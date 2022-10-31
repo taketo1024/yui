@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Sano"
+  given-names: "Taketo"
+  orcid: "0000-0001-9450-1380"
+title: "YUI"
+version: 0.0.0
+date-released: 2022-10-31
+url: "https://github.com/taketo1024/yui"

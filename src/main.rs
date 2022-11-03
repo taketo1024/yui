@@ -1,3 +1,8 @@
+mod links;
+
+use links::Link;
+
 fn main() {
-    println!("Hello, world!");
+    let l = Link::new();
+    println!("{:?}", l);
 }

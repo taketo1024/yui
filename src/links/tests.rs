@@ -96,3 +96,37 @@ fn test_crossing_pass() {
     assert_eq!(c.pass(2), 3);
     assert_eq!(c.pass(3), 2);
 }
+
+#[test]
+fn test_empty_link() { 
+    let l = Link::empty();
+    assert_eq!(l.data.len(), 0);
+}
+
+#[test]
+fn test_link_from_pd_code() { 
+    let pd_code = [[1,2,3,4]];
+    let l = Link::new(&pd_code);
+    assert_eq!(l.data.len(), 1);
+    assert_eq!(l.data[0].ctype, Xn);
+}
+
+#[test]
+fn test_link_is_empty() {
+    let l = Link::empty();
+    assert!(l.is_empty());
+
+    let pd_code = [[1,2,3,4]];
+    let l = Link::new(&pd_code);
+    assert!(!l.is_empty());
+}
+
+#[test]
+fn test_link_crossing_num() {
+    let l = Link::empty();
+    assert_eq!(l.crossing_num(), 0);
+
+    let pd_code = [[1,2,3,4]];
+    let l = Link::new(&pd_code);
+    assert_eq!(l.crossing_num(), 1);
+}

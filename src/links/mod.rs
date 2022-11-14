@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use CrossingType::{Xp, Xn, V, H};
 use Resolution::{Res0, Res1};
 
@@ -28,6 +30,7 @@ impl CrossingType {
     }
 }
 
+#[derive(Debug, PartialEq)]
 struct Crossing { 
     ctype: CrossingType,
     edges: [Edge; 4]
@@ -69,14 +72,50 @@ impl Crossing {
     }
 }
 
+// Planer Diagram code, represented by crossings:
+//
+//     3   2
+//      \ /
+//       \      = (0, 1, 2, 3)
+//      / \
+//     0   1
+//
+// The lower edge has direction 0 -> 2.
+// The crossing is +1 if the upper goes 3 -> 1.
+// see: http://katlas.math.toronto.edu/wiki/Planar_Diagrams
+
 #[derive(Debug)]
 pub struct Link { 
-
+    data: Vec<Crossing>
 }
 
 impl Link {
-    pub fn new() -> Link { 
-        Link{}
+    pub fn empty() -> Link {
+        Link { data: vec![] }
+    }
+
+    pub fn new(pd_code: &[[Edge; 4]]) -> Link { 
+        let data = pd_code
+            .iter()
+            .map( |x| 
+                Crossing { 
+                    ctype: Xn,
+                    edges: *x
+                }
+            )
+            .collect();
+
+        Link{ data }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+
+    pub fn crossing_num(&self) -> usize { 
+        self.data.iter()
+            .filter(|x| !x.is_resolved())
+            .count()
     }
 }
 

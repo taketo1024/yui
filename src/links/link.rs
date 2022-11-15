@@ -55,19 +55,14 @@ impl Crossing {
         self.ctype = self.ctype.mirror();
     }
 
-    fn pass(&self, index:usize) -> Edge { 
+    fn pass(&self, index:usize) -> usize { 
         debug_assert!((0..4).contains(&index));
 
-        fn next(ctype: CrossingType, j: usize) -> usize { 
-            match ctype {
-                Xp | Xn => (j + 2) % 4,
-                V => 3 - j,
-                H => (5 - j) % 4
-            }
+        match self.ctype {
+            Xp | Xn => (index + 2) % 4,
+            V => 3 - index,
+            H => (5 - index) % 4
         }
-
-        let ctype = self.ctype;
-        self.edges[ next(ctype, index) ]
     }
 }
 
@@ -115,6 +110,84 @@ impl Link {
         self.data.iter()
             .filter(|x| !x.is_resolved())
             .count()
+    }
+
+    pub fn writhe(&self) -> i8 { 
+        self.crossing_signs().iter().sum()
+    }
+
+    fn next(&self, c_index:usize, e_index:usize) -> Option<(usize, usize)> {
+        let n = self.data.len();
+        debug_assert!((0..n).contains(&c_index));
+        debug_assert!((0..4).contains(&e_index));
+
+        let e = &self.data[c_index].edges[e_index];
+
+        for (i, c) in self.data.iter().enumerate() { 
+            for (j, f) in c.edges.iter().enumerate() { 
+                if e == f && (c_index != i || (c_index == i && e_index != j)) { 
+                    return Some((i, j))
+                }
+            }
+        }
+        None
+    }
+
+    fn traverse_edges<F>(&self, c_index:usize, e_index:usize, mut f:F) where
+        F: FnMut(usize, usize)
+    {
+        let n = self.data.len();
+        debug_assert!((0..n).contains(&c_index));
+        debug_assert!((0..4).contains(&e_index));
+
+        let mut i = c_index;
+        let mut j = e_index;
+
+        loop {
+            f(i, j);
+
+            let c = &self.data[i];
+            let k = c.pass(j);
+            
+            if let Some(next) = self.next(i, k) { 
+                if next != (c_index, e_index) {
+                    (i, j) = next;
+                    continue
+                } else {
+                    f(c_index, e_index); // final call
+                }
+            }
+            break
+        }
+    }
+
+    fn crossing_signs(&self) -> Vec<i8> {
+        let n = self.data.len();
+        let mut signs = vec![0; n];
+
+        let mut traverse = |e0: usize| {
+            for i0 in 0..n {
+                if signs[i0] != 0 { 
+                    continue 
+                }
+                self.traverse_edges(i0, e0, |i, j| { 
+                    let c = &self.data[i];
+                    let sign = match (c.ctype, j) { 
+                        (Xp, 1) | (Xn, 3) =>  1,
+                        (Xp, 3) | (Xn, 1) => -1,
+                        _ => 0
+                    };
+                    if sign != 0 {
+                        signs[i] = sign;
+                    }
+                })
+            }
+        };
+
+        traverse(0);
+        traverse(1); // in case 
+
+        signs
     }
 }
 

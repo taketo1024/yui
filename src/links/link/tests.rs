@@ -130,3 +130,65 @@ fn test_link_crossing_num() {
     let l = Link::new(&pd_code);
     assert_eq!(l.crossing_num(), 1);
 }
+
+#[test]
+fn test_link_next() {
+    let pd_code = [[0,0,1,1]];
+    let l = Link::new(&pd_code);
+
+    assert_eq!(l.next(0, 0), Some((0, 1)));
+    assert_eq!(l.next(0, 1), Some((0, 0)));
+    assert_eq!(l.next(0, 2), Some((0, 3)));
+    assert_eq!(l.next(0, 3), Some((0, 2)));
+
+    let pd_code = [[0,3,1,4],[3,2,2,1]];
+    let l = Link::new(&pd_code);
+
+    assert_eq!(l.next(0, 0), None);
+    assert_eq!(l.next(0, 2), Some((1, 3)));
+    assert_eq!(l.next(1, 1), Some((1, 2)));
+    assert_eq!(l.next(1, 0), Some((0, 1)));
+    assert_eq!(l.next(0, 3), None);
+}
+
+#[test]
+fn test_link_traverse() {
+    let pd_code = [[0,0,1,1]];
+    let l = Link::new(&pd_code);
+
+    let mut queue = vec![];
+    l.traverse_edges(0, 0, |i, j| queue.push((i, j)));
+    
+    assert_eq!(queue, [(0, 0), (0, 3), (0, 0)]); // loop
+
+    let pd_code = [[0,3,1,4],[3,2,2,1]];
+    let l = Link::new(&pd_code);
+
+    let mut queue = vec![];
+    l.traverse_edges(0, 0, |i, j| queue.push((i, j)));
+    
+    assert_eq!(queue, [(0, 0), (1, 3), (1, 2), (0, 1)]); // no loop
+}
+
+#[test]
+fn test_link_crossing_signs() {
+    let pd_code = [[0,0,1,1]];
+    let l = Link::new(&pd_code);
+    assert_eq!(l.crossing_signs(), vec![1]);
+
+    let pd_code = [[0,1,1,0]];
+    let l = Link::new(&pd_code);
+    assert_eq!(l.crossing_signs(), vec![-1]);
+}
+
+#[test]
+fn test_link_writhe() {
+    let pd_code = [[0,0,1,1]];
+    let l = Link::new(&pd_code);
+    assert_eq!(l.writhe(), 1);
+
+    let pd_code = [[0,1,1,0]];
+    let l = Link::new(&pd_code);
+    assert_eq!(l.writhe(), -1);
+}
+

@@ -1,6 +1,3 @@
-use std::collections::HashSet;
-
-use CrossingType::{Xp, Xn, V, H};
 use Resolution::{Res0, Res1};
 
 type Edge = u8;
@@ -14,6 +11,8 @@ enum Resolution {
 struct State { 
     res: Vec<Resolution>
 }
+
+use CrossingType::{Xp, Xn, V, H};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum CrossingType { 

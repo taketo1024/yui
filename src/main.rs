@@ -1,8 +1,6 @@
-mod links;
-
-use links::Link;
+use yui::links::Link;
 
 fn main() {
-    let l = Link::new();
+    let l = Link::empty();
     println!("{:?}", l);
 }

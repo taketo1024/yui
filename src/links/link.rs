@@ -1,70 +1,6 @@
+use std::collections::HashSet;
 use Resolution::{Res0, Res1};
-
-type Edge = u8;
-
-#[derive(Debug, PartialEq)]
-enum Resolution { 
-    Res0, Res1
-}
-
-#[derive(Debug, PartialEq)]
-struct State { 
-    res: Vec<Resolution>
-}
-
 use CrossingType::{Xp, Xn, V, H};
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum CrossingType { 
-    Xp, Xn, V, H 
-}
-
-impl CrossingType { 
-    fn mirror(self) -> CrossingType {
-        match self { 
-            Xp => Xn,
-            Xn => Xp, 
-            other => other
-        }
-    }
-}
-
-#[derive(Debug, PartialEq)]
-struct Crossing { 
-    ctype: CrossingType,
-    edges: [Edge; 4]
-}
-
-impl Crossing {
-    fn is_resolved(&self) -> bool { 
-        match self.ctype { 
-            V | H => true,
-            _ => false
-        }
-    }
-
-    fn resolve(&mut self, r: Resolution) {
-        match (self.ctype, r) {
-            (Xp, Res0) | (Xn, Res1) => self.ctype = V,
-            (Xp, Res1) | (Xn, Res0) => self.ctype = H,
-            _ => panic!()
-        }
-    }
-
-    fn mirror(&mut self) { 
-        self.ctype = self.ctype.mirror();
-    }
-
-    fn pass(&self, index:usize) -> usize { 
-        debug_assert!((0..4).contains(&index));
-
-        match self.ctype {
-            Xp | Xn => (index + 2) % 4,
-            V => 3 - index,
-            H => (5 - index) % 4
-        }
-    }
-}
 
 // Planer Diagram code, represented by crossings:
 //
@@ -78,7 +14,7 @@ impl Crossing {
 // The crossing is +1 if the upper goes 3 -> 1.
 // see: http://katlas.math.toronto.edu/wiki/Planar_Diagrams
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Link { 
     data: Vec<Crossing>
 }
@@ -116,6 +52,54 @@ impl Link {
         self.crossing_signs().iter().sum()
     }
 
+    pub fn components(&self) -> Vec<Component> {
+        let n = self.data.len();
+
+        let mut comps = vec![];
+        let mut passed = HashSet::new();
+
+        let mut traverse = |e0: usize| {
+            for i0 in 0..n {
+                let start_edge = self.data[i0].edges[e0];
+                if passed.contains(&start_edge) { 
+                    continue 
+                }
+
+                let mut edges = vec![];
+                let mut closed = false;
+
+                self.traverse_edges(i0, e0, |i, j| { 
+                    let edge = self.data[i].edges[j];
+                    if edges.first() == Some(&edge) { 
+                        closed = true;
+                    } else { 
+                        edges.push(edge);
+                        passed.insert(edge);
+                    }
+                });
+
+                let comp = Component{edges, closed};
+                comps.push(comp);
+            }
+        };
+
+        traverse(0);
+        traverse(1); // in case 
+
+        // TODO: connect non-closed comps
+
+        comps
+    }
+
+    pub fn mirror(&mut self) {
+        for c in &mut self.data { 
+            c.mirror()
+        }
+        // self
+    }
+
+    // -- internal methods -- //
+    
     fn next(&self, c_index:usize, e_index:usize) -> Option<(usize, usize)> {
         let n = self.data.len();
         debug_assert!((0..n).contains(&c_index));
@@ -156,6 +140,8 @@ impl Link {
                 } else {
                     f(c_index, e_index); // final call
                 }
+            } else { 
+                f(i, k); // end edge
             }
             break
         }
@@ -189,6 +175,72 @@ impl Link {
 
         signs
     }
+}
+
+pub type State = Vec<Resolution>;
+pub type Edge = u8;
+
+#[derive(Debug, PartialEq)]
+pub enum Resolution { 
+    Res0, Res1
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum CrossingType { 
+    Xp, Xn, V, H 
+}
+
+impl CrossingType { 
+    fn mirror(self) -> CrossingType {
+        match self { 
+            Xp => Xn,
+            Xn => Xp, 
+            other => other
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct Crossing { 
+    ctype: CrossingType,
+    edges: [Edge; 4]
+}
+
+impl Crossing {
+    fn is_resolved(&self) -> bool { 
+        match self.ctype { 
+            V | H => true,
+            _ => false
+        }
+    }
+
+    fn resolve(&mut self, r: Resolution) {
+        match (self.ctype, r) {
+            (Xp, Res0) | (Xn, Res1) => self.ctype = V,
+            (Xp, Res1) | (Xn, Res0) => self.ctype = H,
+            _ => panic!()
+        }
+    }
+
+    fn mirror(&mut self) { 
+        self.ctype = self.ctype.mirror();
+    }
+
+    fn pass(&self, index:usize) -> usize { 
+        debug_assert!((0..4).contains(&index));
+
+        match self.ctype {
+            Xp | Xn => (index + 2) % 4,
+            V => 3 - index,
+            H => (5 - index) % 4
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Component { 
+    edges:Vec<Edge>,
+    closed:bool
 }
 
 #[cfg(test)]

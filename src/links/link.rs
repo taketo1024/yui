@@ -24,20 +24,6 @@ impl Link {
         Link { data: vec![] }
     }
 
-    pub fn new(pd_code: &[[Edge; 4]]) -> Link { 
-        let data = pd_code
-            .iter()
-            .map( |x| 
-                Crossing { 
-                    ctype: Xn,
-                    edges: *x
-                }
-            )
-            .collect();
-
-        Link{ data }
-    }
-
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
@@ -95,7 +81,20 @@ impl Link {
         for c in &mut self.data { 
             c.mirror()
         }
-        // self
+    }
+
+    pub fn resolve_at(&mut self, i: usize, r: Resolution) {
+        let c = &mut self.data[i];
+        c.resolve(r);
+    }
+
+    pub fn resolve(&mut self, s: State) {
+        let n = self.data.len();
+        debug_assert_eq!(n, s.len());
+
+        for (i, r) in s.into_iter().enumerate() {
+            self.resolve_at(i, r);
+        }
     }
 
     // -- internal methods -- //
@@ -174,6 +173,22 @@ impl Link {
         traverse(1); // in case 
 
         signs
+    }
+}
+
+impl<const N: usize> From<[[Edge; 4]; N]> for Link { 
+    fn from(pd_code: [[Edge; 4]; N]) -> Link { 
+        let data = pd_code
+            .into_iter()
+            .map( |x| 
+                Crossing { 
+                    ctype: Xn,
+                    edges: x
+                }
+            )
+            .collect();
+
+        Link{ data }
     }
 }
 

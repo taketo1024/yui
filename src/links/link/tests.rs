@@ -213,7 +213,7 @@ fn test_2comp_unlink() {
 }
 
 #[test]
-fn test_mirror() { 
+fn test_link_mirror() { 
     let pd_code = [[0,0,1,1]];
     let mut l = Link::from(pd_code);
     assert_eq!(l.data[0].ctype, Xn);
@@ -221,4 +221,23 @@ fn test_mirror() {
     l.mirror();
 
     assert_eq!(l.data[0].ctype, Xp);
+}
+
+#[test]
+fn test_link_resolve() {
+    let mut l = Link::from([[1,4,2,5],[3,6,4,1],[5,2,6,3]]); // trefoil
+    let s = State::from([0, 0, 0]);
+    l.resolve(s);
+
+    let comps = l.components();
+    assert_eq!(comps.len(), 3);
+    assert!(comps.iter().all(|c| c.closed));
+
+    let mut l = Link::from([[1,4,2,5],[3,6,4,1],[5,2,6,3]]); // trefoil
+    let s = State::from([1, 1, 1]);
+    l.resolve(s);
+
+    let comps = l.components();
+    assert_eq!(comps.len(), 2);
+    assert!(comps.iter().all(|c| c.closed));
 }

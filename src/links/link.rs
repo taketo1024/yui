@@ -92,7 +92,7 @@ impl Link {
         let n = self.data.len();
         debug_assert_eq!(n, s.len());
 
-        for (i, r) in s.into_iter().enumerate() {
+        for (i, r) in s.values.into_iter().enumerate() {
             self.resolve_at(i, r);
         }
     }
@@ -192,12 +192,39 @@ impl<const N: usize> From<[[Edge; 4]; N]> for Link {
     }
 }
 
-pub type State = Vec<Resolution>;
 pub type Edge = u8;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Resolution { 
     Res0, Res1
+}
+
+impl From<u8> for Resolution {
+    fn from(a: u8) -> Self {
+        match a { 
+            0 => Res0,
+            1 => Res1,
+            _ => panic!()
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct State { 
+    values: Vec<Resolution>
+}
+
+impl State { 
+    pub fn len(&self) -> usize { 
+        self.values.len()
+    }
+}
+
+impl<const N: usize> From<[u8; N]> for State {
+    fn from(values: [u8; N]) -> Self {
+        let values = values.into_iter().map(|v| Resolution::from(v)).collect();
+        Self { values }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

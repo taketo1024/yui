@@ -1,10 +1,10 @@
-use num_traits::{One, Zero};
+use num_traits::{One, Zero, Pow};
 use std::ops::{Add, Mul, Neg, Sub};
 use std::{fmt, cmp};
 use polynomial::Polynomial;
 
 #[derive(Eq, PartialEq, Clone, Debug)]
-struct LaurentPolynomial<T> {
+pub struct LaurentPolynomial<T> {
     polynomial: Polynomial<T>,
     base_degree: isize
 }
@@ -15,6 +15,16 @@ impl<T: Zero> LaurentPolynomial<T> {
         // TODO truncate front
         let polynomial = Polynomial::new(data);
         Self { polynomial, base_degree }
+    }
+
+    pub fn constant(a: T) -> Self { 
+        LaurentPolynomial::new(vec![a], 0)
+    }
+}
+
+impl<T:One + Zero> LaurentPolynomial<T> { 
+    pub fn variable() -> LaurentPolynomial<T> {
+        LaurentPolynomial::new(vec![T::one()], 1)
     }
 }
 
@@ -169,6 +179,22 @@ impl<'a, 'b, Lhs, Rhs> Mul<&'b LaurentPolynomial<Rhs>> for &'a LaurentPolynomial
     }
 }
 
+// TODO use macro
+
+impl <T> Pow<i32> for &LaurentPolynomial<T> 
+where
+    T: Zero + One + Mul<T> + Clone
+{
+    type Output = LaurentPolynomial<<T as Mul<T>>::Output>;
+
+    fn pow(self, rhs: i32) -> Self::Output {
+        assert!(rhs >= 0);
+        (0..rhs).fold(LaurentPolynomial::one(), |p, _| {
+            p * self
+        })
+    }
+}
+
 impl<T: Zero + Clone> Zero for LaurentPolynomial<T> {
     #[inline]
     fn zero() -> Self {
@@ -208,7 +234,7 @@ fn shift<T>(polynomial: &Polynomial<T>, degree: isize) -> Polynomial<T> where
 
 #[cfg(test)]
 mod tests { 
-    use num_traits::{One, Zero};
+    use num_traits::{One, Zero, Pow};
     use super::LaurentPolynomial;
 
     #[test]
@@ -274,6 +300,14 @@ mod tests {
         let p = LaurentPolynomial::new(vec![1,2,3], -1);
         let q = LaurentPolynomial::new(vec![-1,3], 1);
         assert_eq!(p - q, LaurentPolynomial::new(vec![1,2,4,-3], -1));
+    }
+
+    #[test]
+    fn pow() { 
+        let p = LaurentPolynomial::new(vec![1,1], 0);
+        assert_eq!(p.pow(0), LaurentPolynomial::one());
+        assert_eq!(p.pow(1), p);
+        assert_eq!(p.pow(2), LaurentPolynomial::new(vec![1,2,1], 0));
     }
 
     #[test]

@@ -1,4 +1,6 @@
 use std::collections::HashSet;
+use std::fmt;
+use itertools::join;
 use Resolution::{Res0, Res1};
 use CrossingType::{Xp, Xn, V, H};
 
@@ -24,17 +26,42 @@ impl Link {
         Link { data: vec![] }
     }
 
+    pub fn unknot() -> Link { 
+        let mut u = Link::from([[0, 1, 1, 0]]);
+        u.resolve_at(0, &Res0);
+        u
+    }
+
+    pub fn trefoil() -> Link { 
+        Link::from([[1,4,2,5],[3,6,4,1],[5,2,6,3]])
+    }
+
+    pub fn figure8() -> Link { 
+        Link::from([[4,2,5,1],[8,6,1,5],[6,3,7,4],[2,7,3,8]])
+    }
+
+    pub fn hopf_link() -> Link { 
+        Link::from([[4,1,3,2],[2,3,1,4]])
+    }
+
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
 
-    pub fn crossing_num(&self) -> usize { 
+    pub fn crossing_num(&self) -> u32 { 
         self.data.iter()
             .filter(|x| !x.is_resolved())
-            .count()
+            .count() as u32
     }
 
-    pub fn writhe(&self) -> i8 { 
+    pub fn signed_crossing_nums(&self) -> (u32, u32) {
+        let signs = self.crossing_signs();
+        let pos = signs.iter().filter(|e| e.is_positive()).count() as u32;
+        let neg = signs.iter().filter(|e| e.is_negative()).count() as u32;
+        (pos, neg)
+    }
+
+    pub fn writhe(&self) -> i32 { 
         self.crossing_signs().iter().sum()
     }
 
@@ -42,7 +69,7 @@ impl Link {
         let n = self.data.len();
 
         let mut comps = vec![];
-        let mut passed = HashSet::new();
+        let mut passed: HashSet<Edge> = HashSet::new();
 
         let mut traverse = |e0: usize| {
             for i0 in 0..n {
@@ -69,10 +96,9 @@ impl Link {
             }
         };
 
-        traverse(0);
-        traverse(1); // in case 
-
-        // TODO: connect non-closed comps
+        for i in [0, 1, 2] { 
+            traverse(i);
+        }
 
         comps
     }
@@ -83,16 +109,15 @@ impl Link {
         }
     }
 
-    pub fn resolve_at(&mut self, i: usize, r: Resolution) {
+    pub fn resolve_at(&mut self, i: usize, r: &Resolution) {
+        debug_assert!(i < self.data.len());
         let c = &mut self.data[i];
         c.resolve(r);
     }
 
-    pub fn resolve(&mut self, s: State) {
-        let n = self.data.len();
-        debug_assert_eq!(n, s.len());
-
-        for (i, r) in s.values.into_iter().enumerate() {
+    pub fn resolve(&mut self, s: &State) {
+        debug_assert!(s.len() <= self.data.len());
+        for (i, r) in s.values.iter().enumerate() {
             self.resolve_at(i, r);
         }
     }
@@ -146,7 +171,7 @@ impl Link {
         }
     }
 
-    fn crossing_signs(&self) -> Vec<i8> {
+    fn crossing_signs(&self) -> Vec<i32> {
         let n = self.data.len();
         let mut signs = vec![0; n];
 
@@ -223,7 +248,7 @@ impl Crossing {
         }
     }
 
-    fn resolve(&mut self, r: Resolution) {
+    fn resolve(&mut self, r: &Resolution) {
         match (self.ctype, r) {
             (Xp, Res0) | (Xn, Res1) => self.ctype = V,
             (Xp, Res1) | (Xn, Res0) => self.ctype = H,
@@ -257,8 +282,17 @@ pub enum Resolution {
     Res0, Res1
 }
 
-impl From<u8> for Resolution {
-    fn from(a: u8) -> Self {
+impl Resolution { 
+    pub fn weight(&self) -> u32 {
+        match self { 
+            Res0 => 0,
+            Res1 => 1
+        }
+    }
+}
+
+impl From<&u8> for Resolution {
+    fn from(a: &u8) -> Self {
         match a { 
             0 => Res0,
             1 => Res1,
@@ -267,12 +301,41 @@ impl From<u8> for Resolution {
     }
 }
 
+impl fmt::Display for Resolution {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.weight())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct State { 
     values: Vec<Resolution>
 }
 
+impl From<Vec<u8>> for State { 
+    fn from(seq: Vec<u8>) -> Self {
+        let values = seq.iter().map(|a| Resolution::from(a)).collect();
+        State{ values }
+    }
+}
+
 impl State { 
+    pub fn from_bseq(mut bseq: u32, length: u32) -> Self {
+        let seq = (0..length)
+            .map(|_| {
+                let a = (bseq & 1) as u8;
+                bseq >>= 1;
+                Resolution::from(&a)
+            })
+            .rev()
+            .collect();
+        State{ values: seq }
+    }
+
+    pub fn weight(&self) -> u32 { 
+        self.values.iter().map(|r| r.weight()).sum()
+    }
+    
     pub fn len(&self) -> usize { 
         self.values.len()
     }
@@ -280,10 +343,17 @@ impl State {
 
 impl<const N: usize> From<[u8; N]> for State {
     fn from(values: [u8; N]) -> Self {
-        let values = values.into_iter().map(|v| Resolution::from(v)).collect();
+        let values = values.iter().map(|v| Resolution::from(v)).collect();
         Self { values }
     }
 }
+
+impl fmt::Display for State {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "[{}]", join(self.values.iter(), ", "))
+    }
+}
+
 
 #[cfg(test)]
 mod tests { 
@@ -299,7 +369,7 @@ mod tests {
     }
 
     #[test]
-    fn test_crossing_is_resolved() {
+    fn crossing_is_resolved() {
         let c = a_crossing(Xp);
         assert!(!c.is_resolved());
 
@@ -314,34 +384,34 @@ mod tests {
     }
 
     #[test]
-    fn test_crossing_resolve() {
+    fn crossing_resolve() {
         let mut c = a_crossing(Xp);
         
-        c.resolve(Res0);
+        c.resolve(&Res0);
         assert!(c.is_resolved());
         assert_eq!(c.ctype, V);
 
         let mut c = a_crossing(Xp);
         
-        c.resolve(Res1);
+        c.resolve(&Res1);
         assert!(c.is_resolved());
         assert_eq!(c.ctype, H);
 
         let mut c = a_crossing(Xn);
         
-        c.resolve(Res0);
+        c.resolve(&Res0);
         assert!(c.is_resolved());
         assert_eq!(c.ctype, H);
 
         let mut c = a_crossing(Xn);
         
-        c.resolve(Res1);
+        c.resolve(&Res1);
         assert!(c.is_resolved());
         assert_eq!(c.ctype, V);
     }
 
     #[test]
-    fn test_crossing_mirror() {
+    fn crossing_mirror() {
         let mut c = a_crossing(Xp);
         c.mirror();
         assert_eq!(c.ctype, Xn);
@@ -360,7 +430,7 @@ mod tests {
     }
 
     #[test]
-    fn test_crossing_pass() {
+    fn crossing_pass() {
         let c = a_crossing(Xp);
         assert_eq!(c.pass(0), 2);
         assert_eq!(c.pass(1), 3);
@@ -387,13 +457,13 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_link() { 
-        let l = Link::empty();
+    fn link_init() { 
+        let l = Link { data: vec![] };
         assert_eq!(l.data.len(), 0);
     }
 
     #[test]
-    fn test_link_from_pd_code() { 
+    fn link_from_pd_code() { 
         let pd_code = [[1,2,3,4]];
         let l = Link::from(pd_code);
         assert_eq!(l.data.len(), 1);
@@ -401,7 +471,7 @@ mod tests {
     }
 
     #[test]
-    fn test_link_is_empty() {
+    fn link_is_empty() {
         let l = Link::empty();
         assert!(l.is_empty());
 
@@ -411,7 +481,7 @@ mod tests {
     }
 
     #[test]
-    fn test_link_crossing_num() {
+    fn link_crossing_num() {
         let l = Link::empty();
         assert_eq!(l.crossing_num(), 0);
 
@@ -421,7 +491,7 @@ mod tests {
     }
 
     #[test]
-    fn test_link_next() {
+    fn link_next() {
         let pd_code = [[0,0,1,1]];
         let l = Link::from(pd_code);
 
@@ -441,7 +511,7 @@ mod tests {
     }
 
     #[test]
-    fn test_link_traverse() {
+    fn link_traverse() {
         let pd_code = [[0,0,1,1]];
         let l = Link::from(pd_code);
         let mut queue = vec![];
@@ -458,7 +528,7 @@ mod tests {
     }
 
     #[test]
-    fn test_link_crossing_signs() {
+    fn link_crossing_signs() {
         let pd_code = [[0,0,1,1]];
         let l = Link::from(pd_code);
         assert_eq!(l.crossing_signs(), vec![1]);
@@ -469,7 +539,7 @@ mod tests {
     }
 
     #[test]
-    fn test_link_writhe() {
+    fn link_writhe() {
         let pd_code = [[0,0,1,1]];
         let l = Link::from(pd_code);
         assert_eq!(l.writhe(), 1);
@@ -480,7 +550,7 @@ mod tests {
     }
 
     #[test]
-    fn test_components() {
+    fn link_components() {
         let pd_code = [[0,0,1,1]];
         let l = Link::from(pd_code);
         let comps = l.components();
@@ -493,16 +563,7 @@ mod tests {
     }
 
     #[test]
-    fn test_2comp_unlink() {
-        let pd_code = [[1,2,3,4], [3,2,1,4]];
-        let l = Link::from(pd_code);
-        assert_eq!(l.crossing_num(), 2);
-        assert_eq!(l.crossing_signs(), [-1, 1]);
-        assert_eq!(l.writhe(), 0);
-    }
-
-    #[test]
-    fn test_link_mirror() { 
+    fn link_mirror() { 
         let pd_code = [[0,0,1,1]];
         let mut l = Link::from(pd_code);
         assert_eq!(l.data[0].ctype, Xn);
@@ -513,10 +574,10 @@ mod tests {
     }
 
     #[test]
-    fn test_link_resolve() {
+    fn link_resolve() {
         let mut l = Link::from([[1,4,2,5],[3,6,4,1],[5,2,6,3]]); // trefoil
         let s = State::from([0, 0, 0]);
-        l.resolve(s);
+        l.resolve(&s);
 
         let comps = l.components();
         assert_eq!(comps.len(), 3);
@@ -524,10 +585,61 @@ mod tests {
 
         let mut l = Link::from([[1,4,2,5],[3,6,4,1],[5,2,6,3]]); // trefoil
         let s = State::from([1, 1, 1]);
-        l.resolve(s);
+        l.resolve(&s);
 
         let comps = l.components();
         assert_eq!(comps.len(), 2);
         assert!(comps.iter().all(|c| c.closed));
     }
+
+    #[test]
+    fn empty_link() {
+        let l = Link::empty();
+        assert_eq!(l.crossing_num(), 0);
+        assert_eq!(l.writhe(), 0);
+        assert_eq!(l.components().len(), 0);
+    }
+
+    #[test]
+    fn unknot() { 
+        let l = Link::unknot();
+        assert_eq!(l.crossing_num(), 0);
+        assert_eq!(l.writhe(), 0);
+        assert_eq!(l.components().len(), 1);
+    }
+
+    #[test]
+    fn trefoil() { 
+        let l = Link::trefoil();
+        assert_eq!(l.crossing_num(), 3);
+        assert_eq!(l.writhe(), -3);
+        assert_eq!(l.components().len(), 1);
+    }
+
+    #[test]
+    fn figure8() { 
+        let l = Link::figure8();
+        assert_eq!(l.crossing_num(), 4);
+        assert_eq!(l.writhe(), 0);
+        assert_eq!(l.components().len(), 1);
+    }
+
+    #[test]
+    fn hopf_link() { 
+        let l = Link::hopf_link();
+        assert_eq!(l.crossing_num(), 2);
+        assert_eq!(l.writhe(), -2);
+        assert_eq!(l.components().len(), 2);
+    }
+
+    #[test]
+    fn unlink_2() {
+        let pd_code = [[1,2,3,4], [3,2,1,4]];
+        let l = Link::from(pd_code);
+        assert_eq!(l.crossing_num(), 2);
+        assert_eq!(l.writhe(), 0);
+        assert_eq!(l.components().len(), 2);
+    }
+
+
 }

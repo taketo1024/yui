@@ -14,7 +14,7 @@ pub trait ChainComplex {
     fn hdeg_range(&self) -> RangeInclusive<isize>;
     fn in_hdeg_range(&self, k: isize) -> bool { self.hdeg_range().contains(&k) }
     fn generators(&self, k: isize) -> &Vec<Self::Generator>;
-    fn rank(&self, k: isize) -> u32 { self.generators(k).len() as u32 } 
+    fn rank(&self, k: isize) -> u32 { if self.in_hdeg_range(k) { self.generators(k).len() as u32 } else { 0 } } 
 
     fn d_degree(&self) -> isize { 1 } 
     fn d_matrix(&self, k: isize) -> &CsMat<Self::R>;
@@ -68,9 +68,6 @@ pub trait ChainComplex {
         let d1 = self.d_matrix(k);
         let d2 = self.d_matrix(k + self.d_degree());
         let res = d2 * d1;
-
-        println!("{res:?}");
-
         assert!( res.data().iter().all(|a| a.is_zero()) );
     }
 
@@ -158,6 +155,26 @@ mod tests {
     }
 
     #[test]
+    fn empty_complex() {
+        let c: SimpleChainComplex<X, i32> = SimpleChainComplex { 
+            generators: vec![
+                gens(0..0),
+                gens(0..0),
+                gens(0..0),
+            ],
+            d_matrices: vec![
+                mat((0, 0), vec![]),
+                mat((0, 0), vec![]),
+                mat((0, 0), vec![]),
+            ],
+            d_degree: -1
+        };
+
+        assert_eq!(c.hdeg_range(), 0..=2);
+        assert_eq!(c.d_degree(), -1);
+    }
+
+    #[test]
     fn complex_d3() {
         let c: SimpleChainComplex<X, i32> = SimpleChainComplex { 
             generators: vec![
@@ -174,6 +191,15 @@ mod tests {
             ],
             d_degree: -1
         };
+
+        assert_eq!(c.hdeg_range(), 0..=3);
+        assert_eq!(c.d_degree(), -1);
+        
+        assert_eq!(c.rank(0), 4);
+        assert_eq!(c.rank(1), 6);
+        assert_eq!(c.rank(2), 4);
+        assert_eq!(c.rank(3), 1);
+
         c.check_d_all();
     }
 
@@ -192,6 +218,14 @@ mod tests {
             ],
             d_degree: -1
         };
+
+        assert_eq!(c.hdeg_range(), 0..=2);
+        assert_eq!(c.d_degree(), -1);
+        
+        assert_eq!(c.rank(0), 9);
+        assert_eq!(c.rank(1), 27);
+        assert_eq!(c.rank(2), 18);
+
         c.check_d_all();
     }
 
@@ -211,6 +245,14 @@ mod tests {
             ],
             d_degree: -1
         };
+
+        assert_eq!(c.hdeg_range(), 0..=2);
+        assert_eq!(c.d_degree(), -1);
+        
+        assert_eq!(c.rank(0), 6);
+        assert_eq!(c.rank(1), 15);
+        assert_eq!(c.rank(2), 10);
+
         c.check_d_all();
     }
 }

@@ -1,6 +1,6 @@
 use num_traits::{Pow, Zero};
 use crate::math::laurent_polynomial::LaurentPolynomial;
-use crate::math::integers::PowMod2;
+use crate::math::traits::PowMod2;
 use crate::links::{Link, State};
 
 pub fn jones_polynomial(l: &Link) -> LaurentPolynomial<i32> {

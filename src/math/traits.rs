@@ -1,5 +1,8 @@
 use is_even::IsEven;
-use num_traits::One;
+use num_traits::{One, Num};
+
+pub trait Ring: Num + Clone + Default + Send + Sync + sprs::MulAcc + std::fmt::Debug {}
+impl Ring for i32 {}
 
 pub trait PowMod2<Rhs> {
     type Output;

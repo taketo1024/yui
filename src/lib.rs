@@ -7,6 +7,7 @@ macro_rules! hashmap {
 }
 
 pub mod math;
+pub mod matrix;
 pub mod homology;
 pub mod links;
 pub mod jones;

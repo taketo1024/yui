@@ -33,9 +33,12 @@ impl Ring for i64 {
 }
 
 pub trait EucRing: Ring + Rem {
+    fn is_divisible(&self, y: Self) -> bool { 
+        (self.clone() % y).is_zero()
+    }
+
     fn gcd(mut x: Self, mut y: Self) -> Self { 
         while !y.is_zero() {
-            let q = x.clone() / y.clone();
             let r = x.clone() % y.clone();
             (x, y) = (y, r);
         }
@@ -58,11 +61,6 @@ pub trait EucRing: Ring + Rem {
             (x, y) = (y, r);
             (s0, s1) = (s1.clone(), s0 - q.clone() * s1);
             (t0, t1) = (t1.clone(), t0 - q.clone() * t1);
-        }
-
-        let u = x.normalizing_unit().0;
-        if !u.is_one() {
-            (x, s0, t0) = (x * u.clone(), s0 * u.clone(), t0 * u.clone());
         }
 
         (x, s0, t0)
@@ -100,6 +98,7 @@ mod tests {
         assert_eq!(d, 2);
     }
 
+    #[test]
     fn test_gcdx_i32() {
         let (a, b) = (240, 46);
         let (d, s, t) = EucRing::gcdx(a, b);

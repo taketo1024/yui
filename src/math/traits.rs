@@ -15,27 +15,21 @@ pub trait Ring: Clone + Default + Send + Sync + Debug + Num + Neg<Output = Self>
     }
 }
 
-// TODO use macro
-
-impl Ring for i32 {
-    fn is_unit(&self) -> bool {
-        self == &1 || self == &-1
-    }
-
-    fn normalizing_unit(&self) -> (Self, Self) {
-        if self >= &0 { (1, 1) } else { (-1, -1) }
-    }
+macro_rules! impl_ring_integer {
+    ($type:ident) => {
+        impl Ring for $type {
+            fn is_unit(&self) -> bool {
+                self == &1 || self == &-1
+            }
+            fn normalizing_unit(&self) -> (Self, Self) {
+                if self >= &0 { (1, 1) } else { (-1, -1) }
+            }
+        }                
+    };
 }
 
-impl Ring for i64 {
-    fn is_unit(&self) -> bool {
-        self == &1 || self == &-1
-    }
-
-    fn normalizing_unit(&self) -> (Self, Self) {
-        if self >= &0 { (1, 1) } else { (-1, -1) }
-    }
-}
+impl_ring_integer!(i32);
+impl_ring_integer!(i64);
 
 pub trait EucRing: Ring + Rem {
     fn is_divisible(&self, y: Self) -> bool { 
@@ -80,17 +74,22 @@ pub trait PowMod2<Rhs> {
     fn pow_mod2(self, rhs: Rhs) -> Self::Output;
 }
 
-// TODO use macro
-
-impl PowMod2<i32> for i32 { 
-    type Output = i32;
-    fn pow_mod2(self, rhs: i32) -> i32 { 
-        match rhs.is_even() {
-            true  => Self::one(),
-            false => self
+macro_rules! impl_powmod2_integer {
+    ($type:ident) => {
+        impl PowMod2<$type> for $type { 
+            type Output = $type;
+            fn pow_mod2(self, rhs: $type) -> $type { 
+                match rhs.is_even() {
+                    true  => Self::one(),
+                    false => self
+                }
+            }
         }
-    }
+    };
 }
+
+impl_powmod2_integer!(i32);
+impl_powmod2_integer!(i64);
 
 #[cfg(test)]
 mod tests { 

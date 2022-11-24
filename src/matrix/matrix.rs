@@ -182,10 +182,6 @@ impl<R> DnsMat<R> where R: Ring {
     fn is_valid_col_index(&self, j: usize) -> bool { 
         (0..self.ncols()).contains(&j)
     }
-
-    fn is_valid_index(&self, i: usize, j: usize) -> bool { 
-        self.is_valid_row_index(i) && self.is_valid_col_index(j)
-    }
 }
 
 impl<R> Add<Self> for DnsMat<R> where R: Ring {

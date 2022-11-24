@@ -1,4 +1,4 @@
-use std::{ops::{Index, Add, Sub, Mul, Neg}};
+use std::{ops::{Index, Add, Sub, Mul, Neg, IndexMut}, cmp::min};
 
 use ndarray::{Array2, s};
 use sprs::{CsMat, TriMat};
@@ -53,6 +53,21 @@ impl<R> DnsMat<R> where R: Ring {
 
     pub fn is_zero(&self) -> bool {
         self.array.iter().all(|a| a.is_zero())
+    }
+
+    pub fn diag(shape: (usize, usize), entries: Vec<R>) -> Self {
+        assert!( entries.len() <= min(shape.0, shape.1) );
+        let mut mat = Self::zero(shape);
+        for (i, a) in entries.into_iter().enumerate() {
+            mat[[i, i]] = a;
+        }
+        mat
+    }
+
+    pub fn is_diag(&self) -> bool { 
+        self.array.indexed_iter().all(|((i, j), a)| 
+            i == j || a.is_zero()
+        )
     }
 
     pub fn to_sparse(&self) -> CsMat<R> {
@@ -214,11 +229,16 @@ impl<R> Mul<Self> for DnsMat<R> where R: Ring {
     }
 }
 
-
 impl<R> Index<[usize; 2]> for DnsMat<R> where R: Ring { 
     type Output = R;
     fn index(&self, index: [usize; 2]) -> &R {
         &self.array[index]
+    }
+}
+
+impl<R> IndexMut<[usize; 2]> for DnsMat<R> where R: Ring {
+    fn index_mut(&mut self, index: [usize; 2]) -> &mut Self::Output {
+        &mut self.array[index]
     }
 }
 

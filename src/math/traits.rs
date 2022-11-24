@@ -7,7 +7,12 @@ use num_traits::{One, Num};
 // TODO split into RingOps
 pub trait Ring: Clone + Default + Send + Sync + Debug + Num + Neg<Output = Self> + sprs::MulAcc + Sum {
     fn is_unit(&self) -> bool;
-    fn normalizing_unit(&self) -> (Self, Self) { (Self::one(), Self::one()) }
+    fn is_normalized(&self) -> bool { 
+        self.normalizing_unit().0.is_one()
+    }
+    fn normalizing_unit(&self) -> (Self, Self) { 
+        (Self::one(), Self::one()) 
+    }
 }
 
 // TODO use macro
@@ -34,7 +39,7 @@ impl Ring for i64 {
 
 pub trait EucRing: Ring + Rem {
     fn is_divisible(&self, y: Self) -> bool { 
-        (self.clone() % y).is_zero()
+        !y.is_zero() && (self.clone() % y).is_zero()
     }
 
     fn gcd(mut x: Self, mut y: Self) -> Self { 

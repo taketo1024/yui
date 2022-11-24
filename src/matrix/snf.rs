@@ -1,4 +1,5 @@
 use core::panic;
+use std::cmp::min;
 
 use crate::math::traits::EucRing;
 use super::DnsMat;
@@ -13,9 +14,9 @@ pub fn snf<R: EucRing>(target: &DnsMat<R>, flags: SnfFlags) -> SnfResult<R> {
 
 pub fn snf_in_place<R: EucRing>(target: DnsMat<R>, flags: SnfFlags) -> SnfResult<R> {
     let mut calc = SnfCalc::new(target, flags);
-    
-    calc.eliminate_all();
 
+    calc.eliminate_all();
+    calc.diag_normalize();
     calc.result()
 }
 
@@ -217,6 +218,59 @@ impl<R: EucRing> SnfCalc<R> {
         modified
     }
     
+    fn diag_normalize(&mut self) {
+        debug_assert!(self.target.is_diag());
+
+        let r = min(self.target.nrows(), self.target.ncols());
+        loop { 
+            let mut done = true;
+            for i in 0..r-1 { 
+                done &= self.diag_normalize_step(i);
+            }
+            if done { break }
+        }
+
+        for i in 0..r { 
+            let a = &self.target[[i, i]];
+            if !a.is_normalized() {
+                let (u, uinv) = a.normalizing_unit();
+                self.mul_row(i, u, uinv);
+            }
+        }
+    }
+
+    fn diag_normalize_step(&mut self, i: usize) -> bool {
+        let x = self.target[[i, i]].clone();
+        let y = self.target[[i + 1, i + 1]].clone();
+
+        if 
+             x.is_zero() && y.is_zero() || 
+            !x.is_zero() && y.clone().is_divisible(x.clone()) 
+        { 
+            return true
+        }
+
+        // sx + ty = d, a = x/d, b = y/d.
+        //
+        // [1   1 ][x   ][s  -b] = [d      ]
+        // [-tb sa][   y][t   a]   [   xy/d]
+
+        let (d, s, t) = Self::gcdx(x.clone(), y.clone());
+        let (a, b) = (x.clone() / d.clone(), y.clone() / d.clone());
+        let (tb, sa) = (t.clone() * b.clone(), s.clone() * a.clone());
+
+        self.left_elementary(
+            [R::one(), R::one(), -tb, sa], 
+            i, i + 1
+        );
+        self.right_elementary(
+            [s, t, -b, a], 
+            i, i + 1
+        );
+
+        false
+    }
+
     fn gcdx(x: R, y: R) -> (R, R, R) { 
         let (mut d, mut s, mut t) = EucRing::gcdx(x.clone(), y);
 
@@ -578,6 +632,32 @@ mod tests {
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
         assert_eq!(res, DnsMat::diag((5, 5), vec![1,1,1,2,60]));
+        assert_eq!(p * a.clone() * q, res);
+        assert_eq!(pinv * res * qinv, a.clone());
+    }
+
+    #[test]
+    fn diag_normalize1() {
+        let a = DnsMat::diag((5, 5), vec![4, 24, -2, 1, 72]);
+        let mut calc = SnfCalc::new(a.clone(), [true; 4]);
+        calc.diag_normalize();
+
+        let (res, trans) = calc.result();
+        let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
+        
+        assert_eq!(p * a.clone() * q, res);
+        assert_eq!(pinv * res * qinv, a.clone());
+    }
+
+    #[test]
+    fn diag_normalize2() {
+        let a = DnsMat::diag((5, 5), vec![0, -3, 54, 92, -4]);
+        let mut calc = SnfCalc::new(a.clone(), [true; 4]);
+        calc.diag_normalize();
+
+        let (res, trans) = calc.result();
+        let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
+        
         assert_eq!(p * a.clone() * q, res);
         assert_eq!(pinv * res * qinv, a.clone());
     }

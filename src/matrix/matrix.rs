@@ -1,6 +1,6 @@
-use std::{ops::{Index, Add, Sub, Mul, Neg}, process::Output};
+use std::{ops::{Index, Add, Sub, Mul, Neg}};
 
-use ndarray::{Array2, s, array};
+use ndarray::{Array2, s};
 use sprs::{CsMat, TriMat};
 use crate::math::traits::Ring;
 

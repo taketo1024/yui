@@ -147,16 +147,18 @@ impl<R: EucRing> SnfCalc<R> {
     fn select_pivot(&self, below_i: usize, j: usize) -> Option<usize> { 
         // find row `i` below `below_i` with minimum nnz. 
         (below_i..self.target.nrows())
+            .filter( |i| !self.target[[*i, j]].is_zero() )
             .map( |i| (i, self.row_nz(i)) )
             .min_by( |e1, e2| e1.1.cmp(&e2.1) )
-            .map( |e| e.0 )
+            .map( |(i, _)| i )
     }
 
     fn eliminate_at(&mut self, i: usize, j: usize) {
         assert!(!self.target[[i, j]].is_zero());
 
         while self.row_nz(i) > 1 || self.col_nz(j) > 1 { 
-            let modified = self.eliminate_row(i, j) || self.eliminate_col(i, j);
+            let modified = self.eliminate_col(i, j)
+                         | self.eliminate_row(i, j);
             if !modified {
                 panic!("Detect endless loop");
             }
@@ -216,14 +218,19 @@ impl<R: EucRing> SnfCalc<R> {
     }
     
     fn gcdx(x: R, y: R) -> (R, R, R) { 
-        let (mut d, mut s, mut t) = EucRing::gcdx(x, y);
+        let (mut d, mut s, mut t) = EucRing::gcdx(x.clone(), y);
 
         let u = d.normalizing_unit().0;
         if !u.is_one() {
             (d, s, t) = (d * u.clone(), s * u.clone(), t * u.clone());
         }
 
-        (d, s, t)
+        let a = x.clone() / d.clone();
+        if a.is_unit() { 
+            (d, a, R::zero())
+        } else {
+            (d, s, t)
+        }
     }
 }
 
@@ -281,15 +288,15 @@ mod tests {
     #[test]
     fn swap_rows() { 
         let a = DnsMat::from(array![[1,2,3], [4,5,6], [7,8,9]]);
-        let mut calc = SnfCalc::new(a, [true; 4]);
+        let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.swap_rows(0, 1);
 
         let (res, trans) = calc.result();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
         assert_eq!(res,  DnsMat::from(array![[4,5,6], [1,2,3], [7,8,9]]));
-        assert_eq!(p,    DnsMat::from(array![[0,1,0], [1,0,0], [0,0,1]]));
-        assert_eq!(pinv, DnsMat::from(array![[0,1,0], [1,0,0], [0,0,1]]));
+        assert_eq!(p * a.clone(), res);
+        assert_eq!(pinv * res, a);
         assert!(q.is_eye());
         assert!(qinv.is_eye());
     }
@@ -297,31 +304,31 @@ mod tests {
     #[test]
     fn swap_cols() { 
         let a = DnsMat::from(array![[1,2,3], [4,5,6], [7,8,9]]);
-        let mut calc = SnfCalc::new(a, [true; 4]);
+        let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.swap_cols(0, 1);
 
         let (res, trans) = calc.result();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
         assert_eq!(res,  DnsMat::from(array![[2,1,3], [5,4,6], [8,7,9]]));
-        assert_eq!(q,    DnsMat::from(array![[0,1,0], [1,0,0], [0,0,1]]));
-        assert_eq!(qinv, DnsMat::from(array![[0,1,0], [1,0,0], [0,0,1]]));
         assert!(p   .is_eye());
         assert!(pinv.is_eye());
+        assert_eq!(a.clone() * q, res);
+        assert_eq!(res * qinv, a);
     }
 
     #[test]
     fn mul_row() { 
         let a = DnsMat::from(array![[1,2,3], [4,5,6], [7,8,9]]);
-        let mut calc = SnfCalc::new(a, [true; 4]);
+        let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.mul_row(0, -1, -1);
         
         let (res, trans) = calc.result();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
         assert_eq!(res,  DnsMat::from(array![[-1,-2,-3], [4,5,6], [7,8,9]]));
-        assert_eq!(p,    DnsMat::from(array![[-1,0,0], [0,1,0], [0,0,1]]));
-        assert_eq!(pinv, DnsMat::from(array![[-1,0,0], [0,1,0], [0,0,1]]));
+        assert_eq!(p * a.clone(), res);
+        assert_eq!(pinv * res, a);
         assert!(q.is_eye());
         assert!(qinv.is_eye());
     }
@@ -329,32 +336,32 @@ mod tests {
     #[test]
     fn mul_col() { 
         let a = DnsMat::from(array![[1,2,3], [4,5,6], [7,8,9]]);
-        let mut calc = SnfCalc::new(a, [true; 4]);
+        let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.mul_col(0, -1, -1);
         
         let (res, trans) = calc.result();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
         assert_eq!(res,  DnsMat::from(array![[-1,2,3], [-4,5,6], [-7,8,9]]));
-        assert_eq!(q,    DnsMat::from(array![[-1,0,0], [0,1,0], [0,0,1]]));
-        assert_eq!(qinv, DnsMat::from(array![[-1,0,0], [0,1,0], [0,0,1]]));
         assert!(p.is_eye());
         assert!(pinv.is_eye());
+        assert_eq!(a.clone() * q, res);
+        assert_eq!(res * qinv, a);
     }
 
     #[test]
     fn left_elementary() { 
         let a = DnsMat::from(array![[1,2,3], [4,5,6], [7,8,9]]);
         let e = [3,2,4,3]; // det = 1
-        let mut calc = SnfCalc::new(a, [true; 4]);
+        let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.left_elementary(e, 0, 1);
 
         let (res, trans) = calc.result();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
         assert_eq!(res,  DnsMat::from(array![[11,16,21], [16,23,30], [7,8,9]]));
-        assert_eq!(p,    DnsMat::from(array![[3,2,0], [4,3,0], [0,0,1]]));
-        assert_eq!(pinv, DnsMat::from(array![[3,-2,0], [-4,3,0], [0,0,1]]));
+        assert_eq!(p * a.clone(), res);
+        assert_eq!(pinv * res, a);
         assert!(q.is_eye());
         assert!(qinv.is_eye());
     }
@@ -363,16 +370,215 @@ mod tests {
     fn right_elementary() { 
         let a = DnsMat::from(array![[1,2,3], [4,5,6], [7,8,9]]);
         let e = [3,2,4,3]; // det = 1
-        let mut calc = SnfCalc::new(a, [true; 4]);
+        let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.right_elementary(e, 0, 1);
 
         let (res, trans) = calc.result();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
         assert_eq!(res,  DnsMat::from(array![[7,10,3], [22,31,6], [37,52,9]]));
-        assert_eq!(q,    DnsMat::from(array![[3,4,0], [2,3,0], [0,0,1]]));
-        assert_eq!(qinv, DnsMat::from(array![[3,-4,0], [-2,3,0], [0,0,1]]));
         assert!(p.is_eye());
         assert!(pinv.is_eye());
+        assert_eq!(a.clone() * q, res);
+        assert_eq!(res * qinv, a);
+    }
+
+    #[test]
+    fn gcdx() {
+        let (x, y) = (14, -52);
+        let (d, s, t) = SnfCalc::gcdx(x, y);
+        assert_eq!(d, 2);
+        assert_eq!(s * x + t * y, d);
+
+        let (x, y) = (2, 52);
+        let (d, s, t) = SnfCalc::gcdx(x, y);
+        assert_eq!(d, 2);
+        assert_eq!(s, 1);
+        assert_eq!(t, 0);
+
+        let (x, y) = (-2, 52);
+        let (d, s, t) = SnfCalc::gcdx(x, y);
+        assert_eq!(d, 2);
+        assert_eq!(s, -1);
+        assert_eq!(t, 0);
+    }
+
+    #[test]
+    fn eliminate_row1() {
+        let a = DnsMat::from(array![[1,2,3], [4,5,6], [7,8,9]]);
+        let mut calc = SnfCalc::new(a.clone(), [true; 4]);
+        calc.eliminate_row(0,0);
+
+        let (res, trans) = calc.result();
+        let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
+
+        assert_eq!(res[[0, 0]], 1);
+        assert_eq!(res[[0, 1]], 0);
+        assert_eq!(res[[0, 2]], 0);
+        assert!(p.is_eye());
+        assert!(pinv.is_eye());
+        assert_eq!(a.clone() * q, res);
+        assert_eq!(res * qinv, a);
+    }
+
+    #[test]
+    fn eliminate_row2() {
+        let a = DnsMat::from(array![[1,2,3], [4,5,6], [7,8,9]]);
+        let mut calc = SnfCalc::new(a.clone(), [true; 4]);
+        calc.eliminate_row(1,1);
+
+        let (res, trans) = calc.result();
+        let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
+
+        assert_eq!(res[[1, 0]], 0);
+        assert_eq!(res[[1, 1]], 1);
+        assert_eq!(res[[1, 2]], 0);
+        assert!(p.is_eye());
+        assert!(pinv.is_eye());
+        assert_eq!(a.clone() * q, res);
+        assert_eq!(res * qinv, a);
+    }
+
+    #[test]
+    fn eliminate_col1() {
+        let a = DnsMat::from(array![[1,2,3], [4,5,6], [7,8,9]]);
+        let mut calc = SnfCalc::new(a.clone(), [true; 4]);
+        calc.eliminate_col(0,0);
+
+        let (res, trans) = calc.result();
+        let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
+
+        assert_eq!(res[[0, 0]], 1);
+        assert_eq!(res[[1, 0]], 0);
+        assert_eq!(res[[2, 0]], 0);
+        assert_eq!(p * a.clone(), res);
+        assert_eq!(pinv * res, a);
+        assert!(q.is_eye());
+        assert!(qinv.is_eye());
+    }
+
+    #[test]
+    fn eliminate_col2() {
+        let a = DnsMat::from(array![[1,2,3], [4,5,6], [7,8,9]]);
+        let mut calc = SnfCalc::new(a.clone(), [true; 4]);
+        calc.eliminate_col(1,1);
+
+        let (res, trans) = calc.result();
+        let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
+
+        assert_eq!(res[[0, 1]], 0);
+        assert_eq!(res[[1, 1]], 1);
+        assert_eq!(res[[2, 1]], 0);
+        assert_eq!(p * a.clone(), res);
+        assert_eq!(pinv * res, a);
+        assert!(q.is_eye());
+        assert!(qinv.is_eye());
+    }
+
+    #[test]
+    fn eliminate_at1() {
+        let a = DnsMat::from(array![[1,2,3], [4,5,6], [7,8,9]]);
+        let mut calc = SnfCalc::new(a.clone(), [true; 4]);
+        calc.eliminate_at(0,0);
+
+        let (res, trans) = calc.result();
+        let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
+
+        assert_eq!(res[[0, 0]], 1);
+        assert_eq!(res[[0, 1]], 0);
+        assert_eq!(res[[0, 2]], 0);
+        assert_eq!(res[[1, 0]], 0);
+        assert_eq!(res[[2, 0]], 0);
+        assert_eq!(p * a.clone() * q, res);
+        assert_eq!(pinv * res * qinv, a.clone());
+    }
+
+    #[test]
+    fn eliminate_at2() {
+        let a = DnsMat::from(array![[1,2,3], [4,5,6], [7,8,9]]);
+        let mut calc = SnfCalc::new(a.clone(), [true; 4]);
+        calc.eliminate_at(1,1);
+
+        let (res, trans) = calc.result();
+        let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
+
+        assert_eq!(res[[1, 1]], 1);
+        assert_eq!(res[[1, 0]], 0);
+        assert_eq!(res[[1, 2]], 0);
+        assert_eq!(res[[0, 1]], 0);
+        assert_eq!(res[[2, 1]], 0);
+        assert_eq!(p * a.clone() * q, res);
+        assert_eq!(pinv * res * qinv, a.clone());
+    }
+
+    #[test]
+    fn select_pivot() {
+        let a = DnsMat::from(array![[1,0,1], [0,1,0], [0,1,1]]);
+        let calc = SnfCalc::new(a.clone(), [true; 4]);
+
+        assert_eq!(calc.select_pivot(0, 0), Some(0));
+        assert_eq!(calc.select_pivot(1, 0), None);
+        assert_eq!(calc.select_pivot(2, 0), None);
+        assert_eq!(calc.select_pivot(0, 1), Some(1));
+        assert_eq!(calc.select_pivot(1, 1), Some(1));
+        assert_eq!(calc.select_pivot(2, 1), Some(2));
+        assert_eq!(calc.select_pivot(0, 2), Some(0));
+        assert_eq!(calc.select_pivot(1, 2), Some(2));
+        assert_eq!(calc.select_pivot(2, 2), Some(2));
+    }
+
+    #[test]
+    fn eliminate_all1() {
+        let a = DnsMat::from(array![[1,2,3], [4,5,6], [7,8,9]]);
+        let mut calc = SnfCalc::new(a.clone(), [true; 4]);
+        calc.eliminate_all();
+
+        let (res, trans) = calc.result();
+        let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
+
+        assert_eq!(res, DnsMat::from(array![[1,0,0],[0,3,0],[0,0,0]]));
+        assert_eq!(p * a.clone() * q, res);
+        assert_eq!(pinv * res * qinv, a.clone());
+    }
+
+    #[test]
+    fn eliminate_all2() {
+        let a = DnsMat::from(array![
+            [1, 0, 1, 0, 0, 1, 1, 0, 1],
+            [0, 1, 3, 1, 0, 1, 0, 2, 0],
+            [0, 0, 1, 1, 0, 0, 0, 5, 1],
+            [0, 1, 1, 0, 3, 0, 0, 0, 0],
+            [0, 1, 0, 1, 0, 0, 1, 0, 1],
+            [1, 0, 2, 0, 1, 1, 0, 1, 1]
+        ]);
+        let mut calc = SnfCalc::new(a.clone(), [true; 4]);
+        calc.eliminate_all();
+
+        let (res, trans) = calc.result();
+        let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
+
+        assert_eq!(res, DnsMat::diag((6, 9), vec![1,1,1,1,1,1]));
+        assert_eq!(p * a.clone() * q, res);
+        assert_eq!(pinv * res * qinv, a.clone());
+    }
+
+    #[test]
+    fn eliminate_all3() {
+        let a: DnsMat<i64> = DnsMat::from(array![
+            [-20, -7, -27, 2, 29], 
+            [17, 8, 14, -4, -10], 
+            [13, 8, 10, -4, -6], 
+            [-9, -2, -14, 0, 16], 
+            [5, 0, 5, -1, -4]
+        ]);
+        let mut calc = SnfCalc::new(a.clone(), [true; 4]);
+        calc.eliminate_all();
+
+        let (res, trans) = calc.result();
+        let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
+
+        assert_eq!(res, DnsMat::diag((5, 5), vec![1,1,1,2,60]));
+        assert_eq!(p * a.clone() * q, res);
+        assert_eq!(pinv * res * qinv, a.clone());
     }
 }

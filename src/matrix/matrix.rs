@@ -1,22 +1,24 @@
-use std::{ops::{Index, Add, Sub, Mul, Neg, IndexMut}, cmp::min};
-
+use std::ops::{Add, Neg, Sub, Mul, Index, IndexMut};
+use std::cmp::min;
 use ndarray::{Array2, s};
 use sprs::{CsMat, TriMat};
-use crate::math::traits::Ring;
+use crate::math::traits::{Ring, RingOps};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct DnsMat<R>
-where R: Ring {
+where R: Ring, for<'a> &'a R: RingOps<R> {
     array: Array2<R>
 }
 
-impl<R> From<Array2<R>> for DnsMat<R> where R: Ring { 
+impl<R> From<Array2<R>> for DnsMat<R> 
+where R: Ring, for<'a> &'a R: RingOps<R> {
     fn from(array: Array2<R>) -> Self {
         Self { array }
     }
 }
 
-impl<R> DnsMat<R> where R: Ring {
+impl<R> DnsMat<R>
+where R: Ring, for<'a> &'a R: RingOps<R> {
     pub fn shape(&self) -> (usize, usize) { 
         (self.nrows(), self.ncols())
     }
@@ -38,7 +40,8 @@ impl<R> DnsMat<R> where R: Ring {
     }
 
     pub fn eye(size: usize) -> Self { 
-        Self::from(CsMat::eye(size))
+        let array = Array2::from_diag_elem(size, R::one());
+        Self::from(array)
     }
 
     pub fn is_eye(&self) -> bool { 
@@ -70,18 +73,19 @@ impl<R> DnsMat<R> where R: Ring {
         )
     }
 
-    pub fn to_sparse(&self) -> CsMat<R> {
-        let (m, n) = (self.array.nrows(), self.array.ncols());
-        let mut sp = TriMat::new((m, n));
+    // TODO
+    // pub fn to_sparse(&self) -> CsMat<R> {
+    //     let (m, n) = (self.array.nrows(), self.array.ncols());
+    //     let mut sp = TriMat::new((m, n));
 
-        for (k, a) in self.array.iter().enumerate() {
-            if a.is_zero() { continue }
-            let (i, j) = (k / n, k % n);
-            sp.add_triplet(i, j, a.clone());
-        }
+    //     for (k, a) in self.array.iter().enumerate() {
+    //         if a.is_zero() { continue }
+    //         let (i, j) = (k / n, k % n);
+    //         sp.add_triplet(i, j, a.clone());
+    //     }
 
-        sp.to_csc()
-    }
+    //     sp.to_csc()
+    // }
 
     pub fn swap_rows(&mut self, i: usize, j: usize) {
         debug_assert_ne!(i, j);
@@ -103,72 +107,78 @@ impl<R> DnsMat<R> where R: Ring {
         ndarray::Zip::from(col_i).and(col_j).for_each(std::mem::swap);
     }
 
-    pub fn mul_row(&mut self, i: usize, r: R) {
+    pub fn mul_row(&mut self, i: usize, r: &R) {
         debug_assert!(self.is_valid_row_index(i));
         let mut row = self.array.row_mut(i);
-        for a in row.iter_mut() {
-            *a = a.clone() * r.clone();
+        for a_mut in row.iter_mut() {
+            let a = a_mut as &R;
+            *a_mut = a * r;
         }
     }
 
-    pub fn mul_col(&mut self, i: usize, r: R) {
+    pub fn mul_col(&mut self, i: usize, r: &R) {
         debug_assert!(self.is_valid_col_index(i));
         let mut col = self.array.column_mut(i);
-        for a in col.iter_mut() {
-            *a = a.clone() * r.clone();
+        for a_mut in col.iter_mut() {
+            let a = a_mut as &R;
+            *a_mut = a * r;
         }
     }
 
-    pub fn add_row_to(&mut self, i: usize, j: usize, r: R) { 
+    pub fn add_row_to(&mut self, i: usize, j: usize, r: &R) { 
         debug_assert!(self.is_valid_row_index(i));
         debug_assert!(self.is_valid_row_index(j));
 
         let (s_i, s_j) = (s![i, ..], s![j, ..]);
         let (row_i, row_j) = self.array.multi_slice_mut((s_i, s_j));
-        ndarray::Zip::from(row_i).and(row_j).for_each(|x, y| { 
-            *y = y.clone() + r.clone() * x.clone();
+        ndarray::Zip::from(row_i).and(row_j).for_each(|x_mut, y_mut| { 
+            let (x, y) = (x_mut as &R, y_mut as &R);
+            *y_mut = y + &(r * x);
         });
     }
 
-    pub fn add_col_to(&mut self, i: usize, j: usize, r: R) { 
+    pub fn add_col_to(&mut self, i: usize, j: usize, r: &R) { 
         debug_assert!(self.is_valid_col_index(i));
         debug_assert!(self.is_valid_col_index(j));
 
         let (s_i, s_j) = (s![.., i], s![.., j]);
         let (col_i, col_j) = self.array.multi_slice_mut((s_i, s_j));
-        ndarray::Zip::from(col_i).and(col_j).for_each(|x, y| { 
-            *y = y.clone() + r.clone() * x.clone();
+        ndarray::Zip::from(col_i).and(col_j).for_each(|x_mut, y_mut| { 
+            let (x, y) = (x_mut as &R, y_mut as &R);
+            *y_mut = y + &(r * x);
         });
     }
 
     // Multiply [a, b; c, d] from left. 
-    pub fn left_elementary(&mut self, comps: [R; 4], i: usize, j: usize) { 
+    pub fn left_elementary(&mut self, comps: [&R; 4], i: usize, j: usize) { 
         debug_assert!(self.is_valid_row_index(i));
         debug_assert!(self.is_valid_row_index(j));
 
         let [a, b, c, d] = comps;
         let (s_i, s_j) = (s![i, ..], s![j, ..]);
         let (row_i, row_j) = self.array.multi_slice_mut((s_i, s_j));
-        ndarray::Zip::from(row_i).and(row_j).for_each(|x, y| { 
-            (*x, *y) = (
-                a.clone() * x.clone() + b.clone() * y.clone(),
-                c.clone() * x.clone() + d.clone() * y.clone()
+        ndarray::Zip::from(row_i).and(row_j).for_each(|x_mut, y_mut| { 
+            let (x, y) = (x_mut as &R, y_mut as &R);
+            (*x_mut, *y_mut) = (
+                a * x + b * y,
+                c * x + d * y
             )
         });
     }
 
     // Multiply [a, c; b, d] from left. 
-    pub fn right_elementary(&mut self, comps: [R; 4], i: usize, j: usize) { 
+    pub fn right_elementary(&mut self, comps: [&R; 4], i: usize, j: usize) { 
         debug_assert!(self.is_valid_col_index(i));
         debug_assert!(self.is_valid_col_index(j));
 
         let [a, b, c, d] = comps;
         let (s_i, s_j) = (s![.., i], s![.., j]);
         let (col_i, col_j) = self.array.multi_slice_mut((s_i, s_j));
-        ndarray::Zip::from(col_i).and(col_j).for_each(|x, y| { 
-            (*x, *y) = (
-                x.clone() * a.clone() + y.clone() * b.clone(),
-                x.clone() * c.clone() + y.clone() * d.clone()
+        ndarray::Zip::from(col_i).and(col_j).for_each(|x_mut, y_mut| { 
+            let (x, y) = (x_mut as &R, y_mut as &R);
+            (*x_mut, *y_mut) = (
+                x * a + y * b,
+                x * c + y * d
             )
         });
     }
@@ -184,7 +194,8 @@ impl<R> DnsMat<R> where R: Ring {
     }
 }
 
-impl<R> Add<Self> for DnsMat<R> where R: Ring {
+impl<R> Add<Self> for DnsMat<R>
+where R: Ring, for<'a> &'a R: RingOps<R> {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
@@ -193,7 +204,8 @@ impl<R> Add<Self> for DnsMat<R> where R: Ring {
     }
 }
 
-impl<R> Neg for DnsMat<R> where R: Ring {
+impl<R> Neg for DnsMat<R>
+where R: Ring, for<'a> &'a R: RingOps<R> {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
@@ -201,7 +213,8 @@ impl<R> Neg for DnsMat<R> where R: Ring {
     }
 }
 
-impl<R> Sub<Self> for DnsMat<R> where R: Ring {
+impl<R> Sub<Self> for DnsMat<R>
+where R: Ring, for<'a> &'a R: RingOps<R> {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
@@ -210,7 +223,8 @@ impl<R> Sub<Self> for DnsMat<R> where R: Ring {
     }
 }
 
-impl<R> Mul<Self> for DnsMat<R> where R: Ring {
+impl<R> Mul<Self> for DnsMat<R>
+where R: Ring, for<'a> &'a R: RingOps<R> {
     type Output = Self;
 
     fn mul(self, rhs: Self) -> Self::Output {
@@ -218,27 +232,30 @@ impl<R> Mul<Self> for DnsMat<R> where R: Ring {
         let (l, m, n) = (self.nrows(), self.ncols(), rhs.ncols());
         let array = Array2::from_shape_fn((l, n), |(i, k)| {
             (0..m).map(|j| {
-                self[[i, j]].clone() * rhs[[j, k]].clone()
+                &self[[i, j]] * &rhs[[j, k]]
             }).sum()
         });
         DnsMat::from(array)
     }
 }
 
-impl<R> Index<[usize; 2]> for DnsMat<R> where R: Ring { 
+impl<R> Index<[usize; 2]> for DnsMat<R>
+where R: Ring, for<'a> &'a R: RingOps<R> {
     type Output = R;
     fn index(&self, index: [usize; 2]) -> &R {
         &self.array[index]
     }
 }
 
-impl<R> IndexMut<[usize; 2]> for DnsMat<R> where R: Ring {
+impl<R> IndexMut<[usize; 2]> for DnsMat<R>
+where R: Ring, for<'a> &'a R: RingOps<R> {
     fn index_mut(&mut self, index: [usize; 2]) -> &mut Self::Output {
         &mut self.array[index]
     }
 }
 
-impl<R> From<CsMat<R>> for DnsMat<R> where R: Ring {
+impl<R> From<CsMat<R>> for DnsMat<R>
+where R: Ring, for<'a> &'a R: RingOps<R> {
     fn from(sp: CsMat<R>) -> Self {
         DnsMat{ array: sp.to_dense() }
     }
@@ -318,7 +335,7 @@ mod tests {
     fn mul_row() { 
         let array = array![[1,2,3],[4,5,6],[7,8,9]];
         let mut a = DnsMat::from(array);
-        a.mul_row(1, 10);
+        a.mul_row(1, &10);
         assert_eq!(a.array, array![[1,2,3],[40,50,60],[7,8,9]]);
     }
 
@@ -326,7 +343,7 @@ mod tests {
     fn mul_col() { 
         let array = array![[1,2,3],[4,5,6],[7,8,9]];
         let mut a = DnsMat::from(array);
-        a.mul_col(1, 10);
+        a.mul_col(1, &10);
         assert_eq!(a.array, array![[1,20,3],[4,50,6],[7,80,9]]);
     }
 
@@ -334,7 +351,7 @@ mod tests {
     fn add_row_to() { 
         let array = array![[1,2,3],[4,5,6],[7,8,9]];
         let mut a = DnsMat::from(array);
-        a.add_row_to(0, 1, 10);
+        a.add_row_to(0, 1, &10);
         assert_eq!(a.array, array![[1,2,3],[14,25,36],[7,8,9]]);
     }
 
@@ -342,7 +359,7 @@ mod tests {
     fn add_col_to() { 
         let array = array![[1,2,3],[4,5,6],[7,8,9]];
         let mut a = DnsMat::from(array);
-        a.add_col_to(0, 1, 10);
+        a.add_col_to(0, 1, &10);
         assert_eq!(a.array, array![[1,12,3],[4,45,6],[7,78,9]]);
     }
 

@@ -1,73 +1,139 @@
-use std::iter::Sum;
-use std::ops::{Rem, Neg};
 use std::fmt::Debug;
+use std::ops::{Add, Neg, Sub, Mul, Rem};
+use num_traits::{Zero, One, Num};
+use std::iter::Sum;
 use is_even::IsEven;
-use num_traits::{One, Num};
 
-// TODO split into RingOps
-pub trait Ring: Clone + Default + Send + Sync + Debug + Num + Neg<Output = Self> + sprs::MulAcc + Sum {
+// Set Elements
+pub trait MathElem: 
+    Clone + PartialEq + Eq + Debug
+{}
+
+impl<T> MathElem for T where 
+    T: Clone + PartialEq + Eq + Debug
+{}
+
+// Additive Monoids 
+
+pub trait AddMonOps<T>: 
+    Sized + Add<Output = T>
+{}
+
+pub trait AddMon: 
+    MathElem + AddMonOps<Self> + Sum<Self> + Zero
+where 
+    for<'a> &'a Self: AddMonOps<Self>,
+    for<'a> Self: Sum<&'a Self>
+{}
+
+macro_rules! impl_add_mon {
+    ($type:ident) => {
+        impl AddMonOps<$type> for $type {}
+        impl<'a> AddMonOps<$type> for &'a $type {}
+        impl AddMon for $type {}
+    };
+}
+
+// Additive Groups 
+
+pub trait AddGrpOps<T>: 
+    AddMonOps<T> + Neg<Output = T> + Sub<Output = T>
+{}
+
+pub trait AddGrp: 
+    AddMon + AddGrpOps<Self>
+where 
+    for<'a> &'a Self: AddGrpOps<Self>
+{}
+
+macro_rules! impl_add_grp {
+    ($type:ident) => {
+        impl_add_mon!($type);
+        impl AddGrpOps<$type> for $type {}
+        impl<'a> AddGrpOps<$type> for &'a $type {}
+        impl AddGrp for $type {}
+    };
+}
+
+// Monoids (multiplicative)
+
+pub trait MonOps<T>: 
+    Sized + Mul<Output = T> 
+{}
+
+pub trait Mon: 
+    MathElem + MonOps<Self> + One
+where
+    for<'a> &'a Self: MonOps<Self>
+{}
+
+macro_rules! impl_mon {
+    ($type:ident) => {
+        impl MonOps<$type> for $type {}
+        impl<'a> MonOps<$type> for &'a $type {}
+        impl Mon for $type {}
+    };
+}
+
+// Rings 
+
+pub trait RingOps<T>: 
+    AddGrpOps<T> + MonOps<T>
+{}
+
+pub trait RingMethods: 
+    Sized
+{
+    fn inv(&self) -> Option<Self>;
     fn is_unit(&self) -> bool;
-    fn is_normalized(&self) -> bool { 
-        self.normalizing_unit().0.is_one()
-    }
-    fn normalizing_unit(&self) -> (Self, Self) { 
-        (Self::one(), Self::one()) 
-    }
+    fn normalizing_unit(&self) -> Self;
+}
+
+pub trait Ring: 
+    AddGrp + Mon + RingOps<Self> + RingMethods + One 
+where
+    for<'a> &'a Self: RingOps<Self>
+{}
+
+macro_rules! impl_ring {
+    ($type:ident) => {
+        impl_add_grp!($type);
+        impl_mon!($type);
+        impl RingOps<$type> for $type {}
+        impl<'a> RingOps<$type> for &'a $type {}
+        impl Ring for $type {}
+    };
 }
 
 macro_rules! impl_ring_integer {
     ($type:ident) => {
-        impl Ring for $type {
+        impl RingMethods for $type {
+            fn inv(&self) -> Option<Self> {
+                match self.is_unit() {
+                    true => Some(self.clone()),
+                    false => None
+                }
+            }
+
             fn is_unit(&self) -> bool {
                 self == &1 || self == &-1
             }
-            fn normalizing_unit(&self) -> (Self, Self) {
-                if self >= &0 { (1, 1) } else { (-1, -1) }
+
+            fn normalizing_unit(&self) -> Self {
+                match self >= &0 { 
+                    true  => 1,
+                    false => -1
+                }
             }
         }                
+        impl_ring!($type);
     };
 }
 
+impl_ring_integer!(i8);
+impl_ring_integer!(i16);
 impl_ring_integer!(i32);
 impl_ring_integer!(i64);
-
-pub trait EucRing: Ring + Rem {
-    fn is_divisible(&self, y: Self) -> bool { 
-        !y.is_zero() && (self.clone() % y).is_zero()
-    }
-
-    fn gcd(mut x: Self, mut y: Self) -> Self { 
-        while !y.is_zero() {
-            let r = x.clone() % y.clone();
-            (x, y) = (y, r);
-        }
-
-        let u = x.normalizing_unit().0;
-        if !u.is_one() {
-            x * u.clone()
-        } else {
-            x
-        }
-    }
-
-    fn gcdx(mut x: Self, mut y: Self) -> (Self, Self, Self) { 
-        let (mut s0, mut s1) = (Self::one(),  Self::zero());
-        let (mut t0, mut t1) = (Self::zero(), Self::one() );
-
-        while !y.is_zero() {
-            let q = x.clone() / y.clone();
-            let r = x.clone() % y.clone();
-            (x, y) = (y, r);
-            (s0, s1) = (s1.clone(), s0 - q.clone() * s1);
-            (t0, t1) = (t1.clone(), t0 - q.clone() * t1);
-        }
-
-        (x, s0, t0)
-    }
-}
-
-impl EucRing for i32 {}
-impl EucRing for i64 {}
 
 pub trait PowMod2<Rhs> {
     type Output;
@@ -93,20 +159,41 @@ impl_powmod2_integer!(i64);
 
 #[cfg(test)]
 mod tests { 
-    use super::EucRing;
+    use super::*;
 
     #[test]
-    fn test_gcd_i32() {
-        let (a, b) = (240, 46);
-        let d = EucRing::gcd(a, b);
-        assert_eq!(d, 2);
+    fn check_add_mon() {
+        fn check<T>() where T: AddMon, for<'a> &'a T: AddMonOps<T> {}
+        check::<i8>();
+        check::<i16>();
+        check::<i32>();
+        check::<i64>();
+    }
+    
+    #[test]
+    fn check_add_grp() {
+        fn check<T>() where T: AddGrp, for<'a> &'a T: AddGrpOps<T> {}
+        check::<i8>();
+        check::<i16>();
+        check::<i32>();
+        check::<i64>();
+    }
+    
+    #[test]
+    fn check_mon() {
+        fn check<T>() where T: Mon, for<'a> &'a T: MonOps<T> {}
+        check::<i8>();
+        check::<i16>();
+        check::<i32>();
+        check::<i64>();
     }
 
     #[test]
-    fn test_gcdx_i32() {
-        let (a, b) = (240, 46);
-        let (d, s, t) = EucRing::gcdx(a, b);
-        assert_eq!(d, 2);
-        assert_eq!(s * a + t * b, d);
+    fn check_ring() {
+        fn check<T>() where T: Ring, for<'a> &'a T: RingOps<T> {}
+        check::<i8>();
+        check::<i16>();
+        check::<i32>();
+        check::<i64>();
     }
 }

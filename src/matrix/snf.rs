@@ -1,18 +1,20 @@
 use core::panic;
 use std::cmp::min;
 
-use crate::math::traits::EucRing;
+use crate::math::traits::{EucRing, EucRingOps};
 use super::DnsMat;
 
 pub type SnfFlags = [bool; 4];
 pub type SnfResult<R> = (DnsMat<R>, [Option<DnsMat<R>>; 4]);
 
-pub fn snf<R: EucRing>(target: &DnsMat<R>, flags: SnfFlags) -> SnfResult<R> {
+pub fn snf<R>(target: &DnsMat<R>, flags: SnfFlags) -> SnfResult<R>
+where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     let copy = target.clone();
     snf_in_place(copy, flags)
 }
 
-pub fn snf_in_place<R: EucRing>(target: DnsMat<R>, flags: SnfFlags) -> SnfResult<R> {
+pub fn snf_in_place<R>(target: DnsMat<R>, flags: SnfFlags) -> SnfResult<R>
+where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     let mut calc = SnfCalc::new(target, flags);
 
     calc.eliminate_all();
@@ -22,7 +24,8 @@ pub fn snf_in_place<R: EucRing>(target: DnsMat<R>, flags: SnfFlags) -> SnfResult
 
 // -- private -- //
 
-struct SnfCalc<R: EucRing> { 
+struct SnfCalc<R>
+where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     target: DnsMat<R>,
     p:    Option<DnsMat<R>>,
     pinv: Option<DnsMat<R>>,
@@ -30,7 +33,8 @@ struct SnfCalc<R: EucRing> {
     qinv: Option<DnsMat<R>>
 }
 
-impl<R: EucRing> SnfCalc<R> {
+impl<R> SnfCalc<R>
+where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     fn new(target: DnsMat<R>, flags: SnfFlags) -> Self { 
         let eye_opt = |size, flag| {
             if flag{ Some(DnsMat::eye(size)) } else { None }
@@ -78,9 +82,9 @@ impl<R: EucRing> SnfCalc<R> {
         }
 
         // normalize pivot
-        let (u, uinv) = self.target[[i, i]].normalizing_unit();
+        let u = self.target[[i, i]].normalizing_unit();
         if !u.is_one() { 
-            self.mul_col(i, u, uinv);
+            self.mul_col(i, &u);
         }
 
         // eliminate row and col
@@ -109,38 +113,46 @@ impl<R: EucRing> SnfCalc<R> {
         self.qinv.as_mut().map( |qinv| qinv.swap_rows(i, j) );
     }
 
-    fn mul_row(&mut self, i: usize, u: R, uinv: R) {
-        assert_eq!(u.clone() * uinv.clone(), R::one());
-        self.target.mul_row(i, u.clone());
+    fn mul_row(&mut self, i: usize, u: &R) {
+        self.target.mul_row(i, u);
         self.p.as_mut().map( |p| p.mul_row(i, u));
-        self.pinv.as_mut().map( |pinv| pinv.mul_col(i, uinv) );
+        self.pinv.as_mut().map( |pinv| {
+            let Some(uinv) = &u.inv() else { panic!("`u` is not invertible.") };
+            pinv.mul_col(i, uinv) 
+        });
     }
     
-    fn mul_col(&mut self, i: usize, u: R, uinv: R) {
-        assert_eq!(u.clone() * uinv.clone(), R::one());
-        self.target.mul_col(i, u.clone());
+    fn mul_col(&mut self, i: usize, u: &R) {
+        self.target.mul_col(i, u);
         self.q.as_mut().map( |q| q.mul_col(i, u) );
-        self.qinv.as_mut().map( |qinv| qinv.mul_row(i, uinv) );
+        self.qinv.as_mut().map( |qinv| {
+            let Some(uinv) = &u.inv() else { panic!("`u` is not invertible.") };
+            qinv.mul_row(i, uinv) 
+        });
     }
 
     // Multiply [a, b; c, d] from left, assuming det = 1.
-    pub fn left_elementary(&mut self, comps: [R; 4], i: usize, j: usize) { 
-        self.target.left_elementary(comps.clone(), i, j);
-        self.p.as_mut().map( |p| p.left_elementary(comps.clone(), i, j) ); 
+    pub fn left_elementary(&mut self, comps: [&R; 4], i: usize, j: usize) { 
+        let [a, b, c, d] = comps;
+        debug_assert_eq!(a * d - b * c, R::one());
+
+        self.target.left_elementary(comps, i, j);
+        self.p.as_mut().map( |p| p.left_elementary(comps, i, j) ); 
         self.pinv.as_mut().map(|pinv| { 
-            let [a, b, c, d] = comps;
-            let inv_t = [d, -c, -b, a];
+            let inv_t = [d, &-c, &-b, a];
             pinv.right_elementary(inv_t, i, j) 
         }); 
     }
 
     // Multiply [a, c; b, d] from right, assuming det = 1. 
-    pub fn right_elementary(&mut self, comps: [R; 4], i: usize, j: usize) { 
-        self.target.right_elementary(comps.clone(), i, j);
-        self.q.as_mut().map( |q| q.right_elementary(comps.clone(), i, j) ); 
+    pub fn right_elementary(&mut self, comps: [&R; 4], i: usize, j: usize) { 
+        let [a, b, c, d] = comps;
+        debug_assert_eq!(a * d - b * c, R::one());
+        
+        self.target.right_elementary(comps, i, j);
+        self.q.as_mut().map( |q| q.right_elementary(comps, i, j) ); 
         self.qinv.as_mut().map(|qinv| { 
-            let [a, b, c, d] = comps;
-            let inv_t = [d, -c, -b, a];
+            let inv_t = [d, &-c, &-b, a];
             qinv.left_elementary(inv_t, i, j) 
         }); 
     }
@@ -179,13 +191,16 @@ impl<R: EucRing> SnfCalc<R> {
             // [x y][s -b] = [d 0]
             //      [t  a]   
 
-            let x = self.target[[i, j ]].clone();
-            let y = self.target[[i, j1]].clone();
+            let x = &self.target[[i, j ]];
+            let y = &self.target[[i, j1]];
 
-            let (d, s, t) = Self::gcdx(x.clone(), y.clone());
-            let (a, b) = (x / d.clone(), y / d.clone());
+            let (d, s, t) = Self::gcdx(x, y);
+            let (a, b) = (x / &d, y / &d);
 
-            self.right_elementary([s, t, -b, a], j, j1);
+            self.right_elementary(
+                [&s, &t, &-b, &a], 
+                j, j1
+            );
             modified = true
         }
 
@@ -205,13 +220,16 @@ impl<R: EucRing> SnfCalc<R> {
             // [ s t][x] < i  = [d]
             // [-b a][y] < i1   [0]
 
-            let x = self.target[[i , j]].clone();
-            let y = self.target[[i1, j]].clone();
+            let x = &self.target[[i , j]];
+            let y = &self.target[[i1, j]];
 
-            let (d, s, t) = Self::gcdx(x.clone(), y.clone());
-            let (a, b) = (x / d.clone(), y / d.clone());
+            let (d, s, t) = Self::gcdx(x, y);
+            let (a, b) = (x / &d, y / &d);
 
-            self.left_elementary([s, t, -b, a], i, i1);
+            self.left_elementary(
+                [&s, &t, &-b, &a], 
+                i, i1
+            );
             modified = true
         }
         
@@ -232,20 +250,20 @@ impl<R: EucRing> SnfCalc<R> {
 
         for i in 0..r { 
             let a = &self.target[[i, i]];
-            if !a.is_normalized() {
-                let (u, uinv) = a.normalizing_unit();
-                self.mul_row(i, u, uinv);
+            let u = a.normalizing_unit();
+            if !u.is_one() {
+                self.mul_row(i, &u);
             }
         }
     }
 
     fn diag_normalize_step(&mut self, i: usize) -> bool {
-        let x = self.target[[i, i]].clone();
-        let y = self.target[[i + 1, i + 1]].clone();
+        let x = &self.target[[i, i]];
+        let y = &self.target[[i + 1, i + 1]];
 
         if 
              x.is_zero() && y.is_zero() || 
-            !x.is_zero() && y.clone().is_divisible(x.clone()) 
+            !x.is_zero() && x.divides(y)
         { 
             return true
         }
@@ -255,31 +273,31 @@ impl<R: EucRing> SnfCalc<R> {
         // [1   1 ][x   ][s  -b] = [d      ]
         // [-tb sa][   y][t   a]   [   xy/d]
 
-        let (d, s, t) = Self::gcdx(x.clone(), y.clone());
-        let (a, b) = (x.clone() / d.clone(), y.clone() / d.clone());
-        let (tb, sa) = (t.clone() * b.clone(), s.clone() * a.clone());
+        let (d, s, t) = Self::gcdx(x, y);
+        let (a, b) = (x / &d, y / &d);
+        let (tb, sa) = (&t * &b, &s * &a);
 
         self.left_elementary(
-            [R::one(), R::one(), -tb, sa], 
+            [&R::one(), &R::one(), &-tb, &sa], 
             i, i + 1
         );
         self.right_elementary(
-            [s, t, -b, a], 
+            [&s, &t, &-b, &a], 
             i, i + 1
         );
 
         false
     }
 
-    fn gcdx(x: R, y: R) -> (R, R, R) { 
-        let (mut d, mut s, mut t) = EucRing::gcdx(x.clone(), y);
+    fn gcdx(x: &R, y: &R) -> (R, R, R) { 
+        let (mut d, mut s, mut t) = EucRing::gcdx(x, y);
 
-        let u = d.normalizing_unit().0;
+        let u = d.normalizing_unit();
         if !u.is_one() {
-            (d, s, t) = (d * u.clone(), s * u.clone(), t * u.clone());
+            (d, s, t) = (&d * &u, &s * &u, &t * &u);
         }
 
-        let a = x.clone() / d.clone();
+        let a = x / &d;
         if a.is_unit() { 
             (d, a, R::zero())
         } else {
@@ -375,7 +393,7 @@ mod tests {
     fn mul_row() { 
         let a = DnsMat::from(array![[1,2,3], [4,5,6], [7,8,9]]);
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
-        calc.mul_row(0, -1, -1);
+        calc.mul_row(0, &-1);
         
         let (res, trans) = calc.result();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
@@ -391,7 +409,7 @@ mod tests {
     fn mul_col() { 
         let a = DnsMat::from(array![[1,2,3], [4,5,6], [7,8,9]]);
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
-        calc.mul_col(0, -1, -1);
+        calc.mul_col(0, &-1);
         
         let (res, trans) = calc.result();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
@@ -406,7 +424,7 @@ mod tests {
     #[test]
     fn left_elementary() { 
         let a = DnsMat::from(array![[1,2,3], [4,5,6], [7,8,9]]);
-        let e = [3,2,4,3]; // det = 1
+        let e = [&3,&2,&4,&3]; // det = 1
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.left_elementary(e, 0, 1);
 
@@ -423,7 +441,7 @@ mod tests {
     #[test]
     fn right_elementary() { 
         let a = DnsMat::from(array![[1,2,3], [4,5,6], [7,8,9]]);
-        let e = [3,2,4,3]; // det = 1
+        let e = [&3,&2,&4,&3]; // det = 1
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.right_elementary(e, 0, 1);
 
@@ -440,18 +458,18 @@ mod tests {
     #[test]
     fn gcdx() {
         let (x, y) = (14, -52);
-        let (d, s, t) = SnfCalc::gcdx(x, y);
+        let (d, s, t) = SnfCalc::gcdx(&x, &y);
         assert_eq!(d, 2);
         assert_eq!(s * x + t * y, d);
 
         let (x, y) = (2, 52);
-        let (d, s, t) = SnfCalc::gcdx(x, y);
+        let (d, s, t) = SnfCalc::gcdx(&x, &y);
         assert_eq!(d, 2);
         assert_eq!(s, 1);
         assert_eq!(t, 0);
 
         let (x, y) = (-2, 52);
-        let (d, s, t) = SnfCalc::gcdx(x, y);
+        let (d, s, t) = SnfCalc::gcdx(&x, &y);
         assert_eq!(d, 2);
         assert_eq!(s, -1);
         assert_eq!(t, 0);

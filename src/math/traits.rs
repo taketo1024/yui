@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 use std::ops::{Add, Neg, Sub, Mul, Rem};
-use num_traits::{Zero, One, Num};
-use std::iter::Sum;
+use num_traits::{Zero, One};
+use std::iter::{Sum, Product};
 use is_even::IsEven;
 
 // Set Elements
@@ -62,9 +62,10 @@ pub trait MonOps<T>:
 {}
 
 pub trait Mon: 
-    MathElem + MonOps<Self> + One
+    MathElem + MonOps<Self> + Product<Self> + One
 where
-    for<'a> &'a Self: MonOps<Self>
+    for<'a> &'a Self: MonOps<Self>,
+    for<'a> Self: Product<&'a Self>
 {}
 
 macro_rules! impl_mon {
@@ -76,7 +77,6 @@ macro_rules! impl_mon {
 }
 
 // Rings 
-
 pub trait RingOps<T>: 
     AddGrpOps<T> + MonOps<T>
 {}

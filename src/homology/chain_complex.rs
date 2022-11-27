@@ -1,14 +1,14 @@
-use std::{ops::{RangeInclusive}, collections::HashMap};
+use std::ops::RangeInclusive;
+use std::collections::HashMap;
 use std::hash::Hash;
 use sprs::{CsMat, CsVec, TriMat};
 use num_traits::{One, Zero};
-
-use crate::math::traits::Ring;
+use crate::matrix::CsMatElem;
 
 pub trait ChainGenerator: PartialEq + Eq + Hash {}
 
 pub trait ChainComplex {
-    type R: Ring;
+    type R: CsMatElem;
     type Generator: ChainGenerator;
 
     fn hdeg_range(&self) -> RangeInclusive<isize>;
@@ -82,14 +82,20 @@ pub trait ChainComplex {
 }
 
 pub struct SimpleChainComplex<X, R> 
-where X: ChainGenerator, R: Ring { 
+where 
+    X: ChainGenerator, 
+    R: CsMatElem
+{ 
     generators: Vec<Vec<X>>,
     d_matrices: Vec<CsMat<R>>,
     d_degree: isize
 }
 
 impl<R, X> ChainComplex for SimpleChainComplex<X, R> 
-where X: ChainGenerator, R: Ring {
+where 
+    X: ChainGenerator, 
+    R: CsMatElem
+{ 
     type R = R;
     type Generator = X;
 

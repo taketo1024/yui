@@ -1,5 +1,5 @@
 use std::fmt::Debug;
-use std::ops::{Add, Neg, Sub, Mul, Rem};
+use std::ops::{Add, Neg, Sub, Mul, Rem, Div};
 use num_traits::{Zero, One};
 use std::iter::{Sum, Product};
 use is_even::IsEven;
@@ -105,7 +105,7 @@ macro_rules! impl_ring {
     };
 }
 
-macro_rules! impl_ring_integer {
+macro_rules! impl_ring_methods_integer {
     ($type:ident) => {
         impl RingMethods for $type {
             fn inv(&self) -> Option<Self> {
@@ -125,15 +125,86 @@ macro_rules! impl_ring_integer {
                     false => -1
                 }
             }
-        }                
-        impl_ring!($type);
+        }
     };
 }
 
-impl_ring_integer!(i8);
-impl_ring_integer!(i16);
-impl_ring_integer!(i32);
-impl_ring_integer!(i64);
+// Euclidean Rings
+pub trait EucRingOps<T>: 
+    RingOps<T> + Rem<Output = T> + Div<Output = T>
+{}
+
+pub trait EucRing: 
+    Ring + EucRingOps<Self> 
+where 
+    for<'a> &'a Self: EucRingOps<Self>
+{
+    fn divides(&self, y: &Self) -> bool { 
+        !self.is_zero() && (y % self).is_zero()
+    }
+
+    fn gcd(x: &Self, y: &Self) -> Self {
+        if x.is_zero() && y.is_zero() { return Self::zero() }
+        if x.divides(y) { return x.clone() }
+        if y.divides(x) { return y.clone() }
+
+        let (mut x, mut y) = (x.clone(), y.clone());
+
+        while !y.is_zero() {
+            let r = &x % &y;
+            (x, y) = (y, r);
+        }
+
+        let u = x.normalizing_unit();
+
+        match u.is_one() { 
+            true  => x,
+            false => x * u
+        }
+    }
+
+    fn gcdx(x: &Self, y: &Self) -> (Self, Self, Self) {
+        if x.is_zero() && y.is_zero() { return (Self::zero(), Self::zero(), Self::zero()) }
+        if x.divides(y) { return (x.clone(), Self::one(), Self::zero()) }
+        if y.divides(x) { return (y.clone(), Self::zero(), Self::one()) }
+
+        let (mut x,  mut y)  = (x.clone(), y.clone());
+        let (mut s0, mut s1) = (Self::one(),  Self::zero());
+        let (mut t0, mut t1) = (Self::zero(), Self::one() );
+
+        while !y.is_zero() {
+            let q = &x / &y;
+            let r = &x % &y;
+
+            (x, y) = (y, r);
+            (s1, s0) = (s0 - &q * &s1, s1);
+            (t1, t0) = (t0 - &q * &t1, t1);
+        }
+
+        (x, s0, t0)
+    }
+}
+
+macro_rules! impl_euc_ring {
+    ($type:ident) => {
+        impl_ring!($type);
+        impl EucRingOps<$type> for $type {}
+        impl<'a> EucRingOps<$type> for &'a $type {}
+        impl EucRing for $type {}
+    };
+}
+
+macro_rules! impl_euc_ring_integer {
+    ($type:ident) => {
+        impl_ring_methods_integer!($type);
+        impl_euc_ring!($type);
+    }
+}
+
+impl_euc_ring_integer!(i32);
+impl_euc_ring_integer!(i64);
+
+// Mod Pow 2
 
 pub trait PowMod2<Rhs> {
     type Output;
@@ -164,8 +235,6 @@ mod tests {
     #[test]
     fn check_add_mon() {
         fn check<T>() where T: AddMon, for<'a> &'a T: AddMonOps<T> {}
-        check::<i8>();
-        check::<i16>();
         check::<i32>();
         check::<i64>();
     }
@@ -173,8 +242,6 @@ mod tests {
     #[test]
     fn check_add_grp() {
         fn check<T>() where T: AddGrp, for<'a> &'a T: AddGrpOps<T> {}
-        check::<i8>();
-        check::<i16>();
         check::<i32>();
         check::<i64>();
     }
@@ -182,8 +249,6 @@ mod tests {
     #[test]
     fn check_mon() {
         fn check<T>() where T: Mon, for<'a> &'a T: MonOps<T> {}
-        check::<i8>();
-        check::<i16>();
         check::<i32>();
         check::<i64>();
     }
@@ -191,9 +256,77 @@ mod tests {
     #[test]
     fn check_ring() {
         fn check<T>() where T: Ring, for<'a> &'a T: RingOps<T> {}
-        check::<i8>();
-        check::<i16>();
         check::<i32>();
         check::<i64>();
+    }
+
+    #[test]
+    fn check_eucring() {
+        fn check<T>() where T: EucRing, for<'a> &'a T: EucRingOps<T> {}
+        check::<i32>();
+        check::<i64>();
+    }
+
+    #[test]
+    fn int_is_unit() { 
+        assert!(1.is_unit());
+        assert!((-1).is_unit());
+        assert_eq!(2.is_unit(), false);
+    }
+
+    #[test]
+    fn int_inv() { 
+        assert_eq!(1.inv(), Some(1));
+        assert_eq!((-1).inv(), Some(-1));
+        assert_eq!(2.inv(), None);
+    }
+
+    #[test]
+    fn int_normalizing_unit() { 
+        assert_eq!(1.normalizing_unit(), 1);
+        assert_eq!((-1).normalizing_unit(), -1);
+        assert_eq!(2.normalizing_unit(), 1);
+    }
+
+    #[test]
+    fn int_divides() {
+        assert!(2.divides(&4));
+        assert_eq!(3.divides(&4), false);
+        assert_eq!(0.divides(&1), false);
+    }
+
+    #[test]
+    fn test_gcd_i32() {
+        let (a, b) = (240, 46);
+        let d = i32::gcd(&a, &b);
+        assert_eq!(d, 2);
+
+        let (a, b) = (24, 0);
+        let d = i32::gcd(&a, &b);
+        assert_eq!(d, 24);
+
+        let (a, b) = (0, 0);
+        let d = i32::gcd(&a, &b);
+        assert_eq!(d, 0);
+    }
+
+    #[test]
+    fn test_gcdx_i32() {
+        let (a, b) = (240, 46);
+        let (d, s, t) = i32::gcdx(&a, &b);
+        assert_eq!(d, 2);
+        assert_eq!(&s * &a + &t * &b, d);
+
+        let (a, b) = (24, 0);
+        let (d, s, t) = i32::gcdx(&a, &b);
+        assert_eq!(d, 24);
+        assert_eq!(s, 1);
+        assert_eq!(t, 0);
+
+        let (a, b) = (0, 0);
+        let (d, s, t) = i32::gcdx(&a, &b);
+        assert_eq!(d, 0);
+        assert_eq!(s, 0);
+        assert_eq!(t, 0);
     }
 }

@@ -241,10 +241,10 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     }
 }
 
-pub trait CsMatElem: Num {}
+pub trait CsMatElem: Clone + Default + Send + Sync + Num + sprs::MulAcc {}
 
 impl<T> CsMatElem for T
-    where Self: Num
+    where Self: Clone + Default + Send + Sync + Num + sprs::MulAcc 
 {}
 
 impl<R> From<CsMat<R>> for DnsMat<R>

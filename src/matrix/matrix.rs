@@ -1,5 +1,6 @@
 use std::ops::{Add, Neg, Sub, Mul, Index, IndexMut};
 use std::cmp::min;
+use num_traits::Num;
 use ndarray::{Array2, s};
 use sprs::{CsMat, TriMat};
 use crate::math::traits::{Ring, RingOps};
@@ -51,7 +52,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     }
 
     pub fn zero(shape: (usize, usize)) -> Self { 
-        Self::from(CsMat::zero(shape))
+        Self::from(Array2::zeros(shape))
     }
 
     pub fn is_zero(&self) -> bool {
@@ -72,20 +73,6 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
             i == j || a.is_zero()
         )
     }
-
-    // TODO
-    // pub fn to_sparse(&self) -> CsMat<R> {
-    //     let (m, n) = (self.array.nrows(), self.array.ncols());
-    //     let mut sp = TriMat::new((m, n));
-
-    //     for (k, a) in self.array.iter().enumerate() {
-    //         if a.is_zero() { continue }
-    //         let (i, j) = (k / n, k % n);
-    //         sp.add_triplet(i, j, a.clone());
-    //     }
-
-    //     sp.to_csc()
-    // }
 
     pub fn swap_rows(&mut self, i: usize, j: usize) {
         debug_assert_ne!(i, j);
@@ -254,17 +241,43 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     }
 }
 
+pub trait CsMatElem: Num {}
+
+impl<T> CsMatElem for T
+    where Self: Num
+{}
+
 impl<R> From<CsMat<R>> for DnsMat<R>
-where R: Ring, for<'a> &'a R: RingOps<R> {
+where R: Ring + CsMatElem, for<'a> &'a R: RingOps<R> {
     fn from(sp: CsMat<R>) -> Self {
         DnsMat{ array: sp.to_dense() }
+    }
+}
+
+pub trait ToSparse<R: CsMatElem> {
+    fn to_sparse(&self) -> CsMat<R>;
+}
+
+impl<R> ToSparse<R> for DnsMat<R>
+where R: Ring + CsMatElem, for<'a> &'a R: RingOps<R> {
+    fn to_sparse(&self) -> CsMat<R> {
+        let (m, n) = (self.array.nrows(), self.array.ncols());
+        let mut sp = TriMat::new((m, n));
+
+        for (k, a) in self.array.iter().enumerate() {
+            if a.is_zero() { continue }
+            let (i, j) = (k / n, k % n);
+            sp.add_triplet(i, j, a.clone());
+        }
+
+        sp.to_csc()
     }
 }
 
 #[cfg(test)]
 mod tests { 
     use ndarray::array;
-    use super::DnsMat;
+    use super::*;
 
     #[test]
     fn init() { 
@@ -391,5 +404,19 @@ mod tests {
         let b = DnsMat::from(array![[1,2],[1,-1],[0,2]]);
         let c = a * b;
         assert_eq!(c, DnsMat::from(array![[3,6],[9,15]]));
+    }
+
+    #[test]
+    fn to_sparse() { 
+        let dns = DnsMat::from(array![[1,2,3],[4,5,6]]);
+        let sps = dns.to_sparse();
+        assert_eq!(sps, CsMat::new((2, 3), vec![0,3,6], vec![0,1,2,0,1,2], vec![1,2,3,4,5,6]).into_csc());
+    }
+
+    #[test]
+    fn from_sparse() { 
+        let sps = CsMat::new((2, 3), vec![0,3,6], vec![0,1,2,0,1,2], vec![1,2,3,4,5,6]);
+        let dns = DnsMat::from(sps);
+        assert_eq!(dns, DnsMat::from(array![[1,2,3],[4,5,6]]));
     }
 }

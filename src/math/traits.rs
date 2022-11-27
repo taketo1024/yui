@@ -204,29 +204,20 @@ macro_rules! impl_euc_ring_integer {
 impl_euc_ring_integer!(i32);
 impl_euc_ring_integer!(i64);
 
-// Mod Pow 2
+// PowMod2
 
-pub trait PowMod2<Rhs> {
-    type Output;
-    fn pow_mod2(self, rhs: Rhs) -> Self::Output;
-}
-
-macro_rules! impl_powmod2_integer {
-    ($type:ident) => {
-        impl PowMod2<$type> for $type { 
-            type Output = $type;
-            fn pow_mod2(self, rhs: $type) -> $type { 
-                match rhs.is_even() {
-                    true  => Self::one(),
-                    false => self
-                }
-            }
+pub trait PowMod2<Rhs> 
+where Self: One, Rhs: IsEven {
+    fn pow_mod2(self, rhs: Rhs) -> Self { 
+        match rhs.is_even() {
+            true  => Self::one(),
+            false => self
         }
-    };
+    }
 }
 
-impl_powmod2_integer!(i32);
-impl_powmod2_integer!(i64);
+impl<T, Rhs> PowMod2<Rhs> for T
+where T: One, Rhs: IsEven {}
 
 #[cfg(test)]
 mod tests { 
@@ -296,7 +287,7 @@ mod tests {
     }
 
     #[test]
-    fn test_gcd_i32() {
+    fn gcd_i32() {
         let (a, b) = (240, 46);
         let d = i32::gcd(&a, &b);
         assert_eq!(d, 2);
@@ -311,7 +302,7 @@ mod tests {
     }
 
     #[test]
-    fn test_gcdx_i32() {
+    fn gcdx_i32() {
         let (a, b) = (240, 46);
         let (d, s, t) = i32::gcdx(&a, &b);
         assert_eq!(d, 2);
@@ -328,5 +319,11 @@ mod tests {
         assert_eq!(d, 0);
         assert_eq!(s, 0);
         assert_eq!(t, 0);
+    }
+
+    #[test]
+    fn pow_mod_2() {
+        assert_eq!((-1).pow_mod2(10), 1);
+        assert_eq!((-1).pow_mod2(-11), -1);
     }
 }

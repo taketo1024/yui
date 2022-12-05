@@ -1,6 +1,5 @@
 use std::ops::{Add, Neg, Sub, Mul, Index, IndexMut};
 use std::cmp::min;
-use num_traits::Num;
 use ndarray::{Array2, s};
 use sprs::{CsMat, TriMat};
 use crate::math::traits::{Ring, RingOps};
@@ -17,6 +16,14 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         Self { array }
     }
 }
+
+impl<R> From<CsMat<R>> for DnsMat<R>
+where R: Ring, for<'a> &'a R: RingOps<R> {
+    fn from(sp: CsMat<R>) -> Self {
+        DnsMat{ array: sp.to_dense() }
+    }
+}
+
 
 impl<R> DnsMat<R>
 where R: Ring, for<'a> &'a R: RingOps<R> {
@@ -170,6 +177,19 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         });
     }
 
+    pub fn to_sparse(&self) -> CsMat<R> {
+        let (m, n) = (self.array.nrows(), self.array.ncols());
+        let mut sp = TriMat::new((m, n));
+
+        for (k, a) in self.array.iter().enumerate() {
+            if a.is_zero() { continue }
+            let (i, j) = (k / n, k % n);
+            sp.add_triplet(i, j, a.clone());
+        }
+
+        sp.to_csc()
+    }
+
     // private methods // 
 
     fn is_valid_row_index(&self, i: usize) -> bool { 
@@ -238,39 +258,6 @@ impl<R> IndexMut<[usize; 2]> for DnsMat<R>
 where R: Ring, for<'a> &'a R: RingOps<R> {
     fn index_mut(&mut self, index: [usize; 2]) -> &mut Self::Output {
         &mut self.array[index]
-    }
-}
-
-pub trait CsMatElem: Clone + Default + Send + Sync + Num + sprs::MulAcc {}
-
-impl<T> CsMatElem for T
-    where Self: Clone + Default + Send + Sync + Num + sprs::MulAcc 
-{}
-
-impl<R> From<CsMat<R>> for DnsMat<R>
-where R: Ring + CsMatElem, for<'a> &'a R: RingOps<R> {
-    fn from(sp: CsMat<R>) -> Self {
-        DnsMat{ array: sp.to_dense() }
-    }
-}
-
-pub trait ToSparse<R: CsMatElem> {
-    fn to_sparse(&self) -> CsMat<R>;
-}
-
-impl<R> ToSparse<R> for DnsMat<R>
-where R: Ring + CsMatElem, for<'a> &'a R: RingOps<R> {
-    fn to_sparse(&self) -> CsMat<R> {
-        let (m, n) = (self.array.nrows(), self.array.ncols());
-        let mut sp = TriMat::new((m, n));
-
-        for (k, a) in self.array.iter().enumerate() {
-            if a.is_zero() { continue }
-            let (i, j) = (k / n, k % n);
-            sp.add_triplet(i, j, a.clone());
-        }
-
-        sp.to_csc()
     }
 }
 

@@ -3,12 +3,17 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use sprs::{CsMat, CsVec, TriMat};
 use num_traits::{One, Zero};
+use crate::math::traits::{Ring, RingOps};
 use crate::matrix::CsMatElem;
 
 pub trait ChainGenerator: PartialEq + Eq + Hash {}
 
-pub trait ChainComplex {
-    type R: CsMatElem;
+pub trait ChainComplex 
+where 
+    Self::R: Ring + CsMatElem, 
+    for<'x> &'x Self::R: RingOps<Self::R> 
+{
+    type R;
     type Generator: ChainGenerator;
 
     fn hdeg_range(&self) -> RangeInclusive<isize>;
@@ -94,7 +99,8 @@ where
 impl<R, X> ChainComplex for SimpleChainComplex<X, R> 
 where 
     X: ChainGenerator, 
-    R: CsMatElem
+    R: Ring + CsMatElem,
+    for<'x> &'x R: RingOps<R> 
 { 
     type R = R;
     type Generator = X;

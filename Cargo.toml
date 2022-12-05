@@ -12,4 +12,4 @@ itertools = "0.10.5"
 ndarray = "0.15.6"
 num-traits = "0.2.15"
 polynomial = "0.2.4"
-sprs = "0.11.0"
+sprs = { git = "https://github.com/sparsemat/sprs" }

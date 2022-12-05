@@ -1,7 +1,7 @@
-use std::ops::{Add, Neg, Sub, Mul, Index, IndexMut};
+use std::ops::{Add, Neg, Sub, Mul, Index, IndexMut, Deref};
 use std::cmp::min;
 use ndarray::{Array2, s};
-use sprs::{CsMat, TriMat};
+use sprs::{CsMat, TriMat, CsMatBase, SpIndex};
 use crate::math::traits::{Ring, RingOps};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -17,9 +17,18 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     }
 }
 
-impl<R> From<CsMat<R>> for DnsMat<R>
-where R: Ring, for<'a> &'a R: RingOps<R> {
-    fn from(sp: CsMat<R>) -> Self {
+impl<R, I, Iptr, IptrStorage, IndStorage, DataStorage> 
+    From<&CsMatBase<R, I, IptrStorage, IndStorage, DataStorage, Iptr>> 
+    for DnsMat<R>
+where 
+    R: Ring, for<'a> &'a R: RingOps<R> ,
+    I: SpIndex,
+    Iptr: SpIndex,
+    IptrStorage: Deref<Target = [Iptr]>,
+    IndStorage: Deref<Target = [I]>,
+    DataStorage: Deref<Target = [R]>,
+{
+    fn from(sp: &CsMatBase<R, I, IptrStorage, IndStorage, DataStorage, Iptr>) -> Self {
         DnsMat{ array: sp.to_dense() }
     }
 }
@@ -403,7 +412,7 @@ mod tests {
     #[test]
     fn from_sparse() { 
         let sps = CsMat::new((2, 3), vec![0,3,6], vec![0,1,2,0,1,2], vec![1,2,3,4,5,6]);
-        let dns = DnsMat::from(sps);
+        let dns = DnsMat::from(&sps);
         assert_eq!(dns, DnsMat::from(array![[1,2,3],[4,5,6]]));
     }
 }

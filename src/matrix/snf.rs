@@ -5,7 +5,6 @@ use crate::math::traits::{EucRing, EucRingOps};
 use super::DnsMat;
 
 pub type SnfFlags = [bool; 4];
-pub type SnfResult<R> = (DnsMat<R>, [Option<DnsMat<R>>; 4]);
 
 pub fn snf<R>(target: &DnsMat<R>, flags: SnfFlags) -> SnfResult<R>
 where R: EucRing, for<'a> &'a R: EucRingOps<R> {
@@ -21,6 +20,72 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     calc.diag_normalize();
     calc.result()
 }
+
+pub struct SnfResult<R>
+where R: EucRing, for<'a> &'a R: EucRingOps<R> { 
+    result: DnsMat<R>,
+    p:    Option<DnsMat<R>>,
+    pinv: Option<DnsMat<R>>,
+    q:    Option<DnsMat<R>>,
+    qinv: Option<DnsMat<R>>
+}
+
+impl<R> SnfResult<R>
+where R: EucRing, for<'a> &'a R: EucRingOps<R> { 
+    pub fn result(&self) -> &DnsMat<R> { 
+        &self.result
+    }
+
+    pub fn p(&self) -> Option<&DnsMat<R>> {
+        self.p.as_ref()
+    }
+
+    pub fn pinv(&self) -> Option<&DnsMat<R>> {
+        self.pinv.as_ref()
+    }
+
+    pub fn q(&self) -> Option<&DnsMat<R>> {
+        self.q.as_ref()
+    }
+
+    pub fn qinv(&self) -> Option<&DnsMat<R>> {
+        self.qinv.as_ref()
+    }
+
+    pub fn trans(&self) -> [Option<&DnsMat<R>>; 4] {
+        [self.p.as_ref(),
+         self.pinv.as_ref(),
+         self.q.as_ref(),
+         self.qinv.as_ref()]
+    }
+
+    pub fn destruct(self) -> (DnsMat<R>, [Option<DnsMat<R>>; 4]) {
+        (self.result, [self.p, self.pinv, self.q, self.qinv])
+    }
+
+    pub fn rank(&self) -> usize {
+        let n = min(self.result.nrows(), self.result.ncols());
+        for i in 0..n { 
+            if self.result[[i, i]].is_zero() { 
+                return i
+            }
+        }
+        return n
+    }
+
+    pub fn factors(&self) -> Vec<&R> { 
+        let n = min(self.result.nrows(), self.result.ncols());
+        (0..n).filter_map(|i| { 
+            let a = &self.result[[i, i]];
+            if !a.is_zero() { 
+                Some(a)
+            } else {
+                None
+            }
+         }).collect()
+    }
+}
+
 
 // -- private -- //
 
@@ -50,7 +115,13 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     }
 
     fn result(self) -> SnfResult<R> {
-        (self.target, [self.p, self.pinv, self.q, self.qinv])
+        SnfResult { 
+            result: self.target, 
+            p: self.p,
+            pinv: self.pinv,
+            q: self.q,
+            qinv: self.qinv
+        }
     }
 
     fn eliminate_all(&mut self) {
@@ -240,6 +311,10 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
         debug_assert!(self.target.is_diag());
 
         let r = min(self.target.nrows(), self.target.ncols());
+        if r == 0 { 
+            return
+        }
+
         loop { 
             let mut done = true;
             for i in 0..r-1 { 
@@ -315,8 +390,7 @@ mod tests {
     fn init() { 
         let a = DnsMat::from(array![[1,2,3], [4,5,6]]);
         let calc = SnfCalc::new(a, [true; 4]);
-
-        let (res, [p, pinv, q, qinv]) = calc.result();
+        let (res, [p, pinv, q, qinv]) = calc.result().destruct();
 
         assert_eq!(res, DnsMat::from(array![[1,2,3], [4,5,6]]));
         assert_eq!(p,    Some(DnsMat::eye(2)));
@@ -330,7 +404,7 @@ mod tests {
         let a = DnsMat::from(array![[1,2,3], [4,5,6]]);
         let calc = SnfCalc::new(a, [false; 4]);
         
-        let (res, [p, pinv, q, qinv]) = calc.result();
+        let (res, [p, pinv, q, qinv]) = calc.result().destruct();
 
         assert_eq!(res, DnsMat::from(array![[1,2,3], [4,5,6]]));
         assert_eq!(p,    None);
@@ -363,7 +437,7 @@ mod tests {
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.swap_rows(0, 1);
 
-        let (res, trans) = calc.result();
+        let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
         assert_eq!(res,  DnsMat::from(array![[4,5,6], [1,2,3], [7,8,9]]));
@@ -379,7 +453,7 @@ mod tests {
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.swap_cols(0, 1);
 
-        let (res, trans) = calc.result();
+        let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
         assert_eq!(res,  DnsMat::from(array![[2,1,3], [5,4,6], [8,7,9]]));
@@ -395,7 +469,7 @@ mod tests {
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.mul_row(0, &-1);
         
-        let (res, trans) = calc.result();
+        let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
         assert_eq!(res,  DnsMat::from(array![[-1,-2,-3], [4,5,6], [7,8,9]]));
@@ -411,7 +485,7 @@ mod tests {
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.mul_col(0, &-1);
         
-        let (res, trans) = calc.result();
+        let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
         assert_eq!(res,  DnsMat::from(array![[-1,2,3], [-4,5,6], [-7,8,9]]));
@@ -428,7 +502,7 @@ mod tests {
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.left_elementary(e, 0, 1);
 
-        let (res, trans) = calc.result();
+        let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
         assert_eq!(res,  DnsMat::from(array![[11,16,21], [16,23,30], [7,8,9]]));
@@ -445,7 +519,7 @@ mod tests {
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.right_elementary(e, 0, 1);
 
-        let (res, trans) = calc.result();
+        let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
         assert_eq!(res,  DnsMat::from(array![[7,10,3], [22,31,6], [37,52,9]]));
@@ -481,7 +555,7 @@ mod tests {
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.eliminate_row(0,0);
 
-        let (res, trans) = calc.result();
+        let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
         assert_eq!(res[[0, 0]], 1);
@@ -499,7 +573,7 @@ mod tests {
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.eliminate_row(1,1);
 
-        let (res, trans) = calc.result();
+        let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
         assert_eq!(res[[1, 0]], 0);
@@ -517,7 +591,7 @@ mod tests {
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.eliminate_col(0,0);
 
-        let (res, trans) = calc.result();
+        let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
         assert_eq!(res[[0, 0]], 1);
@@ -535,7 +609,7 @@ mod tests {
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.eliminate_col(1,1);
 
-        let (res, trans) = calc.result();
+        let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
         assert_eq!(res[[0, 1]], 0);
@@ -553,7 +627,7 @@ mod tests {
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.eliminate_at(0,0);
 
-        let (res, trans) = calc.result();
+        let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
         assert_eq!(res[[0, 0]], 1);
@@ -571,7 +645,7 @@ mod tests {
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.eliminate_at(1,1);
 
-        let (res, trans) = calc.result();
+        let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
         assert_eq!(res[[1, 1]], 1);
@@ -605,7 +679,7 @@ mod tests {
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.eliminate_all();
 
-        let (res, trans) = calc.result();
+        let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
         assert_eq!(res, DnsMat::from(array![[1,0,0],[0,3,0],[0,0,0]]));
@@ -626,7 +700,7 @@ mod tests {
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.eliminate_all();
 
-        let (res, trans) = calc.result();
+        let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
         assert_eq!(res, DnsMat::diag((6, 9), vec![1,1,1,1,1,1]));
@@ -646,7 +720,7 @@ mod tests {
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.eliminate_all();
 
-        let (res, trans) = calc.result();
+        let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
         assert_eq!(res, DnsMat::diag((5, 5), vec![1,1,1,2,60]));
@@ -660,7 +734,7 @@ mod tests {
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.diag_normalize();
 
-        let (res, trans) = calc.result();
+        let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
         
         assert_eq!(p * a.clone() * q, res);
@@ -673,7 +747,7 @@ mod tests {
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.diag_normalize();
 
-        let (res, trans) = calc.result();
+        let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
         
         assert_eq!(p * a.clone() * q, res);

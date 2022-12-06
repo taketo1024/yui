@@ -1,7 +1,7 @@
 use num_traits::{Pow, Zero};
 use crate::math::laurent_polynomial::LaurentPolynomial;
 use crate::math::traits::PowMod2;
-use crate::links::{Link, State};
+use crate::links::links::{Link, State};
 
 pub fn jones_polynomial(l: &Link) -> LaurentPolynomial<i32> {
     type P = LaurentPolynomial<i32>;
@@ -41,7 +41,7 @@ mod tests {
     use num_traits::One;
 
     use crate::math::laurent_polynomial::LaurentPolynomial;
-    use crate::links::{Link, Resolution::Res1};
+    use crate::links::links::{Link, Resolution::Res1};
     use super::jones_polynomial;
 
     type P = LaurentPolynomial<i32>;

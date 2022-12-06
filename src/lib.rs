@@ -1,13 +1,3 @@
-macro_rules! hashmap {
-    ($( $key: expr => $val: expr ),*) => {{
-         let mut map = ::std::collections::HashMap::new();
-         $( map.insert($key, $val); )*
-         map
-    }}
-}
-
+pub mod utils;
 pub mod math;
-pub mod matrix;
-pub mod homology;
 pub mod links;
-pub mod jones;

@@ -4,7 +4,8 @@ use std::hash::Hash;
 use sprs::{CsMat, CsVec, TriMat};
 use num_traits::One;
 use crate::math::traits::{Ring, RingOps};
-use crate::matrix::sparse::*;
+use crate::math::matrix::sparse::*;
+use crate::utils::hashmap;
 
 pub trait ChainGenerator: PartialEq + Eq + Hash {}
 
@@ -197,7 +198,7 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 pub mod tests { 
     use super::{SimpleChainComplex, ChainComplex};
-    use crate::matrix::sparse::*;
+    use crate::math::matrix::sparse::*;
     use sprs::CsMat;
 
     #[test]

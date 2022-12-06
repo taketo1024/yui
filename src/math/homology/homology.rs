@@ -3,8 +3,8 @@ use std::ops::{Index, RangeInclusive};
 use sprs::CsMat;
 
 use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps};
-use crate::matrix::{snf_in_place, DnsMat};
-use crate::matrix::sparse::*;
+use crate::math::matrix::{snf_in_place, DnsMat};
+use crate::math::matrix::sparse::*;
 use super::chain_complex::{ChainComplex, SimpleChainComplex};
 
 pub trait HomologyAtComputable: ChainComplex

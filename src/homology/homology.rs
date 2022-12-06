@@ -1,11 +1,13 @@
+use std::ops::{Index, RangeInclusive};
+
 use sprs::CsMat;
 
 use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps};
 use crate::matrix::{snf_in_place, DnsMat};
 use crate::matrix::sparse::*;
-use super::chain_complex::ChainComplex;
+use super::chain_complex::{ChainComplex, SimpleChainComplex, ChainGenerator};
 
-pub trait HomologyComputable: ChainComplex
+pub trait HomologyAtComputable: ChainComplex
 where 
     Self::R: Ring + CsMatElem, 
     for<'x> &'x Self::R: RingOps<Self::R>  
@@ -13,7 +15,7 @@ where
     fn homology_at(&self, i: isize) -> HomologySummand<Self::R>;
 }
 
-impl<C> HomologyComputable for C
+impl<C> HomologyAtComputable for C
 where 
     C: ChainComplex,
     C::R: EucRing + CsMatElem, 
@@ -26,7 +28,7 @@ where
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct HomologySummand<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> {
     rank: usize,
@@ -35,6 +37,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> HomologySummand<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
+    pub fn new(rank: usize, tors: Vec<R>) -> Self { 
+        Self { rank, tors }
+    }
+
+    pub fn empty() -> Self { 
+        Self { rank: 0, tors: vec![] }
+    }
+
     pub fn rank(&self) -> usize { 
         self.rank
     }
@@ -45,6 +55,72 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn is_free(&self) -> bool { 
         self.tors.is_empty()
+    }
+}
+
+pub trait HomologyComputable: ChainComplex + HomologyAtComputable
+where 
+    Self::R: Ring + CsMatElem, 
+    for<'x> &'x Self::R: RingOps<Self::R>  
+{
+    type Homology: Homology<R = Self::R>;
+    fn homology(&self) -> Self::Homology;
+}
+
+pub trait Homology: Index<isize>
+where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
+    type R;
+    fn range(&self) -> RangeInclusive<isize>;
+}
+
+pub struct SimpleHomology<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    summands: Vec<HomologySummand<R>>,
+    empty_summand: HomologySummand<R>
+}
+
+impl<R> SimpleHomology<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    pub fn new(summands: Vec<HomologySummand<R>>) -> Self { 
+        let empty_summand = HomologySummand::empty();
+        SimpleHomology { summands, empty_summand }
+    }
+}
+
+impl<R> Index<isize> for SimpleHomology<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = HomologySummand<R>;
+
+    fn index(&self, index: isize) -> &Self::Output {
+        if self.range().contains(&index) {
+            &self.summands[index as usize]
+        } else {
+            &self.empty_summand
+        }
+    }
+}
+
+impl<R> Homology for SimpleHomology<R> 
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type R = R;
+    fn range(&self) -> RangeInclusive<isize> {
+        let n = self.summands.len() as isize;
+        0 ..= n - 1
+    }
+}
+
+impl<X, R> HomologyComputable for SimpleChainComplex<X, R>
+where 
+    X: ChainGenerator,
+    R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> 
+{
+    type Homology = SimpleHomology<R>;
+
+    fn homology(&self) -> SimpleHomology<R> {
+        let summands = self.hdeg_range().map(|i| { 
+            self.homology_at(i)
+        }).collect();
+        SimpleHomology::new(summands)
     }
 }
 
@@ -102,7 +178,6 @@ where
 #[cfg(test)]
 mod tests { 
     use super::*;
-    use super::super::chain_complex::*;
     use super::super::chain_complex::tests::*;
 
     #[test]
@@ -119,10 +194,10 @@ mod tests {
             -1
         );
 
-        let h = c.homology_at(0);
+        let h = c.homology();
         
-        assert_eq!(h.rank(), 0);
-        assert!(h.is_free());
+        assert_eq!(h[0].rank(), 0);
+        assert!(h[0].is_free());
     }
 
     #[test]
@@ -138,64 +213,58 @@ mod tests {
             ],
             -1
         );
-        let h = c.homology_at(0);
-        assert_eq!(h.rank(), 0);
-        assert_eq!(h.tors(), &vec![2]);
+
+        let h = c.homology();
+        assert_eq!(h[0].rank(), 0);
+        assert_eq!(h[0].tors(), &vec![2]);
     }
 
     #[test]
     fn homology_d3() {
         let c = sample_d3();
-        let h0 = c.homology_at(0);
-        let h1 = c.homology_at(1);
-        let h2 = c.homology_at(2);
-        let h3 = c.homology_at(3);
+        let h = c.homology();
 
-        assert_eq!(h0.rank(), 1);
-        assert_eq!(h0.is_free(), true);
+        assert_eq!(h[0].rank(), 1);
+        assert_eq!(h[0].is_free(), true);
 
-        assert_eq!(h1.rank(), 0);
-        assert_eq!(h1.is_free(), true);
+        assert_eq!(h[1].rank(), 0);
+        assert_eq!(h[1].is_free(), true);
 
-        assert_eq!(h2.rank(), 0);
-        assert_eq!(h2.is_free(), true);
+        assert_eq!(h[2].rank(), 0);
+        assert_eq!(h[2].is_free(), true);
 
-        assert_eq!(h3.rank(), 0);
-        assert_eq!(h3.is_free(), true);
+        assert_eq!(h[3].rank(), 0);
+        assert_eq!(h[3].is_free(), true);
     }
 
     #[test]
     fn homology_t2() {
         let c = sample_t2();
-        let h0 = c.homology_at(0);
-        let h1 = c.homology_at(1);
-        let h2 = c.homology_at(2);
+        let h = c.homology();
 
-        assert_eq!(h0.rank(), 1);
-        assert_eq!(h0.is_free(), true);
+        assert_eq!(h[0].rank(), 1);
+        assert_eq!(h[0].is_free(), true);
 
-        assert_eq!(h1.rank(), 2);
-        assert_eq!(h1.is_free(), true);
+        assert_eq!(h[1].rank(), 2);
+        assert_eq!(h[1].is_free(), true);
 
-        assert_eq!(h2.rank(), 1);
-        assert_eq!(h2.is_free(), true);
+        assert_eq!(h[2].rank(), 1);
+        assert_eq!(h[2].is_free(), true);
     }
 
     #[test]
     fn homology_rp2() {
         let c = sample_rp2();
-        let h0 = c.homology_at(0);
-        let h1 = c.homology_at(1);
-        let h2 = c.homology_at(2);
+        let h = c.homology();
 
-        assert_eq!(h0.rank(), 1);
-        assert_eq!(h0.is_free(), true);
+        assert_eq!(h[0].rank(), 1);
+        assert_eq!(h[0].is_free(), true);
 
-        assert_eq!(h1.rank(), 0);
-        assert_eq!(h1.tors(), &vec![2]);
-        assert_eq!(h1.is_free(), false);
+        assert_eq!(h[1].rank(), 0);
+        assert_eq!(h[1].tors(), &vec![2]);
+        assert_eq!(h[1].is_free(), false);
 
-        assert_eq!(h2.rank(), 0);
-        assert_eq!(h2.is_free(), true);
+        assert_eq!(h[2].rank(), 0);
+        assert_eq!(h[2].is_free(), true);
     }
 }

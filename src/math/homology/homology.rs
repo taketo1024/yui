@@ -1,5 +1,5 @@
 use std::ops::{Index, RangeInclusive};
-
+use itertools::Itertools;
 use sprs::CsMat;
 
 use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps};
@@ -87,6 +87,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
+impl<'a, C> From<&'a C> for SimpleHomology<C::R>
+where
+    C: ChainComplex,
+    C::R: EucRing + CsMatElem, 
+    for<'x> &'x C::R: EucRingOps<C::R>  
+{
+    fn from(c: &C) -> Self {
+        let summands = c.hdeg_range().map(|k| c.homology_at(k)).collect_vec();
+        Self::new(summands)
+    }
+}
+
 impl<R> Index<isize> for SimpleHomology<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = HomologySummand<R>;
@@ -114,10 +126,7 @@ where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> {
     type Homology = SimpleHomology<R>;
 
     fn homology(&self) -> SimpleHomology<R> {
-        let summands = self.hdeg_range().map(|i| { 
-            self.homology_at(i)
-        }).collect();
-        SimpleHomology::new(summands)
+       SimpleHomology::from(self)
     }
 }
 

@@ -1,6 +1,6 @@
 use crate::math::traits::{Ring, RingOps};
 
-#[derive(PartialEq, Eq, Hash, Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum KhAlgGen { 
     I, X
 }

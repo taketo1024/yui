@@ -278,7 +278,7 @@ pub struct Component {
     closed:bool
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Resolution { 
     Res0, Res1
 }
@@ -308,7 +308,7 @@ impl fmt::Display for Resolution {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct State { 
     values: Vec<Resolution>
 }

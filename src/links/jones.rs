@@ -6,7 +6,7 @@ use crate::links::links::{Link, State};
 pub fn jones_polynomial(l: &Link) -> LaurentPolynomial<i32> {
     type P = LaurentPolynomial<i32>;
 
-    let n = l.crossing_num();
+    let n = l.crossing_num() as usize;
     let n_signed = l.signed_crossing_nums();
     let (n_pos, n_neg) = (n_signed.0 as i32, n_signed.1 as i32);
 
@@ -20,7 +20,7 @@ pub fn jones_polynomial(l: &Link) -> LaurentPolynomial<i32> {
         false => qinv.pow(-s)
     };
 
-    let m = 2.pow(n) as u32;
+    let m = 2.pow(n) as usize;
     let body = (0..m).fold(P::zero(), |res, i| { 
         let s = State::from_bseq(i, n);
         let l_s = l.clone().resolve(&s);

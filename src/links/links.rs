@@ -1,6 +1,6 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, ops::Index};
 use std::fmt;
-use itertools::join;
+use itertools::{join, Itertools};
 use Resolution::{Res0, Res1};
 use CrossingType::{Xp, Xn, V, H};
 
@@ -272,7 +272,7 @@ impl Crossing {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Component { 
     edges:Vec<Edge>,
     closed:bool
@@ -317,17 +317,8 @@ impl State {
     pub fn empty() -> Self { 
         State { values: vec![] }
     }
-}
 
-impl From<Vec<u8>> for State { 
-    fn from(seq: Vec<u8>) -> Self {
-        let values = seq.iter().map(|&a| Resolution::from(a)).collect();
-        State{ values }
-    }
-}
-
-impl State { 
-    pub fn from_bseq(mut bseq: u32, length: u32) -> Self {
+    pub fn from_bseq(mut bseq: usize, length: usize) -> Self {
         let seq = (0..length)
             .map(|_| {
                 let a = (bseq & 1) as u8;
@@ -345,6 +336,29 @@ impl State {
     
     pub fn len(&self) -> usize { 
         self.values.len()
+    }
+
+    pub fn targets(&self) -> Vec<State> { 
+        let n = self.len();
+        (0..n).filter(|&i| self[i] == Res0 ).map(|i| { 
+            let mut t = self.clone();
+            t.values[i] = Res1;
+            t
+        }).collect_vec()
+    }
+}
+
+impl Index<usize> for State { 
+    type Output = Resolution;
+    fn index(&self, index: usize) -> &Resolution {
+        &self.values[index]
+    }
+}
+
+impl From<Vec<u8>> for State { 
+    fn from(seq: Vec<u8>) -> Self {
+        let values = seq.iter().map(|&a| Resolution::from(a)).collect();
+        State{ values }
     }
 }
 
@@ -647,5 +661,27 @@ mod tests {
         assert_eq!(l.components().len(), 2);
     }
 
+    #[test]
+    fn state_targets() {
+        let s = State::from(vec![0, 0, 0]);
+        assert_eq!(s.targets(), vec![
+            State::from(vec![1, 0, 0]),
+            State::from(vec![0, 1, 0]),
+            State::from(vec![0, 0, 1]),
+        ]);
 
+        let s = State::from(vec![0, 1, 0]);
+        assert_eq!(s.targets(), vec![
+            State::from(vec![1, 1, 0]),
+            State::from(vec![0, 1, 1]),
+        ]);
+
+        let s = State::from(vec![1, 1, 0]);
+        assert_eq!(s.targets(), vec![
+            State::from(vec![1, 1, 1]),
+        ]);
+
+        let s = State::from(vec![1, 1, 1]);
+        assert_eq!(s.targets(), vec![]);
+    }
 }

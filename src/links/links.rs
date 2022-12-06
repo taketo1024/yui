@@ -27,9 +27,7 @@ impl Link {
     }
 
     pub fn unknot() -> Link { 
-        let mut u = Link::from([[0, 1, 1, 0]]);
-        u.resolve_at(0, &Res0);
-        u
+        Link::from([[0, 1, 1, 0]]).resolve_at(0, Res0)
     }
 
     pub fn trefoil() -> Link { 
@@ -103,23 +101,26 @@ impl Link {
         comps
     }
 
-    pub fn mirror(&mut self) {
-        for c in &mut self.data { 
-            c.mirror()
-        }
+    pub fn mirror(self) -> Self {
+        let mut data = self.data;
+        data.iter_mut().for_each(|x| x.mirror());
+        Link { data }
     }
 
-    pub fn resolve_at(&mut self, i: usize, r: &Resolution) {
+    pub fn resolve_at(self, i: usize, r: Resolution) -> Self {
         debug_assert!(i < self.data.len());
-        let c = &mut self.data[i];
-        c.resolve(r);
+        let mut data = self.data;
+        data[i].resolve(r);
+        Link { data }
     }
 
-    pub fn resolve(&mut self, s: &State) {
+    pub fn resolve(self, s: &State) -> Self {
         debug_assert!(s.len() <= self.data.len());
-        for (i, r) in s.values.iter().enumerate() {
-            self.resolve_at(i, r);
+        let mut data = self.data;
+        for (i, &r) in s.values.iter().enumerate() {
+            data[i].resolve(r);
         }
+        Link { data }
     }
 
     // -- internal methods -- //
@@ -248,7 +249,7 @@ impl Crossing {
         }
     }
 
-    fn resolve(&mut self, r: &Resolution) {
+    fn resolve(&mut self, r: Resolution) {
         match (self.ctype, r) {
             (Xp, Res0) | (Xn, Res1) => self.ctype = V,
             (Xp, Res1) | (Xn, Res0) => self.ctype = H,
@@ -277,7 +278,7 @@ pub struct Component {
     closed:bool
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Resolution { 
     Res0, Res1
 }
@@ -291,8 +292,8 @@ impl Resolution {
     }
 }
 
-impl From<&u8> for Resolution {
-    fn from(a: &u8) -> Self {
+impl From<u8> for Resolution {
+    fn from(a: u8) -> Self {
         match a { 
             0 => Res0,
             1 => Res1,
@@ -307,14 +308,20 @@ impl fmt::Display for Resolution {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct State { 
     values: Vec<Resolution>
 }
 
+impl State { 
+    pub fn empty() -> Self { 
+        State { values: vec![] }
+    }
+}
+
 impl From<Vec<u8>> for State { 
     fn from(seq: Vec<u8>) -> Self {
-        let values = seq.iter().map(|a| Resolution::from(a)).collect();
+        let values = seq.iter().map(|&a| Resolution::from(a)).collect();
         State{ values }
     }
 }
@@ -325,7 +332,7 @@ impl State {
             .map(|_| {
                 let a = (bseq & 1) as u8;
                 bseq >>= 1;
-                Resolution::from(&a)
+                Resolution::from(a)
             })
             .rev()
             .collect();
@@ -343,7 +350,7 @@ impl State {
 
 impl<const N: usize> From<[u8; N]> for State {
     fn from(values: [u8; N]) -> Self {
-        let values = values.iter().map(|v| Resolution::from(v)).collect();
+        let values = values.iter().map(|&v| Resolution::from(v)).collect();
         Self { values }
     }
 }
@@ -387,25 +394,25 @@ mod tests {
     fn crossing_resolve() {
         let mut c = a_crossing(Xp);
         
-        c.resolve(&Res0);
+        c.resolve(Res0);
         assert!(c.is_resolved());
         assert_eq!(c.ctype, V);
 
         let mut c = a_crossing(Xp);
         
-        c.resolve(&Res1);
+        c.resolve(Res1);
         assert!(c.is_resolved());
         assert_eq!(c.ctype, H);
 
         let mut c = a_crossing(Xn);
         
-        c.resolve(&Res0);
+        c.resolve(Res0);
         assert!(c.is_resolved());
         assert_eq!(c.ctype, H);
 
         let mut c = a_crossing(Xn);
         
-        c.resolve(&Res1);
+        c.resolve(Res1);
         assert!(c.is_resolved());
         assert_eq!(c.ctype, V);
     }
@@ -565,27 +572,26 @@ mod tests {
     #[test]
     fn link_mirror() { 
         let pd_code = [[0,0,1,1]];
-        let mut l = Link::from(pd_code);
+        let l = Link::from(pd_code);
         assert_eq!(l.data[0].ctype, Xn);
 
-        l.mirror();
-
+        let l = l.mirror();
         assert_eq!(l.data[0].ctype, Xp);
     }
 
     #[test]
     fn link_resolve() {
-        let mut l = Link::from([[1,4,2,5],[3,6,4,1],[5,2,6,3]]); // trefoil
         let s = State::from([0, 0, 0]);
-        l.resolve(&s);
+        let l = Link::from([[1,4,2,5],[3,6,4,1],[5,2,6,3]]) // trefoil
+            .resolve(&s);
 
         let comps = l.components();
         assert_eq!(comps.len(), 3);
         assert!(comps.iter().all(|c| c.closed));
 
-        let mut l = Link::from([[1,4,2,5],[3,6,4,1],[5,2,6,3]]); // trefoil
         let s = State::from([1, 1, 1]);
-        l.resolve(&s);
+        let l = Link::from([[1,4,2,5],[3,6,4,1],[5,2,6,3]]) // trefoil
+            .resolve(&s);
 
         let comps = l.components();
         assert_eq!(comps.len(), 2);

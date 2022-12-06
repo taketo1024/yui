@@ -8,6 +8,9 @@ use crate::matrix::sparse::*;
 
 pub trait ChainGenerator: PartialEq + Eq + Hash {}
 
+impl<T> ChainGenerator for T 
+where T: PartialEq + Eq + Hash {}
+
 pub trait ChainComplex 
 where 
     Self::R: Ring + CsMatElem, 
@@ -17,11 +20,10 @@ where
     type Generator: ChainGenerator;
 
     fn hdeg_range(&self) -> RangeInclusive<isize>;
-    fn in_hdeg_range(&self, k: isize) -> bool { self.hdeg_range().contains(&k) }
     fn generators(&self, k: isize) -> Vec<&Self::Generator>;
 
     fn rank(&self, k: isize) -> usize { 
-        if self.in_hdeg_range(k) { 
+        if self.hdeg_range().contains(&k) { 
             self.generators(k).len()
         } else {
             0
@@ -95,34 +97,43 @@ where
     }
 }
 
-pub struct SimpleChainComplex<X, R> 
-where 
-    X: ChainGenerator, 
-    R: CsMatElem
-{ 
-    generators: Vec<Vec<X>>,
+pub struct SimpleChainComplex<R> 
+where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> { 
+    generators: Vec<Vec<usize>>,
     d_matrices: Vec<CsMat<R>>,
     d_degree: isize
 }
 
-impl<X, R> SimpleChainComplex<X, R>
-where 
-    X: ChainGenerator, 
-    R: CsMatElem
-{ 
-    pub fn new(generators: Vec<Vec<X>>, d_matrices: Vec<CsMat<R>>, d_degree: isize) -> Self { 
+impl<R> SimpleChainComplex<R>
+where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> { 
+    pub fn new(d_matrices: Vec<CsMat<R>>, d_degree: isize) -> Self {
+        assert!(d_degree == 1 || d_degree == -1);
+
+        let mut count = 0;
+        let mut gens = |n: usize| { 
+            let g = (count .. count + n).into_iter().collect();
+            count += n;
+            g
+        };
+
+        let mut generators: Vec<_> = d_matrices.iter().map(|d| {
+            let n = if d_degree > 0 { d.cols() } else { d.rows() };
+            gens(n)
+        }).collect();
+
+        if let Some(d) = d_matrices.last() { 
+            let n = if d_degree > 0 { d.rows() } else { d.cols() };
+            generators.push(gens(n));
+        }
+
         SimpleChainComplex { generators, d_matrices, d_degree }
     }
 }
 
-impl<R, X> ChainComplex for SimpleChainComplex<X, R> 
-where 
-    X: ChainGenerator, 
-    R: Ring + CsMatElem,
-    for<'x> &'x R: RingOps<R> 
-{ 
+impl<R> ChainComplex for SimpleChainComplex<R> 
+where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> { 
     type R = R;
-    type Generator = X;
+    type Generator = usize;
 
     fn hdeg_range(&self) -> RangeInclusive<isize> {
         let n = self.generators.len() as isize;
@@ -135,23 +146,31 @@ where
 
     fn rank(&self, k: isize) -> usize {
         if self.hdeg_range().contains(&k) { 
-            self.generators[k as usize].len()
+            let k = k as usize;
+            self.generators[k].len()
         } else {
             0
         }
    }
 
-    fn generators(&self, k: isize) -> Vec<&X> {
+    fn generators(&self, k: isize) -> Vec<&Self::Generator> {
         if self.hdeg_range().contains(&k) { 
-            self.generators[k as usize].iter().collect()
+            let k = k as usize;
+            self.generators[k].iter().collect()
         } else {
             vec![]
         }
     }
 
     fn d_matrix(&self, k: isize) -> CsMat<R> {
-        if self.hdeg_range().contains(&k) { 
-            self.d_matrices[k as usize].clone()
+        let n = *self.hdeg_range().end();
+        let (range, idx) = if self.d_degree > 0 { 
+            (0 ..= n - 1, k as usize)
+        } else {
+            (1 ..= n, (k - 1) as usize)
+        };
+        if range.contains(&k) { 
+            self.d_matrices[idx].clone()
         } else {
             let m = self.rank(k + self.d_degree);
             let n = self.rank(k);
@@ -159,7 +178,7 @@ where
         }
     }
 
-    fn differentiate(&self, k: isize, x: &X) -> Vec<(&X, R)> {
+    fn differentiate(&self, k: isize, x: &Self::Generator) -> Vec<(&Self::Generator, R)> {
         assert!(self.hdeg_range().contains(&k));
         let v = self.vectorize_x(k, x);
         let d = self.d_matrix(k);
@@ -177,8 +196,7 @@ where
 
 #[cfg(test)]
 pub mod tests { 
-    use super::{SimpleChainComplex, ChainGenerator, ChainComplex};
-    use std::ops::Range;
+    use super::{SimpleChainComplex, ChainComplex};
     use num_traits::Zero;
     use sprs::{CsMat, TriMat};
 
@@ -236,14 +254,6 @@ pub mod tests {
 
     // below : test data // 
 
-    #[derive(PartialEq, Eq, Hash)]
-    pub struct X { val: i32 }
-    impl ChainGenerator for X {}
-
-    pub fn gens(range: Range<i32>) -> Vec<X> { 
-        range.map(|i| X{ val: i }).collect() 
-    }
-
     pub fn mat(size:(usize, usize), data: Vec<i32>) -> CsMat<i32> {
         let n = size.1;
         let mut trip = TriMat::new(size);
@@ -255,61 +265,38 @@ pub mod tests {
         trip.to_csc()
     }
 
-    pub fn sample_empty() -> SimpleChainComplex<X, i32> {
-        SimpleChainComplex { 
-            generators: vec![],
-            d_matrices: vec![],
-            d_degree: -1
-        }
+    pub fn sample_empty() -> SimpleChainComplex<i32> {
+        SimpleChainComplex::new(vec![], -1)
     }
 
-    pub fn sample_d3() -> SimpleChainComplex<X, i32> {
-        SimpleChainComplex { 
-            generators: vec![
-                gens(0..4),
-                gens(4..10),
-                gens(10..14),
-                gens(14..15)
-            ],
-            d_matrices: vec![
-                mat((0, 4), vec![]),
+    pub fn sample_d3() -> SimpleChainComplex<i32> {
+        SimpleChainComplex::new(
+            vec![
                 mat((4, 6), vec![-1, -1, 0, -1, 0, 0, 1, 0, -1, 0, -1, 0, 0, 1, 1, 0, 0, -1, 0, 0, 0, 1, 1, 1]),
                 mat((6, 4), vec![1, 1, 0, 0, -1, 0, 1, 0, 1, 0, 0, 1, 0, -1, -1, 0, 0, 1, 0, -1, 0, 0, 1, 1] ),
                 mat((4, 1), vec![-1, 1, -1, 1])
             ],
-            d_degree: -1
-        }
+            -1
+        )
     }
 
-    pub fn sample_t2() -> SimpleChainComplex<X, i32> {
-        SimpleChainComplex { 
-            generators: vec![
-                gens(0..9),
-                gens(9..36),
-                gens(36..54)
-            ],
-            d_matrices: vec![
-                mat((0, 9), vec![]),
+    pub fn sample_t2() -> SimpleChainComplex<i32> {
+        SimpleChainComplex::new(
+            vec![
                 mat((9, 27), vec![-1, -1, 0, -1, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1, 1, 0, -1, 0, 0, 0, 0, 0, 0, -1, -1, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, -1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, -1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, -1, 0, 1, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0, 1, -1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, -1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1, 1]),
                 mat((27, 18), vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1])
             ],
-            d_degree: -1
-        }
+            -1
+        )
     }
 
-    pub fn sample_rp2() -> SimpleChainComplex<X, i32> { 
-        SimpleChainComplex { 
-            generators: vec![
-                gens(0..6),
-                gens(6..21),
-                gens(21..31)
-            ],
-            d_matrices: vec![
-                mat((0, 6), vec![]),
+    pub fn sample_rp2() -> SimpleChainComplex<i32> { 
+        SimpleChainComplex::new(
+            vec![
                 mat((6, 15), vec![-1, -1, 0, 0, 0, 0, 0, -1, -1, 0, -1, 0, 0, 0, 0, 1, 0, -1, -1, 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 1, 1, 0, 1, 1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 1, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1] ),
                 mat((15, 10), vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, -1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, -1] ),
             ],
-            d_degree: -1
-        }
+            -1
+        )
     }
 }

@@ -5,7 +5,7 @@ use sprs::CsMat;
 use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps};
 use crate::matrix::{snf_in_place, DnsMat};
 use crate::matrix::sparse::*;
-use super::chain_complex::{ChainComplex, SimpleChainComplex, ChainGenerator};
+use super::chain_complex::{ChainComplex, SimpleChainComplex};
 
 pub trait HomologyAtComputable: ChainComplex
 where 
@@ -109,11 +109,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<X, R> HomologyComputable for SimpleChainComplex<X, R>
-where 
-    X: ChainGenerator,
-    R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> 
-{
+impl<R> HomologyComputable for SimpleChainComplex<R>
+where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> {
     type Homology = SimpleHomology<R>;
 
     fn homology(&self) -> SimpleHomology<R> {
@@ -182,15 +179,8 @@ mod tests {
 
     #[test]
     fn cancel_pair() { 
-        let c = SimpleChainComplex::new( 
-            vec![
-                gens(0..1),
-                gens(1..2)
-            ],
-            vec![
-                mat((0, 1), vec![]),
-                mat((1, 1), vec![1]),
-            ],
+        let c = SimpleChainComplex::new(
+            vec![ mat((1, 1), vec![1]) ],
             -1
         );
 
@@ -203,14 +193,7 @@ mod tests {
     #[test]
     fn torsion() { 
         let c = SimpleChainComplex::new( 
-            vec![
-                gens(0..1),
-                gens(1..2)
-            ],
-            vec![
-                mat((0, 1), vec![]),
-                mat((1, 1), vec![2]),
-            ],
+            vec![ mat((1, 1), vec![2]) ],
             -1
         );
 

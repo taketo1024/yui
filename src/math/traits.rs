@@ -2,6 +2,7 @@ use std::fmt::Debug;
 use std::ops::{Add, Neg, Sub, Mul, Rem, Div};
 use num_traits::{Zero, One};
 use std::iter::{Sum, Product};
+use super::sign::Sign;
 use is_even::IsEven;
 
 // Set Elements
@@ -41,7 +42,7 @@ pub trait AddGrpOps<T>:
 {}
 
 pub trait AddGrp: 
-    AddMon + AddGrpOps<Self>
+    AddMon + AddGrpOps<Self> + From<Sign>
 where 
     for<'a> &'a Self: AddGrpOps<Self>
 {}
@@ -52,6 +53,11 @@ macro_rules! impl_add_grp {
         impl AddGrpOps<$type> for $type {}
         impl<'a> AddGrpOps<$type> for &'a $type {}
         impl AddGrp for $type {}
+        impl From<Sign> for $type { 
+            fn from(e: Sign) -> Self {
+                if e.is_positive() { Self::one() } else { -Self::one() }
+            }
+        }
     };
 }
 

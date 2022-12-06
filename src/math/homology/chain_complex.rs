@@ -7,10 +7,10 @@ use crate::math::traits::{Ring, RingOps};
 use crate::math::matrix::sparse::*;
 use crate::utils::hashmap;
 
-pub trait ChainGenerator: PartialEq + Eq + Hash {}
+pub trait ChainGenerator: Clone + PartialEq + Eq + Hash {}
 
 impl<T> ChainGenerator for T 
-where T: PartialEq + Eq + Hash {}
+where T: Clone + PartialEq + Eq + Hash {}
 
 pub trait ChainComplex 
 where 
@@ -20,8 +20,10 @@ where
     type R;
     type Generator: ChainGenerator;
 
+    fn d_degree(&self) -> isize { 1 } 
     fn hdeg_range(&self) -> RangeInclusive<isize>;
     fn generators(&self, k: isize) -> Vec<&Self::Generator>;
+    fn differentiate(&self, k: isize, x:&Self::Generator) -> Vec<(Self::Generator, Self::R)>;
 
     fn rank(&self, k: isize) -> usize { 
         if self.hdeg_range().contains(&k) { 
@@ -31,11 +33,7 @@ where
         }
     }
 
-    fn d_degree(&self) -> isize { 1 } 
-    fn d_matrix(&self, k: isize) -> CsMat<Self::R>;
-    fn differentiate(&self, k: isize, x:&Self::Generator) -> Vec<(&Self::Generator, Self::R)>;
-
-    fn make_d_matrix(&self, k: isize) -> CsMat<Self::R> {
+    fn d_matrix(&self, k: isize) -> CsMat<Self::R> {
         let source = self.generators(k);
         let target = self.generators(k + self.d_degree());
         let (m, n) = (target.len(), source.len());
@@ -50,8 +48,8 @@ where
         for (j, x) in source.iter().enumerate() {
             let ys = self.differentiate(k, x);
             for (y, a) in ys {
-                if !t_ind.contains_key(y) { continue }
-                let i = t_ind[y];
+                if !t_ind.contains_key(&y) { continue }
+                let i = t_ind[&y];
                 trip.add_triplet(i, j, a);
             }
         }
@@ -179,7 +177,7 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    fn differentiate(&self, k: isize, x: &Self::Generator) -> Vec<(&Self::Generator, R)> {
+    fn differentiate(&self, k: isize, x: &Self::Generator) -> Vec<(Self::Generator, R)> {
         assert!(self.hdeg_range().contains(&k));
         let v = self.vectorize_x(k, x);
         let d = self.d_matrix(k);
@@ -188,7 +186,7 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
         let gens = self.generators(k + self.d_degree());
 
         let res = w.iter().map(|(i, a)| { 
-            (gens[i], a.clone())
+            (gens[i].clone(), a.clone())
         }).collect();
 
         res

@@ -3,9 +3,10 @@ use itertools::Itertools;
 use num_traits::Pow;
 use crate::links::links::{Link, State, Component, Resolution};
 use crate::math::traits::{Ring, RingOps, PowMod2};
+use crate::math::sign::Sign;
 use super::algebra::{KhAlgGen, KhAlgStr};
 
-#[derive(PartialEq, Eq, Hash, Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct KhEnhState { 
     state: State,
     label: Vec<KhAlgGen>
@@ -40,6 +41,10 @@ impl KhCubeVertex {
 
         KhCubeVertex { state: s.clone(), circles, generators }
     }
+
+    pub fn generators(&self) -> Vec<&KhEnhState> { 
+        self.generators.iter().collect()
+    }
 }
 
 #[derive(Debug)]
@@ -50,9 +55,10 @@ enum KhCubeEdgeTrans {
 
 #[derive(Debug)]
 struct KhCubeEdge { 
+    from: State,
     to: State,
     trans: KhCubeEdgeTrans,
-    sign: i8
+    sign: Sign
 }
 
 impl KhCubeEdge { 
@@ -77,23 +83,23 @@ impl KhCubeEdge {
         };
 
         let sign = Self::sign(&from.state, &to.state);
-        KhCubeEdge { to: to.state.clone(), trans, sign }
+        KhCubeEdge { from: from.state.clone(), to: to.state.clone(), trans, sign }
     }
 
-    fn sign(from: &State, to: &State) -> i8 { 
+    fn sign(from: &State, to: &State) -> Sign { 
         use Resolution::Res1;
         debug_assert_eq!(from.len(), to.len());
         debug_assert_eq!(from.weight() + 1, to.weight());
 
         let n = from.len();
         let i = (0..n).find(|&i| from[i] != to[i]).unwrap();
-        let k = (0..i).filter(|&j| from[j] == Res1).count();
+        let k = (0..i).filter(|&j| from[j] == Res1).count() as u32;
 
-        (-1).pow_mod2(k as u8)
+        Sign::from( (-1).pow_mod2(k) )
     }
 }
 
-struct KhCube<R>
+pub struct KhCube<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     str: KhAlgStr<R>,
     dim: usize,
@@ -103,7 +109,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> KhCube<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    fn new(l: &Link, str: KhAlgStr<R>) -> Self { 
+    pub fn new(l: &Link, str: KhAlgStr<R>) -> Self { 
         let dim = l.crossing_num() as usize;
         let m = 2.pow(dim) as usize;
 
@@ -126,12 +132,80 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         KhCube { str, dim, vertices, edges }
     }
 
-    fn dim(&self) -> usize { 
+    pub fn dim(&self) -> usize { 
         self.dim
+    }
+
+    pub fn generators(&self, k: usize) -> Vec<&KhEnhState> { 
+        self.vertices(k).into_iter().flat_map(|v| v.generators()).collect_vec()
+    }
+
+    pub fn differentiate(&self, x: &KhEnhState) -> Vec<(KhEnhState, R)> {
+        let edges = self.edges_from(&x.state);
+        edges.iter().flat_map(|e| { 
+            self.apply(x, e)
+        }).collect_vec()
     }
 
     fn vertex(&self, s: &State) -> &KhCubeVertex { 
         &self.vertices[s]
+    }
+
+    fn vertices(&self, k: usize) -> Vec<&KhCubeVertex> { 
+        let k = k as u32;
+        self.vertices
+            .iter()
+            .sorted_by(|(s1, _), (s2, _)| Ord::cmp(s1, s2))
+            .filter_map(|(s, v)| {
+                if s.weight() == k { 
+                    Some(v)
+                } else {
+                    None
+                }
+            })
+            .collect_vec()
+    }
+
+    fn edges_from(&self, s: &State) -> &Vec<KhCubeEdge> {
+        &self.edges[s]
+    }
+
+    fn apply(&self, x: &KhEnhState, e: &KhCubeEdge) -> Vec<(KhEnhState, R)> {
+        use KhCubeEdgeTrans::*;
+        
+        assert_eq!(x.state, e.from);
+        let sign = R::from(e.sign);
+
+        match e.trans { 
+            Merge((i, j), k) => {
+                let (x_i, x_j) = (x.label[i], x.label[j]);
+                self.str.prod(x_i, x_j).into_iter().map(|(y_k, a)| { 
+                    let t = e.to.clone();
+                    let mut label = x.label.clone();
+                    label.remove(j);
+                    label.remove(i);
+                    label.insert(k, y_k);
+
+                    let y = KhEnhState::new(t, label);
+                    let r = &sign * &a;
+                    (y, r)
+                }).collect_vec()
+            },
+            Split(i, (j, k)) => {
+                let x_i = x.label[i];
+                self.str.coprod(x_i).into_iter().map(|(y_j, y_k, a)| { 
+                    let t = e.to.clone();
+                    let mut label = x.label.clone();
+                    label.remove(i);
+                    label.insert(j, y_j);
+                    label.insert(k, y_k);
+
+                    let y = KhEnhState::new(t, label);
+                    let r = &sign * &a;
+                    (y, r)
+                }).collect_vec()
+            }
+        }
     }
 }
 
@@ -183,7 +257,7 @@ mod tests {
         let e = KhCubeEdge::between(&v, &w);
 
         assert_eq!(e.to, t);
-        assert_eq!(e.sign, 1);
+        assert!(e.sign.is_positive());
 
         let KhCubeEdgeTrans::Merge(from, to) = e.trans else { 
             panic!()
@@ -202,7 +276,7 @@ mod tests {
         let e = KhCubeEdge::between(&v, &w);
 
         assert_eq!(e.to, t);
-        assert_eq!(e.sign, 1);
+        assert!(e.sign.is_positive());
 
         let KhCubeEdgeTrans::Split(from, to) = e.trans else { 
             panic!()
@@ -215,19 +289,23 @@ mod tests {
     fn edge_sign() { 
         let s = State::from(vec![0, 0, 0]);
         let t = State::from(vec![1, 0, 0]);
-        assert_eq!(KhCubeEdge::sign(&s, &t), 1);
+        let e = KhCubeEdge::sign(&s, &t);
+        assert!(e.is_positive());
 
         let s = State::from(vec![1, 0, 0]);
         let t = State::from(vec![1, 1, 0]);
-        assert_eq!(KhCubeEdge::sign(&s, &t), -1);
+        let e = KhCubeEdge::sign(&s, &t);
+        assert!(e.is_negative());
 
         let s = State::from(vec![1, 1, 0]);
         let t = State::from(vec![1, 1, 1]);
-        assert_eq!(KhCubeEdge::sign(&s, &t), 1);
+        let e = KhCubeEdge::sign(&s, &t);
+        assert!(e.is_positive());
 
         let s = State::from(vec![0, 1, 0]);
         let t = State::from(vec![0, 1, 1]);
-        assert_eq!(KhCubeEdge::sign(&s, &t), -1);
+        let e = KhCubeEdge::sign(&s, &t);
+        assert!(e.is_negative());
     }
 
     #[test]
@@ -245,7 +323,8 @@ mod tests {
 
         assert_eq!(v.circles.len(), 0);
         assert_eq!(v.generators.len(), 1);
-        assert!(cube.edges[&s].is_empty());
+
+        assert!(cube.edges_from(&s).is_empty());
     }
 
     #[test]
@@ -262,7 +341,8 @@ mod tests {
 
         assert_eq!(v.circles.len(), 1);
         assert_eq!(v.generators.len(), 2);
-        assert!(cube.edges[&s].is_empty());
+
+        assert!(cube.edges_from(&s).is_empty());
     }
 
     #[test]
@@ -286,7 +366,27 @@ mod tests {
         assert_eq!(v1.circles.len(), 1);
         assert_eq!(v1.generators.len(), 2);
 
-        assert_eq!(cube.edges[&s0].len(), 1);
-        assert_eq!(cube.edges[&s1].len(), 0);
+        assert_eq!(cube.edges_from(&s0).len(), 1);
+        assert_eq!(cube.edges_from(&s1).len(), 0);
     }
+
+    #[test]
+    fn cube_hopf_link() { 
+        let l = Link::hopf_link();
+        let str = KhAlgStr::new(0, 0);
+        let cube = KhCube::new(&l, str);
+
+        assert_eq!(cube.dim, 2);
+        assert_eq!(cube.vertices.len(), 4);
+   }
+
+   #[test]
+   fn cube_trefoil() { 
+       let l = Link::trefoil();
+       let str = KhAlgStr::new(0, 0);
+       let cube = KhCube::new(&l, str);
+
+       assert_eq!(cube.dim, 3);
+       assert_eq!(cube.vertices.len(), 8);
+  }
 }

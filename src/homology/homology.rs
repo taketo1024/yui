@@ -180,7 +180,7 @@ mod tests {
     #[test]
     fn cancel_pair() { 
         let c = SimpleChainComplex::new(
-            vec![ mat((1, 1), vec![1]) ],
+            vec![ CsMat::csc_from_vec((1, 1), vec![1]) ],
             -1
         );
 
@@ -193,7 +193,7 @@ mod tests {
     #[test]
     fn torsion() { 
         let c = SimpleChainComplex::new( 
-            vec![ mat((1, 1), vec![2]) ],
+            vec![ CsMat::csc_from_vec((1, 1), vec![2]) ],
             -1
         );
 
@@ -218,6 +218,21 @@ mod tests {
 
         assert_eq!(h[3].rank(), 0);
         assert_eq!(h[3].is_free(), true);
+    }
+
+    #[test]
+    fn homology_s2() {
+        let c = sample_s2();
+        let h = c.homology();
+
+        assert_eq!(h[0].rank(), 1);
+        assert_eq!(h[0].is_free(), true);
+
+        assert_eq!(h[1].rank(), 0);
+        assert_eq!(h[1].is_free(), true);
+
+        assert_eq!(h[2].rank(), 1);
+        assert_eq!(h[2].is_free(), true);
     }
 
     #[test]

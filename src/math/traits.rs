@@ -1,18 +1,27 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::ops::{Add, Neg, Sub, Mul, Rem, Div};
-use num_traits::{Zero, One};
+use std::hash::Hash;
 use std::iter::{Sum, Product};
-use super::sign::Sign;
 use is_even::IsEven;
+use num_traits::{Zero, One};
+use super::sign::Sign;
 
 // Set Elements
 pub trait MathElem: 
-    Clone + PartialEq + Eq + Debug
-{}
+    Debug + Display + Clone + PartialEq + Eq + Hash
+{
+    fn symbol() -> String;
+}
 
-impl<T> MathElem for T where 
-    T: Clone + PartialEq + Eq + Debug
-{}
+macro_rules! impl_math_elem {
+    ($type:ident, $symbol:literal) => {
+        impl MathElem for $type {
+            fn symbol() -> String {
+                String::from($symbol)
+            }
+        }
+    };
+}
 
 // Additive Monoids 
 
@@ -202,6 +211,7 @@ macro_rules! impl_euc_ring {
 
 macro_rules! impl_euc_ring_integer {
     ($type:ident) => {
+        impl_math_elem!($type, "Z");
         impl_ring_methods_integer!($type);
         impl_euc_ring!($type);
     }

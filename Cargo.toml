@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+grouping_by = "0.2.2"
 is-even = "1.0.0"
 is-odd = "1.0.0"
 itertools = "0.10.5"

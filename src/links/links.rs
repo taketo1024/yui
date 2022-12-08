@@ -203,18 +203,28 @@ impl Link {
 }
 
 impl<const N: usize> From<[[Edge; 4]; N]> for Link { 
-    fn from(pd_code: [[Edge; 4]; N]) -> Link { 
-        let data = pd_code
-            .into_iter()
-            .map( |x| 
-                Crossing { 
-                    ctype: Xn,
-                    edges: x
-                }
-            )
-            .collect();
+    fn from(pd_code: [[Edge; 4]; N]) -> Link {
+        let data = pd_code.into_iter().collect_vec(); 
+        Self::from(data)
+    }
+}
 
+impl From<Vec<[Edge; 4]>> for Link { 
+    fn from(pd_code: Vec<[Edge; 4]>) -> Link { 
+        let data = pd_code.into_iter().map( |x| 
+            Crossing { ctype: Xn, edges: x }
+        ).collect();
         Link{ data }
+    }
+}
+
+impl Link { 
+    pub fn load(name: String) -> Result<Link, Box<dyn std::error::Error>> {
+        let path = format!("{}/links/{}.json", crate::RESOURCE_DIR, name);
+        let json = std::fs::read_to_string(path)?;
+        let data: Vec<[Edge; 4]> = serde_json::from_str(&json)?;
+        let l = Link::from(data);
+        Ok(l)
     }
 }
 

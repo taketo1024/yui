@@ -19,7 +19,7 @@ pub fn subscript(i: isize) -> String {
 }
 
 pub fn superscript(i: isize) -> String {
-    if i == 0 { return String::from('\u{207B}') }
+    if i == 0 { return String::from('\u{2070}') }
 
     let (mut res, i) = if i > 0 { 
         (vec![], i as usize)

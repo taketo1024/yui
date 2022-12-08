@@ -1,3 +1,5 @@
+use std::ops::RangeInclusive;
+
 use crate::math::homology::chain_complex::ChainComplex;
 use crate::math::homology::homology::{HomologyComputable, SimpleHomology};
 use crate::math::matrix::CsMatElem;
@@ -14,7 +16,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn new(l: &Link, str: KhAlgStr<R>) -> Self { 
+    pub fn new(l: &Link) -> Self { 
+        Self::new_ht(l, R::zero(), R::zero())
+    }
+
+    pub fn new_ht(l: &Link, h: R, t: R) -> Self { 
+        let str = KhAlgStr::new(h, t);
         let cube = KhCube::new(l, str);
         let (n_pos, n_neg) = l.signed_crossing_nums();
         let (n_pos, n_neg) = (n_pos as isize, n_neg as isize);
@@ -36,7 +43,7 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
         1
     }
 
-    fn hdeg_range(&self) -> std::ops::RangeInclusive<isize> {
+    fn hdeg_range(&self) -> RangeInclusive<isize> {
         let n = self.cube.dim() as isize;
         let s = self.shift.0;
         s ..= s + n
@@ -69,8 +76,7 @@ mod tests {
     #[test]
     fn kh_empty() {
         let l = Link::empty();
-        let a = KhAlgStr::new(0, 0);
-        let c = KhComplex::new(&l, a);
+        let c = KhComplex::<i32>::new(&l);
 
         assert_eq!(c.hdeg_range(), 0..=0);
         c.check_d_all();
@@ -79,8 +85,7 @@ mod tests {
     #[test]
     fn kh_unknot() {
         let l = Link::unknot();
-        let a = KhAlgStr::new(0, 0);
-        let c = KhComplex::new(&l, a);
+        let c = KhComplex::<i32>::new(&l);
 
         assert_eq!(c.hdeg_range(), 0..=0);
         c.check_d_all();
@@ -89,8 +94,7 @@ mod tests {
     #[test]
     fn kh_trefoil() {
         let l = Link::trefoil();
-        let a = KhAlgStr::new(0, 0);
-        let c = KhComplex::new(&l, a);
+        let c = KhComplex::<i32>::new(&l);
 
         assert_eq!(c.hdeg_range(), -3..=0);
         assert_eq!(c.generators(-3).len(), 8);
@@ -104,8 +108,7 @@ mod tests {
     #[test]
     fn kh_figure8() {
         let l = Link::figure8();
-        let a = KhAlgStr::new(0, 0);
-        let c = KhComplex::new(&l, a);
+        let c = KhComplex::<i32>::new(&l);
 
         assert_eq!(c.hdeg_range(), -2..=2);
         assert_eq!(c.generators(-2).len(), 8);

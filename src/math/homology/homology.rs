@@ -76,14 +76,15 @@ where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
 pub struct SimpleHomology<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     summands: Vec<HomologySummand<R>>,
-    empty_summand: HomologySummand<R>
+    empty_summand: HomologySummand<R>,
+    shift: isize
 }
 
 impl<R> SimpleHomology<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new(summands: Vec<HomologySummand<R>>) -> Self { 
+    pub fn new(summands: Vec<HomologySummand<R>>, shift: isize) -> Self { 
         let empty_summand = HomologySummand::empty();
-        SimpleHomology { summands, empty_summand }
+        SimpleHomology { summands, empty_summand, shift }
     }
 }
 
@@ -95,7 +96,8 @@ where
 {
     fn from(c: &C) -> Self {
         let summands = c.hdeg_range().map(|k| c.homology_at(k)).collect_vec();
-        Self::new(summands)
+        let shift = *c.hdeg_range().start();
+        Self::new(summands, shift)
     }
 }
 
@@ -103,11 +105,13 @@ impl<R> Index<isize> for SimpleHomology<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = HomologySummand<R>;
 
-    fn index(&self, index: isize) -> &Self::Output {
-        if self.range().contains(&index) {
-            &self.summands[index as usize]
+    fn index(&self, k: isize) -> &Self::Output {
+        if self.range().contains(&k) {
+            let index = (k - self.shift) as usize;
+            &self.summands[index]
         } else {
-            &self.empty_summand
+            panic!()
+            // &self.empty_summand
         }
     }
 }
@@ -116,8 +120,9 @@ impl<R> Homology for SimpleHomology<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type R = R;
     fn range(&self) -> RangeInclusive<isize> {
+        let s = self.shift;
         let n = self.summands.len() as isize;
-        0 ..= n - 1
+        s ..= s + n - 1
     }
 }
 

@@ -1,9 +1,8 @@
 use std::ops::RangeInclusive;
 
-use crate::math::homology::chain_complex::ChainComplex;
-use crate::math::homology::homology::{HomologyComputable, SimpleHomology};
+use crate::math::traits::{Ring, RingOps};
 use crate::math::matrix::CsMatElem;
-use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps};
+use crate::math::homology::complex::{ChainComplex, ChainComplexSparseD};
 use crate::links::Link;
 use super::algebra::KhAlgStr;
 use super::cube::{KhEnhState, KhCube};
@@ -35,7 +34,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 impl<R> ChainComplex for KhComplex<R>
-where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> { 
+where R: Ring, for<'x> &'x R: RingOps<R> { 
     type R = R;
     type Generator = KhEnhState;
 
@@ -43,7 +42,7 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
         1
     }
 
-    fn hdeg_range(&self) -> RangeInclusive<isize> {
+    fn range(&self) -> RangeInclusive<isize> {
         let n = self.cube.dim() as isize;
         let s = self.shift.0;
         s ..= s + n
@@ -60,17 +59,13 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<R> HomologyComputable for KhComplex<R>
-where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> { 
-    type Homology = SimpleHomology<R>;
-    fn homology(&self) -> Self::Homology {
-        SimpleHomology::from(self)
-    }
-}
+impl<R> ChainComplexSparseD for KhComplex<R>
+where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {}
 
 #[cfg(test)]
 mod tests {
-    use crate::{links::Link, khovanov::algebra::KhAlgStr, math::homology::chain_complex::ChainComplex};
+    use crate::links::Link;
+    use crate::math::homology::complex::{ChainComplex, ChainComplexSparseD};
     use super::KhComplex;
 
     #[test]
@@ -78,7 +73,7 @@ mod tests {
         let l = Link::empty();
         let c = KhComplex::<i32>::new(&l);
 
-        assert_eq!(c.hdeg_range(), 0..=0);
+        assert_eq!(c.range(), 0..=0);
         c.check_d_all();
     }
 
@@ -87,7 +82,7 @@ mod tests {
         let l = Link::unknot();
         let c = KhComplex::<i32>::new(&l);
 
-        assert_eq!(c.hdeg_range(), 0..=0);
+        assert_eq!(c.range(), 0..=0);
         c.check_d_all();
     }
 
@@ -96,7 +91,7 @@ mod tests {
         let l = Link::trefoil();
         let c = KhComplex::<i32>::new(&l);
 
-        assert_eq!(c.hdeg_range(), -3..=0);
+        assert_eq!(c.range(), -3..=0);
         assert_eq!(c.generators(-3).len(), 8);
         assert_eq!(c.generators(-2).len(), 12);
         assert_eq!(c.generators(-1).len(), 6);
@@ -110,7 +105,7 @@ mod tests {
         let l = Link::figure8();
         let c = KhComplex::<i32>::new(&l);
 
-        assert_eq!(c.hdeg_range(), -2..=2);
+        assert_eq!(c.range(), -2..=2);
         assert_eq!(c.generators(-2).len(), 8);
         assert_eq!(c.generators(-1).len(), 16);
         assert_eq!(c.generators( 0).len(), 18);

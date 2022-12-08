@@ -1,23 +1,22 @@
 use std::ops::{Index, RangeInclusive};
-use itertools::Itertools;
 use sprs::CsMat;
 
 use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps};
 use crate::math::matrix::{snf_in_place, DnsMat};
 use crate::math::matrix::sparse::*;
-use super::chain_complex::{ChainComplex, SimpleChainComplex};
+use super::complex::{ChainComplex, ChainComplexSparseD};
 
-pub trait HomologyAtComputable: ChainComplex
+pub trait HomologyComputable: ChainComplex
 where 
-    Self::R: Ring + CsMatElem, 
+    Self::R: Ring, 
     for<'x> &'x Self::R: RingOps<Self::R>  
 {
     fn homology_at(&self, i: isize) -> HomologySummand<Self::R>;
 }
 
-impl<C> HomologyAtComputable for C
+impl<C> HomologyComputable for C
 where 
-    C: ChainComplex,
+    C: ChainComplexSparseD,
     C::R: EucRing + CsMatElem, 
     for<'x> &'x C::R: EucRingOps<C::R>  
 { 
@@ -58,81 +57,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-pub trait HomologyComputable: ChainComplex + HomologyAtComputable
-where 
-    Self::R: Ring + CsMatElem, 
-    for<'x> &'x Self::R: RingOps<Self::R>  
-{
-    type Homology: Homology<R = Self::R>;
-    fn homology(&self) -> Self::Homology;
-}
-
 pub trait Homology: Index<isize>
 where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
     type R;
     fn range(&self) -> RangeInclusive<isize>;
-}
-
-pub struct SimpleHomology<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    summands: Vec<HomologySummand<R>>,
-    empty_summand: HomologySummand<R>,
-    shift: isize
-}
-
-impl<R> SimpleHomology<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new(summands: Vec<HomologySummand<R>>, shift: isize) -> Self { 
-        let empty_summand = HomologySummand::empty();
-        SimpleHomology { summands, empty_summand, shift }
-    }
-}
-
-impl<'a, C> From<&'a C> for SimpleHomology<C::R>
-where
-    C: ChainComplex,
-    C::R: EucRing + CsMatElem, 
-    for<'x> &'x C::R: EucRingOps<C::R>  
-{
-    fn from(c: &C) -> Self {
-        let summands = c.hdeg_range().map(|k| c.homology_at(k)).collect_vec();
-        let shift = *c.hdeg_range().start();
-        Self::new(summands, shift)
-    }
-}
-
-impl<R> Index<isize> for SimpleHomology<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = HomologySummand<R>;
-
-    fn index(&self, k: isize) -> &Self::Output {
-        if self.range().contains(&k) {
-            let index = (k - self.shift) as usize;
-            &self.summands[index]
-        } else {
-            panic!()
-            // &self.empty_summand
-        }
-    }
-}
-
-impl<R> Homology for SimpleHomology<R> 
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type R = R;
-    fn range(&self) -> RangeInclusive<isize> {
-        let s = self.shift;
-        let n = self.summands.len() as isize;
-        s ..= s + n - 1
-    }
-}
-
-impl<R> HomologyComputable for SimpleChainComplex<R>
-where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> {
-    type Homology = SimpleHomology<R>;
-
-    fn homology(&self) -> SimpleHomology<R> {
-       SimpleHomology::from(self)
-    }
 }
 
 //       d₁            d₂
@@ -149,7 +77,7 @@ where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> {
 // H = Ker(d₂) / Im(d₁)
 // ≅ Rᶠ ⊕ (Rᵇ / Im(s₁))
 
-fn compute_homology<R>(d1: &CsMat<R>, d2: &CsMat<R>, with_trans: bool) 
+pub fn compute_homology<R>(d1: &CsMat<R>, d2: &CsMat<R>, with_trans: bool) 
     -> HomologySummand<R>
 where 
     R: EucRing + CsMatElem,
@@ -184,99 +112,4 @@ where
     }).collect();
 
     HomologySummand{ rank, tors }
-}
-
-#[cfg(test)]
-mod tests { 
-    use super::*;
-    use super::super::chain_complex::tests::*;
-
-    #[test]
-    fn cancel_pair() { 
-        let c = SimpleChainComplex::new(
-            vec![ CsMat::csc_from_vec((1, 1), vec![1]) ],
-            -1
-        );
-
-        let h = c.homology();
-        
-        assert_eq!(h[0].rank(), 0);
-        assert!(h[0].is_free());
-    }
-
-    #[test]
-    fn torsion() { 
-        let c = SimpleChainComplex::new( 
-            vec![ CsMat::csc_from_vec((1, 1), vec![2]) ],
-            -1
-        );
-
-        let h = c.homology();
-        assert_eq!(h[0].rank(), 0);
-        assert_eq!(h[0].tors(), &vec![2]);
-    }
-
-    #[test]
-    fn homology_d3() {
-        let c = sample_d3();
-        let h = c.homology();
-
-        assert_eq!(h[0].rank(), 1);
-        assert_eq!(h[0].is_free(), true);
-
-        assert_eq!(h[1].rank(), 0);
-        assert_eq!(h[1].is_free(), true);
-
-        assert_eq!(h[2].rank(), 0);
-        assert_eq!(h[2].is_free(), true);
-
-        assert_eq!(h[3].rank(), 0);
-        assert_eq!(h[3].is_free(), true);
-    }
-
-    #[test]
-    fn homology_s2() {
-        let c = sample_s2();
-        let h = c.homology();
-
-        assert_eq!(h[0].rank(), 1);
-        assert_eq!(h[0].is_free(), true);
-
-        assert_eq!(h[1].rank(), 0);
-        assert_eq!(h[1].is_free(), true);
-
-        assert_eq!(h[2].rank(), 1);
-        assert_eq!(h[2].is_free(), true);
-    }
-
-    #[test]
-    fn homology_t2() {
-        let c = sample_t2();
-        let h = c.homology();
-
-        assert_eq!(h[0].rank(), 1);
-        assert_eq!(h[0].is_free(), true);
-
-        assert_eq!(h[1].rank(), 2);
-        assert_eq!(h[1].is_free(), true);
-
-        assert_eq!(h[2].rank(), 1);
-        assert_eq!(h[2].is_free(), true);
-    }
-
-    #[test]
-    fn homology_rp2() {
-        let c = sample_rp2();
-        let h = c.homology();
-
-        assert_eq!(h[0].rank(), 1);
-        assert_eq!(h[0].is_free(), true);
-
-        assert_eq!(h[1].rank(), 0);
-        assert_eq!(h[1].tors(), &vec![2]);
-        assert_eq!(h[1].is_free(), false);
-
-        assert_eq!(h[2].rank(), 0);
-        assert_eq!(h[2].is_free(), true);
-    }
 }

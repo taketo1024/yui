@@ -20,7 +20,7 @@ where
     type R;
     type Generator: ChainGenerator;
 
-    fn d_degree(&self) -> isize { 1 } 
+    fn d_degree(&self) -> isize;
     fn hdeg_range(&self) -> RangeInclusive<isize>;
     fn generators(&self, k: isize) -> Vec<&Self::Generator>;
     fn differentiate(&self, k: isize, x:&Self::Generator) -> Vec<(Self::Generator, Self::R)>;

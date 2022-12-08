@@ -1,4 +1,5 @@
 use std::ops::{RangeInclusive, Index};
+use std::fmt::Display;
 use itertools::Itertools;
 
 use crate::math::traits::{Ring, RingOps};
@@ -52,6 +53,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let s = self.shift;
         let n = self.summands.len() as isize;
         s ..= s + n - 1
+    }
+}
+
+impl<R> Display for SimpleHomology<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.fmt_default(f)
     }
 }
 

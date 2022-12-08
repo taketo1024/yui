@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::ops::{Index, RangeInclusive};
 use sprs::CsMat;
 
@@ -61,10 +62,51 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-pub trait Homology: Index<isize>
+impl<R> Display for HomologySummand<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use grouping_by::GroupingBy;
+        use crate::utils::format::superscript;
+
+        if self.is_zero() { return write!(f, "0") }
+
+        let mut res = vec![];
+        let symbol = R::symbol();
+        let r = self.rank as isize;
+
+        if r > 0 {
+            let str = if r > 1 { 
+                format!("{}{}", symbol, superscript(r))
+            }  else {
+                format!("{}", symbol)
+            };
+            res.push(str);
+        }
+
+        for (t, r) in self.tors.iter().counter(|&t| t) { 
+            let str = if r > 1 { 
+                format!("({}/{}){}", symbol, t, superscript(r as isize))
+            } else { 
+                format!("({}/{})", symbol, t)
+            };
+            res.push(str);
+        }
+
+        write!(f, "{}", res.join(" ⊕ "))
+    }
+}
+
+pub trait Homology: Index<isize, Output = HomologySummand<Self::R>>
 where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
     type R;
     fn range(&self) -> RangeInclusive<isize>;
+
+    fn fmt_default(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for i in self.range() { 
+            write!(f, "H[{}]: {}\n", i, self[i])?
+        }
+        Ok(())
+    }
 }
 
 //       d₁            d₂

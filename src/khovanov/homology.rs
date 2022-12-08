@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::ops::{RangeInclusive, Index};
 
 use crate::math::homology::homology::{Homology, HomologySummand};
@@ -52,6 +53,16 @@ where
 
     fn range(&self) -> RangeInclusive<isize> {
         self.homology.range()
+    }
+}
+
+impl<R> Display for KhHomology<R> 
+where 
+    R: EucRing + CsMatElem,
+    for<'x> &'x R: EucRingOps<R>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.homology.fmt(f)
     }
 }
 

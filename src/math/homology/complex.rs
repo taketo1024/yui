@@ -5,7 +5,7 @@ use sprs::{CsMat, CsVec, TriMat};
 use num_traits::One;
 use crate::math::traits::{Ring, RingOps};
 use crate::math::matrix::sparse::*;
-use crate::utils::hashmap;
+use crate::utils::collections::hashmap;
 
 pub trait ChainGenerator: Clone + PartialEq + Eq + Hash {}
 

@@ -40,7 +40,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         Self { rank, tors }
     }
 
-    pub fn empty() -> Self { 
+    pub fn zero() -> Self { 
         Self { rank: 0, tors: vec![] }
     }
 
@@ -54,6 +54,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn is_free(&self) -> bool { 
         self.tors.is_empty()
+    }
+
+    pub fn is_zero(&self) -> bool { 
+        self.rank == 0 && self.tors.is_empty()
     }
 }
 

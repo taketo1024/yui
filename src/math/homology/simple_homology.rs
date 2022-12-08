@@ -7,15 +7,15 @@ use super::homology::{HomologySummand, HomologyComputable, Homology};
 pub struct SimpleHomology<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     summands: Vec<HomologySummand<R>>,
-    empty_summand: HomologySummand<R>,
+    zero: HomologySummand<R>,
     shift: isize
 }
 
 impl<R> SimpleHomology<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(summands: Vec<HomologySummand<R>>, shift: isize) -> Self { 
-        let empty_summand = HomologySummand::empty();
-        SimpleHomology { summands, empty_summand, shift }
+        let zero = HomologySummand::zero();
+        SimpleHomology { summands, zero, shift }
     }
 }
 
@@ -40,7 +40,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let index = (k - self.shift) as usize;
             &self.summands[index]
         } else {
-            &self.empty_summand
+            &self.zero
         }
     }
 }

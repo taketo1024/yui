@@ -1,9 +1,14 @@
 macro_rules! hashmap {
-    ($( $key: expr => $val: expr ),*) => {{
-         let mut map = ::std::collections::HashMap::new();
-         $( map.insert($key, $val); )*
-         map
+    {$( $key: expr => $val: expr ),*} => {{
+        HashMap::from([$(($key, $val),)*])
+    }}
+}
+
+macro_rules! hashset {
+    {$($val: expr ),*} => {{
+        HashSet::from([$($val,)*])
     }}
 }
 
 pub(crate) use hashmap;
+pub(crate) use hashset;

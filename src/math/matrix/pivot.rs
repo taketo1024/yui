@@ -338,8 +338,8 @@ mod tests {
     fn rows_cols() {
         let a = CsMat::<i32>::csc_from_vec((4, 3), vec![]);
         let pf = PivotFinder::new(&a);
-        assert_eq!(a.rows(), 4);
-        assert_eq!(a.cols(), 3);
+        assert_eq!(pf.nrows(), 4);
+        assert_eq!(pf.ncols(), 3);
     }
 
     #[test]

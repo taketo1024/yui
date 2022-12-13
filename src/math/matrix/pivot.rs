@@ -1,7 +1,7 @@
 use std::{collections::{HashSet, HashMap, VecDeque}, cmp::Ordering, slice::Iter};
 
 use itertools::Itertools;
-use sprs::CsMat;
+use sprs::{CsMat, PermOwned};
 
 use crate::math::traits::{Ring, RingOps};
 
@@ -14,6 +14,30 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pf.find_cycle_free_pivots();
 
     pf.result()
+}
+
+pub fn perms_by_pivots<R>(a: &CsMat<R>, pivs: &Vec<(usize, usize)>) -> (PermOwned, PermOwned)
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    use std::collections::BTreeSet;
+    fn perm(n: usize, v: Vec<usize>) -> PermOwned { 
+        let mut set: BTreeSet<_> = (0..n).collect();
+        let mut vec: Vec<usize> = vec![];
+        for i in v { 
+            vec.push(i);
+            set.remove(&i);
+        }
+        for i in set { 
+            vec.push(i);
+        }
+        let mut inv = vec![0; n];
+        for (i, j) in vec.into_iter().enumerate() {
+            inv[j] = i;
+        }
+        PermOwned::new(inv)
+    }
+    let (m, n) = a.shape();
+    let (rows, cols) = pivs.iter().cloned().unzip();
+    (perm(m, rows), perm(n, cols))
 }
 
 type Row = usize;
@@ -234,17 +258,33 @@ impl PivotFinder {
         ).next()
     }
 
-    fn result(self) -> Vec<(usize, usize)> { 
-        todo!()
+    fn result(&self) -> Vec<(usize, usize)> { 
+        use topological_sort::TopologicalSort;
+        let mut ts = TopologicalSort::new();
+        
+        for (&j, &i) in self.pivots.iter() { 
+            for &j2 in self.nz_cols(i) { 
+                if j != j2 && self.is_piv_col(j2) {
+                    ts.add_dependency(j, j2);
+                }
+            }
+        }
+
+        ts.into_iter().map(|j| {
+            let i = self.pivots[&j];
+            (i, j)
+        }).collect_vec()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use std::collections::{HashSet, HashMap};
+    use num_traits::{Zero, One};
     use sprs::CsMat;
-    use crate::{math::matrix::sparse::CsMatExt, utils::collections::*};
-    use super::PivotFinder;
+    use crate::math::matrix::{sparse::CsMatExt, pivot::perms_by_pivots};
+    use crate::utils::collections::{hashmap, hashset};
+    use super::*;
  
     #[test]
     fn init() {
@@ -410,7 +450,51 @@ mod tests {
             0, 1, 0, 0, 0, 1, 0, 1, 0
         ]);
         let mut pf = PivotFinder::new(&a);
+
         pf.find_cycle_free_pivots();
+
         assert_eq!(pf.pivots, hashmap!{2 => 4, 4 => 3, 0 => 0, 1 => 5, 3 => 2});
+    }
+
+    #[test]
+    fn result() { 
+        let a = CsMat::csc_from_vec((6, 9), vec![
+            1, 0, 0, 0, 0, 1, 0, 0, 1,
+            0, 1, 1, 1, 0, 1, 0, 1, 0,
+            0, 0, 1, 1, 0, 0, 0, 1, 1,
+            0, 1, 0, 0, 1, 0, 0, 0, 0,
+            0, 0, 1, 0, 0, 0, 0, 0, 0,
+            0, 1, 0, 0, 0, 1, 0, 1, 0
+        ]);
+        let pivs = find_pivots(&a);
+        let r = pivs.len();
+        assert_eq!(r, 4);
+        
+        let (p, q) = perms_by_pivots(&a, &pivs);
+        let b = a.permute(p.view(), q.view()).to_dense();
+
+        assert!((0..r).all(|i| b[[i, i]].is_one()));
+        assert!((0..r).all(|j| {
+            (j+1..r).all(|i| b[[i, j]].is_zero())
+        }));
+    }
+
+    #[test]
+    fn rand() {
+        let d = 0.1;
+        let shape = (60, 80);
+        let a: CsMat<i32> = CsMat::rand(shape, d);
+
+        let pivs = find_pivots(&a);
+        let r = pivs.len();
+        assert!(r > 10);
+        
+        let (p, q) = perms_by_pivots(&a, &pivs);
+        let b = a.permute(p.view(), q.view()).to_dense();
+
+        assert!((0..r).all(|i| b[[i, i]].is_one()));
+        assert!((0..r).all(|j| {
+            (j+1..r).all(|i| b[[i, j]].is_zero())
+        }))
     }
 }

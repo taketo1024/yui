@@ -15,8 +15,7 @@ type Row = usize;
 type Col = usize;
 struct PivotFinder {
     shape: (usize, usize),
-    nnz: Vec<Vec<Col>>, // [row -> [col]]
-    row_head: Vec<Col>,     // [row -> col]
+    nnz: Vec<Vec<Col>>,     // [row -> [col]]
     row_wght: Vec<f32>,     // [row -> weight]
     col_wght: Vec<f32>,     // [col -> weight]
     cands: Vec<HashSet<Col>>, // [row -> [col]]
@@ -54,7 +53,7 @@ impl PivotFinder {
             }
         }
 
-        PivotFinder{ shape, nnz, row_head, row_wght, col_wght, cands, pivots, max_pivot }
+        PivotFinder{ shape, nnz, row_wght, col_wght, cands, pivots, max_pivot }
     }
 
     fn rows(&self) -> Row { 
@@ -65,8 +64,24 @@ impl PivotFinder {
         self.shape.1
     }
 
+    fn row_head(&self, i: Row) -> Option<Col> {
+        self.nnz[i].first().map(|&j| j)
+    }
+
     fn is_candidate(&self, i: Row, j: Col) -> bool { 
         self.cands[i].contains(&j)
+    }
+
+    fn npivs(&self) -> usize { 
+        self.pivots.len()
+    }
+
+    fn has_pivot(&self, j: Col) -> bool { 
+        self.pivots.contains_key(&j)
+    }
+
+    fn piv_row(&self, j: Col) -> Option<Row>{ 
+        self.pivots.get(&j).copied()
     }
 
     fn set_pivot(&mut self, i: Row, j: Col) {
@@ -89,13 +104,33 @@ impl PivotFinder {
             res
         })
     }
+
+    fn find_fl_pivots(&mut self) {
+        let m = self.rows();
+
+        for i in 0..m {
+            let Some(j) = self.row_head(i) else { continue };
+            if !self.is_candidate(i, j) { continue }
+
+            let should_ins = 
+                self.piv_row(j).map(|i2| // occupied
+                    self.row_wght[i] < self.row_wght[i2]
+                ).unwrap_or(             // free
+                    self.npivs() < self.max_pivot
+                );
+
+            if should_ins {
+                self.set_pivot(i, j);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
+    use std::collections::{HashSet, HashMap};
     use sprs::CsMat;
-    use crate::{math::matrix::sparse::CsMatExt, utils::collections::hashset};
+    use crate::{math::matrix::sparse::CsMatExt, utils::collections::*};
     use super::PivotFinder;
  
     #[test]
@@ -118,7 +153,6 @@ mod tests {
             vec![1,3,6,8], 
             vec![0,2,4,5,7,8]]
         );
-        assert_eq!(pf.row_head, vec![0,1,2,1,1,0]);
         assert_eq!(pf.row_wght, vec![5f32,5f32,4f32,3f32,4f32,6f32]);
         assert_eq!(pf.col_wght, vec![2f32,3f32,5f32,3f32,2f32,3f32,2f32,3f32,4f32]);
         assert_eq!(pf.cands, vec![
@@ -129,5 +163,80 @@ mod tests {
             hashset!{1,3,6,8},
             hashset!{0,2,4,5,7,8}
         ]);
+    }
+
+    #[test]
+    fn row_head() {
+        let a = CsMat::csc_from_vec((4, 4), vec![
+            1, 0, 1, 0,
+            0, 1, 1, 1,
+            0, 0, 0, 0,
+            0, 0, 1, 1,
+        ]);
+        let pf = PivotFinder::new(&a);
+
+        assert_eq!(pf.row_head(0), Some(0));
+        assert_eq!(pf.row_head(1), Some(1));
+        assert_eq!(pf.row_head(2), None);
+        assert_eq!(pf.row_head(3), Some(2));
+    }
+
+    #[test]
+    fn rows_cols() {
+        let a = CsMat::<i32>::csc_from_vec((4, 3), vec![]);
+        let pf = PivotFinder::new(&a);
+        assert_eq!(a.rows(), 4);
+        assert_eq!(a.cols(), 3);
+    }
+
+    #[test]
+    fn remain_rows() {
+        let a = CsMat::<i32>::csc_from_vec((4, 3), vec![]);
+        let mut pf = PivotFinder::new(&a);
+
+        assert_eq!(pf.remain_rows(), vec![0,1,2,3]);
+
+        pf.set_pivot(0, 0);
+        pf.set_pivot(2, 1);
+
+        assert_eq!(pf.remain_rows(), vec![1,3]);
+    }
+
+    #[test]
+    fn occupied_cols() {
+        let a = CsMat::csc_from_vec((4, 4), vec![
+            1, 0, 1, 0,
+            0, 1, 1, 1,
+            0, 0, 0, 0,
+            0, 0, 1, 1,
+        ]);
+        let mut pf = PivotFinder::new(&a);
+
+        assert_eq!(pf.occupied_cols(), hashset!{});
+
+        pf.set_pivot(0, 0);
+
+        assert_eq!(pf.occupied_cols(), hashset!{0,2});
+
+        pf.set_pivot(1, 1);
+
+        assert_eq!(pf.occupied_cols(), hashset!{0,1,2,3});
+    }
+
+    #[test]
+    fn find_fl_pivots() {
+        let a = CsMat::csc_from_vec((6, 9), vec![
+            1, 0, 1, 0, 0, 1, 1, 0, 1,
+            0, 1, 1, 1, 0, 1, 0, 1, 0,
+            0, 0, 1, 1, 0, 0, 0, 1, 1,
+            0, 1, 1, 0, 1, 0, 0, 0, 0,
+            0, 0, 1, 1, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 1, 0, 1, 1
+        ]);
+        let mut pf = PivotFinder::new(&a);
+
+        pf.find_fl_pivots();
+
+        assert_eq!(pf.pivots, hashmap!{0 => 0, 1 => 3, 2 => 4, 5 => 5} );
     }
 }

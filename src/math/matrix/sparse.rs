@@ -75,7 +75,22 @@ where
     }
 
     fn submatrix(&self, rows: Range<usize>, cols: Range<usize>) -> CsMat<R> {
-        todo!()
+        let (i0, i1) = (rows.start, rows.end);
+        let (j0, j1) = (cols.start, cols.end);
+
+        assert!(i0 <= i1 && i1 <= self.rows());
+        assert!(j0 <= j1 && j1 <= self.cols());
+
+        let mut trip = TriMat::new((i1 - i0, j1 - j0));
+        
+        for (a, (i, j)) in self.into_iter() { 
+            let (i, j) = (i.index(), j.index());
+            if !a.is_zero() && rows.contains(&i) && cols.contains(&j) {
+                trip.add_triplet(i - i0, j - j0, a.clone());
+            }
+        }
+
+        trip.to_csc()
     }
 }
 

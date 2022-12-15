@@ -52,6 +52,7 @@ struct PivotFinder {
     max_pivot: usize
 }
 
+#[allow(unused)]
 impl PivotFinder { 
     fn new<R>(a: &CsMat<R>) -> Self
     where R: Ring, for<'x> &'x R: RingOps<R> {

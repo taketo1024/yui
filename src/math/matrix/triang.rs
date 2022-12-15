@@ -31,10 +31,6 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
             let x_i = replace(&mut x[i], R::zero());
             trip.add_triplet(i, j, x_i);
         }
-
-        debug_assert!(x.iter().all(|x_i| 
-            x_i.is_zero())
-        ); 
     }
 
     trip.to_csc()
@@ -59,10 +55,16 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
 
 fn solve_upper_tri_into<R>(u: &CsMat<R>, diag: &Vec<&R>, b: &mut Vec<R>, x: &mut Vec<R>)
 where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
+    debug_assert!(x.iter().all(|x_i| 
+        x_i.is_zero())
+    ); 
+
     let n = u.rows();
     for j in (0..n).rev() {
+        if b[j].is_zero() { continue }
+
         let Some(u_jj_inv) = diag[j].inv() else { panic!() };
-        let x_j = &b[j] * &u_jj_inv;
+        let x_j = &b[j] * &u_jj_inv; // non-zero
 
         for (i, u_ij) in u.outer_view(j).unwrap().iter() {
             if u_ij.is_zero() { continue }

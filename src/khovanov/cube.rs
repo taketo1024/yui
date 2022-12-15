@@ -19,7 +19,7 @@ impl KhEnhState {
 }
 
 #[derive(Debug)]
-struct KhCubeVertex { 
+pub struct KhCubeVertex { 
     state: State,
     circles: Vec<Component>,
     generators: Vec<KhEnhState>
@@ -47,22 +47,28 @@ impl KhCubeVertex {
     }
 }
 
-#[derive(Debug)]
-enum KhCubeEdgeTrans { 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum KhCubeEdgeTrans { 
     Merge((usize, usize), usize),
     Split(usize, (usize, usize))
 }
 
-#[derive(Debug)]
-struct KhCubeEdge { 
-    from: State,
-    to: State,
+#[derive(Debug, Clone)]
+pub struct KhCubeEdge { 
     trans: KhCubeEdgeTrans,
     sign: Sign
 }
 
 impl KhCubeEdge { 
-    fn between(from: &KhCubeVertex, to: &KhCubeVertex) -> Self { 
+    pub fn sign(&self) -> Sign { 
+        self.sign
+    }
+
+    pub fn trans(&self) -> &KhCubeEdgeTrans { 
+        &self.trans
+    }
+    
+    fn edge_between(from: &KhCubeVertex, to: &KhCubeVertex) -> Self { 
         debug_assert!(from.state.weight() + 1 == to.state.weight());
 
         fn diff(c1: &Vec<Component>, c2: &Vec<Component>) -> Vec<usize> { 
@@ -82,11 +88,11 @@ impl KhCubeEdge {
             _ => panic!()
         };
 
-        let sign = Self::sign(&from.state, &to.state);
-        KhCubeEdge { from: from.state.clone(), to: to.state.clone(), trans, sign }
+        let sign = Self::sign_between(&from.state, &to.state);
+        KhCubeEdge { trans, sign }
     }
 
-    fn sign(from: &State, to: &State) -> Sign { 
+    fn sign_between(from: &State, to: &State) -> Sign { 
         use Resolution::Res1;
         debug_assert_eq!(from.len(), to.len());
         debug_assert_eq!(from.weight() + 1, to.weight());
@@ -104,7 +110,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     str: KhAlgStr<R>,
     dim: usize,
     vertices: HashMap<State, KhCubeVertex>,
-    edges: HashMap<State, Vec<KhCubeEdge>>
+    edges: HashMap<State, Vec<(State, KhCubeEdge)>>
 }
 
 impl<R> KhCube<R>
@@ -124,7 +130,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let edges = s.targets().into_iter().map(|t| { 
                 let v = &vertices[&s];
                 let w = &vertices[&t];
-                KhCubeEdge::between(v, w)
+                (t, KhCubeEdge::edge_between(v, w))
             }).collect_vec();
             (s, edges)
         }).collect();
@@ -142,13 +148,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn differentiate(&self, x: &KhEnhState) -> Vec<(KhEnhState, R)> {
         let edges = self.edges_from(&x.state);
-        edges.iter().flat_map(|e| { 
-            self.apply(x, e)
+        edges.iter().flat_map(|(t, e)| { 
+            self.apply(x, t, e)
         }).collect_vec()
     }
 
-    fn vertex(&self, s: &State) -> &KhCubeVertex { 
+    pub fn vertex(&self, s: &State) -> &KhCubeVertex { 
         &self.vertices[s]
+    }
+
+    pub fn edge(&self, from: &State, to: &State) -> Option<&KhCubeEdge> { 
+        self.edges[from].iter().find(|(t, _)| t == to).map(|(_, e)| e)
     }
 
     fn vertices(&self, k: usize) -> Vec<&KhCubeVertex> { 
@@ -166,26 +176,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             .collect_vec()
     }
 
-    fn edges_from(&self, s: &State) -> &Vec<KhCubeEdge> {
+    fn edges_from(&self, s: &State) -> &Vec<(State, KhCubeEdge)> {
         &self.edges[s]
     }
 
-    fn apply(&self, x: &KhEnhState, e: &KhCubeEdge) -> Vec<(KhEnhState, R)> {
+    fn apply(&self, x: &KhEnhState, to: &State, e: &KhCubeEdge) -> Vec<(KhEnhState, R)> {
         use KhCubeEdgeTrans::*;
         
-        assert_eq!(x.state, e.from);
         let sign = R::from(e.sign);
 
         match e.trans { 
             Merge((i, j), k) => {
                 let (x_i, x_j) = (x.label[i], x.label[j]);
                 self.str.prod(x_i, x_j).into_iter().map(|(y_k, a)| { 
-                    let t = e.to.clone();
                     let mut label = x.label.clone();
                     label.remove(j);
                     label.remove(i);
                     label.insert(k, y_k);
 
+                    let t = to.clone();
                     let y = KhEnhState::new(t, label);
                     let r = &sign * &a;
                     (y, r)
@@ -194,14 +203,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             Split(i, (j, k)) => {
                 let x_i = x.label[i];
                 self.str.coprod(x_i).into_iter().map(|(y_j, y_k, a)| { 
-                    let t = e.to.clone();
                     let mut label = x.label.clone();
                     label.remove(i);
                     label.insert(j, y_j);
                     label.insert(k, y_k);
 
+                    let t = to.clone();
                     let y = KhEnhState::new(t, label);
                     let r = &sign * &a;
+
                     (y, r)
                 }).collect_vec()
             }
@@ -254,9 +264,8 @@ mod tests {
         let t = State::from(vec![1]);
         let v = KhCubeVertex::new(&l, &s);
         let w = KhCubeVertex::new(&l, &t);
-        let e = KhCubeEdge::between(&v, &w);
+        let e = KhCubeEdge::edge_between(&v, &w);
 
-        assert_eq!(e.to, t);
         assert!(e.sign.is_positive());
 
         let KhCubeEdgeTrans::Merge(from, to) = e.trans else { 
@@ -273,9 +282,8 @@ mod tests {
         let t = State::from(vec![1]);
         let v = KhCubeVertex::new(&l, &s);
         let w = KhCubeVertex::new(&l, &t);
-        let e = KhCubeEdge::between(&v, &w);
+        let e = KhCubeEdge::edge_between(&v, &w);
 
-        assert_eq!(e.to, t);
         assert!(e.sign.is_positive());
 
         let KhCubeEdgeTrans::Split(from, to) = e.trans else { 
@@ -289,22 +297,22 @@ mod tests {
     fn edge_sign() { 
         let s = State::from(vec![0, 0, 0]);
         let t = State::from(vec![1, 0, 0]);
-        let e = KhCubeEdge::sign(&s, &t);
+        let e = KhCubeEdge::sign_between(&s, &t);
         assert!(e.is_positive());
 
         let s = State::from(vec![1, 0, 0]);
         let t = State::from(vec![1, 1, 0]);
-        let e = KhCubeEdge::sign(&s, &t);
+        let e = KhCubeEdge::sign_between(&s, &t);
         assert!(e.is_negative());
 
         let s = State::from(vec![1, 1, 0]);
         let t = State::from(vec![1, 1, 1]);
-        let e = KhCubeEdge::sign(&s, &t);
+        let e = KhCubeEdge::sign_between(&s, &t);
         assert!(e.is_positive());
 
         let s = State::from(vec![0, 1, 0]);
         let t = State::from(vec![0, 1, 1]);
-        let e = KhCubeEdge::sign(&s, &t);
+        let e = KhCubeEdge::sign_between(&s, &t);
         assert!(e.is_negative());
     }
 
@@ -366,8 +374,10 @@ mod tests {
         assert_eq!(v1.circles.len(), 1);
         assert_eq!(v1.generators.len(), 2);
 
-        assert_eq!(cube.edges_from(&s0).len(), 1);
-        assert_eq!(cube.edges_from(&s1).len(), 0);
+        let Some(e) = cube.edge(&s0, &s1) else { panic!() };
+
+        assert_eq!(e.sign(), Sign::Pos);
+        assert_eq!(e.trans(), &KhCubeEdgeTrans::Merge((0, 1), 0));
     }
 
     #[test]

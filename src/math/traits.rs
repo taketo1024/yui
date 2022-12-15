@@ -1,5 +1,5 @@
 use std::fmt::{Debug, Display};
-use std::ops::{Add, Neg, Sub, Mul, Rem, Div};
+use std::ops::{Add, Neg, Sub, Mul, Rem, Div, AddAssign, SubAssign, MulAssign, RemAssign, DivAssign};
 use std::hash::Hash;
 use std::iter::{Sum, Product};
 use is_even::IsEven;
@@ -30,7 +30,7 @@ pub trait AddMonOps<T>:
 {}
 
 pub trait AddMon: 
-    MathElem + AddMonOps<Self> + Sum<Self> + Zero
+    MathElem + AddMonOps<Self> + AddAssign + Sum<Self> + Zero
 where 
     for<'a> &'a Self: AddMonOps<Self>,
     for<'a> Self: Sum<&'a Self>
@@ -51,7 +51,7 @@ pub trait AddGrpOps<T>:
 {}
 
 pub trait AddGrp: 
-    AddMon + AddGrpOps<Self> + From<Sign>
+    AddMon + AddGrpOps<Self> + SubAssign + From<Sign>
 where 
     for<'a> &'a Self: AddGrpOps<Self>
 {}
@@ -77,7 +77,7 @@ pub trait MonOps<T>:
 {}
 
 pub trait Mon: 
-    MathElem + MonOps<Self> + Product<Self> + One
+    MathElem + MonOps<Self> + MulAssign + Product<Self> + One
 where
     for<'a> &'a Self: MonOps<Self>,
     for<'a> Self: Product<&'a Self>
@@ -150,7 +150,7 @@ pub trait EucRingOps<T>:
 {}
 
 pub trait EucRing: 
-    Ring + EucRingOps<Self> 
+    Ring + EucRingOps<Self> + RemAssign + DivAssign
 where 
     for<'a> &'a Self: EucRingOps<Self>
 {

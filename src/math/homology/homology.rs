@@ -13,6 +13,9 @@ where
     for<'x> &'x Self::R: RingOps<Self::R>  
 {
     fn homology_at(&self, i: isize) -> HomologySummand<Self::R>;
+    fn homology<H>(self) -> H where H: Homology<R = Self::R>, H: From<Self>, Self: Sized {
+        H::from(self)
+    }
 }
 
 impl<C> HomologyComputable for C

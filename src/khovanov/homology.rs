@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::ops::{RangeInclusive, Index};
 
 use crate::math::homology::homology::{Homology, HomologySummand};
-use crate::math::homology::simple_homology::SimpleHomology;
+use crate::math::homology::homology::GenericHomology;
 use crate::math::matrix::CsMatElem;
 use crate::math::traits::{EucRing, EucRingOps};
 use crate::links::Link;
@@ -10,7 +10,7 @@ use super::complex::KhComplex;
 
 pub struct KhHomology<R> 
 where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> { 
-    homology: SimpleHomology<R>,
+    homology: GenericHomology<R>,
     shift: (isize, isize)
 }
 
@@ -23,7 +23,7 @@ where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> {
     pub fn new_ht(l: &Link, h: R, t: R) -> Self {
         let complex = KhComplex::new_ht(l, h, t);
         let shift = complex.shift();
-        let homology = SimpleHomology::from(complex);
+        let homology = GenericHomology::from(complex);
         Self { homology, shift }
     }
 

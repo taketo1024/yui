@@ -95,6 +95,6 @@ mod tests {
             3, 2, 3, 0, 2, 8
         ]);
         let s = schur_compl(a, 3);
-        assert_eq!(s, CsMat::csc_from_vec((3,3), vec![5,36,12,45,-14,-60]));
+        assert_eq!(s, CsMat::csc_from_vec((2,3), vec![5,12,-14,36,45,-60]));
     }
 }

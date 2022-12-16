@@ -3,7 +3,7 @@ use sprs::CsMat;
 
 use crate::math::traits::{Ring, RingOps};
 use crate::math::matrix::CsMatElem;
-use super::complex::{ChainComplex, ChainComplexSparseD, ChainGenerator};
+use super::complex::{ChainComplex, ChainGenerator};
 
 pub struct SimpleChainComplex<X, R> 
 where 
@@ -13,28 +13,6 @@ where
     generators: Vec<Vec<X>>,
     d_matrices: Vec<CsMat<R>>,
     d_degree: isize
-}
-
-impl<X, R> SimpleChainComplex<X, R>
-where 
-    X: ChainGenerator,
-    R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> 
-{ 
-    pub fn d_matrix(&self, k: isize) -> CsMat<R> {
-        let n = *self.range().end();
-        let (range, idx) = if self.d_degree > 0 { 
-            (0 ..= n - 1, k as usize)
-        } else {
-            (1 ..= n, (k - 1) as usize)
-        };
-        if range.contains(&k) { 
-            self.d_matrices[idx].clone()
-        } else {
-            let m = self.rank(k + self.d_degree);
-            let n = self.rank(k);
-            CsMat::zero((m, n))
-        }
-    }
 }
 
 impl<X, R> ChainComplex for SimpleChainComplex<X, R> 
@@ -72,31 +50,30 @@ where
         }
     }
 
+    fn d_matrix(&self, k: isize) -> CsMat<R> {
+        let n = *self.range().end();
+        let (range, idx) = if self.d_degree > 0 { 
+            (0 ..= n - 1, k as usize)
+        } else {
+            (1 ..= n, (k - 1) as usize)
+        };
+        if range.contains(&k) { 
+            self.d_matrices[idx].clone()
+        } else {
+            let m = self.rank(k + self.d_degree);
+            let n = self.rank(k);
+            CsMat::zero((m, n))
+        }
+    }
+
     fn differentiate(&self, k: isize, x: &X) -> Vec<(X, R)> {
-        assert!(self.range().contains(&k));
-        let v = self.vectorize_x(k, x);
-        let d = self.d_matrix(k);
-        let w = &d * &v;
-
-        let gens = self.generators(k + self.d_degree());
-
-        let res = w.iter().map(|(i, a)| { 
-            (gens[i].clone(), a.clone())
-        }).collect();
-
-        res
+        self.impl_differentiate_from_d_matrix(k, x)
     }
 }
 
-impl<X, R> ChainComplexSparseD for SimpleChainComplex<X, R>
-where 
-    X: ChainGenerator,
-    R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> 
-{}
-
 #[cfg(test)]
 pub mod tests { 
-    use super::{ChainComplex, ChainComplexSparseD};
+    use super::ChainComplex;
     use super::super::simple_complex::*;
     use crate::math::matrix::sparse::*;
     use sprs::CsMat;

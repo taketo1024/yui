@@ -5,7 +5,7 @@ use sprs::CsMat;
 use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps};
 use crate::math::matrix::{snf_in_place, DnsMat};
 use crate::math::matrix::sparse::*;
-use super::complex::{ChainComplex, ChainComplexSparseD};
+use super::complex::ChainComplex;
 
 pub trait HomologyComputable: ChainComplex
 where 
@@ -20,7 +20,7 @@ where
 
 impl<C> HomologyComputable for C
 where 
-    C: ChainComplexSparseD,
+    C: ChainComplex,
     C::R: EucRing + CsMatElem, 
     for<'x> &'x C::R: EucRingOps<C::R>  
 { 

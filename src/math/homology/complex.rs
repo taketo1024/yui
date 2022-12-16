@@ -13,7 +13,7 @@ impl<T> ChainGenerator for T
 where T: Clone + PartialEq + Eq + Hash {}
 
 pub trait ChainComplex 
-where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
+where Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R> {
     type R;
     type Generator: ChainGenerator;
 
@@ -22,6 +22,7 @@ where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
     fn generators(&self, k: isize) -> Vec<&Self::Generator>;
     fn d_degree(&self) -> isize;
     fn differentiate(&self, k: isize, x:&Self::Generator) -> Vec<(Self::Generator, Self::R)>;
+    fn d_matrix(&self, k: isize) -> CsMat<Self::R>;
 
     // -- convenient methods -- //
     fn rank(&self, k: isize) -> usize { 
@@ -53,11 +54,8 @@ where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
 
         CsVec::new(n, v_ind, v_val)
     }
-}
 
-pub trait ChainComplexSparseD: ChainComplex
-where Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R> {
-    fn d_matrix(&self, k: isize) -> CsMat<Self::R> {
+    fn impl_d_matrix_from_differentiate(&self, k: isize) -> CsMat<Self::R> {
         let source = self.generators(k);
         let target = self.generators(k + self.d_degree());
         let (m, n) = (target.len(), source.len());
@@ -79,6 +77,21 @@ where Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R> {
         }
 
         trip.to_csc()
+    }
+
+    fn impl_differentiate_from_d_matrix(&self, k: isize, x: &Self::Generator) -> Vec<(Self::Generator, Self::R)> {
+        assert!(self.range().contains(&k));
+        let v = self.vectorize_x(k, x);
+        let d = self.d_matrix(k);
+        let w = &d * &v;
+
+        let gens = self.generators(k + self.d_degree());
+
+        let res = w.iter().map(|(i, a)| { 
+            (gens[i].clone(), a.clone())
+        }).collect();
+
+        res
     }
 
     fn check_d_at(&self, k: isize) { 

@@ -2,7 +2,7 @@ use std::ops::RangeInclusive;
 
 use crate::math::traits::{Ring, RingOps};
 use crate::math::matrix::CsMatElem;
-use crate::math::homology::complex::{ChainComplex, ChainComplexSparseD};
+use crate::math::homology::complex::ChainComplex;
 use crate::links::Link;
 use super::algebra::KhAlgStr;
 use super::cube::{KhEnhState, KhCube};
@@ -34,7 +34,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 impl<R> ChainComplex for KhComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> { 
+where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> { 
     type R = R;
     type Generator = KhEnhState;
 
@@ -57,15 +57,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn differentiate(&self, _k: isize, x:&Self::Generator) -> Vec<(Self::Generator, Self::R)> {
         self.cube.differentiate(x)
     }
-}
 
-impl<R> ChainComplexSparseD for KhComplex<R>
-where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {}
+    fn d_matrix(&self, k: isize) -> sprs::CsMat<Self::R> {
+        self.impl_d_matrix_from_differentiate(k)
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use crate::links::Link;
-    use crate::math::homology::complex::{ChainComplex, ChainComplexSparseD};
+    use crate::math::homology::complex::ChainComplex;
     use super::KhComplex;
 
     #[test]

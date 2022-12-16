@@ -69,12 +69,11 @@ mod tests {
     use crate::math::matrix::sparse::CsMatExt;
 
     use super::*;
-    use super::super::simple_complex::*;
     use super::super::simple_complex::tests::*;
 
     #[test]
     fn cancel_pair() { 
-        let c = SimpleChainComplex::new(
+        let c = make_complex::<i32>(
             vec![ CsMat::csc_from_vec((1, 1), vec![1]) ],
             -1
         );
@@ -87,7 +86,7 @@ mod tests {
 
     #[test]
     fn torsion() { 
-        let c = SimpleChainComplex::new( 
+        let c = make_complex::<i32>( 
             vec![ CsMat::csc_from_vec((1, 1), vec![2]) ],
             -1
         );
@@ -99,7 +98,7 @@ mod tests {
 
     #[test]
     fn homology_d3() {
-        let c = sample_d3();
+        let c = sample_d3::<i32>();
         let h = SimpleHomology::from(c);
 
         assert_eq!(h[0].rank(), 1);
@@ -117,7 +116,7 @@ mod tests {
 
     #[test]
     fn homology_s2() {
-        let c = sample_s2();
+        let c = sample_s2::<i32>();
         let h = SimpleHomology::from(c);
 
         assert_eq!(h[0].rank(), 1);
@@ -132,7 +131,7 @@ mod tests {
 
     #[test]
     fn homology_t2() {
-        let c = sample_t2();
+        let c = sample_t2::<i32>();
         let h = SimpleHomology::from(c);
 
         assert_eq!(h[0].rank(), 1);
@@ -147,7 +146,7 @@ mod tests {
 
     #[test]
     fn homology_rp2() {
-        let c = sample_rp2();
+        let c = sample_rp2::<i32>();
         let h = SimpleHomology::from(c);
 
         assert_eq!(h[0].rank(), 1);

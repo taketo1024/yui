@@ -3,40 +3,23 @@ use sprs::CsMat;
 
 use crate::math::traits::{Ring, RingOps};
 use crate::math::matrix::CsMatElem;
-use super::complex::{ChainComplex, ChainComplexSparseD};
+use super::complex::{ChainComplex, ChainComplexSparseD, ChainGenerator};
 
-pub struct SimpleChainComplex<R> 
-where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> { 
-    generators: Vec<Vec<usize>>,
+pub struct SimpleChainComplex<X, R> 
+where 
+    X: ChainGenerator,
+    R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> 
+{ 
+    generators: Vec<Vec<X>>,
     d_matrices: Vec<CsMat<R>>,
     d_degree: isize
 }
 
-impl<R> SimpleChainComplex<R>
-where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> { 
-    pub fn new(d_matrices: Vec<CsMat<R>>, d_degree: isize) -> Self {
-        assert!(d_degree == 1 || d_degree == -1);
-
-        let mut count = 0;
-        let mut gens = |n: usize| { 
-            let g = (count .. count + n).into_iter().collect();
-            count += n;
-            g
-        };
-
-        let mut generators: Vec<_> = d_matrices.iter().map(|d| {
-            let n = if d_degree > 0 { d.cols() } else { d.rows() };
-            gens(n)
-        }).collect();
-
-        if let Some(d) = d_matrices.last() { 
-            let n = if d_degree > 0 { d.rows() } else { d.cols() };
-            generators.push(gens(n));
-        }
-
-        SimpleChainComplex { generators, d_matrices, d_degree }
-    }
-
+impl<X, R> SimpleChainComplex<X, R>
+where 
+    X: ChainGenerator,
+    R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> 
+{ 
     pub fn d_matrix(&self, k: isize) -> CsMat<R> {
         let n = *self.range().end();
         let (range, idx) = if self.d_degree > 0 { 
@@ -54,10 +37,13 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<R> ChainComplex for SimpleChainComplex<R> 
-where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> { 
+impl<X, R> ChainComplex for SimpleChainComplex<X, R> 
+where 
+    X: ChainGenerator,
+    R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> 
+{ 
     type R = R;
-    type Generator = usize;
+    type Generator = X;
 
     fn range(&self) -> RangeInclusive<isize> {
         let n = self.generators.len() as isize;
@@ -77,7 +63,7 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
         }
    }
 
-    fn generators(&self, k: isize) -> Vec<&Self::Generator> {
+    fn generators(&self, k: isize) -> Vec<&X> {
         if self.range().contains(&k) { 
             let k = k as usize;
             self.generators[k].iter().collect()
@@ -86,7 +72,7 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    fn differentiate(&self, k: isize, x: &Self::Generator) -> Vec<(Self::Generator, R)> {
+    fn differentiate(&self, k: isize, x: &X) -> Vec<(X, R)> {
         assert!(self.range().contains(&k));
         let v = self.vectorize_x(k, x);
         let d = self.d_matrix(k);
@@ -102,8 +88,11 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<R> ChainComplexSparseD for SimpleChainComplex<R>
-where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {}
+impl<X, R> ChainComplexSparseD for SimpleChainComplex<X, R>
+where 
+    X: ChainGenerator,
+    R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> 
+{}
 
 #[cfg(test)]
 pub mod tests { 
@@ -114,7 +103,7 @@ pub mod tests {
 
     #[test]
     fn empty_complex() {
-        let c = sample_empty();
+        let c = sample_empty::<i32>();
         assert_eq!(c.range(), 0..=-1);
         assert_eq!(c.d_degree(), -1);
         assert_eq!(c.rank(0), 0);
@@ -122,7 +111,7 @@ pub mod tests {
 
     #[test]
     fn complex_d3() {
-        let c = sample_d3();
+        let c = sample_d3::<i32>();
 
         assert_eq!(c.range(), 0..=3);
         assert_eq!(c.d_degree(), -1);
@@ -137,7 +126,7 @@ pub mod tests {
 
     #[test]
     fn complex_s2() {
-        let c = sample_s2();
+        let c = sample_s2::<i32>();
 
         assert_eq!(c.range(), 0..=2);
         assert_eq!(c.d_degree(), -1);
@@ -151,7 +140,7 @@ pub mod tests {
 
     #[test]
     fn complex_t2() {
-        let c = sample_t2();
+        let c = sample_t2::<i32>();
 
         assert_eq!(c.range(), 0..=2);
         assert_eq!(c.d_degree(), -1);
@@ -165,7 +154,7 @@ pub mod tests {
 
     #[test]
     fn complex_rp2() {
-        let c = sample_rp2();
+        let c = sample_rp2::<i32>();
 
         assert_eq!(c.range(), 0..=2);
         assert_eq!(c.d_degree(), -1);
@@ -179,12 +168,43 @@ pub mod tests {
 
     // below : test data // 
 
-    pub fn sample_empty() -> SimpleChainComplex<i32> {
-        SimpleChainComplex::new(vec![], -1)
+    pub fn make_complex<R>(d_matrices: Vec<CsMat<i32>>, d_degree: isize) -> SimpleChainComplex<usize, R>
+    where R: Ring + CsMatElem + From<i32>, for<'x> &'x R: RingOps<R> 
+    {
+        assert!(d_degree == 1 || d_degree == -1);
+
+        let mut count = 0;
+        let mut gens = |n: usize| { 
+            let g = (count .. count + n).into_iter().collect();
+            count += n;
+            g
+        };
+
+        let mut generators: Vec<_> = d_matrices.iter().map(|d| {
+            let n = if d_degree > 0 { d.cols() } else { d.rows() };
+            gens(n)
+        }).collect();
+
+        if let Some(d) = d_matrices.last() { 
+            let n = if d_degree > 0 { d.rows() } else { d.cols() };
+            generators.push(gens(n));
+        }
+
+        let d_matrices = d_matrices.into_iter().map(|d| 
+            d.map(|&a| R::from(a))
+        ).collect();
+
+        SimpleChainComplex { generators, d_matrices, d_degree }
     }
 
-    pub fn sample_d3() -> SimpleChainComplex<i32> {
-        SimpleChainComplex::new(
+    pub fn sample_empty<R>() -> SimpleChainComplex<usize, R>
+    where R: Ring + CsMatElem + From<i32>, for<'x> &'x R: RingOps<R> {
+        make_complex(vec![], -1)
+    }
+
+    pub fn sample_d3<R>() -> SimpleChainComplex<usize, R>
+    where R: Ring + CsMatElem + From<i32>, for<'x> &'x R: RingOps<R> {
+        make_complex(
             vec![
                 CsMat::csc_from_vec((4, 6), vec![-1, -1, 0, -1, 0, 0, 1, 0, -1, 0, -1, 0, 0, 1, 1, 0, 0, -1, 0, 0, 0, 1, 1, 1]),
                 CsMat::csc_from_vec((6, 4), vec![1, 1, 0, 0, -1, 0, 1, 0, 1, 0, 0, 1, 0, -1, -1, 0, 0, 1, 0, -1, 0, 0, 1, 1] ),
@@ -194,8 +214,9 @@ pub mod tests {
         )
     }
 
-    pub fn sample_s2() -> SimpleChainComplex<i32> {
-        SimpleChainComplex::new(
+    pub fn sample_s2<R>() -> SimpleChainComplex<usize, R>
+    where R: Ring + CsMatElem + From<i32>, for<'x> &'x R: RingOps<R> {
+        make_complex(
             vec![
                 CsMat::csc_from_vec((4, 6), vec![-1, -1, 0, -1, 0, 0, 1, 0, -1, 0, -1, 0, 0, 1, 1, 0, 0, -1, 0, 0, 0, 1, 1, 1]),
                 CsMat::csc_from_vec((6, 4), vec![1, 1, 0, 0, -1, 0, 1, 0, 1, 0, 0, 1, 0, -1, -1, 0, 0, 1, 0, -1, 0, 0, 1, 1] )
@@ -204,8 +225,9 @@ pub mod tests {
         )
     }
 
-    pub fn sample_t2() -> SimpleChainComplex<i32> {
-        SimpleChainComplex::new(
+    pub fn sample_t2<R>() -> SimpleChainComplex<usize, R>
+    where R: Ring + CsMatElem + From<i32>, for<'x> &'x R: RingOps<R> {
+        make_complex(
             vec![
                 CsMat::csc_from_vec((9, 27), vec![-1, -1, 0, -1, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1, 1, 0, -1, 0, 0, 0, 0, 0, 0, -1, -1, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, -1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, -1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, -1, 0, 1, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0, 1, -1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, -1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1, 1]),
                 CsMat::csc_from_vec((27, 18), vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1])
@@ -214,8 +236,9 @@ pub mod tests {
         )
     }
 
-    pub fn sample_rp2() -> SimpleChainComplex<i32> { 
-        SimpleChainComplex::new(
+    pub fn sample_rp2<R>() -> SimpleChainComplex<usize, R>
+    where R: Ring + CsMatElem + From<i32>, for<'x> &'x R: RingOps<R> { 
+        make_complex(
             vec![
                 CsMat::csc_from_vec((6, 15), vec![-1, -1, 0, 0, 0, 0, 0, -1, -1, 0, -1, 0, 0, 0, 0, 1, 0, -1, -1, 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 1, 1, 0, 1, 1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 1, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1] ),
                 CsMat::csc_from_vec((15, 10), vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, -1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, -1] ),

@@ -40,21 +40,13 @@ fn schur_compl<R>(a: CsMat<R>, r: usize) -> CsMat<R>
 where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
     assert!(a.is_csc());
 
-    let (m, n) = a.shape();
-
     // a = [u b]  ~>  s = d - c u⁻¹ b.
     //     [c d]
     //
     // [u⁻¹     ] [u b] [id -u⁻¹b] = [id  ]
     // [-cu⁻¹ id] [c d] [      id]   [   s]
 
-    let (a1, a2) = (a.slice_outer(0..r), a.slice_outer(r..n));
-
-    let u = a1.submatrix(0..r, 0..r);
-    let b = a2.submatrix(0..r, 0..n-r);
-    let c = a1.submatrix(r..m, 0..r);
-    let d = a2.submatrix(r..m, 0..n-r);
-
+    let [u, b, c, d] = a.divide4(r, r);
     let uinv = inv_upper_tri(&u);
     let s = schur_compl_block(&uinv, &b, &c, &d);
 

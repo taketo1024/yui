@@ -16,6 +16,7 @@ pub trait CsMatExt<R> {
     fn is_zero(&self) -> bool;
     fn permute(self, p: PermView, q: PermView) -> CsMat<R>;
     fn submatrix(&self, rows: Range<usize>, cols: Range<usize>) -> CsMat<R>;
+    fn divide4(self, i0: usize, j0: usize) -> [CsMat<R>; 4];
 }
 
 impl<R, I, IptrStorage, IndStorage, DataStorage, Iptr> CsMatExt<R> for CsMatBase<R, I, IptrStorage, IndStorage, DataStorage, Iptr>
@@ -91,6 +92,31 @@ where
         }
 
         trip.to_csc()
+    }
+
+    fn divide4(self, k: usize, l: usize) -> [CsMat<R>; 4] {
+        let (m, n) = self.shape();
+        assert!(k <= m);
+        assert!(l <= n);
+
+        let mut trip1 = TriMat::new((k, l));
+        let mut trip2 = TriMat::new((k, n - l));
+        let mut trip3 = TriMat::new((m - k, l));
+        let mut trip4 = TriMat::new((m - k, n - l));
+        
+        for (a, (i, j)) in self.into_iter() { 
+            if a.is_zero() { continue }
+
+            let (a, i, j) = (a.clone(), i.index(), j.index());
+            match ((0..k).contains(&i), (0..l).contains(&j)) { 
+                (true , true ) => trip1.add_triplet(i,     j,     a),
+                (true , false) => trip2.add_triplet(i,     j - l, a),
+                (false, true ) => trip3.add_triplet(i - k, j,     a),
+                (false, false) => trip4.add_triplet(i - k, j - l, a),
+            }
+        }
+
+        [trip1.to_csc(), trip2.to_csc(), trip3.to_csc(), trip4.to_csc()]
     }
 }
 

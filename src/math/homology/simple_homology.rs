@@ -67,15 +67,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 mod tests { 
     use sprs::CsMat;
     use crate::math::matrix::sparse::CsMatExt;
-
     use super::*;
-    use super::super::simple_complex::tests::*;
+    use super::super::complex::tests::*;
 
     #[test]
     fn cancel_pair() { 
-        let c = make_complex::<i32>(
+        let c = TestChainComplex::<i32>::new(
+            -1,
             vec![ CsMat::csc_from_vec((1, 1), vec![1]) ],
-            -1
         );
 
         let h = SimpleHomology::from(c);
@@ -86,9 +85,9 @@ mod tests {
 
     #[test]
     fn torsion() { 
-        let c = make_complex::<i32>( 
+        let c = TestChainComplex::<i32>::new( 
+            -1,
             vec![ CsMat::csc_from_vec((1, 1), vec![2]) ],
-            -1
         );
 
         let h = SimpleHomology::from(c);
@@ -98,7 +97,7 @@ mod tests {
 
     #[test]
     fn homology_d3() {
-        let c = sample_d3::<i32>();
+        let c = TestChainComplex::<i32>::d3();
         let h = SimpleHomology::from(c);
 
         assert_eq!(h[0].rank(), 1);
@@ -116,7 +115,7 @@ mod tests {
 
     #[test]
     fn homology_s2() {
-        let c = sample_s2::<i32>();
+        let c = TestChainComplex::<i32>::s2();
         let h = SimpleHomology::from(c);
 
         assert_eq!(h[0].rank(), 1);
@@ -131,7 +130,7 @@ mod tests {
 
     #[test]
     fn homology_t2() {
-        let c = sample_t2::<i32>();
+        let c = TestChainComplex::<i32>::t2();
         let h = SimpleHomology::from(c);
 
         assert_eq!(h[0].rank(), 1);
@@ -146,7 +145,7 @@ mod tests {
 
     #[test]
     fn homology_rp2() {
-        let c = sample_rp2::<i32>();
+        let c = TestChainComplex::<i32>::rp2();
         let h = SimpleHomology::from(c);
 
         assert_eq!(h[0].rank(), 1);

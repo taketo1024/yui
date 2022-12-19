@@ -15,6 +15,8 @@ pub trait CsMatExt<R> {
     fn rand(shape: (usize, usize), density: f64) -> CsMat<R>;
     fn is_zero(&self) -> bool;
     fn permute(self, p: PermView, q: PermView) -> CsMat<R>;
+    fn permute_rows(self, p: PermView) -> CsMat<R>;
+    fn permute_cols(self, q: PermView) -> CsMat<R>;
     fn submatrix(&self, rows: Range<usize>, cols: Range<usize>) -> CsMat<R>;
     fn divide4(self, i0: usize, j0: usize) -> [CsMat<R>; 4];
 }
@@ -73,6 +75,16 @@ where
         }
 
         trip.to_csc()
+    }
+
+    fn permute_rows(self, p: PermView) -> CsMat<R> {
+        let id = PermView::identity(self.cols());
+        self.permute(p, id)
+    }
+
+    fn permute_cols(self, q: PermView) -> CsMat<R> {
+        let id = PermView::identity(self.rows());
+        self.permute(id, q)
     }
 
     fn submatrix(&self, rows: Range<usize>, cols: Range<usize>) -> CsMat<R> {

@@ -3,7 +3,7 @@ pub mod sparse;
 pub mod snf;
 pub mod triang;
 pub mod pivot;
-pub mod pivot_schur;
+pub mod schur;
 
 pub use dense::DnsMat;
 pub use sparse::CsMatElem;

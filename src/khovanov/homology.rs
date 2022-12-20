@@ -3,6 +3,7 @@ use std::ops::{RangeInclusive, Index};
 
 use crate::math::homology::homology::{Homology, HomologySummand};
 use crate::math::homology::homology::GenericHomology;
+use crate::math::homology::reduce::Reduced;
 use crate::math::matrix::CsMatElem;
 use crate::math::traits::{EucRing, EucRingOps};
 use crate::links::Link;
@@ -21,9 +22,18 @@ where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> {
     }
 
     pub fn new_ht(l: &Link, h: R, t: R) -> Self {
+        Self::_new(l, h, t, true)
+    }
+
+    fn _new(l: &Link, h: R, t: R, reduction: bool) -> Self {
         let complex = KhComplex::new_ht(l, h, t);
         let shift = complex.shift();
-        let homology = GenericHomology::from(complex);
+        let homology = if reduction { 
+            let reduced = Reduced::new(complex);
+            GenericHomology::from(reduced)
+        } else { 
+            GenericHomology::from(complex)
+        };
         Self { homology, shift }
     }
 
@@ -71,11 +81,11 @@ mod tests {
     use crate::links::Link;
     use crate::math::homology::homology::Homology;
     use super::KhHomology;
-
+    
     #[test]
     fn kh_empty() {
         let l = Link::empty();
-        let h = KhHomology::<i32>::new(&l);
+        let h = KhHomology::<i32>::_new(&l, 0, 0, false);
 
         assert_eq!(h.range(), 0..=0);
 
@@ -86,7 +96,7 @@ mod tests {
     #[test]
     fn kh_unknot() {
         let l = Link::unknot();
-        let h = KhHomology::<i32>::new(&l);
+        let h = KhHomology::<i32>::_new(&l, 0, 0, false);
 
         assert_eq!(h.range(), 0..=0);
         
@@ -97,7 +107,7 @@ mod tests {
     #[test]
     fn kh_trefoil() {
         let l = Link::trefoil();
-        let h = KhHomology::<i32>::new(&l);
+        let h = KhHomology::<i32>::_new(&l, 0, 0, false);
 
         assert_eq!(h.range(), -3..=0);
 
@@ -116,7 +126,7 @@ mod tests {
     #[test]
     fn kh_trefoil_mirror() {
         let l = Link::trefoil().mirror();
-        let h = KhHomology::<i32>::new(&l);
+        let h = KhHomology::<i32>::_new(&l, 0, 0, false);
 
         assert_eq!(h.range(), 0..=3);
 
@@ -135,7 +145,7 @@ mod tests {
     #[test]
     fn kh_figure8() {
         let l = Link::figure8();
-        let h = KhHomology::<i32>::new(&l);
+        let h = KhHomology::<i32>::_new(&l, 0, 0, false);
 
         assert_eq!(h.range(), -2..=2);
 

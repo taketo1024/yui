@@ -1,7 +1,7 @@
 use std::mem::replace;
 
 use itertools::Itertools;
-use sprs::{CsMat, TriMat, CsVec};
+use sprs::{CsMat, CsVec};
 
 use crate::math::{traits::{Ring, RingOps}, matrix::sparse::CsVecExt};
 
@@ -12,11 +12,16 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
     assert!(u.is_csc());
     debug_assert!(is_upper_tri(u));
 
+    let shape = u.shape();
     let n = u.rows();
     let zero = R::zero();
     let diag = diag(&u, &zero);
 
-    let mut trip = TriMat::new(u.shape());  // TODO: directly construct CsMat.
+    let mut count = 0;
+    let mut indptr = vec![0];
+    let mut indices = vec![];
+    let mut data = vec![];
+
     let mut x = vec![R::zero(); n];
     let mut e = vec![R::zero(); n];
 
@@ -25,15 +30,19 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
 
         solve_upper_tri_into(&u, &diag, &mut e, &mut x);
 
-        for i in 0..n { 
+        for i in 0..=j { 
             if x[i].is_zero() { continue }
-
             let x_i = replace(&mut x[i], R::zero());
-            trip.add_triplet(i, j, x_i);
+
+            count += 1;
+            indices.push(i);
+            data.push(x_i);
         }
+
+        indptr.push(count);
     }
 
-    trip.to_csc()
+    CsMat::new_csc(shape, indptr, indices, data)
 }
 
 pub fn solve_upper_tri<R>(u: &CsMat<R>, b: &CsVec<R>) -> CsVec<R>

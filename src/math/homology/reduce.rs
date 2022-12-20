@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
+use either::Either;
 use sprs::{CsMat, PermView};
 
-use crate::math::matrix::pivot::{find_pivots, perms_by_pivots};
+use crate::math::matrix::pivot::{perms_by_pivots, find_pivots_upto};
 use crate::math::matrix::schur::schur_partial_upper_triang;
 use crate::math::matrix::sparse::CsMatExt;
 use crate::math::traits::{Ring, RingOps};
@@ -27,10 +28,10 @@ where
 { 
     pub fn new(c: C) -> Self {
         let mut d_matrices = HashMap::new();
-        let range: Box<dyn Iterator<Item = _>> = if c.d_degree() > 0 { 
-            Box::new(c.range())
+        let range = if c.d_degree() > 0 { 
+            Either::Left(c.range())
         } else {
-            Box::new(c.range().rev())
+            Either::Right(c.range().rev())
         };
 
         for k in range {
@@ -41,7 +42,7 @@ where
             let a1 = d_matrices.remove(&k1).unwrap_or(c.d_matrix(k1)); // target
             let a2 = c.d_matrix(k2); // next
 
-            let (b0, b1, b2) = Self::reduce(k, a0, a1, a2);
+            let (b0, b1, b2) = Self::reduce(a0, a1, a2, k, 1);
             
             if let Some(b0) = b0 {
                 d_matrices.insert(k0, b0);
@@ -53,21 +54,24 @@ where
         Self { d_matrices, original: c }
     }
 
-    fn reduce(k: isize, a0: Option<CsMat<C::R>>, a1: CsMat<C::R>, a2: CsMat<C::R>) -> (Option<CsMat<C::R>>, CsMat<C::R>, CsMat<C::R>) {
+    fn reduce(a0: Option<CsMat<C::R>>, a1: CsMat<C::R>, a2: CsMat<C::R>, k: isize, step: usize) -> (Option<CsMat<C::R>>, CsMat<C::R>, CsMat<C::R>) {
+        const MAX_PIVOTS: usize = 300_000;
+
         if let Some(a0) = a0.as_ref() {
             assert_eq!(a0.rows(), a1.cols());
         }
         assert_eq!(a1.rows(), a2.cols());
 
-        let pivs = find_pivots(&a1);
+        let pivs = find_pivots_upto(&a1, MAX_PIVOTS);
         let r = pivs.len();
 
-        println!("k = {k}, reduce: {r} / {}", a1.cols());
-    
         if r == 0 { 
+            // println!("k = {k} ({step}), no reduce: {}", a1.cols());
             return (a0, a1, a2)
         }
     
+        // println!("k = {k} ({step}), reduce: {} -> {}", a1.cols(), a1.cols() - r);
+        
         let (p, q) = perms_by_pivots(&a1, &pivs);
         let b1 = a1.permute(p.view(), q.view());
         let b1 = schur_partial_upper_triang(b1, r);
@@ -77,7 +81,7 @@ where
         });
         let b2 = Self::reduce_cols(a2, p.view(), r);
 
-        (b0, b1, b2)
+        Self::reduce(b0, b1, b2, k, step + 1)
     }
 
     fn reduce_rows(a: CsMat<C::R>, p: PermView, r: usize) -> CsMat<C::R> {

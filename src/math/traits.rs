@@ -123,22 +123,23 @@ macro_rules! impl_ring {
 macro_rules! impl_ring_methods_integer {
     ($type:ident) => {
         impl RingMethods for $type {
+            #[inline]
             fn inv(&self) -> Option<Self> {
-                match self.is_unit() {
-                    true => Some(self.clone()),
-                    false => None
+                if self.is_unit() { 
+                    Some(self.clone())
+                } else { 
+                    None
                 }
             }
 
+            #[inline]
             fn is_unit(&self) -> bool {
                 self == &1 || self == &-1
             }
 
+            #[inline]
             fn normalizing_unit(&self) -> Self {
-                match self >= &0 { 
-                    true  => 1,
-                    false => -1
-                }
+                if self >= &0 { 1 } else { -1 } 
             }
         }
     };

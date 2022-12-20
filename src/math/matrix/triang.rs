@@ -14,8 +14,7 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
 
     let shape = u.shape();
     let n = u.rows();
-    let zero = R::zero();
-    let diag = diag(&u, &zero);
+    let diag = diag(&u);
 
     let mut count = 0;
     let mut indptr = vec![0];
@@ -51,8 +50,7 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
     debug_assert!(is_upper_tri(u));
 
     let n = u.rows();
-    let zero = R::zero();
-    let diag = diag(&u, &zero);
+    let diag = diag(&u);
 
     let mut x = vec![R::zero(); n];
     let mut b = b.to_dense().to_vec();
@@ -72,7 +70,7 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
     for j in (0..n).rev() {
         if b[j].is_zero() { continue }
 
-        let Some(u_jj_inv) = diag[j].inv() else { panic!() };
+        let u_jj_inv = diag[j].inv().unwrap();
         let x_j = &b[j] * &u_jj_inv; // non-zero
 
         for (i, u_ij) in u.outer_view(j).unwrap().iter() {
@@ -88,10 +86,15 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
     );
 }
 
-fn diag<'a, R>(u: &'a CsMat<R>, zero: &'a R) -> Vec<&'a R> {
-    (0..u.rows()).map( |i| 
-        u.get(i, i).unwrap_or(&zero)
-    ).collect_vec()
+fn diag<'a, R>(u: &'a CsMat<R>) -> Vec<&'a R> {
+    let n = u.rows();
+    let indptr = u.indptr();
+    let data = u.data();
+
+    (0..n).map( |i| {
+        let p = indptr.index(i + 1);
+        &data[p - 1]
+    }).collect_vec()
 }
 
 fn is_upper_tri<R>(u: &CsMat<R>) -> bool

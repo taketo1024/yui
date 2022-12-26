@@ -6,7 +6,8 @@ use sprs::CsMat;
 use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps};
 use crate::math::matrix::{snf_in_place, DnsMat};
 use crate::math::matrix::sparse::*;
-use super::complex::{ChainComplex, Graded};
+use super::base::Graded;
+use super::complex::ChainComplex;
 
 pub trait HomologyComputable: ChainComplex
 where 
@@ -69,34 +70,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> Display for HomologySummand<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use grouping_by::GroupingBy;
-        use crate::utils::format::superscript;
-
-        if self.is_zero() { return write!(f, "0") }
-
-        let mut res = vec![];
-        let symbol = R::symbol();
-        let r = self.rank as isize;
-
-        if r > 0 {
-            let str = if r > 1 { 
-                format!("{}{}", symbol, superscript(r))
-            }  else {
-                format!("{}", symbol)
-            };
-            res.push(str);
-        }
-
-        for (t, r) in self.tors.iter().counter(|&t| t) { 
-            let str = if r > 1 { 
-                format!("({}/{}){}", symbol, t, superscript(r as isize))
-            } else { 
-                format!("({}/{})", symbol, t)
-            };
-            res.push(str);
-        }
-
-        write!(f, "{}", res.join(" ⊕ "))
+        use crate::utils::format::module_descr;
+        f.write_str(&module_descr(self.rank, &self.tors))
     }
 }
 
@@ -107,6 +82,15 @@ where
     Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> 
 {
     type R;
+
+    fn is_zero(&self) -> bool {
+        self.range().all(|i| self[i].is_zero())
+    }
+
+    fn is_free(&self) -> bool {
+        self.range().all(|i| self[i].is_free())
+    }
+
     fn fmt_default(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for i in self.range() { 
             write!(f, "H[{}]: {}\n", i, self[i])?

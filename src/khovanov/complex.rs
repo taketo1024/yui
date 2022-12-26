@@ -1,8 +1,9 @@
 use std::ops::RangeInclusive;
 
+use crate::math::homology::base::Graded;
 use crate::math::traits::{Ring, RingOps};
 use crate::math::matrix::CsMatElem;
-use crate::math::homology::complex::{ChainComplex, Graded};
+use crate::math::homology::complex::ChainComplex;
 use crate::links::Link;
 use super::cube::{KhEnhState, KhCube};
 
@@ -66,7 +67,8 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 mod tests {
     use crate::links::Link;
-    use crate::math::homology::complex::{ChainComplex, Graded};
+    use crate::math::homology::base::Graded;
+    use crate::math::homology::complex::ChainComplex;
     use super::KhComplex;
 
     #[test]

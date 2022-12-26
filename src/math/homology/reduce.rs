@@ -6,7 +6,8 @@ use crate::math::matrix::schur::schur_partial_upper_triang;
 use crate::math::matrix::sparse::CsMatExt;
 use crate::math::traits::{Ring, RingOps};
 use crate::math::matrix::CsMatElem;
-use super::complex::{ChainComplex, Graded};
+use super::base::Graded;
+use super::complex::ChainComplex;
 
 pub struct Reduced<C>
 where 

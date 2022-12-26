@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use std::ops::{RangeInclusive, Index};
 
-use crate::math::homology::complex::Graded;
+use crate::math::homology::base::Graded;
 use crate::math::homology::homology::{Homology, HomologySummand};
 use crate::math::homology::homology::GenericHomology;
 use crate::math::homology::reduce::Reduced;
@@ -29,7 +29,17 @@ where
 
     pub fn new_ht(l: &Link, h: R, t: R) -> Self {
         let complex = KhComplex::new_ht(l, h, t);
-        let reduced = Reduced::from(complex);
+        Self::from(complex)
+    }
+}
+
+impl<R> From<KhComplex<R>> for KhHomology<R>
+where 
+    R: EucRing + CsMatElem, 
+    for<'x> &'x R: EucRingOps<R> 
+{
+    fn from(c: KhComplex<R>) -> Self {
+        let reduced = Reduced::from(c);
         let homology = GenericHomology::from(reduced);
         Self { homology }
     }
@@ -84,8 +94,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::links::Link;
-    use crate::math::homology::complex::Graded;
+    use crate::{links::Link, math::homology::base::Graded};
     use super::KhHomology;
     
     #[test]

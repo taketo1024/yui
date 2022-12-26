@@ -1,6 +1,4 @@
 use std::collections::HashMap;
-
-use either::Either;
 use sprs::{CsMat, PermView};
 
 use crate::math::matrix::pivot::{perms_by_pivots, find_pivots_upto};
@@ -8,7 +6,7 @@ use crate::math::matrix::schur::schur_partial_upper_triang;
 use crate::math::matrix::sparse::CsMatExt;
 use crate::math::traits::{Ring, RingOps};
 use crate::math::matrix::CsMatElem;
-use super::complex::ChainComplex;
+use super::complex::{ChainComplex, Graded};
 
 pub struct Reduced<C>
 where 
@@ -16,7 +14,7 @@ where
     C::R: Ring + CsMatElem, 
     for<'x> &'x C::R: RingOps<C::R>  
 { 
-    d_matrices: HashMap<isize, CsMat<C::R>>,
+    d_matrices: HashMap<C::Index, CsMat<C::R>>,
     original: C,
 }
 
@@ -26,35 +24,7 @@ where
     C::R: Ring + CsMatElem, 
     for<'x> &'x C::R: RingOps<C::R>  
 { 
-    pub fn new(c: C) -> Self {
-        let mut d_matrices = HashMap::new();
-        let range = if c.d_degree() > 0 { 
-            Either::Left(c.range())
-        } else {
-            Either::Right(c.range().rev())
-        };
-
-        for k in range {
-            let deg = c.d_degree();
-            let (k0, k1, k2) = (k - deg, k, k + deg);
-
-            let a0 = d_matrices.remove(&k0); // prev(optional)
-            let a1 = d_matrices.remove(&k1).unwrap_or(c.d_matrix(k1)); // target
-            let a2 = c.d_matrix(k2); // next
-
-            let (b0, b1, b2) = Self::reduce(a0, a1, a2, k, 1);
-            
-            if let Some(b0) = b0 {
-                d_matrices.insert(k0, b0);
-            }
-            d_matrices.insert(k1, b1);
-            d_matrices.insert(k2, b2);
-        }
-
-        Self { d_matrices, original: c }
-    }
-
-    fn reduce(a0: Option<CsMat<C::R>>, a1: CsMat<C::R>, a2: CsMat<C::R>, k: isize, step: usize) -> (Option<CsMat<C::R>>, CsMat<C::R>, CsMat<C::R>) {
+    fn reduce(a0: Option<CsMat<C::R>>, a1: CsMat<C::R>, a2: CsMat<C::R>, k: C::Index, step: usize) -> (Option<CsMat<C::R>>, CsMat<C::R>, CsMat<C::R>) {
         const MAX_PIVOTS: usize = 300_000;
 
         if let Some(a0) = a0.as_ref() {
@@ -95,6 +65,53 @@ where
     }
 } 
 
+impl<C> From<C> for Reduced<C>
+where 
+    C: ChainComplex,
+    C::R: Ring + CsMatElem, 
+    for<'x> &'x C::R: RingOps<C::R>  
+{
+    fn from(c: C) -> Self {
+        let mut d_matrices = HashMap::new();
+        for k in c.range() {
+            let deg = c.d_degree();
+            let (k0, k1, k2) = (k - deg, k, k + deg);
+
+            let a0 = d_matrices.remove(&k0); // prev(optional)
+            let a1 = d_matrices.remove(&k1).unwrap_or(c.d_matrix(k1)); // target
+            let a2 = c.d_matrix(k2); // next
+
+            let (b0, b1, b2) = Self::reduce(a0, a1, a2, k, 1);
+            
+            if let Some(b0) = b0 {
+                d_matrices.insert(k0, b0);
+            }
+            d_matrices.insert(k1, b1);
+            d_matrices.insert(k2, b2);
+        }
+
+        Self { d_matrices, original: c }
+    }
+}
+
+impl<C> Graded for Reduced<C>
+where 
+    C: ChainComplex,
+    C::R: Ring + CsMatElem, 
+    for<'x> &'x C::R: RingOps<C::R>  
+{
+    type Index = C::Index;
+    type IndexRange = C::IndexRange;
+
+    fn in_range(&self, k: Self::Index) -> bool {
+        self.original.in_range(k)
+    }
+
+    fn range(&self) -> Self::IndexRange {
+        self.original.range()
+    }
+}
+
 impl<C> ChainComplex for Reduced<C>
 where 
     C: ChainComplex,
@@ -104,24 +121,20 @@ where
     type R = C::R;
     type Generator = C::Generator;
 
-    fn range(&self) -> std::ops::RangeInclusive<isize> {
-        self.original.range()
-    }
-
-    fn rank(&self, k: isize) -> usize {
-        if self.range().contains(&k) {
+    fn rank(&self, k: Self::Index) -> usize {
+        if self.in_range(k) {
             self.d_matrices[&k].cols()
         } else {
             0
         }
     }
 
-    fn d_degree(&self) -> isize {
+    fn d_degree(&self) -> Self::Index {
         self.original.d_degree()
     }
 
-    fn d_matrix(&self, k: isize) -> sprs::CsMat<Self::R> {
-        if self.range().contains(&k) { 
+    fn d_matrix(&self, k: Self::Index) -> sprs::CsMat<Self::R> {
+        if self.in_range(k) { 
             self.d_matrices[&k].clone()
         } else {
             let m = self.rank(k + self.d_degree());
@@ -130,11 +143,110 @@ where
         }
     }
 
-    fn generators(&self, _k: isize) -> Vec<&Self::Generator> {
+    fn generators(&self, _k: Self::Index) -> Vec<&Self::Generator> {
         todo!()
     }
 
-    fn differentiate(&self, _k: isize, _x:&Self::Generator) -> Vec<(Self::Generator, Self::R)> {
+    fn differentiate(&self, _k: Self::Index, _x:&Self::Generator) -> Vec<(Self::Generator, Self::R)> {
         todo!()
+    }
+}
+
+#[cfg(test)]
+mod tests { 
+    use crate::math::homology::homology::GenericHomology;
+
+    use super::*;
+    use super::super::complex::tests::*;
+
+    #[test]
+    fn cancel_pair() { 
+        let c = TestChainComplex::<i32>::new(
+            -1,
+            vec![ CsMat::csc_from_vec((1, 1), vec![1]) ],
+        );
+        let c = Reduced::from(c);
+
+        assert_eq!(c.rank(0), 0);
+        assert_eq!(c.rank(1), 0);
+    }
+
+    #[test]
+    fn torsion() { 
+        let c = TestChainComplex::<i32>::new( 
+            -1,
+            vec![ CsMat::csc_from_vec((1, 1), vec![2]) ],
+        );
+        let c = Reduced::from(c);
+
+        assert_eq!(c.rank(0), 1);
+        assert_eq!(c.rank(1), 1);
+    }
+
+    #[test]
+    fn homology_d3() {
+        let c = TestChainComplex::<i32>::d3();
+        let c = Reduced::from(c);
+
+        assert_eq!(c.rank(0), 1);
+        assert_eq!(c.rank(1), 0);
+        assert_eq!(c.rank(2), 0);
+        assert_eq!(c.rank(3), 0);
+
+        let h = GenericHomology::from(c);
+
+        assert_eq!(h[0].rank(), 1);
+        assert_eq!(h[1].rank(), 0);
+        assert_eq!(h[2].rank(), 0);
+        assert_eq!(h[3].rank(), 0);
+    }
+
+    #[test]
+    fn homology_s2() {
+        let c = TestChainComplex::<i32>::s2();
+        let c = Reduced::from(c);
+
+        assert_eq!(c.rank(0), 1);
+        assert_eq!(c.rank(1), 0);
+        assert_eq!(c.rank(2), 1);
+
+        let h = GenericHomology::from(c);
+
+        assert_eq!(h[0].rank(), 1);
+        assert_eq!(h[1].rank(), 0);
+        assert_eq!(h[2].rank(), 1);
+    }
+
+    #[test]
+    fn homology_t2() {
+        let c = TestChainComplex::<i32>::t2();
+        let c = Reduced::from(c);
+
+        assert_eq!(c.rank(0), 1);
+        assert_eq!(c.rank(1), 2);
+        assert_eq!(c.rank(2), 1);
+
+        let h = GenericHomology::from(c);
+
+        assert_eq!(h[0].rank(), 1);
+        assert_eq!(h[1].rank(), 2);
+        assert_eq!(h[2].rank(), 1);
+    }
+
+    #[test]
+    fn homology_rp2() {
+        let c = TestChainComplex::<i32>::rp2();
+        let c = Reduced::from(c);
+
+        assert_eq!(c.rank(0), 1);
+        assert_eq!(c.rank(1), 1);
+        assert_eq!(c.rank(2), 1);
+
+        let h = GenericHomology::from(c);
+
+        assert_eq!(h[0].rank(), 1);
+        assert_eq!(h[1].rank(), 0);
+        assert_eq!(h[1].tors(), &vec![2]);
+        assert_eq!(h[2].rank(), 0);
     }
 }

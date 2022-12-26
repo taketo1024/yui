@@ -2,7 +2,7 @@ use std::ops::RangeInclusive;
 
 use crate::math::traits::{Ring, RingOps};
 use crate::math::matrix::CsMatElem;
-use crate::math::homology::complex::ChainComplex;
+use crate::math::homology::complex::{ChainComplex, Graded};
 use crate::links::Link;
 use super::algebra::KhAlgStr;
 use super::cube::{KhEnhState, KhCube};
@@ -33,32 +33,42 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
+impl<R> Graded for KhComplex<R>
+where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> { 
+    type Index = isize;
+    type IndexRange = RangeInclusive<isize>;
+
+    fn in_range(&self, k: Self::Index) -> bool {
+        self.range().contains(&k)
+    }
+
+    fn range(&self) -> Self::IndexRange {
+        let n = self.cube.dim() as isize;
+        let s = self.shift.0;
+        s ..= s + n
+    }
+}
+
 impl<R> ChainComplex for KhComplex<R>
 where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> { 
     type R = R;
     type Generator = KhEnhState;
 
-    fn d_degree(&self) -> isize {
+    fn d_degree(&self) -> Self::Index {
         1
     }
 
-    fn range(&self) -> RangeInclusive<isize> {
-        let n = self.cube.dim() as isize;
-        let s = self.shift.0;
-        s ..= s + n
-    }
-
-    fn generators(&self, k: isize) -> Vec<&Self::Generator> {
+    fn generators(&self, k: Self::Index) -> Vec<&Self::Generator> {
         let s = self.shift.0;
         let k = (k - s) as usize;
         self.cube.generators(k)
     }
 
-    fn differentiate(&self, _k: isize, x:&Self::Generator) -> Vec<(Self::Generator, Self::R)> {
+    fn differentiate(&self, _k: Self::Index, x:&Self::Generator) -> Vec<(Self::Generator, Self::R)> {
         self.cube.differentiate(x)
     }
 
-    fn d_matrix(&self, k: isize) -> sprs::CsMat<Self::R> {
+    fn d_matrix(&self, k: Self::Index) -> sprs::CsMat<Self::R> {
         self.impl_d_matrix_from_differentiate(k)
     }
 }
@@ -66,7 +76,7 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 mod tests {
     use crate::links::Link;
-    use crate::math::homology::complex::ChainComplex;
+    use crate::math::homology::complex::{ChainComplex, Graded};
     use super::KhComplex;
 
     #[test]

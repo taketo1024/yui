@@ -1,6 +1,7 @@
 use std::fmt::Display;
 use std::ops::{RangeInclusive, Index};
 
+use crate::math::homology::complex::Graded;
 use crate::math::homology::homology::{Homology, HomologySummand};
 use crate::math::homology::homology::GenericHomology;
 use crate::math::homology::reduce::Reduced;
@@ -10,35 +11,44 @@ use crate::links::Link;
 use super::complex::KhComplex;
 
 pub struct KhHomology<R> 
-where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> { 
-    homology: GenericHomology<R>,
-    shift: (isize, isize)
+where 
+    R: EucRing + CsMatElem, 
+    for<'x> &'x R: EucRingOps<R> 
+{ 
+    homology: GenericHomology<Reduced<KhComplex<R>>>,
 }
 
 impl<R> KhHomology<R> 
-where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> { 
+where 
+    R: EucRing + CsMatElem, 
+    for<'x> &'x R: EucRingOps<R> 
+{ 
     pub fn new(l: &Link) -> Self {
         Self::new_ht(l, R::zero(), R::zero())
     }
 
     pub fn new_ht(l: &Link, h: R, t: R) -> Self {
-        Self::_new(l, h, t, true)
-    }
-
-    fn _new(l: &Link, h: R, t: R, reduction: bool) -> Self {
         let complex = KhComplex::new_ht(l, h, t);
-        let shift = complex.shift();
-        let homology = if reduction { 
-            let reduced = Reduced::new(complex);
-            GenericHomology::from(reduced)
-        } else { 
-            GenericHomology::from(complex)
-        };
-        Self { homology, shift }
+        let reduced = Reduced::from(complex);
+        let homology = GenericHomology::from(reduced);
+        Self { homology }
+    }
+}
+
+impl<R> Graded for KhHomology<R>
+where 
+    R: EucRing + CsMatElem, 
+    for<'x> &'x R: EucRingOps<R> 
+{ 
+    type Index = isize;
+    type IndexRange = RangeInclusive<isize>;
+
+    fn in_range(&self, k: Self::Index) -> bool {
+        self.homology.in_range(k)
     }
 
-    pub fn shift(&self) -> (isize, isize) { 
-        self.shift
+    fn range(&self) -> Self::IndexRange {
+        self.homology.range()
     }
 }
 
@@ -60,10 +70,6 @@ where
     for<'x> &'x R: EucRingOps<R>
 {
     type R = R;
-
-    fn range(&self) -> RangeInclusive<isize> {
-        self.homology.range()
-    }
 }
 
 impl<R> Display for KhHomology<R> 
@@ -79,13 +85,13 @@ where
 #[cfg(test)]
 mod tests {
     use crate::links::Link;
-    use crate::math::homology::homology::Homology;
+    use crate::math::homology::complex::Graded;
     use super::KhHomology;
     
     #[test]
     fn kh_empty() {
         let l = Link::empty();
-        let h = KhHomology::<i32>::_new(&l, 0, 0, false);
+        let h = KhHomology::<i32>::new(&l);
 
         assert_eq!(h.range(), 0..=0);
 
@@ -96,7 +102,7 @@ mod tests {
     #[test]
     fn kh_unknot() {
         let l = Link::unknot();
-        let h = KhHomology::<i32>::_new(&l, 0, 0, false);
+        let h = KhHomology::<i32>::new(&l);
 
         assert_eq!(h.range(), 0..=0);
         
@@ -107,7 +113,7 @@ mod tests {
     #[test]
     fn kh_trefoil() {
         let l = Link::trefoil();
-        let h = KhHomology::<i32>::_new(&l, 0, 0, false);
+        let h = KhHomology::<i32>::new(&l);
 
         assert_eq!(h.range(), -3..=0);
 
@@ -126,7 +132,7 @@ mod tests {
     #[test]
     fn kh_trefoil_mirror() {
         let l = Link::trefoil().mirror();
-        let h = KhHomology::<i32>::_new(&l, 0, 0, false);
+        let h = KhHomology::<i32>::new(&l);
 
         assert_eq!(h.range(), 0..=3);
 
@@ -145,7 +151,7 @@ mod tests {
     #[test]
     fn kh_figure8() {
         let l = Link::figure8();
-        let h = KhHomology::<i32>::_new(&l, 0, 0, false);
+        let h = KhHomology::<i32>::new(&l);
 
         assert_eq!(h.range(), -2..=2);
 

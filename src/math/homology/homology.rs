@@ -1,18 +1,19 @@
+use std::collections::HashMap;
 use std::fmt::Display;
-use std::ops::{Index, RangeInclusive};
+use std::ops::Index;
 use sprs::CsMat;
 
 use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps};
 use crate::math::matrix::{snf_in_place, DnsMat};
 use crate::math::matrix::sparse::*;
-use super::complex::ChainComplex;
+use super::complex::{ChainComplex, Graded};
 
 pub trait HomologyComputable: ChainComplex
 where 
     Self::R: Ring, 
     for<'x> &'x Self::R: RingOps<Self::R>  
 {
-    fn homology_at(&self, i: isize) -> HomologySummand<Self::R>;
+    fn homology_at(&self, i: Self::Index) -> HomologySummand<Self::R>;
     fn homology<H>(self) -> H where H: Homology<R = Self::R>, H: From<Self>, Self: Sized {
         H::from(self)
     }
@@ -24,7 +25,7 @@ where
     C::R: EucRing + CsMatElem, 
     for<'x> &'x C::R: EucRingOps<C::R>  
 { 
-    fn homology_at(&self, k: isize) -> HomologySummand<Self::R> {
+    fn homology_at(&self, k: C::Index) -> HomologySummand<Self::R> {
         let d1 = self.d_matrix(k - self.d_degree());
         let d2 = self.d_matrix(k);
         compute_homology(&d1, &d2, false)
@@ -99,16 +100,94 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-pub trait Homology: Index<isize, Output = HomologySummand<Self::R>>
-where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
+pub trait Homology: 
+    Graded + 
+    Index<Self::Index, Output = HomologySummand<Self::R>>
+where 
+    Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> 
+{
     type R;
-    fn range(&self) -> RangeInclusive<isize>;
-
     fn fmt_default(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for i in self.range() { 
             write!(f, "H[{}]: {}\n", i, self[i])?
         }
         Ok(())
+    }
+}
+
+pub struct GenericHomology<C>
+where 
+    C: ChainComplex,
+    C::R: Ring + CsMatElem, 
+    for<'x> &'x C::R: RingOps<C::R>  
+{
+    complex: C,
+    summands: HashMap<C::Index, HomologySummand<C::R>>,
+    zero: HomologySummand<C::R>
+}
+
+impl<C> From<C> for GenericHomology<C>
+where
+    C: HomologyComputable,
+    C::R: Ring, for<'x> &'x C::R: RingOps<C::R>  
+{
+    fn from(c: C) -> Self {
+        let summands = c.range().map(|k| 
+            (k, c.homology_at(k))
+        ).collect();
+        let zero = HomologySummand::zero();
+        Self { complex: c, summands, zero }
+    }
+}
+
+impl<C> Graded for GenericHomology<C>
+where
+    C: ChainComplex,
+    C::R: Ring, for<'x> &'x C::R: RingOps<C::R>  
+{
+    type Index = C::Index;
+    type IndexRange = C::IndexRange;
+
+    fn in_range(&self, k: Self::Index) -> bool {
+        self.complex.in_range(k)
+    }
+
+    fn range(&self) -> Self::IndexRange {
+        self.complex.range()
+    }
+}
+
+impl<C> Index<C::Index> for GenericHomology<C>
+where
+    C: ChainComplex,
+    C::R: Ring, for<'x> &'x C::R: RingOps<C::R>  
+{
+    type Output = HomologySummand<C::R>;
+
+    fn index(&self, k: C::Index) -> &Self::Output {
+        if self.in_range(k) {
+            &self.summands[&k]
+        } else {
+            &self.zero
+        }
+    }
+}
+
+impl<C> Homology for GenericHomology<C>
+where
+    C: ChainComplex,
+    C::R: Ring, for<'x> &'x C::R: RingOps<C::R>  
+{
+    type R = C::R;
+}
+
+impl<C> Display for GenericHomology<C>
+where
+    C: ChainComplex,
+    C::R: Ring, for<'x> &'x C::R: RingOps<C::R>  
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.fmt_default(f)
     }
 }
 
@@ -161,64 +240,6 @@ where
     }).collect();
 
     HomologySummand{ rank, tors }
-}
-
-pub struct GenericHomology<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    summands: Vec<HomologySummand<R>>,
-    zero: HomologySummand<R>,
-    shift: isize
-}
-
-impl<R> GenericHomology<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new(summands: Vec<HomologySummand<R>>, shift: isize) -> Self { 
-        let zero = HomologySummand::zero();
-        GenericHomology { summands, zero, shift }
-    }
-}
-
-impl<C> From<C> for GenericHomology<C::R>
-where
-    C: HomologyComputable,
-    C::R: Ring, for<'x> &'x C::R: RingOps<C::R>  
-{
-    fn from(c: C) -> Self {
-        let summands = c.range().map(|k| c.homology_at(k)).collect();
-        let shift = *c.range().start();
-        Self::new(summands, shift)
-    }
-}
-
-impl<R> Index<isize> for GenericHomology<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = HomologySummand<R>;
-
-    fn index(&self, k: isize) -> &Self::Output {
-        if self.range().contains(&k) {
-            let index = (k - self.shift) as usize;
-            &self.summands[index]
-        } else {
-            &self.zero
-        }
-    }
-}
-
-impl<R> Homology for GenericHomology<R> 
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type R = R;
-    fn range(&self) -> RangeInclusive<isize> {
-        let s = self.shift;
-        let n = self.summands.len() as isize;
-        s ..= s + n - 1
-    }
-}
-
-impl<R> Display for GenericHomology<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.fmt_default(f)
-    }
 }
 
 #[cfg(test)]

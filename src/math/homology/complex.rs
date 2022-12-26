@@ -1,4 +1,5 @@
-use std::ops::RangeInclusive;
+use std::fmt::Display;
+use std::ops::{Add, Sub};
 use std::collections::HashMap;
 use std::hash::Hash;
 use sprs::{CsMat, CsVec, TriMat};
@@ -8,36 +9,48 @@ use crate::math::matrix::sparse::*;
 use crate::utils::collections::hashmap;
 
 pub trait ChainGenerator: Clone + PartialEq + Eq + Hash {}
-
 impl<T> ChainGenerator for T 
 where T: Clone + PartialEq + Eq + Hash {}
 
-pub trait ChainComplex 
-where Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R> {
+pub trait AdditiveIndex: Clone + Copy + PartialEq + Eq + Hash + Display + Add<Output = Self> + Sub<Output = Self>{}
+impl <T> AdditiveIndex for T
+where T: Clone + Copy + PartialEq + Eq + Hash + Display + Add<Output = Self> + Sub<Output = Self>{}
+
+pub trait Graded {
+    type Index: AdditiveIndex;
+    type IndexRange: Iterator<Item = Self::Index>;
+
+    fn in_range(&self, k: Self::Index) -> bool;
+    fn range(&self) -> Self::IndexRange;
+}
+
+pub trait ChainComplex: Graded
+where 
+    Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R> 
+{
     type R;
     type Generator: ChainGenerator;
 
     // -- must override -- //
-    fn range(&self) -> RangeInclusive<isize>;
-    fn generators(&self, k: isize) -> Vec<&Self::Generator>;
-    fn d_degree(&self) -> isize;
-    fn differentiate(&self, k: isize, x:&Self::Generator) -> Vec<(Self::Generator, Self::R)>;
-    fn d_matrix(&self, k: isize) -> CsMat<Self::R>;
+    fn generators(&self, k: Self::Index) -> Vec<&Self::Generator>;
+    fn d_degree(&self) -> Self::Index;
+    fn differentiate(&self, k: Self::Index, x:&Self::Generator) -> Vec<(Self::Generator, Self::R)>;
+    fn d_matrix(&self, k: Self::Index) -> CsMat<Self::R>;
 
     // -- convenient methods -- //
-    fn rank(&self, k: isize) -> usize { 
-        if self.range().contains(&k) { 
+    fn rank(&self, k: Self::Index) -> usize { 
+        if self.in_range(k) { 
             self.generators(k).len()
         } else {
             0
         }
     }
 
-    fn vectorize_x(&self, k: isize, x:&Self::Generator) -> CsVec<Self::R> {
+    fn vectorize_x(&self, k: Self::Index, x:&Self::Generator) -> CsVec<Self::R> {
         self.vectorize(k, hashmap![x => Self::R::one()])
     }
 
-    fn vectorize(&self, k: isize, z:HashMap<&Self::Generator, Self::R>) -> CsVec<Self::R> {
+    fn vectorize(&self, k: Self::Index, z:HashMap<&Self::Generator, Self::R>) -> CsVec<Self::R> {
         let gens = self.generators(k);
         let n = gens.len();
 
@@ -55,7 +68,7 @@ where Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R> {
         CsVec::new(n, v_ind, v_val)
     }
 
-    fn impl_d_matrix_from_differentiate(&self, k: isize) -> CsMat<Self::R> {
+    fn impl_d_matrix_from_differentiate(&self, k: Self::Index) -> CsMat<Self::R> {
         let source = self.generators(k);
         let target = self.generators(k + self.d_degree());
         let (m, n) = (target.len(), source.len());
@@ -79,8 +92,8 @@ where Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R> {
         trip.to_csc()
     }
 
-    fn impl_differentiate_from_d_matrix(&self, k: isize, x: &Self::Generator) -> Vec<(Self::Generator, Self::R)> {
-        assert!(self.range().contains(&k));
+    fn impl_differentiate_from_d_matrix(&self, k: Self::Index, x: &Self::Generator) -> Vec<(Self::Generator, Self::R)> {
+        assert!(self.in_range(k));
         let v = self.vectorize_x(k, x);
         let d = self.d_matrix(k);
         let w = &d * &v;
@@ -94,7 +107,7 @@ where Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R> {
         res
     }
 
-    fn check_d_at(&self, k: isize) { 
+    fn check_d_at(&self, k: Self::Index) { 
         let d1 = self.d_matrix(k);
         let d2 = self.d_matrix(k + self.d_degree());
         let res = &d2 * &d1;
@@ -104,8 +117,7 @@ where Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R> {
     fn check_d_all(&self) {
         for k in self.range() { 
             let k2 = k + self.d_degree();
-            if !self.range().contains(&k2) { continue }
-
+            if !self.in_range(k2) { continue }
             self.check_d_at(k);
         }
     }
@@ -113,17 +125,18 @@ where Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R> {
 
 #[cfg(test)]
 pub mod tests { 
+    use std::iter::Rev;
     use std::ops::RangeInclusive;
+    use either::Either;
     use sprs::CsMat;
-    use super::ChainComplex;
+    use super::{ChainComplex, Graded};
     use crate::math::traits::{Ring, RingOps};
     use crate::math::matrix::sparse::*;
     use crate::math::matrix::CsMatElem;
 
     #[test]
     fn zero_complex() {
-        let c = TestChainComplex::<i32>::empty();
-        assert_eq!(c.range(), 0..=-1);
+        let c = TestChainComplex::<i32>::zero();
         assert_eq!(c.d_degree(), -1);
         assert_eq!(c.rank(0), 0);
     }
@@ -132,7 +145,6 @@ pub mod tests {
     fn d3() {
         let c = TestChainComplex::<i32>::d3();
 
-        assert_eq!(c.range(), 0..=3);
         assert_eq!(c.d_degree(), -1);
         
         assert_eq!(c.rank(0), 4);
@@ -147,7 +159,6 @@ pub mod tests {
     fn s2() {
         let c = TestChainComplex::<i32>::s2();
 
-        assert_eq!(c.range(), 0..=2);
         assert_eq!(c.d_degree(), -1);
         
         assert_eq!(c.rank(0), 4);
@@ -161,7 +172,6 @@ pub mod tests {
     fn t2() {
         let c = TestChainComplex::<i32>::t2();
 
-        assert_eq!(c.range(), 0..=2);
         assert_eq!(c.d_degree(), -1);
         
         assert_eq!(c.rank(0), 9);
@@ -175,7 +185,6 @@ pub mod tests {
     fn rp2() {
         let c = TestChainComplex::<i32>::rp2();
 
-        assert_eq!(c.range(), 0..=2);
         assert_eq!(c.d_degree(), -1);
         
         assert_eq!(c.rank(0), 6);
@@ -207,16 +216,28 @@ pub mod tests {
                 count += n;
                 g
             };
-    
-            let mut generators: Vec<_> = d_matrices.iter().map(|d| {
-                let n = if d_degree > 0 { d.cols() } else { d.rows() };
-                gens(n)
-            }).collect();
-    
-            if let Some(d) = d_matrices.last() { 
-                let n = if d_degree > 0 { d.rows() } else { d.cols() };
-                generators.push(gens(n));
+
+            // insert matrix so that `rank(C_k) = d_k.cols()`.
+
+            let mut d_matrices = d_matrices;
+            
+            if d_matrices.is_empty() { 
+                d_matrices.push(CsMat::zero((0, 0)))
+            } else if d_degree > 0 { 
+                let d_n_1 = d_matrices.last().unwrap();
+                let k = d_n_1.rows();
+                let d_n = CsMat::zero((0, k));
+                d_matrices.push(d_n);
+            } else if d_degree < 0 { 
+                let d_1 = d_matrices.first().unwrap();
+                let k = d_1.rows();
+                let d_0 = CsMat::zero((0, k));
+                d_matrices.insert(0, d_0);
             }
+
+            let generators: Vec<_> = d_matrices.iter().map(|d| {
+                gens( d.cols() )
+            }).collect();
     
             let d_matrices = d_matrices.into_iter().map(|d| 
                 d.map(|&a| R::from(a))
@@ -229,6 +250,27 @@ pub mod tests {
         }
     }
 
+    impl<R> Graded for TestChainComplex<R>
+    where 
+        R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> 
+    {
+        type Index = isize;
+        type IndexRange = Either<RangeInclusive<isize>, Rev<RangeInclusive<isize>>>;
+        
+        fn in_range(&self, k: isize) -> bool {
+            self.range.contains(&k)
+        }
+
+        fn range(&self) -> Self::IndexRange {
+            let range = self.range.clone();
+            if self.d_degree > 0 {
+                Either::Left(range)
+            } else {
+                Either::Right(range.rev())
+            }
+        }
+    }
+
     impl<R> ChainComplex for TestChainComplex<R> 
     where 
         R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> 
@@ -236,16 +278,12 @@ pub mod tests {
         type R = R;
         type Generator = X;
 
-        fn range(&self) -> RangeInclusive<isize> {
-            self.range.clone()
-        }
-
         fn d_degree(&self) -> isize {
             self.d_degree
         }
 
         fn rank(&self, k: isize) -> usize {
-            if self.range().contains(&k) { 
+            if self.in_range(k) { 
                 let k = k as usize;
                 self.generators[k].len()
             } else {
@@ -254,7 +292,7 @@ pub mod tests {
         }
 
         fn generators(&self, k: isize) -> Vec<&X> {
-            if self.range().contains(&k) { 
+            if self.in_range(k) { 
                 let k = k as usize;
                 self.generators[k].iter().collect()
             } else {
@@ -263,14 +301,9 @@ pub mod tests {
         }
 
         fn d_matrix(&self, k: isize) -> CsMat<R> {
-            let n = *self.range().end();
-            let (range, idx) = if self.d_degree > 0 { 
-                (0 ..= n - 1, k as usize)
-            } else {
-                (1 ..= n, (k - 1) as usize)
-            };
-            if range.contains(&k) { 
-                self.d_matrices[idx].clone()
+            if self.in_range(k) { 
+                let k = k as usize;
+                self.d_matrices[k].clone()
             } else {
                 let m = self.rank(k + self.d_degree);
                 let n = self.rank(k);
@@ -285,7 +318,7 @@ pub mod tests {
 
     impl<R> TestChainComplex<R>
     where R: Ring + CsMatElem + From<i32>, for<'x> &'x R: RingOps<R> {
-        pub fn empty() -> Self {
+        pub fn zero() -> Self {
             Self::new(-1, vec![])
         }
     

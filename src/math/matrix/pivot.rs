@@ -270,6 +270,7 @@ impl PivotFinder {
         let mut ts = TopologicalSort::new();
         
         for (&j, &i) in self.pivots.iter() { 
+            ts.insert(j);
             for &j2 in self.nz_cols(i) { 
                 if j != j2 && self.is_piv_col(j2) {
                     ts.add_dependency(j, j2);
@@ -464,6 +465,36 @@ mod tests {
     }
 
     #[test]
+    fn zero() { 
+        let a = CsMat::csc_from_vec((1, 1), vec![
+            0
+        ]);
+        let pivs = find_pivots(&a);
+        let r = pivs.len();
+        assert_eq!(r, 0);
+    }
+
+    #[test]
+    fn id_1() { 
+        let a = CsMat::csc_from_vec((1, 1), vec![
+            1
+        ]);
+        let pivs = find_pivots(&a);
+        let r = pivs.len();
+        assert_eq!(r, 1);
+    }
+
+    #[test]
+    fn id_2() { 
+        let a = CsMat::csc_from_vec((2, 2), vec![
+            1, 0, 0, 1
+        ]);
+        let pivs = find_pivots(&a);
+        let r = pivs.len();
+        assert_eq!(r, 2);
+    }
+
+    #[test]
     fn result() { 
         let a = CsMat::csc_from_vec((6, 9), vec![
             1, 0, 0, 0, 0, 1, 0, 0, 1,
@@ -475,7 +506,7 @@ mod tests {
         ]);
         let pivs = find_pivots(&a);
         let r = pivs.len();
-        assert_eq!(r, 4);
+        assert_eq!(r, 5);
         
         let (p, q) = perms_by_pivots(&a, &pivs);
         let b = a.permute(p.view(), q.view()).to_dense();

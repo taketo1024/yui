@@ -1,9 +1,12 @@
 use std::collections::HashMap;
-use itertools::Itertools;
+use std::fmt::Display;
+use std::ops::RangeInclusive;
+use itertools::{Itertools, join};
 use num_traits::Pow;
 use crate::links::links::{Link, State, Component, Resolution};
 use crate::math::traits::{Ring, RingOps, PowMod2};
 use crate::math::sign::Sign;
+use crate::utils::format::subscript;
 use super::algebra::{KhAlgGen, KhAlgStr};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -15,6 +18,21 @@ pub struct KhEnhState {
 impl KhEnhState {
     pub fn new(state: State, label: Vec<KhAlgGen>) -> KhEnhState { 
         KhEnhState { state, label }
+    }
+
+    pub fn q_deg(&self) -> isize { 
+        let q = self.label.iter().map(|x| x.q_deg()).sum::<isize>();
+        let r = self.label.len() as isize;
+        let s = self.state.weight() as isize;
+        q + r + s
+    }
+}
+
+impl Display for KhEnhState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let label = join(self.label.iter(), "");
+        let state = join(self.state.values().map(|i| subscript(i.as_u8() as isize)), "");
+        write!(f, "{}{}", label, state)
     }
 }
 
@@ -44,6 +62,14 @@ impl KhCubeVertex {
 
     pub fn generators(&self) -> Vec<&KhEnhState> { 
         self.generators.iter().collect()
+    }
+
+    pub fn filter<F>(&self, pred: F) -> Self
+    where F: Fn(&KhEnhState) -> bool { 
+        let state = self.state.clone();
+        let circles = self.circles.clone();
+        let generators: Vec<_> = self.generators.iter().filter(|x| pred(x)).cloned().collect();
+        Self { state, circles, generators }
     }
 }
 
@@ -109,16 +135,27 @@ pub struct KhCube<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     str: KhAlgStr<R>,
     dim: usize,
+    shift: (isize, isize),
     vertices: HashMap<State, KhCubeVertex>,
     edges: HashMap<State, Vec<(State, KhCubeEdge)>>
 }
 
 impl<R> KhCube<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn new(l: &Link, str: KhAlgStr<R>) -> Self { 
-        let dim = l.crossing_num() as usize;
-        let m = 2.pow(dim) as usize;
+    pub fn new(l: &Link) -> Self { 
+        Self::new_ht(l, R::zero(), R::zero())
+    }
 
+    pub fn new_ht(l: &Link, h: R, t: R) -> Self { 
+        let str = KhAlgStr::new(h, t);
+        Self::_new(l, str)
+    }
+    
+    fn _new(l: &Link, str: KhAlgStr<R>) -> Self { 
+        let dim = l.crossing_num() as usize;
+        let shift = Self::deg_shift(l);
+
+        let m = 2.pow(dim) as usize;
         let vertices: HashMap<_, _> = (0..m).map(|i| { 
             let s = State::from_bseq(i, dim);
             let v = KhCubeVertex::new(&l, &s);
@@ -135,15 +172,52 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             (s, edges)
         }).collect();
 
-        KhCube { str, dim, vertices, edges }
+        KhCube { str, dim, shift, vertices, edges }
+    }
+
+    fn deg_shift(l: &Link) -> (isize, isize) {
+        let (n_pos, n_neg) = l.signed_crossing_nums();
+        let (n_pos, n_neg) = (n_pos as isize, n_neg as isize);
+        (-n_neg, n_pos - 2 * n_neg)
     }
 
     pub fn dim(&self) -> usize { 
         self.dim
     }
 
-    pub fn generators(&self, k: usize) -> Vec<&KhEnhState> { 
-        self.vertices(k).into_iter().flat_map(|v| v.generators()).collect_vec()
+    pub fn shift(&self) -> (isize, isize) { 
+        self.shift
+    }
+
+    pub fn h_range(&self) -> RangeInclusive<isize> { 
+        let i0 = self.shift.0;
+        let n = self.dim as isize;
+        i0 ..= (i0 + n)
+    }
+
+    pub fn q_range(&self) -> RangeInclusive<isize> { 
+        let j0 = self.shift.1;
+        let n = self.dim;
+
+        let s0 = State::from_bseq(0, n);
+        let v0 = self.vertex(&s0);
+        let q0 = -(v0.circles.len() as isize); // tensor factors are all X
+
+        let s1 = State::from_bseq((2.pow(n) - 1) as usize, n);
+        let v1 = self.vertex(&s1);
+        let q1 = v1.circles.len() as isize; // tensor factors are all 1
+
+        (j0 + q0) ..= (j0 + q1)
+    }
+
+    pub fn generators(&self, i: isize) -> Vec<&KhEnhState> { 
+        if self.h_range().contains(&i) { 
+            let i0 = self.shift.0;
+            let k = (i - i0) as usize;
+            self.vertices(k).into_iter().flat_map(|v| v.generators()).collect_vec()
+        } else {
+            vec![]
+        }
     }
 
     pub fn differentiate(&self, x: &KhEnhState) -> Vec<(KhEnhState, R)> {
@@ -162,7 +236,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn vertices(&self, k: usize) -> Vec<&KhCubeVertex> { 
-        let k = k as u32;
         self.vertices
             .iter()
             .sorted_by(|(s1, _), (s2, _)| Ord::cmp(s1, s2))
@@ -216,6 +289,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 }).collect_vec()
             }
         }
+    }
+
+    pub fn filter<F>(&self, pred: F) -> Self
+    where F: Fn(&KhEnhState) -> bool {
+        let str = self.str.clone();
+        let dim = self.dim().clone();
+        let shift = self.shift.clone();
+        let vertices = self.vertices.iter().map(|(i, v)| (i.clone(), v.filter(&pred))).collect();
+        let edges = self.edges.clone();
+        Self { str, dim, shift, vertices, edges }
     }
 }
 
@@ -319,8 +402,7 @@ mod tests {
     #[test]
     fn cube_empty() { 
         let l = Link::empty();
-        let str = KhAlgStr::new(0, 0);
-        let cube = KhCube::new(&l, str);
+        let cube = KhCube::<i32>::new(&l);
 
         assert_eq!(cube.dim, 0);
         assert_eq!(cube.vertices.len(), 1);
@@ -333,15 +415,16 @@ mod tests {
         assert_eq!(v.generators.len(), 1);
 
         assert!(cube.edges_from(&s).is_empty());
+        assert_eq!(cube.shift(), (0, 0));
     }
 
     #[test]
     fn cube_unknot() { 
         let l = Link::unknot();
-        let str = KhAlgStr::new(0, 0);
-        let cube = KhCube::new(&l, str);
+        let cube = KhCube::<i32>::new(&l);
 
         assert_eq!(cube.dim, 0);
+        assert_eq!(cube.shift(), (0, 0));
         assert_eq!(cube.vertices.len(), 1);
 
         let s = State::empty();
@@ -356,10 +439,10 @@ mod tests {
     #[test]
     fn cube_twist_unknot() { 
         let l = Link::from([[0, 0, 1, 1]]);
-        let str = KhAlgStr::new(0, 0);
-        let cube = KhCube::new(&l, str);
+        let cube = KhCube::<i32>::new(&l);
 
         assert_eq!(cube.dim, 1);
+        assert_eq!(cube.shift(), (0, 1));
         assert_eq!(cube.vertices.len(), 2);
 
         let s0 = State::from(vec![0]);
@@ -383,20 +466,20 @@ mod tests {
     #[test]
     fn cube_hopf_link() { 
         let l = Link::hopf_link();
-        let str = KhAlgStr::new(0, 0);
-        let cube = KhCube::new(&l, str);
+        let cube = KhCube::<i32>::new(&l);
 
         assert_eq!(cube.dim, 2);
+        assert_eq!(cube.shift(), (-2, -4));
         assert_eq!(cube.vertices.len(), 4);
    }
 
    #[test]
    fn cube_trefoil() { 
        let l = Link::trefoil();
-       let str = KhAlgStr::new(0, 0);
-       let cube = KhCube::new(&l, str);
+       let cube = KhCube::<i32>::new(&l);
 
        assert_eq!(cube.dim, 3);
+       assert_eq!(cube.shift(), (-3, -6));
        assert_eq!(cube.vertices.len(), 8);
   }
 }

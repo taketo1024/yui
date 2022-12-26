@@ -4,13 +4,11 @@ use crate::math::traits::{Ring, RingOps};
 use crate::math::matrix::CsMatElem;
 use crate::math::homology::complex::{ChainComplex, Graded};
 use crate::links::Link;
-use super::algebra::KhAlgStr;
 use super::cube::{KhEnhState, KhCube};
 
 pub struct KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    cube: KhCube<R>,
-    shift: (isize, isize)
+    cube: KhCube<R>
 }
 
 impl<R> KhComplex<R>
@@ -20,16 +18,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn new_ht(l: &Link, h: R, t: R) -> Self { 
-        let str = KhAlgStr::new(h, t);
-        let cube = KhCube::new(l, str);
-        let (n_pos, n_neg) = l.signed_crossing_nums();
-        let (n_pos, n_neg) = (n_pos as isize, n_neg as isize);
-        let shift = (-n_neg, n_pos - 2 * n_neg);
-        KhComplex { cube, shift }
+        let cube = KhCube::new_ht(l, h, t);
+        Self::from_cube(cube)
     }
 
-    pub fn shift(&self) -> (isize, isize) { 
-        self.shift
+    pub fn from_cube(cube: KhCube<R>) -> Self { 
+        KhComplex { cube }
     }
 }
 
@@ -43,9 +37,7 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
     }
 
     fn range(&self) -> Self::IndexRange {
-        let n = self.cube.dim() as isize;
-        let s = self.shift.0;
-        s ..= s + n
+        self.cube.h_range()
     }
 }
 
@@ -59,8 +51,6 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
     }
 
     fn generators(&self, k: Self::Index) -> Vec<&Self::Generator> {
-        let s = self.shift.0;
-        let k = (k - s) as usize;
         self.cube.generators(k)
     }
 

@@ -282,7 +282,7 @@ impl Crossing {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Component { 
     edges:Vec<Edge>,
     closed:bool
@@ -294,11 +294,15 @@ pub enum Resolution {
 }
 
 impl Resolution { 
-    pub fn weight(&self) -> u32 {
+    pub fn as_u8(&self) -> u8 {
         match self { 
             Res0 => 0,
             Res1 => 1
         }
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self == &Res0
     }
 }
 
@@ -314,7 +318,10 @@ impl From<u8> for Resolution {
 
 impl fmt::Display for Resolution {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.weight())
+        match self { 
+            Res0 => f.write_str("0"),
+            Res1 => f.write_str("1")
+        }
     }
 }
 
@@ -340,8 +347,12 @@ impl State {
         State{ values: seq }
     }
 
-    pub fn weight(&self) -> u32 { 
-        self.values.iter().map(|r| r.weight()).sum()
+    pub fn values(&self) -> core::slice::Iter<Resolution> {
+        self.values.iter()
+    }
+
+    pub fn weight(&self) -> usize { 
+        self.values.iter().filter(|r| !r.is_zero()).count()
     }
     
     pub fn len(&self) -> usize { 

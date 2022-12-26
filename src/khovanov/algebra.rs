@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::math::traits::{Ring, RingOps};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -14,6 +16,16 @@ impl KhAlgGen {
     }
 }
 
+impl Display for KhAlgGen {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self { 
+            KhAlgGen::I => f.write_str("1"),
+            KhAlgGen::X => f.write_str("X")
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct KhAlgStr<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     h: R,

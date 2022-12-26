@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::{RangeInclusive, Index};
 
@@ -9,6 +10,7 @@ use crate::math::matrix::CsMatElem;
 use crate::math::traits::{EucRing, EucRingOps};
 use crate::links::Link;
 use super::complex::KhComplex;
+use super::cube::KhCube;
 
 pub struct KhHomology<R> 
 where 
@@ -89,6 +91,57 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.homology.fmt(f)
+    }
+}
+
+pub struct BigradedKhHomology<R> 
+where 
+    R: EucRing + CsMatElem, 
+    for<'x> &'x R: EucRingOps<R> 
+{ 
+    decomposed: HashMap<isize, KhHomology<R>>,
+    h_range: RangeInclusive<isize>,
+    q_range: RangeInclusive<isize>,
+    zero: HomologySummand<R>
+}
+
+impl<R> BigradedKhHomology<R>
+where 
+    R: EucRing + CsMatElem, 
+    for<'x> &'x R: EucRingOps<R> 
+{ 
+    pub fn new(l: &Link) -> Self {
+        let cube = KhCube::<R>::new(l);
+
+        let h_range = cube.h_range();
+        let q_range = cube.q_range();
+        let j0 = cube.shift().1;
+
+        let decomposed = q_range.clone().step_by(2).map(|j| {
+            let subcube = cube.filter(|x| x.q_deg() == j - j0);
+            let c = KhComplex::from_cube(subcube);
+            (j, KhHomology::from(c))
+        }).collect();
+
+        let zero = HomologySummand::zero();
+
+        Self { decomposed, h_range, q_range, zero }
+    }
+}
+
+impl<R> Index<[isize; 2]> for BigradedKhHomology<R>
+where 
+    R: EucRing + CsMatElem, 
+    for<'x> &'x R: EucRingOps<R> 
+{ 
+    type Output = HomologySummand<R>;
+    fn index(&self, index: [isize; 2]) -> &Self::Output {
+        let [i, j] = index;
+        if let Some(h) = self.decomposed.get(&j) { 
+            &h[i]
+        } else {
+            &self.zero
+        }
     }
 }
 

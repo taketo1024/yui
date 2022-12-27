@@ -8,7 +8,9 @@ where
     Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R>,
     Self::Output: RModStr<R = Self::R>
 {
+    #[deprecated]
     fn rank(&self, k: Self::Index) -> usize;
+
     fn d_degree(&self) -> Self::Index;
     fn d_matrix(&self, k: Self::Index) -> CsMat<Self::R>;
 
@@ -37,7 +39,7 @@ pub mod tests {
     use either::Either;
     use sprs::CsMat;
     use super::{ChainComplex, GradedRModStr};
-    use crate::math::homology::base::GenericRModStr;
+    use crate::math::homology::base::{GenericRModStr, RModGrid, RModStr};
     use crate::math::traits::{Ring, RingOps};
     use crate::math::matrix::sparse::*;
     use crate::math::matrix::CsMatElem;
@@ -46,7 +48,7 @@ pub mod tests {
     fn zero_complex() {
         let c = TestChainComplex::<i32>::zero();
         assert_eq!(c.d_degree(), -1);
-        assert_eq!(c.rank(0), 0);
+        assert_eq!(c[0].rank(), 0);
     }
 
     #[test]
@@ -55,10 +57,10 @@ pub mod tests {
 
         assert_eq!(c.d_degree(), -1);
         
-        assert_eq!(c.rank(0), 4);
-        assert_eq!(c.rank(1), 6);
-        assert_eq!(c.rank(2), 4);
-        assert_eq!(c.rank(3), 1);
+        assert_eq!(c[0].rank(), 4);
+        assert_eq!(c[1].rank(), 6);
+        assert_eq!(c[2].rank(), 4);
+        assert_eq!(c[3].rank(), 1);
 
         c.check_d_all();
     }
@@ -69,9 +71,9 @@ pub mod tests {
 
         assert_eq!(c.d_degree(), -1);
         
-        assert_eq!(c.rank(0), 4);
-        assert_eq!(c.rank(1), 6);
-        assert_eq!(c.rank(2), 4);
+        assert_eq!(c[0].rank(), 4);
+        assert_eq!(c[1].rank(), 6);
+        assert_eq!(c[2].rank(), 4);
 
         c.check_d_all();
     }
@@ -82,9 +84,9 @@ pub mod tests {
 
         assert_eq!(c.d_degree(), -1);
         
-        assert_eq!(c.rank(0), 9);
-        assert_eq!(c.rank(1), 27);
-        assert_eq!(c.rank(2), 18);
+        assert_eq!(c[0].rank(), 9);
+        assert_eq!(c[1].rank(), 27);
+        assert_eq!(c[2].rank(), 18);
 
         c.check_d_all();
     }
@@ -95,9 +97,9 @@ pub mod tests {
 
         assert_eq!(c.d_degree(), -1);
         
-        assert_eq!(c.rank(0), 6);
-        assert_eq!(c.rank(1), 15);
-        assert_eq!(c.rank(2), 10);
+        assert_eq!(c[0].rank(), 6);
+        assert_eq!(c[1].rank(), 15);
+        assert_eq!(c[2].rank(), 10);
 
         c.check_d_all();
     }
@@ -106,7 +108,7 @@ pub mod tests {
 
     pub struct TestChainComplex<R> 
     where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
-        range: RangeInclusive<isize>,
+        grid: RModGrid<R, GenericRModStr<R>, isize, Either<RangeInclusive<isize>, Rev<RangeInclusive<isize>>>>,
         d_degree: isize,
         d_matrices: Vec<CsMat<R>>,
     }
@@ -117,8 +119,12 @@ pub mod tests {
             assert!(d_degree == 1 || d_degree == -1);
     
             let n = d_matrices.len() as isize;
-            let range = 0..=n;
-            
+            let range = if d_degree > 0 { 
+                Either::Left(0..=n)
+            } else { 
+                Either::Right((0..=n).rev())
+            };
+
             // insert matrix so that `rank(C_k) = d_k.cols()`.
 
             let mut d_matrices = d_matrices;
@@ -137,11 +143,15 @@ pub mod tests {
                 d_matrices.insert(0, d_0);
             }
 
+            let grid = RModGrid::new(range.clone(), |i| { 
+                GenericRModStr::new(d_matrices[i as usize].cols(), vec![])
+            });
+            
             let d_matrices = d_matrices.into_iter().map(|d| 
                 d.map(|&a| R::from(a))
             ).collect();
     
-            Self { range, d_degree, d_matrices }
+            Self { grid, d_degree, d_matrices }
         }
     }
 
@@ -152,7 +162,7 @@ pub mod tests {
         type Output = GenericRModStr<R>;
 
         fn index(&self, index: isize) -> &Self::Output {
-            todo!()
+            &self.grid[index]
         }
     }
 
@@ -165,16 +175,11 @@ pub mod tests {
         type IndexRange = Either<RangeInclusive<isize>, Rev<RangeInclusive<isize>>>;
         
         fn in_range(&self, k: isize) -> bool {
-            self.range.contains(&k)
+            self.grid.in_range(k)
         }
 
         fn range(&self) -> Self::IndexRange {
-            let range = self.range.clone();
-            if self.d_degree > 0 {
-                Either::Left(range)
-            } else {
-                Either::Right(range.rev())
-            }
+            self.grid.range()
         }
     }
 
@@ -182,13 +187,8 @@ pub mod tests {
     where 
         R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> 
     { 
-        fn rank(&self, k: isize) -> usize {
-            if self.in_range(k) { 
-                let k = k as usize;
-                self.d_matrices[k].cols()
-            } else {
-                0
-            }
+        fn rank(&self, _k: isize) -> usize {
+            todo!("remove")
         }
 
         fn d_degree(&self) -> isize {
@@ -200,8 +200,8 @@ pub mod tests {
                 let k = k as usize;
                 self.d_matrices[k].clone()
             } else {
-                let m = self.rank(k + self.d_degree);
-                let n = self.rank(k);
+                let m = self[k + self.d_degree].rank();
+                let n = self[k].rank();
                 CsMat::zero((m, n))
             }
         }

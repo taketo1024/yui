@@ -1,12 +1,9 @@
 use std::hash::Hash;
 use std::collections::HashMap;
 use sprs::{CsVec, CsMat, TriMat};
-use crate::math::matrix::CsMatElem;
 use crate::utils::collections::hashmap;
 use crate::math::traits::{Ring, RingOps};
-
 use super::base::RModStr;
-use super::complex::ChainComplex;
 
 pub trait FreeGenerator: Clone + PartialEq + Eq + Hash {}
 impl<T> FreeGenerator for T 
@@ -53,17 +50,6 @@ where
     fn tors(&self) -> &Vec<Self::R> {
         &self.tors
     }
-}
-
-pub trait FreeChainComplex: ChainComplex
-where 
-    Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R>,
-    Self::Output: RModStr<R = Self::R>
-{ 
-    type Generator: FreeGenerator;
-
-    fn generators(&self, k: Self::Index) -> Vec<&Self::Generator>;
-    fn differentiate(&self, k: Self::Index, x:&Self::Generator) -> Vec<(Self::Generator, Self::R)>;
 }
 
 pub fn vectorize<R, X>(generators: &Vec<&X>, x:&X) -> CsVec<R>

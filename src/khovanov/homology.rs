@@ -116,9 +116,10 @@ where
         let j0 = cube.shift().1;
 
         let decomposed = q_range.clone().step_by(2).map(|j| {
-            let subcube = cube.filter(|x| x.q_deg() == j - j0);
-            let c = KhComplex::from_cube(subcube);
-            (j, KhHomology::from(c))
+            todo!()
+            // let subcube = cube.filter(|x| x.q_deg() == j - j0);
+            // let c = KhComplex::from_cube(subcube);
+            // (j, KhHomology::from(c))
         }).collect();
 
         let zero = GenericRModStr::zero();

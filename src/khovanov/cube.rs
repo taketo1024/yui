@@ -39,37 +39,30 @@ impl Display for KhEnhState {
 #[derive(Debug)]
 pub struct KhCubeVertex { 
     state: State,
-    circles: Vec<Component>,
-    generators: Vec<KhEnhState>
+    circles: Vec<Component>
 }
 
 impl KhCubeVertex { 
-    pub fn new(l: &Link, s: &State) -> Self {
+    pub fn new(l: &Link, state: State) -> Self {
+        let circles = l.clone().resolve(&state).components();
+        KhCubeVertex { state, circles }
+    }
+
+    pub fn generators(&self) -> Vec<KhEnhState> { 
         use super::algebra::KhAlgGen::{X, I};
-        let circles = l.clone().resolve(&s).components();
-        let r = circles.len();
-        let generators = (0..2.pow(r)).map(|mut i| { 
+        let r = self.circles.len();
+
+        let gens = (0..2.pow(r)).map(|mut i| { 
+            let state = self.state.clone();
             let labels = (0..r).map(|_j| { 
                 let x = if i & 1 == 1 { I } else { X };
                 i >>= 1;
                 x
-            }).collect_vec();
-            KhEnhState::new( s.clone(), labels )
-        }).collect_vec();
+            }).collect();
+            KhEnhState::new( state, labels )
+        }).collect();
 
-        KhCubeVertex { state: s.clone(), circles, generators }
-    }
-
-    pub fn generators(&self) -> Vec<&KhEnhState> { 
-        self.generators.iter().collect()
-    }
-
-    pub fn filter<F>(&self, pred: F) -> Self
-    where F: Fn(&KhEnhState) -> bool { 
-        let state = self.state.clone();
-        let circles = self.circles.clone();
-        let generators: Vec<_> = self.generators.iter().filter(|x| pred(x)).cloned().collect();
-        Self { state, circles, generators }
+        gens
     }
 }
 
@@ -158,7 +151,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let m = 2.pow(dim) as usize;
         let vertices: HashMap<_, _> = (0..m).map(|i| { 
             let s = State::from_bseq(i, dim);
-            let v = KhCubeVertex::new(&l, &s);
+            let v = KhCubeVertex::new(&l, s.clone());
             (s, v)
         }).collect();
 
@@ -210,11 +203,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         (j0 + q0) ..= (j0 + q1)
     }
 
-    pub fn generators(&self, i: isize) -> Vec<&KhEnhState> { 
+    pub fn generators(&self, i: isize) -> Vec<KhEnhState> { 
         if self.h_range().contains(&i) { 
             let i0 = self.shift.0;
             let k = (i - i0) as usize;
-            self.vertices(k).into_iter().flat_map(|v| v.generators()).collect_vec()
+
+            self.vertices_of(k).into_iter().flat_map(|v| 
+                v.generators()
+            ).collect()
         } else {
             vec![]
         }
@@ -235,7 +231,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.edges[from].iter().find(|(t, _)| t == to).map(|(_, e)| e)
     }
 
-    fn vertices(&self, k: usize) -> Vec<&KhCubeVertex> { 
+    fn vertices_of(&self, k: usize) -> Vec<&KhCubeVertex> { 
         self.vertices
             .iter()
             .sorted_by(|(s1, _), (s2, _)| Ord::cmp(s1, s2))
@@ -290,16 +286,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
         }
     }
-
-    pub fn filter<F>(&self, pred: F) -> Self
-    where F: Fn(&KhEnhState) -> bool {
-        let str = self.str.clone();
-        let dim = self.dim().clone();
-        let shift = self.shift.clone();
-        let vertices = self.vertices.iter().map(|(i, v)| (i.clone(), v.filter(&pred))).collect();
-        let edges = self.edges.clone();
-        Self { str, dim, shift, vertices, edges }
-    }
 }
 
 #[cfg(test)]
@@ -311,33 +297,33 @@ mod tests {
     fn empty() { 
         let l = Link::empty();
         let s = State::empty();
-        let v = KhCubeVertex::new(&l, &s);
+        let v = KhCubeVertex::new(&l, s.clone());
 
         assert_eq!(v.state, s);
         assert_eq!(v.circles.len(), 0);
-        assert_eq!(v.generators.len(), 1);
+        assert_eq!(v.generators().len(), 1);
     }
     
     #[test]
     fn unknot() { 
         let l = Link::unknot();
         let s = State::empty();
-        let v = KhCubeVertex::new(&l, &s);
+        let v = KhCubeVertex::new(&l, s.clone());
 
         assert_eq!(v.state, s);
         assert_eq!(v.circles.len(), 1);
-        assert_eq!(v.generators.len(), 2);
+        assert_eq!(v.generators().len(), 2);
     }
 
     #[test]
     fn unlink_2() {
         let l = Link::from([[0, 0, 1, 1]]).resolve_at(0, Res0);
         let s = State::empty();
-        let v = KhCubeVertex::new(&l, &s);
+        let v = KhCubeVertex::new(&l, s.clone());
 
         assert_eq!(v.state, s);
         assert_eq!(v.circles.len(), 2);
-        assert_eq!(v.generators.len(), 4);
+        assert_eq!(v.generators().len(), 4);
     }
 
     #[test]
@@ -345,8 +331,8 @@ mod tests {
         let l = Link::from([[0, 0, 1, 1]]);
         let s = State::from(vec![0]);
         let t = State::from(vec![1]);
-        let v = KhCubeVertex::new(&l, &s);
-        let w = KhCubeVertex::new(&l, &t);
+        let v = KhCubeVertex::new(&l, s);
+        let w = KhCubeVertex::new(&l, t);
         let e = KhCubeEdge::edge_between(&v, &w);
 
         assert!(e.sign.is_positive());
@@ -363,8 +349,8 @@ mod tests {
         let l = Link::from([[0, 1, 1, 0]]);
         let s = State::from(vec![0]);
         let t = State::from(vec![1]);
-        let v = KhCubeVertex::new(&l, &s);
-        let w = KhCubeVertex::new(&l, &t);
+        let v = KhCubeVertex::new(&l, s);
+        let w = KhCubeVertex::new(&l, t);
         let e = KhCubeEdge::edge_between(&v, &w);
 
         assert!(e.sign.is_positive());
@@ -412,7 +398,7 @@ mod tests {
         let v = cube.vertex(&s);
 
         assert_eq!(v.circles.len(), 0);
-        assert_eq!(v.generators.len(), 1);
+        assert_eq!(v.generators().len(), 1);
 
         assert!(cube.edges_from(&s).is_empty());
         assert_eq!(cube.shift(), (0, 0));
@@ -431,7 +417,7 @@ mod tests {
         let v = cube.vertex(&s);
 
         assert_eq!(v.circles.len(), 1);
-        assert_eq!(v.generators.len(), 2);
+        assert_eq!(v.generators().len(), 2);
 
         assert!(cube.edges_from(&s).is_empty());
     }
@@ -452,10 +438,10 @@ mod tests {
         let v1 = cube.vertex(&s1);
 
         assert_eq!(v0.circles.len(), 2);
-        assert_eq!(v0.generators.len(), 4);
+        assert_eq!(v0.generators().len(), 4);
 
         assert_eq!(v1.circles.len(), 1);
-        assert_eq!(v1.generators.len(), 2);
+        assert_eq!(v1.generators().len(), 2);
 
         let Some(e) = cube.edge(&s0, &s1) else { panic!() };
 

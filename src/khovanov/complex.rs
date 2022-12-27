@@ -1,7 +1,7 @@
 use std::ops::{RangeInclusive, Index};
 
-use crate::math::homology::base::{GradedRModStr, GenericRModStr};
-use crate::math::homology::free::FreeChainComplex;
+use crate::math::homology::base::{GradedRModStr, RModGrid};
+use crate::math::homology::free::FreeRModStr;
 use crate::math::traits::{Ring, RingOps};
 use crate::math::matrix::CsMatElem;
 use crate::math::homology::complex::ChainComplex;
@@ -10,7 +10,8 @@ use super::cube::{KhEnhState, KhCube};
 
 pub struct KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    cube: KhCube<R>
+    cube: KhCube<R>,
+    grid: RModGrid<R, FreeRModStr<R, KhEnhState>, isize, RangeInclusive<isize>>
 }
 
 impl<R> KhComplex<R>
@@ -25,16 +26,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn from_cube(cube: KhCube<R>) -> Self { 
-        KhComplex { cube }
+        let grid = RModGrid::new(cube.h_range(), |i| {
+            let gens = cube.generators(i);
+            FreeRModStr::new(gens)
+        });
+        KhComplex { cube, grid }
     }
 }
 
 impl<R> Index<isize> for KhComplex<R>
 where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> { 
-    type Output = GenericRModStr<R>;
+    type Output = FreeRModStr<R, KhEnhState>;
     
     fn index(&self, index: isize) -> &Self::Output {
-        todo!()
+        &self.grid[index]
     }
 }
 
@@ -45,18 +50,18 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
     type IndexRange = RangeInclusive<isize>;
 
     fn in_range(&self, k: Self::Index) -> bool {
-        self.range().contains(&k)
+        self.grid.in_range(k)
     }
 
     fn range(&self) -> Self::IndexRange {
-        self.cube.h_range()
+        self.grid.range()
     }
 }
 
 impl<R> ChainComplex for KhComplex<R>
 where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> { 
-    fn rank(&self, k: Self::Index) -> usize {
-        self.cube.generators(k).len()
+    fn rank(&self, _k: Self::Index) -> usize {
+        todo!("remove")
     }
 
     fn d_degree(&self) -> Self::Index {
@@ -64,23 +69,10 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
     }
 
     fn d_matrix(&self, k: Self::Index) -> sprs::CsMat<Self::R> {
-        let source = self.cube.generators(k);
-        let target = self.cube.generators(k + 1);
-        crate::math::homology::free::make_matrix(&source, &target, |x| self.cube.differentiate(x))
+        let source = self.grid[k].generators();
+        let target = self.grid[k + 1].generators();
+        crate::math::homology::free::make_matrix(source, target, |x| self.cube.differentiate(x))
     }
-}
-
-impl<R> FreeChainComplex for KhComplex<R>
-where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> { 
-    type Generator = KhEnhState;
-        
-    fn generators(&self, k: Self::Index) -> Vec<&Self::Generator> {
-        self.cube.generators(k)
-    }
-
-    fn differentiate(&self, _k: Self::Index, x:&Self::Generator) -> Vec<(Self::Generator, Self::R)> {
-        self.cube.differentiate(x)
-    }    
 }
 
 #[cfg(test)]
@@ -88,7 +80,6 @@ mod tests {
     use crate::links::Link;
     use crate::math::homology::base::GradedRModStr;
     use crate::math::homology::complex::ChainComplex;
-    use crate::math::homology::free::FreeChainComplex;
     use super::KhComplex;
 
     #[test]
@@ -115,10 +106,10 @@ mod tests {
         let c = KhComplex::<i32>::new(&l);
 
         assert_eq!(c.range(), -3..=0);
-        assert_eq!(c.generators(-3).len(), 8);
-        assert_eq!(c.generators(-2).len(), 12);
-        assert_eq!(c.generators(-1).len(), 6);
-        assert_eq!(c.generators( 0).len(), 4);
+        assert_eq!(c[-3].generators().len(), 8);
+        assert_eq!(c[-2].generators().len(), 12);
+        assert_eq!(c[-1].generators().len(), 6);
+        assert_eq!(c[ 0].generators().len(), 4);
 
         c.check_d_all();
     }
@@ -129,11 +120,11 @@ mod tests {
         let c = KhComplex::<i32>::new(&l);
 
         assert_eq!(c.range(), -2..=2);
-        assert_eq!(c.generators(-2).len(), 8);
-        assert_eq!(c.generators(-1).len(), 16);
-        assert_eq!(c.generators( 0).len(), 18);
-        assert_eq!(c.generators( 1).len(), 16);
-        assert_eq!(c.generators( 2).len(), 8);
+        assert_eq!(c[-2].generators().len(), 8);
+        assert_eq!(c[-1].generators().len(), 16);
+        assert_eq!(c[ 0].generators().len(), 18);
+        assert_eq!(c[ 1].generators().len(), 16);
+        assert_eq!(c[ 2].generators().len(), 8);
 
         c.check_d_all();
     }

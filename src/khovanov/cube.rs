@@ -198,7 +198,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let s1 = State::from_bseq((2.pow(n) - 1) as usize, n);
         let v1 = self.vertex(&s1);
-        let q1 = v1.circles.len() as isize; // tensor factors are all 1
+        let q1 = (n + v1.circles.len()) as isize; // tensor factors are all 1
 
         (j0 + q0) ..= (j0 + q1)
     }

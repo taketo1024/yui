@@ -1,15 +1,10 @@
 use std::collections::HashMap;
-use std::hash::Hash;
 use sprs::{CsMat, CsVec, TriMat};
 use num_traits::One;
 use crate::math::traits::{Ring, RingOps};
 use crate::math::matrix::sparse::*;
 use crate::utils::collections::hashmap;
-use super::base::Graded;
-
-pub trait ChainGenerator: Clone + PartialEq + Eq + Hash {}
-impl<T> ChainGenerator for T 
-where T: Clone + PartialEq + Eq + Hash {}
+use super::base::{Graded, ChainGenerator};
 
 pub trait ChainComplex: Graded
 where 

@@ -6,7 +6,7 @@ use crate::math::matrix::schur::schur_partial_upper_triang;
 use crate::math::matrix::sparse::CsMatExt;
 use crate::math::traits::{Ring, RingOps};
 use crate::math::matrix::CsMatElem;
-use super::base::Graded;
+use super::base::GradedRModStr;
 use super::complex::ChainComplex;
 
 pub struct Reduced<C>
@@ -95,12 +95,13 @@ where
     }
 }
 
-impl<C> Graded for Reduced<C>
+impl<C> GradedRModStr for Reduced<C>
 where 
     C: ChainComplex,
     C::R: Ring + CsMatElem, 
     for<'x> &'x C::R: RingOps<C::R>  
 {
+    type R = C::R;
     type Index = C::Index;
     type IndexRange = C::IndexRange;
 
@@ -119,8 +120,6 @@ where
     C::R: Ring + CsMatElem, 
     for<'x> &'x C::R: RingOps<C::R>  
 {
-    type R = C::R;
-
     fn rank(&self, k: Self::Index) -> usize {
         if self.in_range(k) {
             self.d_matrices[&k].cols()

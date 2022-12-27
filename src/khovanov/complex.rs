@@ -1,6 +1,6 @@
 use std::ops::RangeInclusive;
 
-use crate::math::homology::base::Graded;
+use crate::math::homology::base::GradedRModStr;
 use crate::math::homology::free::FreeChainComplex;
 use crate::math::traits::{Ring, RingOps};
 use crate::math::matrix::CsMatElem;
@@ -29,8 +29,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<R> Graded for KhComplex<R>
+impl<R> GradedRModStr for KhComplex<R>
 where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> { 
+    type R = R;
     type Index = isize;
     type IndexRange = RangeInclusive<isize>;
 
@@ -45,8 +46,6 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
 
 impl<R> ChainComplex for KhComplex<R>
 where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> { 
-    type R = R;
-
     fn rank(&self, k: Self::Index) -> usize {
         self.cube.generators(k).len()
     }
@@ -78,7 +77,7 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 mod tests {
     use crate::links::Link;
-    use crate::math::homology::base::Graded;
+    use crate::math::homology::base::GradedRModStr;
     use crate::math::homology::complex::ChainComplex;
     use crate::math::homology::free::FreeChainComplex;
     use super::KhComplex;

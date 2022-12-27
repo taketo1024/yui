@@ -1,14 +1,12 @@
 use sprs::CsMat;
-use crate::math::traits::{Ring, RingOps};
 use crate::math::matrix::sparse::*;
-use super::base::Graded;
+use crate::math::traits::{RingOps, Ring};
+use super::base::GradedRModStr;
 
-pub trait ChainComplex: Graded
+pub trait ChainComplex: GradedRModStr
 where 
     Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R> 
 {
-    type R;
-
     fn rank(&self, k: Self::Index) -> usize;
     fn d_degree(&self) -> Self::Index;
     fn d_matrix(&self, k: Self::Index) -> CsMat<Self::R>;
@@ -37,7 +35,7 @@ pub mod tests {
     use std::ops::RangeInclusive;
     use either::Either;
     use sprs::CsMat;
-    use super::{ChainComplex, Graded};
+    use super::{ChainComplex, GradedRModStr};
     use crate::math::traits::{Ring, RingOps};
     use crate::math::matrix::sparse::*;
     use crate::math::matrix::CsMatElem;
@@ -145,10 +143,11 @@ pub mod tests {
         }
     }
 
-    impl<R> Graded for TestChainComplex<R>
+    impl<R> GradedRModStr for TestChainComplex<R>
     where 
         R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> 
     {
+        type R = R;
         type Index = isize;
         type IndexRange = Either<RangeInclusive<isize>, Rev<RangeInclusive<isize>>>;
         
@@ -170,8 +169,6 @@ pub mod tests {
     where 
         R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> 
     { 
-        type R = R;
-
         fn rank(&self, k: isize) -> usize {
             if self.in_range(k) { 
                 let k = k as usize;

@@ -97,7 +97,11 @@ pub trait AdditiveIndex: Clone + Copy + PartialEq + Eq + Hash + Display + Add<Ou
 impl <T> AdditiveIndex for T
 where T: Clone + Copy + PartialEq + Eq + Hash + Display + Add<Output = Self> + Sub<Output = Self>{}
 
-pub trait Graded {
+pub trait GradedRModStr 
+where 
+    Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> 
+{
+    type R;
     type Index: AdditiveIndex;
     type IndexRange: Iterator<Item = Self::Index>;
 
@@ -150,13 +154,14 @@ where
     }
 }
 
-impl<R, S, I, IR> Graded for RModGrid<R, S, I, IR>
+impl<R, S, I, IR> GradedRModStr for RModGrid<R, S, I, IR>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
     S: RModStr<R = R>,
     I: AdditiveIndex,
     IR: Iterator<Item = I> + Clone
 {
+    type R = R;
     type Index = I;
     type IndexRange = IR;
 

@@ -5,12 +5,12 @@ use sprs::CsMat;
 use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps};
 use crate::math::matrix::{snf_in_place, DnsMat};
 use crate::math::matrix::sparse::*;
-use super::base::{Graded, RModStr, GenericRModStr, RModGrid, AdditiveIndex};
+use super::base::{GradedRModStr, RModStr, GenericRModStr, RModGrid, AdditiveIndex};
 use super::complex::ChainComplex;
 
 pub trait HomologyComputable: ChainComplex
 where 
-    Self::R: Ring, 
+    Self::R: Ring + CsMatElem, 
     for<'x> &'x Self::R: RingOps<Self::R>  
 {
     fn homology_at(&self, i: Self::Index) -> GenericRModStr<Self::R>;
@@ -33,13 +33,11 @@ where
 }
 
 pub trait Homology: 
-    Graded + 
+    GradedRModStr + 
     Index<Self::Index, Output = GenericRModStr<Self::R>>
 where 
     Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> 
 {
-    type R;
-
     fn is_zero(&self) -> bool {
         self.range().all(|i| self[i].is_zero())
     }
@@ -68,7 +66,7 @@ where
 impl<'a, C> From<&'a C> for GenericHomology<C::R, C::Index, C::IndexRange>
 where
     C: HomologyComputable,
-    C::R: Ring, for<'x> &'x C::R: RingOps<C::R>,
+    C::R: Ring + CsMatElem, for<'x> &'x C::R: RingOps<C::R>,
     C::IndexRange: Clone
 {
     fn from(c: &'a C) -> Self {
@@ -78,12 +76,13 @@ where
     }
 }
 
-impl<R, I, IR> Graded for GenericHomology<R, I, IR>
+impl<R, I, IR> GradedRModStr for GenericHomology<R, I, IR>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
     I: AdditiveIndex,
     IR: Iterator<Item = I> + Clone
 {
+    type R = R;
     type Index = I;
     type IndexRange = IR;
 
@@ -115,7 +114,6 @@ where
     I: AdditiveIndex,
     IR: Iterator<Item = I> + Clone
 {
-    type R = R;
 }
 
 impl<R, I, IR> Display for GenericHomology<R, I, IR>

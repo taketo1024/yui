@@ -1,6 +1,7 @@
 use std::hash::Hash;
 use std::collections::HashMap;
 use sprs::{CsVec, CsMat, TriMat};
+use crate::math::matrix::CsMatElem;
 use crate::utils::collections::hashmap;
 use crate::math::traits::{Ring, RingOps};
 
@@ -12,7 +13,7 @@ where T: Clone + PartialEq + Eq + Hash {}
 
 pub trait FreeChainComplex: ChainComplex
 where 
-    Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> 
+    Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R> 
 { 
     type Generator: FreeGenerator;
 

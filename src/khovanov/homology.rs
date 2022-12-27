@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::{RangeInclusive, Index};
 
-use crate::math::homology::base::{Graded, GenericRModStr, RModStr};
+use crate::math::homology::base::{GradedRModStr, GenericRModStr, RModStr};
 use crate::math::homology::homology::{Homology, GenericHomology};
 use crate::math::homology::reduce::Reduced;
 use crate::math::matrix::CsMatElem;
@@ -46,11 +46,12 @@ where
     }
 }
 
-impl<R> Graded for KhHomology<R>
+impl<R> GradedRModStr for KhHomology<R>
 where 
     R: EucRing + CsMatElem, 
     for<'x> &'x R: EucRingOps<R> 
 { 
+    type R = R;
     type Index = isize;
     type IndexRange = RangeInclusive<isize>;
 
@@ -79,9 +80,7 @@ impl<R> Homology for KhHomology<R>
 where 
     R: EucRing + CsMatElem,
     for<'x> &'x R: EucRingOps<R>
-{
-    type R = R;
-}
+{}
 
 impl<R> Display for KhHomology<R> 
 where 
@@ -146,7 +145,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{links::Link, math::homology::base::{Graded, RModStr}};
+    use crate::{links::Link, math::homology::base::{GradedRModStr, RModStr}};
     use super::KhHomology;
     
     #[test]

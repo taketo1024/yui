@@ -1,6 +1,7 @@
+use std::collections::HashMap;
 use std::hash::Hash;
 use std::fmt::Display;
-use std::ops::{Add, Sub};
+use std::ops::{Add, Sub, Index};
 use crate::math::traits::{MathElem, Ring, RingOps};
 use crate::utils::format::superscript;
 
@@ -102,4 +103,68 @@ pub trait Graded {
 
     fn in_range(&self, k: Self::Index) -> bool;
     fn range(&self) -> Self::IndexRange;
+}
+
+pub struct RModGrid<R, S, I, IR>
+where 
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    S: RModStr<R = R>,
+    I: AdditiveIndex,
+    IR: Iterator<Item = I> + Clone
+{
+    range: IR,
+    grid: HashMap<I, S>,
+    zero: S
+}
+
+impl<R, S, I, IR> RModGrid<R, S, I, IR>
+where 
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    S: RModStr<R = R>,
+    I: AdditiveIndex,
+    IR: Iterator<Item = I> + Clone
+{
+    pub fn new<F>(range: IR, f: F) -> Self
+    where F: Fn(I) -> S {
+        let grid = range.clone().map(|i| (i, f(i))).collect();
+        let zero = S::zero();
+        Self { range, grid, zero }
+    }
+}
+
+impl<R, S, I, IR> Index<I> for RModGrid<R, S, I, IR>
+where
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    S: RModStr<R = R>,
+    I: AdditiveIndex,
+    IR: Iterator<Item = I> + Clone
+{
+    type Output = S;
+
+    fn index(&self, index: I) -> &Self::Output {
+        if let Some(s) = self.grid.get(&index) { 
+            s
+        } else { 
+            &self.zero
+        }
+    }
+}
+
+impl<R, S, I, IR> Graded for RModGrid<R, S, I, IR>
+where 
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    S: RModStr<R = R>,
+    I: AdditiveIndex,
+    IR: Iterator<Item = I> + Clone
+{
+    type Index = I;
+    type IndexRange = IR;
+
+    fn in_range(&self, k: Self::Index) -> bool {
+        self.grid.contains_key(&k)
+    }
+
+    fn range(&self) -> Self::IndexRange {
+        self.range.clone()
+    }
 }

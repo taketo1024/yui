@@ -3,8 +3,7 @@ use std::fmt::Display;
 use std::ops::{RangeInclusive, Index};
 
 use crate::math::homology::base::{Graded, GenericRModStr, RModStr};
-use crate::math::homology::homology::Homology;
-use crate::math::homology::homology::GenericHomology;
+use crate::math::homology::homology::{Homology, GenericHomology};
 use crate::math::homology::reduce::Reduced;
 use crate::math::matrix::CsMatElem;
 use crate::math::traits::{EucRing, EucRingOps};
@@ -17,7 +16,7 @@ where
     R: EucRing + CsMatElem, 
     for<'x> &'x R: EucRingOps<R> 
 { 
-    homology: GenericHomology<Reduced<KhComplex<R>>>,
+    homology: GenericHomology<R, isize, RangeInclusive<isize>>
 }
 
 impl<R> KhHomology<R> 
@@ -42,7 +41,7 @@ where
 {
     fn from(c: KhComplex<R>) -> Self {
         let reduced = Reduced::from(c);
-        let homology = GenericHomology::from(reduced);
+        let homology = GenericHomology::from(&reduced);
         Self { homology }
     }
 }

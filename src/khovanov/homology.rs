@@ -1,7 +1,8 @@
 use std::fmt::Display;
 use std::ops::{RangeInclusive, Index};
 
-use crate::math::homology::base::{GradedRModStr, GenericRModStr, Idx2, Idx2Range};
+use crate::utils::misc::{Idx2, Idx2Range};
+use crate::math::homology::base::{GradedRModStr, GenericRModStr};
 use crate::math::homology::homology::{Homology, GenericHomology};
 use crate::math::homology::reduce::Reduced;
 use crate::math::matrix::CsMatElem;

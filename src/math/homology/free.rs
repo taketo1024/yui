@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::hash::Hash;
 use std::collections::HashMap;
 use sprs::{CsVec, CsMat, TriMat};
@@ -30,6 +31,26 @@ where
     pub fn generators(&self) -> &Vec<X> {
         &self.generators
     }
+
+    pub fn vectorize(&self, x: &X) -> CsVec<R> {
+        vectorize(self.generators(), x)
+    }
+
+    pub fn extract<F>(&mut self, pred: F) -> Self
+    where F: Fn(&X) -> bool { 
+        let mut i = 0;
+        let mut ext = vec![];
+
+        while i < self.generators.len() { 
+            if pred(&self.generators[i]) {
+                ext.push(self.generators.remove(i));
+            } else { 
+                i += 1;
+            }
+        }
+        
+        Self::new(ext)
+    }
 }
 
 impl<R, X> RModStr for FreeRModStr<R, X>
@@ -52,7 +73,17 @@ where
     }
 }
 
-pub fn vectorize<R, X>(generators: &Vec<&X>, x:&X) -> CsVec<R>
+impl<R, X> Display for FreeRModStr<R, X>
+where 
+    R: Ring, for<'x> &'x R: RingOps<R>, 
+    X: FreeGenerator
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.fmt_default(f)
+    }
+}
+
+pub fn vectorize<R, X>(generators: &Vec<X>, x:&X) -> CsVec<R>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
     X: FreeGenerator
@@ -60,7 +91,7 @@ where
     vectorize_comb(generators, hashmap![x => R::one()])
 }
 
-pub fn vectorize_comb<R, X>(generators: &Vec<&X>, z:HashMap<&X, R>) -> CsVec<R>
+pub fn vectorize_comb<R, X>(generators: &Vec<X>, z:HashMap<&X, R>) -> CsVec<R>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
     X: FreeGenerator
@@ -71,7 +102,7 @@ where
     let mut v_val: Vec<R> = vec![];
 
     for (x, a) in z { 
-        let Some(i) = generators.iter().position(|&z| x == z) else { 
+        let Some(i) = generators.iter().position(|z| x == z) else { 
             continue 
         };
         v_ind.push(i);

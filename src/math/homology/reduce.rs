@@ -7,7 +7,7 @@ use crate::math::matrix::schur::schur_partial_upper_triang;
 use crate::math::matrix::sparse::CsMatExt;
 use crate::math::traits::{Ring, RingOps};
 use crate::math::matrix::CsMatElem;
-use super::base::{GradedRModStr, RModStr};
+use super::base::{GradedRModStr, RModStr, RModGrid, GenericRModStr};
 use super::complex::ChainComplex;
 
 pub struct Reduced<C>
@@ -16,8 +16,9 @@ where
     C::R: Ring + CsMatElem, for<'x> &'x C::R: RingOps<C::R>,
     C::Output: RModStr<R = C::R>
 { 
-    d_matrices: HashMap<C::Index, CsMat<C::R>>,
     original: C,
+    grid: RModGrid<C::R, GenericRModStr<C::R>, C::Index, C::IndexRange>,
+    d_matrices: HashMap<C::Index, CsMat<C::R>>,
 }
 
 impl<C> Reduced<C>
@@ -75,6 +76,7 @@ where
 {
     fn from(c: C) -> Self {
         let mut d_matrices = HashMap::new();
+
         for k in c.range() {
             let deg = c.d_degree();
             let (k0, k1, k2) = (k - deg, k, k + deg);
@@ -92,7 +94,11 @@ where
             d_matrices.insert(k2, b2);
         }
 
-        Self { d_matrices, original: c }
+        let grid = RModGrid::new(c.range(), |i| { 
+            GenericRModStr::new(d_matrices[&i].cols(), vec![])
+        });
+
+        Self { original: c, grid, d_matrices }
     }
 }
 
@@ -102,10 +108,10 @@ where
     C::R: Ring + CsMatElem, for<'x> &'x C::R: RingOps<C::R>,
     C::Output: RModStr<R = C::R>
 {
-    type Output = C::Output;
+    type Output = GenericRModStr<C::R>;
 
     fn index(&self, index: C::Index) -> &Self::Output {
-        todo!()
+        &self.grid[index]
     }
 }
 
@@ -136,11 +142,7 @@ where
     C::Output: RModStr<R = C::R>
 {
     fn rank(&self, k: Self::Index) -> usize {
-        if self.in_range(k) {
-            self.d_matrices[&k].cols()
-        } else {
-            0
-        }
+        todo!("remove")
     }
 
     fn d_degree(&self) -> Self::Index {
@@ -151,8 +153,8 @@ where
         if self.in_range(k) { 
             self.d_matrices[&k].clone()
         } else {
-            let m = self.rank(k + self.d_degree());
-            let n = self.rank(k);
+            let m = self[k + self.d_degree()].rank();
+            let n = self[k].rank();
             CsMat::zero((m, n))
         }
     }
@@ -174,8 +176,8 @@ mod tests {
         );
         let c = Reduced::from(c);
 
-        assert_eq!(c.rank(0), 0);
-        assert_eq!(c.rank(1), 0);
+        assert_eq!(c[0].rank(), 0);
+        assert_eq!(c[1].rank(), 0);
     }
 
     #[test]
@@ -186,8 +188,8 @@ mod tests {
         );
         let c = Reduced::from(c);
 
-        assert_eq!(c.rank(0), 1);
-        assert_eq!(c.rank(1), 1);
+        assert_eq!(c[0].rank(), 1);
+        assert_eq!(c[1].rank(), 1);
     }
 
     #[test]
@@ -195,10 +197,10 @@ mod tests {
         let c = TestChainComplex::<i32>::d3();
         let c = Reduced::from(c);
 
-        assert_eq!(c.rank(0), 1);
-        assert_eq!(c.rank(1), 0);
-        assert_eq!(c.rank(2), 0);
-        assert_eq!(c.rank(3), 0);
+        assert_eq!(c[0].rank(), 1);
+        assert_eq!(c[1].rank(), 0);
+        assert_eq!(c[2].rank(), 0);
+        assert_eq!(c[3].rank(), 0);
 
         let h = GenericHomology::from(&c);
 
@@ -213,9 +215,9 @@ mod tests {
         let c = TestChainComplex::<i32>::s2();
         let c = Reduced::from(c);
 
-        assert_eq!(c.rank(0), 1);
-        assert_eq!(c.rank(1), 0);
-        assert_eq!(c.rank(2), 1);
+        assert_eq!(c[0].rank(), 1);
+        assert_eq!(c[1].rank(), 0);
+        assert_eq!(c[2].rank(), 1);
 
         let h = GenericHomology::from(&c);
 
@@ -229,9 +231,9 @@ mod tests {
         let c = TestChainComplex::<i32>::t2();
         let c = Reduced::from(c);
 
-        assert_eq!(c.rank(0), 1);
-        assert_eq!(c.rank(1), 2);
-        assert_eq!(c.rank(2), 1);
+        assert_eq!(c[0].rank(), 1);
+        assert_eq!(c[1].rank(), 2);
+        assert_eq!(c[2].rank(), 1);
 
         let h = GenericHomology::from(&c);
 
@@ -245,9 +247,9 @@ mod tests {
         let c = TestChainComplex::<i32>::rp2();
         let c = Reduced::from(c);
 
-        assert_eq!(c.rank(0), 1);
-        assert_eq!(c.rank(1), 1);
-        assert_eq!(c.rank(2), 1);
+        assert_eq!(c[0].rank(), 1);
+        assert_eq!(c[1].rank(), 1);
+        assert_eq!(c[2].rank(), 1);
 
         let h = GenericHomology::from(&c);
 

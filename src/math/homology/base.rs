@@ -104,7 +104,7 @@ where
 {
     type R;
     type Index: AdditiveIndex;
-    type IndexRange: Iterator<Item = Self::Index>;
+    type IndexRange: Iterator<Item = Self::Index> + Clone;
 
     fn in_range(&self, k: Self::Index) -> bool;
     fn range(&self) -> Self::IndexRange;

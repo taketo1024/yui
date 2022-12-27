@@ -1,9 +1,10 @@
 use std::ops::RangeInclusive;
 
 use crate::math::homology::base::Graded;
+use crate::math::homology::free::FreeChainComplex;
 use crate::math::traits::{Ring, RingOps};
 use crate::math::matrix::CsMatElem;
-use crate::math::homology::complex::{ChainComplex, FreeChainComplex};
+use crate::math::homology::complex::ChainComplex;
 use crate::links::Link;
 use super::cube::{KhEnhState, KhCube};
 
@@ -57,7 +58,7 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
     fn d_matrix(&self, k: Self::Index) -> sprs::CsMat<Self::R> {
         let source = self.cube.generators(k);
         let target = self.cube.generators(k + 1);
-        crate::math::homology::base::make_matrix(&source, &target, |x| self.cube.differentiate(x))
+        crate::math::homology::free::make_matrix(&source, &target, |x| self.cube.differentiate(x))
     }
 }
 
@@ -78,7 +79,8 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
 mod tests {
     use crate::links::Link;
     use crate::math::homology::base::Graded;
-    use crate::math::homology::complex::{ChainComplex, FreeChainComplex};
+    use crate::math::homology::complex::ChainComplex;
+    use crate::math::homology::free::FreeChainComplex;
     use super::KhComplex;
 
     #[test]

@@ -1,7 +1,7 @@
 use sprs::CsMat;
 use crate::math::traits::{Ring, RingOps};
 use crate::math::matrix::sparse::*;
-use super::base::{Graded, FreeGenerator};
+use super::base::Graded;
 
 pub trait ChainComplex: Graded
 where 
@@ -29,16 +29,6 @@ where
             self.check_d_at(k);
         }
     }
-}
-
-pub trait FreeChainComplex: ChainComplex
-where 
-    Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R> 
-{ 
-    type Generator: FreeGenerator;
-
-    fn generators(&self, k: Self::Index) -> Vec<&Self::Generator>;
-    fn differentiate(&self, k: Self::Index, x:&Self::Generator) -> Vec<(Self::Generator, Self::R)>;
 }
 
 #[cfg(test)]

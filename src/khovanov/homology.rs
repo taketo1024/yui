@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::{RangeInclusive, Index};
 
-use crate::math::homology::base::Graded;
+use crate::math::homology::base::{Graded, Summand};
 use crate::math::homology::homology::{Homology, HomologySummand};
 use crate::math::homology::homology::GenericHomology;
 use crate::math::homology::reduce::Reduced;
@@ -147,7 +147,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{links::Link, math::homology::base::Graded};
+    use crate::{links::Link, math::homology::base::{Graded, Summand}};
     use super::KhHomology;
     
     #[test]

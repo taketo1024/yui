@@ -6,7 +6,7 @@ use sprs::CsMat;
 use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps};
 use crate::math::matrix::{snf_in_place, DnsMat};
 use crate::math::matrix::sparse::*;
-use super::base::Graded;
+use super::base::{Graded, Summand};
 use super::complex::ChainComplex;
 
 pub trait HomologyComputable: ChainComplex
@@ -45,33 +45,29 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(rank: usize, tors: Vec<R>) -> Self { 
         Self { rank, tors }
     }
+}
 
-    pub fn zero() -> Self { 
+impl<R> Summand for HomologySummand<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type R = R;
+
+    fn zero() -> Self { 
         Self { rank: 0, tors: vec![] }
     }
 
-    pub fn rank(&self) -> usize { 
+    fn rank(&self) -> usize { 
         self.rank
     }
 
-    pub fn tors(&self) -> &Vec<R> {
+    fn tors(&self) -> &Vec<R> {
         &self.tors
-    }
-
-    pub fn is_free(&self) -> bool { 
-        self.tors.is_empty()
-    }
-
-    pub fn is_zero(&self) -> bool { 
-        self.rank == 0 && self.tors.is_empty()
     }
 }
 
 impl<R> Display for HomologySummand<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use crate::utils::format::module_descr;
-        f.write_str(&module_descr(self.rank, &self.tors))
+        self.fmt_default(f)
     }
 }
 

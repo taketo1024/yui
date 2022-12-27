@@ -1,6 +1,4 @@
 use itertools::Itertools;
-use crate::math::traits::{Ring, RingOps};
-
 use super::digits::Digits;
 
 pub fn subscript(i: isize) -> String {
@@ -40,37 +38,6 @@ pub fn superscript(i: isize) -> String {
 
     res.append(&mut s);
     res.iter().collect()
-}
-
-pub fn module_descr<R>(rank: usize, tors: &Vec<R>) -> String 
-where R: Ring, for<'x> &'x R: RingOps<R>  
-{ 
-    use grouping_by::GroupingBy;
-    if rank == 0 && tors.is_empty() { 
-        return String::from("0")
-    }
-
-    let mut res = vec![];
-    let symbol = R::symbol();
-
-    if rank > 1 {
-        let str = format!("{}{}", symbol, superscript(rank as isize));
-        res.push(str);
-    } else if rank == 1 { 
-        let str = format!("{}", symbol);
-        res.push(str);
-    }
-
-    for (t, r) in tors.iter().counter(|&t| t) { 
-        let str = if r > 1 { 
-            format!("({}/{}){}", symbol, t, superscript(r as isize))
-        } else { 
-            format!("({}/{})", symbol, t)
-        };
-        res.push(str);
-    }
-
-    res.join(" ⊕ ")
 }
 
 #[cfg(test)]

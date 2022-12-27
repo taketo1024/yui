@@ -151,6 +151,10 @@ where
     assert_eq!(d2.cols(), d1.rows());
     debug_assert!((d2 * d1).is_zero());
 
+    if d1.rows() == 0 { 
+        return GenericRModStr::zero()
+    }
+
     let d1_dns = DnsMat::from(d1);
     let s1 = snf_in_place(d1_dns, [with_trans, true, false, false]);
     let r1 = s1.rank();

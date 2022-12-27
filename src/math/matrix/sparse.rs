@@ -13,6 +13,7 @@ impl<T> CsMatElem for T
 pub trait CsMatExt<R> { 
     fn csc_from_vec(shape: (usize, usize), data: Vec<R>) -> CsMat<R>;
     fn rand(shape: (usize, usize), density: f64) -> CsMat<R>;
+    fn is_zero_shape(&self) -> bool;
     fn is_zero(&self) -> bool;
     fn permute(self, p: PermView, q: PermView) -> CsMat<R>;
     fn permute_rows(self, p: PermView) -> CsMat<R>;
@@ -61,7 +62,12 @@ where
         trip.to_csc()
     }
 
+    fn is_zero_shape(&self) -> bool {
+        self.rows() == 0 || self.cols() == 0
+    }
+
     fn is_zero(&self) -> bool {
+        self.is_zero_shape() || 
         self.data().iter().all(|a| a.is_zero())
     }
 

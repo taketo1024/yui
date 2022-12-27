@@ -1,7 +1,7 @@
 use std::ops::{RangeInclusive, Index};
 use std::vec::IntoIter;
 
-use crate::math::homology::base::{GradedRModStr, RModGrid, Idx2};
+use crate::math::homology::base::{GradedRModStr, RModGrid, Idx2, Idx2Range};
 use crate::math::homology::free::FreeRModStr;
 use crate::math::traits::{Ring, RingOps};
 use crate::math::matrix::CsMatElem;
@@ -12,7 +12,7 @@ use super::cube::{KhEnhState, KhCube};
 pub struct KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     cube: KhCube<R>,
-    grid: RModGrid<R, FreeRModStr<R, KhEnhState>, isize, RangeInclusive<isize>>
+    grid: RModGrid<FreeRModStr<R, KhEnhState>, RangeInclusive<isize>>
 }
 
 impl<R> KhComplex<R>
@@ -72,7 +72,7 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
 pub struct KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     cube: KhCube<R>,
-    grid: RModGrid<R, FreeRModStr<R, KhEnhState>, Idx2, IntoIter<Idx2>>
+    grid: RModGrid<FreeRModStr<R, KhEnhState>, Idx2Range>
 }
 
 impl<R> KhComplexBigraded<R>

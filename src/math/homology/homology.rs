@@ -5,7 +5,7 @@ use sprs::CsMat;
 use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps};
 use crate::math::matrix::{snf_in_place, DnsMat};
 use crate::math::matrix::sparse::*;
-use super::base::{GradedRModStr, RModStr, GenericRModStr, RModGrid, AdditiveIndex};
+use super::base::{GradedRModStr, RModStr, GenericRModStr, RModGrid, AdditiveIndex, AdditiveIndexRange};
 use super::complex::ChainComplex;
 
 pub trait HomologyComputable: ChainComplex
@@ -54,16 +54,16 @@ where
     }
 }
 
-pub struct GenericHomology<R, I, IR>
+pub struct GenericHomology<R, I>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
-    I: AdditiveIndex,
-    IR: Iterator<Item = I> + Clone
+    I: AdditiveIndexRange,
+    I::Item: AdditiveIndex
 {
-    grid: RModGrid<R, GenericRModStr<R>, I, IR>
+    grid: RModGrid<GenericRModStr<R>, I>
 }
 
-impl<'a, C> From<&'a C> for GenericHomology<C::R, C::Index, C::IndexRange>
+impl<'a, C> From<&'a C> for GenericHomology<C::R, C::IndexRange>
 where
     C: HomologyComputable,
     C::R: Ring + CsMatElem, for<'x> &'x C::R: RingOps<C::R>,
@@ -77,15 +77,15 @@ where
     }
 }
 
-impl<R, I, IR> GradedRModStr for GenericHomology<R, I, IR>
+impl<R, I> GradedRModStr for GenericHomology<R, I>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
-    I: AdditiveIndex,
-    IR: Iterator<Item = I> + Clone
+    I: AdditiveIndexRange,
+    I::Item: AdditiveIndex
 {
     type R = R;
-    type Index = I;
-    type IndexRange = IR;
+    type Index = I::Item;
+    type IndexRange = I;
 
     fn in_range(&self, k: Self::Index) -> bool {
         self.grid.in_range(k)
@@ -96,32 +96,32 @@ where
     }
 }
 
-impl<R, I, IR> Index<I> for GenericHomology<R, I, IR>
+impl<R, I> Index<I::Item> for GenericHomology<R, I>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
-    I: AdditiveIndex,
-    IR: Iterator<Item = I> + Clone
+    I: AdditiveIndexRange,
+    I::Item: AdditiveIndex
 {
     type Output = GenericRModStr<R>;
 
-    fn index(&self, k: I) -> &Self::Output {
+    fn index(&self, k: I::Item) -> &Self::Output {
         &self.grid[k]
     }
 }
 
-impl<R, I, IR> Homology for GenericHomology<R, I, IR>
+impl<R, I> Homology for GenericHomology<R, I>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
-    I: AdditiveIndex,
-    IR: Iterator<Item = I> + Clone
+    I: AdditiveIndexRange,
+    I::Item: AdditiveIndex
 {
 }
 
-impl<R, I, IR> Display for GenericHomology<R, I, IR>
+impl<R, I> Display for GenericHomology<R, I>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
-    I: AdditiveIndex,
-    IR: Iterator<Item = I> + Clone
+    I: AdditiveIndexRange,
+    I::Item: AdditiveIndex
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.fmt_default(f)

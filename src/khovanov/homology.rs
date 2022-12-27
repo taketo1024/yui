@@ -14,7 +14,7 @@ where
     R: EucRing + CsMatElem, 
     for<'x> &'x R: EucRingOps<R> 
 { 
-    homology: GenericHomology<R, isize, RangeInclusive<isize>>
+    homology: GenericHomology<R, RangeInclusive<isize>>
 }
 
 impl<R> KhHomology<R> 
@@ -95,7 +95,7 @@ where
     R: EucRing + CsMatElem, 
     for<'x> &'x R: EucRingOps<R> 
 {
-    homology: GenericHomology<R, Idx2, Idx2Range>
+    homology: GenericHomology<R, Idx2Range>
 }
 
 impl<R> KhHomologyBigraded<R>

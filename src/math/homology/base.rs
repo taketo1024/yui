@@ -94,18 +94,30 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-pub trait AdditiveIndex: Clone + Copy + PartialEq + Eq + Hash + Display + Add<Output = Self> + Sub<Output = Self>{}
+pub trait AdditiveIndex: Clone + Copy + PartialEq + Eq + Hash + Display + Add<Output = Self> + Sub<Output = Self>
+{}
+
 impl <T> AdditiveIndex for T
 where T: Clone + Copy + PartialEq + Eq + Hash + Display + Add<Output = Self> + Sub<Output = Self>{}
+
+pub trait AdditiveIndexRange: Iterator + Clone 
+where Self::Item: AdditiveIndex
+{}
+
+impl <T> AdditiveIndexRange for T
+where T: Iterator + Clone, T::Item: AdditiveIndex
+{}
 
 pub trait GradedRModStr: Index<Self::Index>
 where 
     Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>,
-    Self::Output: RModStr<R = Self::R>
+    Self::Output: RModStr<R = Self::R>,
+    Self::Index: AdditiveIndex,
+    Self::IndexRange: AdditiveIndexRange<Item = Self::Index>
 {
     type R;
-    type Index: AdditiveIndex;
-    type IndexRange: Iterator<Item = Self::Index> + Clone;
+    type Index;
+    type IndexRange;
 
     fn in_range(&self, k: Self::Index) -> bool;
     fn range(&self) -> Self::IndexRange;
@@ -119,27 +131,27 @@ where
     }
 }
 
-pub struct RModGrid<R, S, I, IR>
+pub struct RModGrid<S, I>
 where 
-    R: Ring, for<'x> &'x R: RingOps<R>,
-    S: RModStr<R = R>,
-    I: AdditiveIndex,
-    IR: Iterator<Item = I> + Clone
+    S: RModStr,
+    S::R: Ring, for<'x> &'x S::R: RingOps<S::R>,
+    I: AdditiveIndexRange,
+    I::Item: AdditiveIndex
 {
-    range: IR,
-    grid: HashMap<I, S>,
+    range: I,
+    grid: HashMap<I::Item, S>,
     zero: S
 }
 
-impl<R, S, I, IR> RModGrid<R, S, I, IR>
+impl<S, I> RModGrid<S, I>
 where 
-    R: Ring, for<'x> &'x R: RingOps<R>,
-    S: RModStr<R = R>,
-    I: AdditiveIndex,
-    IR: Iterator<Item = I> + Clone
+    S: RModStr,
+    S::R: Ring, for<'x> &'x S::R: RingOps<S::R>,
+    I: AdditiveIndexRange,
+    I::Item: AdditiveIndex
 {
-    pub fn new<F>(range: IR, mut f: F) -> Self
-    where F: FnMut(I) -> S {
+    pub fn new<F>(range: I, mut f: F) -> Self
+    where F: FnMut(I::Item) -> S {
         let grid = range.clone().filter_map(|i| {
             let s = f(i);
             if !s.is_zero() { Some((i, s)) } else { None }
@@ -149,16 +161,16 @@ where
     }
 }
 
-impl<R, S, I, IR> Index<I> for RModGrid<R, S, I, IR>
+impl<S, I> Index<I::Item> for RModGrid<S, I>
 where
-    R: Ring, for<'x> &'x R: RingOps<R>,
-    S: RModStr<R = R>,
-    I: AdditiveIndex,
-    IR: Iterator<Item = I> + Clone
+    S: RModStr,
+    S::R: Ring, for<'x> &'x S::R: RingOps<S::R>,
+    I: AdditiveIndexRange,
+    I::Item: AdditiveIndex
 {
     type Output = S;
 
-    fn index(&self, index: I) -> &Self::Output {
+    fn index(&self, index: I::Item) -> &Self::Output {
         if let Some(s) = self.grid.get(&index) { 
             s
         } else { 
@@ -167,28 +179,28 @@ where
     }
 }
 
-impl<R, S, I, IR> IndexMut<I> for RModGrid<R, S, I, IR>
+impl<S, I> IndexMut<I::Item> for RModGrid<S, I>
 where
-    R: Ring, for<'x> &'x R: RingOps<R>,
-    S: RModStr<R = R>,
-    I: AdditiveIndex,
-    IR: Iterator<Item = I> + Clone
+    S: RModStr,
+    S::R: Ring, for<'x> &'x S::R: RingOps<S::R>,
+    I: AdditiveIndexRange,
+    I::Item: AdditiveIndex
 {
-    fn index_mut(&mut self, index: I) -> &mut Self::Output {
+    fn index_mut(&mut self, index: I::Item) -> &mut Self::Output {
         self.grid.get_mut(&index).unwrap()
     }
 }
 
-impl<R, S, I, IR> GradedRModStr for RModGrid<R, S, I, IR>
+impl<S, I> GradedRModStr for RModGrid<S, I>
 where 
-    R: Ring, for<'x> &'x R: RingOps<R>,
-    S: RModStr<R = R>,
-    I: AdditiveIndex,
-    IR: Iterator<Item = I> + Clone
+    S: RModStr,
+    S::R: Ring, for<'x> &'x S::R: RingOps<S::R>,
+    I: AdditiveIndexRange,
+    I::Item: AdditiveIndex
 {
-    type R = R;
-    type Index = I;
-    type IndexRange = IR;
+    type R = S::R;
+    type Index = I::Item;
+    type IndexRange = I;
 
     fn in_range(&self, k: Self::Index) -> bool {
         self.grid.contains_key(&k)

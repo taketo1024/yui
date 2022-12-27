@@ -17,7 +17,7 @@ where
     C::Output: RModStr<R = C::R>
 { 
     original: C,
-    grid: RModGrid<C::R, GenericRModStr<C::R>, C::Index, C::IndexRange>,
+    grid: RModGrid<GenericRModStr<C::R>, C::IndexRange>,
     d_matrices: HashMap<C::Index, CsMat<C::R>>,
 }
 

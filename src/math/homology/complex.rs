@@ -105,7 +105,7 @@ pub mod tests {
 
     pub struct TestChainComplex<R> 
     where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
-        grid: RModGrid<R, GenericRModStr<R>, isize, Either<RangeInclusive<isize>, Rev<RangeInclusive<isize>>>>,
+        grid: RModGrid<GenericRModStr<R>, Either<RangeInclusive<isize>, Rev<RangeInclusive<isize>>>>,
         d_degree: isize,
         d_matrices: Vec<CsMat<R>>,
     }

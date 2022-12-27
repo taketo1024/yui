@@ -219,7 +219,7 @@ impl From<Vec<[Edge; 4]>> for Link {
 }
 
 impl Link { 
-    pub fn load(name: String) -> Result<Link, Box<dyn std::error::Error>> {
+    pub fn load(name: &str) -> Result<Link, Box<dyn std::error::Error>> {
         let path = format!("{}/links/{}.json", crate::RESOURCE_DIR, name);
         let json = std::fs::read_to_string(path)?;
         let data: Vec<[Edge; 4]> = serde_json::from_str(&json)?;

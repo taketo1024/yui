@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ops::Index;
 use sprs::{CsMat, PermView};
 
 use crate::math::matrix::pivot::{perms_by_pivots, find_pivots_upto};
@@ -6,14 +7,14 @@ use crate::math::matrix::schur::schur_partial_upper_triang;
 use crate::math::matrix::sparse::CsMatExt;
 use crate::math::traits::{Ring, RingOps};
 use crate::math::matrix::CsMatElem;
-use super::base::GradedRModStr;
+use super::base::{GradedRModStr, RModStr};
 use super::complex::ChainComplex;
 
 pub struct Reduced<C>
 where 
     C: ChainComplex,
-    C::R: Ring + CsMatElem, 
-    for<'x> &'x C::R: RingOps<C::R>  
+    C::R: Ring + CsMatElem, for<'x> &'x C::R: RingOps<C::R>,
+    C::Output: RModStr<R = C::R>
 { 
     d_matrices: HashMap<C::Index, CsMat<C::R>>,
     original: C,
@@ -22,8 +23,8 @@ where
 impl<C> Reduced<C>
 where 
     C: ChainComplex,
-    C::R: Ring + CsMatElem, 
-    for<'x> &'x C::R: RingOps<C::R>  
+    C::R: Ring + CsMatElem, for<'x> &'x C::R: RingOps<C::R>,
+    C::Output: RModStr<R = C::R>
 { 
     fn reduce(a0: Option<CsMat<C::R>>, a1: CsMat<C::R>, a2: CsMat<C::R>, k: C::Index, step: usize) -> (Option<CsMat<C::R>>, CsMat<C::R>, CsMat<C::R>) {
         const MAX_PIVOTS: usize = 300_000;
@@ -69,8 +70,8 @@ where
 impl<C> From<C> for Reduced<C>
 where 
     C: ChainComplex,
-    C::R: Ring + CsMatElem, 
-    for<'x> &'x C::R: RingOps<C::R>  
+    C::R: Ring + CsMatElem, for<'x> &'x C::R: RingOps<C::R>,
+    C::Output: RModStr<R = C::R>
 {
     fn from(c: C) -> Self {
         let mut d_matrices = HashMap::new();
@@ -95,11 +96,24 @@ where
     }
 }
 
+impl<C> Index<C::Index> for Reduced<C>
+where 
+    C: ChainComplex,
+    C::R: Ring + CsMatElem, for<'x> &'x C::R: RingOps<C::R>,
+    C::Output: RModStr<R = C::R>
+{
+    type Output = C::Output;
+
+    fn index(&self, index: C::Index) -> &Self::Output {
+        todo!()
+    }
+}
+
 impl<C> GradedRModStr for Reduced<C>
 where 
     C: ChainComplex,
-    C::R: Ring + CsMatElem, 
-    for<'x> &'x C::R: RingOps<C::R>  
+    C::R: Ring + CsMatElem, for<'x> &'x C::R: RingOps<C::R>,
+    C::Output: RModStr<R = C::R>
 {
     type R = C::R;
     type Index = C::Index;
@@ -118,7 +132,8 @@ impl<C> ChainComplex for Reduced<C>
 where 
     C: ChainComplex,
     C::R: Ring + CsMatElem, 
-    for<'x> &'x C::R: RingOps<C::R>  
+    for<'x> &'x C::R: RingOps<C::R>,
+    C::Output: RModStr<R = C::R>
 {
     fn rank(&self, k: Self::Index) -> usize {
         if self.in_range(k) {

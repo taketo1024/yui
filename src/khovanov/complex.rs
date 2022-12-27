@@ -1,6 +1,6 @@
-use std::ops::RangeInclusive;
+use std::ops::{RangeInclusive, Index};
 
-use crate::math::homology::base::GradedRModStr;
+use crate::math::homology::base::{GradedRModStr, GenericRModStr};
 use crate::math::homology::free::FreeChainComplex;
 use crate::math::traits::{Ring, RingOps};
 use crate::math::matrix::CsMatElem;
@@ -26,6 +26,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn from_cube(cube: KhCube<R>) -> Self { 
         KhComplex { cube }
+    }
+}
+
+impl<R> Index<isize> for KhComplex<R>
+where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> { 
+    type Output = GenericRModStr<R>;
+    
+    fn index(&self, index: isize) -> &Self::Output {
+        todo!()
     }
 }
 

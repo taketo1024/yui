@@ -5,6 +5,7 @@ use crate::math::matrix::CsMatElem;
 use crate::utils::collections::hashmap;
 use crate::math::traits::{Ring, RingOps};
 
+use super::base::RModStr;
 use super::complex::ChainComplex;
 
 pub trait FreeGenerator: Clone + PartialEq + Eq + Hash {}
@@ -13,7 +14,8 @@ where T: Clone + PartialEq + Eq + Hash {}
 
 pub trait FreeChainComplex: ChainComplex
 where 
-    Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R> 
+    Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R>,
+    Self::Output: RModStr<R = Self::R>
 { 
     type Generator: FreeGenerator;
 

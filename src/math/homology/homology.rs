@@ -10,8 +10,8 @@ use super::complex::ChainComplex;
 
 pub trait HomologyComputable: ChainComplex
 where 
-    Self::R: Ring + CsMatElem, 
-    for<'x> &'x Self::R: RingOps<Self::R>  
+    Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R>,
+    Self::Output: RModStr<R = Self::R>
 {
     fn homology_at(&self, i: Self::Index) -> GenericRModStr<Self::R>;
     fn homology<H>(self) -> H where H: Homology<R = Self::R>, H: From<Self>, Self: Sized {
@@ -22,8 +22,8 @@ where
 impl<C> HomologyComputable for C
 where 
     C: ChainComplex,
-    C::R: EucRing + CsMatElem, 
-    for<'x> &'x C::R: EucRingOps<C::R>  
+    C::R: EucRing + CsMatElem, for<'x> &'x C::R: EucRingOps<C::R>,
+    C::Output: RModStr<R = C::R>
 { 
     fn homology_at(&self, k: C::Index) -> GenericRModStr<Self::R> {
         let d1 = self.d_matrix(k - self.d_degree());
@@ -67,7 +67,8 @@ impl<'a, C> From<&'a C> for GenericHomology<C::R, C::Index, C::IndexRange>
 where
     C: HomologyComputable,
     C::R: Ring + CsMatElem, for<'x> &'x C::R: RingOps<C::R>,
-    C::IndexRange: Clone
+    C::IndexRange: Clone,
+    C::Output: RModStr<R = C::R>
 {
     fn from(c: &'a C) -> Self {
         let range = c.range();

@@ -97,9 +97,10 @@ pub trait AdditiveIndex: Clone + Copy + PartialEq + Eq + Hash + Display + Add<Ou
 impl <T> AdditiveIndex for T
 where T: Clone + Copy + PartialEq + Eq + Hash + Display + Add<Output = Self> + Sub<Output = Self>{}
 
-pub trait GradedRModStr 
+pub trait GradedRModStr: Index<Self::Index>
 where 
-    Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> 
+    Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>,
+    Self::Output: RModStr<R = Self::R>
 {
     type R;
     type Index: AdditiveIndex;

@@ -1,11 +1,12 @@
 use sprs::CsMat;
 use crate::math::matrix::sparse::*;
 use crate::math::traits::{RingOps, Ring};
-use super::base::GradedRModStr;
+use super::base::{GradedRModStr, RModStr};
 
 pub trait ChainComplex: GradedRModStr
 where 
-    Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R> 
+    Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R>,
+    Self::Output: RModStr<R = Self::R>
 {
     fn rank(&self, k: Self::Index) -> usize;
     fn d_degree(&self) -> Self::Index;
@@ -32,10 +33,11 @@ where
 #[cfg(test)]
 pub mod tests { 
     use std::iter::Rev;
-    use std::ops::RangeInclusive;
+    use std::ops::{RangeInclusive, Index};
     use either::Either;
     use sprs::CsMat;
     use super::{ChainComplex, GradedRModStr};
+    use crate::math::homology::base::GenericRModStr;
     use crate::math::traits::{Ring, RingOps};
     use crate::math::matrix::sparse::*;
     use crate::math::matrix::CsMatElem;
@@ -140,6 +142,17 @@ pub mod tests {
             ).collect();
     
             Self { range, d_degree, d_matrices }
+        }
+    }
+
+    impl<R> Index<isize> for TestChainComplex<R>
+    where
+        R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> 
+    {
+        type Output = GenericRModStr<R>;
+
+        fn index(&self, index: isize) -> &Self::Output {
+            todo!()
         }
     }
 

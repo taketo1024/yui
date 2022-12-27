@@ -146,7 +146,7 @@ where
 
 #[cfg(test)]
 mod tests { 
-    use crate::math::homology::base::Summand;
+    use crate::math::homology::base::RModStr;
     use crate::math::homology::homology::GenericHomology;
 
     use super::*;

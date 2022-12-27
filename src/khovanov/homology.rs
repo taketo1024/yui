@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::{RangeInclusive, Index};
 
-use crate::math::homology::base::{Graded, Summand};
-use crate::math::homology::homology::{Homology, HomologySummand};
+use crate::math::homology::base::{Graded, GenericRModStr, RModStr};
+use crate::math::homology::homology::Homology;
 use crate::math::homology::homology::GenericHomology;
 use crate::math::homology::reduce::Reduced;
 use crate::math::matrix::CsMatElem;
@@ -69,7 +69,7 @@ where
     R: EucRing + CsMatElem,
     for<'x> &'x R: EucRingOps<R>
 {
-    type Output = HomologySummand<R>;
+    type Output = GenericRModStr<R>;
 
     fn index(&self, index: isize) -> &Self::Output {
         self.homology.index(index)
@@ -102,7 +102,7 @@ where
     decomposed: HashMap<isize, KhHomology<R>>,
     h_range: RangeInclusive<isize>,
     q_range: RangeInclusive<isize>,
-    zero: HomologySummand<R>
+    zero: GenericRModStr<R>
 }
 
 impl<R> BigradedKhHomology<R>
@@ -123,7 +123,7 @@ where
             (j, KhHomology::from(c))
         }).collect();
 
-        let zero = HomologySummand::zero();
+        let zero = GenericRModStr::zero();
 
         Self { decomposed, h_range, q_range, zero }
     }
@@ -134,7 +134,7 @@ where
     R: EucRing + CsMatElem, 
     for<'x> &'x R: EucRingOps<R> 
 { 
-    type Output = HomologySummand<R>;
+    type Output = GenericRModStr<R>;
     fn index(&self, index: [isize; 2]) -> &Self::Output {
         let [i, j] = index;
         if let Some(h) = self.decomposed.get(&j) { 
@@ -147,7 +147,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{links::Link, math::homology::base::{Graded, Summand}};
+    use crate::{links::Link, math::homology::base::{Graded, RModStr}};
     use super::KhHomology;
     
     #[test]

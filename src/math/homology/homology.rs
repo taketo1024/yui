@@ -6,7 +6,7 @@ use sprs::CsMat;
 use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps};
 use crate::math::matrix::{snf_in_place, DnsMat};
 use crate::math::matrix::sparse::*;
-use super::base::{Graded, Summand};
+use super::base::{Graded, RModStr, GenericRModStr};
 use super::complex::ChainComplex;
 
 pub trait HomologyComputable: ChainComplex
@@ -14,7 +14,7 @@ where
     Self::R: Ring, 
     for<'x> &'x Self::R: RingOps<Self::R>  
 {
-    fn homology_at(&self, i: Self::Index) -> HomologySummand<Self::R>;
+    fn homology_at(&self, i: Self::Index) -> GenericRModStr<Self::R>;
     fn homology<H>(self) -> H where H: Homology<R = Self::R>, H: From<Self>, Self: Sized {
         H::from(self)
     }
@@ -26,54 +26,16 @@ where
     C::R: EucRing + CsMatElem, 
     for<'x> &'x C::R: EucRingOps<C::R>  
 { 
-    fn homology_at(&self, k: C::Index) -> HomologySummand<Self::R> {
+    fn homology_at(&self, k: C::Index) -> GenericRModStr<Self::R> {
         let d1 = self.d_matrix(k - self.d_degree());
         let d2 = self.d_matrix(k);
         compute_homology(&d1, &d2, false)
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct HomologySummand<R> 
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    rank: usize,
-    tors: Vec<R>
-}
-
-impl<R> HomologySummand<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new(rank: usize, tors: Vec<R>) -> Self { 
-        Self { rank, tors }
-    }
-}
-
-impl<R> Summand for HomologySummand<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type R = R;
-
-    fn zero() -> Self { 
-        Self { rank: 0, tors: vec![] }
-    }
-
-    fn rank(&self) -> usize { 
-        self.rank
-    }
-
-    fn tors(&self) -> &Vec<R> {
-        &self.tors
-    }
-}
-
-impl<R> Display for HomologySummand<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.fmt_default(f)
-    }
-}
-
 pub trait Homology: 
     Graded + 
-    Index<Self::Index, Output = HomologySummand<Self::R>>
+    Index<Self::Index, Output = GenericRModStr<Self::R>>
 where 
     Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> 
 {
@@ -102,8 +64,8 @@ where
     for<'x> &'x C::R: RingOps<C::R>  
 {
     complex: C,
-    summands: HashMap<C::Index, HomologySummand<C::R>>,
-    zero: HomologySummand<C::R>
+    summands: HashMap<C::Index, GenericRModStr<C::R>>,
+    zero: GenericRModStr<C::R>
 }
 
 impl<C> From<C> for GenericHomology<C>
@@ -115,7 +77,7 @@ where
         let summands = c.range().map(|k| 
             (k, c.homology_at(k))
         ).collect();
-        let zero = HomologySummand::zero();
+        let zero = GenericRModStr::zero();
         Self { complex: c, summands, zero }
     }
 }
@@ -142,7 +104,7 @@ where
     C: ChainComplex,
     C::R: Ring, for<'x> &'x C::R: RingOps<C::R>  
 {
-    type Output = HomologySummand<C::R>;
+    type Output = GenericRModStr<C::R>;
 
     fn index(&self, k: C::Index) -> &Self::Output {
         if self.in_range(k) {
@@ -186,7 +148,7 @@ where
 // ≅ Rᶠ ⊕ (Rᵇ / Im(s₁))
 
 pub fn compute_homology<R>(d1: &CsMat<R>, d2: &CsMat<R>, with_trans: bool) 
-    -> HomologySummand<R>
+    -> GenericRModStr<R>
 where 
     R: EucRing + CsMatElem,
     for<'x> &'x R: EucRingOps<R>
@@ -219,7 +181,7 @@ where
         }
     }).collect();
 
-    HomologySummand{ rank, tors }
+    GenericRModStr::new(rank, tors)
 }
 
 #[cfg(test)]

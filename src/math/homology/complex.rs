@@ -8,9 +8,6 @@ where
     Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R>,
     Self::Output: RModStr<R = Self::R>
 {
-    #[deprecated]
-    fn rank(&self, k: Self::Index) -> usize;
-
     fn d_degree(&self) -> Self::Index;
     fn d_matrix(&self, k: Self::Index) -> CsMat<Self::R>;
 
@@ -187,10 +184,6 @@ pub mod tests {
     where 
         R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> 
     { 
-        fn rank(&self, _k: isize) -> usize {
-            todo!("remove")
-        }
-
         fn d_degree(&self) -> isize {
             self.d_degree
         }

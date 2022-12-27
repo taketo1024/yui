@@ -60,18 +60,15 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
 
 impl<R> ChainComplex for KhComplex<R>
 where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> { 
-    fn rank(&self, _k: Self::Index) -> usize {
-        todo!("remove")
-    }
-
     fn d_degree(&self) -> Self::Index {
         1
     }
 
     fn d_matrix(&self, k: Self::Index) -> sprs::CsMat<Self::R> {
+        use crate::math::homology::free::make_matrix;
         let source = self.grid[k].generators();
         let target = self.grid[k + 1].generators();
-        crate::math::homology::free::make_matrix(source, target, |x| self.cube.differentiate(x))
+        make_matrix(source, target, |x| self.cube.differentiate(x))
     }
 }
 

@@ -141,10 +141,6 @@ where
     for<'x> &'x C::R: RingOps<C::R>,
     C::Output: RModStr<R = C::R>
 {
-    fn rank(&self, k: Self::Index) -> usize {
-        todo!("remove")
-    }
-
     fn d_degree(&self) -> Self::Index {
         self.original.d_degree()
     }

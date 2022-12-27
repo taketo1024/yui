@@ -3,7 +3,7 @@ use std::ops::RangeInclusive;
 use crate::math::homology::base::Graded;
 use crate::math::traits::{Ring, RingOps};
 use crate::math::matrix::CsMatElem;
-use crate::math::homology::complex::ChainComplex;
+use crate::math::homology::complex::{ChainComplex, FreeChainComplex};
 use crate::links::Link;
 use super::cube::{KhEnhState, KhCube};
 
@@ -45,30 +45,40 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
 impl<R> ChainComplex for KhComplex<R>
 where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> { 
     type R = R;
-    type Generator = KhEnhState;
+
+    fn rank(&self, k: Self::Index) -> usize {
+        self.cube.generators(k).len()
+    }
 
     fn d_degree(&self) -> Self::Index {
         1
     }
 
+    fn d_matrix(&self, k: Self::Index) -> sprs::CsMat<Self::R> {
+        let source = self.cube.generators(k);
+        let target = self.cube.generators(k + 1);
+        crate::math::homology::base::make_matrix(&source, &target, |x| self.cube.differentiate(x))
+    }
+}
+
+impl<R> FreeChainComplex for KhComplex<R>
+where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> { 
+    type Generator = KhEnhState;
+        
     fn generators(&self, k: Self::Index) -> Vec<&Self::Generator> {
         self.cube.generators(k)
     }
 
     fn differentiate(&self, _k: Self::Index, x:&Self::Generator) -> Vec<(Self::Generator, Self::R)> {
         self.cube.differentiate(x)
-    }
-
-    fn d_matrix(&self, k: Self::Index) -> sprs::CsMat<Self::R> {
-        self.impl_d_matrix_from_differentiate(k)
-    }
+    }    
 }
 
 #[cfg(test)]
 mod tests {
     use crate::links::Link;
     use crate::math::homology::base::Graded;
-    use crate::math::homology::complex::ChainComplex;
+    use crate::math::homology::complex::{ChainComplex, FreeChainComplex};
     use super::KhComplex;
 
     #[test]

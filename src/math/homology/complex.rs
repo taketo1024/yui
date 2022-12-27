@@ -1,93 +1,19 @@
-use std::collections::HashMap;
-use sprs::{CsMat, CsVec, TriMat};
-use num_traits::One;
+use sprs::CsMat;
 use crate::math::traits::{Ring, RingOps};
 use crate::math::matrix::sparse::*;
-use crate::utils::collections::hashmap;
-use super::base::{Graded, ChainGenerator};
+use super::base::{Graded, FreeGenerator};
 
 pub trait ChainComplex: Graded
 where 
     Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R> 
 {
     type R;
-    type Generator: ChainGenerator;
 
-    // -- must override -- //
-    fn generators(&self, k: Self::Index) -> Vec<&Self::Generator>;
+    fn rank(&self, k: Self::Index) -> usize;
     fn d_degree(&self) -> Self::Index;
-    fn differentiate(&self, k: Self::Index, x:&Self::Generator) -> Vec<(Self::Generator, Self::R)>;
     fn d_matrix(&self, k: Self::Index) -> CsMat<Self::R>;
 
     // -- convenient methods -- //
-    fn rank(&self, k: Self::Index) -> usize { 
-        if self.in_range(k) { 
-            self.generators(k).len()
-        } else {
-            0
-        }
-    }
-
-    fn vectorize_x(&self, k: Self::Index, x:&Self::Generator) -> CsVec<Self::R> {
-        self.vectorize(k, hashmap![x => Self::R::one()])
-    }
-
-    fn vectorize(&self, k: Self::Index, z:HashMap<&Self::Generator, Self::R>) -> CsVec<Self::R> {
-        let gens = self.generators(k);
-        let n = gens.len();
-
-        let mut v_ind: Vec<usize> = vec![];
-        let mut v_val: Vec<Self::R> = vec![];
-
-        for (x, a) in z { 
-            let Some(i) = gens.iter().position(|&z| x == z) else { 
-                continue 
-            };
-            v_ind.push(i);
-            v_val.push(a);
-        }
-
-        CsVec::new(n, v_ind, v_val)
-    }
-
-    fn impl_d_matrix_from_differentiate(&self, k: Self::Index) -> CsMat<Self::R> {
-        let source = self.generators(k);
-        let target = self.generators(k + self.d_degree());
-        let (m, n) = (target.len(), source.len());
-
-        let t_ind = target.into_iter()
-                .enumerate()
-                .map(|(i, y)| (y, i))
-                .collect::<HashMap<_, _>>();
-
-        let mut trip = TriMat::new((m, n));
-
-        for (j, x) in source.iter().enumerate() {
-            let ys = self.differentiate(k, x);
-            for (y, a) in ys {
-                if !t_ind.contains_key(&y) { continue }
-                let i = t_ind[&y];
-                trip.add_triplet(i, j, a);
-            }
-        }
-
-        trip.to_csc()
-    }
-
-    fn impl_differentiate_from_d_matrix(&self, k: Self::Index, x: &Self::Generator) -> Vec<(Self::Generator, Self::R)> {
-        assert!(self.in_range(k));
-        let v = self.vectorize_x(k, x);
-        let d = self.d_matrix(k);
-        let w = &d * &v;
-
-        let gens = self.generators(k + self.d_degree());
-
-        let res = w.iter().map(|(i, a)| { 
-            (gens[i].clone(), a.clone())
-        }).collect();
-
-        res
-    }
 
     fn check_d_at(&self, k: Self::Index) { 
         let d1 = self.d_matrix(k);
@@ -103,6 +29,16 @@ where
             self.check_d_at(k);
         }
     }
+}
+
+pub trait FreeChainComplex: ChainComplex
+where 
+    Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R> 
+{ 
+    type Generator: FreeGenerator;
+
+    fn generators(&self, k: Self::Index) -> Vec<&Self::Generator>;
+    fn differentiate(&self, k: Self::Index, x:&Self::Generator) -> Vec<(Self::Generator, Self::R)>;
 }
 
 #[cfg(test)]
@@ -178,11 +114,9 @@ pub mod tests {
 
     // below : test data // 
 
-    pub type X = usize;
     pub struct TestChainComplex<R> 
     where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
         range: RangeInclusive<isize>,
-        generators: Vec<Vec<X>>,
         d_degree: isize,
         d_matrices: Vec<CsMat<R>>,
     }
@@ -192,13 +126,9 @@ pub mod tests {
         pub fn new(d_degree: isize, d_matrices: Vec<CsMat<i32>>) -> TestChainComplex<R> {
             assert!(d_degree == 1 || d_degree == -1);
     
-            let mut count = 0;
-            let mut gens = |n: usize| { 
-                let g = (count .. count + n).into_iter().collect();
-                count += n;
-                g
-            };
-
+            let n = d_matrices.len() as isize;
+            let range = 0..=n;
+            
             // insert matrix so that `rank(C_k) = d_k.cols()`.
 
             let mut d_matrices = d_matrices;
@@ -217,18 +147,11 @@ pub mod tests {
                 d_matrices.insert(0, d_0);
             }
 
-            let generators: Vec<_> = d_matrices.iter().map(|d| {
-                gens( d.cols() )
-            }).collect();
-    
             let d_matrices = d_matrices.into_iter().map(|d| 
                 d.map(|&a| R::from(a))
             ).collect();
     
-            let n = generators.len() as isize;
-            let range = 0..=(n - 1);
-            
-            Self { range, generators, d_matrices, d_degree }
+            Self { range, d_degree, d_matrices }
         }
     }
 
@@ -258,28 +181,18 @@ pub mod tests {
         R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> 
     { 
         type R = R;
-        type Generator = X;
-
-        fn d_degree(&self) -> isize {
-            self.d_degree
-        }
 
         fn rank(&self, k: isize) -> usize {
             if self.in_range(k) { 
                 let k = k as usize;
-                self.generators[k].len()
+                self.d_matrices[k].cols()
             } else {
                 0
             }
         }
 
-        fn generators(&self, k: isize) -> Vec<&X> {
-            if self.in_range(k) { 
-                let k = k as usize;
-                self.generators[k].iter().collect()
-            } else {
-                vec![]
-            }
+        fn d_degree(&self) -> isize {
+            self.d_degree
         }
 
         fn d_matrix(&self, k: isize) -> CsMat<R> {
@@ -291,10 +204,6 @@ pub mod tests {
                 let n = self.rank(k);
                 CsMat::zero((m, n))
             }
-        }
-
-        fn differentiate(&self, k: isize, x: &X) -> Vec<(X, R)> {
-            self.impl_differentiate_from_d_matrix(k, x)
         }
     }
 

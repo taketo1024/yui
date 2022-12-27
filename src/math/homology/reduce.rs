@@ -120,7 +120,6 @@ where
     for<'x> &'x C::R: RingOps<C::R>  
 {
     type R = C::R;
-    type Generator = C::Generator;
 
     fn rank(&self, k: Self::Index) -> usize {
         if self.in_range(k) {
@@ -142,14 +141,6 @@ where
             let n = self.rank(k);
             CsMat::zero((m, n))
         }
-    }
-
-    fn generators(&self, _k: Self::Index) -> Vec<&Self::Generator> {
-        todo!()
-    }
-
-    fn differentiate(&self, _k: Self::Index, _x:&Self::Generator) -> Vec<(Self::Generator, Self::R)> {
-        todo!()
     }
 }
 

@@ -1,15 +1,13 @@
-use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::{RangeInclusive, Index};
 
-use crate::math::homology::base::{GradedRModStr, GenericRModStr, RModStr};
+use crate::math::homology::base::{GradedRModStr, GenericRModStr, Idx2, Idx2Range};
 use crate::math::homology::homology::{Homology, GenericHomology};
 use crate::math::homology::reduce::Reduced;
 use crate::math::matrix::CsMatElem;
 use crate::math::traits::{EucRing, EucRingOps};
 use crate::links::Link;
-use super::complex::KhComplex;
-use super::cube::KhCube;
+use super::complex::{KhComplex, KhComplexBigraded};
 
 pub struct KhHomology<R> 
 where 
@@ -92,55 +90,58 @@ where
     }
 }
 
-pub struct BigradedKhHomology<R> 
+pub struct KhHomologyBigraded<R> 
 where 
     R: EucRing + CsMatElem, 
     for<'x> &'x R: EucRingOps<R> 
-{ 
-    decomposed: HashMap<isize, KhHomology<R>>,
-    h_range: RangeInclusive<isize>,
-    q_range: RangeInclusive<isize>,
-    zero: GenericRModStr<R>
+{
+    homology: GenericHomology<R, Idx2, Idx2Range>
 }
 
-impl<R> BigradedKhHomology<R>
+impl<R> KhHomologyBigraded<R>
 where 
     R: EucRing + CsMatElem, 
     for<'x> &'x R: EucRingOps<R> 
 { 
     pub fn new(l: &Link) -> Self {
-        let cube = KhCube::<R>::new(l);
-
-        let h_range = cube.h_range();
-        let q_range = cube.q_range();
-        let j0 = cube.shift().1;
-
-        let decomposed = q_range.clone().step_by(2).map(|j| {
-            todo!()
-            // let subcube = cube.filter(|x| x.q_deg() == j - j0);
-            // let c = KhComplex::from_cube(subcube);
-            // (j, KhHomology::from(c))
-        }).collect();
-
-        let zero = GenericRModStr::zero();
-
-        Self { decomposed, h_range, q_range, zero }
+        let c = KhComplexBigraded::new(l);
+        let reduced = Reduced::from(c);
+        let homology = GenericHomology::from(&reduced);
+        Self { homology }
     }
 }
 
-impl<R> Index<[isize; 2]> for BigradedKhHomology<R>
-where 
-    R: EucRing + CsMatElem, 
-    for<'x> &'x R: EucRingOps<R> 
-{ 
+impl<R> Index<Idx2> for KhHomologyBigraded<R>
+where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> {
     type Output = GenericRModStr<R>;
-    fn index(&self, index: [isize; 2]) -> &Self::Output {
-        let [i, j] = index;
-        if let Some(h) = self.decomposed.get(&j) { 
-            &h[i]
-        } else {
-            &self.zero
-        }
+
+    fn index(&self, index: Idx2) -> &Self::Output {
+        &self.homology[index]
+    }
+}
+
+impl<R> GradedRModStr for KhHomologyBigraded<R>
+where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> {
+    type R = R;
+    type Index = Idx2;
+    type IndexRange = Idx2Range;
+
+    fn in_range(&self, k: Self::Index) -> bool {
+        self.homology.in_range(k)
+    }
+
+    fn range(&self) -> Self::IndexRange {
+        self.homology.range()
+    }
+}
+
+impl<R> Homology for KhHomologyBigraded<R>
+where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> {}
+
+impl<R> Display for KhHomologyBigraded<R>
+where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.fmt_default(f)
     }
 }
 

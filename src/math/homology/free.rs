@@ -12,6 +12,49 @@ pub trait FreeGenerator: Clone + PartialEq + Eq + Hash {}
 impl<T> FreeGenerator for T 
 where T: Clone + PartialEq + Eq + Hash {}
 
+pub struct FreeRModStr<R, X>
+where 
+    R: Ring, for<'x> &'x R: RingOps<R>, 
+    X: FreeGenerator
+{
+    generators: Vec<X>,
+    tors: Vec<R> // always empty
+}
+
+impl<R, X> FreeRModStr<R, X>
+where 
+    R: Ring, for<'x> &'x R: RingOps<R>, 
+    X: FreeGenerator
+{
+    pub fn new(generators: Vec<X>) -> Self { 
+        Self { generators, tors: vec![] }
+    }
+
+    pub fn generators(&self) -> &Vec<X> {
+        &self.generators
+    }
+}
+
+impl<R, X> RModStr for FreeRModStr<R, X>
+where 
+    R: Ring, for<'x> &'x R: RingOps<R>, 
+    X: FreeGenerator
+{
+    type R = R;
+
+    fn zero() -> Self {
+        Self::new(vec![])
+    }
+
+    fn rank(&self) -> usize {
+        self.generators.len()
+    }
+
+    fn tors(&self) -> &Vec<Self::R> {
+        &self.tors
+    }
+}
+
 pub trait FreeChainComplex: ChainComplex
 where 
     Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R>,
@@ -52,7 +95,7 @@ where
     CsVec::new(n, v_ind, v_val)
 }
 
-pub fn make_matrix<R, X, F>(source: &Vec<&X>, target: &Vec<&X>, f: F) -> CsMat<R>
+pub fn make_matrix<R, X, F>(source: &Vec<X>, target: &Vec<X>, f: F) -> CsMat<R>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
     X: FreeGenerator,
@@ -62,7 +105,7 @@ where
 
     let t_ind = target.iter()
             .enumerate()
-            .map(|(i, &y)| (y, i))
+            .map(|(i, y)| (y, i))
             .collect::<HashMap<_, _>>();
 
     let mut trip = TriMat::new((m, n));

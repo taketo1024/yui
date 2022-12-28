@@ -153,10 +153,13 @@ where
     I::Item: AdditiveIndex
 {
     pub fn new<F>(range: I, mut f: F) -> Self
-    where F: FnMut(I::Item) -> S {
+    where F: FnMut(I::Item) -> Option<S> {
         let grid = range.clone().filter_map(|i| {
-            let s = f(i);
-            if !s.is_zero() { Some((i, s)) } else { None }
+            if let Some(s) = f(i) { 
+                Some((i, s))
+            } else { 
+                None
+            }
         }).collect();
         let zero = S::zero();
         Self { range, grid, zero }

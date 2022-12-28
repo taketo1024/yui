@@ -95,7 +95,13 @@ where
         }
 
         let grid = RModGrid::new(c.range(), |i| { 
-            GenericRModStr::new(d_matrices[&i].cols(), vec![])
+            let n = d_matrices[&i].cols();
+            if n > 0 { 
+                let s = GenericRModStr::new(n, vec![]);
+                Some(s)
+            } else { 
+                None
+            }
         });
 
         Self { original: c, grid, d_matrices }

@@ -72,7 +72,10 @@ where
 {
     fn from(c: &'a C) -> Self {
         let range = c.range();
-        let grid = RModGrid::new(range, |i| c.homology_at(i));
+        let grid = RModGrid::new(range, |i| {
+            let h_i = c.homology_at(i);
+            if !h_i.is_zero() { Some(h_i) } else { None }
+        });
         Self { grid }
     }
 }

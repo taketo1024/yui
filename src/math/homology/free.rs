@@ -36,20 +36,10 @@ where
         vectorize(self.generators(), x)
     }
 
-    pub fn extract<F>(&mut self, pred: F) -> Self
+    pub fn clone_filter<F>(&self, pred: F) -> Self
     where F: Fn(&X) -> bool { 
-        let mut i = 0;
-        let mut ext = vec![];
-
-        while i < self.generators.len() { 
-            if pred(&self.generators[i]) {
-                ext.push(self.generators.remove(i));
-            } else { 
-                i += 1;
-            }
-        }
-        
-        Self::new(ext)
+        let gens = self.generators.iter().filter(|x| pred(x)).cloned().collect();
+        Self::new(gens)
     }
 }
 

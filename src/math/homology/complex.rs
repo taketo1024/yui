@@ -141,7 +141,9 @@ pub mod tests {
             }
 
             let grid = RModGrid::new(range.clone(), |i| { 
-                GenericRModStr::new(d_matrices[i as usize].cols(), vec![])
+                let n = d_matrices[i as usize].cols();
+                let s = GenericRModStr::new(n, vec![]);
+                Some(s)
             });
             
             let d_matrices = d_matrices.into_iter().map(|d| 

@@ -26,7 +26,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let cube = KhCube::new_ht(l, h, t);
         let grid = RModGrid::new(cube.h_range(), |i| {
             let gens = cube.generators(i);
-            FreeRModStr::new(gens)
+            let s = FreeRModStr::new(gens);
+            Some(s)
         });
         KhComplex { cube, grid }
     }
@@ -80,9 +81,9 @@ impl<R> KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn new(l: &Link) -> Self { 
         let cube = KhCube::new(l);
-        let mut grid1 = RModGrid::new(cube.h_range(), |i| {
+        let grid1 = RModGrid::new(cube.h_range(), |i| {
             let gens = cube.generators(i);
-            FreeRModStr::new(gens)
+            Some(FreeRModStr::new(gens))
         });
 
         let h_range = cube.h_range();
@@ -97,10 +98,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let j0 = cube.shift().1;
         let grid = RModGrid::new(range, |idx| {
             let (i, j) = idx.as_tuple();
-            grid1[i].extract(|x| x.q_deg() == j - j0)
+            Some(grid1[i].clone_filter(|x| x.q_deg() == j - j0))
         });
-
-        debug_assert!(grid1.is_zero());
 
         Self { cube, grid }
     }

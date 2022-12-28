@@ -8,35 +8,33 @@ use crate::math::matrix::sparse::*;
 use super::base::{GradedRModStr, RModStr, GenericRModStr, RModGrid, AdditiveIndex, AdditiveIndexRange};
 use super::complex::ChainComplex;
 
-pub trait HomologyComputable: ChainComplex
+pub trait HomologyComputable<S>: ChainComplex
 where 
     Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R>,
-    Self::Output: RModStr<R = Self::R>
+    Self::Output: RModStr<R = Self::R>,
+    S: RModStr<R = Self::R>
 {
-    fn homology_at(&self, i: Self::Index) -> GenericRModStr<Self::R>;
-    fn homology<H>(self) -> H where H: Homology<R = Self::R>, H: From<Self>, Self: Sized {
-        H::from(self)
-    }
+    fn homology_at(&self, i: Self::Index) -> S;
 }
 
-impl<C> HomologyComputable for C
+impl<R, C> HomologyComputable<GenericRModStr<R>> for C
 where 
-    C: ChainComplex,
-    C::R: EucRing + CsMatElem, for<'x> &'x C::R: EucRingOps<C::R>,
-    C::Output: RModStr<R = C::R>
+    R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R>,
+    C: ChainComplex<R = R>,
+    C::Output: RModStr<R = R>
 { 
     fn homology_at(&self, k: C::Index) -> GenericRModStr<Self::R> {
         let d1 = self.d_matrix(k - self.d_degree());
         let d2 = self.d_matrix(k);
-        compute_homology(&d1, &d2, false)
+        let (rank, tors) = compute_homology(&d1, &d2, false);
+        GenericRModStr::new(rank, tors)
     }
 }
 
-pub trait Homology: 
-    GradedRModStr + 
-    Index<Self::Index, Output = GenericRModStr<Self::R>>
+pub trait Homology: GradedRModStr
 where 
-    Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> 
+    Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>,
+    Self::Output: RModStr<R = Self::R>
 {
     fn is_zero(&self) -> bool {
         self.range().all(|i| self[i].is_zero())
@@ -63,14 +61,14 @@ where
     grid: RModGrid<GenericRModStr<R>, I>
 }
 
-impl<'a, C> From<&'a C> for GenericHomology<C::R, C::IndexRange>
+impl<R, C> From<C> for GenericHomology<R, C::IndexRange>
 where
-    C: HomologyComputable,
-    C::R: Ring + CsMatElem, for<'x> &'x C::R: RingOps<C::R>,
+    R: Ring + CsMatElem, for<'x> &'x R: RingOps<R>,
+    C: HomologyComputable<GenericRModStr<R>, R = R>,
     C::IndexRange: Clone,
     C::Output: RModStr<R = C::R>
 {
-    fn from(c: &'a C) -> Self {
+    fn from(c: C) -> Self {
         let range = c.range();
         let grid = RModGrid::new(range, |i| {
             let h_i = c.homology_at(i);
@@ -145,17 +143,15 @@ where
 // H = Ker(d₂) / Im(d₁)
 // ≅ Rᶠ ⊕ (Rᵇ / Im(s₁))
 
-pub fn compute_homology<R>(d1: &CsMat<R>, d2: &CsMat<R>, with_trans: bool) 
-    -> GenericRModStr<R>
+pub fn compute_homology<R>(d1: &CsMat<R>, d2: &CsMat<R>, with_trans: bool) -> (usize, Vec<R>)
 where 
-    R: EucRing + CsMatElem,
-    for<'x> &'x R: EucRingOps<R>
+    R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R>
 {
     assert_eq!(d2.cols(), d1.rows());
     debug_assert!((d2 * d1).is_zero());
 
     if d1.rows() == 0 { 
-        return GenericRModStr::zero()
+        return (0, vec![])
     }
 
     let d1_dns = DnsMat::from(d1);
@@ -183,7 +179,7 @@ where
         }
     }).collect();
 
-    GenericRModStr::new(rank, tors)
+    (rank, tors)
 }
 
 #[cfg(test)]
@@ -200,7 +196,7 @@ mod tests {
             vec![ CsMat::csc_from_vec((1, 1), vec![1]) ],
         );
 
-        let h = GenericHomology::from(&c);
+        let h = GenericHomology::from(c);
         
         assert_eq!(h[0].rank(), 0);
         assert!(h[0].is_free());
@@ -213,7 +209,7 @@ mod tests {
             vec![ CsMat::csc_from_vec((1, 1), vec![2]) ],
         );
 
-        let h = GenericHomology::from(&c);
+        let h = GenericHomology::from(c);
         assert_eq!(h[0].rank(), 0);
         assert_eq!(h[0].tors(), &vec![2]);
     }
@@ -221,7 +217,7 @@ mod tests {
     #[test]
     fn homology_d3() {
         let c = TestChainComplex::<i32>::d3();
-        let h = GenericHomology::from(&c);
+        let h = GenericHomology::from(c);
 
         assert_eq!(h[0].rank(), 1);
         assert_eq!(h[0].is_free(), true);
@@ -239,7 +235,7 @@ mod tests {
     #[test]
     fn homology_s2() {
         let c = TestChainComplex::<i32>::s2();
-        let h = GenericHomology::from(&c);
+        let h = GenericHomology::from(c);
 
         assert_eq!(h[0].rank(), 1);
         assert_eq!(h[0].is_free(), true);
@@ -254,7 +250,7 @@ mod tests {
     #[test]
     fn homology_t2() {
         let c = TestChainComplex::<i32>::t2();
-        let h = GenericHomology::from(&c);
+        let h = GenericHomology::from(c);
 
         assert_eq!(h[0].rank(), 1);
         assert_eq!(h[0].is_free(), true);
@@ -269,7 +265,7 @@ mod tests {
     #[test]
     fn homology_rp2() {
         let c = TestChainComplex::<i32>::rp2();
-        let h = GenericHomology::from(&c);
+        let h = GenericHomology::from(c);
 
         assert_eq!(h[0].rank(), 1);
         assert_eq!(h[0].is_free(), true);

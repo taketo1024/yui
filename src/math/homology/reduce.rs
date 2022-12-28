@@ -204,7 +204,7 @@ mod tests {
         assert_eq!(c[2].rank(), 0);
         assert_eq!(c[3].rank(), 0);
 
-        let h = GenericHomology::from(&c);
+        let h = GenericHomology::from(c);
 
         assert_eq!(h[0].rank(), 1);
         assert_eq!(h[1].rank(), 0);
@@ -221,7 +221,7 @@ mod tests {
         assert_eq!(c[1].rank(), 0);
         assert_eq!(c[2].rank(), 1);
 
-        let h = GenericHomology::from(&c);
+        let h = GenericHomology::from(c);
 
         assert_eq!(h[0].rank(), 1);
         assert_eq!(h[1].rank(), 0);
@@ -237,7 +237,7 @@ mod tests {
         assert_eq!(c[1].rank(), 2);
         assert_eq!(c[2].rank(), 1);
 
-        let h = GenericHomology::from(&c);
+        let h = GenericHomology::from(c);
 
         assert_eq!(h[0].rank(), 1);
         assert_eq!(h[1].rank(), 2);
@@ -253,7 +253,7 @@ mod tests {
         assert_eq!(c[1].rank(), 1);
         assert_eq!(c[2].rank(), 1);
 
-        let h = GenericHomology::from(&c);
+        let h = GenericHomology::from(c);
 
         assert_eq!(h[0].rank(), 1);
         assert_eq!(h[1].rank(), 0);

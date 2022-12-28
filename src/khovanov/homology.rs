@@ -40,7 +40,7 @@ where
 {
     fn from(c: KhComplex<R>) -> Self {
         let reduced = Reduced::from(c);
-        let homology = GenericHomology::from(&reduced);
+        let homology = GenericHomology::from(reduced);
         Self { homology }
     }
 }
@@ -107,7 +107,7 @@ where
     pub fn new(l: &Link) -> Self {
         let c = KhComplexBigraded::new(l);
         let reduced = Reduced::from(c);
-        let homology = GenericHomology::from(&reduced);
+        let homology = GenericHomology::from(reduced);
         Self { homology }
     }
 }

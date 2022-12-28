@@ -21,53 +21,6 @@ where
     d_matrices: HashMap<C::Index, CsMat<C::R>>,
 }
 
-impl<C> Reduced<C>
-where 
-    C: ChainComplex,
-    C::R: Ring + CsMatElem, for<'x> &'x C::R: RingOps<C::R>,
-    C::Output: RModStr<R = C::R>
-{ 
-    fn reduce(a0: Option<CsMat<C::R>>, a1: CsMat<C::R>, a2: CsMat<C::R>, k: C::Index, step: usize) -> (Option<CsMat<C::R>>, CsMat<C::R>, CsMat<C::R>) {
-        const MAX_PIVOTS: usize = 300_000;
-
-        if let Some(a0) = a0.as_ref() {
-            assert_eq!(a0.rows(), a1.cols());
-        }
-        assert_eq!(a1.rows(), a2.cols());
-
-        let pivs = find_pivots_upto(&a1, MAX_PIVOTS);
-        let r = pivs.len();
-
-        if r == 0 { 
-            // println!("k = {k} ({step}), no reduce: {}", a1.cols());
-            return (a0, a1, a2)
-        }
-    
-        // println!("k = {k} ({step}), reduce: {} -> {}", a1.cols(), a1.cols() - r);
-        
-        let (p, q) = perms_by_pivots(&a1, &pivs);
-        let b1 = a1.permute(p.view(), q.view());
-        let b1 = schur_partial_upper_triang(b1, r);
-        
-        let b0 = a0.map(|a0| {
-            Self::reduce_rows(a0, q.view(), r)
-        });
-        let b2 = Self::reduce_cols(a2, p.view(), r);
-
-        Self::reduce(b0, b1, b2, k, step + 1)
-    }
-
-    fn reduce_rows(a: CsMat<C::R>, p: PermView, r: usize) -> CsMat<C::R> {
-        let (m, n) = a.shape();
-        a.permute_rows(p.view()).submatrix(r..m, 0..n)
-    }
-
-    fn reduce_cols(a: CsMat<C::R>, p: PermView, r: usize) -> CsMat<C::R> {
-        let (m, n) = a.shape();
-        a.permute_cols(p.view()).submatrix(0..m, r..n)
-    }
-} 
-
 impl<C> From<C> for Reduced<C>
 where 
     C: ChainComplex,
@@ -81,15 +34,13 @@ where
             let deg = c.d_degree();
             let (k0, k1, k2) = (k - deg, k, k + deg);
 
-            let a0 = d_matrices.remove(&k0); // prev(optional)
+            let a0 = d_matrices.remove(&k0).unwrap_or(c.d_matrix(k0)); // prev
             let a1 = d_matrices.remove(&k1).unwrap_or(c.d_matrix(k1)); // target
             let a2 = c.d_matrix(k2); // next
 
-            let (b0, b1, b2) = Self::reduce(a0, a1, a2, k, 1);
+            let (b0, b1, b2) = reduce_d_matrices(a0, a1, a2);
             
-            if let Some(b0) = b0 {
-                d_matrices.insert(k0, b0);
-            }
+            d_matrices.insert(k0, b0);
             d_matrices.insert(k1, b1);
             d_matrices.insert(k2, b2);
         }
@@ -159,6 +110,50 @@ where
             CsMat::zero((m, n))
         }
     }
+}
+
+pub fn reduce_d_matrices<R>(a0: CsMat<R>, a1: CsMat<R>, a2: CsMat<R>) -> (CsMat<R>, CsMat<R>, CsMat<R>)
+where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
+    _reduce_d_matrices(a0, a1, a2, 1)
+}
+
+fn _reduce_d_matrices<R>(a0: CsMat<R>, a1: CsMat<R>, a2: CsMat<R>, step: usize) -> (CsMat<R>, CsMat<R>, CsMat<R>)
+where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
+    const MAX_PIVOTS: usize = 300_000;
+
+    assert_eq!(a0.rows(), a1.cols());
+    assert_eq!(a1.rows(), a2.cols());
+
+    let pivs = find_pivots_upto(&a1, MAX_PIVOTS);
+    let r = pivs.len();
+
+    if r == 0 { 
+        // println!("k = {k} ({step}), no reduce: {}", a1.cols());
+        return (a0, a1, a2)
+    }
+
+    // println!("k = {k} ({step}), reduce: {} -> {}", a1.cols(), a1.cols() - r);
+    
+    let (p, q) = perms_by_pivots(&a1, &pivs);
+    let b1 = a1.permute(p.view(), q.view());
+    let b1 = schur_partial_upper_triang(b1, r);
+    
+    let b0 = reduce_rows(a0, q.view(), r);
+    let b2 = reduce_cols(a2, p.view(), r);
+
+    _reduce_d_matrices(b0, b1, b2, step + 1)
+}
+
+fn reduce_rows<R>(a: CsMat<R>, p: PermView, r: usize) -> CsMat<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    let (m, n) = a.shape();
+    a.permute_rows(p.view()).submatrix(r..m, 0..n)
+}
+
+fn reduce_cols<R>(a: CsMat<R>, p: PermView, r: usize) -> CsMat<R>
+where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
+    let (m, n) = a.shape();
+    a.permute_cols(p.view()).submatrix(0..m, r..n)
 }
 
 #[cfg(test)]

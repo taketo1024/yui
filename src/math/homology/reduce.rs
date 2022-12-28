@@ -174,14 +174,15 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
     
         let (p, q) = perms_by_pivots(a1, &pivs);
         let b1 = a1.permute(p.view(), q.view());
-        let b1 = schur_partial_upper_triang(b1, r);
-        
+        let sch = schur_partial_upper_triang(b1, r);
+
+        let b1 = sch.complement();
         let b0 = Self::reduce_rows(a0, q.view(), r);
         let b2 = Self::reduce_cols(a2, p.view(), r);
 
         self.set_matrices(b0, b1, b2);
 
-        // TODO modify vectors 
+        // TODO modify vectors
 
         self.step += 1;
         

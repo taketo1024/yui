@@ -91,6 +91,22 @@ where
     }
 }
 
+impl<R, I> GenericChainComplex<R, I>
+where 
+    R: Ring + Default, for<'x> &'x R: RingOps<R>,
+    I: AdditiveIndexRange + DoubleEndedIterator,
+    I::Item: AdditiveIndex
+{
+    pub fn dual(self) -> GenericChainComplex<R, Rev<I>> {
+        let range = self.range().rev();
+        let d_degree = -self.d_degree();
+        let d_matrices = self.d_matrices.into_iter().map(|(i, d)| 
+            (i - d_degree, d.transpose_into().into_csc())
+        ).collect();
+        GenericChainComplex::new(range, d_degree, d_matrices)
+    }
+}
+
 impl<R, I> Index<I::Item> for GenericChainComplex<R, I>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
@@ -240,6 +256,58 @@ pub mod tests {
         c.check_d_all();
     }
 
+    #[test]
+    fn d3_dual() {
+        let c = TestChainComplex::<i32>::d3().dual();
+
+        assert_eq!(c.d_degree(), 1);
+        
+        assert_eq!(c[0].rank(), 4);
+        assert_eq!(c[1].rank(), 6);
+        assert_eq!(c[2].rank(), 4);
+        assert_eq!(c[3].rank(), 1);
+
+        c.check_d_all();
+    }
+
+    #[test]
+    fn s2_dual() {
+        let c = TestChainComplex::<i32>::s2().dual();
+
+        assert_eq!(c.d_degree(), 1);
+        
+        assert_eq!(c[0].rank(), 4);
+        assert_eq!(c[1].rank(), 6);
+        assert_eq!(c[2].rank(), 4);
+
+        c.check_d_all();
+    }
+
+    #[test]
+    fn t2_dual() {
+        let c = TestChainComplex::<i32>::t2().dual();
+
+        assert_eq!(c.d_degree(), 1);
+        
+        assert_eq!(c[0].rank(), 9);
+        assert_eq!(c[1].rank(), 27);
+        assert_eq!(c[2].rank(), 18);
+
+        c.check_d_all();
+    }
+
+    #[test]
+    fn rp2_dual() {
+        let c = TestChainComplex::<i32>::rp2().dual();
+
+        assert_eq!(c.d_degree(), 1);
+        
+        assert_eq!(c[0].rank(), 6);
+        assert_eq!(c[1].rank(), 15);
+        assert_eq!(c[2].rank(), 10);
+
+        c.check_d_all();
+    }
     // below : test data // 
 
     pub type TestChainComplex<R> = GenericChainComplex<R, Rev<RangeInclusive<isize>>>;    

@@ -1,12 +1,27 @@
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::fmt::Display;
-use std::ops::{Add, Sub, Index};
+use std::ops::{Add, Sub, Index, Neg};
 use itertools::Itertools;
 
 use crate::math::traits::{MathElem, Ring, RingOps};
 use crate::utils::format::superscript;
 use crate::utils::misc::Idx2;
+
+pub trait AdditiveIndex: Clone + Copy + PartialEq + Eq + Hash + Display + Add<Output = Self> + Sub<Output = Self> + Neg<Output = Self>
+{}
+
+impl <T> AdditiveIndex for T
+where T: Clone + Copy + PartialEq + Eq + Hash + Display + Add<Output = Self> + Sub<Output = Self> + Neg<Output = Self>
+{}
+
+pub trait AdditiveIndexRange: Iterator + Clone 
+where Self::Item: AdditiveIndex
+{}
+
+impl <T> AdditiveIndexRange for T
+where T: Iterator + Clone, T::Item: AdditiveIndex
+{}
 
 pub trait RModStr: Sized + Display
 where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> { 
@@ -95,20 +110,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.fmt_default(f)
     }
 }
-
-pub trait AdditiveIndex: Clone + Copy + PartialEq + Eq + Hash + Display + Add<Output = Self> + Sub<Output = Self>
-{}
-
-impl <T> AdditiveIndex for T
-where T: Clone + Copy + PartialEq + Eq + Hash + Display + Add<Output = Self> + Sub<Output = Self>{}
-
-pub trait AdditiveIndexRange: Iterator + Clone 
-where Self::Item: AdditiveIndex
-{}
-
-impl <T> AdditiveIndexRange for T
-where T: Iterator + Clone, T::Item: AdditiveIndex
-{}
 
 pub trait GradedRModStr: Index<Self::Index>
 where 

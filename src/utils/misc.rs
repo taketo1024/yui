@@ -1,8 +1,8 @@
 use std::vec::IntoIter;
 use itertools::Itertools;
-use derive_more::{Display, Add, Sub};
+use derive_more::{Display, Add, Sub, Neg};
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Display, Add, Sub)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Display, Add, Sub, Neg)]
 #[display(fmt = "({}, {})", _0, _1)]
 pub struct Idx2(pub isize, pub isize);
 

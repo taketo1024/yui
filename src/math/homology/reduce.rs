@@ -192,7 +192,7 @@ mod tests {
     }
 
     #[test]
-    fn homology_d3() {
+    fn d3() {
         let c = TestChainComplex::<i32>::d3();
         let c = Reduced::from(c);
 
@@ -210,7 +210,7 @@ mod tests {
     }
 
     #[test]
-    fn homology_s2() {
+    fn s2() {
         let c = TestChainComplex::<i32>::s2();
         let c = Reduced::from(c);
 
@@ -226,7 +226,7 @@ mod tests {
     }
 
     #[test]
-    fn homology_t2() {
+    fn t2() {
         let c = TestChainComplex::<i32>::t2();
         let c = Reduced::from(c);
 
@@ -242,7 +242,7 @@ mod tests {
     }
 
     #[test]
-    fn homology_rp2() {
+    fn rp2() {
         let c = TestChainComplex::<i32>::rp2();
         let c = Reduced::from(c);
 
@@ -257,4 +257,72 @@ mod tests {
         assert_eq!(h[1].tors(), &vec![2]);
         assert_eq!(h[2].rank(), 0);
     }
+
+    #[test]
+    fn d3_dual() {
+        let c = TestChainComplex::<i32>::d3().dual();
+        let c = Reduced::from(c);
+
+        assert_eq!(c[0].rank(), 1);
+        assert_eq!(c[1].rank(), 0);
+        assert_eq!(c[2].rank(), 0);
+        assert_eq!(c[3].rank(), 0);
+
+        let h = GenericHomology::from(c);
+
+        assert_eq!(h[0].rank(), 1);
+        assert_eq!(h[1].rank(), 0);
+        assert_eq!(h[2].rank(), 0);
+        assert_eq!(h[3].rank(), 0);
+    }
+
+    #[test]
+    fn s2_dual() {
+        let c = TestChainComplex::<i32>::s2().dual();
+        let c = Reduced::from(c);
+
+        assert_eq!(c[0].rank(), 1);
+        assert_eq!(c[1].rank(), 0);
+        assert_eq!(c[2].rank(), 1);
+
+        let h = GenericHomology::from(c);
+
+        assert_eq!(h[0].rank(), 1);
+        assert_eq!(h[1].rank(), 0);
+        assert_eq!(h[2].rank(), 1);
+    }
+
+    #[test]
+    fn t2_dual() {
+        let c = TestChainComplex::<i32>::t2().dual();
+        let c = Reduced::from(c);
+
+        assert_eq!(c[0].rank(), 1);
+        assert_eq!(c[1].rank(), 2);
+        assert_eq!(c[2].rank(), 1);
+
+        let h = GenericHomology::from(c);
+
+        assert_eq!(h[0].rank(), 1);
+        assert_eq!(h[1].rank(), 2);
+        assert_eq!(h[2].rank(), 1);
+    }
+
+    #[test]
+    fn rp2_dual() {
+        let c = TestChainComplex::<i32>::rp2().dual();
+        let c = Reduced::from(c);
+
+        assert_eq!(c[0].rank(), 1);
+        assert_eq!(c[1].rank(), 1);
+        assert_eq!(c[2].rank(), 1);
+
+        let h = GenericHomology::from(c);
+
+        assert_eq!(h[0].rank(), 1);
+        assert_eq!(h[1].rank(), 0);
+        assert_eq!(h[2].rank(), 0);
+        assert_eq!(h[2].tors(), &vec![2]);
+    }
+    
 }

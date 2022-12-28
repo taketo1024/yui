@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::fmt::Display;
-use std::ops::{Add, Sub, Index, IndexMut};
+use std::ops::{Add, Sub, Index};
 use itertools::Itertools;
 
 use crate::math::traits::{MathElem, Ring, RingOps};
@@ -181,18 +181,6 @@ where
         } else { 
             &self.zero
         }
-    }
-}
-
-impl<S, I> IndexMut<I::Item> for RModGrid<S, I>
-where
-    S: RModStr,
-    S::R: Ring, for<'x> &'x S::R: RingOps<S::R>,
-    I: AdditiveIndexRange,
-    I::Item: AdditiveIndex
-{
-    fn index_mut(&mut self, index: I::Item) -> &mut Self::Output {
-        self.grid.get_mut(&index).unwrap()
     }
 }
 

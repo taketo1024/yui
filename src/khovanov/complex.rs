@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::ops::{RangeInclusive, Index};
 use std::vec::IntoIter;
 
@@ -80,12 +81,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn new(l: &Link) -> Self { 
-        let cube = KhCube::new(l);
-        let grid1 = RModGrid::new(cube.h_range(), |i| {
-            let gens = cube.generators(i);
-            Some(FreeRModStr::new(gens))
-        });
+        use grouping_by::GroupingBy;
 
+        let cube = KhCube::new(l);
         let h_range = cube.h_range();
         let q_range = cube.q_range();
         
@@ -95,10 +93,21 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             (1, 2)
         );
 
-        let j0 = cube.shift().1;
+        let q0 = cube.shift().1;
+        let mut gens: HashMap<_, _> = h_range.clone().map(|i| { 
+            let set = cube.generators(i).into_iter().grouping_by(|x| x.q_deg() + q0);
+            (i, set)
+        }).collect();
+
         let grid = RModGrid::new(range, |idx| {
             let (i, j) = idx.as_tuple();
-            Some(grid1[i].clone_filter(|x| x.q_deg() == j - j0))
+            let set = gens.get_mut(&i).unwrap();
+            if let Some(g) = set.remove(&j) {
+                let s = FreeRModStr::new(g);
+                Some(s)
+            } else { 
+                None
+            }
         });
 
         Self { cube, grid }

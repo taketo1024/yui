@@ -35,12 +35,6 @@ where
     pub fn vectorize(&self, x: &X) -> CsVec<R> {
         vectorize(self.generators(), x)
     }
-
-    pub fn clone_filter<F>(&self, pred: F) -> Self
-    where F: Fn(&X) -> bool { 
-        let gens = self.generators.iter().filter(|x| pred(x)).cloned().collect();
-        Self::new(gens)
-    }
 }
 
 impl<R, X> RModStr for FreeRModStr<R, X>

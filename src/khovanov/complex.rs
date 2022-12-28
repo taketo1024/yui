@@ -5,7 +5,6 @@ use std::vec::IntoIter;
 use crate::math::homology::base::{GradedRModStr, RModGrid};
 use crate::math::homology::free::FreeRModStr;
 use crate::math::traits::{Ring, RingOps};
-use crate::math::matrix::CsMatElem;
 use crate::math::homology::complex::ChainComplex;
 use crate::links::Link;
 use crate::utils::misc::{Idx2, Idx2Range};
@@ -35,7 +34,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 impl<R> Index<isize> for KhComplex<R>
-where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> { 
+where R: Ring, for<'x> &'x R: RingOps<R> { 
     type Output = FreeRModStr<R, KhEnhState>;
     
     fn index(&self, index: isize) -> &Self::Output {
@@ -44,7 +43,7 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
 }
 
 impl<R> GradedRModStr for KhComplex<R>
-where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> { 
+where R: Ring, for<'x> &'x R: RingOps<R> { 
     type R = R;
     type Index = isize;
     type IndexRange = RangeInclusive<isize>;
@@ -59,7 +58,7 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
 }
 
 impl<R> ChainComplex for KhComplex<R>
-where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> { 
+where R: Ring, for<'x> &'x R: RingOps<R> { 
     fn d_degree(&self) -> Self::Index {
         1
     }
@@ -139,7 +138,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 impl<R> ChainComplex for KhComplexBigraded<R>
-where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
+where R: Ring, for<'x> &'x R: RingOps<R> {
     fn d_degree(&self) -> Self::Index {
         Idx2(1, 0)
     }
@@ -156,7 +155,7 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
 mod tests {
     use crate::links::Link;
     use crate::math::homology::base::GradedRModStr;
-    use crate::math::homology::complex::ChainComplex;
+    use crate::math::homology::complex::ChainComplexValidation;
     use super::KhComplex;
 
     #[test]

@@ -10,7 +10,7 @@ use super::complex::ChainComplex;
 
 pub trait HomologyComputable<S>: ChainComplex
 where 
-    Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R>,
+    Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>,
     Self::Output: RModStr<R = Self::R>,
     S: RModStr<R = Self::R>
 {
@@ -63,7 +63,7 @@ where
 
 impl<R, C> From<C> for GenericHomology<R, C::IndexRange>
 where
-    R: Ring + CsMatElem, for<'x> &'x R: RingOps<R>,
+    R: Ring, for<'x> &'x R: RingOps<R>,
     C: HomologyComputable<GenericRModStr<R>, R = R>,
     C::IndexRange: Clone,
     C::Output: RModStr<R = C::R>
@@ -144,9 +144,7 @@ where
 // ≅ Rᶠ ⊕ (Rᵇ / Im(s₁))
 
 pub fn compute_homology<R>(d1: &CsMat<R>, d2: &CsMat<R>, with_trans: bool) -> (usize, Vec<R>)
-where 
-    R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R>
-{
+where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> {
     assert_eq!(d2.cols(), d1.rows());
     debug_assert!((d2 * d1).is_zero());
 

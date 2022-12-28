@@ -13,7 +13,7 @@ use super::complex::ChainComplex;
 pub struct Reduced<C>
 where 
     C: ChainComplex,
-    C::R: Ring + CsMatElem, for<'x> &'x C::R: RingOps<C::R>,
+    C::R: Ring, for<'x> &'x C::R: RingOps<C::R>,
     C::Output: RModStr<R = C::R>
 { 
     original: C,
@@ -111,7 +111,7 @@ where
 impl<C> Index<C::Index> for Reduced<C>
 where 
     C: ChainComplex,
-    C::R: Ring + CsMatElem, for<'x> &'x C::R: RingOps<C::R>,
+    C::R: Ring, for<'x> &'x C::R: RingOps<C::R>,
     C::Output: RModStr<R = C::R>
 {
     type Output = GenericRModStr<C::R>;
@@ -124,7 +124,7 @@ where
 impl<C> GradedRModStr for Reduced<C>
 where 
     C: ChainComplex,
-    C::R: Ring + CsMatElem, for<'x> &'x C::R: RingOps<C::R>,
+    C::R: Ring, for<'x> &'x C::R: RingOps<C::R>,
     C::Output: RModStr<R = C::R>
 {
     type R = C::R;
@@ -143,8 +143,7 @@ where
 impl<C> ChainComplex for Reduced<C>
 where 
     C: ChainComplex,
-    C::R: Ring + CsMatElem, 
-    for<'x> &'x C::R: RingOps<C::R>,
+    C::R: Ring, for<'x> &'x C::R: RingOps<C::R>,
     C::Output: RModStr<R = C::R>
 {
     fn d_degree(&self) -> Self::Index {

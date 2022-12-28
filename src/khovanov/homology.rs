@@ -6,23 +6,17 @@ use crate::math::homology::base::{GradedRModStr, GenericRModStr};
 use crate::math::homology::homology::{Homology, GenericHomology};
 use crate::math::homology::reduce::Reduced;
 use crate::math::matrix::CsMatElem;
-use crate::math::traits::{EucRing, EucRingOps};
+use crate::math::traits::{EucRing, EucRingOps, Ring, RingOps};
 use crate::links::Link;
 use super::complex::{KhComplex, KhComplexBigraded};
 
 pub struct KhHomology<R> 
-where 
-    R: EucRing + CsMatElem, 
-    for<'x> &'x R: EucRingOps<R> 
-{ 
+where R: Ring, for<'x> &'x R: RingOps<R> {
     homology: GenericHomology<R, RangeInclusive<isize>>
 }
 
 impl<R> KhHomology<R> 
-where 
-    R: EucRing + CsMatElem, 
-    for<'x> &'x R: EucRingOps<R> 
-{ 
+where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> {
     pub fn new(l: &Link) -> Self {
         Self::new_ht(l, R::zero(), R::zero())
     }
@@ -34,10 +28,7 @@ where
 }
 
 impl<R> From<KhComplex<R>> for KhHomology<R>
-where 
-    R: EucRing + CsMatElem, 
-    for<'x> &'x R: EucRingOps<R> 
-{
+where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> {
     fn from(c: KhComplex<R>) -> Self {
         let reduced = Reduced::from(c);
         let homology = GenericHomology::from(reduced);
@@ -45,11 +36,17 @@ where
     }
 }
 
+impl<R> Index<isize> for KhHomology<R> 
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = GenericRModStr<R>;
+
+    fn index(&self, index: isize) -> &Self::Output {
+        self.homology.index(index)
+    }
+}
+
 impl<R> GradedRModStr for KhHomology<R>
-where 
-    R: EucRing + CsMatElem, 
-    for<'x> &'x R: EucRingOps<R> 
-{ 
+where R: Ring, for<'x> &'x R: RingOps<R> {
     type R = R;
     type Index = isize;
     type IndexRange = RangeInclusive<isize>;
@@ -63,47 +60,23 @@ where
     }
 }
 
-impl<R> Index<isize> for KhHomology<R> 
-where 
-    R: EucRing + CsMatElem,
-    for<'x> &'x R: EucRingOps<R>
-{
-    type Output = GenericRModStr<R>;
-
-    fn index(&self, index: isize) -> &Self::Output {
-        self.homology.index(index)
-    }
-}
-
 impl<R> Homology for KhHomology<R> 
-where 
-    R: EucRing + CsMatElem,
-    for<'x> &'x R: EucRingOps<R>
-{}
+where R: Ring, for<'x> &'x R: RingOps<R> {}
 
 impl<R> Display for KhHomology<R> 
-where 
-    R: EucRing + CsMatElem,
-    for<'x> &'x R: EucRingOps<R>
-{
+where R: Ring, for<'x> &'x R: EucRingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.homology.fmt(f)
     }
 }
 
 pub struct KhHomologyBigraded<R> 
-where 
-    R: EucRing + CsMatElem, 
-    for<'x> &'x R: EucRingOps<R> 
-{
+where R: Ring, for<'x> &'x R: RingOps<R> {
     homology: GenericHomology<R, Idx2Range>
 }
 
 impl<R> KhHomologyBigraded<R>
-where 
-    R: EucRing + CsMatElem, 
-    for<'x> &'x R: EucRingOps<R> 
-{ 
+where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> {
     pub fn new(l: &Link) -> Self {
         let c = KhComplexBigraded::new(l);
         let reduced = Reduced::from(c);
@@ -113,7 +86,7 @@ where
 }
 
 impl<R> Index<Idx2> for KhHomologyBigraded<R>
-where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> {
+where R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = GenericRModStr<R>;
 
     fn index(&self, index: Idx2) -> &Self::Output {
@@ -122,7 +95,7 @@ where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> {
 }
 
 impl<R> GradedRModStr for KhHomologyBigraded<R>
-where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> {
+where R: Ring, for<'x> &'x R: RingOps<R> {
     type R = R;
     type Index = Idx2;
     type IndexRange = Idx2Range;
@@ -137,10 +110,10 @@ where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> {
 }
 
 impl<R> Homology for KhHomologyBigraded<R>
-where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> {}
+where R: Ring, for<'x> &'x R: RingOps<R> {}
 
 impl<R> Display for KhHomologyBigraded<R>
-where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> {
+where R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.fmt_default(f)
     }

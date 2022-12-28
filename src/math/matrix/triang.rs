@@ -1,14 +1,11 @@
 use std::mem::replace;
-
 use itertools::Itertools;
 use sprs::{CsMat, CsVec};
-
-use crate::math::{traits::{Ring, RingOps}, matrix::sparse::CsVecExt};
-
-use super::CsMatElem;
+use crate::math::traits::{Ring, RingOps};
+use crate::math::matrix::sparse::CsVecExt;
 
 pub fn inv_upper_tri<R>(u: &CsMat<R>) -> CsMat<R>
-where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
+where R: Ring, for<'x> &'x R: RingOps<R> {
     assert!(u.is_csc());
     debug_assert!(is_upper_tri(u));
 
@@ -45,7 +42,7 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
 }
 
 pub fn solve_upper_tri<R>(u: &CsMat<R>, b: &CsVec<R>) -> CsVec<R>
-where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
+where R: Ring, for<'x> &'x R: RingOps<R> {
     assert!(u.is_csc());
     debug_assert!(is_upper_tri(u));
 
@@ -61,7 +58,7 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
 }
 
 fn solve_upper_tri_into<R>(u: &CsMat<R>, diag: &Vec<&R>, b: &mut Vec<R>, x: &mut Vec<R>)
-where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
+where R: Ring, for<'x> &'x R: RingOps<R> {
     debug_assert!(x.iter().all(|x_i| 
         x_i.is_zero())
     ); 
@@ -98,7 +95,7 @@ fn diag<'a, R>(u: &'a CsMat<R>) -> Vec<&'a R> {
 }
 
 fn is_upper_tri<R>(u: &CsMat<R>) -> bool
-where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
+where R: Ring, for<'x> &'x R: RingOps<R> {
     u.rows() == u.cols() && 
     u.iter().all(|(a, (i, j))| 
         i < j || (i == j && a.is_unit()) || (i > j && a.is_zero())

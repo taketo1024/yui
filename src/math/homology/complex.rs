@@ -5,14 +5,18 @@ use super::base::{GradedRModStr, RModStr};
 
 pub trait ChainComplex: GradedRModStr
 where 
-    Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R>,
+    Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>,
     Self::Output: RModStr<R = Self::R>
 {
     fn d_degree(&self) -> Self::Index;
     fn d_matrix(&self, k: Self::Index) -> CsMat<Self::R>;
+}
 
-    // -- convenient methods -- //
-
+pub trait ChainComplexValidation: ChainComplex
+where 
+    Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R>,
+    Self::Output: RModStr<R = Self::R>
+{
     fn check_d_at(&self, k: Self::Index) { 
         let d1 = self.d_matrix(k);
         let d2 = self.d_matrix(k + self.d_degree());
@@ -29,17 +33,24 @@ where
     }
 }
 
+impl<R, C> ChainComplexValidation for C
+where 
+    R: Ring + CsMatElem, for<'x> &'x R: RingOps<R>,
+    C: ChainComplex<R = R>,
+    C::Output: RModStr<R = R>
+{}
+
+
 #[cfg(test)]
 pub mod tests { 
     use std::iter::Rev;
     use std::ops::{RangeInclusive, Index};
     use either::Either;
     use sprs::CsMat;
-    use super::{ChainComplex, GradedRModStr};
+    use super::{ChainComplex, ChainComplexValidation, GradedRModStr};
     use crate::math::homology::base::{GenericRModStr, RModGrid, RModStr};
     use crate::math::traits::{Ring, RingOps};
     use crate::math::matrix::sparse::*;
-    use crate::math::matrix::CsMatElem;
 
     #[test]
     fn zero_complex() {
@@ -104,14 +115,14 @@ pub mod tests {
     // below : test data // 
 
     pub struct TestChainComplex<R> 
-    where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
+    where R: Ring, for<'x> &'x R: RingOps<R> {
         grid: RModGrid<GenericRModStr<R>, Either<RangeInclusive<isize>, Rev<RangeInclusive<isize>>>>,
         d_degree: isize,
         d_matrices: Vec<CsMat<R>>,
     }
 
     impl<R> TestChainComplex<R>
-    where R: Ring + CsMatElem + From<i32>, for<'x> &'x R: RingOps<R> {
+    where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> {
         pub fn new(d_degree: isize, d_matrices: Vec<CsMat<i32>>) -> TestChainComplex<R> {
             assert!(d_degree == 1 || d_degree == -1);
     
@@ -155,9 +166,7 @@ pub mod tests {
     }
 
     impl<R> Index<isize> for TestChainComplex<R>
-    where
-        R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> 
-    {
+    where R: Ring, for<'x> &'x R: RingOps<R> {
         type Output = GenericRModStr<R>;
 
         fn index(&self, index: isize) -> &Self::Output {
@@ -166,9 +175,7 @@ pub mod tests {
     }
 
     impl<R> GradedRModStr for TestChainComplex<R>
-    where 
-        R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> 
-    {
+    where R: Ring, for<'x> &'x R: RingOps<R> {
         type R = R;
         type Index = isize;
         type IndexRange = Either<RangeInclusive<isize>, Rev<RangeInclusive<isize>>>;
@@ -183,9 +190,7 @@ pub mod tests {
     }
 
     impl<R> ChainComplex for TestChainComplex<R> 
-    where 
-        R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> 
-    { 
+    where R: Ring, for<'x> &'x R: RingOps<R> { 
         fn d_degree(&self) -> isize {
             self.d_degree
         }
@@ -203,7 +208,7 @@ pub mod tests {
     }
 
     impl<R> TestChainComplex<R>
-    where R: Ring + CsMatElem + From<i32>, for<'x> &'x R: RingOps<R> {
+    where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> {
         pub fn zero() -> Self {
             Self::new(-1, vec![])
         }

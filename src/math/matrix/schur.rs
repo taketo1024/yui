@@ -15,7 +15,6 @@ pub fn schur_partial_upper_triang<R>(a: CsMat<R>, r: usize) -> CsMat<R>
 where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
     assert!(a.is_csc());
 
-
     let [u, b, c, d] = a.divide4(r, r);
     let uinv = inv_upper_tri(&u);
     let s = schur(&uinv, &b, &c, &d);

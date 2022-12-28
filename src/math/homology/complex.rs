@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::iter::Rev;
 use std::ops::{Index, RangeInclusive};
-
-use sprs::CsMat;
+use num_traits::Zero;
+use sprs::{CsMat, CsVec};
 use crate::math::matrix::sparse::*;
 use crate::math::traits::{RingOps, Ring};
 use super::base::{GradedRModStr, RModStr, AdditiveIndexRange, AdditiveIndex, RModGrid, GenericRModStr};
@@ -21,6 +21,11 @@ where
     Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R>,
     Self::Output: RModStr<R = Self::R>
 {
+    fn is_cycle(&self, k: Self::Index, z: &CsVec<Self::R>) -> bool { 
+        let d = self.d_matrix(k);
+        (&d * z).iter().all(|(_, a)| a.is_zero())
+    }
+    
     fn check_d_at(&self, k: Self::Index) { 
         let d1 = self.d_matrix(k);
         let d2 = self.d_matrix(k + self.d_degree());

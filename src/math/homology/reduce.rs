@@ -171,8 +171,7 @@ mod tests {
 
     #[test]
     fn cancel_pair() { 
-        let c = TestChainComplex::<i32>::new(
-            -1,
+        let c = TestChainComplex::<i32>::descending(
             vec![ CsMat::csc_from_vec((1, 1), vec![1]) ],
         );
         let c = Reduced::from(c);
@@ -183,8 +182,7 @@ mod tests {
 
     #[test]
     fn torsion() { 
-        let c = TestChainComplex::<i32>::new( 
-            -1,
+        let c = TestChainComplex::<i32>::descending( 
             vec![ CsMat::csc_from_vec((1, 1), vec![2]) ],
         );
         let c = Reduced::from(c);

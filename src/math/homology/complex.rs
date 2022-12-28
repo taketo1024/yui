@@ -1,7 +1,11 @@
+use std::collections::HashMap;
+use std::iter::Rev;
+use std::ops::{Index, RangeInclusive};
+
 use sprs::CsMat;
 use crate::math::matrix::sparse::*;
 use crate::math::traits::{RingOps, Ring};
-use super::base::{GradedRModStr, RModStr};
+use super::base::{GradedRModStr, RModStr, AdditiveIndexRange, AdditiveIndex, RModGrid, GenericRModStr};
 
 pub trait ChainComplex: GradedRModStr
 where 
@@ -40,15 +44,139 @@ where
     C::Output: RModStr<R = R>
 {}
 
+pub struct GenericChainComplex<R, I>
+where 
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    I: AdditiveIndexRange,
+    I::Item: AdditiveIndex
+{
+    grid: RModGrid<GenericRModStr<R>, I>,
+    d_degree: I::Item,
+    d_matrices: HashMap<I::Item, CsMat<R>>
+}
+
+impl<R, I> GenericChainComplex<R, I>
+where 
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    I: AdditiveIndexRange,
+    I::Item: AdditiveIndex
+{
+    pub fn new(range: I, d_degree: I::Item, d_matrices: HashMap<I::Item, CsMat<R>>) -> Self {
+        let grid = RModGrid::new(range, |i| {
+            if let Some(d) = d_matrices.get(&i) {
+                let n = d.cols();
+                Some(GenericRModStr::new(n, vec![]))
+            } else if let Some(d) = d_matrices.get(&(i - d_degree)) {
+                let n = d.rows();
+                Some(GenericRModStr::new(n, vec![]))
+            } else {
+                None
+            }
+        });
+
+        Self { grid, d_degree, d_matrices }
+    }
+
+    pub fn generate<F>(range: I, d_degree: I::Item, d_matrices: F) -> Self 
+    where F: Fn(I::Item) -> Option<CsMat<R>> {
+        let d_matrices = range.clone().flat_map(|i| 
+            if let Some(d_i) = d_matrices(i) { 
+                Some((i, d_i))
+            } else { 
+                None
+            }
+        ).collect();
+
+        Self::new(range, d_degree, d_matrices)
+    }
+}
+
+impl<R, I> Index<I::Item> for GenericChainComplex<R, I>
+where 
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    I: AdditiveIndexRange,
+    I::Item: AdditiveIndex
+{
+    type Output = GenericRModStr<R>;
+
+    fn index(&self, index: I::Item) -> &Self::Output {
+        &self.grid[index]
+    }
+}
+
+impl<R, I> GradedRModStr for GenericChainComplex<R, I>
+where 
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    I: AdditiveIndexRange,
+    I::Item: AdditiveIndex
+{
+    type R = R;
+    type Index = I::Item;
+    type IndexRange = I;
+    
+    fn in_range(&self, k: Self::Index) -> bool {
+        self.grid.in_range(k)
+    }
+
+    fn range(&self) -> Self::IndexRange {
+        self.grid.range()
+    }
+}
+
+impl<R, I> ChainComplex for GenericChainComplex<R, I> 
+where 
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    I: AdditiveIndexRange,
+    I::Item: AdditiveIndex
+{
+    fn d_degree(&self) -> Self::Index {
+        self.d_degree
+    }
+
+    fn d_matrix(&self, k: Self::Index) -> CsMat<R> {
+        if let Some(d) = self.d_matrices.get(&k) { 
+            d.clone()
+        } else {
+            let m = self[k + self.d_degree].rank();
+            let n = self[k].rank();
+            CsMat::zero((m, n))
+        }
+    }
+}
+
+impl<R> GenericChainComplex<R, Rev<RangeInclusive<isize>>> 
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    pub fn descending(d_matrices: Vec<CsMat<R>>) -> Self {
+        let n = d_matrices.len() as isize;
+        let range = (0..=n).rev();
+        let d_degree = -1;
+        let d_matrices = d_matrices.into_iter().enumerate().map(|(i, d)| 
+            ((i + 1) as isize, d)
+        ).collect();
+        Self::new(range, d_degree, d_matrices)
+    }
+}
+
+impl<R> GenericChainComplex<R, RangeInclusive<isize>>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    pub fn ascending(d_matrices: Vec<CsMat<R>>) -> Self {
+        let n = d_matrices.len() as isize;
+        let range = 0..=n;
+        let d_degree = 1;
+        let d_matrices = d_matrices.into_iter().enumerate().map(|(i, d)| 
+            (i as isize, d)
+        ).collect();
+        GenericChainComplex::new(range, d_degree, d_matrices)
+    }
+}
 
 #[cfg(test)]
 pub mod tests { 
     use std::iter::Rev;
-    use std::ops::{RangeInclusive, Index};
-    use either::Either;
+    use std::ops::RangeInclusive;
     use sprs::CsMat;
-    use super::{ChainComplex, ChainComplexValidation, GradedRModStr};
-    use crate::math::homology::base::{GenericRModStr, RModGrid, RModStr};
+    use super::{ChainComplex, ChainComplexValidation, GenericChainComplex};
+    use crate::math::homology::base::RModStr;
     use crate::math::traits::{Ring, RingOps};
     use crate::math::matrix::sparse::*;
 
@@ -114,108 +242,26 @@ pub mod tests {
 
     // below : test data // 
 
-    pub struct TestChainComplex<R> 
-    where R: Ring, for<'x> &'x R: RingOps<R> {
-        grid: RModGrid<GenericRModStr<R>, Either<RangeInclusive<isize>, Rev<RangeInclusive<isize>>>>,
-        d_degree: isize,
-        d_matrices: Vec<CsMat<R>>,
-    }
-
-    impl<R> TestChainComplex<R>
-    where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> {
-        pub fn new(d_degree: isize, d_matrices: Vec<CsMat<i32>>) -> TestChainComplex<R> {
-            assert!(d_degree == 1 || d_degree == -1);
-    
-            let n = d_matrices.len() as isize;
-            let range = if d_degree > 0 { 
-                Either::Left(0..=n)
-            } else { 
-                Either::Right((0..=n).rev())
-            };
-
-            // insert matrix so that `rank(C_k) = d_k.cols()`.
-
-            let mut d_matrices = d_matrices;
-            
-            if d_matrices.is_empty() { 
-                d_matrices.push(CsMat::zero((0, 0)))
-            } else if d_degree > 0 { 
-                let d_n_1 = d_matrices.last().unwrap();
-                let k = d_n_1.rows();
-                let d_n = CsMat::zero((0, k));
-                d_matrices.push(d_n);
-            } else if d_degree < 0 { 
-                let d_1 = d_matrices.first().unwrap();
-                let k = d_1.rows();
-                let d_0 = CsMat::zero((0, k));
-                d_matrices.insert(0, d_0);
-            }
-
-            let grid = RModGrid::new(range.clone(), |i| { 
-                let n = d_matrices[i as usize].cols();
-                let s = GenericRModStr::new(n, vec![]);
-                Some(s)
-            });
-            
-            let d_matrices = d_matrices.into_iter().map(|d| 
-                d.map(|&a| R::from(a))
-            ).collect();
-    
-            Self { grid, d_degree, d_matrices }
-        }
-    }
-
-    impl<R> Index<isize> for TestChainComplex<R>
-    where R: Ring, for<'x> &'x R: RingOps<R> {
-        type Output = GenericRModStr<R>;
-
-        fn index(&self, index: isize) -> &Self::Output {
-            &self.grid[index]
-        }
-    }
-
-    impl<R> GradedRModStr for TestChainComplex<R>
-    where R: Ring, for<'x> &'x R: RingOps<R> {
-        type R = R;
-        type Index = isize;
-        type IndexRange = Either<RangeInclusive<isize>, Rev<RangeInclusive<isize>>>;
-        
-        fn in_range(&self, k: isize) -> bool {
-            self.grid.in_range(k)
-        }
-
-        fn range(&self) -> Self::IndexRange {
-            self.grid.range()
-        }
-    }
-
-    impl<R> ChainComplex for TestChainComplex<R> 
-    where R: Ring, for<'x> &'x R: RingOps<R> { 
-        fn d_degree(&self) -> isize {
-            self.d_degree
-        }
-
-        fn d_matrix(&self, k: isize) -> CsMat<R> {
-            if self.in_range(k) { 
-                let k = k as usize;
-                self.d_matrices[k].clone()
-            } else {
-                let m = self[k + self.d_degree].rank();
-                let n = self[k].rank();
-                CsMat::zero((m, n))
-            }
-        }
-    }
+    pub type TestChainComplex<R> = GenericChainComplex<R, Rev<RangeInclusive<isize>>>;    
 
     impl<R> TestChainComplex<R>
     where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> {
         pub fn zero() -> Self {
-            Self::new(-1, vec![])
+            Self::descending(vec![])
         }
-    
+    }
+
+    impl<R> TestChainComplex<R>
+    where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> {
+        fn descending_i32(d_matrices: Vec<CsMat<i32>>) -> Self {
+            let d_matrices = d_matrices.into_iter().map(|d| 
+                d.map(|&a| R::from(a))
+            ).collect();
+            Self::descending(d_matrices)
+        }
+
         pub fn d3() -> Self {
-            Self::new(
-                -1,
+            Self::descending_i32(
                 vec![
                     CsMat::csc_from_vec((4, 6), vec![-1, -1, 0, -1, 0, 0, 1, 0, -1, 0, -1, 0, 0, 1, 1, 0, 0, -1, 0, 0, 0, 1, 1, 1]),
                     CsMat::csc_from_vec((6, 4), vec![1, 1, 0, 0, -1, 0, 1, 0, 1, 0, 0, 1, 0, -1, -1, 0, 0, 1, 0, -1, 0, 0, 1, 1] ),
@@ -225,8 +271,7 @@ pub mod tests {
         }
     
         pub fn s2() -> Self {
-            Self::new(
-                -1,
+            Self::descending_i32(
                 vec![
                     CsMat::csc_from_vec((4, 6), vec![-1, -1, 0, -1, 0, 0, 1, 0, -1, 0, -1, 0, 0, 1, 1, 0, 0, -1, 0, 0, 0, 1, 1, 1]),
                     CsMat::csc_from_vec((6, 4), vec![1, 1, 0, 0, -1, 0, 1, 0, 1, 0, 0, 1, 0, -1, -1, 0, 0, 1, 0, -1, 0, 0, 1, 1] )
@@ -235,8 +280,7 @@ pub mod tests {
         }
     
         pub fn t2() -> Self {
-            Self::new(
-                -1,
+            Self::descending_i32(
                 vec![
                     CsMat::csc_from_vec((9, 27), vec![-1, -1, 0, -1, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1, 1, 0, -1, 0, 0, 0, 0, 0, 0, -1, -1, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, -1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, -1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, -1, 0, 1, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0, 1, -1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, -1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1, 1]),
                     CsMat::csc_from_vec((27, 18), vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1])
@@ -245,8 +289,7 @@ pub mod tests {
         }
     
         pub fn rp2() -> Self { 
-            Self::new(
-                -1,
+            Self::descending_i32(
                 vec![
                     CsMat::csc_from_vec((6, 15), vec![-1, -1, 0, 0, 0, 0, 0, -1, -1, 0, -1, 0, 0, 0, 0, 1, 0, -1, -1, 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 1, 1, 0, 1, 1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 1, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1] ),
                     CsMat::csc_from_vec((15, 10), vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, -1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, -1] ),

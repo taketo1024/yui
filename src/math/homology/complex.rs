@@ -18,7 +18,7 @@ where
 
 pub trait ChainComplexValidation: ChainComplex
 where 
-    Self::R: Ring + CsMatElem, for<'x> &'x Self::R: RingOps<Self::R>,
+    Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>,
     Self::Output: RModStr<R = Self::R>
 {
     fn is_cycle(&self, k: Self::Index, z: &CsVec<Self::R>) -> bool { 
@@ -44,7 +44,7 @@ where
 
 impl<R, C> ChainComplexValidation for C
 where 
-    R: Ring + CsMatElem, for<'x> &'x R: RingOps<R>,
+    R: Ring, for<'x> &'x R: RingOps<R>,
     C: ChainComplex<R = R>,
     C::Output: RModStr<R = R>
 {}

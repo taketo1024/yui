@@ -6,9 +6,8 @@ use is_even::IsEven;
 use num_traits::{Zero, One};
 use super::sign::Sign;
 
-// Set Elements
 pub trait MathElem: 
-    Debug + Display + Clone + PartialEq + Eq + Hash
+    Clone + Default + Send + Sync + PartialEq + Eq + Hash + Debug + Display
 {
     fn symbol() -> String;
 }
@@ -105,7 +104,7 @@ pub trait RingMethods:
 }
 
 pub trait Ring: 
-    AddGrp + Mon + RingOps<Self> + RingMethods + One 
+    AddGrp + Mon + RingOps<Self> + RingMethods + One + sprs::MulAcc
 where
     for<'a> &'a Self: RingOps<Self>
 {}

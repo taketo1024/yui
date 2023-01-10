@@ -19,7 +19,7 @@ where
 
 impl<R, C> HomologyComputable<GenericRModStr<R>> for C
 where 
-    R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R>,
+    R: EucRing, for<'x> &'x R: EucRingOps<R>,
     C: ChainComplex<R = R>,
     C::Output: RModStr<R = R>
 { 
@@ -144,7 +144,7 @@ where
 // ≅ Rᶠ ⊕ (Rᵇ / Im(s₁))
 
 pub fn compute_homology<R>(d1: &CsMat<R>, d2: &CsMat<R>, with_trans: bool) -> (usize, Vec<R>)
-where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> {
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     assert_eq!(d2.cols(), d1.rows());
     debug_assert!((d2 * d1).is_zero());
 

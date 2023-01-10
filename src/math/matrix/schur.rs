@@ -1,12 +1,11 @@
 use sprs::{CsMat, CsVec};
 
 use crate::math::traits::{Ring, RingOps};
-use super::CsMatElem;
 use super::sparse::CsMatExt;
 use super::triang::inv_upper_tri;
 
 pub fn schur_partial_upper_triang<R>(a: CsMat<R>, r: usize) -> Schur<R>
-where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
+where R: Ring, for<'x> &'x R: RingOps<R> {
     assert!(a.is_csc());
 
     let [u, b, c, d] = a.divide4(r, r);
@@ -23,7 +22,7 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
 // [-ca⁻¹ id] [c d] [      id]   [   s]
 
 pub struct Schur<R>
-where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
+where R: Ring, for<'x> &'x R: RingOps<R> {
     ainv: CsMat<R>,
     b: CsMat<R>,
     c: CsMat<R>,
@@ -31,7 +30,7 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
 }
 
 impl<R> Schur<R>
-where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
+where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(ainv: CsMat<R>, b: CsMat<R>, c: CsMat<R>, d: CsMat<R>) -> Self {
         assert_eq!(ainv.rows(), b.rows());
         assert_eq!(c.rows(), d.rows());

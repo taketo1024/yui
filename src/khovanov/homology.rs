@@ -5,7 +5,6 @@ use crate::utils::misc::{Idx2, Idx2Range};
 use crate::math::homology::base::{GradedRModStr, GenericRModStr};
 use crate::math::homology::homology::{Homology, GenericHomology};
 use crate::math::homology::reduce::Reduced;
-use crate::math::matrix::CsMatElem;
 use crate::math::traits::{EucRing, EucRingOps, Ring, RingOps};
 use crate::links::Link;
 use super::complex::{KhComplex, KhComplexBigraded};
@@ -16,7 +15,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 impl<R> KhHomology<R> 
-where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> {
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn new(l: &Link) -> Self {
         Self::new_ht(l, R::zero(), R::zero())
     }
@@ -28,7 +27,7 @@ where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> {
 }
 
 impl<R> From<KhComplex<R>> for KhHomology<R>
-where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> {
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     fn from(c: KhComplex<R>) -> Self {
         let reduced = Reduced::from(c);
         let homology = GenericHomology::from(reduced);
@@ -76,7 +75,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 impl<R> KhHomologyBigraded<R>
-where R: EucRing + CsMatElem, for<'x> &'x R: EucRingOps<R> {
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn new(l: &Link) -> Self {
         let c = KhComplexBigraded::new(l);
         let reduced = Reduced::from(c);

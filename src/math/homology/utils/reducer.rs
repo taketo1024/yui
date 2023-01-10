@@ -1,5 +1,4 @@
 use sprs::{CsMat, PermView, CsVec};
-use crate::math::matrix::CsMatElem;
 use crate::math::matrix::sparse::{CsMatExt, CsVecExt};
 use crate::math::matrix::pivot::{perms_by_pivots, find_pivots_upto};
 use crate::math::matrix::schur::schur_partial_upper_triang;
@@ -11,7 +10,7 @@ use crate::math::traits::{Ring, RingOps};
 //             v1         v2
 
 pub struct ChainReducer<R>
-where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> { 
+where R: Ring, for<'x> &'x R: RingOps<R> { 
     a0: CsMat<R>, // prev
     a1: CsMat<R>, // target
     a2: CsMat<R>, // next
@@ -21,7 +20,7 @@ where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> {
 }
 
 impl<R> ChainReducer<R>
-where R: Ring + CsMatElem, for<'x> &'x R: RingOps<R> { 
+where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn reduce(a0: CsMat<R>, a1: CsMat<R>, a2: CsMat<R>)
         -> (CsMat<R>, CsMat<R>, CsMat<R>)
     {

@@ -4,12 +4,6 @@ use num_traits::{Zero, One};
 use rand::Rng;
 use sprs::{CsMatBase, SpIndex, TriMat, CsMat, PermView, CsVec};
 
-pub trait CsMatElem: Clone + Default + Send + Sync + sprs::MulAcc {}
-
-impl<T> CsMatElem for T
-    where Self: Clone + Default + Send + Sync + sprs::MulAcc 
-{}
-
 pub trait CsMatExt<R> { 
     fn csc_from_vec(shape: (usize, usize), data: Vec<R>) -> CsMat<R>;
     fn rand(shape: (usize, usize), density: f64) -> CsMat<R>;

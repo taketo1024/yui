@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::ops::Index;
 use sprs::CsMat;
 use crate::math::traits::{Ring, RingOps};
-use crate::math::matrix::CsMatElem;
 use super::base::{GradedRModStr, RModStr, RModGrid, GenericRModStr};
 use super::complex::ChainComplex;
 use super::utils::reducer::ChainReducer;
@@ -21,7 +20,7 @@ where
 impl<C> From<C> for Reduced<C>
 where 
     C: ChainComplex,
-    C::R: Ring + CsMatElem, for<'x> &'x C::R: RingOps<C::R>,
+    C::R: Ring, for<'x> &'x C::R: RingOps<C::R>,
     C::Output: RModStr<R = C::R>
 {
     fn from(c: C) -> Self {

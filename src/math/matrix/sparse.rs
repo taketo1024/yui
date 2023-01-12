@@ -1,10 +1,11 @@
-use std::ops::{Deref, Add, Range};
+use std::{ops::{Deref, Add, Range}, iter::zip};
 
 use num_traits::{Zero, One};
 use rand::Rng;
 use sprs::{CsMatBase, SpIndex, TriMat, CsMat, PermView, CsVec};
 
 pub trait CsMatExt<R> { 
+    fn id(n: usize) -> CsMat<R>;
     fn csc_from_vec(shape: (usize, usize), data: Vec<R>) -> CsMat<R>;
     fn rand(shape: (usize, usize), density: f64) -> CsMat<R>;
     fn is_zero_shape(&self) -> bool;
@@ -13,7 +14,8 @@ pub trait CsMatExt<R> {
     fn permute_rows(&self, p: PermView) -> CsMat<R>;
     fn permute_cols(&self, q: PermView) -> CsMat<R>;
     fn submatrix(&self, rows: Range<usize>, cols: Range<usize>) -> CsMat<R>;
-    fn divide4(self, i0: usize, j0: usize) -> [CsMat<R>; 4];
+    fn divide4(&self, i0: usize, j0: usize) -> [CsMat<R>; 4];
+    fn combine4(blocks: [&CsMat<R>; 4]) -> CsMat<R>;
 }
 
 impl<R, I, IptrStorage, IndStorage, DataStorage, Iptr> CsMatExt<R> for CsMatBase<R, I, IptrStorage, IndStorage, DataStorage, Iptr>
@@ -25,6 +27,13 @@ where
     IndStorage: Deref<Target = [I]>,
     DataStorage: Deref<Target = [R]>,
 {
+    fn id(n: usize) -> CsMat<R> { 
+        let indptr = (0..=n).collect();
+        let indices = (0..n).collect();
+        let data = vec![R::one(); n];
+        CsMat::new_csc((n, n), indptr, indices, data)
+    }
+
     fn csc_from_vec(shape: (usize, usize), data: Vec<R>) -> CsMat<R> {
         let (m, n) = shape;
         assert!(m * n >= data.len());
@@ -106,7 +115,7 @@ where
         trip.to_csc()
     }
 
-    fn divide4(self, k: usize, l: usize) -> [CsMat<R>; 4] {
+    fn divide4(&self, k: usize, l: usize) -> [CsMat<R>; 4] {
         let (m, n) = self.shape();
         assert!(k <= m);
         assert!(l <= n);
@@ -129,6 +138,28 @@ where
         }
 
         [trip1.to_csc(), trip2.to_csc(), trip3.to_csc(), trip4.to_csc()]
+    }
+
+    fn combine4(blocks: [&CsMat<R>; 4]) -> CsMat<R> {
+        let [a, b, c, d] = blocks;
+
+        assert_eq!(a.rows(), b.rows());
+        assert_eq!(c.rows(), d.rows());
+        assert_eq!(a.cols(), c.cols());
+        assert_eq!(b.cols(), d.cols());
+
+        let (m, n) = (a.rows() + c.rows(), a.cols() + b.cols());
+        let (k, l) = a.shape();
+
+        let mut trip = TriMat::<R>::new((m, n));
+
+        for (x, (di, dj)) in zip([a,b,c,d], [(0,0),(0,l),(k,0),(k,l)]) { 
+            for (r, (i, j)) in x.into_iter() {
+                trip.add_triplet(i + di, j + dj, r.clone());
+            }
+        }
+
+        trip.to_csc()
     }
 }
 
@@ -216,7 +247,74 @@ where R: Clone + Zero {
 mod tests {
     use sprs::PermOwned;
     use super::*;
- 
+
+    #[test]
+    fn divide4() { 
+        let a = CsMat::csc_from_vec((6, 9), vec![
+            1, 0, 1, 0, 0, 1, 1, 0, 1,
+            0, 1, 1, 1, 0, 1, 0, 2, 0,
+            0, 0, 1, 1, 0, 0, 0, 1, 1,
+            0, 1, 1, 0, 3, 0, 0, 0, 0,
+            0, 1, 0, 1, 0, 0, 1, 0, 1,
+            1, 0, 1, 0, 1, 1, 0, 1, 1
+        ]);
+
+        let [p,q,r,s] = a.divide4(3, 5);
+        assert_eq!(p, CsMat::csc_from_vec((3, 5), vec![
+            1, 0, 1, 0, 0,
+            0, 1, 1, 1, 0,
+            0, 0, 1, 1, 0,
+        ]));
+        assert_eq!(q, CsMat::csc_from_vec((3, 4), vec![
+            1, 1, 0, 1,
+            1, 0, 2, 0,
+            0, 0, 1, 1,
+        ]));
+        assert_eq!(r, CsMat::csc_from_vec((3, 5), vec![
+            0, 1, 1, 0, 3,
+            0, 1, 0, 1, 0,
+            1, 0, 1, 0, 1,
+        ]));
+        assert_eq!(s, CsMat::csc_from_vec((3, 4), vec![
+            0, 0, 0, 0,
+            0, 1, 0, 1,
+            1, 0, 1, 1,
+        ]));
+    }
+
+    #[test]
+    fn combine4() { 
+        let p = CsMat::csc_from_vec((3, 5), vec![
+            1, 0, 1, 0, 0,
+            0, 1, 1, 1, 0,
+            0, 0, 1, 1, 0,
+        ]);
+        let q = CsMat::csc_from_vec((3, 4), vec![
+            1, 1, 0, 1,
+            1, 0, 2, 0,
+            0, 0, 1, 1,
+        ]);
+        let r = CsMat::csc_from_vec((3, 5), vec![
+            0, 1, 1, 0, 3,
+            0, 1, 0, 1, 0,
+            1, 0, 1, 0, 1,
+        ]);
+        let s = CsMat::csc_from_vec((3, 4), vec![
+            0, 0, 0, 0,
+            0, 1, 0, 1,
+            1, 0, 1, 1,
+        ]);
+
+        assert_eq!(CsMat::combine4([&p,&q,&r,&s]), CsMat::csc_from_vec((6, 9), vec![
+            1, 0, 1, 0, 0, 1, 1, 0, 1,
+            0, 1, 1, 1, 0, 1, 0, 2, 0,
+            0, 0, 1, 1, 0, 0, 0, 1, 1,
+            0, 1, 1, 0, 3, 0, 0, 0, 0,
+            0, 1, 0, 1, 0, 0, 1, 0, 1,
+            1, 0, 1, 0, 1, 1, 0, 1, 1
+        ]));
+    }
+
     #[test]
     fn permute_vec() { 
         let p = PermOwned::new(vec![1,3,0,2]);

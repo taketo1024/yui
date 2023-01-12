@@ -6,20 +6,10 @@ use is_even::IsEven;
 use num_traits::{Zero, One};
 use super::sign::Sign;
 
-pub trait MathElem: 
-    Clone + Default + Send + Sync + PartialEq + Eq + Hash + Debug + Display
+pub trait AlgBase: 
+    Default + PartialEq + Eq + Hash + Clone + Send + Sync + Display + Debug
 {
     fn symbol() -> String;
-}
-
-macro_rules! impl_math_elem {
-    ($type:ident, $symbol:literal) => {
-        impl MathElem for $type {
-            fn symbol() -> String {
-                String::from($symbol)
-            }
-        }
-    };
 }
 
 // Additive Monoids 
@@ -29,19 +19,11 @@ pub trait AddMonOps<T>:
 {}
 
 pub trait AddMon: 
-    MathElem + AddMonOps<Self> + AddAssign + Sum<Self> + Zero
+    AlgBase + AddMonOps<Self> + AddAssign + Sum<Self> + Zero
 where 
     for<'a> &'a Self: AddMonOps<Self>,
     for<'a> Self: Sum<&'a Self>
 {}
-
-macro_rules! impl_add_mon {
-    ($type:ident) => {
-        impl AddMonOps<$type> for $type {}
-        impl<'a> AddMonOps<$type> for &'a $type {}
-        impl AddMon for $type {}
-    };
-}
 
 // Additive Groups 
 
@@ -50,24 +32,10 @@ pub trait AddGrpOps<T>:
 {}
 
 pub trait AddGrp: 
-    AddMon + AddGrpOps<Self> + SubAssign + From<Sign>
+    AddMon + AddGrpOps<Self> + SubAssign
 where 
     for<'a> &'a Self: AddGrpOps<Self>
 {}
-
-macro_rules! impl_add_grp {
-    ($type:ident) => {
-        impl_add_mon!($type);
-        impl AddGrpOps<$type> for $type {}
-        impl<'a> AddGrpOps<$type> for &'a $type {}
-        impl AddGrp for $type {}
-        impl From<Sign> for $type { 
-            fn from(e: Sign) -> Self {
-                if e.is_positive() { Self::one() } else { -Self::one() }
-            }
-        }
-    };
-}
 
 // Monoids (multiplicative)
 
@@ -76,19 +44,11 @@ pub trait MonOps<T>:
 {}
 
 pub trait Mon: 
-    MathElem + MonOps<Self> + MulAssign + Product<Self> + One
+    AlgBase + MonOps<Self> + MulAssign + Product<Self> + One
 where
     for<'a> &'a Self: MonOps<Self>,
     for<'a> Self: Product<&'a Self>
 {}
-
-macro_rules! impl_mon {
-    ($type:ident) => {
-        impl MonOps<$type> for $type {}
-        impl<'a> MonOps<$type> for &'a $type {}
-        impl Mon for $type {}
-    };
-}
 
 // Rings 
 pub trait RingOps<T>: 
@@ -104,45 +64,10 @@ pub trait RingMethods:
 }
 
 pub trait Ring: 
-    AddGrp + Mon + RingOps<Self> + RingMethods + One + sprs::MulAcc
+    AddGrp + Mon + RingOps<Self> + RingMethods + One + From<Sign> + sprs::MulAcc
 where
     for<'a> &'a Self: RingOps<Self>
 {}
-
-macro_rules! impl_ring {
-    ($type:ident) => {
-        impl_add_grp!($type);
-        impl_mon!($type);
-        impl RingOps<$type> for $type {}
-        impl<'a> RingOps<$type> for &'a $type {}
-        impl Ring for $type {}
-    };
-}
-
-macro_rules! impl_ring_methods_integer {
-    ($type:ident) => {
-        impl RingMethods for $type {
-            #[inline]
-            fn inv(&self) -> Option<Self> {
-                if self.is_unit() { 
-                    Some(self.clone())
-                } else { 
-                    None
-                }
-            }
-
-            #[inline]
-            fn is_unit(&self) -> bool {
-                self == &1 || self == &-1
-            }
-
-            #[inline]
-            fn normalizing_unit(&self) -> Self {
-                if self >= &0 { 1 } else { -1 } 
-            }
-        }
-    };
-}
 
 // Euclidean Rings
 pub trait EucRingOps<T>: 
@@ -200,20 +125,64 @@ where
     }
 }
 
-macro_rules! impl_euc_ring {
-    ($type:ident) => {
-        impl_ring!($type);
-        impl EucRingOps<$type> for $type {}
-        impl<'a> EucRingOps<$type> for &'a $type {}
-        impl EucRing for $type {}
-    };
-}
+// Integers
 
 macro_rules! impl_euc_ring_integer {
     ($type:ident) => {
-        impl_math_elem!($type, "Z");
-        impl_ring_methods_integer!($type);
-        impl_euc_ring!($type);
+        impl AlgBase for $type {
+            fn symbol() -> String {
+                String::from("Z")
+            }
+        }
+
+        impl AddMonOps<$type> for $type {}
+        impl<'a> AddMonOps<$type> for &'a $type {}
+        impl AddMon for $type {}
+
+        impl AddGrpOps<$type> for $type {}
+        impl<'a> AddGrpOps<$type> for &'a $type {}
+        impl AddGrp for $type {}
+
+        impl MonOps<$type> for $type {}
+        impl<'a> MonOps<$type> for &'a $type {}
+        impl Mon for $type {}
+
+        impl RingOps<$type> for $type {}
+        impl<'a> RingOps<$type> for &'a $type {}
+
+        impl RingMethods for $type {
+            #[inline]
+            fn inv(&self) -> Option<Self> {
+                if self.is_unit() { 
+                    Some(self.clone())
+                } else { 
+                    None
+                }
+            }
+
+            #[inline]
+            fn is_unit(&self) -> bool {
+                self == &1 || self == &-1
+            }
+
+            #[inline]
+            fn normalizing_unit(&self) -> Self {
+                if self >= &0 { 1 } else { -1 } 
+            }
+        }
+
+        impl From<Sign> for $type { 
+            #[inline]
+            fn from(e: Sign) -> Self {
+                if e.is_positive() { 1 } else { -1 }
+            }
+        }
+
+        impl Ring for $type {}
+
+        impl EucRingOps<$type> for $type {}
+        impl<'a> EucRingOps<$type> for &'a $type {}
+        impl EucRing for $type {}
     }
 }
 
@@ -225,10 +194,7 @@ impl_euc_ring_integer!(i64);
 pub trait PowMod2<Rhs> 
 where Self: One, Rhs: IsEven {
     fn pow_mod2(self, rhs: Rhs) -> Self { 
-        match rhs.is_even() {
-            true  => Self::one(),
-            false => self
-        }
+        if rhs.is_even() { Self::one() } else { self }
     }
 }
 

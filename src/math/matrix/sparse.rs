@@ -134,10 +134,13 @@ where
 
 pub trait CsVecExt<R> { 
     fn from_vec(data: Vec<R>) -> CsVec<R>;
+    fn permute(&self, p: PermView) -> CsVec<R>;
+    fn subvec(&self, range: Range<usize>) -> CsVec<R>;
+    fn divide2(self, r: usize) -> (CsVec<R>, CsVec<R>);
 }
 
 impl<R> CsVecExt<R> for CsVec<R> 
-where R: Zero {
+where R: Clone + Zero {
     fn from_vec(data: Vec<R>) -> CsVec<R> {
         let n = data.len();
         let (indices, data): (Vec<usize>, Vec<R>) = data
@@ -148,5 +151,92 @@ where R: Zero {
             ).unzip();
         
         Self::new(n, indices, data)
+    }
+
+    fn permute(&self, p: PermView) -> CsVec<R> { 
+        let n = self.dim();
+        let mut ind = vec![];
+        let mut val = vec![];
+
+        for (i, a) in self.iter() { 
+            ind.push(p.at(i.index()));
+            val.push(a.clone());
+        }
+
+        CsVec::new_from_unsorted(n, ind, val).ok().unwrap()
+    }
+
+    fn subvec(&self, range: Range<usize>) -> CsVec<R> {
+        let (i0, i1) = (range.start, range.end);
+        assert!(i0 <= i1 && i1 <= self.dim());
+
+        let mut ind = vec![];
+        let mut val = vec![];
+
+        for (i, a) in self.iter() {
+            let i = i.index();
+            if !a.is_zero() && range.contains(&i) {
+                ind.push(i - i0);
+                val.push(a.clone());
+            }
+        }
+
+        CsVec::new(i1 - i0, ind, val)
+    }
+
+    fn divide2(self, r: usize) -> (CsVec<R>, CsVec<R>) { 
+        let n = self.dim();
+        assert!(r <= n);
+
+        let mut ind1: Vec<usize> = vec![];
+        let mut val1: Vec<R> = vec![];
+
+        let mut ind2: Vec<usize> = vec![];
+        let mut val2: Vec<R> = vec![];
+
+        for (i, a) in self.iter() {
+            let i = i.index();
+            if i < r { 
+                ind1.push(i);
+                val1.push(a.clone());
+            } else { 
+                ind2.push(i - r);
+                val2.push(a.clone());
+            }
+        }
+
+        let v1 = CsVec::new(r, ind1, val1);
+        let v2 = CsVec::new(n -r, ind2, val2);
+        
+        (v1, v2)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use sprs::PermOwned;
+    use super::*;
+ 
+    #[test]
+    fn permute_vec() { 
+        let p = PermOwned::new(vec![1,3,0,2]);
+        let v = CsVec::new(4, vec![0,1,2,3], vec![0,1,2,3]);
+        let w = v.permute(p.view());
+        assert_eq!(w, CsVec::new(4, vec![0,1,2,3], vec![2,0,3,1]))
+    }
+
+    #[test]
+    fn subvec() {
+        let v = CsVec::new(10, (0..10).collect(), (0..10).collect());
+        let w = v.subvec(3..7);
+        assert_eq!(w, CsVec::new(4, vec![0,1,2,3], vec![3,4,5,6]))
+    }
+
+    #[test]
+    fn divide2_vec() {
+        let v = CsVec::new(10, (0..10).collect(), (0..10).collect());
+        let (v1, v2) = v.divide2(3);
+        assert_eq!(v1, CsVec::new(3, vec![0,1,2], vec![0,1,2]));
+        assert_eq!(v2, CsVec::new(7, vec![0,1,2,3,4,5,6], vec![3,4,5,6,7,8,9]));
     }
 }

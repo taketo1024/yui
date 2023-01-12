@@ -1,5 +1,6 @@
-use sprs::CsMat;
+use sprs::{CsMat, CsVec};
 
+use crate::math::matrix::sparse::CsVecExt;
 use crate::math::traits::{Ring, RingOps};
 use super::sparse::CsMatExt;
 use super::triang::inv_upper_tri;
@@ -32,16 +33,39 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> Schur<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(ainv: CsMat<R>, b: CsMat<R>, c: CsMat<R>, d: CsMat<R>) -> Self {
-        assert_eq!(ainv.rows(), b.rows());
-        assert_eq!(c.rows(), d.rows());
-        assert_eq!(ainv.cols(), c.cols());
-        assert_eq!(b.cols(), d.cols());
+        let (r, m, n) = (ainv.rows(), c.rows(), b.cols());
+        assert_eq!(ainv.cols(), r);
+        assert_eq!(b.rows(), r);
+        assert_eq!(c.cols(), r);
+        assert_eq!(d.rows(), m);
+        assert_eq!(d.cols(), n);
+
         Self { ainv, b, c, d }
+    }
+
+    pub fn rows(&self) -> usize {
+        self.ainv.rows() + self.c.rows()
+    }
+
+    pub fn cols(&self) -> usize {
+        self.ainv.cols() + self.b.cols()
     }
 
     pub fn complement(&self) -> CsMat<R> {
         let (ainv, b, c, d) = self.blocks();
         d - &( &(c * ainv) * b)
+    }
+
+    // returns: [-ca⁻¹ id][v1] = v2 - ca⁻¹v1
+    //                    [v2] 
+    pub fn trans_vec(&self, v: CsVec<R>) -> CsVec<R> { 
+        assert_eq!(v.dim(), self.rows());
+        
+        let (ainv, _, c, _) = self.blocks();
+        let r = self.ainv.rows();
+        let (v1, v2) = v.divide2(r);
+
+        &v2 - &(c * &(ainv * &v1))
     }
 
     fn blocks(&self) -> (&CsMat<R>, &CsMat<R>, &CsMat<R>, &CsMat<R>) {
@@ -54,7 +78,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn _schur_compl_block() {
+    fn schur_compl_block() {
         let ainv = CsMat::csc_from_vec((2, 2), vec![2,-5,-1,3]);
         let b = CsMat::csc_from_vec((2, 3), vec![1,2,3,4,5,6]);
         let c = CsMat::csc_from_vec((3, 2), vec![1,0,1,2,3,7]);
@@ -65,7 +89,7 @@ mod tests {
     }
 
     #[test]
-    fn _schur_compl() {
+    fn schur_compl() {
         let a = CsMat::csc_from_vec((5, 6), vec![
             1, 2, 3, 4, 5, 6,
             0,-1, 2, 2, 3, 2,
@@ -76,5 +100,21 @@ mod tests {
 
         let s = schur_partial_upper_triang(a, 3);
         assert_eq!(s.complement(), CsMat::csc_from_vec((2,3), vec![5,12,-14,36,45,-60]));
+    }
+
+    #[test]
+    fn trans_vec() {
+        let a = CsMat::csc_from_vec((5, 6), vec![
+            1, 2, 3, 4, 5, 6,
+            0,-1, 2, 2, 3, 2,
+            0, 0, 1, 4, 5,-3,
+            1, 2, 0,-3, 2, 1,
+            3, 2, 3, 0, 2, 8
+        ]);
+
+        let s = schur_partial_upper_triang(a, 3);
+        let v = CsVec::new(5, (0..5).collect(), (0..5).collect());
+        let w = s.trans_vec(v);
+        assert_eq!(w, CsVec::new(2, vec![0,1], vec![9, 28]));
     }
 }

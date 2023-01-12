@@ -1,13 +1,21 @@
 use sprs::{CsMat, PermView, CsVec};
-use crate::math::matrix::sparse::CsMatExt;
+use crate::math::matrix::sparse::{CsMatExt, CsVecExt};
 use crate::math::matrix::pivot::{perms_by_pivots, find_pivots_upto};
 use crate::math::matrix::schur::schur_partial_upper_triang;
 use crate::math::traits::{Ring, RingOps};
 
-//       a0         a1         a2 
-// C[0] ----> C[1] ----> C[2] ----> C[3]
-//             ::         ::
-//             v1         v2
+//          [x]          [a b]
+//          [y]          [c d]         [z  w] 
+//  C[0] --------> C[1] -------> C[2] -------> C[3]
+//    |    [1 a⁻¹b] |             | [a⁻¹    ]    |
+//    |    [    1 ] |             | [-ca⁻¹ 1]    |
+//    |             V             V              |    
+//  C[0] --------> C[1] -------> C[2] -------> C[3]
+//    |     [0]     |    [1 0]    |    [0  w]    |
+//    |     [y]     |    [0 s]    |              |
+//    |             V             V              |
+//  C[0] --------> C[1]'-------> C[2]'-------> C[3]
+//          [y]           [s]           [w]
 
 pub struct ChainReducer<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
@@ -57,6 +65,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         const MAX_PIVOTS: usize = 300_000;
 
         let (a0, a1, a2) = (&self.a0, &self.a1, &self.a2);
+        let (_m, n) = a1.shape();
+
         let pivs = find_pivots_upto(a1, MAX_PIVOTS);
         let r = pivs.len();
     
@@ -74,7 +84,22 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         self.set_matrices(b0, b1, b2);
 
-        // TODO modify vectors
+        if !self.v1.is_empty() {
+            let v1 = self.v1.iter().map(|v| {
+                v.permute(q.view()).subvec(r..n)
+            }).collect();
+
+            self.v1 = v1;
+        }
+
+        if !self.v2.is_empty() {
+            let v2 = self.v2.iter().map(|v| {
+                let v = v.permute(p.view());
+                sch.trans_vec(v)
+            }).collect();
+            
+            self.v2 = v2;
+        }
 
         self.step += 1;
         

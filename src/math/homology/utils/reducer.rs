@@ -1,5 +1,5 @@
 use sprs::{CsMat, PermView, CsVec};
-use crate::math::matrix::sparse::{CsMatExt, CsVecExt};
+use crate::math::matrix::sparse::CsMatExt;
 use crate::math::matrix::pivot::{perms_by_pivots, find_pivots_upto};
 use crate::math::matrix::schur::schur_partial_upper_triang;
 use crate::math::traits::{Ring, RingOps};

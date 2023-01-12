@@ -1,4 +1,4 @@
-use sprs::{CsMat, CsVec};
+use sprs::CsMat;
 
 use crate::math::traits::{Ring, RingOps};
 use super::sparse::CsMatExt;

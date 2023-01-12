@@ -11,7 +11,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     let [u, b, c, d] = a.divide4(r, r);
     let uinv = inv_upper_tri(&u);
-    let s = Schur::new(uinv, b, c, d);
+    let s = Schur::new(u, uinv, b, c, d);
 
     s
 }
@@ -24,6 +24,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 pub struct Schur<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
+    a: CsMat<R>,
     ainv: CsMat<R>,
     b: CsMat<R>,
     c: CsMat<R>,
@@ -32,27 +33,28 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> Schur<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new(ainv: CsMat<R>, b: CsMat<R>, c: CsMat<R>, d: CsMat<R>) -> Self {
-        let (r, m, n) = (ainv.rows(), c.rows(), b.cols());
-        assert_eq!(ainv.cols(), r);
+    pub fn new(a: CsMat<R>, ainv: CsMat<R>, b: CsMat<R>, c: CsMat<R>, d: CsMat<R>) -> Self {
+        let (r, m, n) = (a.rows(), c.rows(), b.cols());
+        assert_eq!(a.shape(), ainv.shape());
+        assert_eq!(a.cols(), r);
         assert_eq!(b.rows(), r);
         assert_eq!(c.cols(), r);
         assert_eq!(d.rows(), m);
         assert_eq!(d.cols(), n);
 
-        Self { ainv, b, c, d }
+        Self { a, ainv, b, c, d }
     }
 
     pub fn rows(&self) -> usize {
-        self.ainv.rows() + self.c.rows()
+        self.a.rows() + self.c.rows()
     }
 
     pub fn cols(&self) -> usize {
-        self.ainv.cols() + self.b.cols()
+        self.a.cols() + self.b.cols()
     }
 
     pub fn complement(&self) -> CsMat<R> {
-        let (ainv, b, c, d) = self.blocks();
+        let (ainv, b, c, d) = (&self.ainv, &self.b, &self.c, &self.d);
         d - &( &(c * ainv) * b)
     }
 
@@ -61,15 +63,79 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn trans_vec(&self, v: CsVec<R>) -> CsVec<R> { 
         assert_eq!(v.dim(), self.rows());
         
-        let (ainv, _, c, _) = self.blocks();
+        let (ainv, c) = (&self.ainv, &self.c);
         let r = self.ainv.rows();
         let (v1, v2) = v.divide2(r);
 
         &v2 - &(c * &(ainv * &v1))
     }
 
-    fn blocks(&self) -> (&CsMat<R>, &CsMat<R>, &CsMat<R>, &CsMat<R>) {
-        (&self.ainv, &self.b, &self.c, &self.d)
+    // p = [a⁻¹     ]
+    //     [-ca⁻¹ id]
+    pub fn p(&self) -> CsMat<R> { 
+        let (r, m) = (self.ainv.rows(), self.rows());
+        let (ainv, c) = (&self.ainv, &self.c);
+
+        let zero = |shape| CsMat::<R>::zero(shape);
+        let id = |n| CsMat::<R>::id(n);
+
+        CsMat::combine4([
+            ainv, 
+            &zero((r, m - r)), 
+            &( &zero((m - r, r)) - &(c * ainv) ), // MEMO: unary - not supported.
+            &id(m - r)
+        ])
+    }
+
+    // p⁻¹ = [a    ]
+    //       [c  id]
+    pub fn pinv(&self) -> CsMat<R> { 
+        let (r, m) = (self.a.rows(), self.rows());
+        let (a, c) = (&self.a, &self.c);
+
+        let zero = |shape| CsMat::<R>::zero(shape);
+        let id = |n| CsMat::<R>::id(n);
+
+        CsMat::combine4([
+            a, 
+            &zero((r, m - r)), 
+            c,
+            &id(m - r)
+        ])
+    }
+
+    // q = [id -a⁻¹b]
+    //     [      id]
+    pub fn q(&self) -> CsMat<R> { 
+        let (r, n) = (self.a.rows(), self.cols());
+        let (ainv, b) = (&self.ainv, &self.b);
+
+        let zero = |shape| CsMat::<R>::zero(shape);
+        let id = |n| CsMat::<R>::id(n);
+
+        CsMat::combine4([
+            &id(r), 
+            &( &zero((r, n - r)) - &(ainv * b) ), // MEMO: unary - not supported., 
+            &zero((n - r, r)),
+            &id(n - r)
+        ])
+    }
+
+    // q⁻¹ = [id a⁻¹b]
+    //       [     id]
+    pub fn qinv(&self) -> CsMat<R> { 
+        let (r, n) = (self.a.rows(), self.cols());
+        let (ainv, b) = (&self.ainv, &self.b);
+
+        let zero = |shape| CsMat::<R>::zero(shape);
+        let id = |n| CsMat::<R>::id(n);
+
+        CsMat::combine4([
+            &id(r), 
+            &(ainv * b),
+            &zero((n - r, r)),
+            &id(n - r)
+        ])
     }
 }
 
@@ -79,13 +145,51 @@ mod tests {
 
     #[test]
     fn schur_compl_block() {
+        let x = CsMat::csc_from_vec((5,5), vec![
+            3,5,1,2,3,
+            1,2,4,5,6,
+            1,0,9,8,2,
+            1,2,5,3,1,
+            3,7,3,4,7
+        ]);
+        let [a,b,c,d] = x.divide4(2,2);
         let ainv = CsMat::csc_from_vec((2, 2), vec![2,-5,-1,3]);
-        let b = CsMat::csc_from_vec((2, 3), vec![1,2,3,4,5,6]);
-        let c = CsMat::csc_from_vec((3, 2), vec![1,0,1,2,3,7]);
-        let d = CsMat::csc_from_vec((3, 3), vec![9,8,2,5,3,1,3,4,7]);
 
-        let s = Schur::new(ainv, b, c, d);
-        assert_eq!(s.complement(), CsMat::csc_from_vec((3,3), vec![27,29,26,1,-2,-5,-20,-24,-26]));
+        let s = Schur::new(a, ainv, b, c, d);
+        assert_eq!(
+            s.complement().to_dense(), 
+            CsMat::csc_from_vec((3,3), vec![27,29,26,1,-2,-5,-20,-24,-26]).to_dense()
+        );
+    }
+
+    #[test]
+    fn trans_mats() {
+        let x = CsMat::csc_from_vec((5,5), vec![
+            3,5,1,2,3,
+            1,2,4,5,6,
+            1,0,9,8,2,
+            1,2,5,3,1,
+            3,7,3,4,7
+        ]);
+        let [a,b,c,d] = x.divide4(2,2);
+        let ainv = CsMat::csc_from_vec((2, 2), vec![2,-5,-1,3]);
+
+        let s = Schur::new(a, ainv, b, c, d);
+
+        let id = |n| CsMat::<i32>::id(n);
+        let (p, pinv) = (s.p(), s.pinv());
+        let (q, qinv) = (s.q(), s.qinv());
+
+        assert_eq!((&p * &pinv).to_dense(), id(5).to_dense());
+        assert_eq!((&q * &qinv).to_dense(), id(5).to_dense());
+
+        let y = &(&p * &x) * &q;
+        let [e,f,g,h] = y.divide4(2,2);
+
+        assert_eq!(e.to_dense(), id(2).to_dense());
+        assert!(f.is_zero());
+        assert!(g.is_zero());
+        assert_eq!(h.to_dense(), s.complement().to_dense());
     }
 
     #[test]
@@ -97,9 +201,24 @@ mod tests {
             1, 2, 0,-3, 2, 1,
             3, 2, 3, 0, 2, 8
         ]);
+        let s = schur_partial_upper_triang(a.clone(), 3);
 
-        let s = schur_partial_upper_triang(a, 3);
         assert_eq!(s.complement(), CsMat::csc_from_vec((2,3), vec![5,12,-14,36,45,-60]));
+
+        let id = |n| CsMat::<i32>::id(n);
+        let (p, pinv) = (s.p(), s.pinv());
+        let (q, qinv) = (s.q(), s.qinv());
+
+        assert_eq!((&p * &pinv).to_dense(), id(5).to_dense());
+        assert_eq!((&q * &qinv).to_dense(), id(6).to_dense());
+
+        let y = &(&p * &a) * &q;
+        let [e,f,g,h] = y.divide4(3,3);
+
+        assert_eq!(e.to_dense(), id(3).to_dense());
+        assert!(f.is_zero());
+        assert!(g.is_zero());
+        assert_eq!(h.to_dense(), s.complement().to_dense());
     }
 
     #[test]

@@ -16,6 +16,8 @@ pub trait CsMatExt<R> {
     fn submatrix(&self, rows: Range<usize>, cols: Range<usize>) -> CsMat<R>;
     fn divide4(&self, i0: usize, j0: usize) -> [CsMat<R>; 4];
     fn combine4(blocks: [&CsMat<R>; 4]) -> CsMat<R>;
+    fn concat(a: &CsMat<R>, b: &CsMat<R>) -> CsMat<R>;
+    fn stack(a: &CsMat<R>, b: &CsMat<R>) -> CsMat<R>;
 }
 
 impl<R, I, IptrStorage, IndStorage, DataStorage, Iptr> CsMatExt<R> for CsMatBase<R, I, IptrStorage, IndStorage, DataStorage, Iptr>
@@ -161,6 +163,23 @@ where
 
         trip.to_csc()
     }
+
+    fn concat(a: &CsMat<R>, b: &CsMat<R>) -> CsMat<R> {
+        let zero = |m, n| CsMat::<R>::zero((m, n));
+        Self::combine4([
+            a, b, 
+            &zero(0, a.cols()), &zero(0, b.cols())
+        ])
+    }
+
+    fn stack(a: &CsMat<R>, b: &CsMat<R>) -> CsMat<R> {
+        let zero = |m, n| CsMat::<R>::zero((m, n));
+        Self::combine4([
+            a, &zero(a.rows(), 0), 
+            b, &zero(b.rows(), 0)
+        ])
+    }
+
 }
 
 pub trait CsVecExt<R> { 

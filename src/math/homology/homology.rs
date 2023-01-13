@@ -1,12 +1,10 @@
 use std::fmt::Display;
 use std::ops::Index;
-use sprs::CsMat;
 
 use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps};
-use crate::math::matrix::{snf_in_place, DnsMat};
-use crate::math::matrix::sparse::*;
 use super::base::{GradedRModStr, RModStr, GenericRModStr, RModGrid, AdditiveIndex, AdditiveIndexRange};
 use super::complex::ChainComplex;
+use super::utils::homology_calc::HomologyCalc;
 
 pub trait HomologyComputable<S>: ChainComplex
 where 
@@ -26,7 +24,8 @@ where
     fn homology_at(&self, k: C::Index) -> GenericRModStr<Self::R> {
         let d1 = self.d_matrix(k - self.d_degree());
         let d2 = self.d_matrix(k);
-        let (rank, tors) = compute_homology(&d1, &d2, false);
+        let res = HomologyCalc::calculate(d1, d2, false);
+        let (rank, tors) = res.into();
         GenericRModStr::new(rank, tors)
     }
 }
@@ -127,57 +126,6 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.fmt_default(f)
     }
-}
-
-//       d₁            d₂
-// Rⁿ¹---------> Rᵐ²--------> Rᵖ
-// |             | P₁         | 
-// |             V            V
-// |             *  --------> * ⊕ ..
-// |             ⊕ 
-// |             Rᶠ \ 
-// V      s₁     ⊕   | Z
-// *  ---------> Rᵇ /
-// ⊕
-// :
-// H = Ker(d₂) / Im(d₁)
-// ≅ Rᶠ ⊕ (Rᵇ / Im(s₁))
-
-pub fn compute_homology<R>(d1: &CsMat<R>, d2: &CsMat<R>, with_trans: bool) -> (usize, Vec<R>)
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    assert_eq!(d2.cols(), d1.rows());
-    debug_assert!((d2 * d1).is_zero());
-
-    if d1.rows() == 0 { 
-        return (0, vec![])
-    }
-
-    let d1_dns = DnsMat::from(d1);
-    let s1 = snf_in_place(d1_dns, [with_trans, true, false, false]);
-    let r1 = s1.rank();
-    let p1_inv = s1.pinv().unwrap().to_sparse();
-
-    let n2 = d2.cols();
-    let d2_dns = if r1 > 0 { 
-        let t2 = p1_inv.slice_outer(r1..n2);
-        DnsMat::from(&(d2 * &t2))
-    } else {
-        DnsMat::from(d2)
-    };
-
-    let s2 = snf_in_place(d2_dns, [false, false, false, with_trans]);
-    let r2 = s2.rank();
-
-    let rank = n2 - r1 - r2;
-    let tors = s1.factors().into_iter().filter_map(|a| {
-        if !a.is_unit() {
-            Some(a.clone())
-        } else {
-            None
-        }
-    }).collect();
-
-    (rank, tors)
 }
 
 #[cfg(test)]

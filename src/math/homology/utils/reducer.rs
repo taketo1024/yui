@@ -1,7 +1,7 @@
-use sprs::{CsMat, PermView, CsVec};
+use sprs::{CsMat, CsVec, PermOwned};
 use crate::math::matrix::sparse::{CsMatExt, CsVecExt};
 use crate::math::matrix::pivot::{perms_by_pivots, find_pivots_upto};
-use crate::math::matrix::schur::schur_partial_upper_triang;
+use crate::math::matrix::schur::{schur_partial_upper_triang, Schur};
 use crate::math::traits::{Ring, RingOps};
 
 //          [x]          [a b]
@@ -45,75 +45,96 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn new(a0: CsMat<R>, a1: CsMat<R>, a2: CsMat<R>, v1: Vec<CsVec<R>>, v2: Vec<CsVec<R>>) -> Self {
-        assert_eq!(a0.rows(), a1.cols());
-        assert_eq!(a1.rows(), a2.cols());
-        assert!(v1.iter().all(|v| v.dim() == a1.cols()));
-        assert!(v2.iter().all(|v| v.dim() == a2.cols()));
-        let step = 0;
-        Self { a0, a1, a2, v1, v2, step }
+        let (m, n) = a1.shape();
+
+        assert_eq!(a0.rows(), n);
+        assert_eq!(a2.cols(), m);
+        assert!(v1.iter().all(|v| v.dim() == n));
+        assert!(v2.iter().all(|v| v.dim() == m));
+
+        Self { a0, a1, a2, v1, v2, step: 0 }
     }
 
     fn result(self) -> (CsMat<R>, CsMat<R>, CsMat<R>, Vec<CsVec<R>>, Vec<CsVec<R>>) {
         (self.a0, self.a1, self.a2, self.v1, self.v2)
     }
 
-    fn set_matrices(&mut self, a0: CsMat<R>, a1: CsMat<R>, a2: CsMat<R>) { 
-        (self.a0, self.a1, self.a2) = (a0, a1, a2)
-    } 
-
     fn process(&mut self) -> bool { 
-        const MAX_PIVOTS: usize = 300_000;
+        let (p, q, r) = self.piv_perms();
 
-        let (a0, a1, a2) = (&self.a0, &self.a1, &self.a2);
-        let (_m, n) = a1.shape();
-
-        let pivs = find_pivots_upto(a1, MAX_PIVOTS);
-        let r = pivs.len();
-    
         if r == 0 { 
             return false
         }
     
-        let (p, q) = perms_by_pivots(a1, &pivs);
-        let b1 = a1.permute(p.view(), q.view());
-        let sch = schur_partial_upper_triang(b1, r);
-
-        let b1 = sch.complement();
-        let b0 = Self::reduce_rows(a0, q.view(), r);
-        let b2 = Self::reduce_cols(a2, p.view(), r);
-
-        self.set_matrices(b0, b1, b2);
-
-        if !self.v1.is_empty() {
-            let v1 = self.v1.iter().map(|v| {
-                v.permute(q.view()).subvec(r..n)
-            }).collect();
-
-            self.v1 = v1;
-        }
-
-        if !self.v2.is_empty() {
-            let v2 = self.v2.iter().map(|v| {
-                let v = v.permute(p.view());
-                sch.trans_vec(v)
-            }).collect();
-            
-            self.v2 = v2;
-        }
+        let s = self.schur(&p, &q, r);
+        self.reduce_matrices(&p, &q, r, &s);
+        self.reduce_vecs(&p, &q, r, &s);
 
         self.step += 1;
         
         true
     }
 
-    fn reduce_rows(a: &CsMat<R>, p: PermView, r: usize) -> CsMat<R> {
+    fn piv_perms(&self) -> (PermOwned, PermOwned, usize) {
+        const MAX_PIVOTS: usize = 300_000;
+
+        let a1 = &self.a1;
+        let pivs = find_pivots_upto(a1, MAX_PIVOTS);
+        let (p, q) = perms_by_pivots(a1, &pivs);
+        let r = pivs.len();
+
+        (p, q, r)
+    }
+
+    fn schur(&self, p: &PermOwned, q: &PermOwned, r: usize) -> Schur<R> {
+        let a1 = &self.a1;
+        let b1 = a1.permute(p.view(), q.view());
+        schur_partial_upper_triang(b1, r)
+    }
+
+    fn reduce_matrices(&mut self, p: &PermOwned, q: &PermOwned, r: usize, s: &Schur<R>) {
+        let (a0, a2) = (&self.a0, &self.a2);
+
+        self.a0 = Self::reduce_rows(a0, q, r);
+        self.a1 = s.complement();
+        self.a2 = Self::reduce_cols(a2, p, r);
+    }
+
+    fn reduce_rows(a: &CsMat<R>, p: &PermOwned, r: usize) -> CsMat<R> {
         let (m, n) = a.shape();
         a.permute_rows(p.view()).submatrix(r..m, 0..n)
     }
 
-    fn reduce_cols(a: &CsMat<R>, p: PermView, r: usize) -> CsMat<R> {
+    fn reduce_cols(a: &CsMat<R>, p: &PermOwned, r: usize) -> CsMat<R> {
         let (m, n) = a.shape();
         a.permute_cols(p.view()).submatrix(0..m, r..n)
+    }
+
+    fn reduce_vecs(&mut self, p: &PermOwned, q: &PermOwned, r: usize, s: &Schur<R>) {
+        self.reduce_v1(q, r);
+        self.reduce_v2(p, s);
+    }
+
+    fn reduce_v1(&mut self, q: &PermOwned, r: usize) {
+        if self.v1.is_empty() { return }
+
+        let n = self.a1.cols();
+        let v1 = self.v1.iter().map(|v| {
+            v.permute(q.view()).subvec(r..n)
+        }).collect();
+
+        self.v1 = v1;
+    }
+
+    fn reduce_v2(&mut self, p: &PermOwned, s: &Schur<R>) {
+        if self.v2.is_empty() { return }
+
+        let v2 = self.v2.iter().map(|v| {
+            let v = v.permute(p.view());
+            s.trans_vec(v)
+        }).collect();
+        
+        self.v2 = v2;
     }
 }
 

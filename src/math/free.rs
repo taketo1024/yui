@@ -35,6 +35,18 @@ where
         let data = self.data.into_iter().filter(|(_, r)| !r.is_zero()).collect();
         Self::new(data)
     }
+
+    pub fn map_coeffs<F>(&self, f: F) -> Self 
+    where F: Fn(&R) -> R { 
+        let data = self.data.iter().map(|(x, r)| (x.clone(), f(r))).collect();
+        Self::new(data)
+    }
+
+    pub fn map_coeffs_into<F>(self, f: F) -> Self 
+    where F: Fn(R) -> R { 
+        let data = self.data.into_iter().map(|(x, r)| (x, f(r))).collect();
+        Self::new(data)
+    }
 }
 
 impl<X, R> From<Vec<(X, R)>> for LinComb<X, R>
@@ -126,20 +138,48 @@ where
     }
 }
 
+impl<X, R> AddAssign<(X, R)> for LinComb<X, R>
+where
+    X: FreeGenerator,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{
+    fn add_assign(&mut self, rhs: (X, R)) {
+        let data = &mut self.data;
+        let (x, r) = rhs;
+        if data.contains_key(&x) { 
+            let v = data.get_mut(&x).unwrap();
+            v.add_assign(r);
+        } else { 
+            data.insert(x, r);
+        }
+    }
+}
+
+impl<'a, X, R> AddAssign<(&'a X, &'a R)> for LinComb<X, R>
+where
+    X: FreeGenerator,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{
+    fn add_assign(&mut self, rhs: (&'a X, &'a R)) {
+        let data = &mut self.data;
+        let (x, r) = rhs;
+        if data.contains_key(x) { 
+            let v = data.get_mut(x).unwrap();
+            v.add_assign(r);
+        } else { 
+            data.insert(x.clone(), r.clone());
+        }
+    }
+}
+
 impl<X, R> AddAssign for LinComb<X, R>
 where
     X: FreeGenerator,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn add_assign(&mut self, rhs: Self) {
-        let data = &mut self.data;
-        for (x, r) in rhs.data.into_iter() { 
-            if data.contains_key(&x) { 
-                let v = data.get_mut(&x).unwrap();
-                *v += r;
-            } else { 
-                data.insert(x, r);
-            }
+        for e in rhs.data.into_iter() { 
+            self.add_assign(e);
         }
     }
 }
@@ -150,14 +190,8 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn add_assign(&mut self, rhs: &'a Self) {
-        let data = &mut self.data;
-        for (x, r) in rhs.data.iter() { 
-            if data.contains_key(&x) { 
-                let v = data.get_mut(&x).unwrap();
-                *v += r;
-            } else { 
-                data.insert(x.clone(), r.clone());
-            }
+        for e in rhs.data.iter() { 
+            self.add_assign(e);
         }
     }
 }
@@ -216,7 +250,7 @@ where
     type Output = Self;
 
     fn neg(self) -> Self::Output {
-        todo!()
+        self.map_coeffs_into(|r| -r)
     }
 }
 
@@ -228,7 +262,7 @@ where
     type Output = LinComb<X, R>;
 
     fn neg(self) -> Self::Output {
-        todo!()
+        self.map_coeffs(|r| -r)
     }
 }
 
@@ -240,7 +274,9 @@ where
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        todo!()
+        let mut res = self;
+        res -= rhs;
+        res
     }
 }
 
@@ -252,7 +288,45 @@ where
     type Output = LinComb<X, R>;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        todo!()
+        let mut res = self.clone();
+        res -= rhs;
+        res
+    }
+}
+
+impl<X, R> SubAssign<(X, R)> for LinComb<X, R>
+where
+    X: FreeGenerator,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{
+    fn sub_assign(&mut self, rhs: (X, R)) {
+        let data = &mut self.data;
+        let (x, r) = rhs;
+
+        if data.contains_key(&x) { 
+            let v = data.get_mut(&x).unwrap();
+            *v -= r;
+        } else { 
+            data.insert(x, -r);
+        }
+    }
+}
+
+impl<'a, X, R> SubAssign<(&'a X, &'a R)> for LinComb<X, R>
+where
+    X: FreeGenerator,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{
+    fn sub_assign(&mut self, rhs: (&'a X, &'a R)) {
+        let data = &mut self.data;
+        let (x, r) = rhs;
+
+        if data.contains_key(x) { 
+            let v = data.get_mut(x).unwrap();
+            v.sub_assign(r);
+        } else { 
+            data.insert(x.clone(), -r);
+        }
     }
 }
 
@@ -262,7 +336,9 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn sub_assign(&mut self, rhs: Self) {
-        todo!()
+        for e in rhs.data.into_iter() { 
+            self.sub_assign(e);
+        }
     }
 }
 
@@ -272,7 +348,9 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn sub_assign(&mut self, rhs: &'a Self) {
-        todo!()
+        for e in rhs.data.iter() { 
+            self.sub_assign(e);
+        }
     }
 }
 
@@ -318,18 +396,6 @@ where
     }
 }
 
-impl<X, R> RModOps<R, R, Self> for LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{}
-
-impl<'a, X, R> RModOps<R, &'a R, LinComb<X, R>> for &'a LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{}
-
 impl<X, R> MulAssign<R> for LinComb<X, R>
 where
     X: FreeGenerator,
@@ -349,6 +415,18 @@ where
         todo!()
     }
 }
+
+impl<X, R> RModOps<R, R, Self> for LinComb<X, R>
+where
+    X: FreeGenerator,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{}
+
+impl<'a, X, R> RModOps<R, &'a R, LinComb<X, R>> for &'a LinComb<X, R>
+where
+    X: FreeGenerator,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{}
 
 impl<X, R> RMod for LinComb<X, R>
 where
@@ -482,6 +560,60 @@ mod tests {
         let w: L = [&z1, &z2, &z3].into_iter().sum();
 
         assert_eq!(w, L::new(hashmap!{ X(1) => 1, X(2) => 22, X(3) => 330, X(4) => 400 }));
+    }
+
+    #[test]
+    fn neg() {
+        type L = LinComb<X, i32>;
+        let z = L::new(hashmap!{ X(1) => 1, X(2) => 2 });
+        assert_eq!(-z, L::new(hashmap!{ X(1) => -1, X(2) => -2 }));
+    }
+
+    #[test]
+    fn neg_ref() {
+        type L = LinComb<X, i32>;
+        let z = L::new(hashmap!{ X(1) => 1, X(2) => 2 });
+        assert_eq!(-(&z), L::new(hashmap!{ X(1) => -1, X(2) => -2 }));
+    }
+
+    #[test]
+    fn sub() {
+        type L = LinComb<X, i32>;
+        let z1 = L::new(hashmap!{ X(1) => 1, X(2) => 2 });
+        let z2 = L::new(hashmap!{ X(2) => 20, X(3) => 30 });
+        let w = z1 - z2;
+
+        assert_eq!(w, L::new(hashmap!{ X(1) => 1, X(2) => -18, X(3) => -30 }));
+    }
+
+    #[test]
+    fn sub_ref() {
+        type L = LinComb<X, i32>;
+        let z1 = L::new(hashmap!{ X(1) => 1, X(2) => 2 });
+        let z2 = L::new(hashmap!{ X(2) => 20, X(3) => 30 });
+        let w = &z1 - &z2;
+
+        assert_eq!(w, L::new(hashmap!{ X(1) => 1, X(2) => -18, X(3) => -30 }));
+    }
+
+    #[test]
+    fn sub_assign() {
+        type L = LinComb<X, i32>;
+        let mut z1 = L::new(hashmap!{ X(1) => 1, X(2) => 2 });
+        let z2 = L::new(hashmap!{ X(2) => 20, X(3) => 30 });
+        z1 -= z2;
+
+        assert_eq!(z1, L::new(hashmap!{ X(1) => 1, X(2) => -18, X(3) => -30 }));
+    }
+
+    #[test]
+    fn sub_assign_ref() {
+        type L = LinComb<X, i32>;
+        let mut z1 = L::new(hashmap!{ X(1) => 1, X(2) => 2 });
+        let z2 = L::new(hashmap!{ X(2) => 20, X(3) => 30 });
+        z1 -= &z2;
+
+        assert_eq!(z1, L::new(hashmap!{ X(1) => 1, X(2) => -18, X(3) => -30 }));
     }
 
 }

@@ -1,14 +1,10 @@
 use std::fmt::Display;
-use std::hash::Hash;
 use std::collections::HashMap;
 use sprs::{CsVec, CsMat, TriMat};
+use crate::math::free::FreeGenerator;
 use crate::utils::collections::hashmap;
 use crate::math::traits::{Ring, RingOps};
 use super::base::RModStr;
-
-pub trait FreeGenerator: Clone + PartialEq + Eq + Hash {}
-impl<T> FreeGenerator for T 
-where T: Clone + PartialEq + Eq + Hash {}
 
 pub struct FreeRModStr<R, X>
 where 

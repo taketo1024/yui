@@ -4,7 +4,8 @@ use std::ops::RangeInclusive;
 use itertools::{Itertools, join};
 use num_traits::Pow;
 use crate::links::links::{Link, State, Component, Resolution};
-use crate::math::traits::{Ring, RingOps, PowMod2};
+use crate::math::free::FreeGenerator;
+use crate::math::traits::{Ring, RingOps, PowMod2, Symbol};
 use crate::math::sign::Sign;
 use crate::utils::format::subscript;
 use super::algebra::{KhAlgGen, KhAlgStr};
@@ -28,6 +29,12 @@ impl KhEnhState {
     }
 }
 
+impl Symbol for KhEnhState { 
+    fn symbol() -> String { 
+        String::from("KhEnhState")
+    }
+}
+
 impl Display for KhEnhState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let label = join(self.label.iter(), "");
@@ -35,6 +42,8 @@ impl Display for KhEnhState {
         write!(f, "{}{}", label, state)
     }
 }
+
+impl FreeGenerator for KhEnhState {}
 
 #[derive(Debug)]
 pub struct KhCubeVertex { 

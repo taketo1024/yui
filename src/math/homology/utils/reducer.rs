@@ -118,8 +118,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn reduce_v1(&mut self, q: &PermOwned, r: usize) {
         if self.v1.is_empty() { return }
 
-        let n = self.a1.cols();
         let v1 = self.v1.iter().map(|v| {
+            let n = v.dim();
             v.permute(q.view()).subvec(r..n)
         }).collect();
 
@@ -138,3 +138,121 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use sprs::CsVec;
+
+    use crate::math::{homology::complex::{tests::TestChainComplex, ChainComplex}, matrix::sparse::{CsVecExt, CsMatExt}};
+
+    use super::ChainReducer;
+
+    #[test]
+    fn s2_2nd() {
+        let c = TestChainComplex::<i32>::s2();
+        let d3 = c.d_matrix(3); // zero
+        let d2 = c.d_matrix(2);
+        let d1 = c.d_matrix(1);
+
+        let v = CsVec::from_vec(vec![-1, 1, -1, 1]);
+
+        let (d3, d2, d1, v_red, _) = ChainReducer::reduce_with(d3, d2, d1, vec![v], vec![]);
+
+        assert_eq!((&d2 * &d3).is_zero(), true);
+        assert_eq!((&d1 * &d2).is_zero(), true);
+
+        assert_eq!(v_red.len(), 1);
+        assert_eq!(v_red[0].is_zero(), false);
+        assert_eq!((&d2 * &v_red[0]).is_zero(), true);
+    }
+
+    #[test]
+    fn t2_2nd() {
+        let c = TestChainComplex::<i32>::t2();
+        let d3 = c.d_matrix(3); // zero
+        let d2 = c.d_matrix(2);
+        let d1 = c.d_matrix(1);
+
+        let v = CsVec::from_vec(vec![1,1,-1,1,-1,-1,1,-1,1,-1,-1,1,1,-1,1,-1,-1,1]);
+
+        let (d3, d2, d1, v_red, _) = ChainReducer::reduce_with(d3, d2, d1, vec![v], vec![]);
+
+        assert_eq!((&d2 * &d3).is_zero(), true);
+        assert_eq!((&d1 * &d2).is_zero(), true);
+        
+        assert_eq!(v_red.len(), 1);
+        assert_eq!(v_red[0].is_zero(), false);
+        assert_eq!((&d2 * &v_red[0]).is_zero(), true);
+    }
+
+    #[test]
+    fn t2_1st_right() {
+        let c = TestChainComplex::<i32>::t2();
+        let d3 = c.d_matrix(3);
+        let d2 = c.d_matrix(2);
+        let d1 = c.d_matrix(1);
+
+        let v = CsVec::from_vec(vec![0,0,0,0,0,0,0,0,0,1,-1,0,0,0,0,0,0,0,0,-1,0,0,1,-1,1,0,0]);
+        let w = CsVec::from_vec(vec![0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0,1,0,-1,0,0,0,-1,1]);
+
+        let (d3, d2, d1, _, v_red) = ChainReducer::reduce_with(d3, d2, d1, vec![], vec![v, w]);
+
+        assert_eq!((&d2 * &d3).is_zero(), true);
+        assert_eq!((&d1 * &d2).is_zero(), true);
+        
+        assert_eq!(v_red.len(), 2);
+        for i in 0..2 { 
+            assert_eq!(v_red[i].is_zero(), false);
+            assert_eq!((&d1 * &v_red[i]).is_zero(), true);
+        }
+    }
+
+    #[test]
+    fn t2_1st_left() {
+        let c = TestChainComplex::<i32>::t2();
+        let d2 = c.d_matrix(2);
+        let d1 = c.d_matrix(1);
+        let d0 = c.d_matrix(0);
+
+        let v = CsVec::from_vec(vec![0,0,0,0,0,0,0,0,0,1,-1,0,0,0,0,0,0,0,0,-1,0,0,1,-1,1,0,0]);
+        let w = CsVec::from_vec(vec![0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0,1,0,-1,0,0,0,-1,1]);
+
+        let (d2, d1, d0, v_red, _) = ChainReducer::reduce_with(d2, d1, d0, vec![v, w], vec![]);
+
+        assert_eq!((&d1 * &d2).is_zero(), true);
+        assert_eq!((&d0 * &d1).is_zero(), true);
+        
+        assert_eq!(v_red.len(), 2);
+        for i in 0..2 { 
+            assert_eq!(v_red[i].is_zero(), false);
+            assert_eq!((&d1 * &v_red[i]).is_zero(), true);
+        }
+
+        dbg!(v_red);
+    }
+
+    #[test]
+    fn t2_1st_both() {
+        let c = TestChainComplex::<i32>::t2();
+        let d3 = c.d_matrix(3); // zero
+        let d2 = c.d_matrix(2);
+        let d1 = c.d_matrix(1);
+        let d0 = c.d_matrix(0);
+
+        let v = CsVec::from_vec(vec![0,0,0,0,0,0,0,0,0,1,-1,0,0,0,0,0,0,0,0,-1,0,0,1,-1,1,0,0]);
+        let w = CsVec::from_vec(vec![0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0,1,0,-1,0,0,0,-1,1]);
+
+        let (d3, d2, d1, _, v_red) = ChainReducer::reduce_with(d3, d2, d1, vec![], vec![v, w]);
+        let (d2, d1, d0, v_red, _) = ChainReducer::reduce_with(d2, d1, d0, v_red, vec![]);
+
+        assert_eq!((&d2 * &d3).is_zero(), true);
+        assert_eq!((&d1 * &d2).is_zero(), true);
+        assert_eq!((&d0 * &d1).is_zero(), true);
+        
+        assert_eq!(v_red.len(), 2);
+
+        for i in 0..2 { 
+            assert_eq!(v_red[i].is_zero(), false);
+            assert_eq!((&d1 * &v_red[i]).is_zero(), true);
+        }
+    }
+}

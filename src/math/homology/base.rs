@@ -4,7 +4,7 @@ use std::fmt::Display;
 use std::ops::{Add, Sub, Index, Neg};
 use itertools::Itertools;
 
-use crate::math::traits::{AlgBase, Ring, RingOps};
+use crate::math::traits::{Symbol, Ring, RingOps};
 use crate::utils::format::superscript;
 use crate::utils::misc::Idx2;
 
@@ -59,7 +59,7 @@ where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
             res.push(str);
         }
     
-        for (t, r) in tors.iter().counter(|&t| t) { 
+        for (t, r) in tors.iter().counter(|&t| t.to_string()) { 
             let str = if r > 1 { 
                 format!("({}/{}){}", symbol, t, superscript(r as isize))
             } else { 

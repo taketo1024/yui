@@ -1,16 +1,17 @@
 use std::fmt::{Debug, Display};
 use std::ops::{Add, Neg, Sub, Mul, Rem, Div, AddAssign, SubAssign, MulAssign, RemAssign, DivAssign};
-use std::hash::Hash;
 use std::iter::{Sum, Product};
 use is_even::IsEven;
 use num_traits::{Zero, One};
 use super::sign::Sign;
 
-pub trait AlgBase: 
-    Default + PartialEq + Eq + Hash + Clone + Send + Sync + Display + Debug
-{
+pub trait Symbol { 
     fn symbol() -> String;
 }
+
+pub trait AlgBase: 
+    Default + PartialEq + Eq + Clone + Send + Sync + Display + Debug + Symbol
+{}
 
 // Additive Monoids 
 
@@ -22,6 +23,7 @@ pub trait AddMon:
     AlgBase + AddMonOps<Self> + AddAssign + Sum<Self> + Zero
 where 
     for<'a> &'a Self: AddMonOps<Self>,
+    for<'a> Self: AddAssign<&'a Self>,
     for<'a> Self: Sum<&'a Self>
 {}
 
@@ -34,7 +36,8 @@ pub trait AddGrpOps<T>:
 pub trait AddGrp: 
     AddMon + AddGrpOps<Self> + SubAssign
 where 
-    for<'a> &'a Self: AddGrpOps<Self>
+    for<'a> &'a Self: AddGrpOps<Self>,
+    for<'a> Self: SubAssign<&'a Self>
 {}
 
 // Monoids (multiplicative)
@@ -47,6 +50,7 @@ pub trait Mon:
     AlgBase + MonOps<Self> + MulAssign + Product<Self> + One
 where
     for<'a> &'a Self: MonOps<Self>,
+    for<'a> Self: MulAssign<&'a Self>,
     for<'a> Self: Product<&'a Self>
 {}
 
@@ -77,7 +81,9 @@ pub trait EucRingOps<T>:
 pub trait EucRing: 
     Ring + EucRingOps<Self> + RemAssign + DivAssign
 where 
-    for<'a> &'a Self: EucRingOps<Self>
+    for<'a> &'a Self: EucRingOps<Self>,
+    for<'a> Self: RemAssign<&'a Self>,
+    for<'a> Self: DivAssign<&'a Self>
 {
     fn divides(&self, y: &Self) -> bool { 
         !self.is_zero() && (y % self).is_zero()
@@ -125,15 +131,30 @@ where
     }
 }
 
+pub trait RModOps<R, S, T>: AddGrpOps<T> + Mul<S, Output = T>
+where R: Ring, for<'x> &'x R: RingOps<R>, S: RingOps<R>
+{}
+
+pub trait RMod:
+    AddGrp + RModOps<Self::R, Self::R, Self> + MulAssign<Self::R>
+where 
+    Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>, 
+    for<'a> &'a Self: RModOps<Self::R, &'a Self::R, Self>,
+    for<'a> Self: MulAssign<&'a Self::R>
+{
+    type R;
+}
+
 // Integers
 
 macro_rules! impl_euc_ring_integer {
     ($type:ident) => {
-        impl AlgBase for $type {
+        impl Symbol for $type { 
             fn symbol() -> String {
                 String::from("Z")
             }
         }
+        impl AlgBase for $type {}
 
         impl AddMonOps<$type> for $type {}
         impl<'a> AddMonOps<$type> for &'a $type {}

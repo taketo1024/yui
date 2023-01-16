@@ -2,7 +2,7 @@ use std::{ops::{Deref, Add, Range}, iter::zip};
 
 use num_traits::{Zero, One};
 use rand::Rng;
-use sprs::{CsMatBase, SpIndex, TriMat, CsMat, PermView, CsVec};
+use sprs::{CsMatBase, SpIndex, TriMat, CsMat, PermView, CsVec, CsVecBase};
 
 pub trait CsMatExt<R> { 
     fn id(n: usize) -> CsMat<R>;
@@ -10,6 +10,8 @@ pub trait CsMatExt<R> {
     fn rand(shape: (usize, usize), density: f64) -> CsMat<R>;
     fn is_zero_shape(&self) -> bool;
     fn is_zero(&self) -> bool;
+    fn is_square(&self) -> bool;
+    fn is_id(&self) -> bool;
     fn permute(&self, p: PermView, q: PermView) -> CsMat<R>;
     fn permute_rows(&self, p: PermView) -> CsMat<R>;
     fn permute_cols(&self, q: PermView) -> CsMat<R>;
@@ -22,7 +24,7 @@ pub trait CsMatExt<R> {
 
 impl<R, I, IptrStorage, IndStorage, DataStorage, Iptr> CsMatExt<R> for CsMatBase<R, I, IptrStorage, IndStorage, DataStorage, Iptr>
 where
-    R: Clone + Zero + One + Add<Output = R>,
+    R: Clone + Zero + One + Add<Output = R> + PartialEq,
     I: SpIndex,
     Iptr: SpIndex,
     IptrStorage: Deref<Target = [Iptr]>,
@@ -74,6 +76,16 @@ where
     fn is_zero(&self) -> bool {
         self.is_zero_shape() || 
         self.data().iter().all(|a| a.is_zero())
+    }
+
+    fn is_square(&self) -> bool {
+        self.rows() == self.cols()
+    }
+
+    fn is_id(&self) -> bool {
+        self.is_square() && self.into_iter().all(|(a, (i, j))| 
+            (i == j && a.is_one()) || (i != j && a.is_zero())
+        )
     }
 
     fn permute(&self, p: PermView, q: PermView) -> CsMat<R> {
@@ -184,14 +196,19 @@ where
 
 pub trait CsVecExt<R> { 
     fn from_vec(data: Vec<R>) -> CsVec<R>;
+    fn is_zero(&self) -> bool;
     fn permute(&self, p: PermView) -> CsVec<R>;
     fn subvec(&self, range: Range<usize>) -> CsVec<R>;
     fn divide2(self, r: usize) -> (CsVec<R>, CsVec<R>);
 }
 
-impl<R> CsVecExt<R> for CsVec<R> 
-where R: Clone + Zero {
-    fn from_vec(data: Vec<R>) -> CsVec<R> {
+impl<IStorage, DStorage, R, I: SpIndex> CsVecExt<R> for CsVecBase<IStorage, DStorage, R, I>
+where
+    R: Clone + Zero,
+    IStorage: Deref<Target = [I]>,
+    DStorage: Deref<Target = [R]>
+{
+   fn from_vec(data: Vec<R>) -> CsVec<R> {
         let n = data.len();
         let (indices, data): (Vec<usize>, Vec<R>) = data
             .into_iter()
@@ -200,7 +217,11 @@ where R: Clone + Zero {
                 if a.is_zero() { None } else { Some((i, a)) }
             ).unzip();
         
-        Self::new(n, indices, data)
+        CsVec::new(n, indices, data)
+    }
+
+    fn is_zero(&self) -> bool {
+        self.data().iter().all(|a| a.is_zero())
     }
 
     fn permute(&self, p: PermView) -> CsVec<R> { 

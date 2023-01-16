@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::ops::Index;
 use sprs::CsMat;
 use crate::math::traits::{Ring, RingOps};
-use super::super::base::{GradedRModStr, RModStr, RModGrid, GenericRModStr};
-use super::super::complex::ChainComplex;
-use super::reducer::ChainReducer;
+use super::base::{GradedRModStr, RModStr, RModGrid, GenericRModStr};
+use super::complex::ChainComplex;
+use super::utils::reducer::ChainReducer;
 
 pub struct Reduced<C>
 where 
@@ -115,7 +115,7 @@ mod tests {
     use crate::math::matrix::sparse::CsMatExt;
 
     use super::*;
-    use super::super::super::complex::tests::*;
+    use super::super::complex::tests::*;
 
     #[test]
     fn cancel_pair() { 

@@ -132,7 +132,9 @@ where
 }
 
 pub trait RModOps<R, S, T>: AddGrpOps<T> + Mul<S, Output = T>
-where R: Ring, for<'x> &'x R: RingOps<R>, S: RingOps<R>
+where 
+    R: Ring, for<'x> &'x R: RingOps<R>, 
+    S: RingOps<R> // S = R or &'a R
 {}
 
 pub trait RMod:

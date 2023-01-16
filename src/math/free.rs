@@ -380,7 +380,7 @@ where
     type Output = Self;
 
     fn mul(self, rhs: R) -> Self::Output {
-        &self * &rhs
+        self.map_coeffs_into(|r| &r * &rhs)
     }
 }
 
@@ -392,7 +392,7 @@ where
     type Output = LinComb<X, R>;
 
     fn mul(self, rhs: &'a R) -> Self::Output {
-        todo!()
+        self.map_coeffs(|r| r * rhs)
     }
 }
 
@@ -402,7 +402,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn mul_assign(&mut self, rhs: R) {
-        self.mul_assign(&rhs)
+        self.mul_assign(&rhs);
     }
 }
 
@@ -412,7 +412,8 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn mul_assign(&mut self, rhs: &'a R) {
-        todo!()
+        let data = std::mem::replace(&mut self.data, HashMap::default());
+        self.data = data.into_iter().map(|(x, r)| (x, &r * rhs)).collect();
     }
 }
 
@@ -616,4 +617,43 @@ mod tests {
         assert_eq!(z1, L::new(hashmap!{ X(1) => 1, X(2) => -18, X(3) => -30 }));
     }
 
+    #[test]
+    fn mul() {
+        type L = LinComb<X, i32>;
+        let z = L::new(hashmap!{ X(1) => 1, X(2) => 2 });
+        let r = 2;
+        let w = z * r;
+
+        assert_eq!(w, L::new(hashmap!{ X(1) => 2, X(2) => 4 }));
+    }
+
+    #[test]
+    fn mul_ref() {
+        type L = LinComb<X, i32>;
+        let z = L::new(hashmap!{ X(1) => 1, X(2) => 2 });
+        let r = 2;
+        let w = &z * &r;
+
+        assert_eq!(w, L::new(hashmap!{ X(1) => 2, X(2) => 4 }));
+    }
+
+    #[test]
+    fn mul_assign() {
+        type L = LinComb<X, i32>;
+        let mut z = L::new(hashmap!{ X(1) => 1, X(2) => 2 });
+        let r = 2;
+        z *= r;
+
+        assert_eq!(z, L::new(hashmap!{ X(1) => 2, X(2) => 4 }));
+    }
+
+    #[test]
+    fn mul_assign_ref() {
+        type L = LinComb<X, i32>;
+        let mut z = L::new(hashmap!{ X(1) => 1, X(2) => 2 });
+        let r = 2;
+        z *= &r;
+
+        assert_eq!(z, L::new(hashmap!{ X(1) => 2, X(2) => 4 }));
+    }
 }

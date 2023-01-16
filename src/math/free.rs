@@ -5,6 +5,8 @@ use std::iter::Sum;
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, MulAssign};
 use num_traits::Zero;
 
+use crate::utils::collections::hashmap;
+
 use super::traits::{Symbol, AlgBase, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
 
 pub trait FreeGenerator: Clone + PartialEq + Eq + Hash + Display + Debug + Send + Sync + Symbol {}
@@ -23,28 +25,47 @@ where
     X: FreeGenerator,
     R: Ring, for<'x> &'x R: RingOps<R>
 { 
-    fn new(data: HashMap<X, R>) -> Self {
+    pub fn new(data: HashMap<X, R>) -> Self {
         Self { data }
     }
 
-    pub fn data(&self) -> &HashMap<X, R> {
-        &self.data
+    pub fn wrap(x: X) -> Self { 
+        Self::new(hashmap!{ x => R::one() })
+    }
+
+    pub fn unwrap(self) -> X { 
+        if self.data.len() == 1 {
+            if let Some((x, r)) = self.data.into_iter().next() {
+                if r.is_one() { 
+                    return x
+                }
+            }
+        } 
+        panic!()
+    }
+
+    pub fn iter(&self) -> std::collections::hash_map::Iter<'_, X, R> {
+        self.data.iter()
+    }
+
+    pub fn into_iter(self) -> std::collections::hash_map::IntoIter<X, R> {
+        self.data.into_iter()
     }
 
     pub fn drop_zeros(self) -> Self { 
-        let data = self.data.into_iter().filter(|(_, r)| !r.is_zero()).collect();
+        let data = self.into_iter().filter(|(_, r)| !r.is_zero()).collect();
         Self::new(data)
     }
 
     pub fn map_coeffs<F>(&self, f: F) -> Self 
     where F: Fn(&R) -> R { 
-        let data = self.data.iter().map(|(x, r)| (x.clone(), f(r))).collect();
+        let data = self.iter().map(|(x, r)| (x.clone(), f(r))).collect();
         Self::new(data)
     }
 
     pub fn map_coeffs_into<F>(self, f: F) -> Self 
     where F: Fn(R) -> R { 
-        let data = self.data.into_iter().map(|(x, r)| (x, f(r))).collect();
+        let data = self.into_iter().map(|(x, r)| (x, f(r))).collect();
         Self::new(data)
     }
 }

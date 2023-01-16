@@ -64,10 +64,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn d_matrix(&self, k: Self::Index) -> sprs::CsMat<Self::R> {
-        use crate::math::homology::free::make_matrix;
-        let source = self.grid[k].generators();
-        let target = self.grid[k + 1].generators();
-        make_matrix(source, target, |x| self.cube.differentiate(x))
+        let c1 = &self.grid[k];
+        let c2 = &self.grid[k + 1];
+        c1.make_matrix(c2, |x| self.cube.differentiate(x))
     }
 }
 
@@ -144,10 +143,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn d_matrix(&self, idx: Self::Index) -> sprs::CsMat<Self::R> {
-        use crate::math::homology::free::make_matrix;
-        let source = self.grid[idx].generators();
-        let target = self.grid[idx + self.d_degree()].generators();
-        make_matrix(source, target, |x| self.cube.differentiate(x))
+        let c1 = &self[idx];
+        let c2 = &self[idx + self.d_degree()];
+        c1.make_matrix(c2, |x| self.cube.differentiate(x))
     }
 }
 

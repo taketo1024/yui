@@ -137,21 +137,147 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 #[cfg(test)]
 mod tests {
-    use crate::math::homology::complex::{tests::TestChainComplex, ChainComplex};
+    use crate::math::{homology::complex::{tests::TestChainComplex, ChainComplex}, matrix::sparse::{CsVecExt, CsMatExt}};
 
     use super::HomologyCalc;
  
     #[test]
-    fn trans_s2() {
+    fn trans_s2_0th() {
         let c = TestChainComplex::<i32>::s2();
-        let d3 = c.d_matrix(1); // zero
-        let d2 = c.d_matrix(0);
+        let d1 = c.d_matrix(1);
+        let d0 = c.d_matrix(0); // zero
 
-        let (r, tors, p, q) = HomologyCalc::calculate_with_trans(d3, d2);
+        let (r, tors, p, q) = HomologyCalc::calculate_with_trans(d1, d0.clone());
 
         assert_eq!(r, 1);
         assert_eq!(tors.len(), 0);
 
-        dbg!((&p * &q).to_dense());
+        assert!((&p * &q).is_id());
+
+        let v = q.outer_view(0).unwrap();
+        assert_eq!(v.is_zero(), false);
+    }
+
+    #[test]
+    fn trans_s2_1st() {
+        let c = TestChainComplex::<i32>::s2();
+        let d1 = c.d_matrix(2);
+        let d0 = c.d_matrix(1);
+
+        let (r, tors, p, q) = HomologyCalc::calculate_with_trans(d1, d0.clone());
+
+        assert_eq!(r, 0);
+        assert_eq!(tors.len(), 0);
+
+        assert!((&p * &q).is_id());
+    }
+
+    #[test]
+    fn trans_s2_2nd() {
+        let c = TestChainComplex::<i32>::s2();
+        let d3 = c.d_matrix(3); // zero
+        let d2 = c.d_matrix(2);
+
+        let (r, tors, p, q) = HomologyCalc::calculate_with_trans(d3, d2.clone());
+
+        assert_eq!(r, 1);
+        assert_eq!(tors.len(), 0);
+
+        assert!((&p * &q).is_id());
+
+        let v = q.outer_view(0).unwrap();
+        assert_eq!(v.is_zero(), false);
+        assert_eq!((&d2 * &v).is_zero(), true);
+    }
+
+    #[test]
+    fn trans_t2_0th() {
+        let c = TestChainComplex::<i32>::t2();
+        let d1 = c.d_matrix(1);
+        let d0 = c.d_matrix(0); // zero
+
+        let (r, tors, p, q) = HomologyCalc::calculate_with_trans(d1, d0.clone());
+
+        assert_eq!(r, 1);
+        assert_eq!(tors.len(), 0);
+
+        assert!((&p * &q).is_id());
+
+        let v = q.outer_view(0).unwrap();
+        assert_eq!(v.is_zero(), false);
+    }
+
+    #[test]
+    fn trans_t2_1st() {
+        let c = TestChainComplex::<i32>::t2();
+        let d2 = c.d_matrix(2);
+        let d1 = c.d_matrix(1);
+
+        let (r, tors, p, q) = HomologyCalc::calculate_with_trans(d2, d1.clone());
+
+        assert_eq!(r, 2);
+        assert_eq!(tors.len(), 0);
+
+        assert!((&p * &q).is_id());
+
+        for i in 0..2 { 
+            let v = q.outer_view(i).unwrap();
+            assert_eq!(v.is_zero(), false);
+            assert_eq!((&d1 * &v).is_zero(), true);
+        }
+    }
+
+    #[test]
+    fn trans_t2_2nd() {
+        let c = TestChainComplex::<i32>::t2();
+        let d3 = c.d_matrix(3); // zero
+        let d2 = c.d_matrix(2);
+
+        let (r, tors, p, q) = HomologyCalc::calculate_with_trans(d3, d2.clone());
+
+        assert_eq!(r, 1);
+        assert_eq!(tors.len(), 0);
+
+        assert!((&p * &q).is_id());
+
+        let v = q.outer_view(0).unwrap();
+        assert_eq!(v.is_zero(), false);
+        assert_eq!((&d2 * &v).is_zero(), true);
+    }
+
+
+    #[test]
+    fn trans_rp2_0th() {
+        let c = TestChainComplex::<i32>::rp2();
+        let d1 = c.d_matrix(1);
+        let d0 = c.d_matrix(0); // zero
+
+        let (r, tors, p, q) = HomologyCalc::calculate_with_trans(d1, d0.clone());
+
+        assert_eq!(r, 1);
+        assert_eq!(tors.len(), 0);
+
+        assert!((&p * &q).is_id());
+
+        let v = q.outer_view(0).unwrap();
+        assert_eq!(v.is_zero(), false);
+    }
+
+    #[test]
+    fn trans_rp2_1st() {
+        let c = TestChainComplex::<i32>::rp2();
+        let d2 = c.d_matrix(2);
+        let d1 = c.d_matrix(1);
+
+        let (r, tors, p, q) = HomologyCalc::calculate_with_trans(d2, d1.clone());
+
+        assert_eq!(r, 0);
+        assert_eq!(tors, vec![2]);
+
+        assert!((&p * &q).is_id());
+
+        let v = q.outer_view(0).unwrap();
+        assert_eq!(v.is_zero(), false);
+        assert_eq!((&d1 * &v).is_zero(), true);
     }
 }

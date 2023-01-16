@@ -24,7 +24,7 @@ where
     fn homology_at(&self, k: C::Index) -> GenericRModStr<Self::R> {
         let d1 = self.d_matrix(k - self.d_degree());
         let d2 = self.d_matrix(k);
-        let (rank, tors, _, _) = HomologyCalc::calculate(d1, d2, false);
+        let (rank, tors) = HomologyCalc::calculate(d1, d2);
         GenericRModStr::new(rank, tors)
     }
 }

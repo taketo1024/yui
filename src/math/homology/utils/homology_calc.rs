@@ -32,13 +32,30 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     //  H2 = Ker(d2) / Im(d1)
     //     ≅ C22' (free) ⊕ (C21 / Im(d1')) (tor)
 
-    pub fn calculate(d1: CsMat<R>, d2: CsMat<R>, with_trans: bool) -> HomologyCalcResult<R> {
+    pub fn calculate(d1: CsMat<R>, d2: CsMat<R>) -> (usize, Vec<R>) {
+        let (rank, tor, _) = Self::_calculate(d1, d2, false);
+        (rank, tor)
+    }
+
+    pub fn calculate_with_trans(d1: CsMat<R>, d2: CsMat<R>) -> (usize, Vec<R>, CsMat<R>, CsMat<R>) {
+        let (rank, tor, trans) = Self::_calculate(d1, d2, true);
+        let (p, q) = trans.unwrap();
+        (rank, tor, p, q)
+    }
+
+    fn _calculate(d1: CsMat<R>, d2: CsMat<R>, with_trans: bool) -> (usize, Vec<R>, Option<(CsMat<R>, CsMat<R>)>) {
         let c = Self::new(d1, d2, with_trans);
 
         let (s1, s2) = c.process();
-        let res = c.result(&s1, &s2);
+        let (rank, tors) = c.result(&s1, &s2);
 
-        res
+        let trans = if with_trans {
+            Some(c.trans(&s1, &s2))
+        } else {
+            None
+        };
+
+        (rank, tors, trans)
     }
 
     fn new(d1: CsMat<R>, d2: CsMat<R>, with_trans: bool) -> Self { 
@@ -69,10 +86,11 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         (s1, s2)
     }
 
-    fn result(&self, s1: &SnfResult<R>, s2: &SnfResult<R>) -> HomologyCalcResult<R> {
+    fn result(&self, s1: &SnfResult<R>, s2: &SnfResult<R>) -> (usize, Vec<R>) {
         let n = self.d2.cols();
         let (r1, r2) = (s1.rank(), s2.rank());
-        let r = n - r1 - r2;
+
+        let rank = n - r1 - r2;
 
         let tors = s1.factors().into_iter().filter_map(|a| {
             if !a.is_unit() {
@@ -82,20 +100,14 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
             }
         }).collect_vec();
 
-        let (p, q) = if self.with_trans { 
-            let t = tors.len();
-            let (p, q) = self.trans(s1, s2, r, t);
-            (Some(p), Some(q))
-        } else {
-            (None, None)
-        };
-
-        (r, tors, p, q)
+        (rank, tors)
     }
 
-    fn trans(&self, s1: &SnfResult<R>, s2: &SnfResult<R>, r: usize, t: usize) -> (CsMat<R>, CsMat<R>) {
+    fn trans(&self, s1: &SnfResult<R>, s2: &SnfResult<R>) -> (CsMat<R>, CsMat<R>) {
         let n = self.d2.cols();
         let (r1, r2) = (s1.rank(), s2.rank());
+        let r = n - r1 - r2;
+        let t = s1.factors().iter().filter(|a| !a.is_unit()).count();
 
         let p1 = s1.p().unwrap().to_sparse();       // size = (n, n)
         let p11 = p1.submatrix(r1..n, 0..n);        // size = (n - r1, n)
@@ -135,9 +147,7 @@ mod tests {
         let d3 = c.d_matrix(1); // zero
         let d2 = c.d_matrix(0);
 
-        let (r, tors, p, q) = HomologyCalc::calculate(d3, d2, true);
-        let p = p.unwrap();
-        let q = q.unwrap();
+        let (r, tors, p, q) = HomologyCalc::calculate_with_trans(d3, d2);
 
         assert_eq!(r, 1);
         assert_eq!(tors.len(), 0);

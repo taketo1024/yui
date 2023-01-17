@@ -108,13 +108,33 @@ impl Color {
 
 #[cfg(test)]
 mod tests {
+    use num_traits::Zero;
+
     use crate::{links::Link, khovanov::complex::KhComplex};
  
     #[test]
     fn trefoil() { 
         let l = Link::trefoil().mirror();
         let c = KhComplex::new_ht(l, 1, 0);
-        let a = c.canon_cycles();
-        println!("{}, {}", a[0], a[1]);
+        let zs = c.canon_cycles();
+
+        for z in zs { 
+            let dz = c.differetiate(&z);
+            assert_eq!(z.is_zero(), false);
+            assert_eq!(dz.is_zero(), true);
+        }
+    }
+ 
+    #[test]
+    fn figure8() { 
+        let l = Link::figure8();
+        let c = KhComplex::new_ht(l, 1, 0);
+        let zs = c.canon_cycles();
+
+        for z in zs { 
+            let dz = c.differetiate(&z);
+            assert_eq!(z.is_zero(), false);
+            assert_eq!(dz.is_zero(), true);
+        }
     }
 }

@@ -38,13 +38,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         Self { h, t }
     }
 
-    pub fn ht(&self) -> (&R, &R) { 
-        (&self.h, &self.t)
+    pub fn h(&self) -> &R { 
+        &self.h
+    }
+
+    pub fn t(&self) -> &R { 
+        &self.t
     }
 
     pub fn prod(&self, x: KhAlgGen, y: KhAlgGen) -> Vec<(KhAlgGen, R)> {
         use KhAlgGen::{I, X};
-        let (h, t) = self.ht();
+        let (h, t) = (self.h(), self.t());
 
         let res = match (x, y) { 
             (I, I) => vec![(I, R::one())],
@@ -57,7 +61,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn coprod(&self, x: KhAlgGen) -> Vec<(KhAlgGen, KhAlgGen, R)> {
         use KhAlgGen::{I, X};
-        let (h, t) = self.ht();
+        let (h, t) = (self.h(), self.t());
 
         let res = match x { 
             I => vec![(X, I, R::one()), (I, X, R::one()), (I, I, -h.clone())],

@@ -294,6 +294,33 @@ pub struct Component {
     closed:bool
 }
 
+impl Component { 
+    pub fn is_adj(&self, other: &Component, link: &Link) -> bool { 
+        // 1) find crossings `x` that touche `self`. 
+        // 2) check if `x` also touches `other`.
+        
+        for x in &link.data { 
+            if !x.edges.iter().any(|e| 
+                self.edges.contains(e)
+            ) { 
+                continue
+            }
+
+            let Some(e) = x.edges.iter().find(|e| 
+                !self.edges.contains(e)
+            ) else { 
+                continue
+            };
+
+            if other.edges.contains(e) { 
+                return true
+            }
+        }
+
+        false
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Resolution { 
     Res0, Res1
@@ -378,6 +405,10 @@ impl State {
             t.values[i] = Res1;
             t
         }).collect_vec()
+    }
+
+    pub fn append(&mut self, mut other: Self) {
+        self.values.append(&mut other.values);
     }
 }
 

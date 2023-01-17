@@ -27,6 +27,12 @@ impl KhEnhState {
         let s = self.state.weight() as isize;
         q + r + s
     }
+
+    pub fn append(&mut self, other: KhEnhState) { 
+        let KhEnhState { state, mut label } = other;
+        self.state.append(state);
+        self.label.append(&mut label);
+    }
 }
 
 impl Symbol for KhEnhState { 
@@ -175,6 +181,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }).collect();
 
         KhCube { str, dim, shift, vertices, edges }
+    }
+
+    pub fn structure(&self) -> &KhAlgStr<R> {
+        &self.str
     }
 
     fn deg_shift(l: &Link) -> (isize, isize) {

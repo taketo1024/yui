@@ -2,16 +2,14 @@ use std::collections::HashMap;
 use std::ops::{RangeInclusive, Index};
 use std::vec::IntoIter;
 
-use crate::math::free::LinComb;
 use crate::math::homology::base::{GradedRModStr, RModGrid};
 use crate::math::homology::free::FreeRModStr;
 use crate::math::traits::{Ring, RingOps};
 use crate::math::homology::complex::ChainComplex;
 use crate::links::Link;
 use crate::utils::misc::{Idx2, Idx2Range};
+use super::algebra::KhAlgStr;
 use super::cube::{KhEnhState, KhCube};
-
-pub type KhChain<R> = LinComb<KhEnhState, R>;
 
 pub struct KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
@@ -38,6 +36,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn link(&self) -> &Link { 
         &self.link
+    }
+
+    pub fn structure(&self) -> &KhAlgStr<R> {
+        self.cube.structure()
     }
 }
 

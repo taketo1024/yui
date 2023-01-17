@@ -5,6 +5,7 @@ edition = "2021"
 
 [profile.release]
 debug = true
+overflow-checks = true
 
 [dependencies]
 derive_more = "0.99.17"

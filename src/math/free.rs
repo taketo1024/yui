@@ -46,6 +46,12 @@ where
         panic!()
     }
 
+    pub fn from_iter<I>(iter: I) -> Self 
+    where I: Iterator<Item = (X, R)> {
+        let data = iter.collect::<HashMap<_, _>>();
+        Self::new(data)
+    }
+
     pub fn iter(&self) -> std::collections::hash_map::Iter<'_, X, R> {
         self.data.iter()
     }
@@ -70,6 +76,20 @@ where
         let data = self.into_iter().map(|(x, r)| (x, f(r))).collect();
         Self::new(data)
     }
+
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+}
+
+impl<X, R> From<(X, R)> for LinComb<X, R>
+where
+    X: FreeGenerator,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{
+    fn from(pair: (X, R)) -> Self {
+        Self::new(hashmap!{ pair.0 => pair.1 })
+    }
 }
 
 impl<X, R> From<Vec<(X, R)>> for LinComb<X, R>
@@ -78,8 +98,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn from(data: Vec<(X, R)>) -> Self {
-        let data = data.into_iter().collect::<HashMap<_, _>>();
-        Self::new(data)
+        Self::from_iter(data.into_iter())
     }
 }
 
@@ -89,7 +108,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn default() -> Self {
-        Self::new(HashMap::new())
+        Self::new(HashMap::default())
     }
 }
 

@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::math::traits::{Ring, RingOps};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum KhAlgGen { 
     I, X
 }

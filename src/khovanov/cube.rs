@@ -10,7 +10,7 @@ use crate::math::sign::Sign;
 use crate::utils::format::subscript;
 use super::algebra::{KhAlgGen, KhAlgStr};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct KhEnhState { 
     state: State,
     label: Vec<KhAlgGen>

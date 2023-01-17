@@ -3,13 +3,15 @@ use std::fmt::{Display, Debug};
 use std::hash::Hash;
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, MulAssign};
+use itertools::Itertools;
 use num_traits::Zero;
 
 use crate::utils::collections::hashmap;
+use crate::utils::display::OrdForDisplay;
 
 use super::traits::{Symbol, AlgBase, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
 
-pub trait FreeGenerator: Clone + PartialEq + Eq + Hash + Display + Debug + Send + Sync + Symbol {}
+pub trait FreeGenerator: Clone + PartialEq + Eq + Hash + Display + Debug + Send + Sync + Symbol + OrdForDisplay {}
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct LinComb<X, R>
@@ -98,7 +100,8 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut initial = true;
-        for (x, r) in self.iter() {
+        let sorted = self.iter().sorted_by(|(x, _), (y, _)| x.cmp_for_display(y) );
+        for (x, r) in sorted {
             let x = x.to_string();
             let r = r.to_string();
 
@@ -495,7 +498,7 @@ mod tests {
 
     use super::{FreeGenerator, LinComb};
  
-    #[derive(Debug, Hash, PartialEq, Eq, Clone)]
+    #[derive(Debug, Hash, PartialEq, Eq, Clone, PartialOrd, Ord)]
     struct X(i32);
 
     impl Symbol for X { 
@@ -522,32 +525,25 @@ mod tests {
         type L = LinComb<X, i32>;
 
         let z = L::new(hashmap!{ X(1) => 1 });
-        let str = z.to_string();
-        assert_eq!(str, "X1");
+        assert_eq!(z.to_string(), "X1");
 
         let z = L::new(hashmap!{ X(1) => -1 });
-        let str = z.to_string();
-        assert_eq!(str, "-X1");
+        assert_eq!(z.to_string(), "-X1");
 
         let z = L::new(hashmap!{ X(1) => 2 });
-        let str = z.to_string();
-        assert_eq!(str, "2X1");
+        assert_eq!(z.to_string(), "2X1");
 
         let z = L::new(hashmap!{ X(1) => 1, X(2) => 1 });
-        let str = z.to_string();
-        assert!(["X1 + X2", "X2 + X1"].contains(&str.as_str()));
+        assert_eq!(z.to_string(), "X1 + X2");
 
         let z = L::new(hashmap!{ X(1) => -1, X(2) => -1 });
-        let str = z.to_string();
-        assert!(["-X1 - X2", "-X2 - X1"].contains(&str.as_str()));
+        assert_eq!(z.to_string(), "-X1 - X2");
 
         let z = L::new(hashmap!{ X(1) => 2, X(2) => 3 });
-        let str = z.to_string();
-        assert!(["2X1 + 3X2", "3X2 + 2X1"].contains(&str.as_str()));
+        assert_eq!(z.to_string(), "2X1 + 3X2");
 
         let z = L::new(hashmap!{ X(1) => -2, X(2) => -3 });
-        let str = z.to_string();
-        assert!(["-2X1 - 3X2", "-3X2 - 2X1"].contains(&str.as_str()));
+        assert_eq!(z.to_string(), "-2X1 - 3X2");
     }
 
     #[test]

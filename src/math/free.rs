@@ -187,10 +187,9 @@ where
 {
     type Output = Self;
 
-    fn add(self, rhs: Self) -> Self::Output {
-        let mut res = self;
-        res += rhs;
-        res
+    fn add(mut self, rhs: Self) -> Self::Output {
+        self += rhs;
+        self
     }
 }
 
@@ -343,10 +342,9 @@ where
 {
     type Output = Self;
 
-    fn sub(self, rhs: Self) -> Self::Output {
-        let mut res = self;
-        res -= rhs;
-        res
+    fn sub(mut self, rhs: Self) -> Self::Output {
+        self -= rhs;
+        self
     }
 }
 
@@ -482,7 +480,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn mul_assign(&mut self, rhs: &'a R) {
-        let data = std::mem::replace(&mut self.data, HashMap::default());
+        let data = std::mem::take(&mut self.data);
         self.data = data.into_iter().map(|(x, r)| (x, &r * rhs)).collect();
     }
 }
@@ -505,6 +503,62 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     type R = R;
+}
+
+impl<X, R> Mul for LinComb<X, R>
+where 
+    X: FreeGenerator, for<'x> &'x X: Mul<Output = X>,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{
+    type Output = Self;
+    
+    fn mul(mut self, rhs: Self) -> Self {
+        self *= rhs;
+        self
+    }
+}
+
+impl<'a, X, R> Mul for &'a LinComb<X, R>
+where 
+    X: FreeGenerator, for<'x> &'x X: Mul<Output = X>,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{
+    type Output = LinComb<X, R>;
+    
+    fn mul(self, rhs: Self) -> LinComb<X, R> {
+        let mut res = self.clone();
+        res *= rhs;
+        res
+    }
+}
+
+impl<X, R> MulAssign for LinComb<X, R>
+where 
+    X: FreeGenerator, for<'x> &'x X: Mul<Output = X>,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{
+    fn mul_assign(&mut self, rhs: Self) {
+        self.mul_assign(&rhs)
+    }
+}
+
+impl<'a, X, R> MulAssign<&'a LinComb<X, R>> for LinComb<X, R>
+where 
+    X: FreeGenerator, for<'x> &'x X: Mul<Output = X>,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{
+    fn mul_assign(&mut self, rhs: &'a Self) {
+        let mut data = HashMap::new();
+        data.reserve(self.len() * rhs.len());
+
+        for (x, r) in self.iter() { 
+            for (y, s) in rhs.iter() { 
+                data.insert(x * y, r * s);
+            }
+        }
+        
+        self.data = data;
+    }
 }
 
 #[cfg(test)]

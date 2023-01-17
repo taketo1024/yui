@@ -8,7 +8,7 @@ use crate::math::traits::{Ring, RingOps};
 use crate::math::homology::complex::ChainComplex;
 use crate::links::Link;
 use crate::utils::misc::{Idx2, Idx2Range};
-use super::algebra::{KhAlgStr, KhEnhState};
+use super::algebra::{KhAlgStr, KhEnhState, KhChain};
 use super::cube::KhCube;
 
 pub type KhComplexSummand<R> = FreeRModStr<KhEnhState, R>;
@@ -41,6 +41,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn structure(&self) -> &KhAlgStr<R> {
         self.cube.structure()
+    }
+
+    // TODO abstract as FreeChainComplex
+    pub fn differentiate_x(&self, x: &KhEnhState) -> Vec<(KhEnhState, R)> {
+        self.cube.differentiate(x)
+    }
+
+    pub fn differetiate(&self, z: &KhChain<R>) -> KhChain<R> { 
+        z.apply(|x| self.differentiate_x(x))
     }
 }
 

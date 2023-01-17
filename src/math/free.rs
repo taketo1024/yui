@@ -52,6 +52,10 @@ where
         Self::new(data)
     }
 
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+
     pub fn iter(&self) -> std::collections::hash_map::Iter<'_, X, R> {
         self.data.iter()
     }
@@ -77,8 +81,15 @@ where
         Self::new(data)
     }
 
-    pub fn len(&self) -> usize {
-        self.data.len()
+    pub fn apply<F>(&self, f: F) -> Self 
+    where F: Fn(&X) -> Vec<(X, R)> {
+        let mut res = Self::zero();
+        for (x, r) in self.iter() { 
+            for (y, s) in f(x) { 
+                res += (y, r * &s);
+            }
+        }
+        res
     }
 }
 

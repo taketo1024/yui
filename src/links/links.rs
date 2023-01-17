@@ -335,6 +335,12 @@ impl State {
         State { values: vec![] }
     }
 
+    pub fn from_iter<I>(iter: I) -> Self
+    where I: Iterator<Item = u8> {
+        let values = iter.map(|a| Resolution::from(a)).collect();
+        State{ values }
+    }
+
     pub fn from_bseq(mut bseq: usize, length: usize) -> Self {
         let seq = (0..length)
             .map(|_| {
@@ -369,24 +375,22 @@ impl State {
     }
 }
 
-impl Index<usize> for State { 
-    type Output = Resolution;
-    fn index(&self, index: usize) -> &Resolution {
-        &self.values[index]
+impl<const N: usize> From<[u8; N]> for State {
+    fn from(values: [u8; N]) -> Self {
+        Self::from_iter(values.into_iter())
     }
 }
 
 impl From<Vec<u8>> for State { 
-    fn from(seq: Vec<u8>) -> Self {
-        let values = seq.iter().map(|&a| Resolution::from(a)).collect();
-        State{ values }
+    fn from(v: Vec<u8>) -> Self {
+        Self::from_iter(v.into_iter())
     }
 }
 
-impl<const N: usize> From<[u8; N]> for State {
-    fn from(values: [u8; N]) -> Self {
-        let values = values.iter().map(|&v| Resolution::from(v)).collect();
-        Self { values }
+impl Index<usize> for State { 
+    type Output = Resolution;
+    fn index(&self, index: usize) -> &Resolution {
+        &self.values[index]
     }
 }
 

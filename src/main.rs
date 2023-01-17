@@ -8,7 +8,7 @@ fn main() {
     let l = Link::from(pd);
 
     measure(|| {
-        let h = KhHomology::<i32>::new(&l);
+        let h = KhHomology::<i32>::new(l);
         println!("{h}");
     });
 }
@@ -21,7 +21,7 @@ fn load_data() -> Result<Data, Box<dyn std::error::Error>> {
     Ok(data)
 }
 
-fn measure<F>(proc: F) where F: Fn() -> () { 
+fn measure<F>(proc: F) where F: FnOnce() -> () { 
     let start = std::time::Instant::now();
     proc();
     let dur = start.elapsed();

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::ops::{RangeInclusive, Index};
 use std::vec::IntoIter;
 
+use crate::math::free::LinComb;
 use crate::math::homology::base::{GradedRModStr, RModGrid};
 use crate::math::homology::free::FreeRModStr;
 use crate::math::traits::{Ring, RingOps};
@@ -10,26 +11,33 @@ use crate::links::Link;
 use crate::utils::misc::{Idx2, Idx2Range};
 use super::cube::{KhEnhState, KhCube};
 
+pub type KhChain<R> = LinComb<KhEnhState, R>;
+
 pub struct KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
+    link: Link,
     cube: KhCube<R>,
     grid: RModGrid<FreeRModStr<R, KhEnhState>, RangeInclusive<isize>>
 }
 
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn new(l: &Link) -> Self { 
+    pub fn new(l: Link) -> Self { 
         Self::new_ht(l, R::zero(), R::zero())
     }
 
-    pub fn new_ht(l: &Link, h: R, t: R) -> Self { 
-        let cube = KhCube::new_ht(l, h, t);
+    pub fn new_ht(link: Link, h: R, t: R) -> Self { 
+        let cube = KhCube::new_ht(&link, h, t);
         let grid = RModGrid::new(cube.h_range(), |i| {
             let gens = cube.generators(i);
             let s = FreeRModStr::new(gens);
             Some(s)
         });
-        KhComplex { cube, grid }
+        KhComplex { link, cube, grid }
+    }
+
+    pub fn link(&self) -> &Link { 
+        &self.link
     }
 }
 
@@ -159,7 +167,7 @@ mod tests {
     #[test]
     fn kh_empty() {
         let l = Link::empty();
-        let c = KhComplex::<i32>::new(&l);
+        let c = KhComplex::<i32>::new(l);
 
         assert_eq!(c.range(), 0..=0);
         c.check_d_all();
@@ -168,7 +176,7 @@ mod tests {
     #[test]
     fn kh_unknot() {
         let l = Link::unknot();
-        let c = KhComplex::<i32>::new(&l);
+        let c = KhComplex::<i32>::new(l);
 
         assert_eq!(c.range(), 0..=0);
         c.check_d_all();
@@ -177,7 +185,7 @@ mod tests {
     #[test]
     fn kh_trefoil() {
         let l = Link::trefoil();
-        let c = KhComplex::<i32>::new(&l);
+        let c = KhComplex::<i32>::new(l);
 
         assert_eq!(c.range(), -3..=0);
         assert_eq!(c[-3].generators().len(), 8);
@@ -191,7 +199,7 @@ mod tests {
     #[test]
     fn kh_figure8() {
         let l = Link::figure8();
-        let c = KhComplex::<i32>::new(&l);
+        let c = KhComplex::<i32>::new(l);
 
         assert_eq!(c.range(), -2..=2);
         assert_eq!(c[-2].generators().len(), 8);

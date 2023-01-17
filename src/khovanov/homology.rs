@@ -16,11 +16,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> KhHomology<R> 
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    pub fn new(l: &Link) -> Self {
+    pub fn new(l: Link) -> Self {
         Self::new_ht(l, R::zero(), R::zero())
     }
 
-    pub fn new_ht(l: &Link, h: R, t: R) -> Self {
+    pub fn new_ht(l: Link, h: R, t: R) -> Self {
         let complex = KhComplex::new_ht(l, h, t);
         Self::from(complex)
     }
@@ -126,7 +126,7 @@ mod tests {
     #[test]
     fn kh_empty() {
         let l = Link::empty();
-        let h = KhHomology::<i32>::new(&l);
+        let h = KhHomology::<i32>::new(l);
 
         assert_eq!(h.range(), 0..=0);
 
@@ -137,7 +137,7 @@ mod tests {
     #[test]
     fn kh_unknot() {
         let l = Link::unknot();
-        let h = KhHomology::<i32>::new(&l);
+        let h = KhHomology::<i32>::new(l);
 
         assert_eq!(h.range(), 0..=0);
         
@@ -148,7 +148,7 @@ mod tests {
     #[test]
     fn kh_trefoil() {
         let l = Link::trefoil();
-        let h = KhHomology::<i32>::new(&l);
+        let h = KhHomology::<i32>::new(l);
 
         assert_eq!(h.range(), -3..=0);
 
@@ -167,7 +167,7 @@ mod tests {
     #[test]
     fn kh_trefoil_mirror() {
         let l = Link::trefoil().mirror();
-        let h = KhHomology::<i32>::new(&l);
+        let h = KhHomology::<i32>::new(l);
 
         assert_eq!(h.range(), 0..=3);
 
@@ -186,7 +186,7 @@ mod tests {
     #[test]
     fn kh_figure8() {
         let l = Link::figure8();
-        let h = KhHomology::<i32>::new(&l);
+        let h = KhHomology::<i32>::new(l);
 
         assert_eq!(h.range(), -2..=2);
 

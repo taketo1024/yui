@@ -97,7 +97,34 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        let mut initial = true;
+        for (x, r) in self.iter() {
+            let x = x.to_string();
+            let r = r.to_string();
+
+            if initial { 
+                let r = if r == "1" { 
+                    ""
+                } else if r == "-1" { 
+                    "-"
+                } else {
+                    &r
+                };
+                write!(f, "{r}{x}")?;
+                initial = false
+            } else {
+                let sign = if r.starts_with("-") { "-" } else { "+" };
+                let r = if r == "1" || r == "-1" { 
+                    ""
+                } else if r.starts_with("-") { 
+                    &r[1..]
+                } else { 
+                    &r
+                };
+                write!(f, " {sign} {r}{x}")?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -107,7 +134,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn symbol() -> String {
-        format!("LinComb<{}; {}>", X::symbol(), R::symbol())
+        format!("Free<{}; {}>", X::symbol(), R::symbol())
     }
 }
 
@@ -460,21 +487,25 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::{collections::HashMap, fmt::Display};
 
     use crate::math::traits::Symbol;
     use crate::utils::collections::hashmap;
-    use derive_more::Display;
     use num_traits::Zero;
 
     use super::{FreeGenerator, LinComb};
  
-    #[derive(Debug, Display, Hash, PartialEq, Eq, Clone)]
+    #[derive(Debug, Hash, PartialEq, Eq, Clone)]
     struct X(i32);
 
     impl Symbol for X { 
         fn symbol() -> String {
             String::from("X")
+        }
+    }
+    impl Display for X {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "X{}", self.0)
         }
     }
     impl FreeGenerator for X {}
@@ -483,7 +514,40 @@ mod tests {
     fn symbol() { 
         type L = LinComb<X, i32>;
         let symbol = L::symbol();
-        assert_eq!(symbol, "LinComb<X; Z>");
+        assert_eq!(symbol, "Free<X; Z>");
+    }
+
+    #[test]
+    fn fmt() { 
+        type L = LinComb<X, i32>;
+
+        let z = L::new(hashmap!{ X(1) => 1 });
+        let str = z.to_string();
+        assert_eq!(str, "X1");
+
+        let z = L::new(hashmap!{ X(1) => -1 });
+        let str = z.to_string();
+        assert_eq!(str, "-X1");
+
+        let z = L::new(hashmap!{ X(1) => 2 });
+        let str = z.to_string();
+        assert_eq!(str, "2X1");
+
+        let z = L::new(hashmap!{ X(1) => 1, X(2) => 1 });
+        let str = z.to_string();
+        assert!(["X1 + X2", "X2 + X1"].contains(&str.as_str()));
+
+        let z = L::new(hashmap!{ X(1) => -1, X(2) => -1 });
+        let str = z.to_string();
+        assert!(["-X1 - X2", "-X2 - X1"].contains(&str.as_str()));
+
+        let z = L::new(hashmap!{ X(1) => 2, X(2) => 3 });
+        let str = z.to_string();
+        assert!(["2X1 + 3X2", "3X2 + 2X1"].contains(&str.as_str()));
+
+        let z = L::new(hashmap!{ X(1) => -2, X(2) => -3 });
+        let str = z.to_string();
+        assert!(["-2X1 - 3X2", "-3X2 - 2X1"].contains(&str.as_str()));
     }
 
     #[test]

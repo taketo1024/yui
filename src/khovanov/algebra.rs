@@ -1,5 +1,10 @@
 use std::fmt::Display;
-
+use std::ops::Mul;
+use itertools::join;
+use crate::links::links::State;
+use crate::math::free::{FreeGenerator, LinComb};
+use crate::math::traits::Symbol;
+use crate::utils::format::subscript;
 use crate::math::traits::{Ring, RingOps};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -71,6 +76,71 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         res.into_iter().filter(|(_, _, a)| !a.is_zero()).collect()
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct KhEnhState { 
+    state: State,
+    label: Vec<KhAlgGen>
+}
+
+impl KhEnhState {
+    pub fn new(state: State, label: Vec<KhAlgGen>) -> KhEnhState { 
+        KhEnhState { state, label }
+    }
+
+    pub fn state(&self) -> &State {
+        &self.state
+    }
+
+    pub fn label(&self) -> &Vec<KhAlgGen> {
+        &self.label
+    }
+
+    pub fn label_at(&self, i: usize) -> KhAlgGen {
+        self.label[i]
+    }
+
+    pub fn q_deg(&self) -> isize { 
+        let q = self.label.iter().map(|x| x.q_deg()).sum::<isize>();
+        let r = self.label.len() as isize;
+        let s = self.state.weight() as isize;
+        q + r + s
+    }
+
+    pub fn append(&mut self, other: KhEnhState) { 
+        let KhEnhState { state, mut label } = other;
+        self.state.append(state);
+        self.label.append(&mut label);
+    }
+}
+
+impl<'a> Mul for &'a KhEnhState {
+    type Output = KhEnhState;
+
+    fn mul(self, rhs: Self) -> KhEnhState {
+        let mut res = self.clone();
+        res.append(rhs.clone());
+        res
+    }
+}
+
+impl Symbol for KhEnhState { 
+    fn symbol() -> String { 
+        String::from("KhEnhState")
+    }
+}
+
+impl Display for KhEnhState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let label = join(self.label.iter(), "");
+        let state = join(self.state.values().map(|i| subscript(i.as_u8() as isize)), "");
+        write!(f, "{}{}", label, state)
+    }
+}
+
+impl FreeGenerator for KhEnhState {}
+
+pub type KhChain<R> = LinComb<KhEnhState, R>;
 
 #[cfg(test)]
 pub mod tests {

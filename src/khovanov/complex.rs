@@ -8,8 +8,8 @@ use crate::math::traits::{Ring, RingOps};
 use crate::math::homology::complex::ChainComplex;
 use crate::links::Link;
 use crate::utils::misc::{Idx2, Idx2Range};
-use super::algebra::KhAlgStr;
-use super::cube::{KhEnhState, KhCube};
+use super::algebra::{KhAlgStr, KhEnhState};
+use super::cube::KhCube;
 
 pub struct KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 

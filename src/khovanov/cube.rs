@@ -1,55 +1,11 @@
 use std::collections::HashMap;
-use std::fmt::Display;
 use std::ops::RangeInclusive;
-use itertools::{Itertools, join};
+use itertools::Itertools;
 use num_traits::Pow;
 use crate::links::links::{Link, State, Component, Resolution};
-use crate::math::free::FreeGenerator;
-use crate::math::traits::{Ring, RingOps, PowMod2, Symbol};
+use crate::math::traits::{Ring, RingOps, PowMod2};
 use crate::math::sign::Sign;
-use crate::utils::format::subscript;
-use super::algebra::{KhAlgGen, KhAlgStr};
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct KhEnhState { 
-    state: State,
-    label: Vec<KhAlgGen>
-}
-
-impl KhEnhState {
-    pub fn new(state: State, label: Vec<KhAlgGen>) -> KhEnhState { 
-        KhEnhState { state, label }
-    }
-
-    pub fn q_deg(&self) -> isize { 
-        let q = self.label.iter().map(|x| x.q_deg()).sum::<isize>();
-        let r = self.label.len() as isize;
-        let s = self.state.weight() as isize;
-        q + r + s
-    }
-
-    pub fn append(&mut self, other: KhEnhState) { 
-        let KhEnhState { state, mut label } = other;
-        self.state.append(state);
-        self.label.append(&mut label);
-    }
-}
-
-impl Symbol for KhEnhState { 
-    fn symbol() -> String { 
-        String::from("KhEnhState")
-    }
-}
-
-impl Display for KhEnhState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let label = join(self.label.iter(), "");
-        let state = join(self.state.values().map(|i| subscript(i.as_u8() as isize)), "");
-        write!(f, "{}{}", label, state)
-    }
-}
-
-impl FreeGenerator for KhEnhState {}
+use super::algebra::{KhAlgStr, KhEnhState};
 
 #[derive(Debug)]
 pub struct KhCubeVertex { 
@@ -236,7 +192,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn differentiate(&self, x: &KhEnhState) -> Vec<(KhEnhState, R)> {
-        let edges = self.edges_from(&x.state);
+        let edges = self.edges_from(x.state());
         edges.iter().flat_map(|(t, e)| { 
             self.apply(x, t, e)
         }).collect_vec()
@@ -275,9 +231,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         match e.trans { 
             Merge((i, j), k) => {
-                let (x_i, x_j) = (x.label[i], x.label[j]);
+                let (x_i, x_j) = (x.label_at(i), x.label_at(j));
                 self.str.prod(x_i, x_j).into_iter().map(|(y_k, a)| { 
-                    let mut label = x.label.clone();
+                    let mut label = x.label().clone();
                     label.remove(j);
                     label.remove(i);
                     label.insert(k, y_k);
@@ -289,9 +245,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 }).collect_vec()
             },
             Split(i, (j, k)) => {
-                let x_i = x.label[i];
+                let x_i = x.label_at(i);
                 self.str.coprod(x_i).into_iter().map(|(y_j, y_k, a)| { 
-                    let mut label = x.label.clone();
+                    let mut label = x.label().clone();
                     label.remove(i);
                     label.insert(j, y_j);
                     label.insert(k, y_k);

@@ -11,11 +11,12 @@ use crate::utils::misc::{Idx2, Idx2Range};
 use super::algebra::{KhAlgStr, KhEnhState};
 use super::cube::KhCube;
 
+pub type KhComplexSummand<R> = FreeRModStr<KhEnhState, R>;
 pub struct KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     link: Link,
     cube: KhCube<R>,
-    grid: RModGrid<FreeRModStr<R, KhEnhState>, RangeInclusive<isize>>
+    grid: RModGrid<KhComplexSummand<R>, RangeInclusive<isize>>
 }
 
 impl<R> KhComplex<R>
@@ -45,7 +46,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> Index<isize> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    type Output = FreeRModStr<R, KhEnhState>;
+    type Output = KhComplexSummand<R>;
     
     fn index(&self, index: isize) -> &Self::Output {
         &self.grid[index]
@@ -83,7 +84,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 pub struct KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     cube: KhCube<R>,
-    grid: RModGrid<FreeRModStr<R, KhEnhState>, Idx2Range>
+    grid: RModGrid<KhComplexSummand<R>, Idx2Range>
 }
 
 impl<R> KhComplexBigraded<R>
@@ -124,7 +125,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> Index<Idx2> for KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = FreeRModStr<R, KhEnhState>;
+    type Output = KhComplexSummand<R>;
 
     fn index(&self, index: Idx2) -> &Self::Output {
         &self.grid[index]

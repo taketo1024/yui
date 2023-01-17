@@ -5,19 +5,19 @@ use crate::math::free::{FreeGenerator, LinComb};
 use crate::math::traits::{Ring, RingOps};
 use super::base::RModStr;
 
-pub struct FreeRModStr<R, X>
+pub struct FreeRModStr<X, R>
 where 
+    X: FreeGenerator,
     R: Ring, for<'x> &'x R: RingOps<R>, 
-    X: FreeGenerator
 {
     generators: Vec<X>,
     tors: Vec<R>, // always empty
 }
 
-impl<R, X> FreeRModStr<R, X>
+impl<X, R> FreeRModStr<X, R>
 where 
+    X: FreeGenerator,
     R: Ring, for<'x> &'x R: RingOps<R>, 
-    X: FreeGenerator
 {
     pub fn new(generators: Vec<X>) -> Self {
         Self { generators, tors: vec![] }
@@ -75,10 +75,10 @@ where
     }
 }
 
-impl<R, X> RModStr for FreeRModStr<R, X>
+impl<X, R> RModStr for FreeRModStr<X, R>
 where 
+    X: FreeGenerator,
     R: Ring, for<'x> &'x R: RingOps<R>, 
-    X: FreeGenerator
 {
     type R = R;
 
@@ -95,10 +95,10 @@ where
     }
 }
 
-impl<R, X> Display for FreeRModStr<R, X>
+impl<X, R> Display for FreeRModStr<X, R>
 where 
+    X: FreeGenerator,
     R: Ring, for<'x> &'x R: RingOps<R>, 
-    X: FreeGenerator
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.fmt_default(f)

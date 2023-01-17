@@ -46,7 +46,7 @@ where
             v_val.push(a.clone());
         }
     
-        CsVec::new(n, v_ind, v_val)
+        CsVec::new_from_unsorted(n, v_ind, v_val).unwrap()
     }
 
     pub fn make_matrix<F>(&self, target: &Self, f: F) -> CsMat<R>

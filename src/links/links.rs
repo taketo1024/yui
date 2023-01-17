@@ -27,7 +27,7 @@ impl Link {
     }
 
     pub fn unknot() -> Link { 
-        Link::from([[0, 1, 1, 0]]).resolve_at(0, Res0)
+        Link::from([[0, 1, 1, 0]]).resolved_at(0, Res0)
     }
 
     pub fn trefoil() -> Link { 
@@ -101,26 +101,32 @@ impl Link {
         comps
     }
 
-    pub fn mirror(self) -> Self {
-        let mut data = self.data;
+    pub fn mirror(&self) -> Self {
+        let mut data = self.data.clone();
         data.iter_mut().for_each(|x| x.mirror());
         Link { data }
     }
 
-    pub fn resolve_at(self, i: usize, r: Resolution) -> Self {
+    pub fn resolved_at(&self, i: usize, r: Resolution) -> Self {
         debug_assert!(i < self.data.len());
-        let mut data = self.data;
+        let mut data = self.data.clone();
         data[i].resolve(r);
         Link { data }
     }
 
-    pub fn resolve(self, s: &State) -> Self {
+    pub fn resolved_by(&self, s: &State) -> Self {
         debug_assert!(s.len() <= self.data.len());
-        let mut data = self.data;
+        let mut data = self.data.clone();
         for (i, &r) in s.values.iter().enumerate() {
             data[i].resolve(r);
         }
         Link { data }
+    }
+
+    pub fn ori_pres_state(&self) -> State { 
+        State::from_iter(self.crossing_signs().into_iter().map( |e|
+            if e.is_positive() { 0 } else { 1 }
+        ))
     }
 
     // -- internal methods -- //
@@ -622,7 +628,7 @@ mod tests {
     fn link_resolve() {
         let s = State::from([0, 0, 0]);
         let l = Link::from([[1,4,2,5],[3,6,4,1],[5,2,6,3]]) // trefoil
-            .resolve(&s);
+            .resolved_by(&s);
 
         let comps = l.components();
         assert_eq!(comps.len(), 3);
@@ -630,7 +636,7 @@ mod tests {
 
         let s = State::from([1, 1, 1]);
         let l = Link::from([[1,4,2,5],[3,6,4,1],[5,2,6,3]]) // trefoil
-            .resolve(&s);
+            .resolved_by(&s);
 
         let comps = l.components();
         assert_eq!(comps.len(), 2);

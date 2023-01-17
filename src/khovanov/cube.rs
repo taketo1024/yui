@@ -53,7 +53,7 @@ pub struct KhCubeVertex {
 
 impl KhCubeVertex { 
     pub fn new(l: &Link, state: State) -> Self {
-        let circles = l.clone().resolve(&state).components();
+        let circles = l.resolved_by(&state).components();
         KhCubeVertex { state, circles }
     }
 
@@ -326,7 +326,7 @@ mod tests {
 
     #[test]
     fn unlink_2() {
-        let l = Link::from([[0, 0, 1, 1]]).resolve_at(0, Res0);
+        let l = Link::from([[0, 0, 1, 1]]).resolved_at(0, Res0);
         let s = State::empty();
         let v = KhCubeVertex::new(&l, s.clone());
 

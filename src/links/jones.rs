@@ -23,7 +23,7 @@ pub fn jones_polynomial(l: &Link) -> LaurentPolynomial<i32> {
     let m = 2.pow(n) as usize;
     let body = (0..m).fold(P::zero(), |res, i| { 
         let s = State::from_bseq(i, n);
-        let l_s = l.clone().resolve(&s);
+        let l_s = l.resolved_by(&s);
 
         let w = s.weight() as i32;
         let r = l_s.components().len() as i32;
@@ -61,7 +61,7 @@ mod tests {
 
     #[test]
     fn unlink_2() {
-        let l = Link::from([[0, 1, 1, 0]]).resolve_at(0, Res1);
+        let l = Link::from([[0, 1, 1, 0]]).resolved_at(0, Res1);
         let p = jones_polynomial(&l);
         assert_eq!(p, P::new(vec![1, 0, 2, 0, 1], -2));
     }

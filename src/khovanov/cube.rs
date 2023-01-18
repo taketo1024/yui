@@ -118,7 +118,6 @@ pub struct KhCube<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     str: KhAlgStr<R>,
     dim: usize,
-    shift: (isize, isize),
     vertices: HashMap<State, KhCubeVertex>,
     edges: HashMap<State, Vec<(State, KhCubeEdge)>>
 }
@@ -136,8 +135,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     
     fn _new(l: &Link, str: KhAlgStr<R>) -> Self { 
         let dim = l.crossing_num() as usize;
-        let shift = Self::deg_shift(l);
-
         let m = 2.pow(dim) as usize;
         let vertices: HashMap<_, _> = (0..m).map(|i| { 
             let s = State::from_bseq(i, dim);
@@ -155,35 +152,22 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             (s, edges)
         }).collect();
 
-        KhCube { str, dim, shift, vertices, edges }
+        KhCube { str, dim, vertices, edges }
     }
 
     pub fn structure(&self) -> &KhAlgStr<R> {
         &self.str
     }
 
-    fn deg_shift(l: &Link) -> (isize, isize) {
-        let (n_pos, n_neg) = l.signed_crossing_nums();
-        let (n_pos, n_neg) = (n_pos as isize, n_neg as isize);
-        (-n_neg, n_pos - 2 * n_neg)
-    }
-
     pub fn dim(&self) -> usize { 
         self.dim
     }
 
-    pub fn shift(&self) -> (isize, isize) { 
-        self.shift
-    }
-
     pub fn h_range(&self) -> RangeInclusive<isize> { 
-        let i0 = self.shift.0;
-        let n = self.dim as isize;
-        i0 ..= (i0 + n)
+        0 ..= (self.dim as isize)
     }
 
     pub fn q_range(&self) -> RangeInclusive<isize> { 
-        let j0 = self.shift.1;
         let n = self.dim;
 
         let s0 = State::from_bseq(0, n);
@@ -194,7 +178,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let v1 = self.vertex(&s1);
         let q1 = (n + v1.circles.len()) as isize; // tensor factors are all 1
 
-        (j0 + q0) ..= (j0 + q1)
+        q0 ..= q1
     }
 
     pub fn generators(&self, i: isize) -> Vec<KhEnhState> { 
@@ -207,10 +191,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn collect_generators(&self, i: isize, red_e: Option<&Edge>) -> Vec<KhEnhState> { 
         if self.h_range().contains(&i) { 
-            let i0 = self.shift.0;
-            let k = (i - i0) as usize;
-
-            self.vertices_of(k).into_iter().flat_map(|v| 
+            let i = i as usize;
+            self.vertices_of_weight(i).into_iter().flat_map(|v| 
                 if let Some(red_e) = red_e { 
                     v.reduced_generators(red_e)
                 } else { 
@@ -237,7 +219,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.edges[from].iter().find(|(t, _)| t == to).map(|(_, e)| e)
     }
 
-    fn vertices_of(&self, k: usize) -> Vec<&KhCubeVertex> { 
+    fn vertices_of_weight(&self, k: usize) -> Vec<&KhCubeVertex> { 
         self.vertices
             .iter()
             .sorted_by(|(s1, _), (s2, _)| Ord::cmp(s1, s2))
@@ -407,7 +389,6 @@ mod tests {
         assert_eq!(v.generators().len(), 1);
 
         assert!(cube.edges_from(&s).is_empty());
-        assert_eq!(cube.shift(), (0, 0));
     }
 
     #[test]
@@ -416,7 +397,6 @@ mod tests {
         let cube = KhCube::<i32>::new(&l);
 
         assert_eq!(cube.dim, 0);
-        assert_eq!(cube.shift(), (0, 0));
         assert_eq!(cube.vertices.len(), 1);
 
         let s = State::empty();
@@ -434,7 +414,6 @@ mod tests {
         let cube = KhCube::<i32>::new(&l);
 
         assert_eq!(cube.dim, 1);
-        assert_eq!(cube.shift(), (0, 1));
         assert_eq!(cube.vertices.len(), 2);
 
         let s0 = State::from([0]);
@@ -461,7 +440,6 @@ mod tests {
         let cube = KhCube::<i32>::new(&l);
 
         assert_eq!(cube.dim, 2);
-        assert_eq!(cube.shift(), (-2, -4));
         assert_eq!(cube.vertices.len(), 4);
    }
 
@@ -471,7 +449,6 @@ mod tests {
        let cube = KhCube::<i32>::new(&l);
 
        assert_eq!(cube.dim, 3);
-       assert_eq!(cube.shift(), (-3, -6));
        assert_eq!(cube.vertices.len(), 8);
   }
 }

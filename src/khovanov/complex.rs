@@ -16,14 +16,20 @@ pub struct KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     link: Link,
     cube: KhCube<R>,
-    grid: RModGrid<KhComplexSummand<R>, RangeInclusive<isize>>
+    grid: RModGrid<KhComplexSummand<R>, RangeInclusive<isize>>,
+    reduced: bool
 }
 
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn new(link: Link, h: R, t: R, reduced: bool) -> Self { 
         let cube = KhCube::new_ht(&link, h, t);
-        let grid = RModGrid::new(cube.h_range(), |i| {
+
+        let i0 = Self::calc_deg_shift(&link, reduced).0;
+        let range = cube.h_range().shift(i0);
+
+        let grid = RModGrid::new(range, |i| {
+            let i = i - i0;
             let gens = if reduced {
                 let e = link.first_edge().unwrap();
                 cube.reduced_generators(i, e)
@@ -33,7 +39,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let s = FreeRModStr::new(gens);
             Some(s)
         });
-        KhComplex { link, cube, grid }
+
+        KhComplex { link, cube, grid, reduced }
     }
 
     pub fn unreduced(l: Link) -> Self { 
@@ -60,6 +67,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.cube.structure()
     }
 
+    pub fn deg_shift(&self) -> (isize, isize) { 
+        Self::calc_deg_shift(&self.link, self.reduced)
+    }
+
     // TODO abstract as FreeChainComplex
     pub fn differentiate_x(&self, x: &KhEnhState) -> Vec<(KhEnhState, R)> {
         self.cube.differentiate(x)
@@ -67,6 +78,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn differetiate(&self, z: &KhChain<R>) -> KhChain<R> { 
         z.apply(|x| self.differentiate_x(x))
+    }
+
+    fn calc_deg_shift(l: &Link, reduced: bool) -> (isize, isize) {
+        let (n_pos, n_neg) = l.signed_crossing_nums();
+        let (n_pos, n_neg) = (n_pos as isize, n_neg as isize);
+        let h = -n_neg;
+        let q = n_pos - 2 * n_neg + (if reduced { 1 } else { 0 });
+        (h, q)
     }
 }
 
@@ -119,8 +138,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         use grouping_by::GroupingBy;
 
         let cube = KhCube::new(&l);
-        let h_range = cube.h_range();
-        let q_range = cube.q_range();
+        let (i0, j0) = KhComplex::calc_deg_shift(&l, reduced);
+        let h_range = cube.h_range().shift(i0);
+        let q_range = cube.q_range().shift(j0);
         
         let range = Idx2::iterate(
             Idx2(*h_range.start(), *q_range.start()), 
@@ -128,17 +148,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             (1, 2)
         );
 
-        let q0 = cube.shift().1;
         let mut gens: HashMap<_, _> = h_range.clone().map(|i| { 
             let gens = if reduced {
                 let e = l.first_edge().unwrap();
-                cube.reduced_generators(i, e)
+                cube.reduced_generators(i - i0, e)
             } else { 
-                cube.generators(i) 
+                cube.generators(i - i0)
             };
 
             let set = gens.into_iter().grouping_by(|x| 
-                x.q_deg() + q0
+                x.q_deg() + j0
             );
             (i, set)
         }).collect();
@@ -203,6 +222,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
+trait Shift { 
+    fn shift(self, i: isize) -> Self;
+}
+
+impl Shift for RangeInclusive<isize> { 
+    fn shift(self, i: isize) -> Self {
+        RangeInclusive::new(
+            self.start() + i, 
+            self.end() + i
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::links::Link;
@@ -216,6 +248,8 @@ mod tests {
         let c = KhComplex::<i32>::unreduced(l);
 
         assert_eq!(c.range(), 0..=0);
+        assert_eq!(c.deg_shift(), (0, 0));
+
         c.check_d_all();
     }
 
@@ -225,6 +259,19 @@ mod tests {
         let c = KhComplex::<i32>::unreduced(l);
 
         assert_eq!(c.range(), 0..=0);
+        assert_eq!(c.deg_shift(), (0, 0));
+        
+        c.check_d_all();
+    }
+
+    #[test]
+    fn kh_unknot_twist() {
+        let l = Link::from([[0, 0, 1, 1]]);
+        let c = KhComplex::<i32>::unreduced(l);
+
+        assert_eq!(c.range(), 0..=1);
+        assert_eq!(c.deg_shift(), (0, 1));
+        
         c.check_d_all();
     }
 
@@ -234,6 +281,8 @@ mod tests {
         let c = KhComplex::<i32>::unreduced(l);
 
         assert_eq!(c.range(), -3..=0);
+        assert_eq!(c.deg_shift(), (-3, -6));
+
         assert_eq!(c[-3].generators().len(), 8);
         assert_eq!(c[-2].generators().len(), 12);
         assert_eq!(c[-1].generators().len(), 6);
@@ -248,6 +297,8 @@ mod tests {
         let c = KhComplex::<i32>::unreduced(l);
 
         assert_eq!(c.range(), -2..=2);
+        assert_eq!(c.deg_shift(), (-2, -2));
+
         assert_eq!(c[-2].generators().len(), 8);
         assert_eq!(c[-1].generators().len(), 16);
         assert_eq!(c[ 0].generators().len(), 18);

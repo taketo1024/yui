@@ -13,7 +13,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn canon_cycles(&self) -> Vec<KhChain<R>> {
-        vec![self._canon_cycle(true), self._canon_cycle(false)]
+        if self.is_reduced() { 
+            vec![self._canon_cycle(true)]
+        } else { 
+            vec![self._canon_cycle(true), self._canon_cycle(false)]
+        }
     }
 
     pub fn _canon_cycle(&self, positive: bool) -> KhChain<R> {
@@ -36,10 +40,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             return colors
         }
 
-        let mut queue = vec![0];
-        let mut remain: HashSet<_> = (1..n).collect();
+        let mut queue = vec![];
+        let mut remain: HashSet<_> = (0..n).collect();
 
-        colors[0] = if positive { Color::A } else { Color::B };
+        let e = l.first_edge().unwrap();
+        let i = circles.iter().find_position(|c| c.edges().contains(e)).unwrap().0;
+
+        queue.push(i);
+        colors[i] = if positive { Color::A } else { Color::B };
 
         while !queue.is_empty() { 
             let i1 = queue.remove(0);

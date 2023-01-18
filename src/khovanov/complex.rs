@@ -71,6 +71,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         Self::calc_deg_shift(&self.link, self.reduced)
     }
 
+    pub fn is_reduced(&self) -> bool { 
+        self.reduced
+    }
+
     // TODO abstract as FreeChainComplex
     pub fn differentiate_x(&self, x: &KhEnhState) -> Vec<(KhEnhState, R)> {
         self.cube.differentiate(x)

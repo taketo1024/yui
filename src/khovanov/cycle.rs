@@ -26,7 +26,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let l = self.link();
         let s = l.ori_pres_state();
-        let circles = l.resolved_by(&s).components();
+        let circles = l.seifert_circles();
         let colors = self.color_circles(l, &circles, positive);
 
         self.make_chain(&s, &colors)

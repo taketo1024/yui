@@ -129,6 +129,10 @@ impl Link {
         ))
     }
 
+    pub fn seifert_circles(&self) -> Vec<Component> { 
+        self.resolved_by(&self.ori_pres_state()).components()
+    }
+
     pub fn first_edge(&self) -> Option<&Edge> { 
         let Some(x) = self.data.first() else { return None };
         x.edges.iter().min()

@@ -88,8 +88,23 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> KhHomologyBigraded<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    pub fn new(l: &Link) -> Self {
-        let c = KhComplexBigraded::new(l);
+    pub fn new(l: Link, reduced: bool) -> Self {
+        let c = KhComplexBigraded::new(l, reduced);
+        Self::from(c)
+    }
+
+    pub fn unreduced(l: Link) -> Self {
+        Self::new(l, false)
+    }
+
+    pub fn reduced(l: Link) -> Self {
+        Self::new(l, true)
+    }
+}
+
+impl<R> From<KhComplexBigraded<R>> for KhHomologyBigraded<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    fn from(c: KhComplexBigraded<R>) -> Self {
         let reduced = Reduced::from(c);
         let homology = GenericHomology::from(reduced);
         Self { homology }

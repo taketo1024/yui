@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ops::RangeInclusive;
 use itertools::Itertools;
 use num_traits::Pow;
-use crate::links::links::{Link, State, Component, Resolution};
+use crate::links::links::{Link, State, Component, Resolution, Edge};
 use crate::math::traits::{Ring, RingOps, PowMod2};
 use crate::math::sign::Sign;
 use super::algebra::{KhAlgStr, KhEnhState};
@@ -20,20 +20,39 @@ impl KhCubeVertex {
     }
 
     pub fn generators(&self) -> Vec<KhEnhState> { 
+        self.collect_generators(None)
+    }
+
+    pub fn reduced_generators(&self, red_e: &Edge) -> Vec<KhEnhState> { 
+        self.collect_generators(Some(red_e))
+    }
+
+    fn collect_generators(&self, red_e: Option<&Edge>) -> Vec<KhEnhState> { 
         use super::algebra::KhAlgGen::{X, I};
+        let s = &self.state;
         let r = self.circles.len();
 
-        let gens = (0..2.pow(r)).map(|mut i| { 
-            let state = self.state.clone();
-            let labels = (0..r).map(|_j| { 
-                let x = if i & 1 == 1 { I } else { X };
-                i >>= 1;
-                x
-            }).collect();
-            KhEnhState::new( state, labels )
-        }).collect();
+        let red_i = red_e.map(|red_e| 
+            self.circles.iter().find_position(|c| 
+                c.edges().contains(red_e)
+            ).unwrap().0 // must exist
+        );
 
-        gens
+        return (0..2.pow(r)).filter_map(|b| { 
+            if let Some(red_i) = red_i { 
+                if (b >> red_i) & 1 == 1 { 
+                    return None
+                }
+            }
+            
+            let state = s.clone();
+            let labels = (0..r).map(|i| {
+                if (b >> i) & 1 == 1 { I } else { X }
+            }).collect();
+            let x = KhEnhState::new( state, labels );
+
+            Some(x)
+        }).collect();
     }
 }
 
@@ -179,12 +198,24 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn generators(&self, i: isize) -> Vec<KhEnhState> { 
+        self.collect_generators(i, None)
+    }
+
+    pub fn reduced_generators(&self, i: isize, red_e: &Edge) -> Vec<KhEnhState> { 
+        self.collect_generators(i, Some(red_e))
+    }
+
+    fn collect_generators(&self, i: isize, red_e: Option<&Edge>) -> Vec<KhEnhState> { 
         if self.h_range().contains(&i) { 
             let i0 = self.shift.0;
             let k = (i - i0) as usize;
 
             self.vertices_of(k).into_iter().flat_map(|v| 
-                v.generators()
+                if let Some(red_e) = red_e { 
+                    v.reduced_generators(red_e)
+                } else { 
+                    v.generators() 
+                }
             ).collect()
         } else {
             vec![]

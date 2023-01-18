@@ -129,6 +129,11 @@ impl Link {
         ))
     }
 
+    pub fn first_edge(&self) -> Option<&Edge> { 
+        let Some(x) = self.data.first() else { return None };
+        x.edges.iter().min()
+    }
+
     // -- internal methods -- //
     
     fn next(&self, c_index:usize, e_index:usize) -> Option<(usize, usize)> {
@@ -295,6 +300,10 @@ pub struct Component {
 }
 
 impl Component { 
+    pub fn edges(&self) -> &Vec<Edge> { 
+        &self.edges
+    }
+
     pub fn is_adj(&self, other: &Component, link: &Link) -> bool { 
         // 1) find crossings `x` that touche `self`. 
         // 2) check if `x` also touches `other`.

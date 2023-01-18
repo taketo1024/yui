@@ -25,8 +25,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let cube = KhCube::new_ht(&link, h, t);
         let grid = RModGrid::new(cube.h_range(), |i| {
             let gens = if reduced {
-                // TODO 
-                cube.generators(i) 
+                let e = link.first_edge().unwrap();
+                cube.reduced_generators(i, e)
             } else { 
                 cube.generators(i) 
             };
@@ -115,10 +115,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn new(l: &Link) -> Self { 
+    pub fn new(l: Link, reduced: bool) -> Self { 
         use grouping_by::GroupingBy;
 
-        let cube = KhCube::new(l);
+        let cube = KhCube::new(&l);
         let h_range = cube.h_range();
         let q_range = cube.q_range();
         
@@ -130,7 +130,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let q0 = cube.shift().1;
         let mut gens: HashMap<_, _> = h_range.clone().map(|i| { 
-            let set = cube.generators(i).into_iter().grouping_by(|x| x.q_deg() + q0);
+            let gens = if reduced {
+                let e = l.first_edge().unwrap();
+                cube.reduced_generators(i, e)
+            } else { 
+                cube.generators(i) 
+            };
+
+            let set = gens.into_iter().grouping_by(|x| 
+                x.q_deg() + q0
+            );
             (i, set)
         }).collect();
 
@@ -146,6 +155,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         });
 
         Self { cube, grid }
+    }
+
+    pub fn unreduced(l: Link) -> Self { 
+        Self::new(l, false)
+    }
+
+    pub fn reduced(l: Link) -> Self { 
+        Self::new(l, true)
     }
 }
 

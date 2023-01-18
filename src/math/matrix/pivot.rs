@@ -1,8 +1,16 @@
-use std::{collections::{HashSet, HashMap, VecDeque}, cmp::Ordering, slice::Iter};
+// Implementation based on:
+// 
+// "Parallel Sparse PLUQ Factorization modulo p", Charles Bouillaguet, Claire Delaplace, Marie-Emilie Voge.
+// https://hal.inria.fr/hal-01646133/document
+// 
+// see also: SpaSM (Sparse direct Solver Modulo p)
+// https://github.com/cbouilla/spasm
 
+use std::slice::Iter;
+use std::cmp::Ordering;
+use std::collections::{HashSet, HashMap, VecDeque};
 use itertools::Itertools;
 use sprs::{CsMat, PermOwned};
-
 use crate::math::traits::{Ring, RingOps};
 
 pub const MAX_PIVOTS: usize = 300_000;

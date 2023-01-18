@@ -115,7 +115,7 @@ mod tests {
     #[test]
     fn trefoil() { 
         let l = Link::trefoil().mirror();
-        let c = KhComplex::new_ht(l, 1, 0);
+        let c = KhComplex::unreduced_ht(l, 1, 0);
         let zs = c.canon_cycles();
 
         for z in zs { 
@@ -128,7 +128,7 @@ mod tests {
     #[test]
     fn figure8() { 
         let l = Link::figure8();
-        let c = KhComplex::new_ht(l, 1, 0);
+        let c = KhComplex::unreduced_ht(l, 1, 0);
         let zs = c.canon_cycles();
 
         for z in zs { 

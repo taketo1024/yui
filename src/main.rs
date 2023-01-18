@@ -8,7 +8,7 @@ fn main() {
     let l = Link::from(pd);
 
     measure(|| {
-        let h = KhHomology::<i32>::new(l);
+        let h = KhHomology::<i32>::unreduced(l);
         println!("{h}");
     });
 }

@@ -21,18 +21,35 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn new(l: Link) -> Self { 
-        Self::new_ht(l, R::zero(), R::zero())
-    }
-
-    pub fn new_ht(link: Link, h: R, t: R) -> Self { 
+    pub fn new(link: Link, h: R, t: R, reduced: bool) -> Self { 
         let cube = KhCube::new_ht(&link, h, t);
         let grid = RModGrid::new(cube.h_range(), |i| {
-            let gens = cube.generators(i);
+            let gens = if reduced {
+                // TODO 
+                cube.generators(i) 
+            } else { 
+                cube.generators(i) 
+            };
             let s = FreeRModStr::new(gens);
             Some(s)
         });
         KhComplex { link, cube, grid }
+    }
+
+    pub fn unreduced(l: Link) -> Self { 
+        Self::new(l, R::zero(), R::zero(), false)
+    }
+
+    pub fn unreduced_ht(l: Link, h: R, t: R) -> Self { 
+        Self::new(l, h, t, false)
+    }
+
+    pub fn reduced(l: Link) -> Self { 
+        Self::new(l, R::zero(), R::zero(), true)
+    }
+
+    pub fn reduced_ht(l: Link, h: R, t: R) -> Self { 
+        Self::new(l, h, t, true)
     }
 
     pub fn link(&self) -> &Link { 
@@ -179,7 +196,7 @@ mod tests {
     #[test]
     fn kh_empty() {
         let l = Link::empty();
-        let c = KhComplex::<i32>::new(l);
+        let c = KhComplex::<i32>::unreduced(l);
 
         assert_eq!(c.range(), 0..=0);
         c.check_d_all();
@@ -188,7 +205,7 @@ mod tests {
     #[test]
     fn kh_unknot() {
         let l = Link::unknot();
-        let c = KhComplex::<i32>::new(l);
+        let c = KhComplex::<i32>::unreduced(l);
 
         assert_eq!(c.range(), 0..=0);
         c.check_d_all();
@@ -197,7 +214,7 @@ mod tests {
     #[test]
     fn kh_trefoil() {
         let l = Link::trefoil();
-        let c = KhComplex::<i32>::new(l);
+        let c = KhComplex::<i32>::unreduced(l);
 
         assert_eq!(c.range(), -3..=0);
         assert_eq!(c[-3].generators().len(), 8);
@@ -211,7 +228,7 @@ mod tests {
     #[test]
     fn kh_figure8() {
         let l = Link::figure8();
-        let c = KhComplex::<i32>::new(l);
+        let c = KhComplex::<i32>::unreduced(l);
 
         assert_eq!(c.range(), -2..=2);
         assert_eq!(c[-2].generators().len(), 8);

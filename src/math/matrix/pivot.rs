@@ -220,15 +220,20 @@ impl PivotFinder {
     }
 
     fn find_cycle_free_pivots(&mut self) {
+        let n = self.ncols();
+        let mut w = RowWorker::new(n);
+
         for i in self.remain_rows() { 
             if !self.can_insert() { break }
-            if let Some(j) = self.cycle_free_pivot_in(i) { 
+
+            if let Some(j) = self.cycle_free_pivot_in(i, &mut w) { 
                 self.set_pivot(i, j);
             }
+            w.clear();
         }
      }
 
-    fn cycle_free_pivot_in(&self, i: usize) -> Option<Col> {
+    fn cycle_free_pivot_in(&self, i: usize, w: &mut RowWorker) -> Option<Col> {
         
         //       j          j2
         //  i [  o   #   #   #      # ]    *: pivot,
@@ -241,34 +246,32 @@ impl PivotFinder {
         //                       |  
 
         let mut queue = VecDeque::new();
-        let mut added = HashSet::new();
-        let mut cands = HashSet::new();
 
         for &j in self.nz_cols(i) {
             if self.is_piv_col(j) {
                 queue.push_back(j);
-                added.insert(j);
+                w.set_occupied(j);
             } else if self.is_candidate(i, j) {
-                cands.insert(j);
+                w.set_candidate(j);
             }
         }
 
-        while !queue.is_empty() && !cands.is_empty() { 
+        while !queue.is_empty() && w.has_candidate() { 
             let j = queue.pop_front().unwrap();
             let i2 = self.piv_row(j).unwrap();
 
             for &j2 in self.nz_cols(i2) { 
-                if self.is_piv_col(j2) && !added.contains(&j2) { 
+                if self.is_piv_col(j2) && !w.is_occupied(j2) { 
                     queue.push_back(j2);
-                    added.insert(j2);
-                } else if cands.contains(&j2) { 
-                    cands.remove(&j2);
-                    if cands.is_empty() { break }
+                    w.set_occupied(j2);
+                } else if w.is_candidate(j2) { 
+                    w.set_occupied(j2);
+                    if !w.has_candidate() { break }
                 }
             }
         }
 
-        cands.into_iter().sorted_by(|&j1, &j2| 
+        w.collect_candidates().into_iter().sorted_by(|&j1, &j2| 
             self.cmp_cols(j1, j2)
         ).next()
     }
@@ -290,6 +293,57 @@ impl PivotFinder {
             let i = self.pivots[&j];
             (i, j)
         }).collect_vec()
+    }
+}
+
+struct RowWorker { 
+    status: Vec<i8>,
+    ncand: usize
+}
+
+impl RowWorker {
+    fn new(size: usize) -> Self { 
+        let status = vec![0; size];
+        RowWorker { status, ncand: 0 }
+    }
+
+    fn clear(&mut self) {
+        self.status.fill(0);
+        self.ncand = 0;
+    }
+
+    fn has_candidate(&self) -> bool { 
+        self.ncand > 0
+    }
+
+    fn is_candidate(&self, i: usize) -> bool { 
+        self.status[i] == 1
+    }
+
+    fn set_candidate(&mut self, i: usize) { 
+        self.status[i] = 1;
+        self.ncand += 1;
+    }
+
+    fn collect_candidates(&self) -> Vec<usize> { 
+        self.status.iter().enumerate().filter_map(|(i, &s)| 
+            if s == 1 { 
+                Some(i)
+            } else { 
+                None
+            }
+        ).collect()
+    }
+
+    fn is_occupied(&self, i: usize) -> bool { 
+        self.status[i] == -1
+    }
+
+    fn set_occupied(&mut self, i: usize) { 
+        if self.is_candidate(i) { 
+            self.ncand -= 1;
+        }
+        self.status[i] = -1;
     }
 }
 

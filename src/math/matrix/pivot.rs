@@ -23,11 +23,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 pub fn find_pivots_upto<R>(a: &CsMat<R>, max_pivots: usize) -> Vec<(usize, usize)>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let mut pf = PivotFinder::new(a, max_pivots);
-
-    pf.find_fl_pivots();
-    pf.find_fl_col_pivots();
-    pf.find_cycle_free_pivots();
-
+    pf.find_pivots();
     pf.result()
 }
 
@@ -57,83 +53,52 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 type Row = usize;
 type Col = usize;
-struct PivotFinder {
-    shape: (usize, usize),
-    entries: Vec<Vec<Col>>,     // [row -> [col]]
-    row_wght: Vec<f32>,         // [row -> weight]
-    col_wght: Vec<f32>,         // [col -> weight]
-    cands: Vec<HashSet<Col>>,   // [row -> [col]]
+
+pub struct PivotFinder {
+    str: MatrixStr,
     pivots: PivotData,
     max_pivots: usize
 }
 
-#[allow(unused)]
 impl PivotFinder { 
-    fn new<R>(a: &CsMat<R>, max_pivots: usize) -> Self
+    pub fn new<R>(a: &CsMat<R>, max_pivots: usize) -> Self
     where R: Ring, for<'x> &'x R: RingOps<R> {
-        let shape = a.shape();
-        let (m, n) = shape;
-        let mut entries = vec![vec![]; m];
-        let mut row_wght = vec![0f32; m];
-        let mut col_wght = vec![0f32; n];
-        let mut cands = vec![HashSet::new(); m];
+        let str = MatrixStr::from(a);
+        let pivots = PivotData::new(a.cols());
+        PivotFinder{ str, pivots, max_pivots }
+    }
 
-        for (r, (i, j)) in a.iter() { 
-            if r.is_zero() { continue }
-            entries[i].push(j);
+    pub fn find_pivots(&mut self) {
+        self.find_fl_pivots();
+        self.find_fl_col_pivots();
+        self.find_cycle_free_pivots();
+    }
 
-            let w = 1f32; // TODO
-            row_wght[i] += w;
-            col_wght[j] += w;
-
-            if r.is_unit() { 
-                cands[i].insert(j);
+    pub fn result(&self) -> Vec<(usize, usize)> { 
+        use topological_sort::TopologicalSort;
+        let mut ts = TopologicalSort::new();
+        
+        for (i, j) in self.pivots.iter() { 
+            ts.insert(j);
+            for &j2 in self.str.cols_in(i) { 
+                if j != j2 && self.pivots.has_col(j2) {
+                    ts.add_dependency(j, j2);
+                }
             }
         }
-        
-        let pivots = PivotData::new(n);
 
-        PivotFinder{ shape, entries, row_wght, col_wght, cands, pivots, max_pivots }
+        ts.into_iter().map(|j| {
+            let i = self.pivots.row_for(j).unwrap();
+            (i, j)
+        }).collect_vec()
     }
 
-    fn nrows(&self) -> Row { 
-        self.shape.0
+    fn rows(&self) -> Row { 
+        self.str.shape.0
     }
 
-    fn ncols(&self) -> Col { 
-        self.shape.1
-    }
-
-    fn is_empty_row(&self, i: Row) -> bool { 
-        self.entries[i].is_empty()
-    }
-
-    fn row_head(&self, i: Row) -> Option<Col> {
-        self.entries[i].first().copied()
-    }
-
-    fn nz_cols(&self, i: Row) -> Iter<Col> {
-        self.entries[i].iter()
-    }
-
-    fn cmp_rows(&self, i1: Row, i2: Row) -> Ordering {
-        if let Some(o) = self.row_wght[i1].partial_cmp(&self.row_wght[i2]) { 
-            o.then(Ord::cmp(&i1, &i2))
-        } else { 
-            Ordering::Equal
-        }
-    }
-
-    fn cmp_cols(&self, j1: Col, j2: Col) -> Ordering {
-        if let Some(o) = self.col_wght[j1].partial_cmp(&self.col_wght[j2]) { 
-            o.then(Ord::cmp(&j1, &j2))
-        } else {
-            Ordering::Equal
-        }
-    }
-
-    fn is_candidate(&self, i: Row, j: Col) -> bool { 
-        self.cands[i].contains(&j)
+    fn cols(&self) -> Col { 
+        self.str.shape.1
     }
 
     fn can_insert(&self) -> bool { 
@@ -142,18 +107,18 @@ impl PivotFinder {
 
     fn remain_rows(&self) -> impl Iterator<Item = Row> + '_ { 
         let piv_rows: HashSet<_> = self.pivots.iter().map(|(i, _)| i).collect();
-        let m = self.nrows();
+        let m = self.rows();
 
         (0 .. m).filter(|&i| 
-            !piv_rows.contains(&i) && !self.is_empty_row(i)
+            !piv_rows.contains(&i) && !self.str.is_empty_row(i)
         ).sorted_by(|&i1, &i2| 
-            self.cmp_rows(i1, i2)
+            self.str.cmp_rows(i1, i2)
         )
     }
 
     fn occupied_cols(&self) -> HashSet<Col> {
         self.pivots.iter().fold(HashSet::new(), |mut res, (i, _)| {
-            for &j in self.nz_cols(i) { 
+            for &j in self.str.cols_in(i) { 
                 res.insert(j);
             }
             res
@@ -165,9 +130,9 @@ impl PivotFinder {
         for i in remain_rows {
             if !self.can_insert() { break }
 
-            let Some(j) = self.row_head(i) else { continue };
+            let Some(j) = self.str.head_col_in(i) else { continue };
 
-            if !self.pivots.has_col(j) && self.is_candidate(i, j) {
+            if !self.pivots.has_col(j) && self.str.is_candidate(i, j) {
                 self.pivots.set(i, j);
             }
         }
@@ -182,26 +147,26 @@ impl PivotFinder {
 
             let mut cands = vec![];
 
-            for &j in self.nz_cols(i) { 
-                if !occ_cols.contains(&j) && self.is_candidate(i, j) {
+            for &j in self.str.cols_in(i) { 
+                if !occ_cols.contains(&j) && self.str.is_candidate(i, j) {
                     cands.push(j);
                 }
             }
 
             let Some(j) = cands.into_iter().sorted_by(|&j1, &j2| 
-                self.cmp_cols(j1, j2)
+                self.str.cmp_cols(j1, j2)
             ).next() else { continue };
 
             self.pivots.set(i, j);
 
-            for &j in self.nz_cols(i) { 
+            for &j in self.str.cols_in(i) { 
                 occ_cols.insert(j);
             }
         }
     }
 
     fn find_cycle_free_pivots(&mut self) {
-        let n = self.ncols();
+        let n = self.cols();
         let remain_rows: Vec<_> = self.remain_rows().collect();
 
         let mut w = RowWorker::new(n);
@@ -230,11 +195,11 @@ impl PivotFinder {
 
         let mut queue = VecDeque::new();
 
-        for &j in self.nz_cols(i) {
+        for &j in self.str.cols_in(i) {
             if self.pivots.has_col(j) {
                 queue.push_back(j);
                 w.set_occupied(j);
-            } else if self.is_candidate(i, j) {
+            } else if self.str.is_candidate(i, j) {
                 w.set_candidate(j);
             }
         }
@@ -243,7 +208,7 @@ impl PivotFinder {
             let j = queue.pop_front().unwrap();
             let i2 = self.pivots.row_for(j).unwrap();
 
-            for &j2 in self.nz_cols(i2) { 
+            for &j2 in self.str.cols_in(i2) { 
                 if self.pivots.has_col(j2) && !w.is_occupied(j2) { 
                     queue.push_back(j2);
                     w.set_occupied(j2);
@@ -255,27 +220,75 @@ impl PivotFinder {
         }
 
         w.collect_candidates().into_iter().sorted_by(|&j1, &j2| 
-            self.cmp_cols(j1, j2)
+            self.str.cmp_cols(j1, j2)
         ).next()
     }
+}
 
-    fn result(&self) -> Vec<(usize, usize)> { 
-        use topological_sort::TopologicalSort;
-        let mut ts = TopologicalSort::new();
-        
-        for (i, j) in self.pivots.iter() { 
-            ts.insert(j);
-            for &j2 in self.nz_cols(i) { 
-                if j != j2 && self.pivots.has_col(j2) {
-                    ts.add_dependency(j, j2);
-                }
+struct MatrixStr { 
+    shape: (usize, usize),
+    entries: Vec<Vec<Col>>,     // [row -> [col]]
+    cands: Vec<HashSet<Col>>,   // [row -> [col]]
+    row_wght: Vec<f32>,         // [row -> weight]
+    col_wght: Vec<f32>,         // [col -> weight]
+}
+
+impl MatrixStr { 
+    fn from<R>(a: &CsMat<R>) -> Self
+    where R: Ring, for<'x> &'x R: RingOps<R> { 
+        let shape = a.shape();
+        let (m, n) = shape;
+        let mut entries = vec![vec![]; m];
+        let mut row_wght = vec![0f32; m];
+        let mut col_wght = vec![0f32; n];
+        let mut cands = vec![HashSet::new(); m];
+
+        for (r, (i, j)) in a.iter() { 
+            if r.is_zero() { continue }
+            entries[i].push(j);
+
+            let w = 1f32; // TODO
+            row_wght[i] += w;
+            col_wght[j] += w;
+
+            if r.is_unit() { 
+                cands[i].insert(j);
             }
         }
 
-        ts.into_iter().map(|j| {
-            let i = self.pivots.row_for(j).unwrap();
-            (i, j)
-        }).collect_vec()
+        Self { shape, entries, cands, row_wght, col_wght }
+    }
+
+    fn is_empty_row(&self, i: Row) -> bool { 
+        self.entries[i].is_empty()
+    }
+
+    fn head_col_in(&self, i: Row) -> Option<Col> {
+        self.entries[i].first().copied()
+    }
+
+    fn cols_in(&self, i: Row) -> Iter<Col> {
+        self.entries[i].iter()
+    }
+
+    fn cmp_rows(&self, i1: Row, i2: Row) -> Ordering {
+        if let Some(o) = self.row_wght[i1].partial_cmp(&self.row_wght[i2]) { 
+            o.then(Ord::cmp(&i1, &i2))
+        } else { 
+            Ordering::Equal
+        }
+    }
+
+    fn cmp_cols(&self, j1: Col, j2: Col) -> Ordering {
+        if let Some(o) = self.col_wght[j1].partial_cmp(&self.col_wght[j2]) { 
+            o.then(Ord::cmp(&j1, &j2))
+        } else {
+            Ordering::Equal
+        }
+    }
+
+    fn is_candidate(&self, i: Row, j: Col) -> bool { 
+        self.cands[i].contains(&j)
     }
 }
 
@@ -373,7 +386,7 @@ mod tests {
     use super::*;
  
     #[test]
-    fn init() {
+    fn str_init() {
         let a = CsMat::csc_from_vec((6, 9), vec![
             1, 0, 1, 0, 0, 1, 1, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 2, 0,
@@ -382,9 +395,9 @@ mod tests {
             0, 1, 0, 1, 0, 0, 1, 0, 1,
             1, 0, 1, 0, 1, 1, 0, 1, 1
         ]);
-        let pf = PivotFinder::new(&a, MAX_PIVOTS);
+        let str = MatrixStr::from(&a);
 
-        assert_eq!(pf.entries, vec![
+        assert_eq!(str.entries, vec![
             vec![0,2,5,6,8], 
             vec![1,2,3,5,7], 
             vec![2,3,7,8], 
@@ -392,9 +405,9 @@ mod tests {
             vec![1,3,6,8], 
             vec![0,2,4,5,7,8]]
         );
-        assert_eq!(pf.row_wght, vec![5f32,5f32,4f32,3f32,4f32,6f32]);
-        assert_eq!(pf.col_wght, vec![2f32,3f32,5f32,3f32,2f32,3f32,2f32,3f32,4f32]);
-        assert_eq!(pf.cands, vec![
+        assert_eq!(str.row_wght, vec![5f32,5f32,4f32,3f32,4f32,6f32]);
+        assert_eq!(str.col_wght, vec![2f32,3f32,5f32,3f32,2f32,3f32,2f32,3f32,4f32]);
+        assert_eq!(str.cands, vec![
             hashset!{0,2,5,6,8},
             hashset!{1,2,3,5},
             hashset!{2,3,7,8},
@@ -405,27 +418,27 @@ mod tests {
     }
 
     #[test]
-    fn row_head() {
+    fn str_row_head() {
         let a = CsMat::csc_from_vec((4, 4), vec![
             1, 0, 1, 0,
             0, 1, 1, 1,
             0, 0, 0, 0,
             0, 0, 1, 1,
         ]);
-        let pf = PivotFinder::new(&a, MAX_PIVOTS);
+        let str = MatrixStr::from(&a);
 
-        assert_eq!(pf.row_head(0), Some(0));
-        assert_eq!(pf.row_head(1), Some(1));
-        assert_eq!(pf.row_head(2), None);
-        assert_eq!(pf.row_head(3), Some(2));
+        assert_eq!(str.head_col_in(0), Some(0));
+        assert_eq!(str.head_col_in(1), Some(1));
+        assert_eq!(str.head_col_in(2), None);
+        assert_eq!(str.head_col_in(3), Some(2));
     }
 
     #[test]
     fn rows_cols() {
         let a = CsMat::<i32>::csc_from_vec((4, 3), vec![]);
         let pf = PivotFinder::new(&a, MAX_PIVOTS);
-        assert_eq!(pf.nrows(), 4);
-        assert_eq!(pf.ncols(), 3);
+        assert_eq!(pf.rows(), 4);
+        assert_eq!(pf.cols(), 3);
     }
 
     #[test]

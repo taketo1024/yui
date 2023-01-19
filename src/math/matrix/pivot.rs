@@ -74,7 +74,6 @@ impl PivotFinder {
         let shape = a.shape();
         let (m, n) = shape;
         let mut entries = vec![vec![]; m];
-        let mut row_head = vec![n; m];
         let mut row_wght = vec![0f32; m];
         let mut col_wght = vec![0f32; n];
         let mut cands = vec![HashSet::new(); m];
@@ -87,10 +86,6 @@ impl PivotFinder {
             let w = 1f32; // TODO
             row_wght[i] += w;
             col_wght[j] += w;
-
-            if row_head[i] == n || j < row_head[i] { 
-                row_head[i] = j;
-            }
 
             if r.is_unit() { 
                 cands[i].insert(j);

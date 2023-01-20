@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::mem::replace;
 use std::ops::DerefMut;
 use std::sync::Arc;
-use itertools::Itertools;
+use either::Either;
 use sprs::{CsMat, CsVec};
 use rayon::prelude::*;
 use thread_local::ThreadLocal;
@@ -11,32 +11,51 @@ use crate::math::matrix::sparse::CsVecExt;
 
 use super::sparse::CsMatExt;
 
-pub fn inv_upper_tri<R>(u: &CsMat<R>) -> CsMat<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    let e = CsMat::id(u.rows());
-    solve_upper_tri_mat(u, &e)
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum TriangularType { 
+    Upper, Lower
 }
 
-pub fn solve_upper_tri_mat<R>(u: &CsMat<R>, y: &CsMat<R>) -> CsMat<R>
+impl TriangularType { 
+    pub fn is_upper(&self) -> bool { 
+        match self { 
+            Self::Upper => true,
+            Self::Lower => false
+        }
+    }
+}
+
+pub fn inv_triangular<R>(t: TriangularType, a: &CsMat<R>) -> CsMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    assert!(u.is_csc());
+    let e = CsMat::id(a.rows());
+    solve_triangular(t, a, &e)
+}
+
+pub fn solve_triangular<R>(t: TriangularType, a: &CsMat<R>, y: &CsMat<R>) -> CsMat<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    assert!(a.is_csc());
     assert!(y.is_csc());
-    debug_assert!(is_upper_tri(u));
+    assert_eq!(a.rows(), y.rows());
+
+    if t.is_upper() { 
+        debug_assert!(is_upper_tri(a));
+    } else { 
+        // TODO
+    }
 
     const MULTI_THREAD: bool = true;
 
     if MULTI_THREAD { 
-        solve_upper_tri_m(u, y)
+        solve_triangular_m(t, a, y)
     } else { 
-        solve_upper_tri_s(u, y)
+        solve_triangular_s(t, a, y)
     }
 }
 
-fn solve_upper_tri_s<R>(u: &CsMat<R>, y: &CsMat<R>) -> CsMat<R>
+fn solve_triangular_s<R>(t: TriangularType, a: &CsMat<R>, y: &CsMat<R>) -> CsMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let shape = u.shape();
-    let n = u.rows();
-    let diag = diag(&u);
+    let (n, k) = (a.rows(), y.cols());
+    let diag = diag(t, &a);
 
     let mut count = 0;
     let mut indptr = vec![0];
@@ -46,14 +65,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let mut x = vec![R::zero(); n];
     let mut b = vec![R::zero(); n];
 
-    for j in 0..n { 
+    for j in 0..k { 
         for (i, r) in y.outer_view(j).unwrap().iter() { 
             b[i] = r.clone();
         }
 
-        solve_upper_tri_into(&u, &diag, &mut b, &mut x);
+        solve_triangular_into(t, &a, &diag, &mut b, &mut x);
 
-        for i in 0..=n { 
+        for i in 0..n { 
             if x[i].is_zero() { continue }
             let x_i = replace(&mut x[i], R::zero());
 
@@ -65,19 +84,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         indptr.push(count);
     }
 
-    CsMat::new_csc(shape, indptr, indices, data)
+    CsMat::new_csc((n, k), indptr, indices, data)
 }
 
-fn solve_upper_tri_m<R>(u: &CsMat<R>, y: &CsMat<R>) -> CsMat<R>
+fn solve_triangular_m<R>(t: TriangularType, a: &CsMat<R>, y: &CsMat<R>) -> CsMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let shape = u.shape();
-    let n = u.rows();
-    let diag = diag(&u);
+    let (n, k) = (a.rows(), y.cols());
+    let diag = diag(t, &a);
 
     let tls1 = Arc::new(ThreadLocal::new());
     let tls2 = Arc::new(ThreadLocal::new());
 
-    let result: Vec<_> = (0..n).into_par_iter().map(|j| -> Vec<_> { 
+    let result: Vec<_> = (0..k).into_par_iter().map(|j| -> Vec<_> { 
         let mut x_st = tls1.get_or(|| {
             let x = vec![R::zero(); n];
             RefCell::new(x)
@@ -95,7 +113,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             b[i] = r.clone();
         }
 
-        solve_upper_tri_into(&u, &diag, b, x);
+        solve_triangular_into(t, &a, &diag, b, x);
 
         (0..n).filter_map(|i| { 
             if x[i].is_zero() { return None }
@@ -122,39 +140,51 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         (indptr, indices, data)
     };
 
-    CsMat::new_csc(shape, indptr, indices, data)
+    CsMat::new_csc((n, k), indptr, indices, data)
 }
 
-pub fn solve_upper_tri<R>(u: &CsMat<R>, b: &CsVec<R>) -> CsVec<R>
+pub fn solve_triangular_vec<R>(t: TriangularType, a: &CsMat<R>, b: &CsVec<R>) -> CsVec<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    assert!(u.is_csc());
-    debug_assert!(is_upper_tri(u));
+    assert!(a.is_csc());
+    assert_eq!(a.rows(), b.dim());
 
-    let n = u.rows();
-    let diag = diag(&u);
+    if t.is_upper() { 
+        debug_assert!(is_upper_tri(a));
+    } else { 
+        // TODO
+    }
+
+    let n = a.rows();
+    let diag = diag(t, &a);
 
     let mut x = vec![R::zero(); n];
     let mut b = b.to_dense().to_vec();
 
-    solve_upper_tri_into(u, &diag, &mut b, &mut x);
+    solve_triangular_into(t, a, &diag, &mut b, &mut x);
 
     CsVec::from_vec(x)
 }
 
-fn solve_upper_tri_into<R>(u: &CsMat<R>, diag: &Vec<&R>, b: &mut Vec<R>, x: &mut Vec<R>)
+fn solve_triangular_into<R>(t: TriangularType, a: &CsMat<R>, diag: &Vec<&R>, b: &mut Vec<R>, x: &mut Vec<R>)
 where R: Ring, for<'x> &'x R: RingOps<R> {
     debug_assert!(x.iter().all(|x_i| 
         x_i.is_zero())
     ); 
 
-    let n = u.rows();
-    for j in (0..n).rev() {
+    let n = a.rows();
+    let range = if t.is_upper() { 
+        Either::Left((0..n).rev())
+    } else { 
+        Either::Right(0..n)
+    };
+
+    for j in range {
         if b[j].is_zero() { continue }
 
         let u_jj_inv = diag[j].inv().unwrap();
         let x_j = &b[j] * &u_jj_inv; // non-zero
 
-        for (i, u_ij) in u.outer_view(j).unwrap().iter() {
+        for (i, u_ij) in a.outer_view(j).unwrap().iter() {
             if u_ij.is_zero() { continue }
             b[i] -= u_ij * &x_j;
         }
@@ -167,15 +197,22 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     );
 }
 
-fn diag<'a, R>(u: &'a CsMat<R>) -> Vec<&'a R> {
-    let n = u.rows();
-    let indptr = u.indptr();
-    let data = u.data();
+fn diag<'a, R>(t: TriangularType, a: &'a CsMat<R>) -> Vec<&'a R> {
+    let n = a.rows();
+    let indptr = a.indptr();
+    let data = a.data();
 
-    (0..n).map( |i| {
-        let p = indptr.index(i + 1);
-        &data[p - 1]
-    }).collect_vec()
+    if t.is_upper() { 
+        (0..n).map( |i| {
+            let p = indptr.index(i + 1);
+            &data[p - 1]
+        }).collect()
+    } else { 
+        (0..n).map( |i| {
+            let p = indptr.index(i);
+            &data[p]
+        }).collect()
+    }
 }
 
 fn is_upper_tri<R>(u: &CsMat<R>) -> bool
@@ -188,15 +225,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests { 
-    use num_traits::Zero;
     use sprs::CsVec;
 
-    use crate::math::{matrix::sparse::{CsMatExt, CsVecExt}, traits::RingMethods};
-
+    use crate::math::matrix::sparse::{CsMatExt, CsVecExt};
     use super::*;
+    use super::TriangularType::{Upper, Lower};
 
     #[test]
-    fn solve() { 
+    fn solve_upper() { 
         let u = CsMat::csc_from_vec((5, 5), vec![
             1, -2, 1,  3, 5,
             0, -1, 4,  2, 1,
@@ -206,11 +242,11 @@ mod tests {
         ]);
         let x = CsVec::from_vec(vec![1,2,3,4,5]);
         let b = CsVec::from_vec(vec![37,23,18,21,5]);
-        assert_eq!(solve_upper_tri(&u, &b), x);
+        assert_eq!(solve_triangular_vec(Upper, &u, &b), x);
     }
 
     #[test]
-    fn inv() { 
+    fn inv_upper() { 
         let u = CsMat::csc_from_vec((5, 5), vec![
             1, -2, 1,  3, 5,
             0, -1, 4,  2, 1,
@@ -218,11 +254,36 @@ mod tests {
             0,  0, 0, -1, 5,
             0,  0, 0,  0, 1
         ]);
-        let uinv = inv_upper_tri(&u);
+        let uinv = inv_triangular(Upper, &u);
         let e = &u * &uinv;
+        assert!(e.is_id());
+    }
 
-        assert!(e.iter().all(|(a, (i, j))|
-            (i == j && a.is_unit()) || (i != j && a.is_zero())
-        ))
+    #[test]
+    fn solve_lower() { 
+        let l = CsMat::csc_from_vec((5, 5), vec![
+            1,  0, 0,  0, 0,
+           -2, -1, 0,  0, 0,
+            1,  4, 1,  0, 0,
+            3,  2, 0, -1, 0,
+            5,  1, 3,  5, 1
+        ]);
+        let x = CsVec::from_vec(vec![1,2,3,4,5]);
+        let b = CsVec::from_vec(vec![1,-4,12,3,41]);
+        assert_eq!(solve_triangular_vec(Lower, &l, &b), x);
+    }
+
+    #[test]
+    fn inv_lower() { 
+        let l = CsMat::csc_from_vec((5, 5), vec![
+            1,  0, 0,  0, 0,
+           -2, -1, 0,  0, 0,
+            1,  4, 1,  0, 0,
+            3,  2, 0, -1, 0,
+            5,  1, 3,  5, 1
+        ]);
+        let linv = inv_triangular(Lower, &l);
+        let e = &l * &linv;
+        assert!(e.is_id());
     }
 }

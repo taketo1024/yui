@@ -1,16 +1,17 @@
 use sprs::{CsMat, CsVec};
 
 use crate::math::matrix::sparse::CsVecExt;
+use crate::math::matrix::triang::TriangularType;
 use crate::math::traits::{Ring, RingOps};
 use super::sparse::CsMatExt;
-use super::triang::inv_upper_tri;
+use super::triang::inv_triangular;
 
 pub fn schur_partial_upper_triang<R>(a: CsMat<R>, r: usize) -> Schur<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     assert!(a.is_csc());
 
     let [u, b, c, d] = a.divide4(r, r);
-    let uinv = inv_upper_tri(&u);
+    let uinv = inv_triangular(TriangularType::Upper, &u);
     let s = Schur::new(u, uinv, b, c, d);
 
     s

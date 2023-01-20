@@ -1,7 +1,7 @@
 use sprs::{CsMat, CsVec, PermOwned};
 use crate::math::matrix::sparse::{CsMatExt, CsVecExt};
 use crate::math::matrix::pivot::{perms_by_pivots, find_pivots_upto, PivotType};
-use crate::math::matrix::schur::{schur_partial_upper_triang, Schur};
+use crate::math::matrix::schur::SchurLT;
 use crate::math::traits::{Ring, RingOps};
 
 //          [x]          [a b]
@@ -79,20 +79,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         const MAX_PIVOTS: usize = 300_000;
 
         let a1 = &self.a1;
-        let pivs = find_pivots_upto(a1, MAX_PIVOTS, PivotType::Rows);
+        let pivs = find_pivots_upto(a1, MAX_PIVOTS, PivotType::Cols);
         let (p, q) = perms_by_pivots(a1, &pivs);
         let r = pivs.len();
 
         (p, q, r)
     }
 
-    fn schur(&self, p: &PermOwned, q: &PermOwned, r: usize) -> Schur<R> {
+    fn schur(&self, p: &PermOwned, q: &PermOwned, r: usize) -> SchurLT<R> {
         let a1 = &self.a1;
         let b1 = a1.permute(p.view(), q.view());
-        schur_partial_upper_triang(b1, r)
+        SchurLT::from_partial_lower(b1, r)
     }
 
-    fn reduce_matrices(&mut self, p: &PermOwned, q: &PermOwned, r: usize, s: &Schur<R>) {
+    fn reduce_matrices(&mut self, p: &PermOwned, q: &PermOwned, r: usize, s: &SchurLT<R>) {
         let (a0, a2) = (&self.a0, &self.a2);
 
         self.a0 = Self::reduce_rows(a0, q, r);
@@ -110,7 +110,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         a.permute_cols(p.view()).submatrix(0..m, r..n)
     }
 
-    fn reduce_vecs(&mut self, p: &PermOwned, q: &PermOwned, r: usize, s: &Schur<R>) {
+    fn reduce_vecs(&mut self, p: &PermOwned, q: &PermOwned, r: usize, s: &SchurLT<R>) {
         self.reduce_v1(q, r);
         self.reduce_v2(p, s);
     }
@@ -126,7 +126,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.v1 = v1;
     }
 
-    fn reduce_v2(&mut self, p: &PermOwned, s: &Schur<R>) {
+    fn reduce_v2(&mut self, p: &PermOwned, s: &SchurLT<R>) {
         if self.v2.is_empty() { return }
 
         let v2 = self.v2.iter().map(|v| {

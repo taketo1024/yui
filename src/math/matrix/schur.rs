@@ -1,10 +1,93 @@
+use once_cell::sync::OnceCell;
 use sprs::{CsMat, CsVec};
 
 use crate::math::matrix::sparse::CsVecExt;
 use crate::math::matrix::triang::TriangularType;
 use crate::math::traits::{Ring, RingOps};
 use super::sparse::CsMatExt;
-use super::triang::inv_triangular;
+use super::triang::{inv_triangular, solve_triangular, solve_triangular_vec};
+
+// A = [a b]  ~>  s = d - c a⁻¹ b.
+//     [c d]
+//
+// [a⁻¹     ] [a b] [id -a⁻¹b] = [id  ]
+// [-ca⁻¹ id] [c d] [      id]   [   s]
+
+pub struct SchurLT<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    ac: CsMat<R>, 
+    bd: CsMat<R>, 
+    pinv: OnceCell<CsMat<R>>
+}
+
+impl<R> SchurLT<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    pub fn from_partial_lower(a: CsMat<R>, r: usize) -> Self {
+        assert!(r <= a.rows());
+        assert!(r <= a.cols());
+
+        debug_assert!(a.iter().all(|(a, (i, j))| { 
+            (j < r && (i >= j || a.is_zero())) || (j >= r) 
+        }));
+
+        let [ac, bd] = a.split_hor(r);
+        let pinv = OnceCell::new();
+        Self { ac, bd, pinv }
+    }
+
+    // p⁻¹ = [a    ] : lower triangular
+    //       [c  id]
+    pub fn pinv(&self) -> &CsMat<R> { 
+        self.pinv.get_or_init(|| { 
+            let zero = |n, m| CsMat::<R>::zero((n, m));
+            let id = |n| CsMat::<R>::id(n);
+    
+            let (n, r) = self.ac.shape();
+            let right = CsMat::stack(&zero(r, n - r), &id(n - r));
+            let pinv = CsMat::concat(&self.ac, &right);
+
+            pinv
+        })
+    }
+
+    // s = d - c a⁻¹ b is given by the x2 of 
+    //
+    //   [a    ][x1] = [b]
+    //   [c  id][x2]   [d].
+    //
+    pub fn complement(&self) -> CsMat<R> {
+        let r = self.ac.cols();
+        let pinv = self.pinv();
+        let x = solve_triangular(TriangularType::Lower, pinv, &self.bd);
+        let [_, x2] = x.split_ver(r);
+        x2
+    }
+
+    // Given 
+    //
+    //   v = [v1], 
+    //       [v2]
+    //
+    // returns: 
+    //
+    //   [-ca⁻¹ id][v1] = v2 - ca⁻¹v1
+    //             [v2] 
+    //
+    // which is given by the x2 of
+    //
+    //   [a    ][x1] = [v1]
+    //   [c  id][x2]   [v2].
+    //
+    pub fn trans_vec(&self, v: CsVec<R>) -> CsVec<R> { 
+        let r = self.ac.cols();
+        let pinv = self.pinv();
+        let x = solve_triangular_vec(TriangularType::Lower, pinv, &v);
+        let (_, x2) = x.divide2(r);
+        x2
+    }
+}
+
+// -- TODO: remove old code -- //
 
 pub fn schur_partial_upper_triang<R>(a: CsMat<R>, r: usize) -> Schur<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {

@@ -308,6 +308,7 @@ impl MatrixStr {
 
 struct PivotData { 
     data: Vec<Option<Row>>,   // col -> row
+    count: usize
 }
 
 impl PivotData { 
@@ -319,11 +320,11 @@ impl PivotData {
             a.rows()
         };
         let data = vec![None; n];
-        Self { data }
+        Self { data, count: 0 }
     }
 
     fn count(&self) -> usize { 
-        self.data.iter().filter(|c| c.is_some()).count()
+        self.count
     }
 
     fn has_col(&self, j: Col) -> bool { 
@@ -335,6 +336,9 @@ impl PivotData {
     }
 
     fn set(&mut self, i: Row, j: Col) {
+        if !self.has_col(j) { 
+            self.count += 1
+        }
         self.data[j] = Some(i)
     }
 
@@ -459,6 +463,25 @@ mod tests {
         let pf = PivotFinder::new(&a, MAX_PIVOTS, PivotType::Rows);
         assert_eq!(pf.rows(), 4);
         assert_eq!(pf.cols(), 3);
+    }
+
+    #[test]
+    fn pivot_data() { 
+        let a = CsMat::csc_from_vec((2, 4), vec![
+            1, 0, 1, 0,
+            0, 0, 1, 1,
+        ]);
+        let mut piv = PivotData::new(&a, PivotType::Rows);
+
+        assert_eq!(piv.count(), 0);
+        assert_eq!(piv.has_col(0), false);
+        assert_eq!(piv.row_for(0), None);
+
+        piv.set(1, 2);
+
+        assert_eq!(piv.count(), 1);
+        assert_eq!(piv.has_col(2), true);
+        assert_eq!(piv.row_for(2), Some(1));
     }
 
     #[test]

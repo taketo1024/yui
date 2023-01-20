@@ -6,19 +6,12 @@ use yui::links::{Link, links::Edge};
 use yui::khovanov::invariants::ss::ss_invariant;
 
 fn main() {
-    let name = "3_1";
-    let l = Link::load(name).unwrap();
-    run(&l, name, 2);
-}
-
-fn run_all() { 
+    let target = "14n19265";
+    let c: i64 = 2;
+    
     let data = load_data().expect("");
-    for (name, pd) in data.into_iter() { 
-        let l = Link::from(pd);
-        for c in [2 as i64, 3] { 
-            run(&l, &name, c)
-        }
-    }
+    let l = Link::from(data[target].clone());
+    run(&l, &target, c);
 }
 
 fn run<R>(l: &Link, name: &str, c: R) 

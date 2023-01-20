@@ -6,11 +6,16 @@
 // see also: SpaSM (Sparse direct Solver Modulo p)
 // https://github.com/cbouilla/spasm
 
+use std::cell::RefCell;
 use std::slice::Iter;
 use std::cmp::Ordering;
 use std::collections::{HashSet, VecDeque, HashMap};
+use std::sync::{Mutex, RwLock};
+use std::thread;
 use itertools::Itertools;
+use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use sprs::{CsMat, PermOwned};
+use thread_local::ThreadLocal;
 use crate::math::traits::{Ring, RingOps};
 use crate::utils::top_sort::top_sort;
 
@@ -172,6 +177,15 @@ impl PivotFinder {
     }
 
     fn find_cycle_free_pivots(&mut self) {
+        const MULTI_THREAD: bool = true;
+        if MULTI_THREAD { 
+            self.find_cycle_free_pivots_m();
+        } else {
+            self.find_cycle_free_pivots_s();
+        }
+    }
+
+    fn find_cycle_free_pivots_s(&mut self) {
         let n = self.cols();
         let remain_rows: Vec<_> = self.remain_rows().collect();
 
@@ -180,14 +194,78 @@ impl PivotFinder {
         for i in remain_rows { 
             if !self.can_insert() { break }
 
-            if let Some(j) = self.cycle_free_pivot_in(i, &mut w) { 
+            let res = Self::cycle_free_pivot_in(i, &self.str, &self.pivots, &mut w);
+
+            if let Some(j) = res { 
                 self.pivots.set(i, j);
+                println!("t: {:?}, p: {}", thread::current().id(), self.pivots.count);
             }
-            w.clear();
         }
      }
 
-    fn cycle_free_pivot_in(&self, i: usize, w: &mut RowWorker) -> Option<Col> {
+     fn find_cycle_free_pivots_m(&mut self) {
+        let th_num = std::thread::available_parallelism().map(|x| x.get()).unwrap_or(1);
+        let remain_rows = self.remain_rows().collect_vec();
+
+        if th_num == 1 || remain_rows.len() < 10000 { 
+            return self.find_cycle_free_pivots_s()
+        }
+
+        dbg!(th_num);
+
+        let n = self.cols();
+        let rw_lock = RwLock::new(
+            self.pivots.clone()
+        );
+        let tls1 = ThreadLocal::new();
+        let tls2 = ThreadLocal::new();
+
+        remain_rows.par_iter().for_each(|&i| { 
+            let mut loc_pivots = tls1.get_or(|| {
+                let loc_pivots = rw_lock.read().unwrap().clone();
+                RefCell::new( loc_pivots )
+            }).borrow_mut();
+
+            let mut w = tls2.get_or(|| { 
+                let w = RowWorker::new(n);
+                RefCell::new( w )
+            }).borrow_mut();
+
+            loop { 
+                { 
+                    let pivots = rw_lock.read().unwrap();
+                    if loc_pivots.count < pivots.count { 
+                        *loc_pivots = pivots.clone();
+                    }
+                }
+
+                let res = Self::cycle_free_pivot_in(i, &self.str, &loc_pivots, &mut w);
+    
+                if let Some(j) = res { 
+                    let mut pivots = rw_lock.write().unwrap();
+
+                    // If no changes are made in other threads, 
+                    // modify both `loc_pivots`, `pivots` and exit.
+                    // Otherwise, update `loc_pivots` and retry.
+
+                    if loc_pivots.count == pivots.count { 
+                        loc_pivots.set(i, j);
+                        pivots.set(i, j);
+                        println!("t: {:?}, p: {}", thread::current().id(), pivots.count);
+                        break
+                    } else {
+                        continue;
+                    }
+                } else { 
+                    break
+                }
+            }
+        });
+
+        self.pivots = rw_lock.into_inner().unwrap();
+     }
+
+     fn cycle_free_pivot_in(i: usize, str: &MatrixStr, pivots: &PivotData, w: &mut RowWorker) -> Option<Col> {
         
         //       j          j2
         //  i [  o   #   #   #      # ]    *: pivot,
@@ -201,21 +279,21 @@ impl PivotFinder {
 
         let mut queue = VecDeque::new();
 
-        for &j in self.str.cols_in(i) {
-            if self.pivots.has_col(j) {
+        for &j in str.cols_in(i) {
+            if pivots.has_col(j) {
                 queue.push_back(j);
                 w.set_occupied(j);
-            } else if self.str.is_candidate(i, j) {
+            } else if str.is_candidate(i, j) {
                 w.set_candidate(j);
             }
         }
 
         while !queue.is_empty() && w.has_candidate() { 
             let j = queue.pop_front().unwrap();
-            let i2 = self.pivots.row_for(j).unwrap();
+            let i2 = pivots.row_for(j).unwrap();
 
-            for &j2 in self.str.cols_in(i2) { 
-                if self.pivots.has_col(j2) && !w.is_occupied(j2) { 
+            for &j2 in str.cols_in(i2) { 
+                if pivots.has_col(j2) && !w.is_occupied(j2) { 
                     queue.push_back(j2);
                     w.set_occupied(j2);
                 } else if w.is_candidate(j2) { 
@@ -225,9 +303,13 @@ impl PivotFinder {
             }
         }
 
-        w.collect_candidates().into_iter().sorted_by(|&j1, &j2| 
-            self.str.cmp_cols(j1, j2)
-        ).next()
+        let res = w.collect_candidates().into_iter().sorted_by(|&j1, &j2| 
+            str.cmp_cols(j1, j2)
+        ).next();
+
+        w.clear();
+
+        res
     }
 }
 
@@ -304,6 +386,7 @@ impl MatrixStr {
     }
 }
 
+#[derive(Clone)]
 struct PivotData { 
     data: Vec<Option<Row>>,   // col -> row
     count: usize
@@ -580,7 +663,7 @@ mod tests {
     }
 
     #[test]
-    fn find_cycle_free_pivots() {
+    fn find_cycle_free_pivots_s() {
         let a = CsMat::csc_from_vec((6, 9), vec![
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
@@ -591,9 +674,26 @@ mod tests {
         ]);
         let mut pf = PivotFinder::new(&a, MAX_PIVOTS, PivotType::Rows);
 
-        pf.find_cycle_free_pivots();
+        pf.find_cycle_free_pivots_s();
 
         assert_eq!(pf.pivots.iter().collect_vec(), vec![(0, 0), (5, 1), (4, 2), (2, 3), (3, 4)]);
+    }
+
+    #[test]
+    fn find_cycle_free_pivots_m() {
+        let a = CsMat::csc_from_vec((6, 9), vec![
+            1, 0, 0, 0, 0, 1, 0, 0, 1,
+            0, 1, 1, 1, 0, 1, 0, 1, 0,
+            0, 0, 1, 1, 0, 0, 0, 1, 1,
+            0, 1, 0, 0, 1, 0, 0, 0, 0,
+            0, 0, 1, 0, 0, 0, 0, 0, 0,
+            0, 1, 0, 0, 0, 1, 0, 1, 0
+        ]);
+        let mut pf = PivotFinder::new(&a, MAX_PIVOTS, PivotType::Rows);
+
+        pf.find_cycle_free_pivots_m();
+
+        assert!(pf.pivots.count() >= 5);
     }
 
     #[test]

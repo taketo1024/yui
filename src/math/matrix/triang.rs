@@ -9,21 +9,31 @@ use thread_local::ThreadLocal;
 use crate::math::traits::{Ring, RingOps};
 use crate::math::matrix::sparse::CsVecExt;
 
+use super::sparse::CsMatExt;
+
 pub fn inv_upper_tri<R>(u: &CsMat<R>) -> CsMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    const MULTI_THREAD: bool = false;
+    let e = CsMat::id(u.rows());
+    solve_upper_tri_mat(u, &e)
+}
+
+pub fn solve_upper_tri_mat<R>(u: &CsMat<R>, y: &CsMat<R>) -> CsMat<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    assert!(u.is_csc());
+    assert!(y.is_csc());
+    debug_assert!(is_upper_tri(u));
+
+    const MULTI_THREAD: bool = true;
+
     if MULTI_THREAD { 
-        inv_upper_tri_m(u)
+        solve_upper_tri_m(u, y)
     } else { 
-        inv_upper_tri_s(u)
+        solve_upper_tri_s(u, y)
     }
 }
 
-fn inv_upper_tri_s<R>(u: &CsMat<R>) -> CsMat<R>
+fn solve_upper_tri_s<R>(u: &CsMat<R>, y: &CsMat<R>) -> CsMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    assert!(u.is_csc());
-    debug_assert!(is_upper_tri(u));
-
     let shape = u.shape();
     let n = u.rows();
     let diag = diag(&u);
@@ -34,14 +44,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let mut data = vec![];
 
     let mut x = vec![R::zero(); n];
-    let mut e = vec![R::zero(); n];
+    let mut b = vec![R::zero(); n];
 
     for j in 0..n { 
-        e[j] = R::one();
+        for (i, r) in y.outer_view(j).unwrap().iter() { 
+            b[i] = r.clone();
+        }
 
-        solve_upper_tri_into(&u, &diag, &mut e, &mut x);
+        solve_upper_tri_into(&u, &diag, &mut b, &mut x);
 
-        for i in 0..=j { 
+        for i in 0..=n { 
             if x[i].is_zero() { continue }
             let x_i = replace(&mut x[i], R::zero());
 
@@ -56,11 +68,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     CsMat::new_csc(shape, indptr, indices, data)
 }
 
-fn inv_upper_tri_m<R>(u: &CsMat<R>) -> CsMat<R>
+fn solve_upper_tri_m<R>(u: &CsMat<R>, y: &CsMat<R>) -> CsMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    assert!(u.is_csc());
-    debug_assert!(is_upper_tri(u));
-
     let shape = u.shape();
     let n = u.rows();
     let diag = diag(&u);
@@ -82,11 +91,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let x = x_st.deref_mut();
         let b = b_st.deref_mut();
 
-        b[j] = R::one();
+        for (i, r) in y.outer_view(j).unwrap().iter() { 
+            b[i] = r.clone();
+        }
 
         solve_upper_tri_into(&u, &diag, b, x);
 
-        (0..=j).filter_map(|i| { 
+        (0..n).filter_map(|i| { 
             if x[i].is_zero() { return None }
             let x_i = replace(&mut x[i], R::zero());
             Some((i, x_i))

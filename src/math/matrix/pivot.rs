@@ -8,10 +8,11 @@
 
 use std::slice::Iter;
 use std::cmp::Ordering;
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque, HashMap};
 use itertools::Itertools;
 use sprs::{CsMat, PermOwned};
 use crate::math::traits::{Ring, RingOps};
+use crate::utils::top_sort::top_sort;
 
 pub const MAX_PIVOTS: usize = 300_000;
 
@@ -81,17 +82,14 @@ impl PivotFinder {
     }
 
     pub fn result(&self) -> Vec<(usize, usize)> { 
-        use topological_sort::TopologicalSort;
-        let mut ts = TopologicalSort::new();
-        
-        for (i, j) in self.pivots.iter() { 
-            ts.insert(j);
-            for &j2 in self.str.cols_in(i) { 
-                if j != j2 && self.pivots.has_col(j2) {
-                    ts.add_dependency(j, j2);
-                }
-            }
-        }
+        let tree: HashMap<_, _> = self.pivots.iter().map(|(i, j)| { 
+            let list = self.str.cols_in(i).filter(|&&j2|
+                j != j2 && self.pivots.has_col(j2)
+            ).copied().collect_vec();
+            (j, list)
+        }).collect();
+
+        let ts = top_sort(tree);
 
         let row_type = self.piv_type == PivotType::Rows;
 

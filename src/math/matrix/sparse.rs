@@ -16,6 +16,8 @@ pub trait CsMatExt<R> {
     fn permute_rows(&self, p: PermView) -> CsMat<R>;
     fn permute_cols(&self, q: PermView) -> CsMat<R>;
     fn submatrix(&self, rows: Range<usize>, cols: Range<usize>) -> CsMat<R>;
+    fn split_hor(&self, k: usize) -> [CsMat<R>; 2];
+    fn split_ver(&self, k: usize) -> [CsMat<R>; 2];
     fn divide4(&self, i0: usize, j0: usize) -> [CsMat<R>; 4];
     fn combine4(blocks: [&CsMat<R>; 4]) -> CsMat<R>;
     fn concat(a: &CsMat<R>, b: &CsMat<R>) -> CsMat<R>;
@@ -127,6 +129,16 @@ where
         }
 
         trip.to_csc()
+    }
+
+    fn split_hor(&self, k: usize) -> [CsMat<R>; 2] {
+        let [a, b, _, _] = self.divide4(self.rows(), k);
+        [a, b]
+    }
+
+    fn split_ver(&self, k: usize) -> [CsMat<R>; 2] {
+        let [a, _, c, _] = self.divide4(k, self.cols());
+        [a, c]
     }
 
     fn divide4(&self, k: usize, l: usize) -> [CsMat<R>; 4] {

@@ -1,6 +1,6 @@
 use sprs::{CsMat, CsVec, PermOwned};
 use crate::math::matrix::sparse::{CsMatExt, CsVecExt};
-use crate::math::matrix::pivot::{perms_by_pivots, find_pivots_upto};
+use crate::math::matrix::pivot::{perms_by_pivots, find_pivots_upto, PivotType};
 use crate::math::matrix::schur::{schur_partial_upper_triang, Schur};
 use crate::math::traits::{Ring, RingOps};
 
@@ -79,7 +79,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         const MAX_PIVOTS: usize = 300_000;
 
         let a1 = &self.a1;
-        let pivs = find_pivots_upto(a1, MAX_PIVOTS);
+        let pivs = find_pivots_upto(a1, MAX_PIVOTS, PivotType::Rows);
         let (p, q) = perms_by_pivots(a1, &pivs);
         let r = pivs.len();
 

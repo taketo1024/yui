@@ -786,6 +786,7 @@ dependencies = [
  "itertools",
  "ndarray",
  "num-traits",
+ "once_cell",
  "polynomial",
  "prettytable-rs",
  "rand",

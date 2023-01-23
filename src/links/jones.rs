@@ -61,7 +61,7 @@ mod tests {
 
     #[test]
     fn unlink_2() {
-        let l = Link::from([[0, 1, 1, 0]]).resolved_at(0, Res1);
+        let l = Link::from(&[[0, 1, 1, 0]]).resolved_at(0, Res1);
         let p = jones_polynomial(&l);
         assert_eq!(p, P::new(vec![1, 0, 2, 0, 1], -2));
     }

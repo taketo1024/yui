@@ -10,7 +10,8 @@ fn main() {
     let c: i64 = 2;
     
     let data = load_data().expect("");
-    let l = Link::from(data[target].clone());
+    let l = Link::from(&data[target]);
+
     run(&l, &target, c);
 }
 

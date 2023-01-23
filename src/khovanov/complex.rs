@@ -270,7 +270,7 @@ mod tests {
 
     #[test]
     fn kh_unknot_twist() {
-        let l = Link::from([[0, 0, 1, 1]]);
+        let l = Link::from(&[[0, 0, 1, 1]]);
         let c = KhComplex::<i32>::unreduced(l);
 
         assert_eq!(c.range(), 0..=1);

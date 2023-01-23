@@ -27,19 +27,19 @@ impl Link {
     }
 
     pub fn unknot() -> Link { 
-        Link::from([[0, 1, 1, 0]]).resolved_at(0, Res0)
+        Link::from(&[[0, 1, 1, 0]]).resolved_at(0, Res0)
     }
 
     pub fn trefoil() -> Link { 
-        Link::from([[1,4,2,5],[3,6,4,1],[5,2,6,3]])
+        Link::from(&[[1,4,2,5],[3,6,4,1],[5,2,6,3]])
     }
 
     pub fn figure8() -> Link { 
-        Link::from([[4,2,5,1],[8,6,1,5],[6,3,7,4],[2,7,3,8]])
+        Link::from(&[[4,2,5,1],[8,6,1,5],[6,3,7,4],[2,7,3,8]])
     }
 
     pub fn hopf_link() -> Link { 
-        Link::from([[4,1,3,2],[2,3,1,4]])
+        Link::from(&[[4,1,3,2],[2,3,1,4]])
     }
 
     pub fn is_empty(&self) -> bool {
@@ -217,17 +217,17 @@ impl Link {
     }
 }
 
-impl<const N: usize> From<[[Edge; 4]; N]> for Link { 
-    fn from(pd_code: [[Edge; 4]; N]) -> Link {
-        let data = pd_code.into_iter().collect_vec(); 
-        Self::from(data)
+impl<const N: usize> From<&[[Edge; 4]; N]> for Link { 
+    fn from(pd_code: &[[Edge; 4]; N]) -> Link {
+        let data = pd_code.iter().cloned().collect_vec(); 
+        Self::from(&data)
     }
 }
 
-impl From<Vec<[Edge; 4]>> for Link { 
-    fn from(pd_code: Vec<[Edge; 4]>) -> Link { 
+impl From<&Vec<[Edge; 4]>> for Link { 
+    fn from(pd_code: &Vec<[Edge; 4]>) -> Link { 
         let data = pd_code.into_iter().map( |x| 
-            Crossing { ctype: Xn, edges: x }
+            Crossing { ctype: Xn, edges: x.clone() }
         ).collect();
         Link{ data }
     }
@@ -238,7 +238,7 @@ impl Link {
         let path = format!("{}/links/{}.json", crate::RESOURCE_DIR, name);
         let json = std::fs::read_to_string(path)?;
         let data: Vec<[Edge; 4]> = serde_json::from_str(&json)?;
-        let l = Link::from(data);
+        let l = Link::from(&data);
         Ok(l)
     }
 }
@@ -561,7 +561,7 @@ mod tests {
     #[test]
     fn link_from_pd_code() { 
         let pd_code = [[1,2,3,4]];
-        let l = Link::from(pd_code);
+        let l = Link::from(&pd_code);
         assert_eq!(l.data.len(), 1);
         assert_eq!(l.data[0].ctype, Xn);
     }
@@ -572,7 +572,7 @@ mod tests {
         assert!(l.is_empty());
 
         let pd_code = [[1,2,3,4]];
-        let l = Link::from(pd_code);
+        let l = Link::from(&pd_code);
         assert!(!l.is_empty());
     }
 
@@ -582,14 +582,14 @@ mod tests {
         assert_eq!(l.crossing_num(), 0);
 
         let pd_code = [[1,2,3,4]];
-        let l = Link::from(pd_code);
+        let l = Link::from(&pd_code);
         assert_eq!(l.crossing_num(), 1);
     }
 
     #[test]
     fn link_next() {
         let pd_code = [[0,0,1,1]];
-        let l = Link::from(pd_code);
+        let l = Link::from(&pd_code);
 
         assert_eq!(l.next(0, 0), Some((0, 1)));
         assert_eq!(l.next(0, 1), Some((0, 0)));
@@ -597,7 +597,7 @@ mod tests {
         assert_eq!(l.next(0, 3), Some((0, 2)));
 
         let pd_code = [[0,3,1,4],[3,2,2,1]];
-        let l = Link::from(pd_code);
+        let l = Link::from(&pd_code);
 
         assert_eq!(l.next(0, 0), None);
         assert_eq!(l.next(0, 2), Some((1, 3)));
@@ -609,14 +609,14 @@ mod tests {
     #[test]
     fn link_traverse() {
         let pd_code = [[0,0,1,1]];
-        let l = Link::from(pd_code);
+        let l = Link::from(&pd_code);
         let mut queue = vec![];
         l.traverse_edges(0, 0, |i, j| queue.push((i, j)));
         
         assert_eq!(queue, [(0, 0), (0, 3), (0, 0)]); // loop
 
         let pd_code = [[0,3,1,4],[3,2,2,1]];
-        let l = Link::from(pd_code);
+        let l = Link::from(&pd_code);
         let mut queue = vec![];
         l.traverse_edges(0, 0, |i, j| queue.push((i, j)));
 
@@ -626,34 +626,34 @@ mod tests {
     #[test]
     fn link_crossing_signs() {
         let pd_code = [[0,0,1,1]];
-        let l = Link::from(pd_code);
+        let l = Link::from(&pd_code);
         assert_eq!(l.crossing_signs(), vec![1]);
 
         let pd_code = [[0,1,1,0]];
-        let l = Link::from(pd_code);
+        let l = Link::from(&pd_code);
         assert_eq!(l.crossing_signs(), vec![-1]);
     }
 
     #[test]
     fn link_writhe() {
         let pd_code = [[0,0,1,1]];
-        let l = Link::from(pd_code);
+        let l = Link::from(&pd_code);
         assert_eq!(l.writhe(), 1);
 
         let pd_code = [[0,1,1,0]];
-        let l = Link::from(pd_code);
+        let l = Link::from(&pd_code);
         assert_eq!(l.writhe(), -1);
     }
 
     #[test]
     fn link_components() {
         let pd_code = [[0,0,1,1]];
-        let l = Link::from(pd_code);
+        let l = Link::from(&pd_code);
         let comps = l.components();
         assert_eq!(comps, vec![Component{ edges: vec![0, 1], closed: true }]);
 
         let pd_code = [[0,3,1,4],[3,2,2,1]];
-        let l = Link::from(pd_code);
+        let l = Link::from(&pd_code);
         let comps = l.components();
         assert_eq!(comps, vec![Component{ edges: vec![0,1,2,3,4], closed: false }]);
     }
@@ -661,7 +661,7 @@ mod tests {
     #[test]
     fn link_mirror() { 
         let pd_code = [[0,0,1,1]];
-        let l = Link::from(pd_code);
+        let l = Link::from(&pd_code);
         assert_eq!(l.data[0].ctype, Xn);
 
         let l = l.mirror();
@@ -671,7 +671,7 @@ mod tests {
     #[test]
     fn link_resolve() {
         let s = State::from([0, 0, 0]);
-        let l = Link::from([[1,4,2,5],[3,6,4,1],[5,2,6,3]]) // trefoil
+        let l = Link::from(&[[1,4,2,5],[3,6,4,1],[5,2,6,3]]) // trefoil
             .resolved_by(&s);
 
         let comps = l.components();
@@ -679,7 +679,7 @@ mod tests {
         assert!(comps.iter().all(|c| c.closed));
 
         let s = State::from([1, 1, 1]);
-        let l = Link::from([[1,4,2,5],[3,6,4,1],[5,2,6,3]]) // trefoil
+        let l = Link::from(&[[1,4,2,5],[3,6,4,1],[5,2,6,3]]) // trefoil
             .resolved_by(&s);
 
         let comps = l.components();
@@ -730,7 +730,7 @@ mod tests {
     #[test]
     fn unlink_2() {
         let pd_code = [[1,2,3,4], [3,2,1,4]];
-        let l = Link::from(pd_code);
+        let l = Link::from(&pd_code);
         assert_eq!(l.crossing_num(), 2);
         assert_eq!(l.writhe(), 0);
         assert_eq!(l.components().len(), 2);

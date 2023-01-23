@@ -13,6 +13,14 @@ pub trait AlgBase:
     Default + PartialEq + Eq + Clone + Send + Sync + Display + Debug + Symbol
 {}
 
+macro_rules! decl_alg_base {
+    ($type:ty) => {
+        impl AlgBase for $type {}
+    }
+}
+
+pub(crate) use decl_alg_base;
+
 // Additive Monoids 
 
 pub trait AddMonOps<T>: 
@@ -27,6 +35,16 @@ where
     for<'a> Self: Sum<&'a Self>
 {}
 
+macro_rules! decl_add_mon {
+    ($type:ty) => {
+        impl AddMonOps<$type> for $type {}
+        impl<'a> AddMonOps<$type> for &'a $type {}
+        impl AddMon for $type {}
+    }
+}
+
+pub(crate) use decl_add_mon;
+
 // Additive Groups 
 
 pub trait AddGrpOps<T>: 
@@ -39,6 +57,16 @@ where
     for<'a> &'a Self: AddGrpOps<Self>,
     for<'a> Self: SubAssign<&'a Self>
 {}
+
+macro_rules! decl_add_grp {
+    ($type:ty) => {
+        impl AddGrpOps<$type> for $type {}
+        impl<'a> AddGrpOps<$type> for &'a $type {}
+        impl AddGrp for $type {}
+    }
+}
+
+pub(crate) use decl_add_grp;
 
 // Monoids (multiplicative)
 
@@ -53,6 +81,16 @@ where
     for<'a> Self: MulAssign<&'a Self>,
     for<'a> Self: Product<&'a Self>
 {}
+
+macro_rules! decl_mon {
+    ($type:ty) => {
+        impl MonOps<$type> for $type {}
+        impl<'a> MonOps<$type> for &'a $type {}
+        impl Mon for $type {}
+    }
+}
+
+pub(crate) use decl_mon;
 
 // Rings 
 pub trait RingOps<T>: 
@@ -72,6 +110,16 @@ pub trait Ring:
 where
     for<'a> &'a Self: RingOps<Self>
 {}
+
+macro_rules! decl_ring {
+    ($type:ty) => {
+        impl RingOps<$type> for $type {}
+        impl<'a> RingOps<$type> for &'a $type {}
+        impl Ring for $type {}
+    }
+}
+
+pub(crate) use decl_ring;
 
 // Euclidean Rings
 pub trait EucRingOps<T>: 
@@ -130,6 +178,16 @@ where
         (x, s0, t0)
     }
 }
+
+macro_rules! decl_euc_ring {
+    ($type:ty) => {
+        impl EucRingOps<$type> for $type {}
+        impl<'a> EucRingOps<$type> for &'a $type {}
+        impl EucRing for $type {}
+    }
+}
+
+pub(crate) use decl_euc_ring;
 
 pub trait RModOps<R, S, T>: AddGrpOps<T> + Mul<S, Output = T>
 where 

@@ -344,10 +344,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "adb12d4e967ec485a5f71c6311fe28158e9d6f4bc4a447b474184d0f91a8fa32"
 dependencies = [
  "matrixmultiply",
- "num-complex 0.4.2",
+ "num-complex 0.4.3",
  "num-integer",
  "num-traits",
  "rawpointer",
+]
+
+[[package]]
+name = "num-bigint"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f93ab6289c7b344a8a9f60f88d80aa20032336fe78da341afc91c8a2341fc75f"
+dependencies = [
+ "autocfg",
+ "num-integer",
+ "num-traits",
 ]
 
 [[package]]
@@ -362,9 +373,9 @@ dependencies = [
 
 [[package]]
 name = "num-complex"
-version = "0.4.2"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ae39348c8bc5fbd7f40c727a9925f03517afd2ab27d46702108b6a7e5414c19"
+checksum = "02e0d21255c828d6f128a1e41534206671e8c3ea0c62f32291e808dc82cff17d"
 dependencies = [
  "num-traits",
 ]
@@ -609,11 +620,11 @@ checksum = "a507befe795404456341dfab10cef66ead4c041f62b8b11bbb92bffe5d0953e0"
 [[package]]
 name = "sprs"
 version = "0.11.0"
-source = "git+https://github.com/sparsemat/sprs?branch=master#a0da7bd0e6d61e71029de8089a0da10a6180fa72"
+source = "git+https://github.com/taketo1024/sprs?branch=mul_acc_default#9c3aa64ff7e2737bc278dae2840fb8706aa3e9a9"
 dependencies = [
  "alga",
  "ndarray",
- "num-complex 0.4.2",
+ "num-complex 0.4.3",
  "num-traits",
  "num_cpus",
  "rayon",
@@ -779,6 +790,8 @@ dependencies = [
  "is-odd",
  "itertools",
  "ndarray",
+ "num-bigint",
+ "num-complex 0.4.3",
  "num-traits",
  "once_cell",
  "polynomial",

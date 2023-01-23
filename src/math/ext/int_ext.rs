@@ -1,5 +1,4 @@
 use super::super::traits::*;
-use super::super::sign::Sign;
 
 macro_rules! impl_euc_ring_integer {
     ($type:ident) => {
@@ -27,13 +26,6 @@ macro_rules! impl_euc_ring_integer {
             #[inline]
             fn normalizing_unit(&self) -> Self {
                 if self >= &0 { 1 } else { -1 } 
-            }
-        }
-
-        impl From<Sign> for $type { 
-            #[inline]
-            fn from(e: Sign) -> Self {
-                if e.is_positive() { 1 } else { -1 }
             }
         }
 

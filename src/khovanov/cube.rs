@@ -240,7 +240,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn apply(&self, x: &KhEnhState, to: &State, e: &KhCubeEdge) -> Vec<(KhEnhState, R)> {
         use KhCubeEdgeTrans::*;
         
-        let sign = R::from(e.sign);
+        let sign = R::from_sign(e.sign);
 
         match e.trans { 
             Merge((i, j), k) => {

@@ -106,10 +106,14 @@ pub trait RingMethods:
 }
 
 pub trait Ring: 
-    AddGrp + Mon + RingOps<Self> + RingMethods + One + From<Sign> + sprs::MulAcc
+    AddGrp + Mon + RingOps<Self> + RingMethods + One + sprs::MulAcc
 where
     for<'a> &'a Self: RingOps<Self>
-{}
+{
+    fn from_sign(e: Sign) -> Self {
+        if e.is_positive() { Self::one() } else { -Self::one() }
+    }
+}
 
 macro_rules! decl_ring {
     ($type:ty) => {

@@ -176,8 +176,8 @@ impl PivotFinder {
     }
 
     fn find_cycle_free_pivots(&mut self) {
-        const MULTI_THREAD: bool = true;
-        const MT_THRESHOLD: usize = 10_000;
+        const MULTI_THREAD: bool = false; // MEMO: currently turned off. 
+        const MT_THRESHOLD: usize = 100_000;
 
         let rem_rows = self.remain_rows().count();
 
@@ -198,10 +198,8 @@ impl PivotFinder {
             if !self.can_insert() { break }
 
             w.init(i, &self.pivots);
-            w.find_cycle_free_pivots(&self.pivots);
-            let cand = w.choose_candidate();
 
-            if let Some(j) = cand { 
+            if let Some(j) = w.find_cycle_free_pivots(&self.pivots) { 
                 self.pivots.set(i, j);
             }
         }
@@ -210,7 +208,7 @@ impl PivotFinder {
      fn find_cycle_free_pivots_m(&mut self) {
         let n = self.cols();
         let rw_lock = RwLock::new(
-            self.pivots.clone()
+            std::mem::take(&mut self.pivots)
         );
 
         let tls1 = ThreadLocal::new();
@@ -237,25 +235,24 @@ impl PivotFinder {
             w.init(i, &loc_pivots);
 
             loop { 
-                w.find_cycle_free_pivots(&loc_pivots);
-                let cand = w.choose_candidate();
+                let Some(j) = w.find_cycle_free_pivots(&loc_pivots) else {
+                    break
+                };
+                
+                // If no changes are made in other threads, modify `pivots` and exit.
+                // Otherwise, update `loc_pivots` and retry.
 
-                if let Some(j) = cand { 
-                    // If no changes are made in other threads, modify `pivots` and exit.
-                    // Otherwise, update `loc_pivots` and retry.
-
-                    let mut pivots = rw_lock.write().unwrap();
-                    let retry = w.update(&loc_pivots, &pivots);
-                    
-                    if !retry { 
-                        // println!("t: {:?}, p: {:?}", thread::current().id(), pivots.pivot_at(pivots.count() - 1));
-                        pivots.set(i, j);
-                    } else { 
-                        loc_pivots.update_from(&pivots);
-                        continue
-                    }
+                let mut pivots = rw_lock.write().unwrap();
+                let retry = w.update(&loc_pivots, &pivots);
+                
+                if !retry { 
+                    // println!("t: {:?}, p: {:?}", thread::current().id(), pivots.pivot_at(pivots.count() - 1));
+                    pivots.set(i, j);
+                    break
+                } else { 
+                    loc_pivots.update_from(&pivots);
+                    continue
                 }
-                break
             }
         });
 
@@ -336,7 +333,7 @@ impl MatrixStr {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 struct PivotData { 
     data: Vec<Option<Row>>,   // col -> row
     indices: Vec<Col>
@@ -421,6 +418,41 @@ impl<'a> RowWorker<'a> {
         }
     }
 
+    //  i [  o       #     # ]     [  o   x   x      # ]     [  o   x   x   x  # ]
+    //    [  |               ]     [  |   :   :        ]     [  |   :   :   :    ]
+    //    [  *   .   .       ] ~~> [  * - o - .        ] ~~> [  * - o - .   :    ]
+    //    [                  ]     [      |            ]     [      |       :    ]
+    //    [      *       .   ]     [      *       .    ]     [      *-------.    ]
+    //
+    //  o: queued, #: candidate, x: occupied
+
+    fn find_cycle_free_pivots(&mut self, pivots: &PivotData) -> Option<Col> {
+        if !self.has_candidate() { 
+            return None
+        }
+        
+        while !self.queue.is_empty() && self.has_candidate() { 
+            let j = self.queue.pop_front().unwrap();
+            let i2 = pivots.row_for(j).unwrap();
+
+            for &j2 in self.str.cols_in(i2) { 
+                if pivots.has_col(j2) && !self.is_occupied(j2) { 
+                    self.queue.push_back(j2);
+                }
+
+                self.set_occupied(j2);
+
+                if !self.has_candidate() { 
+                    break 
+                }
+            }
+        }
+
+        self.collect_candidates().into_iter().sorted_by(|&j1, &j2| 
+            self.str.cmp_cols(j1, j2)
+        ).next()
+    }
+
     fn update(&mut self, loc_pivots: &PivotData, pivots: &PivotData) -> bool {
         let mut retry = false; 
         for k in loc_pivots.count()..pivots.count() { 
@@ -453,16 +485,6 @@ impl<'a> RowWorker<'a> {
         self.ncand += 1;
     }
 
-    fn collect_candidates(&self) -> Vec<usize> { 
-        self.status.iter().enumerate().filter_map(|(i, &s)| 
-            if s == 1 { 
-                Some(i)
-            } else { 
-                None
-            }
-        ).collect()
-    }
-
     fn is_occupied(&self, i: usize) -> bool { 
         self.status[i] == -1
     }
@@ -474,43 +496,14 @@ impl<'a> RowWorker<'a> {
         self.status[i] = -1;
     }
 
-    fn find_cycle_free_pivots(&mut self, pivots: &PivotData) {
-        if !self.has_candidate() { 
-            return
-        }
-        
-        //       j          j2
-        //  i [  o   #   #   #      # ]    * : pivot,
-        //       |           :             # : candidate,
-        //       V           : rmv         o : queued,
-        // i2 [  * --> o --> .        ]    . : entry
-        //             |            
-        //             V            
-        //    [        * ------> o    ]
-        //                       |  
-
-        while !self.queue.is_empty() && self.has_candidate() { 
-            let j = self.queue.pop_front().unwrap();
-            let i2 = pivots.row_for(j).unwrap();
-
-            for &j2 in self.str.cols_in(i2) { 
-                if pivots.has_col(j2) && !self.is_occupied(j2) { 
-                    self.queue.push_back(j2);
-                }
-
-                self.set_occupied(j2);
-
-                if !self.has_candidate() { 
-                    break 
-                }
+    fn collect_candidates(&self) -> Vec<usize> { 
+        self.status.iter().enumerate().filter_map(|(i, &s)| 
+            if s == 1 { 
+                Some(i)
+            } else { 
+                None
             }
-        }
-    }
-
-    fn choose_candidate(&self) -> Option<Col> { 
-        self.collect_candidates().into_iter().sorted_by(|&j1, &j2| 
-            self.str.cmp_cols(j1, j2)
-        ).next()
+        ).collect()
     }
 }
 
@@ -654,7 +647,7 @@ mod tests {
 
         pf.find_fl_pivots();
 
-        assert_eq!(pf.pivots.iter().collect_vec(), vec![(0, 0), (3, 1), (4, 2), (5, 5)]);
+        assert_eq!(pf.pivots.iter().collect_vec(), vec![(4, 2), (3, 1), (5, 5), (0, 0)]);
     }
 
     #[test]
@@ -671,7 +664,7 @@ mod tests {
 
         pf.find_fl_col_pivots();
 
-        assert_eq!(pf.pivots.iter().collect_vec(), vec![(0, 0), (4, 2), (2, 3), (3, 4), (5, 7)]);
+        assert_eq!(pf.pivots.iter().collect_vec(), vec![(4, 2), (3, 4), (0, 0), (5, 7), (2, 3)]);
     }
 
     #[test]
@@ -688,11 +681,11 @@ mod tests {
 
         pf.find_fl_pivots();
 
-        assert_eq!(pf.pivots.iter().collect_vec(), vec![(0, 0), (3, 1), (4, 2)]);
+        assert_eq!(pf.pivots.iter().collect_vec(), vec![(4, 2), (3, 1), (0, 0)]);
 
         pf.find_fl_col_pivots();
 
-        assert_eq!(pf.pivots.iter().collect_vec(), vec![(0, 0), (3, 1), (4, 2), (2, 3), (5, 7)]);
+        assert_eq!(pf.pivots.iter().collect_vec(), vec![(4, 2), (3, 1), (0, 0), (5, 7), (2, 3)]);
     }
 
     #[test]
@@ -709,7 +702,7 @@ mod tests {
 
         pf.find_cycle_free_pivots_s();
 
-        assert_eq!(pf.pivots.iter().collect_vec(), vec![(0, 0), (5, 1), (4, 2), (2, 3), (3, 4)]);
+        assert_eq!(pf.pivots.iter().collect_vec(), vec![(4, 2), (3, 4), (0, 0), (5, 1), (2, 3)]);
     }
 
     #[test]

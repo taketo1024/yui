@@ -1,13 +1,28 @@
 #![allow(dead_code)]
 
 use std::collections::BTreeMap;
+use std::panic::UnwindSafe;
+use log::{info, error};
+use num_bigint::{BigInt, ToBigInt};
+use simplelog::*;
+use yui::math::ext::int_ext::{Integer, IntOps};
 use yui::math::ext::quad_int::{GaussInt, EisenInt};
 use yui::math::traits::{EucRing, EucRingOps};
 use yui::links::{Link, links::Edge};
 use yui::khovanov::invariants::ss::ss_invariant;
 
-fn main() {
-    run_all().expect("");
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    set_logger()?;
+    run_all()
+}
+
+fn set_logger() -> Result<(), log::SetLoggerError> {
+    TermLogger::init(
+        LevelFilter::Trace,
+        Config::default(),
+        TerminalMode::Mixed,
+        ColorChoice::Auto
+    )
 }
 
 fn run_all() -> Result<(), Box<dyn std::error::Error>> {
@@ -29,12 +44,12 @@ fn run_all() -> Result<(), Box<dyn std::error::Error>> {
 
     for (target, code) in data { 
         let l = Link::from(&code);
-        let s2 = run(&l, &target, c2);
-        let s3 = run(&l, &target, c3);
-        let sx = run(&l, &target, cx.clone());
-        let sy = run(&l, &target, cy.clone());
+        let s2 = run(&l, &target, &c2);
+        let s3 = run(&l, &target, &c3);
+        let sx = run(&l, &target, &cx);
+        let sy = run(&l, &target, &cy);
 
-        println!("{target}: s2 = {s2}, s3 = {s3}, s_(1+i) = {sx}, s_(1+ω) = {sy}\n");
+        info!("{target}: s2 = {s2}, s3 = {s3}, s_(1+i) = {sx}, s_(1+ω) = {sy}");
         
         csv.write_record(vec![
             target, 
@@ -49,17 +64,27 @@ fn run_all() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn run<R>(l: &Link, name: &str, c: R) -> i32
-where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
-    let ((h, s), time) = measure(|| {
-        ss_invariant(l, c.clone(), true)
+fn run<R>(l: &Link, name: &str, c: &R) -> i32
+where 
+    R: EucRing, for<'x> &'x R: EucRingOps<R> + UnwindSafe,
+    R: ToBig, for<'x> &'x <R as ToBig>::BigR: EucRingOps<<R as ToBig>::BigR>
+{ 
+    info!("compute {name}, c = {c}");
+
+    let (s, time) = measure(|| {
+        std::panic::catch_unwind(|| {
+            ss_invariant(l, c.clone(), true)
+        }).unwrap_or_else(|_| {
+            error!("");
+            info!("retry with c = {} ({})", c.to_big(), std::any::type_name::<R::BigR>());
+            ss_invariant(l, c.to_big(), true)
+        })
     });
 
-    println!("l = {name}, c = {c}");
-    println!("h = {h}");
-    println!("s = {s}");
-
-    println!("\ntime: {:?}\n", time);
+    info!("l = {name}, c = {c}");
+    info!("s = {s}");
+    info!("time: {:?}", time);
+    info!("");
 
     s
 }
@@ -80,3 +105,42 @@ fn load_data() -> Result<Data, Box<dyn std::error::Error>> {
     Ok(data)
 }
 
+trait ToBig
+where Self::BigR: EucRing, for<'x> &'x Self::BigR: EucRingOps<Self::BigR> { 
+    type BigR;
+    fn to_big(&self) -> Self::BigR;
+}
+
+impl ToBig for i32 { 
+    type BigR = BigInt;
+    fn to_big(&self) -> Self::BigR {
+        self.to_bigint().unwrap()
+    }
+}
+
+impl ToBig for i64 { 
+    type BigR = BigInt;
+    fn to_big(&self) -> Self::BigR {
+        self.to_bigint().unwrap()
+    }
+}
+
+impl<I> ToBig for GaussInt<I>
+where I: Integer + ToBigInt, for<'x> &'x I: IntOps<I> {
+    type BigR = GaussInt<BigInt>;
+
+    fn to_big(&self) -> Self::BigR {
+        let (a, b) = self.pair();
+        Self::BigR::new(a.to_bigint().unwrap(), b.to_bigint().unwrap())
+    }
+}
+
+impl<I> ToBig for EisenInt<I>
+where I: Integer + ToBigInt, for<'x> &'x I: IntOps<I> {
+    type BigR = EisenInt<BigInt>;
+
+    fn to_big(&self) -> Self::BigR {
+        let (a, b) = self.pair();
+        Self::BigR::new(a.to_bigint().unwrap(), b.to_bigint().unwrap())
+    }
+}

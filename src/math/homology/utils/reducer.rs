@@ -1,3 +1,4 @@
+use log::*;
 use sprs::{CsMat, CsVec, PermOwned};
 use crate::math::matrix::sparse::{CsMatExt, CsVecExt};
 use crate::math::matrix::pivot::{perms_by_pivots, find_pivots_upto, PivotType};
@@ -40,7 +41,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         -> (CsMat<R>, CsMat<R>, CsMat<R>, Vec<CsVec<R>>, Vec<CsVec<R>>) 
     {
         let mut c = Self::new(a0, a1, a2, v1, v2);
+
+        let before = c.a1.rows();
+        info!("reduce: {:?}-{:?}-{:?}", c.a0.shape(), c.a1.shape(), c.a2.shape());
+        
         while c.process() {}
+
+        let count =  before - c.a1.rows();
+        info!("result: {:?}-{:?}-{:?}, reduced: {}", c.a0.shape(), c.a1.shape(), c.a2.shape(), count);
+
         c.result()
     }
 

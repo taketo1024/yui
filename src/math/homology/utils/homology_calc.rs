@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use log::*;
 use sprs::CsMat;
 
 use crate::math::{traits::{EucRing, EucRingOps}, matrix::{DnsMat, snf_in_place, sparse::CsMatExt, snf::SnfResult}, homology::base::GenericRModStr};
@@ -45,6 +46,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     fn _calculate(d1: CsMat<R>, d2: CsMat<R>, with_trans: bool) -> (usize, Vec<R>, Option<(CsMat<R>, CsMat<R>)>) {
+        info!("calculate homology: {:?}-{:?}", d1.shape(), d2.shape());
         let c = Self::new(d1, d2, with_trans);
 
         let (s1, s2) = c.process();

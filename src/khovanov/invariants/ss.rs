@@ -2,6 +2,7 @@
 // T. Sano, K. Sato
 // https://arxiv.org/abs/2211.02494
 
+use log::info;
 use sprs::{CsMat, CsVec};
 use crate::khovanov::complex::KhComplex;
 use crate::links::Link;
@@ -19,6 +20,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     let v = cpx[0].vectorize(&z);
 
     let (h, v) = homology_with(
+        cpx.d_matrix(-2), 
         cpx.d_matrix(-1), 
         cpx.d_matrix(0), 
         cpx.d_matrix(1), 
@@ -33,16 +35,28 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     (h, s)
 }
 
-fn homology_with<R>(a0: CsMat<R>, a1: CsMat<R>, a2: CsMat<R>, v: CsVec<R>) -> (GenericRModStr<R>, CsVec<R>)
+fn homology_with<R>(a0: CsMat<R>, a1: CsMat<R>, a2: CsMat<R>, a3: CsMat<R>, v: CsVec<R>) -> (GenericRModStr<R>, CsVec<R>)
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
     let vs = vec![v];
-    let (n0, n3) = (a0.cols(), a2.rows());
+    let (n0, n3) = (a0.cols(), a3.rows());
 
-    let ( _, a0, a1, _, vs) = ChainReducer::reduce_with(CsMat::zero((n0, 0)), a0, a1, vec![], vs);
-    let (a0, a1, a2, vs, _) = ChainReducer::reduce_with(a0, a1, a2, vs, vec![]);
-    let (a1,  _,  _)        = ChainReducer::reduce(a1, a2, CsMat::zero((0, n3)));
+    info!("(k = -2)");
+    let ( _, a0, a1, _, _) 
+        = ChainReducer::reduce_with(CsMat::zero((n0, 0)), a0, a1, vec![], vec![]);
 
-    let (h, p, _) = HomologyCalc::calculate_with_trans(a0, a1);
+    info!("(k = -1)");
+    let ( _, a1, a2, _, vs) 
+        = ChainReducer::reduce_with(a0, a1, a2, vec![], vs);
+
+    info!("(k = 0)");
+    let (a1, a2, a3, vs, _) 
+        = ChainReducer::reduce_with(a1, a2, a3, vs, vec![]);
+
+    info!("(k = 1)");
+    let (a2,  _,  _)
+        = ChainReducer::reduce(a2, a3, CsMat::zero((0, n3)));
+
+    let (h, p, _) = HomologyCalc::calculate_with_trans(a1, a2);
 
     let r = h.rank();
     let p = p.submatrix(0..r, 0..p.cols());

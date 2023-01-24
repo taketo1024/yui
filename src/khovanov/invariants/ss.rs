@@ -13,13 +13,13 @@ use crate::math::homology::utils::reducer::ChainReducer;
 use crate::math::matrix::sparse::CsMatExt;
 use crate::math::traits::{EucRing, EucRingOps};
 
-pub fn ss_invariant<R>(l: &Link, c: R, reduced: bool) -> (GenericRModStr<R>, i32)
+pub fn ss_invariant<R>(l: &Link, c: R, reduced: bool) -> i32
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
     let cpx = KhComplex::<R>::new(l.clone(), c.clone(), R::zero(), reduced);
     let z = cpx.canon_cycle();
     let v = cpx[0].vectorize(&z);
 
-    let (h, v) = homology_with(
+    let (_, v) = homology_with(
         cpx.d_matrix(-2), 
         cpx.d_matrix(-1), 
         cpx.d_matrix(0), 
@@ -32,7 +32,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     let r = l.seifert_circles().len() as i32;
     let s = 2 * d + w - r + 1;
 
-    (h, s)
+    s
 }
 
 fn homology_with<R>(a0: CsMat<R>, a1: CsMat<R>, a2: CsMat<R>, a3: CsMat<R>, v: CsVec<R>) -> (GenericRModStr<R>, CsVec<R>)
@@ -58,11 +58,15 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     let (h, p, _) = HomologyCalc::calculate_with_trans(a1, a2);
 
+    info!("homology: {h}");
+    
     let r = h.rank();
     let p = p.submatrix(0..r, 0..p.cols());
 
     let v = &vs[0];
     let w = &p * v;
+
+    info!("canon-cycle: {}", w.to_dense());
 
     (h, w)
 }

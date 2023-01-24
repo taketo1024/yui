@@ -8,6 +8,7 @@ debug = true
 overflow-checks = true
 
 [dependencies]
+csv = "1.1.6"
 derive_more = "0.99.17"
 either = "1.8.0"
 grouping_by = "0.2.2"

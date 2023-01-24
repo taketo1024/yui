@@ -620,7 +620,7 @@ checksum = "a507befe795404456341dfab10cef66ead4c041f62b8b11bbb92bffe5d0953e0"
 [[package]]
 name = "sprs"
 version = "0.11.0"
-source = "git+https://github.com/taketo1024/sprs?branch=mul_acc_default#9c3aa64ff7e2737bc278dae2840fb8706aa3e9a9"
+source = "git+https://github.com/taketo1024/sprs?branch=mul_acc_default#d9720e5e5bbc2e09846d839e0c6e35e5501ecad0"
 dependencies = [
  "alga",
  "ndarray",
@@ -783,6 +783,7 @@ checksum = "f40009d85759725a34da6d89a94e63d7bdc50a862acf0dbc7c8e488f1edcb6f5"
 name = "yui"
 version = "0.1.0"
 dependencies = [
+ "csv",
  "derive_more",
  "either",
  "grouping_by",

@@ -117,13 +117,14 @@ impl<I, const D: i32> Display for QuadInt<I, D>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let (a, b) = self.pair();
+        let sign = if !b.is_negative() { "+" } else { "-" };
+        let b_str = 
+            if b.is_unit() { String::from("") } 
+            else if b.is_negative() { (-b).to_string() } 
+            else { b.to_string() };
         let x = if D == -1 { "i" } else { "ω" };
 
-        if !b.is_negative() { 
-            write!(f, "{a} + {b}{x}")
-        } else { 
-            write!(f, "{a} - {}{x}", -b)
-        }
+        write!(f, "{a} {sign} {b_str}{x}")
     }
 }
 

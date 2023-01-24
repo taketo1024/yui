@@ -2,6 +2,7 @@ use std::fmt::Debug;
 use std::iter::{Sum, Product};
 use std::{fmt::Display};
 use std::ops::{Add, Neg, Sub, Mul, AddAssign, SubAssign, MulAssign, Rem, Div, RemAssign, DivAssign};
+use num_rational::Ratio;
 use num_traits::{Zero, One};
 use super::int_ext::{Integer, IntOps};
 use super::super::traits::*;
@@ -122,7 +123,7 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
         if b.is_zero() { 
             write!(f, "{a}")
         } else if a.is_zero() { 
-            let b_str = 
+            let b = 
                 if b.is_one() { String::from("") } 
                 else if (-b).is_one() { String::from("-") }
                 else { b.to_string() };
@@ -272,6 +273,11 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 
 // Div / Rem for GaussInt (D = -1).
 
+fn div_round<I>(p: &I, q: &I) -> I 
+where I: Integer, for<'x> &'x I: IntOps<I> {
+    Ratio::new(p.clone(), q.clone()).round().to_integer()
+}
+
 impl<'a, I> Div for &'a QuadInt<I, -1>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     type Output = QuadInt<I, -1>;
@@ -280,7 +286,10 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
         let norm = rhs.norm();
         let w = self * &rhs.conj();
         let (x, y) = w.pair_into();
-        QuadInt(&x / &norm, &y / &norm)
+        QuadInt( 
+            div_round(&x, &norm), 
+            div_round(&y, &norm) 
+        )
     }
 }
 
@@ -317,7 +326,10 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
         let norm = rhs.norm();
         let w = self * &rhs.conj();
         let (x, y) = w.pair();
-        let (m, n) = ( &(x + y) / &norm, y / &norm);
+        let (m, n) = ( 
+            div_round(&(x + y), &norm),
+            div_round(y, &norm)
+        );
         QuadInt(&m - &n, n)
     }
 }
@@ -766,5 +778,14 @@ mod tests {
         assert!(!r.is_zero());
         assert!(r.norm() < a.norm());
         assert_eq!(a, b * q + r);
+    }
+
+    #[test]
+    fn rem_gauss2() { 
+        type A = QuadInt<i32, -1>; // GaussInt
+        let a = A::new(4, 0);
+        let b = A::new(3, 3);
+        let (d, s, t) = A::gcdx(&a, &b);
+        println!("{d}, {s}, {t}");
     }
 }

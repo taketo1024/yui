@@ -1,7 +1,7 @@
 use super::super::traits::*;
 
 pub trait IntOps<T>: EucRingOps<T> {}
-pub trait Integer: EucRing + IntOps<Self> + From<i32> + Signed
+pub trait Integer: EucRing + IntOps<Self> + From<i32> + Signed + num_integer::Integer
 where for<'a> &'a Self: EucRingOps<Self> {}
 
 macro_rules! decl_integer {

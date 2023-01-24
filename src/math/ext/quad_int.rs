@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 use std::iter::{Sum, Product};
 use std::{fmt::Display};
-use std::ops::{Add, Neg, Sub, Mul, AddAssign, SubAssign, MulAssign};
+use std::ops::{Add, Neg, Sub, Mul, AddAssign, SubAssign, MulAssign, Rem, Div, RemAssign, DivAssign};
 use num_traits::{Zero, One};
 use super::int_ext::{Integer, IntOps};
 use super::super::traits::*;
@@ -142,25 +142,6 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
     }
 }
 
-impl<I, const D: i32> Mul<I> for QuadInt<I, D>
-where I: Integer, for<'x> &'x I: IntOps<I> {
-    type Output = Self;
-
-    fn mul(self, rhs: I) -> Self::Output {
-        &self * &rhs
-    }
-}
-
-impl<'a, I, const D: i32> Mul<&'a I> for &'a QuadInt<I, D>
-where I: Integer, for<'x> &'x I: IntOps<I> {
-    type Output = QuadInt<I, D>;
-
-    fn mul(self, rhs: &'a I) -> Self::Output {
-        let (a, b) = self.pair();
-        QuadInt(a * rhs, b * rhs)
-    }
-}
-
 impl<I, const D: i32> Mul for QuadInt<I, D>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     type Output = Self;
@@ -175,35 +156,33 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
     type Output = QuadInt<I, D>;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        if rhs.is_rational() { 
-            return self * &rhs.0
-        }
-
-        if self.is_rational() { 
-            return rhs * &self.0
-        } 
-
         // When D ≡ 1,
         //
-        //  ω^2 = (D + 1)/4 + √D/2 
-        //      = (D - 1)/4 + ω,
+        //   ω^2 = (D + 1)/4 + √D/2 
+        //       = (D - 1)/4 + ω,
         //
         // hence 
         // 
-        //   (a + bω)(c + dω) 
-        // = (ac + bd(D - 1)/4) + (ad + bc + bd)ω.
+        //    (a + bω)(c + dω) 
+        //  = (ac + bd(D - 1)/4) + (ad + bc + bd)ω.
         //
         // When D ≡ 2, 3,
-        //
-        //  ω^2 = D,
+        // 
+        //   ω^2 = D,
         //
         // hence 
         // 
-        //   (a + bω)(c + dω) 
-        // = (ac + bdD) + (ad + bc)ω.
+        //    (a + bω)(c + dω) 
+        //  = (ac + bdD) + (ad + bc)ω.
 
         let (a, b) = self.pair();
         let (c, d) = rhs.pair();
+
+        if b.is_zero() {
+            return QuadInt(a * c, a * d)
+        } else if d.is_zero() { 
+            return QuadInt(a * c, b * c)
+        }
 
         match D.rem_euclid(4) { 
             1 => {
@@ -237,6 +216,41 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
     }
 }
 
+impl<I, const D: i32> Div for QuadInt<I, D>
+where I: Integer, for<'x> &'x I: IntOps<I> {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        &self / &rhs
+    }
+}
+
+impl<'a, I, const D: i32> Div for &'a QuadInt<I, D>
+where I: Integer, for<'x> &'x I: IntOps<I> {
+    type Output = QuadInt<I, D>;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        let norm = rhs.norm();
+        let w = self * &rhs.conj();
+        let (x, y) = w.pair_into();
+        QuadInt(&x / &norm, &y / &norm)
+    }
+}
+
+impl<I, const D: i32> DivAssign for QuadInt<I, D>
+where I: Integer, for<'x> &'x I: IntOps<I> {
+    fn div_assign(&mut self, rhs: Self) {
+        *self = &*self / &rhs;
+    }
+}
+
+impl<'a, I, const D: i32> DivAssign<&'a Self> for QuadInt<I, D>
+where I: Integer, for<'x> &'x I: IntOps<I> {
+    fn div_assign(&mut self, rhs: &'a Self) {
+        *self = &*self / rhs;
+    }
+}
+
 impl<I, const D: i32> RingMethods for QuadInt<I, D>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     // see: https://en.wikipedia.org/wiki/Quadratic_integer#Units
@@ -246,7 +260,8 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 
     fn inv(&self) -> Option<Self> {
         if let Some(u) = self.norm().inv() {
-            Some(self.conj() * u)
+            let u = Self::from(u);
+            Some(u * self.conj())
         } else { 
             None
         }
@@ -280,6 +295,40 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
                 Self::one()
             }
         }
+    }
+}
+
+// Rem is implemented for GaussInt (D = -1) and EisenInt (D = -1). 
+
+impl<I> Rem for QuadInt<I, -1>
+where I: Integer, for<'x> &'x I: IntOps<I> {
+    type Output = Self;
+
+    fn rem(self, rhs: Self) -> Self::Output {
+        todo!()
+    }
+}
+
+impl<'a, I> Rem for &'a QuadInt<I, -1>
+where I: Integer, for<'x> &'x I: IntOps<I> {
+    type Output = QuadInt<I, -1>;
+
+    fn rem(self, rhs: Self) -> Self::Output {
+        todo!()
+    }
+}
+
+impl<I> RemAssign for QuadInt<I, -1>
+where I: Integer, for<'x> &'x I: IntOps<I> {
+    fn rem_assign(&mut self, rhs: Self) {
+        todo!()
+    }
+}
+
+impl<'a, I> RemAssign<&'a Self> for QuadInt<I, -1>
+where I: Integer, for<'x> &'x I: IntOps<I> {
+    fn rem_assign(&mut self, rhs: &'a Self) {
+        todo!()
     }
 }
 
@@ -426,6 +475,15 @@ where I: Integer, for<'x> &'x I: IntOps<I> {}
 impl<I, const D: i32> Ring for QuadInt<I, D> 
 where I: Integer, for<'x> &'x I: IntOps<I> {}
 
+impl<I> EucRingOps<Self> for QuadInt<I, -1> 
+where I: Integer, for<'x> &'x I: IntOps<I> {}
+
+impl<'a, I> EucRingOps<QuadInt<I, -1>> for &'a QuadInt<I, -1> 
+where I: Integer, for<'x> &'x I: IntOps<I> {}
+
+impl<I> EucRing for QuadInt<I, -1> 
+where I: Integer, for<'x> &'x I: IntOps<I> {}
+
 #[cfg(test)]
 mod tests {
     use num_bigint::BigInt;
@@ -534,7 +592,6 @@ mod tests {
         let a = A::new(3, -2);
         assert_eq!(a.norm(), 7);
     }
-
 
     #[test]
     fn conj_gauss() { 

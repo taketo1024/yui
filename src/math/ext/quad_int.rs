@@ -116,7 +116,14 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 impl<I, const D: i32> Display for QuadInt<I, D>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        let (a, b) = self.pair();
+        let x = if D == -1 { "i" } else { "ω" };
+
+        if !b.is_negative() { 
+            write!(f, "{a} + {b}{x}")
+        } else { 
+            write!(f, "{a} - {}{x}", -b)
+        }
     }
 }
 
@@ -305,7 +312,7 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
     type Output = Self;
 
     fn rem(self, rhs: Self) -> Self::Output {
-        todo!()
+        &self % &rhs
     }
 }
 
@@ -314,21 +321,22 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
     type Output = QuadInt<I, -1>;
 
     fn rem(self, rhs: Self) -> Self::Output {
-        todo!()
+        let q = self / rhs;
+        self - &(rhs * &q)
     }
 }
 
 impl<I> RemAssign for QuadInt<I, -1>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     fn rem_assign(&mut self, rhs: Self) {
-        todo!()
+        *self = &*self % &rhs;
     }
 }
 
 impl<'a, I> RemAssign<&'a Self> for QuadInt<I, -1>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     fn rem_assign(&mut self, rhs: &'a Self) {
-        todo!()
+        *self = &*self % rhs;
     }
 }
 
@@ -665,5 +673,18 @@ mod tests {
         assert_eq!(A::new(-1, 1).normalizing_unit(), A::new(0, -1));
         assert_eq!(A::new(-1,-1).normalizing_unit(), A::new(-1, 0));
         assert_eq!(A::new(1, -1).normalizing_unit(), A::new(0,  1));
+    }
+
+    #[test]
+    fn rem_gauss() {
+        type A = QuadInt<i32, -1>; // GaussInt
+        let a = A::new(49, -58);
+        let b = A::new(7, 9);
+        let q = &a / &b;
+        let r = &a % &b;
+
+        assert!(!r.is_zero());
+        assert!(r.norm() < a.norm());
+        assert_eq!(a, b * q + r);
     }
 }

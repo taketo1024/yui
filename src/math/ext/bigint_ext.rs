@@ -1,5 +1,6 @@
 use num_bigint::BigInt;
 use num_traits::{One, Signed};
+use super::int_ext::{Integer, IntOps, decl_integer};
 use super::super::traits::*;
 
 
@@ -40,6 +41,7 @@ decl_add_grp!(BigInt);
 decl_mon!(BigInt);
 decl_ring!(BigInt);
 decl_euc_ring!(BigInt);
+decl_integer!(BigInt);
 
 #[cfg(test)]
 mod tests { 

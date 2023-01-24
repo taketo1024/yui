@@ -1,5 +1,19 @@
 use super::super::traits::*;
 
+pub trait IntOps<T>: EucRingOps<T> {}
+pub trait Integer: EucRing + IntOps<Self> + From<i32>
+where for<'a> &'a Self: EucRingOps<Self> {}
+
+macro_rules! decl_integer {
+    ($type:ty) => {
+        impl IntOps<$type> for $type {}
+        impl<'a> IntOps<$type> for &'a $type {}
+        impl Integer for $type {}
+    }
+}
+
+pub(crate) use decl_integer;
+
 macro_rules! impl_euc_ring_integer {
     ($type:ident) => {
         impl Symbol for $type { 
@@ -35,6 +49,7 @@ macro_rules! impl_euc_ring_integer {
         decl_mon!($type);
         decl_ring!($type);
         decl_euc_ring!($type);
+        decl_integer!($type);
     }
 }
 

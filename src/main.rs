@@ -13,7 +13,7 @@ use yui::khovanov::invariants::ss::ss_invariant;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     set_logger()?;
-    run_all()
+    run_all("computation/targets/18.json")
 }
 
 fn set_logger() -> Result<(), log::SetLoggerError> {
@@ -25,13 +25,15 @@ fn set_logger() -> Result<(), log::SetLoggerError> {
     )
 }
 
-fn run_all() -> Result<(), Box<dyn std::error::Error>> {
+fn run_all(target: &str) -> Result<(), Box<dyn std::error::Error>> {
     let c2: i64 = 2;
     let c3: i64 = 3;
     let cx: GaussInt<i64> = GaussInt::new(1, 1);
     let cy: EisenInt<i64> = EisenInt::new(1, 1);
     
-    let mut csv = csv::Writer::from_path("result.csv")?;
+    let file = format!("result.csv");
+    let mut csv = csv::Writer::from_path(file)?;
+
     csv.write_record(vec![
         "name", 
         "s_2", 
@@ -40,19 +42,19 @@ fn run_all() -> Result<(), Box<dyn std::error::Error>> {
         "s_{1+ω}"
     ])?;
 
-    let data = load_data()?;
+    let data = load_data(target)?;
 
-    for (target, code) in data { 
+    for (name, code) in data { 
         let l = Link::from(&code);
-        let s2 = run(&l, &target, &c2);
-        let s3 = run(&l, &target, &c3);
-        let sx = run(&l, &target, &cx);
-        let sy = run(&l, &target, &cy);
+        let s2 = run(&l, &name, &c2);
+        let s3 = run(&l, &name, &c3);
+        let sx = run(&l, &name, &cx);
+        let sy = run(&l, &name, &cy);
 
-        info!("{target}: s2 = {s2}, s3 = {s3}, s_(1+i) = {sx}, s_(1+ω) = {sy}");
+        info!("{name}: s2 = {s2}, s3 = {s3}, s_(1+i) = {sx}, s_(1+ω) = {sy}");
         
         csv.write_record(vec![
-            target, 
+            name, 
             s2.to_string(), 
             s3.to_string(), 
             sx.to_string(),
@@ -98,9 +100,9 @@ where F: FnOnce() -> Res {
 }
 
 type Data = BTreeMap<String, Vec<[Edge; 4]>>;
-fn load_data() -> Result<Data, Box<dyn std::error::Error>> {
-    let path = "resources/targets/targets.json";
-    let json = std::fs::read_to_string(path)?;
+
+fn load_data(target: &str) -> Result<Data, Box<dyn std::error::Error>> {
+    let json = std::fs::read_to_string(target)?;
     let data: Data = serde_json::from_str(&json)?;
     Ok(data)
 }

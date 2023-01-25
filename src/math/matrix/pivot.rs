@@ -18,8 +18,6 @@ use thread_local::ThreadLocal;
 use crate::math::traits::{Ring, RingOps};
 use crate::utils::top_sort::top_sort;
 
-pub const MAX_PIVOTS: usize = 300_000;
-
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum PivotType { 
     Rows, Cols
@@ -27,12 +25,7 @@ pub enum PivotType {
 
 pub fn find_pivots<R>(a: &CsMat<R>, piv_type: PivotType) -> Vec<(usize, usize)>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    find_pivots_upto(a, MAX_PIVOTS, piv_type)
-}
-
-pub fn find_pivots_upto<R>(a: &CsMat<R>, max_pivots: usize, piv_type: PivotType) -> Vec<(usize, usize)>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    let mut pf = PivotFinder::new(a, max_pivots, piv_type);
+    let mut pf = PivotFinder::new(a, piv_type);
     pf.find_pivots();
     pf.result()
 }
@@ -67,16 +60,15 @@ type Col = usize;
 pub struct PivotFinder {
     str: MatrixStr,
     pivots: PivotData,
-    max_pivots: usize,
     piv_type: PivotType
 }
 
 impl PivotFinder { 
-    pub fn new<R>(a: &CsMat<R>, max_pivots: usize, piv_type: PivotType) -> Self
+    pub fn new<R>(a: &CsMat<R>, piv_type: PivotType) -> Self
     where R: Ring, for<'x> &'x R: RingOps<R> {
         let str = MatrixStr::new(a, piv_type);
         let pivots = PivotData::new(a, piv_type);
-        PivotFinder{ str, pivots, max_pivots, piv_type }
+        PivotFinder{ str, pivots, piv_type }
     }
 
     pub fn find_pivots(&mut self) {
@@ -111,10 +103,6 @@ impl PivotFinder {
         self.str.shape.1
     }
 
-    fn can_insert(&self) -> bool { 
-        self.pivots.count() < self.max_pivots
-    }
-
     fn remain_rows(&self) -> impl Iterator<Item = Row> + '_ { 
         let piv_rows: HashSet<_> = self.pivots.iter().map(|(i, _)| i).collect();
         let m = self.rows();
@@ -138,8 +126,6 @@ impl PivotFinder {
     fn find_fl_pivots(&mut self) {
         let remain_rows: Vec<_> = self.remain_rows().collect();
         for i in remain_rows {
-            if !self.can_insert() { break }
-
             let Some(j) = self.str.head_col_in(i) else { continue };
 
             if !self.pivots.has_col(j) && self.str.is_candidate(i, j) {
@@ -153,8 +139,6 @@ impl PivotFinder {
         let mut occ_cols = self.occupied_cols();
 
         for i in remain_rows { 
-            if !self.can_insert() { break }
-
             let mut cands = vec![];
 
             for &j in self.str.cols_in(i) { 
@@ -195,8 +179,6 @@ impl PivotFinder {
         let remain_rows: Vec<_> = self.remain_rows().collect();
 
         for i in remain_rows { 
-            if !self.can_insert() { break }
-
             w.init(i, &self.pivots);
 
             if let Some(j) = w.find_cycle_free_pivots(&self.pivots) { 
@@ -567,7 +549,7 @@ mod tests {
     #[test]
     fn rows_cols() {
         let a = CsMat::<i32>::csc_from_vec((4, 3), vec![]);
-        let pf = PivotFinder::new(&a, MAX_PIVOTS, PivotType::Rows);
+        let pf = PivotFinder::new(&a, PivotType::Rows);
         assert_eq!(pf.rows(), 4);
         assert_eq!(pf.cols(), 3);
     }
@@ -599,7 +581,7 @@ mod tests {
             0, 0, 0, 0,
             0, 0, 1, 1,
         ]);
-        let mut pf = PivotFinder::new(&a, MAX_PIVOTS, PivotType::Rows);
+        let mut pf = PivotFinder::new(&a, PivotType::Rows);
 
         assert_eq!(pf.remain_rows().collect_vec(), vec![0,3,1]);
 
@@ -620,7 +602,7 @@ mod tests {
             0, 0, 0, 0,
             0, 0, 1, 1,
         ]);
-        let mut pf = PivotFinder::new(&a, MAX_PIVOTS, PivotType::Rows);
+        let mut pf = PivotFinder::new(&a, PivotType::Rows);
 
         assert_eq!(pf.occupied_cols(), hashset!{});
 
@@ -643,7 +625,7 @@ mod tests {
             0, 0, 1, 1, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 1, 0, 1, 1
         ]);
-        let mut pf = PivotFinder::new(&a, MAX_PIVOTS, PivotType::Rows);
+        let mut pf = PivotFinder::new(&a, PivotType::Rows);
 
         pf.find_fl_pivots();
 
@@ -660,7 +642,7 @@ mod tests {
             0, 0, 1, 0, 0, 0, 0, 0, 0,
             0, 1, 0, 0, 0, 1, 0, 1, 0
         ]);
-        let mut pf = PivotFinder::new(&a, MAX_PIVOTS, PivotType::Rows);
+        let mut pf = PivotFinder::new(&a, PivotType::Rows);
 
         pf.find_fl_col_pivots();
 
@@ -677,7 +659,7 @@ mod tests {
             0, 0, 1, 0, 0, 0, 0, 0, 0,
             0, 1, 0, 0, 0, 1, 0, 1, 0
         ]);
-        let mut pf = PivotFinder::new(&a, MAX_PIVOTS, PivotType::Rows);
+        let mut pf = PivotFinder::new(&a, PivotType::Rows);
 
         pf.find_fl_pivots();
 
@@ -698,7 +680,7 @@ mod tests {
             0, 0, 1, 0, 0, 0, 0, 0, 0,
             0, 1, 0, 0, 0, 1, 0, 1, 0
         ]);
-        let mut pf = PivotFinder::new(&a, MAX_PIVOTS, PivotType::Rows);
+        let mut pf = PivotFinder::new(&a, PivotType::Rows);
 
         pf.find_cycle_free_pivots_s();
 
@@ -715,7 +697,7 @@ mod tests {
             0, 0, 1, 0, 0, 0, 0, 0, 0,
             0, 1, 0, 0, 0, 1, 0, 1, 0
         ]);
-        let mut pf = PivotFinder::new(&a, MAX_PIVOTS, PivotType::Rows);
+        let mut pf = PivotFinder::new(&a, PivotType::Rows);
 
         pf.find_cycle_free_pivots_m();
 

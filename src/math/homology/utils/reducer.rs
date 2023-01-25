@@ -1,7 +1,7 @@
 use log::*;
 use sprs::{CsMat, CsVec, PermOwned};
 use crate::math::matrix::sparse::{CsMatExt, CsVecExt};
-use crate::math::matrix::pivot::{perms_by_pivots, find_pivots_upto, PivotType};
+use crate::math::matrix::pivot::{perms_by_pivots, find_pivots, PivotType};
 use crate::math::matrix::schur::SchurLT;
 use crate::math::traits::{Ring, RingOps};
 
@@ -85,10 +85,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn piv_perms(&self) -> (PermOwned, PermOwned, usize) {
-        const MAX_PIVOTS: usize = 300_000;
-
         let a1 = &self.a1;
-        let pivs = find_pivots_upto(a1, MAX_PIVOTS, PivotType::Cols);
+        let pivs = find_pivots(a1, PivotType::Cols);
         let (p, q) = perms_by_pivots(a1, &pivs);
         let r = pivs.len();
 

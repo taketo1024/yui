@@ -42,13 +42,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     {
         let mut c = Self::new(a0, a1, a2, v1, v2);
 
-        let before = c.a1.rows();
         info!("reduce: {:?}-{:?}-{:?}", c.a0.shape(), c.a1.shape(), c.a2.shape());
         
         while c.process() {}
 
-        let count =  before - c.a1.rows();
-        info!("result: {:?}-{:?}-{:?}, reduced: {}", c.a0.shape(), c.a1.shape(), c.a2.shape(), count);
+        info!("result: {:?}-{:?}-{:?}", c.a0.shape(), c.a1.shape(), c.a2.shape());
 
         c.result()
     }
@@ -102,8 +100,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn reduce_matrices(&mut self, p: &PermOwned, q: &PermOwned, r: usize, s: &SchurLT<R>) {
         let (a0, a2) = (&self.a0, &self.a2);
 
-        self.a0 = Self::reduce_rows(a0, q, r);
+        info!("compute schur complement.");
+
         self.a1 = s.complement();
+        
+        info!("schur complement: {:?}", self.a1.shape());
+
+        self.a0 = Self::reduce_rows(a0, q, r);
         self.a2 = Self::reduce_cols(a2, p, r);
     }
 

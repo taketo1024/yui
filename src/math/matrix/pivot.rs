@@ -10,8 +10,9 @@ use std::cell::RefCell;
 use std::slice::Iter;
 use std::cmp::Ordering;
 use std::collections::{HashSet, VecDeque, HashMap};
-use std::sync::RwLock;
+use std::sync::{RwLock, Mutex};
 use itertools::Itertools;
+use log::info;
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use sprs::{CsMat, PermOwned};
 use thread_local::ThreadLocal;
@@ -72,9 +73,13 @@ impl PivotFinder {
     }
 
     pub fn find_pivots(&mut self) {
+        info!("find pivots: {:?}", self.str.shape());
+
         self.find_fl_pivots();
         self.find_fl_col_pivots();
         self.find_cycle_free_pivots();
+
+        info!("found {} pivots.", self.pivots.count());
     }
 
     pub fn result(&self) -> Vec<(usize, usize)> { 
@@ -125,6 +130,7 @@ impl PivotFinder {
 
     fn find_fl_pivots(&mut self) {
         let remain_rows: Vec<_> = self.remain_rows().collect();
+
         for i in remain_rows {
             let Some(j) = self.str.head_col_in(i) else { continue };
 
@@ -132,9 +138,14 @@ impl PivotFinder {
                 self.pivots.set(i, j);
             }
         }
+
+        let piv_count = self.pivots.count();
+        info!("  fl-pivots: +{}.", piv_count);
     }
 
     fn find_fl_col_pivots(&mut self) {
+        let before_piv_count = self.pivots.count();
+
         let remain_rows: Vec<_> = self.remain_rows().collect();
         let mut occ_cols = self.occupied_cols();
 
@@ -157,47 +168,72 @@ impl PivotFinder {
                 occ_cols.insert(j);
             }
         }
+
+        let piv_count = self.pivots.count();
+        info!("  fl-col-pivots: +{}, total: {}.", piv_count - before_piv_count, piv_count);
     }
 
     fn find_cycle_free_pivots(&mut self) {
-        const MULTI_THREAD: bool = false; // MEMO: currently turned off. 
-        const MT_THRESHOLD: usize = 100_000;
+        let before_piv_count = self.pivots.count();
 
-        let rem_rows = self.remain_rows().count();
-
-        if MULTI_THREAD && rem_rows > MT_THRESHOLD { 
+        const MULTI_THREAD: bool = true;
+        if MULTI_THREAD { 
             self.find_cycle_free_pivots_m();
         } else {
             self.find_cycle_free_pivots_s();
         }
+
+        let piv_count = self.pivots.count();
+        info!("  cycle-free-pivots: +{}, total: {}.", piv_count - before_piv_count, piv_count);
     }
 
     fn find_cycle_free_pivots_s(&mut self) {
+        let mut before_piv_count = self.pivots.count();
+
         let n = self.cols();
         let mut w = RowWorker::new(n, &self.str);
 
-        let remain_rows: Vec<_> = self.remain_rows().collect();
+        let remain_rows: Vec<_> = self.remain_rows().enumerate().collect();
+        let total = remain_rows.len();
 
-        for i in remain_rows { 
+        if total > 100_000 { 
+            info!("  start find-cycle-free-pivots: {total} rows");
+        }
+
+        for (c, i) in remain_rows { 
             w.init(i, &self.pivots);
 
             if let Some(j) = w.find_cycle_free_pivots(&self.pivots) { 
                 self.pivots.set(i, j);
             }
+
+            if c > 0 && c % 10_000 == 0 { 
+                let piv_count = self.pivots.count();
+                info!("    [{c}/{total}] +{}, total: {}.", piv_count - before_piv_count, piv_count);
+                before_piv_count = piv_count;
+            }
         }
      }
 
      fn find_cycle_free_pivots_m(&mut self) {
+        let before_piv_count = Mutex::new(self.pivots.count());
+        let count = Mutex::new(0);
+        let report = true;
+
         let n = self.cols();
+        let remain_rows = self.remain_rows().collect_vec();
+        let total = remain_rows.len();
+
+        if total > 100_000 { 
+            info!("  start find-cycle-free-pivots: {total} rows (multi-thread)");
+        }
+
         let rw_lock = RwLock::new(
             std::mem::take(&mut self.pivots)
         );
-
         let tls1 = ThreadLocal::new();
         let tls2 = ThreadLocal::new();
 
-        let remain_rows = self.remain_rows().collect_vec();
-        
         remain_rows.par_iter().for_each(|&i| { 
             let mut loc_pivots = tls1.get_or(|| {
                 let loc_pivots = rw_lock.read().unwrap().clone();
@@ -234,6 +270,21 @@ impl PivotFinder {
                 } else { 
                     loc_pivots.update_from(&pivots);
                     continue
+                }
+            }
+
+            if report { 
+                let c = {
+                    let mut count = count.lock().unwrap();
+                    *count += 1;
+                    *count
+                };
+    
+                if c > 0 && c % 10_000 == 0 { 
+                    let mut before_piv_count = before_piv_count.lock().unwrap();
+                    let piv_count = loc_pivots.count();
+                    info!("    [{c}/{total}] +{}, total: {}.", piv_count - *before_piv_count, piv_count);
+                    *before_piv_count = piv_count;
                 }
             }
         });
@@ -280,6 +331,10 @@ impl MatrixStr {
         }
 
         Self { shape, entries, cands, row_wght, col_wght }
+    }
+
+    fn shape(&self) -> (usize, usize) {
+        self.shape
     }
 
     fn is_empty_row(&self, i: Row) -> bool { 

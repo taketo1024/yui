@@ -188,43 +188,48 @@ impl PivotFinder {
     }
 
     fn find_cycle_free_pivots_s(&mut self) {
+        let report = log::max_level() >= log::LevelFilter::Info;
         let mut before_piv_count = self.pivots.count();
+        let mut count = 0;
 
         let n = self.cols();
         let mut w = RowWorker::new(n, &self.str);
 
-        let remain_rows: Vec<_> = self.remain_rows().enumerate().collect();
+        let remain_rows: Vec<_> = self.remain_rows().collect();
         let total = remain_rows.len();
 
-        if total > 100_000 { 
+        if report && total > 100_000 { 
             info!("  start find-cycle-free-pivots: {total} rows");
         }
 
-        for (c, i) in remain_rows { 
+        for i in remain_rows { 
             w.init(i, &self.pivots);
 
             if let Some(j) = w.find_cycle_free_pivots(&self.pivots) { 
                 self.pivots.set(i, j);
             }
 
-            if c > 0 && c % 10_000 == 0 { 
-                let piv_count = self.pivots.count();
-                info!("    [{c}/{total}] +{}, total: {}.", piv_count - before_piv_count, piv_count);
-                before_piv_count = piv_count;
+            if report {
+                count += 1;
+                if count % 10_000 == 0 { 
+                    let piv_count = self.pivots.count();
+                    info!("    [{count}/{total}] +{}, total: {}.", piv_count - before_piv_count, piv_count);
+                    before_piv_count = piv_count;
+                }
             }
         }
      }
 
      fn find_cycle_free_pivots_m(&mut self) {
+        let report = log::max_level() >= log::LevelFilter::Info;
         let before_piv_count = Mutex::new(self.pivots.count());
         let count = Mutex::new(0);
-        let report = true;
 
         let n = self.cols();
         let remain_rows = self.remain_rows().collect_vec();
         let total = remain_rows.len();
 
-        if total > 100_000 { 
+        if report && total > 100_000 { 
             info!("  start find-cycle-free-pivots: {total} rows (multi-thread)");
         }
 
@@ -274,16 +279,16 @@ impl PivotFinder {
             }
 
             if report { 
-                let c = {
+                let count = {
                     let mut count = count.lock().unwrap();
                     *count += 1;
                     *count
                 };
     
-                if c > 0 && c % 10_000 == 0 { 
+                if count % 10_000 == 0 { 
                     let mut before_piv_count = before_piv_count.lock().unwrap();
                     let piv_count = loc_pivots.count();
-                    info!("    [{c}/{total}] +{}, total: {}.", piv_count - *before_piv_count, piv_count);
+                    info!("    [{count}/{total}] +{}, total: {}.", piv_count - *before_piv_count, piv_count);
                     *before_piv_count = piv_count;
                 }
             }

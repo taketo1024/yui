@@ -1,9 +1,10 @@
 use std::cell::RefCell;
 use std::mem::replace;
 use std::ops::DerefMut;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use either::Either;
-use sprs::{CsMat, CsVec};
+use log::info;
+use sprs::{CsMat, CsVec, TriMat};
 use rayon::prelude::*;
 use thread_local::ThreadLocal;
 use crate::math::traits::{Ring, RingOps};
@@ -42,6 +43,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     } else { 
         // TODO
     }
+
+    info!("solve triangular, a = {:?}, y = {:?}", a.shape(), y.shape());
 
     const MULTI_THREAD: bool = true;
 
@@ -89,13 +92,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 fn solve_triangular_m<R>(t: TriangularType, a: &CsMat<R>, y: &CsMat<R>) -> CsMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
+    let report = log::max_level() >= log::LevelFilter::Info;
+    let count = Mutex::new(0);
+    
     let (n, k) = (a.rows(), y.cols());
     let diag = diag(t, &a);
 
+    let trip = Mutex::new( TriMat::new((n, k)) );
     let tls1 = Arc::new(ThreadLocal::new());
     let tls2 = Arc::new(ThreadLocal::new());
 
-    let result: Vec<_> = (0..k).into_par_iter().map(|j| -> Vec<_> { 
+    (0..k).into_par_iter().for_each(|j| { 
         let mut x_st = tls1.get_or(|| {
             let x = vec![R::zero(); n];
             RefCell::new(x)
@@ -115,32 +122,29 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         solve_triangular_into(t, &a, &diag, b, x);
 
-        (0..n).filter_map(|i| { 
-            if x[i].is_zero() { return None }
-            let x_i = replace(&mut x[i], R::zero());
-            Some((i, x_i))
-        }).collect()
-    }).collect();
-
-    let (indptr, indices, data) = {
-        let mut count = 0;
-        let mut indptr = vec![0];
-        let mut indices = vec![];
-        let mut data = vec![];
-    
-        for col in result { 
-            for (i, x_i) in col { 
-                count += 1;
-                indices.push(i);
-                data.push(x_i);
+        { 
+            let mut trip = trip.lock().unwrap();
+            for i in 0..n { 
+                if x[i].is_zero() { continue }
+                let x_i = replace(&mut x[i], R::zero());
+                trip.add_triplet(i, j, x_i);
             }
-            indptr.push(count);
         }
 
-        (indptr, indices, data)
-    };
+        if report { 
+            let c = {
+                let mut count = count.lock().unwrap();
+                *count += 1;
+                *count
+            };
 
-    CsMat::new_csc((n, k), indptr, indices, data)
+            if c > 0 && c % 10_000 == 0 { 
+                info!("  solved {c}/{k}");
+            }
+        }
+    });
+
+    trip.into_inner().unwrap().to_csc()
 }
 
 pub fn solve_triangular_vec<R>(t: TriangularType, a: &CsMat<R>, b: &CsVec<R>) -> CsVec<R>

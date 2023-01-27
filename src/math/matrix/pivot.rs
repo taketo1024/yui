@@ -192,9 +192,6 @@ impl PivotFinder {
         let mut before_piv_count = self.pivots.count();
         let mut count = 0;
 
-        let n = self.cols();
-        let mut w = RowWorker::new(n, &self.str);
-
         let remain_rows: Vec<_> = self.remain_rows().collect();
         let total = remain_rows.len();
 
@@ -202,8 +199,11 @@ impl PivotFinder {
             info!("  start find-cycle-free-pivots: {total} rows");
         }
 
+        let n = self.cols();
+        let mut w = RowWorker::new(n);
+
         for i in remain_rows { 
-            if let Some(j) = w.find_cycle_free_pivots(i, &self.pivots) { 
+            if let Some(j) = w.find_cycle_free_pivots(i, &self.str, &self.pivots) { 
                 self.pivots.set(i, j);
             }
 
@@ -244,7 +244,7 @@ impl PivotFinder {
             }).borrow_mut();
 
             let mut w = tls2.get_or(|| { 
-                let w = RowWorker::new(n, &self.str);
+                let w = RowWorker::new(n);
                 RefCell::new( w )
             }).borrow_mut();
 
@@ -253,12 +253,12 @@ impl PivotFinder {
                 loc_pivots.update_from(&pivots);
             }
 
-            w.init(i, &loc_pivots);
+            w.init(i, &self.str, &loc_pivots);
 
             loop { 
-                w.traverse(&loc_pivots);
+                w.traverse(&self.str, &loc_pivots);
                 
-                let Some(j) = w.choose_candidate() else {
+                let Some(j) = w.choose_candidate(&self.str) else {
                     break
                 };
                 
@@ -267,7 +267,7 @@ impl PivotFinder {
 
                 let mut pivots = rw_lock.write().unwrap();
                 
-                w.update(&loc_pivots, &pivots);
+                w.update_diff(&loc_pivots, &pivots);
                 
                 if w.should_retry() { 
                     loc_pivots.update_from(&pivots);
@@ -434,20 +434,19 @@ impl PivotData {
     }
 }
 
-struct RowWorker<'a> { 
-    str: &'a MatrixStr,
+struct RowWorker { 
     status: Vec<i8>,
     ncand: usize,
     queue: VecDeque<Col>,
     queued: HashSet<Col>
 }
 
-impl<'a> RowWorker<'a> {
-    fn new(size: usize, str: &'a MatrixStr) -> Self { 
+impl<'a> RowWorker {
+    fn new(size: usize) -> Self { 
         let status = vec![0; size];
         let queue = VecDeque::new();
         let queued = HashSet::new();
-        RowWorker { str, status, ncand: 0, queue, queued }
+        RowWorker {status, ncand: 0, queue, queued }
     }
 
     fn clear(&mut self) {
@@ -465,20 +464,20 @@ impl<'a> RowWorker<'a> {
     //
     //  o: queued, #: candidate, x: occupied
 
-    fn find_cycle_free_pivots(&mut self, i: usize, pivots: &PivotData) -> Option<Col> {
-        self.init(i, pivots);
-        self.traverse(pivots);
-        self.choose_candidate()
+    fn find_cycle_free_pivots(&mut self, i: usize, str: &MatrixStr, pivots: &PivotData) -> Option<Col> {
+        self.init(i, str, pivots);
+        self.traverse(str, pivots);
+        self.choose_candidate(str)
     }
 
-    fn init(&mut self, i: usize, pivots: &PivotData) { 
+    fn init(&mut self, i: usize, str: &MatrixStr, pivots: &PivotData) { 
         self.clear();
 
-        for &j in self.str.cols_in(i) {
+        for &j in str.cols_in(i) {
             if pivots.has_col(j) {
                 self.enqueue(j);
                 self.set_occupied(j);
-            } else if self.str.is_candidate(i, j) {
+            } else if str.is_candidate(i, j) {
                 self.set_candidate(j);
             } else { 
                 self.set_occupied(j);
@@ -486,7 +485,7 @@ impl<'a> RowWorker<'a> {
         }
     }
 
-    fn traverse(&mut self, pivots: &PivotData) {
+    fn traverse(&mut self, str: &MatrixStr, pivots: &PivotData) {
         if !self.has_candidate() { 
             return
         }
@@ -494,7 +493,7 @@ impl<'a> RowWorker<'a> {
         while let Some(j) = self.dequeue() { 
             let i2 = pivots.row_for(j).unwrap();
 
-            for &j2 in self.str.cols_in(i2) { 
+            for &j2 in str.cols_in(i2) { 
                 if pivots.has_col(j2) && !self.is_queued(j2) { 
                     self.enqueue(j2);
                 }
@@ -508,16 +507,16 @@ impl<'a> RowWorker<'a> {
         }
     }
 
-    fn choose_candidate(&self) -> Option<Col> { 
+    fn choose_candidate(&self, str: &MatrixStr) -> Option<Col> { 
         let n = self.status.len();
         (0 .. n)
             .filter(|&j| self.is_candidate(j))
             .sorted_by(|&j1, &j2| 
-                self.str.cmp_cols(j1, j2)
+                str.cmp_cols(j1, j2)
             ).next()
         }
 
-    fn update(&mut self, loc_pivots: &PivotData, pivots: &PivotData) {
+    fn update_diff(&mut self, loc_pivots: &PivotData, pivots: &PivotData) {
         debug_assert!(loc_pivots.count() <= pivots.count());
         for k in loc_pivots.count()..pivots.count() { 
             let j = pivots.indices[k];

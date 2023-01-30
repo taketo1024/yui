@@ -1,8 +1,16 @@
+use num_rational::Ratio;
+use num_traits::Signed;
 use super::super::traits::*;
 
 pub trait IntOps<T>: EucRingOps<T> {}
+
 pub trait Integer: EucRing + IntOps<Self> + From<i32> + Signed + num_integer::Integer
-where for<'a> &'a Self: EucRingOps<Self> {}
+where for<'a> &'a Self: EucRingOps<Self> {
+    fn div_round(&self, q: &Self) -> Self {
+        let r = Ratio::new(self.clone(), q.clone());
+        r.round().to_integer()
+    }
+}
 
 macro_rules! decl_integer {
     ($type:ty) => {
@@ -13,7 +21,6 @@ macro_rules! decl_integer {
 }
 
 pub(crate) use decl_integer;
-use num_traits::Signed;
 
 macro_rules! impl_euc_ring_integer {
     ($type:ident) => {

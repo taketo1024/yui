@@ -10,12 +10,13 @@ use std::cell::RefCell;
 use std::slice::Iter;
 use std::cmp::Ordering;
 use std::collections::{HashSet, VecDeque, HashMap};
-use std::sync::{RwLock, Mutex};
+use std::sync::Mutex;
 use itertools::Itertools;
 use log::info;
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use sprs::{CsMat, PermOwned};
 use thread_local::ThreadLocal;
+use parking_lot::RwLock;
 use crate::math::traits::{Ring, RingOps};
 use crate::utils::top_sort::top_sort;
 
@@ -239,7 +240,7 @@ impl PivotFinder {
 
         remain_rows.par_iter().for_each(|&i| { 
             let mut loc_pivots = tls1.get_or(|| {
-                let loc_pivots = rw_lock.read().unwrap().clone();
+                let loc_pivots = rw_lock.read().clone();
                 RefCell::new( loc_pivots )
             }).borrow_mut();
 
@@ -249,7 +250,7 @@ impl PivotFinder {
             }).borrow_mut();
 
             {
-                let pivots = rw_lock.read().unwrap();
+                let pivots = rw_lock.read();
                 loc_pivots.update_from(&pivots);
             }
 
@@ -265,7 +266,7 @@ impl PivotFinder {
                 // If no changes are made in other threads, modify `pivots` and exit.
                 // Otherwise, update `loc_pivots` and retry.
 
-                let mut pivots = rw_lock.write().unwrap();
+                let mut pivots = rw_lock.write();
                 
                 w.update_diff(&loc_pivots, &pivots);
                 
@@ -294,7 +295,7 @@ impl PivotFinder {
             }
         });
 
-        self.pivots = rw_lock.into_inner().unwrap();
+        self.pivots = rw_lock.into_inner();
      }
 }
 

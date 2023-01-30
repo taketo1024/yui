@@ -52,6 +52,10 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         &self.array
     }
 
+    pub fn array_mut(&mut self) -> &mut Array2<R> {
+        &mut self.array
+    }
+
     pub fn is_square(&self) -> bool { 
         self.nrows() == self.ncols()
     }

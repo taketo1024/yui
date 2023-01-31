@@ -203,15 +203,14 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
     }
 
     fn add_row_to(&mut self, i: Row, k: Row, r: &R) {
+        assert!(i < k);
         self.target.add_row_to(i, k, r);
 
         self.lambda[[k, i]] += r * &self.det[i];
 
-        if i > 0 { 
-            for j in 0..i-1 { 
-                let a = r * &self.lambda[[i, j]];
-                self.lambda[[k, j]] += a;
-            }
+        for j in 0..i { 
+            let a = r * &self.lambda[[i, j]];
+            self.lambda[[k, j]] += a;
         }
     }
 
@@ -447,6 +446,7 @@ mod tests {
         
         // compare data
         a.swap_rows(0, 1);
+
         let mut data2 = LLLData::new(a.clone(), alpha);
         data2.setup();
 
@@ -457,6 +457,43 @@ mod tests {
 
         // compare data
         a.swap_rows(1, 2);
+
+        let mut data3 = LLLData::new(a.clone(), alpha);
+        data3.setup();
+
+        assert_eq!(&data, &data3);
+     }
+
+
+    #[test]
+    fn add_row_to() { 
+        let mut a = DnsMat::from(array![
+            [1,-1, 3],
+            [1, 0, 5],
+            [1, 2, 6]
+        ]);
+        let alpha = (3, 4);
+
+        let mut data = LLLData::new(a.clone(), alpha);
+        data.setup();
+        
+        // first addition
+        data.add_row_to(0, 1, &2);
+        
+        // compare data
+        a.add_row_to(0, 1, &2);
+
+        let mut data2 = LLLData::new(a.clone(), alpha);
+        data2.setup();
+
+        assert_eq!(&data, &data2);
+
+        // second addition
+        data.add_row_to(1, 2, &-3);
+
+        // compare data
+        a.add_row_to(1, 2, &-3);
+        
         let mut data3 = LLLData::new(a.clone(), alpha);
         data3.setup();
 

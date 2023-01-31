@@ -5,13 +5,13 @@
 // See also: "Keith Matthews' LLL page", 
 // http://www.numbertheory.org/lll.html
 
-use std::ops::{Mul, Add, Div};
-
-use ndarray::{ArrayBase, Array1, ArrayView1, array, Array2, ArrayView2};
+use std::ops::Div;
+use log::trace;
+use ndarray::{Array1, ArrayView1, Array2, ArrayView2};
 use num_rational::Ratio;
 use num_traits::Signed;
-use crate::math::ext::ratio_ext::*;
-use crate::math::{ext::int_ext::{Integer, IntOps}, traits::{Ring, RingOps, EucRing, EucRingOps}};
+use crate::math::ext::int_ext::{Integer, IntOps};
+use crate::math::traits::{Ring, RingOps};
 use super::DnsMat;
 
 type Row = usize;
@@ -80,24 +80,28 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
         let m = self.data.rows();
 
         while self.data.step < m { 
-            println!("step: {}", self.data.step);
-
-            let k = self.data.step;
-
-            self.reduce(k - 1, k);
-
-            if self.is_ok(k) { 
-                for i in (0..k-1).rev() { 
-                    self.reduce(i, k);
-                }
-                self.data.next();
-            } else { 
-                self.data.swap(k);
-                self.data.back();
-            }
+            self.iterate();
         }
 
         self.finalize();
+    }
+
+    fn iterate(&mut self) { 
+        trace!("step: {}", self.data.step);
+
+        let k = self.data.step;
+
+        self.reduce(k - 1, k);
+
+        if self.is_ok(k) { 
+            for i in (0..k-1).rev() { 
+                self.reduce(i, k);
+            }
+            self.data.next();
+        } else { 
+            self.data.swap(k);
+            self.data.back();
+        }
     }
 
     pub fn result(self) -> DnsMat<R> { 
@@ -222,7 +226,6 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
     }
 
     fn swap(&mut self, k: Row) { 
-        println!("swap {},{}", k-1, k);
         assert!(k > 0);
 
         // b[k-1, ..] <--> b[k, ..]
@@ -271,23 +274,19 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
         let l0 = &self.lambda[[k,k-1]];
         self.det[k-1] = &(d0 * d2 + l0 * l0) / d1;
 
-        self.print_current();
+        trace!("swap {},{}.\n{}", k-1, k, self.target);
     }
 
     fn neg_row(&mut self, i: Row) { 
-        println!("negate {}", i);
-
         let n_one = -R::one();
         self.target.mul_row(i, &n_one);
         self.lambda.mul_row(i, &n_one);
         self.lambda.mul_col(i, &n_one);
 
-        self.print_current();
+        trace!("negate {}.\n{}", i, self.target);
     }
 
     fn add_row_to(&mut self, i: Row, k: Row, r: &R) {
-        println!("add-row {} to {}, mul {}", i, k, r);
-
         assert!(i < k);
         self.target.add_row_to(i, k, r);
 
@@ -298,7 +297,7 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
             self.lambda[[k, j]] += a;
         }
 
-        self.print_current();
+        trace!("add-row {} to {}, mul {}.\n{}", i, k, r, self.target);
     }
 
     fn nz_col_in(&self, i: Row) -> Option<Col> {
@@ -315,20 +314,10 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
         if self.step > 1 { 
             self.step -= 1;
         }
-        self.print_current();
     }
 
     fn rows(&self) -> usize { 
         self.target.nrows()
-    }
-
-    fn cols(&self) -> usize { 
-        self.target.ncols()
-    }
-
-    fn print_current(&self) {
-        println!("step: {}", self.step);
-        println!("target:\n{}", self.target);
     }
 }
 
@@ -350,8 +339,6 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
         let m = &l[[i, i - 1]];
         is_lovasz_ok(c0, c1, m, &alpha)
     });
-
-    dbg!(size_reduced, lovasz_ok);
 
     size_reduced && lovasz_ok
 }
@@ -612,6 +599,42 @@ mod tests {
 
         assert_eq!(&data, &data3);
      }
+
+     #[test]
+     fn neg_row() { 
+         let mut a = DnsMat::from(array![
+             [1,-1, 3],
+             [1, 0, 5],
+             [1, 2, 6]
+         ]);
+         let alpha = (3, 4);
+ 
+         let mut data = LLLData::new(a.clone(), alpha);
+         data.setup();
+         
+         // first neg
+         data.neg_row(1);
+         
+         // compare data
+         a.mul_row(1, &-1);
+ 
+         let mut data2 = LLLData::new(a.clone(), alpha);
+         data2.setup();
+ 
+         assert_eq!(&data, &data2);
+ 
+         // second swap
+         data.neg_row(2);
+ 
+         // compare data
+         a.mul_row(2, &-1);
+ 
+         let mut data3 = LLLData::new(a.clone(), alpha);
+         data3.setup();
+ 
+         assert_eq!(&data, &data3);
+      }
+ 
 
      #[test]
      fn lll() { 

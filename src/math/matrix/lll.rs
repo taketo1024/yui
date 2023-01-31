@@ -78,8 +78,8 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
 struct LLLData<R>
 where R: Integer, for<'x> &'x R: IntOps<R> {
     target: DnsMat<R>,
-    d: Vec<R>,     // d[0] = 1, d[i] = |b^*_i|^2 * d[i-1]. 
-    l: DnsMat<R>,  // l[i,j] = d[j] * m[i, j], m[i, j] = (b_i.b^*_j)/(b^*_j.b^*_j) (0 <= j < i)
+    det: Vec<R>,        // D[i] = det(b_1, ..., b_i)^2 = Π^i |b^*_j|^2. 
+    lambda: DnsMat<R>,  // l[i,j] = D[j] * p_ij (0 <= j < i)
     alpha: (R, R),
     step: usize
 }
@@ -88,10 +88,10 @@ impl<R> LLLData<R>
 where R: Integer, for<'x> &'x R: IntOps<R> {
     fn new(target: DnsMat<R>, alpha: (R, R)) -> Self { 
         let m = target.nrows();
-        let d = vec![R::one(); m];
-        let l = DnsMat::zero((m, m)); // lower-triangular
+        let det = vec![R::one(); m];
+        let lambda = DnsMat::zero((m, m)); // lower-triangular
 
-        LLLData { target, d, l, alpha, step: 1 }
+        LLLData { target, det, lambda, alpha, step: 1 }
     }
 
     fn setup(&mut self) { 
@@ -106,14 +106,14 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
         let b = self.target.array().slice(s);
         let (_, l, d) = large_orth_basis(&b);
 
-        self.l = DnsMat::from(l);
-        self.d = d;
+        self.lambda = DnsMat::from(l);
+        self.det = d;
     }
 
     fn lovasz_cond(&self, k: usize) -> bool { 
         assert!(k > 0);
 
-        let (d, l) = (&self.d, &self.l);
+        let (d, l) = (&self.det, &self.lambda);
         let (p, q) = &self.alpha;
 
         let one = R::one();
@@ -146,7 +146,7 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
             let a_kj = &a[[k, j]];
             a_kj.div_round(a_ij)
         } else {
-            let (d, l) = (&self.d, &self.l);
+            let (d, l) = (&self.det, &self.lambda);
             let l_ki = &l[[k, i]];
             let d_i = &d[i];
             l_ki.div_round(d_i)
@@ -165,45 +165,45 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
 
         for j in 0..k-1 { 
             let slice = ndarray::s![.., j];
-            let l_j = &mut self.l.array_mut().slice_mut(slice);
+            let l_j = &mut self.lambda.array_mut().slice_mut(slice);
             l_j.swap(k - 1, k);
         }
 
         let one = R::one();
-        let d = &self.d;
+        let d = &self.det;
         let d0 = if k >= 2 { &d[k - 2] } else { &one };
         let d1 = &d[k - 1];
         let d2 = &d[k];
 
         for i in k+1..m { 
-            let l = &self.l;
+            let l = &self.lambda;
             let t = &l[[i, k-1]] * d2 - &l[[i, k]] * &l[[k, k-1]];
             let s = &(&l[[i, k-1]] * &l[[k, k-1]] + &l[[i, k]] * d0) / d1;
 
-            self.l[[i, k-1]] = s;
-            self.l[[i, k]]   = &t / d1;
+            self.lambda[[i, k-1]] = s;
+            self.lambda[[i, k]]   = &t / d1;
         }
 
-        let l0 = &self.l[[k,k-1]];
-        self.d[k-1] = &(d0 * d2 + l0 * l0) / d1;
+        let l0 = &self.lambda[[k,k-1]];
+        self.det[k-1] = &(d0 * d2 + l0 * l0) / d1;
     }
 
     fn neg_row(&mut self, i: Row) { 
         let n_one = -R::one();
         self.target.mul_row(i, &n_one);
-        self.l.mul_row(i, &n_one);
-        self.l.mul_col(i, &n_one);
+        self.lambda.mul_row(i, &n_one);
+        self.lambda.mul_col(i, &n_one);
     }
 
     fn add_row_to(&mut self, i: Row, k: Row, r: &R) {
         self.target.add_row_to(i, k, r);
 
-        self.l[[k, i]] += r * &self.d[i];
+        self.lambda[[k, i]] += r * &self.det[i];
 
         if i > 0 { 
             for j in 0..i-1 { 
-                let a = r * &self.l[[i, j]];
-                self.l[[k, j]] += a;
+                let a = r * &self.lambda[[i, j]];
+                self.lambda[[k, j]] += a;
             }
         }
     }
@@ -236,14 +236,15 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
     fn print_current(&self) {
         dbg!(self.step);
         dbg!(&self.target);
-        dbg!(&self.d);
-        dbg!(&self.l);
+        dbg!(&self.det);
+        dbg!(&self.lambda);
         dbg!();
     }
 }
 
 // -- helper funcs -- //
 
+#[allow(unused)]
 fn orth_basis<R>(b: &ArrayView2<R>) -> (Array2<Ratio<R>>, Array2<Ratio<R>>)
 where R: Integer, for<'x> &'x R: IntOps<R> {
     let m = b.nrows();
@@ -322,12 +323,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     rhs.map(|x| r * x)
 }
 
-fn sdiv<'a, R>(lhs: &ArrayView1<'a, R>, r: &'a R) -> Array1<R>
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    lhs.map(|x| x / r)
-}
-
-
 #[cfg(test)]
 mod tests {
     use ndarray::array;
@@ -348,6 +343,10 @@ mod tests {
         assert!(dot(&c.row(0), &c.row(2)).is_zero());
         assert!(dot(&c.row(1), &c.row(2)).is_zero());
         
+        let det: Ratio<i32> = (0..3).map(|i| dot(&c.row(i), &c.row(i))).product();
+        assert!(det.is_integer());
+        assert_eq!(det.to_integer(), 9);
+
         assert_eq!(dot(&c.row(0), &c.row(0)), Ratio::new(11, 1));
         assert_eq!(dot(&c.row(1), &c.row(1)), Ratio::new(30, 11));
         assert_eq!(dot(&c.row(2), &c.row(2)), Ratio::new(3, 10));
@@ -388,12 +387,12 @@ mod tests {
         let mut data = LLLData::new(a, (3, 4));
         data.setup();
 
-        assert_eq!(data.d.len(), 3);
-        assert_eq!(data.d[0], 11);
-        assert_eq!(data.d[1], 30);
-        assert_eq!(data.d[2], 9);
+        assert_eq!(data.det.len(), 3);
+        assert_eq!(data.det[0], 11);
+        assert_eq!(data.det[1], 30);
+        assert_eq!(data.det[2], 9);
 
-        assert_eq!(data.l, DnsMat::from(array![
+        assert_eq!(data.lambda, DnsMat::from(array![
             [0,  0, 0],
             [16, 0, 0],
             [17,69, 0]
@@ -410,11 +409,11 @@ mod tests {
         let mut data = LLLData::new(a, (3, 4));
         data.setup_upto(1);
 
-        assert_eq!(data.d.len(), 2);
-        assert_eq!(data.d[0], 11);
-        assert_eq!(data.d[1], 30);
+        assert_eq!(data.det.len(), 2);
+        assert_eq!(data.det[0], 11);
+        assert_eq!(data.det[1], 30);
 
-        assert_eq!(data.l, DnsMat::from(array![
+        assert_eq!(data.lambda, DnsMat::from(array![
             [0,  0],
             [16, 0],
         ]));

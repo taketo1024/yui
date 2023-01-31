@@ -1,6 +1,7 @@
 pub mod dense;
 pub mod sparse;
 pub mod snf;
+pub mod lll;
 pub mod triang;
 pub mod pivot;
 pub mod schur;

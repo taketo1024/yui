@@ -2,10 +2,12 @@
 // George Havas, Bohdan S. Majewski, and Keith R. Matthews
 // https://projecteuclid.org/journals/experimental-mathematics/volume-7/issue-2/Extended-GCD-and-Hermite-normal-form-algorithms-via-lattice-basis/em/1048515660.full
 
-use std::ops::Mul;
+use std::ops::{Mul, Add, Div};
 
-use ndarray::{ArrayBase, Array1, ArrayView1, array};
-use crate::math::{ext::int_ext::{Integer, IntOps}, traits::{Ring, RingOps}};
+use ndarray::{ArrayBase, Array1, ArrayView1, array, Array2, ArrayView2};
+use num_rational::Ratio;
+use crate::math::ext::ratio_ext::*;
+use crate::math::{ext::int_ext::{Integer, IntOps}, traits::{Ring, RingOps, EucRing, EucRingOps}};
 use super::DnsMat;
 
 #[derive(Debug)]
@@ -93,32 +95,17 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
     }
 
     fn setup(&mut self) { 
-        let (m, n) = self.target.shape();
+        let m = self.rows();
+        self.setup_upto(m);
+    }
 
-        let b = self.target.array();
-        let mut c = b.clone();
-
-        self.d[0] = dot(c.row(0), c.row(0));
-
-        for i in 1..m { 
-            for j in 0..i { 
-                let l0 = dot(b.row(i), c.row(j));
-                
-                let one = R::one();
-                let d0 = if j > 0 { &self.d[j - 1] } else { &one };
-                let d1 = &self.d[j];
-
-                let c_i = Array1::from_iter( (0..n).map(|k| { 
-                    &(d1 * &c[[i, k]] - &l0 * &c[[j, k]]) / d0
-                }));
-                c.row_mut(i).assign(&c_i);
-
-                self.l[[i, j]] = l0;
-            }
-
-            let d0 = &self.d[i];
-            self.d[i] = &dot(c.row(i), c.row(i)) / d0;
-        }
+    fn setup_upto(&mut self, i0: Row) { 
+        let s = ndarray::s![0..i0, ..];
+        let b = self.target.array().slice(s);
+        let (_, l, d) = large_orth_basis(&b);
+        
+        self.l = DnsMat::from(l);
+        self.d = d;
     }
 
     fn lovasz_cond(&self, k: usize) -> bool { 
@@ -240,6 +227,10 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
         self.target.nrows()
     }
 
+    fn cols(&self) -> usize { 
+        self.target.ncols()
+    }
+
     fn print_current(&self) {
         dbg!(self.step);
         dbg!(&self.target);
@@ -249,8 +240,73 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
     }
 }
 
+// -- helper funcs -- //
 
-fn dot<'a, R>(lhs: ArrayView1<'a, R>, rhs: ArrayView1<'a, R>) -> R
+fn orth_basis<R>(b: &ArrayView2<R>) -> (Array2<Ratio<R>>, Array2<Ratio<R>>)
+where R: Integer, for<'x> &'x R: IntOps<R> {
+    let m = b.nrows();
+
+    let mut c = b.map(|x| Ratio::from(x.clone()));
+    let mut l = Array2::zeros((m, m));
+
+    for i in 1..m { 
+        for j in 0..i {
+            let (c_i, c_j) = (c.row(i), c.row(j));
+            let p_ij = proj_coeff::<Ratio<R>>(&c_j, &c_i);
+            let v_ij = smul::<Ratio<R>>(&p_ij, &c_j);
+
+            let mut c_i = c.row_mut(i);
+            c_i -= &v_ij;
+
+            l[[i, j]] = p_ij;
+        }
+    }
+
+    (c, l)
+}
+
+fn large_orth_basis<R>(b: &ArrayView2<R>) -> (Array2<R>, Array2<R>, Vec<R>)
+where R: Integer, for<'x> &'x R: IntOps<R> {
+    let (m, n) = (b.nrows(), b.ncols());
+    let one = R::one();
+
+    let mut c = b.to_owned();
+    let mut d = vec![R::one(); m];
+    let mut l = Array2::zeros((m, m));
+
+    d[0] = dot(&c.row(0), &c.row(0));
+
+    for i in 1..m { 
+        for j in 0..i { 
+            let l0 = dot(&b.row(i), &c.row(j));
+            let d0 = if j > 0 { &d[j - 1] } else { &one };
+            let d1 = &d[j];
+            
+            let c_i = Array1::from_iter( (0..n).map(|k| { 
+                &(d1 * &c[[i, k]] - &l0 * &c[[j, k]]) / d0
+            }));
+
+            l[[i, j]] = l0;
+            c.row_mut(i).assign(&c_i);
+        }
+
+        let c_i = &c.row(i);
+        let d0 = &d[i - 1];
+        
+        d[i] = &dot(&c_i, &c_i) / d0;
+    }
+
+    (c, l, d)
+}
+
+fn proj_coeff<'a, R>(base: &ArrayView1<'a, R>, other: &ArrayView1<'a, R>) -> R
+where R: Ring + Div<Output = R>, for<'x> &'x R: RingOps<R> {
+    let p = dot(&base, &other);
+    let q = dot(&base, &base);
+    p / q
+}
+
+fn dot<'a, R>(lhs: &ArrayView1<'a, R>, rhs: &ArrayView1<'a, R>) -> R
 where R: Ring, for<'x> &'x R: RingOps<R> {
     assert_eq!(lhs.dim(), rhs.dim());
     ndarray::Zip::from(lhs).and(rhs).fold(R::zero(), |mut acc, a, b| { 
@@ -259,12 +315,77 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     })
 }
 
+fn smul<'a, R>(r: &'a R, rhs: &ArrayView1<'a, R>) -> Array1<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    rhs.map(|x| r * x)
+}
+
+fn sdiv<'a, R>(lhs: &ArrayView1<'a, R>, r: &'a R) -> Array1<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    lhs.map(|x| x / r)
+}
+
+
 #[cfg(test)]
 mod tests {
     use ndarray::array;
+    use num_traits::Zero;
     use crate::math::matrix::DnsMat;
     use super::*;
  
+    #[test]
+    fn test_orth_basis() {
+        let a = array![
+            [1,-1, 3],
+            [1, 0, 5],
+            [1, 2, 6]
+        ];
+        let (c, _) = orth_basis(&a.view());
+
+        assert!(dot(&c.row(0), &c.row(1)).is_zero());
+        assert!(dot(&c.row(0), &c.row(2)).is_zero());
+        assert!(dot(&c.row(1), &c.row(2)).is_zero());
+        
+        assert_eq!(dot(&c.row(0), &c.row(0)), Ratio::new(11, 1));
+        assert_eq!(dot(&c.row(1), &c.row(1)), Ratio::new(30, 11));
+        assert_eq!(dot(&c.row(2), &c.row(2)), Ratio::new(3, 10));
+    }
+
+    #[test]
+    fn test_large_orth_basis() {
+        let a = array![
+            [1,-1, 3],
+            [1, 0, 5],
+            [1, 2, 6]
+        ];
+        let (c, l, d) = large_orth_basis(&a.view());
+
+        assert_eq!(c.row(0), array![1, -1, 3].view());
+        assert_eq!(c.row(1), array![-5, 16, 7].view());
+        assert_eq!(c.row(2), array![15, 6, -3].view());
+
+        assert_eq!(d[0], 11);
+        assert_eq!(d[1], 30);
+        assert_eq!(d[2], 9);
+
+        assert_eq!(l, array![
+            [0,  0, 0],
+            [16, 0, 0],
+            [17,69, 0]
+        ]);
+    }
+
+    #[test]
+    fn setup() { 
+        let a = DnsMat::from(array![
+            [1,-1, 3],
+            [1, 0, 5],
+            [1, 2, 6]
+        ]);
+        let mut data = LLLData::new(a, (3, 4));
+        data.setup();
+    }
+
     #[test]
     fn swap() { 
         let a = DnsMat::from(array![

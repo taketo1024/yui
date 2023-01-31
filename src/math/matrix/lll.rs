@@ -2,6 +2,9 @@
 // George Havas, Bohdan S. Majewski, and Keith R. Matthews
 // https://projecteuclid.org/journals/experimental-mathematics/volume-7/issue-2/Extended-GCD-and-Hermite-normal-form-algorithms-via-lattice-basis/em/1048515660.full
 
+// See also: "Keith Matthews' LLL page", 
+// http://www.numbertheory.org/lll.html
+
 use std::ops::{Mul, Add, Div};
 
 use ndarray::{ArrayBase, Array1, ArrayView1, array, Array2, ArrayView2};
@@ -67,10 +70,8 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
 
 impl<R> LLLHNFCalc<R>
 where R: Integer, for<'x> &'x R: IntOps<R> {
-    pub fn new(target: DnsMat<R>) -> Self { 
-        let alpha = (R::from(3), R::from(4)); // α = 3/4
+    pub fn new(target: DnsMat<R>, alpha: (R, R)) -> Self { 
         let data = LLLData::new(target, alpha);
-        
         LLLHNFCalc { data }
     }
 
@@ -83,35 +84,60 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
 
             let k = self.data.step;
 
-            self.data.reduce(k - 1, k);
+            self.reduce(k - 1, k);
 
-            if self.should_swap(k) { 
-                self.data.swap(k);
-                self.data.back();
-            } else { 
-                if k >= 2 { 
-                    for i in (0..(k - 2)).rev() { 
-                        self.data.reduce(i, k);
-                    }
+            if self.is_ok(k) { 
+                for i in (0..k-1).rev() { 
+                    self.reduce(i, k);
                 }
                 self.data.next();
+            } else { 
+                self.data.swap(k);
+                self.data.back();
             }
         }
 
         self.finalize();
     }
 
-    fn should_swap(&self, k: usize) -> bool {
+    pub fn result(self) -> DnsMat<R> { 
+        self.data.target
+    }
+
+    fn reduce(&mut self, i: Row, k: Row) {
+        assert!(i < k);
+
+        let j = self.data.nz_col_in(i);
+
+        if let Some(j) = j { 
+            if self.data.target[[i, j]].is_negative() { 
+                self.data.neg_row(i);
+            }
+
+            let a = &self.data.target;
+            let a0 = &a[[i, j]];
+            let a1 = &a[[k, j]];
+            let q = a1.div_round(a0);
+
+            if !q.is_zero() { 
+                self.data.add_row_to(i, k, &-q) // a[k] -= q & a[i]
+            }
+        } else { 
+            self.data.reduce(i, k)
+        }
+    }
+
+    fn is_ok(&self, k: usize) -> bool {
         assert!(k > 0);
 
-        let i = k - 1;
-        let (j1, j2) = (self.data.nz_col_in(i), self.data.nz_col_in(k));
+        let j = self.data.nz_col_in(k - 1);
+        let l = self.data.nz_col_in(k);
 
-        match (j1, j2) { 
-            (Some(j1), Some(j2)) => j1 <= j2,
-            (Some(_),  None)     => true,
-            (None,     Some(_))  => false,
-            (None,     None)     => !self.data.lovasz_ok(k)
+        match (j, l) { 
+            (Some(j), Some(l)) => j > l,
+            (Some(_), None)    => false,
+            (None,    Some(_)) => true,
+            (None,    None)    => self.data.lovasz_ok(k)
         }
     }
 
@@ -196,6 +222,7 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
     }
 
     fn swap(&mut self, k: Row) { 
+        println!("swap {},{}", k-1, k);
         assert!(k > 0);
 
         // b[k-1, ..] <--> b[k, ..]
@@ -243,16 +270,24 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
 
         let l0 = &self.lambda[[k,k-1]];
         self.det[k-1] = &(d0 * d2 + l0 * l0) / d1;
+
+        self.print_current();
     }
 
     fn neg_row(&mut self, i: Row) { 
+        println!("negate {}", i);
+
         let n_one = -R::one();
         self.target.mul_row(i, &n_one);
         self.lambda.mul_row(i, &n_one);
         self.lambda.mul_col(i, &n_one);
+
+        self.print_current();
     }
 
     fn add_row_to(&mut self, i: Row, k: Row, r: &R) {
+        println!("add-row {} to {}, mul {}", i, k, r);
+
         assert!(i < k);
         self.target.add_row_to(i, k, r);
 
@@ -262,6 +297,8 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
             let a = r * &self.lambda[[i, j]];
             self.lambda[[k, j]] += a;
         }
+
+        self.print_current();
     }
 
     fn nz_col_in(&self, i: Row) -> Option<Col> {
@@ -618,4 +655,26 @@ mod tests {
         ]));
         assert!(is_reduced(&res.array().view(), &alpha));
       }
+
+     #[test]
+     fn hnf() { 
+        let a: DnsMat<i64> = DnsMat::from(array![
+            [8,    44,   43],
+            [4,    10,   43],
+            [56, -550, -328],
+            [76,   10,   42]
+        ]);
+        let alpha = (3, 4);
+
+        let mut calc = LLLHNFCalc::new(a.clone(), alpha);
+        calc.process();
+        let res = calc.result();
+
+        assert_eq!(res, DnsMat::from(array![
+            [0, 0, 0],
+            [0, 0, 5],
+            [0, 6,-2],
+            [4,-2, 2]
+        ]));
+    }
 }

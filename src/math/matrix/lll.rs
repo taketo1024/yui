@@ -96,14 +96,16 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
 
     fn setup(&mut self) { 
         let m = self.rows();
-        self.setup_upto(m);
+        self.setup_upto(m - 1);
     }
 
     fn setup_upto(&mut self, i0: Row) { 
-        let s = ndarray::s![0..i0, ..];
+        assert!(i0 < self.rows());
+
+        let s = ndarray::s![0..=i0, ..];
         let b = self.target.array().slice(s);
         let (_, l, d) = large_orth_basis(&b);
-        
+
         self.l = DnsMat::from(l);
         self.d = d;
     }
@@ -374,6 +376,7 @@ mod tests {
             [17,69, 0]
         ]);
     }
+    
 
     #[test]
     fn setup() { 
@@ -384,6 +387,37 @@ mod tests {
         ]);
         let mut data = LLLData::new(a, (3, 4));
         data.setup();
+
+        assert_eq!(data.d.len(), 3);
+        assert_eq!(data.d[0], 11);
+        assert_eq!(data.d[1], 30);
+        assert_eq!(data.d[2], 9);
+
+        assert_eq!(data.l, DnsMat::from(array![
+            [0,  0, 0],
+            [16, 0, 0],
+            [17,69, 0]
+        ]));
+    }
+
+    #[test]
+    fn setup_upto() { 
+        let a = DnsMat::from(array![
+            [1,-1, 3],
+            [1, 0, 5],
+            [1, 2, 6]
+        ]);
+        let mut data = LLLData::new(a, (3, 4));
+        data.setup_upto(1);
+
+        assert_eq!(data.d.len(), 2);
+        assert_eq!(data.d[0], 11);
+        assert_eq!(data.d[1], 30);
+
+        assert_eq!(data.l, DnsMat::from(array![
+            [0,  0],
+            [16, 0],
+        ]));
     }
 
     #[test]

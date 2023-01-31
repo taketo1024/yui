@@ -6,9 +6,13 @@ use std::ops::{Mul, Add, Div};
 
 use ndarray::{ArrayBase, Array1, ArrayView1, array, Array2, ArrayView2};
 use num_rational::Ratio;
+use num_traits::Signed;
 use crate::math::ext::ratio_ext::*;
 use crate::math::{ext::int_ext::{Integer, IntOps}, traits::{Ring, RingOps, EucRing, EucRingOps}};
 use super::DnsMat;
+
+type Row = usize;
+type Col = usize;
 
 #[derive(Debug)]
 pub struct LLLCalc<R>
@@ -16,16 +20,58 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
     data: LLLData<R>
 }
 
-type Row = usize;
-type Col = usize;
-
 impl<R> LLLCalc<R>
+where R: Integer, for<'x> &'x R: IntOps<R> {
+    pub fn new(target: DnsMat<R>, alpha: (R, R)) -> Self {
+        let mut data = LLLData::new(target, alpha);
+        data.setup();
+
+        LLLCalc { data }
+    }
+
+    pub fn process(&mut self) { 
+        assert!(self.data.step == 1);
+        let m = self.data.rows();
+
+        while self.data.step < m { 
+            self.iterate()
+        }
+    }
+
+    fn iterate(&mut self) { 
+        let k = self.data.step;
+
+        self.data.reduce(k - 1, k);
+
+        if self.data.lovasz_ok(k) { 
+            for i in (0..k-1).rev() { 
+                self.data.reduce(i, k);
+            }
+            self.data.next();
+        } else { 
+            self.data.swap(k);
+            self.data.back();
+        }
+    }
+
+    pub fn result(self) -> DnsMat<R> { 
+        self.data.target
+    }
+}
+
+#[derive(Debug)]
+pub struct LLLHNFCalc<R>
+where R: Integer, for<'x> &'x R: IntOps<R> {
+    data: LLLData<R>
+}
+
+impl<R> LLLHNFCalc<R>
 where R: Integer, for<'x> &'x R: IntOps<R> {
     pub fn new(target: DnsMat<R>) -> Self { 
         let alpha = (R::from(3), R::from(4)); // α = 3/4
         let data = LLLData::new(target, alpha);
         
-        LLLCalc { data }
+        LLLHNFCalc { data }
     }
 
     pub fn process(&mut self) { 
@@ -65,7 +111,7 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
             (Some(j1), Some(j2)) => j1 <= j2,
             (Some(_),  None)     => true,
             (None,     Some(_))  => false,
-            (None,     None)     => !self.data.lovasz_cond(k)
+            (None,     None)     => !self.data.lovasz_ok(k)
         }
     }
 
@@ -73,7 +119,6 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
 
     }
 }
-
 
 #[derive(Debug, PartialEq, Eq)]
 struct LLLData<R>
@@ -88,6 +133,11 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
 impl<R> LLLData<R>
 where R: Integer, for<'x> &'x R: IntOps<R> {
     fn new(target: DnsMat<R>, alpha: (R, R)) -> Self { 
+        // 1/4 < α < 1 
+        let (p, q) = alpha.clone();
+        assert!(&q < &(&R::from(4) * &p));
+        assert!(&p < &q);
+
         let m = target.nrows();
         let det = vec![R::one(); m];
         let lambda = DnsMat::zero((m, m)); // lower-triangular
@@ -112,7 +162,7 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
         self.det = d;
     }
 
-    fn lovasz_cond(&self, k: usize) -> bool { 
+    fn lovasz_ok(&self, k: usize) -> bool { 
         assert!(k > 0);
 
         let (d, l) = (&self.det, &self.lambda);
@@ -240,15 +290,42 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
     }
 
     fn print_current(&self) {
-        dbg!(self.step);
-        dbg!(&self.target);
-        dbg!(&self.det);
-        dbg!(&self.lambda);
-        dbg!();
+        println!("step: {}", self.step);
+        println!("target:\n{}", self.target);
     }
 }
 
 // -- helper funcs -- //
+
+#[allow(unused)]
+fn is_reduced<R>(b: &ArrayView2<R>, alpha: &(R, R)) -> bool
+where R: Integer, for<'x> &'x R: IntOps<R> {
+    let m = b.nrows();
+
+    let (c, l) = orth_basis(b);
+    let alpha = Ratio::from(alpha.clone());
+    let thr = Ratio::new(R::one(), R::from(2));
+
+    let size_reduced = l.iter().all(|r| &r.abs() <= &thr);
+    let lovasz_ok = (1..m).all(|i| {
+        let c0 = &c.row(i - 1);
+        let c1 = &c.row(i);
+        let m = &l[[i, i - 1]];
+        is_lovasz_ok(c0, c1, m, &alpha)
+    });
+
+    dbg!(size_reduced, lovasz_ok);
+
+    size_reduced && lovasz_ok
+}
+
+#[allow(unused)]
+fn is_lovasz_ok<R>(c0: &ArrayView1<Ratio<R>>, c1: &ArrayView1<Ratio<R>>, m: &Ratio<R>, alpha: &Ratio<R>) -> bool
+where R: Integer, for<'x> &'x R: IntOps<R> {
+    let r0 = dot::<Ratio<R>>(c0, c0);
+    let r1 = dot::<Ratio<R>>(c1, c1);
+    r1 >= (alpha - m * m) * r0
+}
 
 #[allow(unused)]
 fn orth_basis<R>(b: &ArrayView2<R>) -> (Array2<Ratio<R>>, Array2<Ratio<R>>)
@@ -464,7 +541,6 @@ mod tests {
         assert_eq!(&data, &data3);
      }
 
-
     #[test]
     fn add_row_to() { 
         let mut a = DnsMat::from(array![
@@ -499,4 +575,47 @@ mod tests {
 
         assert_eq!(&data, &data3);
      }
+
+     #[test]
+     fn lll() { 
+        let a = DnsMat::from(array![
+            [1,-1, 3],
+            [1, 0, 5],
+            [1, 2, 6]
+        ]);
+        let alpha = (3, 4);
+
+        let mut calc = LLLCalc::new(a, alpha);
+        calc.process();
+        let res = calc.result();
+
+        assert_eq!(res, DnsMat::from(array![
+            [0, 1, -1],
+            [1, 0, -1],
+            [1, 1, 1]
+        ]));
+        assert!(is_reduced(&res.array().view(), &alpha));
+    }
+
+     #[test]
+     fn lll_gcdx() { 
+        // MEMO: γ = 10
+        let a = DnsMat::from(array![
+            [1, 0, 0, 40],
+            [0, 1, 0, 60],
+            [0, 0, 1, 90]
+        ]);
+        let alpha = (3, 4);
+
+        let mut calc = LLLCalc::new(a.clone(), alpha);
+        calc.process();
+        let res = calc.result();
+
+        assert_eq!(res, DnsMat::from(array![
+            [3, -2, 0, 0],
+            [0, 3, -2, 0],
+            [-2, 0, 1, 10]
+        ]));
+        assert!(is_reduced(&res.array().view(), &alpha));
+      }
 }

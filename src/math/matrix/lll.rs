@@ -74,7 +74,8 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
     }
 }
 
-#[derive(Debug)]
+
+#[derive(Debug, PartialEq, Eq)]
 struct LLLData<R>
 where R: Integer, for<'x> &'x R: IntOps<R> {
     target: DnsMat<R>,
@@ -94,6 +95,7 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
         LLLData { target, det, lambda, alpha, step: 1 }
     }
 
+    #[allow(unused)]
     fn setup(&mut self) { 
         let m = self.rows();
         self.setup_upto(m - 1);
@@ -132,25 +134,11 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
 
     fn reduce(&mut self, i: Row, k: Row) { 
         assert!(i < k);
-        let j = self.nz_col_in(i);
 
-        if let Some(j) = j { 
-            if self.target[[i, j]].is_negative() { 
-                self.neg_row(i);
-            }
-        }
-
-        let q = if let Some(j) = j { 
-            let a = &self.target;
-            let a_ij = &a[[i, j]];
-            let a_kj = &a[[k, j]];
-            a_kj.div_round(a_ij)
-        } else {
-            let (d, l) = (&self.det, &self.lambda);
-            let l_ki = &l[[k, i]];
-            let d_i = &d[i];
-            l_ki.div_round(d_i)
-        };
+        let (d, l) = (&self.det, &self.lambda);
+        let l_ki = &l[[k, i]];
+        let d_i = &d[i];
+        let q = l_ki.div_round(d_i);
 
         if !q.is_zero() { 
             self.add_row_to(i, k, &-q) // a[k] -= q & a[i]
@@ -159,10 +147,20 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
 
     fn swap(&mut self, k: Row) { 
         assert!(k > 0);
-        let m = self.rows();
 
+        // b[k-1, ..] <--> b[k, ..]
         self.target.swap_rows(k - 1, k);
 
+        //                   k 
+        //      |                     |
+        //  k-1 |  . . . . 0          |
+        //  k   |  . . . . * 0        |
+        //  k+1 |          . . 0      |
+        //      |          . .        |
+        //      |          . .        |
+        //
+
+        // λ[k-1, ..] <--> λ[k, ..] 
         for j in 0..k-1 { 
             let slice = ndarray::s![.., j];
             let l_j = &mut self.lambda.array_mut().slice_mut(slice);
@@ -175,14 +173,23 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
         let d1 = &d[k - 1];
         let d2 = &d[k];
 
+        let m = self.lambda.ncols();
+
+        // λ[.., k-1] <--> λ[.., k]
         for i in k+1..m { 
             let l = &self.lambda;
-            let t = &l[[i, k-1]] * d2 - &l[[i, k]] * &l[[k, k-1]];
-            let s = &(&l[[i, k-1]] * &l[[k, k-1]] + &l[[i, k]] * d0) / d1;
+            let l0 = &l[[k, k-1]];
+            let l1 = &l[[i, k-1]];
+            let l2 = &l[[i, k]];
 
-            self.lambda[[i, k-1]] = s;
+            let s = l1 * l0 + l2 * d0;
+            let t = l1 * d2 - l2 * l0;
+
+            self.lambda[[i, k-1]] = &s / d1;
             self.lambda[[i, k]]   = &t / d1;
         }
+
+        // λ[k, k-1] remains unchanged.
 
         let l0 = &self.lambda[[k,k-1]];
         self.det[k-1] = &(d0 * d2 + l0 * l0) / d1;
@@ -384,7 +391,9 @@ mod tests {
             [1, 0, 5],
             [1, 2, 6]
         ]);
-        let mut data = LLLData::new(a, (3, 4));
+        let alpha = (3, 4);
+        let mut data = LLLData::new(a, alpha);
+
         data.setup();
 
         assert_eq!(data.det.len(), 3);
@@ -406,7 +415,9 @@ mod tests {
             [1, 0, 5],
             [1, 2, 6]
         ]);
-        let mut data = LLLData::new(a, (3, 4));
+        let alpha = (3, 4);
+        let mut data = LLLData::new(a, alpha);
+
         data.setup_upto(1);
 
         assert_eq!(data.det.len(), 2);
@@ -421,18 +432,34 @@ mod tests {
 
     #[test]
     fn swap() { 
-        let a = DnsMat::from(array![
+        let mut a = DnsMat::from(array![
             [1,-1, 3],
             [1, 0, 5],
             [1, 2, 6]
         ]);
-        let mut data = LLLData::new(a, (3, 4));
+        let alpha = (3, 4);
+
+        let mut data = LLLData::new(a.clone(), alpha);
+        data.setup();
+        
+        // first swap
+        data.swap(1);
+        
+        // compare data
+        a.swap_rows(0, 1);
+        let mut data2 = LLLData::new(a.clone(), alpha);
+        data2.setup();
+
+        assert_eq!(&data, &data2);
+
+        // second swap
         data.swap(2);
 
-        assert_eq!(&data.target, &DnsMat::from(array![
-            [1,-1, 3],
-            [1, 2, 6],
-            [1, 0, 5]
-        ]));
-    }
+        // compare data
+        a.swap_rows(1, 2);
+        let mut data3 = LLLData::new(a.clone(), alpha);
+        data3.setup();
+
+        assert_eq!(&data, &data3);
+     }
 }

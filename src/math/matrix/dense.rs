@@ -4,7 +4,7 @@ use ndarray::{Array2, s};
 use sprs::{CsMat, TriMat, CsMatBase, SpIndex};
 use crate::math::traits::{Ring, RingOps};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DnsMat<R>
 where R: Ring, for<'a> &'a R: RingOps<R> {
     array: Array2<R>

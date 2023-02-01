@@ -13,7 +13,7 @@ use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps, DivRound};
 use super::DnsMat;
 
 pub trait LLLRingOps<T>: EucRingOps<T> {}
-pub trait LLLRing: EucRing + LLLRingOps<Self> + DivRound + From<i32>
+pub trait LLLRing: EucRing + LLLRingOps<Self> + DivRound
 where for<'x> &'x Self: LLLRingOps<Self> {
     type Int: PartialOrd + Ord;
     fn alpha() -> (Self, Self);

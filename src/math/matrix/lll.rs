@@ -8,13 +8,12 @@
 use ndarray::{Array1, ArrayView1, Array2, ArrayView2};
 use log::trace;
 use num_bigint::BigInt;
-use num_traits::Signed;
 
 use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps, DivRound};
 use super::DnsMat;
 
 pub trait LLLRingOps<T>: EucRingOps<T> + PartialOrd + Ord {}
-pub trait LLLRing: EucRing + LLLRingOps<Self> + Signed + DivRound + From<i32>
+pub trait LLLRing: EucRing + LLLRingOps<Self> + DivRound + From<i32>
 where for<'x> &'x Self: LLLRingOps<Self> {
     fn alpha() -> (Self, Self);
 }
@@ -135,8 +134,9 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         let j = self.data.nz_col_in(i);
 
         if let Some(j) = j { 
-            if self.data.target[[i, j]].is_negative() { 
-                self.data.neg_row(i);
+            let u = self.data.target[[i, j]].normalizing_unit();
+            if !u.is_one() { 
+                self.data.mul_row(i, &u);
             }
 
             let a = &self.data.target;
@@ -283,13 +283,12 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         trace!("swap {},{}.\n{}", k-1, k, self.target);
     }
 
-    fn neg_row(&mut self, i: Row) { 
-        let n_one = -R::one();
-        self.target.mul_row(i, &n_one);
-        self.lambda.mul_row(i, &n_one);
-        self.lambda.mul_col(i, &n_one);
+    fn mul_row(&mut self, i: Row, r: &R) { 
+        self.target.mul_row(i, r);
+        self.lambda.mul_row(i, r);
+        self.lambda.mul_col(i, r);
 
-        trace!("negate {}.\n{}", i, self.target);
+        trace!("mul {} to row {}.\n{}", r, i, self.target);
     }
 
     fn add_row_to(&mut self, i: Row, k: Row, r: &R) {
@@ -492,7 +491,7 @@ mod tests {
      }
 
      #[test]
-     fn neg_row() { 
+     fn mul_row() { 
          let mut a = DnsMat::from(array![
              [1,-1, 3],
              [1, 0, 5],
@@ -502,7 +501,7 @@ mod tests {
          data.setup();
          
          // first neg
-         data.neg_row(1);
+         data.mul_row(1, &-1);
          
          // compare data
          a.mul_row(1, &-1);
@@ -513,7 +512,7 @@ mod tests {
          assert_eq!(&data, &data2);
  
          // second swap
-         data.neg_row(2);
+         data.mul_row(2, &-1);
  
          // compare data
          a.mul_row(2, &-1);

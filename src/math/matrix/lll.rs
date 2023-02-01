@@ -5,13 +5,11 @@
 // See also: "Keith Matthews' LLL page", 
 // http://www.numbertheory.org/lll.html
 
-use std::ops::Div;
-use log::trace;
 use ndarray::{Array1, ArrayView1, Array2, ArrayView2};
-use num_rational::Ratio;
-use num_traits::Signed;
+use log::trace;
+
 use crate::math::ext::int_ext::{Integer, IntOps};
-use crate::math::traits::{Ring, RingOps};
+use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps};
 use super::DnsMat;
 
 type Row = usize;
@@ -175,18 +173,9 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
         LLLData { target, det, lambda, alpha, step: 1 }
     }
 
-    #[allow(unused)]
     fn setup(&mut self) { 
-        let m = self.rows();
-        self.setup_upto(m - 1);
-    }
-
-    fn setup_upto(&mut self, i0: Row) { 
-        assert!(i0 < self.rows());
-
-        let s = ndarray::s![0..=i0, ..];
-        let b = self.target.array().slice(s);
-        let (_, l, d) = large_orth_basis(&b);
+        let b = self.target.array();
+        let (_, l, d) = orthogonalize(&b.view());
 
         self.lambda = DnsMat::from(l);
         self.det = d;
@@ -323,60 +312,8 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
 
 // -- helper funcs -- //
 
-#[allow(unused)]
-fn is_reduced<R>(b: &ArrayView2<R>, alpha: &(R, R)) -> bool
-where R: Integer, for<'x> &'x R: IntOps<R> {
-    let m = b.nrows();
-
-    let (c, l) = orth_basis(b);
-    let alpha = Ratio::from(alpha.clone());
-    let thr = Ratio::new(R::one(), R::from(2));
-
-    let size_reduced = l.iter().all(|r| &r.abs() <= &thr);
-    let lovasz_ok = (1..m).all(|i| {
-        let c0 = &c.row(i - 1);
-        let c1 = &c.row(i);
-        let m = &l[[i, i - 1]];
-        is_lovasz_ok(c0, c1, m, &alpha)
-    });
-
-    size_reduced && lovasz_ok
-}
-
-#[allow(unused)]
-fn is_lovasz_ok<R>(c0: &ArrayView1<Ratio<R>>, c1: &ArrayView1<Ratio<R>>, m: &Ratio<R>, alpha: &Ratio<R>) -> bool
-where R: Integer, for<'x> &'x R: IntOps<R> {
-    let r0 = dot::<Ratio<R>>(c0, c0);
-    let r1 = dot::<Ratio<R>>(c1, c1);
-    r1 >= (alpha - m * m) * r0
-}
-
-#[allow(unused)]
-fn orth_basis<R>(b: &ArrayView2<R>) -> (Array2<Ratio<R>>, Array2<Ratio<R>>)
-where R: Integer, for<'x> &'x R: IntOps<R> {
-    let m = b.nrows();
-
-    let mut c = b.map(|x| Ratio::from(x.clone()));
-    let mut l = Array2::zeros((m, m));
-
-    for i in 1..m { 
-        for j in 0..i {
-            let (c_i, c_j) = (c.row(i), c.row(j));
-            let p_ij = proj_coeff::<Ratio<R>>(&c_j, &c_i);
-            let v_ij = smul::<Ratio<R>>(&p_ij, &c_j);
-
-            let mut c_i = c.row_mut(i);
-            c_i -= &v_ij;
-
-            l[[i, j]] = p_ij;
-        }
-    }
-
-    (c, l)
-}
-
-fn large_orth_basis<R>(b: &ArrayView2<R>) -> (Array2<R>, Array2<R>, Vec<R>)
-where R: Integer, for<'x> &'x R: IntOps<R> {
+fn orthogonalize<R>(b: &ArrayView2<R>) -> (Array2<R>, Array2<R>, Vec<R>)
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     let (m, n) = (b.nrows(), b.ncols());
     let one = R::one();
 
@@ -409,13 +346,6 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
     (c, l, d)
 }
 
-fn proj_coeff<'a, R>(base: &ArrayView1<'a, R>, other: &ArrayView1<'a, R>) -> R
-where R: Ring + Div<Output = R>, for<'x> &'x R: RingOps<R> {
-    let p = dot(&base, &other);
-    let q = dot(&base, &base);
-    p / q
-}
-
 fn dot<'a, R>(lhs: &ArrayView1<'a, R>, rhs: &ArrayView1<'a, R>) -> R
 where R: Ring, for<'x> &'x R: RingOps<R> {
     assert_eq!(lhs.dim(), rhs.dim());
@@ -425,40 +355,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     })
 }
 
-fn smul<'a, R>(r: &'a R, rhs: &ArrayView1<'a, R>) -> Array1<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    rhs.map(|x| r * x)
-}
-
 #[cfg(test)]
 mod tests {
     use ndarray::array;
-    use num_traits::Zero;
     use crate::math::matrix::DnsMat;
     use super::*;
  
-    #[test]
-    fn test_orth_basis() {
-        let a = array![
-            [1,-1, 3],
-            [1, 0, 5],
-            [1, 2, 6]
-        ];
-        let (c, _) = orth_basis(&a.view());
-
-        assert!(dot(&c.row(0), &c.row(1)).is_zero());
-        assert!(dot(&c.row(0), &c.row(2)).is_zero());
-        assert!(dot(&c.row(1), &c.row(2)).is_zero());
-        
-        let det: Ratio<i32> = (0..3).map(|i| dot(&c.row(i), &c.row(i))).product();
-        assert!(det.is_integer());
-        assert_eq!(det.to_integer(), 9);
-
-        assert_eq!(dot(&c.row(0), &c.row(0)), Ratio::new(11, 1));
-        assert_eq!(dot(&c.row(1), &c.row(1)), Ratio::new(30, 11));
-        assert_eq!(dot(&c.row(2), &c.row(2)), Ratio::new(3, 10));
-    }
-
     #[test]
     fn test_large_orth_basis() {
         let a = array![
@@ -466,7 +368,7 @@ mod tests {
             [1, 0, 5],
             [1, 2, 6]
         ];
-        let (c, l, d) = large_orth_basis(&a.view());
+        let (c, l, d) = orthogonalize(&a.view());
 
         assert_eq!(c.row(0), array![1, -1, 3].view());
         assert_eq!(c.row(1), array![-5, 16, 7].view());
@@ -483,7 +385,6 @@ mod tests {
         ]);
     }
     
-
     #[test]
     fn setup() { 
         let a = DnsMat::from(array![
@@ -505,28 +406,6 @@ mod tests {
             [0,  0, 0],
             [16, 0, 0],
             [17,69, 0]
-        ]));
-    }
-
-    #[test]
-    fn setup_upto() { 
-        let a = DnsMat::from(array![
-            [1,-1, 3],
-            [1, 0, 5],
-            [1, 2, 6]
-        ]);
-        let alpha = (3, 4);
-        let mut data = LLLData::new(a, alpha);
-
-        data.setup_upto(1);
-
-        assert_eq!(data.det.len(), 2);
-        assert_eq!(data.det[0], 11);
-        assert_eq!(data.det[1], 30);
-
-        assert_eq!(data.lambda, DnsMat::from(array![
-            [0,  0],
-            [16, 0],
         ]));
     }
 
@@ -633,8 +512,7 @@ mod tests {
          data3.setup();
  
          assert_eq!(&data, &data3);
-      }
- 
+    }
 
      #[test]
      fn lll() { 
@@ -699,5 +577,72 @@ mod tests {
             [0, 6,-2],
             [4,-2, 2]
         ]));
+    }
+
+    // --helper funcs-- //
+
+    use std::ops::Div;
+    use num_rational::Ratio;
+    use num_traits::Signed;
+
+    fn is_reduced<R>(b: &ArrayView2<R>, alpha: &(R, R)) -> bool
+    where R: Integer, for<'x> &'x R: IntOps<R> {
+        let m = b.nrows();
+
+        let (c, l) = gram_schmidt(b);
+        let alpha = Ratio::from(alpha.clone());
+        let thr = Ratio::new(R::one(), R::from(2));
+
+        let size_reduced = l.iter().all(|r| &r.abs() <= &thr);
+        let lovasz_ok = (1..m).all(|i| {
+            let c0 = &c.row(i - 1);
+            let c1 = &c.row(i);
+            let m = &l[[i, i - 1]];
+            is_lovasz_ok(c0, c1, m, &alpha)
+        });
+
+        size_reduced && lovasz_ok
+    }
+
+    fn is_lovasz_ok<R>(c0: &ArrayView1<Ratio<R>>, c1: &ArrayView1<Ratio<R>>, m: &Ratio<R>, alpha: &Ratio<R>) -> bool
+    where R: Integer, for<'x> &'x R: IntOps<R> {
+        let r0 = dot::<Ratio<R>>(c0, c0);
+        let r1 = dot::<Ratio<R>>(c1, c1);
+        r1 >= (alpha - m * m) * r0
+    }
+
+    fn gram_schmidt<R>(b: &ArrayView2<R>) -> (Array2<Ratio<R>>, Array2<Ratio<R>>)
+    where R: Integer, for<'x> &'x R: IntOps<R> {
+        let m = b.nrows();
+
+        let mut c = b.map(|x| Ratio::from(x.clone()));
+        let mut l = Array2::zeros((m, m));
+
+        for i in 1..m { 
+            for j in 0..i {
+                let (c_i, c_j) = (c.row(i), c.row(j));
+                let p_ij = proj_coeff::<Ratio<R>>(&c_j, &c_i);
+                let v_ij = smul::<Ratio<R>>(&p_ij, &c_j);
+
+                let mut c_i = c.row_mut(i);
+                c_i -= &v_ij;
+
+                l[[i, j]] = p_ij;
+            }
+        }
+
+        (c, l)
+    }
+
+    fn proj_coeff<'a, R>(base: &ArrayView1<'a, R>, other: &ArrayView1<'a, R>) -> R
+    where R: Ring + Div<Output = R>, for<'x> &'x R: RingOps<R> {
+        let p = dot(&base, &other);
+        let q = dot(&base, &base);
+        p / q
+    }
+
+    fn smul<'a, R>(r: &'a R, rhs: &ArrayView1<'a, R>) -> Array1<R>
+    where R: Ring, for<'x> &'x R: RingOps<R> {
+        rhs.map(|x| r * x)
     }
 }

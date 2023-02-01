@@ -2,7 +2,6 @@ use std::fmt::Debug;
 use std::iter::{Sum, Product};
 use std::{fmt::Display};
 use std::ops::{Add, Neg, Sub, Mul, AddAssign, SubAssign, MulAssign, Rem, Div, RemAssign, DivAssign};
-use num_rational::Ratio;
 use num_traits::{Zero, One};
 use super::int_ext::{Integer, IntOps};
 use super::super::traits::*;
@@ -273,30 +272,32 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 
 // Div / Rem for GaussInt (D = -1).
 
-fn div_round<I>(p: &I, q: &I) -> I 
+impl<I> DivRound for GaussInt<I>
 where I: Integer, for<'x> &'x I: IntOps<I> {
-    Ratio::new(p.clone(), q.clone()).round().to_integer()
-}
-
-impl<'a, I> Div for &'a QuadInt<I, -1>
-where I: Integer, for<'x> &'x I: IntOps<I> {
-    type Output = QuadInt<I, -1>;
-
-    fn div(self, rhs: Self) -> Self::Output {
+    fn div_round(&self, rhs: &Self) -> Self {
         let norm = rhs.norm();
         let w = self * &rhs.conj();
         let (x, y) = w.pair_into();
         QuadInt( 
-            div_round(&x, &norm), 
-            div_round(&y, &norm) 
+            x.div_round(&norm),
+            y.div_round(&norm)
         )
+    }
+}
+
+impl<'a, I> Div for &'a GaussInt<I>
+where I: Integer, for<'x> &'x I: IntOps<I> {
+    type Output = GaussInt<I>;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        self.div_round(rhs)
     }
 }
 
 forward_binop_specific!(Div, div, -1);
 forward_assop_specific!(DivAssign, div_assign, div, -1);
 
-impl<'a, I> Rem for &'a QuadInt<I, -1>
+impl<'a, I> Rem for &'a GaussInt<I>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     type Output = QuadInt<I, -1>;
 
@@ -311,10 +312,8 @@ forward_assop_specific!(RemAssign, rem_assign, rem, -1);
 
 // Div / Rem for EisenInt (D = -3).
 
-impl<'a, I> Div for &'a QuadInt<I, -3>
+impl<I> DivRound for EisenInt<I>
 where I: Integer, for<'x> &'x I: IntOps<I> {
-    type Output = QuadInt<I, -3>;
-
     //  z / w = (x + y ω) / N(w) 
     //        = (x + y) / N(w) + y / N(w) (ω - 1).
     //
@@ -322,24 +321,33 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
     //
     // [z / w] = m + n(ω - 1) = (m - n) + nω.
 
-    fn div(self, rhs: Self) -> Self::Output {
+    fn div_round(&self, rhs: &Self) -> Self {
         let norm = rhs.norm();
         let w = self * &rhs.conj();
         let (x, y) = w.pair();
         let (m, n) = ( 
-            div_round(&(x + y), &norm),
-            div_round(y, &norm)
+            (x + y).div_round(&norm),
+            y.div_round(&norm)
         );
         QuadInt(&m - &n, n)
+    }
+}
+
+impl<'a, I> Div for &'a EisenInt<I>
+where I: Integer, for<'x> &'x I: IntOps<I> {
+    type Output = EisenInt<I>;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        self.div_round(rhs)
     }
 }
 
 forward_binop_specific!(Div, div, -3);
 forward_assop_specific!(DivAssign, div_assign, div, -3);
 
-impl<'a, I> Rem for &'a QuadInt<I, -3>
+impl<'a, I> Rem for &'a EisenInt<I>
 where I: Integer, for<'x> &'x I: IntOps<I> {
-    type Output = QuadInt<I, -3>;
+    type Output = EisenInt<I>;
 
     fn rem(self, rhs: Self) -> Self::Output {
         let q = self / rhs;
@@ -778,14 +786,5 @@ mod tests {
         assert!(!r.is_zero());
         assert!(r.norm() < a.norm());
         assert_eq!(a, b * q + r);
-    }
-
-    #[test]
-    fn rem_gauss2() { 
-        type A = QuadInt<i32, -1>; // GaussInt
-        let a = A::new(4, 0);
-        let b = A::new(3, 3);
-        let (d, s, t) = A::gcdx(&a, &b);
-        println!("{d}, {s}, {t}");
     }
 }

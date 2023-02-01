@@ -343,7 +343,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 
 fn orthogonalize<R>(b: &ArrayView2<R>) -> (Array2<R>, Array2<R>, Vec<R>)
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    let (m, n) = (b.nrows(), b.ncols());
+    let m = b.nrows();
     let one = R::one();
 
     let mut c = b.to_owned();
@@ -354,14 +354,15 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     for i in 1..m { 
         for j in 0..i { 
+            // c_i = (d[j] * c_i - l[i,j] * c_j) / d[j - 1];
+            
             let l0 = dot(&b.row(i), &c.row(j));
             let d0 = if j > 0 { &d[j - 1] } else { &one };
             let d1 = &d[j];
             
-            let c_i = Array1::from_iter( (0..n).map(|k| { 
-                &(d1 * &c[[i, k]] - &l0 * &c[[j, k]]) / d0
-            }));
-
+            let c_i = smul(d1, &c.row(i)) - smul(&l0, &c.row(j));
+            let c_i = sdiv(&c_i.view(), d0);
+            
             l[[i, j]] = l0;
             c.row_mut(i).assign(&c_i);
         }
@@ -373,6 +374,16 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     (c, l, d)
+}
+
+fn smul<'a, R>(r: &'a R, rhs: &ArrayView1<'a, R>) -> Array1<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    rhs.map(|x| r * x)
+}
+
+fn sdiv<'a, R>(lhs: &ArrayView1<'a, R>, r: &'a R) -> Array1<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    lhs.map(|x| x / r)
 }
 
 fn dot<'a, R>(lhs: &ArrayView1<'a, R>, rhs: &ArrayView1<'a, R>) -> R

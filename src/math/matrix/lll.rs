@@ -1,15 +1,21 @@
 // "Extended GCD and Hermite Normal Form Algorithms via Lattice Basis Reduction",
 // George Havas, Bohdan S. Majewski, and Keith R. Matthews
 // https://projecteuclid.org/journals/experimental-mathematics/volume-7/issue-2/Extended-GCD-and-Hermite-normal-form-algorithms-via-lattice-basis/em/1048515660.full
-
-// See also: "Keith Matthews' LLL page", 
+//
+// see also: "Keith Matthews' LLL page", 
 // http://www.numbertheory.org/lll.html
+//
+// "A generalization of the LLL-algorithm over euclidean rings or orders",
+// Huguette Napias
+// https://www.jstor.org/stable/43974220
 
 use ndarray::{Array1, ArrayView1, Array2, ArrayView2};
 use log::trace;
 use num_bigint::BigInt;
 
 use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps, DivRound};
+use crate::math::ext::int_ext::{Integer, IntOps};
+use crate::math::ext::quad_int::{GaussInt, QuadInt, EisenInt};
 use super::DnsMat;
 
 pub trait LLLRingOps<T>: EucRingOps<T> {}
@@ -23,16 +29,18 @@ where for<'x> &'x Self: LLLRingOps<Self> {
     fn conj(&self) -> Self;
 }
 
-macro_rules! decl_lll_ring {
-    ($type:ty, $alpha:expr) => {
+macro_rules! impl_lll_ring_integer {
+    ($type:ty) => {
         impl LLLRing for $type {
             type Int = Self;
             fn alpha() -> (Self, Self) {
-                $alpha
+                (Self::from(3), Self::from(4))
             }
+
             fn as_int(&self) -> Option<Self::Int> { 
                 Some(self.clone())
             }
+            
             fn conj(&self) -> Self { 
                 self.clone()
             }
@@ -40,9 +48,37 @@ macro_rules! decl_lll_ring {
     };
 }
 
-decl_lll_ring!(i32, (3, 4));
-decl_lll_ring!(i64, (3, 4));
-decl_lll_ring!(BigInt, (BigInt::from(3), BigInt::from(4)));
+impl_lll_ring_integer!(i32);
+impl_lll_ring_integer!(i64);
+impl_lll_ring_integer!(BigInt);
+
+macro_rules! impl_lll_ring_quad_int {
+    ($type:ident, $p:literal, $q:literal) => {
+        impl<I> LLLRing for $type<I>
+        where I: Integer, for<'x> &'x I: IntOps<I> {
+            type Int = I;
+
+            fn alpha() -> (Self, Self) {
+                (Self::from(I::from($p)), Self::from(I::from($q)))
+            }
+
+            fn as_int(&self) -> Option<Self::Int> {
+                if self.right().is_zero() { 
+                    Some(self.left().clone())
+                } else { 
+                    None
+                }
+            }
+
+            fn conj(&self) -> Self {
+                QuadInt::conj(self)
+            }
+        }
+    }
+}
+
+impl_lll_ring_quad_int!(GaussInt, 3, 4);
+impl_lll_ring_quad_int!(EisenInt, 2, 3);
 
 type Row = usize;
 type Col = usize;
@@ -610,6 +646,42 @@ mod tests {
             [0, 6,-2],
             [4,-2, 2]
         ]));
+    }
+
+    #[test]
+    fn hnf_gauss() { 
+        type A = GaussInt<i64>;
+        let i = |a, b| A::new(a, b);
+
+        let a: DnsMat<A> = DnsMat::from(array![
+            [i(-2, 3), i(7, 3), i(7, 3)],
+            [i(3, 3), i(-2, 4), i(6, 2)],
+            [i(2, 2), i(-8, 0), i(-9, 1)],
+        ]);
+
+        let mut calc = LLLHNFCalc::new(a);
+        calc.process();
+        let _res = calc.result();
+
+        // TODO
+    }
+
+    #[test]
+    fn hnf_eisen() { 
+        type A = EisenInt<i64>;
+        let i = |a, b| A::new(a, b);
+
+        let a: DnsMat<A> = DnsMat::from(array![
+            [i(-2, 3), i(7, 3), i(7, 3)],
+            [i(3, 3), i(-2, 4), i(6, 2)],
+            [i(2, 2), i(-8, 0), i(-9, 1)],
+        ]);
+
+        let mut calc = LLLHNFCalc::new(a);
+        calc.process();
+        let _res = calc.result();
+
+        // TODO
     }
 
     // --helper funcs-- //

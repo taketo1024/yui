@@ -1,12 +1,15 @@
-use num_rational::Ratio;
 use num_traits::Signed;
 use super::super::traits::*;
 
 pub trait IntOps<T>: EucRingOps<T> {}
 
 pub trait Integer: EucRing + IntOps<Self> + From<i32> + Signed + num_integer::Integer
-where for<'a> &'a Self: EucRingOps<Self> {
+where for<'a> &'a Self: EucRingOps<Self> {}
+
+impl<T> DivRound for T
+where T: Integer, for<'x> &'x T: IntOps<T> {
     fn div_round(&self, q: &Self) -> Self {
+        use num_rational::Ratio;
         let r = Ratio::new(self.clone(), q.clone());
         r.round().to_integer()
     }

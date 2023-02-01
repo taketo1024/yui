@@ -7,24 +7,47 @@
 
 use ndarray::{Array1, ArrayView1, Array2, ArrayView2};
 use log::trace;
+use num_bigint::BigInt;
+use num_traits::Signed;
 
-use crate::math::ext::int_ext::{Integer, IntOps};
-use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps};
+use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps, DivRound};
 use super::DnsMat;
+
+pub trait LLLRingOps<T>: EucRingOps<T> + PartialOrd + Ord {}
+pub trait LLLRing: EucRing + LLLRingOps<Self> + Signed + DivRound + From<i32>
+where for<'x> &'x Self: LLLRingOps<Self> {
+    fn alpha() -> (Self, Self);
+}
+
+macro_rules! decl_lll_ring {
+    ($type:ty, $alpha:expr) => {
+        impl LLLRingOps<$type> for $type {}
+        impl<'a> LLLRingOps<$type> for &'a $type {}
+        impl LLLRing for $type {
+            fn alpha() -> (Self, Self) {
+                $alpha
+            }
+        }
+    };
+}
+
+decl_lll_ring!(i32, (3, 4));
+decl_lll_ring!(i64, (3, 4));
+decl_lll_ring!(BigInt, (BigInt::from(3), BigInt::from(4)));
 
 type Row = usize;
 type Col = usize;
 
 #[derive(Debug)]
 pub struct LLLCalc<R>
-where R: Integer, for<'x> &'x R: IntOps<R> {
+where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     data: LLLData<R>
 }
 
 impl<R> LLLCalc<R>
-where R: Integer, for<'x> &'x R: IntOps<R> {
-    pub fn new(target: DnsMat<R>, alpha: (R, R)) -> Self {
-        let mut data = LLLData::new(target, alpha);
+where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
+    pub fn new(target: DnsMat<R>) -> Self {
+        let mut data = LLLData::new(target);
         data.setup();
 
         LLLCalc { data }
@@ -62,14 +85,14 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
 
 #[derive(Debug)]
 pub struct LLLHNFCalc<R>
-where R: Integer, for<'x> &'x R: IntOps<R> {
+where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     data: LLLData<R>
 }
 
 impl<R> LLLHNFCalc<R>
-where R: Integer, for<'x> &'x R: IntOps<R> {
-    pub fn new(target: DnsMat<R>, alpha: (R, R)) -> Self { 
-        let data = LLLData::new(target, alpha);
+where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
+    pub fn new(target: DnsMat<R>) -> Self { 
+        let data = LLLData::new(target);
         LLLHNFCalc { data }
     }
 
@@ -150,27 +173,21 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
 
 #[derive(Debug, PartialEq, Eq)]
 struct LLLData<R>
-where R: Integer, for<'x> &'x R: IntOps<R> {
+where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     target: DnsMat<R>,
     det: Vec<R>,        // D[i] = det(b_1, ..., b_i)^2 = Π^i |b^*_j|^2. 
     lambda: DnsMat<R>,  // l[i,j] = D[j] * p_ij (0 <= j < i)
-    alpha: (R, R),
     step: usize
 }
 
 impl<R> LLLData<R>
-where R: Integer, for<'x> &'x R: IntOps<R> {
-    fn new(target: DnsMat<R>, alpha: (R, R)) -> Self { 
-        // 1/4 < α < 1 
-        let (p, q) = alpha.clone();
-        assert!(&q < &(&R::from(4) * &p));
-        assert!(&p < &q);
-
+where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
+    fn new(target: DnsMat<R>) -> Self { 
         let m = target.nrows();
         let det = vec![R::one(); m];
         let lambda = DnsMat::zero((m, m)); // lower-triangular
 
-        LLLData { target, det, lambda, alpha, step: 1 }
+        LLLData { target, det, lambda, step: 1 }
     }
 
     fn setup(&mut self) { 
@@ -185,7 +202,7 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
         assert!(k > 0);
 
         let (d, l) = (&self.det, &self.lambda);
-        let (p, q) = &self.alpha;
+        let (p, q) = &R::alpha();
 
         let one = R::one();
         let d0 = if k >= 2 { &d[k - 2] } else { &one };
@@ -392,8 +409,7 @@ mod tests {
             [1, 0, 5],
             [1, 2, 6]
         ]);
-        let alpha = (3, 4);
-        let mut data = LLLData::new(a, alpha);
+        let mut data = LLLData::new(a);
 
         data.setup();
 
@@ -416,9 +432,7 @@ mod tests {
             [1, 0, 5],
             [1, 2, 6]
         ]);
-        let alpha = (3, 4);
-
-        let mut data = LLLData::new(a.clone(), alpha);
+        let mut data = LLLData::new(a.clone());
         data.setup();
         
         // first swap
@@ -427,7 +441,7 @@ mod tests {
         // compare data
         a.swap_rows(0, 1);
 
-        let mut data2 = LLLData::new(a.clone(), alpha);
+        let mut data2 = LLLData::new(a.clone());
         data2.setup();
 
         assert_eq!(&data, &data2);
@@ -438,7 +452,7 @@ mod tests {
         // compare data
         a.swap_rows(1, 2);
 
-        let mut data3 = LLLData::new(a.clone(), alpha);
+        let mut data3 = LLLData::new(a.clone());
         data3.setup();
 
         assert_eq!(&data, &data3);
@@ -451,9 +465,7 @@ mod tests {
             [1, 0, 5],
             [1, 2, 6]
         ]);
-        let alpha = (3, 4);
-
-        let mut data = LLLData::new(a.clone(), alpha);
+        let mut data = LLLData::new(a.clone());
         data.setup();
         
         // first addition
@@ -462,7 +474,7 @@ mod tests {
         // compare data
         a.add_row_to(0, 1, &2);
 
-        let mut data2 = LLLData::new(a.clone(), alpha);
+        let mut data2 = LLLData::new(a.clone());
         data2.setup();
 
         assert_eq!(&data, &data2);
@@ -473,7 +485,7 @@ mod tests {
         // compare data
         a.add_row_to(1, 2, &-3);
         
-        let mut data3 = LLLData::new(a.clone(), alpha);
+        let mut data3 = LLLData::new(a.clone());
         data3.setup();
 
         assert_eq!(&data, &data3);
@@ -486,9 +498,7 @@ mod tests {
              [1, 0, 5],
              [1, 2, 6]
          ]);
-         let alpha = (3, 4);
- 
-         let mut data = LLLData::new(a.clone(), alpha);
+         let mut data = LLLData::new(a.clone());
          data.setup();
          
          // first neg
@@ -497,7 +507,7 @@ mod tests {
          // compare data
          a.mul_row(1, &-1);
  
-         let mut data2 = LLLData::new(a.clone(), alpha);
+         let mut data2 = LLLData::new(a.clone());
          data2.setup();
  
          assert_eq!(&data, &data2);
@@ -508,7 +518,7 @@ mod tests {
          // compare data
          a.mul_row(2, &-1);
  
-         let mut data3 = LLLData::new(a.clone(), alpha);
+         let mut data3 = LLLData::new(a.clone());
          data3.setup();
  
          assert_eq!(&data, &data3);
@@ -521,9 +531,7 @@ mod tests {
             [1, 0, 5],
             [1, 2, 6]
         ]);
-        let alpha = (3, 4);
-
-        let mut calc = LLLCalc::new(a, alpha);
+        let mut calc = LLLCalc::new(a);
         calc.process();
         let res = calc.result();
 
@@ -532,7 +540,7 @@ mod tests {
             [1, 0, -1],
             [1, 1, 1]
         ]));
-        assert!(is_reduced(&res.array().view(), &alpha));
+        assert!( is_reduced( &res.array().view() ) );
     }
 
      #[test]
@@ -543,9 +551,7 @@ mod tests {
             [0, 1, 0, 60],
             [0, 0, 1, 90]
         ]);
-        let alpha = (3, 4);
-
-        let mut calc = LLLCalc::new(a.clone(), alpha);
+        let mut calc = LLLCalc::new(a.clone());
         calc.process();
         let res = calc.result();
 
@@ -554,7 +560,7 @@ mod tests {
             [0, 3, -2, 0],
             [-2, 0, 1, 10]
         ]));
-        assert!(is_reduced(&res.array().view(), &alpha));
+        assert!(is_reduced( &res.array().view() ));
       }
 
      #[test]
@@ -565,9 +571,7 @@ mod tests {
             [56, -550, -328],
             [76,   10,   42]
         ]);
-        let alpha = (3, 4);
-
-        let mut calc = LLLHNFCalc::new(a.clone(), alpha);
+        let mut calc = LLLHNFCalc::new(a.clone());
         calc.process();
         let res = calc.result();
 
@@ -584,13 +588,14 @@ mod tests {
     use std::ops::Div;
     use num_rational::Ratio;
     use num_traits::Signed;
+    use crate::math::ext::int_ext::{Integer, IntOps};
 
-    fn is_reduced<R>(b: &ArrayView2<R>, alpha: &(R, R)) -> bool
-    where R: Integer, for<'x> &'x R: IntOps<R> {
+    fn is_reduced<R>(b: &ArrayView2<R>) -> bool
+    where R: Integer + LLLRing, for<'x> &'x R: IntOps<R> + LLLRingOps<R> {
         let m = b.nrows();
 
         let (c, l) = gram_schmidt(b);
-        let alpha = Ratio::from(alpha.clone());
+        let alpha = Ratio::from(R::alpha());
         let thr = Ratio::new(R::one(), R::from(2));
 
         let size_reduced = l.iter().all(|r| &r.abs() <= &thr);

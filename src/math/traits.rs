@@ -220,3 +220,9 @@ where Self: One, Rhs: IsEven {
 
 impl<T, Rhs> PowMod2<Rhs> for T
 where T: One, Rhs: IsEven {}
+
+// DivRound
+
+pub trait DivRound { 
+    fn div_round(&self, rhs: &Self) -> Self;
+}

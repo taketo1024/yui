@@ -13,17 +13,18 @@ use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps, DivRound};
 use super::DnsMat;
 
 pub trait LLLRingOps<T>: EucRingOps<T> {}
+impl<S, T> LLLRingOps<T> for S where S: EucRingOps<T> {}
+
 pub trait LLLRing: EucRing + LLLRingOps<Self> + DivRound
 where for<'x> &'x Self: LLLRingOps<Self> {
     type Int: PartialOrd + Ord;
     fn alpha() -> (Self, Self);
     fn as_int(&self) -> Option<Self::Int>;
+    fn conj(&self) -> Self;
 }
 
 macro_rules! decl_lll_ring {
     ($type:ty, $alpha:expr) => {
-        impl LLLRingOps<$type> for $type {}
-        impl<'a> LLLRingOps<$type> for &'a $type {}
         impl LLLRing for $type {
             type Int = Self;
             fn alpha() -> (Self, Self) {
@@ -31,6 +32,9 @@ macro_rules! decl_lll_ring {
             }
             fn as_int(&self) -> Option<Self::Int> { 
                 Some(self.clone())
+            }
+            fn conj(&self) -> Self { 
+                self.clone()
             }
         }
     };
@@ -222,7 +226,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         let d2 = &d[k];
         let l0 = &l[[k, k - 1]];
 
-        let lhs = q * &(d0 * d2 + l0 * l0);
+        let lhs = q * &(d0 * d2 + l0 * &l0.conj());
         let rhs = p * &(d1 * d1);
 
         let Some(lhs) = lhs.as_int() else { panic!() };
@@ -281,7 +285,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
             let l1 = &l[[i, k-1]];
             let l2 = &l[[i, k]];
 
-            let s = l1 * l0 + l2 * d0;
+            let s = &l0.conj() * l1 + l2 * d0;
             let t = l1 * d2 - l2 * l0;
 
             self.lambda[[i, k-1]] = &s / d1;
@@ -291,7 +295,9 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         // λ[k, k-1] remains unchanged.
 
         let l0 = &self.lambda[[k,k-1]];
-        self.det[k-1] = &(d0 * d2 + l0 * l0) / d1;
+
+        self.det[k-1] = &(d0 * d2 + l0 * &l0.conj()) / d1;
+        self.lambda[[k, k-1]] = l0.conj();
 
         trace!("swap {},{}.\n{}", k-1, k, self.target);
     }
@@ -342,7 +348,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 // -- helper funcs -- //
 
 fn orthogonalize<R>(b: &ArrayView2<R>) -> (Array2<R>, Array2<R>, Vec<R>)
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     let m = b.nrows();
     let one = R::one();
 
@@ -350,13 +356,13 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     let mut d = vec![R::one(); m];
     let mut l = Array2::zeros((m, m));
 
-    d[0] = dot(&c.row(0), &c.row(0));
+    d[0] = h_dot(&c.row(0), &c.row(0));
 
     for i in 1..m { 
         for j in 0..i { 
             // c_i = (d[j] * c_i - l[i,j] * c_j) / d[j - 1];
             
-            let l0 = dot(&b.row(i), &c.row(j));
+            let l0 = h_dot(&b.row(i), &c.row(j));
             let d0 = if j > 0 { &d[j - 1] } else { &one };
             let d1 = &d[j];
             
@@ -370,7 +376,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         let c_i = &c.row(i);
         let d0 = &d[i - 1];
         
-        d[i] = &dot(&c_i, &c_i) / d0;
+        d[i] = &h_dot(&c_i, &c_i) / d0;
     }
 
     (c, l, d)
@@ -386,11 +392,11 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     lhs.map(|x| x / r)
 }
 
-fn dot<'a, R>(lhs: &ArrayView1<'a, R>, rhs: &ArrayView1<'a, R>) -> R
-where R: Ring, for<'x> &'x R: RingOps<R> {
+fn h_dot<'a, R>(lhs: &ArrayView1<'a, R>, rhs: &ArrayView1<'a, R>) -> R
+where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     assert_eq!(lhs.dim(), rhs.dim());
     ndarray::Zip::from(lhs).and(rhs).fold(R::zero(), |mut acc, a, b| { 
-        acc.mul_acc(a, b);
+        acc.mul_acc(a, &b.conj());
         acc
     })
 }
@@ -669,8 +675,12 @@ mod tests {
         p / q
     }
 
-    fn smul<'a, R>(r: &'a R, rhs: &ArrayView1<'a, R>) -> Array1<R>
+    fn dot<'a, R>(lhs: &ArrayView1<'a, R>, rhs: &ArrayView1<'a, R>) -> R
     where R: Ring, for<'x> &'x R: RingOps<R> {
-        rhs.map(|x| r * x)
+        assert_eq!(lhs.dim(), rhs.dim());
+        ndarray::Zip::from(lhs).and(rhs).fold(R::zero(), |mut acc, a, b| { 
+            acc.mul_acc(a, b);
+            acc
+        })
     }
 }

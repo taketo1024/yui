@@ -1,3 +1,4 @@
+use num_bigint::BigInt;
 use num_traits::Signed;
 use super::super::traits::*;
 
@@ -5,15 +6,6 @@ pub trait IntOps<T>: EucRingOps<T> {}
 
 pub trait Integer: EucRing + IntOps<Self> + From<i32> + Signed + num_integer::Integer
 where for<'a> &'a Self: EucRingOps<Self> {}
-
-impl<T> DivRound for T
-where T: Integer, for<'x> &'x T: IntOps<T> {
-    fn div_round(&self, q: &Self) -> Self {
-        use num_rational::Ratio;
-        let r = Ratio::new(self.clone(), q.clone());
-        r.round().to_integer()
-    }
-}
 
 macro_rules! decl_integer {
     ($type:ty) => {
@@ -25,35 +17,49 @@ macro_rules! decl_integer {
 
 pub(crate) use decl_integer;
 
-macro_rules! impl_euc_ring_integer {
+impl<T> Symbol for T
+where T: Integer, for<'x> &'x T: IntOps<T> {
+    fn symbol() -> String {
+        String::from("Z")
+    }
+}
+
+impl<T> RingMethods for T
+where T: Integer, for<'x> &'x T: IntOps<T> {
+    fn inv(&self) -> Option<Self> {
+        if self.is_unit() { 
+            Some(self.clone())
+        } else { 
+            None
+        }
+    }
+
+    #[inline]
+    fn is_unit(&self) -> bool {
+        self.is_one() || (-self).is_one()
+    }
+
+    #[inline]
+    fn normalizing_unit(&self) -> Self {
+        if !self.is_negative() { 
+            Self::one() 
+        } else { 
+            -Self::one() 
+        }
+    }
+}
+
+impl<T> DivRound for T
+where T: Integer, for<'x> &'x T: IntOps<T> {
+    fn div_round(&self, q: &Self) -> Self {
+        use num_rational::Ratio;
+        let r = Ratio::new(self.clone(), q.clone());
+        r.round().to_integer()
+    }
+}
+
+macro_rules! decl_integer_all {
     ($type:ident) => {
-        impl Symbol for $type { 
-            fn symbol() -> String {
-                String::from("Z")
-            }
-        }
-
-        impl RingMethods for $type {
-            #[inline]
-            fn inv(&self) -> Option<Self> {
-                if self.is_unit() { 
-                    Some(self.clone())
-                } else { 
-                    None
-                }
-            }
-
-            #[inline]
-            fn is_unit(&self) -> bool {
-                self == &1 || self == &-1
-            }
-
-            #[inline]
-            fn normalizing_unit(&self) -> Self {
-                if self >= &0 { 1 } else { -1 } 
-            }
-        }
-
         decl_alg_base!($type);
         decl_add_mon!($type);
         decl_add_grp!($type);
@@ -64,46 +70,20 @@ macro_rules! impl_euc_ring_integer {
     }
 }
 
-impl_euc_ring_integer!(i32);
-impl_euc_ring_integer!(i64);
+decl_integer_all!(i32);
+decl_integer_all!(i64);
+decl_integer_all!(BigInt);
 
 #[cfg(test)]
 mod tests { 
     use super::*;
 
     #[test]
-    fn check_add_mon() {
-        fn check<T>() where T: AddMon, for<'a> &'a T: AddMonOps<T> {}
+    fn check_type() {
+        fn check<T>() where T: Integer, for<'a> &'a T: IntOps<T> {}
         check::<i32>();
         check::<i64>();
-    }
-    
-    #[test]
-    fn check_add_grp() {
-        fn check<T>() where T: AddGrp, for<'a> &'a T: AddGrpOps<T> {}
-        check::<i32>();
-        check::<i64>();
-    }
-    
-    #[test]
-    fn check_mon() {
-        fn check<T>() where T: Mon, for<'a> &'a T: MonOps<T> {}
-        check::<i32>();
-        check::<i64>();
-    }
-
-    #[test]
-    fn check_ring() {
-        fn check<T>() where T: Ring, for<'a> &'a T: RingOps<T> {}
-        check::<i32>();
-        check::<i64>();
-    }
-
-    #[test]
-    fn check_eucring() {
-        fn check<T>() where T: EucRing, for<'a> &'a T: EucRingOps<T> {}
-        check::<i32>();
-        check::<i64>();
+        check::<BigInt>();
     }
 
     #[test]
@@ -167,11 +147,5 @@ mod tests {
         assert_eq!(d, 0);
         assert_eq!(s, 0);
         assert_eq!(t, 0);
-    }
-
-    #[test]
-    fn pow_mod_2() {
-        assert_eq!((-1).pow_mod2(10), 1);
-        assert_eq!((-1).pow_mod2(-11), -1);
     }
 }

@@ -12,10 +12,12 @@ use num_bigint::BigInt;
 use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps, DivRound};
 use super::DnsMat;
 
-pub trait LLLRingOps<T>: EucRingOps<T> + PartialOrd + Ord {}
+pub trait LLLRingOps<T>: EucRingOps<T> {}
 pub trait LLLRing: EucRing + LLLRingOps<Self> + DivRound + From<i32>
 where for<'x> &'x Self: LLLRingOps<Self> {
+    type Int: PartialOrd + Ord;
     fn alpha() -> (Self, Self);
+    fn as_int(&self) -> Option<Self::Int>;
 }
 
 macro_rules! decl_lll_ring {
@@ -23,8 +25,12 @@ macro_rules! decl_lll_ring {
         impl LLLRingOps<$type> for $type {}
         impl<'a> LLLRingOps<$type> for &'a $type {}
         impl LLLRing for $type {
+            type Int = Self;
             fn alpha() -> (Self, Self) {
                 $alpha
+            }
+            fn as_int(&self) -> Option<Self::Int> { 
+                Some(self.clone())
             }
         }
     };
@@ -198,6 +204,12 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         self.det = d;
     }
 
+    // Lovasz condition:
+    //   |b^*_k|^2 >= (α - m[k,k-1]^2)|b^*_{k-1}|^2
+    // ⇔ |b^*{k-1}|^{-2} * |b^*_k|^2 + m[k,k-1]^2 >= α
+    // ⇔ (d[k-2]/d[k-1]) * (d[k]/d[k-1]) + (l[k,k-1]/d[k-1])^2 >= p/q
+    // ⇔ q * (d[k-2] * d[k] + (l[k,k-1])^2) >= p d[k-1]^2
+    
     fn lovasz_ok(&self, k: usize) -> bool { 
         assert!(k > 0);
 
@@ -210,12 +222,13 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         let d2 = &d[k];
         let l0 = &l[[k, k - 1]];
 
-        q * &(d0 * d2 + l0 * l0) >= p * &(d1 * d1) 
+        let lhs = q * &(d0 * d2 + l0 * l0);
+        let rhs = p * &(d1 * d1);
 
-        // q * (d[k-2] * d[k] + (l[k,k-1])^2) >= p d[k-1]^2
-        // ⇔ (d[k-2]/d[k-1]) * (d[k]/d[k-1]) + (l[k,k-1]/d[k-1])^2 >= p/q
-        // ⇔ |b^*{k-1}|^{-2} * |b^*_k|^2 + m[k,k-1]^2 >= α
-        // ⇔ |b^*_k|^2 >= (α - m[k,k-1]^2)|b^*_{k-1}|^2 : Lovasz condition
+        let Some(lhs) = lhs.as_int() else { panic!() };
+        let Some(rhs) = rhs.as_int() else { panic!() };
+
+        lhs >= rhs
     }
 
     fn reduce(&mut self, i: Row, k: Row) { 

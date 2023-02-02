@@ -15,7 +15,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
 
 pub fn snf_in_place<R>(target: DnsMat<R>, flags: SnfFlags) -> SnfResult<R>
 where R: EucRing, for<'a> &'a R: EucRingOps<R> {
-    info!("start snf: {:?}, flags: {:?}", target.shape(), flags);
+    info!("start snf: {:?}, flags: {:?}.\n{}", target.shape(), flags, target);
 
     let mut calc = SnfCalc::new(target, flags);
 

@@ -1,11 +1,11 @@
-#![allow(dead_code)]
+#![allow(unused_imports)]
 
 use std::collections::BTreeMap;
 use std::panic::UnwindSafe;
+use derive_more::{Display, Error};
 use log::{info, error};
-use num_bigint::{BigInt, ToBigInt};
 use simplelog::*;
-use yui::math::ext::int_ext::{Integer, IntOps};
+use num_bigint::BigInt;
 use yui::math::types::quad_int::{GaussInt, EisenInt};
 use yui::math::traits::{EucRing, EucRingOps};
 use yui::links::{Link, links::Edge};
@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn set_logger() -> Result<(), log::SetLoggerError> {
     TermLogger::init(
-        LevelFilter::Trace,
+        LevelFilter::Info,
         Config::default(),
         TerminalMode::Mixed,
         ColorChoice::Auto
@@ -36,60 +36,73 @@ fn run_all(target: &str) -> Result<(), Box<dyn std::error::Error>> {
 
     csv.write_record(vec![
         "name", 
-        "s_2", 
-        "s_3", 
-        "s_{1+i}", 
-        "s_{1+ω}"
+        "(Z, 2)", 
+        "(Z, 3)", 
+        "(Z[i], 1+i)", 
+        "(Z[j], 1+j)"
     ])?;
+    csv.flush()?;
 
     let data = load_data(target)?;
 
     for (name, code) in data { 
         let l = Link::from(&code);
-        let s2 = run(&l, &name, &c2);
-        let s3 = run(&l, &name, &c3);
-        let sx = run(&l, &name, &cx);
-        let sy = run(&l, &name, &cy);
+        let list = run_for!(&l, &name, &c2, &c3, &cx, &cy);
+        let record = [vec![name], list].concat();
 
-        info!("{name}: s2 = {s2}, s3 = {s3}, s_(1+i) = {sx}, s_(1+ω) = {sy}");
-        
-        csv.write_record(vec![
-            name, 
-            s2.to_string(), 
-            s3.to_string(), 
-            sx.to_string(),
-            sy.to_string()
-        ])?;
+        csv.write_record(record)?;
         csv.flush()?;
+
+        break
     }
 
     Ok(())
 }
 
-fn run<R>(l: &Link, name: &str, c: &R) -> i32
-where 
-    R: EucRing, for<'x> &'x R: EucRingOps<R> + UnwindSafe,
-    R: ToBig, for<'x> &'x <R as ToBig>::BigR: EucRingOps<<R as ToBig>::BigR>
-{ 
+macro_rules! run_for {
+    ($l:expr, $name:expr) => { vec![] };
+    ($l:expr, $name:expr, $c:expr $(,$next:expr)*) => {{
+        let res = run($l, $name, $c);
+        let str = if let Ok(res) = res { 
+            res.to_string()
+        } else { 
+            "!".to_string()
+        };
+        let mut list = vec![str];
+        let mut other = run_for!($l, $name $(,$next)*);
+        list.append(&mut other);
+
+        list
+    }};
+}
+
+use run_for;
+
+fn run<R>(l: &Link, name: &str, c: &R) -> Result<i32, Box<dyn std::error::Error>> 
+where R: EucRing, for<'x> &'x R: EucRingOps<R> + UnwindSafe { 
     info!("compute {name}, c = {c}");
 
-    let (s, time) = measure(|| {
+    let (res, time) = measure(|| {
         std::panic::catch_unwind(|| {
-            ss_invariant(l, c.clone(), true)
+            Ok(ss_invariant(l, c.clone(), true))
         }).unwrap_or_else(|_| {
-            error!("");
-            info!("retry with c = {} ({})", c.to_big(), std::any::type_name::<R::BigR>());
-            ss_invariant(l, c.to_big(), true)
+            error!("panic!");
+            Err(Panic().into())
         })
     });
 
-    info!("l = {name}, c = {c}");
-    info!("s = {s}");
-    info!("time: {:?}", time);
-    info!("");
+    if let Ok(s) = res {
+        info!("l = {name}, c = {c}");
+        info!("s = {s}");
+        info!("time: {:?}", time);
+        info!("");
+    }
 
-    s
+    res
 }
+
+#[derive(Debug, Display, Error)]
+struct Panic();
 
 fn measure<F, Res>(proc: F) -> (Res, std::time::Duration) 
 where F: FnOnce() -> Res { 
@@ -105,44 +118,4 @@ fn load_data(target: &str) -> Result<Data, Box<dyn std::error::Error>> {
     let json = std::fs::read_to_string(target)?;
     let data: Data = serde_json::from_str(&json)?;
     Ok(data)
-}
-
-trait ToBig
-where Self::BigR: EucRing, for<'x> &'x Self::BigR: EucRingOps<Self::BigR> { 
-    type BigR;
-    fn to_big(&self) -> Self::BigR;
-}
-
-impl ToBig for i32 { 
-    type BigR = BigInt;
-    fn to_big(&self) -> Self::BigR {
-        self.to_bigint().unwrap()
-    }
-}
-
-impl ToBig for i64 { 
-    type BigR = BigInt;
-    fn to_big(&self) -> Self::BigR {
-        self.to_bigint().unwrap()
-    }
-}
-
-impl<I> ToBig for GaussInt<I>
-where I: Integer + ToBigInt, for<'x> &'x I: IntOps<I> {
-    type BigR = GaussInt<BigInt>;
-
-    fn to_big(&self) -> Self::BigR {
-        let (a, b) = self.pair();
-        Self::BigR::new(a.to_bigint().unwrap(), b.to_bigint().unwrap())
-    }
-}
-
-impl<I> ToBig for EisenInt<I>
-where I: Integer + ToBigInt, for<'x> &'x I: IntOps<I> {
-    type BigR = EisenInt<BigInt>;
-
-    fn to_big(&self) -> Self::BigR {
-        let (a, b) = self.pair();
-        Self::BigR::new(a.to_bigint().unwrap(), b.to_bigint().unwrap())
-    }
 }

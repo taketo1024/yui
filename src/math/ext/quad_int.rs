@@ -236,8 +236,8 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
     }
 }
 
-forward_binop_specific!(Div, div, -1);
-forward_assop_specific!(DivAssign, div_assign, div, -1);
+forward_binop_d!(Div, div, -1);
+forward_assop_d!(DivAssign, div_assign, div, -1);
 
 impl<'a, I> Rem for &'a GaussInt<I>
 where I: Integer, for<'x> &'x I: IntOps<I> {
@@ -249,8 +249,8 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
     }
 }
 
-forward_binop_specific!(Rem, rem, -1);
-forward_assop_specific!(RemAssign, rem_assign, rem, -1);
+forward_binop_d!(Rem, rem, -1);
+forward_assop_d!(RemAssign, rem_assign, rem, -1);
 
 // Div / Rem for EisenInt (D = -3).
 
@@ -284,8 +284,8 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
     }
 }
 
-forward_binop_specific!(Div, div, -3);
-forward_assop_specific!(DivAssign, div_assign, div, -3);
+forward_binop_d!(Div, div, -3);
+forward_assop_d!(DivAssign, div_assign, div, -3);
 
 impl<'a, I> Rem for &'a EisenInt<I>
 where I: Integer, for<'x> &'x I: IntOps<I> {
@@ -297,9 +297,15 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
     }
 }
 
-forward_binop_specific!(Rem, rem, -3);
-forward_assop_specific!(RemAssign, rem_assign, rem, -3);
+forward_binop_d!(Rem, rem, -3);
+forward_assop_d!(RemAssign, rem_assign, rem, -3);
 
+impl_alg_ops!(AddMonOps);
+impl_alg_ops!(AddGrpOps);
+impl_alg_ops!(MonOps);
+impl_alg_ops!(RingOps);
+impl_alg_ops_d!(EucRingOps, -1);
+impl_alg_ops_d!(EucRingOps, -3);
 
 impl<I, const D: i32> AlgBase for QuadInt<I, D>
 where I: Integer, for<'x> &'x I: IntOps<I> {
@@ -312,37 +318,13 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
     }
 }
 
-impl<I, const D: i32> AddMonOps<Self> for QuadInt<I, D> 
-where I: Integer, for<'x> &'x I: IntOps<I> {}
-
-impl<'a, I, const D: i32> AddMonOps<QuadInt<I, D>> for &'a QuadInt<I, D> 
-where I: Integer, for<'x> &'x I: IntOps<I> {}
-
 impl<I, const D: i32> AddMon for QuadInt<I, D> 
-where I: Integer, for<'x> &'x I: IntOps<I> {}
-
-impl<I, const D: i32> AddGrpOps<Self> for QuadInt<I, D> 
-where I: Integer, for<'x> &'x I: IntOps<I> {}
-
-impl<'a, I, const D: i32> AddGrpOps<QuadInt<I, D>> for &'a QuadInt<I, D> 
 where I: Integer, for<'x> &'x I: IntOps<I> {}
 
 impl<I, const D: i32> AddGrp for QuadInt<I, D> 
 where I: Integer, for<'x> &'x I: IntOps<I> {}
 
-impl<I, const D: i32> MonOps<Self> for QuadInt<I, D> 
-where I: Integer, for<'x> &'x I: IntOps<I> {}
-
-impl<'a, I, const D: i32> MonOps<QuadInt<I, D>> for &'a QuadInt<I, D> 
-where I: Integer, for<'x> &'x I: IntOps<I> {}
-
 impl<I, const D: i32> Mon for QuadInt<I, D> 
-where I: Integer, for<'x> &'x I: IntOps<I> {}
-
-impl<I, const D: i32> RingOps<Self> for QuadInt<I, D> 
-where I: Integer, for<'x> &'x I: IntOps<I> {}
-
-impl<'a, I, const D: i32> RingOps<QuadInt<I, D>> for &'a QuadInt<I, D> 
 where I: Integer, for<'x> &'x I: IntOps<I> {}
 
 impl<I, const D: i32> Ring for QuadInt<I, D> 
@@ -392,19 +374,7 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
     }
 }
 
-impl<I> EucRingOps<Self> for QuadInt<I, -1> 
-where I: Integer, for<'x> &'x I: IntOps<I> {}
-
-impl<'a, I> EucRingOps<QuadInt<I, -1>> for &'a QuadInt<I, -1> 
-where I: Integer, for<'x> &'x I: IntOps<I> {}
-
 impl<I> EucRing for QuadInt<I, -1> 
-where I: Integer, for<'x> &'x I: IntOps<I> {}
-
-impl<I> EucRingOps<Self> for QuadInt<I, -3> 
-where I: Integer, for<'x> &'x I: IntOps<I> {}
-
-impl<'a, I> EucRingOps<QuadInt<I, -3>> for &'a QuadInt<I, -3> 
 where I: Integer, for<'x> &'x I: IntOps<I> {}
 
 impl<I> EucRing for QuadInt<I, -3> 
@@ -539,7 +509,7 @@ macro_rules! forward_assop {
     }
 }
 
-macro_rules! forward_binop_specific {
+macro_rules! forward_binop_d {
     ($trait:ident, $method:ident, $d:literal) => {
         impl<I> $trait for QuadInt<I, $d>
         where I: Integer, for<'x> &'x I: IntOps<I> {
@@ -552,7 +522,7 @@ macro_rules! forward_binop_specific {
     }
 }
 
-macro_rules! forward_assop_specific {
+macro_rules! forward_assop_d {
     ($trait:ident, $method:ident, $op_method:ident, $d:literal) => {
         impl<I> $trait for QuadInt<I, $d>
         where I: Integer, for<'x> &'x I: IntOps<I> {
@@ -570,8 +540,27 @@ macro_rules! forward_assop_specific {
     }
 }
 
+macro_rules! impl_alg_ops {
+    ($trait:ident) => {
+        impl<I, const D: i32> $trait<Self> for QuadInt<I, D> 
+        where I: Integer, for<'x> &'x I: IntOps<I> {}
 
-use {impl_unop, impl_binop, impl_assop, impl_accum, forward_binop, forward_assop, forward_binop_specific, forward_assop_specific};
+        impl<'a, I, const D: i32> $trait<QuadInt<I, D>> for &'a QuadInt<I, D> 
+        where I: Integer, for<'x> &'x I: IntOps<I> {}
+    };
+}
+
+macro_rules! impl_alg_ops_d {
+    ($trait:ident, $d:literal) => {
+        impl<I> $trait<Self> for QuadInt<I, $d> 
+        where I: Integer, for<'x> &'x I: IntOps<I> {}
+
+        impl<'a, I> $trait<QuadInt<I, $d>> for &'a QuadInt<I, $d> 
+        where I: Integer, for<'x> &'x I: IntOps<I> {}
+    };
+}
+
+use {impl_unop, impl_binop, impl_assop, impl_accum, forward_binop, forward_assop, forward_binop_d, forward_assop_d, impl_alg_ops, impl_alg_ops_d};
 
 #[cfg(test)]
 mod tests {

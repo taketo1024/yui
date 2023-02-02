@@ -23,36 +23,24 @@ macro_rules! impl_ops {
     };
 }
 
-macro_rules! impl_trait {
-    ($trait:ty, $type:ty) => {
-        impl $trait for $type {}
-    };
-    ($trait:ty, $type:ty, { $($item:item)* }) => {
-        impl $trait for $type {
-            $( $item )*
-        }
-    };
-}
-
-macro_rules! decl_integer_all {
+macro_rules! impl_integer {
     ($type:ident) => {
-        impl_trait!(AlgBase, $type, {
+        impl_ops!(AddMonOps, $type);
+        impl_ops!(AddGrpOps, $type);
+        impl_ops!(MonOps, $type);
+        impl_ops!(RingOps, $type);
+        impl_ops!(EucRingOps, $type);
+        impl_ops!(IntOps, $type);
+
+        impl AlgBase for $type {
             fn symbol() -> String { 
                 String::from("Z")
             }
-        });
-
-        impl_ops!(AddMonOps, $type);
-        impl_trait!(AddMon, $type);
-
-        impl_ops!(AddGrpOps, $type);
-        impl_trait!(AddGrp, $type);
-
-        impl_ops!(MonOps, $type);
-        impl_trait!(Mon, $type);
-
-        impl_ops!(RingOps, $type);
-        impl_trait!(Ring, $type, {
+        }
+        impl AddMon for $type {}
+        impl AddGrp for $type {}
+        impl Mon for $type {}
+        impl Ring for $type {
             fn inv(&self) -> Option<Self> {
                 if self.is_unit() { 
                     Some(self.clone())
@@ -72,19 +60,15 @@ macro_rules! decl_integer_all {
                     -Self::one() 
                 }
             }
-        });
-
-        impl_ops!(EucRingOps, $type);
-        impl_trait!(EucRing, $type);
-
-        impl_ops!(IntOps, $type);
-        impl_trait!(Integer, $type);
+        }
+        impl EucRing for $type {}
+        impl Integer for $type {}
     }
 }
 
-decl_integer_all!(i32);
-decl_integer_all!(i64);
-decl_integer_all!(BigInt);
+impl_integer!(i32);
+impl_integer!(i64);
+impl_integer!(BigInt);
 
 #[cfg(test)]
 mod tests { 

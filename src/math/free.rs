@@ -297,24 +297,6 @@ where
     }
 }
 
-impl<X, R> AddMonOps<Self> for LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{}
-
-impl<'a, X, R> AddMonOps<LinComb<X, R>> for &'a LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{}
-
-impl<X, R> AddMon for LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{}
-
 impl<X, R> Neg for LinComb<X, R>
 where
     X: FreeGenerator,
@@ -426,24 +408,6 @@ where
     }
 }
 
-impl<X, R> AddGrpOps<Self> for LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{}
-
-impl<'a, X, R> AddGrpOps<LinComb<X, R>> for &'a LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{}
-
-impl<X, R> AddGrp for LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{}
-
 impl<X, R> Mul<R> for LinComb<X, R>
 where
     X: FreeGenerator,
@@ -487,26 +451,6 @@ where
         let data = std::mem::take(&mut self.data);
         self.data = data.into_iter().map(|(x, r)| (x, &r * rhs)).collect();
     }
-}
-
-impl<X, R> RModOps<R, R, Self> for LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{}
-
-impl<'a, X, R> RModOps<R, &'a R, LinComb<X, R>> for &'a LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{}
-
-impl<X, R> RMod for LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    type R = R;
 }
 
 impl<X, R> Mul for LinComb<X, R>
@@ -563,6 +507,52 @@ where
         
         self.data = data;
     }
+}
+
+macro_rules! impl_alg_ops {
+    ($trait:ident) => {
+        impl<X, R> $trait<Self> for LinComb<X, R>
+        where X: FreeGenerator, R: Ring, for<'x> &'x R: RingOps<R> {}
+
+        impl<'a, X, R> $trait<LinComb<X, R>> for &'a LinComb<X, R>
+        where X: FreeGenerator, R: Ring, for<'x> &'x R: RingOps<R> {}
+    };
+}
+
+impl_alg_ops!(AddMonOps);
+impl_alg_ops!(AddGrpOps);
+
+impl<X, R> AddMon for LinComb<X, R>
+where
+    X: FreeGenerator,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{}
+
+impl<X, R> AddGrp for LinComb<X, R>
+where
+    X: FreeGenerator,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{}
+
+
+impl<X, R> RModOps<R, R, Self> for LinComb<X, R>
+where
+    X: FreeGenerator,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{}
+
+impl<'a, X, R> RModOps<R, &'a R, LinComb<X, R>> for &'a LinComb<X, R>
+where
+    X: FreeGenerator,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{}
+
+impl<X, R> RMod for LinComb<X, R>
+where
+    X: FreeGenerator,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{
+    type R = R;
 }
 
 #[cfg(test)]

@@ -1,9 +1,22 @@
 use num_rational::Ratio;
 use num_traits::{Zero, One};
-
 use crate::math::traits::{Ring, RingOps, AlgBase, MonOps, Mon, AddMon, AddMonOps, AddGrpOps, AddGrp};
-
 use super::int_ext::{Integer, IntOps};
+
+macro_rules! impl_alg_ops {
+    ($trait:ident) => {
+        impl<R> $trait<Self> for Ratio<R> 
+        where R: Integer, for<'x> &'x R: IntOps<R> {}
+
+        impl<'a, R> $trait<Ratio<R>> for &'a Ratio<R> 
+        where R: Integer, for<'x> &'x R: IntOps<R> {}
+    };
+}
+
+impl_alg_ops!(AddMonOps);
+impl_alg_ops!(AddGrpOps);
+impl_alg_ops!(MonOps);
+impl_alg_ops!(RingOps);
 
 impl<R> AlgBase for Ratio<R> 
 where R: Integer, for<'x> &'x R: IntOps<R> {
@@ -12,37 +25,13 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
     }
 }
 
-impl<R> MonOps<Self> for Ratio<R> 
-where R: Integer, for<'x> &'x R: IntOps<R> {}
-
-impl<'a, R> MonOps<Ratio<R>> for &'a Ratio<R> 
-where R: Integer, for<'x> &'x R: IntOps<R> {}
-
 impl<R> Mon for Ratio<R> 
-where R: Integer, for<'x> &'x R: IntOps<R> {}
-
-impl<R> AddMonOps<Self> for Ratio<R> 
-where R: Integer, for<'x> &'x R: IntOps<R> {}
-
-impl<'a, R> AddMonOps<Ratio<R>> for &'a Ratio<R> 
 where R: Integer, for<'x> &'x R: IntOps<R> {}
 
 impl<R> AddMon for Ratio<R> 
 where R: Integer, for<'x> &'x R: IntOps<R> {}
 
-impl<R> AddGrpOps<Self> for Ratio<R> 
-where R: Integer, for<'x> &'x R: IntOps<R> {}
-
-impl<'a, R> AddGrpOps<Ratio<R>> for &'a Ratio<R> 
-where R: Integer, for<'x> &'x R: IntOps<R> {}
-
 impl<R> AddGrp for Ratio<R> 
-where R: Integer, for<'x> &'x R: IntOps<R> {}
-
-impl<R> RingOps<Self> for Ratio<R> 
-where R: Integer, for<'x> &'x R: IntOps<R> {}
-
-impl<'a, R> RingOps<Ratio<R>> for &'a Ratio<R> 
 where R: Integer, for<'x> &'x R: IntOps<R> {}
 
 impl<R> Ring for Ratio<R> 

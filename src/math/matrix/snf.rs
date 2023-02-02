@@ -130,7 +130,11 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     fn preprocess(&mut self) {
         use num_bigint::BigInt;
         use crate::math::types::quad_int::{GaussInt, EisenInt};
-        preprocess_lll_for!(self, i32, i64, BigInt, GaussInt<i32>, GaussInt<i64>, GaussInt<BigInt>, EisenInt<i32>, EisenInt<i64>, EisenInt<BigInt>);
+        preprocess_lll_for!(self, 
+            i32, i64, i128, BigInt, 
+            GaussInt<i32>, GaussInt<i64>, GaussInt<i128>, GaussInt<BigInt>, 
+            EisenInt<i32>, EisenInt<i64>, EisenInt<i128>, EisenInt<BigInt>
+        );
     }
 
     fn eliminate_all(&mut self) {

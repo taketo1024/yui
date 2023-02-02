@@ -85,6 +85,7 @@ macro_rules! impl_for_int {
 
 impl_for_int!(i32);
 impl_for_int!(i64);
+impl_for_int!(i128);
 impl_for_int!(BigInt);
 
 macro_rules! impl_for_quad_int {

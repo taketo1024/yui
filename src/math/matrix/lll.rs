@@ -11,13 +11,43 @@
 
 use std::fmt::Debug;
 use ndarray::{Array1, ArrayView1, Array2, ArrayView2};
-use log::trace;
+use log::{trace, info};
 use num_bigint::BigInt;
 
 use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps, DivRound};
 use crate::math::ext::int_ext::{Integer, IntOps};
 use crate::math::types::quad_int::{GaussInt, QuadInt, EisenInt};
 use super::DnsMat;
+
+pub fn lll<R>(b: &DnsMat<R>, with_trans: bool) -> (DnsMat<R>, Option<DnsMat<R>>)
+where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
+    lll_in_place(b.clone(), with_trans)
+}
+
+pub fn lll_in_place<R>(b: DnsMat<R>, with_trans: bool) -> (DnsMat<R>, Option<DnsMat<R>>)
+where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
+    info!("lll: {:?}", b.shape());
+    
+    let mut calc = LLLCalc::new(b, with_trans);
+    calc.process();
+    calc.result()
+}
+
+pub fn lll_hnf<R>(b: &DnsMat<R>, with_trans: [bool; 2]) -> (DnsMat<R>, Option<DnsMat<R>>, Option<DnsMat<R>>)
+where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
+    lll_hnf_in_place(b.clone(), with_trans)
+}
+
+pub fn lll_hnf_in_place<R>(b: DnsMat<R>, with_trans: [bool; 2]) -> (DnsMat<R>, Option<DnsMat<R>>, Option<DnsMat<R>>)
+where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
+    info!("lll-hnf: {:?}", b.shape());
+    
+    let mut calc = LLLHNFCalc::new(b, with_trans);
+    calc.process();
+    calc.result()
+}
+
+// -- LLLRing trait -- //
 
 pub trait LLLRingOps<T>: EucRingOps<T> {}
 
@@ -28,6 +58,8 @@ where for<'x> &'x Self: LLLRingOps<Self> {
     fn as_int(&self) -> Option<Self::Int>;
     fn conj(&self) -> Self;
 }
+
+// -- implementations of LLLRing -- //
 
 macro_rules! impl_for_int {
     ($type:ty) => {
@@ -89,18 +121,20 @@ macro_rules! impl_for_quad_int {
 impl_for_quad_int!(GaussInt, 3, 4);
 impl_for_quad_int!(EisenInt, 2, 3);
 
+// -- private implementation -- //
+
 type Row = usize;
 type Col = usize;
 
 #[derive(Debug)]
-pub struct LLLCalc<R>
+struct LLLCalc<R>
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     data: LLLData<R>
 }
 
 impl<R> LLLCalc<R>
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
-    pub fn new(target: DnsMat<R>, with_trans: bool) -> Self {
+    fn new(target: DnsMat<R>, with_trans: bool) -> Self {
         let mut data = LLLData::new(target, [with_trans, false]);
         data.setup();
 
@@ -139,19 +173,19 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 }
 
 #[derive(Debug)]
-pub struct LLLHNFCalc<R>
+struct LLLHNFCalc<R>
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     data: LLLData<R>
 }
 
 impl<R> LLLHNFCalc<R>
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
-    pub fn new(target: DnsMat<R>, with_trans: [bool; 2]) -> Self { 
+    fn new(target: DnsMat<R>, with_trans: [bool; 2]) -> Self { 
         let data = LLLData::new(target, with_trans);
         LLLHNFCalc { data }
     }
 
-    pub fn process(&mut self) { 
+    fn process(&mut self) { 
         assert!(self.data.step > 0);
         let m = self.data.rows();
 
@@ -178,7 +212,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         }
     }
 
-    pub fn result(self) -> (DnsMat<R>, Option<DnsMat<R>>, Option<DnsMat<R>>) { 
+    fn result(self) -> (DnsMat<R>, Option<DnsMat<R>>, Option<DnsMat<R>>) { 
         let m = self.data.rows();
         let (mut target, mut p, mut pinv) = self.data.result();
 

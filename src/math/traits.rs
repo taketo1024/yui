@@ -8,7 +8,7 @@ use super::types::sign::Sign;
 // TODO use default impls for op types. 
 
 pub trait AlgBase: 
-    Default + PartialEq + Eq + Clone + Send + Sync + Display + Debug
+    Default + PartialEq + Eq + Clone + Send + Sync + Display + Debug + 'static
 {
     fn symbol() -> String;
 }

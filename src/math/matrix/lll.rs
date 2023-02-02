@@ -99,8 +99,8 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 
 impl<R> LLLCalc<R>
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
-    pub fn new(target: DnsMat<R>) -> Self {
-        let mut data = LLLData::new(target);
+    pub fn new(target: DnsMat<R>, with_trans: bool) -> Self {
+        let mut data = LLLData::new(target, [with_trans, false]);
         data.setup();
 
         LLLCalc { data }
@@ -131,8 +131,9 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         }
     }
 
-    pub fn result(self) -> DnsMat<R> { 
-        self.data.target
+    pub fn result(self) -> (DnsMat<R>, Option<DnsMat<R>>) { 
+        let (target, p, _) = self.data.result();
+        (target, p)
     }
 }
 
@@ -144,8 +145,8 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 
 impl<R> LLLHNFCalc<R>
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
-    pub fn new(target: DnsMat<R>) -> Self { 
-        let data = LLLData::new(target);
+    pub fn new(target: DnsMat<R>, with_trans: [bool; 2]) -> Self { 
+        let data = LLLData::new(target, with_trans);
         LLLHNFCalc { data }
     }
 
@@ -156,8 +157,6 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         while self.data.step < m { 
             self.iterate();
         }
-
-        self.finalize();
     }
 
     fn iterate(&mut self) { 
@@ -178,8 +177,8 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         }
     }
 
-    pub fn result(self) -> DnsMat<R> { 
-        self.data.target
+    pub fn result(self) -> (DnsMat<R>, Option<DnsMat<R>>, Option<DnsMat<R>>) { 
+        self.data.result()
     }
 
     fn reduce(&mut self, i: Row, k: Row) {
@@ -219,29 +218,33 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
             (None,    None)    => self.data.lovasz_ok(k)
         }
     }
-
-    fn finalize(&mut self) { 
-
-    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
 struct LLLData<R>
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     target: DnsMat<R>,
+    p:    Option<DnsMat<R>>,
+    pinv: Option<DnsMat<R>>,
     det: Vec<R>,        // D[i] = det(b_1, ..., b_i)^2 = Π^i |b^*_j|^2. 
     lambda: DnsMat<R>,  // l[i,j] = D[j] * p_ij (0 <= j < i)
-    step: usize
+    step: usize,
 }
 
 impl<R> LLLData<R>
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
-    fn new(target: DnsMat<R>) -> Self { 
+    fn new(target: DnsMat<R>, flags: [bool; 2]) -> Self { 
         let m = target.nrows();
+        let p = if flags[0] { Some(DnsMat::eye(m)) } else { None };
+        let pinv = if flags[0] { Some(DnsMat::eye(m)) } else { None };
         let det = vec![R::one(); m];
         let lambda = DnsMat::zero((m, m)); // lower-triangular
 
-        LLLData { target, det, lambda, step: 1 }
+        LLLData { target, p, pinv, det, lambda, step: 1 }
+    }
+
+    fn result(self) -> (DnsMat<R>, Option<DnsMat<R>>, Option<DnsMat<R>>) {
+        (self.target, self.p, self.pinv)
     }
 
     fn setup(&mut self) { 
@@ -297,6 +300,8 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 
         // b[k-1, ..] <--> b[k, ..]
         self.target.swap_rows(k - 1, k);
+        self.p.as_mut().map(|p| p.swap_rows(k-1, k));
+        self.pinv.as_mut().map(|pinv| pinv.swap_cols(k-1, k));
 
         //                   k 
         //      |                     |
@@ -350,6 +355,13 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         assert!(r.is_unit());
 
         self.target.mul_row(i, r);
+        self.p.as_mut().map(|p| p.mul_row(i, r));
+
+        if self.pinv.is_some() { 
+            let rinv = r.inv().unwrap();
+            self.pinv.as_mut().map(|pinv| pinv.mul_col(i, &rinv));
+        }
+
         self.lambda.mul_row(i, r);
         self.lambda.mul_col(i, &r.conj());
 
@@ -358,7 +370,15 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 
     fn add_row_to(&mut self, i: Row, k: Row, r: &R) {
         assert!(i < k);
+        
         self.target.add_row_to(i, k, r);
+        self.p.as_mut().map(|p| p.add_row_to(i, k, r));
+
+        if self.pinv.is_some() { 
+            let nr = -r;
+            self.pinv.as_mut().map(|pinv| pinv.add_col_to(k, i, &nr));
+        }
+
 
         self.lambda[[k, i]] += r * &self.det[i];
 
@@ -484,7 +504,7 @@ mod tests {
             [1, 0, 5],
             [1, 2, 6]
         ]);
-        let mut data = LLLData::new(a);
+        let mut data = LLLData::new(a, [false, false]);
 
         data.setup();
 
@@ -507,7 +527,7 @@ mod tests {
             [1, 0, 5],
             [1, 2, 6]
         ]);
-        let mut data0 = LLLData::new(a0);
+        let mut data0 = LLLData::new(a0, [false, false]);
         data0.setup();
         data0.swap(1);
         data0.swap(2);
@@ -518,11 +538,37 @@ mod tests {
             [1, 2, 6],
             [1,-1, 3]
         ]);
-        let mut data1 = LLLData::new(a1);
+        let mut data1 = LLLData::new(a1, [false, false]);
         data1.setup();
 
         assert_eq!(data0, data1);
-     }
+    }
+
+    #[test]
+    fn swap_trans() { 
+        let a0 = DnsMat::from(array![
+            [1,-1, 3],
+            [1, 0, 5],
+            [1, 2, 6]
+        ]);
+        let mut data0 = LLLData::new(a0.clone(), [true, true]);
+        data0.setup();
+        data0.swap(1);
+        data0.swap(2);
+
+        // compare data
+        let a1 = DnsMat::from(array![
+            [1, 0, 5],
+            [1, 2, 6],
+            [1,-1, 3]
+        ]);
+        
+        let p = data0.p.unwrap().clone();
+        let pinv = data0.pinv.unwrap().clone();
+
+        assert_eq!(p * a0.clone(), a1.clone());
+        assert_eq!(pinv * a1.clone(), a0.clone());
+    }
 
     #[test]
     fn add_row_to() { 
@@ -531,7 +577,7 @@ mod tests {
             [1, 0, 5],
             [1, 2, 6]
         ]);
-        let mut data0 = LLLData::new(a0);
+        let mut data0 = LLLData::new(a0, [false, false]);
         data0.setup();
         data0.add_row_to(0, 1, &2);
         data0.add_row_to(1, 2, &-3);
@@ -542,20 +588,46 @@ mod tests {
             [3,-2,11],
             [-8,8,-27]
         ]);
-        let mut data1 = LLLData::new(a1);
+        let mut data1 = LLLData::new(a1, [false, false]);
         data1.setup();
 
         assert_eq!(data0, data1);
-     }
+    }
 
-     #[test]
-     fn mul_row() { 
+    #[test]
+    fn add_row_to_trans() { 
         let a0 = DnsMat::from(array![
             [1,-1, 3],
             [1, 0, 5],
             [1, 2, 6]
         ]);
-        let mut data0 = LLLData::new(a0);
+        let mut data0 = LLLData::new(a0.clone(), [true, true]);
+        data0.setup();
+        data0.add_row_to(0, 1, &2);
+        data0.add_row_to(1, 2, &-3);
+        
+        // compare data
+        let a1 = DnsMat::from(array![
+            [1,-1, 3],
+            [3,-2,11],
+            [-8,8,-27]
+        ]);
+
+        let p = data0.p.unwrap().clone();
+        let pinv = data0.pinv.unwrap().clone();
+ 
+        assert_eq!(p * a0.clone(), a1.clone());
+        assert_eq!(pinv * a1.clone(), a0.clone());
+     }
+
+    #[test]
+    fn mul_row() { 
+        let a0 = DnsMat::from(array![
+            [1,-1, 3],
+            [1, 0, 5],
+            [1, 2, 6]
+        ]);
+        let mut data0 = LLLData::new(a0, [false, false]);
         data0.setup();
         data0.mul_row(1, &-1);
         data0.mul_row(2, &-1);
@@ -566,22 +638,49 @@ mod tests {
             [-1, 0, -5],
             [-1, -2, -6]
         ]);
-        let mut data1 = LLLData::new(a1);
+        let mut data1 = LLLData::new(a1, [false, false]);
         data1.setup();
 
         assert_eq!(data0, data1);
     }
 
-     #[test]
-     fn lll() { 
+    #[test]
+    fn mul_row_trans() { 
+       let a0 = DnsMat::from(array![
+           [1,-1, 3],
+           [1, 0, 5],
+           [1, 2, 6]
+       ]);
+       let mut data0 = LLLData::new(a0.clone(), [true, true]);
+       data0.setup();
+       data0.mul_row(1, &-1);
+       data0.mul_row(2, &-1);
+       
+       // compare data
+       let a1 = DnsMat::from(array![
+           [1,-1, 3],
+           [-1, 0, -5],
+           [-1, -2, -6]
+       ]);
+
+       let p = data0.p.unwrap().clone();
+       let pinv = data0.pinv.unwrap().clone();
+
+       assert_eq!(p * a0.clone(), a1.clone());
+       assert_eq!(pinv * a1.clone(), a0.clone());
+    }
+
+    #[test]
+    fn lll() { 
         let a = DnsMat::from(array![
             [1,-1, 3],
             [1, 0, 5],
             [1, 2, 6]
         ]);
-        let mut calc = LLLCalc::new(a);
+        let mut calc = LLLCalc::new(a.clone(), true);
         calc.process();
-        let res = calc.result();
+
+        let (res, Some(p)) = calc.result() else { panic!() };
 
         assert_eq!(res, DnsMat::from(array![
             [0, 1, -1],
@@ -589,6 +688,8 @@ mod tests {
             [1, 1, 1]
         ]));
         assert!( helper::is_reduced( &res.array().view() ) );
+
+        assert_eq!(p * a, res);
     }
 
      #[test]
@@ -599,9 +700,10 @@ mod tests {
             [0, 1, 0, 60],
             [0, 0, 1, 90]
         ]);
-        let mut calc = LLLCalc::new(a.clone());
+        let mut calc = LLLCalc::new(a.clone(), true);
         calc.process();
-        let res = calc.result();
+
+        let (res, Some(p)) = calc.result() else { panic!() };
 
         assert_eq!(res, DnsMat::from(array![
             [3, -2, 0, 0],
@@ -609,6 +711,8 @@ mod tests {
             [-2, 0, 1, 10]
         ]));
         assert!( helper::is_reduced( &res.array().view() ));
+
+        assert_eq!(p * a, res);
       }
 
      #[test]
@@ -619,9 +723,10 @@ mod tests {
             [56, -550, -328],
             [76,   10,   42]
         ]);
-        let mut calc = LLLHNFCalc::new(a.clone());
+        let mut calc = LLLHNFCalc::new(a.clone(), [true, true]);
         calc.process();
-        let res = calc.result();
+
+        let (res, Some(p), Some(pinv)) = calc.result() else { panic!() };
 
         assert_eq!(res, DnsMat::from(array![
             [0, 0, 0],
@@ -629,6 +734,9 @@ mod tests {
             [0, 6,-2],
             [4,-2, 2]
         ]));
+
+        assert_eq!(p.clone() * a, res);
+        assert_eq!(p * pinv, DnsMat::eye(4));
     }
 
     #[test]
@@ -641,7 +749,7 @@ mod tests {
             [i(3, 3), i(-2, 4), i(6, 2)],
             [i(2, 2), i(-8, 0), i(-9, 1)],
         ]);
-        let mut data = LLLData::new(a);
+        let mut data = LLLData::new(a, [false, false]);
 
         data.setup();
 
@@ -666,7 +774,7 @@ mod tests {
             [i(3, 3), i(-2, 4), i(6, 2)],
             [i(2, 2), i(-8, 0), i(-9, 1)],
         ]);
-        let mut data0 = LLLData::new(a0);
+        let mut data0 = LLLData::new(a0, [false, false]);
         data0.setup();
         data0.swap(1);
         data0.swap(2);
@@ -677,7 +785,7 @@ mod tests {
             [i(2, 2), i(-8, 0), i(-9, 1)],
             [i(-2, 3), i(7, 3), i(7, 3)],
         ]);
-        let mut data1 = LLLData::new(a1);
+        let mut data1 = LLLData::new(a1, [false, false]);
         data1.setup();
 
         assert_eq!(data0, data1);
@@ -692,7 +800,7 @@ mod tests {
             [i(3, 3), i(-2, 4), i(6, 2)],
             [i(2, 2), i(-8, 0), i(-9, 1)],
         ]);
-        let mut data0 = LLLData::new(a0);
+        let mut data0 = LLLData::new(a0, [false, false]);
         data0.setup();
         data0.add_row_to(0, 1, &i(1, 1));
         data0.add_row_to(1, 2, &i(-3, 2));
@@ -703,7 +811,7 @@ mod tests {
             [i(-2, 4), i(2, 14), i(10, 12)],
             [i(0, -14), i(-42, -38), i(-63, -15)],
         ]);
-        let mut data1 = LLLData::new(a1);
+        let mut data1 = LLLData::new(a1, [false, false]);
         data1.setup();
 
         assert_eq!(data0, data1);
@@ -719,7 +827,7 @@ mod tests {
             [i(2, 2), i(-8, 0), i(-9, 1)],
         ]);
 
-        let mut data0 = LLLData::new(a0.clone());
+        let mut data0 = LLLData::new(a0.clone(), [false, false]);
         data0.setup();
         data0.mul_row(1, &i(0, 1));
         data0.mul_row(2, &i(0, -1));
@@ -730,7 +838,7 @@ mod tests {
             [i(-3, 3), i(-4, -2), i(-2, 6)],
             [i(2, -2), i(0, 8), i(1, 9)],
         ]);
-        let mut data1 = LLLData::new(a1);
+        let mut data1 = LLLData::new(a1, [false, false]);
         data1.setup();
 
         assert_eq!(data0, data1);
@@ -747,11 +855,15 @@ mod tests {
             [i(2, 2), i(-8, 0), i(-9, 1)],
         ]);
 
-        let mut calc = LLLHNFCalc::new(a);
+        let mut calc = LLLHNFCalc::new(a.clone(), [true, true]);
         calc.process();
-        let _res = calc.result();
 
-        // TODO
+        let (res, Some(p), Some(pinv)) = calc.result() else { panic!() };
+
+        // TODO check res
+
+        assert_eq!(p.clone() * a, res);
+        assert_eq!(p * pinv, DnsMat::eye(3));
     }
 
     #[test]
@@ -765,11 +877,15 @@ mod tests {
             [i(2, 2), i(-8, 0), i(-9, 1)],
         ]);
 
-        let mut calc = LLLHNFCalc::new(a);
+        let mut calc = LLLHNFCalc::new(a.clone(), [true, true]);
         calc.process();
-        let _res = calc.result();
 
-        // TODO
+        let (res, Some(p), Some(pinv)) = calc.result() else { panic!() };
+
+        // TODO check res
+
+        assert_eq!(p.clone() * a, res);
+        assert_eq!(p * pinv, DnsMat::eye(3));
     }
 
     mod helper { 

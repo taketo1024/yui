@@ -52,8 +52,6 @@ fn run_all(target: &str) -> Result<(), Box<dyn std::error::Error>> {
 
         csv.write_record(record)?;
         csv.flush()?;
-
-        break
     }
 
     Ok(())

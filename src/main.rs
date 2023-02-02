@@ -26,10 +26,10 @@ fn set_logger() -> Result<(), log::SetLoggerError> {
 }
 
 fn run_all(target: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let c2: i64 = 2;
-    let c3: i64 = 3;
-    let cx: GaussInt<i64> = GaussInt::new(1, 1);
-    let cy: EisenInt<i64> = EisenInt::new(1, 1);
+    let c2: i128 = 2;
+    let c3: i128 = 3;
+    let cx: GaussInt<i128> = GaussInt::new(1, 1);
+    let cy: EisenInt<i128> = EisenInt::new(1, 1);
     
     let file = format!("result.csv");
     let mut csv = csv::Writer::from_path(file)?;
@@ -78,7 +78,7 @@ use run_for;
 
 fn run<R>(l: &Link, name: &str, c: &R) -> Result<i32, Box<dyn std::error::Error>> 
 where R: EucRing, for<'x> &'x R: EucRingOps<R> + UnwindSafe { 
-    info!("compute {name}, c = {c}");
+    info!("compute {name}, c = {c} ({})", std::any::type_name::<R>());
 
     let (res, time) = measure(|| {
         std::panic::catch_unwind(|| {

@@ -5,7 +5,7 @@ use sprs::{CsMat, TriMat, CsMatBase, SpIndex};
 use derive_more::Display;
 use crate::math::traits::{Ring, RingOps};
 
-#[derive(Clone, Debug, Display, PartialEq, Eq)]
+#[derive(Clone, Debug, Display, Default, PartialEq, Eq)]
 pub struct DnsMat<R>
 where R: Ring, for<'a> &'a R: RingOps<R> {
     array: Array2<R>
@@ -33,7 +33,6 @@ where
         DnsMat{ array: sp.to_dense() }
     }
 }
-
 
 impl<R> DnsMat<R>
 where R: Ring, for<'a> &'a R: RingOps<R> {

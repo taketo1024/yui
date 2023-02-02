@@ -1,8 +1,9 @@
 use core::panic;
 use std::cmp::min;
-
+use log::info;
 use crate::math::traits::{EucRing, EucRingOps};
 use super::DnsMat;
+use super::lll::{LLLRing, LLLRingOps, lll_hnf_in_place};
 
 pub type SnfFlags = [bool; 4];
 
@@ -14,8 +15,11 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
 
 pub fn snf_in_place<R>(target: DnsMat<R>, flags: SnfFlags) -> SnfResult<R>
 where R: EucRing, for<'a> &'a R: EucRingOps<R> {
+    info!("start snf: {:?}, flags: {:?}", target.shape(), flags);
+
     let mut calc = SnfCalc::new(target, flags);
 
+    calc.preprocess();
     calc.eliminate_all();
     calc.diag_normalize();
     calc.result()
@@ -86,7 +90,6 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     }
 }
 
-
 // -- private -- //
 
 struct SnfCalc<R>
@@ -122,6 +125,12 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
             q: self.q,
             qinv: self.qinv
         }
+    }
+
+    fn preprocess(&mut self) {
+        use num_bigint::BigInt;
+        use crate::math::types::quad_int::{GaussInt, EisenInt};
+        preprocess_lll_for!(self, i32, i64, BigInt, GaussInt<i32>, GaussInt<i64>, GaussInt<BigInt>, EisenInt<i32>, EisenInt<i64>, EisenInt<BigInt>);
     }
 
     fn eliminate_all(&mut self) {
@@ -380,6 +389,41 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
         }
     }
 }
+
+impl<R> SnfCalc<R>
+where R: LLLRing, for<'a> &'a R: LLLRingOps<R> {
+    fn preprocess_lll(&mut self) {
+        let flag = [self.p.is_some(), self.pinv.is_some()];
+
+        let b = std::mem::take(&mut self.target);
+        let (res, p, pinv) = lll_hnf_in_place(b, flag);
+
+        self.target = res;
+        self.p = p;
+        self.pinv = pinv;
+    }
+}
+
+macro_rules! preprocess_lll_expand {
+    ($any:ident) => {};
+    ($any:ident, $t:ty $(,$next:ty)*) => {{
+        if let Some(_self) = $any.downcast_mut::<SnfCalc<$t>>() {
+            info!("lll-preprocess for {}", std::any::type_name::<$t>());
+            _self.preprocess_lll()
+        } else {
+            preprocess_lll_expand!($any $(,$next)*);
+        }
+    }};
+}
+
+macro_rules! preprocess_lll_for {
+    ($self:ident, $t:ty $(,$next:ty)*) => {{
+        let any: &mut dyn std::any::Any = $self;
+        preprocess_lll_expand!(any, $t, $($next),*);
+    }};
+}
+
+use {preprocess_lll_for, preprocess_lll_expand};
 
 #[cfg(test)]
 mod tests {
@@ -752,5 +796,54 @@ mod tests {
         
         assert_eq!(p * a.clone() * q, res);
         assert_eq!(pinv * res * qinv, a.clone());
+    }
+
+    #[test]
+    fn lll_preprocess() { 
+        use super::super::lll::tests::helper::assert_is_hnf;
+
+        let a = DnsMat::from(array![
+            [1, 0, 1, 0, 0, 1, 1, 0, 1],
+            [0, 1, 3, 1, 0, 1, 0, 2, 0],
+            [0, 0, 1, 1, 0, 0, 0, 5, 1],
+            [0, 1, 1, 0, 3, 0, 0, 0, 0],
+            [0, 1, 0, 1, 0, 0, 1, 0, 1],
+            [1, 0, 2, 0, 1, 1, 0, 1, 1]
+        ]);
+        let mut calc = SnfCalc::new(a.clone(), [true; 4]);
+        calc.preprocess();
+
+        let (res, trans) = calc.result().destruct();
+        let [p, pinv, _, _] = trans.map( |p| p.unwrap() );
+
+        assert_is_hnf(&res);
+
+        assert_eq!(p * a.clone(), res);
+        assert_eq!(pinv * res, a.clone());
+    }
+
+    #[test]
+    fn lll_preprocess_bigint() { 
+        use super::super::lll::tests::helper::assert_is_hnf;
+
+        let a = DnsMat::from(array![
+            [1, 0, 1, 0, 0, 1, 1, 0, 1],
+            [0, 1, 3, 1, 0, 1, 0, 2, 0],
+            [0, 0, 1, 1, 0, 0, 0, 5, 1],
+            [0, 1, 1, 0, 3, 0, 0, 0, 0],
+            [0, 1, 0, 1, 0, 0, 1, 0, 1],
+            [1, 0, 2, 0, 1, 1, 0, 1, 1]
+        ].map(|&a| num_bigint::BigInt::from(a)));
+
+        let mut calc = SnfCalc::new(a.clone(), [true; 4]);
+        calc.preprocess();
+
+        let (res, trans) = calc.result().destruct();
+        let [p, pinv, _, _] = trans.map( |p| p.unwrap() );
+
+        assert_is_hnf(&res);
+
+        assert_eq!(p * a.clone(), res);
+        assert_eq!(pinv * res, a.clone());
     }
 }

@@ -7,23 +7,6 @@ pub trait IntOps<T>: EucRingOps<T> {}
 pub trait Integer: EucRing + IntOps<Self> + From<i32> + Signed + num_integer::Integer
 where for<'a> &'a Self: EucRingOps<Self> {}
 
-macro_rules! decl_integer {
-    ($type:ty) => {
-        impl IntOps<$type> for $type {}
-        impl<'a> IntOps<$type> for &'a $type {}
-        impl Integer for $type {}
-    }
-}
-
-pub(crate) use decl_integer;
-
-impl<T> Symbol for T
-where T: Integer, for<'x> &'x T: IntOps<T> {
-    fn symbol() -> String {
-        String::from("Z")
-    }
-}
-
 impl<T> RingMethods for T
 where T: Integer, for<'x> &'x T: IntOps<T> {
     fn inv(&self) -> Option<Self> {
@@ -58,15 +41,50 @@ where T: Integer, for<'x> &'x T: IntOps<T> {
     }
 }
 
+macro_rules! impl_ops {
+    ($trait:ident, $type:ty) => {
+        impl $trait<$type> for $type {}
+        impl<'a> $trait<$type> for &'a $type {}
+    };
+}
+
+macro_rules! impl_trait {
+    ($trait:ty, $type:ty) => {
+        impl $trait for $type {}
+    };
+    ($trait:ty, $type:ty, { $($item:item)* }) => {
+        impl $trait for $type {
+            $( $item )*
+        }
+    };
+}
+
 macro_rules! decl_integer_all {
     ($type:ident) => {
-        decl_alg_base!($type);
-        decl_add_mon!($type);
-        decl_add_grp!($type);
-        decl_mon!($type);
-        decl_ring!($type);
-        decl_euc_ring!($type);
-        decl_integer!($type);
+        impl_trait!(Symbol, $type, { 
+            fn symbol() -> String {
+                String::from("Z")
+            }
+        });
+        impl_trait!(AlgBase, $type);
+
+        impl_ops!(AddMonOps, $type);
+        impl_trait!(AddMon, $type);
+
+        impl_ops!(AddGrpOps, $type);
+        impl_trait!(AddGrp, $type);
+
+        impl_ops!(MonOps, $type);
+        impl_trait!(Mon, $type);
+
+        impl_ops!(RingOps, $type);
+        impl_trait!(Ring, $type, {});
+
+        impl_ops!(EucRingOps, $type);
+        impl_trait!(EucRing, $type);
+
+        impl_ops!(IntOps, $type);
+        impl_trait!(Integer, $type);
     }
 }
 

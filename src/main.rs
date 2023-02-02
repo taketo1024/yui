@@ -1,11 +1,11 @@
 #![allow(unused_imports)]
 
-use std::collections::BTreeMap;
 use std::panic::UnwindSafe;
 use derive_more::{Display, Error};
 use log::{info, error};
 use simplelog::*;
 use num_bigint::BigInt;
+use indexmap::IndexMap;
 use yui::math::types::quad_int::{GaussInt, EisenInt};
 use yui::math::traits::{EucRing, EucRingOps};
 use yui::links::{Link, links::Edge};
@@ -110,7 +110,7 @@ where F: FnOnce() -> Res {
     (res, time)
 }
 
-type Data = BTreeMap<String, Vec<[Edge; 4]>>;
+type Data = IndexMap<String, Vec<[Edge; 4]>>;
 
 fn load_data(target: &str) -> Result<Data, Box<dyn std::error::Error>> {
     let json = std::fs::read_to_string(target)?;

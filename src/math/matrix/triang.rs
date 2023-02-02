@@ -44,10 +44,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         // TODO
     }
 
-    info!("solve triangular, a = {:?}, y = {:?}", a.shape(), y.shape());
-
     const MULTI_THREAD: bool = true;
-
     if MULTI_THREAD { 
         solve_triangular_m(t, a, y)
     } else { 
@@ -57,6 +54,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 fn solve_triangular_s<R>(t: TriangularType, a: &CsMat<R>, y: &CsMat<R>) -> CsMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
+    info!("solve triangular: a = {:?}, y = {:?}", a.shape(), y.shape());
+
     let (n, k) = (a.rows(), y.cols());
     let diag = diag(t, &a);
 
@@ -92,6 +91,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 fn solve_triangular_m<R>(t: TriangularType, a: &CsMat<R>, y: &CsMat<R>) -> CsMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
+    let nth = std::thread::available_parallelism().map(|x| x.get()).unwrap_or(1);
+
+    info!("solve triangular: a = {:?}, y = {:?} (multi-thread: {nth})", a.shape(), y.shape());
+
     let report = log::max_level() >= log::LevelFilter::Info;
     let count = Mutex::new(0);
     

@@ -84,6 +84,8 @@ impl PivotFinder {
     }
 
     pub fn result(&self) -> Vec<(usize, usize)> { 
+        info!("sort: {} pivots.", self.pivots.count());
+
         let tree: HashMap<_, _> = self.pivots.iter().map(|(i, j)| { 
             let list = self.str.cols_in(i).filter(|&&j2|
                 j != j2 && self.pivots.has_col(j2)
@@ -177,7 +179,7 @@ impl PivotFinder {
     fn find_cycle_free_pivots(&mut self) {
         let before_piv_count = self.pivots.count();
 
-        const MULTI_THREAD: bool = false;
+        const MULTI_THREAD: bool = true;
         if MULTI_THREAD { 
             self.find_cycle_free_pivots_m();
         } else {
@@ -220,6 +222,8 @@ impl PivotFinder {
      }
 
      fn find_cycle_free_pivots_m(&mut self) {
+        let nth = std::thread::available_parallelism().map(|x| x.get()).unwrap_or(1);
+
         let report = log::max_level() >= log::LevelFilter::Info;
         let before_piv_count = Mutex::new(self.pivots.count());
         let count = Mutex::new(0);
@@ -229,7 +233,7 @@ impl PivotFinder {
         let total = remain_rows.len();
 
         if report && total > 10_000 { 
-            info!("  start find-cycle-free-pivots: {total} rows (multi-thread)");
+            info!("  start find-cycle-free-pivots: {total} rows (multi-thread: {nth})");
         }
 
         let rw_lock = RwLock::new(

@@ -1,36 +1,11 @@
 use num_bigint::BigInt;
-use num_traits::Signed;
+use num_traits::{One, Signed};
 use super::super::traits::*;
 
 pub trait IntOps<T>: EucRingOps<T> {}
 
 pub trait Integer: EucRing + IntOps<Self> + From<i32> + Signed + num_integer::Integer
 where for<'a> &'a Self: EucRingOps<Self> {}
-
-impl<T> RingMethods for T
-where T: Integer, for<'x> &'x T: IntOps<T> {
-    fn inv(&self) -> Option<Self> {
-        if self.is_unit() { 
-            Some(self.clone())
-        } else { 
-            None
-        }
-    }
-
-    #[inline]
-    fn is_unit(&self) -> bool {
-        self.is_one() || (-self).is_one()
-    }
-
-    #[inline]
-    fn normalizing_unit(&self) -> Self {
-        if !self.is_negative() { 
-            Self::one() 
-        } else { 
-            -Self::one() 
-        }
-    }
-}
 
 impl<T> DivRound for T
 where T: Integer, for<'x> &'x T: IntOps<T> {
@@ -78,7 +53,27 @@ macro_rules! decl_integer_all {
         impl_trait!(Mon, $type);
 
         impl_ops!(RingOps, $type);
-        impl_trait!(Ring, $type, {});
+        impl_trait!(Ring, $type, {
+            fn inv(&self) -> Option<Self> {
+                if self.is_unit() { 
+                    Some(self.clone())
+                } else { 
+                    None
+                }
+            }
+        
+            fn is_unit(&self) -> bool {
+                self.is_one() || (-self).is_one()
+            }
+        
+            fn normalizing_unit(&self) -> Self {
+                if !self.is_negative() { 
+                    Self::one() 
+                } else { 
+                    -Self::one() 
+                }
+            }
+        });
 
         impl_ops!(EucRingOps, $type);
         impl_trait!(EucRing, $type);

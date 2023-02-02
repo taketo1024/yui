@@ -61,18 +61,14 @@ pub trait RingOps<T>:
     AddGrpOps<T> + MonOps<T>
 {}
 
-pub trait RingMethods: Sized
+pub trait Ring: 
+    AddGrp + Mon + RingOps<Self> + One + sprs::MulAcc
+where
+    for<'a> &'a Self: RingOps<Self>
 {
     fn inv(&self) -> Option<Self>;
     fn is_unit(&self) -> bool;
     fn normalizing_unit(&self) -> Self;
-}
-
-pub trait Ring: 
-    AddGrp + Mon + RingOps<Self> + RingMethods + One + sprs::MulAcc
-where
-    for<'a> &'a Self: RingOps<Self>
-{
     fn from_sign(e: Sign) -> Self {
         if e.is_positive() { Self::one() } else { -Self::one() }
     }

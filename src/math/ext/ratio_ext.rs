@@ -1,7 +1,7 @@
 use num_rational::Ratio;
 use num_traits::{Zero, One};
 
-use crate::math::traits::{Ring, RingOps, Symbol, AlgBase, MonOps, Mon, AddMon, AddMonOps, AddGrpOps, AddGrp, RingMethods};
+use crate::math::traits::{Ring, RingOps, Symbol, AlgBase, MonOps, Mon, AddMon, AddMonOps, AddGrpOps, AddGrp};
 
 use super::int_ext::{Integer, IntOps};
 
@@ -48,7 +48,7 @@ where R: Integer, for<'x> &'x R: IntOps<R> {}
 impl<'a, R> RingOps<Ratio<R>> for &'a Ratio<R> 
 where R: Integer, for<'x> &'x R: IntOps<R> {}
 
-impl<R> RingMethods for Ratio<R>
+impl<R> Ring for Ratio<R> 
 where R: Integer, for<'x> &'x R: IntOps<R> {
     fn inv(&self) -> Option<Self> {
         if !self.is_zero() { 
@@ -70,7 +70,3 @@ where R: Integer, for<'x> &'x R: IntOps<R> {
         }
     }
 }
-
-impl<R> Ring for Ratio<R> 
-where R: Integer, for<'x> &'x R: IntOps<R> {}
-

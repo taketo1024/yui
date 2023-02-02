@@ -223,53 +223,6 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 forward_binop!(Mul, mul);
 forward_assop!(MulAssign, mul_assign, mul);
 
-impl<I, const D: i32> RingMethods for QuadInt<I, D>
-where I: Integer, for<'x> &'x I: IntOps<I> {
-    // see: https://en.wikipedia.org/wiki/Quadratic_integer#Units
-    fn is_unit(&self) -> bool {
-        self.norm().is_unit()
-    }
-
-    fn inv(&self) -> Option<Self> {
-        if let Some(u) = self.norm().inv() {
-            let u = Self::from(u);
-            Some(u * self.conj())
-        } else { 
-            None
-        }
-    }
-
-    fn normalizing_unit(&self) -> Self {
-        let (a, b) = self.pair();
-        if D == -1 { 
-            if a.is_positive() && !b.is_negative() { 
-                Self::one()
-            } else if !a.is_positive() && b.is_positive() { 
-                -Self::omega()
-            } else if a.is_negative() && !b.is_positive() { 
-                -Self::one()
-            } else if !a.is_negative() && b.is_negative() { 
-                Self::omega()
-            } else { 
-                Self::one()
-            }
-        } else if D == -3 { 
-            // TODO
-            if a.is_negative() { 
-                -Self::one()
-            } else { 
-                Self::one()
-            }
-        } else { 
-            if a.is_negative() { 
-                -Self::one()
-            } else { 
-                Self::one()
-            }
-        }
-    }
-}
-
 // Div / Rem for GaussInt (D = -1).
 
 impl<I> DivRound for GaussInt<I>
@@ -396,7 +349,51 @@ impl<'a, I, const D: i32> RingOps<QuadInt<I, D>> for &'a QuadInt<I, D>
 where I: Integer, for<'x> &'x I: IntOps<I> {}
 
 impl<I, const D: i32> Ring for QuadInt<I, D> 
-where I: Integer, for<'x> &'x I: IntOps<I> {}
+where I: Integer, for<'x> &'x I: IntOps<I> {
+    // see: https://en.wikipedia.org/wiki/Quadratic_integer#Units
+    fn is_unit(&self) -> bool {
+        self.norm().is_unit()
+    }
+
+    fn inv(&self) -> Option<Self> {
+        if let Some(u) = self.norm().inv() {
+            let u = Self::from(u);
+            Some(u * self.conj())
+        } else { 
+            None
+        }
+    }
+
+    fn normalizing_unit(&self) -> Self {
+        let (a, b) = self.pair();
+        if D == -1 { 
+            if a.is_positive() && !b.is_negative() { 
+                Self::one()
+            } else if !a.is_positive() && b.is_positive() { 
+                -Self::omega()
+            } else if a.is_negative() && !b.is_positive() { 
+                -Self::one()
+            } else if !a.is_negative() && b.is_negative() { 
+                Self::omega()
+            } else { 
+                Self::one()
+            }
+        } else if D == -3 { 
+            // TODO
+            if a.is_negative() { 
+                -Self::one()
+            } else { 
+                Self::one()
+            }
+        } else { 
+            if a.is_negative() { 
+                -Self::one()
+            } else { 
+                Self::one()
+            }
+        }
+    }
+}
 
 impl<I> EucRingOps<Self> for QuadInt<I, -1> 
 where I: Integer, for<'x> &'x I: IntOps<I> {}

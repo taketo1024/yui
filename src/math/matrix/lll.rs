@@ -19,7 +19,6 @@ use crate::math::types::quad_int::{GaussInt, QuadInt, EisenInt};
 use super::DnsMat;
 
 pub trait LLLRingOps<T>: EucRingOps<T> {}
-impl<S, T> LLLRingOps<T> for S where S: EucRingOps<T> {}
 
 pub trait LLLRing: EucRing + LLLRingOps<Self> + DivRound
 where for<'x> &'x Self: LLLRingOps<Self> {
@@ -29,8 +28,11 @@ where for<'x> &'x Self: LLLRingOps<Self> {
     fn conj(&self) -> Self;
 }
 
-macro_rules! impl_lll_ring_integer {
+macro_rules! impl_for_int {
     ($type:ty) => {
+        impl LLLRingOps<Self> for $type {}
+        impl<'a> LLLRingOps<$type> for &'a $type {}
+
         impl LLLRing for $type {
             type Int = Self;
             fn alpha() -> (Self, Self) {
@@ -48,12 +50,18 @@ macro_rules! impl_lll_ring_integer {
     };
 }
 
-impl_lll_ring_integer!(i32);
-impl_lll_ring_integer!(i64);
-impl_lll_ring_integer!(BigInt);
+impl_for_int!(i32);
+impl_for_int!(i64);
+impl_for_int!(BigInt);
 
-macro_rules! impl_lll_ring_quad_int {
+macro_rules! impl_for_quad_int {
     ($type:ident, $p:literal, $q:literal) => {
+        impl<I> LLLRingOps<Self> for $type<I>
+        where I: Integer, for<'x> &'x I: IntOps<I> {}
+
+        impl<'a, I> LLLRingOps<$type<I>> for &'a $type<I>
+        where I: Integer, for<'x> &'x I: IntOps<I> {}
+
         impl<I> LLLRing for $type<I>
         where I: Integer, for<'x> &'x I: IntOps<I> {
             type Int = I;
@@ -77,8 +85,8 @@ macro_rules! impl_lll_ring_quad_int {
     }
 }
 
-impl_lll_ring_quad_int!(GaussInt, 3, 4);
-impl_lll_ring_quad_int!(EisenInt, 2, 3);
+impl_for_quad_int!(GaussInt, 3, 4);
+impl_for_quad_int!(EisenInt, 2, 3);
 
 type Row = usize;
 type Col = usize;
@@ -341,7 +349,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     fn mul_row(&mut self, i: Row, r: &R) { 
         self.target.mul_row(i, r);
         self.lambda.mul_row(i, r);
-        self.lambda.mul_col(i, r);
+        self.lambda.mul_col(i, &r.conj());
 
         trace!("mul {} to row {}.\n{}", r, i, self.target);
     }
@@ -605,7 +613,7 @@ mod tests {
             [1, 0, -1],
             [1, 1, 1]
         ]));
-        assert!( is_reduced( &res.array().view() ) );
+        assert!( helper::is_reduced( &res.array().view() ) );
     }
 
      #[test]
@@ -625,7 +633,7 @@ mod tests {
             [0, 3, -2, 0],
             [-2, 0, 1, 10]
         ]));
-        assert!(is_reduced( &res.array().view() ));
+        assert!( helper::is_reduced( &res.array().view() ));
       }
 
      #[test]
@@ -646,6 +654,138 @@ mod tests {
             [0, 6,-2],
             [4,-2, 2]
         ]));
+    }
+
+    #[test]
+    fn setup_gauss() { 
+        type A = GaussInt<i64>;
+
+        let i = |a, b| A::new(a, b);
+        let a = DnsMat::from(array![
+            [i(-2, 3), i(7, 3), i(7, 3)],
+            [i(3, 3), i(-2, 4), i(6, 2)],
+            [i(2, 2), i(-8, 0), i(-9, 1)],
+        ]);
+        let mut data = LLLData::new(a);
+
+        data.setup();
+
+        assert_eq!(data.det.len(), 3);
+        assert_eq!(data.det[0], i(129, 0));
+        assert_eq!(data.det[1], i(7436, 0));
+        assert_eq!(data.det[2], i(161408, 0));
+
+        assert_eq!(data.lambda, DnsMat::from(array![
+            [i(0, 0),     i(0, 0),      i(0, 0)],
+            [i(49, 15),   i(0, 0),      i(0, 0)],
+            [i(-114, 48), i(1770,3162), i(0, 0)]
+        ]));
+    }
+
+    #[test]
+    fn swap_gauss() { 
+        type A = GaussInt<i64>;
+        let i = |a, b| A::new(a, b);
+        let mut a = DnsMat::from(array![
+            [i(-2, 3), i(7, 3), i(7, 3)],
+            [i(3, 3), i(-2, 4), i(6, 2)],
+            [i(2, 2), i(-8, 0), i(-9, 1)],
+        ]);
+        let mut data = LLLData::new(a.clone());
+        data.setup();
+        
+        // first swap
+        data.swap(1);
+        
+        // compare data
+        a.swap_rows(0, 1);
+
+        let mut data2 = LLLData::new(a.clone());
+        data2.setup();
+
+        assert_eq!(&data, &data2);
+
+        // second swap
+        data.swap(2);
+
+        // compare data
+        a.swap_rows(1, 2);
+
+        let mut data3 = LLLData::new(a.clone());
+        data3.setup();
+
+        assert_eq!(&data, &data3);
+    }
+
+    #[test]
+    fn add_row_to_gauss() { 
+        type A = GaussInt<i64>;
+        let i = |a, b| A::new(a, b);
+        let mut a = DnsMat::from(array![
+            [i(-2, 3), i(7, 3), i(7, 3)],
+            [i(3, 3), i(-2, 4), i(6, 2)],
+            [i(2, 2), i(-8, 0), i(-9, 1)],
+        ]);
+        let mut data = LLLData::new(a.clone());
+        data.setup();
+        
+        // first addition
+        data.add_row_to(0, 1, &i(1, 1));
+        
+        // compare data
+        a.add_row_to(0, 1, &i(1, 1));
+
+        let mut data2 = LLLData::new(a.clone());
+        data2.setup();
+
+        assert_eq!(&data, &data2);
+
+        // second addition
+        data.add_row_to(1, 2, &i(-3, 2));
+
+        // compare data
+        a.add_row_to(1, 2, &i(-3, 2));
+        
+        let mut data3 = LLLData::new(a.clone());
+        data3.setup();
+
+        assert_eq!(&data, &data3);
+    }
+ 
+    #[test]
+    fn mul_row_gauss() { 
+        type A = GaussInt<i64>;
+        let i = |a, b| A::new(a, b);
+        let mut a = DnsMat::from(array![
+            [i(-2, 3), i(7, 3), i(7, 3)],
+            [i(3, 3), i(-2, 4), i(6, 2)],
+            [i(2, 2), i(-8, 0), i(-9, 1)],
+        ]);
+
+          let mut data = LLLData::new(a.clone());
+          data.setup();
+          
+          // first neg
+          data.mul_row(1, &i(0, 1));
+          
+          // compare data
+          a.mul_row(1, &i(0, 1));
+  
+          let mut data2 = LLLData::new(a.clone());
+          data2.setup();
+  
+          assert_eq!(&data, &data2);
+  
+          // second swap
+          data.mul_row(2, &i(0, -1));
+  
+          // compare data
+          a.mul_row(2, &i(0, -1));
+  
+          let mut data3 = LLLData::new(a.clone());
+          data3.setup();
+  
+          assert_eq!(&data, &data3);
     }
 
     #[test]
@@ -684,75 +824,76 @@ mod tests {
         // TODO
     }
 
-    // --helper funcs-- //
-
-    use std::ops::Div;
-    use num_rational::Ratio;
-    use num_traits::Signed;
-    use crate::math::ext::int_ext::{Integer, IntOps};
-
-    fn is_reduced<R>(b: &ArrayView2<R>) -> bool
-    where R: Integer + LLLRing, for<'x> &'x R: IntOps<R> + LLLRingOps<R> {
-        let m = b.nrows();
-
-        let (c, l) = gram_schmidt(b);
-        let alpha = Ratio::from(R::alpha());
-        let thr = Ratio::new(R::one(), R::from(2));
-
-        let size_reduced = l.iter().all(|r| &r.abs() <= &thr);
-        let lovasz_ok = (1..m).all(|i| {
-            let c0 = &c.row(i - 1);
-            let c1 = &c.row(i);
-            let m = &l[[i, i - 1]];
-            is_lovasz_ok(c0, c1, m, &alpha)
-        });
-
-        size_reduced && lovasz_ok
-    }
-
-    fn is_lovasz_ok<R>(c0: &ArrayView1<Ratio<R>>, c1: &ArrayView1<Ratio<R>>, m: &Ratio<R>, alpha: &Ratio<R>) -> bool
-    where R: Integer, for<'x> &'x R: IntOps<R> {
-        let r0 = dot::<Ratio<R>>(c0, c0);
-        let r1 = dot::<Ratio<R>>(c1, c1);
-        r1 >= (alpha - m * m) * r0
-    }
-
-    fn gram_schmidt<R>(b: &ArrayView2<R>) -> (Array2<Ratio<R>>, Array2<Ratio<R>>)
-    where R: Integer, for<'x> &'x R: IntOps<R> {
-        let m = b.nrows();
-
-        let mut c = b.map(|x| Ratio::from(x.clone()));
-        let mut l = Array2::zeros((m, m));
-
-        for i in 1..m { 
-            for j in 0..i {
-                let (c_i, c_j) = (c.row(i), c.row(j));
-                let p_ij = proj_coeff::<Ratio<R>>(&c_j, &c_i);
-                let v_ij = smul::<Ratio<R>>(&p_ij, &c_j);
-
-                let mut c_i = c.row_mut(i);
-                c_i -= &v_ij;
-
-                l[[i, j]] = p_ij;
-            }
+    mod helper { 
+        use std::ops::Div;
+        use num_rational::Ratio;
+        use num_traits::Signed;
+        use super::*;
+        use crate::math::ext::int_ext::{Integer, IntOps};
+    
+        pub fn is_reduced<R>(b: &ArrayView2<R>) -> bool
+        where R: Integer + LLLRing, for<'x> &'x R: IntOps<R> + LLLRingOps<R> {
+            let m = b.nrows();
+    
+            let (c, l) = gram_schmidt(b);
+            let alpha = Ratio::from(R::alpha());
+            let thr = Ratio::new(R::one(), R::from(2));
+    
+            let size_reduced = l.iter().all(|r| &r.abs() <= &thr);
+            let lovasz_ok = (1..m).all(|i| {
+                let c0 = &c.row(i - 1);
+                let c1 = &c.row(i);
+                let m = &l[[i, i - 1]];
+                is_lovasz_ok(c0, c1, m, &alpha)
+            });
+    
+            size_reduced && lovasz_ok
         }
-
-        (c, l)
-    }
-
-    fn proj_coeff<'a, R>(base: &ArrayView1<'a, R>, other: &ArrayView1<'a, R>) -> R
-    where R: Ring + Div<Output = R>, for<'x> &'x R: RingOps<R> {
-        let p = dot(&base, &other);
-        let q = dot(&base, &base);
-        p / q
-    }
-
-    fn dot<'a, R>(lhs: &ArrayView1<'a, R>, rhs: &ArrayView1<'a, R>) -> R
-    where R: Ring, for<'x> &'x R: RingOps<R> {
-        assert_eq!(lhs.dim(), rhs.dim());
-        ndarray::Zip::from(lhs).and(rhs).fold(R::zero(), |mut acc, a, b| { 
-            acc.mul_acc(a, b);
-            acc
-        })
+    
+        pub fn is_lovasz_ok<R>(c0: &ArrayView1<Ratio<R>>, c1: &ArrayView1<Ratio<R>>, m: &Ratio<R>, alpha: &Ratio<R>) -> bool
+        where R: Integer, for<'x> &'x R: IntOps<R> {
+            let r0 = dot::<Ratio<R>>(c0, c0);
+            let r1 = dot::<Ratio<R>>(c1, c1);
+            r1 >= (alpha - m * m) * r0
+        }
+    
+        fn gram_schmidt<R>(b: &ArrayView2<R>) -> (Array2<Ratio<R>>, Array2<Ratio<R>>)
+        where R: Integer, for<'x> &'x R: IntOps<R> {
+            let m = b.nrows();
+    
+            let mut c = b.map(|x| Ratio::from(x.clone()));
+            let mut l = Array2::zeros((m, m));
+    
+            for i in 1..m { 
+                for j in 0..i {
+                    let (c_i, c_j) = (c.row(i), c.row(j));
+                    let p_ij = proj_coeff::<Ratio<R>>(&c_j, &c_i);
+                    let v_ij = smul::<Ratio<R>>(&p_ij, &c_j);
+    
+                    let mut c_i = c.row_mut(i);
+                    c_i -= &v_ij;
+    
+                    l[[i, j]] = p_ij;
+                }
+            }
+    
+            (c, l)
+        }
+    
+        fn proj_coeff<'a, R>(base: &ArrayView1<'a, R>, other: &ArrayView1<'a, R>) -> R
+        where R: Ring + Div<Output = R>, for<'x> &'x R: RingOps<R> {
+            let p = dot(&base, &other);
+            let q = dot(&base, &base);
+            p / q
+        }
+    
+        fn dot<'a, R>(lhs: &ArrayView1<'a, R>, rhs: &ArrayView1<'a, R>) -> R
+        where R: Ring, for<'x> &'x R: RingOps<R> {
+            assert_eq!(lhs.dim(), rhs.dim());
+            ndarray::Zip::from(lhs).and(rhs).fold(R::zero(), |mut acc, a, b| { 
+                acc.mul_acc(a, b);
+                acc
+            })
+        }
     }
 }

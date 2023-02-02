@@ -9,9 +9,8 @@ use num_traits::Zero;
 use crate::utils::collections::hashmap;
 use crate::utils::display::OrdForDisplay;
 
-use super::traits::{Symbol, AlgBase, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
-
-pub trait FreeGenerator: Clone + PartialEq + Eq + Hash + Display + Debug + Send + Sync + Symbol + OrdForDisplay {}
+use super::traits::{AlgBase, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
+pub trait FreeGenerator: AlgBase + Hash + OrdForDisplay {}
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct LinComb<X, R>
@@ -161,7 +160,7 @@ where
     }
 }
 
-impl<X, R> Symbol for LinComb<X, R>
+impl<X, R> AlgBase for LinComb<X, R>
 where
     X: FreeGenerator,
     R: Ring, for<'x> &'x R: RingOps<R>
@@ -170,12 +169,6 @@ where
         format!("Free<{}; {}>", X::symbol(), R::symbol())
     }
 }
-
-impl<X, R> AlgBase for LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{}
 
 impl<X, R> Zero for LinComb<X, R>
 where
@@ -576,16 +569,15 @@ where
 mod tests {
     use std::{collections::HashMap, fmt::Display};
 
-    use crate::math::traits::Symbol;
-    use crate::utils::collections::hashmap;
+    use crate::{utils::collections::hashmap, math::traits::AlgBase};
     use num_traits::Zero;
 
     use super::{FreeGenerator, LinComb};
  
-    #[derive(Debug, Hash, PartialEq, Eq, Clone, PartialOrd, Ord)]
+    #[derive(Debug, Default, Hash, PartialEq, Eq, Clone, PartialOrd, Ord)]
     struct X(i32);
 
-    impl Symbol for X { 
+    impl AlgBase for X { 
         fn symbol() -> String {
             String::from("X")
         }

@@ -3,7 +3,7 @@ use std::ops::Mul;
 use itertools::join;
 use crate::links::links::State;
 use crate::math::free::{FreeGenerator, LinComb};
-use crate::math::traits::Symbol;
+use crate::math::traits::AlgBase;
 use crate::utils::format::subscript;
 use crate::math::traits::{Ring, RingOps};
 
@@ -77,7 +77,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct KhEnhState { 
     state: State,
     label: Vec<KhAlgGen>
@@ -124,9 +124,9 @@ impl<'a> Mul for &'a KhEnhState {
     }
 }
 
-impl Symbol for KhEnhState { 
+impl AlgBase for KhEnhState { 
     fn symbol() -> String { 
-        String::from("KhEnhState")
+        String::from("Kh")
     }
 }
 

@@ -102,17 +102,6 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
     }
 }
 
-impl<I, const D: i32> Symbol for QuadInt<I, D>
-where I: Integer, for<'x> &'x I: IntOps<I> {
-    fn symbol() -> String {
-        if D == -1 { 
-            String::from("Z[i]")
-        } else {
-            String::from("Z[ω]")
-        }
-    }
-}
-
 impl<I, const D: i32> Display for QuadInt<I, D>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -313,7 +302,15 @@ forward_assop_specific!(RemAssign, rem_assign, rem, -3);
 
 
 impl<I, const D: i32> AlgBase for QuadInt<I, D>
-where I: Integer, for<'x> &'x I: IntOps<I> {}
+where I: Integer, for<'x> &'x I: IntOps<I> {
+    fn symbol() -> String {
+        if D == -1 { 
+            String::from("Z[i]")
+        } else {
+            format!("Z[√{}]", D)
+        }
+    }
+}
 
 impl<I, const D: i32> AddMonOps<Self> for QuadInt<I, D> 
 where I: Integer, for<'x> &'x I: IntOps<I> {}

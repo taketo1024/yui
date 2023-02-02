@@ -371,7 +371,7 @@ impl fmt::Display for Resolution {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct State { 
     values: Vec<Resolution>
 }

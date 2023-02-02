@@ -5,15 +5,13 @@ use is_even::IsEven;
 use num_traits::{Zero, One};
 use super::sign::Sign;
 
-pub trait Symbol { 
-    fn symbol() -> String;
-}
-
 // TODO use default impls for op types. 
 
 pub trait AlgBase: 
-    Default + PartialEq + Eq + Clone + Send + Sync + Display + Debug + Symbol
-{}
+    Default + PartialEq + Eq + Clone + Send + Sync + Display + Debug
+{
+    fn symbol() -> String;
+}
 
 // Additive Monoids 
 

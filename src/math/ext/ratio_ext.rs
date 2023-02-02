@@ -1,19 +1,16 @@
 use num_rational::Ratio;
 use num_traits::{Zero, One};
 
-use crate::math::traits::{Ring, RingOps, Symbol, AlgBase, MonOps, Mon, AddMon, AddMonOps, AddGrpOps, AddGrp};
+use crate::math::traits::{Ring, RingOps, AlgBase, MonOps, Mon, AddMon, AddMonOps, AddGrpOps, AddGrp};
 
 use super::int_ext::{Integer, IntOps};
 
-impl<R> Symbol for Ratio<R>
+impl<R> AlgBase for Ratio<R> 
 where R: Integer, for<'x> &'x R: IntOps<R> {
     fn symbol() -> String {
-        String::from(format!("Frac({})", R::symbol()))
+        format!("Frac({})", R::symbol())
     }
 }
-
-impl<R> AlgBase for Ratio<R> 
-where R: Integer, for<'x> &'x R: IntOps<R> {}
 
 impl<R> MonOps<Self> for Ratio<R> 
 where R: Integer, for<'x> &'x R: IntOps<R> {}

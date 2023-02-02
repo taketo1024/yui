@@ -36,12 +36,11 @@ macro_rules! impl_trait {
 
 macro_rules! decl_integer_all {
     ($type:ident) => {
-        impl_trait!(Symbol, $type, { 
-            fn symbol() -> String {
+        impl_trait!(AlgBase, $type, {
+            fn symbol() -> String { 
                 String::from("Z")
             }
         });
-        impl_trait!(AlgBase, $type);
 
         impl_ops!(AddMonOps, $type);
         impl_trait!(AddMon, $type);

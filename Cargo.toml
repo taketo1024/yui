@@ -12,6 +12,7 @@ csv = "1.1.6"
 derive_more = "0.99.17"
 either = "1.8.0"
 grouping_by = "0.2.2"
+indexmap = { version = "1.9.2", features = ["serde"] }
 is-even = "1.0.0"
 is-odd = "1.0.0"
 itertools = "0.10.5"

@@ -68,6 +68,7 @@ macro_rules! impl_integer {
 
 impl_integer!(i32);
 impl_integer!(i64);
+impl_integer!(i128);
 impl_integer!(BigInt);
 
 #[cfg(test)]
@@ -79,6 +80,7 @@ mod tests {
         fn check<T>() where T: Integer, for<'a> &'a T: IntOps<T> {}
         check::<i32>();
         check::<i64>();
+        check::<i128>();
         check::<BigInt>();
     }
 

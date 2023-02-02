@@ -347,6 +347,8 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     }
 
     fn mul_row(&mut self, i: Row, r: &R) { 
+        assert!(r.is_unit());
+
         self.target.mul_row(i, r);
         self.lambda.mul_row(i, r);
         self.lambda.mul_col(i, &r.conj());
@@ -500,101 +502,74 @@ mod tests {
 
     #[test]
     fn swap() { 
-        let mut a = DnsMat::from(array![
+        let a0 = DnsMat::from(array![
             [1,-1, 3],
             [1, 0, 5],
             [1, 2, 6]
         ]);
-        let mut data = LLLData::new(a.clone());
-        data.setup();
-        
-        // first swap
-        data.swap(1);
+        let mut data0 = LLLData::new(a0);
+        data0.setup();
+        data0.swap(1);
+        data0.swap(2);
         
         // compare data
-        a.swap_rows(0, 1);
+        let a1 = DnsMat::from(array![
+            [1, 0, 5],
+            [1, 2, 6],
+            [1,-1, 3]
+        ]);
+        let mut data1 = LLLData::new(a1);
+        data1.setup();
 
-        let mut data2 = LLLData::new(a.clone());
-        data2.setup();
-
-        assert_eq!(&data, &data2);
-
-        // second swap
-        data.swap(2);
-
-        // compare data
-        a.swap_rows(1, 2);
-
-        let mut data3 = LLLData::new(a.clone());
-        data3.setup();
-
-        assert_eq!(&data, &data3);
+        assert_eq!(data0, data1);
      }
 
     #[test]
     fn add_row_to() { 
-        let mut a = DnsMat::from(array![
+        let a0 = DnsMat::from(array![
             [1,-1, 3],
             [1, 0, 5],
             [1, 2, 6]
         ]);
-        let mut data = LLLData::new(a.clone());
-        data.setup();
-        
-        // first addition
-        data.add_row_to(0, 1, &2);
+        let mut data0 = LLLData::new(a0);
+        data0.setup();
+        data0.add_row_to(0, 1, &2);
+        data0.add_row_to(1, 2, &-3);
         
         // compare data
-        a.add_row_to(0, 1, &2);
+        let a1 = DnsMat::from(array![
+            [1,-1, 3],
+            [3,-2,11],
+            [-8,8,-27]
+        ]);
+        let mut data1 = LLLData::new(a1);
+        data1.setup();
 
-        let mut data2 = LLLData::new(a.clone());
-        data2.setup();
-
-        assert_eq!(&data, &data2);
-
-        // second addition
-        data.add_row_to(1, 2, &-3);
-
-        // compare data
-        a.add_row_to(1, 2, &-3);
-        
-        let mut data3 = LLLData::new(a.clone());
-        data3.setup();
-
-        assert_eq!(&data, &data3);
+        assert_eq!(data0, data1);
      }
 
      #[test]
      fn mul_row() { 
-         let mut a = DnsMat::from(array![
-             [1,-1, 3],
-             [1, 0, 5],
-             [1, 2, 6]
-         ]);
-         let mut data = LLLData::new(a.clone());
-         data.setup();
-         
-         // first neg
-         data.mul_row(1, &-1);
-         
-         // compare data
-         a.mul_row(1, &-1);
- 
-         let mut data2 = LLLData::new(a.clone());
-         data2.setup();
- 
-         assert_eq!(&data, &data2);
- 
-         // second swap
-         data.mul_row(2, &-1);
- 
-         // compare data
-         a.mul_row(2, &-1);
- 
-         let mut data3 = LLLData::new(a.clone());
-         data3.setup();
- 
-         assert_eq!(&data, &data3);
+        let a0 = DnsMat::from(array![
+            [1,-1, 3],
+            [1, 0, 5],
+            [1, 2, 6]
+        ]);
+        let mut data0 = LLLData::new(a0);
+        data0.setup();
+        data0.mul_row(1, &-1);
+        data0.mul_row(2, &-1);
+        
+        // compare data
+        let a1 = DnsMat::from(array![
+            [1,-1, 3],
+            [-1, 0, -5],
+            [-1, -2, -6]
+        ]);
+        let mut data1 = LLLData::new(a1);
+        data1.setup();
+
+        assert_eq!(data0, data1);
     }
 
      #[test]
@@ -686,106 +661,79 @@ mod tests {
     fn swap_gauss() { 
         type A = GaussInt<i64>;
         let i = |a, b| A::new(a, b);
-        let mut a = DnsMat::from(array![
+        let a0 = DnsMat::from(array![
             [i(-2, 3), i(7, 3), i(7, 3)],
             [i(3, 3), i(-2, 4), i(6, 2)],
             [i(2, 2), i(-8, 0), i(-9, 1)],
         ]);
-        let mut data = LLLData::new(a.clone());
-        data.setup();
-        
-        // first swap
-        data.swap(1);
+        let mut data0 = LLLData::new(a0);
+        data0.setup();
+        data0.swap(1);
+        data0.swap(2);
         
         // compare data
-        a.swap_rows(0, 1);
+        let a1 = DnsMat::from(array![
+            [i(3, 3), i(-2, 4), i(6, 2)],
+            [i(2, 2), i(-8, 0), i(-9, 1)],
+            [i(-2, 3), i(7, 3), i(7, 3)],
+        ]);
+        let mut data1 = LLLData::new(a1);
+        data1.setup();
 
-        let mut data2 = LLLData::new(a.clone());
-        data2.setup();
-
-        assert_eq!(&data, &data2);
-
-        // second swap
-        data.swap(2);
-
-        // compare data
-        a.swap_rows(1, 2);
-
-        let mut data3 = LLLData::new(a.clone());
-        data3.setup();
-
-        assert_eq!(&data, &data3);
+        assert_eq!(data0, data1);
     }
 
     #[test]
     fn add_row_to_gauss() { 
         type A = GaussInt<i64>;
         let i = |a, b| A::new(a, b);
-        let mut a = DnsMat::from(array![
+        let a0 = DnsMat::from(array![
             [i(-2, 3), i(7, 3), i(7, 3)],
             [i(3, 3), i(-2, 4), i(6, 2)],
             [i(2, 2), i(-8, 0), i(-9, 1)],
         ]);
-        let mut data = LLLData::new(a.clone());
-        data.setup();
-        
-        // first addition
-        data.add_row_to(0, 1, &i(1, 1));
+        let mut data0 = LLLData::new(a0);
+        data0.setup();
+        data0.add_row_to(0, 1, &i(1, 1));
+        data0.add_row_to(1, 2, &i(-3, 2));
         
         // compare data
-        a.add_row_to(0, 1, &i(1, 1));
+        let a1 = DnsMat::from(array![
+            [i(-2, 3), i(7, 3), i(7, 3)],
+            [i(-2, 4), i(2, 14), i(10, 12)],
+            [i(0, -14), i(-42, -38), i(-63, -15)],
+        ]);
+        let mut data1 = LLLData::new(a1);
+        data1.setup();
 
-        let mut data2 = LLLData::new(a.clone());
-        data2.setup();
-
-        assert_eq!(&data, &data2);
-
-        // second addition
-        data.add_row_to(1, 2, &i(-3, 2));
-
-        // compare data
-        a.add_row_to(1, 2, &i(-3, 2));
-        
-        let mut data3 = LLLData::new(a.clone());
-        data3.setup();
-
-        assert_eq!(&data, &data3);
+        assert_eq!(data0, data1);
     }
  
     #[test]
     fn mul_row_gauss() { 
         type A = GaussInt<i64>;
         let i = |a, b| A::new(a, b);
-        let mut a = DnsMat::from(array![
+        let a0 = DnsMat::from(array![
             [i(-2, 3), i(7, 3), i(7, 3)],
             [i(3, 3), i(-2, 4), i(6, 2)],
             [i(2, 2), i(-8, 0), i(-9, 1)],
         ]);
 
-          let mut data = LLLData::new(a.clone());
-          data.setup();
-          
-          // first neg
-          data.mul_row(1, &i(0, 1));
-          
-          // compare data
-          a.mul_row(1, &i(0, 1));
-  
-          let mut data2 = LLLData::new(a.clone());
-          data2.setup();
-  
-          assert_eq!(&data, &data2);
-  
-          // second swap
-          data.mul_row(2, &i(0, -1));
-  
-          // compare data
-          a.mul_row(2, &i(0, -1));
-  
-          let mut data3 = LLLData::new(a.clone());
-          data3.setup();
-  
-          assert_eq!(&data, &data3);
+        let mut data0 = LLLData::new(a0.clone());
+        data0.setup();
+        data0.mul_row(1, &i(0, 1));
+        data0.mul_row(2, &i(0, -1));
+
+        // compare data
+        let a1 = DnsMat::from(array![
+            [i(-2, 3), i(7, 3), i(7, 3)],
+            [i(-3, 3), i(-4, -2), i(-2, 6)],
+            [i(2, -2), i(0, 8), i(1, 9)],
+        ]);
+        let mut data1 = LLLData::new(a1);
+        data1.setup();
+
+        assert_eq!(data0, data1);
     }
 
     #[test]

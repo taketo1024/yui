@@ -9,7 +9,7 @@ use num_traits::Zero;
 use crate::utils::collections::hashmap;
 use crate::utils::display::OrdForDisplay;
 
-use super::traits::{AlgBase, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
+use super::super::traits::{AlgBase, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
 pub trait FreeGenerator: AlgBase + Hash + OrdForDisplay {}
 
 #[derive(PartialEq, Eq, Clone, Debug)]

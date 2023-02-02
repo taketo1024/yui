@@ -3,7 +3,7 @@ use std::iter::{Sum, Product};
 use std::{fmt::Display};
 use std::ops::{Add, Neg, Sub, Mul, AddAssign, SubAssign, MulAssign, Rem, Div, RemAssign, DivAssign};
 use num_traits::{Zero, One};
-use super::int_ext::{Integer, IntOps};
+use super::super::ext::int_ext::{Integer, IntOps};
 use super::super::traits::*;
 
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
@@ -567,7 +567,7 @@ mod tests {
     use num_bigint::BigInt;
     use num_traits::{Zero, One};
     use super::super::super::traits::*;
-    use crate::math::ext::quad_int::QuadInt;
+    use crate::math::types::quad_int::QuadInt;
 
     #[test]
     fn check() { 

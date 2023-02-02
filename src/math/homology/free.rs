@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use std::collections::HashMap;
 use sprs::{CsVec, CsMat, TriMat};
-use crate::math::free::{FreeGenerator, LinComb};
+use crate::math::types::lin_comb::{FreeGenerator, LinComb};
 use crate::math::traits::{Ring, RingOps};
 use super::base::RModStr;
 

@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::ops::Mul;
 use itertools::join;
 use crate::links::links::State;
-use crate::math::free::{FreeGenerator, LinComb};
+use crate::math::types::lin_comb::{FreeGenerator, LinComb};
 use crate::math::traits::AlgBase;
 use crate::utils::format::subscript;
 use crate::math::traits::{Ring, RingOps};

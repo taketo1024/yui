@@ -15,7 +15,7 @@ use num_bigint::BigInt;
 
 use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps, DivRound};
 use crate::math::ext::int_ext::{Integer, IntOps};
-use crate::math::ext::quad_int::{GaussInt, QuadInt, EisenInt};
+use crate::math::types::quad_int::{GaussInt, QuadInt, EisenInt};
 use super::DnsMat;
 
 pub trait LLLRingOps<T>: EucRingOps<T> {}

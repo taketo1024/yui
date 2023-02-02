@@ -6,7 +6,7 @@ use log::{info, error};
 use num_bigint::{BigInt, ToBigInt};
 use simplelog::*;
 use yui::math::ext::int_ext::{Integer, IntOps};
-use yui::math::ext::quad_int::{GaussInt, EisenInt};
+use yui::math::types::quad_int::{GaussInt, EisenInt};
 use yui::math::traits::{EucRing, EucRingOps};
 use yui::links::{Link, links::Edge};
 use yui::khovanov::invariants::ss::ss_invariant;

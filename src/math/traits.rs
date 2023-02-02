@@ -3,7 +3,7 @@ use std::ops::{Add, Neg, Sub, Mul, Rem, Div, AddAssign, SubAssign, MulAssign, Re
 use std::iter::{Sum, Product};
 use is_even::IsEven;
 use num_traits::{Zero, One};
-use super::sign::Sign;
+use super::types::sign::Sign;
 
 // TODO use default impls for op types. 
 

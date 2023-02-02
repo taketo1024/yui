@@ -9,6 +9,7 @@
 // Huguette Napias
 // https://www.jstor.org/stable/43974220
 
+use std::fmt::Debug;
 use ndarray::{Array1, ArrayView1, Array2, ArrayView2};
 use log::trace;
 use num_bigint::BigInt;
@@ -22,7 +23,7 @@ pub trait LLLRingOps<T>: EucRingOps<T> {}
 
 pub trait LLLRing: EucRing + LLLRingOps<Self> + DivRound
 where for<'x> &'x Self: LLLRingOps<Self> {
-    type Int: PartialOrd + Ord;
+    type Int: PartialOrd + Ord + Debug;
     fn alpha() -> (Self, Self);
     fn as_int(&self) -> Option<Self::Int>;
     fn conj(&self) -> Self;
@@ -178,7 +179,19 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     }
 
     pub fn result(self) -> (DnsMat<R>, Option<DnsMat<R>>, Option<DnsMat<R>>) { 
-        self.data.result()
+        let m = self.data.rows();
+        let (mut target, mut p, mut pinv) = self.data.result();
+
+        for i in 0..m/2 {
+            let j = m - i - 1;
+            if i == j { break } 
+
+            target.swap_rows(i, j);
+            p.as_mut().map(|p| p.swap_rows(i, j));
+            pinv.as_mut().map(|pinv| pinv.swap_cols(i, j));
+        }
+
+        (target, p, pinv)
     }
 
     fn reduce(&mut self, i: Row, k: Row) {
@@ -687,7 +700,8 @@ mod tests {
             [1, 0, -1],
             [1, 1, 1]
         ]));
-        assert!( helper::is_reduced( &res.array().view() ) );
+
+        helper::assert_is_reduced( &res.array().view() );
 
         assert_eq!(p * a, res);
     }
@@ -710,7 +724,8 @@ mod tests {
             [0, 3, -2, 0],
             [-2, 0, 1, 10]
         ]));
-        assert!( helper::is_reduced( &res.array().view() ));
+
+        helper::assert_is_reduced( &res.array().view() );
 
         assert_eq!(p * a, res);
       }
@@ -728,13 +743,8 @@ mod tests {
 
         let (res, Some(p), Some(pinv)) = calc.result() else { panic!() };
 
-        assert_eq!(res, DnsMat::from(array![
-            [0, 0, 0],
-            [0, 0, 5],
-            [0, 6,-2],
-            [4,-2, 2]
-        ]));
-
+        helper::assert_is_hnf(&res);
+        
         assert_eq!(p.clone() * a, res);
         assert_eq!(p * pinv, DnsMat::eye(4));
     }
@@ -860,8 +870,8 @@ mod tests {
 
         let (res, Some(p), Some(pinv)) = calc.result() else { panic!() };
 
-        // TODO check res
-
+        helper::assert_is_hnf(&res);
+        
         assert_eq!(p.clone() * a, res);
         assert_eq!(p * pinv, DnsMat::eye(3));
     }
@@ -882,10 +892,30 @@ mod tests {
 
         let (res, Some(p), Some(pinv)) = calc.result() else { panic!() };
 
-        // TODO check res
+        helper::assert_is_hnf(&res);
 
         assert_eq!(p.clone() * a, res);
         assert_eq!(p * pinv, DnsMat::eye(3));
+    }
+
+    #[test]
+    fn hnf_rand() {
+        use crate::math::matrix::sparse::CsMatExt;
+
+        let d = 0.5;
+        let shape = (8, 8);
+        let a = sprs::CsMat::<i64>::rand(shape, d);
+        let a = DnsMat::from(a.to_dense());
+
+        let mut calc = LLLHNFCalc::new(a.clone(), [true, true]);
+        calc.process();
+
+        let (res, Some(p), Some(pinv)) = calc.result() else { panic!() };
+
+        helper::assert_is_hnf(&res);
+        
+        assert_eq!(p.clone() * a, res);
+        assert_eq!(p * pinv, DnsMat::eye(shape.0));
     }
 
     mod helper { 
@@ -894,8 +924,46 @@ mod tests {
         use num_traits::Signed;
         use super::*;
         use crate::math::ext::int_ext::{Integer, IntOps};
+
+        pub fn assert_is_hnf<R>(b: &DnsMat<R>)
+        where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
+            use ndarray::s;
+
+            let (m, n) = b.shape();
+            let b = b.array();
+
+            let mut j0 = 0;
+            for i0 in 0..m {
+                let j1 = (0..n).filter(|&j| !b[[i0, j]].is_zero()).next().unwrap_or(n);
+
+                // assert: b[i0.., j0..j1] = 0
+                let s = s![i0..m, j0..j1];
+                assert!( b.slice(s).iter().all(|x| x.is_zero()) );
+
+                if j1 < n { 
+                    j0 = j1;
+
+                    // assert: b[i0+1.., j0] = 0
+                    let s = s![i0+1..m, j0];
+                    assert!( b.slice(s).iter().all(|x| x.is_zero()) );
+
+                    let a = &b[[i0, j0]];
+                    assert!( !a.is_zero() );
+                    assert!( a.normalizing_unit().is_one() );
+
+                    let a0 = (a * &a.conj()).as_int().unwrap();
+                    let s = s![0..i0, j0];
+                    assert!( b.slice(s).iter().all(|x| {
+                        let x0 = (x * &x.conj()).as_int().unwrap();
+                        x0 < a0
+                    }));
+                } else {
+                    break
+                }
+            }
+        }
     
-        pub fn is_reduced<R>(b: &ArrayView2<R>) -> bool
+        pub fn assert_is_reduced<R>(b: &ArrayView2<R>)
         where R: Integer + LLLRing, for<'x> &'x R: IntOps<R> + LLLRingOps<R> {
             let m = b.nrows();
     
@@ -911,10 +979,11 @@ mod tests {
                 is_lovasz_ok(c0, c1, m, &alpha)
             });
     
-            size_reduced && lovasz_ok
+            assert!(size_reduced);
+            assert!(lovasz_ok);
         }
     
-        pub fn is_lovasz_ok<R>(c0: &ArrayView1<Ratio<R>>, c1: &ArrayView1<Ratio<R>>, m: &Ratio<R>, alpha: &Ratio<R>) -> bool
+        fn is_lovasz_ok<R>(c0: &ArrayView1<Ratio<R>>, c1: &ArrayView1<Ratio<R>>, m: &Ratio<R>, alpha: &Ratio<R>) -> bool
         where R: Integer, for<'x> &'x R: IntOps<R> {
             let r0 = dot::<Ratio<R>>(c0, c0);
             let r1 = dot::<Ratio<R>>(c1, c1);

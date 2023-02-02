@@ -515,7 +515,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use ndarray::array;
     use crate::math::matrix::DnsMat;
     use super::*;
@@ -952,7 +952,7 @@ mod tests {
         assert_eq!(p * pinv, DnsMat::eye(shape.0));
     }
 
-    mod helper { 
+    pub(in super::super) mod helper { 
         use std::ops::Div;
         use num_rational::Ratio;
         use num_traits::Signed;

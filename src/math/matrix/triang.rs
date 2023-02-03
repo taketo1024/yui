@@ -34,6 +34,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 pub fn solve_triangular<R>(t: TriangularType, a: &CsMat<R>, y: &CsMat<R>) -> CsMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
+    let mut trip = TriMat::new(y.shape());
+    solve_triangular_with(t, a, y, |i, j, x|
+        trip.add_triplet(i, j, x)
+    );
+    trip.to_csc()
+}
+
+pub fn solve_triangular_with<R, F>(t: TriangularType, a: &CsMat<R>, y: &CsMat<R>, f: F)
+where 
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    F: FnMut(usize, usize, R) + Send + Sync
+{
     assert!(a.is_csc());
     assert!(y.is_csc());
     assert_eq!(a.rows(), y.rows());
@@ -46,23 +58,21 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     const MULTI_THREAD: bool = true;
     if MULTI_THREAD { 
-        solve_triangular_m(t, a, y)
+        solve_triangular_m(t, a, y, f)
     } else { 
-        solve_triangular_s(t, a, y)
+        solve_triangular_s(t, a, y, f)
     }
 }
 
-fn solve_triangular_s<R>(t: TriangularType, a: &CsMat<R>, y: &CsMat<R>) -> CsMat<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
+fn solve_triangular_s<R, F>(t: TriangularType, a: &CsMat<R>, y: &CsMat<R>, mut f: F)
+where 
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    F: FnMut(usize, usize, R)
+{
     info!("solve triangular: a = {:?}, y = {:?}", a.shape(), y.shape());
 
     let (n, k) = (a.rows(), y.cols());
     let diag = diag(t, &a);
-
-    let mut count = 0;
-    let mut indptr = vec![0];
-    let mut indices = vec![];
-    let mut data = vec![];
 
     let mut x = vec![R::zero(); n];
     let mut b = vec![R::zero(); n];
@@ -76,21 +86,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         for i in 0..n { 
             if x[i].is_zero() { continue }
+
             let x_i = replace(&mut x[i], R::zero());
-
-            count += 1;
-            indices.push(i);
-            data.push(x_i);
+            f(i, j, x_i);
         }
-
-        indptr.push(count);
     }
-
-    CsMat::new_csc((n, k), indptr, indices, data)
 }
 
-fn solve_triangular_m<R>(t: TriangularType, a: &CsMat<R>, y: &CsMat<R>) -> CsMat<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
+fn solve_triangular_m<R, F>(t: TriangularType, a: &CsMat<R>, y: &CsMat<R>, f: F)
+where 
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    F: FnMut(usize, usize, R) + Send + Sync
+{
     let nth = std::thread::available_parallelism().map(|x| x.get()).unwrap_or(1);
 
     info!("solve triangular: a = {:?}, y = {:?} (multi-thread: {nth})", a.shape(), y.shape());
@@ -101,9 +108,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let (n, k) = (a.rows(), y.cols());
     let diag = diag(t, &a);
 
-    let trip = Mutex::new( TriMat::new((n, k)) );
     let tls1 = Arc::new(ThreadLocal::new());
     let tls2 = Arc::new(ThreadLocal::new());
+    let f = Mutex::new(f);
 
     (0..k).into_par_iter().for_each(|j| { 
         let mut x_st = tls1.get_or(|| {
@@ -126,11 +133,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         solve_triangular_into(t, &a, &diag, b, x);
 
         { 
-            let mut trip = trip.lock().unwrap();
+            let mut f = f.lock().unwrap();
             for i in 0..n { 
                 if x[i].is_zero() { continue }
                 let x_i = replace(&mut x[i], R::zero());
-                trip.add_triplet(i, j, x_i);
+                f(i, j, x_i);
             }
         }
 
@@ -146,8 +153,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
         }
     });
-
-    trip.into_inner().unwrap().to_csc()
 }
 
 pub fn solve_triangular_vec<R>(t: TriangularType, a: &CsMat<R>, b: &CsVec<R>) -> CsVec<R>

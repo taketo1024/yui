@@ -57,6 +57,9 @@ where for<'x> &'x Self: LLLRingOps<Self> {
     fn alpha() -> (Self, Self);
     fn as_int(&self) -> Option<Self::Int>;
     fn conj(&self) -> Self;
+    fn norm(&self) -> Self { 
+        self * &self.conj()
+    }
 }
 
 // -- implementations of LLLRing -- //
@@ -152,6 +155,8 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     }
 
     fn iterate(&mut self) { 
+        trace!("step: {}.\n{}", self.data.step, self.data.dump());
+
         let k = self.data.step;
 
         self.data.reduce(k - 1, k);
@@ -196,7 +201,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     }
 
     fn iterate(&mut self) { 
-        trace!("step: {}", self.data.step);
+        trace!("step: {}.\n{}", self.data.step, self.data.dump());
 
         let k = self.data.step;
 
@@ -321,7 +326,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         let d2 = &d[k];
         let l0 = &l[[k, k - 1]];
 
-        let lhs = q * &(d0 * d2 + l0 * &l0.conj());
+        let lhs = q * &(d0 * d2 + l0.norm());
         let rhs = p * &(d1 * d1);
 
         let Some(lhs) = lhs.as_int() else { panic!() };
@@ -393,10 +398,10 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 
         let l0 = &self.lambda[[k,k-1]];
 
-        self.det[k-1] = &(d0 * d2 + l0 * &l0.conj()) / d1;
+        self.det[k-1] = &(d0 * d2 + l0.norm()) / d1;
         self.lambda[[k, k-1]] = l0.conj();
 
-        trace!("swap {},{}.\n{}", k-1, k, self.target);
+        trace!("swap {},{}.\n{}", k-1, k, self.dump());
     }
 
     fn mul_row(&mut self, i: Row, r: &R) { 
@@ -413,7 +418,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         self.lambda.mul_row(i, r);
         self.lambda.mul_col(i, &r.conj());
 
-        trace!("mul {} to row {}.\n{}", r, i, self.target);
+        trace!("mul {} to row {}.\n{}", r, i, self.dump());
     }
 
     fn add_row_to(&mut self, i: Row, k: Row, r: &R) {
@@ -435,7 +440,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
             self.lambda[[k, j]] += a;
         }
 
-        trace!("add-row {} to {}, mul {}.\n{}", i, k, r, self.target);
+        trace!("add-row {} to {}, mul {}.\n{}", i, k, r, self.dump());
     }
 
     fn nz_col_in(&self, i: Row) -> Option<Col> {
@@ -456,6 +461,10 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 
     fn rows(&self) -> usize { 
         self.target.nrows()
+    }
+
+    fn dump(&self) -> String { 
+        format!("target:\n{},\nlambda:\n{},\ndet: {:?}.", self.target, self.lambda, self.det)
     }
 }
 

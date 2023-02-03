@@ -131,9 +131,9 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
         use num_bigint::BigInt;
         use crate::math::types::quad_int::{GaussInt, EisenInt};
         preprocess_lll_for!(self, 
-            i32, i64, i128, BigInt, 
-            GaussInt<i32>, GaussInt<i64>, GaussInt<i128>, GaussInt<BigInt>, 
-            EisenInt<i32>, EisenInt<i64>, EisenInt<i128>, EisenInt<BigInt>
+            i64, i128, BigInt, 
+            GaussInt<i64>, GaussInt<i128>, GaussInt<BigInt>, 
+            EisenInt<i64>, EisenInt<i128>, EisenInt<BigInt>
         );
     }
 
@@ -803,10 +803,10 @@ mod tests {
     }
 
     #[test]
-    fn lll_preprocess() { 
+    fn lll_preprocess_i64() { 
         use super::super::lll::tests::helper::assert_is_hnf;
 
-        let a = DnsMat::from(array![
+        let a: DnsMat<i64> = DnsMat::from(array![
             [1, 0, 1, 0, 0, 1, 1, 0, 1],
             [0, 1, 3, 1, 0, 1, 0, 2, 0],
             [0, 0, 1, 1, 0, 0, 0, 5, 1],
@@ -829,15 +829,16 @@ mod tests {
     #[test]
     fn lll_preprocess_bigint() { 
         use super::super::lll::tests::helper::assert_is_hnf;
+        use num_bigint::BigInt;
 
-        let a = DnsMat::from(array![
+        let a: DnsMat<BigInt> = DnsMat::from(array![
             [1, 0, 1, 0, 0, 1, 1, 0, 1],
             [0, 1, 3, 1, 0, 1, 0, 2, 0],
             [0, 0, 1, 1, 0, 0, 0, 5, 1],
             [0, 1, 1, 0, 3, 0, 0, 0, 0],
             [0, 1, 0, 1, 0, 0, 1, 0, 1],
             [1, 0, 2, 0, 1, 1, 0, 1, 1]
-        ].map(|&a| num_bigint::BigInt::from(a)));
+        ].map(|&a| a.into()));
 
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.preprocess();

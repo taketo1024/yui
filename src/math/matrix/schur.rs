@@ -1,11 +1,11 @@
 use once_cell::sync::OnceCell;
-use sprs::{CsMat, CsVec};
+use sprs::{CsMat, CsVec, TriMat};
 
 use crate::math::matrix::sparse::CsVecExt;
 use crate::math::matrix::triang::TriangularType;
 use crate::math::traits::{Ring, RingOps};
 use super::sparse::CsMatExt;
-use super::triang::{inv_triangular, solve_triangular, solve_triangular_vec};
+use super::triang::{inv_triangular, solve_triangular_vec, solve_triangular_with};
 
 // A = [a b]  ~>  s = d - c a⁻¹ b.
 //     [c d]
@@ -56,11 +56,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     //   [c  id][x2]   [d].
     //
     pub fn complement(&self) -> CsMat<R> {
-        let r = self.ac.cols();
+        let (m, r) = self.ac.shape();
+        let k = self.bd.cols();
         let pinv = self.pinv();
-        let x = solve_triangular(TriangularType::Lower, pinv, &self.bd);
-        let [_, x2] = x.split_ver(r);
-        x2
+
+        let mut trip = TriMat::new((m - r, k));
+        solve_triangular_with(TriangularType::Lower, pinv, &self.bd, |i, j, x|
+            if i >= r { 
+                trip.add_triplet(i - r, j, x)
+            }
+        );
+        trip.to_csc()
     }
 
     // Given 

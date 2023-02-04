@@ -13,13 +13,14 @@ use crate::math::homology::utils::reducer::ChainReducer;
 use crate::math::matrix::sparse::CsMatExt;
 use crate::math::traits::{EucRing, EucRingOps};
 
-pub fn ss_invariant<R>(l: &Link, c: R, reduced: bool) -> i32
+pub fn ss_invariant<R>(l: &Link, c: &R, reduced: bool) -> i32
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
     if reduced && l.writhe() < 0 { 
+        info!("switch to mirror, w = {}.", l.writhe());
         return -ss_invariant(&l.mirror(), c, reduced)
     }
 
-    info!("compute ss, n = {}, c = {}.", l.crossing_num(), &c);
+    info!("compute ss, n = {}, c = {} ({}).", l.crossing_num(), c, std::any::type_name::<R>());
 
     let cpx = KhComplex::<R>::new(l.clone(), c.clone(), R::zero(), reduced);
     let z = cpx.canon_cycle();

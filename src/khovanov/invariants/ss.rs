@@ -15,6 +15,12 @@ use crate::math::traits::{EucRing, EucRingOps};
 
 pub fn ss_invariant<R>(l: &Link, c: R, reduced: bool) -> i32
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
+    if reduced && l.writhe() < 0 { 
+        return -ss_invariant(&l.mirror(), c, reduced)
+    }
+
+    info!("compute ss, n = {}, c = {}.", l.crossing_num(), &c);
+
     let cpx = KhComplex::<R>::new(l.clone(), c.clone(), R::zero(), reduced);
     let z = cpx.canon_cycle();
     let v = cpx[0].vectorize(&z);
@@ -31,6 +37,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     let w = l.writhe();
     let r = l.seifert_circles().len() as i32;
     let s = 2 * d + w - r + 1;
+
+    info!("d = {d}, w = {s}, r = {r}, s = {s}");
 
     s
 }

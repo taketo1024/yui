@@ -22,6 +22,9 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     calc.preprocess();
     calc.eliminate_all();
     calc.diag_normalize();
+
+    info!("snf done.\n{}", calc.target);
+
     calc.result()
 }
 

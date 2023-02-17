@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 use std::iter::{Sum, Product};
+use std::str::FromStr;
 use std::{fmt::Display};
 use std::ops::{Add, Neg, Sub, Mul, AddAssign, SubAssign, MulAssign, Rem, Div, RemAssign, DivAssign};
 use num_traits::{Zero, One};
@@ -101,6 +102,34 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
         Self::new(i, I::zero())
     }
 }
+
+impl<I, const D: i32> FromStr for QuadInt<I, D>
+where I: Integer + FromStr, for<'x> &'x I: IntOps<I> {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Ok(a) = s.parse::<I>() {
+            Ok(Self::from(a))
+        } else if let Ok((a, b)) = parse_tuple::<I, I>(s) { 
+            Ok(Self::new(a, b))
+        } else { 
+            Err(())
+        }
+    }
+}
+
+fn parse_tuple<I, J>(s: &str) -> Result<(I, J), ()>
+where I: FromStr, J: FromStr {
+    let r = regex::Regex::new(r"\((.+)?,\s*(.+)?\)").unwrap();
+    if let Some(c) = r.captures(&s) { 
+        let (s1, s2) = (&c[1], &c[2]);
+        if let (Ok(a), Ok(b)) = (s1.parse::<I>(), s2.parse::<J>()) {
+            return Ok((a, b))
+        }
+    }
+    Err(())
+}
+ 
 
 impl<I, const D: i32> Display for QuadInt<I, D>
 where I: Integer, for<'x> &'x I: IntOps<I> {

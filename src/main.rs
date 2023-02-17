@@ -28,6 +28,17 @@ enum Commands {
         #[arg(short, long)]
         output: Option<String>,
     },
+
+    SSBatch {
+        targets: String,
+        c_value: String,
+        
+        #[arg(short = 't', long, default_value_t = ss::CType::i64)]
+        c_type: ss::CType,
+
+        #[arg(short, long)]
+        output: Option<String>,
+    },
 }
 
 fn main() {
@@ -41,13 +52,16 @@ fn main() {
         guard_panic(||
             match args.command { 
             Commands::SS { name, c_value, c_type, data, output } 
-                => ss::run(name, c_value, c_type, data, output)
+                => ss::run_single(name, c_value, c_type, data, output),
+            Commands::SSBatch { targets, c_value, c_type, output }
+                => ss::run_batch(targets, c_value, c_type, output)
             }
         )
     );
 
-    if res.is_ok() { 
+    if let Ok(res) = res { 
         info!("time: {:?}", time);
+        println!("{res}");
         std::process::exit(0)
 
     } else if let Err(e) = res { 
@@ -66,29 +80,52 @@ mod ss {
     #[allow(non_camel_case_types)]
     #[derive(Clone, ValueEnum, Debug, Display)]
     pub enum CType { 
-        i32, i64, i128, bigint, gauss, eisen
+        i64, i128, bigint, 
+        gauss, gauss_128, gauss_big,
+        eisen, eisen_128, eisen_big,
     }
 
-    pub fn run(name: String, c_value: String, c_type: CType, data: Option<String>, output: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn run_single(name: String, c_value: String, c_type: CType, data: Option<String>, output: Option<String>) -> Result<String, Box<dyn std::error::Error>> {
+        let l = load_link(&name, &data)?;
+        run(&name, &l, &c_value, &c_type, &output)
+    }
+
+    pub fn run_batch(targets: String, c_value: String, c_type: CType, output: Option<String>) -> Result<String, Box<dyn std::error::Error>> {
+        let data = load_data(&targets)?;
+        let mut all_res = String::from("");
+
+        for (name, code) in data { 
+            let l = Link::from(&code);
+            let res = run(&name, &l, &c_value, &c_type, &output)?;
+
+            if !all_res.is_empty() { 
+                all_res += "\n";
+            }
+            all_res += &format!("{name}: {res}");
+        }
+        
+        Ok(all_res)
+    }
+
+    fn run(name: &String, link: &Link, c_value: &String, c_type: &CType, output: &Option<String>) -> Result<String, Box<dyn std::error::Error>> {
         info!("compute ss: {name}, c = {c_value}");
 
-        let l = load_link(&name, &data)?;
         let res = guard_panic(|| 
-            compute_ss(&l, &c_value, &c_type)
+            compute_ss(name, link, c_value, c_type)
         );
 
         if let Ok(s) = res { 
-            info!("result: {name}, c = {c_value}: s = {s}");
+            info!("{name}: s = {s} (c = {c_value})")
         }
 
         if let Some(output) = output { 
             write_res(&name, &c_value, &res, &output)?;
         }
 
-        res.map(|_| ())
+        res.map(|s| s.to_string() )
     }
 
-    macro_rules! compute_ss_int {
+    macro_rules! ss_parse {
         ($l:expr, $c_value: expr, $t:ty) => {{
             if let Ok(c) = $c_value.parse::<$t>() { 
                 Ok( ss_invariant($l, &c, true) )
@@ -98,16 +135,22 @@ mod ss {
         }};
     }
 
-    fn compute_ss(l: &Link, c_value: &String, c_type: &CType) -> Result<i32, Box<dyn std::error::Error>> { 
+    fn compute_ss(name: &String, l: &Link, c_value: &String, c_type: &CType) -> Result<i32, Box<dyn std::error::Error>> { 
         use num_bigint::BigInt;
-        // use yui::math::types::quad_int::{GaussInt, EisenInt};
+        use yui::math::types::quad_int::{GaussInt, EisenInt};
+
+        info!("compute ss: {name}, c = {c_value}");
 
         match c_type { 
-            CType::i32    => compute_ss_int!(l, c_value, i32),
-            CType::i64    => compute_ss_int!(l, c_value, i64),
-            CType::i128   => compute_ss_int!(l, c_value, i128),
-            CType::bigint => compute_ss_int!(l, c_value, BigInt),
-            _ => err!("invalid c-type: {c_type}.")
+            CType::i64        => ss_parse!(l, c_value, i64),
+            CType::i128       => ss_parse!(l, c_value, i128),
+            CType::bigint     => ss_parse!(l, c_value, BigInt),
+            CType::gauss      => ss_parse!(l, c_value, GaussInt<i64>), 
+            CType::gauss_128  => ss_parse!(l, c_value, GaussInt<i128>), 
+            CType::gauss_big  => ss_parse!(l, c_value, GaussInt<BigInt>), 
+            CType::eisen      => ss_parse!(l, c_value, EisenInt<i64>), 
+            CType::eisen_128  => ss_parse!(l, c_value, EisenInt<i128>), 
+            CType::eisen_big  => ss_parse!(l, c_value, EisenInt<BigInt>), 
         }
     }
 
@@ -142,16 +185,21 @@ mod ss {
     }
 }
 
-fn load_link(name: &String, path: &Option<String>) -> Result<yui::links::Link, Box<dyn std::error::Error>> { 
-    use indexmap::IndexMap;
-    use yui::links::{Link, links::Edge};
-    type Data = IndexMap<String, Vec<[Edge; 4]>>;
+use indexmap::IndexMap;
+use yui::links::{Link, links::Edge};
 
+type Data = IndexMap<String, Vec<[Edge; 4]>>;
+fn load_data(path: &String) -> Result<Data, Box<dyn std::error::Error>> { 
+    let json = std::fs::read_to_string(path)?;
+    let data: Data = serde_json::from_str(&json)?;
+    Ok(data)
+}
+
+fn load_link(name: &String, path: &Option<String>) -> Result<Link, Box<dyn std::error::Error>> { 
     if let Ok(l) = Link::load(&name) { 
         Ok(l)
     } else if let Some(path) = path {
-        let json = std::fs::read_to_string(path)?;
-        let data: Data = serde_json::from_str(&json)?;
+        let data = load_data(path)?;
         let Some(code) = data.get(name) else { 
             return err!("{name} not found in file: {path}")
         };

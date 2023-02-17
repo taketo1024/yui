@@ -2,12 +2,14 @@
 name = "yui"
 version = "0.1.0"
 edition = "2021"
+authors = ["Taketo Sano <taketo1024@gmail.com>"]
 
 [profile.release]
 debug = true
 overflow-checks = true
 
 [dependencies]
+clap = { version = "4.1.6", features = ["derive", "cargo"] }
 csv = "1.1.6"
 derive_more = "0.99.17"
 either = "1.8.0"

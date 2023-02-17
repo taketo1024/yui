@@ -15,6 +15,9 @@ use crate::math::traits::{EucRing, EucRingOps};
 
 pub fn ss_invariant<R>(l: &Link, c: &R, reduced: bool) -> i32
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
+    assert!(!c.is_zero());
+    assert!(!c.is_unit());
+
     if reduced && l.writhe() < 0 { 
         info!("switch to mirror, w = {}.", l.writhe());
         return -ss_invariant(&l.mirror(), c, reduced)

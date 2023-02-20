@@ -17,13 +17,15 @@ struct Cli {
 enum Commands {
     SS {
         name: String,
+
+        #[arg(short, long)]
+        link: Option<String>,
+
+        #[arg(short, long)]
         c_value: String,
 
         #[arg(short = 't', long, default_value_t = ss::CType::i64)]
         c_type: ss::CType,
-
-        #[arg(short, long)]
-        data: Option<String>,
 
         #[arg(short, long)]
         output: Option<String>,
@@ -51,8 +53,8 @@ fn main() {
     let (res, time) = measure(|| 
         guard_panic(||
             match args.command { 
-            Commands::SS { name, c_value, c_type, data, output } 
-                => ss::run_single(name, c_value, c_type, data, output),
+            Commands::SS { name, link, c_value, c_type, output } 
+                => ss::run_single(name, link, c_value, c_type, output),
             Commands::SSBatch { targets, c_value, c_type, output }
                 => ss::run_batch(targets, c_value, c_type, output)
             }
@@ -85,8 +87,8 @@ mod ss {
         eisen, eisen_128, eisen_big,
     }
 
-    pub fn run_single(name: String, c_value: String, c_type: CType, data: Option<String>, output: Option<String>) -> Result<String, Box<dyn std::error::Error>> {
-        let l = load_link(&name, &data)?;
+    pub fn run_single(name: String, link: Option<String>, c_value: String, c_type: CType, output: Option<String>) -> Result<String, Box<dyn std::error::Error>> {
+        let l = load_link(&name, &link)?;
         run(&name, &l, &c_value, &c_type, &output)
     }
 
@@ -188,24 +190,23 @@ mod ss {
 use indexmap::IndexMap;
 use yui::links::{Link, links::Edge};
 
-type Data = IndexMap<String, Vec<[Edge; 4]>>;
+type PDCode = Vec<[Edge; 4]>;
+type Data = IndexMap<String, PDCode>;
+
 fn load_data(path: &String) -> Result<Data, Box<dyn std::error::Error>> { 
     let json = std::fs::read_to_string(path)?;
     let data: Data = serde_json::from_str(&json)?;
     Ok(data)
 }
 
-fn load_link(name: &String, path: &Option<String>) -> Result<Link, Box<dyn std::error::Error>> { 
-    if let Ok(l) = Link::load(&name) { 
+fn load_link(name: &String, pd_code: &Option<String>) -> Result<Link, Box<dyn std::error::Error>> { 
+    if let Some(pd_code) = pd_code { 
+        let pd_code: PDCode = serde_json::from_str(&pd_code)?;
+        let l = Link::from(&pd_code);
         Ok(l)
-    } else if let Some(path) = path {
-        let data = load_data(path)?;
-        let Some(code) = data.get(name) else { 
-            return err!("{name} not found in file: {path}")
-        };
-        let l = Link::from(code);
+    } else if let Ok(l) = Link::load(&name) { 
         Ok(l)
-    } else { 
+    } else {
         err!("cannot load {name}")
     }
 }

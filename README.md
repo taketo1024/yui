@@ -15,6 +15,8 @@ Options:
       --reduced            
       --bigraded           
 ```
+
+### Example 1 
   
 ```sh
 $ cargo run -r -- kh 3_1 --bigraded
@@ -29,6 +31,8 @@ j\i  -3  -2     -1  0
 
 Note: Any link can be given by the pd-code via `-l [[e1, e2, e3, e4], ...]` option. 
 
+### Example 2 (reduced)
+
 ```sh
 $ cargo run -r -- kh 3_1 --bigraded --reduced
 
@@ -40,6 +44,8 @@ j\i  -3  -2  -1  0
  -8   Z            
 ```
 
+### Example 3 (Lee homology)
+
 ```sh
 $ cargo run -r -- kh 3_1 -c 2
 
@@ -50,6 +56,8 @@ H[0]: Z²
 ```
 
 Note: Lee = `c = 2`, Bar-Natan = `c = 1`.
+
+### Example 4 (various coefficients)
 
 ```sh
 $ cargo run -r -- kh 3_1 -c "(1,1)" -t gauss

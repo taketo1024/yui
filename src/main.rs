@@ -74,10 +74,13 @@ fn main() {
 }
 
 mod ss { 
+    use std::str::FromStr;
+
     use super::*;
     use yui::links::Link;
     use yui::khovanov::invariants::ss::ss_invariant;
     use derive_more::Display;
+    use yui::math::traits::{EucRing, EucRingOps};
 
     #[allow(non_camel_case_types)]
     #[derive(Clone, ValueEnum, Debug, Display)]
@@ -85,6 +88,7 @@ mod ss {
         i64, i128, bigint, 
         gauss, gauss_128, gauss_big,
         eisen, eisen_128, eisen_big,
+        none
     }
 
     pub fn run_single(name: String, link: Option<String>, c_value: String, c_type: CType, output: Option<String>) -> Result<String, Box<dyn std::error::Error>> {
@@ -113,7 +117,7 @@ mod ss {
         info!("compute ss: {name}, c = {c_value}");
 
         let res = guard_panic(|| 
-            compute_ss(name, link, c_value, c_type)
+            compute_ss_switch(link, c_value, c_type)
         );
 
         if let Ok(s) = res { 
@@ -127,32 +131,30 @@ mod ss {
         res.map(|s| s.to_string() )
     }
 
-    macro_rules! ss_parse {
-        ($l:expr, $c_value: expr, $t:ty) => {{
-            if let Ok(c) = $c_value.parse::<$t>() { 
-                Ok( ss_invariant($l, &c, true) )
-            } else { 
-                err!("invalid c: {} as type: {}.", $c_value, std::any::type_name::<$t>())
-            }
-        }};
-    }
-
-    fn compute_ss(name: &String, l: &Link, c_value: &String, c_type: &CType) -> Result<i32, Box<dyn std::error::Error>> { 
+    fn compute_ss_switch(l: &Link, c_value: &String, c_type: &CType) -> Result<i32, Box<dyn std::error::Error>> {
         use num_bigint::BigInt;
         use yui::math::types::quad_int::{GaussInt, EisenInt};
 
-        info!("compute ss: {name}, c = {c_value}");
-
         match c_type { 
-            CType::i64        => ss_parse!(l, c_value, i64),
-            CType::i128       => ss_parse!(l, c_value, i128),
-            CType::bigint     => ss_parse!(l, c_value, BigInt),
-            CType::gauss      => ss_parse!(l, c_value, GaussInt<i64>), 
-            CType::gauss_128  => ss_parse!(l, c_value, GaussInt<i128>), 
-            CType::gauss_big  => ss_parse!(l, c_value, GaussInt<BigInt>), 
-            CType::eisen      => ss_parse!(l, c_value, EisenInt<i64>), 
-            CType::eisen_128  => ss_parse!(l, c_value, EisenInt<i128>), 
-            CType::eisen_big  => ss_parse!(l, c_value, EisenInt<BigInt>), 
+            CType::i64        => compute_ss::<i64>(l, c_value),
+            CType::i128       => compute_ss::<i128>(l, c_value),
+            CType::bigint     => compute_ss::<BigInt>(l, c_value),
+            CType::gauss      => compute_ss::<GaussInt<i64>>(l, c_value), 
+            CType::gauss_128  => compute_ss::<GaussInt<i128>>(l, c_value), 
+            CType::gauss_big  => compute_ss::<GaussInt<BigInt>>(l, c_value), 
+            CType::eisen      => compute_ss::<EisenInt<i64>>(l, c_value), 
+            CType::eisen_128  => compute_ss::<EisenInt<i128>>(l, c_value), 
+            CType::eisen_big  => compute_ss::<EisenInt<BigInt>>(l, c_value), 
+            _ => err!("")
+        }
+    }
+
+    fn compute_ss<R>(l: &Link, c_value: &String) -> Result<i32, Box<dyn std::error::Error>>
+    where R: EucRing + FromStr, for<'x> &'x R: EucRingOps<R> { 
+        if let Ok(c) = c_value.parse::<R>() { 
+            Ok( ss_invariant(l, &c, true) )
+        } else { 
+            err!("cannot parse c: '{}' as type: {}.", c_value, std::any::type_name::<R>())
         }
     }
 

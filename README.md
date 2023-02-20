@@ -44,7 +44,7 @@ j\i  -3  -2  -1  0
  -8   Z            
 ```
 
-### Example 3 (Lee homology)
+### Example 3 (Lee homology, Bar-Natan homology, etc)
 
 ```sh
 $ cargo run -r -- kh 3_1 -c 2

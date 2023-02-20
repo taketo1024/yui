@@ -115,27 +115,9 @@ mod kh {
         let l = load_link(&name, &link)?;
 
         if bigraded { 
-            compute_bigraded_switch(l, &c_value, &c_type, reduced)
+            dispatch!(compute_bigraded, &c_type, l, &c_value, reduced)
         } else { 
-            compute_homology_switch(l, &c_value, &c_type, reduced)
-        }
-    }
-
-    fn compute_bigraded_switch(l: Link, c_value: &String, c_type: &CType, reduced: bool) -> Result<String, Box<dyn std::error::Error>> {
-        use num_bigint::BigInt;
-        use yui::math::types::quad_int::{GaussInt, EisenInt};
-
-        match c_type { 
-            CType::i64        => compute_bigraded::<i64>(l, c_value, reduced),
-            CType::i128       => compute_bigraded::<i128>(l, c_value, reduced),
-            CType::bigint     => compute_bigraded::<BigInt>(l, c_value, reduced),
-            CType::gauss      => compute_bigraded::<GaussInt<i64>>(l, c_value, reduced), 
-            CType::gauss_128  => compute_bigraded::<GaussInt<i128>>(l, c_value, reduced), 
-            CType::gauss_big  => compute_bigraded::<GaussInt<BigInt>>(l, c_value, reduced), 
-            CType::eisen      => compute_bigraded::<EisenInt<i64>>(l, c_value, reduced), 
-            CType::eisen_128  => compute_bigraded::<EisenInt<i128>>(l, c_value, reduced), 
-            CType::eisen_big  => compute_bigraded::<EisenInt<BigInt>>(l, c_value, reduced), 
-            _ => err!("")
+            dispatch!(compute_homology, &c_type, l, &c_value, reduced)
         }
     }
 
@@ -150,24 +132,6 @@ mod kh {
             Ok(table)
         } else { 
             err!("cannot parse c: '{}' as type: {}.", c_value, std::any::type_name::<R>())
-        }
-    }
-
-    fn compute_homology_switch(l: Link, c_value: &String, c_type: &CType, reduced: bool) -> Result<String, Box<dyn std::error::Error>> {
-        use num_bigint::BigInt;
-        use yui::math::types::quad_int::{GaussInt, EisenInt};
-
-        match c_type { 
-            CType::i64        => compute_homology::<i64>(l, c_value, reduced),
-            CType::i128       => compute_homology::<i128>(l, c_value, reduced),
-            CType::bigint     => compute_homology::<BigInt>(l, c_value, reduced),
-            CType::gauss      => compute_homology::<GaussInt<i64>>(l, c_value, reduced), 
-            CType::gauss_128  => compute_homology::<GaussInt<i128>>(l, c_value, reduced), 
-            CType::gauss_big  => compute_homology::<GaussInt<BigInt>>(l, c_value, reduced), 
-            CType::eisen      => compute_homology::<EisenInt<i64>>(l, c_value, reduced), 
-            CType::eisen_128  => compute_homology::<EisenInt<i128>>(l, c_value, reduced), 
-            CType::eisen_big  => compute_homology::<EisenInt<BigInt>>(l, c_value, reduced), 
-            _ => err!("")
         }
     }
 
@@ -216,7 +180,7 @@ mod ss {
         info!("compute ss: {name}, c = {c_value}");
 
         let res = guard_panic(|| 
-            compute_ss_switch(link, c_value, c_type)
+            dispatch!(compute_ss, c_type, link, c_value)
         );
 
         if let Ok(s) = res { 
@@ -228,24 +192,6 @@ mod ss {
         }
 
         res.map(|s| s.to_string() )
-    }
-
-    fn compute_ss_switch(l: &Link, c_value: &String, c_type: &CType) -> Result<i32, Box<dyn std::error::Error>> {
-        use num_bigint::BigInt;
-        use yui::math::types::quad_int::{GaussInt, EisenInt};
-
-        match c_type { 
-            CType::i64        => compute_ss::<i64>(l, c_value),
-            CType::i128       => compute_ss::<i128>(l, c_value),
-            CType::bigint     => compute_ss::<BigInt>(l, c_value),
-            CType::gauss      => compute_ss::<GaussInt<i64>>(l, c_value), 
-            CType::gauss_128  => compute_ss::<GaussInt<i128>>(l, c_value), 
-            CType::gauss_big  => compute_ss::<GaussInt<BigInt>>(l, c_value), 
-            CType::eisen      => compute_ss::<EisenInt<i64>>(l, c_value), 
-            CType::eisen_128  => compute_ss::<EisenInt<i128>>(l, c_value), 
-            CType::eisen_big  => compute_ss::<EisenInt<BigInt>>(l, c_value), 
-            _ => err!("")
-        }
     }
 
     fn compute_ss<R>(l: &Link, c_value: &String) -> Result<i32, Box<dyn std::error::Error>>
@@ -344,6 +290,28 @@ where F: FnOnce() -> Result<R, Box<dyn std::error::Error>> + std::panic::UnwindS
         err!("panic: {info}")
     })
 }
+
+use num_bigint::BigInt;
+use yui::math::types::quad_int::{GaussInt, EisenInt};
+
+macro_rules! dispatch {
+    ($method:ident, $c_type:expr $(, $args:expr)*) => {
+        match $c_type { 
+            CType::i64        => $method::<i64>($($args),*),
+            CType::i128       => $method::<i128>($($args),*),
+            CType::bigint     => $method::<BigInt>($($args),*),
+            CType::gauss      => $method::<GaussInt<i64>>($($args),*), 
+            CType::gauss_128  => $method::<GaussInt<i128>>($($args),*), 
+            CType::gauss_big  => $method::<GaussInt<BigInt>>($($args),*), 
+            CType::eisen      => $method::<EisenInt<i64>>($($args),*), 
+            CType::eisen_128  => $method::<EisenInt<i128>>($($args),*), 
+            CType::eisen_big  => $method::<EisenInt<BigInt>>($($args),*), 
+            _ => err!("cannot dispatch {} for c-type: {}", stringify!($method), $c_type)
+        }
+    };
+}
+
+pub(crate) use dispatch;
 
 #[derive(Debug, derive_more::Display)]
 struct Error(String);

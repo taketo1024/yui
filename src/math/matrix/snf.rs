@@ -28,6 +28,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     calc.result()
 }
 
+#[derive(Debug)]
 pub struct SnfResult<R>
 where R: EucRing, for<'a> &'a R: EucRingOps<R> { 
     result: DnsMat<R>,
@@ -95,6 +96,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
 
 // -- private -- //
 
+#[derive(Debug)]
 struct SnfCalc<R>
 where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     target: DnsMat<R>,
@@ -401,7 +403,7 @@ impl<R> SnfCalc<R>
 where R: LLLRing, for<'a> &'a R: LLLRingOps<R> {
     fn preprocess_lll(&mut self) {
         let flag = [self.p.is_some(), self.pinv.is_some()];
-
+        
         let b = std::mem::take(&mut self.target);
         let (res, p, pinv) = lll_hnf_in_place(b, flag);
 

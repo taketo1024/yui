@@ -288,8 +288,8 @@ impl<R> LLLData<R>
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     fn new(target: DnsMat<R>, flags: [bool; 2]) -> Self { 
         let m = target.nrows();
-        let p = if flags[0] { Some(DnsMat::eye(m)) } else { None };
-        let pinv = if flags[0] { Some(DnsMat::eye(m)) } else { None };
+        let p =    if flags[0] { Some(DnsMat::eye(m)) } else { None };
+        let pinv = if flags[1] { Some(DnsMat::eye(m)) } else { None };
         let det = vec![R::one(); m];
         let lambda = DnsMat::zero((m, m)); // lower-triangular
 
@@ -552,6 +552,30 @@ pub(super) mod tests {
             [16, 0, 0],
             [17,69, 0]
         ]);
+    }
+
+    #[test]
+    fn data_init() { 
+        let a = DnsMat::from(array![
+            [1,-1, 3],
+            [1, 0, 5],
+            [1, 2, 6]
+        ]);
+
+        let data = LLLData::new(a.clone(), [false, false]);
+        assert_eq!(data.target, a);
+        assert_eq!(data.p, None);
+        assert_eq!(data.pinv, None);
+
+        let data = LLLData::new(a.clone(), [true, false]);
+        assert_eq!(data.target, a);
+        assert_eq!(data.p, Some(DnsMat::eye(3)));
+        assert_eq!(data.pinv, None);
+
+        let data = LLLData::new(a.clone(), [false, true]);
+        assert_eq!(data.target, a);
+        assert_eq!(data.p, None);
+        assert_eq!(data.pinv, Some(DnsMat::eye(3)));
     }
     
     #[test]

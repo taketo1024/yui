@@ -135,6 +135,15 @@ where
     }
 }
 
+// Fields
+
+pub trait FieldOps<T = Self>: EucRingOps<T>{}
+
+pub trait Field: EucRing + FieldOps
+where for<'a> &'a Self: FieldOps<Self> {}
+
+// R-Modules
+
 pub trait RModOps<R, S, T>: AddGrpOps<T> + Mul<S, Output = T>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>, 

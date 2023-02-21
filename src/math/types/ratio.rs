@@ -1,8 +1,11 @@
-use std::{ops::{Mul, Add, Sub, Neg, AddAssign, SubAssign, MulAssign, Div, DivAssign, Rem, RemAssign}, iter::{Sum, Product}, fmt::Display, cmp, str::FromStr};
-
+use std::fmt::Display;
+use std::str::FromStr;
+use std::cmp;
+use std::iter::{Sum, Product};
+use std::ops::{Mul, Add, Sub, Neg, AddAssign, SubAssign, MulAssign, Div, DivAssign, Rem, RemAssign};
 use num_traits::{Zero, One};
-
-use crate::math::{traits::{EucRing, EucRingOps, AlgBase, Mon, AddMon, AddGrp, AddMonOps, AddGrpOps, MonOps, RingOps, Ring}, ext::int_ext::{Integer, IntOps}};
+use crate::math::ext::int_ext::{Integer, IntOps};
+use crate::math::traits::{EucRing, EucRingOps, AlgBase, Mon, AddMon, AddGrp, AddMonOps, AddGrpOps, MonOps, RingOps, Ring, FieldOps, Field};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Ratio<T> {
@@ -234,6 +237,7 @@ decl_alg_ops!(AddGrpOps);
 decl_alg_ops!(MonOps);
 decl_alg_ops!(RingOps);
 decl_alg_ops!(EucRingOps);
+decl_alg_ops!(FieldOps);
 
 impl<T> AlgBase for Ratio<T> 
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {
@@ -282,6 +286,9 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
 }
 
 impl<T> EucRing for Ratio<T> 
+where T: EucRing, for<'x> &'x T: EucRingOps<T> {}
+
+impl<T> Field for Ratio<T> 
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {}
 
 impl<T> Ratio<T>

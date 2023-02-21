@@ -100,7 +100,7 @@ decl_alg_ops!(FieldOps);
 
 impl<const p: I> AlgBase for FF<p> {
     fn symbol() -> String {
-        format!("F{p}")
+        format!("F{}", crate::utils::format::subscript(p as isize))
     }
 }
 

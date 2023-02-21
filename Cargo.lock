@@ -479,18 +479,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "num-rational"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0638a1c9d0a3c0914158145bc76cff373a75a627e6ecbfb71cbe6f453a5a19b0"
-dependencies = [
- "autocfg",
- "num-bigint",
- "num-integer",
- "num-traits",
-]
-
-[[package]]
 name = "num-traits"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1044,9 +1032,6 @@ dependencies = [
  "log",
  "ndarray",
  "num-bigint",
- "num-complex 0.4.3",
- "num-integer",
- "num-rational",
  "num-traits",
  "once_cell",
  "parking_lot",

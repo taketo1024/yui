@@ -286,13 +286,27 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {}
 
 impl<T> Ratio<T>
 where T: Integer, for<'x> &'x T: IntOps<T> {
-    // TODO
+    pub fn abs(&self) -> Self {
+        if self.numer.is_negative() { 
+            -self
+        } else { 
+            self.clone()
+        }
+    }
+
+    pub fn to_f64(&self) -> f64 { 
+        let p = self.numer.to_f64().unwrap();
+        let q = self.denom.to_f64().unwrap();
+        p / q
+    }
 }
 
 impl<T> Ord for Ratio<T>
 where T: Integer, for<'x> &'x T: IntOps<T> {
-    fn cmp(&self, _other: &Self) -> cmp::Ordering {
-        todo!()
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        let l = self.to_f64();
+        let r = other.to_f64();
+        l.total_cmp(&r)
     }
 }
 
@@ -551,5 +565,12 @@ mod tests {
 
         let a = Ratio::<i32>::zero();
         assert_eq!(a.normalizing_unit(), Ratio::one());
+    }
+
+    #[test]
+    fn cmp() { 
+        let a = Ratio::new(3, 5);
+        let b = Ratio::new(4, 7);
+        assert!(a > b);
     }
 }

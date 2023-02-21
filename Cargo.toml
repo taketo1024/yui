@@ -9,6 +9,7 @@ debug = true
 overflow-checks = true
 
 [dependencies]
+auto-impl-ops = "0.1.1"
 clap = { version = "4.1.6", features = ["derive", "cargo"] }
 csv = "1.1.6"
 derive_more = "0.99.17"

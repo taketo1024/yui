@@ -5,10 +5,12 @@ use simplelog::*;
 #[allow(non_camel_case_types)]
 #[derive(Clone, ValueEnum, Debug, derive_more::Display)]
 pub enum CType { 
-    i64, i128, bigint, 
-    gauss, gauss_128, gauss_big,
-    eisen, eisen_128, eisen_big,
-    none
+    Z, Z_128, Z_big, 
+    Q, Q_128, Q_big, 
+    F2, F3, F5, F7,
+    Gauss, Gauss_128, Gauss_big,
+    Eisen, Eisen_128, Eisen_big,
+    None
 }
 
 #[derive(Parser, Debug)]
@@ -33,13 +35,16 @@ enum Commands {
         #[arg(short, long, default_value = "0")]
         c_value: String,
 
-        #[arg(short = 't', long, default_value_t = CType::i64)]
+        #[arg(short = 't', long, default_value = "z")]
         c_type: CType,
 
-        #[arg(long)]
+        #[arg(short, long)]
+        mirror: bool,
+
+        #[arg(short, long)]
         reduced: bool,
 
-        #[arg(long)]
+        #[arg(short, long)]
         bigraded: bool,
     },
 
@@ -52,7 +57,7 @@ enum Commands {
         #[arg(short, long)]
         c_value: String,
 
-        #[arg(short = 't', long, default_value_t = CType::i64)]
+        #[arg(short = 't', long, default_value = "z")]
         c_type: CType,
 
         #[arg(short, long)]
@@ -63,7 +68,7 @@ enum Commands {
         targets: String,
         c_value: String,
         
-        #[arg(short = 't', long, default_value_t = CType::i64)]
+        #[arg(short = 't', long, default_value = "z")]
         c_type: CType,
 
         #[arg(short, long)]
@@ -81,8 +86,8 @@ fn main() {
     let (res, time) = measure(|| 
         guard_panic(||
             match args.command { 
-            Commands::Kh { name, link, c_value, c_type, reduced, bigraded }
-                => kh::run(name, link, c_value, c_type, reduced, bigraded),
+            Commands::Kh { name, link, c_value, c_type, mirror, reduced, bigraded }
+                => kh::run(name, link, c_value, c_type, mirror, reduced, bigraded),
             Commands::SS { name, link, c_value, c_type, output } 
                 => ss::run_single(name, link, c_value, c_type, output),
             Commands::SSBatch { targets, c_value, c_type, output }
@@ -111,8 +116,11 @@ mod kh {
     use yui::math::traits::{EucRing, EucRingOps};
     use super::*;
 
-    pub fn run(name: String, link: Option<String>, c_value: String, c_type: CType, reduced: bool, bigraded: bool) -> Result<String, Box<dyn std::error::Error>> {
-        let l = load_link(&name, &link)?;
+    pub fn run(name: String, link: Option<String>, c_value: String, c_type: CType, mirror: bool, reduced: bool, bigraded: bool) -> Result<String, Box<dyn std::error::Error>> {
+        let mut l = load_link(&name, &link)?;
+        if mirror { 
+            l = l.mirror();
+        }
 
         if bigraded { 
             dispatch!(compute_bigraded, &c_type, l, &c_value, reduced)
@@ -293,19 +301,27 @@ where F: FnOnce() -> Result<R, Box<dyn std::error::Error>> + std::panic::UnwindS
 
 use num_bigint::BigInt;
 use yui::math::types::quad_int::{GaussInt, EisenInt};
+use yui::math::types::{ratio::Ratio, fin_field::FF};
 
 macro_rules! dispatch {
     ($method:ident, $c_type:expr $(, $args:expr)*) => {
         match $c_type { 
-            CType::i64        => $method::<i64>($($args),*),
-            CType::i128       => $method::<i128>($($args),*),
-            CType::bigint     => $method::<BigInt>($($args),*),
-            CType::gauss      => $method::<GaussInt<i64>>($($args),*), 
-            CType::gauss_128  => $method::<GaussInt<i128>>($($args),*), 
-            CType::gauss_big  => $method::<GaussInt<BigInt>>($($args),*), 
-            CType::eisen      => $method::<EisenInt<i64>>($($args),*), 
-            CType::eisen_128  => $method::<EisenInt<i128>>($($args),*), 
-            CType::eisen_big  => $method::<EisenInt<BigInt>>($($args),*), 
+            CType::Z          => $method::<i64>($($args),*),
+            CType::Z_128      => $method::<i128>($($args),*),
+            CType::Z_big      => $method::<BigInt>($($args),*),
+            CType::Q          => $method::<Ratio<i64>>($($args),*),
+            CType::Q_128      => $method::<Ratio<i128>>($($args),*),
+            CType::Q_big      => $method::<Ratio<BigInt>>($($args),*),
+            CType::F2         => $method::<FF<2>>($($args),*),
+            CType::F3         => $method::<FF<3>>($($args),*),
+            CType::F5         => $method::<FF<5>>($($args),*),
+            CType::F7         => $method::<FF<7>>($($args),*),
+            CType::Gauss      => $method::<GaussInt<i64>>($($args),*), 
+            CType::Gauss_128  => $method::<GaussInt<i128>>($($args),*), 
+            CType::Gauss_big  => $method::<GaussInt<BigInt>>($($args),*), 
+            CType::Eisen      => $method::<EisenInt<i64>>($($args),*), 
+            CType::Eisen_128  => $method::<EisenInt<i128>>($($args),*), 
+            CType::Eisen_big  => $method::<EisenInt<BigInt>>($($args),*), 
             _ => err!("cannot dispatch {} for c-type: {}", stringify!($method), $c_type)
         }
     };

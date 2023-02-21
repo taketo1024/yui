@@ -2,9 +2,9 @@ use num_bigint::BigInt;
 use num_traits::{One, Signed};
 use super::super::traits::*;
 
-pub trait IntOps<T>: EucRingOps<T> {}
+pub trait IntOps<T = Self>: EucRingOps<T> {}
 
-pub trait Integer: EucRing + IntOps<Self> + From<i32> + Signed + num_integer::Integer
+pub trait Integer: EucRing + IntOps + From<i32> + Signed + num_integer::Integer
 where for<'a> &'a Self: EucRingOps<Self> {}
 
 impl<T> DivRound for T
@@ -18,7 +18,7 @@ where T: Integer, for<'x> &'x T: IntOps<T> {
 
 macro_rules! impl_ops {
     ($trait:ident, $type:ty) => {
-        impl $trait<$type> for $type {}
+        impl $trait for $type {}
         impl<'a> $trait<$type> for &'a $type {}
     };
 }

@@ -15,12 +15,12 @@ pub trait AlgBase:
 
 // Additive Monoids 
 
-pub trait AddMonOps<T>: 
+pub trait AddMonOps<T = Self>: 
     Sized + Add<Output = T>
 {}
 
 pub trait AddMon: 
-    AlgBase + AddMonOps<Self> + AddAssign + Sum<Self> + Zero
+    AlgBase + AddMonOps + AddAssign + Sum<Self> + Zero
 where 
     for<'a> &'a Self: AddMonOps<Self>,
     for<'a> Self: AddAssign<&'a Self>,
@@ -29,12 +29,12 @@ where
 
 // Additive Groups 
 
-pub trait AddGrpOps<T>: 
+pub trait AddGrpOps<T = Self>: 
     AddMonOps<T> + Neg<Output = T> + Sub<Output = T>
 {}
 
 pub trait AddGrp: 
-    AddMon + AddGrpOps<Self> + SubAssign
+    AddMon + AddGrpOps + SubAssign
 where 
     for<'a> &'a Self: AddGrpOps<Self>,
     for<'a> Self: SubAssign<&'a Self>
@@ -42,12 +42,12 @@ where
 
 // Monoids (multiplicative)
 
-pub trait MonOps<T>: 
+pub trait MonOps<T = Self>: 
     Sized + Mul<Output = T> 
 {}
 
 pub trait Mon: 
-    AlgBase + MonOps<Self> + MulAssign + Product<Self> + One
+    AlgBase + MonOps + MulAssign + Product<Self> + One
 where
     for<'a> &'a Self: MonOps<Self>,
     for<'a> Self: MulAssign<&'a Self>,
@@ -55,12 +55,12 @@ where
 {}
 
 // Rings 
-pub trait RingOps<T>: 
+pub trait RingOps<T = Self>: 
     AddGrpOps<T> + MonOps<T>
 {}
 
 pub trait Ring: 
-    AddGrp + Mon + RingOps<Self> + One + sprs::MulAcc
+    AddGrp + Mon + RingOps + One + sprs::MulAcc
 where
     for<'a> &'a Self: RingOps<Self>
 {
@@ -73,12 +73,12 @@ where
 }
 
 // Euclidean Rings
-pub trait EucRingOps<T>: 
+pub trait EucRingOps<T = Self>: 
     RingOps<T> + Rem<Output = T> + Div<Output = T>
 {}
 
 pub trait EucRing: 
-    Ring + EucRingOps<Self> + RemAssign + DivAssign
+    Ring + EucRingOps + RemAssign + DivAssign
 where 
     for<'a> &'a Self: EucRingOps<Self>,
     for<'a> Self: RemAssign<&'a Self>,
@@ -127,6 +127,11 @@ where
         }
 
         (x, s0, t0)
+    }
+
+    fn lcm(x: &Self, y: &Self) -> Self { 
+        let g = Self::gcd(x, y);
+        x * &(y / &g)
     }
 }
 

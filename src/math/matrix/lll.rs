@@ -988,10 +988,9 @@ pub(super) mod tests {
 
     pub(in super::super) mod helper { 
         use std::ops::Div;
-        use num_rational::Ratio;
-        use num_traits::Signed;
         use super::*;
-        use crate::math::ext::int_ext::{Integer, IntOps};
+        use crate::math::{ext::int_ext::{Integer, IntOps}};
+        use crate::math::types::ratio::Ratio;
 
         pub fn assert_is_hnf<R>(b: &DnsMat<R>)
         where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
@@ -1055,7 +1054,7 @@ pub(super) mod tests {
         where R: Integer, for<'x> &'x R: IntOps<R> {
             let r0 = dot::<Ratio<R>>(c0, c0);
             let r1 = dot::<Ratio<R>>(c1, c1);
-            r1 >= (alpha - m * m) * r0
+            r1 >= (alpha - &(m * m)) * r0
         }
     
         fn gram_schmidt<R>(b: &ArrayView2<R>) -> (Array2<Ratio<R>>, Array2<Ratio<R>>)

@@ -1,18 +1,19 @@
 use num_bigint::BigInt;
-use num_traits::{One, Signed};
+use num_traits::{One, Signed, ToPrimitive, FromPrimitive};
 use super::super::traits::*;
 
 pub trait IntOps<T = Self>: EucRingOps<T> {}
 
-pub trait Integer: EucRing + IntOps + From<i32> + Signed + num_integer::Integer
+pub trait Integer: EucRing + IntOps + From<i32> + Signed + PartialOrd + Ord + FromPrimitive + ToPrimitive
 where for<'a> &'a Self: EucRingOps<Self> {}
 
 impl<T> DivRound for T
 where T: Integer, for<'x> &'x T: IntOps<T> {
     fn div_round(&self, q: &Self) -> Self {
-        use num_rational::Ratio;
-        let r = Ratio::new(self.clone(), q.clone());
-        r.round().to_integer()
+        let a = self.to_f64().unwrap();
+        let b = q.to_f64().unwrap();
+        let r = (a / b).round();
+        Self::from_f64(r).unwrap()
     }
 }
 
@@ -145,5 +146,13 @@ mod tests {
         assert_eq!(d, 0);
         assert_eq!(s, 0);
         assert_eq!(t, 0);
+    }
+
+    #[test]
+    fn div_round() { 
+        assert_eq!(12.div_round(&5), 2);
+        assert_eq!(13.div_round(&5), 3);
+        assert_eq!(-12.div_round(&5), -2);
+        assert_eq!(-13.div_round(&5), -3);
     }
 }

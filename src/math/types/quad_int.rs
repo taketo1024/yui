@@ -375,21 +375,31 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
     fn normalizing_unit(&self) -> Self {
         let (a, b) = self.pair();
         if D == -1 { 
-            if a.is_positive() && !b.is_negative() { 
+            if a.is_positive() && !b.is_negative() {         // a > 0, b ≧ 0 -> 1
                 Self::one()
-            } else if !a.is_positive() && b.is_positive() { 
+            } else if !a.is_positive() && b.is_positive() {  // a ≦ 0, b > 0 -> -i
                 -Self::omega()
-            } else if a.is_negative() && !b.is_positive() { 
+            } else if a.is_negative() && !b.is_positive() {  // a < 0, b ≦ 0 -> -1
                 -Self::one()
-            } else if !a.is_negative() && b.is_negative() { 
+            } else if !a.is_negative() && b.is_negative() {  // a ≧ 0, b < 0 -> i
                 Self::omega()
-            } else { 
+            } else {                                         // a = b = 0    -> 1
                 Self::one()
             }
         } else if D == -3 { 
-            // TODO
-            if a.is_negative() { 
+            let c = a + b;
+            if a.is_positive() && !b.is_negative() {         // a > 0, b ≧ 0     -> 1
+                Self::one()
+            } else if !a.is_positive() && c.is_positive() {  // a ≦ 0, a + b > 0 -> 1/ω   = 1 - ω
+                Self::new(I::one(), -I::one())
+            } else if !c.is_positive() && b.is_positive() {  // a + b ≦ 0, b > 0 -> 1/ω^2 = -ω
+                -Self::omega()
+            } else if a.is_negative() && !b.is_positive() {  // a < 0, b ≦ 0     -> 1/ω^3 = -1
                 -Self::one()
+            } else if !a.is_negative() && c.is_negative() {  // a ≧ 0, a + b < 0 -> 1/ω^4 = ω - 1
+                Self::new(-I::one(), I::one())
+            } else if !c.is_negative() && b.is_negative() {  // a + b ≧ 0, b < 0 -> 1/ω^5 = ω
+                Self::omega()
             } else { 
                 Self::one()
             }
@@ -774,6 +784,17 @@ mod tests {
         assert_eq!(A::new(1, -1).normalizing_unit(), A::new(0,  1));
     }
 
+    #[test]
+    fn normalizing_unit_eisen() { 
+        type A = QuadInt<i32, -3>; // EisenInt
+        assert_eq!(A::new(1,  0).normalizing_unit(), A::new(1,  0));
+        assert_eq!(A::new(0,  1).normalizing_unit(), A::new(1, -1));
+        assert_eq!(A::new(-1, 1).normalizing_unit(), A::new(0, -1));
+        assert_eq!(A::new(-1, 0).normalizing_unit(), A::new(-1, 0));
+        assert_eq!(A::new(0, -1).normalizing_unit(), A::new(-1, 1));
+        assert_eq!(A::new(1, -1).normalizing_unit(), A::new(0,  1));
+    }
+    
     #[test]
     fn rem_gauss() {
         type A = QuadInt<i32, -1>; // GaussInt

@@ -5,6 +5,7 @@ use std::iter::Sum;
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, MulAssign};
 use itertools::Itertools;
 use num_traits::Zero;
+use auto_impl_ops::auto_ops;
 
 use crate::utils::collections::hashmap;
 use crate::utils::display::OrdForDisplay;
@@ -84,8 +85,8 @@ where
     where F: Fn(&X) -> Vec<(X, R)> {
         let mut res = Self::zero();
         for (x, r) in self.iter() { 
-            for (y, s) in f(x) { 
-                res += (y, r * &s);
+            for (y, s) in f(x).iter() { 
+                res += (y, &(r * s));
             }
         }
         res
@@ -160,16 +161,6 @@ where
     }
 }
 
-impl<X, R> AlgBase for LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    fn symbol() -> String {
-        format!("Free<{}; {}>", X::symbol(), R::symbol())
-    }
-}
-
 impl<X, R> Zero for LinComb<X, R>
 where
     X: FreeGenerator,
@@ -181,119 +172,6 @@ where
 
     fn is_zero(&self) -> bool {
         self.data.values().all(|r| r.is_zero())
-    }
-}
-
-impl<X, R> Add for LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    type Output = Self;
-
-    fn add(mut self, rhs: Self) -> Self::Output {
-        self += rhs;
-        self
-    }
-}
-
-impl<'a, X, R> Add for &'a LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    type Output = LinComb<X, R>;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        let mut res = self.clone();
-        res += rhs;
-        res
-    }
-}
-
-impl<X, R> AddAssign<(X, R)> for LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    fn add_assign(&mut self, rhs: (X, R)) {
-        let data = &mut self.data;
-        let (x, r) = rhs;
-        if data.contains_key(&x) { 
-            let v = data.get_mut(&x).unwrap();
-            v.add_assign(r);
-        } else { 
-            data.insert(x, r);
-        }
-    }
-}
-
-impl<'a, X, R> AddAssign<(&'a X, &'a R)> for LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    fn add_assign(&mut self, rhs: (&'a X, &'a R)) {
-        let data = &mut self.data;
-        let (x, r) = rhs;
-        if data.contains_key(x) { 
-            let v = data.get_mut(x).unwrap();
-            v.add_assign(r);
-        } else { 
-            data.insert(x.clone(), r.clone());
-        }
-    }
-}
-
-impl<X, R> AddAssign for LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    fn add_assign(&mut self, rhs: Self) {
-        for e in rhs.data.into_iter() { 
-            self.add_assign(e);
-        }
-    }
-}
-
-impl<'a, X, R> AddAssign<&'a Self> for LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    fn add_assign(&mut self, rhs: &'a Self) {
-        for e in rhs.data.iter() { 
-            self.add_assign(e);
-        }
-    }
-}
-
-impl<X, R> Sum for LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        let mut res = Self::zero();
-        for z in iter { 
-            res += z
-        }
-        res
-    }
-}
-
-impl<'a, X, R> Sum<&'a Self> for LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    fn sum<I: Iterator<Item = &'a Self>>(iter: I) -> Self {
-        let mut res = Self::zero();
-        for z in iter { 
-            res += z
-        }
-        res
     }
 }
 
@@ -309,7 +187,7 @@ where
     }
 }
 
-impl<'a, X, R> Neg for &'a LinComb<X, R>
+impl<X, R> Neg for &LinComb<X, R>
 where
     X: FreeGenerator,
     R: Ring, for<'x> &'x R: RingOps<R>
@@ -321,57 +199,42 @@ where
     }
 }
 
-impl<X, R> Sub for LinComb<X, R>
+impl<X, R> AddAssign<(&X, &R)> for LinComb<X, R>
 where
     X: FreeGenerator,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    type Output = Self;
-
-    fn sub(mut self, rhs: Self) -> Self::Output {
-        self -= rhs;
-        self
-    }
-}
-
-impl<'a, X, R> Sub for &'a LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    type Output = LinComb<X, R>;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        let mut res = self.clone();
-        res -= rhs;
-        res
-    }
-}
-
-impl<X, R> SubAssign<(X, R)> for LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    fn sub_assign(&mut self, rhs: (X, R)) {
+    fn add_assign(&mut self, rhs: (&X, &R)) {
         let data = &mut self.data;
         let (x, r) = rhs;
-
-        if data.contains_key(&x) { 
-            let v = data.get_mut(&x).unwrap();
-            *v -= r;
+        if data.contains_key(x) { 
+            let v = data.get_mut(x).unwrap();
+            v.add_assign(r);
         } else { 
-            data.insert(x, -r);
+            data.insert(x.clone(), r.clone());
         }
     }
 }
 
-impl<'a, X, R> SubAssign<(&'a X, &'a R)> for LinComb<X, R>
+#[auto_ops]
+impl<X, R> AddAssign<&LinComb<X, R>> for LinComb<X, R>
 where
     X: FreeGenerator,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    fn sub_assign(&mut self, rhs: (&'a X, &'a R)) {
+    fn add_assign(&mut self, rhs: &Self) {
+        for e in rhs.data.iter() { 
+            self.add_assign(e);
+        }
+    }
+}
+
+impl<X, R> SubAssign<(&X, &R)> for LinComb<X, R>
+where
+    X: FreeGenerator,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{
+    fn sub_assign(&mut self, rhs: (&X, &R)) {
         let data = &mut self.data;
         let (x, r) = rhs;
 
@@ -384,118 +247,38 @@ where
     }
 }
 
-impl<X, R> SubAssign for LinComb<X, R>
+#[auto_ops]
+impl<X, R> SubAssign<&LinComb<X, R>> for LinComb<X, R>
 where
     X: FreeGenerator,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    fn sub_assign(&mut self, rhs: Self) {
-        for e in rhs.data.into_iter() { 
-            self.sub_assign(e);
-        }
-    }
-}
-
-impl<'a, X, R> SubAssign<&'a Self> for LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    fn sub_assign(&mut self, rhs: &'a Self) {
+    fn sub_assign(&mut self, rhs: &Self) {
         for e in rhs.data.iter() { 
             self.sub_assign(e);
         }
     }
 }
 
-impl<X, R> Mul<R> for LinComb<X, R>
+#[auto_ops]
+impl<X, R> MulAssign<&R> for LinComb<X, R>
 where
     X: FreeGenerator,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    type Output = Self;
-
-    fn mul(self, rhs: R) -> Self::Output {
-        self.map_coeffs_into(|r| &r * &rhs)
-    }
-}
-
-impl<'a, X, R> Mul<&'a R> for &'a LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    type Output = LinComb<X, R>;
-
-    fn mul(self, rhs: &'a R) -> Self::Output {
-        self.map_coeffs(|r| r * rhs)
-    }
-}
-
-impl<X, R> MulAssign<R> for LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    fn mul_assign(&mut self, rhs: R) {
-        self.mul_assign(&rhs);
-    }
-}
-
-impl<'a, X, R> MulAssign<&'a R> for LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    fn mul_assign(&mut self, rhs: &'a R) {
+    fn mul_assign(&mut self, rhs: &R) {
         let data = std::mem::take(&mut self.data);
         self.data = data.into_iter().map(|(x, r)| (x, &r * rhs)).collect();
     }
 }
 
-impl<X, R> Mul for LinComb<X, R>
+#[auto_ops]
+impl<X, R> MulAssign<&LinComb<X, R>> for LinComb<X, R>
 where 
     X: FreeGenerator, for<'x> &'x X: Mul<Output = X>,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    type Output = Self;
-    
-    fn mul(mut self, rhs: Self) -> Self {
-        self *= rhs;
-        self
-    }
-}
-
-impl<'a, X, R> Mul for &'a LinComb<X, R>
-where 
-    X: FreeGenerator, for<'x> &'x X: Mul<Output = X>,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    type Output = LinComb<X, R>;
-    
-    fn mul(self, rhs: Self) -> LinComb<X, R> {
-        let mut res = self.clone();
-        res *= rhs;
-        res
-    }
-}
-
-impl<X, R> MulAssign for LinComb<X, R>
-where 
-    X: FreeGenerator, for<'x> &'x X: Mul<Output = X>,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    fn mul_assign(&mut self, rhs: Self) {
-        self.mul_assign(&rhs)
-    }
-}
-
-impl<'a, X, R> MulAssign<&'a LinComb<X, R>> for LinComb<X, R>
-where 
-    X: FreeGenerator, for<'x> &'x X: Mul<Output = X>,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    fn mul_assign(&mut self, rhs: &'a Self) {
+    fn mul_assign(&mut self, rhs: &Self) {
         let mut data = HashMap::new();
         data.reserve(self.len() * rhs.len());
 
@@ -509,18 +292,52 @@ where
     }
 }
 
+macro_rules! impl_accum {
+    ($trait:ident, $method:ident, $accum_trait:ident, $accum_method:ident, $accum_init:ident) => {
+        impl<X, R> $trait<Self> for LinComb<X, R>
+        where X: FreeGenerator, R: Ring, for<'x> &'x R: RingOps<R> {
+            fn $method<Iter: Iterator<Item = Self>>(iter: Iter) -> Self {
+                let mut res = Self::$accum_init();
+                for r in iter { Self::$accum_method(&mut res, r) }
+                return res;
+            }
+        }
+
+        impl<'a, X, R> $trait<&'a Self> for LinComb<X, R>
+        where X: FreeGenerator, R: Ring, for<'x> &'x R: RingOps<R> {
+            fn $method<Iter: Iterator<Item = &'a Self>>(iter: Iter) -> Self {
+                let mut res = Self::$accum_init();
+                for r in iter { Self::$accum_method(&mut res, r) }
+                return res;
+            }
+        }
+    }
+}
+
+impl_accum!(Sum, sum, AddAssign, add_assign, zero);
+
 macro_rules! impl_alg_ops {
     ($trait:ident) => {
         impl<X, R> $trait<Self> for LinComb<X, R>
         where X: FreeGenerator, R: Ring, for<'x> &'x R: RingOps<R> {}
 
-        impl<'a, X, R> $trait<LinComb<X, R>> for &'a LinComb<X, R>
+        impl<X, R> $trait<LinComb<X, R>> for &LinComb<X, R>
         where X: FreeGenerator, R: Ring, for<'x> &'x R: RingOps<R> {}
     };
 }
 
 impl_alg_ops!(AddMonOps);
 impl_alg_ops!(AddGrpOps);
+
+impl<X, R> AlgBase for LinComb<X, R>
+where
+    X: FreeGenerator,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{
+    fn symbol() -> String {
+        format!("Free<{}; {}>", X::symbol(), R::symbol())
+    }
+}
 
 impl<X, R> AddMon for LinComb<X, R>
 where
@@ -541,7 +358,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {}
 
-impl<'a, X, R> RModOps<R, &'a R, LinComb<X, R>> for &'a LinComb<X, R>
+impl<X, R> RModOps<R, &R, LinComb<X, R>> for &LinComb<X, R>
 where
     X: FreeGenerator,
     R: Ring, for<'x> &'x R: RingOps<R>
@@ -557,11 +374,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, fmt::Display};
-
-    use crate::{utils::collections::hashmap, math::traits::AlgBase};
+    use std::collections::HashMap;
+    use std::fmt::Display;
     use num_traits::Zero;
-
+    
+    use crate::utils::collections::hashmap;
+    use crate::math::traits::AlgBase;
     use super::{FreeGenerator, LinComb};
  
     #[derive(Debug, Default, Hash, PartialEq, Eq, Clone, PartialOrd, Ord)]

@@ -13,7 +13,7 @@ use crate::utils::display::OrdForDisplay;
 use super::super::traits::{AlgBase, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
 pub trait FreeGenerator: AlgBase + Hash + OrdForDisplay {}
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug, Default)]
 pub struct LinComb<X, R>
 where
     X: FreeGenerator,
@@ -113,16 +113,6 @@ where
     }
 }
 
-impl<X, R> Default for LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    fn default() -> Self {
-        Self::new(HashMap::default())
-    }
-}
-
 impl<X, R> Display for LinComb<X, R>
 where
     X: FreeGenerator,
@@ -132,29 +122,33 @@ where
         let mut initial = true;
         let sorted = self.iter().sorted_by(|(x, _), (y, _)| x.cmp_for_display(y) );
         for (x, r) in sorted {
-            let x = x.to_string();
             let r = r.to_string();
+            let x = x.to_string();
 
             if initial { 
-                let r = if r == "1" { 
-                    ""
+                if r == "1" { 
+                    write!(f, "{x}")?;
                 } else if r == "-1" { 
-                    "-"
-                } else {
-                    &r
+                    write!(f, "-{x}")?;
+                } else if x == "1" {
+                    write!(f, "{r}")?;
+                } else { 
+                    write!(f, "{r}{x}")?;
                 };
-                write!(f, "{r}{x}")?;
                 initial = false
             } else {
-                let sign = if r.starts_with("-") { "-" } else { "+" };
-                let r = if r == "1" || r == "-1" { 
-                    ""
-                } else if r.starts_with("-") { 
-                    &r[1..]
+                let (sign, r) = if r.starts_with("-") { 
+                    ("-", &r[1..]) 
                 } else { 
-                    &r
+                    ("+", r.as_str())
                 };
-                write!(f, " {sign} {r}{x}")?;
+                if r == "1" { 
+                    write!(f, " {sign} {x}")?;
+                } else if x == "1" { 
+                    write!(f, " {sign} {r}")?;
+                } else { 
+                    write!(f, " {sign} {r}{x}")?;
+                };
             }
         }
         Ok(())

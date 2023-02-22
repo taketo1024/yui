@@ -4,6 +4,7 @@ use std::cmp;
 use std::iter::{Sum, Product};
 use std::ops::{Mul, Add, Sub, Neg, AddAssign, SubAssign, MulAssign, Div, DivAssign, Rem, RemAssign};
 use num_traits::{Zero, One};
+use auto_impl_ops::auto_ops;
 use crate::math::ext::int_ext::{Integer, IntOps};
 use crate::math::traits::{EucRing, EucRingOps, AlgBase, Mon, AddMon, AddGrp, AddMonOps, AddGrpOps, MonOps, RingOps, Ring, FieldOps, Field};
 
@@ -181,16 +182,13 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
 }
 
 impl_unop!(Neg, neg);
-impl_additive_op!(Add, add);
-impl_additive_op!(Sub, sub);
-forward_assop!(AddAssign, add_assign, add);
-forward_assop!(SubAssign, sub_assign, sub);
-forward_accum!(Sum, sum, AddAssign, add_assign, zero);
+impl_add_op!(Add, add);
+impl_add_op!(Sub, sub);
 
+#[auto_ops]
 impl<'a, T> Mul for &'a Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     type Output = Ratio<T>;
-    #[inline]
     fn mul(self, rhs: Self) -> Self::Output {
         let gcd_ad = EucRing::gcd(&self.numer, &rhs.denom);
         let gcd_bc = EucRing::gcd(&self.denom, &rhs.numer);
@@ -202,35 +200,28 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     }
 }
 
-forward_binop!(Mul, mul);
-forward_assop!(MulAssign, mul_assign, mul);
-forward_accum!(Product, product, MulAssign, mul_assign, one);
-
+#[auto_ops]
 impl<'a, T> Div for &'a Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     type Output = Ratio<T>;
-    #[inline]
     fn div(self, rhs: Self) -> Self::Output {
         assert!(!rhs.is_zero());
         self * &(rhs.clone().inv_raw())
     }
 }
 
-forward_binop!(Div, div);
-forward_assop!(DivAssign, div_assign, div);
-
+#[auto_ops]
 impl<'a, T> Rem for &'a Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     type Output = Ratio<T>;
-    #[inline]
     fn rem(self, rhs: Self) -> Self::Output {
         assert!(!rhs.is_zero());
         Ratio::zero() // MEMO Frac<T> is a field. 
     }
 }
 
-forward_binop!(Rem, rem);
-forward_assop!(RemAssign, rem_assign, rem);
+impl_accum!(Sum, sum, AddAssign, add_assign, zero);
+impl_accum!(Product, product, MulAssign, mul_assign, one);
 
 decl_alg_ops!(AddMonOps);
 decl_alg_ops!(AddGrpOps);
@@ -345,14 +336,12 @@ macro_rules! impl_unop {
     };
 }
 
-macro_rules! impl_additive_op {
+macro_rules! impl_add_op {
     ($trait:ident, $method:ident) => {
-        forward_binop!($trait, $method);
-
+        #[auto_ops]
         impl<'a, T> $trait for &'a Ratio<T>
         where T: EucRing, for<'x> &'x T: EucRingOps<T> {
             type Output = Ratio<T>;
-            #[inline]
             fn $method(self, rhs: Self) -> Self::Output {
                 if self.denom == rhs.denom {
                     return Ratio::new( 
@@ -369,37 +358,7 @@ macro_rules! impl_additive_op {
     };
 }
 
-macro_rules! forward_binop {
-    ($trait:ident, $method:ident) => {
-        impl<T> $trait for Ratio<T>
-        where T: EucRing, for<'x> &'x T: EucRingOps<T> {
-            type Output = Self;
-            fn $method(self, rhs: Self) -> Self::Output {
-                (&self).$method(&rhs)
-            }
-        }
-    }
-}
-
-macro_rules! forward_assop {
-    ($trait:ident, $method:ident, $op_method:ident) => {
-        impl<T> $trait for Ratio<T>
-        where T: EucRing, for<'x> &'x T: EucRingOps<T> {
-            fn $method(&mut self, rhs: Self) {
-                *self = (&*self).$op_method(&rhs);
-            }
-        }
-        
-        impl<'a, T> $trait<&'a Ratio<T>> for Ratio<T>
-        where T: EucRing, for<'x> &'x T: EucRingOps<T> {
-            fn $method(&mut self, rhs: &'a Self) {
-                *self = (&*self).$op_method(rhs);
-            }
-        }
-    }
-}
-
-macro_rules! forward_accum {
+macro_rules! impl_accum {
     ($trait:ident, $method:ident, $accum_trait:ident, $accum_method:ident, $accum_init:ident) => {
         impl<T> $trait for Ratio<T>
         where T: EucRing, for<'x> &'x T: EucRingOps<T> {
@@ -431,7 +390,7 @@ macro_rules! decl_alg_ops {
     };
 }
 
-pub(self) use {impl_unop, impl_additive_op, forward_binop, forward_assop, forward_accum, decl_alg_ops};
+pub(self) use {impl_unop, impl_add_op, impl_accum, decl_alg_ops};
 
 #[cfg(test)]
 mod tests { 

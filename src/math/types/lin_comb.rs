@@ -269,7 +269,7 @@ where
 #[auto_ops]
 impl<X, R> MulAssign<&LinComb<X, R>> for LinComb<X, R>
 where 
-    X: FreeGenerator, for<'x> &'x X: Mul<Output = X>,
+    X: FreeGenerator + Mul<Output = X>,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn mul_assign(&mut self, rhs: &Self) {
@@ -278,7 +278,9 @@ where
 
         for (x, r) in self.iter() { 
             for (y, s) in rhs.iter() { 
-                data.insert(x * y, r * s);
+                let xy = x.clone() * y.clone();
+                let rs = r * s;
+                data.insert(xy, rs);
             }
         }
         

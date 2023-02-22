@@ -1,6 +1,7 @@
 use std::fmt::Display;
-use std::ops::Mul;
+use std::ops::{Mul, MulAssign};
 use itertools::join;
+use auto_impl_ops::auto_ops;
 use crate::links::links::State;
 use crate::math::types::lin_comb::{FreeGenerator, LinComb};
 use crate::math::traits::AlgBase;
@@ -114,13 +115,10 @@ impl KhEnhState {
     }
 }
 
-impl<'a> Mul for &'a KhEnhState {
-    type Output = KhEnhState;
-
-    fn mul(self, rhs: Self) -> KhEnhState {
-        let mut res = self.clone();
-        res.append(rhs.clone());
-        res
+#[auto_ops]
+impl MulAssign<&KhEnhState> for KhEnhState {
+    fn mul_assign(&mut self, rhs: &KhEnhState) {
+        self.append(rhs.clone())
     }
 }
 

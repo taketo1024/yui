@@ -19,7 +19,8 @@ where
     X: FreeGenerator,
     R: Ring, for<'x> &'x R: RingOps<R>
 { 
-    data: HashMap<X, R>
+    data: HashMap<X, R>,
+    r_zero: R
 }
 
 impl<X, R> LinComb<X, R>
@@ -28,22 +29,11 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 { 
     pub fn new(data: HashMap<X, R>) -> Self {
-        Self { data }
+        Self { data, r_zero: R::zero() }
     }
 
     pub fn wrap(x: X) -> Self { 
         Self::new(map!{ x => R::one() })
-    }
-
-    pub fn unwrap(self) -> X { 
-        if self.data.len() == 1 {
-            if let Some((x, r)) = self.data.into_iter().next() {
-                if r.is_one() { 
-                    return x
-                }
-            }
-        } 
-        panic!()
     }
 
     pub fn from_iter<I>(iter: I) -> Self 
@@ -56,17 +46,30 @@ where
         self.data.len()
     }
 
-    pub fn iter(&self) -> std::collections::hash_map::Iter<'_, X, R> {
+    pub fn keys(&self) -> impl Iterator<Item = &X> {
+        self.data.keys()
+    }
+
+    pub fn coeff(&self, x: &X) -> &R { 
+        self.data.get(x).unwrap_or(&self.r_zero)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&X, &R)> {
         self.data.iter()
     }
 
-    pub fn into_iter(self) -> std::collections::hash_map::IntoIter<X, R> {
+    pub fn into_iter(self) -> impl Iterator<Item = (X, R)> {
         self.data.into_iter()
     }
 
-    pub fn drop_zeros(self) -> Self { 
-        let data = self.into_iter().filter(|(_, r)| !r.is_zero()).collect();
-        Self::new(data)
+    pub fn reduce(&mut self) { 
+        self.data.retain(|_, r| !r.is_zero());
+    }
+
+    pub fn reduced(&self) -> Self { 
+        let mut copy = self.clone();
+        copy.reduce();
+        copy
     }
 
     pub fn map_coeffs<F>(&self, f: F) -> Self 
@@ -85,8 +88,8 @@ where
     where F: Fn(&X) -> Vec<(X, R)> {
         let mut res = Self::zero();
         for (x, r) in self.iter() { 
-            for (y, s) in f(x).iter() { 
-                res += (y, &(r * s));
+            for (y, s) in f(x) { 
+                res += (y, r * &s);
             }
         }
         res
@@ -193,6 +196,23 @@ where
     }
 }
 
+impl<X, R> AddAssign<(X, R)> for LinComb<X, R>
+where
+    X: FreeGenerator,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{
+    fn add_assign(&mut self, rhs: (X, R)) {
+        let data = &mut self.data;
+        let (x, r) = rhs;
+        if data.contains_key(&x) { 
+            let v = data.get_mut(&x).unwrap();
+            v.add_assign(r);
+        } else { 
+            data.insert(x, r);
+        }
+    }
+}
+
 impl<X, R> AddAssign<(&X, &R)> for LinComb<X, R>
 where
     X: FreeGenerator,
@@ -223,24 +243,6 @@ where
     }
 }
 
-impl<X, R> SubAssign<(&X, &R)> for LinComb<X, R>
-where
-    X: FreeGenerator,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    fn sub_assign(&mut self, rhs: (&X, &R)) {
-        let data = &mut self.data;
-        let (x, r) = rhs;
-
-        if data.contains_key(x) { 
-            let v = data.get_mut(x).unwrap();
-            v.sub_assign(r);
-        } else { 
-            data.insert(x.clone(), -r);
-        }
-    }
-}
-
 #[auto_ops]
 impl<X, R> SubAssign<&LinComb<X, R>> for LinComb<X, R>
 where
@@ -249,7 +251,8 @@ where
 {
     fn sub_assign(&mut self, rhs: &Self) {
         for e in rhs.data.iter() { 
-            self.sub_assign(e);
+            let e = (e.0, &-e.1);
+            self.add_assign(e);
         }
     }
 }
@@ -267,24 +270,26 @@ where
 }
 
 #[auto_ops]
-impl<X, R> MulAssign<&LinComb<X, R>> for LinComb<X, R>
+impl<X, R> Mul for &LinComb<X, R>
 where 
     X: FreeGenerator + Mul<Output = X>,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    fn mul_assign(&mut self, rhs: &Self) {
-        let mut data = HashMap::new();
-        data.reserve(self.len() * rhs.len());
+    type Output = LinComb<X, R>;
 
-        for (x, r) in self.iter() { 
-            for (y, s) in rhs.iter() { 
+    fn mul(self, rhs: Self) -> Self::Output {
+        let mut res = Self::Output::zero();
+        res.data.reserve(self.len() * rhs.len());
+
+        for (x, r) in self.iter().filter(|(_, r)| !r.is_zero()) { 
+            for (y, s) in rhs.iter().filter(|(_, r)| !r.is_zero()) { 
                 let xy = x.clone() * y.clone();
                 let rs = r * s;
-                data.insert(xy, rs);
+                res += (xy, rs);
             }
         }
         
-        self.data = data;
+        res
     }
 }
 
@@ -453,10 +458,11 @@ mod tests {
     }
 
     #[test]
-    fn drop_zeros() { 
+    fn reduce() { 
         type L = LinComb<X, i32>;
-        let z = L::new(map!{ X(1) => 1, X(2) => 0, X(3) => 0 });
-        let z = z.drop_zeros();
+
+        let mut z = L::new(map!{ X(1) => 1, X(2) => 0, X(3) => 0 });
+        z.reduce();
 
         assert_eq!(z, L::new(map!{ X(1) => 1 }));
     }

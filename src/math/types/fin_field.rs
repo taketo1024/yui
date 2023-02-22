@@ -202,8 +202,8 @@ macro_rules! decl_alg_ops {
 
 pub(self) use {impl_unop, impl_binop, forward_accum, decl_alg_ops};
 
+#[cfg(test)]
 mod tests { 
-    #![allow(unused)]
     use super::*;
 
     type F3 = FF<3>;

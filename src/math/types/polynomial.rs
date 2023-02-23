@@ -107,16 +107,6 @@ macro_rules! impl_poly_gen {
                 self.0.clone()
             }
         }
-
-        impl<const X: char, R> From<Vec<($deg_type, R)>> for PolyBase<$struct<X>, R>
-        where R: Ring, for<'x> &'x R: RingOps<R> {
-            fn from(data: Vec<($deg_type, R)>) -> Self {
-                let data = data.into_iter().map(|(i, r)| 
-                    ($struct::from(i), r)
-                ).collect_vec();
-                Self::from(data)
-            }
-        }
     };
 }
 
@@ -164,17 +154,6 @@ macro_rules! impl_mpoly_gen {
                 }
             }
         }
-
-        impl<const X: char, R> From<Vec<(Vec<$deg_type>, R)>> for PolyBase<$struct<X>, R>
-        where R: Ring, for<'x> &'x R: RingOps<R> {
-            fn from(data: Vec<(Vec<$deg_type>, R)>) -> Self {
-                let data = data.into_iter().map(|(v, r)| {
-                    let mdeg = MDegree::from_vec(v);
-                    ($struct::from(mdeg), r)
-                }).collect_vec();
-                Self::from(data)
-            }
-        }
     };
 }
 
@@ -197,6 +176,13 @@ impl<I, R> PolyBase<I, R>
 where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(data: LinComb<I, R>) -> Self { 
         Self { data, zero: (I::one(), R::zero()) }
+    }
+
+    pub fn from_deg(data: Vec<(I::Degree, R)>) -> Self {
+        let data = data.into_iter().map(|(i, r)| 
+            (I::from(i), r)
+        ).collect_vec();
+        Self::from(data)
     }
     
     pub fn as_lincomb(&self) -> &LinComb<I, R> { 
@@ -252,6 +238,18 @@ where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
         self.lead_term().1
     }
 }
+
+impl<I, J, R> PolyBase<I, R>
+where I: PolyGen<Degree = MDegree<J>>, J: Zero, R: Ring, for<'x> &'x R: RingOps<R> {
+    pub fn from_mdeg(data: Vec<(Vec<J>, R)>) -> Self {
+        let data = data.into_iter().map(|(v, r)| {
+            let mdeg = MDegree::from_vec(v);
+            (I::from(mdeg), r)
+        }).collect_vec();
+        Self::from(data)
+    }
+}
+
 
 impl<I, R> From<R> for PolyBase<I, R>
 where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
@@ -412,21 +410,21 @@ mod tests {
     #[test]
     fn init_poly() { 
         type P = Poly::<'x', i32>; 
-        let f = P::from(vec![(0, 3), (1, 2), (2, 3)]);
+        let f = P::from_deg(vec![(0, 3), (1, 2), (2, 3)]);
         assert_eq!(&f.to_string(), "3 + 2x + 3x²");
     }
  
     #[test]
     fn init_lpoly() { 
         type P = LPoly::<'x', i32>; 
-        let f = P::from(vec![(-1, 4), (0, 2), (2, 3)]);
+        let f = P::from_deg(vec![(-1, 4), (0, 2), (2, 3)]);
         assert_eq!(&f.to_string(), "4x⁻¹ + 2 + 3x²");
     }
 
     #[test]
     fn init_mpoly() { 
         type P = MPoly::<'x', i32>; 
-        let f = P::from(vec![
+        let f = P::from_mdeg(vec![
             (vec![], 3),
             (vec![1], -1),
             (vec![3, 0, 2], 2),
@@ -437,7 +435,7 @@ mod tests {
     #[test]
     fn init_mlpoly() { 
         type P = MLPoly::<'x', i32>; 
-        let f = P::from(vec![
+        let f = P::from_mdeg(vec![
             (vec![], 3),
             (vec![1], 1),
             (vec![-3, 1, 3], 2),
@@ -448,7 +446,7 @@ mod tests {
     #[test]
     fn reduce() { 
         type P = Poly::<'x', i32>;
-        let mut f = P::from(vec![(0, 0), (1, 1), (2, 0)]);
+        let mut f = P::from_deg(vec![(0, 0), (1, 1), (2, 0)]);
         assert_eq!(f.len(), 3);
 
         f.reduce();
@@ -458,7 +456,7 @@ mod tests {
     #[test]
     fn coeff() { 
         type P = Poly::<'x', i32>;
-        let f = P::from(vec![(0, 2), (1, 3), (2, -4)]);
+        let f = P::from_deg(vec![(0, 2), (1, 3), (2, -4)]);
         
         assert_eq!(f.coeff_for(0), &2);
         assert_eq!(f.coeff_for(1), &3);
@@ -469,10 +467,10 @@ mod tests {
     #[test]
     fn const_term() { 
         type P = Poly::<'x', i32>;
-        let f = P::from(vec![(0, 2), (1, 3), (2, -4)]);
+        let f = P::from_deg(vec![(0, 2), (1, 3), (2, -4)]);
         assert_eq!(f.const_term(), &2);
 
-        let f = P::from(vec![(1, 3), (2, -4)]);
+        let f = P::from_deg(vec![(1, 3), (2, -4)]);
         assert_eq!(f.const_term(), &0);
     }
 
@@ -480,7 +478,7 @@ mod tests {
     fn lead_term() { 
         type P = Poly::<'x', i32>;
 
-        let f = P::from(vec![(0, 2), (1, 3), (2, -4)]);
+        let f = P::from_deg(vec![(0, 2), (1, 3), (2, -4)]);
         let (x, a) = f.lead_term();
         assert_eq!(x.degree(), 2);
         assert_eq!(a, &-4);
@@ -495,43 +493,43 @@ mod tests {
     fn add() { 
         type P = Poly::<'x', i32>;
 
-        let f = P::from(vec![(0, 2), (1, 3), (2, -4)]);
-        let g = P::from(vec![(0, -3), (1, -3), (3, 5)]);
-        assert_eq!(f + g, P::from(vec![(0, -1), (1, 0), (2, -4), (3, 5)]));
+        let f = P::from_deg(vec![(0, 2), (1, 3), (2, -4)]);
+        let g = P::from_deg(vec![(0, -3), (1, -3), (3, 5)]);
+        assert_eq!(f + g, P::from_deg(vec![(0, -1), (1, 0), (2, -4), (3, 5)]));
     }
 
     #[test]
     fn neg() { 
         type P = Poly::<'x', i32>;
 
-        let f = P::from(vec![(0, 2), (1, 3), (2, -4)]);
-        assert_eq!(-f, P::from(vec![(0, -2), (1, -3), (2, 4)]));
+        let f = P::from_deg(vec![(0, 2), (1, 3), (2, -4)]);
+        assert_eq!(-f, P::from_deg(vec![(0, -2), (1, -3), (2, 4)]));
     }
 
     #[test]
     fn sub() { 
         type P = Poly::<'x', i32>;
 
-        let f = P::from(vec![(0, 2), (1, 3), (2, -4)]);
-        let g = P::from(vec![(0, -3), (1, -3), (3, 5)]);
-        assert_eq!(f - g, P::from(vec![(0, 5), (1, 6), (2, -4), (3, -5)]));
+        let f = P::from_deg(vec![(0, 2), (1, 3), (2, -4)]);
+        let g = P::from_deg(vec![(0, -3), (1, -3), (3, 5)]);
+        assert_eq!(f - g, P::from_deg(vec![(0, 5), (1, 6), (2, -4), (3, -5)]));
     }
 
     #[test]
     fn mul() { 
         type P = Poly::<'x', i32>;
 
-        let f = P::from(vec![(0, 2), (1, 3), (2, -4)]);
-        let g = P::from(vec![(0, -3), (1, -3), (3, 5)]);
-        assert_eq!(f * g, P::from(vec![(0, -6), (1, -15), (2, 3), (3, 22), (4, 15), (5, -20)]));
+        let f = P::from_deg(vec![(0, 2), (1, 3), (2, -4)]);
+        let g = P::from_deg(vec![(0, -3), (1, -3), (3, 5)]);
+        assert_eq!(f * g, P::from_deg(vec![(0, -6), (1, -15), (2, 3), (3, 22), (4, 15), (5, -20)]));
     }
 
     #[test]
     fn mul_scal() { 
         type P = Poly::<'x', i32>;
 
-        let f = P::from(vec![(0, 2), (1, 3), (2, -4)]);
+        let f = P::from_deg(vec![(0, 2), (1, 3), (2, -4)]);
         let g = P::from(3);
-        assert_eq!(f * g, P::from(vec![(0, 6), (1, 9), (2, -12)]));
+        assert_eq!(f * g, P::from_deg(vec![(0, 6), (1, 9), (2, -12)]));
     }
 }

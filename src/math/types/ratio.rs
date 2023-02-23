@@ -206,7 +206,7 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     type Output = Ratio<T>;
     fn div(self, rhs: &'b Ratio<T>) -> Self::Output {
         assert!(!rhs.is_zero());
-        self * &(rhs.clone().inv_raw())
+        self * rhs.clone().inv_raw()
     }
 }
 
@@ -350,8 +350,8 @@ macro_rules! impl_add_op {
                     );
                 }
                 let lcm = EucRing::lcm(&self.denom, &rhs.denom);
-                let lhs_numer = &self.numer * &(&lcm / &self.denom);
-                let rhs_numer = &rhs.numer * &(&lcm / &rhs.denom);
+                let lhs_numer = &self.numer * (&lcm / &self.denom);
+                let rhs_numer = &rhs.numer * (&lcm / &rhs.denom);
                 Ratio::new(lhs_numer.$method(rhs_numer), lcm)
             }
         }

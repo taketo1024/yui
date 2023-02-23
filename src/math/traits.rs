@@ -167,7 +167,7 @@ where
 
     fn lcm(x: &Self, y: &Self) -> Self { 
         let g = Self::gcd(x, y);
-        x * &(y / &g)
+        x * (y / g)
     }
 }
 

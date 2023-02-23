@@ -117,18 +117,16 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     pub fn mul_row(&mut self, i: usize, r: &R) {
         debug_assert!(self.is_valid_row_index(i));
         let mut row = self.array.row_mut(i);
-        for a_mut in row.iter_mut() {
-            let a = a_mut as &R;
-            *a_mut = a * r;
+        for a in row.iter_mut() {
+            *a *= r;
         }
     }
 
     pub fn mul_col(&mut self, i: usize, r: &R) {
         debug_assert!(self.is_valid_col_index(i));
         let mut col = self.array.column_mut(i);
-        for a_mut in col.iter_mut() {
-            let a = a_mut as &R;
-            *a_mut = a * r;
+        for a in col.iter_mut() {
+            *a *= r;
         }
     }
 
@@ -138,9 +136,9 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
         let (s_i, s_j) = (s![i, ..], s![j, ..]);
         let (row_i, row_j) = self.array.multi_slice_mut((s_i, s_j));
-        ndarray::Zip::from(row_i).and(row_j).for_each(|x_mut, y_mut| { 
-            let (x, y) = (x_mut as &R, y_mut as &R);
-            *y_mut = y + &(r * x);
+        ndarray::Zip::from(row_i).and(row_j).for_each(|x, y| { 
+            let x = x as &R;
+            *y += r * x;
         });
     }
 
@@ -150,9 +148,9 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
         let (s_i, s_j) = (s![.., i], s![.., j]);
         let (col_i, col_j) = self.array.multi_slice_mut((s_i, s_j));
-        ndarray::Zip::from(col_i).and(col_j).for_each(|x_mut, y_mut| { 
-            let (x, y) = (x_mut as &R, y_mut as &R);
-            *y_mut = y + &(r * x);
+        ndarray::Zip::from(col_i).and(col_j).for_each(|x, y| { 
+            let x = x as &R;
+            *y += r * x;
         });
     }
 

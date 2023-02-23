@@ -271,7 +271,7 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 
     fn rem(self, rhs: &'b GaussInt<I>) -> Self::Output {
         let q = self / rhs;
-        self - &(rhs * &q)
+        self - rhs * q
     }
 }
 
@@ -315,7 +315,7 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 
     fn rem(self, rhs: &'b EisenInt<I>) -> Self::Output {
         let q = self / rhs;
-        self - &(rhs * &q)
+        self - rhs * q
     }
 }
 

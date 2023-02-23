@@ -353,13 +353,13 @@ where
 {}
 
 
-impl<X, R> RModOps<R, R, Self> for LinComb<X, R>
+impl<X, R> RModOps<R, Self> for LinComb<X, R>
 where
     X: FreeGenerator,
     R: Ring, for<'x> &'x R: RingOps<R>
 {}
 
-impl<X, R> RModOps<R, &R, LinComb<X, R>> for &LinComb<X, R>
+impl<X, R> RModOps<R, LinComb<X, R>> for &LinComb<X, R>
 where
     X: FreeGenerator,
     R: Ring, for<'x> &'x R: RingOps<R>

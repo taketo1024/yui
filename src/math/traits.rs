@@ -186,20 +186,22 @@ where
 
 // R-Modules
 
-pub trait RModOps<R, S, T>: AddGrpOps<T> + Mul<S, Output = T>
+pub trait RModOps<R, T>: 
+    AddGrpOps<T> + 
+    Mul<R, Output = T> + 
+    for<'a> Mul<&'a R, Output = T>
 where 
-    R: Ring, for<'x> &'x R: RingOps<R>, 
-    S: RingOps<R> // S = R or &'a R
+    R: Ring, for<'x> &'x R: RingOps<R>
 {}
 
 pub trait RMod:
     AddGrp + 
-    RModOps<Self::R, Self::R, Self> + 
+    RModOps<Self::R, Self> + 
     MulAssign<Self::R> +
     for<'a> MulAssign<&'a Self::R>
 where 
     Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>, 
-    for<'a> &'a Self: RModOps<Self::R, &'a Self::R, Self>,
+    for<'a> &'a Self: RModOps<Self::R, Self>,
 {
     type R;
 }

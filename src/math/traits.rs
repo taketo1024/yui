@@ -23,7 +23,8 @@ pub trait AlgBase:
 
 pub trait AddMonOps<T = Self>: 
     Sized + 
-    Add<Output = T>
+    Add<T, Output = T> + 
+    for<'a> Add<&'a T, Output = T> 
 {}
 
 pub trait AddMon: 
@@ -43,7 +44,8 @@ where
 pub trait AddGrpOps<T = Self>: 
     AddMonOps<T> + 
     Neg<Output = T> + 
-    Sub<Output = T>
+    Sub<T, Output = T> +
+    for<'a> Sub<&'a T, Output = T> 
 {}
 
 pub trait AddGrp: 
@@ -59,7 +61,8 @@ where
 
 pub trait MonOps<T = Self>: 
     Sized + 
-    Mul<Output = T> 
+    Mul<T, Output = T> + 
+    for<'a> Mul<&'a T, Output = T> 
 {}
 
 pub trait Mon: 
@@ -101,8 +104,10 @@ where
 
 pub trait EucRingOps<T = Self>: 
     RingOps<T> + 
-    Div<Output = T> +
-    Rem<Output = T> 
+    Div<T, Output = T> +
+    for<'a> Div<&'a T, Output = T> +
+    Rem<T, Output = T> +
+    for<'a> Rem<&'a T, Output = T> +
 {}
 
 pub trait EucRing: 

@@ -185,11 +185,11 @@ impl_add_op!(Add, add);
 impl_add_op!(Sub, sub);
 
 #[auto_ops]
-impl<'a, I, const D: i32> Mul for &'a QuadInt<I, D>
+impl<'a, 'b, I, const D: i32> Mul<&'b QuadInt<I, D>> for &'a QuadInt<I, D>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     type Output = QuadInt<I, D>;
 
-    fn mul(self, rhs: Self) -> Self::Output {
+    fn mul(self, rhs: &'b QuadInt<I, D>) -> Self::Output {
         // When D ≡ 1,
         //
         //   ω^2 = (D + 1)/4 + √D/2 
@@ -255,21 +255,21 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 }
 
 #[auto_ops]
-impl<'a, I> Div for &'a GaussInt<I>
+impl<'a, 'b, I> Div<&'b GaussInt<I>> for &'a GaussInt<I>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     type Output = GaussInt<I>;
 
-    fn div(self, rhs: Self) -> Self::Output {
+    fn div(self, rhs: &'b GaussInt<I>) -> Self::Output {
         self.div_round(rhs)
     }
 }
 
 #[auto_ops]
-impl<'a, I> Rem for &'a GaussInt<I>
+impl<'a, 'b, I> Rem<&'b GaussInt<I>> for &'a GaussInt<I>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     type Output = QuadInt<I, -1>;
 
-    fn rem(self, rhs: Self) -> Self::Output {
+    fn rem(self, rhs: &'b GaussInt<I>) -> Self::Output {
         let q = self / rhs;
         self - &(rhs * &q)
     }
@@ -299,21 +299,21 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 }
 
 #[auto_ops]
-impl<'a, I> Div for &'a EisenInt<I>
+impl<'a, 'b, I> Div<&'b EisenInt<I>> for &'a EisenInt<I>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     type Output = EisenInt<I>;
 
-    fn div(self, rhs: Self) -> Self::Output {
+    fn div(self, rhs: &'b EisenInt<I>) -> Self::Output {
         self.div_round(rhs)
     }
 }
 
 #[auto_ops]
-impl<'a, I> Rem for &'a EisenInt<I>
+impl<'a, 'b, I> Rem<&'b EisenInt<I>> for &'a EisenInt<I>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     type Output = EisenInt<I>;
 
-    fn rem(self, rhs: Self) -> Self::Output {
+    fn rem(self, rhs: &'b EisenInt<I>) -> Self::Output {
         let q = self / rhs;
         self - &(rhs * &q)
     }
@@ -438,11 +438,11 @@ macro_rules! impl_unop {
 macro_rules! impl_add_op {
     ($trait:ident, $method:ident) => {
         #[auto_ops]
-        impl<'a, I, const D: i32> $trait for &'a QuadInt<I, D>
+        impl<'a, 'b, I, const D: i32> $trait<&'b QuadInt<I, D>> for &'a QuadInt<I, D>
         where I: Integer, for<'x> &'x I: IntOps<I> {
             type Output = QuadInt<I, D>;
 
-            fn $method(self, rhs: Self) -> Self::Output {
+            fn $method(self, rhs: &'b QuadInt<I, D>) -> Self::Output {
                 let (a, b) = self.pair();
                 let (c, d) =  rhs.pair();
                 QuadInt(<&'a I>::$method(a, c), <&'a I>::$method(b, d))

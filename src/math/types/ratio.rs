@@ -186,10 +186,10 @@ impl_add_op!(Add, add);
 impl_add_op!(Sub, sub);
 
 #[auto_ops]
-impl<'a, T> Mul for &'a Ratio<T>
+impl<'a, 'b, T> Mul<&'b Ratio<T>> for &'a Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     type Output = Ratio<T>;
-    fn mul(self, rhs: Self) -> Self::Output {
+    fn mul(self, rhs: &'b Ratio<T>) -> Self::Output {
         let gcd_ad = EucRing::gcd(&self.numer, &rhs.denom);
         let gcd_bc = EucRing::gcd(&self.denom, &rhs.numer);
 
@@ -201,20 +201,20 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
 }
 
 #[auto_ops]
-impl<'a, T> Div for &'a Ratio<T>
+impl<'a, 'b, T> Div<&'b Ratio<T>> for &'a Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     type Output = Ratio<T>;
-    fn div(self, rhs: Self) -> Self::Output {
+    fn div(self, rhs: &'b Ratio<T>) -> Self::Output {
         assert!(!rhs.is_zero());
         self * &(rhs.clone().inv_raw())
     }
 }
 
 #[auto_ops]
-impl<'a, T> Rem for &'a Ratio<T>
+impl<'a, 'b, T> Rem<&'b Ratio<T>> for &'a Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     type Output = Ratio<T>;
-    fn rem(self, rhs: Self) -> Self::Output {
+    fn rem(self, rhs: &'b Ratio<T>) -> Self::Output {
         assert!(!rhs.is_zero());
         Ratio::zero() // MEMO Frac<T> is a field. 
     }
@@ -339,10 +339,10 @@ macro_rules! impl_unop {
 macro_rules! impl_add_op {
     ($trait:ident, $method:ident) => {
         #[auto_ops]
-        impl<'a, T> $trait for &'a Ratio<T>
+        impl<'a, 'b, T> $trait<&'b Ratio<T>> for &'a Ratio<T>
         where T: EucRing, for<'x> &'x T: EucRingOps<T> {
             type Output = Ratio<T>;
-            fn $method(self, rhs: Self) -> Self::Output {
+            fn $method(self, rhs: &'b Ratio<T>) -> Self::Output {
                 if self.denom == rhs.denom {
                     return Ratio::new( 
                         (&self.numer).$method(&rhs.numer), 
@@ -385,7 +385,7 @@ macro_rules! decl_alg_ops {
         impl<T> $trait for Ratio<T>
         where T: EucRing, for<'x> &'x T: EucRingOps<T> {}
 
-        impl<'a, T> $trait<Ratio<T>> for &'a Ratio<T>
+        impl<T> $trait<Ratio<T>> for &Ratio<T>
         where T: EucRing, for<'x> &'x T: EucRingOps<T> {}
     };
 }

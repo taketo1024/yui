@@ -23,20 +23,20 @@ pub trait AlgBase:
 
 pub trait AddMonOps<T = Self>: 
     Sized + 
-    Add<T, Output = T> + 
-    for<'a> Add<&'a T, Output = T> 
+    Add<T, Output = T> +              // S + T -> T
+    for<'a> Add<&'a T, Output = T>    // S + &T -> T
 {}
 
 pub trait AddMon: 
     AlgBase + 
-    AddMonOps + 
-    AddAssign + 
-    for<'a> AddAssign<&'a Self> + 
-    Sum<Self> + 
-    for<'a> Sum<&'a Self> +
+    AddMonOps +                       // T + T -> T, T + &T -> T
+    AddAssign +                       // T += T
+    for<'a> AddAssign<&'a Self> +     // T += &T
+    Sum<Self> +                       // [T] -> T
+    for<'a> Sum<&'a Self> +           // [&T] -> T
     Zero
 where 
-    for<'a> &'a Self: AddMonOps<Self>
+    for<'a> &'a Self: AddMonOps<Self> // &T + T -> T, &T + &T -> T
 {}
 
 // Additive Groups 

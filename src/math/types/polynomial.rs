@@ -11,12 +11,19 @@ use crate::math::traits::{Ring, RingOps, AlgBase, AddMon, AddMonOps, AddGrpOps, 
 use super::lin_comb::{LinComb, FreeGenerator};
 use crate::utils::format::{subscript, superscript};
 
-pub type Poly  <const X: char, R> = PolyBase<UPolyGen <X>, R>; // univar
-pub type LPoly <const X: char, R> = PolyBase<ULPolyGen<X>, R>; // univar, Laurent
-pub type MPoly <const X: char, R> = PolyBase<MPolyGen <X>, R>; // multivar
-pub type MLPoly<const X: char, R> = PolyBase<MLPolyGen<X>, R>; // multivar, Laurent
+pub type Poly  <const X: char, R> = PolyBase<Mono<X, usize>, R>;          // univar
+pub type LPoly <const X: char, R> = PolyBase<Mono<X, isize>, R>;          // univar, Laurent
+pub type MPoly <const X: char, R> = PolyBase<Mono<X, MDegree<usize>>, R>; // multivar
+pub type MLPoly<const X: char, R> = PolyBase<Mono<X, MDegree<isize>>, R>; // multivar, Laurent
 
-pub trait PolyGen: FreeGenerator + Mul<Output = Self> + One + PartialOrd + Ord + From<Self::Degree> {
+pub trait PolyGen: 
+    Mul<Output = Self> + 
+    One + 
+    PartialOrd + 
+    Ord + 
+    From<Self::Degree> +
+    FreeGenerator
+{
     type Degree;
     fn degree(&self) -> Self::Degree;
 }
@@ -68,53 +75,37 @@ where for<'x> Deg: Clone + AddAssign<&'x Deg> + Zero {
     }
 }
 
-macro_rules! impl_poly_gen {
-    ($struct:ident, $deg_type:ty) => {
-        #[derive(Clone, PartialEq, Eq, Hash, Default, Debug, PartialOrd, Ord)]
-        pub struct $struct<const X: char>($deg_type);
+// `Mono<X, I>` : a struct representing X^d (univar) or ΠX_i^{d_i} (multivar).
+// `I` is one of `usize`, `isize`, `MDegree<usize>`, `MDegree<isize>`.
 
-        impl<const X: char> From<$deg_type> for $struct<X> {
-            fn from(d: $deg_type) -> Self {
-                Self(d)
-            }
-        }
+#[derive(Clone, PartialEq, Eq, Hash, Default, Debug, PartialOrd, Ord)]
+pub struct Mono<const X: char, I>(I);
 
-        impl<const X: char> AlgBase for $struct<X> { 
-            fn symbol() -> String {
-                format!("{X}")
-            }
-        }
-
-        impl<const X: char> FreeGenerator for $struct<X> {}
-
-        impl<const X: char> One for $struct<X> {
-            fn one() -> Self {
-                Self::from(<$deg_type>::zero()) // x^0 = 1.
-            }
-        }
-
-        #[auto_ops]
-        impl<const X: char> Mul<&$struct<X>> for $struct<X> {
-            type Output = Self;
-            fn mul(self, rhs: &Self) -> Self::Output {
-                Self(self.0 + &rhs.0) // x^i * x^j = x^{i+j}.
-            }
-        }
-
-        impl<const X: char> PolyGen for $struct<X> {
-            type Degree = $deg_type;
-            fn degree(&self) -> Self::Degree {
-                self.0.clone()
-            }
-        }
-    };
+impl<const X: char, I> From<I> for Mono<X, I> {
+    fn from(d: I) -> Self {
+        Self(d)
+    }
 }
 
-macro_rules! impl_upoly_gen {
-    ($struct:ident, $deg_type:ty) => {
-        impl_poly_gen!($struct, $deg_type);
+impl<const X: char, I> One for Mono<X, I>
+where I: for<'x >AddAssign<&'x I> + Zero {
+    fn one() -> Self {
+        Self::from(I::zero()) // x^0 = 1.
+    }
+}
 
-        impl<const X: char> Display for $struct<X> { 
+#[auto_ops]
+impl<const X: char, I> MulAssign<&Mono<X, I>> for Mono<X, I>
+where I: for<'x >AddAssign<&'x I> {
+    fn mul_assign(&mut self, rhs: &Mono<X, I>) {
+        self.0 += &rhs.0 // x^i * x^j = x^{i+j}
+    }
+}
+
+// Display for univar-type.
+macro_rules! impl_display_u {
+    ($struct:ident<X, $I:ty>) => {
+        impl<const X: char> Display for $struct<X, $I> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let d = self.degree();
                 if d.is_zero() { 
@@ -132,11 +123,13 @@ macro_rules! impl_upoly_gen {
     };
 }
 
-macro_rules! impl_mpoly_gen {
-    ($struct:ident, $mdeg_type:ident<$deg_type:ty>) => {
-        impl_poly_gen!($struct, $mdeg_type<$deg_type>);
+impl_display_u!(Mono<X, usize>);
+impl_display_u!(Mono<X, isize>);
 
-        impl<const X: char> Display for $struct<X> { 
+// Display for multivar-type.
+macro_rules! impl_display_m {
+    ($struct:ident<X, $I:ty>) => {
+        impl<const X: char> Display for $struct<X, $I> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let d = self.degree();
                 if d.is_zero() { 
@@ -157,10 +150,32 @@ macro_rules! impl_mpoly_gen {
     };
 }
 
-impl_upoly_gen!(UPolyGen,  usize);
-impl_upoly_gen!(ULPolyGen, isize);
-impl_mpoly_gen!(MPolyGen,  MDegree<usize>);
-impl_mpoly_gen!(MLPolyGen, MDegree<isize>);
+impl_display_m!(Mono<X, MDegree<usize>>);
+impl_display_m!(Mono<X, MDegree<isize>>);
+
+macro_rules! impl_poly_gen {
+    ($struct:ident, $I:ty) => {
+        impl<const X: char> AlgBase for $struct<X, $I> { 
+            fn symbol() -> String {
+                format!("{}", X)
+            }
+        }
+
+        impl<const X: char> FreeGenerator for $struct<X, $I> {}
+
+        impl<const X: char> PolyGen for $struct<X, $I> {
+            type Degree = $I;
+            fn degree(&self) -> Self::Degree {
+                self.0.clone()
+            }
+        }
+    };
+}
+
+impl_poly_gen!(Mono, usize);
+impl_poly_gen!(Mono, isize);
+impl_poly_gen!(Mono, MDegree<usize>);
+impl_poly_gen!(Mono, MDegree<isize>);
 
 #[derive(Clone, PartialEq, Eq, Default, Debug)]
 pub struct PolyBase<I, R>
@@ -249,7 +264,6 @@ where I: PolyGen<Degree = MDegree<J>>, J: Zero, R: Ring, for<'x> &'x R: RingOps<
         Self::from(data)
     }
 }
-
 
 impl<I, R> From<R> for PolyBase<I, R>
 where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
@@ -381,6 +395,8 @@ where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {}
 
 impl<I, R> Mon for PolyBase<I, R>
 where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {}
+
+// TODO must change impl for Laurent-type. 
 
 impl<I, R> Ring for PolyBase<I, R>
 where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {

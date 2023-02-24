@@ -88,6 +88,12 @@ where Deg: Zero {
     }
 }
 
+impl<Deg> From<(usize, Deg)> for MDegree<Deg> {
+    fn from(value: (usize, Deg)) -> Self {
+        MDegree(BTreeMap::from([value]))
+    }
+}
+
 impl<Deg> FromIterator<(usize, Deg)> for MDegree<Deg> {
     fn from_iter<T: IntoIterator<Item = (usize, Deg)>>(iter: T) -> Self {
         Self(iter.into_iter().collect())
@@ -144,19 +150,6 @@ impl<const X: char, I> From<I> for Mono<X, I> {
     }
 }
 
-impl<const X: char, I> FromStr for Mono<X, I>
-where I: FromStr + One {
-    type Err = ();
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() == 1 && s.chars().next().unwrap() == X { 
-            Ok(Self(I::one()))
-        } else { 
-            // TODO support more complex format. 
-            Err(())
-        }
-    }
-}
-
 impl<const X: char, I> One for Mono<X, I>
 where I: for<'x >AddAssign<&'x I> + Zero {
     fn one() -> Self {
@@ -172,10 +165,16 @@ where I: for<'x >AddAssign<&'x I> {
     }
 }
 
-// Display for univar-type.
-macro_rules! impl_display_u {
-    ($struct:ident<X, $I:ty>) => {
-        impl<const X: char> Display for $struct<X, $I> { 
+// impls for univar-type.
+macro_rules! impl_mono_univar {
+    ($I:ty) => {
+        impl<const X: char> AlgBase for Mono<X, $I> { 
+            fn symbol() -> String {
+                format!("{X}")
+            }
+        }
+
+        impl<const X: char> Display for Mono<X, $I> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let d = self.degree();
                 if d.is_zero() { 
@@ -190,16 +189,34 @@ macro_rules! impl_display_u {
                 }
             }
         }
+
+        impl<const X: char> FromStr for Mono<X, $I> {
+            type Err = ();
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                if s.len() == 1 && s.chars().next().unwrap() == X { 
+                    Ok(Self(<$I>::one()))
+                } else { 
+                    // TODO support more complex format. 
+                    Err(())
+                }
+            }
+        }
     };
 }
 
-impl_display_u!(Mono<X, usize>);
-impl_display_u!(Mono<X, isize>);
+impl_mono_univar!(usize);
+impl_mono_univar!(isize);
 
-// Display for multivar-type.
-macro_rules! impl_display_m {
-    ($struct:ident<X, $I:ty>) => {
-        impl<const X: char> Display for $struct<X, $I> { 
+// impls for multivar-type.
+macro_rules! impl_mono_multivar {
+    ($I:ty) => {
+        impl<const X: char> AlgBase for Mono<X, $I> { 
+            fn symbol() -> String {
+                format!("{X}")
+            }
+        }
+
+        impl<const X: char> Display for Mono<X, $I> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let d = self.degree();
                 if d.is_zero() { 
@@ -217,20 +234,29 @@ macro_rules! impl_display_m {
                 }
             }
         }
+
+        impl<const X: char> FromStr for Mono<X, $I> {
+            type Err = ();
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                let r = regex::Regex::new(&format!("^{X}([0-9]+)$")).unwrap();
+                if let Some(m) = r.captures(&s) { 
+                    let i = usize::from_str(&m[1]).unwrap();
+                    let mdeg = MDegree::from((i, 1));
+                    return Ok(Mono(mdeg))
+                } else { 
+                    // TODO support more complex format. 
+                    Err(())
+                }
+            }
+        }
     };
 }
 
-impl_display_m!(Mono<X, MDegree<usize>>);
-impl_display_m!(Mono<X, MDegree<isize>>);
+impl_mono_multivar!(MDegree<usize>);
+impl_mono_multivar!(MDegree<isize>);
 
 macro_rules! impl_poly_gen {
     ($struct:ident, $I:ty) => {
-        impl<const X: char> AlgBase for $struct<X, $I> { 
-            fn symbol() -> String {
-                format!("{}", X)
-            }
-        }
-
         impl<const X: char> FreeGenerator for $struct<X, $I> {}
 
         impl<const X: char> PolyGen for $struct<X, $I> {

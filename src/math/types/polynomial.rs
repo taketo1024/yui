@@ -417,7 +417,30 @@ macro_rules! impl_assop {
 
 impl_assop!(AddAssign, add_assign);
 impl_assop!(SubAssign, sub_assign);
-impl_assop!(MulAssign, mul_assign);
+
+#[auto_ops]
+impl<I, R> MulAssign<&R> for PolyBase<I, R>
+where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
+    fn mul_assign(&mut self, rhs: &R) {
+        self.data *= rhs
+    }
+}
+
+#[auto_ops]
+impl<I, R> MulAssign<&PolyBase<I, R>> for PolyBase<I, R>
+where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
+    fn mul_assign(&mut self, rhs: &PolyBase<I, R>) {
+        if rhs.is_one() {
+            // do nothing
+        } else if rhs.is_const() { 
+            *self *= rhs.const_term()
+        } else if self.is_const() { 
+            *self = rhs * self.const_term()
+        } else { 
+            self.data *= &rhs.data
+        }
+    }
+}
 
 macro_rules! impl_accum {
     ($trait:ident, $method:ident, $accum_trait:ident, $accum_method:ident, $accum_init:ident) => {
@@ -683,12 +706,14 @@ mod tests {
     }
 
     #[test]
-    fn mul_scal() { 
+    fn mul_const() { 
         type P = Poly::<'x', i32>;
 
         let f = P::from_deg(vec![(0, 2), (1, 3), (2, -4)]);
         let g = P::from(3);
-        assert_eq!(f * g, P::from_deg(vec![(0, 6), (1, 9), (2, -12)]));
+
+        assert_eq!(&f * &g, P::from_deg(vec![(0, 6), (1, 9), (2, -12)]));
+        assert_eq!(&g * &f, P::from_deg(vec![(0, 6), (1, 9), (2, -12)]));
     }
 
     #[test]

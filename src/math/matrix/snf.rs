@@ -223,7 +223,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     // Multiply [a, b; c, d] from left, assuming det = 1.
     pub fn left_elementary(&mut self, comps: [&R; 4], i: usize, j: usize) { 
         let [a, b, c, d] = comps;
-        debug_assert_eq!(a * d - b * c, R::one());
+        debug_assert!((a * d - b * c).is_one());
 
         self.target.left_elementary(comps, i, j);
         self.p.as_mut().map( |p| p.left_elementary(comps, i, j) ); 
@@ -236,7 +236,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     // Multiply [a, c; b, d] from right, assuming det = 1. 
     pub fn right_elementary(&mut self, comps: [&R; 4], i: usize, j: usize) { 
         let [a, b, c, d] = comps;
-        debug_assert_eq!(a * d - b * c, R::one());
+        debug_assert!((a * d - b * c).is_one());
         
         self.target.right_elementary(comps, i, j);
         self.q.as_mut().map( |q| q.right_elementary(comps, i, j) ); 

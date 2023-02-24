@@ -1,17 +1,16 @@
 #![allow(unused_macros)]
 #![allow(unused_imports)]
 
-macro_rules! hashmap {
+macro_rules! map {
     {$( $key: expr => $val: expr ),*} => {{
-        HashMap::from([$(($key, $val),)*])
+        core::convert::From::from([$(($key, $val),)*])
     }}
 }
 
-macro_rules! hashset {
+macro_rules! set {
     {$($val: expr ),*} => {{
         HashSet::from([$($val,)*])
     }}
 }
 
-pub(crate) use hashmap;
-pub(crate) use hashset;
+pub(crate) use {map, set};

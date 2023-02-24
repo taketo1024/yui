@@ -4,6 +4,7 @@ use std::str::FromStr;
 use std::{fmt::Display};
 use std::ops::{Add, Neg, Sub, Mul, AddAssign, SubAssign, MulAssign, Rem, Div, RemAssign, DivAssign};
 use num_traits::{Zero, One};
+use auto_impl_ops::auto_ops;
 use super::super::ext::int_ext::{Integer, IntOps};
 use super::super::traits::*;
 
@@ -180,18 +181,15 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 }
 
 impl_unop!(Neg, neg);
-impl_binop!(Add, add);
-impl_binop!(Sub, sub);
-impl_assop!(AddAssign, add_assign);
-impl_assop!(SubAssign, sub_assign);
-impl_accum!(Sum, sum, AddAssign, add_assign, zero);
-impl_accum!(Product, product, MulAssign, mul_assign, one);
+impl_add_op!(Add, add);
+impl_add_op!(Sub, sub);
 
-impl<'a, I, const D: i32> Mul for &'a QuadInt<I, D>
+#[auto_ops]
+impl<'a, 'b, I, const D: i32> Mul<&'b QuadInt<I, D>> for &'a QuadInt<I, D>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     type Output = QuadInt<I, D>;
 
-    fn mul(self, rhs: Self) -> Self::Output {
+    fn mul(self, rhs: &'b QuadInt<I, D>) -> Self::Output {
         // When D ≡ 1,
         //
         //   ω^2 = (D + 1)/4 + √D/2 
@@ -238,8 +236,8 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
     }
 }
 
-forward_binop!(Mul, mul);
-forward_assop!(MulAssign, mul_assign, mul);
+impl_accum!(Sum, sum, AddAssign, add_assign, zero);
+impl_accum!(Product, product, MulAssign, mul_assign, one);
 
 // Div / Rem for GaussInt (D = -1).
 
@@ -256,30 +254,26 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
     }
 }
 
-impl<'a, I> Div for &'a GaussInt<I>
+#[auto_ops]
+impl<'a, 'b, I> Div<&'b GaussInt<I>> for &'a GaussInt<I>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     type Output = GaussInt<I>;
 
-    fn div(self, rhs: Self) -> Self::Output {
+    fn div(self, rhs: &'b GaussInt<I>) -> Self::Output {
         self.div_round(rhs)
     }
 }
 
-forward_binop_d!(Div, div, -1);
-forward_assop_d!(DivAssign, div_assign, div, -1);
-
-impl<'a, I> Rem for &'a GaussInt<I>
+#[auto_ops]
+impl<'a, 'b, I> Rem<&'b GaussInt<I>> for &'a GaussInt<I>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     type Output = QuadInt<I, -1>;
 
-    fn rem(self, rhs: Self) -> Self::Output {
+    fn rem(self, rhs: &'b GaussInt<I>) -> Self::Output {
         let q = self / rhs;
-        self - &(rhs * &q)
+        self - rhs * q
     }
 }
-
-forward_binop_d!(Rem, rem, -1);
-forward_assop_d!(RemAssign, rem_assign, rem, -1);
 
 // Div / Rem for EisenInt (D = -3).
 
@@ -304,37 +298,33 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
     }
 }
 
-impl<'a, I> Div for &'a EisenInt<I>
+#[auto_ops]
+impl<'a, 'b, I> Div<&'b EisenInt<I>> for &'a EisenInt<I>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     type Output = EisenInt<I>;
 
-    fn div(self, rhs: Self) -> Self::Output {
+    fn div(self, rhs: &'b EisenInt<I>) -> Self::Output {
         self.div_round(rhs)
     }
 }
 
-forward_binop_d!(Div, div, -3);
-forward_assop_d!(DivAssign, div_assign, div, -3);
-
-impl<'a, I> Rem for &'a EisenInt<I>
+#[auto_ops]
+impl<'a, 'b, I> Rem<&'b EisenInt<I>> for &'a EisenInt<I>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     type Output = EisenInt<I>;
 
-    fn rem(self, rhs: Self) -> Self::Output {
+    fn rem(self, rhs: &'b EisenInt<I>) -> Self::Output {
         let q = self / rhs;
-        self - &(rhs * &q)
+        self - rhs * q
     }
 }
 
-forward_binop_d!(Rem, rem, -3);
-forward_assop_d!(RemAssign, rem_assign, rem, -3);
-
-impl_alg_ops!(AddMonOps);
-impl_alg_ops!(AddGrpOps);
-impl_alg_ops!(MonOps);
-impl_alg_ops!(RingOps);
-impl_alg_ops_d!(EucRingOps, -1);
-impl_alg_ops_d!(EucRingOps, -3);
+impl_alg_op!(AddMonOps);
+impl_alg_op!(AddGrpOps);
+impl_alg_op!(MonOps);
+impl_alg_op!(RingOps);
+impl_alg_op_d!(EucRingOps, -1);
+impl_alg_op_d!(EucRingOps, -3);
 
 impl<I, const D: i32> AlgBase for QuadInt<I, D>
 where I: Integer, for<'x> &'x I: IntOps<I> {
@@ -375,21 +365,31 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
     fn normalizing_unit(&self) -> Self {
         let (a, b) = self.pair();
         if D == -1 { 
-            if a.is_positive() && !b.is_negative() { 
+            if a.is_positive() && !b.is_negative() {         // a > 0, b ≧ 0 -> 1
                 Self::one()
-            } else if !a.is_positive() && b.is_positive() { 
+            } else if !a.is_positive() && b.is_positive() {  // a ≦ 0, b > 0 -> -i
                 -Self::omega()
-            } else if a.is_negative() && !b.is_positive() { 
+            } else if a.is_negative() && !b.is_positive() {  // a < 0, b ≦ 0 -> -1
                 -Self::one()
-            } else if !a.is_negative() && b.is_negative() { 
+            } else if !a.is_negative() && b.is_negative() {  // a ≧ 0, b < 0 -> i
                 Self::omega()
-            } else { 
+            } else {                                         // a = b = 0    -> 1
                 Self::one()
             }
         } else if D == -3 { 
-            // TODO
-            if a.is_negative() { 
+            let c = a + b;
+            if a.is_positive() && !b.is_negative() {         // a > 0, b ≧ 0     -> 1
+                Self::one()
+            } else if !a.is_positive() && c.is_positive() {  // a ≦ 0, a + b > 0 -> 1/ω   = 1 - ω
+                Self::new(I::one(), -I::one())
+            } else if !c.is_positive() && b.is_positive() {  // a + b ≦ 0, b > 0 -> 1/ω^2 = -ω
+                -Self::omega()
+            } else if a.is_negative() && !b.is_positive() {  // a < 0, b ≦ 0     -> 1/ω^3 = -1
                 -Self::one()
+            } else if !a.is_negative() && c.is_negative() {  // a ≧ 0, a + b < 0 -> 1/ω^4 = ω - 1
+                Self::new(-I::one(), I::one())
+            } else if !c.is_negative() && b.is_negative() {  // a + b ≧ 0, b < 0 -> 1/ω^5 = ω
+                Self::omega()
             } else { 
                 Self::one()
             }
@@ -435,51 +435,17 @@ macro_rules! impl_unop {
     };
 }
 
-macro_rules! impl_binop {
+macro_rules! impl_add_op {
     ($trait:ident, $method:ident) => {
-        impl<I, const D: i32> $trait for QuadInt<I, D>
-        where I: Integer, for<'x> &'x I: IntOps<I> {
-            type Output = Self;
-
-            fn $method(self, rhs: Self) -> Self::Output {
-                let (a, b) = self.pair_into();
-                let (c, d) =  rhs.pair_into();
-                Self(I::$method(a, c), I::$method(b, d))
-            }
-        }
-
-        impl<'a, I, const D: i32> $trait for &'a QuadInt<I, D>
+        #[auto_ops]
+        impl<'a, 'b, I, const D: i32> $trait<&'b QuadInt<I, D>> for &'a QuadInt<I, D>
         where I: Integer, for<'x> &'x I: IntOps<I> {
             type Output = QuadInt<I, D>;
 
-            fn $method(self, rhs: Self) -> Self::Output {
+            fn $method(self, rhs: &'b QuadInt<I, D>) -> Self::Output {
                 let (a, b) = self.pair();
                 let (c, d) =  rhs.pair();
                 QuadInt(<&'a I>::$method(a, c), <&'a I>::$method(b, d))
-            }
-        }
-    };
-}
-
-macro_rules! impl_assop {
-    ($trait:ident, $method:ident) => {
-        impl<I, const D: i32> $trait for QuadInt<I, D>
-        where I: Integer, for<'x> &'x I: IntOps<I> {
-            fn $method(&mut self, rhs: Self) {
-                let (a, b) = (&mut self.0, &mut self.1);
-                let (c, d) = rhs.pair();
-                a.$method(c);
-                b.$method(d);
-            }
-        }
-
-        impl<'a, I, const D: i32> $trait<&'a Self> for QuadInt<I, D>
-        where I: Integer, for<'x> &'x I: IntOps<I> {
-            fn $method(&mut self, rhs: &'a Self) {
-                let (a, b) = (&mut self.0, &mut self.1);
-                let (c, d) = rhs.pair();
-                a.$method(c);
-                b.$method(d);
             }
         }
     };
@@ -507,69 +473,7 @@ macro_rules! impl_accum {
     }
 }
 
-macro_rules! forward_binop {
-    ($trait:ident, $method:ident) => {
-        impl<I, const D: i32> $trait for QuadInt<I, D>
-        where I: Integer, for<'x> &'x I: IntOps<I> {
-            type Output = Self;
-
-            fn $method(self, rhs: Self) -> Self::Output {
-                (&self).$method(&rhs)
-            }
-        }
-    }
-}
-
-macro_rules! forward_assop {
-    ($trait:ident, $method:ident, $op_method:ident) => {
-        impl<I, const D: i32> $trait for QuadInt<I, D>
-        where I: Integer, for<'x> &'x I: IntOps<I> {
-            fn $method(&mut self, rhs: Self) {
-                *self = (&*self).$op_method(&rhs);
-            }
-        }
-        
-        impl<'a, I, const D: i32> $trait<&'a QuadInt<I, D>> for QuadInt<I, D>
-        where I: Integer, for<'x> &'x I: IntOps<I> {
-            fn $method(&mut self, rhs: &'a Self) {
-                *self = (&*self).$op_method(rhs);
-            }
-        }
-    }
-}
-
-macro_rules! forward_binop_d {
-    ($trait:ident, $method:ident, $d:literal) => {
-        impl<I> $trait for QuadInt<I, $d>
-        where I: Integer, for<'x> &'x I: IntOps<I> {
-            type Output = Self;
-
-            fn $method(self, rhs: Self) -> Self::Output {
-                (&self).$method(&rhs)
-            }
-        }
-    }
-}
-
-macro_rules! forward_assop_d {
-    ($trait:ident, $method:ident, $op_method:ident, $d:literal) => {
-        impl<I> $trait for QuadInt<I, $d>
-        where I: Integer, for<'x> &'x I: IntOps<I> {
-            fn $method(&mut self, rhs: Self) {
-                *self = (&*self).$op_method(&rhs);
-            }
-        }
-        
-        impl<'a, I> $trait<&'a QuadInt<I, $d>> for QuadInt<I, $d>
-        where I: Integer, for<'x> &'x I: IntOps<I> {
-            fn $method(&mut self, rhs: &'a Self) {
-                *self = (&*self).$op_method(rhs);
-            }
-        }
-    }
-}
-
-macro_rules! impl_alg_ops {
+macro_rules! impl_alg_op {
     ($trait:ident) => {
         impl<I, const D: i32> $trait<Self> for QuadInt<I, D> 
         where I: Integer, for<'x> &'x I: IntOps<I> {}
@@ -579,7 +483,7 @@ macro_rules! impl_alg_ops {
     };
 }
 
-macro_rules! impl_alg_ops_d {
+macro_rules! impl_alg_op_d {
     ($trait:ident, $d:literal) => {
         impl<I> $trait<Self> for QuadInt<I, $d> 
         where I: Integer, for<'x> &'x I: IntOps<I> {}
@@ -589,7 +493,7 @@ macro_rules! impl_alg_ops_d {
     };
 }
 
-use {impl_unop, impl_binop, impl_assop, impl_accum, forward_binop, forward_assop, forward_binop_d, forward_assop_d, impl_alg_ops, impl_alg_ops_d};
+use {impl_unop, impl_add_op, impl_accum, impl_alg_op, impl_alg_op_d};
 
 #[cfg(test)]
 mod tests {
@@ -774,6 +678,17 @@ mod tests {
         assert_eq!(A::new(1, -1).normalizing_unit(), A::new(0,  1));
     }
 
+    #[test]
+    fn normalizing_unit_eisen() { 
+        type A = QuadInt<i32, -3>; // EisenInt
+        assert_eq!(A::new(1,  0).normalizing_unit(), A::new(1,  0));
+        assert_eq!(A::new(0,  1).normalizing_unit(), A::new(1, -1));
+        assert_eq!(A::new(-1, 1).normalizing_unit(), A::new(0, -1));
+        assert_eq!(A::new(-1, 0).normalizing_unit(), A::new(-1, 0));
+        assert_eq!(A::new(0, -1).normalizing_unit(), A::new(-1, 1));
+        assert_eq!(A::new(1, -1).normalizing_unit(), A::new(0,  1));
+    }
+    
     #[test]
     fn rem_gauss() {
         type A = QuadInt<i32, -1>; // GaussInt

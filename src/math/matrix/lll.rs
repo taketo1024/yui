@@ -58,7 +58,7 @@ where for<'x> &'x Self: LLLRingOps<Self> {
     fn as_int(&self) -> Option<Self::Int>;
     fn conj(&self) -> Self;
     fn norm(&self) -> Self { 
-        self * &self.conj()
+        self * self.conj()
     }
 }
 
@@ -326,8 +326,8 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         let d2 = &d[k];
         let l0 = &l[[k, k - 1]];
 
-        let lhs = q * &(d0 * d2 + l0.norm());
-        let rhs = p * &(d1 * d1);
+        let lhs = q * (d0 * d2 + l0.norm());
+        let rhs = p * (d1 * d1);
 
         let Some(lhs) = lhs.as_int() else { panic!() };
         let Some(rhs) = rhs.as_int() else { panic!() };
@@ -387,7 +387,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
             let l1 = &l[[i, k-1]];
             let l2 = &l[[i, k]];
 
-            let s = &l0.conj() * l1 + l2 * d0;
+            let s = l0.conj() * l1 + l2 * d0;
             let t = l1 * d2 - l2 * l0;
 
             self.lambda[[i, k-1]] = &s / d1;
@@ -398,7 +398,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 
         let l0 = &self.lambda[[k,k-1]];
 
-        self.det[k-1] = &(d0 * d2 + l0.norm()) / d1;
+        self.det[k-1] = (d0 * d2 + l0.norm()) / d1;
         self.lambda[[k, k-1]] = l0.conj();
 
         trace!("swap {},{}.\n{}", k-1, k, self.dump());
@@ -988,10 +988,9 @@ pub(super) mod tests {
 
     pub(in super::super) mod helper { 
         use std::ops::Div;
-        use num_rational::Ratio;
-        use num_traits::Signed;
         use super::*;
-        use crate::math::ext::int_ext::{Integer, IntOps};
+        use crate::math::{ext::int_ext::{Integer, IntOps}};
+        use crate::math::types::ratio::Ratio;
 
         pub fn assert_is_hnf<R>(b: &DnsMat<R>)
         where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
@@ -1055,7 +1054,7 @@ pub(super) mod tests {
         where R: Integer, for<'x> &'x R: IntOps<R> {
             let r0 = dot::<Ratio<R>>(c0, c0);
             let r1 = dot::<Ratio<R>>(c1, c1);
-            r1 >= (alpha - m * m) * r0
+            r1 >= (alpha - (m * m)) * r0
         }
     
         fn gram_schmidt<R>(b: &ArrayView2<R>) -> (Array2<Ratio<R>>, Array2<Ratio<R>>)

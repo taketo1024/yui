@@ -5,62 +5,90 @@ use is_even::IsEven;
 use num_traits::{Zero, One};
 use super::types::sign::Sign;
 
-// TODO use default impls for op types. 
-
 pub trait AlgBase: 
-    Default + PartialEq + Eq + Clone + Send + Sync + Display + Debug + 'static
+    Default + 
+    PartialEq + 
+    Eq + 
+    Clone + 
+    Send + 
+    Sync + 
+    Display + 
+    Debug + 
+    'static
 {
-    fn symbol() -> String;
+    fn symbol() -> String; // TODO rename to `set_symbol`
 }
 
 // Additive Monoids 
 
-pub trait AddMonOps<T>: 
-    Sized + Add<Output = T>
+pub trait AddMonOps<T = Self>: 
+    Sized + 
+    Add<T, Output = T> +              // S + T -> T
+    for<'a> Add<&'a T, Output = T>    // S + &T -> T
 {}
 
 pub trait AddMon: 
-    AlgBase + AddMonOps<Self> + AddAssign + Sum<Self> + Zero
+    AlgBase + 
+    AddMonOps +                       // T + T -> T, T + &T -> T
+    AddAssign +                       // T += T
+    for<'a> AddAssign<&'a Self> +     // T += &T
+    Sum<Self> +                       // [T] -> T
+    for<'a> Sum<&'a Self> +           // [&T] -> T
+    Zero
 where 
-    for<'a> &'a Self: AddMonOps<Self>,
-    for<'a> Self: AddAssign<&'a Self>,
-    for<'a> Self: Sum<&'a Self>
+    for<'a> &'a Self: AddMonOps<Self> // &T + T -> T, &T + &T -> T
 {}
 
 // Additive Groups 
 
-pub trait AddGrpOps<T>: 
-    AddMonOps<T> + Neg<Output = T> + Sub<Output = T>
+pub trait AddGrpOps<T = Self>: 
+    AddMonOps<T> + 
+    Neg<Output = T> + 
+    Sub<T, Output = T> +
+    for<'a> Sub<&'a T, Output = T> 
 {}
 
 pub trait AddGrp: 
-    AddMon + AddGrpOps<Self> + SubAssign
+    AddMon + 
+    AddGrpOps + 
+    SubAssign + 
+    for<'a> SubAssign<&'a Self>
 where 
-    for<'a> &'a Self: AddGrpOps<Self>,
-    for<'a> Self: SubAssign<&'a Self>
+    for<'a> &'a Self: AddGrpOps<Self>
 {}
 
 // Monoids (multiplicative)
 
-pub trait MonOps<T>: 
-    Sized + Mul<Output = T> 
+pub trait MonOps<T = Self>: 
+    Sized + 
+    Mul<T, Output = T> + 
+    for<'a> Mul<&'a T, Output = T> 
 {}
 
 pub trait Mon: 
-    AlgBase + MonOps<Self> + MulAssign + Product<Self> + One
+    AlgBase + 
+    MonOps + 
+    MulAssign + 
+    for<'a> MulAssign<&'a Self> + 
+    Product<Self> + 
+    for<'a> Product<&'a Self> +
+    One
 where
-    for<'a> &'a Self: MonOps<Self>,
-    for<'a> Self: MulAssign<&'a Self>,
-    for<'a> Self: Product<&'a Self>
+    for<'a> &'a Self: MonOps<Self>
 {}
 
 // Rings 
-pub trait RingOps<T>: 
-    AddGrpOps<T> + MonOps<T>
+
+pub trait RingOps<T = Self>: 
+    AddGrpOps<T> + 
+    MonOps<T>
 {}
 
 pub trait Ring: 
-    AddGrp + Mon + RingOps<Self> + One + sprs::MulAcc
+    AddGrp + 
+    Mon + 
+    RingOps + 
+    sprs::MulAcc
 where
     for<'a> &'a Self: RingOps<Self>
 {
@@ -73,16 +101,24 @@ where
 }
 
 // Euclidean Rings
-pub trait EucRingOps<T>: 
-    RingOps<T> + Rem<Output = T> + Div<Output = T>
+
+pub trait EucRingOps<T = Self>: 
+    RingOps<T> + 
+    Div<T, Output = T> +
+    for<'a> Div<&'a T, Output = T> +
+    Rem<T, Output = T> +
+    for<'a> Rem<&'a T, Output = T> +
 {}
 
 pub trait EucRing: 
-    Ring + EucRingOps<Self> + RemAssign + DivAssign
+    Ring + 
+    EucRingOps + 
+    DivAssign +
+    for<'a> DivAssign<&'a Self> +
+    RemAssign + 
+    for<'a> RemAssign<&'a Self>
 where 
     for<'a> &'a Self: EucRingOps<Self>,
-    for<'a> Self: RemAssign<&'a Self>,
-    for<'a> Self: DivAssign<&'a Self>
 {
     fn divides(&self, y: &Self) -> bool { 
         !self.is_zero() && (y % self).is_zero()
@@ -128,20 +164,44 @@ where
 
         (x, s0, t0)
     }
+
+    fn lcm(x: &Self, y: &Self) -> Self { 
+        let g = Self::gcd(x, y);
+        x * (y / g)
+    }
 }
 
-pub trait RModOps<R, S, T>: AddGrpOps<T> + Mul<S, Output = T>
+// Fields
+
+pub trait FieldOps<T = Self>: 
+    EucRingOps<T>
+{}
+
+pub trait Field: 
+    EucRing + 
+    FieldOps
 where 
-    R: Ring, for<'x> &'x R: RingOps<R>, 
-    S: RingOps<R> // S = R or &'a R
+    for<'a> &'a Self: FieldOps<Self> 
+{}
+
+// R-Modules
+
+pub trait RModOps<R, T>: 
+    AddGrpOps<T> + 
+    Mul<R, Output = T> + 
+    for<'a> Mul<&'a R, Output = T>
+where 
+    R: Ring, for<'x> &'x R: RingOps<R>
 {}
 
 pub trait RMod:
-    AddGrp + RModOps<Self::R, Self::R, Self> + MulAssign<Self::R>
+    AddGrp + 
+    RModOps<Self::R, Self> + 
+    MulAssign<Self::R> +
+    for<'a> MulAssign<&'a Self::R>
 where 
     Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>, 
-    for<'a> &'a Self: RModOps<Self::R, &'a Self::R, Self>,
-    for<'a> Self: MulAssign<&'a Self::R>
+    for<'a> &'a Self: RModOps<Self::R, Self>,
 {
     type R;
 }

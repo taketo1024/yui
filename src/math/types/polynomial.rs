@@ -4,7 +4,7 @@ use std::fmt::Display;
 use std::iter::{Sum, Product};
 use std::ops::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Neg};
 use itertools::Itertools;
-use num_traits::{Zero, One};
+use num_traits::{Zero, One, Pow};
 use auto_impl_ops::auto_ops;
 
 use crate::math::traits::{Ring, RingOps, AlgBase, AddMon, AddMonOps, AddGrpOps, MonOps, AddGrp, Mon};
@@ -199,7 +199,11 @@ where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
         ).collect_vec();
         Self::from(data)
     }
-    
+
+    pub fn mono(i: I::Degree, coeff: R) -> Self { 
+        Self::from((I::from(i), coeff))
+    }
+
     pub fn as_lincomb(&self) -> &LinComb<I, R> { 
         &self.data
     }
@@ -254,6 +258,13 @@ where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
+impl<I, R> PolyBase<I, R>
+where I: PolyGen, I::Degree: One, R: Ring, for<'x> &'x R: RingOps<R> {
+    pub fn variable() -> Self { 
+        Self::mono(I::Degree::one(), R::one()) // x^1
+    }
+}
+
 impl<I, J, R> PolyBase<I, R>
 where I: PolyGen<Degree = MDegree<J>>, J: Zero, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn from_mdeg(data: Vec<(Vec<J>, R)>) -> Self {
@@ -269,6 +280,13 @@ impl<I, R> From<R> for PolyBase<I, R>
 where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn from(a: R) -> Self {
         Self::new(LinComb::from((I::one(), a)))
+    }
+}
+
+impl<I, R> From<(I, R)> for PolyBase<I, R>
+where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
+    fn from(data: (I, R)) -> Self {
+        Self::new(LinComb::from(data))
     }
 }
 
@@ -364,6 +382,47 @@ macro_rules! impl_accum {
 
 impl_accum!(Sum, sum, AddAssign, add_assign, zero);
 impl_accum!(Product, product, MulAssign, mul_assign, one);
+
+macro_rules! impl_pow_unsigned {
+    ($t:ty) => {
+        impl<I, R> Pow<$t> for &PolyBase<I, R>
+        where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
+            type Output = PolyBase<I, R>;
+            fn pow(self, n: $t) -> Self::Output {
+                let mut res = PolyBase::one();
+                for _ in 0..n { 
+                    res *= self
+                }
+                res
+            }
+        }
+    };
+}
+
+impl_pow_unsigned!(u32);
+impl_pow_unsigned!(u64);
+impl_pow_unsigned!(usize);
+
+macro_rules! impl_pow_signed {
+    ($t:ty) => {
+        impl<I, R> Pow<$t> for &PolyBase<I, R>
+        where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
+            type Output = PolyBase<I, R>;
+            fn pow(self, n: $t) -> Self::Output {
+                if n >= 0 { 
+                    self.pow(n as usize)
+                } else {
+                    let inv = self.inv().unwrap();
+                    (&inv).pow(-n as usize)
+                }
+            }
+        }
+    }
+}
+
+impl_pow_signed!(i32);
+impl_pow_signed!(i64);
+impl_pow_signed!(isize);
 
 macro_rules! impl_alg_op {
     ($trait:ident) => {
@@ -470,6 +529,13 @@ mod tests {
     }
 
     #[test]
+    fn variable() {
+        type P = Poly::<'x', i32>;
+        let x = P::variable();
+        assert_eq!(x, P::from_deg(vec![(1, 1)]));
+    }
+
+    #[test]
     fn coeff() { 
         type P = Poly::<'x', i32>;
         let f = P::from_deg(vec![(0, 2), (1, 3), (2, -4)]);
@@ -547,5 +613,15 @@ mod tests {
         let f = P::from_deg(vec![(0, 2), (1, 3), (2, -4)]);
         let g = P::from(3);
         assert_eq!(f * g, P::from_deg(vec![(0, 6), (1, 9), (2, -12)]));
+    }
+
+    #[test]
+    fn pow() { 
+        type P = Poly::<'x', i32>;
+
+        let f = P::from_deg(vec![(0, 3), (1, 2)]);
+        assert_eq!(f.pow(0), P::one());
+        assert_eq!(f.pow(1), f);       assert_eq!(f.pow(0), P::one());
+        assert_eq!(f.pow(2), P::from_deg(vec![(0, 9), (1, 12), (2, 4)]));
     }
 }

@@ -16,6 +16,40 @@ pub type LPoly <const X: char, R> = PolyBase<Mono<X, isize>, R>;          // uni
 pub type MPoly <const X: char, R> = PolyBase<Mono<X, MDegree<usize>>, R>; // multivar
 pub type MLPoly<const X: char, R> = PolyBase<Mono<X, MDegree<isize>>, R>; // multivar, Laurent
 
+pub trait PolyDeg: Add + Zero {
+    fn add_inv(&self) -> Option<Self>;
+}
+
+macro_rules! impl_polydeg_unsigned {
+    ($t:ty) => {
+        impl PolyDeg for $t {
+            fn add_inv(&self) -> Option<Self> {
+                if self.is_zero() { 
+                    Some(Self::zero())
+                } else { 
+                    None
+                }
+            }
+        }
+    };
+}
+
+impl_polydeg_unsigned!(usize);
+impl_polydeg_unsigned!(MDegree<usize>);
+
+macro_rules! impl_polydeg_signed {
+    ($t:ty) => {
+        impl PolyDeg for $t {
+            fn add_inv(&self) -> Option<Self> {
+                Some(-self)
+            }
+        }
+    };
+}
+
+impl_polydeg_signed!(isize);
+impl_polydeg_signed!(MDegree<isize>);
+
 pub trait PolyGen: 
     Mul<Output = Self> + 
     One + 
@@ -24,8 +58,9 @@ pub trait PolyGen:
     From<Self::Degree> +
     FreeGenerator
 {
-    type Degree;
+    type Degree: PolyDeg;
     fn degree(&self) -> Self::Degree;
+    fn inv(&self) -> Option<Self>;
 }
 
 #[derive(Clone, Default, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
@@ -72,6 +107,17 @@ where for<'x> Deg: Clone + AddAssign<&'x Deg> + Zero {
             }
         }
         data.retain(|_, v| !v.is_zero())
+    }
+}
+
+impl<Deg> Neg for &MDegree<Deg>
+where for<'x> &'x Deg: Neg<Output = Deg> {
+    type Output = MDegree<Deg>;
+    fn neg(self) -> Self::Output {
+        let list = self.0.iter().map(|(&i, d)| 
+            (i, -d)
+        ).collect();
+        MDegree(list)
     }
 }
 
@@ -165,8 +211,17 @@ macro_rules! impl_poly_gen {
 
         impl<const X: char> PolyGen for $struct<X, $I> {
             type Degree = $I;
+
             fn degree(&self) -> Self::Degree {
                 self.0.clone()
+            }
+
+            fn inv(&self) -> Option<Self> { // (x^i)^{-1} = x^{-i}
+                if let Some(i) = self.degree().add_inv() { 
+                    Some(Self(i))
+                } else { 
+                    None
+                }
             }
         }
     };
@@ -240,6 +295,12 @@ where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
         self.iter().all(|(i, r)| 
             i.is_one() || !i.is_one() && r.is_zero()
         )
+    }
+
+    pub fn is_mono(&self) -> bool { 
+        self.iter().filter(|(_, r)| 
+            !r.is_zero()
+        ).count() <= 1
     }
 
     pub fn const_term(&self) -> &R { 
@@ -455,18 +516,19 @@ where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {}
 impl<I, R> Mon for PolyBase<I, R>
 where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {}
 
-// TODO must change impl for Laurent-type. 
-
 impl<I, R> Ring for PolyBase<I, R>
 where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn inv(&self) -> Option<Self> {
-        if self.is_const() { 
-            let a = self.const_term();
-            if let Some(ainv) = a.inv() { 
-                return Some(Self::from(ainv))
-            }
+        if !self.is_mono() { 
+            return None
         }
-        None
+
+        let (x, a) = self.lead_term(); // (a x^i)^{-1} = a^{-1} x^{-i}
+        if let (Some(xinv), Some(ainv)) = (x.inv(), a.inv()) { 
+            Some(Self::from((xinv, ainv)))
+        } else { 
+            None
+        }
     }
 
     fn is_unit(&self) -> bool {
@@ -526,6 +588,20 @@ mod tests {
 
         f.reduce();
         assert_eq!(f.len(), 1);
+    }
+
+    #[test]
+    fn zero() {
+        type P = Poly::<'x', i32>;
+        let x = P::zero();
+        assert_eq!(x, P::from_deg(vec![]));
+    }
+
+    #[test]
+    fn one() {
+        type P = Poly::<'x', i32>;
+        let x = P::one();
+        assert_eq!(x, P::from_deg(vec![(0, 1)]));
     }
 
     #[test]
@@ -623,5 +699,105 @@ mod tests {
         assert_eq!(f.pow(0), P::one());
         assert_eq!(f.pow(1), f);       assert_eq!(f.pow(0), P::one());
         assert_eq!(f.pow(2), P::from_deg(vec![(0, 9), (1, 12), (2, 4)]));
+    }
+
+    #[test]
+    fn pow_laurent() { 
+        type P = LPoly::<'x', i32>;
+
+        let f = P::variable();
+        assert_eq!(f.pow(0), P::one());
+        assert_eq!(f.pow(-1), P::mono(-1, 1));       assert_eq!(f.pow(0), P::one());
+        assert_eq!(f.pow(-2), P::mono(-2, 1));
+    }
+
+    #[test]
+    fn inv() { 
+        type P = Poly::<'x', i32>;
+
+        let f = P::from(1);
+        assert_eq!(f.inv(), Some(P::from(1)));
+
+        let f = P::from(0);
+        assert_eq!(f.inv(), None);
+
+        let f = P::from(2);
+        assert_eq!(f.inv(), None);
+
+        let f = P::variable();
+        assert_eq!(f.inv(), None);
+
+        let f = P::from_deg(vec![(0, 1), (1, 1)]);
+        assert_eq!(f.inv(), None);
+    }
+
+    #[test]
+    fn inv_rat() { 
+        use crate::math::types::ratio::Ratio;
+        type R = Ratio<i32>;
+        type P = Poly::<'x', R>;
+
+        let f = P::from(R::from(1));
+        assert_eq!(f.inv(), Some(P::from(R::from(1))));
+
+        let f = P::from(R::zero());
+        assert_eq!(f.inv(), None);
+
+        let f = P::from(R::from(2));
+        assert_eq!(f.inv(), Some(P::from(R::new(1, 2))));
+
+        let f = P::variable();
+        assert_eq!(f.inv(), None);
+
+        let f = P::from_deg(vec![(0, R::one()), (1, R::one())]);
+        assert_eq!(f.inv(), None);
+    }
+
+    #[test]
+    fn inv_laurent() { 
+        type P = LPoly::<'x', i32>;
+
+        let f = P::from(1);
+        assert_eq!(f.inv(), Some(P::from(1)));
+
+        let f = P::from(0);
+        assert_eq!(f.inv(), None);
+
+        let f = P::from(2);
+        assert_eq!(f.inv(), None);
+
+        let f = P::variable();
+        assert_eq!(f.inv(), Some(P::mono(-1, 1)));
+
+        let f = P::mono(1, 2);
+        assert_eq!(f.inv(), None);
+
+        let f = P::from_deg(vec![(0, 1), (1, 1)]);
+        assert_eq!(f.inv(), None);
+    }
+
+    #[test]
+    fn inv_laurent_rat() { 
+        use crate::math::types::ratio::Ratio;
+        type R = Ratio<i32>;
+        type P = LPoly::<'x', R>;
+
+        let f = P::from(R::from(1));
+        assert_eq!(f.inv(), Some(P::from(R::from(1))));
+
+        let f = P::from(R::zero());
+        assert_eq!(f.inv(), None);
+
+        let f = P::from(R::from(2));
+        assert_eq!(f.inv(), Some(P::from(R::new(1, 2))));
+
+        let f = P::variable();
+        assert_eq!(f.inv(), Some(P::mono(-1, R::one())));
+
+        let f = P::mono(1, R::from(2));
+        assert_eq!(f.inv(), Some(P::mono(-1, R::new(1, 2))));
+
+        let f = P::from_deg(vec![(0, R::one()), (1, R::one())]);
+        assert_eq!(f.inv(), None);
     }
 }

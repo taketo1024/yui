@@ -638,11 +638,13 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
             (q, r)
         };
 
-        let d = (self.lead_deg() - rhs.lead_deg()).max(0);
         let mut q = Self::zero();
         let mut r = self.clone();
 
-        for _ in 0 ..= d { 
+        let i = self.lead_deg();
+        let j =  rhs.lead_deg();
+        
+        for _ in j ..= i { // passes if j > i. 
             let (q1, r1) = iter(r, rhs);
             q += q1;
             r = r1;
@@ -980,7 +982,11 @@ mod tests {
 
         assert_eq!(q, P::from_deg( vec![(0, R::new(1, 4)), (1, R::new(1, 2))]) );
         assert_eq!(r, P::from( R::new(1, 4)) );
-        assert_eq!(f, q * g + r);
+        assert_eq!(f, q * &g + r);
+
+        let (q, r) = g.div_rem(&f);
+        assert_eq!(q, P::zero());
+        assert_eq!(r, g);
     }
 
     #[test]

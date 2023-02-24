@@ -11,6 +11,9 @@ pub enum CType {
     ZPoly, ZPoly_128, ZPoly_big, 
     QPoly, QPoly_128, QPoly_big, 
     F2Poly, F3Poly, F5Poly, F7Poly,
+    ZMpoly, ZMpoly_128, ZMpoly_big,
+    QMpoly, QMpoly_128, QMpoly_big, 
+    F2Mpoly, F3Mpoly, F5Mpoly, F7Mpoly,
     Gauss, Gauss_128, Gauss_big,
     Eisen, Eisen_128, Eisen_big,
     None
@@ -155,10 +158,7 @@ mod kh {
 
     fn compute_bigraded<R>(l: &Link, c_value: &String, reduced: bool) -> Result<String, Box<dyn std::error::Error>>
     where R: EucRing + FromStr, for<'x> &'x R: EucRingOps<R> { 
-        let Ok(c) = c_value.parse::<R>() else {
-            return err!("cannot parse c: '{}' as type: {}.", c_value, std::any::type_name::<R>())
-        };
-        if !c.is_zero() { 
+        if c_value.as_str() != "0" { 
             return err!("--bigraded only supported for `c = 0`.")
         }
         let h = KhHomologyBigraded::new(l.clone(), reduced);
@@ -168,11 +168,9 @@ mod kh {
 
     fn compute_homology<R>(l: &Link, c_value: &String, reduced: bool) -> Result<String, Box<dyn std::error::Error>>
     where R: EucRing + FromStr, for<'x> &'x R: EucRingOps<R> { 
-        let Ok(c) = c_value.parse::<R>() else {
-            return err!("cannot parse c: '{}' as type: {}.", c_value, std::any::type_name::<R>())
-        };
-        let h = KhHomology::new(l.clone(), c, R::zero(), reduced);
-        let res = h.to_string();
+        let (h, t) = parse_pair(c_value)?;
+        let kh = KhHomology::new(l.clone(), h, t, reduced);
+        let res = kh.to_string();
         Ok(res)
     }
 }
@@ -200,17 +198,15 @@ mod ckh {
     where R: Ring + FromStr, for<'x> &'x R: RingOps<R> { 
         use string_builder::Builder;
 
-        let Ok(c) = R::from_str(c_value) else { 
-            return err!("cannot parse c: '{}' as type: {}.", c_value, std::any::type_name::<R>())
-        };
-        let c = KhComplex::new(l.clone(), c, R::zero(), reduced);
-        let c = Reduced::from(c);
+        let (h, t) = parse_pair(c_value)?;
+        let ckh = KhComplex::new(l.clone(), h, t, reduced);
+        let ckh = Reduced::from(ckh);
 
         let mut b = Builder::new(1024);
-        for i in c.range() {
-            b.append(format!("C[{}]: {} -> {}\n", i, c[i], c[i+1]));
+        for i in ckh.range() {
+            b.append(format!("C[{}]: {} -> {}\n", i, ckh[i], ckh[i+1]));
 
-            let d = c.d_matrix(i);
+            let d = ckh.d_matrix(i);
             if d.rows() > 0 && d.cols() > 0 {
                 b.append(d.to_dense().to_string());
                 b.append("\n");
@@ -272,11 +268,12 @@ mod ss {
 
     fn compute_ss<R>(l: &Link, c_value: &String) -> Result<i32, Box<dyn std::error::Error>>
     where R: EucRing + FromStr, for<'x> &'x R: EucRingOps<R> { 
-        if let Ok(c) = c_value.parse::<R>() { 
-            Ok( ss_invariant(l, &c, true) )
-        } else { 
-            err!("cannot parse c: '{}' as type: {}.", c_value, std::any::type_name::<R>())
-        }
+        let Ok(c) = R::from_str(c_value) else { 
+            return err!("cannot parse c: '{}' as type: {}.", c_value, std::any::type_name::<R>())
+        };
+
+        let ss = ss_invariant(l, &c, true);
+        Ok(ss)
     }
 
     fn write_res(name: &String, c_value: &String, res: &Result<i32, Box<dyn std::error::Error>>, output: &String) -> Result<(), Box<dyn std::error::Error>> { 
@@ -351,6 +348,25 @@ where F: FnOnce() -> Res {
     (res, time)
 }
 
+use std::str::FromStr;
+use num_traits::Zero;
+
+fn parse_pair<R: FromStr + Zero>(s: &String) -> Result<(R, R), Box<dyn std::error::Error>> { 
+    if let Ok(c) = R::from_str(s) { 
+        return Ok((c, R::zero()))
+    }
+
+    let r = regex::Regex::new(r"(.+)?,(.+)?").unwrap();
+    if let Some(m) = r.captures(&s) { 
+        let (s1, s2) = (&m[1], &m[2]);
+        if let (Ok(a), Ok(b)) = (R::from_str(s1), R::from_str(s2)) {
+            return Ok((a, b))
+        }
+    }
+
+    err!("cannot parse '{}' as {}.", s, std::any::type_name::<R>())
+}
+
 fn guard_panic<F, R>(f: F) -> Result<R, Box<dyn std::error::Error>>
 where F: FnOnce() -> Result<R, Box<dyn std::error::Error>> + std::panic::UnwindSafe {
     std::panic::catch_unwind(|| {
@@ -370,7 +386,28 @@ where F: FnOnce() -> Result<R, Box<dyn std::error::Error>> + std::panic::UnwindS
 use num_bigint::BigInt;
 use yui::math::types::quad_int::{GaussInt, EisenInt};
 use yui::math::types::{ratio::Ratio, fin_field::FF};
-use yui::math::types::polynomial::Poly;
+use yui::math::types::polynomial::{Poly, MPoly};
+
+macro_rules! dispatch_ring {
+    ($method:ident, $c_type:expr $(, $args:expr)*) => {{
+        match $c_type { 
+            CType::ZPoly      => $method::<Poly<'H', i64>>($($args),*),
+            CType::ZPoly_128  => $method::<Poly<'H', i128>>($($args),*),
+            CType::ZPoly_big  => $method::<Poly<'H', BigInt>>($($args),*),
+            CType::ZMpoly     => $method::<MPoly<'H', i64>>($($args),*),
+            CType::ZMpoly_128 => $method::<MPoly<'H', i128>>($($args),*),
+            CType::ZMpoly_big => $method::<MPoly<'H', BigInt>>($($args),*),
+            CType::QMpoly     => $method::<MPoly<'H', Ratio<i64>>>($($args),*),
+            CType::QMpoly_128 => $method::<MPoly<'H', Ratio<i128>>>($($args),*),
+            CType::QMpoly_big => $method::<MPoly<'H', Ratio<BigInt>>>($($args),*),
+            CType::F2Mpoly    => $method::<MPoly<'H', FF<2>>>($($args),*),
+            CType::F3Mpoly    => $method::<MPoly<'H', FF<3>>>($($args),*),
+            CType::F5Mpoly    => $method::<MPoly<'H', FF<5>>>($($args),*),
+            CType::F7Mpoly    => $method::<MPoly<'H', FF<7>>>($($args),*),
+            _ => dispatch_eucring!($method, $c_type, $($args),*)
+        }
+    }};
+}
 
 macro_rules! dispatch_eucring {
     ($method:ident, $c_type:expr $(, $args:expr)*) => {
@@ -401,20 +438,6 @@ macro_rules! dispatch_eucring {
             _ => err!("{} is not supported for: {}", stringify!($method), $c_type)
         }
     };
-}
-
-macro_rules! dispatch_ring {
-    ($method:ident, $c_type:expr $(, $args:expr)*) => {{
-        if let Ok(res) = dispatch_eucring!($method, $c_type, $($args),*) { 
-            return Ok(res)
-        }
-        match $c_type { 
-            CType::ZPoly      => $method::<Poly<'H', i64>>($($args),*),
-            CType::ZPoly_128  => $method::<Poly<'H', i128>>($($args),*),
-            CType::ZPoly_big  => $method::<Poly<'H', BigInt>>($($args),*),
-            _ => err!("{} is not supported for: {}", stringify!($method), $c_type)
-        }
-    }};
 }
 
 pub(crate) use {dispatch_ring, dispatch_eucring};

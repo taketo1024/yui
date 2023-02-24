@@ -2,12 +2,12 @@
 use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::iter::{Sum, Product};
-use std::ops::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Neg};
+use std::ops::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Neg, DivAssign, RemAssign, Div, Rem};
 use itertools::Itertools;
 use num_traits::{Zero, One, Pow};
 use auto_impl_ops::auto_ops;
 
-use crate::math::traits::{Ring, RingOps, AlgBase, AddMon, AddMonOps, AddGrpOps, MonOps, AddGrp, Mon};
+use crate::math::traits::{AlgBase, AddMon, AddMonOps, AddGrp, AddGrpOps, Mon, MonOps, Ring, RingOps, EucRing, EucRingOps, Field, FieldOps};
 use super::lin_comb::{LinComb, FreeGenerator};
 use crate::utils::format::{subscript, superscript};
 
@@ -331,6 +331,10 @@ where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn lead_coeff(&self) -> &R { 
         self.lead_term().1
     }
+
+    pub fn lead_deg(&self) -> I::Degree { 
+        self.lead_term().0.degree()
+    }
 }
 
 impl<I, R> PolyBase<I, R>
@@ -581,6 +585,72 @@ where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
         Self::from(self.lead_coeff().normalizing_unit())
     }
 }
+
+// UPoly over R: Field
+
+impl<const X: char, R> Poly<X, R>
+where R: Field, for<'x> &'x R: FieldOps<R> {
+    pub fn div_rem(&self, rhs: &Self) -> (Self, Self) { 
+        let iter = |f: Self, g: &Self| -> (Self, Self) { 
+            if f.lead_deg() < g.lead_deg() { 
+                return (Self::zero(), f)
+            }
+
+            let (i, a) = f.lead_term(); // ax^i
+            let (j, b) = g.lead_term(); // bx^j
+            
+            let k = i.degree() - j.degree(); // >= 0
+            let c = a / b;
+            let q = Poly::mono(k, c);   // cx^k = (a/b) x^{i-j}.
+            let r = f - &q * g;
+            
+            (q, r)
+        };
+
+        let d = (self.lead_deg() - rhs.lead_deg()).max(0);
+        let mut q = Self::zero();
+        let mut r = self.clone();
+
+        for _ in 0 ..= d { 
+            let (q1, r1) = iter(r, rhs);
+            q += q1;
+            r = r1;
+        }
+
+        r.reduce();
+
+        (q, r)
+    }
+}
+
+#[auto_ops]
+impl<const X: char, R> Div<&Poly<X, R>> for Poly<X, R>
+where R: Field, for<'x> &'x R: FieldOps<R> {
+    type Output = Self;
+
+    fn div(self, rhs: &Poly<X, R>) -> Self {
+        self.div_rem(rhs).0
+    }
+}
+
+#[auto_ops]
+impl<const X: char, R> Rem<&Poly<X, R>> for Poly<X, R>
+where R: Field, for<'x> &'x R: FieldOps<R> {
+    type Output = Self;
+
+    fn rem(self, rhs: &Poly<X, R>) -> Self::Output {
+        self.div_rem(rhs).1
+    }
+}
+
+impl<const X: char, R> EucRingOps<Poly<X, R>> for Poly<X, R>
+where R: Field, for<'x> &'x R: FieldOps<R> {}
+
+impl<const X: char, R> EucRingOps<Poly<X, R>> for &Poly<X, R>
+where R: Field, for<'x> &'x R: FieldOps<R> {}
+
+impl<const X: char, R> EucRing for Poly<X, R>
+where R: Field, for<'x> &'x R: FieldOps<R> {}
 
 #[cfg(test)]
 mod tests {
@@ -865,5 +935,20 @@ mod tests {
         let f = P::from_deg(vec![(0, R::one()), (1, R::one())]);
         assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
+    }
+
+    #[test]
+    fn div_rem() { 
+        use crate::math::types::ratio::Ratio;
+        type R = Ratio<i32>;
+        type P = Poly::<'x', R>;
+
+        let f = P::from_deg(vec![(0, R::from(1)), (1, R::from(2)), (2, R::from(1))]);
+        let g = P::from_deg(vec![(0, R::from(3)), (1, R::from(2))]);
+        let (q, r) = f.div_rem(&g);
+
+        assert_eq!(q, P::from_deg( vec![(0, R::new(1, 4)), (1, R::new(1, 2))]) );
+        assert_eq!(r, P::from( R::new(1, 4)) );
+        assert_eq!(f, q * g + r);
     }
 }

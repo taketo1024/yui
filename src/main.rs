@@ -8,6 +8,8 @@ pub enum CType {
     Z, Z_128, Z_big, 
     Q, Q_128, Q_big, 
     F2, F3, F5, F7,
+    PolyQ, PolyQ_128, PolyQ_big, 
+    PolyF2, PolyF3, PolyF5, PolyF7,
     Gauss, Gauss_128, Gauss_big,
     Eisen, Eisen_128, Eisen_big,
     None
@@ -302,6 +304,7 @@ where F: FnOnce() -> Result<R, Box<dyn std::error::Error>> + std::panic::UnwindS
 use num_bigint::BigInt;
 use yui::math::types::quad_int::{GaussInt, EisenInt};
 use yui::math::types::{ratio::Ratio, fin_field::FF};
+use yui::math::types::polynomial::Poly;
 
 macro_rules! dispatch {
     ($method:ident, $c_type:expr $(, $args:expr)*) => {
@@ -316,6 +319,13 @@ macro_rules! dispatch {
             CType::F3         => $method::<FF<3>>($($args),*),
             CType::F5         => $method::<FF<5>>($($args),*),
             CType::F7         => $method::<FF<7>>($($args),*),
+            CType::PolyQ      => $method::<Poly<'H', Ratio<i64>>>($($args),*),
+            CType::PolyQ_128  => $method::<Poly<'H', Ratio<i128>>>($($args),*),
+            CType::PolyQ_big  => $method::<Poly<'H', Ratio<BigInt>>>($($args),*),
+            CType::PolyF2     => $method::<Poly<'H', FF<2>>>($($args),*),
+            CType::PolyF3     => $method::<Poly<'H', FF<3>>>($($args),*),
+            CType::PolyF5     => $method::<Poly<'H', FF<5>>>($($args),*),
+            CType::PolyF7     => $method::<Poly<'H', FF<7>>>($($args),*),
             CType::Gauss      => $method::<GaussInt<i64>>($($args),*), 
             CType::Gauss_128  => $method::<GaussInt<i128>>($($args),*), 
             CType::Gauss_big  => $method::<GaussInt<BigInt>>($($args),*), 

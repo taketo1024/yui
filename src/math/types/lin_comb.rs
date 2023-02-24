@@ -28,12 +28,18 @@ where
     X: FreeGenerator,
     R: Ring, for<'x> &'x R: RingOps<R>
 { 
-    pub fn new(data: HashMap<X, R>) -> Self {
+    pub fn new_raw(data: HashMap<X, R>) -> Self {
         Self { data, r_zero: R::zero() }
     }
 
+    pub fn new(data: HashMap<X, R>) -> Self {
+        let mut new = Self::new_raw(data);
+        new.reduce();
+        new
+    }
+
     pub fn wrap(x: X) -> Self { 
-        Self::new(map!{ x => R::one() })
+        Self::new_raw(map!{ x => R::one() })
     }
 
     pub fn from_iter<I>(iter: I) -> Self 
@@ -164,7 +170,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn zero() -> Self {
-        Self::default()
+        Self::new_raw(HashMap::new())
     }
 
     fn is_zero(&self) -> bool {
@@ -202,6 +208,8 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn add_assign(&mut self, rhs: (X, R)) {
+        if rhs.1.is_zero() { return }
+
         let data = &mut self.data;
         let (x, r) = rhs;
         if data.contains_key(&x) { 
@@ -219,6 +227,8 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn add_assign(&mut self, rhs: (&X, &R)) {
+        if rhs.1.is_zero() { return }
+
         let data = &mut self.data;
         let (x, r) = rhs;
         if data.contains_key(x) { 
@@ -240,6 +250,7 @@ where
         for e in rhs.data.iter() { 
             self.add_assign(e);
         }
+        self.reduce()
     }
 }
 
@@ -254,6 +265,7 @@ where
             let e = (e.0, &-e.1);
             self.add_assign(e);
         }
+        self.reduce()
     }
 }
 
@@ -266,6 +278,7 @@ where
     fn mul_assign(&mut self, rhs: &R) {
         let data = std::mem::take(&mut self.data);
         self.data = data.into_iter().map(|(x, r)| (x, &r * rhs)).collect();
+        self.reduce()
     }
 }
 
@@ -289,6 +302,7 @@ where
             }
         }
         
+        res.reduce();
         res
     }
 }
@@ -461,10 +475,15 @@ mod tests {
     fn reduce() { 
         type L = LinComb<X, i32>;
 
-        let mut z = L::new(map!{ X(1) => 1, X(2) => 0, X(3) => 0 });
+        let data = map!{ X(1) => 1, X(2) => 0, X(3) => 0 };
+        let mut z = L::new_raw(data);
+        
+        assert_eq!(z.len(), 3);
+
         z.reduce();
 
-        assert_eq!(z, L::new(map!{ X(1) => 1 }));
+        assert_eq!(z, L::new_raw(map!{ X(1) => 1 }));
+        assert_eq!(z.len(), 1);
     }
 
     #[test]

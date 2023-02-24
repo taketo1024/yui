@@ -272,8 +272,14 @@ where
 
 impl<I, R> PolyBase<I, R>
 where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new(data: LinComb<I, R>) -> Self { 
+    pub fn new_raw(data: LinComb<I, R>) -> Self { 
         Self { data, zero: (I::one(), R::zero()) }
+    }
+
+    pub fn new(data: LinComb<I, R>) -> Self { 
+        let mut new = Self::new_raw(data);
+        new.reduce();
+        new
     }
 
     pub fn from_deg(data: Vec<(I::Degree, R)>) -> Self {
@@ -316,7 +322,7 @@ where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn reduced(&self) -> Self { 
-        Self::new(self.data.reduced())
+        Self::new_raw(self.data.reduced())
     }
 
     pub fn is_const(&self) -> bool { 
@@ -417,7 +423,7 @@ where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
 impl<I, R> Zero for PolyBase<I, R>
 where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn zero() -> Self {
-        Self::new(LinComb::zero())
+        Self::new_raw(LinComb::zero())
     }
 
     fn is_zero(&self) -> bool {
@@ -428,7 +434,7 @@ where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
 impl<I, R> One for PolyBase<I, R>
 where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn one() -> Self {
-        Self::new(LinComb::from((I::one(), R::one())))
+        Self::new_raw(LinComb::from((I::one(), R::one())))
     }
 
     fn is_one(&self) -> bool {
@@ -687,6 +693,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {}
 
 #[cfg(test)]
 mod tests {
+    use crate::utils::collections::map;
     use super::*;
  
     #[test]
@@ -728,7 +735,14 @@ mod tests {
     #[test]
     fn reduce() { 
         type P = Poly::<'x', i32>;
-        let mut f = P::from_deg(vec![(0, 0), (1, 1), (2, 0)]);
+        type X = Mono<'x', usize>;
+
+        let data = map!{
+            X::from(0) => 0, 
+            X::from(1) => 1, 
+            X::from(2) => 0 
+        };
+        let mut f = P::new_raw(LinComb::new_raw(data));
         assert_eq!(f.len(), 3);
 
         f.reduce();

@@ -17,12 +17,17 @@ pub type MPoly <const X: char, R> = PolyBase<Mono<X, MDegree<usize>>, R>; // mul
 pub type MLPoly<const X: char, R> = PolyBase<Mono<X, MDegree<isize>>, R>; // multivar, Laurent
 
 pub trait PolyDeg: Add + Zero {
+    fn is_add_unit(&self) -> bool;
     fn add_inv(&self) -> Option<Self>;
 }
 
 macro_rules! impl_polydeg_unsigned {
     ($t:ty) => {
         impl PolyDeg for $t {
+            fn is_add_unit(&self) -> bool { 
+                self.is_zero()
+            }
+
             fn add_inv(&self) -> Option<Self> {
                 if self.is_zero() { 
                     Some(Self::zero())
@@ -40,6 +45,10 @@ impl_polydeg_unsigned!(MDegree<usize>);
 macro_rules! impl_polydeg_signed {
     ($t:ty) => {
         impl PolyDeg for $t {
+            fn is_add_unit(&self) -> bool { 
+                true
+            }
+
             fn add_inv(&self) -> Option<Self> {
                 Some(-self)
             }
@@ -60,6 +69,7 @@ pub trait PolyGen:
 {
     type Degree: PolyDeg;
     fn degree(&self) -> Self::Degree;
+    fn is_unit(&self) -> bool;
     fn inv(&self) -> Option<Self>;
 }
 
@@ -214,6 +224,10 @@ macro_rules! impl_poly_gen {
 
             fn degree(&self) -> Self::Degree {
                 self.0.clone()
+            }
+
+            fn is_unit(&self) -> bool { 
+                self.degree().is_add_unit()
             }
 
             fn inv(&self) -> Option<Self> { // (x^i)^{-1} = x^{-i}
@@ -555,7 +569,12 @@ where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn is_unit(&self) -> bool {
-        self.is_const() && self.const_term().is_unit()
+        if self.is_mono() { 
+            let (x, a) = self.lead_term();
+            x.is_unit() && a.is_unit()
+        } else { 
+            false
+        }
     }
 
     fn normalizing_unit(&self) -> Self {
@@ -741,18 +760,23 @@ mod tests {
         type P = Poly::<'x', i32>;
 
         let f = P::from(1);
+        assert_eq!(f.is_unit(), true);
         assert_eq!(f.inv(), Some(P::from(1)));
 
         let f = P::from(0);
+        assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
 
         let f = P::from(2);
+        assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
 
         let f = P::variable();
+        assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
 
         let f = P::from_deg(vec![(0, 1), (1, 1)]);
+        assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
     }
 
@@ -763,18 +787,23 @@ mod tests {
         type P = Poly::<'x', R>;
 
         let f = P::from(R::from(1));
+        assert_eq!(f.is_unit(), true);
         assert_eq!(f.inv(), Some(P::from(R::from(1))));
 
         let f = P::from(R::zero());
+        assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
 
         let f = P::from(R::from(2));
+        assert_eq!(f.is_unit(), true);
         assert_eq!(f.inv(), Some(P::from(R::new(1, 2))));
 
         let f = P::variable();
+        assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
 
         let f = P::from_deg(vec![(0, R::one()), (1, R::one())]);
+        assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
     }
 
@@ -783,21 +812,27 @@ mod tests {
         type P = LPoly::<'x', i32>;
 
         let f = P::from(1);
+        assert_eq!(f.is_unit(), true);
         assert_eq!(f.inv(), Some(P::from(1)));
 
         let f = P::from(0);
+        assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
 
         let f = P::from(2);
+        assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
 
         let f = P::variable();
+        assert_eq!(f.is_unit(), true);
         assert_eq!(f.inv(), Some(P::mono(-1, 1)));
 
         let f = P::mono(1, 2);
+        assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
 
         let f = P::from_deg(vec![(0, 1), (1, 1)]);
+        assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
     }
 
@@ -808,21 +843,27 @@ mod tests {
         type P = LPoly::<'x', R>;
 
         let f = P::from(R::from(1));
+        assert_eq!(f.is_unit(), true);
         assert_eq!(f.inv(), Some(P::from(R::from(1))));
 
         let f = P::from(R::zero());
+        assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
 
         let f = P::from(R::from(2));
+        assert_eq!(f.is_unit(), true);
         assert_eq!(f.inv(), Some(P::from(R::new(1, 2))));
 
         let f = P::variable();
+        assert_eq!(f.is_unit(), true);
         assert_eq!(f.inv(), Some(P::mono(-1, R::one())));
 
         let f = P::mono(1, R::from(2));
+        assert_eq!(f.is_unit(), true);
         assert_eq!(f.inv(), Some(P::mono(-1, R::new(1, 2))));
 
         let f = P::from_deg(vec![(0, R::one()), (1, R::one())]);
+        assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
     }
 }

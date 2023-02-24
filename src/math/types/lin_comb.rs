@@ -128,6 +128,10 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_zero() { 
+            return write!(f, "0")
+        }
+
         let mut initial = true;
         let sorted = self.iter().sorted_by(|(x, _), (y, _)| x.cmp_for_display(y) );
         for (x, r) in sorted {
@@ -160,6 +164,7 @@ where
                 };
             }
         }
+        
         Ok(())
     }
 }

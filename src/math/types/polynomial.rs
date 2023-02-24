@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::iter::{Sum, Product};
 use std::ops::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Neg, DivAssign, RemAssign, Div, Rem};
+use std::str::FromStr;
 use itertools::Itertools;
 use num_traits::{Zero, One, Pow};
 use auto_impl_ops::auto_ops;
@@ -140,6 +141,19 @@ pub struct Mono<const X: char, I>(I);
 impl<const X: char, I> From<I> for Mono<X, I> {
     fn from(d: I) -> Self {
         Self(d)
+    }
+}
+
+impl<const X: char, I> FromStr for Mono<X, I>
+where I: FromStr + One {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() == 1 && s.chars().next().unwrap() == X { 
+            Ok(Self(I::one()))
+        } else { 
+            // TODO support more complex format. 
+            Err(())
+        }
     }
 }
 
@@ -375,6 +389,23 @@ where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
         Self::new(LinComb::from(data))
     }
 }
+
+impl<I, R> FromStr for PolyBase<I, R>
+where I: PolyGen + FromStr, R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Ok(r) = R::from_str(s) { 
+            Ok(Self::from(r))
+        } else if let Ok(i) = I::from_str(s) { 
+            Ok(Self::from((i, R::one())))
+        } else {
+            // TODO support more complex format.
+            Err(())
+        }
+    }
+}
+
 
 impl<I, R> Display for PolyBase<I, R>
 where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
@@ -950,5 +981,16 @@ mod tests {
         assert_eq!(q, P::from_deg( vec![(0, R::new(1, 4)), (1, R::new(1, 2))]) );
         assert_eq!(r, P::from( R::new(1, 4)) );
         assert_eq!(f, q * g + r);
+    }
+
+    #[test]
+    fn from_str() { 
+        type P = Poly::<'x', i32>;
+
+        assert_eq!(P::from_str("-3"), Ok(P::from(-3)));
+        assert_eq!(P::from_str("x"), Ok(P::variable()));
+        assert_eq!(P::from_str("y"), Err(()));
+
+        // TODO support more complex types
     }
 }

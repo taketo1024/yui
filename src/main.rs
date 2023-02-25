@@ -168,7 +168,11 @@ mod kh {
 
     fn compute_homology<R>(l: &Link, c_value: &String, reduced: bool) -> Result<String, Box<dyn std::error::Error>>
     where R: EucRing + FromStr, for<'x> &'x R: EucRingOps<R> { 
-        let (h, t) = parse_pair(c_value)?;
+        let (h, t) = parse_pair::<R>(c_value)?;
+        if reduced && !t.is_zero() { 
+            return err!("{t} != 0 is not allowed for reduced.");
+        }
+
         let kh = KhHomology::new(l.clone(), h, t, reduced);
         let res = kh.to_string();
         Ok(res)
@@ -198,7 +202,11 @@ mod ckh {
     where R: Ring + FromStr, for<'x> &'x R: RingOps<R> { 
         use string_builder::Builder;
 
-        let (h, t) = parse_pair(c_value)?;
+        let (h, t) = parse_pair::<R>(c_value)?;
+        if reduced && !t.is_zero() { 
+            return err!("{t} != 0 is not allowed for reduced.");
+        }
+        
         let ckh = KhComplex::new(l.clone(), h, t, reduced);
         let ckh = Reduced::from(ckh);
 
@@ -356,7 +364,7 @@ fn parse_pair<R: FromStr + Zero>(s: &String) -> Result<(R, R), Box<dyn std::erro
         return Ok((c, R::zero()))
     }
 
-    let r = regex::Regex::new(r"(.+)?,(.+)?").unwrap();
+    let r = regex::Regex::new(r"^(.+),(.+)$").unwrap();
     if let Some(m) = r.captures(&s) { 
         let (s1, s2) = (&m[1], &m[2]);
         if let (Ok(a), Ok(b)) = (R::from_str(s1), R::from_str(s2)) {

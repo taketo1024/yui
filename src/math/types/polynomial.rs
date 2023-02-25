@@ -9,7 +9,7 @@ use num_traits::{Zero, One, Pow};
 use auto_impl_ops::auto_ops;
 
 use crate::math::traits::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Mon, MonOps, Ring, RingOps, EucRing, EucRingOps, Field, FieldOps};
-use super::lin_comb::{LinComb, FreeGenerator};
+use super::lin_comb::{LinComb, FreeGen};
 use crate::utils::format::{subscript, superscript};
 
 pub type Poly  <const X: char, R> = PolyBase<Mono<X, usize>, R>;          // univar
@@ -66,7 +66,7 @@ pub trait PolyGen:
     PartialOrd + 
     Ord + 
     From<Self::Degree> +
-    FreeGenerator
+    FreeGen
 {
     type Degree: PolyDeg;
     fn degree(&self) -> Self::Degree;
@@ -257,7 +257,7 @@ impl_mono_multivar!(MDegree<isize>);
 
 macro_rules! impl_poly_gen {
     ($struct:ident, $I:ty) => {
-        impl<const X: char> FreeGenerator for $struct<X, $I> {}
+        impl<const X: char> FreeGen for $struct<X, $I> {}
 
         impl<const X: char> PolyGen for $struct<X, $I> {
             type Degree = $I;

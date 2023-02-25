@@ -1,13 +1,13 @@
 use std::fmt::Display;
 use std::collections::HashMap;
 use sprs::{CsVec, CsMat, TriMat};
-use crate::math::types::lin_comb::{FreeGenerator, LinComb};
+use crate::math::types::lin_comb::{FreeGen, LinComb};
 use crate::math::traits::{Ring, RingOps};
 use super::base::RModStr;
 
 pub struct FreeRModStr<X, R>
 where 
-    X: FreeGenerator,
+    X: FreeGen,
     R: Ring, for<'x> &'x R: RingOps<R>, 
 {
     generators: Vec<X>,
@@ -16,7 +16,7 @@ where
 
 impl<X, R> FreeRModStr<X, R>
 where 
-    X: FreeGenerator,
+    X: FreeGen,
     R: Ring, for<'x> &'x R: RingOps<R>, 
 {
     pub fn new(generators: Vec<X>) -> Self {
@@ -77,7 +77,7 @@ where
 
 impl<X, R> RModStr for FreeRModStr<X, R>
 where 
-    X: FreeGenerator,
+    X: FreeGen,
     R: Ring, for<'x> &'x R: RingOps<R>, 
 {
     type R = R;
@@ -97,7 +97,7 @@ where
 
 impl<X, R> Display for FreeRModStr<X, R>
 where 
-    X: FreeGenerator,
+    X: FreeGen,
     R: Ring, for<'x> &'x R: RingOps<R>, 
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

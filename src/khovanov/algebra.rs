@@ -3,7 +3,7 @@ use std::ops::{Mul, MulAssign};
 use itertools::join;
 use auto_impl_ops::auto_ops;
 use crate::links::links::State;
-use crate::math::types::lin_comb::{FreeGenerator, LinComb};
+use crate::math::types::lin_comb::{FreeGen, LinComb};
 use crate::math::traits::Elem;
 use crate::utils::format::subscript;
 use crate::math::traits::{Ring, RingOps};
@@ -136,7 +136,7 @@ impl Display for KhEnhState {
     }
 }
 
-impl FreeGenerator for KhEnhState {}
+impl FreeGen for KhEnhState {}
 
 pub type KhChain<R> = LinComb<KhEnhState, R>;
 

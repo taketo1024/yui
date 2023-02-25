@@ -1,8 +1,87 @@
-use std::{ops::{Deref, Add, Range}, iter::zip};
-
+use std::ops::{Add, AddAssign, Neg, Deref, Range, Sub, SubAssign, Mul, MulAssign};
+use std::iter::zip;
 use num_traits::{Zero, One};
 use rand::Rng;
 use sprs::{CsMatBase, SpIndex, TriMat, CsMat, PermView, CsVec, CsVecBase};
+use auto_impl_ops::auto_ops;
+use crate::math::traits::{Ring, RingOps, AddMonOps, AddGrpOps, MonOps};
+
+use super::dense::MatType;
+
+pub struct SpMat<R>
+where R: Ring, for<'a> &'a R: RingOps<R> { 
+    cs_mat: CsMat<R>
+}
+
+impl<R> SpMat<R>
+where R: Ring, for<'a> &'a R: RingOps<R> { 
+    pub fn shape(&self) -> (usize, usize) {
+        self.cs_mat.shape()
+    }
+}
+
+impl<R> From<CsMat<R>> for SpMat<R>
+where R: Ring, for<'a> &'a R: RingOps<R> {
+    fn from(cs_mat: CsMat<R>) -> Self {
+        assert!(cs_mat.is_csc());
+        Self { cs_mat }
+    }
+}
+
+impl<R> Neg for SpMat<R>
+where R: Ring, for<'a> &'a R: RingOps<R> {
+    type Output = Self;
+    fn neg(self) -> Self::Output {
+        -&self
+    }
+}
+
+impl<R> Neg for &SpMat<R>
+where R: Ring, for<'a> &'a R: RingOps<R> {
+    type Output = SpMat<R>;
+    fn neg(self) -> Self::Output {
+        let neg = self.cs_mat.map(|a| -a);
+        SpMat::from(neg)
+    }
+}
+
+macro_rules! impl_op {
+    ($trait:ident, $method:ident) => {
+        #[auto_ops]
+        impl<'a, 'b, R> $trait<&'b SpMat<R>> for &'a SpMat<R>
+        where R: Ring, for<'x> &'x R: RingOps<R> {
+            type Output = SpMat<R>;
+            fn $method(self, rhs: &'b SpMat<R>) -> Self::Output {
+                let res = self.cs_mat.$method(&rhs.cs_mat);
+                SpMat::from(res)
+            }
+        }
+    };
+}
+
+impl_op!(Add, add);
+impl_op!(Sub, sub);
+impl_op!(Mul, mul);
+
+macro_rules! impl_ops {
+    ($trait:ident) => {
+        impl<R> $trait<SpMat<R>> for SpMat<R>
+        where R: Ring, for<'x> &'x R: RingOps<R> {}
+
+        impl<R> $trait<SpMat<R>> for &SpMat<R>
+        where R: Ring, for<'x> &'x R: RingOps<R> {}
+    };
+}
+
+impl_ops!(AddMonOps);
+impl_ops!(AddGrpOps);
+impl_ops!(MonOps);
+impl_ops!(RingOps);
+
+impl<R> MatType for SpMat<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type R = R;
+}
 
 pub trait CsMatExt<R> { 
     fn id(n: usize) -> CsMat<R>;

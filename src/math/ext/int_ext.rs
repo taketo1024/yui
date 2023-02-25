@@ -33,8 +33,8 @@ macro_rules! impl_integer {
         impl_ops!(EucRingOps, $type);
         impl_ops!(IntOps, $type);
 
-        impl AlgBase for $type {
-            fn symbol() -> String { 
+        impl Elem for $type {
+            fn set_symbol() -> String { 
                 String::from("Z")
             }
         }

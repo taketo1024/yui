@@ -4,7 +4,7 @@ use itertools::join;
 use auto_impl_ops::auto_ops;
 use crate::links::links::State;
 use crate::math::types::lin_comb::{FreeGenerator, LinComb};
-use crate::math::traits::AlgBase;
+use crate::math::traits::Elem;
 use crate::utils::format::subscript;
 use crate::math::traits::{Ring, RingOps};
 
@@ -122,8 +122,8 @@ impl MulAssign<&KhEnhState> for KhEnhState {
     }
 }
 
-impl AlgBase for KhEnhState { 
-    fn symbol() -> String { 
+impl Elem for KhEnhState { 
+    fn set_symbol() -> String { 
         String::from("Kh")
     }
 }

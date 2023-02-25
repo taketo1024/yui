@@ -4,7 +4,7 @@ use std::fmt::Display;
 use std::ops::{Add, Sub, Index, Neg};
 use itertools::Itertools;
 
-use crate::math::traits::{AlgBase, Ring, RingOps};
+use crate::math::traits::{Elem, Ring, RingOps};
 use crate::utils::format::superscript;
 use crate::utils::misc::Idx2;
 
@@ -49,7 +49,7 @@ where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
         }
     
         let mut res = vec![];
-        let symbol = Self::R::symbol();
+        let symbol = Self::R::set_symbol();
     
         if rank > 1 {
             let str = format!("{}{}", symbol, superscript(rank as isize));

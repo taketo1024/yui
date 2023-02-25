@@ -6,7 +6,7 @@ use std::ops::{Mul, Add, Sub, Neg, AddAssign, SubAssign, MulAssign, Div, DivAssi
 use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
 use crate::math::ext::int_ext::{Integer, IntOps};
-use crate::math::traits::{EucRing, EucRingOps, AlgBase, Mon, AddMon, AddGrp, AddMonOps, AddGrpOps, MonOps, RingOps, Ring, FieldOps, Field};
+use crate::math::traits::{EucRing, EucRingOps, Elem, Mon, AddMon, AddGrp, AddMonOps, AddGrpOps, MonOps, RingOps, Ring, FieldOps, Field};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Ratio<T> {
@@ -230,14 +230,14 @@ decl_alg_ops!(RingOps);
 decl_alg_ops!(EucRingOps);
 decl_alg_ops!(FieldOps);
 
-impl<T> AlgBase for Ratio<T> 
+impl<T> Elem for Ratio<T> 
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {
-    fn symbol() -> String {
-        let t = T::symbol();
+    fn set_symbol() -> String {
+        let t = T::set_symbol();
         if &t == "Z" { 
             String::from("Q")
         } else { 
-            format!("Frac({})", T::symbol())
+            format!("Frac({})", T::set_symbol())
         }
     }
 }
@@ -398,9 +398,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn symbol() {
-        assert_eq!(Ratio::<i32>::symbol(), "Q");
-        assert_eq!(Ratio::<GaussInt<i32>>::symbol(), "Frac(Z[i])");
+    fn set_symbol() {
+        assert_eq!(Ratio::<i32>::set_symbol(), "Q");
+        assert_eq!(Ratio::<GaussInt<i32>>::set_symbol(), "Frac(Z[i])");
     }
 
     #[test]

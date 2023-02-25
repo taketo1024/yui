@@ -8,7 +8,7 @@ use itertools::Itertools;
 use num_traits::{Zero, One, Pow};
 use auto_impl_ops::auto_ops;
 
-use crate::math::traits::{AlgBase, AddMon, AddMonOps, AddGrp, AddGrpOps, Mon, MonOps, Ring, RingOps, EucRing, EucRingOps, Field, FieldOps};
+use crate::math::traits::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Mon, MonOps, Ring, RingOps, EucRing, EucRingOps, Field, FieldOps};
 use super::lin_comb::{LinComb, FreeGenerator};
 use crate::utils::format::{subscript, superscript};
 
@@ -168,8 +168,8 @@ where I: for<'x >AddAssign<&'x I> {
 // impls for univar-type.
 macro_rules! impl_mono_univar {
     ($I:ty) => {
-        impl<const X: char> AlgBase for Mono<X, $I> { 
-            fn symbol() -> String {
+        impl<const X: char> Elem for Mono<X, $I> { 
+            fn set_symbol() -> String {
                 format!("{X}")
             }
         }
@@ -210,8 +210,8 @@ impl_mono_univar!(isize);
 // impls for multivar-type.
 macro_rules! impl_mono_multivar {
     ($I:ty) => {
-        impl<const X: char> AlgBase for Mono<X, $I> { 
-            fn symbol() -> String {
+        impl<const X: char> Elem for Mono<X, $I> { 
+            fn set_symbol() -> String {
                 format!("{X}")
             }
         }
@@ -604,10 +604,10 @@ impl_alg_op!(AddGrpOps);
 impl_alg_op!(MonOps);
 impl_alg_op!(RingOps);
 
-impl<I, R> AlgBase for PolyBase<I, R>
+impl<I, R> Elem for PolyBase<I, R>
 where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
-    fn symbol() -> String {
-        format!("{}[{}]", R::symbol(), I::symbol())
+    fn set_symbol() -> String {
+        format!("{}[{}]", R::set_symbol(), I::set_symbol())
     }
 }
 

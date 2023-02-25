@@ -10,8 +10,8 @@ use auto_impl_ops::auto_ops;
 use crate::utils::collections::map;
 use crate::utils::display::OrdForDisplay;
 
-use super::super::traits::{AlgBase, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
-pub trait FreeGenerator: AlgBase + Hash + OrdForDisplay {}
+use super::super::traits::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
+pub trait FreeGenerator: Elem + Hash + OrdForDisplay {}
 
 #[derive(PartialEq, Eq, Clone, Debug, Default)]
 pub struct LinComb<X, R>
@@ -349,13 +349,13 @@ macro_rules! impl_alg_ops {
 impl_alg_ops!(AddMonOps);
 impl_alg_ops!(AddGrpOps);
 
-impl<X, R> AlgBase for LinComb<X, R>
+impl<X, R> Elem for LinComb<X, R>
 where
     X: FreeGenerator,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    fn symbol() -> String {
-        format!("Free<{}; {}>", X::symbol(), R::symbol())
+    fn set_symbol() -> String {
+        format!("Free<{}; {}>", X::set_symbol(), R::set_symbol())
     }
 }
 
@@ -398,14 +398,14 @@ mod tests {
     use num_traits::Zero;
     
     use crate::utils::collections::map;
-    use crate::math::traits::AlgBase;
+    use crate::math::traits::Elem;
     use super::{FreeGenerator, LinComb};
  
     #[derive(Debug, Default, Hash, PartialEq, Eq, Clone, PartialOrd, Ord)]
     struct X(i32);
 
-    impl AlgBase for X { 
-        fn symbol() -> String {
+    impl Elem for X { 
+        fn set_symbol() -> String {
             String::from("X")
         }
     }
@@ -417,9 +417,9 @@ mod tests {
     impl FreeGenerator for X {}
 
     #[test]
-    fn symbol() { 
+    fn set_symbol() { 
         type L = LinComb<X, i32>;
-        let symbol = L::symbol();
+        let symbol = L::set_symbol();
         assert_eq!(symbol, "Free<X; Z>");
     }
 

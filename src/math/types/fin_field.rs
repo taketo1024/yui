@@ -7,7 +7,7 @@ use std::str::FromStr;
 use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
 
-use crate::math::traits::{AlgBase, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, EucRingOps, AddMon, AddGrp, Mon, Ring, EucRing, Field};
+use crate::math::traits::{Elem, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, EucRingOps, AddMon, AddGrp, Mon, Ring, EucRing, Field};
 
 pub type I = i32;
 
@@ -98,8 +98,8 @@ decl_alg_ops!(RingOps);
 decl_alg_ops!(EucRingOps);
 decl_alg_ops!(FieldOps);
 
-impl<const p: I> AlgBase for FF<p> {
-    fn symbol() -> String {
+impl<const p: I> Elem for FF<p> {
+    fn set_symbol() -> String {
         format!("F{}", crate::utils::format::subscript(p as isize))
     }
 }

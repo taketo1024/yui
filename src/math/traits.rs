@@ -5,7 +5,7 @@ use is_even::IsEven;
 use num_traits::{Zero, One};
 use super::types::sign::Sign;
 
-pub trait AlgBase: 
+pub trait ElemBase: 
     Default + 
     PartialEq + 
     Eq + 
@@ -15,8 +15,22 @@ pub trait AlgBase:
     Display + 
     Debug + 
     'static
-{
-    fn symbol() -> String; // TODO rename to `set_symbol`
+{}
+
+impl<T> ElemBase for T where T: 
+    Default + 
+    PartialEq + 
+    Eq + 
+    Clone + 
+    Send + 
+    Sync + 
+    Display + 
+    Debug + 
+    'static
+{}
+
+pub trait Elem: ElemBase { 
+    fn set_symbol() -> String;
 }
 
 // Additive Monoids 
@@ -28,7 +42,7 @@ pub trait AddMonOps<T = Self>:
 {}
 
 pub trait AddMon: 
-    AlgBase + 
+    Elem + 
     AddMonOps +                       // T + T -> T, T + &T -> T
     AddAssign +                       // T += T
     for<'a> AddAssign<&'a Self> +     // T += &T
@@ -66,7 +80,7 @@ pub trait MonOps<T = Self>:
 {}
 
 pub trait Mon: 
-    AlgBase + 
+    Elem + 
     MonOps + 
     MulAssign + 
     for<'a> MulAssign<&'a Self> + 

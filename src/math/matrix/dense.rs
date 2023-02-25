@@ -1,9 +1,16 @@
-use std::ops::{Add, Neg, Sub, Mul, Index, IndexMut, Deref};
+use std::ops::{Add, Neg, Sub, Mul, Index, IndexMut, Deref, AddAssign, SubAssign, MulAssign};
 use std::cmp::min;
 use ndarray::{Array2, s};
 use sprs::{CsMat, TriMat, CsMatBase, SpIndex};
 use derive_more::Display;
-use crate::math::traits::{Ring, RingOps};
+use auto_impl_ops::auto_ops;
+use crate::math::traits::{Ring, RingOps, AddMonOps, AddGrpOps, MonOps};
+
+pub trait MatType: RingOps<Self> 
+where for<'x> &'x Self: RingOps<Self>
+{
+    type R;
+}
 
 #[derive(Clone, Debug, Display, Default, PartialEq, Eq)]
 pub struct DnsMat<R>
@@ -40,10 +47,12 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         (self.nrows(), self.ncols())
     }
 
+    // TODO replace with `rows`.
     pub fn nrows(&self) -> usize { 
         self.array.nrows()
     }
 
+    // TODO replace with `cols`.
     pub fn ncols(&self) -> usize { 
         self.array.ncols()
     }
@@ -212,51 +221,6 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     }
 }
 
-impl<R> Add<Self> for DnsMat<R>
-where R: Ring, for<'a> &'a R: RingOps<R> {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        assert_eq!(self.shape(), rhs.shape());
-        DnsMat::from(self.array + rhs.array)
-    }
-}
-
-impl<R> Neg for DnsMat<R>
-where R: Ring, for<'a> &'a R: RingOps<R> {
-    type Output = Self;
-
-    fn neg(self) -> Self::Output {
-        DnsMat::from(-self.array)
-    }
-}
-
-impl<R> Sub<Self> for DnsMat<R>
-where R: Ring, for<'a> &'a R: RingOps<R> {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        assert_eq!(self.shape(), rhs.shape());
-        DnsMat::from(self.array - rhs.array)
-    }
-}
-
-impl<R> Mul<Self> for DnsMat<R>
-where R: Ring, for<'a> &'a R: RingOps<R> {
-    type Output = Self;
-
-    fn mul(self, rhs: Self) -> Self::Output {
-        assert_eq!(self.ncols(), rhs.nrows());
-        let (l, m, n) = (self.nrows(), self.ncols(), rhs.ncols());
-        let array = Array2::from_shape_fn((l, n), |(i, k)| {
-            (0..m).map(|j| {
-                &self[[i, j]] * &rhs[[j, k]]
-            }).sum()
-        });
-        DnsMat::from(array)
-    }
-}
-
 impl<R> Index<[usize; 2]> for DnsMat<R>
 where R: Ring, for<'a> &'a R: RingOps<R> {
     type Output = R;
@@ -270,6 +234,77 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     fn index_mut(&mut self, index: [usize; 2]) -> &mut Self::Output {
         &mut self.array[index]
     }
+}
+
+impl<R> Neg for DnsMat<R>
+where R: Ring, for<'a> &'a R: RingOps<R> {
+    type Output = Self;
+    fn neg(self) -> Self::Output {
+        DnsMat::from(-self.array)
+    }
+}
+
+impl<R> Neg for &DnsMat<R>
+where R: Ring, for<'a> &'a R: RingOps<R> {
+    type Output = DnsMat<R>;
+    fn neg(self) -> Self::Output {
+        DnsMat::from(-&self.array)
+    }
+}
+
+#[auto_ops]
+impl<R> AddAssign<&DnsMat<R>> for DnsMat<R>
+where R: Ring, for<'a> &'a R: RingOps<R> {
+    fn add_assign(&mut self, rhs: &Self) {
+        assert_eq!(self.shape(), rhs.shape());
+        self.array += &rhs.array;
+    }
+}
+
+#[auto_ops]
+impl<R> SubAssign<&DnsMat<R>> for DnsMat<R>
+where R: Ring, for<'a> &'a R: RingOps<R> {
+    fn sub_assign(&mut self, rhs: &Self) {
+        assert_eq!(self.shape(), rhs.shape());
+        self.array -= &rhs.array
+    }
+}
+
+#[auto_ops]
+impl<'a, 'b, R> Mul<&'b DnsMat<R>> for &'a DnsMat<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = DnsMat<R>;
+
+    fn mul(self, rhs: &'b DnsMat<R>) -> Self::Output {
+        assert_eq!(self.ncols(), rhs.nrows());
+        let (l, m, n) = (self.nrows(), self.ncols(), rhs.ncols());
+        let array = Array2::from_shape_fn((l, n), |(i, k)| {
+            (0..m).map(|j| {
+                &self[[i, j]] * &rhs[[j, k]]
+            }).sum()
+        });
+        DnsMat::from(array)
+    }
+}
+
+macro_rules! impl_ops {
+    ($trait:ident) => {
+        impl<R> $trait<DnsMat<R>> for DnsMat<R>
+        where R: Ring, for<'x> &'x R: RingOps<R> {}
+
+        impl<R> $trait<DnsMat<R>> for &DnsMat<R>
+        where R: Ring, for<'x> &'x R: RingOps<R> {}
+    };
+}
+
+impl_ops!(AddMonOps);
+impl_ops!(AddGrpOps);
+impl_ops!(MonOps);
+impl_ops!(RingOps);
+
+impl<R> MatType for DnsMat<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type R = R;
 }
 
 #[cfg(test)]

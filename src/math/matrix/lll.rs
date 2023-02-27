@@ -17,7 +17,7 @@ use num_bigint::BigInt;
 use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps, DivRound};
 use crate::math::ext::int_ext::{Integer, IntOps};
 use crate::math::types::quad_int::{GaussInt, QuadInt, EisenInt};
-use super::DnsMat;
+use super::dense::*;
 
 pub fn lll<R>(b: &DnsMat<R>, with_trans: bool) -> (DnsMat<R>, Option<DnsMat<R>>)
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
@@ -287,9 +287,9 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 impl<R> LLLData<R>
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     fn new(target: DnsMat<R>, flags: [bool; 2]) -> Self { 
-        let m = target.nrows();
-        let p =    if flags[0] { Some(DnsMat::eye(m)) } else { None };
-        let pinv = if flags[1] { Some(DnsMat::eye(m)) } else { None };
+        let m = target.rows();
+        let p =    if flags[0] { Some(DnsMat::id(m)) } else { None };
+        let pinv = if flags[1] { Some(DnsMat::id(m)) } else { None };
         let det = vec![R::one(); m];
         let lambda = DnsMat::zero((m, m)); // lower-triangular
 
@@ -378,7 +378,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         let d1 = &d[k - 1];
         let d2 = &d[k];
 
-        let m = self.lambda.ncols();
+        let m = self.lambda.cols();
 
         // λ[.., k-1] <--> λ[.., k]
         for i in k+1..m { 
@@ -460,7 +460,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     }
 
     fn rows(&self) -> usize { 
-        self.target.nrows()
+        self.target.rows()
     }
 
     fn dump(&self) -> String { 
@@ -570,13 +570,13 @@ pub(super) mod tests {
 
         let data = LLLData::new(a.clone(), [true, false]);
         assert_eq!(data.target, a);
-        assert_eq!(data.p, Some(DnsMat::eye(3)));
+        assert_eq!(data.p, Some(DnsMat::id(3)));
         assert_eq!(data.pinv, None);
 
         let data = LLLData::new(a.clone(), [false, true]);
         assert_eq!(data.target, a);
         assert_eq!(data.p, None);
-        assert_eq!(data.pinv, Some(DnsMat::eye(3)));
+        assert_eq!(data.pinv, Some(DnsMat::id(3)));
     }
     
     #[test]
@@ -815,7 +815,7 @@ pub(super) mod tests {
         helper::assert_is_hnf(&res);
         
         assert_eq!(p.clone() * a, res);
-        assert_eq!(p * pinv, DnsMat::eye(4));
+        assert_eq!(p * pinv, DnsMat::id(4));
     }
 
     #[test]
@@ -942,7 +942,7 @@ pub(super) mod tests {
         helper::assert_is_hnf(&res);
         
         assert_eq!(p.clone() * a, res);
-        assert_eq!(p * pinv, DnsMat::eye(3));
+        assert_eq!(p * pinv, DnsMat::id(3));
     }
 
     #[test]
@@ -964,7 +964,7 @@ pub(super) mod tests {
         helper::assert_is_hnf(&res);
 
         assert_eq!(p.clone() * a, res);
-        assert_eq!(p * pinv, DnsMat::eye(3));
+        assert_eq!(p * pinv, DnsMat::id(3));
     }
 
     #[test]
@@ -984,7 +984,7 @@ pub(super) mod tests {
         helper::assert_is_hnf(&res);
         
         assert_eq!(p.clone() * a, res);
-        assert_eq!(p * pinv, DnsMat::eye(shape.0));
+        assert_eq!(p * pinv, DnsMat::id(shape.0));
     }
 
     pub(in super::super) mod helper { 

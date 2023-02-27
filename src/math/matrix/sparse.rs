@@ -1,13 +1,15 @@
 use std::ops::{Add, AddAssign, Neg, Deref, Range, Sub, SubAssign, Mul, MulAssign};
 use std::iter::zip;
+use std::fmt::Display;
 use num_traits::{Zero, One};
 use rand::Rng;
 use sprs::{CsMatBase, SpIndex, TriMat, CsMat, PermView, CsVec, CsVecBase};
 use auto_impl_ops::auto_ops;
 use crate::math::traits::{Ring, RingOps, AddMonOps, AddGrpOps, MonOps};
 
-use super::dense::MatType;
+pub use super::dense::MatType;
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SpMat<R>
 where R: Ring, for<'a> &'a R: RingOps<R> { 
     cs_mat: CsMat<R>
@@ -15,8 +17,8 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
 impl<R> SpMat<R>
 where R: Ring, for<'a> &'a R: RingOps<R> { 
-    pub fn shape(&self) -> (usize, usize) {
-        self.cs_mat.shape()
+    pub fn cs_mat(&self) -> &CsMat<R> { 
+        &self.cs_mat
     }
 }
 
@@ -25,6 +27,20 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     fn from(cs_mat: CsMat<R>) -> Self {
         assert!(cs_mat.is_csc());
         Self { cs_mat }
+    }
+}
+
+impl<R> Display for SpMat<R>
+where R: Ring, for<'a> &'a R: RingOps<R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "") // TODO
+    }
+}
+
+impl<R> Default for SpMat<R>
+where R: Ring, for<'a> &'a R: RingOps<R> {
+    fn default() -> Self {
+        todo!()
     }
 }
 
@@ -81,6 +97,32 @@ impl_ops!(RingOps);
 impl<R> MatType for SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type R = R;
+
+    fn shape(&self) -> (usize, usize) {
+        self.cs_mat.shape()
+    }
+
+    fn zero(shape: (usize, usize)) -> Self {
+        Self::from(CsMat::zero(shape))
+    }
+
+    fn is_zero(&self) -> bool {
+        self.cs_mat.data().iter().all(|a| a.is_zero())
+    }
+
+    fn id(n: usize) -> Self { 
+        let indptr = (0..=n).collect();
+        let indices = (0..n).collect();
+        let data = vec![R::one(); n];
+        let cs_mat = CsMat::new_csc((n, n), indptr, indices, data);
+        Self::from(cs_mat)
+    }
+
+    fn is_id(&self) -> bool {
+        self.is_square() && self.cs_mat.into_iter().all(|(a, (i, j))| 
+            (i == j && a.is_one()) || (i != j && a.is_zero())
+        )
+    }
 }
 
 pub trait CsMatExt<R> { 

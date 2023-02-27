@@ -1,15 +1,31 @@
 use std::ops::{Add, Neg, Sub, Mul, Index, IndexMut, Deref, AddAssign, SubAssign, MulAssign};
 use std::cmp::min;
+use std::fmt::{Debug, Display};
 use ndarray::{Array2, s};
 use sprs::{CsMat, TriMat, CsMatBase, SpIndex};
 use derive_more::Display;
 use auto_impl_ops::auto_ops;
 use crate::math::traits::{Ring, RingOps, AddMonOps, AddGrpOps, MonOps};
 
-pub trait MatType: RingOps<Self> 
+pub trait MatType: Clone + Debug + Display + Default + PartialEq + Eq + RingOps<Self> 
 where for<'x> &'x Self: RingOps<Self>
 {
     type R;
+
+    fn shape(&self) -> (usize, usize);
+    fn rows(&self) -> usize { self.shape().0 }
+    fn cols(&self) -> usize { self.shape().1 }
+
+    fn is_square(&self) -> bool { 
+        let (m, n) = self.shape();
+        m == n
+    }
+
+    fn zero(shape: (usize, usize)) -> Self;
+    fn is_zero(&self) -> bool;
+
+    fn id(size: usize) -> Self;
+    fn is_id(&self) -> bool;
 }
 
 #[derive(Clone, Debug, Display, Default, PartialEq, Eq)]
@@ -43,49 +59,12 @@ where
 
 impl<R> DnsMat<R>
 where R: Ring, for<'a> &'a R: RingOps<R> {
-    pub fn shape(&self) -> (usize, usize) { 
-        (self.nrows(), self.ncols())
-    }
-
-    // TODO replace with `rows`.
-    pub fn nrows(&self) -> usize { 
-        self.array.nrows()
-    }
-
-    // TODO replace with `cols`.
-    pub fn ncols(&self) -> usize { 
-        self.array.ncols()
-    }
-
     pub fn array(&self) -> &Array2<R> {
         &self.array
     }
 
     pub fn array_mut(&mut self) -> &mut Array2<R> {
         &mut self.array
-    }
-
-    pub fn is_square(&self) -> bool { 
-        self.nrows() == self.ncols()
-    }
-
-    pub fn eye(size: usize) -> Self { 
-        let array = Array2::from_diag_elem(size, R::one());
-        Self::from(array)
-    }
-
-    pub fn is_eye(&self) -> bool { 
-        self.is_square() && self.array.indexed_iter().all(|((i, j), a)| 
-            i == j && a.is_one() || i != j && a.is_zero()
-        )
-    }
-
-    pub fn zero(shape: (usize, usize)) -> Self { 
-        Self::from(Array2::zeros(shape))
-    }
-
-    pub fn is_zero(&self) -> bool {
-        self.array.iter().all(|a| a.is_zero())
     }
 
     pub fn diag(shape: (usize, usize), entries: Vec<R>) -> Self {
@@ -213,11 +192,11 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     // private methods // 
 
     fn is_valid_row_index(&self, i: usize) -> bool { 
-        (0..self.nrows()).contains(&i)
+        (0..self.rows()).contains(&i)
     }
 
     fn is_valid_col_index(&self, j: usize) -> bool { 
-        (0..self.ncols()).contains(&j)
+        (0..self.cols()).contains(&j)
     }
 }
 
@@ -276,8 +255,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = DnsMat<R>;
 
     fn mul(self, rhs: &'b DnsMat<R>) -> Self::Output {
-        assert_eq!(self.ncols(), rhs.nrows());
-        let (l, m, n) = (self.nrows(), self.ncols(), rhs.ncols());
+        assert_eq!(self.cols(), rhs.rows());
+        let (l, m, n) = (self.rows(), self.cols(), rhs.cols());
         let array = Array2::from_shape_fn((l, n), |(i, k)| {
             (0..m).map(|j| {
                 &self[[i, j]] * &rhs[[j, k]]
@@ -305,6 +284,29 @@ impl_ops!(RingOps);
 impl<R> MatType for DnsMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type R = R;
+
+    fn shape(&self) -> (usize, usize) {
+        (self.array.nrows(), self.array.ncols())
+    }
+
+    fn zero(shape: (usize, usize)) -> Self { 
+        Self::from(Array2::zeros(shape))
+    }
+
+    fn is_zero(&self) -> bool {
+        self.array.iter().all(|a| a.is_zero())
+    }
+
+    fn id(size: usize) -> Self { 
+        let array = Array2::from_diag_elem(size, R::one());
+        Self::from(array)
+    }
+
+    fn is_id(&self) -> bool { 
+        self.is_square() && self.array.indexed_iter().all(|((i, j), a)| 
+            i == j && a.is_one() || i != j && a.is_zero()
+        )
+    }
 }
 
 #[cfg(test)]
@@ -316,8 +318,8 @@ mod tests {
     fn init() { 
         let a = DnsMat::from(array![[1,2,3],[4,5,6]]);
 
-        assert_eq!(a.nrows(), 2);
-        assert_eq!(a.ncols(), 3);
+        assert_eq!(a.rows(), 2);
+        assert_eq!(a.cols(), 3);
         assert_eq!(a.array(), array![[1,2,3],[4,5,6]]);
     }
 
@@ -351,13 +353,13 @@ mod tests {
     }
 
     #[test]
-    fn eye() {
-        let a: DnsMat<i32> = DnsMat::eye(3);
-        assert!(a.is_eye());
+    fn id() {
+        let a: DnsMat<i32> = DnsMat::id(3);
+        assert!(a.is_id());
 
         let array = array![[1,2,3],[4,5,6],[7,8,9]];
         let a = DnsMat::from(array);
-        assert!(!a.is_eye());
+        assert!(!a.is_id());
     }
 
     

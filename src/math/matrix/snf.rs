@@ -2,7 +2,7 @@ use core::panic;
 use std::cmp::min;
 use log::{info, trace};
 use crate::math::traits::{EucRing, EucRingOps};
-use super::DnsMat;
+use super::dense::*;
 use super::lll::{LLLRing, LLLRingOps, lll_hnf_in_place};
 
 pub type SnfFlags = [bool; 4];
@@ -70,7 +70,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     }
 
     pub fn rank(&self) -> usize {
-        let n = min(self.result.nrows(), self.result.ncols());
+        let n = min(self.result.rows(), self.result.cols());
         for i in 0..n { 
             if self.result[[i, i]].is_zero() { 
                 return i
@@ -80,7 +80,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     }
 
     pub fn factors(&self) -> Vec<&R> { 
-        let n = min(self.result.nrows(), self.result.ncols());
+        let n = min(self.result.rows(), self.result.cols());
         (0..n).filter_map(|i| { 
             let a = &self.result[[i, i]];
             if !a.is_zero() { 
@@ -105,15 +105,15 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
 impl<R> SnfCalc<R>
 where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     pub fn new(target: DnsMat<R>, flags: SnfFlags) -> Self { 
-        let eye_opt = |size, flag| {
-            if flag{ Some(DnsMat::eye(size)) } else { None }
+        let id_opt = |size, flag| {
+            if flag{ Some(DnsMat::id(size)) } else { None }
         };
 
         let (m, n) = target.shape();
-        let p    = eye_opt(m, flags[0]);
-        let pinv = eye_opt(m, flags[1]);
-        let q    = eye_opt(n, flags[2]);
-        let qinv = eye_opt(n, flags[3]);
+        let p    = id_opt(m, flags[0]);
+        let pinv = id_opt(m, flags[1]);
+        let q    = id_opt(n, flags[2]);
+        let qinv = id_opt(n, flags[3]);
 
         SnfCalc{ target, p, pinv, q, qinv }
     }
@@ -268,7 +268,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
 
     fn select_pivot(&self, below_i: usize, j: usize) -> Option<usize> { 
         // find row `i` below `below_i` with minimum nnz. 
-        (below_i..self.target.nrows())
+        (below_i..self.target.rows())
             .filter( |i| !self.target[[*i, j]].is_zero() )
             .map( |i| (i, self.row_nz(i)) )
             .min_by( |e1, e2| e1.1.cmp(&e2.1) )
@@ -290,7 +290,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     fn eliminate_row(&mut self, i: usize, j: usize) -> bool { 
         let mut modified = false;
 
-        for j1 in 0..self.target.ncols() {
+        for j1 in 0..self.target.cols() {
             if j == j1 || self.target[[i, j1]].is_zero() { continue }
 
             // d = sx + ty,
@@ -319,7 +319,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     fn eliminate_col(&mut self, i: usize, j: usize) -> bool { 
         let mut modified = false;
 
-        for i1 in 0..self.target.nrows() {
+        for i1 in 0..self.target.rows() {
             if i == i1 || self.target[[i1, j]].is_zero() { continue }
 
             // d = sx + ty,
@@ -348,7 +348,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     fn diag_normalize(&mut self) {
         debug_assert!(self.target.is_diag());
 
-        let r = min(self.target.nrows(), self.target.ncols());
+        let r = min(self.target.rows(), self.target.cols());
         if r == 0 { 
             return
         }
@@ -469,10 +469,10 @@ mod tests {
         let (res, [p, pinv, q, qinv]) = calc.result().destruct();
 
         assert_eq!(res, DnsMat::from(array![[1,2,3], [4,5,6]]));
-        assert_eq!(p,    Some(DnsMat::eye(2)));
-        assert_eq!(pinv, Some(DnsMat::eye(2)));
-        assert_eq!(q,    Some(DnsMat::eye(3)));
-        assert_eq!(qinv, Some(DnsMat::eye(3)));
+        assert_eq!(p,    Some(DnsMat::id(2)));
+        assert_eq!(pinv, Some(DnsMat::id(2)));
+        assert_eq!(q,    Some(DnsMat::id(3)));
+        assert_eq!(qinv, Some(DnsMat::id(3)));
     }
 
     #[test]
@@ -519,8 +519,8 @@ mod tests {
         assert_eq!(res,  DnsMat::from(array![[4,5,6], [1,2,3], [7,8,9]]));
         assert_eq!(p * a.clone(), res);
         assert_eq!(pinv * res, a);
-        assert!(q.is_eye());
-        assert!(qinv.is_eye());
+        assert!(q.is_id());
+        assert!(qinv.is_id());
     }
 
     #[test]
@@ -533,8 +533,8 @@ mod tests {
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
         assert_eq!(res,  DnsMat::from(array![[2,1,3], [5,4,6], [8,7,9]]));
-        assert!(p   .is_eye());
-        assert!(pinv.is_eye());
+        assert!(p   .is_id());
+        assert!(pinv.is_id());
         assert_eq!(a.clone() * q, res);
         assert_eq!(res * qinv, a);
     }
@@ -551,8 +551,8 @@ mod tests {
         assert_eq!(res,  DnsMat::from(array![[-1,-2,-3], [4,5,6], [7,8,9]]));
         assert_eq!(p * a.clone(), res);
         assert_eq!(pinv * res, a);
-        assert!(q.is_eye());
-        assert!(qinv.is_eye());
+        assert!(q.is_id());
+        assert!(qinv.is_id());
     }
 
     #[test]
@@ -565,8 +565,8 @@ mod tests {
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
         assert_eq!(res,  DnsMat::from(array![[-1,2,3], [-4,5,6], [-7,8,9]]));
-        assert!(p.is_eye());
-        assert!(pinv.is_eye());
+        assert!(p.is_id());
+        assert!(pinv.is_id());
         assert_eq!(a.clone() * q, res);
         assert_eq!(res * qinv, a);
     }
@@ -584,8 +584,8 @@ mod tests {
         assert_eq!(res,  DnsMat::from(array![[11,16,21], [16,23,30], [7,8,9]]));
         assert_eq!(p * a.clone(), res);
         assert_eq!(pinv * res, a);
-        assert!(q.is_eye());
-        assert!(qinv.is_eye());
+        assert!(q.is_id());
+        assert!(qinv.is_id());
     }
 
     #[test]
@@ -599,8 +599,8 @@ mod tests {
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
         assert_eq!(res,  DnsMat::from(array![[7,10,3], [22,31,6], [37,52,9]]));
-        assert!(p.is_eye());
-        assert!(pinv.is_eye());
+        assert!(p.is_id());
+        assert!(pinv.is_id());
         assert_eq!(a.clone() * q, res);
         assert_eq!(res * qinv, a);
     }
@@ -637,8 +637,8 @@ mod tests {
         assert_eq!(res[[0, 0]], 1);
         assert_eq!(res[[0, 1]], 0);
         assert_eq!(res[[0, 2]], 0);
-        assert!(p.is_eye());
-        assert!(pinv.is_eye());
+        assert!(p.is_id());
+        assert!(pinv.is_id());
         assert_eq!(a.clone() * q, res);
         assert_eq!(res * qinv, a);
     }
@@ -655,8 +655,8 @@ mod tests {
         assert_eq!(res[[1, 0]], 0);
         assert_eq!(res[[1, 1]], 1);
         assert_eq!(res[[1, 2]], 0);
-        assert!(p.is_eye());
-        assert!(pinv.is_eye());
+        assert!(p.is_id());
+        assert!(pinv.is_id());
         assert_eq!(a.clone() * q, res);
         assert_eq!(res * qinv, a);
     }
@@ -675,8 +675,8 @@ mod tests {
         assert_eq!(res[[2, 0]], 0);
         assert_eq!(p * a.clone(), res);
         assert_eq!(pinv * res, a);
-        assert!(q.is_eye());
-        assert!(qinv.is_eye());
+        assert!(q.is_id());
+        assert!(qinv.is_id());
     }
 
     #[test]
@@ -693,8 +693,8 @@ mod tests {
         assert_eq!(res[[2, 1]], 0);
         assert_eq!(p * a.clone(), res);
         assert_eq!(pinv * res, a);
-        assert!(q.is_eye());
-        assert!(qinv.is_eye());
+        assert!(q.is_id());
+        assert!(qinv.is_id());
     }
 
     #[test]

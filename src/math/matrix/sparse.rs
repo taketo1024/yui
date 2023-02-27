@@ -178,82 +178,52 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> SpMat<R>
 where R: Ring, for<'a> &'a R: RingOps<R> { 
-    pub fn transpose(&self) -> Self { 
-        Self::from(self.cs_mat.transpose_view().to_csc())
+    pub fn view(&self) -> SpMatView<R> { 
+        SpMatView::new(self, self.shape(), |i, j| Some((i, j)))
     }
 
-    pub fn permute(&self, p: PermView, q: PermView) -> Self { 
-        Self::generate(self.shape(), |set| { 
-            for (i, j, a) in self.iter() { 
-                if a.is_zero() { continue }
-                let (i, j) = (i.index(), j.index());
-                set(p.at(i), q.at(j), a.clone());
-            }
-        })
+    pub fn transpose(&self) -> SpMatView<R> { 
+        SpMatView::new(self, (self.cols(), self.rows()), |i, j| Some((j, i)))
     }
 
-    pub fn permute_rows(&self, p: PermView) -> Self { 
+    pub fn permute<'b>(&self, p: PermView<'b>, q: PermView<'b>) -> SpMatView<'_, 'b, R> { 
+        SpMatView::new(self, self.shape(), move |i, j| Some((p.at(i), q.at(j))))
+    }
+
+    pub fn permute_rows<'b>(&self, p: PermView<'b>) -> SpMatView<'_, 'b, R> { 
         let id = PermView::identity(self.cols());
         self.permute(p, id)
     }
     
-    pub fn permute_cols(&self, q: PermView) -> Self { 
+    pub fn permute_cols<'b>(&self, q: PermView<'b>) -> SpMatView<'_, 'b, R> { 
         let id = PermView::identity(self.rows());
         self.permute(id, q)
     }
 
-    pub fn submatrix(&self, rows: Range<usize>, cols: Range<usize>) -> Self { 
+    pub fn submatrix(&self, rows: Range<usize>, cols: Range<usize>) -> SpMatView<R> { 
         let (i0, i1) = (rows.start, rows.end);
         let (j0, j1) = (cols.start, cols.end);
 
         assert!(i0 <= i1 && i1 <= self.rows());
         assert!(j0 <= j1 && j1 <= self.cols());
 
-        Self::generate((i1 - i0, j1 - j0), |set| { 
-            for (i, j, a) in self.iter() { 
-                let (i, j) = (i.index(), j.index());
-                if !a.is_zero() && rows.contains(&i) && cols.contains(&j) {
-                    set(i - i0, j - j0, a.clone());
-                }
+        SpMatView::new(self, (i1 - i0, j1 - j0), move |i, j| { 
+            if rows.contains(&i) && cols.contains(&j) {
+                Some((i - i0, j - j0))
+            } else { 
+                None
             }
         })
     }
 
-    pub fn split_blocks(&self, k: usize, l: usize) -> [SpMat<R>; 4] {
-        let (m, n) = self.shape();
-        assert!(k <= m);
-        assert!(l <= n);
-
-        let mut trips = [
-            TriMat::new((k, l)),
-            TriMat::new((k, n - l)),
-            TriMat::new((m - k, l)),
-            TriMat::new((m - k, n - l))
-        ];
-        
-        for (i, j, a) in self.iter() { 
-            if a.is_zero() { continue }
-
-            let (a, i, j) = (a.clone(), i.index(), j.index());
-            match ((0..k).contains(&i), (0..l).contains(&j)) { 
-                (true , true ) => trips[0].add_triplet(i,     j,     a),
-                (true , false) => trips[1].add_triplet(i,     j - l, a),
-                (false, true ) => trips[2].add_triplet(i - k, j,     a),
-                (false, false) => trips[3].add_triplet(i - k, j - l, a),
-            }
-        }
-
-        trips.map(|t| SpMat::from(t.to_csc()))
+    pub fn submatrix_rows(&self, rows: Range<usize>) -> SpMatView<R> { 
+        let n = self.cols();
+        self.submatrix(rows, 0 .. n)
     }
 
-    pub fn split_hor(&self, k: usize) -> (Self, Self) { 
-        let [a, b, _, _] = self.split_blocks(self.rows(), k);
-        (a, b)
-    }
-
-    pub fn split_ver(&self, k: usize) -> (Self, Self) { 
-        let [a, _, c, _] = self.split_blocks(k, self.cols());
-        (a, c)
+    pub fn submatrix_cols(&self, cols: Range<usize>) -> SpMatView<R> { 
+        let m = self.rows();
+        self.submatrix(0 .. m, cols)
     }
 
     pub fn combine_blocks(blocks: [&SpMat<R>; 4]) -> SpMat<R> {
@@ -300,11 +270,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         ])
     }
 
-    pub fn col(&self, j: usize) -> CsVec<R> { 
-        self.col_view(j).to_owned()
-    }
-
-    pub fn col_view(&self, j: usize) -> CsVecView<R> { 
+    pub fn col(&self, j: usize) -> CsVecView<R> { 
         self.cs_mat.outer_view(j).unwrap()
     }
 }
@@ -315,6 +281,81 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
     fn mul(self, rhs: &CsVec<R>) -> Self::Output {
         self.cs_mat() * rhs
+    }
+}
+
+pub struct SpMatView<'a, 'b, R> 
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    target: &'a SpMat<R>,
+    shape: (usize, usize),
+    trans: Box<dyn Fn(usize, usize) -> Option<(usize, usize)> + 'b>
+}
+
+impl<'a, 'b, R> SpMatView<'a, 'b, R> 
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn new<F>(target: &'a SpMat<R>, shape: (usize, usize), trans: F) -> Self
+    where F: Fn(usize, usize) -> Option<(usize, usize)> + 'b {
+        Self { target, shape, trans: Box::new(trans) }
+    }
+
+    pub fn shape(&self) -> (usize, usize) { 
+        self.shape
+    }
+
+    pub fn rows(&self) -> usize { 
+        self.shape.0
+    }
+
+    pub fn cols(&self) -> usize { 
+        self.shape.1
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (usize, usize, &R)> {
+        self.target.iter().filter_map(|(i, j, a)| { 
+            (self.trans)(i, j).map(|(i, j)| (i, j, a))
+        })
+    }
+
+    pub fn to_owned(&self) -> SpMat<R> {
+        SpMat::generate(self.shape(), |set| { 
+            for (i, j, a) in self.iter() { 
+                set(i, j, a.clone())
+            }
+        })
+    }
+
+    pub fn to_dense(&self) -> DnsMat<R> { 
+        self.to_owned().to_dense()
+    }
+
+    pub fn submatrix(&self, rows: Range<usize>, cols: Range<usize>) -> SpMatView<R> { 
+        let (i0, i1) = (rows.start, rows.end);
+        let (j0, j1) = (cols.start, cols.end);
+
+        assert!(i0 <= i1 && i1 <= self.rows());
+        assert!(j0 <= j1 && j1 <= self.cols());
+
+        SpMatView::new(self.target, (i1 - i0, j1 - j0), move |i, j| { 
+            let Some((i, j)) = (self.trans)(i, j) else { 
+                return None
+            };
+
+            if rows.contains(&i) && cols.contains(&j) {
+                Some((i - i0, j - j0))
+            } else { 
+                None
+            }
+        })
+    }
+
+    pub fn submatrix_rows(&self, rows: Range<usize>) -> SpMatView<R> { 
+        let n = self.cols();
+        self.submatrix(rows, 0 .. n)
+    }
+
+    pub fn submatrix_cols(&self, cols: Range<usize>) -> SpMatView<R> { 
+        let m = self.rows();
+        self.submatrix(0 .. m, cols)
     }
 }
 

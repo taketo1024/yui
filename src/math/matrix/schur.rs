@@ -22,7 +22,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> SchurLT<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn from_partial_lower(a: SpMat<R>, r: usize) -> Self {
+    pub fn from_partial_lower(a: SpMatView<R>, r: usize) -> Self {
         assert!(r <= a.rows());
         assert!(r <= a.cols());
 
@@ -30,7 +30,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             (j < r && (i >= j || a.is_zero())) || (j >= r) 
         }));
 
-        let (ac, bd) = a.split_hor(r);
+        // TODO improve performance!
+        
+        let ac = a.submatrix_cols(0 .. r).to_owned();
+        let bd = a.submatrix_cols(r .. a.cols()).to_owned();
         let pinv = OnceCell::new();
         Self { ac, bd, pinv }
     }

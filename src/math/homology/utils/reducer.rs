@@ -111,13 +111,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn reduce_rows(a: &SpMat<R>, p: &PermOwned, r: usize) -> SpMat<R> {
-        let (m, n) = a.shape();
-        a.permute_rows(p.view()).submatrix(r..m, 0..n)
+        let m = a.rows();
+        a.permute_rows(p.view()).submatrix_rows(r..m).to_owned()
     }
 
     fn reduce_cols(a: &SpMat<R>, p: &PermOwned, r: usize) -> SpMat<R> {
-        let (m, n) = a.shape();
-        a.permute_cols(p.view()).submatrix(0..m, r..n)
+        let n = a.cols();
+        a.permute_cols(p.view()).submatrix_cols(r..n).to_owned()
     }
 
     fn reduce_vecs(&mut self, p: &PermOwned, q: &PermOwned, r: usize, s: &SchurLT<R>) {

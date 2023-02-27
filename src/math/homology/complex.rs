@@ -106,7 +106,7 @@ where
         let range = self.range().rev();
         let d_degree = -self.d_degree();
         let d_matrices = self.d_matrices.into_iter().map(|(i, d)| 
-            (i - d_degree, d.transpose())
+            (i - d_degree, d.transpose().to_owned())
         ).collect();
         GenericChainComplex::new(range, d_degree, d_matrices)
     }

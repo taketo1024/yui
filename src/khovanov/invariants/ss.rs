@@ -84,7 +84,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     info!("homology: {h}");
     
     let r = h.rank();
-    let p = p.submatrix(0..r, 0..p.cols());
+    let p = p.submatrix_rows(0..r).to_owned();
 
     let v = &vs[0];
     let w = &p * v;

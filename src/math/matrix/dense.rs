@@ -7,6 +7,8 @@ use derive_more::Display;
 use auto_impl_ops::auto_ops;
 use crate::math::traits::{Ring, RingOps, AddMonOps, AddGrpOps, MonOps};
 
+use super::sparse::SpMat;
+
 pub trait MatType: Clone + Debug + Display + Default + PartialEq + Eq + RingOps<Self> 
 where for<'x> &'x Self: RingOps<Self>
 {
@@ -41,19 +43,10 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     }
 }
 
-impl<R, I, Iptr, IptrStorage, IndStorage, DataStorage> 
-    From<&CsMatBase<R, I, IptrStorage, IndStorage, DataStorage, Iptr>> 
-    for DnsMat<R>
-where 
-    R: Ring, for<'a> &'a R: RingOps<R> ,
-    I: SpIndex,
-    Iptr: SpIndex,
-    IptrStorage: Deref<Target = [Iptr]>,
-    IndStorage: Deref<Target = [I]>,
-    DataStorage: Deref<Target = [R]>,
-{
-    fn from(sp: &CsMatBase<R, I, IptrStorage, IndStorage, DataStorage, Iptr>) -> Self {
-        DnsMat{ array: sp.to_dense() }
+impl<R> From<SpMat<R>> for DnsMat<R> 
+where R: Ring, for<'a> &'a R: RingOps<R> {
+    fn from(a: SpMat<R>) -> Self {
+        DnsMat::from(a.cs_mat().to_dense())
     }
 }
 
@@ -65,6 +58,10 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
     pub fn array_mut(&mut self) -> &mut Array2<R> {
         &mut self.array
+    }
+
+    pub fn array_into(self) -> Array2<R> {
+        self.array
     }
 
     pub fn diag(shape: (usize, usize), entries: Vec<R>) -> Self {
@@ -82,6 +79,13 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         )
     }
 
+    pub fn to_sparse(self) -> SpMat<R> { 
+        self.into()
+    }
+}
+
+impl<R> DnsMat<R>
+where R: Ring, for<'a> &'a R: RingOps<R> {
     pub fn swap_rows(&mut self, i: usize, j: usize) {
         debug_assert_ne!(i, j);
         debug_assert!(self.is_valid_row_index(i));
@@ -174,19 +178,6 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
                 x * c + y * d
             )
         });
-    }
-
-    pub fn to_sparse(&self) -> CsMat<R> {
-        let (m, n) = (self.array.nrows(), self.array.ncols());
-        let mut sp = TriMat::new((m, n));
-
-        for (k, a) in self.array.iter().enumerate() {
-            if a.is_zero() { continue }
-            let (i, j) = (k / n, k % n);
-            sp.add_triplet(i, j, a.clone());
-        }
-
-        sp.to_csc()
     }
 
     // private methods // 
@@ -306,6 +297,40 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.is_square() && self.array.indexed_iter().all(|((i, j), a)| 
             i == j && a.is_one() || i != j && a.is_zero()
         )
+    }
+}
+
+// -- old code -- //
+
+impl<R, I, Iptr, IptrStorage, IndStorage, DataStorage> 
+    From<&CsMatBase<R, I, IptrStorage, IndStorage, DataStorage, Iptr>> 
+    for DnsMat<R>
+where 
+    R: Ring, for<'a> &'a R: RingOps<R> ,
+    I: SpIndex,
+    Iptr: SpIndex,
+    IptrStorage: Deref<Target = [Iptr]>,
+    IndStorage: Deref<Target = [I]>,
+    DataStorage: Deref<Target = [R]>,
+{
+    fn from(sp: &CsMatBase<R, I, IptrStorage, IndStorage, DataStorage, Iptr>) -> Self {
+        DnsMat{ array: sp.to_dense() }
+    }
+}
+
+impl<R> DnsMat<R>
+where R: Ring, for<'a> &'a R: RingOps<R> {
+    pub fn to_cs_mat(&self) -> CsMat<R> {
+        let (m, n) = (self.array.nrows(), self.array.ncols());
+        let mut sp = TriMat::new((m, n));
+
+        for (k, a) in self.array.iter().enumerate() {
+            if a.is_zero() { continue }
+            let (i, j) = (k / n, k % n);
+            sp.add_triplet(i, j, a.clone());
+        }
+
+        sp.to_csc()
     }
 }
 
@@ -444,7 +469,7 @@ mod tests {
     #[test]
     fn to_sparse() { 
         let dns = DnsMat::from(array![[1,2,3],[4,5,6]]);
-        let sps = dns.to_sparse();
+        let sps = dns.to_cs_mat();
         assert_eq!(sps, CsMat::new((2, 3), vec![0,3,6], vec![0,1,2,0,1,2], vec![1,2,3,4,5,6]).into_csc());
     }
 

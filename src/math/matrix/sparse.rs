@@ -7,6 +7,7 @@ use sprs::{CsMatBase, SpIndex, TriMat, CsMat, PermView, CsVec, CsVecBase};
 use auto_impl_ops::auto_ops;
 use crate::math::traits::{Ring, RingOps, AddMonOps, AddGrpOps, MonOps};
 
+use super::DnsMat;
 pub use super::dense::MatType;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -17,8 +18,44 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
 impl<R> SpMat<R>
 where R: Ring, for<'a> &'a R: RingOps<R> { 
+    pub fn new<F>(shape: (usize, usize), f: F) -> Self
+    where F: FnOnce(&mut (dyn FnMut(usize, usize, R) + Send + Sync)) { 
+        let mut t = TriMat::new(shape);
+        f( &mut |i, j, a| { 
+            if !a.is_zero() { 
+                t.add_triplet(i, j, a)
+            }
+        });
+        let cs_mat = t.to_csc();
+        Self { cs_mat }
+    }
+
+    pub fn from_grid(shape: (usize, usize), grid: Vec<R>) -> Self { 
+        let n = shape.1;
+        Self::new(shape, |init| { 
+            grid.into_iter().enumerate().for_each(|(k, a)| { 
+                let (i, j) = (k / n, k % n);
+                init(i, j, a)
+            })
+        })
+    }
+
     pub fn cs_mat(&self) -> &CsMat<R> { 
         &self.cs_mat
+    }
+
+    pub fn cs_mat_into(self) -> CsMat<R> { 
+        self.cs_mat
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (usize, usize, &R)> { 
+        self.cs_mat.iter().map(|(a, (i, j))| {
+            (i, j, a)
+        })
+    }
+
+    pub fn to_dense(self) -> DnsMat<R> { 
+        self.into()
     }
 }
 
@@ -27,6 +64,20 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     fn from(cs_mat: CsMat<R>) -> Self {
         assert!(cs_mat.is_csc());
         Self { cs_mat }
+    }
+}
+
+impl<R> From<DnsMat<R>> for SpMat<R>
+where R: Ring, for<'a> &'a R: RingOps<R> {
+    fn from(a: DnsMat<R>) -> Self {
+        let n = a.cols();
+        SpMat::new(a.shape(), |set| { 
+            for (k, a) in a.array_into().into_iter().enumerate() {
+                if a.is_zero() { continue }
+                let (i, j) = (k / n, k % n);
+                set(i, j, a);
+            }
+        })
     }
 }
 
@@ -124,6 +175,41 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         )
     }
 }
+
+#[cfg(test)]
+mod tests { 
+    use super::*;
+
+    #[test]
+    fn init() { 
+        let a = SpMat::new((2, 2), |set| { 
+            set(0, 0, 1);
+            set(0, 1, 2);
+            set(1, 0, 3);
+            set(1, 1, 4);
+        });
+        assert_eq!(&a.cs_mat, &CsMat::new_csc((2, 2), vec![0, 2, 4], vec![0, 1, 0, 1], vec![1, 3, 2, 4]));
+    }
+
+    #[test]
+    fn from_grid() { 
+        let a = SpMat::from_grid((2, 2), vec![1,2,3,4]);
+        assert_eq!(&a.cs_mat, &CsMat::new_csc((2, 2), vec![0, 2, 4], vec![0, 1, 0, 1], vec![1, 3, 2, 4]));
+    }
+
+    #[test]
+    fn to_dense() { 
+        let a = SpMat::new((2, 2), |set| { 
+            set(0, 0, 1);
+            set(0, 1, 2);
+            set(1, 0, 3);
+            set(1, 1, 4);
+        });
+        assert_eq!(a.to_dense(), DnsMat::from(ndarray::array![[1, 2], [3, 4]]));
+    }
+}
+
+// -- old code -- //
 
 pub trait CsMatExt<R> { 
     fn id(n: usize) -> CsMat<R>;
@@ -417,7 +503,7 @@ where
 }
 
 #[cfg(test)]
-mod tests {
+mod tests_old {
     use sprs::PermOwned;
     use super::*;
 

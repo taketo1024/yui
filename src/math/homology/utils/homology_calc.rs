@@ -76,7 +76,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         let r1 = s1.rank();
 
         let d2_dns = if r1 > 0 { 
-            let p1_inv = s1.pinv().unwrap().to_sparse();
+            let p1_inv = s1.pinv().unwrap().to_cs_mat();
             let t2 = p1_inv.slice_outer(r1..n);
             let d2 = d2 * &t2; // d2': C21' -> C3
             DnsMat::from(&d2)
@@ -112,9 +112,9 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         let r = n - r1 - r2;
         let t = s1.factors().iter().filter(|a| !a.is_unit()).count();
 
-        let p1 = s1.p().unwrap().to_sparse();       // size = (n, n)
+        let p1 = s1.p().unwrap().to_cs_mat();       // size = (n, n)
         let p11 = p1.submatrix(r1..n, 0..n);        // size = (n - r1, n)
-        let p2 = s2.qinv().unwrap().to_sparse();    // size = (n - r1, n - r1)
+        let p2 = s2.qinv().unwrap().to_cs_mat();    // size = (n - r1, n - r1)
         let p22 = p2.submatrix(r2..n-r1, 0..n-r1);  // size = (n - (r1 + r2), n - r1)
 
         let p_free = &p22 * &p11;                   // size = (n - (r1 + r2), n)
@@ -123,9 +123,9 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
         assert_eq!(p.shape(), (r + t, n));
 
-        let q1 = s1.pinv().unwrap().to_sparse();    // size = (n, n)
+        let q1 = s1.pinv().unwrap().to_cs_mat();    // size = (n, n)
         let q12 = q1.submatrix(0..n, r1..n);        // size = (n, n - r1)
-        let q2 = s2.q().unwrap().to_sparse();       // size = (n - r1, n - r1)
+        let q2 = s2.q().unwrap().to_cs_mat();       // size = (n - r1, n - r1)
         let q22 = q2.submatrix(0..n-r1, r2..n-r1);  // size = (n - r1, n - (r1 + r2))
 
         let q_free = &q12 * &q22;                   // size = (n, n - (r1 + r2))

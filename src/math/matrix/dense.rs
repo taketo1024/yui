@@ -36,20 +36,6 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     array: Array2<R>
 }
 
-impl<R> From<Array2<R>> for DnsMat<R> 
-where R: Ring, for<'a> &'a R: RingOps<R> {
-    fn from(array: Array2<R>) -> Self {
-        Self { array }
-    }
-}
-
-impl<R> From<&SpMat<R>> for DnsMat<R> 
-where R: Ring, for<'a> &'a R: RingOps<R> {
-    fn from(a: &SpMat<R>) -> Self {
-        DnsMat::from(a.cs_mat().to_dense())
-    }
-}
-
 impl<R> DnsMat<R>
 where R: Ring, for<'a> &'a R: RingOps<R> {
     pub fn array(&self) -> &Array2<R> {
@@ -82,10 +68,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     pub fn to_sparse(&self) -> SpMat<R> { 
         self.into()
     }
-}
 
-impl<R> DnsMat<R>
-where R: Ring, for<'a> &'a R: RingOps<R> {
     pub fn swap_rows(&mut self, i: usize, j: usize) {
         debug_assert_ne!(i, j);
         debug_assert!(self.is_valid_row_index(i));
@@ -188,6 +171,20 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
     fn is_valid_col_index(&self, j: usize) -> bool { 
         (0..self.cols()).contains(&j)
+    }
+}
+
+impl<R> From<Array2<R>> for DnsMat<R> 
+where R: Ring, for<'a> &'a R: RingOps<R> {
+    fn from(array: Array2<R>) -> Self {
+        Self { array }
+    }
+}
+
+impl<R> From<&SpMat<R>> for DnsMat<R> 
+where R: Ring, for<'a> &'a R: RingOps<R> {
+    fn from(a: &SpMat<R>) -> Self {
+        DnsMat::from(a.cs_mat().to_dense())
     }
 }
 
@@ -475,7 +472,7 @@ mod tests {
 
     #[test]
     fn from_sparse() { 
-        let sps = CsMat::new((2, 3), vec![0,3,6], vec![0,1,2,0,1,2], vec![1,2,3,4,5,6]);
+        let sps = SpMat::from_vec((2, 3), vec![1,2,3,4,5,6]);
         let dns = DnsMat::from(&sps);
         assert_eq!(dns, DnsMat::from(array![[1,2,3],[4,5,6]]));
     }

@@ -19,7 +19,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
 impl<R> SpMat<R>
 where R: Ring, for<'a> &'a R: RingOps<R> { 
-    pub fn new<F>(shape: (usize, usize), f: F) -> Self
+    pub fn generate<F>(shape: (usize, usize), f: F) -> Self
     where F: FnOnce(&mut (dyn FnMut(usize, usize, R) + Send + Sync)) { 
         let mut t = TriMat::new(shape);
         f( &mut |i, j, a| { 
@@ -28,12 +28,12 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
             }
         });
         let cs_mat = t.to_csc();
-        Self { cs_mat }
+        Self::from(cs_mat)
     }
 
-    pub fn from_grid(shape: (usize, usize), grid: Vec<R>) -> Self { 
+    pub fn from_vec(shape: (usize, usize), grid: Vec<R>) -> Self { 
         let n = shape.1;
-        Self::new(shape, |init| { 
+        Self::generate(shape, |init| { 
             grid.into_iter().enumerate().for_each(|(k, a)| { 
                 let (i, j) = (k / n, k % n);
                 init(i, j, a)
@@ -72,7 +72,7 @@ impl<R> From<&DnsMat<R>> for SpMat<R>
 where R: Ring, for<'a> &'a R: RingOps<R> {
     fn from(a: &DnsMat<R>) -> Self {
         let n = a.cols();
-        SpMat::new(a.shape(), |set| { 
+        SpMat::generate(a.shape(), |set| { 
             for (k, a) in a.array().iter().enumerate() {
                 if a.is_zero() { continue }
                 let (i, j) = (k / n, k % n);
@@ -155,7 +155,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn zero(shape: (usize, usize)) -> Self {
-        Self::from(CsMat::zero(shape))
+        Self::from(CsMat::zero(shape).to_csc())
     }
 
     fn is_zero(&self) -> bool {
@@ -183,7 +183,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         let (m, n) = shape;
         let mut rng = rand::thread_rng();
 
-        Self::new(shape, |set| { 
+        Self::generate(shape, |set| { 
             for i in 0..m { 
                 for j in 0..n { 
                     if rng.gen::<f64>() < density { 
@@ -195,39 +195,125 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     }
 
     pub fn transpose(&self) -> Self { 
-        todo!()
+        Self::from(self.cs_mat.transpose_view().to_csc())
     }
 
     pub fn permute(&self, p: PermView, q: PermView) -> Self { 
-        todo!()
+        Self::generate(self.shape(), |set| { 
+            for (i, j, a) in self.iter() { 
+                if a.is_zero() { continue }
+                let (i, j) = (i.index(), j.index());
+                set(p.at(i), q.at(j), a.clone());
+            }
+        })
     }
 
     pub fn permute_rows(&self, p: PermView) -> Self { 
-        todo!()
+        let id = PermView::identity(self.cols());
+        self.permute(p, id)
     }
     
     pub fn permute_cols(&self, q: PermView) -> Self { 
-        todo!()
+        let id = PermView::identity(self.rows());
+        self.permute(id, q)
     }
 
     pub fn submatrix(&self, rows: Range<usize>, cols: Range<usize>) -> Self { 
-        todo!()
+        let (i0, i1) = (rows.start, rows.end);
+        let (j0, j1) = (cols.start, cols.end);
+
+        assert!(i0 <= i1 && i1 <= self.rows());
+        assert!(j0 <= j1 && j1 <= self.cols());
+
+        Self::generate((i1 - i0, j1 - j0), |set| { 
+            for (i, j, a) in self.iter() { 
+                let (i, j) = (i.index(), j.index());
+                if !a.is_zero() && rows.contains(&i) && cols.contains(&j) {
+                    set(i - i0, j - j0, a.clone());
+                }
+            }
+        })
     }
 
-    pub fn split_hor(&self, k: usize) -> [Self; 2] { 
-        todo!()
+    pub fn split_blocks(&self, k: usize, l: usize) -> [SpMat<R>; 4] {
+        let (m, n) = self.shape();
+        assert!(k <= m);
+        assert!(l <= n);
+
+        let mut trips = [
+            TriMat::new((k, l)),
+            TriMat::new((k, n - l)),
+            TriMat::new((m - k, l)),
+            TriMat::new((m - k, n - l))
+        ];
+        
+        for (i, j, a) in self.iter() { 
+            if a.is_zero() { continue }
+
+            let (a, i, j) = (a.clone(), i.index(), j.index());
+            match ((0..k).contains(&i), (0..l).contains(&j)) { 
+                (true , true ) => trips[0].add_triplet(i,     j,     a),
+                (true , false) => trips[1].add_triplet(i,     j - l, a),
+                (false, true ) => trips[2].add_triplet(i - k, j,     a),
+                (false, false) => trips[3].add_triplet(i - k, j - l, a),
+            }
+        }
+
+        trips.map(|t| SpMat::from(t.to_csc()))
     }
 
-    pub fn split_ver(&self, k: usize) -> [Self; 2] { 
-        todo!()
+    pub fn split_hor(&self, k: usize) -> (Self, Self) { 
+        let [a, b, _, _] = self.split_blocks(self.rows(), k);
+        (a, b)
+    }
+
+    pub fn split_ver(&self, k: usize) -> (Self, Self) { 
+        let [a, _, c, _] = self.split_blocks(k, self.cols());
+        (a, c)
+    }
+
+    pub fn combine_blocks(blocks: [&SpMat<R>; 4]) -> SpMat<R> {
+        let [a, b, c, d] = blocks;
+
+        assert_eq!(a.rows(), b.rows());
+        assert_eq!(c.rows(), d.rows());
+        assert_eq!(a.cols(), c.cols());
+        assert_eq!(b.cols(), d.cols());
+
+        let (m, n) = (a.rows() + c.rows(), a.cols() + b.cols());
+        let (k, l) = a.shape();
+        let targets = zip(
+            [a, b, c, d], 
+            [(0,0), (0,l), (k,0), (k,l)]
+        );
+
+        Self::generate((m, n), |set| { 
+            for (x, (di, dj)) in targets { 
+                for (i, j, r) in x.iter() {
+                    set(i + di, j + dj, r.clone());
+                }
+            }    
+        })
     }
 
     pub fn concat(&self, b: &Self) -> Self { 
-        todo!()
+        let zero = |m, n| SpMat::<R>::zero((m, n));
+        Self::combine_blocks([
+            self, 
+            b, 
+            &zero(0, self.cols()), 
+            &zero(0, b.cols())
+        ])
     }
 
     pub fn stack(&self, b: &Self) -> Self { 
-        todo!()
+        let zero = |m, n| SpMat::<R>::zero((m, n));
+        Self::combine_blocks([
+            self, 
+            &zero(self.rows(), 0), 
+            b, 
+            &zero(b.rows(), 0)
+        ])
     }
 
     pub fn col(&self, j: usize) -> CsVec<R> { 
@@ -244,7 +330,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     type Output = CsVec<R>;
 
     fn mul(self, rhs: &CsVec<R>) -> Self::Output {
-        todo!()
+        self.cs_mat() * rhs
     }
 }
 
@@ -254,7 +340,7 @@ mod tests {
 
     #[test]
     fn init() { 
-        let a = SpMat::new((2, 2), |set| { 
+        let a = SpMat::generate((2, 2), |set| { 
             set(0, 0, 1);
             set(0, 1, 2);
             set(1, 0, 3);
@@ -265,13 +351,13 @@ mod tests {
 
     #[test]
     fn from_grid() { 
-        let a = SpMat::from_grid((2, 2), vec![1,2,3,4]);
+        let a = SpMat::from_vec((2, 2), vec![1,2,3,4]);
         assert_eq!(&a.cs_mat, &CsMat::new_csc((2, 2), vec![0, 2, 4], vec![0, 1, 0, 1], vec![1, 3, 2, 4]));
     }
 
     #[test]
     fn to_dense() { 
-        let a = SpMat::new((2, 2), |set| { 
+        let a = SpMat::generate((2, 2), |set| { 
             set(0, 0, 1);
             set(0, 1, 2);
             set(1, 0, 3);

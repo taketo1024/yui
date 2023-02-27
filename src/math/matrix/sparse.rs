@@ -2,7 +2,6 @@ use std::ops::{Add, AddAssign, Neg, Deref, Range, Sub, SubAssign, Mul, MulAssign
 use std::iter::zip;
 use std::fmt::Display;
 use num_traits::Zero;
-use rand::Rng;
 use sprs::{SpIndex, TriMat, CsMat, PermView, CsVec, CsVecBase, CsVecView};
 use auto_impl_ops::auto_ops;
 use crate::math::traits::{Ring, RingOps, AddMonOps, AddGrpOps, MonOps};
@@ -179,21 +178,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> SpMat<R>
 where R: Ring, for<'a> &'a R: RingOps<R> { 
-    pub fn rand(shape: (usize, usize), density: f64) -> SpMat<R> { 
-        let (m, n) = shape;
-        let mut rng = rand::thread_rng();
-
-        Self::generate(shape, |set| { 
-            for i in 0..m { 
-                for j in 0..n { 
-                    if rng.gen::<f64>() < density { 
-                        set(i, j, R::one());
-                    }
-                }
-            }
-        })
-    }
-
     pub fn transpose(&self) -> Self { 
         Self::from(self.cs_mat.transpose_view().to_csc())
     }
@@ -335,8 +319,26 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 }
 
 #[cfg(test)]
-mod tests { 
+pub(super) mod tests { 
     use super::*;
+
+    pub fn mat_rand<R>(shape: (usize, usize), density: f64) -> SpMat<R>
+    where R: Ring, for<'a> &'a R: RingOps<R> { 
+        use rand::Rng;
+
+        let (m, n) = shape;
+        let mut rng = rand::thread_rng();
+
+        SpMat::generate(shape, |set| { 
+            for i in 0..m { 
+                for j in 0..n { 
+                    if rng.gen::<f64>() < density { 
+                        set(i, j, R::one());
+                    }
+                }
+            }
+        })
+    }
 
     #[test]
     fn init() { 

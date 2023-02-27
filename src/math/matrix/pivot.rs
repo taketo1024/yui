@@ -869,9 +869,11 @@ mod tests {
 
     #[test]
     fn rand() {
+        use super::super::sparse::tests::mat_rand;
+
         let d = 0.1;
         let shape = (60, 80);
-        let a: SpMat<i32> = SpMat::rand(shape, d);
+        let a: SpMat<i32> = mat_rand(shape, d);
 
         let pivs = find_pivots(&a, PivotType::Rows);
         let r = pivs.len();

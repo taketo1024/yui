@@ -14,25 +14,26 @@ use std::sync::Mutex;
 use itertools::Itertools;
 use log::info;
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
-use sprs::{CsMat, PermOwned};
+use sprs::PermOwned;
 use thread_local::ThreadLocal;
 use parking_lot::RwLock;
 use crate::math::traits::{Ring, RingOps};
 use crate::utils::top_sort::top_sort;
+use super::sparse::*;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum PivotType { 
     Rows, Cols
 }
 
-pub fn find_pivots<R>(a: &CsMat<R>, piv_type: PivotType) -> Vec<(usize, usize)>
+pub fn find_pivots<R>(a: &SpMat<R>, piv_type: PivotType) -> Vec<(usize, usize)>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let mut pf = PivotFinder::new(a, piv_type);
     pf.find_pivots();
     pf.result()
 }
 
-pub fn perms_by_pivots<R>(a: &CsMat<R>, pivs: &Vec<(usize, usize)>) -> (PermOwned, PermOwned)
+pub fn perms_by_pivots<R>(a: &SpMat<R>, pivs: &Vec<(usize, usize)>) -> (PermOwned, PermOwned)
 where R: Ring, for<'x> &'x R: RingOps<R> {
     use std::collections::BTreeSet;
     fn perm(n: usize, v: Vec<usize>) -> PermOwned { 
@@ -66,7 +67,7 @@ pub struct PivotFinder {
 }
 
 impl PivotFinder { 
-    pub fn new<R>(a: &CsMat<R>, piv_type: PivotType) -> Self
+    pub fn new<R>(a: &SpMat<R>, piv_type: PivotType) -> Self
     where R: Ring, for<'x> &'x R: RingOps<R> {
         let str = MatrixStr::new(a, piv_type);
         let pivots = PivotData::new(a, piv_type);
@@ -312,8 +313,9 @@ struct MatrixStr {
 }
 
 impl MatrixStr { 
-    fn new<R>(a: &CsMat<R>, piv_type: PivotType) -> Self
+    fn new<R>(a: &SpMat<R>, piv_type: PivotType) -> Self
     where R: Ring, for<'x> &'x R: RingOps<R> { 
+        let a = a.cs_mat();
         let a = if piv_type == PivotType::Rows { 
             a.view() 
         } else { 
@@ -387,7 +389,7 @@ struct PivotData {
 }
 
 impl PivotData { 
-    fn new<R>(a: &CsMat<R>, piv_type: PivotType) -> Self
+    fn new<R>(a: &SpMat<R>, piv_type: PivotType) -> Self
     where R: Ring, for<'x> &'x R: RingOps<R> { 
         let n = if piv_type == PivotType::Rows { 
             a.cols()
@@ -579,14 +581,13 @@ impl<'a> RowWorker {
 mod tests {
     use std::collections::HashSet;
     use num_traits::{Zero, One};
-    use sprs::CsMat;
-    use crate::math::matrix::{sparse::CsMatExt, pivot::perms_by_pivots};
+    use crate::math::matrix::pivot::perms_by_pivots;
     use crate::utils::collections::set;
     use super::*;
  
     #[test]
     fn str_init() {
-        let a = CsMat::csc_from_vec((6, 9), vec![
+        let a = SpMat::from_vec((6, 9), vec![
             1, 0, 1, 0, 0, 1, 1, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 2, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -618,7 +619,7 @@ mod tests {
 
     #[test]
     fn str_row_head() {
-        let a = CsMat::csc_from_vec((4, 4), vec![
+        let a = SpMat::from_vec((4, 4), vec![
             1, 0, 1, 0,
             0, 1, 1, 1,
             0, 0, 0, 0,
@@ -634,7 +635,7 @@ mod tests {
 
     #[test]
     fn rows_cols() {
-        let a = CsMat::<i32>::csc_from_vec((4, 3), vec![]);
+        let a = SpMat::<i32>::from_vec((4, 3), vec![]);
         let pf = PivotFinder::new(&a, PivotType::Rows);
         assert_eq!(pf.rows(), 4);
         assert_eq!(pf.cols(), 3);
@@ -642,7 +643,7 @@ mod tests {
 
     #[test]
     fn pivot_data() { 
-        let a = CsMat::csc_from_vec((2, 4), vec![
+        let a = SpMat::from_vec((2, 4), vec![
             1, 0, 1, 0,
             0, 0, 1, 1,
         ]);
@@ -661,7 +662,7 @@ mod tests {
 
     #[test]
     fn remain_rows() {
-        let a = CsMat::csc_from_vec((4, 4), vec![
+        let a = SpMat::from_vec((4, 4), vec![
             1, 0, 1, 0,
             0, 1, 1, 1,
             0, 0, 0, 0,
@@ -682,7 +683,7 @@ mod tests {
 
     #[test]
     fn pivots() {
-        let a = CsMat::csc_from_vec((4, 4), vec![
+        let a = SpMat::from_vec((4, 4), vec![
             1, 0, 1, 0,
             0, 1, 1, 1,
             0, 0, 0, 0,
@@ -703,7 +704,7 @@ mod tests {
 
     #[test]
     fn find_fl_pivots() {
-        let a = CsMat::csc_from_vec((6, 9), vec![
+        let a = SpMat::from_vec((6, 9), vec![
             1, 0, 1, 0, 0, 1, 1, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -720,7 +721,7 @@ mod tests {
 
     #[test]
     fn find_fl_col_pivots() { 
-        let a = CsMat::csc_from_vec((6, 9), vec![
+        let a = SpMat::from_vec((6, 9), vec![
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -737,7 +738,7 @@ mod tests {
 
     #[test]
     fn find_fl_row_col_pivots() { 
-        let a = CsMat::csc_from_vec((6, 9), vec![
+        let a = SpMat::from_vec((6, 9), vec![
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -758,7 +759,7 @@ mod tests {
 
     #[test]
     fn find_cycle_free_pivots_s() {
-        let a = CsMat::csc_from_vec((6, 9), vec![
+        let a = SpMat::from_vec((6, 9), vec![
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -775,7 +776,7 @@ mod tests {
 
     #[test]
     fn find_cycle_free_pivots_m() {
-        let a = CsMat::csc_from_vec((6, 9), vec![
+        let a = SpMat::from_vec((6, 9), vec![
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -792,7 +793,7 @@ mod tests {
 
     #[test]
     fn zero() { 
-        let a = CsMat::csc_from_vec((1, 1), vec![
+        let a = SpMat::from_vec((1, 1), vec![
             0
         ]);
         let pivs = find_pivots(&a, PivotType::Rows);
@@ -802,7 +803,7 @@ mod tests {
 
     #[test]
     fn id_1() { 
-        let a = CsMat::csc_from_vec((1, 1), vec![
+        let a = SpMat::from_vec((1, 1), vec![
             1
         ]);
         let pivs = find_pivots(&a, PivotType::Rows);
@@ -812,7 +813,7 @@ mod tests {
 
     #[test]
     fn id_2() { 
-        let a = CsMat::csc_from_vec((2, 2), vec![
+        let a = SpMat::from_vec((2, 2), vec![
             1, 0, 0, 1
         ]);
         let pivs = find_pivots(&a, PivotType::Rows);
@@ -822,7 +823,7 @@ mod tests {
 
     #[test]
     fn result() { 
-        let a = CsMat::csc_from_vec((6, 9), vec![
+        let a = SpMat::from_vec((6, 9), vec![
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -845,7 +846,7 @@ mod tests {
 
     #[test]
     fn result_cols() { 
-        let a = CsMat::csc_from_vec((6, 9), vec![
+        let a = SpMat::from_vec((6, 9), vec![
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -870,7 +871,7 @@ mod tests {
     fn rand() {
         let d = 0.1;
         let shape = (60, 80);
-        let a: CsMat<i32> = CsMat::rand(shape, d);
+        let a: SpMat<i32> = SpMat::rand(shape, d);
 
         let pivs = find_pivots(&a, PivotType::Rows);
         let r = pivs.len();

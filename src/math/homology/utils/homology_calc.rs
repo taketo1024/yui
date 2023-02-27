@@ -1,15 +1,17 @@
 use itertools::Itertools;
 use log::*;
-use sprs::CsMat;
+use crate::math::traits::{EucRing, EucRingOps};
+use crate::math::matrix::snf_in_place;
+use crate::math::matrix::sparse::*;
+use crate::math::matrix::snf::SnfResult;
+use crate::math::homology::base::GenericRModStr;
 
-use crate::math::{traits::{EucRing, EucRingOps}, matrix::{DnsMat, snf_in_place, sparse::CsMatExt, snf::SnfResult}, homology::base::GenericRModStr};
-
-pub type HomologyCalcResult<R> = (usize, Vec<R>, Option<CsMat<R>>, Option<CsMat<R>>);
+pub type HomologyCalcResult<R> = (usize, Vec<R>, Option<SpMat<R>>, Option<SpMat<R>>);
 
 pub struct HomologyCalc<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    d1: CsMat<R>,
-    d2: CsMat<R>,
+    d1: SpMat<R>,
+    d2: SpMat<R>,
     with_trans: bool
 }
 
@@ -33,22 +35,22 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     //  H2 = Ker(d2) / Im(d1)
     //     ≅ C22' (free) ⊕ (C21 / Im(d1')) (tor)
 
-    pub fn calculate(d1: CsMat<R>, d2: CsMat<R>) -> GenericRModStr<R> {
+    pub fn calculate(d1: SpMat<R>, d2: SpMat<R>) -> GenericRModStr<R> {
         let (rank, tor, _) = Self::_calculate(d1, d2, false);
         GenericRModStr::new(rank, tor)
     }
 
-    pub fn calculate_with_trans(d1: CsMat<R>, d2: CsMat<R>) -> (GenericRModStr<R>, CsMat<R>, CsMat<R>) {
+    pub fn calculate_with_trans(d1: SpMat<R>, d2: SpMat<R>) -> (GenericRModStr<R>, SpMat<R>, SpMat<R>) {
         let (rank, tor, trans) = Self::_calculate(d1, d2, true);
         let h = GenericRModStr::new(rank, tor);
         let (p, q) = trans.unwrap();
         (h, p, q)
     }
 
-    fn _calculate(d1: CsMat<R>, d2: CsMat<R>, with_trans: bool) -> (usize, Vec<R>, Option<(CsMat<R>, CsMat<R>)>) {
+    fn _calculate(d1: SpMat<R>, d2: SpMat<R>, with_trans: bool) -> (usize, Vec<R>, Option<(SpMat<R>, SpMat<R>)>) {
         info!("calculate homology: {:?}-{:?}", d1.shape(), d2.shape());
-        let c = Self::new(d1, d2, with_trans);
 
+        let mut c = Self::new(d1, d2, with_trans);
         let (s1, s2) = c.process();
         let (rank, tors) = c.result(&s1, &s2);
 
@@ -61,27 +63,27 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         (rank, tors, trans)
     }
 
-    fn new(d1: CsMat<R>, d2: CsMat<R>, with_trans: bool) -> Self { 
+    fn new(d1: SpMat<R>, d2: SpMat<R>, with_trans: bool) -> Self { 
         assert_eq!(d1.rows(), d2.cols());
         Self { d1, d2, with_trans }
     }
 
-    fn process(&self) -> (SnfResult<R>, SnfResult<R>) {
+    fn process(&mut self) -> (SnfResult<R>, SnfResult<R>) {
         let with_trans = self.with_trans;
-        let (d1, d2) = (&self.d1, &self.d2);
+        let (d1, d2) =  (&self.d1, &self.d2);
         let n = d2.cols();
 
-        let d1_dns = DnsMat::from(d1);
+        let d1_dns = d1.to_dense();
         let s1 = snf_in_place(d1_dns, [with_trans, true, false, false]);
         let r1 = s1.rank();
 
         let d2_dns = if r1 > 0 { 
-            let p1_inv = s1.pinv().unwrap().to_cs_mat();
-            let t2 = p1_inv.slice_outer(r1..n);
+            let p1_inv = s1.pinv().unwrap().to_sparse();
+            let t2 = p1_inv.submatrix(0..n, r1..n);
             let d2 = d2 * &t2; // d2': C21' -> C3
-            DnsMat::from(&d2)
+            d2.to_dense()
         } else {
-            DnsMat::from(d2)
+            d2.to_dense()
         };
 
         let s2 = snf_in_place(d2_dns, [false, false, with_trans, with_trans]);
@@ -106,31 +108,31 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         (rank, tors)
     }
 
-    fn trans(&self, s1: &SnfResult<R>, s2: &SnfResult<R>) -> (CsMat<R>, CsMat<R>) {
+    fn trans(&self, s1: &SnfResult<R>, s2: &SnfResult<R>) -> (SpMat<R>, SpMat<R>) {
         let n = self.d2.cols();
         let (r1, r2) = (s1.rank(), s2.rank());
         let r = n - r1 - r2;
         let t = s1.factors().iter().filter(|a| !a.is_unit()).count();
 
-        let p1 = s1.p().unwrap().to_cs_mat();       // size = (n, n)
+        let p1 = s1.p().unwrap().to_sparse();       // size = (n, n)
         let p11 = p1.submatrix(r1..n, 0..n);        // size = (n - r1, n)
-        let p2 = s2.qinv().unwrap().to_cs_mat();    // size = (n - r1, n - r1)
+        let p2 = s2.qinv().unwrap().to_sparse();    // size = (n - r1, n - r1)
         let p22 = p2.submatrix(r2..n-r1, 0..n-r1);  // size = (n - (r1 + r2), n - r1)
 
         let p_free = &p22 * &p11;                   // size = (n - (r1 + r2), n)
         let p_tor = p1.submatrix(r1-t..r1, 0..n);   // size = (t, n)
-        let p = CsMat::stack(&p_free, &p_tor);      // size = (r + t, n)
+        let p = p_free.stack(&p_tor);               // size = (r + t, n)
 
         assert_eq!(p.shape(), (r + t, n));
 
-        let q1 = s1.pinv().unwrap().to_cs_mat();    // size = (n, n)
+        let q1 = s1.pinv().unwrap().to_sparse();    // size = (n, n)
         let q12 = q1.submatrix(0..n, r1..n);        // size = (n, n - r1)
-        let q2 = s2.q().unwrap().to_cs_mat();       // size = (n - r1, n - r1)
+        let q2 = s2.q().unwrap().to_sparse();       // size = (n - r1, n - r1)
         let q22 = q2.submatrix(0..n-r1, r2..n-r1);  // size = (n - r1, n - (r1 + r2))
 
         let q_free = &q12 * &q22;                   // size = (n, n - (r1 + r2))
         let q_tor = q1.submatrix(0..n, r1-t..r1);   // size = (n, t)
-        let q = CsMat::concat(&q_free, &q_tor);     // size = (n, r + t)
+        let q = q_free.concat(&q_tor);              // size = (n, r + t)
 
         assert_eq!(q.shape(), (n, r + t));
 
@@ -140,7 +142,9 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 #[cfg(test)]
 mod tests {
-    use crate::math::{homology::{complex::{tests::TestChainComplex, ChainComplex}, base::RModStr}, matrix::sparse::{CsVecExt, CsMatExt}};
+    use crate::math::homology::complex::{tests::TestChainComplex, ChainComplex};
+    use crate::math::homology::base::RModStr;
+    use crate::math::matrix::sparse::*;
 
     use super::HomologyCalc;
  
@@ -157,7 +161,7 @@ mod tests {
 
         assert!((&p * &q).is_id());
 
-        let v = q.outer_view(0).unwrap();
+        let v = q.col(0);
         assert_eq!(v.is_zero(), false);
     }
 
@@ -188,7 +192,7 @@ mod tests {
 
         assert!((&p * &q).is_id());
 
-        let v = q.outer_view(0).unwrap();
+        let v = q.col(0);
         assert_eq!(v.is_zero(), false);
         assert_eq!((&d2 * &v).is_zero(), true);
     }
@@ -206,7 +210,7 @@ mod tests {
 
         assert!((&p * &q).is_id());
 
-        let v = q.outer_view(0).unwrap();
+        let v = q.col(0);
         assert_eq!(v.is_zero(), false);
     }
 
@@ -224,7 +228,7 @@ mod tests {
         assert!((&p * &q).is_id());
 
         for i in 0..2 { 
-            let v = q.outer_view(i).unwrap();
+            let v = q.col(i);
             assert_eq!(v.is_zero(), false);
             assert_eq!((&d1 * &v).is_zero(), true);
         }
@@ -243,7 +247,7 @@ mod tests {
 
         assert!((&p * &q).is_id());
 
-        let v = q.outer_view(0).unwrap();
+        let v = q.col(0);
         assert_eq!(v.is_zero(), false);
         assert_eq!((&d2 * &v).is_zero(), true);
     }
@@ -262,7 +266,7 @@ mod tests {
 
         assert!((&p * &q).is_id());
 
-        let v = q.outer_view(0).unwrap();
+        let v = q.col(0);
         assert_eq!(v.is_zero(), false);
     }
 
@@ -279,7 +283,7 @@ mod tests {
 
         assert!((&p * &q).is_id());
 
-        let v = q.outer_view(0).unwrap();
+        let v = q.col(0);
         assert_eq!(v.is_zero(), false);
         assert_eq!((&d1 * &v).is_zero(), true);
     }

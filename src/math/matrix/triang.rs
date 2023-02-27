@@ -4,13 +4,12 @@ use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
 use either::Either;
 use log::info;
-use sprs::{CsMat, CsVec, TriMat};
+use sprs::CsVec;
 use rayon::prelude::*;
 use thread_local::ThreadLocal;
 use crate::math::traits::{Ring, RingOps};
 use crate::math::matrix::sparse::CsVecExt;
-
-use super::sparse::CsMatExt;
+use super::sparse::*;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum TriangularType { 
@@ -26,28 +25,26 @@ impl TriangularType {
     }
 }
 
-pub fn inv_triangular<R>(t: TriangularType, a: &CsMat<R>) -> CsMat<R>
+pub fn inv_triangular<R>(t: TriangularType, a: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let e = CsMat::id(a.rows());
+    let e = SpMat::id(a.rows());
     solve_triangular(t, a, &e)
 }
 
-pub fn solve_triangular<R>(t: TriangularType, a: &CsMat<R>, y: &CsMat<R>) -> CsMat<R>
+pub fn solve_triangular<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let mut trip = TriMat::new(y.shape());
-    solve_triangular_with(t, a, y, |i, j, x|
-        trip.add_triplet(i, j, x)
-    );
-    trip.to_csc()
+    SpMat::generate(y.shape(), |set| { 
+        solve_triangular_with(t, a, y, |i, j, x|
+            set(i, j, x)
+        );
+    })
 }
 
-pub fn solve_triangular_with<R, F>(t: TriangularType, a: &CsMat<R>, y: &CsMat<R>, f: F)
+pub fn solve_triangular_with<R, F>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>, f: F)
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
     F: FnMut(usize, usize, R) + Send + Sync
 {
-    assert!(a.is_csc());
-    assert!(y.is_csc());
     assert_eq!(a.rows(), y.rows());
 
     if t.is_upper() { 
@@ -64,7 +61,7 @@ where
     }
 }
 
-fn solve_triangular_s<R, F>(t: TriangularType, a: &CsMat<R>, y: &CsMat<R>, mut f: F)
+fn solve_triangular_s<R, F>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>, mut f: F)
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
     F: FnMut(usize, usize, R)
@@ -78,7 +75,7 @@ where
     let mut b = vec![R::zero(); n];
 
     for j in 0..k { 
-        for (i, r) in y.outer_view(j).unwrap().iter() { 
+        for (i, r) in y.col_view(j).iter() { 
             b[i] = r.clone();
         }
 
@@ -93,7 +90,7 @@ where
     }
 }
 
-fn solve_triangular_m<R, F>(t: TriangularType, a: &CsMat<R>, y: &CsMat<R>, f: F)
+fn solve_triangular_m<R, F>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>, f: F)
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
     F: FnMut(usize, usize, R) + Send + Sync
@@ -126,7 +123,7 @@ where
         let x = x_st.deref_mut();
         let b = b_st.deref_mut();
 
-        for (i, r) in y.outer_view(j).unwrap().iter() { 
+        for (i, r) in y.col_view(j).iter() { 
             b[i] = r.clone();
         }
 
@@ -155,9 +152,8 @@ where
     });
 }
 
-pub fn solve_triangular_vec<R>(t: TriangularType, a: &CsMat<R>, b: &CsVec<R>) -> CsVec<R>
+pub fn solve_triangular_vec<R>(t: TriangularType, a: &SpMat<R>, b: &CsVec<R>) -> CsVec<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    assert!(a.is_csc());
     assert_eq!(a.rows(), b.dim());
 
     if t.is_upper() { 
@@ -177,7 +173,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     CsVec::from_vec(x)
 }
 
-fn solve_triangular_into<R>(t: TriangularType, a: &CsMat<R>, diag: &Vec<&R>, b: &mut Vec<R>, x: &mut Vec<R>)
+fn solve_triangular_into<R>(t: TriangularType, a: &SpMat<R>, diag: &Vec<&R>, b: &mut Vec<R>, x: &mut Vec<R>)
 where R: Ring, for<'x> &'x R: RingOps<R> {
     debug_assert!(x.iter().all(|x_i| 
         x_i.is_zero())
@@ -196,7 +192,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let u_jj_inv = diag[j].inv().unwrap();
         let x_j = &b[j] * &u_jj_inv; // non-zero
 
-        for (i, u_ij) in a.outer_view(j).unwrap().iter() {
+        for (i, u_ij) in a.col_view(j).iter() {
             if u_ij.is_zero() { continue }
             b[i] -= u_ij * &x_j;
         }
@@ -209,7 +205,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     );
 }
 
-fn diag<'a, R>(t: TriangularType, a: &'a CsMat<R>) -> Vec<&'a R> {
+fn diag<'a, R>(t: TriangularType, a: &'a SpMat<R>) -> Vec<&'a R>
+where R: Ring, for<'x> &'x R: RingOps<R> { 
+    let a = &a.cs_mat();
     let n = a.rows();
     let indptr = a.indptr();
     let data = a.data();
@@ -227,10 +225,10 @@ fn diag<'a, R>(t: TriangularType, a: &'a CsMat<R>) -> Vec<&'a R> {
     }
 }
 
-fn is_upper_tri<R>(u: &CsMat<R>) -> bool
+fn is_upper_tri<R>(u: &SpMat<R>) -> bool
 where R: Ring, for<'x> &'x R: RingOps<R> {
     u.rows() == u.cols() && 
-    u.iter().all(|(a, (i, j))| 
+    u.iter().all(|(i, j, a)| 
         i < j || (i == j && a.is_unit()) || (i > j && a.is_zero())
     )
 }
@@ -238,14 +236,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 mod tests { 
     use sprs::CsVec;
-
-    use crate::math::matrix::sparse::{CsMatExt, CsVecExt};
+    use crate::math::matrix::sparse::*;
     use super::*;
     use super::TriangularType::{Upper, Lower};
 
     #[test]
     fn solve_upper() { 
-        let u = CsMat::csc_from_vec((5, 5), vec![
+        let u = SpMat::from_vec((5, 5), vec![
             1, -2, 1,  3, 5,
             0, -1, 4,  2, 1,
             0,  0, 1,  0, 3,
@@ -259,7 +256,7 @@ mod tests {
 
     #[test]
     fn inv_upper() { 
-        let u = CsMat::csc_from_vec((5, 5), vec![
+        let u = SpMat::from_vec((5, 5), vec![
             1, -2, 1,  3, 5,
             0, -1, 4,  2, 1,
             0,  0, 1,  0, 3,
@@ -273,7 +270,7 @@ mod tests {
 
     #[test]
     fn solve_lower() { 
-        let l = CsMat::csc_from_vec((5, 5), vec![
+        let l = SpMat::from_vec((5, 5), vec![
             1,  0, 0,  0, 0,
            -2, -1, 0,  0, 0,
             1,  4, 1,  0, 0,
@@ -287,7 +284,7 @@ mod tests {
 
     #[test]
     fn inv_lower() { 
-        let l = CsMat::csc_from_vec((5, 5), vec![
+        let l = SpMat::from_vec((5, 5), vec![
             1,  0, 0,  0, 0,
            -2, -1, 0,  0, 0,
             1,  4, 1,  0, 0,

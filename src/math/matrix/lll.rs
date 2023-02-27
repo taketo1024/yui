@@ -529,6 +529,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 pub(super) mod tests {
     use ndarray::array;
     use crate::math::matrix::DnsMat;
+    use crate::math::matrix::sparse::SpMat;
     use super::*;
  
     #[test]
@@ -969,12 +970,9 @@ pub(super) mod tests {
 
     #[test]
     fn hnf_rand() {
-        use crate::math::matrix::sparse::CsMatExt;
-
         let d = 0.5;
         let shape = (8, 8);
-        let a = sprs::CsMat::<i64>::rand(shape, d);
-        let a = DnsMat::from(a.to_dense());
+        let a = SpMat::<i64>::rand(shape, d).to_dense();
 
         let mut calc = LLLHNFCalc::new(a.clone(), [true, true]);
         calc.process();

@@ -4,6 +4,7 @@ use std::vec::IntoIter;
 
 use crate::math::homology::base::{GradedRModStr, RModGrid};
 use crate::math::homology::free::FreeRModStr;
+use crate::math::matrix::sparse::SpMat;
 use crate::math::traits::{Ring, RingOps};
 use crate::math::homology::complex::ChainComplex;
 use crate::links::Link;
@@ -123,7 +124,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         1
     }
 
-    fn d_matrix(&self, k: Self::Index) -> sprs::CsMat<Self::R> {
+    fn d_matrix(&self, k: Self::Index) -> SpMat<Self::R> {
         let c1 = &self.grid[k];
         let c2 = &self.grid[k + 1];
         c1.make_matrix(c2, |x| self.cube.differentiate(x))
@@ -219,7 +220,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         Idx2(1, 0)
     }
 
-    fn d_matrix(&self, idx: Self::Index) -> sprs::CsMat<Self::R> {
+    fn d_matrix(&self, idx: Self::Index) -> SpMat<Self::R> {
         let c1 = &self[idx];
         let c2 = &self[idx + self.d_degree()];
         c1.make_matrix(c2, |x| self.cube.differentiate(x))

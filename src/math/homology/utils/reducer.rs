@@ -1,6 +1,6 @@
 use log::*;
-use sprs::{CsMat, CsVec, PermOwned};
-use crate::math::matrix::sparse::{CsMatExt, CsVecExt};
+use sprs::{CsVec, PermOwned};
+use crate::math::matrix::sparse::*;
 use crate::math::matrix::pivot::{perms_by_pivots, find_pivots, PivotType};
 use crate::math::matrix::schur::SchurLT;
 use crate::math::traits::{Ring, RingOps};
@@ -20,9 +20,9 @@ use crate::math::traits::{Ring, RingOps};
 
 pub struct ChainReducer<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    a0: CsMat<R>, // prev
-    a1: CsMat<R>, // target
-    a2: CsMat<R>, // next
+    a0: SpMat<R>, // prev
+    a1: SpMat<R>, // target
+    a2: SpMat<R>, // next
     v1: Vec<CsVec<R>>,
     v2: Vec<CsVec<R>>,
     step: usize
@@ -30,15 +30,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> ChainReducer<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn reduce(a0: CsMat<R>, a1: CsMat<R>, a2: CsMat<R>)
-        -> (CsMat<R>, CsMat<R>, CsMat<R>)
+    pub fn reduce(a0: SpMat<R>, a1: SpMat<R>, a2: SpMat<R>)
+        -> (SpMat<R>, SpMat<R>, SpMat<R>)
     {
         let (b0, b1, b2, _, _) = Self::reduce_with(a0, a1, a2, vec![], vec![]);
         (b0, b1, b2)
     }
 
-    pub fn reduce_with(a0: CsMat<R>, a1: CsMat<R>, a2: CsMat<R>, v1: Vec<CsVec<R>>, v2: Vec<CsVec<R>>) 
-        -> (CsMat<R>, CsMat<R>, CsMat<R>, Vec<CsVec<R>>, Vec<CsVec<R>>) 
+    pub fn reduce_with(a0: SpMat<R>, a1: SpMat<R>, a2: SpMat<R>, v1: Vec<CsVec<R>>, v2: Vec<CsVec<R>>) 
+        -> (SpMat<R>, SpMat<R>, SpMat<R>, Vec<CsVec<R>>, Vec<CsVec<R>>) 
     {
         let mut c = Self::new(a0, a1, a2, v1, v2);
 
@@ -51,7 +51,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         c.result()
     }
 
-    fn new(a0: CsMat<R>, a1: CsMat<R>, a2: CsMat<R>, v1: Vec<CsVec<R>>, v2: Vec<CsVec<R>>) -> Self {
+    fn new(a0: SpMat<R>, a1: SpMat<R>, a2: SpMat<R>, v1: Vec<CsVec<R>>, v2: Vec<CsVec<R>>) -> Self {
         let (m, n) = a1.shape();
 
         assert_eq!(a0.rows(), n);
@@ -62,7 +62,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         Self { a0, a1, a2, v1, v2, step: 0 }
     }
 
-    fn result(self) -> (CsMat<R>, CsMat<R>, CsMat<R>, Vec<CsVec<R>>, Vec<CsVec<R>>) {
+    fn result(self) -> (SpMat<R>, SpMat<R>, SpMat<R>, Vec<CsVec<R>>, Vec<CsVec<R>>) {
         (self.a0, self.a1, self.a2, self.v1, self.v2)
     }
 
@@ -110,12 +110,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.a2 = Self::reduce_cols(a2, p, r);
     }
 
-    fn reduce_rows(a: &CsMat<R>, p: &PermOwned, r: usize) -> CsMat<R> {
+    fn reduce_rows(a: &SpMat<R>, p: &PermOwned, r: usize) -> SpMat<R> {
         let (m, n) = a.shape();
         a.permute_rows(p.view()).submatrix(r..m, 0..n)
     }
 
-    fn reduce_cols(a: &CsMat<R>, p: &PermOwned, r: usize) -> CsMat<R> {
+    fn reduce_cols(a: &SpMat<R>, p: &PermOwned, r: usize) -> SpMat<R> {
         let (m, n) = a.shape();
         a.permute_cols(p.view()).submatrix(0..m, r..n)
     }
@@ -152,7 +152,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 mod tests {
     use sprs::CsVec;
 
-    use crate::math::{homology::complex::{tests::TestChainComplex, ChainComplex}, matrix::sparse::{CsVecExt, CsMatExt}};
+    use crate::math::homology::complex::{tests::TestChainComplex, ChainComplex};
+    use crate::math::matrix::sparse::*;
 
     use super::ChainReducer;
 

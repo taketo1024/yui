@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::ops::Index;
-use sprs::CsMat;
+use crate::math::matrix::sparse::*;
 use crate::math::traits::{Ring, RingOps};
 use super::base::{GradedRModStr, RModStr, RModGrid, GenericRModStr};
 use super::complex::ChainComplex;
@@ -14,7 +14,7 @@ where
 { 
     original: C,
     grid: RModGrid<GenericRModStr<C::R>, C::IndexRange>,
-    d_matrices: HashMap<C::Index, CsMat<C::R>>,
+    d_matrices: HashMap<C::Index, SpMat<C::R>>,
 }
 
 impl<C> From<C> for Reduced<C>
@@ -97,13 +97,13 @@ where
         self.original.d_degree()
     }
 
-    fn d_matrix(&self, k: Self::Index) -> sprs::CsMat<Self::R> {
+    fn d_matrix(&self, k: Self::Index) -> SpMat<Self::R> {
         if self.in_range(k) { 
             self.d_matrices[&k].clone()
         } else {
             let m = self[k + self.d_degree()].rank();
             let n = self[k].rank();
-            CsMat::zero((m, n))
+            SpMat::zero((m, n))
         }
     }
 }
@@ -112,15 +112,13 @@ where
 mod tests { 
     use crate::math::homology::base::RModStr;
     use crate::math::homology::homology::GenericHomology;
-    use crate::math::matrix::sparse::CsMatExt;
-
     use super::*;
     use super::super::complex::tests::*;
 
     #[test]
     fn cancel_pair() { 
         let c = TestChainComplex::<i32>::descending(
-            vec![ CsMat::csc_from_vec((1, 1), vec![1]) ],
+            vec![ SpMat::from_vec((1, 1), vec![1]) ],
         );
         let c = Reduced::from(c);
 
@@ -131,7 +129,7 @@ mod tests {
     #[test]
     fn torsion() { 
         let c = TestChainComplex::<i32>::descending( 
-            vec![ CsMat::csc_from_vec((1, 1), vec![2]) ],
+            vec![ SpMat::from_vec((1, 1), vec![2]) ],
         );
         let c = Reduced::from(c);
 

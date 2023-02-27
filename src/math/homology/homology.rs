@@ -128,15 +128,14 @@ where
 
 #[cfg(test)]
 mod tests { 
-    use sprs::CsMat;
-    use crate::math::matrix::sparse::CsMatExt;
+    use crate::math::matrix::sparse::*;
     use super::*;
     use super::super::complex::tests::*;
 
     #[test]
     fn cancel_pair() { 
         let c = TestChainComplex::<i32>::descending(
-            vec![ CsMat::csc_from_vec((1, 1), vec![1]) ],
+            vec![ SpMat::from_vec((1, 1), vec![1]) ],
         );
 
         let h = GenericHomology::from(c);
@@ -148,7 +147,7 @@ mod tests {
     #[test]
     fn torsion() { 
         let c = TestChainComplex::<i32>::descending( 
-            vec![ CsMat::csc_from_vec((1, 1), vec![2]) ],
+            vec![ SpMat::from_vec((1, 1), vec![2]) ],
         );
 
         let h = GenericHomology::from(c);

@@ -1,11 +1,11 @@
 use once_cell::sync::OnceCell;
-use sprs::{CsMat, CsVec, TriMat};
+use sprs::CsVec;
 
 use crate::math::matrix::sparse::CsVecExt;
 use crate::math::matrix::triang::TriangularType;
 use crate::math::traits::{Ring, RingOps};
-use super::sparse::CsMatExt;
-use super::triang::{inv_triangular, solve_triangular_vec, solve_triangular_with};
+use super::sparse::*;
+use super::triang::{solve_triangular_vec, solve_triangular_with};
 
 // A = [a b]  ~>  s = d - c a⁻¹ b.
 //     [c d]
@@ -15,36 +15,36 @@ use super::triang::{inv_triangular, solve_triangular_vec, solve_triangular_with}
 
 pub struct SchurLT<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    ac: CsMat<R>, 
-    bd: CsMat<R>, 
-    pinv: OnceCell<CsMat<R>>
+    ac: SpMat<R>, 
+    bd: SpMat<R>, 
+    pinv: OnceCell<SpMat<R>>
 }
 
 impl<R> SchurLT<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn from_partial_lower(a: CsMat<R>, r: usize) -> Self {
+    pub fn from_partial_lower(a: SpMat<R>, r: usize) -> Self {
         assert!(r <= a.rows());
         assert!(r <= a.cols());
 
-        debug_assert!(a.iter().all(|(a, (i, j))| { 
+        debug_assert!(a.iter().all(|(i, j, a)| { 
             (j < r && (i >= j || a.is_zero())) || (j >= r) 
         }));
 
-        let [ac, bd] = a.split_hor(r);
+        let (ac, bd) = a.split_hor(r);
         let pinv = OnceCell::new();
         Self { ac, bd, pinv }
     }
 
     // p⁻¹ = [a    ] : lower triangular
     //       [c  id]
-    pub fn pinv(&self) -> &CsMat<R> { 
+    pub fn pinv(&self) -> &SpMat<R> { 
         self.pinv.get_or_init(|| { 
-            let zero = |n, m| CsMat::<R>::zero((n, m));
-            let id = |n| CsMat::<R>::id(n);
+            let zero = |n, m| SpMat::<R>::zero((n, m));
+            let id = |n| SpMat::<R>::id(n);
     
             let (n, r) = self.ac.shape();
-            let right = CsMat::stack(&zero(r, n - r), &id(n - r));
-            let pinv = CsMat::concat(&self.ac, &right);
+            let right = zero(r, n - r).stack(&id(n - r));
+            let pinv = self.ac.concat(&right);
 
             pinv
         })
@@ -55,18 +55,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     //   [a    ][x1] = [b]
     //   [c  id][x2]   [d].
     //
-    pub fn complement(&self) -> CsMat<R> {
+    pub fn complement(&self) -> SpMat<R> {
         let (m, r) = self.ac.shape();
         let k = self.bd.cols();
         let pinv = self.pinv();
 
-        let mut trip = TriMat::new((m - r, k));
-        solve_triangular_with(TriangularType::Lower, pinv, &self.bd, |i, j, x|
-            if i >= r { 
-                trip.add_triplet(i - r, j, x)
-            }
-        );
-        trip.to_csc()
+        SpMat::generate((m - r, k), |init| { 
+            solve_triangular_with(TriangularType::Lower, pinv, &self.bd, |i, j, x|
+                if i >= r { 
+                    init(i - r, j, x)
+                }
+            );
+        })
     }
 
     // Given 
@@ -93,142 +93,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-// -- TODO: remove old code -- //
-
-pub fn schur_partial_upper_triang<R>(a: CsMat<R>, r: usize) -> Schur<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    assert!(a.is_csc());
-
-    let [u, b, c, d] = a.divide4(r, r);
-    let uinv = inv_triangular(TriangularType::Upper, &u);
-    let s = Schur::new(u, uinv, b, c, d);
-
-    s
-}
-
-// A = [a b]  ~>  s = d - c a⁻¹ b.
-//     [c d]
-//
-// [a⁻¹     ] [a b] [id -a⁻¹b] = [id  ]
-// [-ca⁻¹ id] [c d] [      id]   [   s]
-
-pub struct Schur<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    a: CsMat<R>,
-    ainv: CsMat<R>,
-    b: CsMat<R>,
-    c: CsMat<R>,
-    d: CsMat<R>
-}
-
-impl<R> Schur<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new(a: CsMat<R>, ainv: CsMat<R>, b: CsMat<R>, c: CsMat<R>, d: CsMat<R>) -> Self {
-        let (r, m, n) = (a.rows(), c.rows(), b.cols());
-        assert_eq!(a.shape(), ainv.shape());
-        assert_eq!(a.cols(), r);
-        assert_eq!(b.rows(), r);
-        assert_eq!(c.cols(), r);
-        assert_eq!(d.rows(), m);
-        assert_eq!(d.cols(), n);
-
-        Self { a, ainv, b, c, d }
-    }
-
-    pub fn rows(&self) -> usize {
-        self.a.rows() + self.c.rows()
-    }
-
-    pub fn cols(&self) -> usize {
-        self.a.cols() + self.b.cols()
-    }
-
-    pub fn complement(&self) -> CsMat<R> {
-        let (ainv, b, c, d) = (&self.ainv, &self.b, &self.c, &self.d);
-        d - &( &(c * ainv) * b)
-    }
-
-    // returns: [-ca⁻¹ id][v1] = v2 - ca⁻¹v1
-    //                    [v2] 
-    pub fn trans_vec(&self, v: CsVec<R>) -> CsVec<R> { 
-        assert_eq!(v.dim(), self.rows());
-        
-        let (ainv, c) = (&self.ainv, &self.c);
-        let r = self.ainv.rows();
-        let (v1, v2) = v.divide2(r);
-
-        &v2 - &(c * &(ainv * &v1))
-    }
-
-    // p = [a⁻¹     ]
-    //     [-ca⁻¹ id]
-    pub fn p(&self) -> CsMat<R> { 
-        let (r, m) = (self.ainv.rows(), self.rows());
-        let (ainv, c) = (&self.ainv, &self.c);
-
-        let zero = |shape| CsMat::<R>::zero(shape);
-        let id = |n| CsMat::<R>::id(n);
-
-        CsMat::combine4([
-            ainv, 
-            &zero((r, m - r)), 
-            &( &zero((m - r, r)) - &(c * ainv) ), // MEMO: unary - not supported.
-            &id(m - r)
-        ])
-    }
-
-    // p⁻¹ = [a    ]
-    //       [c  id]
-    pub fn pinv(&self) -> CsMat<R> { 
-        let (r, m) = (self.a.rows(), self.rows());
-        let (a, c) = (&self.a, &self.c);
-
-        let zero = |shape| CsMat::<R>::zero(shape);
-        let id = |n| CsMat::<R>::id(n);
-
-        CsMat::combine4([
-            a, 
-            &zero((r, m - r)), 
-            c,
-            &id(m - r)
-        ])
-    }
-
-    // q = [id -a⁻¹b]
-    //     [      id]
-    pub fn q(&self) -> CsMat<R> { 
-        let (r, n) = (self.a.rows(), self.cols());
-        let (ainv, b) = (&self.ainv, &self.b);
-
-        let zero = |shape| CsMat::<R>::zero(shape);
-        let id = |n| CsMat::<R>::id(n);
-
-        CsMat::combine4([
-            &id(r), 
-            &( &zero((r, n - r)) - &(ainv * b) ), // MEMO: unary - not supported., 
-            &zero((n - r, r)),
-            &id(n - r)
-        ])
-    }
-
-    // q⁻¹ = [id a⁻¹b]
-    //       [     id]
-    pub fn qinv(&self) -> CsMat<R> { 
-        let (r, n) = (self.a.rows(), self.cols());
-        let (ainv, b) = (&self.ainv, &self.b);
-
-        let zero = |shape| CsMat::<R>::zero(shape);
-        let id = |n| CsMat::<R>::id(n);
-
-        CsMat::combine4([
-            &id(r), 
-            &(ainv * b),
-            &zero((n - r, r)),
-            &id(n - r)
-        ])
-    }
-}
-
+/*
 #[cfg(test)]
 mod tests { 
     use super::*;
@@ -327,3 +192,4 @@ mod tests {
         assert_eq!(w, CsVec::new(2, vec![0,1], vec![9, 28]));
     }
 }
+*/

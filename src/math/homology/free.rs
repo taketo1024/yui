@@ -1,6 +1,7 @@
 use std::fmt::Display;
 use std::collections::HashMap;
-use sprs::{CsVec, CsMat, TriMat};
+use sprs::CsVec;
+use crate::math::matrix::sparse::SpMat;
 use crate::math::types::lin_comb::{FreeGen, LinComb};
 use crate::math::traits::{Ring, RingOps};
 use super::base::RModStr;
@@ -49,7 +50,7 @@ where
         CsVec::new_from_unsorted(n, v_ind, v_val).unwrap()
     }
 
-    pub fn make_matrix<F>(&self, target: &Self, f: F) -> CsMat<R>
+    pub fn make_matrix<F>(&self, target: &Self, f: F) -> SpMat<R>
     where 
         F: Fn(&X) -> Vec<(X, R)> 
     {
@@ -60,18 +61,16 @@ where
                 .map(|(i, y)| (y, i))
                 .collect::<HashMap<_, _>>();
 
-        let mut trip = TriMat::new((m, n));
-
-        for (j, x) in self.generators.iter().enumerate() {
-            let ys = f(x);
-            for (y, a) in ys {
-                if !t_ind.contains_key(&y) { continue }
-                let i = t_ind[&y];
-                trip.add_triplet(i, j, a);
+        SpMat::generate((m, n), |set|
+            for (j, x) in self.generators.iter().enumerate() {
+                let ys = f(x);
+                for (y, a) in ys {
+                    if !t_ind.contains_key(&y) { continue }
+                    let i = t_ind[&y];
+                    set(i, j, a);
+                }
             }
-        }
-
-        trip.to_csc()
+        )
     }
 }
 

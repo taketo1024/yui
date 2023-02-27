@@ -3,11 +3,12 @@ use std::iter::zip;
 use std::fmt::Display;
 use num_traits::{Zero, One};
 use rand::Rng;
-use sprs::{CsMatBase, SpIndex, TriMat, CsMat, PermView, CsVec, CsVecBase};
+use sprs::{CsMatBase, SpIndex, TriMat, CsMat, PermView, CsVec, CsVecBase, CsVecView};
 use auto_impl_ops::auto_ops;
 use crate::math::traits::{Ring, RingOps, AddMonOps, AddGrpOps, MonOps};
 
 use super::DnsMat;
+
 pub use super::dense::MatType;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -54,7 +55,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         })
     }
 
-    pub fn to_dense(self) -> DnsMat<R> { 
+    pub fn to_dense(&self) -> DnsMat<R> { 
         self.into()
     }
 }
@@ -67,15 +68,15 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     }
 }
 
-impl<R> From<DnsMat<R>> for SpMat<R>
+impl<R> From<&DnsMat<R>> for SpMat<R>
 where R: Ring, for<'a> &'a R: RingOps<R> {
-    fn from(a: DnsMat<R>) -> Self {
+    fn from(a: &DnsMat<R>) -> Self {
         let n = a.cols();
         SpMat::new(a.shape(), |set| { 
-            for (k, a) in a.array_into().into_iter().enumerate() {
+            for (k, a) in a.array().iter().enumerate() {
                 if a.is_zero() { continue }
                 let (i, j) = (k / n, k % n);
-                set(i, j, a);
+                set(i, j, a.clone());
             }
         })
     }
@@ -173,6 +174,77 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.is_square() && self.cs_mat.into_iter().all(|(a, (i, j))| 
             (i == j && a.is_one()) || (i != j && a.is_zero())
         )
+    }
+}
+
+impl<R> SpMat<R>
+where R: Ring, for<'a> &'a R: RingOps<R> { 
+    pub fn rand(shape: (usize, usize), density: f64) -> SpMat<R> { 
+        let (m, n) = shape;
+        let mut rng = rand::thread_rng();
+
+        Self::new(shape, |set| { 
+            for i in 0..m { 
+                for j in 0..n { 
+                    if rng.gen::<f64>() < density { 
+                        set(i, j, R::one());
+                    }
+                }
+            }
+        })
+    }
+
+    pub fn transpose(&self) -> Self { 
+        todo!()
+    }
+
+    pub fn permute(&self, p: PermView, q: PermView) -> Self { 
+        todo!()
+    }
+
+    pub fn permute_rows(&self, p: PermView) -> Self { 
+        todo!()
+    }
+    
+    pub fn permute_cols(&self, q: PermView) -> Self { 
+        todo!()
+    }
+
+    pub fn submatrix(&self, rows: Range<usize>, cols: Range<usize>) -> Self { 
+        todo!()
+    }
+
+    pub fn split_hor(&self, k: usize) -> [Self; 2] { 
+        todo!()
+    }
+
+    pub fn split_ver(&self, k: usize) -> [Self; 2] { 
+        todo!()
+    }
+
+    pub fn concat(&self, b: &Self) -> Self { 
+        todo!()
+    }
+
+    pub fn stack(&self, b: &Self) -> Self { 
+        todo!()
+    }
+
+    pub fn col(&self, j: usize) -> CsVec<R> { 
+        self.col_view(j).to_owned()
+    }
+
+    pub fn col_view(&self, j: usize) -> CsVecView<R> { 
+        self.cs_mat.outer_view(j).unwrap()
+    }
+}
+
+impl<R> Mul<&CsVec<R>> for &SpMat<R>
+where R: Ring, for<'a> &'a R: RingOps<R> {
+    type Output = CsVec<R>;
+
+    fn mul(self, rhs: &CsVec<R>) -> Self::Output {
+        todo!()
     }
 }
 

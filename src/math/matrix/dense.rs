@@ -43,9 +43,9 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     }
 }
 
-impl<R> From<SpMat<R>> for DnsMat<R> 
+impl<R> From<&SpMat<R>> for DnsMat<R> 
 where R: Ring, for<'a> &'a R: RingOps<R> {
-    fn from(a: SpMat<R>) -> Self {
+    fn from(a: &SpMat<R>) -> Self {
         DnsMat::from(a.cs_mat().to_dense())
     }
 }
@@ -79,7 +79,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         )
     }
 
-    pub fn to_sparse(self) -> SpMat<R> { 
+    pub fn to_sparse(&self) -> SpMat<R> { 
         self.into()
     }
 }

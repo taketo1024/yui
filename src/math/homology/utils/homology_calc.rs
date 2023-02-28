@@ -167,7 +167,7 @@ mod tests {
 
         assert!((&p * &q).is_id());
 
-        let v = q.col(0);
+        let v = q.col_vec(0);
         assert_eq!(v.is_zero(), false);
     }
 
@@ -198,7 +198,7 @@ mod tests {
 
         assert!((&p * &q).is_id());
 
-        let v = q.col(0).to_owned();
+        let v = q.col_vec(0);
         assert_eq!(v.is_zero(), false);
         assert_eq!((&d2 * &v).is_zero(), true);
     }
@@ -216,7 +216,7 @@ mod tests {
 
         assert!((&p * &q).is_id());
 
-        let v = q.col(0);
+        let v = q.col_vec(0);
         assert_eq!(v.is_zero(), false);
     }
 
@@ -234,7 +234,7 @@ mod tests {
         assert!((&p * &q).is_id());
 
         for i in 0..2 { 
-            let v = q.col(i).to_owned();
+            let v = q.col_vec(i);
             assert_eq!(v.is_zero(), false);
             assert_eq!((&d1 * &v).is_zero(), true);
         }
@@ -253,7 +253,7 @@ mod tests {
 
         assert!((&p * &q).is_id());
 
-        let v = q.col(0).to_owned();
+        let v = q.col_vec(0);
         assert_eq!(v.is_zero(), false);
         assert_eq!((&d2 * &v).is_zero(), true);
     }
@@ -272,7 +272,7 @@ mod tests {
 
         assert!((&p * &q).is_id());
 
-        let v = q.col(0);
+        let v = q.col_vec(0);
         assert_eq!(v.is_zero(), false);
     }
 
@@ -289,7 +289,7 @@ mod tests {
 
         assert!((&p * &q).is_id());
 
-        let v = q.col(0).to_owned();
+        let v = q.col_vec(0);
         assert_eq!(v.is_zero(), false);
         assert_eq!((&d1 * &v).is_zero(), true);
     }

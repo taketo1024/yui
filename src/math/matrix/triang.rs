@@ -74,7 +74,7 @@ where
     let mut b = vec![R::zero(); n];
 
     for j in 0..k { 
-        for (i, r) in y.col(j).iter() { 
+        for (i, r) in y.col_view(j).iter() { 
             b[i] = r.clone();
         }
 
@@ -122,7 +122,7 @@ where
         let x = x_st.deref_mut();
         let b = b_st.deref_mut();
 
-        for (i, r) in y.col(j).iter() { 
+        for (i, r) in y.col_vec(j).iter() { 
             b[i] = r.clone();
         }
 
@@ -191,7 +191,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let u_jj_inv = diag[j].inv().unwrap();
         let x_j = &b[j] * &u_jj_inv; // non-zero
 
-        for (i, u_ij) in a.col(j).iter() {
+        for (i, u_ij) in a.col_vec(j).iter() {
             if u_ij.is_zero() { continue }
             b[i] -= u_ij * &x_j;
         }

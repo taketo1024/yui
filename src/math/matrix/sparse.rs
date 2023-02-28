@@ -6,8 +6,10 @@ use sprs::{SpIndex, TriMat, CsMat, PermView, CsVec, CsVecBase, CsVecView};
 use auto_impl_ops::auto_ops;
 use crate::math::traits::{Ring, RingOps, AddMonOps, AddGrpOps, MonOps};
 use super::DnsMat;
+use super::sp_vec::SpVec;
 
 pub use super::dense::MatType;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SpMat<R>
 where R: Ring, for<'a> &'a R: RingOps<R> { 
@@ -54,6 +56,16 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
     pub fn to_dense(&self) -> DnsMat<R> { 
         self.into()
+    }
+
+    pub fn col_view(&self, j: usize) -> CsVecView<R> { 
+        assert!(j < self.cols());
+        self.cs_mat.outer_view(j).unwrap()
+    }
+
+    pub fn col_vec(&self, j: usize) -> SpVec<R> { 
+        let cs_vec = self.col_view(j).to_owned();
+        SpVec::from(cs_vec)
     }
 }
 
@@ -266,19 +278,6 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
             b, 
             &zero(b.rows(), 0)
         ])
-    }
-
-    pub fn col(&self, j: usize) -> CsVecView<R> { 
-        self.cs_mat.outer_view(j).unwrap()
-    }
-}
-
-impl<R> Mul<&CsVec<R>> for &SpMat<R>
-where R: Ring, for<'a> &'a R: RingOps<R> {
-    type Output = CsVec<R>;
-
-    fn mul(self, rhs: &CsVec<R>) -> Self::Output {
-        self.cs_mat() * rhs
     }
 }
 

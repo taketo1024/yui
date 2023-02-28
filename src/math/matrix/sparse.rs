@@ -209,7 +209,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         self.permute(id, q)
     }
 
-    pub fn submatrix(&self, rows: Range<usize>, cols: Range<usize>) -> SpMatView<R> { 
+    pub fn submat(&self, rows: Range<usize>, cols: Range<usize>) -> SpMatView<R> { 
         let (i0, i1) = (rows.start, rows.end);
         let (j0, j1) = (cols.start, cols.end);
 
@@ -225,14 +225,14 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         })
     }
 
-    pub fn submatrix_rows(&self, rows: Range<usize>) -> SpMatView<R> { 
+    pub fn submat_rows(&self, rows: Range<usize>) -> SpMatView<R> { 
         let n = self.cols();
-        self.submatrix(rows, 0 .. n)
+        self.submat(rows, 0 .. n)
     }
 
-    pub fn submatrix_cols(&self, cols: Range<usize>) -> SpMatView<R> { 
+    pub fn submat_cols(&self, cols: Range<usize>) -> SpMatView<R> { 
         let m = self.rows();
-        self.submatrix(0 .. m, cols)
+        self.submat(0 .. m, cols)
     }
 
     pub fn combine_blocks(blocks: [&SpMat<R>; 4]) -> SpMat<R> {
@@ -324,7 +324,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.to_owned().to_dense()
     }
 
-    pub fn submatrix(&self, rows: Range<usize>, cols: Range<usize>) -> SpMatView<R> { 
+    pub fn submat(&self, rows: Range<usize>, cols: Range<usize>) -> SpMatView<R> { 
         let (i0, i1) = (rows.start, rows.end);
         let (j0, j1) = (cols.start, cols.end);
 
@@ -344,14 +344,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         })
     }
 
-    pub fn submatrix_rows(&self, rows: Range<usize>) -> SpMatView<R> { 
+    pub fn submat_rows(&self, rows: Range<usize>) -> SpMatView<R> { 
         let n = self.cols();
-        self.submatrix(rows, 0 .. n)
+        self.submat(rows, 0 .. n)
     }
 
-    pub fn submatrix_cols(&self, cols: Range<usize>) -> SpMatView<R> { 
+    pub fn submat_cols(&self, cols: Range<usize>) -> SpMatView<R> { 
         let m = self.rows();
-        self.submatrix(0 .. m, cols)
+        self.submat(0 .. m, cols)
     }
 }
 

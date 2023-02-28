@@ -35,7 +35,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let m = a.rows();
         SpMat::generate((m, m), |set| { 
             // [a; c]
-            for (i, j, x) in a.submatrix_cols(0..r).iter() {
+            for (i, j, x) in a.submat_cols(0..r).iter() {
                 set(i, j, x.clone());
             }
             // [0; id]
@@ -52,7 +52,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     //
     fn compute_compl(a: &SpMatView<R>, r: usize, pinv: &SpMat<R>) -> SpMat<R> { 
         let (m, n) = a.shape();
-        let bd = a.submatrix_cols(r..n).to_owned();
+        let bd = a.submat_cols(r..n).to_owned();
 
         SpMat::generate((m - r, n - r), |set| { 
             solve_triangular_with(TriangularType::Lower, pinv, &bd, |i, j, x|

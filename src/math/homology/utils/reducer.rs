@@ -74,10 +74,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             return false
         }
     
-        let s = self.schur(&p, &q, r);
-        self.reduce_matrices(&p, &q, r, &s);
-        self.reduce_vecs(&p, &q, r, &s);
+        info!("compute schur complement.");
 
+        let s = self.schur(&p, &q, r);
+
+        info!("schur complement: {:?}", s.complement().shape());
+
+        self.reduce_matrices(&p, &q, r);
+        self.reduce_vecs(&p, &q, r, &s);
+        
+        self.a1 = s.complement_into();
         self.step += 1;
         
         true
@@ -95,17 +101,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn schur(&self, p: &PermOwned, q: &PermOwned, r: usize) -> SchurLT<R> {
         let a1 = &self.a1;
         let b1 = a1.permute(p.view(), q.view());
-        SchurLT::from_partial_lower(b1, r)
+        SchurLT::from_partial_lower(&b1, r)
     }
 
-    fn reduce_matrices(&mut self, p: &PermOwned, q: &PermOwned, r: usize, s: &SchurLT<R>) {
+    fn reduce_matrices(&mut self, p: &PermOwned, q: &PermOwned, r: usize) {
         let (a0, a2) = (&self.a0, &self.a2);
-
-        info!("compute schur complement.");
-
-        self.a1 = s.complement();
-        
-        info!("schur complement: {:?}", self.a1.shape());
 
         self.a0 = Self::reduce_rows(a0, q, r);
         self.a2 = Self::reduce_cols(a2, p, r);

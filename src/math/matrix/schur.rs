@@ -1,4 +1,3 @@
-use once_cell::sync::OnceCell;
 use crate::math::matrix::sp_vec::SpVec;
 use crate::math::matrix::triang::TriangularType;
 use crate::math::traits::{Ring, RingOps};
@@ -13,41 +12,36 @@ use super::triang::{solve_triangular_vec, solve_triangular_with};
 
 pub struct SchurLT<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    ac: SpMat<R>, 
-    bd: SpMat<R>, 
-    pinv: OnceCell<SpMat<R>>
+    r: usize,
+    compl: SpMat<R>,
+    pinv: SpMat<R>
 }
 
-impl<R> SchurLT<R>
+impl<'a, R> SchurLT<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn from_partial_lower(a: SpMatView<R>, r: usize) -> Self {
+    pub fn from_partial_lower(a: &SpMatView<R>, r: usize) -> Self {
         assert!(r <= a.rows());
         assert!(r <= a.cols());
 
-        debug_assert!(a.iter().all(|(i, j, a)| { 
-            (j < r && (i >= j || a.is_zero())) || (j >= r) 
-        }));
+        let pinv = Self::compute_pinv(a, r);
+        let compl = Self::compute_compl(a, r, &pinv);
 
-        // TODO improve performance!
-        
-        let ac = a.submatrix_cols(0 .. r).to_owned();
-        let bd = a.submatrix_cols(r .. a.cols()).to_owned();
-        let pinv = OnceCell::new();
-        Self { ac, bd, pinv }
+        Self { r, compl, pinv }
     }
 
     // p⁻¹ = [a    ] : lower triangular
     //       [c  id]
-    pub fn pinv(&self) -> &SpMat<R> { 
-        self.pinv.get_or_init(|| { 
-            let zero = |n, m| SpMat::<R>::zero((n, m));
-            let id = |n| SpMat::<R>::id(n);
-    
-            let (n, r) = self.ac.shape();
-            let right = zero(r, n - r).stack(&id(n - r));
-            let pinv = self.ac.concat(&right);
-
-            pinv
+    fn compute_pinv(a: &SpMatView<R>, r: usize) -> SpMat<R> {
+        let m = a.rows();
+        SpMat::generate((m, m), |set| { 
+            // [a; c]
+            for (i, j, x) in a.submatrix_cols(0..r).iter() {
+                set(i, j, x.clone());
+            }
+            // [0; id]
+            for i in r..m { 
+                set(i, i, R::one());
+            }
         })
     }
 
@@ -56,18 +50,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     //   [a    ][x1] = [b]
     //   [c  id][x2]   [d].
     //
-    pub fn complement(&self) -> SpMat<R> {
-        let (m, r) = self.ac.shape();
-        let k = self.bd.cols();
-        let pinv = self.pinv();
+    fn compute_compl(a: &SpMatView<R>, r: usize, pinv: &SpMat<R>) -> SpMat<R> { 
+        let (m, n) = a.shape();
+        let bd = a.submatrix_cols(r..n).to_owned();
 
-        SpMat::generate((m - r, k), |init| { 
-            solve_triangular_with(TriangularType::Lower, pinv, &self.bd, |i, j, x|
+        SpMat::generate((m - r, n - r), |set| { 
+            solve_triangular_with(TriangularType::Lower, pinv, &bd, |i, j, x|
                 if i >= r { 
-                    init(i - r, j, x)
+                    set(i - r, j, x)
                 }
             );
         })
+    }
+
+    pub fn complement(&self) -> &SpMat<R> {
+        &self.compl
+    }
+
+    pub fn complement_into(self) -> SpMat<R> {
+        self.compl
     }
 
     // Given 
@@ -86,10 +87,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     //   [c  id][x2]   [v2].
     //
     pub fn trans_vec(&self, v: SpVec<R>) -> SpVec<R> { 
-        let (m, r) = self.ac.shape();
-        let pinv = self.pinv();
+        let r = self.r;
+        let m = r + self.compl.rows();
+
+        assert_eq!(m, v.dim());
+
+        let pinv = &self.pinv;
         let x = solve_triangular_vec(TriangularType::Lower, pinv, &v);
         let x2 = x.subvec(r..m).to_owned();
+
         x2
     }
 }

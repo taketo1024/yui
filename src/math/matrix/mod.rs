@@ -1,5 +1,6 @@
 pub mod dense;
 pub mod sparse;
+pub mod sp_vec;
 pub mod snf;
 pub mod lll;
 pub mod triang;

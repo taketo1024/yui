@@ -19,12 +19,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<'a, R> SchurLT<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn from_partial_lower(a: &SpMatView<R>, r: usize) -> Self {
+    pub fn from_partial_lower(a: SpMatView<R>, r: usize) -> Self {
         assert!(r <= a.rows());
         assert!(r <= a.cols());
 
-        let pinv = Self::compute_pinv(a, r);
-        let compl = Self::compute_compl(a, r, &pinv);
+        let pinv = Self::compute_pinv(&a, r);
+        let compl = Self::compute_compl(&a, r, &pinv);
 
         Self { r, compl, pinv }
     }
@@ -114,7 +114,7 @@ mod tests {
             5, 3, 5, 2, 2,
             6, 2,-3, 1, 8
         ]);
-        let s = SchurLT::from_partial_lower(&a.view(), 3);
+        let s = SchurLT::from_partial_lower(a.view(), 3);
         assert_eq!(s.complement(), &SpMat::from_vec((3,2), vec![5,36,12,45,-14,-60]));
     }
 
@@ -128,7 +128,7 @@ mod tests {
             5, 3, 5, 2, 2,
             6, 2,-3, 1, 8
         ]);
-        let s = SchurLT::from_partial_lower(&a.view(), 3);
+        let s = SchurLT::from_partial_lower(a.view(), 3);
 
         let v = SpVec::from(vec![1,2,0,-3,2,1]);
         let w = s.trans_vec(v);

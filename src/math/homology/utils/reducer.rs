@@ -101,7 +101,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn schur(&self, p: &PermOwned, q: &PermOwned, r: usize) -> SchurLT<R> {
         let a1 = &self.a1;
         let b1 = a1.permute(p.view(), q.view());
-        SchurLT::from_partial_lower(&b1, r)
+        SchurLT::from_partial_lower(b1, r)
     }
 
     fn reduce_matrices(&mut self, p: &PermOwned, q: &PermOwned, r: usize) {

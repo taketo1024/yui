@@ -5,11 +5,9 @@ use num_traits::Zero;
 use sprs::{SpIndex, TriMat, CsMat, PermView, CsVec, CsVecBase, CsVecView};
 use auto_impl_ops::auto_ops;
 use crate::math::traits::{Ring, RingOps, AddMonOps, AddGrpOps, MonOps};
-
 use super::DnsMat;
 
 pub use super::dense::MatType;
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SpMat<R>
 where R: Ring, for<'a> &'a R: RingOps<R> { 
@@ -84,14 +82,14 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 impl<R> Display for SpMat<R>
 where R: Ring, for<'a> &'a R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "") // TODO
+        self.to_dense().fmt(f)
     }
 }
 
 impl<R> Default for SpMat<R>
 where R: Ring, for<'a> &'a R: RingOps<R> {
     fn default() -> Self {
-        todo!()
+        Self::zero((0, 0))
     }
 }
 
@@ -470,26 +468,5 @@ where
         }
 
         CsVec::new(i1 - i0, ind, val)
-    }
-}
-
-#[cfg(test)]
-mod tests_old {
-    use sprs::PermOwned;
-    use super::*;
-
-    #[test]
-    fn permute_vec() { 
-        let p = PermOwned::new(vec![1,3,0,2]);
-        let v = CsVec::new(4, vec![0,1,2,3], vec![0,1,2,3]);
-        let w = v.permute(p.view());
-        assert_eq!(w, CsVec::new(4, vec![0,1,2,3], vec![2,0,3,1]))
-    }
-
-    #[test]
-    fn subvec() {
-        let v = CsVec::new(10, (0..10).collect(), (0..10).collect());
-        let w = v.subvec(3..7);
-        assert_eq!(w, CsVec::new(4, vec![0,1,2,3], vec![3,4,5,6]))
     }
 }

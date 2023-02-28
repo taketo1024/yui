@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::iter::Rev;
 use std::ops::{Index, RangeInclusive};
 use num_traits::Zero;
-use sprs::CsVec;
+use crate::math::matrix::sp_vec::SpVec;
 use crate::math::matrix::sparse::*;
 use crate::math::traits::{RingOps, Ring};
 use super::base::{GradedRModStr, RModStr, AdditiveIndexRange, AdditiveIndex, RModGrid, GenericRModStr};
@@ -21,7 +21,7 @@ where
     Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>,
     Self::Output: RModStr<R = Self::R>
 {
-    fn is_cycle(&self, k: Self::Index, z: &CsVec<Self::R>) -> bool { 
+    fn is_cycle(&self, k: Self::Index, z: &SpVec<Self::R>) -> bool { 
         let d = self.d_matrix(k);
         (&d * z).iter().all(|(_, a)| a.is_zero())
     }

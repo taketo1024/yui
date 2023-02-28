@@ -4,11 +4,10 @@ use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
 use either::Either;
 use log::info;
-use sprs::CsVec;
+use crate::math::matrix::sp_vec::SpVec;
 use rayon::prelude::*;
 use thread_local::ThreadLocal;
 use crate::math::traits::{Ring, RingOps};
-use crate::math::matrix::sparse::CsVecExt;
 use super::sparse::*;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -152,7 +151,7 @@ where
     });
 }
 
-pub fn solve_triangular_vec<R>(t: TriangularType, a: &SpMat<R>, b: &CsVec<R>) -> CsVec<R>
+pub fn solve_triangular_vec<R>(t: TriangularType, a: &SpMat<R>, b: &SpVec<R>) -> SpVec<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     assert_eq!(a.rows(), b.dim());
 
@@ -170,7 +169,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     solve_triangular_into(t, a, &diag, &mut b, &mut x);
 
-    CsVec::from_vec(x)
+    SpVec::from(x)
 }
 
 fn solve_triangular_into<R>(t: TriangularType, a: &SpMat<R>, diag: &Vec<&R>, b: &mut Vec<R>, x: &mut Vec<R>)
@@ -235,7 +234,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests { 
-    use sprs::CsVec;
+    use crate::math::matrix::sp_vec::SpVec;
     use crate::math::matrix::sparse::*;
     use super::*;
     use super::TriangularType::{Upper, Lower};
@@ -249,8 +248,8 @@ mod tests {
             0,  0, 0, -1, 5,
             0,  0, 0,  0, 1
         ]);
-        let x = CsVec::from_vec(vec![1,2,3,4,5]);
-        let b = CsVec::from_vec(vec![37,23,18,21,5]);
+        let x = SpVec::from(vec![1,2,3,4,5]);
+        let b = SpVec::from(vec![37,23,18,21,5]);
         assert_eq!(solve_triangular_vec(Upper, &u, &b), x);
     }
 
@@ -277,8 +276,8 @@ mod tests {
             3,  2, 0, -1, 0,
             5,  1, 3,  5, 1
         ]);
-        let x = CsVec::from_vec(vec![1,2,3,4,5]);
-        let b = CsVec::from_vec(vec![1,-4,12,3,41]);
+        let x = SpVec::from(vec![1,2,3,4,5]);
+        let b = SpVec::from(vec![1,-4,12,3,41]);
         assert_eq!(solve_triangular_vec(Lower, &l, &b), x);
     }
 

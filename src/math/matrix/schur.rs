@@ -1,7 +1,5 @@
 use once_cell::sync::OnceCell;
-use sprs::CsVec;
-
-use crate::math::matrix::sparse::CsVecExt;
+use crate::math::matrix::sp_vec::SpVec;
 use crate::math::matrix::triang::TriangularType;
 use crate::math::traits::{Ring, RingOps};
 use super::sparse::*;
@@ -87,11 +85,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     //   [a    ][x1] = [v1]
     //   [c  id][x2]   [v2].
     //
-    pub fn trans_vec(&self, v: CsVec<R>) -> CsVec<R> { 
+    pub fn trans_vec(&self, v: SpVec<R>) -> SpVec<R> { 
         let (m, r) = self.ac.shape();
         let pinv = self.pinv();
         let x = solve_triangular_vec(TriangularType::Lower, pinv, &v);
-        x.subvec(r..m)
+        let x2 = x.subvec(r..m).to_owned();
+        x2
     }
 }
 

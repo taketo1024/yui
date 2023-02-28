@@ -1,6 +1,6 @@
 use std::fmt::Display;
 use std::collections::HashMap;
-use sprs::CsVec;
+use crate::math::matrix::sp_vec::SpVec;
 use crate::math::matrix::sparse::SpMat;
 use crate::math::types::lin_comb::{FreeGen, LinComb};
 use crate::math::traits::{Ring, RingOps};
@@ -28,26 +28,22 @@ where
         &self.generators
     }
 
-    pub fn vectorize_x(&self, x: X) -> CsVec<R> {
+    pub fn vectorize_x(&self, x: X) -> SpVec<R> {
         self.vectorize(&LinComb::wrap(x))
     }
 
-    pub fn vectorize(&self, z: &LinComb<X, R>) -> CsVec<R> {
+    pub fn vectorize(&self, z: &LinComb<X, R>) -> SpVec<R> {
         let n = self.generators.len();
 
-        let mut v_ind: Vec<usize> = vec![];
-        let mut v_val: Vec<R> = vec![];
-    
-        for (x, a) in z.iter() { 
-            // MEMO non-effective
-            let Some(i) = self.generators.iter().position(|z| x == z) else { 
-                continue
-            };
-            v_ind.push(i);
-            v_val.push(a.clone());
-        }
-    
-        CsVec::new_from_unsorted(n, v_ind, v_val).unwrap()
+        SpVec::generate(n, |set| { 
+            for (x, a) in z.iter() { 
+                // MEMO non-effective
+                let Some(i) = self.generators.iter().position(|z| x == z) else { 
+                    continue
+                };
+                set(i, a.clone())
+            }
+        })
     }
 
     pub fn make_matrix<F>(&self, target: &Self, f: F) -> SpMat<R>

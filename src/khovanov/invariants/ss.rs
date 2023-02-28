@@ -5,7 +5,7 @@
 use core::panic;
 
 use log::info;
-use sprs::CsVec;
+use crate::math::matrix::sp_vec::SpVec;
 use crate::khovanov::complex::KhComplex;
 use crate::links::Link;
 use crate::math::homology::base::{RModStr, GenericRModStr};
@@ -44,7 +44,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     );
 
     let Some(d) = div_vec(&v, &c) else { 
-        panic!("invalid divisibility for v = {}, c = {}", v.to_dense(), c)
+        panic!("invalid divisibility for v = {}, c = {}", v, c)
     };
 
     let w = l.writhe();
@@ -56,7 +56,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     s
 }
 
-fn homology_with<R>(a0: SpMat<R>, a1: SpMat<R>, a2: SpMat<R>, a3: SpMat<R>, v: CsVec<R>) -> (GenericRModStr<R>, CsVec<R>)
+fn homology_with<R>(a0: SpMat<R>, a1: SpMat<R>, a2: SpMat<R>, a3: SpMat<R>, v: SpVec<R>) -> (GenericRModStr<R>, SpVec<R>)
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
     let zero = |m, n| SpMat::<R>::zero((m, n));
 
@@ -89,12 +89,12 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     let v = &vs[0];
     let w = &p * v;
 
-    info!("canon-cycle: {}", w.to_dense());
+    info!("canon-cycle: {}", w);
 
     (h, w)
 }
 
-fn div_vec<R>(v: &CsVec<R>, c: &R) -> Option<i32>
+fn div_vec<R>(v: &SpVec<R>, c: &R) -> Option<i32>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     v.iter().filter_map(|(_, a)|
         div(a, c)

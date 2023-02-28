@@ -1,6 +1,7 @@
 use log::*;
-use sprs::{CsVec, PermOwned};
+use sprs::PermOwned;
 use crate::math::matrix::sparse::*;
+use crate::math::matrix::sp_vec::SpVec;
 use crate::math::matrix::pivot::{perms_by_pivots, find_pivots, PivotType};
 use crate::math::matrix::schur::SchurLT;
 use crate::math::traits::{Ring, RingOps};
@@ -23,8 +24,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     a0: SpMat<R>, // prev
     a1: SpMat<R>, // target
     a2: SpMat<R>, // next
-    v1: Vec<CsVec<R>>,
-    v2: Vec<CsVec<R>>,
+    v1: Vec<SpVec<R>>,
+    v2: Vec<SpVec<R>>,
     step: usize
 }
 
@@ -37,8 +38,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         (b0, b1, b2)
     }
 
-    pub fn reduce_with(a0: SpMat<R>, a1: SpMat<R>, a2: SpMat<R>, v1: Vec<CsVec<R>>, v2: Vec<CsVec<R>>) 
-        -> (SpMat<R>, SpMat<R>, SpMat<R>, Vec<CsVec<R>>, Vec<CsVec<R>>) 
+    pub fn reduce_with(a0: SpMat<R>, a1: SpMat<R>, a2: SpMat<R>, v1: Vec<SpVec<R>>, v2: Vec<SpVec<R>>) 
+        -> (SpMat<R>, SpMat<R>, SpMat<R>, Vec<SpVec<R>>, Vec<SpVec<R>>) 
     {
         let mut c = Self::new(a0, a1, a2, v1, v2);
 
@@ -51,7 +52,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         c.result()
     }
 
-    fn new(a0: SpMat<R>, a1: SpMat<R>, a2: SpMat<R>, v1: Vec<CsVec<R>>, v2: Vec<CsVec<R>>) -> Self {
+    fn new(a0: SpMat<R>, a1: SpMat<R>, a2: SpMat<R>, v1: Vec<SpVec<R>>, v2: Vec<SpVec<R>>) -> Self {
         let (m, n) = a1.shape();
 
         assert_eq!(a0.rows(), n);
@@ -62,7 +63,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         Self { a0, a1, a2, v1, v2, step: 0 }
     }
 
-    fn result(self) -> (SpMat<R>, SpMat<R>, SpMat<R>, Vec<CsVec<R>>, Vec<CsVec<R>>) {
+    fn result(self) -> (SpMat<R>, SpMat<R>, SpMat<R>, Vec<SpVec<R>>, Vec<SpVec<R>>) {
         (self.a0, self.a1, self.a2, self.v1, self.v2)
     }
 
@@ -130,7 +131,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let v1 = self.v1.iter().map(|v| {
             let n = v.dim();
-            v.permute(q.view()).subvec(r..n)
+            v.permute(q.view()).subvec(r..n).to_owned()
         }).collect();
 
         self.v1 = v1;
@@ -140,7 +141,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         if self.v2.is_empty() { return }
 
         let v2 = self.v2.iter().map(|v| {
-            let v = v.permute(p.view());
+            let v = v.permute(p.view()).to_owned();
             s.trans_vec(v)
         }).collect();
         
@@ -150,7 +151,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests {
-    use sprs::CsVec;
+    use crate::math::matrix::sp_vec::SpVec;
 
     use crate::math::homology::complex::{tests::TestChainComplex, ChainComplex};
     use crate::math::matrix::sparse::*;
@@ -164,7 +165,7 @@ mod tests {
         let d2 = c.d_matrix(2);
         let d1 = c.d_matrix(1);
 
-        let v = CsVec::from_vec(vec![-1, 1, -1, 1]);
+        let v = SpVec::from(vec![-1, 1, -1, 1]);
 
         let (d3, d2, d1, v_red, _) = ChainReducer::reduce_with(d3, d2, d1, vec![v], vec![]);
 
@@ -183,7 +184,7 @@ mod tests {
         let d2 = c.d_matrix(2);
         let d1 = c.d_matrix(1);
 
-        let v = CsVec::from_vec(vec![1,1,-1,1,-1,-1,1,-1,1,-1,-1,1,1,-1,1,-1,-1,1]);
+        let v = SpVec::from(vec![1,1,-1,1,-1,-1,1,-1,1,-1,-1,1,1,-1,1,-1,-1,1]);
 
         let (d3, d2, d1, v_red, _) = ChainReducer::reduce_with(d3, d2, d1, vec![v], vec![]);
 
@@ -202,8 +203,8 @@ mod tests {
         let d2 = c.d_matrix(2);
         let d1 = c.d_matrix(1);
 
-        let v = CsVec::from_vec(vec![0,0,0,0,0,0,0,0,0,1,-1,0,0,0,0,0,0,0,0,-1,0,0,1,-1,1,0,0]);
-        let w = CsVec::from_vec(vec![0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0,1,0,-1,0,0,0,-1,1]);
+        let v = SpVec::from(vec![0,0,0,0,0,0,0,0,0,1,-1,0,0,0,0,0,0,0,0,-1,0,0,1,-1,1,0,0]);
+        let w = SpVec::from(vec![0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0,1,0,-1,0,0,0,-1,1]);
 
         let (d3, d2, d1, _, v_red) = ChainReducer::reduce_with(d3, d2, d1, vec![], vec![v, w]);
 
@@ -224,8 +225,8 @@ mod tests {
         let d1 = c.d_matrix(1);
         let d0 = c.d_matrix(0);
 
-        let v = CsVec::from_vec(vec![0,0,0,0,0,0,0,0,0,1,-1,0,0,0,0,0,0,0,0,-1,0,0,1,-1,1,0,0]);
-        let w = CsVec::from_vec(vec![0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0,1,0,-1,0,0,0,-1,1]);
+        let v = SpVec::from(vec![0,0,0,0,0,0,0,0,0,1,-1,0,0,0,0,0,0,0,0,-1,0,0,1,-1,1,0,0]);
+        let w = SpVec::from(vec![0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0,1,0,-1,0,0,0,-1,1]);
 
         let (d2, d1, d0, v_red, _) = ChainReducer::reduce_with(d2, d1, d0, vec![v, w], vec![]);
 
@@ -249,8 +250,8 @@ mod tests {
         let d1 = c.d_matrix(1);
         let d0 = c.d_matrix(0);
 
-        let v = CsVec::from_vec(vec![0,0,0,0,0,0,0,0,0,1,-1,0,0,0,0,0,0,0,0,-1,0,0,1,-1,1,0,0]);
-        let w = CsVec::from_vec(vec![0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0,1,0,-1,0,0,0,-1,1]);
+        let v = SpVec::from(vec![0,0,0,0,0,0,0,0,0,1,-1,0,0,0,0,0,0,0,0,-1,0,0,1,-1,1,0,0]);
+        let w = SpVec::from(vec![0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0,1,0,-1,0,0,0,-1,1]);
 
         let (d3, d2, d1, _, v_red) = ChainReducer::reduce_with(d3, d2, d1, vec![], vec![v, w]);
         let (d2, d1, d0, v_red, _) = ChainReducer::reduce_with(d2, d1, d0, v_red, vec![]);

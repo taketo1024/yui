@@ -1,6 +1,6 @@
 use core::panic;
 use std::cmp::min;
-use log::info;
+use log::{info, trace};
 use crate::math::traits::{EucRing, EucRingOps};
 use super::DnsMat;
 use super::lll::{LLLRing, LLLRingOps, lll_hnf_in_place};
@@ -19,9 +19,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
 
     let mut calc = SnfCalc::new(target, flags);
 
-    calc.preprocess();
-    calc.eliminate_all();
-    calc.diag_normalize();
+    calc.process();
 
     info!("snf done.\n{}", calc.target);
 
@@ -94,10 +92,8 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     }
 }
 
-// -- private -- //
-
 #[derive(Debug)]
-struct SnfCalc<R>
+pub struct SnfCalc<R>
 where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     target: DnsMat<R>,
     p:    Option<DnsMat<R>>,
@@ -108,7 +104,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
 
 impl<R> SnfCalc<R>
 where R: EucRing, for<'a> &'a R: EucRingOps<R> {
-    fn new(target: DnsMat<R>, flags: SnfFlags) -> Self { 
+    pub fn new(target: DnsMat<R>, flags: SnfFlags) -> Self { 
         let eye_opt = |size, flag| {
             if flag{ Some(DnsMat::eye(size)) } else { None }
         };
@@ -122,7 +118,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
         SnfCalc{ target, p, pinv, q, qinv }
     }
 
-    fn result(self) -> SnfResult<R> {
+    pub fn result(self) -> SnfResult<R> {
         SnfResult { 
             result: self.target, 
             p: self.p,
@@ -130,6 +126,16 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
             q: self.q,
             qinv: self.qinv
         }
+    }
+
+    pub fn process(&mut self) { 
+        if self.target.is_zero() { 
+            return
+        }
+        
+        self.preprocess();
+        self.eliminate_all();
+        self.diag_normalize();
     }
 
     fn preprocess(&mut self) {
@@ -159,6 +165,8 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
         let Some(i_p) = self.select_pivot(i, j) else { 
             return false 
         };
+
+        trace!("select-pivot: ({i_p}, {j})");
 
         // swap rows
         if i_p > i { 
@@ -194,12 +202,16 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
         self.target.swap_rows(i, j);
         self.p.as_mut().map( |p| p.swap_rows(i, j) );
         self.pinv.as_mut().map( |pinv| pinv.swap_cols(i, j) );
+
+        trace!("swap-rows: ({i}, {j})\n{}", self.target);
     }
 
     fn swap_cols(&mut self, i: usize, j: usize) {
         self.target.swap_cols(i, j);
         self.q.as_mut().map( |q| q.swap_cols(i, j) );
         self.qinv.as_mut().map( |qinv| qinv.swap_rows(i, j) );
+
+        trace!("swap-cols: ({i}, {j})\n{}", self.target);
     }
 
     fn mul_row(&mut self, i: usize, u: &R) {
@@ -209,6 +221,8 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
             let Some(uinv) = &u.inv() else { panic!("`u` is not invertible.") };
             pinv.mul_col(i, uinv) 
         });
+
+        trace!("mul-row: {i} by {u})\n{}", self.target);
     }
     
     fn mul_col(&mut self, i: usize, u: &R) {
@@ -218,6 +232,8 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
             let Some(uinv) = &u.inv() else { panic!("`u` is not invertible.") };
             qinv.mul_row(i, uinv) 
         });
+
+        trace!("mul-col: {i} by {u})\n{}", self.target);
     }
 
     // Multiply [a, b; c, d] from left, assuming det = 1.
@@ -231,6 +247,8 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
             let inv_t = [d, &-c, &-b, a];
             pinv.right_elementary(inv_t, i, j) 
         }); 
+
+        trace!("left-elem: [{a}, {b}; {c}, {d}] for rows ({i}, {j})).\n{}", self.target);
     }
 
     // Multiply [a, c; b, d] from right, assuming det = 1. 
@@ -244,6 +262,8 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
             let inv_t = [d, &-c, &-b, a];
             qinv.left_elementary(inv_t, i, j) 
         }); 
+
+        trace!("right-elem: [{a}, {b}; {c}, {d}] for cols ({i}, {j})).\n{}", self.target);
     }
 
     fn select_pivot(&self, below_i: usize, j: usize) -> Option<usize> { 
@@ -402,6 +422,8 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
 impl<R> SnfCalc<R>
 where R: LLLRing, for<'a> &'a R: LLLRingOps<R> {
     fn preprocess_lll(&mut self) {
+        info!("start lll-preprocess, type = {}", std::any::type_name::<R>());
+
         let flag = [self.p.is_some(), self.pinv.is_some()];
         
         let b = std::mem::take(&mut self.target);
@@ -410,6 +432,8 @@ where R: LLLRing, for<'a> &'a R: LLLRingOps<R> {
         self.target = res;
         self.p = p;
         self.pinv = pinv;
+
+        info!("preprocess done.\n{}", self.target);
     }
 }
 
@@ -417,7 +441,6 @@ macro_rules! preprocess_lll_expand {
     ($any:ident) => {};
     ($any:ident, $t:ty $(,$next:ty)*) => {{
         if let Some(_self) = $any.downcast_mut::<SnfCalc<$t>>() {
-            info!("lll-preprocess for {}", std::any::type_name::<$t>());
             _self.preprocess_lll()
         } else {
             preprocess_lll_expand!($any $(,$next)*);

@@ -118,7 +118,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 mod tests {
     use indexmap::IndexMap;
 
-    use crate::links::{Link, jones_polynomial};
+    use crate::links::Link;
     use crate::utils::collections::map;
     use super::*;
 

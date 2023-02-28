@@ -1,8 +1,7 @@
-use std::ops::{Add, AddAssign, Neg, Deref, Range, Sub, SubAssign, Mul, MulAssign};
+use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, MulAssign, Range};
 use std::iter::zip;
 use std::fmt::Display;
-use num_traits::Zero;
-use sprs::{SpIndex, TriMat, CsMat, PermView, CsVec, CsVecBase, CsVecView};
+use sprs::{TriMat, CsMat, PermView, CsVecView};
 use auto_impl_ops::auto_ops;
 use crate::math::traits::{Ring, RingOps, AddMonOps, AddGrpOps, MonOps};
 use super::DnsMat;
@@ -404,68 +403,5 @@ pub(super) mod tests {
             set(1, 1, 4);
         });
         assert_eq!(a.to_dense(), DnsMat::from(ndarray::array![[1, 2], [3, 4]]));
-    }
-}
-
-// -- old code -- //
-
-pub trait CsVecExt<R> { 
-    fn from_vec(data: Vec<R>) -> CsVec<R>;
-    fn is_zero(&self) -> bool;
-    fn permute(&self, p: PermView) -> CsVec<R>;
-    fn subvec(&self, range: Range<usize>) -> CsVec<R>;
-}
-
-impl<IStorage, DStorage, R, I: SpIndex> CsVecExt<R> for CsVecBase<IStorage, DStorage, R, I>
-where
-    R: Clone + Zero,
-    IStorage: Deref<Target = [I]>,
-    DStorage: Deref<Target = [R]>
-{
-   fn from_vec(data: Vec<R>) -> CsVec<R> {
-        let n = data.len();
-        let (indices, data): (Vec<usize>, Vec<R>) = data
-            .into_iter()
-            .enumerate()
-            .filter_map(|(i, a)| 
-                if a.is_zero() { None } else { Some((i, a)) }
-            ).unzip();
-        
-        CsVec::new(n, indices, data)
-    }
-
-    fn is_zero(&self) -> bool {
-        self.data().iter().all(|a| a.is_zero())
-    }
-
-    fn permute(&self, p: PermView) -> CsVec<R> { 
-        let n = self.dim();
-        let mut ind = vec![];
-        let mut val = vec![];
-
-        for (i, a) in self.iter() { 
-            ind.push(p.at(i.index()));
-            val.push(a.clone());
-        }
-
-        CsVec::new_from_unsorted(n, ind, val).ok().unwrap()
-    }
-
-    fn subvec(&self, range: Range<usize>) -> CsVec<R> {
-        let (i0, i1) = (range.start, range.end);
-        assert!(i0 <= i1 && i1 <= self.dim());
-
-        let mut ind = vec![];
-        let mut val = vec![];
-
-        for (i, a) in self.iter() {
-            let i = i.index();
-            if !a.is_zero() && range.contains(&i) {
-                ind.push(i - i0);
-                val.push(a.clone());
-            }
-        }
-
-        CsVec::new(i1 - i0, ind, val)
     }
 }

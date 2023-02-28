@@ -7,5 +7,5 @@ pub mod triang;
 pub mod pivot;
 pub mod schur;
 
-pub use dense::DnsMat;
+pub use dense::Mat;
 pub use snf::{snf, snf_in_place};

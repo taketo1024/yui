@@ -19,12 +19,12 @@ use crate::math::ext::int_ext::{Integer, IntOps};
 use crate::math::types::quad_int::{GaussInt, QuadInt, EisenInt};
 use super::dense::*;
 
-pub fn lll<R>(b: &DnsMat<R>, with_trans: bool) -> (DnsMat<R>, Option<DnsMat<R>>)
+pub fn lll<R>(b: &Mat<R>, with_trans: bool) -> (Mat<R>, Option<Mat<R>>)
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     lll_in_place(b.clone(), with_trans)
 }
 
-pub fn lll_in_place<R>(b: DnsMat<R>, with_trans: bool) -> (DnsMat<R>, Option<DnsMat<R>>)
+pub fn lll_in_place<R>(b: Mat<R>, with_trans: bool) -> (Mat<R>, Option<Mat<R>>)
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     info!("lll: {:?}", b.shape());
     
@@ -33,12 +33,12 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     calc.result()
 }
 
-pub fn lll_hnf<R>(b: &DnsMat<R>, with_trans: [bool; 2]) -> (DnsMat<R>, Option<DnsMat<R>>, Option<DnsMat<R>>)
+pub fn lll_hnf<R>(b: &Mat<R>, with_trans: [bool; 2]) -> (Mat<R>, Option<Mat<R>>, Option<Mat<R>>)
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     lll_hnf_in_place(b.clone(), with_trans)
 }
 
-pub fn lll_hnf_in_place<R>(b: DnsMat<R>, with_trans: [bool; 2]) -> (DnsMat<R>, Option<DnsMat<R>>, Option<DnsMat<R>>)
+pub fn lll_hnf_in_place<R>(b: Mat<R>, with_trans: [bool; 2]) -> (Mat<R>, Option<Mat<R>>, Option<Mat<R>>)
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     info!("lll-hnf: {:?}", b.shape());
     
@@ -138,7 +138,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 
 impl<R> LLLCalc<R>
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
-    fn new(target: DnsMat<R>, with_trans: bool) -> Self {
+    fn new(target: Mat<R>, with_trans: bool) -> Self {
         let mut data = LLLData::new(target, [with_trans, false]);
         data.setup();
 
@@ -172,7 +172,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         }
     }
 
-    pub fn result(self) -> (DnsMat<R>, Option<DnsMat<R>>) { 
+    pub fn result(self) -> (Mat<R>, Option<Mat<R>>) { 
         let (target, p, _) = self.data.result();
         (target, p)
     }
@@ -186,7 +186,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 
 impl<R> LLLHNFCalc<R>
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
-    fn new(target: DnsMat<R>, with_trans: [bool; 2]) -> Self { 
+    fn new(target: Mat<R>, with_trans: [bool; 2]) -> Self { 
         let data = LLLData::new(target, with_trans);
         LLLHNFCalc { data }
     }
@@ -218,7 +218,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         }
     }
 
-    fn result(self) -> (DnsMat<R>, Option<DnsMat<R>>, Option<DnsMat<R>>) { 
+    fn result(self) -> (Mat<R>, Option<Mat<R>>, Option<Mat<R>>) { 
         let m = self.data.rows();
         let (mut target, mut p, mut pinv) = self.data.result();
 
@@ -276,27 +276,27 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 #[derive(Debug, PartialEq, Eq)]
 struct LLLData<R>
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
-    target: DnsMat<R>,
-    p:    Option<DnsMat<R>>,
-    pinv: Option<DnsMat<R>>,
+    target: Mat<R>,
+    p:    Option<Mat<R>>,
+    pinv: Option<Mat<R>>,
     det: Vec<R>,        // D[i] = det(b_1, ..., b_i)^2 = Π^i |b^*_j|^2. 
-    lambda: DnsMat<R>,  // l[i,j] = D[j] * p_ij (0 <= j < i)
+    lambda: Mat<R>,  // l[i,j] = D[j] * p_ij (0 <= j < i)
     step: usize,
 }
 
 impl<R> LLLData<R>
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
-    fn new(target: DnsMat<R>, flags: [bool; 2]) -> Self { 
+    fn new(target: Mat<R>, flags: [bool; 2]) -> Self { 
         let m = target.rows();
-        let p =    if flags[0] { Some(DnsMat::id(m)) } else { None };
-        let pinv = if flags[1] { Some(DnsMat::id(m)) } else { None };
+        let p =    if flags[0] { Some(Mat::id(m)) } else { None };
+        let pinv = if flags[1] { Some(Mat::id(m)) } else { None };
         let det = vec![R::one(); m];
-        let lambda = DnsMat::zero((m, m)); // lower-triangular
+        let lambda = Mat::zero((m, m)); // lower-triangular
 
         LLLData { target, p, pinv, det, lambda, step: 1 }
     }
 
-    fn result(self) -> (DnsMat<R>, Option<DnsMat<R>>, Option<DnsMat<R>>) {
+    fn result(self) -> (Mat<R>, Option<Mat<R>>, Option<Mat<R>>) {
         (self.target, self.p, self.pinv)
     }
 
@@ -304,7 +304,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         let b = self.target.array();
         let (_, l, d) = orthogonalize(&b.view());
 
-        self.lambda = DnsMat::from(l);
+        self.lambda = Mat::from(l);
         self.det = d;
     }
 
@@ -528,7 +528,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 #[cfg(test)]
 pub(super) mod tests {
     use ndarray::array;
-    use crate::math::matrix::DnsMat;
+    use crate::math::matrix::Mat;
     use super::*;
  
     #[test]
@@ -557,7 +557,7 @@ pub(super) mod tests {
 
     #[test]
     fn data_init() { 
-        let a = DnsMat::from(array![
+        let a = Mat::from(array![
             [1,-1, 3],
             [1, 0, 5],
             [1, 2, 6]
@@ -570,18 +570,18 @@ pub(super) mod tests {
 
         let data = LLLData::new(a.clone(), [true, false]);
         assert_eq!(data.target, a);
-        assert_eq!(data.p, Some(DnsMat::id(3)));
+        assert_eq!(data.p, Some(Mat::id(3)));
         assert_eq!(data.pinv, None);
 
         let data = LLLData::new(a.clone(), [false, true]);
         assert_eq!(data.target, a);
         assert_eq!(data.p, None);
-        assert_eq!(data.pinv, Some(DnsMat::id(3)));
+        assert_eq!(data.pinv, Some(Mat::id(3)));
     }
     
     #[test]
     fn setup() { 
-        let a = DnsMat::from(array![
+        let a = Mat::from(array![
             [1,-1, 3],
             [1, 0, 5],
             [1, 2, 6]
@@ -595,7 +595,7 @@ pub(super) mod tests {
         assert_eq!(data.det[1], 30);
         assert_eq!(data.det[2], 9);
 
-        assert_eq!(data.lambda, DnsMat::from(array![
+        assert_eq!(data.lambda, Mat::from(array![
             [0,  0, 0],
             [16, 0, 0],
             [17,69, 0]
@@ -604,7 +604,7 @@ pub(super) mod tests {
 
     #[test]
     fn swap() { 
-        let a0 = DnsMat::from(array![
+        let a0 = Mat::from(array![
             [1,-1, 3],
             [1, 0, 5],
             [1, 2, 6]
@@ -615,7 +615,7 @@ pub(super) mod tests {
         data0.swap(2);
         
         // compare data
-        let a1 = DnsMat::from(array![
+        let a1 = Mat::from(array![
             [1, 0, 5],
             [1, 2, 6],
             [1,-1, 3]
@@ -628,7 +628,7 @@ pub(super) mod tests {
 
     #[test]
     fn swap_trans() { 
-        let a0 = DnsMat::from(array![
+        let a0 = Mat::from(array![
             [1,-1, 3],
             [1, 0, 5],
             [1, 2, 6]
@@ -639,7 +639,7 @@ pub(super) mod tests {
         data0.swap(2);
 
         // compare data
-        let a1 = DnsMat::from(array![
+        let a1 = Mat::from(array![
             [1, 0, 5],
             [1, 2, 6],
             [1,-1, 3]
@@ -654,7 +654,7 @@ pub(super) mod tests {
 
     #[test]
     fn add_row_to() { 
-        let a0 = DnsMat::from(array![
+        let a0 = Mat::from(array![
             [1,-1, 3],
             [1, 0, 5],
             [1, 2, 6]
@@ -665,7 +665,7 @@ pub(super) mod tests {
         data0.add_row_to(1, 2, &-3);
         
         // compare data
-        let a1 = DnsMat::from(array![
+        let a1 = Mat::from(array![
             [1,-1, 3],
             [3,-2,11],
             [-8,8,-27]
@@ -678,7 +678,7 @@ pub(super) mod tests {
 
     #[test]
     fn add_row_to_trans() { 
-        let a0 = DnsMat::from(array![
+        let a0 = Mat::from(array![
             [1,-1, 3],
             [1, 0, 5],
             [1, 2, 6]
@@ -689,7 +689,7 @@ pub(super) mod tests {
         data0.add_row_to(1, 2, &-3);
         
         // compare data
-        let a1 = DnsMat::from(array![
+        let a1 = Mat::from(array![
             [1,-1, 3],
             [3,-2,11],
             [-8,8,-27]
@@ -704,7 +704,7 @@ pub(super) mod tests {
 
     #[test]
     fn mul_row() { 
-        let a0 = DnsMat::from(array![
+        let a0 = Mat::from(array![
             [1,-1, 3],
             [1, 0, 5],
             [1, 2, 6]
@@ -715,7 +715,7 @@ pub(super) mod tests {
         data0.mul_row(2, &-1);
         
         // compare data
-        let a1 = DnsMat::from(array![
+        let a1 = Mat::from(array![
             [1,-1, 3],
             [-1, 0, -5],
             [-1, -2, -6]
@@ -728,7 +728,7 @@ pub(super) mod tests {
 
     #[test]
     fn mul_row_trans() { 
-       let a0 = DnsMat::from(array![
+       let a0 = Mat::from(array![
            [1,-1, 3],
            [1, 0, 5],
            [1, 2, 6]
@@ -739,7 +739,7 @@ pub(super) mod tests {
        data0.mul_row(2, &-1);
        
        // compare data
-       let a1 = DnsMat::from(array![
+       let a1 = Mat::from(array![
            [1,-1, 3],
            [-1, 0, -5],
            [-1, -2, -6]
@@ -754,7 +754,7 @@ pub(super) mod tests {
 
     #[test]
     fn lll() { 
-        let a = DnsMat::from(array![
+        let a = Mat::from(array![
             [1,-1, 3],
             [1, 0, 5],
             [1, 2, 6]
@@ -764,7 +764,7 @@ pub(super) mod tests {
 
         let (res, Some(p)) = calc.result() else { panic!() };
 
-        assert_eq!(res, DnsMat::from(array![
+        assert_eq!(res, Mat::from(array![
             [0, 1, -1],
             [1, 0, -1],
             [1, 1, 1]
@@ -778,7 +778,7 @@ pub(super) mod tests {
      #[test]
      fn lll_gcdx() { 
         // MEMO: γ = 10
-        let a = DnsMat::from(array![
+        let a = Mat::from(array![
             [1, 0, 0, 40],
             [0, 1, 0, 60],
             [0, 0, 1, 90]
@@ -788,7 +788,7 @@ pub(super) mod tests {
 
         let (res, Some(p)) = calc.result() else { panic!() };
 
-        assert_eq!(res, DnsMat::from(array![
+        assert_eq!(res, Mat::from(array![
             [3, -2, 0, 0],
             [0, 3, -2, 0],
             [-2, 0, 1, 10]
@@ -801,7 +801,7 @@ pub(super) mod tests {
 
      #[test]
      fn hnf() { 
-        let a: DnsMat<i64> = DnsMat::from(array![
+        let a: Mat<i64> = Mat::from(array![
             [8,    44,   43],
             [4,    10,   43],
             [56, -550, -328],
@@ -815,7 +815,7 @@ pub(super) mod tests {
         helper::assert_is_hnf(&res);
         
         assert_eq!(p.clone() * a, res);
-        assert_eq!(p * pinv, DnsMat::id(4));
+        assert_eq!(p * pinv, Mat::id(4));
     }
 
     #[test]
@@ -823,7 +823,7 @@ pub(super) mod tests {
         type A = GaussInt<i64>;
 
         let i = |a, b| A::new(a, b);
-        let a = DnsMat::from(array![
+        let a = Mat::from(array![
             [i(-2, 3), i(7, 3), i(7, 3)],
             [i(3, 3), i(-2, 4), i(6, 2)],
             [i(2, 2), i(-8, 0), i(-9, 1)],
@@ -837,7 +837,7 @@ pub(super) mod tests {
         assert_eq!(data.det[1], i(7436, 0));
         assert_eq!(data.det[2], i(161408, 0));
 
-        assert_eq!(data.lambda, DnsMat::from(array![
+        assert_eq!(data.lambda, Mat::from(array![
             [i(0, 0),     i(0, 0),      i(0, 0)],
             [i(49, 15),   i(0, 0),      i(0, 0)],
             [i(-114, 48), i(1770,3162), i(0, 0)]
@@ -848,7 +848,7 @@ pub(super) mod tests {
     fn swap_gauss() { 
         type A = GaussInt<i64>;
         let i = |a, b| A::new(a, b);
-        let a0 = DnsMat::from(array![
+        let a0 = Mat::from(array![
             [i(-2, 3), i(7, 3), i(7, 3)],
             [i(3, 3), i(-2, 4), i(6, 2)],
             [i(2, 2), i(-8, 0), i(-9, 1)],
@@ -859,7 +859,7 @@ pub(super) mod tests {
         data0.swap(2);
         
         // compare data
-        let a1 = DnsMat::from(array![
+        let a1 = Mat::from(array![
             [i(3, 3), i(-2, 4), i(6, 2)],
             [i(2, 2), i(-8, 0), i(-9, 1)],
             [i(-2, 3), i(7, 3), i(7, 3)],
@@ -874,7 +874,7 @@ pub(super) mod tests {
     fn add_row_to_gauss() { 
         type A = GaussInt<i64>;
         let i = |a, b| A::new(a, b);
-        let a0 = DnsMat::from(array![
+        let a0 = Mat::from(array![
             [i(-2, 3), i(7, 3), i(7, 3)],
             [i(3, 3), i(-2, 4), i(6, 2)],
             [i(2, 2), i(-8, 0), i(-9, 1)],
@@ -885,7 +885,7 @@ pub(super) mod tests {
         data0.add_row_to(1, 2, &i(-3, 2));
         
         // compare data
-        let a1 = DnsMat::from(array![
+        let a1 = Mat::from(array![
             [i(-2, 3), i(7, 3), i(7, 3)],
             [i(-2, 4), i(2, 14), i(10, 12)],
             [i(0, -14), i(-42, -38), i(-63, -15)],
@@ -900,7 +900,7 @@ pub(super) mod tests {
     fn mul_row_gauss() { 
         type A = GaussInt<i64>;
         let i = |a, b| A::new(a, b);
-        let a0 = DnsMat::from(array![
+        let a0 = Mat::from(array![
             [i(-2, 3), i(7, 3), i(7, 3)],
             [i(3, 3), i(-2, 4), i(6, 2)],
             [i(2, 2), i(-8, 0), i(-9, 1)],
@@ -912,7 +912,7 @@ pub(super) mod tests {
         data0.mul_row(2, &i(0, -1));
 
         // compare data
-        let a1 = DnsMat::from(array![
+        let a1 = Mat::from(array![
             [i(-2, 3), i(7, 3), i(7, 3)],
             [i(-3, 3), i(-4, -2), i(-2, 6)],
             [i(2, -2), i(0, 8), i(1, 9)],
@@ -928,7 +928,7 @@ pub(super) mod tests {
         type A = GaussInt<i64>;
         let i = |a, b| A::new(a, b);
 
-        let a: DnsMat<A> = DnsMat::from(array![
+        let a: Mat<A> = Mat::from(array![
             [i(-2, 3), i(7, 3), i(7, 3)],
             [i(3, 3), i(-2, 4), i(6, 2)],
             [i(2, 2), i(-8, 0), i(-9, 1)],
@@ -942,7 +942,7 @@ pub(super) mod tests {
         helper::assert_is_hnf(&res);
         
         assert_eq!(p.clone() * a, res);
-        assert_eq!(p * pinv, DnsMat::id(3));
+        assert_eq!(p * pinv, Mat::id(3));
     }
 
     #[test]
@@ -950,7 +950,7 @@ pub(super) mod tests {
         type A = EisenInt<i64>;
         let i = |a, b| A::new(a, b);
 
-        let a: DnsMat<A> = DnsMat::from(array![
+        let a: Mat<A> = Mat::from(array![
             [i(-2, 3), i(7, 3), i(7, 3)],
             [i(3, 3), i(-2, 4), i(6, 2)],
             [i(2, 2), i(-8, 0), i(-9, 1)],
@@ -964,7 +964,7 @@ pub(super) mod tests {
         helper::assert_is_hnf(&res);
 
         assert_eq!(p.clone() * a, res);
-        assert_eq!(p * pinv, DnsMat::id(3));
+        assert_eq!(p * pinv, Mat::id(3));
     }
 
     #[test]
@@ -973,7 +973,7 @@ pub(super) mod tests {
 
         let d = 0.5;
         let shape = (8, 8);
-        let a: DnsMat::<i64> = mat_rand(shape, d).to_dense();
+        let a: Mat::<i64> = mat_rand(shape, d).to_dense();
 
         let mut calc = LLLHNFCalc::new(a.clone(), [true, true]);
         calc.process();
@@ -983,7 +983,7 @@ pub(super) mod tests {
         helper::assert_is_hnf(&res);
         
         assert_eq!(p.clone() * a, res);
-        assert_eq!(p * pinv, DnsMat::id(shape.0));
+        assert_eq!(p * pinv, Mat::id(shape.0));
     }
 
     pub(in super::super) mod helper { 
@@ -992,7 +992,7 @@ pub(super) mod tests {
         use crate::math::{ext::int_ext::{Integer, IntOps}};
         use crate::math::types::ratio::Ratio;
 
-        pub fn assert_is_hnf<R>(b: &DnsMat<R>)
+        pub fn assert_is_hnf<R>(b: &Mat<R>)
         where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
             use ndarray::s;
 

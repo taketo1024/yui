@@ -4,7 +4,7 @@ use std::fmt::Display;
 use sprs::{TriMat, CsMat, PermView, CsVecView};
 use auto_impl_ops::auto_ops;
 use crate::math::traits::{Ring, RingOps, AddMonOps, AddGrpOps, MonOps};
-use super::DnsMat;
+use super::Mat;
 use super::sp_vec::SpVec;
 
 pub use super::dense::MatType;
@@ -53,7 +53,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         })
     }
 
-    pub fn to_dense(&self) -> DnsMat<R> { 
+    pub fn to_dense(&self) -> Mat<R> { 
         self.into()
     }
 
@@ -76,9 +76,9 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     }
 }
 
-impl<R> From<&DnsMat<R>> for SpMat<R>
+impl<R> From<&Mat<R>> for SpMat<R>
 where R: Ring, for<'a> &'a R: RingOps<R> {
-    fn from(a: &DnsMat<R>) -> Self {
+    fn from(a: &Mat<R>) -> Self {
         let n = a.cols();
         SpMat::generate(a.shape(), |set| { 
             for (k, a) in a.array().iter().enumerate() {
@@ -320,7 +320,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         })
     }
 
-    pub fn to_dense(&self) -> DnsMat<R> { 
+    pub fn to_dense(&self) -> Mat<R> { 
         self.to_owned().to_dense()
     }
 
@@ -402,6 +402,6 @@ pub(super) mod tests {
             set(1, 0, 3);
             set(1, 1, 4);
         });
-        assert_eq!(a.to_dense(), DnsMat::from(ndarray::array![[1, 2], [3, 4]]));
+        assert_eq!(a.to_dense(), Mat::from(ndarray::array![[1, 2], [3, 4]]));
     }
 }

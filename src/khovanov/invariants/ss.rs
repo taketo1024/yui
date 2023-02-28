@@ -21,12 +21,16 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     assert!(!c.is_unit());
 
     if reduced && l.writhe() < 0 { 
-        info!("switch to mirror, w = {}.", l.writhe());
-        return -ss_invariant(&l.mirror(), c, reduced)
+        info!("compute ss (mirror), n = {}, c = {} ({}).", l.crossing_num(), c, std::any::type_name::<R>());
+        -(compute_ss(&l.mirror(), c, reduced))
+    } else { 
+        info!("compute ss, n = {}, c = {} ({}).", l.crossing_num(), c, std::any::type_name::<R>());
+        compute_ss(l, c, reduced)
     }
+}
 
-    info!("compute ss, n = {}, c = {} ({}).", l.crossing_num(), c, std::any::type_name::<R>());
-
+fn compute_ss<R>(l: &Link, c: &R, reduced: bool) -> i32
+where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
     let cpx = KhComplex::<R>::new(l.clone(), c.clone(), R::zero(), reduced);
     let z = cpx.canon_cycle();
     let v = cpx[0].vectorize(&z);
@@ -108,4 +112,108 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     Some(k)
+}
+
+#[cfg(test)]
+mod tests {
+    use indexmap::IndexMap;
+
+    use crate::links::{Link, jones_polynomial};
+    use crate::utils::collections::map;
+    use super::*;
+
+    fn test(name: &str) { 
+        let values: IndexMap<_, _> = map!{ 
+            "3_1" => -2,
+            "4_1" =>  0,
+            "5_1" => -4,
+            "5_2" => -2,
+            "6_1" => -0,
+            "6_2" => -2,
+            "6_3" =>  0,
+            "7_1" => -6,
+            "7_2" => -2,
+            "7_3" =>  4, // mirrored
+            "7_4" =>  2, // mirrored
+            "7_5" => -4,
+            "7_6" => -2,
+            "7_7" =>  0
+        };
+
+        let l = Link::load(name).unwrap();
+        let s = values[name];
+
+        assert_eq!(compute_ss(&l, &2, true), s);
+        assert_eq!(compute_ss(&l.mirror(), &2, true), -s);
+    }
+
+    #[test]
+    fn test_3_1() { 
+        test("3_1");
+    }
+
+    #[test]
+    fn test_4_1() { 
+        test("4_1");
+    }
+
+    #[test]
+    fn test_5_1() { 
+        test("5_1");
+    }
+
+    #[test]
+    fn test_5_2() { 
+        test("3_1");
+    }
+
+    #[test]
+    fn test_6_1() { 
+        test("6_1");
+    }
+
+    #[test]
+    fn test_6_2() { 
+        test("6_2");
+    }
+
+    #[test]
+    fn test_6_3() { 
+        test("6_3");
+    }
+
+    #[test]
+    fn test_7_1() { 
+        test("7_1");
+    }
+
+    #[test]
+    fn test_7_2() { 
+        test("7_2");
+    }
+
+    #[test]
+    fn test_7_3() { 
+        test("7_3");
+    }
+
+    #[test]
+    fn test_7_4() { 
+        test("7_4");
+    }
+
+    #[test]
+    fn test_7_5() { 
+        test("7_5");
+    }
+
+    #[test]
+    fn test_7_6() { 
+        test("7_6");
+    }
+
+    #[test]
+    fn test_7_7() { 
+        test("7_7");
+    }
 }

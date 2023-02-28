@@ -401,7 +401,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         self.det[k-1] = (d0 * d2 + l0.norm()) / d1;
         self.lambda[[k, k-1]] = l0.conj();
 
-        trace!("swap {},{}.\n{}", k-1, k, self.dump());
+        trace!("swap-rows ({},{}).\n{}", k-1, k, self.dump());
     }
 
     fn mul_row(&mut self, i: Row, r: &R) { 
@@ -464,7 +464,8 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     }
 
     fn dump(&self) -> String { 
-        format!("target:\n{},\nlambda:\n{},\ndet: {:?}.", self.target, self.lambda, self.det)
+        format!("{}", self.target)
+        // format!("target:\n{},\nlambda:\n{},\ndet: {:?}.", self.target, self.lambda, self.det)
     }
 }
 

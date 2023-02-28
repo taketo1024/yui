@@ -2,6 +2,8 @@
 // T. Sano, K. Sato
 // https://arxiv.org/abs/2211.02494
 
+use core::panic;
+
 use log::info;
 use sprs::{CsMat, CsVec};
 use crate::khovanov::complex::KhComplex;
@@ -37,7 +39,10 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         v
     );
 
-    let d = div_vec(&v, &c);
+    let Some(d) = div_vec(&v, &c) else { 
+        panic!("invalid divisibility for v = {}, c = {}", v.to_dense(), c)
+    };
+
     let w = l.writhe();
     let r = l.seifert_circles().len() as i32;
     let s = 2 * d + w - r + 1;
@@ -83,16 +88,16 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     (h, w)
 }
 
-fn div_vec<R>(v: &CsVec<R>, c: &R) -> i32 
+fn div_vec<R>(v: &CsVec<R>, c: &R) -> Option<i32>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    v.iter().map(|(_, a)|
+    v.iter().filter_map(|(_, a)|
         div(a, c)
-    ).min().unwrap_or(i32::MAX)
+    ).min()
 }
 
-fn div<R>(a: &R, c: &R) -> i32 
+fn div<R>(a: &R, c: &R) -> Option<i32>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    if a.is_zero() { return i32::MAX }
+    if a.is_zero() { return None }
 
     let mut a = a.clone();
     let mut k = 0;
@@ -102,5 +107,5 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         k += 1;
     }
 
-    k
+    Some(k)
 }

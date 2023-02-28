@@ -417,7 +417,6 @@ pub trait CsVecExt<R> {
     fn is_zero(&self) -> bool;
     fn permute(&self, p: PermView) -> CsVec<R>;
     fn subvec(&self, range: Range<usize>) -> CsVec<R>;
-    fn divide2(self, r: usize) -> (CsVec<R>, CsVec<R>);
 }
 
 impl<IStorage, DStorage, R, I: SpIndex> CsVecExt<R> for CsVecBase<IStorage, DStorage, R, I>
@@ -472,33 +471,6 @@ where
 
         CsVec::new(i1 - i0, ind, val)
     }
-
-    fn divide2(self, r: usize) -> (CsVec<R>, CsVec<R>) { 
-        let n = self.dim();
-        assert!(r <= n);
-
-        let mut ind1: Vec<usize> = vec![];
-        let mut val1: Vec<R> = vec![];
-
-        let mut ind2: Vec<usize> = vec![];
-        let mut val2: Vec<R> = vec![];
-
-        for (i, a) in self.iter() {
-            let i = i.index();
-            if i < r { 
-                ind1.push(i);
-                val1.push(a.clone());
-            } else { 
-                ind2.push(i - r);
-                val2.push(a.clone());
-            }
-        }
-
-        let v1 = CsVec::new(r, ind1, val1);
-        let v2 = CsVec::new(n -r, ind2, val2);
-        
-        (v1, v2)
-    }
 }
 
 #[cfg(test)]
@@ -519,13 +491,5 @@ mod tests_old {
         let v = CsVec::new(10, (0..10).collect(), (0..10).collect());
         let w = v.subvec(3..7);
         assert_eq!(w, CsVec::new(4, vec![0,1,2,3], vec![3,4,5,6]))
-    }
-
-    #[test]
-    fn divide2_vec() {
-        let v = CsVec::new(10, (0..10).collect(), (0..10).collect());
-        let (v1, v2) = v.divide2(3);
-        assert_eq!(v1, CsVec::new(3, vec![0,1,2], vec![0,1,2]));
-        assert_eq!(v2, CsVec::new(7, vec![0,1,2,3,4,5,6], vec![3,4,5,6,7,8,9]));
     }
 }

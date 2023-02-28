@@ -88,11 +88,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     //   [c  id][x2]   [v2].
     //
     pub fn trans_vec(&self, v: CsVec<R>) -> CsVec<R> { 
-        let r = self.ac.cols();
+        let (m, r) = self.ac.shape();
         let pinv = self.pinv();
         let x = solve_triangular_vec(TriangularType::Lower, pinv, &v);
-        let (_, x2) = x.divide2(r);
-        x2
+        x.subvec(r..m)
     }
 }
 

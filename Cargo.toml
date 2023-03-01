@@ -4,6 +4,11 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Taketo Sano <taketo1024@gmail.com>"]
 
+[workspace]
+members = [ 
+    "yui_core" 
+]
+
 [profile.release]
 debug = true
 overflow-checks = true

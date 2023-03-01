@@ -11,8 +11,10 @@ members = [
     "workspace/types/ratio",
     "workspace/types/ff",
     "workspace/types/quad_int",    
-    "workspace/types/lin_comb",    
-    "workspace/types/polynomial",    
+    "workspace/types/lin_comb",
+    "workspace/types/polynomial",
+    "workspace/link",
+    "workspace/khovanov"
 ]
 
 [profile.release]
@@ -20,38 +22,21 @@ debug = true
 overflow-checks = true
 
 [dependencies]
-auto-impl-ops = "0.1.2"
 clap = { version = "4.1.6", features = ["derive", "cargo"] }
 csv = "1.2.0"
 derive_more = "0.99.17"
-either = "1.8.1"
-grouping_by = "0.2.2"
 indexmap = { version = "1.9.2", features = ["serde"] }
-is-even = "1.0.0"
-is-odd = "1.0.0"
-itertools = "0.10.5"
 log = "0.4.17"
-ndarray = "0.15.6"
 num-bigint = "0.4.3"
 num-traits = "0.2.15"
-once_cell = "1.17.1"
-parking_lot = "0.12.1"
-prettytable-rs = "0.10.0"
-rand = "0.8.5"
-rayon = "1.6.1"
 regex = "1.7.1"
-serde = "1.0.152"
 serde_json = "1.0.93"
 simplelog = "0.12.0"
-sprs = { git = "https://github.com/sparsemat/sprs", branch = "master" }
 string-builder = "0.2.0"
-thread_local = "1.1.7"
 yui-core  = { version = "0.1.0", path = "workspace/core" }
-yui-utils = { version = "0.1.0", path = "workspace/utils" }
 yui-ratio = { version = "0.1.0", path = "workspace/types/ratio" }
 yui-ff = { version = "0.1.0", path = "workspace/types/ff" }
 yui-quad-int = { version = "0.1.0", path = "workspace/types/quad_int" }
-yui-lin-comb = { version = "0.1.0", path = "workspace/types/lin_comb" }
 yui-polynomial = { version = "0.1.0", path = "workspace/types/polynomial" }
 yui-matrix = { version = "0.1.0", path = "workspace/matrix" }
 yui-homology = { version = "0.1.0", path = "workspace/homology" }

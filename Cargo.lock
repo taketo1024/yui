@@ -1100,6 +1100,7 @@ dependencies = [
  "thread_local",
  "yui-core",
  "yui-ff",
+ "yui-lin-comb",
  "yui-quad-int",
  "yui-ratio",
  "yui-utils",
@@ -1119,6 +1120,17 @@ name = "yui-ff"
 version = "0.1.0"
 dependencies = [
  "auto-impl-ops 0.2.0",
+ "num-traits",
+ "yui-core",
+ "yui-utils",
+]
+
+[[package]]
+name = "yui-lin-comb"
+version = "0.1.0"
+dependencies = [
+ "auto-impl-ops 0.2.0",
+ "itertools",
  "num-traits",
  "yui-core",
  "yui-utils",

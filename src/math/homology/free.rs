@@ -2,8 +2,8 @@ use std::fmt::Display;
 use std::collections::HashMap;
 use crate::math::matrix::sp_vec::SpVec;
 use crate::math::matrix::sparse::SpMat;
-use crate::math::types::lin_comb::{FreeGen, LinComb};
 use yui_core::{Ring, RingOps};
+use yui_lin_comb::{FreeGen, LinComb};
 use super::base::RModStr;
 
 pub struct FreeRModStr<X, R>

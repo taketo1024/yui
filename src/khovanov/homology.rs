@@ -5,7 +5,7 @@ use crate::utils::misc::{Idx2, Idx2Range};
 use crate::math::homology::base::{GradedRModStr, GenericRModStr};
 use crate::math::homology::homology::{Homology, GenericHomology};
 use crate::math::homology::reduced::Reduced;
-use crate::math::traits::{EucRing, EucRingOps, Ring, RingOps};
+use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 use crate::links::Link;
 use super::complex::{KhComplex, KhComplexBigraded};
 

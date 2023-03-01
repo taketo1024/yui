@@ -4,7 +4,7 @@ use std::ops::{Index, RangeInclusive};
 use num_traits::Zero;
 use crate::math::matrix::sp_vec::SpVec;
 use crate::math::matrix::sparse::*;
-use crate::math::traits::{RingOps, Ring};
+use yui_core::{RingOps, Ring};
 use super::base::{GradedRModStr, RModStr, AdditiveIndexRange, AdditiveIndex, RModGrid, GenericRModStr};
 
 pub trait ChainComplex: GradedRModStr
@@ -197,7 +197,7 @@ pub mod tests {
     use std::ops::RangeInclusive;
     use super::{ChainComplex, ChainComplexValidation, GenericChainComplex};
     use crate::math::homology::base::RModStr;
-    use crate::math::traits::{Ring, RingOps};
+    use yui_core::{Ring, RingOps};
     use crate::math::matrix::sparse::*;
 
     #[test]

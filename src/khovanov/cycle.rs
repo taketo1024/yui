@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use itertools::Itertools;
-use crate::math::traits::{Ring, RingOps};
+use yui_core::{Ring, RingOps};
 use crate::khovanov::algebra::KhAlgGen;
 use crate::links::{links::{Component, State}, Link};
 use super::complex::KhComplex;

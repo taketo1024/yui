@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use std::ops::Index;
 
-use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps};
+use yui_core::{Ring, RingOps, EucRing, EucRingOps};
 use super::base::{GradedRModStr, RModStr, GenericRModStr, RModGrid, AdditiveIndex, AdditiveIndexRange};
 use super::complex::ChainComplex;
 use super::utils::homology_calc::HomologyCalc;

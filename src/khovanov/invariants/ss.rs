@@ -13,7 +13,7 @@ use crate::math::homology::complex::ChainComplex;
 use crate::math::homology::utils::homology_calc::HomologyCalc;
 use crate::math::homology::utils::reducer::ChainReducer;
 use crate::math::matrix::sparse::*;
-use crate::math::traits::{EucRing, EucRingOps};
+use yui_core::{EucRing, EucRingOps};
 
 pub fn ss_invariant<R>(l: &Link, c: &R, reduced: bool) -> i32
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 

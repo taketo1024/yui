@@ -4,7 +4,7 @@ use std::fmt::{Debug, Display};
 use ndarray::{Array2, s};
 use derive_more::Display;
 use auto_impl_ops::auto_ops;
-use crate::math::traits::{Ring, RingOps, AddMonOps, AddGrpOps, MonOps};
+use yui_core::{Ring, RingOps, AddMonOps, AddGrpOps, MonOps};
 
 use super::sparse::SpMat;
 

@@ -5,7 +5,7 @@ use std::vec::IntoIter;
 use crate::math::homology::base::{GradedRModStr, RModGrid};
 use crate::math::homology::free::FreeRModStr;
 use crate::math::matrix::sparse::SpMat;
-use crate::math::traits::{Ring, RingOps};
+use yui_core::{Ring, RingOps};
 use crate::math::homology::complex::ChainComplex;
 use crate::links::Link;
 use crate::utils::misc::{Idx2, Idx2Range};

@@ -1,6 +1,6 @@
 use crate::math::matrix::sp_vec::SpVec;
 use crate::math::matrix::triang::TriangularType;
-use crate::math::traits::{Ring, RingOps};
+use yui_core::{Ring, RingOps};
 use super::sparse::*;
 use super::triang::{solve_triangular_vec, solve_triangular_with};
 

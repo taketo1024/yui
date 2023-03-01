@@ -14,8 +14,7 @@ use ndarray::{Array1, ArrayView1, Array2, ArrayView2};
 use log::{trace, info};
 use num_bigint::BigInt;
 
-use crate::math::traits::{Ring, RingOps, EucRing, EucRingOps, DivRound};
-use crate::math::ext::int_ext::{Integer, IntOps};
+use yui_core::{Ring, RingOps, EucRing, EucRingOps, DivRound, Integer, IntOps};
 use crate::math::types::quad_int::{GaussInt, QuadInt, EisenInt};
 use super::dense::*;
 
@@ -987,9 +986,8 @@ pub(super) mod tests {
     }
 
     pub(in super::super) mod helper { 
-        use std::ops::Div;
         use super::*;
-        use crate::math::{ext::int_ext::{Integer, IntOps}};
+        use std::ops::Div;
         use crate::math::types::ratio::Ratio;
 
         pub fn assert_is_hnf<R>(b: &Mat<R>)

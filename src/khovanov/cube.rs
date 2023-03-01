@@ -3,8 +3,7 @@ use std::ops::RangeInclusive;
 use itertools::Itertools;
 use num_traits::Pow;
 use crate::links::links::{Link, State, Component, Resolution, Edge};
-use crate::math::traits::{Ring, RingOps, PowMod2};
-use crate::math::types::sign::Sign;
+use yui_core::{Ring, RingOps, PowMod2, Sign};
 use super::algebra::{KhAlgStr, KhEnhState};
 
 #[derive(Debug)]

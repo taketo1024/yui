@@ -4,7 +4,7 @@ use crate::math::matrix::sparse::*;
 use crate::math::matrix::sp_vec::SpVec;
 use crate::math::matrix::pivot::{perms_by_pivots, find_pivots, PivotType};
 use crate::math::matrix::schur::SchurLT;
-use crate::math::traits::{Ring, RingOps};
+use yui_core::{Ring, RingOps};
 
 //          [x]          [a b]
 //          [y]          [c d]         [z  w] 

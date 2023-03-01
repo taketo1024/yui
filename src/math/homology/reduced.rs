@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::ops::Index;
 use crate::math::matrix::sparse::*;
-use crate::math::traits::{Ring, RingOps};
+use yui_core::{Ring, RingOps};
 use super::base::{GradedRModStr, RModStr, RModGrid, GenericRModStr};
 use super::complex::ChainComplex;
 use super::utils::reducer::ChainReducer;

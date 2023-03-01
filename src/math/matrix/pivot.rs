@@ -17,7 +17,7 @@ use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use sprs::PermOwned;
 use thread_local::ThreadLocal;
 use parking_lot::RwLock;
-use crate::math::traits::{Ring, RingOps};
+use yui_core::{Ring, RingOps};
 use crate::utils::top_sort::top_sort;
 use super::sparse::*;
 

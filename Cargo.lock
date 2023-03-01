@@ -1071,8 +1071,14 @@ dependencies = [
  "sprs",
  "string-builder",
  "thread_local",
+ "yui-core",
 ]
 
 [[package]]
 name = "yui-core"
 version = "0.1.0"
+dependencies = [
+ "is-even",
+ "num-bigint",
+ "num-traits",
+]

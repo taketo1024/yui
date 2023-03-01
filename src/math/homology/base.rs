@@ -4,7 +4,7 @@ use std::fmt::Display;
 use std::ops::{Add, Sub, Index, Neg};
 use itertools::Itertools;
 
-use crate::math::traits::{Elem, Ring, RingOps};
+use yui_core::{Elem, Ring, RingOps};
 use crate::utils::format::superscript;
 use crate::utils::misc::Idx2;
 

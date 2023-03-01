@@ -2,7 +2,7 @@ use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, Range};
 use std::fmt::Display;
 use sprs::{CsVec, PermView};
 use auto_impl_ops::auto_ops;
-use crate::math::traits::{Ring, RingOps, AddMonOps, AddGrpOps};
+use yui_core::{Ring, RingOps, AddMonOps, AddGrpOps};
 
 use super::sparse::SpMat;
 

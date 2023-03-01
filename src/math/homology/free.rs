@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::math::matrix::sp_vec::SpVec;
 use crate::math::matrix::sparse::SpMat;
 use crate::math::types::lin_comb::{FreeGen, LinComb};
-use crate::math::traits::{Ring, RingOps};
+use yui_core::{Ring, RingOps};
 use super::base::RModStr;
 
 pub struct FreeRModStr<X, R>

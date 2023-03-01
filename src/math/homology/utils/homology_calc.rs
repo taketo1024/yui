@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use log::*;
-use crate::math::traits::{EucRing, EucRingOps};
+use yui_core::{EucRing, EucRingOps};
 use crate::math::matrix::snf_in_place;
 use crate::math::matrix::sparse::*;
 use crate::math::matrix::snf::SnfResult;

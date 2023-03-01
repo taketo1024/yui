@@ -1,7 +1,7 @@
 use core::panic;
 use std::cmp::min;
 use log::{info, trace};
-use crate::math::traits::{EucRing, EucRingOps};
+use yui_core::{EucRing, EucRingOps};
 use super::dense::*;
 use super::lll::{LLLRing, LLLRingOps, lll_hnf_in_place};
 

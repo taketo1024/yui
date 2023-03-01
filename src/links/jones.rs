@@ -1,5 +1,5 @@
 use num_traits::Pow;
-use crate::math::traits::PowMod2;
+use yui_core::PowMod2;
 use crate::links::links::{Link, State};
 use crate::math::types::polynomial::LPoly;
 

@@ -136,12 +136,12 @@ fn main() {
 }
 
 mod kh { 
+    use super::*;
     use std::str::FromStr;
     use yui::khovanov::homology::{KhHomologyBigraded, KhHomology};
     use yui::links::Link;
     use yui::math::homology::base::PrintTable;
-    use yui::math::traits::{EucRing, EucRingOps};
-    use super::*;
+    use yui_core::{EucRing, EucRingOps};
 
     pub fn run(name: String, link: Option<String>, c_value: String, c_type: CType, mirror: bool, reduced: bool, bigraded: bool) -> Result<String, Box<dyn std::error::Error>> {
         let mut l = load_link(&name, &link)?;
@@ -180,15 +180,15 @@ mod kh {
 }
 
 mod ckh { 
+    use super::*;
     use std::str::FromStr;
     use yui::khovanov::complex::KhComplex;
     use yui::links::Link;
     use yui::math::homology::reduced::Reduced;
     use yui::math::homology::complex::*;
     use yui::math::homology::base::*;
-    use yui::math::traits::{Ring, RingOps};
+    use yui_core::{Ring, RingOps};
     use yui::math::matrix::dense::*;
-    use super::*;
     
     pub fn run(name: String, link: Option<String>, c_value: String, c_type: CType, mirror: bool, reduced: bool) -> Result<String, Box<dyn std::error::Error>> {
         let mut l = load_link(&name, &link)?;
@@ -229,11 +229,11 @@ mod ckh {
 }
 
 mod ss { 
+    use super::*;
     use std::str::FromStr;
     use yui::links::Link;
-    use yui::math::traits::{EucRing, EucRingOps};
+    use yui_core::{EucRing, EucRingOps};
     use yui::khovanov::invariants::ss::ss_invariant;
-    use super::*;
 
     pub fn run_single(name: String, link: Option<String>, c_value: String, c_type: CType, output: Option<String>) -> Result<String, Box<dyn std::error::Error>> {
         let l = load_link(&name, &link)?;

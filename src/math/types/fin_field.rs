@@ -7,7 +7,7 @@ use std::str::FromStr;
 use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
 
-use crate::math::traits::{Elem, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, EucRingOps, AddMon, AddGrp, Mon, Ring, EucRing, Field};
+use yui_core::{Elem, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, EucRingOps, AddMon, AddGrp, Mon, Ring, EucRing, Field};
 
 pub type I = i32;
 

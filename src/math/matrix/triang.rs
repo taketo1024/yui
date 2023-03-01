@@ -7,7 +7,7 @@ use log::info;
 use crate::math::matrix::sp_vec::SpVec;
 use rayon::prelude::*;
 use thread_local::ThreadLocal;
-use crate::math::traits::{Ring, RingOps};
+use yui_core::{Ring, RingOps};
 use super::sparse::*;
 
 #[derive(Clone, Copy, PartialEq, Eq)]

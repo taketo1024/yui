@@ -5,8 +5,7 @@ use std::{fmt::Display};
 use std::ops::{Add, Neg, Sub, Mul, AddAssign, SubAssign, MulAssign, Rem, Div, RemAssign, DivAssign};
 use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
-use super::super::ext::int_ext::{Integer, IntOps};
-use super::super::traits::*;
+use yui_core::{AddGrp, AddGrpOps, AddMon, AddMonOps, DivRound, Elem, EucRing, EucRingOps, Mon, MonOps, Ring, RingOps, Integer, IntOps};
 
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
 pub struct QuadInt<I, const D: i32>(I, I)
@@ -498,9 +497,7 @@ use {impl_unop, impl_add_op, impl_accum, impl_alg_op, impl_alg_op_d};
 #[cfg(test)]
 mod tests {
     use num_bigint::BigInt;
-    use num_traits::{Zero, One};
-    use super::super::super::traits::*;
-    use crate::math::types::quad_int::QuadInt;
+    use super::*;
 
     #[test]
     fn check() { 

@@ -10,7 +10,7 @@ use auto_impl_ops::auto_ops;
 use crate::utils::collections::map;
 use crate::utils::display::OrdForDisplay;
 
-use super::super::traits::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
+use yui_core::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
 pub trait FreeGen: Elem + Hash + OrdForDisplay {}
 
 #[derive(PartialEq, Eq, Clone, Debug, Default)]
@@ -398,7 +398,7 @@ mod tests {
     use num_traits::Zero;
     
     use crate::utils::collections::map;
-    use crate::math::traits::Elem;
+    use yui_core::Elem;
     use super::{FreeGen, LinComb};
  
     #[derive(Debug, Default, Hash, PartialEq, Eq, Clone, PartialOrd, Ord)]

@@ -14,6 +14,7 @@ debug = true
 overflow-checks = true
 
 [dependencies]
+yui-core = { path = "yui_core" }
 auto-impl-ops = "0.1.2"
 clap = { version = "4.1.6", features = ["derive", "cargo"] }
 csv = "1.2.0"

@@ -3,7 +3,7 @@ use std::iter::zip;
 use std::fmt::Display;
 use sprs::{TriMat, CsMat, PermView, CsVecView};
 use auto_impl_ops::auto_ops;
-use crate::math::traits::{Ring, RingOps, AddMonOps, AddGrpOps, MonOps};
+use yui_core::{Ring, RingOps, AddMonOps, AddGrpOps, MonOps};
 use super::Mat;
 use super::sp_vec::SpVec;
 

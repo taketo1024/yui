@@ -520,7 +520,7 @@ fn h_dot<'a, R>(lhs: &ArrayView1<'a, R>, rhs: &ArrayView1<'a, R>) -> R
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     assert_eq!(lhs.dim(), rhs.dim());
     ndarray::Zip::from(lhs).and(rhs).fold(R::zero(), |mut acc, a, b| { 
-        acc.mul_acc(a, &b.conj());
+        acc += a * b.conj();
         acc
     })
 }
@@ -1091,7 +1091,7 @@ pub(super) mod tests {
         where R: Ring, for<'x> &'x R: RingOps<R> {
             assert_eq!(lhs.dim(), rhs.dim());
             ndarray::Zip::from(lhs).and(rhs).fold(R::zero(), |mut acc, a, b| { 
-                acc.mul_acc(a, b);
+                acc += a * b;
                 acc
             })
         }

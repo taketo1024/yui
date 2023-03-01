@@ -101,8 +101,7 @@ pub trait RingOps<T = Self>:
 pub trait Ring: 
     AddGrp + 
     Mon + 
-    RingOps + 
-    sprs::MulAcc
+    RingOps
 where
     for<'a> &'a Self: RingOps<Self>
 {

@@ -5,7 +5,7 @@ use auto_impl_ops::auto_ops;
 use crate::links::links::State;
 use crate::math::types::lin_comb::{FreeGen, LinComb};
 use yui_core::Elem;
-use crate::utils::format::subscript;
+use yui_utils::format::subscript;
 use yui_core::{Ring, RingOps};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]

@@ -8,7 +8,7 @@ use crate::math::matrix::sparse::SpMat;
 use yui_core::{Ring, RingOps};
 use crate::math::homology::complex::ChainComplex;
 use crate::links::Link;
-use crate::utils::misc::{Idx2, Idx2Range};
+use crate::math::homology::idx2::{Idx2, Idx2Range};
 use super::algebra::{KhAlgStr, KhEnhState, KhChain};
 use super::cube::KhCube;
 

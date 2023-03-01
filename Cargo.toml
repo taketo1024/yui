@@ -6,7 +6,8 @@ authors = ["Taketo Sano <taketo1024@gmail.com>"]
 
 [workspace]
 members = [ 
-    "workspace/core" 
+    "workspace/core",
+    "workspace/utils"
 ]
 
 [profile.release]
@@ -14,7 +15,6 @@ debug = true
 overflow-checks = true
 
 [dependencies]
-yui-core = { path = "workspace/core" }
 auto-impl-ops = "0.1.2"
 clap = { version = "4.1.6", features = ["derive", "cargo"] }
 csv = "1.2.0"
@@ -41,3 +41,5 @@ simplelog = "0.12.0"
 sprs = { git = "https://github.com/sparsemat/sprs", branch = "master" }
 string-builder = "0.2.0"
 thread_local = "1.1.7"
+yui-core = { path = "workspace/core" }
+yui-utils = { path = "workspace/utils" }

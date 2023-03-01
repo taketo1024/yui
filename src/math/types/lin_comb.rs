@@ -7,8 +7,8 @@ use itertools::Itertools;
 use num_traits::Zero;
 use auto_impl_ops::auto_ops;
 
-use crate::utils::collections::map;
-use crate::utils::display::OrdForDisplay;
+use yui_utils::map;
+use yui_utils::display::OrdForDisplay;
 
 use yui_core::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
 pub trait FreeGen: Elem + Hash + OrdForDisplay {}
@@ -397,7 +397,7 @@ mod tests {
     use std::fmt::Display;
     use num_traits::Zero;
     
-    use crate::utils::collections::map;
+    use yui_utils::map;
     use yui_core::Elem;
     use super::{FreeGen, LinComb};
  

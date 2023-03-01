@@ -18,7 +18,7 @@ use sprs::PermOwned;
 use thread_local::ThreadLocal;
 use parking_lot::RwLock;
 use yui_core::{Ring, RingOps};
-use crate::utils::top_sort::top_sort;
+use yui_utils::top_sort::top_sort;
 use super::sparse::*;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -581,7 +581,7 @@ mod tests {
     use std::collections::HashSet;
     use num_traits::{Zero, One};
     use crate::math::matrix::pivot::perms_by_pivots;
-    use crate::utils::collections::set;
+    use yui_utils::set;
     use super::*;
  
     #[test]

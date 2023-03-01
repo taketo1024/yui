@@ -121,7 +121,7 @@ mod tests {
     use indexmap::IndexMap;
 
     use crate::links::Link;
-    use crate::utils::collections::map;
+    use yui_utils::map;
     use super::*;
 
     fn test(name: &str) { 

@@ -1,3 +1,4 @@
+pub mod idx2;
 pub mod base;
 pub mod complex;
 pub mod homology;

@@ -7,7 +7,8 @@ authors = ["Taketo Sano <taketo1024@gmail.com>"]
 [workspace]
 members = [ 
     "workspace/core",
-    "workspace/utils"
+    "workspace/utils",
+    "workspace/types/ratio"
 ]
 
 [profile.release]
@@ -43,3 +44,4 @@ string-builder = "0.2.0"
 thread_local = "1.1.7"
 yui-core = { path = "workspace/core" }
 yui-utils = { path = "workspace/utils" }
+yui-ratio = { path = "workspace/types/ratio" }

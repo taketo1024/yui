@@ -45,6 +45,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "auto-impl-ops"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2bb8cbc931513b9a5af4f1a299726e3ee4a9fa4d550efdca60814900eea03cb5"
+dependencies = [
+ "derive-syn-parse",
+ "proc-macro2",
+ "quote",
+ "strum",
+ "syn",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1059,7 +1072,7 @@ checksum = "447660ad36a13288b1db4d4248e857b510e8c3a225c822ba4fb748c0aafecffd"
 name = "yui"
 version = "0.1.0"
 dependencies = [
- "auto-impl-ops",
+ "auto-impl-ops 0.1.2",
  "clap",
  "csv",
  "derive_more",
@@ -1086,6 +1099,7 @@ dependencies = [
  "string-builder",
  "thread_local",
  "yui-core",
+ "yui-ratio",
  "yui-utils",
 ]
 
@@ -1096,6 +1110,16 @@ dependencies = [
  "is-even",
  "num-bigint",
  "num-traits",
+]
+
+[[package]]
+name = "yui-ratio"
+version = "0.1.0"
+dependencies = [
+ "auto-impl-ops 0.2.0",
+ "num-traits",
+ "regex",
+ "yui-core",
 ]
 
 [[package]]

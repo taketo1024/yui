@@ -393,8 +393,9 @@ where F: FnOnce() -> Result<R, Box<dyn std::error::Error>> + std::panic::UnwindS
 }
 
 use num_bigint::BigInt;
+use yui_ratio::Ratio;
 use yui::math::types::quad_int::{GaussInt, EisenInt};
-use yui::math::types::{ratio::Ratio, fin_field::FF};
+use yui::math::types::fin_field::FF;
 use yui::math::types::polynomial::{Poly, MPoly};
 
 macro_rules! dispatch_ring {

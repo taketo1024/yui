@@ -393,13 +393,11 @@ pub(self) use {impl_unop, impl_add_op, impl_accum, decl_alg_ops};
 
 #[cfg(test)]
 mod tests { 
-    use crate::math::types::quad_int::GaussInt;
     use super::*;
 
     #[test]
     fn set_symbol() {
         assert_eq!(Ratio::<i32>::set_symbol(), "Q");
-        assert_eq!(Ratio::<GaussInt<i32>>::set_symbol(), "Frac(Z[i])");
     }
 
     #[test]
@@ -423,9 +421,6 @@ mod tests {
     fn display() {
         assert_eq!(Ratio::new(-3, 1).to_string(), "-3");
         assert_eq!(Ratio::new(-3, 4).to_string(), "-3/4");
-
-        use GaussInt as T;
-        assert_eq!(Ratio::new(T::new(1, 1), T::new(2, 3)).to_string(), "(1 + i)/(2 + 3i)");
     }
 
     #[test]

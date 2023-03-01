@@ -988,7 +988,7 @@ pub(super) mod tests {
     pub(in super::super) mod helper { 
         use super::*;
         use std::ops::Div;
-        use crate::math::types::ratio::Ratio;
+        use yui_ratio::Ratio;
 
         pub fn assert_is_hnf<R>(b: &Mat<R>)
         where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {

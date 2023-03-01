@@ -925,7 +925,7 @@ mod tests {
 
     #[test]
     fn inv_rat() { 
-        use crate::math::types::ratio::Ratio;
+        use yui_ratio::Ratio;
         type R = Ratio<i32>;
         type P = Poly::<'x', R>;
 
@@ -981,7 +981,7 @@ mod tests {
 
     #[test]
     fn inv_laurent_rat() { 
-        use crate::math::types::ratio::Ratio;
+        use yui_ratio::Ratio;
         type R = Ratio<i32>;
         type P = LPoly::<'x', R>;
 
@@ -1012,7 +1012,7 @@ mod tests {
 
     #[test]
     fn div_rem() { 
-        use crate::math::types::ratio::Ratio;
+        use yui_ratio::Ratio;
         type R = Ratio<i32>;
         type P = Poly::<'x', R>;
 

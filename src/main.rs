@@ -138,7 +138,7 @@ fn main() {
 mod kh { 
     use super::*;
     use std::str::FromStr;
-    use yui::khovanov::homology::{KhHomologyBigraded, KhHomology};
+    use yui_khovanov::homology::{KhHomologyBigraded, KhHomology};
     use yui_link::Link;
     use yui_homology::base::PrintTable;
     use yui_core::{EucRing, EucRingOps};
@@ -182,7 +182,7 @@ mod kh {
 mod ckh { 
     use super::*;
     use std::str::FromStr;
-    use yui::khovanov::complex::KhComplex;
+    use yui_khovanov::complex::KhComplex;
     use yui_link::Link;
     use yui_homology::reduced::Reduced;
     use yui_homology::complex::*;
@@ -233,7 +233,7 @@ mod ss {
     use std::str::FromStr;
     use yui_link::Link;
     use yui_core::{EucRing, EucRingOps};
-    use yui::khovanov::invariants::ss::ss_invariant;
+    use yui_khovanov::invariants::ss::ss_invariant;
 
     pub fn run_single(name: String, link: Option<String>, c_value: String, c_type: CType, output: Option<String>) -> Result<String, Box<dyn std::error::Error>> {
         let l = load_link(&name, &link)?;

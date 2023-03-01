@@ -1101,6 +1101,7 @@ dependencies = [
  "yui-core",
  "yui-ff",
  "yui-homology",
+ "yui-khovanov",
  "yui-lin-comb",
  "yui-link",
  "yui-matrix",
@@ -1141,6 +1142,23 @@ dependencies = [
  "sprs",
  "yui-core",
  "yui-lin-comb",
+ "yui-matrix",
+ "yui-utils",
+]
+
+[[package]]
+name = "yui-khovanov"
+version = "0.1.0"
+dependencies = [
+ "auto-impl-ops 0.2.0",
+ "grouping_by",
+ "itertools",
+ "log",
+ "num-traits",
+ "yui-core",
+ "yui-homology",
+ "yui-lin-comb",
+ "yui-link",
  "yui-matrix",
  "yui-utils",
 ]

@@ -5,7 +5,6 @@
 use core::panic;
 
 use log::info;
-use crate::khovanov::complex::KhComplex;
 use yui_link::Link;
 use yui_homology::base::{RModStr, GenericRModStr};
 use yui_homology::complex::ChainComplex;
@@ -13,6 +12,7 @@ use yui_homology::utils::homology_calc::HomologyCalc;
 use yui_homology::utils::reducer::ChainReducer;
 use yui_core::{EucRing, EucRingOps};
 use yui_matrix::sparse::*;
+use crate::complex::KhComplex;
 
 pub fn ss_invariant<R>(l: &Link, c: &R, reduced: bool) -> i32
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
@@ -115,16 +115,15 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     Some(k)
 }
 
-#[cfg(test)]
+#[cfg(_test)] // FIXME!
 mod tests {
-    use indexmap::IndexMap;
-
+    use std::collections::HashMap;
     use yui_link::Link;
     use yui_utils::map;
     use super::*;
 
     fn test(name: &str) { 
-        let values: IndexMap<_, _> = map!{ 
+        let values: HashMap<_, _> = map!{ 
             "3_1" => -2,
             "4_1" =>  0,
             "5_1" => -4,

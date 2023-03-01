@@ -4,11 +4,10 @@ use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
 use either::Either;
 use log::info;
-use crate::sp_vec::SpVec;
 use rayon::prelude::*;
 use thread_local::ThreadLocal;
 use yui_core::{Ring, RingOps};
-use super::sparse::*;
+use super::*;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum TriangularType { 

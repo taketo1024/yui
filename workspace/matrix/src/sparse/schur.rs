@@ -1,8 +1,6 @@
-use crate::sp_vec::SpVec;
-use crate::triang::TriangularType;
 use yui_core::{Ring, RingOps};
-use super::sparse::*;
-use super::triang::{solve_triangular_vec, solve_triangular_with};
+use super::*;
+use super::triang::{TriangularType, solve_triangular_vec, solve_triangular_with};
 
 // A = [a b]  ~>  s = d - c a⁻¹ b.
 //     [c d]

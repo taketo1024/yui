@@ -4,10 +4,8 @@ use std::fmt::Display;
 use sprs::{TriMat, CsMat, PermView, CsVecView};
 use auto_impl_ops::auto_ops;
 use yui_core::{Ring, RingOps, AddMonOps, AddGrpOps, MonOps};
-use super::Mat;
+use crate::dense::*;
 use super::sp_vec::SpVec;
-
-pub use super::dense::MatType;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SpMat<R>
@@ -355,18 +353,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
+
 #[cfg(test)]
-pub(super) mod tests { 
-    use super::*;
-
-    pub fn mat_rand<R>(shape: (usize, usize), density: f64) -> SpMat<R>
-    where R: Ring, for<'a> &'a R: RingOps<R> { 
+impl<R> SpMat<R>
+where R: Ring, for<'a> &'a R: RingOps<R> { 
+    pub fn rand(shape: (usize, usize), density: f64) -> Self {
         use rand::Rng;
-
+    
         let (m, n) = shape;
         let mut rng = rand::thread_rng();
-
-        SpMat::generate(shape, |set| { 
+    
+        Self::generate(shape, |set| { 
             for i in 0..m { 
                 for j in 0..n { 
                     if rng.gen::<f64>() < density { 
@@ -376,6 +373,11 @@ pub(super) mod tests {
             }
         })
     }
+}
+
+#[cfg(test)]
+pub(super) mod tests { 
+    use super::*;
 
     #[test]
     fn init() { 

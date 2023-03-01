@@ -16,7 +16,7 @@ use num_bigint::BigInt;
 
 use yui_core::{Ring, RingOps, EucRing, EucRingOps, DivRound, Integer, IntOps};
 use yui_quad_int::{QuadInt, GaussInt, EisenInt};
-use super::dense::*;
+use crate::dense::*;
 
 pub fn lll<R>(b: &Mat<R>, with_trans: bool) -> (Mat<R>, Option<Mat<R>>)
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
@@ -967,11 +967,9 @@ pub(super) mod tests {
 
     #[test]
     fn hnf_rand() {
-        use super::super::sparse::tests::mat_rand;
-
         let d = 0.5;
         let shape = (8, 8);
-        let a: Mat::<i64> = mat_rand(shape, d).to_dense();
+        let a = crate::sparse::SpMat::<i64>::rand(shape, d).to_dense();
 
         let mut calc = LLLHNFCalc::new(a.clone(), [true, true]);
         calc.process();

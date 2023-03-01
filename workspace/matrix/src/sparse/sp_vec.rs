@@ -3,8 +3,7 @@ use std::fmt::Display;
 use sprs::{CsVec, PermView};
 use auto_impl_ops::auto_ops;
 use yui_core::{Ring, RingOps, AddMonOps, AddGrpOps};
-
-use super::sparse::SpMat;
+use super::SpMat;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SpVec<R>

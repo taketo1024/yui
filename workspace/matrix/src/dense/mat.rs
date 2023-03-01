@@ -5,8 +5,7 @@ use ndarray::{Array2, s};
 use derive_more::Display;
 use auto_impl_ops::auto_ops;
 use yui_core::{Ring, RingOps, AddMonOps, AddGrpOps, MonOps};
-
-use super::sparse::SpMat;
+use crate::sparse::SpMat;
 
 pub trait MatType: Clone + Debug + Display + Default + PartialEq + Eq + RingOps<Self> 
 where for<'x> &'x Self: RingOps<Self>

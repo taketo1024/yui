@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::iter::Rev;
 use std::ops::{Index, RangeInclusive};
 use num_traits::Zero;
-use yui_matrix::sp_vec::SpVec;
 use yui_matrix::sparse::*;
 use yui_core::{RingOps, Ring};
 use super::base::{GradedRModStr, RModStr, AdditiveIndexRange, AdditiveIndex, RModGrid, GenericRModStr};

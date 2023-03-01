@@ -18,7 +18,7 @@ use sprs::PermOwned;
 use thread_local::ThreadLocal;
 use yui_core::{Ring, RingOps};
 use yui_utils::top_sort;
-use super::sparse::*;
+use super::*;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum PivotType { 
@@ -866,11 +866,9 @@ mod tests {
 
     #[test]
     fn rand() {
-        use super::super::sparse::tests::mat_rand;
-
         let d = 0.1;
         let shape = (60, 80);
-        let a: SpMat<i32> = mat_rand(shape, d);
+        let a = SpMat::<i32>::rand(shape, d);
 
         let pivs = find_pivots(&a, PivotType::Rows);
         let r = pivs.len();

@@ -2,7 +2,7 @@ use core::panic;
 use std::cmp::min;
 use log::{info, trace};
 use yui_core::{EucRing, EucRingOps};
-use super::dense::*;
+use crate::dense::*;
 use super::lll::{LLLRing, LLLRingOps, lll_hnf_in_place};
 
 pub type SnfFlags = [bool; 4];

@@ -1,9 +1,8 @@
 use itertools::Itertools;
 use log::*;
 use yui_core::{EucRing, EucRingOps};
-use yui_matrix::snf_in_place;
+use yui_matrix::dense::{*, snf::*};
 use yui_matrix::sparse::*;
-use yui_matrix::snf::SnfResult;
 use crate::math::homology::base::GenericRModStr;
 
 pub type HomologyCalcResult<R> = (usize, Vec<R>, Option<SpMat<R>>, Option<SpMat<R>>);

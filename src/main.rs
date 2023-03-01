@@ -317,7 +317,7 @@ mod ss {
 }
 
 use indexmap::IndexMap;
-use yui_link::{Link, links::Edge};
+use yui_link::{Link, Edge};
 
 type PDCode = Vec<[Edge; 4]>;
 type Data = IndexMap<String, PDCode>;

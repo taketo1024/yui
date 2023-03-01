@@ -2,11 +2,10 @@ use std::fmt::Display;
 use std::ops::{Mul, MulAssign};
 use itertools::join;
 use auto_impl_ops::auto_ops;
-use yui_link::links::State;
+use yui_core::{Elem, Ring, RingOps};
 use yui_lin_comb::{FreeGen, LinComb};
-use yui_core::Elem;
+use yui_link::State;
 use yui_utils::subscript;
-use yui_core::{Ring, RingOps};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum KhAlgGen { 

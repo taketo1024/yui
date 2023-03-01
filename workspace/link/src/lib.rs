@@ -1,7 +1,7 @@
 const RESOURCE_DIR: &str = "resources";
 
-pub mod links;
-pub mod jones;
+mod links;
+mod jones;
 
-pub use links::Link;
+pub use links::{Link, Edge, Component, State, Resolution};
 pub use jones::jones_polynomial;

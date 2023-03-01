@@ -2,12 +2,12 @@ use std::collections::HashMap;
 use std::ops::{RangeInclusive, Index};
 use std::vec::IntoIter;
 
+use yui_core::{Ring, RingOps};
+use yui_matrix::sparse::SpMat;
+use yui_link::Link;
 use yui_homology::base::{GradedRModStr, RModGrid};
 use yui_homology::free::FreeRModStr;
-use yui_matrix::sparse::SpMat;
-use yui_core::{Ring, RingOps};
 use yui_homology::complex::ChainComplex;
-use yui_link::Link;
 use yui_homology::idx2::{Idx2, Idx2Range};
 use super::algebra::{KhAlgStr, KhEnhState, KhChain};
 use super::cube::KhCube;

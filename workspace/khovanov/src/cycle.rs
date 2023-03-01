@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use itertools::Itertools;
 use yui_core::{Ring, RingOps};
-use yui_link::{links::{Component, State}, Link};
+use yui_link::{Link, Component, State};
 use super::algebra::KhAlgGen;
 use super::complex::KhComplex;
 use super::algebra::{KhAlgStr, KhEnhState, KhChain};

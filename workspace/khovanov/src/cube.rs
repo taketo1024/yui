@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::ops::RangeInclusive;
 use itertools::Itertools;
 use num_traits::Pow;
-use yui_link::links::{Link, State, Component, Resolution, Edge};
 use yui_core::{Ring, RingOps, PowMod2, Sign};
+use yui_link::{Link, State, Component, Resolution, Edge};
 use super::algebra::{KhAlgStr, KhEnhState};
 
 #[derive(Debug)]
@@ -277,7 +277,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests { 
-    use yui_link::links::Resolution::*;
+    use yui_link::Resolution;
     use super::*;
     
     #[test]
@@ -304,7 +304,7 @@ mod tests {
 
     #[test]
     fn unlink_2() {
-        let l = Link::from(&[[0, 0, 1, 1]]).resolved_at(0, Res0);
+        let l = Link::from(&[[0, 0, 1, 1]]).resolved_at(0, Resolution::Res0);
         let s = State::empty();
         let v = KhCubeVertex::new(&l, s.clone());
 

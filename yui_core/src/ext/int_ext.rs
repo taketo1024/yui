@@ -1,6 +1,6 @@
 use num_bigint::BigInt;
 use num_traits::{One, Signed, ToPrimitive, FromPrimitive};
-use super::*;
+use crate::*;
 
 pub trait IntOps<T = Self>: EucRingOps<T> {}
 

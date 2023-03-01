@@ -1,9 +1,9 @@
 use log::*;
 use sprs::PermOwned;
-use crate::math::matrix::sparse::*;
-use crate::math::matrix::sp_vec::SpVec;
-use crate::math::matrix::pivot::{perms_by_pivots, find_pivots, PivotType};
-use crate::math::matrix::schur::SchurLT;
+use yui_matrix::sparse::*;
+use yui_matrix::sp_vec::SpVec;
+use yui_matrix::pivot::{perms_by_pivots, find_pivots, PivotType};
+use yui_matrix::schur::SchurLT;
 use yui_core::{Ring, RingOps};
 
 //          [x]          [a b]
@@ -151,10 +151,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests {
-    use crate::math::matrix::sp_vec::SpVec;
+    use yui_matrix::sp_vec::SpVec;
 
     use crate::math::homology::complex::{tests::TestChainComplex, ChainComplex};
-    use crate::math::matrix::sparse::*;
+    use yui_matrix::sparse::*;
 
     use super::ChainReducer;
 

@@ -1,9 +1,9 @@
 use itertools::Itertools;
 use log::*;
 use yui_core::{EucRing, EucRingOps};
-use crate::math::matrix::snf_in_place;
-use crate::math::matrix::sparse::*;
-use crate::math::matrix::snf::SnfResult;
+use yui_matrix::snf_in_place;
+use yui_matrix::sparse::*;
+use yui_matrix::snf::SnfResult;
 use crate::math::homology::base::GenericRModStr;
 
 pub type HomologyCalcResult<R> = (usize, Vec<R>, Option<SpMat<R>>, Option<SpMat<R>>);
@@ -150,7 +150,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 mod tests {
     use crate::math::homology::complex::{tests::TestChainComplex, ChainComplex};
     use crate::math::homology::base::RModStr;
-    use crate::math::matrix::sparse::*;
+    use yui_matrix::sparse::*;
 
     use super::HomologyCalc;
  

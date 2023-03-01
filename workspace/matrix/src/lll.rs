@@ -526,9 +526,8 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 
 #[cfg(test)]
 pub(super) mod tests {
-    use ndarray::array;
-    use crate::math::matrix::Mat;
     use super::*;
+    use ndarray::array;
  
     #[test]
     fn test_large_orth_basis() {

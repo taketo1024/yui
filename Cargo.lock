@@ -1101,6 +1101,7 @@ dependencies = [
  "yui-core",
  "yui-ff",
  "yui-lin-comb",
+ "yui-matrix",
  "yui-polynomial",
  "yui-quad-int",
  "yui-ratio",
@@ -1134,6 +1135,28 @@ dependencies = [
  "itertools",
  "num-traits",
  "yui-core",
+ "yui-utils",
+]
+
+[[package]]
+name = "yui-matrix"
+version = "0.1.0"
+dependencies = [
+ "auto-impl-ops 0.2.0",
+ "derive_more",
+ "either",
+ "itertools",
+ "log",
+ "ndarray",
+ "num-bigint",
+ "num-traits",
+ "rand",
+ "rayon",
+ "sprs",
+ "thread_local",
+ "yui-core",
+ "yui-quad-int",
+ "yui-ratio",
  "yui-utils",
 ]
 

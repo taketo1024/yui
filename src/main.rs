@@ -188,7 +188,7 @@ mod ckh {
     use yui::math::homology::complex::*;
     use yui::math::homology::base::*;
     use yui_core::{Ring, RingOps};
-    use yui::math::matrix::dense::*;
+    use yui_matrix::dense::*;
     
     pub fn run(name: String, link: Option<String>, c_value: String, c_type: CType, mirror: bool, reduced: bool) -> Result<String, Box<dyn std::error::Error>> {
         let mut l = load_link(&name, &link)?;

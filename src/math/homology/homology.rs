@@ -128,7 +128,7 @@ where
 
 #[cfg(test)]
 mod tests { 
-    use crate::math::matrix::sparse::*;
+    use yui_matrix::sparse::*;
     use super::*;
     use super::super::complex::tests::*;
 

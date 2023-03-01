@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::iter::Rev;
 use std::ops::{Index, RangeInclusive};
 use num_traits::Zero;
-use crate::math::matrix::sp_vec::SpVec;
-use crate::math::matrix::sparse::*;
+use yui_matrix::sp_vec::SpVec;
+use yui_matrix::sparse::*;
 use yui_core::{RingOps, Ring};
 use super::base::{GradedRModStr, RModStr, AdditiveIndexRange, AdditiveIndex, RModGrid, GenericRModStr};
 
@@ -198,7 +198,7 @@ pub mod tests {
     use super::{ChainComplex, ChainComplexValidation, GenericChainComplex};
     use crate::math::homology::base::RModStr;
     use yui_core::{Ring, RingOps};
-    use crate::math::matrix::sparse::*;
+    use yui_matrix::sparse::*;
 
     #[test]
     fn zero_complex() {

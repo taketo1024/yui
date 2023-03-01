@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::ops::Index;
-use crate::math::matrix::sparse::*;
+use yui_matrix::sparse::*;
 use yui_core::{Ring, RingOps};
 use super::base::{GradedRModStr, RModStr, RModGrid, GenericRModStr};
 use super::complex::ChainComplex;

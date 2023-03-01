@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use std::collections::HashMap;
-use crate::math::matrix::sp_vec::SpVec;
-use crate::math::matrix::sparse::SpMat;
+use yui_matrix::sp_vec::SpVec;
+use yui_matrix::sparse::SpMat;
 use yui_core::{Ring, RingOps};
 use yui_lin_comb::{FreeGen, LinComb};
 use super::base::RModStr;

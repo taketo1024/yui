@@ -5,14 +5,14 @@
 use core::panic;
 
 use log::info;
-use crate::math::matrix::sp_vec::SpVec;
+use yui_matrix::sp_vec::SpVec;
 use crate::khovanov::complex::KhComplex;
 use crate::links::Link;
 use crate::math::homology::base::{RModStr, GenericRModStr};
 use crate::math::homology::complex::ChainComplex;
 use crate::math::homology::utils::homology_calc::HomologyCalc;
 use crate::math::homology::utils::reducer::ChainReducer;
-use crate::math::matrix::sparse::*;
+use yui_matrix::sparse::*;
 use yui_core::{EucRing, EucRingOps};
 
 pub fn ss_invariant<R>(l: &Link, c: &R, reduced: bool) -> i32

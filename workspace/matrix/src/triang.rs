@@ -4,7 +4,7 @@ use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
 use either::Either;
 use log::info;
-use crate::math::matrix::sp_vec::SpVec;
+use crate::sp_vec::SpVec;
 use rayon::prelude::*;
 use thread_local::ThreadLocal;
 use yui_core::{Ring, RingOps};
@@ -234,8 +234,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests { 
-    use crate::math::matrix::sp_vec::SpVec;
-    use crate::math::matrix::sparse::*;
     use super::*;
     use super::TriangularType::{Upper, Lower};
 

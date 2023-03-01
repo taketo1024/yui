@@ -10,7 +10,7 @@ use auto_impl_ops::auto_ops;
 
 use yui_core::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Mon, MonOps, Ring, RingOps, EucRing, EucRingOps, Field, FieldOps};
 use super::lin_comb::{LinComb, FreeGen};
-use yui_utils::format::{subscript, superscript};
+use yui_utils::{subscript, superscript};
 
 pub type Poly  <const X: char, R> = PolyBase<Mono<X, usize>, R>;          // univar
 pub type LPoly <const X: char, R> = PolyBase<Mono<X, isize>, R>;          // univar, Laurent

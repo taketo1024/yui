@@ -5,7 +5,7 @@ use std::ops::{Add, Sub, Index, Neg};
 use itertools::Itertools;
 
 use yui_core::{Elem, Ring, RingOps};
-use yui_utils::format::superscript;
+use yui_utils::superscript;
 use super::idx2::Idx2;
 
 pub trait AdditiveIndex: Clone + Copy + PartialEq + Eq + Hash + Display + Add<Output = Self> + Sub<Output = Self> + Neg<Output = Self>
@@ -218,7 +218,7 @@ where
     <T as Index<Idx2>>::Output: RModStr<R = T::R>
 {
     fn table(&self) -> String {
-        use yui_utils::format::table as f_table;
+        use yui_utils::table as f_table;
 
         fn collect<R, F>(range: R, f: F) -> Vec<isize>
         where R: Iterator<Item = Idx2>, F: Fn(Idx2) -> isize { 

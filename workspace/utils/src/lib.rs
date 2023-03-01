@@ -1,5 +1,7 @@
-pub mod collections;
-pub mod digits;
-pub mod display;
-pub mod format;
-pub mod top_sort;
+mod macros;
+mod format;
+mod top_sort;
+mod digits;
+
+pub use format::{subscript, superscript, table};
+pub use top_sort::top_sort;

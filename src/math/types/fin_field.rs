@@ -100,7 +100,8 @@ decl_alg_ops!(FieldOps);
 
 impl<const p: I> Elem for FF<p> {
     fn set_symbol() -> String {
-        format!("F{}", yui_utils::format::subscript(p as isize))
+        use yui_utils::subscript;
+        format!("F{}", subscript(p as isize))
     }
 }
 

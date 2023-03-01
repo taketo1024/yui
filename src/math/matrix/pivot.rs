@@ -18,7 +18,7 @@ use sprs::PermOwned;
 use thread_local::ThreadLocal;
 use parking_lot::RwLock;
 use yui_core::{Ring, RingOps};
-use yui_utils::top_sort::top_sort;
+use yui_utils::top_sort;
 use super::sparse::*;
 
 #[derive(PartialEq, Eq, Clone, Copy)]

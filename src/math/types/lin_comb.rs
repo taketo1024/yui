@@ -7,10 +7,29 @@ use itertools::Itertools;
 use num_traits::Zero;
 use auto_impl_ops::auto_ops;
 
-use yui_utils::map;
-use yui_utils::display::OrdForDisplay;
-
 use yui_core::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
+use yui_utils::map;
+
+pub trait OrdForDisplay {
+    fn cmp_for_display(&self, other: &Self) -> std::cmp::Ordering;
+}
+
+impl<T> OrdForDisplay for T where T: Ord { 
+    fn cmp_for_display(&self, other: &Self) -> std::cmp::Ordering {
+        std::cmp::Ord::cmp(self, other)
+    }
+}
+
+pub trait SortForDisplay { 
+    fn sort_for_display(&mut self);
+}
+
+impl<T> SortForDisplay for Vec<T> where T: OrdForDisplay { 
+    fn sort_for_display(&mut self) {
+        self.sort_by(T::cmp_for_display)
+    }
+}
+
 pub trait FreeGen: Elem + Hash + OrdForDisplay {}
 
 #[derive(PartialEq, Eq, Clone, Debug, Default)]

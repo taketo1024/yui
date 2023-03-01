@@ -1,7 +1,5 @@
 use std::collections::{HashMap, VecDeque};
-
 use num_traits::Zero;
-
 
 pub fn top_sort(data: HashMap<usize, Vec<usize>>) -> Vec<usize> {
     if data.is_empty() { 

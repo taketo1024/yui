@@ -1,11 +1,11 @@
-pub mod elem;
-pub mod add_mon;
-pub mod add_grp;
-pub mod mon;
-pub mod ring;
-pub mod euc_ring;
-pub mod field;
-pub mod r_mod;
+mod elem;
+mod add_mon;
+mod add_grp;
+mod mon;
+mod ring;
+mod euc_ring;
+mod field;
+mod r_mod;
 
 pub use elem::Elem;
 pub use add_mon::{AddMon, AddMonOps};

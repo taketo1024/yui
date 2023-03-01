@@ -1101,6 +1101,7 @@ dependencies = [
  "yui-core",
  "yui-ff",
  "yui-lin-comb",
+ "yui-polynomial",
  "yui-quad-int",
  "yui-ratio",
  "yui-utils",
@@ -1133,6 +1134,20 @@ dependencies = [
  "itertools",
  "num-traits",
  "yui-core",
+ "yui-utils",
+]
+
+[[package]]
+name = "yui-polynomial"
+version = "0.1.0"
+dependencies = [
+ "auto-impl-ops 0.2.0",
+ "itertools",
+ "num-traits",
+ "regex",
+ "yui-core",
+ "yui-lin-comb",
+ "yui-ratio",
  "yui-utils",
 ]
 

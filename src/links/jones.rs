@@ -1,7 +1,7 @@
 use num_traits::Pow;
 use yui_core::PowMod2;
 use crate::links::links::{Link, State};
-use crate::math::types::polynomial::LPoly;
+use yui_polynomial::LPoly;
 
 pub fn jones_polynomial(l: &Link) -> LPoly<'q', i32> {
     type P = LPoly<'q', i32>;
@@ -31,10 +31,9 @@ pub fn jones_polynomial(l: &Link) -> LPoly<'q', i32> {
 
 #[cfg(test)]
 mod tests { 
-    use num_traits::One;
-    use crate::links::links::{Link, Resolution::Res1};
-    use crate::math::types::polynomial::LPoly;
     use super::*;
+    use num_traits::One;
+    use crate::links::links::Resolution::Res1;
 
     type P = LPoly<'q', i32>;
 

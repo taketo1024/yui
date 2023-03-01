@@ -396,7 +396,7 @@ use num_bigint::BigInt;
 use yui_ratio::Ratio;
 use yui_ff::FF;
 use yui_quad_int::{GaussInt, EisenInt};
-use yui::math::types::polynomial::{Poly, MPoly};
+use yui_polynomial::{Poly, MPoly};
 
 macro_rules! dispatch_ring {
     ($method:ident, $c_type:expr $(, $args:expr)*) => {{

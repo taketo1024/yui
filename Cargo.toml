@@ -12,6 +12,7 @@ members = [
     "workspace/types/ff",
     "workspace/types/quad_int",    
     "workspace/types/lin_comb",    
+    "workspace/types/polynomial",    
 ]
 
 [profile.release]
@@ -51,3 +52,4 @@ yui-ratio = { version = "0.1.0", path = "workspace/types/ratio" }
 yui-ff = { version = "0.1.0", path = "workspace/types/ff" }
 yui-quad-int = { version = "0.1.0", path = "workspace/types/quad_int" }
 yui-lin-comb = { version = "0.1.0", path = "workspace/types/lin_comb" }
+yui-polynomial = { version = "0.1.0", path = "workspace/types/polynomial" }

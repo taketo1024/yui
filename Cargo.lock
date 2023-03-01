@@ -1099,6 +1099,7 @@ dependencies = [
  "string-builder",
  "thread_local",
  "yui-core",
+ "yui-ff",
  "yui-ratio",
  "yui-utils",
 ]
@@ -1110,6 +1111,16 @@ dependencies = [
  "is-even",
  "num-bigint",
  "num-traits",
+]
+
+[[package]]
+name = "yui-ff"
+version = "0.1.0"
+dependencies = [
+ "auto-impl-ops 0.2.0",
+ "num-traits",
+ "yui-core",
+ "yui-utils",
 ]
 
 [[package]]

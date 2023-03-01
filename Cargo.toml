@@ -8,7 +8,8 @@ authors = ["Taketo Sano <taketo1024@gmail.com>"]
 members = [ 
     "workspace/core",
     "workspace/utils",
-    "workspace/types/ratio"
+    "workspace/types/ratio",
+    "workspace/types/ff"
 ]
 
 [profile.release]
@@ -42,6 +43,7 @@ simplelog = "0.12.0"
 sprs = { git = "https://github.com/sparsemat/sprs", branch = "master" }
 string-builder = "0.2.0"
 thread_local = "1.1.7"
-yui-core = { path = "workspace/core" }
+yui-core  = { path = "workspace/core" }
 yui-utils = { path = "workspace/utils" }
 yui-ratio = { path = "workspace/types/ratio" }
+yui-ff    = { path = "workspace/types/ff" }

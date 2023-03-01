@@ -65,38 +65,97 @@ impl<const p: I> One for FF<p> {
     }
 }
 
+macro_rules! impl_unop {
+    ($trait:ident, $method:ident) => {
+        impl<const p: I> $trait for FF<p> {
+            type Output = Self;
+            fn $method(self) -> Self::Output {
+                Self::new(self.0.$method())
+            }
+        }
+
+        impl<'a, const p: I> $trait for &'a FF<p> {
+            type Output = FF<p>;
+            #[inline]
+            fn $method(self) -> Self::Output {
+                FF::new(self.0.$method())
+            }
+        }
+    };
+}
+
 impl_unop!(Neg, neg);
+
+macro_rules! impl_binop {
+    ($trait:ident, $method:ident) => {
+        #[auto_ops]
+        impl<'a, 'b, const p: I> $trait<&'b FF<p>> for &'a FF<p> {
+            type Output = FF<p>;
+            fn $method(self, rhs: &'b FF<p>) -> Self::Output {
+                FF::new(self.0.$method(&rhs.0))
+            }
+        }
+    }
+}
+
 impl_binop!(Add, add);
 impl_binop!(Sub, sub);
 impl_binop!(Mul, mul);
 
-forward_accum!(Sum, sum, AddAssign, add_assign, zero);
-forward_accum!(Product, product, MulAssign, mul_assign, one);
-
 #[auto_ops]
-impl<'a, const p: I> Div<&'a FF<p>> for FF<p> {
-    type Output = Self;
-    fn div(self, rhs: &'a Self) -> Self::Output {
+impl<'a, 'b, const p: I> Div<&'b FF<p>> for &'a FF<p> {
+    type Output = FF<p>;
+    fn div(self, rhs: &'b FF<p>) -> Self::Output {
         assert!(!rhs.is_zero());
         self * rhs.inv().unwrap()
     }
 }
 
 #[auto_ops]
-impl<'a, const p: I> Rem<&'a FF<p>> for FF<p> {
-    type Output = Self;
-    fn rem(self, rhs: &'a Self) -> Self::Output {
+impl<'a, 'b, const p: I> Rem<&'b FF<p>> for &'a FF<p> {
+    type Output = FF<p>;
+    fn rem(self, rhs: &'b FF<p>) -> Self::Output {
         assert!(!rhs.is_zero());
         FF::zero() // MEMO: FF<p> is a field. 
     }
 }
 
-decl_alg_ops!(AddMonOps);
-decl_alg_ops!(AddGrpOps);
-decl_alg_ops!(MonOps);
-decl_alg_ops!(RingOps);
-decl_alg_ops!(EucRingOps);
-decl_alg_ops!(FieldOps);
+macro_rules! impl_accum {
+    ($trait:ident, $method:ident, $accum_trait:ident, $accum_method:ident, $accum_init:ident) => {
+        impl<const p: I> $trait for FF<p> {
+            fn $method<Iter: Iterator<Item = Self>>(iter: Iter) -> Self {
+                let mut res = Self::$accum_init();
+                for r in iter { Self::$accum_method(&mut res, r) }
+                return res;
+            }
+        }
+
+        impl<'a, const p: I> $trait<&'a FF<p>> for FF<p> {
+            fn $method<Iter: Iterator<Item = &'a FF<p>>>(iter: Iter) -> Self {
+                let mut res = Self::$accum_init();
+                for r in iter { Self::$accum_method(&mut res, r) }
+                return res;
+            }
+        }
+    }
+}
+
+impl_accum!(Sum, sum, AddAssign, add_assign, zero);
+impl_accum!(Product, product, MulAssign, mul_assign, one);
+
+macro_rules! impl_alg_ops {
+    ($trait:ident) => {
+        impl<const p: I> $trait for FF<p> {}
+        impl<'a, const p: I> $trait<FF<p>> for &'a FF<p> {}
+    };
+}
+
+impl_alg_ops!(AddMonOps);
+impl_alg_ops!(AddGrpOps);
+impl_alg_ops!(MonOps);
+impl_alg_ops!(RingOps);
+impl_alg_ops!(EucRingOps);
+impl_alg_ops!(FieldOps);
 
 impl<const p: I> Elem for FF<p> {
     fn set_symbol() -> String {
@@ -142,66 +201,6 @@ impl<const p: I> Ring for FF<p> {
 
 impl<const p: I> EucRing for FF<p> {}
 impl<const p: I> Field for FF<p> {}
-
-macro_rules! impl_unop {
-    ($trait:ident, $method:ident) => {
-        impl<const p: I> $trait for FF<p> {
-            type Output = Self;
-            fn $method(self) -> Self::Output {
-                Self::new(self.0.$method())
-            }
-        }
-
-        impl<'a, const p: I> $trait for &'a FF<p> {
-            type Output = FF<p>;
-            #[inline]
-            fn $method(self) -> Self::Output {
-                FF::new(self.0.$method())
-            }
-        }
-    };
-}
-
-macro_rules! impl_binop {
-    ($trait:ident, $method:ident) => {
-        #[auto_ops]
-        impl<'a, const p: I> $trait<&'a FF<p>> for FF<p> {
-            type Output = Self;
-            fn $method(self, rhs: &'a Self) -> Self::Output {
-                Self::new(self.0.$method(&rhs.0))
-            }
-        }
-    }
-}
-
-macro_rules! forward_accum {
-    ($trait:ident, $method:ident, $accum_trait:ident, $accum_method:ident, $accum_init:ident) => {
-        impl<const p: I> $trait for FF<p> {
-            fn $method<Iter: Iterator<Item = Self>>(iter: Iter) -> Self {
-                let mut res = Self::$accum_init();
-                for r in iter { Self::$accum_method(&mut res, r) }
-                return res;
-            }
-        }
-
-        impl<'a, const p: I> $trait<&'a FF<p>> for FF<p> {
-            fn $method<Iter: Iterator<Item = &'a FF<p>>>(iter: Iter) -> Self {
-                let mut res = Self::$accum_init();
-                for r in iter { Self::$accum_method(&mut res, r) }
-                return res;
-            }
-        }
-    }
-}
-
-macro_rules! decl_alg_ops {
-    ($trait:ident) => {
-        impl<const p: I> $trait for FF<p> {}
-        impl<'a, const p: I> $trait<FF<p>> for &'a FF<p> {}
-    };
-}
-
-pub(self) use {impl_unop, impl_binop, forward_accum, decl_alg_ops};
 
 #[cfg(test)]
 mod tests { 

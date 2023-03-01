@@ -1,7 +1,7 @@
 use num_traits::Pow;
 use yui_core::PowMod2;
-use crate::links::links::{Link, State};
 use yui_polynomial::LPoly;
+use super::links::{Link, State};
 
 pub fn jones_polynomial(l: &Link) -> LPoly<'q', i32> {
     type P = LPoly<'q', i32>;
@@ -33,7 +33,7 @@ pub fn jones_polynomial(l: &Link) -> LPoly<'q', i32> {
 mod tests { 
     use super::*;
     use num_traits::One;
-    use crate::links::links::Resolution::Res1;
+    use crate::links::Resolution;
 
     type P = LPoly<'q', i32>;
 
@@ -53,7 +53,7 @@ mod tests {
 
     #[test]
     fn unlink_2() {
-        let l = Link::from(&[[0, 1, 1, 0]]).resolved_at(0, Res1);
+        let l = Link::from(&[[0, 1, 1, 0]]).resolved_at(0, Resolution::Res1);
         let p = jones_polynomial(&l);
         assert_eq!(p, P::from_deg(vec![(-2, 1), (0, 2), (2, 1)]));
     }

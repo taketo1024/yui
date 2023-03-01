@@ -1102,6 +1102,7 @@ dependencies = [
  "yui-ff",
  "yui-homology",
  "yui-lin-comb",
+ "yui-link",
  "yui-matrix",
  "yui-polynomial",
  "yui-quad-int",
@@ -1153,6 +1154,18 @@ dependencies = [
  "num-traits",
  "yui-core",
  "yui-utils",
+]
+
+[[package]]
+name = "yui-link"
+version = "0.1.0"
+dependencies = [
+ "itertools",
+ "num-traits",
+ "serde",
+ "serde_json",
+ "yui-core",
+ "yui-polynomial",
 ]
 
 [[package]]

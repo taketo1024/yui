@@ -139,7 +139,7 @@ mod kh {
     use super::*;
     use std::str::FromStr;
     use yui::khovanov::homology::{KhHomologyBigraded, KhHomology};
-    use yui::links::Link;
+    use yui_link::Link;
     use yui_homology::base::PrintTable;
     use yui_core::{EucRing, EucRingOps};
 
@@ -183,7 +183,7 @@ mod ckh {
     use super::*;
     use std::str::FromStr;
     use yui::khovanov::complex::KhComplex;
-    use yui::links::Link;
+    use yui_link::Link;
     use yui_homology::reduced::Reduced;
     use yui_homology::complex::*;
     use yui_homology::base::*;
@@ -231,7 +231,7 @@ mod ckh {
 mod ss { 
     use super::*;
     use std::str::FromStr;
-    use yui::links::Link;
+    use yui_link::Link;
     use yui_core::{EucRing, EucRingOps};
     use yui::khovanov::invariants::ss::ss_invariant;
 
@@ -317,7 +317,7 @@ mod ss {
 }
 
 use indexmap::IndexMap;
-use yui::links::{Link, links::Edge};
+use yui_link::{Link, links::Edge};
 
 type PDCode = Vec<[Edge; 4]>;
 type Data = IndexMap<String, PDCode>;

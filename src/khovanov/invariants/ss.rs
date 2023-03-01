@@ -6,7 +6,7 @@ use core::panic;
 
 use log::info;
 use crate::khovanov::complex::KhComplex;
-use crate::links::Link;
+use yui_link::Link;
 use yui_homology::base::{RModStr, GenericRModStr};
 use yui_homology::complex::ChainComplex;
 use yui_homology::utils::homology_calc::HomologyCalc;
@@ -119,7 +119,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 mod tests {
     use indexmap::IndexMap;
 
-    use crate::links::Link;
+    use yui_link::Link;
     use yui_utils::map;
     use super::*;
 

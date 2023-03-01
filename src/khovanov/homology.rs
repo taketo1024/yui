@@ -6,7 +6,7 @@ use yui_homology::base::{GradedRModStr, GenericRModStr};
 use yui_homology::homology::{Homology, GenericHomology};
 use yui_homology::reduced::Reduced;
 use yui_core::{EucRing, EucRingOps, Ring, RingOps};
-use crate::links::Link;
+use yui_link::Link;
 use super::complex::{KhComplex, KhComplexBigraded};
 
 pub struct KhHomology<R> 
@@ -147,7 +147,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests {
-    use crate::links::Link;
+    use yui_link::Link;
     use yui_homology::base::{GradedRModStr, RModStr};
     use super::KhHomology;
     

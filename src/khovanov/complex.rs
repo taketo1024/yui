@@ -7,7 +7,7 @@ use yui_homology::free::FreeRModStr;
 use yui_matrix::sparse::SpMat;
 use yui_core::{Ring, RingOps};
 use yui_homology::complex::ChainComplex;
-use crate::links::Link;
+use yui_link::Link;
 use yui_homology::idx2::{Idx2, Idx2Range};
 use super::algebra::{KhAlgStr, KhEnhState, KhChain};
 use super::cube::KhCube;
@@ -242,7 +242,7 @@ impl Shift for RangeInclusive<isize> {
 
 #[cfg(test)]
 mod tests {
-    use crate::links::Link;
+    use yui_link::Link;
     use yui_homology::base::GradedRModStr;
     use yui_homology::complex::ChainComplexValidation;
     use super::KhComplex;

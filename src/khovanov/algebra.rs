@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::ops::{Mul, MulAssign};
 use itertools::join;
 use auto_impl_ops::auto_ops;
-use crate::links::links::State;
+use yui_link::links::State;
 use yui_lin_comb::{FreeGen, LinComb};
 use yui_core::Elem;
 use yui_utils::subscript;

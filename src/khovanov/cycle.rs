@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use itertools::Itertools;
 use yui_core::{Ring, RingOps};
 use crate::khovanov::algebra::KhAlgGen;
-use crate::links::{links::{Component, State}, Link};
+use yui_link::{links::{Component, State}, Link};
 use super::complex::KhComplex;
 use super::algebra::{KhAlgStr, KhEnhState, KhChain};
 
@@ -116,9 +116,8 @@ impl Color {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use num_traits::Zero;
-
-    use crate::{links::Link, khovanov::complex::KhComplex};
  
     #[test]
     fn trefoil() { 

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ops::RangeInclusive;
 use itertools::Itertools;
 use num_traits::Pow;
-use crate::links::links::{Link, State, Component, Resolution, Edge};
+use yui_link::links::{Link, State, Component, Resolution, Edge};
 use yui_core::{Ring, RingOps, PowMod2, Sign};
 use super::algebra::{KhAlgStr, KhEnhState};
 
@@ -277,7 +277,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests { 
-    use crate::links::links::Resolution::*;
+    use yui_link::links::Resolution::*;
     use super::*;
     
     #[test]

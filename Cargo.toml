@@ -6,7 +6,7 @@ authors = ["Taketo Sano <taketo1024@gmail.com>"]
 
 [workspace]
 members = [ 
-    "yui_core" 
+    "workspace/core" 
 ]
 
 [profile.release]
@@ -14,7 +14,7 @@ debug = true
 overflow-checks = true
 
 [dependencies]
-yui-core = { path = "yui_core" }
+yui-core = { path = "workspace/core" }
 auto-impl-ops = "0.1.2"
 clap = { version = "4.1.6", features = ["derive", "cargo"] }
 csv = "1.2.0"

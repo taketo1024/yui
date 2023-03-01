@@ -194,10 +194,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 pub mod tests { 
     use std::iter::Rev;
     use std::ops::RangeInclusive;
-    use super::{ChainComplex, ChainComplexValidation, GenericChainComplex};
-    use crate::math::homology::base::RModStr;
     use yui_core::{Ring, RingOps};
     use yui_matrix::sparse::*;
+    use super::{ChainComplex, ChainComplexValidation, GenericChainComplex};
+    use crate::base::RModStr;
 
     #[test]
     fn zero_complex() {

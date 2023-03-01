@@ -140,7 +140,7 @@ mod kh {
     use std::str::FromStr;
     use yui::khovanov::homology::{KhHomologyBigraded, KhHomology};
     use yui::links::Link;
-    use yui::math::homology::base::PrintTable;
+    use yui_homology::base::PrintTable;
     use yui_core::{EucRing, EucRingOps};
 
     pub fn run(name: String, link: Option<String>, c_value: String, c_type: CType, mirror: bool, reduced: bool, bigraded: bool) -> Result<String, Box<dyn std::error::Error>> {
@@ -184,9 +184,9 @@ mod ckh {
     use std::str::FromStr;
     use yui::khovanov::complex::KhComplex;
     use yui::links::Link;
-    use yui::math::homology::reduced::Reduced;
-    use yui::math::homology::complex::*;
-    use yui::math::homology::base::*;
+    use yui_homology::reduced::Reduced;
+    use yui_homology::complex::*;
+    use yui_homology::base::*;
     use yui_core::{Ring, RingOps};
     use yui_matrix::dense::*;
     

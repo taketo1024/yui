@@ -7,10 +7,10 @@ use core::panic;
 use log::info;
 use crate::khovanov::complex::KhComplex;
 use crate::links::Link;
-use crate::math::homology::base::{RModStr, GenericRModStr};
-use crate::math::homology::complex::ChainComplex;
-use crate::math::homology::utils::homology_calc::HomologyCalc;
-use crate::math::homology::utils::reducer::ChainReducer;
+use yui_homology::base::{RModStr, GenericRModStr};
+use yui_homology::complex::ChainComplex;
+use yui_homology::utils::homology_calc::HomologyCalc;
+use yui_homology::utils::reducer::ChainReducer;
 use yui_core::{EucRing, EucRingOps};
 use yui_matrix::sparse::*;
 

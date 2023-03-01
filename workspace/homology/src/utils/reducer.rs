@@ -150,12 +150,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::complex::{tests::TestChainComplex, ChainComplex};
     use yui_matrix::sparse::SpVec;
-
-    use crate::math::homology::complex::{tests::TestChainComplex, ChainComplex};
-    use yui_matrix::sparse::*;
-
-    use super::ChainReducer;
 
     #[test]
     fn s2_2nd() {

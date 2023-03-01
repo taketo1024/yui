@@ -1,10 +1,10 @@
 use std::fmt::Display;
 use std::ops::{RangeInclusive, Index};
 
-use crate::math::homology::idx2::{Idx2, Idx2Range};
-use crate::math::homology::base::{GradedRModStr, GenericRModStr};
-use crate::math::homology::homology::{Homology, GenericHomology};
-use crate::math::homology::reduced::Reduced;
+use yui_homology::idx2::{Idx2, Idx2Range};
+use yui_homology::base::{GradedRModStr, GenericRModStr};
+use yui_homology::homology::{Homology, GenericHomology};
+use yui_homology::reduced::Reduced;
 use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 use crate::links::Link;
 use super::complex::{KhComplex, KhComplexBigraded};
@@ -147,7 +147,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{links::Link, math::homology::base::{GradedRModStr, RModStr}};
+    use crate::links::Link;
+    use yui_homology::base::{GradedRModStr, RModStr};
     use super::KhHomology;
     
     #[test]

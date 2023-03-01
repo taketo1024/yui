@@ -110,8 +110,8 @@ where
 
 #[cfg(test)]
 mod tests { 
-    use crate::math::homology::base::RModStr;
-    use crate::math::homology::homology::GenericHomology;
+    use crate::base::RModStr;
+    use crate::homology::GenericHomology;
     use super::*;
     use super::super::complex::tests::*;
 

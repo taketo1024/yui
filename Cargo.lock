@@ -1100,6 +1100,7 @@ dependencies = [
  "thread_local",
  "yui-core",
  "yui-ff",
+ "yui-homology",
  "yui-lin-comb",
  "yui-matrix",
  "yui-polynomial",
@@ -1124,6 +1125,22 @@ dependencies = [
  "auto-impl-ops 0.2.0",
  "num-traits",
  "yui-core",
+ "yui-utils",
+]
+
+[[package]]
+name = "yui-homology"
+version = "0.1.0"
+dependencies = [
+ "derive_more",
+ "grouping_by",
+ "itertools",
+ "log",
+ "num-traits",
+ "sprs",
+ "yui-core",
+ "yui-lin-comb",
+ "yui-matrix",
  "yui-utils",
 ]
 

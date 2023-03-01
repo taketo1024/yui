@@ -2,13 +2,13 @@ use std::collections::HashMap;
 use std::ops::{RangeInclusive, Index};
 use std::vec::IntoIter;
 
-use crate::math::homology::base::{GradedRModStr, RModGrid};
-use crate::math::homology::free::FreeRModStr;
+use yui_homology::base::{GradedRModStr, RModGrid};
+use yui_homology::free::FreeRModStr;
 use yui_matrix::sparse::SpMat;
 use yui_core::{Ring, RingOps};
-use crate::math::homology::complex::ChainComplex;
+use yui_homology::complex::ChainComplex;
 use crate::links::Link;
-use crate::math::homology::idx2::{Idx2, Idx2Range};
+use yui_homology::idx2::{Idx2, Idx2Range};
 use super::algebra::{KhAlgStr, KhEnhState, KhChain};
 use super::cube::KhCube;
 
@@ -243,8 +243,8 @@ impl Shift for RangeInclusive<isize> {
 #[cfg(test)]
 mod tests {
     use crate::links::Link;
-    use crate::math::homology::base::GradedRModStr;
-    use crate::math::homology::complex::ChainComplexValidation;
+    use yui_homology::base::GradedRModStr;
+    use yui_homology::complex::ChainComplexValidation;
     use super::KhComplex;
 
     #[test]

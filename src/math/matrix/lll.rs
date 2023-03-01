@@ -15,7 +15,7 @@ use log::{trace, info};
 use num_bigint::BigInt;
 
 use yui_core::{Ring, RingOps, EucRing, EucRingOps, DivRound, Integer, IntOps};
-use crate::math::types::quad_int::{GaussInt, QuadInt, EisenInt};
+use yui_quad_int::{QuadInt, GaussInt, EisenInt};
 use super::dense::*;
 
 pub fn lll<R>(b: &Mat<R>, with_trans: bool) -> (Mat<R>, Option<Mat<R>>)

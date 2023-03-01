@@ -1100,6 +1100,7 @@ dependencies = [
  "thread_local",
  "yui-core",
  "yui-ff",
+ "yui-quad-int",
  "yui-ratio",
  "yui-utils",
 ]
@@ -1121,6 +1122,17 @@ dependencies = [
  "num-traits",
  "yui-core",
  "yui-utils",
+]
+
+[[package]]
+name = "yui-quad-int"
+version = "0.1.0"
+dependencies = [
+ "auto-impl-ops 0.2.0",
+ "num-bigint",
+ "num-traits",
+ "regex",
+ "yui-core",
 ]
 
 [[package]]

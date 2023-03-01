@@ -496,8 +496,8 @@ use {impl_unop, impl_add_op, impl_accum, impl_alg_op, impl_alg_op_d};
 
 #[cfg(test)]
 mod tests {
-    use num_bigint::BigInt;
     use super::*;
+    use num_bigint::BigInt;
 
     #[test]
     fn check() { 

@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Taketo Sano <taketo1024@gmail.com>"]
 
+[features]
+i128 = []
+bigint = []
+
 [workspace]
 members = [ 
     "workspace/core",
@@ -43,3 +47,4 @@ yui-homology = { version = "0.1.0", path = "workspace/homology" }
 yui-link = { version = "0.1.0", path = "workspace/link" }
 yui-khovanov = { version = "0.1.0", path = "workspace/khovanov" }
 serde = "1.0.152"
+cfg-if = "1.0.0"

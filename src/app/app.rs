@@ -21,6 +21,9 @@ impl App {
             init_logger();
         }
 
+        info!("args: {:?}", args);
+        info!("int-type: {}", std::any::type_name::<crate::utils::dispatch::Int>());
+
         let (res, time) = measure(|| 
             guard_panic(||
                 match args.command { 

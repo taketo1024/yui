@@ -1020,6 +1020,7 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "regex",
+ "serde",
  "serde_json",
  "simplelog",
  "string-builder",

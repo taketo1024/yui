@@ -42,3 +42,4 @@ yui-matrix = { version = "0.1.0", path = "workspace/matrix" }
 yui-homology = { version = "0.1.0", path = "workspace/homology" }
 yui-link = { version = "0.1.0", path = "workspace/link" }
 yui-khovanov = { version = "0.1.0", path = "workspace/khovanov" }
+serde = "1.0.152"

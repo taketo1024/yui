@@ -185,7 +185,7 @@ mod ckh {
     use yui_core::{Ring, RingOps};
     use yui_link::Link;
     use yui_matrix::dense::*;
-    use yui_homology::{Reduced, ChainComplex, GradedRModStr};
+    use yui_homology::{Reduced, ChainComplex, RModGrid};
         use yui_khovanov::complex::KhComplex;
     
     pub fn run(name: String, link: Option<String>, c_value: String, c_type: CType, mirror: bool, reduced: bool) -> Result<String, Box<dyn std::error::Error>> {

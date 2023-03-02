@@ -1,8 +1,8 @@
 use yui_core::{Ring, RingOps, EucRing, EucRingOps};
-use crate::{RModStr, GradedRModStr, ChainComplex, GenericRModStr};
+use crate::{RModStr, RModGrid, ChainComplex, GenericRModStr};
 use crate::utils::homology_calc::HomologyCalc;
 
-pub trait Homology: GradedRModStr
+pub trait Homology: RModGrid
 where 
     Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>,
     Self::Output: RModStr<R = Self::R>

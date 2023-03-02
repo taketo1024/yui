@@ -3,7 +3,7 @@ use std::iter::Rev;
 use std::ops::{Index, RangeInclusive};
 use yui_matrix::sparse::*;
 use yui_core::{RingOps, Ring};
-use crate::{AdditiveIndexRange, AdditiveIndex, RModStr, GradedRModStr, GenericRModStr, RModGrid, ChainComplex};
+use crate::{AdditiveIndexRange, AdditiveIndex, RModStr, RModGrid, ChainComplex, GenericRModStr, GenericRModGrid};
 
 pub struct GenericChainComplex<R, I>
 where 
@@ -11,7 +11,7 @@ where
     I: AdditiveIndexRange,
     I::Item: AdditiveIndex
 {
-    grid: RModGrid<GenericRModStr<R>, I>,
+    grid: GenericRModGrid<GenericRModStr<R>, I>,
     d_degree: I::Item,
     d_matrices: HashMap<I::Item, SpMat<R>>
 }
@@ -23,7 +23,7 @@ where
     I::Item: AdditiveIndex
 {
     pub fn new(range: I, d_degree: I::Item, d_matrices: HashMap<I::Item, SpMat<R>>) -> Self {
-        let grid = RModGrid::new(range, |i| {
+        let grid = GenericRModGrid::new(range, |i| {
             if let Some(d) = d_matrices.get(&i) {
                 let n = d.cols();
                 Some(GenericRModStr::new(n, vec![]))
@@ -81,7 +81,7 @@ where
     }
 }
 
-impl<R, I> GradedRModStr for GenericChainComplex<R, I>
+impl<R, I> RModGrid for GenericChainComplex<R, I>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
     I: AdditiveIndexRange,

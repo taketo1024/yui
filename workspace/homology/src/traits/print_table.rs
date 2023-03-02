@@ -3,7 +3,7 @@ use std::ops::Index;
 use itertools::Itertools;
 
 use yui_core::{Ring, RingOps};
-use crate::{RModStr, GradedRModStr, Idx2};
+use crate::{RModStr, RModGrid, Idx2};
 
 pub trait PrintTable {
     fn table(&self) -> String;
@@ -13,7 +13,7 @@ pub trait PrintTable {
 impl<T> PrintTable for T
 where
     T: Index<Idx2>,
-    T: GradedRModStr<Index = Idx2>,
+    T: RModGrid<Index = Idx2>,
     T::R: Ring, for<'x> &'x T::R: RingOps<T::R>,
     <T as Index<Idx2>>::Output: RModStr<R = T::R>
 {

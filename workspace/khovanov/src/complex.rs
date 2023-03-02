@@ -5,7 +5,7 @@ use std::vec::IntoIter;
 use yui_core::{Ring, RingOps};
 use yui_matrix::sparse::SpMat;
 use yui_link::Link;
-use yui_homology::{Idx2, Idx2Range, GradedRModStr, RModGrid, FreeRModStr, ChainComplex};
+use yui_homology::{Idx2, Idx2Range, RModGrid, GenericRModGrid, FreeRModStr, ChainComplex};
 use super::algebra::{KhAlgStr, KhEnhState, KhChain};
 use super::cube::KhCube;
 
@@ -14,7 +14,7 @@ pub struct KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     link: Link,
     cube: KhCube<R>,
-    grid: RModGrid<KhComplexSummand<R>, RangeInclusive<isize>>,
+    grid: GenericRModGrid<KhComplexSummand<R>, RangeInclusive<isize>>,
     reduced: bool
 }
 
@@ -26,7 +26,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let i0 = Self::calc_deg_shift(&link, reduced).0;
         let range = cube.h_range().shift(i0);
 
-        let grid = RModGrid::new(range, |i| {
+        let grid = GenericRModGrid::new(range, |i| {
             let i = i - i0;
             let gens = if reduced {
                 let e = link.first_edge().unwrap();
@@ -100,7 +100,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<R> GradedRModStr for KhComplex<R>
+impl<R> RModGrid for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     type R = R;
     type Index = isize;
@@ -131,7 +131,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 pub struct KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     cube: KhCube<R>,
-    grid: RModGrid<KhComplexSummand<R>, Idx2Range>
+    grid: GenericRModGrid<KhComplexSummand<R>, Idx2Range>
 }
 
 impl<R> KhComplexBigraded<R>
@@ -164,7 +164,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             (i, set)
         }).collect();
 
-        let grid = RModGrid::new(range, |idx| {
+        let grid = GenericRModGrid::new(range, |idx| {
             let (i, j) = idx.as_tuple();
             let set = gens.get_mut(&i).unwrap();
             if let Some(g) = set.remove(&j) {
@@ -196,7 +196,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<R> GradedRModStr for KhComplexBigraded<R>
+impl<R> RModGrid for KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type R = R;
     type Index = Idx2;
@@ -240,7 +240,7 @@ impl Shift for RangeInclusive<isize> {
 #[cfg(test)]
 mod tests {
     use yui_link::Link;
-    use yui_homology::GradedRModStr;
+    use yui_homology::RModGrid;
     use yui_homology::test::ChainComplexValidation;
     use super::KhComplex;
 

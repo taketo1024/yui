@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::ops::Index;
 
 use yui_core::{Ring, RingOps};
-use crate::{AdditiveIndex, AdditiveIndexRange, RModStr, GradedRModStr, GenericRModStr, RModGrid, Homology, HomologyComputable};
+use crate::{AdditiveIndex, AdditiveIndexRange, RModStr, RModGrid, GenericRModStr, GenericRModGrid, Homology, HomologyComputable};
 
 pub struct GenericHomology<R, I>
 where 
@@ -10,7 +10,7 @@ where
     I: AdditiveIndexRange,
     I::Item: AdditiveIndex
 {
-    grid: RModGrid<GenericRModStr<R>, I>
+    grid: GenericRModGrid<GenericRModStr<R>, I>
 }
 
 impl<R, C> From<C> for GenericHomology<R, C::IndexRange>
@@ -22,7 +22,7 @@ where
 {
     fn from(c: C) -> Self {
         let range = c.range();
-        let grid = RModGrid::new(range, |i| {
+        let grid = GenericRModGrid::new(range, |i| {
             let h_i = c.homology_at(i);
             if !h_i.is_zero() { Some(h_i) } else { None }
         });
@@ -30,7 +30,7 @@ where
     }
 }
 
-impl<R, I> GradedRModStr for GenericHomology<R, I>
+impl<R, I> RModGrid for GenericHomology<R, I>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
     I: AdditiveIndexRange,

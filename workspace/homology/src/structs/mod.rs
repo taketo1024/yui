@@ -5,7 +5,7 @@ mod r_mod_str;
 pub use r_mod_str::GenericRModStr;
 
 mod r_mod_grid;
-pub use r_mod_grid::RModGrid;
+pub use r_mod_grid::GenericRModGrid;
 
 mod free;
 pub use free::FreeRModStr;

@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 use std::ops::{Index};
 use yui_core::{Ring, RingOps};
-use crate::{AdditiveIndex, AdditiveIndexRange, RModStr, GradedRModStr};
+use crate::{AdditiveIndex, AdditiveIndexRange, RModStr, RModGrid};
 
-pub struct RModGrid<S, I>
+pub struct GenericRModGrid<S, I>
 where 
     S: RModStr,
     S::R: Ring, for<'x> &'x S::R: RingOps<S::R>,
@@ -15,7 +15,7 @@ where
     zero: S
 }
 
-impl<S, I> RModGrid<S, I>
+impl<S, I> GenericRModGrid<S, I>
 where 
     S: RModStr,
     S::R: Ring, for<'x> &'x S::R: RingOps<S::R>,
@@ -36,7 +36,7 @@ where
     }
 }
 
-impl<S, I> Index<I::Item> for RModGrid<S, I>
+impl<S, I> Index<I::Item> for GenericRModGrid<S, I>
 where
     S: RModStr,
     S::R: Ring, for<'x> &'x S::R: RingOps<S::R>,
@@ -54,7 +54,7 @@ where
     }
 }
 
-impl<S, I> GradedRModStr for RModGrid<S, I>
+impl<S, I> RModGrid for GenericRModGrid<S, I>
 where 
     S: RModStr,
     S::R: Ring, for<'x> &'x S::R: RingOps<S::R>,

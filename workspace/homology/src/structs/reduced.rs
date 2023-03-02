@@ -3,7 +3,7 @@ use std::ops::Index;
 use yui_matrix::sparse::*;
 use yui_core::{Ring, RingOps};
 
-use crate::{RModStr, GradedRModStr, RModGrid, ChainComplex, GenericRModStr};
+use crate::{RModStr, RModGrid, GenericRModGrid, GenericRModStr, ChainComplex};
 use crate::utils::reducer::ChainReducer;
 
 pub struct Reduced<C>
@@ -13,7 +13,7 @@ where
     C::Output: RModStr<R = C::R>
 { 
     original: C,
-    grid: RModGrid<GenericRModStr<C::R>, C::IndexRange>,
+    grid: GenericRModGrid<GenericRModStr<C::R>, C::IndexRange>,
     d_matrices: HashMap<C::Index, SpMat<C::R>>,
 }
 
@@ -41,7 +41,7 @@ where
             d_matrices.insert(k2, b2);
         }
 
-        let grid = RModGrid::new(c.range(), |i| { 
+        let grid = GenericRModGrid::new(c.range(), |i| { 
             let n = d_matrices[&i].cols();
             if n > 0 { 
                 let s = GenericRModStr::new(n, vec![]);
@@ -68,7 +68,7 @@ where
     }
 }
 
-impl<C> GradedRModStr for Reduced<C>
+impl<C> RModGrid for Reduced<C>
 where 
     C: ChainComplex,
     C::R: Ring, for<'x> &'x C::R: RingOps<C::R>,

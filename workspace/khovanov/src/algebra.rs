@@ -130,7 +130,7 @@ impl Elem for KhEnhState {
 impl Display for KhEnhState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let label = join(self.label.iter(), "");
-        let state = join(self.state.values().map(|i| subscript(i.as_u8() as isize)), "");
+        let state = join(self.state.values().iter().map(|i| subscript(i.as_u8() as isize)), "");
         write!(f, "{}{}", label, state)
     }
 }

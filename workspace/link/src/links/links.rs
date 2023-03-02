@@ -1,8 +1,10 @@
-use std::{collections::HashSet, ops::Index};
-use std::fmt;
-use itertools::{join, Itertools};
-use Resolution::{Res0, Res1};
-use CrossingType::{Xp, Xn, V, H};
+use std::collections::HashSet;
+use itertools::Itertools;
+use super::{Crossing, CrossingType, Resolution, Component, State};
+
+pub type Edge = u8;
+
+use CrossingType::{Xp, Xn};
 
 // Planer Diagram code, represented by crossings:
 //
@@ -27,7 +29,7 @@ impl Link {
     }
 
     pub fn unknot() -> Link { 
-        Link::from(&[[0, 1, 1, 0]]).resolved_at(0, Res0)
+        Link::from(&[[0, 1, 1, 0]]).resolved_at(0, Resolution::Res0)
     }
 
     pub fn trefoil() -> Link { 
@@ -71,7 +73,7 @@ impl Link {
 
         let mut traverse = |e0: usize| {
             for i0 in 0..n {
-                let start_edge = self.data[i0].edges[e0];
+                let start_edge = self.data[i0].edge(e0);
                 if passed.contains(&start_edge) { 
                     continue 
                 }
@@ -80,7 +82,7 @@ impl Link {
                 let mut closed = false;
 
                 self.traverse_edges(i0, e0, |i, j| { 
-                    let edge = self.data[i].edges[j];
+                    let edge = self.data[i].edge(j);
                     if edges.first() == Some(&edge) { 
                         closed = true;
                     } else { 
@@ -89,7 +91,7 @@ impl Link {
                     }
                 });
 
-                let comp = Component{edges, closed};
+                let comp = Component::new(edges, closed);
                 comps.push(comp);
             }
         };
@@ -117,7 +119,7 @@ impl Link {
     pub fn resolved_by(&self, s: &State) -> Self {
         debug_assert!(s.len() <= self.data.len());
         let mut data = self.data.clone();
-        for (i, &r) in s.values.iter().enumerate() {
+        for (i, &r) in s.values().iter().enumerate() {
             data[i].resolve(r);
         }
         Link { data }
@@ -135,7 +137,11 @@ impl Link {
 
     pub fn first_edge(&self) -> Option<&Edge> { 
         let Some(x) = self.data.first() else { return None };
-        x.edges.iter().min()
+        x.edges().iter().min()
+    }
+
+    pub fn data(&self) -> &Vec<Crossing> { 
+        &self.data
     }
 
     // -- internal methods -- //
@@ -145,10 +151,10 @@ impl Link {
         debug_assert!((0..n).contains(&c_index));
         debug_assert!((0..4).contains(&e_index));
 
-        let e = &self.data[c_index].edges[e_index];
+        let e = &self.data[c_index].edge(e_index);
 
         for (i, c) in self.data.iter().enumerate() { 
-            for (j, f) in c.edges.iter().enumerate() { 
+            for (j, f) in c.edges().iter().enumerate() { 
                 if e == f && (c_index != i || (c_index == i && e_index != j)) { 
                     return Some((i, j))
                 }
@@ -198,7 +204,7 @@ impl Link {
                 }
                 self.traverse_edges(i0, e0, |i, j| { 
                     let c = &self.data[i];
-                    let sign = match (c.ctype, j) { 
+                    let sign = match (c.ctype(), j) { 
                         (Xp, 1) | (Xn, 3) =>  1,
                         (Xp, 3) | (Xn, 1) => -1,
                         _ => 0
@@ -227,7 +233,7 @@ impl<const N: usize> From<&[[Edge; 4]; N]> for Link {
 impl From<&Vec<[Edge; 4]>> for Link { 
     fn from(pd_code: &Vec<[Edge; 4]>) -> Link { 
         let data = pd_code.into_iter().map( |x| 
-            Crossing { ctype: Xn, edges: x.clone() }
+            Crossing::new(Xn, x.clone())
         ).collect();
         Link{ data }
     }
@@ -243,314 +249,10 @@ impl Link {
     }
 }
 
-pub type Edge = u8;
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum CrossingType { 
-    Xp, Xn, V, H 
-}
-
-impl CrossingType { 
-    fn mirror(self) -> CrossingType {
-        match self { 
-            Xp => Xn,
-            Xn => Xp, 
-            other => other
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-struct Crossing { 
-    ctype: CrossingType,
-    edges: [Edge; 4]
-}
-
-impl Crossing {
-    fn is_resolved(&self) -> bool { 
-        match self.ctype { 
-            V | H => true,
-            _ => false
-        }
-    }
-
-    fn resolve(&mut self, r: Resolution) {
-        match (self.ctype, r) {
-            (Xp, Res0) | (Xn, Res1) => self.ctype = V,
-            (Xp, Res1) | (Xn, Res0) => self.ctype = H,
-            _ => panic!()
-        }
-    }
-
-    fn mirror(&mut self) { 
-        self.ctype = self.ctype.mirror();
-    }
-
-    fn pass(&self, index:usize) -> usize { 
-        debug_assert!((0..4).contains(&index));
-
-        match self.ctype {
-            Xp | Xn => (index + 2) % 4,
-            V => 3 - index,
-            H => (5 - index) % 4
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Component { 
-    edges:Vec<Edge>,
-    closed:bool
-}
-
-impl Component { 
-    pub fn edges(&self) -> &Vec<Edge> { 
-        &self.edges
-    }
-
-    pub fn is_adj(&self, other: &Component, link: &Link) -> bool { 
-        // 1) find crossings `x` that touche `self`. 
-        // 2) check if `x` also touches `other`.
-        
-        for x in &link.data { 
-            if !x.edges.iter().any(|e| 
-                self.edges.contains(e)
-            ) { 
-                continue
-            }
-
-            let Some(e) = x.edges.iter().find(|e| 
-                !self.edges.contains(e)
-            ) else { 
-                continue
-            };
-
-            if other.edges.contains(e) { 
-                return true
-            }
-        }
-
-        false
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum Resolution { 
-    Res0, Res1
-}
-
-impl Resolution { 
-    pub fn as_u8(&self) -> u8 {
-        match self { 
-            Res0 => 0,
-            Res1 => 1
-        }
-    }
-
-    pub fn is_zero(&self) -> bool {
-        self == &Res0
-    }
-}
-
-impl From<u8> for Resolution {
-    fn from(a: u8) -> Self {
-        match a { 
-            0 => Res0,
-            1 => Res1,
-            _ => panic!()
-        }
-    }
-}
-
-impl fmt::Display for Resolution {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self { 
-            Res0 => f.write_str("0"),
-            Res1 => f.write_str("1")
-        }
-    }
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct State { 
-    values: Vec<Resolution>
-}
-
-impl State { 
-    pub fn empty() -> Self { 
-        State { values: vec![] }
-    }
-
-    pub fn from_iter<I>(iter: I) -> Self
-    where I: Iterator<Item = u8> {
-        let values = iter.map(|a| Resolution::from(a)).collect();
-        State{ values }
-    }
-
-    pub fn from_bseq(mut bseq: usize, length: usize) -> Self {
-        let seq = (0..length)
-            .map(|_| {
-                let a = (bseq & 1) as u8;
-                bseq >>= 1;
-                Resolution::from(a)
-            })
-            .rev()
-            .collect();
-        State{ values: seq }
-    }
-
-    pub fn values(&self) -> core::slice::Iter<Resolution> {
-        self.values.iter()
-    }
-
-    pub fn weight(&self) -> usize { 
-        self.values.iter().filter(|r| !r.is_zero()).count()
-    }
-    
-    pub fn len(&self) -> usize { 
-        self.values.len()
-    }
-
-    pub fn targets(&self) -> Vec<State> { 
-        let n = self.len();
-        (0..n).filter(|&i| self[i] == Res0 ).map(|i| { 
-            let mut t = self.clone();
-            t.values[i] = Res1;
-            t
-        }).collect_vec()
-    }
-
-    pub fn append(&mut self, mut other: Self) {
-        self.values.append(&mut other.values);
-    }
-}
-
-impl<const N: usize> From<[u8; N]> for State {
-    fn from(values: [u8; N]) -> Self {
-        Self::from_iter(values.into_iter())
-    }
-}
-
-impl From<Vec<u8>> for State { 
-    fn from(v: Vec<u8>) -> Self {
-        Self::from_iter(v.into_iter())
-    }
-}
-
-impl Index<usize> for State { 
-    type Output = Resolution;
-    fn index(&self, index: usize) -> &Resolution {
-        &self.values[index]
-    }
-}
-
-impl fmt::Display for State {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "[{}]", join(self.values.iter(), ", "))
-    }
-}
-
-
 #[cfg(test)]
 mod tests { 
     use super::*;
-    use super::Resolution::{Res0, Res1};
-    use super::CrossingType::{Xp, Xn, H, V};
-
-    fn a_crossing(ctype:CrossingType) -> Crossing {
-        Crossing{
-            ctype, 
-            edges: [0,1,2,3]
-        }
-    }
-
-    #[test]
-    fn crossing_is_resolved() {
-        let c = a_crossing(Xp);
-        assert!(!c.is_resolved());
-
-        let c = a_crossing(Xn);
-        assert!(!c.is_resolved());
-
-        let c = a_crossing(H);
-        assert!(c.is_resolved());
-
-        let c = a_crossing(V);
-        assert!(c.is_resolved());
-    }
-
-    #[test]
-    fn crossing_resolve() {
-        let mut c = a_crossing(Xp);
-        
-        c.resolve(Res0);
-        assert!(c.is_resolved());
-        assert_eq!(c.ctype, V);
-
-        let mut c = a_crossing(Xp);
-        
-        c.resolve(Res1);
-        assert!(c.is_resolved());
-        assert_eq!(c.ctype, H);
-
-        let mut c = a_crossing(Xn);
-        
-        c.resolve(Res0);
-        assert!(c.is_resolved());
-        assert_eq!(c.ctype, H);
-
-        let mut c = a_crossing(Xn);
-        
-        c.resolve(Res1);
-        assert!(c.is_resolved());
-        assert_eq!(c.ctype, V);
-    }
-
-    #[test]
-    fn crossing_mirror() {
-        let mut c = a_crossing(Xp);
-        c.mirror();
-        assert_eq!(c.ctype, Xn);
-
-        let mut c = a_crossing(Xn);
-        c.mirror();
-        assert_eq!(c.ctype, Xp);
-
-        let mut c = a_crossing(H);
-        c.mirror();
-        assert_eq!(c.ctype, H);
-
-        let mut c = a_crossing(V);
-        c.mirror();
-        assert_eq!(c.ctype, V);
-    }
-
-    #[test]
-    fn crossing_pass() {
-        let c = a_crossing(Xp);
-        assert_eq!(c.pass(0), 2);
-        assert_eq!(c.pass(1), 3);
-        assert_eq!(c.pass(2), 0);
-        assert_eq!(c.pass(3), 1);
-
-        let c = a_crossing(Xn);
-        assert_eq!(c.pass(0), 2);
-        assert_eq!(c.pass(1), 3);
-        assert_eq!(c.pass(2), 0);
-        assert_eq!(c.pass(3), 1);
-
-        let c = a_crossing(V);
-        assert_eq!(c.pass(0), 3);
-        assert_eq!(c.pass(1), 2);
-        assert_eq!(c.pass(2), 1);
-        assert_eq!(c.pass(3), 0);
-
-        let c = a_crossing(H);
-        assert_eq!(c.pass(0), 1);
-        assert_eq!(c.pass(1), 0);
-        assert_eq!(c.pass(2), 3);
-        assert_eq!(c.pass(3), 2);
-    }
+    use super::CrossingType::{Xp, Xn};
 
     #[test]
     fn link_init() { 
@@ -563,7 +265,7 @@ mod tests {
         let pd_code = [[1,2,3,4]];
         let l = Link::from(&pd_code);
         assert_eq!(l.data.len(), 1);
-        assert_eq!(l.data[0].ctype, Xn);
+        assert_eq!(l.data[0].ctype(), Xn);
     }
 
     #[test]
@@ -650,22 +352,22 @@ mod tests {
         let pd_code = [[0,0,1,1]];
         let l = Link::from(&pd_code);
         let comps = l.components();
-        assert_eq!(comps, vec![Component{ edges: vec![0, 1], closed: true }]);
+        assert_eq!(comps, vec![ Component::new(vec![0, 1], true)]);
 
         let pd_code = [[0,3,1,4],[3,2,2,1]];
         let l = Link::from(&pd_code);
         let comps = l.components();
-        assert_eq!(comps, vec![Component{ edges: vec![0,1,2,3,4], closed: false }]);
+        assert_eq!(comps, vec![ Component::new(vec![0,1,2,3,4], false) ]);
     }
 
     #[test]
     fn link_mirror() { 
         let pd_code = [[0,0,1,1]];
         let l = Link::from(&pd_code);
-        assert_eq!(l.data[0].ctype, Xn);
+        assert_eq!(l.data[0].ctype(), Xn);
 
         let l = l.mirror();
-        assert_eq!(l.data[0].ctype, Xp);
+        assert_eq!(l.data[0].ctype(), Xp);
     }
 
     #[test]
@@ -676,7 +378,7 @@ mod tests {
 
         let comps = l.components();
         assert_eq!(comps.len(), 3);
-        assert!(comps.iter().all(|c| c.closed));
+        assert!(comps.iter().all(|c| c.is_closed()));
 
         let s = State::from([1, 1, 1]);
         let l = Link::from(&[[1,4,2,5],[3,6,4,1],[5,2,6,3]]) // trefoil
@@ -684,7 +386,7 @@ mod tests {
 
         let comps = l.components();
         assert_eq!(comps.len(), 2);
-        assert!(comps.iter().all(|c| c.closed));
+        assert!(comps.iter().all(|c| c.is_closed()));
     }
 
     #[test]
@@ -734,29 +436,5 @@ mod tests {
         assert_eq!(l.crossing_num(), 2);
         assert_eq!(l.writhe(), 0);
         assert_eq!(l.components().len(), 2);
-    }
-
-    #[test]
-    fn state_targets() {
-        let s = State::from(vec![0, 0, 0]);
-        assert_eq!(s.targets(), vec![
-            State::from(vec![1, 0, 0]),
-            State::from(vec![0, 1, 0]),
-            State::from(vec![0, 0, 1]),
-        ]);
-
-        let s = State::from(vec![0, 1, 0]);
-        assert_eq!(s.targets(), vec![
-            State::from(vec![1, 1, 0]),
-            State::from(vec![0, 1, 1]),
-        ]);
-
-        let s = State::from(vec![1, 1, 0]);
-        assert_eq!(s.targets(), vec![
-            State::from(vec![1, 1, 1]),
-        ]);
-
-        let s = State::from(vec![1, 1, 1]);
-        assert_eq!(s.targets(), vec![]);
     }
 }

@@ -3,7 +3,7 @@ use log::*;
 use yui_core::{EucRing, EucRingOps};
 use yui_matrix::dense::{*, snf::*};
 use yui_matrix::sparse::*;
-use crate::base::GenericRModStr;
+use crate::GenericRModStr;
 
 pub type HomologyCalcResult<R> = (usize, Vec<R>, Option<SpMat<R>>, Option<SpMat<R>>);
 
@@ -148,8 +148,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::base::RModStr;
-    use crate::complex::{tests::TestChainComplex, ChainComplex};
+    use crate::{RModStr, ChainComplex};
+    use crate::test::TestChainComplex;
  
     #[test]
     fn trans_s2_0th() {

@@ -1,10 +1,8 @@
 use std::fmt::Display;
 use std::ops::{RangeInclusive, Index};
 
-use yui_homology::idx2::{Idx2, Idx2Range};
-use yui_homology::base::{GradedRModStr, GenericRModStr};
-use yui_homology::homology::{Homology, GenericHomology};
-use yui_homology::reduced::Reduced;
+use yui_homology::{Idx2, Idx2Range};
+use yui_homology::{GradedRModStr, GenericRModStr, Reduced, Homology, GenericHomology};
 use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 use yui_link::Link;
 use super::complex::{KhComplex, KhComplexBigraded};
@@ -148,7 +146,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 mod tests {
     use yui_link::Link;
-    use yui_homology::base::{GradedRModStr, RModStr};
+    use yui_homology::{RModStr, GradedRModStr};
     use super::KhHomology;
     
     #[test]

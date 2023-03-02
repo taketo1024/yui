@@ -6,8 +6,7 @@ use core::panic;
 
 use log::info;
 use yui_link::Link;
-use yui_homology::base::{RModStr, GenericRModStr};
-use yui_homology::complex::ChainComplex;
+use yui_homology::{RModStr, GenericRModStr, ChainComplex};
 use yui_homology::utils::homology_calc::HomologyCalc;
 use yui_homology::utils::reducer::ChainReducer;
 use yui_core::{EucRing, EucRingOps};

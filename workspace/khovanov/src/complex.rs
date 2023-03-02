@@ -5,10 +5,7 @@ use std::vec::IntoIter;
 use yui_core::{Ring, RingOps};
 use yui_matrix::sparse::SpMat;
 use yui_link::Link;
-use yui_homology::base::{GradedRModStr, RModGrid};
-use yui_homology::free::FreeRModStr;
-use yui_homology::complex::ChainComplex;
-use yui_homology::idx2::{Idx2, Idx2Range};
+use yui_homology::{Idx2, Idx2Range, GradedRModStr, RModGrid, FreeRModStr, ChainComplex};
 use super::algebra::{KhAlgStr, KhEnhState, KhChain};
 use super::cube::KhCube;
 
@@ -243,8 +240,8 @@ impl Shift for RangeInclusive<isize> {
 #[cfg(test)]
 mod tests {
     use yui_link::Link;
-    use yui_homology::base::GradedRModStr;
-    use yui_homology::complex::ChainComplexValidation;
+    use yui_homology::GradedRModStr;
+    use yui_homology::test::ChainComplexValidation;
     use super::KhComplex;
 
     #[test]

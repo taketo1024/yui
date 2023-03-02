@@ -1,53 +1,8 @@
 use std::fmt::Display;
 use std::ops::Index;
 
-use yui_core::{Ring, RingOps, EucRing, EucRingOps};
-use super::base::{GradedRModStr, RModStr, GenericRModStr, RModGrid, AdditiveIndex, AdditiveIndexRange};
-use super::complex::ChainComplex;
-use super::utils::homology_calc::HomologyCalc;
-
-pub trait HomologyComputable<S>: ChainComplex
-where 
-    Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>,
-    Self::Output: RModStr<R = Self::R>,
-    S: RModStr<R = Self::R>
-{
-    fn homology_at(&self, i: Self::Index) -> S;
-}
-
-impl<R, C> HomologyComputable<GenericRModStr<R>> for C
-where 
-    R: EucRing, for<'x> &'x R: EucRingOps<R>,
-    C: ChainComplex<R = R>,
-    C::Output: RModStr<R = R>
-{ 
-    fn homology_at(&self, k: C::Index) -> GenericRModStr<Self::R> {
-        let d1 = self.d_matrix(k - self.d_degree());
-        let d2 = self.d_matrix(k);
-        HomologyCalc::calculate(d1, d2)
-    }
-}
-
-pub trait Homology: GradedRModStr
-where 
-    Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>,
-    Self::Output: RModStr<R = Self::R>
-{
-    fn is_zero(&self) -> bool {
-        self.range().all(|i| self[i].is_zero())
-    }
-
-    fn is_free(&self) -> bool {
-        self.range().all(|i| self[i].is_free())
-    }
-
-    fn fmt_default(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for i in self.range() { 
-            write!(f, "H[{}]: {}\n", i, self[i])?
-        }
-        Ok(())
-    }
-}
+use yui_core::{Ring, RingOps};
+use crate::{AdditiveIndex, AdditiveIndexRange, RModStr, GradedRModStr, GenericRModStr, RModGrid, Homology, HomologyComputable};
 
 pub struct GenericHomology<R, I>
 where 
@@ -128,9 +83,9 @@ where
 
 #[cfg(test)]
 mod tests { 
-    use yui_matrix::sparse::*;
     use super::*;
-    use super::super::complex::tests::*;
+    use yui_matrix::sparse::*;
+    use crate::test::TestChainComplex;
 
     #[test]
     fn cancel_pair() { 

@@ -1,7 +1,8 @@
-pub mod idx2;
-pub mod base;
-pub mod complex;
-pub mod homology;
-pub mod reduced;
-pub mod free;
+mod traits;
+pub use traits::*;
+
+mod structs;
+pub use structs::*;
+
 pub mod utils;
+pub mod test;

@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::ops::Index;
 use yui_matrix::sparse::*;
 use yui_core::{Ring, RingOps};
-use super::base::{GradedRModStr, RModStr, RModGrid, GenericRModStr};
-use super::complex::ChainComplex;
-use super::utils::reducer::ChainReducer;
+
+use crate::{RModStr, GradedRModStr, RModGrid, ChainComplex, GenericRModStr};
+use crate::utils::reducer::ChainReducer;
 
 pub struct Reduced<C>
 where 
@@ -110,10 +110,9 @@ where
 
 #[cfg(test)]
 mod tests { 
-    use crate::base::RModStr;
-    use crate::homology::GenericHomology;
     use super::*;
-    use super::super::complex::tests::*;
+    use crate::{RModStr, GenericHomology};
+    use crate::test::TestChainComplex;
 
     #[test]
     fn cancel_pair() { 

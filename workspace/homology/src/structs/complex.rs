@@ -1,52 +1,9 @@
 use std::collections::HashMap;
 use std::iter::Rev;
 use std::ops::{Index, RangeInclusive};
-use num_traits::Zero;
 use yui_matrix::sparse::*;
 use yui_core::{RingOps, Ring};
-use super::base::{GradedRModStr, RModStr, AdditiveIndexRange, AdditiveIndex, RModGrid, GenericRModStr};
-
-pub trait ChainComplex: GradedRModStr
-where 
-    Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>,
-    Self::Output: RModStr<R = Self::R>
-{
-    fn d_degree(&self) -> Self::Index;
-    fn d_matrix(&self, k: Self::Index) -> SpMat<Self::R>;
-}
-
-pub trait ChainComplexValidation: ChainComplex
-where 
-    Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>,
-    Self::Output: RModStr<R = Self::R>
-{
-    fn is_cycle(&self, k: Self::Index, z: &SpVec<Self::R>) -> bool { 
-        let d = self.d_matrix(k);
-        (&d * z).iter().all(|(_, a)| a.is_zero())
-    }
-    
-    fn check_d_at(&self, k: Self::Index) { 
-        let d1 = self.d_matrix(k);
-        let d2 = self.d_matrix(k + self.d_degree());
-        let res = &d2 * &d1;
-        assert!( res.is_zero() );
-    }
-
-    fn check_d_all(&self) {
-        for k in self.range() { 
-            let k2 = k + self.d_degree();
-            if !self.in_range(k2) { continue }
-            self.check_d_at(k);
-        }
-    }
-}
-
-impl<R, C> ChainComplexValidation for C
-where 
-    R: Ring, for<'x> &'x R: RingOps<R>,
-    C: ChainComplex<R = R>,
-    C::Output: RModStr<R = R>
-{}
+use crate::{AdditiveIndexRange, AdditiveIndex, RModStr, GradedRModStr, GenericRModStr, RModGrid, ChainComplex};
 
 pub struct GenericChainComplex<R, I>
 where 
@@ -191,13 +148,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 #[cfg(test)]
-pub mod tests { 
-    use std::iter::Rev;
-    use std::ops::RangeInclusive;
-    use yui_core::{Ring, RingOps};
-    use yui_matrix::sparse::*;
-    use super::{ChainComplex, ChainComplexValidation, GenericChainComplex};
-    use crate::base::RModStr;
+mod tests { 
+    use super::*;
+    use crate::test::{TestChainComplex, ChainComplexValidation};
 
     #[test]
     fn zero_complex() {
@@ -311,62 +264,5 @@ pub mod tests {
 
         c.check_d_all();
     }
-    // below : test data // 
 
-    pub type TestChainComplex<R> = GenericChainComplex<R, Rev<RangeInclusive<isize>>>;    
-
-    impl<R> TestChainComplex<R>
-    where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> {
-        pub fn zero() -> Self {
-            Self::descending(vec![])
-        }
-    }
-
-    impl<R> TestChainComplex<R>
-    where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> {
-        fn descending_i32(data: Vec<( (usize, usize), Vec<i32>)>) -> Self {
-            let d_matrices = data.into_iter().map(|(shape, vec)| {
-                let vec = vec.into_iter().map(|a| a.into()).collect();
-                SpMat::from_vec(shape, vec)
-            }).collect();
-            Self::descending(d_matrices)
-        }
-
-        pub fn d3() -> Self {
-            Self::descending_i32(
-                vec![
-                    ((4, 6), vec![-1, -1, 0, -1, 0, 0, 1, 0, -1, 0, -1, 0, 0, 1, 1, 0, 0, -1, 0, 0, 0, 1, 1, 1]),
-                    ((6, 4), vec![1, 1, 0, 0, -1, 0, 1, 0, 1, 0, 0, 1, 0, -1, -1, 0, 0, 1, 0, -1, 0, 0, 1, 1] ),
-                    ((4, 1), vec![-1, 1, -1, 1])
-                ]
-            )
-        }
-    
-        pub fn s2() -> Self {
-            Self::descending_i32(
-                vec![
-                    ((4, 6), vec![-1, -1, 0, -1, 0, 0, 1, 0, -1, 0, -1, 0, 0, 1, 1, 0, 0, -1, 0, 0, 0, 1, 1, 1]),
-                    ((6, 4), vec![1, 1, 0, 0, -1, 0, 1, 0, 1, 0, 0, 1, 0, -1, -1, 0, 0, 1, 0, -1, 0, 0, 1, 1] )
-                ]
-            )
-        }
-    
-        pub fn t2() -> Self {
-            Self::descending_i32(
-                vec![
-                    ((9, 27), vec![-1, -1, 0, -1, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1, 1, 0, -1, 0, 0, 0, 0, 0, 0, -1, -1, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, -1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, -1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, -1, 0, 1, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0, 1, -1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, -1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1, 1]),
-                    ((27, 18), vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1])
-                ]
-            )
-        }
-    
-        pub fn rp2() -> Self { 
-            Self::descending_i32(
-                vec![
-                    ((6, 15), vec![-1, -1, 0, 0, 0, 0, 0, -1, -1, 0, -1, 0, 0, 0, 0, 1, 0, -1, -1, 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 1, 1, 0, 1, 1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 1, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1] ),
-                    ((15, 10), vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, -1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, -1] ),
-                ]
-            )
-        }
-    }
 }

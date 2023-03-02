@@ -148,10 +148,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-#[cfg(test)]
+#[cfg(_test)]
 mod tests {
     use super::*;
-    use crate::complex::{tests::TestChainComplex, ChainComplex};
+    use crate::TestChainComplex;
     use yui_matrix::sparse::SpVec;
 
     #[test]

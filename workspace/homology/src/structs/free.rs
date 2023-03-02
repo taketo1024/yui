@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use yui_core::{Ring, RingOps};
 use yui_matrix::sparse::{SpMat, SpVec};
 use yui_lin_comb::{FreeGen, LinComb};
-use super::base::RModStr;
+use crate::RModStr;
 
 pub struct FreeRModStr<X, R>
 where 

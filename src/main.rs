@@ -140,7 +140,7 @@ mod kh {
     use std::str::FromStr;
     use yui_khovanov::homology::{KhHomologyBigraded, KhHomology};
     use yui_link::Link;
-    use yui_homology::base::PrintTable;
+    use yui_homology::PrintTable;
     use yui_core::{EucRing, EucRingOps};
 
     pub fn run(name: String, link: Option<String>, c_value: String, c_type: CType, mirror: bool, reduced: bool, bigraded: bool) -> Result<String, Box<dyn std::error::Error>> {
@@ -182,13 +182,11 @@ mod kh {
 mod ckh { 
     use super::*;
     use std::str::FromStr;
-    use yui_khovanov::complex::KhComplex;
-    use yui_link::Link;
-    use yui_homology::reduced::Reduced;
-    use yui_homology::complex::*;
-    use yui_homology::base::*;
     use yui_core::{Ring, RingOps};
+    use yui_link::Link;
     use yui_matrix::dense::*;
+    use yui_homology::{Reduced, ChainComplex, GradedRModStr};
+        use yui_khovanov::complex::KhComplex;
     
     pub fn run(name: String, link: Option<String>, c_value: String, c_type: CType, mirror: bool, reduced: bool) -> Result<String, Box<dyn std::error::Error>> {
         let mut l = load_link(&name, &link)?;

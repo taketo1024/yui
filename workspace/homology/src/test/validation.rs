@@ -8,12 +8,12 @@ where
     Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>,
     Self::Output: RModStr<R = Self::R>
 {
-    fn is_cycle(&self, k: Self::Index, z: &SpVec<Self::R>) -> bool { 
+    fn is_cycle(&self, k: Self::Idx, z: &SpVec<Self::R>) -> bool { 
         let d = self.d_matrix(k);
         (&d * z).iter().all(|(_, a)| a.is_zero())
     }
     
-    fn check_d_at(&self, k: Self::Index) { 
+    fn check_d_at(&self, k: Self::Idx) { 
         let d1 = self.d_matrix(k);
         let d2 = self.d_matrix(k + self.d_degree());
         let res = &d2 * &d1;
@@ -21,9 +21,9 @@ where
     }
 
     fn check_d_all(&self) {
-        for k in self.range() { 
+        for k in self.indices() { 
             let k2 = k + self.d_degree();
-            if !self.in_range(k2) { continue }
+            if !self.contains_idx(k2) { continue }
             self.check_d_at(k);
         }
     }

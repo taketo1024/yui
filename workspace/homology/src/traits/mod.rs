@@ -1,5 +1,5 @@
-mod add_idx;
-pub use add_idx::{AdditiveIndex, AdditiveIndexRange};
+mod grid_idx;
+pub use grid_idx::{GridIdx, GridItr};
 
 mod r_mod_str;
 pub use r_mod_str::RModStr;

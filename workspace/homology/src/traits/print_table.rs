@@ -13,7 +13,7 @@ pub trait PrintTable {
 impl<T> PrintTable for T
 where
     T: Index<Idx2>,
-    T: RModGrid<Index = Idx2>,
+    T: RModGrid<Idx = Idx2>,
     T::R: Ring, for<'x> &'x T::R: RingOps<T::R>,
     <T as Index<Idx2>>::Output: RModStr<R = T::R>
 {
@@ -24,8 +24,8 @@ where
         where R: Iterator<Item = Idx2>, F: Fn(Idx2) -> isize { 
             range.map(f).collect::<HashSet<_>>().into_iter().sorted().collect_vec()
         }
-        let is = collect(self.range(), |idx| idx.0);
-        let js = collect(self.range(), |idx| idx.1).into_iter().rev().collect();
+        let is = collect(self.indices(), |idx| idx.0);
+        let js = collect(self.indices(), |idx| idx.1).into_iter().rev().collect();
 
         f_table("j\\i", &js, &is, |j, i| {
             let s = &self[Idx2(i, j)];

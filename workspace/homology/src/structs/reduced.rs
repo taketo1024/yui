@@ -13,8 +13,8 @@ where
     C::Output: RModStr<R = C::R>
 { 
     original: C,
-    grid: GenericRModGrid<GenericRModStr<C::R>, C::IndexRange>,
-    d_matrices: HashMap<C::Index, SpMat<C::R>>,
+    grid: GenericRModGrid<GenericRModStr<C::R>, C::IdxIter>,
+    d_matrices: HashMap<C::Idx, SpMat<C::R>>,
 }
 
 impl<C> From<C> for Reduced<C>
@@ -26,7 +26,7 @@ where
     fn from(c: C) -> Self {
         let mut d_matrices = HashMap::new();
 
-        for k in c.range() {
+        for k in c.indices() {
             let deg = c.d_degree();
             let (k0, k1, k2) = (k - deg, k, k + deg);
 
@@ -41,7 +41,7 @@ where
             d_matrices.insert(k2, b2);
         }
 
-        let grid = GenericRModGrid::new(c.range(), |i| { 
+        let grid = GenericRModGrid::new(c.indices(), |i| { 
             let n = d_matrices[&i].cols();
             if n > 0 { 
                 let s = GenericRModStr::new(n, vec![]);
@@ -55,7 +55,7 @@ where
     }
 }
 
-impl<C> Index<C::Index> for Reduced<C>
+impl<C> Index<C::Idx> for Reduced<C>
 where 
     C: ChainComplex,
     C::R: Ring, for<'x> &'x C::R: RingOps<C::R>,
@@ -63,7 +63,7 @@ where
 {
     type Output = GenericRModStr<C::R>;
 
-    fn index(&self, index: C::Index) -> &Self::Output {
+    fn index(&self, index: C::Idx) -> &Self::Output {
         &self.grid[index]
     }
 }
@@ -75,15 +75,15 @@ where
     C::Output: RModStr<R = C::R>
 {
     type R = C::R;
-    type Index = C::Index;
-    type IndexRange = C::IndexRange;
+    type Idx = C::Idx;
+    type IdxIter = C::IdxIter;
 
-    fn in_range(&self, k: Self::Index) -> bool {
-        self.original.in_range(k)
+    fn contains_idx(&self, k: Self::Idx) -> bool {
+        self.original.contains_idx(k)
     }
 
-    fn range(&self) -> Self::IndexRange {
-        self.original.range()
+    fn indices(&self) -> Self::IdxIter {
+        self.original.indices()
     }
 }
 
@@ -93,12 +93,12 @@ where
     C::R: Ring, for<'x> &'x C::R: RingOps<C::R>,
     C::Output: RModStr<R = C::R>
 {
-    fn d_degree(&self) -> Self::Index {
+    fn d_degree(&self) -> Self::Idx {
         self.original.d_degree()
     }
 
-    fn d_matrix(&self, k: Self::Index) -> SpMat<Self::R> {
-        if self.in_range(k) { 
+    fn d_matrix(&self, k: Self::Idx) -> SpMat<Self::R> {
+        if self.contains_idx(k) { 
             self.d_matrices[&k].clone()
         } else {
             let m = self[k + self.d_degree()].rank();

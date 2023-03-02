@@ -57,15 +57,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> RModGrid for KhHomology<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type R = R;
-    type Index = isize;
-    type IndexRange = RangeInclusive<isize>;
+    type Idx = isize;
+    type IdxIter = RangeInclusive<isize>;
 
-    fn in_range(&self, k: Self::Index) -> bool {
-        self.homology.in_range(k)
+    fn contains_idx(&self, k: Self::Idx) -> bool {
+        self.homology.contains_idx(k)
     }
 
-    fn range(&self) -> Self::IndexRange {
-        self.homology.range()
+    fn indices(&self) -> Self::IdxIter {
+        self.homology.indices()
     }
 }
 
@@ -121,15 +121,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> RModGrid for KhHomologyBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type R = R;
-    type Index = Idx2;
-    type IndexRange = Idx2Range;
+    type Idx = Idx2;
+    type IdxIter = Idx2Range;
 
-    fn in_range(&self, k: Self::Index) -> bool {
-        self.homology.in_range(k)
+    fn contains_idx(&self, k: Self::Idx) -> bool {
+        self.homology.contains_idx(k)
     }
 
-    fn range(&self) -> Self::IndexRange {
-        self.homology.range()
+    fn indices(&self) -> Self::IdxIter {
+        self.homology.indices()
     }
 }
 
@@ -154,7 +154,7 @@ mod tests {
         let l = Link::empty();
         let h = KhHomology::<i32>::unreduced(l);
 
-        assert_eq!(h.range(), 0..=0);
+        assert_eq!(h.indices(), 0..=0);
 
         assert_eq!(h[0].rank(), 1);
         assert_eq!(h[0].is_free(), true);
@@ -165,7 +165,7 @@ mod tests {
         let l = Link::unknot();
         let h = KhHomology::<i32>::unreduced(l);
 
-        assert_eq!(h.range(), 0..=0);
+        assert_eq!(h.indices(), 0..=0);
         
         assert_eq!(h[0].rank(), 2);
         assert_eq!(h[0].is_free(), true);
@@ -176,7 +176,7 @@ mod tests {
         let l = Link::trefoil();
         let h = KhHomology::<i32>::unreduced(l);
 
-        assert_eq!(h.range(), -3..=0);
+        assert_eq!(h.indices(), -3..=0);
 
         assert_eq!(h[-3].rank(), 1);
         assert_eq!(h[-3].is_free(), true);
@@ -195,7 +195,7 @@ mod tests {
         let l = Link::trefoil().mirror();
         let h = KhHomology::<i32>::unreduced(l);
 
-        assert_eq!(h.range(), 0..=3);
+        assert_eq!(h.indices(), 0..=3);
 
         assert_eq!(h[0].rank(), 2);
         assert_eq!(h[0].is_free(), true);
@@ -214,7 +214,7 @@ mod tests {
         let l = Link::figure8();
         let h = KhHomology::<i32>::unreduced(l);
 
-        assert_eq!(h.range(), -2..=2);
+        assert_eq!(h.indices(), -2..=2);
 
         assert_eq!(h[-2].rank(), 1);
         assert_eq!(h[-2].is_free(), true);

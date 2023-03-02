@@ -103,25 +103,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> RModGrid for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     type R = R;
-    type Index = isize;
-    type IndexRange = RangeInclusive<isize>;
+    type Idx = isize;
+    type IdxIter = RangeInclusive<isize>;
 
-    fn in_range(&self, k: Self::Index) -> bool {
-        self.grid.in_range(k)
+    fn contains_idx(&self, k: Self::Idx) -> bool {
+        self.grid.contains_idx(k)
     }
 
-    fn range(&self) -> Self::IndexRange {
-        self.grid.range()
+    fn indices(&self) -> Self::IdxIter {
+        self.grid.indices()
     }
 }
 
 impl<R> ChainComplex for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    fn d_degree(&self) -> Self::Index {
+    fn d_degree(&self) -> Self::Idx {
         1
     }
 
-    fn d_matrix(&self, k: Self::Index) -> SpMat<Self::R> {
+    fn d_matrix(&self, k: Self::Idx) -> SpMat<Self::R> {
         let c1 = &self.grid[k];
         let c2 = &self.grid[k + 1];
         c1.make_matrix(c2, |x| self.cube.differentiate(x))
@@ -199,25 +199,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> RModGrid for KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type R = R;
-    type Index = Idx2;
-    type IndexRange = IntoIter<Idx2>;
+    type Idx = Idx2;
+    type IdxIter = IntoIter<Idx2>;
 
-    fn in_range(&self, k: Self::Index) -> bool {
-        self.grid.in_range(k)
+    fn contains_idx(&self, k: Self::Idx) -> bool {
+        self.grid.contains_idx(k)
     }
 
-    fn range(&self) -> Self::IndexRange {
-        self.grid.range()
+    fn indices(&self) -> Self::IdxIter {
+        self.grid.indices()
     }
 }
 
 impl<R> ChainComplex for KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn d_degree(&self) -> Self::Index {
+    fn d_degree(&self) -> Self::Idx {
         Idx2(1, 0)
     }
 
-    fn d_matrix(&self, idx: Self::Index) -> SpMat<Self::R> {
+    fn d_matrix(&self, idx: Self::Idx) -> SpMat<Self::R> {
         let c1 = &self[idx];
         let c2 = &self[idx + self.d_degree()];
         c1.make_matrix(c2, |x| self.cube.differentiate(x))
@@ -249,7 +249,7 @@ mod tests {
         let l = Link::empty();
         let c = KhComplex::<i32>::unreduced(l);
 
-        assert_eq!(c.range(), 0..=0);
+        assert_eq!(c.indices(), 0..=0);
         assert_eq!(c.deg_shift(), (0, 0));
 
         c.check_d_all();
@@ -260,7 +260,7 @@ mod tests {
         let l = Link::unknot();
         let c = KhComplex::<i32>::unreduced(l);
 
-        assert_eq!(c.range(), 0..=0);
+        assert_eq!(c.indices(), 0..=0);
         assert_eq!(c.deg_shift(), (0, 0));
         
         c.check_d_all();
@@ -271,7 +271,7 @@ mod tests {
         let l = Link::from(&[[0, 0, 1, 1]]);
         let c = KhComplex::<i32>::unreduced(l);
 
-        assert_eq!(c.range(), 0..=1);
+        assert_eq!(c.indices(), 0..=1);
         assert_eq!(c.deg_shift(), (0, 1));
         
         c.check_d_all();
@@ -282,7 +282,7 @@ mod tests {
         let l = Link::trefoil();
         let c = KhComplex::<i32>::unreduced(l);
 
-        assert_eq!(c.range(), -3..=0);
+        assert_eq!(c.indices(), -3..=0);
         assert_eq!(c.deg_shift(), (-3, -6));
 
         assert_eq!(c[-3].generators().len(), 8);
@@ -298,7 +298,7 @@ mod tests {
         let l = Link::figure8();
         let c = KhComplex::<i32>::unreduced(l);
 
-        assert_eq!(c.range(), -2..=2);
+        assert_eq!(c.indices(), -2..=2);
         assert_eq!(c.deg_shift(), (-2, -2));
 
         assert_eq!(c[-2].generators().len(), 8);

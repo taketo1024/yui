@@ -7,6 +7,6 @@ where
     Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>,
     Self::Output: RModStr<R = Self::R>
 {
-    fn d_degree(&self) -> Self::Index;
-    fn d_matrix(&self, k: Self::Index) -> SpMat<Self::R>;
+    fn d_degree(&self) -> Self::Idx;
+    fn d_matrix(&self, k: Self::Idx) -> SpMat<Self::R>;
 }

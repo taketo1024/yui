@@ -8,15 +8,15 @@ where
     Self::Output: RModStr<R = Self::R>
 {
     fn is_zero(&self) -> bool {
-        self.range().all(|i| self[i].is_zero())
+        self.indices().all(|i| self[i].is_zero())
     }
 
     fn is_free(&self) -> bool {
-        self.range().all(|i| self[i].is_free())
+        self.indices().all(|i| self[i].is_free())
     }
 
     fn fmt_default(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for i in self.range() { 
+        for i in self.indices() { 
             write!(f, "H[{}]: {}\n", i, self[i])?
         }
         Ok(())
@@ -29,7 +29,7 @@ where
     Self::Output: RModStr<R = Self::R>,
     S: RModStr<R = Self::R>
 {
-    fn homology_at(&self, i: Self::Index) -> S;
+    fn homology_at(&self, i: Self::Idx) -> S;
 }
 
 impl<R, C> HomologyComputable<GenericRModStr<R>> for C
@@ -38,7 +38,7 @@ where
     C: ChainComplex<R = R>,
     C::Output: RModStr<R = R>
 { 
-    fn homology_at(&self, k: C::Index) -> GenericRModStr<Self::R> {
+    fn homology_at(&self, k: C::Idx) -> GenericRModStr<Self::R> {
         let d1 = self.d_matrix(k - self.d_degree());
         let d2 = self.d_matrix(k);
         HomologyCalc::calculate(d1, d2)

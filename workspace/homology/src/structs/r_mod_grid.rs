@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 use std::ops::{Index};
 use yui_core::{Ring, RingOps};
-use crate::{AdditiveIndex, AdditiveIndexRange, RModStr, RModGrid};
+use crate::{GridIdx, GridItr, RModStr, RModGrid};
 
 pub struct GenericRModGrid<S, I>
 where 
     S: RModStr,
     S::R: Ring, for<'x> &'x S::R: RingOps<S::R>,
-    I: AdditiveIndexRange,
-    I::Item: AdditiveIndex
+    I: GridItr,
+    I::Item: GridIdx
 {
     range: I,
     grid: HashMap<I::Item, S>,
@@ -19,8 +19,8 @@ impl<S, I> GenericRModGrid<S, I>
 where 
     S: RModStr,
     S::R: Ring, for<'x> &'x S::R: RingOps<S::R>,
-    I: AdditiveIndexRange,
-    I::Item: AdditiveIndex
+    I: GridItr,
+    I::Item: GridIdx
 {
     pub fn new<F>(range: I, mut f: F) -> Self
     where F: FnMut(I::Item) -> Option<S> {
@@ -40,8 +40,8 @@ impl<S, I> Index<I::Item> for GenericRModGrid<S, I>
 where
     S: RModStr,
     S::R: Ring, for<'x> &'x S::R: RingOps<S::R>,
-    I: AdditiveIndexRange,
-    I::Item: AdditiveIndex
+    I: GridItr,
+    I::Item: GridIdx
 {
     type Output = S;
 
@@ -58,18 +58,18 @@ impl<S, I> RModGrid for GenericRModGrid<S, I>
 where 
     S: RModStr,
     S::R: Ring, for<'x> &'x S::R: RingOps<S::R>,
-    I: AdditiveIndexRange,
-    I::Item: AdditiveIndex
+    I: GridItr,
+    I::Item: GridIdx
 {
     type R = S::R;
-    type Index = I::Item;
-    type IndexRange = I;
+    type Idx = I::Item;
+    type IdxIter = I;
 
-    fn in_range(&self, k: Self::Index) -> bool {
+    fn contains_idx(&self, k: Self::Idx) -> bool {
         self.grid.contains_key(&k)
     }
 
-    fn range(&self) -> Self::IndexRange {
+    fn indices(&self) -> Self::IdxIter {
         self.range.clone()
     }
 }

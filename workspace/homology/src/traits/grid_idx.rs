@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::hash::Hash;
 use std::ops::{Add, Neg, Sub};
 
-pub trait AdditiveIndex:
+pub trait GridIdx:
     Clone
     + Copy
     + PartialEq
@@ -14,7 +14,7 @@ pub trait AdditiveIndex:
     + Neg<Output = Self>
 {}
 
-impl<T> AdditiveIndex for T where
+impl<T> GridIdx for T where
     T: Clone
         + Copy
         + PartialEq
@@ -26,13 +26,13 @@ impl<T> AdditiveIndex for T where
         + Neg<Output = Self>
 {}
 
-pub trait AdditiveIndexRange: Iterator + Clone
+pub trait GridItr: Iterator + Clone
 where
-    Self::Item: AdditiveIndex,
+    Self::Item: GridIdx,
 {}
 
-impl<T> AdditiveIndexRange for T
+impl<T> GridItr for T
 where
     T: Iterator + Clone,
-    T::Item: AdditiveIndex,
+    T::Item: GridIdx,
 {}

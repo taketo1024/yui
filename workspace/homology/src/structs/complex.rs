@@ -3,13 +3,13 @@ use std::iter::Rev;
 use std::ops::{Index, RangeInclusive};
 use yui_matrix::sparse::*;
 use yui_core::{RingOps, Ring};
-use crate::{AdditiveIndexRange, AdditiveIndex, RModStr, RModGrid, ChainComplex, GenericRModStr, GenericRModGrid};
+use crate::{GridItr, GridIdx, RModStr, RModGrid, ChainComplex, GenericRModStr, GenericRModGrid};
 
 pub struct GenericChainComplex<R, I>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
-    I: AdditiveIndexRange,
-    I::Item: AdditiveIndex
+    I: GridItr,
+    I::Item: GridIdx
 {
     grid: GenericRModGrid<GenericRModStr<R>, I>,
     d_degree: I::Item,
@@ -19,8 +19,8 @@ where
 impl<R, I> GenericChainComplex<R, I>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
-    I: AdditiveIndexRange,
-    I::Item: AdditiveIndex
+    I: GridItr,
+    I::Item: GridIdx
 {
     pub fn new(range: I, d_degree: I::Item, d_matrices: HashMap<I::Item, SpMat<R>>) -> Self {
         let grid = GenericRModGrid::new(range, |i| {
@@ -55,11 +55,11 @@ where
 impl<R, I> GenericChainComplex<R, I>
 where 
     R: Ring + Default, for<'x> &'x R: RingOps<R>,
-    I: AdditiveIndexRange + DoubleEndedIterator,
-    I::Item: AdditiveIndex
+    I: GridItr + DoubleEndedIterator,
+    I::Item: GridIdx
 {
     pub fn dual(self) -> GenericChainComplex<R, Rev<I>> {
-        let range = self.range().rev();
+        let range = self.indices().rev();
         let d_degree = -self.d_degree();
         let d_matrices = self.d_matrices.into_iter().map(|(i, d)| 
             (i - d_degree, d.transpose().to_owned())
@@ -71,8 +71,8 @@ where
 impl<R, I> Index<I::Item> for GenericChainComplex<R, I>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
-    I: AdditiveIndexRange,
-    I::Item: AdditiveIndex
+    I: GridItr,
+    I::Item: GridIdx
 {
     type Output = GenericRModStr<R>;
 
@@ -84,33 +84,33 @@ where
 impl<R, I> RModGrid for GenericChainComplex<R, I>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
-    I: AdditiveIndexRange,
-    I::Item: AdditiveIndex
+    I: GridItr,
+    I::Item: GridIdx
 {
     type R = R;
-    type Index = I::Item;
-    type IndexRange = I;
+    type Idx = I::Item;
+    type IdxIter = I;
     
-    fn in_range(&self, k: Self::Index) -> bool {
-        self.grid.in_range(k)
+    fn contains_idx(&self, k: Self::Idx) -> bool {
+        self.grid.contains_idx(k)
     }
 
-    fn range(&self) -> Self::IndexRange {
-        self.grid.range()
+    fn indices(&self) -> Self::IdxIter {
+        self.grid.indices()
     }
 }
 
 impl<R, I> ChainComplex for GenericChainComplex<R, I> 
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
-    I: AdditiveIndexRange,
-    I::Item: AdditiveIndex
+    I: GridItr,
+    I::Item: GridIdx
 {
-    fn d_degree(&self) -> Self::Index {
+    fn d_degree(&self) -> Self::Idx {
         self.d_degree
     }
 
-    fn d_matrix(&self, k: Self::Index) -> SpMat<R> {
+    fn d_matrix(&self, k: Self::Idx) -> SpMat<R> {
         if let Some(d) = self.d_matrices.get(&k) { 
             d.clone()
         } else {

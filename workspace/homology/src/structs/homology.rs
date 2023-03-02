@@ -2,26 +2,26 @@ use std::fmt::Display;
 use std::ops::Index;
 
 use yui_core::{Ring, RingOps};
-use crate::{AdditiveIndex, AdditiveIndexRange, RModStr, RModGrid, GenericRModStr, GenericRModGrid, Homology, HomologyComputable};
+use crate::{GridIdx, GridItr, RModStr, RModGrid, GenericRModStr, GenericRModGrid, Homology, HomologyComputable};
 
 pub struct GenericHomology<R, I>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
-    I: AdditiveIndexRange,
-    I::Item: AdditiveIndex
+    I: GridItr,
+    I::Item: GridIdx
 {
     grid: GenericRModGrid<GenericRModStr<R>, I>
 }
 
-impl<R, C> From<C> for GenericHomology<R, C::IndexRange>
+impl<R, C> From<C> for GenericHomology<R, C::IdxIter>
 where
     R: Ring, for<'x> &'x R: RingOps<R>,
     C: HomologyComputable<GenericRModStr<R>, R = R>,
-    C::IndexRange: Clone,
+    C::IdxIter: Clone,
     C::Output: RModStr<R = C::R>
 {
     fn from(c: C) -> Self {
-        let range = c.range();
+        let range = c.indices();
         let grid = GenericRModGrid::new(range, |i| {
             let h_i = c.homology_at(i);
             if !h_i.is_zero() { Some(h_i) } else { None }
@@ -33,27 +33,27 @@ where
 impl<R, I> RModGrid for GenericHomology<R, I>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
-    I: AdditiveIndexRange,
-    I::Item: AdditiveIndex
+    I: GridItr,
+    I::Item: GridIdx
 {
     type R = R;
-    type Index = I::Item;
-    type IndexRange = I;
+    type Idx = I::Item;
+    type IdxIter = I;
 
-    fn in_range(&self, k: Self::Index) -> bool {
-        self.grid.in_range(k)
+    fn contains_idx(&self, k: Self::Idx) -> bool {
+        self.grid.contains_idx(k)
     }
 
-    fn range(&self) -> Self::IndexRange {
-        self.grid.range()
+    fn indices(&self) -> Self::IdxIter {
+        self.grid.indices()
     }
 }
 
 impl<R, I> Index<I::Item> for GenericHomology<R, I>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
-    I: AdditiveIndexRange,
-    I::Item: AdditiveIndex
+    I: GridItr,
+    I::Item: GridIdx
 {
     type Output = GenericRModStr<R>;
 
@@ -65,16 +65,16 @@ where
 impl<R, I> Homology for GenericHomology<R, I>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
-    I: AdditiveIndexRange,
-    I::Item: AdditiveIndex
+    I: GridItr,
+    I::Item: GridIdx
 {
 }
 
 impl<R, I> Display for GenericHomology<R, I>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
-    I: AdditiveIndexRange,
-    I::Item: AdditiveIndex
+    I: GridItr,
+    I::Item: GridIdx
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.fmt_default(f)

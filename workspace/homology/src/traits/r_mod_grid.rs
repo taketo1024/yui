@@ -1,26 +1,26 @@
 use std::{ops::Index};
 use yui_core::{Ring, RingOps};
-use crate::{AdditiveIndex, AdditiveIndexRange, RModStr};
+use crate::{GridIdx, GridItr, RModStr};
 
-pub trait RModGrid: Index<Self::Index>
+pub trait RModGrid: Index<Self::Idx>
 where 
     Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>,
     Self::Output: RModStr<R = Self::R>,
-    Self::Index: AdditiveIndex,
-    Self::IndexRange: AdditiveIndexRange<Item = Self::Index>
+    Self::Idx: GridIdx,
+    Self::IdxIter: GridItr<Item = Self::Idx>
 {
     type R;
-    type Index;
-    type IndexRange;
+    type Idx;
+    type IdxIter;
 
-    fn in_range(&self, k: Self::Index) -> bool;
-    fn range(&self) -> Self::IndexRange;
+    fn contains_idx(&self, k: Self::Idx) -> bool;
+    fn indices(&self) -> Self::IdxIter;
 
     fn is_free(&self) -> bool { 
-        self.range().all(|i| self[i].is_free())
+        self.indices().all(|i| self[i].is_free())
     }
 
     fn is_zero(&self) -> bool { 
-        self.range().all(|i| self[i].is_zero())
+        self.indices().all(|i| self[i].is_zero())
     }
 }

@@ -210,7 +210,7 @@ mod ckh {
         let ckh = Reduced::from(ckh);
 
         let mut b = Builder::new(1024);
-        for i in ckh.range() {
+        for i in ckh.indices() {
             b.append(format!("C[{}]: {} -> {}\n", i, ckh[i], ckh[i+1]));
 
             let d = ckh.d_matrix(i);

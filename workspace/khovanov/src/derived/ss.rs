@@ -11,7 +11,7 @@ use yui_homology::utils::homology_calc::HomologyCalc;
 use yui_homology::utils::reducer::ChainReducer;
 use yui_core::{EucRing, EucRingOps};
 use yui_matrix::sparse::*;
-use crate::complex::KhComplex;
+use crate::KhComplex;
 
 pub fn ss_invariant<R>(l: &Link, c: &R, reduced: bool) -> i32
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 

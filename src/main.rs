@@ -138,10 +138,10 @@ fn main() {
 mod kh { 
     use super::*;
     use std::str::FromStr;
-    use yui_khovanov::homology::{KhHomologyBigraded, KhHomology};
+    use yui_core::{EucRing, EucRingOps};
     use yui_link::Link;
     use yui_homology::PrintTable;
-    use yui_core::{EucRing, EucRingOps};
+    use yui_khovanov::{KhHomology, KhHomologyBigraded};
 
     pub fn run(name: String, link: Option<String>, c_value: String, c_type: CType, mirror: bool, reduced: bool, bigraded: bool) -> Result<String, Box<dyn std::error::Error>> {
         let mut l = load_link(&name, &link)?;
@@ -185,8 +185,8 @@ mod ckh {
     use yui_core::{Ring, RingOps};
     use yui_link::Link;
     use yui_matrix::dense::*;
-    use yui_homology::{Reduced, ChainComplex, RModGrid};
-        use yui_khovanov::complex::KhComplex;
+    use yui_homology::{RModGrid, ChainComplex, Reduced};
+    use yui_khovanov::KhComplex;
     
     pub fn run(name: String, link: Option<String>, c_value: String, c_type: CType, mirror: bool, reduced: bool) -> Result<String, Box<dyn std::error::Error>> {
         let mut l = load_link(&name, &link)?;
@@ -231,7 +231,7 @@ mod ss {
     use std::str::FromStr;
     use yui_link::Link;
     use yui_core::{EucRing, EucRingOps};
-    use yui_khovanov::invariants::ss::ss_invariant;
+    use yui_khovanov::ss_invariant;
 
     pub fn run_single(name: String, link: Option<String>, c_value: String, c_type: CType, output: Option<String>) -> Result<String, Box<dyn std::error::Error>> {
         let l = load_link(&name, &link)?;

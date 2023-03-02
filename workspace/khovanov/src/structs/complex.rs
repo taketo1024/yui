@@ -6,10 +6,10 @@ use yui_core::{Ring, RingOps};
 use yui_matrix::sparse::SpMat;
 use yui_link::Link;
 use yui_homology::{Idx2, Idx2Iter, RModGrid, GenericRModGrid, FreeRModStr, ChainComplex};
-use super::algebra::{KhAlgStr, KhEnhState, KhChain};
-use super::cube::KhCube;
 
-pub type KhComplexSummand<R> = FreeRModStr<KhEnhState, R>;
+use crate::{KhAlgStr, KhGen, KhCube, KhChain};
+
+pub type KhComplexSummand<R> = FreeRModStr<KhGen, R>;
 pub struct KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     link: Link,
@@ -74,7 +74,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     // TODO abstract as FreeChainComplex
-    pub fn differentiate_x(&self, x: &KhEnhState) -> Vec<(KhEnhState, R)> {
+    pub fn differentiate_x(&self, x: &KhGen) -> Vec<(KhGen, R)> {
         self.cube.differentiate(x)
     }
 

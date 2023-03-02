@@ -7,9 +7,9 @@ use derive_more::{Display, Add, Sub, Neg};
 pub struct Idx2(pub isize, pub isize);
 
 impl Idx2 { 
-    pub fn iterate(from: Idx2, to: Idx2, step:(usize, usize)) -> Idx2Range {
-        (from.1 ..= to.1).step_by(step.1).flat_map(|j| { 
-            (from.0 ..= to.0).step_by(step.0).map(move |i| Idx2(i, j))
+    pub fn iter_rect(&self, end: Idx2, step:(usize, usize)) -> Idx2Iter {
+        (self.1 ..= end.1).step_by(step.1).flat_map(|j| { 
+            (self.0 ..= end.0).step_by(step.0).map(move |i| Idx2(i, j))
         }).collect_vec().into_iter()
     }
 
@@ -24,4 +24,4 @@ impl From<[isize; 2]> for Idx2 {
     }
 }
 
-pub type Idx2Range = IntoIter<Idx2>;
+pub type Idx2Iter = IntoIter<Idx2>;

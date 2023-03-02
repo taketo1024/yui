@@ -5,7 +5,7 @@ use std::vec::IntoIter;
 use yui_core::{Ring, RingOps};
 use yui_matrix::sparse::SpMat;
 use yui_link::Link;
-use yui_homology::{Idx2, Idx2Range, RModGrid, GenericRModGrid, FreeRModStr, ChainComplex};
+use yui_homology::{Idx2, Idx2Iter, RModGrid, GenericRModGrid, FreeRModStr, ChainComplex};
 use super::algebra::{KhAlgStr, KhEnhState, KhChain};
 use super::cube::KhCube;
 
@@ -131,7 +131,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 pub struct KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     cube: KhCube<R>,
-    grid: GenericRModGrid<KhComplexSummand<R>, Idx2Range>
+    grid: GenericRModGrid<KhComplexSummand<R>, Idx2Iter>
 }
 
 impl<R> KhComplexBigraded<R>
@@ -144,11 +144,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let h_range = cube.h_range().shift(i0);
         let q_range = cube.q_range().shift(j0);
         
-        let range = Idx2::iterate(
-            Idx2(*h_range.start(), *q_range.start()), 
-            Idx2(*h_range.end(),   *q_range.end()), 
-            (1, 2)
-        );
+        let start = Idx2(*h_range.start(), *q_range.start());
+        let end   = Idx2(*h_range.end(),   *q_range.end());
+        let range = start.iter_rect(end, (1, 2));
 
         let mut gens: HashMap<_, _> = h_range.clone().map(|i| { 
             let gens = if reduced {

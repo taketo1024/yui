@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use std::ops::{RangeInclusive, Index};
 
-use yui_homology::{Idx2, Idx2Range};
+use yui_homology::{Idx2, Idx2Iter};
 use yui_homology::{RModGrid, GenericRModStr, Reduced, Homology, GenericHomology};
 use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 use yui_link::Link;
@@ -81,7 +81,7 @@ where R: Ring, for<'x> &'x R: EucRingOps<R> {
 
 pub struct KhHomologyBigraded<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    homology: GenericHomology<R, Idx2Range>
+    homology: GenericHomology<R, Idx2Iter>
 }
 
 impl<R> KhHomologyBigraded<R>
@@ -122,7 +122,7 @@ impl<R> RModGrid for KhHomologyBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type R = R;
     type Idx = Idx2;
-    type IdxIter = Idx2Range;
+    type IdxIter = Idx2Iter;
 
     fn contains_idx(&self, k: Self::Idx) -> bool {
         self.homology.contains_idx(k)

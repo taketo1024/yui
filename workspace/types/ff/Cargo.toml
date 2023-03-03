@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-auto-impl-ops = "0.2.0"
+auto-impl-ops = "0.2.1"
 num-traits = "0.2.15"
 yui-core  = { version = "0.1.0", path = "../../core" }
 yui-utils = { version = "0.1.0", path = "../../utils" }

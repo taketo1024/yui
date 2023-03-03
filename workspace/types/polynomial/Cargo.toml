@@ -1,0 +1,16 @@
+[package]
+name = "yui-polynomial"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+auto-impl-ops = "0.2.1"
+itertools = "0.10.5"
+num-traits = "0.2.15"
+regex = "1.7.1"
+yui-core = { version = "0.1.0", path = "../../core" }
+yui-lin-comb = { version = "0.1.0", path = "../lin_comb" }
+yui-ratio = { version = "0.1.0", path = "../ratio" }
+yui-utils = { version = "0.1.0", path = "../../utils" }

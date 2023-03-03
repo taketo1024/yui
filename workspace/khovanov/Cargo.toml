@@ -1,0 +1,19 @@
+[package]
+name = "yui-khovanov"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+auto-impl-ops = "0.2.1"
+grouping_by = "0.2.2"
+itertools = "0.10.5"
+log = "0.4.17"
+num-traits = "0.2.15"
+yui-core = { version = "0.1.0", path = "../core" }
+yui-homology = { version = "0.1.0", path = "../homology" }
+yui-lin-comb = { version = "0.1.0", path = "../types/lin_comb" }
+yui-link = { version = "0.1.0", path = "../link" }
+yui-matrix = { version = "0.1.0", path = "../matrix" }
+yui-utils = { version = "0.1.0", path = "../utils" }

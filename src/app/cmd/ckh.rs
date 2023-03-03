@@ -1,9 +1,8 @@
 use std::str::FromStr;
 use itertools::Itertools;
 use yui_core::{Ring, RingOps};
-use yui_homology::utils::ChainReducer;
+use yui_homology::{ChainComplex, GenericChainComplex, utils::ChainReducer};
 use yui_link::Link;
-use yui_matrix::dense::*;
 use yui_homology::RModGrid;
 use yui_khovanov::KhComplex;
 use crate::utils::*;
@@ -26,38 +25,43 @@ where R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
         return err!("{t} != 0 is not allowed for reduced.");
     }
     
-    let ckh = KhComplex::new(l.clone(), h, t, reduced);
-    let mut red = ChainReducer::new(&ckh);
+    let c = KhComplex::new(l.clone(), h, t, reduced);
+    let mut red = ChainReducer::new(&c);
 
     if with_alpha { 
-        for z in ckh.canon_cycles() {
-            let v = ckh[0].vectorize(&z);
+        for z in c.canon_cycles() {
+            let v = c[0].vectorize(&z);
             red.set_vec(0, v);
         }
     }
 
     red.process();
 
+    let c = GenericChainComplex::generate(
+        c.indices(), 
+        c.d_degree(), 
+        |i| Some(red.take_matrix(i))
+    );
+    let vs = red.take_vecs(0);
+
     let mut b = Builder::new(1024);
-    let symbol = R::set_symbol();
-    let superscript = |n: usize| yui_utils::superscript(n as isize);
 
-    b.append(format!("{}\n", ckh.to_string()));
+    b.append(format!("-------\nComplex\n-------\n\n"));
+    b.append(format!("{}\n", c.to_string()));
 
-    for i in ckh.indices() {
-        let d = red.matrix(i).unwrap();
-        let (m, n) = d.shape();
-        b.append(format!("d[{}]: {}{} -> {}{}\n\n", i, symbol, superscript(m), symbol, superscript(n)));
+    b.append(format!("-------------\nDifferentials\n-------------\n\n"));
+    for i in c.indices() {
+        let d = c.d_matrix(i);
+        b.append(format!("d[{}]: {} -> {}\n\n", i, c[i], c[i+1]));
         b.append(d.to_dense().to_string());
         b.append("\n\n");
     }
 
     if with_alpha { 
-        let vs = red.vecs(0).unwrap();
+        b.append(format!("----------\nLee cycles\n----------\n\n"));
         for (i, v) in vs.iter().enumerate() {
             b.append(format!("a[{i}] = [{}]\n", v.to_dense().iter().map(|r| r.to_string()).collect_vec().join(", ")));
         }
-        b.append("\n");
     }
 
     let res = b.string()?;

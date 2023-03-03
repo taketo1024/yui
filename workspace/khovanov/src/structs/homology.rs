@@ -1,8 +1,8 @@
 use std::fmt::Display;
 use std::ops::{RangeInclusive, Index};
 
-use yui_homology::{Idx2, Idx2Iter};
-use yui_homology::{RModGrid, GenericRModStr, Reduced, Homology, GenericHomology};
+use yui_homology::{Idx2, Idx2Iter, ChainComplex};
+use yui_homology::{RModGrid, GenericRModStr, Homology, GenericHomology};
 use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 use yui_link::Link;
 use super::complex::{KhComplex, KhComplexBigraded};
@@ -39,8 +39,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 impl<R> From<KhComplex<R>> for KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     fn from(c: KhComplex<R>) -> Self {
-        let reduced = Reduced::from(c);
-        let homology = GenericHomology::from(reduced);
+        let c = c.as_generic().reduced();
+        let homology = GenericHomology::from(c);
         Self { homology }
     }
 }
@@ -103,8 +103,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 impl<R> From<KhComplexBigraded<R>> for KhHomologyBigraded<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     fn from(c: KhComplexBigraded<R>) -> Self {
-        let reduced = Reduced::from(c);
-        let homology = GenericHomology::from(reduced);
+        let c = c.as_generic().reduced();
+        let homology = GenericHomology::from(c);
         Self { homology }
     }
 }

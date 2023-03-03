@@ -166,40 +166,13 @@ macro_rules! impl_ops {
 impl_ops!(AddMonOps);
 impl_ops!(AddGrpOps);
 
-// ref-ref
+#[auto_ops(val_val, val_ref, ref_val)]
 impl<'a, 'b, R> Mul<&'b SpVec<R>> for &'a SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = SpVec<R>;
     fn mul(self, rhs: &'b SpVec<R>) -> Self::Output {
         let res = self.cs_mat() * rhs.cs_vec();
         SpVec::from(res)
-    }
-}
-
-// ref-val
-impl<'a, R> Mul<SpVec<R>> for &'a SpMat<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = SpVec<R>;
-    fn mul(self, rhs: SpVec<R>) -> Self::Output {
-        self * &rhs
-    }
-}
-
-// val-ref
-impl<'b, R> Mul<&'b SpVec<R>> for SpMat<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = SpVec<R>;
-    fn mul(self, rhs: &'b SpVec<R>) -> Self::Output {
-        &self * rhs
-    }
-}
-
-// val-val
-impl<R> Mul<SpVec<R>> for SpMat<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = SpVec<R>;
-    fn mul(self, rhs: SpVec<R>) -> Self::Output {
-        &self * &rhs
     }
 }
 

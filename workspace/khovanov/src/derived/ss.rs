@@ -114,105 +114,49 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     Some(k)
 }
 
-#[cfg(_test)] // FIXME!
+#[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-    use yui_link::Link;
-    use yui_utils::map;
     use super::*;
+    use yui_link::{Link, Edge};
 
-    fn test(name: &str) { 
-        let values: HashMap<_, _> = map!{ 
-            "3_1" => -2,
-            "4_1" =>  0,
-            "5_1" => -4,
-            "5_2" => -2,
-            "6_1" => -0,
-            "6_2" => -2,
-            "6_3" =>  0,
-            "7_1" => -6,
-            "7_2" => -2,
-            "7_3" =>  4, // mirrored
-            "7_4" =>  2, // mirrored
-            "7_5" => -4,
-            "7_6" => -2,
-            "7_7" =>  0
-        };
-
-        let l = Link::load(name).unwrap();
-        let s = values[name];
-
-        assert_eq!(compute_ss(&l, &2, true), s);
-        assert_eq!(compute_ss(&l.mirror(), &2, true), -s);
+    fn test(pd_code: &Vec<[Edge; 4]>, value: i32) { 
+        let l = Link::from(pd_code);
+        assert_eq!(compute_ss(&l, &2, true), value);
+        assert_eq!(compute_ss(&l.mirror(), &2, true), -value);
     }
 
     #[test]
     fn test_3_1() { 
-        test("3_1");
+        test(&vec![[1,4,2,5],[3,6,4,1],[5,2,6,3]], -2);
     }
 
     #[test]
     fn test_4_1() { 
-        test("4_1");
+        test(&vec![[4,2,5,1],[8,6,1,5],[6,3,7,4],[2,7,3,8]], 0);
     }
 
     #[test]
     fn test_5_1() { 
-        test("5_1");
+        test(&vec![[1,6,2,7],[3,8,4,9],[5,10,6,1],[7,2,8,3],[9,4,10,5]], -4);
     }
 
     #[test]
     fn test_5_2() { 
-        test("3_1");
+        test(&vec![[1,4,2,5],[3,8,4,9],[5,10,6,1],[9,6,10,7],[7,2,8,3]], -2);
     }
 
     #[test]
     fn test_6_1() { 
-        test("6_1");
+        test(&vec![[1,4,2,5],[7,10,8,11],[3,9,4,8],[9,3,10,2],[5,12,6,1],[11,6,12,7]], 0);
     }
 
     #[test]
     fn test_6_2() { 
-        test("6_2");
+        test(&vec![[1,4,2,5],[5,10,6,11],[3,9,4,8],[9,3,10,2],[7,12,8,1],[11,6,12,7]], -2);
     }
 
     #[test]
     fn test_6_3() { 
-        test("6_3");
-    }
-
-    #[test]
-    fn test_7_1() { 
-        test("7_1");
-    }
-
-    #[test]
-    fn test_7_2() { 
-        test("7_2");
-    }
-
-    #[test]
-    fn test_7_3() { 
-        test("7_3");
-    }
-
-    #[test]
-    fn test_7_4() { 
-        test("7_4");
-    }
-
-    #[test]
-    fn test_7_5() { 
-        test("7_5");
-    }
-
-    #[test]
-    fn test_7_6() { 
-        test("7_6");
-    }
-
-    #[test]
-    fn test_7_7() { 
-        test("7_7");
+        test(&vec![[4,2,5,1],[8,4,9,3],[12,9,1,10],[10,5,11,6],[6,11,7,12],[2,8,3,7]], 0);
     }
 }

@@ -1,3 +1,5 @@
-pub mod homology_calc;
-pub mod reducer;
-pub mod reducer2;
+mod homology_calc;
+pub use homology_calc::{HomologyCalc, HomologyCalcResult};
+
+mod reducer;
+pub use reducer::ChainReducer;

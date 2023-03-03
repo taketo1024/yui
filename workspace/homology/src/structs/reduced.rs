@@ -4,7 +4,7 @@ use yui_matrix::sparse::*;
 use yui_core::{Ring, RingOps};
 
 use crate::{RModStr, RModGrid, GenericRModGrid, GenericRModStr, ChainComplex};
-use crate::utils::reducer2::ChainReducer;
+use crate::utils::ChainReducer;
 
 pub struct Reduced<C>
 where 

@@ -1,6 +1,6 @@
 use yui_core::{Ring, RingOps, EucRing, EucRingOps};
 use crate::{RModStr, RModGrid, ChainComplex, GenericRModStr};
-use crate::utils::homology_calc::HomologyCalc;
+use crate::utils::HomologyCalc;
 
 pub trait Homology: RModGrid
 where 

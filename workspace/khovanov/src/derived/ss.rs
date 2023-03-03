@@ -6,9 +6,9 @@ use core::panic;
 
 use log::info;
 use yui_link::Link;
-use yui_homology::{RModStr, GenericRModStr, ChainComplex};
+use yui_homology::{RModStr, RModGrid};
 use yui_homology::utils::homology_calc::HomologyCalc;
-use yui_homology::utils::reducer::ChainReducer;
+use yui_homology::utils::reducer2::ChainReducer;
 use yui_core::{EucRing, EucRingOps};
 use yui_matrix::sparse::*;
 use crate::KhComplex;
@@ -30,16 +30,28 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 fn compute_ss<R>(l: &Link, c: &R, reduced: bool) -> i32
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
     let cpx = KhComplex::<R>::new(l.clone(), c.clone(), R::zero(), reduced);
+    let i0 = *cpx.indices().start();
     let z = cpx.canon_cycle();
     let v = cpx[0].vectorize(&z);
 
-    let (_, v) = homology_with(
-        cpx.d_matrix(-2), 
-        cpx.d_matrix(-1), 
-        cpx.d_matrix(0), 
-        cpx.d_matrix(1), 
-        v
-    );
+    let mut red = ChainReducer::new(&cpx);
+    red.set_indices(i0 ..= 1);
+    red.set_vec(0, v);
+    red.process();
+
+    let a0 = red.take_matrix(-1);
+    let a1 = red.take_matrix(0);
+    let v  = red.take_vecs(0).remove(0);
+
+    let (h, p, _) = HomologyCalc::calculate_with_trans(a0, a1);
+
+    info!("homology: {h}");
+    
+    let r = h.rank();
+    let p = p.submat_rows(0..r).to_owned();
+    let v = p * v;
+
+    info!("canon-cycle: {}", v);
 
     let Some(d) = div_vec(&v, &c) else { 
         panic!("invalid divisibility for v = {}, c = {}", v, c)
@@ -52,44 +64,6 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     info!("d = {d}, w = {s}, r = {r}, s = {s}");
 
     s
-}
-
-fn homology_with<R>(a0: SpMat<R>, a1: SpMat<R>, a2: SpMat<R>, a3: SpMat<R>, v: SpVec<R>) -> (GenericRModStr<R>, SpVec<R>)
-where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
-    let zero = |m, n| SpMat::<R>::zero((m, n));
-
-    let vs = vec![v];
-    let (n0, n3) = (a0.cols(), a3.rows());
-
-    info!("(k = -2)");
-    let ( _, a0, a1, _, _) 
-        = ChainReducer::reduce_with(zero(n0, 0), a0, a1, vec![], vec![]);
-
-    info!("(k = -1)");
-    let ( _, a1, a2, _, vs) 
-        = ChainReducer::reduce_with(a0, a1, a2, vec![], vs);
-
-    info!("(k = 0)");
-    let (a1, a2, a3, vs, _) 
-        = ChainReducer::reduce_with(a1, a2, a3, vs, vec![]);
-
-    info!("(k = 1)");
-    let (a2,  _,  _)
-        = ChainReducer::reduce(a2, a3, zero(0, n3));
-
-    let (h, p, _) = HomologyCalc::calculate_with_trans(a1, a2);
-
-    info!("homology: {h}");
-    
-    let r = h.rank();
-    let p = p.submat_rows(0..r).to_owned();
-
-    let v = &vs[0];
-    let w = &p * v;
-
-    info!("canon-cycle: {}", w);
-
-    (h, w)
 }
 
 fn div_vec<R>(v: &SpVec<R>, c: &R) -> Option<i32>

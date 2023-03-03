@@ -139,7 +139,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {}
 impl<R> Display for KhHomologyBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.fmt_default(f)
+        self.fmt_default(f, "H")
     }
 }
 

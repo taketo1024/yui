@@ -77,7 +77,7 @@ where
     I::Item: GridIdx
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.fmt_default(f)
+        self.fmt_default(f, "H")
     }
 }
 

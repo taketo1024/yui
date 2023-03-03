@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::ops::{RangeInclusive, Index};
 use std::vec::IntoIter;
 
@@ -88,6 +89,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let h = -n_neg;
         let q = n_pos - 2 * n_neg + (if reduced { 1 } else { 0 });
         (h, q)
+    }
+}
+
+impl<R> Display for KhComplex<R> 
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.grid.fmt_default(f, "C")
     }
 }
 

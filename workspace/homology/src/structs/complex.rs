@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::iter::Rev;
 use std::ops::{Index, RangeInclusive};
 use yui_matrix::sparse::*;
@@ -65,6 +66,17 @@ where
             (i - d_degree, d.transpose().to_owned())
         ).collect();
         GenericChainComplex::new(range, d_degree, d_matrices)
+    }
+}
+
+impl<R, I> Display for GenericChainComplex<R, I>
+where 
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    I: GridItr,
+    I::Item: GridIdx
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.fmt_default(f, "C")
     }
 }
 

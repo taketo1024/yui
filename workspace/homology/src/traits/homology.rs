@@ -14,13 +14,6 @@ where
     fn is_free(&self) -> bool {
         self.indices().all(|i| self[i].is_free())
     }
-
-    fn fmt_default(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for i in self.indices() { 
-            write!(f, "H[{}]: {}\n", i, self[i])?
-        }
-        Ok(())
-    }
 }
 
 pub trait HomologyComputable<S>: ChainComplex

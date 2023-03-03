@@ -15,6 +15,7 @@ where
     C::Output: RModStr<R = R>
  { 
     complex: &'a C,
+    indices: C::IdxIter,
     mats: HashMap<C::Idx, SpMat<R>>,
     vecs: HashMap<C::Idx, Vec<SpVec<R>>>
 }
@@ -26,9 +27,14 @@ where
     C::Output: RModStr<R = R>
  { 
     pub fn new(complex: &'a C) -> Self { 
+        let indices = complex.indices();
         let mats = HashMap::new();
         let vecs = HashMap::new();
-        Self { complex, mats, vecs }
+        Self { complex, indices, mats, vecs }
+    }
+
+    pub fn set_indices(&mut self, indices: C::IdxIter) { 
+        self.indices = indices;
     }
 
     pub fn set_vec(&mut self, i: C::Idx, v: SpVec<R>) {
@@ -39,7 +45,7 @@ where
     }
 
     pub fn process(&mut self) { 
-        for i in self.complex.indices() { 
+        for i in self.indices.clone() { 
             self.process_at(i)
         }
     }
@@ -57,7 +63,11 @@ where
         let v1 = self.take_vecs(i1);
         let v2 = self.take_vecs(i2);
 
+        info!("i = {i}, reduce: {:?}-{:?}-{:?}", a0.shape(), a1.shape(), a2.shape());
+
         let (a0, a1, a2, v1, v2) = process_triple(a0, a1, a2, v1, v2);
+
+        info!("result: {:?}-{:?}-{:?}", a0.shape(), a1.shape(), a2.shape());
 
         self.mats.insert(i0, a0);
         self.mats.insert(i1, a1);

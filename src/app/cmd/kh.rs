@@ -12,9 +12,9 @@ pub fn run(name: String, link: Option<String>, c_value: String, c_type: CType, m
     }
 
     if bigraded { 
-        dispatch_eucring!(compute_bigraded, &c_type, &l, &c_value, reduced)
+        dispatch_eucring!(c_type, compute_bigraded, &l, &c_value, reduced)
     } else { 
-        dispatch_eucring!(compute_homology, &c_type, &l, &c_value, reduced)
+        dispatch_eucring!(c_type, compute_homology, &l, &c_value, reduced)
     }
 }
 

@@ -11,7 +11,7 @@ pub fn run(name: String, l_str: Option<String>, c_value: String, c_type: CType) 
 
     let l = load_link(&name, &l_str)?;
     let s = guard_panic(|| 
-        dispatch_eucring!(compute_ss, c_type, &l, &c_value)
+        dispatch_eucring!(c_type, compute_ss, &l, &c_value)
     )?;
 
     info!("{name}: s = {s} (c = {c_value})");
@@ -26,7 +26,7 @@ pub fn run_batch(c_value: String, c_type: CType, data: String, output: Option<St
     for (name, code) in data { 
         let l = Link::from(&code);
         let res = guard_panic(|| 
-            dispatch_eucring!(compute_ss, c_type, &l, &c_value)
+            dispatch_eucring!(c_type, compute_ss, &l, &c_value)
         );
 
         let s = if let Ok(s) = res { 

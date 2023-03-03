@@ -12,7 +12,7 @@ pub fn run(name: String, link: Option<String>, c_value: String, c_type: CType, m
         l = l.mirror();
     }
 
-    dispatch_ring!(describe_ckh, &c_type, &l, &c_value, reduced)
+    dispatch_ring!(c_type, describe_ckh, &l, &c_value, reduced)
 }
 
 fn describe_ckh<R>(l: &Link, c_value: &String, reduced: bool) -> Result<String, Box<dyn std::error::Error>>

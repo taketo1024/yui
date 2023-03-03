@@ -4,6 +4,7 @@ use std::iter::Rev;
 use std::ops::{Index, RangeInclusive};
 use yui_matrix::sparse::*;
 use yui_core::{RingOps, Ring};
+use crate::utils::ChainReducer;
 use crate::{GridItr, GridIdx, RModStr, RModGrid, ChainComplex, GenericRModStr, GenericRModGrid};
 
 pub struct GenericChainComplex<R, I>
@@ -39,8 +40,8 @@ where
         Self { grid, d_degree, d_matrices }
     }
 
-    pub fn generate<F>(range: I, d_degree: I::Item, d_matrices: F) -> Self 
-    where F: Fn(I::Item) -> Option<SpMat<R>> {
+    pub fn generate<F>(range: I, d_degree: I::Item, mut d_matrices: F) -> Self 
+    where F: FnMut(I::Item) -> Option<SpMat<R>> {
         let d_matrices = range.clone().flat_map(|i| 
             if let Some(d_i) = d_matrices(i) { 
                 Some((i, d_i))
@@ -51,18 +52,29 @@ where
 
         Self::new(range, d_degree, d_matrices)
     }
+
+    pub fn reduced(&self) -> GenericChainComplex<R, I> { 
+        let mut red = ChainReducer::new(self);
+        red.process();
+
+        Self::generate(
+            self.indices(),
+            self.d_degree(),
+            |i| Some(red.take_matrix(i))
+        )
+    }
 }
 
 impl<R, I> GenericChainComplex<R, I>
 where 
-    R: Ring + Default, for<'x> &'x R: RingOps<R>,
+    R: Ring, for<'x> &'x R: RingOps<R>,
     I: GridItr + DoubleEndedIterator,
     I::Item: GridIdx
 {
-    pub fn dual(self) -> GenericChainComplex<R, Rev<I>> {
+    pub fn dual(&self) -> GenericChainComplex<R, Rev<I>> {
         let range = self.indices().rev();
         let d_degree = -self.d_degree();
-        let d_matrices = self.d_matrices.into_iter().map(|(i, d)| 
+        let d_matrices = self.d_matrices.iter().map(|(&i, d)| 
             (i - d_degree, d.transpose().to_owned())
         ).collect();
         GenericChainComplex::new(range, d_degree, d_matrices)
@@ -220,6 +232,51 @@ mod tests {
         assert_eq!(c[0].rank(), 6);
         assert_eq!(c[1].rank(), 15);
         assert_eq!(c[2].rank(), 10);
+
+        c.check_d_all();
+    }
+
+    #[test]
+    fn d3_retr() {
+        let c = TestChainComplex::<i32>::d3().reduced();
+
+        assert_eq!(c[0].rank(), 1);
+        assert_eq!(c[1].rank(), 0);
+        assert_eq!(c[2].rank(), 0);
+        assert_eq!(c[3].rank(), 0);
+
+        c.check_d_all();
+    }
+
+    #[test]
+    fn s2_retr() {
+        let c = TestChainComplex::<i32>::s2().reduced();
+
+        assert_eq!(c[0].rank(), 1);
+        assert_eq!(c[1].rank(), 0);
+        assert_eq!(c[2].rank(), 1);
+
+        c.check_d_all();
+    }
+
+    #[test]
+    fn t2_retr() {
+        let c = TestChainComplex::<i32>::t2().reduced();
+
+        assert_eq!(c[0].rank(), 1);
+        assert_eq!(c[1].rank(), 2);
+        assert_eq!(c[2].rank(), 1);
+
+        c.check_d_all();
+    }
+
+    #[test]
+    fn rp2_retr() {
+        let c = TestChainComplex::<i32>::rp2().reduced();
+
+        assert_eq!(c[0].rank(), 1);
+        assert_eq!(c[1].rank(), 1);
+        assert_eq!(c[2].rank(), 1);
 
         c.check_d_all();
     }

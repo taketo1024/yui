@@ -4,7 +4,7 @@ use yui_matrix::sparse::*;
 use yui_core::{Ring, RingOps};
 
 use crate::{RModStr, RModGrid, GenericRModGrid, GenericRModStr, ChainComplex};
-use crate::utils::reducer::ChainReducer;
+use crate::utils::reducer2::ChainReducer;
 
 pub struct Reduced<C>
 where 
@@ -24,22 +24,12 @@ where
     C::Output: RModStr<R = C::R>
 {
     fn from(c: C) -> Self {
-        let mut d_matrices = HashMap::new();
+        let mut red = ChainReducer::new(&c);
+        red.process();
 
-        for k in c.indices() {
-            let deg = c.d_degree();
-            let (k0, k1, k2) = (k - deg, k, k + deg);
-
-            let a0 = d_matrices.remove(&k0).unwrap_or(c.d_matrix(k0)); // prev
-            let a1 = d_matrices.remove(&k1).unwrap_or(c.d_matrix(k1)); // target
-            let a2 = c.d_matrix(k2); // next
-
-            let (b0, b1, b2) = ChainReducer::reduce(a0, a1, a2);
-            
-            d_matrices.insert(k0, b0);
-            d_matrices.insert(k1, b1);
-            d_matrices.insert(k2, b2);
-        }
+        let d_matrices = c.indices().map(|i| 
+            (i, red.take_matrix(i))
+        ).collect::<HashMap<_, _>>();
 
         let grid = GenericRModGrid::new(c.indices(), |i| { 
             let n = d_matrices[&i].cols();

@@ -15,6 +15,3 @@ pub use complex::GenericChainComplex;
 
 mod homology;
 pub use homology::GenericHomology;
-
-mod reduced;
-pub use reduced::Reduced;

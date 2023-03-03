@@ -53,6 +53,9 @@ pub enum Cmd {
 
         #[arg(short, long)]
         reduced: bool,
+
+        #[arg(short = 'a', long)]
+        with_alpha: bool,
     },
 
     SS {

@@ -1,21 +1,23 @@
 use std::str::FromStr;
+use itertools::Itertools;
 use yui_core::{Ring, RingOps};
+use yui_homology::utils::ChainReducer;
 use yui_link::Link;
 use yui_matrix::dense::*;
-use yui_homology::{RModGrid, ChainComplex, Reduced};
+use yui_homology::RModGrid;
 use yui_khovanov::KhComplex;
 use crate::utils::*;
 
-pub fn run(name: String, link: Option<String>, c_value: String, c_type: CType, mirror: bool, reduced: bool) -> Result<String, Box<dyn std::error::Error>> {
+pub fn run(name: String, link: Option<String>, c_value: String, c_type: CType, mirror: bool, reduced: bool, with_alpha: bool) -> Result<String, Box<dyn std::error::Error>> {
     let mut l = load_link(&name, &link)?;
     if mirror { 
         l = l.mirror();
     }
 
-    dispatch_ring!(c_type, describe_ckh, &l, &c_value, reduced)
+    dispatch_ring!(c_type, describe_ckh, &l, &c_value, reduced, with_alpha)
 }
 
-fn describe_ckh<R>(l: &Link, c_value: &String, reduced: bool) -> Result<String, Box<dyn std::error::Error>>
+fn describe_ckh<R>(l: &Link, c_value: &String, reduced: bool, with_alpha: bool) -> Result<String, Box<dyn std::error::Error>>
 where R: Ring + FromStr, for<'x> &'x R: RingOps<R> { 
     use string_builder::Builder;
 
@@ -25,16 +27,41 @@ where R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
     }
     
     let ckh = KhComplex::new(l.clone(), h, t, reduced);
-    let ckh = Reduced::from(ckh);
+    let mut red = ChainReducer::new(&ckh);
+
+    if with_alpha { 
+        for z in ckh.canon_cycles() {
+            let v = ckh[0].vectorize(&z);
+            red.set_vec(0, v);
+        }
+    }
+
+    red.process();
 
     let mut b = Builder::new(1024);
-    for i in ckh.indices() {
-        b.append(format!("C[{}]: {} -> {}\n", i, ckh[i], ckh[i+1]));
+    let symbol = R::set_symbol();
+    let superscript = |n: usize| yui_utils::superscript(n as isize);
 
-        let d = ckh.d_matrix(i);
-        if d.rows() > 0 && d.cols() > 0 {
-            b.append(d.to_dense().to_string());
-            b.append("\n");
+    b.append("C = [");
+    for i in ckh.indices() {
+        let d = red.matrix(i).unwrap();
+        let r = d.cols();
+        b.append(format!("{i}: {}{}, ", symbol, superscript(r)));
+    }
+    b.append("]\n\n");
+
+    for i in ckh.indices() {
+        let d = red.matrix(i).unwrap();
+        let (m, n) = d.shape();
+        b.append(format!("d[{}]: {}{} -> {}{}\n\n", i, symbol, superscript(m), symbol, superscript(n)));
+        b.append(d.to_dense().to_string());
+        b.append("\n\n");
+    }
+
+    if with_alpha { 
+        let vs = red.vecs(0).unwrap();
+        for (i, v) in vs.iter().enumerate() {
+            b.append(format!("a[{i}] = [{}]\n", v.to_dense().iter().map(|r| r.to_string()).collect_vec().join(", ")));
         }
         b.append("\n");
     }

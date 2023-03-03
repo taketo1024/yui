@@ -1017,6 +1017,7 @@ dependencies = [
  "csv",
  "derive_more",
  "indexmap",
+ "itertools",
  "log",
  "num-bigint",
  "num-traits",
@@ -1034,6 +1035,7 @@ dependencies = [
  "yui-polynomial",
  "yui-quad-int",
  "yui-ratio",
+ "yui-utils",
 ]
 
 [[package]]

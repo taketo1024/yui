@@ -29,8 +29,8 @@ impl App {
                 match args.command { 
                 Cmd::Kh { name, link, c_value, c_type, mirror, reduced, bigraded }
                     => cmd::kh::run(name, link, c_value, c_type, mirror, reduced, bigraded),
-                Cmd::Ckh { name, link, c_value, c_type, mirror, reduced }
-                    => cmd::ckh::run(name, link, c_value, c_type, mirror, reduced),
+                Cmd::Ckh { name, link, c_value, c_type, mirror, reduced, with_alpha }
+                    => cmd::ckh::run(name, link, c_value, c_type, mirror, reduced, with_alpha),
                 Cmd::SS { name, link, c_value, c_type } 
                     => cmd::ss::run(name, link, c_value, c_type),
                 Cmd::SSBatch { c_value, c_type, data, output }

@@ -42,13 +42,7 @@ where R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
     let symbol = R::set_symbol();
     let superscript = |n: usize| yui_utils::superscript(n as isize);
 
-    b.append("C = [");
-    for i in ckh.indices() {
-        let d = red.matrix(i).unwrap();
-        let r = d.cols();
-        b.append(format!("{i}: {}{}, ", symbol, superscript(r)));
-    }
-    b.append("]\n\n");
+    b.append(format!("{}\n", ckh.to_string()));
 
     for i in ckh.indices() {
         let d = red.matrix(i).unwrap();

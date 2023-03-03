@@ -62,3 +62,28 @@ where R: EucRing + FromStr, for<'x> &'x R: EucRingOps<R> {
     let ss = ss_invariant(l, &c, true);
     Ok(ss)
 }
+
+#[cfg(test)]
+mod tests { 
+    use super::*;
+
+    #[test]
+    fn test1() { 
+        let name = "3_1".to_string();
+        let c_value = "2".to_string();
+        let c_type = CType::Z;
+
+        let res = run(name, None, c_value, c_type);
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test2() { 
+        let name = "4_1".to_string();
+        let c_value = "3".to_string();
+        let c_type = CType::Z;
+
+        let res = run(name, None, c_value, c_type);
+        assert!(res.is_ok());
+    }
+}

@@ -39,3 +39,34 @@ where R: EucRing + FromStr, for<'x> &'x R: EucRingOps<R> {
     let res = kh.to_string();
     Ok(res)
 }
+
+#[cfg(test)]
+mod tests { 
+    use super::*;
+
+    #[test]
+    fn test1() { 
+        let name = "3_1".to_string();
+        let c_value = "0".to_string();
+        let c_type = CType::Z;
+        let mirror = false;
+        let reduced = false;
+        let bigraded = false;
+
+        let res = run(name, None, c_value, c_type, mirror, reduced, bigraded);
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test2() { 
+        let name = "4_1".to_string();
+        let c_value = "0".to_string();
+        let c_type = CType::Z;
+        let mirror = true;
+        let reduced = true;
+        let bigraded = true;
+
+        let res = run(name, None, c_value, c_type, mirror, reduced, bigraded);
+        assert!(res.is_ok());
+    }
+}

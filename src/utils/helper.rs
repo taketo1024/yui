@@ -2,7 +2,9 @@ use super::err;
 use std::str::FromStr;
 use num_traits::Zero;
 use yui_link::{Link, Edge};
+
 type PDCode = Vec<[Edge; 4]>;
+const RESOURCE_DIR: &str = "resources";
 
 pub fn init_logger() {
     use simplelog::*;
@@ -50,12 +52,11 @@ pub fn load_link(name: &String, pd_code: &Option<String>) -> Result<Link, Box<dy
     if let Some(pd_code) = pd_code { 
         let pd_code: PDCode = serde_json::from_str(&pd_code)?;
         let l = Link::from(&pd_code);
-        Ok(l)
-    } else if let Ok(l) = Link::load(&name) { 
-        Ok(l)
-    } else {
-        err!("cannot load {name}")
-    }
+        return Ok(l)
+    } 
+    
+    let path = format!("{}/links/{}.json", RESOURCE_DIR, name);
+    Link::load(&path)
 }
 
 pub fn parse_pair<R: FromStr + Zero>(s: &String) -> Result<(R, R), Box<dyn std::error::Error>> { 

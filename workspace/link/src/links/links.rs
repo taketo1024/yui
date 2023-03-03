@@ -240,8 +240,7 @@ impl From<&Vec<[Edge; 4]>> for Link {
 }
 
 impl Link { 
-    pub fn load(name: &str) -> Result<Link, Box<dyn std::error::Error>> {
-        let path = format!("{}/links/{}.json", crate::RESOURCE_DIR, name);
+    pub fn load(path: &str) -> Result<Link, Box<dyn std::error::Error>> {
         let json = std::fs::read_to_string(path)?;
         let data: Vec<[Edge; 4]> = serde_json::from_str(&json)?;
         let l = Link::from(&data);

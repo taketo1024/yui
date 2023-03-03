@@ -5,6 +5,9 @@ edition = "2021"
 authors = ["Taketo Sano <taketo1024@gmail.com>"]
 
 [features]
+all = ["poly", "qint"]
+poly = []
+qint = []
 i128 = []
 bigint = []
 

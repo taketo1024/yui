@@ -45,7 +45,7 @@ impl App {
         } else {
             if let Err(e) = res { 
                 error!("{}", e);
-                eprintln!("{e}");
+                eprintln!("\x1b[0;31merror\x1b[0m: {e}");
             }
             Err(1)
         }

@@ -3,19 +3,7 @@ use std::str::FromStr;
 use num_traits::Zero;
 use yui_link::{Link, Edge};
 
-type PDCode = Vec<[Edge; 4]>;
 const RESOURCE_DIR: &str = "resources";
-
-pub fn init_logger() {
-    use simplelog::*;
-
-    TermLogger::init(
-        LevelFilter::Info,
-        Config::default(),
-        TerminalMode::Mixed,
-        ColorChoice::Auto
-    ).unwrap()
-}
 
 pub fn measure<F, Res>(proc: F) -> (Res, std::time::Duration) 
 where F: FnOnce() -> Res { 
@@ -48,15 +36,23 @@ where Output: serde::de::DeserializeOwned {
     Ok(data)
 }
 
-pub fn load_link(name: &String, pd_code: &Option<String>) -> Result<Link, Box<dyn std::error::Error>> { 
-    if let Some(pd_code) = pd_code { 
-        let pd_code: PDCode = serde_json::from_str(&pd_code)?;
-        let l = Link::from(&pd_code);
-        return Ok(l)
-    } 
-    
-    let path = format!("{}/links/{}.json", RESOURCE_DIR, name);
-    Link::load(&path)
+pub fn load_link(name: &String, pd_code: &Option<String>, mirror: bool) -> Result<Link, Box<dyn std::error::Error>> { 
+    type PDCode = Vec<[Edge; 4]>;
+    let l = { 
+        if let Some(pd_code) = pd_code { 
+            let pd_code: PDCode = serde_json::from_str(&pd_code)?;
+            Link::from(&pd_code)
+        } else { 
+            let path = format!("{}/links/{}.json", RESOURCE_DIR, name);
+            Link::load(&path)?
+        }
+    };
+
+    if mirror { 
+        Ok(l.mirror())
+    } else { 
+        Ok(l)
+    }
 }
 
 pub fn parse_pair<R: FromStr + Zero>(s: &String) -> Result<(R, R), Box<dyn std::error::Error>> { 
@@ -75,7 +71,6 @@ pub fn parse_pair<R: FromStr + Zero>(s: &String) -> Result<(R, R), Box<dyn std::
     err!("cannot parse '{}' as {}.", s, std::any::type_name::<R>())
 }
 
-#[allow(unused)]
 pub fn write_csv(path: &String, records: Vec<&String>) -> Result<(), Box<dyn std::error::Error>> { 
     use std::fs::OpenOptions;
 

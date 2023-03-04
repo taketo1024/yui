@@ -6,27 +6,56 @@ use yui_core::{EucRing, EucRingOps};
 use yui_khovanov::ss_invariant;
 use crate::utils::*;
 
-pub fn run(name: String, l_str: Option<String>, c_value: String, c_type: CType) -> Result<String, Box<dyn std::error::Error>> {
-    info!("compute ss: {name}, c = {c_value}");
+#[derive(Debug, clap::Args)]
+pub struct Args { 
+    name: String,
 
-    let l = load_link(&name, &l_str)?;
+    #[arg(short, long)]
+    link: Option<String>,
+
+    #[arg(short, long)]
+    c_value: String,
+
+    #[arg(short = 't', long, default_value = "z")]
+    c_type: CType,
+}
+
+#[derive(Debug, clap::Args)]
+pub struct BatchArgs { 
+    #[arg(short, long)]
+    c_value: String,
+    
+    #[arg(short = 't', long, default_value = "z")]
+    c_type: CType,
+
+    #[arg(short, long)]
+    data: String,
+
+    #[arg(short, long)]
+    output: Option<String>
+}
+
+pub fn run(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
+    info!("compute ss: {}, c = {}", args.name, args.c_value);
+
+    let l = load_link(&args.name, &args.link, false)?;
     let s = guard_panic(|| 
-        dispatch_eucring!(c_type, compute_ss, &l, &c_value)
+        dispatch_eucring!(&args.c_type, compute_ss, &l, &args.c_value)
     )?;
 
-    info!("{name}: s = {s} (c = {c_value})");
+    info!("{}: ss = {} (c = {})", args.name, s, args.c_value);
 
     Ok(s.to_string())
 }
 
-pub fn run_batch(c_value: String, c_type: CType, data: String, output: Option<String>) -> Result<String, Box<dyn std::error::Error>> {
-    let data: IndexMap<String, Vec<[Edge; 4]>> = load_json(&data)?;
+pub fn run_batch(args: &BatchArgs) -> Result<String, Box<dyn std::error::Error>> {
+    let data: IndexMap<String, Vec<[Edge; 4]>> = load_json(&args.data)?;
     let mut all_res = String::from("");
 
     for (name, code) in data { 
         let l = Link::from(&code);
         let res = guard_panic(|| 
-            dispatch_eucring!(c_type, compute_ss, &l, &c_value)
+            dispatch_eucring!(&args.c_type, compute_ss, &l, &args.c_value)
         );
 
         let s = if let Ok(s) = res { 
@@ -39,7 +68,7 @@ pub fn run_batch(c_value: String, c_type: CType, data: String, output: Option<St
             "!".to_string()            
         };
         
-        if let Some(output) = &output { 
+        if let Some(output) = &args.output { 
             write_csv(output, vec![&name, &s])?;
         }
 
@@ -69,21 +98,25 @@ mod tests {
 
     #[test]
     fn test1() { 
-        let name = "3_1".to_string();
-        let c_value = "2".to_string();
-        let c_type = CType::Z;
-
-        let res = run(name, None, c_value, c_type);
+        let args = Args {
+        	name: "3_1".to_string(),
+            link: None,
+        	c_value: "2".to_string(),
+        	c_type: CType::Z,
+        };
+        let res = run(&args);
         assert!(res.is_ok());
     }
 
     #[test]
     fn test2() { 
-        let name = "4_1".to_string();
-        let c_value = "3".to_string();
-        let c_type = CType::Z;
-
-        let res = run(name, None, c_value, c_type);
+        let args = Args {
+        	name: "4_1".to_string(),
+            link: Some("[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string()),
+        	c_value: "3".to_string(),
+        	c_type: CType::Z,
+        };
+        let res = run(&args);
         assert!(res.is_ok());
     }
 }

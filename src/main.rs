@@ -1,15 +1,13 @@
 mod app;
 mod utils;
+use app::App;
 
 fn main() {
-    use app::App;
+    let app = App::new();
+    let res = app.run();
     
-    let mut app = App::new();
-    let result = app.run();
-
-    if let Ok(output) = result { 
-        println!("{output}");
-    } else if let Err(code) = result { 
-        std::process::exit(code);
+    match res { 
+        Ok(output) => println!("{output}"),
+        Err(code)  => std::process::exit(code)
     }
 }

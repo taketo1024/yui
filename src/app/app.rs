@@ -1,53 +1,77 @@
 use log::{info, error};
-use clap::Parser;
-use super::cli::{CliArgs, Cmd};
-use super::cmd;
+use clap::{Parser, Subcommand};
+use super::cmd::{kh, ckh, ss};
 use crate::utils::*;
 
-pub struct App {
-    debug: bool
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+#[command(propagate_version = true)]
+pub struct CliArgs {
+    #[command(subcommand)]
+    pub command: Cmd,
+
+    #[arg(long, default_value_t = false)]
+    pub debug: bool
 }
+
+#[derive(Subcommand, Debug)]
+pub enum Cmd {
+    Kh(kh::Args),
+    Ckh(ckh::Args),
+    SS(ss::Args),
+    SSBatch(ss::BatchArgs)
+}
+
+pub struct App {}
 
 impl App { 
     pub fn new() -> Self { 
-        App { debug: false }
+        App {}
     }
 
-    pub fn run(&mut self) -> Result<String, i32> { 
+    pub fn run(&self) -> Result<String, i32> { 
         let args = CliArgs::parse();
 
         if args.debug { 
-            self.debug = true;
-            init_logger();
+            self.init_logger();
         }
 
         info!("args: {:?}", args);
         info!("int-type: {}", std::any::type_name::<crate::utils::dispatch::Int>());
 
-        let (res, time) = measure(|| 
-            guard_panic(||
-                match args.command { 
-                Cmd::Kh { name, link, c_value, c_type, mirror, reduced, bigraded }
-                    => cmd::kh::run(name, link, c_value, c_type, mirror, reduced, bigraded),
-                Cmd::Ckh { name, link, c_value, c_type, mirror, reduced, with_alpha }
-                    => cmd::ckh::run(name, link, c_value, c_type, mirror, reduced, with_alpha),
-                Cmd::SS { name, link, c_value, c_type } 
-                    => cmd::ss::run(name, link, c_value, c_type),
-                Cmd::SSBatch { c_value, c_type, data, output }
-                    => cmd::ss::run_batch(c_value, c_type, data, output)
-                }
-            )
+        let (res, time) = measure(||
+            self.dispatch(&args)
         );
 
-        if let Ok(res) = res { 
-            info!("time: {:?}", time);
-            Ok(res)
-        } else {
-            if let Err(e) = res { 
-                error!("{}", e);
-                eprintln!("\x1b[0;31merror\x1b[0m: {e}");
+        let res = res.map_err(|e| { 
+            error!("{}", e);
+            eprintln!("\x1b[0;31merror\x1b[0m: {e}");
+            1 // error code
+        });
+
+        info!("time: {:?}", time);
+
+        res
+    }
+
+    fn init_logger(&self) {
+        use simplelog::*;
+        TermLogger::init(
+            LevelFilter::Info,
+            Config::default(),
+            TerminalMode::Mixed,
+            ColorChoice::Auto
+        ).unwrap()
+    }
+
+    fn dispatch(&self, args: &CliArgs) -> Result<String, Box<dyn std::error::Error>> { 
+        guard_panic(||
+            match &args.command { 
+                Cmd::Kh(args)      => kh::run(args),
+                Cmd::Ckh(args)     => ckh::run(args),
+                Cmd::SS(args)      => ss::run(args),
+                Cmd::SSBatch(args) => ss::run_batch(args)
             }
-            Err(1)
-        }
+        )
     }
 }

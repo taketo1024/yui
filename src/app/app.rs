@@ -24,18 +24,14 @@ impl App {
         info!("args: {:?}", args);
         info!("int-type: {}", std::any::type_name::<crate::utils::dispatch::Int>());
 
-        let (res, time) = measure(|| 
-            guard_panic(||
-                match args.command { 
+        let (res, time) = measure(|| guard_panic(||
+            match args.command { 
                 Cmd::Kh(args)  => cmd::kh::run(args),
                 Cmd::Ckh(args) => cmd::ckh::run(args),
-                Cmd::SS { name, link, c_value, c_type } 
-                    => cmd::ss::run(name, link, c_value, c_type),
-                Cmd::SSBatch { c_value, c_type, data, output }
-                    => cmd::ss::run_batch(c_value, c_type, data, output)
-                }
-            )
-        );
+                Cmd::SS(args)  => cmd::ss::run(args),
+                Cmd::SSBatch(args) => cmd::ss::run_batch(args)
+            }
+        ));
 
         if let Ok(res) = res { 
             info!("time: {:?}", time);

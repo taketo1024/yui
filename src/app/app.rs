@@ -27,8 +27,8 @@ impl App {
         let (res, time) = measure(|| 
             guard_panic(||
                 match args.command { 
-                Cmd::Kh { name, link, c_value, c_type, mirror, reduced, bigraded }
-                    => cmd::kh::run(name, link, c_value, c_type, mirror, reduced, bigraded),
+                Cmd::Kh(args)
+                    => cmd::kh::run(args),
                 Cmd::Ckh { name, link, c_value, c_type, mirror, reduced, with_alpha }
                     => cmd::ckh::run(name, link, c_value, c_type, mirror, reduced, with_alpha),
                 Cmd::SS { name, link, c_value, c_type } 

@@ -35,7 +35,7 @@ pub struct BatchArgs {
     output: Option<String>
 }
 
-pub fn run(args: Args) -> Result<String, Box<dyn std::error::Error>> {
+pub fn run(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
     info!("compute ss: {}, c = {}", args.name, args.c_value);
 
     let l = load_link(&args.name, &args.link)?;
@@ -48,7 +48,7 @@ pub fn run(args: Args) -> Result<String, Box<dyn std::error::Error>> {
     Ok(s.to_string())
 }
 
-pub fn run_batch(args: BatchArgs) -> Result<String, Box<dyn std::error::Error>> {
+pub fn run_batch(args: &BatchArgs) -> Result<String, Box<dyn std::error::Error>> {
     let data: IndexMap<String, Vec<[Edge; 4]>> = load_json(&args.data)?;
     let mut all_res = String::from("");
 
@@ -104,7 +104,7 @@ mod tests {
         	c_value: "2".to_string(),
         	c_type: CType::Z,
         };
-        let res = run(args);
+        let res = run(&args);
         assert!(res.is_ok());
     }
 
@@ -116,7 +116,7 @@ mod tests {
         	c_value: "3".to_string(),
         	c_type: CType::Z,
         };
-        let res = run(args);
+        let res = run(&args);
         assert!(res.is_ok());
     }
 }

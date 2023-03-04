@@ -30,8 +30,8 @@ pub struct Args {
     with_alpha: bool,
 }
 
-pub fn run(args: Args) -> Result<String, Box<dyn std::error::Error>> {
-    dispatch_ring!(&args.c_type, describe_ckh, &args)
+pub fn run(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
+    dispatch_ring!(&args.c_type, describe_ckh, args)
 }
 
 fn link(args: &Args) -> Result<Link, Box<dyn std::error::Error>> { 
@@ -111,7 +111,7 @@ mod tests {
         	reduced: false,
         	with_alpha: false,
         };
-        let res = run(args);
+        let res = run(&args);
         assert!(res.is_ok());
     }
 
@@ -126,7 +126,7 @@ mod tests {
         	reduced: true,
         	with_alpha: true,
         };
-        let res = run(args);
+        let res = run(&args);
         assert!(res.is_ok());
     }
 }

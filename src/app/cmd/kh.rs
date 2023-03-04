@@ -28,11 +28,11 @@ pub struct Args {
     bigraded: bool,
 }
 
-pub fn run(args: Args) -> Result<String, Box<dyn std::error::Error>> {
+pub fn run(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
     if args.bigraded { 
-        dispatch_eucring!(&args.c_type, compute_bigraded, &args)
+        dispatch_eucring!(&args.c_type, compute_bigraded, args)
     } else { 
-        dispatch_eucring!(&args.c_type, compute_homology, &args)
+        dispatch_eucring!(&args.c_type, compute_homology, args)
     }
 }
 
@@ -86,7 +86,7 @@ mod tests {
             reduced: false, 
             bigraded: false
         };
-        let res = run(args);
+        let res = run(&args);
         assert!(res.is_ok());
     }
 
@@ -101,7 +101,7 @@ mod tests {
             reduced: true,
             bigraded: true
         };
-        let res = run(args);
+        let res = run(&args);
         assert!(res.is_ok());
     }
 }

@@ -2,7 +2,6 @@ use std::str::FromStr;
 use itertools::Itertools;
 use yui_core::{Ring, RingOps};
 use yui_homology::{ChainComplex, GenericChainComplex, utils::ChainReducer};
-use yui_link::Link;
 use yui_homology::RModGrid;
 use yui_khovanov::KhComplex;
 use crate::utils::*;
@@ -34,15 +33,6 @@ pub fn run(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
     dispatch_ring!(&args.c_type, describe_ckh, args)
 }
 
-fn link(args: &Args) -> Result<Link, Box<dyn std::error::Error>> { 
-    let l = load_link(&args.name, &args.link)?;
-    if args.mirror { 
-        Ok(l.mirror())
-    } else { 
-        Ok(l)
-    }
-}
-
 fn describe_ckh<R>(args: &Args) -> Result<String, Box<dyn std::error::Error>>
 where R: Ring + FromStr, for<'x> &'x R: RingOps<R> { 
     use string_builder::Builder;
@@ -52,7 +42,7 @@ where R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
         return err!("{t} != 0 is not allowed for reduced.");
     }
     
-    let l = link(args)?;
+    let l = load_link(&args.name, &args.link, args.mirror)?;
     let c = KhComplex::new(l, h, t, args.reduced);
     let mut red = ChainReducer::new(&c);
 

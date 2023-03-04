@@ -22,21 +22,18 @@ pub enum Cmd {
     SSBatch(ss::BatchArgs)
 }
 
-pub struct App {
-    debug: bool
-}
+pub struct App {}
 
 impl App { 
     pub fn new() -> Self { 
-        App { debug: false }
+        App {}
     }
 
-    pub fn run(&mut self) -> Result<String, i32> { 
+    pub fn run(&self) -> Result<String, i32> { 
         let args = CliArgs::parse();
 
         if args.debug { 
-            self.debug = true;
-            init_logger();
+            self.init_logger();
         }
 
         info!("args: {:?}", args);
@@ -55,6 +52,16 @@ impl App {
         info!("time: {:?}", time);
 
         res
+    }
+
+    fn init_logger(&self) {
+        use simplelog::*;
+        TermLogger::init(
+            LevelFilter::Info,
+            Config::default(),
+            TerminalMode::Mixed,
+            ColorChoice::Auto
+        ).unwrap()
     }
 
     fn dispatch(&self, args: &CliArgs) -> Result<String, Box<dyn std::error::Error>> { 

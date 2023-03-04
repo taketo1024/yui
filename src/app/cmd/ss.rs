@@ -38,7 +38,7 @@ pub struct BatchArgs {
 pub fn run(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
     info!("compute ss: {}, c = {}", args.name, args.c_value);
 
-    let l = load_link(&args.name, &args.link)?;
+    let l = load_link(&args.name, &args.link, false)?;
     let s = guard_panic(|| 
         dispatch_eucring!(&args.c_type, compute_ss, &l, &args.c_value)
     )?;

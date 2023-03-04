@@ -1,6 +1,5 @@
 use std::str::FromStr;
 use yui_core::{EucRing, EucRingOps};
-use yui_link::Link;
 use yui_homology::PrintTable;
 use yui_khovanov::{KhHomology, KhHomologyBigraded};
 use crate::utils::*;
@@ -36,18 +35,9 @@ pub fn run(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
     }
 }
 
-fn link(args: &Args) -> Result<Link, Box<dyn std::error::Error>> { 
-    let l = load_link(&args.name, &args.link)?;
-    if args.mirror { 
-        Ok(l.mirror())
-    } else { 
-        Ok(l)
-    }
-}
-
 fn compute_bigraded<R>(args: &Args) -> Result<String, Box<dyn std::error::Error>>
 where R: EucRing + FromStr, for<'x> &'x R: EucRingOps<R> { 
-    let l = link(args)?;
+    let l = load_link(&args.name, &args.link, args.mirror)?;
     if args.c_value != "0" { 
         return err!("--bigraded only supported for `c = 0`.")
     }
@@ -59,7 +49,7 @@ where R: EucRing + FromStr, for<'x> &'x R: EucRingOps<R> {
 
 fn compute_homology<R>(args: &Args) -> Result<String, Box<dyn std::error::Error>>
 where R: EucRing + FromStr, for<'x> &'x R: EucRingOps<R> { 
-    let l = link(args)?;
+    let l = load_link(&args.name, &args.link, args.mirror)?;
     let (h, t) = parse_pair::<R>(&args.c_value)?;
 
     if args.reduced && !t.is_zero() { 

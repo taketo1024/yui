@@ -27,6 +27,9 @@ pub struct Args {
 
     #[arg(short = 'a', long)]
     with_alpha: bool,
+
+    #[arg(short = 'n', long)]
+    no_simplify: bool,
 }
 
 pub fn run(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
@@ -44,23 +47,28 @@ where R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
     
     let l = load_link(&args.name, &args.link, args.mirror)?;
     let c = KhComplex::new(l, h, t, args.reduced);
-    let mut red = ChainReducer::new(&c);
+    let vs = c.canon_cycles().into_iter().map(|z| c[0].vectorize(&z)).collect_vec();
 
-    if args.with_alpha { 
-        for z in c.canon_cycles() {
-            let v = c[0].vectorize(&z);
+    let (c, vs) = if args.no_simplify { 
+        (c.as_generic(), vs)
+    } else { 
+        let mut red = ChainReducer::new(&c);
+
+        for v in vs.into_iter() {
             red.set_vec(0, v);
         }
-    }
+    
+        red.process();
+    
+        let c = GenericChainComplex::generate(
+            c.indices(), 
+            c.d_degree(), 
+            |i| Some(red.take_matrix(i))
+        );
+        let vs = red.take_vecs(0);
 
-    red.process();
-
-    let c = GenericChainComplex::generate(
-        c.indices(), 
-        c.d_degree(), 
-        |i| Some(red.take_matrix(i))
-    );
-    let vs = red.take_vecs(0);
+        (c, vs)
+    };
 
     let mut b = Builder::new(1024);
 
@@ -100,6 +108,7 @@ mod tests {
         	mirror: false,
         	reduced: false,
         	with_alpha: false,
+            no_simplify: false
         };
         let res = run(&args);
         assert!(res.is_ok());
@@ -115,6 +124,7 @@ mod tests {
         	mirror: true,
         	reduced: true,
         	with_alpha: true,
+            no_simplify: false
         };
         let res = run(&args);
         assert!(res.is_ok());

@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 use crate::utils::CType;
-use super::cmd::kh;
+use super::cmd::{kh, ckh};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -16,28 +16,7 @@ pub struct CliArgs {
 #[derive(Subcommand, Debug)]
 pub enum Cmd {
     Kh(kh::Args),
-    Ckh {
-        name: String,
-
-        #[arg(short, long)]
-        link: Option<String>,
-
-        #[arg(short, long, default_value = "0")]
-        c_value: String,
-
-        #[arg(short = 't', long, default_value = "z")]
-        c_type: CType,
-
-        #[arg(short, long)]
-        mirror: bool,
-
-        #[arg(short, long)]
-        reduced: bool,
-
-        #[arg(short = 'a', long)]
-        with_alpha: bool,
-    },
-
+    Ckh(ckh::Args),
     SS {
         name: String,
 

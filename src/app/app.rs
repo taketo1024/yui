@@ -27,10 +27,8 @@ impl App {
         let (res, time) = measure(|| 
             guard_panic(||
                 match args.command { 
-                Cmd::Kh(args)
-                    => cmd::kh::run(args),
-                Cmd::Ckh { name, link, c_value, c_type, mirror, reduced, with_alpha }
-                    => cmd::ckh::run(name, link, c_value, c_type, mirror, reduced, with_alpha),
+                Cmd::Kh(args)  => cmd::kh::run(args),
+                Cmd::Ckh(args) => cmd::ckh::run(args),
                 Cmd::SS { name, link, c_value, c_type } 
                     => cmd::ss::run(name, link, c_value, c_type),
                 Cmd::SSBatch { c_value, c_type, data, output }

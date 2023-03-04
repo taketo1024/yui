@@ -7,28 +7,56 @@ use yui_homology::RModGrid;
 use yui_khovanov::KhComplex;
 use crate::utils::*;
 
-pub fn run(name: String, link: Option<String>, c_value: String, c_type: CType, mirror: bool, reduced: bool, with_alpha: bool) -> Result<String, Box<dyn std::error::Error>> {
-    let mut l = load_link(&name, &link)?;
-    if mirror { 
-        l = l.mirror();
-    }
+#[derive(Debug, clap::Args)]
+pub struct Args { 
+    name: String,
 
-    dispatch_ring!(c_type, describe_ckh, &l, &c_value, reduced, with_alpha)
+    #[arg(short, long)]
+    link: Option<String>,
+
+    #[arg(short, long, default_value = "0")]
+    c_value: String,
+
+    #[arg(short = 't', long, default_value = "z")]
+    c_type: CType,
+
+    #[arg(short, long)]
+    mirror: bool,
+
+    #[arg(short, long)]
+    reduced: bool,
+
+    #[arg(short = 'a', long)]
+    with_alpha: bool,
 }
 
-fn describe_ckh<R>(l: &Link, c_value: &String, reduced: bool, with_alpha: bool) -> Result<String, Box<dyn std::error::Error>>
+pub fn run(args: Args) -> Result<String, Box<dyn std::error::Error>> {
+    dispatch_ring!(&args.c_type, describe_ckh, &args)
+}
+
+fn link(args: &Args) -> Result<Link, Box<dyn std::error::Error>> { 
+    let l = load_link(&args.name, &args.link)?;
+    if args.mirror { 
+        Ok(l.mirror())
+    } else { 
+        Ok(l)
+    }
+}
+
+fn describe_ckh<R>(args: &Args) -> Result<String, Box<dyn std::error::Error>>
 where R: Ring + FromStr, for<'x> &'x R: RingOps<R> { 
     use string_builder::Builder;
-
-    let (h, t) = parse_pair::<R>(c_value)?;
-    if reduced && !t.is_zero() { 
+    
+    let (h, t) = parse_pair::<R>(&args.c_value)?;
+    if args.reduced && !t.is_zero() { 
         return err!("{t} != 0 is not allowed for reduced.");
     }
     
-    let c = KhComplex::new(l.clone(), h, t, reduced);
+    let l = link(args)?;
+    let c = KhComplex::new(l, h, t, args.reduced);
     let mut red = ChainReducer::new(&c);
 
-    if with_alpha { 
+    if args.with_alpha { 
         for z in c.canon_cycles() {
             let v = c[0].vectorize(&z);
             red.set_vec(0, v);
@@ -57,7 +85,7 @@ where R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
         b.append("\n\n");
     }
 
-    if with_alpha { 
+    if args.with_alpha { 
         b.append(format!("----------\nLee cycles\n----------\n\n"));
         for (i, v) in vs.iter().enumerate() {
             b.append(format!("a[{i}] = [{}]\n", v.to_dense().iter().map(|r| r.to_string()).collect_vec().join(", ")));
@@ -74,27 +102,31 @@ mod tests {
 
     #[test]
     fn test1() { 
-        let name = "3_1".to_string();
-        let c_value = "0".to_string();
-        let c_type = CType::Z;
-        let mirror = false;
-        let reduced = false;
-        let with_alpha = false;
-
-        let res = run(name, None, c_value, c_type, mirror, reduced, with_alpha);
+        let args = Args {
+        	name: "3_1".to_string(),
+            link: None,
+        	c_value: "0".to_string(),
+        	c_type: CType::Z,
+        	mirror: false,
+        	reduced: false,
+        	with_alpha: false,
+        };
+        let res = run(args);
         assert!(res.is_ok());
     }
 
     #[test]
     fn test2() { 
-        let name = "4_1".to_string();
-        let c_value = "2".to_string();
-        let c_type = CType::Z;
-        let mirror = true;
-        let reduced = true;
-        let with_alpha = true;
-
-        let res = run(name, None, c_value, c_type, mirror, reduced, with_alpha);
+        let args = Args {
+        	name: "".to_string(),
+            link: Some("[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string()),
+        	c_value: "2".to_string(),
+        	c_type: CType::Z,
+        	mirror: true,
+        	reduced: true,
+        	with_alpha: true,
+        };
+        let res = run(args);
         assert!(res.is_ok());
     }
 }

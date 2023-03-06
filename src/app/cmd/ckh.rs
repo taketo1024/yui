@@ -134,4 +134,57 @@ mod tests {
         let res = run(&args);
         assert!(res.is_ok());
     }
+
+    #[cfg(feature = "poly")]
+    mod poly_tests { 
+        use super::*;
+        
+        #[test]
+        fn test_zpoly_h() { 
+            let args = Args {
+                name: "3_1".to_string(),
+                link: None,
+                c_value: "H".to_string(),
+                c_type: CType::ZPoly,
+                mirror: false,
+                reduced: false,
+                with_alpha: false,
+                no_simplify: false
+            };
+            let res = run(&args);
+            assert!(res.is_ok());
+        }
+
+        #[test]
+        fn test_zpoly_t() { 
+            let args = Args {
+                name: "3_1".to_string(),
+                link: None,
+                c_value: "T".to_string(),
+                c_type: CType::ZPoly,
+                mirror: false,
+                reduced: false,
+                with_alpha: false,
+                no_simplify: false
+            };
+            let res = run(&args);
+            assert!(res.is_ok());
+        }
+
+        #[test]
+        fn test_zpoly_ht() { 
+            let args = Args {
+                name: "3_1".to_string(),
+                link: None,
+                c_value: "H,T".to_string(),
+                c_type: CType::ZPoly,
+                mirror: false,
+                reduced: false,
+                with_alpha: false,
+                no_simplify: false
+            };
+            let res = run(&args);
+            assert!(res.is_ok());
+        }
+    }
 }

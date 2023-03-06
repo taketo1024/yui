@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use itertools::Itertools;
 use yui_core::{Ring, RingOps};
-use yui_homology::{ChainComplex, GenericChainComplex, utils::ChainReducer};
+use yui_homology::ChainComplex;
 use yui_homology::RModGrid;
 use yui_khovanov::KhComplex;
 use crate::utils::*;
@@ -49,7 +49,9 @@ where R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
     let c = KhComplex::new(l, h, t, args.reduced);
     
     let vs = if args.with_alpha { 
-        c.canon_cycles().into_iter().map(|z| c[0].vectorize(&z)).collect_vec()
+        c.canon_cycles().into_iter().map(|z| 
+            (0, c[0].vectorize(&z))
+        ).collect_vec()
     } else { 
         vec![]
     };
@@ -57,22 +59,7 @@ where R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
     let (c, vs) = if args.no_simplify { 
         (c.as_generic(), vs)
     } else { 
-        let mut red = ChainReducer::new(&c);
-
-        for v in vs.into_iter() {
-            red.set_vec(0, v);
-        }
-    
-        red.process();
-    
-        let c = GenericChainComplex::generate(
-            c.indices(), 
-            c.d_degree(), 
-            |i| Some(red.take_matrix(i))
-        );
-        let vs = red.take_vecs(0);
-
-        (c, vs)
+        c.as_generic().simplify_with(vs)
     };
 
     let mut b = Builder::new(1024);
@@ -90,7 +77,7 @@ where R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
 
     if args.with_alpha { 
         b.append(format!("----------\nLee cycles\n----------\n\n"));
-        for (i, v) in vs.iter().enumerate() {
+        for (i, (_, v)) in vs.iter().enumerate() {
             b.append(format!("a[{i}] = [{}]\n", v.to_dense().iter().map(|r| r.to_string()).collect_vec().join(", ")));
         }
     }

@@ -115,17 +115,6 @@ where I: PolyGen, I::Degree: One, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<I, J, R> PolyBase<I, R>
-where I: PolyGen<Degree = MDegree<J>>, J: Zero, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn from_mdeg(data: Vec<(Vec<J>, R)>) -> Self {
-        let data = data.into_iter().map(|(v, r)| {
-            let mdeg = MDegree::from_vec(v);
-            (I::from(mdeg), r)
-        }).collect_vec();
-        Self::from(data)
-    }
-}
-
 impl<I, R> From<R> for PolyBase<I, R>
 where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn from(a: R) -> Self {
@@ -147,6 +136,30 @@ where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
+// for bivar-poly
+impl<I, J, R> PolyBase<I, R>
+where I: PolyGen<Degree = MDegree<J>>, J: Zero, R: Ring, for<'x> &'x R: RingOps<R> {
+    pub fn from_deg2(data: Vec<((J, J), R)>) -> Self {
+        let data = data.into_iter().map(|(d, r)| {
+            let (d0, d1) = d;
+            (vec![d0, d1], r)
+        }).collect_vec();
+        Self::from_mdeg(data)
+    }
+}
+
+// for multivar-poly
+impl<I, J, R> PolyBase<I, R>
+where I: PolyGen<Degree = MDegree<J>>, J: Zero, R: Ring, for<'x> &'x R: RingOps<R> {
+    pub fn from_mdeg(data: Vec<(Vec<J>, R)>) -> Self {
+        let data = data.into_iter().map(|(v, r)| {
+            let mdeg = MDegree::from_vec(v);
+            (I::from(mdeg), r)
+        }).collect_vec();
+        Self::from(data)
+    }
+}
+
 impl<I, R> FromStr for PolyBase<I, R>
 where I: PolyGen + FromStr, R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
     type Err = ();
@@ -162,7 +175,6 @@ where I: PolyGen + FromStr, R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
         }
     }
 }
-
 
 impl<I, R> Display for PolyBase<I, R>
 where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
@@ -446,7 +458,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {}
 mod tests {
     use yui_utils::map;
     use super::*;
-    use crate::{Mono, MPoly, LPoly, MLPoly};
+    use crate::{Mono, Poly2, MPoly, LPoly, MLPoly};
  
     #[test]
     fn init_poly() { 
@@ -462,6 +474,13 @@ mod tests {
         assert_eq!(&f.to_string(), "4x⁻¹ + 2 + 3x²");
     }
 
+    #[test]
+    fn init_poly2() { 
+        type P = Poly2::<'x', 'y', i32>; 
+        let f = P::from_deg2(vec![((0, 0), 3), ((1, 0), 2), ((2, 3), 3)]);
+        assert_eq!(&f.to_string(), "3 + 2x + 3x²y³");
+    }
+ 
     #[test]
     fn init_mpoly() { 
         type P = MPoly::<'x', i32>; 

@@ -14,7 +14,7 @@ macro_rules! dispatch_ring {
 
         try_ring!($c_value, $c_type, $method, $($args),*)
         .unwrap_or( 
-            err!("{} is not supported for: {}", stringify!($method), $c_type) 
+            err!("method `{}` is not supported for: -c {} -t {}", stringify!($method), $c_value, $c_type)
         )
     }};
 }
@@ -25,7 +25,7 @@ macro_rules! dispatch_eucring {
 
         try_eucring!($c_value, $c_type, $method, $($args),*)
         .unwrap_or( 
-            err!("{} is not supported for: {}", stringify!($method), $c_type) 
+            err!("method `{}` is not supported for: -c {} -t {}", stringify!($method), $c_value, $c_type)
         )
     }};
 }
@@ -54,18 +54,35 @@ macro_rules! try_std {
         use yui_ratio::Ratio;
         use yui_ff::FF;
 
+        type Z = Int;
         type Q = Ratio<Int>;
         type F2 = FF<2>;
         type F3 = FF<3>;
 
         match $c_type {
-            CType::Z  => call!(Int, $method, $($args),*),
+            CType::Z  => call!(Z,  $method, $($args),*),
             CType::Q  => call!(Q,  $method, $($args),*),
             CType::F2 => call!(F2, $method, $($args),*),
             CType::F3 => call!(F3, $method, $($args),*),
             _         => None
         }
     }}
+}
+
+pub(crate) enum PolyVars { 
+    H, T, HT
+}
+
+pub(crate) fn poly_vars(c_value: &String) -> PolyVars { 
+    use std::collections::HashSet;
+    
+    let s: HashSet<_> = c_value.split(",").collect();
+    match (s.contains("H"), s.contains("T")) { 
+        (true,  true)  => PolyVars::HT,
+        (true,  false) => PolyVars::H,
+        (false, true)  => PolyVars::T,
+        (false, false) => PolyVars::H
+    }
 }
 
 macro_rules! try_poly {
@@ -76,23 +93,23 @@ macro_rules! try_poly {
                 use yui_ff::FF;
                 use yui_polynomial::Poly;
 
-                type QPoly  = Poly<'H', Ratio<Int>>;
-                type F2Poly = Poly<'H', FF<2>>;
-                type F3Poly = Poly<'H', FF<3>>;
+                type Q = Ratio<Int>;
+                type F2 = FF<2>;
+                type F3 = FF<3>;
 
-                match $c_type {
-                    CType::QPoly  => call!(QPoly, $method, $($args),*),
-                    CType::F2Poly => call!(F2Poly, $method, $($args),*),
-                    CType::F3Poly => call!(F3Poly, $method, $($args),*),
-                    _             => None
+                let vars = poly_vars($c_value);
+
+                match ($c_type, vars) {
+                    (CType::QPoly , PolyVars::H) => call!(Poly<'H', Q>,  $method, $($args),*),
+                    (CType::QPoly , PolyVars::T) => call!(Poly<'T', Q>,  $method, $($args),*),
+                    (CType::F2Poly, PolyVars::H) => call!(Poly<'H', F2>, $method, $($args),*),
+                    (CType::F2Poly, PolyVars::T) => call!(Poly<'T', F2>, $method, $($args),*),
+                    (CType::F3Poly, PolyVars::H) => call!(Poly<'H', F3>, $method, $($args),*),
+                    (CType::F3Poly, PolyVars::T) => call!(Poly<'T', F3>, $method, $($args),*),
+                    _ => None
                 }
             } else {
-                match $c_type {
-                    CType::QPoly  |
-                    CType::F2Poly |
-                    CType::F3Poly => Some(err!("build with `--features poly` to enable polynomial types.")),
-                    _             => None
-                }
+                None
             }
         }
     }}
@@ -104,31 +121,26 @@ macro_rules! try_noneuc_poly {
             if #[cfg(any(feature = "poly", feature = "all"))] {
                 use yui_ratio::Ratio;
                 use yui_ff::FF;
-                use yui_polynomial::{Poly, PolyN};
+                use yui_polynomial::{Poly, Poly2};
 
-                type ZPoly  = Poly<'H', Int>;
-                type ZMPoly = PolyN<'H', Int>;
-                type QMPoly = PolyN<'H', Ratio<Int>>;
-                type F2MPoly = PolyN<'H', FF<2>>;
-                type F3MPoly = PolyN<'H', FF<3>>;
+                type Z = Int;
+                type Q = Ratio<Int>;
+                type F2 = FF<2>;
+                type F3 = FF<3>;
 
-                match $c_type {
-                    CType::ZPoly   => call!(ZPoly,   $method, $($args),*),
-                    CType::ZMpoly  => call!(ZMPoly,  $method, $($args),*),
-                    CType::QMpoly  => call!(QMPoly,  $method, $($args),*),
-                    CType::F2Mpoly => call!(F2MPoly, $method, $($args),*),
-                    CType::F3Mpoly => call!(F3MPoly, $method, $($args),*),
-                    _              => None
+                let vars = poly_vars($c_value);
+
+                match ($c_type, vars) {
+                    (CType::ZPoly,  PolyVars::H ) => call!(Poly<'H', Z>, $method, $($args),*),
+                    (CType::ZPoly,  PolyVars::T ) => call!(Poly<'T', Z>, $method, $($args),*),
+                    (CType::ZPoly,  PolyVars::HT) => call!(Poly2<'H', 'T', Z>, $method, $($args),*),
+                    (CType::QPoly,  PolyVars::HT) => call!(Poly2<'H', 'T', Q>, $method, $($args),*),
+                    (CType::F2Poly, PolyVars::HT) => call!(Poly2<'H', 'T', F2>, $method, $($args),*),
+                    (CType::F3Poly, PolyVars::HT) => call!(Poly2<'H', 'T', F3>, $method, $($args),*),
+                    _ => None
                 }
             } else {
-                match $c_type {
-                    CType::ZPoly   |
-                    CType::ZMpoly  |
-                    CType::QMpoly  |
-                    CType::F2Mpoly |
-                    CType::F3Mpoly => Some(err!("build with `--features poly` to enable polynomial types.")),
-                    _              => None
-                }
+                None
             }
         }
     }}
@@ -147,11 +159,7 @@ macro_rules! try_qint {
                     _            => None
                 }
             } else {
-                match $c_type {
-                    CType::Gauss |
-                    CType::Eisen => Some(err!("build with `--features qint` to enable quad-int types.")),
-                    _            => None
-                }
+                None
             }
         }
     }}

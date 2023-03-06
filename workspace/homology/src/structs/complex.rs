@@ -54,14 +54,25 @@ where
     }
 
     pub fn simplify(&self) -> GenericChainComplex<R, I> { 
+        self.simplify_with(vec![]).0
+    }
+
+    pub fn simplify_with(&self, vecs: Vec<(I::Item, SpVec<R>)>) -> (GenericChainComplex<R, I>, Vec<(I::Item, SpVec<R>)>) { 
         let mut red = ChainReducer::new(self);
+        for (i, v) in vecs { 
+            red.set_vec(i, v);
+        }
         red.process();
 
-        Self::generate(
+        let vecs = red.take_all_vecs();
+
+        let c = Self::generate(
             self.indices(),
             self.d_degree(),
             |i| Some(red.take_matrix(i))
-        )
+        );
+
+        (c, vecs)
     }
 }
 

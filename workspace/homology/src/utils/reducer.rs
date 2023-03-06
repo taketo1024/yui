@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use itertools::Itertools;
 use log::*;
 use sprs::PermOwned;
 use yui_matrix::sparse::*;
@@ -91,6 +92,13 @@ where
 
     pub fn take_vecs(&mut self, i: C::Idx) -> Vec<SpVec<R>> {
         self.vecs.remove(&i).unwrap_or(vec![])
+    }
+
+    pub fn take_all_vecs(&mut self) -> Vec<(C::Idx, SpVec<R>)> {
+        let keys = self.vecs.keys().cloned().collect_vec();
+        keys.into_iter().flat_map(|i| 
+            self.take_vecs(i).into_iter().map(move |v| (i, v))
+        ).collect()
     }
 }
 

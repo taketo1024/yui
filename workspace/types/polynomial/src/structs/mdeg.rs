@@ -7,16 +7,24 @@ use num_traits::Zero;
 use crate::{PolyDeg, impl_polydeg_unsigned, impl_polydeg_signed};
 
 #[derive(Clone, Default, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
-pub struct MDegree<Deg>(BTreeMap<usize, Deg>); // x_0^{d_0} ... x_n^{d_n} <--> [ 0 => d_0, ..., n => d_n ]
+pub struct MDegree<Deg>(BTreeMap<usize, Deg>) // x_0^{d_0} ... x_n^{d_n} <--> [ 0 => d_0, ..., n => d_n ]
+where Deg: Zero;
 
 impl<Deg> MDegree<Deg>
 where Deg: Zero {
+    pub fn new(mut map: BTreeMap<usize, Deg>) -> Self { 
+        map.retain(|_, d| !d.is_zero());
+        Self(map)
+    }
+
     pub fn from_vec(degree: Vec<Deg>) -> Self { 
         Self::from_iter(
-            degree.into_iter().enumerate().filter(|(_, d)| 
-                !d.is_zero()
-            )
+            degree.into_iter().enumerate()
         )
+    }
+    
+    pub fn len(&self) -> usize { 
+        self.0.len()
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&usize, &Deg)> { 
@@ -24,15 +32,24 @@ where Deg: Zero {
     }
 }
 
-impl<Deg> From<(usize, Deg)> for MDegree<Deg> {
+impl<Deg> From<(usize, Deg)> for MDegree<Deg>
+where Deg: Zero {
     fn from(value: (usize, Deg)) -> Self {
-        MDegree(BTreeMap::from([value]))
+        MDegree::from_iter([value])
     }
 }
 
-impl<Deg> FromIterator<(usize, Deg)> for MDegree<Deg> {
+impl<Deg> FromIterator<(usize, Deg)> for MDegree<Deg> 
+where Deg: Zero {
     fn from_iter<T: IntoIterator<Item = (usize, Deg)>>(iter: T) -> Self {
-        Self(iter.into_iter().collect())
+        Self::new(iter.into_iter().collect())
+    }
+}
+
+impl<Deg> MDegree<Deg>
+where Deg: Zero + Clone {
+    pub fn deg(&self, index: usize) -> Deg {
+        self.0.get(&index).cloned().unwrap_or(Deg::zero())
     }
 }
 
@@ -49,7 +66,7 @@ where for<'x> Deg: Clone + AddAssign<&'x Deg> + Zero {
 
 #[auto_ops]
 impl<Deg> AddAssign<&MDegree<Deg>> for MDegree<Deg>
-where for<'x> Deg: Clone + AddAssign<&'x Deg> + Zero {
+where for<'x> Deg: AddAssign<&'x Deg> + Zero + Clone {
     fn add_assign(&mut self, rhs: &MDegree<Deg>) {
         let data = &mut self.0;
         for (i, d) in rhs.0.iter() { 
@@ -64,7 +81,7 @@ where for<'x> Deg: Clone + AddAssign<&'x Deg> + Zero {
 }
 
 impl<Deg> Neg for &MDegree<Deg>
-where for<'x> &'x Deg: Neg<Output = Deg> {
+where Deg: Zero, for<'x> &'x Deg: Neg<Output = Deg> {
     type Output = MDegree<Deg>;
     fn neg(self) -> Self::Output {
         let list = self.0.iter().map(|(&i, d)| 

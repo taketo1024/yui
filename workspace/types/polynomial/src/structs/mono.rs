@@ -37,7 +37,7 @@ where I: for<'x >AddAssign<&'x I> {
     }
 }
 
-fn fmt_mono(x: String, d: isize) -> String { 
+pub(crate) fn fmt_mono(x: String, d: isize) -> String { 
     if d.is_zero() { 
         "1".to_string()
     } else if d.is_one() { 
@@ -68,12 +68,17 @@ macro_rules! impl_mono_univar {
         impl<const X: char> FromStr for Mono<X, $I> {
             type Err = ();
             fn from_str(s: &str) -> Result<Self, Self::Err> {
-                if s.len() == 1 && s.chars().next().unwrap() == X { 
-                    Ok(Self(<$I>::one()))
-                } else { 
-                    // TODO support more complex format. 
-                    Err(())
+                if s.len() == 1 { 
+                    let x = s.chars().next().unwrap();
+                    if x == '1' { 
+                        return Ok(Self(0))
+                    } else if x == X {
+                        return Ok(Self(1))
+                    }
                 }
+
+                // TODO support more complex format. 
+                Err(())
             }
         }
     };
@@ -110,15 +115,19 @@ macro_rules! impl_mono_multivar {
         impl<const X: char> FromStr for Mono<X, MDegree<$I>> {
             type Err = ();
             fn from_str(s: &str) -> Result<Self, Self::Err> {
+                if s == "1" { 
+                    return Ok(Mono::one())
+                }
+
                 let r = regex::Regex::new(&format!("^{X}([0-9]+)$")).unwrap();
                 if let Some(m) = r.captures(&s) { 
                     let i = usize::from_str(&m[1]).unwrap();
                     let mdeg = MDegree::from((i, 1));
                     return Ok(Mono(mdeg))
-                } else { 
-                    // TODO support more complex format. 
-                    Err(())
                 }
+
+                // TODO support more complex format. 
+                Err(())
             }
         }
     };
@@ -128,10 +137,10 @@ impl_mono_multivar!(usize);
 impl_mono_multivar!(isize);
 
 macro_rules! impl_poly_gen {
-    ($struct:ident, $I:ty) => {
-        impl<const X: char> FreeGen for $struct<X, $I> {}
+    ($I:ty) => {
+        impl<const X: char> FreeGen for Mono<X, $I> {}
 
-        impl<const X: char> PolyGen for $struct<X, $I> {
+        impl<const X: char> PolyGen for Mono<X, $I> {
             type Degree = $I;
 
             fn degree(&self) -> Self::Degree {
@@ -153,7 +162,7 @@ macro_rules! impl_poly_gen {
     };
 }
 
-impl_poly_gen!(Mono, usize);
-impl_poly_gen!(Mono, isize);
-impl_poly_gen!(Mono, MDegree<usize>);
-impl_poly_gen!(Mono, MDegree<isize>);
+impl_poly_gen!(usize);
+impl_poly_gen!(isize);
+impl_poly_gen!(MDegree<usize>);
+impl_poly_gen!(MDegree<isize>);

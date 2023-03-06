@@ -9,10 +9,10 @@ cfg_if::cfg_if! {
 }
 
 macro_rules! dispatch_ring {
-    ($c_type:expr, $method:ident $(, $args:expr)*) => {{
+    ($c_value:expr, $c_type:expr, $method:ident $(, $args:expr)*) => {{
         use crate::utils::dispatch::*;
 
-        try_ring!($c_type, $method, $($args),*)
+        try_ring!($c_value, $c_type, $method, $($args),*)
         .unwrap_or( 
             err!("{} is not supported for: {}", stringify!($method), $c_type) 
         )
@@ -20,10 +20,10 @@ macro_rules! dispatch_ring {
 }
 
 macro_rules! dispatch_eucring {
-    ($c_type:expr, $method:ident $(, $args:expr)*) => {{
+    ($c_value:expr, $c_type:expr, $method:ident $(, $args:expr)*) => {{
         use crate::utils::dispatch::*;
 
-        try_eucring!($c_type, $method, $($args),*)
+        try_eucring!($c_value, $c_type, $method, $($args),*)
         .unwrap_or( 
             err!("{} is not supported for: {}", stringify!($method), $c_type) 
         )
@@ -35,22 +35,22 @@ pub(crate) use {dispatch_ring, dispatch_eucring};
 // -- internal -- //
 
 macro_rules! try_ring {
-    ($c_type:expr, $method:ident $(, $args:expr)*) => {{
-        try_eucring!($c_type, $method, $($args),*)
-        .or_else(|| try_noneuc_poly!($c_type, $method, $($args),*) )
+    ($c_value:expr, $c_type:expr, $method:ident $(, $args:expr)*) => {{
+        try_eucring!($c_value, $c_type, $method, $($args),*)
+        .or_else(|| try_noneuc_poly!($c_value, $c_type, $method, $($args),*) )
     }}
 }
 
 macro_rules! try_eucring {
-    ($c_type:expr, $method:ident $(, $args:expr)*) => {{
-        try_std!($c_type, $method, $($args),*)
-        .or_else(|| try_poly!($c_type, $method, $($args),*) )
-        .or_else(|| try_qint!($c_type, $method, $($args),*) )
+    ($c_value:expr, $c_type:expr, $method:ident $(, $args:expr)*) => {{
+        try_std!($c_value, $c_type, $method, $($args),*)
+        .or_else(|| try_poly!($c_value, $c_type, $method, $($args),*) )
+        .or_else(|| try_qint!($c_value, $c_type, $method, $($args),*) )
     }}
 }
 
 macro_rules! try_std {
-    ($c_type:expr, $method:ident $(, $args:expr)*) => {{
+    ($c_value:expr, $c_type:expr, $method:ident $(, $args:expr)*) => {{
         use yui_ratio::Ratio;
         use yui_ff::FF;
 
@@ -69,7 +69,7 @@ macro_rules! try_std {
 }
 
 macro_rules! try_poly {
-    ($c_type:expr, $method:ident $(, $args:expr)*) => {{
+    ($c_value:expr, $c_type:expr, $method:ident $(, $args:expr)*) => {{
         cfg_if::cfg_if! {
             if #[cfg(any(feature = "poly", feature = "all"))] {
                 use yui_ratio::Ratio;
@@ -99,7 +99,7 @@ macro_rules! try_poly {
 }
 
 macro_rules! try_noneuc_poly {
-    ($c_type:expr, $method:ident $(, $args:expr)*) => {{
+    ($c_value:expr, $c_type:expr, $method:ident $(, $args:expr)*) => {{
         cfg_if::cfg_if! {
             if #[cfg(any(feature = "poly", feature = "all"))] {
                 use yui_ratio::Ratio;
@@ -135,7 +135,7 @@ macro_rules! try_noneuc_poly {
 }
 
 macro_rules! try_qint {
-    ($c_type:expr, $method:ident $(, $args:expr)*) => {{
+    ($c_value:expr, $c_type:expr, $method:ident $(, $args:expr)*) => {{
         cfg_if::cfg_if! {
             if #[cfg(any(feature = "qint", feature = "all"))] {
                 type GaussInt = yui_quad_int::GaussInt<Int>;

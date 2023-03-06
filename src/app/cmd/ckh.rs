@@ -33,7 +33,7 @@ pub struct Args {
 }
 
 pub fn run(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
-    dispatch_ring!(&args.c_type, describe_ckh, args)
+    dispatch_ring!(&args.c_value, &args.c_type, describe_ckh, args)
 }
 
 fn describe_ckh<R>(args: &Args) -> Result<String, Box<dyn std::error::Error>>

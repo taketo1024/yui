@@ -29,9 +29,9 @@ pub struct Args {
 
 pub fn run(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
     if args.bigraded { 
-        dispatch_eucring!(&args.c_type, compute_bigraded, args)
+        dispatch_eucring!(&args.c_value, &args.c_type, compute_bigraded, args)
     } else { 
-        dispatch_eucring!(&args.c_type, compute_homology, args)
+        dispatch_eucring!(&args.c_value, &args.c_type, compute_homology, args)
     }
 }
 

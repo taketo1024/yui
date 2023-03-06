@@ -40,7 +40,7 @@ pub fn run(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
 
     let l = load_link(&args.name, &args.link, false)?;
     let s = guard_panic(|| 
-        dispatch_eucring!(&args.c_type, compute_ss, &l, &args.c_value)
+        dispatch_eucring!(&args.c_value, &args.c_type, compute_ss, &l, &args.c_value)
     )?;
 
     info!("{}: ss = {} (c = {})", args.name, s, args.c_value);
@@ -55,7 +55,7 @@ pub fn run_batch(args: &BatchArgs) -> Result<String, Box<dyn std::error::Error>>
     for (name, code) in data { 
         let l = Link::from(&code);
         let res = guard_panic(|| 
-            dispatch_eucring!(&args.c_type, compute_ss, &l, &args.c_value)
+            dispatch_eucring!(&args.c_value, &args.c_type, compute_ss, &l, &args.c_value)
         );
 
         let s = if let Ok(s) = res { 

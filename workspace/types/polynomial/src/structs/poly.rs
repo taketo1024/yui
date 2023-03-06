@@ -458,7 +458,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {}
 mod tests {
     use yui_utils::map;
     use super::*;
-    use crate::{Mono, Poly2, MPoly, LPoly, MLPoly};
+    use crate::{Mono, Poly2, PolyN, LPoly, LPolyN};
  
     #[test]
     fn init_poly() { 
@@ -483,7 +483,7 @@ mod tests {
  
     #[test]
     fn init_mpoly() { 
-        type P = MPoly::<'x', i32>; 
+        type P = PolyN::<'x', i32>; 
         let f = P::from_mdeg(vec![
             (vec![], 3),
             (vec![1], -1),
@@ -494,7 +494,7 @@ mod tests {
 
     #[test]
     fn init_mlpoly() { 
-        type P = MLPoly::<'x', i32>; 
+        type P = LPolyN::<'x', i32>; 
         let f = P::from_mdeg(vec![
             (vec![], 3),
             (vec![1], 1),

@@ -13,5 +13,5 @@ pub type Poly2 <const X: char, const Y: char, R> = PolyBase<Mono2<X, Y, usize>, 
 pub type LPoly2<const X: char, const Y: char, R> = PolyBase<Mono2<X, Y, isize>, R>;
 
 // multivar (ordinary, Laurent)
-pub type MPoly <const X: char, R> = PolyBase<Mono<X, MDegree<usize>>, R>;
-pub type MLPoly<const X: char, R> = PolyBase<Mono<X, MDegree<isize>>, R>;
+pub type PolyN <const X: char, R> = PolyBase<Mono<X, MDegree<usize>>, R>;
+pub type LPolyN<const X: char, R> = PolyBase<Mono<X, MDegree<isize>>, R>;

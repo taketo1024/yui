@@ -104,13 +104,13 @@ macro_rules! try_noneuc_poly {
             if #[cfg(any(feature = "poly", feature = "all"))] {
                 use yui_ratio::Ratio;
                 use yui_ff::FF;
-                use yui_polynomial::{Poly, MPoly};
+                use yui_polynomial::{Poly, PolyN};
 
                 type ZPoly  = Poly<'H', Int>;
-                type ZMPoly = MPoly<'H', Int>;
-                type QMPoly = MPoly<'H', Ratio<Int>>;
-                type F2MPoly = MPoly<'H', FF<2>>;
-                type F3MPoly = MPoly<'H', FF<3>>;
+                type ZMPoly = PolyN<'H', Int>;
+                type QMPoly = PolyN<'H', Ratio<Int>>;
+                type F2MPoly = PolyN<'H', FF<2>>;
+                type F3MPoly = PolyN<'H', FF<3>>;
 
                 match $c_type {
                     CType::ZPoly   => call!(ZPoly,   $method, $($args),*),

@@ -69,19 +69,24 @@ macro_rules! try_std {
     }}
 }
 
-pub(crate) enum PolyVars { 
-    H, T, HT
-}
+cfg_if::cfg_if! {
+    if #[cfg(feature = "poly")] {
+        pub(crate) enum PolyVars { 
+            H, T, HT
+        }
 
-pub(crate) fn poly_vars(c_value: &String) -> PolyVars { 
-    use std::collections::HashSet;
-    
-    let s: HashSet<_> = c_value.split(",").collect();
-    match (s.contains("H"), s.contains("T")) { 
-        (true,  true)  => PolyVars::HT,
-        (true,  false) => PolyVars::H,
-        (false, true)  => PolyVars::T,
-        (false, false) => PolyVars::H
+        pub(crate) fn poly_vars(c_value: &String) -> PolyVars { 
+            use std::collections::HashSet;
+            
+            let s: HashSet<_> = c_value.split(",").collect();
+            match (s.contains("H"), s.contains("T")) { 
+                (true,  true)  => PolyVars::HT,
+                (true,  false) => PolyVars::H,
+                (false, true)  => PolyVars::T,
+                (false, false) => PolyVars::H
+            }
+        }
+    } else {
     }
 }
 

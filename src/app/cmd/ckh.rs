@@ -33,7 +33,7 @@ pub struct Args {
 }
 
 pub fn run(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
-    dispatch_ring!(&args.c_type, describe_ckh, args)
+    dispatch_ring!(&args.c_value, &args.c_type, describe_ckh, args)
 }
 
 fn describe_ckh<R>(args: &Args) -> Result<String, Box<dyn std::error::Error>>
@@ -47,7 +47,12 @@ where R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
     
     let l = load_link(&args.name, &args.link, args.mirror)?;
     let c = KhComplex::new(l, h, t, args.reduced);
-    let vs = c.canon_cycles().into_iter().map(|z| c[0].vectorize(&z)).collect_vec();
+    
+    let vs = if args.with_alpha { 
+        c.canon_cycles().into_iter().map(|z| c[0].vectorize(&z)).collect_vec()
+    } else { 
+        vec![]
+    };
 
     let (c, vs) = if args.no_simplify { 
         (c.as_generic(), vs)
@@ -128,5 +133,58 @@ mod tests {
         };
         let res = run(&args);
         assert!(res.is_ok());
+    }
+
+    #[cfg(feature = "poly")]
+    mod poly_tests { 
+        use super::*;
+        
+        #[test]
+        fn test_zpoly_h() { 
+            let args = Args {
+                name: "3_1".to_string(),
+                link: None,
+                c_value: "H".to_string(),
+                c_type: CType::ZPoly,
+                mirror: false,
+                reduced: false,
+                with_alpha: false,
+                no_simplify: false
+            };
+            let res = run(&args);
+            assert!(res.is_ok());
+        }
+
+        #[test]
+        fn test_zpoly_t() { 
+            let args = Args {
+                name: "3_1".to_string(),
+                link: None,
+                c_value: "T".to_string(),
+                c_type: CType::ZPoly,
+                mirror: false,
+                reduced: false,
+                with_alpha: false,
+                no_simplify: false
+            };
+            let res = run(&args);
+            assert!(res.is_ok());
+        }
+
+        #[test]
+        fn test_zpoly_ht() { 
+            let args = Args {
+                name: "3_1".to_string(),
+                link: None,
+                c_value: "H,T".to_string(),
+                c_type: CType::ZPoly,
+                mirror: false,
+                reduced: false,
+                with_alpha: false,
+                no_simplify: false
+            };
+            let res = run(&args);
+            assert!(res.is_ok());
+        }
     }
 }

@@ -29,9 +29,9 @@ pub struct Args {
 
 pub fn run(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
     if args.bigraded { 
-        dispatch_eucring!(&args.c_type, compute_bigraded, args)
+        dispatch_eucring!(&args.c_value, &args.c_type, compute_bigraded, args)
     } else { 
-        dispatch_eucring!(&args.c_type, compute_homology, args)
+        dispatch_eucring!(&args.c_value, &args.c_type, compute_homology, args)
     }
 }
 
@@ -93,5 +93,40 @@ mod tests {
         };
         let res = run(&args);
         assert!(res.is_ok());
+    }
+
+    #[cfg(feature = "poly")]
+    mod poly_tests { 
+        use super::*;
+        
+        #[test]
+        fn test_qpoly_h() { 
+            let args = Args {
+                name: "3_1".to_string(),
+                link: None,
+                c_value: "H".to_string(),
+                c_type: CType::QPoly,
+                mirror: false,
+                reduced: false,
+                bigraded: false
+            };
+            let res = run(&args);
+            assert!(res.is_ok());
+        }
+
+        #[test]
+        fn test_qpoly_t() { 
+            let args = Args {
+                name: "3_1".to_string(),
+                link: None,
+                c_value: "0,T".to_string(),
+                c_type: CType::QPoly,
+                mirror: false,
+                reduced: false,
+                bigraded: false
+            };
+            let res = run(&args);
+            assert!(res.is_ok());
+        }
     }
 }

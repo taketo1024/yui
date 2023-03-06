@@ -114,7 +114,12 @@ macro_rules! try_poly {
                     _ => None
                 }
             } else {
-                None
+                match $c_type {
+                    CType::QPoly  |
+                    CType::F2Poly |
+                    CType::F3Poly => Some(err!("build with `--features poly` to enable polynomial types.")),
+                    _             => None
+                }
             }
         }
     }}
@@ -145,7 +150,13 @@ macro_rules! try_noneuc_poly {
                     _ => None
                 }
             } else {
-                None
+                match $c_type {
+                    CType::ZPoly  |
+                    CType::QPoly  |
+                    CType::F2Poly |
+                    CType::F3Poly => Some(err!("build with `--features poly` to enable polynomial types.")),
+                    _              => None
+                }
             }
         }
     }}
@@ -164,7 +175,11 @@ macro_rules! try_qint {
                     _            => None
                 }
             } else {
-                None
+                match $c_type {
+                    CType::Gauss |
+                    CType::Eisen => Some(err!("build with `--features qint` to enable quad-int types.")),
+                    _            => None
+                }
             }
         }
     }}

@@ -53,15 +53,26 @@ where
         Self::new(range, d_degree, d_matrices)
     }
 
-    pub fn reduced(&self) -> GenericChainComplex<R, I> { 
+    pub fn simplify(&self) -> GenericChainComplex<R, I> { 
+        self.simplify_with(vec![]).0
+    }
+
+    pub fn simplify_with(&self, vecs: Vec<(I::Item, SpVec<R>)>) -> (GenericChainComplex<R, I>, Vec<(I::Item, SpVec<R>)>) { 
         let mut red = ChainReducer::new(self);
+        for (i, v) in vecs { 
+            red.set_vec(i, v);
+        }
         red.process();
 
-        Self::generate(
+        let vecs = red.take_all_vecs();
+
+        let c = Self::generate(
             self.indices(),
             self.d_degree(),
             |i| Some(red.take_matrix(i))
-        )
+        );
+
+        (c, vecs)
     }
 }
 
@@ -238,7 +249,7 @@ mod tests {
 
     #[test]
     fn d3_retr() {
-        let c = TestChainComplex::<i32>::d3().reduced();
+        let c = TestChainComplex::<i32>::d3().simplify();
 
         assert_eq!(c[0].rank(), 1);
         assert_eq!(c[1].rank(), 0);
@@ -250,7 +261,7 @@ mod tests {
 
     #[test]
     fn s2_retr() {
-        let c = TestChainComplex::<i32>::s2().reduced();
+        let c = TestChainComplex::<i32>::s2().simplify();
 
         assert_eq!(c[0].rank(), 1);
         assert_eq!(c[1].rank(), 0);
@@ -261,7 +272,7 @@ mod tests {
 
     #[test]
     fn t2_retr() {
-        let c = TestChainComplex::<i32>::t2().reduced();
+        let c = TestChainComplex::<i32>::t2().simplify();
 
         assert_eq!(c[0].rank(), 1);
         assert_eq!(c[1].rank(), 2);
@@ -272,7 +283,7 @@ mod tests {
 
     #[test]
     fn rp2_retr() {
-        let c = TestChainComplex::<i32>::rp2().reduced();
+        let c = TestChainComplex::<i32>::rp2().simplify();
 
         assert_eq!(c[0].rank(), 1);
         assert_eq!(c[1].rank(), 1);

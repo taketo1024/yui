@@ -105,7 +105,7 @@ mod tests {
                 name: "3_1".to_string(),
                 link: None,
                 c_value: "H".to_string(),
-                c_type: CType::QPoly,
+                c_type: CType::Q,
                 mirror: false,
                 reduced: false,
                 bigraded: false
@@ -120,7 +120,7 @@ mod tests {
                 name: "3_1".to_string(),
                 link: None,
                 c_value: "0,T".to_string(),
-                c_type: CType::QPoly,
+                c_type: CType::Q,
                 mirror: false,
                 reduced: false,
                 bigraded: false

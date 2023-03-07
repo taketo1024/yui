@@ -56,6 +56,10 @@ impl State {
     pub fn append(&mut self, mut other: Self) {
         self.values.append(&mut other.values);
     }
+
+    pub fn append_b(&mut self, r: Resolution) { 
+        self.values.push(r);
+    }
 }
 
 impl<const N: usize> From<[u8; N]> for State {

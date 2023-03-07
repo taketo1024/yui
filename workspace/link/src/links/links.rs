@@ -71,28 +71,22 @@ impl Link {
         let mut comps = vec![];
         let mut passed: HashSet<Edge> = HashSet::new();
 
-        let mut traverse = |e0: usize| {
+        let mut traverse = |j0: usize| {
             for i0 in 0..n {
-                let start_edge = self.data[i0].edge(e0);
+                let start_edge = self.data[i0].edge(j0);
                 if passed.contains(&start_edge) { 
                     continue 
                 }
 
-                let mut edges = vec![];
-                let mut closed = false;
+                let mut c = Component::empty();
 
-                self.traverse_edges(i0, e0, |i, j| { 
-                    let edge = self.data[i].edge(j);
-                    if edges.first() == Some(&edge) { 
-                        closed = true;
-                    } else { 
-                        edges.push(edge);
-                        passed.insert(edge);
-                    }
+                self.traverse_edges((i0, j0), |i, j| { 
+                    let e = self.data[i].edge(j);
+                    c.append(e);
+                    passed.insert(e);
                 });
 
-                let comp = Component::new(edges, closed);
-                comps.push(comp);
+                comps.push(c);
             }
         };
 
@@ -163,15 +157,14 @@ impl Link {
         None
     }
 
-    fn traverse_edges<F>(&self, c_index:usize, e_index:usize, mut f:F) where
+    fn traverse_edges<F>(&self, start: (usize, usize), mut f:F) where
         F: FnMut(usize, usize)
     {
         let n = self.data.len();
-        debug_assert!((0..n).contains(&c_index));
-        debug_assert!((0..4).contains(&e_index));
+        debug_assert!((0..n).contains(&start.0));
+        debug_assert!((0..4).contains(&start.1));
 
-        let mut i = c_index;
-        let mut j = e_index;
+        let (mut i, mut j) = start;
 
         loop {
             f(i, j);
@@ -179,17 +172,19 @@ impl Link {
             let c = &self.data[i];
             let k = c.pass(j);
             
-            if let Some(next) = self.next(i, k) { 
-                if next != (c_index, e_index) {
-                    (i, j) = next;
-                    continue
-                } else {
-                    f(c_index, e_index); // final call
-                }
-            } else { 
-                f(i, k); // end edge
+            let Some(next) = self.next(i, k) else {
+                // reached end
+                f(i, k);
+                break
+            } ;
+
+            if next == start {
+                // returned to start
+                f(start.0, start.1);
+                break
             }
-            break
+
+            (i, j) = next;
         }
     }
 
@@ -197,12 +192,13 @@ impl Link {
         let n = self.data.len();
         let mut signs = vec![0; n];
 
-        let mut traverse = |e0: usize| {
+        let mut traverse = |j0: usize| {
             for i0 in 0..n {
                 if signs[i0] != 0 { 
                     continue 
                 }
-                self.traverse_edges(i0, e0, |i, j| { 
+
+                self.traverse_edges((i0, j0), |i, j| { 
                     let c = &self.data[i];
                     let sign = match (c.ctype(), j) { 
                         (Xp, 1) | (Xn, 3) =>  1,
@@ -309,19 +305,31 @@ mod tests {
 
     #[test]
     fn link_traverse() {
+        let traverse = |l: &Link, (i0, j0)| { 
+            let mut queue = vec![];
+            l.traverse_edges((i0, j0), |i, j| queue.push((i, j)));
+            queue
+        };
+
+        // single crossing
+        let pd_code = [[0,1,2,3]];
+        let l = Link::from(&pd_code);
+        let path = traverse(&l, (0, 0));
+        assert_eq!(path, [(0, 0), (0, 2)]);
+
+        // unknot with one crossing
         let pd_code = [[0,0,1,1]];
         let l = Link::from(&pd_code);
-        let mut queue = vec![];
-        l.traverse_edges(0, 0, |i, j| queue.push((i, j)));
+        let path = traverse(&l, (0, 0));
         
-        assert_eq!(queue, [(0, 0), (0, 3), (0, 0)]); // loop
+        assert_eq!(path, [(0, 0), (0, 3), (0, 0)]); // loop
 
+        // open arc with one crossing
         let pd_code = [[0,3,1,4],[3,2,2,1]];
         let l = Link::from(&pd_code);
-        let mut queue = vec![];
-        l.traverse_edges(0, 0, |i, j| queue.push((i, j)));
+        let path = traverse(&l, (0, 0));
 
-        assert_eq!(queue, [(0, 0), (1, 3), (1, 2), (0, 1), (0, 3)]); // no loop
+        assert_eq!(path, [(0, 0), (1, 3), (1, 2), (0, 1), (0, 3)]); // no loop
     }
 
     #[test]

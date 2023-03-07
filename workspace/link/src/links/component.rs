@@ -24,6 +24,16 @@ impl Component {
         &self.edges
     }
 
+    pub fn ends(&self) -> Option<(Edge, Edge)> { 
+        if self.is_empty() || self.is_closed() { 
+            None
+        } else { 
+            let &e0 = self.edges.first().unwrap();
+            let &e1 = self.edges.last().unwrap();
+            Some((e0, e1))
+        }
+    }
+
     pub fn len(&self) -> usize { 
         self.edges.len()
     }
@@ -62,48 +72,45 @@ impl Component {
     }
 
     pub fn is_connectable(&self, other: &Self) -> bool { 
-        if self.is_empty() || self.is_closed() || other.is_empty() || other.is_closed() { 
-            return false
-        }
-
-        let e0 = self.edges.first().unwrap();
-        let e1 = self.edges.last().unwrap();
-        let f0 = other.edges.first().unwrap();
-        let f1 = other.edges.last().unwrap();
+        let Some((e0, e1)) =  self.ends() else { return false };
+        let Some((f0, f1)) = other.ends() else { return false };
         
         e0 == f0 || e0 == f1 || e1 == f0 || e1 == f1
     }
 
     pub fn connect(&mut self, other: Self) { 
-        assert_eq!(self.is_empty()  || self.is_closed(),  false);
-        assert_eq!(other.is_empty() || other.is_closed(), false);
+        assert!(self.is_connectable(&other), "{self} and {other} is not connectable.");
+
+        let (e0, e1) =  self.ends().unwrap();
+        let (f0, f1) = other.ends().unwrap();
 
         let Component {mut edges, ..} = other;
 
-        let e0 = self.edges.first().unwrap();
-        let e1 = self.edges.last() .unwrap();
-        let f0 = edges.first().unwrap();
-        let f1 = edges.last() .unwrap();
+        if e1 == f0 {        // [.., e1) + [f0, ..)
+            edges.remove(0);
+            self.edges.append(&mut edges);
+        } else if e1 == f1 { // [.., e1) + [.., f1)
+            edges.pop();
+            edges.reverse();
+            self.edges.append(&mut edges);
+        } else if e0 == f0 { // [e0, ..) + [f0, ..)
+            edges.remove(0);
+            edges.reverse();
+            edges.append(&mut self.edges);
+            self.edges = edges;
+        } else if e0 == f1 { // [e0, ..) + [.., f1)
+            edges.pop();
+            edges.append(&mut self.edges);
+            self.edges = edges;
+        } else {
+            panic!() // unreachable
+        }
 
-        if e0 == f0 { 
-            edges.remove(0);
-            edges.reverse();
-            edges.append(&mut self.edges);
-            self.edges = edges;
-        } else if e0 == f1 { 
-            edges.pop();
-            edges.append(&mut self.edges);
-            self.edges = edges;
-        } else if e1 == f0 { 
-            edges.remove(0);
-            self.edges.append(&mut edges);
-        } else if e1 == f1 { 
-            edges.pop();
-            edges.reverse();
-            self.edges.append(&mut edges);
-        } else { 
-            let other = Component { edges, closed: false }; 
-            panic!("{self} and {other} is not connectable.")
+        let (e0, e1) = self.ends().unwrap();
+
+        if e0 == e1 { 
+            self.edges.pop();
+            self.closed = true;
         }
     }
 

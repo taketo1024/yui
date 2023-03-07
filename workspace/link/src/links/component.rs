@@ -12,6 +12,7 @@ pub struct Component {
 
 impl Component { 
     pub fn new(edges: Vec<Edge>, closed: bool) -> Self { 
+        assert!(!closed || edges.len() > 0);
         Self { edges, closed }
     }
 
@@ -21,6 +22,14 @@ impl Component {
 
     pub fn edges(&self) -> &Vec<Edge> { 
         &self.edges
+    }
+
+    pub fn len(&self) -> usize { 
+        self.edges.len()
+    }
+    
+    pub fn is_empty(&self) -> bool { 
+        self.edges.is_empty()
     }
 
     pub fn is_closed(&self) -> bool { 
@@ -34,6 +43,67 @@ impl Component {
             self.closed = true
         } else { 
             self.edges.push(e)
+        }
+    }
+
+    pub fn reduce(&mut self) { 
+        if self.is_empty() { 
+            return
+        }
+
+        if self.is_closed() && self.len() > 1 { 
+            let e0 = self.edges.remove(0);
+            self.edges = vec![e0];
+        } else if !self.is_closed() && self.len() > 2 { 
+            let e0 = self.edges.remove(0);
+            let e1 = self.edges.pop().unwrap();
+            self.edges = vec![e0, e1];
+        }
+    }
+
+    pub fn is_connectable(&self, other: &Self) -> bool { 
+        if self.is_empty() || self.is_closed() || other.is_empty() || other.is_closed() { 
+            return false
+        }
+
+        let e0 = self.edges.first().unwrap();
+        let e1 = self.edges.last().unwrap();
+        let f0 = other.edges.first().unwrap();
+        let f1 = other.edges.last().unwrap();
+        
+        e0 == f0 || e0 == f1 || e1 == f0 || e1 == f1
+    }
+
+    pub fn connect(&mut self, other: Self) { 
+        assert_eq!(self.is_empty()  || self.is_closed(),  false);
+        assert_eq!(other.is_empty() || other.is_closed(), false);
+
+        let Component {mut edges, ..} = other;
+
+        let e0 = self.edges.first().unwrap();
+        let e1 = self.edges.last() .unwrap();
+        let f0 = edges.first().unwrap();
+        let f1 = edges.last() .unwrap();
+
+        if e0 == f0 { 
+            edges.remove(0);
+            edges.reverse();
+            edges.append(&mut self.edges);
+            self.edges = edges;
+        } else if e0 == f1 { 
+            edges.pop();
+            edges.append(&mut self.edges);
+            self.edges = edges;
+        } else if e1 == f0 { 
+            edges.remove(0);
+            self.edges.append(&mut edges);
+        } else if e1 == f1 { 
+            edges.pop();
+            edges.reverse();
+            self.edges.append(&mut edges);
+        } else { 
+            let other = Component { edges, closed: false }; 
+            panic!("{self} and {other} is not connectable.")
         }
     }
 
@@ -72,5 +142,90 @@ impl Display for Component {
         } else {
             write!(f, ")")
         }
+    }
+}
+
+#[cfg(test)]
+mod tests { 
+    use super::*;
+
+    #[test]
+    fn append() { 
+        let mut c = Component::empty();
+        c.append(0);
+        c.append(1);
+        c.append(2);
+
+        assert_eq!(c.edges(), &vec![0,1,2]);
+        assert_eq!(c.is_closed(), false);
+
+        c.append(0);
+
+        assert_eq!(c.edges(), &vec![0,1,2]);
+        assert_eq!(c.is_closed(), true);
+    }
+
+    #[test]
+    fn reduce() { 
+        let mut c = Component::new(vec![], false);
+        c.reduce();
+        assert_eq!(c, Component::new(vec![], false));
+        
+        let mut c = Component::new(vec![0], false);
+        c.reduce();
+        assert_eq!(c, Component::new(vec![0], false));
+        
+        let mut c = Component::new(vec![0,1,2,3], false);
+        c.reduce();
+        assert_eq!(c, Component::new(vec![0, 3], false));
+        
+        let mut c = Component::new(vec![0], true);
+        c.reduce();
+        assert_eq!(c, Component::new(vec![0], true));
+
+        let mut c = Component::new(vec![0,1,2,3], true);
+        c.reduce();
+        assert_eq!(c, Component::new(vec![0], true));
+    }
+
+    #[test]
+    fn is_connectable() { 
+        let c = Component::new(vec![1,2,3,4], false);
+
+        assert_eq!(c.is_connectable(&Component::new(vec![4,5], false)), true);
+        assert_eq!(c.is_connectable(&Component::new(vec![5,4], false)), true);
+        assert_eq!(c.is_connectable(&Component::new(vec![1,5], false)), true);
+        assert_eq!(c.is_connectable(&Component::new(vec![5,1], false)), true);
+        assert_eq!(c.is_connectable(&Component::new(vec![5,6], false)), false);
+        assert_eq!(c.is_connectable(&Component::new(vec![2,3], false)), false);
+        assert_eq!(c.is_connectable(&Component::new(vec![0], true)), false);
+        assert_eq!(c.is_connectable(&Component::new(vec![], false)), false);
+    }
+
+    #[test]
+    fn connect() { 
+        let mut c = Component::new(vec![1,2,3,4], false);
+        c.connect(Component::new(vec![4,5], false));
+        assert_eq!(c, Component::new(vec![1,2,3,4,5], false));
+
+        let mut c = Component::new(vec![1,2,3,4], false);
+        c.connect(Component::new(vec![5,4], false));
+        assert_eq!(c, Component::new(vec![1,2,3,4,5], false));
+
+        let mut c = Component::new(vec![1,2,3,4], false);
+        c.connect(Component::new(vec![6,1], false));
+        assert_eq!(c, Component::new(vec![6,1,2,3,4], false));
+
+        let mut c = Component::new(vec![1,2,3,4], false);
+        c.connect(Component::new(vec![1,6], false));
+        assert_eq!(c, Component::new(vec![6,1,2,3,4], false));
+
+        let mut c = Component::new(vec![1,2,3,4], false);
+        c.connect(Component::new(vec![1], false));
+        assert_eq!(c, Component::new(vec![1,2,3,4], false));
+
+        let mut c = Component::new(vec![1,2,3,4], false);
+        c.connect(Component::new(vec![4], false));
+        assert_eq!(c, Component::new(vec![1,2,3,4], false));
     }
 }

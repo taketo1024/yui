@@ -1105,6 +1105,7 @@ dependencies = [
 name = "yui-link"
 version = "0.1.0"
 dependencies = [
+ "derive_more",
  "itertools",
  "num-traits",
  "serde",

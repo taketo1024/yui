@@ -142,10 +142,12 @@ impl Component {
 
 impl Display for Component {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let c = self.edges.iter().map(|e| e.to_string()).join("-");
         write!(f, "[")?;
-        write!(f, "{}", self.edges.iter().map(|e| e.to_string()).join("-"))?;
-        if self.closed { 
-            write!(f, "-")?;
+        if self.is_closed() { 
+            write!(f, "-{c}-", )?;
+        } else { 
+            write!(f, "{c}", )?;
         }
         write!(f, "]")
     }

@@ -33,20 +33,6 @@ impl<R> SpMat<R> {
             (i, j, a)
         })
     }
-
-    pub fn col_view(&self, j: usize) -> CsVecView<R> { 
-        assert!(j < self.cols());
-        self.cs_mat.outer_view(j).unwrap()
-    }
-}
-
-// TODO move above after relaxing trait bounds for SpVec. 
-impl<R> SpMat<R>
-where R: Ring, for<'a> &'a R: RingOps<R> {
-    pub fn col_vec(&self, j: usize) -> SpVec<R> { 
-        let cs_vec = self.col_view(j).to_owned();
-        SpVec::from(cs_vec)
-    }
 }
 
 impl<R> From<CsMat<R>> for SpMat<R> {
@@ -84,17 +70,31 @@ where R: Clone + Default + Zero {
     }
 }
 
-impl<R> SpMat<R> where R: Clone + Zero { 
-    pub fn generate<F>(shape: (usize, usize), f: F) -> Self
-    where F: FnOnce(&mut (dyn FnMut(usize, usize, R))) { 
-        let mut t = TriMat::new(shape);
-        f( &mut |i, j, a| { 
+impl<R> SpMat<R>
+where R: Clone {
+    pub fn col_vec(&self, j: usize) -> SpVec<R> { 
+        let cs_vec = self.col_view(j).to_owned();
+        SpVec::from(cs_vec)
+    }
+}
+
+macro_rules! _generate {
+    ($shape:expr, $f:expr) => {{
+        let mut t = TriMat::new($shape);
+        $f( &mut |i, j, a| { 
             if !a.is_zero() { 
                 t.add_triplet(i, j, a)
             }
         });
         let cs_mat = t.to_csc();
         Self::from(cs_mat)
+    }}
+}
+
+impl<R> SpMat<R> where R: Clone + Zero { 
+    pub fn generate<F>(shape: (usize, usize), f: F) -> Self
+    where F: FnOnce(&mut (dyn FnMut(usize, usize, R))) { 
+        _generate!(shape, f)
     }
 
     pub fn from_vec(shape: (usize, usize), grid: Vec<R>) -> Self { 
@@ -160,14 +160,7 @@ impl<R> SpMat<R>
 where R: Clone + Zero + Send + Sync { 
     pub fn generate_sync<F>(shape: (usize, usize), f: F) -> Self
     where F: FnOnce(&mut (dyn FnMut(usize, usize, R) + Send + Sync)) { 
-        let mut t = TriMat::new(shape);
-        f( &mut |i, j, a| { 
-            if !a.is_zero() { 
-                t.add_triplet(i, j, a)
-            }
-        });
-        let cs_mat = t.to_csc();
-        Self::from(cs_mat)
+        _generate!(shape, f)
     }
 }
 
@@ -217,7 +210,7 @@ where R: AddGrp, for<'a> &'a R: AddGrpOps<R> {
     }
 }
 
-macro_rules! impl_op {
+macro_rules! impl_binop {
     ($trait:ident, $method:ident, $r_trait:ident, $r_op_trait:ident) => {
         #[auto_ops]
         impl<'a, 'b, R> $trait<&'b SpMat<R>> for &'a SpMat<R>
@@ -231,24 +224,24 @@ macro_rules! impl_op {
     };
 }
 
-impl_op!(Add, add, AddGrp, AddGrpOps);
-impl_op!(Sub, sub, AddGrp, AddGrpOps);
-impl_op!(Mul, mul, Ring, RingOps);
+impl_binop!(Add, add, AddGrp, AddGrpOps);
+impl_binop!(Sub, sub, AddGrp, AddGrpOps);
+impl_binop!(Mul, mul, Ring, RingOps);
 
 macro_rules! impl_ops {
-    ($trait:ident) => {
+    ($trait:ident, $r_trait:ident, $r_op_trait:ident) => {
         impl<R> $trait<SpMat<R>> for SpMat<R>
-        where R: Ring, for<'x> &'x R: RingOps<R> {}
+        where R: $r_trait, for<'x> &'x R: $r_op_trait<R> {}
 
         impl<R> $trait<SpMat<R>> for &SpMat<R>
-        where R: Ring, for<'x> &'x R: RingOps<R> {}
+        where R: $r_trait, for<'x> &'x R: $r_op_trait<R> {}
     };
 }
 
-impl_ops!(AddMonOps);
-impl_ops!(AddGrpOps);
-impl_ops!(MonOps);
-impl_ops!(RingOps);
+impl_ops!(AddMonOps, AddGrp, AddGrpOps);
+impl_ops!(AddGrpOps, AddGrp, AddGrpOps);
+impl_ops!(MonOps, Ring, RingOps);
+impl_ops!(RingOps, Ring, RingOps);
 
 impl<R> SpMat<R> { 
     pub fn view(&self) -> SpMatView<R> { 
@@ -297,6 +290,11 @@ impl<R> SpMat<R> {
     pub fn submat_cols(&self, cols: Range<usize>) -> SpMatView<R> { 
         let m = self.rows();
         self.submat(0 .. m, cols)
+    }
+
+    pub fn col_view(&self, j: usize) -> CsVecView<R> { 
+        assert!(j < self.cols());
+        self.cs_mat.outer_view(j).unwrap()
     }
 }
 

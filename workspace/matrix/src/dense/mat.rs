@@ -1,41 +1,53 @@
 use std::ops::{Add, Neg, Sub, Mul, Index, IndexMut, AddAssign, SubAssign, MulAssign};
 use std::cmp::min;
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 use ndarray::{Array2, s};
 use derive_more::Display;
 use auto_impl_ops::auto_ops;
-use yui_core::{Ring, RingOps, AddMonOps, AddGrpOps, MonOps};
+use yui_core::{AddMon, AddMonOps, AddGrp, AddGrpOps, MonOps, Ring, RingOps};
 use crate::sparse::SpMat;
 
-pub trait MatType: Clone + Debug + Display + Default + PartialEq + Eq + RingOps<Self> 
-where for<'x> &'x Self: RingOps<Self>
-{
-    type R;
-
+pub trait MatType {
     fn shape(&self) -> (usize, usize);
     fn rows(&self) -> usize { self.shape().0 }
     fn cols(&self) -> usize { self.shape().1 }
-
     fn is_square(&self) -> bool { 
         let (m, n) = self.shape();
         m == n
     }
-
-    fn zero(shape: (usize, usize)) -> Self;
-    fn is_zero(&self) -> bool;
-
-    fn id(size: usize) -> Self;
-    fn is_id(&self) -> bool;
 }
 
 #[derive(Clone, Debug, Display, Default, PartialEq, Eq)]
-pub struct Mat<R>
-where R: Ring, for<'a> &'a R: RingOps<R> {
+pub struct Mat<R> {
     array: Array2<R>
 }
 
-impl<R> Mat<R>
-where R: Ring, for<'a> &'a R: RingOps<R> {
+impl<R> MatType for Mat<R> {
+    fn shape(&self) -> (usize, usize) {
+        (self.array.nrows(), self.array.ncols())
+    }
+}
+
+impl<R> From<Array2<R>> for Mat<R> {
+    fn from(array: Array2<R>) -> Self {
+        Self { array }
+    }
+}
+
+impl<R> Index<[usize; 2]> for Mat<R> {
+    type Output = R;
+    fn index(&self, index: [usize; 2]) -> &R {
+        &self.array[index]
+    }
+}
+
+impl<R> IndexMut<[usize; 2]> for Mat<R> {
+    fn index_mut(&mut self, index: [usize; 2]) -> &mut Self::Output {
+        &mut self.array[index]
+    }
+}
+
+impl<R> Mat<R> {
     pub fn array(&self) -> &Array2<R> {
         &self.array
     }
@@ -46,25 +58,6 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
     pub fn array_into(self) -> Array2<R> {
         self.array
-    }
-
-    pub fn diag(shape: (usize, usize), entries: Vec<R>) -> Self {
-        assert!( entries.len() <= min(shape.0, shape.1) );
-        let mut mat = Self::zero(shape);
-        for (i, a) in entries.into_iter().enumerate() {
-            mat[[i, i]] = a;
-        }
-        mat
-    }
-
-    pub fn is_diag(&self) -> bool { 
-        self.array.indexed_iter().all(|((i, j), a)| 
-            i == j || a.is_zero()
-        )
-    }
-
-    pub fn to_sparse(&self) -> SpMat<R> { 
-        self.into()
     }
 
     pub fn swap_rows(&mut self, i: usize, j: usize) {
@@ -85,6 +78,60 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         let (s_i, s_j) = (s![.., i], s![.., j]);
         let (col_i, col_j) = self.array.multi_slice_mut((s_i, s_j));
         ndarray::Zip::from(col_i).and(col_j).for_each(std::mem::swap);
+    }
+
+    // private methods // 
+
+    fn is_valid_row_index(&self, i: usize) -> bool { 
+        (0..self.rows()).contains(&i)
+    }
+
+    fn is_valid_col_index(&self, j: usize) -> bool { 
+        (0..self.cols()).contains(&j)
+    }
+}
+
+impl<R> Mat<R>
+where R: AddMon, for<'x> &'x R: AddMonOps<R> {
+    pub fn zero(shape: (usize, usize)) -> Self { 
+        Self::from(Array2::zeros(shape))
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.array.iter().all(|a| a.is_zero())
+    }
+
+    pub fn diag(shape: (usize, usize), entries: Vec<R>) -> Self {
+        assert!( entries.len() <= min(shape.0, shape.1) );
+        let mut mat = Self::zero(shape);
+        for (i, a) in entries.into_iter().enumerate() {
+            mat[[i, i]] = a;
+        }
+        mat
+    }
+
+    pub fn is_diag(&self) -> bool { 
+        self.array.indexed_iter().all(|((i, j), a)| 
+            i == j || a.is_zero()
+        )
+    }
+}
+
+impl<R> Mat<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    pub fn to_sparse(&self) -> SpMat<R> { 
+        self.into()
+    }
+
+    pub fn id(size: usize) -> Self { 
+        let array = Array2::from_diag_elem(size, R::one());
+        Self::from(array)
+    }
+
+    pub fn is_id(&self) -> bool { 
+        self.is_square() && self.array.indexed_iter().all(|((i, j), a)| 
+            i == j && a.is_one() || i != j && a.is_zero()
+        )
     }
 
     pub fn mul_row(&mut self, i: usize, r: &R) {
@@ -160,23 +207,6 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
             )
         });
     }
-
-    // private methods // 
-
-    fn is_valid_row_index(&self, i: usize) -> bool { 
-        (0..self.rows()).contains(&i)
-    }
-
-    fn is_valid_col_index(&self, j: usize) -> bool { 
-        (0..self.cols()).contains(&j)
-    }
-}
-
-impl<R> From<Array2<R>> for Mat<R> 
-where R: Ring, for<'a> &'a R: RingOps<R> {
-    fn from(array: Array2<R>) -> Self {
-        Self { array }
-    }
 }
 
 impl<R> From<&SpMat<R>> for Mat<R> 
@@ -186,23 +216,8 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     }
 }
 
-impl<R> Index<[usize; 2]> for Mat<R>
-where R: Ring, for<'a> &'a R: RingOps<R> {
-    type Output = R;
-    fn index(&self, index: [usize; 2]) -> &R {
-        &self.array[index]
-    }
-}
-
-impl<R> IndexMut<[usize; 2]> for Mat<R>
-where R: Ring, for<'a> &'a R: RingOps<R> {
-    fn index_mut(&mut self, index: [usize; 2]) -> &mut Self::Output {
-        &mut self.array[index]
-    }
-}
-
 impl<R> Neg for Mat<R>
-where R: Ring, for<'a> &'a R: RingOps<R> {
+where R: AddGrp, for<'x> &'x R: AddGrpOps<R> {
     type Output = Self;
     fn neg(self) -> Self::Output {
         Mat::from(-self.array)
@@ -210,7 +225,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 }
 
 impl<R> Neg for &Mat<R>
-where R: Ring, for<'a> &'a R: RingOps<R> {
+where R: AddGrp, for<'x> &'x R: AddGrpOps<R> {
     type Output = Mat<R>;
     fn neg(self) -> Self::Output {
         Mat::from(-&self.array)
@@ -219,7 +234,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
 #[auto_ops]
 impl<R> AddAssign<&Mat<R>> for Mat<R>
-where R: Ring, for<'a> &'a R: RingOps<R> {
+where R: AddMon, for<'x> &'x R: AddMonOps<R> {
     fn add_assign(&mut self, rhs: &Self) {
         assert_eq!(self.shape(), rhs.shape());
         self.array += &rhs.array;
@@ -228,7 +243,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
 #[auto_ops]
 impl<R> SubAssign<&Mat<R>> for Mat<R>
-where R: Ring, for<'a> &'a R: RingOps<R> {
+where R: AddGrp, for<'x> &'x R: AddGrpOps<R> {
     fn sub_assign(&mut self, rhs: &Self) {
         assert_eq!(self.shape(), rhs.shape());
         self.array -= &rhs.array
@@ -253,47 +268,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 macro_rules! impl_ops {
-    ($trait:ident) => {
-        impl<R> $trait<Mat<R>> for Mat<R>
-        where R: Ring, for<'x> &'x R: RingOps<R> {}
+    ($op_trait:ident, $r_trait:ident, $r_op_trait:ident) => {
+        impl<R> $op_trait<Mat<R>> for Mat<R>
+        where R: $r_trait, for<'x> &'x R: $r_op_trait<R> {}
 
-        impl<R> $trait<Mat<R>> for &Mat<R>
-        where R: Ring, for<'x> &'x R: RingOps<R> {}
+        impl<R> $op_trait<Mat<R>> for &Mat<R>
+        where R: $r_trait, for<'x> &'x R: $r_op_trait<R> {}
     };
 }
 
-impl_ops!(AddMonOps);
-impl_ops!(AddGrpOps);
-impl_ops!(MonOps);
-impl_ops!(RingOps);
-
-impl<R> MatType for Mat<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type R = R;
-
-    fn shape(&self) -> (usize, usize) {
-        (self.array.nrows(), self.array.ncols())
-    }
-
-    fn zero(shape: (usize, usize)) -> Self { 
-        Self::from(Array2::zeros(shape))
-    }
-
-    fn is_zero(&self) -> bool {
-        self.array.iter().all(|a| a.is_zero())
-    }
-
-    fn id(size: usize) -> Self { 
-        let array = Array2::from_diag_elem(size, R::one());
-        Self::from(array)
-    }
-
-    fn is_id(&self) -> bool { 
-        self.is_square() && self.array.indexed_iter().all(|((i, j), a)| 
-            i == j && a.is_one() || i != j && a.is_zero()
-        )
-    }
-}
+impl_ops!(AddMonOps, AddMon, AddMonOps);
+impl_ops!(AddGrpOps, AddGrp, AddGrpOps);
+impl_ops!(MonOps, Ring, RingOps);
+impl_ops!(RingOps, Ring, RingOps);
 
 #[cfg(test)]
 mod tests { 

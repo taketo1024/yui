@@ -13,6 +13,13 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     cs_mat: CsMat<R>
 }
 
+impl<R> MatType for SpMat<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn shape(&self) -> (usize, usize) {
+        self.cs_mat.shape()
+    }
+}
+
 impl<R> SpMat<R>
 where R: Ring, for<'a> &'a R: RingOps<R> { 
     pub fn generate<F>(shape: (usize, usize), f: F) -> Self
@@ -43,6 +50,28 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
     pub fn cs_mat_into(self) -> CsMat<R> { 
         self.cs_mat
+    }
+
+    pub fn zero(shape: (usize, usize)) -> Self {
+        Self::from(CsMat::zero(shape).to_csc())
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.cs_mat.data().iter().all(|a| a.is_zero())
+    }
+
+    pub fn id(n: usize) -> Self { 
+        let indptr = (0..=n).collect();
+        let indices = (0..n).collect();
+        let data = vec![R::one(); n];
+        let cs_mat = CsMat::new_csc((n, n), indptr, indices, data);
+        Self::from(cs_mat)
+    }
+
+    pub fn is_id(&self) -> bool {
+        self.is_square() && self.cs_mat.into_iter().all(|(a, (i, j))| 
+            (i == j && a.is_one()) || (i != j && a.is_zero())
+        )
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (usize, usize, &R)> { 
@@ -151,37 +180,6 @@ impl_ops!(AddMonOps);
 impl_ops!(AddGrpOps);
 impl_ops!(MonOps);
 impl_ops!(RingOps);
-
-impl<R> MatType for SpMat<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type R = R;
-
-    fn shape(&self) -> (usize, usize) {
-        self.cs_mat.shape()
-    }
-
-    fn zero(shape: (usize, usize)) -> Self {
-        Self::from(CsMat::zero(shape).to_csc())
-    }
-
-    fn is_zero(&self) -> bool {
-        self.cs_mat.data().iter().all(|a| a.is_zero())
-    }
-
-    fn id(n: usize) -> Self { 
-        let indptr = (0..=n).collect();
-        let indices = (0..n).collect();
-        let data = vec![R::one(); n];
-        let cs_mat = CsMat::new_csc((n, n), indptr, indices, data);
-        Self::from(cs_mat)
-    }
-
-    fn is_id(&self) -> bool {
-        self.is_square() && self.cs_mat.into_iter().all(|(a, (i, j))| 
-            (i == j && a.is_one()) || (i != j && a.is_zero())
-        )
-    }
-}
 
 impl<R> SpMat<R>
 where R: Ring, for<'a> &'a R: RingOps<R> { 

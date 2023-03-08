@@ -28,7 +28,7 @@ where
     }
 
     pub fn vectorize_x(&self, x: X) -> SpVec<R> {
-        self.vectorize(&LinComb::wrap(x))
+        self.vectorize(&LinComb::from(x))
     }
 
     pub fn vectorize(&self, z: &LinComb<X, R>) -> SpVec<R> {

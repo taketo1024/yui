@@ -57,10 +57,6 @@ where
         new
     }
 
-    pub fn wrap(x: X) -> Self { 
-        Self::new_raw(map!{ x => R::one() })
-    }
-
     pub fn from_iter<I>(iter: I) -> Self 
     where I: Iterator<Item = (X, R)> {
         let data = iter.collect::<HashMap<_, _>>();
@@ -118,6 +114,16 @@ where
             }
         }
         res
+    }
+}
+
+impl<X, R> From<X> for LinComb<X, R>
+where
+    X: FreeGen,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{
+    fn from(x: X) -> Self {
+        Self::new_raw(map!{ x => R::one() })
     }
 }
 

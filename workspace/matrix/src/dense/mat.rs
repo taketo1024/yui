@@ -1,7 +1,7 @@
 use std::ops::{Add, Neg, Sub, Mul, Index, IndexMut, AddAssign, SubAssign, MulAssign};
 use std::cmp::min;
 use std::fmt::Debug;
-use ndarray::{Array2, s};
+use ndarray::{Array2, Axis, s, concatenate};
 use derive_more::Display;
 use auto_impl_ops::auto_ops;
 use num_traits::{Zero, One};
@@ -66,6 +66,23 @@ impl<R> Index<[usize; 2]> for Mat<R> {
 impl<R> IndexMut<[usize; 2]> for Mat<R> {
     fn index_mut(&mut self, index: [usize; 2]) -> &mut Self::Output {
         &mut self.array[index]
+    }
+}
+
+impl<R> Mat<R>
+where R: Clone {
+    pub fn combine_blocks(blocks: [&Mat<R>; 4]) -> Mat<R> {
+        let [a, b, c, d] = blocks;
+
+        assert_eq!(a.rows(), b.rows());
+        assert_eq!(c.rows(), d.rows());
+        assert_eq!(a.cols(), c.cols());
+        assert_eq!(b.cols(), d.cols());
+
+        let ab = concatenate![Axis(1), a.array, b.array];
+        let cd = concatenate![Axis(1), c.array, d.array];
+        let x  = concatenate![Axis(0), ab, cd];
+        Mat::from(x)
     }
 }
 
@@ -433,5 +450,29 @@ mod tests {
         let sps = SpMat::from_vec((2, 3), vec![1,2,3,4,5,6]);
         let dns = Mat::from(&sps);
         assert_eq!(dns, Mat::from(array![[1,2,3],[4,5,6]]));
+    }
+
+    #[test]
+    fn combine_blocks() { 
+        let a = Mat::from(array![
+            [1,2,3],
+            [4,5,6]
+        ]);
+        let b = Mat::from(array![
+            [7],
+            [8]
+        ]);
+        let c = Mat::from(array![
+            [9, 10, 11]
+        ]);
+        let d = Mat::from(array![
+            [12]
+        ]);
+        let x = Mat::combine_blocks([&a,&b,&c,&d]);
+        assert_eq!(x, Mat::from(array![
+            [1, 2, 3, 7],
+            [4, 5, 6, 8],
+            [9,10,11,12]           
+        ]))
     }
 }

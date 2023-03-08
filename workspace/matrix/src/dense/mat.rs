@@ -4,6 +4,7 @@ use std::fmt::Debug;
 use ndarray::{Array2, s};
 use derive_more::Display;
 use auto_impl_ops::auto_ops;
+use num_traits::Zero;
 use yui_core::{AddMon, AddMonOps, AddGrp, AddGrpOps, MonOps, Ring, RingOps};
 use crate::sparse::SpMat;
 
@@ -31,6 +32,13 @@ impl<R> MatType for Mat<R> {
 impl<R> From<Array2<R>> for Mat<R> {
     fn from(array: Array2<R>) -> Self {
         Self { array }
+    }
+}
+
+impl<R> From<&SpMat<R>> for Mat<R>
+where R: Clone + Zero {
+    fn from(a: &SpMat<R>) -> Self {
+        Mat::from(a.cs_mat().to_dense())
     }
 }
 
@@ -206,13 +214,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 x * c + y * d
             )
         });
-    }
-}
-
-impl<R> From<&SpMat<R>> for Mat<R> 
-where R: Ring, for<'a> &'a R: RingOps<R> {
-    fn from(a: &SpMat<R>) -> Self {
-        Mat::from(a.cs_mat().to_dense())
     }
 }
 

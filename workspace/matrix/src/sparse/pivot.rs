@@ -578,7 +578,6 @@ impl<'a> RowWorker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashSet;
     use num_traits::{Zero, One};
     use yui_utils::set;
  

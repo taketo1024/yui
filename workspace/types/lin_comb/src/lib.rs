@@ -57,12 +57,6 @@ where
         new
     }
 
-    pub fn from_iter<I>(iter: I) -> Self 
-    where I: Iterator<Item = (X, R)> {
-        let data = iter.collect::<HashMap<_, _>>();
-        Self::new(data)
-    }
-
     pub fn len(&self) -> usize {
         self.data.len()
     }
@@ -144,6 +138,17 @@ where
 {
     fn from(data: Vec<(X, R)>) -> Self {
         Self::from_iter(data.into_iter())
+    }
+}
+
+impl<X, R> FromIterator<(X, R)> for LinComb<X, R>
+where
+    X: FreeGen,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{
+    fn from_iter<T: IntoIterator<Item = (X, R)>>(iter: T) -> Self {
+        let data = iter.into_iter().collect::<HashMap<_, _>>();
+        Self::new(data)
     }
 }
 

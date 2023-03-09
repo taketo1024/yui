@@ -41,6 +41,14 @@ impl<R> Mat<R> {
     pub fn array_into(self) -> Array2<R> {
         self.array
     }
+
+    fn is_valid_row_index(&self, i: usize) -> bool { 
+        i < self.rows()
+    }
+
+    fn is_valid_col_index(&self, j: usize) -> bool { 
+        j < self.cols()
+    }
 }
 
 impl<R> From<Array2<R>> for Mat<R> {
@@ -71,6 +79,16 @@ impl<R> IndexMut<[usize; 2]> for Mat<R> {
 
 impl<R> Mat<R>
 where R: Clone {
+    pub fn clone_row(&self, i: usize) -> Vec<R> {
+        assert!(self.is_valid_row_index(i));
+        self.array.slice(s![i, ..]).iter().cloned().collect()
+    }
+
+    pub fn clone_col(&self, j: usize) -> Vec<R> {
+        assert!(self.is_valid_col_index(j));
+        self.array.slice(s![.., j]).iter().cloned().collect()
+    }
+
     pub fn combine_blocks(blocks: [&Mat<R>; 4]) -> Mat<R> {
         let [a, b, c, d] = blocks;
 
@@ -197,6 +215,28 @@ impl_ops!(AddGrpOps, AddGrp, AddGrpOps);
 impl_ops!(MonOps, Ring, RingOps);
 impl_ops!(RingOps, Ring, RingOps);
 
+impl<R> Mat<R> where R: Clone { 
+    pub fn insert_row(&mut self, row: Vec<R>, i: usize) {
+        // TODO no cloning
+        assert!(i <= self.rows());
+        assert!(row.len() == self.cols());
+        let above = self.array.slice(s![0..i, ..]);
+        let below = self.array.slice(s![i..,  ..]);
+        let row = Array2::from_shape_vec((1, row.len()), row).unwrap();
+        self.array = concatenate![Axis(0), above, row, below];
+    }
+
+    pub fn insert_col(&mut self, col: Vec<R>, j: usize) {
+        // TODO no cloning
+        assert!(j <= self.cols());
+        assert!(col.len() == self.rows());
+        let left  = self.array.slice(s![.., 0..j]);
+        let right = self.array.slice(s![.., j.. ]);
+        let col = Array2::from_shape_vec((col.len(), 1), col).unwrap();
+        self.array = concatenate![Axis(1), left, col, right];
+    }
+}
+
 impl<R> Mat<R> { 
     pub fn swap_rows(&mut self, i: usize, j: usize) {
         debug_assert_ne!(i, j);
@@ -218,33 +258,33 @@ impl<R> Mat<R> {
         ndarray::Zip::from(col_i).and(col_j).for_each(std::mem::swap);
     }
 
-    // private methods // 
-
-    fn is_valid_row_index(&self, i: usize) -> bool { 
-        (0..self.rows()).contains(&i)
+    pub fn mut_row<F>(&mut self, i: usize, f: F)
+    where F: Fn(&mut R) {
+        debug_assert!(self.is_valid_row_index(i));
+        let mut row = self.array.row_mut(i);
+        for a in row.iter_mut() {
+            f(a)
+        }
     }
 
-    fn is_valid_col_index(&self, j: usize) -> bool { 
-        (0..self.cols()).contains(&j)
+    pub fn mut_col<F>(&mut self, j: usize, f: F)
+    where F: Fn(&mut R) {
+        debug_assert!(self.is_valid_col_index(j));
+        let mut col = self.array.column_mut(j);
+        for a in col.iter_mut() {
+            f(a)
+        }
     }
 }
 
 impl<R> Mat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn mul_row(&mut self, i: usize, r: &R) {
-        debug_assert!(self.is_valid_row_index(i));
-        let mut row = self.array.row_mut(i);
-        for a in row.iter_mut() {
-            *a *= r;
-        }
+        self.mut_row(i, |a| *a *= r);
     }
 
-    pub fn mul_col(&mut self, i: usize, r: &R) {
-        debug_assert!(self.is_valid_col_index(i));
-        let mut col = self.array.column_mut(i);
-        for a in col.iter_mut() {
-            *a *= r;
-        }
+    pub fn mul_col(&mut self, j: usize, r: &R) {
+        self.mut_col(j, |a| *a *= r);
     }
 
     pub fn add_row_to(&mut self, i: usize, j: usize, r: &R) { 
@@ -473,6 +513,41 @@ mod tests {
             [1, 2, 3, 7],
             [4, 5, 6, 8],
             [9,10,11,12]           
+        ]))
+    }
+
+    #[test]
+    fn insert_row() {
+        let mut a = Mat::from(array![
+            [1,2,3],
+            [4,5,6],
+            [7,8,9],
+        ]);
+        let v = vec![10,20,30];
+        a.insert_row(v, 2);
+        
+        assert_eq!(a, Mat::from(array![
+            [1,2,3],
+            [4,5,6],
+            [10,20,30],
+            [7,8,9],
+        ]))
+    }
+
+    #[test]
+    fn insert_col() {
+        let mut a = Mat::from(array![
+            [1,2,3],
+            [4,5,6],
+            [7,8,9],
+        ]);
+        let v = vec![10,20,30];
+        a.insert_col(v, 2);
+        
+        assert_eq!(a, Mat::from(array![
+            [1,2,10,3],
+            [4,5,20,6],
+            [7,8,30,9],
         ]))
     }
 }

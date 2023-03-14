@@ -25,12 +25,12 @@ impl Component {
     }
 
     pub fn ends(&self) -> Option<(Edge, Edge)> { 
-        if self.is_empty() || self.is_closed() { 
-            None
-        } else { 
+        if self.is_arc() { 
             let &e0 = self.edges.first().unwrap();
             let &e1 = self.edges.last().unwrap();
             Some((e0, e1))
+        } else { 
+            None
         }
     }
 
@@ -42,12 +42,16 @@ impl Component {
         self.edges.is_empty()
     }
 
-    pub fn is_closed(&self) -> bool { 
-        self.closed
+    pub fn is_arc(&self) -> bool { 
+        !self.is_empty() && !self.closed
+    }
+
+    pub fn is_circle(&self) -> bool { 
+        !self.is_empty() && self.closed
     }
 
     pub fn append(&mut self, e: Edge) { 
-        assert_eq!(self.is_closed(), false);
+        assert_eq!(self.is_circle(), false);
 
         if self.edges.len() > 0 && self.edges[0] == e { 
             self.closed = true
@@ -57,17 +61,13 @@ impl Component {
     }
 
     pub fn reduce(&mut self) { 
-        if self.is_empty() { 
-            return
-        }
-
-        if self.is_closed() && self.len() > 1 { 
-            let e0 = self.edges.remove(0);
-            self.edges = vec![e0];
-        } else if !self.is_closed() && self.len() > 2 { 
+        if self.is_arc() && self.len() > 2 { 
             let e0 = self.edges.remove(0);
             let e1 = self.edges.pop().unwrap();
             self.edges = vec![e0, e1];
+        } else if self.is_circle() && self.len() > 1 { 
+            let e0 = self.edges.remove(0);
+            self.edges = vec![e0];
         }
     }
 
@@ -143,13 +143,11 @@ impl Component {
 impl Display for Component {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let c = self.edges.iter().map(|e| e.to_string()).join("-");
-        write!(f, "[")?;
-        if self.is_closed() { 
-            write!(f, "-{c}-", )?;
-        } else { 
-            write!(f, "{c}", )?;
+        if self.is_circle() { 
+            write!(f, "[-{c}-]")
+        } else {
+            write!(f, "[{c}]")
         }
-        write!(f, "]")
     }
 }
 
@@ -165,12 +163,12 @@ mod tests {
         c.append(2);
 
         assert_eq!(c.edges(), &vec![0,1,2]);
-        assert_eq!(c.is_closed(), false);
+        assert_eq!(c.is_circle(), false);
 
         c.append(0);
 
         assert_eq!(c.edges(), &vec![0,1,2]);
-        assert_eq!(c.is_closed(), true);
+        assert_eq!(c.is_circle(), true);
     }
 
     #[test]

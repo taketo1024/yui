@@ -385,7 +385,7 @@ mod tests {
 
         let comps = l.components();
         assert_eq!(comps.len(), 3);
-        assert!(comps.iter().all(|c| c.is_closed()));
+        assert!(comps.iter().all(|c| c.is_circle()));
 
         let s = State::from([1, 1, 1]);
         let l = Link::from(&[[1,4,2,5],[3,6,4,1],[5,2,6,3]]) // trefoil
@@ -393,7 +393,7 @@ mod tests {
 
         let comps = l.components();
         assert_eq!(comps.len(), 2);
-        assert!(comps.iter().all(|c| c.is_closed()));
+        assert!(comps.iter().all(|c| c.is_circle()));
     }
 
     #[test]

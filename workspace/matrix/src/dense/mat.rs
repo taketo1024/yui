@@ -237,6 +237,18 @@ impl<R> Mat<R> where R: Clone {
     }
 }
 
+impl<R> Mat<R> where R: Clone + Zero { 
+    pub fn insert_zero_row(&mut self, i: usize) {
+        let row = vec![R::zero(); self.cols()];
+        self.insert_row(row, i);
+    }
+
+    pub fn insert_zero_col(&mut self, j: usize) {
+        let col = vec![R::zero(); self.rows()];
+        self.insert_col(col, j);
+    }
+}
+
 impl<R> Mat<R> { 
     pub fn swap_rows(&mut self, i: usize, j: usize) {
         debug_assert_ne!(i, j);

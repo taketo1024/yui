@@ -129,6 +129,10 @@ where R: Clone + Zero {
         )
     }
 
+    pub fn iter(&self) -> impl Iterator<Item = (usize, usize, &R)> {
+        self.array.indexed_iter().map(|((i, j), a)| (i, j, a))
+    }
+
     pub fn to_sparse(&self) -> SpMat<R> { 
         self.into()
     }

@@ -5,7 +5,7 @@ use std::ops::{Index, RangeInclusive};
 use yui_matrix::sparse::*;
 use yui_core::{RingOps, Ring};
 use crate::utils::ChainReducer;
-use crate::{GridItr, GridIdx, RModStr, RModGrid, ChainComplex, GenericRModStr, GenericRModGrid};
+use crate::{GridItr, GridIdx, RModStr, RModGrid, ChainComplex, GenericRModStr, GenericRModGrid, HomologyComputable, GenericHomology};
 
 pub struct GenericChainComplex<R, I>
 where 
@@ -179,6 +179,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             (i as isize, d)
         ).collect();
         GenericChainComplex::new(range, d_degree, d_matrices)
+    }
+}
+
+// TODO this is too much restrictive. 
+
+impl<R, I> GenericChainComplex<R, I>
+where 
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    I: GridItr,
+    I::Item: GridIdx,
+    Self: HomologyComputable<GenericRModStr<R>, R = R, Idx = I::Item, IdxIter = I, Output = GenericRModStr<R>>,
+{
+    pub fn homology(self) -> GenericHomology<R, I> {
+        GenericHomology::from(self)
     }
 }
 

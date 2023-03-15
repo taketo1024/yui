@@ -106,6 +106,16 @@ where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn lead_deg(&self) -> I::Degree { 
         self.lead_term().0.degree()
     }
+
+    pub fn map_coeffs<R2, F>(&self, f: F) -> PolyBase<I, R2>
+    where 
+        R2: Ring, for<'x> &'x R2: RingOps<R2>, 
+        F: Fn(&R) -> R2
+    {
+        PolyBase::<I, R2>::new(
+            self.iter().map(|(i, r)| (i.clone(), f(r))).collect()
+        )
+    }
 }
 
 macro_rules! impl_var_univar {
@@ -361,6 +371,25 @@ macro_rules! impl_pow_signed {
 impl_pow_signed!(i32);
 impl_pow_signed!(i64);
 impl_pow_signed!(isize);
+
+// TODO support eval for other cases
+
+macro_rules! impl_eval_bivar {
+    ($I:ty) => {
+        impl<const X: char, const Y: char, R> PolyBase<Mono2<X, Y, $I>, R>
+        where R: Ring, for<'x> &'x R: RingOps<R> {
+            pub fn eval(&self, x: &R, y: &R) -> R
+            where for<'x, 'y> &'x R: Pow<&'y $I, Output = R> { 
+                self.iter().map(|(i, r)| { 
+                    r * i.eval(x, y)
+                }).sum()
+            }
+        }
+    };
+}
+
+impl_eval_bivar!(usize);
+impl_eval_bivar!(isize);
 
 macro_rules! impl_alg_op {
     ($trait:ident) => {
@@ -837,5 +866,13 @@ mod tests {
         assert_eq!(P::from_str("y"), Err(()));
 
         // TODO support more complex types
+    }
+
+    #[test]
+    fn eval_bivar() { 
+        type P = Poly2::<'x', 'y', i32>;
+        let p = P::from_deg2(vec![((0,0),3), ((1,0),2), ((0,1),-1), ((1,1),4)]);
+        let v = p.eval(&2, &3); // 3 + 2(2) - 1(3) + 4(2*3)
+        assert_eq!(v, 28);
     }
 }

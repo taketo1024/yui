@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use std::ops::{AddAssign, Mul, MulAssign};
 use std::str::FromStr;
-use num_traits::{Zero, One};
+use num_traits::{Zero, One, Pow};
 use auto_impl_ops::auto_ops;
 
 use yui_core::Elem;
@@ -136,6 +136,13 @@ macro_rules! impl_poly_gen {
 impl_poly_gen!(usize);
 impl_poly_gen!(isize);
 
+impl<const X: char, const Y: char, I> Mono2<X, Y, I> {
+    pub fn eval<R>(&self, x: &R, y: &R) -> R
+    where R: Mul<Output = R>, for<'x, 'y> &'x R: Pow<&'y I, Output = R> {
+        x.pow(&self.0) * y.pow(&self.1)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -216,5 +223,25 @@ mod tests {
 
         let d = M::new(2, 3);
         assert_eq!(d.inv(), Some(M::new(-2, -3)));
+    }
+
+    #[test]
+    fn eval() { 
+        type M = Mono2<'X', 'Y', usize>;
+
+        let d = M::new(0, 0);
+        assert_eq!(d.eval::<i32>(&2, &3), 1);
+
+        let d = M::new(1, 0);
+        assert_eq!(d.eval::<i32>(&2, &3), 2);
+
+        let d = M::new(0, 1);
+        assert_eq!(d.eval::<i32>(&2, &3), 3);
+
+        let d = M::new(1, 1);
+        assert_eq!(d.eval::<i32>(&2, &3), 6);
+
+        let d = M::new(2, 3);
+        assert_eq!(d.eval::<i32>(&2, &3), 108);
     }
 }

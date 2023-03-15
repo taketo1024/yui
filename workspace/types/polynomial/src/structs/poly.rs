@@ -9,7 +9,7 @@ use auto_impl_ops::auto_ops;
 use yui_core::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Mon, MonOps, Ring, RingOps, EucRing, EucRingOps, Field, FieldOps};
 use yui_lin_comb::LinComb;
 
-use crate::{PolyGen, MDegree, Poly};
+use crate::{PolyGen, MDegree, Poly, Mono, Mono2};
 
 #[derive(Clone, PartialEq, Eq, Default, Debug)]
 pub struct PolyBase<I, R>
@@ -108,12 +108,48 @@ where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<I, R> PolyBase<I, R>
-where I: PolyGen, I::Degree: One, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn variable() -> Self { 
-        Self::mono(I::Degree::one(), R::one()) // x^1
-    }
+macro_rules! impl_var_univar {
+    ($I:ty) => {
+        impl<const X: char, R> PolyBase<Mono<X, $I>, R>
+        where R: Ring, for<'x> &'x R: RingOps<R> {
+            pub fn variable() -> Self { 
+                Self::mono(1, R::one()) // x^1
+            }
+        }
+    };
 }
+
+impl_var_univar!(usize);
+impl_var_univar!(isize);
+
+macro_rules! impl_var_bivar {
+    ($I:ty) => {
+        impl<const X: char, const Y: char, R> PolyBase<Mono2<X, Y, $I>, R>
+        where R: Ring, for<'x> &'x R: RingOps<R> {
+            pub fn variable(i: usize) -> Self { 
+                assert!(i < 2);
+                Self::mono(MDegree::from((i, 1)), R::one()) // x^1
+            }
+        }
+    };
+}
+
+impl_var_bivar!(usize);
+impl_var_bivar!(isize);
+
+macro_rules! impl_var_mvar {
+    ($I:ty) => {
+        impl<const X: char, R> PolyBase<Mono<X, MDegree<$I>>, R>
+        where R: Ring, for<'x> &'x R: RingOps<R> {
+            pub fn variable(i: usize) -> Self { 
+                Self::mono(MDegree::from((i, 1)), R::one()) // x^1
+            }
+        }
+    };
+}
+
+impl_var_mvar!(usize);
+impl_var_mvar!(isize);
 
 impl<I, R> From<R> for PolyBase<I, R>
 where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
@@ -539,6 +575,24 @@ mod tests {
         type P = Poly::<'x', i32>;
         let x = P::variable();
         assert_eq!(x, P::from_deg(vec![(1, 1)]));
+    }
+
+    #[test]
+    fn variable_bivar() {
+        type P = Poly2::<'x', 'y', i32>;
+        let x = P::variable(0);
+        let y = P::variable(1);
+        assert_eq!(x, P::from_deg2(vec![((1, 0), 1)]));
+        assert_eq!(y, P::from_deg2(vec![((0, 1), 1)]));
+    }
+
+    #[test]
+    fn variable_mvar() {
+        type P = PolyN::<'x', i32>;
+        let x0 = P::variable(0);
+        let x1 = P::variable(1);
+        assert_eq!(x0, P::from_deg2(vec![((1, 0), 1)]));
+        assert_eq!(x1, P::from_deg2(vec![((0, 1), 1)]));
     }
 
     #[test]

@@ -20,8 +20,16 @@ impl Component {
         Self::new(vec![], false)
     }
 
+    pub fn contains(&self, e: Edge) -> bool { 
+        self.edges.contains(&e)
+    }
+
     pub fn edges(&self) -> &Vec<Edge> { 
         &self.edges
+    }
+
+    pub fn min_edge(&self) -> Option<Edge> { 
+        self.edges.iter().min().cloned()
     }
 
     pub fn ends(&self) -> Option<(Edge, Edge)> { 
@@ -142,6 +150,10 @@ impl Component {
 
 impl Display for Component {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_empty() { 
+            return write!(f, "∅");
+        }
+
         let c = self.edges.iter().map(|e| e.to_string()).join("-");
         if self.is_circle() { 
             write!(f, "[-{c}-]")

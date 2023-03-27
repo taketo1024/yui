@@ -1,5 +1,7 @@
 use std::fmt::Display;
 use derive_more::Display;
+use crate::Component;
+
 use super::{Edge, Resolution};
 
 use Resolution::{Res0, Res1};
@@ -70,6 +72,24 @@ impl Crossing {
             V => 3 - index,
             H => (5 - index) % 4
         }
+    }
+
+    pub fn arcs(&self) -> (Component, Component) {
+        let comp = |i: usize, j: usize| {
+            Component::new(vec![self.edges[i], self.edges[j]], false)
+        };
+        match self.ctype { 
+            Xp | 
+            Xn => (comp(0, 2), comp(1, 3)),
+            V  => (comp(0, 3), comp(1, 2)),
+            H  => (comp(0, 1), comp(2, 3))
+        }
+    }
+
+    pub fn res_arcs(&self, r: Resolution) -> (Component, Component) { 
+        let mut x = self.clone();
+        x.resolve(r);
+        x.arcs()        
     }
 }
 

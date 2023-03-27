@@ -4,6 +4,7 @@ use std::fmt::Display;
 
 use itertools::Itertools;
 use num_traits::Zero;
+use cartesian::cartesian;
 use yui_lin_comb::LinComb;
 use yui_matrix::sparse::MatType;
 use yui_polynomial::Poly2;
@@ -210,27 +211,40 @@ impl TngComplex {
             let r = ranks[i];
             let s = ranks[i+1];
 
-            // modify d0, f
+            // modify d0
+            for (j, k) in cartesian!(0..r, 0..s) { 
+                self.modif_mat_cyl(i, j, k);
+            }
+
+            // modify f
             for j in 0..r { 
-                for k in 0..s { 
-                    self.modif_mat_id(i, j, k);
-                }
                 self.modif_mat_sdl(i, j, s+j);
             }
 
             // modify d1
             if i > 0 { 
                 let q = ranks[i-1];
-                for j in 0..q { 
-                    for k in 0..r { 
-                        self.modif_mat_id(i, r+j, s+k);
-                    }
+                for (j, k) in cartesian!(0..q, 0..r) { 
+                    self.modif_mat_cyl(i, r+j, s+k);
                 }
             }
         }
     }
 
-    fn modif_mat_id(&mut self, i: usize, j: usize, k: usize) { 
+    fn modif_mat_cyl(&mut self, i: usize, j: usize, k: usize) { 
+        self.modif_mat_at(i, j, k, |c, u0, u1| { 
+            c.append_cyl(u0, u1)
+        })
+    }
+
+    fn modif_mat_sdl(&mut self, i: usize, j: usize, k: usize) { 
+        self.modif_mat_at(i, j, k, |c, u0, u1| { 
+            c.append_sdl(u0, u1)
+        })
+    }
+
+    fn modif_mat_at<F>(&mut self, i: usize, j: usize, k: usize, f: F) 
+    where F: Fn(&mut Cob, &Vec<TngUpdate>, &Vec<TngUpdate>) { 
         let a = &self.mats[i][[k, j]]; // c[i][j] -> c[i+1][k]
         if a.is_zero() { 
             return
@@ -239,19 +253,13 @@ impl TngComplex {
         let u0 = &self.updates[i][j];
         let u1 = &self.updates[i+1][k];
 
-        // TODO
-    }
+        let a = std::mem::take(&mut self.mats[i][[k, j]]);
+        let a = a.into_map_gens(|mut c| { 
+            f(&mut c, u0, u1);
+            c
+        });
 
-    fn modif_mat_sdl(&mut self, i: usize, j: usize, k: usize) { 
-        let a = &self.mats[i][[k, j]];
-        if a.is_zero() { 
-            return // this should never happen.
-        }
-
-        let u0 = &self.updates[i][j];
-        let u1 = &self.updates[i+1][k];
-
-        // TODO
+        self.mats[i][[k, j]] = a;
     }
 
     pub fn describe(&self) { 

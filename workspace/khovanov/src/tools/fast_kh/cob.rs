@@ -4,7 +4,7 @@ use itertools::Itertools;
 use yui_core::Elem;
 use yui_lin_comb::{FreeGen, OrdForDisplay};
 
-use super::tng::Tng;
+use super::tng::{Tng, TngUpdate};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Display)]
 pub enum Dot { 
@@ -50,6 +50,20 @@ impl Cob {
             CobComp::id(i)
         ).collect();
         Self::new(comps)
+    }
+
+    pub fn append_cyl(&mut self, u0: &Vec<TngUpdate>, u1: &Vec<TngUpdate>) { 
+        assert_eq!(u0.len(), 2);
+        assert_eq!(u1.len(), 2);
+
+        // TODO
+    }
+
+    pub fn append_sdl(&mut self, u0: &Vec<TngUpdate>, u1: &Vec<TngUpdate>) { 
+        assert_eq!(u0.len(), 2);
+        assert_eq!(u1.len(), 2);
+
+        // TODO
     }
 }
 

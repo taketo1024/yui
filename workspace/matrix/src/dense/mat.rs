@@ -1,5 +1,4 @@
 use std::ops::{Add, Neg, Sub, Mul, Index, IndexMut, AddAssign, SubAssign, MulAssign};
-use std::cmp::min;
 use std::fmt::Debug;
 use ndarray::{Array2, Axis, s, concatenate};
 use derive_more::Display;
@@ -114,8 +113,8 @@ where R: Clone + Zero {
         self.array.iter().all(|a| a.is_zero())
     }
 
-    pub fn diag(shape: (usize, usize), entries: Vec<R>) -> Self {
-        assert!( entries.len() <= min(shape.0, shape.1) );
+    pub fn diag<I>(shape: (usize, usize), entries: I) -> Self
+    where I: Iterator<Item = R> {
         let mut mat = Self::zero(shape);
         for (i, a) in entries.into_iter().enumerate() {
             mat[[i, i]] = a;

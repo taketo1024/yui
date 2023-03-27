@@ -1078,6 +1078,7 @@ name = "yui-khovanov"
 version = "0.1.0"
 dependencies = [
  "auto-impl-ops",
+ "derive_more",
  "grouping_by",
  "itertools",
  "log",
@@ -1087,6 +1088,7 @@ dependencies = [
  "yui-lin-comb",
  "yui-link",
  "yui-matrix",
+ "yui-polynomial",
  "yui-utils",
 ]
 

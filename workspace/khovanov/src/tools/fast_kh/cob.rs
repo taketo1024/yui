@@ -4,6 +4,8 @@ use itertools::Itertools;
 use yui_core::Elem;
 use yui_lin_comb::{FreeGen, OrdForDisplay};
 
+use super::tng::Tng;
+
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Display)]
 pub enum Dot { 
     X, Y
@@ -14,6 +16,16 @@ pub struct CobComp {
     src: Vec<usize>, // indices of comps in the source tangle. 
     tgt: Vec<usize>,
     dots: (usize, usize) // nums of X and Y dots resp. 
+}
+
+impl CobComp { 
+    pub fn new(src: Vec<usize>, tgt: Vec<usize>) -> Self { 
+        Self { src, tgt, dots: (0, 0) }
+    }
+
+    pub fn id(i: usize) -> Self { 
+        Self::new(vec![i], vec![i])
+    }
 }
 
 impl Display for CobComp {
@@ -29,6 +41,16 @@ pub struct Cob {
 }
 
 impl Cob {
+    pub fn new(comps: Vec<CobComp>) -> Self { 
+        Self { comps }
+    }
+    
+    pub fn id_for(v: &Tng) -> Self { 
+        let comps = (0..v.ncomps()).map(|i| 
+            CobComp::id(i)
+        ).collect();
+        Self::new(comps)
+    }
 }
 
 impl Display for Cob {

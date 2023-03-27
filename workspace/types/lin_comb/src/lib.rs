@@ -87,16 +87,28 @@ where
         copy
     }
 
-    pub fn map_coeffs<F>(&self, f: F) -> Self 
-    where F: Fn(&R) -> R { 
+    pub fn map_coeffs<S, F>(&self, f: F) -> LinComb<X, S>
+    where S: Ring, for<'x> &'x S: RingOps<S>, F: Fn(&R) -> S { 
         let data = self.iter().map(|(x, r)| (x.clone(), f(r))).collect();
-        Self::new(data)
+        LinComb::new(data)
     }
 
-    pub fn map_coeffs_into<F>(self, f: F) -> Self 
-    where F: Fn(R) -> R { 
+    pub fn into_map_coeffs<S, F>(self, f: F) -> LinComb<X, S>
+    where S: Ring, for<'x> &'x S: RingOps<S>, F: Fn(R) -> S { 
         let data = self.into_iter().map(|(x, r)| (x, f(r))).collect();
-        Self::new(data)
+        LinComb::new(data)
+    }
+
+    pub fn map_gens<Y, F>(&self, f: F) -> LinComb<Y, R>
+    where Y: FreeGen, F: Fn(&X) -> Y { 
+        let data = self.iter().map(|(x, r)| (f(x), r.clone())).collect();
+        LinComb::new(data)
+    }
+
+    pub fn into_map_gens<Y, F>(self, f: F) -> LinComb<Y, R>
+    where Y: FreeGen, F: Fn(X) -> Y { 
+        let data = self.into_iter().map(|(x, r)| (f(x), r.clone())).collect();
+        LinComb::new(data)
     }
 
     pub fn apply<F>(&self, f: F) -> Self 
@@ -221,7 +233,7 @@ where
     type Output = Self;
 
     fn neg(self) -> Self::Output {
-        self.map_coeffs_into(|r| -r)
+        self.into_map_coeffs(|r| -r)
     }
 }
 
@@ -675,5 +687,41 @@ mod tests {
         z *= &r;
 
         assert_eq!(z, L::new(map!{ X(1) => 2, X(2) => 4 }));
+    }
+
+    #[test]
+    fn map_coeffs() {
+        type L = LinComb<X, i32>;
+        let z = L::new(map!{ X(1) => 1, X(2) => 2 });
+        let w = z.map_coeffs(|a| a * 10);
+
+        assert_eq!(w, L::new(map!{ X(1) => 10, X(2) => 20 }));
+    }
+
+    #[test]
+    fn into_map_coeffs() {
+        type L = LinComb<X, i32>;
+        let z = L::new(map!{ X(1) => 1, X(2) => 2 });
+        let w = z.into_map_coeffs(|a| a * 10);
+
+        assert_eq!(w, L::new(map!{ X(1) => 10, X(2) => 20 }));
+    }
+
+    #[test]
+    fn map_gens() {
+        type L = LinComb<X, i32>;
+        let z = L::new(map!{ X(1) => 1, X(2) => 2 });
+        let w = z.map_gens(|x| X(x.0 * 10));
+
+        assert_eq!(w, L::new(map!{ X(10) => 1, X(20) => 2 }));
+    }
+
+    #[test]
+    fn into_map_gens() {
+        type L = LinComb<X, i32>;
+        let z = L::new(map!{ X(1) => 1, X(2) => 2 });
+        let w = z.into_map_gens(|x| X(x.0 * 10));
+
+        assert_eq!(w, L::new(map!{ X(10) => 1, X(20) => 2 }));
     }
 }

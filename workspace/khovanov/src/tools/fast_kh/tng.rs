@@ -32,7 +32,7 @@ impl Tng {
         &self.comps[i]
     }
 
-    pub fn append_arc(&mut self, arc: Component) { 
+    pub fn append_arc(&mut self, arc: Component) -> TngUpdate { 
         assert!(arc.is_arc());
 
         let n = self.ncomps();
@@ -43,9 +43,14 @@ impl Tng {
             if let Some(j) = self.find_connectable(&self.comps[i], i) { 
                 let arc_j = self.comps.remove(j);
                 self.comps[i].connect(arc_j);
+
+                TngUpdate::new(i, Some(j))
+            } else { 
+                TngUpdate::new(i, None)
             }
         } else { 
             self.comps.push(arc);
+            TngUpdate::new(n, None)
         }
     }
 
@@ -77,6 +82,15 @@ impl Display for Tng {
             a.to_string()
         ).join(", ");
         write!(f, "T({})", arcs)
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct TngUpdate(usize, Option<usize>);
+
+impl TngUpdate { 
+    fn new(connected: usize, removed: Option<usize>) -> Self { 
+        TngUpdate(connected, removed)
     }
 }
 

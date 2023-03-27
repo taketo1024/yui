@@ -44,13 +44,13 @@ impl Tng {
                 let arc_j = self.comps.remove(j);
                 self.comps[i].connect(arc_j);
 
-                TngUpdate::new(i, Some(j))
+                TngUpdate(i, false, Some(j))
             } else { 
-                TngUpdate::new(i, None)
+                TngUpdate(i, false, None)
             }
         } else { 
             self.comps.push(arc);
-            TngUpdate::new(n, None)
+            TngUpdate(n, true, None)
         }
     }
 
@@ -86,11 +86,19 @@ impl Display for Tng {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct TngUpdate(usize, Option<usize>);
+pub struct TngUpdate(usize, bool, Option<usize>);
 
 impl TngUpdate { 
-    fn new(connected: usize, removed: Option<usize>) -> Self { 
-        TngUpdate(connected, removed)
+    pub fn index(&self) -> usize { 
+        self.0
+    }
+
+    pub fn added(&self) -> bool { 
+        self.1
+    }
+
+    pub fn removed(&self) -> Option<usize> { 
+        self.2
     }
 }
 

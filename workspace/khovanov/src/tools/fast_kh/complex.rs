@@ -307,8 +307,34 @@ impl TngComplexBuilder {
     }
 
     fn modif_mat_sdl(&mut self, i: usize, j: usize, k: usize) { 
-        self.modif_mat(i, j, k, |c, u0, u1| { 
-            c.append_sdl(u0, u1)
+        self.modif_mat(i, j, k, |cob, u0, u1| { 
+            cob.apply_update(&u0[0], End::Src);
+            cob.apply_update(&u0[1], End::Src);
+            cob.apply_update(&u1[0], End::Tgt);
+            cob.apply_update(&u1[1], End::Tgt);
+
+            let i0 = u0[1].apply(u0[0].index());
+            let j0 = u0[1].index();
+            let i1 = u1[1].apply(u1[0].index());
+            let j1 = u1[1].index();
+
+            let r0 = (i0, j0);
+            let r1 = (i1, j1);
+
+            match (u0[0].added(), u0[1].added(), u1[0].added(), u1[1].added()) { 
+                (true, true, true, true) => {
+                    let c = CobComp::sdl(r0, r1);
+                    cob.append(c);
+                },
+                (true,  false, false, false) |
+                (false, true,  false, false) |
+                (false, false, true,  false) | 
+                (false, false, false, true ) | 
+                (false, false, false, false) => {
+                    cob.insert_sdl(r0, r1)
+                },
+                _ => panic!()
+            }
         })
     }
 

@@ -42,7 +42,19 @@ impl CobComp {
     }
 
     pub fn cyl(i: usize, j: usize) -> Self { 
-        Self::new(set![i], set![j], (0, 0))
+        Self::new(
+            set![i], 
+            set![j], 
+            (0, 0)
+        )
+    }
+
+    pub fn sdl(r0: (usize, usize), r1: (usize, usize)) -> Self { 
+        Self::new(
+            set![r0.0, r0.1], 
+            set![r1.0, r1.1], 
+            (0, 0)
+        )
     }
 
     fn contains(&self, i: usize, e: End) -> bool { 
@@ -51,9 +63,6 @@ impl CobComp {
     
     fn connect(&mut self, other: Self) { 
         let CobComp{ src, tgt, dots } = other;
-
-        assert_eq!(self.src.intersection(&src).count(), 1);
-        assert_eq!(self.tgt.intersection(&tgt).count(), 1);
 
         self.src.extend(src);
         self.tgt.extend(tgt);
@@ -82,7 +91,7 @@ impl CobComp {
 impl Display for CobComp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let dots = vec!["X"; self.dots.0].join("") + &vec!["Y"; self.dots.1].join("");
-        write!(f, "{{{:?} -> {:?}}}{}", self.src, self.tgt, dots)
+        write!(f, "cob({:?} -> {:?}){}", self.src, self.tgt, dots)
     }
 }
 
@@ -140,8 +149,28 @@ impl Cob {
         )
     }
 
-    pub fn append_sdl(&mut self, u0: &Vec<TngUpdate>, u1: &Vec<TngUpdate>) { 
-        // TODO
+    pub fn insert_sdl(&mut self, r0: (usize, usize), r1: (usize, usize)) { 
+        let (i0, j0) = r0;
+        let (i1, j1) = r1;
+        
+        // MEMO: (at most) one of the arcs might not be included yet.
+
+        let complement = [ 
+            self.complement(i0, j0, End::Src),
+            self.complement(j0, i0, End::Src),
+            self.complement(i1, j1, End::Tgt),
+            self.complement(j1, i1, End::Tgt),
+        ];
+
+        assert!(complement.into_iter().filter(|&b| b).count() <= 1);
+
+        self.connect_if_disj(i0, End::Src);
+        self.connect_if_disj(j0, End::Src);
+        self.connect_if_disj(i1, End::Tgt);
+
+        debug_assert!(
+            !self.connect_if_disj(j1, End::Tgt)
+        )
     }
 
     fn connect_if_disj(&mut self, i: usize, e: End) -> bool { 
@@ -164,12 +193,28 @@ impl Cob {
             false
         }
     }
+
+    fn complement(&mut self, i: usize, j: usize, e: End) -> bool { 
+        if self.comp_containing(i, e).is_some() { 
+            return false 
+        }
+
+        let Some(c) = self.comp_containing(j, e) else { 
+            panic!() 
+        };
+        c.end_mut(e).insert(i);
+        true
+    }
+
+    fn comp_containing(&mut self, i: usize, e: End) -> Option<&mut CobComp> { 
+        self.comps.iter_mut().find(|c| c.contains(i, e))
+    }
 }
 
 impl Display for Cob {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let cobs = self.comps.iter().map(|c| c.to_string()).join(", ");
-        write!(f, "cob[{}]", cobs)
+        let cobs = self.comps.iter().map(|c| c.to_string()).join(" + ");
+        write!(f, "[{}]", cobs)
     }
 }
 

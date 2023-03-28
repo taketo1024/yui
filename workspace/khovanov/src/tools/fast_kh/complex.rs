@@ -12,8 +12,9 @@ use yui_matrix::dense::Mat;
 use yui_link::{Crossing, Resolution, State, Component};
 
 use crate::KhAlgLabel;
+use crate::tools::fast_kh::cob::CobComp;
 
-use super::cob::{Cob, Dot};
+use super::cob::{Cob, Dot, End};
 use super::tng::{Tng, TngUpdate};
 
 #[derive(Clone)]
@@ -284,18 +285,34 @@ impl TngComplexBuilder {
     }
 
     fn modif_mat_cyl(&mut self, i: usize, j: usize, k: usize) { 
-        self.modif_mat_at(i, j, k, |c, u0, u1| { 
-            c.append_cyl(u0, u1)
+        self.modif_mat(i, j, k, |cob, u0, u1| { 
+            for i in 0..2 { 
+                let (u0, u1) = (&u0[i], &u1[i]);
+                
+                assert_eq!(u0.added(), u1.added());
+
+                let i0 = u0.index();
+                let i1 = u1.index();
+        
+                if u0.added() { 
+                    let c = CobComp::cyl(i0, i1);
+                    cob.append(c);
+                } else { 
+                    cob.apply_update(u0, End::Src);
+                    cob.apply_update(u1, End::Tgt);
+                    cob.insert_arc_cyl(i0, i1);
+                }
+            }
         })
     }
 
     fn modif_mat_sdl(&mut self, i: usize, j: usize, k: usize) { 
-        self.modif_mat_at(i, j, k, |c, u0, u1| { 
+        self.modif_mat(i, j, k, |c, u0, u1| { 
             c.append_sdl(u0, u1)
         })
     }
 
-    fn modif_mat_at<F>(&mut self, i: usize, j: usize, k: usize, f: F) 
+    fn modif_mat<F>(&mut self, i: usize, j: usize, k: usize, f: F) 
     where F: Fn(&mut Cob, &Vec<TngUpdate>, &Vec<TngUpdate>) { 
         let a = &self.mats[i][[k, j]]; // c[i][j] -> c[i+1][k]
         if a.is_zero() { 
@@ -304,6 +321,9 @@ impl TngComplexBuilder {
 
         let u0 = &self.updates[i][j];
         let u1 = &self.updates[i+1][k];
+
+        assert_eq!(u0.len(), 2);
+        assert_eq!(u1.len(), 2);
 
         let a = std::mem::take(&mut self.mats[i][[k, j]]);
         let a = a.into_map_gens(|mut c| { 

@@ -15,7 +15,7 @@ pub enum Dot {
 }
 
 #[derive(PartialEq, Eq, Clone, Copy)]
-enum End { 
+pub enum End { 
     Src, Tgt
 }
 
@@ -113,42 +113,11 @@ impl Cob {
         self.comps.len()
     }
 
-    pub fn append_cyl(&mut self, u0: &Vec<TngUpdate>, u1: &Vec<TngUpdate>) { 
-        assert_eq!(u0.len(), 2);
-        assert_eq!(u1.len(), 2);
-
-        for i in 0..2 { 
-            let (u0, u1) = (&u0[i], &u1[i]);
-            self.append_arc_cyl(u0, u1);
-        }
-    }
-    
-    fn append_arc_cyl(&mut self, u0: &TngUpdate, u1: &TngUpdate) { 
-        assert_eq!(u0.added(), u1.added());
-
-        self.modify_end(u0, End::Src);
-        self.modify_end(u1, End::Tgt);
-
-        let i0 = u0.index();
-        let i1 = u1.index();
-
-        if u0.added() { 
-            let c = CobComp::cyl(i0, i1);
-            self.comps.push(c);
-        } else { 
-            self.connect_if_disj(i0, End::Src);
-            assert!(!self.connect_if_disj(i1, End::Tgt)) // comps should be already connected
-        }
+    pub fn append(&mut self, c: CobComp) { 
+        self.comps.push(c);
     }
 
-    pub fn append_sdl(&mut self, u0: &Vec<TngUpdate>, u1: &Vec<TngUpdate>) { 
-        assert_eq!(u0.len(), 2);
-        assert_eq!(u1.len(), 2);
-
-        // TODO
-    }
-
-    fn modify_end(&mut self, u: &TngUpdate, e: End) {
+    pub fn apply_update(&mut self, u: &TngUpdate, e: End) {
         let Some(j) = u.removed() else { return };
         let i = u.index();
 
@@ -161,6 +130,18 @@ impl Cob {
                 u.apply(k)
             }).collect();
         }
+    }
+
+    pub fn insert_arc_cyl(&mut self, i0: usize, i1: usize) { 
+        self.connect_if_disj(i0, End::Src);
+        
+        debug_assert!(
+            !self.connect_if_disj(i1, End::Tgt)
+        )
+    }
+
+    pub fn append_sdl(&mut self, u0: &Vec<TngUpdate>, u1: &Vec<TngUpdate>) { 
+        // TODO
     }
 
     fn connect_if_disj(&mut self, i: usize, e: End) -> bool { 
@@ -241,13 +222,13 @@ mod tests {
         
         let mut c = c0.clone();
         let u = TngUpdate::new(1, false, None);
-        c.modify_end(&u, End::Src); // nothing happens
+        c.apply_update(&u, End::Src); // nothing happens
         
         assert_eq!(c, c0);
 
         let mut c = c0.clone();
         let u = TngUpdate::new(1, false, Some(2));
-        c.modify_end(&u, End::Src);
+        c.apply_update(&u, End::Src);
         
         assert_eq!(c, Cob::new(vec![
             CobComp::new(set![0,1], set![10,11], (0, 0)),
@@ -256,7 +237,7 @@ mod tests {
 
         let mut c = c0.clone();
         let u = TngUpdate::new(2, false, Some(3));
-        c.modify_end(&u, End::Src);
+        c.apply_update(&u, End::Src);
         
         assert_eq!(c, Cob::new(vec![
             CobComp::new(set![0,1,2], set![10,11], (0, 0)),
@@ -265,7 +246,7 @@ mod tests {
 
         let mut c = c0.clone();
         let u = TngUpdate::new(10, false, Some(12));
-        c.modify_end(&u, End::Tgt);
+        c.apply_update(&u, End::Tgt);
         
         assert_eq!(c, Cob::new(vec![
             CobComp::new(set![0,1,2], set![10,11], (0, 0)),
@@ -304,31 +285,13 @@ mod tests {
     }
 
     #[test]
-    fn append_arc_cyl() { 
-        let c0 = Cob::new(vec![
+    fn insert_arc_cyl() { 
+        let mut c = Cob::new(vec![
             CobComp::new(set![0,1,2], set![10,11], (0, 0)),
             CobComp::new(set![2,3,4], set![11,12], (0, 0))
         ]);
         
-        // when arcs are newly added.
-        
-        let mut c = c0.clone();
-        let u0 = TngUpdate::new(5,  true, None);
-        let u1 = TngUpdate::new(13, true, None);
-        c.append_arc_cyl(&u0, &u1);
-
-        assert_eq!(c, Cob::new(vec![
-            CobComp::new(set![0,1,2], set![10,11], (0, 0)),
-            CobComp::new(set![2,3,4], set![11,12], (0, 0)),
-            CobComp::new(set![5],     set![13],    (0, 0)),            
-        ]));
-
-        // when arcs connect ends.
-        
-        let mut c = c0.clone();
-        let u0 = TngUpdate::new(2,  false, None);
-        let u1 = TngUpdate::new(11, false, None);
-        c.append_arc_cyl(&u0, &u1);
+        c.insert_arc_cyl(2, 11);
 
         assert_eq!(c, Cob::new(vec![
             CobComp::new(set![0,1,2,3,4], set![10,11,12], (0, 0)),

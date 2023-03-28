@@ -64,16 +64,14 @@ type Mor = LinComb<Cob, R>;    // Mor = Linear combinations of dotted-cobordisms
 
 pub struct TngComplex {
     objs: Vec<Vec<Obj>>, // ⊕_i ⊕_s T[s]
-    mats: Vec<Mat<Mor>>,
-    updates: Vec<Vec<Vec<TngUpdate>>> // tmp data used during `append`.
+    mats: Vec<Mat<Mor>>
 }
 
 impl TngComplex {
     pub fn new() -> Self { 
         let objs = vec![vec![Obj::empty()]];
         let mats = vec![Mat::zero((0, 1))];
-        let updates = vec![];
-        TngComplex{ objs, mats, updates }
+        TngComplex{ objs, mats }
     }
 
     pub fn len(&self) -> usize { 
@@ -96,6 +94,51 @@ impl TngComplex {
         &self.mats[i]
     }
 
+    pub fn append(&mut self, x: &Crossing) {
+        let objs = std::mem::take(&mut self.objs);
+        let mats = std::mem::take(&mut self.mats);
+
+        let mut builder = TngComplexBuilder::new(objs, mats);
+        builder.append(x);
+
+        (self.objs, self.mats) = builder.result();
+    }
+
+    pub fn describe(&self) { 
+        let mut str = "".to_string();
+        for (i, ci) in self.objs.iter().enumerate() { 
+            str += &format!("C[{i}]:\n");
+            for (j, v) in ci.iter().enumerate() { 
+                str += &format!(" - [{j}]: {v}\n");
+            }
+            str += "\n";
+        }
+        str += "\n";
+        for (i, di) in self.mats.iter().enumerate() { 
+            str += &format!("d[{i}]:\n{}\n\n", di);
+        }
+        println!("{str}");
+    }
+}
+
+struct TngComplexBuilder { 
+    objs: Vec<Vec<Obj>>, // ⊕_i ⊕_s T[s]
+    mats: Vec<Mat<Mor>>,
+    ranks: Vec<usize>,
+    updates: Vec<Vec<Vec<TngUpdate>>> // tmp data used during `append`.
+}
+
+impl TngComplexBuilder { 
+    fn new(objs: Vec<Vec<Obj>>, mats: Vec<Mat<Mor>>) -> Self { 
+        let ranks = vec![];
+        let updates = vec![];
+        Self { objs, mats, ranks, updates }
+    }
+
+    fn result(self) -> (Vec<Vec<Obj>>, Vec<Mat<Mor>>) { 
+        (self.objs, self.mats)
+    }
+
     //                          d0
     //                 C[i]#x0 ---> C[i+1]#x0
     //                   |             :
@@ -107,19 +150,38 @@ impl TngComplex {
     //     d' = [d0    ]
     //          [f  -d1]
 
-    pub fn append_x(&mut self, x: &Crossing) {
+    fn append(&mut self, x: &Crossing) {
         assert!(self.updates.is_empty());
-        let n = self.objs.len();
-        let ranks = (0 .. n+1).map(|i| self.rank(i)).collect_vec();
 
+        self.init_updates();
         self.extend_objs();
         self.extend_mats();
 
-        self.init_updates();
-        self.modif_objs(x, &ranks);
-        self.modif_mats(&ranks);
+        self.modif_objs(x);
+        self.modif_mats();
+    }
 
+    fn init_updates(&mut self) { 
+        self.ranks.clear();
         self.updates.clear();
+
+        let n = self.objs.len();
+
+        for i in 0 .. n { 
+            let r = self.objs[i].len();
+            self.ranks.push(r);
+        }
+        self.ranks.push(0);
+
+        for i in 0 .. n+1 { 
+            let r = if i > 0 { 
+                self.ranks[i] + self.ranks[i - 1]
+            } else { 
+                self.ranks[0]
+            };
+            let slot = vec![vec![]; r];
+            self.updates.push(slot);
+        }
     }
 
     fn extend_objs(&mut self) {
@@ -139,7 +201,7 @@ impl TngComplex {
         let mut mats = vec![];
 
         for i in 0..n { 
-            let r = self.mats[i].cols();
+            let r = self.ranks[i];
 
             let d0 = &self.mats[i];
             let d1 = if i > 0 {  
@@ -168,21 +230,11 @@ impl TngComplex {
         self.mats = mats;
     }
 
-    fn init_updates(&mut self) { 
-        assert!(self.updates.is_empty());
-
-        for i in 0..self.objs.len() { 
-            let r = self.objs[i].len();
-            let slot = vec![vec![]; r];
-            self.updates.push(slot);
-        }
-    }
-
-    fn modif_objs(&mut self, x: &Crossing, ranks: &Vec<usize>) { 
+    fn modif_objs(&mut self, x: &Crossing) { 
         let n = self.objs.len() - 1;
         for i in 0..n { 
-            let r = ranks[i];
-            let s = ranks[i+1];
+            let r = self.ranks[i];
+            let s = self.ranks[i+1];
             for j in 0..r { 
                 self.append_x_res(i,   j,   x, Resolution::Res0); // C[i]#x0
                 self.append_x_res(i+1, s+j, x, Resolution::Res1); // C[i]#x1
@@ -205,11 +257,11 @@ impl TngComplex {
         self.updates[i][j].push(e);
     }
 
-    fn modif_mats(&mut self, ranks: &Vec<usize>) { 
+    fn modif_mats(&mut self) { 
         let n = self.mats.len() - 1;
         for i in 0..n { 
-            let r = ranks[i];
-            let s = ranks[i+1];
+            let r = self.ranks[i];
+            let s = self.ranks[i+1];
 
             // modify d0
             for (j, k) in cartesian!(0..r, 0..s) { 
@@ -223,7 +275,7 @@ impl TngComplex {
 
             // modify d1
             if i > 0 { 
-                let q = ranks[i-1];
+                let q = self.ranks[i-1];
                 for (j, k) in cartesian!(0..q, 0..r) { 
                     self.modif_mat_cyl(i, r+j, s+k);
                 }
@@ -261,22 +313,6 @@ impl TngComplex {
 
         self.mats[i][[k, j]] = a;
     }
-
-    pub fn describe(&self) { 
-        let mut str = "".to_string();
-        for (i, ci) in self.objs.iter().enumerate() { 
-            str += &format!("C[{i}]:\n");
-            for (j, v) in ci.iter().enumerate() { 
-                str += &format!(" - [{j}]: {v}\n");
-            }
-            str += "\n";
-        }
-        str += "\n";
-        for (i, di) in self.mats.iter().enumerate() { 
-            str += &format!("d[{i}]:\n{}\n\n", di);
-        }
-        println!("{str}");
-    }
 }
 
 #[cfg(test)]
@@ -290,7 +326,7 @@ mod tests {
         let l = Link::trefoil();
 
         for x in l.data() {
-            c.append_x(x);
+            c.append(x);
         }
 
         assert_eq!(c.len(), 3);
@@ -323,7 +359,7 @@ mod tests {
 
         for x in l.data() {
             step += 1;
-            c.append_x(x);
+            c.append(x);
 
             println!("step: {step}");
             c.describe();

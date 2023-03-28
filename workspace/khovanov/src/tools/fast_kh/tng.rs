@@ -89,6 +89,10 @@ impl Display for Tng {
 pub struct TngUpdate(usize, bool, Option<usize>);
 
 impl TngUpdate { 
+    pub(crate) fn new(index: usize, added: bool, removed: Option<usize>) -> Self {
+        Self(index, added, removed)
+    }
+    
     pub fn index(&self) -> usize { 
         self.0
     }
@@ -99,6 +103,19 @@ impl TngUpdate {
 
     pub fn removed(&self) -> Option<usize> { 
         self.2
+    }
+
+    pub fn apply(&self, k: usize) -> usize { 
+        let Some(j) = self.removed() else { return k };
+        let i = self.index();
+
+        if k < j { 
+            k
+        } else if k == j { 
+            i
+        } else {
+            k - 1
+        }
     }
 }
 

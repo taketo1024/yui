@@ -5,13 +5,14 @@ use derive_more::Display;
 use itertools::Itertools;
 use yui_core::Elem;
 use yui_lin_comb::{FreeGen, OrdForDisplay};
+use yui_polynomial::Mono2;
 use yui_utils::set;
 
 use super::tng::{Tng, TngUpdate};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Display)]
 pub enum Dot { 
-    X, Y
+    None, X, Y
 }
 
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -84,6 +85,22 @@ impl CobComp {
         self.src.is_empty() && self.tgt.is_empty()
     }
 
+    pub fn cup(&mut self, i0: usize) {
+        assert!( self.src.remove(&i0) )
+    }
+
+    pub fn cap(&mut self, i1: usize) {
+        assert!( self.tgt.remove(&i1) )
+    }
+
+    pub fn dot(&mut self, dot: Dot) { 
+        match dot { 
+            Dot::X => self.dots.0 += 1,
+            Dot::Y => self.dots.1 += 1,
+            _      => ()
+        }
+    }
+
     fn end(&self, e: End) -> &HashSet<usize> { 
         if e.is_src() { 
             &self.src 
@@ -121,13 +138,14 @@ impl Display for CobComp {
             _      => "cob"
         };
 
-        write!(f, "{s}({} -> {})", set(&self.src), set(&self.tgt))?;
-
-        if self.has_dots() { 
-            let dots = vec!["X"; self.dots.0].join("") + &vec!["Y"; self.dots.1].join("");
-            write!(f, ":{dots}")?;
-        }
-        Ok(())
+        let dots = if self.has_dots() { 
+            let (p, q) = self.dots;
+            format!("; {}", Mono2::<'X','Y', _>::new(p, q).to_string())
+        } else { 
+            String::new()
+        };
+        
+        write!(f, "{s}({} -> {}{})", set(&self.src), set(&self.tgt), dots)
     }
 }
 
@@ -190,6 +208,22 @@ impl Cob {
         #[cfg(debug_assertions)] {
             self.comps.sort_by_key(|c| c.src.iter().min().cloned().unwrap_or(0));
         }
+    }
+
+    pub fn cup(&mut self, r: usize, x: Dot) {
+        let c = self.comp_containing(r, End::Src);
+        c.cup(r);
+        c.dot(x);
+    }
+
+    pub fn cap(&mut self, r: usize, x: Dot) {
+        let c = self.comp_containing(r, End::Tgt);
+        c.cap(r);
+        c.dot(x);
+    }
+
+    fn comp_containing(&mut self, r: usize, e: End) -> &mut CobComp { 
+        self.comps.iter_mut().find(|c| c.contains(r, e)).unwrap()
     }
 }
 

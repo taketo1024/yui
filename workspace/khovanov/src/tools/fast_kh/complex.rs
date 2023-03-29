@@ -100,11 +100,20 @@ impl TngComplex {
     }
 
     pub fn append(&mut self, x: &Crossing) {
+        self.modify(|b| b.append(x));
+    }
+
+    pub fn deloop(&mut self) { 
+        self.modify(|b| b.deloop());
+    }
+
+    fn modify<F>(&mut self, f: F)
+    where F: Fn(&mut TngComplexBuilder) { 
         let objs = std::mem::take(&mut self.objs);
         let mats = std::mem::take(&mut self.mats);
 
         let mut builder = TngComplexBuilder::new(objs, mats);
-        builder.append(x);
+        f(&mut builder);
 
         (self.objs, self.mats) = builder.result();
     }
@@ -340,6 +349,89 @@ impl TngComplexBuilder {
 
         self.mats[i][[k, j]] = a;
     }
+
+    fn deloop(&mut self) { 
+        for i in 0..self.objs.len() {
+            let mut j = 0;
+            while j < self.objs[i].len() { // number of objects changes by `deloop`.
+                if let Some(r) = self.objs[i][j].find_loop() { 
+                    self.deloop_at(i, j, r);
+                } else { 
+                    j += 1;
+                }
+            }
+        }
+    }
+
+    fn deloop_at(&mut self, i: usize, j: usize, r: usize) { 
+        let ci = &mut self.objs[i];
+
+        let v0 = &mut ci[j];
+        v0.deloop(r);
+
+        let mut v1 = v0.clone();
+        v0.append_label(KhAlgLabel::X);
+        v1.append_label(KhAlgLabel::I);
+
+        ci.insert(j+1, v1);
+
+        if i > 0 { 
+            self.cap_rows(i-1, j, r);
+        }
+        self.cup_cols(i, j, r);
+    }
+
+    fn cap_rows(&mut self, i: usize, j: usize, r: usize) { 
+        let d = &mut self.mats[i];
+
+        d.insert_zero_row(j+1);
+
+        for k in 0..d.cols() { 
+            let a0 = &d[[j, k]];
+            if a0.is_zero() { 
+                continue;
+            }
+
+            let a0 = std::mem::take(&mut d[[j, k]]);
+            let a1 = a0.clone();
+
+            d[[j, k]] = a0.into_map_gens(|mut cob| {
+                cob.cap(r, Dot::None);
+                cob
+            });
+
+            d[[j+1, k]] = a1.into_map_gens(|mut cob| {
+                cob.cap(r, Dot::Y);
+                cob
+            });
+        }
+    }
+
+    fn cup_cols(&mut self, i: usize, j: usize, r: usize) { 
+        let d = &mut self.mats[i];
+
+        d.insert_zero_col(j+1);
+        
+        for k in 0..d.rows() { 
+            let a = &d[[k, j]];
+            if a.is_zero() { 
+                continue;
+            }
+
+            let a0 = std::mem::take(&mut d[[k, j]]);
+            let a1 = a0.clone();
+
+            d[[k, j]] = a0.into_map_gens(|mut cob| { 
+                cob.cup(r, Dot::X);
+                cob
+            });
+
+            d[[k, j+1]] = a1.into_map_gens(|mut cob| { 
+                cob.cup(r, Dot::None);
+                cob
+            });
+        }
+    }
 }
 
 #[cfg(test)]
@@ -401,8 +493,6 @@ mod tests {
         c.append(&x0);
         c.append(&x1);
 
-        c.describe();
-
         assert_eq!(c.len(), 3);
         assert_eq!(c.rank(0), 1);
         assert_eq!(c.rank(1), 2);
@@ -412,6 +502,41 @@ mod tests {
         assert_eq!(c.tng(1, 0).ncomps(), 2);
         assert_eq!(c.tng(1, 1).ncomps(), 2);
         assert_eq!(c.tng(2, 0).ncomps(), 3);
+    }
+
+    #[test]
+    fn deloop_one() { 
+        let mut c = TngComplex::new();
+        let x0 = Crossing::new(CrossingType::Xp, [1,4,2,5]);
+        let x1 = Crossing::new(CrossingType::Xn, [3,6,4,1]);
+
+        c.append(&x0);
+        c.append(&x1);
+
+        assert_eq!(c.len(), 3);
+        assert_eq!(c.rank(0), 1);
+        assert_eq!(c.rank(1), 2);
+        assert_eq!(c.rank(2), 1);
+
+        assert!(c.tng(0, 0).find_loop().is_none());
+        assert!(c.tng(1, 0).find_loop().is_some()); // loop here
+        assert!(c.tng(1, 1).find_loop().is_none());
+        assert!(c.tng(2, 0).find_loop().is_none());
+
+        c.deloop();
+
+        assert_eq!(c.len(), 3);
+        assert_eq!(c.rank(0), 1);
+        assert_eq!(c.rank(1), 3); // delooped here
+        assert_eq!(c.rank(2), 1);
+
+        assert!(c.tng(1, 0).find_loop().is_none()); // delooped
+        assert!(c.tng(1, 1).find_loop().is_none()); // delooped
+
+        assert_eq!(c.obj(1, 0).label, vec![KhAlgLabel::X]);
+        assert_eq!(c.obj(1, 1).label, vec![KhAlgLabel::I]);
+        
+        c.describe()
     }
 
     #[test]

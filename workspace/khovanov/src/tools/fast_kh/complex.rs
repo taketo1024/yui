@@ -1,13 +1,14 @@
-#![allow(unused)] // TODO remove 
+// #![allow(unused)] // TODO remove 
 
 use std::fmt::Display;
+use std::ops::RangeInclusive;
 
-use itertools::Itertools;
 use num_traits::Zero;
 use cartesian::cartesian;
+use yui_core::{Ring, RingOps};
+use yui_homology::GenericChainComplex;
 use yui_lin_comb::LinComb;
-use yui_matrix::sparse::MatType;
-use yui_polynomial::Poly2;
+use yui_matrix::sparse::{MatType, SpMat};
 use yui_matrix::dense::Mat;
 use yui_link::{Crossing, Resolution, State, Component};
 
@@ -60,13 +61,14 @@ impl Display for Obj {
     }
 }
 
-type R = Poly2<'H', 'T', i64>; // R = Z[H, T]
-type Mor = LinComb<Cob, R>;    // Mor = Linear combinations of dotted-cobordisms over Z[H].
+type Mor = LinComb<Cob, i32>; // Z-linear combination of cobordisms.
 
 trait MorTrait {
     fn cup(self, r: usize, dot: Dot) -> Self;
     fn cap(self, r: usize, dot: Dot) -> Self;
     fn cup_or_cap(self, r: usize, dot: Dot, e: End) -> Self;
+    fn eval<R>(&self, h: &R, t: &R) -> R
+    where R: Ring + From<i32>, for<'x> &'x R: RingOps<R>;
 }
 
 impl MorTrait for Mor {
@@ -83,11 +85,18 @@ impl MorTrait for Mor {
             cob.cup_or_cap(p, dot, e);
 
             if cob.is_zero() { 
-                (cob, R::zero())
+                (cob, 0)
             } else { 
                 (cob, r)
             }
         })
+    }
+
+    fn eval<R>(&self, h: &R, t: &R) -> R
+    where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> {
+        self.iter().map(|(c, &a)| { 
+            R::from(a) * c.eval(h, t)
+        }).sum()
     }
 }
 pub struct TngComplex {
@@ -143,6 +152,31 @@ impl TngComplex {
         f(&mut builder);
 
         (self.objs, self.mats) = builder.result();
+    }
+
+    pub fn is_completely_delooped(&self) -> bool { 
+        self.objs.iter().all(|c|
+            c.iter().all(|v|
+                v.tangle.is_empty()
+            )
+        )
+    }
+
+    pub fn as_generic<'a, R>(&'a self, h: &R, t: &R) -> GenericChainComplex<R, RangeInclusive<isize>> 
+    where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> {
+        assert!(self.is_completely_delooped());
+
+        let n = self.len();
+        GenericChainComplex::ascending((0..n).map( |i| {
+            let d = self.mat(i);
+            SpMat::generate(d.shape(), |set| { 
+                for (i, j, c) in d.iter() { 
+                    if c.is_zero() { continue }
+                    let a = c.eval(h, t);
+                    set(i, j, a)
+                }
+            })
+        }).collect())
     }
 
     pub fn describe(&self) { 
@@ -450,6 +484,7 @@ impl TngComplexBuilder {
 #[cfg(test)]
 mod tests { 
     use yui_link::*;
+    use yui_homology::*;
     use super::*;
 
     #[test]
@@ -600,6 +635,32 @@ mod tests {
         assert_eq!(c.rank(1), 12);
         assert_eq!(c.rank(2), 6);
         assert_eq!(c.rank(3), 4);
+    }
+
+    #[test]
+    fn trefoil_eval_homology() { 
+        let mut c = TngComplex::new();
+        let l = Link::trefoil();
+
+        for x in l.data() {
+            c.append(x);
+        }
+
+        c.deloop();
+
+        let h = c.as_generic(&0, &0).homology(); // TODO should shift degree
+
+        assert_eq!(h[0].rank(), 1);
+        assert_eq!(h[0].is_free(), true);
+
+        assert_eq!(h[1].rank(), 1);
+        assert_eq!(h[1].tors(), &vec![2]);
+        
+        assert_eq!(h[2].is_zero(), true);
+        assert_eq!(h[2].is_free(), true);
+        
+        assert_eq!(h[3].rank(), 2);
+        assert_eq!(h[3].is_free(), true);
     }
 
     #[test]

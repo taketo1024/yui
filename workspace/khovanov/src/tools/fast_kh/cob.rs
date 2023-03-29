@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use std::fmt::Display;
 use derive_more::Display;
 use itertools::Itertools;
-use yui_core::Elem;
+use yui_core::{Elem, Ring, RingOps};
 use yui_lin_comb::{FreeGen, OrdForDisplay};
 use yui_polynomial::Mono2;
 use yui_utils::set;
@@ -128,6 +128,29 @@ impl CobComp {
             &mut self.tgt
         }
     }
+
+    pub fn eval<R>(&self, h: &R, t: &R) -> R
+    where R: Ring, for<'x> &'x R: RingOps<R> {
+        assert!(self.is_closed());
+
+        fn eval<R>(x: usize, y: usize, h: &R, t: &R) -> R
+        where R: Ring, for<'x> &'x R: RingOps<R> { 
+            match (x, y) { 
+                (0, 0) | (1, 1)  => R::zero(),
+                (1, 0) | (0, 1)  => R::one(),
+                (x, y) if x >= 2 => // X^2 = hX + t
+                    h * eval(x-1, y, h, t) + 
+                    t * eval(x-2, y, h, t),
+                (x, y) if y >= 2 => // Y^2 = -hY + t
+                    -h * eval(x, y-1, h, t) + 
+                     t * eval(x, y-2, h, t),
+                _ => panic!()
+            }
+        }
+
+        let (x, y) = self.dots;
+        eval(x, y, h, t)
+    }
 }
 
 impl Display for CobComp {
@@ -190,6 +213,10 @@ impl Cob {
 
     pub fn is_zero(&self) -> bool { 
         self.comps.iter().find(|c| c.is_zero()).is_some()
+    }
+
+    pub fn is_closed(&self) -> bool { 
+        self.comps.iter().all(|c| c.is_closed())
     }
 
     pub fn apply_update(&mut self, u: &TngUpdate, e: End) {
@@ -271,6 +298,13 @@ impl Cob {
         self.comps.iter_mut().enumerate().find(|(_, c)| 
             c.contains(r, e)
         ).unwrap()
+    }
+
+    pub fn eval<R>(&self, h: &R, t: &R) -> R
+    where R: Ring, for<'x> &'x R: RingOps<R> {
+        self.comps.iter().map(|c| 
+            c.eval(h, t)
+        ).product()
     }
 }
 

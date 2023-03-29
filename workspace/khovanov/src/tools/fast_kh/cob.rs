@@ -41,10 +41,10 @@ impl CobComp {
         Self { src, tgt, dots }
     }
 
-    pub fn cyl(i: usize, j: usize) -> Self { 
+    pub fn cyl(i0: usize, i1: usize) -> Self { 
         Self::new(
-            set![i], 
-            set![j], 
+            set![i0], 
+            set![i1], 
             (0, 0)
         )
     }
@@ -57,11 +57,16 @@ impl CobComp {
         )
     }
 
-    fn contains(&self, i: usize, e: End) -> bool { 
+    pub fn contains(&self, i: usize, e: End) -> bool { 
         self.end(e).contains(&i)
     }
+
+    pub fn is_connectable(&self, other: &Self) -> bool { 
+        self.src.intersection(&other.src).next().is_some() &&
+        self.tgt.intersection(&other.tgt).next().is_some()
+    }
     
-    fn connect(&mut self, other: Self) { 
+    pub fn connect(&mut self, other: Self) { 
         let CobComp{ src, tgt, dots } = other;
 
         self.src.extend(src);
@@ -69,6 +74,14 @@ impl CobComp {
 
         self.dots.0 += dots.0;
         self.dots.1 += dots.1;
+    }
+
+    pub fn has_dots(&self) -> bool { 
+        self.dots.0 > 0 || self.dots.1 > 0
+    }
+
+    pub fn is_sph(&self) -> bool { 
+        self.src.is_empty() && self.tgt.is_empty()
     }
 
     fn end(&self, e: End) -> &HashSet<usize> { 
@@ -90,7 +103,7 @@ impl CobComp {
 
 impl Display for CobComp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let dots = vec!["X"; self.dots.0].join("") + &vec!["Y"; self.dots.1].join("");
+            let dots = vec!["X"; self.dots.0].join("") + &vec!["Y"; self.dots.1].join("");
         write!(f, "cob({:?} -> {:?}){}", self.src, self.tgt, dots)
     }
 }
@@ -122,10 +135,6 @@ impl Cob {
         self.comps.len()
     }
 
-    pub fn append(&mut self, c: CobComp) { 
-        self.comps.push(c);
-    }
-
     pub fn apply_update(&mut self, u: &TngUpdate, e: End) {
         let Some(j) = u.removed() else { return };
         let i = u.index();
@@ -141,79 +150,29 @@ impl Cob {
         }
     }
 
-    pub fn insert_arc_cyl(&mut self, i0: usize, i1: usize) { 
-        self.connect_if_disj(i0, End::Src);
-        
-        debug_assert!(
-            !self.connect_if_disj(i1, End::Tgt)
-        )
-    }
+    pub fn insert(&mut self, mut c: CobComp) { // horizontal composition
+        let mut i = 0;
 
-    pub fn insert_sdl(&mut self, r0: (usize, usize), r1: (usize, usize)) { 
-        let (i0, j0) = r0;
-        let (i1, j1) = r1;
-        
-        // MEMO: (at most) one of the arcs might not be included yet.
-
-        let complement = [ 
-            self.complement(i0, j0, End::Src),
-            self.complement(j0, i0, End::Src),
-            self.complement(i1, j1, End::Tgt),
-            self.complement(j1, i1, End::Tgt),
-        ];
-
-        assert!(complement.into_iter().filter(|&b| b).count() <= 1);
-
-        self.connect_if_disj(i0, End::Src);
-        self.connect_if_disj(j0, End::Src);
-        self.connect_if_disj(i1, End::Tgt);
-
-        debug_assert!(
-            !self.connect_if_disj(j1, End::Tgt)
-        )
-    }
-
-    fn connect_if_disj(&mut self, i: usize, e: End) -> bool { 
-        let ks = (0 .. self.ncomps()).filter(|&k| 
-            self.comps[k].contains(i, e)
-        ).collect_vec();
-
-        assert!(!ks.is_empty());
-        assert!(ks.len() <= 2);
-
-        if ks.len() == 2 { 
-            let (k0, k1) = (ks[0], ks[1]);
-
-            let c1 = self.comps.remove(k1);
-            let c0 = &mut self.comps[k0];
-            c0.connect(c1);
-            
-            true
-        } else { 
-            false
+        while i < self.comps.len() { 
+            if c.is_connectable(&self.comps[i]) { 
+                let c2 = self.comps.remove(i);
+                c.connect(c2);
+            } else { 
+                i += 1;
+            }
         }
-    }
+        
+        self.comps.push(c);
 
-    fn complement(&mut self, i: usize, j: usize, e: End) -> bool { 
-        if self.comp_containing(i, e).is_some() { 
-            return false 
+        #[cfg(debug_assertions)] {
+            self.comps.sort_by_key(|c| c.src.iter().min().cloned().unwrap_or(0));
         }
-
-        let Some(c) = self.comp_containing(j, e) else { 
-            panic!() 
-        };
-        c.end_mut(e).insert(i);
-        true
-    }
-
-    fn comp_containing(&mut self, i: usize, e: End) -> Option<&mut CobComp> { 
-        self.comps.iter_mut().find(|c| c.contains(i, e))
     }
 }
 
 impl Display for Cob {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let cobs = self.comps.iter().map(|c| c.to_string()).join(" + ");
+        let cobs = self.comps.iter().map(|c| c.to_string()).join(" ⊔ ");
         write!(f, "[{}]", cobs)
     }
 }
@@ -247,6 +206,17 @@ mod tests {
     }
 
     #[test]
+    fn is_connectable() { 
+        let c0 = CobComp::new(set![0,1,2], set![10,11],    (0, 0));
+        let c1 = CobComp::new(set![2,3],   set![11,12,13], (0, 0));
+        let c2 = CobComp::new(set![3,4,5], set![13,14], (0, 0));
+
+        assert!( c0.is_connectable(&c1));
+        assert!( c1.is_connectable(&c2));
+        assert!(!c0.is_connectable(&c2));
+    }
+
+    #[test]
     fn connect() { 
         let mut c0 = CobComp::new(set![0,1,2], set![10,11],    (1, 2));
         let     c1 = CobComp::new(set![2,3],   set![11,12,13], (3, 1));
@@ -259,7 +229,7 @@ mod tests {
     }
 
     #[test]
-    fn modify_end() { 
+    fn apply_update() { 
         let c0 = Cob::new(vec![
             CobComp::new(set![0,1,2], set![10,11], (0, 0)),
             CobComp::new(set![3,4,5], set![12,13], (0, 0))
@@ -300,46 +270,18 @@ mod tests {
     }
 
     #[test]
-    fn connect_if_disj() { 
-        let c0 = Cob::new(vec![
-            CobComp::new(set![0,1,2], set![10,11], (0, 0)),
-            CobComp::new(set![2,3,4], set![11,12], (0, 0))
-        ]);
+    fn insert() { 
+        let mut c = Cob::new(vec![]);
+        c.insert(CobComp::new(set![0,1,2], set![10,11], (0, 0)));
+        c.insert(CobComp::new(set![3,4,5], set![12,13], (0, 0)));
 
-        let mut c = c0.clone();
-        let r = c.connect_if_disj(1, End::Src); // nothing happens
+        assert_eq!(c.comps.len(), 2);
         
-        assert_eq!(c, c0);
-        assert_eq!(r, false);
+        c.insert(CobComp::new(set![2,3], set![11,12], (0, 0)));
 
-        let mut c = c0.clone();
-        let r = c.connect_if_disj(2, End::Src);
-
+        assert_eq!(c.comps.len(), 1);
         assert_eq!(c, Cob::new(vec![
-            CobComp::new(set![0,1,2,3,4], set![10,11,12], (0, 0)),
-        ]));
-        assert_eq!(r, true);
-
-        let mut c = c0.clone();
-        let r = c.connect_if_disj(11, End::Tgt);
-
-        assert_eq!(c, Cob::new(vec![
-            CobComp::new(set![0,1,2,3,4], set![10,11,12], (0, 0)),
-        ]));
-        assert_eq!(r, true);
-    }
-
-    #[test]
-    fn insert_arc_cyl() { 
-        let mut c = Cob::new(vec![
-            CobComp::new(set![0,1,2], set![10,11], (0, 0)),
-            CobComp::new(set![2,3,4], set![11,12], (0, 0))
-        ]);
-        
-        c.insert_arc_cyl(2, 11);
-
-        assert_eq!(c, Cob::new(vec![
-            CobComp::new(set![0,1,2,3,4], set![10,11,12], (0, 0)),
+            CobComp::new(set![0,1,2,3,4,5], set![10,11,12,13], (0, 0)),
         ]));
     }
 }

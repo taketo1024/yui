@@ -266,80 +266,41 @@ impl TngComplexBuilder {
 
             // modify d0
             for (j, k) in cartesian!(0..r, 0..s) { 
-                self.modif_mat_cyl(i, j, k);
+                self.insert_cyl(i, j, k);
             }
 
             // modify f
             for j in 0..r { 
-                self.modif_mat_sdl(i, j, s+j);
+                self.insert_sdl(i, j, s+j);
             }
 
             // modify d1
             if i > 0 { 
                 let q = self.ranks[i-1];
                 for (j, k) in cartesian!(0..q, 0..r) { 
-                    self.modif_mat_cyl(i, r+j, s+k);
+                    self.insert_cyl(i, r+j, s+k);
                 }
             }
         }
     }
 
-    fn modif_mat_cyl(&mut self, i: usize, j: usize, k: usize) { 
-        self.modif_mat(i, j, k, |cob, u0, u1| { 
-            for i in 0..2 { 
-                let (u0, u1) = (&u0[i], &u1[i]);
-                
-                assert_eq!(u0.added(), u1.added());
-
-                let i0 = u0.index();
-                let i1 = u1.index();
-        
-                if u0.added() { 
-                    let c = CobComp::cyl(i0, i1);
-                    cob.append(c);
-                } else { 
-                    cob.apply_update(u0, End::Src);
-                    cob.apply_update(u1, End::Tgt);
-                    cob.insert_arc_cyl(i0, i1);
-                }
-            }
+    fn insert_cyl(&mut self, i: usize, j: usize, k: usize) { 
+        self.insert_cob(i, j, k, |r0, r1| { 
+            let c0 = CobComp::cyl(r0.0, r1.0);
+            let c1 = CobComp::cyl(r0.1, r1.1);
+            vec![c0, c1]
         })
     }
 
-    fn modif_mat_sdl(&mut self, i: usize, j: usize, k: usize) { 
-        self.modif_mat(i, j, k, |cob, u0, u1| { 
-            cob.apply_update(&u0[0], End::Src);
-            cob.apply_update(&u0[1], End::Src);
-            cob.apply_update(&u1[0], End::Tgt);
-            cob.apply_update(&u1[1], End::Tgt);
-
-            let i0 = u0[1].apply(u0[0].index());
-            let j0 = u0[1].index();
-            let i1 = u1[1].apply(u1[0].index());
-            let j1 = u1[1].index();
-
-            let r0 = (i0, j0);
-            let r1 = (i1, j1);
-
-            match (u0[0].added(), u0[1].added(), u1[0].added(), u1[1].added()) { 
-                (true, true, true, true) => {
-                    let c = CobComp::sdl(r0, r1);
-                    cob.append(c);
-                },
-                (true,  false, false, false) |
-                (false, true,  false, false) |
-                (false, false, true,  false) | 
-                (false, false, false, true ) | 
-                (false, false, false, false) => {
-                    cob.insert_sdl(r0, r1)
-                },
-                _ => panic!()
-            }
+    fn insert_sdl(&mut self, i: usize, j: usize, k: usize) { 
+        self.insert_cob(i, j, k, |r0, r1| { 
+            let c = CobComp::sdl(r0, r1);
+            vec![c]
         })
     }
 
-    fn modif_mat<F>(&mut self, i: usize, j: usize, k: usize, f: F) 
-    where F: Fn(&mut Cob, &Vec<TngUpdate>, &Vec<TngUpdate>) { 
+    fn insert_cob<F>(&mut self, i: usize, j: usize, k: usize, f: F) 
+    where F: Fn((usize, usize), (usize, usize)) -> Vec<CobComp> { 
         let a = &self.mats[i][[k, j]]; // c[i][j] -> c[i+1][k]
         if a.is_zero() { 
             return
@@ -351,10 +312,26 @@ impl TngComplexBuilder {
         assert_eq!(u0.len(), 2);
         assert_eq!(u1.len(), 2);
 
+        let i0 = u0[1].apply(u0[0].index());
+        let j0 = u0[1].index();
+        let i1 = u1[1].apply(u1[0].index());
+        let j1 = u1[1].index();
+
+        let r0 = (i0, j0);
+        let r1 = (i1, j1);
+
         let a = std::mem::take(&mut self.mats[i][[k, j]]);
-        let a = a.into_map_gens(|mut c| { 
-            f(&mut c, u0, u1);
-            c
+        let a = a.into_map_gens(|mut cob| { 
+            cob.apply_update(&u0[0], End::Src);
+            cob.apply_update(&u0[1], End::Src);
+            cob.apply_update(&u1[0], End::Tgt);
+            cob.apply_update(&u1[1], End::Tgt);
+
+            for c in f(r0, r1).into_iter() { 
+                cob.insert(c);
+            }
+
+            cob
         });
 
         self.mats[i][[k, j]] = a;

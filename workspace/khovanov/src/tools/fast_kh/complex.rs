@@ -76,7 +76,7 @@ impl TngComplex {
     }
 
     pub fn len(&self) -> usize { 
-        self.objs.len() - 1
+        self.objs.len()
     }
 
     pub fn rank(&self, i: usize) -> usize { 
@@ -89,6 +89,10 @@ impl TngComplex {
 
     pub fn obj(&self, i: usize, j: usize) -> &Obj { 
         &self.objs[i][j]
+    }
+
+    pub fn tng(&self, i: usize, j: usize) -> &Tng { 
+        &self.objs[i][j].tangle
     }
 
     pub fn mat(&self, i: usize) -> &Mat<Mor> { 
@@ -340,11 +344,78 @@ impl TngComplexBuilder {
 
 #[cfg(test)]
 mod tests { 
-    use yui_link::Link;
+    use yui_link::*;
     use super::*;
 
     #[test]
-    fn append_link() { 
+    fn empty() { 
+        let c = TngComplex::new();
+
+        assert_eq!(c.len(), 1);
+        assert_eq!(c.rank(0), 1);
+    }
+
+    #[test]
+    fn single_x() { 
+        let mut c = TngComplex::new();
+        let x = Crossing::new(CrossingType::Xn, [0,1,2,3]);
+        c.append(&x);
+
+        assert_eq!(c.len(), 2);
+        assert_eq!(c.rank(0), 1);
+        assert_eq!(c.rank(1), 1);
+
+        assert_eq!(c.tng(0, 0).ncomps(), 2);
+        assert!(c.tng(0, 0).comp(0).is_arc());
+        assert!(c.tng(0, 0).comp(1).is_arc());
+
+        assert_eq!(c.tng(1, 0).ncomps(), 2);
+        assert!(c.tng(1, 0).comp(0).is_arc());
+        assert!(c.tng(1, 0).comp(1).is_arc());
+    }
+
+    #[test]
+    fn two_x_disj() { 
+        let mut c = TngComplex::new();
+        let x0 = Crossing::new(CrossingType::Xn, [0,1,2,3]);
+        let x1 = Crossing::new(CrossingType::Xn, [4,5,6,7]);
+
+        c.append(&x0);
+        c.append(&x1);
+
+        assert_eq!(c.len(), 3);
+        assert_eq!(c.rank(0), 1);
+        assert_eq!(c.rank(1), 2);
+        assert_eq!(c.rank(2), 1);
+
+        assert_eq!(c.mat(0).shape(), (2, 1));
+        assert_eq!(c.mat(1).shape(), (1, 2));
+    }
+
+    #[test]
+    fn two_x() { 
+        let mut c = TngComplex::new();
+        let x0 = Crossing::new(CrossingType::Xn, [0,4,1,5]);
+        let x1 = Crossing::new(CrossingType::Xn, [3,1,4,2]);
+
+        c.append(&x0);
+        c.append(&x1);
+
+        c.describe();
+
+        assert_eq!(c.len(), 3);
+        assert_eq!(c.rank(0), 1);
+        assert_eq!(c.rank(1), 2);
+        assert_eq!(c.rank(2), 1);
+
+        assert_eq!(c.tng(0, 0).ncomps(), 2);
+        assert_eq!(c.tng(1, 0).ncomps(), 2);
+        assert_eq!(c.tng(1, 1).ncomps(), 2);
+        assert_eq!(c.tng(2, 0).ncomps(), 3);
+    }
+
+    #[test]
+    fn trefoil_no_deloop() { 
         let mut c = TngComplex::new();
         let l = Link::trefoil();
 
@@ -352,7 +423,7 @@ mod tests {
             c.append(x);
         }
 
-        assert_eq!(c.len(), 3);
+        assert_eq!(c.len(), 4);
 
         assert_eq!(c.rank(0), 1);
         assert_eq!(c.rank(1), 3);

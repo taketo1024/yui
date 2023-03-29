@@ -63,6 +63,33 @@ impl Display for Obj {
 type R = Poly2<'H', 'T', i64>; // R = Z[H, T]
 type Mor = LinComb<Cob, R>;    // Mor = Linear combinations of dotted-cobordisms over Z[H].
 
+trait MorTrait {
+    fn cup(self, r: usize, dot: Dot) -> Self;
+    fn cap(self, r: usize, dot: Dot) -> Self;
+    fn cup_or_cap(self, r: usize, dot: Dot, e: End) -> Self;
+}
+
+impl MorTrait for Mor {
+    fn cup(self, r: usize, dot: Dot) -> Self {
+        self.cup_or_cap(r, dot, End::Src)
+    }
+
+    fn cap(self, r: usize, dot: Dot) -> Self {
+        self.cup_or_cap(r, dot, End::Tgt)
+    }
+
+    fn cup_or_cap(self, p: usize, dot: Dot, e: End) -> Self {
+        self.into_map(|mut cob, r| { 
+            cob.cup_or_cap(p, dot, e);
+
+            if cob.is_zero() { 
+                (cob, R::zero())
+            } else { 
+                (cob, r)
+            }
+        })
+    }
+}
 pub struct TngComplex {
     objs: Vec<Vec<Obj>>, // ⊕_i ⊕_s T[s]
     mats: Vec<Mat<Mor>>
@@ -395,15 +422,8 @@ impl TngComplexBuilder {
             let a0 = std::mem::take(&mut d[[j, k]]);
             let a1 = a0.clone();
 
-            d[[j, k]] = a0.into_map_gens(|mut cob| {
-                cob.cap(r, Dot::None);
-                cob
-            });
-
-            d[[j+1, k]] = a1.into_map_gens(|mut cob| {
-                cob.cap(r, Dot::Y);
-                cob
-            });
+            d[[j,   k]] = a0.cap(r, Dot::None);
+            d[[j+1, k]] = a1.cap(r, Dot::Y);
         }
     }
 
@@ -421,15 +441,8 @@ impl TngComplexBuilder {
             let a0 = std::mem::take(&mut d[[k, j]]);
             let a1 = a0.clone();
 
-            d[[k, j]] = a0.into_map_gens(|mut cob| { 
-                cob.cup(r, Dot::X);
-                cob
-            });
-
-            d[[k, j+1]] = a1.into_map_gens(|mut cob| { 
-                cob.cup(r, Dot::None);
-                cob
-            });
+            d[[k, j]]   = a0.cup(r, Dot::X);
+            d[[k, j+1]] = a1.cup(r, Dot::None);
         }
     }
 }
@@ -568,6 +581,25 @@ mod tests {
                 assert!(v.tangle.is_closed());
             }
         }
+    }
+
+    #[test]
+    fn trefoil_deloop() { 
+        let mut c = TngComplex::new();
+        let l = Link::trefoil();
+
+        for x in l.data() {
+            c.append(x);
+        }
+
+        c.deloop();
+
+        assert_eq!(c.len(), 4);
+
+        assert_eq!(c.rank(0), 8);
+        assert_eq!(c.rank(1), 12);
+        assert_eq!(c.rank(2), 6);
+        assert_eq!(c.rank(3), 4);
     }
 
     #[test]

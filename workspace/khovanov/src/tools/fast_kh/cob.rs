@@ -42,6 +42,10 @@ impl CobComp {
         Self { src, tgt, dots }
     }
 
+    pub fn zero() -> Self { // sphere without dots
+        Self::new(set![], set![], (0, 0))
+    }
+
     pub fn cyl(i0: usize, i1: usize) -> Self { 
         Self::new(
             set![i0], 
@@ -81,8 +85,16 @@ impl CobComp {
         self.dots.0 > 0 || self.dots.1 > 0
     }
 
-    pub fn is_sph(&self) -> bool { 
+    pub fn is_closed(&self) -> bool { // sphere possibly with dots.
         self.src.is_empty() && self.tgt.is_empty()
+    }
+
+    pub fn is_zero(&self) -> bool { 
+        self.is_closed() && self.dots == (0, 0)
+    }
+
+    pub fn is_removable(&self) -> bool { 
+        self.is_closed() && (self.dots == (1, 0) || self.dots == (0, 1))
     }
 
     pub fn cup(&mut self, i0: usize) {
@@ -129,7 +141,7 @@ impl Display for CobComp {
         }
 
         let s = match (self.src.len(), self.tgt.len()) { 
-            (0, 0) => "sph",
+            (0, 0) => "S",
             (0, 1) => "ι",
             (1, 0) => "ε",
             (1, 1) => "id",
@@ -176,6 +188,10 @@ impl Cob {
         self.comps.len()
     }
 
+    pub fn is_zero(&self) -> bool { 
+        self.comps.iter().find(|c| c.is_zero()).is_some()
+    }
+
     pub fn apply_update(&mut self, u: &TngUpdate, e: End) {
         let Some(j) = u.removed() else { return };
         let i = u.index();
@@ -211,26 +227,58 @@ impl Cob {
     }
 
     pub fn cup(&mut self, r: usize, x: Dot) {
-        let c = self.comp_containing(r, End::Src);
-        c.cup(r);
-        c.dot(x);
+        self.cup_or_cap(r, x, End::Src)
     }
 
     pub fn cap(&mut self, r: usize, x: Dot) {
-        let c = self.comp_containing(r, End::Tgt);
-        c.cap(r);
-        c.dot(x);
+        self.cup_or_cap(r, x, End::Tgt)
     }
 
-    fn comp_containing(&mut self, r: usize, e: End) -> &mut CobComp { 
-        self.comps.iter_mut().find(|c| c.contains(r, e)).unwrap()
+    pub fn cup_or_cap(&mut self, r: usize, x: Dot, e: End) {
+        let (i, c) = self.comp_containing(r, e);
+
+        if e.is_src() { 
+            c.cup(r);
+        } else {
+            c.cap(r);
+        }
+        c.dot(x);
+
+        if c.is_zero() { 
+            self.comps.clear();
+            self.comps.push(CobComp::zero())
+        } else if c.is_removable() { 
+            self.comps.remove(i);
+        }
+
+        // reindex
+        for c in self.comps.iter_mut() { 
+            let end = c.end_mut(e);
+            *end = end.iter().map(|&k| { 
+                if k > r { 
+                    k - 1
+                } else { 
+                    k
+                }
+            }).collect();
+        }
+    }
+
+    fn comp_containing(&mut self, r: usize, e: End) -> (usize, &mut CobComp) { 
+        self.comps.iter_mut().enumerate().find(|(_, c)| 
+            c.contains(r, e)
+        ).unwrap()
     }
 }
 
 impl Display for Cob {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let cobs = self.comps.iter().map(|c| c.to_string()).join(" ⊔ ");
-        write!(f, "[{}]", cobs)
+        if self.comps.is_empty() { 
+            write!(f, "1")
+        } else { 
+            let cobs = self.comps.iter().map(|c| c.to_string()).join(" ⊔ ");
+            write!(f, "[{}]", cobs)
+        }
     }
 }
 

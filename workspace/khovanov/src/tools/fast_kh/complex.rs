@@ -352,9 +352,9 @@ impl TngComplexBuilder {
         assert_eq!(u0.len(), 2);
         assert_eq!(u1.len(), 2);
 
-        let i0 = u0[1].apply(u0[0].index());
+        let i0 = u0[1].reindex(u0[0].index());
         let j0 = u0[1].index();
-        let i1 = u1[1].apply(u1[0].index());
+        let i1 = u1[1].reindex(u1[0].index());
         let j1 = u1[1].index();
 
         let r0 = (i0, j0);

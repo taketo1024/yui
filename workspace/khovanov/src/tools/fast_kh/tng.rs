@@ -43,14 +43,13 @@ impl Tng {
             if let Some(j) = self.find_connectable(&self.comps[i], i) { 
                 let arc_j = self.comps.remove(j);
                 self.comps[i].connect(arc_j);
-
-                TngUpdate(i, false, Some(j))
+                TngUpdate(i, Some(j))
             } else { 
-                TngUpdate(i, false, None)
+                TngUpdate(i, None)
             }
         } else { 
             self.comps.push(arc);
-            TngUpdate(n, true, None)
+            TngUpdate(n, None)
         }
     }
 
@@ -86,26 +85,22 @@ impl Display for Tng {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct TngUpdate(usize, bool, Option<usize>);
+pub struct TngUpdate(usize, Option<usize>);
 
 impl TngUpdate { 
-    pub(crate) fn new(index: usize, added: bool, removed: Option<usize>) -> Self {
-        Self(index, added, removed)
+    pub(crate) fn new(index: usize, removed: Option<usize>) -> Self {
+        Self(index, removed)
     }
     
     pub fn index(&self) -> usize { 
         self.0
     }
 
-    pub fn added(&self) -> bool { 
+    pub fn removed(&self) -> Option<usize> { 
         self.1
     }
 
-    pub fn removed(&self) -> Option<usize> { 
-        self.2
-    }
-
-    pub fn apply(&self, k: usize) -> usize { 
+    pub fn reindex(&self, k: usize) -> usize { 
         let Some(j) = self.removed() else { return k };
         let i = self.index();
 

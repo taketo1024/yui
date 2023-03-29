@@ -202,7 +202,7 @@ impl Cob {
                 end.remove(&j);
             }
             *end = end.iter().map(|&k| { 
-                u.apply(k)
+                u.reindex(k)
             }).collect();
         }
     }
@@ -246,8 +246,11 @@ impl Cob {
 
         if c.is_zero() { 
             self.comps.clear();
-            self.comps.push(CobComp::zero())
-        } else if c.is_removable() { 
+            self.comps.push(CobComp::zero());
+            return;
+        } 
+        
+        if c.is_removable() { 
             self.comps.remove(i);
         }
 
@@ -341,13 +344,13 @@ mod tests {
         ]);
         
         let mut c = c0.clone();
-        let u = TngUpdate::new(1, false, None);
+        let u = TngUpdate::new(1, None);
         c.apply_update(&u, End::Src); // nothing happens
         
         assert_eq!(c, c0);
 
         let mut c = c0.clone();
-        let u = TngUpdate::new(1, false, Some(2));
+        let u = TngUpdate::new(1, Some(2));
         c.apply_update(&u, End::Src);
         
         assert_eq!(c, Cob::new(vec![
@@ -356,7 +359,7 @@ mod tests {
         ]));
 
         let mut c = c0.clone();
-        let u = TngUpdate::new(2, false, Some(3));
+        let u = TngUpdate::new(2, Some(3));
         c.apply_update(&u, End::Src);
         
         assert_eq!(c, Cob::new(vec![
@@ -365,7 +368,7 @@ mod tests {
         ]));
 
         let mut c = c0.clone();
-        let u = TngUpdate::new(10, false, Some(12));
+        let u = TngUpdate::new(10, Some(12));
         c.apply_update(&u, End::Tgt);
         
         assert_eq!(c, Cob::new(vec![

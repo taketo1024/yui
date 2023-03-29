@@ -65,6 +65,17 @@ where
         self.data.keys()
     }
 
+    pub fn as_gen(&self) -> Option<&X> { 
+        let Some((x, r)) = self.iter().next() else { 
+            return None 
+        };
+        if r.is_one() { 
+            Some(x)
+        } else { 
+            None
+        }
+    }
+
     pub fn coeff(&self, x: &X) -> &R { 
         self.data.get(x).unwrap_or(&self.r_zero)
     }

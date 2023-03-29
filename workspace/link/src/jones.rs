@@ -48,34 +48,34 @@ mod tests {
     fn unknot() {
         let l = Link::unknot();
         let p = jones_polynomial(&l);
-        assert_eq!(p, P::from_deg(vec![(-1, 1), (1, 1)]));
+        assert_eq!(p, P::from_deg([(-1, 1), (1, 1)]));
     }
 
     #[test]
     fn unlink_2() {
         let l = Link::from(&[[0, 1, 1, 0]]).resolved_at(0, Resolution::Res1);
         let p = jones_polynomial(&l);
-        assert_eq!(p, P::from_deg(vec![(-2, 1), (0, 2), (2, 1)]));
+        assert_eq!(p, P::from_deg([(-2, 1), (0, 2), (2, 1)]));
     }
 
     #[test]
     fn trefoil() {
         let l = Link::trefoil();
         let p = jones_polynomial(&l);
-        assert_eq!(p, P::from_deg(vec![(-9, -1), (-5, 1), (-3, 1), (-1, 1)]));
+        assert_eq!(p, P::from_deg([(-9, -1), (-5, 1), (-3, 1), (-1, 1)]));
     }
 
     #[test]
     fn figure8() {
         let l = Link::figure8();
         let p = jones_polynomial(&l);
-        assert_eq!(p, P::from_deg(vec![(-5, 1), (5, 1)]));
+        assert_eq!(p, P::from_deg([(-5, 1), (5, 1)]));
     }
 
     #[test]
     fn hopf_link() { 
         let l = Link::hopf_link();
         let p = jones_polynomial(&l);
-        assert_eq!(p, P::from_deg(vec![(-6, 1), (-4, 1), (-2, 1), (0, 1)]));
+        assert_eq!(p, P::from_deg([(-6, 1), (-4, 1), (-2, 1), (0, 1)]));
     }
 }

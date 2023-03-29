@@ -107,7 +107,7 @@ impl Color {
                 KhGen::new(State::empty(), vec![X]),
                 R::one()
             )),
-            Color::B => KhChain::from(vec![(
+            Color::B => KhChain::from_iter([(
                 KhGen::new(State::empty(), vec![X]),
                 R::one()
             ), (

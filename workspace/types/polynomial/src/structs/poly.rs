@@ -2,7 +2,6 @@ use std::fmt::Display;
 use std::iter::{Sum, Product};
 use std::ops::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Neg, DivAssign, RemAssign, Div, Rem};
 use std::str::FromStr;
-use itertools::Itertools;
 use num_traits::{Zero, One, Pow};
 use auto_impl_ops::auto_ops;
 
@@ -33,11 +32,11 @@ where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
         new
     }
 
-    pub fn from_deg(data: Vec<(I::Degree, R)>) -> Self {
-        let data = data.into_iter().map(|(i, r)| 
+    pub fn from_deg<Iter>(iter: Iter) -> Self 
+    where Iter: IntoIterator<Item = (I::Degree, R)> {
+        iter.into_iter().map(|(i, r)| 
             (I::from(i), r)
-        ).collect_vec();
-        Self::from(data)
+        ).collect()
     }
 
     pub fn mono(i: I::Degree, coeff: R) -> Self { 
@@ -175,34 +174,36 @@ where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<I, R> From<Vec<(I, R)>> for PolyBase<I, R>
+impl<I, R> FromIterator<(I, R)> for PolyBase<I, R>
 where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
-    fn from(data: Vec<(I, R)>) -> Self {
-        Self::new(LinComb::from(data))
+    fn from_iter<T: IntoIterator<Item = (I, R)>>(iter: T) -> Self {
+        Self::new(LinComb::from_iter(iter))
     }
 }
 
 // for bivar-poly
 impl<I, J, R> PolyBase<I, R>
 where I: PolyGen<Degree = MDegree<J>>, J: Zero, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn from_deg2(data: Vec<((J, J), R)>) -> Self {
-        let data = data.into_iter().map(|(d, r)| {
-            let (d0, d1) = d;
-            (vec![d0, d1], r)
-        }).collect_vec();
-        Self::from_mdeg(data)
+    pub fn from_deg2<Iter>(iter: Iter) -> Self
+    where Iter: IntoIterator<Item = ((J, J), R)> {
+        Self::from_mdeg(
+            iter.into_iter().map(|(d, r)| {
+                let (d0, d1) = d;
+                (vec![d0, d1], r)
+            })
+        )
     }
 }
 
 // for multivar-poly
 impl<I, J, R> PolyBase<I, R>
 where I: PolyGen<Degree = MDegree<J>>, J: Zero, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn from_mdeg(data: Vec<(Vec<J>, R)>) -> Self {
-        let data = data.into_iter().map(|(v, r)| {
+    pub fn from_mdeg<Iter>(iter: Iter) -> Self
+    where Iter: IntoIterator<Item = (Vec<J>, R)> {
+        iter.into_iter().map(|(v, r)| {
             let mdeg = MDegree::from_vec(v);
             (I::from(mdeg), r)
-        }).collect_vec();
-        Self::from(data)
+        }).collect()
     }
 }
 
@@ -528,28 +529,28 @@ mod tests {
     #[test]
     fn init_poly() { 
         type P = Poly::<'x', i32>; 
-        let f = P::from_deg(vec![(0, 3), (1, 2), (2, 3)]);
+        let f = P::from_deg([(0, 3), (1, 2), (2, 3)]);
         assert_eq!(&f.to_string(), "3 + 2x + 3x²");
     }
  
     #[test]
     fn init_lpoly() { 
         type P = LPoly::<'x', i32>; 
-        let f = P::from_deg(vec![(-1, 4), (0, 2), (2, 3)]);
+        let f = P::from_deg([(-1, 4), (0, 2), (2, 3)]);
         assert_eq!(&f.to_string(), "4x⁻¹ + 2 + 3x²");
     }
 
     #[test]
     fn init_poly2() { 
         type P = Poly2::<'x', 'y', i32>; 
-        let f = P::from_deg2(vec![((0, 0), 3), ((1, 0), 2), ((2, 3), 3)]);
+        let f = P::from_deg2([((0, 0), 3), ((1, 0), 2), ((2, 3), 3)]);
         assert_eq!(&f.to_string(), "3 + 2x + 3x²y³");
     }
  
     #[test]
     fn init_mpoly() { 
         type P = PolyN::<'x', i32>; 
-        let f = P::from_mdeg(vec![
+        let f = P::from_mdeg([
             (vec![], 3),
             (vec![1], -1),
             (vec![3, 0, 2], 2),
@@ -560,7 +561,7 @@ mod tests {
     #[test]
     fn init_mlpoly() { 
         type P = LPolyN::<'x', i32>; 
-        let f = P::from_mdeg(vec![
+        let f = P::from_mdeg([
             (vec![], 3),
             (vec![1], 1),
             (vec![-3, 1, 3], 2),
@@ -589,21 +590,21 @@ mod tests {
     fn zero() {
         type P = Poly::<'x', i32>;
         let x = P::zero();
-        assert_eq!(x, P::from_deg(vec![]));
+        assert_eq!(x, P::from_deg([]));
     }
 
     #[test]
     fn one() {
         type P = Poly::<'x', i32>;
         let x = P::one();
-        assert_eq!(x, P::from_deg(vec![(0, 1)]));
+        assert_eq!(x, P::from_deg([(0, 1)]));
     }
 
     #[test]
     fn variable() {
         type P = Poly::<'x', i32>;
         let x = P::variable();
-        assert_eq!(x, P::from_deg(vec![(1, 1)]));
+        assert_eq!(x, P::from_deg([(1, 1)]));
     }
 
     #[test]
@@ -611,8 +612,8 @@ mod tests {
         type P = Poly2::<'x', 'y', i32>;
         let x = P::variable(0);
         let y = P::variable(1);
-        assert_eq!(x, P::from_deg2(vec![((1, 0), 1)]));
-        assert_eq!(y, P::from_deg2(vec![((0, 1), 1)]));
+        assert_eq!(x, P::from_deg2([((1, 0), 1)]));
+        assert_eq!(y, P::from_deg2([((0, 1), 1)]));
     }
 
     #[test]
@@ -620,14 +621,14 @@ mod tests {
         type P = PolyN::<'x', i32>;
         let x0 = P::variable(0);
         let x1 = P::variable(1);
-        assert_eq!(x0, P::from_deg2(vec![((1, 0), 1)]));
-        assert_eq!(x1, P::from_deg2(vec![((0, 1), 1)]));
+        assert_eq!(x0, P::from_deg2([((1, 0), 1)]));
+        assert_eq!(x1, P::from_deg2([((0, 1), 1)]));
     }
 
     #[test]
     fn coeff() { 
         type P = Poly::<'x', i32>;
-        let f = P::from_deg(vec![(0, 2), (1, 3), (2, -4)]);
+        let f = P::from_deg([(0, 2), (1, 3), (2, -4)]);
         
         assert_eq!(f.coeff_for(0), &2);
         assert_eq!(f.coeff_for(1), &3);
@@ -638,10 +639,10 @@ mod tests {
     #[test]
     fn const_term() { 
         type P = Poly::<'x', i32>;
-        let f = P::from_deg(vec![(0, 2), (1, 3), (2, -4)]);
+        let f = P::from_deg([(0, 2), (1, 3), (2, -4)]);
         assert_eq!(f.const_term(), &2);
 
-        let f = P::from_deg(vec![(1, 3), (2, -4)]);
+        let f = P::from_deg([(1, 3), (2, -4)]);
         assert_eq!(f.const_term(), &0);
     }
 
@@ -649,7 +650,7 @@ mod tests {
     fn lead_term() { 
         type P = Poly::<'x', i32>;
 
-        let f = P::from_deg(vec![(0, 2), (1, 3), (2, -4)]);
+        let f = P::from_deg([(0, 2), (1, 3), (2, -4)]);
         let (x, a) = f.lead_term();
         assert_eq!(x.degree(), 2);
         assert_eq!(a, &-4);
@@ -664,56 +665,56 @@ mod tests {
     fn add() { 
         type P = Poly::<'x', i32>;
 
-        let f = P::from_deg(vec![(0, 2), (1, 3), (2, -4)]);
-        let g = P::from_deg(vec![(0, -3), (1, -3), (3, 5)]);
-        assert_eq!(f + g, P::from_deg(vec![(0, -1), (1, 0), (2, -4), (3, 5)]));
+        let f = P::from_deg([(0, 2), (1, 3), (2, -4)]);
+        let g = P::from_deg([(0, -3), (1, -3), (3, 5)]);
+        assert_eq!(f + g, P::from_deg([(0, -1), (1, 0), (2, -4), (3, 5)]));
     }
 
     #[test]
     fn neg() { 
         type P = Poly::<'x', i32>;
 
-        let f = P::from_deg(vec![(0, 2), (1, 3), (2, -4)]);
-        assert_eq!(-f, P::from_deg(vec![(0, -2), (1, -3), (2, 4)]));
+        let f = P::from_deg([(0, 2), (1, 3), (2, -4)]);
+        assert_eq!(-f, P::from_deg([(0, -2), (1, -3), (2, 4)]));
     }
 
     #[test]
     fn sub() { 
         type P = Poly::<'x', i32>;
 
-        let f = P::from_deg(vec![(0, 2), (1, 3), (2, -4)]);
-        let g = P::from_deg(vec![(0, -3), (1, -3), (3, 5)]);
-        assert_eq!(f - g, P::from_deg(vec![(0, 5), (1, 6), (2, -4), (3, -5)]));
+        let f = P::from_deg([(0, 2), (1, 3), (2, -4)]);
+        let g = P::from_deg([(0, -3), (1, -3), (3, 5)]);
+        assert_eq!(f - g, P::from_deg([(0, 5), (1, 6), (2, -4), (3, -5)]));
     }
 
     #[test]
     fn mul() { 
         type P = Poly::<'x', i32>;
 
-        let f = P::from_deg(vec![(0, 2), (1, 3), (2, -4)]);
-        let g = P::from_deg(vec![(0, -3), (1, -3), (3, 5)]);
-        assert_eq!(f * g, P::from_deg(vec![(0, -6), (1, -15), (2, 3), (3, 22), (4, 15), (5, -20)]));
+        let f = P::from_deg([(0, 2), (1, 3), (2, -4)]);
+        let g = P::from_deg([(0, -3), (1, -3), (3, 5)]);
+        assert_eq!(f * g, P::from_deg([(0, -6), (1, -15), (2, 3), (3, 22), (4, 15), (5, -20)]));
     }
 
     #[test]
     fn mul_const() { 
         type P = Poly::<'x', i32>;
 
-        let f = P::from_deg(vec![(0, 2), (1, 3), (2, -4)]);
+        let f = P::from_deg([(0, 2), (1, 3), (2, -4)]);
         let g = P::from(3);
 
-        assert_eq!(&f * &g, P::from_deg(vec![(0, 6), (1, 9), (2, -12)]));
-        assert_eq!(&g * &f, P::from_deg(vec![(0, 6), (1, 9), (2, -12)]));
+        assert_eq!(&f * &g, P::from_deg([(0, 6), (1, 9), (2, -12)]));
+        assert_eq!(&g * &f, P::from_deg([(0, 6), (1, 9), (2, -12)]));
     }
 
     #[test]
     fn pow() { 
         type P = Poly::<'x', i32>;
 
-        let f = P::from_deg(vec![(0, 3), (1, 2)]);
+        let f = P::from_deg([(0, 3), (1, 2)]);
         assert_eq!(f.pow(0), P::one());
         assert_eq!(f.pow(1), f);       assert_eq!(f.pow(0), P::one());
-        assert_eq!(f.pow(2), P::from_deg(vec![(0, 9), (1, 12), (2, 4)]));
+        assert_eq!(f.pow(2), P::from_deg([(0, 9), (1, 12), (2, 4)]));
     }
 
     #[test]
@@ -746,7 +747,7 @@ mod tests {
         assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
 
-        let f = P::from_deg(vec![(0, 1), (1, 1)]);
+        let f = P::from_deg([(0, 1), (1, 1)]);
         assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
     }
@@ -773,7 +774,7 @@ mod tests {
         assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
 
-        let f = P::from_deg(vec![(0, R::one()), (1, R::one())]);
+        let f = P::from_deg([(0, R::one()), (1, R::one())]);
         assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
     }
@@ -802,7 +803,7 @@ mod tests {
         assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
 
-        let f = P::from_deg(vec![(0, 1), (1, 1)]);
+        let f = P::from_deg([(0, 1), (1, 1)]);
         assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
     }
@@ -833,7 +834,7 @@ mod tests {
         assert_eq!(f.is_unit(), true);
         assert_eq!(f.inv(), Some(P::mono(-1, R::new(1, 2))));
 
-        let f = P::from_deg(vec![(0, R::one()), (1, R::one())]);
+        let f = P::from_deg([(0, R::one()), (1, R::one())]);
         assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
     }
@@ -844,11 +845,11 @@ mod tests {
         type R = Ratio<i32>;
         type P = Poly::<'x', R>;
 
-        let f = P::from_deg(vec![(0, R::from(1)), (1, R::from(2)), (2, R::from(1))]);
-        let g = P::from_deg(vec![(0, R::from(3)), (1, R::from(2))]);
+        let f = P::from_deg([(0, R::from(1)), (1, R::from(2)), (2, R::from(1))]);
+        let g = P::from_deg([(0, R::from(3)), (1, R::from(2))]);
         let (q, r) = f.div_rem(&g);
 
-        assert_eq!(q, P::from_deg( vec![(0, R::new(1, 4)), (1, R::new(1, 2))]) );
+        assert_eq!(q, P::from_deg([(0, R::new(1, 4)), (1, R::new(1, 2))]));
         assert_eq!(r, P::from( R::new(1, 4)) );
         assert_eq!(f, q * &g + r);
 
@@ -871,7 +872,7 @@ mod tests {
     #[test]
     fn eval_bivar() { 
         type P = Poly2::<'x', 'y', i32>;
-        let p = P::from_deg2(vec![((0,0),3), ((1,0),2), ((0,1),-1), ((1,1),4)]);
+        let p = P::from_deg2([((0,0),3), ((1,0),2), ((0,1),-1), ((1,1),4)]);
         let v = p.eval(&2, &3); // 3 + 2(2) - 1(3) + 4(2*3)
         assert_eq!(v, 28);
     }

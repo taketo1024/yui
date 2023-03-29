@@ -98,28 +98,54 @@ where
         copy
     }
 
+    pub fn map<Y, S, F>(&self, f: F) -> LinComb<Y, S>
+    where 
+        Y: FreeGen, 
+        S: Ring, for<'x> &'x S: RingOps<S>,
+        F: Fn(&X, &R) -> (Y, S) 
+    { 
+        self.iter().map(|(x, r)| f(x, r)).collect()
+    }
+
+    pub fn into_map<Y, S, F>(self, f: F) -> LinComb<Y, S>
+    where 
+        Y: FreeGen, 
+        S: Ring, for<'x> &'x S: RingOps<S>,
+        F: Fn(X, R) -> (Y, S) 
+    { 
+        self.into_iter().map(|(x, r)| f(x, r)).collect()
+    }
+
     pub fn map_coeffs<S, F>(&self, f: F) -> LinComb<X, S>
-    where S: Ring, for<'x> &'x S: RingOps<S>, F: Fn(&R) -> S { 
-        let data = self.iter().map(|(x, r)| (x.clone(), f(r))).collect();
-        LinComb::new(data)
+    where 
+        S: Ring, for<'x> &'x S: RingOps<S>, 
+        F: Fn(&R) -> S 
+    { 
+        self.map(|x, r| (x.clone(), f(r)))
     }
 
     pub fn into_map_coeffs<S, F>(self, f: F) -> LinComb<X, S>
-    where S: Ring, for<'x> &'x S: RingOps<S>, F: Fn(R) -> S { 
-        let data = self.into_iter().map(|(x, r)| (x, f(r))).collect();
-        LinComb::new(data)
+    where 
+        S: Ring, for<'x> &'x S: RingOps<S>, 
+        F: Fn(R) -> S 
+    { 
+        self.into_map(|x, r| (x, f(r)))
     }
 
     pub fn map_gens<Y, F>(&self, f: F) -> LinComb<Y, R>
-    where Y: FreeGen, F: Fn(&X) -> Y { 
-        let data = self.iter().map(|(x, r)| (f(x), r.clone())).collect();
-        LinComb::new(data)
+    where 
+        Y: FreeGen, 
+        F: Fn(&X) -> Y 
+    { 
+        self.map(|x, r| (f(x), r.clone()))
     }
 
     pub fn into_map_gens<Y, F>(self, f: F) -> LinComb<Y, R>
-    where Y: FreeGen, F: Fn(X) -> Y { 
-        let data = self.into_iter().map(|(x, r)| (f(x), r.clone())).collect();
-        LinComb::new(data)
+    where 
+        Y: FreeGen, 
+        F: Fn(X) -> Y 
+    { 
+        self.into_map(|x, r| (f(x), r))
     }
 
     pub fn apply<F>(&self, f: F) -> Self 
@@ -154,24 +180,16 @@ where
     }
 }
 
-impl<X, R> From<Vec<(X, R)>> for LinComb<X, R>
-where
-    X: FreeGen,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    fn from(data: Vec<(X, R)>) -> Self {
-        Self::from_iter(data.into_iter())
-    }
-}
-
 impl<X, R> FromIterator<(X, R)> for LinComb<X, R>
 where
     X: FreeGen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn from_iter<T: IntoIterator<Item = (X, R)>>(iter: T) -> Self {
-        let data = iter.into_iter().collect::<HashMap<_, _>>();
-        Self::new(data)
+        let data = iter.into_iter().filter(|(_, r)| 
+            !r.is_zero()
+        ).collect();
+        Self::new_raw(data)
     }
 }
 

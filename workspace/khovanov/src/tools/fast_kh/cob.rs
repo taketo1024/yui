@@ -97,6 +97,21 @@ impl CobComp {
         self.is_closed() && (self.dots == (1, 0) || self.dots == (0, 1))
     }
 
+    pub fn is_invertible(&self) -> bool { 
+        self.src.len() == 1 && self.tgt.len() == 1 && self.dots == (0, 0)
+    }
+
+    pub fn inv(&self) -> Option<Self> { 
+        if self.is_invertible() { 
+            let &i0 = self.src.iter().next().unwrap();
+            let &i1 = self.tgt.iter().next().unwrap();
+            let inv = Self::new(set![i1], set![i0], (0, 0));
+            Some(inv)
+        } else {
+            None
+        }
+    }
+
     pub fn cup(&mut self, i0: usize) {
         assert!( self.src.remove(&i0) )
     }
@@ -219,6 +234,20 @@ impl Cob {
         self.comps.iter().all(|c| c.is_closed())
     }
 
+    pub fn is_invertible(&self) -> bool { 
+        self.comps.iter().all(|c| c.is_invertible())
+    }
+
+    pub fn inv(&self) -> Option<Self> { 
+        if self.is_invertible() { 
+            let comps = self.comps.iter().map(|c| c.inv().unwrap()).collect();
+            let inv = Self::new(comps);
+            Some(inv)
+        } else { 
+            None
+        }
+    }
+
     pub fn apply_update(&mut self, u: &TngUpdate, e: End) {
         let Some(j) = u.removed() else { return };
         let i = u.index();
@@ -305,6 +334,12 @@ impl Cob {
         self.comps.iter().map(|c| 
             c.eval(h, t)
         ).product()
+    }
+}
+
+impl From<CobComp> for Cob {
+    fn from(c: CobComp) -> Self {
+        Self::new(vec![c])
     }
 }
 
@@ -425,5 +460,32 @@ mod tests {
         assert_eq!(c, Cob::new(vec![
             CobComp::new(set![0,1,2,3,4,5], set![10,11,12,13], (0, 0)),
         ]));
+    }
+
+    #[test]
+    fn cob_comp_inv() { 
+        let c0 = CobComp::new(set![0], set![1], (0, 0));
+        let c = Cob::new(vec![c0]);
+
+        assert_eq!(c.is_invertible(), true);
+        assert_eq!(c.inv(), Some(Cob::new(vec![
+            CobComp::new(set![1], set![0], (0, 0))
+        ])));
+
+        let c0 = CobComp::new(set![0], set![1], (0, 0));
+        let c1 = CobComp::new(set![2], set![3], (0, 0));
+        let c = Cob::new(vec![c0, c1]);
+
+        assert_eq!(c.is_invertible(), true);
+        assert_eq!(c.inv(), Some(Cob::new(vec![
+            CobComp::new(set![1], set![0], (0, 0)),
+            CobComp::new(set![3], set![2], (0, 0))
+        ])));
+
+        let c0 = CobComp::new(set![0], set![1], (1, 0));
+        let c = Cob::new(vec![c0]);
+
+        assert_eq!(c.is_invertible(), false);
+        assert_eq!(c.inv(), None);
     }
 }

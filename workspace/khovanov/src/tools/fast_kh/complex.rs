@@ -63,7 +63,9 @@ impl Display for Obj {
 
 type Mor = LinComb<Cob, i32>; // Z-linear combination of cobordisms.
 
-trait MorTrait {
+trait MorTrait: Sized {
+    fn is_invertible(&self) -> bool;
+    fn inv(&self) -> Option<Self>;
     fn cup(self, r: usize, dot: Dot) -> Self;
     fn cap(self, r: usize, dot: Dot) -> Self;
     fn cup_or_cap(self, r: usize, dot: Dot, e: End) -> Self;
@@ -72,6 +74,24 @@ trait MorTrait {
 }
 
 impl MorTrait for Mor {
+    fn is_invertible(&self) -> bool { 
+        self.len() == 1 && 
+        self.iter().next().map(|(c, a)| 
+            c.is_invertible() && a.is_unit()
+        ).unwrap_or(false)
+    }
+
+    fn inv(&self) -> Option<Self> { 
+        if let Some((Some(cinv), Some(ainv))) = self.iter().next().map(|(c, a)| 
+            (c.inv(), a.inv())
+        ) { 
+            let inv = Mor::from((cinv, ainv));
+            Some(inv)
+        } else { 
+            None
+        }
+    }
+
     fn cup(self, r: usize, dot: Dot) -> Self {
         self.cup_or_cap(r, dot, End::Src)
     }
@@ -550,6 +570,27 @@ mod tests {
         assert_eq!(c.tng(1, 0).ncomps(), 2);
         assert_eq!(c.tng(1, 1).ncomps(), 2);
         assert_eq!(c.tng(2, 0).ncomps(), 3);
+    }
+
+    #[test]
+    fn inv() { 
+        let c = Cob::new(vec![
+            CobComp::cyl(0, 1),
+            CobComp::cyl(2, 3)
+        ]);
+        let f = Mor::from((c.clone(), -1));
+
+        assert!(f.is_invertible());
+        assert_eq!(f.inv(), Some(Mor::from(
+            (Cob::new(vec![
+                CobComp::cyl(1, 0),
+                CobComp::cyl(3, 2)
+            ]), -1)
+        )));
+
+        let f = Mor::from((c.clone(), 2));
+        assert_eq!(f.is_invertible(), false);
+        assert_eq!(f.inv(), None);
     }
 
     #[test]

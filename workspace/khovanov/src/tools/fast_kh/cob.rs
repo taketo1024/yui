@@ -103,8 +103,31 @@ impl CobComp {
 
 impl Display for CobComp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fn set(s: &HashSet<usize>) -> String { 
+            if s.is_empty() { 
+                "∅".to_string()
+            } else { 
+                format!("{{{}}}", s.iter().sorted().join(","))
+            }
+        }
+
+        let s = match (self.src.len(), self.tgt.len()) { 
+            (0, 0) => "sph",
+            (0, 1) => "ι",
+            (1, 0) => "ε",
+            (1, 1) => "id",
+            (2, 1) => "m",
+            (1, 2) => "Δ",
+            _      => "cob"
+        };
+
+        write!(f, "{s}({} -> {})", set(&self.src), set(&self.tgt))?;
+
+        if self.has_dots() { 
             let dots = vec!["X"; self.dots.0].join("") + &vec!["Y"; self.dots.1].join("");
-        write!(f, "cob({:?} -> {:?}){}", self.src, self.tgt, dots)
+            write!(f, ":{dots}")?;
+        }
+        Ok(())
     }
 }
 

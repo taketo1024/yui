@@ -177,6 +177,56 @@ impl CobComp {
         }
     }
 
+    // χ(S) = 2 - 2g(S) - #(∂S)
+    pub fn euler_num(&self, src: &Tng, tgt: &Tng) -> i32 { 
+        let b = self.nbdr_comps(src, tgt) as i32;
+        let g = self.genus as i32;
+        2 - 2 * g - b
+    }
+
+    pub fn nbdr_comps(&self, src: &Tng, tgt: &Tng) -> usize { 
+        let mut src_arcs: HashSet<_> = self.src.iter().filter(|&&i| 
+            src.comp(i).is_arc()
+        ).cloned().collect();
+
+        let mut tgt_arcs: HashSet<_> = self.tgt.iter().filter(|&&i| 
+            tgt.comp(i).is_arc()
+        ).cloned().collect();
+
+        assert_eq!(src_arcs.len(), tgt_arcs.len());
+
+        let src_circs = self.src.len() - src_arcs.len();
+        let tgt_circs = self.tgt.len() - tgt_arcs.len();
+
+        let mut side_circs = 0;
+
+        while !src_arcs.is_empty() { 
+            let mut i0 = src_arcs.iter().next().cloned().unwrap();
+            loop { 
+                src_arcs.remove(&i0);
+
+                let c0 = src.comp(i0);
+                let Some(j) = tgt_arcs.iter().find(|&&j| { 
+                    tgt.comp(j).is_connectable(&c0)
+                }).cloned() else { panic!() };
+
+                tgt_arcs.remove(&j);
+
+                let c1 = tgt.comp(j);
+                if let Some(i1) = src_arcs.iter().find(|&&i| { 
+                    i != i0 && src.comp(i).is_connectable(&c1)
+                }).cloned() { 
+                    i0 = i1;
+                } else { 
+                    side_circs += 1;
+                    break
+                }
+            }
+        }
+
+        src_circs + tgt_circs + side_circs
+    }
+
     pub fn eval<R>(&self, h: &R, t: &R) -> R
     where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(self.is_closed());
@@ -261,6 +311,10 @@ impl Cob {
         self.comps.len()
     }
 
+    pub fn comp(&self, i: usize) -> &CobComp { 
+        &self.comps[i]
+    }
+
     pub fn is_zero(&self) -> bool { 
         self.comps.iter().find(|c| c.is_zero()).is_some()
     }
@@ -281,6 +335,14 @@ impl Cob {
         } else { 
             None
         }
+    }
+
+    pub fn euler_num(&self, src: &Tng, tgt: &Tng) -> i32 { 
+        self.comps.iter().map(|c| c.euler_num(src, tgt)).sum()
+    }
+
+    pub fn nbdr_comps(&self, src: &Tng, tgt: &Tng) -> usize { 
+        self.comps.iter().map(|c| c.nbdr_comps(src, tgt)).sum()
     }
 
     pub fn apply_update(&mut self, u: &TngUpdate, e: End) {
@@ -387,6 +449,8 @@ impl FreeGen for Cob {}
 
 #[cfg(test)]
 mod tests {
+    use yui_link::Component;
+
     use super::CobComp;
     use super::*;
  
@@ -504,5 +568,47 @@ mod tests {
 
         assert_eq!(c.is_invertible(), false);
         assert_eq!(c.inv(), None);
+    }
+
+    #[test]
+    fn euler_num() { 
+        let src = Tng::new(vec![ 
+            Component::new(vec![1,2], false),
+            Component::new(vec![3,4], false),
+            Component::new(vec![5,6], false),
+            Component::new(vec![10], true),
+            Component::new(vec![20], true),
+        ]);
+
+        let tgt = Tng::new(vec![ 
+            Component::new(vec![1,2], false),
+            Component::new(vec![4,5], false),
+            Component::new(vec![6,3], false),
+            Component::new(vec![11], true),
+            Component::new(vec![12], true),
+            Component::new(vec![20], true),
+        ]);
+
+        let cob = Cob::new(vec![
+            CobComp::cyl(0, 0),
+            CobComp::sdl((1,2), (1,2)),
+            CobComp::new_elem(set![3], set![3,4]),
+            CobComp::cup(4),
+            CobComp::cap(5),
+        ]);
+
+        assert_eq!(cob.comp(0).nbdr_comps(&src, &tgt), 1);
+        assert_eq!(cob.comp(1).nbdr_comps(&src, &tgt), 1);
+        assert_eq!(cob.comp(2).nbdr_comps(&src, &tgt), 3);
+        assert_eq!(cob.comp(3).nbdr_comps(&src, &tgt), 1);
+        assert_eq!(cob.comp(4).nbdr_comps(&src, &tgt), 1);
+        assert_eq!(cob.nbdr_comps(&src, &tgt), 7);
+
+        assert_eq!(cob.comp(0).euler_num(&src, &tgt), 1);
+        assert_eq!(cob.comp(1).euler_num(&src, &tgt), 1);
+        assert_eq!(cob.comp(2).euler_num(&src, &tgt), -1);
+        assert_eq!(cob.comp(3).euler_num(&src, &tgt), 1);
+        assert_eq!(cob.comp(4).euler_num(&src, &tgt), 1);
+        assert_eq!(cob.euler_num(&src, &tgt), 3);
     }
 }

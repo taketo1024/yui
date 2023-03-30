@@ -102,12 +102,28 @@ impl CobComp {
     }
     
     pub fn connect(&mut self, other: Self) { 
-        let CobComp{ src, tgt, genus, dots } = other;
+        debug_assert!(self.is_connectable(&other));
+
+        // χ(S∪S') = χ(S) + χ(S') - χ(S∩S'),
+        // χ(S) = 2 - 2g(S) - #∂S, 
+        // χ(S∩S') = #(S∩S').
+        // → g(S∪S') = g(S) + g(S') + 1/2 #{∂S + ∂S' + S∩S' - ∂(S∪S')} - 1.
+
+        let g1 = self.genus;
+        let g2 = other.genus;
+        let b1 = self.nbdr_comps();
+        let b2 = other.nbdr_comps();
+        let f = self.endpts().intersection(&other.endpts()).count();
+
+        let CobComp{ src, tgt, genus: _, dots } = other;
 
         self.src.connect(src);
         self.tgt.connect(tgt);
 
-        // TODO must compute genus properly!
+        let b = self.nbdr_comps();
+        assert!((b1 + b2 + f - b) % 2 == 0);
+        
+        self.genus = g1 + g2 + (b1 + b2 + f - b)/2 - 1;
 
         self.dots.0 += dots.0;
         self.dots.1 += dots.1;
@@ -582,6 +598,41 @@ mod tests {
         assert_eq!(cob.euler_num(), 3);
         assert_eq!(cob.nbdr_comps(), 7);
     }
+
+    #[test]
+    fn connect_incr_genus() { 
+        let mut c0 = CobComp::new_plain(
+            Tng::new(vec![
+                Component::arc(vec![1,2]),
+                Component::arc(vec![3,4])
+            ]),
+            Tng::new(vec![
+                Component::arc(vec![1,2]),
+                Component::arc(vec![3,4])
+            ]),
+        );
+        let c1 = CobComp::id(
+            Component::arc(vec![1, 3])
+        );
+        let c2 = CobComp::id(
+            Component::arc(vec![2, 4])
+        );
+
+        assert_eq!(c0.genus, 0);
+        assert_eq!(c1.genus, 0);
+        assert_eq!(c2.genus, 0);
+
+        c0.connect(c1);
+
+        assert_eq!(c0.genus, 1);
+        assert_eq!(c0.euler_num(), -1);
+
+        c0.connect(c2);
+
+        assert_eq!(c0.genus, 1);
+        assert_eq!(c0.euler_num(), -2);
+    }
+
 
     // #[test]
     // fn cob_comp_inv() { 

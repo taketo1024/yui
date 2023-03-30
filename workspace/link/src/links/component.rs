@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, cmp::min};
 
 use itertools::Itertools;
 
@@ -80,9 +80,15 @@ impl Component {
         if self.is_arc() && self.len() > 2 { 
             let e0 = self.edges.remove(0);
             let e1 = self.edges.pop().unwrap();
-            self.edges = vec![e0, e1];
+            let min = self.edges().iter().filter(|&e| e < min(&e0, &e1)).min();
+
+            self.edges = if let Some(&e2) = min {
+                vec![e0, e2, e1]
+            } else { 
+                vec![e0, e1]
+            };
         } else if self.is_circle() && self.len() > 1 { 
-            let e0 = self.edges.remove(0);
+            let e0 = self.edges.iter().min().unwrap().clone();
             self.edges = vec![e0];
         }
     }

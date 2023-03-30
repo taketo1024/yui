@@ -43,19 +43,35 @@ impl CobComp {
         Self { src, tgt, genus, dots }
     }
 
+    pub fn new_elem(src: HashSet<usize>, tgt: HashSet<usize>) -> Self { 
+        Self::new(src, tgt, 0, (0, 0))
+    }
+
     pub fn cyl(i0: usize, i1: usize) -> Self { 
-        Self::new(
+        Self::new_elem(
             set![i0], 
-            set![i1], 
-            0, (0, 0)
+            set![i1],
         )
     }
 
     pub fn sdl(r0: (usize, usize), r1: (usize, usize)) -> Self { 
-        Self::new(
+        Self::new_elem(
             set![r0.0, r0.1], 
             set![r1.0, r1.1], 
-            0, (0, 0)
+        )
+    }
+
+    pub fn cup(i0: usize) -> Self { 
+        Self::new_elem(
+            set![i0],
+            set![]
+        )
+    }
+
+    pub fn cap(i1: usize) -> Self { 
+        Self::new_elem(
+            set![],
+            set![i1]
         )
     }
 
@@ -133,15 +149,11 @@ impl CobComp {
         }
     }
 
-    pub fn cup(&mut self, i0: usize) {
-        assert!( self.src.remove(&i0) )
+    pub fn cap_off(&mut self, i: usize, e: End) {
+        assert!( self.end_mut(e).remove(&i) )
     }
 
-    pub fn cap(&mut self, i1: usize) {
-        assert!( self.tgt.remove(&i1) )
-    }
-
-    pub fn dot(&mut self, dot: Dot) { 
+    pub fn add_dot(&mut self, dot: Dot) { 
         match dot { 
             Dot::X => self.dots.0 += 1,
             Dot::Y => self.dots.1 += 1,
@@ -305,23 +317,11 @@ impl Cob {
         }
     }
 
-    pub fn cup(&mut self, r: usize, x: Dot) {
-        self.cup_or_cap(r, x, End::Src)
-    }
-
-    pub fn cap(&mut self, r: usize, x: Dot) {
-        self.cup_or_cap(r, x, End::Tgt)
-    }
-
-    pub fn cup_or_cap(&mut self, r: usize, x: Dot, e: End) {
+    pub fn cap_off(&mut self, r: usize, x: Dot, e: End) {
         let (i, c) = self.comp_containing(r, e);
 
-        if e.is_src() { 
-            c.cup(r);
-        } else {
-            c.cap(r);
-        }
-        c.dot(x);
+        c.cap_off(r, e);
+        c.add_dot(x);
 
         if c.is_removable() { 
             self.comps.remove(i);

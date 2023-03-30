@@ -66,9 +66,7 @@ type Mor = LinComb<Cob, i32>; // Z-linear combination of cobordisms.
 trait MorTrait: Sized {
     fn is_invertible(&self) -> bool;
     fn inv(&self) -> Option<Self>;
-    fn cup(self, r: usize, dot: Dot) -> Self;
-    fn cap(self, r: usize, dot: Dot) -> Self;
-    fn cup_or_cap(self, r: usize, dot: Dot, e: End) -> Self;
+    fn cap_off(self, r: usize, dot: Dot, e: End) -> Self;
     fn eval<R>(&self, h: &R, t: &R) -> R
     where R: Ring + From<i32>, for<'x> &'x R: RingOps<R>;
 }
@@ -92,17 +90,9 @@ impl MorTrait for Mor {
         }
     }
 
-    fn cup(self, r: usize, dot: Dot) -> Self {
-        self.cup_or_cap(r, dot, End::Src)
-    }
-
-    fn cap(self, r: usize, dot: Dot) -> Self {
-        self.cup_or_cap(r, dot, End::Tgt)
-    }
-
-    fn cup_or_cap(self, p: usize, dot: Dot, e: End) -> Self {
+    fn cap_off(self, p: usize, dot: Dot, e: End) -> Self {
         self.into_map(|mut cob, r| { 
-            cob.cup_or_cap(p, dot, e);
+            cob.cap_off(p, dot, e);
 
             if cob.is_zero() { 
                 (cob, 0)
@@ -476,8 +466,8 @@ impl TngComplexBuilder {
             let a0 = std::mem::take(&mut d[[j, k]]);
             let a1 = a0.clone();
 
-            d[[j,   k]] = a0.cap(r, Dot::None);
-            d[[j+1, k]] = a1.cap(r, Dot::Y);
+            d[[j,   k]] = a0.cap_off(r, Dot::None, End::Tgt);
+            d[[j+1, k]] = a1.cap_off(r, Dot::Y,    End::Tgt);
         }
     }
 
@@ -495,8 +485,8 @@ impl TngComplexBuilder {
             let a0 = std::mem::take(&mut d[[k, j]]);
             let a1 = a0.clone();
 
-            d[[k, j]]   = a0.cup(r, Dot::X);
-            d[[k, j+1]] = a1.cup(r, Dot::None);
+            d[[k, j]]   = a0.cap_off(r, Dot::X,    End::Src);
+            d[[k, j+1]] = a1.cap_off(r, Dot::None, End::Src);
         }
     }
 }

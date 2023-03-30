@@ -92,6 +92,8 @@ impl Tng {
                 let arc_j = self.comps.remove(j);
                 self.comps[i].connect(arc_j);
             }
+
+            self.comps[i].reduce();
         } else { 
             self.comps.push(arc);
         }

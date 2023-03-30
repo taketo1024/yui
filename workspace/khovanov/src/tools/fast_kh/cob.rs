@@ -34,23 +34,20 @@ impl End {
 pub struct CobComp { 
     src: HashSet<usize>, // indices of comps in the source tangle. 
     tgt: HashSet<usize>,
+    genus: usize,
     dots: (usize, usize) // nums of X and Y dots resp. 
 }
 
 impl CobComp { 
-    pub fn new(src: HashSet<usize>, tgt: HashSet<usize>, dots: (usize, usize)) -> Self { 
-        Self { src, tgt, dots }
-    }
-
-    pub fn zero() -> Self { // sphere without dots
-        Self::new(set![], set![], (0, 0))
+    pub fn new(src: HashSet<usize>, tgt: HashSet<usize>, genus: usize, dots: (usize, usize)) -> Self { 
+        Self { src, tgt, genus, dots }
     }
 
     pub fn cyl(i0: usize, i1: usize) -> Self { 
         Self::new(
             set![i0], 
             set![i1], 
-            (0, 0)
+            0, (0, 0)
         )
     }
 
@@ -58,8 +55,12 @@ impl CobComp {
         Self::new(
             set![r0.0, r0.1], 
             set![r1.0, r1.1], 
-            (0, 0)
+            0, (0, 0)
         )
+    }
+
+    pub fn genus(&self) -> usize { 
+        self.genus
     }
 
     pub fn contains(&self, i: usize, e: End) -> bool { 
@@ -72,40 +73,60 @@ impl CobComp {
     }
     
     pub fn connect(&mut self, other: Self) { 
-        let CobComp{ src, tgt, dots } = other;
+        let CobComp{ src, tgt, genus, dots } = other;
 
         self.src.extend(src);
         self.tgt.extend(tgt);
+
+        // TODO must compute genus properly!
 
         self.dots.0 += dots.0;
         self.dots.1 += dots.1;
     }
 
     pub fn has_dots(&self) -> bool { 
-        self.dots.0 > 0 || self.dots.1 > 0
+        self.dots.0 > 0 || 
+        self.dots.1 > 0
     }
 
-    pub fn is_closed(&self) -> bool { // sphere possibly with dots.
-        self.src.is_empty() && self.tgt.is_empty()
+    pub fn is_closed(&self) -> bool {
+        self.src.is_empty() && 
+        self.tgt.is_empty()
+    }
+
+    pub fn is_sph(&self) -> bool {
+        self.is_closed() && 
+        self.genus == 0
+    }
+
+    pub fn is_cyl(&self) -> bool { // (arc or circle) × I
+        self.src.len() == 1 && 
+        self.tgt.len() == 1 && 
+        self.genus == 0
     }
 
     pub fn is_zero(&self) -> bool { 
-        self.is_closed() && self.dots == (0, 0)
+        self.is_sph() && 
+        (self.dots == (0, 0) || // ε.ι = 0,
+         self.dots == (1, 1))   // ε.XY.ι = ε.T.ι = 0.
     }
 
     pub fn is_removable(&self) -> bool { 
-        self.is_closed() && (self.dots == (1, 0) || self.dots == (0, 1))
+        self.is_sph() && 
+        (self.dots == (1, 0) || // ε.X.ι = 1,
+         self.dots == (0, 1))   // ε.Y.ι = 1.
     }
 
     pub fn is_invertible(&self) -> bool { 
-        self.src.len() == 1 && self.tgt.len() == 1 && self.dots == (0, 0)
+        self.is_cyl() && 
+        self.dots == (0, 0)
     }
 
     pub fn inv(&self) -> Option<Self> { 
         if self.is_invertible() { 
             let &i0 = self.src.iter().next().unwrap();
             let &i1 = self.tgt.iter().next().unwrap();
-            let inv = Self::new(set![i1], set![i0], (0, 0));
+            let inv = Self::new(set![i1], set![i0], 0, (0, 0));
             Some(inv)
         } else {
             None
@@ -147,6 +168,8 @@ impl CobComp {
     pub fn eval<R>(&self, h: &R, t: &R) -> R
     where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(self.is_closed());
+
+        // TODO must `neck cut` until g = 0!
 
         fn eval<R>(x: usize, y: usize, h: &R, t: &R) -> R
         where R: Ring, for<'x> &'x R: RingOps<R> { 
@@ -300,12 +323,6 @@ impl Cob {
         }
         c.dot(x);
 
-        if c.is_zero() { 
-            self.comps.clear();
-            self.comps.push(CobComp::zero());
-            return;
-        } 
-        
         if c.is_removable() { 
             self.comps.remove(i);
         }
@@ -375,7 +392,7 @@ mod tests {
  
     #[test]
     fn contains() { 
-        let c = CobComp::new(set![0,1,2], set![3,4], (0, 0));
+        let c = CobComp::new(set![0,1,2], set![3,4], 0, (0, 0));
         assert!( c.contains(0, End::Src));
         assert!(!c.contains(3, End::Src));
         assert!( c.contains(3, End::Tgt));
@@ -384,9 +401,9 @@ mod tests {
 
     #[test]
     fn is_connectable() { 
-        let c0 = CobComp::new(set![0,1,2], set![10,11],    (0, 0));
-        let c1 = CobComp::new(set![2,3],   set![11,12,13], (0, 0));
-        let c2 = CobComp::new(set![3,4,5], set![13,14], (0, 0));
+        let c0 = CobComp::new(set![0,1,2], set![10,11],    0, (0, 0));
+        let c1 = CobComp::new(set![2,3],   set![11,12,13], 0, (0, 0));
+        let c2 = CobComp::new(set![3,4,5], set![13,14],    0, (0, 0));
 
         assert!( c0.is_connectable(&c1));
         assert!( c1.is_connectable(&c2));
@@ -395,8 +412,8 @@ mod tests {
 
     #[test]
     fn connect() { 
-        let mut c0 = CobComp::new(set![0,1,2], set![10,11],    (1, 2));
-        let     c1 = CobComp::new(set![2,3],   set![11,12,13], (3, 1));
+        let mut c0 = CobComp::new(set![0,1,2], set![10,11],    0, (1, 2));
+        let     c1 = CobComp::new(set![2,3],   set![11,12,13], 0, (3, 1));
 
         c0.connect(c1);
 
@@ -408,8 +425,8 @@ mod tests {
     #[test]
     fn apply_update() { 
         let c0 = Cob::new(vec![
-            CobComp::new(set![0,1,2], set![10,11], (0, 0)),
-            CobComp::new(set![3,4,5], set![12,13], (0, 0))
+            CobComp::new(set![0,1,2], set![10,11], 0, (0, 0)),
+            CobComp::new(set![3,4,5], set![12,13], 0, (0, 0))
         ]);
         
         let mut c = c0.clone();
@@ -423,8 +440,8 @@ mod tests {
         c.apply_update(&u, End::Src);
         
         assert_eq!(c, Cob::new(vec![
-            CobComp::new(set![0,1], set![10,11], (0, 0)),
-            CobComp::new(set![2,3,4], set![12,13], (0, 0))
+            CobComp::new(set![0,1],   set![10,11], 0, (0, 0)),
+            CobComp::new(set![2,3,4], set![12,13], 0, (0, 0))
         ]));
 
         let mut c = c0.clone();
@@ -432,8 +449,8 @@ mod tests {
         c.apply_update(&u, End::Src);
         
         assert_eq!(c, Cob::new(vec![
-            CobComp::new(set![0,1,2], set![10,11], (0, 0)),
-            CobComp::new(set![3,2,4], set![12,13], (0, 0))
+            CobComp::new(set![0,1,2], set![10,11], 0, (0, 0)),
+            CobComp::new(set![3,2,4], set![12,13], 0, (0, 0))
         ]));
 
         let mut c = c0.clone();
@@ -441,48 +458,48 @@ mod tests {
         c.apply_update(&u, End::Tgt);
         
         assert_eq!(c, Cob::new(vec![
-            CobComp::new(set![0,1,2], set![10,11], (0, 0)),
-            CobComp::new(set![3,4,5], set![10,12], (0, 0))
+            CobComp::new(set![0,1,2], set![10,11], 0, (0, 0)),
+            CobComp::new(set![3,4,5], set![10,12], 0, (0, 0))
         ]));
     }
 
     #[test]
     fn insert() { 
         let mut c = Cob::new(vec![]);
-        c.insert(CobComp::new(set![0,1,2], set![10,11], (0, 0)));
-        c.insert(CobComp::new(set![3,4,5], set![12,13], (0, 0)));
+        c.insert(CobComp::new(set![0,1,2], set![10,11], 0, (0, 0)));
+        c.insert(CobComp::new(set![3,4,5], set![12,13], 0, (0, 0)));
 
         assert_eq!(c.comps.len(), 2);
         
-        c.insert(CobComp::new(set![2,3], set![11,12], (0, 0)));
+        c.insert(CobComp::new(set![2,3], set![11,12], 0, (0, 0)));
 
         assert_eq!(c.comps.len(), 1);
         assert_eq!(c, Cob::new(vec![
-            CobComp::new(set![0,1,2,3,4,5], set![10,11,12,13], (0, 0)),
+            CobComp::new(set![0,1,2,3,4,5], set![10,11,12,13], 0, (0, 0)),
         ]));
     }
 
     #[test]
     fn cob_comp_inv() { 
-        let c0 = CobComp::new(set![0], set![1], (0, 0));
+        let c0 = CobComp::new(set![0], set![1], 0, (0, 0));
         let c = Cob::new(vec![c0]);
 
         assert_eq!(c.is_invertible(), true);
         assert_eq!(c.inv(), Some(Cob::new(vec![
-            CobComp::new(set![1], set![0], (0, 0))
+            CobComp::new(set![1], set![0], 0, (0, 0))
         ])));
 
-        let c0 = CobComp::new(set![0], set![1], (0, 0));
-        let c1 = CobComp::new(set![2], set![3], (0, 0));
+        let c0 = CobComp::new(set![0], set![1], 0, (0, 0));
+        let c1 = CobComp::new(set![2], set![3], 0, (0, 0));
         let c = Cob::new(vec![c0, c1]);
 
         assert_eq!(c.is_invertible(), true);
         assert_eq!(c.inv(), Some(Cob::new(vec![
-            CobComp::new(set![1], set![0], (0, 0)),
-            CobComp::new(set![3], set![2], (0, 0))
+            CobComp::new(set![1], set![0], 0, (0, 0)),
+            CobComp::new(set![3], set![2], 0, (0, 0))
         ])));
 
-        let c0 = CobComp::new(set![0], set![1], (1, 0));
+        let c0 = CobComp::new(set![0], set![1], 0, (1, 0));
         let c = Cob::new(vec![c0]);
 
         assert_eq!(c.is_invertible(), false);

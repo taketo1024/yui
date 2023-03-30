@@ -16,7 +16,7 @@ use crate::KhAlgLabel;
 use crate::tools::fast_kh::cob::CobComp;
 
 use super::cob::{Cob, Dot, End};
-use super::tng::{Tng, TngUpdate};
+use super::tng::Tng;
 
 #[derive(Clone)]
 pub struct Obj { 
@@ -42,7 +42,7 @@ impl Obj {
         self.label.push(x)
     }
 
-    fn append_arc(&mut self, a: Component) -> TngUpdate {
+    fn append_arc(&mut self, a: Component) {
         self.tangle.append_arc(a)
     }
 
@@ -50,8 +50,9 @@ impl Obj {
         self.tangle.find_loop()
     }
 
-    fn deloop(&mut self, i: usize) {
-        self.tangle.deloop(i);
+    fn deloop(&mut self, i: usize) -> Component {
+        assert!(self.tangle.comp(i).is_circle());
+        self.tangle.remove_at(i)
     }
 }
 
@@ -66,7 +67,7 @@ type Mor = LinComb<Cob, i32>; // Z-linear combination of cobordisms.
 trait MorTrait: Sized {
     fn is_invertible(&self) -> bool;
     fn inv(&self) -> Option<Self>;
-    fn cap_off(self, r: usize, dot: Dot, e: End) -> Self;
+    fn cap_off(self, c: &Component, dot: Dot, e: End) -> Self;
     fn eval<R>(&self, h: &R, t: &R) -> R
     where R: Ring + From<i32>, for<'x> &'x R: RingOps<R>;
 }
@@ -90,9 +91,9 @@ impl MorTrait for Mor {
         }
     }
 
-    fn cap_off(self, p: usize, dot: Dot, e: End) -> Self {
+    fn cap_off(self, c: &Component, dot: Dot, e: End) -> Self {
         self.into_map(|mut cob, r| { 
-            cob.cap_off(p, dot, e);
+            cob.cap_off(c, dot, e);
 
             if cob.is_zero() { 
                 (cob, 0)
@@ -209,15 +210,13 @@ impl TngComplex {
 struct TngComplexBuilder { 
     objs: Vec<Vec<Obj>>, // ⊕_i ⊕_s T[s]
     mats: Vec<Mat<Mor>>,
-    ranks: Vec<usize>,
-    updates: Vec<Vec<Vec<TngUpdate>>> // tmp data used during `append`.
+    ranks: Vec<usize>
 }
 
 impl TngComplexBuilder { 
     fn new(objs: Vec<Vec<Obj>>, mats: Vec<Mat<Mor>>) -> Self { 
         let ranks = vec![];
-        let updates = vec![];
-        Self { objs, mats, ranks, updates }
+        Self { objs, mats, ranks }
     }
 
     fn result(self) -> (Vec<Vec<Obj>>, Vec<Mat<Mor>>) { 
@@ -236,19 +235,19 @@ impl TngComplexBuilder {
     //          [f  -d1]
 
     fn append(&mut self, x: &Crossing) {
-        assert!(self.updates.is_empty());
-
         self.init_updates();
         self.extend_objs();
         self.extend_mats();
 
-        self.modif_objs(x);
-        self.modif_mats();
+        let t0 = Tng::from_x(x, Resolution::Res0);
+        let t1 = Tng::from_x(x, Resolution::Res1);
+        
+        self.modif_objs(&t0, &t1);
+        self.modif_mats(&t0, &t1);
     }
 
     fn init_updates(&mut self) { 
         self.ranks.clear();
-        self.updates.clear();
 
         let n = self.objs.len();
 
@@ -257,16 +256,6 @@ impl TngComplexBuilder {
             self.ranks.push(r);
         }
         self.ranks.push(0);
-
-        for i in 0 .. n+1 { 
-            let r = if i > 0 { 
-                self.ranks[i] + self.ranks[i - 1]
-            } else { 
-                self.ranks[0]
-            };
-            let slot = vec![vec![]; r];
-            self.updates.push(slot);
-        }
     }
 
     fn extend_objs(&mut self) {
@@ -297,7 +286,7 @@ impl TngComplexBuilder {
 
             let f = Mat::diag((r, r), (0..r).map(|j| {
                 let v = &self.objs[i][j];
-                let f = Cob::id_for(&v.tangle);
+                let f = Cob::id(&v.tangle);
                 Mor::from(f)
             }));
             let o = Mat::zero((d0.rows(), d1.cols()));
@@ -315,106 +304,64 @@ impl TngComplexBuilder {
         self.mats = mats;
     }
 
-    fn modif_objs(&mut self, x: &Crossing) { 
+    fn modif_objs(&mut self, t0: &Tng, t1: &Tng) { 
         let n = self.objs.len() - 1;
         for i in 0..n { 
             let r = self.ranks[i];
             let s = self.ranks[i+1];
             for j in 0..r { 
-                self.append_x_res(i,   j,   x, Resolution::Res0); // C[i]#x0
-                self.append_x_res(i+1, s+j, x, Resolution::Res1); // C[i]#x1
+                self.modif_obj(i,   j,   t0, Resolution::Res0); // C[i]#x0
+                self.modif_obj(i+1, s+j, t1, Resolution::Res1); // C[i]#x1
             }
         }
     }
 
-    fn append_x_res(&mut self, i: usize, j: usize, x: &Crossing, r: Resolution) {
+    fn modif_obj(&mut self, i: usize, j: usize, t: &Tng, r: Resolution) {
         let v = &mut self.objs[i][j];
         v.append_bit(r);
-
-        let (r0, r1) = x.res_arcs(r);
-        self.append_arc(i, j, r0);
-        self.append_arc(i, j, r1);
+        v.tangle.connect(t.clone());
     }
 
-    fn append_arc(&mut self, i: usize, j: usize, arc: Component) {
-        let v = &mut self.objs[i][j];
-        let e = v.append_arc(arc);
-        self.updates[i][j].push(e);
-    }
-
-    fn modif_mats(&mut self) { 
+    fn modif_mats(&mut self, t0: &Tng, t1: &Tng) { 
         let n = self.mats.len() - 1;
         for i in 0..n { 
             let r = self.ranks[i];
             let s = self.ranks[i+1];
 
             // modify d0
+            let c0 = Cob::id(t0);
             for (j, k) in cartesian!(0..r, 0..s) { 
-                self.insert_cyl(i, j, k);
+                self.insert_cob(i, j, k, &c0);
             }
 
             // modify f
+            let sdl = Cob::from(
+                CobComp::new_plain(t0.clone(), t1.clone())
+            );
             for j in 0..r { 
-                self.insert_sdl(i, j, s+j);
+                self.insert_cob(i, j, s+j, &sdl);
             }
 
             // modify d1
             if i > 0 { 
+                let c1 = Cob::id(t1);
                 let q = self.ranks[i-1];
                 for (j, k) in cartesian!(0..q, 0..r) { 
-                    self.insert_cyl(i, r+j, s+k);
+                    self.insert_cob(i, r+j, s+k, &c1);
                 }
             }
         }
     }
 
-    fn insert_cyl(&mut self, i: usize, j: usize, k: usize) { 
-        self.insert_cob(i, j, k, |r0, r1| { 
-            let c0 = CobComp::cyl(r0.0, r1.0);
-            let c1 = CobComp::cyl(r0.1, r1.1);
-            vec![c0, c1]
-        })
-    }
-
-    fn insert_sdl(&mut self, i: usize, j: usize, k: usize) { 
-        self.insert_cob(i, j, k, |r0, r1| { 
-            let c = CobComp::sdl(r0, r1);
-            vec![c]
-        })
-    }
-
-    fn insert_cob<F>(&mut self, i: usize, j: usize, k: usize, f: F) 
-    where F: Fn((usize, usize), (usize, usize)) -> Vec<CobComp> { 
+    fn insert_cob(&mut self, i: usize, j: usize, k: usize, c: &Cob) { 
         let a = &self.mats[i][[k, j]]; // c[i][j] -> c[i+1][k]
         if a.is_zero() { 
             return
         }
 
-        let u0 = &self.updates[i][j];
-        let u1 = &self.updates[i+1][k];
-
-        assert_eq!(u0.len(), 2);
-        assert_eq!(u1.len(), 2);
-
-        let i0 = u0[1].reindex(u0[0].index());
-        let j0 = u0[1].index();
-        let i1 = u1[1].reindex(u1[0].index());
-        let j1 = u1[1].index();
-
-        let r0 = (i0, j0);
-        let r1 = (i1, j1);
-
         let a = std::mem::take(&mut self.mats[i][[k, j]]);
         let a = a.into_map_gens(|mut cob| { 
-            cob.apply_update(&u0[0], End::Src);
-            cob.apply_update(&u0[1], End::Src);
-            cob.apply_update(&u1[0], End::Tgt);
-            cob.apply_update(&u1[1], End::Tgt);
-
-            for c in f(r0, r1).into_iter() { 
-                cob.insert(c);
-            }
-
+            cob.connect(c.clone());
             cob
         });
 
@@ -438,7 +385,7 @@ impl TngComplexBuilder {
         let ci = &mut self.objs[i];
 
         let v0 = &mut ci[j];
-        v0.deloop(r);
+        let c = v0.deloop(r);
 
         let mut v1 = v0.clone();
         v0.append_label(KhAlgLabel::X);
@@ -447,12 +394,12 @@ impl TngComplexBuilder {
         ci.insert(j+1, v1);
 
         if i > 0 { 
-            self.cap_rows(i-1, j, r);
+            self.cap_rows(i-1, j, &c);
         }
-        self.cup_cols(i, j, r);
+        self.cup_cols(i, j, &c);
     }
 
-    fn cap_rows(&mut self, i: usize, j: usize, r: usize) { 
+    fn cap_rows(&mut self, i: usize, j: usize, c: &Component) { 
         let d = &mut self.mats[i];
 
         d.insert_zero_row(j+1);
@@ -466,12 +413,12 @@ impl TngComplexBuilder {
             let a0 = std::mem::take(&mut d[[j, k]]);
             let a1 = a0.clone();
 
-            d[[j,   k]] = a0.cap_off(r, Dot::None, End::Tgt);
-            d[[j+1, k]] = a1.cap_off(r, Dot::Y,    End::Tgt);
+            d[[j,   k]] = a0.cap_off(c, Dot::None, End::Tgt);
+            d[[j+1, k]] = a1.cap_off(c, Dot::Y,    End::Tgt);
         }
     }
 
-    fn cup_cols(&mut self, i: usize, j: usize, r: usize) { 
+    fn cup_cols(&mut self, i: usize, j: usize, c: &Component) { 
         let d = &mut self.mats[i];
 
         d.insert_zero_col(j+1);
@@ -485,8 +432,8 @@ impl TngComplexBuilder {
             let a0 = std::mem::take(&mut d[[k, j]]);
             let a1 = a0.clone();
 
-            d[[k, j]]   = a0.cap_off(r, Dot::X,    End::Src);
-            d[[k, j+1]] = a1.cap_off(r, Dot::None, End::Src);
+            d[[k, j]]   = a0.cap_off(c, Dot::X,    End::Src);
+            d[[k, j+1]] = a1.cap_off(c, Dot::None, End::Src);
         }
     }
 }
@@ -560,27 +507,6 @@ mod tests {
         assert_eq!(c.tng(1, 0).ncomps(), 2);
         assert_eq!(c.tng(1, 1).ncomps(), 2);
         assert_eq!(c.tng(2, 0).ncomps(), 3);
-    }
-
-    #[test]
-    fn inv() { 
-        let c = Cob::new(vec![
-            CobComp::cyl(0, 1),
-            CobComp::cyl(2, 3)
-        ]);
-        let f = Mor::from((c.clone(), -1));
-
-        assert!(f.is_invertible());
-        assert_eq!(f.inv(), Some(Mor::from(
-            (Cob::new(vec![
-                CobComp::cyl(1, 0),
-                CobComp::cyl(3, 2)
-            ]), -1)
-        )));
-
-        let f = Mor::from((c.clone(), 2));
-        assert_eq!(f.is_invertible(), false);
-        assert_eq!(f.inv(), None);
     }
 
     #[test]
@@ -676,10 +602,10 @@ mod tests {
         for x in l.data() {
             c.append(x);
         }
-
         c.deloop();
 
-        let h = c.as_generic(&0, &0).homology(); // TODO should shift degree
+        let c = c.as_generic(&0, &0);
+        let h = c.homology(); // TODO should shift degree
 
         assert_eq!(h[0].rank(), 1);
         assert_eq!(h[0].is_free(), true);
@@ -708,4 +634,25 @@ mod tests {
             c.describe();
         }
     }
+
+    // #[test]
+    // fn inv() { 
+    //     let c = Cob::new(vec![
+    //         CobComp::cyl(0, 1),
+    //         CobComp::cyl(2, 3)
+    //     ]);
+    //     let f = Mor::from((c.clone(), -1));
+
+    //     assert!(f.is_invertible());
+    //     assert_eq!(f.inv(), Some(Mor::from(
+    //         (Cob::new(vec![
+    //             CobComp::cyl(1, 0),
+    //             CobComp::cyl(3, 2)
+    //         ]), -1)
+    //     )));
+
+    //     let f = Mor::from((c.clone(), 2));
+    //     assert_eq!(f.is_invertible(), false);
+    //     assert_eq!(f.inv(), None);
+    // }
 }

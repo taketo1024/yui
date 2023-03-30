@@ -9,6 +9,7 @@ pub struct Tng {
 
 impl Tng { 
     pub fn new(comps: Vec<Component>) -> Self { 
+        debug_assert!(comps.iter().all(|c| !c.is_empty()));
         Self { comps }
     }
 
@@ -72,6 +73,13 @@ impl Tng {
     pub fn deloop(&mut self, i: usize) -> Component {
         assert!(self.comps[i].is_circle());
         self.comps.remove(i)
+    }
+
+    pub fn euler_num(&self) -> isize { 
+        // NOTE: χ(arc) = 1, χ(circle) = 0. 
+        self.comps.iter().filter(|c| 
+            c.is_arc()
+        ).count() as isize
     }
 }
 

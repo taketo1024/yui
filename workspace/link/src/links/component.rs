@@ -4,7 +4,7 @@ use itertools::Itertools;
 
 use crate::{Edge, Link};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq)]
 pub struct Component { 
     edges:Vec<Edge>,
     closed:bool
@@ -171,6 +171,31 @@ impl Display for Component {
     }
 }
 
+impl PartialEq for Component {
+    fn eq(&self, other: &Self) -> bool {
+        if self.closed != other.closed { 
+            return false;
+        }
+        if self.edges.len() != other.edges.len() { 
+            return false;
+        }
+        if self.edges == other.edges { 
+            return true
+        } 
+        
+        if self.closed { 
+            let n = self.edges.len();
+            let Some(p) = other.edges.iter().position(|e| e == &self.edges[0]) else { 
+                return false
+            };
+            (0 .. n).all(|i| &self.edges[i] == &other.edges[(p + i) % n]) || 
+            (0 .. n).all(|i| &self.edges[i] == &other.edges[(p + n - i) % n])
+        } else { 
+            self.edges.iter().zip(other.edges.iter().rev()).all(|(e, f)| e == f)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests { 
     use super::*;
@@ -253,5 +278,30 @@ mod tests {
         let mut c = Component::new(vec![1,2,3,4], false);
         c.connect(Component::new(vec![4], false));
         assert_eq!(c, Component::new(vec![1,2,3,4], false));
+    }
+
+    #[test]
+    fn eq_arc() { 
+        let c = Component::arc(vec![1,2,3]);
+
+        assert_eq!(c, Component::arc(vec![1,2,3]));
+        assert_eq!(c, Component::arc(vec![3,2,1]));
+
+        assert!(c != Component::arc(vec![1,2]));
+        assert!(c != Component::arc(vec![1,2,3,4]));
+        assert!(c != Component::circ(vec![1,2,3]));
+    }
+
+    #[test]
+    fn eq_circ() { 
+        let c = Component::circ(vec![1,2,3]);
+
+        assert_eq!(c, Component::circ(vec![1,2,3]));
+        assert_eq!(c, Component::circ(vec![2,3,1]));
+        assert_eq!(c, Component::circ(vec![3,1,2]));
+        
+        assert!(c != Component::circ(vec![1,2]));
+        assert!(c != Component::circ(vec![3,2,1]));
+        assert!(c != Component::arc(vec![1,2,3]));
     }
 }

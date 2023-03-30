@@ -44,13 +44,13 @@ impl CobComp {
         Self { src, tgt, genus, dots }
     }
 
-    pub fn new_plain(src: Tng, tgt: Tng) -> Self { 
+    pub fn plain(src: Tng, tgt: Tng) -> Self { 
         Self::new(src, tgt, 0, (0, 0))
     }
 
     pub fn id(c: Component) -> Self { 
         assert!(!c.is_empty());
-        Self::new_plain(
+        Self::plain(
             Tng::from(c.clone()), 
             Tng::from(c),
         )
@@ -58,7 +58,7 @@ impl CobComp {
 
     pub fn sdl(r0: (Component, Component), r1: (Component, Component)) -> Self { 
         // TODO validate
-        Self::new_plain(
+        Self::plain(
             Tng::new(vec![r0.0, r0.1]), 
             Tng::new(vec![r1.0, r1.1])
         )
@@ -66,14 +66,14 @@ impl CobComp {
 
     pub fn cup(c: Component) -> Self { 
         assert!(c.is_circle());
-        Self::new_plain(
+        Self::plain(
             Tng::from(c),
             Tng::empty()
         )
     }
 
     pub fn cap(c: Component) -> Self { 
-        Self::new_plain(
+        Self::plain(
             Tng::empty(),
             Tng::from(c)
         )
@@ -175,7 +175,7 @@ impl CobComp {
 
     pub fn inv(&self) -> Option<Self> { 
         if self.is_invertible() { 
-            let inv = Self::new_plain(
+            let inv = Self::plain(
                 self.tgt.clone(),
                 self.src.clone() 
             );
@@ -339,6 +339,13 @@ impl Cob {
         Self::new(comps)
     }
 
+    pub fn sdl(src: &Tng, tgt: &Tng) -> Self { 
+        // TODO validate
+        Self::from(
+            CobComp::plain(src.clone(), tgt.clone())
+        )
+    }
+
     pub fn ncomps(&self) -> usize { 
         self.comps.len()
     }
@@ -480,7 +487,7 @@ mod tests {
             Component::arc(vec![2,4]),
             Component::circ(vec![6]),
         ]);
-        let c = CobComp::new_plain(src, tgt);
+        let c = CobComp::plain(src, tgt);
         
         let c0 = Component::arc(vec![1,2]);
         let c1 = Component::circ(vec![6]);
@@ -503,7 +510,7 @@ mod tests {
             Component::arc(vec![2,4]),
             Component::circ(vec![11]),
         ]);
-        let c = CobComp::new_plain(src, tgt);
+        let c = CobComp::plain(src, tgt);
 
         let c1 = CobComp::id(
             Component::arc(vec![0,1])
@@ -532,12 +539,12 @@ mod tests {
             Component::circ(vec![11]),
         ]);
 
-        let mut c = CobComp::new_plain(src, tgt);
+        let mut c = CobComp::plain(src, tgt);
         c.connect(CobComp::id(
             Component::arc(vec![0,1])
         ));
 
-        assert_eq!(c, CobComp::new_plain(
+        assert_eq!(c, CobComp::plain(
             Tng::new(vec![
                 Component::arc(vec![0,1,2]),
                 Component::arc(vec![3,4]),
@@ -564,12 +571,12 @@ mod tests {
             Component::circ(vec![11]),
         ]);
 
-        let mut c = CobComp::new_plain(src, tgt);
+        let mut c = CobComp::plain(src, tgt);
         c.connect(CobComp::id(
             Component::arc(vec![1,3])
         ));
 
-        assert_eq!(c, CobComp::new_plain(
+        assert_eq!(c, CobComp::plain(
             Tng::new(vec![
                 Component::arc(vec![4,3,1,2]),
                 Component::circ(vec![10]),
@@ -591,7 +598,7 @@ mod tests {
             (Component::arc(vec![3,4]), Component::arc(vec![5,6])),
             (Component::arc(vec![4,5]), Component::arc(vec![6,3])),
         );
-        let c2 = CobComp::new_plain(
+        let c2 = CobComp::plain(
             Tng::from(Component::circ(vec![10])),
             Tng::new(vec![Component::circ(vec![10]), Component::circ(vec![11])]),
         );
@@ -621,7 +628,7 @@ mod tests {
 
     #[test]
     fn connect_incr_genus() { 
-        let mut c0 = CobComp::new_plain(
+        let mut c0 = CobComp::plain(
             Tng::new(vec![
                 Component::arc(vec![1,2]),
                 Component::arc(vec![3,4])

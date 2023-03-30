@@ -13,8 +13,6 @@ use yui_matrix::dense::Mat;
 use yui_link::{Crossing, Resolution, State, Component};
 
 use crate::KhAlgLabel;
-use crate::tools::fast_kh::cob::CobComp;
-
 use super::cob::{Cob, Dot, End};
 use super::tng::Tng;
 
@@ -335,9 +333,7 @@ impl TngComplexBuilder {
             }
 
             // modify f
-            let sdl = Cob::from(
-                CobComp::new_plain(t0.clone(), t1.clone())
-            );
+            let sdl = Cob::sdl(t0, t1);
             for j in 0..r { 
                 self.insert_cob(i, j, s+j, &sdl);
             }

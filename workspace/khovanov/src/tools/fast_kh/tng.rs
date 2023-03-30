@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::fmt::Display;
 use itertools::Itertools;
-use yui_link::{Component, Edge};
+use yui_link::{Component, Edge, Crossing, Resolution};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Tng {
@@ -12,6 +12,11 @@ impl Tng {
     pub fn new(comps: Vec<Component>) -> Self { 
         debug_assert!(comps.iter().all(|c| !c.is_empty()));
         Self { comps }
+    }
+
+    pub fn from_x(x: &Crossing, r: Resolution) -> Self { 
+        let (r0, r1) = x.res_arcs(r);
+        Self::new(vec![r0, r1])
     }
 
     pub fn empty() -> Self { 
@@ -59,8 +64,8 @@ impl Tng {
         self.comps.iter().position(|c1| c1 == c)
     }
 
-    pub fn remove_at(&mut self, i: usize) {
-        self.comps.remove(i);
+    pub fn remove_at(&mut self, i: usize) -> Component {
+        self.comps.remove(i)
     }
 
     pub fn connect(&mut self, other: Self) {
@@ -118,10 +123,14 @@ impl Tng {
 
 impl Display for Tng {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let arcs = self.comps.iter().map(|a| 
-            a.to_string()
-        ).join(", ");
-        write!(f, "T({})", arcs)
+        if self.is_empty() { 
+            write!(f, "∅")
+        } else { 
+            let arcs = self.comps.iter().map(|a| 
+                a.to_string()
+            ).join(", ");
+            write!(f, "{{{}}}", arcs)
+        }
     }
 }
 

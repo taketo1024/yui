@@ -1,3 +1,4 @@
+use core::panic;
 use std::hash::Hash;
 use std::collections::HashSet;
 use std::fmt::Display;
@@ -14,7 +15,7 @@ pub enum Dot {
     None, X, Y
 }
 
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum End { 
     Src, Tgt
 }
@@ -56,6 +57,7 @@ impl CobComp {
     }
 
     pub fn sdl(r0: (Component, Component), r1: (Component, Component)) -> Self { 
+        // TODO validate
         Self::new_plain(
             Tng::new(vec![r0.0, r0.1]), 
             Tng::new(vec![r1.0, r1.1])
@@ -271,14 +273,16 @@ impl CobComp {
         fn eval<R>(x: usize, y: usize, h: &R, t: &R) -> R
         where R: Ring, for<'x> &'x R: RingOps<R> { 
             match (x, y) { 
-                (0, 0) | (1, 1)  => R::zero(),
+                (0, 0) => R::zero(),
                 (1, 0) | (0, 1)  => R::one(),
-                (x, y) if x >= 2 => // X^2 = hX + t
-                    h * eval(x-1, y, h, t) + 
-                    t * eval(x-2, y, h, t),
-                (x, y) if y >= 2 => // Y^2 = -hY + t
-                    -h * eval(x, y-1, h, t) + 
-                     t * eval(x, y-2, h, t),
+                (x, y) if x >= 1 && y >= 1 => // XY = t
+                    t * eval(x-1, y-1, h, t),
+                (x, 0) if x >= 2 => // X^2 = hX + t
+                    h * eval(x-1, 0, h, t) + 
+                    t * eval(x-2, 0, h, t),
+                (0, y) if y >= 2 => // Y^2 = -hY + t
+                    -h * eval(0, y-1, h, t) + 
+                     t * eval(0, y-2, h, t),
                 _ => panic!()
             }
         }
@@ -373,7 +377,13 @@ impl Cob {
         self.comps.iter().map(|c| c.nbdr_comps()).sum()
     }
 
-    pub fn connect(&mut self, mut c: CobComp) { // horizontal composition
+    pub fn connect(&mut self, cob: Cob) { // horizontal composition
+        for c in cob.comps.into_iter() { 
+            self.connect_comp(c);
+        }
+    }
+
+    pub fn connect_comp(&mut self, mut c: CobComp) {
         let mut i = 0;
 
         while i < self.comps.len() { 
@@ -391,7 +401,7 @@ impl Cob {
     pub fn cap_off(&mut self, c: &Component, x: Dot, e: End) {
         assert!(c.is_circle());
         let Some((i, comp, p)) = self.find_comp(c, e) else { 
-            panic!()
+            panic!("{c} not found in {} ({e:?})", self)
         };
 
         comp.cap_off(p, e);

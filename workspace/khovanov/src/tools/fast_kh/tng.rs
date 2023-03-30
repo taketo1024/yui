@@ -41,20 +41,24 @@ impl Tng {
         assert!(arc.is_arc());
 
         let n = self.ncomps();
+
+        // If one end of `arc` is connectable:
         if let Some(i) = self.find_connectable(&arc, n) { 
             self.comps[i].connect(arc);
 
-            // When both ends of `arc` are connectable:
+            // If the other end is also connectable to a different component:
             if let Some(j) = self.find_connectable(&self.comps[i], i) { 
                 let arc_j = self.comps.remove(j);
                 self.comps[i].connect(arc_j);
-                TngUpdate(i, Some(j))
+                TngUpdate(i, Some(j), 2)
             } else { 
-                TngUpdate(i, None)
+                let c = &self.comps[i];
+                let nc = if c.is_circle() { 2 } else { 1 };
+                TngUpdate(i, None, nc)
             }
         } else { 
             self.comps.push(arc);
-            TngUpdate(n, None)
+            TngUpdate(n, None, 0)
         }
     }
 
@@ -97,11 +101,11 @@ impl Display for Tng {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct TngUpdate(usize, Option<usize>);
+pub struct TngUpdate(usize, Option<usize>, usize);
 
 impl TngUpdate { 
-    pub(crate) fn new(index: usize, removed: Option<usize>) -> Self {
-        Self(index, removed)
+    pub(crate) fn new(index: usize, removed: Option<usize>, nconn: usize) -> Self {
+        Self(index, removed, nconn)
     }
     
     pub fn index(&self) -> usize { 
@@ -110,6 +114,10 @@ impl TngUpdate {
 
     pub fn removed(&self) -> Option<usize> { 
         self.1
+    }
+
+    pub fn nconn(&self) -> usize { 
+        self.2
     }
 
     pub fn reindex(&self, k: usize) -> usize { 

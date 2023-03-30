@@ -494,13 +494,13 @@ mod tests {
         ]);
         
         let mut c = c0.clone();
-        let u = TngUpdate::new(1, None);
+        let u = TngUpdate::new(1, None, 1);
         c.apply_update(&u, End::Src); // nothing happens
         
         assert_eq!(c, c0);
 
         let mut c = c0.clone();
-        let u = TngUpdate::new(1, Some(2));
+        let u = TngUpdate::new(1, Some(2), 2);
         c.apply_update(&u, End::Src);
         
         assert_eq!(c, Cob::new(vec![
@@ -509,7 +509,7 @@ mod tests {
         ]));
 
         let mut c = c0.clone();
-        let u = TngUpdate::new(2, Some(3));
+        let u = TngUpdate::new(2, Some(3), 2);
         c.apply_update(&u, End::Src);
         
         assert_eq!(c, Cob::new(vec![
@@ -518,7 +518,7 @@ mod tests {
         ]));
 
         let mut c = c0.clone();
-        let u = TngUpdate::new(10, Some(12));
+        let u = TngUpdate::new(10, Some(12), 2);
         c.apply_update(&u, End::Tgt);
         
         assert_eq!(c, Cob::new(vec![

@@ -29,6 +29,10 @@ impl Tng {
         self.comps.len()
     }
 
+    pub fn comps(&self) -> &Vec<Component> { 
+        &self.comps
+    }
+
     pub fn comp(&self, i: usize) -> &Component { 
         &self.comps[i]
     }

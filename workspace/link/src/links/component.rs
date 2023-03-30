@@ -20,6 +20,14 @@ impl Component {
         Self::new(vec![], false)
     }
 
+    pub fn arc(edges: Vec<Edge>) -> Self { 
+        Self::new(edges, false)
+    }
+
+    pub fn circ(edges: Vec<Edge>) -> Self { 
+        Self::new(edges, true)
+    }
+
     pub fn contains(&self, e: Edge) -> bool { 
         self.edges.contains(&e)
     }

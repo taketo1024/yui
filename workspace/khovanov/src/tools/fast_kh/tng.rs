@@ -55,13 +55,12 @@ impl Tng {
         self.comps.contains(c)
     }
 
-    pub fn remove(&mut self, c: &Component) -> Option<Component> {
-        if let Some(i) = self.comps.iter().position(|c1| c1 == c) {
-            let c = self.comps.remove(i);
-            Some(c)
-        } else { 
-            None
-        }
+    pub fn index_of(&self, c: &Component) -> Option<usize> {
+        self.comps.iter().position(|c1| c1 == c)
+    }
+
+    pub fn remove_at(&mut self, i: usize) {
+        self.comps.remove(i);
     }
 
     pub fn connect(&mut self, other: Self) {
@@ -107,11 +106,6 @@ impl Tng {
         ).map(|(i, _)|
             i
         )
-    }
-
-    pub fn deloop(&mut self, i: usize) -> Component {
-        assert!(self.comps[i].is_circle());
-        self.comps.remove(i)
     }
 
     pub fn euler_num(&self) -> isize { 
@@ -200,7 +194,7 @@ mod tests {
         assert_eq!(t.ncomps(), 2);
         assert_eq!(t.find_loop(), Some(1));
 
-        t.deloop(1);
+        t.remove_at(1);
 
         assert_eq!(t.ncomps(), 1);
         assert_eq!(t.find_loop(), None);

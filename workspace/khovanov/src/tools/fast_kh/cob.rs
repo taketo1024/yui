@@ -89,6 +89,10 @@ impl CobComp {
         self.end(e).contains(c)
     }
 
+    pub fn index_of(&self, c: &Component, e: End) -> Option<usize> { 
+        self.end(e).index_of(c)
+    }
+
     pub fn is_connectable(&self, other: &Self) -> bool { 
         self.src.comps().iter().any(|c1| 
             if c1.is_arc() { 
@@ -179,9 +183,9 @@ impl CobComp {
         }
     }
 
-    pub fn cap_off(&mut self, c: &Component, e: End) {
-        assert!(c.is_circle());
-        self.end_mut(e).remove(c);
+    pub fn cap_off(&mut self, i: usize, e: End) {
+        assert!(self.end(e).comp(i).is_circle());
+        self.end_mut(e).remove_at(i);
     }
 
     pub fn add_dot(&mut self, dot: Dot) { 
@@ -386,9 +390,11 @@ impl Cob {
 
     pub fn cap_off(&mut self, c: &Component, x: Dot, e: End) {
         assert!(c.is_circle());
-        let (i, comp) = self.comp_containing(c, e);
+        let Some((i, comp, p)) = self.find_comp(c, e) else { 
+            panic!()
+        };
 
-        comp.cap_off(c, e);
+        comp.cap_off(p, e);
         comp.add_dot(x);
 
         if comp.is_removable() { 
@@ -396,10 +402,14 @@ impl Cob {
         }
     }
 
-    fn comp_containing(&mut self, c:&Component, e: End) -> (usize, &mut CobComp) { 
-        self.comps.iter_mut().enumerate().find(|(_, comp)| 
-            comp.contains(c, e)
-        ).unwrap()
+    fn find_comp(&mut self, c: &Component, e: End) -> Option<(usize, &mut CobComp, usize)> { 
+        self.comps.iter_mut().enumerate().filter_map(|(i, comp)| 
+            if let Some(p) = comp.index_of(c, e) { 
+                Some((i, comp, p))
+            } else { 
+                None
+            }
+        ).next()
     }
 
     pub fn eval<R>(&self, h: &R, t: &R) -> R
@@ -631,6 +641,17 @@ mod tests {
 
         assert_eq!(c0.genus, 1);
         assert_eq!(c0.euler_num(), -2);
+
+        c0.cap_off(0, End::Src);
+
+        assert_eq!(c0.genus, 1);
+        assert_eq!(c0.euler_num(), -1);
+
+        c0.cap_off(0, End::Tgt);
+
+        assert_eq!(c0.genus, 1);
+        assert_eq!(c0.euler_num(), 0);
+        assert!(c0.is_closed()); // torus
     }
 
 

@@ -294,14 +294,17 @@ mod tests {
 
     #[test]
     fn eq_circ() { 
-        let c = Component::circ(vec![1,2,3]);
+        let c = Component::circ(vec![1,2,3,4]);
 
-        assert_eq!(c, Component::circ(vec![1,2,3]));
-        assert_eq!(c, Component::circ(vec![2,3,1]));
-        assert_eq!(c, Component::circ(vec![3,1,2]));
+        assert_eq!(c, Component::circ(vec![1,2,3,4]));
+        assert_eq!(c, Component::circ(vec![2,3,4,1]));
+        assert_eq!(c, Component::circ(vec![3,4,1,2]));
+        assert_eq!(c, Component::circ(vec![2,3,4,1]));
+        assert_eq!(c, Component::circ(vec![4,3,2,1]));
+        assert_eq!(c, Component::circ(vec![3,2,1,4]));
         
-        assert!(c != Component::circ(vec![1,2]));
-        assert!(c != Component::circ(vec![3,2,1]));
-        assert!(c != Component::arc(vec![1,2,3]));
+        assert!(c != Component::circ(vec![1,2,3]));
+        assert!(c != Component::circ(vec![1,2,3,4,5]));
+        assert!(c != Component::circ(vec![1,2,4,3]));
     }
 }

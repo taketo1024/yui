@@ -1,8 +1,9 @@
+use std::collections::HashSet;
 use std::fmt::Display;
 use itertools::Itertools;
-use yui_link::Component;
+use yui_link::{Component, Edge};
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Tng {
     comps: Vec<Component> // arc or circle
 }
@@ -37,7 +38,43 @@ impl Tng {
         &self.comps[i]
     }
 
-    pub fn append_arc(&mut self, arc: Component) -> TngUpdate { 
+    pub fn sub<I>(&self, iter: I) -> Self 
+    where I: IntoIterator<Item = usize> { 
+        Self::new(
+            iter.into_iter().map(|i| self.comp(i).clone()).collect()
+        )
+    }
+
+    pub fn endpts(&self) -> HashSet<Edge> { 
+        self.comps.iter().flat_map(|c| 
+            c.ends().map(|(e0, e1)| vec![e0, e1]).unwrap_or(vec![])
+        ).collect()
+    }
+
+    pub fn contains(&self, c: &Component) -> bool { 
+        self.comps.contains(c)
+    }
+
+    pub fn remove(&mut self, c: &Component) -> Option<Component> {
+        if let Some(i) = self.comps.iter().position(|c1| c1 == c) {
+            let c = self.comps.remove(i);
+            Some(c)
+        } else { 
+            None
+        }
+    }
+
+    pub fn connect(&mut self, other: Self) {
+        for c in other.comps.into_iter() {
+            if c.is_circle() { 
+                self.comps.push(c);
+            } else { 
+                self.append_arc(c);
+            }
+        }
+    }
+
+    pub fn append_arc(&mut self, arc: Component) { 
         assert!(arc.is_arc());
 
         let n = self.ncomps();
@@ -50,15 +87,9 @@ impl Tng {
             if let Some(j) = self.find_connectable(&self.comps[i], i) { 
                 let arc_j = self.comps.remove(j);
                 self.comps[i].connect(arc_j);
-                TngUpdate(i, Some(j), 2)
-            } else { 
-                let c = &self.comps[i];
-                let nc = if c.is_circle() { 2 } else { 1 };
-                TngUpdate(i, None, nc)
             }
         } else { 
             self.comps.push(arc);
-            TngUpdate(n, None, 0)
         }
     }
 
@@ -100,37 +131,9 @@ impl Display for Tng {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub struct TngUpdate(usize, Option<usize>, usize);
-
-impl TngUpdate { 
-    pub(crate) fn new(index: usize, removed: Option<usize>, nconn: usize) -> Self {
-        Self(index, removed, nconn)
-    }
-    
-    pub fn index(&self) -> usize { 
-        self.0
-    }
-
-    pub fn removed(&self) -> Option<usize> { 
-        self.1
-    }
-
-    pub fn nconn(&self) -> usize { 
-        self.2
-    }
-
-    pub fn reindex(&self, k: usize) -> usize { 
-        let Some(j) = self.removed() else { return k };
-        let i = self.index();
-
-        if k < j { 
-            k
-        } else if k == j { 
-            i
-        } else {
-            k - 1
-        }
+impl From<Component> for Tng {
+    fn from(c: Component) -> Self {
+        Self::new(vec![c])
     }
 }
 
@@ -139,7 +142,7 @@ mod tests {
     use super::*;
  
     #[test]
-    fn append() { 
+    fn append_arc() { 
         let mut t = Tng::empty();
         assert_eq!(t.ncomps(), 0);
 
@@ -154,6 +157,29 @@ mod tests {
 
         t.append_arc(Component::new(vec![0,3], false)); // [-0-1-2-3-]
         assert_eq!(t.ncomps(), 1);
+    }
+
+    #[test]
+    fn connect() { 
+        let mut t0 = Tng::new(vec![
+            Component::new(vec![0,1], false),
+            Component::new(vec![2,3], false),
+            Component::new(vec![10], true),
+        ]);
+
+        let t1 = Tng::new(vec![
+            Component::new(vec![1,2], false),
+            Component::new(vec![3,4], false),
+            Component::new(vec![11], true),
+        ]);
+
+        t0.connect(t1);
+
+        assert_eq!(t0, Tng::new(vec![
+            Component::new(vec![0,1,2,3,4], false),
+            Component::new(vec![10], true),
+            Component::new(vec![11], true),
+        ]));
     }
 
     #[test]

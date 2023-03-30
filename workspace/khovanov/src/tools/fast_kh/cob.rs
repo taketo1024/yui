@@ -5,10 +5,9 @@ use derive_more::Display;
 use itertools::Itertools;
 use yui_core::{Elem, Ring, RingOps};
 use yui_lin_comb::{FreeGen, OrdForDisplay};
+use yui_link::{Component, Edge};
 use yui_polynomial::Mono2;
-use yui_utils::set;
-
-use super::tng::{Tng, TngUpdate};
+use super::tng::Tng;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Display)]
 pub enum Dot { 
@@ -32,46 +31,49 @@ impl End {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct CobComp { 
-    src: HashSet<usize>, // indices of comps in the source tangle. 
-    tgt: HashSet<usize>,
+    src: Tng,
+    tgt: Tng,
     genus: usize,
     dots: (usize, usize) // nums of X and Y dots resp. 
 }
 
 impl CobComp { 
-    pub fn new(src: HashSet<usize>, tgt: HashSet<usize>, genus: usize, dots: (usize, usize)) -> Self { 
+    pub fn new(src: Tng, tgt: Tng, genus: usize, dots: (usize, usize)) -> Self { 
+        debug_assert_eq!(src.endpts(), tgt.endpts());
         Self { src, tgt, genus, dots }
     }
 
-    pub fn new_elem(src: HashSet<usize>, tgt: HashSet<usize>) -> Self { 
+    pub fn new_plain(src: Tng, tgt: Tng) -> Self { 
         Self::new(src, tgt, 0, (0, 0))
     }
 
-    pub fn cyl(i0: usize, i1: usize) -> Self { 
-        Self::new_elem(
-            set![i0], 
-            set![i1],
+    pub fn id(c: Component) -> Self { 
+        assert!(!c.is_empty());
+        Self::new_plain(
+            Tng::from(c.clone()), 
+            Tng::from(c),
         )
     }
 
-    pub fn sdl(r0: (usize, usize), r1: (usize, usize)) -> Self { 
-        Self::new_elem(
-            set![r0.0, r0.1], 
-            set![r1.0, r1.1], 
+    pub fn sdl(r0: (Component, Component), r1: (Component, Component)) -> Self { 
+        Self::new_plain(
+            Tng::new(vec![r0.0, r0.1]), 
+            Tng::new(vec![r1.0, r1.1])
         )
     }
 
-    pub fn cup(i0: usize) -> Self { 
-        Self::new_elem(
-            set![i0],
-            set![]
+    pub fn cup(c: Component) -> Self { 
+        assert!(c.is_circle());
+        Self::new_plain(
+            Tng::from(c),
+            Tng::empty()
         )
     }
 
-    pub fn cap(i1: usize) -> Self { 
-        Self::new_elem(
-            set![],
-            set![i1]
+    pub fn cap(c: Component) -> Self { 
+        Self::new_plain(
+            Tng::empty(),
+            Tng::from(c)
         )
     }
 
@@ -79,20 +81,31 @@ impl CobComp {
         self.genus
     }
 
-    pub fn contains(&self, i: usize, e: End) -> bool { 
-        self.end(e).contains(&i)
+    pub fn endpts(&self) -> HashSet<Edge> { 
+        self.src.endpts() // == self.tgt.endpts()
+    }
+
+    pub fn contains(&self, c: &Component, e: End) -> bool { 
+        self.end(e).contains(c)
     }
 
     pub fn is_connectable(&self, other: &Self) -> bool { 
-        self.src.intersection(&other.src).next().is_some() &&
-        self.tgt.intersection(&other.tgt).next().is_some()
+        self.src.comps().iter().any(|c1| 
+            if c1.is_arc() { 
+                other.src.comps().iter().any(|c2| { 
+                    c2.is_arc() && c1.is_connectable(c2)
+                })
+            } else { 
+                false 
+            }
+        )
     }
     
     pub fn connect(&mut self, other: Self) { 
         let CobComp{ src, tgt, genus, dots } = other;
 
-        self.src.extend(src);
-        self.tgt.extend(tgt);
+        self.src.connect(src);
+        self.tgt.connect(tgt);
 
         // TODO must compute genus properly!
 
@@ -116,8 +129,8 @@ impl CobComp {
     }
 
     pub fn is_cyl(&self) -> bool { // (arc or circle) × I
-        self.src.len() == 1 && 
-        self.tgt.len() == 1 && 
+        self.src.ncomps() == 1 && 
+        self.tgt.ncomps() == 1 && 
         self.genus == 0
     }
 
@@ -140,17 +153,19 @@ impl CobComp {
 
     pub fn inv(&self) -> Option<Self> { 
         if self.is_invertible() { 
-            let &i0 = self.src.iter().next().unwrap();
-            let &i1 = self.tgt.iter().next().unwrap();
-            let inv = Self::new(set![i1], set![i0], 0, (0, 0));
+            let inv = Self::new_plain(
+                self.tgt.clone(),
+                self.src.clone() 
+            );
             Some(inv)
         } else {
             None
         }
     }
 
-    pub fn cap_off(&mut self, i: usize, e: End) {
-        assert!( self.end_mut(e).remove(&i) )
+    pub fn cap_off(&mut self, c: &Component, e: End) {
+        assert!(c.is_circle());
+        self.end_mut(e).remove(c);
     }
 
     pub fn add_dot(&mut self, dot: Dot) { 
@@ -161,7 +176,7 @@ impl CobComp {
         }
     }
 
-    fn end(&self, e: End) -> &HashSet<usize> { 
+    fn end(&self, e: End) -> &Tng { 
         if e.is_src() { 
             &self.src 
         } else { 
@@ -169,7 +184,7 @@ impl CobComp {
         }
     }
 
-    fn end_mut(&mut self, e: End) -> &mut HashSet<usize> { 
+    fn end_mut(&mut self, e: End) -> &mut Tng { 
         if e.is_src() { 
             &mut self.src 
         } else { 
@@ -178,25 +193,25 @@ impl CobComp {
     }
 
     // χ(S) = 2 - 2g(S) - #(∂S)
-    pub fn euler_num(&self, src: &Tng, tgt: &Tng) -> i32 { 
-        let b = self.nbdr_comps(src, tgt) as i32;
+    pub fn euler_num(&self) -> i32 { 
+        let b = self.nbdr_comps() as i32;
         let g = self.genus as i32;
         2 - 2 * g - b
     }
 
-    pub fn nbdr_comps(&self, src: &Tng, tgt: &Tng) -> usize { 
-        let mut src_arcs: HashSet<_> = self.src.iter().filter(|&&i| 
-            src.comp(i).is_arc()
-        ).cloned().collect();
+    pub fn nbdr_comps(&self) -> usize { 
+        let mut src_arcs: HashSet<_> = (0..self.src.ncomps()).filter(|&i| 
+            self.src.comp(i).is_arc()
+        ).collect();
 
-        let mut tgt_arcs: HashSet<_> = self.tgt.iter().filter(|&&i| 
-            tgt.comp(i).is_arc()
-        ).cloned().collect();
+        let mut tgt_arcs: HashSet<_> = (0..self.tgt.ncomps()).filter(|&i| 
+            self.tgt.comp(i).is_arc()
+        ).collect();
 
         assert_eq!(src_arcs.len(), tgt_arcs.len());
 
-        let src_circs = self.src.len() - src_arcs.len();
-        let tgt_circs = self.tgt.len() - tgt_arcs.len();
+        let src_circs = self.src.ncomps() - src_arcs.len();
+        let tgt_circs = self.tgt.ncomps() - tgt_arcs.len();
 
         let mut side_circs = 0;
 
@@ -205,16 +220,16 @@ impl CobComp {
             loop { 
                 src_arcs.remove(&i0);
 
-                let c0 = src.comp(i0);
+                let c0 = self.src.comp(i0);
                 let Some(j) = tgt_arcs.iter().find(|&&j| { 
-                    tgt.comp(j).is_connectable(&c0)
+                    self.tgt.comp(j).is_connectable(&c0)
                 }).cloned() else { panic!() };
 
                 tgt_arcs.remove(&j);
 
-                let c1 = tgt.comp(j);
+                let c1 = self.tgt.comp(j);
                 if let Some(i1) = src_arcs.iter().find(|&&i| { 
-                    i != i0 && src.comp(i).is_connectable(&c1)
+                    i != i0 && self.src.comp(i).is_connectable(&c1)
                 }).cloned() { 
                     i0 = i1;
                 } else { 
@@ -255,15 +270,7 @@ impl CobComp {
 
 impl Display for CobComp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fn set(s: &HashSet<usize>) -> String { 
-            if s.is_empty() { 
-                "∅".to_string()
-            } else { 
-                format!("{{{}}}", s.iter().sorted().join(","))
-            }
-        }
-
-        let s = match (self.src.len(), self.tgt.len()) { 
+        let s = match (self.src.ncomps(), self.tgt.ncomps()) { 
             (0, 0) => "S",
             (0, 1) => "ι",
             (1, 0) => "ε",
@@ -280,7 +287,7 @@ impl Display for CobComp {
             String::new()
         };
         
-        write!(f, "{s}({} -> {}{})", set(&self.src), set(&self.tgt), dots)
+        write!(f, "{s}({} -> {}{})", &self.src, &self.tgt, dots)
     }
 }
 
@@ -300,10 +307,11 @@ impl Cob {
         Self { comps }
     }
     
-    pub fn id_for(v: &Tng) -> Self { 
-        let comps = (0..v.ncomps()).map(|i| 
-            CobComp::cyl(i, i)
-        ).collect();
+    pub fn id(v: &Tng) -> Self { 
+        let comps = (0..v.ncomps()).map(|i| {
+            let c = v.comp(i).clone();
+            CobComp::id(c)
+        }).collect();
         Self::new(comps)
     }
 
@@ -337,30 +345,15 @@ impl Cob {
         }
     }
 
-    pub fn euler_num(&self, src: &Tng, tgt: &Tng) -> i32 { 
-        self.comps.iter().map(|c| c.euler_num(src, tgt)).sum()
+    pub fn euler_num(&self) -> i32 { 
+        self.comps.iter().map(|c| c.euler_num()).sum()
     }
 
-    pub fn nbdr_comps(&self, src: &Tng, tgt: &Tng) -> usize { 
-        self.comps.iter().map(|c| c.nbdr_comps(src, tgt)).sum()
+    pub fn nbdr_comps(&self) -> usize { 
+        self.comps.iter().map(|c| c.nbdr_comps()).sum()
     }
 
-    pub fn apply_update(&mut self, u: &TngUpdate, e: End) {
-        let Some(j) = u.removed() else { return };
-        let i = u.index();
-
-        for c in self.comps.iter_mut() { 
-            let end = c.end_mut(e);
-            if end.contains(&i) && end.contains(&j) { 
-                end.remove(&j);
-            }
-            *end = end.iter().map(|&k| { 
-                u.reindex(k)
-            }).collect();
-        }
-    }
-
-    pub fn insert(&mut self, mut c: CobComp) { // horizontal composition
+    pub fn connect(&mut self, mut c: CobComp) { // horizontal composition
         let mut i = 0;
 
         while i < self.comps.len() { 
@@ -373,38 +366,23 @@ impl Cob {
         }
         
         self.comps.push(c);
-
-        #[cfg(debug_assertions)] {
-            self.comps.sort_by_key(|c| c.src.iter().min().cloned().unwrap_or(0));
-        }
     }
 
-    pub fn cap_off(&mut self, r: usize, x: Dot, e: End) {
-        let (i, c) = self.comp_containing(r, e);
+    pub fn cap_off(&mut self, c: &Component, x: Dot, e: End) {
+        assert!(c.is_circle());
+        let (i, comp) = self.comp_containing(c, e);
 
-        c.cap_off(r, e);
-        c.add_dot(x);
+        comp.cap_off(c, e);
+        comp.add_dot(x);
 
-        if c.is_removable() { 
+        if comp.is_removable() { 
             self.comps.remove(i);
         }
-
-        // reindex
-        for c in self.comps.iter_mut() { 
-            let end = c.end_mut(e);
-            *end = end.iter().map(|&k| { 
-                if k > r { 
-                    k - 1
-                } else { 
-                    k
-                }
-            }).collect();
-        }
     }
 
-    fn comp_containing(&mut self, r: usize, e: End) -> (usize, &mut CobComp) { 
-        self.comps.iter_mut().enumerate().find(|(_, c)| 
-            c.contains(r, e)
+    fn comp_containing(&mut self, c:&Component, e: End) -> (usize, &mut CobComp) { 
+        self.comps.iter_mut().enumerate().find(|(_, comp)| 
+            comp.contains(c, e)
         ).unwrap()
     }
 
@@ -455,160 +433,180 @@ mod tests {
     use super::*;
  
     #[test]
-    fn contains() { 
-        let c = CobComp::new(set![0,1,2], set![3,4], 0, (0, 0));
-        assert!( c.contains(0, End::Src));
-        assert!(!c.contains(3, End::Src));
-        assert!( c.contains(3, End::Tgt));
-        assert!(!c.contains(0, End::Tgt));
+    fn cob_contains() { 
+        let src = Tng::new(vec![
+            Component::arc(vec![1,2]),
+            Component::arc(vec![3,4]),
+            Component::circ(vec![5]),
+        ]);
+        let tgt = Tng::new(vec![
+            Component::arc(vec![1,3]),
+            Component::arc(vec![2,4]),
+            Component::circ(vec![6]),
+        ]);
+        let c = CobComp::new_plain(src, tgt);
+        
+        let c0 = Component::arc(vec![1,2]);
+        let c1 = Component::circ(vec![6]);
+
+        assert!( c.contains(&c0, End::Src));
+        assert!(!c.contains(&c1, End::Src));
+        assert!(!c.contains(&c0, End::Tgt));
+        assert!( c.contains(&c1, End::Tgt));
     }
 
     #[test]
     fn is_connectable() { 
-        let c0 = CobComp::new(set![0,1,2], set![10,11],    0, (0, 0));
-        let c1 = CobComp::new(set![2,3],   set![11,12,13], 0, (0, 0));
-        let c2 = CobComp::new(set![3,4,5], set![13,14],    0, (0, 0));
-
-        assert!( c0.is_connectable(&c1));
-        assert!( c1.is_connectable(&c2));
-        assert!(!c0.is_connectable(&c2));
-    }
-
-    #[test]
-    fn connect() { 
-        let mut c0 = CobComp::new(set![0,1,2], set![10,11],    0, (1, 2));
-        let     c1 = CobComp::new(set![2,3],   set![11,12,13], 0, (3, 1));
-
-        c0.connect(c1);
-
-        assert_eq!(c0.src, set![0,1,2,3]);
-        assert_eq!(c0.tgt, set![10,11,12,13]);
-        assert_eq!(c0.dots, (4, 3));
-    }
-
-    #[test]
-    fn apply_update() { 
-        let c0 = Cob::new(vec![
-            CobComp::new(set![0,1,2], set![10,11], 0, (0, 0)),
-            CobComp::new(set![3,4,5], set![12,13], 0, (0, 0))
+        let src = Tng::new(vec![
+            Component::arc(vec![1,2]),
+            Component::arc(vec![3,4]),
+            Component::circ(vec![10]),
         ]);
-        
-        let mut c = c0.clone();
-        let u = TngUpdate::new(1, None, 1);
-        c.apply_update(&u, End::Src); // nothing happens
-        
-        assert_eq!(c, c0);
+        let tgt = Tng::new(vec![
+            Component::arc(vec![1,3]),
+            Component::arc(vec![2,4]),
+            Component::circ(vec![11]),
+        ]);
+        let c = CobComp::new_plain(src, tgt);
 
-        let mut c = c0.clone();
-        let u = TngUpdate::new(1, Some(2), 2);
-        c.apply_update(&u, End::Src);
-        
-        assert_eq!(c, Cob::new(vec![
-            CobComp::new(set![0,1],   set![10,11], 0, (0, 0)),
-            CobComp::new(set![2,3,4], set![12,13], 0, (0, 0))
-        ]));
+        let c1 = CobComp::id(
+            Component::arc(vec![0,1])
+        );
+        let c2 = CobComp::sdl(
+            (Component::arc(vec![0,1]), Component::arc(vec![90,91])),
+            (Component::arc(vec![0,90]), Component::arc(vec![1,91])),
+        );
+        let c3 = CobComp::id(Component::arc(vec![5,6]));
 
-        let mut c = c0.clone();
-        let u = TngUpdate::new(2, Some(3), 2);
-        c.apply_update(&u, End::Src);
-        
-        assert_eq!(c, Cob::new(vec![
-            CobComp::new(set![0,1,2], set![10,11], 0, (0, 0)),
-            CobComp::new(set![3,2,4], set![12,13], 0, (0, 0))
-        ]));
-
-        let mut c = c0.clone();
-        let u = TngUpdate::new(10, Some(12), 2);
-        c.apply_update(&u, End::Tgt);
-        
-        assert_eq!(c, Cob::new(vec![
-            CobComp::new(set![0,1,2], set![10,11], 0, (0, 0)),
-            CobComp::new(set![3,4,5], set![10,12], 0, (0, 0))
-        ]));
+        assert!(c.is_connectable(&c1));
+        assert!(c.is_connectable(&c2));
+        assert!(!c.is_connectable(&c3));
     }
 
     #[test]
-    fn insert() { 
-        let mut c = Cob::new(vec![]);
-        c.insert(CobComp::new(set![0,1,2], set![10,11], 0, (0, 0)));
-        c.insert(CobComp::new(set![3,4,5], set![12,13], 0, (0, 0)));
+    fn connect1() { 
+        let src = Tng::new(vec![
+            Component::arc(vec![1,2]),
+            Component::arc(vec![3,4]),
+            Component::circ(vec![10]),
+        ]);
+        let tgt = Tng::new(vec![
+            Component::arc(vec![1,3]),
+            Component::arc(vec![2,4]),
+            Component::circ(vec![11]),
+        ]);
 
-        assert_eq!(c.comps.len(), 2);
-        
-        c.insert(CobComp::new(set![2,3], set![11,12], 0, (0, 0)));
+        let mut c = CobComp::new_plain(src, tgt);
+        c.connect(CobComp::id(
+            Component::arc(vec![0,1])
+        ));
 
-        assert_eq!(c.comps.len(), 1);
-        assert_eq!(c, Cob::new(vec![
-            CobComp::new(set![0,1,2,3,4,5], set![10,11,12,13], 0, (0, 0)),
-        ]));
+        assert_eq!(c, CobComp::new_plain(
+            Tng::new(vec![
+                Component::arc(vec![0,1,2]),
+                Component::arc(vec![3,4]),
+                Component::circ(vec![10]),
+            ]),
+            Tng::new(vec![
+                Component::arc(vec![0,1,3]),
+                Component::arc(vec![2,4]),
+                Component::circ(vec![11]),
+            ])
+        ));
     }
 
     #[test]
-    fn cob_comp_inv() { 
-        let c0 = CobComp::new(set![0], set![1], 0, (0, 0));
-        let c = Cob::new(vec![c0]);
+    fn connect2() { 
+        let src = Tng::new(vec![
+            Component::arc(vec![1,2]),
+            Component::arc(vec![3,4]),
+            Component::circ(vec![10]),
+        ]);
+        let tgt = Tng::new(vec![
+            Component::arc(vec![1,3]),
+            Component::arc(vec![2,4]),
+            Component::circ(vec![11]),
+        ]);
 
-        assert_eq!(c.is_invertible(), true);
-        assert_eq!(c.inv(), Some(Cob::new(vec![
-            CobComp::new(set![1], set![0], 0, (0, 0))
-        ])));
+        let mut c = CobComp::new_plain(src, tgt);
+        c.connect(CobComp::id(
+            Component::arc(vec![1,3])
+        ));
 
-        let c0 = CobComp::new(set![0], set![1], 0, (0, 0));
-        let c1 = CobComp::new(set![2], set![3], 0, (0, 0));
-        let c = Cob::new(vec![c0, c1]);
-
-        assert_eq!(c.is_invertible(), true);
-        assert_eq!(c.inv(), Some(Cob::new(vec![
-            CobComp::new(set![1], set![0], 0, (0, 0)),
-            CobComp::new(set![3], set![2], 0, (0, 0))
-        ])));
-
-        let c0 = CobComp::new(set![0], set![1], 0, (1, 0));
-        let c = Cob::new(vec![c0]);
-
-        assert_eq!(c.is_invertible(), false);
-        assert_eq!(c.inv(), None);
+        assert_eq!(c, CobComp::new_plain(
+            Tng::new(vec![
+                Component::arc(vec![4,3,1,2]),
+                Component::circ(vec![10]),
+            ]),
+            Tng::new(vec![
+                Component::circ(vec![1,3]),
+                Component::arc(vec![2,4]),
+                Component::circ(vec![11]),
+            ])
+        ));
     }
 
     #[test]
     fn euler_num() { 
-        let src = Tng::new(vec![ 
-            Component::new(vec![1,2], false),
-            Component::new(vec![3,4], false),
-            Component::new(vec![5,6], false),
-            Component::new(vec![10], true),
-            Component::new(vec![20], true),
-        ]);
+        let c0 = CobComp::id(
+            Component::arc(vec![1,2])
+        );
+        let c1 = CobComp::sdl(
+            (Component::arc(vec![3,4]), Component::arc(vec![5,6])),
+            (Component::arc(vec![4,5]), Component::arc(vec![6,3])),
+        );
+        let c2 = CobComp::new_plain(
+            Tng::from(Component::circ(vec![10])),
+            Tng::new(vec![Component::circ(vec![10]), Component::circ(vec![11])]),
+        );
+        let c3 = CobComp::cup(
+            Component::circ(vec![20])
+        );
+        let c4 = CobComp::cap(
+            Component::circ(vec![30])
+        );
 
-        let tgt = Tng::new(vec![ 
-            Component::new(vec![1,2], false),
-            Component::new(vec![4,5], false),
-            Component::new(vec![6,3], false),
-            Component::new(vec![11], true),
-            Component::new(vec![12], true),
-            Component::new(vec![20], true),
-        ]);
+        assert_eq!(c0.nbdr_comps(), 1);
+        assert_eq!(c1.nbdr_comps(), 1);
+        assert_eq!(c2.nbdr_comps(), 3);
+        assert_eq!(c3.nbdr_comps(), 1);
+        assert_eq!(c4.nbdr_comps(), 1);
 
-        let cob = Cob::new(vec![
-            CobComp::cyl(0, 0),
-            CobComp::sdl((1,2), (1,2)),
-            CobComp::new_elem(set![3], set![3,4]),
-            CobComp::cup(4),
-            CobComp::cap(5),
-        ]);
+        assert_eq!(c0.euler_num(), 1);
+        assert_eq!(c1.euler_num(), 1);
+        assert_eq!(c2.euler_num(), -1);
+        assert_eq!(c3.euler_num(), 1);
+        assert_eq!(c4.euler_num(), 1);
 
-        assert_eq!(cob.comp(0).nbdr_comps(&src, &tgt), 1);
-        assert_eq!(cob.comp(1).nbdr_comps(&src, &tgt), 1);
-        assert_eq!(cob.comp(2).nbdr_comps(&src, &tgt), 3);
-        assert_eq!(cob.comp(3).nbdr_comps(&src, &tgt), 1);
-        assert_eq!(cob.comp(4).nbdr_comps(&src, &tgt), 1);
-        assert_eq!(cob.nbdr_comps(&src, &tgt), 7);
-
-        assert_eq!(cob.comp(0).euler_num(&src, &tgt), 1);
-        assert_eq!(cob.comp(1).euler_num(&src, &tgt), 1);
-        assert_eq!(cob.comp(2).euler_num(&src, &tgt), -1);
-        assert_eq!(cob.comp(3).euler_num(&src, &tgt), 1);
-        assert_eq!(cob.comp(4).euler_num(&src, &tgt), 1);
-        assert_eq!(cob.euler_num(&src, &tgt), 3);
+        let cob = Cob::new(vec![c0,c1,c2,c3,c4]);
+        assert_eq!(cob.euler_num(), 3);
+        assert_eq!(cob.nbdr_comps(), 7);
     }
+
+    // #[test]
+    // fn cob_comp_inv() { 
+    //     let c0 = CobComp::new(set![0], set![1], 0, (0, 0));
+    //     let c = Cob::new(vec![c0]);
+
+    //     assert_eq!(c.is_invertible(), true);
+    //     assert_eq!(c.inv(), Some(Cob::new(vec![
+    //         CobComp::new(set![1], set![0], 0, (0, 0))
+    //     ])));
+
+    //     let c0 = CobComp::new(set![0], set![1], 0, (0, 0));
+    //     let c1 = CobComp::new(set![2], set![3], 0, (0, 0));
+    //     let c = Cob::new(vec![c0, c1]);
+
+    //     assert_eq!(c.is_invertible(), true);
+    //     assert_eq!(c.inv(), Some(Cob::new(vec![
+    //         CobComp::new(set![1], set![0], 0, (0, 0)),
+    //         CobComp::new(set![3], set![2], 0, (0, 0))
+    //     ])));
+
+    //     let c0 = CobComp::new(set![0], set![1], 0, (1, 0));
+    //     let c = Cob::new(vec![c0]);
+
+    //     assert_eq!(c.is_invertible(), false);
+    //     assert_eq!(c.inv(), None);
+    // }
 }

@@ -5,12 +5,12 @@ use itertools::Itertools;
 use crate::{Edge, Link};
 
 #[derive(Debug, Clone, Eq)]
-pub struct Component { 
+pub struct LinkComp { 
     edges:Vec<Edge>,
     closed:bool
 }
 
-impl Component { 
+impl LinkComp { 
     pub fn new(edges: Vec<Edge>, closed: bool) -> Self { 
         assert!(!closed || edges.len() > 0);
         Self { edges, closed }
@@ -106,7 +106,7 @@ impl Component {
         let (e0, e1) =  self.ends().unwrap();
         let (f0, f1) = other.ends().unwrap();
 
-        let Component {mut edges, ..} = other;
+        let LinkComp {mut edges, ..} = other;
 
         if e1 == f0 {        // [.., e1) + [f0, ..)
             edges.remove(0);
@@ -136,7 +136,7 @@ impl Component {
         }
     }
 
-    pub fn is_adj(&self, other: &Component, link: &Link) -> bool { 
+    pub fn is_adj(&self, other: &LinkComp, link: &Link) -> bool { 
         // 1) find crossings `x` that touche `self`. 
         // 2) check if `x` also touches `other`.
         
@@ -162,7 +162,7 @@ impl Component {
     }
 }
 
-impl Display for Component {
+impl Display for LinkComp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.is_empty() { 
             return write!(f, "∅");
@@ -177,7 +177,7 @@ impl Display for Component {
     }
 }
 
-impl PartialEq for Component {
+impl PartialEq for LinkComp {
     fn eq(&self, other: &Self) -> bool {
         if self.closed != other.closed { 
             return false;
@@ -208,7 +208,7 @@ mod tests {
 
     #[test]
     fn append() { 
-        let mut c = Component::empty();
+        let mut c = LinkComp::empty();
         c.append(0);
         c.append(1);
         c.append(2);
@@ -224,93 +224,93 @@ mod tests {
 
     #[test]
     fn reduce() { 
-        let mut c = Component::new(vec![], false);
+        let mut c = LinkComp::new(vec![], false);
         c.reduce();
-        assert_eq!(c, Component::new(vec![], false));
+        assert_eq!(c, LinkComp::new(vec![], false));
         
-        let mut c = Component::new(vec![0], false);
+        let mut c = LinkComp::new(vec![0], false);
         c.reduce();
-        assert_eq!(c, Component::new(vec![0], false));
+        assert_eq!(c, LinkComp::new(vec![0], false));
         
-        let mut c = Component::new(vec![0,1,2,3], false);
+        let mut c = LinkComp::new(vec![0,1,2,3], false);
         c.reduce();
-        assert_eq!(c, Component::new(vec![0, 3], false));
+        assert_eq!(c, LinkComp::new(vec![0, 3], false));
         
-        let mut c = Component::new(vec![0], true);
+        let mut c = LinkComp::new(vec![0], true);
         c.reduce();
-        assert_eq!(c, Component::new(vec![0], true));
+        assert_eq!(c, LinkComp::new(vec![0], true));
 
-        let mut c = Component::new(vec![0,1,2,3], true);
+        let mut c = LinkComp::new(vec![0,1,2,3], true);
         c.reduce();
-        assert_eq!(c, Component::new(vec![0], true));
+        assert_eq!(c, LinkComp::new(vec![0], true));
     }
 
     #[test]
     fn is_connectable() { 
-        let c = Component::new(vec![1,2,3,4], false);
+        let c = LinkComp::new(vec![1,2,3,4], false);
 
-        assert_eq!(c.is_connectable(&Component::new(vec![4,5], false)), true);
-        assert_eq!(c.is_connectable(&Component::new(vec![5,4], false)), true);
-        assert_eq!(c.is_connectable(&Component::new(vec![1,5], false)), true);
-        assert_eq!(c.is_connectable(&Component::new(vec![5,1], false)), true);
-        assert_eq!(c.is_connectable(&Component::new(vec![5,6], false)), false);
-        assert_eq!(c.is_connectable(&Component::new(vec![2,3], false)), false);
-        assert_eq!(c.is_connectable(&Component::new(vec![0], true)), false);
-        assert_eq!(c.is_connectable(&Component::new(vec![], false)), false);
+        assert_eq!(c.is_connectable(&LinkComp::new(vec![4,5], false)), true);
+        assert_eq!(c.is_connectable(&LinkComp::new(vec![5,4], false)), true);
+        assert_eq!(c.is_connectable(&LinkComp::new(vec![1,5], false)), true);
+        assert_eq!(c.is_connectable(&LinkComp::new(vec![5,1], false)), true);
+        assert_eq!(c.is_connectable(&LinkComp::new(vec![5,6], false)), false);
+        assert_eq!(c.is_connectable(&LinkComp::new(vec![2,3], false)), false);
+        assert_eq!(c.is_connectable(&LinkComp::new(vec![0], true)), false);
+        assert_eq!(c.is_connectable(&LinkComp::new(vec![], false)), false);
     }
 
     #[test]
     fn connect() { 
-        let mut c = Component::new(vec![1,2,3,4], false);
-        c.connect(Component::new(vec![4,5], false));
-        assert_eq!(c, Component::new(vec![1,2,3,4,5], false));
+        let mut c = LinkComp::new(vec![1,2,3,4], false);
+        c.connect(LinkComp::new(vec![4,5], false));
+        assert_eq!(c, LinkComp::new(vec![1,2,3,4,5], false));
 
-        let mut c = Component::new(vec![1,2,3,4], false);
-        c.connect(Component::new(vec![5,4], false));
-        assert_eq!(c, Component::new(vec![1,2,3,4,5], false));
+        let mut c = LinkComp::new(vec![1,2,3,4], false);
+        c.connect(LinkComp::new(vec![5,4], false));
+        assert_eq!(c, LinkComp::new(vec![1,2,3,4,5], false));
 
-        let mut c = Component::new(vec![1,2,3,4], false);
-        c.connect(Component::new(vec![6,1], false));
-        assert_eq!(c, Component::new(vec![6,1,2,3,4], false));
+        let mut c = LinkComp::new(vec![1,2,3,4], false);
+        c.connect(LinkComp::new(vec![6,1], false));
+        assert_eq!(c, LinkComp::new(vec![6,1,2,3,4], false));
 
-        let mut c = Component::new(vec![1,2,3,4], false);
-        c.connect(Component::new(vec![1,6], false));
-        assert_eq!(c, Component::new(vec![6,1,2,3,4], false));
+        let mut c = LinkComp::new(vec![1,2,3,4], false);
+        c.connect(LinkComp::new(vec![1,6], false));
+        assert_eq!(c, LinkComp::new(vec![6,1,2,3,4], false));
 
-        let mut c = Component::new(vec![1,2,3,4], false);
-        c.connect(Component::new(vec![1], false));
-        assert_eq!(c, Component::new(vec![1,2,3,4], false));
+        let mut c = LinkComp::new(vec![1,2,3,4], false);
+        c.connect(LinkComp::new(vec![1], false));
+        assert_eq!(c, LinkComp::new(vec![1,2,3,4], false));
 
-        let mut c = Component::new(vec![1,2,3,4], false);
-        c.connect(Component::new(vec![4], false));
-        assert_eq!(c, Component::new(vec![1,2,3,4], false));
+        let mut c = LinkComp::new(vec![1,2,3,4], false);
+        c.connect(LinkComp::new(vec![4], false));
+        assert_eq!(c, LinkComp::new(vec![1,2,3,4], false));
     }
 
     #[test]
     fn eq_arc() { 
-        let c = Component::arc(vec![1,2,3]);
+        let c = LinkComp::arc(vec![1,2,3]);
 
-        assert_eq!(c, Component::arc(vec![1,2,3]));
-        assert_eq!(c, Component::arc(vec![3,2,1]));
+        assert_eq!(c, LinkComp::arc(vec![1,2,3]));
+        assert_eq!(c, LinkComp::arc(vec![3,2,1]));
 
-        assert!(c != Component::arc(vec![1,2]));
-        assert!(c != Component::arc(vec![1,2,3,4]));
-        assert!(c != Component::circ(vec![1,2,3]));
+        assert!(c != LinkComp::arc(vec![1,2]));
+        assert!(c != LinkComp::arc(vec![1,2,3,4]));
+        assert!(c != LinkComp::circ(vec![1,2,3]));
     }
 
     #[test]
     fn eq_circ() { 
-        let c = Component::circ(vec![1,2,3,4]);
+        let c = LinkComp::circ(vec![1,2,3,4]);
 
-        assert_eq!(c, Component::circ(vec![1,2,3,4]));
-        assert_eq!(c, Component::circ(vec![2,3,4,1]));
-        assert_eq!(c, Component::circ(vec![3,4,1,2]));
-        assert_eq!(c, Component::circ(vec![2,3,4,1]));
-        assert_eq!(c, Component::circ(vec![4,3,2,1]));
-        assert_eq!(c, Component::circ(vec![3,2,1,4]));
+        assert_eq!(c, LinkComp::circ(vec![1,2,3,4]));
+        assert_eq!(c, LinkComp::circ(vec![2,3,4,1]));
+        assert_eq!(c, LinkComp::circ(vec![3,4,1,2]));
+        assert_eq!(c, LinkComp::circ(vec![2,3,4,1]));
+        assert_eq!(c, LinkComp::circ(vec![4,3,2,1]));
+        assert_eq!(c, LinkComp::circ(vec![3,2,1,4]));
         
-        assert!(c != Component::circ(vec![1,2,3]));
-        assert!(c != Component::circ(vec![1,2,3,4,5]));
-        assert!(c != Component::circ(vec![1,2,4,3]));
+        assert!(c != LinkComp::circ(vec![1,2,3]));
+        assert!(c != LinkComp::circ(vec![1,2,3,4,5]));
+        assert!(c != LinkComp::circ(vec![1,2,4,3]));
     }
 }

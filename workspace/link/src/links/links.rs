@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use itertools::Itertools;
-use super::{Crossing, CrossingType, Resolution, Component, State};
+use super::{Crossing, CrossingType, Resolution, LinkComp, State};
 
 pub type Edge = u8;
 
@@ -65,7 +65,7 @@ impl Link {
         self.crossing_signs().iter().sum()
     }
 
-    pub fn components(&self) -> Vec<Component> {
+    pub fn components(&self) -> Vec<LinkComp> {
         let n = self.data.len();
 
         let mut comps = vec![];
@@ -78,7 +78,7 @@ impl Link {
                     continue 
                 }
 
-                let mut c = Component::empty();
+                let mut c = LinkComp::empty();
 
                 self.traverse_edges((i0, j0), |i, j| { 
                     let e = self.data[i].edge(j);
@@ -125,7 +125,7 @@ impl Link {
         ))
     }
 
-    pub fn seifert_circles(&self) -> Vec<Component> { 
+    pub fn seifert_circles(&self) -> Vec<LinkComp> { 
         self.resolved_by(&self.ori_pres_state()).components()
     }
 
@@ -359,12 +359,12 @@ mod tests {
         let pd_code = [[0,0,1,1]];
         let l = Link::from(&pd_code);
         let comps = l.components();
-        assert_eq!(comps, vec![ Component::new(vec![0, 1], true)]);
+        assert_eq!(comps, vec![ LinkComp::new(vec![0, 1], true)]);
 
         let pd_code = [[0,3,1,4],[3,2,2,1]];
         let l = Link::from(&pd_code);
         let comps = l.components();
-        assert_eq!(comps, vec![ Component::new(vec![0,1,2,3,4], false) ]);
+        assert_eq!(comps, vec![ LinkComp::new(vec![0,1,2,3,4], false) ]);
     }
 
     #[test]

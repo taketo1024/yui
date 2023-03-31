@@ -3,13 +3,13 @@ use std::ops::RangeInclusive;
 use itertools::Itertools;
 use num_traits::Pow;
 use yui_core::{Ring, RingOps, PowMod2, Sign};
-use yui_link::{Link, State, Component, Resolution, Edge};
+use yui_link::{Link, State, LinkComp, Resolution, Edge};
 use crate::{KhAlgStr, KhGen};
 
 #[derive(Debug)]
 pub struct KhCubeVertex { 
     state: State,
-    circles: Vec<Component>
+    circles: Vec<LinkComp>
 }
 
 impl KhCubeVertex { 
@@ -79,7 +79,7 @@ impl KhCubeEdge {
     fn edge_between(from: &KhCubeVertex, to: &KhCubeVertex) -> Self { 
         debug_assert!(from.state.weight() + 1 == to.state.weight());
 
-        fn diff(c1: &Vec<Component>, c2: &Vec<Component>) -> Vec<usize> { 
+        fn diff(c1: &Vec<LinkComp>, c2: &Vec<LinkComp>) -> Vec<usize> { 
             let (n1, n2) = (c1.len(), c2.len());
             assert!(n1 == n2 + 1 || n1 + 1 == n2);
             c1.iter().enumerate().filter_map(|(i, c)| { 

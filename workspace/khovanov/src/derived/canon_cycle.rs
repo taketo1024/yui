@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use itertools::Itertools;
 use yui_core::{Ring, RingOps};
-use yui_link::{Link, Component, State};
+use yui_link::{Link, LinkComp, State};
 use crate::{KhAlgLabel, KhAlgStr, KhComplex, KhGen, KhChain};
 
 impl<R> KhComplex<R>
@@ -37,7 +37,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     make_chain(str, &s, &colors)
 }
 
-fn color_circles(l: &Link, circles: &Vec<Component>, positive: bool) -> Vec<Color> { 
+fn color_circles(l: &Link, circles: &Vec<LinkComp>, positive: bool) -> Vec<Color> { 
     let n = circles.len();
     let mut colors = vec![Color::A; n];
 

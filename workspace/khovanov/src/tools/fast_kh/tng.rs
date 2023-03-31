@@ -1,15 +1,15 @@
 use std::collections::HashSet;
 use std::fmt::Display;
 use itertools::Itertools;
-use yui_link::{Component, Edge, Crossing, Resolution};
+use yui_link::{LinkComp, Edge, Crossing, Resolution};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Tng {
-    comps: Vec<Component> // arc or circle
+    comps: Vec<LinkComp> // arc or circle
 }
 
 impl Tng { 
-    pub fn new(comps: Vec<Component>) -> Self { 
+    pub fn new(comps: Vec<LinkComp>) -> Self { 
         debug_assert!(comps.iter().all(|c| !c.is_empty()));
         Self { comps }
     }
@@ -35,11 +35,11 @@ impl Tng {
         self.comps.len()
     }
 
-    pub fn comps(&self) -> &Vec<Component> { 
+    pub fn comps(&self) -> &Vec<LinkComp> { 
         &self.comps
     }
 
-    pub fn comp(&self, i: usize) -> &Component { 
+    pub fn comp(&self, i: usize) -> &LinkComp { 
         &self.comps[i]
     }
 
@@ -56,15 +56,15 @@ impl Tng {
         ).collect()
     }
 
-    pub fn contains(&self, c: &Component) -> bool { 
+    pub fn contains(&self, c: &LinkComp) -> bool { 
         self.comps.contains(c)
     }
 
-    pub fn index_of(&self, c: &Component) -> Option<usize> {
+    pub fn index_of(&self, c: &LinkComp) -> Option<usize> {
         self.comps.iter().position(|c1| c1 == c)
     }
 
-    pub fn remove_at(&mut self, i: usize) -> Component {
+    pub fn remove_at(&mut self, i: usize) -> LinkComp {
         self.comps.remove(i)
     }
 
@@ -78,7 +78,7 @@ impl Tng {
         }
     }
 
-    pub fn append_arc(&mut self, arc: Component) { 
+    pub fn append_arc(&mut self, arc: LinkComp) { 
         assert!(arc.is_arc());
 
         let n = self.ncomps();
@@ -99,7 +99,7 @@ impl Tng {
         }
     }
 
-    fn find_connectable(&self, arc: &Component, j: usize) -> Option<usize> {
+    fn find_connectable(&self, arc: &LinkComp, j: usize) -> Option<usize> {
         let n = self.comps.len();
 
         (0..n).find(|&i| 
@@ -136,8 +136,8 @@ impl Display for Tng {
     }
 }
 
-impl From<Component> for Tng {
-    fn from(c: Component) -> Self {
+impl From<LinkComp> for Tng {
+    fn from(c: LinkComp) -> Self {
         Self::new(vec![c])
     }
 }
@@ -151,39 +151,39 @@ mod tests {
         let mut t = Tng::empty();
         assert_eq!(t.ncomps(), 0);
 
-        t.append_arc(Component::new(vec![0,1], false)); // [0-1]
+        t.append_arc(LinkComp::new(vec![0,1], false)); // [0-1]
         assert_eq!(t.ncomps(), 1);
 
-        t.append_arc(Component::new(vec![2,3], false)); // [0-1] [2-3]
+        t.append_arc(LinkComp::new(vec![2,3], false)); // [0-1] [2-3]
         assert_eq!(t.ncomps(), 2);
 
-        t.append_arc(Component::new(vec![1,2], false)); // [0-1-2-3]
+        t.append_arc(LinkComp::new(vec![1,2], false)); // [0-1-2-3]
         assert_eq!(t.ncomps(), 1);
 
-        t.append_arc(Component::new(vec![0,3], false)); // [-0-1-2-3-]
+        t.append_arc(LinkComp::new(vec![0,3], false)); // [-0-1-2-3-]
         assert_eq!(t.ncomps(), 1);
     }
 
     #[test]
     fn connect() { 
         let mut t0 = Tng::new(vec![
-            Component::new(vec![0,1], false),
-            Component::new(vec![2,3], false),
-            Component::new(vec![10], true),
+            LinkComp::new(vec![0,1], false),
+            LinkComp::new(vec![2,3], false),
+            LinkComp::new(vec![10], true),
         ]);
 
         let t1 = Tng::new(vec![
-            Component::new(vec![1,2], false),
-            Component::new(vec![3,4], false),
-            Component::new(vec![11], true),
+            LinkComp::new(vec![1,2], false),
+            LinkComp::new(vec![3,4], false),
+            LinkComp::new(vec![11], true),
         ]);
 
         t0.connect(t1);
 
         assert_eq!(t0, Tng::new(vec![
-            Component::new(vec![0,4], false), // [0,1,2,3,4] -> [0,4]
-            Component::new(vec![10], true),
-            Component::new(vec![11], true),
+            LinkComp::new(vec![0,4], false), // [0,1,2,3,4] -> [0,4]
+            LinkComp::new(vec![10], true),
+            LinkComp::new(vec![11], true),
         ]));
     }
 
@@ -193,15 +193,15 @@ mod tests {
         assert_eq!(t.ncomps(), 0);
         assert_eq!(t.find_loop(), None);
 
-        t.append_arc(Component::new(vec![0,1], false));
+        t.append_arc(LinkComp::new(vec![0,1], false));
         assert_eq!(t.ncomps(), 1);
         assert_eq!(t.find_loop(), None);
 
-        t.append_arc(Component::new(vec![2,3], false));
+        t.append_arc(LinkComp::new(vec![2,3], false));
         assert_eq!(t.ncomps(), 2);
         assert_eq!(t.find_loop(), None);
 
-        t.append_arc(Component::new(vec![2,3], false));
+        t.append_arc(LinkComp::new(vec![2,3], false));
         assert_eq!(t.ncomps(), 2);
         assert_eq!(t.find_loop(), Some(1));
 

@@ -1,6 +1,6 @@
 use std::fmt::Display;
 use derive_more::Display;
-use crate::Component;
+use crate::LinkComp;
 
 use super::{Edge, Resolution};
 
@@ -74,9 +74,9 @@ impl Crossing {
         }
     }
 
-    pub fn arcs(&self) -> (Component, Component) {
+    pub fn arcs(&self) -> (LinkComp, LinkComp) {
         let comp = |i: usize, j: usize| {
-            Component::new(vec![self.edges[i], self.edges[j]], false)
+            LinkComp::new(vec![self.edges[i], self.edges[j]], false)
         };
         match self.ctype { 
             Xp | 
@@ -86,7 +86,7 @@ impl Crossing {
         }
     }
 
-    pub fn res_arcs(&self, r: Resolution) -> (Component, Component) { 
+    pub fn res_arcs(&self, r: Resolution) -> (LinkComp, LinkComp) { 
         let mut x = self.clone();
         x.resolve(r);
         x.arcs()        

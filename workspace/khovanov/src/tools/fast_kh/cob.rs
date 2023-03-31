@@ -6,7 +6,7 @@ use derive_more::Display;
 use itertools::Itertools;
 use yui_core::{Elem, Ring, RingOps};
 use yui_lin_comb::{FreeGen, OrdForDisplay};
-use yui_link::{Component, Edge};
+use yui_link::{LinkComp, Edge};
 use yui_polynomial::Mono2;
 use super::tng::Tng;
 
@@ -48,7 +48,7 @@ impl CobComp {
         Self::new(src, tgt, 0, (0, 0))
     }
 
-    pub fn id(c: Component) -> Self { 
+    pub fn id(c: LinkComp) -> Self { 
         assert!(!c.is_empty());
         Self::plain(
             Tng::from(c.clone()), 
@@ -56,7 +56,7 @@ impl CobComp {
         )
     }
 
-    pub fn sdl(r0: (Component, Component), r1: (Component, Component)) -> Self { 
+    pub fn sdl(r0: (LinkComp, LinkComp), r1: (LinkComp, LinkComp)) -> Self { 
         // TODO validate
         Self::plain(
             Tng::new(vec![r0.0, r0.1]), 
@@ -64,7 +64,7 @@ impl CobComp {
         )
     }
 
-    pub fn cup(c: Component) -> Self { 
+    pub fn cup(c: LinkComp) -> Self { 
         assert!(c.is_circle());
         Self::plain(
             Tng::from(c),
@@ -72,7 +72,7 @@ impl CobComp {
         )
     }
 
-    pub fn cap(c: Component) -> Self { 
+    pub fn cap(c: LinkComp) -> Self { 
         Self::plain(
             Tng::empty(),
             Tng::from(c)
@@ -87,11 +87,11 @@ impl CobComp {
         self.src.endpts() // == self.tgt.endpts()
     }
 
-    pub fn contains(&self, c: &Component, e: End) -> bool { 
+    pub fn contains(&self, c: &LinkComp, e: End) -> bool { 
         self.end(e).contains(c)
     }
 
-    pub fn index_of(&self, c: &Component, e: End) -> Option<usize> { 
+    pub fn index_of(&self, c: &LinkComp, e: End) -> Option<usize> { 
         self.end(e).index_of(c)
     }
 
@@ -405,7 +405,7 @@ impl Cob {
         self.comps.push(c);
     }
 
-    pub fn cap_off(&mut self, c: &Component, x: Dot, e: End) {
+    pub fn cap_off(&mut self, c: &LinkComp, x: Dot, e: End) {
         assert!(c.is_circle());
         let Some((i, comp, p)) = self.find_comp(c, e) else { 
             panic!("{c} not found in {} ({e:?})", self)
@@ -419,7 +419,7 @@ impl Cob {
         }
     }
 
-    fn find_comp(&mut self, c: &Component, e: End) -> Option<(usize, &mut CobComp, usize)> { 
+    fn find_comp(&mut self, c: &LinkComp, e: End) -> Option<(usize, &mut CobComp, usize)> { 
         self.comps.iter_mut().enumerate().filter_map(|(i, comp)| 
             if let Some(p) = comp.index_of(c, e) { 
                 Some((i, comp, p))
@@ -470,7 +470,7 @@ impl FreeGen for Cob {}
 
 #[cfg(test)]
 mod tests {
-    use yui_link::Component;
+    use yui_link::LinkComp;
 
     use super::CobComp;
     use super::*;
@@ -478,19 +478,19 @@ mod tests {
     #[test]
     fn cob_contains() { 
         let src = Tng::new(vec![
-            Component::arc(vec![1,2]),
-            Component::arc(vec![3,4]),
-            Component::circ(vec![5]),
+            LinkComp::arc(vec![1,2]),
+            LinkComp::arc(vec![3,4]),
+            LinkComp::circ(vec![5]),
         ]);
         let tgt = Tng::new(vec![
-            Component::arc(vec![1,3]),
-            Component::arc(vec![2,4]),
-            Component::circ(vec![6]),
+            LinkComp::arc(vec![1,3]),
+            LinkComp::arc(vec![2,4]),
+            LinkComp::circ(vec![6]),
         ]);
         let c = CobComp::plain(src, tgt);
         
-        let c0 = Component::arc(vec![1,2]);
-        let c1 = Component::circ(vec![6]);
+        let c0 = LinkComp::arc(vec![1,2]);
+        let c1 = LinkComp::circ(vec![6]);
 
         assert!( c.contains(&c0, End::Src));
         assert!(!c.contains(&c1, End::Src));
@@ -501,25 +501,25 @@ mod tests {
     #[test]
     fn is_connectable() { 
         let src = Tng::new(vec![
-            Component::arc(vec![1,2]),
-            Component::arc(vec![3,4]),
-            Component::circ(vec![10]),
+            LinkComp::arc(vec![1,2]),
+            LinkComp::arc(vec![3,4]),
+            LinkComp::circ(vec![10]),
         ]);
         let tgt = Tng::new(vec![
-            Component::arc(vec![1,3]),
-            Component::arc(vec![2,4]),
-            Component::circ(vec![11]),
+            LinkComp::arc(vec![1,3]),
+            LinkComp::arc(vec![2,4]),
+            LinkComp::circ(vec![11]),
         ]);
         let c = CobComp::plain(src, tgt);
 
         let c1 = CobComp::id(
-            Component::arc(vec![0,1])
+            LinkComp::arc(vec![0,1])
         );
         let c2 = CobComp::sdl(
-            (Component::arc(vec![0,1]), Component::arc(vec![90,91])),
-            (Component::arc(vec![0,90]), Component::arc(vec![1,91])),
+            (LinkComp::arc(vec![0,1]), LinkComp::arc(vec![90,91])),
+            (LinkComp::arc(vec![0,90]), LinkComp::arc(vec![1,91])),
         );
-        let c3 = CobComp::id(Component::arc(vec![5,6]));
+        let c3 = CobComp::id(LinkComp::arc(vec![5,6]));
 
         assert!(c.is_connectable(&c1));
         assert!(c.is_connectable(&c2));
@@ -529,31 +529,31 @@ mod tests {
     #[test]
     fn connect1() { 
         let src = Tng::new(vec![
-            Component::arc(vec![1,2]),
-            Component::arc(vec![3,4]),
-            Component::circ(vec![10]),
+            LinkComp::arc(vec![1,2]),
+            LinkComp::arc(vec![3,4]),
+            LinkComp::circ(vec![10]),
         ]);
         let tgt = Tng::new(vec![
-            Component::arc(vec![1,3]),
-            Component::arc(vec![2,4]),
-            Component::circ(vec![11]),
+            LinkComp::arc(vec![1,3]),
+            LinkComp::arc(vec![2,4]),
+            LinkComp::circ(vec![11]),
         ]);
 
         let mut c = CobComp::plain(src, tgt);
         c.connect(CobComp::id(
-            Component::arc(vec![0,1])
+            LinkComp::arc(vec![0,1])
         ));
 
         assert_eq!(c, CobComp::plain(
             Tng::new(vec![
-                Component::arc(vec![0,2]), // [0,1,2] -> [0,2]
-                Component::arc(vec![3,4]),
-                Component::circ(vec![10]),
+                LinkComp::arc(vec![0,2]), // [0,1,2] -> [0,2]
+                LinkComp::arc(vec![3,4]),
+                LinkComp::circ(vec![10]),
             ]),
             Tng::new(vec![
-                Component::arc(vec![0,3]), // [0,1,2] -> [0,2]
-                Component::arc(vec![2,4]),
-                Component::circ(vec![11]),
+                LinkComp::arc(vec![0,3]), // [0,1,2] -> [0,2]
+                LinkComp::arc(vec![2,4]),
+                LinkComp::circ(vec![11]),
             ])
         ));
     }
@@ -561,30 +561,30 @@ mod tests {
     #[test]
     fn connect2() { 
         let src = Tng::new(vec![
-            Component::arc(vec![1,2]),
-            Component::arc(vec![3,4]),
-            Component::circ(vec![10]),
+            LinkComp::arc(vec![1,2]),
+            LinkComp::arc(vec![3,4]),
+            LinkComp::circ(vec![10]),
         ]);
         let tgt = Tng::new(vec![
-            Component::arc(vec![1,3]),
-            Component::arc(vec![2,4]),
-            Component::circ(vec![11]),
+            LinkComp::arc(vec![1,3]),
+            LinkComp::arc(vec![2,4]),
+            LinkComp::circ(vec![11]),
         ]);
 
         let mut c = CobComp::plain(src, tgt);
         c.connect(CobComp::id(
-            Component::arc(vec![1,3])
+            LinkComp::arc(vec![1,3])
         ));
 
         assert_eq!(c, CobComp::plain(
             Tng::new(vec![
-                Component::arc(vec![4,1,2]), // [4,3,1,2] -> [4,1,2]
-                Component::circ(vec![10]),
+                LinkComp::arc(vec![4,1,2]), // [4,3,1,2] -> [4,1,2]
+                LinkComp::circ(vec![10]),
             ]),
             Tng::new(vec![
-                Component::circ(vec![1]), // [1,3] -> [1]
-                Component::arc(vec![2,4]),
-                Component::circ(vec![11]),
+                LinkComp::circ(vec![1]), // [1,3] -> [1]
+                LinkComp::arc(vec![2,4]),
+                LinkComp::circ(vec![11]),
             ])
         ));
     }
@@ -592,21 +592,21 @@ mod tests {
     #[test]
     fn euler_num() { 
         let c0 = CobComp::id(
-            Component::arc(vec![1,2])
+            LinkComp::arc(vec![1,2])
         );
         let c1 = CobComp::sdl(
-            (Component::arc(vec![3,4]), Component::arc(vec![5,6])),
-            (Component::arc(vec![4,5]), Component::arc(vec![6,3])),
+            (LinkComp::arc(vec![3,4]), LinkComp::arc(vec![5,6])),
+            (LinkComp::arc(vec![4,5]), LinkComp::arc(vec![6,3])),
         );
         let c2 = CobComp::plain(
-            Tng::from(Component::circ(vec![10])),
-            Tng::new(vec![Component::circ(vec![10]), Component::circ(vec![11])]),
+            Tng::from(LinkComp::circ(vec![10])),
+            Tng::new(vec![LinkComp::circ(vec![10]), LinkComp::circ(vec![11])]),
         );
         let c3 = CobComp::cup(
-            Component::circ(vec![20])
+            LinkComp::circ(vec![20])
         );
         let c4 = CobComp::cap(
-            Component::circ(vec![30])
+            LinkComp::circ(vec![30])
         );
 
         assert_eq!(c0.nbdr_comps(), 1);
@@ -630,19 +630,19 @@ mod tests {
     fn connect_incr_genus() { 
         let mut c0 = CobComp::plain(
             Tng::new(vec![
-                Component::arc(vec![1,2]),
-                Component::arc(vec![3,4])
+                LinkComp::arc(vec![1,2]),
+                LinkComp::arc(vec![3,4])
             ]),
             Tng::new(vec![
-                Component::arc(vec![1,2]),
-                Component::arc(vec![3,4])
+                LinkComp::arc(vec![1,2]),
+                LinkComp::arc(vec![3,4])
             ]),
         );
         let c1 = CobComp::id(
-            Component::arc(vec![1, 3])
+            LinkComp::arc(vec![1, 3])
         );
         let c2 = CobComp::id(
-            Component::arc(vec![2, 4])
+            LinkComp::arc(vec![2, 4])
         );
 
         assert_eq!(c0.genus, 0);

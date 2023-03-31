@@ -181,7 +181,7 @@ mod tests {
         t0.connect(t1);
 
         assert_eq!(t0, Tng::new(vec![
-            Component::new(vec![0,1,2,3,4], false),
+            Component::new(vec![0,4], false), // [0,1,2,3,4] -> [0,4]
             Component::new(vec![10], true),
             Component::new(vec![11], true),
         ]));

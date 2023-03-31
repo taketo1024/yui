@@ -546,12 +546,12 @@ mod tests {
 
         assert_eq!(c, CobComp::plain(
             Tng::new(vec![
-                Component::arc(vec![0,1,2]),
+                Component::arc(vec![0,2]), // [0,1,2] -> [0,2]
                 Component::arc(vec![3,4]),
                 Component::circ(vec![10]),
             ]),
             Tng::new(vec![
-                Component::arc(vec![0,1,3]),
+                Component::arc(vec![0,3]), // [0,1,2] -> [0,2]
                 Component::arc(vec![2,4]),
                 Component::circ(vec![11]),
             ])
@@ -578,11 +578,11 @@ mod tests {
 
         assert_eq!(c, CobComp::plain(
             Tng::new(vec![
-                Component::arc(vec![4,3,1,2]),
+                Component::arc(vec![4,1,2]), // [4,3,1,2] -> [4,1,2]
                 Component::circ(vec![10]),
             ]),
             Tng::new(vec![
-                Component::circ(vec![1,3]),
+                Component::circ(vec![1]), // [1,3] -> [1]
                 Component::arc(vec![2,4]),
                 Component::circ(vec![11]),
             ])

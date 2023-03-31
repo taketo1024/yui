@@ -3,7 +3,7 @@ use std::fmt::Display;
 use itertools::Itertools;
 use yui_link::{Edge, Crossing, Resolution, LinkComp};
 
-#[derive(Clone, Copy, Eq, PartialOrd, Ord, Debug)]
+#[derive(Clone, Copy, Eq, Hash, PartialOrd, Ord, Debug)]
 pub enum TngComp { 
     Arc(Edge, Edge, Edge), // the middle edge keeps the min edge-id.
     Circ(Edge)
@@ -107,7 +107,7 @@ impl From<LinkComp> for TngComp {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Tng {
     comps: Vec<TngComp> // arc or circle
 }

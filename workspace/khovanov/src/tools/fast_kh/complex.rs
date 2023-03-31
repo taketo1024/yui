@@ -631,24 +631,19 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn inv() { 
-    //     let c = Cob::new(vec![
-    //         CobComp::cyl(0, 1),
-    //         CobComp::cyl(2, 3)
-    //     ]);
-    //     let f = Mor::from((c.clone(), -1));
+    #[test]
+    fn inv() { 
+        let c = Cob::id(&Tng::new(vec![
+            TngComp::arc(0,1),
+            TngComp::arc(2,3)
+        ]));
+        let f = Mor::from((c.clone(), -1));
 
-    //     assert!(f.is_invertible());
-    //     assert_eq!(f.inv(), Some(Mor::from(
-    //         (Cob::new(vec![
-    //             CobComp::cyl(1, 0),
-    //             CobComp::cyl(3, 2)
-    //         ]), -1)
-    //     )));
+        assert!(f.is_invertible());
+        assert_eq!(f.inv(), Some(f.clone()));
 
-    //     let f = Mor::from((c.clone(), 2));
-    //     assert_eq!(f.is_invertible(), false);
-    //     assert_eq!(f.inv(), None);
-    // }
+        let f = Mor::from((c.clone(), 2));
+        assert_eq!(f.is_invertible(), false);
+        assert_eq!(f.inv(), None);
+    }
 }

@@ -687,31 +687,51 @@ mod tests {
         assert!(c0.is_closed()); // torus
     }
 
+    #[test]
+    fn inv() { 
+        let cc0 = CobComp::id(TngComp::arc(0, 1));
+        let cc1 = CobComp::plain(
+            Tng::from(TngComp::circ(2)), 
+            Tng::from(TngComp::circ(3))
+        );
 
-    // #[test]
-    // fn cob_comp_inv() { 
-    //     let c0 = CobComp::new(set![0], set![1], 0, (0, 0));
-    //     let c = Cob::new(vec![c0]);
+        assert_eq!(cc0.is_invertible(), true);
+        assert_eq!(cc0.inv(), Some(cc0.clone()));
 
-    //     assert_eq!(c.is_invertible(), true);
-    //     assert_eq!(c.inv(), Some(Cob::new(vec![
-    //         CobComp::new(set![1], set![0], 0, (0, 0))
-    //     ])));
+        assert_eq!(cc1.is_invertible(), true);
+        assert_eq!(cc1.inv(), Some(CobComp::plain(
+            Tng::from(TngComp::circ(3)), 
+            Tng::from(TngComp::circ(2))
+        )));
 
-    //     let c0 = CobComp::new(set![0], set![1], 0, (0, 0));
-    //     let c1 = CobComp::new(set![2], set![3], 0, (0, 0));
-    //     let c = Cob::new(vec![c0, c1]);
+        let c0 = Cob::new(vec![cc0, cc1]);
 
-    //     assert_eq!(c.is_invertible(), true);
-    //     assert_eq!(c.inv(), Some(Cob::new(vec![
-    //         CobComp::new(set![1], set![0], 0, (0, 0)),
-    //         CobComp::new(set![3], set![2], 0, (0, 0))
-    //     ])));
+        assert_eq!(c0.is_invertible(), true);
+        assert_eq!(c0.inv(), Some(Cob::new(vec![
+            c0.comp(0).inv().unwrap(),
+            c0.comp(1).inv().unwrap()
+        ])));
 
-    //     let c0 = CobComp::new(set![0], set![1], 0, (1, 0));
-    //     let c = Cob::new(vec![c0]);
+        let c1 = Cob::from(
+            CobComp::sdl(
+                (TngComp::arc(1,2), TngComp::arc(3,4)),
+                (TngComp::arc(1,3), TngComp::arc(2,4))
+            )
+        );
 
-    //     assert_eq!(c.is_invertible(), false);
-    //     assert_eq!(c.inv(), None);
-    // }
+        assert_eq!(c1.is_invertible(), false);
+        assert_eq!(c1.inv(), None);
+
+        let mut c2 = c0.clone();
+        c2.comps[0].add_dot(Dot::X);
+
+        assert_eq!(c2.is_invertible(), false);
+        assert_eq!(c2.inv(), None);
+
+        let mut c3 = c0.clone();
+        c3.comps[0].genus += 1;
+
+        assert_eq!(c3.is_invertible(), false);
+        assert_eq!(c3.inv(), None);
+    }
 }

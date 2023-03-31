@@ -1,6 +1,6 @@
 use core::panic;
 use std::hash::Hash;
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 use std::fmt::Display;
 use derive_more::Display;
 use itertools::Itertools;
@@ -61,18 +61,34 @@ impl CobComp {
         )
     }
 
+    pub fn merge(from: (TngComp, TngComp), to: TngComp) -> Self { 
+        assert!(from.0.is_circle() || from.1.is_circle());
+        Self::plain(
+            Tng::new(vec![from.0, from.1]), 
+            Tng::new(vec![to])
+        )
+    }
+
+    pub fn split(from: TngComp, to: (TngComp, TngComp)) -> Self { 
+        assert!(to.0.is_circle() || to.1.is_circle());
+        Self::plain(
+            Tng::new(vec![from]), 
+            Tng::new(vec![to.0, to.1])
+        )
+    }
+
     pub fn cup(c: TngComp) -> Self { 
         assert!(c.is_circle());
         Self::plain(
-            Tng::from(c),
-            Tng::empty()
+            Tng::empty(),
+            Tng::from(c)
         )
     }
 
     pub fn cap(c: TngComp) -> Self { 
         Self::plain(
-            Tng::empty(),
-            Tng::from(c)
+            Tng::from(c),
+            Tng::empty()
         )
     }
 
@@ -245,8 +261,8 @@ impl CobComp {
 
         // χ(S∪S') = χ(S) + χ(S') - χ(S∩S'),
         // χ(S) = 2 - 2g(S) - #∂S, 
-        // χ(S∩S') = #(S∩S').
-        // → g(S∪S') = g(S) + g(S') + 1/2 #{∂S + ∂S' + S∩S' - ∂(S∪S')} - 1.
+        // χ(S∩S') = #{ arcs in S∩S' }.
+        // → g(S∪S') = g(S) + g(S') + 1/2 #{ ∂S + ∂S' - ∂(S∪S') + A(S∩S') } - 1.
 
         let g1 = self.genus;
         let g2 = other.genus;
@@ -341,6 +357,10 @@ impl Cob {
     pub fn new(comps: Vec<CobComp>) -> Self { 
         Self { comps }
     }
+
+    pub fn empty() -> Self { 
+        Self::new(vec![])
+    }
     
     pub fn id(v: &Tng) -> Self { 
         let comps = (0..v.ncomps()).map(|i| {
@@ -367,6 +387,10 @@ impl Cob {
 
     pub fn comp(&self, i: usize) -> &CobComp { 
         &self.comps[i]
+    }
+
+    pub fn is_empty(&self) -> bool { 
+        self.comps.is_empty()
     }
 
     pub fn is_zero(&self) -> bool { 
@@ -423,8 +447,8 @@ impl Cob {
         ).next()
     }
 
-    pub fn connect(&mut self, cob: Cob) { // horizontal composition
-        for c in cob.comps.into_iter() { 
+    pub fn connect(&mut self, other: Cob) { // horizontal composition
+        for c in other.comps.into_iter() { 
             self.connect_comp(c);
         }
     }
@@ -442,6 +466,102 @@ impl Cob {
         }
         
         self.comps.push(c);
+    }
+
+    pub fn stack(&mut self, other: Cob) { // vertical composition
+        // TODO assert `self.tgt == other.src`.
+
+        if self.is_empty() { 
+            *self = other;
+            return;
+        } else if other.is_empty() { 
+            return;
+        }
+
+        let mut bot = std::mem::replace(&mut self.comps, vec![]);
+        let mut top = other.comps;
+
+        while !(bot.is_empty() && top.is_empty()) { 
+            let (b, t) = self.take_stackable_comps(&mut bot, &mut top);
+            let c = self.stack_comps(b, t);
+            self.comps.push(c)
+        }
+    }
+
+    // collect `bot` & `top` comps that will form a connected component.
+    fn take_stackable_comps(&self, bot: &mut Vec<CobComp>, top: &mut Vec<CobComp>) -> (Vec<CobComp>, Vec<CobComp>) {
+        assert!(!bot.is_empty());
+        assert!(!top.is_empty());
+
+        let mut res_bot = vec![];
+        let mut res_top = vec![];
+
+        let mut q_bot = VecDeque::new();
+        let mut q_top = VecDeque::new();
+
+        q_bot.push_back(bot.remove(0));
+
+        while !(q_bot.is_empty() && q_top.is_empty()) {
+            while let Some(b) = q_bot.pop_front() {
+                for c in b.tgt.comps().iter() { 
+                    if let Some(i) = top.iter().position(|t| t.src.contains(&c)) {
+                        let t = top.remove(i);
+                        q_top.push_back(t);
+                    }
+                }
+                res_bot.push(b)
+            }
+            while let Some(t) = q_top.pop_front() {
+                for c in t.src.comps().iter() { 
+                    if let Some(i) = bot.iter().position(|b| b.tgt.contains(&c)) {
+                        let b = bot.remove(i);
+                        q_bot.push_back(b);
+                    }
+                }
+                res_top.push(t)
+            }
+        }
+
+        (res_bot, res_top)
+    }
+
+    fn stack_comps(&self, bot: Vec<CobComp>, top: Vec<CobComp>) -> CobComp { 
+        // `bot`, `top` must be non-empty for genus calculation. 
+        assert!(!bot.is_empty());
+        assert!(!top.is_empty());
+
+        // assert `bot.tgt == top.src`.
+
+        let g0: usize = bot.iter().map(|c| c.genus).sum();
+        let g1: usize = top.iter().map(|c| c.genus).sum();
+        let b0: usize = bot.iter().map(|c| c.nbdr_comps()).sum();
+        let b1: usize = top.iter().map(|c| c.nbdr_comps()).sum();
+        let a : usize = bot.iter().map(|c| c.tgt.comps().iter().filter(|a| a.is_arc()).count()).sum();
+
+        let dots = bot.iter().chain(top.iter()).fold((0, 0), |mut res, c| { 
+            res.0 += c.dots.0;
+            res.1 += c.dots.1;
+            res
+        });
+
+        let src = bot.into_iter().fold(Tng::empty(), |mut res, c| {
+            res.connect(c.src);
+            res
+        });
+
+        let tgt = top.into_iter().fold(Tng::empty(), |mut res, c| {
+            res.connect(c.tgt);
+            res
+        });
+
+        let mut c = CobComp::new(src, tgt, 0, dots);
+        let b = c.nbdr_comps();
+
+        assert!((b0 + b1 + a - b) % 2 == 0);
+
+        c.genus = g0 + g1 + (b0 + b1 + a - b)/2 - 1;
+
+        c
     }
 
     pub fn eval<R>(&self, h: &R, t: &R) -> R
@@ -734,5 +854,49 @@ mod tests {
 
         assert_eq!(c3.is_invertible(), false);
         assert_eq!(c3.inv(), None);
+    }
+
+    #[test]
+    fn stack_torus() {
+        let c0 = Cob::from(CobComp::cup(TngComp::Circ(0)));
+        let c1 = Cob::new(vec![
+            CobComp::split(
+                TngComp::Circ(0),
+                (TngComp::circ(1), TngComp::circ(2))
+            )
+        ]);
+        let c2 = Cob::new(vec![
+            CobComp::merge(
+                (TngComp::circ(1), TngComp::circ(2)), 
+                TngComp::Circ(3)
+            )
+        ]);
+        let c3 = Cob::from(CobComp::cap(TngComp::Circ(3)));
+
+        let mut c =  Cob::empty();
+        c.stack(c0);
+
+        assert_eq!(c.ncomps(), 1);
+        assert_eq!(c.comp(0).src.ncomps(), 0);
+        assert_eq!(c.comp(0).tgt.ncomps(), 1);
+        assert_eq!(c.comp(0).genus, 0);
+
+        c.stack(c1);
+        assert_eq!(c.ncomps(), 1);
+        assert_eq!(c.comp(0).src.ncomps(), 0);
+        assert_eq!(c.comp(0).tgt.ncomps(), 2);
+        assert_eq!(c.comp(0).genus, 0);
+
+        c.stack(c2);
+        assert_eq!(c.ncomps(), 1);
+        assert_eq!(c.comp(0).src.ncomps(), 0);
+        assert_eq!(c.comp(0).tgt.ncomps(), 1);
+        assert_eq!(c.comp(0).genus, 1);
+
+        c.stack(c3);
+        assert_eq!(c.ncomps(), 1);
+        assert_eq!(c.comp(0).src.ncomps(), 0);
+        assert_eq!(c.comp(0).tgt.ncomps(), 0);
+        assert_eq!(c.comp(0).genus, 1);
     }
 }

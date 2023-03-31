@@ -10,11 +10,11 @@ use yui_homology::GenericChainComplex;
 use yui_lin_comb::LinComb;
 use yui_matrix::sparse::{MatType, SpMat};
 use yui_matrix::dense::Mat;
-use yui_link::{Crossing, Resolution, State, LinkComp};
+use yui_link::{Crossing, Resolution, State};
 
 use crate::KhAlgLabel;
 use super::cob::{Cob, Dot, End};
-use super::tng::Tng;
+use super::tng::{Tng, TngComp};
 
 #[derive(Clone)]
 pub struct Obj { 
@@ -40,7 +40,7 @@ impl Obj {
         self.label.push(x)
     }
 
-    fn append_arc(&mut self, a: LinkComp) {
+    fn append_arc(&mut self, a: TngComp) {
         self.tangle.append_arc(a)
     }
 
@@ -48,7 +48,7 @@ impl Obj {
         self.tangle.find_loop()
     }
 
-    fn deloop(&mut self, i: usize) -> LinkComp {
+    fn deloop(&mut self, i: usize) -> TngComp {
         assert!(self.tangle.comp(i).is_circle());
         self.tangle.remove_at(i)
     }
@@ -65,7 +65,7 @@ type Mor = LinComb<Cob, i32>; // Z-linear combination of cobordisms.
 trait MorTrait: Sized {
     fn is_invertible(&self) -> bool;
     fn inv(&self) -> Option<Self>;
-    fn cap_off(self, c: &LinkComp, dot: Dot, e: End) -> Self;
+    fn cap_off(self, c: &TngComp, dot: Dot, e: End) -> Self;
     fn eval<R>(&self, h: &R, t: &R) -> R
     where R: Ring + From<i32>, for<'x> &'x R: RingOps<R>;
 }
@@ -89,7 +89,7 @@ impl MorTrait for Mor {
         }
     }
 
-    fn cap_off(self, c: &LinkComp, dot: Dot, e: End) -> Self {
+    fn cap_off(self, c: &TngComp, dot: Dot, e: End) -> Self {
         self.into_map(|mut cob, r| { 
             cob.cap_off(c, dot, e);
 
@@ -237,8 +237,8 @@ impl TngComplexBuilder {
         self.extend_objs();
         self.extend_mats();
 
-        let t0 = Tng::from_x(x, Resolution::Res0);
-        let t1 = Tng::from_x(x, Resolution::Res1);
+        let t0 = Tng::res(x, Resolution::Res0);
+        let t1 = Tng::res(x, Resolution::Res1);
         
         self.modif_objs(&t0, &t1);
         self.modif_mats(&t0, &t1);
@@ -395,7 +395,7 @@ impl TngComplexBuilder {
         self.cup_cols(i, j, &c);
     }
 
-    fn cap_rows(&mut self, i: usize, j: usize, c: &LinkComp) { 
+    fn cap_rows(&mut self, i: usize, j: usize, c: &TngComp) { 
         let d = &mut self.mats[i];
 
         d.insert_zero_row(j+1);
@@ -414,7 +414,7 @@ impl TngComplexBuilder {
         }
     }
 
-    fn cup_cols(&mut self, i: usize, j: usize, c: &LinkComp) { 
+    fn cup_cols(&mut self, i: usize, j: usize, c: &TngComp) { 
         let d = &mut self.mats[i];
 
         d.insert_zero_col(j+1);

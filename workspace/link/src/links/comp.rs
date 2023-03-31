@@ -32,8 +32,8 @@ impl LinkComp {
         &self.edges
     }
 
-    pub fn min_edge(&self) -> Option<Edge> { 
-        self.edges.iter().min().cloned()
+    pub fn min_edge(&self) -> Edge { 
+        self.edges.iter().min().unwrap().clone()
     }
 
     pub fn ends(&self) -> Option<(Edge, Edge)> { 

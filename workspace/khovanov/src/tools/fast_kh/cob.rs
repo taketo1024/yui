@@ -164,59 +164,6 @@ impl CobComp {
         }
     }
 
-    pub fn cap_off(&mut self, b: Bottom, i: usize) {
-        assert!(self.bottom(b).comp(i).is_circle());
-        self.bottom_mut(b).remove_at(i);
-    }
-
-    pub fn add_dot(&mut self, dot: Dot) { 
-        match dot { 
-            Dot::X => self.dots.0 += 1,
-            Dot::Y => self.dots.1 += 1,
-            _      => ()
-        }
-    }
-
-    pub fn is_connectable(&self, other: &Self) -> bool { 
-        self.src.comps().iter().any(|c1| 
-            if c1.is_arc() { 
-                other.src.comps().iter().any(|c2| { 
-                    c2.is_arc() && c1.is_connectable(c2)
-                })
-            } else { 
-                false 
-            }
-        )
-    }
-    
-    pub fn connect(&mut self, other: Self) { 
-        debug_assert!(self.is_connectable(&other));
-
-        // χ(S∪S') = χ(S) + χ(S') - χ(S∩S'),
-        // χ(S) = 2 - 2g(S) - #∂S, 
-        // χ(S∩S') = #(S∩S').
-        // → g(S∪S') = g(S) + g(S') + 1/2 #{∂S + ∂S' + S∩S' - ∂(S∪S')} - 1.
-
-        let g1 = self.genus;
-        let g2 = other.genus;
-        let b1 = self.nbdr_comps();
-        let b2 = other.nbdr_comps();
-        let f = self.endpts().intersection(&other.endpts()).count();
-
-        let CobComp{ src, tgt, genus: _, dots } = other;
-
-        self.src.connect(src);
-        self.tgt.connect(tgt);
-
-        let b = self.nbdr_comps();
-        assert!((b1 + b2 + f - b) % 2 == 0);
-        
-        self.genus = g1 + g2 + (b1 + b2 + f - b)/2 - 1;
-
-        self.dots.0 += dots.0;
-        self.dots.1 += dots.1;
-    }
-
     // χ(S) = 2 - 2g(S) - #(∂S)
     pub fn euler_num(&self) -> i32 { 
         let b = self.nbdr_comps() as i32;
@@ -265,6 +212,60 @@ impl CobComp {
         }
 
         src_circs + tgt_circs + side_circs
+    }
+
+    pub fn add_dot(&mut self, dot: Dot) { 
+        match dot { 
+            Dot::X => self.dots.0 += 1,
+            Dot::Y => self.dots.1 += 1,
+            _      => ()
+        }
+    }
+
+    pub fn cap_off(&mut self, b: Bottom, i: usize) {
+        assert!(self.bottom(b).comp(i).is_circle());
+        self.bottom_mut(b).remove_at(i);
+    }
+
+    // connect = horizontal composition
+    pub fn is_connectable(&self, other: &Self) -> bool { 
+        self.src.comps().iter().any(|c1| 
+            if c1.is_arc() { 
+                other.src.comps().iter().any(|c2| { 
+                    c2.is_arc() && c1.is_connectable(c2)
+                })
+            } else { 
+                false 
+            }
+        )
+    }
+    
+    pub fn connect(&mut self, other: Self) { 
+        debug_assert!(self.is_connectable(&other));
+
+        // χ(S∪S') = χ(S) + χ(S') - χ(S∩S'),
+        // χ(S) = 2 - 2g(S) - #∂S, 
+        // χ(S∩S') = #(S∩S').
+        // → g(S∪S') = g(S) + g(S') + 1/2 #{∂S + ∂S' + S∩S' - ∂(S∪S')} - 1.
+
+        let g1 = self.genus;
+        let g2 = other.genus;
+        let b1 = self.nbdr_comps();
+        let b2 = other.nbdr_comps();
+        let f = self.endpts().intersection(&other.endpts()).count();
+
+        let CobComp{ src, tgt, genus: _, dots } = other;
+
+        self.src.connect(src);
+        self.tgt.connect(tgt);
+
+        let b = self.nbdr_comps();
+        assert!((b1 + b2 + f - b) % 2 == 0);
+        
+        self.genus = g1 + g2 + (b1 + b2 + f - b)/2 - 1;
+
+        self.dots.0 += dots.0;
+        self.dots.1 += dots.1;
     }
 
     pub fn eval<R>(&self, h: &R, t: &R) -> R
@@ -398,27 +399,6 @@ impl Cob {
         self.comps.iter().map(|c| c.nbdr_comps()).sum()
     }
 
-    pub fn connect(&mut self, cob: Cob) { // horizontal composition
-        for c in cob.comps.into_iter() { 
-            self.connect_comp(c);
-        }
-    }
-
-    pub fn connect_comp(&mut self, mut c: CobComp) {
-        let mut i = 0;
-
-        while i < self.comps.len() { 
-            if c.is_connectable(&self.comps[i]) { 
-                let c2 = self.comps.remove(i);
-                c.connect(c2);
-            } else { 
-                i += 1;
-            }
-        }
-        
-        self.comps.push(c);
-    }
-
     pub fn cap_off(&mut self, b: Bottom, c: &TngComp, x: Dot) {
         assert!(c.is_circle());
         let Some((i, comp, p)) = self.find_comp(b, c) else { 
@@ -441,6 +421,27 @@ impl Cob {
                 None
             }
         ).next()
+    }
+
+    pub fn connect(&mut self, cob: Cob) { // horizontal composition
+        for c in cob.comps.into_iter() { 
+            self.connect_comp(c);
+        }
+    }
+
+    pub fn connect_comp(&mut self, mut c: CobComp) {
+        let mut i = 0;
+
+        while i < self.comps.len() { 
+            if c.is_connectable(&self.comps[i]) { 
+                let c2 = self.comps.remove(i);
+                c.connect(c2);
+            } else { 
+                i += 1;
+            }
+        }
+        
+        self.comps.push(c);
     }
 
     pub fn eval<R>(&self, h: &R, t: &R) -> R

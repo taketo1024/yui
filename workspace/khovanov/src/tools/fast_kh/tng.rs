@@ -10,7 +10,6 @@ pub struct Tng {
 
 impl Tng { 
     pub fn new(comps: Vec<LinkComp>) -> Self { 
-        debug_assert!(comps.iter().all(|c| !c.is_empty()));
         Self { comps }
     }
 
@@ -28,7 +27,7 @@ impl Tng {
     }
 
     pub fn is_closed(&self) -> bool { 
-        self.comps.iter().all(|a| a.is_empty() || a.is_circle())
+        self.comps.iter().all(|a| a.is_circle())
     }
 
     pub fn ncomps(&self) -> usize { 

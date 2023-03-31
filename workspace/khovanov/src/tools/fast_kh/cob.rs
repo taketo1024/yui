@@ -49,7 +49,6 @@ impl CobComp {
     }
 
     pub fn id(c: LinkComp) -> Self { 
-        assert!(!c.is_empty());
         Self::plain(
             Tng::from(c.clone()), 
             Tng::from(c),

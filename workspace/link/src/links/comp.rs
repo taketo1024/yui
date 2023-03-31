@@ -12,12 +12,8 @@ pub struct LinkComp {
 
 impl LinkComp { 
     pub fn new(edges: Vec<Edge>, closed: bool) -> Self { 
-        assert!(!closed || edges.len() > 0);
+        assert!(!edges.is_empty());
         Self { edges, closed }
-    }
-
-    pub fn empty() -> Self { 
-        Self::new(vec![], false)
     }
 
     pub fn arc(edges: Vec<Edge>) -> Self { 
@@ -54,26 +50,12 @@ impl LinkComp {
         self.edges.len()
     }
     
-    pub fn is_empty(&self) -> bool { 
-        self.edges.is_empty()
-    }
-
     pub fn is_arc(&self) -> bool { 
-        !self.is_empty() && !self.closed
+        !self.closed
     }
 
     pub fn is_circle(&self) -> bool { 
-        !self.is_empty() && self.closed
-    }
-
-    pub fn append(&mut self, e: Edge) { 
-        assert_eq!(self.is_circle(), false);
-
-        if self.edges.len() > 0 && self.edges[0] == e { 
-            self.closed = true
-        } else { 
-            self.edges.push(e)
-        }
+        self.closed
     }
 
     pub fn reduce(&mut self) { 
@@ -164,10 +146,6 @@ impl LinkComp {
 
 impl Display for LinkComp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.is_empty() { 
-            return write!(f, "∅");
-        }
-
         let c = self.edges.iter().map(|e| e.to_string()).join("-");
         if self.is_circle() { 
             write!(f, "[-{c}-]")
@@ -207,27 +185,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn append() { 
-        let mut c = LinkComp::empty();
-        c.append(0);
-        c.append(1);
-        c.append(2);
-
-        assert_eq!(c.edges(), &vec![0,1,2]);
-        assert_eq!(c.is_circle(), false);
-
-        c.append(0);
-
-        assert_eq!(c.edges(), &vec![0,1,2]);
-        assert_eq!(c.is_circle(), true);
-    }
-
-    #[test]
     fn reduce() { 
-        let mut c = LinkComp::new(vec![], false);
-        c.reduce();
-        assert_eq!(c, LinkComp::new(vec![], false));
-        
         let mut c = LinkComp::new(vec![0], false);
         c.reduce();
         assert_eq!(c, LinkComp::new(vec![0], false));
@@ -256,7 +214,6 @@ mod tests {
         assert_eq!(c.is_connectable(&LinkComp::new(vec![5,6], false)), false);
         assert_eq!(c.is_connectable(&LinkComp::new(vec![2,3], false)), false);
         assert_eq!(c.is_connectable(&LinkComp::new(vec![0], true)), false);
-        assert_eq!(c.is_connectable(&LinkComp::new(vec![], false)), false);
     }
 
     #[test]

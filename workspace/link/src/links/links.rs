@@ -78,13 +78,20 @@ impl Link {
                     continue 
                 }
 
-                let mut c = LinkComp::empty();
+                let mut edges = vec![];
 
                 self.traverse_edges((i0, j0), |i, j| { 
                     let e = self.data[i].edge(j);
-                    c.append(e);
+                    edges.push(e);
                     passed.insert(e);
                 });
+
+                let c = if edges.len() > 1 && edges.first() == edges.last() { 
+                    edges.pop();
+                    LinkComp::circ(edges)
+                } else { 
+                    LinkComp::arc(edges)
+                };
 
                 comps.push(c);
             }

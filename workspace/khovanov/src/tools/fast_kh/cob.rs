@@ -106,6 +106,77 @@ impl CobComp {
         self.bottom(b).index_of(c)
     }
 
+    pub fn has_dots(&self) -> bool { 
+        self.dots.0 > 0 || 
+        self.dots.1 > 0
+    }
+
+    pub fn is_closed(&self) -> bool {
+        self.src.is_empty() && 
+        self.tgt.is_empty()
+    }
+
+    pub fn is_sph(&self) -> bool {
+        self.is_closed() && 
+        self.genus == 0
+    }
+
+    pub fn is_cyl(&self) -> bool { // possibly with genus
+        self.src.ncomps() == 1 && 
+        self.tgt.ncomps() == 1
+    }
+
+    pub fn is_sdl(&self) -> bool { // possibly with genus
+        self.src.ncomps() == 2 && 
+        self.tgt.ncomps() == 2 && 
+        self.src.comps().iter().all(|c| c.is_arc()) && 
+        self.tgt.comps().iter().all(|c| c.is_arc()) && 
+        self.src != self.tgt
+    }
+
+    pub fn is_zero(&self) -> bool { 
+        self.is_sph() && 
+        (self.dots == (0, 0) || // ε.ι = 0,
+         self.dots == (1, 1))   // ε.XY.ι = ε.T.ι = 0.
+    }
+
+    pub fn is_removable(&self) -> bool { 
+        self.is_sph() && 
+        (self.dots == (1, 0) || // ε.X.ι = 1,
+         self.dots == (0, 1))   // ε.Y.ι = 1.
+    }
+
+    pub fn is_invertible(&self) -> bool { 
+        self.is_cyl() && 
+        self.genus == 0 &&
+        self.dots == (0, 0)
+    }
+
+    pub fn inv(&self) -> Option<Self> { 
+        if self.is_invertible() { 
+            let inv = Self::plain(
+                self.tgt.clone(),
+                self.src.clone() 
+            );
+            Some(inv)
+        } else {
+            None
+        }
+    }
+
+    pub fn cap_off(&mut self, b: Bottom, i: usize) {
+        assert!(self.bottom(b).comp(i).is_circle());
+        self.bottom_mut(b).remove_at(i);
+    }
+
+    pub fn add_dot(&mut self, dot: Dot) { 
+        match dot { 
+            Dot::X => self.dots.0 += 1,
+            Dot::Y => self.dots.1 += 1,
+            _      => ()
+        }
+    }
+
     pub fn is_connectable(&self, other: &Self) -> bool { 
         self.src.comps().iter().any(|c1| 
             if c1.is_arc() { 
@@ -144,69 +215,6 @@ impl CobComp {
 
         self.dots.0 += dots.0;
         self.dots.1 += dots.1;
-    }
-
-    pub fn has_dots(&self) -> bool { 
-        self.dots.0 > 0 || 
-        self.dots.1 > 0
-    }
-
-    pub fn is_closed(&self) -> bool {
-        self.src.is_empty() && 
-        self.tgt.is_empty()
-    }
-
-    pub fn is_sph(&self) -> bool {
-        self.is_closed() && 
-        self.genus == 0
-    }
-
-    pub fn is_cyl(&self) -> bool { // (arc or circle) × I
-        self.src.ncomps() == 1 && 
-        self.tgt.ncomps() == 1 && 
-        self.genus == 0
-    }
-
-    pub fn is_zero(&self) -> bool { 
-        self.is_sph() && 
-        (self.dots == (0, 0) || // ε.ι = 0,
-         self.dots == (1, 1))   // ε.XY.ι = ε.T.ι = 0.
-    }
-
-    pub fn is_removable(&self) -> bool { 
-        self.is_sph() && 
-        (self.dots == (1, 0) || // ε.X.ι = 1,
-         self.dots == (0, 1))   // ε.Y.ι = 1.
-    }
-
-    pub fn is_invertible(&self) -> bool { 
-        self.is_cyl() && 
-        self.dots == (0, 0)
-    }
-
-    pub fn inv(&self) -> Option<Self> { 
-        if self.is_invertible() { 
-            let inv = Self::plain(
-                self.tgt.clone(),
-                self.src.clone() 
-            );
-            Some(inv)
-        } else {
-            None
-        }
-    }
-
-    pub fn cap_off(&mut self, b: Bottom, i: usize) {
-        assert!(self.bottom(b).comp(i).is_circle());
-        self.bottom_mut(b).remove_at(i);
-    }
-
-    pub fn add_dot(&mut self, dot: Dot) { 
-        match dot { 
-            Dot::X => self.dots.0 += 1,
-            Dot::Y => self.dots.1 += 1,
-            _      => ()
-        }
     }
 
     // χ(S) = 2 - 2g(S) - #(∂S)
@@ -293,20 +301,33 @@ impl Display for CobComp {
             (0, 0) => "S",
             (0, 1) => "ι",
             (1, 0) => "ε",
-            (1, 1) => "id",
+            (1, 1) => "cyl",
             (2, 1) => "m",
             (1, 2) => "Δ",
+            (2, 2) if self.is_sdl() => "sdl",
             _      => "cob"
+        };
+
+        let g = if self.genus > 0 { 
+            yui_utils::subscript(self.genus as isize)
+        } else { 
+            "".to_string()
         };
 
         let dots = if self.has_dots() { 
             let (p, q) = self.dots;
-            format!("; {}", Mono2::<'X','Y', _>::new(p, q).to_string())
+            format!("({})", Mono2::<'X','Y', _>::new(p, q).to_string())
         } else { 
             String::new()
         };
         
-        write!(f, "{s}({} -> {}{})", &self.src, &self.tgt, dots)
+        let cob = format!("{s}{g}{dots}");
+
+        if self.src.is_empty() && self.tgt.is_empty() { 
+            write!(f, "{cob}")
+        } else { 
+            write!(f, "{cob}({} -> {})", &self.src, &self.tgt)
+        }
     }
 }
 
@@ -440,9 +461,13 @@ impl Display for Cob {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.comps.is_empty() { 
             write!(f, "1")
+        } else if self.is_zero() { 
+            write!(f, "0")
+        } else if self.comps.len() == 1 {
+            self.comps[0].fmt(f)
         } else { 
             let cobs = self.comps.iter().map(|c| c.to_string()).join(" ⊔ ");
-            write!(f, "[{}]", cobs)
+            write!(f, "{{{}}}", cobs)
         }
     }
 }

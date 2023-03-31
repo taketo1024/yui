@@ -56,7 +56,15 @@ impl CobComp {
     }
 
     pub fn sdl(r0: (TngComp, TngComp), r1: (TngComp, TngComp)) -> Self { 
-        // TODO validate
+        assert!(r0.0.is_arc());
+        assert!(r0.1.is_arc());
+        assert!(r1.0.is_arc());
+        assert!(r1.1.is_arc());
+        assert!(r0.0 != r1.0);
+        assert!(r0.0 != r1.1);
+        assert!(r0.1 != r1.0);
+        assert!(r0.1 != r1.1);
+
         Self::plain(
             Tng::new(vec![r0.0, r0.1]), 
             Tng::new(vec![r1.0, r1.1])
@@ -339,10 +347,14 @@ impl Cob {
     }
 
     pub fn sdl(src: &Tng, tgt: &Tng) -> Self { 
-        // TODO validate
-        Self::from(
-            CobComp::plain(src.clone(), tgt.clone())
-        )
+        assert_eq!(src.ncomps(), 2);
+        assert_eq!(tgt.ncomps(), 2);
+
+        let r0 = (src.comp(0).clone(), src.comp(1).clone());
+        let r1 = (tgt.comp(0).clone(), tgt.comp(1).clone());
+        let sdl = CobComp::sdl(r0, r1);
+
+        Self::from(sdl)
     }
 
     pub fn ncomps(&self) -> usize { 

@@ -15,22 +15,12 @@ pub enum Dot {
     None, X, Y
 }
 
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub enum End { 
+#[derive(PartialEq, Eq, Clone, Copy, Debug, Display)]
+pub enum Bottom { 
     Src, Tgt
 }
 
-impl End { 
-    fn is_src(&self) -> bool { 
-        self == &End::Src
-    }
-
-    fn is_tgt(&self) -> bool { 
-        self == &End::Tgt
-    }
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct CobComp { 
     src: Tng,
     tgt: Tng,
@@ -94,12 +84,26 @@ impl CobComp {
         self.src.endpts() // == self.tgt.endpts()
     }
 
-    pub fn contains(&self, c: &TngComp, e: End) -> bool { 
-        self.end(e).contains(c)
+    pub fn bottom(&self, b: Bottom) -> &Tng { 
+        match b { 
+            Bottom::Src => &self.src,
+            Bottom::Tgt => &self.tgt
+        }
     }
 
-    pub fn index_of(&self, c: &TngComp, e: End) -> Option<usize> { 
-        self.end(e).index_of(c)
+    pub fn bottom_mut(&mut self, b: Bottom) -> &mut Tng { 
+        match b { 
+            Bottom::Src => &mut self.src,
+            Bottom::Tgt => &mut self.tgt
+        }
+    }
+
+    pub fn contains(&self, b: Bottom, c: &TngComp) -> bool { 
+        self.bottom(b).contains(c)
+    }
+
+    pub fn index_of(&self, b: Bottom, c: &TngComp) -> Option<usize> { 
+        self.bottom(b).index_of(c)
     }
 
     pub fn is_connectable(&self, other: &Self) -> bool { 
@@ -192,9 +196,9 @@ impl CobComp {
         }
     }
 
-    pub fn cap_off(&mut self, i: usize, e: End) {
-        assert!(self.end(e).comp(i).is_circle());
-        self.end_mut(e).remove_at(i);
+    pub fn cap_off(&mut self, b: Bottom, i: usize) {
+        assert!(self.bottom(b).comp(i).is_circle());
+        self.bottom_mut(b).remove_at(i);
     }
 
     pub fn add_dot(&mut self, dot: Dot) { 
@@ -202,22 +206,6 @@ impl CobComp {
             Dot::X => self.dots.0 += 1,
             Dot::Y => self.dots.1 += 1,
             _      => ()
-        }
-    }
-
-    fn end(&self, e: End) -> &Tng { 
-        if e.is_src() { 
-            &self.src 
-        } else { 
-            &self.tgt
-        }
-    }
-
-    fn end_mut(&mut self, e: End) -> &mut Tng { 
-        if e.is_src() { 
-            &mut self.src 
-        } else { 
-            &mut self.tgt
         }
     }
 
@@ -322,12 +310,6 @@ impl Display for CobComp {
     }
 }
 
-impl Hash for CobComp {
-    fn hash<H: std::hash::Hasher>(&self, _state: &mut H) {
-        // TODO
-    }
-}
-
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Default)]
 pub struct Cob { 
     comps: Vec<CobComp>
@@ -416,13 +398,13 @@ impl Cob {
         self.comps.push(c);
     }
 
-    pub fn cap_off(&mut self, c: &TngComp, x: Dot, e: End) {
+    pub fn cap_off(&mut self, b: Bottom, c: &TngComp, x: Dot) {
         assert!(c.is_circle());
-        let Some((i, comp, p)) = self.find_comp(c, e) else { 
-            panic!("{c} not found in {} ({e:?})", self)
+        let Some((i, comp, p)) = self.find_comp(b, c) else { 
+            panic!("{c} not found in {} ({b})", self)
         };
 
-        comp.cap_off(p, e);
+        comp.cap_off(b, p);
         comp.add_dot(x);
 
         if comp.is_removable() { 
@@ -430,9 +412,9 @@ impl Cob {
         }
     }
 
-    fn find_comp(&mut self, c: &TngComp, e: End) -> Option<(usize, &mut CobComp, usize)> { 
+    fn find_comp(&mut self, b: Bottom, c: &TngComp) -> Option<(usize, &mut CobComp, usize)> { 
         self.comps.iter_mut().enumerate().filter_map(|(i, comp)| 
-            if let Some(p) = comp.index_of(c, e) { 
+            if let Some(p) = comp.index_of(b, c) { 
                 Some((i, comp, p))
             } else { 
                 None
@@ -501,10 +483,10 @@ mod tests {
         let c0 = TngComp::arc(1,2);
         let c1 = TngComp::circ(6);
 
-        assert!( c.contains(&c0, End::Src));
-        assert!(!c.contains(&c1, End::Src));
-        assert!(!c.contains(&c0, End::Tgt));
-        assert!( c.contains(&c1, End::Tgt));
+        assert!( c.contains(Bottom::Src, &c0));
+        assert!(!c.contains(Bottom::Src, &c1));
+        assert!(!c.contains(Bottom::Tgt, &c0));
+        assert!( c.contains(Bottom::Tgt, &c1));
     }
 
     #[test]
@@ -668,12 +650,12 @@ mod tests {
         assert_eq!(c0.genus, 1);
         assert_eq!(c0.euler_num(), -2);
 
-        c0.cap_off(0, End::Src);
+        c0.cap_off(Bottom::Src, 0);
 
         assert_eq!(c0.genus, 1);
         assert_eq!(c0.euler_num(), -1);
 
-        c0.cap_off(0, End::Tgt);
+        c0.cap_off(Bottom::Tgt, 0);
 
         assert_eq!(c0.genus, 1);
         assert_eq!(c0.euler_num(), 0);

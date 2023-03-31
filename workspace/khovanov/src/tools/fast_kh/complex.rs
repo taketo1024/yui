@@ -13,7 +13,7 @@ use yui_matrix::dense::Mat;
 use yui_link::{Crossing, Resolution, State};
 
 use crate::KhAlgLabel;
-use super::cob::{Cob, Dot, End};
+use super::cob::{Cob, Dot, Bottom};
 use super::tng::{Tng, TngComp};
 
 #[derive(Clone)]
@@ -65,7 +65,7 @@ type Mor = LinComb<Cob, i32>; // Z-linear combination of cobordisms.
 trait MorTrait: Sized {
     fn is_invertible(&self) -> bool;
     fn inv(&self) -> Option<Self>;
-    fn cap_off(self, c: &TngComp, dot: Dot, e: End) -> Self;
+    fn cap_off(self, b: Bottom, c: &TngComp, dot: Dot) -> Self;
     fn eval<R>(&self, h: &R, t: &R) -> R
     where R: Ring + From<i32>, for<'x> &'x R: RingOps<R>;
 }
@@ -89,9 +89,9 @@ impl MorTrait for Mor {
         }
     }
 
-    fn cap_off(self, c: &TngComp, dot: Dot, e: End) -> Self {
+    fn cap_off(self, b: Bottom, c: &TngComp, dot: Dot) -> Self {
         self.into_map(|mut cob, r| { 
-            cob.cap_off(c, dot, e);
+            cob.cap_off(b, c, dot);
 
             if cob.is_zero() { 
                 (cob, 0)
@@ -409,8 +409,8 @@ impl TngComplexBuilder {
             let a0 = std::mem::take(&mut d[[j, k]]);
             let a1 = a0.clone();
 
-            d[[j,   k]] = a0.cap_off(c, Dot::None, End::Tgt);
-            d[[j+1, k]] = a1.cap_off(c, Dot::Y,    End::Tgt);
+            d[[j,   k]] = a0.cap_off(Bottom::Tgt, c, Dot::None);
+            d[[j+1, k]] = a1.cap_off(Bottom::Tgt, c, Dot::Y);
         }
     }
 
@@ -428,8 +428,8 @@ impl TngComplexBuilder {
             let a0 = std::mem::take(&mut d[[k, j]]);
             let a1 = a0.clone();
 
-            d[[k, j]]   = a0.cap_off(c, Dot::X,    End::Src);
-            d[[k, j+1]] = a1.cap_off(c, Dot::None, End::Src);
+            d[[k, j]]   = a0.cap_off(Bottom::Src, c, Dot::X);
+            d[[k, j+1]] = a1.cap_off(Bottom::Src, c, Dot::None);
         }
     }
 }

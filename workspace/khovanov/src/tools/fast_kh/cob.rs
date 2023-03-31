@@ -92,6 +92,15 @@ impl CobComp {
         )
     }
 
+    pub fn closed(g: usize) -> Self { 
+        Self::new(
+            Tng::empty(),
+            Tng::empty(),
+            g,
+            (0, 0)
+        )
+    }
+
     pub fn genus(&self) -> usize { 
         self.genus
     }
@@ -288,27 +297,29 @@ impl CobComp {
     where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(self.is_closed());
 
-        // TODO must `neck cut` until g = 0!
-
-        fn eval<R>(x: usize, y: usize, h: &R, t: &R) -> R
+        fn eval<R>(g: usize, x: usize, y: usize, h: &R, t: &R) -> R
         where R: Ring, for<'x> &'x R: RingOps<R> { 
-            match (x, y) { 
-                (0, 0) => R::zero(),
-                (1, 0) | (0, 1)  => R::one(),
-                (x, y) if x >= 1 && y >= 1 => // XY = t
-                    t * eval(x-1, y-1, h, t),
-                (x, 0) if x >= 2 => // X^2 = hX + t
-                    h * eval(x-1, 0, h, t) + 
-                    t * eval(x-2, 0, h, t),
-                (0, y) if y >= 2 => // Y^2 = -hY + t
-                    -h * eval(0, y-1, h, t) + 
-                     t * eval(0, y-2, h, t),
+            match (g, x, y) { 
+                (0, 0, 0) => R::zero(),
+                (0, 1, 0) | (0, 0, 1)  => R::one(),
+                (g, _, _) if g > 0 => // neck-cut
+                    eval(g-1, x+1, y, h, t) + eval(g-1, x, y+1, h, t),
+                (0, x, y) if x >= 1 && y >= 1 => // XY = t
+                    t * eval(0, x-1, y-1, h, t),
+                (0, x, 0) if x >= 2 => // X^2 = hX + t
+                    h * eval(0, x-1, 0, h, t) + 
+                    t * eval(0, x-2, 0, h, t),
+                (0, 0, y) if y >= 2 => // Y^2 = -hY + t
+                    -h * eval(0, 0, y-1, h, t) + 
+                     t * eval(0, 0, y-2, h, t),
                 _ => panic!()
             }
         }
 
+        let g = self.genus;
         let (x, y) = self.dots;
-        eval(x, y, h, t)
+
+        eval(g, x, y, h, t)
     }
 }
 
@@ -609,6 +620,9 @@ impl FreeGen for Cob {}
 
 #[cfg(test)]
 mod tests {
+    use num_traits::Zero;
+    use yui_polynomial::Poly2;
+
     use super::CobComp;
     use super::*;
  
@@ -898,5 +912,24 @@ mod tests {
         assert_eq!(c.comp(0).src.ncomps(), 0);
         assert_eq!(c.comp(0).tgt.ncomps(), 0);
         assert_eq!(c.comp(0).genus, 1);
+    }
+
+    #[test]
+    fn eval() { 
+        type R = Poly2<'H', 'T', i32>;
+        let h = R::variable(0);
+        let t = R::variable(1);
+
+        let c = CobComp::closed(0);
+        assert_eq!(c.eval(&h, &t), R::zero());
+
+        let c = CobComp::closed(1);
+        assert_eq!(c.eval(&h, &t), R::from(2));
+
+        let c = CobComp::closed(2);
+        assert_eq!(c.eval(&h, &t), R::zero());
+
+        let c = CobComp::closed(3);
+        assert_eq!(c.eval(&h, &t), R::from_deg2([((2, 0), 2), ((0, 1), 8)])); // 2(H^2 + 4T)
     }
 }

@@ -103,6 +103,10 @@ impl CobComp {
         )
     }
 
+    pub fn sphere() -> Self { 
+        Self::closed(0)
+    }
+
     pub fn genus(&self) -> usize { 
         self.genus
     }
@@ -503,34 +507,35 @@ impl Cob {
         let mut bot = std::mem::replace(&mut self.comps, vec![]);
         let mut top = other.comps;
 
-        // retain closed cob-comps.
-        while let Some(i) = bot.iter().position(|c| c.is_closed()) { 
-            self.comps.push(bot.remove(i));
-        }
-        while let Some(i) = top.iter().position(|c| c.is_closed()) { 
-            self.comps.push(top.remove(i));
-        }
-
-        // stack non-closed cob-comps.
         while !(bot.is_empty() && top.is_empty()) { 
-            let (b, t) = self.take_stackable_comps(&mut bot, &mut top);
-            let c = self.stack_comps(b, t);
-            self.comps.push(c)
+            let (mut b, mut t) = self.take_stackable_comps(&mut bot, &mut top);
+
+            if t.is_empty() { 
+                assert_eq!(b.len(), 1);
+                self.comps.push(b.remove(0))
+            } else if b.is_empty() {
+                assert_eq!(t.len(), 1);
+                self.comps.push(t.remove(0))
+            } else { 
+                let c = self.stack_comps(b, t);
+                self.comps.push(c)
+            }
         }
     }
 
     // collect `bot` & `top` comps that will form a connected component.
     fn take_stackable_comps(&self, bot: &mut Vec<CobComp>, top: &mut Vec<CobComp>) -> (Vec<CobComp>, Vec<CobComp>) {
-        assert!(!bot.is_empty());
-        assert!(!top.is_empty());
-
         let mut res_bot = vec![];
         let mut res_top = vec![];
 
         let mut q_bot = VecDeque::new();
         let mut q_top = VecDeque::new();
 
-        q_bot.push_back(bot.remove(0));
+        if !bot.is_empty() { 
+            q_bot.push_back(bot.remove(0))
+        } else if !top.is_empty() { 
+            q_top.push_back(top.remove(0))
+        }
 
         while !(q_bot.is_empty() && q_top.is_empty()) {
             while let Some(b) = q_bot.pop_front() {
@@ -899,6 +904,63 @@ mod tests {
         assert_eq!(c3.inv(), None);
     }
 
+    #[test]
+    fn stack_closed() {
+        let mut c0 = Cob::from(CobComp::closed(0));
+        let c1 = Cob::from(CobComp::closed(1));
+        
+        c0.stack(c1);
+
+        assert_eq!(c0, Cob::new(vec![
+            CobComp::closed(0),
+            CobComp::closed(1)
+        ]));
+    }
+    
+    #[test]
+    fn stack_cup_cap() {
+        let mut c0 = Cob::from(CobComp::cup(TngComp::circ(0)));
+        let c1 = Cob::from(CobComp::cap(TngComp::circ(0)));
+        
+        c0.stack(c1);
+
+        assert_eq!(c0, Cob::new(vec![
+            CobComp::sphere()
+        ]));
+    }
+   
+    #[test]
+    fn stack_cap_cup() {
+        let mut c0 = Cob::from(CobComp::cap(TngComp::circ(0)));
+        let c1 = Cob::from(CobComp::cup(TngComp::circ(0)));
+        
+        c0.stack(c1);
+
+        assert_eq!(c0, Cob::new(vec![
+            CobComp::cap(TngComp::circ(0)),
+            CobComp::cup(TngComp::circ(0))
+        ]));
+    }
+   
+    #[test]
+    fn stack_comps() {
+        let mut c0 = Cob::new(vec![
+            CobComp::id(TngComp::arc(0, 1)),
+            CobComp::cup(TngComp::circ(2))
+        ]);
+        let c1 = Cob::new(vec![
+            CobComp::cap(TngComp::circ(2)),
+            CobComp::id(TngComp::arc(0, 1))
+        ]);
+        
+        c0.stack(c1);
+
+        assert_eq!(c0, Cob::new(vec![
+            CobComp::id(TngComp::arc(0, 1)),
+            CobComp::sphere()
+        ]));
+    }
+   
     #[test]
     fn stack_torus() {
         let c0 = Cob::from(CobComp::cup(TngComp::Circ(0)));

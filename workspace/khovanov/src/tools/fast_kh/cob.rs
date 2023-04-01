@@ -2,6 +2,8 @@ use core::panic;
 use std::hash::Hash;
 use std::collections::{HashSet, VecDeque};
 use std::fmt::Display;
+use std::ops::{Mul, MulAssign};
+use auto_impl_ops::auto_ops;
 use derive_more::Display;
 use itertools::Itertools;
 use yui_core::{Elem, Ring, RingOps};
@@ -149,6 +151,12 @@ impl CobComp {
     pub fn is_cyl(&self) -> bool { // possibly with genus
         self.src.ncomps() == 1 && 
         self.tgt.ncomps() == 1
+    }
+
+    pub fn is_id(&self) -> bool { 
+        self.is_cyl() && 
+        self.src.comp(0) == self.tgt.comp(0) && 
+        self.genus == 0
     }
 
     pub fn is_sdl(&self) -> bool { // possibly with genus
@@ -329,6 +337,7 @@ impl Display for CobComp {
             (0, 0) => "S",
             (0, 1) => "ι",
             (1, 0) => "ε",
+            (1, 1) if self.is_id() => "id",
             (1, 1) => "cyl",
             (2, 1) => "m",
             (1, 2) => "Δ",
@@ -344,15 +353,17 @@ impl Display for CobComp {
 
         let dots = if self.has_dots() { 
             let (p, q) = self.dots;
-            format!("({})", Mono2::<'X','Y', _>::new(p, q).to_string())
+            format!("{}.", Mono2::<'X','Y', _>::new(p, q).to_string())
         } else { 
             String::new()
         };
         
-        let cob = format!("{s}{g}{dots}");
+        let cob = format!("{dots}{s}{g}");
 
         if self.src.is_empty() && self.tgt.is_empty() { 
             write!(f, "{cob}")
+        } else if self.is_id() { 
+            write!(f, "{cob}({})", &self.src.comp(0))
         } else { 
             write!(f, "{cob}({} -> {})", &self.src, &self.tgt)
         }
@@ -492,6 +503,15 @@ impl Cob {
         let mut bot = std::mem::replace(&mut self.comps, vec![]);
         let mut top = other.comps;
 
+        // retain closed cob-comps.
+        while let Some(i) = bot.iter().position(|c| c.is_closed()) { 
+            self.comps.push(bot.remove(i));
+        }
+        while let Some(i) = top.iter().position(|c| c.is_closed()) { 
+            self.comps.push(top.remove(i));
+        }
+
+        // stack non-closed cob-comps.
         while !(bot.is_empty() && top.is_empty()) { 
             let (b, t) = self.take_stackable_comps(&mut bot, &mut top);
             let c = self.stack_comps(b, t);
@@ -617,6 +637,15 @@ impl Elem for Cob {
 }
 
 impl FreeGen for Cob {}
+
+#[auto_ops]
+impl Mul for Cob {
+    type Output = Cob;
+    fn mul(self, mut rhs: Self) -> Self::Output {
+        rhs.stack(self);
+        rhs
+    }
+}
 
 #[cfg(test)]
 mod tests {

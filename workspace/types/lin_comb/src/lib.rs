@@ -186,9 +186,15 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn from_iter<T: IntoIterator<Item = (X, R)>>(iter: T) -> Self {
-        let data = iter.into_iter().filter(|(_, r)| 
-            !r.is_zero()
-        ).collect();
+        let mut data = HashMap::<X, R>::new();
+        for (x, r) in iter.into_iter() { 
+            if r.is_zero() { continue }
+            if let Some(val) = data.get_mut(&x) { 
+                val.add_assign(r);
+            } else { 
+                data.insert(x, r);
+            }
+        }
         Self::new_raw(data)
     }
 }

@@ -1,6 +1,6 @@
 use std::ops::{Add, Neg, Sub, Mul, Index, IndexMut, AddAssign, SubAssign, MulAssign};
 use std::fmt::Debug;
-use ndarray::{Array2, Axis, s, concatenate};
+use ndarray::{Array2, Axis, s, concatenate, array};
 use derive_more::Display;
 use auto_impl_ops::auto_ops;
 use num_traits::{Zero, One};
@@ -290,6 +290,22 @@ impl<R> Mat<R> {
             f(a)
         }
     }
+
+    pub fn del_row(&mut self, i: usize) {
+        assert!(self.is_valid_row_index(i));
+        let (m, n) = self.shape();
+        let arr = std::mem::replace(&mut self.array, array![[]]);
+        let vec = arr.into_iter().enumerate().filter(|(idx, _)| idx / n != i).map(|e| e.1).collect();
+        self.array = Array2::from_shape_vec((m-1, n), vec).unwrap();
+    }
+
+    pub fn del_col(&mut self, j: usize) {
+        assert!(self.is_valid_col_index(j));
+        let (m, n) = self.shape();
+        let arr = std::mem::replace(&mut self.array, array![[]]);
+        let vec = arr.into_iter().enumerate().filter(|(idx, _)| idx % n != j).map(|e| e.1).collect();
+        self.array = Array2::from_shape_vec((m, n-1), vec).unwrap();
+    }
 }
 
 impl<R> Mat<R>
@@ -563,6 +579,37 @@ mod tests {
             [1,2,10,3],
             [4,5,20,6],
             [7,8,30,9],
+        ]))
+    }
+
+    #[test]
+    fn del_row() {
+        let mut a = Mat::from(array![
+            [1,2,3],
+            [4,5,6],
+            [7,8,9],
+        ]);
+        a.del_row(1);
+        
+        assert_eq!(a, Mat::from(array![
+            [1,2,3],
+            [7,8,9],
+        ]))
+    }
+
+    #[test]
+    fn del_col() {
+        let mut a = Mat::from(array![
+            [1,2,3],
+            [4,5,6],
+            [7,8,9],
+        ]);
+        a.del_col(1);
+        
+        assert_eq!(a, Mat::from(array![
+            [1,3],
+            [4,6],
+            [7,9],
         ]))
     }
 }

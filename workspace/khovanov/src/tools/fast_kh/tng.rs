@@ -225,6 +225,10 @@ impl Tng {
             c.is_arc()
         ).count() as isize
     }
+
+    pub fn min_comp(&self) -> Option<&TngComp> { 
+        self.comps.iter().min()
+    }
 }
 
 impl Display for Tng {

@@ -148,8 +148,8 @@ impl TngComplex {
         self.modify(|b| b.append(x));
     }
 
-    pub fn deloop(&mut self) { 
-        self.modify(|b| b.deloop());
+    pub fn deloop(&mut self, simplify: bool) { 
+        self.modify(|b| b.deloop(simplify));
     }
 
     pub fn simplify(&mut self) { 
@@ -371,12 +371,12 @@ impl TngComplexBuilder {
         self.mats[i][[k, j]] = a;
     }
 
-    fn deloop(&mut self) { 
+    fn deloop(&mut self, simplify: bool) { 
         for i in 0..self.objs.len() {
             let mut j = 0;
             while j < self.objs[i].len() { // number of objects changes by `deloop`.
                 if let Some(r) = self.objs[i][j].find_loop() { 
-                    self.deloop_at(i, j, r);
+                    self.deloop_at(i, j, r, simplify);
                 } else { 
                     j += 1;
                 }
@@ -384,22 +384,28 @@ impl TngComplexBuilder {
         }
     }
 
-    fn deloop_at(&mut self, i: usize, j: usize, r: usize) { 
+    fn deloop_at(&mut self, i: usize, j: usize, r: usize, simplify: bool) { 
         let ci = &mut self.objs[i];
-
         let v0 = &mut ci[j];
-        let c = v0.deloop(r);
 
+        let c = v0.deloop(r);
         let mut v1 = v0.clone();
+
         v0.append_label(KhAlgLabel::X);
         v1.append_label(KhAlgLabel::I);
-
         ci.insert(j+1, v1);
 
         if i > 0 { 
             self.cap_rows(i-1, j, &c);
         }
         self.cup_cols(i, j, &c);
+
+        if simplify { 
+            if i > 0 { 
+                self.simplify_in(i - 1);
+            }
+            self.simplify_in(i);
+        }
     }
 
     fn cap_rows(&mut self, i: usize, j: usize, c: &TngComp) { 
@@ -442,24 +448,25 @@ impl TngComplexBuilder {
 
     fn simplify(&mut self) {
         for i in 0..self.objs.len()-1 {
-            println!("i = {i}, try simplify:\n{}\n", self.mats[i]);
-
-            while let Some((j, k)) = self.find_inv(i) {
-                self.simplify_at(i, j, k);
-            }
+            self.simplify_in(i)
         }
-        println!();
+    }
+
+    fn simplify_in(&mut self, i: usize) {
+        while let Some((j, k)) = self.find_inv(i) {
+            self.simplify_at(i, j, k);
+        }
     }
 
     fn simplify_at(&mut self, i: usize, j: usize, k: usize) {
         let d = &mut self.mats[i]; // c[i][k] -> c[i+1][j]
+        let a = &d[[j, k]];
+
+        let Some(ainv) = a.inv() else { 
+            panic!()
+        };
 
         let (m, n) = d.shape();
-        let a = &d[[j, k]];
-        let ainv = a.inv().unwrap();
-
-        println!("simplify at ({j}, {k}), a = {a}\n");
-
         for (p, q) in cartesian!(0..m, 0..n) { 
             if p == j || q == k { 
                 continue 
@@ -486,8 +493,6 @@ impl TngComplexBuilder {
 
         self.objs[i].remove(k);
         self.objs[i+1].remove(j);
-
-        println!("simplified:\n{}\n", self.mats[i]);
     }
 
     fn find_inv(&self, i: usize) -> Option<(usize, usize)> {
@@ -607,7 +612,7 @@ mod tests {
         assert!(c.tng(1, 1).find_loop().is_none());
         assert!(c.tng(2, 0).find_loop().is_none());
 
-        c.deloop();
+        c.deloop(false);
 
         assert_eq!(c.len(), 3);
         assert_eq!(c.rank(0), 1);
@@ -619,8 +624,6 @@ mod tests {
 
         assert_eq!(c.obj(1, 0).label, vec![KhAlgLabel::X]);
         assert_eq!(c.obj(1, 1).label, vec![KhAlgLabel::I]);
-        
-        c.describe()
     }
 
     #[test]
@@ -661,9 +664,8 @@ mod tests {
 
         for x in l.data() {
             c.append(x);
+            c.deloop(false);
         }
-
-        c.deloop();
 
         assert_eq!(c.len(), 4);
 
@@ -671,17 +673,6 @@ mod tests {
         assert_eq!(c.rank(1), 12);
         assert_eq!(c.rank(2), 6);
         assert_eq!(c.rank(3), 4);
-    }
-
-    #[test]
-    fn trefoil_eval_homology() { 
-        let mut c = TngComplex::new();
-        let l = Link::trefoil();
-
-        for x in l.data() {
-            c.append(x);
-        }
-        c.deloop();
 
         let c = c.as_generic(&0, &0);
         let h = c.homology(); // TODO should shift degree
@@ -697,36 +688,38 @@ mod tests {
         
         assert_eq!(h[3].rank(), 2);
         assert_eq!(h[3].is_free(), true);
-
-        println!("{h}");
-
     }
 
     #[test]
-    fn test() { 
+    fn trefoil_deloop_simplify() { 
         let mut c = TngComplex::new();
         let l = Link::trefoil();
-        let mut step = 0;
 
         for x in l.data() {
-            step += 1;
-            println!("step: {step}");
-
             c.append(x);
-            c.deloop();
-            
-            println!("delooped:");
-            c.describe();
-
-            c.simplify();
-
-            println!("simplified:");
-            c.describe();
+            c.deloop(true);
         }
+
+        assert_eq!(c.len(), 4);
+
+        assert_eq!(c.rank(0), 2);
+        assert_eq!(c.rank(1), 2);
+        assert_eq!(c.rank(2), 0);
+        assert_eq!(c.rank(3), 2);
 
         let c = c.as_generic(&0, &0);
         let h = c.homology(); // TODO should shift degree
 
-        println!("{h}");
+        assert_eq!(h[0].rank(), 1);
+        assert_eq!(h[0].is_free(), true);
+
+        assert_eq!(h[1].rank(), 1);
+        assert_eq!(h[1].tors(), &vec![2]);
+        
+        assert_eq!(h[2].is_zero(), true);
+        assert_eq!(h[2].is_free(), true);
+        
+        assert_eq!(h[3].rank(), 2);
+        assert_eq!(h[3].is_free(), true);
     }
 }

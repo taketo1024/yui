@@ -152,6 +152,10 @@ impl TngComplex {
         self.modify(|b| b.deloop());
     }
 
+    pub fn simplify(&mut self) { 
+        self.modify(|b| b.simplify());
+    }
+
     fn modify<F>(&mut self, f: F)
     where F: Fn(&mut TngComplexBuilder) { 
         let objs = std::mem::take(&mut self.objs);
@@ -176,7 +180,7 @@ impl TngComplex {
         assert!(self.is_completely_delooped());
 
         let n = self.len();
-        GenericChainComplex::ascending((0..n).map( |i| {
+        GenericChainComplex::ascending((0..n-1).map( |i| {
             let d = self.mat(i);
             SpMat::generate(d.shape(), |set| { 
                 for (i, j, c) in d.iter() { 
@@ -190,7 +194,9 @@ impl TngComplex {
 
     pub fn describe(&self) { 
         let mut str = "".to_string();
-        for (i, ci) in self.objs.iter().enumerate() { 
+        let n = self.len();
+        for i in 0..n { 
+            let ci = &self.objs[i];
             str += &format!("C[{i}]:\n");
             for (j, v) in ci.iter().enumerate() { 
                 str += &format!(" - [{j}]: {v}\n");
@@ -198,7 +204,8 @@ impl TngComplex {
             str += "\n";
         }
         str += "\n";
-        for (i, di) in self.mats.iter().enumerate() { 
+        for i in 0..n-1 { 
+            let di = &self.mats[i];
             str += &format!("d[{i}]:\n{}\n\n", di);
         }
         println!("{str}");
@@ -432,6 +439,66 @@ impl TngComplexBuilder {
             d[[k, j+1]] = a1.cap_off(Bottom::Src, c, Dot::None);
         }
     }
+
+    fn simplify(&mut self) {
+        for i in 0..self.objs.len()-1 {
+            println!("i = {i}, try simplify:\n{}\n", self.mats[i]);
+
+            while let Some((j, k)) = self.find_inv(i) {
+                self.simplify_at(i, j, k);
+            }
+        }
+        println!();
+    }
+
+    fn simplify_at(&mut self, i: usize, j: usize, k: usize) {
+        let d = &mut self.mats[i]; // c[i][k] -> c[i+1][j]
+
+        let (m, n) = d.shape();
+        let a = &d[[j, k]];
+        let ainv = a.inv().unwrap();
+
+        println!("simplify at ({j}, {k}), a = {a}\n");
+
+        for (p, q) in cartesian!(0..m, 0..n) { 
+            if p == j || q == k { 
+                continue 
+            }
+
+            let b = &d[[j, q]];
+            let c = &d[[p, k]];
+
+            if b.is_zero() || c.is_zero() { 
+                continue 
+            }
+
+            let cab = c * &ainv * b;
+
+            d[[p, q]] -= cab;
+        }
+
+        if i > 0 { 
+            self.mats[i-1].del_row(k);
+        }
+        self.mats[i].del_col(k);
+        self.mats[i].del_row(j);
+        self.mats[i+1].del_col(j);
+
+        self.objs[i].remove(k);
+        self.objs[i+1].remove(j);
+
+        println!("simplified:\n{}\n", self.mats[i]);
+    }
+
+    fn find_inv(&self, i: usize) -> Option<(usize, usize)> {
+        let d = &self.mats[i];
+        for (j, k, a) in d.iter() { 
+            if a.is_invertible() { 
+                return Some((j, k))
+            }
+        }
+        None
+    }
 }
 
 #[cfg(test)]
@@ -439,6 +506,22 @@ mod tests {
     use yui_link::*;
     use yui_homology::*;
     use super::*;
+
+    #[test]
+    fn mor_inv() { 
+        let c = Cob::id(&Tng::new(vec![
+            TngComp::arc(0,1),
+            TngComp::arc(2,3)
+        ]));
+        let f = Mor::from((c.clone(), -1));
+
+        assert!(f.is_invertible());
+        assert_eq!(f.inv(), Some(f.clone()));
+
+        let f = Mor::from((c.clone(), 2));
+        assert_eq!(f.is_invertible(), false);
+        assert_eq!(f.inv(), None);
+    }
 
     #[test]
     fn empty() { 
@@ -614,6 +697,9 @@ mod tests {
         
         assert_eq!(h[3].rank(), 2);
         assert_eq!(h[3].is_free(), true);
+
+        println!("{h}");
+
     }
 
     #[test]
@@ -624,26 +710,23 @@ mod tests {
 
         for x in l.data() {
             step += 1;
-            c.append(x);
-
             println!("step: {step}");
+
+            c.append(x);
+            c.deloop();
+            
+            println!("delooped:");
+            c.describe();
+
+            c.simplify();
+
+            println!("simplified:");
             c.describe();
         }
-    }
 
-    #[test]
-    fn inv() { 
-        let c = Cob::id(&Tng::new(vec![
-            TngComp::arc(0,1),
-            TngComp::arc(2,3)
-        ]));
-        let f = Mor::from((c.clone(), -1));
+        let c = c.as_generic(&0, &0);
+        let h = c.homology(); // TODO should shift degree
 
-        assert!(f.is_invertible());
-        assert_eq!(f.inv(), Some(f.clone()));
-
-        let f = Mor::from((c.clone(), 2));
-        assert_eq!(f.is_invertible(), false);
-        assert_eq!(f.inv(), None);
+        println!("{h}");
     }
 }

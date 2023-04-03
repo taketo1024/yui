@@ -374,6 +374,29 @@ impl Display for CobComp {
     }
 }
 
+impl OrdForDisplay for CobComp {
+    fn cmp_for_display(&self, other: &Self) -> std::cmp::Ordering {
+        use std::cmp::Ordering::*;
+
+        fn cmp(c0: Option<&TngComp>, c1: Option<&TngComp>) -> Option<std::cmp::Ordering> {
+            match (c0, c1) { 
+                (Some(c0), Some(c1)) => Some(c0.cmp(c1)),
+                (None, Some(_)) => Some(Less),
+                (Some(_), None) => Some(Greater),
+                (None, None) => None
+            }
+        }
+
+        if let Some(c) = cmp(self.src.min_comp(), other.src.min_comp()) { 
+            c
+        } else if let Some(c) = cmp(self.tgt.min_comp(), other.tgt.min_comp()) { 
+            c
+        } else { 
+            Equal
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Default)]
 pub struct Cob { 
     comps: Vec<CobComp>
@@ -477,6 +500,7 @@ impl Cob {
         for c in other.comps.into_iter() { 
             self.connect_comp(c);
         }
+        self.sort_comps()
     }
 
     pub fn connect_comp(&mut self, mut c: CobComp) {
@@ -521,6 +545,8 @@ impl Cob {
                 self.comps.push(c)
             }
         }
+
+        self.sort_comps()
     }
 
     // collect `bot` & `top` comps that will form a connected component.
@@ -606,6 +632,14 @@ impl Cob {
             c.eval(h, t)
         ).product()
     }
+
+    fn sort_comps(&mut self) { 
+        // self.comps.sort_by(|c0, c1| c0.cmp_for_display(c1))
+    }
+
+    fn min_comp(&self) -> Option<&CobComp> { 
+        self.comps.iter().min_by(|c0, c1| c0.cmp_for_display(c1))
+    }
 }
 
 impl From<CobComp> for Cob {
@@ -624,14 +658,22 @@ impl Display for Cob {
             self.comps[0].fmt(f)
         } else { 
             let cobs = self.comps.iter().map(|c| c.to_string()).join(" ⊔ ");
-            write!(f, "{{{}}}", cobs)
+            write!(f, "|{}|", cobs)
         }
     }
 }
 
 impl OrdForDisplay for Cob {
-    fn cmp_for_display(&self, _other: &Self) -> std::cmp::Ordering {
-        std::cmp::Ordering::Equal
+    fn cmp_for_display(&self, other: &Self) -> std::cmp::Ordering {
+        use std::cmp::Ordering::*;
+
+        let Some(c0) = self.min_comp() else {
+            return Less;
+        };
+        let Some(c1) = other.min_comp() else {
+            return Greater;
+        };
+        c0.cmp_for_display(c1)
     }
 }
 
@@ -935,10 +977,11 @@ mod tests {
         let c1 = Cob::from(CobComp::cup(TngComp::circ(0)));
         
         c0.stack(c1);
+        c0.sort_comps();
 
         assert_eq!(c0, Cob::new(vec![
-            CobComp::cap(TngComp::circ(0)),
-            CobComp::cup(TngComp::circ(0))
+            CobComp::cup(TngComp::circ(0)),
+            CobComp::cap(TngComp::circ(0))
         ]));
     }
    
@@ -954,10 +997,11 @@ mod tests {
         ]);
         
         c0.stack(c1);
+        c0.sort_comps();
 
         assert_eq!(c0, Cob::new(vec![
+            CobComp::sphere(),
             CobComp::id(TngComp::arc(0, 1)),
-            CobComp::sphere()
         ]));
     }
    

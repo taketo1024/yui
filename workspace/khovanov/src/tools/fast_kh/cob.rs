@@ -374,11 +374,17 @@ impl Display for CobComp {
     }
 }
 
-impl OrdForDisplay for CobComp {
-    fn cmp_for_display(&self, other: &Self) -> std::cmp::Ordering {
+impl PartialOrd for CobComp {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for CobComp {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         use std::cmp::Ordering::*;
 
-        fn cmp(c0: Option<&TngComp>, c1: Option<&TngComp>) -> Option<std::cmp::Ordering> {
+        fn cmp_opt(c0: Option<&TngComp>, c1: Option<&TngComp>) -> Option<std::cmp::Ordering> {
             match (c0, c1) { 
                 (Some(c0), Some(c1)) => Some(c0.cmp(c1)),
                 (None, Some(_)) => Some(Less),
@@ -387,12 +393,20 @@ impl OrdForDisplay for CobComp {
             }
         }
 
-        if let Some(c) = cmp(self.src.min_comp(), other.src.min_comp()) { 
-            c
-        } else if let Some(c) = cmp(self.tgt.min_comp(), other.tgt.min_comp()) { 
-            c
+        if let Some(src_cmp) = cmp_opt(
+            self.src.min_comp(), 
+            other.src.min_comp()
+        ) { 
+            src_cmp
+        } else if let Some(tgt_cmp) = cmp_opt(
+            self.tgt.min_comp(), 
+            other.tgt.min_comp()
+        ) { 
+            tgt_cmp
         } else { 
-            Equal
+            [self.genus, self.dots.0, self.dots.1].cmp(
+                &[other.genus, other.dots.0, other.dots.1]
+            )
         }
     }
 }
@@ -634,7 +648,7 @@ impl Cob {
     }
 
     fn sort_comps(&mut self) { 
-        // self.comps.sort_by(|c0, c1| c0.cmp_for_display(c1))
+        self.comps.sort()
     }
 
     fn min_comp(&self) -> Option<&CobComp> { 
@@ -673,7 +687,7 @@ impl OrdForDisplay for Cob {
         let Some(c1) = other.min_comp() else {
             return Greater;
         };
-        c0.cmp_for_display(c1)
+        c0.cmp(c1)
     }
 }
 

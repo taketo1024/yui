@@ -732,4 +732,32 @@ mod tests {
         assert_eq!(h[3].rank(), 2);
         assert_eq!(h[3].is_free(), true);
     }
+
+    #[test]
+    fn test_unknot_rm1() {
+        let l = Link::from(&[[0,0,1,1]]);
+        let c = TngComplex::from(&l);
+        let c = c.as_generic(&0, &0);
+
+        assert_eq!(c[0].rank(), 2);
+        assert_eq!(c[1].rank(), 0);
+
+        let l = Link::from(&[[0,1,1,0]]);
+        let c = TngComplex::from(&l);
+        let c = c.as_generic(&0, &0);
+
+        assert_eq!(c[0].rank(), 0);
+        assert_eq!(c[1].rank(), 2);
+    }
+
+    #[test]
+    fn test_unknot_rm2() {
+        let l = Link::from(&[[1,4,2,1],[2,4,3,3]]);
+        let c = TngComplex::from(&l);
+        let c = c.as_generic(&0, &0);
+
+        assert_eq!(c[0].rank(), 0);
+        assert_eq!(c[1].rank(), 2);
+        assert_eq!(c[2].rank(), 0);
+    }
 }

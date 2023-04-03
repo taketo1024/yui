@@ -45,9 +45,9 @@ impl TngComp {
         l0 == r0 || l0 == r2 || l2 == r0 || l2 == r2
     }
 
-    pub fn connect(&self, other: &Self) -> Self { 
+    pub fn connect(&mut self, other: Self) { 
         use TngComp::Arc;
-        let Arc(l0, l1, l2) = self  else { panic!() };
+        let Arc(l0, l1, l2) = *self  else { panic!() };
         let Arc(r0, r1, r2) = other else { panic!() };
 
         let e1 = std::cmp::min(l1, r1);
@@ -64,12 +64,12 @@ impl TngComp {
             panic!()
         };
 
-        if e0 == e2 { 
-            TngComp::circ(*e1)
+        *self = if e0 == e2 { 
+            TngComp::circ(e1)
         } else if e0 < e2 { 
-            TngComp::Arc(*e0, *e1, *e2)
+            TngComp::Arc(e0, e1, e2)
         } else { 
-            TngComp::Arc(*e2, *e1, *e0)
+            TngComp::Arc(e2, e1, e0)
         }
     }
 }
@@ -98,11 +98,14 @@ impl Display for TngComp {
 impl From<LinkComp> for TngComp {
     fn from(c: LinkComp) -> Self {
         let e = c.min_edge();
-        if c.is_circle() { 
-            Self::Circ(e)
+        if let Some((l, r)) = c.ends() { 
+            if l == r { 
+                Self::Circ(e)
+            } else { 
+                Self::Arc(l, e, r)
+            } 
         } else { 
-            let (l, r) = c.ends().unwrap();
-            Self::Arc(l, e, r)
+            Self::Circ(e)
         }
     }
 }
@@ -119,8 +122,14 @@ impl Tng {
 
     pub fn res(x: &Crossing, r: Resolution) -> Self { 
         let (r0, r1) = x.res_arcs(r);
-        let (c0, c1) = (TngComp::from(r0), TngComp::from(r1));
-        Self::new(vec![c0, c1])
+        let (mut c0, c1) = (TngComp::from(r0), TngComp::from(r1));
+
+        if c0.is_connectable(&c1) { 
+            c0.connect(c1);
+            Self::from(c0)
+        } else { 
+            Self::new(vec![c0, c1])
+        }
     }
 
     pub fn empty() -> Self { 
@@ -189,15 +198,13 @@ impl Tng {
 
         // If one end of `arc` is connectable:
         if let Some(i) = self.find_connectable(&arc, n) { 
-            let mut c = self.comps[i].connect(&arc);
+            self.comps[i].connect(arc);
 
             // If the other end is also connectable to a different component:
-            if let Some(j) = self.find_connectable(&c, i) { 
+            if let Some(j) = self.find_connectable(&self.comps[i], i) { 
                 let arc_j = self.comps.remove(j);
-                c = c.connect(&arc_j);
+                self.comps[i].connect(arc_j);
             }
-
-            self.comps[i] = c;
         } else { 
             self.comps.push(arc);
         }
@@ -272,15 +279,15 @@ mod tests {
 
     #[test]
     fn connect_comp() { 
-        let c0 = TngComp::arc(0, 1);
+        let mut c0 = TngComp::arc(0, 1);
         let c1 = TngComp::arc(1, 2);
         let c2 = TngComp::arc(0, 2);
 
-        assert_eq!(c0.connect(&c1), TngComp::arc(0, 2));
-        assert_eq!(c1.connect(&c0), TngComp::arc(0, 2));
-        assert_eq!(c0.connect(&c2), TngComp::arc(1, 2));
-        assert_eq!(c2.connect(&c0), TngComp::arc(1, 2));
-        assert_eq!(c0.connect(&c1).connect(&c2), TngComp::circ(0));
+        c0.connect(c1);
+        assert_eq!(c0, TngComp::arc(0, 2));
+
+        c0.connect(c2);
+        assert_eq!(c0, TngComp::circ(0));
     }
 
     #[test]

@@ -8,7 +8,7 @@ use derive_more::Display;
 use itertools::Itertools;
 use yui_core::{Elem, Ring, RingOps};
 use yui_lin_comb::{FreeGen, OrdForDisplay};
-use yui_link::Edge;
+use yui_link::{Edge, Crossing, Resolution};
 use yui_polynomial::Mono2;
 use super::tng::{Tng, TngComp};
 
@@ -105,6 +105,14 @@ impl CobComp {
 
     pub fn sphere() -> Self { 
         Self::closed(0)
+    }
+
+    pub fn src(&self) -> &Tng { 
+        &self.src
+    }
+
+    pub fn tgt(&self) -> &Tng { 
+        &self.tgt
     }
 
     pub fn genus(&self) -> usize { 
@@ -335,6 +343,14 @@ impl CobComp {
     }
 }
 
+impl From<&Crossing> for CobComp {
+    fn from(x: &Crossing) -> Self {
+        let src = Tng::res(x, Resolution::Res0);
+        let tgt = Tng::res(x, Resolution::Res1);
+        Self::plain(src, tgt)
+    }
+}
+
 impl Display for CobComp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match (self.src.ncomps(), self.tgt.ncomps()) { 
@@ -431,17 +447,6 @@ impl Cob {
             CobComp::id(c)
         }).collect();
         Self::new(comps)
-    }
-
-    pub fn sdl(src: &Tng, tgt: &Tng) -> Self { 
-        assert_eq!(src.ncomps(), 2);
-        assert_eq!(tgt.ncomps(), 2);
-
-        let r0 = (src.comp(0).clone(), src.comp(1).clone());
-        let r1 = (tgt.comp(0).clone(), tgt.comp(1).clone());
-        let sdl = CobComp::sdl(r0, r1);
-
-        Self::from(sdl)
     }
 
     pub fn ncomps(&self) -> usize { 

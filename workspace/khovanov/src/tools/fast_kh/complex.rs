@@ -10,10 +10,10 @@ use yui_homology::GenericChainComplex;
 use yui_lin_comb::LinComb;
 use yui_matrix::sparse::{MatType, SpMat};
 use yui_matrix::dense::Mat;
-use yui_link::{Crossing, Resolution, State};
+use yui_link::{Crossing, Resolution, State, Link};
 
 use crate::KhAlgLabel;
-use super::cob::{Cob, Dot, Bottom};
+use super::cob::{Cob, Dot, Bottom, CobComp};
 use super::tng::{Tng, TngComp};
 
 #[derive(Clone)]
@@ -212,6 +212,17 @@ impl TngComplex {
     }
 }
 
+impl From<&Link> for TngComplex {
+    fn from(l: &Link) -> Self {
+        let mut c = TngComplex::new();
+        for x in l.data() {
+            c.append(x);
+            c.deloop(true);
+        }
+        c
+    }
+}
+
 struct TngComplexBuilder { 
     objs: Vec<Vec<Obj>>, // ⊕_i ⊕_s T[s]
     mats: Vec<Mat<Mor>>,
@@ -244,11 +255,10 @@ impl TngComplexBuilder {
         self.extend_objs();
         self.extend_mats();
 
-        let t0 = Tng::res(x, Resolution::Res0);
-        let t1 = Tng::res(x, Resolution::Res1);
-        
-        self.modif_objs(&t0, &t1);
-        self.modif_mats(&t0, &t1);
+        let c = CobComp::from(x);
+
+        self.modif_objs(&c);
+        self.modif_mats(&c);
     }
 
     fn init_updates(&mut self) { 
@@ -309,14 +319,14 @@ impl TngComplexBuilder {
         self.mats = mats;
     }
 
-    fn modif_objs(&mut self, t0: &Tng, t1: &Tng) { 
+    fn modif_objs(&mut self, c: &CobComp) { 
         let n = self.objs.len() - 1;
         for i in 0..n { 
             let r = self.ranks[i];
             let s = self.ranks[i+1];
             for j in 0..r { 
-                self.modif_obj(i,   j,   t0, Resolution::Res0); // C[i]#x0
-                self.modif_obj(i+1, s+j, t1, Resolution::Res1); // C[i]#x1
+                self.modif_obj(i,   j,   c.src(), Resolution::Res0); // C[i]#x0
+                self.modif_obj(i+1, s+j, c.tgt(), Resolution::Res1); // C[i]#x1
             }
         }
     }
@@ -327,27 +337,27 @@ impl TngComplexBuilder {
         v.tangle.connect(t.clone());
     }
 
-    fn modif_mats(&mut self, t0: &Tng, t1: &Tng) { 
+    fn modif_mats(&mut self, c: &CobComp) { 
         let n = self.mats.len() - 1;
         for i in 0..n { 
             let r = self.ranks[i];
             let s = self.ranks[i+1];
 
             // modify d0
-            let c0 = Cob::id(t0);
+            let c0 = Cob::id(c.src());
             for (j, k) in cartesian!(0..r, 0..s) { 
                 self.insert_cob(i, j, k, &c0);
             }
 
             // modify f
-            let sdl = Cob::sdl(t0, t1);
+            let f = Cob::from(c.clone());
             for j in 0..r { 
-                self.insert_cob(i, j, s+j, &sdl);
+                self.insert_cob(i, j, s+j, &f);
             }
 
             // modify d1
             if i > 0 { 
-                let c1 = Cob::id(t1);
+                let c1 = Cob::id(c.tgt());
                 let q = self.ranks[i-1];
                 for (j, k) in cartesian!(0..q, 0..r) { 
                     self.insert_cob(i, r+j, s+k, &c1);

@@ -119,7 +119,9 @@ pub struct Tng {
 
 impl Tng { 
     pub fn new(comps: Vec<TngComp>) -> Self { 
-        Self { comps }
+        let mut tng = Self { comps };
+        tng.comps.sort();
+        tng
     }
 
     pub fn res(x: &Crossing, r: Resolution) -> Self { 

@@ -288,31 +288,32 @@ impl CobComp {
     pub fn connect(&mut self, other: Self) { 
         debug_assert!(self.is_connectable(&other));
 
-        // χ(S∪S') = χ(S) + χ(S') - χ(S∩S'),
-        // χ(S) = 2 - 2g(S) - #∂S, 
+        // χ(S∪S') = χ(S) + χ(S') - χ(S∩S')
+        //         = 2 - 2g(S∪S') - #∂(S∪S'),
         // χ(S∩S') = #{ arcs in S∩S' }.
-        // → g(S∪S') = g(S) + g(S') + 1/2 #{ ∂S + ∂S' + A(S∩S') - ∂(S∪S') } - 1.
+        // 2g(S∪S') = 2 - (χ(S) + χ(S') + #∂(S∪S')) + #∂(S∩S').
 
-        let g1 = self.genus;
-        let g2 = other.genus;
-        let b1 = self.nbdr_comps();
-        let b2 = other.nbdr_comps();
+        let x1 = self.euler_num();
+        let x2 = other.euler_num();
 
-        let f = self.endpts().intersection(
+        let a = self.endpts().intersection(
             &other.endpts()
-        ).count();
+        ).count() as i32;
 
-        assert!(f > 0);
+        assert!(a > 0);
 
         let CobComp{ src, tgt, genus: _, dots } = other;
 
         self.src.connect(src);
         self.tgt.connect(tgt);
 
-        let b = self.nbdr_comps();
-        assert!((b1 + b2 + f - b) % 2 == 0);
+        let b = self.nbdr_comps() as i32;
+        let g = 2 - (x1 + x2 + b) + a;
+
+        assert!(g >= 0);
+        assert!(g % 2 == 0);
         
-        self.genus = g1 + g2 + (b1 + b2 + f - b)/2 - 1;
+        self.genus = (g / 2) as usize;
 
         self.dots.0 += dots.0;
         self.dots.1 += dots.1;
@@ -439,7 +440,9 @@ pub struct Cob {
 
 impl Cob {
     pub fn new(comps: Vec<CobComp>) -> Self { 
-        Self { comps }
+        let mut cob = Self { comps };
+        cob.sort_comps();
+        cob
     }
 
     pub fn empty() -> Self { 
@@ -460,6 +463,20 @@ impl Cob {
 
     pub fn comp(&self, i: usize) -> &CobComp { 
         &self.comps[i]
+    }
+
+    pub fn src(&self) -> Tng { 
+        self.comps.iter().fold(Tng::empty(), |mut t, c| {
+            t.connect(c.src.clone());
+            t
+        })
+    }
+
+    pub fn tgt(&self) -> Tng { 
+        self.comps.iter().fold(Tng::empty(), |mut t, c| {
+            t.connect(c.tgt.clone());
+            t
+        })
     }
 
     pub fn is_empty(&self) -> bool { 
@@ -508,6 +525,8 @@ impl Cob {
         if comp.is_removable() { 
             self.comps.remove(i);
         }
+
+        self.sort_comps()
     }
 
     fn find_comp(&mut self, b: Bottom, c: &TngComp) -> Option<(usize, &mut CobComp, usize)> { 
@@ -624,21 +643,11 @@ impl Cob {
         assert!(!bot.is_empty());
         assert!(!top.is_empty());
 
-        debug_assert!(
-            bot.iter().fold(0, |n, c| n + c.tgt.ncomps()) == 
-            top.iter().fold(0, |n, c| n + c.src.ncomps()) && 
-            bot.iter().all(|c| c.tgt.comps().iter().all(|a|
-                top.iter().any(|c| c.contains(Bottom::Src, &a))
-            ))
-        );
-
-        let g0: usize = bot.iter().map(|c| c.genus).sum();
-        let g1: usize = top.iter().map(|c| c.genus).sum();
-        let b0: usize = bot.iter().map(|c| c.nbdr_comps()).sum();
-        let b1: usize = top.iter().map(|c| c.nbdr_comps()).sum();
+        let x0: i32 = bot.iter().map(|c| c.euler_num()).sum();
+        let x1: i32 = top.iter().map(|c| c.euler_num()).sum();
         
-        let a : usize = bot.iter().map(|c| 
-            c.tgt.comps().iter().filter(|a| a.is_arc()).count()
+        let a : i32 = bot.iter().map(|c| 
+            c.tgt.comps().iter().filter(|a| a.is_arc()).count() as i32
         ).sum();
 
         let dots = bot.iter().chain(top.iter()).fold((0, 0), |mut res, c| { 
@@ -658,11 +667,13 @@ impl Cob {
         });
 
         let mut c = CobComp::new(src, tgt, 0, dots);
-        let b = c.nbdr_comps();
+        let b = c.nbdr_comps() as i32;
+        let g = 2 - (x0 + x1 + b) + a;
 
-        assert!((b0 + b1 + a - b) % 2 == 0);
-
-        c.genus = g0 + g1 + (b0 + b1 + a - b)/2 - 1;
+        assert!(g >= 0);
+        assert!(g % 2 == 0);
+        
+        c.genus = (g / 2) as usize;
 
         c
     }
@@ -850,8 +861,8 @@ mod tests {
                 TngComp::circ(10),
             ]),
             Tng::new(vec![
-                TngComp::circ(1),
                 TngComp::arc(2,4),
+                TngComp::circ(1),
                 TngComp::circ(11),
             ])
         ));
@@ -1044,6 +1055,26 @@ mod tests {
             CobComp::sphere(),
             CobComp::id(TngComp::arc(0, 1)),
         ]));
+    }
+
+    #[test]
+    fn stack_id() {
+        let c1 = Cob::new(vec![
+            CobComp::from(&Crossing::new(yui_link::CrossingType::Xn, [0,1,2,3])),
+            CobComp::cup(TngComp::circ(4)),
+            CobComp::cap(TngComp::circ(5)),
+        ]);
+        let c0 = Cob::id(&c1.src());
+        let c2 = Cob::id(&c1.tgt());
+
+        let mut e = c1.clone();
+        e.stack(c2);
+
+        assert_eq!(e, c1);
+
+        let mut e = c0.clone();
+        e.stack(c1.clone());
+        assert_eq!(e, c1);
     }
    
     #[test]

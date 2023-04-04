@@ -189,6 +189,7 @@ impl Tng {
                 self.append_arc(c);
             }
         }
+        self.comps.sort()
     }
 
     pub fn append_arc(&mut self, arc: TngComp) { 

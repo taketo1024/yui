@@ -520,6 +520,7 @@ impl TngComplexBuilder {
 mod tests { 
     use yui_link::*;
     use yui_homology::*;
+    use yui_homology::test::ChainComplexValidation;
     use super::*;
 
     #[test]
@@ -759,5 +760,55 @@ mod tests {
         assert_eq!(c[0].rank(), 0);
         assert_eq!(c[1].rank(), 2);
         assert_eq!(c[2].rank(), 0);
+    }
+
+    #[test]
+    fn test_unlink_2() {
+        let pd_code = [[1,2,3,4], [3,2,1,4]];
+        let l = Link::from(&pd_code);
+        let c = TngComplex::from(&l);
+        let c = c.as_generic(&0, &0);
+
+        assert_eq!(c[0].rank(), 0);
+        assert_eq!(c[1].rank(), 4);
+        assert_eq!(c[2].rank(), 0);
+    }
+
+    #[test]
+    fn test_hopf_link() {
+        let l = Link::hopf_link();
+        let c = TngComplex::from(&l);
+        let c = c.as_generic(&0, &0);
+
+        assert_eq!(c[0].rank(), 2);
+        assert_eq!(c[1].rank(), 0);
+        assert_eq!(c[2].rank(), 2);
+    }
+
+    #[test]
+    fn test_8_19() {
+        let l = Link::from(&[[4,2,5,1],[8,4,9,3],[9,15,10,14],[5,13,6,12],[13,7,14,6],[11,1,12,16],[15,11,16,10],[2,8,3,7]]);
+        let c = TngComplex::from(&l);
+        let c = c.as_generic(&0, &0);
+
+        c.check_d_all();
+
+        let h = c.homology();
+
+        for i in [1,6,7,8] {
+            assert_eq!(h[i].rank(), 0);
+            assert_eq!(h[i].is_free(), true);
+        }
+
+        for i in [0,4,5] {
+            assert_eq!(h[i].rank(), 2);
+            assert_eq!(h[i].is_free(), true);
+        }
+
+        assert_eq!(h[2].rank(), 1);
+        assert_eq!(h[2].is_free(), true);
+
+        assert_eq!(h[3].rank(), 1);
+        assert_eq!(h[3].tors(), &vec![2]);
     }
 }

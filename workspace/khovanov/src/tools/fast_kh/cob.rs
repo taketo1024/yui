@@ -291,13 +291,18 @@ impl CobComp {
         // χ(S∪S') = χ(S) + χ(S') - χ(S∩S'),
         // χ(S) = 2 - 2g(S) - #∂S, 
         // χ(S∩S') = #{ arcs in S∩S' }.
-        // → g(S∪S') = g(S) + g(S') + 1/2 #{ ∂S + ∂S' - ∂(S∪S') + A(S∩S') } - 1.
+        // → g(S∪S') = g(S) + g(S') + 1/2 #{ ∂S + ∂S' + A(S∩S') - ∂(S∪S') } - 1.
 
         let g1 = self.genus;
         let g2 = other.genus;
         let b1 = self.nbdr_comps();
         let b2 = other.nbdr_comps();
-        let f = self.endpts().intersection(&other.endpts()).count();
+
+        let f = self.endpts().intersection(
+            &other.endpts()
+        ).count();
+
+        assert!(f > 0);
 
         let CobComp{ src, tgt, genus: _, dots } = other;
 
@@ -537,8 +542,16 @@ impl Cob {
         self.comps.push(c);
     }
 
+    pub fn is_stackable(&self, other: &Self) -> bool { 
+        self.comps.iter().fold(0, |n, c| n + c.tgt.ncomps()) == 
+        other.comps.iter().fold(0, |n, c| n + c.src.ncomps()) && 
+        self.comps.iter().all(|c| c.tgt.comps().iter().all(|a|
+            other.comps.iter().any(|c| c.contains(Bottom::Src, &a))
+        ))
+    }
+
     pub fn stack(&mut self, other: Cob) { // vertical composition
-        // TODO assert `self.tgt == other.src`.
+        debug_assert!(self.is_stackable(&other));
 
         if self.is_empty() { 
             *self = other;
@@ -611,13 +624,22 @@ impl Cob {
         assert!(!bot.is_empty());
         assert!(!top.is_empty());
 
-        // assert `bot.tgt == top.src`.
+        debug_assert!(
+            bot.iter().fold(0, |n, c| n + c.tgt.ncomps()) == 
+            top.iter().fold(0, |n, c| n + c.src.ncomps()) && 
+            bot.iter().all(|c| c.tgt.comps().iter().all(|a|
+                top.iter().any(|c| c.contains(Bottom::Src, &a))
+            ))
+        );
 
         let g0: usize = bot.iter().map(|c| c.genus).sum();
         let g1: usize = top.iter().map(|c| c.genus).sum();
         let b0: usize = bot.iter().map(|c| c.nbdr_comps()).sum();
         let b1: usize = top.iter().map(|c| c.nbdr_comps()).sum();
-        let a : usize = bot.iter().map(|c| c.tgt.comps().iter().filter(|a| a.is_arc()).count()).sum();
+        
+        let a : usize = bot.iter().map(|c| 
+            c.tgt.comps().iter().filter(|a| a.is_arc()).count()
+        ).sum();
 
         let dots = bot.iter().chain(top.iter()).fold((0, 0), |mut res, c| { 
             res.0 += c.dots.0;

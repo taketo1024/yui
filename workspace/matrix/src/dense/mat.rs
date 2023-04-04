@@ -188,7 +188,7 @@ where R: AddGrp, for<'x> &'x R: AddGrpOps<R> {
 
 #[auto_ops]
 impl<'a, 'b, R> Mul<&'b Mat<R>> for &'a Mat<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
+where R: AddGrp, for<'x> &'x R: AddGrpOps<R> + Mul<Output = R> {
     type Output = Mat<R>;
 
     fn mul(self, rhs: &'b Mat<R>) -> Self::Output {

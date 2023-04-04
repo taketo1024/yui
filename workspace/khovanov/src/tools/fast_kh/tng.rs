@@ -101,9 +101,11 @@ impl From<LinkComp> for TngComp {
         if let Some((l, r)) = c.ends() { 
             if l == r { 
                 Self::Circ(e)
-            } else { 
+            } else if l < r { 
                 Self::Arc(l, e, r)
-            } 
+            } else { 
+                Self::Arc(r, e, l)
+            }
         } else { 
             Self::Circ(e)
         }

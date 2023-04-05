@@ -175,7 +175,7 @@ impl TngComplex {
         )
     }
 
-    pub fn as_generic<'a, R>(&'a self, h: &R, t: &R) -> GenericChainComplex<R, RangeInclusive<isize>> 
+    pub fn as_generic<R>(&self, h: R, t: R) -> GenericChainComplex<R, RangeInclusive<isize>> 
     where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> {
         assert!(self.is_completely_delooped());
 
@@ -185,7 +185,7 @@ impl TngComplex {
             SpMat::generate(d.shape(), |set| { 
                 for (i, j, c) in d.iter() { 
                     if c.is_zero() { continue }
-                    let a = c.eval(h, t);
+                    let a = c.eval(&h, &t);
                     set(i, j, a)
                 }
             })
@@ -685,7 +685,7 @@ mod tests {
         assert_eq!(c.rank(2), 6);
         assert_eq!(c.rank(3), 4);
 
-        let c = c.as_generic(&0, &0);
+        let c = c.as_generic(0, 0);
         let h = c.homology(); // TODO should shift degree
 
         assert_eq!(h[0].rank(), 1);
@@ -718,7 +718,7 @@ mod tests {
         assert_eq!(c.rank(2), 0);
         assert_eq!(c.rank(3), 2);
 
-        let c = c.as_generic(&0, &0);
+        let c = c.as_generic(0, 0);
         let h = c.homology(); // TODO should shift degree
 
         assert_eq!(h[0].rank(), 1);
@@ -738,14 +738,14 @@ mod tests {
     fn test_unknot_rm1() {
         let l = Link::from(&[[0,0,1,1]]);
         let c = TngComplex::from(&l);
-        let c = c.as_generic(&0, &0);
+        let c = c.as_generic(0, 0);
 
         assert_eq!(c[0].rank(), 2);
         assert_eq!(c[1].rank(), 0);
 
         let l = Link::from(&[[0,1,1,0]]);
         let c = TngComplex::from(&l);
-        let c = c.as_generic(&0, &0);
+        let c = c.as_generic(0, 0);
 
         assert_eq!(c[0].rank(), 0);
         assert_eq!(c[1].rank(), 2);
@@ -755,7 +755,7 @@ mod tests {
     fn test_unknot_rm2() {
         let l = Link::from(&[[1,4,2,1],[2,4,3,3]]);
         let c = TngComplex::from(&l);
-        let c = c.as_generic(&0, &0);
+        let c = c.as_generic(0, 0);
 
         assert_eq!(c[0].rank(), 0);
         assert_eq!(c[1].rank(), 2);
@@ -767,7 +767,7 @@ mod tests {
         let pd_code = [[1,2,3,4], [3,2,1,4]];
         let l = Link::from(&pd_code);
         let c = TngComplex::from(&l);
-        let c = c.as_generic(&0, &0);
+        let c = c.as_generic(0, 0);
 
         assert_eq!(c[0].rank(), 0);
         assert_eq!(c[1].rank(), 4);
@@ -778,7 +778,7 @@ mod tests {
     fn test_hopf_link() {
         let l = Link::hopf_link();
         let c = TngComplex::from(&l);
-        let c = c.as_generic(&0, &0);
+        let c = c.as_generic(0, 0);
 
         assert_eq!(c[0].rank(), 2);
         assert_eq!(c[1].rank(), 0);
@@ -789,7 +789,7 @@ mod tests {
     fn test_8_19() {
         let l = Link::from(&[[4,2,5,1],[8,4,9,3],[9,15,10,14],[5,13,6,12],[13,7,14,6],[11,1,12,16],[15,11,16,10],[2,8,3,7]]);
         let c = TngComplex::from(&l);
-        let c = c.as_generic(&0, &0);
+        let c = c.as_generic(0, 0);
 
         c.check_d_all();
 

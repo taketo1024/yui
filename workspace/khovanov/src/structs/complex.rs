@@ -24,7 +24,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(link: Link, h: R, t: R, reduced: bool) -> Self { 
         let cube = KhCube::new_ht(&link, h, t);
 
-        let i0 = Self::calc_deg_shift(&link, reduced).0;
+        let i0 = Self::deg_shift_for(&link, reduced).0;
         let range = cube.h_range().shift(i0);
 
         let grid = GenericRModGrid::new(range, |i| {
@@ -67,7 +67,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn deg_shift(&self) -> (isize, isize) { 
-        Self::calc_deg_shift(&self.link, self.reduced)
+        Self::deg_shift_for(&self.link, self.reduced)
     }
 
     pub fn is_reduced(&self) -> bool { 
@@ -83,7 +83,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         z.apply(|x| self.differentiate_x(x))
     }
 
-    fn calc_deg_shift(l: &Link, reduced: bool) -> (isize, isize) {
+    pub fn deg_shift_for(l: &Link, reduced: bool) -> (isize, isize) {
         let (n_pos, n_neg) = l.signed_crossing_nums();
         let (n_pos, n_neg) = (n_pos as isize, n_neg as isize);
         let h = -n_neg;
@@ -148,7 +148,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         use grouping_by::GroupingBy;
 
         let cube = KhCube::new(&l);
-        let (i0, j0) = KhComplex::calc_deg_shift(&l, reduced);
+        let (i0, j0) = KhComplex::deg_shift_for(&l, reduced);
         let h_range = cube.h_range().shift(i0);
         let q_range = cube.q_range().shift(j0);
         

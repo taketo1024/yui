@@ -4,7 +4,7 @@ use itertools::join;
 use auto_impl_ops::auto_ops;
 use yui_core::Elem;
 use yui_lin_comb::{FreeGen, LinComb};
-use yui_link::State;
+use yui_link::{State, Resolution};
 use yui_utils::subscript;
 
 use crate::KhAlgLabel;
@@ -18,6 +18,10 @@ pub struct KhGen {
 impl KhGen {
     pub fn new(state: State, label: Vec<KhAlgLabel>) -> KhGen { 
         KhGen { state, label }
+    }
+
+    pub fn init() -> Self { 
+        Self::new(State::empty(), vec![])
     }
 
     pub fn state(&self) -> &State {
@@ -39,6 +43,14 @@ impl KhGen {
         q + r + s
     }
 
+    pub fn append_state(&mut self, r: Resolution) { 
+        self.state.append_b(r)
+    }
+    
+    pub fn append_label(&mut self, x: KhAlgLabel) { 
+        self.label.push(x)
+    }
+    
     pub fn append(&mut self, other: KhGen) { 
         let KhGen { state, mut label } = other;
         self.state.append(state);

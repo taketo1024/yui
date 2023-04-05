@@ -12,7 +12,7 @@ use yui_matrix::sparse::{MatType, SpMat};
 use yui_matrix::dense::Mat;
 use yui_link::{Crossing, Resolution, State, Link};
 
-use crate::KhAlgLabel;
+use crate::{KhAlgLabel, KhComplex};
 use super::cob::{Cob, Dot, Bottom, CobComp};
 use super::tng::{Tng, TngComp};
 
@@ -110,14 +110,15 @@ impl MorTrait for Mor {
 }
 pub struct TngComplex {
     objs: Vec<Vec<Obj>>, // ⊕_i ⊕_s T[s]
-    mats: Vec<Mat<Mor>>
+    mats: Vec<Mat<Mor>>,
+    deg_shift: (isize, isize)
 }
 
 impl TngComplex {
-    pub fn new() -> Self { 
+    pub fn new(deg_shift: (isize, isize)) -> Self { 
         let objs = vec![vec![Obj::empty()]];
         let mats = vec![Mat::zero((0, 1))];
-        TngComplex{ objs, mats }
+        TngComplex{ objs, mats, deg_shift }
     }
 
     pub fn len(&self) -> usize { 
@@ -180,7 +181,9 @@ impl TngComplex {
         assert!(self.is_completely_delooped());
 
         let n = self.len();
-        GenericChainComplex::ascending((0..n-1).map( |i| {
+        let i0 = self.deg_shift.0;
+
+        GenericChainComplex::ascending_from(i0, (0..n-1).map( |i| {
             let d = self.mat(i);
             SpMat::generate(d.shape(), |set| { 
                 for (i, j, c) in d.iter() { 
@@ -214,7 +217,8 @@ impl TngComplex {
 
 impl From<&Link> for TngComplex {
     fn from(l: &Link) -> Self {
-        let mut c = TngComplex::new();
+        let deg_shift = KhComplex::<i64>::deg_shift_for(l, false);
+        let mut c = TngComplex::new(deg_shift);
         for x in l.data() {
             c.append(x);
             c.deloop(true);
@@ -541,7 +545,7 @@ mod tests {
 
     #[test]
     fn empty() { 
-        let c = TngComplex::new();
+        let c = TngComplex::new((0, 0));
 
         assert_eq!(c.len(), 1);
         assert_eq!(c.rank(0), 1);
@@ -549,7 +553,7 @@ mod tests {
 
     #[test]
     fn single_x() { 
-        let mut c = TngComplex::new();
+        let mut c = TngComplex::new((0, 0));
         let x = Crossing::new(CrossingType::Xn, [0,1,2,3]);
         c.append(&x);
 
@@ -568,7 +572,7 @@ mod tests {
 
     #[test]
     fn two_x_disj() { 
-        let mut c = TngComplex::new();
+        let mut c = TngComplex::new((0, 0));
         let x0 = Crossing::new(CrossingType::Xn, [0,1,2,3]);
         let x1 = Crossing::new(CrossingType::Xn, [4,5,6,7]);
 
@@ -586,7 +590,7 @@ mod tests {
 
     #[test]
     fn two_x() { 
-        let mut c = TngComplex::new();
+        let mut c = TngComplex::new((0, 0));
         let x0 = Crossing::new(CrossingType::Xn, [0,4,1,5]);
         let x1 = Crossing::new(CrossingType::Xn, [3,1,4,2]);
 
@@ -606,7 +610,7 @@ mod tests {
 
     #[test]
     fn deloop_one() { 
-        let mut c = TngComplex::new();
+        let mut c = TngComplex::new((0, 0));
         let x0 = Crossing::new(CrossingType::Xp, [1,4,2,5]);
         let x1 = Crossing::new(CrossingType::Xn, [3,6,4,1]);
 
@@ -639,7 +643,7 @@ mod tests {
 
     #[test]
     fn trefoil_no_deloop() { 
-        let mut c = TngComplex::new();
+        let mut c = TngComplex::new((0, 0));
         let l = Link::trefoil();
 
         for x in l.data() {
@@ -670,7 +674,7 @@ mod tests {
 
     #[test]
     fn trefoil_deloop() { 
-        let mut c = TngComplex::new();
+        let mut c = TngComplex::new((0, 0));
         let l = Link::trefoil();
 
         for x in l.data() {
@@ -703,7 +707,7 @@ mod tests {
 
     #[test]
     fn trefoil_deloop_simplify() { 
-        let mut c = TngComplex::new();
+        let mut c = TngComplex::new((0, 0));
         let l = Link::trefoil();
 
         for x in l.data() {
@@ -747,8 +751,8 @@ mod tests {
         let c = TngComplex::from(&l);
         let c = c.as_generic(0, 0);
 
-        assert_eq!(c[0].rank(), 0);
-        assert_eq!(c[1].rank(), 2);
+        assert_eq!(c[-1].rank(), 0);
+        assert_eq!(c[0].rank(), 2);
     }
 
     #[test]
@@ -757,9 +761,9 @@ mod tests {
         let c = TngComplex::from(&l);
         let c = c.as_generic(0, 0);
 
-        assert_eq!(c[0].rank(), 0);
-        assert_eq!(c[1].rank(), 2);
-        assert_eq!(c[2].rank(), 0);
+        assert_eq!(c[-1].rank(), 0);
+        assert_eq!(c[0].rank(), 2);
+        assert_eq!(c[1].rank(), 0);
     }
 
     #[test]
@@ -769,9 +773,9 @@ mod tests {
         let c = TngComplex::from(&l);
         let c = c.as_generic(0, 0);
 
-        assert_eq!(c[0].rank(), 0);
-        assert_eq!(c[1].rank(), 4);
-        assert_eq!(c[2].rank(), 0);
+        assert_eq!(c[-1].rank(), 0);
+        assert_eq!(c[0].rank(), 4);
+        assert_eq!(c[1].rank(), 0);
     }
 
     #[test]
@@ -780,9 +784,9 @@ mod tests {
         let c = TngComplex::from(&l);
         let c = c.as_generic(0, 0);
 
+        assert_eq!(c[-2].rank(), 2);
+        assert_eq!(c[-1].rank(), 0);
         assert_eq!(c[0].rank(), 2);
-        assert_eq!(c[1].rank(), 0);
-        assert_eq!(c[2].rank(), 2);
     }
 
     #[test]

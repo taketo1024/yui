@@ -1,70 +1,25 @@
-// #![allow(unused)] // TODO remove 
-
-use std::fmt::Display;
+use std::collections::{HashMap, HashSet};
 use std::ops::RangeInclusive;
 
+use itertools::Itertools;
 use num_traits::Zero;
 use cartesian::cartesian;
 use yui_core::{Ring, RingOps};
-use yui_homology::GenericChainComplex;
+use yui_homology::{GenericChainComplex, FreeRModStr};
 use yui_lin_comb::LinComb;
-use yui_matrix::sparse::{MatType, SpMat};
-use yui_matrix::dense::Mat;
-use yui_link::{Crossing, Resolution, State, Link};
+use yui_link::{Crossing, Resolution, Link};
 
-use crate::{KhAlgLabel, KhComplex};
+use crate::{KhAlgLabel, KhComplex, KhGen};
 use super::cob::{Cob, Dot, Bottom, CobComp};
 use super::tng::{Tng, TngComp};
-
-#[derive(Clone)]
-pub struct Obj { 
-    state: State, 
-    label: Vec<KhAlgLabel>,
-    tangle: Tng,
-}
-
-impl Obj { 
-    fn new(state: State, label: Vec<KhAlgLabel>, tangle: Tng) -> Self { 
-        Self { state, label, tangle }
-    }
-
-    fn empty() -> Self { 
-        Self::new(State::empty(), vec![], Tng::empty())
-    }
-
-    fn append_bit(&mut self, r: Resolution) { 
-        self.state.append_b(r)
-    }
-
-    fn append_label(&mut self, x: KhAlgLabel) { 
-        self.label.push(x)
-    }
-
-    fn append_arc(&mut self, a: TngComp) {
-        self.tangle.append_arc(a)
-    }
-
-    fn find_loop(&self) -> Option<usize> { 
-        self.tangle.find_loop()
-    }
-
-    fn deloop(&mut self, i: usize) -> TngComp {
-        assert!(self.tangle.comp(i).is_circle());
-        self.tangle.remove_at(i)
-    }
-}
-
-impl Display for Obj {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{{{}; {:?}; {}}}", self.state, self.label, self.tangle)
-    }
-}
 
 type Mor = LinComb<Cob, i32>; // Z-linear combination of cobordisms.
 
 trait MorTrait: Sized {
     fn is_invertible(&self) -> bool;
     fn inv(&self) -> Option<Self>;
+    fn connect(self, c: &Cob) -> Self;
+    fn connect_comp(self, c: &CobComp) -> Self;
     fn cap_off(self, b: Bottom, c: &TngComp, dot: Dot) -> Self;
     fn eval<R>(&self, h: &R, t: &R) -> R
     where R: Ring + From<i32>, for<'x> &'x R: RingOps<R>;
@@ -89,6 +44,20 @@ impl MorTrait for Mor {
         }
     }
 
+    fn connect(self, c: &Cob) -> Self {
+        self.into_map_gens(|mut cob| { 
+            cob.connect(c.clone());
+            cob
+        })
+    }
+
+    fn connect_comp(self, c: &CobComp) -> Self {
+        self.into_map_gens(|mut cob| { 
+            cob.connect_comp(c.clone());
+            cob
+        })
+    }
+
     fn cap_off(self, b: Bottom, c: &TngComp, dot: Dot) -> Self {
         self.into_map(|mut cob, r| { 
             cob.cap_off(b, c, dot);
@@ -108,139 +77,55 @@ impl MorTrait for Mor {
         }).sum()
     }
 }
+
+#[derive(Clone)]
+pub struct TngVertex { 
+    tng: Tng,
+    in_edges: HashSet<KhGen>,
+    out_edges: HashMap<KhGen, Mor>
+}
+
+impl TngVertex { 
+    pub fn init() -> Self { 
+        let tng = Tng::empty();
+        let in_edges = HashSet::new();
+        let out_edges = HashMap::new();
+        Self { tng, in_edges, out_edges }
+    }
+}
+
 pub struct TngComplex {
-    objs: Vec<Vec<Obj>>, // ⊕_i ⊕_s T[s]
-    mats: Vec<Mat<Mor>>,
+    vertices: HashMap<KhGen, TngVertex>,
+    len: usize,
     deg_shift: (isize, isize)
 }
 
 impl TngComplex {
     pub fn new(deg_shift: (isize, isize)) -> Self { 
-        let objs = vec![vec![Obj::empty()]];
-        let mats = vec![Mat::zero((0, 1))];
-        TngComplex{ objs, mats, deg_shift }
+        let mut vertices = HashMap::new();
+        let k0 = KhGen::init();
+        let v0 = TngVertex::init();
+        vertices.insert(k0, v0);
+
+        let len = 1;
+
+        TngComplex{ vertices, len, deg_shift }
     }
 
     pub fn len(&self) -> usize { 
-        self.objs.len()
+        self.len
     }
 
-    pub fn rank(&self, i: usize) -> usize { 
-        if i < self.objs.len() { 
-            self.objs[i].len()
-        } else { 
-            0
-        }
-    }
-
-    pub fn obj(&self, i: usize, j: usize) -> &Obj { 
-        &self.objs[i][j]
-    }
-
-    pub fn tng(&self, i: usize, j: usize) -> &Tng { 
-        &self.objs[i][j].tangle
-    }
-
-    pub fn mat(&self, i: usize) -> &Mat<Mor> { 
-        &self.mats[i]
-    }
-
-    pub fn append(&mut self, x: &Crossing) {
-        self.modify(|b| b.append(x));
-    }
-
-    pub fn deloop(&mut self, simplify: bool) { 
-        self.modify(|b| b.deloop(simplify));
-    }
-
-    pub fn simplify(&mut self) { 
-        self.modify(|b| b.simplify());
-    }
-
-    fn modify<F>(&mut self, f: F)
-    where F: Fn(&mut TngComplexBuilder) { 
-        let objs = std::mem::take(&mut self.objs);
-        let mats = std::mem::take(&mut self.mats);
-
-        let mut builder = TngComplexBuilder::new(objs, mats);
-        f(&mut builder);
-
-        (self.objs, self.mats) = builder.result();
-    }
-
-    pub fn is_completely_delooped(&self) -> bool { 
-        self.objs.iter().all(|c|
-            c.iter().all(|v|
-                v.tangle.is_empty()
-            )
-        )
-    }
-
-    pub fn as_generic<R>(&self, h: R, t: R) -> GenericChainComplex<R, RangeInclusive<isize>> 
-    where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> {
-        assert!(self.is_completely_delooped());
-
-        let n = self.len();
+    pub fn rank(&self, i: isize) -> usize { 
         let i0 = self.deg_shift.0;
-
-        GenericChainComplex::ascending_from(i0, (0..n-1).map( |i| {
-            let d = self.mat(i);
-            SpMat::generate(d.shape(), |set| { 
-                for (i, j, c) in d.iter() { 
-                    if c.is_zero() { continue }
-                    let a = c.eval(&h, &t);
-                    set(i, j, a)
-                }
-            })
-        }).collect())
+        self.vertices.keys().filter(|k| {
+            let w = k.state().weight() as isize;
+            w == i - i0
+        }).count()
     }
 
-    pub fn describe(&self) { 
-        let mut str = "".to_string();
-        let n = self.len();
-        for i in 0..n { 
-            let ci = &self.objs[i];
-            str += &format!("C[{i}]:\n");
-            for (j, v) in ci.iter().enumerate() { 
-                str += &format!(" - [{j}]: {v}\n");
-            }
-            str += "\n";
-        }
-        str += "\n";
-        for i in 0..n-1 { 
-            let di = &self.mats[i];
-            str += &format!("d[{i}]:\n{}\n\n", di);
-        }
-        println!("{str}");
-    }
-}
-
-impl From<&Link> for TngComplex {
-    fn from(l: &Link) -> Self {
-        let deg_shift = KhComplex::<i64>::deg_shift_for(l, false);
-        let mut c = TngComplex::new(deg_shift);
-        for x in l.data() {
-            c.append(x);
-            c.deloop(true);
-        }
-        c
-    }
-}
-
-struct TngComplexBuilder { 
-    objs: Vec<Vec<Obj>>, // ⊕_i ⊕_s T[s]
-    mats: Vec<Mat<Mor>>,
-    ranks: Vec<usize>
-}
-
-impl TngComplexBuilder { 
-    fn new(objs: Vec<Vec<Obj>>, mats: Vec<Mat<Mor>>) -> Self { 
-        let ranks = vec![];
-        Self { objs, mats, ranks }
-    }
-
-    fn result(self) -> (Vec<Vec<Obj>>, Vec<Mat<Mor>>) { 
-        (self.objs, self.mats)
+    pub fn vertex(&self, v: &KhGen) -> &TngVertex { 
+        &self.vertices[v]
     }
 
     //                          d0
@@ -254,269 +139,335 @@ impl TngComplexBuilder {
     //     d' = [d0    ]
     //          [f  -d1]
 
-    fn append(&mut self, x: &Crossing) {
-        self.init_updates();
-        self.extend_objs();
-        self.extend_mats();
+    pub fn append(&mut self, x: &Crossing) {
+        let sdl = CobComp::from(x);
 
-        let c = CobComp::from(x);
+        let c0 = std::mem::take(&mut self.vertices);
+        let c1 = c0.clone();
 
-        self.modif_objs(&c);
-        self.modif_mats(&c);
+        let c0 = Self::modify_vertices(c0, &sdl, sdl.src(), Resolution::Res0);
+        let c1 = Self::modify_vertices(c1, &sdl, sdl.tgt(), Resolution::Res1);
+
+        self.vertices.extend(c0);
+        self.vertices.extend(c1);
+        self.len += 1;
     }
 
-    fn init_updates(&mut self) { 
-        self.ranks.clear();
+    fn modify_vertices(vertices: HashMap<KhGen, TngVertex>, sdl: &CobComp, t: &Tng, r: Resolution) -> HashMap<KhGen, TngVertex> {
+        let c = Cob::id(t); // t × I
 
-        let n = self.objs.len();
-
-        for i in 0 .. n { 
-            let r = self.objs[i].len();
-            self.ranks.push(r);
-        }
-        self.ranks.push(0);
-    }
-
-    fn extend_objs(&mut self) {
-        let n = self.objs.len();
-        let mut clone = self.objs.clone();
-
-        // duplicate objs with deg-shift.
-        self.objs.push(vec![]);
-
-        for i in 0..n { 
-            self.objs[i+1].append(&mut clone[i]);
-        }
-    }
-
-    fn extend_mats(&mut self) { 
-        let n = self.mats.len();
-        let mut mats = vec![];
-
-        for i in 0..n { 
-            let r = self.ranks[i];
-
-            let d0 = &self.mats[i];
-            let d1 = if i > 0 {  
-                -&self.mats[i-1]
-            } else { 
-                Mat::zero((r, 0))
-            };
-
-            let f = Mat::diag((r, r), (0..r).map(|j| {
-                let v = &self.objs[i][j];
-                let f = Cob::id(&v.tangle);
-                Mor::from(f)
-            }));
-            let o = Mat::zero((d0.rows(), d1.cols()));
-            let d = Mat::combine_blocks([
-                &d0, &o, 
-                &f,  &d1
-            ]);
-
-            mats.push(d)
-        }
-
-        let d_n = Mat::zero((0, self.mats[n-1].cols()));
-        mats.push(d_n);
-
-        self.mats = mats;
-    }
-
-    fn modif_objs(&mut self, c: &CobComp) { 
-        let n = self.objs.len() - 1;
-        for i in 0..n { 
-            let r = self.ranks[i];
-            let s = self.ranks[i+1];
-            for j in 0..r { 
-                self.modif_obj(i,   j,   c.src(), Resolution::Res0); // C[i]#x0
-                self.modif_obj(i+1, s+j, c.tgt(), Resolution::Res1); // C[i]#x1
-            }
-        }
-    }
-
-    fn modif_obj(&mut self, i: usize, j: usize, t: &Tng, r: Resolution) {
-        let v = &mut self.objs[i][j];
-        v.append_bit(r);
-        v.tangle.connect(t.clone());
-    }
-
-    fn modif_mats(&mut self, c: &CobComp) { 
-        let n = self.mats.len() - 1;
-        for i in 0..n { 
-            let r = self.ranks[i];
-            let s = self.ranks[i+1];
-
-            // modify d0
-            let c0 = Cob::id(c.src());
-            for (j, k) in cartesian!(0..r, 0..s) { 
-                self.insert_cob(i, j, k, &c0);
-            }
-
-            // modify f
-            let f = Cob::from(c.clone());
-            for j in 0..r { 
-                self.insert_cob(i, j, s+j, &f);
-            }
-
-            // modify d1
-            if i > 0 { 
-                let c1 = Cob::id(c.tgt());
-                let q = self.ranks[i-1];
-                for (j, k) in cartesian!(0..q, 0..r) { 
-                    self.insert_cob(i, r+j, s+k, &c1);
-                }
-            }
-        }
-    }
-
-    fn insert_cob(&mut self, i: usize, j: usize, k: usize, c: &Cob) { 
-        let a = &self.mats[i][[k, j]]; // c[i][j] -> c[i+1][k]
-        if a.is_zero() { 
-            return
-        }
-
-        let a = std::mem::take(&mut self.mats[i][[k, j]]);
-        let a = a.into_map_gens(|mut cob| { 
-            cob.connect(c.clone());
-            cob
-        });
-
-        self.mats[i][[k, j]] = a;
-    }
-
-    fn deloop(&mut self, simplify: bool) { 
-        for i in 0..self.objs.len() {
-            let mut j = 0;
-            while j < self.objs[i].len() { // number of objects changes by `deloop`.
-                if let Some(r) = self.objs[i][j].find_loop() { 
-                    self.deloop_at(i, j, r, simplify);
+        vertices.into_iter().map(|(mut k, mut v)| { 
+            let in_edges  = std::mem::take(&mut v.in_edges);
+            v.in_edges = in_edges.into_iter().map(|mut k| {
+                k.append_state(r);
+                k
+            }).collect();
+    
+            let out_edges = std::mem::take(&mut v.out_edges);
+            v.out_edges = out_edges.into_iter().map(|(mut k, mut v)| { 
+                k.append_state(r);
+                v = v.connect(&c);
+                
+                if r == Resolution::Res0 { 
+                    (k, v)
                 } else { 
-                    j += 1;
+                    (k, -v)
+                }
+            }).collect();
+
+            if r == Resolution::Res0 { 
+                let mut k1 = k.clone();
+                k1.append_state(Resolution::Res1);
+
+                let mut f = Cob::id(&v.tng);
+                f.connect_comp(sdl.clone());
+                v.out_edges.insert(k1.clone(), Mor::from(f));
+
+            } else { 
+                let mut k0 = k.clone();
+                k0.append_state(Resolution::Res0);
+                v.in_edges.insert(k0);
+            }
+    
+            k.append_state(r);
+            v.tng.connect(t.clone());
+
+            (k, v)
+        }).collect()
+    }
+
+    pub fn deloop(&mut self, simplify: bool) { 
+        // TODO improve 
+        'outer: loop { 
+            for (k, v) in self.vertices.iter() { 
+                if let Some(r) = v.tng.find_loop() { 
+                    let k = k.clone();
+                    let (k0, k1) = self.deloop_at(&k, r);
+
+                    if simplify { 
+                        self.simplify_on_deloop(&k0);
+                        self.simplify_on_deloop(&k1);
+                    }
+
+                    continue 'outer;
                 }
             }
+            break
         }
     }
 
-    fn deloop_at(&mut self, i: usize, j: usize, r: usize, simplify: bool) { 
-        let ci = &mut self.objs[i];
-        let v0 = &mut ci[j];
-
-        let c = v0.deloop(r);
+    fn deloop_at(&mut self, k: &KhGen, r: usize) -> (KhGen, KhGen) { 
+        let mut v0 = self.vertices.remove(k).unwrap();
+        let c = v0.tng.remove_at(r);
         let mut v1 = v0.clone();
 
-        v0.append_label(KhAlgLabel::X);
-        v1.append_label(KhAlgLabel::I);
-        ci.insert(j+1, v1);
+        let mut k0 = k.clone();
+        let mut k1 = k.clone();
 
-        if i > 0 { 
-            self.cap_rows(i-1, j, &c);
-        }
-        self.cup_cols(i, j, &c);
+        k0.append_label(KhAlgLabel::X);
+        k1.append_label(KhAlgLabel::I);
 
-        if simplify { 
-            if i > 0 { 
-                self.simplify_in(i - 1);
-            }
-            self.simplify_in(i);
-        }
-    }
+        let v0_in = v0.in_edges.iter().cloned().collect_vec();
+        for j in v0_in.iter() { 
+            let u = self.vertices.get_mut(j).unwrap();
 
-    fn cap_rows(&mut self, i: usize, j: usize, c: &TngComp) { 
-        let d = &mut self.mats[i];
+            let f = u.out_edges.remove(&k).unwrap();
+            v0.in_edges.remove(&j);
+            v1.in_edges.remove(&j);
 
-        d.insert_zero_row(j+1);
+            let f0 = f.clone().cap_off(Bottom::Tgt, &c, Dot::None);
+            let f1 = f.cap_off(Bottom::Tgt, &c, Dot::Y);
 
-        for k in 0..d.cols() { 
-            let a0 = &d[[j, k]];
-            if a0.is_zero() { 
-                continue;
+            if !f0.is_zero() {
+                u.out_edges.insert(k0.clone(), f0);
+                v0.in_edges.insert(j.clone());
             }
 
-            let a0 = std::mem::take(&mut d[[j, k]]);
-            let a1 = a0.clone();
-
-            d[[j,   k]] = a0.cap_off(Bottom::Tgt, c, Dot::None);
-            d[[j+1, k]] = a1.cap_off(Bottom::Tgt, c, Dot::Y);
+            if !f1.is_zero() {
+                u.out_edges.insert(k1.clone(), f1);
+                v1.in_edges.insert(j.clone());
+            }
         }
-    }
-
-    fn cup_cols(&mut self, i: usize, j: usize, c: &TngComp) { 
-        let d = &mut self.mats[i];
-
-        d.insert_zero_col(j+1);
         
-        for k in 0..d.rows() { 
-            let a = &d[[k, j]];
-            if a.is_zero() { 
-                continue;
+        let v0_out = v0.out_edges.keys().cloned().collect_vec();
+        for l in v0_out.iter() { 
+            let w = self.vertices.get_mut(l).unwrap();
+
+            let f0 = v0.out_edges.remove(&l).unwrap();
+            let f1 = v1.out_edges.remove(&l).unwrap();
+            w.in_edges.remove(&k);
+
+            let f0 = f0.cap_off(Bottom::Src, &c, Dot::X);
+            let f1 = f1.cap_off(Bottom::Src, &c, Dot::None);
+
+            if !f0.is_zero() { 
+                v0.out_edges.insert(l.clone(), f0);
+                w.in_edges.insert(k0.clone());
             }
 
-            let a0 = std::mem::take(&mut d[[k, j]]);
-            let a1 = a0.clone();
+            if !f1.is_zero() { 
+                v1.out_edges.insert(l.clone(), f1);
+                w.in_edges.insert(k1.clone());
+            }
+        }
+        
+        self.vertices.insert(k0.clone(), v0);
+        self.vertices.insert(k1.clone(), v1);
 
-            d[[k, j]]   = a0.cap_off(Bottom::Src, c, Dot::X);
-            d[[k, j+1]] = a1.cap_off(Bottom::Src, c, Dot::None);
+        (k0, k1)
+    }
+
+    fn simplify_on_deloop(&mut self, k: &KhGen) { 
+        let v = self.vertex(k);
+        
+        for k_from in v.in_edges.iter() { 
+            let w = &self.vertices[k_from];
+            let f = &w.out_edges[k];
+            if f.is_invertible() { 
+                self.eliminate(&k_from.clone(), k);
+                return;
+            }
+        }
+
+        for (k_to, f) in v.out_edges.iter() { 
+            if f.is_invertible() { 
+                self.eliminate(k, &k_to.clone());
+                return;
+            }
         }
     }
 
-    fn simplify(&mut self) {
-        for i in 0..self.objs.len()-1 {
-            self.simplify_in(i)
-        }
-    }
-
-    fn simplify_in(&mut self, i: usize) {
-        while let Some((j, k)) = self.find_inv(i) {
-            self.simplify_at(i, j, k);
-        }
-    }
-
-    fn simplify_at(&mut self, i: usize, j: usize, k: usize) {
-        let d = &mut self.mats[i]; // c[i][k] -> c[i+1][j]
-        let a = &d[[j, k]];
+    fn eliminate(&mut self, k0: &KhGen, l0: &KhGen) {
+        let v0 = self.vertex(k0);
+        let w0 = self.vertex(l0);
+        let a = &v0.out_edges[l0];
 
         let Some(ainv) = a.inv() else { 
             panic!()
         };
+        
+        //       a
+        //  v0 - - -> w0
+        //     \   / b
+        //       / 
+        //     /   \ c
+        //  v1 -----> w1
+        //       d
 
-        let (m, n) = d.shape();
-        for (p, q) in cartesian!(0..m, 0..n) { 
-            if p == j || q == k { 
-                continue 
+        let w0_in  = w0.in_edges.iter().cloned().collect_vec();
+        let v0_out = v0.out_edges.keys().cloned().collect_vec();
+        
+        for (k1, l1) in cartesian!(w0_in.iter(), v0_out.iter()) {
+            if k1 == k0 || l1 == l0 { 
+                continue
             }
 
-            let b = &d[[j, q]];
-            let c = &d[[p, k]];
-
-            if b.is_zero() || c.is_zero() { 
-                continue 
-            }
-
+            let b = &self.vertex(k1).out_edges[l0];
+            let c = &self.vertex(k0).out_edges[l1];
+            
             let cab = c * &ainv * b;
+            let v1 = self.vertices.get_mut(&k1).unwrap();
 
-            d[[p, q]] -= cab;
+            let d = if let Some(d) = v1.out_edges.get(&l1) { 
+                d - cab
+            } else { 
+                -cab
+            };
+
+            if d.is_zero() { 
+                self.remove_edge(k1, l1);
+            } else { 
+                self.add_edge(k1, l1, d);
+            }
         }
 
-        if i > 0 { 
-            self.mats[i-1].del_row(k);
+        // remove edges into w0
+        for k1 in w0_in.iter() {
+            self.remove_edge(k1, l0);
         }
-        self.mats[i].del_col(k);
-        self.mats[i].del_row(j);
-        self.mats[i+1].del_col(j);
 
-        self.objs[i].remove(k);
-        self.objs[i+1].remove(j);
+        // remove edges out from v0
+        for l1 in v0_out.iter() {
+            self.remove_edge(k0, l1);
+        }
+
+        let v0_in  = self.vertex(k0).in_edges.iter().cloned().collect_vec();
+        let w0_out = self.vertex(l0).out_edges.keys().cloned().collect_vec();
+
+        // remove edges into v0
+        for j in v0_in.iter() { 
+            self.remove_edge(j, k0);
+        }
+
+        // remove edges out from w0
+        for j in w0_out.iter() { 
+            self.remove_edge(l0, j);
+        }
+
+        // remove v0 and w0.
+        self.vertices.remove(k0);
+        self.vertices.remove(l0);
     }
 
-    fn find_inv(&self, i: usize) -> Option<(usize, usize)> {
-        let d = &self.mats[i];
-        for (j, k, a) in d.iter() { 
-            if a.is_invertible() { 
-                return Some((j, k))
+    fn add_edge(&mut self, k: &KhGen, l: &KhGen, f: Mor) { 
+        let v = self.vertices.get_mut(k).unwrap();
+        v.out_edges.insert(l.clone(), f);
+
+        let w = self.vertices.get_mut(l).unwrap();
+        w.in_edges.insert(k.clone());
+    }
+
+    fn remove_edge(&mut self, k: &KhGen, l: &KhGen) { 
+        let v = self.vertices.get_mut(k).unwrap();
+        v.out_edges.remove(l);
+
+        let w = self.vertices.get_mut(l).unwrap();
+        w.in_edges.remove(k);
+    }
+
+    pub fn is_completely_delooped(&self) -> bool { 
+        self.vertices.iter().all(|(_, v)|
+            v.tng.is_empty()
+        )
+    }
+
+    pub fn as_generic<R>(&self, h: R, t: R) -> GenericChainComplex<R, RangeInclusive<isize>> 
+    where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> {
+        assert!(self.is_completely_delooped());
+
+        // TODO improve construction. 
+
+        let n = self.len();
+        let c = (0..n).map(|i| {
+            let gens = self.vertices.keys().filter(|k| k.state().weight() == i).sorted().cloned().collect();
+            FreeRModStr::new(gens)
+        }).collect_vec();
+
+        let i0 = self.deg_shift.0;
+
+        GenericChainComplex::ascending_from(i0, (0..n-1).map( |i| {
+            c[i].make_matrix(&c[i+1], |x| { 
+                let v = self.vertex(x);
+                v.out_edges.iter().map(|(y, f)| 
+                    (y.clone(), f.eval(&h, &t))
+                ).collect()
+            })
+        }).collect())
+    }
+
+    pub fn describe(&self) { 
+        let mut str = "".to_string();
+        for k0 in self.vertices.keys().sorted() { 
+            let v = &self.vertices[&k0];
+            str += &format!("{k0}: {}\n", v.tng);
+
+            for k1 in v.out_edges.keys().sorted() { 
+                let f = &v.out_edges[&k1];
+                str += &format!(" -> {k1}: {f}\n");
+            }
+            str += "\n";
+        }
+        println!("{str}");
+    }
+
+    fn validate_edges(&self) {
+        for (k, v) in self.vertices.iter() { 
+            for j in v.in_edges.iter() {
+                assert!(
+                    self.vertices.contains_key(j),
+                    "no vertex for in-edge {j} -> {k}"
+                );
+                let u = self.vertex(j);
+                assert!(
+                    u.out_edges.contains_key(k),
+                    "no out-edge {j} -> {k}"
+                );
+            }
+            for (l, _f) in v.out_edges.iter() {
+                assert!(
+                    self.vertices.contains_key(l),
+                    "no vertex for out-edge {k} -> {l}"
+                );
+                let w = self.vertex(l);
+                assert!(
+                    w.in_edges.contains(k),
+                    "no in-edge {k} -> {l}"
+                );
+                // assert!(!f.is_zero());
             }
         }
-        None
+    }
+}
+
+impl From<&Link> for TngComplex {
+    fn from(l: &Link) -> Self {
+        let deg_shift = KhComplex::<i64>::deg_shift_for(l, false);
+        let mut c = TngComplex::new(deg_shift);
+        for x in l.data() {
+            c.append(x);
+            c.deloop(true);
+        }
+        c
     }
 }
 
@@ -560,14 +511,6 @@ mod tests {
         assert_eq!(c.len(), 2);
         assert_eq!(c.rank(0), 1);
         assert_eq!(c.rank(1), 1);
-
-        assert_eq!(c.tng(0, 0).ncomps(), 2);
-        assert!(c.tng(0, 0).comp(0).is_arc());
-        assert!(c.tng(0, 0).comp(1).is_arc());
-
-        assert_eq!(c.tng(1, 0).ncomps(), 2);
-        assert!(c.tng(1, 0).comp(0).is_arc());
-        assert!(c.tng(1, 0).comp(1).is_arc());
     }
 
     #[test]
@@ -583,9 +526,6 @@ mod tests {
         assert_eq!(c.rank(0), 1);
         assert_eq!(c.rank(1), 2);
         assert_eq!(c.rank(2), 1);
-
-        assert_eq!(c.mat(0).shape(), (2, 1));
-        assert_eq!(c.mat(1).shape(), (1, 2));
     }
 
     #[test]
@@ -601,11 +541,6 @@ mod tests {
         assert_eq!(c.rank(0), 1);
         assert_eq!(c.rank(1), 2);
         assert_eq!(c.rank(2), 1);
-
-        assert_eq!(c.tng(0, 0).ncomps(), 2);
-        assert_eq!(c.tng(1, 0).ncomps(), 2);
-        assert_eq!(c.tng(1, 1).ncomps(), 2);
-        assert_eq!(c.tng(2, 0).ncomps(), 3);
     }
 
     #[test]
@@ -622,23 +557,12 @@ mod tests {
         assert_eq!(c.rank(1), 2);
         assert_eq!(c.rank(2), 1);
 
-        assert!(c.tng(0, 0).find_loop().is_none());
-        assert!(c.tng(1, 0).find_loop().is_some()); // loop here
-        assert!(c.tng(1, 1).find_loop().is_none());
-        assert!(c.tng(2, 0).find_loop().is_none());
-
         c.deloop(false);
 
         assert_eq!(c.len(), 3);
         assert_eq!(c.rank(0), 1);
         assert_eq!(c.rank(1), 3); // delooped here
         assert_eq!(c.rank(2), 1);
-
-        assert!(c.tng(1, 0).find_loop().is_none()); // delooped
-        assert!(c.tng(1, 1).find_loop().is_none()); // delooped
-
-        assert_eq!(c.obj(1, 0).label, vec![KhAlgLabel::X]);
-        assert_eq!(c.obj(1, 1).label, vec![KhAlgLabel::I]);
     }
 
     #[test]
@@ -656,20 +580,6 @@ mod tests {
         assert_eq!(c.rank(1), 3);
         assert_eq!(c.rank(2), 3);
         assert_eq!(c.rank(3), 1);
-
-        assert_eq!(c.mat(0).shape(), (3, 1));
-        assert_eq!(c.mat(1).shape(), (3, 3));
-        assert_eq!(c.mat(2).shape(), (1, 3));
-        assert_eq!(c.mat(3).shape(), (0, 1));
-
-        for i in 0..= 3 { 
-            let ci = &c.objs[i];
-            for j in 0..ci.len() { 
-                let v = &ci[j];
-                assert_eq!(v.state.weight(), i);
-                assert!(v.tangle.is_closed());
-            }
-        }
     }
 
     #[test]

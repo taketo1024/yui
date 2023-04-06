@@ -8,7 +8,7 @@ use cartesian::cartesian;
 use yui_core::{Ring, RingOps};
 use yui_homology::{GenericChainComplex, FreeRModStr};
 use yui_lin_comb::LinComb;
-use yui_link::{Crossing, Resolution, Link};
+use yui_link::{Crossing, Resolution, Link, Edge};
 
 use crate::{KhAlgLabel, KhComplex, KhGen};
 use super::cob::{Cob, Dot, Bottom, CobComp};
@@ -158,6 +158,12 @@ impl TngComplex {
 
     pub fn iter_verts(&self) -> impl Iterator<Item = (&KhGen, &TngVertex)> {
         self.vertices.iter().sorted_by(|(k0, _), (k1, _)| k0.cmp(k1))
+    }
+
+    pub fn endpts(&self) -> HashSet<Edge> { 
+        // MEMO: all tngs have common endpts. 
+        let v = self.vertices.iter().next().unwrap().1;
+        v.tng.endpts()
     }
 
     //                          d0
@@ -567,9 +573,35 @@ impl From<&Link> for TngComplex {
     fn from(l: &Link) -> Self {
         info!("construct TngComplex.");
 
+        fn take_best<'a>(c: &TngComplex, xs: &mut Vec<&'a Crossing>) -> Option<&'a Crossing> { 
+            if xs.is_empty() { return None }
+
+            let endpts = c.endpts();
+            if endpts.is_empty() { 
+                return Some(xs.remove(0));
+            }
+
+            let mut cand_i = 0;
+            let mut cand_c = 0;
+
+            for (i, x) in xs.iter().enumerate() { 
+                let c = x.edges().iter().filter(|e| endpts.contains(e)).count();
+                if c == 4 { 
+                    return Some(xs.remove(i));
+                } else if c > cand_c { 
+                    cand_i = i;
+                    cand_c = c;
+                }
+            }
+
+            Some(xs.remove(cand_i))
+        }
+
         let deg_shift = KhComplex::<i64>::deg_shift_for(l, false);
         let mut c = TngComplex::new(deg_shift);
-        for x in l.data() {
+        let mut xs = l.data().iter().collect_vec();
+
+        while let Some(x) = take_best(&c, &mut xs) { 
             c.append(x);
             c.deloop(true);
         }

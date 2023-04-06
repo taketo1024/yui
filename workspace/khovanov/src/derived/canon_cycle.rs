@@ -3,7 +3,7 @@ use itertools::Itertools;
 use yui_core::{Ring, RingOps};
 use yui_link::{Link, LinkComp, State};
 
-use crate::{KhAlgLabel, KhAlgStr, KhComplex, KhLabel, KhGen, KhChain};
+use crate::{KhAlgGen, KhAlgStr, KhComplex, KhLabel, KhEnhState, KhChain};
 
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
@@ -76,11 +76,8 @@ fn color_circles(l: &Link, circles: &Vec<LinkComp>, positive: bool) -> Vec<Color
 
 fn make_chain<R>(str: &KhAlgStr<R>, s: &State, colors: &Vec<Color>) -> KhChain<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    let mut z = KhChain::from((
-        KhGen::new(s.clone(), KhLabel::empty()),
-        R::one()
-    ));
-
+    let x = KhEnhState::new(s.clone(), KhLabel::empty());
+    let mut z = KhChain::from((x, R::one()));
     for c in colors {
         z *= c.as_tensor_factor(str);
     }
@@ -101,10 +98,10 @@ impl Color {
 
     fn as_tensor_factor<R>(&self, s: &KhAlgStr<R>) -> KhChain<R>
     where R: Ring, for<'x> &'x R: RingOps<R> {
-        use KhAlgLabel::{I, X};
+        use KhAlgGen::{I, X};
 
-        fn init(x: KhAlgLabel) -> KhGen { 
-            let mut z = KhGen::init();
+        fn init(x: KhAlgGen) -> KhEnhState { 
+            let mut z = KhEnhState::init();
             z.label.push(x);
             z
         }

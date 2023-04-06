@@ -7,7 +7,7 @@ use yui_lin_comb::{FreeGen, LinComb};
 use yui_link::State;
 use yui_utils::bitseq::BitSeq;
 
-use crate::KhAlgLabel;
+use crate::KhAlgGen;
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub struct KhLabel(BitSeq);
@@ -25,17 +25,17 @@ impl KhLabel {
         self.0.len()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = KhAlgLabel> {
+    pub fn iter(&self) -> impl Iterator<Item = KhAlgGen> {
         self.0.iter().map(|b| 
             if b.is_zero() { 
-                KhAlgLabel::X
+                KhAlgGen::X
             } else { 
-                KhAlgLabel::I
+                KhAlgGen::I
             }
         )
     }
 
-    pub fn push(&mut self, x: KhAlgLabel) {
+    pub fn push(&mut self, x: KhAlgGen) {
         if x.is_X() { 
             self.0.push_0()
         } else { 
@@ -51,7 +51,7 @@ impl KhLabel {
         self.0.remove(i)
     }
 
-    pub fn insert(&mut self, i: usize, x: KhAlgLabel) { 
+    pub fn insert(&mut self, i: usize, x: KhAlgGen) { 
         if x.is_X() { 
             self.0.insert_0(i)
         } else { 
@@ -66,8 +66,8 @@ impl KhLabel {
     }
 }
 
-impl FromIterator<KhAlgLabel> for KhLabel {
-    fn from_iter<I: IntoIterator<Item = KhAlgLabel>>(iter: I) -> Self {
+impl FromIterator<KhAlgGen> for KhLabel {
+    fn from_iter<I: IntoIterator<Item = KhAlgGen>>(iter: I) -> Self {
         Self(BitSeq::from_iter(iter.into_iter().map(|x| 
             if x.is_X() { 0 } else { 1 }
         )))
@@ -75,13 +75,13 @@ impl FromIterator<KhAlgLabel> for KhLabel {
 }
 
 impl Index<usize> for KhLabel {
-    type Output = KhAlgLabel;
+    type Output = KhAlgGen;
 
     fn index(&self, index: usize) -> &Self::Output {
         if self.0[index].is_zero() { 
-            &KhAlgLabel::X
+            &KhAlgGen::X
         } else { 
-            &KhAlgLabel::I
+            &KhAlgGen::I
         }
     }
 }
@@ -93,14 +93,14 @@ impl Display for KhLabel {
 }
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
-pub struct KhGen { 
+pub struct KhEnhState { 
     pub state: State,
     pub label: KhLabel
 }
 
-impl KhGen {
-    pub fn new(state: State, label: KhLabel) -> KhGen { 
-        KhGen { state, label }
+impl KhEnhState {
+    pub fn new(state: State, label: KhLabel) -> KhEnhState { 
+        KhEnhState { state, label }
     }
 
     pub fn init() -> Self { 
@@ -114,27 +114,27 @@ impl KhGen {
         q + r + s
     }
 
-    pub fn append(&mut self, other: KhGen) { 
-        let KhGen { state, label } = other;
+    pub fn append(&mut self, other: KhEnhState) { 
+        let KhEnhState { state, label } = other;
         self.state.append(state);
         self.label.append(label);
     }
 }
 
 #[auto_ops]
-impl MulAssign<&KhGen> for KhGen {
-    fn mul_assign(&mut self, rhs: &KhGen) {
+impl MulAssign<&KhEnhState> for KhEnhState {
+    fn mul_assign(&mut self, rhs: &KhEnhState) {
         self.append(rhs.clone())
     }
 }
 
-impl Elem for KhGen { 
+impl Elem for KhEnhState { 
     fn set_symbol() -> String { 
         String::from("Kh")
     }
 }
 
-impl Display for KhGen {
+impl Display for KhEnhState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.state.is_empty() {
             write!(f, "()")
@@ -146,6 +146,6 @@ impl Display for KhGen {
     }
 }
 
-impl FreeGen for KhGen {}
+impl FreeGen for KhEnhState {}
 
-pub type KhChain<R> = LinComb<KhGen, R>;
+pub type KhChain<R> = LinComb<KhEnhState, R>;

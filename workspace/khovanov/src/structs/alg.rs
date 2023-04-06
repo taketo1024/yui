@@ -2,33 +2,33 @@ use std::fmt::Display;
 use yui_core::{Ring, RingOps};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum KhAlgLabel { 
+pub enum KhAlgGen { 
     I, X
 }
 
-impl KhAlgLabel { 
+impl KhAlgGen { 
     #[allow(non_snake_case)]
     pub fn is_X(&self) -> bool { 
-        self == &KhAlgLabel::X
+        self == &KhAlgGen::X
     }
 
     pub fn is_1(&self) -> bool { 
-        self == &KhAlgLabel::I
+        self == &KhAlgGen::I
     }
 
     pub fn q_deg(&self) -> isize {
         match self { 
-            KhAlgLabel::I => 0,
-            KhAlgLabel::X => -2
+            KhAlgGen::I => 0,
+            KhAlgGen::X => -2
         }
     }
 }
 
-impl Display for KhAlgLabel {
+impl Display for KhAlgGen {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self { 
-            KhAlgLabel::I => f.write_str("1"),
-            KhAlgLabel::X => f.write_str("X")
+            KhAlgGen::I => f.write_str("1"),
+            KhAlgGen::X => f.write_str("X")
         }
     }
 }
@@ -54,8 +54,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.t
     }
 
-    pub fn prod(&self, x: KhAlgLabel, y: KhAlgLabel) -> Vec<(KhAlgLabel, R)> {
-        use KhAlgLabel::{I, X};
+    pub fn prod(&self, x: KhAlgGen, y: KhAlgGen) -> Vec<(KhAlgGen, R)> {
+        use KhAlgGen::{I, X};
         let (h, t) = (self.h(), self.t());
 
         let res = match (x, y) { 
@@ -67,8 +67,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         res.into_iter().filter(|(_, a)| !a.is_zero()).collect()
     }
 
-    pub fn coprod(&self, x: KhAlgLabel) -> Vec<(KhAlgLabel, KhAlgLabel, R)> {
-        use KhAlgLabel::{I, X};
+    pub fn coprod(&self, x: KhAlgGen) -> Vec<(KhAlgGen, KhAlgGen, R)> {
+        use KhAlgGen::{I, X};
         let (h, t) = (self.h(), self.t());
 
         let res = match x { 
@@ -82,18 +82,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 pub mod tests {
-    use super::{KhAlgLabel, KhAlgStr};
+    use super::{KhAlgGen, KhAlgStr};
  
     #[test]
     fn alg_gen() { 
-        use KhAlgLabel::{I, X};
+        use KhAlgGen::{I, X};
         assert_eq!(I.q_deg(), 0);
         assert_eq!(X.q_deg(), -2);
     }
 
     #[test]
     fn str_prod_kh() { 
-        use KhAlgLabel::{I, X};
+        use KhAlgGen::{I, X};
         let a = KhAlgStr::new(0, 0);
         assert_eq!(a.prod(I, I), vec![(I, 1)]);
         assert_eq!(a.prod(X, I), vec![(X, 1)]);
@@ -103,14 +103,14 @@ pub mod tests {
 
     #[test]
     fn str_coprod_kh() { 
-        use KhAlgLabel::{I, X};
+        use KhAlgGen::{I, X};
         let a = KhAlgStr::new(0, 0);
         assert_eq!(a.coprod(I), vec![(X, I, 1), (I, X, 1)]);
         assert_eq!(a.coprod(X), vec![(X, X, 1)]);
     }
     #[test]
     fn str_prod_bn() { 
-        use KhAlgLabel::{I, X};
+        use KhAlgGen::{I, X};
         let a = KhAlgStr::new(1, 0);
         assert_eq!(a.prod(I, I), vec![(I, 1)]);
         assert_eq!(a.prod(X, I), vec![(X, 1)]);
@@ -120,14 +120,14 @@ pub mod tests {
 
     #[test]
     fn str_coprod_bn() { 
-        use KhAlgLabel::{I, X};
+        use KhAlgGen::{I, X};
         let a = KhAlgStr::new(1, 0);
         assert_eq!(a.coprod(I), vec![(X, I, 1), (I, X, 1), (I, I, -1)]);
         assert_eq!(a.coprod(X), vec![(X, X, 1)]);
     }
     #[test]
     fn str_prod_lee() { 
-        use KhAlgLabel::{I, X};
+        use KhAlgGen::{I, X};
         let a = KhAlgStr::new(0, 1);
         assert_eq!(a.prod(I, I), vec![(I, 1)]);
         assert_eq!(a.prod(X, I), vec![(X, 1)]);
@@ -137,7 +137,7 @@ pub mod tests {
 
     #[test]
     fn str_coprod_lee() { 
-        use KhAlgLabel::{I, X};
+        use KhAlgGen::{I, X};
         let a = KhAlgStr::new(0, 1);
         assert_eq!(a.coprod(I), vec![(X, I, 1), (I, X, 1)]);
         assert_eq!(a.coprod(X), vec![(X, X, 1), (I, I, 1)]);

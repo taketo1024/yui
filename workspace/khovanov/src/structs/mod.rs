@@ -1,8 +1,8 @@
 mod alg;
-pub use alg::{KhAlgLabel, KhAlgStr};
+pub use alg::{KhAlgGen, KhAlgStr};
 
 mod chain;
-pub use chain::{KhLabel, KhGen, KhChain};
+pub use chain::{KhLabel, KhEnhState, KhChain};
 
 mod cube;
 pub use cube::{KhCube};

@@ -4,7 +4,7 @@ use itertools::Itertools;
 use yui_core::{Ring, RingOps, PowMod2, Sign};
 use yui_link::{Link, State, LinkComp, Resolution, Edge};
 
-use crate::{KhAlgStr, KhLabel, KhGen};
+use crate::{KhAlgStr, KhLabel, KhEnhState};
 
 #[derive(Debug)]
 pub struct KhCubeVertex { 
@@ -18,14 +18,14 @@ impl KhCubeVertex {
         KhCubeVertex { state, circles }
     }
 
-    pub fn generators(&self) -> Vec<KhGen> { 
+    pub fn generators(&self) -> Vec<KhEnhState> { 
         let r = self.circles.len();
         KhLabel::generate(r).into_iter().map(|label| { 
-            KhGen::new( self.state, label )
+            KhEnhState::new( self.state, label )
         }).collect()
     }
 
-    pub fn reduced_generators(&self, red_e: &Edge) -> Vec<KhGen> { 
+    pub fn reduced_generators(&self, red_e: &Edge) -> Vec<KhEnhState> { 
         let r = self.circles.len();
         let red_i = self.circles.iter().position(|c| 
             c.edges().contains(red_e)
@@ -35,7 +35,7 @@ impl KhCubeVertex {
             if label[red_i].is_1() { 
                 return None
             } else { 
-                return Some(KhGen::new(self.state, label))
+                return Some(KhEnhState::new(self.state, label))
             }
         }).collect()
     }
@@ -163,15 +163,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         q0 ..= q1
     }
 
-    pub fn generators(&self, i: isize) -> Vec<KhGen> { 
+    pub fn generators(&self, i: isize) -> Vec<KhEnhState> { 
         self.collect_generators(i, None)
     }
 
-    pub fn reduced_generators(&self, i: isize, red_e: &Edge) -> Vec<KhGen> { 
+    pub fn reduced_generators(&self, i: isize, red_e: &Edge) -> Vec<KhEnhState> { 
         self.collect_generators(i, Some(red_e))
     }
 
-    fn collect_generators(&self, i: isize, red_e: Option<&Edge>) -> Vec<KhGen> { 
+    fn collect_generators(&self, i: isize, red_e: Option<&Edge>) -> Vec<KhEnhState> { 
         if self.h_range().contains(&i) { 
             let i = i as usize;
             self.vertices_of_weight(i).into_iter().flat_map(|v| 
@@ -186,7 +186,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn differentiate(&self, x: &KhGen) -> Vec<(KhGen, R)> {
+    pub fn differentiate(&self, x: &KhEnhState) -> Vec<(KhEnhState, R)> {
         let edges = self.edges_from(&x.state);
         edges.iter().flat_map(|(t, e)| { 
             self.apply(x, t, e)
@@ -219,7 +219,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.edges[s]
     }
 
-    fn apply(&self, x: &KhGen, to: &State, e: &KhCubeEdge) -> Vec<(KhGen, R)> {
+    fn apply(&self, x: &KhEnhState, to: &State, e: &KhCubeEdge) -> Vec<(KhEnhState, R)> {
         use KhCubeEdgeTrans::*;
         
         let sign = R::from_sign(e.sign);
@@ -234,7 +234,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                     label.insert(k, y_k);
 
                     let t = to.clone();
-                    let y = KhGen::new(t, label);
+                    let y = KhEnhState::new(t, label);
                     let r = &sign * &a;
                     (y, r)
                 }).collect_vec()
@@ -248,7 +248,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                     label.insert(k, y_k);
 
                     let t = to.clone();
-                    let y = KhGen::new(t, label);
+                    let y = KhEnhState::new(t, label);
                     let r = &sign * &a;
 
                     (y, r)

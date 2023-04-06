@@ -2,7 +2,8 @@ use std::collections::HashSet;
 use itertools::Itertools;
 use yui_core::{Ring, RingOps};
 use yui_link::{Link, LinkComp, State};
-use crate::{KhAlgLabel, KhAlgStr, KhComplex, KhGen, KhChain};
+
+use crate::{KhAlgLabel, KhAlgStr, KhComplex, KhLabel, KhGen, KhChain};
 
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
@@ -76,7 +77,7 @@ fn color_circles(l: &Link, circles: &Vec<LinkComp>, positive: bool) -> Vec<Color
 fn make_chain<R>(str: &KhAlgStr<R>, s: &State, colors: &Vec<Color>) -> KhChain<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     let mut z = KhChain::from((
-        KhGen::new(s.clone(), vec![]),
+        KhGen::new(s.clone(), KhLabel::empty()),
         R::one()
     ));
 
@@ -102,18 +103,20 @@ impl Color {
     where R: Ring, for<'x> &'x R: RingOps<R> {
         use KhAlgLabel::{I, X};
 
+        fn init(x: KhAlgLabel) -> KhGen { 
+            let mut z = KhGen::init();
+            z.label.push(x);
+            z
+        }
+
         match self { 
-            Color::A => KhChain::from((
-                KhGen::new(State::empty(), vec![X]),
-                R::one()
-            )),
-            Color::B => KhChain::from_iter([(
-                KhGen::new(State::empty(), vec![X]),
-                R::one()
-            ), (
-                KhGen::new(State::empty(), vec![I]),
-                -s.h()
-            )])
+            Color::A => KhChain::from( 
+                (init(X), R::one()) 
+            ),
+            Color::B => KhChain::from_iter([
+                (init(X), R::one()), 
+                (init(I), -s.h())
+            ])
         }
     }
 }

@@ -7,6 +7,15 @@ pub enum KhAlgLabel {
 }
 
 impl KhAlgLabel { 
+    #[allow(non_snake_case)]
+    pub fn is_X(&self) -> bool { 
+        self == &KhAlgLabel::X
+    }
+
+    pub fn is_1(&self) -> bool { 
+        self == &KhAlgLabel::I
+    }
+
     pub fn q_deg(&self) -> isize {
         match self { 
             KhAlgLabel::I => 0,

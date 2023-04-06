@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::ops::RangeInclusive;
 
-use itertools::{Itertools, join};
+use itertools::Itertools;
 use num_traits::Zero;
 use cartesian::cartesian;
 use yui_core::{Ring, RingOps};
@@ -104,17 +104,7 @@ impl TngVertex {
 
 impl Display for TngVertex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let key = {
-            let state = self.key.state().to_string();
-            if self.key.label().is_empty() { 
-                state
-            } else { 
-                let label = join(self.key.label().iter(), "");
-                format!("{}-{}", state, label)
-            }
-        };
-
-        write!(f, "({}; {})", key, self.tng)
+        write!(f, "({}; {})", self.key, self.tng)
     }
 }
 
@@ -143,7 +133,7 @@ impl TngComplex {
     pub fn rank(&self, i: isize) -> usize { 
         let i0 = self.deg_shift.0;
         self.vertices.keys().filter(|k| {
-            let w = k.state().weight() as isize;
+            let w = k.state.weight() as isize;
             w == i - i0
         }).count()
     }
@@ -210,20 +200,20 @@ impl TngComplex {
         let mut v0 = v.clone();
         let mut v1 = v;
 
-        v0.key.append_state(Res0);
-        v1.key.append_state(Res1);
+        v0.key.state.push(Res0);
+        v1.key.state.push(Res1);
 
         // append 0 / 1 to in_edges.
         modify!(v0.in_edges, |e: HashSet<KhGen>| { 
             e.into_iter().map(|mut k| { 
-                k.append_state(Res0);
+                k.state.push(Res0);
                 k
             }).collect()
         });
 
         modify!(v1.in_edges, |e: HashSet<KhGen>| { 
             e.into_iter().map(|mut k| { 
-                k.append_state(Res1);
+                k.state.push(Res1);
                 k
             }).collect()
         });
@@ -234,14 +224,14 @@ impl TngComplex {
 
         modify!(v0.out_edges, |e: HashMap<KhGen, Mor>| { 
             e.into_iter().map(|(mut k, f)| { 
-                k.append_state(Res0);
+                k.state.push(Res0);
                 (k, f.connect(&c0))
             }).collect()
         });
 
         modify!(v1.out_edges, |e: HashMap<KhGen, Mor>| { 
             e.into_iter().map(|(mut k, f)| { 
-                k.append_state(Res1);
+                k.state.push(Res1);
                 (k, -f.connect(&c1))
             }).collect()
         });
@@ -286,8 +276,8 @@ impl TngComplex {
         let c = v0.tng.remove_at(r);
         let mut v1 = v0.clone();
 
-        v0.key.append_label(KhAlgLabel::X);
-        v1.key.append_label(KhAlgLabel::I);
+        v0.key.label.push(KhAlgLabel::X);
+        v1.key.label.push(KhAlgLabel::I);
 
         let k0 = &v0.key;
         let k1 = &v1.key;
@@ -509,7 +499,7 @@ impl TngComplex {
 
         let n = self.len();
         let c = (0..n).map(|i| {
-            let gens = self.vertices.keys().filter(|k| k.state().weight() == i).sorted().cloned().collect();
+            let gens = self.vertices.keys().filter(|k| k.state.weight() == i).sorted().cloned().collect();
             FreeRModStr::new(gens)
         }).collect_vec();
 

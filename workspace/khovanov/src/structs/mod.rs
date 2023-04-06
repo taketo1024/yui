@@ -2,7 +2,7 @@ mod alg;
 pub use alg::{KhAlgLabel, KhAlgStr};
 
 mod chain;
-pub use chain::{KhGen, KhChain};
+pub use chain::{KhLabel, KhGen, KhChain};
 
 mod cube;
 pub use cube::{KhCube};

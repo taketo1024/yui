@@ -3,7 +3,7 @@ use std::fmt;
 use yui_utils::bitseq::{BitSeq, Bit};
 use super::Resolution;
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Ord)]
+#[derive(Clone, Copy, Default, PartialEq, Eq, Hash, Ord, Debug)]
 pub struct State(BitSeq);
 
 impl State { 
@@ -21,6 +21,10 @@ impl State {
         let b = (0..l).fold(0, |b, _| b << 1 | 1);
         State(BitSeq::new(b, l))
     }
+
+    pub fn is_empty(&self) -> bool { 
+        self.0.is_empty()
+    } 
 
     pub fn len(&self) -> usize { 
         self.0.len()

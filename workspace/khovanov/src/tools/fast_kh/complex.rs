@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::ops::RangeInclusive;
 
-use itertools::Itertools;
+use itertools::{Itertools, join};
 use num_traits::Zero;
 use cartesian::cartesian;
 use yui_core::{Ring, RingOps};
@@ -25,6 +25,7 @@ type Mor = LinComb<Cob, i32>; // Z-linear combination of cobordisms.
 trait MorTrait: Sized {
     fn is_invertible(&self) -> bool;
     fn inv(&self) -> Option<Self>;
+    fn map_cob<F>(self, f: F) -> Self where F: Fn(&mut Cob);
     fn connect(self, c: &Cob) -> Self;
     fn connect_comp(self, c: &CobComp) -> Self;
     fn cap_off(self, b: Bottom, c: &TngComp, dot: Dot) -> Self;
@@ -51,30 +52,28 @@ impl MorTrait for Mor {
         }
     }
 
-    fn connect(self, c: &Cob) -> Self {
-        self.into_map_gens(|mut cob| { 
-            cob.connect(c.clone());
-            cob
-        })
-    }
-
-    fn connect_comp(self, c: &CobComp) -> Self {
-        self.into_map_gens(|mut cob| { 
-            cob.connect_comp(c.clone());
-            cob
-        })
-    }
-
-    fn cap_off(self, b: Bottom, c: &TngComp, dot: Dot) -> Self {
+    fn map_cob<F>(self, f: F) -> Self 
+    where F: Fn(&mut Cob) {
         self.into_map(|mut cob, r| { 
-            cob.cap_off(b, c, dot);
-
+            f(&mut cob);
             if cob.is_zero() { 
                 (cob, 0)
             } else { 
                 (cob, r)
             }
         })
+    }
+
+    fn connect(self, c: &Cob) -> Self {
+        self.map_cob(|cob| cob.connect(c.clone()) )
+    }
+
+    fn connect_comp(self, c: &CobComp) -> Self {
+        self.map_cob(|cob| cob.connect_comp(c.clone()) )
+    }
+
+    fn cap_off(self, b: Bottom, c: &TngComp, dot: Dot) -> Self {
+        self.map_cob(|cob| cob.cap_off(b, c, dot) )
     }
 
     fn eval<R>(&self, h: &R, t: &R) -> R
@@ -105,7 +104,17 @@ impl TngVertex {
 
 impl Display for TngVertex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{{{}; {:?}; {}}}", self.key.state(), self.key.label(), self.tng)
+        let key = {
+            let state = join(self.key.state().values().iter(), "");
+            if self.key.label().is_empty() { 
+                state
+            } else { 
+                let label = join(self.key.label().iter(), "");
+                format!("{}-{}", state, label)
+            }
+        };
+
+        write!(f, "({}; {})", key, self.tng)
     }
 }
 
@@ -145,6 +154,10 @@ impl TngComplex {
 
     pub fn nverts(&self) -> usize { 
         self.vertices.len()
+    }
+
+    pub fn iter_verts(&self) -> impl Iterator<Item = (&KhGen, &TngVertex)> {
+        self.vertices.iter().sorted_by(|(k0, _), (k1, _)| k0.cmp(k1))
     }
 
     //                          d0
@@ -218,23 +231,22 @@ impl TngComplex {
     }
 
     pub fn deloop(&mut self, simplify: bool) { 
-        // TODO improve 
-        'outer: loop { 
-            for (k, v) in self.vertices.iter() { 
-                if let Some(r) = v.tng.find_loop() { 
-                    let k = k.clone();
-                    let (k0, k1) = self.deloop_at(&k, r);
-
-                    if simplify { 
-                        self.simplify_on_deloop(&k0);
-                        self.simplify_on_deloop(&k1);
-                    }
-
-                    continue 'outer;
-                }
+        while let Some((k, r)) = self.find_loop() { 
+            let (k0, k1) = self.deloop_at(&k, r);
+            if simplify { 
+                self.simplify_on_deloop(&k0);
+                self.simplify_on_deloop(&k1);
             }
-            break
         }
+    }
+
+    fn find_loop(&self) -> Option<(KhGen, usize)> { 
+        for (k, v) in self.iter_verts() { 
+            if let Some(r) = v.tng.find_loop() { 
+                return Some((k.clone(), r))
+            }
+        }
+        None
     }
 
     fn deloop_at(&mut self, k: &KhGen, r: usize) -> (KhGen, KhGen) { 
@@ -503,6 +515,13 @@ impl From<&Link> for TngComplex {
 
         c
     }
+}
+
+#[test]
+fn test() { 
+    let l = Link::from(&[[1, 30, 2, 31], [3, 27, 4, 26], [5, 12, 6, 13], [7, 29, 8, 28], [9, 35, 10, 34], [11, 4, 12, 5], [13, 8, 14, 9], [14, 36, 15, 35], [17, 24, 18, 25], [18, 32, 19, 31], [21, 3, 22, 2], [23, 16, 24, 17], [25, 22, 26, 23], [27, 7, 28, 6], [29, 21, 30, 20], [32, 16, 33, 15], [33, 11, 34, 10], [36, 20, 1, 19]]);
+    let c = TngComplex::from(&l);
+    info!("{:?}", c.iter_verts().map(|x| x.0.state().to_string()).join(", "));
 }
 
 #[cfg(test)]

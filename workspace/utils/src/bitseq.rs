@@ -22,6 +22,10 @@ impl Bit {
     pub fn is_one(&self) -> bool { 
         self == &Bit::Bit1
     }
+
+    pub fn as_u64(&self) -> u64 { 
+        if self.is_zero() { 0 } else { 1 }
+    }
 }
 
 impl From<bool> for Bit {
@@ -133,10 +137,47 @@ impl BitSeq {
         self.len += 1;
     }
 
+    pub fn push_0(&mut self) { 
+        self.push(Bit::Bit0)
+    }
+
+    pub fn push_1(&mut self) { 
+        self.push(Bit::Bit1)
+    }
+
     pub fn append(&mut self, b: BitSeq) {
         assert!(self.len + b.len <= Self::MAX_LEN);
         self.val = self.val << b.len | b.val;
         self.len += b.len;
+    }
+
+    pub fn remove(&mut self, i: usize) { 
+        assert!(i < self.len);
+        let k = self.len - i;
+        let a = self.val >> k;
+        let b = self.val & ((1 << (k - 1)) - 1);
+        self.val = a << (k - 1) | b;
+        self.len -= 1;
+    }
+
+    pub fn insert(&mut self, i: usize, b: Bit) { 
+        assert!(i <= self.len);
+        assert!(self.len < Self::MAX_LEN);
+
+        let k = self.len - i;
+        let a = self.val >> k;
+        let b = b.as_u64();
+        let c = self.val & ((1 << k) - 1);
+        self.val = a << k + 1 | b << k | c;
+        self.len += 1;
+    }
+
+    pub fn insert_0(&mut self, i: usize) { 
+        self.insert(i, Bit::Bit0)
+    }
+
+    pub fn insert_1(&mut self, i: usize) { 
+        self.insert(i, Bit::Bit1)
     }
 
     pub fn generate(len: usize) -> Vec<BitSeq> {
@@ -251,6 +292,44 @@ mod tests {
 
         b.set(4, Bit1);
         assert_eq!(b, BitSeq::new(0b00011, 5));
+    }
+
+    #[test]
+    fn remove() { 
+        let mut b = BitSeq::new(0b1, 1);
+
+        b.remove(0);
+        assert_eq!(b, BitSeq::empty());
+
+        let mut b = BitSeq::new(0b100101, 6);
+
+        b.remove(0);
+        assert_eq!(b, BitSeq::new(0b00101, 5));
+
+        b.remove(4);
+        assert_eq!(b, BitSeq::new(0b0010, 4));
+
+        b.remove(2);
+        assert_eq!(b, BitSeq::new(0b000, 3));
+    }
+
+    #[test]
+    fn insert() { 
+        let mut b = BitSeq::empty();
+
+        b.insert(0, Bit1);
+        assert_eq!(b, BitSeq::new(0b1, 1));
+
+        let mut b = BitSeq::new(0b100101, 6);
+
+        b.insert(0, Bit0);
+        assert_eq!(b, BitSeq::new(0b0100101, 7));
+
+        b.insert(7, Bit1);
+        assert_eq!(b, BitSeq::new(0b01001011, 8));
+
+        b.insert(3, Bit1);
+        assert_eq!(b, BitSeq::new(0b010101011, 9));
     }
 
     #[test]

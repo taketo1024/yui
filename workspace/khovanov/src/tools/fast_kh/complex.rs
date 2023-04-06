@@ -340,23 +340,58 @@ impl TngComplex {
     }
 
     fn simplify_on_deloop(&mut self, k: &KhGen) { 
+        if let Some((i, j)) = self.find_pivot(k) { 
+            self.eliminate(&i.clone(), &j.clone());
+        }
+    }
+
+    fn find_pivot<'a>(&'a self, k: &'a KhGen) -> Option<(&'a KhGen, &'a KhGen)> { 
+        let mut cand = None;
+        let mut cand_s = usize::MAX;
+
+        fn score(v: &TngVertex, w: &TngVertex) -> usize { 
+            let v_out = v.out_edges.len();
+            let w_in  = w.in_edges.len();
+            (v_out - 1) * (w_in - 1)
+        }
+
         let v = self.vertex(k);
-        
-        for k_from in v.in_edges.iter() { 
-            let w = &self.vertices[k_from];
-            let f = &w.out_edges[k];
+
+        for j in v.in_edges.iter() { 
+            let u = &self.vertices[j];
+            let f = &u.out_edges[k];
+            
             if f.is_invertible() { 
-                self.eliminate(&k_from.clone(), k);
-                return;
+                let s = score(u, v);
+                if s == 0 {
+                    info!("({}) good pivot {}: {} -> {}", self.nverts(), f, u, v);
+                    return Some((j, k));
+                } else if s < cand_s { 
+                    cand = Some((j, k));
+                    cand_s = s;
+                }
             }
         }
 
-        for (k_to, f) in v.out_edges.iter() { 
+        for (l, f) in v.out_edges.iter() { 
             if f.is_invertible() { 
-                self.eliminate(k, &k_to.clone());
-                return;
+                let w = self.vertex(l);
+                let s = score(v, w);
+                if s == 0 {
+                    info!("({}) good pivot {}: {} -> {}", self.nverts(), f, v, w);
+                    return Some((k, l));
+                } else if s < cand_s { 
+                    cand = Some((k, l));
+                    cand_s = s;
+                }
             }
         }
+
+        if let Some((k, l)) = cand { 
+            info!("({}) pivot (score: {cand_s}) {}: {} -> {}", self.nverts(), self.edge(k, l), self.vertex(k), self.vertex(l));
+        }
+
+        cand
     }
 
     fn eliminate(&mut self, k0: &KhGen, l0: &KhGen) {
@@ -432,6 +467,10 @@ impl TngComplex {
         // remove v0 and w0.
         self.vertices.remove(k0);
         self.vertices.remove(l0);
+    }
+
+    fn edge(&self, k: &KhGen, l: &KhGen) -> &Mor {
+        &self.vertices[k].out_edges[l]
     }
 
     fn add_edge(&mut self, k: &KhGen, l: &KhGen, f: Mor) { 

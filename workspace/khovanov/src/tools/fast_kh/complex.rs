@@ -174,60 +174,84 @@ impl TngComplex {
     pub fn append(&mut self, x: &Crossing) {
         info!("({}) append: {x}", self.nverts());
 
+        let verts = std::mem::take(&mut self.vertices);
         let sdl = CobComp::from(x);
+        let mut rmv = HashSet::new();
 
-        let c0 = std::mem::take(&mut self.vertices);
-        let c1 = c0.clone();
+        for (_, v) in verts.into_iter() { 
+            let vs = Self::dupl_01(v, &sdl);
+            for v in vs { 
+                for (l, f) in v.out_edges.iter() { 
+                    if f.is_zero() { 
+                        rmv.insert((v.key.clone(), l.clone()));
+                    }
+                }
+                self.vertices.insert(v.key.clone(), v);
+            }
+        }
 
-        let c0 = Self::modify_vertices(c0, &sdl, sdl.src(), Resolution::Res0);
-        let c1 = Self::modify_vertices(c1, &sdl, sdl.tgt(), Resolution::Res1);
+        for (k, l) in rmv { 
+            info!("remove 0-edge: {k} -> {l}");
+            self.remove_edge(&k, &l);
+        }
 
-        self.vertices.extend(c0);
-        self.vertices.extend(c1);
         self.len += 1;
     }
 
-    fn modify_vertices(vertices: HashMap<KhGen, TngVertex>, sdl: &CobComp, t: &Tng, r: Resolution) -> HashMap<KhGen, TngVertex> {
-        let c = Cob::id(t); // t × I
+    fn dupl_01(v: TngVertex, sdl: &CobComp) -> [TngVertex; 2] {
+        use Resolution::{Res0, Res1};
 
-        vertices.into_iter().map(|(k, mut v)| { 
-            let v_in  = std::mem::take(&mut v.in_edges);
-            v.in_edges = v_in.into_iter().map(|mut k| {
-                k.append_state(r);
+        let mut v0 = v.clone();
+        let mut v1 = v;
+
+        v0.key.append_state(Res0);
+        v1.key.append_state(Res1);
+
+        // append 0 / 1 to in_edges.
+        modify!(v0.in_edges, |e: HashSet<KhGen>| { 
+            e.into_iter().map(|mut k| { 
+                k.append_state(Res0);
                 k
-            }).collect();
-    
-            let v_out = std::mem::take(&mut v.out_edges);
-            v.out_edges = v_out.into_iter().map(|(mut k, mut v)| { 
-                k.append_state(r);
-                v = v.connect(&c);
-                
-                if r == Resolution::Res0 { 
-                    (k, v)
-                } else { 
-                    (k, -v)
-                }
-            }).collect();
+            }).collect()
+        });
 
-            if r == Resolution::Res0 { 
-                let mut k1 = k.clone();
-                k1.append_state(Resolution::Res1);
+        modify!(v1.in_edges, |e: HashSet<KhGen>| { 
+            e.into_iter().map(|mut k| { 
+                k.append_state(Res1);
+                k
+            }).collect()
+        });
 
-                let mut f = Cob::id(&v.tng);
-                f.connect_comp(sdl.clone());
-                v.out_edges.insert(k1.clone(), Mor::from(f));
+        // append 0 / 1 to out_edges with id-cob connected.
+        let c0 = Cob::id(sdl.src());
+        let c1 = Cob::id(sdl.tgt());
 
-            } else { 
-                let mut k0 = k.clone();
-                k0.append_state(Resolution::Res0);
-                v.in_edges.insert(k0);
-            }
-    
-            v.key.append_state(r);
-            v.tng.connect(t.clone());
+        modify!(v0.out_edges, |e: HashMap<KhGen, Mor>| { 
+            e.into_iter().map(|(mut k, f)| { 
+                k.append_state(Res0);
+                (k, f.connect(&c0))
+            }).collect()
+        });
 
-            (v.key.clone(), v)
-        }).collect()
+        modify!(v1.out_edges, |e: HashMap<KhGen, Mor>| { 
+            e.into_iter().map(|(mut k, f)| { 
+                k.append_state(Res1);
+                (k, -f.connect(&c1))
+            }).collect()
+        });
+
+        // insert sdl between v0 and v1.
+        let mut f = Cob::id(&v0.tng);
+        f.connect_comp(sdl.clone());
+
+        v0.out_edges.insert(v1.key.clone(), Mor::from(f));
+        v1.in_edges.insert(v0.key.clone());
+
+        // modify tngs of v0 and v1.
+        v0.tng.connect(sdl.src().clone());
+        v1.tng.connect(sdl.tgt().clone());
+
+        [v0, v1]
     }
 
     pub fn deloop(&mut self, simplify: bool) { 
@@ -517,12 +541,14 @@ impl From<&Link> for TngComplex {
     }
 }
 
-#[test]
-fn test() { 
-    let l = Link::from(&[[1, 30, 2, 31], [3, 27, 4, 26], [5, 12, 6, 13], [7, 29, 8, 28], [9, 35, 10, 34], [11, 4, 12, 5], [13, 8, 14, 9], [14, 36, 15, 35], [17, 24, 18, 25], [18, 32, 19, 31], [21, 3, 22, 2], [23, 16, 24, 17], [25, 22, 26, 23], [27, 7, 28, 6], [29, 21, 30, 20], [32, 16, 33, 15], [33, 11, 34, 10], [36, 20, 1, 19]]);
-    let c = TngComplex::from(&l);
-    info!("{:?}", c.iter_verts().map(|x| x.0.state().to_string()).join(", "));
+macro_rules! modify {
+    ($e: expr, $f: expr) => {{
+        let val = std::mem::take(&mut $e);
+        $e = $f(val);
+    }};
 }
+
+pub(self) use modify;
 
 #[cfg(test)]
 mod tests { 

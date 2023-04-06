@@ -105,7 +105,7 @@ impl TngVertex {
 impl Display for TngVertex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let key = {
-            let state = join(self.key.state().values().iter(), "");
+            let state = self.key.state().to_string();
             if self.key.label().is_empty() { 
                 state
             } else { 

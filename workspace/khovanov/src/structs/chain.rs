@@ -44,7 +44,7 @@ impl KhGen {
     }
 
     pub fn append_state(&mut self, r: Resolution) { 
-        self.state.append_b(r)
+        self.state.push(r)
     }
     
     pub fn append_label(&mut self, x: KhAlgLabel) { 
@@ -74,7 +74,7 @@ impl Elem for KhGen {
 impl Display for KhGen {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let label = join(self.label.iter(), "");
-        let state = join(self.state.values().iter().map(|i| subscript(i.as_u8() as isize)), "");
+        let state = join(self.state.iter().map(|i| subscript(i.as_u8() as isize)), "");
         write!(f, "{}{}", label, state)
     }
 }

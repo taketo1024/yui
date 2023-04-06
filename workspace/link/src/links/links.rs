@@ -120,7 +120,7 @@ impl Link {
     pub fn resolved_by(&self, s: &State) -> Self {
         debug_assert!(s.len() <= self.data.len());
         let mut data = self.data.clone();
-        for (i, &r) in s.values().iter().enumerate() {
+        for (i, r) in s.iter().enumerate() {
             data[i].resolve(r);
         }
         Link { data }
@@ -386,7 +386,7 @@ mod tests {
 
     #[test]
     fn link_resolve() {
-        let s = State::from([0, 0, 0]);
+        let s = State::from_iter([0, 0, 0]);
         let l = Link::from(&[[1,4,2,5],[3,6,4,1],[5,2,6,3]]) // trefoil
             .resolved_by(&s);
 
@@ -394,7 +394,7 @@ mod tests {
         assert_eq!(comps.len(), 3);
         assert!(comps.iter().all(|c| c.is_circle()));
 
-        let s = State::from([1, 1, 1]);
+        let s = State::from_iter([1, 1, 1]);
         let l = Link::from(&[[1,4,2,5],[3,6,4,1],[5,2,6,3]]) // trefoil
             .resolved_by(&s);
 

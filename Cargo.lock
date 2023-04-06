@@ -1121,6 +1121,7 @@ dependencies = [
  "serde_json",
  "yui-core",
  "yui-polynomial",
+ "yui-utils",
 ]
 
 [[package]]
@@ -1184,6 +1185,7 @@ dependencies = [
 name = "yui-utils"
 version = "0.1.0"
 dependencies = [
+ "derive_more",
  "itertools",
  "num-traits",
  "prettytable",

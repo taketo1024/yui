@@ -129,29 +129,26 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn new_ht(l: &Link, h: R, t: R) -> Self { 
         let str = KhAlgStr::new(h, t);
-        Self::_new(l, str)
+        Self::new_str(l, str)
     }
     
-    fn _new(l: &Link, str: KhAlgStr<R>) -> Self { 
-        let dim = l.crossing_num() as usize;
-        let m = 2.pow(dim) as usize;
-        let vertices: HashMap<_, _> = (0..m).map(|i| { 
-            let s = State::from_bseq(i, dim);
+    fn new_str(l: &Link, str: KhAlgStr<R>) -> Self { 
+        let n = l.crossing_num() as usize;
+        let vertices: HashMap<_, _> = State::generate(n).into_iter().map(|s| { 
             let v = KhCubeVertex::new(&l, s.clone());
             (s, v)
         }).collect();
 
-        let edges: HashMap<_, _> = (0..m).map(|i| { 
-            let s = State::from_bseq(i, dim);
+        let edges: HashMap<_, _> = vertices.keys().map(|s| { 
             let edges = s.targets().into_iter().map(|t| { 
-                let v = &vertices[&s];
+                let v = &vertices[s];
                 let w = &vertices[&t];
                 (t, KhCubeEdge::edge_between(v, w))
             }).collect_vec();
-            (s, edges)
+            (s.clone(), edges)
         }).collect();
 
-        KhCube { str, dim, vertices, edges }
+        KhCube { str, dim: n, vertices, edges }
     }
 
     pub fn structure(&self) -> &KhAlgStr<R> {
@@ -169,11 +166,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn q_range(&self) -> RangeInclusive<isize> { 
         let n = self.dim;
 
-        let s0 = State::from_bseq(0, n);
+        let s0 = State::zeros(n);
         let v0 = self.vertex(&s0);
         let q0 = -(v0.circles.len() as isize); // tensor factors are all X
 
-        let s1 = State::from_bseq((2.pow(n) - 1) as usize, n);
+        let s1 = State::ones(n);
         let v1 = self.vertex(&s1);
         let q1 = (n + v1.circles.len()) as isize; // tensor factors are all 1
 
@@ -316,8 +313,8 @@ mod tests {
     #[test]
     fn edge_merge() { 
         let l = Link::from(&[[0, 0, 1, 1]]);
-        let s = State::from([0]);
-        let t = State::from([1]);
+        let s = State::from_iter([0]);
+        let t = State::from_iter([1]);
         let v = KhCubeVertex::new(&l, s);
         let w = KhCubeVertex::new(&l, t);
         let e = KhCubeEdge::edge_between(&v, &w);
@@ -334,8 +331,8 @@ mod tests {
     #[test]
     fn edge_split() { 
         let l = Link::from(&[[0, 1, 1, 0]]);
-        let s = State::from([0]);
-        let t = State::from([1]);
+        let s = State::from_iter([0]);
+        let t = State::from_iter([1]);
         let v = KhCubeVertex::new(&l, s);
         let w = KhCubeVertex::new(&l, t);
         let e = KhCubeEdge::edge_between(&v, &w);
@@ -351,23 +348,23 @@ mod tests {
 
     #[test]
     fn edge_sign() { 
-        let s = State::from([0, 0, 0]);
-        let t = State::from([1, 0, 0]);
+        let s = State::from_iter([0, 0, 0]);
+        let t = State::from_iter([1, 0, 0]);
         let e = KhCubeEdge::sign_between(&s, &t);
         assert!(e.is_positive());
 
-        let s = State::from([1, 0, 0]);
-        let t = State::from([1, 1, 0]);
+        let s = State::from_iter([1, 0, 0]);
+        let t = State::from_iter([1, 1, 0]);
         let e = KhCubeEdge::sign_between(&s, &t);
         assert!(e.is_negative());
 
-        let s = State::from([1, 1, 0]);
-        let t = State::from([1, 1, 1]);
+        let s = State::from_iter([1, 1, 0]);
+        let t = State::from_iter([1, 1, 1]);
         let e = KhCubeEdge::sign_between(&s, &t);
         assert!(e.is_positive());
 
-        let s = State::from([0, 1, 0]);
-        let t = State::from([0, 1, 1]);
+        let s = State::from_iter([0, 1, 0]);
+        let t = State::from_iter([0, 1, 1]);
         let e = KhCubeEdge::sign_between(&s, &t);
         assert!(e.is_negative());
     }
@@ -415,8 +412,8 @@ mod tests {
         assert_eq!(cube.dim, 1);
         assert_eq!(cube.vertices.len(), 2);
 
-        let s0 = State::from([0]);
-        let s1 = State::from([1]);
+        let s0 = State::from_iter([0]);
+        let s1 = State::from_iter([1]);
 
         let v0 = cube.vertex(&s0);
         let v1 = cube.vertex(&s1);

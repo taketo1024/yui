@@ -15,12 +15,9 @@ pub fn jones_polynomial(l: &Link) -> LPoly<'q', i32> {
     let a = e * q.pow(n_pos - 2 * n_neg); // a = (-1)^{n^-} q^{n^+ - 2n^-}
 
     let q0: P = &q + q.pow(-1);
-    let body: P = (0..2.pow(n)).map(|i| { 
-        let i = i as usize;
-        let s = State::from_bseq(i, n);
-        let l_s = l.resolved_by(&s);
-
+    let body: P = State::generate(n).into_iter().map(|s| { 
         let w = s.weight();
+        let l_s = l.resolved_by(&s);
         let r = l_s.components().len();
 
         (-&q).pow(w) * q0.pow(r) // (-q)^w (q + q^{-1})^r

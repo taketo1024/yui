@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::fmt::Display;
 use std::ops::RangeInclusive;
 
 use itertools::Itertools;
@@ -12,6 +13,12 @@ use yui_link::{Crossing, Resolution, Link};
 use crate::{KhAlgLabel, KhComplex, KhGen};
 use super::cob::{Cob, Dot, Bottom, CobComp};
 use super::tng::{Tng, TngComp};
+
+// MEMO remove 
+#[cfg(not(test))] 
+use log::info; 
+#[cfg(test)]
+use std::println as info;
 
 type Mor = LinComb<Cob, i32>; // Z-linear combination of cobordisms.
 
@@ -78,8 +85,9 @@ impl MorTrait for Mor {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TngVertex { 
+    key: KhGen,
     tng: Tng,
     in_edges: HashSet<KhGen>,
     out_edges: HashMap<KhGen, Mor>
@@ -87,10 +95,17 @@ pub struct TngVertex {
 
 impl TngVertex { 
     pub fn init() -> Self { 
+        let key = KhGen::init();
         let tng = Tng::empty();
         let in_edges = HashSet::new();
         let out_edges = HashMap::new();
-        Self { tng, in_edges, out_edges }
+        Self { key, tng, in_edges, out_edges }
+    }
+}
+
+impl Display for TngVertex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{{{}; {:?}; {}}}", self.key.state(), self.key.label(), self.tng)
     }
 }
 
@@ -128,6 +143,10 @@ impl TngComplex {
         &self.vertices[v]
     }
 
+    pub fn nverts(&self) -> usize { 
+        self.vertices.len()
+    }
+
     //                          d0
     //                 C[i]#x0 ---> C[i+1]#x0
     //                   |             :
@@ -140,6 +159,8 @@ impl TngComplex {
     //          [f  -d1]
 
     pub fn append(&mut self, x: &Crossing) {
+        info!("({}) append: {x}", self.nverts());
+
         let sdl = CobComp::from(x);
 
         let c0 = std::mem::take(&mut self.vertices);
@@ -156,15 +177,15 @@ impl TngComplex {
     fn modify_vertices(vertices: HashMap<KhGen, TngVertex>, sdl: &CobComp, t: &Tng, r: Resolution) -> HashMap<KhGen, TngVertex> {
         let c = Cob::id(t); // t × I
 
-        vertices.into_iter().map(|(mut k, mut v)| { 
-            let in_edges  = std::mem::take(&mut v.in_edges);
-            v.in_edges = in_edges.into_iter().map(|mut k| {
+        vertices.into_iter().map(|(k, mut v)| { 
+            let v_in  = std::mem::take(&mut v.in_edges);
+            v.in_edges = v_in.into_iter().map(|mut k| {
                 k.append_state(r);
                 k
             }).collect();
     
-            let out_edges = std::mem::take(&mut v.out_edges);
-            v.out_edges = out_edges.into_iter().map(|(mut k, mut v)| { 
+            let v_out = std::mem::take(&mut v.out_edges);
+            v.out_edges = v_out.into_iter().map(|(mut k, mut v)| { 
                 k.append_state(r);
                 v = v.connect(&c);
                 
@@ -189,10 +210,10 @@ impl TngComplex {
                 v.in_edges.insert(k0);
             }
     
-            k.append_state(r);
+            v.key.append_state(r);
             v.tng.connect(t.clone());
 
-            (k, v)
+            (v.key.clone(), v)
         }).collect()
     }
 
@@ -217,15 +238,17 @@ impl TngComplex {
     }
 
     fn deloop_at(&mut self, k: &KhGen, r: usize) -> (KhGen, KhGen) { 
+        info!("({}) deloop {} at {r}", self.nverts(), &self.vertices[k]);
+
         let mut v0 = self.vertices.remove(k).unwrap();
         let c = v0.tng.remove_at(r);
         let mut v1 = v0.clone();
 
-        let mut k0 = k.clone();
-        let mut k1 = k.clone();
+        v0.key.append_label(KhAlgLabel::X);
+        v1.key.append_label(KhAlgLabel::I);
 
-        k0.append_label(KhAlgLabel::X);
-        k1.append_label(KhAlgLabel::I);
+        let k0 = &v0.key;
+        let k1 = &v1.key;
 
         let v0_in = v0.in_edges.iter().cloned().collect_vec();
         for j in v0_in.iter() { 
@@ -271,6 +294,9 @@ impl TngComplex {
             }
         }
         
+        let k0 = k0.clone();
+        let k1 = k1.clone();
+
         self.vertices.insert(k0.clone(), v0);
         self.vertices.insert(k1.clone(), v1);
 
@@ -298,9 +324,12 @@ impl TngComplex {
     }
 
     fn eliminate(&mut self, k0: &KhGen, l0: &KhGen) {
+
         let v0 = self.vertex(k0);
         let w0 = self.vertex(l0);
         let a = &v0.out_edges[l0];
+
+        println!("({}) eliminate {}: {} -> {}", self.nverts(), a, &v0, &w0);
 
         let Some(ainv) = a.inv() else { 
             panic!()
@@ -461,12 +490,17 @@ impl TngComplex {
 
 impl From<&Link> for TngComplex {
     fn from(l: &Link) -> Self {
+        info!("construct TngComplex.");
+
         let deg_shift = KhComplex::<i64>::deg_shift_for(l, false);
         let mut c = TngComplex::new(deg_shift);
         for x in l.data() {
             c.append(x);
             c.deloop(true);
         }
+
+        info!("result: #v = {}", c.vertices.len());
+
         c
     }
 }

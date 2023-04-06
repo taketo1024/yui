@@ -180,9 +180,9 @@ impl CobComp {
     }
 
     pub fn is_zero(&self) -> bool { 
-        self.is_sph() && 
-        (self.dots == (0, 0) || // ε.ι = 0,
-         self.dots == (1, 1))   // ε.XY.ι = ε.T.ι = 0.
+        self.is_closed() && 
+        self.genus % 2 == 0 &&
+        self.dots.0 == self.dots.1 // XY = T
     }
 
     pub fn is_removable(&self) -> bool { 

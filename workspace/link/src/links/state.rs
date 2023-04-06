@@ -4,7 +4,7 @@ use itertools::{join, Itertools};
 use super::Resolution;
 use Resolution::{Res0, Res1};
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Ord)]
 pub struct State { 
     values: Vec<Resolution>
 }
@@ -87,6 +87,18 @@ impl fmt::Display for State {
     }
 }
 
+impl PartialOrd for State {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(
+            self.len().cmp(&other.len()).then_with( ||
+                self.weight().cmp(&other.weight())
+            ).then_with( ||
+                self.values.cmp(&other.values).reverse()
+            )
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests { 
     use super::*;
@@ -113,5 +125,14 @@ mod tests {
 
         let s = State::from(vec![1, 1, 1]);
         assert_eq!(s.targets(), vec![]);
+    }
+
+    #[test]
+    fn order() { 
+        let l = 3;
+        let ss = (0..2_usize.pow(l)).map(|i| State::from_bseq(i, l as usize));
+        let ss = ss.sorted().collect_vec();
+        
+        assert_eq!(ss, [[0, 0, 0],[1, 0, 0],[0, 1, 0],[0, 0, 1],[1, 1, 0],[1, 0, 1],[0, 1, 1],[1, 1, 1]].map(|v| State::from(v)));
     }
 }

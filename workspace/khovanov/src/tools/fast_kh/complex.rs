@@ -123,6 +123,8 @@ impl TngComplex {
         }
 
         self.len += 1;
+
+        debug_assert!(self.validate_edges());
     }
 
     fn dupl_01(v: TngVertex, sdl: &CobComp) -> [TngVertex; 2] {
@@ -263,6 +265,8 @@ impl TngComplex {
         self.vertices.insert(k0.clone(), v0);
         self.vertices.insert(k1.clone(), v1);
 
+        debug_assert!(self.validate_edges());
+
         (k0, k1)
     }
 
@@ -327,7 +331,7 @@ impl TngComplex {
         let w0 = self.vertex(l0);
         let a = &v0.out_edges[l0];
 
-        println!("({}) eliminate {}: {} -> {}", self.nverts(), a, &v0, &w0);
+        info!("({}) eliminate {}: {} -> {}", self.nverts(), a, &v0, &w0);
 
         let Some(ainv) = a.inv() else { 
             panic!()
@@ -394,6 +398,8 @@ impl TngComplex {
         // remove v0 and w0.
         self.vertices.remove(k0);
         self.vertices.remove(l0);
+
+        debug_assert!(self.validate_edges());
     }
 
     fn edge(&self, k: &KhEnhState, l: &KhEnhState) -> &Mor {
@@ -424,7 +430,7 @@ impl TngComplex {
 
     pub fn as_generic<R>(&self, h: R, t: R) -> GenericChainComplex<R, RangeInclusive<isize>> 
     where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> {
-        assert!(self.is_completely_delooped());
+        debug_assert!(self.is_completely_delooped());
 
         // TODO improve construction. 
 
@@ -458,10 +464,10 @@ impl TngComplex {
             }
             str += "\n";
         }
-        println!("{str}");
+        info!("{str}");
     }
 
-    fn validate_edges(&self) {
+    fn validate_edges(&self) -> bool {
         for (k, v) in self.vertices.iter() { 
             for j in v.in_edges.iter() {
                 assert!(
@@ -474,7 +480,7 @@ impl TngComplex {
                     "no out-edge {j} -> {k}"
                 );
             }
-            for (l, _f) in v.out_edges.iter() {
+            for (l, f) in v.out_edges.iter() {
                 assert!(
                     self.vertices.contains_key(l),
                     "no vertex for out-edge {k} -> {l}"
@@ -484,9 +490,10 @@ impl TngComplex {
                     w.in_edges.contains(k),
                     "no in-edge {k} -> {l}"
                 );
-                // assert!(!f.is_zero());
+                assert!(!f.is_zero());
             }
         }
+        true
     }
 }
 

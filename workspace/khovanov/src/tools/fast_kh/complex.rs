@@ -8,9 +8,9 @@ use num_traits::Zero;
 use cartesian::cartesian;
 use yui_core::{Ring, RingOps};
 use yui_homology::{GenericChainComplex, FreeRModStr};
-use yui_link::{Crossing, Resolution, Link, Edge};
+use yui_link::{Crossing, Resolution};
 
-use crate::{KhAlgGen, KhComplex, KhEnhState};
+use crate::{KhAlgGen, KhEnhState};
 use super::cob::{Cob, Dot, Bottom, CobComp};
 use super::tng::Tng;
 use super::mor::{Mor, MorTrait};
@@ -81,10 +81,24 @@ impl TngComplex {
         self.vertices.iter().sorted_by(|(k0, _), (k1, _)| k0.cmp(k1))
     }
 
-    pub fn endpts(&self) -> HashSet<Edge> { 
-        // MEMO: all tngs have common endpts. 
-        let v = self.vertices.iter().next().unwrap().1;
-        v.tng.endpts()
+    pub fn edge(&self, k: &KhEnhState, l: &KhEnhState) -> &Mor {
+        &self.vertices[k].out_edges[l]
+    }
+
+    fn add_edge(&mut self, k: &KhEnhState, l: &KhEnhState, f: Mor) { 
+        let v = self.vertices.get_mut(k).unwrap();
+        v.out_edges.insert(l.clone(), f);
+
+        let w = self.vertices.get_mut(l).unwrap();
+        w.in_edges.insert(k.clone());
+    }
+
+    fn remove_edge(&mut self, k: &KhEnhState, l: &KhEnhState) { 
+        let v = self.vertices.get_mut(k).unwrap();
+        v.out_edges.remove(l);
+
+        let w = self.vertices.get_mut(l).unwrap();
+        w.in_edges.remove(k);
     }
 
     //                          d0
@@ -118,7 +132,6 @@ impl TngComplex {
         }
 
         for (k, l) in rmv { 
-            info!("remove 0-edge: {k} -> {l}");
             self.remove_edge(&k, &l);
         }
 
@@ -183,17 +196,7 @@ impl TngComplex {
         [v0, v1]
     }
 
-    pub fn deloop(&mut self, simplify: bool) { 
-        while let Some((k, r)) = self.find_loop() { 
-            let (k0, k1) = self.deloop_at(&k, r);
-            if simplify { 
-                self.simplify_on_deloop(&k0);
-                self.simplify_on_deloop(&k1);
-            }
-        }
-    }
-
-    fn find_loop(&self) -> Option<(KhEnhState, usize)> { 
+    pub fn find_loop(&self) -> Option<(KhEnhState, usize)> { 
         for (k, v) in self.iter_verts() { 
             if let Some(r) = v.tng.find_loop() { 
                 return Some((k.clone(), r))
@@ -202,7 +205,7 @@ impl TngComplex {
         None
     }
 
-    fn deloop_at(&mut self, k: &KhEnhState, r: usize) -> (KhEnhState, KhEnhState) { 
+    pub fn deloop(&mut self, k: &KhEnhState, r: usize) -> (KhEnhState, KhEnhState) { 
         info!("({}) deloop {} at {r}", self.nverts(), &self.vertices[k]);
 
         let mut v0 = self.vertices.remove(k).unwrap();
@@ -270,13 +273,7 @@ impl TngComplex {
         (k0, k1)
     }
 
-    fn simplify_on_deloop(&mut self, k: &KhEnhState) { 
-        if let Some((i, j)) = self.find_pivot(k) { 
-            self.eliminate(&i.clone(), &j.clone());
-        }
-    }
-
-    fn find_pivot<'a>(&'a self, k: &'a KhEnhState) -> Option<(&'a KhEnhState, &'a KhEnhState)> { 
+    pub fn find_pivot<'a>(&'a self, k: &'a KhEnhState) -> Option<(&'a KhEnhState, &'a KhEnhState)> { 
         let mut cand = None;
         let mut cand_s = usize::MAX;
 
@@ -325,8 +322,7 @@ impl TngComplex {
         cand
     }
 
-    fn eliminate(&mut self, k0: &KhEnhState, l0: &KhEnhState) {
-
+    pub fn eliminate(&mut self, k0: &KhEnhState, l0: &KhEnhState) {
         let v0 = self.vertex(k0);
         let w0 = self.vertex(l0);
         let a = &v0.out_edges[l0];
@@ -402,32 +398,6 @@ impl TngComplex {
         debug_assert!(self.validate_edges());
     }
 
-    fn edge(&self, k: &KhEnhState, l: &KhEnhState) -> &Mor {
-        &self.vertices[k].out_edges[l]
-    }
-
-    fn add_edge(&mut self, k: &KhEnhState, l: &KhEnhState, f: Mor) { 
-        let v = self.vertices.get_mut(k).unwrap();
-        v.out_edges.insert(l.clone(), f);
-
-        let w = self.vertices.get_mut(l).unwrap();
-        w.in_edges.insert(k.clone());
-    }
-
-    fn remove_edge(&mut self, k: &KhEnhState, l: &KhEnhState) { 
-        let v = self.vertices.get_mut(k).unwrap();
-        v.out_edges.remove(l);
-
-        let w = self.vertices.get_mut(l).unwrap();
-        w.in_edges.remove(k);
-    }
-
-    pub fn is_completely_delooped(&self) -> bool { 
-        self.vertices.iter().all(|(_, v)|
-            v.tng.is_empty()
-        )
-    }
-
     pub fn as_generic<R>(&self, h: R, t: R) -> GenericChainComplex<R, RangeInclusive<isize>> 
     where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> {
         debug_assert!(self.is_completely_delooped());
@@ -452,6 +422,12 @@ impl TngComplex {
         }).collect())
     }
 
+    fn is_completely_delooped(&self) -> bool { 
+        self.vertices.iter().all(|(_, v)|
+            v.tng.is_empty()
+        )
+    }
+
     pub fn describe(&self) { 
         let mut str = "".to_string();
         for k0 in self.vertices.keys().sorted() { 
@@ -467,7 +443,7 @@ impl TngComplex {
         info!("{str}");
     }
 
-    fn validate_edges(&self) -> bool {
+    pub fn validate_edges(&self) -> bool {
         for (k, v) in self.vertices.iter() { 
             for j in v.in_edges.iter() {
                 assert!(
@@ -497,49 +473,6 @@ impl TngComplex {
     }
 }
 
-impl From<&Link> for TngComplex {
-    fn from(l: &Link) -> Self {
-        info!("construct TngComplex.");
-
-        fn take_best<'a>(c: &TngComplex, xs: &mut Vec<&'a Crossing>) -> Option<&'a Crossing> { 
-            if xs.is_empty() { return None }
-
-            let endpts = c.endpts();
-            if endpts.is_empty() { 
-                return Some(xs.remove(0));
-            }
-
-            let mut cand_i = 0;
-            let mut cand_c = 0;
-
-            for (i, x) in xs.iter().enumerate() { 
-                let c = x.edges().iter().filter(|e| endpts.contains(e)).count();
-                if c == 4 { 
-                    return Some(xs.remove(i));
-                } else if c > cand_c { 
-                    cand_i = i;
-                    cand_c = c;
-                }
-            }
-
-            Some(xs.remove(cand_i))
-        }
-
-        let deg_shift = KhComplex::<i64>::deg_shift_for(l, false);
-        let mut c = TngComplex::new(deg_shift);
-        let mut xs = l.data().iter().collect_vec();
-
-        while let Some(x) = take_best(&c, &mut xs) { 
-            c.append(x);
-            c.deloop(true);
-        }
-
-        info!("result: #v = {}", c.vertices.len());
-
-        c
-    }
-}
-
 macro_rules! modify {
     ($e: expr, $f: expr) => {{
         let val = std::mem::take(&mut $e);
@@ -552,8 +485,7 @@ pub(self) use modify;
 #[cfg(test)]
 mod tests { 
     use yui_link::*;
-    use yui_homology::*;
-    use yui_homology::test::ChainComplexValidation;
+    use crate::KhLabel;
     use crate::tools::fast_kh::tng::TngComp;
 
     use super::*;
@@ -637,172 +569,25 @@ mod tests {
         assert_eq!(c.rank(1), 2);
         assert_eq!(c.rank(2), 1);
 
-        c.deloop(false);
+        let e = c.find_loop();
+        assert!(e.is_some());
+
+        let Some((k, r)) = e else { panic!() };
+
+        dbg!(k.to_string());
+        dbg!(r);
+
+        assert_eq!(k, KhEnhState::new(
+            State::from_iter([1,0]), 
+            KhLabel::from_iter([])
+        ));
+        assert_eq!(r, 2);
+
+        c.deloop(&k, r);
 
         assert_eq!(c.len(), 3);
         assert_eq!(c.rank(0), 1);
         assert_eq!(c.rank(1), 3); // delooped here
         assert_eq!(c.rank(2), 1);
-    }
-
-    #[test]
-    fn trefoil_no_deloop() { 
-        let mut c = TngComplex::new((0, 0));
-        let l = Link::trefoil();
-
-        for x in l.data() {
-            c.append(x);
-        }
-
-        assert_eq!(c.len(), 4);
-
-        assert_eq!(c.rank(0), 1);
-        assert_eq!(c.rank(1), 3);
-        assert_eq!(c.rank(2), 3);
-        assert_eq!(c.rank(3), 1);
-    }
-
-    #[test]
-    fn trefoil_deloop() { 
-        let mut c = TngComplex::new((0, 0));
-        let l = Link::trefoil();
-
-        for x in l.data() {
-            c.append(x);
-            c.deloop(false);
-        }
-
-        assert_eq!(c.len(), 4);
-
-        assert_eq!(c.rank(0), 8);
-        assert_eq!(c.rank(1), 12);
-        assert_eq!(c.rank(2), 6);
-        assert_eq!(c.rank(3), 4);
-
-        let c = c.as_generic(0, 0);
-        let h = c.homology(); // TODO should shift degree
-
-        assert_eq!(h[0].rank(), 1);
-        assert_eq!(h[0].is_free(), true);
-
-        assert_eq!(h[1].rank(), 1);
-        assert_eq!(h[1].tors(), &vec![2]);
-        
-        assert_eq!(h[2].is_zero(), true);
-        assert_eq!(h[2].is_free(), true);
-        
-        assert_eq!(h[3].rank(), 2);
-        assert_eq!(h[3].is_free(), true);
-    }
-
-    #[test]
-    fn trefoil_deloop_simplify() { 
-        let mut c = TngComplex::new((0, 0));
-        let l = Link::trefoil();
-
-        for x in l.data() {
-            c.append(x);
-            c.deloop(true);
-        }
-
-        assert_eq!(c.len(), 4);
-
-        assert_eq!(c.rank(0), 2);
-        assert_eq!(c.rank(1), 2);
-        assert_eq!(c.rank(2), 0);
-        assert_eq!(c.rank(3), 2);
-
-        let c = c.as_generic(0, 0);
-        let h = c.homology(); // TODO should shift degree
-
-        assert_eq!(h[0].rank(), 1);
-        assert_eq!(h[0].is_free(), true);
-
-        assert_eq!(h[1].rank(), 1);
-        assert_eq!(h[1].tors(), &vec![2]);
-        
-        assert_eq!(h[2].is_zero(), true);
-        assert_eq!(h[2].is_free(), true);
-        
-        assert_eq!(h[3].rank(), 2);
-        assert_eq!(h[3].is_free(), true);
-    }
-
-    #[test]
-    fn test_unknot_rm1() {
-        let l = Link::from(&[[0,0,1,1]]);
-        let c = TngComplex::from(&l);
-        let c = c.as_generic(0, 0);
-
-        assert_eq!(c[0].rank(), 2);
-        assert_eq!(c[1].rank(), 0);
-
-        let l = Link::from(&[[0,1,1,0]]);
-        let c = TngComplex::from(&l);
-        let c = c.as_generic(0, 0);
-
-        assert_eq!(c[-1].rank(), 0);
-        assert_eq!(c[0].rank(), 2);
-    }
-
-    #[test]
-    fn test_unknot_rm2() {
-        let l = Link::from(&[[1,4,2,1],[2,4,3,3]]);
-        let c = TngComplex::from(&l);
-        let c = c.as_generic(0, 0);
-
-        assert_eq!(c[-1].rank(), 0);
-        assert_eq!(c[0].rank(), 2);
-        assert_eq!(c[1].rank(), 0);
-    }
-
-    #[test]
-    fn test_unlink_2() {
-        let pd_code = [[1,2,3,4], [3,2,1,4]];
-        let l = Link::from(&pd_code);
-        let c = TngComplex::from(&l);
-        let c = c.as_generic(0, 0);
-
-        assert_eq!(c[-1].rank(), 0);
-        assert_eq!(c[0].rank(), 4);
-        assert_eq!(c[1].rank(), 0);
-    }
-
-    #[test]
-    fn test_hopf_link() {
-        let l = Link::hopf_link();
-        let c = TngComplex::from(&l);
-        let c = c.as_generic(0, 0);
-
-        assert_eq!(c[-2].rank(), 2);
-        assert_eq!(c[-1].rank(), 0);
-        assert_eq!(c[0].rank(), 2);
-    }
-
-    #[test]
-    fn test_8_19() {
-        let l = Link::from(&[[4,2,5,1],[8,4,9,3],[9,15,10,14],[5,13,6,12],[13,7,14,6],[11,1,12,16],[15,11,16,10],[2,8,3,7]]);
-        let c = TngComplex::from(&l);
-        let c = c.as_generic(0, 0);
-
-        c.check_d_all();
-
-        let h = c.homology();
-
-        for i in [1,6,7,8] {
-            assert_eq!(h[i].rank(), 0);
-            assert_eq!(h[i].is_free(), true);
-        }
-
-        for i in [0,4,5] {
-            assert_eq!(h[i].rank(), 2);
-            assert_eq!(h[i].is_free(), true);
-        }
-
-        assert_eq!(h[2].rank(), 1);
-        assert_eq!(h[2].is_free(), true);
-
-        assert_eq!(h[3].rank(), 1);
-        assert_eq!(h[3].tors(), &vec![2]);
     }
 }

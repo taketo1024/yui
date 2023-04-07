@@ -273,7 +273,7 @@ impl TngComplex {
         (k0, k1)
     }
 
-    pub fn find_pivot<'a>(&'a self, k: &'a KhEnhState) -> Option<(&'a KhEnhState, &'a KhEnhState)> { 
+    pub fn find_inv_edge<'a>(&'a self, k: &'a KhEnhState) -> Option<(&'a KhEnhState, &'a KhEnhState)> { 
         let mut cand = None;
         let mut cand_s = usize::MAX;
 
@@ -283,28 +283,20 @@ impl TngComplex {
             (v_out - 1) * (w_in - 1)
         }
 
+        // collect candidate edges into v, and out from v. 
+
         let v = self.vertex(k);
+        let edges = v.in_edges.iter().map(|j| (j, k)).chain(
+            v.out_edges.keys().map(|l| (k, l))
+        );
 
-        for j in v.in_edges.iter() { 
-            let u = &self.vertices[j];
-            let f = &u.out_edges[k];
-            
+        for (k, l) in edges { 
+            let f = self.edge(k, l);
             if f.is_invertible() { 
-                let s = score(u, v);
-                if s == 0 {
-                    info!("({}) good pivot {}: {} -> {}", self.nverts(), f, u, v);
-                    return Some((j, k));
-                } else if s < cand_s { 
-                    cand = Some((j, k));
-                    cand_s = s;
-                }
-            }
-        }
-
-        for (l, f) in v.out_edges.iter() { 
-            if f.is_invertible() { 
+                let v = self.vertex(k);
                 let w = self.vertex(l);
                 let s = score(v, w);
+
                 if s == 0 {
                     info!("({}) good pivot {}: {} -> {}", self.nverts(), f, v, w);
                     return Some((k, l));

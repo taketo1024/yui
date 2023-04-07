@@ -86,7 +86,7 @@ impl TngComplexBuilder {
         while let Some((k, r)) = c.find_loop() { 
             let (k0, k1) = c.deloop(&k, r);
             for k in [k0, k1] { 
-                if let Some((i, j)) = c.find_pivot(&k) { 
+                if let Some((i, j)) = c.find_inv_edge(&k) { 
                     c.eliminate(&i.clone(), &j.clone());
                 }
             }

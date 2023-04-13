@@ -7,11 +7,11 @@ pub use r_mod_str::GenericRModStr;
 mod r_mod_grid;
 pub use r_mod_grid::GenericRModGrid;
 
-mod free;
-pub use free::FreeRModStr;
-
 mod complex;
 pub use complex::GenericChainComplex;
 
 mod homology;
 pub use homology::GenericHomology;
+
+mod free;
+pub use free::{FreeRModStr, FreeChainComplex};

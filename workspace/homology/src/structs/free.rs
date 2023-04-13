@@ -1,9 +1,10 @@
 use std::fmt::Display;
 use std::collections::HashMap;
+use std::ops::Index;
 use yui_core::{Ring, RingOps};
 use yui_matrix::sparse::{SpMat, SpVec};
 use yui_lin_comb::{FreeGen, LinComb};
-use crate::RModStr;
+use crate::{RModStr, RModGrid, GridItr, GridIdx, GenericRModGrid, Grid, ChainComplex};
 
 pub struct FreeRModStr<X, R>
 where 
@@ -96,5 +97,99 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.fmt_default(f)
+    }
+}
+
+pub struct FreeChainComplex<X, R, I>
+where 
+    X: FreeGen,
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    I: GridItr, I::Item: GridIdx
+{
+    grid: GenericRModGrid<FreeRModStr<X, R>, I>,
+    d_degree: I::Item,
+    d_map: Box<dyn Fn(&X) -> Vec<(X, R)>>
+}
+
+impl<X, R, I> FreeChainComplex<X, R, I>
+where 
+    X: FreeGen,
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    I: GridItr, I::Item: GridIdx
+{
+    pub fn new<F1, F2>(range: I, d_degree: I::Item, gens: F1, d_maps: F2) -> Self
+    where F1: Fn(I::Item) -> Vec<X>, F2: Fn(&X) -> Vec<(X, R)> + 'static { 
+        let grid = GenericRModGrid::new(range, |i| { 
+            FreeRModStr::new(gens(i))
+        });
+        let d_maps = Box::new(d_maps);
+        Self { grid, d_degree, d_map: d_maps }
+    }
+
+    pub fn differentiate_x(&self, x: &X) -> Vec<(X, R)> {
+        (self.d_map)(x)
+    }
+
+    pub fn differetiate(&self, z: &LinComb<X, R>) -> LinComb<X, R> { 
+        z.apply(|x| self.differentiate_x(x))
+    }
+}
+
+impl<X, R, I> Display for FreeChainComplex<X, R, I>
+where 
+    X: FreeGen,
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    I: GridItr, I::Item: GridIdx
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.fmt_default(f, "C")
+    }
+}
+
+impl<X, R, I> Index<I::Item> for FreeChainComplex<X, R, I>
+where 
+    X: FreeGen,
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    I: GridItr, I::Item: GridIdx
+{
+    type Output = FreeRModStr<X, R>;
+
+    fn index(&self, index: I::Item) -> &Self::Output {
+        &self.grid[index]
+    }
+}
+
+impl<X, R, I> Grid for FreeChainComplex<X, R, I>
+where 
+    X: FreeGen,
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    I: GridItr, I::Item: GridIdx
+{
+    type Idx = I::Item;
+    type IdxIter = I;
+
+    fn contains_idx(&self, k: Self::Idx) -> bool {
+        self.grid.contains_idx(k)
+    }
+
+    fn indices(&self) -> Self::IdxIter {
+        self.grid.indices()
+    }
+}
+
+impl<X, R, I> ChainComplex for FreeChainComplex<X, R, I>
+where 
+    X: FreeGen,
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    I: GridItr, I::Item: GridIdx
+{
+    fn d_degree(&self) -> Self::Idx {
+        self.d_degree
+    }
+
+    fn d_matrix(&self, k: Self::Idx) -> SpMat<Self::R> {
+        let c0 = &self[k];
+        let c1 = &self[k + self.d_degree];
+        c0.make_matrix(c1, &self.d_map)
     }
 }

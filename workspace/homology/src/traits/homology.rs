@@ -6,15 +6,7 @@ pub trait Homology: RModGrid
 where 
     Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>,
     Self::Output: RModStr<R = Self::R>
-{
-    fn is_zero(&self) -> bool {
-        self.indices().all(|i| self[i].is_zero())
-    }
-
-    fn is_free(&self) -> bool {
-        self.indices().all(|i| self[i].is_free())
-    }
-}
+{}
 
 pub trait HomologyComputable<S>: ChainComplex
 where 

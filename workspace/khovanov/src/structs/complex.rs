@@ -1,12 +1,12 @@
-use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::{RangeInclusive, Index};
+use std::rc::Rc;
 use std::vec::IntoIter;
 
 use yui_core::{Ring, RingOps};
 use yui_matrix::sparse::SpMat;
 use yui_link::Link;
-use yui_homology::{Idx2, Idx2Iter, RModGrid, GenericRModGrid, FreeRModStr, ChainComplex, Grid, RModStr};
+use yui_homology::{Idx2, Idx2Iter, Grid, ChainComplex, FreeRModStr, FreeChainComplex};
 
 use crate::{KhAlgStr, KhEnhState, KhCube, KhChain};
 
@@ -14,8 +14,8 @@ pub type KhComplexSummand<R> = FreeRModStr<KhEnhState, R>;
 pub struct KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     link: Link,
-    cube: KhCube<R>,
-    grid: GenericRModGrid<KhComplexSummand<R>, RangeInclusive<isize>>,
+    str: KhAlgStr<R>,
+    complex: FreeChainComplex<KhEnhState, R, RangeInclusive<isize>>,
     reduced: bool
 }
 
@@ -23,22 +23,30 @@ impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn new(link: Link, h: R, t: R, reduced: bool) -> Self { 
         let cube = KhCube::new_ht(&link, h, t);
+        let str = cube.structure().clone();
 
         let i0 = Self::deg_shift_for(&link, reduced).0;
         let range = cube.h_range().shift(i0);
 
-        let grid = GenericRModGrid::new(range, |i| {
-            let i = i - i0;
-            let gens = if reduced {
-                let e = link.first_edge().unwrap();
-                cube.reduced_generators(i, e)
-            } else { 
-                cube.generators(i) 
-            };
-            FreeRModStr::new(gens)
-        });
+        let cube0 = Rc::new(cube);
+        let cube1 = cube0.clone();
 
-        KhComplex { link, cube, grid, reduced }
+        let complex = FreeChainComplex::new(range, 1, 
+            |i| {
+                let i = i - i0;
+                if reduced {
+                    let e = link.first_edge().unwrap();
+                    cube0.reduced_generators(i, e)
+                } else { 
+                    cube0.generators(i) 
+                }
+            },
+            move |x| { 
+                cube1.differentiate(x)
+            }
+        );
+
+        KhComplex { link, str, complex, reduced }
     }
 
     pub fn unreduced(l: Link) -> Self { 
@@ -62,7 +70,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn structure(&self) -> &KhAlgStr<R> {
-        self.cube.structure()
+        &self.str
     }
 
     pub fn deg_shift(&self) -> (isize, isize) { 
@@ -73,13 +81,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.reduced
     }
 
-    // TODO abstract as FreeChainComplex
     pub fn differentiate_x(&self, x: &KhEnhState) -> Vec<(KhEnhState, R)> {
-        self.cube.differentiate(x)
+        self.complex.differentiate_x(x)
     }
 
     pub fn differetiate(&self, z: &KhChain<R>) -> KhChain<R> { 
-        z.apply(|x| self.differentiate_x(x))
+        self.complex.differetiate(z)
     }
 
     pub fn deg_shift_for(l: &Link, reduced: bool) -> (isize, isize) {
@@ -94,7 +101,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> Display for KhComplex<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.grid.fmt_default(f, "C")
+        self.complex.fmt(f)
     }
 }
 
@@ -103,7 +110,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = KhComplexSummand<R>;
     
     fn index(&self, index: isize) -> &Self::Output {
-        &self.grid[index]
+        &self.complex[index]
     }
 }
 
@@ -113,38 +120,33 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     type IdxIter = RangeInclusive<isize>;
 
     fn contains_idx(&self, k: Self::Idx) -> bool {
-        self.grid.contains_idx(k)
+        self.complex.contains_idx(k)
     }
 
     fn indices(&self) -> Self::IdxIter {
-        self.grid.indices()
+        self.complex.indices()
     }
 }
 
 impl<R> ChainComplex for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     fn d_degree(&self) -> Self::Idx {
-        1
+        self.complex.d_degree()
     }
 
     fn d_matrix(&self, k: Self::Idx) -> SpMat<Self::R> {
-        let c1 = &self.grid[k];
-        let c2 = &self.grid[k + 1];
-        c1.make_matrix(c2, |x| self.cube.differentiate(x))
+        self.complex.d_matrix(k)
     }
 }
 
 pub struct KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    cube: KhCube<R>,
-    grid: GenericRModGrid<KhComplexSummand<R>, Idx2Iter>
+    complex: FreeChainComplex<KhEnhState, R, Idx2Iter>
 }
 
 impl<R> KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn new(l: Link, reduced: bool) -> Self { 
-        use grouping_by::GroupingBy;
-
         let cube = KhCube::new(&l);
         let (i0, j0) = KhComplex::deg_shift_for(&l, reduced);
         let h_range = cube.h_range().shift(i0);
@@ -154,31 +156,31 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let end   = Idx2(*h_range.end(),   *q_range.end());
         let range = start.iter_rect(end, (1, 2));
 
-        let mut gens: HashMap<_, _> = h_range.clone().map(|i| { 
-            let gens = if reduced {
-                let e = l.first_edge().unwrap();
-                cube.reduced_generators(i - i0, e)
-            } else { 
-                cube.generators(i - i0)
-            };
+        let cube0 = Rc::new(cube);
+        let cube1 = cube0.clone();
 
-            let set = gens.into_iter().grouping_by(|x| 
-                x.q_deg() + j0
-            );
-            (i, set)
-        }).collect();
+        let complex = FreeChainComplex::new(range, Idx2(1, 0), 
+            |idx| {
+                let (i, j) = idx.as_tuple();
+                let i = i - i0;
+                let j = j - j0;
 
-        let grid = GenericRModGrid::new(range, |idx| {
-            let (i, j) = idx.as_tuple();
-            let set = gens.get_mut(&i).unwrap();
-            if let Some(g) = set.remove(&j) {
-                FreeRModStr::new(g)
-            } else { 
-                FreeRModStr::zero()
+                let gens = if reduced {
+                    let e = l.first_edge().unwrap();
+                    cube0.reduced_generators(i, e)
+                } else { 
+                    cube0.generators(i)
+                };
+                gens.into_iter().filter(|x| { 
+                    x.q_deg() == j
+                }).collect()
+            },
+            move |x| { 
+                cube1.differentiate(x)
             }
-        });
+        );
 
-        Self { cube, grid }
+        Self { complex }
     }
 
     pub fn unreduced(l: Link) -> Self { 
@@ -195,7 +197,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = KhComplexSummand<R>;
 
     fn index(&self, index: Idx2) -> &Self::Output {
-        &self.grid[index]
+        &self.complex[index]
     }
 }
 
@@ -205,24 +207,22 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     type IdxIter = IntoIter<Idx2>;
 
     fn contains_idx(&self, k: Self::Idx) -> bool {
-        self.grid.contains_idx(k)
+        self.complex.contains_idx(k)
     }
 
     fn indices(&self) -> Self::IdxIter {
-        self.grid.indices()
+        self.complex.indices()
     }
 }
 
 impl<R> ChainComplex for KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn d_degree(&self) -> Self::Idx {
-        Idx2(1, 0)
+        self.complex.d_degree()
     }
 
     fn d_matrix(&self, idx: Self::Idx) -> SpMat<Self::R> {
-        let c1 = &self[idx];
-        let c2 = &self[idx + self.d_degree()];
-        c1.make_matrix(c2, |x| self.cube.differentiate(x))
+        self.complex.d_matrix(idx)
     }
 }
 

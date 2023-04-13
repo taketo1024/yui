@@ -195,32 +195,43 @@ impl Link {
         }
     }
 
-    fn crossing_signs(&self) -> Vec<i32> {
+    pub fn crossing_signs(&self) -> Vec<i32> {
         let n = self.data.len();
-        let mut signs = vec![0; n];
 
-        let mut traverse = |j0: usize| {
+        let mut signs = vec![0; n];
+        let mut passed: HashSet<Edge> = HashSet::new();
+
+        let mut traverse = |signs: &mut Vec<i32>, j0: usize| {
             for i0 in 0..n {
-                if signs[i0] != 0 { 
+                let start_edge = self.data[i0].edge(j0);
+                if passed.contains(&start_edge) { 
                     continue 
                 }
 
                 self.traverse_edges((i0, j0), |i, j| { 
                     let c = &self.data[i];
+                    let e = c.edge(j);
+                    passed.insert(e);
+
                     let sign = match (c.ctype(), j) { 
                         (Xp, 1) | (Xn, 3) =>  1,
                         (Xp, 3) | (Xn, 1) => -1,
-                        _ => 0
+                        _                 =>  0
                     };
-                    if sign != 0 {
+                    if sign != 0 { 
                         signs[i] = sign;
                     }
-                })
+                });
             }
         };
 
-        traverse(0);
-        traverse(1); // in case 
+        traverse(&mut signs, 0);
+
+        if (0..n).any(|i| !self.data[i].is_resolved() && signs[i] == 0) { 
+            for j in [1,2] {
+                traverse(&mut signs, j);
+            }
+        };
 
         signs
     }
@@ -449,6 +460,16 @@ mod tests {
         let l = Link::from(&pd_code);
         assert_eq!(l.crossing_num(), 2);
         assert_eq!(l.writhe(), 0);
+        assert_eq!(l.components().len(), 2);
+    }
+
+
+    #[test]
+    fn l2x4() {
+        let pd_code = [[1,5,2,8],[5,3,6,2],[3,7,4,6],[7,1,8,4]];
+        let l = Link::from(&pd_code);
+        assert_eq!(l.crossing_num(), 4);
+        assert_eq!(l.writhe(), 4);
         assert_eq!(l.components().len(), 2);
     }
 }

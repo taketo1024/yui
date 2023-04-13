@@ -779,7 +779,7 @@ mod tests {
         let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
-        assert_eq!(res, Mat::diag((6, 9), vec![1,1,1,1,1,1]));
+        assert_eq!(res, Mat::diag((6, 9), [1,1,1,1,1,1].into_iter()));
         assert_eq!(p * a.clone() * q, res);
         assert_eq!(pinv * res * qinv, a.clone());
     }
@@ -799,14 +799,14 @@ mod tests {
         let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
-        assert_eq!(res, Mat::diag((5, 5), vec![1,1,1,2,60]));
+        assert_eq!(res, Mat::diag((5, 5), [1,1,1,2,60].into_iter()));
         assert_eq!(p * a.clone() * q, res);
         assert_eq!(pinv * res * qinv, a.clone());
     }
 
     #[test]
     fn diag_normalize1() {
-        let a = Mat::diag((5, 5), vec![4, 24, -2, 1, 72]);
+        let a = Mat::diag((5, 5), [4, 24, -2, 1, 72].into_iter());
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.diag_normalize();
 
@@ -819,7 +819,7 @@ mod tests {
 
     #[test]
     fn diag_normalize2() {
-        let a = Mat::diag((5, 5), vec![0, -3, 54, 92, -4]);
+        let a = Mat::diag((5, 5), [0, -3, 54, 92, -4].into_iter());
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.diag_normalize();
 

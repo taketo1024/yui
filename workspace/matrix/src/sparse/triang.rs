@@ -31,7 +31,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 pub fn solve_triangular<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    SpMat::generate(y.shape(), |set| { 
+    SpMat::generate_sync(y.shape(), |set| { 
         solve_triangular_with(t, a, y, |i, j, x|
             set(i, j, x)
         );

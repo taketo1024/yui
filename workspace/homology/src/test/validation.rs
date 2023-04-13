@@ -17,7 +17,7 @@ where
         let d1 = self.d_matrix(k);
         let d2 = self.d_matrix(k + self.d_degree());
         let res = &d2 * &d1;
-        assert!( res.is_zero() );
+        assert!( res.is_zero(), "d² is non-zero at {k}." );
     }
 
     fn check_d_all(&self) {

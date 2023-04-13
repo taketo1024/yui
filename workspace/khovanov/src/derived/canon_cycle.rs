@@ -1,8 +1,9 @@
 use std::collections::HashSet;
 use itertools::Itertools;
 use yui_core::{Ring, RingOps};
-use yui_link::{Link, Component, State};
-use crate::{KhAlgLabel, KhAlgStr, KhComplex, KhGen, KhChain};
+use yui_link::{Link, LinkComp, State};
+
+use crate::{KhAlgGen, KhAlgStr, KhComplex, KhLabel, KhEnhState, KhChain};
 
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
@@ -37,7 +38,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     make_chain(str, &s, &colors)
 }
 
-fn color_circles(l: &Link, circles: &Vec<Component>, positive: bool) -> Vec<Color> { 
+fn color_circles(l: &Link, circles: &Vec<LinkComp>, positive: bool) -> Vec<Color> { 
     let n = circles.len();
     let mut colors = vec![Color::A; n];
 
@@ -75,11 +76,8 @@ fn color_circles(l: &Link, circles: &Vec<Component>, positive: bool) -> Vec<Colo
 
 fn make_chain<R>(str: &KhAlgStr<R>, s: &State, colors: &Vec<Color>) -> KhChain<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    let mut z = KhChain::from((
-        KhGen::new(s.clone(), vec![]),
-        R::one()
-    ));
-
+    let x = KhEnhState::new(s.clone(), KhLabel::empty());
+    let mut z = KhChain::from((x, R::one()));
     for c in colors {
         z *= c.as_tensor_factor(str);
     }
@@ -100,20 +98,22 @@ impl Color {
 
     fn as_tensor_factor<R>(&self, s: &KhAlgStr<R>) -> KhChain<R>
     where R: Ring, for<'x> &'x R: RingOps<R> {
-        use KhAlgLabel::{I, X};
+        use KhAlgGen::{I, X};
+
+        fn init(x: KhAlgGen) -> KhEnhState { 
+            let mut z = KhEnhState::init();
+            z.label.push(x);
+            z
+        }
 
         match self { 
-            Color::A => KhChain::from((
-                KhGen::new(State::empty(), vec![X]),
-                R::one()
-            )),
-            Color::B => KhChain::from(vec![(
-                KhGen::new(State::empty(), vec![X]),
-                R::one()
-            ), (
-                KhGen::new(State::empty(), vec![I]),
-                -s.h()
-            )])
+            Color::A => KhChain::from( 
+                (init(X), R::one()) 
+            ),
+            Color::B => KhChain::from_iter([
+                (init(X), R::one()), 
+                (init(I), -s.h())
+            ])
         }
     }
 }

@@ -7,8 +7,8 @@ pub use resolution::{Resolution};
 mod crossing;
 pub use crossing::{Crossing, CrossingType};
 
-mod component;
-pub use component::Component;
+mod comp;
+pub use comp::LinkComp;
 
 mod state;
 pub use state::State;

@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
-use std::ops::RangeInclusive;
+use std::ops::Range;
 
 use log::info; 
 use itertools::Itertools;
@@ -390,7 +390,7 @@ impl TngComplex {
         debug_assert!(self.validate_edges());
     }
 
-    pub fn as_generic<R>(&self, h: R, t: R) -> GenericChainComplex<R, RangeInclusive<isize>> 
+    pub fn as_generic<R>(&self, h: R, t: R) -> GenericChainComplex<R, Range<isize>> 
     where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> {
         debug_assert!(self.is_completely_delooped());
 
@@ -403,15 +403,19 @@ impl TngComplex {
         }).collect_vec();
 
         let i0 = self.deg_shift.0;
+        let i1 = i0 + (n as isize);
 
-        GenericChainComplex::ascending_from(i0, (0..n-1).map( |i| {
-            c[i].make_matrix(&c[i+1], |x| { 
+        GenericChainComplex::new(i0..i1, 1, (0..n-1).map( |i| {
+            let c0 = &c[i];
+            let c1 = &c[i+1];
+            let d = c0.make_matrix(c1, |x| { 
                 let v = self.vertex(x);
                 v.out_edges.iter().map(|(y, f)| 
                     (y.clone(), f.eval(&h, &t))
                 ).collect()
-            })
-        }).collect())
+            });
+            (i0 + (i as isize), d)
+        }))
     }
 
     fn is_completely_delooped(&self) -> bool { 

@@ -88,14 +88,13 @@ where
 #[cfg(test)]
 mod tests { 
     use super::*;
-    use yui_matrix::sparse::*;
     use crate::RModStr;
     use crate::test::TestChainComplex;
 
     #[test]
     fn cancel_pair() { 
         let c = TestChainComplex::<i32>::descending(
-            vec![ SpMat::from_vec((1, 1), vec![1]) ],
+            vec![ ((1, 1), vec![1]) ],
         );
 
         let h = GenericHomology::from(c);
@@ -107,7 +106,7 @@ mod tests {
     #[test]
     fn torsion() { 
         let c = TestChainComplex::<i32>::descending( 
-            vec![ SpMat::from_vec((1, 1), vec![2]) ],
+            vec![ ((1, 1), vec![2]) ],
         );
 
         let h = GenericHomology::from(c);

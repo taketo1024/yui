@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::iter::Rev;
-use std::ops::{Index, RangeInclusive};
+use std::ops::Index;
 use yui_matrix::sparse::*;
 use yui_core::{RingOps, Ring, EucRingOps, EucRing};
 use crate::utils::{ChainReducer, HomologyCalc};
@@ -154,40 +154,6 @@ where
             let n = self[k].rank();
             SpMat::zero((m, n))
         }
-    }
-}
-
-impl<R> GenericChainComplex<R, Rev<RangeInclusive<isize>>> 
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn descending_from(i0: isize, d_matrices: Vec<SpMat<R>>) -> Self {
-        let n = d_matrices.len() as isize;
-        let range = (i0-n..=i0).rev();
-        let d_degree = -1;
-        let d_matrices = d_matrices.into_iter().enumerate().map(|(i, d)| 
-            (i0 - n + (i as isize) + 1, d)
-        );
-        Self::new(range, d_degree, d_matrices)
-    }
-
-    pub fn descending(d_matrices: Vec<SpMat<R>>) -> Self {
-        Self::descending_from(d_matrices.len() as isize, d_matrices)
-    }
-}
-
-impl<R> GenericChainComplex<R, RangeInclusive<isize>>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn ascending_from(i0: isize, d_matrices: Vec<SpMat<R>>) -> Self {
-        let n = d_matrices.len() as isize;
-        let range = i0..=i0+n;
-        let d_degree = 1;
-        let d_matrices = d_matrices.into_iter().enumerate().map(|(i, d)| 
-            ((i as isize) + i0, d)
-        );
-        GenericChainComplex::new(range, d_degree, d_matrices)
-    }
-
-    pub fn ascending(d_matrices: Vec<SpMat<R>>) -> Self {
-        Self::ascending_from(0, d_matrices)
     }
 }
 

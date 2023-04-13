@@ -96,7 +96,7 @@ impl TngComplexBuilder {
 
 #[cfg(test)]
 mod tests { 
-    use yui_homology::RModStr;
+    use yui_homology::{RModStr, HomologyComputable};
     use yui_homology::test::ChainComplexValidation;
     use super::*;
 

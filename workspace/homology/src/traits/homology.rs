@@ -1,6 +1,5 @@
-use yui_core::{Ring, RingOps, EucRing, EucRingOps};
-use crate::{RModStr, RModGrid, ChainComplex, GenericRModStr};
-use crate::utils::HomologyCalc;
+use yui_core::{Ring, RingOps};
+use crate::{RModStr, RModGrid, ChainComplex};
 
 pub trait Homology: RModGrid
 where 
@@ -8,25 +7,16 @@ where
     Self::Output: RModStr<R = Self::R>
 {}
 
-pub trait HomologyComputable<S>: ChainComplex
+pub trait HomologyComputable: ChainComplex
 where 
     Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>,
     Self::Output: RModStr<R = Self::R>,
-    S: RModStr<R = Self::R>
+    Self::HomologySummand: RModStr<R = Self::R>,
+    Self::Homology: Homology<R = Self::R, Idx = Self::Idx, IdxIter = Self::IdxIter, Output = Self::HomologySummand>
 {
-    fn homology_at(&self, i: Self::Idx) -> S;
-}
+    type Homology;
+    type HomologySummand;
 
-impl<R, C> HomologyComputable<GenericRModStr<R>> for C
-where 
-    R: EucRing, for<'x> &'x R: EucRingOps<R>,
-    C: ChainComplex<R = R>,
-    C::Output: RModStr<R = R>
-{ 
-    fn homology_at(&self, k: C::Idx) -> GenericRModStr<Self::R> {
-        let d1 = self.d_matrix(k - self.d_degree());
-        let d2 = self.d_matrix(k);
-        HomologyCalc::calculate(d1, d2)
-    }
+    fn homology(&self) -> Self::Homology;
+    fn homology_at(&self, i: Self::Idx) -> Self::HomologySummand;
 }
-

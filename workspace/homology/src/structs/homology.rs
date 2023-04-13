@@ -1,8 +1,8 @@
 use std::fmt::Display;
 use std::ops::Index;
 
-use yui_core::{Ring, RingOps};
-use crate::{GridIdx, GridItr, RModStr, RModGrid, GenericRModStr, GenericRModGrid, Homology, HomologyComputable, Grid};
+use yui_core::{Ring, RingOps, EucRing, EucRingOps};
+use crate::{GridIdx, GridItr, RModGrid, GenericRModStr, GenericRModGrid, Homology, HomologyComputable, Grid, GenericChainComplex};
 
 pub struct GenericHomology<R, I>
 where 
@@ -13,20 +13,25 @@ where
     grid: GenericRModGrid<GenericRModStr<R>, I>
 }
 
-impl<R, C> From<C> for GenericHomology<R, C::IdxIter>
-where
+impl<R, I> GenericHomology<R, I>
+where 
     R: Ring, for<'x> &'x R: RingOps<R>,
-    C: HomologyComputable<GenericRModStr<R>, R = R>,
-    C::IdxIter: Clone,
-    C::Output: RModStr<R = C::R>
-{
-    fn from(c: C) -> Self {
-        let range = c.indices();
-        let grid = GenericRModGrid::new(range, |i| {
-            let h_i = c.homology_at(i);
-            if !h_i.is_zero() { Some(h_i) } else { None }
-        });
+    I: GridItr,
+    I::Item: GridIdx
+{ 
+    pub fn new(grid: GenericRModGrid<GenericRModStr<R>, I>) -> Self { 
         Self { grid }
+    }
+}
+
+impl<R, I> From<GenericChainComplex<R, I>> for GenericHomology<R, I>
+where
+    R: EucRing, for<'x> &'x R: EucRingOps<R>,
+    I: GridItr,
+    I::Item: GridIdx
+{
+    fn from(c: GenericChainComplex<R, I>) -> Self {
+        c.homology()
     }
 }
 
@@ -84,6 +89,7 @@ where
 mod tests { 
     use super::*;
     use yui_matrix::sparse::*;
+    use crate::RModStr;
     use crate::test::TestChainComplex;
 
     #[test]

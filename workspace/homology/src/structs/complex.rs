@@ -3,8 +3,8 @@ use std::fmt::Display;
 use std::iter::Rev;
 use std::ops::{Index, RangeInclusive};
 use yui_matrix::sparse::*;
-use yui_core::{RingOps, Ring};
-use crate::utils::ChainReducer;
+use yui_core::{RingOps, Ring, EucRingOps, EucRing};
+use crate::utils::{ChainReducer, HomologyCalc};
 use crate::{GridItr, GridIdx, RModStr, RModGrid, ChainComplex, GenericRModStr, GenericRModGrid, HomologyComputable, GenericHomology, Grid};
 
 pub struct GenericChainComplex<R, I>
@@ -189,19 +189,31 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-// TODO this is too much restrictive. 
-
-impl<R, I> GenericChainComplex<R, I>
+impl<R, I> HomologyComputable for GenericChainComplex<R, I>
 where 
-    R: Ring, for<'x> &'x R: RingOps<R>,
+    R: EucRing, for<'x> &'x R: EucRingOps<R>,
     I: GridItr,
-    I::Item: GridIdx,
-    Self: HomologyComputable<GenericRModStr<R>, R = R, Idx = I::Item, IdxIter = I, Output = GenericRModStr<R>>,
+    I::Item: GridIdx
 {
-    pub fn homology(self) -> GenericHomology<R, I> {
-        GenericHomology::from(self)
+    type Homology = GenericHomology<R, I>;
+    type HomologySummand = GenericRModStr<R>;
+
+    fn homology_at(&self, i: Self::Idx) -> Self::HomologySummand {
+        let d1 = self.d_matrix(i - self.d_degree());
+        let d2 = self.d_matrix(i);
+        HomologyCalc::calculate(d1, d2)
+    }
+
+    fn homology(&self) -> Self::Homology {
+        let range = self.indices();
+        let grid = GenericRModGrid::new(range, |i| {
+            let h_i = self.homology_at(i);
+            if !h_i.is_zero() { Some(h_i) } else { None }
+        });
+        Self::Homology::new(grid)
     }
 }
+
 
 #[cfg(test)]
 mod tests { 

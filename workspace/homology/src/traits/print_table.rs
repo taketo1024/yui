@@ -1,21 +1,26 @@
 use std::collections::HashSet;
+use std::fmt::Display;
 use std::ops::Index;
 use itertools::Itertools;
+use crate::{Idx2, Grid};
 
-use yui_core::{Ring, RingOps};
-use crate::{RModStr, RModGrid, Idx2};
+pub trait DisplayForTable: Display { 
+    fn should_display(&self) -> bool { true }
+}
 
 pub trait PrintTable {
     fn table(&self) -> String;
-    fn print_table(&self);
+    
+    fn print_table(&self) { 
+        println!("{}", self.table())
+    }
 }
 
 impl<T> PrintTable for T
 where
     T: Index<Idx2>,
-    T: RModGrid<Idx = Idx2>,
-    T::R: Ring, for<'x> &'x T::R: RingOps<T::R>,
-    <T as Index<Idx2>>::Output: RModStr<R = T::R>
+    T: Grid<Idx = Idx2>,
+    <T as Index<Idx2>>::Output: DisplayForTable
 {
     fn table(&self) -> String {
         use yui_utils::table as f_table;
@@ -29,15 +34,11 @@ where
 
         f_table("j\\i", &js, &is, |j, i| {
             let s = &self[Idx2(i, j)];
-            if !s.is_zero() {
+            if s.should_display() {
                 format!("{}", s)
             } else { 
                 String::from("")
             }
         })
-    }
-
-    fn print_table(&self) {
-        println!("{}", self.table())
     }
 }

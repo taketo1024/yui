@@ -14,4 +14,4 @@ mod homology;
 pub use homology::{Homology, HomologyComputable};
 
 mod print_table;
-pub use print_table::PrintTable;
+pub use print_table::{DisplayForTable, PrintTable};

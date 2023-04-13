@@ -24,7 +24,9 @@ where
     I: GridItr,
     I::Item: GridIdx
 {
-    pub fn new(range: I, d_degree: I::Item, d_matrices: HashMap<I::Item, SpMat<R>>) -> Self {
+    pub fn new<Iter>(range: I, d_degree: I::Item, d_matrices: Iter) -> Self
+    where Iter: Iterator<Item = (I::Item, SpMat<R>)> {
+        let d_matrices = d_matrices.collect::<HashMap<_, _>>();
         let grid = GenericRModGrid::new(range, |i| {
             if let Some(d) = d_matrices.get(&i) {
                 let n = d.cols();
@@ -48,7 +50,7 @@ where
             } else { 
                 None
             }
-        ).collect();
+        );
 
         Self::new(range, d_degree, d_matrices)
     }
@@ -87,7 +89,7 @@ where
         let d_degree = -self.d_degree();
         let d_matrices = self.d_matrices.iter().map(|(&i, d)| 
             (i - d_degree, d.transpose().to_owned())
-        ).collect();
+        );
         GenericChainComplex::new(range, d_degree, d_matrices)
     }
 }
@@ -163,7 +165,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let d_degree = -1;
         let d_matrices = d_matrices.into_iter().enumerate().map(|(i, d)| 
             (i0 - n + (i as isize) + 1, d)
-        ).collect();
+        );
         Self::new(range, d_degree, d_matrices)
     }
 
@@ -180,7 +182,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let d_degree = 1;
         let d_matrices = d_matrices.into_iter().enumerate().map(|(i, d)| 
             ((i as isize) + i0, d)
-        ).collect();
+        );
         GenericChainComplex::new(range, d_degree, d_matrices)
     }
 

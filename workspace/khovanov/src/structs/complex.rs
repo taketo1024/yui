@@ -6,7 +6,7 @@ use std::vec::IntoIter;
 use yui_core::{Ring, RingOps};
 use yui_matrix::sparse::SpMat;
 use yui_link::Link;
-use yui_homology::{Idx2, Idx2Iter, RModGrid, GenericRModGrid, FreeRModStr, ChainComplex, Grid};
+use yui_homology::{Idx2, Idx2Iter, RModGrid, GenericRModGrid, FreeRModStr, ChainComplex, Grid, RModStr};
 
 use crate::{KhAlgStr, KhEnhState, KhCube, KhChain};
 
@@ -35,8 +35,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             } else { 
                 cube.generators(i) 
             };
-            let s = FreeRModStr::new(gens);
-            Some(s)
+            FreeRModStr::new(gens)
         });
 
         KhComplex { link, cube, grid, reduced }
@@ -173,10 +172,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let (i, j) = idx.as_tuple();
             let set = gens.get_mut(&i).unwrap();
             if let Some(g) = set.remove(&j) {
-                let s = FreeRModStr::new(g);
-                Some(s)
+                FreeRModStr::new(g)
             } else { 
-                None
+                FreeRModStr::zero()
             }
         });
 

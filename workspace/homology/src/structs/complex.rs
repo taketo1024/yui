@@ -30,12 +30,12 @@ where
         let grid = GenericRModGrid::new(range, |i| {
             if let Some(d) = d_matrices.get(&i) {
                 let n = d.cols();
-                Some(GenericRModStr::new(n, vec![]))
+                GenericRModStr::new(n, vec![])
             } else if let Some(d) = d_matrices.get(&(i - d_degree)) {
                 let n = d.rows();
-                Some(GenericRModStr::new(n, vec![]))
+                GenericRModStr::new(n, vec![])
             } else {
-                None
+                GenericRModStr::zero()
             }
         });
 
@@ -175,13 +175,11 @@ where
     fn homology(&self) -> Self::Homology {
         let range = self.indices();
         let grid = GenericRModGrid::new(range, |i| {
-            let h_i = self.homology_at(i);
-            if !h_i.is_zero() { Some(h_i) } else { None }
+            self.homology_at(i)
         });
         Self::Homology::new(grid)
     }
 }
-
 
 #[cfg(test)]
 mod tests { 

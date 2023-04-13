@@ -23,13 +23,9 @@ where
     I::Item: GridIdx
 {
     pub fn new<F>(range: I, mut f: F) -> Self
-    where F: FnMut(I::Item) -> Option<S> {
-        let grid = range.clone().filter_map(|i| {
-            if let Some(s) = f(i) { 
-                Some((i, s))
-            } else { 
-                None
-            }
+    where F: FnMut(I::Item) -> S {
+        let grid = range.clone().map(|i| {
+            (i, f(i))
         }).collect();
         let zero = S::zero();
         Self { range, grid, zero }

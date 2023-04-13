@@ -34,12 +34,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let complex = FreeChainComplex::new(range, 1, 
             |i| {
                 let i = i - i0;
-                if reduced {
+                let gens = if reduced {
                     let e = link.first_edge().unwrap();
                     cube0.reduced_generators(i, e)
                 } else { 
                     cube0.generators(i) 
-                }
+                };
+                gens.into_iter().cloned().collect()
             },
             move |x| { 
                 cube1.differentiate(x)
@@ -173,7 +174,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 };
                 gens.into_iter().filter(|x| { 
                     x.q_deg() == j
-                }).collect()
+                }).cloned().collect()
             },
             move |x| { 
                 cube1.differentiate(x)

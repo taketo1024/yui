@@ -9,34 +9,31 @@ use crate::{KhAlgStr, KhLabel, KhEnhState};
 #[derive(Debug)]
 pub struct KhCubeVertex { 
     state: State,
-    circles: Vec<LinkComp>
+    circles: Vec<LinkComp>,
+    gens: Vec<KhEnhState>
 }
 
 impl KhCubeVertex { 
     pub fn new(l: &Link, state: State) -> Self {
         let circles = l.resolved_by(&state).components();
-        KhCubeVertex { state, circles }
+        let r = circles.len();
+        let gens = KhLabel::generate(r).into_iter().map(|label| { 
+            KhEnhState::new( state, label )
+        }).collect();
+        KhCubeVertex { state, circles, gens }
     }
 
-    pub fn generators(&self) -> Vec<KhEnhState> { 
-        let r = self.circles.len();
-        KhLabel::generate(r).into_iter().map(|label| { 
-            KhEnhState::new( self.state, label )
-        }).collect()
+    pub fn generators(&self) -> Vec<&KhEnhState> { 
+        self.gens.iter().collect()
     }
 
-    pub fn reduced_generators(&self, red_e: &Edge) -> Vec<KhEnhState> { 
-        let r = self.circles.len();
+    pub fn reduced_generators(&self, red_e: &Edge) -> Vec<&KhEnhState> { 
         let red_i = self.circles.iter().position(|c| 
             c.edges().contains(red_e)
         ).unwrap(); // must exist
 
-        KhLabel::generate(r).into_iter().filter_map(|label| { 
-            if label[red_i].is_1() { 
-                return None
-            } else { 
-                return Some(KhEnhState::new(self.state, label))
-            }
+        self.generators().into_iter().filter(|x| { 
+            x.label[red_i].is_X()
         }).collect()
     }
 }
@@ -163,15 +160,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         q0 ..= q1
     }
 
-    pub fn generators(&self, i: isize) -> Vec<KhEnhState> { 
+    pub fn generators(&self, i: isize) -> Vec<&KhEnhState> { 
         self.collect_generators(i, None)
     }
 
-    pub fn reduced_generators(&self, i: isize, red_e: &Edge) -> Vec<KhEnhState> { 
+    pub fn reduced_generators(&self, i: isize, red_e: &Edge) -> Vec<&KhEnhState> { 
         self.collect_generators(i, Some(red_e))
     }
 
-    fn collect_generators(&self, i: isize, red_e: Option<&Edge>) -> Vec<KhEnhState> { 
+    fn collect_generators(&self, i: isize, red_e: Option<&Edge>) -> Vec<&KhEnhState> { 
         if self.h_range().contains(&i) { 
             let i = i as usize;
             self.vertices_of_weight(i).into_iter().flat_map(|v| 

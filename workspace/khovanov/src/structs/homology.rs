@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use std::ops::{RangeInclusive, Index};
 
-use yui_homology::{Idx2, Idx2Iter, ChainComplex};
+use yui_homology::{Idx2, Idx2Iter, ChainComplex, Grid};
 use yui_homology::{RModGrid, GenericRModStr, Homology, GenericHomology};
 use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 use yui_link::Link;
@@ -54,9 +54,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<R> RModGrid for KhHomology<R>
+impl<R> Grid for KhHomology<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    type R = R;
     type Idx = isize;
     type IdxIter = RangeInclusive<isize>;
 
@@ -118,9 +117,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<R> RModGrid for KhHomologyBigraded<R>
+impl<R> Grid for KhHomologyBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    type R = R;
     type Idx = Idx2;
     type IdxIter = Idx2Iter;
 
@@ -146,7 +144,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 mod tests {
     use yui_link::Link;
-    use yui_homology::{RModStr, RModGrid};
+    use yui_homology::{RModStr, Grid};
     use super::KhHomology;
     
     #[test]

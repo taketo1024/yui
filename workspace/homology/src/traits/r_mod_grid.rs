@@ -1,20 +1,12 @@
-use std::{ops::Index};
 use yui_core::{Ring, RingOps};
-use crate::{GridIdx, GridItr, RModStr};
+use crate::{Grid, RModStr};
 
-pub trait RModGrid: Index<Self::Idx>
+pub trait RModGrid: Grid
 where 
     Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>,
     Self::Output: RModStr<R = Self::R>,
-    Self::Idx: GridIdx,
-    Self::IdxIter: GridItr<Item = Self::Idx>
 {
     type R;
-    type Idx;
-    type IdxIter;
-
-    fn contains_idx(&self, k: Self::Idx) -> bool;
-    fn indices(&self) -> Self::IdxIter;
 
     fn is_free(&self) -> bool { 
         self.indices().all(|i| self[i].is_free())
@@ -30,4 +22,13 @@ where
         }
         Ok(())
     }
+}
+
+impl<R, T> RModGrid for T
+where 
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    T: Grid, 
+    T::Output: RModStr<R = R>
+{
+    type R = R;
 }

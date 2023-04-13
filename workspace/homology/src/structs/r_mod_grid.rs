@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::ops::{Index};
 use yui_core::{Ring, RingOps};
-use crate::{GridIdx, GridItr, RModStr, RModGrid};
+use crate::{GridIdx, GridItr, RModStr, Grid};
 
 pub struct GenericRModGrid<S, I>
 where 
@@ -54,14 +54,13 @@ where
     }
 }
 
-impl<S, I> RModGrid for GenericRModGrid<S, I>
+impl<S, I> Grid for GenericRModGrid<S, I>
 where 
     S: RModStr,
     S::R: Ring, for<'x> &'x S::R: RingOps<S::R>,
     I: GridItr,
     I::Item: GridIdx
 {
-    type R = S::R;
     type Idx = I::Item;
     type IdxIter = I;
 

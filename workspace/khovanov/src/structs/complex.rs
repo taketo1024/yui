@@ -6,7 +6,7 @@ use std::vec::IntoIter;
 use yui_core::{Ring, RingOps};
 use yui_matrix::sparse::SpMat;
 use yui_link::Link;
-use yui_homology::{Idx2, Idx2Iter, RModGrid, GenericRModGrid, FreeRModStr, ChainComplex};
+use yui_homology::{Idx2, Idx2Iter, RModGrid, GenericRModGrid, FreeRModStr, ChainComplex, Grid};
 
 use crate::{KhAlgStr, KhEnhState, KhCube, KhChain};
 
@@ -108,9 +108,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<R> RModGrid for KhComplex<R>
+impl<R> Grid for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    type R = R;
     type Idx = isize;
     type IdxIter = RangeInclusive<isize>;
 
@@ -202,9 +201,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<R> RModGrid for KhComplexBigraded<R>
+impl<R> Grid for KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    type R = R;
     type Idx = Idx2;
     type IdxIter = IntoIter<Idx2>;
 
@@ -246,7 +244,7 @@ impl Shift for RangeInclusive<isize> {
 #[cfg(test)]
 mod tests {
     use yui_link::Link;
-    use yui_homology::RModGrid;
+    use yui_homology::Grid;
     use yui_homology::test::ChainComplexValidation;
     use super::KhComplex;
 

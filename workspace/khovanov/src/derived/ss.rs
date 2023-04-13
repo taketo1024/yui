@@ -6,7 +6,7 @@ use core::panic;
 
 use log::info;
 use yui_link::Link;
-use yui_homology::{RModStr, RModGrid};
+use yui_homology::{RModStr, Grid};
 use yui_homology::utils::{ChainReducer, HomologyCalc};
 use yui_core::{EucRing, EucRingOps};
 use yui_matrix::sparse::*;

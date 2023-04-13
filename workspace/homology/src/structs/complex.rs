@@ -5,7 +5,7 @@ use std::ops::{Index, RangeInclusive};
 use yui_matrix::sparse::*;
 use yui_core::{RingOps, Ring};
 use crate::utils::ChainReducer;
-use crate::{GridItr, GridIdx, RModStr, RModGrid, ChainComplex, GenericRModStr, GenericRModGrid, HomologyComputable, GenericHomology};
+use crate::{GridItr, GridIdx, RModStr, RModGrid, ChainComplex, GenericRModStr, GenericRModGrid, HomologyComputable, GenericHomology, Grid};
 
 pub struct GenericChainComplex<R, I>
 where 
@@ -116,13 +116,12 @@ where
     }
 }
 
-impl<R, I> RModGrid for GenericChainComplex<R, I>
+impl<R, I> Grid for GenericChainComplex<R, I>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
     I: GridItr,
     I::Item: GridIdx
 {
-    type R = R;
     type Idx = I::Item;
     type IdxIter = I;
     

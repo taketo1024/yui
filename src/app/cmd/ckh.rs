@@ -2,7 +2,7 @@ use std::str::FromStr;
 use itertools::Itertools;
 use yui_core::{Ring, RingOps};
 use yui_homology::ChainComplex;
-use yui_homology::RModGrid;
+use yui_homology::Grid;
 use yui_khovanov::KhComplex;
 use crate::utils::*;
 

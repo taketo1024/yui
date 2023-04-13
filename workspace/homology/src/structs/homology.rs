@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::ops::Index;
 
 use yui_core::{Ring, RingOps};
-use crate::{GridIdx, GridItr, RModStr, RModGrid, GenericRModStr, GenericRModGrid, Homology, HomologyComputable};
+use crate::{GridIdx, GridItr, RModStr, RModGrid, GenericRModStr, GenericRModGrid, Homology, HomologyComputable, Grid};
 
 pub struct GenericHomology<R, I>
 where 
@@ -30,13 +30,12 @@ where
     }
 }
 
-impl<R, I> RModGrid for GenericHomology<R, I>
+impl<R, I> Grid for GenericHomology<R, I>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
     I: GridItr,
     I::Item: GridIdx
 {
-    type R = R;
     type Idx = I::Item;
     type IdxIter = I;
 

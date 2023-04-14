@@ -11,4 +11,4 @@ mod complex;
 pub use complex::{KhComplex, KhComplexBigraded, KhComplexSummand};
 
 mod homology;
-pub use homology::{KhHomology, KhHomologyBigraded};
+pub use homology::{KhHomology, KhHomologyBigraded, KhHomologySummand};

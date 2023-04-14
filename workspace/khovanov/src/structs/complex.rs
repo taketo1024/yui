@@ -3,12 +3,12 @@ use std::ops::{RangeInclusive, Index};
 use std::rc::Rc;
 use std::vec::IntoIter;
 
-use yui_core::{Ring, RingOps};
+use yui_core::{Ring, RingOps, EucRing, EucRingOps};
 use yui_matrix::sparse::SpMat;
 use yui_link::Link;
-use yui_homology::{Idx2, Idx2Iter, Grid, ChainComplex, FreeRModStr, FreeChainComplex};
+use yui_homology::{Idx2, Idx2Iter, Grid, ChainComplex, FreeRModStr, FreeChainComplex, HomologyComputable};
 
-use crate::{KhAlgStr, KhEnhState, KhCube, KhChain};
+use crate::{KhAlgStr, KhEnhState, KhCube, KhChain, KhHomology, KhHomologySummand, KhHomologyBigraded};
 
 pub type KhComplexSummand<R> = FreeRModStr<KhEnhState, R>;
 pub struct KhComplex<R>
@@ -48,22 +48,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         );
 
         KhComplex { link, str, complex, reduced }
-    }
-
-    pub fn unreduced(l: Link) -> Self { 
-        Self::new(l, R::zero(), R::zero(), false)
-    }
-
-    pub fn unreduced_ht(l: Link, h: R, t: R) -> Self { 
-        Self::new(l, h, t, false)
-    }
-
-    pub fn reduced(l: Link) -> Self { 
-        Self::new(l, R::zero(), R::zero(), true)
-    }
-
-    pub fn reduced_ht(l: Link, h: R, t: R) -> Self { 
-        Self::new(l, h, t, true)
     }
 
     pub fn link(&self) -> &Link { 
@@ -142,6 +126,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn d_matrix(&self, k: Self::Idx) -> SpMat<Self::R> {
         self.complex.d_matrix(k)
+    }
+}
+
+impl<R> HomologyComputable for KhComplex<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    type Homology = KhHomology<R>;
+    type HomologySummand = KhHomologySummand<R>;
+
+    fn homology(&self) -> Self::Homology {
+        KhHomology::from(self)
+    }
+
+    fn homology_at(&self, _i: Self::Idx) -> Self::HomologySummand {
+        todo!()
     }
 }
 
@@ -237,6 +235,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
+impl<R> HomologyComputable for KhComplexBigraded<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    type Homology = KhHomologyBigraded<R>;
+    type HomologySummand = KhHomologySummand<R>;
+
+    fn homology(&self) -> Self::Homology {
+        KhHomologyBigraded::from(self)
+    }
+
+    fn homology_at(&self, _i: Self::Idx) -> Self::HomologySummand {
+        todo!()
+    }
+}
+
 trait Shift { 
     fn shift(self, i: isize) -> Self;
 }
@@ -260,7 +272,7 @@ mod tests {
     #[test]
     fn kh_empty() {
         let l = Link::empty();
-        let c = KhComplex::<i32>::unreduced(l);
+        let c = KhComplex::new(l, 0, 0, false);
 
         assert_eq!(c.indices(), 0..=0);
         assert_eq!(c.deg_shift(), (0, 0));
@@ -271,7 +283,7 @@ mod tests {
     #[test]
     fn kh_unknot() {
         let l = Link::unknot();
-        let c = KhComplex::<i32>::unreduced(l);
+        let c = KhComplex::new(l, 0, 0, false);
 
         assert_eq!(c.indices(), 0..=0);
         assert_eq!(c.deg_shift(), (0, 0));
@@ -282,7 +294,7 @@ mod tests {
     #[test]
     fn kh_unknot_twist() {
         let l = Link::from(&[[0, 0, 1, 1]]);
-        let c = KhComplex::<i32>::unreduced(l);
+        let c = KhComplex::new(l, 0, 0, false);
 
         assert_eq!(c.indices(), 0..=1);
         assert_eq!(c.deg_shift(), (0, 1));
@@ -293,7 +305,7 @@ mod tests {
     #[test]
     fn kh_trefoil() {
         let l = Link::trefoil();
-        let c = KhComplex::<i32>::unreduced(l);
+        let c = KhComplex::new(l, 0, 0, false);
 
         assert_eq!(c.indices(), -3..=0);
         assert_eq!(c.deg_shift(), (-3, -6));
@@ -309,7 +321,7 @@ mod tests {
     #[test]
     fn kh_figure8() {
         let l = Link::figure8();
-        let c = KhComplex::<i32>::unreduced(l);
+        let c = KhComplex::new(l, 0, 0, false);
 
         assert_eq!(c.indices(), -2..=2);
         assert_eq!(c.deg_shift(), (-2, -2));

@@ -6,6 +6,8 @@ use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 use yui_link::Link;
 use super::complex::{KhComplex, KhComplexBigraded};
 
+pub type KhHomologySummand<R> = GenericRModStr<R>;
+
 pub struct KhHomology<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> {
     homology: GenericHomology<R, RangeInclusive<isize>>
@@ -15,29 +17,13 @@ impl<R> KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn new(l: Link, h: R, t: R, reduced: bool) -> Self {
         let complex = KhComplex::new(l, h, t, reduced);
-        Self::from(complex)
-    }
-
-    pub fn unreduced(l: Link) -> Self { 
-        Self::new(l, R::zero(), R::zero(), false)
-    }
-
-    pub fn unreduced_ht(l: Link, h: R, t: R) -> Self { 
-        Self::new(l, h, t, false)
-    }
-
-    pub fn reduced(l: Link) -> Self { 
-        Self::new(l, R::zero(), R::zero(), true)
-    }
-
-    pub fn reduced_ht(l: Link, h: R, t: R) -> Self { 
-        Self::new(l, h, t, true)
+        Self::from(&complex)
     }
 }
 
-impl<R> From<KhComplex<R>> for KhHomology<R>
+impl<R> From<&KhComplex<R>> for KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    fn from(c: KhComplex<R>) -> Self {
+    fn from(c: &KhComplex<R>) -> Self {
         let c = c.as_generic().simplify();
         let homology = GenericHomology::from(c);
         Self { homology }
@@ -46,7 +32,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 impl<R> Index<isize> for KhHomology<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = GenericRModStr<R>;
+    type Output = KhHomologySummand<R>;
 
     fn index(&self, index: isize) -> &Self::Output {
         self.homology.index(index)
@@ -57,7 +43,7 @@ impl<R> Grid for KhHomology<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Idx = isize;
     type IdxIter = RangeInclusive<isize>;
-    type Output = GenericRModStr<R>;
+    type Output = KhHomologySummand<R>;
 
     fn contains_idx(&self, k: Self::Idx) -> bool {
         self.homology.contains_idx(k)
@@ -91,21 +77,13 @@ impl<R> KhHomologyBigraded<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn new(l: Link, reduced: bool) -> Self {
         let c = KhComplexBigraded::new(l, reduced);
-        Self::from(c)
-    }
-
-    pub fn unreduced(l: Link) -> Self {
-        Self::new(l, false)
-    }
-
-    pub fn reduced(l: Link) -> Self {
-        Self::new(l, true)
+        Self::from(&c)
     }
 }
 
-impl<R> From<KhComplexBigraded<R>> for KhHomologyBigraded<R>
+impl<R> From<&KhComplexBigraded<R>> for KhHomologyBigraded<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    fn from(c: KhComplexBigraded<R>) -> Self {
+    fn from(c: &KhComplexBigraded<R>) -> Self {
         let c = c.as_generic().simplify();
         let homology = GenericHomology::from(c);
         Self { homology }
@@ -159,7 +137,7 @@ mod tests {
     #[test]
     fn kh_empty() {
         let l = Link::empty();
-        let h = KhHomology::<i32>::unreduced(l);
+        let h = KhHomology::new(l, 0, 0, false);
 
         assert_eq!(h.indices(), 0..=0);
 
@@ -170,7 +148,7 @@ mod tests {
     #[test]
     fn kh_unknot() {
         let l = Link::unknot();
-        let h = KhHomology::<i32>::unreduced(l);
+        let h = KhHomology::new(l, 0, 0, false);
 
         assert_eq!(h.indices(), 0..=0);
         
@@ -181,7 +159,7 @@ mod tests {
     #[test]
     fn kh_trefoil() {
         let l = Link::trefoil();
-        let h = KhHomology::<i32>::unreduced(l);
+        let h = KhHomology::new(l, 0, 0, false);
 
         assert_eq!(h.indices(), -3..=0);
 
@@ -200,7 +178,7 @@ mod tests {
     #[test]
     fn kh_trefoil_mirror() {
         let l = Link::trefoil().mirror();
-        let h = KhHomology::<i32>::unreduced(l);
+        let h = KhHomology::new(l, 0, 0, false);
 
         assert_eq!(h.indices(), 0..=3);
 
@@ -219,7 +197,7 @@ mod tests {
     #[test]
     fn kh_figure8() {
         let l = Link::figure8();
-        let h = KhHomology::<i32>::unreduced(l);
+        let h = KhHomology::new(l, 0, 0, false);
 
         assert_eq!(h.indices(), -2..=2);
 

@@ -1,6 +1,6 @@
 use std::str::FromStr;
 use yui_core::{EucRing, EucRingOps};
-use yui_homology::PrintTable;
+use yui_homology::fmt::FmtTable;
 use yui_khovanov::{KhHomology, KhHomologyBigraded};
 use crate::utils::*;
 
@@ -43,7 +43,7 @@ where R: EucRing + FromStr, for<'x> &'x R: EucRingOps<R> {
     }
 
     let h = KhHomologyBigraded::new(l, args.reduced);
-    let table = h.table();
+    let table = h.table_string();
     Ok(table)
 }
 

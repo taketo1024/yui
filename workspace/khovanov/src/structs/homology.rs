@@ -1,8 +1,7 @@
 use std::fmt::Display;
 use std::ops::{RangeInclusive, Index};
 
-use yui_homology::{Idx2, Idx2Iter, ChainComplex, Grid};
-use yui_homology::{RModGrid, GenericRModStr, Homology, GenericHomology};
+use yui_homology::{Idx2, Idx2Iter, ChainComplex, Grid, GenericRModStr, Homology, GenericHomology, fmt::FmtList};
 use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 use yui_link::Link;
 use super::complex::{KhComplex, KhComplexBigraded};
@@ -147,7 +146,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {}
 impl<R> Display for KhHomologyBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.fmt_default(f, "H")
+        self.fmt_list(f)
     }
 }
 

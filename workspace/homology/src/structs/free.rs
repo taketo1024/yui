@@ -4,7 +4,8 @@ use std::ops::Index;
 use yui_core::{Ring, RingOps};
 use yui_matrix::sparse::{SpMat, SpVec};
 use yui_lin_comb::{FreeGen, LinComb};
-use crate::{RModStr, RModGrid, GridItr, GridIdx, GenericRModGrid, Grid, ChainComplex};
+use crate::{RModStr, GridItr, GridIdx, GenericRModGrid, Grid, ChainComplex};
+use crate::fmt::FmtList;
 
 pub struct FreeRModStr<X, R>
 where 
@@ -142,7 +143,7 @@ where
     I: GridItr, I::Item: GridIdx
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.fmt_default(f, "C")
+        self.fmt_list(f)
     }
 }
 

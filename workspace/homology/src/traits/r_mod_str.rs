@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use yui_core::{Elem, Ring, RingOps};
 use yui_utils::superscript;
-use crate::DisplayForTable;
+use crate::fmt::DisplayForTable;
 
 pub trait RModStr: Sized + Display
 where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> { 

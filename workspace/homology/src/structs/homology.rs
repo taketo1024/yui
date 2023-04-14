@@ -2,7 +2,8 @@ use std::fmt::Display;
 use std::ops::Index;
 
 use yui_core::{Ring, RingOps, EucRing, EucRingOps};
-use crate::{GridIdx, GridItr, RModGrid, GenericRModStr, GenericRModGrid, Homology, HomologyComputable, Grid, GenericChainComplex};
+use crate::{GridIdx, GridItr, GenericRModStr, GenericRModGrid, Homology, HomologyComputable, Grid, GenericChainComplex};
+use crate::fmt::FmtList;
 
 pub struct GenericHomology<R, I>
 where 
@@ -76,8 +77,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>,
     I: GridItr,
     I::Item: GridIdx
-{
-}
+{}
 
 impl<R, I> Display for GenericHomology<R, I>
 where 
@@ -86,7 +86,7 @@ where
     I::Item: GridIdx
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.fmt_default(f, "H")
+        self.fmt_list(f)
     }
 }
 

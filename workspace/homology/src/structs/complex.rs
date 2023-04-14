@@ -5,7 +5,8 @@ use std::ops::Index;
 use yui_matrix::sparse::*;
 use yui_core::{RingOps, Ring, EucRingOps, EucRing};
 use crate::utils::{ChainReducer, HomologyCalc};
-use crate::{GridItr, GridIdx, RModStr, RModGrid, ChainComplex, GenericRModStr, GenericRModGrid, HomologyComputable, GenericHomology, Grid};
+use crate::{GridItr, GridIdx, RModStr, ChainComplex, GenericRModStr, GenericRModGrid, HomologyComputable, GenericHomology, Grid};
+use crate::fmt::FmtList;
 
 pub struct GenericChainComplex<R, I>
 where 
@@ -101,7 +102,7 @@ where
     I::Item: GridIdx
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.fmt_default(f, "C")
+        self.fmt_list(f)
     }
 }
 

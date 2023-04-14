@@ -15,13 +15,6 @@ where
     fn is_zero(&self) -> bool { 
         self.iter().all(|(_, v)| v.is_zero())
     }
-
-    fn fmt_default(&self, f: &mut std::fmt::Formatter<'_>, s: &str) -> std::fmt::Result {
-        for (i, v) in self.iter() { 
-            write!(f, "{s}[{}]: {}\n", i, v)?
-        }
-        Ok(())
-    }
 }
 
 impl<R, T> RModGrid for T

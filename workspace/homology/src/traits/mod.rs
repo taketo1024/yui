@@ -12,6 +12,3 @@ pub use complex::ChainComplex;
 
 mod homology;
 pub use homology::{Homology, HomologyComputable};
-
-mod print_table;
-pub use print_table::{DisplayForTable, PrintTable};

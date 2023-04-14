@@ -3,8 +3,6 @@ use super::{Crossing, CrossingType, Resolution, LinkComp, State};
 
 pub type Edge = u8;
 
-use CrossingType::{Xp, Xn};
-
 // Planer Diagram code, represented by crossings:
 //
 //     3   2
@@ -29,7 +27,10 @@ impl Link {
 
     pub fn from_pd_code<I>(pd_code: I) -> Self
     where I: IntoIterator<Item = [Edge; 4]> { 
-        let data = pd_code.into_iter().map(|x| Crossing::from_pd_code(x)).collect();
+        // TODO validate code
+        let data = pd_code.into_iter().map(|x| 
+            Crossing::from_pd_code(x)
+        ).collect();
         Self::new(data)
     }
 
@@ -205,6 +206,8 @@ impl Link {
     }
 
     pub fn crossing_signs(&self) -> Vec<i32> {
+        use CrossingType::{X, Xm};
+
         let n = self.data.len();
 
         let mut signs = vec![0; n];
@@ -223,8 +226,8 @@ impl Link {
                     passed.insert(e);
 
                     let sign = match (c.ctype(), j) { 
-                        (Xp, 1) | (Xn, 3) =>  1,
-                        (Xp, 3) | (Xn, 1) => -1,
+                        (Xm, 1) | (X, 3) =>  1,
+                        (Xm, 3) | (X, 1) => -1,
                         _                 =>  0
                     };
                     if sign != 0 { 
@@ -258,7 +261,7 @@ impl Link {
 #[cfg(test)]
 mod tests { 
     use super::*;
-    use super::CrossingType::{Xp, Xn};
+    use super::CrossingType::{X, Xm};
 
     #[test]
     fn link_init() { 
@@ -271,7 +274,7 @@ mod tests {
         let pd_code = [[1,2,3,4]];
         let l = Link::from_pd_code(pd_code);
         assert_eq!(l.data.len(), 1);
-        assert_eq!(l.data[0].ctype(), Xn);
+        assert_eq!(l.data[0].ctype(), X);
     }
 
     #[test]
@@ -382,10 +385,10 @@ mod tests {
     fn link_mirror() { 
         let pd_code = [[0,0,1,1]];
         let l = Link::from_pd_code(pd_code);
-        assert_eq!(l.data[0].ctype(), Xn);
+        assert_eq!(l.data[0].ctype(), X);
 
         let l = l.mirror();
-        assert_eq!(l.data[0].ctype(), Xp);
+        assert_eq!(l.data[0].ctype(), Xm);
     }
 
     #[test]

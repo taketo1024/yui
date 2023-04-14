@@ -1060,7 +1060,7 @@ mod tests {
     #[test]
     fn stack_id() {
         let c1 = Cob::new(vec![
-            CobComp::from(&Crossing::new(yui_link::CrossingType::Xn, [0,1,2,3])),
+            CobComp::from(&Crossing::from_pd_code([0,1,2,3])),
             CobComp::cup(TngComp::circ(4)),
             CobComp::cap(TngComp::circ(5)),
         ]);

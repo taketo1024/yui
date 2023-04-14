@@ -513,7 +513,7 @@ mod tests {
     #[test]
     fn single_x() { 
         let mut c = TngComplex::new((0, 0));
-        let x = Crossing::new(CrossingType::Xn, [0,1,2,3]);
+        let x = Crossing::from_pd_code([0,1,2,3]);
         c.append(&x);
 
         assert_eq!(c.len(), 2);
@@ -524,8 +524,8 @@ mod tests {
     #[test]
     fn two_x_disj() { 
         let mut c = TngComplex::new((0, 0));
-        let x0 = Crossing::new(CrossingType::Xn, [0,1,2,3]);
-        let x1 = Crossing::new(CrossingType::Xn, [4,5,6,7]);
+        let x0 = Crossing::from_pd_code([0,1,2,3]);
+        let x1 = Crossing::from_pd_code([4,5,6,7]);
 
         c.append(&x0);
         c.append(&x1);
@@ -539,8 +539,8 @@ mod tests {
     #[test]
     fn two_x() { 
         let mut c = TngComplex::new((0, 0));
-        let x0 = Crossing::new(CrossingType::Xn, [0,4,1,5]);
-        let x1 = Crossing::new(CrossingType::Xn, [3,1,4,2]);
+        let x0 = Crossing::from_pd_code([0,4,1,5]);
+        let x1 = Crossing::from_pd_code([3,1,4,2]);
 
         c.append(&x0);
         c.append(&x1);
@@ -554,8 +554,8 @@ mod tests {
     #[test]
     fn deloop_one() { 
         let mut c = TngComplex::new((0, 0));
-        let x0 = Crossing::new(CrossingType::Xp, [1,4,2,5]);
-        let x1 = Crossing::new(CrossingType::Xn, [3,6,4,1]);
+        let x0 = Crossing::from_pd_code([4,2,5,1]);
+        let x1 = Crossing::from_pd_code([3,6,4,1]);
 
         c.append(&x0);
         c.append(&x1);

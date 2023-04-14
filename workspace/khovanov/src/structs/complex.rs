@@ -293,7 +293,7 @@ mod tests {
 
     #[test]
     fn kh_unknot_twist() {
-        let l = Link::from(&[[0, 0, 1, 1]]);
+        let l = Link::from_pd_code([[0, 0, 1, 1]]);
         let c = KhComplex::new(l, 0, 0, false);
 
         assert_eq!(c.indices(), 0..=1);

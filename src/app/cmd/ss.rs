@@ -53,7 +53,7 @@ pub fn run_batch(args: &BatchArgs) -> Result<String, Box<dyn std::error::Error>>
     let mut all_res = String::from("");
 
     for (name, code) in data { 
-        let l = Link::from(&code);
+        let l = Link::from_pd_code(code);
         let res = guard_panic(|| 
             dispatch_eucring!(&args.c_value, &args.c_type, compute_ss, &l, &args.c_value)
         );

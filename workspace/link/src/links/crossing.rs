@@ -32,6 +32,11 @@ impl Crossing {
     pub fn new(ctype: CrossingType, edges: [Edge; 4]) -> Self { 
         Crossing { ctype, edges }
     }
+
+    pub fn from_pd_code(edges: [Edge; 4]) -> Self { 
+        Crossing::new(CrossingType::Xn, edges)
+    }
+
     pub fn ctype(&self) -> CrossingType { 
         self.ctype
     }

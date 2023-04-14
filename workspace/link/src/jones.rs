@@ -50,7 +50,7 @@ mod tests {
 
     #[test]
     fn unlink_2() {
-        let l = Link::from(&[[0, 1, 1, 0]]).resolved_at(0, Resolution::Res1);
+        let l = Link::from_pd_code([[0, 1, 1, 0]]).resolved_at(0, Resolution::Res1);
         let p = jones_polynomial(&l);
         assert_eq!(p, P::from_deg([(-2, 1), (0, 2), (2, 1)]));
     }

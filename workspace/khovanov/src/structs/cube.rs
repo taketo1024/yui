@@ -284,7 +284,7 @@ mod tests {
 
     #[test]
     fn unlink_2() {
-        let l = Link::from(&[[0, 0, 1, 1]]).resolved_at(0, Resolution::Res0);
+        let l = Link::from_pd_code([[0, 0, 1, 1]]).resolved_at(0, Resolution::Res0);
         let s = State::empty();
         let v = KhCubeVertex::new(&l, s.clone());
 
@@ -295,7 +295,7 @@ mod tests {
 
     #[test]
     fn edge_merge() { 
-        let l = Link::from(&[[0, 0, 1, 1]]);
+        let l = Link::from_pd_code([[0, 0, 1, 1]]);
         let s = State::from_iter([0]);
         let t = State::from_iter([1]);
         let v = KhCubeVertex::new(&l, s);
@@ -313,7 +313,7 @@ mod tests {
 
     #[test]
     fn edge_split() { 
-        let l = Link::from(&[[0, 1, 1, 0]]);
+        let l = Link::from_pd_code([[0, 1, 1, 0]]);
         let s = State::from_iter([0]);
         let t = State::from_iter([1]);
         let v = KhCubeVertex::new(&l, s);
@@ -389,7 +389,7 @@ mod tests {
 
     #[test]
     fn cube_twist_unknot() { 
-        let l = Link::from(&[[0, 0, 1, 1]]);
+        let l = Link::from_pd_code([[0, 0, 1, 1]]);
         let cube = KhCube::<i32>::new(&l);
 
         assert_eq!(cube.dim, 1);

@@ -41,7 +41,7 @@ pub fn load_link(name: &String, pd_code: &Option<String>, mirror: bool) -> Resul
     let l = { 
         if let Some(pd_code) = pd_code { 
             let pd_code: PDCode = serde_json::from_str(&pd_code)?;
-            Link::from(&pd_code)
+            Link::from_pd_code(pd_code)
         } else { 
             let path = format!("{}/links/{}.json", RESOURCE_DIR, name);
             Link::load(&path)?

@@ -58,6 +58,7 @@ impl<R> Grid for KhHomology<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Idx = isize;
     type IdxIter = RangeInclusive<isize>;
+    type Output = GenericRModStr<R>;
 
     fn contains_idx(&self, k: Self::Idx) -> bool {
         self.homology.contains_idx(k)
@@ -65,6 +66,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn indices(&self) -> Self::IdxIter {
         self.homology.indices()
+    }
+
+    fn get(&self, i: Self::Idx) -> Option<&Self::Output> {
+        self.homology.get(i)
     }
 }
 
@@ -121,6 +126,7 @@ impl<R> Grid for KhHomologyBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Idx = Idx2;
     type IdxIter = Idx2Iter;
+    type Output = GenericRModStr<R>;
 
     fn contains_idx(&self, k: Self::Idx) -> bool {
         self.homology.contains_idx(k)
@@ -128,6 +134,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn indices(&self) -> Self::IdxIter {
         self.homology.indices()
+    }
+
+    fn get(&self, i: Self::Idx) -> Option<&Self::Output> {
+        self.homology.get(i)
     }
 }
 

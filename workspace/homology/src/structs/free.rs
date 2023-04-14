@@ -167,6 +167,7 @@ where
 {
     type Idx = I::Item;
     type IdxIter = I;
+    type Output = FreeRModStr<X, R>;
 
     fn contains_idx(&self, k: Self::Idx) -> bool {
         self.grid.contains_idx(k)
@@ -174,6 +175,10 @@ where
 
     fn indices(&self) -> Self::IdxIter {
         self.grid.indices()
+    }
+
+    fn get(&self, i: Self::Idx) -> Option<&Self::Output> {
+        self.grid.get(i)
     }
 }
 

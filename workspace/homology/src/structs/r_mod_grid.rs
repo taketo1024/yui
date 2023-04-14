@@ -59,6 +59,7 @@ where
 {
     type Idx = I::Item;
     type IdxIter = I;
+    type Output = S;
 
     fn contains_idx(&self, k: Self::Idx) -> bool {
         self.grid.contains_key(&k)
@@ -66,5 +67,9 @@ where
 
     fn indices(&self) -> Self::IdxIter {
         self.range.clone()
+    }
+
+    fn get(&self, i: Self::Idx) -> Option<&Self::Output> {
+        self.grid.get(&i)
     }
 }

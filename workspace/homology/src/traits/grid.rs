@@ -1,6 +1,6 @@
 use std::fmt::Display;
 use std::hash::Hash;
-use std::ops::{Add, Neg, Sub, Index};
+use std::ops::{Add, Neg, Sub};
 
 pub trait GridIdx:
     Clone
@@ -37,14 +37,40 @@ where
     T::Item: GridIdx,
 {}
 
-pub trait Grid: Index<Self::Idx>
+pub trait Grid: Sized
 where 
     Self::Idx: GridIdx,
     Self::IdxIter: GridItr<Item = Self::Idx>,
 {
     type Idx;
     type IdxIter;
+    type Output;
 
-    fn contains_idx(&self, k: Self::Idx) -> bool;
     fn indices(&self) -> Self::IdxIter;
+    fn get(&self, i: Self::Idx) -> Option<&Self::Output>;
+
+    fn contains_idx(&self, i: Self::Idx) -> bool {
+        self.get(i).is_some()
+    }
+
+    fn iter(&self) -> GridIter<'_, Self> { 
+        GridIter { grid: self, iter: self.indices() }
+    }
+}
+
+pub struct GridIter<'a, G>
+where G: Grid { 
+    grid: &'a G,
+    iter: G::IdxIter,
+}
+
+impl<'a, G> Iterator for GridIter<'a, G>
+where G: Grid {
+    type Item = (G::Idx, &'a G::Output);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let Some(i) = self.iter.next() else { return None };
+        let v = self.grid.get(i).unwrap();
+        Some((i, v))
+    }
 }

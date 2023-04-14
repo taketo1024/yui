@@ -9,16 +9,16 @@ where
     type R;
 
     fn is_free(&self) -> bool { 
-        self.indices().all(|i| self[i].is_free())
+        self.iter().all(|(_, v)| v.is_free())
     }
 
     fn is_zero(&self) -> bool { 
-        self.indices().all(|i| self[i].is_zero())
+        self.iter().all(|(_, v)| v.is_zero())
     }
 
     fn fmt_default(&self, f: &mut std::fmt::Formatter<'_>, s: &str) -> std::fmt::Result {
-        for i in self.indices() { 
-            write!(f, "{s}[{}]: {}\n", i, self[i])?
+        for (i, v) in self.iter() { 
+            write!(f, "{s}[{}]: {}\n", i, v)?
         }
         Ok(())
     }

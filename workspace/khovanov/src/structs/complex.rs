@@ -119,6 +119,7 @@ impl<R> Grid for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     type Idx = isize;
     type IdxIter = RangeInclusive<isize>;
+    type Output = KhComplexSummand<R>;
 
     fn contains_idx(&self, k: Self::Idx) -> bool {
         self.complex.contains_idx(k)
@@ -126,6 +127,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn indices(&self) -> Self::IdxIter {
         self.complex.indices()
+    }
+
+    fn get(&self, i: Self::Idx) -> Option<&Self::Output> {
+        self.complex.get(i)
     }
 }
 
@@ -206,6 +211,7 @@ impl<R> Grid for KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Idx = Idx2;
     type IdxIter = IntoIter<Idx2>;
+    type Output = KhComplexSummand<R>;
 
     fn contains_idx(&self, k: Self::Idx) -> bool {
         self.complex.contains_idx(k)
@@ -213,6 +219,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn indices(&self) -> Self::IdxIter {
         self.complex.indices()
+    }
+
+    fn get(&self, i: Self::Idx) -> Option<&Self::Output> {
+        self.complex.get(i)
     }
 }
 

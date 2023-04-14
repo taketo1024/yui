@@ -99,6 +99,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
+impl<R> Index<[isize; 2]> for KhHomologyBigraded<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = GenericRModStr<R>;
+
+    fn index(&self, index: [isize; 2]) -> &Self::Output {
+        let index = Idx2::from(index);
+        &self.homology[index]
+    }
+}
+
 impl<R> Grid for KhHomologyBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Idx = Idx2;
@@ -132,7 +142,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 mod tests {
     use yui_link::Link;
     use yui_homology::{RModStr, Grid};
-    use super::KhHomology;
+    use super::*;
     
     #[test]
     fn kh_empty() {
@@ -216,4 +226,120 @@ mod tests {
         assert_eq!(h[2].rank(), 1);
         assert_eq!(h[2].tors(), &vec![2]);
     }
+
+    #[test]
+    fn kh_empty_bigr() {
+        let l = Link::empty();
+        let h = KhHomologyBigraded::<i32>::new(l, false);
+
+        assert_eq!(h[[0,0]].rank(), 1);
+        assert_eq!(h[[0,0]].is_free(), true);
+    }
+
+    #[test]
+    fn kh_unknot_bigr() {
+        let l = Link::unknot();
+        let h = KhHomologyBigraded::<i32>::new(l, false);
+
+        assert_eq!(h[[0,-1]].rank(), 1);
+        assert_eq!(h[[0,-1]].is_free(), true);
+        assert_eq!(h[[0, 1]].rank(), 1);
+        assert_eq!(h[[0, 1]].is_free(), true);
+    }
+
+    #[test]
+    fn kh_unknot_bigr_red() {
+        let l = Link::unknot();
+        let h = KhHomologyBigraded::<i32>::new(l, true);
+
+        assert_eq!(h[[0, 0]].rank(), 1);
+        assert_eq!(h[[0, 0]].is_free(), true);
+    }
+
+    #[test]
+    fn kh_trefoil_bigr() {
+        let l = Link::trefoil();
+        let h = KhHomologyBigraded::<i32>::new(l, false);
+
+        assert_eq!(h[[-3,-9]].rank(), 1);
+        assert_eq!(h[[-3,-9]].is_free(), true);
+        assert_eq!(h[[-2,-7]].rank(), 0);
+        assert_eq!(h[[-2,-7]].tors(), &vec![2]);
+        assert_eq!(h[[-2,-5]].rank(), 1);
+        assert_eq!(h[[-2,-5]].is_free(), true);
+        assert_eq!(h[[ 0,-3]].rank(), 1);
+        assert_eq!(h[[ 0,-3]].is_free(), true);
+        assert_eq!(h[[ 0,-1]].rank(), 1);
+        assert_eq!(h[[ 0,-1]].is_free(), true);
+    }
+
+    #[test]
+    fn kh_trefoil_mirror_bigr() {
+        let l = Link::trefoil().mirror();
+        let h = KhHomologyBigraded::<i32>::new(l, false);
+
+        assert_eq!(h[[0, 1]].rank(), 1);
+        assert_eq!(h[[0, 1]].is_free(), true);
+        assert_eq!(h[[0, 3]].rank(), 1);
+        assert_eq!(h[[0, 3]].is_free(), true);
+        assert_eq!(h[[2, 5]].rank(), 1);
+        assert_eq!(h[[2, 5]].is_free(), true);
+        assert_eq!(h[[3, 7]].rank(), 0);
+        assert_eq!(h[[3, 7]].tors(), &vec![2]);
+        assert_eq!(h[[3, 9]].rank(), 1);
+        assert_eq!(h[[3, 9]].is_free(), true);
+    }
+
+    #[test]
+    fn kh_trefoil_bigr_red() {
+        let l = Link::trefoil();
+        let h = KhHomologyBigraded::<i32>::new(l, true);
+
+        assert_eq!(h[[-3,-8]].rank(), 1);
+        assert_eq!(h[[-3,-8]].is_free(), true);
+        assert_eq!(h[[-2,-6]].rank(), 1);
+        assert_eq!(h[[-2,-6]].is_free(), true);
+        assert_eq!(h[[ 0,-2]].rank(), 1);
+        assert_eq!(h[[ 0,-2]].is_free(), true);
+    }
+
+    #[test]
+    fn kh_figure8_bigr() {
+        let l = Link::figure8();
+        let h = KhHomologyBigraded::<i32>::new(l, false);
+
+        assert_eq!(h[[-2,-5]].rank(), 1);
+        assert_eq!(h[[-2,-5]].is_free(), true);
+        assert_eq!(h[[-1,-3]].rank(), 0);
+        assert_eq!(h[[-1,-3]].tors(), &vec![2]);
+        assert_eq!(h[[-1,-1]].rank(), 1);
+        assert_eq!(h[[-1,-1]].is_free(), true);
+        assert_eq!(h[[ 0,-1]].rank(), 1);
+        assert_eq!(h[[ 0,-1]].is_free(), true);
+        assert_eq!(h[[ 0, 1]].rank(), 1);
+        assert_eq!(h[[ 0, 1]].is_free(), true);
+        assert_eq!(h[[ 1, 1]].rank(), 1);
+        assert_eq!(h[[ 1, 1]].is_free(), true);
+        assert_eq!(h[[ 2, 3]].rank(), 0);
+        assert_eq!(h[[ 2, 3]].tors(), &vec![2]);
+        assert_eq!(h[[ 2, 5]].rank(), 1);
+        assert_eq!(h[[ 2, 5]].is_free(), true);
+   }
+
+    #[test]
+    fn kh_figure8_bigr_red() {
+        let l = Link::figure8();
+        let h = KhHomologyBigraded::<i32>::new(l, true);
+
+        assert_eq!(h[[-2,-4]].rank(), 1);
+        assert_eq!(h[[-2,-4]].is_free(), true);
+        assert_eq!(h[[-1,-2]].rank(), 1);
+        assert_eq!(h[[-1,-2]].is_free(), true);
+        assert_eq!(h[[ 0, 0]].rank(), 1);
+        assert_eq!(h[[ 0, 0]].is_free(), true);
+        assert_eq!(h[[ 1, 2]].rank(), 1);
+        assert_eq!(h[[ 1, 2]].is_free(), true);
+        assert_eq!(h[[ 2, 4]].rank(), 1);
+        assert_eq!(h[[ 2, 4]].is_free(), true);
+   }
 }

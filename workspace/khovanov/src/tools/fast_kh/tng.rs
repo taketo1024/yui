@@ -95,8 +95,8 @@ impl Display for TngComp {
     }
 }
 
-impl From<LinkComp> for TngComp {
-    fn from(c: LinkComp) -> Self {
+impl From<&LinkComp> for TngComp {
+    fn from(c: &LinkComp) -> Self {
         let e = c.min_edge();
         if let Some((l, r)) = c.ends() { 
             if l == r { 
@@ -126,7 +126,7 @@ impl Tng {
 
     pub fn res(x: &Crossing, r: Resolution) -> Self { 
         let (r0, r1) = x.res_arcs(r);
-        let (mut c0, c1) = (TngComp::from(r0), TngComp::from(r1));
+        let (mut c0, c1) = (TngComp::from(&r0), TngComp::from(&r1));
 
         if c0.is_connectable(&c1) { 
             c0.connect(c1);

@@ -10,6 +10,10 @@ use crate::{KhAlgGen, KhComplex, KhLabel, KhEnhState, KhChain};
 pub enum Color { A, B }
 
 impl Color { 
+    pub fn is_a(&self) -> bool { 
+        self == &Color::A
+    }
+
     fn other(&self) -> Self { 
         match self { 
             Color::A => Color::B,

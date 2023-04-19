@@ -66,6 +66,13 @@ impl KhLabel {
     }
 }
 
+impl From<KhAlgGen> for KhLabel {
+    fn from(x: KhAlgGen) -> Self {
+        let v = if x.is_X() { 0 } else { 1 };
+        Self(BitSeq::from(v))
+    }
+}
+
 impl FromIterator<KhAlgGen> for KhLabel {
     fn from_iter<I: IntoIterator<Item = KhAlgGen>>(iter: I) -> Self {
         Self(BitSeq::from_iter(iter.into_iter().map(|x| 

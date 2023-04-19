@@ -186,6 +186,14 @@ impl BitSeq {
     }
 }
 
+impl<T> From<T> for BitSeq 
+where Bit: From<T> {
+    fn from(b: T) -> Self {
+        let val = if Bit::from(b).is_zero() { 0 } else { 1 };
+        Self::new(val, 1)
+    }
+}
+
 impl<T> FromIterator<T> for BitSeq
 where Bit: From<T> {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {

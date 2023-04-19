@@ -4,19 +4,32 @@ use log::info;
 use yui_link::{Link, Crossing, Edge};
 
 use crate::KhComplex;
+use crate::tools::fast_kh::cob::{CobComp, Dot};
+use crate::tools::fast_kh::tng::{TngComp};
 
+use super::cob::Cob;
 use super::complex::TngComplex;
+use super::mor::Mor;
 
 pub struct TngComplexBuilder {
     crossings: VecDeque<Crossing>,
-    complex: TngComplex
+    complex: TngComplex,
+    canon_cycles: Vec<Mor>
 }
 
 impl TngComplexBuilder {
-    pub fn build(l: &Link) -> TngComplex { 
+    pub fn build(l: &Link, with_canon_cycle: bool) -> TngComplex { 
         info!("construct TngComplex.");
 
         let mut c = Self::new(l);
+        
+        if with_canon_cycle { 
+            assert_eq!(l.components().len(), 1);
+            c.canon_cycles = vec![
+                Self::make_canon_cycle(l)
+            ];
+        }
+        
         c.process();
 
         c.complex
@@ -27,7 +40,7 @@ impl TngComplexBuilder {
         let deg_shift = KhComplex::<i64>::deg_shift_for(l, false);
         let complex = TngComplex::new(deg_shift);
 
-        Self { crossings, complex }
+        Self { crossings, complex, canon_cycles: vec![] }
     }
 
     fn sort_crossings(l: &Link) -> VecDeque<Crossing> { 
@@ -92,6 +105,25 @@ impl TngComplexBuilder {
             }
         }
     }
+
+    fn make_canon_cycle(l: &Link) -> Mor { 
+        use crate::derived::canon_cycle::ColoredSeifertCircles;
+
+        let circles = l.colored_seifert_circles(true);
+        let cob = Cob::new(
+            circles.iter().map(|(circ, col)| { 
+                let t = TngComp::from(circ);
+                let mut cup = CobComp::cup(t);
+                let dot = if col.is_a() { Dot::X } else { Dot::Y };
+                cup.add_dot(dot);
+                cup
+            }).collect()
+        );
+
+        info!("canon-cycle: {}", cob);
+        
+        Mor::from(cob)
+    }
 }
 
 #[cfg(test)]
@@ -103,14 +135,14 @@ mod tests {
     #[test]
     fn test_unknot_rm1() {
         let l = Link::from_pd_code([[0,0,1,1]]);
-        let c = TngComplexBuilder::build(&l);
+        let c = TngComplexBuilder::build(&l, false);
         let c = c.as_generic(0, 0);
 
         assert_eq!(c[0].rank(), 2);
         assert_eq!(c[1].rank(), 0);
 
         let l = Link::from_pd_code([[0,1,1,0]]);
-        let c = TngComplexBuilder::build(&l);
+        let c = TngComplexBuilder::build(&l, false);
         let c = c.as_generic(0, 0);
 
         c.check_d_all();
@@ -122,7 +154,7 @@ mod tests {
     #[test]
     fn test_unknot_rm2() {
         let l = Link::from_pd_code([[1,4,2,1],[2,4,3,3]]);
-        let c = TngComplexBuilder::build(&l);
+        let c = TngComplexBuilder::build(&l, false);
         let c = c.as_generic(0, 0);
 
         c.check_d_all();
@@ -136,7 +168,7 @@ mod tests {
     fn test_unlink_2() {
         let pd_code = [[1,2,3,4], [3,2,1,4]];
         let l = Link::from_pd_code(pd_code);
-        let c = TngComplexBuilder::build(&l);
+        let c = TngComplexBuilder::build(&l, false);
         let c = c.as_generic(0, 0);
 
         c.check_d_all();
@@ -149,7 +181,7 @@ mod tests {
     #[test]
     fn test_hopf_link() {
         let l = Link::hopf_link();
-        let c = TngComplexBuilder::build(&l);
+        let c = TngComplexBuilder::build(&l, false);
         let c = c.as_generic(0, 0);
 
         c.check_d_all();
@@ -162,7 +194,7 @@ mod tests {
     #[test]
     fn test_8_19() {
         let l = Link::from_pd_code([[4,2,5,1],[8,4,9,3],[9,15,10,14],[5,13,6,12],[13,7,14,6],[11,1,12,16],[15,11,16,10],[2,8,3,7]]);
-        let c = TngComplexBuilder::build(&l);
+        let c = TngComplexBuilder::build(&l, false);
         let c = c.as_generic(0, 0);
 
         c.check_d_all();

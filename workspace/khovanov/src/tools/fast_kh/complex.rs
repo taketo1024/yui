@@ -31,6 +31,10 @@ impl TngVertex {
         let out_edges = HashMap::new();
         Self { key, tng, in_edges, out_edges }
     }
+
+    pub fn out_edges(&self) -> &HashMap<KhEnhState, Mor> {
+        &self.out_edges
+    }
 }
 
 impl Display for TngVertex {
@@ -434,7 +438,7 @@ impl TngComplex {
             }
             str += "\n";
         }
-        info!("{str}");
+        println!("{str}");
     }
 
     pub fn validate_edges(&self) -> bool {

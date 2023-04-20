@@ -188,6 +188,17 @@ impl BitSeq {
         self.insert(i, Bit::Bit1)
     }
 
+    pub fn sub(&self, l: usize) -> Self { 
+        assert!(l <= self.len);
+        let val = self.val & ((1 << l) - 1);
+        Self::new(val, l)
+    }
+
+    pub fn is_sub(&self, other: &Self) -> bool { 
+        self.len <= other.len && 
+        self.val == (other.val & ((1 << self.len) - 1))
+    }
+
     pub fn generate(len: usize) -> Vec<BitSeq> {
         assert!(len <= Self::MAX_LEN);
         (0..2_u64.pow(len as u32)).map(|v| Self::new(v, len)).collect()
@@ -416,5 +427,28 @@ mod tests {
         assert!(b0 > b1);
         assert!(b1 < b2);
         assert!(b0 < b2);
+    }
+
+    #[test]
+    fn sub() { 
+        let b = BitSeq::new(0b10110, 5);
+
+        assert_eq!(b.sub(0), BitSeq::empty());
+        assert_eq!(b.sub(3), BitSeq::new(0b110, 3));
+        assert_eq!(b.sub(5), b);
+    }
+
+    #[test]
+    fn is_sub() { 
+        let b0 = BitSeq::new(0b110,   3);
+        let b1 = BitSeq::new(0b10110, 5);
+        let b2 = BitSeq::new(0b11110, 5);
+
+        assert!(b0.is_sub(&b1));
+        assert!(b0.is_sub(&b2));
+        assert!(!b1.is_sub(&b0));
+        assert!(!b1.is_sub(&b2));
+        assert!(!b2.is_sub(&b0));
+        assert!(!b2.is_sub(&b1));
     }
 }

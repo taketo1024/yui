@@ -87,10 +87,10 @@ impl TngComplex {
 
     fn add_edge(&mut self, k: &KhEnhState, l: &KhEnhState, f: Mor) { 
         let v = self.vertices.get_mut(k).unwrap();
-        v.out_edges.insert(l.clone(), f);
+        v.out_edges.insert(*l, f);
 
         let w = self.vertices.get_mut(l).unwrap();
-        w.in_edges.insert(k.clone());
+        w.in_edges.insert(*k);
     }
 
     fn remove_edge(&mut self, k: &KhEnhState, l: &KhEnhState) { 
@@ -124,10 +124,10 @@ impl TngComplex {
             for v in vs { 
                 for (l, f) in v.out_edges.iter() { 
                     if f.is_zero() { 
-                        rmv.insert((v.key.clone(), l.clone()));
+                        rmv.insert((v.key, *l));
                     }
                 }
-                self.vertices.insert(v.key.clone(), v);
+                self.vertices.insert(v.key, v);
             }
         }
 
@@ -186,8 +186,8 @@ impl TngComplex {
         let mut f = Cob::id(&v0.tng);
         f.connect_comp(sdl.clone());
 
-        v0.out_edges.insert(v1.key.clone(), Mor::from(f));
-        v1.in_edges.insert(v0.key.clone());
+        v0.out_edges.insert(v1.key, Mor::from(f));
+        v1.in_edges.insert(v0.key);
 
         // modify tngs of v0 and v1.
         v0.tng.connect(sdl.src().clone());
@@ -199,7 +199,7 @@ impl TngComplex {
     pub fn find_loop(&self) -> Option<(KhEnhState, usize)> { 
         for (k, v) in self.iter_verts() { 
             if let Some(r) = v.tng.find_loop() { 
-                return Some((k.clone(), r))
+                return Some((*k, r))
             }
         }
         None
@@ -215,8 +215,8 @@ impl TngComplex {
         v0.key.label.push(KhAlgGen::X);
         v1.key.label.push(KhAlgGen::I);
 
-        let k0 = &v0.key;
-        let k1 = &v1.key;
+        let k0 = v0.key;
+        let k1 = v1.key;
 
         let v0_in = v0.in_edges.iter().cloned().collect_vec();
         for j in v0_in.iter() { 
@@ -230,13 +230,13 @@ impl TngComplex {
             let f1 = f.cap_off(Bottom::Tgt, &c, Dot::Y);
 
             if !f0.is_zero() {
-                u.out_edges.insert(k0.clone(), f0);
-                v0.in_edges.insert(j.clone());
+                u.out_edges.insert(k0, f0);
+                v0.in_edges.insert(*j);
             }
 
             if !f1.is_zero() {
-                u.out_edges.insert(k1.clone(), f1);
-                v1.in_edges.insert(j.clone());
+                u.out_edges.insert(k1, f1);
+                v1.in_edges.insert(*j);
             }
         }
         
@@ -252,28 +252,25 @@ impl TngComplex {
             let f1 = f1.cap_off(Bottom::Src, &c, Dot::None);
 
             if !f0.is_zero() { 
-                v0.out_edges.insert(l.clone(), f0);
-                w.in_edges.insert(k0.clone());
+                v0.out_edges.insert(*l, f0);
+                w.in_edges.insert(k0);
             }
 
             if !f1.is_zero() { 
-                v1.out_edges.insert(l.clone(), f1);
-                w.in_edges.insert(k1.clone());
+                v1.out_edges.insert(*l, f1);
+                w.in_edges.insert(k1);
             }
         }
         
-        let k0 = k0.clone();
-        let k1 = k1.clone();
-
-        self.vertices.insert(k0.clone(), v0);
-        self.vertices.insert(k1.clone(), v1);
+        self.vertices.insert(k0, v0);
+        self.vertices.insert(k1, v1);
 
         debug_assert!(self.validate_edges());
 
         (k0, k1)
     }
 
-    pub fn find_inv_edge<'a>(&'a self, k: &'a KhEnhState) -> Option<(&'a KhEnhState, &'a KhEnhState)> { 
+    pub fn find_inv_edge(&self, k: &KhEnhState) -> Option<(KhEnhState, KhEnhState)> { 
         let mut cand = None;
         let mut cand_s = usize::MAX;
 
@@ -299,7 +296,7 @@ impl TngComplex {
 
                 if s == 0 {
                     info!("({}) good pivot {}: {} -> {}", self.nverts(), f, v, w);
-                    return Some((k, l));
+                    return Some((*k, *l));
                 } else if s < cand_s { 
                     cand = Some((k, l));
                     cand_s = s;
@@ -309,9 +306,10 @@ impl TngComplex {
 
         if let Some((k, l)) = cand { 
             info!("({}) pivot (score: {cand_s}) {}: {} -> {}", self.nverts(), self.edge(k, l), self.vertex(k), self.vertex(l));
+            Some((*k, *l))
+        } else { 
+            None
         }
-
-        cand
     }
 
     pub fn eliminate(&mut self, k0: &KhEnhState, l0: &KhEnhState) {
@@ -569,9 +567,6 @@ mod tests {
         assert!(e.is_some());
 
         let Some((k, r)) = e else { panic!() };
-
-        dbg!(k.to_string());
-        dbg!(r);
 
         assert_eq!(k, KhEnhState::new(
             State::from_iter([1,0]), 

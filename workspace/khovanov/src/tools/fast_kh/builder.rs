@@ -3,7 +3,7 @@ use std::collections::{VecDeque, HashSet};
 use log::info;
 use yui_link::{Link, Crossing, Edge};
 
-use crate::KhComplex;
+use crate::{KhComplex, KhEnhState};
 use crate::tools::fast_kh::cob::{CobComp, Dot};
 use crate::tools::fast_kh::tng::{TngComp};
 
@@ -25,9 +25,7 @@ impl TngComplexBuilder {
         
         if with_canon_cycle { 
             assert_eq!(l.components().len(), 1);
-            c.canon_cycles = vec![
-                Self::make_canon_cycle(l)
-            ];
+            c.make_canon_cycles();
         }
         
         c.process();
@@ -93,21 +91,32 @@ impl TngComplexBuilder {
     }
 
     fn proceed_each(&mut self, x: Crossing) { 
-        let c = &mut self.complex;
-        c.append(&x);
-        
-        while let Some((k, r)) = c.find_loop() { 
-            let (k0, k1) = c.deloop(&k, r);
-            for k in [k0, k1] { 
-                if let Some((i, j)) = c.find_inv_edge(&k) { 
-                    c.eliminate(&i.clone(), &j.clone());
-                }
-            }
+        self.complex.append(&x);
+
+        while let Some((k, r)) = self.complex.find_loop() { 
+            self.deloop(&k, r);
         }
     }
 
-    fn make_canon_cycle(l: &Link) -> Mor { 
+    fn deloop(&mut self, k: &KhEnhState, r: usize) {
+        let (k0, k1) = self.complex.deloop(k, r);
+
+        for k in [k0, k1] { 
+            self.eliminate(&k)
+        }
+    }
+
+    fn eliminate(&mut self, k: &KhEnhState) {
+        if let Some((i, j)) = self.complex.find_inv_edge(k) { 
+            self.complex.eliminate(&i, &j);
+        }
+    }
+
+    fn make_canon_cycles(&mut self) { 
         use crate::derived::canon_cycle::ColoredSeifertCircles;
+
+        let l = Link::new(self.crossings.iter().cloned().collect());
+        assert_eq!(l.components().len(), 1);
 
         let circles = l.colored_seifert_circles(true);
         let cob = Cob::new(
@@ -122,7 +131,8 @@ impl TngComplexBuilder {
 
         info!("canon-cycle: {}", cob);
         
-        Mor::from(cob)
+        let f = Mor::from(cob);
+        self.canon_cycles = vec![f];
     }
 }
 

@@ -18,7 +18,7 @@ pub struct TngComplexBuilder {
 }
 
 impl TngComplexBuilder {
-    pub fn build(l: &Link, with_canon_cycle: bool) -> TngComplex { 
+    pub fn build(l: &Link, with_canon_cycle: bool) -> Self { 
         info!("construct TngComplex.");
 
         let mut c = Self::new(l);
@@ -30,7 +30,7 @@ impl TngComplexBuilder {
         
         c.process();
 
-        c.complex
+        c
     }
 
     fn new(l: &Link) -> Self { 
@@ -99,7 +99,11 @@ impl TngComplexBuilder {
     }
 
     fn deloop(&mut self, k: &KhEnhState, r: usize) {
-        let (k0, k1) = self.complex.deloop(k, r);
+        let (c, k0, k1) = self.complex.deloop(k, r);
+
+        for e in self.canon_cycles.iter_mut() { 
+            e.deloop(k, &c);
+        }
 
         for k in [k0, k1] { 
             self.eliminate(&k)
@@ -148,15 +152,15 @@ mod tests {
     #[test]
     fn test_unknot_rm1() {
         let l = Link::from_pd_code([[0,0,1,1]]);
-        let c = TngComplexBuilder::build(&l, false);
-        let c = c.as_generic(0, 0);
+        let b = TngComplexBuilder::build(&l, false);
+        let c = b.complex.as_generic(0, 0);
 
         assert_eq!(c[0].rank(), 2);
         assert_eq!(c[1].rank(), 0);
 
         let l = Link::from_pd_code([[0,1,1,0]]);
-        let c = TngComplexBuilder::build(&l, false);
-        let c = c.as_generic(0, 0);
+        let b = TngComplexBuilder::build(&l, false);
+        let c = b.complex.as_generic(0, 0);
 
         c.check_d_all();
 
@@ -167,8 +171,8 @@ mod tests {
     #[test]
     fn test_unknot_rm2() {
         let l = Link::from_pd_code([[1,4,2,1],[2,4,3,3]]);
-        let c = TngComplexBuilder::build(&l, false);
-        let c = c.as_generic(0, 0);
+        let b = TngComplexBuilder::build(&l, false);
+        let c = b.complex.as_generic(0, 0);
 
         c.check_d_all();
 
@@ -181,8 +185,8 @@ mod tests {
     fn test_unlink_2() {
         let pd_code = [[1,2,3,4], [3,2,1,4]];
         let l = Link::from_pd_code(pd_code);
-        let c = TngComplexBuilder::build(&l, false);
-        let c = c.as_generic(0, 0);
+        let b = TngComplexBuilder::build(&l, false);
+        let c = b.complex.as_generic(0, 0);
 
         c.check_d_all();
 
@@ -194,8 +198,8 @@ mod tests {
     #[test]
     fn test_hopf_link() {
         let l = Link::hopf_link();
-        let c = TngComplexBuilder::build(&l, false);
-        let c = c.as_generic(0, 0);
+        let b = TngComplexBuilder::build(&l, false);
+        let c = b.complex.as_generic(0, 0);
 
         c.check_d_all();
 
@@ -207,8 +211,8 @@ mod tests {
     #[test]
     fn test_8_19() {
         let l = Link::from_pd_code([[4,2,5,1],[8,4,9,3],[9,15,10,14],[5,13,6,12],[13,7,14,6],[11,1,12,16],[15,11,16,10],[2,8,3,7]]);
-        let c = TngComplexBuilder::build(&l, false);
-        let c = c.as_generic(0, 0);
+        let b = TngComplexBuilder::build(&l, false);
+        let c = b.complex.as_generic(0, 0);
 
         c.check_d_all();
 
@@ -229,5 +233,12 @@ mod tests {
 
         assert_eq!(h[3].rank(), 1);
         assert_eq!(h[3].tors(), &vec![2]);
+    }
+
+    #[test]
+    fn canon_cycle_trefoil() { 
+        let l = Link::trefoil();
+        let b = TngComplexBuilder::build(&l, true);
+        // println!("{}", b.canon_cycles[0]);
     }
 }

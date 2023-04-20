@@ -12,7 +12,7 @@ use yui_link::{Crossing, Resolution};
 
 use crate::{KhAlgGen, KhEnhState};
 use super::cob::{Cob, Dot, Bottom, CobComp};
-use super::tng::Tng;
+use super::tng::{Tng, TngComp};
 use super::mor::{Mor, MorTrait};
 
 #[derive(Clone, Debug)]
@@ -205,7 +205,7 @@ impl TngComplex {
         None
     }
 
-    pub fn deloop(&mut self, k: &KhEnhState, r: usize) -> (KhEnhState, KhEnhState) { 
+    pub fn deloop(&mut self, k: &KhEnhState, r: usize) -> (TngComp, KhEnhState, KhEnhState) { 
         info!("({}) deloop {} at {r}", self.nverts(), &self.vertices[k]);
 
         let mut v0 = self.vertices.remove(k).unwrap();
@@ -267,7 +267,7 @@ impl TngComplex {
 
         debug_assert!(self.validate_edges());
 
-        (k0, k1)
+        (c, k0, k1)
     }
 
     pub fn find_inv_edge(&self, k: &KhEnhState) -> Option<(KhEnhState, KhEnhState)> { 

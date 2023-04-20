@@ -2,11 +2,13 @@ use yui_core::{Ring, RingOps};
 use yui_lin_comb::LinComb;
 
 use super::cob::{Cob, Dot, Bottom, CobComp};
-use super::tng::TngComp;
+use super::tng::{Tng, TngComp};
 
 pub type Mor = LinComb<Cob, i32>; // Z-linear combination of cobordisms.
 
 pub trait MorTrait: Sized {
+    fn src(&self) -> Tng;
+    fn tgt(&self) -> Tng;
     fn is_invertible(&self) -> bool;
     fn inv(&self) -> Option<Self>;
     fn map_cob<F>(self, f: F) -> Self where F: Fn(&mut Cob);
@@ -18,6 +20,20 @@ pub trait MorTrait: Sized {
 }
 
 impl MorTrait for Mor {
+    fn src(&self) -> Tng {
+        let Some((c, _)) = self.iter().next() else { 
+            return Tng::empty()
+        };
+        c.src()
+    }
+
+    fn tgt(&self) -> Tng { 
+        let Some((c, _)) = self.iter().next() else { 
+            return Tng::empty()
+        };
+        c.tgt()
+    }
+
     fn is_invertible(&self) -> bool { 
         self.len() == 1 && 
         self.iter().next().map(|(c, a)| 

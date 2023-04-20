@@ -3,18 +3,18 @@ use std::collections::{VecDeque, HashSet};
 use log::info;
 use yui_link::{Link, Crossing, Edge};
 
-use crate::{KhComplex, KhEnhState};
+use crate::{KhComplex, KhEnhState, KhLabel};
 use crate::tools::fast_kh::cob::{CobComp, Dot};
 use crate::tools::fast_kh::tng::{TngComp};
 
 use super::cob::Cob;
 use super::complex::TngComplex;
-use super::mor::Mor;
+use super::elem::TngElem;
 
 pub struct TngComplexBuilder {
     crossings: VecDeque<Crossing>,
     complex: TngComplex,
-    canon_cycles: Vec<Mor>
+    canon_cycles: Vec<TngElem>
 }
 
 impl TngComplexBuilder {
@@ -118,8 +118,11 @@ impl TngComplexBuilder {
         let l = Link::new(self.crossings.iter().cloned().collect());
         assert_eq!(l.components().len(), 1);
 
+        let s = l.ori_pres_state();
         let circles = l.colored_seifert_circles(true);
-        let cob = Cob::new(
+
+        let t = KhEnhState::new(s, KhLabel::empty());
+        let f = Cob::new(
             circles.iter().map(|(circ, col)| { 
                 let t = TngComp::from(circ);
                 let mut cup = CobComp::cup(t);
@@ -128,11 +131,11 @@ impl TngComplexBuilder {
                 cup
             }).collect()
         );
+        let e = TngElem::init(t, f);
 
-        info!("canon-cycle: {}", cob);
+        info!("canon-cycle: {}", e);
         
-        let f = Mor::from(cob);
-        self.canon_cycles = vec![f];
+        self.canon_cycles = vec![e];
     }
 }
 

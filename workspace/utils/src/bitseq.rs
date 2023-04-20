@@ -1,5 +1,6 @@
 use core::fmt;
 use std::fmt::Display;
+use std::iter::zip;
 use std::ops::Index;
 
 use derive_more::Display;
@@ -72,13 +73,23 @@ pub struct BitSeq {
 impl BitSeq { 
     pub const MAX_LEN: usize = 64;
 
-    pub fn new(val: u64, len: usize) -> Self { 
+    fn new(val: u64, len: usize) -> Self { 
         assert!(len <= Self::MAX_LEN);
+        assert!(val < (1 << len));
         Self { val, len }
     }
 
     pub fn empty() -> Self { 
         Self::new(0, 0)
+    }
+
+    pub fn zeros(len: usize) -> Self { 
+        Self::new(0, len)
+    }
+
+    pub fn ones(len: usize) -> Self { 
+        let val = (1 << len) - 1;
+        Self::new(val, len)
     }
 
     pub fn len(&self) -> usize { 
@@ -99,24 +110,21 @@ impl BitSeq {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = Bit> {
-        let val = self.val;
-        (0..self.len).rev().into_iter().map(move |i| {
-            Bit::from((val >> i) & 1)
+        let mut val = self.val;
+        
+        (0..self.len).into_iter().map(move |_| {
+            let b = val & 1;
+            val >>= 1;
+            Bit::from(b)
         })
     }
 
     pub fn set(&mut self, i: usize, b: Bit) {
         assert!(i < self.len);
-        if self[i] == b { 
-            return
-        }
-
-        let j = self.len - i - 1;
-
         if b.is_zero() { 
-            self.val &= !(1 << j);
+            self.val &= !(1 << i);
         } else { 
-            self.val |= 1 << j;
+            self.val |= 1 << i;
         }
     }
 
@@ -129,11 +137,9 @@ impl BitSeq {
     }
 
     pub fn push(&mut self, b: Bit) {
-        self.val = if b.is_zero() { 
-            self.val << 1
-        } else { 
-            self.val << 1 | 1
-        };
+        if b.is_one() { 
+            self.val |= 1 << self.len;
+        }
         self.len += 1;
     }
 
@@ -147,16 +153,17 @@ impl BitSeq {
 
     pub fn append(&mut self, b: BitSeq) {
         assert!(self.len + b.len <= Self::MAX_LEN);
-        self.val = self.val << b.len | b.val;
+        self.val = b.val << self.len | self.val;
         self.len += b.len;
     }
 
     pub fn remove(&mut self, i: usize) { 
         assert!(i < self.len);
-        let k = self.len - i;
-        let a = self.val >> k;
-        let b = self.val & ((1 << (k - 1)) - 1);
-        self.val = a << (k - 1) | b;
+        
+        let a = self.val & !((1 << i + 1) - 1);
+        let b = self.val & ((1 << i) - 1);
+
+        self.val = a >> 1 | b;
         self.len -= 1;
     }
 
@@ -164,11 +171,12 @@ impl BitSeq {
         assert!(i <= self.len);
         assert!(self.len < Self::MAX_LEN);
 
-        let k = self.len - i;
-        let a = self.val >> k;
-        let b = b.as_u64();
-        let c = self.val & ((1 << k) - 1);
-        self.val = a << k + 1 | b << k | c;
+        let mask = (1 << i) - 1;
+        let a = self.val & !mask;
+        let b = b.as_u64() << i;
+        let c = self.val & mask;
+
+        self.val = a << 1 | b | c;
         self.len += 1;
     }
 
@@ -200,11 +208,10 @@ where Bit: From<T> {
         let mut val = 0;
         let mut len = 0;
         for b in iter.into_iter() {
-            val <<= 1;
-            len += 1;
             if Bit::from(b).is_one() {
-                val |= 1;
+                val |= 1 << len;
             }
+            len += 1;
         }
         Self::new(val, len)
     }
@@ -215,8 +222,7 @@ impl Index<usize> for BitSeq {
 
     fn index(&self, i: usize) -> &Self::Output {
         assert!(i < self.len);
-        let j = self.len - i - 1;
-        match (self.val >> j) & 1 { 
+        match (self.val >> i) & 1 { 
             0 => &Bit::Bit0,
             1 => &Bit::Bit1,
             _ => panic!()
@@ -226,8 +232,8 @@ impl Index<usize> for BitSeq {
 
 impl Display for BitSeq {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for i in 0..self.len { 
-            self[i].fmt(f)?;
+        for b in self.iter() { 
+            b.fmt(f)?;
         }
         Ok(())
     }
@@ -235,10 +241,19 @@ impl Display for BitSeq {
 
 impl PartialOrd for BitSeq {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        let cmp = self.len.cmp(&other.len).then_with( || {
-            self.val.cmp(&other.val)
-        });
-        Some(cmp)
+        let c = self.len.cmp(&other.len);
+        if !c.is_eq() { 
+            return Some(c);
+        }
+
+        for (b1, b2) in zip(self.iter(), other.iter()) {
+            let c = b1.cmp(&b2);
+            if !c.is_eq() { 
+                return Some(c)
+            }
+        }
+
+        Some(std::cmp::Ordering::Equal)
     }
 }
 
@@ -249,8 +264,15 @@ mod tests {
     use super::*;
 
     #[test]
+    fn new() { 
+        let b = BitSeq::new(0b10110, 5);
+        assert_eq!(b.val, 22);
+        assert_eq!(b.len, 5);
+    }
+
+    #[test]
     fn from_iter() { 
-        let b = BitSeq::from_iter([0,1,1,0,1]);
+        let b = BitSeq::from_iter([1,0,1,1,0]);
         assert_eq!(b, BitSeq::new(0b01101, 5));
     }
 
@@ -262,7 +284,7 @@ mod tests {
 
     #[test]
     fn index() { 
-        let b = BitSeq::new(0b10110, 5);
+        let b = BitSeq::new(0b01101, 5);
         assert_eq!(b.len(), 5);
         assert_eq!(b[0], Bit1);
         assert_eq!(b[1], Bit0);
@@ -273,52 +295,59 @@ mod tests {
 
     #[test]
     fn iter() { 
-        let b = BitSeq::new(0b10110, 5);
+        let b = BitSeq::new(0b01101, 5);
         let v = b.iter().collect_vec();
         assert_eq!(v, vec![Bit1, Bit0, Bit1, Bit1, Bit0])
     }
 
     #[test]
     fn to_string() { 
-        let b = BitSeq::new(0b10110, 5);
+        let b = BitSeq::new(0b01101, 5);
         let s = b.to_string();
         assert_eq!(s, "10110");
     }
 
     #[test]
     fn set() { 
-        let mut b = BitSeq::new(0b10110, 5);
+        let mut b = BitSeq::new(0b01101, 5);
 
-        b.set(0, Bit0);
-        assert_eq!(b, BitSeq::new(0b00110, 5));
+        b.set(0, Bit1);
+        assert_eq!(b, BitSeq::new(0b01101, 5));
+
+        b.set(1, Bit0);
+        assert_eq!(b, BitSeq::new(0b01101, 5));
 
         b.set(2, Bit0);
-        assert_eq!(b, BitSeq::new(0b00010, 5));
+        assert_eq!(b, BitSeq::new(0b01001, 5));
 
-        b.set(3, Bit1);
-        assert_eq!(b, BitSeq::new(0b00010, 5));
+        b.set(3, Bit0);
+        assert_eq!(b, BitSeq::new(0b00001, 5));
 
         b.set(4, Bit1);
-        assert_eq!(b, BitSeq::new(0b00011, 5));
+        assert_eq!(b, BitSeq::new(0b10001, 5));
     }
 
     #[test]
     fn remove() { 
-        let mut b = BitSeq::new(0b1, 1);
-
-        b.remove(0);
-        assert_eq!(b, BitSeq::empty());
-
         let mut b = BitSeq::new(0b100101, 6);
 
         b.remove(0);
-        assert_eq!(b, BitSeq::new(0b00101, 5));
-
-        b.remove(4);
-        assert_eq!(b, BitSeq::new(0b0010, 4));
+        assert_eq!(b, BitSeq::new(0b10010, 5));
 
         b.remove(2);
-        assert_eq!(b, BitSeq::new(0b000, 3));
+        assert_eq!(b, BitSeq::new(0b1010, 4));
+
+        b.remove(3);
+        assert_eq!(b, BitSeq::new(0b010, 3));
+
+        b.remove(2);
+        assert_eq!(b, BitSeq::new(0b10, 2));
+        
+        b.remove(1);
+        assert_eq!(b, BitSeq::new(0b0, 1));
+        
+        b.remove(0);
+        assert_eq!(b, BitSeq::new(0b0, 0));
     }
 
     #[test]
@@ -328,27 +357,25 @@ mod tests {
         b.insert(0, Bit1);
         assert_eq!(b, BitSeq::new(0b1, 1));
 
-        let mut b = BitSeq::new(0b100101, 6);
-
         b.insert(0, Bit0);
-        assert_eq!(b, BitSeq::new(0b0100101, 7));
+        assert_eq!(b, BitSeq::new(0b10, 2));
 
-        b.insert(7, Bit1);
-        assert_eq!(b, BitSeq::new(0b01001011, 8));
+        b.insert(2, Bit0);
+        assert_eq!(b, BitSeq::new(0b010, 3));
 
         b.insert(3, Bit1);
-        assert_eq!(b, BitSeq::new(0b010101011, 9));
+        assert_eq!(b, BitSeq::new(0b1010, 4));
     }
 
     #[test]
     fn push() { 
-        let mut b = BitSeq::new(0b10110, 5);
+        let mut b = BitSeq::new(0b01101, 5);
 
         b.push(Bit0);
-        assert_eq!(b, BitSeq::new(0b101100, 6));
+        assert_eq!(b, BitSeq::new(0b001101, 6));
 
         b.push(Bit1);
-        assert_eq!(b, BitSeq::new(0b1011001, 7));
+        assert_eq!(b, BitSeq::new(0b1001101, 7));
     }
 
     #[test]
@@ -358,7 +385,7 @@ mod tests {
 
         b0.append(b1);
 
-        assert_eq!(b0, BitSeq::new(0b101100101, 9));
+        assert_eq!(b0, BitSeq::new(0b010110110, 9));
     }
 
     #[test]
@@ -378,16 +405,16 @@ mod tests {
 
     #[test]
     fn ord() { 
-        let b0 = BitSeq::new(0b110, 3);
-        let b1 = BitSeq::new(0b100, 3);
-        let b2 = BitSeq::new(0b011, 3);
-
-        assert!(b0 > b1);
-        assert!(b1 > b2);
-        assert!(b0 > b2);
-
         let b0 = BitSeq::new(0b0,  1);
         let b1 = BitSeq::new(0b00, 2);
         assert!(b0 < b1);
+        
+        let b0 = BitSeq::new(0b110, 3); // [0,1,1]
+        let b1 = BitSeq::new(0b100, 3); // [0,0,1]
+        let b2 = BitSeq::new(0b011, 3); // [1,1,0]
+
+        assert!(b0 > b1);
+        assert!(b1 < b2);
+        assert!(b0 < b2);
     }
 }

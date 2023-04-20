@@ -12,14 +12,11 @@ impl State {
     }
 
     pub fn zeros(l: usize) -> Self { 
-        assert!(l <= BitSeq::MAX_LEN);
-        State(BitSeq::new(0, l))
+        State(BitSeq::zeros(l))
     }
 
     pub fn ones(l: usize) -> Self { 
-        assert!(l <= BitSeq::MAX_LEN);
-        let b = (0..l).fold(0, |b, _| b << 1 | 1);
-        State(BitSeq::new(b, l))
+        State(BitSeq::ones(l))
     }
 
     pub fn is_empty(&self) -> bool { 
@@ -107,7 +104,7 @@ impl PartialOrd for State {
         let cmp = self.len().cmp(&other.len()).then_with( ||
             self.weight().cmp(&other.weight())
         ).then_with( ||
-            self.0.cmp(&other.0).reverse()
+            self.0.cmp(&other.0)
         );
         Some(cmp)
     }

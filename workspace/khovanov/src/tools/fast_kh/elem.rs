@@ -53,6 +53,36 @@ impl TngElem {
             }
         }
     }
+
+    pub fn eliminate(&mut self, j: &KhEnhState, i_out: &HashMap<KhEnhState, Mor>) {
+        let targets = self.mors.keys().cloned().collect_vec();
+
+        for t in targets { 
+            if !j.is_sub(&t) { 
+                continue 
+            }
+
+            assert_eq!(t.label, j.label);
+
+            let f = self.mors.remove(&t).unwrap();
+            let a = &i_out[&j];
+            let ainv = a.inv().unwrap();
+
+            for (k, c) in i_out.iter() { 
+                if k == j { continue }
+
+                let mut t1 = t.clone();
+                t1.state.overwrite(&k.state);
+                t1.label = k.label;
+
+                let f1 = -c * &ainv * &f;
+
+                if !f1.is_zero() { 
+                    self.mors.insert(t1, f1);
+                }
+            }
+        }
+    }
 }
 
 impl Display for TngElem {

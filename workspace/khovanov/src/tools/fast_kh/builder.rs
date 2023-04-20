@@ -112,6 +112,11 @@ impl TngComplexBuilder {
 
     fn eliminate(&mut self, k: &KhEnhState) {
         if let Some((i, j)) = self.complex.find_inv_edge(k) { 
+            let i_out = self.complex.vertex(&i).out_edges();
+            for e in self.canon_cycles.iter_mut() { 
+                e.eliminate(&j, i_out);
+            }
+            
             self.complex.eliminate(&i, &j);
         }
     }

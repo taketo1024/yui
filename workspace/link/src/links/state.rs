@@ -53,6 +53,14 @@ impl State {
         self.0.append(other.0);
     }
 
+    pub fn sub(&self, l: usize) -> State { 
+        Self(self.0.sub(l))
+    }
+
+    pub fn is_sub(&self, other: &Self) -> bool { 
+        self.0.is_sub(&other.0)
+    }
+
     pub fn targets(&self) -> Vec<State> { 
         let n = self.len();
         (0..n).filter(|&i| self[i].is_zero() ).map(|i| { 
@@ -136,6 +144,12 @@ mod tests {
 
         let s = State::from_iter([1, 1, 1]);
         assert_eq!(s.targets(), vec![]);
+    }
+
+    #[test]
+    fn sub() { 
+        let s = State::from_iter([1,0,0,1,1]);
+        assert_eq!(s.sub(3), State::from_iter([1,0,0]));
     }
 
     #[test]

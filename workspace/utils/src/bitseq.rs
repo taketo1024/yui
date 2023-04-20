@@ -199,6 +199,11 @@ impl BitSeq {
         self.val == (other.val & ((1 << self.len) - 1))
     }
 
+    pub fn overwrite(&mut self, other: &Self) {
+        assert!(self.len >= other.len);
+        self.val = self.val & !((1 << other.len) - 1) | other.val
+    }
+
     pub fn generate(len: usize) -> Vec<BitSeq> {
         assert!(len <= Self::MAX_LEN);
         (0..2_u64.pow(len as u32)).map(|v| Self::new(v, len)).collect()
@@ -450,5 +455,15 @@ mod tests {
         assert!(!b1.is_sub(&b2));
         assert!(!b2.is_sub(&b0));
         assert!(!b2.is_sub(&b1));
+    }
+
+    #[test]
+    fn overwrite() { 
+        let mut b0 = BitSeq::new(0b1010010110, 10);
+        let b1 = BitSeq::new(0b10101, 5);
+
+        b0.overwrite(&b1);
+
+        assert_eq!(b0, BitSeq::new(0b1010010101, 10))
     }
 }

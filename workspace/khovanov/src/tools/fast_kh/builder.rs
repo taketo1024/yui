@@ -1,9 +1,9 @@
-use std::collections::{VecDeque, HashSet};
+use std::collections::HashSet;
 
 use log::info;
 use yui_link::{Link, Crossing, Edge};
 
-use crate::{KhComplex, KhEnhState, KhLabel};
+use crate::{KhComplex, KhEnhState};
 use crate::tools::fast_kh::cob::{CobComp, Dot};
 use crate::tools::fast_kh::tng::{TngComp};
 
@@ -12,7 +12,7 @@ use super::complex::TngComplex;
 use super::elem::TngElem;
 
 pub struct TngComplexBuilder {
-    crossings: VecDeque<Crossing>,
+    crossings: Vec<Crossing>,
     complex: TngComplex,
     canon_cycles: Vec<TngElem>
 }
@@ -41,10 +41,10 @@ impl TngComplexBuilder {
         Self { crossings, complex, canon_cycles: vec![] }
     }
 
-    fn sort_crossings(l: &Link) -> VecDeque<Crossing> { 
+    fn sort_crossings(l: &Link) -> Vec<Crossing> { 
         let mut remain = l.data().clone();
         let mut endpts = HashSet::new();
-        let mut res = VecDeque::new();
+        let mut res = Vec::new();
 
         fn take_best(remain: &mut Vec<Crossing>, endpts: &mut HashSet<Edge>) -> Option<Crossing> { 
             if remain.is_empty() { 
@@ -77,21 +77,26 @@ impl TngComplexBuilder {
         }
 
         while let Some(x) = take_best(&mut remain, &mut endpts) { 
-            res.push_back(x);
+            res.push(x);
         }
 
         res
     }
 
     fn process(&mut self) {
-        while let Some(x) = self.crossings.pop_front() { 
-            self.proceed_each(x);
+        for i in 0 .. self.crossings.len() { 
+            self.proceed_each(i);
         }
-        // info!("result: #v = {}", c.vertices.len());
+        self.finalize();
     }
 
-    fn proceed_each(&mut self, x: Crossing) { 
-        self.complex.append(&x);
+    fn proceed_each(&mut self, i: usize) { 
+        let x = &self.crossings[i];
+        self.complex.append(x);
+
+        for e in self.canon_cycles.iter_mut() { 
+            e.append(i, x);
+        }
 
         while let Some((k, r)) = self.complex.find_loop() { 
             self.deloop(&k, r);
@@ -114,10 +119,16 @@ impl TngComplexBuilder {
         if let Some((i, j)) = self.complex.find_inv_edge(k) { 
             let i_out = self.complex.vertex(&i).out_edges();
             for e in self.canon_cycles.iter_mut() { 
-                e.eliminate(&j, i_out);
+                e.eliminate(&i, &j, i_out);
             }
             
             self.complex.eliminate(&i, &j);
+        }
+    }
+
+    fn finalize(&mut self) { 
+        for e in self.canon_cycles.iter_mut() { 
+            e.finalize();
         }
     }
 
@@ -130,7 +141,6 @@ impl TngComplexBuilder {
         let s = l.ori_pres_state();
         let circles = l.colored_seifert_circles(true);
 
-        let t = KhEnhState::new(s, KhLabel::empty());
         let f = Cob::new(
             circles.iter().map(|(circ, col)| { 
                 let t = TngComp::from(circ);
@@ -140,7 +150,7 @@ impl TngComplexBuilder {
                 cup
             }).collect()
         );
-        let e = TngElem::init(t, f);
+        let e = TngElem::init(s, f);
 
         info!("canon-cycle: {}", e);
         
@@ -244,6 +254,8 @@ mod tests {
     fn canon_cycle_trefoil() { 
         let l = Link::trefoil();
         let b = TngComplexBuilder::build(&l, true);
-        // println!("{}", b.canon_cycles[0]);
+
+        b.complex.describe();
+        println!("{}", b.canon_cycles[0]);
     }
 }

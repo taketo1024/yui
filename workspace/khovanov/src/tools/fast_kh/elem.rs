@@ -3,85 +3,97 @@ use std::fmt::Display;
 
 use itertools::Itertools;
 use num_traits::Zero;
+use yui_link::{State, Crossing};
 use yui_utils::map;
 
 use crate::{KhEnhState, KhAlgGen};
 
 use super::cob::{Cob, Bottom, Dot};
 use super::mor::{Mor, MorTrait};
-use super::tng::TngComp;
+use super::tng::{TngComp, Tng};
 
 // element in C as a cobordism ∅ → C.
 pub struct TngElem {
-    mors: HashMap<KhEnhState, Mor>
+    init_state: State,
+    init_cob: Cob,                 // precomposed at the final step.
+    mors: HashMap<KhEnhState, Mor> // src must partially match init_cob. 
 }
 
 impl TngElem { 
-    pub fn new(mors: HashMap<KhEnhState, Mor>) -> Self { 
-        Self {mors}
+    pub fn init(init_state: State, init_cob: Cob) -> Self { 
+        let f = Mor::from(Cob::empty());
+        Self{ init_state, init_cob, mors: map! { KhEnhState::init() => f } }
     }
 
-    pub fn init(t: KhEnhState, c: Cob) -> Self { 
-        let f = Mor::from(c);
-        Self::new(map! { t => f })
+    pub fn append(&mut self, i: usize, x: &Crossing) { 
+        let r = self.init_state[i];
+        let arcs = x.res_arcs(r);
+        let tng = Tng::new(vec![TngComp::from(&arcs.0), TngComp::from(&arcs.1)]);
+        let id = Cob::id(&tng);
+
+        let mors = std::mem::take(&mut self.mors);
+        self.mors = mors.into_iter().map(|(mut k, f)| {
+            k.state.push(r);
+            let f = f.connect(&id);
+            (k, f)
+        }).collect();
     }
 
     pub fn deloop(&mut self, k: &KhEnhState, c: &TngComp) {
-        let targets = self.mors.keys().cloned().collect_vec();
+        let Some(f) = self.mors.remove(k) else { return };
 
-        for t in targets { 
-            if !k.is_sub(&t) { 
-                continue 
-            }
+        let mut k0 = *k;
+        let mut k1 = *k;
 
-            let f = self.mors.remove(&t).unwrap();
+        k0.label.push(KhAlgGen::X);
+        k1.label.push(KhAlgGen::I);
 
-            let mut t0 = t.clone();
-            let mut t1 = t.clone();
+        let f0 = f.clone().cap_off(Bottom::Tgt, c, Dot::None);
+        let f1 = f.clone().cap_off(Bottom::Tgt, c, Dot::Y);
 
-            t0.label.push(KhAlgGen::X);
-            t1.label.push(KhAlgGen::I);
-
-            let f0 = f.clone().cap_off(Bottom::Tgt, c, Dot::None);
-            let f1 = f.clone().cap_off(Bottom::Tgt, c, Dot::Y);
-
-            if !f0.is_zero() {
-                self.mors.insert(t0, f0);
-            }
-            if !f1.is_zero() { 
-                self.mors.insert(t1, f1);
+        for (k, f) in [(k0, f0), (k1, f1)] { 
+            if !f.is_zero() { 
+                self.mors.insert(k, f);
             }
         }
     }
 
-    pub fn eliminate(&mut self, j: &KhEnhState, i_out: &HashMap<KhEnhState, Mor>) {
-        let targets = self.mors.keys().cloned().collect_vec();
+    pub fn eliminate(&mut self, i: &KhEnhState, j: &KhEnhState, i_out: &HashMap<KhEnhState, Mor>) {
+        // mors into i can be simply dropped.
+        self.mors.remove(i);
 
-        for t in targets { 
-            if !j.is_sub(&t) { 
-                continue 
-            }
+        // mors into j must be redirected by -ca^{-1}
+        let Some(f) = self.mors.remove(j) else { return };
 
-            assert_eq!(t.label, j.label);
+        let a = &i_out[&j];
+        let ainv = a.inv().unwrap();
 
-            let f = self.mors.remove(&t).unwrap();
-            let a = &i_out[&j];
-            let ainv = a.inv().unwrap();
+        for (k, c) in i_out.iter() { 
+            if k == j { continue }
 
-            for (k, c) in i_out.iter() { 
-                if k == j { continue }
+            let caf = c * &ainv * &f;
+            let d = if let Some(d) = self.mors.get(k) { 
+                d - caf
+            } else { 
+                -caf
+            };
 
-                let mut t1 = t.clone();
-                t1.state.overwrite(&k.state);
-                t1.label = k.label;
-
-                let f1 = -c * &ainv * &f;
-
-                if !f1.is_zero() { 
-                    self.mors.insert(t1, f1);
-                }
+            if !d.is_zero() { 
+                self.mors.insert(*k, d);
+            } else { 
+                self.mors.remove(k);
             }
         }
+    }
+
+    pub fn finalize(&mut self) { 
+        let init = std::mem::take(&mut self.init_cob);
+        let mors = std::mem::take(&mut self.mors);
+
+        self.mors = mors.into_iter().map(|(k, f)| {
+            let f = f.map_cob(|c| *c = &*c * &init);
+            (k, f)
+        }).collect();
     }
 }
 

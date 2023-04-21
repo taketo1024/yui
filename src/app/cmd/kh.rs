@@ -56,7 +56,7 @@ where R: EucRing + FromStr, for<'x> &'x R: EucRingOps<R> {
         return err!("{t} != 0 is not allowed for reduced.");
     }
 
-    let kh = KhHomology::new(l.clone(), h, t, args.reduced);
+    let kh = KhHomology::new(l.clone(), &h, &t, args.reduced);
     let res = kh.to_string();
     Ok(res)
 }

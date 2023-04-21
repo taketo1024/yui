@@ -106,16 +106,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> KhCube<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn new(l: &Link) -> Self { 
-        Self::new_ht(l, R::zero(), R::zero())
-    }
-
-    pub fn new_ht(l: &Link, h: R, t: R) -> Self { 
+    pub fn new(l: &Link, h: &R, t: &R) -> Self { 
         let str = KhAlgStr::new(h, t);
-        Self::new_str(l, str)
-    }
-    
-    fn new_str(l: &Link, str: KhAlgStr<R>) -> Self { 
+
         let n = l.crossing_num() as usize;
         let vertices: HashMap<_, _> = State::generate(n).into_iter().map(|s| { 
             let v = KhCubeVertex::new(&l, s.clone());
@@ -355,7 +348,7 @@ mod tests {
     #[test]
     fn cube_empty() { 
         let l = Link::empty();
-        let cube = KhCube::<i32>::new(&l);
+        let cube = KhCube::<i32>::new(&l, &0, &0);
 
         assert_eq!(cube.dim, 0);
         assert_eq!(cube.vertices.len(), 1);
@@ -373,7 +366,7 @@ mod tests {
     #[test]
     fn cube_unknot() { 
         let l = Link::unknot();
-        let cube = KhCube::<i32>::new(&l);
+        let cube = KhCube::<i32>::new(&l, &0, &0);
 
         assert_eq!(cube.dim, 0);
         assert_eq!(cube.vertices.len(), 1);
@@ -390,7 +383,7 @@ mod tests {
     #[test]
     fn cube_twist_unknot() { 
         let l = Link::from_pd_code([[0, 0, 1, 1]]);
-        let cube = KhCube::<i32>::new(&l);
+        let cube = KhCube::<i32>::new(&l, &0, &0);
 
         assert_eq!(cube.dim, 1);
         assert_eq!(cube.vertices.len(), 2);
@@ -416,7 +409,7 @@ mod tests {
     #[test]
     fn cube_hopf_link() { 
         let l = Link::hopf_link();
-        let cube = KhCube::<i32>::new(&l);
+        let cube = KhCube::<i32>::new(&l, &0, &0);
 
         assert_eq!(cube.dim, 2);
         assert_eq!(cube.vertices.len(), 4);
@@ -425,7 +418,7 @@ mod tests {
    #[test]
    fn cube_trefoil() { 
        let l = Link::trefoil();
-       let cube = KhCube::<i32>::new(&l);
+       let cube = KhCube::<i32>::new(&l, &0, &0);
 
        assert_eq!(cube.dim, 3);
        assert_eq!(cube.vertices.len(), 8);

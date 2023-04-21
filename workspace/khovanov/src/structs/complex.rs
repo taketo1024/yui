@@ -21,8 +21,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn new(link: Link, h: R, t: R, reduced: bool) -> Self { 
-        let cube = KhCube::new_ht(&link, h, t);
+    pub fn new(link: Link, h: &R, t: &R, reduced: bool) -> Self { 
+        let cube = KhCube::new(&link, h, t);
         let str = cube.structure().clone();
 
         let i0 = Self::deg_shift_for(&link, reduced).0;
@@ -151,7 +151,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn new(l: Link, reduced: bool) -> Self { 
-        let cube = KhCube::new(&l);
+        let cube = KhCube::new(&l, &R::zero(), &R::zero());
         let (i0, j0) = KhComplex::deg_shift_for(&l, reduced);
         let h_range = cube.h_range().shift(i0);
         let q_range = cube.q_range().shift(j0);
@@ -272,7 +272,7 @@ mod tests {
     #[test]
     fn kh_empty() {
         let l = Link::empty();
-        let c = KhComplex::new(l, 0, 0, false);
+        let c = KhComplex::new(l, &0, &0, false);
 
         assert_eq!(c.indices(), 0..=0);
         assert_eq!(c.deg_shift(), (0, 0));
@@ -283,7 +283,7 @@ mod tests {
     #[test]
     fn kh_unknot() {
         let l = Link::unknot();
-        let c = KhComplex::new(l, 0, 0, false);
+        let c = KhComplex::new(l, &0, &0, false);
 
         assert_eq!(c.indices(), 0..=0);
         assert_eq!(c.deg_shift(), (0, 0));
@@ -294,7 +294,7 @@ mod tests {
     #[test]
     fn kh_unknot_twist() {
         let l = Link::from_pd_code([[0, 0, 1, 1]]);
-        let c = KhComplex::new(l, 0, 0, false);
+        let c = KhComplex::new(l, &0, &0, false);
 
         assert_eq!(c.indices(), 0..=1);
         assert_eq!(c.deg_shift(), (0, 1));
@@ -305,7 +305,7 @@ mod tests {
     #[test]
     fn kh_trefoil() {
         let l = Link::trefoil();
-        let c = KhComplex::new(l, 0, 0, false);
+        let c = KhComplex::new(l, &0, &0, false);
 
         assert_eq!(c.indices(), -3..=0);
         assert_eq!(c.deg_shift(), (-3, -6));
@@ -321,7 +321,7 @@ mod tests {
     #[test]
     fn kh_figure8() {
         let l = Link::figure8();
-        let c = KhComplex::new(l, 0, 0, false);
+        let c = KhComplex::new(l, &0, &0, false);
 
         assert_eq!(c.indices(), -2..=2);
         assert_eq!(c.deg_shift(), (-2, -2));

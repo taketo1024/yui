@@ -1,3 +1,5 @@
+use itertools::Itertools;
+use num_traits::Zero;
 use yui_core::{Ring, RingOps};
 use yui_link::Link;
 
@@ -18,7 +20,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         b.process();
 
         let complex = b.complex().eval(h, t);
-        let canon_cycles = b.canon_cycles().iter().map(|z| z.eval(h, t)).collect();
+        let canon_cycles = b.canon_cycles().iter().map(|z| 
+            z.eval(h, t)
+        ).collect_vec();
+
+        assert!(canon_cycles.iter().all(|z| 
+            complex.differetiate(z).is_zero()
+        ));
 
         Self::_new(complex, canon_cycles, reduced, deg_shift)
     }        

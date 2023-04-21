@@ -42,6 +42,13 @@ where T: One {
     }
 }
 
+impl<T> From<i32> for Ratio<T>
+where T: One + From<i32> {
+    fn from(i: i32) -> Self {
+        Self::from_numer(T::from(i))
+    }
+}
+
 impl<T> Default for Ratio<T>
 where T: Default + One {
     fn default() -> Self {

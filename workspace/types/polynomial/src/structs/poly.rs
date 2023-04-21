@@ -202,6 +202,13 @@ where I: PolyGen<Degree = MDegree<J>>, J: Zero, R: Ring, for<'x> &'x R: RingOps<
     }
 }
 
+impl<I, R> From<i32> for PolyBase<I, R>
+where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
+    fn from(i: i32) -> Self {
+        Self::from_const(R::from(i))
+    }
+}
+
 impl<I, R> FromStr for PolyBase<I, R>
 where I: PolyGen + FromStr, R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
     type Err = ();

@@ -10,7 +10,8 @@ pub trait RingOps<T = Self>:
 pub trait Ring: 
     AddGrp + 
     Mon + 
-    RingOps
+    RingOps + 
+    From<i32>
 where
     for<'a> &'a Self: RingOps<Self>
 {

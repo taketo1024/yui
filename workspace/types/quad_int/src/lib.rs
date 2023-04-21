@@ -100,6 +100,13 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
     }
 }
 
+impl<I, const D: i32> From<i32> for QuadInt<I, D>
+where I: Integer, for<'x> &'x I: IntOps<I> {
+    fn from(i: i32) -> Self {
+        Self::from_real(I::from(i))
+    }
+}
+
 impl<I, const D: i32> FromStr for QuadInt<I, D>
 where I: Integer + FromStr, for<'x> &'x I: IntOps<I> {
     type Err = ();

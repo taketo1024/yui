@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 use std::ops::RangeInclusive;
+use std::rc::Rc;
 use itertools::Itertools;
 use yui_core::{Ring, RingOps, PowMod2, Sign};
+use yui_homology::{FreeChainComplex, Shift};
 use yui_link::{Link, State, LinkComp, Resolution, Edge};
 
 use crate::{KhAlgStr, KhLabel, KhEnhState};
@@ -101,7 +103,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     str: KhAlgStr<R>,
     dim: usize,
     vertices: HashMap<State, KhCubeVertex>,
-    edges: HashMap<State, Vec<(State, KhCubeEdge)>>
+    edges: HashMap<State, Vec<(State, KhCubeEdge)>>,
+    base_pt: Option<Edge>
 }
 
 impl<R> KhCube<R>
@@ -124,7 +127,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             (s.clone(), edges)
         }).collect();
 
-        KhCube { str, dim: n, vertices, edges }
+        let base_pt = l.first_edge().cloned();
+
+        KhCube { str, dim: n, vertices, edges, base_pt }
     }
 
     pub fn structure(&self) -> &KhAlgStr<R> {
@@ -245,6 +250,29 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 }).collect_vec()
             }
         }
+    }
+
+    pub fn as_complex(self, i0: isize, reduced: bool) -> FreeChainComplex<KhEnhState, R, RangeInclusive<isize>> {
+        let range = self.h_range().shift(i0);
+        
+        let rc0 = Rc::new(self);
+        let rc1 = rc0.clone();
+
+        FreeChainComplex::new(range, 1, 
+            move |i| {
+                let i = i - i0;
+                let gens = if reduced {
+                    let e = rc0.base_pt.unwrap();
+                    rc0.reduced_generators(i, &e)
+                } else { 
+                    rc0.generators(i) 
+                };
+                gens.into_iter().cloned().collect()
+            },
+            move |x| { 
+                rc1.differentiate(x)
+            }
+        )
     }
 }
 

@@ -6,7 +6,7 @@ use std::vec::IntoIter;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps};
 use yui_matrix::sparse::SpMat;
 use yui_link::Link;
-use yui_homology::{Idx2, Idx2Iter, Grid, ChainComplex, FreeRModStr, FreeChainComplex, HomologyComputable};
+use yui_homology::{Idx2, Idx2Iter, Grid, ChainComplex, FreeRModStr, FreeChainComplex, HomologyComputable, Shift};
 
 use crate::{KhEnhState, KhCube, KhChain, KhHomology, KhHomologySummand, KhHomologyBigraded};
 
@@ -20,29 +20,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn new(link: &Link, h: &R, t: &R, reduced: bool) -> Self { 
+        let deg_shift = Self::deg_shift_for(link, reduced);
         let cube = KhCube::new(link, h, t);
-
-        let i0 = Self::deg_shift_for(link, reduced).0;
-        let range = cube.h_range().shift(i0);
-
-        let cube0 = Rc::new(cube);
-        let cube1 = cube0.clone();
-
-        let complex = FreeChainComplex::new(range, 1, 
-            |i| {
-                let i = i - i0;
-                let gens = if reduced {
-                    let e = link.first_edge().unwrap();
-                    cube0.reduced_generators(i, e)
-                } else { 
-                    cube0.generators(i) 
-                };
-                gens.into_iter().cloned().collect()
-            },
-            move |x| { 
-                cube1.differentiate(x)
-            }
-        );
+        let complex = cube.as_complex(deg_shift.0, reduced);
 
         KhComplex { complex, reduced }
     }
@@ -231,19 +211,6 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     fn homology_at(&self, _i: Self::Idx) -> Self::HomologySummand {
         todo!()
-    }
-}
-
-trait Shift { 
-    fn shift(self, i: isize) -> Self;
-}
-
-impl Shift for RangeInclusive<isize> { 
-    fn shift(self, i: isize) -> Self {
-        RangeInclusive::new(
-            self.start() + i, 
-            self.end() + i
-        )
     }
 }
 

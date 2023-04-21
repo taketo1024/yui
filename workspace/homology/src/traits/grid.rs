@@ -1,6 +1,6 @@
 use std::fmt::Display;
 use std::hash::Hash;
-use std::ops::{Add, Neg, Sub};
+use std::ops::{Add, Neg, Sub, RangeInclusive};
 
 pub trait GridIdx:
     Clone
@@ -74,3 +74,17 @@ where G: Grid {
         Some((i, v))
     }
 }
+
+pub trait Shift { 
+    fn shift(self, i: isize) -> Self;
+}
+
+impl Shift for RangeInclusive<isize> { 
+    fn shift(self, i: isize) -> Self {
+        RangeInclusive::new(
+            self.start() + i, 
+            self.end() + i
+        )
+    }
+}
+

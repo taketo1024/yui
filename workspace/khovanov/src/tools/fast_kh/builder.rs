@@ -133,9 +133,7 @@ impl TngComplexBuilder {
     }
 
     fn make_canon_cycles(&mut self) { 
-        use crate::derived::canon_cycle::ColoredSeifertCircles;
-
-        let l = Link::new(self.crossings.iter().cloned().collect());
+        let l = Link::new(self.crossings.clone());
         
         assert_eq!(l.components().len(), 1);
 
@@ -262,7 +260,7 @@ mod tests {
         let b = TngComplexBuilder::build(&l, true);
 
         b.complex.print_d();
-        
+
         for i in [0, 1] { 
             let z = &b.canon_cycles[i];
             let z = z.eval(&2, &0);

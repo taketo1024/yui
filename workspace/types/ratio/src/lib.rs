@@ -35,9 +35,9 @@ impl<T> Ratio<T> {
     }
 }
 
-impl<T> From<T> for Ratio<T>
+impl<T> Ratio<T>
 where T: One {
-    fn from(a: T) -> Self {
+    pub fn from_numer(a: T) -> Self {
         Self::new_raw(a, T::one())
     }
 }
@@ -45,7 +45,7 @@ where T: One {
 impl<T> Default for Ratio<T>
 where T: Default + One {
     fn default() -> Self {
-        Self::from(T::default())
+        Self::from_numer(T::default())
     }
 }
 
@@ -132,7 +132,7 @@ where T: EucRing + FromStr, for<'x> &'x T: EucRingOps<T> {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if let Ok(a) = s.parse::<T>() {
-            return Ok(Self::from(a))
+            return Ok(Self::from_numer(a))
         } 
         
         let r = regex::Regex::new(r"(.+)/(.+)").unwrap();

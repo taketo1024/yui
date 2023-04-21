@@ -758,15 +758,15 @@ mod tests {
         type R = Ratio<i32>;
         type P = Poly::<'x', R>;
 
-        let f = P::from(R::from(1));
+        let f = P::from(R::from_numer(1));
         assert_eq!(f.is_unit(), true);
-        assert_eq!(f.inv(), Some(P::from(R::from(1))));
+        assert_eq!(f.inv(), Some(P::from(R::from_numer(1))));
 
         let f = P::from(R::zero());
         assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
 
-        let f = P::from(R::from(2));
+        let f = P::from(R::from_numer(2));
         assert_eq!(f.is_unit(), true);
         assert_eq!(f.inv(), Some(P::from(R::new(1, 2))));
 
@@ -814,15 +814,15 @@ mod tests {
         type R = Ratio<i32>;
         type P = LPoly::<'x', R>;
 
-        let f = P::from(R::from(1));
+        let f = P::from(R::from_numer(1));
         assert_eq!(f.is_unit(), true);
-        assert_eq!(f.inv(), Some(P::from(R::from(1))));
+        assert_eq!(f.inv(), Some(P::from(R::from_numer(1))));
 
         let f = P::from(R::zero());
         assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
 
-        let f = P::from(R::from(2));
+        let f = P::from(R::from_numer(2));
         assert_eq!(f.is_unit(), true);
         assert_eq!(f.inv(), Some(P::from(R::new(1, 2))));
 
@@ -830,7 +830,7 @@ mod tests {
         assert_eq!(f.is_unit(), true);
         assert_eq!(f.inv(), Some(P::mono(-1, R::one())));
 
-        let f = P::mono(1, R::from(2));
+        let f = P::mono(1, R::from_numer(2));
         assert_eq!(f.is_unit(), true);
         assert_eq!(f.inv(), Some(P::mono(-1, R::new(1, 2))));
 
@@ -845,8 +845,8 @@ mod tests {
         type R = Ratio<i32>;
         type P = Poly::<'x', R>;
 
-        let f = P::from_deg([(0, R::from(1)), (1, R::from(2)), (2, R::from(1))]);
-        let g = P::from_deg([(0, R::from(3)), (1, R::from(2))]);
+        let f = P::from_deg([(0, R::from_numer(1)), (1, R::from_numer(2)), (2, R::from_numer(1))]);
+        let g = P::from_deg([(0, R::from_numer(3)), (1, R::from_numer(2))]);
         let (q, r) = f.div_rem(&g);
 
         assert_eq!(q, P::from_deg([(0, R::new(1, 4)), (1, R::new(1, 2))]));

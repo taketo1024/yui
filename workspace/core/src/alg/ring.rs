@@ -1,4 +1,4 @@
-use crate::{Sign, AddGrp, AddGrpOps, Mon, MonOps};
+use crate::{AddGrp, AddGrpOps, Mon, MonOps};
 
 // Rings 
 
@@ -18,8 +18,5 @@ where
     fn inv(&self) -> Option<Self>;
     fn is_unit(&self) -> bool;
     fn normalizing_unit(&self) -> Self;
-    fn from_sign(e: Sign) -> Self {
-        if e.is_positive() { Self::one() } else { -Self::one() }
-    }
 }
 

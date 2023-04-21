@@ -136,27 +136,31 @@ impl TngComplexBuilder {
         use crate::derived::canon_cycle::ColoredSeifertCircles;
 
         let l = Link::new(self.crossings.iter().cloned().collect());
+        
         assert_eq!(l.components().len(), 1);
 
         let s = l.ori_pres_state();
+        let ori = vec![true, false];
 
-        let circles = l.colored_seifert_circles(true);
-        let f = Cob::new(
-            circles.iter().map(|(circ, col)| { 
-                let t = TngComp::from(circ);
-                let mut cup = CobComp::cup(t);
-                let dot = if col.is_a() { Dot::X } else { Dot::Y };
-                cup.add_dot(dot);
-                cup
-            }).collect()
-        );
-
-        info!("canon-cycle: {}", f);
-
-        let e = TngElem::init(s, f);
-
+        let cycles = ori.into_iter().map(|o| { 
+            let circles = l.colored_seifert_circles(o);
+            let f = Cob::new(
+                circles.iter().map(|(circ, col)| { 
+                    let t = TngComp::from(circ);
+                    let mut cup = CobComp::cup(t);
+                    let dot = if col.is_a() { Dot::X } else { Dot::Y };
+                    cup.add_dot(dot);
+                    cup
+                }).collect()
+            );
+    
+            let z = TngElem::init(s, f);
+            info!("canon-cycle: {z}");
+    
+            z
+        }).collect();
         
-        self.canon_cycles = vec![e];
+        self.canon_cycles = cycles;
     }
 }
 
@@ -258,9 +262,10 @@ mod tests {
         let b = TngComplexBuilder::build(&l, true);
 
         b.complex.describe();
-        let z = &b.canon_cycles[0];
-        let z = z.eval(&2, &0);
-
-        println!("canon-cycle: {z}");
+        for i in [0, 1] { 
+            let z = &b.canon_cycles[i];
+            let z = z.eval(&2, &0);
+            println!("a[{i}] = {z}");
+        }
     }
 }

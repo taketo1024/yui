@@ -8,24 +8,21 @@ use yui_matrix::sparse::SpMat;
 use yui_link::Link;
 use yui_homology::{Idx2, Idx2Iter, Grid, ChainComplex, FreeRModStr, FreeChainComplex, HomologyComputable};
 
-use crate::{KhAlgStr, KhEnhState, KhCube, KhChain, KhHomology, KhHomologySummand, KhHomologyBigraded};
+use crate::{KhEnhState, KhCube, KhChain, KhHomology, KhHomologySummand, KhHomologyBigraded};
 
 pub type KhComplexSummand<R> = FreeRModStr<KhEnhState, R>;
 pub struct KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    link: Link,
-    str: KhAlgStr<R>,
     complex: FreeChainComplex<KhEnhState, R, RangeInclusive<isize>>,
     reduced: bool
 }
 
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn new(link: Link, h: &R, t: &R, reduced: bool) -> Self { 
-        let cube = KhCube::new(&link, h, t);
-        let str = cube.structure().clone();
+    pub fn new(link: &Link, h: &R, t: &R, reduced: bool) -> Self { 
+        let cube = KhCube::new(link, h, t);
 
-        let i0 = Self::deg_shift_for(&link, reduced).0;
+        let i0 = Self::deg_shift_for(link, reduced).0;
         let range = cube.h_range().shift(i0);
 
         let cube0 = Rc::new(cube);
@@ -47,19 +44,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
         );
 
-        KhComplex { link, str, complex, reduced }
-    }
-
-    pub fn link(&self) -> &Link { 
-        &self.link
-    }
-
-    pub fn structure(&self) -> &KhAlgStr<R> {
-        &self.str
-    }
-
-    pub fn deg_shift(&self) -> (isize, isize) { 
-        Self::deg_shift_for(&self.link, self.reduced)
+        KhComplex { complex, reduced }
     }
 
     pub fn is_reduced(&self) -> bool { 
@@ -272,10 +257,9 @@ mod tests {
     #[test]
     fn kh_empty() {
         let l = Link::empty();
-        let c = KhComplex::new(l, &0, &0, false);
+        let c = KhComplex::new(&l, &0, &0, false);
 
         assert_eq!(c.indices(), 0..=0);
-        assert_eq!(c.deg_shift(), (0, 0));
 
         c.check_d_all();
     }
@@ -283,10 +267,9 @@ mod tests {
     #[test]
     fn kh_unknot() {
         let l = Link::unknot();
-        let c = KhComplex::new(l, &0, &0, false);
+        let c = KhComplex::new(&l, &0, &0, false);
 
         assert_eq!(c.indices(), 0..=0);
-        assert_eq!(c.deg_shift(), (0, 0));
         
         c.check_d_all();
     }
@@ -294,10 +277,9 @@ mod tests {
     #[test]
     fn kh_unknot_twist() {
         let l = Link::from_pd_code([[0, 0, 1, 1]]);
-        let c = KhComplex::new(l, &0, &0, false);
+        let c = KhComplex::new(&l, &0, &0, false);
 
         assert_eq!(c.indices(), 0..=1);
-        assert_eq!(c.deg_shift(), (0, 1));
         
         c.check_d_all();
     }
@@ -305,10 +287,9 @@ mod tests {
     #[test]
     fn kh_trefoil() {
         let l = Link::trefoil();
-        let c = KhComplex::new(l, &0, &0, false);
+        let c = KhComplex::new(&l, &0, &0, false);
 
         assert_eq!(c.indices(), -3..=0);
-        assert_eq!(c.deg_shift(), (-3, -6));
 
         assert_eq!(c[-3].generators().len(), 8);
         assert_eq!(c[-2].generators().len(), 12);
@@ -321,10 +302,9 @@ mod tests {
     #[test]
     fn kh_figure8() {
         let l = Link::figure8();
-        let c = KhComplex::new(l, &0, &0, false);
+        let c = KhComplex::new(&l, &0, &0, false);
 
         assert_eq!(c.indices(), -2..=2);
-        assert_eq!(c.deg_shift(), (-2, -2));
 
         assert_eq!(c[-2].generators().len(), 8);
         assert_eq!(c[-1].generators().len(), 16);

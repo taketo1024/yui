@@ -48,7 +48,7 @@ where R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
     }
     
     let l = load_link(&args.name, &args.link, args.mirror)?;
-    let c = KhComplex::new(l.clone(), &h, &t, args.reduced);
+    let c = KhComplex::new(&l, &h, &t, args.reduced);
     
     let vs = if args.with_alpha { 
         let ori = if args.reduced { 

@@ -29,7 +29,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 fn compute_ss<R>(l: &Link, c: &R, reduced: bool) -> i32
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
-    let cpx = KhComplex::<R>::new(l.clone(), c, &R::zero(), reduced);
+    let cpx = KhComplex::<R>::new(l, c, &R::zero(), reduced);
     let i0 = *cpx.indices().start();
     let z = KhChain::canon_cycle(&l, &R::zero(), c, true);
     let v = cpx[0].vectorize(&z);

@@ -261,7 +261,8 @@ mod tests {
         let l = Link::trefoil();
         let b = TngComplexBuilder::build(&l, true);
 
-        b.complex.describe();
+        b.complex.print_d();
+        
         for i in [0, 1] { 
             let z = &b.canon_cycles[i];
             let z = z.eval(&2, &0);

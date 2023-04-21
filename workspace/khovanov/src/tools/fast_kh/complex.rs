@@ -425,19 +425,23 @@ impl TngComplex {
         )
     }
 
-    pub fn describe(&self) { 
+    pub fn desc_d(&self) -> String { 
         let mut str = "".to_string();
         for k0 in self.vertices.keys().sorted() { 
             let v = &self.vertices[&k0];
-            str += &format!("{k0}: {}\n", v.tng);
+            str += &format!("{k0}: {}", v.tng);
 
             for k1 in v.out_edges.keys().sorted() { 
                 let f = &v.out_edges[&k1];
-                str += &format!(" -> {k1}: {f}\n");
+                str += &format!("\n  -> {k1}: {f}");
             }
             str += "\n";
         }
-        println!("{str}");
+        str
+    }
+
+    pub fn print_d(&self) { 
+        println!("{}", self.desc_d());
     }
 
     pub fn validate_edges(&self) -> bool {

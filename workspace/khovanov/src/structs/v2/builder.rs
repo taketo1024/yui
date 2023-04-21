@@ -4,10 +4,9 @@ use log::info;
 use yui_link::{Link, Crossing, Edge};
 
 use crate::{KhComplex, KhEnhState};
-use crate::tools::fast_kh::cob::{CobComp, Dot};
-use crate::tools::fast_kh::tng::{TngComp};
 
-use super::cob::Cob;
+use super::tng::TngComp;
+use super::cob::{Cob, CobComp, Dot};
 use super::complex::TngComplex;
 use super::elem::TngElem;
 
@@ -18,22 +17,7 @@ pub struct TngComplexBuilder {
 }
 
 impl TngComplexBuilder {
-    pub fn build(l: &Link, with_canon_cycle: bool) -> Self { 
-        info!("construct TngComplex.");
-
-        let mut c = Self::new(l);
-        
-        if with_canon_cycle { 
-            assert_eq!(l.components().len(), 1);
-            c.make_canon_cycles();
-        }
-        
-        c.process();
-
-        c
-    }
-
-    fn new(l: &Link) -> Self { 
+    pub fn new(l: &Link) -> Self { 
         let crossings = Self::sort_crossings(l);
         let deg_shift = KhComplex::<i64>::deg_shift_for(l, false);
         let complex = TngComplex::new(deg_shift);
@@ -83,7 +67,15 @@ impl TngComplexBuilder {
         res
     }
 
-    fn process(&mut self) {
+    pub fn complex(&self) -> &TngComplex { 
+        &self.complex
+    }
+
+    pub fn canon_cycles(&self) -> &Vec<TngElem> { 
+        &self.canon_cycles
+    }
+
+    pub fn process(&mut self) {
         for i in 0 .. self.crossings.len() { 
             self.proceed_each(i);
         }
@@ -132,7 +124,7 @@ impl TngComplexBuilder {
         }
     }
 
-    fn make_canon_cycles(&mut self) { 
+    pub fn make_canon_cycles(&mut self) { 
         let l = Link::new(self.crossings.clone());
         
         assert_eq!(l.components().len(), 1);
@@ -171,15 +163,22 @@ mod tests {
     #[test]
     fn test_unknot_rm1() {
         let l = Link::from_pd_code([[0,0,1,1]]);
-        let b = TngComplexBuilder::build(&l, false);
-        let c = b.complex.eval(0, 0);
+        let mut b = TngComplexBuilder::new(&l);
+        b.process();
+
+        let c = b.complex.eval(&0, &0);
 
         assert_eq!(c[0].rank(), 2);
         assert_eq!(c[1].rank(), 0);
+    }
 
+    #[test]
+    fn test_unknot_rm1_neg() {
         let l = Link::from_pd_code([[0,1,1,0]]);
-        let b = TngComplexBuilder::build(&l, false);
-        let c = b.complex.eval(0, 0);
+        let mut b = TngComplexBuilder::new(&l);
+        b.process();
+
+        let c = b.complex.eval(&0, &0);
 
         c.check_d_all();
 
@@ -190,8 +189,10 @@ mod tests {
     #[test]
     fn test_unknot_rm2() {
         let l = Link::from_pd_code([[1,4,2,1],[2,4,3,3]]);
-        let b = TngComplexBuilder::build(&l, false);
-        let c = b.complex.eval(0, 0);
+        let mut b = TngComplexBuilder::new(&l);
+        b.process();
+
+        let c = b.complex.eval(&0, &0);
 
         c.check_d_all();
 
@@ -204,8 +205,10 @@ mod tests {
     fn test_unlink_2() {
         let pd_code = [[1,2,3,4], [3,2,1,4]];
         let l = Link::from_pd_code(pd_code);
-        let b = TngComplexBuilder::build(&l, false);
-        let c = b.complex.eval(0, 0);
+        let mut b = TngComplexBuilder::new(&l);
+        b.process();
+
+        let c = b.complex.eval(&0, &0);
 
         c.check_d_all();
 
@@ -217,8 +220,10 @@ mod tests {
     #[test]
     fn test_hopf_link() {
         let l = Link::hopf_link();
-        let b = TngComplexBuilder::build(&l, false);
-        let c = b.complex.eval(0, 0);
+        let mut b = TngComplexBuilder::new(&l);
+        b.process();
+
+        let c = b.complex.eval(&0, &0);
 
         c.check_d_all();
 
@@ -230,8 +235,10 @@ mod tests {
     #[test]
     fn test_8_19() {
         let l = Link::from_pd_code([[4,2,5,1],[8,4,9,3],[9,15,10,14],[5,13,6,12],[13,7,14,6],[11,1,12,16],[15,11,16,10],[2,8,3,7]]);
-        let b = TngComplexBuilder::build(&l, false);
-        let c = b.complex.eval(0, 0);
+        let mut b = TngComplexBuilder::new(&l);
+        b.process();
+
+        let c = b.complex.eval(&0, &0);
 
         c.check_d_all();
 
@@ -257,7 +264,10 @@ mod tests {
     #[test]
     fn canon_cycle_trefoil() { 
         let l = Link::trefoil();
-        let b = TngComplexBuilder::build(&l, true);
+        let mut b = TngComplexBuilder::new(&l);
+
+        b.make_canon_cycles();
+        b.process();
 
         b.complex.print_d();
 

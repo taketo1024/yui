@@ -11,3 +11,4 @@ mod homology;
 pub use homology::{KhHomology, KhHomologyBigraded, KhHomologySummand};
 
 pub mod v1;
+pub mod v2;

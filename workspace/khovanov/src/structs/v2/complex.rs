@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
-use std::ops::Range;
+use std::ops::RangeInclusive;
 
 use log::info; 
 use itertools::Itertools;
@@ -392,18 +392,20 @@ impl TngComplex {
         debug_assert!(self.validate_edges());
     }
 
-    pub fn eval<R>(&self, h: R, t: R) -> FreeChainComplex<KhEnhState, R, Range<isize>> 
+    pub fn eval<R>(&self, h: &R, t: &R) -> FreeChainComplex<KhEnhState, R, RangeInclusive<isize>> 
     where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> {
         debug_assert!(self.is_evalable());
 
+        let (h, t) = (h.clone(), t.clone());
+
         let n = self.len();
         let i0 = self.deg_shift.0;
-        let i1 = i0 + (n as isize);
+        let i1 = i0 + (n as isize) - 1;
 
         let all_gens = self.vertices.keys().cloned().collect_vec();
         let vertices = self.vertices.clone();
 
-        FreeChainComplex::new(i0..i1, 1, 
+        FreeChainComplex::new(i0..=i1, 1, 
             move |i| { 
                 let w = (i - i0) as usize;
                 all_gens.iter().filter(|x| 
@@ -413,7 +415,7 @@ impl TngComplex {
             move |x| { 
                 let v = &vertices[&x];
                 v.out_edges.iter().map(|(y, f)| 
-                    (y.clone(), f.eval(&h, &t))
+                    (*y, f.eval(&h, &t))
                 ).collect()
             }
         )
@@ -487,7 +489,7 @@ pub(self) use modify;
 mod tests { 
     use yui_link::*;
     use crate::KhLabel;
-    use crate::tools::fast_kh::tng::TngComp;
+    use super::super::tng::TngComp;
 
     use super::*;
 

@@ -90,15 +90,6 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 }
 
-impl<R> Index<Idx2> for KhHomologyBigraded<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = GenericRModStr<R>;
-
-    fn index(&self, index: Idx2) -> &Self::Output {
-        &self.homology[index]
-    }
-}
-
 impl<R> Index<[isize; 2]> for KhHomologyBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = GenericRModStr<R>;

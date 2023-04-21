@@ -1131,12 +1131,12 @@ mod tests {
         assert_eq!(c.eval(&h, &t), R::zero());
 
         let c = CobComp::closed(1);
-        assert_eq!(c.eval(&h, &t), R::from(2));
+        assert_eq!(c.eval(&h, &t), R::from_const(2));
 
         let c = CobComp::closed(2);
         assert_eq!(c.eval(&h, &t), R::zero());
 
         let c = CobComp::closed(3);
-        assert_eq!(c.eval(&h, &t), R::from_deg2([((2, 0), 2), ((0, 1), 8)])); // 2(H^2 + 4T)
+        assert_eq!(c.eval(&h, &t), R::from_deg2_iter([((2, 0), 2), ((0, 1), 8)])); // 2(H^2 + 4T)
     }
 }

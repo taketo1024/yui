@@ -103,7 +103,7 @@ macro_rules! impl_for_quad_int {
             type Int = I;
 
             fn alpha() -> (Self, Self) {
-                (Self::from(I::from($p)), Self::from(I::from($q)))
+                (Self::from_real(I::from($p)), Self::from_real(I::from($q)))
             }
 
             fn as_int(&self) -> Option<Self::Int> {

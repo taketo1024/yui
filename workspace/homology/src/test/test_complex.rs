@@ -6,7 +6,7 @@ use crate::{GenericChainComplex};
 pub type TestChainComplex<R> = GenericChainComplex<R, Rev<RangeInclusive<isize>>>;    
 
 impl<R> TestChainComplex<R>
-where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> {
+where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn descending(data: Vec<( (usize, usize), Vec<i32>)>) -> Self {
         let n = data.len() as isize;
         let range = (0..=n).rev();

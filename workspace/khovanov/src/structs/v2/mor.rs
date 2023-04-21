@@ -17,7 +17,7 @@ pub trait MorTrait: Sized {
     fn connect_comp(self, c: &CobComp) -> Self;
     fn cap_off(self, b: Bottom, c: &TngComp, dot: Dot) -> Self;
     fn eval<R>(&self, h: &R, t: &R) -> R
-    where R: Ring + From<i32>, for<'x> &'x R: RingOps<R>;
+    where R: Ring, for<'x> &'x R: RingOps<R>;
 }
 
 impl MorTrait for Mor {
@@ -82,7 +82,7 @@ impl MorTrait for Mor {
     }
 
     fn eval<R>(&self, h: &R, t: &R) -> R
-    where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> {
+    where R: Ring, for<'x> &'x R: RingOps<R> {
         self.iter().map(|(c, &a)| { 
             R::from(a) * c.eval(h, t)
         }).sum()

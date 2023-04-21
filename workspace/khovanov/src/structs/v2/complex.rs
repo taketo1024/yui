@@ -393,7 +393,7 @@ impl TngComplex {
     }
 
     pub fn eval<R>(&self, h: &R, t: &R) -> FreeChainComplex<KhEnhState, R, RangeInclusive<isize>> 
-    where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> {
+    where R: Ring, for<'x> &'x R: RingOps<R> {
         debug_assert!(self.is_evalable());
 
         let (h, t) = (h.clone(), t.clone());

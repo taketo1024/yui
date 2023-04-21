@@ -6,7 +6,7 @@ use crate::KhComplex;
 use super::builder::TngComplexBuilder;
 
 impl<R> KhComplex<R>
-where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> { 
+where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn new_v2(l: &Link, h: &R, t: &R, reduced: bool) -> Self { 
         let deg_shift = Self::deg_shift_for(l, reduced);
         let mut b = TngComplexBuilder::new(l);

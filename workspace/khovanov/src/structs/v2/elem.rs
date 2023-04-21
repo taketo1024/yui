@@ -102,7 +102,7 @@ impl TngElem {
     }
 
     pub fn eval<R>(&self, h: &R, t: &R) -> KhChain<R>
-    where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> {
+    where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(self.value.is_empty());
         assert!(self.mors.values().all(|f| f.is_closed()));
 

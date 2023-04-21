@@ -50,7 +50,7 @@ impl MorTrait for Mor {
         if let Some((Some(cinv), Some(ainv))) = self.iter().next().map(|(c, a)| 
             (c.inv(), a.inv())
         ) { 
-            let inv = Mor::from((cinv, ainv));
+            let inv = Mor::from_pair(cinv, ainv);
             Some(inv)
         } else { 
             None

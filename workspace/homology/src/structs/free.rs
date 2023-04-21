@@ -32,7 +32,8 @@ where
     }
 
     pub fn vectorize_x(&self, x: X) -> SpVec<R> {
-        self.vectorize(&LinComb::from(x))
+        let z = LinComb::from_gen(x);
+        self.vectorize(&z)
     }
 
     pub fn vectorize(&self, z: &LinComb<X, R>) -> SpVec<R> {

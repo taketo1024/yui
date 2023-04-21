@@ -21,7 +21,7 @@ pub struct TngElem {
 
 impl TngElem { 
     pub fn init(init_state: State, init_cob: Cob) -> Self { 
-        let f = Mor::from(Cob::empty());
+        let f = Mor::from_gen(Cob::empty());
         Self{ state: init_state, value: init_cob, mors: map! { KhEnhState::init() => f } }
     }
 

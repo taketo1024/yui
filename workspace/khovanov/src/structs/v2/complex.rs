@@ -190,7 +190,7 @@ impl TngComplex {
         let mut f = Cob::id(&v0.tng);
         f.connect_comp(sdl.clone());
 
-        v0.out_edges.insert(v1.key, Mor::from(f));
+        v0.out_edges.insert(v1.key, Mor::from_gen(f));
         v1.in_edges.insert(v0.key);
 
         // modify tngs of v0 and v1.
@@ -499,12 +499,12 @@ mod tests {
             TngComp::arc(0,1),
             TngComp::arc(2,3)
         ]));
-        let f = Mor::from((c.clone(), -1));
+        let f = Mor::from_pair(c.clone(), -1);
 
         assert!(f.is_invertible());
         assert_eq!(f.inv(), Some(f.clone()));
 
-        let f = Mor::from((c.clone(), 2));
+        let f = Mor::from_pair(c.clone(), 2);
         assert_eq!(f.is_invertible(), false);
         assert_eq!(f.inv(), None);
     }

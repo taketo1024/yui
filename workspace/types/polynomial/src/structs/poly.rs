@@ -163,14 +163,16 @@ impl_var_mvar!(isize);
 impl<I, R> From<R> for PolyBase<I, R>
 where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn from(a: R) -> Self {
-        Self::new(LinComb::from((I::one(), a)))
+        let t = LinComb::from_pair(I::one(), a);
+        Self::new(t)
     }
 }
 
 impl<I, R> From<(I, R)> for PolyBase<I, R>
 where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn from(data: (I, R)) -> Self {
-        Self::new(LinComb::from(data))
+        let t = LinComb::from_pair(data.0, data.1);
+        Self::new(t)
     }
 }
 
@@ -244,7 +246,8 @@ where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
 impl<I, R> One for PolyBase<I, R>
 where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn one() -> Self {
-        Self::new_raw(LinComb::from((I::one(), R::one())))
+        let t = LinComb::from_pair(I::one(), R::one());
+        Self::new_raw(t)
     }
 
     fn is_one(&self) -> bool {

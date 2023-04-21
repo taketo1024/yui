@@ -58,6 +58,10 @@ impl Link {
         self.data.is_empty()
     }
 
+    pub fn is_knot(&self) -> bool { 
+        self.components().len() == 1
+    }
+
     pub fn crossing_num(&self) -> u32 { 
         self.data.iter()
             .filter(|x| !x.is_resolved())
@@ -129,6 +133,9 @@ impl Link {
 
     pub fn resolved_by(&self, s: &State) -> Self {
         debug_assert!(s.len() <= self.data.len());
+
+        // TODO: must skip resolved crossings.
+
         let mut data = self.data.clone();
         for (i, r) in s.iter().enumerate() {
             data[i].resolve(r);
@@ -137,8 +144,14 @@ impl Link {
     }
 
     pub fn ori_pres_state(&self) -> State { 
-        State::from_iter(self.crossing_signs().into_iter().map( |e|
-            if e.is_positive() { 0 } else { 1 }
+        State::from_iter(self.crossing_signs().into_iter().filter_map( |e|
+            if e > 0 { 
+                Some(0)
+            } else if e < 0 { 
+                Some(1)
+            } else { 
+                None
+            }
         ))
     }
 

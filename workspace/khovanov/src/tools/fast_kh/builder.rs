@@ -174,14 +174,14 @@ mod tests {
     fn test_unknot_rm1() {
         let l = Link::from_pd_code([[0,0,1,1]]);
         let b = TngComplexBuilder::build(&l, false);
-        let c = b.complex.as_generic(0, 0);
+        let c = b.complex.eval(0, 0);
 
         assert_eq!(c[0].rank(), 2);
         assert_eq!(c[1].rank(), 0);
 
         let l = Link::from_pd_code([[0,1,1,0]]);
         let b = TngComplexBuilder::build(&l, false);
-        let c = b.complex.as_generic(0, 0);
+        let c = b.complex.eval(0, 0);
 
         c.check_d_all();
 
@@ -193,7 +193,7 @@ mod tests {
     fn test_unknot_rm2() {
         let l = Link::from_pd_code([[1,4,2,1],[2,4,3,3]]);
         let b = TngComplexBuilder::build(&l, false);
-        let c = b.complex.as_generic(0, 0);
+        let c = b.complex.eval(0, 0);
 
         c.check_d_all();
 
@@ -207,7 +207,7 @@ mod tests {
         let pd_code = [[1,2,3,4], [3,2,1,4]];
         let l = Link::from_pd_code(pd_code);
         let b = TngComplexBuilder::build(&l, false);
-        let c = b.complex.as_generic(0, 0);
+        let c = b.complex.eval(0, 0);
 
         c.check_d_all();
 
@@ -220,7 +220,7 @@ mod tests {
     fn test_hopf_link() {
         let l = Link::hopf_link();
         let b = TngComplexBuilder::build(&l, false);
-        let c = b.complex.as_generic(0, 0);
+        let c = b.complex.eval(0, 0);
 
         c.check_d_all();
 
@@ -233,7 +233,7 @@ mod tests {
     fn test_8_19() {
         let l = Link::from_pd_code([[4,2,5,1],[8,4,9,3],[9,15,10,14],[5,13,6,12],[13,7,14,6],[11,1,12,16],[15,11,16,10],[2,8,3,7]]);
         let b = TngComplexBuilder::build(&l, false);
-        let c = b.complex.as_generic(0, 0);
+        let c = b.complex.eval(0, 0);
 
         c.check_d_all();
 

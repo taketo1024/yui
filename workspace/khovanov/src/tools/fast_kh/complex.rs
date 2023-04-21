@@ -7,7 +7,7 @@ use itertools::Itertools;
 use num_traits::Zero;
 use cartesian::cartesian;
 use yui_core::{Ring, RingOps};
-use yui_homology::{GenericChainComplex, FreeRModStr};
+use yui_homology::FreeChainComplex;
 use yui_link::{Crossing, Resolution};
 
 use crate::{KhAlgGen, KhEnhState};
@@ -392,35 +392,34 @@ impl TngComplex {
         debug_assert!(self.validate_edges());
     }
 
-    pub fn as_generic<R>(&self, h: R, t: R) -> GenericChainComplex<R, Range<isize>> 
+    pub fn eval<R>(&self, h: R, t: R) -> FreeChainComplex<KhEnhState, R, Range<isize>> 
     where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> {
-        debug_assert!(self.is_completely_delooped());
-
-        // TODO improve construction. 
+        debug_assert!(self.is_evalable());
 
         let n = self.len();
-        let c = (0..n).map(|i| {
-            let gens = self.vertices.keys().filter(|k| k.state.weight() == i).sorted().cloned().collect();
-            FreeRModStr::new(gens)
-        }).collect_vec();
-
         let i0 = self.deg_shift.0;
         let i1 = i0 + (n as isize);
 
-        GenericChainComplex::new(i0..i1, 1, (0..n-1).map( |i| {
-            let c0 = &c[i];
-            let c1 = &c[i+1];
-            let d = c0.make_matrix(c1, |x| { 
-                let v = self.vertex(x);
+        let all_gens = self.vertices.keys().cloned().collect_vec();
+        let vertices = self.vertices.clone();
+
+        FreeChainComplex::new(i0..i1, 1, 
+            move |i| { 
+                let w = (i - i0) as usize;
+                all_gens.iter().filter(|x| 
+                    x.state.weight() == w
+                ).sorted().cloned().collect()
+            }, 
+            move |x| { 
+                let v = &vertices[&x];
                 v.out_edges.iter().map(|(y, f)| 
                     (y.clone(), f.eval(&h, &t))
                 ).collect()
-            });
-            (i0 + (i as isize), d)
-        }))
+            }
+        )
     }
 
-    fn is_completely_delooped(&self) -> bool { 
+    fn is_evalable(&self) -> bool { 
         self.vertices.iter().all(|(_, v)|
             v.tng.is_empty()
         )

@@ -139,8 +139,8 @@ impl TngComplexBuilder {
         assert_eq!(l.components().len(), 1);
 
         let s = l.ori_pres_state();
-        let circles = l.colored_seifert_circles(true);
 
+        let circles = l.colored_seifert_circles(true);
         let f = Cob::new(
             circles.iter().map(|(circ, col)| { 
                 let t = TngComp::from(circ);
@@ -150,9 +150,11 @@ impl TngComplexBuilder {
                 cup
             }).collect()
         );
+
+        info!("canon-cycle: {}", f);
+
         let e = TngElem::init(s, f);
 
-        info!("canon-cycle: {}", e);
         
         self.canon_cycles = vec![e];
     }
@@ -256,6 +258,9 @@ mod tests {
         let b = TngComplexBuilder::build(&l, true);
 
         b.complex.describe();
-        println!("{}", b.canon_cycles[0]);
+        let z = &b.canon_cycles[0];
+        let z = z.eval(&2, &0);
+
+        println!("canon-cycle: {z}");
     }
 }

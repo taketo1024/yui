@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use std::fmt::Display;
-
 use itertools::Itertools;
 use num_traits::Zero;
+use yui_core::{Ring, RingOps};
 use yui_link::{State, Crossing};
 use yui_utils::map;
 
-use crate::{KhEnhState, KhAlgGen};
+use crate::{KhEnhState, KhAlgGen, KhChain};
 
 use super::cob::{Cob, Bottom, Dot};
 use super::mor::{Mor, MorTrait};
@@ -14,21 +14,24 @@ use super::tng::{TngComp, Tng};
 
 // element in C as a cobordism ∅ → C.
 pub struct TngElem {
-    init_state: State,
-    init_cob: Cob,                 // precomposed at the final step.
+    state: State,
+    value: Cob,                    // precomposed at the final step.
     mors: HashMap<KhEnhState, Mor> // src must partially match init_cob. 
 }
 
 impl TngElem { 
     pub fn init(init_state: State, init_cob: Cob) -> Self { 
         let f = Mor::from(Cob::empty());
-        Self{ init_state, init_cob, mors: map! { KhEnhState::init() => f } }
+        Self{ state: init_state, value: init_cob, mors: map! { KhEnhState::init() => f } }
     }
 
     pub fn append(&mut self, i: usize, x: &Crossing) { 
-        let r = self.init_state[i];
+        let r = self.state[i];
         let arcs = x.res_arcs(r);
-        let tng = Tng::new(vec![TngComp::from(&arcs.0), TngComp::from(&arcs.1)]);
+        let tng = Tng::new(vec![
+            TngComp::from(&arcs.0), 
+            TngComp::from(&arcs.1)
+        ]);
         let id = Cob::id(&tng);
 
         let mors = std::mem::take(&mut self.mors);
@@ -87,20 +90,32 @@ impl TngElem {
     }
 
     pub fn finalize(&mut self) { 
-        let init = std::mem::take(&mut self.init_cob);
-        let mors = std::mem::take(&mut self.mors);
+        let val = std::mem::take(&mut self.value);
+        let mut mors = std::mem::take(&mut self.mors);
 
-        self.mors = mors.into_iter().map(|(k, f)| {
-            let f = f.map_cob(|c| *c = &*c * &init);
-            (k, f)
-        }).collect();
+        mors = mors.into_iter().map(|(k, f)|
+            (k, f.map_cob(|c| *c = &*c * &val))
+        ).collect();
+        mors.retain(|_, f| !f.is_zero());
+
+        self.mors = mors;
+    }
+
+    pub fn eval<R>(&self, h: &R, t: &R) -> KhChain<R>
+    where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> {
+        assert!(self.value.is_empty());
+        assert!(self.mors.values().all(|f| f.is_closed()));
+
+        KhChain::from_iter(self.mors.iter().map(|(k, f)|
+            (*k, f.eval(h, t))
+        ))
     }
 }
 
 impl Display for TngElem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mors = self.mors.iter().map(|(t, f)| { 
-            format!("{}: {}", t, f)
+        let mors = self.mors.iter().map(|(k, f)| { 
+            format!("{}: {}", k, f)
         }).join(", ");
         write!(f, "[{}]", mors)
     }

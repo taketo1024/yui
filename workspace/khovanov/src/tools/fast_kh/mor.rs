@@ -9,6 +9,7 @@ pub type Mor = LinComb<Cob, i32>; // Z-linear combination of cobordisms.
 pub trait MorTrait: Sized {
     fn src(&self) -> Tng;
     fn tgt(&self) -> Tng;
+    fn is_closed(&self) -> bool;
     fn is_invertible(&self) -> bool;
     fn inv(&self) -> Option<Self>;
     fn map_cob<F>(self, f: F) -> Self where F: Fn(&mut Cob);
@@ -32,6 +33,10 @@ impl MorTrait for Mor {
             return Tng::empty()
         };
         c.tgt()
+    }
+
+    fn is_closed(&self) -> bool { 
+        self.iter().all(|(f, _)| f.is_closed())
     }
 
     fn is_invertible(&self) -> bool { 

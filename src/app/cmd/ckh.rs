@@ -3,7 +3,9 @@ use itertools::Itertools;
 use yui_core::{Ring, RingOps};
 use yui_homology::ChainComplex;
 use yui_homology::Grid;
+use yui_khovanov::KhChain;
 use yui_khovanov::KhComplex;
+use yui_khovanov::canon_cycle::CanonCycles;
 use crate::utils::*;
 
 #[derive(Debug, clap::Args)]
@@ -46,12 +48,18 @@ where R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
     }
     
     let l = load_link(&args.name, &args.link, args.mirror)?;
-    let c = KhComplex::new(l, &h, &t, args.reduced);
+    let c = KhComplex::new(l.clone(), &h, &t, args.reduced);
     
     let vs = if args.with_alpha { 
-        c.canon_cycles().into_iter().map(|z| 
+        let ori = if args.reduced { 
+            vec![true] 
+        } else { 
+            vec![true, false] 
+        };
+        ori.into_iter().map(|o| {
+            let z = KhChain::canon_cycle(&l, &R::zero(), &h, o);
             (0, c[0].vectorize(&z))
-        ).collect_vec()
+        }).collect_vec()
     } else { 
         vec![]
     };

@@ -4,7 +4,7 @@ use itertools::Itertools;
 use yui_core::{Ring, RingOps};
 use yui_link::{Link, LinkComp, State};
 
-use crate::{KhAlgGen, KhComplex, KhLabel, KhEnhState, KhChain};
+use crate::{KhAlgGen, KhLabel, KhEnhState, KhChain};
 
 #[derive(PartialEq, Eq, Clone)]
 pub enum Color { A, B }
@@ -23,11 +23,11 @@ impl Color {
 }
 
 pub trait ColoredSeifertCircles { 
-    fn colored_seifert_circles(&self, positive: bool) -> Vec<(LinkComp, Color)>;
+    fn colored_seifert_circles(&self, ori: bool) -> Vec<(LinkComp, Color)>;
 }
 
 impl ColoredSeifertCircles for Link {
-    fn colored_seifert_circles(&self, positive: bool) -> Vec<(LinkComp, Color)> {
+    fn colored_seifert_circles(&self, ori: bool) -> Vec<(LinkComp, Color)> {
         assert_eq!(self.components().len(), 1, "Only knots are supported.");
 
         let circles = self.seifert_circles();
@@ -41,7 +41,7 @@ impl ColoredSeifertCircles for Link {
         let i = circles.iter().find_position(|c| c.edges().contains(e)).unwrap().0;
     
         queue.push(i);
-        colors[i] = if positive { Color::A } else { Color::B };
+        colors[i] = if ori { Color::A } else { Color::B };
     
         while !queue.is_empty() { 
             let i1 = queue.remove(0);
@@ -65,35 +65,16 @@ impl ColoredSeifertCircles for Link {
     }
 }
 
-impl<R> KhComplex<R>
+pub trait CanonCycles<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn canon_cycle(&self) -> KhChain<R> {
-        self.canon_cycles().remove(0)
-    }
+    fn canon_cycle(l: &Link, a: &R, b: &R, ori: bool) -> KhChain<R>;
+}
 
-    pub fn canon_cycles(&self) -> Vec<KhChain<R>> {
-        let l = self.link();
-
-        let str = self.structure();
-        assert!(str.t().is_zero(), "Only supported for t = 0.");
-
-        let a = R::zero(); // X_a = X
-        let b = str.h();   // X_b = X - h
-    
-        let ori = if self.is_reduced() { 
-            vec![true]
-        } else { 
-            vec![true, false]
-        };
-
-        ori.into_iter().map(|o| { 
-            Self::make_canon_cycle(l, &a, b, o)
-        }).collect()
-    }
-
-    fn make_canon_cycle(l: &Link, a: &R, b: &R, positive: bool) -> KhChain<R> {
+impl<R> CanonCycles<R> for KhChain<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn canon_cycle(l: &Link, a: &R, b: &R, ori: bool) -> KhChain<R> {
         let s = l.ori_pres_state();
-        let colors = l.colored_seifert_circles(positive);
+        let colors = l.colored_seifert_circles(ori);
 
         let mut z = KhChain::from(
             KhEnhState::new(s, KhLabel::empty())
@@ -132,14 +113,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use num_traits::Zero;
+    use crate::KhComplex;
+
+    use super::*;
  
     #[test]
     fn trefoil() { 
         let l = Link::trefoil().mirror();
-        let c = KhComplex::new(l, &1, &0, false);
-        let zs = c.canon_cycles();
+        let c = KhComplex::new(l.clone(), &1, &0, false);
+
+        let zs = [true, false].map(|ori| 
+            KhChain::canon_cycle(&l, &0, &1, ori)
+        );
 
         for z in zs { 
             let dz = c.differetiate(&z);
@@ -151,8 +137,11 @@ mod tests {
     #[test]
     fn figure8() { 
         let l = Link::figure8();
-        let c = KhComplex::new(l, &1, &0, false);
-        let zs = c.canon_cycles();
+        let c = KhComplex::new(l.clone(), &1, &0, false);
+        
+        let zs = [true, false].map(|ori| 
+            KhChain::canon_cycle(&l, &0, &1, ori)
+        );
 
         for z in zs { 
             let dz = c.differetiate(&z);

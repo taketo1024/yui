@@ -38,6 +38,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         KhComplex { complex, canon_cycles, reduced, deg_shift }
     }
 
+    pub fn canon_cycles(&self) -> &Vec<KhChain<R>> { 
+        &self.canon_cycles
+    }
+
     pub fn canon_cycle(&self, i: usize) -> &KhChain<R> { 
         &self.canon_cycles[i]
     }

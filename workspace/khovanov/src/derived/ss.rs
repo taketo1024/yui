@@ -4,10 +4,11 @@
 
 use core::panic;
 
+use itertools::Itertools;
 use log::info;
 use yui_link::Link;
-use yui_homology::{RModStr, Grid};
-use yui_homology::utils::{ChainReducer, HomologyCalc};
+use yui_homology::{RModStr, ChainComplex};
+use yui_homology::utils::HomologyCalc;
 use yui_core::{EucRing, EucRingOps};
 use yui_matrix::sparse::*;
 use crate::KhComplex;
@@ -17,52 +18,49 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     assert!(!c.is_zero());
     assert!(!c.is_unit());
 
-    if reduced && l.writhe() < 0 { 
-        info!("compute ss (mirror), n = {}, c = {} ({}).", l.crossing_num(), c, std::any::type_name::<R>());
-        -(compute_ss(&l.mirror(), c, reduced))
-    } else { 
-        info!("compute ss, n = {}, c = {} ({}).", l.crossing_num(), c, std::any::type_name::<R>());
-        compute_ss(l, c, reduced)
-    }
-}
+    info!("compute ss, n = {}, c = {} ({}).", l.crossing_num(), c, std::any::type_name::<R>());
 
-fn compute_ss<R>(l: &Link, c: &R, reduced: bool) -> i32
-where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
-    let cpx = KhComplex::<R>::new(l, c, &R::zero(), reduced);
-    let i0 = *cpx.indices().start();
-    let z = cpx.canon_cycle(0);
-    let v = cpx[0].vectorize(&z);
-
-    let mut red = ChainReducer::new(&cpx);
-    red.set_indices(i0 ..= 1);
-    red.set_vec(0, v);
-    red.process();
-
-    let a0 = red.take_matrix(-1);
-    let a1 = red.take_matrix(0);
-    let v  = red.take_vecs(0).remove(0);
-
+    let (a0, a1, vs) = compute_d(l, c, reduced);
     let (h, p, _) = HomologyCalc::calculate_with_trans(a0, a1);
 
     info!("homology: {h}");
     
     let r = h.rank();
     let p = p.submat_rows(0..r).to_owned();
-    let v = p * v;
 
-    info!("canon-cycle: {}", v);
+    let vs = vs.into_iter().enumerate().map(|(i, v)| { 
+        let v = &p * v;
+        info!("a[{i}] = {v}");
+        v
+    }).collect_vec();
 
+    let v = &vs[0];
     let Some(d) = div_vec(&v, &c) else { 
         panic!("invalid divisibility for v = {}, c = {}", v, c)
     };
 
     let w = l.writhe();
     let r = l.seifert_circles().len() as i32;
-    let s = 2 * d + w - r + 1;
+    let ss = 2 * d + w - r + 1;
 
-    info!("d = {d}, w = {s}, r = {r}, s = {s}");
+    info!("d = {d}, w = {w}, r = {r}.");
+    info!("ss = {ss} (c = {c}, {}).", if reduced { "reduced" } else { "unreduced" } );
 
-    s
+    ss
+}
+
+fn compute_d<R>(l: &Link, h: &R, reduced: bool) -> (SpMat<R>, SpMat<R>, Vec<SpVec<R>>)
+where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
+    let c = KhComplex::<R>::new(l, h, &R::zero(), reduced);
+
+    let a0 = c.d_matrix(-1);
+    let a1 = c.d_matrix(0);
+
+    let vs = c.canon_cycles().iter().map(|z| 
+        c[0].vectorize(&z)
+    ).collect_vec();
+
+    (a0, a1, vs)
 }
 
 fn div_vec<R>(v: &SpVec<R>, c: &R) -> Option<i32>
@@ -95,8 +93,8 @@ mod tests {
     fn test<I>(pd_code: I, value: i32)
     where I: IntoIterator<Item = [Edge; 4]> { 
         let l = Link::from_pd_code(pd_code);
-        assert_eq!(compute_ss(&l, &2, true), value);
-        assert_eq!(compute_ss(&l.mirror(), &2, true), -value);
+        assert_eq!(ss_invariant(&l, &2, true), value);
+        assert_eq!(ss_invariant(&l.mirror(), &2, true), -value);
     }
 
     #[test]

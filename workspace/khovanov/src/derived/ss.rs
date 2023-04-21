@@ -10,8 +10,7 @@ use yui_homology::{RModStr, Grid};
 use yui_homology::utils::{ChainReducer, HomologyCalc};
 use yui_core::{EucRing, EucRingOps};
 use yui_matrix::sparse::*;
-use crate::canon_cycle::CanonCycles;
-use crate::{KhComplex, KhChain};
+use crate::KhComplex;
 
 pub fn ss_invariant<R>(l: &Link, c: &R, reduced: bool) -> i32
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
@@ -31,7 +30,7 @@ fn compute_ss<R>(l: &Link, c: &R, reduced: bool) -> i32
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
     let cpx = KhComplex::<R>::new(l, c, &R::zero(), reduced);
     let i0 = *cpx.indices().start();
-    let z = KhChain::canon_cycle(&l, &R::zero(), c, true);
+    let z = cpx.canon_cycle(0);
     let v = cpx[0].vectorize(&z);
 
     let mut red = ChainReducer::new(&cpx);

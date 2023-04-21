@@ -8,12 +8,14 @@ use yui_matrix::sparse::SpMat;
 use yui_link::Link;
 use yui_homology::{Idx2, Idx2Iter, Grid, ChainComplex, FreeRModStr, FreeChainComplex, HomologyComputable, Shift};
 
+use crate::canon_cycle::CanonCycles;
 use crate::{KhEnhState, KhCube, KhChain, KhHomology, KhHomologySummand, KhHomologyBigraded};
 
 pub type KhComplexSummand<R> = FreeRModStr<KhEnhState, R>;
 pub struct KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     complex: FreeChainComplex<KhEnhState, R, RangeInclusive<isize>>,
+    canon_cycles: Vec<KhChain<R>>,
     reduced: bool,
     deg_shift: (isize, isize)
 }
@@ -22,10 +24,22 @@ impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn new(link: &Link, h: &R, t: &R, reduced: bool) -> Self { 
         let deg_shift = Self::deg_shift_for(link, reduced);
+        let canon_cycles = if t.is_zero() && link.is_knot() {
+            let ori = if reduced { vec![true] } else { vec![true, false] };
+            ori.into_iter().map(|o| 
+                KhChain::canon_cycle(link, &R::zero(), h, o)
+            ).collect()
+        } else { 
+            vec![]
+        };
         let cube = KhCube::new(link, h, t);
         let complex = cube.as_complex(deg_shift.0, reduced);
 
-        KhComplex { complex, reduced, deg_shift }
+        KhComplex { complex, canon_cycles, reduced, deg_shift }
+    }
+
+    pub fn canon_cycle(&self, i: usize) -> &KhChain<R> { 
+        &self.canon_cycles[i]
     }
 
     pub fn is_reduced(&self) -> bool { 

@@ -175,7 +175,7 @@ impl Link {
         let mut remain: HashSet<_> = (0..n).collect();
     
         let e = self.first_edge().unwrap();
-        let i = circles.iter().find_position(|c| c.edges().contains(e)).unwrap().0;
+        let i = circles.iter().find_position(|c| c.edges().contains(&e)).unwrap().0;
     
         queue.push(i);
         colors[i] = if ori { Color::A } else { Color::B };
@@ -201,9 +201,9 @@ impl Link {
         zip(circles.into_iter(), colors.into_iter()).collect()
     }
 
-    pub fn first_edge(&self) -> Option<&Edge> { 
+    pub fn first_edge(&self) -> Option<Edge> { 
         let Some(x) = self.data.first() else { return None };
-        x.edges().iter().min()
+        x.edges().iter().min().cloned()
     }
 
     pub fn data(&self) -> &Vec<Crossing> { 

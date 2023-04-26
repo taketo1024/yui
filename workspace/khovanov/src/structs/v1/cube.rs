@@ -127,7 +127,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             (s.clone(), edges)
         }).collect();
 
-        let base_pt = l.first_edge().cloned();
+        let base_pt = l.first_edge();
 
         KhCube { str, dim: n, vertices, edges, base_pt }
     }

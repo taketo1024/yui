@@ -32,9 +32,17 @@ impl TngComp {
     }
 
     pub fn endpts(&self) -> Option<(Edge, Edge)> { 
+        use TngComp::Arc;
         match self { 
-            &TngComp::Arc(e0, _, e2) => Some((e0, e2)),
+            &Arc(e0, _, e2) => Some((e0, e2)),
             _ => None
+        }
+    }
+
+    pub fn min_edge(&self) -> Edge { 
+        use TngComp::{Arc, Circ};
+        match self { 
+            &Arc(_, e, _) | &Circ(e) => e
         }
     }
 

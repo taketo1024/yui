@@ -15,14 +15,17 @@ pub struct TngComplexBuilder {
     complex: TngComplex,
     canon_cycles: Vec<TngElem>,
     base_pt: Option<Edge>,
-    reduced: bool
+    reduced: bool,
+    pub auto_deloop: bool,
+    pub auto_elim: bool
 }
 
 impl TngComplexBuilder {
     pub fn new(l: &Link, reduced: bool) -> Self { 
         let crossings = Self::sort_crossings(l);
-        let deg_shift = KhComplex::<i64>::deg_shift_for(l, false);
+        let deg_shift = KhComplex::<i64>::deg_shift_for(l, reduced);
         let complex = TngComplex::new(deg_shift);
+
         let base_pt = if reduced { 
             assert!(l.components().len() > 0);
             l.first_edge()
@@ -30,7 +33,10 @@ impl TngComplexBuilder {
             None
         };
 
-        Self { crossings, complex, canon_cycles: vec![], base_pt, reduced }
+        let auto_deloop = true;
+        let auto_elim   = true;
+
+        Self { crossings, complex, canon_cycles: vec![], base_pt, reduced, auto_deloop, auto_elim }
     }
 
     fn sort_crossings(l: &Link) -> Vec<Crossing> { 
@@ -98,9 +104,13 @@ impl TngComplexBuilder {
             e.append(i, x);
         }
 
-        while let Some((k, r)) = self.complex.find_loop() { 
-            self.deloop(&k, r);
+        if self.auto_deloop { 
+            while let Some((k, r)) = self.complex.find_loop() { 
+                self.deloop(&k, r);
+            }
         }
+
+        self.complex.print_d();
     }
 
     fn deloop(&mut self, k: &KhEnhState, r: usize) {
@@ -110,9 +120,11 @@ impl TngComplexBuilder {
         }
 
         let keys = self.complex.deloop(k, r);
-        
-        for k in keys { 
-            self.eliminate(&k)
+
+        if self.auto_elim { 
+            for k in keys { 
+                self.eliminate(&k)
+            }
         }
     }
 

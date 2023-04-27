@@ -345,10 +345,8 @@ impl CobComp {
                     eval(c, 0, 0, y-2, h, t) *  t,
                 (0, 0, 0) if c.is_closed() => // ε.ι = 0
                     LinComb::zero(),
-                (0, 1, 0) | (0, 0, 1) => 
-                    LinComb::from_gen(cob(c, x, y)),
-                _ => 
-                    panic!("impossible.")
+                _ =>
+                    LinComb::from_gen(cob(c, x, y))
             }
         }
 
@@ -722,6 +720,9 @@ impl Cob {
                 let mut cob = cob.clone();
                 cob.comps.push(c.clone());
                 (cob, r * s)
+            }).map(|(mut cob, r)| {
+                cob.sort_comps();
+                (cob, r)
             });
             prod.collect()
         })

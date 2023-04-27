@@ -13,7 +13,9 @@ use super::elem::TngElem;
 pub struct TngComplexBuilder {
     crossings: Vec<Crossing>,
     complex: TngComplex,
-    canon_cycles: Vec<TngElem>
+    canon_cycles: Vec<TngElem>,
+    base_pt: Option<Edge>,
+    reduced: bool
 }
 
 impl TngComplexBuilder {
@@ -21,8 +23,14 @@ impl TngComplexBuilder {
         let crossings = Self::sort_crossings(l);
         let deg_shift = KhComplex::<i64>::deg_shift_for(l, false);
         let complex = TngComplex::new(deg_shift);
+        let base_pt = if reduced { 
+            assert!(l.components().len() > 0);
+            l.first_edge()
+        } else { 
+            None
+        };
 
-        Self { crossings, complex, canon_cycles: vec![] }
+        Self { crossings, complex, canon_cycles: vec![], base_pt, reduced }
     }
 
     fn sort_crossings(l: &Link) -> Vec<Crossing> { 
@@ -131,7 +139,11 @@ impl TngComplexBuilder {
         assert_eq!(l.components().len(), 1);
 
         let s = l.ori_pres_state();
-        let ori = vec![true, false];
+        let ori = if self.reduced { 
+            vec![true]
+        } else { 
+            vec![true, false]
+        };
 
         let cycles = ori.into_iter().map(|o| { 
             let circles = l.colored_seifert_circles(o);
@@ -270,8 +282,8 @@ mod tests {
         b.make_canon_cycles();
         b.process();
 
-        b.complex.print_d();
-
+        assert_eq!(b.canon_cycles.len(), 2);
+        
         for i in [0, 1] { 
             let z = &b.canon_cycles[i];
             let z = z.eval(&2, &0);

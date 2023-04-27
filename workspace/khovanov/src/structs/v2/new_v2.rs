@@ -11,7 +11,7 @@ impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn new_v2(l: &Link, h: &R, t: &R, reduced: bool) -> Self { 
         let deg_shift = Self::deg_shift_for(l, reduced);
-        let mut b = TngComplexBuilder::new(l);
+        let mut b = TngComplexBuilder::new(l, reduced);
 
         if t.is_zero() && l.is_knot() {
             b.make_canon_cycles();

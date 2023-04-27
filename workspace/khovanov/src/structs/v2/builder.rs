@@ -17,7 +17,7 @@ pub struct TngComplexBuilder {
 }
 
 impl TngComplexBuilder {
-    pub fn new(l: &Link) -> Self { 
+    pub fn new(l: &Link, reduced: bool) -> Self { 
         let crossings = Self::sort_crossings(l);
         let deg_shift = KhComplex::<i64>::deg_shift_for(l, false);
         let complex = TngComplex::new(deg_shift);
@@ -164,7 +164,7 @@ mod tests {
     #[test]
     fn test_unknot_rm1() {
         let l = Link::from_pd_code([[0,0,1,1]]);
-        let mut b = TngComplexBuilder::new(&l);
+        let mut b = TngComplexBuilder::new(&l, false);
         b.process();
 
         let c = b.complex.eval(&0, &0);
@@ -176,7 +176,7 @@ mod tests {
     #[test]
     fn test_unknot_rm1_neg() {
         let l = Link::from_pd_code([[0,1,1,0]]);
-        let mut b = TngComplexBuilder::new(&l);
+        let mut b = TngComplexBuilder::new(&l, false);
         b.process();
 
         let c = b.complex.eval(&0, &0);
@@ -190,7 +190,7 @@ mod tests {
     #[test]
     fn test_unknot_rm2() {
         let l = Link::from_pd_code([[1,4,2,1],[2,4,3,3]]);
-        let mut b = TngComplexBuilder::new(&l);
+        let mut b = TngComplexBuilder::new(&l, false);
         b.process();
 
         let c = b.complex.eval(&0, &0);
@@ -206,7 +206,7 @@ mod tests {
     fn test_unlink_2() {
         let pd_code = [[1,2,3,4], [3,2,1,4]];
         let l = Link::from_pd_code(pd_code);
-        let mut b = TngComplexBuilder::new(&l);
+        let mut b = TngComplexBuilder::new(&l, false);
         b.process();
 
         let c = b.complex.eval(&0, &0);
@@ -221,7 +221,7 @@ mod tests {
     #[test]
     fn test_hopf_link() {
         let l = Link::hopf_link();
-        let mut b = TngComplexBuilder::new(&l);
+        let mut b = TngComplexBuilder::new(&l, false);
         b.process();
 
         let c = b.complex.eval(&0, &0);
@@ -236,7 +236,7 @@ mod tests {
     #[test]
     fn test_8_19() {
         let l = Link::from_pd_code([[4,2,5,1],[8,4,9,3],[9,15,10,14],[5,13,6,12],[13,7,14,6],[11,1,12,16],[15,11,16,10],[2,8,3,7]]);
-        let mut b = TngComplexBuilder::new(&l);
+        let mut b = TngComplexBuilder::new(&l, false);
         b.process();
 
         let c = b.complex.eval(&0, &0);
@@ -265,7 +265,7 @@ mod tests {
     #[test]
     fn canon_cycle_trefoil() { 
         let l = Link::trefoil();
-        let mut b = TngComplexBuilder::new(&l);
+        let mut b = TngComplexBuilder::new(&l, false);
 
         b.make_canon_cycles();
         b.process();

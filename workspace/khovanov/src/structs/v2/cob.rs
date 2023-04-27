@@ -7,6 +7,7 @@ use auto_impl_ops::auto_ops;
 use derive_more::Display;
 use itertools::Itertools;
 use num_traits::Zero;
+use cartesian::cartesian;
 use yui_core::{Elem, Ring, RingOps};
 use yui_lin_comb::{FreeGen, OrdForDisplay, LinComb};
 use yui_link::{Edge, Crossing, Resolution};
@@ -709,6 +710,21 @@ impl Cob {
         c.genus = (g / 2) as usize;
 
         c
+    }
+
+    pub fn part_eval<R>(&self, h: &R, t: &R) -> LinComb<Cob, R>
+    where R: Ring, for<'x> &'x R: RingOps<R> {
+        let init = LinComb::from_gen(Cob::empty());
+        self.comps.iter().fold(init, |res, c| { 
+            let eval = c.part_eval(h, t);
+            let all = cartesian!(res.iter(), eval.iter());
+            let prod = all.map(|((cob, r), (c, s))| {
+                let mut cob = cob.clone();
+                cob.comps.push(c.clone());
+                (cob, r * s)
+            });
+            prod.collect()
+        })
     }
 
     pub fn eval<R>(&self, h: &R, t: &R) -> R

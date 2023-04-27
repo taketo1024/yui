@@ -13,13 +13,15 @@ use super::mor::{Mor, MorTrait};
 use super::tng::{TngComp, Tng};
 
 // element in C as a cobordism ∅ → C.
-pub struct TngElem {
+pub struct TngElem<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
     state: State,
     value: Cob,                    // precomposed at the final step.
-    mors: HashMap<KhEnhState, Mor> // src must partially match init_cob. 
+    mors: HashMap<KhEnhState, Mor<R>> // src must partially match init_cob. 
 }
 
-impl TngElem { 
+impl<R> TngElem<R> 
+where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn init(init_state: State, init_cob: Cob) -> Self { 
         let f = Mor::from_gen(Cob::empty());
         Self{ state: init_state, value: init_cob, mors: map! { KhEnhState::init() => f } }
@@ -54,7 +56,7 @@ impl TngElem {
         }
     }
 
-    fn deloop_for(&self, k: &KhEnhState, f: &Mor, c: &TngComp, label: KhAlgGen, dot: Dot) -> (KhEnhState, Mor) { 
+    fn deloop_for(&self, k: &KhEnhState, f: &Mor<R>, c: &TngComp, label: KhAlgGen, dot: Dot) -> (KhEnhState, Mor<R>) { 
         let mut k_new = *k;
         k_new.label.push(label);
 
@@ -62,7 +64,7 @@ impl TngElem {
         (k_new, f_new)
     }
 
-    pub fn eliminate(&mut self, i: &KhEnhState, j: &KhEnhState, i_out: &HashMap<KhEnhState, Mor>) {
+    pub fn eliminate(&mut self, i: &KhEnhState, j: &KhEnhState, i_out: &HashMap<KhEnhState, Mor<R>>) {
         // mors into i can be simply dropped.
         self.mors.remove(i);
 
@@ -102,8 +104,7 @@ impl TngElem {
         self.mors = mors;
     }
 
-    pub fn eval<R>(&self, h: &R, t: &R) -> KhChain<R>
-    where R: Ring, for<'x> &'x R: RingOps<R> {
+    pub fn eval(&self, h: &R, t: &R) -> KhChain<R> {
         assert!(self.value.is_empty());
         assert!(self.mors.values().all(|f| f.is_closed()));
 
@@ -113,7 +114,8 @@ impl TngElem {
     }
 }
 
-impl Display for TngElem {
+impl<R> Display for TngElem<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mors = self.mors.iter().map(|(k, f)| { 
             format!("{}: {}", k, f)

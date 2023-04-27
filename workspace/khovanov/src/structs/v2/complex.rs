@@ -16,14 +16,16 @@ use super::tng::{Tng, TngComp};
 use super::mor::{Mor, MorTrait};
 
 #[derive(Clone, Debug)]
-pub struct TngVertex { 
+pub struct TngVertex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> { 
     key: KhEnhState,
     tng: Tng,
     in_edges: HashSet<KhEnhState>,
-    out_edges: HashMap<KhEnhState, Mor>
+    out_edges: HashMap<KhEnhState, Mor<R>>
 }
 
-impl TngVertex { 
+impl<R> TngVertex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn init() -> Self { 
         let key = KhEnhState::init();
         let tng = Tng::empty();
@@ -36,24 +38,27 @@ impl TngVertex {
         &self.tng
     }
 
-    pub fn out_edges(&self) -> &HashMap<KhEnhState, Mor> {
+    pub fn out_edges(&self) -> &HashMap<KhEnhState, Mor<R>> {
         &self.out_edges
     }
 }
 
-impl Display for TngVertex {
+impl<R> Display for TngVertex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({}; {})", self.key, self.tng)
     }
 }
 
-pub struct TngComplex {
-    vertices: HashMap<KhEnhState, TngVertex>,
+pub struct TngComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    vertices: HashMap<KhEnhState, TngVertex<R>>,
     len: usize,
     deg_shift: (isize, isize)
 }
 
-impl TngComplex {
+impl<R> TngComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(deg_shift: (isize, isize)) -> Self { 
         let mut vertices = HashMap::new();
         let k0 = KhEnhState::init();
@@ -77,7 +82,7 @@ impl TngComplex {
         }).count()
     }
 
-    pub fn vertex(&self, v: &KhEnhState) -> &TngVertex { 
+    pub fn vertex(&self, v: &KhEnhState) -> &TngVertex<R> { 
         &self.vertices[v]
     }
 
@@ -85,15 +90,15 @@ impl TngComplex {
         self.vertices.len()
     }
 
-    pub fn iter_verts(&self) -> impl Iterator<Item = (&KhEnhState, &TngVertex)> {
+    pub fn iter_verts(&self) -> impl Iterator<Item = (&KhEnhState, &TngVertex<R>)> {
         self.vertices.iter().sorted_by(|(k0, _), (k1, _)| k0.cmp(k1))
     }
 
-    pub fn edge(&self, k: &KhEnhState, l: &KhEnhState) -> &Mor {
+    pub fn edge(&self, k: &KhEnhState, l: &KhEnhState) -> &Mor<R> {
         &self.vertices[k].out_edges[l]
     }
 
-    fn add_edge(&mut self, k: &KhEnhState, l: &KhEnhState, f: Mor) { 
+    fn add_edge(&mut self, k: &KhEnhState, l: &KhEnhState, f: Mor<R>) { 
         let v = self.vertices.get_mut(k).unwrap();
         v.out_edges.insert(*l, f);
 
@@ -148,7 +153,7 @@ impl TngComplex {
         debug_assert!(self.validate_edges());
     }
 
-    fn dupl_01(v: TngVertex, sdl: &CobComp) -> [TngVertex; 2] {
+    fn dupl_01(v: TngVertex<R>, sdl: &CobComp) -> [TngVertex<R>; 2] {
         use Resolution::{Res0, Res1};
 
         let mut v0 = v.clone();
@@ -176,14 +181,14 @@ impl TngComplex {
         let c0 = Cob::id(sdl.src());
         let c1 = Cob::id(sdl.tgt());
 
-        modify!(v0.out_edges, |e: HashMap<KhEnhState, Mor>| { 
+        modify!(v0.out_edges, |e: HashMap<KhEnhState, Mor<R>>| { 
             e.into_iter().map(|(mut k, f)| { 
                 k.state.push(Res0);
                 (k, f.connect(&c0))
             }).collect()
         });
 
-        modify!(v1.out_edges, |e: HashMap<KhEnhState, Mor>| { 
+        modify!(v1.out_edges, |e: HashMap<KhEnhState, Mor<R>>| { 
             e.into_iter().map(|(mut k, f)| { 
                 k.state.push(Res1);
                 (k, -f.connect(&c1))
@@ -247,7 +252,7 @@ impl TngComplex {
         }
     }
 
-    fn deloop_in(&mut self, v: &mut TngVertex, c: &TngComp, label: KhAlgGen, birth_dot: Dot, death_dot: Dot, remove: bool) { 
+    fn deloop_in(&mut self, v: &mut TngVertex<R>, c: &TngComp, label: KhAlgGen, birth_dot: Dot, death_dot: Dot, remove: bool) { 
         assert!(c.is_circle());
 
         let k_old = v.key;
@@ -294,7 +299,8 @@ impl TngComplex {
         let mut cand = None;
         let mut cand_s = usize::MAX;
 
-        fn score(v: &TngVertex, w: &TngVertex) -> usize { 
+        fn score<_R>(v: &TngVertex<_R>, w: &TngVertex<_R>) -> usize
+        where _R: Ring, for<'x> &'x _R: RingOps<_R> { 
             let v_out = v.out_edges.len();
             let w_in  = w.in_edges.len();
             (v_out - 1) * (w_in - 1)
@@ -408,8 +414,7 @@ impl TngComplex {
         debug_assert!(self.validate_edges());
     }
 
-    pub fn eval<R>(&self, h: &R, t: &R) -> FreeChainComplex<KhEnhState, R, RangeInclusive<isize>> 
-    where R: Ring, for<'x> &'x R: RingOps<R> {
+    pub fn eval(&self, h: &R, t: &R) -> FreeChainComplex<KhEnhState, R, RangeInclusive<isize>> {
         debug_assert!(self.is_evalable());
 
         let (h, t) = (h.clone(), t.clone());
@@ -527,7 +532,7 @@ mod tests {
 
     #[test]
     fn empty() { 
-        let c = TngComplex::new((0, 0));
+        let c = TngComplex::<i32>::new((0, 0));
 
         assert_eq!(c.len(), 1);
         assert_eq!(c.rank(0), 1);
@@ -535,7 +540,7 @@ mod tests {
 
     #[test]
     fn single_x() { 
-        let mut c = TngComplex::new((0, 0));
+        let mut c = TngComplex::<i32>::new((0, 0));
         let x = Crossing::from_pd_code([0,1,2,3]);
         c.append(&x);
 
@@ -546,7 +551,7 @@ mod tests {
 
     #[test]
     fn two_x_disj() { 
-        let mut c = TngComplex::new((0, 0));
+        let mut c = TngComplex::<i32>::new((0, 0));
         let x0 = Crossing::from_pd_code([0,1,2,3]);
         let x1 = Crossing::from_pd_code([4,5,6,7]);
 
@@ -561,7 +566,7 @@ mod tests {
 
     #[test]
     fn two_x() { 
-        let mut c = TngComplex::new((0, 0));
+        let mut c = TngComplex::<i32>::new((0, 0));
         let x0 = Crossing::from_pd_code([0,4,1,5]);
         let x1 = Crossing::from_pd_code([3,1,4,2]);
 
@@ -576,7 +581,7 @@ mod tests {
 
     #[test]
     fn deloop_one() { 
-        let mut c = TngComplex::new((0, 0));
+        let mut c = TngComplex::<i32>::new((0, 0));
         let x0 = Crossing::from_pd_code([4,2,5,1]);
         let x1 = Crossing::from_pd_code([3,6,4,1]);
 

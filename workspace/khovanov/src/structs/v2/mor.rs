@@ -4,9 +4,10 @@ use yui_lin_comb::LinComb;
 use super::cob::{Cob, Dot, Bottom, CobComp};
 use super::tng::{Tng, TngComp};
 
-pub type Mor = LinComb<Cob, i32>; // Z-linear combination of cobordisms.
+pub type Mor<R> = LinComb<Cob, R>; // R-linear combination of cobordisms.
 
 pub trait MorTrait: Sized {
+    type R;
     fn src(&self) -> Tng;
     fn tgt(&self) -> Tng;
     fn is_closed(&self) -> bool;
@@ -16,11 +17,13 @@ pub trait MorTrait: Sized {
     fn connect(self, c: &Cob) -> Self;
     fn connect_comp(self, c: &CobComp) -> Self;
     fn cap_off(self, b: Bottom, c: &TngComp, dot: Dot) -> Self;
-    fn eval<R>(&self, h: &R, t: &R) -> R
-    where R: Ring, for<'x> &'x R: RingOps<R>;
+    fn eval(&self, h: &Self::R, t: &Self::R) -> Self::R;
 }
 
-impl MorTrait for Mor {
+impl<R> MorTrait for Mor<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type R = R;
+
     fn src(&self) -> Tng {
         let Some((c, _)) = self.iter().next() else { 
             return Tng::empty()
@@ -62,7 +65,7 @@ impl MorTrait for Mor {
         self.into_map(|mut cob, r| { 
             f(&mut cob);
             if cob.is_zero() { 
-                (cob, 0)
+                (cob, R::zero())
             } else { 
                 (cob, r)
             }
@@ -81,10 +84,9 @@ impl MorTrait for Mor {
         self.map_cob(|cob| cob.cap_off(b, c, dot) )
     }
 
-    fn eval<R>(&self, h: &R, t: &R) -> R
-    where R: Ring, for<'x> &'x R: RingOps<R> {
-        self.iter().map(|(c, &a)| { 
-            R::from(a) * c.eval(h, t)
+    fn eval(&self, h: &R, t: &R) -> R {
+        self.iter().map(|(c, a)| { 
+            a * c.eval(h, t)
         }).sum()
     }
 }

@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use log::info;
+use yui_core::{Ring, RingOps};
 use yui_link::{Link, Crossing, Edge};
 
 use crate::{KhComplex, KhEnhState};
@@ -10,17 +11,19 @@ use super::cob::{Cob, CobComp, Dot};
 use super::complex::TngComplex;
 use super::elem::TngElem;
 
-pub struct TngComplexBuilder {
+pub struct TngComplexBuilder<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
     crossings: Vec<Crossing>,
-    complex: TngComplex,
-    canon_cycles: Vec<TngElem>,
+    complex: TngComplex<R>,
+    canon_cycles: Vec<TngElem<R>>,
     base_pt: Option<Edge>,
     reduced: bool,
     pub auto_deloop: bool,
     pub auto_elim: bool
 }
 
-impl TngComplexBuilder {
+impl<R> TngComplexBuilder<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(l: &Link, reduced: bool) -> Self { 
         let base_pt = if reduced { 
             assert!(l.components().len() > 0);
@@ -87,11 +90,11 @@ impl TngComplexBuilder {
         res
     }
 
-    pub fn complex(&self) -> &TngComplex { 
+    pub fn complex(&self) -> &TngComplex<R> { 
         &self.complex
     }
 
-    pub fn canon_cycles(&self) -> &Vec<TngElem> { 
+    pub fn canon_cycles(&self) -> &Vec<TngElem<R>> { 
         &self.canon_cycles
     }
 

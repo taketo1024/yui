@@ -22,10 +22,6 @@ pub struct TngComplexBuilder {
 
 impl TngComplexBuilder {
     pub fn new(l: &Link, reduced: bool) -> Self { 
-        let crossings = Self::sort_crossings(l);
-        let deg_shift = KhComplex::<i64>::deg_shift_for(l, reduced);
-        let complex = TngComplex::new(deg_shift);
-
         let base_pt = if reduced { 
             assert!(l.components().len() > 0);
             l.first_edge()
@@ -33,18 +29,22 @@ impl TngComplexBuilder {
             None
         };
 
+        let crossings = Self::sort_crossings(l, &base_pt);
+        let deg_shift = KhComplex::<i64>::deg_shift_for(l, reduced);
+        let complex = TngComplex::new(deg_shift);
+
         let auto_deloop = true;
         let auto_elim   = true;
 
         Self { crossings, complex, canon_cycles: vec![], base_pt, reduced, auto_deloop, auto_elim }
     }
 
-    fn sort_crossings(l: &Link) -> Vec<Crossing> { 
+    fn sort_crossings(l: &Link, base_pt: &Option<Edge>) -> Vec<Crossing> { 
         let mut remain = l.data().clone();
         let mut endpts = HashSet::new();
         let mut res = Vec::new();
 
-        fn take_best(remain: &mut Vec<Crossing>, endpts: &mut HashSet<Edge>) -> Option<Crossing> { 
+        fn take_best(remain: &mut Vec<Crossing>, endpts: &mut HashSet<Edge>, base_pt: &Option<Edge>) -> Option<Crossing> { 
             if remain.is_empty() { 
                 return None 
             }
@@ -53,6 +53,12 @@ impl TngComplexBuilder {
             let mut cand_c = 0;
 
             for (i, x) in remain.iter().enumerate() { 
+                if let Some(e) = base_pt { 
+                    if x.edges().contains(&e) { 
+                        continue
+                    }
+                }
+
                 let c = x.edges().iter().filter(|e| 
                     endpts.contains(e)
                 ).count();
@@ -74,7 +80,7 @@ impl TngComplexBuilder {
             Some(x)
         }
 
-        while let Some(x) = take_best(&mut remain, &mut endpts) { 
+        while let Some(x) = take_best(&mut remain, &mut endpts, base_pt) { 
             res.push(x);
         }
 

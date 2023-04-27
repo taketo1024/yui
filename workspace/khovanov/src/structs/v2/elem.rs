@@ -45,20 +45,19 @@ impl TngElem {
     pub fn deloop(&mut self, k: &KhEnhState, c: &TngComp) {
         let Some(f) = self.mors.remove(k) else { return };
 
-        let mut k0 = *k;
-        let mut k1 = *k;
+        let (k0, f0) = self.deloop_for(k, &f, c, KhAlgGen::X, Dot::None);
+        let (k1, f1) = self.deloop_for(k, &f, c, KhAlgGen::I, Dot::Y);
 
-        k0.label.push(KhAlgGen::X);
-        k1.label.push(KhAlgGen::I);
+        self.mors.insert(k0, f0);
+        self.mors.insert(k1, f1);
+    }
 
-        let f0 = f.clone().cap_off(Bottom::Tgt, c, Dot::None);
-        let f1 = f.clone().cap_off(Bottom::Tgt, c, Dot::Y);
+    fn deloop_for(&self, k: &KhEnhState, f: &Mor, c: &TngComp, label: KhAlgGen, dot: Dot) -> (KhEnhState, Mor) { 
+        let mut k_new = *k;
+        k_new.label.push(label);
 
-        for (k, f) in [(k0, f0), (k1, f1)] { 
-            if !f.is_zero() { 
-                self.mors.insert(k, f);
-            }
-        }
+        let f_new = f.clone().cap_off(Bottom::Tgt, c, dot);
+        (k_new, f_new)
     }
 
     pub fn eliminate(&mut self, i: &KhEnhState, j: &KhEnhState, i_out: &HashMap<KhEnhState, Mor>) {

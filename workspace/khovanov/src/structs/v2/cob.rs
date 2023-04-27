@@ -321,6 +321,14 @@ impl CobComp {
         self.dots.1 += dots.1;
     }
 
+    pub fn should_part_eval(&self) -> bool {
+        self.is_zero() ||
+        self.genus > 0 || 
+        self.dots.0 >= 1 && self.dots.1 >= 1 ||
+        self.dots.0 >= 2 ||
+        self.dots.1 >= 2
+    }
+
     pub fn part_eval<R>(&self, h: &R, t: &R) -> LinComb<CobComp, R>
     where R: Ring, for<'x> &'x R: RingOps<R> {
 
@@ -710,22 +718,30 @@ impl Cob {
         c
     }
 
-    pub fn part_eval<R>(&self, h: &R, t: &R) -> LinComb<Cob, R>
+    pub fn should_part_eval(&self) -> bool {
+        self.comps.iter().any(|c| c.should_part_eval())
+    }
+
+    pub fn part_eval<R>(self, h: &R, t: &R) -> LinComb<Cob, R>
     where R: Ring, for<'x> &'x R: RingOps<R> {
-        let init = LinComb::from_gen(Cob::empty());
-        self.comps.iter().fold(init, |res, c| { 
-            let eval = c.part_eval(h, t);
-            let all = cartesian!(res.iter(), eval.iter());
-            let prod = all.map(|((cob, r), (c, s))| {
-                let mut cob = cob.clone();
-                cob.comps.push(c.clone());
-                (cob, r * s)
-            }).map(|(mut cob, r)| {
-                cob.sort_comps();
-                (cob, r)
-            });
-            prod.collect()
-        })
+        if self.should_part_eval() { 
+            let init = LinComb::from_gen(Cob::empty());
+            self.comps.iter().fold(init, |res, c| { 
+                let eval = c.part_eval(h, t);
+                let all = cartesian!(res.iter(), eval.iter());
+                let prod = all.map(|((cob, r), (c, s))| {
+                    let mut cob = cob.clone();
+                    cob.comps.push(c.clone());
+                    (cob, r * s)
+                }).map(|(mut cob, r)| {
+                    cob.sort_comps();
+                    (cob, r)
+                });
+                prod.collect()
+            })
+        } else { 
+            LinComb::from_gen(self)
+        }
     }
 
     pub fn eval<R>(&self, h: &R, t: &R) -> R

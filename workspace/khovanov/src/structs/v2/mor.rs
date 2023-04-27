@@ -17,7 +17,7 @@ pub trait MorTrait: Sized {
     fn connect(self, c: &Cob) -> Self;
     fn connect_comp(self, c: &CobComp) -> Self;
     fn cap_off(self, b: Bottom, c: &TngComp, dot: Dot) -> Self;
-    fn part_eval(&self, h: &Self::R, t: &Self::R) -> Self;
+    fn part_eval(self, h: &Self::R, t: &Self::R) -> Self;
     fn eval(&self, h: &Self::R, t: &Self::R) -> Self::R;
 }
 
@@ -85,10 +85,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.map_cob(|cob| cob.cap_off(b, c, dot) )
     }
 
-    fn part_eval(&self, h: &Self::R, t: &Self::R) -> Self {
-        self.iter().map(|(cob, r)|
-            cob.part_eval(h, t) * r
-        ).sum()
+    fn part_eval(self, h: &Self::R, t: &Self::R) -> Self {
+        if self.keys().any(|c| c.should_part_eval()) { 
+            self.into_iter().map(|(cob, r)|
+                cob.part_eval(h, t) * r
+            ).sum()
+        } else { 
+            self
+        }
     }
 
     fn eval(&self, h: &R, t: &R) -> R {

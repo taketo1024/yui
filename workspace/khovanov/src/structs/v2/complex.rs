@@ -32,6 +32,10 @@ impl TngVertex {
         Self { key, tng, in_edges, out_edges }
     }
 
+    pub fn tng(&self) -> &Tng { 
+        &self.tng
+    }
+
     pub fn out_edges(&self) -> &HashMap<KhEnhState, Mor> {
         &self.out_edges
     }
@@ -209,69 +213,70 @@ impl TngComplex {
         None
     }
 
-    pub fn deloop(&mut self, k: &KhEnhState, r: usize) -> (TngComp, KhEnhState, KhEnhState) { 
+    pub fn deloop(&mut self, k: &KhEnhState, r: usize) -> Vec<KhEnhState> { 
         info!("({}) deloop {} at {r}", self.nverts(), &self.vertices[k]);
 
-        let mut v0 = self.vertices.remove(k).unwrap();
-        let c = v0.tng.remove_at(r);
+        let mut v = self.vertices.remove(k).unwrap();
+        let c = v.tng.remove_at(r);
+
+        let mut v0 = v;
         let mut v1 = v0.clone();
 
-        v0.key.label.push(KhAlgGen::X);
-        v1.key.label.push(KhAlgGen::I);
+        self.deloop_in(&mut v0, &c, KhAlgGen::X, Dot::X, Dot::None, false);
+        self.deloop_in(&mut v1, &c, KhAlgGen::I, Dot::None, Dot::Y, true);
 
         let k0 = v0.key;
         let k1 = v1.key;
 
-        let v0_in = v0.in_edges.iter().cloned().collect_vec();
-        for j in v0_in.iter() { 
-            let u = self.vertices.get_mut(j).unwrap();
-
-            let f = u.out_edges.remove(&k).unwrap();
-            v0.in_edges.remove(&j);
-            v1.in_edges.remove(&j);
-
-            let f0 = f.clone().cap_off(Bottom::Tgt, &c, Dot::None);
-            let f1 = f.cap_off(Bottom::Tgt, &c, Dot::Y);
-
-            if !f0.is_zero() {
-                u.out_edges.insert(k0, f0);
-                v0.in_edges.insert(*j);
-            }
-
-            if !f1.is_zero() {
-                u.out_edges.insert(k1, f1);
-                v1.in_edges.insert(*j);
-            }
-        }
-        
-        let v0_out = v0.out_edges.keys().cloned().collect_vec();
-        for l in v0_out.iter() { 
-            let w = self.vertices.get_mut(l).unwrap();
-
-            let f0 = v0.out_edges.remove(&l).unwrap();
-            let f1 = v1.out_edges.remove(&l).unwrap();
-            w.in_edges.remove(&k);
-
-            let f0 = f0.cap_off(Bottom::Src, &c, Dot::X);
-            let f1 = f1.cap_off(Bottom::Src, &c, Dot::None);
-
-            if !f0.is_zero() { 
-                v0.out_edges.insert(*l, f0);
-                w.in_edges.insert(k0);
-            }
-
-            if !f1.is_zero() { 
-                v1.out_edges.insert(*l, f1);
-                w.in_edges.insert(k1);
-            }
-        }
-        
         self.vertices.insert(k0, v0);
         self.vertices.insert(k1, v1);
 
         debug_assert!(self.validate_edges());
 
-        (c, k0, k1)
+        vec![k0, k1]
+    }
+
+    fn deloop_in(&mut self, v: &mut TngVertex, c: &TngComp, label: KhAlgGen, birth_dot: Dot, death_dot: Dot, remove: bool) { 
+        assert!(c.is_circle());
+
+        let k_old = v.key;
+
+        v.key.label.push(label);
+        let k_new = v.key;
+
+        let v_in = v.in_edges.iter().cloned().collect_vec();
+        for j in v_in.iter() { 
+            v.in_edges.remove(&j);
+            let u = self.vertices.get_mut(j).unwrap();
+
+            let f_old = if remove {
+                u.out_edges.remove(&k_old).unwrap()
+            } else { 
+                u.out_edges[&k_old].clone()
+            };
+            let f_new = f_old.cap_off(Bottom::Tgt, &c, death_dot);
+
+            if !f_new.is_zero() {
+                u.out_edges.insert(k_new, f_new);
+                v.in_edges.insert(*j);
+            }
+        }
+        
+        let v_out = v.out_edges.keys().cloned().collect_vec();
+        for l in v_out.iter() { 
+            let w = self.vertices.get_mut(l).unwrap();
+            if remove {
+                w.in_edges.remove(&k_old);
+            }
+
+            let f_old = v.out_edges.remove(&l).unwrap();
+            let f_new = f_old.cap_off(Bottom::Src, &c, birth_dot);
+
+            if !f_new.is_zero() { 
+                v.out_edges.insert(*l, f_new);
+                w.in_edges.insert(k_new);
+            }
+        }
     }
 
     pub fn find_inv_edge(&self, k: &KhEnhState) -> Option<(KhEnhState, KhEnhState)> { 

@@ -96,13 +96,14 @@ impl TngComplexBuilder {
     }
 
     fn deloop(&mut self, k: &KhEnhState, r: usize) {
-        let (c, k0, k1) = self.complex.deloop(k, r);
-
+        let c = self.complex.vertex(k).tng().comp(r);
         for e in self.canon_cycles.iter_mut() { 
             e.deloop(k, &c);
         }
 
-        for k in [k0, k1] { 
+        let keys = self.complex.deloop(k, r);
+        
+        for k in keys { 
             self.eliminate(&k)
         }
     }

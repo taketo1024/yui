@@ -54,20 +54,24 @@ pub struct TngComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     vertices: HashMap<KhEnhState, TngVertex<R>>,
     len: usize,
+    h: R,
+    t: R,
     deg_shift: (isize, isize)
 }
 
 impl<R> TngComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new(deg_shift: (isize, isize)) -> Self { 
+    pub fn new(h: &R, t: &R, deg_shift: (isize, isize)) -> Self { 
         let mut vertices = HashMap::new();
         let k0 = KhEnhState::init();
         let v0 = TngVertex::init();
         vertices.insert(k0, v0);
 
         let len = 1;
+        let h = h.clone();
+        let t = t.clone();
 
-        TngComplex{ vertices, len, deg_shift }
+        TngComplex{ vertices, len, h, t, deg_shift }
     }
 
     pub fn len(&self) -> usize { 
@@ -270,7 +274,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             } else { 
                 u.out_edges[&k_old].clone()
             };
-            let f_new = f_old.cap_off(Bottom::Tgt, &c, death_dot);
+
+            let (h, t) = (&self.h, &self.t);
+            let f_new = f_old.cap_off(Bottom::Tgt, &c, death_dot).part_eval(h, t);
 
             if !f_new.is_zero() {
                 u.out_edges.insert(k_new, f_new);
@@ -286,7 +292,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
 
             let f_old = v.out_edges.remove(&l).unwrap();
-            let f_new = f_old.cap_off(Bottom::Src, &c, birth_dot);
+
+            let (h, t) = (&self.h, &self.t);
+            let f_new = f_old.cap_off(Bottom::Src, &c, birth_dot).part_eval(h, t);
 
             if !f_new.is_zero() { 
                 v.out_edges.insert(*l, f_new);
@@ -376,6 +384,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             } else { 
                 -cab
             };
+
+            let (h, t) = (&self.h, &self.t);
+            let d = d.part_eval(h, t);
 
             if d.is_zero() { 
                 self.remove_edge(k1, l1);
@@ -532,7 +543,7 @@ mod tests {
 
     #[test]
     fn empty() { 
-        let c = TngComplex::<i32>::new((0, 0));
+        let c = TngComplex::new(&0, &0, (0, 0));
 
         assert_eq!(c.len(), 1);
         assert_eq!(c.rank(0), 1);
@@ -540,7 +551,7 @@ mod tests {
 
     #[test]
     fn single_x() { 
-        let mut c = TngComplex::<i32>::new((0, 0));
+        let mut c = TngComplex::new(&0, &0, (0, 0));
         let x = Crossing::from_pd_code([0,1,2,3]);
         c.append(&x);
 
@@ -551,7 +562,7 @@ mod tests {
 
     #[test]
     fn two_x_disj() { 
-        let mut c = TngComplex::<i32>::new((0, 0));
+        let mut c = TngComplex::new(&0, &0, (0, 0));
         let x0 = Crossing::from_pd_code([0,1,2,3]);
         let x1 = Crossing::from_pd_code([4,5,6,7]);
 
@@ -566,7 +577,7 @@ mod tests {
 
     #[test]
     fn two_x() { 
-        let mut c = TngComplex::<i32>::new((0, 0));
+        let mut c = TngComplex::new(&0, &0, (0, 0));
         let x0 = Crossing::from_pd_code([0,4,1,5]);
         let x1 = Crossing::from_pd_code([3,1,4,2]);
 
@@ -581,7 +592,7 @@ mod tests {
 
     #[test]
     fn deloop_one() { 
-        let mut c = TngComplex::<i32>::new((0, 0));
+        let mut c = TngComplex::new(&0, &0, (0, 0));
         let x0 = Crossing::from_pd_code([4,2,5,1]);
         let x1 = Crossing::from_pd_code([3,6,4,1]);
 

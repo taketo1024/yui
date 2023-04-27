@@ -231,11 +231,10 @@ impl Tng {
         )
     }
 
-    pub fn find_loop(&self) -> Option<usize> {
+    pub fn find_loop(&self, exclude: Option<Edge>) -> Option<(usize, &TngComp)> {
         self.comps.iter().enumerate().find(|(_, c)| 
-            c.is_circle()
-        ).map(|(i, _)|
-            i
+            c.is_circle() && 
+            exclude.map(|e| e != c.min_edge()).unwrap_or(true)
         )
     }
 
@@ -348,23 +347,23 @@ mod tests {
     fn deloop() { 
         let mut t = Tng::empty();
         assert_eq!(t.ncomps(), 0);
-        assert_eq!(t.find_loop(), None);
+        assert_eq!(t.find_loop(None), None);
 
         t.append_arc(TngComp::arc(0,1));
         assert_eq!(t.ncomps(), 1);
-        assert_eq!(t.find_loop(), None);
+        assert_eq!(t.find_loop(None), None);
 
         t.append_arc(TngComp::arc(2,3));
         assert_eq!(t.ncomps(), 2);
-        assert_eq!(t.find_loop(), None);
+        assert_eq!(t.find_loop(None), None);
 
         t.append_arc(TngComp::arc(2,3));
         assert_eq!(t.ncomps(), 2);
-        assert_eq!(t.find_loop(), Some(1));
+        assert_eq!(t.find_loop(None), Some((1, t.comp(1))));
 
         t.remove_at(1);
 
         assert_eq!(t.ncomps(), 1);
-        assert_eq!(t.find_loop(), None);
+        assert_eq!(t.find_loop(None), None);
     }
 }

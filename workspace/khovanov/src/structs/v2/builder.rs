@@ -105,21 +105,20 @@ impl TngComplexBuilder {
         }
 
         if self.auto_deloop { 
-            while let Some((k, r)) = self.complex.find_loop() { 
-                self.deloop(&k, r);
+            let p = self.base_pt;
+            while let Some((k, r, _)) = self.complex.find_loop(p) { 
+                self.deloop(&k, r, false);
             }
         }
-
-        self.complex.print_d();
     }
 
-    fn deloop(&mut self, k: &KhEnhState, r: usize) {
+    fn deloop(&mut self, k: &KhEnhState, r: usize, reduced: bool) {
         let c = self.complex.vertex(k).tng().comp(r);
         for e in self.canon_cycles.iter_mut() { 
-            e.deloop(k, &c);
+            e.deloop(k, &c, reduced);
         }
 
-        let keys = self.complex.deloop(k, r);
+        let keys = self.complex.deloop(k, r, reduced);
 
         if self.auto_elim { 
             for k in keys { 
@@ -140,6 +139,12 @@ impl TngComplexBuilder {
     }
 
     fn finalize(&mut self) { 
+        if self.reduced && self.auto_deloop { 
+            while let Some((k, r, _)) = self.complex.find_loop(None) { 
+                self.deloop(&k, r, true);
+            }
+        }
+        
         for e in self.canon_cycles.iter_mut() { 
             e.finalize();
         }

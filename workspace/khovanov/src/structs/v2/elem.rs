@@ -42,14 +42,16 @@ impl TngElem {
         }).collect();
     }
 
-    pub fn deloop(&mut self, k: &KhEnhState, c: &TngComp) {
+    pub fn deloop(&mut self, k: &KhEnhState, c: &TngComp, reduced: bool) {
         let Some(f) = self.mors.remove(k) else { return };
 
         let (k0, f0) = self.deloop_for(k, &f, c, KhAlgGen::X, Dot::None);
-        let (k1, f1) = self.deloop_for(k, &f, c, KhAlgGen::I, Dot::Y);
-
         self.mors.insert(k0, f0);
-        self.mors.insert(k1, f1);
+
+        if !reduced { 
+            let (k1, f1) = self.deloop_for(k, &f, c, KhAlgGen::I, Dot::Y);
+            self.mors.insert(k1, f1);    
+        }
     }
 
     fn deloop_for(&self, k: &KhEnhState, f: &Mor, c: &TngComp, label: KhAlgGen, dot: Dot) -> (KhEnhState, Mor) { 

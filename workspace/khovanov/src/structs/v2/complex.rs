@@ -8,7 +8,7 @@ use num_traits::Zero;
 use cartesian::cartesian;
 use yui_core::{Ring, RingOps};
 use yui_homology::FreeChainComplex;
-use yui_link::{Crossing, Resolution};
+use yui_link::{Crossing, Resolution, Edge};
 
 use crate::{KhAlgGen, KhEnhState};
 use super::cob::{Cob, Dot, Bottom, CobComp};
@@ -204,36 +204,47 @@ impl TngComplex {
         [v0, v1]
     }
 
-    pub fn find_loop(&self) -> Option<(KhEnhState, usize)> { 
+    pub fn find_loop(&self, exclude: Option<Edge>) -> Option<(KhEnhState, usize, &TngComp)> { 
         for (k, v) in self.iter_verts() { 
-            if let Some(r) = v.tng.find_loop() { 
-                return Some((*k, r))
+            if let Some((r, c)) = v.tng.find_loop(exclude) { 
+                return Some((*k, r, c))
             }
         }
         None
     }
 
-    pub fn deloop(&mut self, k: &KhEnhState, r: usize) -> Vec<KhEnhState> { 
+    pub fn deloop(&mut self, k: &KhEnhState, r: usize, reduced: bool) -> Vec<KhEnhState> { 
         info!("({}) deloop {} at {r}", self.nverts(), &self.vertices[k]);
 
         let mut v = self.vertices.remove(k).unwrap();
         let c = v.tng.remove_at(r);
 
-        let mut v0 = v;
-        let mut v1 = v0.clone();
+        if reduced { 
+            self.deloop_in(&mut v, &c, KhAlgGen::X, Dot::X, Dot::None, true);
 
-        self.deloop_in(&mut v0, &c, KhAlgGen::X, Dot::X, Dot::None, false);
-        self.deloop_in(&mut v1, &c, KhAlgGen::I, Dot::None, Dot::Y, true);
+            let k_new = v.key;
+            self.vertices.insert(k_new, v);
 
-        let k0 = v0.key;
-        let k1 = v1.key;
+            debug_assert!(self.validate_edges());
 
-        self.vertices.insert(k0, v0);
-        self.vertices.insert(k1, v1);
+            vec![k_new]
+        } else { 
+            let mut v0 = v;
+            let mut v1 = v0.clone();
 
-        debug_assert!(self.validate_edges());
+            self.deloop_in(&mut v0, &c, KhAlgGen::X, Dot::X, Dot::None, false);
+            self.deloop_in(&mut v1, &c, KhAlgGen::I, Dot::None, Dot::Y, true);
 
-        vec![k0, k1]
+            let k0 = v0.key;
+            let k1 = v1.key;
+
+            self.vertices.insert(k0, v0);
+            self.vertices.insert(k1, v1);
+
+            debug_assert!(self.validate_edges());
+
+            vec![k0, k1]
+        }
     }
 
     fn deloop_in(&mut self, v: &mut TngVertex, c: &TngComp, label: KhAlgGen, birth_dot: Dot, death_dot: Dot, remove: bool) { 
@@ -577,10 +588,10 @@ mod tests {
         assert_eq!(c.rank(1), 2);
         assert_eq!(c.rank(2), 1);
 
-        let e = c.find_loop();
+        let e = c.find_loop(None);
         assert!(e.is_some());
 
-        let Some((k, r)) = e else { panic!() };
+        let Some((k, r, _)) = e else { panic!() };
 
         assert_eq!(k, KhEnhState::new(
             State::from_iter([1,0]), 
@@ -588,7 +599,7 @@ mod tests {
         ));
         assert_eq!(r, 2);
 
-        c.deloop(&k, r);
+        c.deloop(&k, r, false);
 
         assert_eq!(c.len(), 3);
         assert_eq!(c.rank(0), 1);

@@ -6,7 +6,7 @@ use yui_core::{Ring, RingOps, EucRing, EucRingOps};
 use yui_matrix::sparse::{SpMat, SpVec};
 use yui_lin_comb::{FreeGen, LinComb};
 use crate::utils::HomologyCalc;
-use crate::{RModStr, GridItr, GridIdx, GenericRModGrid, Grid, ChainComplex, HomologyComputable, GenericHomology, GenericRModStr};
+use crate::{RModStr, GridItr, GridIdx, GenericRModGrid, Grid, ChainComplex, HomologyComputable, GenericHomology, GenericRModStr, RModGrid};
 use crate::fmt::FmtList;
 
 pub struct FreeRModStr<X, R>
@@ -139,14 +139,25 @@ where
     }
 
     pub fn desc_d_gens_at(&self, i: I::Item) -> String {
-        format!("C[{i}]: {}", &self[i]) + &self[i].generators.iter().map(|x| { 
+        let c = |i| self.get(i).map(|v| v.to_string()).unwrap_or("0".to_string());
+        let c0 = c(i);
+        let c1 = c(i + self.d_degree());
+        let d = self[i].generators.iter().map(|x| { 
             let dx = LinComb::from_iter(self.differentiate_x(x));
             format!("\n  {x} -> {dx}")
-        }).join("")
+        }).join("");
+
+        format!("C[{i}]: {c0} -> {c1}{d}") 
     }
 
     pub fn desc_d_gens(&self) -> String { 
-        self.indices().map(|i| self.desc_d_gens_at(i)).join("\n\n")
+        self.indices().filter_map(|i| 
+            if !self.is_zero_at(i) || !self.is_zero_at(i + self.d_degree) {
+                Some(self.desc_d_gens_at(i))
+            } else { 
+                None
+            }
+        ).join("\n\n")
     }
 
     pub fn print_d_gens(&self) {

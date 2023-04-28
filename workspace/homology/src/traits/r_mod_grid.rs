@@ -12,8 +12,16 @@ where
         self.iter().all(|(_, v)| v.is_free())
     }
 
+    fn is_free_at(&self, i: Self::Idx) -> bool { 
+        self.get(i).map(|v| v.is_free()).unwrap_or(true)
+    }
+
     fn is_zero(&self) -> bool { 
         self.iter().all(|(_, v)| v.is_zero())
+    }
+
+    fn is_zero_at(&self, i: Self::Idx) -> bool { 
+        self.get(i).map(|v| v.is_zero()).unwrap_or(true)
     }
 }
 

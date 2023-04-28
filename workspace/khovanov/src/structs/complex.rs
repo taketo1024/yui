@@ -170,8 +170,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn new(l: Link, reduced: bool) -> Self { 
-        let c = KhComplex::new(&l, &R::zero(), &R::zero(), reduced);
-        c.as_bigraded()
+        Self::new_v2(l, reduced)
     }
 
     pub fn is_reduced(&self) -> bool { 

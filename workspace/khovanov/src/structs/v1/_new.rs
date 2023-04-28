@@ -1,10 +1,10 @@
-use yui_core::{Ring, RingOps};
+use yui_core::{Ring, RingOps, EucRing, EucRingOps};
 use yui_link::Link;
 
 use super::canon_cycle::CanonCycles;
 use super::cube::KhCube;
 
-use crate::{KhComplex, KhChain};
+use crate::{KhComplex, KhChain, KhHomology, KhComplexBigraded, KhHomologyBigraded};
 
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
@@ -23,6 +23,30 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         KhComplex::_new(complex, canon_cycles, reduced, deg_shift)
     }        
+}
+
+impl<R> KhComplexBigraded<R>
+where R: Ring, for<'x> &'x R: RingOps<R> { 
+    pub fn new_v1(l: Link, reduced: bool) -> Self { 
+        let c = KhComplex::new_v1(&l, &R::zero(), &R::zero(), reduced);
+        c.as_bigraded()
+    }
+}
+
+impl<R> KhHomology<R> 
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    pub fn new_v1(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
+        let complex = KhComplex::new_v1(l, h, t, reduced);
+        Self::from(&complex)
+    }
+}
+
+impl<R> KhHomologyBigraded<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    pub fn new_v1(l: Link, reduced: bool) -> Self {
+        let c = KhComplexBigraded::new_v1(l, reduced);
+        Self::from(&c)
+    }
 }
 
 #[cfg(test)]

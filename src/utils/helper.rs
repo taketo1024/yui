@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use super::err;
 use std::str::FromStr;
 use num_traits::Zero;

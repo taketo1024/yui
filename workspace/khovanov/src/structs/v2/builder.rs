@@ -107,10 +107,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn proceed_each(&mut self, i: usize) { 
         let x = &self.crossings[i];
+        
         self.complex.append(x);
 
         for e in self.canon_cycles.iter_mut() { 
-            e.append(i, x);
+            e.append(x);
         }
 
         if self.auto_deloop { 

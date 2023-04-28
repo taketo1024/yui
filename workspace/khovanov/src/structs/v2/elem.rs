@@ -16,29 +16,57 @@ use super::tng::{TngComp, Tng};
 pub struct TngElem<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     state: State,
-    value: Cob,                    // precomposed at the final step.
-    mors: HashMap<KhEnhState, Mor<R>> // src must partially match init_cob. 
+    value: Cob,                        // precomposed at the final step.
+    mors: HashMap<KhEnhState, Mor<R>>, // src must partially match init_cob. 
+    x_count: usize
 }
 
 impl<R> TngElem<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn init(init_state: State, init_cob: Cob) -> Self { 
+    pub fn init(state: State, value: Cob) -> Self { 
         let f = Mor::from_gen(Cob::empty());
-        Self{ state: init_state, value: init_cob, mors: map! { KhEnhState::init() => f } }
+        let mors = map! { KhEnhState::init() => f };
+        let x_count = 0;
+
+        Self{ state, value, mors, x_count }
     }
 
-    pub fn append(&mut self, i: usize, x: &Crossing) { 
+    pub fn append(&mut self, x: &Crossing) { 
+        if !x.is_resolved() { 
+            self.append_x(x)
+        } else { 
+            self.append_a(x)
+        }
+    }
+
+    fn append_x(&mut self, x: &Crossing) {
+        assert!(!x.is_resolved());
+
+        let i = self.x_count;
         let r = self.state[i];
-        let arcs = x.resolved(r).arcs();
-        let tng = Tng::new(vec![
-            TngComp::from(&arcs.0), 
-            TngComp::from(&arcs.1)
-        ]);
+
+        let a = x.resolved(r);
+        let tng = Tng::from_a(&a);
         let id = Cob::id(&tng);
 
         let mors = std::mem::take(&mut self.mors);
         self.mors = mors.into_iter().map(|(mut k, f)| {
             k.state.push(r);
+            let f = f.connect(&id);
+            (k, f)
+        }).collect();
+
+        self.x_count += 1;
+    }
+
+    fn append_a(&mut self, x: &Crossing) {
+        assert!(x.is_resolved());
+
+        let tng = Tng::from_a(x);
+        let id = Cob::id(&tng);
+
+        let mors = std::mem::take(&mut self.mors);
+        self.mors = mors.into_iter().map(|(k, f)| {
             let f = f.connect(&id);
             (k, f)
         }).collect();

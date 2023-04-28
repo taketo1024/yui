@@ -60,7 +60,7 @@ mod tests {
     #[test]
     fn trefoil() { 
         let l = Link::trefoil().mirror();
-        let c = KhComplex::new(&l, &1, &0, false);
+        let c = KhComplex::new_v1(&l, &1, &0, false);
 
         let zs = [true, false].map(|ori| 
             KhChain::canon_cycle(&l, &0, &1, ori)
@@ -76,7 +76,7 @@ mod tests {
     #[test]
     fn figure8() { 
         let l = Link::figure8();
-        let c = KhComplex::new(&l, &1, &0, false);
+        let c = KhComplex::new_v1(&l, &1, &0, false);
         
         let zs = [true, false].map(|ori| 
             KhChain::canon_cycle(&l, &0, &1, ori)

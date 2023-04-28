@@ -22,7 +22,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn new(link: &Link, h: &R, t: &R, reduced: bool) -> Self { 
-        Self::new_v1(link, h, t, reduced)
+        Self::new_v2(link, h, t, reduced)
     }
 
     pub(crate) fn _new(complex: FreeChainComplex<KhEnhState, R, RangeInclusive<isize>>, canon_cycles: Vec<KhChain<R>>, reduced: bool, deg_shift: (isize, isize)) -> Self { 

@@ -1,8 +1,9 @@
 use std::fmt::Display;
 use std::ops::Index;
 
-use yui_core::{Ring, RingOps};
-use crate::{GridIdx, GridItr, RModStr, RModGrid, GenericRModStr, GenericRModGrid, Homology, HomologyComputable};
+use yui_core::{Ring, RingOps, EucRing, EucRingOps};
+use crate::{GridIdx, GridItr, GenericRModStr, GenericRModGrid, Homology, HomologyComputable, Grid, GenericChainComplex};
+use crate::fmt::FmtList;
 
 pub struct GenericHomology<R, I>
 where 
@@ -13,32 +14,37 @@ where
     grid: GenericRModGrid<GenericRModStr<R>, I>
 }
 
-impl<R, C> From<C> for GenericHomology<R, C::IdxIter>
-where
+impl<R, I> GenericHomology<R, I>
+where 
     R: Ring, for<'x> &'x R: RingOps<R>,
-    C: HomologyComputable<GenericRModStr<R>, R = R>,
-    C::IdxIter: Clone,
-    C::Output: RModStr<R = C::R>
-{
-    fn from(c: C) -> Self {
-        let range = c.indices();
-        let grid = GenericRModGrid::new(range, |i| {
-            let h_i = c.homology_at(i);
-            if !h_i.is_zero() { Some(h_i) } else { None }
-        });
+    I: GridItr,
+    I::Item: GridIdx
+{ 
+    pub fn new(grid: GenericRModGrid<GenericRModStr<R>, I>) -> Self { 
         Self { grid }
     }
 }
 
-impl<R, I> RModGrid for GenericHomology<R, I>
+impl<R, I> From<GenericChainComplex<R, I>> for GenericHomology<R, I>
+where
+    R: EucRing, for<'x> &'x R: EucRingOps<R>,
+    I: GridItr,
+    I::Item: GridIdx
+{
+    fn from(c: GenericChainComplex<R, I>) -> Self {
+        c.homology()
+    }
+}
+
+impl<R, I> Grid for GenericHomology<R, I>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
     I: GridItr,
     I::Item: GridIdx
 {
-    type R = R;
     type Idx = I::Item;
     type IdxIter = I;
+    type Output = GenericRModStr<R>;
 
     fn contains_idx(&self, k: Self::Idx) -> bool {
         self.grid.contains_idx(k)
@@ -46,6 +52,10 @@ where
 
     fn indices(&self) -> Self::IdxIter {
         self.grid.indices()
+    }
+
+    fn get(&self, i: Self::Idx) -> Option<&Self::Output> {
+        self.grid.get(i)
     }
 }
 
@@ -67,8 +77,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>,
     I: GridItr,
     I::Item: GridIdx
-{
-}
+{}
 
 impl<R, I> Display for GenericHomology<R, I>
 where 
@@ -77,20 +86,20 @@ where
     I::Item: GridIdx
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.fmt_default(f, "H")
+        self.fmt_list(f)
     }
 }
 
 #[cfg(test)]
 mod tests { 
     use super::*;
-    use yui_matrix::sparse::*;
+    use crate::RModStr;
     use crate::test::TestChainComplex;
 
     #[test]
     fn cancel_pair() { 
         let c = TestChainComplex::<i32>::descending(
-            vec![ SpMat::from_vec((1, 1), vec![1]) ],
+            vec![ ((1, 1), vec![1]) ],
         );
 
         let h = GenericHomology::from(c);
@@ -102,7 +111,7 @@ mod tests {
     #[test]
     fn torsion() { 
         let c = TestChainComplex::<i32>::descending( 
-            vec![ SpMat::from_vec((1, 1), vec![2]) ],
+            vec![ ((1, 1), vec![2]) ],
         );
 
         let h = GenericHomology::from(c);

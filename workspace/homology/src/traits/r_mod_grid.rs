@@ -1,33 +1,35 @@
-use std::{ops::Index};
 use yui_core::{Ring, RingOps};
-use crate::{GridIdx, GridItr, RModStr};
+use crate::{Grid, RModStr};
 
-pub trait RModGrid: Index<Self::Idx>
+pub trait RModGrid: Grid
 where 
     Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>,
     Self::Output: RModStr<R = Self::R>,
-    Self::Idx: GridIdx,
-    Self::IdxIter: GridItr<Item = Self::Idx>
 {
     type R;
-    type Idx;
-    type IdxIter;
-
-    fn contains_idx(&self, k: Self::Idx) -> bool;
-    fn indices(&self) -> Self::IdxIter;
 
     fn is_free(&self) -> bool { 
-        self.indices().all(|i| self[i].is_free())
+        self.iter().all(|(_, v)| v.is_free())
+    }
+
+    fn is_free_at(&self, i: Self::Idx) -> bool { 
+        self.get(i).map(|v| v.is_free()).unwrap_or(true)
     }
 
     fn is_zero(&self) -> bool { 
-        self.indices().all(|i| self[i].is_zero())
+        self.iter().all(|(_, v)| v.is_zero())
     }
 
-    fn fmt_default(&self, f: &mut std::fmt::Formatter<'_>, s: &str) -> std::fmt::Result {
-        for i in self.indices() { 
-            write!(f, "{s}[{}]: {}\n", i, self[i])?
-        }
-        Ok(())
+    fn is_zero_at(&self, i: Self::Idx) -> bool { 
+        self.get(i).map(|v| v.is_zero()).unwrap_or(true)
     }
+}
+
+impl<R, T> RModGrid for T
+where 
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    T: Grid, 
+    T::Output: RModStr<R = R>
+{
+    type R = R;
 }

@@ -1,85 +1,124 @@
 use std::ops::Index;
 use std::fmt;
-use itertools::{join, Itertools};
+use yui_utils::bitseq::{BitSeq, Bit};
 use super::Resolution;
-use Resolution::{Res0, Res1};
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct State { 
-    values: Vec<Resolution>
-}
+#[derive(Clone, Copy, Default, PartialEq, Eq, Hash, Ord, Debug)]
+pub struct State(BitSeq);
 
 impl State { 
     pub fn empty() -> Self { 
-        State { values: vec![] }
+        State(BitSeq::empty())
     }
 
-    pub fn from_iter<I>(iter: I) -> Self
-    where I: Iterator<Item = u8> {
-        let values = iter.map(|a| Resolution::from(a)).collect();
-        State{ values }
+    pub fn zeros(l: usize) -> Self { 
+        State(BitSeq::zeros(l))
     }
 
-    pub fn from_bseq(mut bseq: usize, length: usize) -> Self {
-        let seq = (0..length)
-            .map(|_| {
-                let a = (bseq & 1) as u8;
-                bseq >>= 1;
-                Resolution::from(a)
-            })
-            .rev()
-            .collect();
-        State{ values: seq }
+    pub fn ones(l: usize) -> Self { 
+        State(BitSeq::ones(l))
     }
 
-    pub fn values(&self) -> &Vec<Resolution> {
-        &self.values
+    pub fn is_empty(&self) -> bool { 
+        self.0.is_empty()
+    } 
+
+    pub fn len(&self) -> usize { 
+        self.0.len()
     }
 
     pub fn weight(&self) -> usize { 
-        self.values.iter().filter(|r| !r.is_zero()).count()
+        self.0.weight()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = Resolution> { 
+        self.0.iter().map(|b| 
+            if b.is_zero() { 
+                Resolution::Res0
+            } else { 
+                Resolution::Res1
+            }
+        )
     }
     
-    pub fn len(&self) -> usize { 
-        self.values.len()
+    pub fn push(&mut self, r: Resolution) { 
+        if r.is_zero() { 
+            self.0.push(Bit::Bit0)
+        } else { 
+            self.0.push(Bit::Bit1)
+        }
+    }
+
+    pub fn append(&mut self, other: Self) {
+        self.0.append(other.0);
+    }
+
+    pub fn sub(&self, l: usize) -> State { 
+        Self(self.0.sub(l))
+    }
+
+    pub fn is_sub(&self, other: &Self) -> bool { 
+        self.0.is_sub(&other.0)
+    }
+
+    pub fn overwrite(&mut self, other: &Self) { 
+        self.0.overwrite(&other.0)
     }
 
     pub fn targets(&self) -> Vec<State> { 
         let n = self.len();
-        (0..n).filter(|&i| self[i] == Res0 ).map(|i| { 
+        (0..n).filter(|&i| self[i].is_zero() ).map(|i| { 
             let mut t = self.clone();
-            t.values[i] = Res1;
+            t.0.set_1(i);
             t
-        }).collect_vec()
+        }).collect()
     }
 
-    pub fn append(&mut self, mut other: Self) {
-        self.values.append(&mut other.values);
-    }
-}
-
-impl<const N: usize> From<[u8; N]> for State {
-    fn from(values: [u8; N]) -> Self {
-        Self::from_iter(values.into_iter())
+    pub fn generate(len: usize) -> Vec<State> { 
+        BitSeq::generate(len).into_iter().map(|b| 
+            Self(b)
+        ).collect()
     }
 }
 
-impl From<Vec<u8>> for State { 
-    fn from(v: Vec<u8>) -> Self {
-        Self::from_iter(v.into_iter())
+impl From<BitSeq> for State {
+    fn from(b: BitSeq) -> Self {
+        Self(b)
+    }
+}
+
+impl<T> FromIterator<T> for State
+where Bit: From<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        Self(BitSeq::from_iter(iter))
     }
 }
 
 impl Index<usize> for State { 
     type Output = Resolution;
     fn index(&self, index: usize) -> &Resolution {
-        &self.values[index]
+        if self.0[index].is_zero() { 
+            &Resolution::Res0
+        } else { 
+            &Resolution::Res1
+        }
     }
 }
 
 impl fmt::Display for State {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "[{}]", join(self.values.iter(), ", "))
+        self.0.fmt(f)
+    }
+}
+
+impl PartialOrd for State {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        let cmp = self.len().cmp(&other.len()).then_with( ||
+            self.weight().cmp(&other.weight())
+        ).then_with( ||
+            self.0.cmp(&other.0)
+        );
+        Some(cmp)
     }
 }
 
@@ -89,25 +128,42 @@ mod tests {
 
     #[test]
     fn state_targets() {
-        let s = State::from(vec![0, 0, 0]);
+        let s = State::from_iter([0, 0, 0]);
         assert_eq!(s.targets(), vec![
-            State::from(vec![1, 0, 0]),
-            State::from(vec![0, 1, 0]),
-            State::from(vec![0, 0, 1]),
+            State::from_iter([1, 0, 0]),
+            State::from_iter([0, 1, 0]),
+            State::from_iter([0, 0, 1]),
         ]);
 
-        let s = State::from(vec![0, 1, 0]);
+        let s = State::from_iter([0, 1, 0]);
         assert_eq!(s.targets(), vec![
-            State::from(vec![1, 1, 0]),
-            State::from(vec![0, 1, 1]),
+            State::from_iter([1, 1, 0]),
+            State::from_iter([0, 1, 1]),
         ]);
 
-        let s = State::from(vec![1, 1, 0]);
+        let s = State::from_iter([1, 1, 0]);
         assert_eq!(s.targets(), vec![
-            State::from(vec![1, 1, 1]),
+            State::from_iter([1, 1, 1]),
         ]);
 
-        let s = State::from(vec![1, 1, 1]);
+        let s = State::from_iter([1, 1, 1]);
         assert_eq!(s.targets(), vec![]);
+    }
+
+    #[test]
+    fn sub() { 
+        let s = State::from_iter([1,0,0,1,1]);
+        assert_eq!(s.sub(3), State::from_iter([1,0,0]));
+    }
+
+    #[test]
+    fn order() { 
+        let mut ss = State::generate(3);
+        ss.sort();
+        
+        assert_eq!(ss, 
+            [[0, 0, 0],[1, 0, 0],[0, 1, 0],[0, 0, 1],[1, 1, 0],[1, 0, 1],[0, 1, 1],[1, 1, 1]]
+            .map(|v| State::from_iter(v))
+        );
     }
 }

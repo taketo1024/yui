@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use yui_matrix::sparse::*;
 use yui_core::{RingOps, Ring};
 use crate::{RModStr, RModGrid, GenericChainComplex};
@@ -16,5 +17,28 @@ where
             self.d_degree(), 
             |i| Some(self.d_matrix(i))
         )
+    }
+
+    fn desc_d_at(&self, i: Self::Idx) -> String {
+        let c = |i| self.get(i).map(|v| v.to_string()).unwrap_or("0".to_string());
+        let c0 = c(i);
+        let c1 = c(i + self.d_degree());
+        let d = self.d_matrix(i).to_dense();
+        
+        format!("C[{i}]: {c0} -> {c1}\n{d}") 
+    }
+
+    fn desc_d(&self) -> String { 
+        self.indices().filter_map(|i| 
+            if !self.is_zero_at(i) || !self.is_zero_at(i + self.d_degree()) {
+                Some(self.desc_d_at(i))
+            } else { 
+                None
+            }
+        ).join("\n\n")
+    }
+
+    fn print_d(&self) {
+        println!("{}", self.desc_d());
     }
 }

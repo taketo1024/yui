@@ -103,7 +103,7 @@ macro_rules! impl_for_quad_int {
             type Int = I;
 
             fn alpha() -> (Self, Self) {
-                (Self::from(I::from($p)), Self::from(I::from($q)))
+                (Self::from_real(I::from($p)), Self::from_real(I::from($q)))
             }
 
             fn as_int(&self) -> Option<Self::Int> {
@@ -1056,7 +1056,7 @@ pub(super) mod tests {
         where R: Integer, for<'x> &'x R: IntOps<R> {
             let m = b.nrows();
     
-            let mut c = b.map(|x| Ratio::from(x.clone()));
+            let mut c = b.map(|x| Ratio::from_numer(x.clone()));
             let mut l = Array2::zeros((m, m));
     
             for i in 1..m { 

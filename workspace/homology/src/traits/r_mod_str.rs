@@ -1,6 +1,7 @@
 use std::fmt::Display;
 use yui_core::{Elem, Ring, RingOps};
 use yui_utils::superscript;
+use crate::fmt::DisplayForTable;
 
 pub trait RModStr: Sized + Display
 where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> { 
@@ -49,5 +50,15 @@ where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
     
         let str = res.join(" ⊕ ");
         f.write_str(&str) 
+    }
+}
+
+impl<R, T> DisplayForTable for T
+where 
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    T: RModStr<R = R> 
+{
+    fn should_display(&self) -> bool {
+        !self.is_zero()
     }
 }

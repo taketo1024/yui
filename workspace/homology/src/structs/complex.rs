@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::iter::Rev;
-use std::ops::{Index, RangeInclusive};
+use std::ops::Index;
 use yui_matrix::sparse::*;
-use yui_core::{RingOps, Ring};
-use crate::utils::ChainReducer;
-use crate::{GridItr, GridIdx, RModStr, RModGrid, ChainComplex, GenericRModStr, GenericRModGrid};
+use yui_core::{RingOps, Ring, EucRingOps, EucRing};
+use crate::utils::{ChainReducer, HomologyCalc};
+use crate::{GridItr, GridIdx, RModStr, ChainComplex, GenericRModStr, GenericRModGrid, HomologyComputable, GenericHomology, Grid};
+use crate::fmt::FmtList;
 
 pub struct GenericChainComplex<R, I>
 where 
@@ -24,16 +25,18 @@ where
     I: GridItr,
     I::Item: GridIdx
 {
-    pub fn new(range: I, d_degree: I::Item, d_matrices: HashMap<I::Item, SpMat<R>>) -> Self {
+    pub fn new<Iter>(range: I, d_degree: I::Item, d_matrices: Iter) -> Self
+    where Iter: Iterator<Item = (I::Item, SpMat<R>)> {
+        let d_matrices = d_matrices.collect::<HashMap<_, _>>();
         let grid = GenericRModGrid::new(range, |i| {
             if let Some(d) = d_matrices.get(&i) {
                 let n = d.cols();
-                Some(GenericRModStr::new(n, vec![]))
+                GenericRModStr::new(n, vec![])
             } else if let Some(d) = d_matrices.get(&(i - d_degree)) {
                 let n = d.rows();
-                Some(GenericRModStr::new(n, vec![]))
+                GenericRModStr::new(n, vec![])
             } else {
-                None
+                GenericRModStr::zero()
             }
         });
 
@@ -48,7 +51,7 @@ where
             } else { 
                 None
             }
-        ).collect();
+        );
 
         Self::new(range, d_degree, d_matrices)
     }
@@ -87,7 +90,7 @@ where
         let d_degree = -self.d_degree();
         let d_matrices = self.d_matrices.iter().map(|(&i, d)| 
             (i - d_degree, d.transpose().to_owned())
-        ).collect();
+        );
         GenericChainComplex::new(range, d_degree, d_matrices)
     }
 }
@@ -99,7 +102,7 @@ where
     I::Item: GridIdx
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.fmt_default(f, "C")
+        self.fmt_list(f)
     }
 }
 
@@ -116,15 +119,15 @@ where
     }
 }
 
-impl<R, I> RModGrid for GenericChainComplex<R, I>
+impl<R, I> Grid for GenericChainComplex<R, I>
 where 
     R: Ring, for<'x> &'x R: RingOps<R>,
     I: GridItr,
     I::Item: GridIdx
 {
-    type R = R;
     type Idx = I::Item;
     type IdxIter = I;
+    type Output = GenericRModStr<R>;
     
     fn contains_idx(&self, k: Self::Idx) -> bool {
         self.grid.contains_idx(k)
@@ -132,6 +135,10 @@ where
 
     fn indices(&self) -> Self::IdxIter {
         self.grid.indices()
+    }
+
+    fn get(&self, i: Self::Idx) -> Option<&Self::Output> {
+        self.grid.get(i)
     }
 }
 
@@ -156,29 +163,27 @@ where
     }
 }
 
-impl<R> GenericChainComplex<R, Rev<RangeInclusive<isize>>> 
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn descending(d_matrices: Vec<SpMat<R>>) -> Self {
-        let n = d_matrices.len() as isize;
-        let range = (0..=n).rev();
-        let d_degree = -1;
-        let d_matrices = d_matrices.into_iter().enumerate().map(|(i, d)| 
-            ((i + 1) as isize, d)
-        ).collect();
-        Self::new(range, d_degree, d_matrices)
-    }
-}
+impl<R, I> HomologyComputable for GenericChainComplex<R, I>
+where 
+    R: EucRing, for<'x> &'x R: EucRingOps<R>,
+    I: GridItr,
+    I::Item: GridIdx
+{
+    type Homology = GenericHomology<R, I>;
+    type HomologySummand = GenericRModStr<R>;
 
-impl<R> GenericChainComplex<R, RangeInclusive<isize>>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn ascending(d_matrices: Vec<SpMat<R>>) -> Self {
-        let n = d_matrices.len() as isize;
-        let range = 0..=n;
-        let d_degree = 1;
-        let d_matrices = d_matrices.into_iter().enumerate().map(|(i, d)| 
-            (i as isize, d)
-        ).collect();
-        GenericChainComplex::new(range, d_degree, d_matrices)
+    fn homology_at(&self, i: Self::Idx) -> Self::HomologySummand {
+        let d1 = self.d_matrix(i - self.d_degree());
+        let d2 = self.d_matrix(i);
+        HomologyCalc::calculate(d1, d2)
+    }
+
+    fn homology(&self) -> Self::Homology {
+        let range = self.indices();
+        let grid = GenericRModGrid::new(range, |i| {
+            self.homology_at(i)
+        });
+        Self::Homology::new(grid)
     }
 }
 

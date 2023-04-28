@@ -99,7 +99,7 @@ macro_rules! try_qint {
         cfg_if::cfg_if! {
             if #[cfg(any(feature = "qint", feature = "all"))] {
                 type GaussInt = yui_quad_int::GaussInt<Int>;
-                type EisenInt = yui_quad_int::GaussInt<Int>;
+                type EisenInt = yui_quad_int::EisenInt<Int>;
 
                 match $c_type {
                     CType::Gauss => call!(GaussInt, $method, $($args),*),

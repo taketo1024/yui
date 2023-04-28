@@ -52,7 +52,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let (m, n) = a.shape();
         let bd = a.submat_cols(r..n).to_owned();
 
-        SpMat::generate((m - r, n - r), |set| { 
+        SpMat::generate_sync((m - r, n - r), |set| { 
             solve_triangular_with(TriangularType::Lower, pinv, &bd, |i, j, x|
                 if i >= r { 
                     set(i - r, j, x)

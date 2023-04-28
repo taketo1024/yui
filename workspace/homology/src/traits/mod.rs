@@ -1,5 +1,5 @@
-mod grid_idx;
-pub use grid_idx::{GridIdx, GridItr};
+mod grid;
+pub use grid::{GridIdx, GridItr, Grid, Shift};
 
 mod r_mod_str;
 pub use r_mod_str::RModStr;
@@ -12,6 +12,3 @@ pub use complex::ChainComplex;
 
 mod homology;
 pub use homology::{Homology, HomologyComputable};
-
-mod print_table;
-pub use print_table::PrintTable;

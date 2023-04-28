@@ -4,13 +4,13 @@
 #[macro_export]
 macro_rules! map {
     {$( $key: expr => $val: expr ),*} => {{
-        core::convert::From::from([$(($key, $val),)*])
+        FromIterator::from_iter([$(($key, $val),)*])
     }}
 }
 
 #[macro_export]
 macro_rules! set {
     {$($val: expr ),*} => {{
-        HashSet::from([$($val,)*])
+        FromIterator::from_iter([$($val,)*])
     }}
 }

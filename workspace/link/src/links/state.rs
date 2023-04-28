@@ -12,14 +12,11 @@ impl State {
     }
 
     pub fn zeros(l: usize) -> Self { 
-        assert!(l <= BitSeq::MAX_LEN);
-        State(BitSeq::new(0, l))
+        State(BitSeq::zeros(l))
     }
 
     pub fn ones(l: usize) -> Self { 
-        assert!(l <= BitSeq::MAX_LEN);
-        let b = (0..l).fold(0, |b, _| b << 1 | 1);
-        State(BitSeq::new(b, l))
+        State(BitSeq::ones(l))
     }
 
     pub fn is_empty(&self) -> bool { 
@@ -54,6 +51,18 @@ impl State {
 
     pub fn append(&mut self, other: Self) {
         self.0.append(other.0);
+    }
+
+    pub fn sub(&self, l: usize) -> State { 
+        Self(self.0.sub(l))
+    }
+
+    pub fn is_sub(&self, other: &Self) -> bool { 
+        self.0.is_sub(&other.0)
+    }
+
+    pub fn overwrite(&mut self, other: &Self) { 
+        self.0.overwrite(&other.0)
     }
 
     pub fn targets(&self) -> Vec<State> { 
@@ -107,7 +116,7 @@ impl PartialOrd for State {
         let cmp = self.len().cmp(&other.len()).then_with( ||
             self.weight().cmp(&other.weight())
         ).then_with( ||
-            self.0.cmp(&other.0).reverse()
+            self.0.cmp(&other.0)
         );
         Some(cmp)
     }
@@ -139,6 +148,12 @@ mod tests {
 
         let s = State::from_iter([1, 1, 1]);
         assert_eq!(s.targets(), vec![]);
+    }
+
+    #[test]
+    fn sub() { 
+        let s = State::from_iter([1,0,0,1,1]);
+        assert_eq!(s.sub(3), State::from_iter([1,0,0]));
     }
 
     #[test]

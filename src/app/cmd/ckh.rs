@@ -46,12 +46,12 @@ where R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
     }
     
     let l = load_link(&args.name, &args.link, args.mirror)?;
-    let c = KhComplex::new(l, h, t, args.reduced);
+    let c = KhComplex::new(&l, &h, &t, args.reduced);
     
     let vs = if args.with_alpha { 
-        c.canon_cycles().into_iter().map(|z| 
-            (0, c[0].vectorize(&z))
-        ).collect_vec()
+        c.canon_cycles().iter().map(|z| {
+            (0, c[0].vectorize(z))
+        }).collect_vec()
     } else { 
         vec![]
     };

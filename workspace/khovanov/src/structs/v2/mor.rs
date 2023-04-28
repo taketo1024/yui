@@ -2,22 +2,47 @@ use yui_core::{Ring, RingOps};
 use yui_lin_comb::LinComb;
 
 use super::cob::{Cob, Dot, Bottom, CobComp};
-use super::tng::TngComp;
+use super::tng::{Tng, TngComp};
 
-pub type Mor = LinComb<Cob, i32>; // Z-linear combination of cobordisms.
+pub type Mor<R> = LinComb<Cob, R>; // R-linear combination of cobordisms.
 
 pub trait MorTrait: Sized {
+    type R;
+    fn src(&self) -> Tng;
+    fn tgt(&self) -> Tng;
+    fn is_closed(&self) -> bool;
     fn is_invertible(&self) -> bool;
     fn inv(&self) -> Option<Self>;
     fn map_cob<F>(self, f: F) -> Self where F: Fn(&mut Cob);
     fn connect(self, c: &Cob) -> Self;
     fn connect_comp(self, c: &CobComp) -> Self;
     fn cap_off(self, b: Bottom, c: &TngComp, dot: Dot) -> Self;
-    fn eval<R>(&self, h: &R, t: &R) -> R
-    where R: Ring + From<i32>, for<'x> &'x R: RingOps<R>;
+    fn part_eval(self, h: &Self::R, t: &Self::R) -> Self;
+    fn eval(&self, h: &Self::R, t: &Self::R) -> Self::R;
 }
 
-impl MorTrait for Mor {
+impl<R> MorTrait for Mor<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type R = R;
+
+    fn src(&self) -> Tng {
+        let Some((c, _)) = self.iter().next() else { 
+            return Tng::empty()
+        };
+        c.src()
+    }
+
+    fn tgt(&self) -> Tng { 
+        let Some((c, _)) = self.iter().next() else { 
+            return Tng::empty()
+        };
+        c.tgt()
+    }
+
+    fn is_closed(&self) -> bool { 
+        self.iter().all(|(f, _)| f.is_closed())
+    }
+
     fn is_invertible(&self) -> bool { 
         self.len() == 1 && 
         self.iter().next().map(|(c, a)| 
@@ -29,7 +54,7 @@ impl MorTrait for Mor {
         if let Some((Some(cinv), Some(ainv))) = self.iter().next().map(|(c, a)| 
             (c.inv(), a.inv())
         ) { 
-            let inv = Mor::from((cinv, ainv));
+            let inv = Mor::from_pair(cinv, ainv);
             Some(inv)
         } else { 
             None
@@ -41,7 +66,7 @@ impl MorTrait for Mor {
         self.into_map(|mut cob, r| { 
             f(&mut cob);
             if cob.is_zero() { 
-                (cob, 0)
+                (cob, R::zero())
             } else { 
                 (cob, r)
             }
@@ -60,10 +85,19 @@ impl MorTrait for Mor {
         self.map_cob(|cob| cob.cap_off(b, c, dot) )
     }
 
-    fn eval<R>(&self, h: &R, t: &R) -> R
-    where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> {
-        self.iter().map(|(c, &a)| { 
-            R::from(a) * c.eval(h, t)
+    fn part_eval(self, h: &Self::R, t: &Self::R) -> Self {
+        if self.keys().any(|c| c.should_part_eval()) { 
+            self.into_iter().map(|(cob, r)|
+                cob.part_eval(h, t) * r
+            ).sum()
+        } else { 
+            self
+        }
+    }
+
+    fn eval(&self, h: &R, t: &R) -> R {
+        self.iter().map(|(c, a)| { 
+            a * c.eval(h, t)
         }).sum()
     }
 }

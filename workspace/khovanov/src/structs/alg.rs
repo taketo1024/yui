@@ -42,8 +42,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> KhAlgStr<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn new(h:R, t:R) -> Self { 
-        Self { h, t }
+    pub fn new(h: &R, t: &R) -> Self { 
+        Self { 
+            h: h.clone(), 
+            t: t.clone() 
+        }
     }
 
     pub fn h(&self) -> &R { 
@@ -94,7 +97,7 @@ pub mod tests {
     #[test]
     fn str_prod_kh() { 
         use KhAlgGen::{I, X};
-        let a = KhAlgStr::new(0, 0);
+        let a = KhAlgStr::new(&0, &0);
         assert_eq!(a.prod(I, I), vec![(I, 1)]);
         assert_eq!(a.prod(X, I), vec![(X, 1)]);
         assert_eq!(a.prod(I, X), vec![(X, 1)]);
@@ -104,14 +107,14 @@ pub mod tests {
     #[test]
     fn str_coprod_kh() { 
         use KhAlgGen::{I, X};
-        let a = KhAlgStr::new(0, 0);
+        let a = KhAlgStr::new(&0, &0);
         assert_eq!(a.coprod(I), vec![(X, I, 1), (I, X, 1)]);
         assert_eq!(a.coprod(X), vec![(X, X, 1)]);
     }
     #[test]
     fn str_prod_bn() { 
         use KhAlgGen::{I, X};
-        let a = KhAlgStr::new(1, 0);
+        let a = KhAlgStr::new(&1, &0);
         assert_eq!(a.prod(I, I), vec![(I, 1)]);
         assert_eq!(a.prod(X, I), vec![(X, 1)]);
         assert_eq!(a.prod(I, X), vec![(X, 1)]);
@@ -121,14 +124,14 @@ pub mod tests {
     #[test]
     fn str_coprod_bn() { 
         use KhAlgGen::{I, X};
-        let a = KhAlgStr::new(1, 0);
+        let a = KhAlgStr::new(&1, &0);
         assert_eq!(a.coprod(I), vec![(X, I, 1), (I, X, 1), (I, I, -1)]);
         assert_eq!(a.coprod(X), vec![(X, X, 1)]);
     }
     #[test]
     fn str_prod_lee() { 
         use KhAlgGen::{I, X};
-        let a = KhAlgStr::new(0, 1);
+        let a = KhAlgStr::new(&0, &1);
         assert_eq!(a.prod(I, I), vec![(I, 1)]);
         assert_eq!(a.prod(X, I), vec![(X, 1)]);
         assert_eq!(a.prod(I, X), vec![(X, 1)]);
@@ -138,7 +141,7 @@ pub mod tests {
     #[test]
     fn str_coprod_lee() { 
         use KhAlgGen::{I, X};
-        let a = KhAlgStr::new(0, 1);
+        let a = KhAlgStr::new(&0, &1);
         assert_eq!(a.coprod(I), vec![(X, I, 1), (I, X, 1)]);
         assert_eq!(a.coprod(X), vec![(X, X, 1), (I, I, 1)]);
     }

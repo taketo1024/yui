@@ -18,6 +18,12 @@ pub struct Args {
 
     #[arg(short = 't', long, default_value = "z")]
     c_type: CType,
+
+    #[arg(short, long)]
+    mirror: bool,
+
+    #[arg(short, long)]
+    reduced: bool,
 }
 
 #[derive(Debug, clap::Args)]
@@ -38,9 +44,9 @@ pub struct BatchArgs {
 pub fn run(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
     info!("compute ss: {}, c = {}", args.name, args.c_value);
 
-    let l = load_link(&args.name, &args.link, false)?;
+    let l = load_link(&args.name, &args.link, args.mirror)?;
     let s = guard_panic(|| 
-        dispatch_eucring!(&args.c_value, &args.c_type, compute_ss, &l, &args.c_value)
+        dispatch_eucring!(&args.c_value, &args.c_type, compute_ss, &l, &args.c_value, args.reduced)
     )?;
 
     info!("{}: ss = {} (c = {})", args.name, s, args.c_value);
@@ -55,7 +61,7 @@ pub fn run_batch(args: &BatchArgs) -> Result<String, Box<dyn std::error::Error>>
     for (name, code) in data { 
         let l = Link::from_pd_code(code);
         let res = guard_panic(|| 
-            dispatch_eucring!(&args.c_value, &args.c_type, compute_ss, &l, &args.c_value)
+            dispatch_eucring!(&args.c_value, &args.c_type, compute_ss, &l, &args.c_value, true)
         );
 
         let s = if let Ok(s) = res { 
@@ -82,13 +88,13 @@ pub fn run_batch(args: &BatchArgs) -> Result<String, Box<dyn std::error::Error>>
     Ok(all_res)
 }
 
-fn compute_ss<R>(l: &Link, c_value: &String) -> Result<i32, Box<dyn std::error::Error>>
+fn compute_ss<R>(l: &Link, c_value: &String, reduced: bool) -> Result<i32, Box<dyn std::error::Error>>
 where R: EucRing + FromStr, for<'x> &'x R: EucRingOps<R> { 
     let Ok(c) = R::from_str(c_value) else { 
         return err!("cannot parse c: '{}' as type: {}.", c_value, std::any::type_name::<R>())
     };
 
-    let ss = ss_invariant(l, &c, true);
+    let ss = ss_invariant(l, &c, reduced);
     Ok(ss)
 }
 
@@ -103,6 +109,8 @@ mod tests {
             link: None,
         	c_value: "2".to_string(),
         	c_type: CType::Z,
+            mirror: false,
+            reduced: true
         };
         let res = run(&args);
         assert!(res.is_ok());
@@ -115,6 +123,8 @@ mod tests {
             link: Some("[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string()),
         	c_value: "3".to_string(),
         	c_type: CType::Z,
+            mirror: false,
+            reduced: true
         };
         let res = run(&args);
         assert!(res.is_ok());

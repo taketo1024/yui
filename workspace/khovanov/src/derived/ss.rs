@@ -4,43 +4,42 @@
 
 use core::panic;
 
+use itertools::Itertools;
 use log::info;
 use yui_link::Link;
-use yui_homology::{RModStr, Grid};
-use yui_homology::utils::{ChainReducer, HomologyCalc};
+use yui_homology::{RModStr, ChainComplex, Grid};
+use yui_homology::utils::{HomologyCalc, ChainReducer};
 use yui_core::{EucRing, EucRingOps};
 use yui_matrix::sparse::*;
 use crate::KhComplex;
 
 pub fn ss_invariant<R>(l: &Link, c: &R, reduced: bool) -> i32
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
+    ss_invariant_v2(l, c, reduced)
+}
+
+pub fn ss_invariant_v1<R>(l: &Link, c: &R, reduced: bool) -> i32
+where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
+    compute_ss(l, c, reduced, 1)
+}
+
+pub fn ss_invariant_v2<R>(l: &Link, c: &R, reduced: bool) -> i32
+where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
+    compute_ss(l, c, reduced, 2)
+}
+
+fn compute_ss<R>(l: &Link, c: &R, reduced: bool, ver: usize) -> i32
+where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
     assert!(!c.is_zero());
     assert!(!c.is_unit());
 
-    if reduced && l.writhe() < 0 { 
-        info!("compute ss (mirror), n = {}, c = {} ({}).", l.crossing_num(), c, std::any::type_name::<R>());
-        -(compute_ss(&l.mirror(), c, reduced))
-    } else { 
-        info!("compute ss, n = {}, c = {} ({}).", l.crossing_num(), c, std::any::type_name::<R>());
-        compute_ss(l, c, reduced)
-    }
-}
+    info!("compute ss, n = {}, c = {} ({}).", l.crossing_num(), c, std::any::type_name::<R>());
 
-fn compute_ss<R>(l: &Link, c: &R, reduced: bool) -> i32
-where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
-    let cpx = KhComplex::<R>::new(l.clone(), c.clone(), R::zero(), reduced);
-    let i0 = *cpx.indices().start();
-    let z = cpx.canon_cycle();
-    let v = cpx[0].vectorize(&z);
-
-    let mut red = ChainReducer::new(&cpx);
-    red.set_indices(i0 ..= 1);
-    red.set_vec(0, v);
-    red.process();
-
-    let a0 = red.take_matrix(-1);
-    let a1 = red.take_matrix(0);
-    let v  = red.take_vecs(0).remove(0);
+    let (a0, a1, vs) = match ver { 
+        1 => prepare_v1(l, c, reduced),
+        2 => prepare_v2(l, c, reduced),
+        _ => panic!()
+    };
 
     let (h, p, _) = HomologyCalc::calculate_with_trans(a0, a1);
 
@@ -48,21 +47,63 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     
     let r = h.rank();
     let p = p.submat_rows(0..r).to_owned();
-    let v = p * v;
 
-    info!("canon-cycle: {}", v);
+    let vs = vs.into_iter().enumerate().map(|(i, v)| { 
+        let v = &p * v;
+        info!("a[{i}] = {v}");
+        v
+    }).collect_vec();
 
+    let v = &vs[0];
     let Some(d) = div_vec(&v, &c) else { 
         panic!("invalid divisibility for v = {}, c = {}", v, c)
     };
 
     let w = l.writhe();
     let r = l.seifert_circles().len() as i32;
-    let s = 2 * d + w - r + 1;
+    let ss = 2 * d + w - r + 1;
 
-    info!("d = {d}, w = {s}, r = {r}, s = {s}");
+    info!("d = {d}, w = {w}, r = {r}.");
+    info!("ss = {ss} (c = {c}, {}).", if reduced { "reduced" } else { "unreduced" } );
 
-    s
+    ss
+}
+
+fn prepare_v1<R>(l: &Link, h: &R, reduced: bool) -> (SpMat<R>, SpMat<R>, Vec<SpVec<R>>)
+where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
+    let c = KhComplex::new_v1(l, h, &R::zero(), reduced);
+    let vs = c.canon_cycles().iter().map(|z| 
+        c[0].vectorize(&z)
+    ).collect_vec();
+
+    let i0 = *c.indices().start();
+
+    let mut red = ChainReducer::new(&c);
+    red.set_indices(i0 ..= 1);
+    for v in vs.into_iter() { 
+        red.set_vec(0, v);
+    }
+    red.process();
+
+    let a0 = red.take_matrix(-1);
+    let a1 = red.take_matrix(0);
+    let vs = red.take_vecs(0);
+
+    (a0, a1, vs)
+}
+
+fn prepare_v2<R>(l: &Link, h: &R, reduced: bool) -> (SpMat<R>, SpMat<R>, Vec<SpVec<R>>)
+where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
+    let c = KhComplex::new_v2(l, h, &R::zero(), reduced);
+
+    let a0 = c.d_matrix(-1);
+    let a1 = c.d_matrix(0);
+
+    let vs = c.canon_cycles().iter().map(|z| 
+        c[0].vectorize(&z)
+    ).collect_vec();
+
+    (a0, a1, vs)
 }
 
 fn div_vec<R>(v: &SpVec<R>, c: &R) -> Option<i32>
@@ -89,48 +130,106 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 #[cfg(test)]
 mod tests {
+    use cartesian::cartesian;
+    use yui_link::Link;
     use super::*;
-    use yui_link::{Link, Edge};
 
-    fn test<I>(pd_code: I, value: i32)
-    where I: IntoIterator<Item = [Edge; 4]> { 
-        let l = Link::from_pd_code(pd_code);
-        assert_eq!(compute_ss(&l, &2, true), value);
-        assert_eq!(compute_ss(&l.mirror(), &2, true), -value);
+    fn test(l: &Link, c: i32, value: i32) { 
+        for (&r, &v) in cartesian!([true, false].iter(), [1, 2].iter()) { 
+            assert_eq!(compute_ss(&l, &c, r, v), value);
+            assert_eq!(compute_ss(&l.mirror(), &c, r, v), -value);
+        }
+    }
+
+    #[test]
+    fn test_unknot() { 
+        let l = Link::unknot();
+        test(&l, 2, 0);
+    }
+
+    #[test]
+    fn test_unknot_rm1() { 
+        let l = Link::from_pd_code([[0,0,1,1]]);
+        test(&l, 2, 0);
+    }
+
+    #[test]
+    fn test_unknot_rm1_neg() { 
+        let l = Link::from_pd_code([[0,1,1,0]]);
+        test(&l, 2, 0);
     }
 
     #[test]
     fn test_3_1() { 
-        test([[1,4,2,5],[3,6,4,1],[5,2,6,3]], -2);
+        let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]);
+        test(&l, 2, -2);
     }
 
     #[test]
     fn test_4_1() { 
-        test([[4,2,5,1],[8,6,1,5],[6,3,7,4],[2,7,3,8]], 0);
+        let l = Link::from_pd_code([[4,2,5,1],[8,6,1,5],[6,3,7,4],[2,7,3,8]]);
+        test(&l, 2, 0);
     }
 
     #[test]
     fn test_5_1() { 
-        test([[1,6,2,7],[3,8,4,9],[5,10,6,1],[7,2,8,3],[9,4,10,5]], -4);
+        let l = Link::from_pd_code([[1,6,2,7],[3,8,4,9],[5,10,6,1],[7,2,8,3],[9,4,10,5]]);
+        test(&l, 2, -4);
     }
 
     #[test]
     fn test_5_2() { 
-        test([[1,4,2,5],[3,8,4,9],[5,10,6,1],[9,6,10,7],[7,2,8,3]], -2);
+        let l = Link::from_pd_code([[1,4,2,5],[3,8,4,9],[5,10,6,1],[9,6,10,7],[7,2,8,3]]);
+        test(&l, 2, -2);
     }
 
     #[test]
     fn test_6_1() { 
-        test([[1,4,2,5],[7,10,8,11],[3,9,4,8],[9,3,10,2],[5,12,6,1],[11,6,12,7]], 0);
+        let l = Link::from_pd_code([[1,4,2,5],[7,10,8,11],[3,9,4,8],[9,3,10,2],[5,12,6,1],[11,6,12,7]]);
+        test(&l, 2, 0);
     }
 
     #[test]
     fn test_6_2() { 
-        test([[1,4,2,5],[5,10,6,11],[3,9,4,8],[9,3,10,2],[7,12,8,1],[11,6,12,7]], -2);
+        let l = Link::from_pd_code([[1,4,2,5],[5,10,6,11],[3,9,4,8],[9,3,10,2],[7,12,8,1],[11,6,12,7]]);
+        test(&l, 2, -2);
     }
 
     #[test]
     fn test_6_3() { 
-        test([[4,2,5,1],[8,4,9,3],[12,9,1,10],[10,5,11,6],[6,11,7,12],[2,8,3,7]], 0);
+        let l = Link::from_pd_code([[4,2,5,1],[8,4,9,3],[12,9,1,10],[10,5,11,6],[6,11,7,12],[2,8,3,7]]);
+        test(&l, 2, 0);
+    }
+
+    #[test]
+    fn test_7_1() { 
+        let l = Link::from_pd_code([[1,8,2,9],[3,10,4,11],[5,12,6,13],[7,14,8,1],[9,2,10,3],[11,4,12,5],[13,6,14,7]]);
+        test(&l, 2, -6);
+    }
+
+    #[test]
+    fn test_7_2() { 
+        let l = Link::from_pd_code([[1,4,2,5],[3,10,4,11],[5,14,6,1],[7,12,8,13],[11,8,12,9],[13,6,14,7],[9,2,10,3]]);
+        test(&l, 2, -2);
+    }
+
+    #[test]
+    fn test_7_3() { 
+        let l = Link::from_pd_code([[6,2,7,1],[10,4,11,3],[14,8,1,7],[8,14,9,13],[12,6,13,5],[2,10,3,9],[4,12,5,11]]);
+        test(&l, 2, 4);
+    }
+
+    #[test]
+    fn test_8_19() { 
+        let l = Link::from_pd_code([[4,2,5,1],[8,4,9,3],[9,15,10,14],[5,13,6,12],[13,7,14,6],[11,1,12,16],[15,11,16,10],[2,8,3,7]]);
+        test(&l, 2, 6);
+    }
+
+    #[test]
+    #[cfg(not(debug_assertions))]
+    fn test_k14() { 
+        let l = Link::from_pd_code([[1,19,2,18],[19,1,20,28],[20,13,21,14],[12,17,13,18],[16,21,17,22],[5,15,6,14],[15,5,16,4],[6,27,7,28],[2,7,3,8],[26,3,27,4],[25,23,26,22],[11,9,12,8],[23,10,24,11],[9,24,10,25]]);
+        assert_eq!(ss_invariant_v2(&l, &2, true), -2);
+        assert_eq!(ss_invariant_v2(&l, &3, true), 0);
     }
 }

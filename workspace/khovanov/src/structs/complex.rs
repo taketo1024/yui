@@ -6,64 +6,51 @@ use std::vec::IntoIter;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps};
 use yui_matrix::sparse::SpMat;
 use yui_link::Link;
-use yui_homology::{Idx2, Idx2Iter, Grid, ChainComplex, FreeRModStr, FreeChainComplex, HomologyComputable};
+use yui_homology::{Idx2, Idx2Iter, Grid, ChainComplex, FreeRModStr, FreeChainComplex, HomologyComputable, Shift};
 
-use crate::{KhAlgStr, KhEnhState, KhCube, KhChain, KhHomology, KhHomologySummand, KhHomologyBigraded};
+use crate::{KhEnhState, KhChain, KhHomology, KhHomologySummand, KhHomologyBigraded};
 
 pub type KhComplexSummand<R> = FreeRModStr<KhEnhState, R>;
 pub struct KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    link: Link,
-    str: KhAlgStr<R>,
     complex: FreeChainComplex<KhEnhState, R, RangeInclusive<isize>>,
-    reduced: bool
+    canon_cycles: Vec<KhChain<R>>,
+    reduced: bool,
+    deg_shift: (isize, isize)
 }
 
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn new(link: Link, h: R, t: R, reduced: bool) -> Self { 
-        let cube = KhCube::new_ht(&link, h, t);
-        let str = cube.structure().clone();
-
-        let i0 = Self::deg_shift_for(&link, reduced).0;
-        let range = cube.h_range().shift(i0);
-
-        let cube0 = Rc::new(cube);
-        let cube1 = cube0.clone();
-
-        let complex = FreeChainComplex::new(range, 1, 
-            |i| {
-                let i = i - i0;
-                let gens = if reduced {
-                    let e = link.first_edge().unwrap();
-                    cube0.reduced_generators(i, e)
-                } else { 
-                    cube0.generators(i) 
-                };
-                gens.into_iter().cloned().collect()
-            },
-            move |x| { 
-                cube1.differentiate(x)
-            }
-        );
-
-        KhComplex { link, str, complex, reduced }
+    pub fn new(link: &Link, h: &R, t: &R, reduced: bool) -> Self { 
+        Self::new_v2(link, h, t, reduced)
     }
 
-    pub fn link(&self) -> &Link { 
-        &self.link
+    pub(crate) fn _new(complex: FreeChainComplex<KhEnhState, R, RangeInclusive<isize>>, canon_cycles: Vec<KhChain<R>>, reduced: bool, deg_shift: (isize, isize)) -> Self { 
+        KhComplex { complex, canon_cycles, reduced, deg_shift }
     }
 
-    pub fn structure(&self) -> &KhAlgStr<R> {
-        &self.str
+    pub fn canon_cycles(&self) -> &Vec<KhChain<R>> { 
+        &self.canon_cycles
     }
 
-    pub fn deg_shift(&self) -> (isize, isize) { 
-        Self::deg_shift_for(&self.link, self.reduced)
+    pub fn canon_cycle(&self, i: usize) -> &KhChain<R> { 
+        &self.canon_cycles[i]
     }
 
     pub fn is_reduced(&self) -> bool { 
         self.reduced
+    }
+
+    pub fn h_range(&self) -> RangeInclusive<isize> { 
+        self.complex.indices()
+    }
+
+    pub fn q_range(&self) -> RangeInclusive<isize> { 
+        let q_min = self.iter().filter_map(|(_, v)| v.generators().iter().map(|x| x.q_deg()).min()).min().unwrap();
+        let q_max = self.iter().filter_map(|(_, v)| v.generators().iter().map(|x| x.q_deg()).max()).max().unwrap();
+        let q0 = self.deg_shift.1;
+        
+        (q_min ..= q_max).shift(q0)
     }
 
     pub fn differentiate_x(&self, x: &KhEnhState) -> Vec<(KhEnhState, R)> {
@@ -72,6 +59,37 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn differetiate(&self, z: &KhChain<R>) -> KhChain<R> { 
         self.complex.differetiate(z)
+    }
+
+    pub fn as_bigraded(self) -> KhComplexBigraded<R> {
+        let reduced = self.reduced;
+        let deg_shift = self.deg_shift;
+
+        let h_range = self.h_range();
+        let q_range = self.q_range();
+        
+        let start = Idx2(*h_range.start(), *q_range.start());
+        let end   = Idx2(*h_range.end(),   *q_range.end());
+        let range = start.iter_rect(end, (1, 2));
+
+        let self0 = Rc::new(self);
+        let self1 = self0.clone();
+
+        let complex = FreeChainComplex::new(range, Idx2(1, 0), 
+            move |idx| {
+                let (i, j) = idx.as_tuple();
+                let q = j - deg_shift.1;
+
+                self0[i].generators().iter().filter(|x| { 
+                    x.q_deg() == q
+                }).cloned().collect()
+            },
+            move |x| { 
+                self1.differentiate_x(x)
+            }
+        );
+
+        KhComplexBigraded { complex, reduced }
     }
 
     pub fn deg_shift_for(l: &Link, reduced: bool) -> (isize, isize) {
@@ -145,63 +163,28 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 pub struct KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    complex: FreeChainComplex<KhEnhState, R, Idx2Iter>
+    complex: FreeChainComplex<KhEnhState, R, Idx2Iter>,
+    reduced: bool,
 }
 
 impl<R> KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn new(l: Link, reduced: bool) -> Self { 
-        let cube = KhCube::new(&l);
-        let (i0, j0) = KhComplex::deg_shift_for(&l, reduced);
-        let h_range = cube.h_range().shift(i0);
-        let q_range = cube.q_range().shift(j0);
-        
-        let start = Idx2(*h_range.start(), *q_range.start());
-        let end   = Idx2(*h_range.end(),   *q_range.end());
-        let range = start.iter_rect(end, (1, 2));
-
-        let cube0 = Rc::new(cube);
-        let cube1 = cube0.clone();
-
-        let complex = FreeChainComplex::new(range, Idx2(1, 0), 
-            |idx| {
-                let (i, j) = idx.as_tuple();
-                let i = i - i0;
-                let j = j - j0;
-
-                let gens = if reduced {
-                    let e = l.first_edge().unwrap();
-                    cube0.reduced_generators(i, e)
-                } else { 
-                    cube0.generators(i)
-                };
-                gens.into_iter().filter(|x| { 
-                    x.q_deg() == j
-                }).cloned().collect()
-            },
-            move |x| { 
-                cube1.differentiate(x)
-            }
-        );
-
-        Self { complex }
+        let c = KhComplex::new(&l, &R::zero(), &R::zero(), reduced);
+        c.as_bigraded()
     }
 
-    pub fn unreduced(l: Link) -> Self { 
-        Self::new(l, false)
-    }
-
-    pub fn reduced(l: Link) -> Self { 
-        Self::new(l, true)
+    pub fn is_reduced(&self) -> bool { 
+        self.reduced
     }
 }
 
-impl<R> Index<Idx2> for KhComplexBigraded<R>
+impl<R> Index<[isize; 2]> for KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = KhComplexSummand<R>;
 
-    fn index(&self, index: Idx2) -> &Self::Output {
-        &self.complex[index]
+    fn index(&self, index: [isize; 2]) -> &Self::Output {
+        &self.complex[Idx2::from(index)]
     }
 }
 
@@ -246,92 +229,5 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     fn homology_at(&self, _i: Self::Idx) -> Self::HomologySummand {
         todo!()
-    }
-}
-
-trait Shift { 
-    fn shift(self, i: isize) -> Self;
-}
-
-impl Shift for RangeInclusive<isize> { 
-    fn shift(self, i: isize) -> Self {
-        RangeInclusive::new(
-            self.start() + i, 
-            self.end() + i
-        )
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use yui_link::Link;
-    use yui_homology::Grid;
-    use yui_homology::test::ChainComplexValidation;
-    use super::KhComplex;
-
-    #[test]
-    fn kh_empty() {
-        let l = Link::empty();
-        let c = KhComplex::new(l, 0, 0, false);
-
-        assert_eq!(c.indices(), 0..=0);
-        assert_eq!(c.deg_shift(), (0, 0));
-
-        c.check_d_all();
-    }
-
-    #[test]
-    fn kh_unknot() {
-        let l = Link::unknot();
-        let c = KhComplex::new(l, 0, 0, false);
-
-        assert_eq!(c.indices(), 0..=0);
-        assert_eq!(c.deg_shift(), (0, 0));
-        
-        c.check_d_all();
-    }
-
-    #[test]
-    fn kh_unknot_twist() {
-        let l = Link::from_pd_code([[0, 0, 1, 1]]);
-        let c = KhComplex::new(l, 0, 0, false);
-
-        assert_eq!(c.indices(), 0..=1);
-        assert_eq!(c.deg_shift(), (0, 1));
-        
-        c.check_d_all();
-    }
-
-    #[test]
-    fn kh_trefoil() {
-        let l = Link::trefoil();
-        let c = KhComplex::new(l, 0, 0, false);
-
-        assert_eq!(c.indices(), -3..=0);
-        assert_eq!(c.deg_shift(), (-3, -6));
-
-        assert_eq!(c[-3].generators().len(), 8);
-        assert_eq!(c[-2].generators().len(), 12);
-        assert_eq!(c[-1].generators().len(), 6);
-        assert_eq!(c[ 0].generators().len(), 4);
-
-        c.check_d_all();
-    }
-
-    #[test]
-    fn kh_figure8() {
-        let l = Link::figure8();
-        let c = KhComplex::new(l, 0, 0, false);
-
-        assert_eq!(c.indices(), -2..=2);
-        assert_eq!(c.deg_shift(), (-2, -2));
-
-        assert_eq!(c[-2].generators().len(), 8);
-        assert_eq!(c[-1].generators().len(), 16);
-        assert_eq!(c[ 0].generators().len(), 18);
-        assert_eq!(c[ 1].generators().len(), 16);
-        assert_eq!(c[ 2].generators().len(), 8);
-
-        c.check_d_all();
     }
 }

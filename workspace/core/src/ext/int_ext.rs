@@ -4,7 +4,7 @@ use crate::*;
 
 pub trait IntOps<T = Self>: EucRingOps<T> {}
 
-pub trait Integer: EucRing + IntOps + From<i32> + Signed + PartialOrd + Ord + FromPrimitive + ToPrimitive
+pub trait Integer: EucRing + IntOps + Signed + PartialOrd + Ord + FromPrimitive + ToPrimitive
 where for<'a> &'a Self: EucRingOps<Self> {}
 
 impl<T> DivRound for T

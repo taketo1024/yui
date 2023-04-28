@@ -32,9 +32,17 @@ impl TngComp {
     }
 
     pub fn endpts(&self) -> Option<(Edge, Edge)> { 
+        use TngComp::Arc;
         match self { 
-            &TngComp::Arc(e0, _, e2) => Some((e0, e2)),
+            &Arc(e0, _, e2) => Some((e0, e2)),
             _ => None
+        }
+    }
+
+    pub fn min_edge(&self) -> Edge { 
+        use TngComp::{Arc, Circ};
+        match self { 
+            &Arc(_, e, _) | &Circ(e) => e
         }
     }
 
@@ -95,8 +103,8 @@ impl Display for TngComp {
     }
 }
 
-impl From<LinkComp> for TngComp {
-    fn from(c: LinkComp) -> Self {
+impl From<&LinkComp> for TngComp {
+    fn from(c: &LinkComp) -> Self {
         let e = c.min_edge();
         if let Some((l, r)) = c.ends() { 
             if l == r { 
@@ -124,9 +132,16 @@ impl Tng {
         tng
     }
 
-    pub fn res(x: &Crossing, r: Resolution) -> Self { 
-        let (r0, r1) = x.res_arcs(r);
-        let (mut c0, c1) = (TngComp::from(r0), TngComp::from(r1));
+    pub fn from_x(x: &Crossing, r: Resolution) -> Self { 
+        assert!(!x.is_resolved());
+        Self::from_a(&x.resolved(r))
+    }
+
+    pub fn from_a(x: &Crossing) -> Self { 
+        assert!(x.is_resolved());
+
+        let (r0, r1) = x.arcs();
+        let (mut c0, c1) = (TngComp::from(&r0), TngComp::from(&r1));
 
         if c0.is_connectable(&c1) { 
             c0.connect(c1);
@@ -223,11 +238,10 @@ impl Tng {
         )
     }
 
-    pub fn find_loop(&self) -> Option<usize> {
+    pub fn find_loop(&self, exclude: Option<Edge>) -> Option<(usize, &TngComp)> {
         self.comps.iter().enumerate().find(|(_, c)| 
-            c.is_circle()
-        ).map(|(i, _)|
-            i
+            c.is_circle() && 
+            exclude.map(|e| e != c.min_edge()).unwrap_or(true)
         )
     }
 
@@ -340,23 +354,23 @@ mod tests {
     fn deloop() { 
         let mut t = Tng::empty();
         assert_eq!(t.ncomps(), 0);
-        assert_eq!(t.find_loop(), None);
+        assert_eq!(t.find_loop(None), None);
 
         t.append_arc(TngComp::arc(0,1));
         assert_eq!(t.ncomps(), 1);
-        assert_eq!(t.find_loop(), None);
+        assert_eq!(t.find_loop(None), None);
 
         t.append_arc(TngComp::arc(2,3));
         assert_eq!(t.ncomps(), 2);
-        assert_eq!(t.find_loop(), None);
+        assert_eq!(t.find_loop(None), None);
 
         t.append_arc(TngComp::arc(2,3));
         assert_eq!(t.ncomps(), 2);
-        assert_eq!(t.find_loop(), Some(1));
+        assert_eq!(t.find_loop(None), Some((1, t.comp(1))));
 
         t.remove_at(1);
 
         assert_eq!(t.ncomps(), 1);
-        assert_eq!(t.find_loop(), None);
+        assert_eq!(t.find_loop(None), None);
     }
 }

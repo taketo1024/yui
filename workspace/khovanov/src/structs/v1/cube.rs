@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 use std::ops::RangeInclusive;
+use std::rc::Rc;
 use itertools::Itertools;
-use yui_core::{Ring, RingOps, PowMod2, Sign};
+use yui_core::{Ring, RingOps, PowMod2};
+use yui_homology::{FreeChainComplex, Shift};
 use yui_link::{Link, State, LinkComp, Resolution, Edge};
 
 use crate::{KhAlgStr, KhLabel, KhEnhState};
@@ -47,11 +49,11 @@ pub enum KhCubeEdgeTrans {
 #[derive(Debug, Clone)]
 pub struct KhCubeEdge { 
     trans: KhCubeEdgeTrans,
-    sign: Sign
+    sign: i32
 }
 
 impl KhCubeEdge { 
-    pub fn sign(&self) -> Sign { 
+    pub fn sign(&self) -> i32 { 
         self.sign
     }
 
@@ -83,7 +85,7 @@ impl KhCubeEdge {
         KhCubeEdge { trans, sign }
     }
 
-    fn sign_between(from: &State, to: &State) -> Sign { 
+    fn sign_between(from: &State, to: &State) -> i32 { 
         use Resolution::Res1;
         debug_assert_eq!(from.len(), to.len());
         debug_assert_eq!(from.weight() + 1, to.weight());
@@ -92,7 +94,7 @@ impl KhCubeEdge {
         let i = (0..n).find(|&i| from[i] != to[i]).unwrap();
         let k = (0..i).filter(|&j| from[j] == Res1).count() as u32;
 
-        Sign::from( (-1).pow_mod2(k) )
+        (-1).pow_mod2(k)
     }
 }
 
@@ -101,21 +103,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     str: KhAlgStr<R>,
     dim: usize,
     vertices: HashMap<State, KhCubeVertex>,
-    edges: HashMap<State, Vec<(State, KhCubeEdge)>>
+    edges: HashMap<State, Vec<(State, KhCubeEdge)>>,
+    base_pt: Option<Edge>
 }
 
 impl<R> KhCube<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn new(l: &Link) -> Self { 
-        Self::new_ht(l, R::zero(), R::zero())
-    }
-
-    pub fn new_ht(l: &Link, h: R, t: R) -> Self { 
+    pub fn new(l: &Link, h: &R, t: &R) -> Self { 
         let str = KhAlgStr::new(h, t);
-        Self::new_str(l, str)
-    }
-    
-    fn new_str(l: &Link, str: KhAlgStr<R>) -> Self { 
+
         let n = l.crossing_num() as usize;
         let vertices: HashMap<_, _> = State::generate(n).into_iter().map(|s| { 
             let v = KhCubeVertex::new(&l, s.clone());
@@ -131,7 +127,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             (s.clone(), edges)
         }).collect();
 
-        KhCube { str, dim: n, vertices, edges }
+        let base_pt = l.first_edge();
+
+        KhCube { str, dim: n, vertices, edges, base_pt }
     }
 
     pub fn structure(&self) -> &KhAlgStr<R> {
@@ -219,7 +217,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn apply(&self, x: &KhEnhState, to: &State, e: &KhCubeEdge) -> Vec<(KhEnhState, R)> {
         use KhCubeEdgeTrans::*;
         
-        let sign = R::from_sign(e.sign);
+        let sign = R::from(e.sign);
 
         match e.trans { 
             Merge((i, j), k) => {
@@ -252,6 +250,29 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 }).collect_vec()
             }
         }
+    }
+
+    pub fn as_complex(self, i0: isize, reduced: bool) -> FreeChainComplex<KhEnhState, R, RangeInclusive<isize>> {
+        let range = self.h_range().shift(i0);
+        
+        let rc0 = Rc::new(self);
+        let rc1 = rc0.clone();
+
+        FreeChainComplex::new(range, 1, 
+            move |i| {
+                let i = i - i0;
+                let gens = if reduced {
+                    let e = rc0.base_pt.unwrap();
+                    rc0.reduced_generators(i, &e)
+                } else { 
+                    rc0.generators(i) 
+                };
+                gens.into_iter().cloned().collect()
+            },
+            move |x| { 
+                rc1.differentiate(x)
+            }
+        )
     }
 }
 
@@ -355,7 +376,7 @@ mod tests {
     #[test]
     fn cube_empty() { 
         let l = Link::empty();
-        let cube = KhCube::<i32>::new(&l);
+        let cube = KhCube::<i32>::new(&l, &0, &0);
 
         assert_eq!(cube.dim, 0);
         assert_eq!(cube.vertices.len(), 1);
@@ -373,7 +394,7 @@ mod tests {
     #[test]
     fn cube_unknot() { 
         let l = Link::unknot();
-        let cube = KhCube::<i32>::new(&l);
+        let cube = KhCube::<i32>::new(&l, &0, &0);
 
         assert_eq!(cube.dim, 0);
         assert_eq!(cube.vertices.len(), 1);
@@ -390,7 +411,7 @@ mod tests {
     #[test]
     fn cube_twist_unknot() { 
         let l = Link::from_pd_code([[0, 0, 1, 1]]);
-        let cube = KhCube::<i32>::new(&l);
+        let cube = KhCube::<i32>::new(&l, &0, &0);
 
         assert_eq!(cube.dim, 1);
         assert_eq!(cube.vertices.len(), 2);
@@ -409,14 +430,14 @@ mod tests {
 
         let Some(e) = cube.edge(&s0, &s1) else { panic!() };
 
-        assert_eq!(e.sign(), Sign::Pos);
+        assert_eq!(e.sign(), 1);
         assert_eq!(e.trans(), &KhCubeEdgeTrans::Merge((0, 1), 0));
     }
 
     #[test]
     fn cube_hopf_link() { 
         let l = Link::hopf_link();
-        let cube = KhCube::<i32>::new(&l);
+        let cube = KhCube::<i32>::new(&l, &0, &0);
 
         assert_eq!(cube.dim, 2);
         assert_eq!(cube.vertices.len(), 4);
@@ -425,7 +446,7 @@ mod tests {
    #[test]
    fn cube_trefoil() { 
        let l = Link::trefoil();
-       let cube = KhCube::<i32>::new(&l);
+       let cube = KhCube::<i32>::new(&l, &0, &0);
 
        assert_eq!(cube.dim, 3);
        assert_eq!(cube.vertices.len(), 8);

@@ -1,5 +1,5 @@
 mod grid;
-pub use grid::{GridIdx, GridItr, Grid};
+pub use grid::{GridIdx, GridItr, Grid, Shift};
 
 mod r_mod_str;
 pub use r_mod_str::RModStr;

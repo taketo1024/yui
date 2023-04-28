@@ -1,4 +1,9 @@
 use std::collections::HashSet;
+use std::iter::zip;
+use itertools::Itertools;
+
+use crate::color::Color;
+
 use super::{Crossing, CrossingType, Resolution, LinkComp, State};
 
 pub type Edge = u8;
@@ -56,6 +61,10 @@ impl Link {
 
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
+    }
+
+    pub fn is_knot(&self) -> bool { 
+        self.components().len() == 1
     }
 
     pub fn crossing_num(&self) -> u32 { 
@@ -129,6 +138,9 @@ impl Link {
 
     pub fn resolved_by(&self, s: &State) -> Self {
         debug_assert!(s.len() <= self.data.len());
+
+        // TODO: must skip resolved crossings.
+
         let mut data = self.data.clone();
         for (i, r) in s.iter().enumerate() {
             data[i].resolve(r);
@@ -137,8 +149,14 @@ impl Link {
     }
 
     pub fn ori_pres_state(&self) -> State { 
-        State::from_iter(self.crossing_signs().into_iter().map( |e|
-            if e.is_positive() { 0 } else { 1 }
+        State::from_iter(self.crossing_signs().into_iter().filter_map( |e|
+            if e > 0 { 
+                Some(0)
+            } else if e < 0 { 
+                Some(1)
+            } else { 
+                None
+            }
         ))
     }
 
@@ -146,9 +164,46 @@ impl Link {
         self.resolved_by(&self.ori_pres_state()).components()
     }
 
-    pub fn first_edge(&self) -> Option<&Edge> { 
+    pub fn colored_seifert_circles(&self, ori: bool) -> Vec<(LinkComp, Color)> {
+        assert_eq!(self.components().len(), 1, "Only knots are supported.");
+
+        let circles = self.seifert_circles();
+        let n = circles.len();
+    
+        let mut colors = vec![Color::A; n];
+        let mut queue = vec![];
+        let mut remain: HashSet<_> = (0..n).collect();
+    
+        let e = self.first_edge().unwrap();
+        let i = circles.iter().find_position(|c| c.edges().contains(&e)).unwrap().0;
+    
+        queue.push(i);
+        colors[i] = if ori { Color::A } else { Color::B };
+    
+        while !queue.is_empty() { 
+            let i1 = queue.remove(0);
+            let c1 = &circles[i1];
+    
+            let adjs = remain.iter().filter_map(|&i2| {
+                let c2 = &circles[i2];
+                if c1.is_adj(c2, self) { Some(i2) } else { None }
+            }).collect_vec();
+            
+            for i2 in adjs {
+                remain.remove(&i2);
+                queue.push(i2);
+                colors[i2] = colors[i1].other();
+            };
+        }
+    
+        assert!(queue.is_empty());
+    
+        zip(circles.into_iter(), colors.into_iter()).collect()
+    }
+
+    pub fn first_edge(&self) -> Option<Edge> { 
         let Some(x) = self.data.first() else { return None };
-        x.edges().iter().min()
+        x.edges().iter().min().cloned()
     }
 
     pub fn data(&self) -> &Vec<Crossing> { 

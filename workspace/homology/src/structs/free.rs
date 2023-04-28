@@ -1,10 +1,12 @@
 use std::fmt::Display;
 use std::collections::HashMap;
 use std::ops::Index;
-use yui_core::{Ring, RingOps};
+use itertools::Itertools;
+use yui_core::{Ring, RingOps, EucRing, EucRingOps};
 use yui_matrix::sparse::{SpMat, SpVec};
 use yui_lin_comb::{FreeGen, LinComb};
-use crate::{RModStr, GridItr, GridIdx, GenericRModGrid, Grid, ChainComplex};
+use crate::utils::HomologyCalc;
+use crate::{RModStr, GridItr, GridIdx, GenericRModGrid, Grid, ChainComplex, HomologyComputable, GenericHomology, GenericRModStr};
 use crate::fmt::FmtList;
 
 pub struct FreeRModStr<X, R>
@@ -30,7 +32,8 @@ where
     }
 
     pub fn vectorize_x(&self, x: X) -> SpVec<R> {
-        self.vectorize(&LinComb::from(x))
+        let z = LinComb::from_gen(x);
+        self.vectorize(&z)
     }
 
     pub fn vectorize(&self, z: &LinComb<X, R>) -> SpVec<R> {
@@ -134,6 +137,21 @@ where
     pub fn differetiate(&self, z: &LinComb<X, R>) -> LinComb<X, R> { 
         z.apply(|x| self.differentiate_x(x))
     }
+
+    pub fn desc_d_gens_at(&self, i: I::Item) -> String {
+        format!("C[{i}]: {}", &self[i]) + &self[i].generators.iter().map(|x| { 
+            let dx = LinComb::from_iter(self.differentiate_x(x));
+            format!("\n  {x} -> {dx}")
+        }).join("")
+    }
+
+    pub fn desc_d_gens(&self) -> String { 
+        self.indices().map(|i| self.desc_d_gens_at(i)).join("\n\n")
+    }
+
+    pub fn print_d_gens(&self) {
+        println!("{}", self.desc_d_gens());
+    }
 }
 
 impl<X, R, I> Display for FreeChainComplex<X, R, I>
@@ -197,5 +215,30 @@ where
         let c0 = &self[k];
         let c1 = &self[k + self.d_degree];
         c0.make_matrix(c1, &self.d_map)
+    }
+}
+
+impl<X, R, I> HomologyComputable for FreeChainComplex<X, R, I>
+where 
+    X: FreeGen,
+    R: EucRing, for<'x> &'x R: EucRingOps<R>,
+    I: GridItr,
+    I::Item: GridIdx
+{
+    type Homology = GenericHomology<R, I>;
+    type HomologySummand = GenericRModStr<R>;
+
+    fn homology_at(&self, i: Self::Idx) -> Self::HomologySummand {
+        let d1 = self.d_matrix(i - self.d_degree());
+        let d2 = self.d_matrix(i);
+        HomologyCalc::calculate(d1, d2)
+    }
+
+    fn homology(&self) -> Self::Homology {
+        let range = self.indices();
+        let grid = GenericRModGrid::new(range, |i| {
+            self.homology_at(i)
+        });
+        Self::Homology::new(grid)
     }
 }

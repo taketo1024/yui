@@ -1,29 +1,31 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
-use std::ops::Range;
+use std::ops::RangeInclusive;
 
 use log::info; 
 use itertools::Itertools;
 use num_traits::Zero;
 use cartesian::cartesian;
 use yui_core::{Ring, RingOps};
-use yui_homology::{GenericChainComplex, FreeRModStr};
-use yui_link::{Crossing, Resolution};
+use yui_homology::FreeChainComplex;
+use yui_link::{Crossing, Resolution, Edge};
 
 use crate::{KhAlgGen, KhEnhState};
 use super::cob::{Cob, Dot, Bottom, CobComp};
-use super::tng::Tng;
+use super::tng::{Tng, TngComp};
 use super::mor::{Mor, MorTrait};
 
 #[derive(Clone, Debug)]
-pub struct TngVertex { 
+pub struct TngVertex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> { 
     key: KhEnhState,
     tng: Tng,
     in_edges: HashSet<KhEnhState>,
-    out_edges: HashMap<KhEnhState, Mor>
+    out_edges: HashMap<KhEnhState, Mor<R>>
 }
 
-impl TngVertex { 
+impl<R> TngVertex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn init() -> Self { 
         let key = KhEnhState::init();
         let tng = Tng::empty();
@@ -31,30 +33,45 @@ impl TngVertex {
         let out_edges = HashMap::new();
         Self { key, tng, in_edges, out_edges }
     }
+
+    pub fn tng(&self) -> &Tng { 
+        &self.tng
+    }
+
+    pub fn out_edges(&self) -> &HashMap<KhEnhState, Mor<R>> {
+        &self.out_edges
+    }
 }
 
-impl Display for TngVertex {
+impl<R> Display for TngVertex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({}; {})", self.key, self.tng)
     }
 }
 
-pub struct TngComplex {
-    vertices: HashMap<KhEnhState, TngVertex>,
+pub struct TngComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    vertices: HashMap<KhEnhState, TngVertex<R>>,
     len: usize,
+    h: R,
+    t: R,
     deg_shift: (isize, isize)
 }
 
-impl TngComplex {
-    pub fn new(deg_shift: (isize, isize)) -> Self { 
+impl<R> TngComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    pub fn new(h: &R, t: &R, deg_shift: (isize, isize)) -> Self { 
         let mut vertices = HashMap::new();
         let k0 = KhEnhState::init();
         let v0 = TngVertex::init();
         vertices.insert(k0, v0);
 
         let len = 1;
+        let h = h.clone();
+        let t = t.clone();
 
-        TngComplex{ vertices, len, deg_shift }
+        TngComplex{ vertices, len, h, t, deg_shift }
     }
 
     pub fn len(&self) -> usize { 
@@ -69,7 +86,7 @@ impl TngComplex {
         }).count()
     }
 
-    pub fn vertex(&self, v: &KhEnhState) -> &TngVertex { 
+    pub fn vertex(&self, v: &KhEnhState) -> &TngVertex<R> { 
         &self.vertices[v]
     }
 
@@ -77,20 +94,20 @@ impl TngComplex {
         self.vertices.len()
     }
 
-    pub fn iter_verts(&self) -> impl Iterator<Item = (&KhEnhState, &TngVertex)> {
+    pub fn iter_verts(&self) -> impl Iterator<Item = (&KhEnhState, &TngVertex<R>)> {
         self.vertices.iter().sorted_by(|(k0, _), (k1, _)| k0.cmp(k1))
     }
 
-    pub fn edge(&self, k: &KhEnhState, l: &KhEnhState) -> &Mor {
+    pub fn edge(&self, k: &KhEnhState, l: &KhEnhState) -> &Mor<R> {
         &self.vertices[k].out_edges[l]
     }
 
-    fn add_edge(&mut self, k: &KhEnhState, l: &KhEnhState, f: Mor) { 
+    fn add_edge(&mut self, k: &KhEnhState, l: &KhEnhState, f: Mor<R>) { 
         let v = self.vertices.get_mut(k).unwrap();
-        v.out_edges.insert(l.clone(), f);
+        v.out_edges.insert(*l, f);
 
         let w = self.vertices.get_mut(l).unwrap();
-        w.in_edges.insert(k.clone());
+        w.in_edges.insert(*k);
     }
 
     fn remove_edge(&mut self, k: &KhEnhState, l: &KhEnhState) { 
@@ -115,19 +132,33 @@ impl TngComplex {
     pub fn append(&mut self, x: &Crossing) {
         info!("({}) append: {x}", self.nverts());
 
+        if !x.is_resolved() { 
+            self.append_x(x)
+        } else { 
+            self.append_a(x)
+        }
+    }
+
+    fn append_x(&mut self, x: &Crossing) {
+        assert!(!x.is_resolved());
+
         let verts = std::mem::take(&mut self.vertices);
+
         let sdl = CobComp::from(x);
+        let c0 = Cob::id(sdl.src());
+        let c1 = Cob::id(sdl.tgt());
+
         let mut rmv = HashSet::new();
 
         for (_, v) in verts.into_iter() { 
-            let vs = Self::dupl_01(v, &sdl);
+            let vs = Self::make_cone(v, &c0, &c1, &sdl);
             for v in vs { 
                 for (l, f) in v.out_edges.iter() { 
                     if f.is_zero() { 
-                        rmv.insert((v.key.clone(), l.clone()));
+                        rmv.insert((v.key, *l));
                     }
                 }
-                self.vertices.insert(v.key.clone(), v);
+                self.vertices.insert(v.key, v);
             }
         }
 
@@ -140,144 +171,167 @@ impl TngComplex {
         debug_assert!(self.validate_edges());
     }
 
-    fn dupl_01(v: TngVertex, sdl: &CobComp) -> [TngVertex; 2] {
+    fn append_a(&mut self, x: &Crossing) {
+        assert!(x.is_resolved());
+
+        let verts = std::mem::take(&mut self.vertices);
+        let c = Cob::id(&Tng::from_a(x));
+
+        self.vertices = verts.into_iter().map(|(k, mut v)| { 
+            v.tng.connect(c.src());
+
+            modify!(v.out_edges, |edges: HashMap<KhEnhState, Mor<R>>| { 
+                edges.into_iter().map(|(k, f)| { 
+                    (k, f.connect(&c))
+                }).collect()
+            });
+    
+            (k, v)
+        }).collect();
+
+        debug_assert!(self.validate_edges());
+    }
+
+    fn make_cone(v: TngVertex<R>, c0: &Cob, c1: &Cob, sdl: &CobComp) -> [TngVertex<R>; 2] {
         use Resolution::{Res0, Res1};
 
         let mut v0 = v.clone();
         let mut v1 = v;
 
-        v0.key.state.push(Res0);
-        v1.key.state.push(Res1);
+        let mut c = Cob::id(&v0.tng);
+        c.connect_comp(sdl.clone());
+        
+        Self::extend_by(&mut v0, c0, Res0);
+        Self::extend_by(&mut v1, c1, Res1);
+        Self::insert_sdl(&mut v0, &mut v1, c);
+
+        [v0, v1]
+    }
+
+    fn extend_by(v: &mut TngVertex<R>, c: &Cob, r: Resolution) {
+        v.key.state.push(r);
+        v.tng.connect(c.src());
 
         // append 0 / 1 to in_edges.
-        modify!(v0.in_edges, |e: HashSet<KhEnhState>| { 
-            e.into_iter().map(|mut k| { 
-                k.state.push(Res0);
-                k
-            }).collect()
-        });
-
-        modify!(v1.in_edges, |e: HashSet<KhEnhState>| { 
-            e.into_iter().map(|mut k| { 
-                k.state.push(Res1);
+        modify!(v.in_edges, |edges: HashSet<KhEnhState>| { 
+            edges.into_iter().map(|mut k| { 
+                k.state.push(r);
                 k
             }).collect()
         });
 
         // append 0 / 1 to out_edges with id-cob connected.
-        let c0 = Cob::id(sdl.src());
-        let c1 = Cob::id(sdl.tgt());
-
-        modify!(v0.out_edges, |e: HashMap<KhEnhState, Mor>| { 
-            e.into_iter().map(|(mut k, f)| { 
-                k.state.push(Res0);
-                (k, f.connect(&c0))
+        let e = if r.is_zero() { R::one() } else { -R::one() };
+        modify!(v.out_edges, |edges: HashMap<KhEnhState, Mor<R>>| { 
+            edges.into_iter().map(|(mut k, f)| { 
+                k.state.push(r);
+                (k, f.connect(c) * &e)
             }).collect()
         });
-
-        modify!(v1.out_edges, |e: HashMap<KhEnhState, Mor>| { 
-            e.into_iter().map(|(mut k, f)| { 
-                k.state.push(Res1);
-                (k, -f.connect(&c1))
-            }).collect()
-        });
-
-        // insert sdl between v0 and v1.
-        let mut f = Cob::id(&v0.tng);
-        f.connect_comp(sdl.clone());
-
-        v0.out_edges.insert(v1.key.clone(), Mor::from(f));
-        v1.in_edges.insert(v0.key.clone());
-
-        // modify tngs of v0 and v1.
-        v0.tng.connect(sdl.src().clone());
-        v1.tng.connect(sdl.tgt().clone());
-
-        [v0, v1]
     }
 
-    pub fn find_loop(&self) -> Option<(KhEnhState, usize)> { 
+    fn insert_sdl(v0: &mut TngVertex<R>, v1: &mut TngVertex<R>, sdl: Cob) { 
+        let f = Mor::from_gen(sdl);
+        v0.out_edges.insert(v1.key, f);
+        v1.in_edges.insert(v0.key);
+    }
+
+    pub fn find_loop(&self, exclude: Option<Edge>) -> Option<(KhEnhState, usize, &TngComp)> { 
         for (k, v) in self.iter_verts() { 
-            if let Some(r) = v.tng.find_loop() { 
-                return Some((k.clone(), r))
+            if let Some((r, c)) = v.tng.find_loop(exclude) { 
+                return Some((*k, r, c))
             }
         }
         None
     }
 
-    pub fn deloop(&mut self, k: &KhEnhState, r: usize) -> (KhEnhState, KhEnhState) { 
+    pub fn deloop(&mut self, k: &KhEnhState, r: usize, reduced: bool) -> Vec<KhEnhState> { 
         info!("({}) deloop {} at {r}", self.nverts(), &self.vertices[k]);
 
-        let mut v0 = self.vertices.remove(k).unwrap();
-        let c = v0.tng.remove_at(r);
-        let mut v1 = v0.clone();
+        let mut v = self.vertices.remove(k).unwrap();
+        let c = v.tng.remove_at(r);
 
-        v0.key.label.push(KhAlgGen::X);
-        v1.key.label.push(KhAlgGen::I);
+        if reduced { 
+            self.deloop_in(&mut v, &c, KhAlgGen::X, Dot::X, Dot::None, true);
 
-        let k0 = &v0.key;
-        let k1 = &v1.key;
+            let k_new = v.key;
+            self.vertices.insert(k_new, v);
 
-        let v0_in = v0.in_edges.iter().cloned().collect_vec();
-        for j in v0_in.iter() { 
-            let u = self.vertices.get_mut(j).unwrap();
+            debug_assert!(self.validate_edges());
 
-            let f = u.out_edges.remove(&k).unwrap();
-            v0.in_edges.remove(&j);
-            v1.in_edges.remove(&j);
+            vec![k_new]
+        } else { 
+            let mut v0 = v;
+            let mut v1 = v0.clone();
 
-            let f0 = f.clone().cap_off(Bottom::Tgt, &c, Dot::None);
-            let f1 = f.cap_off(Bottom::Tgt, &c, Dot::Y);
+            self.deloop_in(&mut v0, &c, KhAlgGen::X, Dot::X, Dot::None, false);
+            self.deloop_in(&mut v1, &c, KhAlgGen::I, Dot::None, Dot::Y, true);
 
-            if !f0.is_zero() {
-                u.out_edges.insert(k0.clone(), f0);
-                v0.in_edges.insert(j.clone());
-            }
+            let k0 = v0.key;
+            let k1 = v1.key;
 
-            if !f1.is_zero() {
-                u.out_edges.insert(k1.clone(), f1);
-                v1.in_edges.insert(j.clone());
-            }
+            self.vertices.insert(k0, v0);
+            self.vertices.insert(k1, v1);
+
+            debug_assert!(self.validate_edges());
+
+            vec![k0, k1]
         }
-        
-        let v0_out = v0.out_edges.keys().cloned().collect_vec();
-        for l in v0_out.iter() { 
-            let w = self.vertices.get_mut(l).unwrap();
-
-            let f0 = v0.out_edges.remove(&l).unwrap();
-            let f1 = v1.out_edges.remove(&l).unwrap();
-            w.in_edges.remove(&k);
-
-            let f0 = f0.cap_off(Bottom::Src, &c, Dot::X);
-            let f1 = f1.cap_off(Bottom::Src, &c, Dot::None);
-
-            if !f0.is_zero() { 
-                v0.out_edges.insert(l.clone(), f0);
-                w.in_edges.insert(k0.clone());
-            }
-
-            if !f1.is_zero() { 
-                v1.out_edges.insert(l.clone(), f1);
-                w.in_edges.insert(k1.clone());
-            }
-        }
-        
-        let k0 = k0.clone();
-        let k1 = k1.clone();
-
-        self.vertices.insert(k0.clone(), v0);
-        self.vertices.insert(k1.clone(), v1);
-
-        debug_assert!(self.validate_edges());
-
-        (k0, k1)
     }
 
-    pub fn find_inv_edge<'a>(&'a self, k: &'a KhEnhState) -> Option<(&'a KhEnhState, &'a KhEnhState)> { 
+    fn deloop_in(&mut self, v: &mut TngVertex<R>, c: &TngComp, label: KhAlgGen, birth_dot: Dot, death_dot: Dot, remove: bool) { 
+        assert!(c.is_circle());
+
+        let k_old = v.key;
+
+        v.key.label.push(label);
+        let k_new = v.key;
+
+        let v_in = v.in_edges.iter().cloned().collect_vec();
+        for j in v_in.iter() { 
+            v.in_edges.remove(&j);
+            let u = self.vertices.get_mut(j).unwrap();
+
+            let f_old = if remove {
+                u.out_edges.remove(&k_old).unwrap()
+            } else { 
+                u.out_edges[&k_old].clone()
+            };
+
+            let (h, t) = (&self.h, &self.t);
+            let f_new = f_old.cap_off(Bottom::Tgt, &c, death_dot).part_eval(h, t);
+
+            if !f_new.is_zero() {
+                u.out_edges.insert(k_new, f_new);
+                v.in_edges.insert(*j);
+            }
+        }
+        
+        let v_out = v.out_edges.keys().cloned().collect_vec();
+        for l in v_out.iter() { 
+            let w = self.vertices.get_mut(l).unwrap();
+            if remove {
+                w.in_edges.remove(&k_old);
+            }
+
+            let f_old = v.out_edges.remove(&l).unwrap();
+
+            let (h, t) = (&self.h, &self.t);
+            let f_new = f_old.cap_off(Bottom::Src, &c, birth_dot).part_eval(h, t);
+
+            if !f_new.is_zero() { 
+                v.out_edges.insert(*l, f_new);
+                w.in_edges.insert(k_new);
+            }
+        }
+    }
+
+    pub fn find_inv_edge(&self, k: &KhEnhState) -> Option<(KhEnhState, KhEnhState)> { 
         let mut cand = None;
         let mut cand_s = usize::MAX;
 
-        fn score(v: &TngVertex, w: &TngVertex) -> usize { 
+        fn score<_R>(v: &TngVertex<_R>, w: &TngVertex<_R>) -> usize
+        where _R: Ring, for<'x> &'x _R: RingOps<_R> { 
             let v_out = v.out_edges.len();
             let w_in  = w.in_edges.len();
             (v_out - 1) * (w_in - 1)
@@ -299,7 +353,7 @@ impl TngComplex {
 
                 if s == 0 {
                     info!("({}) good pivot {}: {} -> {}", self.nverts(), f, v, w);
-                    return Some((k, l));
+                    return Some((*k, *l));
                 } else if s < cand_s { 
                     cand = Some((k, l));
                     cand_s = s;
@@ -309,9 +363,10 @@ impl TngComplex {
 
         if let Some((k, l)) = cand { 
             info!("({}) pivot (score: {cand_s}) {}: {} -> {}", self.nverts(), self.edge(k, l), self.vertex(k), self.vertex(l));
+            Some((*k, *l))
+        } else { 
+            None
         }
-
-        cand
     }
 
     pub fn eliminate(&mut self, k0: &KhEnhState, l0: &KhEnhState) {
@@ -353,6 +408,9 @@ impl TngComplex {
                 -cab
             };
 
+            let (h, t) = (&self.h, &self.t);
+            let d = d.part_eval(h, t);
+
             if d.is_zero() { 
                 self.remove_edge(k1, l1);
             } else { 
@@ -390,53 +448,57 @@ impl TngComplex {
         debug_assert!(self.validate_edges());
     }
 
-    pub fn as_generic<R>(&self, h: R, t: R) -> GenericChainComplex<R, Range<isize>> 
-    where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> {
-        debug_assert!(self.is_completely_delooped());
+    pub fn eval(&self, h: &R, t: &R) -> FreeChainComplex<KhEnhState, R, RangeInclusive<isize>> {
+        debug_assert!(self.is_evalable());
 
-        // TODO improve construction. 
+        let (h, t) = (h.clone(), t.clone());
 
         let n = self.len();
-        let c = (0..n).map(|i| {
-            let gens = self.vertices.keys().filter(|k| k.state.weight() == i).sorted().cloned().collect();
-            FreeRModStr::new(gens)
-        }).collect_vec();
-
         let i0 = self.deg_shift.0;
-        let i1 = i0 + (n as isize);
+        let i1 = i0 + (n as isize) - 1;
 
-        GenericChainComplex::new(i0..i1, 1, (0..n-1).map( |i| {
-            let c0 = &c[i];
-            let c1 = &c[i+1];
-            let d = c0.make_matrix(c1, |x| { 
-                let v = self.vertex(x);
+        let all_gens = self.vertices.keys().cloned().collect_vec();
+        let vertices = self.vertices.clone();
+
+        FreeChainComplex::new(i0..=i1, 1, 
+            move |i| { 
+                let w = (i - i0) as usize;
+                all_gens.iter().filter(|x| 
+                    x.state.weight() == w
+                ).sorted().cloned().collect()
+            }, 
+            move |x| { 
+                let v = &vertices[&x];
                 v.out_edges.iter().map(|(y, f)| 
-                    (y.clone(), f.eval(&h, &t))
+                    (*y, f.eval(&h, &t))
                 ).collect()
-            });
-            (i0 + (i as isize), d)
-        }))
+            }
+        )
     }
 
-    fn is_completely_delooped(&self) -> bool { 
+    fn is_evalable(&self) -> bool { 
         self.vertices.iter().all(|(_, v)|
             v.tng.is_empty()
         )
     }
 
-    pub fn describe(&self) { 
+    pub fn desc_d(&self) -> String { 
         let mut str = "".to_string();
         for k0 in self.vertices.keys().sorted() { 
             let v = &self.vertices[&k0];
-            str += &format!("{k0}: {}\n", v.tng);
+            str += &format!("{k0}: {}", v.tng);
 
             for k1 in v.out_edges.keys().sorted() { 
                 let f = &v.out_edges[&k1];
-                str += &format!(" -> {k1}: {f}\n");
+                str += &format!("\n  -> {k1}: {f}");
             }
             str += "\n";
         }
-        info!("{str}");
+        str
+    }
+
+    pub fn print_d(&self) { 
+        println!("{}", self.desc_d());
     }
 
     pub fn validate_edges(&self) -> bool {
@@ -482,7 +544,7 @@ pub(self) use modify;
 mod tests { 
     use yui_link::*;
     use crate::KhLabel;
-    use crate::tools::fast_kh::tng::TngComp;
+    use super::super::tng::TngComp;
 
     use super::*;
 
@@ -492,19 +554,19 @@ mod tests {
             TngComp::arc(0,1),
             TngComp::arc(2,3)
         ]));
-        let f = Mor::from((c.clone(), -1));
+        let f = Mor::from_pair(c.clone(), -1);
 
         assert!(f.is_invertible());
         assert_eq!(f.inv(), Some(f.clone()));
 
-        let f = Mor::from((c.clone(), 2));
+        let f = Mor::from_pair(c.clone(), 2);
         assert_eq!(f.is_invertible(), false);
         assert_eq!(f.inv(), None);
     }
 
     #[test]
     fn empty() { 
-        let c = TngComplex::new((0, 0));
+        let c = TngComplex::new(&0, &0, (0, 0));
 
         assert_eq!(c.len(), 1);
         assert_eq!(c.rank(0), 1);
@@ -512,7 +574,7 @@ mod tests {
 
     #[test]
     fn single_x() { 
-        let mut c = TngComplex::new((0, 0));
+        let mut c = TngComplex::new(&0, &0, (0, 0));
         let x = Crossing::from_pd_code([0,1,2,3]);
         c.append(&x);
 
@@ -522,8 +584,18 @@ mod tests {
     }
 
     #[test]
+    fn single_x_resolved() { 
+        let mut c = TngComplex::new(&0, &0, (0, 0));
+        let x = Crossing::from_pd_code([0,1,2,3]).resolved(Resolution::Res0);
+        c.append(&x);
+
+        assert_eq!(c.len(), 1);
+        assert_eq!(c.rank(0), 1);
+    }
+
+    #[test]
     fn two_x_disj() { 
-        let mut c = TngComplex::new((0, 0));
+        let mut c = TngComplex::new(&0, &0, (0, 0));
         let x0 = Crossing::from_pd_code([0,1,2,3]);
         let x1 = Crossing::from_pd_code([4,5,6,7]);
 
@@ -538,7 +610,7 @@ mod tests {
 
     #[test]
     fn two_x() { 
-        let mut c = TngComplex::new((0, 0));
+        let mut c = TngComplex::new(&0, &0, (0, 0));
         let x0 = Crossing::from_pd_code([0,4,1,5]);
         let x1 = Crossing::from_pd_code([3,1,4,2]);
 
@@ -553,7 +625,7 @@ mod tests {
 
     #[test]
     fn deloop_one() { 
-        let mut c = TngComplex::new((0, 0));
+        let mut c = TngComplex::new(&0, &0, (0, 0));
         let x0 = Crossing::from_pd_code([4,2,5,1]);
         let x1 = Crossing::from_pd_code([3,6,4,1]);
 
@@ -565,13 +637,10 @@ mod tests {
         assert_eq!(c.rank(1), 2);
         assert_eq!(c.rank(2), 1);
 
-        let e = c.find_loop();
+        let e = c.find_loop(None);
         assert!(e.is_some());
 
-        let Some((k, r)) = e else { panic!() };
-
-        dbg!(k.to_string());
-        dbg!(r);
+        let Some((k, r, _)) = e else { panic!() };
 
         assert_eq!(k, KhEnhState::new(
             State::from_iter([1,0]), 
@@ -579,7 +648,7 @@ mod tests {
         ));
         assert_eq!(r, 2);
 
-        c.deloop(&k, r);
+        c.deloop(&k, r, false);
 
         assert_eq!(c.len(), 3);
         assert_eq!(c.rank(0), 1);

@@ -6,8 +6,10 @@ use std::ops::{Mul, MulAssign};
 use auto_impl_ops::auto_ops;
 use derive_more::Display;
 use itertools::Itertools;
+use num_traits::Zero;
+use cartesian::cartesian;
 use yui_core::{Elem, Ring, RingOps};
-use yui_lin_comb::{FreeGen, OrdForDisplay};
+use yui_lin_comb::{FreeGen, OrdForDisplay, LinComb};
 use yui_link::{Edge, Crossing, Resolution};
 use yui_polynomial::Mono2;
 use super::tng::{Tng, TngComp};
@@ -185,7 +187,7 @@ impl CobComp {
         self.dots.0 == self.dots.1 // XY = T
     }
 
-    pub fn is_removable(&self) -> bool { 
+    pub fn is_removable(&self) -> bool { // TODO rename to `is_one()`
         self.is_sph() && 
         (self.dots == (1, 0) || // ε.X.ι = 1,
          self.dots == (0, 1))   // ε.Y.ι = 1.
@@ -319,40 +321,64 @@ impl CobComp {
         self.dots.1 += dots.1;
     }
 
-    pub fn eval<R>(&self, h: &R, t: &R) -> R
-    where R: Ring, for<'x> &'x R: RingOps<R> {
-        assert!(self.is_closed());
+    pub fn should_part_eval(&self) -> bool {
+        self.is_zero() ||
+        self.genus > 0 || 
+        self.dots.0 >= 1 && self.dots.1 >= 1 ||
+        self.dots.0 >= 2 ||
+        self.dots.1 >= 2
+    }
 
-        fn eval<R>(g: usize, x: usize, y: usize, h: &R, t: &R) -> R
+    pub fn part_eval<R>(&self, h: &R, t: &R) -> LinComb<CobComp, R>
+    where R: Ring, for<'x> &'x R: RingOps<R> {
+
+        fn cob(c: &CobComp, x: usize, y: usize) -> CobComp { 
+            CobComp { src: c.src.clone(), tgt: c.tgt.clone(), genus: 0, dots: (x, y) }
+        }
+
+        fn eval<R>(c: &CobComp, g: usize, x: usize, y: usize, h: &R, t: &R) -> LinComb<CobComp, R>
         where R: Ring, for<'x> &'x R: RingOps<R> { 
             match (g, x, y) { 
-                (0, 0, 0) => R::zero(),
-                (0, 1, 0) | (0, 0, 1)  => R::one(),
-                (g, _, _) if g > 0 => // neck-cut
-                    eval(g-1, x+1, y, h, t) + eval(g-1, x, y+1, h, t),
+                (g, _, _) if g > 0 => { // neck-cut
+                    eval(c, g-1, x+1, y, h, t) + 
+                    eval(c, g-1, x, y+1, h, t)
+                },
                 (0, x, y) if x >= 1 && y >= 1 => // XY = t
-                    t * eval(0, x-1, y-1, h, t),
+                    eval(c, 0, x-1, y-1, h, t) * t,
                 (0, x, 0) if x >= 2 => // X^2 = hX + t
-                    h * eval(0, x-1, 0, h, t) + 
-                    t * eval(0, x-2, 0, h, t),
+                    eval(c, 0, x-1, 0, h, t) * h + 
+                    eval(c, 0, x-2, 0, h, t) * t,
                 (0, 0, y) if y >= 2 => // Y^2 = -hY + t
-                    -h * eval(0, 0, y-1, h, t) + 
-                     t * eval(0, 0, y-2, h, t),
-                _ => panic!()
+                    eval(c, 0, 0, y-1, h, t) * -h + 
+                    eval(c, 0, 0, y-2, h, t) *  t,
+                (0, 0, 0) if c.is_closed() => // ε.ι = 0
+                    LinComb::zero(),
+                _ =>
+                    LinComb::from_gen(cob(c, x, y))
             }
         }
 
         let g = self.genus;
         let (x, y) = self.dots;
 
-        eval(g, x, y, h, t)
+        eval(self, g, x, y, h, t)
+    }
+
+    pub fn eval<R>(&self, h: &R, t: &R) -> R
+    where R: Ring, for<'x> &'x R: RingOps<R> {
+        assert!(self.is_closed());
+
+        self.part_eval(h, t).into_iter().map(|(c, r)| {
+            debug_assert!(c.is_removable()); // either ε.X.ι or ε.Y.ι .
+            r
+        }).sum()
     }
 }
 
 impl From<&Crossing> for CobComp {
     fn from(x: &Crossing) -> Self {
-        let src = Tng::res(x, Resolution::Res0);
-        let tgt = Tng::res(x, Resolution::Res1);
+        let src = Tng::from_x(x, Resolution::Res0);
+        let tgt = Tng::from_x(x, Resolution::Res1);
         Self::plain(src, tgt)
     }
 }
@@ -432,6 +458,20 @@ impl Ord for CobComp {
         }
     }
 }
+
+impl Default for CobComp {
+    fn default() -> Self {
+        Self::sphere() // == zero
+    }
+}
+
+impl Elem for CobComp {
+    fn set_symbol() -> String {
+        "CobComp".to_string()
+    }
+}
+
+impl FreeGen for CobComp {}
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Default)]
 pub struct Cob { 
@@ -676,6 +716,32 @@ impl Cob {
         c.genus = (g / 2) as usize;
 
         c
+    }
+
+    pub fn should_part_eval(&self) -> bool {
+        self.comps.iter().any(|c| c.should_part_eval())
+    }
+
+    pub fn part_eval<R>(self, h: &R, t: &R) -> LinComb<Cob, R>
+    where R: Ring, for<'x> &'x R: RingOps<R> {
+        if self.should_part_eval() { 
+            let init = LinComb::from_gen(Cob::empty());
+            self.comps.iter().fold(init, |res, c| { 
+                let eval = c.part_eval(h, t);
+                let all = cartesian!(res.iter(), eval.iter());
+                let prod = all.map(|((cob, r), (c, s))| {
+                    let mut cob = cob.clone();
+                    cob.comps.push(c.clone());
+                    (cob, r * s)
+                }).map(|(mut cob, r)| {
+                    cob.sort_comps();
+                    (cob, r)
+                });
+                prod.collect()
+            })
+        } else { 
+            LinComb::from_gen(self)
+        }
     }
 
     pub fn eval<R>(&self, h: &R, t: &R) -> R
@@ -1131,12 +1197,12 @@ mod tests {
         assert_eq!(c.eval(&h, &t), R::zero());
 
         let c = CobComp::closed(1);
-        assert_eq!(c.eval(&h, &t), R::from(2));
+        assert_eq!(c.eval(&h, &t), R::from_const(2));
 
         let c = CobComp::closed(2);
         assert_eq!(c.eval(&h, &t), R::zero());
 
         let c = CobComp::closed(3);
-        assert_eq!(c.eval(&h, &t), R::from_deg2([((2, 0), 2), ((0, 1), 8)])); // 2(H^2 + 4T)
+        assert_eq!(c.eval(&h, &t), R::from_deg2_iter([((2, 0), 2), ((0, 1), 8)])); // 2(H^2 + 4T)
     }
 }

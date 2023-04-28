@@ -59,10 +59,25 @@ impl KhLabel {
         }
     }
 
+    pub fn sub(&self, l: usize) -> Self { 
+        Self(self.0.sub(l))
+    }
+
+    pub fn is_sub(&self, other: &Self) -> bool { 
+        self.0.is_sub(&other.0)
+    }
+
     pub fn generate(len: usize) -> Vec<Self> { 
         BitSeq::generate(len).into_iter().map(|b| 
             Self(b)
         ).collect()
+    }
+}
+
+impl From<KhAlgGen> for KhLabel {
+    fn from(x: KhAlgGen) -> Self {
+        let v = if x.is_X() { 0 } else { 1 };
+        Self(BitSeq::from(v))
     }
 }
 
@@ -118,6 +133,11 @@ impl KhEnhState {
         let KhEnhState { state, label } = other;
         self.state.append(state);
         self.label.append(label);
+    }
+
+    pub fn is_sub(&self, other: &Self) -> bool { 
+        self.state.is_sub(&other.state) && 
+        self.label.is_sub(&other.label)
     }
 }
 

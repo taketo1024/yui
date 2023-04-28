@@ -6,10 +6,7 @@ use crate::utils::*;
 
 #[derive(Debug, clap::Args)]
 pub struct Args { 
-    name: String,
-
-    #[arg(short, long)]
-    link: Option<String>,
+    link: String,
 
     #[arg(short, long, default_value = "0")]
     c_value: String,
@@ -40,7 +37,7 @@ pub fn run(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
 
 fn compute_bigraded<R>(args: &Args) -> Result<String, Box<dyn std::error::Error>>
 where R: EucRing + FromStr, for<'x> &'x R: EucRingOps<R> { 
-    let l = load_link(&args.name, &args.link, args.mirror)?;
+    let l = load_link(&args.link, args.mirror)?;
     if args.c_value != "0" { 
         return err!("--bigraded only supported for `c = 0`.")
     }
@@ -52,7 +49,7 @@ where R: EucRing + FromStr, for<'x> &'x R: EucRingOps<R> {
 
 fn compute_homology<R>(args: &Args) -> Result<String, Box<dyn std::error::Error>>
 where R: EucRing + FromStr, for<'x> &'x R: EucRingOps<R> { 
-    let l = load_link(&args.name, &args.link, args.mirror)?;
+    let l = load_link(&args.link, args.mirror)?;
     let (h, t) = parse_pair::<R>(&args.c_value)?;
 
     if args.reduced && !t.is_zero() { 
@@ -71,8 +68,7 @@ mod tests {
     #[test]
     fn test1() { 
         let args = Args { 
-            name: "3_1".to_string(), 
-            link: None, 
+            link: "3_1".to_string(), 
             c_value: "0".to_string(), 
             c_type: CType::Z, 
             mirror: false, 
@@ -87,8 +83,7 @@ mod tests {
     #[test]
     fn test2() { 
         let args = Args { 
-            name: "".to_string(),
-            link: Some("[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string()),
+            link: "[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string(),
             c_value: "0".to_string(),
             c_type: CType::Z,
             mirror: true,
@@ -107,8 +102,7 @@ mod tests {
         #[test]
         fn test_qpoly_h() { 
             let args = Args {
-                name: "3_1".to_string(),
-                link: None,
+                link: "3_1".to_string(),
                 c_value: "H".to_string(),
                 c_type: CType::Q,
                 mirror: false,
@@ -123,8 +117,7 @@ mod tests {
         #[test]
         fn test_qpoly_t() { 
             let args = Args {
-                name: "3_1".to_string(),
-                link: None,
+                link: "3_1".to_string(),
                 c_value: "0,T".to_string(),
                 c_type: CType::Q,
                 mirror: false,

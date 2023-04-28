@@ -8,10 +8,7 @@ use crate::utils::*;
 
 #[derive(Debug, clap::Args)]
 pub struct Args { 
-    name: String,
-
-    #[arg(short, long)]
-    link: Option<String>,
+    link: String,
 
     #[arg(short, long, default_value = "0")]
     c_value: String,
@@ -48,7 +45,7 @@ where R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
         return err!("{t} != 0 is not allowed for reduced.");
     }
     
-    let l = load_link(&args.name, &args.link, args.mirror)?;
+    let l = load_link(&args.link, args.mirror)?;
     let c = KhComplex::new(&l, &h, &t, args.reduced);
     
     let vs = if args.with_alpha { 
@@ -96,8 +93,7 @@ mod tests {
     #[test]
     fn test1() { 
         let args = Args {
-        	name: "3_1".to_string(),
-            link: None,
+        	link: "3_1".to_string(),
         	c_value: "0".to_string(),
         	c_type: CType::Z,
         	mirror: false,
@@ -113,8 +109,7 @@ mod tests {
     #[test]
     fn test2() { 
         let args = Args {
-        	name: "".to_string(),
-            link: Some("[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string()),
+        	link: "[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string(),
         	c_value: "2".to_string(),
         	c_type: CType::Z,
         	mirror: true,
@@ -134,14 +129,14 @@ mod tests {
         #[test]
         fn test_zpoly_h() { 
             let args = Args {
-                name: "3_1".to_string(),
-                link: None,
+                link: "3_1".to_string(),
                 c_value: "H".to_string(),
                 c_type: CType::Z,
                 mirror: false,
                 reduced: false,
                 with_alpha: false,
-                no_simplify: false
+                no_simplify: false,
+                debug: false
             };
             let res = run(&args);
             assert!(res.is_ok());
@@ -150,14 +145,14 @@ mod tests {
         #[test]
         fn test_zpoly_t() { 
             let args = Args {
-                name: "3_1".to_string(),
-                link: None,
+                link: "3_1".to_string(),
                 c_value: "T".to_string(),
                 c_type: CType::Z,
                 mirror: false,
                 reduced: false,
                 with_alpha: false,
-                no_simplify: false
+                no_simplify: false,
+                debug: false
             };
             let res = run(&args);
             assert!(res.is_ok());
@@ -166,14 +161,14 @@ mod tests {
         #[test]
         fn test_zpoly_ht() { 
             let args = Args {
-                name: "3_1".to_string(),
-                link: None,
+                link: "3_1".to_string(),
                 c_value: "H,T".to_string(),
                 c_type: CType::Z,
                 mirror: false,
                 reduced: false,
                 with_alpha: false,
-                no_simplify: false
+                no_simplify: false,
+                debug: false
             };
             let res = run(&args);
             assert!(res.is_ok());

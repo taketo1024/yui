@@ -36,15 +36,18 @@ where Output: serde::de::DeserializeOwned {
     Ok(data)
 }
 
-pub fn load_link(name: &String, pd_code: &Option<String>, mirror: bool) -> Result<Link, Box<dyn std::error::Error>> { 
+pub fn load_link(link: &String, mirror: bool) -> Result<Link, Box<dyn std::error::Error>> { 
     type PDCode = Vec<[Edge; 4]>;
+    
     let l = { 
-        if let Some(pd_code) = pd_code { 
-            let pd_code: PDCode = serde_json::from_str(&pd_code)?;
+        let path = format!("{}/links/{}.json", RESOURCE_DIR, link);
+        
+        if let Ok(pd_code) = serde_json::from_str::<PDCode>(&link) { 
             Link::from_pd_code(pd_code)
-        } else { 
-            let path = format!("{}/links/{}.json", RESOURCE_DIR, name);
+        } else if std::path::Path::new(&path).exists() { 
             Link::load(&path)?
+        } else { 
+            return err!("invalid input link: '{}'", link);
         }
     };
 

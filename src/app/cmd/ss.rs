@@ -8,10 +8,7 @@ use crate::utils::*;
 
 #[derive(Debug, clap::Args)]
 pub struct Args { 
-    name: String,
-
-    #[arg(short, long)]
-    link: Option<String>,
+    link: String,
 
     #[arg(short, long)]
     c_value: String,
@@ -45,14 +42,14 @@ pub struct BatchArgs {
 }
 
 pub fn run(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
-    info!("compute ss: {}, c = {}", args.name, args.c_value);
+    info!("compute ss: {}, c = {}", args.link, args.c_value);
 
-    let l = load_link(&args.name, &args.link, args.mirror)?;
+    let l = load_link(&args.link, args.mirror)?;
     let s = guard_panic(|| 
         dispatch_eucring!(&args.c_value, &args.c_type, compute_ss, &l, &args.c_value, args.reduced)
     )?;
 
-    info!("{}: ss = {} (c = {})", args.name, s, args.c_value);
+    info!("{}: ss = {} (c = {})", args.link, s, args.c_value);
 
     Ok(s.to_string())
 }
@@ -108,8 +105,7 @@ mod tests {
     #[test]
     fn test1() { 
         let args = Args {
-        	name: "3_1".to_string(),
-            link: None,
+            link: "3_1".to_string(),
         	c_value: "2".to_string(),
         	c_type: CType::Z,
             mirror: false,
@@ -117,14 +113,15 @@ mod tests {
             debug: false
         };
         let res = run(&args);
+
         assert!(res.is_ok());
+        assert_eq!(res.unwrap(), "-2".to_string());
     }
 
     #[test]
     fn test2() { 
         let args = Args {
-        	name: "4_1".to_string(),
-            link: Some("[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string()),
+        	link: "[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string(),
         	c_value: "3".to_string(),
         	c_type: CType::Z,
             mirror: false,
@@ -132,6 +129,28 @@ mod tests {
             debug: false
         };
         let res = run(&args);
+
         assert!(res.is_ok());
+        assert_eq!(res.unwrap(), "-2".to_string());
+    }
+
+    #[cfg(feature = "poly")]
+    mod poly_tests { 
+        use super::*;
+        #[test]
+        fn test1() { 
+            let args = Args {
+                link: "[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string(),
+                c_value: "H".to_string(),
+                c_type: CType::Q,
+                mirror: false,
+                reduced: true,
+                debug: false
+            };
+            let res = run(&args);
+            
+            assert!(res.is_ok());
+            assert_eq!(res.unwrap(), "-2".to_string());
+        }    
     }
 }

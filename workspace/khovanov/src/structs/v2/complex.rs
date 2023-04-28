@@ -135,7 +135,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         if !x.is_resolved() { 
             self.append_x(x)
         } else { 
-            todo!()
+            self.append_a(x)
         }
     }
 
@@ -167,6 +167,27 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
 
         self.len += 1;
+
+        debug_assert!(self.validate_edges());
+    }
+
+    fn append_a(&mut self, x: &Crossing) {
+        assert!(x.is_resolved());
+
+        let verts = std::mem::take(&mut self.vertices);
+        let c = Cob::id(&Tng::from_a(x));
+
+        self.vertices = verts.into_iter().map(|(k, mut v)| { 
+            v.tng.connect(c.src());
+
+            modify!(v.out_edges, |edges: HashMap<KhEnhState, Mor<R>>| { 
+                edges.into_iter().map(|(k, f)| { 
+                    (k, f.connect(&c))
+                }).collect()
+            });
+    
+            (k, v)
+        }).collect();
 
         debug_assert!(self.validate_edges());
     }
@@ -560,6 +581,16 @@ mod tests {
         assert_eq!(c.len(), 2);
         assert_eq!(c.rank(0), 1);
         assert_eq!(c.rank(1), 1);
+    }
+
+    #[test]
+    fn single_x_resolved() { 
+        let mut c = TngComplex::new(&0, &0, (0, 0));
+        let x = Crossing::from_pd_code([0,1,2,3]).resolved(Resolution::Res0);
+        c.append(&x);
+
+        assert_eq!(c.len(), 1);
+        assert_eq!(c.rank(0), 1);
     }
 
     #[test]

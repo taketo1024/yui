@@ -1,9 +1,9 @@
 use itertools::Itertools;
 use num_traits::Zero;
-use yui_core::{Ring, RingOps};
+use yui_core::{Ring, RingOps, EucRing, EucRingOps};
 use yui_link::Link;
 
-use crate::KhComplex;
+use crate::{KhComplex, KhComplexBigraded, KhHomology, KhHomologyBigraded};
 
 use super::builder::TngComplexBuilder;
 
@@ -30,6 +30,30 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let deg_shift = Self::deg_shift_for(l, reduced);
         Self::_new(complex, canon_cycles, reduced, deg_shift)
     }        
+}
+
+impl<R> KhComplexBigraded<R>
+where R: Ring, for<'x> &'x R: RingOps<R> { 
+    pub fn new_v2(l: Link, reduced: bool) -> Self { 
+        let c = KhComplex::new_v2(&l, &R::zero(), &R::zero(), reduced);
+        c.as_bigraded()
+    }
+}
+
+impl<R> KhHomology<R> 
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    pub fn new_v2(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
+        let complex = KhComplex::new_v2(l, h, t, reduced);
+        Self::from(&complex)
+    }
+}
+
+impl<R> KhHomologyBigraded<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    pub fn new_v2(l: Link, reduced: bool) -> Self {
+        let c = KhComplexBigraded::new_v2(l, reduced);
+        Self::from(&c)
+    }
 }
 
 #[cfg(test)]

@@ -6,10 +6,7 @@ use crate::utils::*;
 
 #[derive(Debug, clap::Args)]
 pub struct Args { 
-    name: String,
-
-    #[arg(short, long)]
-    link: Option<String>,
+    link: String,
 
     #[arg(short, long, default_value = "0")]
     c_value: String,
@@ -25,6 +22,12 @@ pub struct Args {
 
     #[arg(short, long)]
     bigraded: bool,
+
+    #[arg(long)]
+    old: bool,
+
+    #[arg(long, default_value_t = false)]
+    pub debug: bool
 }
 
 pub fn run(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
@@ -37,26 +40,36 @@ pub fn run(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
 
 fn compute_bigraded<R>(args: &Args) -> Result<String, Box<dyn std::error::Error>>
 where R: EucRing + FromStr, for<'x> &'x R: EucRingOps<R> { 
-    let l = load_link(&args.name, &args.link, args.mirror)?;
+    let l = load_link(&args.link, args.mirror)?;
     if args.c_value != "0" { 
         return err!("--bigraded only supported for `c = 0`.")
     }
 
-    let h = KhHomologyBigraded::new(l, args.reduced);
-    let table = h.table_string();
+    let kh = if args.old { 
+        KhHomologyBigraded::new_v1(l, args.reduced)
+    } else {
+        KhHomologyBigraded::new(l, args.reduced)
+    };
+
+    let table = kh.table_string();
     Ok(table)
 }
 
 fn compute_homology<R>(args: &Args) -> Result<String, Box<dyn std::error::Error>>
 where R: EucRing + FromStr, for<'x> &'x R: EucRingOps<R> { 
-    let l = load_link(&args.name, &args.link, args.mirror)?;
+    let l = load_link(&args.link, args.mirror)?;
     let (h, t) = parse_pair::<R>(&args.c_value)?;
 
     if args.reduced && !t.is_zero() { 
         return err!("{t} != 0 is not allowed for reduced.");
     }
 
-    let kh = KhHomology::new(&l, &h, &t, args.reduced);
+    let kh = if args.old { 
+        KhHomology::new_v1(&l, &h, &t, args.reduced)
+    } else {
+        KhHomology::new(&l, &h, &t, args.reduced)
+    };
+
     let res = kh.to_string();
     Ok(res)
 }
@@ -68,13 +81,14 @@ mod tests {
     #[test]
     fn test1() { 
         let args = Args { 
-            name: "3_1".to_string(), 
-            link: None, 
+            link: "3_1".to_string(), 
             c_value: "0".to_string(), 
             c_type: CType::Z, 
             mirror: false, 
             reduced: false, 
-            bigraded: false
+            bigraded: false,
+            old: false,
+            debug: false
         };
         let res = run(&args);
         assert!(res.is_ok());
@@ -83,13 +97,14 @@ mod tests {
     #[test]
     fn test2() { 
         let args = Args { 
-            name: "".to_string(),
-            link: Some("[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string()),
+            link: "[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string(),
             c_value: "0".to_string(),
             c_type: CType::Z,
             mirror: true,
             reduced: true,
-            bigraded: true
+            bigraded: true,
+            old: false,
+            debug: false
         };
         let res = run(&args);
         assert!(res.is_ok());
@@ -102,13 +117,14 @@ mod tests {
         #[test]
         fn test_qpoly_h() { 
             let args = Args {
-                name: "3_1".to_string(),
-                link: None,
+                link: "3_1".to_string(),
                 c_value: "H".to_string(),
                 c_type: CType::Q,
                 mirror: false,
                 reduced: false,
-                bigraded: false
+                bigraded: false,
+                old: false,
+                debug: false
             };
             let res = run(&args);
             assert!(res.is_ok());
@@ -117,13 +133,14 @@ mod tests {
         #[test]
         fn test_qpoly_t() { 
             let args = Args {
-                name: "3_1".to_string(),
-                link: None,
+                link: "3_1".to_string(),
                 c_value: "0,T".to_string(),
                 c_type: CType::Q,
                 mirror: false,
                 reduced: false,
-                bigraded: false
+                bigraded: false,
+                old: false,
+                debug: false
             };
             let res = run(&args);
             assert!(res.is_ok());

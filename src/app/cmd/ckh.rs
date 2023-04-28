@@ -2,16 +2,13 @@ use std::str::FromStr;
 use itertools::Itertools;
 use yui_core::{Ring, RingOps};
 use yui_homology::ChainComplex;
-use yui_homology::Grid;
+use yui_homology::fmt::FmtTable;
 use yui_khovanov::KhComplex;
 use crate::utils::*;
 
 #[derive(Debug, clap::Args)]
 pub struct Args { 
-    name: String,
-
-    #[arg(short, long)]
-    link: Option<String>,
+    link: String,
 
     #[arg(short, long, default_value = "0")]
     c_value: String,
@@ -25,11 +22,20 @@ pub struct Args {
     #[arg(short, long)]
     reduced: bool,
 
+    #[arg(short, long)]
+    bigraded: bool,
+
+    #[arg(short = 'g', long)]
+    print_gens: bool,
+
     #[arg(short = 'a', long)]
     with_alpha: bool,
 
     #[arg(short = 'n', long)]
     no_simplify: bool,
+
+    #[arg(long, default_value_t = false)]
+    pub debug: bool
 }
 
 pub fn run(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
@@ -38,15 +44,20 @@ pub fn run(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
 
 fn describe_ckh<R>(args: &Args) -> Result<String, Box<dyn std::error::Error>>
 where R: Ring + FromStr, for<'x> &'x R: RingOps<R> { 
-    use string_builder::Builder;
-    
     let (h, t) = parse_pair::<R>(&args.c_value)?;
     if args.reduced && !t.is_zero() { 
         return err!("{t} != 0 is not allowed for reduced.");
     }
+    if args.bigraded && !(h.is_zero() && t.is_zero()) {
+        return err!("--bigraded only supported for `c = 0`.");
+    }
     
-    let l = load_link(&args.name, &args.link, args.mirror)?;
-    let c = KhComplex::new(&l, &h, &t, args.reduced);
+    let l = load_link(&args.link, args.mirror)?;
+    let c = if args.no_simplify { 
+        KhComplex::new_v1(&l, &h, &t, args.reduced)
+    } else { 
+        KhComplex::new(&l, &h, &t, args.reduced)
+    };
     
     let vs = if args.with_alpha { 
         c.canon_cycles().iter().map(|z| {
@@ -56,27 +67,28 @@ where R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
         vec![]
     };
 
-    let (c, vs) = if args.no_simplify { 
-        (c.as_generic(), vs)
+    let mut b = string_builder::Builder::new(1024);
+
+    if args.bigraded {
+        let c = c.as_bigraded();
+
+        b.append(c.table_string() + "\n");
+
+        if args.print_gens {
+            b.append(c.desc_d_gens());
+        } else {
+            b.append(c.desc_d());
+        }
     } else { 
-        c.as_generic().simplify_with(vs)
-    };
-
-    let mut b = Builder::new(1024);
-
-    b.append(format!("-------\nComplex\n-------\n\n"));
-    b.append(format!("{}\n", c.to_string()));
-
-    b.append(format!("-------------\nDifferentials\n-------------\n\n"));
-    for i in c.indices() {
-        let d = c.d_matrix(i);
-        b.append(format!("d[{}]: {} -> {}\n\n", i, c[i], c[i+1]));
-        b.append(d.to_dense().to_string());
-        b.append("\n\n");
+        if args.print_gens {
+            b.append(c.desc_d_gens());
+        } else {
+            b.append(c.desc_d());
+        }    
     }
 
     if args.with_alpha { 
-        b.append(format!("----------\nLee cycles\n----------\n\n"));
+        b.append("\n\n");
         for (i, (_, v)) in vs.iter().enumerate() {
             b.append(format!("a[{i}] = [{}]\n", v.to_dense().iter().map(|r| r.to_string()).collect_vec().join(", ")));
         }
@@ -93,14 +105,16 @@ mod tests {
     #[test]
     fn test1() { 
         let args = Args {
-        	name: "3_1".to_string(),
-            link: None,
+        	link: "3_1".to_string(),
         	c_value: "0".to_string(),
         	c_type: CType::Z,
         	mirror: false,
         	reduced: false,
+            bigraded: false,
+            print_gens: false,
         	with_alpha: false,
-            no_simplify: false
+            no_simplify: false,
+            debug: false
         };
         let res = run(&args);
         assert!(res.is_ok());
@@ -109,14 +123,16 @@ mod tests {
     #[test]
     fn test2() { 
         let args = Args {
-        	name: "".to_string(),
-            link: Some("[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string()),
+        	link: "[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string(),
         	c_value: "2".to_string(),
         	c_type: CType::Z,
         	mirror: true,
         	reduced: true,
+            bigraded: false,
+            print_gens: true,
         	with_alpha: true,
-            no_simplify: false
+            no_simplify: false,
+            debug: false
         };
         let res = run(&args);
         assert!(res.is_ok());
@@ -129,14 +145,16 @@ mod tests {
         #[test]
         fn test_zpoly_h() { 
             let args = Args {
-                name: "3_1".to_string(),
-                link: None,
+                link: "3_1".to_string(),
                 c_value: "H".to_string(),
                 c_type: CType::Z,
                 mirror: false,
                 reduced: false,
+                bigraded: false,
+                print_gens: false,
                 with_alpha: false,
-                no_simplify: false
+                no_simplify: false,
+                debug: false
             };
             let res = run(&args);
             assert!(res.is_ok());
@@ -145,14 +163,16 @@ mod tests {
         #[test]
         fn test_zpoly_t() { 
             let args = Args {
-                name: "3_1".to_string(),
-                link: None,
+                link: "3_1".to_string(),
                 c_value: "T".to_string(),
                 c_type: CType::Z,
                 mirror: false,
                 reduced: false,
+                bigraded: false,
+                print_gens: false,
                 with_alpha: false,
-                no_simplify: false
+                no_simplify: false,
+                debug: false
             };
             let res = run(&args);
             assert!(res.is_ok());
@@ -161,14 +181,16 @@ mod tests {
         #[test]
         fn test_zpoly_ht() { 
             let args = Args {
-                name: "3_1".to_string(),
-                link: None,
+                link: "3_1".to_string(),
                 c_value: "H,T".to_string(),
                 c_type: CType::Z,
                 mirror: false,
                 reduced: false,
+                bigraded: false,
+                print_gens: false,
                 with_alpha: false,
-                no_simplify: false
+                no_simplify: false,
+                debug: false
             };
             let res = run(&args);
             assert!(res.is_ok());

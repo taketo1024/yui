@@ -15,8 +15,7 @@ pub struct CliArgs {
 pub enum Cmd {
     Kh(kh::Args),
     Ckh(ckh::Args),
-    SS(ss::Args),
-    SSBatch(ss::BatchArgs)
+    SS(ss::Args)
 }
 
 impl Cmd { 
@@ -24,8 +23,7 @@ impl Cmd {
         match self { 
             Cmd::Kh(args)  => args.debug,
             Cmd::Ckh(args) => args.debug,
-            Cmd::SS(args)  => args.debug,
-            _ => false
+            Cmd::SS(args)  => args.debug
         }
     }
 }
@@ -77,8 +75,7 @@ impl App {
             match &args.command { 
                 Cmd::Kh(args)      => kh::run(args),
                 Cmd::Ckh(args)     => ckh::run(args),
-                Cmd::SS(args)      => ss::run(args),
-                Cmd::SSBatch(args) => ss::run_batch(args)
+                Cmd::SS(args)      => ss::run(args)
             }
         )
     }

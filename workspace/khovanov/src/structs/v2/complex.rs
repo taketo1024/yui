@@ -132,12 +132,26 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn append(&mut self, x: &Crossing) {
         info!("({}) append: {x}", self.nverts());
 
+        if !x.is_resolved() { 
+            self.append_x(x)
+        } else { 
+            todo!()
+        }
+    }
+
+    fn append_x(&mut self, x: &Crossing) {
+        assert!(!x.is_resolved());
+
         let verts = std::mem::take(&mut self.vertices);
+
         let sdl = CobComp::from(x);
+        let c0 = Cob::id(sdl.src());
+        let c1 = Cob::id(sdl.tgt());
+
         let mut rmv = HashSet::new();
 
         for (_, v) in verts.into_iter() { 
-            let vs = Self::dupl_01(v, &sdl);
+            let vs = Self::make_cone(v, &c0, &c1, &sdl);
             for v in vs { 
                 for (l, f) in v.out_edges.iter() { 
                     if f.is_zero() { 
@@ -157,60 +171,48 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug_assert!(self.validate_edges());
     }
 
-    fn dupl_01(v: TngVertex<R>, sdl: &CobComp) -> [TngVertex<R>; 2] {
+    fn make_cone(v: TngVertex<R>, c0: &Cob, c1: &Cob, sdl: &CobComp) -> [TngVertex<R>; 2] {
         use Resolution::{Res0, Res1};
 
         let mut v0 = v.clone();
         let mut v1 = v;
 
-        v0.key.state.push(Res0);
-        v1.key.state.push(Res1);
+        let mut c = Cob::id(&v0.tng);
+        c.connect_comp(sdl.clone());
+        
+        Self::extend_by(&mut v0, c0, Res0);
+        Self::extend_by(&mut v1, c1, Res1);
+        Self::insert_sdl(&mut v0, &mut v1, c);
+
+        [v0, v1]
+    }
+
+    fn extend_by(v: &mut TngVertex<R>, c: &Cob, r: Resolution) {
+        v.key.state.push(r);
+        v.tng.connect(c.src());
 
         // append 0 / 1 to in_edges.
-        modify!(v0.in_edges, |e: HashSet<KhEnhState>| { 
-            e.into_iter().map(|mut k| { 
-                k.state.push(Res0);
-                k
-            }).collect()
-        });
-
-        modify!(v1.in_edges, |e: HashSet<KhEnhState>| { 
-            e.into_iter().map(|mut k| { 
-                k.state.push(Res1);
+        modify!(v.in_edges, |edges: HashSet<KhEnhState>| { 
+            edges.into_iter().map(|mut k| { 
+                k.state.push(r);
                 k
             }).collect()
         });
 
         // append 0 / 1 to out_edges with id-cob connected.
-        let c0 = Cob::id(sdl.src());
-        let c1 = Cob::id(sdl.tgt());
-
-        modify!(v0.out_edges, |e: HashMap<KhEnhState, Mor<R>>| { 
-            e.into_iter().map(|(mut k, f)| { 
-                k.state.push(Res0);
-                (k, f.connect(&c0))
+        let e = if r.is_zero() { R::one() } else { -R::one() };
+        modify!(v.out_edges, |edges: HashMap<KhEnhState, Mor<R>>| { 
+            edges.into_iter().map(|(mut k, f)| { 
+                k.state.push(r);
+                (k, f.connect(c) * &e)
             }).collect()
         });
+    }
 
-        modify!(v1.out_edges, |e: HashMap<KhEnhState, Mor<R>>| { 
-            e.into_iter().map(|(mut k, f)| { 
-                k.state.push(Res1);
-                (k, -f.connect(&c1))
-            }).collect()
-        });
-
-        // insert sdl between v0 and v1.
-        let mut f = Cob::id(&v0.tng);
-        f.connect_comp(sdl.clone());
-
-        v0.out_edges.insert(v1.key, Mor::from_gen(f));
+    fn insert_sdl(v0: &mut TngVertex<R>, v1: &mut TngVertex<R>, sdl: Cob) { 
+        let f = Mor::from_gen(sdl);
+        v0.out_edges.insert(v1.key, f);
         v1.in_edges.insert(v0.key);
-
-        // modify tngs of v0 and v1.
-        v0.tng.connect(sdl.src().clone());
-        v1.tng.connect(sdl.tgt().clone());
-
-        [v0, v1]
     }
 
     pub fn find_loop(&self, exclude: Option<Edge>) -> Option<(KhEnhState, usize, &TngComp)> { 

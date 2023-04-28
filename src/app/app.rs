@@ -8,10 +8,7 @@ use crate::utils::*;
 #[command(propagate_version = true)]
 pub struct CliArgs {
     #[command(subcommand)]
-    pub command: Cmd,
-
-    #[arg(long, default_value_t = false)]
-    pub debug: bool
+    pub command: Cmd
 }
 
 #[derive(Subcommand, Debug)]
@@ -20,6 +17,17 @@ pub enum Cmd {
     Ckh(ckh::Args),
     SS(ss::Args),
     SSBatch(ss::BatchArgs)
+}
+
+impl Cmd { 
+    fn debug(&self) -> bool { 
+        match self { 
+            Cmd::Kh(args)  => args.debug,
+            Cmd::Ckh(args) => args.debug,
+            Cmd::SS(args)  => args.debug,
+            _ => false
+        }
+    }
 }
 
 pub struct App {}
@@ -32,7 +40,7 @@ impl App {
     pub fn run(&self) -> Result<String, i32> { 
         let args = CliArgs::parse();
 
-        if args.debug { 
+        if args.command.debug() { 
             self.init_logger();
         }
 

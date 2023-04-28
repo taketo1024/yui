@@ -30,6 +30,9 @@ pub struct Args {
 
     #[arg(short = 'n', long)]
     no_simplify: bool,
+
+    #[arg(long, default_value_t = false)]
+    pub debug: bool
 }
 
 pub fn run(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
@@ -100,7 +103,8 @@ mod tests {
         	mirror: false,
         	reduced: false,
         	with_alpha: false,
-            no_simplify: false
+            no_simplify: false,
+            debug: false
         };
         let res = run(&args);
         assert!(res.is_ok());
@@ -116,7 +120,8 @@ mod tests {
         	mirror: true,
         	reduced: true,
         	with_alpha: true,
-            no_simplify: false
+            no_simplify: false,
+            debug: false
         };
         let res = run(&args);
         assert!(res.is_ok());

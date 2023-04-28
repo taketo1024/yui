@@ -25,6 +25,9 @@ pub struct Args {
 
     #[arg(short, long)]
     bigraded: bool,
+
+    #[arg(long, default_value_t = false)]
+    pub debug: bool
 }
 
 pub fn run(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
@@ -74,7 +77,8 @@ mod tests {
             c_type: CType::Z, 
             mirror: false, 
             reduced: false, 
-            bigraded: false
+            bigraded: false,
+            debug: false
         };
         let res = run(&args);
         assert!(res.is_ok());
@@ -89,7 +93,8 @@ mod tests {
             c_type: CType::Z,
             mirror: true,
             reduced: true,
-            bigraded: true
+            bigraded: true,
+            debug: false
         };
         let res = run(&args);
         assert!(res.is_ok());
@@ -108,7 +113,8 @@ mod tests {
                 c_type: CType::Q,
                 mirror: false,
                 reduced: false,
-                bigraded: false
+                bigraded: false,
+                debug: false
             };
             let res = run(&args);
             assert!(res.is_ok());
@@ -123,7 +129,8 @@ mod tests {
                 c_type: CType::Q,
                 mirror: false,
                 reduced: false,
-                bigraded: false
+                bigraded: false,
+                debug: false
             };
             let res = run(&args);
             assert!(res.is_ok());

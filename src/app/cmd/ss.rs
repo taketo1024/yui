@@ -24,6 +24,9 @@ pub struct Args {
 
     #[arg(short, long)]
     reduced: bool,
+
+    #[arg(long, default_value_t = false)]
+    pub debug: bool
 }
 
 #[derive(Debug, clap::Args)]
@@ -110,7 +113,8 @@ mod tests {
         	c_value: "2".to_string(),
         	c_type: CType::Z,
             mirror: false,
-            reduced: true
+            reduced: true,
+            debug: false
         };
         let res = run(&args);
         assert!(res.is_ok());
@@ -124,7 +128,8 @@ mod tests {
         	c_value: "3".to_string(),
         	c_type: CType::Z,
             mirror: false,
-            reduced: true
+            reduced: true,
+            debug: false
         };
         let res = run(&args);
         assert!(res.is_ok());

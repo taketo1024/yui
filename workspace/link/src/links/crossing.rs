@@ -65,6 +65,12 @@ impl Crossing {
         }
     }
 
+    pub fn resolved(&self, r: Resolution) -> Self { 
+        let mut x = self.clone();
+        x.resolve(r);
+        x
+    }
+
     pub fn mirror(&mut self) { 
         self.ctype = self.ctype.mirror();
     }
@@ -89,12 +95,6 @@ impl Crossing {
             V  => (comp(0, 3), comp(1, 2)),
             H  => (comp(0, 1), comp(2, 3))
         }
-    }
-
-    pub fn res_arcs(&self, r: Resolution) -> (LinkComp, LinkComp) { 
-        let mut x = self.clone();
-        x.resolve(r);
-        x.arcs()        
     }
 }
 

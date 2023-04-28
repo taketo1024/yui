@@ -377,8 +377,8 @@ impl CobComp {
 
 impl From<&Crossing> for CobComp {
     fn from(x: &Crossing) -> Self {
-        let src = Tng::res(x, Resolution::Res0);
-        let tgt = Tng::res(x, Resolution::Res1);
+        let src = Tng::from_x(x, Resolution::Res0);
+        let tgt = Tng::from_x(x, Resolution::Res1);
         Self::plain(src, tgt)
     }
 }

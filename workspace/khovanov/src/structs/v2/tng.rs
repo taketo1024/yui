@@ -132,8 +132,15 @@ impl Tng {
         tng
     }
 
-    pub fn res(x: &Crossing, r: Resolution) -> Self { 
-        let (r0, r1) = x.res_arcs(r);
+    pub fn from_x(x: &Crossing, r: Resolution) -> Self { 
+        assert!(!x.is_resolved());
+        Self::from_a(&x.resolved(r))
+    }
+
+    pub fn from_a(x: &Crossing) -> Self { 
+        assert!(x.is_resolved());
+
+        let (r0, r1) = x.arcs();
         let (mut c0, c1) = (TngComp::from(&r0), TngComp::from(&r1));
 
         if c0.is_connectable(&c1) { 

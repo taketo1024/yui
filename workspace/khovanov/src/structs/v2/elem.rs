@@ -29,7 +29,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn append(&mut self, i: usize, x: &Crossing) { 
         let r = self.state[i];
-        let arcs = x.res_arcs(r);
+        let arcs = x.resolved(r).arcs();
         let tng = Tng::new(vec![
             TngComp::from(&arcs.0), 
             TngComp::from(&arcs.1)

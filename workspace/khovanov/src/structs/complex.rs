@@ -92,6 +92,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         KhComplexBigraded { complex, reduced }
     }
 
+    pub fn desc_d_gens_at(&self, i: isize) -> String {
+        self.complex.desc_d_gens_at(i)
+    }
+
+    pub fn desc_d_gens(&self) -> String { 
+        self.complex.desc_d_gens()
+    }
+    
+    pub fn print_d_gens(&self) {
+        self.complex.print_d_gens()
+    }
+
     pub fn deg_shift_for(l: &Link, reduced: bool) -> (isize, isize) {
         let (n_pos, n_neg) = l.signed_crossing_nums();
         let (n_pos, n_neg) = (n_pos as isize, n_neg as isize);
@@ -176,6 +188,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn is_reduced(&self) -> bool { 
         self.reduced
     }
+
+    pub fn desc_d_gens(&self) -> String { 
+        self.complex.desc_d_gens()
+    }
+    
+    pub fn print_d_gens(&self) {
+        self.complex.print_d_gens()
+    }
+
 }
 
 impl<R> Index<[isize; 2]> for KhComplexBigraded<R>

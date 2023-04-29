@@ -31,10 +31,10 @@ pub struct Args {
     #[arg(short = 'a', long)]
     with_alpha: bool,
 
-    #[arg(short = 'n', long)]
+    #[arg(long)]
     no_simplify: bool,
 
-    #[arg(long, default_value_t = false)]
+    #[arg(long)]
     pub debug: bool
 }
 

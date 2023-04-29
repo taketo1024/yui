@@ -26,7 +26,7 @@ pub struct Args {
     #[arg(long)]
     old: bool,
 
-    #[arg(long, default_value_t = false)]
+    #[arg(long)]
     pub debug: bool
 }
 

@@ -13,39 +13,41 @@ use yui_core::{EucRing, EucRingOps};
 use yui_matrix::sparse::*;
 use crate::KhComplex;
 
-pub fn ss_invariant<R>(l: &Link, c: &R, reduced: bool) -> i32
+pub fn ss_invariant<R>(l: &Link, c: &R, n: usize, reduced: bool) -> i32
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
-    ss_invariant_v2(l, c, reduced)
+    ss_invariant_v2(l, c, n, reduced)
 }
 
-pub fn ss_invariant_v1<R>(l: &Link, c: &R, reduced: bool) -> i32
+pub fn ss_invariant_v1<R>(l: &Link, c: &R, n: usize, reduced: bool) -> i32
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
-    compute_ss(l, c, reduced, 1)
+    compute_ss(l, c, n, reduced, 1)
 }
 
-pub fn ss_invariant_v2<R>(l: &Link, c: &R, reduced: bool) -> i32
+pub fn ss_invariant_v2<R>(l: &Link, c: &R, n: usize, reduced: bool) -> i32
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
-    compute_ss(l, c, reduced, 2)
+    compute_ss(l, c, n, reduced, 2)
 }
 
-fn compute_ss<R>(l: &Link, c: &R, reduced: bool, ver: usize) -> i32
+fn compute_ss<R>(l: &Link, c: &R, n: usize, reduced: bool, ver: usize) -> i32
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
     assert!(!c.is_zero());
     assert!(!c.is_unit());
+    assert!(n >= 1);
 
-    info!("compute ss, n = {}, c = {} ({}).", l.crossing_num(), c, std::any::type_name::<R>());
+    info!("compute ss, c = {c} ({}), n = {n}.", std::any::type_name::<R>());
 
+    let h = (0..n).fold(R::one(), |p, _| p * c); // h = c^n
     let (a0, a1, vs) = match ver { 
-        1 => prepare_v1(l, c, reduced),
-        2 => prepare_v2(l, c, reduced),
+        1 => prepare_v1(l, &h, reduced),
+        2 => prepare_v2(l, &h, reduced),
         _ => panic!()
     };
 
-    let (h, p, _) = HomologyCalc::calculate_with_trans(a0, a1);
+    let (kh, p, _) = HomologyCalc::calculate_with_trans(a0, a1);
 
     info!("homology: {h}");
     
-    let r = h.rank();
+    let r = kh.rank();
     let p = p.submat_rows(0..r).to_owned();
 
     let vs = vs.into_iter().enumerate().map(|(i, v)| { 
@@ -61,7 +63,9 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     let w = l.writhe();
     let r = l.seifert_circles().len() as i32;
-    let ss = 2 * d + w - r + 1;
+    let n = n as i32;
+
+    let ss = 2 * d + n * (w - r + 1);
 
     info!("d = {d}, w = {w}, r = {r}.");
     info!("ss = {ss} (c = {c}, {}).", if reduced { "reduced" } else { "unreduced" } );
@@ -136,8 +140,8 @@ mod tests {
 
     fn test(l: &Link, c: i32, value: i32) { 
         for (&r, &v) in cartesian!([true, false].iter(), [1, 2].iter()) { 
-            assert_eq!(compute_ss(&l, &c, r, v), value);
-            assert_eq!(compute_ss(&l.mirror(), &c, r, v), -value);
+            assert_eq!(compute_ss(&l, &c, 1, r, v), value);
+            assert_eq!(compute_ss(&l.mirror(), &c, 1, r, v), -value);
         }
     }
 
@@ -229,7 +233,7 @@ mod tests {
     #[cfg(not(debug_assertions))]
     fn test_k14() { 
         let l = Link::from_pd_code([[1,19,2,18],[19,1,20,28],[20,13,21,14],[12,17,13,18],[16,21,17,22],[5,15,6,14],[15,5,16,4],[6,27,7,28],[2,7,3,8],[26,3,27,4],[25,23,26,22],[11,9,12,8],[23,10,24,11],[9,24,10,25]]);
-        assert_eq!(ss_invariant_v2(&l, &2, true), -2);
-        assert_eq!(ss_invariant_v2(&l, &3, true), 0);
+        assert_eq!(ss_invariant_v2(&l, &2, 1, true), -2);
+        assert_eq!(ss_invariant_v2(&l, &3, 1, true), 0);
     }
 }

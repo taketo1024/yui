@@ -6,25 +6,25 @@ use crate::utils::*;
 
 #[derive(Debug, clap::Args)]
 pub struct Args { 
-    link: String,
+    pub link: String,
 
     #[arg(short, long)]
-    c_value: String,
+    pub c_value: String,
 
     #[arg(short = 't', long, default_value = "z")]
-    c_type: CType,
+    pub c_type: CType,
 
     #[arg(short, long)]
-    mirror: bool,
+    pub mirror: bool,
 
     #[arg(short = 'n', long, default_value = "1")]
-    order: usize,
+    pub order: usize,
 
     #[arg(short, long)]
-    reduced: bool,
+    pub reduced: bool,
 
     #[arg(long)]
-    old: bool,
+    pub old: bool,
 
     #[arg(long)]
     pub debug: bool

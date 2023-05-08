@@ -8,5 +8,5 @@ edition = "2021"
 [dependencies]
 auto-impl-ops = "0.2.1"
 num-traits = "0.2.15"
-regex = "1.7.1"
+regex = "1.8.1"
 yui-core = { path = "../../core" }

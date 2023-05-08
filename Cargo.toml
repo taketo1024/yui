@@ -29,15 +29,15 @@ debug = true
 overflow-checks = true
 
 [dependencies]
-clap = { version = "4.1.8", features = ["derive", "cargo"] }
-csv = "1.2.0"
+clap = { version = "4.2.7", features = ["derive", "cargo"] }
+csv = "1.2.1"
 derive_more = "0.99.17"
-indexmap = { version = "1.9.2", features = ["serde"] }
+indexmap = { version = "1.9.3", features = ["serde"] }
 log = "0.4.17"
 num-bigint = "0.4.3"
 num-traits = "0.2.15"
-regex = "1.7.1"
-serde_json = "1.0.93"
+regex = "1.8.1"
+serde_json = "1.0.96"
 simplelog = "0.12.1"
 string-builder = "0.2.0"
 yui-core  = { version = "0.1.0", path = "workspace/core" }
@@ -49,7 +49,7 @@ yui-matrix = { version = "0.1.0", path = "workspace/matrix" }
 yui-homology = { version = "0.1.0", path = "workspace/homology" }
 yui-link = { version = "0.1.0", path = "workspace/link" }
 yui-khovanov = { version = "0.1.0", path = "workspace/khovanov" }
-serde = "1.0.152"
+serde = { version = "1.0.162", features = ["derive"] }
 cfg-if = "1.0.0"
 yui-utils = { version = "0.1.0", path = "workspace/utils" }
 itertools = "0.10.5"

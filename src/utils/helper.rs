@@ -76,19 +76,15 @@ pub fn parse_pair<R: FromStr + Zero>(s: &String) -> Result<(R, R), Box<dyn std::
     err!("cannot parse '{}' as {}.", s, std::any::type_name::<R>())
 }
 
-pub fn write_csv(path: &String, records: Vec<&String>) -> Result<(), Box<dyn std::error::Error>> { 
+pub fn csv_writer(path: &String) -> Result<csv::Writer<std::fs::File>, Box<dyn std::error::Error>> { 
     use std::fs::OpenOptions;
 
     let file = OpenOptions::new()
         .write(true)
         .create(true)
-        .append(true)
         .open(&path)?;
 
-    let mut wtr = csv::Writer::from_writer(file);
+    let wtr = csv::Writer::from_writer(file);
 
-    wtr.write_record(records)?;
-    wtr.flush()?;
-
-    Ok(())
+    Ok(wtr)
 }

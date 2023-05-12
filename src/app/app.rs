@@ -1,6 +1,6 @@
 use log::{info, error};
 use clap::{Parser, Subcommand};
-use super::cmd::{kh, ckh, ss};
+use super::cmd::{kh, ckh, ss, ss_batch};
 use crate::utils::*;
 
 #[derive(Parser, Debug)]
@@ -15,7 +15,8 @@ pub struct CliArgs {
 pub enum Cmd {
     Kh(kh::Args),
     Ckh(ckh::Args),
-    SS(ss::Args)
+    SS(ss::Args),
+    SSBatch(ss_batch::Args),
 }
 
 impl Cmd { 
@@ -23,7 +24,8 @@ impl Cmd {
         match self { 
             Cmd::Kh(args)  => args.debug,
             Cmd::Ckh(args) => args.debug,
-            Cmd::SS(args)  => args.debug
+            Cmd::SS(args)  => args.debug,
+            Cmd::SSBatch(args)  => args.debug
         }
     }
 }
@@ -75,7 +77,8 @@ impl App {
             match &args.command { 
                 Cmd::Kh(args)      => kh::run(args),
                 Cmd::Ckh(args)     => ckh::run(args),
-                Cmd::SS(args)      => ss::run(args)
+                Cmd::SS(args)      => ss::run(args),
+                Cmd::SSBatch(args) => ss_batch::run(args),
             }
         )
     }

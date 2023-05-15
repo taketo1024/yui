@@ -89,7 +89,6 @@ macro_rules! try_std {
             CType::F3    => call!(F3, $method, $($args),*),
             CType::Gauss | 
             CType::Eisen => try_qint!($c_value, $c_type, $method, $($args),*),
-            _            => None
         }
     }}
 }

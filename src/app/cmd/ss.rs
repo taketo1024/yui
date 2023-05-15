@@ -11,7 +11,7 @@ pub struct Args {
     #[arg(short, long)]
     pub c_value: String,
 
-    #[arg(short = 't', long, default_value = "z")]
+    #[arg(short = 't', long, default_value = "Z")]
     pub c_type: CType,
 
     #[arg(short, long)]

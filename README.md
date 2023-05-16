@@ -78,7 +78,7 @@ $ cargo run --features poly -- kh 3_1 -t Q -c H
 ### Khovanov complex (`ckh`)
 
 ```
-Usage: ckh [OPTIONS] <LINK>
+Usage: ckh <LINK> [OPTIONS]
 
 Arguments:
   <LINK>  
@@ -138,7 +138,7 @@ C[0]: Z[H]² -> 0
 See [this paper](https://arxiv.org/abs/2211.02494) for detail.
 
 ```
-Usage: yui ss [OPTIONS] --c-value <C_VALUE> <LINK>
+Usage: ss <LINK> -c <C_VALUE> [OPTIONS]
 
 Arguments:
   <LINK>  

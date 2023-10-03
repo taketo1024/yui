@@ -8,10 +8,11 @@ edition = "2021"
 [dependencies]
 derive_more = "0.99.17"
 grouping_by = "0.2.2"
-itertools = "0.10.5"
-log = "0.4.17"
-num-traits = "0.2.15"
-sprs = { git = "https://github.com/sparsemat/sprs", branch = "master" }
+itertools = "0.11.0"
+log = "0.4.20"
+num-traits = "0.2.16"
+sprs = "0.11.1"
+# sprs = { git = "https://github.com/sparsemat/sprs", branch = "master" }
 yui-core = { version = "0.1.0", path = "../core" }
 yui-lin-comb = { version = "0.1.0", path = "../types/lin_comb" }
 yui-matrix = { version = "0.1.0", path = "../matrix" }

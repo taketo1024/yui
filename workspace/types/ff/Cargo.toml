@@ -7,6 +7,6 @@ edition = "2021"
 
 [dependencies]
 auto-impl-ops = "0.2.1"
-num-traits = "0.2.15"
+num-traits = "0.2.16"
 yui-core  = { version = "0.1.0", path = "../../core" }
 yui-utils = { version = "0.1.0", path = "../../utils" }

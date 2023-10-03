@@ -7,5 +7,5 @@ edition = "2021"
 
 [dependencies]
 is-even = "1.0.0"
-num-bigint = "0.4.3"
-num-traits = "0.2.15"
+num-bigint = "0.4.4"
+num-traits = "0.2.16"

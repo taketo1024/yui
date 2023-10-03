@@ -16,7 +16,8 @@ num-bigint = "0.4.4"
 num-traits = "0.2.16"
 rand = "0.8.5"
 rayon = "1.8.0"
-sprs = { git = "https://github.com/sparsemat/sprs", branch = "master" }
+sprs = "0.11.1"
+# sprs = { git = "https://github.com/sparsemat/sprs", branch = "master" }
 thread_local = "1.1.7"
 yui-core = { version = "0.1.0", path = "../core" }
 yui-quad-int = { version = "0.1.0", path = "../types/quad_int" }

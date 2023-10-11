@@ -72,10 +72,15 @@ pub struct BitSeq {
 impl BitSeq { 
     pub const MAX_LEN: usize = 64;
 
-    fn new(val: u64, len: usize) -> Self { 
+    pub fn new(val: u64, len: usize) -> Self { 
         assert!(len <= Self::MAX_LEN);
         assert!(val < (1 << len));
         Self { val, len }
+    }
+
+    pub fn new_rev(val: u64, len: usize) -> Self { 
+        let val = val.reverse_bits() >> (64 - len);
+        Self::new(val, len)
     }
 
     pub fn empty() -> Self { 
@@ -202,11 +207,6 @@ impl BitSeq {
         self.val == (other.val & ((1 << self.len) - 1))
     }
 
-    pub fn overwrite(&mut self, other: &Self) {
-        assert!(self.len >= other.len);
-        self.val = self.val & !((1 << other.len) - 1) | other.val
-    }
-
     pub fn generate(len: usize) -> Vec<BitSeq> {
         assert!(len <= Self::MAX_LEN);
         (0..2_u64.pow(len as u32)).map(|v| Self::new(v, len)).collect()
@@ -285,6 +285,13 @@ mod tests {
     #[test]
     fn new() { 
         let b = BitSeq::new(0b10110, 5);
+        assert_eq!(b.val, 22);
+        assert_eq!(b.len, 5);
+    }
+
+    #[test]
+    fn new_rev() { 
+        let b = BitSeq::new_rev(0b01101, 5);
         assert_eq!(b.val, 22);
         assert_eq!(b.len, 5);
     }
@@ -461,15 +468,5 @@ mod tests {
         assert!(!b1.is_sub(&b2));
         assert!(!b2.is_sub(&b0));
         assert!(!b2.is_sub(&b1));
-    }
-
-    #[test]
-    fn overwrite() { 
-        let mut b0 = BitSeq::new(0b1010010110, 10);
-        let b1 = BitSeq::new(0b10101, 5);
-
-        b0.overwrite(&b1);
-
-        assert_eq!(b0, BitSeq::new(0b1010010101, 10))
     }
 }

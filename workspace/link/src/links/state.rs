@@ -61,10 +61,6 @@ impl State {
         self.0.is_sub(&other.0)
     }
 
-    pub fn overwrite(&mut self, other: &Self) { 
-        self.0.overwrite(&other.0)
-    }
-
     pub fn targets(&self) -> Vec<State> { 
         let n = self.len();
         (0..n).filter(|&i| self[i].is_zero() ).map(|i| { 

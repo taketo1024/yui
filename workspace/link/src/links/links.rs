@@ -210,8 +210,6 @@ impl Link {
         &self.data
     }
 
-    // -- internal methods -- //
-    
     fn next(&self, c_index:usize, e_index:usize) -> Option<(usize, usize)> {
         let n = self.data.len();
         debug_assert!((0..n).contains(&c_index));
@@ -229,7 +227,7 @@ impl Link {
         None
     }
 
-    fn traverse_edges<F>(&self, start: (usize, usize), mut f:F) where
+    pub fn traverse_edges<F>(&self, start: (usize, usize), mut f:F) where
         F: FnMut(usize, usize)
     {
         let n = self.data.len();

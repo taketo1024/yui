@@ -1,6 +1,5 @@
 use core::fmt;
 use std::fmt::Display;
-use std::iter::zip;
 use std::ops::Index;
 
 use derive_more::Display;
@@ -64,7 +63,7 @@ impl_bit_from_int!(i32);
 impl_bit_from_int!(i64);
 impl_bit_from_int!(isize);
 
-#[derive(Clone, Copy, PartialEq, Eq, Ord, Hash, Debug, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
 pub struct BitSeq { 
     val: u64,
     len: usize
@@ -94,6 +93,10 @@ impl BitSeq {
 
     pub fn len(&self) -> usize { 
         self.len
+    }
+
+    pub fn as_u64(&self) -> u64 { 
+        self.val
     }
 
     pub fn is_empty(&self) -> bool { 
@@ -257,19 +260,19 @@ impl Display for BitSeq {
 
 impl PartialOrd for BitSeq {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        let c = self.len.cmp(&other.len);
-        if !c.is_eq() { 
-            return Some(c);
-        }
+        Some(self.cmp(&other))
+    }
+}
 
-        for (b1, b2) in zip(self.iter(), other.iter()) {
-            let c = b1.cmp(&b2);
-            if !c.is_eq() { 
-                return Some(c)
-            }
-        }
+// TODO support lex-order (using generic parameter).
 
-        Some(std::cmp::Ordering::Equal)
+impl Ord for BitSeq {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.len().cmp(&other.len()).then_with( ||
+            self.weight().cmp(&other.weight())
+        ).then_with(|| 
+            self.as_u64().cmp(&other.as_u64())
+        )
     }
 }
 
@@ -421,17 +424,20 @@ mod tests {
 
     #[test]
     fn ord() { 
+        // order priority: len > weight > val
+
         let b0 = BitSeq::new(0b0,  1);
         let b1 = BitSeq::new(0b00, 2);
+
         assert!(b0 < b1);
         
-        let b0 = BitSeq::new(0b110, 3); // [0,1,1]
-        let b1 = BitSeq::new(0b100, 3); // [0,0,1]
-        let b2 = BitSeq::new(0b011, 3); // [1,1,0]
+        let b0 = BitSeq::new(0b110, 3);
+        let b1 = BitSeq::new(0b100, 3);
+        let b2 = BitSeq::new(0b011, 3);
 
         assert!(b0 > b1);
         assert!(b1 < b2);
-        assert!(b0 < b2);
+        assert!(b0 > b2);
     }
 
     #[test]

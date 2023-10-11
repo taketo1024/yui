@@ -3,7 +3,7 @@ use std::fmt;
 use yui_utils::bitseq::{BitSeq, Bit};
 use super::Resolution;
 
-#[derive(Clone, Copy, Default, PartialEq, Eq, Hash, Ord, Debug)]
+#[derive(Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct State(BitSeq);
 
 impl State { 
@@ -108,17 +108,6 @@ impl Index<usize> for State {
 impl fmt::Display for State {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.0.fmt(f)
-    }
-}
-
-impl PartialOrd for State {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        let cmp = self.len().cmp(&other.len()).then_with( ||
-            self.weight().cmp(&other.weight())
-        ).then_with( ||
-            self.0.cmp(&other.0)
-        );
-        Some(cmp)
     }
 }
 

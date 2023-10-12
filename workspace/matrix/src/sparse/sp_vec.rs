@@ -88,6 +88,14 @@ where R: Clone + Zero {
         _generate!(n, f)
     }
 
+    pub fn from_entries<T: IntoIterator<Item = (usize, R)>>(dim: usize, iter: T) -> Self {
+        Self::generate(dim, |init| { 
+            for (i, a) in iter { 
+                init(i, a)
+            }
+        })
+    }
+
     pub fn to_dense(&self) -> Vec<R> { 
         let mut vec = vec![R::zero(); self.dim()];
         for (i, a) in self.iter() { 
@@ -274,6 +282,12 @@ mod tests {
     fn from_vec() {
         let v = SpVec::from(vec![1,0,3,5,0]);
         assert_eq!(v.cs_vec(), &CsVec::new_from_unsorted(5, vec![0, 2, 3], vec![1, 3, 5]).unwrap());
+    }
+
+    #[test]
+    fn from_entries() {
+        let v = SpVec::from_entries(5, vec![(0, 1), (4, 5), (2, 3)]);
+        assert_eq!(v.cs_vec(), &CsVec::new_from_unsorted(5, vec![0, 2, 4], vec![1, 3, 5]).unwrap());
     }
 
     #[test]

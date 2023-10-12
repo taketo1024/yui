@@ -107,6 +107,14 @@ impl<R> SpMat<R> where R: Clone + Zero {
         })
     }
 
+    pub fn from_entries<T: IntoIterator<Item = (usize, usize, R)>>(shape: (usize, usize), iter: T) -> Self {
+        Self::generate(shape, |init| { 
+            for (i, j, a) in iter { 
+                init(i, j, a)
+            }
+        })
+    }
+
     pub fn combine_blocks(blocks: [&SpMat<R>; 4]) -> SpMat<R> {
         let [a, b, c, d] = blocks;
 
@@ -414,6 +422,12 @@ pub(super) mod tests {
     fn from_grid() { 
         let a = SpMat::from_vec((2, 2), vec![1,2,3,4]);
         assert_eq!(&a.cs_mat, &CsMat::new_csc((2, 2), vec![0, 2, 4], vec![0, 1, 0, 1], vec![1, 3, 2, 4]));
+    }
+
+    #[test]
+    fn from_entries() {
+        let a = SpMat::from_entries((3,3), vec![(0, 0, 1), (2, 1, 5), (1, 2, 3)]);
+        assert_eq!(&a.cs_mat, &CsMat::new_csc((3, 3), vec![0, 1, 2, 3], vec![0, 2, 1], vec![1, 5, 3]));
     }
 
     #[test]

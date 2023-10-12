@@ -156,6 +156,18 @@ where
         self.into_map(|x, r| (f(x), r))
     }
 
+    pub fn filter_gens<F>(&self, f: F) -> Self
+    where F: Fn(&X) -> bool { 
+        let data = self.data.iter().filter_map(|(x, a)| 
+            if f(x) { 
+                Some((x.clone(), a.clone()))
+            } else { 
+                None
+            }
+        ).collect::<HashMap<_, _>>();
+        Self::new_raw(data)
+    }
+
     pub fn apply<F>(&self, f: F) -> Self 
     where F: Fn(&X) -> Vec<(X, R)> {
         let mut res = Self::zero();
@@ -746,5 +758,13 @@ mod tests {
         let w = z.into_map_gens(|x| X(x.0 * 10));
 
         assert_eq!(w, L::new(map!{ X(10) => 1, X(20) => 2 }));
+    }
+
+    #[test]
+    fn filter_gens() { 
+        type L = LinComb<X, i32>;
+        let z = L::new( (0..10).map(|i| (X(i), i * 10)).collect() );
+        let w = z.filter_gens(|x| x.0 % 3 == 0 );
+        assert_eq!(w, L::new(map!{ X(0) => 0, X(3) => 30, X(6) => 60, X(9) => 90}))
     }
 }

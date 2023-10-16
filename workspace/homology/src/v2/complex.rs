@@ -107,7 +107,17 @@ where D: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn display(&self, i: D) -> String {
-        todo!()
+        use yui_utils::superscript;
+
+        let symbol = R::set_symbol();
+        let rank = self.rank(i);
+        if rank > 1 {
+            format!("{}{}", symbol, superscript(rank as isize))
+        } else if rank == 1 { 
+            symbol
+        } else { 
+            String::from("0")
+        }
     }
 }
 

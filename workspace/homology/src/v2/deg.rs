@@ -1,10 +1,11 @@
+use std::fmt::Display;
 use std::ops::{Add, Sub};
 use std::hash::Hash;
 
-use derive_more::{Add, Sub};
+use derive_more::{Display, Add, Sub};
 use num_traits::Zero;
+pub trait Deg: Sized + Display + Clone + Copy + PartialEq + Eq + Hash + Zero + Add + Sub {}
 
-pub trait Deg: Clone + Copy + PartialEq + Eq + Hash + Zero + Add + Sub {}
 
 impl Deg for isize  {}
 impl Deg for usize  {}
@@ -12,7 +13,8 @@ impl Deg for usize  {}
 macro_rules! make2 {
     ($name:ident, $t:ty) => {
         #[allow(non_camel_case_types)]
-        #[derive(Clone, Copy, PartialEq, Eq, Hash, Add, Sub)]
+        #[derive(Display, Clone, Copy, PartialEq, Eq, Hash, Add, Sub)]
+        #[display(fmt = "({}, {})", _0, _1)]
         pub struct $name(pub $t, pub $t);
         
         impl Zero for $name {
@@ -36,7 +38,8 @@ impl Deg for usize2 {}
 macro_rules! make3 {
     ($name:ident, $t:ty) => {
         #[allow(non_camel_case_types)]
-        #[derive(Clone, Copy, PartialEq, Eq, Hash, Add, Sub)]
+        #[derive(Display, Clone, Copy, PartialEq, Eq, Hash, Add, Sub)]
+        #[display(fmt = "({}, {}, {})", _0, _1, _2)]
         pub struct $name(pub $t, pub $t, pub $t);
         
         impl Zero for $name {

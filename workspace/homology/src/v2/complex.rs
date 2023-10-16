@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use itertools::Itertools;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps};
-use yui_matrix::sparse::{SpMat, SpVec};
+use yui_matrix::sparse::{SpMat, SpVec, MatType};
 
 use super::deg::{Deg, isize2, isize3};
 use super::graded::Graded;
@@ -17,38 +17,31 @@ pub struct ChainComplexBase<D, R>
 where D: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     support: Vec<D>,
     d_deg: D,
-    f_rank: Box<dyn Fn(D) -> usize>,
-    f_d:    Box<dyn Fn(D) -> SpMat<R>>,
-    cache_rank: HashMap<D, OnceCell<usize>>,
-    cache_d   : HashMap<D, OnceCell<SpMat<R>>>,
+    d_matrix: Box<dyn Fn(D) -> SpMat<R>>,
+    cache: HashMap<D, OnceCell<SpMat<R>>>,
     zero_d: SpMat<R>
 }
 
 impl<I, R> ChainComplexBase<I, R> 
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new<It, F1, F2>(support: It, d_deg: I, f_rank: F1, f_d: F2) -> Self
+    pub fn new<It, F>(support: It, d_deg: I, d_matrix: F) -> Self
     where 
         It: Iterator<Item = I>, 
-        F1: Fn(I) -> usize + 'static,
-        F2: Fn(I) -> SpMat<R> + 'static 
+        F: Fn(I) -> SpMat<R> + 'static 
     {
         let support = support.collect_vec();
-        let f_rank = Box::new( f_rank );
-        let f_d = Box::new( f_d );
-        let cache_rank = HashMap::from_iter( support.iter().map(|&i| (i, OnceCell::new())) );
-        let cache_d    = HashMap::from_iter( support.iter().map(|&i| (i, OnceCell::new())) );
+        let d_matrix = Box::new( d_matrix );
+        let cache = HashMap::from_iter( support.iter().map(|&i| (i, OnceCell::new())) );
         let zero_d = SpMat::zero((0, 0));
 
         Self { 
-            support, d_deg, f_rank, f_d, cache_rank, cache_d, zero_d
+            support, d_deg, d_matrix, cache, zero_d
         }
     }
 
     pub fn rank(&self, i: I) -> usize { 
         if self.is_supported(i) { 
-            self.cache_rank[&i].get_or_init(|| { 
-                (self.f_rank)(i)
-            }).clone()
+            self.d_matrix(i).shape().1 // column
         } else { 
             0
         }
@@ -60,8 +53,8 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn d_matrix(&self, i: I) -> &SpMat<R> { 
         if self.is_supported(i) { 
-            self.cache_d[&i].get_or_init(|| { 
-                (self.f_d)(i)
+            self.cache[&i].get_or_init(|| { 
+                (self.d_matrix)(i)
             })
         } else { 
             &self.zero_d
@@ -131,25 +124,22 @@ where D: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
+impl<R> ChainComplexBase<isize, R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    pub fn from_mats(d_deg: isize, offset: isize, mats: Vec<SpMat<R>>) -> Self { 
+        let n = mats.len() as isize;
+        let range = offset .. offset + n;
+        Self::new(
+            range, d_deg, 
+            move |i| mats[(i - offset) as usize].clone()
+        )
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod tests { 
     use super::*;
 
-    impl<R> ChainComplexBase<isize, R>
-    where R: Ring, for<'x> &'x R: RingOps<R> {
-        pub fn from_mats(d_deg: isize, mats: Vec<SpMat<R>>) -> Self { 
-            use yui_matrix::sparse::MatType;
-    
-            let n = mats.len() as isize;
-            let ranks = mats.iter().map(|d| d.shape().1).collect_vec();
-            Self::new(
-                0..n, d_deg, 
-                move |i| if 0 <= i && i < n { ranks[i as usize] } else { 0 }, 
-                move |i| if 0 <= i && i < n { mats[i as usize].clone() } else { SpMat::zero((0, 0)) }
-            )
-        }
-    }
-    
     pub(crate) struct Samples<R>
     where R: Ring, for<'x> &'x R: RingOps<R> {
         _r: R
@@ -162,7 +152,7 @@ pub(crate) mod tests {
         }
 
         pub fn d3() -> ChainComplex<R> {
-            ChainComplex::from_mats(-1,
+            ChainComplex::from_mats(-1, 0,
                 vec![
                     Self::mat((0, 4), vec![]),
                     Self::mat((4, 6), vec![-1, -1, 0, -1, 0, 0, 1, 0, -1, 0, -1, 0, 0, 1, 1, 0, 0, -1, 0, 0, 0, 1, 1, 1] ),
@@ -174,7 +164,7 @@ pub(crate) mod tests {
         }
 
         pub fn s2() -> ChainComplex<R> {
-            ChainComplex::from_mats(-1,
+            ChainComplex::from_mats(-1, 0,
                 vec![
                     Self::mat((0, 4), vec![]),
                     Self::mat((4, 6), vec![-1, -1, 0, -1, 0, 0, 1, 0, -1, 0, -1, 0, 0, 1, 1, 0, 0, -1, 0, 0, 0, 1, 1, 1]),
@@ -185,7 +175,7 @@ pub(crate) mod tests {
         }
     
         pub fn t2() -> ChainComplex<R> {
-            ChainComplex::from_mats(-1,
+            ChainComplex::from_mats(-1, 0,
                 vec![
                     Self::mat((0, 9), vec![]),
                     Self::mat((9, 27), vec![-1, -1, 0, -1, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1, 1, 0, -1, 0, 0, 0, 0, 0, 0, -1, -1, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, -1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, -1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, -1, 0, 1, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0, 1, -1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, -1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1, 1]),
@@ -196,7 +186,7 @@ pub(crate) mod tests {
         }
     
         pub fn rp2() -> ChainComplex<R> { 
-            ChainComplex::from_mats(-1,
+            ChainComplex::from_mats(-1, 0,
                 vec![
                     Self::mat((0, 6), vec![]),
                     Self::mat((6, 15), vec![-1, -1, 0, 0, 0, 0, 0, -1, -1, 0, -1, 0, 0, 0, 0, 1, 0, -1, -1, 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 1, 1, 0, 1, 1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 1, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1] ),

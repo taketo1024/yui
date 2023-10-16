@@ -215,7 +215,7 @@ mod tests {
 
     #[test]
     fn singleton() { 
-        let c = ChainComplex::<i32>::from_mats(-1,
+        let c = ChainComplex::<i32>::from_mats(-1, 0,
             vec![
                 SpMat::from_vec((0, 1), vec![]),
                 SpMat::from_vec((1, 0), vec![])
@@ -230,7 +230,7 @@ mod tests {
 
     #[test]
     fn torsion() { 
-        let c = ChainComplex::<i32>::from_mats(-1,
+        let c = ChainComplex::<i32>::from_mats(-1, 0,
             vec![
                 SpMat::from_vec((0, 1), vec![]),
                 SpMat::from_vec((1, 1), vec![2]),

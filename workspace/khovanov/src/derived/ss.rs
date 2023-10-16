@@ -43,7 +43,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         _ => panic!()
     };
 
-    let (kh, p, _) = HomologyCalc::calculate_with_trans(a0, a1);
+    let (kh, p, _) = HomologyCalc::calculate_with_trans(&a0, &a1);
 
     info!("homology: {h}");
     

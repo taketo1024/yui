@@ -242,7 +242,7 @@ where
     fn homology_at(&self, i: Self::Idx) -> Self::HomologySummand {
         let d1 = self.d_matrix(i - self.d_degree());
         let d2 = self.d_matrix(i);
-        HomologyCalc::calculate(d1, d2)
+        HomologyCalc::calculate(&d1, &d2)
     }
 
     fn homology(&self) -> Self::Homology {

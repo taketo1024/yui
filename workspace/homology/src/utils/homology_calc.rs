@@ -7,14 +7,14 @@ use crate::GenericRModStr;
 
 pub type HomologyCalcResult<R> = (usize, Vec<R>, Option<SpMat<R>>, Option<SpMat<R>>);
 
-pub struct HomologyCalc<R>
+pub struct HomologyCalc<'a, 'b, R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    d1: SpMat<R>,
-    d2: SpMat<R>,
+    d1: &'a SpMat<R>,
+    d2: &'b SpMat<R>,
     with_trans: bool
 }
 
-impl<R> HomologyCalc<R>
+impl<'a, 'b, R> HomologyCalc<'a, 'b, R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     //            d1             d2
     //    C1 ----------> C2 -----------> C3
@@ -34,22 +34,22 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     //  H2 = Ker(d2) / Im(d1)
     //     ≅ C22' (free) ⊕ (C21 / Im(d1')) (tor)
 
-    pub fn calculate(d1: SpMat<R>, d2: SpMat<R>) -> GenericRModStr<R> {
+    pub fn calculate(d1: &'a SpMat<R>, d2: &'b SpMat<R>) -> GenericRModStr<R> {
         let (rank, tor, _) = Self::_calculate(d1, d2, false);
         GenericRModStr::new(rank, tor)
     }
 
-    pub fn calculate_with_trans(d1: SpMat<R>, d2: SpMat<R>) -> (GenericRModStr<R>, SpMat<R>, SpMat<R>) {
+    pub fn calculate_with_trans(d1: &'a SpMat<R>, d2: &'b SpMat<R>) -> (GenericRModStr<R>, SpMat<R>, SpMat<R>) {
         let (rank, tor, trans) = Self::_calculate(d1, d2, true);
         let h = GenericRModStr::new(rank, tor);
         let (p, q) = trans.unwrap();
         (h, p, q)
     }
 
-    fn _calculate(d1: SpMat<R>, d2: SpMat<R>, with_trans: bool) -> (usize, Vec<R>, Option<(SpMat<R>, SpMat<R>)>) {
+    fn _calculate(d1: &'a SpMat<R>, d2: &'b SpMat<R>, with_trans: bool) -> (usize, Vec<R>, Option<(SpMat<R>, SpMat<R>)>) {
         info!("calculate homology: {:?}-{:?}", d1.shape(), d2.shape());
 
-        let mut c = Self::new(d1, d2, with_trans);
+        let mut c = Self::new(&d1, &d2, with_trans);
         let (s1, s2) = c.process();
         let (rank, tors) = c.result(&s1, &s2);
 
@@ -62,14 +62,14 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         (rank, tors, trans)
     }
 
-    fn new(d1: SpMat<R>, d2: SpMat<R>, with_trans: bool) -> Self { 
+    fn new(d1: &'a SpMat<R>, d2: &'b SpMat<R>, with_trans: bool) -> Self { 
         assert_eq!(d1.rows(), d2.cols());
         Self { d1, d2, with_trans }
     }
 
     fn process(&mut self) -> (SnfResult<R>, SnfResult<R>) {
         let with_trans = self.with_trans;
-        let (d1, d2) =  (&self.d1, &self.d2);
+        let (d1, d2) =  (self.d1, self.d2);
         let n = d2.cols();
 
         let d1_dns = d1.to_dense();
@@ -157,7 +157,7 @@ mod tests {
         let d1 = c.d_matrix(1);
         let d0 = c.d_matrix(0); // zero
 
-        let (h, p, q) = HomologyCalc::calculate_with_trans(d1, d0.clone());
+        let (h, p, q) = HomologyCalc::calculate_with_trans(&d1, &d0);
 
         assert_eq!(h.rank(), 1);
         assert_eq!(h.tors().len(), 0);
@@ -174,7 +174,7 @@ mod tests {
         let d1 = c.d_matrix(2);
         let d0 = c.d_matrix(1);
 
-        let (h, p, q) = HomologyCalc::calculate_with_trans(d1, d0.clone());
+        let (h, p, q) = HomologyCalc::calculate_with_trans(&d1, &d0);
 
         assert_eq!(h.rank(), 0);
         assert_eq!(h.tors().len(), 0);
@@ -188,7 +188,7 @@ mod tests {
         let d3 = c.d_matrix(3); // zero
         let d2 = c.d_matrix(2);
 
-        let (h, p, q) = HomologyCalc::calculate_with_trans(d3, d2.clone());
+        let (h, p, q) = HomologyCalc::calculate_with_trans(&d3, &d2);
 
         assert_eq!(h.rank(), 1);
         assert_eq!(h.tors().len(), 0);
@@ -206,7 +206,7 @@ mod tests {
         let d1 = c.d_matrix(1);
         let d0 = c.d_matrix(0); // zero
 
-        let (h, p, q) = HomologyCalc::calculate_with_trans(d1, d0.clone());
+        let (h, p, q) = HomologyCalc::calculate_with_trans(&d1, &d0);
 
         assert_eq!(h.rank(), 1);
         assert_eq!(h.tors().len(), 0);
@@ -223,7 +223,7 @@ mod tests {
         let d2 = c.d_matrix(2);
         let d1 = c.d_matrix(1);
 
-        let (h, p, q) = HomologyCalc::calculate_with_trans(d2, d1.clone());
+        let (h, p, q) = HomologyCalc::calculate_with_trans(&d2, &d1);
 
         assert_eq!(h.rank(), 2);
         assert_eq!(h.tors().len(), 0);
@@ -243,7 +243,7 @@ mod tests {
         let d3 = c.d_matrix(3); // zero
         let d2 = c.d_matrix(2);
 
-        let (h, p, q) = HomologyCalc::calculate_with_trans(d3, d2.clone());
+        let (h, p, q) = HomologyCalc::calculate_with_trans(&d3, &d2);
 
         assert_eq!(h.rank(), 1);
         assert_eq!(h.tors().len(), 0);
@@ -262,7 +262,7 @@ mod tests {
         let d1 = c.d_matrix(1);
         let d0 = c.d_matrix(0); // zero
 
-        let (h, p, q) = HomologyCalc::calculate_with_trans(d1, d0.clone());
+        let (h, p, q) = HomologyCalc::calculate_with_trans(&d1, &d0);
 
         assert_eq!(h.rank(), 1);
         assert_eq!(h.tors().len(), 0);
@@ -279,7 +279,7 @@ mod tests {
         let d2 = c.d_matrix(2);
         let d1 = c.d_matrix(1);
 
-        let (h, p, q) = HomologyCalc::calculate_with_trans(d2, d1.clone());
+        let (h, p, q) = HomologyCalc::calculate_with_trans(&d2, &d1);
 
         assert_eq!(h.rank(), 0);
         assert_eq!(h.tors(), &vec![2]);

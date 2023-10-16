@@ -41,12 +41,20 @@ pub fn superscript(i: isize) -> String {
     res.iter().collect()
 }
 
-pub fn table<F, D>(head: &str, rows: &Vec<isize>, cols: &Vec<isize>, entry: F) -> String
+pub fn table<S, I, J, I1, I2, D, F>(head: S, rows: I1, cols: I2, entry: F) -> String
 where 
-    D: Display, 
-    F: Fn(isize, isize) -> D
+    S: Display,
+    I: Display,
+    J: Display,
+    I1: Iterator<Item = I>,
+    I2: Iterator<Item = J>,
+    D: Display,
+    F: Fn(&I, &J) -> D
 {
     use prettytable::*;
+
+    let rows = rows.collect_vec();
+    let cols = cols.collect_vec();
 
     fn row<I>(head: String, cols: I) -> Row
     where I: Iterator<Item = String> { 
@@ -59,14 +67,14 @@ where
 
     table.set_format(*format::consts::FORMAT_CLEAN);
     table.set_titles(row(
-        String::from(head), 
+        head.to_string(),
         cols.iter().map(|j| j.to_string() )
     ));
 
-    for &i in rows { 
+    for i in rows.iter() { 
         table.add_row(row(
             i.to_string(),
-            cols.iter().map(|&j| format!("{}", entry(i, j)))
+            cols.iter().map(|j| format!("{}", entry(i, j)))
         ));
     }
 
@@ -93,7 +101,7 @@ mod tests {
 
     #[test]
     fn test_table() { 
-        let table = table("", &vec![1,2,3], &vec![4,5,6], |i, j| i * 10 + j);
+        let table = table("", 1..=3, 4..=6, |i, j| i * 10 + j);
         let a = "    4   5   6 \n 1  14  15  16 \n 2  24  25  26 \n 3  34  35  36 \n";
         assert_eq!(table, a.to_string());
     }

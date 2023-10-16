@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use itertools::Itertools;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps};
-use yui_matrix::sparse::SpMat;
+use yui_matrix::sparse::{SpMat, SpVec};
 
 use super::deg::{Deg, isize2, isize3};
 use super::graded::Graded;
@@ -68,6 +68,12 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
+    pub fn differentiate(&self, i: I, v: &SpVec<R>) -> SpVec<R> {
+        assert_eq!(self.rank(i), v.dim());
+        let d = self.d_matrix(i);
+        d * v
+    }
+
     pub fn is_supported(&self, i: I) -> bool { 
         self.support.contains(&i)
     }
@@ -95,7 +101,11 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 impl<I, R> ChainComplexBase<I, R> 
 where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn homology(self) -> HomologyBase<I, R> {
-        HomologyBase::new(self)
+        HomologyBase::new(self, false)
+    }
+
+    pub fn homology_with_gens(self) -> HomologyBase<I, R> {
+        HomologyBase::new(self, true)
     }
 }
 

@@ -4,7 +4,7 @@ use std::hash::Hash;
 
 use derive_more::{Display, Add, Sub};
 use num_traits::Zero;
-pub trait Deg: Sized + Display + Clone + Copy + PartialEq + Eq + Hash + Zero + Add<Output = Self> + Sub<Output = Self> {}
+pub trait Deg: Sized + Display + Clone + Copy + PartialEq + Eq + Hash + Zero + Add<Output = Self> + Sub<Output = Self> + 'static {}
 
 
 impl Deg for isize  {}

@@ -1,5 +1,5 @@
-use std::cell::OnceCell;
 use std::collections::HashMap;
+use std::mem;
 
 use itertools::Itertools;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps};
@@ -17,25 +17,25 @@ pub struct ChainComplexBase<D, R>
 where D: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     support: Vec<D>,
     d_deg: D,
-    d_matrix: Box<dyn Fn(D) -> SpMat<R>>,
-    cache: HashMap<D, OnceCell<SpMat<R>>>,
+    d_matrix: HashMap<D, SpMat<R>>,
     zero_d: SpMat<R>
 }
 
 impl<I, R> ChainComplexBase<I, R> 
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new<It, F>(support: It, d_deg: I, d_matrix: F) -> Self
+    pub fn new<It, F>(support: It, d_deg: I, mut d_matrix: F) -> Self
     where 
         It: Iterator<Item = I>, 
-        F: Fn(I) -> SpMat<R> + 'static 
+        F: FnMut(I) -> SpMat<R> + 'static 
     {
         let support = support.collect_vec();
-        let d_matrix = Box::new( d_matrix );
-        let cache = HashMap::from_iter( support.iter().map(|&i| (i, OnceCell::new())) );
+        let d_matrix = HashMap::from_iter( 
+            support.iter().map(|&i| (i, d_matrix(i))) 
+        );
         let zero_d = SpMat::zero((0, 0));
 
         Self { 
-            support, d_deg, d_matrix, cache, zero_d
+            support, d_deg, d_matrix, zero_d
         }
     }
 
@@ -53,9 +53,7 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn d_matrix(&self, i: I) -> &SpMat<R> { 
         if self.is_supported(i) { 
-            self.cache[&i].get_or_init(|| { 
-                (self.d_matrix)(i)
-            })
+            &self.d_matrix[&i]
         } else { 
             &self.zero_d
         }
@@ -126,12 +124,15 @@ where D: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> ChainComplexBase<isize, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn from_mats(d_deg: isize, offset: isize, mats: Vec<SpMat<R>>) -> Self { 
+    pub fn from_mats(d_deg: isize, offset: isize, mut mats: Vec<SpMat<R>>) -> Self { 
         let n = mats.len() as isize;
         let range = offset .. offset + n;
         Self::new(
             range, d_deg, 
-            move |i| mats[(i - offset) as usize].clone()
+            move |i| {
+                let i = (i - offset) as usize;
+                mem::take(&mut mats[i])
+            }
         )
     }
 }

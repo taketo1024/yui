@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
 use itertools::Itertools;
-use yui_core::{Ring, RingOps};
+use yui_core::{Ring, RingOps, EucRing, EucRingOps};
 use yui_lin_comb::{FreeGen, LinComb};
 use yui_matrix::sparse::{SpMat, SpVec};
 
+use super::HomologyBase;
 use super::complex::ChainComplexBase;
 use super::deg::{Deg, isize2, isize3};
 
@@ -131,8 +132,27 @@ where
         self.inner.d_matrix(i)
     }
 
+    pub fn check_d_at(&self, i: I) {
+        self.inner.check_d_at(i)
+    }
+    
+    pub fn check_d_all(&self) {
+        self.inner.check_d_all()
+    }
+
     pub fn get_inner(self) -> ChainComplexBase<I, R> { 
         self.inner
+    }
+}
+
+impl<I, X, R> XChainComplexBase<I, X, R>
+where 
+    I: Deg,
+    X: FreeGen,
+    R: EucRing, for<'x> &'x R: EucRingOps<R>,
+{
+    pub fn homology(self) -> HomologyBase<I, R> { 
+        self.inner.homology()
     }
 }
 

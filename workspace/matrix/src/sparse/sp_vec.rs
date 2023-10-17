@@ -1,6 +1,6 @@
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, Range};
 use std::fmt::Display;
-use num_traits::Zero;
+use num_traits::{Zero, One};
 use sprs::{CsVec, PermView};
 use auto_impl_ops::auto_ops;
 use yui_core::{Ring, RingOps, AddMonOps, AddGrpOps, AddMon, AddGrp};
@@ -102,6 +102,13 @@ where R: Clone + Zero {
             vec[i] = a.clone();
         }
         vec
+    }
+}
+
+impl<R> SpVec<R> 
+where R: Clone + Zero + One { 
+    pub fn unit(n: usize, i: usize) -> Self {
+        Self::generate(n, |set| set(i, R::one()))
     }
 }
 

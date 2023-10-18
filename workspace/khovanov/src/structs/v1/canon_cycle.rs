@@ -67,7 +67,7 @@ mod tests {
         );
 
         for z in zs { 
-            let dz = c.differetiate(&z);
+            let dz = c.differentiate(0, &z);
             assert_eq!(z.is_zero(), false);
             assert_eq!(dz.is_zero(), true);
         }
@@ -83,7 +83,7 @@ mod tests {
         );
 
         for z in zs { 
-            let dz = c.differetiate(&z);
+            let dz = c.differentiate(0, &z);
             assert_eq!(z.is_zero(), false);
             assert_eq!(dz.is_zero(), true);
         }

@@ -1,8 +1,6 @@
 use std::str::FromStr;
 use itertools::Itertools;
 use yui_core::{Ring, RingOps};
-use yui_homology::ChainComplex;
-use yui_homology::fmt::FmtTable;
 use yui_khovanov::KhComplex;
 use crate::utils::*;
 
@@ -24,9 +22,6 @@ pub struct Args {
 
     #[arg(short, long)]
     bigraded: bool,
-
-    #[arg(short = 'g', long)]
-    print_gens: bool,
 
     #[arg(short = 'a', long)]
     with_alpha: bool,
@@ -61,7 +56,7 @@ where R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
     
     let vs = if args.with_alpha { 
         c.canon_cycles().iter().map(|z| {
-            (0, c[0].vectorize(z))
+            (0, c.vectorize(0, z))
         }).collect_vec()
     } else { 
         vec![]
@@ -71,24 +66,15 @@ where R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
 
     if args.bigraded {
         let c = c.as_bigraded();
-
-        b.append(c.table_string() + "\n");
-
-        if args.print_gens {
-            b.append(c.desc_d_gens());
-        } else {
-            b.append(c.desc_d());
-        }
+        b.append(c.display_table() + "\n");
+        b.append(c.display_d() + "\n");
     } else { 
-        if args.print_gens {
-            b.append(c.desc_d_gens());
-        } else {
-            b.append(c.desc_d());
-        }    
+        b.append(c.display_seq() + "\n");
+        b.append(c.display_d() + "\n");
     }
 
     if args.with_alpha { 
-        b.append("\n\n");
+        b.append("\n");
         for (i, (_, v)) in vs.iter().enumerate() {
             b.append(format!("a[{i}] = [{}]\n", v.to_dense().iter().map(|r| r.to_string()).collect_vec().join(", ")));
         }
@@ -111,7 +97,6 @@ mod tests {
         	mirror: false,
         	reduced: false,
             bigraded: false,
-            print_gens: false,
         	with_alpha: false,
             no_simplify: false,
             debug: false
@@ -129,7 +114,6 @@ mod tests {
         	mirror: true,
         	reduced: true,
             bigraded: false,
-            print_gens: true,
         	with_alpha: true,
             no_simplify: false,
             debug: false
@@ -151,7 +135,6 @@ mod tests {
                 mirror: false,
                 reduced: false,
                 bigraded: false,
-                print_gens: false,
                 with_alpha: false,
                 no_simplify: false,
                 debug: false
@@ -169,7 +152,6 @@ mod tests {
                 mirror: false,
                 reduced: false,
                 bigraded: false,
-                print_gens: false,
                 with_alpha: false,
                 no_simplify: false,
                 debug: false
@@ -187,7 +169,6 @@ mod tests {
                 mirror: false,
                 reduced: false,
                 bigraded: false,
-                print_gens: false,
                 with_alpha: false,
                 no_simplify: false,
                 debug: false

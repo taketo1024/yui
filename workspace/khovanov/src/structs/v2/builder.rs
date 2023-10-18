@@ -196,8 +196,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests { 
-    use yui_homology::{RModStr, HomologyComputable};
-    use yui_homology::test::ChainComplexValidation;
+    use yui_homology::v2::ChainComplexTrait;
     use super::*;
 
     #[test]
@@ -208,8 +207,8 @@ mod tests {
 
         let c = b.complex.eval(&0, &0);
 
-        assert_eq!(c[0].rank(), 2);
-        assert_eq!(c[1].rank(), 0);
+        assert_eq!(c.rank(0), 2);
+        assert_eq!(c.rank(1), 0);
     }
 
     #[test]
@@ -222,8 +221,8 @@ mod tests {
 
         c.check_d_all();
 
-        assert_eq!(c[-1].rank(), 0);
-        assert_eq!(c[0].rank(), 2);
+        assert_eq!(c.rank(-1), 0);
+        assert_eq!(c.rank(0), 2);
     }
 
     #[test]
@@ -236,9 +235,9 @@ mod tests {
 
         c.check_d_all();
 
-        assert_eq!(c[-1].rank(), 0);
-        assert_eq!(c[0].rank(), 2);
-        assert_eq!(c[1].rank(), 0);
+        assert_eq!(c.rank(-1), 0);
+        assert_eq!(c.rank(0), 2);
+        assert_eq!(c.rank(1), 0);
     }
 
     #[test]
@@ -252,9 +251,9 @@ mod tests {
 
         c.check_d_all();
 
-        assert_eq!(c[-1].rank(), 0);
-        assert_eq!(c[0].rank(), 4);
-        assert_eq!(c[1].rank(), 0);
+        assert_eq!(c.rank(-1), 0);
+        assert_eq!(c.rank(0), 4);
+        assert_eq!(c.rank(1), 0);
     }
 
     #[test]
@@ -267,9 +266,9 @@ mod tests {
 
         c.check_d_all();
 
-        assert_eq!(c[-2].rank(), 2);
-        assert_eq!(c[-1].rank(), 0);
-        assert_eq!(c[0].rank(), 2);
+        assert_eq!(c.rank(-2), 2);
+        assert_eq!(c.rank(-1), 0);
+        assert_eq!(c.rank(0), 2);
     }
 
     #[test]
@@ -282,7 +281,7 @@ mod tests {
 
         c.check_d_all();
 
-        let h = c.homology();
+        let h = c.homology(false);
 
         for i in [1,6,7,8] {
             assert_eq!(h[i].rank(), 0);

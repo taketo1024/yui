@@ -1,19 +1,17 @@
-use std::fmt::Display;
-use std::ops::{RangeInclusive, Index};
-use std::rc::Rc;
-use std::vec::IntoIter;
+use std::ops::RangeInclusive;
+use cartesian::cartesian;
 
 use yui_core::{Ring, RingOps, EucRing, EucRingOps};
-use yui_matrix::sparse::SpMat;
+use yui_lin_comb::LinComb;
+use yui_matrix::sparse::{SpMat, SpVec};
 use yui_link::Link;
-use yui_homology::{Idx2, Idx2Iter, Grid, ChainComplex, FreeRModStr, FreeChainComplex, HomologyComputable, Shift};
+use yui_homology::v2::{ChainComplexTrait, XChainComplex, XChainComplex2, Graded, isize2, PrintSeq, PrintTable};
 
-use crate::{KhEnhState, KhChain, KhHomology, KhHomologySummand, KhHomologyBigraded};
+use crate::{KhEnhState, KhChain, KhHomology, KhHomologyBigraded};
 
-pub type KhComplexSummand<R> = FreeRModStr<KhEnhState, R>;
 pub struct KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    complex: FreeChainComplex<KhEnhState, R, RangeInclusive<isize>>,
+    complex: XChainComplex<KhEnhState, R>,
     canon_cycles: Vec<KhChain<R>>,
     reduced: bool,
     deg_shift: (isize, isize)
@@ -25,8 +23,24 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         Self::new_v2(link, h, t, reduced)
     }
 
-    pub(crate) fn _new(complex: FreeChainComplex<KhEnhState, R, RangeInclusive<isize>>, canon_cycles: Vec<KhChain<R>>, reduced: bool, deg_shift: (isize, isize)) -> Self { 
+    pub(crate) fn _new(complex: XChainComplex<KhEnhState, R>, canon_cycles: Vec<KhChain<R>>, reduced: bool, deg_shift: (isize, isize)) -> Self { 
         KhComplex { complex, canon_cycles, reduced, deg_shift }
+    }
+
+    pub fn support(&self) -> impl Iterator<Item = isize> { 
+        self.complex.support()
+    }
+
+    pub fn rank(&self, i: isize) -> usize { 
+        self.complex.rank(i)
+    }
+
+    pub fn gens(&self, i: isize) -> &Vec<KhEnhState> {
+        self.complex.gens(i)
+    }
+
+    pub fn d_matrix(&self, i: isize) -> &SpMat<R> {
+        self.complex.d_matrix(i)
     }
 
     pub fn canon_cycles(&self) -> &Vec<KhChain<R>> { 
@@ -42,23 +56,48 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn h_range(&self) -> RangeInclusive<isize> { 
-        self.complex.indices()
+        let h_min = self.support().min().unwrap_or(0);
+        let h_max = self.support().max().unwrap_or(0);
+        h_min ..= h_max
     }
 
     pub fn q_range(&self) -> RangeInclusive<isize> { 
-        let q_min = self.iter().filter_map(|(_, v)| v.generators().iter().map(|x| x.q_deg()).min()).min().unwrap();
-        let q_max = self.iter().filter_map(|(_, v)| v.generators().iter().map(|x| x.q_deg()).max()).max().unwrap();
+        let q_min = self.support().filter_map(|i| self.gens(i).iter().map(|x| x.q_deg()).min()).min().unwrap_or(0);
+        let q_max = self.support().filter_map(|i| self.gens(i).iter().map(|x| x.q_deg()).max()).max().unwrap_or(0);
         let q0 = self.deg_shift.1;
-        
-        (q_min ..= q_max).shift(q0)
+        (q_min + q0) ..= (q_max + q0)
     }
 
-    pub fn differentiate_x(&self, x: &KhEnhState) -> Vec<(KhEnhState, R)> {
-        self.complex.differentiate_x(x)
+    pub fn vectorize(&self, i: isize, z: &KhChain<R>) -> SpVec<R> {
+        self.complex.vectorize(i, z)
     }
 
-    pub fn differetiate(&self, z: &KhChain<R>) -> KhChain<R> { 
-        self.complex.differetiate(z)
+    pub fn differentiate_x(&self, i: isize, x: &KhEnhState) -> KhChain<R> { 
+        self.differentiate(i, &LinComb::from_gen(x.clone()))
+    }
+
+    pub fn differentiate(&self, i: isize, z: &KhChain<R>) -> KhChain<R> { 
+        self.complex.differetiate(i, z)
+    }
+
+    pub fn check_d_all(&self) {
+        self.complex.check_d_all()
+    }
+
+    pub fn display_seq(&self) -> String { 
+        self.complex.display_seq()
+    }
+
+    pub fn display_d(&self) -> String { 
+        self.complex.display_d()
+    }
+
+    pub fn print_seq(&self) { 
+        self.complex.print_seq()
+    }
+
+    pub fn inner(&self) -> &XChainComplex<KhEnhState, R> {
+        &self.complex
     }
 
     pub fn as_bigraded(self) -> KhComplexBigraded<R> {
@@ -66,42 +105,28 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let deg_shift = self.deg_shift;
 
         let h_range = self.h_range();
-        let q_range = self.q_range();
-        
-        let start = Idx2(*h_range.start(), *q_range.start());
-        let end   = Idx2(*h_range.end(),   *q_range.end());
-        let range = start.iter_rect(end, (1, 2));
+        let q_range = self.q_range().step_by(2);
+        let support = cartesian!(h_range, q_range.clone()).map(|(i, j)| 
+            isize2(i, j)
+        );
 
-        let self0 = Rc::new(self);
-        let self1 = self0.clone();
-
-        let complex = FreeChainComplex::new(range, Idx2(1, 0), 
-            move |idx| {
-                let (i, j) = idx.as_tuple();
+        let complex = XChainComplex2::new(support, isize2(1, 0), 
+            |idx| {
+                let isize2(i, j) = idx;
                 let q = j - deg_shift.1;
 
-                self0[i].generators().iter().filter(|x| { 
+                self.gens(i).iter().filter(|x| { 
                     x.q_deg() == q
                 }).cloned().collect()
             },
-            move |x| { 
-                self1.differentiate_x(x)
+            |idx, x| { 
+                let i = idx.0;
+                let dx = self.differentiate_x(i, x);
+                dx.into_iter().collect()
             }
         );
 
         KhComplexBigraded { complex, reduced }
-    }
-
-    pub fn desc_d_gens_at(&self, i: isize) -> String {
-        self.complex.desc_d_gens_at(i)
-    }
-
-    pub fn desc_d_gens(&self) -> String { 
-        self.complex.desc_d_gens()
-    }
-    
-    pub fn print_d_gens(&self) {
-        self.complex.print_d_gens()
     }
 
     pub fn deg_shift_for(l: &Link, reduced: bool) -> (isize, isize) {
@@ -113,69 +138,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<R> Display for KhComplex<R> 
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.complex.fmt(f)
-    }
-}
-
-impl<R> Index<isize> for KhComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> { 
-    type Output = KhComplexSummand<R>;
-    
-    fn index(&self, index: isize) -> &Self::Output {
-        &self.complex[index]
-    }
-}
-
-impl<R> Grid for KhComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> { 
-    type Idx = isize;
-    type IdxIter = RangeInclusive<isize>;
-    type Output = KhComplexSummand<R>;
-
-    fn contains_idx(&self, k: Self::Idx) -> bool {
-        self.complex.contains_idx(k)
-    }
-
-    fn indices(&self) -> Self::IdxIter {
-        self.complex.indices()
-    }
-
-    fn get(&self, i: Self::Idx) -> Option<&Self::Output> {
-        self.complex.get(i)
-    }
-}
-
-impl<R> ChainComplex for KhComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> { 
-    fn d_degree(&self) -> Self::Idx {
-        self.complex.d_degree()
-    }
-
-    fn d_matrix(&self, k: Self::Idx) -> SpMat<Self::R> {
-        self.complex.d_matrix(k)
-    }
-}
-
-impl<R> HomologyComputable for KhComplex<R>
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    type Homology = KhHomology<R>;
-    type HomologySummand = KhHomologySummand<R>;
-
-    fn homology(&self) -> Self::Homology {
+impl<R> KhComplex<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
+    pub fn homology(self) -> KhHomology<R> { 
         KhHomology::from(self)
-    }
-
-    fn homology_at(&self, _i: Self::Idx) -> Self::HomologySummand {
-        todo!()
     }
 }
 
 pub struct KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    complex: FreeChainComplex<KhEnhState, R, Idx2Iter>,
+    complex: XChainComplex2<KhEnhState, R>,
     reduced: bool,
 }
 
@@ -189,65 +161,26 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.reduced
     }
 
-    pub fn desc_d_gens(&self) -> String { 
-        self.complex.desc_d_gens()
-    }
-    
-    pub fn print_d_gens(&self) {
-        self.complex.print_d_gens()
+    pub fn display_table(&self) -> String { 
+        self.complex.display_table()
     }
 
-}
+    pub fn print_table(&self) { 
+        self.complex.print_table()
+    }
 
-impl<R> Index<[isize; 2]> for KhComplexBigraded<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = KhComplexSummand<R>;
+    pub fn display_d(&self) -> String { 
+        self.complex.display_d()
+    }
 
-    fn index(&self, index: [isize; 2]) -> &Self::Output {
-        &self.complex[Idx2::from(index)]
+    pub fn inner(&self) -> &XChainComplex2<KhEnhState, R> {
+        &self.complex
     }
 }
 
-impl<R> Grid for KhComplexBigraded<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Idx = Idx2;
-    type IdxIter = IntoIter<Idx2>;
-    type Output = KhComplexSummand<R>;
-
-    fn contains_idx(&self, k: Self::Idx) -> bool {
-        self.complex.contains_idx(k)
-    }
-
-    fn indices(&self) -> Self::IdxIter {
-        self.complex.indices()
-    }
-
-    fn get(&self, i: Self::Idx) -> Option<&Self::Output> {
-        self.complex.get(i)
-    }
-}
-
-impl<R> ChainComplex for KhComplexBigraded<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn d_degree(&self) -> Self::Idx {
-        self.complex.d_degree()
-    }
-
-    fn d_matrix(&self, idx: Self::Idx) -> SpMat<Self::R> {
-        self.complex.d_matrix(idx)
-    }
-}
-
-impl<R> HomologyComputable for KhComplexBigraded<R>
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    type Homology = KhHomologyBigraded<R>;
-    type HomologySummand = KhHomologySummand<R>;
-
-    fn homology(&self) -> Self::Homology {
+impl<R> KhComplexBigraded<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
+    pub fn homology(self) -> KhHomologyBigraded<R> { 
         KhHomologyBigraded::from(self)
-    }
-
-    fn homology_at(&self, _i: Self::Idx) -> Self::HomologySummand {
-        todo!()
     }
 }

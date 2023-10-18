@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 use std::ops::RangeInclusive;
-use std::rc::Rc;
 use itertools::Itertools;
 use yui_core::{Ring, RingOps, PowMod2};
-use yui_homology::{FreeChainComplex, Shift};
+use yui_homology::v2::XChainComplex;
 use yui_link::{Link, State, LinkComp, Resolution, Edge};
 
 use crate::{KhAlgStr, KhLabel, KhEnhState};
@@ -252,28 +251,26 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn as_complex(self, i0: isize, reduced: bool) -> FreeChainComplex<KhEnhState, R, RangeInclusive<isize>> {
-        let range = self.h_range().shift(i0);
+    pub fn as_complex(self, i0: isize, reduced: bool) -> XChainComplex<KhEnhState, R> {
+        let range = self.h_range();
+        let range = (range.start() + i0) ..= (range.end() + i0);
         
-        let rc0 = Rc::new(self);
-        let rc1 = rc0.clone();
-
-        FreeChainComplex::new(range, 1, 
-            move |i| {
+        XChainComplex::new(range, 1, 
+            |i| {
                 let i = i - i0;
                 let gens = if reduced {
-                    let e = rc0.base_pt.unwrap();
-                    rc0.reduced_generators(i, &e)
+                    let e = self.base_pt.unwrap();
+                    self.reduced_generators(i, &e)
                 } else { 
-                    rc0.generators(i) 
+                    self.generators(i) 
                 };
                 gens.into_iter().cloned().collect()
             },
-            move |x| { 
-                rc1.differentiate(x)
+            |_i, x| { 
+                self.differentiate(x)
             }
         )
-    }
+    }   
 }
 
 #[cfg(test)]
@@ -450,5 +447,5 @@ mod tests {
 
        assert_eq!(cube.dim, 3);
        assert_eq!(cube.vertices.len(), 8);
-  }
+    }
 }

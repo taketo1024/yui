@@ -7,10 +7,10 @@ use core::panic;
 use itertools::Itertools;
 use log::info;
 use yui_link::Link;
-use yui_homology::{RModStr, ChainComplex, Grid};
-use yui_homology::utils::{HomologyCalc, ChainReducer};
+use yui_homology::v2::HomologyCalc;
 use yui_core::{EucRing, EucRingOps};
 use yui_matrix::sparse::*;
+
 use crate::KhComplex;
 
 pub fn ss_invariant<R>(l: &Link, c: &R, n: usize, reduced: bool) -> i32
@@ -33,25 +33,24 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     assert!(!c.is_zero());
     assert!(!c.is_unit());
     assert!(n >= 1);
+    assert!(ver == 2);
 
     info!("compute ss, c = {c} ({}), n = {n}.", std::any::type_name::<R>());
 
     let h = (0..n).fold(R::one(), |p, _| p * c); // h = c^n
     let (a0, a1, vs) = match ver { 
-        1 => prepare_v1(l, &h, reduced),
         2 => prepare_v2(l, &h, reduced),
         _ => panic!()
     };
 
-    let (kh, p, _) = HomologyCalc::calculate_with_trans(&a0, &a1);
+    let kh = HomologyCalc::calculate(&a0, &a1, true);
 
-    info!("homology: {h}");
+    info!("homology: {kh}");
     
     let r = kh.rank();
-    let p = p.submat_rows(0..r).to_owned();
 
     let vs = vs.into_iter().enumerate().map(|(i, v)| { 
-        let v = &p * v;
+        let v = kh.vectorize(&v).subvec(0..r).to_owned();
         info!("a[{i}] = {v}");
         v
     }).collect_vec();
@@ -73,38 +72,15 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     ss
 }
 
-fn prepare_v1<R>(l: &Link, h: &R, reduced: bool) -> (SpMat<R>, SpMat<R>, Vec<SpVec<R>>)
-where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
-    let c = KhComplex::new_v1(l, h, &R::zero(), reduced);
-    let vs = c.canon_cycles().iter().map(|z| 
-        c[0].vectorize(&z)
-    ).collect_vec();
-
-    let i0 = *c.indices().start();
-
-    let mut red = ChainReducer::new(&c);
-    red.set_indices(i0 ..= 1);
-    for v in vs.into_iter() { 
-        red.set_vec(0, v);
-    }
-    red.process();
-
-    let a0 = red.take_matrix(-1);
-    let a1 = red.take_matrix(0);
-    let vs = red.take_vecs(0);
-
-    (a0, a1, vs)
-}
-
 fn prepare_v2<R>(l: &Link, h: &R, reduced: bool) -> (SpMat<R>, SpMat<R>, Vec<SpVec<R>>)
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
     let c = KhComplex::new_v2(l, h, &R::zero(), reduced);
 
-    let a0 = c.d_matrix(-1);
-    let a1 = c.d_matrix(0);
+    let a0 = c.d_matrix(-1).clone();
+    let a1 = c.d_matrix( 0).clone();
 
     let vs = c.canon_cycles().iter().map(|z| 
-        c[0].vectorize(&z)
+        c.vectorize(0, &z)
     ).collect_vec();
 
     (a0, a1, vs)
@@ -139,9 +115,10 @@ mod tests {
     use super::*;
 
     fn test(l: &Link, c: i32, value: i32) { 
-        for (&r, &v) in cartesian!([true, false].iter(), [1, 2].iter()) { 
-            assert_eq!(compute_ss(&l, &c, 1, r, v), value);
-            assert_eq!(compute_ss(&l.mirror(), &c, 1, r, v), -value);
+        let ver = 2;
+        for &r in cartesian!([true, false].iter()) { 
+            assert_eq!(compute_ss(&l, &c, 1, r, ver), value);
+            assert_eq!(compute_ss(&l.mirror(), &c, 1, r, ver), -value);
         }
     }
 

@@ -1,16 +1,13 @@
-use std::fmt::Display;
 use std::ops::{RangeInclusive, Index};
 
-use yui_homology::{Idx2, Idx2Iter, ChainComplex, Grid, GenericRModStr, Homology, GenericHomology, fmt::FmtList};
-use yui_core::{EucRing, EucRingOps, Ring, RingOps};
+use yui_homology::v2::{Homology, HomologySummand, Homology2, Graded, PrintTable, PrintSeq};
+use yui_core::{EucRing, EucRingOps};
 use yui_link::Link;
-use super::complex::{KhComplex, KhComplexBigraded};
 
-pub type KhHomologySummand<R> = GenericRModStr<R>;
-
+use crate::{KhComplex, KhComplexBigraded};
 pub struct KhHomology<R> 
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    homology: GenericHomology<R, RangeInclusive<isize>>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    homology: Homology<R>
 }
 
 impl<R> KhHomology<R> 
@@ -18,58 +15,45 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn new(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
         Self::new_v2(l, h, t, reduced)
     }
-}
 
-impl<R> From<&KhComplex<R>> for KhHomology<R>
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    fn from(c: &KhComplex<R>) -> Self {
-        let c = c.as_generic().simplify();
-        let homology = GenericHomology::from(c);
-        Self { homology }
+    pub fn h_range(&self) -> RangeInclusive<isize> { 
+        let h = &self.homology;
+        let h_min = h.support().min().unwrap_or(0);
+        let h_max = h.support().max().unwrap_or(0);
+        h_min ..= h_max
+    }
+
+    pub fn display_seq(&self) -> String { 
+        self.homology.display_seq()
+    }
+
+    pub fn print_seq(&self) { 
+        self.homology.print_seq()
     }
 }
+
+impl<R> From<KhComplex<R>> for KhHomology<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    fn from(c: KhComplex<R>) -> Self {
+        let c = c.inner().inner();
+        let h = Homology::new(c, false);
+        Self { homology: h }
+    }
+}
+
 
 impl<R> Index<isize> for KhHomology<R> 
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = KhHomologySummand<R>;
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    type Output = HomologySummand<R>;
 
     fn index(&self, index: isize) -> &Self::Output {
-        self.homology.index(index)
-    }
-}
-
-impl<R> Grid for KhHomology<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Idx = isize;
-    type IdxIter = RangeInclusive<isize>;
-    type Output = KhHomologySummand<R>;
-
-    fn contains_idx(&self, k: Self::Idx) -> bool {
-        self.homology.contains_idx(k)
-    }
-
-    fn indices(&self) -> Self::IdxIter {
-        self.homology.indices()
-    }
-
-    fn get(&self, i: Self::Idx) -> Option<&Self::Output> {
-        self.homology.get(i)
-    }
-}
-
-impl<R> Homology for KhHomology<R> 
-where R: Ring, for<'x> &'x R: RingOps<R> {}
-
-impl<R> Display for KhHomology<R> 
-where R: Ring, for<'x> &'x R: EucRingOps<R> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.homology.fmt(f)
+        &self.homology[index]
     }
 }
 
 pub struct KhHomologyBigraded<R> 
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    homology: GenericHomology<R, Idx2Iter>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    homology: Homology2<R>
 }
 
 impl<R> KhHomologyBigraded<R>
@@ -77,60 +61,37 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn new(l: Link, reduced: bool) -> Self {
         Self::new_v2(l, reduced)
     }
+
+    pub fn display_table(&self) -> String { 
+        self.homology.display_table()
+    }
+
+    pub fn print_table(&self) { 
+        self.homology.print_table()
+    }
 }
 
-impl<R> From<&KhComplexBigraded<R>> for KhHomologyBigraded<R>
+impl<R> From<KhComplexBigraded<R>> for KhHomologyBigraded<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    fn from(c: &KhComplexBigraded<R>) -> Self {
-        let c = c.as_generic().simplify();
-        let homology = GenericHomology::from(c);
-        Self { homology }
+    fn from(c: KhComplexBigraded<R>) -> Self {
+        let c = c.inner().inner();
+        let h = Homology2::new(c, false);
+        Self { homology: h }
     }
 }
 
-impl<R> Index<[isize; 2]> for KhHomologyBigraded<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = GenericRModStr<R>;
+impl<R> Index<(isize, isize)> for KhHomologyBigraded<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    type Output = HomologySummand<R>;
 
-    fn index(&self, index: [isize; 2]) -> &Self::Output {
-        let index = Idx2::from(index);
+    fn index(&self, index: (isize, isize)) -> &Self::Output {
         &self.homology[index]
-    }
-}
-
-impl<R> Grid for KhHomologyBigraded<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Idx = Idx2;
-    type IdxIter = Idx2Iter;
-    type Output = GenericRModStr<R>;
-
-    fn contains_idx(&self, k: Self::Idx) -> bool {
-        self.homology.contains_idx(k)
-    }
-
-    fn indices(&self) -> Self::IdxIter {
-        self.homology.indices()
-    }
-
-    fn get(&self, i: Self::Idx) -> Option<&Self::Output> {
-        self.homology.get(i)
-    }
-}
-
-impl<R> Homology for KhHomologyBigraded<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {}
-
-impl<R> Display for KhHomologyBigraded<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.fmt_list(f)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use yui_link::Link;
-    use yui_homology::{RModStr, Grid};
     use super::*;
     
     #[test]
@@ -138,7 +99,7 @@ mod tests {
         let l = Link::empty();
         let h = KhHomology::new(&l, &0, &0, false);
 
-        assert_eq!(h.indices(), 0..=0);
+        assert_eq!(h.h_range(), 0..=0);
 
         assert_eq!(h[0].rank(), 1);
         assert_eq!(h[0].is_free(), true);
@@ -149,7 +110,7 @@ mod tests {
         let l = Link::unknot();
         let h = KhHomology::new(&l, &0, &0, false);
 
-        assert_eq!(h.indices(), 0..=0);
+        assert_eq!(h.h_range(), 0..=0);
         
         assert_eq!(h[0].rank(), 2);
         assert_eq!(h[0].is_free(), true);
@@ -160,7 +121,7 @@ mod tests {
         let l = Link::trefoil();
         let h = KhHomology::new(&l, &0, &0, false);
 
-        assert_eq!(h.indices(), -3..=0);
+        assert_eq!(h.h_range(), -3..=0);
 
         assert_eq!(h[-3].rank(), 1);
         assert_eq!(h[-3].is_free(), true);
@@ -179,7 +140,7 @@ mod tests {
         let l = Link::trefoil().mirror();
         let h = KhHomology::new(&l, &0, &0, false);
 
-        assert_eq!(h.indices(), 0..=3);
+        assert_eq!(h.h_range(), 0..=3);
 
         assert_eq!(h[0].rank(), 2);
         assert_eq!(h[0].is_free(), true);
@@ -198,7 +159,7 @@ mod tests {
         let l = Link::figure8();
         let h = KhHomology::new(&l, &0, &0, false);
 
-        assert_eq!(h.indices(), -2..=2);
+        assert_eq!(h.h_range(), -2..=2);
 
         assert_eq!(h[-2].rank(), 1);
         assert_eq!(h[-2].is_free(), true);
@@ -221,8 +182,8 @@ mod tests {
         let l = Link::empty();
         let h = KhHomologyBigraded::<i32>::new(l, false);
 
-        assert_eq!(h[[0,0]].rank(), 1);
-        assert_eq!(h[[0,0]].is_free(), true);
+        assert_eq!(h[(0,0)].rank(), 1);
+        assert_eq!(h[(0,0)].is_free(), true);
     }
 
     #[test]
@@ -230,10 +191,10 @@ mod tests {
         let l = Link::unknot();
         let h = KhHomologyBigraded::<i32>::new(l, false);
 
-        assert_eq!(h[[0,-1]].rank(), 1);
-        assert_eq!(h[[0,-1]].is_free(), true);
-        assert_eq!(h[[0, 1]].rank(), 1);
-        assert_eq!(h[[0, 1]].is_free(), true);
+        assert_eq!(h[(0,-1)].rank(), 1);
+        assert_eq!(h[(0,-1)].is_free(), true);
+        assert_eq!(h[(0, 1)].rank(), 1);
+        assert_eq!(h[(0, 1)].is_free(), true);
     }
 
     #[test]
@@ -241,8 +202,8 @@ mod tests {
         let l = Link::unknot();
         let h = KhHomologyBigraded::<i32>::new(l, true);
 
-        assert_eq!(h[[0, 0]].rank(), 1);
-        assert_eq!(h[[0, 0]].is_free(), true);
+        assert_eq!(h[(0, 0)].rank(), 1);
+        assert_eq!(h[(0, 0)].is_free(), true);
     }
 
     #[test]
@@ -250,16 +211,16 @@ mod tests {
         let l = Link::trefoil();
         let h = KhHomologyBigraded::<i32>::new(l, false);
 
-        assert_eq!(h[[-3,-9]].rank(), 1);
-        assert_eq!(h[[-3,-9]].is_free(), true);
-        assert_eq!(h[[-2,-7]].rank(), 0);
-        assert_eq!(h[[-2,-7]].tors(), &vec![2]);
-        assert_eq!(h[[-2,-5]].rank(), 1);
-        assert_eq!(h[[-2,-5]].is_free(), true);
-        assert_eq!(h[[ 0,-3]].rank(), 1);
-        assert_eq!(h[[ 0,-3]].is_free(), true);
-        assert_eq!(h[[ 0,-1]].rank(), 1);
-        assert_eq!(h[[ 0,-1]].is_free(), true);
+        assert_eq!(h[(-3,-9)].rank(), 1);
+        assert_eq!(h[(-3,-9)].is_free(), true);
+        assert_eq!(h[(-2,-7)].rank(), 0);
+        assert_eq!(h[(-2,-7)].tors(), &vec![2]);
+        assert_eq!(h[(-2,-5)].rank(), 1);
+        assert_eq!(h[(-2,-5)].is_free(), true);
+        assert_eq!(h[( 0,-3)].rank(), 1);
+        assert_eq!(h[( 0,-3)].is_free(), true);
+        assert_eq!(h[( 0,-1)].rank(), 1);
+        assert_eq!(h[( 0,-1)].is_free(), true);
     }
 
     #[test]
@@ -267,16 +228,16 @@ mod tests {
         let l = Link::trefoil().mirror();
         let h = KhHomologyBigraded::<i32>::new(l, false);
 
-        assert_eq!(h[[0, 1]].rank(), 1);
-        assert_eq!(h[[0, 1]].is_free(), true);
-        assert_eq!(h[[0, 3]].rank(), 1);
-        assert_eq!(h[[0, 3]].is_free(), true);
-        assert_eq!(h[[2, 5]].rank(), 1);
-        assert_eq!(h[[2, 5]].is_free(), true);
-        assert_eq!(h[[3, 7]].rank(), 0);
-        assert_eq!(h[[3, 7]].tors(), &vec![2]);
-        assert_eq!(h[[3, 9]].rank(), 1);
-        assert_eq!(h[[3, 9]].is_free(), true);
+        assert_eq!(h[(0, 1)].rank(), 1);
+        assert_eq!(h[(0, 1)].is_free(), true);
+        assert_eq!(h[(0, 3)].rank(), 1);
+        assert_eq!(h[(0, 3)].is_free(), true);
+        assert_eq!(h[(2, 5)].rank(), 1);
+        assert_eq!(h[(2, 5)].is_free(), true);
+        assert_eq!(h[(3, 7)].rank(), 0);
+        assert_eq!(h[(3, 7)].tors(), &vec![2]);
+        assert_eq!(h[(3, 9)].rank(), 1);
+        assert_eq!(h[(3, 9)].is_free(), true);
     }
 
     #[test]
@@ -284,12 +245,12 @@ mod tests {
         let l = Link::trefoil();
         let h = KhHomologyBigraded::<i32>::new(l, true);
 
-        assert_eq!(h[[-3,-8]].rank(), 1);
-        assert_eq!(h[[-3,-8]].is_free(), true);
-        assert_eq!(h[[-2,-6]].rank(), 1);
-        assert_eq!(h[[-2,-6]].is_free(), true);
-        assert_eq!(h[[ 0,-2]].rank(), 1);
-        assert_eq!(h[[ 0,-2]].is_free(), true);
+        assert_eq!(h[(-3,-8)].rank(), 1);
+        assert_eq!(h[(-3,-8)].is_free(), true);
+        assert_eq!(h[(-2,-6)].rank(), 1);
+        assert_eq!(h[(-2,-6)].is_free(), true);
+        assert_eq!(h[( 0,-2)].rank(), 1);
+        assert_eq!(h[( 0,-2)].is_free(), true);
     }
 
     #[test]
@@ -297,22 +258,22 @@ mod tests {
         let l = Link::figure8();
         let h = KhHomologyBigraded::<i32>::new(l, false);
 
-        assert_eq!(h[[-2,-5]].rank(), 1);
-        assert_eq!(h[[-2,-5]].is_free(), true);
-        assert_eq!(h[[-1,-3]].rank(), 0);
-        assert_eq!(h[[-1,-3]].tors(), &vec![2]);
-        assert_eq!(h[[-1,-1]].rank(), 1);
-        assert_eq!(h[[-1,-1]].is_free(), true);
-        assert_eq!(h[[ 0,-1]].rank(), 1);
-        assert_eq!(h[[ 0,-1]].is_free(), true);
-        assert_eq!(h[[ 0, 1]].rank(), 1);
-        assert_eq!(h[[ 0, 1]].is_free(), true);
-        assert_eq!(h[[ 1, 1]].rank(), 1);
-        assert_eq!(h[[ 1, 1]].is_free(), true);
-        assert_eq!(h[[ 2, 3]].rank(), 0);
-        assert_eq!(h[[ 2, 3]].tors(), &vec![2]);
-        assert_eq!(h[[ 2, 5]].rank(), 1);
-        assert_eq!(h[[ 2, 5]].is_free(), true);
+        assert_eq!(h[(-2,-5)].rank(), 1);
+        assert_eq!(h[(-2,-5)].is_free(), true);
+        assert_eq!(h[(-1,-3)].rank(), 0);
+        assert_eq!(h[(-1,-3)].tors(), &vec![2]);
+        assert_eq!(h[(-1,-1)].rank(), 1);
+        assert_eq!(h[(-1,-1)].is_free(), true);
+        assert_eq!(h[( 0,-1)].rank(), 1);
+        assert_eq!(h[( 0,-1)].is_free(), true);
+        assert_eq!(h[( 0, 1)].rank(), 1);
+        assert_eq!(h[( 0, 1)].is_free(), true);
+        assert_eq!(h[( 1, 1)].rank(), 1);
+        assert_eq!(h[( 1, 1)].is_free(), true);
+        assert_eq!(h[( 2, 3)].rank(), 0);
+        assert_eq!(h[( 2, 3)].tors(), &vec![2]);
+        assert_eq!(h[( 2, 5)].rank(), 1);
+        assert_eq!(h[( 2, 5)].is_free(), true);
    }
 
     #[test]
@@ -320,15 +281,15 @@ mod tests {
         let l = Link::figure8();
         let h = KhHomologyBigraded::<i32>::new(l, true);
 
-        assert_eq!(h[[-2,-4]].rank(), 1);
-        assert_eq!(h[[-2,-4]].is_free(), true);
-        assert_eq!(h[[-1,-2]].rank(), 1);
-        assert_eq!(h[[-1,-2]].is_free(), true);
-        assert_eq!(h[[ 0, 0]].rank(), 1);
-        assert_eq!(h[[ 0, 0]].is_free(), true);
-        assert_eq!(h[[ 1, 2]].rank(), 1);
-        assert_eq!(h[[ 1, 2]].is_free(), true);
-        assert_eq!(h[[ 2, 4]].rank(), 1);
-        assert_eq!(h[[ 2, 4]].is_free(), true);
+        assert_eq!(h[(-2,-4)].rank(), 1);
+        assert_eq!(h[(-2,-4)].is_free(), true);
+        assert_eq!(h[(-1,-2)].rank(), 1);
+        assert_eq!(h[(-1,-2)].is_free(), true);
+        assert_eq!(h[( 0, 0)].rank(), 1);
+        assert_eq!(h[( 0, 0)].is_free(), true);
+        assert_eq!(h[( 1, 2)].rank(), 1);
+        assert_eq!(h[( 1, 2)].is_free(), true);
+        assert_eq!(h[( 2, 4)].rank(), 1);
+        assert_eq!(h[( 2, 4)].is_free(), true);
    }
 }

@@ -5,10 +5,10 @@ mod chain;
 pub use chain::{KhLabel, KhEnhState, KhChain};
 
 mod complex;
-pub use complex::{KhComplex, KhComplexBigraded, KhComplexSummand};
+pub use complex::{KhComplex, KhComplexBigraded};
 
 mod homology;
-pub use homology::{KhHomology, KhHomologyBigraded, KhHomologySummand};
+pub use homology::{KhHomology, KhHomologyBigraded};
 
 pub mod v1;
 pub mod v2;

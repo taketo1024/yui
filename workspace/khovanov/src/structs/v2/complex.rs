@@ -1,13 +1,12 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
-use std::ops::RangeInclusive;
 
 use log::info; 
 use itertools::Itertools;
 use num_traits::Zero;
 use cartesian::cartesian;
 use yui_core::{Ring, RingOps};
-use yui_homology::FreeChainComplex;
+use yui_homology::v2::XChainComplex;
 use yui_link::{Crossing, Resolution, Edge};
 
 use crate::{KhAlgGen, KhEnhState};
@@ -448,7 +447,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug_assert!(self.validate_edges());
     }
 
-    pub fn eval(&self, h: &R, t: &R) -> FreeChainComplex<KhEnhState, R, RangeInclusive<isize>> {
+    pub fn eval(&self, h: &R, t: &R) -> XChainComplex<KhEnhState, R> {
         debug_assert!(self.is_evalable());
 
         let (h, t) = (h.clone(), t.clone());
@@ -460,14 +459,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let all_gens = self.vertices.keys().cloned().collect_vec();
         let vertices = self.vertices.clone();
 
-        FreeChainComplex::new(i0..=i1, 1, 
-            move |i| { 
+        XChainComplex::new(i0..=i1, 1, 
+            |i| { 
                 let w = (i - i0) as usize;
                 all_gens.iter().filter(|x| 
                     x.state.weight() == w
                 ).sorted().cloned().collect()
             }, 
-            move |x| { 
+            |_i, x| { 
                 let v = &vertices[&x];
                 v.out_edges.iter().map(|(y, f)| 
                     (*y, f.eval(&h, &t))

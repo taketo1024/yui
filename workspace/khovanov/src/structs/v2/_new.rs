@@ -24,7 +24,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         ).collect_vec();
 
         assert!(canon_cycles.iter().all(|z| 
-            complex.differetiate(z).is_zero()
+            complex.differetiate(0, z).is_zero()
         ));
 
         let deg_shift = Self::deg_shift_for(l, reduced);
@@ -43,8 +43,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> KhHomology<R> 
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn new_v2(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
-        let complex = KhComplex::new_v2(l, h, t, reduced);
-        Self::from(&complex)
+        let c = KhComplex::new_v2(l, h, t, reduced);
+        Self::from(c)
     }
 }
 
@@ -52,14 +52,12 @@ impl<R> KhHomologyBigraded<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn new_v2(l: Link, reduced: bool) -> Self {
         let c = KhComplexBigraded::new_v2(l, reduced);
-        Self::from(&c)
+        Self::from(c)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use yui_homology::{Grid, RModStr, HomologyComputable};
-
     use super::*;
  
     #[test]
@@ -68,7 +66,7 @@ mod tests {
         let c = KhComplex::new_v2(&l, &0, &0, false);
         let h = c.homology();
 
-        assert_eq!(h.indices(), -3..=0);
+        assert_eq!(h.h_range(), -3..=0);
 
         assert_eq!(h[-3].rank(), 1);
         assert_eq!(h[-3].is_free(), true);

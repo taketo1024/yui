@@ -1,11 +1,9 @@
 mod mdeg;
-pub use mdeg::MDegree;
-
 mod mono;
-pub use mono::Mono;
-
 mod mono2;
-pub use mono2::Mono2;
-
 mod poly;
+
+pub use mdeg::MultiDeg;
+pub use mono::Mono;
+pub use mono2::Mono2;
 pub use poly::PolyBase;

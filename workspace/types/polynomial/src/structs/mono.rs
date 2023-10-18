@@ -8,10 +8,10 @@ use yui_core::Elem;
 use yui_lin_comb::Gen;
 use yui_utils::{subscript, superscript};
 
-use crate::{PolyDeg, PolyGen, MDegree};
+use crate::{MonoDeg, MonoGen, MultiDeg};
 
 // `Mono<X, I>` : a struct representing X^d (univar) or ΠX_i^{d_i} (multivar).
-// `I` is one of `usize`, `isize`, `MDegree<usize>`, `MDegree<isize>`.
+// `I` is one of `usize`, `isize`, `MultiDeg<usize>`, `MultiDeg<isize>`.
 
 #[derive(Clone, PartialEq, Eq, Hash, Default, Debug, PartialOrd, Ord)]
 pub struct Mono<const X: char, I>(I);
@@ -90,13 +90,13 @@ impl_mono_univar!(isize);
 // impls for multivar-type.
 macro_rules! impl_mono_multivar {
     ($I:ty) => {
-        impl<const X: char> Elem for Mono<X, MDegree<$I>> { 
+        impl<const X: char> Elem for Mono<X, MultiDeg<$I>> { 
             fn math_symbol() -> String {
                 format!("{X}")
             }
         }
 
-        impl<const X: char> Display for Mono<X, MDegree<$I>> { 
+        impl<const X: char> Display for Mono<X, MultiDeg<$I>> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let d = self.degree();
                 let s = d.iter().map(|(&i, &d_i)| {
@@ -112,7 +112,7 @@ macro_rules! impl_mono_multivar {
             }
         }
 
-        impl<const X: char> FromStr for Mono<X, MDegree<$I>> {
+        impl<const X: char> FromStr for Mono<X, MultiDeg<$I>> {
             type Err = ();
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 if s == "1" { 
@@ -122,7 +122,7 @@ macro_rules! impl_mono_multivar {
                 let r = regex::Regex::new(&format!("^{X}([0-9]+)$")).unwrap();
                 if let Some(m) = r.captures(&s) { 
                     let i = usize::from_str(&m[1]).unwrap();
-                    let mdeg = MDegree::from((i, 1));
+                    let mdeg = MultiDeg::from((i, 1));
                     return Ok(Mono(mdeg))
                 }
 
@@ -140,7 +140,7 @@ macro_rules! impl_poly_gen {
     ($I:ty) => {
         impl<const X: char> Gen for Mono<X, $I> {}
 
-        impl<const X: char> PolyGen for Mono<X, $I> {
+        impl<const X: char> MonoGen for Mono<X, $I> {
             type Degree = $I;
 
             fn degree(&self) -> Self::Degree {
@@ -164,5 +164,5 @@ macro_rules! impl_poly_gen {
 
 impl_poly_gen!(usize);
 impl_poly_gen!(isize);
-impl_poly_gen!(MDegree<usize>);
-impl_poly_gen!(MDegree<isize>);
+impl_poly_gen!(MultiDeg<usize>);
+impl_poly_gen!(MultiDeg<isize>);

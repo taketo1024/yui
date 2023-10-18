@@ -8,7 +8,7 @@ use yui_core::Elem;
 use yui_lin_comb::Gen;
 use yui_utils::map;
 
-use crate::{PolyDeg, PolyGen, MDegree};
+use crate::{MonoDeg, MonoGen, MultiDeg};
 use super::mono::fmt_mono;
 
 // `Mono2<X, Y, I>` : a struct representing X^i Y^j.
@@ -29,9 +29,9 @@ impl<const X: char, const Y: char, I> From<(I, I)> for Mono2<X, Y, I> {
     }
 }
 
-impl<const X: char, const Y: char, I> From<MDegree<I>> for Mono2<X, Y, I>
+impl<const X: char, const Y: char, I> From<MultiDeg<I>> for Mono2<X, Y, I>
 where I: Zero + Clone {
-    fn from(mdeg: MDegree<I>) -> Self {
+    fn from(mdeg: MultiDeg<I>) -> Self {
         assert!(mdeg.len() <= 2);
         let d0 = mdeg.deg(0);
         let d1 = mdeg.deg(1);
@@ -111,11 +111,11 @@ macro_rules! impl_poly_gen {
                 
         impl<const X: char, const Y: char> Gen for Mono2<X, Y, $I> {}
 
-        impl<const X: char, const Y: char> PolyGen for Mono2<X, Y, $I> {
-            type Degree = MDegree<$I>;
+        impl<const X: char, const Y: char> MonoGen for Mono2<X, Y, $I> {
+            type Degree = MultiDeg<$I>;
 
             fn degree(&self) -> Self::Degree {
-                MDegree::new(map!{ 0 => self.0, 1 => self.1 })
+                MultiDeg::new(map!{ 0 => self.0, 1 => self.1 })
             }
 
             fn is_unit(&self) -> bool { 

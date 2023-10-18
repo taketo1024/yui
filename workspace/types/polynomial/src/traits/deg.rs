@@ -1,14 +1,14 @@
 use std::ops::Add;
 use num_traits::Zero;
 
-pub trait PolyDeg: Add + Zero {
+pub trait MonoDeg: Add + Zero {
     fn is_add_unit(&self) -> bool;
     fn add_inv(&self) -> Option<Self>;
 }
 
-macro_rules! impl_polydeg_unsigned {
+macro_rules! impl_deg_unsigned {
     ($t:ty) => {
-        impl PolyDeg for $t {
+        impl MonoDeg for $t {
             fn is_add_unit(&self) -> bool { 
                 self.is_zero()
             }
@@ -24,9 +24,9 @@ macro_rules! impl_polydeg_unsigned {
     };
 }
 
-macro_rules! impl_polydeg_signed {
+macro_rules! impl_deg_signed {
     ($t:ty) => {
-        impl PolyDeg for $t {
+        impl MonoDeg for $t {
             fn is_add_unit(&self) -> bool { 
                 true
             }
@@ -38,7 +38,7 @@ macro_rules! impl_polydeg_signed {
     };
 }
 
-impl_polydeg_unsigned!(usize);
-impl_polydeg_signed!  (isize);
+impl_deg_unsigned!(usize);
+impl_deg_signed!  (isize);
 
-pub(crate) use {impl_polydeg_unsigned, impl_polydeg_signed};
+pub(crate) use {impl_deg_unsigned, impl_deg_signed};

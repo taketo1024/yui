@@ -4,13 +4,13 @@ use std::ops::{Add, AddAssign, Neg};
 use auto_impl_ops::auto_ops;
 use num_traits::Zero;
 
-use crate::{PolyDeg, impl_polydeg_unsigned, impl_polydeg_signed};
+use crate::{MonoDeg, impl_deg_unsigned, impl_deg_signed};
 
 #[derive(Clone, Default, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
-pub struct MDegree<Deg>(BTreeMap<usize, Deg>) // x_0^{d_0} ... x_n^{d_n} <--> [ 0 => d_0, ..., n => d_n ]
+pub struct MultiDeg<Deg>(BTreeMap<usize, Deg>) // x_0^{d_0} ... x_n^{d_n} <--> [ 0 => d_0, ..., n => d_n ]
 where Deg: Zero;
 
-impl<Deg> MDegree<Deg>
+impl<Deg> MultiDeg<Deg>
 where Deg: Zero {
     pub fn new(mut map: BTreeMap<usize, Deg>) -> Self { 
         map.retain(|_, d| !d.is_zero());
@@ -32,28 +32,28 @@ where Deg: Zero {
     }
 }
 
-impl<Deg> From<(usize, Deg)> for MDegree<Deg>
+impl<Deg> From<(usize, Deg)> for MultiDeg<Deg>
 where Deg: Zero {
     fn from(value: (usize, Deg)) -> Self {
-        MDegree::from_iter([value])
+        MultiDeg::from_iter([value])
     }
 }
 
-impl<Deg> FromIterator<(usize, Deg)> for MDegree<Deg> 
+impl<Deg> FromIterator<(usize, Deg)> for MultiDeg<Deg> 
 where Deg: Zero {
     fn from_iter<T: IntoIterator<Item = (usize, Deg)>>(iter: T) -> Self {
         Self::new(iter.into_iter().collect())
     }
 }
 
-impl<Deg> MDegree<Deg>
+impl<Deg> MultiDeg<Deg>
 where Deg: Zero + Clone {
     pub fn deg(&self, index: usize) -> Deg {
         self.0.get(&index).cloned().unwrap_or(Deg::zero())
     }
 }
 
-impl<Deg> Zero for MDegree<Deg>
+impl<Deg> Zero for MultiDeg<Deg>
 where for<'x> Deg: Clone + AddAssign<&'x Deg> + Zero {
     fn zero() -> Self {
         Self(BTreeMap::new())
@@ -65,9 +65,9 @@ where for<'x> Deg: Clone + AddAssign<&'x Deg> + Zero {
 }
 
 #[auto_ops]
-impl<Deg> AddAssign<&MDegree<Deg>> for MDegree<Deg>
+impl<Deg> AddAssign<&MultiDeg<Deg>> for MultiDeg<Deg>
 where for<'x> Deg: AddAssign<&'x Deg> + Zero + Clone {
-    fn add_assign(&mut self, rhs: &MDegree<Deg>) {
+    fn add_assign(&mut self, rhs: &MultiDeg<Deg>) {
         let data = &mut self.0;
         for (i, d) in rhs.0.iter() { 
             if let Some(d_i) = data.get_mut(i) { 
@@ -80,16 +80,16 @@ where for<'x> Deg: AddAssign<&'x Deg> + Zero + Clone {
     }
 }
 
-impl<Deg> Neg for &MDegree<Deg>
+impl<Deg> Neg for &MultiDeg<Deg>
 where Deg: Zero, for<'x> &'x Deg: Neg<Output = Deg> {
-    type Output = MDegree<Deg>;
+    type Output = MultiDeg<Deg>;
     fn neg(self) -> Self::Output {
         let list = self.0.iter().map(|(&i, d)| 
             (i, -d)
         ).collect();
-        MDegree(list)
+        MultiDeg(list)
     }
 }
 
-impl_polydeg_unsigned!(MDegree<usize>);
-impl_polydeg_signed!  (MDegree<isize>);
+impl_deg_unsigned!(MultiDeg<usize>);
+impl_deg_signed!  (MultiDeg<isize>);

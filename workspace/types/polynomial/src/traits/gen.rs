@@ -1,9 +1,10 @@
 use std::ops::Mul;
 use num_traits::One;
 use yui_lin_comb::Gen;
-use super::PolyDeg;
 
-pub trait PolyGen: 
+use super::MonoDeg;
+
+pub trait MonoGen: 
     Mul<Output = Self> + 
     One + 
     PartialOrd + 
@@ -11,7 +12,7 @@ pub trait PolyGen:
     From<Self::Degree> +
     Gen
 {
-    type Degree: PolyDeg;
+    type Degree: MonoDeg;
     fn degree(&self) -> Self::Degree;
     fn is_unit(&self) -> bool;
     fn inv(&self) -> Option<Self>;

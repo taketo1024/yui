@@ -1,6 +1,6 @@
 mod deg;
-pub use deg::PolyDeg;
-pub (crate) use deg::{impl_polydeg_signed, impl_polydeg_unsigned};
+pub use deg::MonoDeg;
+pub (crate) use deg::{impl_deg_signed, impl_deg_unsigned};
 
 mod gen;
-pub use gen::PolyGen;
+pub use gen::MonoGen;

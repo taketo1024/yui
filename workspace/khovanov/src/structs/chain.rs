@@ -149,7 +149,7 @@ impl MulAssign<&KhEnhState> for KhEnhState {
 }
 
 impl Elem for KhEnhState { 
-    fn set_symbol() -> String { 
+    fn math_symbol() -> String { 
         String::from("Kh")
     }
 }

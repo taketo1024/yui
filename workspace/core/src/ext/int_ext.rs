@@ -34,10 +34,11 @@ macro_rules! impl_integer {
         impl_ops!(IntOps, $type);
 
         impl Elem for $type {
-            fn set_symbol() -> String { 
+            fn math_symbol() -> String { 
                 String::from("Z")
             }
         }
+        
         impl AddMon for $type {}
         impl AddGrp for $type {}
         impl Mon for $type {}

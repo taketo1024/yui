@@ -52,7 +52,7 @@ pub(crate) fn fmt_mono(x: String, d: isize) -> String {
 macro_rules! impl_mono_univar {
     ($I:ty) => {
         impl<const X: char> Elem for Mono<X, $I> { 
-            fn set_symbol() -> String {
+            fn math_symbol() -> String {
                 format!("{X}")
             }
         }
@@ -91,7 +91,7 @@ impl_mono_univar!(isize);
 macro_rules! impl_mono_multivar {
     ($I:ty) => {
         impl<const X: char> Elem for Mono<X, MDegree<$I>> { 
-            fn set_symbol() -> String {
+            fn math_symbol() -> String {
                 format!("{X}")
             }
         }

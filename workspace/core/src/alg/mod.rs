@@ -7,7 +7,7 @@ mod euc_ring;
 mod field;
 mod r_mod;
 
-pub use elem::Elem;
+pub use elem::{ElemBase, Elem};
 pub use add_mon::{AddMon, AddMonOps};
 pub use add_grp::{AddGrp, AddGrpOps};
 pub use mon::{Mon, MonOps};

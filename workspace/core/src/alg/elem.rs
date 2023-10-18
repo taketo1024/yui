@@ -25,5 +25,5 @@ impl<T> ElemBase for T where T:
 {}
 
 pub trait Elem: ElemBase { 
-    fn set_symbol() -> String;
+    fn math_symbol() -> String;
 }

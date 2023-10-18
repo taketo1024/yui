@@ -238,12 +238,12 @@ decl_alg_ops!(FieldOps);
 
 impl<T> Elem for Ratio<T> 
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {
-    fn set_symbol() -> String {
-        let t = T::set_symbol();
+    fn math_symbol() -> String {
+        let t = T::math_symbol();
         if &t == "Z" { 
             String::from("Q")
         } else { 
-            format!("Frac({})", T::set_symbol())
+            format!("Frac({})", T::math_symbol())
         }
     }
 }
@@ -403,8 +403,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn set_symbol() {
-        assert_eq!(Ratio::<i32>::set_symbol(), "Q");
+    fn math_symbol() {
+        assert_eq!(Ratio::<i32>::math_symbol(), "Q");
     }
 
     #[test]

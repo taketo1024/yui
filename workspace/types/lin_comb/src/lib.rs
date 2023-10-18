@@ -431,8 +431,8 @@ where
     X: FreeGen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    fn set_symbol() -> String {
-        format!("Free<{}; {}>", X::set_symbol(), R::set_symbol())
+    fn math_symbol() -> String {
+        format!("Free<{}; {}>", X::math_symbol(), R::math_symbol())
     }
 }
 
@@ -482,7 +482,7 @@ mod tests {
     struct X(i32);
 
     impl Elem for X { 
-        fn set_symbol() -> String {
+        fn math_symbol() -> String {
             String::from("X")
         }
     }
@@ -494,9 +494,9 @@ mod tests {
     impl FreeGen for X {}
 
     #[test]
-    fn set_symbol() { 
+    fn math_symbol() { 
         type L = LinComb<X, i32>;
-        let symbol = L::set_symbol();
+        let symbol = L::math_symbol();
         assert_eq!(symbol, "Free<X; Z>");
     }
 

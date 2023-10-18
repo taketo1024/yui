@@ -331,7 +331,7 @@ impl_alg_op_d!(EucRingOps, -3);
 
 impl<I, const D: i32> Elem for QuadInt<I, D>
 where I: Integer, for<'x> &'x I: IntOps<I> {
-    fn set_symbol() -> String {
+    fn math_symbol() -> String {
         if D == -1 { 
             String::from("Z[i]")
         } else {

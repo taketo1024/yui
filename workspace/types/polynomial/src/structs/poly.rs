@@ -412,8 +412,8 @@ impl_alg_op!(RingOps);
 
 impl<I, R> Elem for PolyBase<I, R>
 where I: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
-    fn set_symbol() -> String {
-        format!("{}[{}]", R::set_symbol(), I::set_symbol())
+    fn math_symbol() -> String {
+        format!("{}[{}]", R::math_symbol(), I::math_symbol())
     }
 }
 

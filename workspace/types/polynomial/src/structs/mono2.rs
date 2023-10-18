@@ -104,7 +104,7 @@ macro_rules! impl_poly_gen {
         }
         
         impl<const X: char, const Y: char> Elem for Mono2<X, Y, $I> { 
-            fn set_symbol() -> String {
+            fn math_symbol() -> String {
                 format!("{X}, {Y}")
             }
         }

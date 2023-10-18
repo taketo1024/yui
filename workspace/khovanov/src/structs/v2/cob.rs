@@ -466,7 +466,7 @@ impl Default for CobComp {
 }
 
 impl Elem for CobComp {
-    fn set_symbol() -> String {
+    fn math_symbol() -> String {
         "CobComp".to_string()
     }
 }
@@ -796,7 +796,7 @@ impl OrdForDisplay for Cob {
 }
 
 impl Elem for Cob {
-    fn set_symbol() -> String {
+    fn math_symbol() -> String {
         "Cob".to_string()
     }
 }

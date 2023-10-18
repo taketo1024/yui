@@ -92,7 +92,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     
         let mut res = vec![];
-        let symbol = R::set_symbol();
+        let symbol = R::math_symbol();
     
         if rank > 1 {
             let str = format!("{}{}", symbol, superscript(rank as isize));

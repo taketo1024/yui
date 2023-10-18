@@ -158,7 +158,7 @@ impl_alg_ops!(EucRingOps);
 impl_alg_ops!(FieldOps);
 
 impl<const p: I> Elem for FF<p> {
-    fn set_symbol() -> String {
+    fn math_symbol() -> String {
         use yui_utils::subscript;
         format!("F{}", subscript(p as isize))
     }

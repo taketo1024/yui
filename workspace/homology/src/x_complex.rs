@@ -189,7 +189,7 @@ mod tests {
     struct X(isize);
 
     impl Elem for X { 
-        fn set_symbol() -> String {
+        fn math_symbol() -> String {
             String::from("X")
         }
     }

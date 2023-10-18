@@ -133,8 +133,8 @@ where
     X: FreeGen,
     R: EucRing, for<'x> &'x R: EucRingOps<R>,
 {
-    pub fn homology(self) -> HomologyBase<I, R> { 
-        self.inner.homology()
+    pub fn homology(&self, with_trans: bool) -> HomologyBase<I, R> { 
+        self.inner.homology(with_trans)
     }
 }
 

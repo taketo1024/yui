@@ -1,5 +1,4 @@
 use std::ops::Index;
-use std::cell::OnceCell;
 use std::collections::HashMap;
 use std::fmt::Display;
 
@@ -9,8 +8,7 @@ use yui_matrix::sparse::{SpVec, SpMat, MatType};
 
 use super::deg::{Deg, isize2, isize3};
 use super::graded::Graded;
-use super::complex::{ChainComplexTrait, ChainComplexBase};
-use super::homology_calc::HomologyCalc;
+use super::complex::ChainComplexBase;
 
 pub type Homology<R>  = HomologyBase<isize,  R>;
 pub type Homology2<R> = HomologyBase<isize2, R>;
@@ -120,41 +118,27 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 pub struct HomologyBase<I, R>
 where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    with_gens: bool,
-    complex: ChainComplexBase<I, R>,
-    cache: HashMap<I, OnceCell<HomologySummand<R>>>,
+    support: Vec<I>,
+    summands: HashMap<I, HomologySummand<R>>,
     zero_smd: HomologySummand<R>
 }
 
 impl<I, R> HomologyBase<I, R>
 where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    pub fn new(complex: ChainComplexBase<I, R>, with_gens: bool) -> Self { 
-        let cache = HashMap::from_iter(
-            complex.support().map(|i| (i, OnceCell::new()) )
+    pub fn new(complex: &ChainComplexBase<I, R>, with_gens: bool) -> Self { 
+        let support = complex.support().collect_vec();
+        let summands = HashMap::from_iter(
+            support.iter().map(|&i| {
+                let h_i = complex.homology_at(i, with_gens);
+                (i, h_i)
+            })
         );
         let zero_smd = HomologySummand::zero();
-        Self { with_gens, complex, cache, zero_smd }
-    }
-
-    pub fn complex(&self) -> &ChainComplexBase<I, R> {
-        &self.complex
+        Self { support, summands, zero_smd }
     }
 
     pub fn get(&self, i: I) -> &HomologySummand<R> {
-        if self.complex.is_supported(i) { 
-            self.cache[&i].get_or_init(|| 
-                self.calc(i)
-            )
-        } else { 
-            &self.zero_smd
-        }
-    }
-
-    fn calc(&self, i: I) -> HomologySummand<R> {
-        let i0 = i - self.complex.d_deg();
-        let d0 = self.complex.d_matrix(i0);
-        let d1 = self.complex.d_matrix(i);
-        HomologyCalc::calculate(d0, d1, self.with_gens)
+        self.summands.get(&i).unwrap_or(&self.zero_smd)
     }
 }
 
@@ -186,7 +170,7 @@ impl<I, R> Graded<I> for HomologyBase<I, R>
 where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
     type Itr = std::vec::IntoIter<I>;
     fn support(&self) -> Self::Itr {
-        self.complex.support()
+        self.support.clone().into_iter()
     }
 
     fn display(&self, i: I) -> String {
@@ -210,7 +194,7 @@ mod tests {
                 SpMat::from_vec((1, 0), vec![])
             ]
         );        
-        let h = c.homology();
+        let h = c.homology(false);
         
         assert_eq!(h[0].rank(), 1);
         assert!( h[0].is_free());
@@ -226,7 +210,7 @@ mod tests {
                 SpMat::from_vec((1, 0), vec![]),
             ]
         );
-        let h = c.homology();
+        let h = c.homology(false);
         assert_eq!(h[0].rank(), 0);
         assert_eq!(h[0].tors(), &vec![2]);
         assert!(!h[0].is_free());
@@ -236,7 +220,7 @@ mod tests {
     #[test]
     fn d3() {
         let c = Samples::<i32>::d3();
-        let h = c.homology();
+        let h = c.homology(false);
 
         assert_eq!(h[0].rank(), 1);
         assert_eq!(h[0].is_free(), true);
@@ -254,7 +238,7 @@ mod tests {
     #[test]
     fn s2() {
         let c = Samples::<i32>::s2();
-        let h = c.homology();
+        let h = c.homology(false);
 
         assert_eq!(h[0].rank(), 1);
         assert_eq!(h[0].is_free(), true);
@@ -269,7 +253,7 @@ mod tests {
     #[test]
     fn t2() {
         let c = Samples::<i32>::t2();
-        let h = c.homology();
+        let h = c.homology(false);
 
         assert_eq!(h[0].rank(), 1);
         assert_eq!(h[0].is_free(), true);
@@ -284,7 +268,7 @@ mod tests {
     #[test]
     fn rp2() {
         let c = Samples::<i32>::rp2();
-        let h = c.homology();
+        let h = c.homology(false);
 
         assert_eq!(h[0].rank(), 1);
         assert_eq!(h[0].is_free(), true);
@@ -300,8 +284,7 @@ mod tests {
     #[test]
     fn s2_gens() {
         let c = Samples::<i32>::s2();
-        let h = c.homology_with_gens();
-        let c = &h.complex;
+        let h = c.homology(true);
 
         let h2 = &h[2];
         assert_eq!(h2.gens().len(), 1);
@@ -315,8 +298,7 @@ mod tests {
     #[test]
     fn t2_gens() {
         let c = Samples::<i32>::t2();
-        let h = c.homology_with_gens();
-        let c = &h.complex;
+        let h = c.homology(true);
 
         let h2 = &h[2];
         assert_eq!(h2.gens().len(), 1);
@@ -344,8 +326,7 @@ mod tests {
     #[test]
     fn rp2_gens() {
         let c = Samples::<i32>::rp2();
-        let h = c.homology_with_gens();
-        let c = &h.complex;
+        let h = c.homology(true);
 
         let h1 = &h[1];
         assert_eq!(h1.gens().len(), 1);

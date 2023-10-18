@@ -7,7 +7,8 @@ use yui_matrix::sparse::{SpMat, SpVec, MatType};
 
 use super::deg::{Deg, isize2, isize3};
 use super::graded::Graded;
-use super::homology::HomologyBase;
+use super::homology_calc::HomologyCalc;
+use super::homology::{HomologySummand, HomologyBase};
 
 pub type ChainComplex<R>  = ChainComplexBase<isize,  R>;
 pub type ChainComplex2<R> = ChainComplexBase<isize2, R>;
@@ -118,12 +119,15 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<I, R> ChainComplexBase<I, R> 
 where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    pub fn homology(self) -> HomologyBase<I, R> {
-        HomologyBase::new(self, false)
+    pub fn homology_at(&self, i: I, with_gens: bool) -> HomologySummand<R> {
+        let i0 = i - self.d_deg();
+        let d0 = self.d_matrix(i0);
+        let d1 = self.d_matrix(i);
+        HomologyCalc::calculate(d0, d1, with_gens)
     }
 
-    pub fn homology_with_gens(self) -> HomologyBase<I, R> {
-        HomologyBase::new(self, true)
+    pub fn homology(&self, with_gens: bool) -> HomologyBase<I, R> {
+        HomologyBase::new(&self, with_gens)
     }
 }
 

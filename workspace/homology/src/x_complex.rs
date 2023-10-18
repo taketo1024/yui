@@ -179,30 +179,22 @@ where
 
 #[cfg(test)]
 mod tests { 
-    use derive_more::Display;
-    use yui_core::Elem;
+    use yui_lin_comb::Free;
 
     use super::*;
 
-    #[derive(Debug, Display, Default, Hash, PartialEq, Eq, Clone, PartialOrd, Ord)]
-    #[display(fmt = "<{}>", _0)]
-    struct X(isize);
-
-    impl Elem for X { 
-        fn math_symbol() -> String {
-            String::from("X")
-        }
+    type X = Free<i32>;
+    fn e(i: isize) -> X { 
+        X::from(i as i32)
     }
-
-    impl Gen for X {}
 
     #[test]
     fn test() { 
         let c = XChainComplex::<X, i32>::new(0..2, -1, 
-            |i| vec![X(i)], 
+            |i| vec![e(i)], 
             |i, x| { 
                 if x.0 == 1 { 
-                    vec![(X(i - 1), 1)] 
+                    vec![(e(i - 1), 1)] 
                 } else {
                     vec![]
                 }

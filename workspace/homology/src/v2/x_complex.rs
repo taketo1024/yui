@@ -116,7 +116,11 @@ where
         LinComb::from_iter(elems)
     }
 
-    pub fn differetiate(&self, i: I, z: &LinComb<X, R>) -> LinComb<X, R> { 
+    pub fn differentiate_x(&self, i: I, x: &X) -> LinComb<X, R> { 
+        self.differentiate(i, &LinComb::from_gen(x.clone()))
+    }
+
+    pub fn differentiate(&self, i: I, z: &LinComb<X, R>) -> LinComb<X, R> { 
         let v = self.vectorize(i, z);
         let w = self.d_matrix(i) * v;
         self.as_chain(i + self.d_deg(), &w)

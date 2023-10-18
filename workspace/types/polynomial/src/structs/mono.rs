@@ -5,7 +5,7 @@ use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
 
 use yui_core::Elem;
-use yui_lin_comb::FreeGen;
+use yui_lin_comb::Gen;
 use yui_utils::{subscript, superscript};
 
 use crate::{PolyDeg, PolyGen, MDegree};
@@ -138,7 +138,7 @@ impl_mono_multivar!(isize);
 
 macro_rules! impl_poly_gen {
     ($I:ty) => {
-        impl<const X: char> FreeGen for Mono<X, $I> {}
+        impl<const X: char> Gen for Mono<X, $I> {}
 
         impl<const X: char> PolyGen for Mono<X, $I> {
             type Degree = $I;

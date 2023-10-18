@@ -3,7 +3,7 @@ use std::ops::{Mul, MulAssign, Index};
 use itertools::join;
 use auto_impl_ops::auto_ops;
 use yui_core::Elem;
-use yui_lin_comb::{FreeGen, LinComb};
+use yui_lin_comb::{Gen, LinComb};
 use yui_link::State;
 use yui_utils::bitseq::BitSeq;
 
@@ -166,6 +166,6 @@ impl Display for KhEnhState {
     }
 }
 
-impl FreeGen for KhEnhState {}
+impl Gen for KhEnhState {}
 
 pub type KhChain<R> = LinComb<KhEnhState, R>;

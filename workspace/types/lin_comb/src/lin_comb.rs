@@ -13,7 +13,7 @@ use super::free::*;
 #[derive(PartialEq, Eq, Clone, Debug, Default)]
 pub struct LinComb<X, R>
 where
-    X: FreeGen,
+    X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 { 
     data: HashMap<X, R>,
@@ -22,7 +22,7 @@ where
 
 impl<X, R> LinComb<X, R>
 where
-    X: FreeGen,
+    X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 { 
     pub fn new_raw(data: HashMap<X, R>) -> Self {
@@ -86,7 +86,7 @@ where
 
     pub fn map<Y, S, F>(&self, f: F) -> LinComb<Y, S>
     where 
-        Y: FreeGen, 
+        Y: Gen, 
         S: Ring, for<'x> &'x S: RingOps<S>,
         F: Fn(&X, &R) -> (Y, S) 
     { 
@@ -95,7 +95,7 @@ where
 
     pub fn into_map<Y, S, F>(self, f: F) -> LinComb<Y, S>
     where 
-        Y: FreeGen, 
+        Y: Gen, 
         S: Ring, for<'x> &'x S: RingOps<S>,
         F: Fn(X, R) -> (Y, S) 
     { 
@@ -120,7 +120,7 @@ where
 
     pub fn map_gens<Y, F>(&self, f: F) -> LinComb<Y, R>
     where 
-        Y: FreeGen, 
+        Y: Gen, 
         F: Fn(&X) -> Y 
     { 
         self.map(|x, r| (f(x), r.clone()))
@@ -128,7 +128,7 @@ where
 
     pub fn into_map_gens<Y, F>(self, f: F) -> LinComb<Y, R>
     where 
-        Y: FreeGen, 
+        Y: Gen, 
         F: Fn(X) -> Y 
     { 
         self.into_map(|x, r| (f(x), r))
@@ -160,7 +160,7 @@ where
 
 impl<X, R> FromIterator<(X, R)> for LinComb<X, R>
 where
-    X: FreeGen,
+    X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn from_iter<T: IntoIterator<Item = (X, R)>>(iter: T) -> Self {
@@ -179,7 +179,7 @@ where
 
 impl<X, R> Display for LinComb<X, R>
 where
-    X: FreeGen,
+    X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -226,7 +226,7 @@ where
 
 impl<X, R> Zero for LinComb<X, R>
 where
-    X: FreeGen,
+    X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn zero() -> Self {
@@ -240,7 +240,7 @@ where
 
 impl<X, R> Neg for LinComb<X, R>
 where
-    X: FreeGen,
+    X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     type Output = Self;
@@ -252,7 +252,7 @@ where
 
 impl<X, R> Neg for &LinComb<X, R>
 where
-    X: FreeGen,
+    X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     type Output = LinComb<X, R>;
@@ -264,7 +264,7 @@ where
 
 impl<X, R> AddAssign<(X, R)> for LinComb<X, R>
 where
-    X: FreeGen,
+    X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn add_assign(&mut self, rhs: (X, R)) {
@@ -283,7 +283,7 @@ where
 
 impl<X, R> AddAssign<(&X, &R)> for LinComb<X, R>
 where
-    X: FreeGen,
+    X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn add_assign(&mut self, rhs: (&X, &R)) {
@@ -303,7 +303,7 @@ where
 #[auto_ops]
 impl<X, R> AddAssign<&LinComb<X, R>> for LinComb<X, R>
 where
-    X: FreeGen,
+    X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn add_assign(&mut self, rhs: &Self) {
@@ -317,7 +317,7 @@ where
 #[auto_ops]
 impl<X, R> SubAssign<&LinComb<X, R>> for LinComb<X, R>
 where
-    X: FreeGen,
+    X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn sub_assign(&mut self, rhs: &Self) {
@@ -332,7 +332,7 @@ where
 #[auto_ops]
 impl<X, R> MulAssign<&R> for LinComb<X, R>
 where
-    X: FreeGen,
+    X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn mul_assign(&mut self, rhs: &R) {
@@ -345,7 +345,7 @@ where
 #[auto_ops]
 impl<X, R> Mul for &LinComb<X, R>
 where 
-    X: FreeGen + Mul<Output = X>,
+    X: Gen + Mul<Output = X>,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     type Output = LinComb<X, R>;
@@ -370,7 +370,7 @@ where
 macro_rules! impl_accum {
     ($trait:ident, $method:ident, $accum_trait:ident, $accum_method:ident, $accum_init:ident) => {
         impl<X, R> $trait<Self> for LinComb<X, R>
-        where X: FreeGen, R: Ring, for<'x> &'x R: RingOps<R> {
+        where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
             fn $method<Iter: Iterator<Item = Self>>(iter: Iter) -> Self {
                 let mut res = Self::$accum_init();
                 for r in iter { Self::$accum_method(&mut res, r) }
@@ -379,7 +379,7 @@ macro_rules! impl_accum {
         }
 
         impl<'a, X, R> $trait<&'a Self> for LinComb<X, R>
-        where X: FreeGen, R: Ring, for<'x> &'x R: RingOps<R> {
+        where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
             fn $method<Iter: Iterator<Item = &'a Self>>(iter: Iter) -> Self {
                 let mut res = Self::$accum_init();
                 for r in iter { Self::$accum_method(&mut res, r) }
@@ -394,10 +394,10 @@ impl_accum!(Sum, sum, AddAssign, add_assign, zero);
 macro_rules! impl_alg_ops {
     ($trait:ident) => {
         impl<X, R> $trait<Self> for LinComb<X, R>
-        where X: FreeGen, R: Ring, for<'x> &'x R: RingOps<R> {}
+        where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {}
 
         impl<X, R> $trait<LinComb<X, R>> for &LinComb<X, R>
-        where X: FreeGen, R: Ring, for<'x> &'x R: RingOps<R> {}
+        where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {}
     };
 }
 
@@ -406,7 +406,7 @@ impl_alg_ops!(AddGrpOps);
 
 impl<X, R> Elem for LinComb<X, R>
 where
-    X: FreeGen,
+    X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn math_symbol() -> String {
@@ -416,32 +416,32 @@ where
 
 impl<X, R> AddMon for LinComb<X, R>
 where
-    X: FreeGen,
+    X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {}
 
 impl<X, R> AddGrp for LinComb<X, R>
 where
-    X: FreeGen,
+    X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {}
 
 
 impl<X, R> RModOps<R, Self> for LinComb<X, R>
 where
-    X: FreeGen,
+    X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {}
 
 impl<X, R> RModOps<R, LinComb<X, R>> for &LinComb<X, R>
 where
-    X: FreeGen,
+    X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {}
 
 impl<X, R> RMod for LinComb<X, R>
 where
-    X: FreeGen,
+    X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     type R = R;
@@ -454,7 +454,7 @@ mod tests {
     
     use yui_utils::map;
     use yui_core::Elem;
-    use super::{FreeGen, LinComb};
+    use super::{Gen, LinComb};
  
     #[derive(Debug, Default, Hash, PartialEq, Eq, Clone, PartialOrd, Ord)]
     struct X(i32);
@@ -469,13 +469,13 @@ mod tests {
             write!(f, "X{}", self.0)
         }
     }
-    impl FreeGen for X {}
+    impl Gen for X {}
 
     #[test]
     fn math_symbol() { 
         type L = LinComb<X, i32>;
         let symbol = L::math_symbol();
-        assert_eq!(symbol, "Free<X; Z>");
+        assert_eq!(symbol, "Z<X>");
     }
 
     #[test]

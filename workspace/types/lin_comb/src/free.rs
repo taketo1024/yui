@@ -21,4 +21,4 @@ impl<T> SortForDisplay for Vec<T> where T: OrdForDisplay {
     }
 }
 
-pub trait FreeGen: Elem + Hash + OrdForDisplay {}
+pub trait Gen: Elem + Hash + OrdForDisplay {}

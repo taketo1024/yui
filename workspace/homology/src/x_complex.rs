@@ -3,7 +3,7 @@ use delegate::delegate;
 
 use itertools::Itertools;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps};
-use yui_lin_comb::{FreeGen, LinComb};
+use yui_lin_comb::{Gen, LinComb};
 use yui_matrix::sparse::{SpMat, SpVec};
 
 use super::deg::{Deg, isize2, isize3};
@@ -18,7 +18,7 @@ pub type XChainComplex3<X, R> = XChainComplexBase<isize3, X, R>;
 pub struct XChainComplexBase<I, X, R>
 where 
     I: Deg,
-    X: FreeGen,
+    X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     inner: ChainComplexBase<I, R>,
@@ -29,7 +29,7 @@ where
 impl<I, X, R> XChainComplexBase<I, X, R>
 where 
     I: Deg,
-    X: FreeGen,
+    X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
     pub fn new<It, F1, F2>(support: It, d_deg: I, gens: F1, d_map: F2) -> Self
@@ -134,7 +134,7 @@ where
 impl<I, X, R> XChainComplexBase<I, X, R>
 where 
     I: Deg,
-    X: FreeGen,
+    X: Gen,
     R: EucRing, for<'x> &'x R: EucRingOps<R>,
 {
     pub fn homology(&self, with_trans: bool) -> HomologyBase<I, R> { 
@@ -145,7 +145,7 @@ where
 impl<I, X, R> Graded<I> for XChainComplexBase<I, X, R>
 where 
     I: Deg,
-    X: FreeGen,
+    X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
     type Itr = std::vec::IntoIter<I>;
@@ -160,7 +160,7 @@ where
 impl<I, X, R> ChainComplexTrait<I> for XChainComplexBase<I, X, R>
 where 
     I: Deg,
-    X: FreeGen,
+    X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
     type R = R;
@@ -194,7 +194,7 @@ mod tests {
         }
     }
 
-    impl FreeGen for X {}
+    impl Gen for X {}
 
     #[test]
     fn test() { 

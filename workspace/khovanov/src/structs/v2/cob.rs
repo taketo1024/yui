@@ -9,7 +9,7 @@ use itertools::Itertools;
 use num_traits::Zero;
 use cartesian::cartesian;
 use yui_core::{Elem, Ring, RingOps};
-use yui_lin_comb::{FreeGen, OrdForDisplay, LinComb};
+use yui_lin_comb::{Gen, OrdForDisplay, LinComb};
 use yui_link::{Edge, Crossing, Resolution};
 use yui_polynomial::Mono2;
 use super::tng::{Tng, TngComp};
@@ -471,7 +471,7 @@ impl Elem for CobComp {
     }
 }
 
-impl FreeGen for CobComp {}
+impl Gen for CobComp {}
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Default)]
 pub struct Cob { 
@@ -801,7 +801,7 @@ impl Elem for Cob {
     }
 }
 
-impl FreeGen for Cob {}
+impl Gen for Cob {}
 
 #[auto_ops]
 impl Mul for Cob {

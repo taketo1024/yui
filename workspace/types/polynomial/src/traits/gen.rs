@@ -1,6 +1,6 @@
 use std::ops::Mul;
 use num_traits::One;
-use yui_lin_comb::FreeGen;
+use yui_lin_comb::Gen;
 use super::PolyDeg;
 
 pub trait PolyGen: 
@@ -9,7 +9,7 @@ pub trait PolyGen:
     PartialOrd + 
     Ord + 
     From<Self::Degree> +
-    FreeGen
+    Gen
 {
     type Degree: PolyDeg;
     fn degree(&self) -> Self::Degree;

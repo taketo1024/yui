@@ -74,6 +74,10 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         d * v
     }
 
+    pub fn is_cycle(&self, i: I, v: &SpVec<R>) -> bool { 
+        self.differentiate(i, v).is_zero()
+    }
+
     pub fn is_supported(&self, i: I) -> bool { 
         self.support.contains(&i)
     }

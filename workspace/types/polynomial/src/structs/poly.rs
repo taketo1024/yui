@@ -11,48 +11,41 @@ use yui_lin_comb::LinComb;
 use crate::{MonoGen, MultiDeg, Poly, Mono, Mono2};
 
 #[derive(Clone, PartialEq, Eq, Default, Debug)]
-pub struct PolyBase<I, R>
+pub struct PolyBase<X, R>
 where 
-    I: MonoGen, 
+    X: MonoGen, 
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    data: LinComb<I, R>,
-    zero: (I, R)
+    data: LinComb<X, R>,
+    zero: (X, R)
 }
 
-impl<I, R> PolyBase<I, R>
-where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new_raw(data: LinComb<I, R>) -> Self { 
-        Self { data, zero: (I::one(), R::zero()) }
+impl<X, R> PolyBase<X, R>
+where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+    pub fn new_raw(data: LinComb<X, R>) -> Self { 
+        Self { data, zero: (X::one(), R::zero()) }
     }
 
-    pub fn new(data: LinComb<I, R>) -> Self { 
+    pub fn new(data: LinComb<X, R>) -> Self { 
         let mut new = Self::new_raw(data);
         new.reduce();
         new
     }
 
-    pub fn from_const(r: R) -> Self {
-        Self::from_deg(I::Deg::zero(), r)
+    pub fn mono(deg: X::Deg) -> X {
+        X::from(deg)
     }
 
-    pub fn from_term(i: I, r: R) -> Self { 
-        let t = LinComb::from_pair(i, r);
+    pub fn from_const(r: R) -> Self {
+        Self::from_pair(X::one(), r)
+    }
+
+    pub fn from_pair(x: X, r: R) -> Self { 
+        let t = LinComb::from_pair(x, r);
         Self::new_raw(t)
     }
 
-    pub fn from_deg(i: I::Deg, r: R) -> Self { 
-        Self::from_term(I::from(i), r)
-    }
-
-    pub fn from_deg_iter<Iter>(iter: Iter) -> Self 
-    where Iter: IntoIterator<Item = (I::Deg, R)> {
-        iter.into_iter().map(|(i, r)| 
-            (I::from(i), r)
-        ).collect()
-    }
-
-    pub fn as_lincomb(&self) -> &LinComb<I, R> { 
+    pub fn as_lincomb(&self) -> &LinComb<X, R> { 
         &self.data
     }
 
@@ -60,19 +53,19 @@ where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
         self.data.len()
     }
 
-    pub fn coeff(&self, i: &I) -> &R {
-        self.data.coeff(i)
+    pub fn coeff(&self, x: &X) -> &R {
+        self.data.coeff(x)
     }
 
-    pub fn coeff_for(&self, i: I::Deg) -> &R {
-        self.data.coeff(&I::from(i))
+    pub fn coeff_for(&self, i: X::Deg) -> &R {
+        self.data.coeff(&X::from(i))
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&I, &R)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&X, &R)> {
         self.data.iter()
     }
 
-    pub fn into_iter(self) -> impl Iterator<Item = (I, R)> {
+    pub fn into_iter(self) -> impl Iterator<Item = (X, R)> {
         self.data.into_iter()
     }
 
@@ -97,10 +90,10 @@ where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn const_term(&self) -> &R { 
-        self.coeff(&I::one())
+        self.coeff(&X::one())
     }
 
-    pub fn lead_term(&self) -> (&I, &R) { 
+    pub fn lead_term(&self) -> (&X, &R) { 
         self.iter()
             .filter(|(_, r)| !r.is_zero())
             .max_by_key(|(i, _)| *i)
@@ -111,16 +104,16 @@ where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
         self.lead_term().1
     }
 
-    pub fn lead_deg(&self) -> I::Deg { 
+    pub fn lead_deg(&self) -> X::Deg { 
         self.lead_term().0.deg()
     }
 
-    pub fn map_coeffs<R2, F>(&self, f: F) -> PolyBase<I, R2>
+    pub fn map_coeffs<R2, F>(&self, f: F) -> PolyBase<X, R2>
     where 
         R2: Ring, for<'x> &'x R2: RingOps<R2>, 
         F: Fn(&R) -> R2
     {
-        PolyBase::<I, R2>::new(
+        PolyBase::<X, R2>::new(
             self.iter().map(|(i, r)| (i.clone(), f(r))).collect()
         )
     }
@@ -131,7 +124,7 @@ macro_rules! impl_var_univar {
         impl<const X: char, R> PolyBase<Mono<X, $I>, R>
         where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn variable() -> Self { 
-                Self::from_deg(1, R::one()) // x^1
+                Self::from(Self::mono(1))
             }
         }
     };
@@ -146,7 +139,8 @@ macro_rules! impl_var_bivar {
         where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn variable(i: usize) -> Self { 
                 assert!(i < 2);
-                Self::from_deg(MultiDeg::from((i, 1)), R::one()) // x^1
+                let d = if i == 0 { (1, 0) } else { (0, 1) };
+                Self::from(Mono2::from(d))
             }
         }
     };
@@ -160,7 +154,8 @@ macro_rules! impl_var_mvar {
         impl<const X: char, R> PolyBase<Mono<X, MultiDeg<$I>>, R>
         where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn variable(i: usize) -> Self { 
-                Self::from_deg(MultiDeg::from((i, 1)), R::one()) // x^1
+                let d = MultiDeg::from((i, 1));
+                Self::from(Mono::from(d)) // x^1
             }
         }
     };
@@ -169,55 +164,36 @@ macro_rules! impl_var_mvar {
 impl_var_mvar!(usize);
 impl_var_mvar!(isize);
 
-impl<I, R> FromIterator<(I, R)> for PolyBase<I, R>
-where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
-    fn from_iter<T: IntoIterator<Item = (I, R)>>(iter: T) -> Self {
+impl<X, R> From<X> for PolyBase<X, R>
+where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+    fn from(x: X) -> Self {
+        Self::from_pair(x, R::one())
+    }
+}
+
+impl<X, R> FromIterator<(X, R)> for PolyBase<X, R>
+where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+    fn from_iter<T: IntoIterator<Item = (X, R)>>(iter: T) -> Self {
         Self::new(LinComb::from_iter(iter))
     }
 }
 
-// for bivar-poly
-impl<I, J, R> PolyBase<I, R>
-where I: MonoGen<Deg = MultiDeg<J>>, J: Zero, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn from_deg2_iter<Iter>(iter: Iter) -> Self
-    where Iter: IntoIterator<Item = ((J, J), R)> {
-        Self::from_mdeg(
-            iter.into_iter().map(|(d, r)| {
-                let (d0, d1) = d;
-                (vec![d0, d1], r)
-            })
-        )
-    }
-}
-
-// for multivar-poly
-impl<I, J, R> PolyBase<I, R>
-where I: MonoGen<Deg = MultiDeg<J>>, J: Zero, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn from_mdeg<Iter>(iter: Iter) -> Self
-    where Iter: IntoIterator<Item = (Vec<J>, R)> {
-        iter.into_iter().map(|(v, r)| {
-            let mdeg = MultiDeg::from_vec(v);
-            (I::from(mdeg), r)
-        }).collect()
-    }
-}
-
-impl<I, R> From<i32> for PolyBase<I, R>
-where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+impl<X, R> From<i32> for PolyBase<X, R>
+where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn from(i: i32) -> Self {
         Self::from_const(R::from(i))
     }
 }
 
-impl<I, R> FromStr for PolyBase<I, R>
-where I: MonoGen + FromStr, R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
+impl<X, R> FromStr for PolyBase<X, R>
+where X: MonoGen + FromStr, R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if let Ok(r) = R::from_str(s) { 
             Ok(Self::from_const(r))
-        } else if let Ok(i) = I::from_str(s) { 
-            Ok(Self::from_term(i, R::one()))
+        } else if let Ok(x) = X::from_str(s) { 
+            Ok(Self::from(x))
         } else {
             // TODO support more complex format.
             Err(())
@@ -225,15 +201,15 @@ where I: MonoGen + FromStr, R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<I, R> Display for PolyBase<I, R>
-where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+impl<X, R> Display for PolyBase<X, R>
+where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.data.fmt(f)
     }
 }
 
-impl<I, R> Zero for PolyBase<I, R>
-where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+impl<X, R> Zero for PolyBase<X, R>
+where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn zero() -> Self {
         Self::new_raw(LinComb::zero())
     }
@@ -243,10 +219,10 @@ where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<I, R> One for PolyBase<I, R>
-where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+impl<X, R> One for PolyBase<X, R>
+where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn one() -> Self {
-        let t = LinComb::from_pair(I::one(), R::one());
+        let t = LinComb::from_pair(X::one(), R::one());
         Self::new_raw(t)
     }
 
@@ -255,17 +231,17 @@ where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<I, R> Neg for PolyBase<I, R>
-where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+impl<X, R> Neg for PolyBase<X, R>
+where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = Self;
     fn neg(self) -> Self::Output {
         Self::new(-self.data)
     }
 }
 
-impl<I, R> Neg for &PolyBase<I, R>
-where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = PolyBase<I, R>;
+impl<X, R> Neg for &PolyBase<X, R>
+where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = PolyBase<X, R>;
     fn neg(self) -> Self::Output {
         PolyBase::new(-&self.data)
     }
@@ -274,9 +250,9 @@ where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
 macro_rules! impl_assop {
     ($trait:ident, $method:ident) => {
         #[auto_ops]
-        impl<I, R> $trait<&PolyBase<I, R>> for PolyBase<I, R>
-        where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
-            fn $method(&mut self, rhs: &PolyBase<I, R>) {
+        impl<X, R> $trait<&PolyBase<X, R>> for PolyBase<X, R>
+        where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+            fn $method(&mut self, rhs: &PolyBase<X, R>) {
                 self.data.$method(&rhs.data)
             }
         }
@@ -287,17 +263,17 @@ impl_assop!(AddAssign, add_assign);
 impl_assop!(SubAssign, sub_assign);
 
 #[auto_ops]
-impl<I, R> MulAssign<&R> for PolyBase<I, R>
-where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+impl<X, R> MulAssign<&R> for PolyBase<X, R>
+where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn mul_assign(&mut self, rhs: &R) {
         self.data *= rhs
     }
 }
 
 #[auto_ops]
-impl<I, R> MulAssign<&PolyBase<I, R>> for PolyBase<I, R>
-where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
-    fn mul_assign(&mut self, rhs: &PolyBase<I, R>) {
+impl<X, R> MulAssign<&PolyBase<X, R>> for PolyBase<X, R>
+where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+    fn mul_assign(&mut self, rhs: &PolyBase<X, R>) {
         if rhs.is_one() {
             // do nothing
         } else if rhs.is_const() { 
@@ -312,8 +288,8 @@ where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
 
 macro_rules! impl_accum {
     ($trait:ident, $method:ident, $accum_trait:ident, $accum_method:ident, $accum_init:ident) => {
-        impl<I, R> $trait for PolyBase<I, R>
-        where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+        impl<X, R> $trait for PolyBase<X, R>
+        where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
             fn $method<Iter: Iterator<Item = Self>>(iter: Iter) -> Self {
                 let mut res = Self::$accum_init();
                 for r in iter { Self::$accum_method(&mut res, r) }
@@ -321,8 +297,8 @@ macro_rules! impl_accum {
             }
         }
 
-        impl<'a, I, R> $trait<&'a Self> for PolyBase<I, R>
-        where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+        impl<'a, X, R> $trait<&'a Self> for PolyBase<X, R>
+        where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
             fn $method<Iter: Iterator<Item = &'a Self>>(iter: Iter) -> Self {
                 let mut res = Self::$accum_init();
                 for r in iter { Self::$accum_method(&mut res, r) }
@@ -337,9 +313,9 @@ impl_accum!(Product, product, MulAssign, mul_assign, one);
 
 macro_rules! impl_pow_unsigned {
     ($t:ty) => {
-        impl<I, R> Pow<$t> for &PolyBase<I, R>
-        where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
-            type Output = PolyBase<I, R>;
+        impl<X, R> Pow<$t> for &PolyBase<X, R>
+        where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+            type Output = PolyBase<X, R>;
             fn pow(self, n: $t) -> Self::Output {
                 let mut res = PolyBase::one();
                 for _ in 0..n { 
@@ -357,9 +333,9 @@ impl_pow_unsigned!(usize);
 
 macro_rules! impl_pow_signed {
     ($t:ty) => {
-        impl<I, R> Pow<$t> for &PolyBase<I, R>
-        where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
-            type Output = PolyBase<I, R>;
+        impl<X, R> Pow<$t> for &PolyBase<X, R>
+        where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+            type Output = PolyBase<X, R>;
             fn pow(self, n: $t) -> Self::Output {
                 if n >= 0 { 
                     self.pow(n as usize)
@@ -397,11 +373,11 @@ impl_eval_bivar!(isize);
 
 macro_rules! impl_alg_op {
     ($trait:ident) => {
-        impl<I, R> $trait<Self> for PolyBase<I, R>
-        where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {}
+        impl<X, R> $trait<Self> for PolyBase<X, R>
+        where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {}
 
-        impl<I, R> $trait<PolyBase<I, R>> for &PolyBase<I, R>
-        where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {}
+        impl<X, R> $trait<PolyBase<X, R>> for &PolyBase<X, R>
+        where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {}
     };
 }
 
@@ -410,24 +386,24 @@ impl_alg_op!(AddGrpOps);
 impl_alg_op!(MonOps);
 impl_alg_op!(RingOps);
 
-impl<I, R> Elem for PolyBase<I, R>
-where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+impl<X, R> Elem for PolyBase<X, R>
+where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn math_symbol() -> String {
-        format!("{}[{}]", R::math_symbol(), I::math_symbol())
+        format!("{}[{}]", R::math_symbol(), X::math_symbol())
     }
 }
 
-impl<I, R> AddMon for PolyBase<I, R>
-where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {}
+impl<X, R> AddMon for PolyBase<X, R>
+where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {}
 
-impl<I, R> AddGrp for PolyBase<I, R>
-where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {}
+impl<X, R> AddGrp for PolyBase<X, R>
+where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {}
 
-impl<I, R> Mon for PolyBase<I, R>
-where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {}
+impl<X, R> Mon for PolyBase<X, R>
+where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {}
 
-impl<I, R> Ring for PolyBase<I, R>
-where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+impl<X, R> Ring for PolyBase<X, R>
+where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn inv(&self) -> Option<Self> {
         if !self.is_mono() { 
             return None
@@ -435,7 +411,7 @@ where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
 
         let (x, a) = self.lead_term(); // (a x^i)^{-1} = a^{-1} x^{-i}
         if let (Some(xinv), Some(ainv)) = (x.inv(), a.inv()) { 
-            Some(Self::from_term(xinv, ainv))
+            Some(Self::from_pair(xinv, ainv))
         } else { 
             None
         }
@@ -471,7 +447,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
             
             let k = i.deg() - j.deg(); // >= 0
             let c = a / b;
-            let q = Poly::from_deg(k, c);   // cx^k = (a/b) x^{i-j}.
+            let q = Poly::from_pair(Mono::from(k), c);   // cx^k = (a/b) x^{i-j}.
             let r = f - &q * g;
             
             (q, r)
@@ -529,35 +505,43 @@ mod tests {
     use yui_utils::map;
     use super::*;
     use crate::{Mono, Poly2, PolyN, LPoly, LPolyN};
- 
+
     #[test]
     fn init_poly() { 
         type P = Poly::<'x', i32>; 
-        let f = P::from_deg_iter([(0, 3), (1, 2), (2, 3)]);
+
+        let x = P::mono;
+        let f = P::from_iter([(x(0), 3), (x(1), 2), (x(2), 3)]);
         assert_eq!(&f.to_string(), "3 + 2x + 3x²");
     }
  
     #[test]
     fn init_lpoly() { 
         type P = LPoly::<'x', i32>; 
-        let f = P::from_deg_iter([(-1, 4), (0, 2), (2, 3)]);
+
+        let x = P::mono;
+        let f = P::from_iter([(x(-1), 4), (x(0), 2), (x(2), 3)]);
         assert_eq!(&f.to_string(), "4x⁻¹ + 2 + 3x²");
     }
 
     #[test]
     fn init_poly2() { 
         type P = Poly2::<'x', 'y', i32>; 
-        let f = P::from_deg2_iter([((0, 0), 3), ((1, 0), 2), ((2, 3), 3)]);
+
+        let xy = |i, j| P::mono((i, j));
+        let f = P::from_iter([(xy(0, 0), 3), (xy(1, 0), 2), (xy(2, 3), 3)]);
         assert_eq!(&f.to_string(), "3 + 2x + 3x²y³");
     }
  
     #[test]
     fn init_mpoly() { 
         type P = PolyN::<'x', i32>; 
-        let f = P::from_mdeg([
-            (vec![], 3),
-            (vec![1], -1),
-            (vec![3, 0, 2], 2),
+
+        let xn = |i| P::mono(MultiDeg::from_vec(i));
+        let f = P::from_iter([
+            (xn(vec![]),        3),
+            (xn(vec![1]),      -1),
+            (xn(vec![3, 0, 2]), 2),
         ]);
         assert_eq!(&f.to_string(), "3 - x₀ + 2x₀³x₂²");
     }
@@ -565,10 +549,12 @@ mod tests {
     #[test]
     fn init_mlpoly() { 
         type P = LPolyN::<'x', i32>; 
-        let f = P::from_mdeg([
-            (vec![], 3),
-            (vec![1], 1),
-            (vec![-3, 1, 3], 2),
+
+        let xn = |i| P::mono(MultiDeg::from_vec(i));
+        let f = P::from_iter([
+            (xn(vec![]),         3),
+            (xn(vec![1]),        1),
+            (xn(vec![-3, 1, 3]), 2),
         ]);
         assert_eq!(&f.to_string(), "3 + 2x₀⁻³x₁x₂³ + x₀");
     }
@@ -593,46 +579,57 @@ mod tests {
     #[test]
     fn zero() {
         type P = Poly::<'x', i32>;
-        let x = P::zero();
-        assert_eq!(x, P::from_deg_iter([]));
+
+        let p = P::zero();
+        assert_eq!(p, P::from_iter([]));
     }
 
     #[test]
     fn one() {
         type P = Poly::<'x', i32>;
-        let x = P::one();
-        assert_eq!(x, P::from_deg_iter([(0, 1)]));
+
+        let x = P::mono;
+        let p = P::one();
+        assert_eq!(p, P::from_iter([(x(0), 1)]));
     }
 
     #[test]
     fn variable() {
         type P = Poly::<'x', i32>;
-        let x = P::variable();
-        assert_eq!(x, P::from_deg_iter([(1, 1)]));
+
+        let x = P::mono;
+        let p = P::variable();
+        assert_eq!(p, P::from_iter([(x(1), 1)]));
     }
 
     #[test]
     fn variable_bivar() {
         type P = Poly2::<'x', 'y', i32>;
-        let x = P::variable(0);
-        let y = P::variable(1);
-        assert_eq!(x, P::from_deg2_iter([((1, 0), 1)]));
-        assert_eq!(y, P::from_deg2_iter([((0, 1), 1)]));
+
+        let xy = |i, j| P::mono((i, j));
+        let p = P::variable(0);
+        let q = P::variable(1);
+        assert_eq!(p, P::from_iter([(xy(1, 0), 1)]));
+        assert_eq!(q, P::from_iter([(xy(0, 1), 1)]));
     }
 
     #[test]
     fn variable_mvar() {
         type P = PolyN::<'x', i32>;
-        let x0 = P::variable(0);
-        let x1 = P::variable(1);
-        assert_eq!(x0, P::from_deg2_iter([((1, 0), 1)]));
-        assert_eq!(x1, P::from_deg2_iter([((0, 1), 1)]));
+
+        let xn = |i| P::mono(MultiDeg::from_vec(i));
+        let p = P::variable(0);
+        let q = P::variable(1);
+        assert_eq!(p, P::from_iter([(xn(vec![1, 0]), 1)]));
+        assert_eq!(q, P::from_iter([(xn(vec![0, 1]), 1)]));
     }
 
     #[test]
     fn coeff() { 
         type P = Poly::<'x', i32>;
-        let f = P::from_deg_iter([(0, 2), (1, 3), (2, -4)]);
+
+        let x = P::mono;
+        let f = P::from_iter([(x(0), 2), (x(1), 3), (x(2), -4)]);
         
         assert_eq!(f.coeff_for(0), &2);
         assert_eq!(f.coeff_for(1), &3);
@@ -643,10 +640,11 @@ mod tests {
     #[test]
     fn const_term() { 
         type P = Poly::<'x', i32>;
-        let f = P::from_deg_iter([(0, 2), (1, 3), (2, -4)]);
+        let x = P::mono;
+        let f = P::from_iter([(x(0), 2), (x(1), 3), (x(2), -4)]);
         assert_eq!(f.const_term(), &2);
 
-        let f = P::from_deg_iter([(1, 3), (2, -4)]);
+        let f = P::from_iter([(x(1), 3), (x(2), -4)]);
         assert_eq!(f.const_term(), &0);
     }
 
@@ -654,14 +652,16 @@ mod tests {
     fn lead_term() { 
         type P = Poly::<'x', i32>;
 
-        let f = P::from_deg_iter([(0, 2), (1, 3), (2, -4)]);
-        let (x, a) = f.lead_term();
-        assert_eq!(x.deg(), 2);
+        let x = P::mono;
+        let f = P::from_iter([(x(0), 2), (x(1), 3), (x(2), -4)]);
+        let (m, a) = f.lead_term();
+
+        assert_eq!(m.deg(), 2);
         assert_eq!(a, &-4);
 
         let f = P::zero();
-        let (x, a) = f.lead_term();
-        assert_eq!(x.deg(), 0);
+        let (m, a) = f.lead_term();
+        assert_eq!(m.deg(), 0);
         assert_eq!(a, &0);
     }
 
@@ -669,72 +669,84 @@ mod tests {
     fn add() { 
         type P = Poly::<'x', i32>;
 
-        let f = P::from_deg_iter([(0, 2), (1, 3), (2, -4)]);
-        let g = P::from_deg_iter([(0, -3), (1, -3), (3, 5)]);
-        assert_eq!(f + g, P::from_deg_iter([(0, -1), (1, 0), (2, -4), (3, 5)]));
+        let x = P::mono;
+        let f = P::from_iter([(x(0), 2), (x(1), 3), (x(2), -4)]);
+        let g = P::from_iter([(x(0), -3), (x(1), -3), (x(3), 5)]);
+
+        assert_eq!(f + g, P::from_iter([(x(0), -1), (x(1), 0), (x(2), -4), (x(3), 5)]));
     }
 
     #[test]
     fn neg() { 
         type P = Poly::<'x', i32>;
 
-        let f = P::from_deg_iter([(0, 2), (1, 3), (2, -4)]);
-        assert_eq!(-f, P::from_deg_iter([(0, -2), (1, -3), (2, 4)]));
+        let x = P::mono;
+        let f = P::from_iter([(x(0), 2), (x(1), 3), (x(2), -4)]);
+
+        assert_eq!(-f, P::from_iter([(x(0), -2), (x(1), -3), (x(2), 4)]));
     }
 
     #[test]
     fn sub() { 
         type P = Poly::<'x', i32>;
-
-        let f = P::from_deg_iter([(0, 2), (1, 3), (2, -4)]);
-        let g = P::from_deg_iter([(0, -3), (1, -3), (3, 5)]);
-        assert_eq!(f - g, P::from_deg_iter([(0, 5), (1, 6), (2, -4), (3, -5)]));
+        let x = P::mono;
+        let f = P::from_iter([(x(0), 2), (x(1), 3), (x(2), -4)]);
+        let g = P::from_iter([(x(0), -3), (x(1), -3), (x(3), 5)]);
+        assert_eq!(f - g, P::from_iter([(x(0), 5), (x(1), 6), (x(2), -4), (x(3), -5)]));
     }
 
     #[test]
     fn mul() { 
         type P = Poly::<'x', i32>;
 
-        let f = P::from_deg_iter([(0, 2), (1, 3), (2, -4)]);
-        let g = P::from_deg_iter([(0, -3), (1, -3), (3, 5)]);
-        assert_eq!(f * g, P::from_deg_iter([(0, -6), (1, -15), (2, 3), (3, 22), (4, 15), (5, -20)]));
+        let x = P::mono;
+        let f = P::from_iter([(x(0), 2), (x(1), 3), (x(2), -4)]);
+        let g = P::from_iter([(x(0), -3), (x(1), -3), (x(3), 5)]);
+
+        assert_eq!(f * g, P::from_iter([(x(0), -6), (x(1), -15), (x(2), 3), (x(3), 22), (x(4), 15), (x(5), -20)]));
     }
 
     #[test]
     fn mul_const() { 
         type P = Poly::<'x', i32>;
 
-        let f = P::from_deg_iter([(0, 2), (1, 3), (2, -4)]);
+        let x = P::mono;
+        let f = P::from_iter([(x(0), 2), (x(1), 3), (x(2), -4)]);
         let g = P::from_const(3);
 
-        assert_eq!(&f * &g, P::from_deg_iter([(0, 6), (1, 9), (2, -12)]));
-        assert_eq!(&g * &f, P::from_deg_iter([(0, 6), (1, 9), (2, -12)]));
+        assert_eq!(&f * &g, P::from_iter([(x(0), 6), (x(1), 9), (x(2), -12)]));
+        assert_eq!(&g * &f, P::from_iter([(x(0), 6), (x(1), 9), (x(2), -12)]));
     }
 
     #[test]
     fn pow() { 
         type P = Poly::<'x', i32>;
 
-        let f = P::from_deg_iter([(0, 3), (1, 2)]);
+        let x = P::mono;
+        let f = P::from_iter([(x(0), 3), (x(1), 2)]);
+
         assert_eq!(f.pow(0), P::one());
         assert_eq!(f.pow(1), f);       assert_eq!(f.pow(0), P::one());
-        assert_eq!(f.pow(2), P::from_deg_iter([(0, 9), (1, 12), (2, 4)]));
+        assert_eq!(f.pow(2), P::from_iter([(x(0), 9), (x(1), 12), (x(2), 4)]));
     }
 
     #[test]
     fn pow_laurent() { 
         type P = LPoly::<'x', i32>;
 
+        let x = P::mono;
         let f = P::variable();
+
         assert_eq!(f.pow(0), P::one());
-        assert_eq!(f.pow(-1), P::from_deg(-1, 1));       assert_eq!(f.pow(0), P::one());
-        assert_eq!(f.pow(-2), P::from_deg(-2, 1));
+        assert_eq!(f.pow(-1), P::from_pair(x(-1), 1));       assert_eq!(f.pow(0), P::one());
+        assert_eq!(f.pow(-2), P::from_pair(x(-2), 1));
     }
 
     #[test]
     fn inv() { 
         type P = Poly::<'x', i32>;
 
+        let x = P::mono;
         let f = P::from_const(1);
         assert_eq!(f.is_unit(), true);
         assert_eq!(f.inv(), Some(P::from_const(1)));
@@ -751,7 +763,7 @@ mod tests {
         assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
 
-        let f = P::from_deg_iter([(0, 1), (1, 1)]);
+        let f = P::from_iter([(x(0), 1), (x(1), 1)]);
         assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
     }
@@ -762,7 +774,9 @@ mod tests {
         type R = Ratio<i32>;
         type P = Poly::<'x', R>;
 
+        let x = P::mono;
         let f = P::from_const(R::from_numer(1));
+
         assert_eq!(f.is_unit(), true);
         assert_eq!(f.inv(), Some(P::from_const(R::from_numer(1))));
 
@@ -778,7 +792,7 @@ mod tests {
         assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
 
-        let f = P::from_deg_iter([(0, R::one()), (1, R::one())]);
+        let f = P::from_iter([(x(0), R::one()), (x(1), R::one())]);
         assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
     }
@@ -787,6 +801,7 @@ mod tests {
     fn inv_laurent() { 
         type P = LPoly::<'x', i32>;
 
+        let x = P::mono;
         let f = P::from_const(1);
         assert_eq!(f.is_unit(), true);
         assert_eq!(f.inv(), Some(P::from_const(1)));
@@ -801,13 +816,13 @@ mod tests {
 
         let f = P::variable();
         assert_eq!(f.is_unit(), true);
-        assert_eq!(f.inv(), Some(P::from_deg(-1, 1)));
+        assert_eq!(f.inv(), Some(P::from_pair(x(-1), 1)));
 
-        let f = P::from_deg(1, 2);
+        let f = P::from_pair(x(1), 2);
         assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
 
-        let f = P::from_deg_iter([(0, 1), (1, 1)]);
+        let f = P::from_iter([(x(0), 1), (x(1), 1)]);
         assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
     }
@@ -818,6 +833,7 @@ mod tests {
         type R = Ratio<i32>;
         type P = LPoly::<'x', R>;
 
+        let x = P::mono;
         let f = P::from_const(R::from_numer(1));
         assert_eq!(f.is_unit(), true);
         assert_eq!(f.inv(), Some(P::from_const(R::from_numer(1))));
@@ -832,13 +848,13 @@ mod tests {
 
         let f = P::variable();
         assert_eq!(f.is_unit(), true);
-        assert_eq!(f.inv(), Some(P::from_deg(-1, R::one())));
+        assert_eq!(f.inv(), Some(P::from_pair(x(-1), R::one())));
 
-        let f = P::from_deg(1, R::from_numer(2));
+        let f = P::from_pair(x(1), R::from_numer(2));
         assert_eq!(f.is_unit(), true);
-        assert_eq!(f.inv(), Some(P::from_deg(-1, R::new(1, 2))));
+        assert_eq!(f.inv(), Some(P::from_pair(x(-1), R::new(1, 2))));
 
-        let f = P::from_deg_iter([(0, R::one()), (1, R::one())]);
+        let f = P::from_iter([(x(0), R::one()), (x(1), R::one())]);
         assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
     }
@@ -849,11 +865,12 @@ mod tests {
         type R = Ratio<i32>;
         type P = Poly::<'x', R>;
 
-        let f = P::from_deg_iter([(0, R::from_numer(1)), (1, R::from_numer(2)), (2, R::from_numer(1))]);
-        let g = P::from_deg_iter([(0, R::from_numer(3)), (1, R::from_numer(2))]);
+        let x = P::mono;
+        let f = P::from_iter([(x(0), R::from_numer(1)), (x(1), R::from_numer(2)), (x(2), R::from_numer(1))]);
+        let g = P::from_iter([(x(0), R::from_numer(3)), (x(1), R::from_numer(2))]);
         let (q, r) = f.div_rem(&g);
 
-        assert_eq!(q, P::from_deg_iter([(0, R::new(1, 4)), (1, R::new(1, 2))]));
+        assert_eq!(q, P::from_iter([(x(0), R::new(1, 4)), (x(1), R::new(1, 2))]));
         assert_eq!(r, P::from_const( R::new(1, 4)) );
         assert_eq!(f, q * &g + r);
 
@@ -876,7 +893,9 @@ mod tests {
     #[test]
     fn eval_bivar() { 
         type P = Poly2::<'x', 'y', i32>;
-        let p = P::from_deg2_iter([((0,0),3), ((1,0),2), ((0,1),-1), ((1,1),4)]);
+
+        let xy = |i, j| P::mono((i, j));
+        let p = P::from_iter([(xy(0,0),3), (xy(1,0),2), (xy(0,1),-1), (xy(1,1),4)]);
         let v = p.eval(&2, &3); // 3 + 2(2) - 1(3) + 4(2*3)
         assert_eq!(v, 28);
     }

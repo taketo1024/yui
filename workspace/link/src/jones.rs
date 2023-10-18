@@ -45,34 +45,39 @@ mod tests {
     fn unknot() {
         let l = Link::unknot();
         let p = jones_polynomial(&l);
-        assert_eq!(p, P::from_deg_iter([(-1, 1), (1, 1)]));
+        let q = P::mono;
+        assert_eq!(p, P::from_iter([(q(-1), 1), (q(1), 1)]));
     }
 
     #[test]
     fn unlink_2() {
         let l = Link::from_pd_code([[0, 1, 1, 0]]).resolved_at(0, Resolution::Res1);
         let p = jones_polynomial(&l);
-        assert_eq!(p, P::from_deg_iter([(-2, 1), (0, 2), (2, 1)]));
+        let q = P::mono;
+        assert_eq!(p, P::from_iter([(q(-2), 1), (q(0), 2), (q(2), 1)]));
     }
 
     #[test]
     fn trefoil() {
         let l = Link::trefoil();
         let p = jones_polynomial(&l);
-        assert_eq!(p, P::from_deg_iter([(-9, -1), (-5, 1), (-3, 1), (-1, 1)]));
+        let q = P::mono;
+        assert_eq!(p, P::from_iter([(q(-9), -1), (q(-5), 1), (q(-3), 1), (q(-1), 1)]));
     }
 
     #[test]
     fn figure8() {
         let l = Link::figure8();
         let p = jones_polynomial(&l);
-        assert_eq!(p, P::from_deg_iter([(-5, 1), (5, 1)]));
+        let q = P::mono;
+        assert_eq!(p, P::from_iter([(q(-5), 1), (q(5), 1)]));
     }
 
     #[test]
     fn hopf_link() { 
         let l = Link::hopf_link();
         let p = jones_polynomial(&l);
-        assert_eq!(p, P::from_deg_iter([(-6, 1), (-4, 1), (-2, 1), (0, 1)]));
+        let q = P::mono;
+        assert_eq!(p, P::from_iter([(q(-6), 1), (q(-4), 1), (q(-2), 1), (q(0), 1)]));
     }
 }

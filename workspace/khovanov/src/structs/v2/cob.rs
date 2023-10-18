@@ -1190,6 +1190,8 @@ mod tests {
     #[test]
     fn eval() { 
         type R = Poly2<'H', 'T', i32>;
+        
+        let ht = |i, j| R::mono((i, j));
         let h = R::variable(0);
         let t = R::variable(1);
 
@@ -1203,6 +1205,6 @@ mod tests {
         assert_eq!(c.eval(&h, &t), R::zero());
 
         let c = CobComp::closed(3);
-        assert_eq!(c.eval(&h, &t), R::from_deg2_iter([((2, 0), 2), ((0, 1), 8)])); // 2(H^2 + 4T)
+        assert_eq!(c.eval(&h, &t), R::from_iter([(ht(2, 0), 2), (ht(0, 1), 8)])); // 2(H^2 + 4T)
     }
 }

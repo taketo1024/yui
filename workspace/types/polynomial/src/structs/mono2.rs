@@ -6,9 +6,8 @@ use auto_impl_ops::auto_ops;
 
 use yui_core::Elem;
 use yui_lin_comb::Gen;
-use yui_utils::map;
 
-use crate::{MonoDeg, MonoGen, MultiDeg};
+use crate::{MonoDeg, MonoGen};
 use super::mono::fmt_mono;
 
 // `Mono2<X, Y, I>` : a struct representing X^i Y^j.
@@ -26,16 +25,6 @@ impl<const X: char, const Y: char, I> Mono2<X, Y, I> {
 impl<const X: char, const Y: char, I> From<(I, I)> for Mono2<X, Y, I> {
     fn from(d: (I, I)) -> Self {
         Self(d.0, d.1)
-    }
-}
-
-impl<const X: char, const Y: char, I> From<MultiDeg<I>> for Mono2<X, Y, I>
-where I: Zero + Clone {
-    fn from(mdeg: MultiDeg<I>) -> Self {
-        assert!(mdeg.len() <= 2);
-        let d0 = mdeg.deg(0);
-        let d1 = mdeg.deg(1);
-        Self(d0, d1)
     }
 }
 
@@ -112,10 +101,10 @@ macro_rules! impl_poly_gen {
         impl<const X: char, const Y: char> Gen for Mono2<X, Y, $I> {}
 
         impl<const X: char, const Y: char> MonoGen for Mono2<X, Y, $I> {
-            type Deg = MultiDeg<$I>;
+            type Deg = ($I, $I);
 
             fn deg(&self) -> Self::Deg {
-                MultiDeg::new(map!{ 0 => self.0, 1 => self.1 })
+                (self.0, self.1)
             }
 
             fn is_unit(&self) -> bool { 

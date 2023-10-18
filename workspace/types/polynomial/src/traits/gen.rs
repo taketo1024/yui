@@ -2,8 +2,6 @@ use std::ops::Mul;
 use num_traits::One;
 use yui_lin_comb::Gen;
 
-use super::MonoDeg;
-
 pub trait MonoGen: 
     Mul<Output = Self> + 
     One + 
@@ -12,7 +10,7 @@ pub trait MonoGen:
     From<Self::Deg> +
     Gen
 {
-    type Deg: MonoDeg;
+    type Deg;
 
     fn deg(&self) -> Self::Deg;
     fn is_unit(&self) -> bool;

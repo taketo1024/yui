@@ -7,12 +7,10 @@ use itertools::Itertools;
 use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 use yui_matrix::sparse::{SpVec, SpMat, MatType};
 
-use crate::RModStr;
-use crate::utils::HomologyCalc;
-
-use super::complex::ChainComplexBase;
 use super::deg::{Deg, isize2, isize3};
 use super::graded::Graded;
+use super::complex::ChainComplexBase;
+use super::homology_calc::HomologyCalc;
 
 pub type Homology<R>  = HomologyBase<isize,  R>;
 pub type Homology2<R> = HomologyBase<isize2, R>;
@@ -29,16 +27,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> HomologySummand<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn new(rank: usize, tors: Vec<R>, gens: Option<Vec<SpVec<R>>>, trans: Option<SpMat<R>>) -> Self { 
+    fn _new(rank: usize, tors: Vec<R>, gens: Option<Vec<SpVec<R>>>, trans: Option<SpMat<R>>) -> Self { 
         Self { rank, tors, gens, trans }
     }
 
-    fn new_gens(rank: usize, tors: Vec<R>, gens: Vec<SpVec<R>>, trans: SpMat<R>) -> Self { 
-        Self::new(rank, tors, Some(gens), Some(trans))
+    pub fn new(rank: usize, tors: Vec<R>, gens: Vec<SpVec<R>>, trans: SpMat<R>) -> Self { 
+        Self::_new(rank, tors, Some(gens), Some(trans))
     }
 
-    fn new_no_gens(rank: usize, tors: Vec<R>) -> Self { 
-        Self::new(rank, tors, None, None)
+    pub fn new_no_gens(rank: usize, tors: Vec<R>) -> Self { 
+        Self::_new(rank, tors, None, None)
     }
 
     fn zero() -> Self { 
@@ -156,16 +154,7 @@ where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
         let i0 = i - self.complex.d_deg();
         let d0 = self.complex.d_matrix(i0);
         let d1 = self.complex.d_matrix(i);
-
-        if self.with_gens { 
-            let (res, p, q) = HomologyCalc::calculate_with_trans(&d0, &d1);
-            let l = q.shape().1;
-            let gens = (0..l).map(|j| q.col_vec(j)).collect();
-            HomologySummand::new_gens(res.rank(), res.tors().to_owned(), gens, p)
-        } else { 
-            let res = HomologyCalc::calculate(&d0, &d1);
-            HomologySummand::new_no_gens(res.rank(), res.tors().to_owned())
-        }
+        HomologyCalc::calculate(d0, d1, self.with_gens)
     }
 }
 
@@ -319,7 +308,7 @@ mod tests {
 
         let z = h2.gen(0);
         assert!(!z.is_zero());
-        assert!(c.differentiate(2, z).is_zero());
+        assert!(c.is_cycle(2, z));
         assert_eq!(h2.vectorize(z), SpVec::from(vec![1]));
     }
 
@@ -334,7 +323,7 @@ mod tests {
 
         let z = h2.gen(0);
         assert!(!z.is_zero());
-        assert!(c.differentiate(2, z).is_zero());
+        assert!(c.is_cycle(2, z));
         assert_eq!(h2.vectorize(z), SpVec::from(vec![1]));
         assert_eq!(h2.gens().len(), 1);
 
@@ -346,8 +335,8 @@ mod tests {
 
         assert!(!a.is_zero());
         assert!(!b.is_zero());
-        assert!(c.differentiate(1, a).is_zero());
-        assert!(c.differentiate(1, b).is_zero());
+        assert!(c.is_cycle(1, a));
+        assert!(c.is_cycle(1, b));
         assert_eq!(h1.vectorize(a), SpVec::from(vec![1, 0]));
         assert_eq!(h1.vectorize(b), SpVec::from(vec![0, 1]));
     }
@@ -364,7 +353,7 @@ mod tests {
         let z = h1.gen(0);
 
         assert!(!z.is_zero());
-        assert!(c.differentiate(1, z).is_zero());
+        assert!(c.is_cycle(1, z));
         assert_eq!(h1.vectorize(z), SpVec::from(vec![1]));
     }
 }

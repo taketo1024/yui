@@ -34,8 +34,8 @@ where
     pub fn new<It, F1, F2>(support: It, d_deg: I, gens: F1, d_map: F2) -> Self
     where 
         It: Iterator<Item = I>, 
-        F1: Fn(I) -> Vec<X> + 'static,
-        F2: Fn(I, &X) -> Vec<(X, R)> + 'static 
+        F1: Fn(I) -> Vec<X>,
+        F2: Fn(I, &X) -> Vec<(X, R)>
     {
         let support = support.collect_vec();
         let gens = support.iter().map(|&i| 
@@ -55,7 +55,7 @@ where
     }
 
     fn make_matrix<F>(i: I, from: &Vec<X>, to: &Vec<X>, d: &F) -> SpMat<R>
-    where F: Fn(I, &X) -> Vec<(X, R)> + 'static {
+    where F: Fn(I, &X) -> Vec<(X, R)> {
         let (m, n) = (to.len(), from.len());
         let dict = to.iter()
                 .enumerate()

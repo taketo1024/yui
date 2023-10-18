@@ -61,7 +61,7 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new<It, F>(support: It, d_deg: I, mut d_matrix: F) -> Self
     where 
         It: Iterator<Item = I>, 
-        F: FnMut(I) -> SpMat<R> + 'static 
+        F: FnMut(I) -> SpMat<R>
     {
         let support = support.collect_vec();
         let mut d_matrix = HashMap::from_iter( 

@@ -8,7 +8,8 @@ use auto_impl_ops::auto_ops;
 
 use yui_core::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
 use yui_utils::map;
-use super::free::*;
+
+use super::gen::*;
 
 #[derive(PartialEq, Eq, Clone, Debug, Default)]
 pub struct LinComb<X, R>
@@ -449,59 +450,48 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::fmt::Display;
     use num_traits::Zero;
-    
     use yui_utils::map;
     use yui_core::Elem;
-    use super::{Gen, LinComb};
- 
-    #[derive(Debug, Default, Hash, PartialEq, Eq, Clone, PartialOrd, Ord)]
-    struct X(i32);
 
-    impl Elem for X { 
-        fn math_symbol() -> String {
-            String::from("X")
-        }
+    use crate::{Free, LinComb};
+ 
+    type X = Free<i32>;
+    fn e(i: i32) -> X { 
+        X::from(i)
     }
-    impl Display for X {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "X{}", self.0)
-        }
-    }
-    impl Gen for X {}
 
     #[test]
     fn math_symbol() { 
         type L = LinComb<X, i32>;
         let symbol = L::math_symbol();
-        assert_eq!(symbol, "Z<X>");
+        assert_eq!(symbol, "Z<Z>");
     }
 
     #[test]
     fn fmt() { 
         type L = LinComb<X, i32>;
 
-        let z = L::new(map!{ X(1) => 1 });
-        assert_eq!(z.to_string(), "X1");
+        let z = L::new(map!{ e(1) => 1 });
+        assert_eq!(z.to_string(), "<1>");
 
-        let z = L::new(map!{ X(1) => -1 });
-        assert_eq!(z.to_string(), "-X1");
+        let z = L::new(map!{ e(1) => -1 });
+        assert_eq!(z.to_string(), "-<1>");
 
-        let z = L::new(map!{ X(1) => 2 });
-        assert_eq!(z.to_string(), "2X1");
+        let z = L::new(map!{ e(1) => 2 });
+        assert_eq!(z.to_string(), "2<1>");
 
-        let z = L::new(map!{ X(1) => 1, X(2) => 1 });
-        assert_eq!(z.to_string(), "X1 + X2");
+        let z = L::new(map!{ e(1) => 1, e(2) => 1 });
+        assert_eq!(z.to_string(), "<1> + <2>");
 
-        let z = L::new(map!{ X(1) => -1, X(2) => -1 });
-        assert_eq!(z.to_string(), "-X1 - X2");
+        let z = L::new(map!{ e(1) => -1, e(2) => -1 });
+        assert_eq!(z.to_string(), "-<1> - <2>");
 
-        let z = L::new(map!{ X(1) => 2, X(2) => 3 });
-        assert_eq!(z.to_string(), "2X1 + 3X2");
+        let z = L::new(map!{ e(1) => 2, e(2) => 3 });
+        assert_eq!(z.to_string(), "2<1> + 3<2>");
 
-        let z = L::new(map!{ X(1) => -2, X(2) => -3 });
-        assert_eq!(z.to_string(), "-2X1 - 3X2");
+        let z = L::new(map!{ e(1) => -2, e(2) => -3 });
+        assert_eq!(z.to_string(), "-2<1> - 3<2>");
     }
 
     #[test]
@@ -514,9 +504,9 @@ mod tests {
     #[test]
     fn eq() { 
         type L = LinComb<X, i32>;
-        let z1 = L::new(map!{ X(1) => 1, X(2) => 2 });
-        let z2 = L::new(map!{ X(2) => 2, X(1) => 1 });
-        let z3 = L::new(map!{ X(1) => 1 });
+        let z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
+        let z2 = L::new(map!{ e(2) => 2, e(1) => 1 });
+        let z3 = L::new(map!{ e(1) => 1 });
 
         assert_eq!(z1, z2);
         assert_ne!(z1, z3);
@@ -535,214 +525,214 @@ mod tests {
     fn reduce() { 
         type L = LinComb<X, i32>;
 
-        let data = map!{ X(1) => 1, X(2) => 0, X(3) => 0 };
+        let data = map!{ e(1) => 1, e(2) => 0, e(3) => 0 };
         let mut z = L::new_raw(data);
         
         assert_eq!(z.len(), 3);
 
         z.reduce();
 
-        assert_eq!(z, L::new_raw(map!{ X(1) => 1 }));
+        assert_eq!(z, L::new_raw(map!{ e(1) => 1 }));
         assert_eq!(z.len(), 1);
     }
 
     #[test]
     fn add() {
         type L = LinComb<X, i32>;
-        let z1 = L::new(map!{ X(1) => 1, X(2) => 2 });
-        let z2 = L::new(map!{ X(2) => 20, X(3) => 30 });
+        let z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
+        let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
         let w = z1 + z2;
 
-        assert_eq!(w, L::new(map!{ X(1) => 1, X(2) => 22, X(3) => 30 }));
+        assert_eq!(w, L::new(map!{ e(1) => 1, e(2) => 22, e(3) => 30 }));
     }
 
     #[test]
     fn add_ref() {
         type L = LinComb<X, i32>;
-        let z1 = L::new(map!{ X(1) => 1, X(2) => 2 });
-        let z2 = L::new(map!{ X(2) => 20, X(3) => 30 });
+        let z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
+        let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
         let w = &z1 + &z2;
 
-        assert_eq!(w, L::new(map!{ X(1) => 1, X(2) => 22, X(3) => 30 }));
+        assert_eq!(w, L::new(map!{ e(1) => 1, e(2) => 22, e(3) => 30 }));
     }
 
     #[test]
     fn add_assign() {
         type L = LinComb<X, i32>;
-        let mut z1 = L::new(map!{ X(1) => 1, X(2) => 2 });
-        let z2 = L::new(map!{ X(2) => 20, X(3) => 30 });
+        let mut z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
+        let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
         z1 += z2;
 
-        assert_eq!(z1, L::new(map!{ X(1) => 1, X(2) => 22, X(3) => 30 }));
+        assert_eq!(z1, L::new(map!{ e(1) => 1, e(2) => 22, e(3) => 30 }));
     }
 
     #[test]
     fn add_assign_ref() {
         type L = LinComb<X, i32>;
-        let mut z1 = L::new(map!{ X(1) => 1, X(2) => 2 });
-        let z2 = L::new(map!{ X(2) => 20, X(3) => 30 });
+        let mut z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
+        let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
         z1 += &z2;
 
-        assert_eq!(z1, L::new(map!{ X(1) => 1, X(2) => 22, X(3) => 30 }));
+        assert_eq!(z1, L::new(map!{ e(1) => 1, e(2) => 22, e(3) => 30 }));
     }
 
     #[test]
     fn sum() {
         type L = LinComb<X, i32>;
-        let z1 = L::new(map!{ X(1) => 1, X(2) => 2 });
-        let z2 = L::new(map!{ X(2) => 20, X(3) => 30 });
-        let z3 = L::new(map!{ X(3) => 300, X(4) => 400 });
+        let z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
+        let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
+        let z3 = L::new(map!{ e(3) => 300, e(4) => 400 });
         let w: L = [z1, z2, z3].into_iter().sum();
 
-        assert_eq!(w, L::new(map!{ X(1) => 1, X(2) => 22, X(3) => 330, X(4) => 400 }));
+        assert_eq!(w, L::new(map!{ e(1) => 1, e(2) => 22, e(3) => 330, e(4) => 400 }));
     }
 
     #[test]
     fn sum_ref() {
         type L = LinComb<X, i32>;
-        let z1 = L::new(map!{ X(1) => 1, X(2) => 2 });
-        let z2 = L::new(map!{ X(2) => 20, X(3) => 30 });
-        let z3 = L::new(map!{ X(3) => 300, X(4) => 400 });
+        let z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
+        let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
+        let z3 = L::new(map!{ e(3) => 300, e(4) => 400 });
         let w: L = [&z1, &z2, &z3].into_iter().sum();
 
-        assert_eq!(w, L::new(map!{ X(1) => 1, X(2) => 22, X(3) => 330, X(4) => 400 }));
+        assert_eq!(w, L::new(map!{ e(1) => 1, e(2) => 22, e(3) => 330, e(4) => 400 }));
     }
 
     #[test]
     fn neg() {
         type L = LinComb<X, i32>;
-        let z = L::new(map!{ X(1) => 1, X(2) => 2 });
-        assert_eq!(-z, L::new(map!{ X(1) => -1, X(2) => -2 }));
+        let z = L::new(map!{ e(1) => 1, e(2) => 2 });
+        assert_eq!(-z, L::new(map!{ e(1) => -1, e(2) => -2 }));
     }
 
     #[test]
     fn neg_ref() {
         type L = LinComb<X, i32>;
-        let z = L::new(map!{ X(1) => 1, X(2) => 2 });
-        assert_eq!(-(&z), L::new(map!{ X(1) => -1, X(2) => -2 }));
+        let z = L::new(map!{ e(1) => 1, e(2) => 2 });
+        assert_eq!(-(&z), L::new(map!{ e(1) => -1, e(2) => -2 }));
     }
 
     #[test]
     fn sub() {
         type L = LinComb<X, i32>;
-        let z1 = L::new(map!{ X(1) => 1, X(2) => 2 });
-        let z2 = L::new(map!{ X(2) => 20, X(3) => 30 });
+        let z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
+        let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
         let w = z1 - z2;
 
-        assert_eq!(w, L::new(map!{ X(1) => 1, X(2) => -18, X(3) => -30 }));
+        assert_eq!(w, L::new(map!{ e(1) => 1, e(2) => -18, e(3) => -30 }));
     }
 
     #[test]
     fn sub_ref() {
         type L = LinComb<X, i32>;
-        let z1 = L::new(map!{ X(1) => 1, X(2) => 2 });
-        let z2 = L::new(map!{ X(2) => 20, X(3) => 30 });
+        let z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
+        let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
         let w = &z1 - &z2;
 
-        assert_eq!(w, L::new(map!{ X(1) => 1, X(2) => -18, X(3) => -30 }));
+        assert_eq!(w, L::new(map!{ e(1) => 1, e(2) => -18, e(3) => -30 }));
     }
 
     #[test]
     fn sub_assign() {
         type L = LinComb<X, i32>;
-        let mut z1 = L::new(map!{ X(1) => 1, X(2) => 2 });
-        let z2 = L::new(map!{ X(2) => 20, X(3) => 30 });
+        let mut z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
+        let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
         z1 -= z2;
 
-        assert_eq!(z1, L::new(map!{ X(1) => 1, X(2) => -18, X(3) => -30 }));
+        assert_eq!(z1, L::new(map!{ e(1) => 1, e(2) => -18, e(3) => -30 }));
     }
 
     #[test]
     fn sub_assign_ref() {
         type L = LinComb<X, i32>;
-        let mut z1 = L::new(map!{ X(1) => 1, X(2) => 2 });
-        let z2 = L::new(map!{ X(2) => 20, X(3) => 30 });
+        let mut z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
+        let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
         z1 -= &z2;
 
-        assert_eq!(z1, L::new(map!{ X(1) => 1, X(2) => -18, X(3) => -30 }));
+        assert_eq!(z1, L::new(map!{ e(1) => 1, e(2) => -18, e(3) => -30 }));
     }
 
     #[test]
     fn mul() {
         type L = LinComb<X, i32>;
-        let z = L::new(map!{ X(1) => 1, X(2) => 2 });
+        let z = L::new(map!{ e(1) => 1, e(2) => 2 });
         let r = 2;
         let w = z * r;
 
-        assert_eq!(w, L::new(map!{ X(1) => 2, X(2) => 4 }));
+        assert_eq!(w, L::new(map!{ e(1) => 2, e(2) => 4 }));
     }
 
     #[test]
     fn mul_ref() {
         type L = LinComb<X, i32>;
-        let z = L::new(map!{ X(1) => 1, X(2) => 2 });
+        let z = L::new(map!{ e(1) => 1, e(2) => 2 });
         let r = 2;
         let w = &z * &r;
 
-        assert_eq!(w, L::new(map!{ X(1) => 2, X(2) => 4 }));
+        assert_eq!(w, L::new(map!{ e(1) => 2, e(2) => 4 }));
     }
 
     #[test]
     fn mul_assign() {
         type L = LinComb<X, i32>;
-        let mut z = L::new(map!{ X(1) => 1, X(2) => 2 });
+        let mut z = L::new(map!{ e(1) => 1, e(2) => 2 });
         let r = 2;
         z *= r;
 
-        assert_eq!(z, L::new(map!{ X(1) => 2, X(2) => 4 }));
+        assert_eq!(z, L::new(map!{ e(1) => 2, e(2) => 4 }));
     }
 
     #[test]
     fn mul_assign_ref() {
         type L = LinComb<X, i32>;
-        let mut z = L::new(map!{ X(1) => 1, X(2) => 2 });
+        let mut z = L::new(map!{ e(1) => 1, e(2) => 2 });
         let r = 2;
         z *= &r;
 
-        assert_eq!(z, L::new(map!{ X(1) => 2, X(2) => 4 }));
+        assert_eq!(z, L::new(map!{ e(1) => 2, e(2) => 4 }));
     }
 
     #[test]
     fn map_coeffs() {
         type L = LinComb<X, i32>;
-        let z = L::new(map!{ X(1) => 1, X(2) => 2 });
+        let z = L::new(map!{ e(1) => 1, e(2) => 2 });
         let w = z.map_coeffs(|a| a * 10);
 
-        assert_eq!(w, L::new(map!{ X(1) => 10, X(2) => 20 }));
+        assert_eq!(w, L::new(map!{ e(1) => 10, e(2) => 20 }));
     }
 
     #[test]
     fn into_map_coeffs() {
         type L = LinComb<X, i32>;
-        let z = L::new(map!{ X(1) => 1, X(2) => 2 });
+        let z = L::new(map!{ e(1) => 1, e(2) => 2 });
         let w = z.into_map_coeffs(|a| a * 10);
 
-        assert_eq!(w, L::new(map!{ X(1) => 10, X(2) => 20 }));
+        assert_eq!(w, L::new(map!{ e(1) => 10, e(2) => 20 }));
     }
 
     #[test]
     fn map_gens() {
         type L = LinComb<X, i32>;
-        let z = L::new(map!{ X(1) => 1, X(2) => 2 });
-        let w = z.map_gens(|x| X(x.0 * 10));
+        let z = L::new(map!{ e(1) => 1, e(2) => 2 });
+        let w = z.map_gens(|x| e(x.0 * 10));
 
-        assert_eq!(w, L::new(map!{ X(10) => 1, X(20) => 2 }));
+        assert_eq!(w, L::new(map!{ e(10) => 1, e(20) => 2 }));
     }
 
     #[test]
     fn into_map_gens() {
         type L = LinComb<X, i32>;
-        let z = L::new(map!{ X(1) => 1, X(2) => 2 });
-        let w = z.into_map_gens(|x| X(x.0 * 10));
+        let z = L::new(map!{ e(1) => 1, e(2) => 2 });
+        let w = z.into_map_gens(|x| e(x.0 * 10));
 
-        assert_eq!(w, L::new(map!{ X(10) => 1, X(20) => 2 }));
+        assert_eq!(w, L::new(map!{ e(10) => 1, e(20) => 2 }));
     }
 
     #[test]
     fn filter_gens() { 
         type L = LinComb<X, i32>;
-        let z = L::new( (0..10).map(|i| (X(i), i * 10)).collect() );
+        let z = L::new( (0..10).map(|i| (e(i), i * 10)).collect() );
         let w = z.filter_gens(|x| x.0 % 3 == 0 );
-        assert_eq!(w, L::new(map!{ X(0) => 0, X(3) => 30, X(6) => 60, X(9) => 90}))
+        assert_eq!(w, L::new(map!{ e(0) => 0, e(3) => 30, e(6) => 60, e(9) => 90}))
     }
 }

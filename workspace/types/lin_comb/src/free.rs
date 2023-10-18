@@ -1,24 +1,26 @@
 use std::hash::Hash;
+use derive_more::Display;
 use yui_core::Elem;
 
-pub trait OrdForDisplay {
-    fn cmp_for_display(&self, other: &Self) -> std::cmp::Ordering;
-}
+use crate::Gen;
 
-impl<T> OrdForDisplay for T where T: Ord { 
-    fn cmp_for_display(&self, other: &Self) -> std::cmp::Ordering {
-        std::cmp::Ord::cmp(self, other)
+#[derive(Debug, Display, Default, Hash, PartialEq, Eq, Clone, PartialOrd, Ord)]
+#[display(fmt = "<{}>", _0)]
+pub struct Free<T>(pub T) where T: Elem;
+
+impl<T> From<T> for Free<T> 
+where T: Elem {
+    fn from(value: T) -> Self {
+        Self(value)
     }
 }
 
-pub trait SortForDisplay { 
-    fn sort_for_display(&mut self);
-}
-
-impl<T> SortForDisplay for Vec<T> where T: OrdForDisplay { 
-    fn sort_for_display(&mut self) {
-        self.sort_by(T::cmp_for_display)
+impl<T> Elem for Free<T> 
+where T: Elem { 
+    fn math_symbol() -> String {
+        T::math_symbol()
     }
 }
 
-pub trait Gen: Elem + Hash + OrdForDisplay {}
+impl<T> Gen for Free<T> 
+where T: Elem + Hash + Ord {}

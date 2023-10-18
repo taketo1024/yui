@@ -9,11 +9,12 @@ pub trait MonoGen:
     One + 
     PartialOrd + 
     Ord + 
-    From<Self::Degree> +
+    From<Self::Deg> +
     Gen
 {
-    type Degree: MonoDeg;
-    fn degree(&self) -> Self::Degree;
+    type Deg: MonoDeg;
+
+    fn deg(&self) -> Self::Deg;
     fn is_unit(&self) -> bool;
     fn inv(&self) -> Option<Self>;
 }

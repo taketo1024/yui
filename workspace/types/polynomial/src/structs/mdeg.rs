@@ -7,17 +7,17 @@ use num_traits::Zero;
 use crate::{MonoDeg, impl_deg_unsigned, impl_deg_signed};
 
 #[derive(Clone, Default, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
-pub struct MultiDeg<Deg>(BTreeMap<usize, Deg>) // x_0^{d_0} ... x_n^{d_n} <--> [ 0 => d_0, ..., n => d_n ]
-where Deg: Zero;
+pub struct MultiDeg<I>(BTreeMap<usize, I>) // x_0^{d_0} ... x_n^{d_n} <--> [ 0 => d_0, ..., n => d_n ]
+where I: Zero;
 
-impl<Deg> MultiDeg<Deg>
-where Deg: Zero {
-    pub fn new(mut map: BTreeMap<usize, Deg>) -> Self { 
+impl<I> MultiDeg<I>
+where I: Zero {
+    pub fn new(mut map: BTreeMap<usize, I>) -> Self { 
         map.retain(|_, d| !d.is_zero());
         Self(map)
     }
 
-    pub fn from_vec(degree: Vec<Deg>) -> Self { 
+    pub fn from_vec(degree: Vec<I>) -> Self { 
         Self::from_iter(
             degree.into_iter().enumerate()
         )
@@ -27,34 +27,34 @@ where Deg: Zero {
         self.0.len()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&usize, &Deg)> { 
+    pub fn iter(&self) -> impl Iterator<Item = (&usize, &I)> { 
         self.0.iter()
     }
 }
 
-impl<Deg> From<(usize, Deg)> for MultiDeg<Deg>
-where Deg: Zero {
-    fn from(value: (usize, Deg)) -> Self {
+impl<I> From<(usize, I)> for MultiDeg<I>
+where I: Zero {
+    fn from(value: (usize, I)) -> Self {
         MultiDeg::from_iter([value])
     }
 }
 
-impl<Deg> FromIterator<(usize, Deg)> for MultiDeg<Deg> 
-where Deg: Zero {
-    fn from_iter<T: IntoIterator<Item = (usize, Deg)>>(iter: T) -> Self {
+impl<I> FromIterator<(usize, I)> for MultiDeg<I> 
+where I: Zero {
+    fn from_iter<T: IntoIterator<Item = (usize, I)>>(iter: T) -> Self {
         Self::new(iter.into_iter().collect())
     }
 }
 
-impl<Deg> MultiDeg<Deg>
-where Deg: Zero + Clone {
-    pub fn deg(&self, index: usize) -> Deg {
-        self.0.get(&index).cloned().unwrap_or(Deg::zero())
+impl<I> MultiDeg<I>
+where I: Zero + Clone {
+    pub fn deg(&self, index: usize) -> I {
+        self.0.get(&index).cloned().unwrap_or(I::zero())
     }
 }
 
-impl<Deg> Zero for MultiDeg<Deg>
-where for<'x> Deg: Clone + AddAssign<&'x Deg> + Zero {
+impl<I> Zero for MultiDeg<I>
+where for<'x> I: Clone + AddAssign<&'x I> + Zero {
     fn zero() -> Self {
         Self(BTreeMap::new())
     }
@@ -65,9 +65,9 @@ where for<'x> Deg: Clone + AddAssign<&'x Deg> + Zero {
 }
 
 #[auto_ops]
-impl<Deg> AddAssign<&MultiDeg<Deg>> for MultiDeg<Deg>
-where for<'x> Deg: AddAssign<&'x Deg> + Zero + Clone {
-    fn add_assign(&mut self, rhs: &MultiDeg<Deg>) {
+impl<I> AddAssign<&MultiDeg<I>> for MultiDeg<I>
+where for<'x> I: AddAssign<&'x I> + Zero + Clone {
+    fn add_assign(&mut self, rhs: &MultiDeg<I>) {
         let data = &mut self.0;
         for (i, d) in rhs.0.iter() { 
             if let Some(d_i) = data.get_mut(i) { 
@@ -80,9 +80,9 @@ where for<'x> Deg: AddAssign<&'x Deg> + Zero + Clone {
     }
 }
 
-impl<Deg> Neg for &MultiDeg<Deg>
-where Deg: Zero, for<'x> &'x Deg: Neg<Output = Deg> {
-    type Output = MultiDeg<Deg>;
+impl<I> Neg for &MultiDeg<I>
+where I: Zero, for<'x> &'x I: Neg<Output = I> {
+    type Output = MultiDeg<I>;
     fn neg(self) -> Self::Output {
         let list = self.0.iter().map(|(&i, d)| 
             (i, -d)

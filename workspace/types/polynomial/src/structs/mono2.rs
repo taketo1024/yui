@@ -112,9 +112,9 @@ macro_rules! impl_poly_gen {
         impl<const X: char, const Y: char> Gen for Mono2<X, Y, $I> {}
 
         impl<const X: char, const Y: char> MonoGen for Mono2<X, Y, $I> {
-            type Degree = MultiDeg<$I>;
+            type Deg = MultiDeg<$I>;
 
-            fn degree(&self) -> Self::Degree {
+            fn deg(&self) -> Self::Deg {
                 MultiDeg::new(map!{ 0 => self.0, 1 => self.1 })
             }
 

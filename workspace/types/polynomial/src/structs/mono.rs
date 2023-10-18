@@ -60,7 +60,7 @@ macro_rules! impl_mono_univar {
         impl<const X: char> Display for Mono<X, $I> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let x = X.to_string();
-                let d = self.degree() as isize;
+                let d = self.deg() as isize;
                 write!(f, "{}", fmt_mono(x, d))
             }
         }
@@ -98,7 +98,7 @@ macro_rules! impl_mono_multivar {
 
         impl<const X: char> Display for Mono<X, MultiDeg<$I>> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let d = self.degree();
+                let d = self.deg();
                 let s = d.iter().map(|(&i, &d_i)| {
                     let x = format!("{X}{}", subscript(i as isize));
                     let d = d_i as isize;
@@ -141,18 +141,18 @@ macro_rules! impl_poly_gen {
         impl<const X: char> Gen for Mono<X, $I> {}
 
         impl<const X: char> MonoGen for Mono<X, $I> {
-            type Degree = $I;
+            type Deg = $I;
 
-            fn degree(&self) -> Self::Degree {
+            fn deg(&self) -> Self::Deg {
                 self.0.clone()
             }
 
             fn is_unit(&self) -> bool { 
-                self.degree().is_add_unit()
+                self.deg().is_add_unit()
             }
 
             fn inv(&self) -> Option<Self> { // (x^i)^{-1} = x^{-i}
-                if let Some(i) = self.degree().add_inv() { 
+                if let Some(i) = self.deg().add_inv() { 
                     Some(Self(i))
                 } else { 
                     None

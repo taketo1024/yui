@@ -33,7 +33,7 @@ where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn from_const(r: R) -> Self {
-        Self::from_deg(I::Degree::zero(), r)
+        Self::from_deg(I::Deg::zero(), r)
     }
 
     pub fn from_term(i: I, r: R) -> Self { 
@@ -41,12 +41,12 @@ where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
         Self::new_raw(t)
     }
 
-    pub fn from_deg(i: I::Degree, r: R) -> Self { 
+    pub fn from_deg(i: I::Deg, r: R) -> Self { 
         Self::from_term(I::from(i), r)
     }
 
     pub fn from_deg_iter<Iter>(iter: Iter) -> Self 
-    where Iter: IntoIterator<Item = (I::Degree, R)> {
+    where Iter: IntoIterator<Item = (I::Deg, R)> {
         iter.into_iter().map(|(i, r)| 
             (I::from(i), r)
         ).collect()
@@ -64,7 +64,7 @@ where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
         self.data.coeff(i)
     }
 
-    pub fn coeff_for(&self, i: I::Degree) -> &R {
+    pub fn coeff_for(&self, i: I::Deg) -> &R {
         self.data.coeff(&I::from(i))
     }
 
@@ -111,8 +111,8 @@ where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
         self.lead_term().1
     }
 
-    pub fn lead_deg(&self) -> I::Degree { 
-        self.lead_term().0.degree()
+    pub fn lead_deg(&self) -> I::Deg { 
+        self.lead_term().0.deg()
     }
 
     pub fn map_coeffs<R2, F>(&self, f: F) -> PolyBase<I, R2>
@@ -178,7 +178,7 @@ where I: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
 
 // for bivar-poly
 impl<I, J, R> PolyBase<I, R>
-where I: MonoGen<Degree = MultiDeg<J>>, J: Zero, R: Ring, for<'x> &'x R: RingOps<R> {
+where I: MonoGen<Deg = MultiDeg<J>>, J: Zero, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn from_deg2_iter<Iter>(iter: Iter) -> Self
     where Iter: IntoIterator<Item = ((J, J), R)> {
         Self::from_mdeg(
@@ -192,7 +192,7 @@ where I: MonoGen<Degree = MultiDeg<J>>, J: Zero, R: Ring, for<'x> &'x R: RingOps
 
 // for multivar-poly
 impl<I, J, R> PolyBase<I, R>
-where I: MonoGen<Degree = MultiDeg<J>>, J: Zero, R: Ring, for<'x> &'x R: RingOps<R> {
+where I: MonoGen<Deg = MultiDeg<J>>, J: Zero, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn from_mdeg<Iter>(iter: Iter) -> Self
     where Iter: IntoIterator<Item = (Vec<J>, R)> {
         iter.into_iter().map(|(v, r)| {
@@ -469,7 +469,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
             let (i, a) = f.lead_term(); // ax^i
             let (j, b) = g.lead_term(); // bx^j
             
-            let k = i.degree() - j.degree(); // >= 0
+            let k = i.deg() - j.deg(); // >= 0
             let c = a / b;
             let q = Poly::from_deg(k, c);   // cx^k = (a/b) x^{i-j}.
             let r = f - &q * g;
@@ -656,12 +656,12 @@ mod tests {
 
         let f = P::from_deg_iter([(0, 2), (1, 3), (2, -4)]);
         let (x, a) = f.lead_term();
-        assert_eq!(x.degree(), 2);
+        assert_eq!(x.deg(), 2);
         assert_eq!(a, &-4);
 
         let f = P::zero();
         let (x, a) = f.lead_term();
-        assert_eq!(x.degree(), 0);
+        assert_eq!(x.deg(), 0);
         assert_eq!(a, &0);
     }
 

@@ -1225,6 +1225,7 @@ version = "0.1.0"
 dependencies = [
  "auto-impl-ops",
  "cartesian",
+ "delegate",
  "derive_more",
  "grouping_by",
  "itertools",

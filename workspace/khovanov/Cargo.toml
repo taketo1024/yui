@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 auto-impl-ops = "0.2.1"
 cartesian = "0.2.1"
+delegate = "0.10.0"
 derive_more = "0.99.17"
 grouping_by = "0.2.2"
 itertools = "0.11.0"

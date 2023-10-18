@@ -122,8 +122,8 @@ where
         self.as_chain(i + self.d_deg(), &w)
     }
 
-    pub fn get_inner(self) -> ChainComplexBase<I, R> { 
-        self.inner
+    pub fn inner(&self) -> &ChainComplexBase<I, R> { 
+        &self.inner
     }
 }
 

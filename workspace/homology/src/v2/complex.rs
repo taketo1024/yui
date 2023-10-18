@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 use std::mem;
 
-use itertools::Itertools;
+use itertools::{Itertools, Either};
 use yui_core::{Ring, RingOps, EucRing, EucRingOps};
 use yui_matrix::sparse::{SpMat, SpVec, MatType};
 
 use super::deg::{Deg, isize2, isize3};
 use super::graded::Graded;
+use super::reducer::ChainReducer;
 use super::homology_calc::HomologyCalc;
 use super::homology::{HomologySummand, HomologyBase};
 
@@ -115,6 +116,12 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn is_cycle(&self, i: I, v: &SpVec<R>) -> bool { 
         self.differentiate(i, v).is_zero()
     }
+    
+    pub fn reduced(&self) -> ChainComplexBase<I, R> { 
+        let mut r = ChainReducer::new(&self);
+        r.process();
+        r.as_complex()
+    }
 }
 
 impl<I, R> ChainComplexBase<I, R> 
@@ -177,6 +184,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn from_mats(d_deg: isize, offset: isize, mut mats: Vec<SpMat<R>>) -> Self { 
         let n = mats.len() as isize;
         let range = offset .. offset + n;
+        let range = if d_deg.is_positive() { 
+            Either::Left(range) 
+        } else { 
+            Either::Right(range.rev())
+        };
         Self::new(
             range, d_deg, 
             move |i| {
@@ -287,6 +299,54 @@ pub(crate) mod tests {
         assert_eq!(c.rank(0), 6);
         assert_eq!(c.rank(1), 15);
         assert_eq!(c.rank(2), 10);
+        assert_eq!(c.rank(3), 0);
+
+        c.check_d_all();
+    }
+
+    #[test]
+    fn d3_reduced() { 
+        let c = Samples::<i64>::d3().reduced();
+
+        assert_eq!(c.rank(0), 1);
+        assert_eq!(c.rank(1), 0);
+        assert_eq!(c.rank(2), 0);
+        assert_eq!(c.rank(3), 0);
+
+        c.check_d_all();
+    }
+
+    #[test]
+    fn s2_reduced() { 
+        let c = Samples::<i64>::s2().reduced();
+
+        assert_eq!(c.rank(0), 1);
+        assert_eq!(c.rank(1), 0);
+        assert_eq!(c.rank(2), 1);
+        assert_eq!(c.rank(3), 0);
+
+        c.check_d_all();
+    }
+
+    #[test]
+    fn t2_reduced() { 
+        let c = Samples::<i64>::t2().reduced();
+
+        assert_eq!(c.rank(0), 1);
+        assert_eq!(c.rank(1), 2);
+        assert_eq!(c.rank(2), 1);
+        assert_eq!(c.rank(3), 0);
+
+        c.check_d_all();
+    }
+
+    #[test]
+    fn rp2_reduced() { 
+        let c = Samples::<i64>::rp2().reduced();
+        
+        assert_eq!(c.rank(0), 1);
+        assert_eq!(c.rank(1), 1);
+        assert_eq!(c.rank(2), 1);
         assert_eq!(c.rank(3), 0);
 
         c.check_d_all();

@@ -3,6 +3,7 @@
 mod deg;
 mod graded;
 mod complex;
+mod reducer;
 mod homology;
 mod homology_calc;
 mod x_complex;

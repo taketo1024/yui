@@ -120,31 +120,6 @@ where
     pub fn get_inner(self) -> ChainComplexBase<I, R> { 
         self.inner
     }
-
-    // TODO auto-impl delegates
-    pub fn is_supported(&self, i: I) -> bool { 
-        self.inner.is_supported(i)
-    }
-
-    pub fn rank(&self, i: I) -> usize { 
-        self.gens(i).len()
-    }
-
-    pub fn d_deg(&self) -> I { 
-        self.inner.d_deg()
-    }
-
-    pub fn d_matrix(&self, i: I) -> &SpMat<R> { 
-        self.inner.d_matrix(i)
-    }
-
-    pub fn check_d_at(&self, i: I) {
-        self.inner.check_d_at(i)
-    }
-    
-    pub fn check_d_all(&self) {
-        self.inner.check_d_all()
-    }
 }
 
 impl<I, X, R> XChainComplexBase<I, X, R>
@@ -155,6 +130,44 @@ where
 {
     pub fn homology(self) -> HomologyBase<I, R> { 
         self.inner.homology()
+    }
+}
+
+impl<I, X, R> Graded<I> for XChainComplexBase<I, X, R>
+where 
+    I: Deg,
+    X: FreeGen,
+    R: Ring, for<'x> &'x R: RingOps<R>,
+{
+    type Itr = std::vec::IntoIter<I>;
+    
+    fn support(&self) -> Self::Itr {
+        self.inner.support()
+    }
+
+    fn display(&self, i: I) -> String {
+        self.inner.display(i)
+    }
+}
+
+impl<I, X, R> ChainComplexTrait<I> for XChainComplexBase<I, X, R>
+where 
+    I: Deg,
+    X: FreeGen,
+    R: Ring, for<'x> &'x R: RingOps<R>,
+{
+    type R = R;
+
+    fn rank(&self, i: I) -> usize {
+        self.gens(i).len()
+    }
+
+    fn d_deg(&self) -> I {
+        self.inner.d_deg()
+    }
+
+    fn d_matrix(&self, i: I) -> &SpMat<Self::R> {
+        self.inner.d_matrix(i)
     }
 }
 

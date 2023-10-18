@@ -105,14 +105,15 @@ where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 }
 
-impl<D, R> Graded<D> for ChainComplexBase<D, R>
-where D: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
-    type Itr = std::vec::IntoIter<D>;
+impl<I, R> Graded<I> for ChainComplexBase<I, R>
+where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
+    type Itr = std::vec::IntoIter<I>;
+
     fn support(&self) -> Self::Itr {
         self.support.clone().into_iter()
     }
 
-    fn display(&self, i: D) -> String {
+    fn display(&self, i: I) -> String {
         use yui_utils::superscript;
 
         let symbol = R::set_symbol();

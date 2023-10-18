@@ -235,6 +235,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "delegate"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ee5df75c70b95bd3aacc8e2fd098797692fb1d54121019c4de481e42f04c8a1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.107",
+]
+
+[[package]]
 name = "derive-syn-parse"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1195,6 +1206,7 @@ dependencies = [
 name = "yui-homology"
 version = "0.1.0"
 dependencies = [
+ "delegate",
  "derive_more",
  "grouping_by",
  "itertools",

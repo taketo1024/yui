@@ -107,8 +107,12 @@ where
         })
     }
 
-    pub fn as_chain(&self, _i: I, _v: &SpVec<R>) -> LinComb<X, R> {
-        todo!()
+    pub fn as_chain(&self, i: I, v: &SpVec<R>) -> LinComb<X, R> {
+        let gens = self.gens(i);
+        let elems = v.iter().map(|(j, a)| 
+            (gens[j].clone(), a.clone())
+        );
+        LinComb::from_iter(elems)
     }
 
     pub fn differetiate(&self, i: I, z: &LinComb<X, R>) -> LinComb<X, R> { 

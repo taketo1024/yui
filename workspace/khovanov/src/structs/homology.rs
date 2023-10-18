@@ -1,13 +1,14 @@
 use std::ops::{RangeInclusive, Index};
+use delegate::delegate;
 
-use yui_homology::v2::{Homology, HomologySummand, Homology2, Graded, PrintTable, PrintSeq};
+use yui_homology::v2::{Homology, HomologySummand, Homology2, Graded, isize2};
 use yui_core::{EucRing, EucRingOps};
 use yui_link::Link;
 
 use crate::{KhComplex, KhComplexBigraded};
 pub struct KhHomology<R> 
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    homology: Homology<R>
+    inner: Homology<R>
 }
 
 impl<R> KhHomology<R> 
@@ -17,18 +18,10 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     pub fn h_range(&self) -> RangeInclusive<isize> { 
-        let h = &self.homology;
+        let h = &self.inner;
         let h_min = h.support().min().unwrap_or(0);
         let h_max = h.support().max().unwrap_or(0);
         h_min ..= h_max
-    }
-
-    pub fn display_seq(&self) -> String { 
-        self.homology.display_seq()
-    }
-
-    pub fn print_seq(&self) { 
-        self.homology.print_seq()
     }
 }
 
@@ -37,37 +30,42 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     fn from(c: KhComplex<R>) -> Self {
         let c = c.inner().inner();
         let h = Homology::new(c, false);
-        Self { homology: h }
+        Self { inner: h }
     }
 }
 
+impl<R> Graded<isize> for KhHomology<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    type Itr = std::vec::IntoIter<isize>;
+
+    delegate! { 
+        to self.inner { 
+            fn support(&self) -> Self::Itr;
+            fn display(&self, i: isize) -> String;
+        }
+    }
+}
 
 impl<R> Index<isize> for KhHomology<R> 
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     type Output = HomologySummand<R>;
 
-    fn index(&self, index: isize) -> &Self::Output {
-        &self.homology[index]
+    delegate! { 
+        to self.inner { 
+            fn index(&self, index: isize) -> &Self::Output;
+        }
     }
 }
 
 pub struct KhHomologyBigraded<R> 
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    homology: Homology2<R>
+    inner: Homology2<R>
 }
 
 impl<R> KhHomologyBigraded<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn new(l: Link, reduced: bool) -> Self {
         Self::new_v2(l, reduced)
-    }
-
-    pub fn display_table(&self) -> String { 
-        self.homology.display_table()
-    }
-
-    pub fn print_table(&self) { 
-        self.homology.print_table()
     }
 }
 
@@ -76,7 +74,19 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     fn from(c: KhComplexBigraded<R>) -> Self {
         let c = c.inner().inner();
         let h = Homology2::new(c, false);
-        Self { homology: h }
+        Self { inner: h }
+    }
+}
+
+impl<R> Graded<isize2> for KhHomologyBigraded<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    type Itr = std::vec::IntoIter<isize2>;
+
+    delegate! { 
+        to self.inner { 
+            fn support(&self) -> Self::Itr;
+            fn display(&self, i: isize2) -> String;
+        }
     }
 }
 
@@ -84,8 +94,10 @@ impl<R> Index<(isize, isize)> for KhHomologyBigraded<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     type Output = HomologySummand<R>;
 
-    fn index(&self, index: (isize, isize)) -> &Self::Output {
-        &self.homology[index]
+    delegate! { 
+        to self.inner { 
+            fn index(&self, index: (isize, isize)) -> &Self::Output;
+        }
     }
 }
 

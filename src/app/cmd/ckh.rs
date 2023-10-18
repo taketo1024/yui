@@ -1,6 +1,7 @@
 use std::str::FromStr;
 use itertools::Itertools;
 use yui_core::{Ring, RingOps};
+use yui_homology::v2::{PrintTable, ChainComplexTrait, PrintSeq};
 use yui_khovanov::KhComplex;
 use crate::utils::*;
 

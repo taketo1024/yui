@@ -24,7 +24,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         ).collect_vec();
 
         assert!(canon_cycles.iter().all(|z| 
-            complex.differetiate(0, z).is_zero()
+            complex.differentiate(0, z).is_zero()
         ));
 
         let deg_shift = Self::deg_shift_for(l, reduced);

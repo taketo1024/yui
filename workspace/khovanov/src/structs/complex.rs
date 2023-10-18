@@ -1,17 +1,17 @@
 use std::ops::RangeInclusive;
 use cartesian::cartesian;
 
+use delegate::delegate;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps};
-use yui_lin_comb::LinComb;
 use yui_matrix::sparse::{SpMat, SpVec};
 use yui_link::Link;
-use yui_homology::v2::{ChainComplexTrait, XChainComplex, XChainComplex2, Graded, isize2, PrintSeq, PrintTable};
+use yui_homology::v2::{ChainComplexTrait, XChainComplex, XChainComplex2, Graded, isize2};
 
 use crate::{KhEnhState, KhChain, KhHomology, KhHomologyBigraded};
 
 pub struct KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    complex: XChainComplex<KhEnhState, R>,
+    inner: XChainComplex<KhEnhState, R>,
     canon_cycles: Vec<KhChain<R>>,
     reduced: bool,
     deg_shift: (isize, isize)
@@ -23,24 +23,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         Self::new_v2(link, h, t, reduced)
     }
 
-    pub(crate) fn _new(complex: XChainComplex<KhEnhState, R>, canon_cycles: Vec<KhChain<R>>, reduced: bool, deg_shift: (isize, isize)) -> Self { 
-        KhComplex { complex, canon_cycles, reduced, deg_shift }
-    }
-
-    pub fn support(&self) -> impl Iterator<Item = isize> { 
-        self.complex.support()
-    }
-
-    pub fn rank(&self, i: isize) -> usize { 
-        self.complex.rank(i)
-    }
-
-    pub fn gens(&self, i: isize) -> &Vec<KhEnhState> {
-        self.complex.gens(i)
-    }
-
-    pub fn d_matrix(&self, i: isize) -> &SpMat<R> {
-        self.complex.d_matrix(i)
+    pub(crate) fn _new(inner: XChainComplex<KhEnhState, R>, canon_cycles: Vec<KhChain<R>>, reduced: bool, deg_shift: (isize, isize)) -> Self { 
+        KhComplex { inner, canon_cycles, reduced, deg_shift }
     }
 
     pub fn canon_cycles(&self) -> &Vec<KhChain<R>> { 
@@ -68,36 +52,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         (q_min + q0) ..= (q_max + q0)
     }
 
-    pub fn vectorize(&self, i: isize, z: &KhChain<R>) -> SpVec<R> {
-        self.complex.vectorize(i, z)
-    }
-
-    pub fn differentiate_x(&self, i: isize, x: &KhEnhState) -> KhChain<R> { 
-        self.differentiate(i, &LinComb::from_gen(x.clone()))
-    }
-
-    pub fn differentiate(&self, i: isize, z: &KhChain<R>) -> KhChain<R> { 
-        self.complex.differetiate(i, z)
-    }
-
-    pub fn check_d_all(&self) {
-        self.complex.check_d_all()
-    }
-
-    pub fn display_seq(&self) -> String { 
-        self.complex.display_seq()
-    }
-
-    pub fn display_d(&self) -> String { 
-        self.complex.display_d()
-    }
-
-    pub fn print_seq(&self) { 
-        self.complex.print_seq()
-    }
-
     pub fn inner(&self) -> &XChainComplex<KhEnhState, R> {
-        &self.complex
+        &self.inner
     }
 
     pub fn as_bigraded(self) -> KhComplexBigraded<R> {
@@ -126,7 +82,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
         );
 
-        KhComplexBigraded { complex, reduced }
+        KhComplexBigraded { inner: complex, reduced }
     }
 
     pub fn deg_shift_for(l: &Link, reduced: bool) -> (isize, isize) {
@@ -135,6 +91,40 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let h = -n_neg;
         let q = n_pos - 2 * n_neg + (if reduced { 1 } else { 0 });
         (h, q)
+    }
+
+    delegate! { 
+        to self.inner { 
+            pub fn gens(&self, i: isize) -> &Vec<KhEnhState>;
+            pub fn vectorize(&self, i: isize, z: &KhChain<R>) -> SpVec<R>;
+            pub fn differentiate_x(&self, i: isize, x: &KhEnhState) -> KhChain<R>;
+            pub fn differentiate(&self, i: isize, z: &KhChain<R>) -> KhChain<R>;
+        }
+    }
+}
+
+impl<R> Graded<isize> for KhComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type Itr = std::vec::IntoIter<isize>;
+
+    delegate! { 
+        to self.inner { 
+            fn support(&self) -> Self::Itr;
+            fn display(&self, i: isize) -> String;
+        }
+    }
+}
+
+impl<R> ChainComplexTrait<isize> for KhComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type R = R;
+
+    delegate! { 
+        to self.inner { 
+            fn rank(&self, i: isize) -> usize;
+            fn d_deg(&self) -> isize;
+            fn d_matrix(&self, i: isize) -> &SpMat<Self::R>;
+        }
     }
 }
 
@@ -147,7 +137,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 pub struct KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    complex: XChainComplex2<KhEnhState, R>,
+    inner: XChainComplex2<KhEnhState, R>,
     reduced: bool,
 }
 
@@ -161,22 +151,36 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.reduced
     }
 
-    pub fn display_table(&self) -> String { 
-        self.complex.display_table()
-    }
-
-    pub fn print_table(&self) { 
-        self.complex.print_table()
-    }
-
-    pub fn display_d(&self) -> String { 
-        self.complex.display_d()
-    }
-
     pub fn inner(&self) -> &XChainComplex2<KhEnhState, R> {
-        &self.complex
+        &self.inner
     }
 }
+
+impl<R> Graded<isize2> for KhComplexBigraded<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type Itr = std::vec::IntoIter<isize2>;
+
+    delegate! { 
+        to self.inner { 
+            fn support(&self) -> Self::Itr;
+            fn display(&self, i: isize2) -> String;
+        }
+    }
+}
+
+impl<R> ChainComplexTrait<isize2> for KhComplexBigraded<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type R = R;
+
+    delegate! { 
+        to self.inner { 
+            fn rank(&self, i: isize2) -> usize;
+            fn d_deg(&self) -> isize2;
+            fn d_matrix(&self, i: isize2) -> &SpMat<Self::R>;
+        }
+    }
+}
+
 
 impl<R> KhComplexBigraded<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 

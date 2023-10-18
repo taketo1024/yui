@@ -6,7 +6,8 @@ use yui_lin_comb::{FreeGen, LinComb};
 use yui_matrix::sparse::{SpMat, SpVec};
 
 use super::deg::{Deg, isize2, isize3};
-use super::complex::ChainComplexBase;
+use super::graded::Graded;
+use super::complex::{ChainComplexTrait, ChainComplexBase};
 use super::homology::HomologyBase;
 
 pub type XChainComplex <X, R> = XChainComplexBase<isize,  X, R>;
@@ -72,20 +73,12 @@ where
         )
     }
 
-    pub fn is_supported(&self, i: I) -> bool { 
-        self.inner.is_supported(i)
-    }
-
     pub fn gens(&self, i: I) -> &Vec<X> { 
         if self.is_supported(i) {
             &self.gens[&i]
         } else { 
             &self.empty_gens
         }
-    }
-
-    pub fn rank(&self, i: I) -> usize { 
-        self.gens(i).len()
     }
 
     pub fn vectorize_x(&self, i: I, x: &X) -> SpVec<R> {
@@ -124,6 +117,19 @@ where
         self.as_chain(i + self.d_deg(), &w)
     }
 
+    pub fn get_inner(self) -> ChainComplexBase<I, R> { 
+        self.inner
+    }
+
+    // TODO auto-impl delegates
+    pub fn is_supported(&self, i: I) -> bool { 
+        self.inner.is_supported(i)
+    }
+
+    pub fn rank(&self, i: I) -> usize { 
+        self.gens(i).len()
+    }
+
     pub fn d_deg(&self) -> I { 
         self.inner.d_deg()
     }
@@ -138,10 +144,6 @@ where
     
     pub fn check_d_all(&self) {
         self.inner.check_d_all()
-    }
-
-    pub fn get_inner(self) -> ChainComplexBase<I, R> { 
-        self.inner
     }
 }
 

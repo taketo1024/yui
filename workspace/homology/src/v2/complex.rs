@@ -13,11 +13,46 @@ pub type ChainComplex<R>  = ChainComplexBase<isize,  R>;
 pub type ChainComplex2<R> = ChainComplexBase<isize2, R>;
 pub type ChainComplex3<R> = ChainComplexBase<isize3, R>;
 
-pub struct ChainComplexBase<D, R>
-where D: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
-    support: Vec<D>,
-    d_deg: D,
-    d_matrix: HashMap<D, SpMat<R>>,
+pub trait ChainComplexTrait<I>: Graded<I>
+where I: Deg, Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> { 
+    type R;
+
+    fn d_deg(&self) -> I;
+    fn d_matrix(&self, i: I) -> &SpMat<Self::R>;
+
+    fn rank(&self, i: I) -> usize { 
+        if self.is_supported(i) { 
+            self.d_matrix(i).shape().1 // column
+        } else { 
+            0
+        }
+    }
+
+    fn check_d_at(&self, i: I) { 
+        let i1 = i + self.d_deg();
+        if !(self.is_supported(i) && self.is_supported(i1)) {
+            return 
+        }
+
+        let d0 = self.d_matrix(i);
+        let d1 = self.d_matrix(i1);
+        let res = d1 * d0;
+
+        assert!( res.is_zero(), "d² is non-zero at {i}." );
+    }
+
+    fn check_d_all(&self) {
+        for i in self.support() { 
+            self.check_d_at(i);
+        }
+    }
+}
+
+pub struct ChainComplexBase<I, R>
+where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
+    support: Vec<I>,
+    d_deg: I,
+    d_matrix: HashMap<I, SpMat<R>>,
     zero_d: SpMat<R>
 }
 
@@ -48,26 +83,6 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn rank(&self, i: I) -> usize { 
-        if self.is_supported(i) { 
-            self.d_matrix(i).shape().1 // column
-        } else { 
-            0
-        }
-    }
-
-    pub fn d_deg(&self) -> I { 
-        self.d_deg
-    }
-
-    pub fn d_matrix(&self, i: I) -> &SpMat<R> { 
-        if let Some(d) = self.d_matrix.get(&i) {
-            d
-        } else { 
-            &self.zero_d
-        }
-    }
-
     pub fn differentiate(&self, i: I, v: &SpVec<R>) -> SpVec<R> {
         assert_eq!(self.rank(i), v.dim());
         let d = self.d_matrix(i);
@@ -76,29 +91,6 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn is_cycle(&self, i: I, v: &SpVec<R>) -> bool { 
         self.differentiate(i, v).is_zero()
-    }
-
-    pub fn is_supported(&self, i: I) -> bool { 
-        self.support.contains(&i)
-    }
-
-    pub fn check_d_at(&self, i: I) { 
-        let i1 = i + self.d_deg;
-        if !(self.is_supported(i) && self.is_supported(i1)) {
-            return 
-        }
-
-        let d0 = self.d_matrix(i);
-        let d1 = self.d_matrix(i1);
-        let res = d1 * d0;
-
-        assert!( res.is_zero(), "d² is non-zero at {i}." );
-    }
-
-    pub fn check_d_all(&self) {
-        for &i in self.support.iter() { 
-            self.check_d_at(i);
-        }
     }
 }
 
@@ -134,6 +126,24 @@ where D: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 }
+
+impl<I, R> ChainComplexTrait<I> for ChainComplexBase<I, R>
+where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
+    type R = R;
+
+    fn d_deg(&self) -> I { 
+        self.d_deg
+    }
+
+    fn d_matrix(&self, i: I) -> &SpMat<R> { 
+        if let Some(d) = self.d_matrix.get(&i) {
+            d
+        } else { 
+            &self.zero_d
+        }
+    }
+}
+
 
 impl<R> ChainComplexBase<isize, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {

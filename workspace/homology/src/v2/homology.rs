@@ -9,7 +9,7 @@ use yui_matrix::sparse::{SpVec, SpMat, MatType};
 
 use super::deg::{Deg, isize2, isize3};
 use super::graded::Graded;
-use super::complex::ChainComplexBase;
+use super::complex::{ChainComplexTrait, ChainComplexBase};
 use super::homology_calc::HomologyCalc;
 
 pub type Homology<R>  = HomologyBase<isize,  R>;

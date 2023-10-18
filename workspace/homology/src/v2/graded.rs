@@ -1,13 +1,19 @@
 use itertools::Itertools;
-use super::deg::{isize2, usize2};
+use super::deg::{isize2, usize2, Deg};
 
-pub trait Graded<Deg> { 
-    type Itr: Iterator<Item = Deg>;
+pub trait Graded<I>
+where I: Deg { 
+    type Itr: Iterator<Item = I>;
+
     fn support(&self) -> Self::Itr;
-    fn display(&self, i: Deg) -> String;
+    fn is_supported(&self, i: I) -> bool { 
+        self.support().contains(&i)
+    }
+
+    fn display(&self, i: I) -> String;
 }
 
-pub trait PrintSeq<Deg> {
+pub trait PrintSeq<I> {
     fn print_seq(&self);
 }
 
@@ -31,7 +37,7 @@ macro_rules! impl_print_seq {
 impl_print_seq!(isize);
 impl_print_seq!(usize);
 
-pub trait PrintTable<Deg> {
+pub trait PrintTable<I> {
     fn print_table(&self);
 }
 

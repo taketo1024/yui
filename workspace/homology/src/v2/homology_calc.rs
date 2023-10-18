@@ -131,6 +131,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::complex::*;
     use super::super::complex::tests::*;
  
     #[test]

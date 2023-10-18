@@ -1,7 +1,7 @@
 use std::ops::{RangeInclusive, Index};
 use delegate::delegate;
 
-use yui_homology::v2::{Homology, HomologySummand, Homology2, Graded, isize2};
+use yui_homology::{Homology, HomologySummand, Homology2, Graded, isize2};
 use yui_core::{EucRing, EucRingOps};
 use yui_link::Link;
 

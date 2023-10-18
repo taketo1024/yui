@@ -5,7 +5,7 @@ use delegate::delegate;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps};
 use yui_matrix::sparse::{SpMat, SpVec};
 use yui_link::Link;
-use yui_homology::v2::{ChainComplexTrait, XChainComplex, XChainComplex2, Graded, isize2};
+use yui_homology::{ChainComplexTrait, XChainComplex, XChainComplex2, Graded, isize2};
 
 use crate::{KhEnhState, KhChain, KhHomology, KhHomologyBigraded};
 

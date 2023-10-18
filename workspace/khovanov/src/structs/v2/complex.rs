@@ -6,7 +6,7 @@ use itertools::Itertools;
 use num_traits::Zero;
 use cartesian::cartesian;
 use yui_core::{Ring, RingOps};
-use yui_homology::v2::XChainComplex;
+use yui_homology::XChainComplex;
 use yui_link::{Crossing, Resolution, Edge};
 
 use crate::{KhAlgGen, KhEnhState};

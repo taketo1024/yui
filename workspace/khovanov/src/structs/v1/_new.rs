@@ -51,7 +51,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 #[cfg(test)]
 mod tests {
-    use yui_homology::v2::ChainComplexTrait;
+    use yui_homology::ChainComplexTrait;
     use yui_link::Link;
     use super::KhComplex;
 

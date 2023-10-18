@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ops::RangeInclusive;
 use itertools::Itertools;
 use yui_core::{Ring, RingOps, PowMod2};
-use yui_homology::v2::XChainComplex;
+use yui_homology::XChainComplex;
 use yui_link::{Link, State, LinkComp, Resolution, Edge};
 
 use crate::{KhAlgStr, KhLabel, KhEnhState};

@@ -1,6 +1,6 @@
 use std::str::FromStr;
 use yui_core::{EucRing, EucRingOps};
-use yui_homology::v2::{PrintTable, PrintSeq};
+use yui_homology::{PrintTable, PrintSeq};
 use yui_khovanov::{KhHomology, KhHomologyBigraded};
 use crate::utils::*;
 

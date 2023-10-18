@@ -7,7 +7,7 @@ use core::panic;
 use itertools::Itertools;
 use log::info;
 use yui_link::Link;
-use yui_homology::v2::{HomologyCalc, ChainComplexTrait};
+use yui_homology::{HomologyCalc, ChainComplexTrait};
 use yui_core::{EucRing, EucRingOps};
 use yui_matrix::sparse::*;
 

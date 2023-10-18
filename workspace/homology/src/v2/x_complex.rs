@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use delegate::delegate;
 
 use itertools::Itertools;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps};
@@ -144,13 +145,11 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
     type Itr = std::vec::IntoIter<I>;
-    
-    fn support(&self) -> Self::Itr {
-        self.inner.support()
-    }
-
-    fn display(&self, i: I) -> String {
-        self.inner.display(i)
+    delegate! { 
+        to self.inner { 
+            fn support(&self) -> Self::Itr;
+            fn display(&self, i: I) -> String;
+        }
     }
 }
 
@@ -166,12 +165,11 @@ where
         self.gens(i).len()
     }
 
-    fn d_deg(&self) -> I {
-        self.inner.d_deg()
-    }
-
-    fn d_matrix(&self, i: I) -> &SpMat<Self::R> {
-        self.inner.d_matrix(i)
+    delegate! { 
+        to self.inner { 
+            fn d_deg(&self) -> I;
+            fn d_matrix(&self, i: I) -> &SpMat<Self::R>;
+        }
     }
 }
 

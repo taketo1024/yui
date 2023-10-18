@@ -1245,6 +1245,7 @@ name = "yui-lin-comb"
 version = "0.1.0"
 dependencies = [
  "auto-impl-ops",
+ "derive_more",
  "itertools",
  "num-traits",
  "yui-core",

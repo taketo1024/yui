@@ -5,9 +5,9 @@ use yui_core::{Ring, RingOps, EucRing, EucRingOps};
 use yui_lin_comb::{FreeGen, LinComb};
 use yui_matrix::sparse::{SpMat, SpVec};
 
-use super::HomologyBase;
-use super::complex::ChainComplexBase;
 use super::deg::{Deg, isize2, isize3};
+use super::complex::ChainComplexBase;
+use super::homology::HomologyBase;
 
 pub type XChainComplex <X, R> = XChainComplexBase<isize,  X, R>;
 pub type XChainComplex2<X, R> = XChainComplexBase<isize2, X, R>;

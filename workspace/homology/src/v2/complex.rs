@@ -46,6 +46,28 @@ where I: Deg, Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
             self.check_d_at(i);
         }
     }
+    
+    fn display_d_at(&self, i: I) -> String {
+        let c = |i| self.display(i);
+        let c0 = c(i);
+        let c1 = c(i + self.d_deg());
+        let d = self.d_matrix(i).to_dense();
+        format!("C[{i}]: {c0} -> {c1}\n{d}") 
+    }
+
+    fn display_d(&self) -> String { 
+        self.support().filter_map(|i| 
+            if self.rank(i) > 0 && self.rank(i + self.d_deg()) > 0 {
+                Some(self.display_d_at(i))
+            } else { 
+                None
+            }
+        ).join("\n\n")
+    }
+
+    fn print_d(&self) {
+        println!("{}", self.display_d());
+    }
 }
 
 pub struct ChainComplexBase<I, R>

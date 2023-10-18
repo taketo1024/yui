@@ -14,21 +14,22 @@ where I: Deg {
 }
 
 pub trait PrintSeq<I> {
-    fn print_seq(&self);
+    fn display_seq(&self) -> String;
+    fn print_seq(&self) {
+        println!("{}", self.display_seq())
+    }
 }
 
 macro_rules! impl_print_seq {
     ($t:ident) => {
         impl<T> PrintSeq<$t> for T
         where T: Graded<$t> {
-            fn print_seq(&self) {
+            fn display_seq(&self) -> String {
                 use yui_utils::table;
-        
                 let str = table("i", [""].iter(), self.support(), |_, &i| {
                     self.display(i)
                 });
-        
-                println!("{str}")
+                str
             }
         }                
     };
@@ -38,14 +39,17 @@ impl_print_seq!(isize);
 impl_print_seq!(usize);
 
 pub trait PrintTable<I> {
-    fn print_table(&self);
+    fn display_table(&self) -> String;
+    fn print_table(&self) {
+        println!("{}", self.display_table())
+    }
 }
 
 macro_rules! impl_print_table {
     ($t:ident) => {
         impl<T> PrintTable<$t> for T
         where T: Graded<$t> {
-            fn print_table(&self) {
+            fn display_table(&self) -> String {
                 use yui_utils::table;
         
                 let cols = self.support().map(|$t(i, _)| i).unique().sorted();
@@ -55,7 +59,7 @@ macro_rules! impl_print_table {
                     self.display($t(i, j))
                 });
         
-                println!("{str}")
+                str
             }
         }
     };

@@ -1187,6 +1187,7 @@ dependencies = [
 name = "yui-core"
 version = "0.1.0"
 dependencies = [
+ "derive_more",
  "is-even",
  "num-bigint",
  "num-traits",

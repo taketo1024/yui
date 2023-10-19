@@ -2,11 +2,10 @@ use std::collections::HashMap;
 use delegate::delegate;
 
 use itertools::Itertools;
-use yui_core::{Ring, RingOps, EucRing, EucRingOps};
+use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
 use yui_lin_comb::{Gen, LinComb};
 use yui_matrix::sparse::{SpMat, SpVec};
 
-use super::deg::{Deg, isize2, isize3};
 use super::graded::Graded;
 use super::complex::{ChainComplexTrait, ChainComplexBase};
 use super::homology::HomologyBase;

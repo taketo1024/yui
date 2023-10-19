@@ -5,10 +5,9 @@ use sprs::PermOwned;
 use yui_matrix::sparse::*;
 use yui_matrix::sparse::pivot::{perms_by_pivots, find_pivots, PivotType};
 use yui_matrix::sparse::schur::SchurLT;
-use yui_core::{Ring, RingOps};
+use yui_core::{Ring, RingOps, Deg};
 
 use super::complex::{ChainComplexTrait, ChainComplexBase};
-use super::deg::Deg;
 use super::graded::Graded;
 
 pub struct ChainReducer<'a, I, R>

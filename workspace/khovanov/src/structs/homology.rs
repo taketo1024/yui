@@ -1,8 +1,8 @@
 use std::ops::{RangeInclusive, Index};
 use delegate::delegate;
 
-use yui_homology::{Homology, HomologySummand, Homology2, Graded, isize2};
-use yui_core::{EucRing, EucRingOps};
+use yui_homology::{Homology, HomologySummand, Homology2, Graded};
+use yui_core::{EucRing, EucRingOps, isize2};
 use yui_link::Link;
 
 use crate::{KhComplex, KhComplexBigraded};

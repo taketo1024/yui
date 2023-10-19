@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use super::deg::{isize2, usize2, Deg};
+use yui_core::{isize2, usize2, Deg};
 
 pub trait Graded<I>
 where I: Deg { 

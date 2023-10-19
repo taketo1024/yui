@@ -2,10 +2,9 @@ use std::collections::HashMap;
 use std::mem;
 
 use itertools::{Itertools, Either};
-use yui_core::{Ring, RingOps, EucRing, EucRingOps};
+use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
 use yui_matrix::sparse::{SpMat, SpVec, MatType};
 
-use super::deg::{Deg, isize2, isize3};
 use super::graded::Graded;
 use super::reducer::ChainReducer;
 use super::homology_calc::HomologyCalc;

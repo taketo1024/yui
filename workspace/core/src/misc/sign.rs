@@ -1,8 +1,9 @@
 use num_traits::Signed;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Sign { 
-    Pos, Neg
+    Neg, 
+    Pos
 }
 
 impl Sign { 
@@ -40,5 +41,15 @@ impl<T> GetSign for T where T: Signed {
         } else { 
             Sign::Neg 
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ord() {
+        assert!(Sign::Neg < Sign::Pos)
     }
 }

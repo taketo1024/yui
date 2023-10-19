@@ -13,7 +13,7 @@ impl Deg for usize  {}
 macro_rules! make2 {
     ($name:ident, $t:ty) => {
         #[allow(non_camel_case_types)]
-        #[derive(Display, Clone, Copy, PartialEq, Eq, Hash, Add, Sub)]
+        #[derive(Display, Debug, Clone, Copy, PartialEq, Eq, Hash, Add, Sub)]
         #[display(fmt = "({}, {})", _0, _1)]
         pub struct $name(pub $t, pub $t);
         
@@ -38,7 +38,7 @@ impl Deg for usize2 {}
 macro_rules! make3 {
     ($name:ident, $t:ty) => {
         #[allow(non_camel_case_types)]
-        #[derive(Display, Clone, Copy, PartialEq, Eq, Hash, Add, Sub)]
+        #[derive(Display, Debug, Clone, Copy, PartialEq, Eq, Hash, Add, Sub)]
         #[display(fmt = "({}, {}, {})", _0, _1, _2)]
         pub struct $name(pub $t, pub $t, pub $t);
         

@@ -4,6 +4,7 @@ use log::info;
 use yui_core::{Ring, RingOps};
 use yui_link::{Link, Crossing, Edge};
 
+use crate::ext::LinkExt;
 use crate::{KhComplex, KhEnhState};
 
 use super::tng::TngComp;

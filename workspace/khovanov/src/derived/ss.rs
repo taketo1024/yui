@@ -60,7 +60,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         panic!("invalid divisibility for v = {}, c = {}", v, c)
     };
 
-    let w = l.writhe();
+    let w = l.writhe() as i32;
     let r = l.seifert_circles().len() as i32;
     let n = n as i32;
 

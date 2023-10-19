@@ -1,6 +1,7 @@
 use yui_core::{Ring, RingOps};
 use yui_link::{Link, State};
 
+use crate::ext::LinkExt;
 use crate::{KhAlgGen, KhLabel, KhEnhState, KhChain};
 
 pub trait CanonCycles<R>

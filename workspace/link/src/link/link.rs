@@ -1,8 +1,6 @@
 use std::collections::HashSet;
-use std::iter::zip;
 use itertools::Itertools;
-
-use crate::color::Color;
+use yui_core::Sign;
 
 use super::{Crossing, CrossingType, Resolution, LinkComp, State};
 
@@ -43,22 +41,6 @@ impl Link {
         Link { data: vec![] }
     }
 
-    pub fn unknot() -> Link { 
-        Link::from_pd_code([[0, 1, 1, 0]]).resolved_at(0, Resolution::Res0)
-    }
-
-    pub fn trefoil() -> Link { 
-        Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]])
-    }
-
-    pub fn figure8() -> Link { 
-        Link::from_pd_code([[4,2,5,1],[8,6,1,5],[6,3,7,4],[2,7,3,8]])
-    }
-
-    pub fn hopf_link() -> Link { 
-        Link::from_pd_code([[4,1,3,2],[2,3,1,4]])
-    }
-
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
@@ -67,21 +49,73 @@ impl Link {
         self.components().len() == 1
     }
 
-    pub fn crossing_num(&self) -> u32 { 
-        self.data.iter()
-            .filter(|x| !x.is_resolved())
-            .count() as u32
+    pub fn data(&self) -> &Vec<Crossing> { 
+        &self.data
     }
 
-    pub fn signed_crossing_nums(&self) -> (u32, u32) {
-        let signs = self.crossing_signs();
-        let pos = signs.iter().filter(|e| e.is_positive()).count() as u32;
-        let neg = signs.iter().filter(|e| e.is_negative()).count() as u32;
+    pub fn crossing_num(&self) -> usize { 
+        self.data.iter()
+            .filter(|x| !x.is_resolved())
+            .count()
+    }
+
+    pub fn signed_crossing_nums(&self) -> (usize, usize) {
+        let signs = self.crossing_signs().into_iter().counts();
+        let pos = signs.get(&Sign::Pos).cloned().unwrap_or(0);
+        let neg = signs.get(&Sign::Neg).cloned().unwrap_or(0);
         (pos, neg)
     }
 
+    pub fn crossing_signs(&self) -> Vec<Sign> {
+        use CrossingType::{X, Xm};
+
+        let n = self.data.len();
+
+        let mut signs = vec![None; n];
+        let mut passed: HashSet<Edge> = HashSet::new();
+
+        let mut traverse = |signs: &mut Vec<Option<Sign>>, j0: usize| {
+            for i0 in 0..n {
+                let start_edge = self.data[i0].edge(j0);
+                if passed.contains(&start_edge) { 
+                    continue 
+                }
+
+                self.traverse_edges((i0, j0), |i, j| { 
+                    let c = &self.data[i];
+                    let e = c.edge(j);
+                    passed.insert(e);
+
+                    let sign = match (c.ctype(), j) { 
+                        (Xm, 1) | (X, 3) => Some(Sign::Pos),
+                        (Xm, 3) | (X, 1) => Some(Sign::Neg),
+                        _                => None
+                    };
+                    if sign.is_some() { 
+                        signs[i] = sign;
+                    }
+                });
+            }
+        };
+
+        traverse(&mut signs, 0);
+
+        if (0..n).any(|i| !self.data[i].is_resolved() && signs[i].is_none()) { 
+            for j in [1,2] {
+                traverse(&mut signs, j);
+            }
+        };
+
+        let signs = signs.into_iter().flatten().collect_vec();
+
+        assert_eq!(signs.len(), self.crossing_num());
+
+        signs
+    }
+    
     pub fn writhe(&self) -> i32 { 
-        self.crossing_signs().iter().sum()
+        let (p, n) = self.signed_crossing_nums();
+        (p as i32) - (n as i32)
     }
 
     pub fn components(&self) -> Vec<LinkComp> {
@@ -123,82 +157,56 @@ impl Link {
         comps
     }
 
+    // index of data for the i-th `actual' crossing.
+    fn crossing_index(&self, i: usize) -> usize {
+        debug_assert!(i < self.crossing_num());
+
+        let mut i = i;
+        for (j, x) in self.data.iter().enumerate() {
+            if !x.is_resolved() {
+                if i > 0 { 
+                    i -= 1;
+                } else { 
+                    return j
+                }
+            }
+        }
+        
+        panic!()
+    }
+
+    pub fn crossing_at(&self, i: usize) -> &Crossing {
+        let j = self.crossing_index(i);
+        &self.data[j]
+    }
+
+    pub fn crossing_at_mut(&mut self, i: usize) -> &mut Crossing {
+        let j = self.crossing_index(i);
+        &mut self.data[j]
+    }
+
+    pub fn resolved_at(&self, i: usize, r: Resolution) -> Self {
+        debug_assert!(i < self.crossing_num());
+
+        let mut l = self.clone();
+        l.crossing_at_mut(i).resolve(r);
+        l
+    }
+
+    pub fn resolved_by(&self, s: &State) -> Self {
+        debug_assert!(s.len() == self.crossing_num());
+
+        let mut l = self.clone();
+        for r in s.iter() {
+            l.crossing_at_mut(0).resolve(r)
+        }
+        l
+    }
+
     pub fn mirror(&self) -> Self {
         let mut data = self.data.clone();
         data.iter_mut().for_each(|x| x.mirror());
         Link { data }
-    }
-
-    pub fn resolved_at(&self, i: usize, r: Resolution) -> Self {
-        debug_assert!(i < self.data.len());
-        let mut data = self.data.clone();
-        data[i].resolve(r);
-        Link { data }
-    }
-
-    pub fn resolved_by(&self, s: &State) -> Self {
-        debug_assert!(s.len() <= self.data.len());
-
-        // TODO: must skip resolved crossings.
-
-        let mut data = self.data.clone();
-        for (i, r) in s.iter().enumerate() {
-            data[i].resolve(r);
-        }
-        Link { data }
-    }
-
-    pub fn ori_pres_state(&self) -> State { 
-        State::from_iter(self.crossing_signs().into_iter().filter_map( |e|
-            if e > 0 { 
-                Some(0)
-            } else if e < 0 { 
-                Some(1)
-            } else { 
-                None
-            }
-        ))
-    }
-
-    pub fn seifert_circles(&self) -> Vec<LinkComp> { 
-        self.resolved_by(&self.ori_pres_state()).components()
-    }
-
-    pub fn colored_seifert_circles(&self, ori: bool) -> Vec<(LinkComp, Color)> {
-        assert_eq!(self.components().len(), 1, "Only knots are supported.");
-
-        let circles = self.seifert_circles();
-        let n = circles.len();
-    
-        let mut colors = vec![Color::A; n];
-        let mut queue = vec![];
-        let mut remain: HashSet<_> = (0..n).collect();
-    
-        let e = self.first_edge().unwrap();
-        let i = circles.iter().find_position(|c| c.edges().contains(&e)).unwrap().0;
-    
-        queue.push(i);
-        colors[i] = if ori { Color::A } else { Color::B };
-    
-        while !queue.is_empty() { 
-            let i1 = queue.remove(0);
-            let c1 = &circles[i1];
-    
-            let adjs = remain.iter().filter_map(|&i2| {
-                let c2 = &circles[i2];
-                if c1.is_adj(c2, self) { Some(i2) } else { None }
-            }).collect_vec();
-            
-            for i2 in adjs {
-                remain.remove(&i2);
-                queue.push(i2);
-                colors[i2] = colors[i1].other();
-            };
-        }
-    
-        assert!(queue.is_empty());
-    
-        zip(circles.into_iter(), colors.into_iter()).collect()
     }
 
     pub fn first_edge(&self) -> Option<Edge> { 
@@ -206,11 +214,7 @@ impl Link {
         x.edges().iter().min().cloned()
     }
 
-    pub fn data(&self) -> &Vec<Crossing> { 
-        &self.data
-    }
-
-    fn next(&self, c_index:usize, e_index:usize) -> Option<(usize, usize)> {
+    fn pass_edge(&self, c_index:usize, e_index:usize) -> Option<(usize, usize)> {
         let n = self.data.len();
         debug_assert!((0..n).contains(&c_index));
         debug_assert!((0..4).contains(&e_index));
@@ -242,7 +246,7 @@ impl Link {
             let c = &self.data[i];
             let k = c.pass(j);
             
-            let Some(next) = self.next(i, k) else {
+            let Some(next) = self.pass_edge(i, k) else {
                 // reached end
                 f(i, k);
                 break
@@ -258,47 +262,15 @@ impl Link {
         }
     }
 
-    pub fn crossing_signs(&self) -> Vec<i32> {
-        use CrossingType::{X, Xm};
+    pub fn ori_pres_state(&self) -> State { 
+        let signs = self.crossing_signs(); 
+        State::from_iter(signs.into_iter().map( |s|
+            if s.is_positive() { 0 } else { 1 }
+        ))
+    }
 
-        let n = self.data.len();
-
-        let mut signs = vec![0; n];
-        let mut passed: HashSet<Edge> = HashSet::new();
-
-        let mut traverse = |signs: &mut Vec<i32>, j0: usize| {
-            for i0 in 0..n {
-                let start_edge = self.data[i0].edge(j0);
-                if passed.contains(&start_edge) { 
-                    continue 
-                }
-
-                self.traverse_edges((i0, j0), |i, j| { 
-                    let c = &self.data[i];
-                    let e = c.edge(j);
-                    passed.insert(e);
-
-                    let sign = match (c.ctype(), j) { 
-                        (Xm, 1) | (X, 3) =>  1,
-                        (Xm, 3) | (X, 1) => -1,
-                        _                 =>  0
-                    };
-                    if sign != 0 { 
-                        signs[i] = sign;
-                    }
-                });
-            }
-        };
-
-        traverse(&mut signs, 0);
-
-        if (0..n).any(|i| !self.data[i].is_resolved() && signs[i] == 0) { 
-            for j in [1,2] {
-                traverse(&mut signs, j);
-            }
-        };
-
-        signs
+    pub fn seifert_circles(&self) -> Vec<LinkComp> { 
+        self.resolved_by(&self.ori_pres_state()).components()
     }
 }
 
@@ -308,6 +280,22 @@ impl Link {
         let data: Vec<[Edge; 4]> = serde_json::from_str(&json)?;
         let l = Link::from_pd_code(data);
         Ok(l)
+    }
+
+    pub fn unknot() -> Link { 
+        Link::from_pd_code([[0, 1, 1, 0]]).resolved_at(0, Resolution::Res0)
+    }
+
+    pub fn trefoil() -> Link { 
+        Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]])
+    }
+
+    pub fn figure8() -> Link { 
+        Link::from_pd_code([[4,2,5,1],[8,6,1,5],[6,3,7,4],[2,7,3,8]])
+    }
+
+    pub fn hopf_link() -> Link { 
+        Link::from_pd_code([[4,1,3,2],[2,3,1,4]])
     }
 }
 
@@ -355,19 +343,19 @@ mod tests {
         let pd_code = [[0,0,1,1]];
         let l = Link::from_pd_code(pd_code);
 
-        assert_eq!(l.next(0, 0), Some((0, 1)));
-        assert_eq!(l.next(0, 1), Some((0, 0)));
-        assert_eq!(l.next(0, 2), Some((0, 3)));
-        assert_eq!(l.next(0, 3), Some((0, 2)));
+        assert_eq!(l.pass_edge(0, 0), Some((0, 1)));
+        assert_eq!(l.pass_edge(0, 1), Some((0, 0)));
+        assert_eq!(l.pass_edge(0, 2), Some((0, 3)));
+        assert_eq!(l.pass_edge(0, 3), Some((0, 2)));
 
         let pd_code = [[0,3,1,4],[3,2,2,1]];
         let l = Link::from_pd_code(pd_code);
 
-        assert_eq!(l.next(0, 0), None);
-        assert_eq!(l.next(0, 2), Some((1, 3)));
-        assert_eq!(l.next(1, 1), Some((1, 2)));
-        assert_eq!(l.next(1, 0), Some((0, 1)));
-        assert_eq!(l.next(0, 3), None);
+        assert_eq!(l.pass_edge(0, 0), None);
+        assert_eq!(l.pass_edge(0, 2), Some((1, 3)));
+        assert_eq!(l.pass_edge(1, 1), Some((1, 2)));
+        assert_eq!(l.pass_edge(1, 0), Some((0, 1)));
+        assert_eq!(l.pass_edge(0, 3), None);
     }
 
     #[test]
@@ -403,11 +391,15 @@ mod tests {
     fn link_crossing_signs() {
         let pd_code = [[0,0,1,1]];
         let l = Link::from_pd_code(pd_code);
-        assert_eq!(l.crossing_signs(), vec![1]);
+        assert_eq!(l.crossing_signs(), vec![Sign::Pos]);
 
         let pd_code = [[0,1,1,0]];
         let l = Link::from_pd_code(pd_code);
-        assert_eq!(l.crossing_signs(), vec![-1]);
+        assert_eq!(l.crossing_signs(), vec![Sign::Neg]);
+
+        let pd_code = [[0,0,1,1]];
+        let l = Link::from_pd_code(pd_code).resolved_at(0, Resolution::Res0);
+        assert_eq!(l.crossing_signs(), vec![]);
     }
 
     #[test]
@@ -419,6 +411,11 @@ mod tests {
         let pd_code = [[0,1,1,0]];
         let l = Link::from_pd_code(pd_code);
         assert_eq!(l.writhe(), -1);
+
+        let pd_code = [[0,0,1,1]];
+        let l = Link::from_pd_code(pd_code).resolved_at(0, Resolution::Res0);
+        assert_eq!(l.writhe(), 0);
+
     }
 
     #[test]

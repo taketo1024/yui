@@ -111,7 +111,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(l: &Link, h: &R, t: &R) -> Self { 
         let str = KhAlgStr::new(h, t);
 
-        let n = l.crossing_num() as usize;
+        let n = l.crossing_num();
         let vertices: HashMap<_, _> = State::generate(n).into_iter().map(|s| { 
             let v = KhCubeVertex::new(&l, s.clone());
             (s, v)

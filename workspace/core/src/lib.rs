@@ -1,7 +1,5 @@
 mod alg;
-mod traits;
-mod ext;
+mod misc;
 
 pub use alg::*;
-pub use traits::*;
-pub use ext::*;
+pub use misc::*;

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::ops::RangeInclusive;
 use itertools::Itertools;
-use yui_core::{Ring, RingOps, PowMod2};
+use yui_core::{Ring, RingOps, PowMod2, Sign, GetSign};
 use yui_homology::XChainComplex;
 use yui_link::{Link, State, LinkComp, Resolution, Edge};
 
@@ -48,11 +48,11 @@ pub enum KhCubeEdgeTrans {
 #[derive(Debug, Clone)]
 pub struct KhCubeEdge { 
     trans: KhCubeEdgeTrans,
-    sign: i32
+    sign: Sign
 }
 
 impl KhCubeEdge { 
-    pub fn sign(&self) -> i32 { 
+    pub fn sign(&self) -> Sign { 
         self.sign
     }
 
@@ -84,7 +84,7 @@ impl KhCubeEdge {
         KhCubeEdge { trans, sign }
     }
 
-    fn sign_between(from: &State, to: &State) -> i32 { 
+    fn sign_between(from: &State, to: &State) -> Sign { 
         use Resolution::Res1;
         debug_assert_eq!(from.len(), to.len());
         debug_assert_eq!(from.weight() + 1, to.weight());
@@ -93,7 +93,7 @@ impl KhCubeEdge {
         let i = (0..n).find(|&i| from[i] != to[i]).unwrap();
         let k = (0..i).filter(|&j| from[j] == Res1).count() as u32;
 
-        (-1).pow_mod2(k)
+        (-1).pow_mod2(k).sign()
     }
 }
 
@@ -216,7 +216,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn apply(&self, x: &KhEnhState, to: &State, e: &KhCubeEdge) -> Vec<(KhEnhState, R)> {
         use KhCubeEdgeTrans::*;
         
-        let sign = R::from(e.sign);
+        let sign = R::from_sign(e.sign);
 
         match e.trans { 
             Merge((i, j), k) => {
@@ -427,7 +427,7 @@ mod tests {
 
         let Some(e) = cube.edge(&s0, &s1) else { panic!() };
 
-        assert_eq!(e.sign(), 1);
+        assert_eq!(e.sign(), Sign::Pos);
         assert_eq!(e.trans(), &KhCubeEdgeTrans::Merge((0, 1), 0));
     }
 

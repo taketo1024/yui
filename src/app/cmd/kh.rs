@@ -24,7 +24,7 @@ pub struct Args {
     bigraded: bool,
 
     #[arg(long)]
-    old: bool,
+    no_simplify: bool,
 
     #[arg(long)]
     pub debug: bool
@@ -45,7 +45,7 @@ where R: EucRing + FromStr, for<'x> &'x R: EucRingOps<R> {
         return err!("--bigraded only supported for `c = 0`.")
     }
 
-    let kh = if args.old { 
+    let kh = if args.no_simplify { 
         KhHomologyBigraded::new_v1(l, args.reduced)
     } else {
         KhHomologyBigraded::new(l, args.reduced)
@@ -64,7 +64,7 @@ where R: EucRing + FromStr, for<'x> &'x R: EucRingOps<R> {
         return err!("{t} != 0 is not allowed for reduced.");
     }
 
-    let kh = if args.old { 
+    let kh = if args.no_simplify { 
         KhHomology::new_v1(&l, &h, &t, args.reduced)
     } else {
         KhHomology::new(&l, &h, &t, args.reduced)
@@ -87,7 +87,7 @@ mod tests {
             mirror: false, 
             reduced: false, 
             bigraded: false,
-            old: false,
+            no_simplify: false,
             debug: false
         };
         let res = run(&args);
@@ -103,7 +103,7 @@ mod tests {
             mirror: true,
             reduced: true,
             bigraded: true,
-            old: false,
+            no_simplify: false,
             debug: false
         };
         let res = run(&args);
@@ -123,7 +123,7 @@ mod tests {
                 mirror: false,
                 reduced: false,
                 bigraded: false,
-                old: false,
+                no_simplify: false,
                 debug: false
             };
             let res = run(&args);
@@ -139,7 +139,7 @@ mod tests {
                 mirror: false,
                 reduced: false,
                 bigraded: false,
-                old: false,
+                no_simplify: false,
                 debug: false
             };
             let res = run(&args);

@@ -53,7 +53,12 @@ where I: Deg, Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
         let c0 = c(i);
         let c1 = c(i + self.d_deg());
         let d = self.d_matrix(i).to_dense();
-        format!("C[{i}]: {c0} -> {c1}\n{d}") 
+
+        if d.is_zero() { 
+            format!("C[{i}] {c0} -> {c1}; zero.")
+        } else { 
+            format!("C[{i}] {c0} -> {c1}\n{d}.")
+        }
     }
 
     fn display_d(&self) -> String { 
@@ -155,7 +160,7 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         } else if rank == 1 { 
             symbol
         } else { 
-            String::from("0")
+            String::from(".")
         }
     }
 }

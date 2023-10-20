@@ -87,7 +87,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             .collect_vec();
 
         if rank == 0 && tors.is_empty() { 
-            return f.write_str("0")
+            return f.write_str(".")
         }
     
         let mut res = vec![];

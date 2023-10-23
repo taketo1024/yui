@@ -18,8 +18,8 @@ pub struct Schur<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     orig_shape: (usize, usize),
     compl: SpMat<R>,
-    t_in: Option<SpMat<R>>,  // -a⁻¹b
-    t_out: Option<SpMat<R>>, // -ca⁻¹
+    t_in: Option<SpMat<R>>,  // [-a⁻¹b; 1]
+    t_out: Option<SpMat<R>>, // [-ca⁻¹  1]
 }
 
 impl<'a, R> Schur<R>
@@ -66,17 +66,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let s = x.submat_rows(r..m);
 
         let (t_in, t_out) = if with_trans { 
-            let t_in = -x.submat_rows(0..r);
+            let id = |n| SpMat::id(n);
+
+            // t_in = [-a⁻¹b; 1]
+            let n_ainvb = -x.submat_rows(0..r);
+            let t_in = n_ainvb.stack(&id(n - r));
     
+            // t_out = [-ca⁻¹, 1]
             let i = SpMat::generate((m, r), |set| { 
-                // [0; 1]
                 for i in 0..m-r { 
                     set(i, i, R::one());
                 }
             });
-    
-            // -c a⁻¹
-            let t_out = solve_triangular(TriangularType::Lower, &p, &i).submat_rows(r..m);
+            let n_cainv = solve_triangular(TriangularType::Lower, &p, &i).submat_rows(r..m);
+            let t_out = n_cainv.concat(&id(m - r));
 
             (Some(t_in), Some(t_out))
         } else { 
@@ -98,34 +101,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.compl
     }
 
-    // v -> [-a⁻¹b v; v]
-    pub fn trans_in(&self, v: SpVec<R>) -> SpVec<R> { 
-        let r = self.compl.shape().1;
-
-        assert_eq!(v.dim(), r);
-
-        let Some(t_in) = &self.t_in else { 
-            panic!()
-        };
-        let v1 = t_in * &v;
-
-        v1.stack(&v)
+    pub fn trans_in(&self) -> Option<&SpMat<R>> { 
+        self.t_in.as_ref()
     }
 
-    // [v1; v2] -> v2 - c a⁻¹ v1
-    pub fn trans_out(&self, v: SpVec<R>) -> SpVec<R> { 
-        let m = self.orig_shape.0;
-
-        assert_eq!(v.dim(), m);
-
-        let Some(t_out) = &self.t_out else { 
-            panic!()
-        };
-        let r = self.compl.shape().0;
-        let v1 = v.subvec(0..r);
-        let v2 = v.subvec(r..m);
-
-        v2 + t_out * v1
+    pub fn trans_out(&self) -> Option<&SpMat<R>> { 
+        self.t_out.as_ref()
     }
 }
 
@@ -163,15 +144,15 @@ mod tests {
         let s = Schur::from_partial_lower(&a, 3, true);
 
         assert_eq!(s.complement(), &SpMat::from_vec((3,2), vec![5,36,12,45,-14,-60]));
-        assert_eq!(s.t_in,  Some(SpMat::from_vec((3,2), vec![-1,-3,0,-4,3,14])));
-        assert_eq!(s.t_out, Some(SpMat::from_vec((3,3), vec![20,-6,-4,24,-7,-5,-31,8,3])));
+        assert_eq!(s.trans_in(),  Some(&SpMat::from_vec((5,2), vec![-1,-3,0,-4,3,14,1,0,0,1])));
+        assert_eq!(s.trans_out(), Some(&SpMat::from_vec((3,6), vec![20,-6,-4,1,0,0,24,-7,-5,0,1,0,-31,8,3,0,0,1])));
 
         let v = SpVec::from(vec![1,2]);
-        let w = s.trans_in(v);
+        let w = s.trans_in().unwrap() * v;
         assert_eq!(w, SpVec::from(vec![-7,-8,31,1,2]));
 
         let v = SpVec::from(vec![1,2,0,-3,2,1]);
-        let w = s.trans_out(v);
+        let w = s.trans_out().unwrap() * v;
         assert_eq!(w, SpVec::from(vec![5,12,-14]));
     }
 }

@@ -72,6 +72,14 @@ where
         self.mats.remove(&i).unwrap_or(self.complex.d_matrix(i).clone())
     }
 
+    pub fn trans(&self, i: I) -> Option<&SpMat<R>> {
+        self.trans.as_ref().and_then(|t| t.get(&i))
+    }
+
+    pub fn trans_rev(&self, i: I) -> Option<&SpMat<R>> {
+        self.trans_rev.as_ref().and_then(|t| t.get(&i))
+    }
+
     pub fn process_all(&mut self) { 
         for i in self.complex.support() { 
             self.process_at(i)
@@ -83,17 +91,11 @@ where
     }
 
     fn process_at_itr(&mut self, i: I, itr: usize) { 
-        let c = &self.complex;
-        let deg = c.d_deg();
-        let (i0, i1, i2) = (i - deg, i, i + deg);
+        let a = self.matrix(i);
 
-        let a0 = self.matrix(i0); // prev
-        let a1 = self.matrix(i1); // target
-        let a2 = self.matrix(i2); // next
+        info!("reduce at C[{i}] (itr: {itr}), size: {:?}.", a.shape());
 
-        info!("reduce C[{i0}]-C[{i1}]-C[{i2}] (itr: {itr}).\n\t{:?}-{:?}-{:?}", a0.shape(), a1.shape(), a2.shape());
-
-        let (p, q, r) = pivots(a1);
+        let (p, q, r) = pivots(a);
 
         if r == 0 { 
             info!("no pivots found.");
@@ -102,20 +104,40 @@ where
 
         info!("compute schur complement.");
 
-        let s = schur(&a1, &p, &q, r, self.with_trans);
+        let s = schur(&a, &p, &q, r, self.with_trans);
+
+        info!("reduced {:?} -> {:?}.", a.shape(), s.complement().shape());
+
+        if self.with_trans { 
+            self.update_trans(i, &p, &q, r, &s);
+        }
+        self.update_mats(i, &p, &q, r, s);
+
+        // to next iteration
+        self.process_at_itr(i, itr + 1)
+    }
+
+    fn update_trans(&mut self, i: I, p: &PermOwned, q: &PermOwned, r: usize, s: &Schur<R>) {
+        // TODO
+    }
+
+    fn update_mats(&mut self, i: I, p: &PermOwned, q: &PermOwned, r: usize, s: Schur<R>) {
+        let (i0, i1, i2) = self.deg_trip(i);
+        let a0 = self.matrix(i0);
+        let a2 = self.matrix(i2);
 
         let a0 = reduce_mat_rows(a0, &q, r);
         let a1 = s.complement_into();
         let a2 = reduce_mat_cols(a2, &p, r);
 
-        info!("result: {:?}-{:?}-{:?}", a0.shape(), a1.shape(), a2.shape());
-
         self.mats.insert(i0, a0);
         self.mats.insert(i1, a1);
         self.mats.insert(i2, a2);
+    }
 
-        // to next iteration
-        self.process_at_itr(i, itr + 1)
+    fn deg_trip(&self, i: I) -> (I, I, I) { 
+        let deg = self.complex.d_deg();
+        (i - deg, i, i + deg)
     }
 }
 

@@ -1,3 +1,4 @@
+use core::panic;
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, Range};
 use std::fmt::Display;
 use num_traits::{Zero, One};
@@ -102,6 +103,18 @@ where R: Clone + Zero {
             vec[i] = a.clone();
         }
         vec
+    }
+
+    pub fn stack(&self, other: &SpVec<R>) -> SpVec<R> {
+        let (n1, n2) = (self.dim(), other.dim());
+        Self::generate(n1 + n2, |set| { 
+            for (i, a) in self.iter() { 
+                set(i, a.clone())
+            }
+            for (i, a) in other.iter() { 
+                set(n1 + i, a.clone())
+            }
+        })
     }
 }
 
@@ -351,5 +364,13 @@ mod tests {
         let v = SpVec::from(vec![0,1,2,3]);
         let w = v.permute(p.view()).to_owned();
         assert_eq!(w, SpVec::from(vec![2,0,3,1]));
+    }
+
+    #[test]
+    fn stack() {
+        let v1 = SpVec::from((0..3).collect_vec());
+        let v2 = SpVec::from((5..8).collect_vec());
+        let w = v1.stack(&v2);
+        assert_eq!(w, SpVec::from(vec![0,1,2,5,6,7]));
     }
 }

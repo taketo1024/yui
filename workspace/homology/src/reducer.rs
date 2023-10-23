@@ -4,7 +4,7 @@ use sprs::PermOwned;
 
 use yui_matrix::sparse::*;
 use yui_matrix::sparse::pivot::{perms_by_pivots, find_pivots, PivotType};
-use yui_matrix::sparse::schur::SchurLT;
+use yui_matrix::sparse::schur::Schur;
 use yui_core::{Ring, RingOps, Deg};
 
 use super::complex::{ChainComplexTrait, ChainComplexBase};
@@ -75,11 +75,11 @@ where
     //       a0 = [x]      a1 = [a b]      a2 = [z w]
     //            [y]           [c d]     
     //  C[0] --------> C[1] ---------> C[2] -------> C[3]
-    //    |    [1 a⁻¹b] |             | [a⁻¹    ]    |
+    //    |    [1 a⁻¹b] |             | [ 1     ]    |
     //    |    [    1 ] |             | [-ca⁻¹ 1]    |
     //    |             V             V              |    
     //  C[0] --------> C[1] ---------> C[2] -------> C[3]
-    //    |     [0]     |    [1 0]    |    [0  w]    |
+    //    |     [0]     |    [a 0]    |    [0  w]    |
     //    |     [y]     |    [0 s]    |              |
     //    |             V             V              |
     //  C[0] --------> C[1]'---------> C[2]'-------> C[3]
@@ -112,9 +112,9 @@ where
         (p, q, r)
     }
 
-    fn schur(a: &SpMat<R>, p: &PermOwned, q: &PermOwned, r: usize) -> SchurLT<R> {
+    fn schur(a: &SpMat<R>, p: &PermOwned, q: &PermOwned, r: usize) -> Schur<R> {
         let b = a.permute(p.view(), q.view()).to_owned();
-        SchurLT::from_partial_lower(&b, r)
+        Schur::from_partial_lower(&b, r, false)
     }
 
     fn reduce_mat_rows(a: SpMat<R>, p: &PermOwned, r: usize) -> SpMat<R> {

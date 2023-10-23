@@ -122,8 +122,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             panic!()
         };
         let r = self.compl.shape().0;
-        let v1 = v.subvec(0..r).to_owned();
-        let v2 = v.subvec(r..m).to_owned();
+        let v1 = v.subvec(0..r);
+        let v2 = v.subvec(r..m);
 
         v2 + t_out * v1
     }

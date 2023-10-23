@@ -97,6 +97,15 @@ where R: Clone + Zero {
         })
     }
 
+    pub fn permute<'b>(&self, p: PermView<'b>) -> SpVec<R> { 
+        self.view().permute(p).to_owned()
+    }
+
+    pub fn subvec(&self, range: Range<usize>) -> SpVec<R> { 
+        self.view().subvec(range).to_owned()
+    }
+
+
     pub fn to_dense(&self) -> Vec<R> { 
         let mut vec = vec![R::zero(); self.dim()];
         for (i, a) in self.iter() { 
@@ -206,24 +215,6 @@ impl<R> SpVec<R> {
     pub fn view(&self) -> SpVecView<R> { 
         SpVecView::new(self, self.dim(), |i| Some(i))
     }
-
-    pub fn permute<'b>(&self, p: PermView<'b>) -> SpVecView<'_, 'b, R> { 
-        SpVecView::new(self, self.dim(), move |i| Some(p.at(i)))
-    }
-
-    pub fn subvec(&self, range: Range<usize>) -> SpVecView<R> { 
-        let (i0, i1) = (range.start, range.end);
-
-        assert!(i0 <= i1 && i1 <= self.dim());
-
-        SpVecView::new(self, i1 - i0, move |i| { 
-            if range.contains(&i) {
-                Some(i - i0)
-            } else { 
-                None
-            }
-        })
-    }
 }
 
 pub struct SpVecView<'a, 'b, R> {
@@ -246,6 +237,10 @@ impl<'a, 'b, R> SpVecView<'a, 'b, R> {
         self.target.iter().filter_map(|(i, a)| { 
             (self.trans)(i).map(|i| (i, a))
         })
+    }
+
+    pub fn permute(&self, p: PermView<'b>) -> SpVecView<R> { 
+        SpVecView::new(self.target, self.dim, move |i| Some(p.at(i)))
     }
 
     pub fn subvec(&self, range: Range<usize>) -> SpVecView<R> { 
@@ -346,7 +341,7 @@ mod tests {
     #[test]
     fn subvec() {
         let v = SpVec::from((0..10).collect_vec());
-        let w = v.subvec(3..7).to_owned();
+        let w = v.subvec(3..7);
         assert_eq!(w, SpVec::from(vec![3,4,5,6]))
     }
 
@@ -354,7 +349,7 @@ mod tests {
     fn subvec2() {
         let v = SpVec::from((0..10).collect_vec());
         let w = v.subvec(1..9);
-        let w = w.subvec(1..4).to_owned();
+        let w = w.subvec(1..4);
         assert_eq!(w, SpVec::from(vec![2,3,4]))
     }
 
@@ -362,7 +357,7 @@ mod tests {
     fn permute() {
         let p = PermOwned::new(vec![1,3,0,2]);
         let v = SpVec::from(vec![0,1,2,3]);
-        let w = v.permute(p.view()).to_owned();
+        let w = v.permute(p.view());
         assert_eq!(w, SpVec::from(vec![2,0,3,1]));
     }
 

@@ -2,11 +2,17 @@ use yui_core::{Ring, RingOps};
 use super::*;
 use super::triang::{TriangularType, solve_triangular_vec, solve_triangular_with};
 
-// A = [a b]  ~>  s = d - c a⁻¹ b.
-//     [c d]
+//                [a  b]
+//                [c  d]
+//            X ----------> X
+//  [1 -a⁻¹b] ^             | [1      ]
+//  [     1 ] |             | [-ca⁻¹ 1]
+//            |             V
+//            Y ----------> Y
+//                [a   ] 
+//                [   s]
 //
-// [a⁻¹     ] [a b] [id -a⁻¹b] = [id  ]
-// [-ca⁻¹ id] [c d] [      id]   [   s]
+// s = d - c a⁻¹ b
 
 pub struct SchurLT<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
@@ -17,7 +23,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<'a, R> SchurLT<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn from_partial_lower(a: SpMatView<R>, r: usize) -> Self {
+    pub fn from_partial_lower(a: &SpMat<R>, r: usize) -> Self {
         assert!(r <= a.rows());
         assert!(r <= a.cols());
 
@@ -29,7 +35,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     // p⁻¹ = [a    ] : lower triangular
     //       [c  id]
-    fn compute_pinv(a: &SpMatView<R>, r: usize) -> SpMat<R> {
+    fn compute_pinv(a: &SpMat<R>, r: usize) -> SpMat<R> {
         let m = a.rows();
         SpMat::generate((m, m), |set| { 
             // [a; c]
@@ -48,7 +54,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     //   [a    ][x1] = [b]
     //   [c  id][x2]   [d].
     //
-    fn compute_compl(a: &SpMatView<R>, r: usize, pinv: &SpMat<R>) -> SpMat<R> { 
+    fn compute_compl(a: &SpMat<R>, r: usize, pinv: &SpMat<R>) -> SpMat<R> { 
         let (m, n) = a.shape();
         let bd = a.submat_cols(r..n).to_owned();
 
@@ -112,7 +118,7 @@ mod tests {
             5, 3, 5, 2, 2,
             6, 2,-3, 1, 8
         ]);
-        let s = SchurLT::from_partial_lower(a.view(), 3);
+        let s = SchurLT::from_partial_lower(&a, 3);
         assert_eq!(s.complement(), &SpMat::from_vec((3,2), vec![5,36,12,45,-14,-60]));
     }
 
@@ -126,7 +132,7 @@ mod tests {
             5, 3, 5, 2, 2,
             6, 2,-3, 1, 8
         ]);
-        let s = SchurLT::from_partial_lower(a.view(), 3);
+        let s = SchurLT::from_partial_lower(&a, 3);
 
         let v = SpVec::from(vec![1,2,0,-3,2,1]);
         let w = s.trans_vec(v);

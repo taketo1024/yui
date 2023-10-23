@@ -113,8 +113,8 @@ where
     }
 
     fn schur(a: &SpMat<R>, p: &PermOwned, q: &PermOwned, r: usize) -> SchurLT<R> {
-        let b1 = a.permute(p.view(), q.view());
-        SchurLT::from_partial_lower(b1, r)
+        let b = a.permute(p.view(), q.view()).to_owned();
+        SchurLT::from_partial_lower(&b, r)
     }
 
     fn reduce_mat_rows(a: SpMat<R>, p: &PermOwned, r: usize) -> SpMat<R> {

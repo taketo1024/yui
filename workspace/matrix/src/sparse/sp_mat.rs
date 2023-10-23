@@ -405,6 +405,8 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
 #[cfg(test)]
 pub(super) mod tests { 
+    use sprs::PermOwned;
+
     use super::*;
 
     #[test]
@@ -439,5 +441,19 @@ pub(super) mod tests {
             set(1, 1, 4);
         });
         assert_eq!(a.to_dense(), Mat::from(ndarray::array![[1, 2], [3, 4]]));
+    }
+
+    #[test]
+    fn permute() { 
+        let p = PermOwned::new(vec![1,2,3,0]);
+        let q = PermOwned::new(vec![3,0,2,1]);
+        let a = SpMat::from_vec((4,4), (0..16).collect());
+        let b = a.permute(p.view(), q.view()).to_owned();
+        assert_eq!(b, SpMat::from_vec((4,4), vec![
+            13, 15, 14, 12,
+             1,  3,  2,  0,
+             5,  7,  6,  4,
+             9, 11, 10,  8,
+        ]));
     }
 }

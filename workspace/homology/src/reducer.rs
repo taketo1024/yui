@@ -151,20 +151,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 fn schur<R>(a: &SpMat<R>, p: &PermOwned, q: &PermOwned, r: usize, with_trans: bool) -> Schur<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let b = a.permute(p.view(), q.view()).to_owned();
+    let b = a.permute(p.view(), q.view());
     Schur::from_partial_lower(&b, r, with_trans)
 }
 
 fn reduce_mat_rows<R>(a: &SpMat<R>, p: &PermOwned, r: usize) -> SpMat<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let m = a.rows();
-    a.permute_rows(p.view()).submat_rows(r..m).to_owned()
+    a.view().permute_rows(p.view()).submat_rows(r..m).to_owned()
 }
 
 fn reduce_mat_cols<R>(a: &SpMat<R>, p: &PermOwned, r: usize) -> SpMat<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let n = a.cols();
-    a.permute_cols(p.view()).submat_cols(r..n).to_owned()
+    a.view().permute_cols(p.view()).submat_cols(r..n).to_owned()
 }
 
 #[cfg(test)]

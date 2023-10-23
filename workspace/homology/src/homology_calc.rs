@@ -57,7 +57,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
         let d2_dns = if r1 > 0 { 
             let p1_inv = s1.pinv().unwrap().to_sparse();
-            let t2 = p1_inv.submat_cols(r1..n).to_owned();
+            let t2 = p1_inv.submat_cols(r1..n);
             let d2 = d2 * &t2; // d2': C21' -> C3
             d2.to_dense()
         } else {
@@ -90,16 +90,14 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         let t = s1.factors().iter().filter(|a| !a.is_unit()).count();
 
         let p1 = s1.p().unwrap().to_sparse();     // size = (n, n)
-        let p11 = p1.submat_rows(r1..n)           // size = (n - r1, n)
-                    .to_owned();
+        let p11 = p1.submat_rows(r1..n);          // size = (n - r1, n)
                 
         let p2 = s2.qinv().unwrap().to_sparse();  // size = (n - r1, n - r1)
-        let p22 = p2.submat_rows(r2..n-r1)        // size = (n - (r1 + r2), n - r1)
-                    .to_owned();
+        let p22 = p2.submat_rows(r2..n-r1);       // size = (n - (r1 + r2), n - r1)
 
         let p_free = p22 * p11;                   // size = (n - (r1 + r2), n)
         let p_tor = p1.submat_rows(r1-t..r1);     // size = (t, n)
-        let p = p_free.stack(&p_tor.to_owned());  // size = (r + t, n)
+        let p = p_free.stack(&p_tor);             // size = (r + t, n)
 
         assert_eq!(p.shape(), (r + t, n));
 

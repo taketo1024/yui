@@ -314,10 +314,11 @@ struct MatrixStr {
 impl MatrixStr { 
     fn new<R>(a: &SpMat<R>, piv_type: PivotType) -> Self
     where R: Ring, for<'x> &'x R: RingOps<R> { 
+        let a_view = a.view();
         let a = if piv_type == PivotType::Rows { 
-            a.view() 
+            a_view 
         } else { 
-            a.transpose()
+            a_view.transpose()
         };
 
         let shape = a.shape();

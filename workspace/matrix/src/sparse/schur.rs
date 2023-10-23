@@ -52,7 +52,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let (m, n) = a.shape();
         let p = SpMat::generate((m, m), |set| { 
             // [a; c]
-            for (i, j, x) in a.submat_cols(0..r).iter() {
+            for (i, j, x) in a.view().submat_cols(0..r).iter() {
                 set(i, j, x.clone());
             }
             // [0; 1]
@@ -60,13 +60,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 set(i, i, R::one());
             }
         });
-        let bd = a.submat_cols(r..n).to_owned();
+        let bd = a.submat_cols(r..n);
         
         let x = solve_triangular(TriangularType::Lower, &p, &bd);
-        let s = x.submat_rows(r..m).to_owned();
+        let s = x.submat_rows(r..m);
 
         let (t_in, t_out) = if with_trans { 
-            let t_in = -x.submat_rows(0..r).to_owned();
+            let t_in = -x.submat_rows(0..r);
     
             let i = SpMat::generate((m, r), |set| { 
                 // [0; 1]
@@ -76,7 +76,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             });
     
             // -c a⁻¹
-            let t_out = solve_triangular(TriangularType::Lower, &p, &i).submat_rows(r..m).to_owned();
+            let t_out = solve_triangular(TriangularType::Lower, &p, &i).submat_rows(r..m);
 
             (Some(t_in), Some(t_out))
         } else { 

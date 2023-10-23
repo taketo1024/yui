@@ -122,9 +122,7 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     }
     
     pub fn reduced(&self) -> ChainComplexBase<I, R> { 
-        let mut r = ChainReducer::new(&self);
-        r.process();
-        r.as_complex()
+        ChainReducer::reduce(&self)
     }
 }
 

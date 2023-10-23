@@ -10,37 +10,73 @@ use yui_core::{Ring, RingOps, Deg};
 use super::complex::{ChainComplexTrait, ChainComplexBase};
 use super::graded::Graded;
 
+//       a0 = [x]      a1 = [a b]      a2 = [z w]
+//            [y]           [c d]     
+//  C[0] --------> C[1] ---------> C[2] -------> C[3]
+//    |    [1 a⁻¹b] |             | [ 1     ]    |
+//    |    [    1 ] |             | [-ca⁻¹ 1]    |
+//    |             V             V              |    
+//  C[0] --------> C[1] ---------> C[2] -------> C[3]
+//    |     [0]     |    [a 0]    |    [0  w]    |
+//    |     [y]     |    [0 s]    |              |
+//    |             V             V              |
+//  C[0] --------> C[1]'---------> C[2]'-------> C[3]
+//          [y]           [s]           [w]
+
 pub struct ChainReducer<'a, I, R>
 where 
     I: Deg,
     R: Ring, for<'x> &'x R: RingOps<R>,
 { 
     complex: &'a ChainComplexBase<I, R>,
-    mats: HashMap<I, SpMat<R>>
+    mats: HashMap<I, SpMat<R>>,
+    with_trans: bool,
+    trans: Option<HashMap<I, SpMat<R>>>,
+    trans_rev: Option<HashMap<I, SpMat<R>>>,
 }
 
 impl<'a, I, R> ChainReducer<'a, I, R>
 where 
     I: Deg,
     R: Ring, for<'x> &'x R: RingOps<R>
-{ 
-    pub fn new(complex: &'a ChainComplexBase<I, R>) -> Self { 
+{
+    pub fn reduce(complex: &'a ChainComplexBase<I, R>) -> ChainComplexBase<I, R> {
+        let mut r = Self::new(complex, false);
+        r.process();
+        r.as_complex()
+    }
+
+    fn new(complex: &'a ChainComplexBase<I, R>, with_trans: bool) -> Self { 
         let mats = HashMap::new();
-        Self { complex, mats }
+        let (trans, trans_rev) = if with_trans { 
+            (Some(HashMap::new()), Some(HashMap::new()))
+        } else { 
+            (None, None)
+        };
+        Self { complex, mats, with_trans, trans, trans_rev }
     }
 
-    pub fn process(&mut self) { 
-        for i in self.complex.support() { 
-            self.process_at(i)
-        }
-    }
-
-    pub fn as_complex(mut self) -> ChainComplexBase<I, R> { 
+    fn as_complex(mut self) -> ChainComplexBase<I, R> { 
         ChainComplexBase::new(
             self.complex.support(), 
             self.complex.d_deg(), 
             move |i| self.take_matrix(i)
         )
+    }
+
+    #[cfg(test)]
+    fn matrix(&self, i: I) -> Option<&SpMat<R>> {
+        self.mats.get(&i)
+    }
+
+    fn take_matrix(&mut self, i: I) -> SpMat<R> {
+        self.mats.remove(&i).unwrap_or(self.complex.d_matrix(i).clone())
+    }
+
+    fn process(&mut self) { 
+        for i in self.complex.support() { 
+            self.process_at(i)
+        }
     }
 
     fn process_at(&mut self, i: I) { 
@@ -63,27 +99,6 @@ where
         self.mats.insert(i1, a1);
         self.mats.insert(i2, a2);
     }
-
-    pub fn matrix(&self, i: I) -> Option<&SpMat<R>> {
-        self.mats.get(&i)
-    }
-
-    fn take_matrix(&mut self, i: I) -> SpMat<R> {
-        self.mats.remove(&i).unwrap_or(self.complex.d_matrix(i).clone())
-    }
-
-    //       a0 = [x]      a1 = [a b]      a2 = [z w]
-    //            [y]           [c d]     
-    //  C[0] --------> C[1] ---------> C[2] -------> C[3]
-    //    |    [1 a⁻¹b] |             | [ 1     ]    |
-    //    |    [    1 ] |             | [-ca⁻¹ 1]    |
-    //    |             V             V              |    
-    //  C[0] --------> C[1] ---------> C[2] -------> C[3]
-    //    |     [0]     |    [a 0]    |    [0  w]    |
-    //    |     [y]     |    [0 s]    |              |
-    //    |             V             V              |
-    //  C[0] --------> C[1]'---------> C[2]'-------> C[3]
-    //          [y]           [s]           [w]
 
     fn process_triple(a0: SpMat<R>, a1: SpMat<R>, a2: SpMat<R>) -> (SpMat<R>, SpMat<R>, SpMat<R>) {
         let (p, q, r) = Self::pivots(&a1);
@@ -137,7 +152,7 @@ mod tests {
     fn s2() {
         let c = Samples::<i32>::s2();
 
-        let mut red = ChainReducer::new(&c);
+        let mut red = ChainReducer::new(&c, false);
         red.process();
 
         let d2 = red.matrix(2).unwrap();
@@ -150,7 +165,7 @@ mod tests {
     fn t2() {
         let c = Samples::<i32>::t2();
 
-        let mut red = ChainReducer::new(&c);
+        let mut red = ChainReducer::new(&c, false);
         red.process();
 
         let d2 = red.matrix(2).unwrap();
@@ -163,7 +178,7 @@ mod tests {
     fn rp2() {
         let c = Samples::<i32>::rp2();
 
-        let mut red = ChainReducer::new(&c);
+        let mut red = ChainReducer::new(&c, false);
         red.process();
 
         let d2 = red.matrix(2).unwrap();

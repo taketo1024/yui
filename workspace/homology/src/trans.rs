@@ -76,8 +76,8 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
 
     pub fn compose_perm(&self, p: PermView) -> Self { 
         self.map(
-            |f| f.permute_rows(p.clone()).to_owned(), 
-            |b| b.permute_cols(p.clone()).to_owned()
+            |f| f.permute_rows(p.clone()), 
+            |b| b.permute_cols(p.clone())
         )
     }
 }

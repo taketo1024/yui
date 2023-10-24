@@ -503,7 +503,7 @@ pub(super) mod tests {
         let a = SpMat::from_vec((3, 4), (0..12).collect());
         let p = PermOwned::new(vec![2,0,1]);
         let q = SpMat::from_row_perm(p.view());
-        assert!(q * &a == a.permute_rows(p.view()).to_owned())
+        assert!(q * &a == a.permute_rows(p.view()))
     }
 
     #[test]
@@ -511,6 +511,6 @@ pub(super) mod tests {
         let a = SpMat::from_vec((3, 4), (0..12).collect());
         let p = PermOwned::new(vec![2,0,1,3]);
         let q = SpMat::from_col_perm(p.view());
-        assert!(&a * q == a.permute_cols(p.view()).to_owned())
+        assert!(&a * q == a.permute_cols(p.view()))
     }
 }

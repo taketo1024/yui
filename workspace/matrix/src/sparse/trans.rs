@@ -12,8 +12,8 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
 impl<R> Trans<R> 
 where R: Ring, for <'x> &'x R: RingOps<R> { 
     pub fn new(f: SpMat<R>, b: SpMat<R>) -> Self {
-        assert!(f.rows() == b.cols());
-        assert!(f.cols() == b.rows());
+        assert_eq!(f.rows(), b.cols());
+        assert_eq!(f.cols(), b.rows());
         Self { f, b }
     }
 
@@ -64,9 +64,9 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
     }
 
     pub fn compose(&self, f: &SpMat<R>, b: &SpMat<R>) -> Self {
-        assert!(f.cols() == self.tgt_dim());
-        assert!(b.rows() == self.tgt_dim());
-        assert!(f.rows() == b.cols());
+        assert_eq!(f.cols(), self.tgt_dim());
+        assert_eq!(b.rows(), self.tgt_dim());
+        assert_eq!(f.rows(), b.cols());
 
         self.map(
             |f0|  f * f0, 

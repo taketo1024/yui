@@ -111,7 +111,7 @@ where
     fn update_trans(&mut self, i: I, p: &PermOwned, q: &PermOwned, r: usize, s: &Schur<R>) {
         assert!(self.with_trans);
 
-        let (m, n)   = self.matrix(i).shape(); // (m, n)
+        let (m, n) = self.matrix(i).shape(); // (m, n)
         let (_, i1, i2) = self.deg_trip(i);
         
         if self.trans(i1).is_none() { 
@@ -121,12 +121,12 @@ where
             self.trans.as_mut().unwrap().insert(i2, Trans::id(m));
         }
 
-        let t1 = self.trans(i1).unwrap().compose_perm(q.view()).map(
+        let t1 = self.trans(i1).unwrap().permute(q.view()).modify(
             |a| a.submat_rows(r..n),
             |b| b * s.trans_in().unwrap()
         );
 
-        let t2 = self.trans(i2).unwrap().compose_perm(p.view()).map(
+        let t2 = self.trans(i2).unwrap().permute(p.view()).modify(
             |a| s.trans_out().unwrap() * a,
             |b| b.submat_cols(r..m)
         );
@@ -245,12 +245,12 @@ mod tests {
         assert_eq!(t1.tgt_dim(), 0);
         assert_eq!(t2.tgt_dim(), 1);
 
-        assert_eq!(t0.f_mat() * t0.b_mat(), SpMat::id(1));
-        assert_eq!(t1.f_mat() * t1.b_mat(), SpMat::id(0));
-        assert_eq!(t2.f_mat() * t2.b_mat(), SpMat::id(1));
+        assert_eq!(t0.forward_mat() * t0.backward_mat(), SpMat::id(1));
+        assert_eq!(t1.forward_mat() * t1.backward_mat(), SpMat::id(0));
+        assert_eq!(t2.forward_mat() * t2.backward_mat(), SpMat::id(1));
 
         let v = SpVec::unit(1, 0);
-        let w = t2.trans_b(&v);
+        let w = t2.backward(&v);
         
         assert!(c.is_cycle(2, &w));
     }
@@ -274,19 +274,19 @@ mod tests {
         assert_eq!(t1.tgt_dim(), 2);
         assert_eq!(t2.tgt_dim(), 1);
 
-        assert_eq!(t0.f_mat() * t0.b_mat(), SpMat::id(1));
-        assert_eq!(t1.f_mat() * t1.b_mat(), SpMat::id(2));
-        assert_eq!(t2.f_mat() * t2.b_mat(), SpMat::id(1));
+        assert_eq!(t0.forward_mat() * t0.backward_mat(), SpMat::id(1));
+        assert_eq!(t1.forward_mat() * t1.backward_mat(), SpMat::id(2));
+        assert_eq!(t2.forward_mat() * t2.backward_mat(), SpMat::id(1));
 
         let v = SpVec::unit(1, 0);
-        let w = t2.trans_b(&v);
+        let w = t2.backward(&v);
         
         assert!(c.is_cycle(2, &w));
 
         let a = SpVec::unit(2, 0);
         let b = SpVec::unit(2, 1);
-        let a = t1.trans_b(&a);
-        let b = t1.trans_b(&b);
+        let a = t1.backward(&a);
+        let b = t1.backward(&b);
         
         assert!(c.is_cycle(1, &a));
         assert!(c.is_cycle(1, &b));
@@ -311,14 +311,14 @@ mod tests {
         assert_eq!(t1.tgt_dim(), 1);
         assert_eq!(t2.tgt_dim(), 1);
 
-        assert_eq!(t0.f_mat() * t0.b_mat(), SpMat::id(1));
-        assert_eq!(t1.f_mat() * t1.b_mat(), SpMat::id(1));
-        assert_eq!(t2.f_mat() * t2.b_mat(), SpMat::id(1));
+        assert_eq!(t0.forward_mat() * t0.backward_mat(), SpMat::id(1));
+        assert_eq!(t1.forward_mat() * t1.backward_mat(), SpMat::id(1));
+        assert_eq!(t2.forward_mat() * t2.backward_mat(), SpMat::id(1));
 
         let v = SpVec::unit(1, 0); // generates 2
-        let w = t2.trans_b(&v);
+        let w = t2.backward(&v);
         let dw = c.differentiate(2, &w);
-        let dv = t1.trans_f(&dw);
+        let dv = t1.forward(&dw);
 
         assert!(
             dv == SpVec::from(vec![ 2]) || 
@@ -326,7 +326,7 @@ mod tests {
         );
 
         let v = SpVec::unit(1, 0);
-        let w = t1.trans_b(&v);
+        let w = t1.backward(&v);
         
         assert!(c.is_cycle(1, &w));
     }

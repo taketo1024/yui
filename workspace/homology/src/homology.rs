@@ -56,14 +56,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let t = self.trans.as_ref().expect("not computed with gens.");
         assert_eq!(t.src_dim(), v.dim());
 
-        t.trans_f(v)
+        t.forward(v)
     }
 
     pub fn h2c(&self, v: &SpVec<R>) -> SpVec<R> { 
         let t = self.trans.as_ref().expect("not computed with gens.");
         assert_eq!(t.tgt_dim(), v.dim());
         
-        t.trans_b(v)
+        t.backward(v)
     }
 
     pub fn ngens(&self) -> usize { 
@@ -75,7 +75,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(i < self.ngens());
 
         let t = self.trans.as_ref().expect("not computed with gens.");
-        t.b_mat().col_vec(i)
+        t.backward_mat().col_vec(i)
     }
 
     pub fn print(&self) {

@@ -37,23 +37,23 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         self.f.rows()
     }
 
-    pub fn f_mat(&self) -> &SpMat<R> {
+    pub fn forward_mat(&self) -> &SpMat<R> {
         &self.f
     }
 
-    pub fn b_mat(&self) -> &SpMat<R> {
+    pub fn backward_mat(&self) -> &SpMat<R> {
         &self.b
     }
 
-    pub fn trans_f(&self, v: &SpVec<R>) -> SpVec<R> {
+    pub fn forward(&self, v: &SpVec<R>) -> SpVec<R> {
         &self.f * v
     }
 
-    pub fn trans_b(&self, v: &SpVec<R>) -> SpVec<R> {
+    pub fn backward(&self, v: &SpVec<R>) -> SpVec<R> {
         &self.b * v
     }
 
-    pub fn map<F, B>(&self, f_map: F, b_map: B) -> Self
+    pub fn modify<F, B>(&self, f_map: F, b_map: B) -> Self
     where 
         F: FnOnce(&SpMat<R>) -> SpMat<R>,
         B: FnOnce(&SpMat<R>) -> SpMat<R> 
@@ -64,22 +64,22 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         ) 
     }
 
-    pub fn compose(&self, f: &SpMat<R>, b: &SpMat<R>) -> Self {
+    pub fn append(&self, f: &SpMat<R>, b: &SpMat<R>) -> Self {
         assert_eq!(f.cols(), self.tgt_dim());
         assert_eq!(b.rows(), self.tgt_dim());
         assert_eq!(f.rows(), b.cols());
 
-        self.map(
+        self.modify(
             |f0|  f * f0, 
             |b0| b0 * b
         )
     }
 
-    pub fn compose_perm(&self, p: PermView) -> Self { 
+    pub fn permute(&self, p: PermView) -> Self { 
         assert_eq!(p.dim(), self.f.rows());
         assert_eq!(p.dim(), self.b.cols());
 
-        self.map(
+        self.modify(
             |f| f.permute_rows(p.clone()), 
             |b| b.permute_cols(p.clone())
         )
@@ -98,8 +98,8 @@ mod tests {
         let t = Trans::<i32>::id(5);
 
         let v = SpVec::from(vec![0,1,2,3,4]);
-        let w = t.trans_f(&v);
-        let x = t.trans_b(&v);
+        let w = t.forward(&v);
+        let x = t.backward(&v);
 
         assert_eq!(w, SpVec::from(vec![0,1,2,3,4]));
         assert_eq!(x, SpVec::from(vec![0,1,2,3,4]));
@@ -113,22 +113,22 @@ mod tests {
         );
 
         let v = SpVec::from(vec![0,1,2,3,4]);
-        let w = t.trans_f(&v);
-        let x = t.trans_b(&w);
+        let w = t.forward(&v);
+        let x = t.backward(&w);
 
         assert_eq!(w, SpVec::from(vec![0,1,2]));
         assert_eq!(x, SpVec::from(vec![0,1,2,0,0]));
     }
 
     #[test]
-    fn permute() {
+    fn from_perm() {
         let t = Trans::<i32>::from_perm(
             PermOwned::new(vec![2,3,1,0,4]).view()
         );
 
         let v = SpVec::from(vec![0,1,2,3,4]);
-        let w = t.trans_f(&v);
-        let x = t.trans_b(&v);
+        let w = t.forward(&v);
+        let x = t.backward(&v);
 
         assert_eq!(w, SpVec::from(vec![3,2,0,1,4]));
         assert_eq!(x, SpVec::from(vec![2,3,1,0,4]));
@@ -139,14 +139,13 @@ mod tests {
         let t = Trans::<i32>::new(
             SpMat::id(5).submat_rows(0..3),
             SpMat::id(5).submat_cols(0..3),
-        );
-        let t = t.compose_perm(
+        ).permute(
             PermOwned::new(vec![1,2,0]).view()
         );
 
         let v = SpVec::from(vec![0,1,2,3,4]);
-        let w = t.trans_f(&v);
-        let x = t.trans_b(&w);
+        let w = t.forward(&v);
+        let x = t.backward(&w);
 
         assert_eq!(w, SpVec::from(vec![2,0,1]));
         assert_eq!(x, SpVec::from(vec![0,1,2,0,0]));

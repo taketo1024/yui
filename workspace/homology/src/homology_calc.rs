@@ -37,12 +37,11 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn calculate(d1: &SpMat<R>, d2: &SpMat<R>, with_trans: bool) -> HomologySummand<R> {
         info!("calculate homology: {:?}-{:?}", d1.shape(), d2.shape());
 
-        let n = d2.cols();
         let (s1, s2) = Self::process_snf(d1, d2, with_trans);
-        let (rank, tors) = Self::result(n, &s1, &s2);
+        let (rank, tors) = Self::result(&s1, &s2);
 
         if with_trans { 
-            let trans = Self::trans(n, &s1, &s2);
+            let trans = Self::trans(&s1, &s2);
             HomologySummand::new(rank, tors, trans)
         } else { 
             HomologySummand::new_no_trans(rank, tors)
@@ -50,7 +49,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     fn process_snf(d1: &SpMat<R>, d2: &SpMat<R>, with_trans: bool) -> (SnfResult<R>, SnfResult<R>) {
-        let n = d2.cols();
+        let n = d1.rows();
 
         let d1_dns = d1.to_dense();
         let s1 = snf_in_place(d1_dns, [with_trans, true, false, false]);
@@ -70,7 +69,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         (s1, s2)
     }
 
-    fn result(n: usize, s1: &SnfResult<R>, s2: &SnfResult<R>) -> (usize, Vec<R>) {
+    fn result(s1: &SnfResult<R>, s2: &SnfResult<R>) -> (usize, Vec<R>) {
+        let n = s1.result().rows();
         let (r1, r2) = (s1.rank(), s2.rank());
         let rank = n - r1 - r2;
 
@@ -85,7 +85,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         (rank, tors)
     }
 
-    fn trans(n: usize, s1: &SnfResult<R>, s2: &SnfResult<R>) -> Trans<R> {
+    fn trans(s1: &SnfResult<R>, s2: &SnfResult<R>) -> Trans<R> {
+        let n = s1.result().rows();
         let (r1, r2) = (s1.rank(), s2.rank());
         let r = n - r1 - r2;
         let t = s1.factors().iter().filter(|a| !a.is_unit()).count();
@@ -103,16 +104,14 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         assert_eq!(p.shape(), (r + t, n));
 
         let q1 = s1.pinv().unwrap().to_sparse();  // size = (n, n)
-        let q12 = q1.submat_cols(r1..n)           // size = (n, n - r1)
-                    .to_owned();
+        let q12 = q1.submat_cols(r1..n);          // size = (n, n - r1)
 
         let q2 = s2.q().unwrap().to_sparse();     // size = (n - r1, n - r1)
-        let q22 = q2.submat_cols(r2..n-r1)        // size = (n - r1, n - (r1 + r2))
-                    .to_owned();
+        let q22 = q2.submat_cols(r2..n-r1);       // size = (n - r1, n - (r1 + r2))
 
         let q_free = q12 * q22;                   // size = (n, n - (r1 + r2))
         let q_tor = q1.submat_cols(r1-t..r1);     // size = (n, t)
-        let q = q_free.concat(&q_tor.to_owned()); // size = (n, r + t)
+        let q = q_free.concat(&q_tor);            // size = (n, r + t)
 
         assert_eq!(q.shape(), (n, r + t));
 

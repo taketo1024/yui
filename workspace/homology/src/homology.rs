@@ -4,8 +4,9 @@ use std::fmt::Display;
 
 use itertools::Itertools;
 use yui_core::{EucRing, EucRingOps, Ring, RingOps, Deg, isize2, isize3};
-use yui_matrix::sparse::{SpVec, SpMat, MatType};
+use yui_matrix::sparse::SpVec;
 
+use super::trans::Trans;
 use super::graded::Graded;
 use super::complex::ChainComplexBase;
 
@@ -18,26 +19,22 @@ pub struct HomologySummand<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     rank: usize,
     tors: Vec<R>,
-    gens: Option<Vec<SpVec<R>>>,
-    trans: Option<SpMat<R>>
+    trans: Option<Trans<R>>
 }
 
 impl<R> HomologySummand<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn _new(rank: usize, tors: Vec<R>, gens: Option<Vec<SpVec<R>>>, trans: Option<SpMat<R>>) -> Self { 
-        Self { rank, tors, gens, trans }
+    pub fn new(rank: usize, tors: Vec<R>, trans: Trans<R>) -> Self { 
+        let trans = Some(trans);
+        Self { rank, tors, trans }
     }
 
-    pub fn new(rank: usize, tors: Vec<R>, gens: Vec<SpVec<R>>, trans: SpMat<R>) -> Self { 
-        Self::_new(rank, tors, Some(gens), Some(trans))
-    }
-
-    pub fn new_no_gens(rank: usize, tors: Vec<R>) -> Self { 
-        Self::_new(rank, tors, None, None)
+    pub fn new_no_trans(rank: usize, tors: Vec<R>) -> Self { 
+        Self { rank, tors, trans: None }
     }
 
     fn zero() -> Self { 
-        Self::new_no_gens(0, vec![])
+        Self::new_no_trans(0, vec![])
     }
 
     pub fn rank(&self) -> usize { 
@@ -56,18 +53,30 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.tors().is_empty()
     }
 
-    pub fn gens(&self) -> &Vec<SpVec<R>> {
-        self.gens.as_ref().expect("not computed with gens.")
+    pub fn c2h(&self, v: &SpVec<R>) -> SpVec<R> { 
+        let t = self.trans.as_ref().expect("not computed with gens.");
+        assert_eq!(t.src_dim(), v.dim());
+
+        t.forward(v)
     }
 
-    pub fn gen(&self, i: usize) -> &SpVec<R> {
-        &self.gens()[i]
+    pub fn h2c(&self, v: &SpVec<R>) -> SpVec<R> { 
+        let t = self.trans.as_ref().expect("not computed with gens.");
+        assert_eq!(t.tgt_dim(), v.dim());
+        
+        t.backward(v)
     }
 
-    pub fn vectorize(&self, z: &SpVec<R>) -> SpVec<R> { 
-        let p = self.trans.as_ref().expect("not computed with gens.");
-        assert_eq!(p.shape().1, z.dim());
-        p * z
+    pub fn ngens(&self) -> usize { 
+        let t = self.trans.as_ref().expect("not computed with gens.");
+        t.tgt_dim()
+    }
+
+    pub fn gen(&self, i: usize) -> SpVec<R> {
+        assert!(i < self.ngens());
+
+        let t = self.trans.as_ref().expect("not computed with gens.");
+        t.b_mat().col_vec(i)
     }
 
     pub fn print(&self) {
@@ -286,12 +295,12 @@ mod tests {
         let h = c.homology(true);
 
         let h2 = &h[2];
-        assert_eq!(h2.gens().len(), 1);
+        assert_eq!(h2.ngens(), 1);
 
         let z = h2.gen(0);
         assert!(!z.is_zero());
-        assert!(c.is_cycle(2, z));
-        assert_eq!(h2.vectorize(z), SpVec::from(vec![1]));
+        assert!(c.is_cycle(2, &z));
+        assert_eq!(h2.c2h(&z), SpVec::from(vec![1]));
     }
 
     #[test]
@@ -300,26 +309,26 @@ mod tests {
         let h = c.homology(true);
 
         let h2 = &h[2];
-        assert_eq!(h2.gens().len(), 1);
+        assert_eq!(h2.ngens(), 1);
 
         let z = h2.gen(0);
         assert!(!z.is_zero());
-        assert!(c.is_cycle(2, z));
-        assert_eq!(h2.vectorize(z), SpVec::from(vec![1]));
-        assert_eq!(h2.gens().len(), 1);
+        assert!(c.is_cycle(2, &z));
+        assert_eq!(h2.c2h(&z), SpVec::from(vec![1]));
+        assert_eq!(h2.ngens(), 1);
 
         let h1 = &h[1];
-        assert_eq!(h1.gens().len(), 2);
+        assert_eq!(h1.ngens(), 2);
 
         let a = h1.gen(0);
         let b = h1.gen(1);
 
         assert!(!a.is_zero());
         assert!(!b.is_zero());
-        assert!(c.is_cycle(1, a));
-        assert!(c.is_cycle(1, b));
-        assert_eq!(h1.vectorize(a), SpVec::from(vec![1, 0]));
-        assert_eq!(h1.vectorize(b), SpVec::from(vec![0, 1]));
+        assert!(c.is_cycle(1, &a));
+        assert!(c.is_cycle(1, &b));
+        assert_eq!(h1.c2h(&a), SpVec::from(vec![1, 0]));
+        assert_eq!(h1.c2h(&b), SpVec::from(vec![0, 1]));
     }
 
     #[test]
@@ -328,12 +337,12 @@ mod tests {
         let h = c.homology(true);
 
         let h1 = &h[1];
-        assert_eq!(h1.gens().len(), 1);
+        assert_eq!(h1.ngens(), 1);
 
         let z = h1.gen(0);
 
         assert!(!z.is_zero());
-        assert!(c.is_cycle(1, z));
-        assert_eq!(h1.vectorize(z), SpVec::from(vec![1]));
+        assert!(c.is_cycle(1, &z));
+        assert_eq!(h1.c2h(&z), SpVec::from(vec![1]));
     }
 }

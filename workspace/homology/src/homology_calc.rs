@@ -5,6 +5,8 @@ use yui_core::{EucRing, EucRingOps};
 use yui_matrix::dense::{*, snf::*};
 use yui_matrix::sparse::*;
 
+use crate::Trans;
+
 use super::homology::HomologySummand;
 
 pub struct HomologyCalc<R>
@@ -40,11 +42,10 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         let (rank, tors) = Self::result(n, &s1, &s2);
 
         if with_trans { 
-            let (p, q) = Self::trans(n, &s1, &s2);
-            let gens = Self::gens(&q);
-            HomologySummand::new(rank, tors, gens, p)
+            let trans = Self::trans(n, &s1, &s2);
+            HomologySummand::new(rank, tors, trans)
         } else { 
-            HomologySummand::new_no_gens(rank, tors)
+            HomologySummand::new_no_trans(rank, tors)
         }
     }
 
@@ -84,7 +85,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         (rank, tors)
     }
 
-    fn trans(n: usize, s1: &SnfResult<R>, s2: &SnfResult<R>) -> (SpMat<R>, SpMat<R>) {
+    fn trans(n: usize, s1: &SnfResult<R>, s2: &SnfResult<R>) -> Trans<R> {
         let (r1, r2) = (s1.rank(), s2.rank());
         let r = n - r1 - r2;
         let t = s1.factors().iter().filter(|a| !a.is_unit()).count();
@@ -115,14 +116,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
         assert_eq!(q.shape(), (n, r + t));
 
-        (p, q)
-    }
-
-    fn gens(q: &SpMat<R>) -> Vec<SpVec<R>> {
-        let l = q.shape().1;
-        (0..l).map(|j| 
-            q.col_vec(j)
-        ).collect()
+        Trans::new(p, q)
     }
 }
 
@@ -146,8 +140,8 @@ mod tests {
         let v = h.gen(0);
 
         assert_eq!(v.is_zero(), false);
-        assert_eq!(c.is_cycle(0, v), true);
-        assert_eq!(h.vectorize(v), SpVec::unit(1, 0));
+        assert_eq!(c.is_cycle(0, &v), true);
+        assert_eq!(h.c2h(&v), SpVec::unit(1, 0));
     }
 
     #[test]
@@ -175,8 +169,8 @@ mod tests {
         let v = h.gen(0);
 
         assert_eq!(v.is_zero(), false);
-        assert_eq!(c.is_cycle(2, v), true);
-        assert_eq!(h.vectorize(v), SpVec::unit(1, 0));
+        assert_eq!(c.is_cycle(2, &v), true);
+        assert_eq!(h.c2h(&v), SpVec::unit(1, 0));
     }
 
     #[test]
@@ -193,8 +187,8 @@ mod tests {
         let v = h.gen(0);
 
         assert_eq!(v.is_zero(), false);
-        assert_eq!(c.is_cycle(0, v), true);
-        assert_eq!(h.vectorize(v), SpVec::unit(1, 0));
+        assert_eq!(c.is_cycle(0, &v), true);
+        assert_eq!(h.c2h(&v), SpVec::unit(1, 0));
     }
 
     #[test]
@@ -211,8 +205,8 @@ mod tests {
         for i in 0..2 { 
             let v = h.gen(i);
             assert_eq!(v.is_zero(), false);
-            assert_eq!(c.is_cycle(1, v), true);
-            assert_eq!(h.vectorize(v), SpVec::unit(2, i));
+            assert_eq!(c.is_cycle(1, &v), true);
+            assert_eq!(h.c2h(&v), SpVec::unit(2, i));
         }
     }
 
@@ -230,8 +224,8 @@ mod tests {
         let v = h.gen(0);
 
         assert_eq!(v.is_zero(), false);
-        assert_eq!(c.is_cycle(2, v), true);
-        assert_eq!(h.vectorize(v), SpVec::unit(1, 0));
+        assert_eq!(c.is_cycle(2, &v), true);
+        assert_eq!(h.c2h(&v), SpVec::unit(1, 0));
     }
 
     #[test]
@@ -246,9 +240,10 @@ mod tests {
         assert_eq!(h.tors().len(), 0);
 
         let v = h.gen(0);
+
         assert_eq!(v.is_zero(), false);
-        assert_eq!(c.is_cycle(0, v), true);
-        assert_eq!(h.vectorize(v), SpVec::unit(1, 0));
+        assert_eq!(c.is_cycle(0, &v), true);
+        assert_eq!(h.c2h(&v), SpVec::unit(1, 0));
     }
 
     #[test]
@@ -263,8 +258,9 @@ mod tests {
         assert_eq!(h.tors(), &vec![2]);
 
         let v = h.gen(0);
+
         assert_eq!(v.is_zero(), false);
-        assert_eq!(c.is_cycle(1, v), true);
-        assert_eq!(h.vectorize(v), SpVec::unit(1, 0));
+        assert_eq!(c.is_cycle(1, &v), true);
+        assert_eq!(h.c2h(&v), SpVec::unit(1, 0));
     }
 }

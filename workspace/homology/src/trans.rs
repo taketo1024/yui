@@ -44,11 +44,11 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         &self.b
     }
 
-    pub fn forward(&self, v: &SpVec<R>) -> SpVec<R> {
+    pub fn trans_f(&self, v: &SpVec<R>) -> SpVec<R> {
         &self.f * v
     }
 
-    pub fn backward(&self, v: &SpVec<R>) -> SpVec<R> {
+    pub fn trans_b(&self, v: &SpVec<R>) -> SpVec<R> {
         &self.b * v
     }
 
@@ -62,11 +62,11 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
             b_map(&self.f)
         ) 
     }
-    
+
     pub fn compose(&self, f: &SpMat<R>, b: &SpMat<R>) -> Self {
-        assert!(f.rows() == b.cols());
-        assert!(f.cols() == b.rows());
         assert!(f.cols() == self.tgt_dim());
+        assert!(b.rows() == self.tgt_dim());
+        assert!(f.rows() == b.cols());
 
         self.map(
             |f0|  f * f0, 

@@ -57,14 +57,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let t = self.trans.as_ref().expect("not computed with gens.");
         assert_eq!(t.src_dim(), v.dim());
 
-        t.forward(v)
+        t.trans_f(v)
     }
 
     pub fn h2c(&self, v: &SpVec<R>) -> SpVec<R> { 
         let t = self.trans.as_ref().expect("not computed with gens.");
         assert_eq!(t.tgt_dim(), v.dim());
         
-        t.backward(v)
+        t.trans_b(v)
     }
 
     pub fn ngens(&self) -> usize { 

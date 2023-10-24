@@ -1,3 +1,4 @@
+use sprs::PermView;
 use yui_core::{RingOps, Ring};
 use yui_matrix::sparse::{SpMat, MatType, SpVec};
 
@@ -14,6 +15,17 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         assert!(f.rows() == b.cols());
         assert!(f.cols() == b.rows());
         Self { f, b }
+    }
+
+    pub fn id(n: usize) -> Self { 
+        Self::new(SpMat::id(n), SpMat::id(n))
+    }
+
+    pub fn from_perm(p: PermView) -> Self { 
+        Self::new(
+            SpMat::from_row_perm(p.clone()), 
+            SpMat::from_col_perm(p)
+        )
     }
 
     pub fn src_dim(&self) -> usize { 
@@ -40,13 +52,32 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         &self.b * v
     }
 
-    pub fn compose(&self, f: SpMat<R>, b: SpMat<R>) -> Self {
+    pub fn map<F, B>(&self, f_map: F, b_map: B) -> Self
+    where 
+        F: FnOnce(&SpMat<R>) -> SpMat<R>,
+        B: FnOnce(&SpMat<R>) -> SpMat<R> 
+    {
+        Self::new(
+            f_map(&self.f), 
+            b_map(&self.f)
+        ) 
+    }
+    
+    pub fn compose(&self, f: &SpMat<R>, b: &SpMat<R>) -> Self {
         assert!(f.rows() == b.cols());
         assert!(f.cols() == b.rows());
+        assert!(f.cols() == self.tgt_dim());
 
-        Self::new(
-            f * &self.f, 
-            &self.b * b
+        self.map(
+            |f0|  f * f0, 
+            |b0| b0 * b
+        )
+    }
+
+    pub fn compose_perm(&self, p: PermView) -> Self { 
+        self.map(
+            |f| f.permute_rows(p.clone()).to_owned(), 
+            |b| b.permute_cols(p.clone()).to_owned()
         )
     }
 }

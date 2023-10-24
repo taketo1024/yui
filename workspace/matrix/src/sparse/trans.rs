@@ -14,6 +14,7 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
     pub fn new(f: SpMat<R>, b: SpMat<R>) -> Self {
         assert_eq!(f.rows(), b.cols());
         assert_eq!(f.cols(), b.rows());
+
         Self { f, b }
     }
 
@@ -59,7 +60,7 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
     {
         Self::new(
             f_map(&self.f), 
-            b_map(&self.f)
+            b_map(&self.b)
         ) 
     }
 
@@ -75,9 +76,79 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
     }
 
     pub fn compose_perm(&self, p: PermView) -> Self { 
+        assert_eq!(p.dim(), self.f.rows());
+        assert_eq!(p.dim(), self.b.cols());
+
         self.map(
             |f| f.permute_rows(p.clone()), 
             |b| b.permute_cols(p.clone())
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use sprs::PermOwned;
+
+    use super::*;
+    use crate::sparse::*;
+
+    #[test]
+    fn id() {
+        let t = Trans::<i32>::id(5);
+
+        let v = SpVec::from(vec![0,1,2,3,4]);
+        let w = t.trans_f(&v);
+        let x = t.trans_b(&v);
+
+        assert_eq!(w, SpVec::from(vec![0,1,2,3,4]));
+        assert_eq!(x, SpVec::from(vec![0,1,2,3,4]));
+    }
+    
+    #[test]
+    fn trans() {
+        let t = Trans::<i32>::new(
+            SpMat::id(5).submat_rows(0..3),
+            SpMat::id(5).submat_cols(0..3),
+        );
+
+        let v = SpVec::from(vec![0,1,2,3,4]);
+        let w = t.trans_f(&v);
+        let x = t.trans_b(&w);
+
+        assert_eq!(w, SpVec::from(vec![0,1,2]));
+        assert_eq!(x, SpVec::from(vec![0,1,2,0,0]));
+    }
+
+    #[test]
+    fn permute() {
+        let t = Trans::<i32>::from_perm(
+            PermOwned::new(vec![2,3,1,0,4]).view()
+        );
+
+        let v = SpVec::from(vec![0,1,2,3,4]);
+        let w = t.trans_f(&v);
+        let x = t.trans_b(&v);
+
+        assert_eq!(w, SpVec::from(vec![3,2,0,1,4]));
+        assert_eq!(x, SpVec::from(vec![2,3,1,0,4]));
+    }
+
+    #[test]
+    fn compose_perm() {
+        let t = Trans::<i32>::new(
+            SpMat::id(5).submat_rows(0..3),
+            SpMat::id(5).submat_cols(0..3),
+        );
+        let t = t.compose_perm(
+            PermOwned::new(vec![1,2,0]).view()
+        );
+
+        let v = SpVec::from(vec![0,1,2,3,4]);
+        let w = t.trans_f(&v);
+        let x = t.trans_b(&w);
+
+        assert_eq!(w, SpVec::from(vec![2,0,1]));
+        assert_eq!(x, SpVec::from(vec![0,1,2,0,0]));
     }
 }

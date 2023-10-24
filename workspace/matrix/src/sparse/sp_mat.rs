@@ -294,6 +294,28 @@ impl<R> SpMat<R> {
     }
 }
 
+impl<R> SpMat<R> where R: Clone + Zero + One { 
+    // row_perm(p) * a == a.permute_rows(p)
+    pub fn from_row_perm(p: PermView) -> Self {
+        let n = p.dim();
+        Self::generate((n, n), |set| { 
+            for i in 0..n { 
+                set(p.at(i), i, R::one())
+            }
+        })
+    }
+
+    // a * col_perm(p) == a.permute_cols(p)
+    pub fn from_col_perm(p: PermView) -> Self {
+        let n = p.dim();
+        Self::generate((n, n), |set| { 
+            for i in 0..n { 
+                set(i, p.at(i), R::one())
+            }
+        })
+    }
+}
+
 pub struct SpMatView<'a, 'b, R>  {
     target: &'a SpMat<R>,
     shape: (usize, usize),
@@ -474,5 +496,21 @@ pub(super) mod tests {
             2, 6, 10, 
             3, 7, 11, 
         ]));
+    }
+
+    #[test]
+    fn row_perm() {
+        let a = SpMat::from_vec((3, 4), (0..12).collect());
+        let p = PermOwned::new(vec![2,0,1]);
+        let q = SpMat::from_row_perm(p.view());
+        assert!(q * &a == a.permute_rows(p.view()).to_owned())
+    }
+
+    #[test]
+    fn col_perm() {
+        let a = SpMat::from_vec((3, 4), (0..12).collect());
+        let p = PermOwned::new(vec![2,0,1,3]);
+        let q = SpMat::from_col_perm(p.view());
+        assert!(&a * q == a.permute_cols(p.view()).to_owned())
     }
 }

@@ -124,13 +124,11 @@ impl<R> SpMat<R> where R: Clone + Zero {
     }
 
     pub fn permute_rows<'b>(&self, p: PermView<'b>) -> SpMat<R> { 
-        let id = PermView::identity(self.cols());
-        self.permute(p, id)
+        self.view().permute_rows(p).to_owned()
     }
     
     pub fn permute_cols<'b>(&self, q: PermView<'b>) -> SpMat<R> { 
-        let id = PermView::identity(self.rows());
-        self.permute(id, q)
+        self.view().permute_cols(q).to_owned()
     }
 
     pub fn submat(&self, rows: Range<usize>, cols: Range<usize>) -> SpMat<R> { 
@@ -138,13 +136,11 @@ impl<R> SpMat<R> where R: Clone + Zero {
     }
 
     pub fn submat_rows(&self, rows: Range<usize>) -> SpMat<R> { 
-        let n = self.cols();
-        self.submat(rows, 0 .. n)
+        self.view().submat_rows(rows).to_owned()
     }
 
     pub fn submat_cols(&self, cols: Range<usize>) -> SpMat<R> { 
-        let m = self.rows();
-        self.submat(0 .. m, cols)
+        self.view().submat_cols(cols).to_owned()
     }
 
     pub fn combine_blocks(blocks: [&SpMat<R>; 4]) -> SpMat<R> {
@@ -351,6 +347,8 @@ impl<'a, 'b, R> SpMatView<'a, 'b, R> {
     }
 
     pub fn permute(&self, p: PermView<'b>, q: PermView<'b>) -> SpMatView<R> { 
+        assert_eq!(self.rows(), p.dim());
+        assert_eq!(self.cols(), q.dim());
         SpMatView::new(self.target, self.shape, move |i, j| (self.trans)(p.at(i), q.at(j)))
     }
 

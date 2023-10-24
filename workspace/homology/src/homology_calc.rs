@@ -5,8 +5,6 @@ use yui_core::{EucRing, EucRingOps};
 use yui_matrix::dense::{*, snf::*};
 use yui_matrix::sparse::*;
 
-use crate::Trans;
-
 use super::homology::HomologySummand;
 
 pub struct HomologyCalc<R>

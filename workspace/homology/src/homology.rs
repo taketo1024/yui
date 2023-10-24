@@ -4,9 +4,8 @@ use std::fmt::Display;
 
 use itertools::Itertools;
 use yui_core::{EucRing, EucRingOps, Ring, RingOps, Deg, isize2, isize3};
-use yui_matrix::sparse::SpVec;
+use yui_matrix::sparse::{SpVec, Trans};
 
-use super::trans::Trans;
 use super::graded::Graded;
 use super::complex::ChainComplexBase;
 

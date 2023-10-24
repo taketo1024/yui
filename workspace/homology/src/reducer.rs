@@ -59,16 +59,12 @@ where
         ChainComplexBase::new(
             self.complex.support(), 
             self.complex.d_deg(), 
-            move |i| self.take_matrix(i)
+            move |i| self.mats.remove(&i).unwrap()
         )
     }
 
     pub fn matrix(&self, i: I) -> &SpMat<R> {
         self.mats.get(&i).unwrap_or(self.complex.d_matrix(i))
-    }
-
-    pub fn take_matrix(&mut self, i: I) -> SpMat<R> {
-        self.mats.remove(&i).unwrap_or(self.complex.d_matrix(i).clone())
     }
 
     pub fn trans(&self, i: I) -> Option<&Trans<R>> {

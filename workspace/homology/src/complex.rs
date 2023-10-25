@@ -29,14 +29,14 @@ where I: Deg, Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
         }
     }
 
-    fn differentiate(&self, i: I, v: &SpVec<Self::R>) -> SpVec<Self::R> {
+    fn d(&self, i: I, v: &SpVec<Self::R>) -> SpVec<Self::R> {
         assert_eq!(self.rank(i), v.dim());
         let d = self.d_matrix(i);
         d * v
     }
 
     fn is_cycle(&self, i: I, v: &SpVec<Self::R>) -> bool { 
-        self.differentiate(i, v).is_zero()
+        self.d(i, v).is_zero()
     }
 
     fn check_d_at(&self, i: I) { 

@@ -77,7 +77,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             },
             |idx, x| { 
                 let i = idx.0;
-                let dx = self.differentiate_x(i, x);
+                let dx = self.d_of(i, x);
                 dx.into_iter().collect()
             }
         );
@@ -97,8 +97,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         to self.inner { 
             pub fn gens(&self, i: isize) -> &Vec<KhEnhState>;
             pub fn vectorize(&self, i: isize, z: &KhChain<R>) -> SpVec<R>;
-            pub fn differentiate_x(&self, i: isize, x: &KhEnhState) -> KhChain<R>;
-            pub fn differentiate(&self, i: isize, z: &KhChain<R>) -> KhChain<R>;
+            pub fn d_of(&self, i: isize, x: &KhEnhState) -> KhChain<R>;
+            pub fn d(&self, i: isize, z: &KhChain<R>) -> KhChain<R>;
         }
     }
 }

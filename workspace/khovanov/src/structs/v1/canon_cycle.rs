@@ -68,7 +68,7 @@ mod tests {
         );
 
         for z in zs { 
-            let dz = c.differentiate(0, &z);
+            let dz = c.d(0, &z);
             assert_eq!(z.is_zero(), false);
             assert_eq!(dz.is_zero(), true);
         }
@@ -84,7 +84,7 @@ mod tests {
         );
 
         for z in zs { 
-            let dz = c.differentiate(0, &z);
+            let dz = c.d(0, &z);
             assert_eq!(z.is_zero(), false);
             assert_eq!(dz.is_zero(), true);
         }

@@ -317,7 +317,7 @@ mod tests {
 
         let v = SpVec::unit(1, 0); // generates 2
         let w = t2.backward(&v);
-        let dw = c.differentiate(2, &w);
+        let dw = c.d(2, &w);
         let dv = t1.forward(&dw);
 
         assert!(

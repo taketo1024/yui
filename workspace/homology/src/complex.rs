@@ -126,20 +126,6 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<I, R> ChainComplexBase<I, R> 
-where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    pub fn homology_at(&self, i: I, with_gens: bool) -> HomologySummand<R> {
-        let i0 = i - self.d_deg();
-        let d0 = self.d_matrix(i0);
-        let d1 = self.d_matrix(i);
-        HomologyCalc::calculate(d0, d1, with_gens)
-    }
-
-    pub fn homology(&self, with_gens: bool) -> HomologyBase<I, R> {
-        HomologyBase::new(&self, with_gens)
-    }
-}
-
 impl<I, R> Graded<I> for ChainComplexBase<I, R>
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     type Itr = std::vec::IntoIter<I>;
@@ -180,6 +166,19 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
+impl<I, R> ChainComplexBase<I, R> 
+where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    pub fn homology_at(&self, i: I, with_gens: bool) -> HomologySummand<R> {
+        let i0 = i - self.d_deg();
+        let d0 = self.d_matrix(i0);
+        let d1 = self.d_matrix(i);
+        HomologyCalc::calculate(d0, d1, with_gens)
+    }
+
+    pub fn homology(&self, with_gens: bool) -> HomologyBase<I, R> {
+        HomologyBase::new(&self, with_gens)
+    }
+}
 
 impl<R> ChainComplexBase<isize, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {

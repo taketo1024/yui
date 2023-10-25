@@ -6,6 +6,8 @@ use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
 use yui_lin_comb::{Gen, LinComb};
 use yui_matrix::sparse::{SpMat, SpVec};
 
+use crate::HomologySummand;
+
 use super::graded::Graded;
 use super::complex::{ChainComplexTrait, ChainComplexBase};
 use super::homology::HomologyBase;
@@ -130,17 +132,6 @@ where
     }
 }
 
-impl<I, X, R> XChainComplexBase<I, X, R>
-where 
-    I: Deg,
-    X: Gen,
-    R: EucRing, for<'x> &'x R: EucRingOps<R>,
-{
-    pub fn homology(&self, with_trans: bool) -> HomologyBase<I, R> { 
-        self.inner.homology(with_trans)
-    }
-}
-
 impl<I, X, R> Graded<I> for XChainComplexBase<I, X, R>
 where 
     I: Deg,
@@ -172,6 +163,20 @@ where
         to self.inner { 
             fn d_deg(&self) -> I;
             fn d_matrix(&self, i: I) -> &SpMat<Self::R>;
+        }
+    }
+}
+
+impl<I, X, R> XChainComplexBase<I, X, R>
+where 
+    I: Deg,
+    X: Gen,
+    R: EucRing, for<'x> &'x R: EucRingOps<R>,
+{
+    delegate! { 
+        to self.inner { 
+            pub fn homology_at(&self, i: I, with_gens: bool) -> HomologySummand<R>;
+            pub fn homology(&self, with_gens: bool) -> HomologyBase<I, R>;
         }
     }
 }

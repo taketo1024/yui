@@ -39,23 +39,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    // Solving
-    //
-    //   [a    ][x1] = [b]
-    //   [c  id][x2]   [d]
-    //
-    // gives 
-    //
-    //   x1 = a⁻¹ b, 
-    //   x2 = d - c a⁻¹ b
     fn compute_from_partial_lower(a: &SpMat<R>, r: usize, with_trans: bool) -> (SpMat<R>, Option<SpMat<R>>, Option<SpMat<R>>) {
         let (m, n) = a.shape();
+
+        //  [a   ][x] = [b]  ==>  [x] = [a⁻¹b     ]
+        //  [c  1][y]   [d]       [y]   [d - ca⁻¹b]
+        //  ~~~~~~
+        //    p
+        
         let p = SpMat::generate((m, m), |set| { 
-            // [a; c]
             for (i, j, x) in a.view().submat_cols(0..r).iter() {
                 set(i, j, x.clone());
             }
-            // [0; 1]
             for i in r..m { 
                 set(i, i, R::one());
             }
@@ -68,18 +63,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let (t_in, t_out) = if with_trans { 
             let id = |n| SpMat::id(n);
 
-            // t_in = [-a⁻¹b; 1]
+            // t_in = [-a⁻¹b]
+            //        [  1  ]
             let n_ainvb = -x.submat_rows(0..r);
             let t_in = n_ainvb.stack(&id(n - r));
     
-            // t_out = [-ca⁻¹, 1]
-            let i = SpMat::generate((m, r), |set| { 
-                for i in 0..m-r { 
-                    set(i, i, R::one());
-                }
-            });
-            let n_cainv = solve_triangular(TriangularType::Lower, &p, &i).submat_rows(r..m);
-            let t_out = n_cainv.concat(&id(m - r));
+            // [a   ][x] = [1]  ==>  [x] = [a⁻¹  ] 
+            // [c  1][y]   [0]       [y]   [-ca⁻¹]
+            let i = SpMat::id(r).stack(&SpMat::zero((m - r, r)));
+            let y = solve_triangular(TriangularType::Lower, &p, &i).submat_rows(r..m);
+
+            // t_out = [-ca⁻¹  1]
+            let t_out = y.concat(&id(m - r));
 
             (Some(t_in), Some(t_out))
         } else { 

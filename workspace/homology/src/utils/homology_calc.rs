@@ -38,12 +38,13 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         let (s1, s2) = Self::process_snf(d1, d2, with_trans);
         let (rank, tors) = Self::result(&s1, &s2);
 
-        if with_trans { 
-            let trans = Self::trans(&s1, &s2);
-            HomologySummand::new(rank, tors, trans)
-        } else { 
-            HomologySummand::new_no_trans(rank, tors)
-        }
+        let trans = if with_trans { 
+            Some( Self::trans(&s1, &s2) )
+        } else {
+            None
+        };
+
+        HomologySummand::new(rank, tors, trans)
     }
 
     fn process_snf(d1: &SpMat<R>, d2: &SpMat<R>, with_trans: bool) -> (SnfResult<R>, SnfResult<R>) {
@@ -138,7 +139,7 @@ mod tests {
 
         assert_eq!(v.is_zero(), false);
         assert_eq!(c.is_cycle(0, &v), true);
-        assert_eq!(h.c2h(&v), SpVec::unit(1, 0));
+        assert_eq!(h.trans_forward(&v), SpVec::unit(1, 0));
     }
 
     #[test]
@@ -167,7 +168,7 @@ mod tests {
 
         assert_eq!(v.is_zero(), false);
         assert_eq!(c.is_cycle(2, &v), true);
-        assert_eq!(h.c2h(&v), SpVec::unit(1, 0));
+        assert_eq!(h.trans_forward(&v), SpVec::unit(1, 0));
     }
 
     #[test]
@@ -185,7 +186,7 @@ mod tests {
 
         assert_eq!(v.is_zero(), false);
         assert_eq!(c.is_cycle(0, &v), true);
-        assert_eq!(h.c2h(&v), SpVec::unit(1, 0));
+        assert_eq!(h.trans_forward(&v), SpVec::unit(1, 0));
     }
 
     #[test]
@@ -203,7 +204,7 @@ mod tests {
             let v = h.gen(i);
             assert_eq!(v.is_zero(), false);
             assert_eq!(c.is_cycle(1, &v), true);
-            assert_eq!(h.c2h(&v), SpVec::unit(2, i));
+            assert_eq!(h.trans_forward(&v), SpVec::unit(2, i));
         }
     }
 
@@ -222,7 +223,7 @@ mod tests {
 
         assert_eq!(v.is_zero(), false);
         assert_eq!(c.is_cycle(2, &v), true);
-        assert_eq!(h.c2h(&v), SpVec::unit(1, 0));
+        assert_eq!(h.trans_forward(&v), SpVec::unit(1, 0));
     }
 
     #[test]
@@ -240,7 +241,7 @@ mod tests {
 
         assert_eq!(v.is_zero(), false);
         assert_eq!(c.is_cycle(0, &v), true);
-        assert_eq!(h.c2h(&v), SpVec::unit(1, 0));
+        assert_eq!(h.trans_forward(&v), SpVec::unit(1, 0));
     }
 
     #[test]
@@ -258,6 +259,6 @@ mod tests {
 
         assert_eq!(v.is_zero(), false);
         assert_eq!(c.is_cycle(1, &v), true);
-        assert_eq!(h.c2h(&v), SpVec::unit(1, 0));
+        assert_eq!(h.trans_forward(&v), SpVec::unit(1, 0));
     }
 }

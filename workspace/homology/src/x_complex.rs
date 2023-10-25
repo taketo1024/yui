@@ -175,8 +175,8 @@ where
 {
     delegate! { 
         to self.inner { 
-            pub fn homology_at(&self, i: I, with_gens: bool) -> HomologySummand<R>;
-            pub fn homology(&self, with_gens: bool) -> HomologyBase<I, R>;
+            pub fn homology_at(&self, i: I, with_trans: bool) -> HomologySummand<R>;
+            pub fn homology(&self, with_trans: bool) -> HomologyBase<I, R>;
         }
     }
 }

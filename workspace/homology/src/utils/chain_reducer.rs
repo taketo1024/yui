@@ -358,12 +358,12 @@ mod tests {
         r.check_d_all();
         
         let u = SpVec::unit(1, 0);
-        let v = r.vec_backward(2, &u);
+        let v = r.trans_backward(2, &u);
 
         assert!(!v.is_zero());
         assert!(c.is_cycle(2, &v));
 
-        let w = r.vec_forward(2, &v);
+        let w = r.trans_forward(2, &v);
 
         assert!(!w.is_zero());
         assert!(r.is_cycle(2, &w));

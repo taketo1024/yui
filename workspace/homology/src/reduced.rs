@@ -38,12 +38,12 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         self.trans.as_ref().map(|ts| &ts[&i])
     }
 
-    pub fn vec_forward(&self, i: I, v: &SpVec<R>) -> SpVec<R> { 
+    pub fn trans_forward(&self, i: I, v: &SpVec<R>) -> SpVec<R> { 
         assert!(self.trans.is_some());
         self.trans(i).unwrap().forward(v)
     }
 
-    pub fn vec_backward(&self, i: I, v: &SpVec<R>) -> SpVec<R> { 
+    pub fn trans_backward(&self, i: I, v: &SpVec<R>) -> SpVec<R> { 
         assert!(self.trans.is_some());
         self.trans(i).unwrap().backward(v)
     }
@@ -77,8 +77,8 @@ impl<I, R> ReducedComplexBase<I, R>
 where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
     delegate! { 
         to self.inner { 
-            pub fn homology_at(&self, i: I, with_gens: bool) -> HomologySummand<R>;
-            pub fn homology(&self, with_gens: bool) -> HomologyBase<I, R>;
+            pub fn homology_at(&self, i: I, with_trans: bool) -> HomologySummand<R>;
+            pub fn homology(&self, with_trans: bool) -> HomologyBase<I, R>;
         }
     }
 }

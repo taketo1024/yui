@@ -13,6 +13,8 @@ pub type Homology<R>  = HomologyBase<isize,  R>;
 pub type Homology2<R> = HomologyBase<isize2, R>;
 pub type Homology3<R> = HomologyBase<isize3, R>;
 
+const ERR_NO_TRANS: &'static str = "not computed with trans.";
+
 #[derive(Debug, Clone)]
 pub struct HomologySummand<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> {
@@ -23,17 +25,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> HomologySummand<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new(rank: usize, tors: Vec<R>, trans: Trans<R>) -> Self { 
-        let trans = Some(trans);
+    pub fn new(rank: usize, tors: Vec<R>, trans: Option<Trans<R>>) -> Self { 
         Self { rank, tors, trans }
     }
 
-    pub fn new_no_trans(rank: usize, tors: Vec<R>) -> Self { 
-        Self { rank, tors, trans: None }
-    }
-
     fn zero() -> Self { 
-        Self::new_no_trans(0, vec![])
+        Self::new(0, vec![], None)
     }
 
     pub fn rank(&self) -> usize { 
@@ -52,30 +49,30 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.tors().is_empty()
     }
 
-    pub fn c2h(&self, v: &SpVec<R>) -> SpVec<R> { 
-        let t = self.trans.as_ref().expect("not computed with gens.");
-        assert_eq!(t.src_dim(), v.dim());
-
-        t.forward(v)
-    }
-
-    pub fn h2c(&self, v: &SpVec<R>) -> SpVec<R> { 
-        let t = self.trans.as_ref().expect("not computed with gens.");
-        assert_eq!(t.tgt_dim(), v.dim());
-        
-        t.backward(v)
-    }
-
     pub fn ngens(&self) -> usize { 
-        let t = self.trans.as_ref().expect("not computed with gens.");
+        let t = self.trans.as_ref().expect(ERR_NO_TRANS);
         t.tgt_dim()
     }
 
     pub fn gen(&self, i: usize) -> SpVec<R> {
         assert!(i < self.ngens());
 
-        let t = self.trans.as_ref().expect("not computed with gens.");
+        let t = self.trans.as_ref().expect(ERR_NO_TRANS);
         t.backward_mat().col_vec(i)
+    }
+
+    pub fn trans_forward(&self, v: &SpVec<R>) -> SpVec<R> { 
+        let t = self.trans.as_ref().expect(ERR_NO_TRANS);
+        assert_eq!(t.src_dim(), v.dim());
+
+        t.forward(v)
+    }
+
+    pub fn trans_backward(&self, v: &SpVec<R>) -> SpVec<R> { 
+        let t = self.trans.as_ref().expect(ERR_NO_TRANS);
+        assert_eq!(t.tgt_dim(), v.dim());
+        
+        t.backward(v)
     }
 
     pub fn print(&self) {
@@ -132,13 +129,12 @@ where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 impl<I, R> HomologyBase<I, R>
 where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    pub fn new(complex: &ChainComplexBase<I, R>, with_gens: bool) -> Self { 
+    pub fn new(complex: &ChainComplexBase<I, R>, with_trans: bool) -> Self { 
         let support = complex.support().collect_vec();
         let summands = HashMap::from_iter(
-            support.iter().map(|&i| {
-                let h_i = complex.homology_at(i, with_gens);
-                (i, h_i)
-            })
+            support.iter().map(|&i|
+                (i, complex.homology_at(i, with_trans))
+            )
         );
         let zero_smd = HomologySummand::zero();
         Self { support, summands, zero_smd }
@@ -301,7 +297,7 @@ mod tests {
         let z = h2.gen(0);
         assert!(!z.is_zero());
         assert!(c.is_cycle(2, &z));
-        assert_eq!(h2.c2h(&z), SpVec::from(vec![1]));
+        assert_eq!(h2.trans_forward(&z), SpVec::from(vec![1]));
     }
 
     #[test]
@@ -315,7 +311,7 @@ mod tests {
         let z = h2.gen(0);
         assert!(!z.is_zero());
         assert!(c.is_cycle(2, &z));
-        assert_eq!(h2.c2h(&z), SpVec::from(vec![1]));
+        assert_eq!(h2.trans_forward(&z), SpVec::from(vec![1]));
         assert_eq!(h2.ngens(), 1);
 
         let h1 = &h[1];
@@ -328,8 +324,8 @@ mod tests {
         assert!(!b.is_zero());
         assert!(c.is_cycle(1, &a));
         assert!(c.is_cycle(1, &b));
-        assert_eq!(h1.c2h(&a), SpVec::from(vec![1, 0]));
-        assert_eq!(h1.c2h(&b), SpVec::from(vec![0, 1]));
+        assert_eq!(h1.trans_forward(&a), SpVec::from(vec![1, 0]));
+        assert_eq!(h1.trans_forward(&b), SpVec::from(vec![0, 1]));
     }
 
     #[test]
@@ -344,6 +340,6 @@ mod tests {
 
         assert!(!z.is_zero());
         assert!(c.is_cycle(1, &z));
-        assert_eq!(h1.c2h(&z), SpVec::from(vec![1]));
+        assert_eq!(h1.trans_forward(&z), SpVec::from(vec![1]));
     }
 }

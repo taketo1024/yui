@@ -7,6 +7,8 @@ use yui_matrix::sparse::pivot::{perms_by_pivots, find_pivots, PivotType};
 use yui_matrix::sparse::schur::Schur;
 use yui_core::{Ring, RingOps, Deg};
 
+use crate::ReducedComplexBase;
+
 use super::complex::{ChainComplexTrait, ChainComplexBase};
 use super::graded::Graded;
 
@@ -39,10 +41,10 @@ where
     I: Deg,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    pub fn reduce(complex: &'a ChainComplexBase<I, R>, with_trans: bool) -> ChainComplexBase<I, R> {
-        let mut r = Self::new(complex, false);
+    pub fn reduce(complex: &'a ChainComplexBase<I, R>, with_trans: bool) -> ReducedComplexBase<I, R> {
+        let mut r = Self::new(complex, with_trans);
         r.process_all();
-        r.as_complex(with_trans)
+        r.as_complex()
     }
 
     pub fn new(complex: &'a ChainComplexBase<I, R>, with_trans: bool) -> Self { 
@@ -147,11 +149,25 @@ where
         (i - deg, i, i + deg)
     }
 
-    pub fn as_complex(mut self, _with_trans: bool) -> ChainComplexBase<I, R> { 
-        ChainComplexBase::new(
+    pub fn as_complex(mut self) -> ReducedComplexBase<I, R> { 
+        use std::mem::take;
+
+        let mut mats = take(&mut self.mats);
+        let mats_map = move |i| mats.remove(&i).unwrap();
+
+        let trans_map = if self.with_trans { 
+            let mut trans = take(&mut self.trans).unwrap();
+            let trans_map = move |i| trans.remove(&i).unwrap();
+            Some(trans_map)
+        } else { 
+            None
+        };
+        
+        ReducedComplexBase::new(
             self.complex.support(), 
             self.complex.d_deg(), 
-            move |i| self.mats.remove(&i).unwrap()
+            mats_map,
+            trans_map
         )
     }
 }
@@ -330,4 +346,29 @@ mod tests {
         
         assert!(c.is_cycle(1, &w));
     }
-}
+
+    #[test]
+    fn as_complex() { 
+        let c = Samples::<i32>::t2();
+        let r = ChainReducer::reduce(&c, false);
+        r.check_d_all();
+    }
+
+    #[test]
+    fn as_complex_with_trans() { 
+        let c = Samples::<i32>::t2();
+        let r = ChainReducer::reduce(&c, true);
+        r.check_d_all();
+        
+        let u = SpVec::unit(1, 0);
+        let v = r.vec_backward(2, &u);
+
+        assert!(!v.is_zero());
+        assert!(c.is_cycle(2, &v));
+
+        let w = r.vec_forward(2, &v);
+
+        assert!(!w.is_zero());
+        assert!(r.is_cycle(2, &w));
+        assert_eq!(w, u);
+    }}

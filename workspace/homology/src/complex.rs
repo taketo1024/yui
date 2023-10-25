@@ -5,6 +5,8 @@ use itertools::{Itertools, Either};
 use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
 use yui_matrix::sparse::{SpMat, SpVec, MatType};
 
+use crate::ReducedComplexBase;
+
 use super::graded::Graded;
 use super::reducer::ChainReducer;
 use super::homology_calc::HomologyCalc;
@@ -121,7 +123,7 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn reduced(&self, with_trans: bool) -> ChainComplexBase<I, R> { 
+    pub fn reduced(&self, with_trans: bool) -> ReducedComplexBase<I, R> { 
         ChainReducer::reduce(&self, with_trans)
     }
 }

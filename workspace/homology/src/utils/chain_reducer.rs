@@ -7,10 +7,7 @@ use yui_matrix::sparse::pivot::{perms_by_pivots, find_pivots, PivotType};
 use yui_matrix::sparse::schur::Schur;
 use yui_core::{Ring, RingOps, Deg};
 
-use crate::ReducedComplexBase;
-
-use super::complex::{ChainComplexTrait, ChainComplexBase};
-use super::graded::Graded;
+use crate::{Graded, ChainComplexTrait, ChainComplexBase, ReducedComplexBase};
 
 //       a0 = [x]      a1 = [a b]      a2 = [z w]
 //            [y]           [c d]     
@@ -201,7 +198,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::complex::tests::*;
+    use crate::complex::tests::*;
 
     #[test]
     fn s2() {

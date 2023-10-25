@@ -8,8 +8,7 @@ use yui_matrix::sparse::{SpMat, SpVec, MatType};
 use crate::ReducedComplexBase;
 
 use super::graded::Graded;
-use super::reducer::ChainReducer;
-use super::homology_calc::HomologyCalc;
+use super::utils::{ChainReducer, HomologyCalc};
 use super::homology::{HomologySummand, HomologyBase};
 
 pub type ChainComplex<R>  = ChainComplexBase<isize,  R>;

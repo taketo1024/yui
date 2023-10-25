@@ -5,7 +5,7 @@ use yui_core::{EucRing, EucRingOps};
 use yui_matrix::dense::{*, snf::*};
 use yui_matrix::sparse::*;
 
-use super::homology::HomologySummand;
+use crate::HomologySummand;
 
 pub struct HomologyCalc<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
@@ -120,8 +120,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::complex::*;
-    use super::super::complex::tests::*;
+    use crate::ChainComplexTrait;
+    use crate::complex::tests::*;
  
     #[test]
     fn s2_0th() {

@@ -34,6 +34,59 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         Self { inner, trans }
     }
 
+    pub fn reduced_by<C, F>(complex: &C, mut trans: F) -> Self
+    where 
+        C: ChainComplexTrait<I, R = R>,
+        F: FnMut(I) -> Trans<R>
+    {
+        //              d
+        //     C[i] ---------> C[i+1]
+        //      ^                |
+        // t_in |                | t_out
+        //      |                V
+        //     C'[i] - - - - > C'[i+1]
+
+        let mut trans = HashMap::from_iter( 
+            complex.support().map(|i| (i, trans(i))) 
+        );
+
+        for i in complex.support() {
+            let i1 = i + complex.d_deg();
+            if !trans.contains_key(&i1) { 
+                trans.insert(i1, Trans::id(0));
+            }
+        }
+        
+        let inner = ChainComplexBase::new(complex.support(), complex.d_deg(), |i| { 
+            let d = complex.d_matrix(i);
+            let i1 = i + complex.d_deg();
+            let t_in  = trans[&i].backward_mat();
+            let t_out = trans[&i1].forward_mat();
+
+            t_out * d * t_in
+        });
+        let trans = Some(trans);
+
+        Self { inner, trans }
+    }
+
+    pub fn bypass<C>(complex: &C, with_trans: bool) -> Self
+    where 
+        C: ChainComplexTrait<I, R = R>,
+    {
+        let trans = if with_trans { 
+            Some(|i| Trans::id(complex.rank(i)))
+        } else { 
+            None
+        };
+        Self::new(
+            complex.support(), 
+            complex.d_deg(), 
+            |i| complex.d_matrix(i).clone(), 
+            trans
+        )
+    }
+
     pub fn trans(&self, i: I) -> Option<&Trans<R>> {
         self.trans.as_ref().map(|ts| &ts[&i])
     }
@@ -80,5 +133,106 @@ where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
             pub fn homology_at(&self, i: I, with_trans: bool) -> HomologySummand<R>;
             pub fn homology(&self, with_trans: bool) -> HomologyBase<I, R>;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests { 
+    use crate::ChainComplex;
+    use crate::utils::ChainReducer;
+
+    use super::*;
+
+
+    #[test]
+    fn d3() { 
+        let c = ChainComplex::<i64>::d3().reduced(false);
+
+        assert_eq!(c.rank(0), 1);
+        assert_eq!(c.rank(1), 0);
+        assert_eq!(c.rank(2), 0);
+        assert_eq!(c.rank(3), 0);
+
+        c.check_d_all();
+    }
+
+    #[test]
+    fn s2() { 
+        let c = ChainComplex::<i64>::s2().reduced(false);
+
+        assert_eq!(c.rank(0), 1);
+        assert_eq!(c.rank(1), 0);
+        assert_eq!(c.rank(2), 1);
+
+        c.check_d_all();
+    }
+
+    #[test]
+    fn t2() { 
+        let c = ChainComplex::<i64>::t2().reduced(false);
+
+        assert_eq!(c.rank(0), 1);
+        assert_eq!(c.rank(1), 2);
+        assert_eq!(c.rank(2), 1);
+
+        c.check_d_all();
+
+        assert!(c.d_matrix(1).is_zero());
+        assert!(c.d_matrix(2).is_zero());
+    }
+
+    #[test]
+    fn rp2() { 
+        let c = ChainComplex::<i64>::rp2().reduced(false);
+        
+        assert_eq!(c.rank(0), 1);
+        assert_eq!(c.rank(1), 1);
+        assert_eq!(c.rank(2), 1);
+
+        c.check_d_all();
+
+        assert!( c.d_matrix(0).is_zero());
+        assert!( c.d_matrix(1).is_zero());
+        assert!(!c.d_matrix(2).is_zero());
+
+        let a = c.d_matrix(2).to_dense()[[0, 0]];
+        assert!(a == 2 || a == -2);
+    }
+    
+    #[test]
+    fn reduced_by() { 
+        let c = ChainComplex::<i32>::rp2();
+
+        let mut f = ChainReducer::new(&c, true);
+        f.process_all();
+
+        let c = c.reduced_by(|i| f.trans(i).unwrap().clone());
+
+        assert_eq!(c.rank(0), 1);
+        assert_eq!(c.rank(1), 1);
+        assert_eq!(c.rank(2), 1);
+
+        c.check_d_all();
+
+        assert!( c.d_matrix(0).is_zero());
+        assert!( c.d_matrix(1).is_zero());
+        assert!(!c.d_matrix(2).is_zero());
+
+        let a = c.d_matrix(2).to_dense()[[0, 0]];
+        assert!(a == 2 || a == -2);
+    }
+
+    #[test]
+    fn bypass() { 
+        let c = ChainComplex::<i32>::t2();
+        let r = ReducedComplex::bypass(&c, false);
+
+        assert_eq!(c.rank(0), r.rank(0));
+        assert_eq!(c.rank(1), r.rank(1));
+        assert_eq!(c.rank(2), r.rank(2));
+
+        assert_eq!(c.d_matrix(0), r.d_matrix(0));
+        assert_eq!(c.d_matrix(1), r.d_matrix(1));
+        assert_eq!(c.d_matrix(2), r.d_matrix(2));
     }
 }

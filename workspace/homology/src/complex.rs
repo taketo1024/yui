@@ -3,7 +3,7 @@ use std::mem;
 
 use itertools::{Itertools, Either};
 use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
-use yui_matrix::sparse::{SpMat, SpVec, MatType};
+use yui_matrix::sparse::{SpMat, SpVec, MatType, Trans};
 
 use crate::ReducedComplexBase;
 
@@ -15,7 +15,7 @@ pub type ChainComplex<R>  = ChainComplexBase<isize,  R>;
 pub type ChainComplex2<R> = ChainComplexBase<isize2, R>;
 pub type ChainComplex3<R> = ChainComplexBase<isize3, R>;
 
-pub trait ChainComplexTrait<I>: Graded<I>
+pub trait ChainComplexTrait<I>: Graded<I> + Sized
 where I: Deg, Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> { 
     type R;
 
@@ -85,6 +85,15 @@ where I: Deg, Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
     fn print_d(&self) {
         println!("{}", self.display_d());
     }
+
+    fn reduced(&self, with_trans: bool) -> ReducedComplexBase<I, Self::R> { 
+        ChainReducer::reduce(self, with_trans)
+    }
+
+    fn reduced_by<F>(&self, trans: F) -> ReducedComplexBase<I, Self::R>
+    where F: FnMut(I) -> Trans<Self::R> {
+        ReducedComplexBase::reduced_by(self, trans)
+    }
 }
 
 pub struct ChainComplexBase<I, R>
@@ -120,10 +129,6 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         Self { 
             support, d_deg, d_matrix, zero_d
         }
-    }
-
-    pub fn reduced(&self, with_trans: bool) -> ReducedComplexBase<I, R> { 
-        ChainReducer::reduce(self, with_trans)
     }
 }
 
@@ -248,54 +253,6 @@ pub(crate) mod tests {
         assert_eq!(c.rank(0), 6);
         assert_eq!(c.rank(1), 15);
         assert_eq!(c.rank(2), 10);
-        assert_eq!(c.rank(3), 0);
-
-        c.check_d_all();
-    }
-
-    #[test]
-    fn d3_reduced() { 
-        let c = ChainComplex::<i64>::d3().reduced(false);
-
-        assert_eq!(c.rank(0), 1);
-        assert_eq!(c.rank(1), 0);
-        assert_eq!(c.rank(2), 0);
-        assert_eq!(c.rank(3), 0);
-
-        c.check_d_all();
-    }
-
-    #[test]
-    fn s2_reduced() { 
-        let c = ChainComplex::<i64>::s2().reduced(false);
-
-        assert_eq!(c.rank(0), 1);
-        assert_eq!(c.rank(1), 0);
-        assert_eq!(c.rank(2), 1);
-        assert_eq!(c.rank(3), 0);
-
-        c.check_d_all();
-    }
-
-    #[test]
-    fn t2_reduced() { 
-        let c = ChainComplex::<i64>::t2().reduced(false);
-
-        assert_eq!(c.rank(0), 1);
-        assert_eq!(c.rank(1), 2);
-        assert_eq!(c.rank(2), 1);
-        assert_eq!(c.rank(3), 0);
-
-        c.check_d_all();
-    }
-
-    #[test]
-    fn rp2_reduced() { 
-        let c = ChainComplex::<i64>::rp2().reduced(false);
-        
-        assert_eq!(c.rank(0), 1);
-        assert_eq!(c.rank(1), 1);
-        assert_eq!(c.rank(2), 1);
         assert_eq!(c.rank(3), 0);
 
         c.check_d_all();

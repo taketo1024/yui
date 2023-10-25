@@ -6,8 +6,7 @@ use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
 use yui_lin_comb::{Gen, LinComb};
 use yui_matrix::sparse::{SpMat, SpVec};
 
-use crate::{HomologySummand, ReducedComplexBase};
-use crate::utils::ChainReducer;
+use crate::HomologySummand;
 
 use super::graded::Graded;
 use super::complex::{ChainComplexTrait, ChainComplexBase};
@@ -130,10 +129,6 @@ where
 
     pub fn inner(&self) -> &ChainComplexBase<I, R> { 
         &self.inner
-    }
-
-    pub fn reduced(&self, with_trans: bool) -> ReducedComplexBase<I, R> { 
-        ChainReducer::reduce(self, with_trans)
     }
 }
 

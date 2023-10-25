@@ -81,6 +81,11 @@ where
 
         if r == 0 { 
             info!("no pivots found.");
+
+            if !self.is_processed_at(i) { 
+                self.init_at(i)
+            }
+            
             return 
         }
 
@@ -141,6 +146,20 @@ where
         self.mats.insert(i2, a2);
     }
 
+    fn is_processed_at(&self, i: I) -> bool { 
+        self.mats.contains_key(&i)
+    }
+
+    fn init_at(&mut self, i: I) {
+        let d = self.complex.d_matrix(i);
+        let n = d.cols();
+
+        self.mats.insert(i, d.clone());
+        if self.with_trans { 
+            self.trans.as_mut().unwrap().insert(i, Trans::id(n));
+        }
+    }
+
     fn deg_trip(&self, i: I) -> (I, I, I) { 
         let deg = self.complex.d_deg();
         (i - deg, i, i + deg)
@@ -198,6 +217,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ChainComplex;
     use crate::complex::tests::*;
 
     #[test]
@@ -345,7 +365,14 @@ mod tests {
     }
 
     #[test]
-    fn as_complex() { 
+    fn as_complex_zero() { 
+        let c = ChainComplex::<i32>::new(0..=0, 1, |_| SpMat::zero((0, 0)));
+        let r = ChainReducer::reduce(&c, true);
+        r.check_d_all();
+    }
+
+    #[test]
+    fn as_complex_t2() { 
         let c = Samples::<i32>::t2();
         let r = ChainReducer::reduce(&c, false);
         r.check_d_all();
@@ -368,4 +395,5 @@ mod tests {
         assert!(!w.is_zero());
         assert!(r.is_cycle(2, &w));
         assert_eq!(w, u);
-    }}
+    }
+}

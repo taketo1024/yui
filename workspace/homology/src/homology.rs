@@ -190,6 +190,8 @@ mod tests {
     use yui_matrix::sparse::SpMat;
     use yui_matrix::sparse::SpVec;
 
+    use crate::ChainComplexTrait;
+
     use super::super::complex::ChainComplex;
     use super::super::complex::tests::*;
 

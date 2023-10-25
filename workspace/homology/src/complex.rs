@@ -29,6 +29,16 @@ where I: Deg, Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
         }
     }
 
+    fn differentiate(&self, i: I, v: &SpVec<Self::R>) -> SpVec<Self::R> {
+        assert_eq!(self.rank(i), v.dim());
+        let d = self.d_matrix(i);
+        d * v
+    }
+
+    fn is_cycle(&self, i: I, v: &SpVec<Self::R>) -> bool { 
+        self.differentiate(i, v).is_zero()
+    }
+
     fn check_d_at(&self, i: I) { 
         let i1 = i + self.d_deg();
         if !(self.is_supported(i) && self.is_supported(i1)) {
@@ -111,16 +121,6 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn differentiate(&self, i: I, v: &SpVec<R>) -> SpVec<R> {
-        assert_eq!(self.rank(i), v.dim());
-        let d = self.d_matrix(i);
-        d * v
-    }
-
-    pub fn is_cycle(&self, i: I, v: &SpVec<R>) -> bool { 
-        self.differentiate(i, v).is_zero()
-    }
-    
     pub fn reduced(&self) -> ChainComplexBase<I, R> { 
         ChainReducer::reduce(&self)
     }

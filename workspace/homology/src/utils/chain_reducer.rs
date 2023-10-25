@@ -7,7 +7,7 @@ use yui_matrix::sparse::pivot::{perms_by_pivots, find_pivots, PivotType};
 use yui_matrix::sparse::schur::Schur;
 use yui_core::{Ring, RingOps, Deg};
 
-use crate::{Graded, ChainComplexTrait, ChainComplexBase, ReducedComplexBase};
+use crate::{ChainComplexTrait, ReducedComplexBase};
 
 //       a0 = [x]      a1 = [a b]      a2 = [z w]
 //            [y]           [c d]     
@@ -22,29 +22,31 @@ use crate::{Graded, ChainComplexTrait, ChainComplexBase, ReducedComplexBase};
 //  C[0] --------> C[1]'---------> C[2]'-------> C[3]
 //          [y]           [s]           [w]
 
-pub struct ChainReducer<'a, I, R>
+pub struct ChainReducer<'a, I, C>
 where 
     I: Deg,
-    R: Ring, for<'x> &'x R: RingOps<R>,
+    C: ChainComplexTrait<I>,
+    C::R: Ring, for<'x> &'x C::R: RingOps<C::R>,
 { 
-    complex: &'a ChainComplexBase<I, R>,
-    mats: HashMap<I, SpMat<R>>,
+    complex: &'a C,
+    mats: HashMap<I, SpMat<C::R>>,
     with_trans: bool,
-    trans: Option<HashMap<I, Trans<R>>>
+    trans: Option<HashMap<I, Trans<C::R>>>
 }
 
-impl<'a, I, R> ChainReducer<'a, I, R>
+impl<'a, I, C> ChainReducer<'a, I, C>
 where 
     I: Deg,
-    R: Ring, for<'x> &'x R: RingOps<R>
+    C: ChainComplexTrait<I>,
+    C::R: Ring, for<'x> &'x C::R: RingOps<C::R>,
 {
-    pub fn reduce(complex: &'a ChainComplexBase<I, R>, with_trans: bool) -> ReducedComplexBase<I, R> {
+    pub fn reduce(complex: &'a C, with_trans: bool) -> ReducedComplexBase<I, C::R> {
         let mut r = Self::new(complex, with_trans);
         r.process_all();
         r.as_complex()
     }
 
-    pub fn new(complex: &'a ChainComplexBase<I, R>, with_trans: bool) -> Self { 
+    pub fn new(complex: &'a C, with_trans: bool) -> Self { 
         let mats = HashMap::new();
         let trans = if with_trans { 
             Some(HashMap::new())
@@ -54,11 +56,11 @@ where
         Self { complex, mats, with_trans, trans }
     }
 
-    pub fn matrix(&self, i: I) -> &SpMat<R> {
+    pub fn matrix(&self, i: I) -> &SpMat<C::R> {
         self.mats.get(&i).unwrap_or(self.complex.d_matrix(i))
     }
 
-    pub fn trans(&self, i: I) -> Option<&Trans<R>> {
+    pub fn trans(&self, i: I) -> Option<&Trans<C::R>> {
         self.trans.as_ref().and_then(|t| t.get(&i))
     }
 
@@ -104,7 +106,7 @@ where
         self.process_at_itr(i, itr + 1)
     }
 
-    fn update_trans(&mut self, i: I, p: &PermOwned, q: &PermOwned, r: usize, s: &Schur<R>) {
+    fn update_trans(&mut self, i: I, p: &PermOwned, q: &PermOwned, r: usize, s: &Schur<C::R>) {
         assert!(self.with_trans);
 
         let (m, n) = self.matrix(i).shape(); // (m, n)
@@ -132,7 +134,7 @@ where
         ts.insert(i2, t2);
     }
 
-    fn update_mats(&mut self, i: I, p: &PermOwned, q: &PermOwned, r: usize, s: Schur<R>) {
+    fn update_mats(&mut self, i: I, p: &PermOwned, q: &PermOwned, r: usize, s: Schur<C::R>) {
         let (i0, i1, i2) = self.deg_trip(i);
         let a0 = self.matrix(i0);
         let a2 = self.matrix(i2);
@@ -165,7 +167,7 @@ where
         (i - deg, i, i + deg)
     }
 
-    pub fn as_complex(mut self) -> ReducedComplexBase<I, R> { 
+    pub fn as_complex(mut self) -> ReducedComplexBase<I, C::R> { 
         use std::mem::take;
 
         let mut mats = take(&mut self.mats);

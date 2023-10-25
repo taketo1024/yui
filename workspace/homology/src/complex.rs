@@ -123,7 +123,7 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn reduced(&self, with_trans: bool) -> ReducedComplexBase<I, R> { 
-        ChainReducer::reduce(&self, with_trans)
+        ChainReducer::reduce(self, with_trans)
     }
 }
 

@@ -39,10 +39,10 @@ where
     I: Deg,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    pub fn reduce(complex: &'a ChainComplexBase<I, R>) -> ChainComplexBase<I, R> {
+    pub fn reduce(complex: &'a ChainComplexBase<I, R>, with_trans: bool) -> ChainComplexBase<I, R> {
         let mut r = Self::new(complex, false);
         r.process_all();
-        r.as_complex()
+        r.as_complex(with_trans)
     }
 
     pub fn new(complex: &'a ChainComplexBase<I, R>, with_trans: bool) -> Self { 
@@ -53,14 +53,6 @@ where
             None
         };
         Self { complex, mats, with_trans, trans }
-    }
-
-    pub fn as_complex(mut self) -> ChainComplexBase<I, R> { 
-        ChainComplexBase::new(
-            self.complex.support(), 
-            self.complex.d_deg(), 
-            move |i| self.mats.remove(&i).unwrap()
-        )
     }
 
     pub fn matrix(&self, i: I) -> &SpMat<R> {
@@ -153,6 +145,14 @@ where
     fn deg_trip(&self, i: I) -> (I, I, I) { 
         let deg = self.complex.d_deg();
         (i - deg, i, i + deg)
+    }
+
+    pub fn as_complex(mut self, _with_trans: bool) -> ChainComplexBase<I, R> { 
+        ChainComplexBase::new(
+            self.complex.support(), 
+            self.complex.d_deg(), 
+            move |i| self.mats.remove(&i).unwrap()
+        )
     }
 }
 

@@ -121,8 +121,8 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn reduced(&self) -> ChainComplexBase<I, R> { 
-        ChainReducer::reduce(&self)
+    pub fn reduced(&self, with_trans: bool) -> ChainComplexBase<I, R> { 
+        ChainReducer::reduce(&self, with_trans)
     }
 }
 
@@ -307,7 +307,7 @@ pub(crate) mod tests {
 
     #[test]
     fn d3_reduced() { 
-        let c = Samples::<i64>::d3().reduced();
+        let c = Samples::<i64>::d3().reduced(false);
 
         assert_eq!(c.rank(0), 1);
         assert_eq!(c.rank(1), 0);
@@ -319,7 +319,7 @@ pub(crate) mod tests {
 
     #[test]
     fn s2_reduced() { 
-        let c = Samples::<i64>::s2().reduced();
+        let c = Samples::<i64>::s2().reduced(false);
 
         assert_eq!(c.rank(0), 1);
         assert_eq!(c.rank(1), 0);
@@ -331,7 +331,7 @@ pub(crate) mod tests {
 
     #[test]
     fn t2_reduced() { 
-        let c = Samples::<i64>::t2().reduced();
+        let c = Samples::<i64>::t2().reduced(false);
 
         assert_eq!(c.rank(0), 1);
         assert_eq!(c.rank(1), 2);
@@ -343,7 +343,7 @@ pub(crate) mod tests {
 
     #[test]
     fn rp2_reduced() { 
-        let c = Samples::<i64>::rp2().reduced();
+        let c = Samples::<i64>::rp2().reduced(false);
         
         assert_eq!(c.rank(0), 1);
         assert_eq!(c.rank(1), 1);

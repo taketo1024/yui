@@ -183,22 +183,20 @@ where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 #[cfg(test)]
 mod tests { 
-    use yui_matrix::sparse::SpMat;
     use yui_matrix::sparse::SpVec;
-
-    use crate::ChainComplexTrait;
-
-    use super::super::complex::ChainComplex;
-    use super::super::complex::tests::*;
+    use crate::{ChainComplexTrait, ChainComplex};
 
     #[test]
-    fn singleton() { 
-        let c = ChainComplex::<i32>::from_mats(-1, 0,
-            vec![
-                SpMat::from_vec((0, 1), vec![]),
-                SpMat::from_vec((1, 0), vec![])
-            ]
-        );        
+    fn zero() { 
+        let c = ChainComplex::<i32>::zero();
+        let h = c.homology(false);
+        
+        assert!(h[0].is_zero());
+    }
+
+    #[test]
+    fn single() { 
+        let c = ChainComplex::<i32>::one();
         let h = c.homology(false);
         
         assert_eq!(h[0].rank(), 1);
@@ -207,24 +205,47 @@ mod tests {
     }
 
     #[test]
-    fn torsion() { 
-        let c = ChainComplex::<i32>::from_mats(-1, 0,
-            vec![
-                SpMat::from_vec((0, 1), vec![]),
-                SpMat::from_vec((1, 1), vec![2]),
-                SpMat::from_vec((1, 0), vec![]),
-            ]
-        );
+    fn one_to_one() { 
+        let c = ChainComplex::<i32>::one_one(1);
         let h = c.homology(false);
+
+        assert!(h[0].is_zero());
+        assert!(h[1].is_zero());
+    }
+
+    #[test]
+    fn two_to_one() { 
+        let c = ChainComplex::<i32>::two_one(1, -1);
+        let h = c.homology(false);
+
+        assert!(h[0].is_zero());
+        assert_eq!(h[1].rank(), 1);
+        assert!(h[1].is_free());
+    }
+
+    #[test]
+    fn one_to_two() { 
+        let c = ChainComplex::<i32>::one_two(1, -1);
+        let h = c.homology(false);
+
+        assert_eq!(h[0].rank(), 1);
+        assert!(h[0].is_free());
+        assert!(h[1].is_zero());
+    }
+
+    #[test]
+    fn torsion() { 
+        let c = ChainComplex::<i32>::one_one(2);
+        let h = c.homology(false);
+
         assert_eq!(h[0].rank(), 0);
         assert_eq!(h[0].tors(), &vec![2]);
         assert!(!h[0].is_free());
-
     }
 
     #[test]
     fn d3() {
-        let c = Samples::<i32>::d3();
+        let c = ChainComplex::<i32>::d3();
         let h = c.homology(false);
 
         assert_eq!(h[0].rank(), 1);
@@ -242,7 +263,7 @@ mod tests {
 
     #[test]
     fn s2() {
-        let c = Samples::<i32>::s2();
+        let c = ChainComplex::<i32>::s2();
         let h = c.homology(false);
 
         assert_eq!(h[0].rank(), 1);
@@ -257,7 +278,7 @@ mod tests {
 
     #[test]
     fn t2() {
-        let c = Samples::<i32>::t2();
+        let c = ChainComplex::<i32>::t2();
         let h = c.homology(false);
 
         assert_eq!(h[0].rank(), 1);
@@ -272,7 +293,7 @@ mod tests {
 
     #[test]
     fn rp2() {
-        let c = Samples::<i32>::rp2();
+        let c = ChainComplex::<i32>::rp2();
         let h = c.homology(false);
 
         assert_eq!(h[0].rank(), 1);
@@ -288,7 +309,7 @@ mod tests {
 
     #[test]
     fn s2_gens() {
-        let c = Samples::<i32>::s2();
+        let c = ChainComplex::<i32>::s2();
         let h = c.homology(true);
 
         let h2 = &h[2];
@@ -302,7 +323,7 @@ mod tests {
 
     #[test]
     fn t2_gens() {
-        let c = Samples::<i32>::t2();
+        let c = ChainComplex::<i32>::t2();
         let h = c.homology(true);
 
         let h2 = &h[2];
@@ -330,7 +351,7 @@ mod tests {
 
     #[test]
     fn rp2_gens() {
-        let c = Samples::<i32>::rp2();
+        let c = ChainComplex::<i32>::rp2();
         let h = c.homology(true);
 
         let h1 = &h[1];

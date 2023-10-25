@@ -218,11 +218,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 mod tests {
     use super::*;
     use crate::ChainComplex;
-    use crate::complex::tests::*;
 
     #[test]
     fn s2() {
-        let c = Samples::<i32>::s2();
+        let c = ChainComplex::<i32>::s2();
 
         let mut red = ChainReducer::new(&c, false);
         red.process_all();
@@ -235,7 +234,7 @@ mod tests {
 
     #[test]
     fn t2() {
-        let c = Samples::<i32>::t2();
+        let c = ChainComplex::<i32>::t2();
 
         let mut red = ChainReducer::new(&c, false);
         red.process_all();
@@ -248,7 +247,7 @@ mod tests {
 
     #[test]
     fn rp2() {
-        let c = Samples::<i32>::rp2();
+        let c = ChainComplex::<i32>::rp2();
 
         let mut red = ChainReducer::new(&c, false);
         red.process_all();
@@ -261,7 +260,7 @@ mod tests {
 
     #[test]
     fn s2_trans() {
-        let c = Samples::<i32>::s2();
+        let c = ChainComplex::<i32>::s2();
 
         let mut red = ChainReducer::new(&c, true);
         red.process_all();
@@ -290,7 +289,7 @@ mod tests {
 
     #[test]
     fn t2_trans() {
-        let c = Samples::<i32>::t2();
+        let c = ChainComplex::<i32>::t2();
 
         let mut red = ChainReducer::new(&c, true);
         red.process_all();
@@ -327,7 +326,7 @@ mod tests {
 
     #[test]
     fn rp2_trans() {
-        let c = Samples::<i32>::rp2();
+        let c = ChainComplex::<i32>::rp2();
 
         let mut red = ChainReducer::new(&c, true);
         red.process_all();
@@ -366,21 +365,35 @@ mod tests {
 
     #[test]
     fn as_complex_zero() { 
-        let c = ChainComplex::<i32>::new(0..=0, 1, |_| SpMat::zero((0, 0)));
+        let c = ChainComplex::<i32>::zero();
+        let r = ChainReducer::reduce(&c, true);
+        r.check_d_all();
+    }
+
+    #[test]
+    fn as_complex_acyclic() { 
+        let c = ChainComplex::<i32>::one_one(1);
+        let r = ChainReducer::reduce(&c, true);
+        r.check_d_all();
+    }
+
+    #[test]
+    fn as_complex_tor() { 
+        let c = ChainComplex::<i32>::one_one(2);
         let r = ChainReducer::reduce(&c, true);
         r.check_d_all();
     }
 
     #[test]
     fn as_complex_t2() { 
-        let c = Samples::<i32>::t2();
+        let c = ChainComplex::<i32>::t2();
         let r = ChainReducer::reduce(&c, false);
         r.check_d_all();
     }
 
     #[test]
     fn as_complex_with_trans() { 
-        let c = Samples::<i32>::t2();
+        let c = ChainComplex::<i32>::t2();
         let r = ChainReducer::reduce(&c, true);
         r.check_d_all();
         

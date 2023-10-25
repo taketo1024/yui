@@ -1,3 +1,5 @@
+mod samples;
+
 pub mod chain_reducer;
 pub mod homology_calc;
 

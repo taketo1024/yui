@@ -77,7 +77,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             },
             |idx, x| { 
                 let i = idx.0;
-                let dx = self.d_of(i, x);
+                let x = KhChain::from(x.clone());
+                let dx = self.d(i, &x);
                 dx.into_iter().collect()
             }
         );
@@ -97,7 +98,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         to self.inner { 
             pub fn gens(&self, i: isize) -> impl Iterator<Item = &KhEnhState>;
             pub fn vectorize(&self, i: isize, z: &KhChain<R>) -> SpVec<R>;
-            pub fn d_of(&self, i: isize, x: &KhEnhState) -> KhChain<R>;
             pub fn d(&self, i: isize, z: &KhChain<R>) -> KhChain<R>;
         }
     }

@@ -118,10 +118,6 @@ where
         }
     }
 
-    pub fn d_of(&self, i: I, x: &X) -> LinComb<X, R> { 
-        self.d(i, &LinComb::from(x.clone()))
-    }
-
     pub fn d(&self, i: I, z: &LinComb<X, R>) -> LinComb<X, R> { 
         let v = self.vectorize(i, z);
         let w = self.d_matrix(i) * v;

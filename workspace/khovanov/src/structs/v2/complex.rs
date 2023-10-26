@@ -230,7 +230,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn insert_sdl(v0: &mut TngVertex<R>, v1: &mut TngVertex<R>, sdl: Cob) { 
-        let f = Mor::from_gen(sdl);
+        let f = Mor::from(sdl);
         v0.out_edges.insert(v1.key, f);
         v1.in_edges.insert(v0.key);
     }
@@ -553,12 +553,12 @@ mod tests {
             TngComp::arc(0,1),
             TngComp::arc(2,3)
         ]));
-        let f = Mor::from_pair(c.clone(), -1);
+        let f = Mor::from((c.clone(), -1));
 
         assert!(f.is_invertible());
         assert_eq!(f.inv(), Some(f.clone()));
 
-        let f = Mor::from_pair(c.clone(), 2);
+        let f = Mor::from((c.clone(), 2));
         assert_eq!(f.is_invertible(), false);
         assert_eq!(f.inv(), None);
     }

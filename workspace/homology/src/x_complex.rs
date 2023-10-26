@@ -119,7 +119,7 @@ where
     }
 
     pub fn d_of(&self, i: I, x: &X) -> LinComb<X, R> { 
-        self.d(i, &LinComb::from_gen(x.clone()))
+        self.d(i, &LinComb::from(x.clone()))
     }
 
     pub fn d(&self, i: I, z: &LinComb<X, R>) -> LinComb<X, R> { 

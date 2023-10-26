@@ -354,7 +354,7 @@ impl CobComp {
                 (0, 0, 0) if c.is_closed() => // ε.ι = 0
                     LinComb::zero(),
                 _ =>
-                    LinComb::from_gen(cob(c, x, y))
+                    LinComb::from(cob(c, x, y))
             }
         }
 
@@ -725,7 +725,7 @@ impl Cob {
     pub fn part_eval<R>(self, h: &R, t: &R) -> LinComb<Cob, R>
     where R: Ring, for<'x> &'x R: RingOps<R> {
         if self.should_part_eval() { 
-            let init = LinComb::from_gen(Cob::empty());
+            let init = LinComb::from(Cob::empty());
             self.comps.iter().fold(init, |res, c| { 
                 let eval = c.part_eval(h, t);
                 let all = cartesian!(res.iter(), eval.iter());
@@ -740,7 +740,7 @@ impl Cob {
                 prod.collect()
             })
         } else { 
-            LinComb::from_gen(self)
+            LinComb::from(self)
         }
     }
 

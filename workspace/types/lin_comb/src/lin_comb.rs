@@ -36,14 +36,6 @@ where
         new
     }
 
-    pub fn from_gen(x: X) -> Self {
-        Self::from_pair(x, R::one())
-    }
-
-    pub fn from_pair(x: X, r: R) -> Self {
-        Self::new(map!{ x => r })
-    }
-
     pub fn len(&self) -> usize {
         self.data.len()
     }
@@ -156,6 +148,27 @@ where
             }
         }
         res
+    }
+}
+
+impl<X, R> From<X> for LinComb<X, R>
+where
+    X: Gen,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{
+    fn from(x: X) -> Self {
+        Self::from((x, R::one()))
+    }    
+}
+
+impl<X, R> From<(X, R)> for LinComb<X, R>
+where
+    X: Gen,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{
+    fn from(value: (X, R)) -> Self {
+        let (x, r) = value;
+        Self::new(map!{ x => r })
     }
 }
 

@@ -15,7 +15,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let s = l.ori_pres_state();
         let colors = l.colored_seifert_circles(ori);
 
-        let mut z = KhChain::from_gen(
+        let mut z = KhChain::from(
             KhEnhState::new(s, KhLabel::empty())
         );
 

@@ -24,7 +24,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> TngElem<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn init(state: State, value: Cob) -> Self { 
-        let f = Mor::from_gen(Cob::empty());
+        let f = Mor::from(Cob::empty());
         let mors = map! { KhEnhState::init() => f };
         let x_count = 0;
 

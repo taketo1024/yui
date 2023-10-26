@@ -37,12 +37,7 @@ where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn from_const(r: R) -> Self {
-        Self::from_pair(X::one(), r)
-    }
-
-    pub fn from_pair(x: X, r: R) -> Self { 
-        let t = LinComb::from_pair(x, r);
-        Self::new_raw(t)
+        Self::from((X::one(), r))
     }
 
     pub fn as_lincomb(&self) -> &LinComb<X, R> { 
@@ -167,7 +162,15 @@ impl_var_mvar!(isize);
 impl<X, R> From<X> for PolyBase<X, R>
 where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn from(x: X) -> Self {
-        Self::from_pair(x, R::one())
+        Self::from((x, R::one()))
+    }
+}
+
+impl<X, R> From<(X, R)> for PolyBase<X, R>
+where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+    fn from(pair: (X, R)) -> Self {
+        let t = LinComb::from(pair);
+        Self::new_raw(t)
     }
 }
 
@@ -222,7 +225,7 @@ where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
 impl<X, R> One for PolyBase<X, R>
 where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn one() -> Self {
-        let t = LinComb::from_pair(X::one(), R::one());
+        let t = LinComb::from((X::one(), R::one()));
         Self::new_raw(t)
     }
 
@@ -411,7 +414,7 @@ where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
 
         let (x, a) = self.lead_term(); // (a x^i)^{-1} = a^{-1} x^{-i}
         if let (Some(xinv), Some(ainv)) = (x.inv(), a.inv()) { 
-            Some(Self::from_pair(xinv, ainv))
+            Some(Self::from((xinv, ainv)))
         } else { 
             None
         }
@@ -447,7 +450,8 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
             
             let k = i.deg() - j.deg(); // >= 0
             let c = a / b;
-            let q = Poly::from_pair(Mono::from(k), c);   // cx^k = (a/b) x^{i-j}.
+            let x = Mono::from(k);
+            let q = Poly::from((x, c));   // cx^k = (a/b) x^{i-j}.
             let r = f - &q * g;
             
             (q, r)
@@ -726,7 +730,8 @@ mod tests {
         let f = P::from_iter([(x(0), 3), (x(1), 2)]);
 
         assert_eq!(f.pow(0), P::one());
-        assert_eq!(f.pow(1), f);       assert_eq!(f.pow(0), P::one());
+        assert_eq!(f.pow(1), f);
+        assert_eq!(f.pow(0), P::one());
         assert_eq!(f.pow(2), P::from_iter([(x(0), 9), (x(1), 12), (x(2), 4)]));
     }
 
@@ -738,8 +743,9 @@ mod tests {
         let f = P::variable();
 
         assert_eq!(f.pow(0), P::one());
-        assert_eq!(f.pow(-1), P::from_pair(x(-1), 1));       assert_eq!(f.pow(0), P::one());
-        assert_eq!(f.pow(-2), P::from_pair(x(-2), 1));
+        assert_eq!(f.pow(-1), P::from((x(-1), 1)));
+        assert_eq!(f.pow(0), P::one());
+        assert_eq!(f.pow(-2), P::from((x(-2), 1)));
     }
 
     #[test]
@@ -816,9 +822,9 @@ mod tests {
 
         let f = P::variable();
         assert_eq!(f.is_unit(), true);
-        assert_eq!(f.inv(), Some(P::from_pair(x(-1), 1)));
+        assert_eq!(f.inv(), Some(P::from((x(-1), 1))));
 
-        let f = P::from_pair(x(1), 2);
+        let f = P::from((x(1), 2));
         assert_eq!(f.is_unit(), false);
         assert_eq!(f.inv(), None);
 
@@ -848,11 +854,11 @@ mod tests {
 
         let f = P::variable();
         assert_eq!(f.is_unit(), true);
-        assert_eq!(f.inv(), Some(P::from_pair(x(-1), R::one())));
+        assert_eq!(f.inv(), Some(P::from((x(-1), R::one()))));
 
-        let f = P::from_pair(x(1), R::from_numer(2));
+        let f = P::from((x(1), R::from_numer(2)));
         assert_eq!(f.is_unit(), true);
-        assert_eq!(f.inv(), Some(P::from_pair(x(-1), R::new(1, 2))));
+        assert_eq!(f.inv(), Some(P::from((x(-1), R::new(1, 2)))));
 
         let f = P::from_iter([(x(0), R::one()), (x(1), R::one())]);
         assert_eq!(f.is_unit(), false);

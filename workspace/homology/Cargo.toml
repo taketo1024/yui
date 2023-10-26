@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+bimap = "0.6.3"
 delegate = "0.10.0"
 derive_more = "0.99.17"
 grouping_by = "0.2.2"

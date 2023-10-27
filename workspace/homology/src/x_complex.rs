@@ -140,7 +140,7 @@ where
     delegate! { 
         to self.inner { 
             fn support(&self) -> Self::Itr;
-            fn display(&self, i: I) -> String;
+            fn display_at(&self, i: I) -> Option<String>;
         }
     }
 

@@ -1,6 +1,5 @@
 use std::ops::Index;
 use std::collections::HashMap;
-use std::fmt::Display;
 
 use itertools::Itertools;
 use yui_core::{EucRing, EucRingOps, Ring, RingOps, Deg, isize2, isize3};
@@ -75,14 +74,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         t.backward(v)
     }
 
-    pub fn print(&self) {
-        println!("{}", self.to_string())
-    }
-}
-
-impl<R> Display for HomologySummand<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    pub fn display(&self) -> Option<String> {
         use yui_utils::superscript;
 
         let rank = self.rank();
@@ -92,7 +84,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             .collect_vec();
 
         if rank == 0 && tors.is_empty() { 
-            return f.write_str(".")
+            return None
         }
     
         let mut res = vec![];
@@ -116,7 +108,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     
         let str = res.join(" ⊕ ");
-        f.write_str(&str) 
+        Some(str)
     }
 }
 
@@ -176,8 +168,8 @@ where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
         self.support.clone().into_iter()
     }
 
-    fn display(&self, i: I) -> String {
-        self.get(i).to_string()
+    fn display_at(&self, i: I) -> Option<String> {
+        self.get(i).display()
     }
 }
 

@@ -41,7 +41,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     delegate! { 
         to self.inner { 
             fn support(&self) -> Self::Itr;
-            fn display(&self, i: isize) -> String;
+            fn display_at(&self, i: isize) -> Option<String>;
         }
     }
 }
@@ -85,7 +85,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     delegate! { 
         to self.inner { 
             fn support(&self) -> Self::Itr;
-            fn display(&self, i: isize2) -> String;
+            fn display_at(&self, i: isize2) -> Option<String>;
         }
     }
 }

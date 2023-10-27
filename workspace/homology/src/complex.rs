@@ -60,7 +60,7 @@ where I: Deg, Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
     }
     
     fn display_d_at(&self, i: I) -> String {
-        let c = |i| self.display(i);
+        let c = |i| self.display_at(i).unwrap();
         let c0 = c(i);
         let c1 = c(i + self.d_deg());
         let d = self.d_matrix(i).to_dense();
@@ -140,17 +140,18 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         self.support.clone().into_iter()
     }
 
-    fn display(&self, i: I) -> String {
+    fn display_at(&self, i: I) -> Option<String> {
         use yui_utils::superscript;
 
         let symbol = R::math_symbol();
         let rank = self.rank(i);
         if rank > 1 {
-            format!("{}{}", symbol, superscript(rank as isize))
+            let f = format!("{}{}", symbol, superscript(rank as isize));
+            Some(f)
         } else if rank == 1 { 
-            symbol
+            Some(symbol)
         } else { 
-            String::from(".")
+            None
         }
     }
 }

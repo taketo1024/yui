@@ -1,9 +1,9 @@
-use std::ops::RangeInclusive;
+use std::ops::{RangeInclusive, Index};
 use cartesian::cartesian;
 
 use delegate::delegate;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps, isize2};
-use yui_matrix::sparse::{SpMat, SpVec};
+use yui_matrix::sparse::SpVec;
 use yui_link::Link;
 use yui_homology::{ChainComplexTrait, XChainComplex, XChainComplex2, GridTrait, ChainComplexSummand};
 
@@ -103,6 +103,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
+impl<R> Index<isize> for KhComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = ChainComplexSummand<R>;
+    delegate! { 
+        to self.inner {
+            fn index(&self, index: isize) -> &Self::Output;
+        }
+    }
+}
+
 impl<R> GridTrait<isize> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Itr = std::vec::IntoIter<isize>;
@@ -123,9 +133,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     delegate! { 
         to self.inner { 
-            fn rank(&self, i: isize) -> usize;
             fn d_deg(&self) -> isize;
-            fn d_matrix(&self, i: isize) -> &SpMat<Self::R>;
         }
     }
 }
@@ -158,6 +166,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
+impl<R> Index<(isize, isize)> for KhComplexBigraded<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = ChainComplexSummand<R>;
+
+    delegate! { 
+        to self.inner { 
+            fn index(&self, #[into] index: (isize, isize)) -> &Self::Output;
+        }
+    }
+}
+
 impl<R> GridTrait<isize2> for KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Itr = std::vec::IntoIter<isize2>;
@@ -178,9 +197,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     delegate! { 
         to self.inner { 
-            fn rank(&self, i: isize2) -> usize;
             fn d_deg(&self) -> isize2;
-            fn d_matrix(&self, i: isize2) -> &SpMat<Self::R>;
         }
     }
 }

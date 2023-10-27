@@ -63,24 +63,11 @@ where I: Deg {
     }
 }
 
-impl<E> Index<isize> for Grid<E> {
+impl<I, E> Index<I> for GridBase<I, E>
+where I: Deg {
     type Output = E;
-    fn index(&self, i: isize) -> &Self::Output {
+    fn index(&self, i: I) -> &Self::Output {
         self.get(i)
-    }
-}
-
-impl<E> Index<(isize, isize)> for Grid2<E> {
-    type Output = E;
-    fn index(&self, i: (isize, isize)) -> &Self::Output {
-        self.get(isize2(i.0, i.1))
-    }
-}
-
-impl<E> Index<(isize, isize, isize)> for Grid3<E> {
-    type Output = E;
-    fn index(&self, i: (isize, isize, isize)) -> &Self::Output {
-        self.get(isize3(i.0, i.1, i.2))
     }
 }
 

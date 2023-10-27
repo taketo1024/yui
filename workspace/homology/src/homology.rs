@@ -144,32 +144,12 @@ where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 }
 
-impl<R> Index<isize> for HomologyBase<isize, R>
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+impl<I, R> Index<I> for HomologyBase<I, R>
+where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
     type Output = HomologySummand<R>;
     delegate! { 
         to self.summands { 
-            fn index(&self, i: isize) -> &Self::Output;
-        }
-    }
-}
-
-impl<R> Index<(isize, isize)> for HomologyBase<isize2, R>
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    type Output = HomologySummand<R>;
-    delegate! { 
-        to self.summands { 
-            fn index(&self, i: (isize, isize)) -> &Self::Output;
-        }
-    }
-}
-
-impl<R> Index<(isize, isize, isize)> for HomologyBase<isize3, R>
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    type Output = HomologySummand<R>;
-    delegate! { 
-        to self.summands { 
-            fn index(&self, i: (isize, isize, isize)) -> &Self::Output;
+            fn index(&self, i: I) -> &Self::Output;
         }
     }
 }
@@ -191,7 +171,7 @@ where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
 #[cfg(test)]
 mod tests { 
     use yui_matrix::sparse::SpVec;
-    use crate::{ChainComplexTrait, ChainComplex};
+    use crate::{ChainComplex, ChainComplexSummandTrait};
 
     #[test]
     fn zero() { 
@@ -324,7 +304,7 @@ mod tests {
 
         let z = h2.gen(0);
         assert!(!z.is_zero());
-        assert!(c.is_cycle(2, &z));
+        assert!(c[2].is_cycle(&z));
         assert_eq!(h2.trans_forward(&z), SpVec::from(vec![1]));
     }
 
@@ -338,7 +318,7 @@ mod tests {
 
         let z = h2.gen(0);
         assert!(!z.is_zero());
-        assert!(c.is_cycle(2, &z));
+        assert!(c[2].is_cycle(&z));
         assert_eq!(h2.trans_forward(&z), SpVec::from(vec![1]));
         assert_eq!(h2.ngens(), 1);
 
@@ -350,8 +330,8 @@ mod tests {
 
         assert!(!a.is_zero());
         assert!(!b.is_zero());
-        assert!(c.is_cycle(1, &a));
-        assert!(c.is_cycle(1, &b));
+        assert!(c[1].is_cycle(&a));
+        assert!(c[1].is_cycle(&b));
         assert_eq!(h1.trans_forward(&a), SpVec::from(vec![1, 0]));
         assert_eq!(h1.trans_forward(&b), SpVec::from(vec![0, 1]));
     }
@@ -367,7 +347,7 @@ mod tests {
         let z = h1.gen(0);
 
         assert!(!z.is_zero());
-        assert!(c.is_cycle(1, &z));
+        assert!(c[1].is_cycle(&z));
         assert_eq!(h1.trans_forward(&z), SpVec::from(vec![1]));
     }
 }

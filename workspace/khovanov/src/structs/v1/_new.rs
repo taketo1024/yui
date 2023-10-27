@@ -51,7 +51,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 #[cfg(test)]
 mod tests {
-    use yui_homology::ChainComplexTrait;
+    use yui_homology::{ChainComplexTrait, ChainComplexSummandTrait};
     use yui_link::Link;
     use super::KhComplex;
 
@@ -62,10 +62,10 @@ mod tests {
 
         assert_eq!(c.h_range(), -3..=0);
 
-        assert_eq!(c.rank(-3), 8);
-        assert_eq!(c.rank(-2), 12);
-        assert_eq!(c.rank(-1), 6);
-        assert_eq!(c.rank( 0), 4);
+        assert_eq!(c[-3].rank(), 8);
+        assert_eq!(c[-2].rank(), 12);
+        assert_eq!(c[-1].rank(), 6);
+        assert_eq!(c[ 0].rank(), 4);
 
         c.check_d_all();
 

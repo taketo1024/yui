@@ -1,3 +1,5 @@
+use std::ops::Index;
+
 use bimap::BiHashMap;
 use delegate::delegate;
 
@@ -7,7 +9,7 @@ use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
 use yui_lin_comb::{Gen, LinComb};
 use yui_matrix::sparse::{SpMat, SpVec};
 
-use crate::{HomologySummand, GridBase, GridIter, ChainComplexSummand};
+use crate::{HomologySummand, GridBase, GridIter, ChainComplexSummand, ChainComplexSummandTrait};
 
 use super::grid::GridTrait;
 use super::complex::{ChainComplexTrait, ChainComplexBase};
@@ -87,7 +89,7 @@ where
     }
 
     pub fn vectorize(&self, i: I, z: &LinComb<X, R>) -> SpVec<R> {
-        let r = self.rank(i);
+        let r = self[i].rank();
         SpVec::generate(r, |set| { 
             for (x, a) in z.iter() { 
                 let j = self.index_of(i, x);
@@ -108,13 +110,29 @@ where
     }
 
     pub fn d(&self, i: I, z: &LinComb<X, R>) -> LinComb<X, R> { 
+        let d = self[i].d_matrix();
         let v = self.vectorize(i, z);
-        let w = self.d_matrix(i) * v;
+        let w = d * v;
         self.as_chain(i + self.d_deg(), &w)
     }
 
     pub fn inner(&self) -> &ChainComplexBase<I, R> { 
         &self.inner
+    }
+}
+
+impl<I, X, R> Index<I> for XChainComplexBase<I, X, R>
+where 
+    I: Deg,
+    X: Gen,
+    R: Ring, for<'x> &'x R: RingOps<R>,
+{
+    type Output = ChainComplexSummand<R>;
+
+    delegate! { 
+        to self.inner { 
+            fn index(&self, index: I) -> &Self::Output;
+        }
     }
 }
 
@@ -144,14 +162,9 @@ where
 {
     type R = R;
 
-    fn rank(&self, i: I) -> usize {
-        self.gens.get(i).len()
-    }
-
     delegate! { 
         to self.inner { 
             fn d_deg(&self) -> I;
-            fn d_matrix(&self, i: I) -> &SpMat<Self::R>;
         }
     }
 }
@@ -194,8 +207,8 @@ mod tests {
             }
         );
 
-        assert_eq!(c.rank(0), 1);
-        assert_eq!(c.rank(1), 1);
-        assert_eq!(c.d_matrix(1), &SpMat::from_vec((1,1), vec![1]));
+        assert_eq!(c[0].rank(), 1);
+        assert_eq!(c[1].rank(), 1);
+        assert_eq!(c[1].d_matrix(), &SpMat::from_vec((1,1), vec![1]));
     }
 }

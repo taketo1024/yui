@@ -59,7 +59,7 @@ where
     }
 
     pub fn matrix(&self, i: I) -> &SpMat<C::R> {
-        self.mats.get(&i).unwrap_or(self.complex.d_matrix(i))
+        self.mats.get(&i).unwrap_or(self.complex.get(i).d_matrix())
     }
 
     pub fn trans(&self, i: I) -> Option<&Trans<C::R>> {
@@ -155,7 +155,7 @@ where
     }
 
     fn init_at(&mut self, i: I) {
-        let d = self.complex.d_matrix(i);
+        let d = self.complex.get(i).d_matrix();
         let n = d.cols();
 
         self.mats.insert(i, d.clone());
@@ -288,7 +288,7 @@ mod tests {
         let v = SpVec::unit(1, 0);
         let w = t2.backward(&v);
         
-        assert!(c.is_cycle(2, &w));
+        assert!(c[2].is_cycle(&w));
     }
 
     #[test]
@@ -317,15 +317,15 @@ mod tests {
         let v = SpVec::unit(1, 0);
         let w = t2.backward(&v);
         
-        assert!(c.is_cycle(2, &w));
+        assert!(c[2].is_cycle(&w));
 
         let a = SpVec::unit(2, 0);
         let b = SpVec::unit(2, 1);
         let a = t1.backward(&a);
         let b = t1.backward(&b);
         
-        assert!(c.is_cycle(1, &a));
-        assert!(c.is_cycle(1, &b));
+        assert!(c[1].is_cycle(&a));
+        assert!(c[1].is_cycle(&b));
     }
 
     #[test]
@@ -353,7 +353,7 @@ mod tests {
 
         let v = SpVec::unit(1, 0); // generates 2
         let w = t2.backward(&v);
-        let dw = c.d(2, &w);
+        let dw = c[2].d(&w);
         let dv = t1.forward(&dw);
 
         assert!(
@@ -364,7 +364,7 @@ mod tests {
         let v = SpVec::unit(1, 0);
         let w = t1.backward(&v);
         
-        assert!(c.is_cycle(1, &w));
+        assert!(c[1].is_cycle(&w));
     }
 
     #[test]
@@ -405,12 +405,12 @@ mod tests {
         let v = r.trans_backward(2, &u);
 
         assert!(!v.is_zero());
-        assert!(c.is_cycle(2, &v));
+        assert!(c[2].is_cycle(&v));
 
         let w = r.trans_forward(2, &v);
 
         assert!(!w.is_zero());
-        assert!(r.is_cycle(2, &w));
+        assert!(r[2].is_cycle(&w));
         assert_eq!(w, u);
     }
 }

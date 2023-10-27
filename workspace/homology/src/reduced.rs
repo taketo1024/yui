@@ -1,3 +1,5 @@
+use std::ops::Index;
+
 use delegate::delegate;
 
 use yui_core::{Deg, Ring, RingOps, EucRing, EucRingOps, isize2, isize3};
@@ -46,7 +48,7 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 
         let trans = GridBase::new(complex.support(), trans_map);        
         let inner = ChainComplexBase::new(complex.support(), complex.d_deg(), |i| { 
-            let d = complex.d_matrix(i);
+            let d = complex.get(i).d_matrix();
             let i1 = i + complex.d_deg();
             let t_in  = trans.get(i).backward_mat();
             let t_out = trans.get(i1).forward_mat();
@@ -63,14 +65,14 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         C::E: ChainComplexSummandTrait<R = R>
     {
         let trans = if with_trans { 
-            Some(|i| Trans::id(complex.rank(i)))
+            Some(|i| Trans::id(complex.get(i).rank()))
         } else { 
             None
         };
         Self::new(
             complex.support(), 
             complex.d_deg(), 
-            |i| complex.d_matrix(i).clone(), 
+            |i| complex.get(i).d_matrix().clone(), 
             trans
         )
     }
@@ -87,6 +89,14 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn trans_backward(&self, i: I, v: &SpVec<R>) -> SpVec<R> { 
         assert!(self.trans.is_some());
         self.trans_at(i).unwrap().backward(v)
+    }
+}
+
+impl<I, R> Index<I> for ReducedComplexBase<I, R>
+where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = ChainComplexSummand<R>;
+    fn index(&self, i: I) -> &Self::Output {
+        self.get(i)
     }
 }
 
@@ -111,7 +121,6 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     delegate! { 
         to self.inner { 
             fn d_deg(&self) -> I;
-            fn d_matrix(&self, i: I) -> &SpMat<Self::R>;
         }
     }
 }
@@ -138,10 +147,10 @@ mod tests {
     fn d3() { 
         let c = ChainComplex::<i64>::d3().reduced(false);
 
-        assert_eq!(c.rank(0), 1);
-        assert_eq!(c.rank(1), 0);
-        assert_eq!(c.rank(2), 0);
-        assert_eq!(c.rank(3), 0);
+        assert_eq!(c[0].rank(), 1);
+        assert_eq!(c[1].rank(), 0);
+        assert_eq!(c[2].rank(), 0);
+        assert_eq!(c[3].rank(), 0);
 
         c.check_d_all();
     }
@@ -150,9 +159,9 @@ mod tests {
     fn s2() { 
         let c = ChainComplex::<i64>::s2().reduced(false);
 
-        assert_eq!(c.rank(0), 1);
-        assert_eq!(c.rank(1), 0);
-        assert_eq!(c.rank(2), 1);
+        assert_eq!(c[0].rank(), 1);
+        assert_eq!(c[1].rank(), 0);
+        assert_eq!(c[2].rank(), 1);
 
         c.check_d_all();
     }
@@ -161,31 +170,31 @@ mod tests {
     fn t2() { 
         let c = ChainComplex::<i64>::t2().reduced(false);
 
-        assert_eq!(c.rank(0), 1);
-        assert_eq!(c.rank(1), 2);
-        assert_eq!(c.rank(2), 1);
+        assert_eq!(c[0].rank(), 1);
+        assert_eq!(c[1].rank(), 2);
+        assert_eq!(c[2].rank(), 1);
 
         c.check_d_all();
 
-        assert!(c.d_matrix(1).is_zero());
-        assert!(c.d_matrix(2).is_zero());
+        assert!(c[1].d_matrix().is_zero());
+        assert!(c[2].d_matrix().is_zero());
     }
 
     #[test]
     fn rp2() { 
         let c = ChainComplex::<i64>::rp2().reduced(false);
         
-        assert_eq!(c.rank(0), 1);
-        assert_eq!(c.rank(1), 1);
-        assert_eq!(c.rank(2), 1);
+        assert_eq!(c[0].rank(), 1);
+        assert_eq!(c[1].rank(), 1);
+        assert_eq!(c[2].rank(), 1);
 
         c.check_d_all();
 
-        assert!( c.d_matrix(0).is_zero());
-        assert!( c.d_matrix(1).is_zero());
-        assert!(!c.d_matrix(2).is_zero());
+        assert!( c[0].d_matrix().is_zero());
+        assert!( c[1].d_matrix().is_zero());
+        assert!(!c[2].d_matrix().is_zero());
 
-        let a = c.d_matrix(2).to_dense()[[0, 0]];
+        let a = c[2].d_matrix().to_dense()[[0, 0]];
         assert!(a == 2 || a == -2);
     }
     
@@ -198,17 +207,17 @@ mod tests {
 
         let c = c.reduced_by(|i| f.trans(i).unwrap().clone());
 
-        assert_eq!(c.rank(0), 1);
-        assert_eq!(c.rank(1), 1);
-        assert_eq!(c.rank(2), 1);
+        assert_eq!(c[0].rank(), 1);
+        assert_eq!(c[1].rank(), 1);
+        assert_eq!(c[2].rank(), 1);
 
         c.check_d_all();
 
-        assert!( c.d_matrix(0).is_zero());
-        assert!( c.d_matrix(1).is_zero());
-        assert!(!c.d_matrix(2).is_zero());
+        assert!( c[0].d_matrix().is_zero());
+        assert!( c[1].d_matrix().is_zero());
+        assert!(!c[2].d_matrix().is_zero());
 
-        let a = c.d_matrix(2).to_dense()[[0, 0]];
+        let a = c[2].d_matrix().to_dense()[[0, 0]];
         assert!(a == 2 || a == -2);
     }
 
@@ -219,12 +228,12 @@ mod tests {
 
         r.check_d_all();
 
-        assert_eq!(c.rank(0), r.rank(0));
-        assert_eq!(c.rank(1), r.rank(1));
-        assert_eq!(c.rank(2), r.rank(2));
+        assert_eq!(c[0].rank(), r[0].rank());
+        assert_eq!(c[1].rank(), r[1].rank());
+        assert_eq!(c[2].rank(), r[2].rank());
 
-        assert_eq!(c.d_matrix(0), r.d_matrix(0));
-        assert_eq!(c.d_matrix(1), r.d_matrix(1));
-        assert_eq!(c.d_matrix(2), r.d_matrix(2));
+        assert_eq!(c[0].d_matrix(), r[0].d_matrix());
+        assert_eq!(c[1].d_matrix(), r[1].d_matrix());
+        assert_eq!(c[2].d_matrix(), r[2].d_matrix());
     }
 }

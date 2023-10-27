@@ -197,7 +197,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests { 
-    use yui_homology::ChainComplexTrait;
+    use yui_homology::{ChainComplexTrait, ChainComplexSummandTrait};
     use super::*;
 
     #[test]
@@ -208,8 +208,8 @@ mod tests {
 
         let c = b.complex.eval(&0, &0);
 
-        assert_eq!(c.rank(0), 2);
-        assert_eq!(c.rank(1), 0);
+        assert_eq!(c[0].rank(), 2);
+        assert_eq!(c[1].rank(), 0);
     }
 
     #[test]
@@ -222,8 +222,8 @@ mod tests {
 
         c.check_d_all();
 
-        assert_eq!(c.rank(-1), 0);
-        assert_eq!(c.rank(0), 2);
+        assert_eq!(c[-1].rank(), 0);
+        assert_eq!(c[ 0].rank(), 2);
     }
 
     #[test]
@@ -236,9 +236,9 @@ mod tests {
 
         c.check_d_all();
 
-        assert_eq!(c.rank(-1), 0);
-        assert_eq!(c.rank(0), 2);
-        assert_eq!(c.rank(1), 0);
+        assert_eq!(c[-1].rank(), 0);
+        assert_eq!(c[ 0].rank(), 2);
+        assert_eq!(c[ 1].rank(), 0);
     }
 
     #[test]
@@ -252,9 +252,9 @@ mod tests {
 
         c.check_d_all();
 
-        assert_eq!(c.rank(-1), 0);
-        assert_eq!(c.rank(0), 4);
-        assert_eq!(c.rank(1), 0);
+        assert_eq!(c[-1].rank(), 0);
+        assert_eq!(c[ 0].rank(), 4);
+        assert_eq!(c[ 1].rank(), 0);
     }
 
     #[test]
@@ -267,9 +267,9 @@ mod tests {
 
         c.check_d_all();
 
-        assert_eq!(c.rank(-2), 2);
-        assert_eq!(c.rank(-1), 0);
-        assert_eq!(c.rank(0), 2);
+        assert_eq!(c[-2].rank(), 2);
+        assert_eq!(c[-1].rank(), 0);
+        assert_eq!(c[ 0].rank(), 2);
     }
 
     #[test]

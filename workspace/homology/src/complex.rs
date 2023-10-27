@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::mem;
+use std::ops::Index;
 
 use itertools::{Itertools, Either};
 use delegate::delegate;
@@ -19,6 +20,18 @@ pub type ChainComplex3<R> = ChainComplexBase<isize3, R>;
 pub trait ChainComplexSummandTrait: DisplayForGrid
 where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> { 
     type R;
+    fn rank(&self) -> usize;
+    fn d_matrix(&self) -> &SpMat<Self::R>;
+
+    fn d(&self, v: &SpVec<Self::R>) -> SpVec<Self::R> {
+        assert_eq!(self.rank(), v.dim());
+        let d = self.d_matrix();
+        d * v
+    }
+
+    fn is_cycle(&self, v: &SpVec<Self::R>) -> bool { 
+        self.d(v).is_zero()
+    }
 }
 
 pub trait ChainComplexTrait<I>: GridTrait<I> + Sized
@@ -30,37 +43,18 @@ where
     type R;
 
     fn d_deg(&self) -> I;
-    fn d_matrix(&self, i: I) -> &SpMat<Self::R>;
 
-    fn rank(&self, i: I) -> usize { 
-        if self.is_supported(i) { 
-            self.d_matrix(i).shape().1 // column
-        } else { 
-            0
-        }
-    }
-
-    fn d(&self, i: I, v: &SpVec<Self::R>) -> SpVec<Self::R> {
-        assert_eq!(self.rank(i), v.dim());
-        let d = self.d_matrix(i);
-        d * v
-    }
-
-    fn is_cycle(&self, i: I, v: &SpVec<Self::R>) -> bool { 
-        self.d(i, v).is_zero()
-    }
-
-    fn check_d_at(&self, i: I) { 
-        let i1 = i + self.d_deg();
-        if !(self.is_supported(i) && self.is_supported(i1)) {
+    fn check_d_at(&self, i0: I) { 
+        let i1 = i0 + self.d_deg();
+        if !(self.is_supported(i0) && self.is_supported(i1)) {
             return 
         }
 
-        let d0 = self.d_matrix(i);
-        let d1 = self.d_matrix(i1);
+        let d0 = self.get(i0).d_matrix();
+        let d1 = self.get(i1).d_matrix();
         let res = d1 * d0;
 
-        assert!( res.is_zero(), "d² is non-zero at {i}." );
+        assert!( res.is_zero(), "d² is non-zero at {i0}." );
     }
 
     fn check_d_all(&self) {
@@ -82,7 +76,7 @@ where
         let c = |i| self.get(i).display_for_grid();
         let c0 = c(i);
         let c1 = c(i + self.d_deg());
-        let d = self.d_matrix(i).to_dense();
+        let d = self.get(i).d_matrix().to_dense();
 
         if d.is_zero() { 
             format!("C[{i}] {c0} -> {c1}; zero.")
@@ -93,7 +87,7 @@ where
 
     fn display_d(&self) -> String { 
         self.support().filter_map(|i| 
-            if self.rank(i) > 0 && self.rank(i + self.d_deg()) > 0 {
+            if self.get(i).rank() > 0 && self.get(i + self.d_deg()).rank() > 0 {
                 Some(self.display_d_at(i))
             } else { 
                 None
@@ -107,37 +101,61 @@ where
 }
 
 pub struct ChainComplexSummand<R> {
-    _r: R // TODO
+    d_matrix: SpMat<R>
 }
 
-impl<R> DisplayForGrid for ChainComplexSummand<R> {
-    fn display_for_grid(&self) -> String {
-        todo!()
-        // use yui_utils::superscript;
+impl<R> ChainComplexSummand<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    pub fn new(d_matrix: SpMat<R>) -> Self { 
+        Self { d_matrix }
+    }
 
-        // let symbol = R::math_symbol();
-        // let rank = self.rank(i);
-        // if rank > 1 {
-        //     let f = format!("{}{}", symbol, superscript(rank as isize));
-        //     Some(f)
-        // } else if rank == 1 { 
-        //     Some(symbol)
-        // } else { 
-        //     None
-        // }
+    pub fn module_str(&self) -> String { 
+        use yui_utils::superscript;
+
+        let symbol = R::math_symbol();
+        let rank = self.rank();
+        if rank > 1 {
+            format!("{}{}", symbol, superscript(rank as isize))
+        } else if rank == 1 { 
+            symbol
+        } else { 
+            ".".to_string()
+        }
+    }
+}
+
+impl<R> Default for ChainComplexSummand<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn default() -> Self {
+        Self::new(SpMat::default())
+    }
+}
+
+impl<R> DisplayForGrid for ChainComplexSummand<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn display_for_grid(&self) -> String {
+        self.module_str()
     }
 }
 
 impl<R> ChainComplexSummandTrait for ChainComplexSummand<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type R = R;
-    // TODO
+
+    fn rank(&self) -> usize {
+        self.d_matrix.cols()
+    }
+
+    fn d_matrix(&self) -> &SpMat<Self::R> {
+        &self.d_matrix
+    }
 }
 
 pub struct ChainComplexBase<I, R>
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     d_deg: I,
-    d_matrix: GridBase<I, SpMat<R>>
+    summands: GridBase<I, ChainComplexSummand<R>>
 }
 
 impl<I, R> ChainComplexBase<I, R> 
@@ -148,7 +166,7 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         F: FnMut(I) -> SpMat<R>
     {
         let support = support.collect_vec();
-        let mut data = HashMap::from_iter( 
+        let mut data = HashMap::<I, SpMat<R>>::from_iter( 
             support.iter().map(|&i| (i, d_matrix(i))) 
         );
 
@@ -161,9 +179,22 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
             }
         }
 
-        let d_matrix = GridBase::new_raw(support, data);
+        let summands = GridBase::new_raw(
+            support, 
+            data.into_iter().map(|(i, d)| 
+                (i, ChainComplexSummand::new(d))
+            ).collect()
+        );
 
-        Self { d_deg, d_matrix }
+        Self { d_deg, summands }
+    }
+}
+
+impl<I, R> Index<I> for ChainComplexBase<I, R>
+where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = ChainComplexSummand<R>;
+    fn index(&self, i: I) -> &Self::Output {
+        self.get(i)
     }
 }
 
@@ -173,14 +204,11 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     type E = ChainComplexSummand<R>;
 
     delegate! { 
-        to self.d_matrix { 
+        to self.summands { 
             fn support(&self) -> Self::Itr;        
             fn is_supported(&self, i: I) -> bool;
+            fn get(&self, i: I) -> &Self::E;
         }
-    }
-
-    fn get(&self, _i: I) -> &Self::E {
-        todo!()
     }
 }
 
@@ -191,18 +219,14 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     fn d_deg(&self) -> I { 
         self.d_deg
     }
-
-    fn d_matrix(&self, i: I) -> &SpMat<R> { 
-        self.d_matrix.get(i)
-    }
 }
 
 impl<I, R> ChainComplexBase<I, R> 
 where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn homology_at(&self, i: I, with_trans: bool) -> HomologySummand<R> {
         let i0 = i - self.d_deg();
-        let d0 = self.d_matrix(i0);
-        let d1 = self.d_matrix(i);
+        let d0 = self.get(i0).d_matrix();
+        let d1 = self.get(i).d_matrix();
         HomologyCalc::calculate(d0, d1, with_trans)
     }
 
@@ -239,10 +263,10 @@ pub(crate) mod tests {
     fn d3() { 
         let c = ChainComplex::<i64>::d3();
 
-        assert_eq!(c.rank(0), 4);
-        assert_eq!(c.rank(1), 6);
-        assert_eq!(c.rank(2), 4);
-        assert_eq!(c.rank(3), 1);
+        assert_eq!(c[0].rank(), 4);
+        assert_eq!(c[1].rank(), 6);
+        assert_eq!(c[2].rank(), 4);
+        assert_eq!(c[3].rank(), 1);
 
         c.check_d_all();
     }
@@ -251,10 +275,10 @@ pub(crate) mod tests {
     fn s2() { 
         let c = ChainComplex::<i64>::s2();
 
-        assert_eq!(c.rank(0), 4);
-        assert_eq!(c.rank(1), 6);
-        assert_eq!(c.rank(2), 4);
-        assert_eq!(c.rank(3), 0);
+        assert_eq!(c[0].rank(), 4);
+        assert_eq!(c[1].rank(), 6);
+        assert_eq!(c[2].rank(), 4);
+        assert_eq!(c[3].rank(), 0);
 
         c.check_d_all();
     }
@@ -263,10 +287,10 @@ pub(crate) mod tests {
     fn t2() { 
         let c = ChainComplex::<i64>::t2();
 
-        assert_eq!(c.rank(0), 9);
-        assert_eq!(c.rank(1), 27);
-        assert_eq!(c.rank(2), 18);
-        assert_eq!(c.rank(3), 0);
+        assert_eq!(c[0].rank(), 9);
+        assert_eq!(c[1].rank(), 27);
+        assert_eq!(c[2].rank(), 18);
+        assert_eq!(c[3].rank(), 0);
 
         c.check_d_all();
     }
@@ -275,10 +299,10 @@ pub(crate) mod tests {
     fn rp2() { 
         let c = ChainComplex::<i64>::rp2();
         
-        assert_eq!(c.rank(0), 6);
-        assert_eq!(c.rank(1), 15);
-        assert_eq!(c.rank(2), 10);
-        assert_eq!(c.rank(3), 0);
+        assert_eq!(c[0].rank(), 6);
+        assert_eq!(c[1].rank(), 15);
+        assert_eq!(c[2].rank(), 10);
+        assert_eq!(c[3].rank(), 0);
 
         c.check_d_all();
     }

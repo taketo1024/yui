@@ -1,10 +1,9 @@
-use std::collections::HashMap;
 use delegate::delegate;
 
 use yui_core::{Deg, Ring, RingOps, EucRing, EucRingOps, isize2, isize3};
 use yui_matrix::sparse::{Trans, SpMat, SpVec};
 
-use crate::{ChainComplexBase, GridTrait, ChainComplexTrait, HomologySummand, HomologyBase, DisplayAt};
+use crate::{ChainComplexBase, GridTrait, ChainComplexTrait, HomologySummand, HomologyBase, DisplayAt, GridBase};
 
 pub type ReducedComplex<R>  = ReducedComplexBase<isize,  R>;
 pub type ReducedComplex2<R> = ReducedComplexBase<isize2, R>;
@@ -13,28 +12,26 @@ pub type ReducedComplex3<R> = ReducedComplexBase<isize3, R>;
 pub struct ReducedComplexBase<I, R>
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     inner: ChainComplexBase<I, R>,
-    trans: Option<HashMap<I, Trans<R>>>
+    trans: Option<GridBase<I, Trans<R>>>
 }
 
 impl<I, R> ReducedComplexBase<I, R>
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new<It, F1, F2>(support: It, d_deg: I, d_matrix: F1, trans: Option<F2>) -> Self
+    pub fn new<It, F1, F2>(support: It, d_deg: I, d_matrix: F1, trans_opt: Option<F2>) -> Self
     where 
         It: Iterator<Item = I>, 
         F1: FnMut(I) -> SpMat<R>,
         F2: FnMut(I) -> Trans<R>
     {
         let inner = ChainComplexBase::new(support, d_deg, d_matrix);
-        let trans = trans.map(|mut t| { 
-            HashMap::from_iter( 
-                inner.support().map(|i| (i, t(i))) 
-            )
+        let trans = trans_opt.map(|t| { 
+            GridBase::new(inner.support(), t)
         });
         
         Self { inner, trans }
     }
 
-    pub fn reduced_by<C, F>(complex: &C, mut trans: F) -> Self
+    pub fn reduced_by<C, F>(complex: &C, trans_map: F) -> Self
     where 
         C: ChainComplexTrait<I, R = R>,
         F: FnMut(I) -> Trans<R>
@@ -46,28 +43,17 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         //      |                V
         //     C'[i] - - - - > C'[i+1]
 
-        let mut trans = HashMap::from_iter( 
-            complex.support().map(|i| (i, trans(i))) 
-        );
-
-        for i in complex.support() {
-            let i1 = i + complex.d_deg();
-            if !trans.contains_key(&i1) { 
-                trans.insert(i1, Trans::id(0));
-            }
-        }
-        
+        let trans = GridBase::new(complex.support(), trans_map);        
         let inner = ChainComplexBase::new(complex.support(), complex.d_deg(), |i| { 
             let d = complex.d_matrix(i);
             let i1 = i + complex.d_deg();
-            let t_in  = trans[&i].backward_mat();
-            let t_out = trans[&i1].forward_mat();
+            let t_in  = trans.get(i).backward_mat();
+            let t_out = trans.get(i1).forward_mat();
 
             t_out * d * t_in
         });
-        let trans = Some(trans);
 
-        Self { inner, trans }
+        Self { inner, trans: Some(trans) }
     }
 
     pub fn bypass<C>(complex: &C, with_trans: bool) -> Self
@@ -87,18 +73,18 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         )
     }
 
-    pub fn trans(&self, i: I) -> Option<&Trans<R>> {
-        self.trans.as_ref().map(|ts| &ts[&i])
+    pub fn trans_at(&self, i: I) -> Option<&Trans<R>> {
+        self.trans.as_ref().map(|ts| ts.get(i))
     }
 
     pub fn trans_forward(&self, i: I, v: &SpVec<R>) -> SpVec<R> { 
         assert!(self.trans.is_some());
-        self.trans(i).unwrap().forward(v)
+        self.trans_at(i).unwrap().forward(v)
     }
 
     pub fn trans_backward(&self, i: I, v: &SpVec<R>) -> SpVec<R> { 
         assert!(self.trans.is_some());
-        self.trans(i).unwrap().backward(v)
+        self.trans_at(i).unwrap().backward(v)
     }
 }
 
@@ -234,6 +220,8 @@ mod tests {
     fn bypass() { 
         let c = ChainComplex::<i32>::t2();
         let r = ReducedComplex::bypass(&c, false);
+
+        r.check_d_all();
 
         assert_eq!(c.rank(0), r.rank(0));
         assert_eq!(c.rank(1), r.rank(1));

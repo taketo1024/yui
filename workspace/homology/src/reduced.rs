@@ -95,6 +95,7 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     delegate! { 
         to self.inner {
             fn support(&self) -> Self::Itr;
+            fn is_supported(&self, i: I) -> bool;
         }
     }
 }

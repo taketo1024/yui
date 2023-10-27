@@ -10,9 +10,7 @@ where I: Deg {
     type Itr: Iterator<Item = I>;
 
     fn support(&self) -> Self::Itr;
-    fn is_supported(&self, i: I) -> bool { 
-        self.support().contains(&i)
-    }
+    fn is_supported(&self, i: I) -> bool;
 }
 
 pub trait DisplayAt<I>

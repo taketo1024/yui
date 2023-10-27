@@ -5,7 +5,7 @@ use delegate::delegate;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps, isize2};
 use yui_matrix::sparse::{SpMat, SpVec};
 use yui_link::Link;
-use yui_homology::{ChainComplexTrait, XChainComplex, XChainComplex2, GridTrait, DisplayAt, ChainComplexSummand};
+use yui_homology::{ChainComplexTrait, XChainComplex, XChainComplex2, GridTrait, ChainComplexSummand};
 
 use crate::{KhEnhState, KhChain, KhHomology, KhHomologyBigraded};
 
@@ -117,15 +117,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<R> DisplayAt<isize> for KhComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    delegate! { 
-        to self.inner { 
-            fn display_at(&self, i: isize) -> Option<String>;
-        }
-    }
-}
-
 impl<R> ChainComplexTrait<isize> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type R = R;
@@ -177,15 +168,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             fn support(&self) -> Self::Itr;
             fn is_supported(&self, i: isize2) -> bool;
             fn get(&self, i: isize2) -> &Self::E;
-        }
-    }
-}
-
-impl<R> DisplayAt<isize2> for KhComplexBigraded<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    delegate! { 
-        to self.inner { 
-            fn display_at(&self, i: isize2) -> Option<String>;
         }
     }
 }

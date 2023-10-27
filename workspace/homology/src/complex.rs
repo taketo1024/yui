@@ -6,7 +6,7 @@ use delegate::delegate;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
 use yui_matrix::sparse::{SpMat, SpVec, MatType, Trans};
 
-use crate::{ReducedComplexBase, DisplayAt, GridBase, GridIter};
+use crate::{ReducedComplexBase, GridBase, GridIter, DisplayForGrid};
 
 use super::grid::GridTrait;
 use super::utils::{ChainReducer, HomologyCalc};
@@ -16,7 +16,7 @@ pub type ChainComplex<R>  = ChainComplexBase<isize,  R>;
 pub type ChainComplex2<R> = ChainComplexBase<isize2, R>;
 pub type ChainComplex3<R> = ChainComplexBase<isize3, R>;
 
-pub trait ChainComplexTrait<I>: GridTrait<I> + DisplayAt<I> + Sized
+pub trait ChainComplexTrait<I>: GridTrait<I> + Sized
 where I: Deg, Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> { 
     type R;
 
@@ -60,8 +60,28 @@ where I: Deg, Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
         }
     }
     
+    fn reduced(&self, with_trans: bool) -> ReducedComplexBase<I, Self::R> { 
+        ChainReducer::reduce(self, with_trans)
+    }
+
+    fn reduced_by<F>(&self, trans: F) -> ReducedComplexBase<I, Self::R>
+    where F: FnMut(I) -> Trans<Self::R> {
+        ReducedComplexBase::reduced_by(self, trans)
+    }
+}
+
+pub trait DisplayChainComplex<I> {
+    fn display_d_at(&self, i: I) -> String;
+    fn display_d(&self) -> String;
+    fn print_d(&self) {
+        println!("{}", self.display_d());
+    }
+}
+
+impl<I, C> DisplayChainComplex<I> for C 
+where I: Deg, C: ChainComplexTrait<I>, C::R: Ring, for<'x> &'x C::R: RingOps<C::R>, C::E: DisplayForGrid {
     fn display_d_at(&self, i: I) -> String {
-        let c = |i| self.display_at(i).unwrap();
+        let c = |i| self.get(i).display_for_grid();
         let c0 = c(i);
         let c1 = c(i + self.d_deg());
         let d = self.d_matrix(i).to_dense();
@@ -82,23 +102,28 @@ where I: Deg, Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
             }
         ).join("\n\n")
     }
-
-    fn print_d(&self) {
-        println!("{}", self.display_d());
-    }
-
-    fn reduced(&self, with_trans: bool) -> ReducedComplexBase<I, Self::R> { 
-        ChainReducer::reduce(self, with_trans)
-    }
-
-    fn reduced_by<F>(&self, trans: F) -> ReducedComplexBase<I, Self::R>
-    where F: FnMut(I) -> Trans<Self::R> {
-        ReducedComplexBase::reduced_by(self, trans)
-    }
 }
 
 pub struct ChainComplexSummand<R> {
     _r: R // TODO
+}
+
+impl<R> DisplayForGrid for ChainComplexSummand<R> {
+    fn display_for_grid(&self) -> String {
+        todo!()
+        // use yui_utils::superscript;
+
+        // let symbol = R::math_symbol();
+        // let rank = self.rank(i);
+        // if rank > 1 {
+        //     let f = format!("{}{}", symbol, superscript(rank as isize));
+        //     Some(f)
+        // } else if rank == 1 { 
+        //     Some(symbol)
+        // } else { 
+        //     None
+        // }
+    }
 }
 
 pub struct ChainComplexBase<I, R>
@@ -148,24 +173,6 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn get(&self, _i: I) -> &Self::E {
         todo!()
-    }
-}
-
-impl<I, R> DisplayAt<I> for ChainComplexBase<I, R>
-where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
-    fn display_at(&self, i: I) -> Option<String> {
-        use yui_utils::superscript;
-
-        let symbol = R::math_symbol();
-        let rank = self.rank(i);
-        if rank > 1 {
-            let f = format!("{}{}", symbol, superscript(rank as isize));
-            Some(f)
-        } else if rank == 1 { 
-            Some(symbol)
-        } else { 
-            None
-        }
     }
 }
 

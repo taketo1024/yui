@@ -45,7 +45,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     let kh = HomologyCalc::calculate(&a0, &a1, true);
 
-    info!("homology: {}", kh.display().unwrap());
+    info!("homology: {}", kh.module_str());
     
     let r = kh.rank();
 

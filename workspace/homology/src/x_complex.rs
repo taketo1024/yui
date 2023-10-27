@@ -7,7 +7,7 @@ use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
 use yui_lin_comb::{Gen, LinComb};
 use yui_matrix::sparse::{SpMat, SpVec};
 
-use crate::{HomologySummand, DisplayAt, GridBase, GridIter, ChainComplexSummand};
+use crate::{HomologySummand, GridBase, GridIter, ChainComplexSummand};
 
 use super::grid::GridTrait;
 use super::complex::{ChainComplexTrait, ChainComplexBase};
@@ -132,19 +132,6 @@ where
             fn support(&self) -> Self::Itr;
             fn is_supported(&self, i: I) -> bool;
             fn get(&self, i: I) -> &Self::E;
-        }
-    }
-}
-
-impl<I, X, R> DisplayAt<I> for XChainComplexBase<I, X, R>
-where 
-    I: Deg,
-    X: Gen,
-    R: Ring, for<'x> &'x R: RingOps<R>,
-{
-    delegate! { 
-        to self.inner { 
-            fn display_at(&self, i: I) -> Option<String>;
         }
     }
 }

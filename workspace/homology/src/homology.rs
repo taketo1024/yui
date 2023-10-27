@@ -5,7 +5,7 @@ use itertools::Itertools;
 use yui_core::{EucRing, EucRingOps, Ring, RingOps, Deg, isize2, isize3};
 use yui_matrix::sparse::{SpVec, Trans};
 
-use crate::{DisplayAt, GridBase, GridIter};
+use crate::{GridBase, GridIter, DisplayForGrid};
 
 use super::grid::GridTrait;
 use super::complex::ChainComplexBase;
@@ -76,7 +76,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         t.backward(v)
     }
 
-    pub fn display(&self) -> Option<String> {
+    pub fn module_str(&self) -> String { 
         use yui_utils::superscript;
 
         let rank = self.rank();
@@ -86,7 +86,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             .collect_vec();
 
         if rank == 0 && tors.is_empty() { 
-            return None
+            return ".".to_string()
         }
     
         let mut res = vec![];
@@ -110,7 +110,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     
         let str = res.join(" ⊕ ");
-        Some(str)
+        str
+    }
+}
+
+impl<R> DisplayForGrid for HomologySummand<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn display_for_grid(&self) -> String {
+        self.module_str()
     }
 }
 
@@ -134,12 +141,6 @@ where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
             |i| complex.homology_at(i, with_trans)
         );
         Self { summands }
-    }
-
-    delegate! { 
-        to self.summands { 
-            fn get(&self, i: I) -> &HomologySummand<R>;    
-        }
     }
 }
 
@@ -184,13 +185,6 @@ where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
             fn is_supported(&self, i: I) -> bool;
             fn get(&self, i: I) -> &Self::E;
         }
-    }
-}
-
-impl<I, R> DisplayAt<I> for HomologyBase<I, R>
-where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    fn display_at(&self, i: I) -> Option<String> {
-        self.get(i).display()
     }
 }
 

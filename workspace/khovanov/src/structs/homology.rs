@@ -1,7 +1,7 @@
 use std::ops::{RangeInclusive, Index};
 use delegate::delegate;
 
-use yui_homology::{Homology, HomologySummand, Homology2, GridTrait, DisplayAt};
+use yui_homology::{Homology, HomologySummand, Homology2, GridTrait};
 use yui_core::{EucRing, EucRingOps, isize2};
 use yui_link::Link;
 
@@ -48,15 +48,6 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 }
 
-impl<R> DisplayAt<isize> for KhHomology<R>
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    delegate! { 
-        to self.inner { 
-            fn display_at(&self, i: isize) -> Option<String>;
-        }
-    }
-}
-
 impl<R> Index<isize> for KhHomology<R> 
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     type Output = HomologySummand<R>;
@@ -99,15 +90,6 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
             fn support(&self) -> Self::Itr;
             fn is_supported(&self, i: isize2) -> bool;
             fn get(&self, i: isize2) -> &Self::E;
-        }
-    }
-}
-
-impl<R> DisplayAt<isize2> for KhHomologyBigraded<R>
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    delegate! { 
-        to self.inner { 
-            fn display_at(&self, i: isize2) -> Option<String>;
         }
     }
 }

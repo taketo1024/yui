@@ -4,7 +4,7 @@ use std::ops::Index;
 
 use itertools::{Itertools, Either};
 use delegate::delegate;
-use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
+use yui_core::{Elem, Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
 use yui_matrix::sparse::{SpMat, SpVec, MatType, Trans};
 
 use crate::{ReducedComplexBase, GridBase, GridIter, DisplayForGrid};
@@ -31,6 +31,20 @@ where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
 
     fn is_cycle(&self, v: &SpVec<Self::R>) -> bool { 
         self.d(v).is_zero()
+    }
+
+    fn module_str(&self) -> String { 
+        use yui_utils::superscript;
+
+        let symbol = Self::R::math_symbol();
+        let rank = self.rank();
+        if rank > 1 {
+            format!("{}{}", symbol, superscript(rank as isize))
+        } else if rank == 1 { 
+            symbol
+        } else { 
+            ".".to_string()
+        }
     }
 }
 
@@ -100,7 +114,9 @@ where
     }
 }
 
-pub struct ChainComplexSummand<R> {
+#[derive(Default)]
+pub struct ChainComplexSummand<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
     d_matrix: SpMat<R>
 }
 
@@ -108,27 +124,6 @@ impl<R> ChainComplexSummand<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(d_matrix: SpMat<R>) -> Self { 
         Self { d_matrix }
-    }
-
-    pub fn module_str(&self) -> String { 
-        use yui_utils::superscript;
-
-        let symbol = R::math_symbol();
-        let rank = self.rank();
-        if rank > 1 {
-            format!("{}{}", symbol, superscript(rank as isize))
-        } else if rank == 1 { 
-            symbol
-        } else { 
-            ".".to_string()
-        }
-    }
-}
-
-impl<R> Default for ChainComplexSummand<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn default() -> Self {
-        Self::new(SpMat::default())
     }
 }
 

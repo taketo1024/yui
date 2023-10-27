@@ -1214,6 +1214,7 @@ name = "yui-homology"
 version = "0.1.0"
 dependencies = [
  "bimap",
+ "cartesian",
  "delegate",
  "derive_more",
  "grouping_by",

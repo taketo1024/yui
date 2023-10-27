@@ -16,8 +16,17 @@ pub type ChainComplex<R>  = ChainComplexBase<isize,  R>;
 pub type ChainComplex2<R> = ChainComplexBase<isize2, R>;
 pub type ChainComplex3<R> = ChainComplexBase<isize3, R>;
 
+pub trait ChainComplexSummandTrait: DisplayForGrid
+where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> { 
+    type R;
+}
+
 pub trait ChainComplexTrait<I>: GridTrait<I> + Sized
-where I: Deg, Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> { 
+where 
+    I: Deg, 
+    Self::E: ChainComplexSummandTrait<R = Self::R>,
+    Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> 
+{ 
     type R;
 
     fn d_deg(&self) -> I;
@@ -68,18 +77,7 @@ where I: Deg, Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
     where F: FnMut(I) -> Trans<Self::R> {
         ReducedComplexBase::reduced_by(self, trans)
     }
-}
 
-pub trait DisplayChainComplex<I> {
-    fn display_d_at(&self, i: I) -> String;
-    fn display_d(&self) -> String;
-    fn print_d(&self) {
-        println!("{}", self.display_d());
-    }
-}
-
-impl<I, C> DisplayChainComplex<I> for C 
-where I: Deg, C: ChainComplexTrait<I>, C::R: Ring, for<'x> &'x C::R: RingOps<C::R>, C::E: DisplayForGrid {
     fn display_d_at(&self, i: I) -> String {
         let c = |i| self.get(i).display_for_grid();
         let c0 = c(i);
@@ -101,6 +99,10 @@ where I: Deg, C: ChainComplexTrait<I>, C::R: Ring, for<'x> &'x C::R: RingOps<C::
                 None
             }
         ).join("\n\n")
+    }
+
+    fn print_d(&self) {
+        println!("{}", self.display_d());
     }
 }
 
@@ -124,6 +126,12 @@ impl<R> DisplayForGrid for ChainComplexSummand<R> {
         //     None
         // }
     }
+}
+
+impl<R> ChainComplexSummandTrait for ChainComplexSummand<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type R = R;
+    // TODO
 }
 
 pub struct ChainComplexBase<I, R>

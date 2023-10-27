@@ -95,8 +95,11 @@ where I: Deg, E: Default {
     {
         let support = support.collect_vec();
         let data = support.iter().map(|&i| (i, e_map(i))).collect();
-        let dflt = E::default();
-        Self { support, data, dflt }
+        Self::new_raw(support, data)
+    }
+
+    pub fn new_raw(support: Vec<I>, data: HashMap<I, E>) -> Self { 
+        Self { support, data, dflt: E::default() }
     }
 }
 

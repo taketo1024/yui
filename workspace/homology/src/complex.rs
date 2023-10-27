@@ -2,10 +2,11 @@ use std::collections::HashMap;
 use std::mem;
 
 use itertools::{Itertools, Either};
+use delegate::delegate;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
 use yui_matrix::sparse::{SpMat, SpVec, MatType, Trans};
 
-use crate::{ReducedComplexBase, DisplayAt};
+use crate::{ReducedComplexBase, DisplayAt, GridBase};
 
 use super::grid::GridTrait;
 use super::utils::{ChainReducer, HomologyCalc};
@@ -98,10 +99,8 @@ where I: Deg, Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
 
 pub struct ChainComplexBase<I, R>
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
-    support: Vec<I>,
     d_deg: I,
-    d_matrix: HashMap<I, SpMat<R>>,
-    zero_d: SpMat<R>
+    d_matrix: GridBase<I, SpMat<R>>
 }
 
 impl<I, R> ChainComplexBase<I, R> 
@@ -112,23 +111,22 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         F: FnMut(I) -> SpMat<R>
     {
         let support = support.collect_vec();
-        let mut d_matrix = HashMap::from_iter( 
+        let mut data = HashMap::from_iter( 
             support.iter().map(|&i| (i, d_matrix(i))) 
         );
 
         // add zero maps
         for &i in support.iter() {
-            if !d_matrix.contains_key(&(i - d_deg)) { 
-                let r = d_matrix[&i].shape().1;
+            if !data.contains_key(&(i - d_deg)) { 
+                let r = data[&i].shape().1;
                 let d = SpMat::zero((r, 0));
-                d_matrix.insert(i - d_deg, d);
+                data.insert(i - d_deg, d);
             }
         }
-        let zero_d = SpMat::zero((0, 0));
 
-        Self { 
-            support, d_deg, d_matrix, zero_d
-        }
+        let d_matrix = GridBase::new_raw(support, data);
+
+        Self { d_deg, d_matrix }
     }
 }
 
@@ -136,8 +134,11 @@ impl<I, R> GridTrait<I> for ChainComplexBase<I, R>
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     type Itr = std::vec::IntoIter<I>;
 
-    fn support(&self) -> Self::Itr {
-        self.support.clone().into_iter()
+    delegate! { 
+        to self.d_matrix { 
+            fn support(&self) -> Self::Itr;        
+            fn is_supported(&self, i: I) -> bool;
+        }
     }
 }
 
@@ -168,11 +169,7 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn d_matrix(&self, i: I) -> &SpMat<R> { 
-        if let Some(d) = self.d_matrix.get(&i) {
-            d
-        } else { 
-            &self.zero_d
-        }
+        self.d_matrix.get(i)
     }
 }
 

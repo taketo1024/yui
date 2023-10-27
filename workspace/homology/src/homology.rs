@@ -1,11 +1,11 @@
 use std::ops::Index;
-use std::collections::HashMap;
 
+use delegate::delegate;
 use itertools::Itertools;
 use yui_core::{EucRing, EucRingOps, Ring, RingOps, Deg, isize2, isize3};
 use yui_matrix::sparse::{SpVec, Trans};
 
-use crate::DisplayAt;
+use crate::{DisplayAt, GridBase};
 
 use super::grid::GridTrait;
 use super::complex::ChainComplexBase;
@@ -30,7 +30,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         Self { rank, tors, trans }
     }
 
-    fn zero() -> Self { 
+    pub fn zero() -> Self { 
         Self::new(0, vec![], None)
     }
 
@@ -114,60 +114,73 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
+impl<R> Default for HomologySummand<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn default() -> Self {
+        Self::zero()
+    }
+}
+
 pub struct HomologyBase<I, R>
 where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    support: Vec<I>,
-    summands: HashMap<I, HomologySummand<R>>,
-    zero_smd: HomologySummand<R>
+    summands: GridBase<I, HomologySummand<R>>
 }
 
 impl<I, R> HomologyBase<I, R>
 where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn new(complex: &ChainComplexBase<I, R>, with_trans: bool) -> Self { 
-        let support = complex.support().collect_vec();
-        let summands = HashMap::from_iter(
-            support.iter().map(|&i|
-                (i, complex.homology_at(i, with_trans))
-            )
+        let summands = GridBase::new(
+            complex.support(), 
+            |i| complex.homology_at(i, with_trans)
         );
-        let zero_smd = HomologySummand::zero();
-        Self { support, summands, zero_smd }
+        Self { summands }
     }
 
-    pub fn get(&self, i: I) -> &HomologySummand<R> {
-        self.summands.get(&i).unwrap_or(&self.zero_smd)
+    delegate! { 
+        to self.summands { 
+            fn get(&self, i: I) -> &HomologySummand<R>;    
+        }
     }
 }
 
 impl<R> Index<isize> for HomologyBase<isize, R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     type Output = HomologySummand<R>;
-    fn index(&self, i: isize) -> &Self::Output {
-        self.get(i)
+    delegate! { 
+        to self.summands { 
+            fn index(&self, i: isize) -> &Self::Output;
+        }
     }
 }
 
 impl<R> Index<(isize, isize)> for HomologyBase<isize2, R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     type Output = HomologySummand<R>;
-    fn index(&self, i: (isize, isize)) -> &Self::Output {
-        self.get(isize2(i.0, i.1))
+    delegate! { 
+        to self.summands { 
+            fn index(&self, i: (isize, isize)) -> &Self::Output;
+        }
     }
 }
 
 impl<R> Index<(isize, isize, isize)> for HomologyBase<isize3, R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     type Output = HomologySummand<R>;
-    fn index(&self, i: (isize, isize, isize)) -> &Self::Output {
-        self.get(isize3(i.0, i.1, i.2))
+    delegate! { 
+        to self.summands { 
+            fn index(&self, i: (isize, isize, isize)) -> &Self::Output;
+        }
     }
 }
 
 impl<I, R> GridTrait<I> for HomologyBase<I, R>
 where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
     type Itr = std::vec::IntoIter<I>;
-    fn support(&self) -> Self::Itr {
-        self.support.clone().into_iter()
+    delegate! { 
+        to self.summands { 
+            fn support(&self) -> Self::Itr;
+            fn is_supported(&self, i: I) -> bool;
+        }
     }
 }
 

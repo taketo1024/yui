@@ -22,6 +22,10 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         Self::new(SpMat::id(n), SpMat::id(n))
     }
 
+    pub fn zero() -> Self { 
+        Self::id(0)
+    }
+
     pub fn from_perm(p: PermView) -> Self { 
         Self::new(
             SpMat::from_row_perm(p.clone()), 
@@ -83,6 +87,13 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
             |f| f.permute_rows(p.clone()), 
             |b| b.permute_cols(p.clone())
         )
+    }
+}
+
+impl<R> Default for Trans<R>
+where R: Ring, for <'x> &'x R: RingOps<R> {
+    fn default() -> Self {
+        Self::zero()
     }
 }
 

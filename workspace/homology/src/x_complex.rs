@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use bimap::BiHashMap;
 use delegate::delegate;
 
@@ -8,7 +7,7 @@ use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
 use yui_lin_comb::{Gen, LinComb};
 use yui_matrix::sparse::{SpMat, SpVec};
 
-use crate::{HomologySummand, DisplayAt};
+use crate::{HomologySummand, DisplayAt, GridBase};
 
 use super::grid::GridTrait;
 use super::complex::{ChainComplexTrait, ChainComplexBase};
@@ -25,8 +24,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     inner: ChainComplexBase<I, R>,
-    gens: HashMap<I, BiHashMap<usize, X>>,
-    empty_gens: BiHashMap<usize, X>
+    gens: GridBase<I, BiHashMap<usize, X>>
 }
 
 impl<I, X, R> XChainComplexBase<I, X, R>
@@ -35,38 +33,29 @@ where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
-    pub fn new<It, F1, F2>(support: It, d_deg: I, gens: F1, d_map: F2) -> Self
+    pub fn new<It, F1, F2>(support: It, d_deg: I, gens_map: F1, d_map: F2) -> Self
     where 
         It: Iterator<Item = I>, 
         F1: Fn(I) -> Vec<X>,
         F2: Fn(I, &X) -> Vec<(X, R)>
     {
         let support = support.collect_vec();
-        let gens: HashMap<_, _> = support.iter().map(|&i| {
-            let g: BiHashMap<_, _> = gens(i).into_iter().enumerate().collect();
-            (i, g)
-        }).collect();
-        let empty_gens = BiHashMap::new();
+        let gens = GridBase::new(
+            support.clone().into_iter(), 
+            |i| gens_map(i).into_iter().enumerate().collect()
+        );
 
-        let mut mats: HashMap<_, _> = support.iter().map(|&i| {
-            let from = &gens[&i];
-            let to = gens.get(&(i + d_deg));
-            let d = Self::make_matrix(i, from, to, &d_map);
-            (i, d)
-        }).collect();
+        let inner = ChainComplexBase::new(
+            support.into_iter(), 
+            d_deg, 
+            |i| Self::make_matrix(i, gens.get(i), gens.get(i + d_deg), &d_map)
+        );
 
-        let inner = ChainComplexBase::new(support.into_iter(), d_deg, move |i| { 
-            std::mem::take(mats.get_mut(&i).unwrap())
-        });
-
-        Self { inner, gens, empty_gens }
+        Self { inner, gens }
     }
 
-    fn make_matrix<F>(i: I, from: &BiHashMap<usize, X>, to: Option<&BiHashMap<usize, X>>, d: &F) -> SpMat<R>
+    fn make_matrix<F>(i: I, from: &BiHashMap<usize, X>, to: &BiHashMap<usize, X>, d: &F) -> SpMat<R>
     where F: Fn(I, &X) -> Vec<(X, R)> {
-        let Some(to) = to else { 
-            return SpMat::zero((0, from.len()))
-        };
         let (m, n) = (to.len(), from.len());
 
         SpMat::generate((m, n), |set|
@@ -81,7 +70,7 @@ where
     }
 
     pub fn gens(&self, i: I) -> impl Iterator<Item = &X> { 
-        let gens = self.gens.get(&i).unwrap_or(&self.empty_gens);
+        let gens = self.gens.get(i);
         let r = gens.len();
 
         (0..r).map(|j| 
@@ -90,11 +79,11 @@ where
     }
 
     pub fn gen_at(&self, i: I, j: usize) -> &X {
-        self.gens[&i].get_by_left(&j).unwrap()
+        self.gens.get(i).get_by_left(&j).unwrap()
     }
 
     pub fn index_of(&self, i: I, x: &X) -> usize {
-        self.gens[&i].get_by_right(x).unwrap().clone()
+        self.gens.get(i).get_by_right(x).unwrap().clone()
     }
 
     pub fn vectorize(&self, i: I, z: &LinComb<X, R>) -> SpVec<R> {
@@ -140,11 +129,8 @@ where
     delegate! { 
         to self.inner { 
             fn support(&self) -> Self::Itr;
+            fn is_supported(&self, i: I) -> bool;
         }
-    }
-
-    fn is_supported(&self, i: I) -> bool {
-        self.gens.contains_key(&i)
     }
 }
 
@@ -170,11 +156,7 @@ where
     type R = R;
 
     fn rank(&self, i: I) -> usize {
-        if let Some(gens) = self.gens.get(&i) { 
-            gens.len()
-        } else { 
-            0
-        }
+        self.gens.get(i).len()
     }
 
     delegate! { 

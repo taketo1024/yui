@@ -10,7 +10,7 @@ use yui_matrix::sparse::{SpMat, SpVec};
 
 use crate::{HomologySummand, DisplayAt};
 
-use super::graded::Graded;
+use super::grid::GridTrait;
 use super::complex::{ChainComplexTrait, ChainComplexBase};
 use super::homology::HomologyBase;
 
@@ -129,7 +129,7 @@ where
     }
 }
 
-impl<I, X, R> Graded<I> for XChainComplexBase<I, X, R>
+impl<I, X, R> GridTrait<I> for XChainComplexBase<I, X, R>
 where 
     I: Deg,
     X: Gen,

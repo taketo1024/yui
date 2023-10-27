@@ -1,10 +1,10 @@
-mod graded;
+mod grid;
 mod complex;
 mod reduced;
 mod homology;
 mod x_complex;
 
-pub use graded::*;
+pub use grid::*;
 pub use complex::*;
 pub use reduced::*;
 pub use homology::*;

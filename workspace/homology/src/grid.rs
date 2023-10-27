@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use yui_core::{isize2, usize2, Deg};
 
-pub trait Graded<I>
+pub trait GridTrait<I>
 where I: Deg { 
     type Itr: Iterator<Item = I>;
 
@@ -11,7 +11,7 @@ where I: Deg {
     }
 }
 
-pub trait DisplayAt<I>: Graded<I>
+pub trait DisplayAt<I>
 where I: Deg { 
     fn display_at(&self, i: I) -> Option<String>;
 }
@@ -26,7 +26,7 @@ pub trait PrintSeq<I> {
 macro_rules! impl_print_seq {
     ($t:ident) => {
         impl<T> PrintSeq<$t> for T
-        where T: DisplayAt<$t> {
+        where T: GridTrait<$t> + DisplayAt<$t> {
             fn display_seq(&self) -> String {
                 use yui_utils::table;
                 let str = table("i", [""].iter(), self.support(), |_, &i| {
@@ -51,7 +51,7 @@ pub trait PrintTable<I> {
 macro_rules! impl_print_table {
     ($t:ident) => {
         impl<T> PrintTable<$t> for T
-        where T: DisplayAt<$t> {
+        where T: GridTrait<$t> + DisplayAt<$t> {
             fn display_table(&self) -> String {
                 use yui_utils::table;
         
@@ -78,7 +78,7 @@ mod tests {
     use super::*;
 
     struct X(usize);
-    impl Graded<usize> for X {
+    impl GridTrait<usize> for X {
         type Itr = Range<usize>;
         fn support(&self) -> Self::Itr {
             0 .. self.0
@@ -91,7 +91,7 @@ mod tests {
     }
 
     struct Y(usize, usize);
-    impl Graded<usize2> for Y {
+    impl GridTrait<usize2> for Y {
         type Itr = IntoIter<usize2>;
         fn support(&self) -> Self::Itr {
             (0 .. self.0).flat_map(|i| 

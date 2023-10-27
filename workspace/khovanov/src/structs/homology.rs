@@ -1,7 +1,7 @@
 use std::ops::{RangeInclusive, Index};
 use delegate::delegate;
 
-use yui_homology::{Homology, HomologySummand, Homology2, Graded, DisplayAt};
+use yui_homology::{Homology, HomologySummand, Homology2, GridTrait, DisplayAt};
 use yui_core::{EucRing, EucRingOps, isize2};
 use yui_link::Link;
 
@@ -34,7 +34,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 }
 
-impl<R> Graded<isize> for KhHomology<R>
+impl<R> GridTrait<isize> for KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     type Itr = std::vec::IntoIter<isize>;
 
@@ -86,7 +86,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 }
 
-impl<R> Graded<isize2> for KhHomologyBigraded<R>
+impl<R> GridTrait<isize2> for KhHomologyBigraded<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     type Itr = std::vec::IntoIter<isize2>;
 

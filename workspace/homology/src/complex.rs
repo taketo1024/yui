@@ -7,7 +7,7 @@ use yui_matrix::sparse::{SpMat, SpVec, MatType, Trans};
 
 use crate::{ReducedComplexBase, DisplayAt};
 
-use super::graded::Graded;
+use super::grid::GridTrait;
 use super::utils::{ChainReducer, HomologyCalc};
 use super::homology::{HomologySummand, HomologyBase};
 
@@ -15,7 +15,7 @@ pub type ChainComplex<R>  = ChainComplexBase<isize,  R>;
 pub type ChainComplex2<R> = ChainComplexBase<isize2, R>;
 pub type ChainComplex3<R> = ChainComplexBase<isize3, R>;
 
-pub trait ChainComplexTrait<I>: Graded<I> + DisplayAt<I> + Sized
+pub trait ChainComplexTrait<I>: GridTrait<I> + DisplayAt<I> + Sized
 where I: Deg, Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> { 
     type R;
 
@@ -132,7 +132,7 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<I, R> Graded<I> for ChainComplexBase<I, R>
+impl<I, R> GridTrait<I> for ChainComplexBase<I, R>
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     type Itr = std::vec::IntoIter<I>;
 

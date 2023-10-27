@@ -5,7 +5,7 @@ use delegate::delegate;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps, isize2};
 use yui_matrix::sparse::{SpMat, SpVec};
 use yui_link::Link;
-use yui_homology::{ChainComplexTrait, XChainComplex, XChainComplex2, Graded, DisplayAt};
+use yui_homology::{ChainComplexTrait, XChainComplex, XChainComplex2, GridTrait, DisplayAt};
 
 use crate::{KhEnhState, KhChain, KhHomology, KhHomologyBigraded};
 
@@ -103,7 +103,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<R> Graded<isize> for KhComplex<R>
+impl<R> GridTrait<isize> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Itr = std::vec::IntoIter<isize>;
 
@@ -164,7 +164,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<R> Graded<isize2> for KhComplexBigraded<R>
+impl<R> GridTrait<isize2> for KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Itr = std::vec::IntoIter<isize2>;
 

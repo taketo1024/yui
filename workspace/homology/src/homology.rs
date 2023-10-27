@@ -7,7 +7,7 @@ use yui_matrix::sparse::{SpVec, Trans};
 
 use crate::DisplayAt;
 
-use super::graded::Graded;
+use super::grid::GridTrait;
 use super::complex::ChainComplexBase;
 
 pub type Homology<R>  = HomologyBase<isize,  R>;
@@ -163,7 +163,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 }
 
-impl<I, R> Graded<I> for HomologyBase<I, R>
+impl<I, R> GridTrait<I> for HomologyBase<I, R>
 where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
     type Itr = std::vec::IntoIter<I>;
     fn support(&self) -> Self::Itr {

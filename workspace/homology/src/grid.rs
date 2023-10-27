@@ -1,5 +1,9 @@
+use std::collections::HashMap;
+use std::ops::Index;
+use std::fmt::Display;
+
 use itertools::Itertools;
-use yui_core::{isize2, usize2, Deg};
+use yui_core::{isize2, usize2, Deg, isize3};
 
 pub trait GridTrait<I>
 where I: Deg { 
@@ -71,50 +75,111 @@ macro_rules! impl_print_table {
 impl_print_table!(isize2);
 impl_print_table!(usize2);
 
+pub type Grid<E>  = GridBase<isize,  E>;
+pub type Grid2<E> = GridBase<isize2, E>;
+pub type Grid3<E> = GridBase<isize3, E>;
+
+pub struct GridBase<I, E>
+where I: Deg { 
+    support: Vec<I>,
+    data: HashMap<I, E>,
+    dflt: E
+}
+
+impl<I, E> GridBase<I, E>
+where I: Deg, E: Default { 
+    pub fn new<It, F>(support: It, mut e_map: F) -> Self
+    where 
+        It: Iterator<Item = I>, 
+        F: FnMut(I) -> E
+    {
+        let support = support.collect_vec();
+        let data = support.iter().map(|&i| (i, e_map(i))).collect();
+        let dflt = E::default();
+        Self { support, data, dflt }
+    }
+}
+
+impl<I, E> GridBase<I, E>
+where I: Deg { 
+    pub fn get(&self, i: I) -> &E {
+        self.data.get(&i).unwrap_or(&self.dflt)
+    }
+}
+
+impl<I, E> GridTrait<I> for GridBase<I, E>
+where I: Deg { 
+    type Itr = std::vec::IntoIter<I>;
+
+    fn support(&self) -> Self::Itr {
+        self.support.clone().into_iter()
+    }
+
+    fn is_supported(&self, i: I) -> bool {
+        self.data.contains_key(&i)
+    }
+}
+
+impl<E> Index<isize> for Grid<E> {
+    type Output = E;
+    fn index(&self, i: isize) -> &Self::Output {
+        self.get(i)
+    }
+}
+
+impl<E> Index<(isize, isize)> for Grid2<E> {
+    type Output = E;
+    fn index(&self, i: (isize, isize)) -> &Self::Output {
+        self.get(isize2(i.0, i.1))
+    }
+}
+
+impl<E> Index<(isize, isize, isize)> for Grid3<E> {
+    type Output = E;
+    fn index(&self, i: (isize, isize, isize)) -> &Self::Output {
+        self.get(isize3(i.0, i.1, i.2))
+    }
+}
+
+impl<I, E> DisplayAt<I> for GridBase<I, E>
+where I: Deg, E: Display {
+    fn display_at(&self, i: I) -> Option<String> {
+        self.data.get(&i).map(|e| e.to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests { 
-    use std::ops::Range;
-    use std::vec::IntoIter;
     use super::*;
 
-    struct X(usize);
-    impl GridTrait<usize> for X {
-        type Itr = Range<usize>;
-        fn support(&self) -> Self::Itr {
-            0 .. self.0
-        }
-    }
-    impl DisplayAt<usize> for X {
-        fn display_at(&self, i: usize) -> Option<String> {
-            Some(format!("a{i}"))
-        }
-    }
+    #[test]
+    fn grid() { 
+        let g = Grid::new(0..=3, |i| i * 10);
 
-    struct Y(usize, usize);
-    impl GridTrait<usize2> for Y {
-        type Itr = IntoIter<usize2>;
-        fn support(&self) -> Self::Itr {
-            (0 .. self.0).flat_map(|i| 
-                (0 .. self.1).map(move |j| usize2(i, j))
-            ).collect_vec().into_iter()
-        }
-    }
-    impl DisplayAt<usize2> for Y {
-        fn display_at(&self, idx: usize2) -> Option<String> {
-            let usize2(i, j) = idx;
-            Some(format!("a{i}{j}"))
-        }
+        assert_eq!(g.is_supported( 1), true);
+        assert_eq!(g.is_supported(-1), false);
+        assert_eq!(g.get( 1), &10);
+        assert_eq!(g.get(-1), &0); // default
+        assert_eq!(g.display_at( 1), Some("10".to_string()));
+        assert_eq!(g.display_at(-1), None);
+
+        let _seq = g.display_seq();
+        // println!("{_seq}");
     }
 
     #[test]
-    fn seq() { 
-        let s = X(3);
-        let _seq = s.display_seq();
-    }
+    fn grid2() { 
+        use cartesian::cartesian;
+        let g = Grid2::new(cartesian!(0..=3, 0..=2).map(|(i, j)| isize2(i, j)), |i| i.0 * 10 + i.1);
 
-    #[test]
-    fn table() { 
-        let s = Y(3, 2);
-        let _table = s.display_table();
+        assert_eq!(g.is_supported(isize2(1, 2)), true);
+        assert_eq!(g.is_supported(isize2(3, 3)), false);
+        assert_eq!(g.get(isize2(1, 2)), &12);
+        assert_eq!(g.get(isize2(3, 3)), &0);
+        assert_eq!(g.display_at(isize2(1, 2)), Some("12".to_string()));
+        assert_eq!(g.display_at(isize2(3, 3)), None);
+
+        let _table = g.display_table();
+        // println!("{_table}");
     }
 }

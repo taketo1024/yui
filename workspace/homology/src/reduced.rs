@@ -5,7 +5,7 @@ use delegate::delegate;
 use yui_core::{Deg, Ring, RingOps, EucRing, EucRingOps, isize2, isize3};
 use yui_matrix::sparse::{Trans, SpMat, SpVec};
 
-use crate::{ChainComplexBase, GridTrait, ChainComplexTrait, HomologySummand, HomologyBase, GridBase, GridIter, ChainComplexSummand, ChainComplexSummandTrait};
+use crate::{ChainComplexBase, GridTrait, ChainComplexTrait, HomologyBase, GridBase, GridIter, ChainComplexSummand, ChainComplexSummandTrait};
 
 pub type ReducedComplex<R>  = ReducedComplexBase<isize,  R>;
 pub type ReducedComplex2<R> = ReducedComplexBase<isize2, R>;
@@ -129,7 +129,6 @@ impl<I, R> ReducedComplexBase<I, R>
 where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
     delegate! { 
         to self.inner { 
-            pub fn homology_at(&self, i: I, with_trans: bool) -> HomologySummand<R>;
             pub fn homology(&self, with_trans: bool) -> HomologyBase<I, R>;
         }
     }

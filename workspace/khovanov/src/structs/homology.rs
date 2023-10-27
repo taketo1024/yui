@@ -28,8 +28,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 impl<R> From<KhComplex<R>> for KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     fn from(c: KhComplex<R>) -> Self {
-        let c = c.inner().inner();
-        let h = Homology::new(c, false);
+        let h = Homology::compute_from(&c, false);
         Self { inner: h }
     }
 }
@@ -74,8 +73,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 impl<R> From<KhComplexBigraded<R>> for KhHomologyBigraded<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     fn from(c: KhComplexBigraded<R>) -> Self {
-        let c = c.inner().inner();
-        let h = Homology2::new(c, false);
+        let h = Homology2::compute_from(&c, false);
         Self { inner: h }
     }
 }

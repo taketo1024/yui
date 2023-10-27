@@ -5,10 +5,10 @@ use itertools::Itertools;
 use yui_core::{EucRing, EucRingOps, Ring, RingOps, Deg, isize2, isize3};
 use yui_matrix::sparse::{SpVec, Trans};
 
-use crate::{GridBase, GridIter, DisplayForGrid};
+use crate::utils::HomologyCalc;
+use crate::{GridBase, GridIter, DisplayForGrid, ChainComplexTrait, ChainComplexSummandTrait};
 
 use super::grid::GridTrait;
-use super::complex::ChainComplexBase;
 
 pub type Homology<R>  = HomologyBase<isize,  R>;
 pub type Homology2<R> = HomologyBase<isize2, R>;
@@ -129,23 +129,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 pub struct HomologyBase<I, R>
-where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
+where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     summands: GridBase<I, HomologySummand<R>>
 }
 
-impl<I, R> HomologyBase<I, R>
-where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    pub fn new(complex: &ChainComplexBase<I, R>, with_trans: bool) -> Self { 
-        let summands = GridBase::new(
-            complex.support(), 
-            |i| complex.homology_at(i, with_trans)
-        );
-        Self { summands }
-    }
-}
-
 impl<I, R> Index<I> for HomologyBase<I, R>
-where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
+where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = HomologySummand<R>;
     delegate! { 
         to self.summands { 
@@ -155,7 +144,7 @@ where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
 }
 
 impl<I, R> GridTrait<I> for HomologyBase<I, R>
-where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
+where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     type Itr = GridIter<I>;
     type E = HomologySummand<R>;
     
@@ -165,6 +154,26 @@ where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
             fn is_supported(&self, i: I) -> bool;
             fn get(&self, i: I) -> &Self::E;
         }
+    }
+}
+
+impl<I, R> HomologyBase<I, R>
+where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    pub fn compute_from<C>(complex: &C, with_trans: bool) -> Self
+    where 
+        C: ChainComplexTrait<I, R = R>,
+        C::E: ChainComplexSummandTrait<R = C::R>
+    { 
+        let summands = GridBase::new(
+            complex.support(), 
+            |i| {
+                let i0 = i - complex.d_deg();
+                let d0 = complex.get(i0).d_matrix();
+                let d1 = complex.get(i).d_matrix();
+                HomologyCalc::calculate(d0, d1, with_trans)
+            }
+        );
+        Self { summands }
     }
 }
 

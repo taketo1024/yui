@@ -9,7 +9,7 @@ use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
 use yui_lin_comb::{Gen, LinComb};
 use yui_matrix::sparse::{SpMat, SpVec};
 
-use crate::{HomologySummand, GridBase, GridIter, ChainComplexSummand, ChainComplexSummandTrait};
+use crate::{GridBase, GridIter, ChainComplexSummand, ChainComplexSummandTrait};
 
 use super::grid::GridTrait;
 use super::complex::{ChainComplexTrait, ChainComplexBase};
@@ -177,7 +177,6 @@ where
 {
     delegate! { 
         to self.inner { 
-            pub fn homology_at(&self, i: I, with_trans: bool) -> HomologySummand<R>;
             pub fn homology(&self, with_trans: bool) -> HomologyBase<I, R>;
         }
     }

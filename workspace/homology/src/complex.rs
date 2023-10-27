@@ -10,8 +10,8 @@ use yui_matrix::sparse::{SpMat, SpVec, MatType, Trans};
 use crate::{ReducedComplexBase, GridBase, GridIter, DisplayForGrid};
 
 use super::grid::GridTrait;
-use super::utils::{ChainReducer, HomologyCalc};
-use super::homology::{HomologySummand, HomologyBase};
+use super::utils::ChainReducer;
+use super::homology::HomologyBase;
 
 pub type ChainComplex<R>  = ChainComplexBase<isize,  R>;
 pub type ChainComplex2<R> = ChainComplexBase<isize2, R>;
@@ -223,15 +223,8 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<I, R> ChainComplexBase<I, R> 
 where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    pub fn homology_at(&self, i: I, with_trans: bool) -> HomologySummand<R> {
-        let i0 = i - self.d_deg();
-        let d0 = self.get(i0).d_matrix();
-        let d1 = self.get(i).d_matrix();
-        HomologyCalc::calculate(d0, d1, with_trans)
-    }
-
     pub fn homology(&self, with_trans: bool) -> HomologyBase<I, R> {
-        HomologyBase::new(&self, with_trans)
+        HomologyBase::compute_from(self, with_trans)
     }
 }
 

@@ -17,6 +17,12 @@ macro_rules! make2 {
         #[display(fmt = "({}, {})", _0, _1)]
         pub struct $name(pub $t, pub $t);
         
+        impl From<($t, $t)> for $name {
+            fn from(i: ($t, $t)) -> Self {
+                Self(i.0, i.1)
+            }
+        }
+        
         impl Zero for $name {
             fn zero() -> Self {
                 Self(0, 0)
@@ -41,6 +47,12 @@ macro_rules! make3 {
         #[derive(Display, Debug, Clone, Copy, PartialEq, Eq, Hash, Add, Sub)]
         #[display(fmt = "({}, {}, {})", _0, _1, _2)]
         pub struct $name(pub $t, pub $t, pub $t);
+        
+        impl From<($t, $t, $t)> for $name {
+            fn from(i: ($t, $t, $t)) -> Self {
+                Self(i.0, i.1, i.2)
+            }
+        }
         
         impl Zero for $name {
             fn zero() -> Self {

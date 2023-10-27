@@ -6,7 +6,7 @@ use delegate::delegate;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
 use yui_matrix::sparse::{SpMat, SpVec, MatType, Trans};
 
-use crate::{ReducedComplexBase, DisplayAt, GridBase};
+use crate::{ReducedComplexBase, DisplayAt, GridBase, GridIter};
 
 use super::grid::GridTrait;
 use super::utils::{ChainReducer, HomologyCalc};
@@ -132,7 +132,7 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<I, R> GridTrait<I> for ChainComplexBase<I, R>
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
-    type Itr = std::vec::IntoIter<I>;
+    type Itr = GridIter<I>;
 
     delegate! { 
         to self.d_matrix { 

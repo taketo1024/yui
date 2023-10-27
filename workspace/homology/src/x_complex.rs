@@ -7,7 +7,7 @@ use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
 use yui_lin_comb::{Gen, LinComb};
 use yui_matrix::sparse::{SpMat, SpVec};
 
-use crate::{HomologySummand, DisplayAt, GridBase};
+use crate::{HomologySummand, DisplayAt, GridBase, GridIter};
 
 use super::grid::GridTrait;
 use super::complex::{ChainComplexTrait, ChainComplexBase};
@@ -124,7 +124,7 @@ where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
-    type Itr = std::vec::IntoIter<I>;
+    type Itr = GridIter<I>;
     
     delegate! { 
         to self.inner { 

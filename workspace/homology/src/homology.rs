@@ -5,7 +5,7 @@ use itertools::Itertools;
 use yui_core::{EucRing, EucRingOps, Ring, RingOps, Deg, isize2, isize3};
 use yui_matrix::sparse::{SpVec, Trans};
 
-use crate::{DisplayAt, GridBase};
+use crate::{DisplayAt, GridBase, GridIter};
 
 use super::grid::GridTrait;
 use super::complex::ChainComplexBase;
@@ -175,7 +175,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 impl<I, R> GridTrait<I> for HomologyBase<I, R>
 where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    type Itr = std::vec::IntoIter<I>;
+    type Itr = GridIter<I>;
     delegate! { 
         to self.summands { 
             fn support(&self) -> Self::Itr;

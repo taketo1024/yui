@@ -77,6 +77,8 @@ pub type Grid<E>  = GridBase<isize,  E>;
 pub type Grid2<E> = GridBase<isize2, E>;
 pub type Grid3<E> = GridBase<isize3, E>;
 
+pub type GridIter<I> = std::vec::IntoIter<I>;
+
 pub struct GridBase<I, E>
 where I: Deg { 
     support: Vec<I>,
@@ -110,7 +112,7 @@ where I: Deg {
 
 impl<I, E> GridTrait<I> for GridBase<I, E>
 where I: Deg { 
-    type Itr = std::vec::IntoIter<I>;
+    type Itr = GridIter<I>;
 
     fn support(&self) -> Self::Itr {
         self.support.clone().into_iter()

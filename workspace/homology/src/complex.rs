@@ -97,6 +97,10 @@ where I: Deg, Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
     }
 }
 
+pub struct ChainComplexSummand<R> {
+    _r: R // TODO
+}
+
 pub struct ChainComplexBase<I, R>
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     d_deg: I,
@@ -133,12 +137,17 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 impl<I, R> GridTrait<I> for ChainComplexBase<I, R>
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     type Itr = GridIter<I>;
+    type E = ChainComplexSummand<R>;
 
     delegate! { 
         to self.d_matrix { 
             fn support(&self) -> Self::Itr;        
             fn is_supported(&self, i: I) -> bool;
         }
+    }
+
+    fn get(&self, _i: I) -> &Self::E {
+        todo!()
     }
 }
 

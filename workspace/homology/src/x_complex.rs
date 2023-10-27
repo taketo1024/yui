@@ -7,7 +7,7 @@ use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
 use yui_lin_comb::{Gen, LinComb};
 use yui_matrix::sparse::{SpMat, SpVec};
 
-use crate::{HomologySummand, DisplayAt, GridBase, GridIter};
+use crate::{HomologySummand, DisplayAt, GridBase, GridIter, ChainComplexSummand};
 
 use super::grid::GridTrait;
 use super::complex::{ChainComplexTrait, ChainComplexBase};
@@ -125,11 +125,13 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
     type Itr = GridIter<I>;
+    type E = ChainComplexSummand<R>;
     
     delegate! { 
         to self.inner { 
             fn support(&self) -> Self::Itr;
             fn is_supported(&self, i: I) -> bool;
+            fn get(&self, i: I) -> &Self::E;
         }
     }
 }

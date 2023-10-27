@@ -8,9 +8,11 @@ use yui_core::{isize2, usize2, Deg, isize3};
 pub trait GridTrait<I>
 where I: Deg { 
     type Itr: Iterator<Item = I>;
+    type E;
 
     fn support(&self) -> Self::Itr;
     fn is_supported(&self, i: I) -> bool;
+    fn get(&self, i: I) -> &Self::E;
 }
 
 pub trait DisplayAt<I>
@@ -103,16 +105,10 @@ where I: Deg, E: Default {
     }
 }
 
-impl<I, E> GridBase<I, E>
-where I: Deg { 
-    pub fn get(&self, i: I) -> &E {
-        self.data.get(&i).unwrap_or(&self.dflt)
-    }
-}
-
 impl<I, E> GridTrait<I> for GridBase<I, E>
 where I: Deg { 
     type Itr = GridIter<I>;
+    type E = E;
 
     fn support(&self) -> Self::Itr {
         self.support.clone().into_iter()
@@ -120,6 +116,10 @@ where I: Deg {
 
     fn is_supported(&self, i: I) -> bool {
         self.data.contains_key(&i)
+    }
+
+    fn get(&self, i: I) -> &E {
+        self.data.get(&i).unwrap_or(&self.dflt)
     }
 }
 

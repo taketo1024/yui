@@ -176,10 +176,13 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 impl<I, R> GridTrait<I> for HomologyBase<I, R>
 where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
     type Itr = GridIter<I>;
+    type E = HomologySummand<R>;
+    
     delegate! { 
         to self.summands { 
             fn support(&self) -> Self::Itr;
             fn is_supported(&self, i: I) -> bool;
+            fn get(&self, i: I) -> &Self::E;
         }
     }
 }

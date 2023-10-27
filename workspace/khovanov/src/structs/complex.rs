@@ -5,7 +5,7 @@ use delegate::delegate;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps, isize2};
 use yui_matrix::sparse::{SpMat, SpVec};
 use yui_link::Link;
-use yui_homology::{ChainComplexTrait, XChainComplex, XChainComplex2, GridTrait, DisplayAt};
+use yui_homology::{ChainComplexTrait, XChainComplex, XChainComplex2, GridTrait, DisplayAt, ChainComplexSummand};
 
 use crate::{KhEnhState, KhChain, KhHomology, KhHomologyBigraded};
 
@@ -106,11 +106,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> GridTrait<isize> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Itr = std::vec::IntoIter<isize>;
+    type E = ChainComplexSummand<R>;
 
     delegate! { 
         to self.inner { 
             fn support(&self) -> Self::Itr;
             fn is_supported(&self, i: isize) -> bool;
+            fn get(&self, i: isize) -> &Self::E;
         }
     }
 }
@@ -168,11 +170,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> GridTrait<isize2> for KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Itr = std::vec::IntoIter<isize2>;
+    type E = ChainComplexSummand<R>;
 
     delegate! { 
         to self.inner { 
             fn support(&self) -> Self::Itr;
             fn is_supported(&self, i: isize2) -> bool;
+            fn get(&self, i: isize2) -> &Self::E;
         }
     }
 }

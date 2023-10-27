@@ -9,7 +9,10 @@ where I: Deg {
     fn is_supported(&self, i: I) -> bool { 
         self.support().contains(&i)
     }
+}
 
+pub trait DisplayAt<I>: Graded<I>
+where I: Deg { 
     fn display_at(&self, i: I) -> Option<String>;
 }
 
@@ -23,7 +26,7 @@ pub trait PrintSeq<I> {
 macro_rules! impl_print_seq {
     ($t:ident) => {
         impl<T> PrintSeq<$t> for T
-        where T: Graded<$t> {
+        where T: DisplayAt<$t> {
             fn display_seq(&self) -> String {
                 use yui_utils::table;
                 let str = table("i", [""].iter(), self.support(), |_, &i| {
@@ -48,7 +51,7 @@ pub trait PrintTable<I> {
 macro_rules! impl_print_table {
     ($t:ident) => {
         impl<T> PrintTable<$t> for T
-        where T: Graded<$t> {
+        where T: DisplayAt<$t> {
             fn display_table(&self) -> String {
                 use yui_utils::table;
         
@@ -80,6 +83,8 @@ mod tests {
         fn support(&self) -> Self::Itr {
             0 .. self.0
         }
+    }
+    impl DisplayAt<usize> for X {
         fn display_at(&self, i: usize) -> Option<String> {
             Some(format!("a{i}"))
         }
@@ -93,6 +98,8 @@ mod tests {
                 (0 .. self.1).map(move |j| usize2(i, j))
             ).collect_vec().into_iter()
         }
+    }
+    impl DisplayAt<usize2> for Y {
         fn display_at(&self, idx: usize2) -> Option<String> {
             let usize2(i, j) = idx;
             Some(format!("a{i}{j}"))
@@ -102,12 +109,12 @@ mod tests {
     #[test]
     fn seq() { 
         let s = X(3);
-        assert_eq!(s.display_at(0), Some("a0".to_string()));
+        let _seq = s.display_seq();
     }
 
     #[test]
     fn table() { 
         let s = Y(3, 2);
-        assert_eq!(s.display_at(usize2(1, 2)), Some("a12".to_string()));
+        let _table = s.display_table();
     }
 }

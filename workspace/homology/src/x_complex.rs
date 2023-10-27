@@ -8,7 +8,7 @@ use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
 use yui_lin_comb::{Gen, LinComb};
 use yui_matrix::sparse::{SpMat, SpVec};
 
-use crate::HomologySummand;
+use crate::{HomologySummand, DisplayAt};
 
 use super::graded::Graded;
 use super::complex::{ChainComplexTrait, ChainComplexBase};
@@ -140,12 +140,24 @@ where
     delegate! { 
         to self.inner { 
             fn support(&self) -> Self::Itr;
-            fn display_at(&self, i: I) -> Option<String>;
         }
     }
 
     fn is_supported(&self, i: I) -> bool {
         self.gens.contains_key(&i)
+    }
+}
+
+impl<I, X, R> DisplayAt<I> for XChainComplexBase<I, X, R>
+where 
+    I: Deg,
+    X: Gen,
+    R: Ring, for<'x> &'x R: RingOps<R>,
+{
+    delegate! { 
+        to self.inner { 
+            fn display_at(&self, i: I) -> Option<String>;
+        }
     }
 }
 

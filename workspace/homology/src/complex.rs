@@ -5,7 +5,7 @@ use itertools::{Itertools, Either};
 use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
 use yui_matrix::sparse::{SpMat, SpVec, MatType, Trans};
 
-use crate::ReducedComplexBase;
+use crate::{ReducedComplexBase, DisplayAt};
 
 use super::graded::Graded;
 use super::utils::{ChainReducer, HomologyCalc};
@@ -15,7 +15,7 @@ pub type ChainComplex<R>  = ChainComplexBase<isize,  R>;
 pub type ChainComplex2<R> = ChainComplexBase<isize2, R>;
 pub type ChainComplex3<R> = ChainComplexBase<isize3, R>;
 
-pub trait ChainComplexTrait<I>: Graded<I> + Sized
+pub trait ChainComplexTrait<I>: Graded<I> + DisplayAt<I> + Sized
 where I: Deg, Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> { 
     type R;
 
@@ -139,7 +139,10 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     fn support(&self) -> Self::Itr {
         self.support.clone().into_iter()
     }
+}
 
+impl<I, R> DisplayAt<I> for ChainComplexBase<I, R>
+where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     fn display_at(&self, i: I) -> Option<String> {
         use yui_utils::superscript;
 

@@ -5,6 +5,8 @@ use itertools::Itertools;
 use yui_core::{EucRing, EucRingOps, Ring, RingOps, Deg, isize2, isize3};
 use yui_matrix::sparse::{SpVec, Trans};
 
+use crate::DisplayAt;
+
 use super::graded::Graded;
 use super::complex::ChainComplexBase;
 
@@ -167,7 +169,10 @@ where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
     fn support(&self) -> Self::Itr {
         self.support.clone().into_iter()
     }
+}
 
+impl<I, R> DisplayAt<I> for HomologyBase<I, R>
+where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
     fn display_at(&self, i: I) -> Option<String> {
         self.get(i).display()
     }

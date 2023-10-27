@@ -4,7 +4,7 @@ use delegate::delegate;
 use yui_core::{Deg, Ring, RingOps, EucRing, EucRingOps, isize2, isize3};
 use yui_matrix::sparse::{Trans, SpMat, SpVec};
 
-use crate::{ChainComplexBase, Graded, ChainComplexTrait, HomologySummand, HomologyBase};
+use crate::{ChainComplexBase, Graded, ChainComplexTrait, HomologySummand, HomologyBase, DisplayAt};
 
 pub type ReducedComplex<R>  = ReducedComplexBase<isize,  R>;
 pub type ReducedComplex2<R> = ReducedComplexBase<isize2, R>;
@@ -109,6 +109,14 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     delegate! { 
         to self.inner {
             fn support(&self) -> Self::Itr;
+        }
+    }
+}
+
+impl<I, R> DisplayAt<I> for ReducedComplexBase<I, R>
+where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
+    delegate! { 
+        to self.inner {
             fn display_at(&self, i: I) -> Option<String>;
         }
     }

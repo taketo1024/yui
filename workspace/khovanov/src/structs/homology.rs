@@ -1,7 +1,7 @@
 use std::ops::{RangeInclusive, Index};
 use delegate::delegate;
 
-use yui_homology::{Homology, HomologySummand, Homology2, Graded};
+use yui_homology::{Homology, HomologySummand, Homology2, Graded, DisplayAt};
 use yui_core::{EucRing, EucRingOps, isize2};
 use yui_link::Link;
 
@@ -41,6 +41,14 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     delegate! { 
         to self.inner { 
             fn support(&self) -> Self::Itr;
+        }
+    }
+}
+
+impl<R> DisplayAt<isize> for KhHomology<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    delegate! { 
+        to self.inner { 
             fn display_at(&self, i: isize) -> Option<String>;
         }
     }
@@ -85,6 +93,14 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     delegate! { 
         to self.inner { 
             fn support(&self) -> Self::Itr;
+        }
+    }
+}
+
+impl<R> DisplayAt<isize2> for KhHomologyBigraded<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    delegate! { 
+        to self.inner { 
             fn display_at(&self, i: isize2) -> Option<String>;
         }
     }

@@ -3,11 +3,12 @@ use cartesian::cartesian;
 
 use delegate::delegate;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps, isize2};
-use yui_matrix::sparse::SpVec;
 use yui_link::Link;
-use yui_homology::{ChainComplexTrait, XChainComplex, XChainComplex2, GridTrait, ChainComplexSummand};
+use yui_homology::{ChainComplexTrait, XChainComplex, XChainComplex2, GridTrait, XChainComplexSummand};
 
 use crate::{KhEnhState, KhChain, KhHomology, KhHomologyBigraded};
+
+pub type KhComplexSummand<R> = XChainComplexSummand<KhEnhState, R>;
 
 pub struct KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
@@ -46,8 +47,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn q_range(&self) -> RangeInclusive<isize> { 
-        let q_min = self.support().filter_map(|i| self.gens(i).map(|x| x.q_deg()).min()).min().unwrap_or(0);
-        let q_max = self.support().filter_map(|i| self.gens(i).map(|x| x.q_deg()).max()).max().unwrap_or(0);
+        let q_min = self.support().filter_map(|i| self[i].gens().map(|x| x.q_deg()).min()).min().unwrap_or(0);
+        let q_max = self.support().filter_map(|i| self[i].gens().map(|x| x.q_deg()).max()).max().unwrap_or(0);
         let q0 = self.deg_shift.1;
         (q_min + q0) ..= (q_max + q0)
     }
@@ -71,7 +72,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 let isize2(i, j) = idx;
                 let q = j - deg_shift.1;
 
-                self.gens(i).filter(|x| { 
+                self[i].gens().filter(|x| { 
                     x.q_deg() == q
                 }).cloned().collect()
             },
@@ -96,8 +97,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     delegate! { 
         to self.inner { 
-            pub fn gens(&self, i: isize) -> impl Iterator<Item = &KhEnhState>;
-            pub fn vectorize(&self, i: isize, z: &KhChain<R>) -> SpVec<R>;
             pub fn d(&self, i: isize, z: &KhChain<R>) -> KhChain<R>;
         }
     }
@@ -105,7 +104,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> Index<isize> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = ChainComplexSummand<R>;
+    type Output = KhComplexSummand<R>;
+
     delegate! { 
         to self.inner {
             fn index(&self, index: isize) -> &Self::Output;
@@ -116,7 +116,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> GridTrait<isize> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Itr = std::vec::IntoIter<isize>;
-    type E = ChainComplexSummand<R>;
+    type E = KhComplexSummand<R>;
 
     delegate! { 
         to self.inner { 
@@ -168,7 +168,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> Index<(isize, isize)> for KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = ChainComplexSummand<R>;
+    type Output = KhComplexSummand<R>;
 
     delegate! { 
         to self.inner { 
@@ -180,7 +180,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> GridTrait<isize2> for KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Itr = std::vec::IntoIter<isize2>;
-    type E = ChainComplexSummand<R>;
+    type E = KhComplexSummand<R>;
 
     delegate! { 
         to self.inner { 

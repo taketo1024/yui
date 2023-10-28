@@ -57,7 +57,7 @@ where R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
     
     let vs = if args.with_alpha { 
         c.canon_cycles().iter().map(|z| {
-            (0, c.vectorize(0, z))
+            (0, c[0].vectorize(z))
         }).collect_vec()
     } else { 
         vec![]

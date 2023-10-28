@@ -34,6 +34,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     pub fn calculate(d1: &SpMat<R>, d2: &SpMat<R>, with_trans: bool) -> HomologySummand<R> {
         info!("calculate homology: {:?}-{:?}", d1.shape(), d2.shape());
+        
+        assert_eq!(d1.rows(), d2.cols());
 
         let (s1, s2) = Self::process_snf(d1, d2, with_trans);
         let (rank, tors) = Self::result(&s1, &s2);
@@ -71,6 +73,9 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     fn result(s1: &SnfResult<R>, s2: &SnfResult<R>) -> (usize, Vec<R>) {
         let n = s1.result().rows();
         let (r1, r2) = (s1.rank(), s2.rank());
+
+        assert!(n >= r1 + r2);
+
         let rank = n - r1 - r2;
 
         let tors = s1.factors().into_iter().filter_map(|a| {

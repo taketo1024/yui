@@ -1,23 +1,101 @@
+use std::collections::HashMap;
 use std::ops::Index;
 
 use bimap::BiHashMap;
 use delegate::delegate;
 
 use itertools::Itertools;
-use num_traits::Zero;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
 use yui_lin_comb::{Gen, LinComb};
-use yui_matrix::sparse::{SpMat, SpVec};
+use yui_matrix::sparse::{SpMat, SpVec, MatType};
 
-use crate::{GridBase, GridIter, ChainComplexSummand, ChainComplexSummandTrait};
+use crate::{GridBase, GridIter, ChainComplexSummandTrait, DisplayForGrid};
 
 use super::grid::GridTrait;
-use super::complex::{ChainComplexTrait, ChainComplexBase};
+use super::complex::ChainComplexTrait;
 use super::homology::HomologyBase;
 
 pub type XChainComplex <X, R> = XChainComplexBase<isize,  X, R>;
 pub type XChainComplex2<X, R> = XChainComplexBase<isize2, X, R>;
 pub type XChainComplex3<X, R> = XChainComplexBase<isize3, X, R>;
+
+#[derive(Default)]
+pub struct XChainComplexSummand<X, R>
+where 
+    X: Gen,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{
+    gens: BiHashMap<usize, X>,
+    d_matrix: SpMat<R>
+}
+
+impl<X, R> XChainComplexSummand<X, R>
+where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+    pub fn new(gens: BiHashMap<usize, X>, d_matrix: SpMat<R>) -> Self { 
+        Self { gens, d_matrix }
+    }
+
+    pub fn ngens(&self) -> usize { 
+        self.gens.len()
+    }
+
+    pub fn gens(&self) -> impl Iterator<Item = &X> { 
+        let n = self.ngens();
+        (0..n).map(|i| 
+            self.gens.get_by_left(&i).unwrap()
+        )
+    }
+
+    pub fn gen(&self, i: usize) -> &X {
+        self.gens.get_by_left(&i).unwrap()
+    }
+
+    pub fn index_of(&self, x: &X) -> usize {
+        self.gens.get_by_right(x).unwrap().clone()
+    }
+
+    pub fn vectorize(&self, z: &LinComb<X, R>) -> SpVec<R> {
+        let n = self.ngens();
+        SpVec::generate(n, |set| { 
+            for (x, a) in z.iter() { 
+                let i = self.index_of(x);
+                set(i, a.clone());
+            }
+        })
+    }
+
+    pub fn as_chain(&self, v: &SpVec<R>) -> LinComb<X, R> {
+        assert_eq!(v.dim(), self.rank());
+
+        let elems = v.iter().map(|(i, a)| 
+            (self.gen(i).clone(), a.clone())
+        );
+        LinComb::from_iter(elems)
+    }
+}
+
+impl<X, R> DisplayForGrid for XChainComplexSummand<X, R>
+where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+    fn display_for_grid(&self) -> String {
+        self.module_str()
+    }
+}
+
+impl<X, R> ChainComplexSummandTrait for XChainComplexSummand<X, R>
+where 
+    X: Gen,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{
+    type R = R;
+
+    fn rank(&self) -> usize {
+        self.d_matrix.cols()
+    }
+
+    fn d_matrix(&self) -> &SpMat<Self::R> {
+        &self.d_matrix
+    }
+}
 
 pub struct XChainComplexBase<I, X, R>
 where 
@@ -25,8 +103,8 @@ where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    inner: ChainComplexBase<I, R>,
-    gens: GridBase<I, BiHashMap<usize, X>>
+    d_deg: I,
+    summands: GridBase<I, XChainComplexSummand<X, R>>
 }
 
 impl<I, X, R> XChainComplexBase<I, X, R>
@@ -42,22 +120,42 @@ where
         F2: Fn(I, &X) -> Vec<(X, R)>
     {
         let support = support.collect_vec();
-        let gens = GridBase::new(
-            support.clone().into_iter(), 
-            |i| gens_map(i).into_iter().enumerate().collect()
-        );
 
-        let inner = ChainComplexBase::new(
-            support.into_iter(), 
-            d_deg, 
-            |i| Self::make_matrix(i, gens.get(i), gens.get(i + d_deg), &d_map)
-        );
+        let mut gens = support.iter().map(|&i| {
+            let gens = gens_map(i).into_iter().enumerate().collect::<BiHashMap<_, _>>();
+            (i, gens)
+        }).collect::<HashMap<_, _>>();
 
-        Self { inner, gens }
+        for &i in support.iter() {
+            let r = gens[&i].len();
+            if r > 0 && !gens.contains_key(&(i - d_deg)) { 
+                gens.insert(i - d_deg, BiHashMap::new());
+            }
+        }
+
+        let mut mats = gens.keys().map( |&i| {
+            let from = &gens[&i];
+            let to = gens.get(&(i + d_deg)); // optional
+            let d = Self::make_matrix(i, from, to, &d_map);
+            (i, d)
+        }).collect::<HashMap<_, _>>();
+
+        let data = gens.into_iter().map(|(i, gens)| {
+            let d_matrix = mats.remove(&i).unwrap();
+            let summand = XChainComplexSummand::new(gens, d_matrix);
+            (i, summand)
+        }).collect();
+
+        let summands = GridBase::new_raw(support, data);
+
+        Self { d_deg, summands }
     }
 
-    fn make_matrix<F>(i: I, from: &BiHashMap<usize, X>, to: &BiHashMap<usize, X>, d: &F) -> SpMat<R>
+    fn make_matrix<F>(i: I, from: &BiHashMap<usize, X>, to_opt: Option<&BiHashMap<usize, X>>, d: &F) -> SpMat<R>
     where F: Fn(I, &X) -> Vec<(X, R)> {
+        let Some(to) = to_opt else { 
+            return SpMat::zero((0, from.len()))
+        };
         let (m, n) = (to.len(), from.len());
 
         SpMat::generate((m, n), |set|
@@ -71,53 +169,13 @@ where
         )
     }
 
-    pub fn gens(&self, i: I) -> impl Iterator<Item = &X> { 
-        let gens = self.gens.get(i);
-        let r = gens.len();
-
-        (0..r).map(|j| 
-            gens.get_by_left(&j).unwrap()
-        )
-    }
-
-    pub fn gen_at(&self, i: I, j: usize) -> &X {
-        self.gens.get(i).get_by_left(&j).unwrap()
-    }
-
-    pub fn index_of(&self, i: I, x: &X) -> usize {
-        self.gens.get(i).get_by_right(x).unwrap().clone()
-    }
-
-    pub fn vectorize(&self, i: I, z: &LinComb<X, R>) -> SpVec<R> {
-        let r = self[i].rank();
-        SpVec::generate(r, |set| { 
-            for (x, a) in z.iter() { 
-                let j = self.index_of(i, x);
-                set(j, a.clone());
-            }
-        })
-    }
-
-    pub fn as_chain(&self, i: I, v: &SpVec<R>) -> LinComb<X, R> {
-        if self.is_supported(i) { 
-            let elems = v.iter().map(|(j, a)| 
-                (self.gen_at(i, j).clone(), a.clone())
-            );
-            LinComb::from_iter(elems)
-        } else {
-            LinComb::zero()
-        }
-    }
-
     pub fn d(&self, i: I, z: &LinComb<X, R>) -> LinComb<X, R> { 
         let d = self[i].d_matrix();
-        let v = self.vectorize(i, z);
+        let v = self[i].vectorize(z);
         let w = d * v;
-        self.as_chain(i + self.d_deg(), &w)
-    }
 
-    pub fn inner(&self) -> &ChainComplexBase<I, R> { 
-        &self.inner
+        let i1 = i + self.d_deg;
+        self[i1].as_chain(&w)
     }
 }
 
@@ -127,10 +185,10 @@ where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
-    type Output = ChainComplexSummand<R>;
+    type Output = XChainComplexSummand<X, R>;
 
     delegate! { 
-        to self.inner { 
+        to self.summands { 
             fn index(&self, index: I) -> &Self::Output;
         }
     }
@@ -143,10 +201,10 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
     type Itr = GridIter<I>;
-    type E = ChainComplexSummand<R>;
+    type E = XChainComplexSummand<X, R>;
     
     delegate! { 
-        to self.inner { 
+        to self.summands { 
             fn support(&self) -> Self::Itr;
             fn is_supported(&self, i: I) -> bool;
             fn get(&self, i: I) -> &Self::E;
@@ -161,11 +219,8 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
     type R = R;
-
-    delegate! { 
-        to self.inner { 
-            fn d_deg(&self) -> I;
-        }
+    fn d_deg(&self) -> I { 
+        self.d_deg
     }
 }
 
@@ -175,10 +230,8 @@ where
     X: Gen,
     R: EucRing, for<'x> &'x R: EucRingOps<R>,
 {
-    delegate! { 
-        to self.inner { 
-            pub fn homology(&self, with_trans: bool) -> HomologyBase<I, R>;
-        }
+    pub fn homology(&self, with_trans: bool) -> HomologyBase<I, R> { 
+        HomologyBase::compute_from(self, with_trans)
     }
 }
 
@@ -209,5 +262,10 @@ mod tests {
         assert_eq!(c[0].rank(), 1);
         assert_eq!(c[1].rank(), 1);
         assert_eq!(c[1].d_matrix(), &SpMat::from_vec((1,1), vec![1]));
+
+        let h = c.homology(false);
+        
+        assert_eq!(h[0].rank(), 0);
+        assert_eq!(h[1].rank(), 0);
     }
 }

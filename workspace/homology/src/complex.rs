@@ -167,8 +167,8 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 
         // add zero maps
         for &i in support.iter() {
-            if !data.contains_key(&(i - d_deg)) { 
-                let r = data[&i].shape().1;
+            let r = data[&i].shape().1;
+            if r > 0 && !data.contains_key(&(i - d_deg)) { 
                 let d = SpMat::zero((r, 0));
                 data.insert(i - d_deg, d);
             }

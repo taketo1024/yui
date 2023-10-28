@@ -81,7 +81,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     let a1 = c[ 0].d_matrix().clone();
 
     let vs = c.canon_cycles().iter().map(|z| 
-        c.vectorize(0, &z)
+        c[0].vectorize(&z)
     ).collect_vec();
 
     (a0, a1, vs)

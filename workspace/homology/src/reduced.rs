@@ -89,14 +89,6 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<I, R> Index<I> for ReducedComplexBase<I, R>
-where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = ChainComplexSummand<R>;
-    fn index(&self, i: I) -> &Self::Output {
-        self.get(i)
-    }
-}
-
 impl<I, R> GridTrait<I> for ReducedComplexBase<I, R>
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     type E = ChainComplexSummand<R>;
@@ -132,6 +124,30 @@ where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
         to self.inner { 
             pub fn homology(&self, with_trans: bool) -> HomologyBase<I, R>;
         }
+    }
+}
+
+impl<I, R> Index<I> for ReducedComplexBase<I, R>
+where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = ChainComplexSummand<R>;
+    fn index(&self, i: I) -> &Self::Output {
+        self.get(i)
+    }
+}
+
+impl<R> Index<(isize, isize)> for ReducedComplex2<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = ChainComplexSummand<R>;
+    fn index(&self, i: (isize, isize)) -> &Self::Output {
+        self.get(i.into())
+    }
+}
+
+impl<R> Index<(isize, isize, isize)> for ReducedComplex3<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = ChainComplexSummand<R>;
+    fn index(&self, i: (isize, isize, isize)) -> &Self::Output {
+        self.get(i.into())
     }
 }
 

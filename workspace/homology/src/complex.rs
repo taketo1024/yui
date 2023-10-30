@@ -170,14 +170,6 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<I, R> Index<I> for ChainComplexBase<I, R>
-where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = ChainComplexSummand<R>;
-    fn index(&self, i: I) -> &Self::Output {
-        self.get(i)
-    }
-}
-
 impl<I, R> GridTrait<I> for ChainComplexBase<I, R>
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     type Itr = GridIter<I>;
@@ -232,6 +224,30 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 mem::take(&mut mats[i])
             }
         )
+    }
+}
+
+impl<I, R> Index<I> for ChainComplexBase<I, R>
+where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = ChainComplexSummand<R>;
+    fn index(&self, i: I) -> &Self::Output {
+        self.get(i)
+    }
+}
+
+impl<R> Index<(isize, isize)> for ChainComplex2<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = ChainComplexSummand<R>;
+    fn index(&self, i: (isize, isize)) -> &Self::Output {
+        self.get(i.into())
+    }
+}
+
+impl<R> Index<(isize, isize, isize)> for ChainComplex3<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = ChainComplexSummand<R>;
+    fn index(&self, i: (isize, isize, isize)) -> &Self::Output {
+        self.get(i.into())
     }
 }
 

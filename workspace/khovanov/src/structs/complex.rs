@@ -177,7 +177,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     delegate! { 
         to self.inner { 
-            fn index(&self, #[into] index: (isize, isize)) -> &Self::Output;
+            fn index(&self, index: (isize, isize)) -> &Self::Output;
         }
     }
 }

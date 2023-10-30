@@ -98,7 +98,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     delegate! { 
         to self.inner { 
-            fn index(&self, #[into] index: (isize, isize)) -> &Self::Output;
+            fn index(&self, index: (isize, isize)) -> &Self::Output;
         }
     }
 }

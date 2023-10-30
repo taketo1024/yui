@@ -91,16 +91,6 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     summands: GridBase<I, HomologySummand<R>>
 }
 
-impl<I, R> Index<I> for HomologyBase<I, R>
-where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = HomologySummand<R>;
-    delegate! { 
-        to self.summands { 
-            fn index(&self, i: I) -> &Self::Output;
-        }
-    }
-}
-
 impl<I, R> GridTrait<I> for HomologyBase<I, R>
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     type Itr = GridIter<I>;
@@ -132,6 +122,30 @@ where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
             }
         );
         Self { summands }
+    }
+}
+
+impl<I, R> Index<I> for HomologyBase<I, R>
+where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = HomologySummand<R>;
+    fn index(&self, i: I) -> &Self::Output {
+        self.get(i)
+    }
+}
+
+impl<R> Index<(isize, isize)> for Homology2<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = HomologySummand<R>;
+    fn index(&self, i: (isize, isize)) -> &Self::Output {
+        self.get(i.into())
+    }
+}
+
+impl<R> Index<(isize, isize, isize)> for Homology3<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = HomologySummand<R>;
+    fn index(&self, i: (isize, isize, isize)) -> &Self::Output {
+        self.get(i.into())
     }
 }
 

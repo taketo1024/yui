@@ -132,21 +132,6 @@ where
     }
 }
 
-impl<I, X, R> Index<I> for XChainComplexBase<I, X, R>
-where 
-    I: Deg,
-    X: Gen,
-    R: Ring, for<'x> &'x R: RingOps<R>,
-{
-    type Output = XChainComplexSummand<X, R>;
-
-    delegate! { 
-        to self.summands { 
-            fn index(&self, index: I) -> &Self::Output;
-        }
-    }
-}
-
 impl<I, X, R> GridTrait<I> for XChainComplexBase<I, X, R>
 where 
     I: Deg,
@@ -192,6 +177,30 @@ where
 {
     pub fn homology(&self, with_trans: bool) -> HomologyBase<I, R> { 
         HomologyBase::compute_from(self, with_trans)
+    }
+}
+
+impl<I, X, R> Index<I> for XChainComplexBase<I, X, R>
+where I: Deg, X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = XChainComplexSummand<X, R>;
+    fn index(&self, i: I) -> &Self::Output {
+        self.get(i)
+    }
+}
+
+impl<X, R> Index<(isize, isize)> for XChainComplex2<X, R>
+where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = XChainComplexSummand<X, R>;
+    fn index(&self, i: (isize, isize)) -> &Self::Output {
+        self.get(i.into())
+    }
+}
+
+impl<X, R> Index<(isize, isize, isize)> for XChainComplex3<X, R>
+where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = XChainComplexSummand<X, R>;
+    fn index(&self, i: (isize, isize, isize)) -> &Self::Output {
+        self.get(i.into())
     }
 }
 

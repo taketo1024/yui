@@ -3,7 +3,7 @@ use std::ops::Index;
 use std::fmt::Display;
 
 use itertools::Itertools;
-use yui_core::{isize2, usize2, Deg, isize3};
+use yui_core::{isize2, usize2, Deg, isize3, usize3};
 
 pub trait GridTrait<I>
 where I: Deg { 
@@ -74,6 +74,27 @@ where I: Deg {
         self.get(i)
     }
 }
+
+macro_rules! impl_index {
+    ($t:ident, $t2:ident, $t3:ident) => {
+        impl<E> Index<($t, $t)> for GridBase<$t2, E> {
+            type Output = E;
+            fn index(&self, i: ($t, $t)) -> &Self::Output {
+                self.get(i.into())
+            }
+        }
+        
+        impl<E> Index<($t, $t, $t)> for GridBase<$t3, E> {
+            type Output = E;
+            fn index(&self, i: ($t, $t, $t)) -> &Self::Output {
+                self.get(i.into())
+            }
+        }
+    };
+}
+
+impl_index!(isize, isize2, isize3);
+impl_index!(usize, usize2, usize3);
 
 pub trait DisplayForGrid {
     fn display_for_grid(&self) -> String;

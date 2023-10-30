@@ -2,7 +2,6 @@ use std::marker::PhantomData;
 use std::ops::Index;
 
 use delegate::delegate;
-use itertools::Itertools;
 
 use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3, IndexList};
 use yui_lin_comb::{Gen, LinComb};
@@ -97,13 +96,11 @@ where
         F1: Fn(I) -> Vec<X>,
         F2: Fn(I, &X) -> Vec<(X, R)>
     {
-        let support = support.collect_vec();
-
-        let summands = GridBase::new(support.clone().into_iter(), |i| 
+        let summands = GridBase::new(support, |i| 
             XChainComplexSummand::new(gens_map(i))
         );
 
-        let inner = ChainComplexBase::new(support.into_iter(), d_deg, |i| {
+        let inner = ChainComplexBase::new(summands.support(), d_deg, |i| {
             let from = summands[i].gens();
             let to = summands[i + d_deg].gens();
             Self::make_matrix(i, from, to, &d_map)

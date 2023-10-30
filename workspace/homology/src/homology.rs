@@ -13,8 +13,6 @@ pub type Homology<R>  = HomologyBase<isize,  R>;
 pub type Homology2<R> = HomologyBase<isize2, R>;
 pub type Homology3<R> = HomologyBase<isize3, R>;
 
-const ERR_NO_TRANS: &'static str = "not computed with trans.";
-
 #[derive(Debug, Clone)]
 pub struct HomologySummand<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> {
@@ -37,11 +35,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.rank + self.tors.len()
     }
 
-    pub fn gen(&self, i: usize) -> SpVec<R> {
+    pub fn gen(&self, i: usize) -> Option<SpVec<R>> {
         assert!(i < self.ngens());
+        let Some(t) = &self.trans else { 
+            return None
+        };
 
-        let t = self.trans.as_ref().expect(ERR_NO_TRANS);
-        t.backward_mat().col_vec(i)
+        let v = t.backward_mat().col_vec(i);
+        Some(v)
     }
 
     pub fn trans(&self) -> Option<&Trans<R>> {
@@ -273,7 +274,7 @@ mod tests {
         let h2 = &h[2];
         assert_eq!(h2.ngens(), 1);
 
-        let z = h2.gen(0);
+        let z = h2.gen(0).unwrap();
         assert!(!z.is_zero());
         assert!(c.d(2, &z).is_zero());
         assert_eq!(h2.trans().unwrap().forward(&z), SpVec::from(vec![1]));
@@ -287,7 +288,7 @@ mod tests {
         let h2 = &h[2];
         assert_eq!(h2.ngens(), 1);
 
-        let z = h2.gen(0);
+        let z = h2.gen(0).unwrap();
         assert!(!z.is_zero());
         assert!(c.d(2, &z).is_zero());
         assert_eq!(h2.trans().unwrap().forward(&z), SpVec::from(vec![1]));
@@ -296,8 +297,8 @@ mod tests {
         let h1 = &h[1];
         assert_eq!(h1.ngens(), 2);
 
-        let a = h1.gen(0);
-        let b = h1.gen(1);
+        let a = h1.gen(0).unwrap();
+        let b = h1.gen(1).unwrap();
 
         assert!(!a.is_zero());
         assert!(!b.is_zero());
@@ -315,7 +316,7 @@ mod tests {
         let h1 = &h[1];
         assert_eq!(h1.ngens(), 1);
 
-        let z = h1.gen(0);
+        let z = h1.gen(0).unwrap();
 
         assert!(!z.is_zero());
         assert!(c.d(1, &z).is_zero());

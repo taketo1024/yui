@@ -139,7 +139,7 @@ mod tests {
         assert_eq!(h.rank(), 1);
         assert_eq!(h.tors().len(), 0);
 
-        let v = h.gen(0);
+        let v = h.gen(0).unwrap();
 
         assert_eq!(v.is_zero(), false);
         assert_eq!(c.d(0, &v).is_zero(), true);
@@ -168,7 +168,7 @@ mod tests {
         assert_eq!(h.rank(), 1);
         assert_eq!(h.tors().len(), 0);
 
-        let v = h.gen(0);
+        let v = h.gen(0).unwrap();
 
         assert_eq!(v.is_zero(), false);
         assert_eq!(c.d(2, &v).is_zero(), true);
@@ -186,7 +186,7 @@ mod tests {
         assert_eq!(h.rank(), 1);
         assert_eq!(h.tors().len(), 0);
 
-        let v = h.gen(0);
+        let v = h.gen(0).unwrap();
 
         assert_eq!(v.is_zero(), false);
         assert_eq!(c.d(0, &v).is_zero(), true);
@@ -205,7 +205,7 @@ mod tests {
         assert_eq!(h.tors().len(), 0);
 
         for i in 0..2 { 
-            let v = h.gen(i);
+            let v = h.gen(i).unwrap();
             assert_eq!(v.is_zero(), false);
             assert_eq!(c.d(1, &v).is_zero(), true);
             assert_eq!(h.trans().unwrap().forward(&v), SpVec::unit(2, i));
@@ -223,7 +223,7 @@ mod tests {
         assert_eq!(h.rank(), 1);
         assert_eq!(h.tors().len(), 0);
 
-        let v = h.gen(0);
+        let v = h.gen(0).unwrap();
 
         assert_eq!(v.is_zero(), false);
         assert_eq!(c.d(2, &v).is_zero(), true);
@@ -241,7 +241,7 @@ mod tests {
         assert_eq!(h.rank(), 1);
         assert_eq!(h.tors().len(), 0);
 
-        let v = h.gen(0);
+        let v = h.gen(0).unwrap();
 
         assert_eq!(v.is_zero(), false);
         assert_eq!(c.d(0, &v).is_zero(), true);
@@ -259,7 +259,7 @@ mod tests {
         assert_eq!(h.rank(), 0);
         assert_eq!(h.tors(), &vec![2]);
 
-        let v = h.gen(0);
+        let v = h.gen(0).unwrap();
 
         assert_eq!(v.is_zero(), false);
         assert_eq!(c.d(1, &v).is_zero(), true);

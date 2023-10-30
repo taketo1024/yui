@@ -1,11 +1,10 @@
 use std::collections::HashMap;
 use std::ops::Index;
 
-use bimap::BiHashMap;
 use delegate::delegate;
-
 use itertools::Itertools;
-use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
+
+use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3, IndexList};
 use yui_lin_comb::{Gen, LinComb};
 use yui_matrix::sparse::{SpMat, SpVec};
 
@@ -25,38 +24,35 @@ where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    gens: BiHashMap<usize, X>,
+    gens: IndexList<X>,
     inner: ChainComplexSummand<R>
 }
 
 impl<X, R> XChainComplexSummand<X, R>
 where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new(gens: BiHashMap<usize, X>, d_matrix: SpMat<R>) -> Self { 
+    pub fn new(gens: IndexList<X>, d_matrix: SpMat<R>) -> Self { 
         let inner = ChainComplexSummand::new(d_matrix);
         Self { gens, inner }
     }
 
-    pub fn ngens(&self) -> usize { 
+    pub fn rank(&self) -> usize { 
         self.gens.len()
     }
 
     pub fn gens(&self) -> impl Iterator<Item = &X> { 
-        let n = self.ngens();
-        (0..n).map(|i| 
-            self.gens.get_by_left(&i).unwrap()
-        )
+        self.gens.iter()
     }
 
     pub fn gen(&self, i: usize) -> &X {
-        self.gens.get_by_left(&i).unwrap()
+        &self.gens[i]
     }
 
     pub fn index_of(&self, x: &X) -> usize {
-        self.gens.get_by_right(x).unwrap().clone()
+        self.gens.index_of(x).unwrap()
     }
 
     pub fn vectorize(&self, z: &LinComb<X, R>) -> SpVec<R> {
-        let n = self.ngens();
+        let n = self.rank();
         SpVec::generate(n, |set| { 
             for (x, a) in z.iter() { 
                 let i = self.index_of(x);
@@ -76,7 +72,6 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
 
     delegate! { 
         to self.inner { 
-            pub fn rank(&self) -> usize;
             pub fn d_matrix(&self) -> &SpMat<R>;
             pub fn d(&self, v: &SpVec<R>) -> SpVec<R>;
             pub fn is_cycle(&self, v: &SpVec<R>) -> bool;
@@ -117,14 +112,13 @@ where
         let support = support.collect_vec();
 
         let mut gens = support.iter().map(|&i| {
-            let gens = gens_map(i).into_iter().enumerate().collect::<BiHashMap<_, _>>();
-            (i, gens)
+            (i, IndexList::new(gens_map(i).into_iter()))
         }).collect::<HashMap<_, _>>();
 
         for &i in support.iter() {
             let r = gens[&i].len();
             if r > 0 && !gens.contains_key(&(i - d_deg)) { 
-                gens.insert(i - d_deg, BiHashMap::new());
+                gens.insert(i - d_deg, IndexList::default());
             }
         }
 
@@ -146,7 +140,7 @@ where
         Self { d_deg, summands }
     }
 
-    fn make_matrix<F>(i: I, from: &BiHashMap<usize, X>, to_opt: Option<&BiHashMap<usize, X>>, d: &F) -> SpMat<R>
+    fn make_matrix<F>(i: I, from: &IndexList<X>, to_opt: Option<&IndexList<X>>, d: &F) -> SpMat<R>
     where F: Fn(I, &X) -> Vec<(X, R)> {
         let Some(to) = to_opt else { 
             return SpMat::zero((0, from.len()))
@@ -154,10 +148,10 @@ where
         let (m, n) = (to.len(), from.len());
 
         SpMat::generate((m, n), |set|
-            for (&j, x) in from.iter() {
+            for (j, x) in from.iter().enumerate() {
                 let ys = d(i, x);
                 for (y, a) in ys {
-                    let &i = to.get_by_right(&y).unwrap();
+                    let i = to.index_of(&y).unwrap();
                     set(i, j, a);
                 }
             }

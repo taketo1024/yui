@@ -1,11 +1,10 @@
 use std::ops::Index;
 
 use delegate::delegate;
-use itertools::Itertools;
 use yui_core::{EucRing, EucRingOps, Ring, RingOps, Deg, isize2, isize3};
 use yui_matrix::sparse::{SpVec, Trans};
 
-use crate::utils::HomologyCalc;
+use crate::utils::{HomologyCalc, r_mod_str};
 use crate::{GridBase, GridIter, DisplayForGrid, ChainComplexTrait, ChainComplexSummandTrait};
 
 use super::grid::GridTrait;
@@ -77,40 +76,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn module_str(&self) -> String { 
-        use yui_utils::superscript;
-
-        let rank = self.rank();
-        let tors = self.tors().iter()
-            .into_group_map_by(|r| r.to_string())
-            .into_iter().map(|(k, list)| (k, list.len()))
-            .collect_vec();
-
-        if rank == 0 && tors.is_empty() { 
-            return ".".to_string()
-        }
-    
-        let mut res = vec![];
-        let symbol = R::math_symbol();
-    
-        if rank > 1 {
-            let str = format!("{}{}", symbol, superscript(rank as isize));
-            res.push(str);
-        } else if rank == 1 { 
-            let str = format!("{}", symbol);
-            res.push(str);
-        }
-        
-        for (t, r) in tors.iter() { 
-            let str = if r > &1 { 
-                format!("({}/{}){}", symbol, t, superscript(*r as isize))
-            } else { 
-                format!("({}/{})", symbol, t)
-            };
-            res.push(str);
-        }
-    
-        let str = res.join(" ⊕ ");
-        str
+        r_mod_str(self.rank, self.tors.iter())
     }
 }
 

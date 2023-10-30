@@ -402,12 +402,12 @@ mod tests {
         r.check_d_all();
         
         let u = SpVec::unit(1, 0);
-        let v = r.trans_backward(2, &u);
+        let v = r.trans(2).backward(&u);
 
         assert!(!v.is_zero());
         assert!(c.d(2, &v).is_zero());
 
-        let w = r.trans_forward(2, &v);
+        let w = r.trans(2).forward(&v);
 
         assert!(!w.is_zero());
         assert!(r.d(2, &w).is_zero());

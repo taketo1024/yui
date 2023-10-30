@@ -14,7 +14,7 @@ pub type ReducedComplex3<R> = ReducedComplexBase<isize3, R>;
 pub struct ReducedComplexBase<I, R>
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     inner: ChainComplexBase<I, R>,
-    trans: Option<GridBase<I, Trans<R>>>
+    trans: GridBase<I, Trans<R>>
 }
 
 impl<I, R> ReducedComplexBase<I, R>
@@ -26,10 +26,11 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         F2: FnMut(I) -> Trans<R>
     {
         let inner = ChainComplexBase::new(support, d_deg, d_matrix);
-        let trans = trans_opt.map(|t| { 
-            GridBase::new(inner.support(), t)
-        });
-        
+        let trans = if let Some(trans) = trans_opt {
+            GridBase::new(inner.support(), trans)
+        } else { 
+            GridBase::new(inner.support(), |i| Trans::id(inner[i].rank()))
+        };
         Self { inner, trans }
     }
 
@@ -56,7 +57,7 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
             t_out * d * t_in
         });
 
-        Self { inner, trans: Some(trans) }
+        Self { inner, trans }
     }
 
     pub fn bypass<C>(complex: &C, with_trans: bool) -> Self
@@ -77,18 +78,8 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         )
     }
 
-    pub fn trans_at(&self, i: I) -> Option<&Trans<R>> {
-        self.trans.as_ref().map(|ts| ts.get(i))
-    }
-
-    pub fn trans_forward(&self, i: I, v: &SpVec<R>) -> SpVec<R> { 
-        assert!(self.trans.is_some());
-        self.trans_at(i).unwrap().forward(v)
-    }
-
-    pub fn trans_backward(&self, i: I, v: &SpVec<R>) -> SpVec<R> { 
-        assert!(self.trans.is_some());
-        self.trans_at(i).unwrap().backward(v)
+    pub fn trans(&self, i: I) -> &Trans<R> {
+        &self.trans[i]
     }
 
     delegate! { 

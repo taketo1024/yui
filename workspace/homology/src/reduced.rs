@@ -66,7 +66,7 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         C::E: RModStr<R = R>
     {
         let trans = if with_trans { 
-            Some(|i| Trans::id(complex.rank(i)))
+            Some(|i| Trans::id(complex.get(i).rank()))
         } else { 
             None
         };

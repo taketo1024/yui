@@ -27,10 +27,6 @@ where
     fn d_deg(&self) -> I;
     fn d_matrix(&self, i: I) -> &SpMat<Self::R>;
 
-    fn rank(&self, i: I) -> usize { 
-        self.get(i).rank()
-    }
-
     fn check_d_at(&self, i0: I) { 
         let i1 = i0 + self.d_deg();
         if !(self.is_supported(i0) && self.is_supported(i1)) {
@@ -81,7 +77,7 @@ where
 
     fn display_d(&self) -> String { 
         self.support().filter_map(|i| 
-            if self.rank(i) > 0 && self.rank(i + self.d_deg()) > 0 {
+            if self.get(i).rank() > 0 && self.get(i + self.d_deg()).rank() > 0 {
                 Some(self.display_d_at(i))
             } else { 
                 None
@@ -131,7 +127,7 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn d(&self, i: I, v: &SpVec<R>) -> SpVec<R> {
-        assert_eq!(self.rank(i), v.dim());
+        assert_eq!(self.get(i).rank(), v.dim());
         let d = self.d_matrix(i);
         d * v
     }

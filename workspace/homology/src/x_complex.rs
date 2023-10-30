@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::marker::PhantomData;
 use std::ops::Index;
 
 use delegate::delegate;
@@ -8,7 +8,8 @@ use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3, IndexLis
 use yui_lin_comb::{Gen, LinComb};
 use yui_matrix::sparse::{SpMat, SpVec};
 
-use crate::{GridBase, GridIter, DisplayForGrid, ChainComplexDisplay, ChainComplexSummand};
+use crate::utils::r_mod_str;
+use crate::{GridBase, GridIter, DisplayForGrid, ChainComplexDisplay, ChainComplexBase};
 
 use super::grid::GridTrait;
 use super::complex::ChainComplexTrait;
@@ -25,37 +26,33 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     gens: IndexList<X>,
-    inner: ChainComplexSummand<R>
+    _r: PhantomData<R>
 }
 
 impl<X, R> XChainComplexSummand<X, R>
 where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new(gens: IndexList<X>, d_matrix: SpMat<R>) -> Self { 
-        let inner = ChainComplexSummand::new(d_matrix);
-        Self { gens, inner }
+    pub fn new(gens: Vec<X>) -> Self { 
+        let gens = IndexList::new(gens.into_iter());
+        Self { gens, _r: PhantomData }
     }
 
     pub fn rank(&self) -> usize { 
         self.gens.len()
     }
 
-    pub fn gens(&self) -> impl Iterator<Item = &X> { 
-        self.gens.iter()
+    pub fn gens(&self) -> &IndexList<X> { 
+        &self.gens
     }
 
     pub fn gen(&self, i: usize) -> &X {
         &self.gens[i]
     }
 
-    pub fn index_of(&self, x: &X) -> usize {
-        self.gens.index_of(x).unwrap()
-    }
-
     pub fn vectorize(&self, z: &LinComb<X, R>) -> SpVec<R> {
         let n = self.rank();
         SpVec::generate(n, |set| { 
             for (x, a) in z.iter() { 
-                let i = self.index_of(x);
+                let i = self.gens.index_of(x).unwrap();
                 set(i, a.clone());
             }
         })
@@ -69,21 +66,12 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         );
         LinComb::from_iter(elems)
     }
-
-    delegate! { 
-        to self.inner { 
-            pub fn d_matrix(&self) -> &SpMat<R>;
-            pub fn d(&self, v: &SpVec<R>) -> SpVec<R>;
-            pub fn is_cycle(&self, v: &SpVec<R>) -> bool;
-            pub fn module_str(&self) -> String;
-        }
-    }
 }
 
 impl<X, R> DisplayForGrid for XChainComplexSummand<X, R>
 where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn display_for_grid(&self) -> String {
-        self.module_str()
+        r_mod_str(self.rank(), [].into_iter())
     }
 }
 
@@ -93,8 +81,8 @@ where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    d_deg: I,
-    summands: GridBase<I, XChainComplexSummand<X, R>>
+    summands: GridBase<I, XChainComplexSummand<X, R>>,
+    inner: ChainComplexBase<I, R>
 }
 
 impl<I, X, R> XChainComplexBase<I, X, R>
@@ -111,40 +99,21 @@ where
     {
         let support = support.collect_vec();
 
-        let mut gens = support.iter().map(|&i| {
-            (i, IndexList::new(gens_map(i).into_iter()))
-        }).collect::<HashMap<_, _>>();
+        let summands = GridBase::new(support.clone().into_iter(), |i| 
+            XChainComplexSummand::new(gens_map(i))
+        );
 
-        for &i in support.iter() {
-            let r = gens[&i].len();
-            if r > 0 && !gens.contains_key(&(i - d_deg)) { 
-                gens.insert(i - d_deg, IndexList::default());
-            }
-        }
+        let inner = ChainComplexBase::new(support.into_iter(), d_deg, |i| {
+            let from = summands[i].gens();
+            let to = summands[i + d_deg].gens();
+            Self::make_matrix(i, from, to, &d_map)
+        });
 
-        let mut mats = gens.keys().map( |&i| {
-            let from = &gens[&i];
-            let to = gens.get(&(i + d_deg)); // optional
-            let d = Self::make_matrix(i, from, to, &d_map);
-            (i, d)
-        }).collect::<HashMap<_, _>>();
-
-        let data = gens.into_iter().map(|(i, gens)| {
-            let d_matrix = mats.remove(&i).unwrap();
-            let summand = XChainComplexSummand::new(gens, d_matrix);
-            (i, summand)
-        }).collect();
-
-        let summands = GridBase::new_raw(support, data);
-
-        Self { d_deg, summands }
+        Self { summands, inner }
     }
 
-    fn make_matrix<F>(i: I, from: &IndexList<X>, to_opt: Option<&IndexList<X>>, d: &F) -> SpMat<R>
+    fn make_matrix<F>(i: I, from: &IndexList<X>, to: &IndexList<X>, d: &F) -> SpMat<R>
     where F: Fn(I, &X) -> Vec<(X, R)> {
-        let Some(to) = to_opt else { 
-            return SpMat::zero((0, from.len()))
-        };
         let (m, n) = (to.len(), from.len());
 
         SpMat::generate((m, n), |set|
@@ -159,11 +128,11 @@ where
     }
 
     pub fn d(&self, i: I, z: &LinComb<X, R>) -> LinComb<X, R> { 
-        let d = self[i].d_matrix();
+        let d = self.d_matrix(i);
         let v = self[i].vectorize(z);
         let w = d * v;
 
-        let i1 = i + self.d_deg;
+        let i1 = i + self.d_deg();
         self[i1].as_chain(&w)
     }
 }
@@ -208,16 +177,13 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
     type R = R;
-    fn d_deg(&self) -> I { 
-        self.d_deg
-    }
 
-    fn rank(&self, i: I) -> usize {
-        self[i].rank()
-    }
-
-    fn d_matrix(&self, i: I) -> &SpMat<Self::R> {
-        self[i].d_matrix()
+    delegate! { 
+        to self.inner { 
+            fn d_deg(&self) -> I;
+            fn rank(&self, i: I) -> usize;
+            fn d_matrix(&self, i: I) -> &SpMat<Self::R>;
+        }
     }
 }
 
@@ -261,7 +227,7 @@ mod tests {
 
         assert_eq!(c[0].rank(), 1);
         assert_eq!(c[1].rank(), 1);
-        assert_eq!(c[1].d_matrix(), &SpMat::from_vec((1,1), vec![1]));
+        assert_eq!(c.d_matrix(1), &SpMat::from_vec((1,1), vec![1]));
 
         let h = c.homology(false);
         

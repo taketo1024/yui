@@ -48,8 +48,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn q_range(&self) -> RangeInclusive<isize> { 
-        let q_min = self.support().filter_map(|i| self[i].gens().map(|x| x.q_deg()).min()).min().unwrap_or(0);
-        let q_max = self.support().filter_map(|i| self[i].gens().map(|x| x.q_deg()).max()).max().unwrap_or(0);
+        let q_min = self.support().filter_map(|i| self[i].gens().iter().map(|x| x.q_deg()).min()).min().unwrap_or(0);
+        let q_max = self.support().filter_map(|i| self[i].gens().iter().map(|x| x.q_deg()).max()).max().unwrap_or(0);
         let q0 = self.deg_shift.1;
         (q_min + q0) ..= (q_max + q0)
     }
@@ -73,7 +73,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 let isize2(i, j) = idx;
                 let q = j - deg_shift.1;
 
-                self[i].gens().filter(|x| { 
+                self[i].gens().iter().filter(|x| { 
                     x.q_deg() == q
                 }).cloned().collect()
             },

@@ -6,6 +6,7 @@ use core::panic;
 
 use itertools::Itertools;
 use log::info;
+use yui_homology::ChainComplexTrait;
 use yui_link::Link;
 use yui_homology::utils::HomologyCalc;
 use yui_core::{EucRing, EucRingOps};
@@ -76,8 +77,8 @@ fn prepare_v2<R>(l: &Link, h: &R, reduced: bool) -> (SpMat<R>, SpMat<R>, Vec<SpV
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
     let c = KhComplex::new_v2(l, h, &R::zero(), reduced);
 
-    let a0 = c[-1].d_matrix().clone();
-    let a1 = c[ 0].d_matrix().clone();
+    let a0 = c.d_matrix(-1).clone();
+    let a1 = c.d_matrix( 0).clone();
 
     let vs = c.canon_cycles().iter().map(|z| 
         c[0].vectorize(&z)

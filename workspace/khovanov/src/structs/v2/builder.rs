@@ -197,7 +197,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests { 
-    use yui_homology::ChainComplexTrait;
+    use yui_homology::{ChainComplexTrait, RModStr};
     use super::*;
 
     #[test]
@@ -298,7 +298,7 @@ mod tests {
         assert_eq!(h[2].is_free(), true);
 
         assert_eq!(h[3].rank(), 1);
-        assert_eq!(h[3].tors(), &vec![2]);
+        assert_eq!(h[3].tors(), vec![&2]);
     }
 
     #[test]

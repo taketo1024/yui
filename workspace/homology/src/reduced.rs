@@ -143,7 +143,7 @@ where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 #[cfg(test)]
 mod tests { 
-    use crate::ChainComplex;
+    use crate::{ChainComplex, RModStr};
     use crate::utils::ChainReducer;
 
     use super::*;

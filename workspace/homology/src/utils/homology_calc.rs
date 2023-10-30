@@ -126,7 +126,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ChainComplex, ChainComplexTrait};
+    use crate::{ChainComplex, ChainComplexTrait, RModStr};
  
     #[test]
     fn s2_0th() {
@@ -257,7 +257,7 @@ mod tests {
         let h = HomologyCalc::calculate(&d2, &d1, true);
 
         assert_eq!(h.rank(), 0);
-        assert_eq!(h.tors(), &vec![2]);
+        assert_eq!(h.tors(), vec![&2]);
 
         let v = h.gen(0);
 

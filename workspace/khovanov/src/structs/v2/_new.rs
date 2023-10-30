@@ -58,6 +58,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 #[cfg(test)]
 mod tests {
+    use yui_homology::{RModStr, DisplaySeq};
+
     use super::*;
  
     #[test]
@@ -72,11 +74,13 @@ mod tests {
         assert_eq!(h[-3].is_free(), true);
 
         assert_eq!(h[-2].rank(), 1);
-        assert_eq!(h[-2].tors(), &vec![2]);
+        assert_eq!(h[-2].tors(), vec![&2]);
 
         assert_eq!(h[-1].is_zero(), true);
 
         assert_eq!(h[ 0].rank(), 2);
         assert_eq!(h[ 0].is_free(), true);
+
+        h.print_seq();
     }
 }

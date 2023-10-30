@@ -6,7 +6,7 @@ use core::panic;
 
 use itertools::Itertools;
 use log::info;
-use yui_homology::ChainComplexTrait;
+use yui_homology::{ChainComplexTrait, RModStr};
 use yui_link::Link;
 use yui_homology::utils::HomologyCalc;
 use yui_core::{EucRing, EucRingOps};
@@ -46,7 +46,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     let kh = HomologyCalc::calculate(&a0, &a1, true);
 
-    info!("homology: {}", kh.module_str());
+    info!("homology: {}", kh.math_symbol());
     
     let r = kh.rank();
 

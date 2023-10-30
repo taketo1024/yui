@@ -7,8 +7,7 @@ use delegate::delegate;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
 use yui_matrix::sparse::{SpMat, SpVec, MatType, Trans};
 
-use crate::utils::r_mod_str;
-use crate::{ReducedComplexBase, GridBase, GridIter, DisplayForGrid};
+use crate::{ReducedComplexBase, GridBase, GridIter, DisplayForGrid, RModStr};
 
 use super::grid::GridTrait;
 use super::utils::ChainReducer;
@@ -104,20 +103,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(rank: usize) -> Self { 
         Self { rank, _r: PhantomData }
     }
+}
 
-    pub fn rank(&self) -> usize {
+impl<R> RModStr for ChainComplexSummand<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type R = R;
+
+    fn rank(&self) -> usize {
         self.rank
     }
 
-    pub fn module_str(&self) -> String { 
-        r_mod_str(self.rank, vec![].iter())
+    fn tors(&self) -> Vec<&Self::R> {
+        vec![]
     }
 }
 
 impl<R> DisplayForGrid for ChainComplexSummand<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn display_for_grid(&self) -> String {
-        self.module_str()
+        self.math_symbol()
     }
 }
 
@@ -138,7 +142,7 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         let mut d_matrices = GridBase::new(support, |i| 
             d_matrix(i)
         );
-        
+
         let summands = GridBase::new(d_matrices.support(), |i| {
             let r = d_matrices[i].cols();
             ChainComplexSummand::new(r) 

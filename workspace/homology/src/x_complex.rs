@@ -7,8 +7,7 @@ use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3, IndexLis
 use yui_lin_comb::{Gen, LinComb};
 use yui_matrix::sparse::{SpMat, SpVec};
 
-use crate::utils::r_mod_str;
-use crate::{GridBase, GridIter, DisplayForGrid, ChainComplexDisplay, ChainComplexBase};
+use crate::{GridBase, GridIter, DisplayForGrid, ChainComplexDisplay, ChainComplexBase, RModStr};
 
 use super::grid::GridTrait;
 use super::complex::ChainComplexTrait;
@@ -33,10 +32,6 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(gens: Vec<X>) -> Self { 
         let gens = IndexList::new(gens.into_iter());
         Self { gens, _r: PhantomData }
-    }
-
-    pub fn rank(&self) -> usize { 
-        self.gens.len()
     }
 
     pub fn gens(&self) -> &IndexList<X> { 
@@ -67,10 +62,23 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
+impl<X, R> RModStr for XChainComplexSummand<X, R>
+where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+    type R = R;
+
+    fn rank(&self) -> usize {
+        self.gens.len()
+    }
+
+    fn tors(&self) -> Vec<&Self::R> {
+        vec![]
+    }
+}
+
 impl<X, R> DisplayForGrid for XChainComplexSummand<X, R>
 where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn display_for_grid(&self) -> String {
-        r_mod_str(self.rank(), [].into_iter())
+        self.math_symbol()
     }
 }
 
@@ -201,6 +209,8 @@ where
 #[cfg(test)]
 mod tests { 
     use yui_lin_comb::Free;
+
+    use crate::RModStr;
 
     use super::*;
 

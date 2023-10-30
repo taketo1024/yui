@@ -4,8 +4,8 @@ use delegate::delegate;
 use yui_core::{EucRing, EucRingOps, Ring, RingOps, Deg, isize2, isize3};
 use yui_matrix::sparse::{SpVec, Trans};
 
-use crate::utils::{HomologyCalc, r_mod_str};
-use crate::{GridBase, GridIter, DisplayForGrid, ChainComplexTrait};
+use crate::utils::HomologyCalc;
+use crate::{GridBase, GridIter, DisplayForGrid, ChainComplexTrait, RModStr};
 
 use super::grid::GridTrait;
 
@@ -33,25 +33,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         Self::new(0, vec![], None)
     }
 
-    pub fn rank(&self) -> usize { 
-        self.rank
-    }
-
-    pub fn tors(&self) -> &Vec<R> {
-        &self.tors
-    }
-
-    pub fn is_zero(&self) -> bool { 
-        self.rank() == 0 && self.is_free()
-    }
-
-    pub fn is_free(&self) -> bool { 
-        self.tors().is_empty()
-    }
-
     pub fn ngens(&self) -> usize { 
-        let t = self.trans.as_ref().expect(ERR_NO_TRANS);
-        t.tgt_dim()
+        self.rank + self.tors.len()
     }
 
     pub fn gen(&self, i: usize) -> SpVec<R> {
@@ -74,23 +57,32 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         
         t.backward(v)
     }
-
-    pub fn module_str(&self) -> String { 
-        r_mod_str(self.rank, self.tors.iter())
-    }
-}
-
-impl<R> DisplayForGrid for HomologySummand<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn display_for_grid(&self) -> String {
-        self.module_str()
-    }
 }
 
 impl<R> Default for HomologySummand<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn default() -> Self {
         Self::zero()
+    }
+}
+
+impl<R> RModStr for HomologySummand<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type R = R;
+
+    fn rank(&self) -> usize {
+        self.rank
+    }
+
+    fn tors(&self) -> Vec<&Self::R> {
+        self.tors.iter().collect()
+    }
+}
+
+impl<R> DisplayForGrid for HomologySummand<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn display_for_grid(&self) -> String {
+        self.math_symbol()
     }
 }
 
@@ -143,7 +135,7 @@ where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
 #[cfg(test)]
 mod tests { 
     use yui_matrix::sparse::SpVec;
-    use crate::ChainComplex;
+    use crate::{ChainComplex, RModStr};
 
     #[test]
     fn zero() { 
@@ -198,7 +190,7 @@ mod tests {
         let h = c.homology(false);
 
         assert_eq!(h[0].rank(), 0);
-        assert_eq!(h[0].tors(), &vec![2]);
+        assert_eq!(h[0].tors(), vec![&2]);
         assert!(!h[0].is_free());
     }
 
@@ -259,7 +251,7 @@ mod tests {
         assert_eq!(h[0].is_free(), true);
 
         assert_eq!(h[1].rank(), 0);
-        assert_eq!(h[1].tors(), &vec![2]);
+        assert_eq!(h[1].tors(), vec![&2]);
         assert_eq!(h[1].is_free(), false);
 
         assert_eq!(h[2].rank(), 0);

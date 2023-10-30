@@ -5,7 +5,7 @@ use yui_core::{EucRing, EucRingOps, Ring, RingOps, Deg, isize2, isize3};
 use yui_matrix::sparse::{SpVec, Trans};
 
 use crate::utils::{HomologyCalc, r_mod_str};
-use crate::{GridBase, GridIter, DisplayForGrid, ChainComplexTrait, ChainComplexSummandTrait};
+use crate::{GridBase, GridIter, DisplayForGrid, ChainComplexTrait};
 
 use super::grid::GridTrait;
 
@@ -126,16 +126,13 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 impl<I, R> HomologyBase<I, R>
 where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn compute_from<C>(complex: &C, with_trans: bool) -> Self
-    where 
-        C: ChainComplexTrait<I, R = R>,
-        C::E: ChainComplexSummandTrait<R = C::R>
-    { 
+    where C: ChainComplexTrait<I, R = R> {
         let summands = GridBase::new(
             complex.support(), 
             |i| {
                 let i0 = i - complex.d_deg();
-                let d0 = complex.get(i0).d_matrix();
-                let d1 = complex.get(i).d_matrix();
+                let d0 = complex.d_matrix(i0);
+                let d1 = complex.d_matrix(i );
                 HomologyCalc::calculate(d0, d1, with_trans)
             }
         );
@@ -146,7 +143,7 @@ where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
 #[cfg(test)]
 mod tests { 
     use yui_matrix::sparse::SpVec;
-    use crate::{ChainComplex, ChainComplexSummandTrait};
+    use crate::ChainComplex;
 
     #[test]
     fn zero() { 

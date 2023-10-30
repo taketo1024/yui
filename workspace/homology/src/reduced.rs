@@ -5,7 +5,7 @@ use delegate::delegate;
 use yui_core::{Deg, Ring, RingOps, EucRing, EucRingOps, isize2, isize3};
 use yui_matrix::sparse::{Trans, SpMat, SpVec};
 
-use crate::{ChainComplexBase, GridTrait, ChainComplexTrait, HomologyBase, GridBase, GridIter, ChainComplexSummand, ChainComplexSummandTrait, ChainComplexDisplay};
+use crate::{ChainComplexBase, GridTrait, ChainComplexTrait, HomologyBase, GridBase, GridIter, ChainComplexSummand, ChainComplexDisplay};
 
 pub type ReducedComplex<R>  = ReducedComplexBase<isize,  R>;
 pub type ReducedComplex2<R> = ReducedComplexBase<isize2, R>;
@@ -59,19 +59,16 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn bypass<C>(complex: &C, with_trans: bool) -> Self
-    where 
-        C: ChainComplexTrait<I, R = R>,
-        C::E: ChainComplexSummandTrait<R = R>
-    {
+    where C: ChainComplexTrait<I, R = R> {
         let trans = if with_trans { 
-            Some(|i| Trans::id(complex.get(i).rank()))
+            Some(|i| Trans::id(complex.rank(i)))
         } else { 
             None
         };
         Self::new(
             complex.support(), 
             complex.d_deg(), 
-            |i| complex.get(i).d_matrix().clone(), 
+            |i| complex.d_matrix(i).clone(), 
             trans
         )
     }

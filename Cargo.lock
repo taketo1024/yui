@@ -1193,8 +1193,10 @@ dependencies = [
 name = "yui-core"
 version = "0.1.0"
 dependencies = [
+ "bimap",
  "derive_more",
  "is-even",
+ "itertools",
  "num-bigint",
  "num-traits",
 ]

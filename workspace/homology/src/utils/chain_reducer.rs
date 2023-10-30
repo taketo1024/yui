@@ -7,7 +7,7 @@ use yui_matrix::sparse::pivot::{perms_by_pivots, find_pivots, PivotType};
 use yui_matrix::sparse::schur::Schur;
 use yui_core::{Ring, RingOps, Deg};
 
-use crate::{ChainComplexTrait, ReducedComplexBase, ChainComplexSummandTrait};
+use crate::{ChainComplexTrait, ReducedComplexBase};
 
 //       a0 = [x]      a1 = [a b]      a2 = [z w]
 //            [y]           [c d]     
@@ -26,7 +26,6 @@ pub struct ChainReducer<'a, I, C>
 where 
     I: Deg,
     C: ChainComplexTrait<I>,
-    C::E: ChainComplexSummandTrait<R = C::R>,
     C::R: Ring, for<'x> &'x C::R: RingOps<C::R>,
 { 
     complex: &'a C,
@@ -39,7 +38,6 @@ impl<'a, I, C> ChainReducer<'a, I, C>
 where 
     I: Deg,
     C: ChainComplexTrait<I>,
-    C::E: ChainComplexSummandTrait<R = C::R>,
     C::R: Ring, for<'x> &'x C::R: RingOps<C::R>,
 {
     pub fn reduce(complex: &'a C, with_trans: bool) -> ReducedComplexBase<I, C::R> {
@@ -59,7 +57,7 @@ where
     }
 
     pub fn matrix(&self, i: I) -> &SpMat<C::R> {
-        self.mats.get(&i).unwrap_or(self.complex.get(i).d_matrix())
+        self.mats.get(&i).unwrap_or(self.complex.d_matrix(i))
     }
 
     pub fn trans(&self, i: I) -> Option<&Trans<C::R>> {
@@ -155,7 +153,7 @@ where
     }
 
     fn init_at(&mut self, i: I) {
-        let d = self.complex.get(i).d_matrix();
+        let d = self.complex.d_matrix(i);
         let n = d.cols();
 
         self.mats.insert(i, d.clone());
@@ -221,7 +219,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ChainComplex;
+    use crate::{ChainComplex, ChainComplexSummandTrait};
 
     #[test]
     fn s2() {

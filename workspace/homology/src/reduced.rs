@@ -5,7 +5,7 @@ use delegate::delegate;
 use yui_core::{Deg, Ring, RingOps, EucRing, EucRingOps, isize2, isize3};
 use yui_matrix::sparse::{Trans, SpMat, SpVec};
 
-use crate::{ChainComplexBase, GridTrait, ChainComplexTrait, HomologyBase, GridBase, GridIter, ChainComplexSummand, ChainComplexSummandTrait};
+use crate::{ChainComplexBase, GridTrait, ChainComplexTrait, HomologyBase, GridBase, GridIter, ChainComplexSummand, ChainComplexSummandTrait, ChainComplexDisplay};
 
 pub type ReducedComplex<R>  = ReducedComplexBase<isize,  R>;
 pub type ReducedComplex2<R> = ReducedComplexBase<isize2, R>;
@@ -36,7 +36,6 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn reduced_by<C, F>(complex: &C, trans_map: F) -> Self
     where 
         C: ChainComplexTrait<I, R = R>,
-        C::E: ChainComplexSummandTrait<R = R>,
         F: FnMut(I) -> Trans<R>
     {
         //              d
@@ -48,7 +47,7 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 
         let trans = GridBase::new(complex.support(), trans_map);        
         let inner = ChainComplexBase::new(complex.support(), complex.d_deg(), |i| { 
-            let d = complex.get(i).d_matrix();
+            let d = complex.d_matrix(i);
             let i1 = i + complex.d_deg();
             let t_in  = trans.get(i).backward_mat();
             let t_out = trans.get(i1).forward_mat();
@@ -120,10 +119,15 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 
     delegate! { 
         to self.inner { 
+            fn rank(&self, i: I) -> usize;
             fn d_deg(&self) -> I;
+            fn d_matrix(&self, i: I) -> &SpMat<Self::R>;
         }
     }
 }
+
+impl<I, R> ChainComplexDisplay<I> for ReducedComplexBase<I, R>
+where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {}
 
 impl<I, R> ReducedComplexBase<I, R>
 where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {

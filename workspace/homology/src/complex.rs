@@ -51,12 +51,13 @@ where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
 pub trait ChainComplexTrait<I>: GridTrait<I> + Sized
 where 
     I: Deg, 
-    Self::E: ChainComplexSummandTrait<R = Self::R>,
     Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> 
 { 
     type R;
 
+    fn rank(&self, i: I) -> usize;
     fn d_deg(&self) -> I;
+    fn d_matrix(&self, i: I) -> &SpMat<Self::R>;
 
     fn check_d_at(&self, i0: I) { 
         let i1 = i0 + self.d_deg();
@@ -64,8 +65,8 @@ where
             return 
         }
 
-        let d0 = self.get(i0).d_matrix();
-        let d1 = self.get(i1).d_matrix();
+        let d0 = self.d_matrix(i0);
+        let d1 = self.d_matrix(i1);
         let res = d1 * d0;
 
         assert!( res.is_zero(), "d² is non-zero at {i0}." );
@@ -85,12 +86,19 @@ where
     where F: FnMut(I) -> Trans<Self::R> {
         ReducedComplexBase::reduced_by(self, trans)
     }
+}
 
+pub trait ChainComplexDisplay<I>: ChainComplexTrait<I>
+where 
+    I: Deg, 
+    Self::E: DisplayForGrid,
+    Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> 
+{
     fn display_d_at(&self, i: I) -> String {
         let c = |i| self.get(i).display_for_grid();
         let c0 = c(i);
         let c1 = c(i + self.d_deg());
-        let d = self.get(i).d_matrix().to_dense();
+        let d = self.d_matrix(i).to_dense();
 
         if d.is_zero() { 
             format!("C[{i}] {c0} -> {c1}; zero.")
@@ -101,7 +109,7 @@ where
 
     fn display_d(&self) -> String { 
         self.support().filter_map(|i| 
-            if self.get(i).rank() > 0 && self.get(i + self.d_deg()).rank() > 0 {
+            if self.rank(i) > 0 && self.rank(i + self.d_deg()) > 0 {
                 Some(self.display_d_at(i))
             } else { 
                 None
@@ -214,7 +222,18 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     fn d_deg(&self) -> I { 
         self.d_deg
     }
+
+    fn rank(&self, i: I) -> usize {
+        self[i].rank()
+    }
+
+    fn d_matrix(&self, i: I) -> &SpMat<Self::R> {
+        self[i].d_matrix()
+    }
 }
+
+impl<I, R> ChainComplexDisplay<I> for ChainComplexBase<I, R>
+where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {}
 
 impl<I, R> ChainComplexBase<I, R> 
 where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {

@@ -4,7 +4,8 @@ use cartesian::cartesian;
 use delegate::delegate;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps, isize2};
 use yui_link::Link;
-use yui_homology::{ChainComplexTrait, XChainComplex, XChainComplex2, GridTrait, XChainComplexSummand};
+use yui_homology::{ChainComplexTrait, XChainComplex, XChainComplex2, GridTrait, XChainComplexSummand, ChainComplexDisplay};
+use yui_matrix::sparse::SpMat;
 
 use crate::{KhEnhState, KhChain, KhHomology, KhHomologyBigraded};
 
@@ -133,10 +134,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     delegate! { 
         to self.inner { 
+            fn rank(&self, i: isize) -> usize;
             fn d_deg(&self) -> isize;
+            fn d_matrix(&self, i: isize) -> &SpMat<R>;
         }
     }
 }
+
+impl<R> ChainComplexDisplay<isize> for KhComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {}
 
 impl<R> KhComplex<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
@@ -197,11 +203,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     delegate! { 
         to self.inner { 
+            fn rank(&self, i: isize2) -> usize;
             fn d_deg(&self) -> isize2;
+            fn d_matrix(&self, i: isize2) -> &SpMat<Self::R>;
         }
     }
 }
 
+impl<R> ChainComplexDisplay<isize2> for KhComplexBigraded<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {}
 
 impl<R> KhComplexBigraded<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 

@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use itertools::Itertools;
 use yui_core::{Ring, RingOps};
-use yui_homology::{DisplayTable, DisplaySeq, ChainComplexTrait};
+use yui_homology::{DisplayTable, DisplaySeq, ChainComplexDisplay};
 use yui_khovanov::KhComplex;
 use crate::utils::*;
 

@@ -9,7 +9,7 @@ use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
 use yui_lin_comb::{Gen, LinComb};
 use yui_matrix::sparse::{SpMat, SpVec, MatType};
 
-use crate::{GridBase, GridIter, ChainComplexSummandTrait, DisplayForGrid};
+use crate::{GridBase, GridIter, ChainComplexSummandTrait, DisplayForGrid, ChainComplexDisplay};
 
 use super::grid::GridTrait;
 use super::complex::ChainComplexTrait;
@@ -222,7 +222,18 @@ where
     fn d_deg(&self) -> I { 
         self.d_deg
     }
+
+    fn rank(&self, i: I) -> usize {
+        self[i].rank()
+    }
+
+    fn d_matrix(&self, i: I) -> &SpMat<Self::R> {
+        self[i].d_matrix()
+    }
 }
+
+impl<I, X, R> ChainComplexDisplay<I> for XChainComplexBase<I, X, R>
+where I: Deg, X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {}
 
 impl<I, X, R> XChainComplexBase<I, X, R>
 where 

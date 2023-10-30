@@ -143,7 +143,7 @@ mod tests {
 
         assert_eq!(v.is_zero(), false);
         assert_eq!(c.d(0, &v).is_zero(), true);
-        assert_eq!(h.trans_forward(&v), SpVec::unit(1, 0));
+        assert_eq!(h.trans().unwrap().forward(&v), SpVec::unit(1, 0));
     }
 
     #[test]
@@ -172,7 +172,7 @@ mod tests {
 
         assert_eq!(v.is_zero(), false);
         assert_eq!(c.d(2, &v).is_zero(), true);
-        assert_eq!(h.trans_forward(&v), SpVec::unit(1, 0));
+        assert_eq!(h.trans().unwrap().forward(&v), SpVec::unit(1, 0));
     }
 
     #[test]
@@ -190,7 +190,7 @@ mod tests {
 
         assert_eq!(v.is_zero(), false);
         assert_eq!(c.d(0, &v).is_zero(), true);
-        assert_eq!(h.trans_forward(&v), SpVec::unit(1, 0));
+        assert_eq!(h.trans().unwrap().forward(&v), SpVec::unit(1, 0));
     }
 
     #[test]
@@ -208,7 +208,7 @@ mod tests {
             let v = h.gen(i);
             assert_eq!(v.is_zero(), false);
             assert_eq!(c.d(1, &v).is_zero(), true);
-            assert_eq!(h.trans_forward(&v), SpVec::unit(2, i));
+            assert_eq!(h.trans().unwrap().forward(&v), SpVec::unit(2, i));
         }
     }
 
@@ -227,7 +227,7 @@ mod tests {
 
         assert_eq!(v.is_zero(), false);
         assert_eq!(c.d(2, &v).is_zero(), true);
-        assert_eq!(h.trans_forward(&v), SpVec::unit(1, 0));
+        assert_eq!(h.trans().unwrap().forward(&v), SpVec::unit(1, 0));
     }
 
     #[test]
@@ -245,7 +245,7 @@ mod tests {
 
         assert_eq!(v.is_zero(), false);
         assert_eq!(c.d(0, &v).is_zero(), true);
-        assert_eq!(h.trans_forward(&v), SpVec::unit(1, 0));
+        assert_eq!(h.trans().unwrap().forward(&v), SpVec::unit(1, 0));
     }
 
     #[test]
@@ -263,6 +263,6 @@ mod tests {
 
         assert_eq!(v.is_zero(), false);
         assert_eq!(c.d(1, &v).is_zero(), true);
-        assert_eq!(h.trans_forward(&v), SpVec::unit(1, 0));
+        assert_eq!(h.trans().unwrap().forward(&v), SpVec::unit(1, 0));
     }
 }

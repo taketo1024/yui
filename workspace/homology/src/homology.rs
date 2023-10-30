@@ -44,18 +44,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         t.backward_mat().col_vec(i)
     }
 
-    pub fn trans_forward(&self, v: &SpVec<R>) -> SpVec<R> { 
-        let t = self.trans.as_ref().expect(ERR_NO_TRANS);
-        assert_eq!(t.src_dim(), v.dim());
-
-        t.forward(v)
-    }
-
-    pub fn trans_backward(&self, v: &SpVec<R>) -> SpVec<R> { 
-        let t = self.trans.as_ref().expect(ERR_NO_TRANS);
-        assert_eq!(t.tgt_dim(), v.dim());
-        
-        t.backward(v)
+    pub fn trans(&self) -> Option<&Trans<R>> {
+        self.trans.as_ref()
     }
 }
 
@@ -286,7 +276,7 @@ mod tests {
         let z = h2.gen(0);
         assert!(!z.is_zero());
         assert!(c.d(2, &z).is_zero());
-        assert_eq!(h2.trans_forward(&z), SpVec::from(vec![1]));
+        assert_eq!(h2.trans().unwrap().forward(&z), SpVec::from(vec![1]));
     }
 
     #[test]
@@ -300,7 +290,7 @@ mod tests {
         let z = h2.gen(0);
         assert!(!z.is_zero());
         assert!(c.d(2, &z).is_zero());
-        assert_eq!(h2.trans_forward(&z), SpVec::from(vec![1]));
+        assert_eq!(h2.trans().unwrap().forward(&z), SpVec::from(vec![1]));
         assert_eq!(h2.ngens(), 1);
 
         let h1 = &h[1];
@@ -313,8 +303,8 @@ mod tests {
         assert!(!b.is_zero());
         assert!(c.d(1, &a).is_zero());
         assert!(c.d(1, &b).is_zero());
-        assert_eq!(h1.trans_forward(&a), SpVec::from(vec![1, 0]));
-        assert_eq!(h1.trans_forward(&b), SpVec::from(vec![0, 1]));
+        assert_eq!(h1.trans().unwrap().forward(&a), SpVec::from(vec![1, 0]));
+        assert_eq!(h1.trans().unwrap().forward(&b), SpVec::from(vec![0, 1]));
     }
 
     #[test]
@@ -329,6 +319,6 @@ mod tests {
 
         assert!(!z.is_zero());
         assert!(c.d(1, &z).is_zero());
-        assert_eq!(h1.trans_forward(&z), SpVec::from(vec![1]));
+        assert_eq!(h1.trans().unwrap().forward(&z), SpVec::from(vec![1]));
     }
 }

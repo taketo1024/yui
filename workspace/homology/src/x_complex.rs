@@ -7,9 +7,9 @@ use delegate::delegate;
 use itertools::Itertools;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
 use yui_lin_comb::{Gen, LinComb};
-use yui_matrix::sparse::{SpMat, SpVec, MatType};
+use yui_matrix::sparse::{SpMat, SpVec};
 
-use crate::{GridBase, GridIter, ChainComplexSummandTrait, DisplayForGrid, ChainComplexDisplay};
+use crate::{GridBase, GridIter, DisplayForGrid, ChainComplexDisplay, ChainComplexSummand};
 
 use super::grid::GridTrait;
 use super::complex::ChainComplexTrait;
@@ -26,13 +26,14 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     gens: BiHashMap<usize, X>,
-    d_matrix: SpMat<R>
+    inner: ChainComplexSummand<R>
 }
 
 impl<X, R> XChainComplexSummand<X, R>
 where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(gens: BiHashMap<usize, X>, d_matrix: SpMat<R>) -> Self { 
-        Self { gens, d_matrix }
+        let inner = ChainComplexSummand::new(d_matrix);
+        Self { gens, inner }
     }
 
     pub fn ngens(&self) -> usize { 
@@ -72,28 +73,22 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         );
         LinComb::from_iter(elems)
     }
+
+    delegate! { 
+        to self.inner { 
+            pub fn rank(&self) -> usize;
+            pub fn d_matrix(&self) -> &SpMat<R>;
+            pub fn d(&self, v: &SpVec<R>) -> SpVec<R>;
+            pub fn is_cycle(&self, v: &SpVec<R>) -> bool;
+            pub fn module_str(&self) -> String;
+        }
+    }
 }
 
 impl<X, R> DisplayForGrid for XChainComplexSummand<X, R>
 where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn display_for_grid(&self) -> String {
         self.module_str()
-    }
-}
-
-impl<X, R> ChainComplexSummandTrait for XChainComplexSummand<X, R>
-where 
-    X: Gen,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    type R = R;
-
-    fn rank(&self) -> usize {
-        self.d_matrix.cols()
-    }
-
-    fn d_matrix(&self) -> &SpMat<Self::R> {
-        &self.d_matrix
     }
 }
 

@@ -219,7 +219,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ChainComplex, ChainComplexSummandTrait};
+    use crate::ChainComplex;
 
     #[test]
     fn s2() {

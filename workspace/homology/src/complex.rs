@@ -18,27 +18,6 @@ pub type ChainComplex<R>  = ChainComplexBase<isize,  R>;
 pub type ChainComplex2<R> = ChainComplexBase<isize2, R>;
 pub type ChainComplex3<R> = ChainComplexBase<isize3, R>;
 
-pub trait ChainComplexSummandTrait: DisplayForGrid
-where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> { 
-    type R;
-    fn rank(&self) -> usize;
-    fn d_matrix(&self) -> &SpMat<Self::R>;
-
-    fn d(&self, v: &SpVec<Self::R>) -> SpVec<Self::R> {
-        assert_eq!(self.rank(), v.dim());
-        let d = self.d_matrix();
-        d * v
-    }
-
-    fn is_cycle(&self, v: &SpVec<Self::R>) -> bool { 
-        self.d(v).is_zero()
-    }
-
-    fn module_str(&self) -> String { 
-        r_mod_str(self.rank(), vec![].iter())
-    }
-}
-
 pub trait ChainComplexTrait<I>: GridTrait<I> + Sized
 where 
     I: Deg, 
@@ -124,25 +103,34 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(d_matrix: SpMat<R>) -> Self { 
         Self { d_matrix }
     }
+
+    pub fn rank(&self) -> usize {
+        self.d_matrix.cols()
+    }
+
+    pub fn d_matrix(&self) -> &SpMat<R> {
+        &self.d_matrix
+    }
+
+    pub fn d(&self, v: &SpVec<R>) -> SpVec<R> {
+        assert_eq!(self.rank(), v.dim());
+        let d = self.d_matrix();
+        d * v
+    }
+
+    pub fn is_cycle(&self, v: &SpVec<R>) -> bool { 
+        self.d(v).is_zero()
+    }
+
+    pub fn module_str(&self) -> String { 
+        r_mod_str(self.rank(), vec![].iter())
+    }
 }
 
 impl<R> DisplayForGrid for ChainComplexSummand<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn display_for_grid(&self) -> String {
         self.module_str()
-    }
-}
-
-impl<R> ChainComplexSummandTrait for ChainComplexSummand<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type R = R;
-
-    fn rank(&self) -> usize {
-        self.d_matrix.cols()
-    }
-
-    fn d_matrix(&self) -> &SpMat<Self::R> {
-        &self.d_matrix
     }
 }
 

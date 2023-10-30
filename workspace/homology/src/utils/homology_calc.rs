@@ -126,7 +126,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ChainComplex, ChainComplexSummandTrait};
+    use crate::ChainComplex;
  
     #[test]
     fn s2_0th() {

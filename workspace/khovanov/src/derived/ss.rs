@@ -6,7 +6,6 @@ use core::panic;
 
 use itertools::Itertools;
 use log::info;
-use yui_homology::ChainComplexSummandTrait;
 use yui_link::Link;
 use yui_homology::utils::HomologyCalc;
 use yui_core::{EucRing, EucRingOps};

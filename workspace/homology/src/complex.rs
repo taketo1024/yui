@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::marker::PhantomData;
 use std::mem;
 use std::ops::Index;
 
@@ -95,21 +95,22 @@ where
 #[derive(Default)]
 pub struct ChainComplexSummand<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    d_matrix: SpMat<R>
+    rank: usize, 
+    _r: PhantomData<R>
 }
 
 impl<R> ChainComplexSummand<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new(d_matrix: SpMat<R>) -> Self { 
-        Self { d_matrix }
+    pub fn new(rank: usize) -> Self { 
+        Self { rank, _r: PhantomData }
     }
 
     pub fn rank(&self) -> usize {
-        self.d_matrix.cols()
+        self.rank
     }
 
     pub fn module_str(&self) -> String { 
-        r_mod_str(self.rank(), vec![].iter())
+        r_mod_str(self.rank, vec![].iter())
     }
 }
 
@@ -122,8 +123,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 pub struct ChainComplexBase<I, R>
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
+    summands: GridBase<I, ChainComplexSummand<R>>,
     d_deg: I,
-    summands: GridBase<I, ChainComplexSummand<R>>
+    d_matrices: GridBase<I, SpMat<R>>
 }
 
 impl<I, R> ChainComplexBase<I, R> 
@@ -133,28 +135,24 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         It: Iterator<Item = I>, 
         F: FnMut(I) -> SpMat<R>
     {
-        let support = support.collect_vec();
-        let mut data = HashMap::<I, SpMat<R>>::from_iter( 
-            support.iter().map(|&i| (i, d_matrix(i))) 
+        let mut d_matrices = GridBase::new(support, |i| 
+            d_matrix(i)
         );
+        
+        let summands = GridBase::new(d_matrices.support(), |i| {
+            let r = d_matrices[i].cols();
+            ChainComplexSummand::new(r) 
+        });
 
-        // add zero maps
-        for &i in support.iter() {
-            let r = data[&i].shape().1;
-            if r > 0 && !data.contains_key(&(i - d_deg)) { 
+        for i in summands.support() { 
+            let r = summands[i].rank();
+            if r > 0 && !d_matrices.is_supported(i - d_deg) { 
                 let d = SpMat::zero((r, 0));
-                data.insert(i - d_deg, d);
+                d_matrices.insert(i - d_deg, d);
             }
         }
 
-        let summands = GridBase::new_raw(
-            support, 
-            data.into_iter().map(|(i, d)| 
-                (i, ChainComplexSummand::new(d))
-            ).collect()
-        );
-
-        Self { d_deg, summands }
+        Self { summands, d_deg, d_matrices }
     }
 
     pub fn d(&self, i: I, v: &SpVec<R>) -> SpVec<R> {
@@ -199,7 +197,7 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn d_matrix(&self, i: I) -> &SpMat<Self::R> {
-        &self[i].d_matrix
+        &self.d_matrices[i]
     }
 }
 

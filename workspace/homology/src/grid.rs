@@ -43,6 +43,10 @@ where I: Deg, E: Default {
     pub fn new_raw(support: Vec<I>, data: HashMap<I, E>) -> Self { 
         Self { support, data, dflt: E::default() }
     }
+
+    pub fn insert(&mut self, i: I, e: E) {
+        self.data.insert(i, e);
+    }
 }
 
 impl<I, E> GridTrait<I> for GridBase<I, E>

@@ -186,7 +186,6 @@ where
     delegate! { 
         to self.inner { 
             fn d_deg(&self) -> I;
-            fn rank(&self, i: I) -> usize;
             fn d_matrix(&self, i: I) -> &SpMat<Self::R>;
         }
     }

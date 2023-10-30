@@ -20,13 +20,17 @@ pub type ChainComplex3<R> = ChainComplexBase<isize3, R>;
 pub trait ChainComplexTrait<I>: GridTrait<I> + Sized
 where 
     I: Deg, 
+    Self::E: RModStr<R = Self::R>,
     Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> 
 { 
     type R;
 
-    fn rank(&self, i: I) -> usize;
     fn d_deg(&self) -> I;
     fn d_matrix(&self, i: I) -> &SpMat<Self::R>;
+
+    fn rank(&self, i: I) -> usize { 
+        self.get(i).rank()
+    }
 
     fn check_d_at(&self, i0: I) { 
         let i1 = i0 + self.d_deg();
@@ -60,11 +64,11 @@ where
 pub trait ChainComplexDisplay<I>: ChainComplexTrait<I>
 where 
     I: Deg, 
-    Self::E: DisplayForGrid,
-    Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> 
+    Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>,
+    Self::E: RModStr<R = Self::R>,
 {
     fn display_d_at(&self, i: I) -> String {
-        let c = |i| self.get(i).display_for_grid();
+        let c = |i| self.get(i).math_symbol();
         let c0 = c(i);
         let c1 = c(i + self.d_deg());
         let d = self.d_matrix(i).to_dense();
@@ -194,10 +198,6 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn d_deg(&self) -> I { 
         self.d_deg
-    }
-
-    fn rank(&self, i: I) -> usize {
-        self[i].rank()
     }
 
     fn d_matrix(&self, i: I) -> &SpMat<Self::R> {

@@ -118,7 +118,10 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 impl<I, R> HomologyBase<I, R>
 where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn compute_from<C>(complex: &C, with_trans: bool) -> Self
-    where C: ChainComplexTrait<I, R = R> {
+    where 
+        C: ChainComplexTrait<I, R = R>,
+        C::E: RModStr<R = R>
+    {
         let summands = GridBase::new(
             complex.support(), 
             |i| {

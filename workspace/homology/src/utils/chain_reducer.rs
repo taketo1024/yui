@@ -7,7 +7,7 @@ use yui_matrix::sparse::pivot::{perms_by_pivots, find_pivots, PivotType};
 use yui_matrix::sparse::schur::Schur;
 use yui_core::{Ring, RingOps, Deg};
 
-use crate::{ChainComplexTrait, ReducedComplexBase};
+use crate::{ChainComplexTrait, ReducedComplexBase, RModStr};
 
 //       a0 = [x]      a1 = [a b]      a2 = [z w]
 //            [y]           [c d]     
@@ -27,6 +27,7 @@ where
     I: Deg,
     C: ChainComplexTrait<I>,
     C::R: Ring, for<'x> &'x C::R: RingOps<C::R>,
+    C::E: RModStr<R = C::R>,
 { 
     complex: &'a C,
     mats: HashMap<I, SpMat<C::R>>,
@@ -39,6 +40,7 @@ where
     I: Deg,
     C: ChainComplexTrait<I>,
     C::R: Ring, for<'x> &'x C::R: RingOps<C::R>,
+    C::E: RModStr<R = C::R>,
 {
     pub fn reduce(complex: &'a C, with_trans: bool) -> ReducedComplexBase<I, C::R> {
         let mut r = Self::new(complex, with_trans);

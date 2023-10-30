@@ -134,7 +134,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     delegate! { 
         to self.inner { 
-            fn rank(&self, i: isize) -> usize;
             fn d_deg(&self) -> isize;
             fn d_matrix(&self, i: isize) -> &SpMat<R>;
         }

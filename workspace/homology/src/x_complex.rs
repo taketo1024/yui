@@ -60,6 +60,11 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         );
         LinComb::from_iter(elems)
     }
+
+    pub fn make_matrix<Y, F>(&self, to: &XChainComplexSummand<Y, R>, f: F) -> SpMat<R>
+    where Y: Gen, F: Fn(&X) -> Vec<(Y, R)> {
+        make_matrix(&self.gens, &to.gens, f)
+    }
 }
 
 impl<X, R> RModStr for XChainComplexSummand<X, R>
@@ -109,27 +114,12 @@ where
         );
 
         let inner = ChainComplexBase::new(summands.support(), d_deg, |i| {
-            let from = summands[i].gens();
-            let to = summands[i + d_deg].gens();
-            Self::make_matrix(i, from, to, &d_map)
+            let from = &summands[i];
+            let to = &summands[i + d_deg];
+            from.make_matrix(to, |x| d_map(i, x))
         });
 
         Self { summands, inner }
-    }
-
-    fn make_matrix<F>(i: I, from: &IndexList<X>, to: &IndexList<X>, d: &F) -> SpMat<R>
-    where F: Fn(I, &X) -> Vec<(X, R)> {
-        let (m, n) = (to.len(), from.len());
-
-        SpMat::generate((m, n), |set|
-            for (j, x) in from.iter().enumerate() {
-                let ys = d(i, x);
-                for (y, a) in ys {
-                    let i = to.index_of(&y).unwrap();
-                    set(i, j, a);
-                }
-            }
-        )
     }
 
     pub fn d(&self, i: I, z: &LinComb<X, R>) -> LinComb<X, R> { 
@@ -204,6 +194,25 @@ where
         HomologyBase::compute_from(self, with_trans)
     }
 }
+
+fn make_matrix<X, Y, R, F>(from: &IndexList<X>, to: &IndexList<Y>, f: F) -> SpMat<R>
+where 
+    X: Gen, Y: Gen, 
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    F: Fn(&X) -> Vec<(Y, R)> 
+{
+    let (m, n) = (to.len(), from.len());
+    SpMat::generate((m, n), |set|
+        for (j, x) in from.iter().enumerate() {
+            let ys = f(x);
+            for (y, a) in ys {
+                let i = to.index_of(&y).unwrap();
+                set(i, j, a);
+            }
+        }
+    )
+}
+
 
 #[cfg(test)]
 mod tests { 

@@ -142,7 +142,7 @@ mod tests {
         assert_eq!(h[-3].is_free(), true);
 
         assert_eq!(h[-2].rank(), 1);
-        assert_eq!(h[-2].tors(), vec![&2]);
+        assert_eq!(h[-2].tors(), &vec![2]);
 
         assert_eq!(h[-1].is_zero(), true);
 
@@ -166,7 +166,7 @@ mod tests {
         assert_eq!(h[2].is_free(), true);
 
         assert_eq!(h[3].rank(), 1);
-        assert_eq!(h[3].tors(), vec![&2]);
+        assert_eq!(h[3].tors(), &vec![2]);
     }
 
     #[test]
@@ -180,7 +180,7 @@ mod tests {
         assert_eq!(h[-2].is_free(), true);
 
         assert_eq!(h[-1].rank(), 1);
-        assert_eq!(h[-1].tors(), vec![&2]);
+        assert_eq!(h[-1].tors(), &vec![2]);
 
         assert_eq!(h[0].rank(), 2);
         assert_eq!(h[0].is_free(), true);
@@ -189,7 +189,7 @@ mod tests {
         assert_eq!(h[1].is_free(), true);
 
         assert_eq!(h[2].rank(), 1);
-        assert_eq!(h[2].tors(), vec![&2]);
+        assert_eq!(h[2].tors(), &vec![2]);
     }
 
     #[test]
@@ -229,7 +229,7 @@ mod tests {
         assert_eq!(h[(-3,-9)].rank(), 1);
         assert_eq!(h[(-3,-9)].is_free(), true);
         assert_eq!(h[(-2,-7)].rank(), 0);
-        assert_eq!(h[(-2,-7)].tors(), vec![&2]);
+        assert_eq!(h[(-2,-7)].tors(), &vec![2]);
         assert_eq!(h[(-2,-5)].rank(), 1);
         assert_eq!(h[(-2,-5)].is_free(), true);
         assert_eq!(h[( 0,-3)].rank(), 1);
@@ -250,7 +250,7 @@ mod tests {
         assert_eq!(h[(2, 5)].rank(), 1);
         assert_eq!(h[(2, 5)].is_free(), true);
         assert_eq!(h[(3, 7)].rank(), 0);
-        assert_eq!(h[(3, 7)].tors(), vec![&2]);
+        assert_eq!(h[(3, 7)].tors(), &vec![2]);
         assert_eq!(h[(3, 9)].rank(), 1);
         assert_eq!(h[(3, 9)].is_free(), true);
     }
@@ -276,7 +276,7 @@ mod tests {
         assert_eq!(h[(-2,-5)].rank(), 1);
         assert_eq!(h[(-2,-5)].is_free(), true);
         assert_eq!(h[(-1,-3)].rank(), 0);
-        assert_eq!(h[(-1,-3)].tors(), vec![&2]);
+        assert_eq!(h[(-1,-3)].tors(), &vec![2]);
         assert_eq!(h[(-1,-1)].rank(), 1);
         assert_eq!(h[(-1,-1)].is_free(), true);
         assert_eq!(h[( 0,-1)].rank(), 1);
@@ -286,7 +286,7 @@ mod tests {
         assert_eq!(h[( 1, 1)].rank(), 1);
         assert_eq!(h[( 1, 1)].is_free(), true);
         assert_eq!(h[( 2, 3)].rank(), 0);
-        assert_eq!(h[( 2, 3)].tors(), vec![&2]);
+        assert_eq!(h[( 2, 3)].tors(), &vec![2]);
         assert_eq!(h[( 2, 5)].rank(), 1);
         assert_eq!(h[( 2, 5)].is_free(), true);
    }

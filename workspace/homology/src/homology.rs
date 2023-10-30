@@ -74,8 +74,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.rank
     }
 
-    fn tors(&self) -> Vec<&Self::R> {
-        self.tors.iter().collect()
+    fn tors(&self) -> &Vec<Self::R> {
+        &self.tors
     }
 }
 
@@ -207,7 +207,7 @@ mod tests {
         let h = c.homology(false);
 
         assert_eq!(h[0].rank(), 0);
-        assert_eq!(h[0].tors(), vec![&2]);
+        assert_eq!(h[0].tors(), &vec![2]);
         assert!(!h[0].is_free());
     }
 
@@ -268,7 +268,7 @@ mod tests {
         assert_eq!(h[0].is_free(), true);
 
         assert_eq!(h[1].rank(), 0);
-        assert_eq!(h[1].tors(), vec![&2]);
+        assert_eq!(h[1].tors(), &vec![2]);
         assert_eq!(h[1].is_free(), false);
 
         assert_eq!(h[2].rank(), 0);

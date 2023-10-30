@@ -1,4 +1,3 @@
-use std::marker::PhantomData;
 use std::ops::Index;
 
 use delegate::delegate;
@@ -24,14 +23,14 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     gens: IndexList<X>,
-    _r: PhantomData<R>
+    tors: Vec<R> // empty
 }
 
 impl<X, R> XChainComplexSummand<X, R>
 where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(gens: Vec<X>) -> Self { 
         let gens = IndexList::new(gens.into_iter());
-        Self { gens, _r: PhantomData }
+        Self { gens, tors: vec![] }
     }
 
     pub fn gens(&self) -> &IndexList<X> { 
@@ -75,8 +74,8 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         self.gens.len()
     }
 
-    fn tors(&self) -> Vec<&Self::R> {
-        vec![]
+    fn tors(&self) -> &Vec<Self::R> {
+        &self.tors // empty
     }
 }
 

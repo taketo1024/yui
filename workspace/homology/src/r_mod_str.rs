@@ -2,6 +2,8 @@ use itertools::Itertools;
 
 use yui_core::{Elem, Ring, RingOps};
 
+use crate::DisplayForGrid;
+
 pub trait RModStr
 where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
     type R;
@@ -52,5 +54,43 @@ where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
     
         let str = res.join(" ⊕ ");
         str
+    }
+}
+
+#[derive(Default, Clone, Debug)]
+pub struct SimpleRModStr<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    rank: usize, 
+    tors: Vec<R>
+}
+
+impl<R> SimpleRModStr<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    pub fn new(rank: usize, tors: Vec<R>) -> Self { 
+        Self { rank, tors }
+    }
+
+    pub fn free(rank: usize) -> Self { 
+        Self::new(rank, vec![])
+    }
+}
+
+impl<R> RModStr for SimpleRModStr<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type R = R;
+
+    fn rank(&self) -> usize {
+        self.rank
+    }
+
+    fn tors(&self) -> Vec<&Self::R> {
+        self.tors.iter().collect()
+    }
+}
+
+impl<R> DisplayForGrid for SimpleRModStr<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn display_for_grid(&self) -> String {
+        self.math_symbol()
     }
 }

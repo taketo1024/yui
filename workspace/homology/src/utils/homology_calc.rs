@@ -126,13 +126,13 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ChainComplex;
+    use crate::{ChainComplex, ChainComplexTrait};
  
     #[test]
     fn s2_0th() {
         let c = ChainComplex::<i32>::s2();
-        let d1 = c[1].d_matrix();
-        let d0 = c[0].d_matrix(); // zero
+        let d1 = c.d_matrix(1);
+        let d0 = c.d_matrix(0); // zero
 
         let h = HomologyCalc::calculate(&d1, &d0, true);
 
@@ -142,15 +142,15 @@ mod tests {
         let v = h.gen(0);
 
         assert_eq!(v.is_zero(), false);
-        assert_eq!(c[0].is_cycle(&v), true);
+        assert_eq!(c.d(0, &v).is_zero(), true);
         assert_eq!(h.trans_forward(&v), SpVec::unit(1, 0));
     }
 
     #[test]
     fn s2_1st() {
         let c = ChainComplex::<i32>::s2();
-        let d1 = c[2].d_matrix();
-        let d0 = c[1].d_matrix();
+        let d1 = c.d_matrix(2);
+        let d0 = c.d_matrix(1);
 
         let h = HomologyCalc::calculate(&d1, &d0, true);
 
@@ -160,8 +160,8 @@ mod tests {
     #[test]
     fn s2_2nd() {
         let c = ChainComplex::<i32>::s2();
-        let d3 = c[3].d_matrix(); // zero
-        let d2 = c[2].d_matrix();
+        let d3 = c.d_matrix(3); // zero
+        let d2 = c.d_matrix(2);
 
         let h = HomologyCalc::calculate(&d3, &d2, true);
 
@@ -171,15 +171,15 @@ mod tests {
         let v = h.gen(0);
 
         assert_eq!(v.is_zero(), false);
-        assert_eq!(c[2].is_cycle(&v), true);
+        assert_eq!(c.d(2, &v).is_zero(), true);
         assert_eq!(h.trans_forward(&v), SpVec::unit(1, 0));
     }
 
     #[test]
     fn t2_0th() {
         let c = ChainComplex::<i32>::t2();
-        let d1 = c[1].d_matrix();
-        let d0 = c[0].d_matrix(); // zero
+        let d1 = c.d_matrix(1);
+        let d0 = c.d_matrix(0); // zero
 
         let h = HomologyCalc::calculate(&d1, &d0, true);
 
@@ -189,15 +189,15 @@ mod tests {
         let v = h.gen(0);
 
         assert_eq!(v.is_zero(), false);
-        assert_eq!(c[0].is_cycle(&v), true);
+        assert_eq!(c.d(0, &v).is_zero(), true);
         assert_eq!(h.trans_forward(&v), SpVec::unit(1, 0));
     }
 
     #[test]
     fn t2_1st() {
         let c = ChainComplex::<i32>::t2();
-        let d2 = c[2].d_matrix();
-        let d1 = c[1].d_matrix();
+        let d2 = c.d_matrix(2);
+        let d1 = c.d_matrix(1);
 
         let h = HomologyCalc::calculate(&d2, &d1, true);
 
@@ -207,7 +207,7 @@ mod tests {
         for i in 0..2 { 
             let v = h.gen(i);
             assert_eq!(v.is_zero(), false);
-            assert_eq!(c[1].is_cycle(&v), true);
+            assert_eq!(c.d(1, &v).is_zero(), true);
             assert_eq!(h.trans_forward(&v), SpVec::unit(2, i));
         }
     }
@@ -215,8 +215,8 @@ mod tests {
     #[test]
     fn t2_2nd() {
         let c = ChainComplex::<i32>::t2();
-        let d3 = c[3].d_matrix(); // zero
-        let d2 = c[2].d_matrix();
+        let d3 = c.d_matrix(3); // zero
+        let d2 = c.d_matrix(2);
 
         let h = HomologyCalc::calculate(&d3, &d2, true);
 
@@ -226,15 +226,15 @@ mod tests {
         let v = h.gen(0);
 
         assert_eq!(v.is_zero(), false);
-        assert_eq!(c[2].is_cycle(&v), true);
+        assert_eq!(c.d(2, &v).is_zero(), true);
         assert_eq!(h.trans_forward(&v), SpVec::unit(1, 0));
     }
 
     #[test]
     fn rp2_0th() {
         let c = ChainComplex::<i32>::rp2();
-        let d1 = c[1].d_matrix();
-        let d0 = c[0].d_matrix(); // zero
+        let d1 = c.d_matrix(1);
+        let d0 = c.d_matrix(0); // zero
 
         let h = HomologyCalc::calculate(&d1, &d0, true);
 
@@ -244,15 +244,15 @@ mod tests {
         let v = h.gen(0);
 
         assert_eq!(v.is_zero(), false);
-        assert_eq!(c[0].is_cycle(&v), true);
+        assert_eq!(c.d(0, &v).is_zero(), true);
         assert_eq!(h.trans_forward(&v), SpVec::unit(1, 0));
     }
 
     #[test]
     fn rp2_1st() {
         let c = ChainComplex::<i32>::rp2();
-        let d2 = c[2].d_matrix();
-        let d1 = c[1].d_matrix();
+        let d2 = c.d_matrix(2);
+        let d1 = c.d_matrix(1);
 
         let h = HomologyCalc::calculate(&d2, &d1, true);
 
@@ -262,7 +262,7 @@ mod tests {
         let v = h.gen(0);
 
         assert_eq!(v.is_zero(), false);
-        assert_eq!(c[1].is_cycle(&v), true);
+        assert_eq!(c.d(1, &v).is_zero(), true);
         assert_eq!(h.trans_forward(&v), SpVec::unit(1, 0));
     }
 }

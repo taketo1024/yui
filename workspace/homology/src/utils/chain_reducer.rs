@@ -286,7 +286,7 @@ mod tests {
         let v = SpVec::unit(1, 0);
         let w = t2.backward(&v);
         
-        assert!(c[2].is_cycle(&w));
+        assert!(c.d(2, &w).is_zero());
     }
 
     #[test]
@@ -315,15 +315,15 @@ mod tests {
         let v = SpVec::unit(1, 0);
         let w = t2.backward(&v);
         
-        assert!(c[2].is_cycle(&w));
+        assert!(c.d(2, &w).is_zero());
 
         let a = SpVec::unit(2, 0);
         let b = SpVec::unit(2, 1);
         let a = t1.backward(&a);
         let b = t1.backward(&b);
         
-        assert!(c[1].is_cycle(&a));
-        assert!(c[1].is_cycle(&b));
+        assert!(c.d(1, &a).is_zero());
+        assert!(c.d(1, &b).is_zero());
     }
 
     #[test]
@@ -351,7 +351,7 @@ mod tests {
 
         let v = SpVec::unit(1, 0); // generates 2
         let w = t2.backward(&v);
-        let dw = c[2].d(&w);
+        let dw = c.d(2, &w);
         let dv = t1.forward(&dw);
 
         assert!(
@@ -362,7 +362,7 @@ mod tests {
         let v = SpVec::unit(1, 0);
         let w = t1.backward(&v);
         
-        assert!(c[1].is_cycle(&w));
+        assert!(c.d(1, &w).is_zero());
     }
 
     #[test]
@@ -403,12 +403,12 @@ mod tests {
         let v = r.trans_backward(2, &u);
 
         assert!(!v.is_zero());
-        assert!(c[2].is_cycle(&v));
+        assert!(c.d(2, &v).is_zero());
 
         let w = r.trans_forward(2, &v);
 
         assert!(!w.is_zero());
-        assert!(r[2].is_cycle(&w));
+        assert!(r.d(2, &w).is_zero());
         assert_eq!(w, u);
     }
 }

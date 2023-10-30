@@ -276,7 +276,7 @@ mod tests {
 
         let z = h2.gen(0);
         assert!(!z.is_zero());
-        assert!(c[2].is_cycle(&z));
+        assert!(c.d(2, &z).is_zero());
         assert_eq!(h2.trans_forward(&z), SpVec::from(vec![1]));
     }
 
@@ -290,7 +290,7 @@ mod tests {
 
         let z = h2.gen(0);
         assert!(!z.is_zero());
-        assert!(c[2].is_cycle(&z));
+        assert!(c.d(2, &z).is_zero());
         assert_eq!(h2.trans_forward(&z), SpVec::from(vec![1]));
         assert_eq!(h2.ngens(), 1);
 
@@ -302,8 +302,8 @@ mod tests {
 
         assert!(!a.is_zero());
         assert!(!b.is_zero());
-        assert!(c[1].is_cycle(&a));
-        assert!(c[1].is_cycle(&b));
+        assert!(c.d(1, &a).is_zero());
+        assert!(c.d(1, &b).is_zero());
         assert_eq!(h1.trans_forward(&a), SpVec::from(vec![1, 0]));
         assert_eq!(h1.trans_forward(&b), SpVec::from(vec![0, 1]));
     }
@@ -319,7 +319,7 @@ mod tests {
         let z = h1.gen(0);
 
         assert!(!z.is_zero());
-        assert!(c[1].is_cycle(&z));
+        assert!(c.d(1, &z).is_zero());
         assert_eq!(h1.trans_forward(&z), SpVec::from(vec![1]));
     }
 }

@@ -108,20 +108,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.d_matrix.cols()
     }
 
-    pub fn d_matrix(&self) -> &SpMat<R> {
-        &self.d_matrix
-    }
-
-    pub fn d(&self, v: &SpVec<R>) -> SpVec<R> {
-        assert_eq!(self.rank(), v.dim());
-        let d = self.d_matrix();
-        d * v
-    }
-
-    pub fn is_cycle(&self, v: &SpVec<R>) -> bool { 
-        self.d(v).is_zero()
-    }
-
     pub fn module_str(&self) -> String { 
         r_mod_str(self.rank(), vec![].iter())
     }
@@ -170,6 +156,12 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 
         Self { d_deg, summands }
     }
+
+    pub fn d(&self, i: I, v: &SpVec<R>) -> SpVec<R> {
+        assert_eq!(self.rank(i), v.dim());
+        let d = self.d_matrix(i);
+        d * v
+    }
 }
 
 impl<I, R> Index<I> for ChainComplexBase<I, R>
@@ -207,7 +199,7 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn d_matrix(&self, i: I) -> &SpMat<Self::R> {
-        self[i].d_matrix()
+        &self[i].d_matrix
     }
 }
 

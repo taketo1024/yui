@@ -86,6 +86,12 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(self.trans.is_some());
         self.trans_at(i).unwrap().backward(v)
     }
+
+    delegate! { 
+        to self.inner { 
+            pub fn d(&self, i: I, v: &SpVec<R>) -> SpVec<R>;
+        }
+    }
 }
 
 impl<I, R> Index<I> for ReducedComplexBase<I, R>
@@ -176,8 +182,8 @@ mod tests {
 
         c.check_d_all();
 
-        assert!(c[1].d_matrix().is_zero());
-        assert!(c[2].d_matrix().is_zero());
+        assert!(c.d_matrix(1).is_zero());
+        assert!(c.d_matrix(2).is_zero());
     }
 
     #[test]
@@ -190,11 +196,11 @@ mod tests {
 
         c.check_d_all();
 
-        assert!( c[0].d_matrix().is_zero());
-        assert!( c[1].d_matrix().is_zero());
-        assert!(!c[2].d_matrix().is_zero());
+        assert!( c.d_matrix(0).is_zero());
+        assert!( c.d_matrix(1).is_zero());
+        assert!(!c.d_matrix(2).is_zero());
 
-        let a = c[2].d_matrix().to_dense()[[0, 0]];
+        let a = c.d_matrix(2).to_dense()[[0, 0]];
         assert!(a == 2 || a == -2);
     }
     
@@ -213,11 +219,11 @@ mod tests {
 
         c.check_d_all();
 
-        assert!( c[0].d_matrix().is_zero());
-        assert!( c[1].d_matrix().is_zero());
-        assert!(!c[2].d_matrix().is_zero());
+        assert!( c.d_matrix(0).is_zero());
+        assert!( c.d_matrix(1).is_zero());
+        assert!(!c.d_matrix(2).is_zero());
 
-        let a = c[2].d_matrix().to_dense()[[0, 0]];
+        let a = c.d_matrix(2).to_dense()[[0, 0]];
         assert!(a == 2 || a == -2);
     }
 
@@ -232,8 +238,8 @@ mod tests {
         assert_eq!(c[1].rank(), r[1].rank());
         assert_eq!(c[2].rank(), r[2].rank());
 
-        assert_eq!(c[0].d_matrix(), r[0].d_matrix());
-        assert_eq!(c[1].d_matrix(), r[1].d_matrix());
-        assert_eq!(c[2].d_matrix(), r[2].d_matrix());
+        assert_eq!(c.d_matrix(0), r.d_matrix(0));
+        assert_eq!(c.d_matrix(1), r.d_matrix(1));
+        assert_eq!(c.d_matrix(2), r.d_matrix(2));
     }
 }

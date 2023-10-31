@@ -29,7 +29,7 @@ where
 impl<X, R> XChainComplexSummand<X, R>
 where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(gens: Vec<X>) -> Self { 
-        let gens = IndexList::new(gens.into_iter());
+        let gens = IndexList::from_iter(gens);
         Self { gens, tors: vec![] }
     }
 

@@ -51,7 +51,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     let r = kh.rank();
 
     let vs = vs.into_iter().enumerate().map(|(i, v)| { 
-        let v = kh.trans().unwrap().forward(&v).subvec(0..r);
+        let v = kh.vec_from_cpx(&v).unwrap().subvec(0..r);
         info!("a[{i}] = {v}");
         v
     }).collect_vec();

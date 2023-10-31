@@ -35,18 +35,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.rank + self.tors.len()
     }
 
-    pub fn gen(&self, i: usize) -> Option<SpVec<R>> {
+    pub fn gen_vec(&self, i: usize) -> Option<SpVec<R>> {
         assert!(i < self.ngens());
-        let Some(t) = &self.trans else { 
-            return None
-        };
-
-        let v = t.backward_mat().col_vec(i);
-        Some(v)
+        self.trans.as_ref().map(|t| t.backward_mat().col_vec(i))
     }
 
-    pub fn trans(&self) -> Option<&Trans<R>> {
-        self.trans.as_ref()
+    pub fn vec_from_cpx(&self, v: &SpVec<R>) -> Option<SpVec<R>> { 
+        self.trans.as_ref().map(|t| t.forward(v))
+    }
+
+    pub fn vec_to_cpx(&self, v: &SpVec<R>) -> Option<SpVec<R>> { 
+        self.trans.as_ref().map(|t| t.backward(v))
     }
 }
 
@@ -274,10 +273,10 @@ mod tests {
         let h2 = &h[2];
         assert_eq!(h2.ngens(), 1);
 
-        let z = h2.gen(0).unwrap();
+        let z = h2.gen_vec(0).unwrap();
         assert!(!z.is_zero());
         assert!(c.d(2, &z).is_zero());
-        assert_eq!(h2.trans().unwrap().forward(&z), SpVec::from(vec![1]));
+        assert_eq!(h2.vec_from_cpx(&z), Some(SpVec::from(vec![1])));
     }
 
     #[test]
@@ -288,24 +287,24 @@ mod tests {
         let h2 = &h[2];
         assert_eq!(h2.ngens(), 1);
 
-        let z = h2.gen(0).unwrap();
+        let z = h2.gen_vec(0).unwrap();
         assert!(!z.is_zero());
         assert!(c.d(2, &z).is_zero());
-        assert_eq!(h2.trans().unwrap().forward(&z), SpVec::from(vec![1]));
+        assert_eq!(h2.vec_from_cpx(&z), Some(SpVec::from(vec![1])));
         assert_eq!(h2.ngens(), 1);
 
         let h1 = &h[1];
         assert_eq!(h1.ngens(), 2);
 
-        let a = h1.gen(0).unwrap();
-        let b = h1.gen(1).unwrap();
+        let a = h1.gen_vec(0).unwrap();
+        let b = h1.gen_vec(1).unwrap();
 
         assert!(!a.is_zero());
         assert!(!b.is_zero());
         assert!(c.d(1, &a).is_zero());
         assert!(c.d(1, &b).is_zero());
-        assert_eq!(h1.trans().unwrap().forward(&a), SpVec::from(vec![1, 0]));
-        assert_eq!(h1.trans().unwrap().forward(&b), SpVec::from(vec![0, 1]));
+        assert_eq!(h1.vec_from_cpx(&a), Some(SpVec::from(vec![1, 0])));
+        assert_eq!(h1.vec_from_cpx(&b), Some(SpVec::from(vec![0, 1])));
     }
 
     #[test]
@@ -316,10 +315,10 @@ mod tests {
         let h1 = &h[1];
         assert_eq!(h1.ngens(), 1);
 
-        let z = h1.gen(0).unwrap();
+        let z = h1.gen_vec(0).unwrap();
 
         assert!(!z.is_zero());
         assert!(c.d(1, &z).is_zero());
-        assert_eq!(h1.trans().unwrap().forward(&z), SpVec::from(vec![1]));
+        assert_eq!(h1.vec_from_cpx(&z), Some(SpVec::from(vec![1])));
     }
 }

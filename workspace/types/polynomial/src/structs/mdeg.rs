@@ -53,6 +53,13 @@ where I: Zero + Clone {
     }
 }
 
+impl<I> MultiDeg<I>
+where for<'x> I: Zero + Add<&'x I, Output = I> {
+    pub fn total(&self) -> I { 
+        self.iter().map(|(_, d)| d).fold(I::zero(), |res, d| res + d)
+    }
+}
+
 impl<I> Zero for MultiDeg<I>
 where for<'x> I: Clone + AddAssign<&'x I> + Zero {
     fn zero() -> Self {
@@ -93,3 +100,14 @@ where I: Zero, for<'x> &'x I: Neg<Output = I> {
 
 impl_deg_unsigned!(MultiDeg<usize>);
 impl_deg_signed!  (MultiDeg<isize>);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn total() {
+        let mdeg = MultiDeg::from_iter([(0, 1), (1, -2), (2, 3), (3, 0)]);
+        assert_eq!(mdeg.total(), 2);
+    }
+}

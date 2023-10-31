@@ -1,3 +1,5 @@
+use std::hash::Hash;
+
 use yui_core::{Ring, RingOps, IndexList};
 use yui_lin_comb::{Gen, LinComb};
 use yui_matrix::sparse::{SpMat, SpVec};
@@ -84,7 +86,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
 
 pub fn make_matrix<X, Y, R, F>(from: &IndexList<X>, to: &IndexList<Y>, f: F) -> SpMat<R>
 where 
-    X: Gen, Y: Gen, 
+    X: Hash + Eq, Y: Hash + Eq, 
     R: Ring, for<'x> &'x R: RingOps<R>,
     F: Fn(&X) -> Vec<(Y, R)> 
 {

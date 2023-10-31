@@ -2,11 +2,11 @@ use std::ops::Index;
 
 use delegate::delegate;
 
-use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3, IndexList};
+use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
 use yui_lin_comb::{Gen, LinComb};
-use yui_matrix::sparse::{SpMat, SpVec};
+use yui_matrix::sparse::SpMat;
 
-use crate::{GridBase, GridIter, DisplayForGrid, ChainComplexDisplay, ChainComplexBase, RModStr};
+use crate::{GridBase, GridIter, ChainComplexDisplay, ChainComplexBase, XModStr};
 
 use super::grid::GridTrait;
 use super::complex::ChainComplexTrait;
@@ -16,75 +16,7 @@ pub type XChainComplex <X, R> = XChainComplexBase<isize,  X, R>;
 pub type XChainComplex2<X, R> = XChainComplexBase<isize2, X, R>;
 pub type XChainComplex3<X, R> = XChainComplexBase<isize3, X, R>;
 
-#[derive(Default)]
-pub struct XChainComplexSummand<X, R>
-where 
-    X: Gen,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    gens: IndexList<X>,
-    tors: Vec<R> // empty
-}
-
-impl<X, R> XChainComplexSummand<X, R>
-where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new(gens: Vec<X>) -> Self { 
-        let gens = IndexList::from_iter(gens);
-        Self { gens, tors: vec![] }
-    }
-
-    pub fn gens(&self) -> &IndexList<X> { 
-        &self.gens
-    }
-
-    pub fn gen(&self, i: usize) -> &X {
-        &self.gens[i]
-    }
-
-    pub fn vectorize(&self, z: &LinComb<X, R>) -> SpVec<R> {
-        let n = self.rank();
-        SpVec::generate(n, |set| { 
-            for (x, a) in z.iter() { 
-                let i = self.gens.index_of(x).unwrap();
-                set(i, a.clone());
-            }
-        })
-    }
-
-    pub fn as_chain(&self, v: &SpVec<R>) -> LinComb<X, R> {
-        assert_eq!(v.dim(), self.rank());
-
-        let elems = v.iter().map(|(i, a)| 
-            (self.gen(i).clone(), a.clone())
-        );
-        LinComb::from_iter(elems)
-    }
-
-    pub fn make_matrix<Y, F>(&self, to: &XChainComplexSummand<Y, R>, f: F) -> SpMat<R>
-    where Y: Gen, F: Fn(&X) -> Vec<(Y, R)> {
-        make_matrix(&self.gens, &to.gens, f)
-    }
-}
-
-impl<X, R> RModStr for XChainComplexSummand<X, R>
-where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
-    type R = R;
-
-    fn rank(&self) -> usize {
-        self.gens.len()
-    }
-
-    fn tors(&self) -> &Vec<Self::R> {
-        &self.tors // empty
-    }
-}
-
-impl<X, R> DisplayForGrid for XChainComplexSummand<X, R>
-where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
-    fn display_for_grid(&self) -> String {
-        self.math_symbol()
-    }
-}
+pub type XChainComplexSummand<X, R> = XModStr<X, R>;
 
 pub struct XChainComplexBase<I, X, R>
 where 
@@ -109,7 +41,7 @@ where
         F2: Fn(I, &X) -> Vec<(X, R)>
     {
         let summands = GridBase::new(support, |i| 
-            XChainComplexSummand::new(gens_map(i))
+            XChainComplexSummand::from_iter(gens_map(i))
         );
 
         let inner = ChainComplexBase::new(summands.support(), d_deg, |i| {
@@ -202,25 +134,6 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         self.get(i.into())
     }
 }
-
-fn make_matrix<X, Y, R, F>(from: &IndexList<X>, to: &IndexList<Y>, f: F) -> SpMat<R>
-where 
-    X: Gen, Y: Gen, 
-    R: Ring, for<'x> &'x R: RingOps<R>,
-    F: Fn(&X) -> Vec<(Y, R)> 
-{
-    let (m, n) = (to.len(), from.len());
-    SpMat::generate((m, n), |set|
-        for (j, x) in from.iter().enumerate() {
-            let ys = f(x);
-            for (y, a) in ys {
-                let i = to.index_of(&y).unwrap();
-                set(i, j, a);
-            }
-        }
-    )
-}
-
 
 #[cfg(test)]
 mod tests { 

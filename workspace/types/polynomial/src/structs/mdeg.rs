@@ -1,10 +1,9 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::ops::{Add, AddAssign, Neg, SubAssign, Sub};
 
 use auto_impl_ops::auto_ops;
+use itertools::Itertools;
 use num_traits::Zero;
-
-use crate::VarDeg;
 
 #[derive(Clone, Default, PartialEq, Eq, Debug, Hash)]
 pub struct MultiDeg<I>(BTreeMap<usize, I>) // x_0^{d_0} ... x_n^{d_n} <--> [ 0 => d_0, ..., n => d_n ]
@@ -37,6 +36,22 @@ where I: Zero {
 
     pub fn min_index(&self) -> Option<usize> { 
         self.0.keys().min().cloned()
+    }
+}
+
+impl<I> MultiDeg<I>
+where I: Clone + Zero + Ord { 
+    pub fn all_leq(&self, other: &Self) -> bool {
+        let i0 = HashSet::<&usize>::from_iter( self.0.keys());
+        let i1 = HashSet::<&usize>::from_iter(other.0.keys());
+
+        i0.union(&i1).all(|&&i|
+            self.of(i) <= other.of(i)
+        )
+    }
+
+    pub fn all_geq(&self, other: &Self) -> bool {
+        other.all_leq(self)
     }
 }
 
@@ -133,9 +148,12 @@ impl<I> Ord for MultiDeg<I>
 where I: Zero + Ord + Clone {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         use std::cmp::*;
-        let n = max(self.max_index().unwrap_or(0), other.max_index().unwrap_or(0));
 
-        for i in 0..=n { 
+        let i0 = HashSet::<&usize>::from_iter(self.0.keys());
+        let i1 = HashSet::<&usize>::from_iter(other.0.keys());
+        let indices = i0.union(&i1).sorted();
+
+        for &&i in indices { 
             let c = Ord::cmp(&self.of(i), &other.of(i));
             if !c.is_eq() { 
                 return c
@@ -143,42 +161,6 @@ where I: Zero + Ord + Clone {
         }
 
         Ordering::Equal
-    }
-}
-
-impl VarDeg for MultiDeg<usize> {
-    fn is_negatable(&self) -> bool {
-        self.is_zero()
-    }
-
-    fn neg_opt(&self) -> Option<Self> {
-        if self.is_zero() { 
-            Some(Self::zero())
-        } else { 
-            None
-        }
-    }
-
-    fn strict_leq(&self, other: &Self) -> bool {
-        self.iter().all(|(&i, d)|
-            d <= &other.of(i)
-        )
-    }
-}
-
-impl VarDeg for MultiDeg<isize> {
-    fn is_negatable(&self) -> bool {
-        true
-    }
-
-    fn neg_opt(&self) -> Option<Self> {
-        Some(-self)
-    }
-
-    fn strict_leq(&self, other: &Self) -> bool {
-        self.iter().all(|(&i, d)|
-            d <= &other.of(i)
-        )
     }
 }
 

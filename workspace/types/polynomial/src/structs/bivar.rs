@@ -7,7 +7,7 @@ use auto_impl_ops::auto_ops;
 use yui_core::Elem;
 use yui_lin_comb::Gen;
 
-use crate::{VarDeg, PolyGen};
+use crate::PolyGen;
 use super::univar::fmt_mono;
 
 // `BiVar<X, Y, I>` : a struct representing X^i Y^j.
@@ -84,13 +84,13 @@ where I: for<'x >SubAssign<&'x I> {
     }
 }
 
-macro_rules! impl_poly_gen {
+macro_rules! impl_bivar {
     ($I:ty) => {
         impl<const X: char, const Y: char> Display for BiVar<X, Y, $I> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let BiVar(d0, d1) = self;
-                let x = fmt_mono(X.to_string(), *d0 as isize);
-                let y = fmt_mono(Y.to_string(), *d1 as isize);
+                let x = fmt_mono(X.to_string(), *d0);
+                let y = fmt_mono(Y.to_string(), *d1);
                 
                 match (x.as_str(), y.as_str()) {
                     ("1", "1") => write!(f, "1"),
@@ -108,6 +108,12 @@ macro_rules! impl_poly_gen {
         }
                 
         impl<const X: char, const Y: char> Gen for BiVar<X, Y, $I> {}
+    }
+}
+
+macro_rules! impl_bivar_unsigned {
+    ($I:ty) => {
+        impl_bivar!($I);
 
         impl<const X: char, const Y: char> PolyGen for BiVar<X, Y, $I> {
             type Deg = ($I, $I);
@@ -117,26 +123,52 @@ macro_rules! impl_poly_gen {
             }
 
             fn is_unit(&self) -> bool { 
-                self.0.is_negatable() && self.1.is_negatable()
+                self.0.is_zero() && self.1.is_zero()
             }
 
             fn inv(&self) -> Option<Self> { // (x^i)^{-1} = x^{-i}
-                if let (Some(d0), Some(d1)) = (self.0.neg_opt(), self.1.neg_opt()) {
-                    Some(Self(d0, d1))
+                if self.is_unit() {
+                    Some(Self(0, 0))
                 } else { 
                     None
                 }
             }
 
             fn divides(&self, other: &Self) -> bool { 
-                self.0.strict_leq(&other.0) && self.1.strict_leq(&other.1)
+                self.0 <= other.0 && self.1 <= other.1
             }
         }
     };
 }
 
-impl_poly_gen!(usize);
-impl_poly_gen!(isize);
+macro_rules! impl_bivar_signed {
+    ($I:ty) => {
+        impl_bivar!($I);
+
+        impl<const X: char, const Y: char> PolyGen for BiVar<X, Y, $I> {
+            type Deg = ($I, $I);
+
+            fn deg(&self) -> Self::Deg {
+                (self.0, self.1)
+            }
+
+            fn is_unit(&self) -> bool { 
+                true
+            }
+
+            fn inv(&self) -> Option<Self> { // (x^i)^{-1} = x^{-i}
+                Some(Self(-self.0, -self.1))
+            }
+
+            fn divides(&self, _other: &Self) -> bool { 
+                true
+            }
+        }
+    };
+}
+
+impl_bivar_unsigned!(usize);
+impl_bivar_signed!  (isize);
 
 impl<const X: char, const Y: char, I> BiVar<X, Y, I> {
     pub fn eval<R>(&self, x: &R, y: &R) -> R

@@ -1,26 +1,18 @@
 use std::fmt::Display;
 use std::str::FromStr;
-use num_traits::One;
+use num_traits::{Zero, One};
 
 use yui_core::Elem;
 use yui_lin_comb::Gen;
 use yui_utils::subscript;
 
-use crate::{PolyGen, VarDeg, MultiDeg, Univar, fmt_mono};
-
-use super::univar::impl_poly_gen;
+use crate::{PolyGen, MultiDeg, Univar, fmt_mono};
 
 pub type MultiVar<const X: char, I> = Univar<X, MultiDeg<I>>;
 
 // impls for multivar-type.
 macro_rules! impl_multivar {
     ($I:ty) => {
-        impl<const X: char> Elem for MultiVar<X, $I> { 
-            fn math_symbol() -> String {
-                format!("{X}")
-            }
-        }
-
         impl<const X: char> Display for MultiVar<X, $I> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let d = self.deg();
@@ -55,14 +47,75 @@ macro_rules! impl_multivar {
                 Err(())
             }
         }
+
+        impl<const X: char> Elem for MultiVar<X, $I> { 
+            fn math_symbol() -> String {
+                format!("{X}")
+            }
+        }
+
+        impl<const X: char> Gen for MultiVar<X, $I> {}
     };
 }
 
-impl_multivar!(usize);
-impl_multivar!(isize);
+macro_rules! impl_multivar_unsigned {
+    ($I:ty) => {
+        impl_multivar!($I);
 
-impl_poly_gen!(MultiDeg<usize>);
-impl_poly_gen!(MultiDeg<isize>);
+        impl<const X: char> PolyGen for MultiVar<X, $I> {
+            type Deg = MultiDeg<$I>;
+
+            fn deg(&self) -> Self::Deg {
+                self.0.clone()
+            }
+
+            fn is_unit(&self) -> bool { 
+                self.0.is_zero()
+            }
+
+            fn inv(&self) -> Option<Self> {
+                if self.is_unit() { 
+                    Some(Self(MultiDeg::zero()))
+                } else { 
+                    None
+                }
+            }
+
+            fn divides(&self, other: &Self) -> bool { 
+                self.0.all_leq(&other.0)
+            }
+        }
+    };
+}
+
+macro_rules! impl_multivar_signed {
+    ($I:ty) => {
+        impl_multivar!($I);
+
+        impl<const X: char> PolyGen for MultiVar<X, $I> {
+            type Deg = MultiDeg<$I>;
+
+            fn deg(&self) -> Self::Deg {
+                self.0.clone()
+            }
+
+            fn is_unit(&self) -> bool { 
+                true
+            }
+
+            fn inv(&self) -> Option<Self> { // (x^i)^{-1} = x^{-i}
+                Some(Self(-&self.0))
+            }
+
+            fn divides(&self, _other: &Self) -> bool { 
+                true
+            }
+        }
+    };
+}
+
+impl_multivar_unsigned!(usize);
+impl_multivar_signed!  (isize);
 
 #[cfg(test)]
 mod tests { 

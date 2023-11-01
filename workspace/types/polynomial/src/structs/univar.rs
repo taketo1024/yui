@@ -1,14 +1,15 @@
-use std::fmt::Display;
+use std::fmt::{Display, Debug};
+use std::hash::Hash;
 use std::ops::{AddAssign, Mul, MulAssign, DivAssign, SubAssign, Div};
 use std::str::FromStr;
-use num_traits::{Zero, One};
+use num_traits::{Zero, One, ToPrimitive};
 use auto_impl_ops::auto_ops;
 
 use yui_core::Elem;
 use yui_lin_comb::Gen;
 use yui_utils::superscript;
 
-use crate::{VarDeg, PolyGen};
+use crate::PolyGen;
 
 // `Univar<X, I>` : a struct representing X^d (univar) or ΠX_i^{d_i} (multivar).
 // `I` is one of `usize`, `isize`, `MultiDeg<usize>`, `MultiDeg<isize>`.
@@ -45,33 +46,15 @@ where I: for<'x >SubAssign<&'x I> {
     }
 }
 
-pub(crate) fn fmt_mono(x: String, d: isize) -> String { 
-    if d.is_zero() { 
-        "1".to_string()
-    } else if d.is_one() { 
-        x
-    } else {
-        let e = superscript(d); 
-        format!("{x}{e}")
-    }
-}
-
 macro_rules! impl_univar {
     ($I:ty) => {
-        impl<const X: char> Elem for Univar<X, $I> { 
-            fn math_symbol() -> String {
-                format!("{X}")
-            }
-        }
-
         impl<const X: char> Display for Univar<X, $I> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let x = X.to_string();
-                let d = self.deg() as isize;
-                write!(f, "{}", fmt_mono(x, d))
+                write!(f, "{}", fmt_mono(x, self.0))
             }
         }
-
+        
         impl<const X: char> FromStr for Univar<X, $I> {
             type Err = ();
             fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -88,43 +71,85 @@ macro_rules! impl_univar {
                 Err(())
             }
         }
-    };
+
+        impl<const X: char> Elem for Univar<X, $I> { 
+            fn math_symbol() -> String {
+                format!("{X}")
+            }
+        }
+        
+        impl<const X: char> Gen for Univar<X, $I> {}
+    }
 }
 
-impl_univar!(usize);
-impl_univar!(isize);
-
-macro_rules! impl_poly_gen {
+macro_rules! impl_univar_unsigned {
     ($I:ty) => {
-        impl<const X: char> Gen for Univar<X, $I> {}
+        impl_univar!($I);
 
         impl<const X: char> PolyGen for Univar<X, $I> {
             type Deg = $I;
 
             fn deg(&self) -> Self::Deg {
-                self.0.clone()
+                self.0
             }
 
             fn is_unit(&self) -> bool { 
-                self.deg().is_negatable()
+                self.0.is_zero()
             }
 
-            fn inv(&self) -> Option<Self> { // (x^i)^{-1} = x^{-i}
-                if let Some(i) = self.deg().neg_opt() { 
-                    Some(Self(i))
+            fn inv(&self) -> Option<Self> {
+                if self.is_unit() { 
+                    Some(Self(0))
                 } else { 
                     None
                 }
             }
 
             fn divides(&self, other: &Self) -> bool { 
-                self.0.strict_leq(&other.0)
+                self.0 <= other.0
             }
         }
     };
 }
 
-impl_poly_gen!(usize);
-impl_poly_gen!(isize);
+macro_rules! impl_univar_signed {
+    ($I:ty) => {
+        impl_univar!($I);
 
-pub(crate) use impl_poly_gen;
+        impl<const X: char> PolyGen for Univar<X, $I> {
+            type Deg = $I;
+
+            fn deg(&self) -> Self::Deg {
+                self.0
+            }
+
+            fn is_unit(&self) -> bool { 
+                true
+            }
+
+            fn inv(&self) -> Option<Self> { // (x^i)^{-1} = x^{-i}
+                Some(Self(-self.0))
+            }
+
+            fn divides(&self, _other: &Self) -> bool { 
+                true
+            }
+        }
+    };
+}
+
+impl_univar_unsigned!(usize);
+impl_univar_signed!  (isize);
+
+pub(crate) fn fmt_mono<I>(x: String, d: I) -> String
+where I: ToPrimitive {
+    let d = d.to_isize().unwrap();
+    if d.is_zero() { 
+        "1".to_string()
+    } else if d.is_one() { 
+        x
+    } else {
+        let e = superscript(d); 
+        format!("{x}{e}")
+    }
+}

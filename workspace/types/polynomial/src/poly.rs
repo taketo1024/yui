@@ -135,6 +135,10 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     {
         PolyBase::<X, R2>::from( self.data.map_coeffs(f) )
     }
+
+    pub fn display(&self, ascending: bool) -> String { 
+        self.data.display(ascending)
+    }
 }
 
 macro_rules! impl_var_univar {
@@ -275,7 +279,7 @@ where X: Mono + FromStr, R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
 impl<X, R> Display for PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.data.fmt(f)
+        f.write_str(&self.display(false)) // descending order
     }
 }
 
@@ -581,8 +585,8 @@ mod tests {
         type P = Poly::<'x', i32>; 
 
         let x = P::mono;
-        let f = P::from_iter([(x(0), 3), (x(1), 2), (x(2), 3)]);
-        assert_eq!(&f.to_string(), "3 + 2x + 3x²");
+        let f = P::from_iter([(x(0), 1), (x(1), 2), (x(2), -3)]);
+        assert_eq!(&f.to_string(), "-3x² + 2x + 1");
     }
  
     #[test]
@@ -591,7 +595,7 @@ mod tests {
 
         let x = P::mono;
         let f = P::from_iter([(x(-1), 4), (x(0), 2), (x(2), 3)]);
-        assert_eq!(&f.to_string(), "4x⁻¹ + 2 + 3x²");
+        assert_eq!(&f.to_string(), "3x² + 2 + 4x⁻¹");
     }
 
     #[test]
@@ -600,7 +604,7 @@ mod tests {
 
         let xy = |i, j| P::mono((i, j));
         let f = P::from_iter([(xy(0, 0), 3), (xy(1, 0), 2), (xy(2, 3), 3)]);
-        assert_eq!(&f.to_string(), "3 + 2x + 3x²y³");
+        assert_eq!(&f.to_string(), "3x²y³ + 2x + 3");
     }
  
     #[test]
@@ -613,7 +617,7 @@ mod tests {
             (xn(vec![1]),      -1),
             (xn(vec![3, 0, 2]), 2),
         ]);
-        assert_eq!(&f.to_string(), "3 - x₀ + 2x₀³x₂²");
+        assert_eq!(&f.to_string(), "2x₀³x₂² - x₀ + 3");
     }
 
     #[test]
@@ -626,7 +630,7 @@ mod tests {
             (xn(vec![1]),        1),
             (xn(vec![-3, 1, 3]), 2),
         ]);
-        assert_eq!(&f.to_string(), "2x₀⁻³x₁x₂³ + 3 + x₀");
+        assert_eq!(&f.to_string(), "x₀ + 2x₀⁻³x₁x₂³ + 3");
     }
 
     #[test]

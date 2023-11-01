@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt::{Display, Debug};
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, MulAssign};
-use itertools::Itertools;
+use itertools::{Itertools, Either};
 use num_traits::Zero;
 use auto_impl_ops::auto_ops;
 
@@ -144,6 +144,63 @@ where
         }
         res
     }
+
+    pub fn display(&self, ascending: bool) -> String {
+        if self.is_zero() { 
+            return "0".to_string();
+        }
+
+        let mut initial = true;
+        let mut terms = vec![];
+
+        let elements = self.iter().filter(|(_, a)| 
+            !a.is_zero()
+        ).sorted_by(|(x, _), (y, _)| 
+            x.cmp_for_display(y) 
+        );
+        
+        let elements = if ascending { 
+            Either::Left(elements)
+        } else { 
+            Either::Right(elements.rev())
+        };
+
+        for (x, r) in elements {
+            let r = r.to_string();
+            let x = x.to_string();
+
+            if initial { 
+                let t = if r == "1" { 
+                    format!("{x}")
+                } else if r == "-1" { 
+                    format!("-{x}")
+                } else if x == "1" {
+                    format!("{r}")
+                } else { 
+                    format!("{r}{x}")
+                };
+                terms.push(t);
+                initial = false
+
+            } else {
+                let (sign, r) = if r.starts_with("-") { 
+                    ("-", &r[1..]) 
+                } else { 
+                    ("+", r.as_str())
+                };
+                let t = if r == "1" { 
+                    format!("{sign} {x}")
+                } else if x == "1" { 
+                    format!("{sign} {r}")
+                } else { 
+                    format!("{sign} {r}{x}")
+                };
+                terms.push(t)
+            }
+        }
+
+        terms.join(" ")
+    }
 }
 
 impl<X, R> From<X> for LinComb<X, R>
@@ -192,44 +249,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.is_zero() { 
-            return write!(f, "0")
-        }
-
-        let mut initial = true;
-        let sorted = self.iter().sorted_by(|(x, _), (y, _)| x.cmp_for_display(y) );
-        for (x, r) in sorted {
-            let r = r.to_string();
-            let x = x.to_string();
-
-            if initial { 
-                if r == "1" { 
-                    write!(f, "{x}")?;
-                } else if r == "-1" { 
-                    write!(f, "-{x}")?;
-                } else if x == "1" {
-                    write!(f, "{r}")?;
-                } else { 
-                    write!(f, "{r}{x}")?;
-                };
-                initial = false
-            } else {
-                let (sign, r) = if r.starts_with("-") { 
-                    ("-", &r[1..]) 
-                } else { 
-                    ("+", r.as_str())
-                };
-                if r == "1" { 
-                    write!(f, " {sign} {x}")?;
-                } else if x == "1" { 
-                    write!(f, " {sign} {r}")?;
-                } else { 
-                    write!(f, " {sign} {r}{x}")?;
-                };
-            }
-        }
-        
-        Ok(())
+        f.write_str(&self.display(true))
     }
 }
 

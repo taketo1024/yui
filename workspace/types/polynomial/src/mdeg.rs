@@ -138,29 +138,35 @@ where I: Zero, for<'x> &'x I: Neg<Output = I> {
 }
 
 impl<I> PartialOrd for MultiDeg<I>
-where I: Zero + Ord + Clone {
+where I: Clone + Zero + Ord + for<'x> Add<&'x I, Output = I> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl<I> Ord for MultiDeg<I>
-where I: Zero + Ord + Clone {
+where I: Clone + Zero + Ord + for<'x> Add<&'x I, Output = I> {
+    // Graded lexicographic order, grlex
+    // see: https://en.wikipedia.org/wiki/Monomial_order#Graded_lexicographic_order
+
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         use std::cmp::*;
 
-        let i0 = HashSet::<&usize>::from_iter(self.0.keys());
-        let i1 = HashSet::<&usize>::from_iter(other.0.keys());
-        let indices = i0.union(&i1).sorted();
-
-        for &&i in indices { 
-            let c = Ord::cmp(&self.of(i), &other.of(i));
-            if !c.is_eq() { 
-                return c
+        Ord::cmp(&self.total(), &other.total())
+        .then_with(|| { 
+            let i0 = HashSet::<&usize>::from_iter(self.0.keys());
+            let i1 = HashSet::<&usize>::from_iter(other.0.keys());
+            let indices = i0.union(&i1).sorted();
+            
+            for &&i in indices { 
+                let c = Ord::cmp(&self.of(i), &other.of(i));
+                if !c.is_eq() { 
+                    return c
+                }
             }
-        }
-
-        Ordering::Equal
+    
+            Ordering::Equal
+        })
     }
 }
 
@@ -184,14 +190,14 @@ mod tests {
     #[test]
     fn ord() { 
         let d0 = MultiDeg::<isize>::from_iter([]);
-        let d1 = MultiDeg::from_iter([(0, 1), (1, -2), (2, 3)]);
-        let d2 = MultiDeg::from_iter([(0, 1), (1,  2), (2, 3)]);
-        let d3 = MultiDeg::from_iter([(0, -1), (1,  2), (2, 3)]);
+        let d1 = MultiDeg::from_iter([(0, 1), (1, -2), (2, 3)]); // total: 2
+        let d2 = MultiDeg::from_iter([(0, 1), (1,  2), (2, 3)]); // total: 6
+        let d3 = MultiDeg::from_iter([(0,-1), (1,  2), (2, 3)]); // total: 4
 
         assert!(!(d1 < d1 || d1 > d1));
         assert!(d0 < d1);
         assert!(d1 < d2);
-        assert!(d0 > d3);
+        assert!(d0 < d3);
     }
 
     #[test]

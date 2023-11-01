@@ -1,5 +1,5 @@
 use std::fmt::Display;
-use std::ops::{AddAssign, Mul, MulAssign, DivAssign, SubAssign, Div};
+use std::ops::{AddAssign, Mul, MulAssign, DivAssign, SubAssign, Div, Add};
 use std::str::FromStr;
 use num_traits::{Zero, One, Pow};
 use auto_impl_ops::auto_ops;
@@ -13,12 +13,19 @@ use super::univar::fmt_mono;
 // `BiVar<X, Y, I>` : represents bivariant monomials X^i Y^j.
 // `I` is either `usize` or `isize`.
 
-#[derive(Clone, PartialEq, Eq, Hash, Default, Debug, PartialOrd, Ord)]
+#[derive(Clone, PartialEq, Eq, Hash, Default, Debug)]
 pub struct BiVar<const X: char, const Y: char, I>(I, I);
 
 impl<const X: char, const Y: char, I> BiVar<X, Y, I> {
     pub fn new(d0: I, d1: I) -> Self { 
         Self(d0, d1)
+    }
+}
+
+impl<const X: char, const Y: char, I> BiVar<X, Y, I>
+where for<'x> &'x I: Add<&'x I, Output = I> {
+    pub fn total(&self) -> I { 
+        &self.0 + &self.1
     }
 }
 
@@ -81,6 +88,27 @@ where I: for<'x >SubAssign<&'x I> {
     fn div_assign(&mut self, rhs: &BiVar<X, Y, I>) {
         self.0 -= &rhs.0; // x^i * x^j = x^{i+j}
         self.1 -= &rhs.1;
+    }
+}
+
+impl<const X: char, const Y: char, I> PartialOrd for BiVar<X, Y, I>
+where I: Eq + Ord, for<'x> &'x I: Add<&'x I, Output = I> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(Ord::cmp(self, other))
+    }
+}
+
+impl<const X: char, const Y: char, I> Ord for BiVar<X, Y, I>
+where I: Eq + Ord, for<'x> &'x I: Add<&'x I, Output = I> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        use std::cmp::*;
+
+        Ord::cmp(&self.total(), &other.total())
+        .then_with(|| 
+            Ord::cmp(&self.0, &other.0)
+        ).then_with(|| 
+            Ord::cmp(&self.1, &other.1)
+        )
     }
 }
 
@@ -277,5 +305,15 @@ mod tests {
 
         let d = M::new(2, 3);
         assert_eq!(d.eval::<i32>(&2, &3), 108);
+    }
+
+    #[test]
+    fn ord() { 
+        type M = BiVar<'X', 'Y', usize>;
+        let xy = |i, j| M::new(i, j);
+
+        assert!(xy(2, 1) < xy(1, 3));
+        assert!(xy(1, 2) < xy(2, 1));
+        assert!(xy(1, 2) < xy(1, 3));
     }
 }

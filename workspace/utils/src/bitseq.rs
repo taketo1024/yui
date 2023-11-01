@@ -196,6 +196,13 @@ impl BitSeq {
         self.insert(i, Bit::Bit1)
     }
 
+    pub fn edit<F>(&self, f: F) -> Self
+    where F: FnOnce(&mut BitSeq) {
+        let mut copy = self.clone();
+        f(&mut copy);
+        copy
+    }
+
     pub fn sub(&self, l: usize) -> Self { 
         assert!(l <= self.len);
         let val = self.val & ((1 << l) - 1);
@@ -468,5 +475,12 @@ mod tests {
         assert!(!b1.is_sub(&b2));
         assert!(!b2.is_sub(&b0));
         assert!(!b2.is_sub(&b1));
+    }
+
+    #[test]
+    fn edit() {
+        let b = BitSeq::new(0b10110, 5);
+        let c = b.edit(|b| b.set_1(0));
+        assert_eq!(c, BitSeq::new(0b10111, 5))
     }
 }

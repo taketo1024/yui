@@ -64,9 +64,7 @@ impl State {
     pub fn targets(&self) -> Vec<State> { 
         let n = self.len();
         (0..n).filter(|&i| self[i].is_zero() ).map(|i| { 
-            let mut t = self.clone();
-            t.0.set_1(i);
-            t
+            State(self.0.edit(|b| b.set_1(i)))
         }).collect()
     }
 

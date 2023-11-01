@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use std::ops::{Add, AddAssign, Neg};
+use std::ops::{Add, AddAssign, Neg, SubAssign, Sub};
 
 use auto_impl_ops::auto_ops;
 use num_traits::Zero;
@@ -95,6 +95,22 @@ where for<'x> I: AddAssign<&'x I> + Zero + Clone {
     }
 }
 
+#[auto_ops]
+impl<I> SubAssign<&MultiDeg<I>> for MultiDeg<I>
+where for<'x> I: SubAssign<&'x I> + Zero + Clone {
+    fn sub_assign(&mut self, rhs: &MultiDeg<I>) {
+        let data = &mut self.0;
+        for (i, d) in rhs.0.iter() { 
+            if !data.contains_key(i) {
+                data.insert(i.clone(), I::zero());
+            }
+            let d_i = data.get_mut(i).unwrap();
+            d_i.sub_assign(d);
+        }
+        data.retain(|_, v| !v.is_zero())
+    }
+}
+
 impl<I> Neg for &MultiDeg<I>
 where I: Zero, for<'x> &'x I: Neg<Output = I> {
     type Output = MultiDeg<I>;
@@ -161,5 +177,34 @@ mod tests {
         assert!(d0 < d1);
         assert!(d1 < d2);
         assert!(d0 > d3);
+    }
+
+    #[test]
+    fn add() { 
+        let d1 = MultiDeg::from_iter([(0, 1), (1, -2), (2, 3)]);
+        let d2 = MultiDeg::from_iter([(1, 3), (2, -3), (4, 5)]);
+        assert_eq!(d1 + d2, MultiDeg::from_iter([(0, 1), (1, 1), (4, 5)]))
+    }
+
+    #[test]
+    fn sub() { 
+        let d1 = MultiDeg::from_iter([(0, 1), (1, -2), (2, 3)]);
+        let d2 = MultiDeg::from_iter([(1, 3), (2, -3), (4, 5)]);
+        assert_eq!(d1 - d2, MultiDeg::from_iter([(0, 1), (1, -5), (2, 6), (4, -5)]))
+    }
+
+    #[test]
+    fn sub_usize() { 
+        let d1 = MultiDeg::<usize>::from_iter([(0, 1), (1, 2), (2, 3)]);
+        let d2 = MultiDeg::<usize>::from_iter([(1, 2), (2, 1)]);
+        assert_eq!(d1 - d2, MultiDeg::from_iter([(0, 1), (2, 2)]))
+    }
+
+    #[test]
+    #[should_panic]
+    fn sub_usize_panic() { 
+        let d1 = MultiDeg::<usize>::from_iter([(0, 1), (1, 2), (2, 3)]);
+        let d2 = MultiDeg::<usize>::from_iter([(1, 3), (2, 1)]);
+        let _ = d1 - d2; // panic!
     }
 }

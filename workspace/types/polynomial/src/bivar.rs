@@ -10,8 +10,8 @@ use yui_lin_comb::Gen;
 use crate::Mono;
 use super::univar::fmt_mono;
 
-// `BiVar<X, Y, I>` : a struct representing X^i Y^j.
-// `I` is one of `usize`, `isize`.
+// `BiVar<X, Y, I>` : represents bivariant monomials X^i Y^j.
+// `I` is either `usize` or `isize`.
 
 #[derive(Clone, PartialEq, Eq, Hash, Default, Debug, PartialOrd, Ord)]
 pub struct BiVar<const X: char, const Y: char, I>(I, I);

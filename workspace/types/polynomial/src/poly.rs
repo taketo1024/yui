@@ -6,11 +6,40 @@ use num_traits::{Zero, One, Pow};
 use auto_impl_ops::auto_ops;
 
 use yui_core::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Mon, MonOps, Ring, RingOps, EucRing, EucRingOps, Field, FieldOps};
-use yui_lin_comb::LinComb;
+use yui_lin_comb::{LinComb, Gen};
 
-use crate::{Mono, MultiDeg, Poly, Univar, BiVar, MultiVar};
+use crate::{MultiDeg, Univar, BiVar, MultiVar};
 
 // A polynomial is a linear combination of monomials over R.
+
+// Univar-type (ordinary, Laurent)
+pub type Poly  <const X: char, R> = PolyBase<Univar<X, usize>, R>;          
+pub type LPoly <const X: char, R> = PolyBase<Univar<X, isize>, R>;
+
+// Bivar-type (ordinary, Laurent)
+pub type Poly2 <const X: char, const Y: char, R> = PolyBase<BiVar<X, Y, usize>, R>;
+pub type LPoly2<const X: char, const Y: char, R> = PolyBase<BiVar<X, Y, isize>, R>;
+
+// Multivar-type (ordinary, Laurent)
+pub type PolyN <const X: char, R> = PolyBase<MultiVar<X, usize>, R>;
+pub type LPolyN<const X: char, R> = PolyBase<MultiVar<X, isize>, R>;
+
+pub trait Mono: 
+    Mul<Output = Self> + 
+    Div<Output = Self> + 
+    One + 
+    PartialOrd + 
+    Ord + 
+    From<Self::Deg> +
+    Gen
+{
+    type Deg;
+
+    fn deg(&self) -> Self::Deg;
+    fn is_unit(&self) -> bool;
+    fn inv(&self) -> Option<Self>;
+    fn divides(&self, other: &Self) -> bool;
+}
 
 #[derive(Clone, PartialEq, Eq, Default, Debug)]
 pub struct PolyBase<X, R>
@@ -541,7 +570,6 @@ where R: Field, for<'x> &'x R: FieldOps<R> {}
 mod tests {
     use yui_utils::map;
     use super::*;
-    use crate::{Univar, Poly2, PolyN, LPoly, LPolyN};
 
     #[test]
     fn init_poly() { 

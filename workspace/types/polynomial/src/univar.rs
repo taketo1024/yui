@@ -11,7 +11,7 @@ use yui_utils::superscript;
 
 use crate::Mono;
 
-// `Univar<X, I>` : a struct representing X^d (univar) or ΠX_i^{d_i} (multivar).
+// `Univar<X, I>` : represents monomials X^d (univar) or ΠX_i^{d_i} (multivar).
 // `I` is one of `usize`, `isize`, `MultiDeg<usize>`, `MultiDeg<isize>`.
 
 #[derive(Clone, PartialEq, Eq, Hash, Default, Debug, PartialOrd, Ord)]

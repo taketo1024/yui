@@ -6,7 +6,7 @@ use num_traits::Zero;
 
 use crate::{MonoDeg, impl_deg_unsigned, impl_deg_signed};
 
-#[derive(Clone, Default, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
+#[derive(Clone, Default, PartialEq, Eq, Debug, Hash)]
 pub struct MultiDeg<I>(BTreeMap<usize, I>) // x_0^{d_0} ... x_n^{d_n} <--> [ 0 => d_0, ..., n => d_n ]
 where I: Zero;
 
@@ -29,6 +29,14 @@ where I: Zero {
 
     pub fn iter(&self) -> impl Iterator<Item = (&usize, &I)> { 
         self.0.iter()
+    }
+
+    pub fn max_index(&self) -> Option<usize> { 
+        self.0.keys().max().cloned()
+    }
+
+    pub fn min_index(&self) -> Option<usize> { 
+        self.0.keys().min().cloned()
     }
 }
 
@@ -101,6 +109,30 @@ where I: Zero, for<'x> &'x I: Neg<Output = I> {
 impl_deg_unsigned!(MultiDeg<usize>);
 impl_deg_signed!  (MultiDeg<isize>);
 
+impl<I> PartialOrd for MultiDeg<I>
+where I: Zero + Ord + Clone {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<I> Ord for MultiDeg<I>
+where I: Zero + Ord + Clone {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        use std::cmp::*;
+        let n = max(self.max_index().unwrap_or(0), other.max_index().unwrap_or(0));
+
+        for i in 0..=n { 
+            let c = Ord::cmp(&self.deg(i), &other.deg(i));
+            if !c.is_eq() { 
+                return c
+            }
+        }
+
+        Ordering::Equal
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -116,5 +148,16 @@ mod tests {
     fn total() {
         let mdeg = MultiDeg::from_iter([(0, 1), (1, -2), (2, 3), (3, 0)]);
         assert_eq!(mdeg.total(), 2);
+    }
+
+    #[test]
+    fn ord() { 
+        let d1 = MultiDeg::from_iter([(0, 1), (1, -2), (2, 3)]);
+        let d2 = MultiDeg::from_iter([(0, 1), (1,  2), (2, 3)]);
+        let d3 = MultiDeg::from_iter([(0, 0), (1,  2), (2, 3)]);
+
+        assert!(d1 < d2);
+        assert!(d1 > d3);
+        assert!(!(d1 < d1 || d1 > d1));
     }
 }

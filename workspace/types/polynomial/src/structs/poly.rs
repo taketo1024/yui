@@ -159,6 +159,37 @@ macro_rules! impl_var_mvar {
 impl_var_mvar!(usize);
 impl_var_mvar!(isize);
 
+macro_rules! impl_polyn_funcs {
+    ($I:ty) => {
+        impl<const X: char, R> PolyBase<Mono<X, MultiDeg<$I>>, R>
+        where R: Ring, for<'x> &'x R: RingOps<R> {
+            pub fn lead_term_for(&self, k: usize) -> (&Mono<X, MultiDeg<$I>>, &R) { 
+                self.iter()
+                    .filter(|(_, r)| !r.is_zero())
+                    .max_by(|(x, _), (y, _)|
+                        Ord::cmp(
+                            &x.deg().deg(k), &y.deg().deg(k)
+                        ).then(Ord::cmp(
+                            &x, &y
+                        ))
+                    )
+                    .unwrap_or((&self.zero.0, &self.zero.1))
+            }
+
+            pub fn lead_coeff_for(&self, k: usize) -> &R { 
+                self.lead_term_for(k).1
+            }
+
+            pub fn lead_deg_for(&self, k: usize) -> MultiDeg<$I> { 
+                self.lead_term_for(k).0.deg()
+            }
+        }
+    };
+}
+
+impl_polyn_funcs!(usize);
+impl_polyn_funcs!(isize);
+
 impl<X, R> From<X> for PolyBase<X, R>
 where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn from(x: X) -> Self {
@@ -904,5 +935,23 @@ mod tests {
         let p = P::from_iter([(xy(0,0),3), (xy(1,0),2), (xy(0,1),-1), (xy(1,1),4)]);
         let v = p.eval(&2, &3); // 3 + 2(2) - 1(3) + 4(2*3)
         assert_eq!(v, 28);
+    }
+
+    #[test]
+    fn lead_term_for() {
+        type P = PolyN::<'x', i32>;
+
+        let xn = |i| P::mono(MultiDeg::from_vec(i));
+        let f = P::from_iter([
+            (xn(vec![1,2,3]), 1),
+            (xn(vec![2,1,3]), 2),
+            (xn(vec![0,2,4]), 3),
+            (xn(vec![5,5,5]), 0), // should be ignored
+        ]);
+        assert_eq!(f.lead_term(),      (&xn(vec![2,1,3]), &2));
+        assert_eq!(f.lead_term_for(0), (&xn(vec![2,1,3]), &2));
+        assert_eq!(f.lead_term_for(1), (&xn(vec![1,2,3]), &1));
+        assert_eq!(f.lead_term_for(2), (&xn(vec![0,2,4]), &3));
+        assert_eq!(f.lead_term_for(3), f.lead_term());
     }
 }

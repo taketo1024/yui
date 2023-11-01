@@ -106,6 +106,13 @@ mod tests {
     use super::*;
 
     #[test]
+    fn deg() {
+        let mdeg = MultiDeg::from_iter([(0, 1), (1, -2), (2, 3), (3, 0)]);
+        assert_eq!(mdeg.deg(1), -2);
+        assert_eq!(mdeg.deg(4), 0);
+    }
+
+    #[test]
     fn total() {
         let mdeg = MultiDeg::from_iter([(0, 1), (1, -2), (2, 3), (3, 0)]);
         assert_eq!(mdeg.total(), 2);

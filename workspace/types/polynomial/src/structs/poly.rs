@@ -8,12 +8,12 @@ use auto_impl_ops::auto_ops;
 use yui_core::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Mon, MonOps, Ring, RingOps, EucRing, EucRingOps, Field, FieldOps};
 use yui_lin_comb::LinComb;
 
-use crate::{MonoGen, MultiDeg, Poly, Mono, Mono2};
+use crate::{PolyGen, MultiDeg, Poly, Univar, BiVar, MultiVar};
 
 #[derive(Clone, PartialEq, Eq, Default, Debug)]
 pub struct PolyBase<X, R>
 where 
-    X: MonoGen, 
+    X: PolyGen, 
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     data: LinComb<X, R>,
@@ -21,7 +21,7 @@ where
 }
 
 impl<X, R> PolyBase<X, R>
-where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+where X: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new_raw(data: LinComb<X, R>) -> Self { 
         Self { data, zero: (X::one(), R::zero()) }
     }
@@ -116,7 +116,7 @@ where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
 
 macro_rules! impl_var_univar {
     ($I:ty) => {
-        impl<const X: char, R> PolyBase<Mono<X, $I>, R>
+        impl<const X: char, R> PolyBase<Univar<X, $I>, R>
         where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn variable() -> Self { 
                 Self::from(Self::mono(1))
@@ -130,12 +130,12 @@ impl_var_univar!(isize);
 
 macro_rules! impl_var_bivar {
     ($I:ty) => {
-        impl<const X: char, const Y: char, R> PolyBase<Mono2<X, Y, $I>, R>
+        impl<const X: char, const Y: char, R> PolyBase<BiVar<X, Y, $I>, R>
         where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn variable(i: usize) -> Self { 
                 assert!(i < 2);
                 let d = if i == 0 { (1, 0) } else { (0, 1) };
-                Self::from(Mono2::from(d))
+                Self::from(BiVar::from(d))
             }
         }
     };
@@ -146,11 +146,11 @@ impl_var_bivar!(isize);
 
 macro_rules! impl_var_mvar {
     ($I:ty) => {
-        impl<const X: char, R> PolyBase<Mono<X, MultiDeg<$I>>, R>
+        impl<const X: char, R> PolyBase<MultiVar<X, $I>, R>
         where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn variable(i: usize) -> Self { 
                 let d = MultiDeg::from((i, 1));
-                Self::from(Mono::from(d)) // x^1
+                Self::from(Univar::from(d)) // x^1
             }
         }
     };
@@ -161,9 +161,9 @@ impl_var_mvar!(isize);
 
 macro_rules! impl_polyn_funcs {
     ($I:ty) => {
-        impl<const X: char, R> PolyBase<Mono<X, MultiDeg<$I>>, R>
+        impl<const X: char, R> PolyBase<MultiVar<X, $I>, R>
         where R: Ring, for<'x> &'x R: RingOps<R> {
-            pub fn lead_term_for(&self, k: usize) -> (&Mono<X, MultiDeg<$I>>, &R) { 
+            pub fn lead_term_for(&self, k: usize) -> (&MultiVar<X, $I>, &R) { 
                 self.iter()
                     .filter(|(_, r)| !r.is_zero())
                     .max_by(|(x, _), (y, _)|
@@ -191,14 +191,14 @@ impl_polyn_funcs!(usize);
 impl_polyn_funcs!(isize);
 
 impl<X, R> From<X> for PolyBase<X, R>
-where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+where X: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn from(x: X) -> Self {
         Self::from((x, R::one()))
     }
 }
 
 impl<X, R> From<(X, R)> for PolyBase<X, R>
-where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+where X: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn from(pair: (X, R)) -> Self {
         let t = LinComb::from(pair);
         Self::new_raw(t)
@@ -206,21 +206,21 @@ where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 impl<X, R> FromIterator<(X, R)> for PolyBase<X, R>
-where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+where X: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn from_iter<T: IntoIterator<Item = (X, R)>>(iter: T) -> Self {
         Self::new(LinComb::from_iter(iter))
     }
 }
 
 impl<X, R> From<i32> for PolyBase<X, R>
-where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+where X: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn from(i: i32) -> Self {
         Self::from_const(R::from(i))
     }
 }
 
 impl<X, R> FromStr for PolyBase<X, R>
-where X: MonoGen + FromStr, R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
+where X: PolyGen + FromStr, R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -236,14 +236,14 @@ where X: MonoGen + FromStr, R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
 }
 
 impl<X, R> Display for PolyBase<X, R>
-where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+where X: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.data.fmt(f)
     }
 }
 
 impl<X, R> Zero for PolyBase<X, R>
-where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+where X: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn zero() -> Self {
         Self::new_raw(LinComb::zero())
     }
@@ -254,7 +254,7 @@ where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 impl<X, R> One for PolyBase<X, R>
-where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+where X: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn one() -> Self {
         let t = LinComb::from((X::one(), R::one()));
         Self::new_raw(t)
@@ -266,7 +266,7 @@ where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 impl<X, R> Neg for PolyBase<X, R>
-where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+where X: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = Self;
     fn neg(self) -> Self::Output {
         Self::new(-self.data)
@@ -274,7 +274,7 @@ where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 impl<X, R> Neg for &PolyBase<X, R>
-where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+where X: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = PolyBase<X, R>;
     fn neg(self) -> Self::Output {
         PolyBase::new(-&self.data)
@@ -285,7 +285,7 @@ macro_rules! impl_assop {
     ($trait:ident, $method:ident) => {
         #[auto_ops]
         impl<X, R> $trait<&PolyBase<X, R>> for PolyBase<X, R>
-        where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+        where X: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
             fn $method(&mut self, rhs: &PolyBase<X, R>) {
                 self.data.$method(&rhs.data)
             }
@@ -298,7 +298,7 @@ impl_assop!(SubAssign, sub_assign);
 
 #[auto_ops]
 impl<X, R> MulAssign<&R> for PolyBase<X, R>
-where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+where X: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn mul_assign(&mut self, rhs: &R) {
         self.data *= rhs
     }
@@ -306,7 +306,7 @@ where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[auto_ops]
 impl<X, R> MulAssign<&PolyBase<X, R>> for PolyBase<X, R>
-where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+where X: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn mul_assign(&mut self, rhs: &PolyBase<X, R>) {
         if rhs.is_one() {
             // do nothing
@@ -323,7 +323,7 @@ where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
 macro_rules! impl_accum {
     ($trait:ident, $method:ident, $accum_trait:ident, $accum_method:ident, $accum_init:ident) => {
         impl<X, R> $trait for PolyBase<X, R>
-        where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+        where X: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
             fn $method<Iter: Iterator<Item = Self>>(iter: Iter) -> Self {
                 let mut res = Self::$accum_init();
                 for r in iter { Self::$accum_method(&mut res, r) }
@@ -332,7 +332,7 @@ macro_rules! impl_accum {
         }
 
         impl<'a, X, R> $trait<&'a Self> for PolyBase<X, R>
-        where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+        where X: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
             fn $method<Iter: Iterator<Item = &'a Self>>(iter: Iter) -> Self {
                 let mut res = Self::$accum_init();
                 for r in iter { Self::$accum_method(&mut res, r) }
@@ -348,7 +348,7 @@ impl_accum!(Product, product, MulAssign, mul_assign, one);
 macro_rules! impl_pow_unsigned {
     ($t:ty) => {
         impl<X, R> Pow<$t> for &PolyBase<X, R>
-        where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+        where X: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
             type Output = PolyBase<X, R>;
             fn pow(self, n: $t) -> Self::Output {
                 let mut res = PolyBase::one();
@@ -368,7 +368,7 @@ impl_pow_unsigned!(usize);
 macro_rules! impl_pow_signed {
     ($t:ty) => {
         impl<X, R> Pow<$t> for &PolyBase<X, R>
-        where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+        where X: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
             type Output = PolyBase<X, R>;
             fn pow(self, n: $t) -> Self::Output {
                 if n >= 0 { 
@@ -390,7 +390,7 @@ impl_pow_signed!(isize);
 
 macro_rules! impl_eval_bivar {
     ($I:ty) => {
-        impl<const X: char, const Y: char, R> PolyBase<Mono2<X, Y, $I>, R>
+        impl<const X: char, const Y: char, R> PolyBase<BiVar<X, Y, $I>, R>
         where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn eval(&self, x: &R, y: &R) -> R
             where for<'x, 'y> &'x R: Pow<&'y $I, Output = R> { 
@@ -408,10 +408,10 @@ impl_eval_bivar!(isize);
 macro_rules! impl_alg_op {
     ($trait:ident) => {
         impl<X, R> $trait<Self> for PolyBase<X, R>
-        where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {}
+        where X: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {}
 
         impl<X, R> $trait<PolyBase<X, R>> for &PolyBase<X, R>
-        where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {}
+        where X: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {}
     };
 }
 
@@ -421,23 +421,23 @@ impl_alg_op!(MonOps);
 impl_alg_op!(RingOps);
 
 impl<X, R> Elem for PolyBase<X, R>
-where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+where X: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn math_symbol() -> String {
         format!("{}[{}]", R::math_symbol(), X::math_symbol())
     }
 }
 
 impl<X, R> AddMon for PolyBase<X, R>
-where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {}
+where X: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {}
 
 impl<X, R> AddGrp for PolyBase<X, R>
-where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {}
+where X: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {}
 
 impl<X, R> Mon for PolyBase<X, R>
-where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {}
+where X: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {}
 
 impl<X, R> Ring for PolyBase<X, R>
-where X: MonoGen, R: Ring, for<'x> &'x R: RingOps<R> {
+where X: PolyGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn inv(&self) -> Option<Self> {
         if !self.is_mono() { 
             return None
@@ -481,7 +481,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
             
             let k = i.deg() - j.deg(); // >= 0
             let c = a / b;
-            let x = Mono::from(k);
+            let x = Univar::from(k);
             let q = Poly::from((x, c));   // cx^k = (a/b) x^{i-j}.
             let r = f - &q * g;
             
@@ -539,7 +539,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {}
 mod tests {
     use yui_utils::map;
     use super::*;
-    use crate::{Mono, Poly2, PolyN, LPoly, LPolyN};
+    use crate::{Univar, Poly2, PolyN, LPoly, LPolyN};
 
     #[test]
     fn init_poly() { 
@@ -597,7 +597,7 @@ mod tests {
     #[test]
     fn reduce() { 
         type P = Poly::<'x', i32>;
-        type X = Mono<'x', usize>;
+        type X = Univar<'x', usize>;
 
         let data = map!{
             X::from(0) => 0, 

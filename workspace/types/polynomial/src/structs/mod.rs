@@ -1,9 +1,13 @@
 mod mdeg;
-mod mono;
-mod mono2;
+mod univar;
+mod bivar;
+mod multivar;
 mod poly;
 
 pub use mdeg::MultiDeg;
-pub use mono::Mono;
-pub use mono2::Mono2;
+pub use univar::Univar;
+pub use bivar::BiVar;
+pub use multivar::MultiVar;
 pub use poly::PolyBase;
+
+pub(crate) use univar::fmt_mono;

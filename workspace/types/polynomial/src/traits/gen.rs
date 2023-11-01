@@ -2,7 +2,7 @@ use std::ops::Mul;
 use num_traits::One;
 use yui_lin_comb::Gen;
 
-pub trait MonoGen: 
+pub trait PolyGen: 
     Mul<Output = Self> + 
     One + 
     PartialOrd + 

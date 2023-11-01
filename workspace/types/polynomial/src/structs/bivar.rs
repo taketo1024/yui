@@ -7,28 +7,28 @@ use auto_impl_ops::auto_ops;
 use yui_core::Elem;
 use yui_lin_comb::Gen;
 
-use crate::{VarDeg, MonoGen};
-use super::mono::fmt_mono;
+use crate::{VarDeg, PolyGen};
+use super::univar::fmt_mono;
 
-// `Mono2<X, Y, I>` : a struct representing X^i Y^j.
+// `BiVar<X, Y, I>` : a struct representing X^i Y^j.
 // `I` is one of `usize`, `isize`.
 
 #[derive(Clone, PartialEq, Eq, Hash, Default, Debug, PartialOrd, Ord)]
-pub struct Mono2<const X: char, const Y: char, I>(I, I);
+pub struct BiVar<const X: char, const Y: char, I>(I, I);
 
-impl<const X: char, const Y: char, I> Mono2<X, Y, I> {
+impl<const X: char, const Y: char, I> BiVar<X, Y, I> {
     pub fn new(d0: I, d1: I) -> Self { 
         Self(d0, d1)
     }
 }
 
-impl<const X: char, const Y: char, I> From<(I, I)> for Mono2<X, Y, I> {
+impl<const X: char, const Y: char, I> From<(I, I)> for BiVar<X, Y, I> {
     fn from(d: (I, I)) -> Self {
         Self(d.0, d.1)
     }
 }
 
-impl<const X: char, const Y: char, I> FromStr for Mono2<X, Y, I>
+impl<const X: char, const Y: char, I> FromStr for BiVar<X, Y, I>
 where I: Zero + One {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -48,7 +48,7 @@ where I: Zero + One {
     }
 }
 
-impl<const X: char, const Y: char, I> Mono2<X, Y, I>
+impl<const X: char, const Y: char, I> BiVar<X, Y, I>
 where I: Zero + Clone {
     pub fn deg(&self, i: usize) -> I { 
         match i { 
@@ -59,7 +59,7 @@ where I: Zero + Clone {
     }
 }
 
-impl<const X: char, const Y: char, I> One for Mono2<X, Y, I>
+impl<const X: char, const Y: char, I> One for BiVar<X, Y, I>
 where I: for<'x >AddAssign<&'x I> + Zero {
     fn one() -> Self {
         Self::from((I::zero(), I::zero())) // x^0 = 1.
@@ -67,9 +67,9 @@ where I: for<'x >AddAssign<&'x I> + Zero {
 }
 
 #[auto_ops]
-impl<const X: char, const Y: char, I> MulAssign<&Mono2<X, Y, I>> for Mono2<X, Y, I>
+impl<const X: char, const Y: char, I> MulAssign<&BiVar<X, Y, I>> for BiVar<X, Y, I>
 where I: for<'x >AddAssign<&'x I> {
-    fn mul_assign(&mut self, rhs: &Mono2<X, Y, I>) {
+    fn mul_assign(&mut self, rhs: &BiVar<X, Y, I>) {
         self.0 += &rhs.0; // x^i * x^j = x^{i+j}
         self.1 += &rhs.1; // x^i * x^j = x^{i+j}
     }
@@ -77,9 +77,9 @@ where I: for<'x >AddAssign<&'x I> {
 
 macro_rules! impl_poly_gen {
     ($I:ty) => {
-        impl<const X: char, const Y: char> Display for Mono2<X, Y, $I> { 
+        impl<const X: char, const Y: char> Display for BiVar<X, Y, $I> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let Mono2(d0, d1) = self;
+                let BiVar(d0, d1) = self;
                 let x = fmt_mono(X.to_string(), *d0 as isize);
                 let y = fmt_mono(Y.to_string(), *d1 as isize);
                 
@@ -92,15 +92,15 @@ macro_rules! impl_poly_gen {
             }
         }
         
-        impl<const X: char, const Y: char> Elem for Mono2<X, Y, $I> { 
+        impl<const X: char, const Y: char> Elem for BiVar<X, Y, $I> { 
             fn math_symbol() -> String {
                 format!("{X}, {Y}")
             }
         }
                 
-        impl<const X: char, const Y: char> Gen for Mono2<X, Y, $I> {}
+        impl<const X: char, const Y: char> Gen for BiVar<X, Y, $I> {}
 
-        impl<const X: char, const Y: char> MonoGen for Mono2<X, Y, $I> {
+        impl<const X: char, const Y: char> PolyGen for BiVar<X, Y, $I> {
             type Deg = ($I, $I);
 
             fn deg(&self) -> Self::Deg {
@@ -125,7 +125,7 @@ macro_rules! impl_poly_gen {
 impl_poly_gen!(usize);
 impl_poly_gen!(isize);
 
-impl<const X: char, const Y: char, I> Mono2<X, Y, I> {
+impl<const X: char, const Y: char, I> BiVar<X, Y, I> {
     pub fn eval<R>(&self, x: &R, y: &R) -> R
     where R: Mul<Output = R>, for<'x, 'y> &'x R: Pow<&'y I, Output = R> {
         x.pow(&self.0) * y.pow(&self.1)
@@ -138,7 +138,7 @@ mod tests {
  
     #[test]
     fn init() { 
-        type M = Mono2<'X', 'Y', usize>;
+        type M = BiVar<'X', 'Y', usize>;
         let d = M::new(2, 3);
 
         assert_eq!(d.0, 2);
@@ -147,7 +147,7 @@ mod tests {
 
     #[test]
     fn from_str() { 
-        type M = Mono2<'X', 'Y', usize>;
+        type M = BiVar<'X', 'Y', usize>;
         
         assert_eq!(M::from_str("1"), Ok(M::one()));
         assert_eq!(M::from_str("X"), Ok(M::new(1, 0)));
@@ -157,7 +157,7 @@ mod tests {
 
     #[test]
     fn display() { 
-        type M = Mono2<'X', 'Y', usize>;
+        type M = BiVar<'X', 'Y', usize>;
         let d = M::new(0, 0);
         assert_eq!(&d.to_string(), "1");
 
@@ -182,7 +182,7 @@ mod tests {
 
     #[test]
     fn neg_opt_unsigned() { 
-        type M = Mono2<'X', 'Y', usize>;
+        type M = BiVar<'X', 'Y', usize>;
 
         let d = M::new(0, 0);
         assert_eq!(d.inv(), Some(M::new(0, 0)));
@@ -199,7 +199,7 @@ mod tests {
 
     #[test]
     fn neg_opt_signed() { 
-        type M = Mono2<'X', 'Y', isize>;
+        type M = BiVar<'X', 'Y', isize>;
 
         let d = M::new(0, 0);
         assert_eq!(d.inv(), Some(M::new(0, 0)));
@@ -216,7 +216,7 @@ mod tests {
 
     #[test]
     fn eval() { 
-        type M = Mono2<'X', 'Y', usize>;
+        type M = BiVar<'X', 'Y', usize>;
 
         let d = M::new(0, 0);
         assert_eq!(d.eval::<i32>(&2, &3), 1);

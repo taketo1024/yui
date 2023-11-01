@@ -11,7 +11,7 @@ use cartesian::cartesian;
 use yui_core::{Elem, Ring, RingOps};
 use yui_lin_comb::{Gen, OrdForDisplay, LinComb};
 use yui_link::{Edge, Crossing, Resolution};
-use yui_polynomial::Mono2;
+use yui_polynomial::BiVar;
 use super::tng::{Tng, TngComp};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Display)]
@@ -405,7 +405,7 @@ impl Display for CobComp {
 
         let dots = if self.has_dots() { 
             let (p, q) = self.dots;
-            format!("{}.", Mono2::<'X','Y', _>::new(p, q).to_string())
+            format!("{}.", BiVar::<'X','Y', _>::new(p, q).to_string())
         } else { 
             String::new()
         };

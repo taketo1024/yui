@@ -515,6 +515,22 @@ mod tests {
     }
 
     #[test]
+    fn from_gen() { 
+        type L = LinComb<X, i32>;
+        let x = e(0);
+        let z = L::from(x);
+        assert_eq!(z, L::new(map!{ e(0) => 1 }));
+    }
+
+    #[test]
+    fn from_pair() { 
+        type L = LinComb<X, i32>;
+        let x = e(0);
+        let z = L::from((x, 2));
+        assert_eq!(z, L::new(map!{ e(0) => 2 }));
+    }
+
+    #[test]
     fn eq() { 
         type L = LinComb<X, i32>;
         let z1 = L::new(map!{ e(1) => 1, e(2) => 2 });

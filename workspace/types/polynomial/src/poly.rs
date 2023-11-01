@@ -53,25 +53,19 @@ where
 
 impl<X, R> PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new_raw(data: LinComb<X, R>) -> Self { 
+    fn new(data: LinComb<X, R>) -> Self { 
         Self { data, zero: (X::one(), R::zero()) }
-    }
-
-    pub fn new(data: LinComb<X, R>) -> Self { 
-        let mut new = Self::new_raw(data);
-        new.reduce();
-        new
-    }
-
-    pub fn mono(deg: X::Deg) -> X {
-        X::from(deg)
     }
 
     pub fn from_const(r: R) -> Self {
         Self::from((X::one(), r))
     }
 
-    pub fn as_lincomb(&self) -> &LinComb<X, R> { 
+    pub fn mono(deg: X::Deg) -> X {
+        X::from(deg)
+    }
+
+    pub fn inner(&self) -> &LinComb<X, R> { 
         &self.data
     }
 
@@ -100,7 +94,7 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn reduced(&self) -> Self { 
-        Self::new_raw(self.data.reduced())
+        Self::from(self.data.reduced())
     }
 
     pub fn is_const(&self) -> bool { 
@@ -139,9 +133,7 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
         R2: Ring, for<'x> &'x R2: RingOps<R2>, 
         F: Fn(&R) -> R2
     {
-        PolyBase::<X, R2>::new(
-            self.iter().map(|(i, r)| (i.clone(), f(r))).collect()
-        )
+        PolyBase::<X, R2>::from( self.data.map_coeffs(f) )
     }
 }
 
@@ -232,14 +224,14 @@ impl<X, R> From<(X, R)> for PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     fn from(pair: (X, R)) -> Self {
         let t = LinComb::from(pair);
-        Self::new_raw(t)
+        Self::from(t)
     }
 }
 
 impl<X, R> FromIterator<(X, R)> for PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     fn from_iter<T: IntoIterator<Item = (X, R)>>(iter: T) -> Self {
-        Self::new(LinComb::from_iter(iter))
+        Self::from(LinComb::from_iter(iter))
     }
 }
 
@@ -247,6 +239,20 @@ impl<X, R> From<i32> for PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     fn from(i: i32) -> Self {
         Self::from_const(R::from(i))
+    }
+}
+
+impl<X, R> From<LinComb<X, R>> for PolyBase<X, R>
+where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
+    fn from(data: LinComb<X, R>) -> Self {
+        Self::new(data)
+    }
+}
+
+impl<X, R> From<PolyBase<X, R>> for LinComb<X, R>
+where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
+    fn from(poly: PolyBase<X, R>) -> Self {
+        poly.data
     }
 }
 
@@ -276,7 +282,7 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
 impl<X, R> Zero for PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     fn zero() -> Self {
-        Self::new_raw(LinComb::zero())
+        Self::from(LinComb::zero())
     }
 
     fn is_zero(&self) -> bool {
@@ -287,8 +293,7 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
 impl<X, R> One for PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     fn one() -> Self {
-        let t = LinComb::from((X::one(), R::one()));
-        Self::new_raw(t)
+        Self::from((X::one(), R::one()))
     }
 
     fn is_one(&self) -> bool {
@@ -300,7 +305,7 @@ impl<X, R> Neg for PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = Self;
     fn neg(self) -> Self::Output {
-        Self::new(-self.data)
+        Self::from(-self.data)
     }
 }
 
@@ -308,7 +313,7 @@ impl<X, R> Neg for &PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = PolyBase<X, R>;
     fn neg(self) -> Self::Output {
-        PolyBase::new(-&self.data)
+        PolyBase::from(-&self.data)
     }
 }
 
@@ -627,17 +632,17 @@ mod tests {
     #[test]
     fn reduce() { 
         type P = Poly::<'x', i32>;
-        type X = Univar<'x', usize>;
 
+        let x = P::mono;
         let data = map!{
-            X::from(0) => 0, 
-            X::from(1) => 1, 
-            X::from(2) => 0 
+            x(0) => 0, 
+            x(1) => 1, 
+            x(2) => 0 
         };
-        let mut f = P::new_raw(LinComb::new_raw(data));
+        let f = P::from(LinComb::new(data));
         assert_eq!(f.len(), 3);
 
-        f.reduce();
+        let f = f.reduced();
         assert_eq!(f.len(), 1);
     }
 
@@ -645,8 +650,16 @@ mod tests {
     fn zero() {
         type P = Poly::<'x', i32>;
 
-        let p = P::zero();
-        assert_eq!(p, P::from_iter([]));
+        let zero = P::zero();
+        assert_eq!(zero, P::from_iter([]));
+
+        let x = P::mono;
+        let data = map!{
+            x(0) => 0 
+        };
+        let f = P::from(LinComb::new(data));
+
+        assert!(f.is_zero());
     }
 
     #[test]

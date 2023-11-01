@@ -26,14 +26,8 @@ where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 { 
-    pub fn new_raw(data: HashMap<X, R>) -> Self {
-        Self { data, r_zero: R::zero() }
-    }
-
     pub fn new(data: HashMap<X, R>) -> Self {
-        let mut new = Self::new_raw(data);
-        new.reduce();
-        new
+        Self { data, r_zero: R::zero() }
     }
 
     pub fn len(&self) -> usize {
@@ -136,7 +130,8 @@ where
                 None
             }
         ).collect::<HashMap<_, _>>();
-        Self::new_raw(data)
+        
+        Self::new(data)
     }
 
     pub fn apply<F>(&self, f: F) -> Self 
@@ -187,7 +182,7 @@ where
                 data.insert(x, r);
             }
         }
-        Self::new_raw(data)
+        Self::new(data)
     }
 }
 
@@ -244,7 +239,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn zero() -> Self {
-        Self::new_raw(HashMap::new())
+        Self::new(HashMap::new())
     }
 
     fn is_zero(&self) -> bool {
@@ -555,13 +550,13 @@ mod tests {
         type L = LinComb<X, i32>;
 
         let data = map!{ e(1) => 1, e(2) => 0, e(3) => 0 };
-        let mut z = L::new_raw(data);
+        let mut z = L::new(data);
         
         assert_eq!(z.len(), 3);
 
         z.reduce();
 
-        assert_eq!(z, L::new_raw(map!{ e(1) => 1 }));
+        assert_eq!(z, L::new(map!{ e(1) => 1 }));
         assert_eq!(z.len(), 1);
     }
 

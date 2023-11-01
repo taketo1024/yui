@@ -168,7 +168,7 @@ macro_rules! impl_polyn_funcs {
                     .filter(|(_, r)| !r.is_zero())
                     .max_by(|(x, _), (y, _)|
                         Ord::cmp(
-                            &x.deg().deg(k), &y.deg().deg(k)
+                            &x.deg().of(k), &y.deg().of(k)
                         ).then(Ord::cmp(
                             &x, &y
                         ))

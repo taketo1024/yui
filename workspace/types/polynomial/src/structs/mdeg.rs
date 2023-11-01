@@ -56,7 +56,7 @@ where I: Zero {
 
 impl<I> MultiDeg<I>
 where I: Zero + Clone {
-    pub fn deg(&self, index: usize) -> I {
+    pub fn of(&self, index: usize) -> I {
         self.0.get(&index).cloned().unwrap_or(I::zero())
     }
 }
@@ -123,7 +123,7 @@ where I: Zero + Ord + Clone {
         let n = max(self.max_index().unwrap_or(0), other.max_index().unwrap_or(0));
 
         for i in 0..=n { 
-            let c = Ord::cmp(&self.deg(i), &other.deg(i));
+            let c = Ord::cmp(&self.of(i), &other.of(i));
             if !c.is_eq() { 
                 return c
             }
@@ -140,8 +140,8 @@ mod tests {
     #[test]
     fn deg() {
         let mdeg = MultiDeg::from_iter([(0, 1), (1, -2), (2, 3), (3, 0)]);
-        assert_eq!(mdeg.deg(1), -2);
-        assert_eq!(mdeg.deg(4), 0);
+        assert_eq!(mdeg.of(1), -2);
+        assert_eq!(mdeg.of(4), 0);
     }
 
     #[test]

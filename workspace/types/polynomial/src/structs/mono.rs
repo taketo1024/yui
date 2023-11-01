@@ -8,7 +8,7 @@ use yui_core::Elem;
 use yui_lin_comb::Gen;
 use yui_utils::{subscript, superscript};
 
-use crate::{MonoDeg, MonoGen, MultiDeg};
+use crate::{VarDeg, MonoGen, MultiDeg};
 
 // `Mono<X, I>` : a struct representing X^d (univar) or ΠX_i^{d_i} (multivar).
 // `I` is one of `usize`, `isize`, `MultiDeg<usize>`, `MultiDeg<isize>`.

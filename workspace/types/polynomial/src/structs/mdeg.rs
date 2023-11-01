@@ -4,7 +4,7 @@ use std::ops::{Add, AddAssign, Neg, SubAssign, Sub};
 use auto_impl_ops::auto_ops;
 use num_traits::Zero;
 
-use crate::{MonoDeg, impl_deg_unsigned, impl_deg_signed};
+use crate::{VarDeg, impl_deg_unsigned, impl_deg_signed};
 
 #[derive(Clone, Default, PartialEq, Eq, Debug, Hash)]
 pub struct MultiDeg<I>(BTreeMap<usize, I>) // x_0^{d_0} ... x_n^{d_n} <--> [ 0 => d_0, ..., n => d_n ]

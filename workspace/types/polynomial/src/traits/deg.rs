@@ -1,14 +1,14 @@
 use std::ops::{Add, Sub};
 use num_traits::Zero;
 
-pub trait MonoDeg: Add + Sub + Zero {
+pub trait VarDeg: Add + Sub + Zero {
     fn is_negatable(&self) -> bool;
     fn neg_opt(&self) -> Option<Self>;
 }
 
 macro_rules! impl_deg_unsigned {
     ($t:ty) => {
-        impl MonoDeg for $t {
+        impl VarDeg for $t {
             fn is_negatable(&self) -> bool { 
                 self.is_zero()
             }
@@ -26,7 +26,7 @@ macro_rules! impl_deg_unsigned {
 
 macro_rules! impl_deg_signed {
     ($t:ty) => {
-        impl MonoDeg for $t {
+        impl VarDeg for $t {
             fn is_negatable(&self) -> bool { 
                 true
             }

@@ -7,7 +7,7 @@ use auto_impl_ops::auto_ops;
 use yui_core::Elem;
 use yui_lin_comb::Gen;
 
-use crate::{MonoDeg, MonoGen};
+use crate::{VarDeg, MonoGen};
 use super::mono::fmt_mono;
 
 // `Mono2<X, Y, I>` : a struct representing X^i Y^j.

@@ -148,11 +148,11 @@ macro_rules! impl_poly_gen {
             }
 
             fn is_unit(&self) -> bool { 
-                self.deg().is_add_unit()
+                self.deg().is_negatable()
             }
 
             fn inv(&self) -> Option<Self> { // (x^i)^{-1} = x^{-i}
-                if let Some(i) = self.deg().add_inv() { 
+                if let Some(i) = self.deg().neg_opt() { 
                     Some(Self(i))
                 } else { 
                     None

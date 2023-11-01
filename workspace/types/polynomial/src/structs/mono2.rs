@@ -108,11 +108,11 @@ macro_rules! impl_poly_gen {
             }
 
             fn is_unit(&self) -> bool { 
-                self.0.is_add_unit() && self.1.is_add_unit()
+                self.0.is_negatable() && self.1.is_negatable()
             }
 
             fn inv(&self) -> Option<Self> { // (x^i)^{-1} = x^{-i}
-                if let (Some(d0), Some(d1)) = (self.0.add_inv(), self.1.add_inv()) {
+                if let (Some(d0), Some(d1)) = (self.0.neg_opt(), self.1.neg_opt()) {
                     Some(Self(d0, d1))
                 } else { 
                     None
@@ -181,7 +181,7 @@ mod tests {
     }
 
     #[test]
-    fn add_inv_unsigned() { 
+    fn neg_opt_unsigned() { 
         type M = Mono2<'X', 'Y', usize>;
 
         let d = M::new(0, 0);
@@ -198,7 +198,7 @@ mod tests {
     }
 
     #[test]
-    fn add_inv_signed() { 
+    fn neg_opt_signed() { 
         type M = Mono2<'X', 'Y', isize>;
 
         let d = M::new(0, 0);

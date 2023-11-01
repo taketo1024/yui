@@ -1,19 +1,19 @@
-use std::ops::Add;
+use std::ops::{Add, Sub};
 use num_traits::Zero;
 
-pub trait MonoDeg: Add + Zero {
-    fn is_add_unit(&self) -> bool;
-    fn add_inv(&self) -> Option<Self>;
+pub trait MonoDeg: Add + Sub + Zero {
+    fn is_negatable(&self) -> bool;
+    fn neg_opt(&self) -> Option<Self>;
 }
 
 macro_rules! impl_deg_unsigned {
     ($t:ty) => {
         impl MonoDeg for $t {
-            fn is_add_unit(&self) -> bool { 
+            fn is_negatable(&self) -> bool { 
                 self.is_zero()
             }
 
-            fn add_inv(&self) -> Option<Self> {
+            fn neg_opt(&self) -> Option<Self> {
                 if self.is_zero() { 
                     Some(Self::zero())
                 } else { 
@@ -27,11 +27,11 @@ macro_rules! impl_deg_unsigned {
 macro_rules! impl_deg_signed {
     ($t:ty) => {
         impl MonoDeg for $t {
-            fn is_add_unit(&self) -> bool { 
+            fn is_negatable(&self) -> bool { 
                 true
             }
 
-            fn add_inv(&self) -> Option<Self> {
+            fn neg_opt(&self) -> Option<Self> {
                 Some(-self)
             }
         }

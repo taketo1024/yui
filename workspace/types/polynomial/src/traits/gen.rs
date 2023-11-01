@@ -2,7 +2,7 @@ use std::ops::{Mul, Div};
 use num_traits::One;
 use yui_lin_comb::Gen;
 
-pub trait PolyGen: 
+pub trait Mono: 
     Mul<Output = Self> + 
     Div<Output = Self> + 
     One + 

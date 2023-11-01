@@ -9,7 +9,7 @@ use yui_core::Elem;
 use yui_lin_comb::Gen;
 use yui_utils::superscript;
 
-use crate::PolyGen;
+use crate::Mono;
 
 // `Univar<X, I>` : a struct representing X^d (univar) or ΠX_i^{d_i} (multivar).
 // `I` is one of `usize`, `isize`, `MultiDeg<usize>`, `MultiDeg<isize>`.
@@ -86,7 +86,7 @@ macro_rules! impl_univar_unsigned {
     ($I:ty) => {
         impl_univar!($I);
 
-        impl<const X: char> PolyGen for Univar<X, $I> {
+        impl<const X: char> Mono for Univar<X, $I> {
             type Deg = $I;
 
             fn deg(&self) -> Self::Deg {
@@ -116,7 +116,7 @@ macro_rules! impl_univar_signed {
     ($I:ty) => {
         impl_univar!($I);
 
-        impl<const X: char> PolyGen for Univar<X, $I> {
+        impl<const X: char> Mono for Univar<X, $I> {
             type Deg = $I;
 
             fn deg(&self) -> Self::Deg {

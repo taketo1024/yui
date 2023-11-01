@@ -1,2 +1,2 @@
 mod gen;
-pub use gen::PolyGen;
+pub use gen::Mono;

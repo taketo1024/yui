@@ -6,7 +6,7 @@ use yui_core::Elem;
 use yui_lin_comb::Gen;
 use yui_utils::subscript;
 
-use crate::{PolyGen, MultiDeg, Univar, fmt_mono};
+use crate::{Mono, MultiDeg, Univar, fmt_mono};
 
 pub type MultiVar<const X: char, I> = Univar<X, MultiDeg<I>>;
 
@@ -62,7 +62,7 @@ macro_rules! impl_multivar_unsigned {
     ($I:ty) => {
         impl_multivar!($I);
 
-        impl<const X: char> PolyGen for MultiVar<X, $I> {
+        impl<const X: char> Mono for MultiVar<X, $I> {
             type Deg = MultiDeg<$I>;
 
             fn deg(&self) -> Self::Deg {
@@ -92,7 +92,7 @@ macro_rules! impl_multivar_signed {
     ($I:ty) => {
         impl_multivar!($I);
 
-        impl<const X: char> PolyGen for MultiVar<X, $I> {
+        impl<const X: char> Mono for MultiVar<X, $I> {
             type Deg = MultiDeg<$I>;
 
             fn deg(&self) -> Self::Deg {

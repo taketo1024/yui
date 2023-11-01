@@ -7,7 +7,7 @@ use auto_impl_ops::auto_ops;
 use yui_core::Elem;
 use yui_lin_comb::Gen;
 
-use crate::PolyGen;
+use crate::Mono;
 use super::univar::fmt_mono;
 
 // `BiVar<X, Y, I>` : a struct representing X^i Y^j.
@@ -115,7 +115,7 @@ macro_rules! impl_bivar_unsigned {
     ($I:ty) => {
         impl_bivar!($I);
 
-        impl<const X: char, const Y: char> PolyGen for BiVar<X, Y, $I> {
+        impl<const X: char, const Y: char> Mono for BiVar<X, Y, $I> {
             type Deg = ($I, $I);
 
             fn deg(&self) -> Self::Deg {
@@ -145,7 +145,7 @@ macro_rules! impl_bivar_signed {
     ($I:ty) => {
         impl_bivar!($I);
 
-        impl<const X: char, const Y: char> PolyGen for BiVar<X, Y, $I> {
+        impl<const X: char, const Y: char> Mono for BiVar<X, Y, $I> {
             type Deg = ($I, $I);
 
             fn deg(&self) -> Self::Deg {

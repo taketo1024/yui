@@ -4,7 +4,7 @@ use std::ops::{Add, AddAssign, Neg, SubAssign, Sub};
 use auto_impl_ops::auto_ops;
 use num_traits::Zero;
 
-use crate::{VarDeg, impl_deg_unsigned, impl_deg_signed};
+use crate::VarDeg;
 
 #[derive(Clone, Default, PartialEq, Eq, Debug, Hash)]
 pub struct MultiDeg<I>(BTreeMap<usize, I>) // x_0^{d_0} ... x_n^{d_n} <--> [ 0 => d_0, ..., n => d_n ]
@@ -122,9 +122,6 @@ where I: Zero, for<'x> &'x I: Neg<Output = I> {
     }
 }
 
-impl_deg_unsigned!(MultiDeg<usize>);
-impl_deg_signed!  (MultiDeg<isize>);
-
 impl<I> PartialOrd for MultiDeg<I>
 where I: Zero + Ord + Clone {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
@@ -146,6 +143,42 @@ where I: Zero + Ord + Clone {
         }
 
         Ordering::Equal
+    }
+}
+
+impl VarDeg for MultiDeg<usize> {
+    fn is_negatable(&self) -> bool {
+        self.is_zero()
+    }
+
+    fn neg_opt(&self) -> Option<Self> {
+        if self.is_zero() { 
+            Some(Self::zero())
+        } else { 
+            None
+        }
+    }
+
+    fn strict_leq(&self, other: &Self) -> bool {
+        self.iter().all(|(&i, d)|
+            d <= &other.of(i)
+        )
+    }
+}
+
+impl VarDeg for MultiDeg<isize> {
+    fn is_negatable(&self) -> bool {
+        true
+    }
+
+    fn neg_opt(&self) -> Option<Self> {
+        Some(-self)
+    }
+
+    fn strict_leq(&self, other: &Self) -> bool {
+        self.iter().all(|(&i, d)|
+            d <= &other.of(i)
+        )
     }
 }
 

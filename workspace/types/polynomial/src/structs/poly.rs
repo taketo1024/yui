@@ -591,7 +591,7 @@ mod tests {
             (xn(vec![1]),        1),
             (xn(vec![-3, 1, 3]), 2),
         ]);
-        assert_eq!(&f.to_string(), "3 + 2x₀⁻³x₁x₂³ + x₀");
+        assert_eq!(&f.to_string(), "2x₀⁻³x₁x₂³ + 3 + x₀");
     }
 
     #[test]

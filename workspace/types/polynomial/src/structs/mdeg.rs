@@ -152,12 +152,14 @@ mod tests {
 
     #[test]
     fn ord() { 
+        let d0 = MultiDeg::<isize>::from_iter([]);
         let d1 = MultiDeg::from_iter([(0, 1), (1, -2), (2, 3)]);
         let d2 = MultiDeg::from_iter([(0, 1), (1,  2), (2, 3)]);
-        let d3 = MultiDeg::from_iter([(0, 0), (1,  2), (2, 3)]);
+        let d3 = MultiDeg::from_iter([(0, -1), (1,  2), (2, 3)]);
 
-        assert!(d1 < d2);
-        assert!(d1 > d3);
         assert!(!(d1 < d1 || d1 > d1));
+        assert!(d0 < d1);
+        assert!(d1 < d2);
+        assert!(d0 > d3);
     }
 }

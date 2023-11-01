@@ -63,3 +63,69 @@ impl_multivar!(isize);
 
 impl_poly_gen!(MultiDeg<usize>);
 impl_poly_gen!(MultiDeg<isize>);
+
+#[cfg(test)]
+mod tests { 
+    use num_traits::Zero;
+
+    use super::*;
+
+    fn mono<I, Itr>(itr: Itr) -> MultiVar<'X', I> 
+    where I: Zero, Itr: IntoIterator<Item = (usize, I)> {
+        let mdeg = MultiDeg::from_iter(itr);
+        MultiVar::from(mdeg)
+    }
+
+    #[test]
+    fn is_divisible() { 
+        let one = mono([]);
+        let d1 = mono::<usize, _>([(0, 1), (1, 2), (2, 3)]);
+        let d2 = mono::<usize, _>([        (1, 2), (2, 1)]);
+        let d3 = mono::<usize, _>([(0, 1), (1, 3)        ]);
+
+        assert!(one.divides(&d1));
+        assert!(d1.divides(&d1));
+        assert!(d2.divides(&d1));
+        assert!(!d1.divides(&d2));
+        assert!(!d3.divides(&d1));
+        assert!(!d1.divides(&d3));
+    }
+
+    #[test]
+    fn div() { 
+        let one = mono([]);
+        let d1 = mono::<usize, _>([(0, 1), (1, 2), (2, 3)]);
+        let d2 = mono::<usize, _>([        (1, 2), (2, 1)]);
+
+        assert_eq!(&d1 / &one, d1);
+        assert_eq!(&d1 / &d1, mono([]));
+        assert_eq!(&d1 / &d2, mono([(0, 1), (2, 2)]));
+    }
+
+    #[test]
+    fn is_divisible_isize() { 
+        let one = mono([]);
+        let d1 = mono::<isize, _>([(0, 1), (1, 2), (2, 3)]);
+        let d2 = mono::<isize, _>([        (1, 2), (2, 1)]);
+        let d3 = mono::<isize, _>([(0, 1), (1, 3)        ]);
+
+        assert!(one.divides(&d1));
+        assert!(d1.divides(&d1));
+        assert!(d2.divides(&d1));
+        assert!(d1.divides(&d2));
+        assert!(d3.divides(&d1));
+        assert!(d1.divides(&d3));
+    }
+
+    #[test]
+    fn div_isize() { 
+        let one = mono::<isize, _>([]);
+        let d1 = mono::<isize, _>([(0, 1), (1, 2), (2, 3)]);
+        let d2 = mono::<isize, _>([        (1, 2), (2, 1)]);
+
+        assert_eq!(&d1 / &one, d1);
+        assert_eq!(&one / &d1, d1.inv().unwrap());
+        assert_eq!(&d1 / &d2, mono([(0, 1), (2, 2)]));
+        assert_eq!(&d2 / &d1, mono([(0, -1), (2, -2)]));
+    }
+}

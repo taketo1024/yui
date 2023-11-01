@@ -1,5 +1,5 @@
 use std::fmt::Display;
-use std::ops::{AddAssign, Mul, MulAssign};
+use std::ops::{AddAssign, Mul, MulAssign, DivAssign, SubAssign, Div};
 use std::str::FromStr;
 use num_traits::{Zero, One, Pow};
 use auto_impl_ops::auto_ops;
@@ -75,6 +75,15 @@ where I: for<'x >AddAssign<&'x I> {
     }
 }
 
+#[auto_ops]
+impl<const X: char, const Y: char, I> DivAssign<&BiVar<X, Y, I>> for BiVar<X, Y, I>
+where I: for<'x >SubAssign<&'x I> {
+    fn div_assign(&mut self, rhs: &BiVar<X, Y, I>) {
+        self.0 -= &rhs.0; // x^i * x^j = x^{i+j}
+        self.1 -= &rhs.1;
+    }
+}
+
 macro_rules! impl_poly_gen {
     ($I:ty) => {
         impl<const X: char, const Y: char> Display for BiVar<X, Y, $I> { 
@@ -117,6 +126,10 @@ macro_rules! impl_poly_gen {
                 } else { 
                     None
                 }
+            }
+
+            fn divides(&self, other: &Self) -> bool { 
+                self.0.strict_leq(&other.0) && self.1.strict_leq(&other.1)
             }
         }
     };

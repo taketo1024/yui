@@ -1,5 +1,5 @@
 use std::fmt::Display;
-use std::ops::{AddAssign, Mul, MulAssign};
+use std::ops::{AddAssign, Mul, MulAssign, DivAssign, SubAssign, Div};
 use std::str::FromStr;
 use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
@@ -34,6 +34,14 @@ impl<const X: char, I> MulAssign<&Univar<X, I>> for Univar<X, I>
 where I: for<'x >AddAssign<&'x I> {
     fn mul_assign(&mut self, rhs: &Univar<X, I>) {
         self.0 += &rhs.0 // x^i * x^j = x^{i+j}
+    }
+}
+
+#[auto_ops]
+impl<const X: char, I> DivAssign<&Univar<X, I>> for Univar<X, I>
+where I: for<'x >SubAssign<&'x I> {
+    fn div_assign(&mut self, rhs: &Univar<X, I>) {
+        self.0 -= &rhs.0 // x^i * x^j = x^{i+j}
     }
 }
 
@@ -107,6 +115,10 @@ macro_rules! impl_poly_gen {
                 } else { 
                     None
                 }
+            }
+
+            fn divides(&self, other: &Self) -> bool { 
+                self.0.strict_leq(&other.0)
             }
         }
     };

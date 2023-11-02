@@ -14,11 +14,24 @@ use super::univar::fmt_mono;
 // `I` is either `usize` or `isize`.
 
 #[derive(Clone, PartialEq, Eq, Hash, Default, Debug)]
-pub struct BiVar<const X: char, const Y: char, I>(I, I);
+pub struct BiVar<const X: char, const Y: char, I>(
+    pub I, 
+    pub I
+);
 
 impl<const X: char, const Y: char, I> BiVar<X, Y, I> {
-    pub fn new(d0: I, d1: I) -> Self { 
-        Self(d0, d1)
+    pub fn var_symbol(i: usize) -> char { 
+        assert!(i == 0 || i == 1);
+        match i { 
+            0 => X,
+            1 => Y,
+            _ => panic!()
+        }
+    }
+
+    pub fn eval<R>(&self, x: &R, y: &R) -> R
+    where R: Mul<Output = R>, for<'x, 'y> &'x R: Pow<&'y I, Output = R> {
+        x.pow(&self.0) * y.pow(&self.1)
     }
 }
 
@@ -52,17 +65,6 @@ where I: Zero + One {
         
         // TODO support more complex format. 
         Err(())
-    }
-}
-
-impl<const X: char, const Y: char, I> BiVar<X, Y, I>
-where I: Zero + Clone {
-    pub fn deg(&self, i: usize) -> I { 
-        match i { 
-            0 => self.0.clone(),
-            1 => self.1.clone(),
-            _ => panic!()
-        }
     }
 }
 
@@ -198,21 +200,24 @@ macro_rules! impl_bivar_signed {
 impl_bivar_unsigned!(usize);
 impl_bivar_signed!  (isize);
 
-impl<const X: char, const Y: char, I> BiVar<X, Y, I> {
-    pub fn eval<R>(&self, x: &R, y: &R) -> R
-    where R: Mul<Output = R>, for<'x, 'y> &'x R: Pow<&'y I, Output = R> {
-        x.pow(&self.0) * y.pow(&self.1)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
- 
+
+    #[test]
+    fn var_symbol() { 
+        type M = BiVar<'X','Y',usize>;
+        
+        assert_eq!(M::var_symbol(0), 'X');
+        assert_eq!(M::var_symbol(1), 'Y');
+    }
+
     #[test]
     fn init() { 
-        type M = BiVar<'X', 'Y', usize>;
-        let d = M::new(2, 3);
+        type M = BiVar<'X','Y',usize>;
+        let xy = |i, j| M::from((i, j));
+
+        let d = xy(2, 3);
 
         assert_eq!(d.0, 2);
         assert_eq!(d.1, 3);
@@ -220,97 +225,103 @@ mod tests {
 
     #[test]
     fn from_str() { 
-        type M = BiVar<'X', 'Y', usize>;
+        type M = BiVar<'X','Y',usize>;
+        let xy = |i, j| BiVar::<'X','Y',usize>(i, j);
         
         assert_eq!(M::from_str("1"), Ok(M::one()));
-        assert_eq!(M::from_str("X"), Ok(M::new(1, 0)));
-        assert_eq!(M::from_str("Y"), Ok(M::new(0, 1)));
+        assert_eq!(M::from_str("X"), Ok(xy(1, 0)));
+        assert_eq!(M::from_str("Y"), Ok(xy(0, 1)));
         assert_eq!(M::from_str("2"), Err(()));
     }
 
     #[test]
     fn display() { 
-        type M = BiVar<'X', 'Y', usize>;
-        let d = M::new(0, 0);
+        type M = BiVar<'X','Y',usize>;
+        let xy = |i, j| M::from((i, j));
+
+        let d = xy(0, 0);
         assert_eq!(&d.to_string(), "1");
 
-        let d = M::new(1, 0);
+        let d = xy(1, 0);
         assert_eq!(&d.to_string(), "X");
 
-        let d = M::new(2, 0);
+        let d = xy(2, 0);
         assert_eq!(&d.to_string(), "X²");
 
-        let d = M::new(0, 1);
+        let d = xy(0, 1);
         assert_eq!(&d.to_string(), "Y");
 
-        let d = M::new(0, 2);
+        let d = xy(0, 2);
         assert_eq!(&d.to_string(), "Y²");
 
-        let d = M::new(1, 1);
+        let d = xy(1, 1);
         assert_eq!(&d.to_string(), "XY");
 
-        let d = M::new(2, 3);
+        let d = xy(2, 3);
         assert_eq!(&d.to_string(), "X²Y³");
     }
 
     #[test]
     fn neg_opt_unsigned() { 
-        type M = BiVar<'X', 'Y', usize>;
+        type M = BiVar<'X','Y',usize>;
+        let xy = |i, j| M::from((i, j));
 
-        let d = M::new(0, 0);
-        assert_eq!(d.inv(), Some(M::new(0, 0)));
+        let d = xy(0, 0);
+        assert_eq!(d.inv(), Some(xy(0, 0)));
 
-        let d = M::new(1, 0);
+        let d = xy(1, 0);
         assert_eq!(d.inv(), None);
 
-        let d = M::new(0, 1);
+        let d = xy(0, 1);
         assert_eq!(d.inv(), None);
 
-        let d = M::new(1, 1);
+        let d = xy(1, 1);
         assert_eq!(d.inv(), None);
     }
 
     #[test]
     fn neg_opt_signed() { 
-        type M = BiVar<'X', 'Y', isize>;
+        type M = BiVar<'X','Y',isize>;
+        let xy = |i, j| M::from((i, j));
 
-        let d = M::new(0, 0);
-        assert_eq!(d.inv(), Some(M::new(0, 0)));
+        let d = xy(0, 0);
+        assert_eq!(d.inv(), Some(xy(0, 0)));
 
-        let d = M::new(1, 0);
-        assert_eq!(d.inv(), Some(M::new(-1, 0)));
+        let d = xy(1, 0);
+        assert_eq!(d.inv(), Some(xy(-1, 0)));
 
-        let d = M::new(0, 1);
-        assert_eq!(d.inv(), Some(M::new(0, -1)));
+        let d = xy(0, 1);
+        assert_eq!(d.inv(), Some(xy(0, -1)));
 
-        let d = M::new(2, 3);
-        assert_eq!(d.inv(), Some(M::new(-2, -3)));
+        let d = xy(2, 3);
+        assert_eq!(d.inv(), Some(xy(-2, -3)));
     }
 
     #[test]
     fn eval() { 
-        type M = BiVar<'X', 'Y', usize>;
+        type M = BiVar<'X','Y',usize>;
+        let xy = |i, j| M::from((i, j));
 
-        let d = M::new(0, 0);
+        let d = xy(0, 0);
         assert_eq!(d.eval::<i32>(&2, &3), 1);
 
-        let d = M::new(1, 0);
+        let d = xy(1, 0);
         assert_eq!(d.eval::<i32>(&2, &3), 2);
 
-        let d = M::new(0, 1);
+        let d = xy(0, 1);
         assert_eq!(d.eval::<i32>(&2, &3), 3);
 
-        let d = M::new(1, 1);
+        let d = xy(1, 1);
         assert_eq!(d.eval::<i32>(&2, &3), 6);
 
-        let d = M::new(2, 3);
+        let d = xy(2, 3);
         assert_eq!(d.eval::<i32>(&2, &3), 108);
     }
 
     #[test]
     fn ord() { 
-        type M = BiVar<'X', 'Y', usize>;
-        let xy = |i, j| M::new(i, j);
+        type M = BiVar<'X','Y',usize>;
+        let xy = |i, j| M::from((i, j));
 
         assert!(xy(2, 1) < xy(1, 3));
         assert!(xy(1, 2) < xy(2, 1));

@@ -405,7 +405,8 @@ impl Display for CobComp {
 
         let dots = if self.has_dots() { 
             let (p, q) = self.dots;
-            format!("{}.", BiVar::<'X','Y', _>::new(p, q).to_string())
+            let m = BiVar::<'X','Y', _>::from((p, q));
+            format!("{}.", m.to_string())
         } else { 
             String::new()
         };

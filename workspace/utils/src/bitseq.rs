@@ -228,6 +228,13 @@ where Bit: From<T> {
     }
 }
 
+impl<T, const N: usize> From<[T; N]> for BitSeq 
+where Bit: From<T> {
+    fn from(value: [T; N]) -> Self {
+        Self::from_iter(value)
+    }
+}
+
 impl<T> FromIterator<T> for BitSeq
 where Bit: From<T> {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
@@ -301,6 +308,12 @@ mod tests {
         let b = BitSeq::new_rev(0b01101, 5);
         assert_eq!(b.val, 22);
         assert_eq!(b.len, 5);
+    }
+
+    #[test]
+    fn from_arr() { 
+        let b = BitSeq::from([1,0,1,1,0]);
+        assert_eq!(b, BitSeq::new(0b01101, 5));
     }
 
     #[test]

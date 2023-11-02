@@ -1,3 +1,4 @@
+use core::panic;
 use std::fmt::Display;
 use std::ops::{AddAssign, Mul, MulAssign, DivAssign, SubAssign, Div, Add};
 use std::str::FromStr;
@@ -15,8 +16,8 @@ use super::univar::fmt_mono;
 
 #[derive(Clone, PartialEq, Eq, Hash, Default, Debug)]
 pub struct BiVar<const X: char, const Y: char, I>(
-    pub I, 
-    pub I
+    I, 
+    I
 );
 
 impl<const X: char, const Y: char, I> BiVar<X, Y, I> {
@@ -32,6 +33,18 @@ impl<const X: char, const Y: char, I> BiVar<X, Y, I> {
     pub fn eval<R>(&self, x: &R, y: &R) -> R
     where R: Mul<Output = R>, for<'x, 'y> &'x R: Pow<&'y I, Output = R> {
         x.pow(&self.0) * y.pow(&self.1)
+    }
+}
+
+impl<const X: char, const Y: char, I> BiVar<X, Y, I>
+where I: Clone {
+    pub fn deg_for(&self, i: usize) -> I { 
+        assert!(i == 0 || i == 1);
+        match i { 
+            0 => self.0.clone(),
+            1 => self.1.clone(),
+            _ => panic!()
+        }
     }
 }
 

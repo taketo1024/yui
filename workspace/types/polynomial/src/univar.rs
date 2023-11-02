@@ -16,7 +16,7 @@ use crate::Mono;
 
 #[derive(Clone, PartialEq, Eq, Hash, Default, Debug, PartialOrd, Ord)]
 pub struct Univar<const X: char, I>(
-    pub I
+    pub(crate) I
 );
 
 impl<const X: char, I> Univar<X, I> {

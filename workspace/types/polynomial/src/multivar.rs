@@ -13,6 +13,12 @@ pub type MultiVar<const X: char, I> = Univar<X, MultiDeg<I>>;
 // impls for multivar-type.
 macro_rules! impl_multivar {
     ($I:ty) => {
+        impl<const X: char> MultiVar<X, $I> {
+            pub fn deg_for(&self, i: usize) -> $I {
+                self.0.of(i)
+            }
+        }
+
         impl<const X: char> Display for MultiVar<X, $I> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let d = self.deg();
@@ -40,7 +46,8 @@ macro_rules! impl_multivar {
                 if let Some(m) = r.captures(&s) { 
                     let i = usize::from_str(&m[1]).unwrap();
                     let mdeg = MultiDeg::from((i, 1));
-                    return Ok(Univar(mdeg))
+                    let m = MultiVar::from(mdeg);
+                    return Ok(m)
                 }
 
                 // TODO support more complex format. 

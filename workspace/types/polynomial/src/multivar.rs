@@ -29,6 +29,12 @@ macro_rules! impl_multivar {
             }
         }
 
+        impl<const X: char> FromIterator<(usize, $I)> for MultiVar<X, $I> {
+            fn from_iter<T: IntoIterator<Item = (usize, $I)>>(iter: T) -> Self {
+                Self::from(MultiDeg::from_iter(iter))
+            }
+        }
+        
         impl<const X: char> Display for MultiVar<X, $I> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let d = self.deg();
@@ -136,22 +142,51 @@ impl_multivar_signed!  (isize);
 
 #[cfg(test)]
 mod tests { 
-    use num_traits::Zero;
-
     use super::*;
 
-    fn mono<I, Itr>(itr: Itr) -> MultiVar<'X', I> 
-    where I: Zero, Itr: IntoIterator<Item = (usize, I)> {
-        let mdeg = MultiDeg::from_iter(itr);
-        MultiVar::from(mdeg)
+    #[test]
+    fn from_arr() { 
+        type M = MultiVar<'X', usize>;
+
+        let d = M::from([1,0,3]);
+        assert_eq!(d.0, MultiDeg::from_iter([(0, 1), (2, 3)]));
+    }
+
+    #[test]
+    fn from_iter() { 
+        type M = MultiVar<'X', usize>;
+
+        let d = M::from_iter([(0, 1), (2, 3)]);
+        assert_eq!(d.0, MultiDeg::from_iter([(0, 1), (2, 3)]));
+    }
+
+    #[test]
+    fn deg_for() { 
+        type M = MultiVar<'X', usize>;
+
+        let d = M::from([1,0,3]);
+        assert_eq!(d.deg_for(0), 1);
+        assert_eq!(d.deg_for(1), 0);
+        assert_eq!(d.deg_for(2), 3);
+        assert_eq!(d.deg_for(3), 0);
+    }
+
+    #[test]
+    fn total_deg() { 
+        type M = MultiVar<'X', usize>;
+
+        let d = M::from([1,0,3]);
+        assert_eq!(d.total_deg(), 4);
     }
 
     #[test]
     fn is_divisible() { 
-        let one = mono([]);
-        let d1 = mono::<usize, _>([(0, 1), (1, 2), (2, 3)]);
-        let d2 = mono::<usize, _>([        (1, 2), (2, 1)]);
-        let d3 = mono::<usize, _>([(0, 1), (1, 3)        ]);
+        type M = MultiVar<'X', usize>;
+
+        let one = M::from([]);
+        let d1 = M::from([1,2,3]);
+        let d2 = M::from([0,2,1]);
+        let d3 = M::from([1,3,0]);
 
         assert!(one.divides(&d1));
         assert!(d1.divides(&d1));
@@ -163,21 +198,25 @@ mod tests {
 
     #[test]
     fn div() { 
-        let one = mono([]);
-        let d1 = mono::<usize, _>([(0, 1), (1, 2), (2, 3)]);
-        let d2 = mono::<usize, _>([        (1, 2), (2, 1)]);
+        type M = MultiVar<'X', usize>;
+
+        let one = M::from([]);
+        let d1 = M::from([1,2,3]);
+        let d2 = M::from([0,2,1]);
 
         assert_eq!(&d1 / &one, d1);
-        assert_eq!(&d1 / &d1, mono([]));
-        assert_eq!(&d1 / &d2, mono([(0, 1), (2, 2)]));
+        assert_eq!(&d1 / &d1, M::from([]));
+        assert_eq!(&d1 / &d2, M::from([1,0,2]));
     }
 
     #[test]
     fn is_divisible_isize() { 
-        let one = mono([]);
-        let d1 = mono::<isize, _>([(0, 1), (1, 2), (2, 3)]);
-        let d2 = mono::<isize, _>([        (1, 2), (2, 1)]);
-        let d3 = mono::<isize, _>([(0, 1), (1, 3)        ]);
+        type M = MultiVar<'X', isize>;
+
+        let one = M::from([]);
+        let d1 = M::from([1,2,3]);
+        let d2 = M::from([0,2,1]);
+        let d3 = M::from([1,3]);
 
         assert!(one.divides(&d1));
         assert!(d1.divides(&d1));
@@ -189,13 +228,15 @@ mod tests {
 
     #[test]
     fn div_isize() { 
-        let one = mono::<isize, _>([]);
-        let d1 = mono::<isize, _>([(0, 1), (1, 2), (2, 3)]);
-        let d2 = mono::<isize, _>([        (1, 2), (2, 1)]);
+        type M = MultiVar<'X', isize>;
+
+        let one = M::from([]);
+        let d1 = M::from([1,2,3]);
+        let d2 = M::from([0,2,1]);
 
         assert_eq!(&d1 / &one, d1);
         assert_eq!(&one / &d1, d1.inv().unwrap());
-        assert_eq!(&d1 / &d2, mono([(0, 1), (2, 2)]));
-        assert_eq!(&d2 / &d1, mono([(0, -1), (2, -2)]));
+        assert_eq!(&d1 / &d2, M::from([1,0,2]));
+        assert_eq!(&d2 / &d1, M::from([-1,0,-2]));
     }
 }

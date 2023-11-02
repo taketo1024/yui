@@ -15,7 +15,7 @@ macro_rules! impl_multivar {
     ($I:ty) => {
         impl<const X: char> MultiVar<X, $I> {
             pub fn deg_for(&self, i: usize) -> $I {
-                self.0.of(i)
+                self.0[i]
             }
         }
 

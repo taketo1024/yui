@@ -1,19 +1,23 @@
 use std::collections::{BTreeMap, HashSet};
-use std::ops::{Add, AddAssign, Neg, SubAssign, Sub};
+use std::ops::{Add, AddAssign, Neg, SubAssign, Sub, Index};
 
 use auto_impl_ops::auto_ops;
 use itertools::Itertools;
 use num_traits::Zero;
 
 #[derive(Clone, Default, PartialEq, Eq, Debug, Hash)]
-pub struct MultiDeg<I>(BTreeMap<usize, I>) // x_0^{d_0} ... x_n^{d_n} <--> [ 0 => d_0, ..., n => d_n ]
-where I: Zero;
+pub struct MultiDeg<I>
+where I: Zero { 
+    data: BTreeMap<usize, I>, // x_0^{d_0} ... x_n^{d_n} <--> [ 0 => d_0, ..., n => d_n ]
+    _zero: I
+}
 
 impl<I> MultiDeg<I>
 where I: Zero {
-    pub fn new(mut map: BTreeMap<usize, I>) -> Self { 
-        map.retain(|_, d| !d.is_zero());
-        Self(map)
+    fn from_raw(data: BTreeMap<usize, I>) -> Self { 
+        let mut data = data;
+        data.retain(|_, d| !d.is_zero());
+        Self { data, _zero: I::zero() }
     }
 
     pub fn from_vec(degree: Vec<I>) -> Self { 
@@ -23,35 +27,42 @@ where I: Zero {
     }
     
     pub fn len(&self) -> usize { 
-        self.0.len()
+        self.data.len()
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&usize, &I)> { 
-        self.0.iter()
+        self.data.iter()
     }
 
     pub fn max_index(&self) -> Option<usize> { 
-        self.0.keys().max().cloned()
+        self.data.keys().max().cloned()
     }
 
     pub fn min_index(&self) -> Option<usize> { 
-        self.0.keys().min().cloned()
+        self.data.keys().min().cloned()
     }
 }
 
 impl<I> MultiDeg<I>
 where I: Clone + Zero + Ord { 
     pub fn all_leq(&self, other: &Self) -> bool {
-        let i0 = HashSet::<&usize>::from_iter( self.0.keys());
-        let i1 = HashSet::<&usize>::from_iter(other.0.keys());
+        let i0 = HashSet::<&usize>::from_iter( self.data.keys());
+        let i1 = HashSet::<&usize>::from_iter(other.data.keys());
 
         i0.union(&i1).all(|&&i|
-            self.of(i) <= other.of(i)
+            self[i] <= other[i]
         )
     }
 
     pub fn all_geq(&self, other: &Self) -> bool {
         other.all_leq(self)
+    }
+}
+
+impl<I> MultiDeg<I>
+where for<'x> I: Zero + Add<&'x I, Output = I> {
+    pub fn total(&self) -> I { 
+        self.iter().map(|(_, d)| d).fold(I::zero(), |res, d| res + d)
     }
 }
 
@@ -65,32 +76,27 @@ where I: Zero {
 impl<I> FromIterator<(usize, I)> for MultiDeg<I> 
 where I: Zero {
     fn from_iter<T: IntoIterator<Item = (usize, I)>>(iter: T) -> Self {
-        Self::new(iter.into_iter().collect())
+        Self::from_raw(iter.into_iter().collect())
     }
 }
 
-impl<I> MultiDeg<I>
+impl<I> Index<usize> for MultiDeg<I>
 where I: Zero + Clone {
-    pub fn of(&self, index: usize) -> I {
-        self.0.get(&index).cloned().unwrap_or(I::zero())
-    }
-}
+    type Output = I;
 
-impl<I> MultiDeg<I>
-where for<'x> I: Zero + Add<&'x I, Output = I> {
-    pub fn total(&self) -> I { 
-        self.iter().map(|(_, d)| d).fold(I::zero(), |res, d| res + d)
+    fn index(&self, i: usize) -> &Self::Output {
+        self.data.get(&i).unwrap_or(&self._zero)
     }
 }
 
 impl<I> Zero for MultiDeg<I>
 where for<'x> I: Clone + AddAssign<&'x I> + Zero {
     fn zero() -> Self {
-        Self(BTreeMap::new())
+        Self::from_raw(BTreeMap::new())
     }
 
     fn is_zero(&self) -> bool {
-        self.0.is_empty()
+        self.data.is_empty()
     }
 }
 
@@ -98,8 +104,8 @@ where for<'x> I: Clone + AddAssign<&'x I> + Zero {
 impl<I> AddAssign<&MultiDeg<I>> for MultiDeg<I>
 where for<'x> I: AddAssign<&'x I> + Zero + Clone {
     fn add_assign(&mut self, rhs: &MultiDeg<I>) {
-        let data = &mut self.0;
-        for (i, d) in rhs.0.iter() { 
+        let data = &mut self.data;
+        for (i, d) in rhs.data.iter() { 
             if let Some(d_i) = data.get_mut(i) { 
                 d_i.add_assign(d);
             } else { 
@@ -114,8 +120,8 @@ where for<'x> I: AddAssign<&'x I> + Zero + Clone {
 impl<I> SubAssign<&MultiDeg<I>> for MultiDeg<I>
 where for<'x> I: SubAssign<&'x I> + Zero + Clone {
     fn sub_assign(&mut self, rhs: &MultiDeg<I>) {
-        let data = &mut self.0;
-        for (i, d) in rhs.0.iter() { 
+        let data = &mut self.data;
+        for (i, d) in rhs.data.iter() { 
             if !data.contains_key(i) {
                 data.insert(i.clone(), I::zero());
             }
@@ -130,10 +136,10 @@ impl<I> Neg for &MultiDeg<I>
 where I: Zero, for<'x> &'x I: Neg<Output = I> {
     type Output = MultiDeg<I>;
     fn neg(self) -> Self::Output {
-        let list = self.0.iter().map(|(&i, d)| 
+        let list = self.data.iter().map(|(&i, d)| 
             (i, -d)
         ).collect();
-        MultiDeg(list)
+        MultiDeg::from_raw(list)
     }
 }
 
@@ -154,12 +160,12 @@ where I: Clone + Zero + Ord + for<'x> Add<&'x I, Output = I> {
 
         Ord::cmp(&self.total(), &other.total())
         .then_with(|| { 
-            let i0 = HashSet::<&usize>::from_iter(self.0.keys());
-            let i1 = HashSet::<&usize>::from_iter(other.0.keys());
+            let i0 = HashSet::<&usize>::from_iter(self.data.keys());
+            let i1 = HashSet::<&usize>::from_iter(other.data.keys());
             let indices = i0.union(&i1).sorted();
             
             for &&i in indices { 
-                let c = Ord::cmp(&self.of(i), &other.of(i));
+                let c = Ord::cmp(&self[i], &other[i]);
                 if !c.is_eq() { 
                     return c
                 }
@@ -177,8 +183,8 @@ mod tests {
     #[test]
     fn deg() {
         let mdeg = MultiDeg::from_iter([(0, 1), (1, -2), (2, 3), (3, 0)]);
-        assert_eq!(mdeg.of(1), -2);
-        assert_eq!(mdeg.of(4), 0);
+        assert_eq!(mdeg[1], -2);
+        assert_eq!(mdeg[4], 0);
     }
 
     #[test]

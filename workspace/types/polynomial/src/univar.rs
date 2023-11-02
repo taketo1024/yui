@@ -2,7 +2,7 @@ use std::fmt::{Display, Debug};
 use std::hash::Hash;
 use std::ops::{AddAssign, Mul, MulAssign, DivAssign, SubAssign, Div};
 use std::str::FromStr;
-use num_traits::{Zero, One, ToPrimitive};
+use num_traits::{Zero, One, ToPrimitive, Pow};
 use auto_impl_ops::auto_ops;
 
 use yui_core::Elem;
@@ -15,7 +15,15 @@ use crate::Mono;
 // `I` is one of `usize`, `isize`, `MultiDeg<usize>`, `MultiDeg<isize>`.
 
 #[derive(Clone, PartialEq, Eq, Hash, Default, Debug, PartialOrd, Ord)]
-pub struct Univar<const X: char, I>(pub(crate) I);
+pub struct Univar<const X: char, I>(
+    pub I
+);
+
+impl<const X: char, I> Univar<X, I> {
+    pub fn var_symbol() -> char { 
+        X
+    }
+}
 
 impl<const X: char, I> From<I> for Univar<X, I> {
     fn from(d: I) -> Self {
@@ -48,6 +56,13 @@ where I: for<'x >SubAssign<&'x I> {
 
 macro_rules! impl_univar {
     ($I:ty) => {
+        impl<const X: char> Univar<X, $I> {
+            pub fn eval<R>(&self, x: &R) -> R
+            where R: Mul<Output = R>, for<'x, 'y> &'x R: Pow<&'y $I, Output = R> {
+                x.pow(&self.0)
+            }
+        }
+        
         impl<const X: char> Display for Univar<X, $I> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let x = X.to_string();
@@ -151,5 +166,105 @@ where I: ToPrimitive {
     } else {
         let e = superscript(d); 
         format!("{x}{e}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn init() { 
+        type M = Univar<'X',usize>;
+        let x = |i| M::from(i);
+
+        let d = x(2);
+
+        assert_eq!(d.0, 2);
+        assert_eq!(d.deg(), 2);
+        assert_eq!(M::var_symbol(), 'X');
+    }
+
+    #[test]
+    fn from_str() { 
+        type M = Univar<'X',usize>;
+        let x = |i| M::from(i);
+        
+        assert_eq!(M::from_str("1"), Ok(M::one()));
+        assert_eq!(M::from_str("X"), Ok(x(1)));
+        assert_eq!(M::from_str("2"), Err(()));
+    }
+
+    #[test]
+    fn display() { 
+        type M = Univar<'X', isize>;
+        let x = |i| M::from(i);
+
+        let d = x(0);
+        assert_eq!(&d.to_string(), "1");
+
+        let d = x(1);
+        assert_eq!(&d.to_string(), "X");
+
+        let d = x(2);
+        assert_eq!(&d.to_string(), "X²");
+
+        let d = x(-1);
+        assert_eq!(&d.to_string(), "X⁻¹");
+
+        let d = x(-2);
+        assert_eq!(&d.to_string(), "X⁻²");
+    }
+
+    #[test]
+    fn neg_opt_unsigned() { 
+        type M = Univar<'X',usize>;
+        let x = |i| M::from(i);
+
+        let d = x(0);
+        assert_eq!(d.inv(), Some(x(0)));
+
+        let d = x(1);
+        assert_eq!(d.inv(), None);
+    }
+
+    #[test]
+    fn neg_opt_signed() { 
+        type M = Univar<'X',isize>;
+        let x = |i| M::from(i);
+
+        let d = x(0);
+        assert_eq!(d.inv(), Some(x(0)));
+
+        let d = x(1);
+        assert_eq!(d.inv(), Some(x(-1)));
+
+        let d = x(-3);
+        assert_eq!(d.inv(), Some(x(3)));
+    }
+
+    #[test]
+    fn eval() { 
+        type M = Univar<'X', usize>;
+        let x = |i| M::from(i);
+
+        let d = x(0);
+        assert_eq!(d.eval(&2), 1);
+
+        let d = x(1);
+        assert_eq!(d.eval(&2), 2);
+
+        let d = x(2);
+        assert_eq!(d.eval(&2), 4);
+    }
+
+    #[test]
+    fn ord() { 
+        type M = Univar<'X', isize>;
+        let x = |i| M::from(i);
+
+        assert!(x(0) < x(1));
+        assert!(x(1) < x(2));
+        assert!(x(-1) < x(0));
     }
 }

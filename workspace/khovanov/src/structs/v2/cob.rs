@@ -1192,7 +1192,7 @@ mod tests {
     fn eval() { 
         type R = Poly2<'H', 'T', i32>;
         
-        let ht = |i, j| R::mono((i, j));
+        let ht = |i, j| R::mono(i, j);
         let h = R::variable(0);
         let t = R::variable(1);
 

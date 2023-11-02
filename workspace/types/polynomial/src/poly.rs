@@ -61,10 +61,6 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
         Self::from((X::one(), r))
     }
 
-    pub fn mono(deg: X::Deg) -> X {
-        X::from(deg)
-    }
-
     pub fn inner(&self) -> &LinComb<X, R> { 
         &self.data
     }
@@ -141,21 +137,25 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-macro_rules! impl_var_univar {
+macro_rules! impl_univar {
     ($I:ty) => {
         impl<const X: char, R> PolyBase<Univar<X, $I>, R>
         where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn variable() -> Self { 
                 Self::from(Self::mono(1))
             }
+
+            pub fn mono(i: $I) -> Univar<X, $I> {
+                Univar::from(i)
+            }
         }
     };
 }
 
-impl_var_univar!(usize);
-impl_var_univar!(isize);
+impl_univar!(usize);
+impl_univar!(isize);
 
-macro_rules! impl_var_bivar {
+macro_rules! impl_bivar {
     ($I:ty) => {
         impl<const X: char, const Y: char, R> PolyBase<BiVar<X, Y, $I>, R>
         where R: Ring, for<'x> &'x R: RingOps<R> {
@@ -164,14 +164,18 @@ macro_rules! impl_var_bivar {
                 let d = if i == 0 { (1, 0) } else { (0, 1) };
                 Self::from(BiVar::from(d))
             }
+
+            pub fn mono(i: $I, j: $I) -> BiVar<X, Y, $I> {
+                BiVar::from((i, j))
+            }
         }
     };
 }
 
-impl_var_bivar!(usize);
-impl_var_bivar!(isize);
+impl_bivar!(usize);
+impl_bivar!(isize);
 
-macro_rules! impl_var_mvar {
+macro_rules! impl_mvar {
     ($I:ty) => {
         impl<const X: char, R> PolyBase<MultiVar<X, $I>, R>
         where R: Ring, for<'x> &'x R: RingOps<R> {
@@ -179,12 +183,16 @@ macro_rules! impl_var_mvar {
                 let d = MultiDeg::from((i, 1));
                 Self::from(Univar::from(d)) // x^1
             }
+
+            pub fn mono<const N: usize>(degs: [$I; N]) -> MultiVar<X, $I> {
+                MultiVar::from(degs)
+            }
         }
     };
 }
 
-impl_var_mvar!(usize);
-impl_var_mvar!(isize);
+impl_mvar!(usize);
+impl_mvar!(isize);
 
 macro_rules! impl_polyn_funcs {
     ($I:ty) => {
@@ -602,7 +610,7 @@ mod tests {
     fn init_poly2() { 
         type P = Poly2::<'x', 'y', i32>; 
 
-        let xy = |i, j| P::mono((i, j));
+        let xy = |i, j| P::mono(i, j);
         let f = P::from_iter([(xy(0, 0), 3), (xy(1, 0), 2), (xy(2, 3), 3)]);
         assert_eq!(&f.to_string(), "3x²y³ + 2x + 3");
     }
@@ -611,11 +619,11 @@ mod tests {
     fn init_mpoly() { 
         type P = PolyN::<'x', i32>; 
 
-        let xn = |i| P::mono(MultiDeg::from_vec(i));
+        let xn = |i| P::mono(i);
         let f = P::from_iter([
-            (xn(vec![]),        3),
-            (xn(vec![1]),      -1),
-            (xn(vec![3, 0, 2]), 2),
+            (xn([0,0,0]),  3),
+            (xn([1,0,0]), -1),
+            (xn([3,0,2]),  2),
         ]);
         assert_eq!(&f.to_string(), "2x₀³x₂² - x₀ + 3");
     }
@@ -624,11 +632,11 @@ mod tests {
     fn init_mlpoly() { 
         type P = LPolyN::<'x', i32>; 
 
-        let xn = |i| P::mono(MultiDeg::from_vec(i));
+        let xn = |i| P::mono(i);
         let f = P::from_iter([
-            (xn(vec![]),         3),
-            (xn(vec![1]),        1),
-            (xn(vec![-3, 1, 3]), 2),
+            (xn([ 0,0,0]), 3),
+            (xn([ 1,0,0]), 1),
+            (xn([-3,1,3]), 2),
         ]);
         assert_eq!(&f.to_string(), "x₀ + 2x₀⁻³x₁x₂³ + 3");
     }
@@ -688,7 +696,7 @@ mod tests {
     fn variable_bivar() {
         type P = Poly2::<'x', 'y', i32>;
 
-        let xy = |i, j| P::mono((i, j));
+        let xy = |i, j| P::mono(i, j);
         let p = P::variable(0);
         let q = P::variable(1);
         assert_eq!(p, P::from_iter([(xy(1, 0), 1)]));
@@ -699,11 +707,11 @@ mod tests {
     fn variable_mvar() {
         type P = PolyN::<'x', i32>;
 
-        let xn = |i| P::mono(MultiDeg::from_vec(i));
+        let xn = |i| P::mono(i);
         let p = P::variable(0);
         let q = P::variable(1);
-        assert_eq!(p, P::from_iter([(xn(vec![1, 0]), 1)]));
-        assert_eq!(q, P::from_iter([(xn(vec![0, 1]), 1)]));
+        assert_eq!(p, P::from_iter([(xn([1, 0]), 1)]));
+        assert_eq!(q, P::from_iter([(xn([0, 1]), 1)]));
     }
 
     #[test]
@@ -978,7 +986,7 @@ mod tests {
     fn eval_bivar() { 
         type P = Poly2::<'x', 'y', i32>;
 
-        let xy = |i, j| P::mono((i, j));
+        let xy = |i, j| P::mono(i, j);
         let p = P::from_iter([(xy(0,0),3), (xy(1,0),2), (xy(0,1),-1), (xy(1,1),4)]);
         let v = p.eval(&2, &3); // 3 + 2(2) - 1(3) + 4(2*3)
         assert_eq!(v, 28);
@@ -988,17 +996,17 @@ mod tests {
     fn lead_term_for() {
         type P = PolyN::<'x', i32>;
 
-        let xn = |i| P::mono(MultiDeg::from_vec(i));
+        let xn = |i| P::mono(i);
         let f = P::from_iter([
-            (xn(vec![1,2,3]), 1),
-            (xn(vec![2,1,3]), 2),
-            (xn(vec![0,2,4]), 3),
-            (xn(vec![5,5,5]), 0), // should be ignored
+            (xn([1,2,3]), 1),
+            (xn([2,1,3]), 2),
+            (xn([0,2,4]), 3),
+            (xn([5,5,5]), 0), // should be ignored
         ]);
-        assert_eq!(f.lead_term(),      (&xn(vec![2,1,3]), &2));
-        assert_eq!(f.lead_term_for(0), (&xn(vec![2,1,3]), &2));
-        assert_eq!(f.lead_term_for(1), (&xn(vec![1,2,3]), &1));
-        assert_eq!(f.lead_term_for(2), (&xn(vec![0,2,4]), &3));
+        assert_eq!(f.lead_term(),      (&xn([2,1,3]), &2));
+        assert_eq!(f.lead_term_for(0), (&xn([2,1,3]), &2));
+        assert_eq!(f.lead_term_for(1), (&xn([1,2,3]), &1));
+        assert_eq!(f.lead_term_for(2), (&xn([0,2,4]), &3));
         assert_eq!(f.lead_term_for(3), f.lead_term());
     }
 }

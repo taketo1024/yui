@@ -19,6 +19,12 @@ macro_rules! impl_multivar {
             }
         }
 
+        impl<const X: char, const N: usize> From<[$I; N]> for MultiVar<X, $I> {
+            fn from(degs: [$I; N]) -> Self {
+                Self::from(MultiDeg::from(degs))
+            }
+        }
+
         impl<const X: char> Display for MultiVar<X, $I> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let d = self.deg();

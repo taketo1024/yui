@@ -20,12 +20,6 @@ where I: Zero {
         Self { data, _zero: I::zero() }
     }
 
-    pub fn from_vec(degree: Vec<I>) -> Self { 
-        Self::from_iter(
-            degree.into_iter().enumerate()
-        )
-    }
-    
     pub fn len(&self) -> usize { 
         self.data.len()
     }
@@ -70,6 +64,13 @@ impl<I> From<(usize, I)> for MultiDeg<I>
 where I: Zero {
     fn from(value: (usize, I)) -> Self {
         MultiDeg::from_iter([value])
+    }
+}
+
+impl<I, const N: usize> From<[I; N]> for MultiDeg<I> 
+where I: Zero {
+    fn from(degrees: [I; N]) -> Self {
+        Self::from_iter(degrees.into_iter().enumerate())
     }
 }
 

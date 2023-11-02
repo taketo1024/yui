@@ -22,7 +22,7 @@ pub struct BiVar<const X: char, const Y: char, I>(
 
 impl<const X: char, const Y: char, I> BiVar<X, Y, I> {
     pub fn var_symbol(i: usize) -> char { 
-        assert!(i == 0 || i == 1);
+        assert!(i < 2);
         match i { 
             0 => X,
             1 => Y,
@@ -39,7 +39,7 @@ impl<const X: char, const Y: char, I> BiVar<X, Y, I> {
 impl<const X: char, const Y: char, I> BiVar<X, Y, I>
 where I: Clone {
     pub fn deg_for(&self, i: usize) -> I { 
-        assert!(i == 0 || i == 1);
+        assert!(i < 2);
         match i { 
             0 => self.0.clone(),
             1 => self.1.clone(),

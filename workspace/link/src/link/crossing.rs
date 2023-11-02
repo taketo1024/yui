@@ -1,10 +1,10 @@
 use std::fmt::Display;
 use derive_more::Display;
+use yui_utils::bitseq::Bit;
+
 use crate::LinkComp;
+use super::Edge;
 
-use super::{Edge, Resolution};
-
-use Resolution::{Res0, Res1};
 use CrossingType::{X, Xm, V, H};
 
 #[derive(Debug, Clone, Copy, PartialEq, Display)]
@@ -57,15 +57,17 @@ impl Crossing {
         }
     }
 
-    pub fn resolve(&mut self, r: Resolution) {
+    pub fn resolve(&mut self, r: Bit) {
+        use Bit::{Bit0, Bit1};
+
         match (self.ctype, r) {
-            (X, Res0) | (Xm, Res1) => self.ctype = H,
-            (X, Res1) | (Xm, Res0) => self.ctype = V,
+            (X, Bit0) | (Xm, Bit1) => self.ctype = H,
+            (X, Bit1) | (Xm, Bit0) => self.ctype = V,
             _ => panic!()
         }
     }
 
-    pub fn resolved(&self, r: Resolution) -> Self { 
+    pub fn resolved(&self, r: Bit) -> Self { 
         let mut x = self.clone();
         x.resolve(r);
         x
@@ -132,27 +134,29 @@ mod tests {
 
     #[test]
     fn crossing_resolve() {
+        use Bit::{Bit0, Bit1};
+
         let mut c = a_crossing(X);
         
-        c.resolve(Res0);
+        c.resolve(Bit0);
         assert!(c.is_resolved());
         assert_eq!(c.ctype(), H);
 
         let mut c = a_crossing(X);
         
-        c.resolve(Res1);
+        c.resolve(Bit1);
         assert!(c.is_resolved());
         assert_eq!(c.ctype(), V);
 
         let mut c = a_crossing(Xm);
         
-        c.resolve(Res0);
+        c.resolve(Bit0);
         assert!(c.is_resolved());
         assert_eq!(c.ctype(), V);
 
         let mut c = a_crossing(Xm);
         
-        c.resolve(Res1);
+        c.resolve(Bit1);
         assert!(c.is_resolved());
         assert_eq!(c.ctype(), H);
     }

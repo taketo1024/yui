@@ -10,8 +10,9 @@ use num_traits::Zero;
 use cartesian::cartesian;
 use yui_core::{Elem, Ring, RingOps};
 use yui_lin_comb::{Gen, OrdForDisplay, LinComb};
-use yui_link::{Edge, Crossing, Resolution};
+use yui_link::{Edge, Crossing};
 use yui_polynomial::BiVar;
+use yui_utils::bitseq::Bit;
 use super::tng::{Tng, TngComp};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Display)]
@@ -377,8 +378,10 @@ impl CobComp {
 
 impl From<&Crossing> for CobComp {
     fn from(x: &Crossing) -> Self {
-        let src = Tng::from_x(x, Resolution::Res0);
-        let tgt = Tng::from_x(x, Resolution::Res1);
+        use Bit::{Bit0, Bit1};
+
+        let src = Tng::from_x(x, Bit0);
+        let tgt = Tng::from_x(x, Bit1);
         Self::plain(src, tgt)
     }
 }

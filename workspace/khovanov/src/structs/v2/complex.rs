@@ -7,7 +7,8 @@ use num_traits::Zero;
 use cartesian::cartesian;
 use yui_core::{Ring, RingOps};
 use yui_homology::XChainComplex;
-use yui_link::{Crossing, Resolution, Edge};
+use yui_link::{Crossing, Edge};
+use yui_utils::bitseq::Bit;
 
 use crate::{KhAlgGen, KhEnhState};
 use super::cob::{Cob, Dot, Bottom, CobComp};
@@ -192,7 +193,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn make_cone(v: TngVertex<R>, c0: &Cob, c1: &Cob, sdl: &CobComp) -> [TngVertex<R>; 2] {
-        use Resolution::{Res0, Res1};
+        use Bit::{Bit0, Bit1};
 
         let mut v0 = v.clone();
         let mut v1 = v;
@@ -200,14 +201,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let mut c = Cob::id(&v0.tng);
         c.connect_comp(sdl.clone());
         
-        Self::extend_by(&mut v0, c0, Res0);
-        Self::extend_by(&mut v1, c1, Res1);
+        Self::extend_by(&mut v0, c0, Bit0);
+        Self::extend_by(&mut v1, c1, Bit1);
         Self::insert_sdl(&mut v0, &mut v1, c);
 
         [v0, v1]
     }
 
-    fn extend_by(v: &mut TngVertex<R>, c: &Cob, r: Resolution) {
+    fn extend_by(v: &mut TngVertex<R>, c: &Cob, r: Bit) {
         v.key.state.push(r);
         v.tng.connect(c.src());
 
@@ -585,7 +586,7 @@ mod tests {
     #[test]
     fn single_x_resolved() { 
         let mut c = TngComplex::new(&0, &0, (0, 0));
-        let x = Crossing::from_pd_code([0,1,2,3]).resolved(Resolution::Res0);
+        let x = Crossing::from_pd_code([0,1,2,3]).resolved(Bit::Bit0);
         c.append(&x);
 
         assert_eq!(c.len(), 1);

@@ -3,7 +3,7 @@ use std::ops::RangeInclusive;
 use itertools::Itertools;
 use yui_core::{Ring, RingOps, PowMod2, Sign, GetSign};
 use yui_homology::XChainComplex;
-use yui_link::{Link, State, LinkComp, Resolution, Edge};
+use yui_link::{Link, State, LinkComp, Edge};
 
 use crate::{KhAlgStr, KhLabel, KhEnhState};
 
@@ -85,13 +85,12 @@ impl KhCubeEdge {
     }
 
     fn sign_between(from: &State, to: &State) -> Sign { 
-        use Resolution::Res1;
         debug_assert_eq!(from.len(), to.len());
         debug_assert_eq!(from.weight() + 1, to.weight());
 
         let n = from.len();
         let i = (0..n).find(|&i| from[i] != to[i]).unwrap();
-        let k = (0..i).filter(|&j| from[j] == Res1).count() as u32;
+        let k = (0..i).filter(|&j| from[j].is_one()).count() as u32;
 
         (-1).pow_mod2(k).sign()
     }
@@ -118,7 +117,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }).collect();
 
         let edges: HashMap<_, _> = vertices.keys().map(|s| { 
-            let edges = s.targets().into_iter().map(|t| { 
+            let edges = Self::targets(s).into_iter().map(|t| { 
                 let v = &vertices[s];
                 let w = &vertices[&t];
                 (t, KhCubeEdge::edge_between(v, w))
@@ -129,6 +128,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let base_pt = l.first_edge();
 
         KhCube { str, dim: n, vertices, edges, base_pt }
+    }
+
+    fn targets(from: &State) -> Vec<State> { 
+        let n = from.len();
+        (0..n).filter(|&i| from[i].is_zero() ).map(|i| { 
+            from.edit(|b| b.set_1(i))
+        }).collect()
     }
 
     pub fn structure(&self) -> &KhAlgStr<R> {
@@ -275,7 +281,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests { 
-    use yui_link::Resolution;
+    use yui_utils::bitseq::Bit;
     use super::*;
     
     #[test]
@@ -302,7 +308,7 @@ mod tests {
 
     #[test]
     fn unlink_2() {
-        let l = Link::from_pd_code([[0, 0, 1, 1]]).resolved_at(0, Resolution::Res0);
+        let l = Link::from_pd_code([[0, 0, 1, 1]]).resolved_at(0, Bit::Bit0);
         let s = State::empty();
         let v = KhCubeVertex::new(&l, s.clone());
 

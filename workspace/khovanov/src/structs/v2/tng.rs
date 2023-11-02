@@ -1,7 +1,8 @@
 use std::collections::HashSet;
 use std::fmt::Display;
 use itertools::Itertools;
-use yui_link::{Edge, Crossing, Resolution, LinkComp};
+use yui_link::{Edge, Crossing, LinkComp};
+use yui_utils::bitseq::Bit;
 
 #[derive(Clone, Copy, Eq, Hash, PartialOrd, Ord, Debug)]
 pub enum TngComp { 
@@ -132,7 +133,7 @@ impl Tng {
         tng
     }
 
-    pub fn from_x(x: &Crossing, r: Resolution) -> Self { 
+    pub fn from_x(x: &Crossing, r: Bit) -> Self { 
         assert!(!x.is_resolved());
         Self::from_a(&x.resolved(r))
     }

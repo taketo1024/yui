@@ -1,10 +1,12 @@
 use std::collections::HashSet;
 use itertools::Itertools;
 use yui_core::Sign;
+use yui_utils::bitseq::Bit;
 
-use super::{Crossing, CrossingType, Resolution, LinkComp, State};
+use super::{Crossing, CrossingType, LinkComp};
 
 pub type Edge = u8;
+pub type State = yui_utils::bitseq::BitSeq;
 
 // Planer Diagram code, represented by crossings:
 //
@@ -185,7 +187,7 @@ impl Link {
         &mut self.data[j]
     }
 
-    pub fn resolved_at(&self, i: usize, r: Resolution) -> Self {
+    pub fn resolved_at(&self, i: usize, r: Bit) -> Self {
         debug_assert!(i < self.crossing_num());
 
         let mut l = self.clone();
@@ -283,7 +285,7 @@ impl Link {
     }
 
     pub fn unknot() -> Link { 
-        Link::from_pd_code([[0, 1, 1, 0]]).resolved_at(0, Resolution::Res0)
+        Link::from_pd_code([[0, 1, 1, 0]]).resolved_at(0, Bit::Bit0)
     }
 
     pub fn trefoil() -> Link { 
@@ -398,7 +400,7 @@ mod tests {
         assert_eq!(l.crossing_signs(), vec![Sign::Neg]);
 
         let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code).resolved_at(0, Resolution::Res0);
+        let l = Link::from_pd_code(pd_code).resolved_at(0, Bit::Bit0);
         assert_eq!(l.crossing_signs(), vec![]);
     }
 
@@ -413,7 +415,7 @@ mod tests {
         assert_eq!(l.writhe(), -1);
 
         let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code).resolved_at(0, Resolution::Res0);
+        let l = Link::from_pd_code(pd_code).resolved_at(0, Bit::Bit0);
         assert_eq!(l.writhe(), 0);
 
     }

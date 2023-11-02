@@ -30,7 +30,7 @@ pub fn jones_polynomial(l: &Link) -> LPoly<'q', i32> {
 mod tests { 
     use super::*;
     use num_traits::One;
-    use crate::link::Resolution;
+    use yui_utils::bitseq::Bit;
 
     type P = LPoly<'q', i32>;
 
@@ -51,7 +51,7 @@ mod tests {
 
     #[test]
     fn unlink_2() {
-        let l = Link::from_pd_code([[0, 1, 1, 0]]).resolved_at(0, Resolution::Res1);
+        let l = Link::from_pd_code([[0, 1, 1, 0]]).resolved_at(0, Bit::Bit1);
         let p = jones_polynomial(&l);
         let q = P::mono;
         assert_eq!(p, P::from_iter([(q(-2), 1), (q(0), 2), (q(2), 1)]));

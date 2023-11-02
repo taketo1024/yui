@@ -50,7 +50,7 @@ where I: Clone {
 
 impl<const X: char, const Y: char, I> BiVar<X, Y, I>
 where for<'x> &'x I: Add<&'x I, Output = I> {
-    pub fn total(&self) -> I { 
+    pub fn total_deg(&self) -> I { 
         &self.0 + &self.1
     }
 }
@@ -118,7 +118,7 @@ where I: Eq + Ord, for<'x> &'x I: Add<&'x I, Output = I> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         use std::cmp::*;
 
-        Ord::cmp(&self.total(), &other.total())
+        Ord::cmp(&self.total_deg(), &other.total_deg())
         .then_with(|| 
             Ord::cmp(&self.0, &other.0)
         ).then_with(|| 

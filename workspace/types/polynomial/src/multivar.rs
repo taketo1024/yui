@@ -17,6 +17,10 @@ macro_rules! impl_multivar {
             pub fn deg_for(&self, i: usize) -> $I {
                 self.0[i]
             }
+
+            pub fn total_deg(&self) -> $I {
+                self.0.total()
+            }
         }
 
         impl<const X: char, const N: usize> From<[$I; N]> for MultiVar<X, $I> {

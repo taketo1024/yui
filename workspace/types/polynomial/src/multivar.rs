@@ -23,6 +23,12 @@ macro_rules! impl_multivar {
             }
         }
 
+        impl<const X: char> From<(usize, $I)> for MultiVar<X, $I> {
+            fn from(value: (usize, $I)) -> Self {
+                Self::from_iter([value])
+            }
+        }
+        
         impl<const X: char, const N: usize> From<[$I; N]> for MultiVar<X, $I> {
             fn from(degs: [$I; N]) -> Self {
                 Self::from(MultiDeg::from(degs))
@@ -145,10 +151,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn from_pair() { 
+        type M = MultiVar<'X', usize>;
+
+        let d = M::from((2, 3)); // X₂³
+        assert_eq!(d.0, MultiDeg::from_iter([(2, 3)]));
+    }
+
+    #[test]
     fn from_arr() { 
         type M = MultiVar<'X', usize>;
 
-        let d = M::from([1,0,3]);
+        let d = M::from([1,0,3]); // X₀X₂³
         assert_eq!(d.0, MultiDeg::from_iter([(0, 1), (2, 3)]));
     }
 
@@ -156,7 +170,7 @@ mod tests {
     fn from_iter() { 
         type M = MultiVar<'X', usize>;
 
-        let d = M::from_iter([(0, 1), (2, 3)]);
+        let d = M::from_iter([(0, 1), (2, 3)]); // X₀X₂³
         assert_eq!(d.0, MultiDeg::from_iter([(0, 1), (2, 3)]));
     }
 
@@ -164,7 +178,7 @@ mod tests {
     fn deg_for() { 
         type M = MultiVar<'X', usize>;
 
-        let d = M::from([1,0,3]);
+        let d = M::from([1,0,3]); // X₀X₂³
         assert_eq!(d.deg_for(0), 1);
         assert_eq!(d.deg_for(1), 0);
         assert_eq!(d.deg_for(2), 3);
@@ -175,7 +189,7 @@ mod tests {
     fn total_deg() { 
         type M = MultiVar<'X', usize>;
 
-        let d = M::from([1,0,3]);
+        let d = M::from([1,0,3]); // X₀X₂³
         assert_eq!(d.total_deg(), 4);
     }
 

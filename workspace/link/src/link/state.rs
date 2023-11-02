@@ -81,6 +81,13 @@ impl From<BitSeq> for State {
     }
 }
 
+impl<T, const N: usize> From<[T; N]> for State 
+where Bit: From<T> {
+    fn from(value: [T; N]) -> Self {
+        Self::from(BitSeq::from(value))
+    }
+}
+
 impl<T> FromIterator<T> for State
 where Bit: From<T> {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
@@ -111,32 +118,32 @@ mod tests {
 
     #[test]
     fn state_targets() {
-        let s = State::from_iter([0, 0, 0]);
+        let s = State::from([0, 0, 0]);
         assert_eq!(s.targets(), vec![
-            State::from_iter([1, 0, 0]),
-            State::from_iter([0, 1, 0]),
-            State::from_iter([0, 0, 1]),
+            State::from([1, 0, 0]),
+            State::from([0, 1, 0]),
+            State::from([0, 0, 1]),
         ]);
 
-        let s = State::from_iter([0, 1, 0]);
+        let s = State::from([0, 1, 0]);
         assert_eq!(s.targets(), vec![
-            State::from_iter([1, 1, 0]),
-            State::from_iter([0, 1, 1]),
+            State::from([1, 1, 0]),
+            State::from([0, 1, 1]),
         ]);
 
-        let s = State::from_iter([1, 1, 0]);
+        let s = State::from([1, 1, 0]);
         assert_eq!(s.targets(), vec![
-            State::from_iter([1, 1, 1]),
+            State::from([1, 1, 1]),
         ]);
 
-        let s = State::from_iter([1, 1, 1]);
+        let s = State::from([1, 1, 1]);
         assert_eq!(s.targets(), vec![]);
     }
 
     #[test]
     fn sub() { 
-        let s = State::from_iter([1,0,0,1,1]);
-        assert_eq!(s.sub(3), State::from_iter([1,0,0]));
+        let s = State::from([1,0,0,1,1]);
+        assert_eq!(s.sub(3), State::from([1,0,0]));
     }
 
     #[test]
@@ -146,7 +153,7 @@ mod tests {
         
         assert_eq!(ss, 
             [[0, 0, 0],[1, 0, 0],[0, 1, 0],[0, 0, 1],[1, 1, 0],[1, 0, 1],[0, 1, 1],[1, 1, 1]]
-            .map(|v| State::from_iter(v))
+            .map(|v| State::from(v))
         );
     }
 }

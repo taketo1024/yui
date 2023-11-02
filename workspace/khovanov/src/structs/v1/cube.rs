@@ -314,8 +314,8 @@ mod tests {
     #[test]
     fn edge_merge() { 
         let l = Link::from_pd_code([[0, 0, 1, 1]]);
-        let s = State::from_iter([0]);
-        let t = State::from_iter([1]);
+        let s = State::from([0]);
+        let t = State::from([1]);
         let v = KhCubeVertex::new(&l, s);
         let w = KhCubeVertex::new(&l, t);
         let e = KhCubeEdge::edge_between(&v, &w);
@@ -332,8 +332,8 @@ mod tests {
     #[test]
     fn edge_split() { 
         let l = Link::from_pd_code([[0, 1, 1, 0]]);
-        let s = State::from_iter([0]);
-        let t = State::from_iter([1]);
+        let s = State::from([0]);
+        let t = State::from([1]);
         let v = KhCubeVertex::new(&l, s);
         let w = KhCubeVertex::new(&l, t);
         let e = KhCubeEdge::edge_between(&v, &w);
@@ -349,23 +349,23 @@ mod tests {
 
     #[test]
     fn edge_sign() { 
-        let s = State::from_iter([0, 0, 0]);
-        let t = State::from_iter([1, 0, 0]);
+        let s = State::from([0, 0, 0]);
+        let t = State::from([1, 0, 0]);
         let e = KhCubeEdge::sign_between(&s, &t);
         assert!(e.is_positive());
 
-        let s = State::from_iter([1, 0, 0]);
-        let t = State::from_iter([1, 1, 0]);
+        let s = State::from([1, 0, 0]);
+        let t = State::from([1, 1, 0]);
         let e = KhCubeEdge::sign_between(&s, &t);
         assert!(e.is_negative());
 
-        let s = State::from_iter([1, 1, 0]);
-        let t = State::from_iter([1, 1, 1]);
+        let s = State::from([1, 1, 0]);
+        let t = State::from([1, 1, 1]);
         let e = KhCubeEdge::sign_between(&s, &t);
         assert!(e.is_positive());
 
-        let s = State::from_iter([0, 1, 0]);
-        let t = State::from_iter([0, 1, 1]);
+        let s = State::from([0, 1, 0]);
+        let t = State::from([0, 1, 1]);
         let e = KhCubeEdge::sign_between(&s, &t);
         assert!(e.is_negative());
     }
@@ -413,8 +413,8 @@ mod tests {
         assert_eq!(cube.dim, 1);
         assert_eq!(cube.vertices.len(), 2);
 
-        let s0 = State::from_iter([0]);
-        let s1 = State::from_iter([1]);
+        let s0 = State::from([0]);
+        let s1 = State::from([1]);
 
         let v0 = cube.vertex(&s0);
         let v1 = cube.vertex(&s1);

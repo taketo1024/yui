@@ -642,7 +642,7 @@ mod tests {
         let Some((k, r, _)) = e else { panic!() };
 
         assert_eq!(k, KhEnhState::new(
-            State::from_iter([1,0]), 
+            State::from([1,0]), 
             KhLabel::from_iter([])
         ));
         assert_eq!(r, 2);

@@ -88,6 +88,14 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
             |b| b.permute_cols(p.clone())
         )
     }
+
+    pub fn compose(&self, other: &Trans<R>) -> Self { 
+        assert_eq!(self.tgt_dim(), other.src_dim());
+        Self::new(
+            other.forward_mat() * self.forward_mat(), 
+            self.backward_mat() * other.backward_mat()
+        )
+    }
 }
 
 impl<R> Default for Trans<R>

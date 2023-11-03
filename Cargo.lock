@@ -1324,6 +1324,7 @@ dependencies = [
 name = "yui-polynomial"
 version = "0.1.0"
 dependencies = [
+ "ahash",
  "auto-impl-ops",
  "itertools",
  "num-traits",

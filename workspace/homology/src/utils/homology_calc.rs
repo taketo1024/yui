@@ -96,30 +96,39 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         let t = s1.factors().iter().filter(|a| !a.is_unit()).count();
 
         let p1 = s1.p().unwrap();                 // size = (n, n)
-        let p11 = p1.submat_rows(r1..n);          // size = (n - r1, n)
+        let p11 = p1.submat_rows(r1..n)           // size = (n - r1, n)
+                    .to_sparse();
                 
         let p2 = s2.qinv().unwrap();              // size = (n - r1, n - r1)
-        let p22 = p2.submat_rows(r2..n-r1);       // size = (n - (r1 + r2), n - r1)
+        let p22 = p2.submat_rows(r2..n-r1)        // size = (n - (r1 + r2), n - r1)
+                    .to_sparse();
 
         let p_free = p22 * p11;                   // size = (n - (r1 + r2), n)
-        let p_tor = p1.submat_rows(r1-t..r1);     // size = (t, n)
+        let p_tor = p1.submat_rows(r1-t..r1)      // size = (t, n)
+                      .to_sparse();
+
         let p = p_free.stack(&p_tor);             // size = (r + t, n)
 
         assert_eq!(p.shape(), (r + t, n));
 
         let q1 = s1.pinv().unwrap();              // size = (n, n)
-        let q12 = q1.submat_cols(r1..n);          // size = (n, n - r1)
+        let q12 = q1.submat_cols(r1..n)           // size = (n, n - r1)
+                    .to_sparse();
 
         let q2 = s2.q().unwrap();                 // size = (n - r1, n - r1)
-        let q22 = q2.submat_cols(r2..n-r1);       // size = (n - r1, n - (r1 + r2))
+        let q22 = q2.submat_cols(r2..n-r1)        // size = (n - r1, n - (r1 + r2))
+                    .to_sparse();
+
 
         let q_free = q12 * q22;                   // size = (n, n - (r1 + r2))
-        let q_tor = q1.submat_cols(r1-t..r1);     // size = (n, t)
+        let q_tor = q1.submat_cols(r1-t..r1)      // size = (n, t)
+                      .to_sparse();
+
         let q = q_free.concat(&q_tor);            // size = (n, r + t)
 
         assert_eq!(q.shape(), (n, r + t));
 
-        Trans::new(p.to_sparse(), q.to_sparse())
+        Trans::new(p, q)
     }
 }
 

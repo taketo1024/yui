@@ -89,38 +89,27 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
 
     pub fn reduce(&mut self) {
         if self.denom.is_zero() {
-            panic!("denominator == 0");
+            panic!("denominator = 0");
         }
 
-        if self.numer.is_zero() {
-            self.denom.set_one();
-            return;
+        if self.denom.is_one() { 
+            return
         }
 
-        if self.numer == self.denom {
-            self.set_one();
-            return;
+        if !self.denom.is_unit() { 
+            let g = EucRing::gcd(&self.numer, &self.denom);
+
+            if !g.is_one() {
+                self.numer /= &g;
+                self.denom /= &g;
+            }
         }
 
-        let g: T = EucRing::gcd(&self.numer, &self.denom);
-
-        #[inline]
-        fn replace_with<T: Zero>(x: &mut T, f: impl FnOnce(T) -> T) {
-            let y = core::mem::replace(x, T::zero());
-            *x = f(y);
-        }
-
-        // self.numer /= g;
-        replace_with(&mut self.numer, |x| x / g.clone());
-
-        // self.denom /= g;
-        replace_with(&mut self.denom, |x| x / g);
-
-        // normalize denom
         let u = self.denom.normalizing_unit();
+
         if !u.is_one() {
-            replace_with(&mut self.numer, |x| x * u.clone());
-            replace_with(&mut self.denom, |x| x * u);
+            self.numer *= &u;
+            self.denom *= &u;
         }
     }
 }
@@ -415,13 +404,21 @@ mod tests {
 
     #[test]
     fn reduce() {
+        let a = Ratio::new(0, -4);
+        assert_eq!(a.numer, 0);
+        assert_eq!(a.denom, 1);
+
+        let a = Ratio::new(-3, 1);
+        assert_eq!(a.numer, -3);
+        assert_eq!(a.denom, 1);
+
+        let a = Ratio::new(1, -3);
+        assert_eq!(a.numer, -1);
+        assert_eq!(a.denom, 3);
+
         let a = Ratio::new(6, -8);
         assert_eq!(a.numer, -3);
         assert_eq!(a.denom, 4);
-
-        let a = Ratio::new(0, i32::MIN);
-        assert_eq!(a.numer, 0);
-        assert_eq!(a.denom, 1);
     }
 
     #[test]

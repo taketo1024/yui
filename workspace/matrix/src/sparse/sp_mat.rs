@@ -78,23 +78,17 @@ where R: Clone {
     }
 }
 
-macro_rules! _generate {
-    ($shape:expr, $f:expr) => {{
-        let mut t = TriMat::new($shape);
-        $f( &mut |i, j, a| { 
+impl<R> SpMat<R> where R: Clone + Zero { 
+    pub fn generate<F>(shape: (usize, usize), init: F) -> Self
+    where F: FnOnce(&mut (dyn FnMut(usize, usize, R))) { 
+        let mut t = TriMat::new(shape);
+        (init)( &mut |i, j, a| { 
             if !a.is_zero() { 
                 t.add_triplet(i, j, a)
             }
         });
         let cs_mat = t.to_csc();
         Self::from(cs_mat)
-    }}
-}
-
-impl<R> SpMat<R> where R: Clone + Zero { 
-    pub fn generate<F>(shape: (usize, usize), f: F) -> Self
-    where F: FnOnce(&mut (dyn FnMut(usize, usize, R))) { 
-        _generate!(shape, f)
     }
 
     pub fn from_vec(shape: (usize, usize), grid: Vec<R>) -> Self { 
@@ -189,14 +183,6 @@ impl<R> SpMat<R> where R: Clone + Zero {
 
     pub fn to_dense(&self) -> Mat<R> { 
         self.into()
-    }
-}
-
-impl<R> SpMat<R>
-where R: Clone + Zero + Send + Sync { 
-    pub fn generate_sync<F>(shape: (usize, usize), f: F) -> Self
-    where F: FnOnce(&mut (dyn FnMut(usize, usize, R) + Send + Sync)) { 
-        _generate!(shape, f)
     }
 }
 

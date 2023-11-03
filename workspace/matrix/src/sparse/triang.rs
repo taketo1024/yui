@@ -1,8 +1,8 @@
 use std::cell::RefCell;
-use std::mem::replace;
 use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
 use either::Either;
+use itertools::Itertools;
 use log::info;
 use rayon::prelude::*;
 use thread_local::ThreadLocal;
@@ -31,18 +31,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 pub fn solve_triangular<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    SpMat::generate_sync(y.shape(), |set| { 
-        solve_triangular_with(t, a, y, |i, j, x|
-            set(i, j, x)
-        );
-    })
-}
-
-pub fn solve_triangular_with<R, F>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>, f: F)
-where 
-    R: Ring, for<'x> &'x R: RingOps<R>,
-    F: FnMut(usize, usize, R) + Send + Sync
-{
     assert_eq!(a.rows(), y.rows());
 
     if t.is_upper() { 
@@ -53,17 +41,16 @@ where
 
     const MULTI_THREAD: bool = true;
     if MULTI_THREAD { 
-        solve_triangular_m(t, a, y, f)
+        solve_triangular_m(t, a, y)
     } else { 
-        solve_triangular_s(t, a, y, f)
+        solve_triangular_s(t, a, y)
     }
 }
 
-fn solve_triangular_s<R, F>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>, mut f: F)
-where 
-    R: Ring, for<'x> &'x R: RingOps<R>,
-    F: FnMut(usize, usize, R)
-{
+fn solve_triangular_s<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    use std::mem::take;
+
     info!("solve triangular: a = {:?}, y = {:?}", a.shape(), y.shape());
 
     let (n, k) = (a.rows(), y.cols());
@@ -72,27 +59,27 @@ where
     let mut x = vec![R::zero(); n];
     let mut b = vec![R::zero(); n];
 
-    for j in 0..k { 
-        for (i, r) in y.col_view(j).iter() { 
-            b[i] = r.clone();
+    SpMat::generate((n, k), |set| { 
+        for j in 0..k { 
+            for (i, r) in y.col_view(j).iter() { 
+                b[i] = r.clone();
+            }
+    
+            solve_triangular_into(t, &a, &diag, &mut b, &mut x);
+    
+            for i in 0..n { 
+                if x[i].is_zero() { continue }
+                let x_i = take(&mut x[i]);
+                set(i, j, x_i);
+            }
         }
-
-        solve_triangular_into(t, &a, &diag, &mut b, &mut x);
-
-        for i in 0..n { 
-            if x[i].is_zero() { continue }
-
-            let x_i = replace(&mut x[i], R::zero());
-            f(i, j, x_i);
-        }
-    }
+    })
 }
 
-fn solve_triangular_m<R, F>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>, f: F)
-where 
-    R: Ring, for<'x> &'x R: RingOps<R>,
-    F: FnMut(usize, usize, R) + Send + Sync
-{
+fn solve_triangular_m<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    use std::mem::take;
+
     let nth = std::thread::available_parallelism().map(|x| x.get()).unwrap_or(1);
 
     info!("solve triangular: a = {:?}, y = {:?} (multi-thread: {nth})", a.shape(), y.shape());
@@ -105,9 +92,8 @@ where
 
     let tls1 = Arc::new(ThreadLocal::new());
     let tls2 = Arc::new(ThreadLocal::new());
-    let f = Mutex::new(f);
 
-    (0..k).into_par_iter().for_each(|j| { 
+    let entries: Vec<(usize, usize, R)> = (0..k).into_par_iter().map(|j| { 
         let mut x_st = tls1.get_or(|| {
             let x = vec![R::zero(); n];
             RefCell::new(x)
@@ -127,15 +113,6 @@ where
 
         solve_triangular_into(t, &a, &diag, b, x);
 
-        { 
-            let mut f = f.lock().unwrap();
-            for i in 0..n { 
-                if x[i].is_zero() { continue }
-                let x_i = replace(&mut x[i], R::zero());
-                f(i, j, x_i);
-            }
-        }
-
         if report { 
             let c = {
                 let mut count = count.lock().unwrap();
@@ -147,7 +124,16 @@ where
                 info!("  solved {c}/{k}");
             }
         }
-    });
+
+        (0..n).into_iter().filter_map(|i| { 
+            if x[i].is_zero() { return None }
+            let x_i = take(&mut x[i]);
+            Some((i, j, x_i))
+        }).collect_vec()
+
+    }).flatten().collect();
+
+    SpMat::from_entries((n, k), entries)
 }
 
 pub fn solve_triangular_vec<R>(t: TriangularType, a: &SpMat<R>, b: &SpVec<R>) -> SpVec<R>

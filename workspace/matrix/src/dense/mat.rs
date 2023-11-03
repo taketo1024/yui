@@ -1,4 +1,4 @@
-use std::ops::{Add, Neg, Sub, Mul, Index, IndexMut, AddAssign, SubAssign, MulAssign};
+use std::ops::{Add, Neg, Sub, Mul, Index, IndexMut, AddAssign, SubAssign, MulAssign, Range};
 use std::fmt::Debug;
 use ndarray::{Array2, Axis, s, concatenate, array};
 use derive_more::Display;
@@ -100,6 +100,27 @@ where R: Clone {
         let cd = concatenate![Axis(1), c.array, d.array];
         let x  = concatenate![Axis(0), ab, cd];
         Mat::from(x)
+    }
+
+    pub fn submat(&self, rows: Range<usize>, cols: Range<usize>) -> Mat<R> { 
+        let (i0, i1) = (rows.start, rows.end);
+        let (j0, j1) = (cols.start, cols.end);
+
+        assert!(i0 <= i1 && i1 <= self.rows());
+        assert!(j0 <= j1 && j1 <= self.cols());
+
+        let slice = self.array.slice(s![rows, cols]);
+        Self::from(slice.to_owned())
+    }
+
+    pub fn submat_rows(&self, rows: Range<usize>) -> Mat<R> { 
+        let n = self.cols();
+        self.submat(rows, 0 .. n)
+    }
+
+    pub fn submat_cols(&self, cols: Range<usize>) -> Mat<R> { 
+        let m = self.rows();
+        self.submat(0 .. m, cols)
     }
 }
 
@@ -545,6 +566,20 @@ mod tests {
             [4, 5, 6, 8],
             [9,10,11,12]           
         ]))
+    }
+
+    #[test]
+    fn submat() { 
+        let a = Mat::from(array![
+            [1, 2, 3, 7],
+            [4, 5, 6, 8],
+            [9,10,11,12]           
+        ]);
+        let b = a.submat(1..3, 2..4);
+        assert_eq!(b, Mat::from(array![
+            [ 6, 8],
+            [11,12]           
+        ]));
     }
 
     #[test]

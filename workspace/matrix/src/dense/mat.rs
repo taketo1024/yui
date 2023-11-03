@@ -98,8 +98,27 @@ where R: Clone {
 
         let ab = concatenate![Axis(1), a.array, b.array];
         let cd = concatenate![Axis(1), c.array, d.array];
-        let x  = concatenate![Axis(0), ab, cd];
-        Mat::from(x)
+        let abcd  = concatenate![Axis(0), ab, cd];
+
+        Mat::from(abcd)
+    }
+
+    pub fn concat(&self, b: &Self) -> Self { 
+        let a = self;
+
+        assert_eq!(a.rows(), b.rows());
+
+        let ab = concatenate![Axis(1), a.array, b.array];
+        Mat::from(ab)
+    }
+
+    pub fn stack(&self, c: &Self) -> Self {
+        let a = self;
+
+        assert_eq!(a.cols(), c.cols());
+
+        let ac = concatenate![Axis(0), a.array, c.array];
+        Mat::from(ac)
     }
 
     pub fn submat(&self, rows: Range<usize>, cols: Range<usize>) -> Mat<R> { 
@@ -565,6 +584,40 @@ mod tests {
             [1, 2, 3, 7],
             [4, 5, 6, 8],
             [9,10,11,12]           
+        ]))
+    }
+
+    #[test]
+    fn concat() { 
+        let a = Mat::from(array![
+            [1,2,3],
+            [4,5,6]
+        ]);
+        let b = Mat::from(array![
+            [7],
+            [8]
+        ]);
+        let x = a.concat(&b);
+        assert_eq!(x, Mat::from(array![
+            [1, 2, 3, 7],
+            [4, 5, 6, 8]
+        ]))
+    }
+
+    #[test]
+    fn stack() { 
+        let a = Mat::from(array![
+            [1,2,3],
+            [4,5,6]
+        ]);
+        let c = Mat::from(array![
+            [9, 10, 11]
+        ]);
+        let x = a.stack(&c);
+        assert_eq!(x, Mat::from(array![
+            [1, 2, 3],
+            [4, 5, 6],
+            [9,10,11]           
         ]))
     }
 

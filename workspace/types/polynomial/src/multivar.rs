@@ -44,7 +44,7 @@ macro_rules! impl_multivar {
         impl<const X: char> Display for MultiVar<X, $I> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let d = self.deg();
-                let s = d.iter_sorted().map(|(&i, &d_i)| {
+                let s = d.iter().map(|(&i, &d_i)| {
                     let x = format!("{X}{}", subscript(i as isize));
                     let d = d_i as isize;
                     fmt_mono(x, d)

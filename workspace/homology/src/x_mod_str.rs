@@ -19,6 +19,10 @@ where
 
 impl<X, R> XModStr<X, R>
 where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+    fn new_raw(gens: IndexList<X>) -> Self { 
+        Self { gens, _tors: vec![] }
+    }
+
     pub fn zero() -> Self { 
         Self::from_iter([])
     }
@@ -56,11 +60,18 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
+impl<X, R> From<IndexList<X>> for XModStr<X, R>
+where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+    fn from(gens: IndexList<X>) -> Self {
+        Self::new_raw(gens)
+    }
+}
+
 impl<X, R> FromIterator<X> for XModStr<X, R>
 where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn from_iter<T: IntoIterator<Item = X>>(iter: T) -> Self {
         let gens = IndexList::from_iter(iter);
-        Self { gens, _tors: vec![] }
+        Self::new_raw(gens)
     }
 }
 

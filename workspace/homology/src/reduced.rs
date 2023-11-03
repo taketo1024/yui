@@ -5,6 +5,7 @@ use delegate::delegate;
 use yui_core::{Deg, Ring, RingOps, EucRing, EucRingOps, isize2, isize3};
 use yui_matrix::sparse::{Trans, SpMat, SpVec};
 
+use crate::utils::ChainReducer;
 use crate::{ChainComplexBase, GridTrait, ChainComplexTrait, HomologyBase, GridBase, GridIter, ChainComplexSummand, ChainComplexDisplay, RModStr};
 
 pub type ReducedComplex<R>  = ReducedComplexBase<isize,  R>;
@@ -73,6 +74,20 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         &self.trans[i]
     }
 
+    pub fn combine(&self, other: &ReducedComplexBase<I, R>) -> Self { 
+        assert!(self.d_deg() == other.d_deg());
+        debug_assert!(self.support().all(|i| 
+            self.trans(i).tgt_dim() == other.trans(i).src_dim())
+        );
+
+        Self::new(
+            self.support(), 
+            self.d_deg(), 
+            |i| other.d_matrix(i).clone(), 
+            |i| self.trans(i).compose(other.trans(i))
+        )
+    }
+
     delegate! { 
         to self.inner { 
             pub fn d(&self, i: I, v: &SpVec<R>) -> SpVec<R>;
@@ -103,6 +118,21 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
             fn d_deg(&self) -> I;
             fn d_matrix(&self, i: I) -> &SpMat<Self::R>;
         }
+    }
+
+    fn reduced(&self, with_trans: bool) -> ReducedComplexBase<I, Self::R> {
+        let red = ChainReducer::reduce(self, with_trans);
+        if with_trans { 
+            self.combine(&red)
+        } else { 
+            red
+        }
+    }
+
+    fn reduced_by<F>(&self, trans: F) -> ReducedComplexBase<I, Self::R>
+    where F: FnMut(I) -> Trans<Self::R> {
+        let red = Self::reduced_by(self, trans);
+        self.combine(&red)
     }
 }
 
@@ -242,5 +272,18 @@ mod tests {
         assert_eq!(c.d_matrix(0), r.d_matrix(0));
         assert_eq!(c.d_matrix(1), r.d_matrix(1));
         assert_eq!(c.d_matrix(2), r.d_matrix(2));
+    }
+
+    #[test]
+    fn bypass_reduced() { 
+        let c = ChainComplex::<i32>::t2();
+        let r = ReducedComplex::bypass(&c);
+        let r = r.reduced(true);
+
+        r.check_d_all();
+
+        assert_eq!(r[0].rank(), 1);
+        assert_eq!(r[1].rank(), 2);
+        assert_eq!(r[2].rank(), 1);
     }
 }

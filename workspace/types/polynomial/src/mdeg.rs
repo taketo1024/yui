@@ -1,47 +1,60 @@
-use std::collections::{BTreeMap, HashSet};
 use std::ops::{Add, AddAssign, Neg, SubAssign, Sub, Index};
+use std::hash::Hash;
 
+use ahash::{AHashMap, AHashSet};
 use auto_impl_ops::auto_ops;
+use delegate::delegate;
 use itertools::Itertools;
 use num_traits::Zero;
 
-#[derive(Clone, Default, PartialEq, Eq, Debug, Hash)]
-pub struct MultiDeg<I>
-where I: Zero { 
-    data: BTreeMap<usize, I>, // x_0^{d_0} ... x_n^{d_n} <--> [ 0 => d_0, ..., n => d_n ]
+#[derive(Clone, Default, PartialEq, Eq, Debug)]
+pub struct MultiDeg<I> { 
+    data: AHashMap<usize, I>, // { index => degree }
     _zero: I
 }
 
 impl<I> MultiDeg<I>
 where I: Zero {
-    fn from_raw(data: BTreeMap<usize, I>) -> Self { 
-        let mut data = data;
-        data.retain(|_, d| !d.is_zero());
+    fn new_raw(data: AHashMap<usize, I>) -> Self { 
         Self { data, _zero: I::zero() }
     }
 
-    pub fn len(&self) -> usize { 
-        self.data.len()
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = (&usize, &I)> { 
-        self.data.iter()
-    }
-
-    pub fn max_index(&self) -> Option<usize> { 
-        self.data.keys().max().cloned()
-    }
-
-    pub fn min_index(&self) -> Option<usize> { 
-        self.data.keys().min().cloned()
+    pub fn reduce(&mut self) { 
+        self.data.retain(|_, i| !i.is_zero())
     }
 }
 
 impl<I> MultiDeg<I>
-where I: Clone + Zero + Ord { 
+where I: Zero + Clone {
+    pub fn reduced(&self) -> Self { 
+        let mut copy = self.clone();
+        copy.reduce();
+        copy
+    }
+}
+
+impl<I> MultiDeg<I> {
+    delegate! { 
+        to self.data { 
+            pub fn len(&self) -> usize;
+            pub fn iter(&self) -> impl Iterator<Item = (&usize, &I)>;
+        }
+    }
+
+    pub fn indices(&self) -> impl Iterator<Item = &usize> {
+        self.data.keys()
+    }
+
+    pub fn iter_sorted(&self) -> impl Iterator<Item = (&usize, &I)> { 
+        self.data.iter().sorted_by_key(|(&i, _)| i)
+    }
+}
+
+impl<I> MultiDeg<I>
+where I: Zero + Ord { 
     pub fn all_leq(&self, other: &Self) -> bool {
-        let i0 = HashSet::<&usize>::from_iter( self.data.keys());
-        let i1 = HashSet::<&usize>::from_iter(other.data.keys());
+        let i0 = AHashSet::from_iter( self.indices());
+        let i1 = AHashSet::from_iter(other.indices());
 
         i0.union(&i1).all(|&&i|
             self[i] <= other[i]
@@ -77,12 +90,23 @@ where I: Zero {
 impl<I> FromIterator<(usize, I)> for MultiDeg<I> 
 where I: Zero {
     fn from_iter<T: IntoIterator<Item = (usize, I)>>(iter: T) -> Self {
-        Self::from_raw(iter.into_iter().collect())
+        Self::new_raw(
+            iter.into_iter().filter(|(_, v)| !v.is_zero()).collect()
+        )
     }
 }
 
-impl<I> Index<usize> for MultiDeg<I>
-where I: Zero + Clone {
+impl<I> Hash for MultiDeg<I>
+where I: Hash {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        for (i, d) in self.iter() { 
+            i.hash(state);
+            d.hash(state);
+        }
+    }
+}
+
+impl<I> Index<usize> for MultiDeg<I> {
     type Output = I;
 
     fn index(&self, i: usize) -> &Self::Output {
@@ -93,7 +117,7 @@ where I: Zero + Clone {
 impl<I> Zero for MultiDeg<I>
 where for<'x> I: Clone + AddAssign<&'x I> + Zero {
     fn zero() -> Self {
-        Self::from_raw(BTreeMap::new())
+        Self::new_raw(AHashMap::new())
     }
 
     fn is_zero(&self) -> bool {
@@ -106,7 +130,7 @@ impl<I> AddAssign<&MultiDeg<I>> for MultiDeg<I>
 where for<'x> I: AddAssign<&'x I> + Zero + Clone {
     fn add_assign(&mut self, rhs: &MultiDeg<I>) {
         let data = &mut self.data;
-        for (i, d) in rhs.data.iter() { 
+        for (i, d) in rhs.iter() { 
             if let Some(d_i) = data.get_mut(i) { 
                 d_i.add_assign(d);
             } else { 
@@ -122,7 +146,7 @@ impl<I> SubAssign<&MultiDeg<I>> for MultiDeg<I>
 where for<'x> I: SubAssign<&'x I> + Zero + Clone {
     fn sub_assign(&mut self, rhs: &MultiDeg<I>) {
         let data = &mut self.data;
-        for (i, d) in rhs.data.iter() { 
+        for (i, d) in rhs.iter() { 
             if !data.contains_key(i) {
                 data.insert(i.clone(), I::zero());
             }
@@ -137,10 +161,10 @@ impl<I> Neg for &MultiDeg<I>
 where I: Zero, for<'x> &'x I: Neg<Output = I> {
     type Output = MultiDeg<I>;
     fn neg(self) -> Self::Output {
-        let list = self.data.iter().map(|(&i, d)| 
+        let list = self.iter().map(|(&i, d)| 
             (i, -d)
         ).collect();
-        MultiDeg::from_raw(list)
+        MultiDeg::new_raw(list)
     }
 }
 
@@ -161,8 +185,8 @@ where I: Clone + Zero + Ord + for<'x> Add<&'x I, Output = I> {
 
         Ord::cmp(&self.total(), &other.total())
         .then_with(|| { 
-            let i0 = HashSet::<&usize>::from_iter(self.data.keys());
-            let i1 = HashSet::<&usize>::from_iter(other.data.keys());
+            let i0 = AHashSet::from_iter( self.indices());
+            let i1 = AHashSet::from_iter(other.indices());
             let indices = i0.union(&i1).sorted();
             
             for &&i in indices { 
@@ -234,5 +258,21 @@ mod tests {
         let d1 = MultiDeg::<usize>::from_iter([(0, 1), (1, 2), (2, 3)]);
         let d2 = MultiDeg::<usize>::from_iter([(1, 3), (2, 1)]);
         let _ = d1 - d2; // panic!
+    }
+
+    #[test]
+    fn reduced() { 
+        let d0 = MultiDeg::new_raw([(1, 0), (0, 1), (7, 0), (2, 3)].into());
+        let d1 = MultiDeg::new_raw([(0, 1), (2, 3)].into());
+
+        assert_ne!(d0, d1);
+        assert_eq!(d0.reduced(), d1);
+    }
+    
+    #[test]
+    fn iter_sorted() { 
+        let d = MultiDeg::from_iter([(1, 2), (0, 1), (7, 1), (2, 3)]);
+        let sorted = d.iter_sorted().map(|(&i, &v)| (i, v)).collect_vec();
+        assert_eq!(sorted, vec![(0, 1), (1, 2), (2, 3), (7, 1)]);
     }
 }

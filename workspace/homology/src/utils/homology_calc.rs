@@ -95,10 +95,10 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         let r = n - r1 - r2;
         let t = s1.factors().iter().filter(|a| !a.is_unit()).count();
 
-        let p1 = s1.p().unwrap().to_sparse();     // size = (n, n)
+        let p1 = s1.p().unwrap();                 // size = (n, n)
         let p11 = p1.submat_rows(r1..n);          // size = (n - r1, n)
                 
-        let p2 = s2.qinv().unwrap().to_sparse();  // size = (n - r1, n - r1)
+        let p2 = s2.qinv().unwrap();              // size = (n - r1, n - r1)
         let p22 = p2.submat_rows(r2..n-r1);       // size = (n - (r1 + r2), n - r1)
 
         let p_free = p22 * p11;                   // size = (n - (r1 + r2), n)
@@ -107,10 +107,10 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
         assert_eq!(p.shape(), (r + t, n));
 
-        let q1 = s1.pinv().unwrap().to_sparse();  // size = (n, n)
+        let q1 = s1.pinv().unwrap();              // size = (n, n)
         let q12 = q1.submat_cols(r1..n);          // size = (n, n - r1)
 
-        let q2 = s2.q().unwrap().to_sparse();     // size = (n - r1, n - r1)
+        let q2 = s2.q().unwrap();                 // size = (n - r1, n - r1)
         let q22 = q2.submat_cols(r2..n-r1);       // size = (n - r1, n - (r1 + r2))
 
         let q_free = q12 * q22;                   // size = (n, n - (r1 + r2))
@@ -119,7 +119,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
         assert_eq!(q.shape(), (n, r + t));
 
-        Trans::new(p, q)
+        Trans::new(p.to_sparse(), q.to_sparse())
     }
 }
 

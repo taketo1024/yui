@@ -1,7 +1,7 @@
-use std::collections::HashMap;
 use std::fmt::{Display, Debug};
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, MulAssign};
+use ahash::AHashMap;
 use itertools::{Itertools, Either};
 use num_traits::Zero;
 use auto_impl_ops::auto_ops;
@@ -17,7 +17,7 @@ where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 { 
-    data: HashMap<X, R>,
+    data: AHashMap<X, R>,
     r_zero: R
 }
 
@@ -26,7 +26,7 @@ where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 { 
-    pub fn new(data: HashMap<X, R>) -> Self {
+    pub fn new(data: AHashMap<X, R>) -> Self {
         Self { data, r_zero: R::zero() }
     }
 
@@ -129,7 +129,7 @@ where
             } else { 
                 None
             }
-        ).collect::<HashMap<_, _>>();
+        ).collect::<AHashMap<_, _>>();
         
         Self::new(data)
     }
@@ -230,7 +230,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn from_iter<T: IntoIterator<Item = (X, R)>>(iter: T) -> Self {
-        let mut data = HashMap::<X, R>::new();
+        let mut data = AHashMap::<X, R>::new();
         for (x, r) in iter.into_iter() { 
             if r.is_zero() { continue }
             if let Some(val) = data.get_mut(&x) { 
@@ -259,7 +259,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn zero() -> Self {
-        Self::new(HashMap::new())
+        Self::new(AHashMap::new())
     }
 
     fn is_zero(&self) -> bool {

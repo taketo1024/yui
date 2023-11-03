@@ -2,17 +2,18 @@ use std::hash::Hash;
 use std::ops::Index;
 
 use bimap::BiHashMap;
+use ahash::RandomState as ARandomState;
 
 #[derive(Default, Clone)]
 pub struct IndexList<E>
 where E: Eq + Hash {
-    data: BiHashMap<usize, E>
+    data: BiHashMap<usize, E, ARandomState, ARandomState>
 }
 
 impl<E> IndexList<E>
 where E: Eq + Hash {
     pub fn new() -> Self {
-        Self { data: BiHashMap::new() }
+        Self { data: BiHashMap::with_hashers(ARandomState::new(), ARandomState::new()) }
     }
 
     pub fn len(&self) -> usize { 

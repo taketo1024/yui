@@ -19,18 +19,14 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<I, R> ReducedComplexBase<I, R>
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new<It, F1, F2>(support: It, d_deg: I, d_matrix: F1, trans_opt: Option<F2>) -> Self
+    pub fn new<It, F1, F2>(support: It, d_deg: I, d_matrix_map: F1, trans_map: F2) -> Self
     where 
         It: Iterator<Item = I>, 
         F1: FnMut(I) -> SpMat<R>,
         F2: FnMut(I) -> Trans<R>
     {
-        let inner = ChainComplexBase::new(support, d_deg, d_matrix);
-        let trans = if let Some(trans) = trans_opt {
-            GridBase::new(inner.support(), trans)
-        } else { 
-            GridBase::new(inner.support(), |i| Trans::id(inner[i].rank()))
-        };
+        let inner = ChainComplexBase::new(support, d_deg, d_matrix_map);
+        let trans = GridBase::new(inner.support(), trans_map);
         Self { inner, trans }
     }
 
@@ -60,21 +56,16 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         Self { inner, trans }
     }
 
-    pub fn bypass<C>(complex: &C, with_trans: bool) -> Self
+    pub fn bypass<C>(complex: &C) -> Self
     where 
         C: ChainComplexTrait<I, R = R>,
         C::E: RModStr<R = R>
     {
-        let trans = if with_trans { 
-            Some(|i| Trans::id(complex.get(i).rank()))
-        } else { 
-            None
-        };
         Self::new(
             complex.support(), 
             complex.d_deg(), 
             |i| complex.d_matrix(i).clone(), 
-            trans
+            |i| Trans::id(complex.get(i).rank())
         )
     }
 
@@ -240,7 +231,7 @@ mod tests {
     #[test]
     fn bypass() { 
         let c = ChainComplex::<i32>::t2();
-        let r = ReducedComplex::bypass(&c, false);
+        let r = ReducedComplex::bypass(&c);
 
         r.check_d_all();
 

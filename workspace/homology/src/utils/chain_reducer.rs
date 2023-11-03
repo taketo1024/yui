@@ -172,23 +172,20 @@ where
     pub fn as_complex(mut self) -> ReducedComplexBase<I, C::R> { 
         use std::mem::take;
 
+        let support = self.complex.support();
+        let d_deg = self.complex.d_deg();
+
         let mut mats = take(&mut self.mats);
         let mats_map = move |i| mats.remove(&i).unwrap();
-
-        let trans_map = if self.with_trans { 
+        
+        if self.with_trans { 
             let mut trans = take(&mut self.trans).unwrap();
             let trans_map = move |i| trans.remove(&i).unwrap();
-            Some(trans_map)
+            ReducedComplexBase::new(support, d_deg, mats_map, trans_map)
         } else { 
-            None
-        };
-        
-        ReducedComplexBase::new(
-            self.complex.support(), 
-            self.complex.d_deg(), 
-            mats_map,
-            trans_map
-        )
+            let trans_map = |i| Trans::id(self.complex.get(i).rank());
+            ReducedComplexBase::new(support, d_deg, mats_map, trans_map)
+        }
     }
 }
 

@@ -1275,6 +1275,7 @@ dependencies = [
 name = "yui-lin-comb"
 version = "0.1.0"
 dependencies = [
+ "ahash",
  "auto-impl-ops",
  "derive_more",
  "itertools",

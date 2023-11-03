@@ -57,8 +57,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         let r1 = s1.rank();
 
         let d2_dns = if r1 > 0 { 
-            let p1_inv = s1.pinv().unwrap().to_sparse();
-            let t2 = p1_inv.submat_cols(r1..n);
+            let p1_inv = s1.pinv().unwrap();
+            let t2 = p1_inv.submat_cols(r1..n).to_sparse();
             let d2 = d2 * &t2; // d2': C21' -> C3
             d2.to_dense()
         } else {

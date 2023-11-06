@@ -1328,6 +1328,7 @@ dependencies = [
  "ahash",
  "auto-impl-ops",
  "delegate",
+ "derive_more",
  "itertools",
  "num-traits",
  "regex",

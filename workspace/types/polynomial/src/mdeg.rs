@@ -5,10 +5,13 @@ use std::hash::Hash;
 use ahash::AHashSet;
 use auto_impl_ops::auto_ops;
 use delegate::delegate;
+use derive_more::{Display, DebugCustom};
 use itertools::Itertools;
 use num_traits::Zero;
 
-#[derive(Clone, Default, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, Default, PartialEq, Eq, Hash, Display, DebugCustom)]
+#[display(fmt = "{:?}", data)]
+#[debug  (fmt = "{:?}", data)]
 pub struct MultiDeg<I> { 
     data: BTreeMap<usize, I>, // { index => degree }
     _zero: I
@@ -16,21 +19,12 @@ pub struct MultiDeg<I> {
 
 impl<I> MultiDeg<I>
 where I: Zero {
-    fn new_raw(data: BTreeMap<usize, I>) -> Self { 
+    fn new_reduced(data: BTreeMap<usize, I>) -> Self { 
         Self { data, _zero: I::zero() }
     }
 
-    pub fn reduce(&mut self) { 
+    fn reduce(&mut self) { 
         self.data.retain(|_, i| !i.is_zero())
-    }
-}
-
-impl<I> MultiDeg<I>
-where I: Zero + Clone {
-    pub fn reduced(&self) -> Self { 
-        let mut copy = self.clone();
-        copy.reduce();
-        copy
     }
 }
 
@@ -85,9 +79,8 @@ where I: Zero {
 impl<I> FromIterator<(usize, I)> for MultiDeg<I> 
 where I: Zero {
     fn from_iter<T: IntoIterator<Item = (usize, I)>>(iter: T) -> Self {
-        Self::new_raw(
-            iter.into_iter().filter(|(_, v)| !v.is_zero()).collect()
-        )
+        let data = iter.into_iter().filter(|(_, v)| !v.is_zero()).collect();
+        Self::new_reduced(data)
     }
 }
 
@@ -102,7 +95,7 @@ impl<I> Index<usize> for MultiDeg<I> {
 impl<I> Zero for MultiDeg<I>
 where for<'x> I: Clone + AddAssign<&'x I> + Zero {
     fn zero() -> Self {
-        Self::new_raw(BTreeMap::new())
+        Self::new_reduced(BTreeMap::new())
     }
 
     fn is_zero(&self) -> bool {
@@ -149,7 +142,7 @@ where I: Zero, for<'x> &'x I: Neg<Output = I> {
         let list = self.iter().map(|(&i, d)| 
             (i, -d)
         ).collect();
-        MultiDeg::new_raw(list)
+        MultiDeg::new_reduced(list)
     }
 }
 
@@ -191,6 +184,16 @@ mod tests {
     use std::hash::{BuildHasher, Hasher};
 
     use super::*;
+
+    #[test]
+    fn reduce() { 
+        let data = BTreeMap::from_iter([(1, 0), (0, 1), (7, 0), (2, 3)]);
+        let mut d0 = MultiDeg{ data, _zero: 0 };
+
+        d0.reduce();
+
+        assert_eq!(d0.data, BTreeMap::from_iter([(0, 1), (2, 3)]));
+    }
 
     #[test]
     fn deg() {
@@ -271,14 +274,5 @@ mod tests {
         let d1 = MultiDeg::<usize>::from_iter([(0, 1), (1, 2), (2, 3)]);
         let d2 = MultiDeg::<usize>::from_iter([(1, 3), (2, 1)]);
         let _ = d1 - d2; // panic!
-    }
-
-    #[test]
-    fn reduced() { 
-        let d0 = MultiDeg::new_raw([(1, 0), (0, 1), (7, 0), (2, 3)].into());
-        let d1 = MultiDeg::new_raw([(0, 1), (2, 3)].into());
-
-        assert_ne!(d0, d1);
-        assert_eq!(d0.reduced(), d1);
     }
 }

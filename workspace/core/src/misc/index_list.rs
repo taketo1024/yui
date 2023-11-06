@@ -32,14 +32,6 @@ where E: Eq + Hash {
             self.data.get_by_left(&i).unwrap()
         )
     }
-
-    pub fn into_iter(self) -> impl Iterator<Item = E> { 
-        let mut data = self.data;
-        let n = data.len();
-        (0..n).map(move |i| 
-            data.remove_by_left(&i).unwrap().1
-        )
-    }
 }
 
 impl<E> Debug for IndexList<E>
@@ -54,6 +46,20 @@ where E: Eq + Hash {
     fn from_iter<T: IntoIterator<Item = E>>(iter: T) -> Self {
         let data = iter.into_iter().enumerate().collect();
         Self { data }
+    }
+}
+
+impl<E> IntoIterator for IndexList<E>
+where E: Eq + Hash {
+    type Item = E;
+    type IntoIter = std::vec::IntoIter<E>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let mut data = self.data;
+        let n = data.len();
+        (0..n).map(move |i| 
+            data.remove_by_left(&i).unwrap().1
+        ).collect_vec().into_iter()
     }
 }
 
@@ -84,5 +90,12 @@ mod tests {
         assert_eq!(list.index_of(&3), Some(0));
         assert_eq!(list.index_of(&4), Some(2));
         assert_eq!(list.index_of(&2), None);
+    }
+
+    #[test]
+    fn into_iter() {
+        let list = IndexList::from_iter([3,7,4,5,1]);
+        let into = list.into_iter().collect_vec();
+        assert_eq!(into, vec![3,7,4,5,1]);
     }
 }

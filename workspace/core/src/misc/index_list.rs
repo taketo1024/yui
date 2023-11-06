@@ -22,6 +22,10 @@ where E: Eq + Hash {
         self.data.len()
     }
 
+    pub fn contains(&self, x: &E) -> bool { 
+        self.data.contains_right(x)
+    }
+
     pub fn index_of(&self, x: &E) -> Option<usize> {
         self.data.get_by_right(x).cloned()
     }

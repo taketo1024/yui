@@ -1,7 +1,8 @@
-use std::ops::Index;
+use std::{ops::Index, collections::HashMap};
 
 use delegate::delegate;
 
+use itertools::Itertools;
 use yui_core::{Deg, Ring, RingOps, EucRing, EucRingOps, isize2, isize3};
 use yui_matrix::sparse::{Trans, SpMat, SpVec};
 
@@ -14,45 +15,39 @@ pub type ReducedComplex3<R> = ReducedComplexBase<isize3, R>;
 pub struct ReducedComplexBase<I, R>
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     inner: ChainComplexBase<I, R>,
-    trans: GridBase<I, Trans<R>>
+    trans: GridBase<I, Option<Trans<R>>>
 }
 
 impl<I, R> ReducedComplexBase<I, R>
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new<It, F1, F2>(support: It, d_deg: I, d_matrix_map: F1, trans_map: F2) -> Self
+    pub fn new<Itr, F>(support: Itr, d_deg: I, mut d_matrix_map: F) -> Self
     where 
-        It: Iterator<Item = I>, 
-        F1: FnMut(I) -> SpMat<R>,
-        F2: FnMut(I) -> Trans<R>
+        Itr: Iterator<Item = I>, 
+        F: FnMut(I) -> (SpMat<R>, Option<Trans<R>>)
     {
-        let inner = ChainComplexBase::new(support, d_deg, d_matrix_map);
-        let trans = GridBase::new(inner.support(), trans_map);
-        Self { inner, trans }
-    }
+        let support = support.collect_vec();
 
-    pub fn reduced_by<C, F>(complex: &C, trans_map: F) -> Self
-    where 
-        C: ChainComplexTrait<I, R = R>,
-        C::E: RModStr<R = R>,
-        F: FnMut(I) -> Trans<R>
-    {
-        //              d
-        //     C[i] ---------> C[i+1]
-        //      ^                |
-        // t_in |                | t_out
-        //      |                V
-        //     C'[i] - - - - > C'[i+1]
+        let mut mats = HashMap::new();
+        let mut trans = HashMap::new();
 
-        let trans = GridBase::new(complex.support(), trans_map);        
-        let inner = ChainComplexBase::new(complex.support(), complex.d_deg(), |i| { 
-            let d = complex.d_matrix(i);
-            let i1 = i + complex.d_deg();
-            let t_in  = trans.get(i).backward_mat();
-            let t_out = trans.get(i1).forward_mat();
+        for i in support.iter() { 
+            let (d, t) = d_matrix_map(i.clone());
+            
+            mats.insert(i.clone(), d);
+            if let Some(t) = t { 
+                trans.insert(i.clone(), t);
+            }
+        }
 
-            t_out * d * t_in
-        });
-
+        let inner = ChainComplexBase::new(
+            support.clone().into_iter(), 
+            d_deg, 
+            move |i| mats.remove(&i).unwrap()
+        );
+        let trans = GridBase::new(
+            inner.support(), 
+            move |i| trans.remove(&i)
+        );
         Self { inner, trans }
     }
 
@@ -64,27 +59,12 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         Self::new(
             complex.support(), 
             complex.d_deg(), 
-            |i| complex.d_matrix(i).clone(), 
-            |i| Trans::id(complex.get(i).rank())
+            |i| (complex.d_matrix(i).clone(), None)
         )
     }
 
-    pub fn trans(&self, i: I) -> &Trans<R> {
-        &self.trans[i]
-    }
-
-    pub fn combine(&self, other: &ReducedComplexBase<I, R>) -> Self { 
-        assert!(self.d_deg() == other.d_deg());
-        debug_assert!(self.support().all(|i| 
-            self.trans(i).tgt_dim() == other.trans(i).src_dim())
-        );
-
-        Self::new(
-            self.support(), 
-            self.d_deg(), 
-            |i| other.d_matrix(i).clone(), 
-            |i| self.trans(i).compose(other.trans(i))
-        )
+    pub fn trans(&self, i: I) -> Option<&Trans<R>> {
+        self.trans.get(i).as_ref()
     }
 
     delegate! { 
@@ -159,10 +139,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 mod tests { 
     use crate::{ChainComplex, RModStr};
-    use crate::utils::ChainReducer;
 
     use super::*;
-
 
     #[test]
     fn d3() { 
@@ -219,29 +197,6 @@ mod tests {
         assert!(a == 2 || a == -2);
     }
     
-    #[test]
-    fn reduced_by() { 
-        let c = ChainComplex::<i32>::rp2();
-
-        let mut f = ChainReducer::new(&c, true);
-        f.process_all();
-
-        let c = c.reduced_by(|i| f.trans(i).unwrap().clone());
-
-        assert_eq!(c[0].rank(), 1);
-        assert_eq!(c[1].rank(), 1);
-        assert_eq!(c[2].rank(), 1);
-
-        c.check_d_all();
-
-        assert!( c.d_matrix(0).is_zero());
-        assert!( c.d_matrix(1).is_zero());
-        assert!(!c.d_matrix(2).is_zero());
-
-        let a = c.d_matrix(2).to_dense()[[0, 0]];
-        assert!(a == 2 || a == -2);
-    }
-
     #[test]
     fn bypass() { 
         let c = ChainComplex::<i32>::t2();

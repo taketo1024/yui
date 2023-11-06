@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use itertools::Itertools;
 use log::*;
 use sprs::PermOwned;
 
@@ -22,62 +23,87 @@ use crate::{ChainComplexTrait, ReducedComplexBase, RModStr};
 //  C[0] --------> C[1]'---------> C[2]'-------> C[3]
 //          [y]           [s]           [w]
 
-pub struct ChainReducer<'a, I, C>
+pub struct ChainReducer<I, R>
 where 
     I: Deg,
-    C: ChainComplexTrait<I>,
-    C::R: Ring, for<'x> &'x C::R: RingOps<C::R>,
-    C::E: RModStr<R = C::R>,
+    R: Ring, for<'x> &'x R: RingOps<R>,
 { 
-    complex: &'a C,
-    mats: HashMap<I, SpMat<C::R>>,
+    d_deg: I,
     with_trans: bool,
-    trans: Option<HashMap<I, Trans<C::R>>>
+    mats: HashMap<I, SpMat<R>>,
+    trans: HashMap<I, Trans<R>>
 }
 
-impl<'a, I, C> ChainReducer<'a, I, C>
+impl<I, R> ChainReducer<I, R>
 where 
     I: Deg,
-    C: ChainComplexTrait<I>,
-    C::R: Ring, for<'x> &'x C::R: RingOps<C::R>,
-    C::E: RModStr<R = C::R>,
+    R: Ring, for<'x> &'x R: RingOps<R>,
 {
-    pub fn reduce(complex: &'a C, with_trans: bool) -> ReducedComplexBase<I, C::R> {
-        let mut r = Self::new(complex, with_trans);
-        r.process_all();
-        r.as_complex()
-    }
+    pub fn reduce<C>(complex: &C, with_trans: bool) -> ReducedComplexBase<I, R> 
+    where
+        C: ChainComplexTrait<I, R = R>,
+        C::E: RModStr<R = R>
+    {
+        let support = complex.support().collect_vec();
+        let d_deg = complex.d_deg();
 
-    pub fn new(complex: &'a C, with_trans: bool) -> Self { 
-        let mats = HashMap::new();
-        let trans = if with_trans { 
-            Some(HashMap::new())
-        } else { 
-            None
-        };
-        Self { complex, mats, with_trans, trans }
-    }
+        let mut reducer = Self::new(d_deg, with_trans);
 
-    pub fn matrix(&self, i: I) -> &SpMat<C::R> {
-        self.mats.get(&i).unwrap_or(self.complex.d_matrix(i))
-    }
-
-    pub fn trans(&self, i: I) -> Option<&Trans<C::R>> {
-        self.trans.as_ref().and_then(|t| t.get(&i))
-    }
-
-    pub fn process_all(&mut self) { 
-        for i in self.complex.support() { 
-            self.process_at(i)
+        for i in support.iter().cloned() { 
+            for j in [i, i + d_deg] { 
+                if !reducer.is_init(j) {
+                    let d = complex.d_matrix(j).clone();
+                    reducer.init(j, d);
+                }
+            }
+            reducer.reduce_at(i);
         }
+
+        reducer.as_complex(support.into_iter())
     }
 
-    pub fn process_at(&mut self, i: I) { 
-        self.process_at_itr(i, 0)
+    pub fn new(d_deg: I, with_trans: bool) -> Self {
+        let mats = HashMap::new();
+        let trans = HashMap::new();
+        Self { d_deg, with_trans, mats, trans }
     }
 
-    fn process_at_itr(&mut self, i: I, itr: usize) { 
-        let a = self.matrix(i);
+    pub fn matrix(&self, i: I) -> Option<&SpMat<R>> {
+        self.mats.get(&i)
+    }
+
+    pub fn trans(&self, i: I) -> Option<&Trans<R>> {
+        self.trans.get(&i)
+    }
+
+    pub fn take_matrix(&mut self, i: I) -> Option<SpMat<R>> {
+        self.mats.remove(&i)
+    }
+
+    pub fn take_trans(&mut self, i: I) -> Option<Trans<R>> {
+        self.trans.remove(&i)
+    }
+
+    pub fn is_init(&self, i: I) -> bool { 
+        self.mats.contains_key(&i)
+    }
+
+    pub fn init(&mut self, i: I, d: SpMat<R>) {
+        if self.with_trans { 
+            let n = d.cols();
+            self.trans.insert(i, Trans::id(n));
+        }
+        self.mats.insert(i, d);
+    }
+
+    pub fn reduce_at(&mut self, i: I) { 
+        assert!(self.is_init(i), "not initialized at {i}");
+
+        self.reduce_at_itr(i, 0)
+    }
+
+    fn reduce_at_itr(&mut self, i: I, itr: usize) { 
+        let a = self.matrix(i).unwrap();
 
         info!("reduce at C[{i}] (itr: {itr}), size: {:?}.", a.shape());
 
@@ -85,11 +111,6 @@ where
 
         if r == 0 { 
             info!("no pivots found.");
-
-            if !self.is_processed_at(i) { 
-                self.init_at(i)
-            }
-            
             return 
         }
 
@@ -105,22 +126,15 @@ where
         self.update_mats(i, &p, &q, r, s);
 
         // to next iteration
-        self.process_at_itr(i, itr + 1)
+        self.reduce_at_itr(i, itr + 1)
     }
 
-    fn update_trans(&mut self, i: I, p: &PermOwned, q: &PermOwned, r: usize, s: &Schur<C::R>) {
+    fn update_trans(&mut self, i: I, p: &PermOwned, q: &PermOwned, r: usize, s: &Schur<R>) {
         assert!(self.with_trans);
 
-        let (m, n) = self.matrix(i).shape(); // (m, n)
+        let (m, n) = s.orig_shape(); // (m, n)
         let (_, i1, i2) = self.deg_trip(i);
         
-        if self.trans(i1).is_none() { 
-            self.trans.as_mut().unwrap().insert(i1, Trans::id(n));
-        }
-        if self.trans(i2).is_none() { 
-            self.trans.as_mut().unwrap().insert(i2, Trans::id(m));
-        }
-
         let t1 = self.trans(i1).unwrap().permute(q.view()).modify(
             |a| a.submat_rows(r..n),
             |b| b * s.trans_in().unwrap()
@@ -131,61 +145,46 @@ where
             |b| b.submat_cols(r..m)
         );
 
-        let ts = self.trans.as_mut().unwrap();
-        ts.insert(i1, t1);
-        ts.insert(i2, t2);
+        self.trans.insert(i1, t1);
+        self.trans.insert(i2, t2);
     }
 
-    fn update_mats(&mut self, i: I, p: &PermOwned, q: &PermOwned, r: usize, s: Schur<C::R>) {
+    fn update_mats(&mut self, i: I, p: &PermOwned, q: &PermOwned, r: usize, s: Schur<R>) {
         let (i0, i1, i2) = self.deg_trip(i);
-        let a0 = self.matrix(i0);
-        let a2 = self.matrix(i2);
 
-        let a0 = reduce_mat_rows(a0, &q, r);
+        if let Some(a0) = self.matrix(i0) {
+            let a0 = reduce_mat_rows(a0, &q, r);
+            self.mats.insert(i0, a0);
+        }
+
         let a1 = s.complement_into();
-        let a2 = reduce_mat_cols(a2, &p, r);
-
-        self.mats.insert(i0, a0);
         self.mats.insert(i1, a1);
-        self.mats.insert(i2, a2);
-    }
 
-    fn is_processed_at(&self, i: I) -> bool { 
-        self.mats.contains_key(&i)
-    }
-
-    fn init_at(&mut self, i: I) {
-        let d = self.complex.d_matrix(i);
-        let n = d.cols();
-
-        self.mats.insert(i, d.clone());
-        if self.with_trans { 
-            self.trans.as_mut().unwrap().insert(i, Trans::id(n));
+        if let Some(a2) = self.matrix(i2) { 
+            let a2 = reduce_mat_cols(a2, &p, r);
+            self.mats.insert(i2, a2);
         }
     }
 
     fn deg_trip(&self, i: I) -> (I, I, I) { 
-        let deg = self.complex.d_deg();
+        let deg = self.d_deg;
         (i - deg, i, i + deg)
     }
 
-    pub fn as_complex(mut self) -> ReducedComplexBase<I, C::R> { 
+    fn as_complex<Itr>(mut self, support: Itr) -> ReducedComplexBase<I, R> 
+    where Itr: Iterator<Item = I> { 
         use std::mem::take;
 
-        let support = self.complex.support();
-        let d_deg = self.complex.d_deg();
+        let d_deg = self.d_deg;
 
         let mut mats = take(&mut self.mats);
-        let mats_map = move |i| mats.remove(&i).unwrap();
-        
-        if self.with_trans { 
-            let mut trans = take(&mut self.trans).unwrap();
-            let trans_map = move |i| trans.remove(&i).unwrap();
-            ReducedComplexBase::new(support, d_deg, mats_map, trans_map)
-        } else { 
-            let trans_map = |i| Trans::id(self.complex.get(i).rank());
-            ReducedComplexBase::new(support, d_deg, mats_map, trans_map)
-        }
+        let mut trans = take(&mut self.trans);
+
+        ReducedComplexBase::new(
+            support, 
+            d_deg, 
+            move |i| (mats.remove(&i).unwrap(), trans.remove(&i))
+        )
     }
 }
 
@@ -221,54 +220,114 @@ mod tests {
     use crate::ChainComplex;
 
     #[test]
+    fn zero() { 
+        let c = ChainComplex::<i32>::zero();
+        let r = ChainReducer::reduce(&c, true);
+
+        r.check_d_all();
+
+        assert!(r[0].is_zero());
+    }
+
+    #[test]
+    fn acyclic() { 
+        let c = ChainComplex::<i32>::one_one(1);
+        let r = ChainReducer::reduce(&c, true);
+
+        r.check_d_all();
+
+        assert!(r[0].is_zero());
+        assert!(r[1].is_zero());
+    }
+
+    #[test]
+    fn tor() { 
+        let c = ChainComplex::<i32>::one_one(2);
+        let r = ChainReducer::reduce(&c, true);
+
+        r.check_d_all();
+
+        assert_eq!(r[0].rank(), 1);
+        assert_eq!(r[1].rank(), 1);
+    }
+    
+    #[test]
+    fn d3() {
+        let c = ChainComplex::<i32>::d3();
+        let r = ChainReducer::reduce(&c, false);
+
+        r.check_d_all();
+
+        assert_eq!(r[0].rank(), 1);
+        assert_eq!(r[1].rank(), 0);
+        assert_eq!(r[2].rank(), 0);
+        assert_eq!(r[3].rank(), 0);
+
+        assert!(r.d_matrix(0).is_zero());
+        assert!(r.d_matrix(1).is_zero());
+        assert!(r.d_matrix(2).is_zero());
+        assert!(r.d_matrix(3).is_zero());
+    }
+
+    #[test]
     fn s2() {
         let c = ChainComplex::<i32>::s2();
+        let r = ChainReducer::reduce(&c, false);
 
-        let mut red = ChainReducer::new(&c, false);
-        red.process_all();
+        r.check_d_all();
 
-        let d2 = red.matrix(2);
-        let d1 = red.matrix(1);
+        assert_eq!(r[0].rank(), 1);
+        assert_eq!(r[1].rank(), 0);
+        assert_eq!(r[2].rank(), 1);
 
-        assert!( (d1 * d2).is_zero() );
+        assert!(r.d_matrix(0).is_zero());
+        assert!(r.d_matrix(1).is_zero());
+        assert!(r.d_matrix(2).is_zero());
     }
 
     #[test]
     fn t2() {
         let c = ChainComplex::<i32>::t2();
+        let r = ChainReducer::reduce(&c, false);
 
-        let mut red = ChainReducer::new(&c, false);
-        red.process_all();
+        r.check_d_all();
 
-        let d2 = red.matrix(2);
-        let d1 = red.matrix(1);
+        assert_eq!(r[0].rank(), 1);
+        assert_eq!(r[1].rank(), 2);
+        assert_eq!(r[2].rank(), 1);
 
-        assert!( (d1 * d2).is_zero() );
+        assert!(r.d_matrix(0).is_zero());
+        assert!(r.d_matrix(1).is_zero());
+        assert!(r.d_matrix(2).is_zero());
     }
 
     #[test]
     fn rp2() {
         let c = ChainComplex::<i32>::rp2();
+        let r = ChainReducer::reduce(&c, false);
 
-        let mut red = ChainReducer::new(&c, false);
-        red.process_all();
+        r.check_d_all();
 
-        let d2 = red.matrix(2);
-        let d1 = red.matrix(1);
+        assert_eq!(r[0].rank(), 1);
+        assert_eq!(r[1].rank(), 1);
+        assert_eq!(r[2].rank(), 1);
 
-        assert!( (d1 * d2).is_zero() );
+        assert!( r.d_matrix(0).is_zero());
+        assert!( r.d_matrix(1).is_zero());
+        assert!(!r.d_matrix(2).is_zero());
+
+        let a = r.d_matrix(2).to_dense()[[0, 0]];
+        assert!(a == 2 || a == -2);
     }
 
     #[test]
     fn s2_trans() {
         let c = ChainComplex::<i32>::s2();
+        let r = ChainReducer::reduce(&c, true);
 
-        let mut red = ChainReducer::new(&c, true);
-        red.process_all();
-
-        let t0 = red.trans(0).unwrap();
-        let t1 = red.trans(1).unwrap();
-        let t2 = red.trans(2).unwrap();
+        let t0 = r.trans(0).unwrap();
+        let t1 = r.trans(1).unwrap();
+        let t2 = r.trans(2).unwrap();
 
         assert_eq!(t0.src_dim(), 4);
         assert_eq!(t1.src_dim(), 6);
@@ -292,12 +351,11 @@ mod tests {
     fn t2_trans() {
         let c = ChainComplex::<i32>::t2();
 
-        let mut red = ChainReducer::new(&c, true);
-        red.process_all();
+        let r = ChainReducer::reduce(&c, true);
 
-        let t0 = red.trans(0).unwrap();
-        let t1 = red.trans(1).unwrap();
-        let t2 = red.trans(2).unwrap();
+        let t0 = r.trans(0).unwrap();
+        let t1 = r.trans(1).unwrap();
+        let t2 = r.trans(2).unwrap();
 
         assert_eq!(t0.src_dim(), 9);
         assert_eq!(t1.src_dim(), 27);
@@ -329,12 +387,11 @@ mod tests {
     fn rp2_trans() {
         let c = ChainComplex::<i32>::rp2();
 
-        let mut red = ChainReducer::new(&c, true);
-        red.process_all();
+        let r = ChainReducer::reduce(&c, true);
 
-        let t0 = red.trans(0).unwrap();
-        let t1 = red.trans(1).unwrap();
-        let t2 = red.trans(2).unwrap();
+        let t0 = r.trans(0).unwrap();
+        let t1 = r.trans(1).unwrap();
+        let t2 = r.trans(2).unwrap();
 
         assert_eq!(t0.src_dim(), 6);
         assert_eq!(t1.src_dim(), 15);
@@ -362,52 +419,5 @@ mod tests {
         let w = t1.backward(&v);
         
         assert!(c.d(1, &w).is_zero());
-    }
-
-    #[test]
-    fn as_complex_zero() { 
-        let c = ChainComplex::<i32>::zero();
-        let r = ChainReducer::reduce(&c, true);
-        r.check_d_all();
-    }
-
-    #[test]
-    fn as_complex_acyclic() { 
-        let c = ChainComplex::<i32>::one_one(1);
-        let r = ChainReducer::reduce(&c, true);
-        r.check_d_all();
-    }
-
-    #[test]
-    fn as_complex_tor() { 
-        let c = ChainComplex::<i32>::one_one(2);
-        let r = ChainReducer::reduce(&c, true);
-        r.check_d_all();
-    }
-
-    #[test]
-    fn as_complex_t2() { 
-        let c = ChainComplex::<i32>::t2();
-        let r = ChainReducer::reduce(&c, false);
-        r.check_d_all();
-    }
-
-    #[test]
-    fn as_complex_with_trans() { 
-        let c = ChainComplex::<i32>::t2();
-        let r = ChainReducer::reduce(&c, true);
-        r.check_d_all();
-        
-        let u = SpVec::unit(1, 0);
-        let v = r.trans(2).backward(&u);
-
-        assert!(!v.is_zero());
-        assert!(c.d(2, &v).is_zero());
-
-        let w = r.trans(2).forward(&v);
-
-        assert!(!w.is_zero());
-        assert!(r.d(2, &w).is_zero());
-        assert_eq!(w, u);
     }
 }

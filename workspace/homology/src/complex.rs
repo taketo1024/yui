@@ -4,7 +4,7 @@ use std::ops::Index;
 use itertools::{Itertools, Either};
 use delegate::delegate;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
-use yui_matrix::sparse::{SpMat, SpVec, MatType, Trans};
+use yui_matrix::sparse::{SpMat, SpVec, MatType};
 
 use crate::{ReducedComplexBase, GridBase, GridIter, RModStr, SimpleRModStr};
 
@@ -48,11 +48,6 @@ where
     
     fn reduced(&self, with_trans: bool) -> ReducedComplexBase<I, Self::R> { 
         ChainReducer::reduce(self, with_trans)
-    }
-
-    fn reduced_by<F>(&self, trans: F) -> ReducedComplexBase<I, Self::R>
-    where F: FnMut(I) -> Trans<Self::R> {
-        ReducedComplexBase::reduced_by(self, trans)
     }
 }
 

@@ -45,6 +45,18 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         self.f.rows()
     }
 
+    pub fn is_id(&self) -> bool { 
+        self.f_id && self.b_id
+    }
+
+    pub fn is_forward_id(&self) -> bool { 
+        self.f_id
+    }
+
+    pub fn is_backward_id(&self) -> bool { 
+        self.b_id
+    }
+
     pub fn forward_mat(&self) -> &SpMat<R> {
         &self.f
     }
@@ -67,14 +79,6 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         } else { 
             &self.b * v
         }
-    }
-
-    pub fn is_forward_id(&self) -> bool { 
-        self.f_id
-    }
-
-    pub fn is_backward_id(&self) -> bool { 
-        self.b_id
     }
 
     pub fn modify<F, B>(&self, f_map: F, b_map: B) -> Self
@@ -195,5 +199,6 @@ mod tests {
         let t = Trans::<i64>::id(10);
         assert!(t.is_forward_id());
         assert!(t.is_backward_id());
+        assert!(t.is_id());
     }
 }

@@ -37,6 +37,11 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         
         assert_eq!(d1.rows(), d2.cols());
 
+        // trivial case
+        if d1.is_zero() && d2.is_zero() { 
+            return Self::trivial_result(d2.cols());
+        }
+
         let (s1, s2) = Self::process_snf(d1, d2, with_trans);
         let (rank, tors) = Self::result(&s1, &s2);
 
@@ -47,6 +52,11 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         };
 
         HomologySummand::new(rank, tors, trans)
+    }
+
+    fn trivial_result(rank: usize) -> HomologySummand<R> {
+        let t = Trans::id(rank);
+        return HomologySummand::new(rank, vec![], Some(t))
     }
 
     fn process_snf(d1: &SpMat<R>, d2: &SpMat<R>, with_trans: bool) -> (SnfResult<R>, SnfResult<R>) {

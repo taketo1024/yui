@@ -1,16 +1,18 @@
 use core::fmt;
-use std::fmt::Display;
+use std::fmt::{Display, Debug};
 use std::ops::Index;
 
-use derive_more::Display;
+use derive_more::{Display, DebugCustom};
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Display, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DebugCustom, Display, Default)]
 pub enum Bit { 
     #[default]
     #[display(fmt="0")]
+    #[debug(fmt="0")]
     Bit0, 
 
     #[display(fmt="1")]
+    #[debug(fmt="0")]
     Bit1
 }
 
@@ -63,7 +65,7 @@ impl_bit_from_int!(i32);
 impl_bit_from_int!(i64);
 impl_bit_from_int!(isize);
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct BitSeq { 
     val: u64,
     len: usize
@@ -266,11 +268,18 @@ impl Index<usize> for BitSeq {
 impl Display for BitSeq {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for b in self.iter() { 
-            b.fmt(f)?;
+            Display::fmt(&b, f)?;
         }
         Ok(())
     }
 }
+
+impl Debug for BitSeq {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Display::fmt(self, f)
+    }
+}
+
 
 impl PartialOrd for BitSeq {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {

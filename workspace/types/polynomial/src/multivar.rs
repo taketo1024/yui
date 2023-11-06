@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::fmt::{Display, Debug};
 use std::str::FromStr;
 use num_traits::{Zero, One};
 
@@ -54,6 +54,12 @@ macro_rules! impl_multivar {
                 } else { 
                     write!(f, "{s}")
                 }
+            }
+        }
+
+        impl<const X: char> Debug for MultiVar<X, $I> { 
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                Display::fmt(self, f)
             }
         }
 
@@ -149,6 +155,17 @@ impl_multivar_signed!  (isize);
 #[cfg(test)]
 mod tests { 
     use super::*;
+
+    #[test]
+    fn display() { 
+        type M = MultiVar<'X', usize>;
+
+        assert_eq!(format!("{}", M::from([])), "1");
+        assert_eq!(format!("{}", M::from([0])), "1");
+        assert_eq!(format!("{}", M::from([1])), "X₀");
+        assert_eq!(format!("{}", M::from([3])), "X₀³");
+        assert_eq!(format!("{}", M::from([1,0,3])), "X₀X₂³");
+    }
 
     #[test]
     fn from_pair() { 

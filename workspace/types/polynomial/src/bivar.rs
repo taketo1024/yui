@@ -1,5 +1,5 @@
 use core::panic;
-use std::fmt::Display;
+use std::fmt::{Display, Debug};
 use std::ops::{AddAssign, Mul, MulAssign, DivAssign, SubAssign, Div, Add};
 use std::str::FromStr;
 use num_traits::{Zero, One, Pow};
@@ -14,7 +14,7 @@ use super::univar::fmt_mono;
 // `BiVar<X, Y, I>` : represents bivariant monomials X^i Y^j.
 // `I` is either `usize` or `isize`.
 
-#[derive(Clone, PartialEq, Eq, Hash, Default, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Default)]
 pub struct BiVar<const X: char, const Y: char, I>(
     I, 
     I
@@ -144,6 +144,12 @@ macro_rules! impl_bivar {
             }
         }
         
+        impl<const X: char, const Y: char> Debug for BiVar<X, Y, $I> { 
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                Display::fmt(self, f)
+            }
+        }
+
         impl<const X: char, const Y: char> Elem for BiVar<X, Y, $I> { 
             fn math_symbol() -> String {
                 format!("{X}, {Y}")

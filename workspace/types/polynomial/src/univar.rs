@@ -14,7 +14,7 @@ use crate::Mono;
 // `Univar<X, I>` : represents monomials X^d (univar) or ΠX_i^{d_i} (multivar).
 // `I` is one of `usize`, `isize`, `MultiDeg<usize>`, `MultiDeg<isize>`.
 
-#[derive(Clone, PartialEq, Eq, Hash, Default, Debug, PartialOrd, Ord)]
+#[derive(Clone, PartialEq, Eq, Hash, Default, PartialOrd, Ord)]
 pub struct Univar<const X: char, I>(
     pub(crate) I
 );
@@ -67,6 +67,12 @@ macro_rules! impl_univar {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let x = X.to_string();
                 write!(f, "{}", fmt_mono(x, self.0))
+            }
+        }
+
+        impl<const X: char> Debug for Univar<X, $I> { 
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                Display::fmt(self, f)
             }
         }
         

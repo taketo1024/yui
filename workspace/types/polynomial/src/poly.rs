@@ -196,7 +196,7 @@ macro_rules! impl_polyn_funcs {
         where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn lead_term_for(&self, k: usize) -> (&MultiVar<X, $I>, &R) { 
                 self.iter()
-                    .filter(|(_, r)| !r.is_zero())
+                    .filter(|(x, r)| !r.is_zero() && x.deg_for(k) > 0)
                     .max_by(|(x, _), (y, _)|
                         Ord::cmp(
                             &x.deg_for(k), &y.deg_for(k)
@@ -204,7 +204,7 @@ macro_rules! impl_polyn_funcs {
                             &x, &y
                         ))
                     )
-                    .unwrap_or((&self.zero.0, &self.zero.1))
+                    .unwrap_or(self.lead_term())
             }
 
             pub fn lead_coeff_for(&self, k: usize) -> &R { 

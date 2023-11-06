@@ -33,9 +33,19 @@ impl<I> MultiDeg<I> {
         to self.data { 
             pub fn len(&self) -> usize;
             pub fn iter(&self) -> impl Iterator<Item = (&usize, &I)>;
-            #[call(keys)] 
-            pub fn indices(&self) -> impl Iterator<Item = &usize>;
         }
+    }
+
+    pub fn indices(&self) -> impl Iterator<Item = &usize> { 
+        self.data.keys()
+    }
+
+    pub fn min_index(&self) -> Option<usize> { 
+        self.indices().min().cloned()
+    }
+
+    pub fn max_index(&self) -> Option<usize> { 
+        self.indices().max().cloned()
     }
 }
 

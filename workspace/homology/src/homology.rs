@@ -40,6 +40,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.trans.as_ref().map(|t| t.backward_mat().col_vec(i))
     }
 
+    pub fn trans(&self) -> Option<&Trans<R>> {
+        self.trans.as_ref()
+    }
+
     pub fn vec_from_cpx(&self, v: &SpVec<R>) -> Option<SpVec<R>> { 
         self.trans.as_ref().map(|t| t.forward(v))
     }

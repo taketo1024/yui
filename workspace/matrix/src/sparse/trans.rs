@@ -6,7 +6,9 @@ use crate::sparse::{SpMat, MatType, SpVec};
 pub struct Trans<R> 
 where R: Ring, for <'x> &'x R: RingOps<R> {
     f: SpMat<R>,
-    b: SpMat<R>
+    b: SpMat<R>,
+    f_id: bool,
+    b_id: bool
 }
 
 impl<R> Trans<R> 
@@ -15,7 +17,9 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         assert_eq!(f.rows(), b.cols());
         assert_eq!(f.cols(), b.rows());
 
-        Self { f, b }
+        let f_id = f.is_id();
+        let b_id = b.is_id();
+        Self { f, b, f_id, b_id }
     }
 
     pub fn id(n: usize) -> Self { 
@@ -50,11 +54,27 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
     }
 
     pub fn forward(&self, v: &SpVec<R>) -> SpVec<R> {
-        &self.f * v
+        if self.f_id { 
+            v.clone() 
+        } else { 
+            &self.f * v
+        }
     }
 
     pub fn backward(&self, v: &SpVec<R>) -> SpVec<R> {
-        &self.b * v
+        if self.b_id { 
+            v.clone()
+        } else { 
+            &self.b * v
+        }
+    }
+
+    pub fn is_forward_id(&self) -> bool { 
+        self.f_id
+    }
+
+    pub fn is_backward_id(&self) -> bool { 
+        self.b_id
     }
 
     pub fn modify<F, B>(&self, f_map: F, b_map: B) -> Self
@@ -168,5 +188,12 @@ mod tests {
 
         assert_eq!(w, SpVec::from(vec![2,0,1]));
         assert_eq!(x, SpVec::from(vec![0,1,2,0,0]));
+    }
+
+    #[test]
+    fn is_id() { 
+        let t = Trans::<i64>::id(10);
+        assert!(t.is_forward_id());
+        assert!(t.is_backward_id());
     }
 }

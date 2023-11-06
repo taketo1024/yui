@@ -39,7 +39,9 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         let n = self.rank();
         SpVec::generate(n, |set| { 
             for (x, a) in z.iter() { 
-                let i = self.gens.index_of(x).unwrap();
+                let Some(i) = self.gens.index_of(x) else { 
+                    panic!("{x} not found in generators: {:?}", &self.gens);
+                };
                 set(i, a.clone());
             }
         })

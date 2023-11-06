@@ -1,13 +1,12 @@
-use std::fmt::Debug;
 use std::iter::{Sum, Product};
 use std::str::FromStr;
-use std::{fmt::Display};
+use std::fmt::{Display, Debug};
 use std::ops::{Add, Neg, Sub, Mul, AddAssign, SubAssign, MulAssign, Rem, Div, RemAssign, DivAssign};
 use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
 use yui_core::{AddGrp, AddGrpOps, AddMon, AddMonOps, DivRound, Elem, EucRing, EucRingOps, Mon, MonOps, Ring, RingOps, Integer, IntOps};
 
-#[derive(Clone, Default, PartialEq, Eq, Debug)]
+#[derive(Clone, Default, PartialEq, Eq)]
 pub struct QuadInt<I, const D: i32>(I, I)
 where I: Integer, for<'x> &'x I: IntOps<I>;
 
@@ -133,7 +132,6 @@ where I: FromStr, J: FromStr {
     }
     Err(())
 }
- 
 
 impl<I, const D: i32> Display for QuadInt<I, D>
 where I: Integer, for<'x> &'x I: IntOps<I> {
@@ -158,6 +156,13 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
     
             write!(f, "{a} {sign} {b}{x}")
         }
+    }
+}
+
+impl<I, const D: i32> Debug for QuadInt<I, D>
+where I: Integer, for<'x> &'x I: IntOps<I> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
     }
 }
 
@@ -515,7 +520,33 @@ mod tests {
         check::<B>();
         check::<C>();
     }
- 
+
+    #[test]
+    fn display_gauss() { 
+        type A = QuadInt<i32, -1>;
+        let a = A::new(-2, 0);
+        let b = A::new(0, 3);
+        let c = A::new(1, 3);
+        let d = A::new(2, -3);
+        assert_eq!(format!("{}", a), "-2");
+        assert_eq!(format!("{}", b), "3i");
+        assert_eq!(format!("{}", c), "1 + 3i");
+        assert_eq!(format!("{}", d), "2 - 3i");
+    }
+
+    #[test]
+    fn display_eisen() { 
+        type A = QuadInt<i32, -3>;
+        let a = A::new(-2, 0);
+        let b = A::new(0, 3);
+        let c = A::new(1, 3);
+        let d = A::new(2, -3);
+        assert_eq!(format!("{}", a), "-2");
+        assert_eq!(format!("{}", b), "3ω");
+        assert_eq!(format!("{}", c), "1 + 3ω");
+        assert_eq!(format!("{}", d), "2 - 3ω");
+    }
+
     #[test]
     fn zero() { 
         type A = QuadInt<i32, -3>;

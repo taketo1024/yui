@@ -1,9 +1,9 @@
 #![allow(non_upper_case_globals)]
 
-use std::fmt::Display;
 use std::iter::{Sum, Product};
 use std::ops::{Add, Neg, Sub, Mul, Div, Rem, AddAssign, SubAssign, MulAssign, DivAssign, RemAssign};
 use std::str::FromStr;
+use derive_more::{Display, DebugCustom};
 use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
 
@@ -11,7 +11,9 @@ use yui_core::{Elem, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, EucRingOps
 
 pub type I = i32;
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, Default, Display, DebugCustom)]
+#[display(fmt= "{}", _0)]
+#[debug(fmt= "{}", _0)]
 pub struct FF<const p: I>(I);
 
 impl<const p: I> FF<p> { 
@@ -36,12 +38,6 @@ impl<const p: I> FromStr for FF<p> {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let a = s.parse::<I>()?;
         Ok(Self::from(a))
-    }
-}
-
-impl<const p: I> Display for FF<p> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
     }
 }
 
@@ -216,6 +212,24 @@ mod tests {
 
         let a = F5::new(-7);
         assert_eq!(a.0, 3);
+    }
+
+    #[test]
+    fn display() { 
+        let a = F3::new(-7);
+        assert_eq!(format!("{}", a), "2");
+
+        let a = F5::new(-7);
+        assert_eq!(format!("{}", a), "3");
+    }
+
+    #[test]
+    fn debug() { 
+        let a = F3::new(-7);
+        assert_eq!(format!("{:?}", a), "2");
+
+        let a = F5::new(-7);
+        assert_eq!(format!("{:?}", a), "3");
     }
 
     #[test]

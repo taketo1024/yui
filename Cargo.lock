@@ -1226,6 +1226,7 @@ name = "yui-ff"
 version = "0.1.0"
 dependencies = [
  "auto-impl-ops",
+ "derive_more",
  "num-traits",
  "yui-core",
  "yui-utils",

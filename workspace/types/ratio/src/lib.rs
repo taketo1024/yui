@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::fmt::{Display, Debug};
 use std::str::FromStr;
 use std::cmp;
 use std::iter::{Sum, Product};
@@ -7,7 +7,7 @@ use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
 use yui_core::{EucRing, EucRingOps, Elem, Mon, AddMon, AddGrp, AddMonOps, AddGrpOps, MonOps, RingOps, Ring, FieldOps, Field, Integer, IntOps};
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub struct Ratio<T> {
     numer: T,
     denom: T,
@@ -59,24 +59,36 @@ where T: Default + One {
 impl<T> Display for Ratio<T>
 where T: Display {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fn par(s: String) -> String {
-            if s.contains(' ') { 
-                format!("({s})")
-            } else { 
-                s
-            }
-        }
-        
-        let p = par(self.numer.to_string());
-        let q = par(self.denom.to_string());
-
-        if &q == "1" { 
-            write!(f, "{}", p)
-        } else { 
-            write!(f, "{}/{}", p, q)
-        }
+        fmt(f, self.numer.to_string(), self.denom.to_string())
     }
 }
+
+impl<T> Debug for Ratio<T>
+where T: Debug {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fmt(f, format!("{:?}", self.numer), format!("{:?}", self.denom))
+    }
+}
+
+fn fmt(f: &mut std::fmt::Formatter<'_>, numer: String, denom: String) -> std::fmt::Result { 
+    fn par(s: String) -> String {
+        if s.contains(' ') { 
+            format!("({s})")
+        } else { 
+            s
+        }
+    }
+
+    let p = par(numer);
+    let q = par(denom);
+
+    if &q == "1" { 
+        write!(f, "{}", p)
+    } else { 
+        write!(f, "{}/{}", p, q)
+    }
+}
+
 
 impl<T> Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {
@@ -423,8 +435,14 @@ mod tests {
 
     #[test]
     fn display() {
-        assert_eq!(Ratio::new(-3, 1).to_string(), "-3");
-        assert_eq!(Ratio::new(-3, 4).to_string(), "-3/4");
+        assert_eq!(format!("{}", Ratio::new(-3, 1)), "-3");
+        assert_eq!(format!("{}", Ratio::new(-3, 4)), "-3/4");
+    }
+
+    #[test]
+    fn debug() {
+        assert_eq!(format!("{:?}", Ratio::new(-3, 1)), "-3");
+        assert_eq!(format!("{:?}", Ratio::new(-3, 4)), "-3/4");
     }
 
     #[test]

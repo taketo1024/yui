@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::fmt::{Display, Debug};
 use std::iter::{Sum, Product};
 use std::ops::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Neg, DivAssign, RemAssign, Div, Rem};
 use std::str::FromStr;
@@ -41,7 +41,7 @@ pub trait Mono:
     fn divides(&self, other: &Self) -> bool;
 }
 
-#[derive(Clone, PartialEq, Eq, Default, Debug)]
+#[derive(Clone, PartialEq, Eq, Default)]
 pub struct PolyBase<X, R>
 where 
     X: Mono, 
@@ -130,10 +130,6 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
         F: Fn(&R) -> R2
     {
         PolyBase::<X, R2>::from( self.data.map_coeffs(f) )
-    }
-
-    pub fn display(&self, ascending: bool) -> String { 
-        self.data.display(ascending)
     }
 }
 
@@ -287,7 +283,14 @@ where X: Mono + FromStr, R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
 impl<X, R> Display for PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.display(false)) // descending order
+        self.data.fmt(f, false) // descending order
+    }
+}
+
+impl<X, R> Debug for PolyBase<X, R>
+where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.data.fmt(f, false) // descending order
     }
 }
 
@@ -589,7 +592,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn init_poly() { 
+    fn init() { 
+        type P = Poly::<'x', i32>; 
+
+        let x = P::mono;
+        let f = P::from_iter([(x(0), 1), (x(1), 2), (x(2), -3)]);
+        assert_eq!(f.data.coeff(&x(0)), &1);
+        assert_eq!(f.data.coeff(&x(1)), &2);
+        assert_eq!(f.data.coeff(&x(2)), &-3);
+        assert_eq!(f.data.coeff(&x(3)), &0);
+    }
+ 
+    #[test]
+    fn display_poly() { 
         type P = Poly::<'x', i32>; 
 
         let x = P::mono;
@@ -598,7 +613,7 @@ mod tests {
     }
  
     #[test]
-    fn init_lpoly() { 
+    fn display_lpoly() { 
         type P = LPoly::<'x', i32>; 
 
         let x = P::mono;
@@ -607,7 +622,7 @@ mod tests {
     }
 
     #[test]
-    fn init_poly2() { 
+    fn display_poly2() { 
         type P = Poly2::<'x', 'y', i32>; 
 
         let xy = |i, j| P::mono(i, j);
@@ -616,7 +631,7 @@ mod tests {
     }
  
     #[test]
-    fn init_mpoly() { 
+    fn display_mpoly() { 
         type P = PolyN::<'x', i32>; 
 
         let xn = |i| P::mono(i);
@@ -629,7 +644,7 @@ mod tests {
     }
 
     #[test]
-    fn init_mlpoly() { 
+    fn display_mlpoly() { 
         type P = LPolyN::<'x', i32>; 
 
         let xn = |i| P::mono(i);

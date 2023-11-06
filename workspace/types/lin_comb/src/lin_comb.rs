@@ -2,7 +2,7 @@ use std::fmt::{Display, Debug};
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, MulAssign};
 use ahash::AHashMap;
-use itertools::{Itertools, Either};
+use itertools::Itertools;
 use num_traits::Zero;
 use auto_impl_ops::auto_ops;
 
@@ -11,7 +11,7 @@ use yui_utils::map;
 
 use super::gen::*;
 
-#[derive(PartialEq, Eq, Clone, Debug, Default)]
+#[derive(PartialEq, Eq, Clone, Default)]
 pub struct LinComb<X, R>
 where
     X: Gen,
@@ -145,61 +145,54 @@ where
         res
     }
 
-    pub fn display(&self, ascending: bool) -> String {
-        if self.is_zero() { 
-            return "0".to_string();
+    pub fn fmt(&self, f: &mut std::fmt::Formatter<'_>, ascending: bool) -> std::fmt::Result {
+        if self.data.is_empty() { 
+            return write!(f, "0");
         }
 
-        let mut initial = true;
-        let mut terms = vec![];
-
-        let elements = self.iter().filter(|(_, a)| 
-            !a.is_zero()
-        ).sorted_by(|(x, _), (y, _)| 
-            x.cmp_for_display(y) 
+        let mut elements = self.iter().sorted_by(|(x, _), (y, _)| 
+            if ascending { 
+                x.cmp_for_display(y) 
+            } else {
+                x.cmp_for_display(y).reverse()
+            }
         );
         
-        let elements = if ascending { 
-            Either::Left(elements)
-        } else { 
-            Either::Right(elements.rev())
+        if let Some((x, r)) = elements.next() {
+            let r = r.to_string();
+            let x = x.to_string();
+
+            if r == "1" { 
+                write!(f, "{x}")?
+            } else if r == "-1" { 
+                write!(f, "-{x}")?
+            } else if x == "1" {
+                write!(f, "{r}")?
+            } else { 
+                write!(f, "{r}{x}")?
+            };
         };
 
         for (x, r) in elements {
             let r = r.to_string();
             let x = x.to_string();
 
-            if initial { 
-                let t = if r == "1" { 
-                    format!("{x}")
-                } else if r == "-1" { 
-                    format!("-{x}")
-                } else if x == "1" {
-                    format!("{r}")
-                } else { 
-                    format!("{r}{x}")
-                };
-                terms.push(t);
-                initial = false
+            let (op, r) = if r.starts_with("-") { 
+                ("-", &r[1..]) 
+            } else { 
+                ("+", r.as_str())
+            };
 
-            } else {
-                let (sign, r) = if r.starts_with("-") { 
-                    ("-", &r[1..]) 
-                } else { 
-                    ("+", r.as_str())
-                };
-                let t = if r == "1" { 
-                    format!("{sign} {x}")
-                } else if x == "1" { 
-                    format!("{sign} {r}")
-                } else { 
-                    format!("{sign} {r}{x}")
-                };
-                terms.push(t)
-            }
+            if r == "1" { 
+                write!(f, " {op} {x}")?
+            } else if x == "1" { 
+                write!(f, " {op} {r}")?
+            } else { 
+                write!(f, " {op} {r}{x}")?
+            };
         }
 
-        terms.join(" ")
+        Ok(())
     }
 }
 
@@ -249,7 +242,17 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.display(true))
+        self.fmt(f, true)
+    }
+}
+
+impl<X, R> Debug for LinComb<X, R>
+where
+    X: Gen,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.fmt(f, true)
     }
 }
 

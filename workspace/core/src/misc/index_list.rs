@@ -1,8 +1,10 @@
+use std::fmt::Debug;
 use std::hash::Hash;
 use std::ops::Index;
 
 use bimap::BiHashMap;
 use ahash::RandomState as ARandomState;
+use itertools::Itertools;
 
 #[derive(Default, Clone)]
 pub struct IndexList<E>
@@ -40,6 +42,13 @@ where E: Eq + Hash {
     }
 }
 
+impl<E> Debug for IndexList<E>
+where E: Eq + Hash + Debug {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.iter().collect_vec())
+    }
+}
+
 impl<E> FromIterator<E> for IndexList<E>
 where E: Eq + Hash {
     fn from_iter<T: IntoIterator<Item = E>>(iter: T) -> Self {
@@ -62,7 +71,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test() {
+    fn display() {
+        let list = IndexList::from_iter([3,7,4,5,1]);
+        assert_eq!(format!("{:?}", list), "[3, 7, 4, 5, 1]");
+    }
+    
+    #[test]
+    fn index_of() {
         let list = IndexList::from_iter([3,7,4,5,1]);
         assert_eq!(list[0], 3);
         assert_eq!(list[4], 1);

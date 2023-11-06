@@ -194,7 +194,7 @@ macro_rules! impl_polyn_funcs {
     ($I:ty) => {
         impl<const X: char, R> PolyBase<MultiVar<X, $I>, R>
         where R: Ring, for<'x> &'x R: RingOps<R> {
-            pub fn lead_term_for(&self, k: usize) -> (&MultiVar<X, $I>, &R) { 
+            pub fn lead_term_for(&self, k: usize) -> Option<(&MultiVar<X, $I>, &R)> { 
                 self.iter()
                     .filter(|(x, r)| !r.is_zero() && x.deg_for(k) > 0)
                     .max_by(|(x, _), (y, _)|
@@ -204,15 +204,6 @@ macro_rules! impl_polyn_funcs {
                             &x, &y
                         ))
                     )
-                    .unwrap_or(self.lead_term())
-            }
-
-            pub fn lead_coeff_for(&self, k: usize) -> &R { 
-                self.lead_term_for(k).1
-            }
-
-            pub fn lead_deg_for(&self, k: usize) -> MultiDeg<$I> { 
-                self.lead_term_for(k).0.deg()
             }
         }
     };
@@ -1018,10 +1009,9 @@ mod tests {
             (xn([0,2,4]), 3),
             (xn([5,5,5]), 0), // should be ignored
         ]);
-        assert_eq!(f.lead_term(),      (&xn([2,1,3]), &2));
-        assert_eq!(f.lead_term_for(0), (&xn([2,1,3]), &2));
-        assert_eq!(f.lead_term_for(1), (&xn([1,2,3]), &1));
-        assert_eq!(f.lead_term_for(2), (&xn([0,2,4]), &3));
-        assert_eq!(f.lead_term_for(3), f.lead_term());
+        assert_eq!(f.lead_term_for(0), Some((&xn([2,1,3]), &2)));
+        assert_eq!(f.lead_term_for(1), Some((&xn([1,2,3]), &1)));
+        assert_eq!(f.lead_term_for(2), Some((&xn([0,2,4]), &3)));
+        assert_eq!(f.lead_term_for(3), None);
     }
 }

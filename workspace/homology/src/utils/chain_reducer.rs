@@ -62,25 +62,6 @@ where
         reducer.as_complex(support)
     }
 
-    pub fn reduce_with<Itr, F>(support: Itr, d_deg: I, mut d_matrix: F) -> ChainComplexBase<I, R> 
-    where
-        Itr: Iterator<Item = I>,
-        F: FnMut(I, Option<&Trans<R>>) -> SpMat<R>
-    {
-        let support = support.collect_vec().into_iter();
-        let mut reducer = Self::new(d_deg, true);
-
-        for i in support.clone() { 
-            let t = reducer.trans(i);
-            let d = d_matrix(i, t);
-
-            reducer.set_matrix(i, d);
-            reducer.reduce_at(i);
-        }
-
-        reducer.as_complex(support.into_iter())
-    }
-
     pub fn new(d_deg: I, with_trans: bool) -> Self {
         let mats = HashMap::new();
         let trans = HashMap::new();
@@ -253,7 +234,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ChainComplex, GridTrait};
+    use crate::ChainComplex;
 
     #[test]
     fn zero() { 
@@ -453,24 +434,5 @@ mod tests {
         let w = t1.backward(&v);
         
         assert!(c.d(1, &w).is_zero());
-    }
-
-    #[test]
-    fn t2_reduce_with() { 
-        let c = ChainComplex::<i32>::t2();
-        let r = ChainReducer::reduce_with(c.support(), c.d_deg(), |i, t| { 
-            let d = c.d_matrix(i);
-            if let Some(t) = t { 
-                d * t.backward_mat()
-            } else { 
-                d.clone()
-            }
-        });
-
-        r.check_d_all();
-
-        assert_eq!(r[0].rank(), 1);
-        assert_eq!(r[1].rank(), 2);
-        assert_eq!(r[2].rank(), 1);
     }
 }

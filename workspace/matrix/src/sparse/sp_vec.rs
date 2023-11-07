@@ -32,6 +32,90 @@ impl<R> SpVec<R> {
     }
 }
 
+impl<R> SpVec<R> 
+where R: Zero { 
+    pub fn zero(dim: usize) -> Self { 
+        let cs_vec = CsVec::new(dim, vec![], vec![]);
+        Self::from(cs_vec)
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.cs_vec.data().iter().all(|a| a.is_zero())
+    }
+}
+
+impl<R> SpVec<R> 
+where R: Clone + Zero + One { 
+    pub fn unit(n: usize, i: usize) -> Self {
+        Self::generate(n, |set| set(i, R::one()))
+    }
+}
+
+impl<R> SpVec<R> 
+where R: Clone + Zero { 
+    pub fn generate<F>(n: usize, f: F) -> Self
+    where F: FnOnce(&mut (dyn FnMut(usize, R))) { 
+        let mut ind = Vec::new();
+        let mut val = Vec::new();
+
+        (f)(&mut |i, a| { 
+            if !a.is_zero() { 
+                ind.push(i);
+                val.push(a);                    
+            }
+        });
+        
+        let Ok(cs_vec) = CsVec::new_from_unsorted(n, ind, val) else { 
+            panic!();
+        };
+        Self::from(cs_vec)
+    }
+
+    pub fn from_entries<T: IntoIterator<Item = (usize, R)>>(dim: usize, iter: T) -> Self {
+        Self::generate(dim, |init| { 
+            for (i, a) in iter { 
+                init(i, a)
+            }
+        })
+    }
+
+    pub fn reduced(&self) -> Self { 
+        Self::generate(self.dim(), |set| { 
+            for (i, a) in self.iter() { 
+                set(i, a.clone())
+            }
+        })
+    }
+
+    pub fn permute<'b>(&self, p: PermView<'b>) -> SpVec<R> { 
+        self.view().permute(p).to_owned()
+    }
+
+    pub fn subvec(&self, range: Range<usize>) -> SpVec<R> { 
+        self.view().subvec(range).to_owned()
+    }
+
+    pub fn stack(&self, other: &SpVec<R>) -> SpVec<R> {
+        let (n1, n2) = (self.dim(), other.dim());
+        Self::generate(n1 + n2, |set| { 
+            for (i, a) in self.iter() { 
+                set(i, a.clone())
+            }
+            for (i, a) in other.iter() { 
+                set(n1 + i, a.clone())
+            }
+        })
+    }
+
+    pub fn to_dense(&self) -> Vec<R> { 
+        let mut vec = vec![R::zero(); self.dim()];
+        for (i, a) in self.iter() { 
+            vec[i] = a.clone();
+        }
+        vec
+    }
+}
+
 impl<R> From<CsVec<R>> for SpVec<R> {
     fn from(cs_vec: CsVec<R>) -> Self {
         Self { cs_vec }
@@ -61,96 +145,6 @@ impl<R> Default for SpVec<R> {
     fn default() -> Self {
         let cs_vec = CsVec::new(0, vec![], vec![]);
         Self::from(cs_vec)
-    }
-}
-
-macro_rules! _generate {
-    ($n:expr, $f:expr) => {{
-        let mut ind = Vec::new();
-        let mut val = Vec::new();
-
-        $f(&mut |i, a| { 
-            if a.is_zero() { return }
-            ind.push(i);
-            val.push(a);
-        });
-        
-        let Ok(cs_vec) = CsVec::new_from_unsorted($n, ind, val) else { 
-            panic!();
-        };
-        Self::from(cs_vec)
-    }};
-}
-
-impl<R> SpVec<R> 
-where R: Clone + Zero { 
-    pub fn generate<F>(n: usize, f: F) -> Self
-    where F: FnOnce(&mut (dyn FnMut(usize, R))) { 
-        _generate!(n, f)
-    }
-
-    pub fn from_entries<T: IntoIterator<Item = (usize, R)>>(dim: usize, iter: T) -> Self {
-        Self::generate(dim, |init| { 
-            for (i, a) in iter { 
-                init(i, a)
-            }
-        })
-    }
-
-    pub fn permute<'b>(&self, p: PermView<'b>) -> SpVec<R> { 
-        self.view().permute(p).to_owned()
-    }
-
-    pub fn subvec(&self, range: Range<usize>) -> SpVec<R> { 
-        self.view().subvec(range).to_owned()
-    }
-
-
-    pub fn to_dense(&self) -> Vec<R> { 
-        let mut vec = vec![R::zero(); self.dim()];
-        for (i, a) in self.iter() { 
-            vec[i] = a.clone();
-        }
-        vec
-    }
-
-    pub fn stack(&self, other: &SpVec<R>) -> SpVec<R> {
-        let (n1, n2) = (self.dim(), other.dim());
-        Self::generate(n1 + n2, |set| { 
-            for (i, a) in self.iter() { 
-                set(i, a.clone())
-            }
-            for (i, a) in other.iter() { 
-                set(n1 + i, a.clone())
-            }
-        })
-    }
-}
-
-impl<R> SpVec<R> 
-where R: Clone + Zero + One { 
-    pub fn unit(n: usize, i: usize) -> Self {
-        Self::generate(n, |set| set(i, R::one()))
-    }
-}
-
-impl<R> SpVec<R> 
-where R: Clone + Zero + Send + Sync { 
-    pub fn generate_sync<F>(n: usize, f: F) -> Self
-    where F: FnOnce(&mut (dyn FnMut(usize, R) + Send + Sync)) { 
-        _generate!(n, f)
-    }
-}
-
-impl<R> SpVec<R> 
-where R: Zero { 
-    pub fn zero(dim: usize) -> Self { 
-        let cs_vec = CsVec::new(dim, vec![], vec![]);
-        Self::from(cs_vec)
-    }
-
-    pub fn is_zero(&self) -> bool {
-        self.cs_vec.data().iter().all(|a| a.is_zero())
     }
 }
 

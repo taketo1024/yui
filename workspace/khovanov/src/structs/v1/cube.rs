@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::ops::RangeInclusive;
+use std::rc::Rc;
 use itertools::Itertools;
 use yui_core::{Ring, RingOps, PowMod2, Sign, GetSign};
 use yui_homology::XChainComplex;
@@ -260,20 +261,23 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn as_complex(self, i0: isize, reduced: bool) -> XChainComplex<KhEnhState, R> {
         let range = self.h_range();
         let range = (range.start() + i0) ..= (range.end() + i0);
+
+        let self0 = Rc::new(self);
+        let self1 = Rc::clone(&self0);
         
         XChainComplex::new(range, 1, 
-            |i| {
+            move |i| {
                 let i = i - i0;
                 let gens = if reduced {
-                    let e = self.base_pt.unwrap();
-                    self.reduced_generators(i, &e)
+                    let e = self0.base_pt.unwrap();
+                    self0.reduced_generators(i, &e)
                 } else { 
-                    self.generators(i) 
+                    self0.generators(i) 
                 };
                 gens.into_iter().cloned().collect()
             },
-            |_i, x| { 
-                self.differentiate(x)
+            move |_i, x| { 
+                self1.differentiate(x)
             }
         )
     }   

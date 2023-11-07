@@ -6,7 +6,7 @@ use yui_core::{Ring, RingOps, Deg, isize2, isize3};
 use yui_lin_comb::{Gen, LinComb};
 use yui_matrix::sparse::SpMat;
 
-use crate::{GridBase, GridIter, ChainComplexDisplay, ChainComplexBase, XModStr};
+use crate::{GridBase, GridIter, ChainComplexDisplay, XModStr, RModStr};
 
 use super::grid::GridTrait;
 use super::complex::ChainComplexTrait;
@@ -24,7 +24,8 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     summands: GridBase<I, XChainComplexSummand<X, R>>,
-    inner: ChainComplexBase<I, R>
+    d_deg: I,
+    d_map: Box<dyn Fn(I, &X) -> Vec<(X, R)>>,
 }
 
 impl<I, X, R> XChainComplexBase<I, X, R>
@@ -37,28 +38,18 @@ where
     where 
         It: Iterator<Item = I>, 
         F1: Fn(I) -> Vec<X>,
-        F2: Fn(I, &X) -> Vec<(X, R)>
+        F2: Fn(I, &X) -> Vec<(X, R)> + 'static
     {
         let summands = GridBase::new(support, |i| 
             XChainComplexSummand::free_from(gens_map(i))
         );
 
-        let inner = ChainComplexBase::new(summands.support(), d_deg, |i| {
-            let from = &summands[i];
-            let to = &summands[i + d_deg];
-            from.make_matrix(to, |x| d_map(i, x))
-        });
-
-        Self { summands, inner }
+        let d_map = Box::new(d_map);
+        Self { summands, d_deg, d_map }
     }
 
     pub fn d(&self, i: I, z: &LinComb<X, R>) -> LinComb<X, R> { 
-        let d = self.inner.d_matrix_ref(i);
-        let v = self[i].vectorize(z);
-        let w = d * v;
-
-        let i1 = i + self.d_deg();
-        self[i1].as_chain(&w)
+        z.apply(|x| (self.d_map)(i, x))
     }
 }
 
@@ -88,11 +79,25 @@ where
 {
     type R = R;
 
-    delegate! { 
-        to self.inner { 
-            fn d_deg(&self) -> I;
-            fn d_matrix(&self, i: I) -> SpMat<Self::R>;
-        }
+    fn d_deg(&self) -> I {
+        self.d_deg
+    }
+
+    fn d_matrix(&self, i: I) -> SpMat<Self::R> { 
+        let i1 = i + self.d_deg;
+        let (m, n) = (self[i1].rank(), self[i].rank());
+
+        SpMat::generate((m, n), |set| { 
+            for j in 0..n { 
+                let z = self[i].gen_chain(j);
+                let dz = self.d(i, &z);
+                let w = self[i1].vectorize(&dz);
+                
+                for (i, a) in w.iter() {
+                    set(i, j, a.clone())
+                }
+            }
+        })
     }
 }
 

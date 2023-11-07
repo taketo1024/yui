@@ -467,7 +467,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                     x.state.weight() == w
                 ).sorted().cloned().collect()
             }, 
-            |_i, x| { 
+            move |_i, x| { 
                 let v = &vertices[&x];
                 v.out_edges.iter().map(|(y, f)| 
                     (*y, f.eval(&h, &t))

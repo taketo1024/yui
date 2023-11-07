@@ -52,6 +52,11 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         self.inner.trans()
     }
 
+    pub fn gen_chain(&self, i: usize) -> LinComb<X, R> { 
+        let v = self.inner.gen_vec(i);
+        self.as_chain(&v)
+    }
+
     pub fn vectorize(&self, z: &LinComb<X, R>) -> SpVec<R> {
         let n = self.rank();
         let v = SpVec::generate(n, |set| { 

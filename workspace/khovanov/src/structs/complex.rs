@@ -1,4 +1,5 @@
 use std::ops::{RangeInclusive, Index};
+use std::rc::Rc;
 use cartesian::cartesian;
 
 use delegate::delegate;
@@ -68,19 +69,22 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             isize2(i, j)
         );
 
+        let self0 = Rc::new(self);
+        let self1 = Rc::clone(&self0);
+
         let complex = XChainComplex2::new(support, isize2(1, 0), 
-            |idx| {
+            move |idx| {
                 let isize2(i, j) = idx;
                 let q = j - deg_shift.1;
 
-                self[i].gens().iter().filter(|x| { 
+                self0[i].gens().iter().filter(|x| { 
                     x.q_deg() == q
                 }).cloned().collect()
             },
-            |idx, x| { 
+            move |idx, x| { 
                 let i = idx.0;
                 let x = KhChain::from(x.clone());
-                let dx = self.d(i, &x);
+                let dx = self1.d(i, &x);
                 dx.into_iter().collect()
             }
         );

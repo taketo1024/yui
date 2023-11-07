@@ -12,6 +12,10 @@ where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
     fn rank(&self) -> usize;
     fn tors(&self) -> &Vec<Self::R>;
 
+    fn dim(&self) -> usize { // not a good name...
+        self.rank() + self.tors().len()
+    }
+
     fn is_zero(&self) -> bool { 
         self.rank() == 0 && self.is_free()
     }
@@ -58,7 +62,7 @@ where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
     }
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct SimpleRModStr<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     rank: usize, 
@@ -87,21 +91,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.trans.as_ref()
     }
 
-    pub fn ngens(&self) -> usize { 
-        self.rank + self.tors.len() // == trans.tgt_dim()
-    }
-
     // The vector representing the i-th generator.
+
     pub fn gen_vec(&self, i: usize) -> SpVec<R> {
-        let n = self.ngens();
+        let Some(t) = &self.trans else { 
+            panic!()
+        };
 
-        assert!(i < n);
+        assert!(i < self.dim());
 
-        if let Some(t) = &self.trans { 
-            t.backward_mat().col_vec(i)
-        } else { 
-            SpVec::unit(n, i)
-        }
+        t.backward_mat().col_vec(i)
     }
 
     pub fn compose(&self, other: SimpleRModStr<R>) -> SimpleRModStr<R> { 
@@ -112,6 +111,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
         }
         Self::new(other.rank, other.tors, None)
+    }
+}
+
+impl<R> Default for SimpleRModStr<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn default() -> Self {
+        Self::zero()
     }
 }
 

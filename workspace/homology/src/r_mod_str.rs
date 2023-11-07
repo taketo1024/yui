@@ -1,7 +1,7 @@
 use itertools::Itertools;
 
 use yui_core::{Elem, Ring, RingOps};
-use yui_matrix::sparse::Trans;
+use yui_matrix::sparse::{Trans, SpVec};
 
 use crate::DisplayForGrid;
 
@@ -69,15 +69,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> SimpleRModStr<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(rank: usize, tors: Vec<R>, trans: Option<Trans<R>>) -> Self { 
+        if let Some(t) = &trans { 
+            assert_eq!(rank + tors.len(), t.tgt_dim());
+        }
         Self { rank, tors, trans }
-    }
-
-    pub fn free(rank: usize) -> Self { 
-        Self::new(rank, vec![], Some(Trans::id(rank)))
     }
 
     pub fn trans(&self) -> Option<&Trans<R>> { 
         self.trans.as_ref()
+    }
+
+    // The vector representing the i-th generator.
+    pub fn gen_vec(&self, i: usize) -> Option<SpVec<R>> {
+        let Some(t) = &self.trans else { 
+            return None 
+        };
+
+        assert!(i < t.tgt_dim());
+        let v = t.backward_mat().col_vec(i);
+        Some(v)
     }
 }
 

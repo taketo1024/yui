@@ -2,10 +2,9 @@ use std::ops::Index;
 
 use delegate::delegate;
 use yui_core::{EucRing, EucRingOps, Ring, RingOps, Deg, isize2, isize3};
-use yui_matrix::sparse::{SpVec, Trans};
 
 use crate::utils::HomologyCalc;
-use crate::{GridBase, GridIter, DisplayForGrid, ChainComplexTrait, RModStr};
+use crate::{GridBase, GridIter, ChainComplexTrait, RModStr, SimpleRModStr};
 
 use super::grid::GridTrait;
 
@@ -13,72 +12,7 @@ pub type Homology<R>  = HomologyBase<isize,  R>;
 pub type Homology2<R> = HomologyBase<isize2, R>;
 pub type Homology3<R> = HomologyBase<isize3, R>;
 
-#[derive(Debug, Clone)]
-pub struct HomologySummand<R> 
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    rank: usize,
-    tors: Vec<R>,
-    trans: Option<Trans<R>>
-}
-
-impl<R> HomologySummand<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new(rank: usize, tors: Vec<R>, trans: Option<Trans<R>>) -> Self { 
-        Self { rank, tors, trans }
-    }
-
-    pub fn zero() -> Self { 
-        Self::new(0, vec![], None)
-    }
-
-    pub fn ngens(&self) -> usize { 
-        self.rank + self.tors.len()
-    }
-
-    pub fn gen_vec(&self, i: usize) -> Option<SpVec<R>> {
-        assert!(i < self.ngens());
-        self.trans.as_ref().map(|t| t.backward_mat().col_vec(i))
-    }
-
-    pub fn trans(&self) -> Option<&Trans<R>> {
-        self.trans.as_ref()
-    }
-
-    pub fn vec_from_cpx(&self, v: &SpVec<R>) -> Option<SpVec<R>> { 
-        self.trans.as_ref().map(|t| t.forward(v))
-    }
-
-    pub fn vec_to_cpx(&self, v: &SpVec<R>) -> Option<SpVec<R>> { 
-        self.trans.as_ref().map(|t| t.backward(v))
-    }
-}
-
-impl<R> Default for HomologySummand<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn default() -> Self {
-        Self::zero()
-    }
-}
-
-impl<R> RModStr for HomologySummand<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type R = R;
-
-    fn rank(&self) -> usize {
-        self.rank
-    }
-
-    fn tors(&self) -> &Vec<Self::R> {
-        &self.tors
-    }
-}
-
-impl<R> DisplayForGrid for HomologySummand<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn display_for_grid(&self) -> String {
-        self.math_symbol()
-    }
-}
+pub type HomologySummand<R> = SimpleRModStr<R>;
 
 pub struct HomologyBase<I, R>
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
@@ -275,12 +209,12 @@ mod tests {
         let h = c.homology(true);
 
         let h2 = &h[2];
-        assert_eq!(h2.ngens(), 1);
-
+        let t = h2.trans().unwrap();
         let z = h2.gen_vec(0).unwrap();
+
         assert!(!z.is_zero());
         assert!(c.d(2, &z).is_zero());
-        assert_eq!(h2.vec_from_cpx(&z), Some(SpVec::from(vec![1])));
+        assert_eq!(t.forward(&z), SpVec::from(vec![1]));
     }
 
     #[test]
@@ -289,17 +223,15 @@ mod tests {
         let h = c.homology(true);
 
         let h2 = &h[2];
-        assert_eq!(h2.ngens(), 1);
-
+        let t2 = h2.trans().unwrap();
         let z = h2.gen_vec(0).unwrap();
+
         assert!(!z.is_zero());
         assert!(c.d(2, &z).is_zero());
-        assert_eq!(h2.vec_from_cpx(&z), Some(SpVec::from(vec![1])));
-        assert_eq!(h2.ngens(), 1);
+        assert_eq!(t2.forward(&z), SpVec::from(vec![1]));
 
         let h1 = &h[1];
-        assert_eq!(h1.ngens(), 2);
-
+        let t1 = h1.trans().unwrap();
         let a = h1.gen_vec(0).unwrap();
         let b = h1.gen_vec(1).unwrap();
 
@@ -307,8 +239,8 @@ mod tests {
         assert!(!b.is_zero());
         assert!(c.d(1, &a).is_zero());
         assert!(c.d(1, &b).is_zero());
-        assert_eq!(h1.vec_from_cpx(&a), Some(SpVec::from(vec![1, 0])));
-        assert_eq!(h1.vec_from_cpx(&b), Some(SpVec::from(vec![0, 1])));
+        assert_eq!(t1.forward(&a), SpVec::from(vec![1, 0]));
+        assert_eq!(t1.forward(&b), SpVec::from(vec![0, 1]));
     }
 
     #[test]
@@ -317,12 +249,11 @@ mod tests {
         let h = c.homology(true);
 
         let h1 = &h[1];
-        assert_eq!(h1.ngens(), 1);
-
+        let t = h1.trans().unwrap();
         let z = h1.gen_vec(0).unwrap();
 
         assert!(!z.is_zero());
         assert!(c.d(1, &z).is_zero());
-        assert_eq!(h1.vec_from_cpx(&z), Some(SpVec::from(vec![1])));
+        assert_eq!(t.forward(&z), SpVec::from(vec![1]));
     }
 }

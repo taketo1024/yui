@@ -49,9 +49,10 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     info!("homology: {}", kh.math_symbol());
     
     let r = kh.rank();
+    let t = kh.trans().unwrap();
 
     let vs = vs.into_iter().enumerate().map(|(i, v)| { 
-        let v = kh.vec_from_cpx(&v).unwrap().subvec(0..r);
+        let v = t.forward(&v).subvec(0..r);
         info!("a[{i}] = {v}");
         v
     }).collect_vec();

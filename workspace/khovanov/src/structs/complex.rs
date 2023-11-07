@@ -5,7 +5,7 @@ use cartesian::cartesian;
 use delegate::delegate;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps, isize2};
 use yui_link::Link;
-use yui_homology::{ChainComplexTrait, XChainComplex, XChainComplex2, GridTrait, XChainComplexSummand, ChainComplexDisplay, ComputeHomology};
+use yui_homology::{ChainComplexTrait, XChainComplex, XChainComplex2, GridTrait, XChainComplexSummand, ChainComplexDisplay};
 use yui_matrix::sparse::SpMat;
 
 use crate::{KhEnhState, KhChain, KhHomology, KhHomologyBigraded};
@@ -147,10 +147,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> ChainComplexDisplay<isize> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {}
 
-impl<R> ComputeHomology<KhHomology<R>> for KhComplex<R>
+impl<R> KhComplex<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    fn homology(&self, with_trans: bool) -> KhHomology<R> {
-        let h = self.homology(with_trans);
+    pub fn homology(&self, with_trans: bool) -> KhHomology<R> {
+        let h = self.inner.homology(with_trans);
         KhHomology::_new(h)
     }
 }
@@ -216,10 +216,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> ChainComplexDisplay<isize2> for KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {}
 
-impl<R> ComputeHomology<KhHomologyBigraded<R>> for KhComplexBigraded<R>
+impl<R> KhComplexBigraded<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    fn homology(&self, with_trans: bool) -> KhHomologyBigraded<R> {
-        let h = self.homology(with_trans);
+    pub fn homology(&self, with_trans: bool) -> KhHomologyBigraded<R> {
+        let h = self.inner.homology(with_trans);
         KhHomologyBigraded::_new(h)
     }
 }

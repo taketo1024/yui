@@ -29,6 +29,11 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         }
 
         let inner = SimpleRModStr::new(rank, tors, trans);
+        Self::from(gens, inner)
+    }
+
+    pub fn from(gens: IndexList<X>, inner: SimpleRModStr<R>) -> Self { 
+        assert_eq!(gens.len(), inner.ngens());
         Self { gens, inner }
     }
 

@@ -1,7 +1,7 @@
 use yui_core::{Deg, isize2, isize3, EucRing, EucRingOps};
 use yui_lin_comb::Gen;
 
-use crate::{GridBase, XModStr, XChainComplexBase, ComputeHomology, GridTrait, RModStr};
+use crate::{GridBase, XModStr, XChainComplexBase, GridTrait, ComputeHomology};
 
 pub type XHomologySummand<X, R> = XModStr<X, R>;
 pub type XHomologyBase<I, X, R> = GridBase<I, XHomologySummand<X, R>>;
@@ -16,27 +16,17 @@ where
     X: Gen,
     R: EucRing, for<'x> &'x R: EucRingOps<R>
 {
-    pub fn x_homology(&self) -> XHomologyBase<I, X, R> {
-        let h = self.homology(true);
+    pub fn homology_at(&self, i: I, with_trans: bool) -> XHomologySummand<X, R> {
+        let gens = self[i].gens().clone();
+        let inner = self.compute_homology(i, with_trans);
+        XHomologySummand::from(gens, inner)
+    }
 
-        XHomologyBase::new(h.support(), move |i| { 
-            let ci = &self[i];
-            let hi = &h[i];
-
-            let t1 = hi.trans().unwrap().clone();
-            let t = if let Some(t0) = ci.trans() { 
-                t0.compose(&t1)
-            } else { 
-                t1
-            };
-
-            XModStr::new(
-                ci.gens().clone(), 
-                hi.rank(), 
-                hi.tors().clone(), 
-                Some(t)
-            )
-        })
+    pub fn homology(&self, with_trans: bool) -> XHomologyBase<I, X, R> {
+        XHomologyBase::new(
+            self.support(), 
+            |i| self.homology_at(i, with_trans)
+        )
     }
 }
 
@@ -50,7 +40,7 @@ pub(crate) mod tests {
     #[test]
     fn zero() { 
         let c = XChainComplex::from(ChainComplex::zero());
-        let h = c.x_homology();
+        let h = c.homology(false);
         
         assert!(h[0].is_zero());
     }
@@ -58,7 +48,7 @@ pub(crate) mod tests {
     #[test]
     fn single() { 
         let c = XChainComplex::from(ChainComplex::one());
-        let h = c.x_homology();
+        let h = c.homology(false);
         
         assert_eq!(h[0].rank(), 1);
         assert!( h[0].is_free());
@@ -68,7 +58,7 @@ pub(crate) mod tests {
     #[test]
     fn one_to_one() { 
         let c = XChainComplex::from(ChainComplex::one_one(1));
-        let h = c.x_homology();
+        let h = c.homology(false);
 
         assert!(h[0].is_zero());
         assert!(h[1].is_zero());
@@ -77,7 +67,7 @@ pub(crate) mod tests {
     #[test]
     fn two_to_one() { 
         let c = XChainComplex::from(ChainComplex::two_one(1, -1));
-        let h = c.x_homology();
+        let h = c.homology(false);
 
         assert!(h[0].is_zero());
         assert_eq!(h[1].rank(), 1);
@@ -87,7 +77,7 @@ pub(crate) mod tests {
     #[test]
     fn one_to_two() { 
         let c = XChainComplex::from(ChainComplex::one_two(1, -1));
-        let h = c.x_homology();
+        let h = c.homology(false);
 
         assert_eq!(h[0].rank(), 1);
         assert!(h[0].is_free());
@@ -97,7 +87,7 @@ pub(crate) mod tests {
     #[test]
     fn torsion() { 
         let c = XChainComplex::from(ChainComplex::one_one(2));
-        let h = c.x_homology();
+        let h = c.homology(false);
 
         assert_eq!(h[0].rank(), 0);
         assert_eq!(h[0].tors(), &vec![2]);
@@ -107,7 +97,7 @@ pub(crate) mod tests {
     #[test]
     fn d3() {
         let c = XChainComplex::from(ChainComplex::d3());
-        let h = c.x_homology();
+        let h = c.homology(false);
 
         assert_eq!(h[0].rank(), 1);
         assert_eq!(h[0].is_free(), true);
@@ -125,7 +115,7 @@ pub(crate) mod tests {
     #[test]
     fn s2() {
         let c = XChainComplex::from(ChainComplex::s2());
-        let h = c.x_homology();
+        let h = c.homology(false);
 
         assert_eq!(h[0].rank(), 1);
         assert_eq!(h[0].is_free(), true);
@@ -147,7 +137,7 @@ pub(crate) mod tests {
     #[test]
     fn t2() {
         let c = XChainComplex::from(ChainComplex::t2());
-        let h = c.x_homology();
+        let h = c.homology(false);
 
         assert_eq!(h[0].rank(), 1);
         assert_eq!(h[0].is_free(), true);
@@ -180,7 +170,7 @@ pub(crate) mod tests {
     #[test]
     fn rp2() {
         let c = XChainComplex::from(ChainComplex::rp2());
-        let h = c.x_homology();
+        let h = c.homology(false);
 
         assert_eq!(h[0].rank(), 1);
         assert_eq!(h[0].is_free(), true);

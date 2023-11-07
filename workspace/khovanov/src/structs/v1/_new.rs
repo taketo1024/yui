@@ -1,5 +1,4 @@
 use yui_core::{Ring, RingOps, EucRing, EucRingOps};
-use yui_homology::ComputeHomology;
 use yui_link::Link;
 
 use super::canon_cycle::CanonCycles;
@@ -50,7 +49,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 #[cfg(test)]
 mod tests {
-    use yui_homology::{ChainComplexTrait, RModStr, ComputeHomology};
+    use yui_homology::{ChainComplexTrait, RModStr};
     use yui_link::Link;
     use crate::KhHomology;
 

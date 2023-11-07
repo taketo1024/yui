@@ -1,7 +1,6 @@
 use itertools::Itertools;
 use num_traits::Zero;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps};
-use yui_homology::ComputeHomology;
 use yui_link::Link;
 
 use crate::{KhComplex, KhComplexBigraded, KhHomology, KhHomologyBigraded};
@@ -57,7 +56,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 #[cfg(test)]
 mod tests {
-    use yui_homology::{RModStr, DisplaySeq, ComputeHomology};
+    use yui_homology::{RModStr, DisplaySeq};
 
     use super::*;
  

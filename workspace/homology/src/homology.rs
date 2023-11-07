@@ -1,7 +1,7 @@
 use yui_core::{EucRing, EucRingOps, Deg, isize2, isize3};
 
 use crate::utils::HomologyCalc;
-use crate::{GridBase, ChainComplexTrait, RModStr, SimpleRModStr};
+use crate::{GridBase, ChainComplexTrait, RModStr, SimpleRModStr, ChainComplexBase, GridTrait};
 
 pub type HomologySummand<R> = SimpleRModStr<R>;
 pub type HomologyBase<I, R> = GridBase<I, HomologySummand<R>>;
@@ -10,26 +10,39 @@ pub type Homology<R>  = HomologyBase<isize,  R>;
 pub type Homology2<R> = HomologyBase<isize2, R>;
 pub type Homology3<R> = HomologyBase<isize3, R>;
 
-pub trait ComputeHomology<H> {
-    fn homology(&self, with_trans: bool) -> H;
+pub trait ComputeHomology<I> {
+    type Output;
+    fn compute_homology(&self, i: I, with_trans: bool) -> Self::Output;
 }
 
-impl<I, R, C> ComputeHomology<HomologyBase<I, R>> for C 
+impl<I, R, C> ComputeHomology<I> for C 
 where 
     I: Deg, 
     R: EucRing, for<'x> &'x R: EucRingOps<R>,
     C: ChainComplexTrait<I, R = R>,
     C::E: RModStr<R = R>
 {
-    fn homology(&self, with_trans: bool) -> HomologyBase<I, R> {
+    type Output = HomologySummand<R>;
+
+    fn compute_homology(&self, i: I, with_trans: bool) -> HomologySummand<R> {
+        let i0 = i - self.d_deg();
+        let d0 = self.d_matrix(i0);
+        let d1 = self.d_matrix(i );
+        HomologyCalc::calculate(&d0, &d1, with_trans)
+    }
+}
+
+impl<I, R> ChainComplexBase<I, R> 
+where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    pub fn homology_at(&self, i: I, with_trans: bool) -> HomologySummand<R> {
+        // TODO compose trans
+        self.compute_homology(i, with_trans)
+    }
+
+    pub fn homology(&self, with_trans: bool) -> HomologyBase<I, R> {
         HomologyBase::new(
             self.support(), 
-            |i| {
-                let i0 = i - self.d_deg();
-                let d0 = self.d_matrix(i0);
-                let d1 = self.d_matrix(i );
-                HomologyCalc::calculate(&d0, &d1, with_trans)
-            }
+            |i| self.homology_at(i, with_trans)
         )
     }
 }
@@ -37,7 +50,6 @@ where
 #[cfg(test)]
 mod tests { 
     use yui_matrix::sparse::SpVec;
-    use crate::homology::ComputeHomology;
     use crate::{ChainComplex, RModStr};
 
     #[test]

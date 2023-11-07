@@ -95,37 +95,29 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<I, R> ChainComplexBase<I, R> 
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new<It, F>(support: It, d_deg: I, mut d_matrix: F) -> Self
+    pub fn new<It, F>(support: It, d_deg: I, d_matrix_map: F) -> Self
     where 
         It: Iterator<Item = I>, 
         F: FnMut(I) -> SpMat<R>
     {
-        Self::new_with_trans(support, d_deg, move |i| {
-            let d = d_matrix(i);
-            let r = d.cols();
-            let t = Trans::id(r);
-            (d, Some(t))
-        })
+        Self::new_with_trans(support, d_deg, d_matrix_map, |_| None)
     }
 
-    pub fn new_with_trans<It, F>(support: It, d_deg: I, mut d_matrix: F) -> Self
+    pub fn new_with_trans<It, F1, F2>(support: It, d_deg: I, mut d_matrix_map: F1, mut trans_map: F2) -> Self
     where 
         It: Iterator<Item = I>, 
-        F: FnMut(I) -> (SpMat<R>, Option<Trans<R>>)
+        F1: FnMut(I) -> SpMat<R>,
+        F2: FnMut(I) -> Option<Trans<R>>
     {
-        use std::mem::take;
-
         let support = support.collect_vec().into_iter();
-        let mut data = GridBase::new(support.clone(), |i| d_matrix(i));
-
         let mut d_matrices = GridBase::new(support.clone(), |i| 
-            take(&mut data.get_mut(i).unwrap().0)
+            d_matrix_map(i)
         );
 
         let summands = GridBase::new(support.clone(), |i| {
             let r = d_matrices[i].cols();
-            let t = take(&mut data.get_mut(i).unwrap().1);
-            ChainComplexSummand::new(r, vec![], t) 
+            let t = trans_map(i).unwrap_or(Trans::id(r));
+            ChainComplexSummand::new(r, vec![], Some(t)) 
         });
 
         for i in support.clone() { 

@@ -196,11 +196,8 @@ where
         ChainComplexBase::new_with_trans(
             support, 
             d_deg, 
-            move |i| {
-                let d = mats.remove(&i).unwrap();
-                let t = trans.remove(&i); // optional
-                (d, t)
-            }
+            move |i| mats.remove(&i).unwrap(),
+            move |i| trans.remove(&i)
         )
     }
 }

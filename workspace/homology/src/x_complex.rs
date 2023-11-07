@@ -129,7 +129,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 #[cfg(test)]
-mod tests { 
+pub(crate) mod tests { 
     use itertools::Itertools;
     use yui_lin_comb::Free;
     use yui_matrix::sparse::SpVec;

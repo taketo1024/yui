@@ -1,6 +1,7 @@
 use itertools::Itertools;
 
 use yui_core::{Elem, Ring, RingOps};
+use yui_matrix::sparse::Trans;
 
 use crate::DisplayForGrid;
 
@@ -61,17 +62,22 @@ where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
 pub struct SimpleRModStr<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     rank: usize, 
-    tors: Vec<R>
+    tors: Vec<R>,
+    trans: Option<Trans<R>>
 }
 
 impl<R> SimpleRModStr<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new(rank: usize, tors: Vec<R>) -> Self { 
-        Self { rank, tors }
+    pub fn new(rank: usize, tors: Vec<R>, trans: Option<Trans<R>>) -> Self { 
+        Self { rank, tors, trans }
     }
 
     pub fn free(rank: usize) -> Self { 
-        Self::new(rank, vec![])
+        Self::new(rank, vec![], Some(Trans::id(rank)))
+    }
+
+    pub fn trans(&self) -> Option<&Trans<R>> { 
+        self.trans.as_ref()
     }
 }
 

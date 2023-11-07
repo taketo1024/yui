@@ -115,7 +115,7 @@ pub(crate) mod tests {
     #[test]
     fn s2() {
         let c = XChainComplex::from(ChainComplex::s2());
-        let h = c.homology(false);
+        let h = c.homology(true);
 
         assert_eq!(h[0].rank(), 1);
         assert_eq!(h[0].is_free(), true);
@@ -137,7 +137,7 @@ pub(crate) mod tests {
     #[test]
     fn t2() {
         let c = XChainComplex::from(ChainComplex::t2());
-        let h = c.homology(false);
+        let h = c.homology(true);
 
         assert_eq!(h[0].rank(), 1);
         assert_eq!(h[0].is_free(), true);
@@ -170,7 +170,7 @@ pub(crate) mod tests {
     #[test]
     fn rp2() {
         let c = XChainComplex::from(ChainComplex::rp2());
-        let h = c.homology(false);
+        let h = c.homology(true);
 
         assert_eq!(h[0].rank(), 1);
         assert_eq!(h[0].is_free(), true);

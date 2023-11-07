@@ -75,6 +75,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         Self { rank, tors, trans }
     }
 
+    pub fn free(rank: usize) -> Self { 
+        Self::new(rank, vec![], Some(Trans::id(rank)))
+    }
+
     pub fn zero() -> Self { 
         Self::new(0, vec![], Some(Trans::zero()))
     }
@@ -98,6 +102,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         } else { 
             SpVec::unit(n, i)
         }
+    }
+
+    pub fn compose(&self, other: SimpleRModStr<R>) -> SimpleRModStr<R> { 
+        if let Some(t0) = &self.trans { 
+            if let Some(t1) = &other.trans { 
+                let t = t0.compose(t1);
+                return Self::new(other.rank, other.tors, Some(t))
+            }
+        }
+        Self::new(other.rank, other.tors, None)
     }
 }
 

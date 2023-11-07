@@ -33,7 +33,9 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn from(gens: IndexList<X>, inner: SimpleRModStr<R>) -> Self { 
-        assert_eq!(gens.len(), inner.ngens());
+        if let Some(t) = inner.trans() { 
+            assert_eq!(gens.len(), t.src_dim());
+        }
         Self { gens, inner }
     }
 
@@ -42,11 +44,11 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         let gens = gens.into_iter().collect::<IndexList<X>>();
         let r = gens.len();
 
-        Self::new(gens, r, vec![], None) 
+        Self::new(gens, r, vec![], Some(Trans::id(r))) 
     }
 
     pub fn zero() -> Self { 
-        Self::new(IndexList::new(), 0, vec![], None)
+        Self::new(IndexList::new(), 0, vec![], Some(Trans::zero()))
     }
 
     pub fn trans(&self) -> Option<&Trans<R>> { 
@@ -102,10 +104,9 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         LinComb::from_iter(elems)
     }
 
-    // FIXME this doesn't work when trans is some. 
-    pub fn make_matrix<Y, F>(&self, to: &XModStr<Y, R>, f: F) -> SpMat<R>
-    where Y: Gen, F: Fn(&X) -> Vec<(Y, R)> {
-        make_matrix(&self.gens, &to.gens, f)
+    pub fn compose(&self, other: Self) -> Self { 
+        let inner = self.inner.compose(other.inner);
+        Self::from(self.gens.clone(), inner)
     }
 }
 

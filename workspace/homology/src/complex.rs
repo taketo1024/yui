@@ -100,7 +100,12 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         It: Iterator<Item = I>, 
         F: FnMut(I) -> SpMat<R>
     {
-        Self::new_with_trans(support, d_deg, move |i| (d_matrix(i), None))
+        Self::new_with_trans(support, d_deg, move |i| {
+            let d = d_matrix(i);
+            let r = d.cols();
+            let t = Trans::id(r);
+            (d, Some(t))
+        })
     }
 
     pub fn new_with_trans<It, F>(support: It, d_deg: I, mut d_matrix: F) -> Self

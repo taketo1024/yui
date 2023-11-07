@@ -44,6 +44,15 @@ where
         C: ChainComplexTrait<I, R = R>,
         C::E: RModStr<R = R>
     {
+        let r = Self::from(complex, with_trans);
+        r.make_complex(complex.support())
+    }
+
+    pub fn from<C>(complex: &C, with_trans: bool) -> Self 
+    where
+        C: ChainComplexTrait<I, R = R>,
+        C::E: RModStr<R = R>
+    {
         let support = complex.support().collect_vec().into_iter();
         let d_deg = complex.d_deg();
 
@@ -59,7 +68,7 @@ where
             reducer.reduce_at(i);
         }
 
-        reducer.as_complex(support)
+        reducer
     }
 
     pub fn new(d_deg: I, with_trans: bool) -> Self {
@@ -184,13 +193,13 @@ where
         (i - deg, i, i + deg)
     }
 
-    fn as_complex<Itr>(mut self, support: Itr) -> ChainComplexBase<I, R> 
+    fn make_complex<Itr>(mut self, support: Itr) -> ChainComplexBase<I, R> 
     where Itr: Iterator<Item = I> { 
         use std::mem::take;
 
         let d_deg = self.d_deg;
 
-        let mut mats = take(&mut self.mats);
+        let mut mats  = take(&mut self.mats);
         let mut trans = take(&mut self.trans);
 
         ChainComplexBase::new_with_trans(

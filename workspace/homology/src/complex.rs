@@ -4,7 +4,7 @@ use std::ops::Index;
 use itertools::{Itertools, Either};
 use delegate::delegate;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
-use yui_matrix::sparse::{SpMat, SpVec, MatType};
+use yui_matrix::sparse::{SpMat, SpVec, MatType, Trans};
 
 use crate::{ReducedComplexBase, GridBase, GridIter, RModStr, SimpleRModStr};
 
@@ -101,16 +101,30 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         It: Iterator<Item = I>, 
         F: FnMut(I) -> SpMat<R>
     {
-        let mut d_matrices = GridBase::new(support, |i| 
-            d_matrix(i)
+        Self::new_with_trans(support, d_deg, move |i| (d_matrix(i), None))
+    }
+
+    pub fn new_with_trans<It, F>(support: It, d_deg: I, mut d_matrix: F) -> Self
+    where 
+        It: Iterator<Item = I>, 
+        F: FnMut(I) -> (SpMat<R>, Option<Trans<R>>)
+    {
+        use std::mem::take;
+
+        let support = support.collect_vec().into_iter();
+        let mut data = GridBase::new(support.clone(), |i| d_matrix(i));
+
+        let mut d_matrices = GridBase::new(support.clone(), |i| 
+            take(&mut data.get_mut(i).unwrap().0)
         );
 
-        let summands = GridBase::new(d_matrices.support(), |i| {
+        let summands = GridBase::new(support.clone(), |i| {
             let r = d_matrices[i].cols();
-            ChainComplexSummand::free(r) 
+            let t = take(&mut data.get_mut(i).unwrap().1);
+            ChainComplexSummand::new(r, vec![], t) 
         });
 
-        for i in summands.support() { 
+        for i in support.clone() { 
             let r = summands[i].rank();
             if r > 0 && !d_matrices.is_supported(i - d_deg) { 
                 let d = SpMat::zero((r, 0));

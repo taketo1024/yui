@@ -130,37 +130,85 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests { 
+    use itertools::Itertools;
     use yui_lin_comb::Free;
+    use yui_matrix::sparse::SpVec;
 
-    use crate::{RModStr, ComputeHomology};
+    use crate::{RModStr, ChainComplex, Grid};
 
     use super::*;
 
-    type X = Free<i32>;
-    fn e(i: isize) -> X { 
-        X::from(i as i32)
+    type X = Free<i64>;
+    fn e(i: usize) -> X { 
+        X::from(i as i64)
+    }
+
+    impl From<ChainComplex<i64>> for XChainComplex<X, i64> {
+        fn from(c: ChainComplex<i64>) -> Self {
+            let gens = Grid::new(c.support(), |i| { 
+                let n = c[i].rank();
+                let gens = (0..n).map(|j| e(j)).collect_vec();
+                gens
+            });
+
+            Self::new(
+                c.support(), c.d_deg(), 
+                move |i| gens[i].clone(), 
+                move |i, x| {
+                    let n = c[i].rank();
+                    let v = SpVec::unit(n, x.0 as usize);
+                    let dv = c.d(i, &v);
+                    dv.iter().map(|(i, a)| (e(i), a.clone())).collect()
+                }
+            )
+        }
     }
 
     #[test]
-    fn test() { 
-        let c = XChainComplex::<X, i32>::new(0..2, -1, 
-            |i| vec![e(i)], 
-            |i, x| { 
-                if x.0 == 1 { 
-                    vec![(e(i - 1), 1)] 
-                } else {
-                    vec![]
-                }
-            }
-        );
+    fn d3() { 
+        let c = XChainComplex::from(ChainComplex::d3());
 
-        assert_eq!(c[0].rank(), 1);
-        assert_eq!(c[1].rank(), 1);
-        assert_eq!(c.d_matrix(1), SpMat::from_vec((1,1), vec![1]));
+        assert_eq!(c[0].rank(), 4);
+        assert_eq!(c[1].rank(), 6);
+        assert_eq!(c[2].rank(), 4);
+        assert_eq!(c[3].rank(), 1);
 
-        let h = c.homology(false);
+        c.check_d_all();
+    }
+
+    #[test]
+    fn s2() { 
+        let c = XChainComplex::from(ChainComplex::s2());
+
+        assert_eq!(c[0].rank(), 4);
+        assert_eq!(c[1].rank(), 6);
+        assert_eq!(c[2].rank(), 4);
+        assert_eq!(c[3].rank(), 0);
+
+        c.check_d_all();
+    }
+
+    #[test]
+    fn t2() { 
+        let c = XChainComplex::from(ChainComplex::t2());
+
+        assert_eq!(c[0].rank(), 9);
+        assert_eq!(c[1].rank(), 27);
+        assert_eq!(c[2].rank(), 18);
+        assert_eq!(c[3].rank(), 0);
+
+        c.check_d_all();
+    }
+
+    #[test]
+    fn rp2() { 
+        let c = XChainComplex::from(ChainComplex::rp2());
         
-        assert_eq!(h[0].rank(), 0);
-        assert_eq!(h[1].rank(), 0);
+        assert_eq!(c[0].rank(), 6);
+        assert_eq!(c[1].rank(), 15);
+        assert_eq!(c[2].rank(), 10);
+        assert_eq!(c[3].rank(), 0);
+
+        c.check_d_all();
     }
 }

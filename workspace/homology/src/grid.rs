@@ -47,6 +47,10 @@ where I: Deg, E: Default {
     pub fn insert(&mut self, i: I, e: E) {
         self.data.insert(i, e);
     }
+
+    pub fn get_mut(&mut self, i: I) -> Option<&mut E> { 
+        self.data.get_mut(&i)
+    }
 }
 
 impl<I, E> GridTrait<I> for GridBase<I, E>

@@ -23,7 +23,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(gens: IndexList<X>, rank: usize, tors: Vec<R>, trans: Option<Trans<R>>) -> Self { 
         if let Some(t) = &trans { 
             assert_eq!(t.src_dim(), gens.len());
-            assert_eq!(t.tgt_dim(), rank);
+            assert_eq!(t.tgt_dim(), rank + tors.len());
         } else { 
             assert_eq!(gens.len(), rank + tors.len());
         }
@@ -44,21 +44,27 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         Self::new(IndexList::new(), 0, vec![], None)
     }
 
-    pub fn gens(&self) -> &IndexList<X> { 
-        &self.gens
-    }
-
     pub fn trans(&self) -> Option<&Trans<R>> { 
         self.inner.trans()
     }
 
+    // TODO rename to `raw_gens`
+    pub fn gens(&self) -> &IndexList<X> { 
+        &self.gens
+    }
+
+    pub fn ngens(&self) -> usize { 
+        self.inner.ngens()
+    }
+
     pub fn gen_chain(&self, i: usize) -> LinComb<X, R> { 
-        let v = self.inner.gen_vec(i);
+        let n = self.ngens();
+        let v = SpVec::unit(n, i);
         self.as_chain(&v)
     }
 
     pub fn vectorize(&self, z: &LinComb<X, R>) -> SpVec<R> {
-        let n = self.rank();
+        let n = self.gens.len();
         let v = SpVec::generate(n, |set| { 
             for (x, a) in z.iter() { 
                 let Some(i) = self.gens.index_of(x) else { 
@@ -76,7 +82,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn as_chain(&self, v: &SpVec<R>) -> LinComb<X, R> {
-        assert_eq!(v.dim(), self.rank());
+        assert_eq!(v.dim(), self.ngens());
 
         let v = if let Some(t) = self.trans() {
             t.backward(&v)
@@ -87,6 +93,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         let elems = v.iter().map(|(i, a)| 
             (self.gens[i].clone(), a.clone())
         );
+
         LinComb::from_iter(elems)
     }
 

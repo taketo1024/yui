@@ -45,9 +45,9 @@ where
             self.check_d_at(i);
         }
     }
-    
-    fn reduced(&self, with_trans: bool) -> ChainComplexBase<I, Self::R> { 
-        ChainReducer::reduce(self, with_trans)
+
+    fn as_generic(&self) -> ChainComplexBase<I, Self::R> {
+        ChainComplexBase::new(self.support(), self.d_deg(), |i| self.d_matrix(i))
     }
 }
 
@@ -143,6 +143,10 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         assert_eq!(self.get(i).rank(), v.dim());
         let d = self.d_matrix_ref(i);
         d * v
+    }
+    
+    pub fn reduced(&self, with_trans: bool) -> ChainComplexBase<I, R> { 
+        ChainReducer::reduce(self, with_trans)
     }
 }
 

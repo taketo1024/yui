@@ -1,6 +1,7 @@
 use itertools::Itertools;
 use num_traits::Zero;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps};
+use yui_homology::ComputeHomology;
 use yui_link::Link;
 
 use crate::{KhComplex, KhComplexBigraded, KhHomology, KhHomologyBigraded};
@@ -43,22 +44,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> KhHomology<R> 
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn new_v2(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
-        let c = KhComplex::new_v2(l, h, t, reduced);
-        Self::from(c)
+        KhComplex::new_v2(l, h, t, reduced).homology(false)
     }
 }
 
 impl<R> KhHomologyBigraded<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn new_v2(l: Link, reduced: bool) -> Self {
-        let c = KhComplexBigraded::new_v2(l, reduced);
-        Self::from(c)
+        KhComplexBigraded::new_v2(l, reduced).homology(false)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use yui_homology::{RModStr, DisplaySeq};
+    use yui_homology::{RModStr, DisplaySeq, ComputeHomology};
 
     use super::*;
  
@@ -66,7 +65,7 @@ mod tests {
     fn kh_trefoil() {
         let l = Link::trefoil();
         let c = KhComplex::new_v2(&l, &0, &0, false);
-        let h = c.homology();
+        let h: KhHomology<_> = c.homology(false);
 
         assert_eq!(h.h_range(), -3..=0);
 

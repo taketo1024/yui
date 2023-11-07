@@ -1,85 +1,43 @@
-use std::ops::Index;
-
-use delegate::delegate;
-use yui_core::{EucRing, EucRingOps, Ring, RingOps, Deg, isize2, isize3};
+use yui_core::{EucRing, EucRingOps, Deg, isize2, isize3};
 
 use crate::utils::HomologyCalc;
-use crate::{GridBase, GridIter, ChainComplexTrait, RModStr, SimpleRModStr};
+use crate::{GridBase, ChainComplexTrait, RModStr, SimpleRModStr};
 
-use super::grid::GridTrait;
+pub type HomologySummand<R> = SimpleRModStr<R>;
+pub type HomologyBase<I, R> = GridBase<I, HomologySummand<R>>;
 
 pub type Homology<R>  = HomologyBase<isize,  R>;
 pub type Homology2<R> = HomologyBase<isize2, R>;
 pub type Homology3<R> = HomologyBase<isize3, R>;
 
-pub type HomologySummand<R> = SimpleRModStr<R>;
-
-pub struct HomologyBase<I, R>
-where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
-    summands: GridBase<I, HomologySummand<R>>
+pub trait ComputeHomology<H> {
+    fn homology(&self, with_trans: bool) -> H;
 }
 
-impl<I, R> GridTrait<I> for HomologyBase<I, R>
-where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
-    type Itr = GridIter<I>;
-    type E = HomologySummand<R>;
-    
-    delegate! { 
-        to self.summands { 
-            fn support(&self) -> Self::Itr;
-            fn is_supported(&self, i: I) -> bool;
-            fn get(&self, i: I) -> &Self::E;
-        }
-    }
-}
-
-impl<I, R> HomologyBase<I, R>
-where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    pub fn compute_from<C>(complex: &C, with_trans: bool) -> Self
-    where 
-        C: ChainComplexTrait<I, R = R>,
-        C::E: RModStr<R = R>
-    {
-        let summands = GridBase::new(
-            complex.support(), 
+impl<I, R, C> ComputeHomology<HomologyBase<I, R>> for C 
+where 
+    I: Deg, 
+    R: EucRing, for<'x> &'x R: EucRingOps<R>,
+    C: ChainComplexTrait<I, R = R>,
+    C::E: RModStr<R = R>
+{
+    fn homology(&self, with_trans: bool) -> HomologyBase<I, R> {
+        HomologyBase::new(
+            self.support(), 
             |i| {
-                let i0 = i - complex.d_deg();
-                let d0 = complex.d_matrix(i0);
-                let d1 = complex.d_matrix(i );
+                let i0 = i - self.d_deg();
+                let d0 = self.d_matrix(i0);
+                let d1 = self.d_matrix(i );
                 HomologyCalc::calculate(&d0, &d1, with_trans)
             }
-        );
-        Self { summands }
-    }
-}
-
-impl<I, R> Index<I> for HomologyBase<I, R>
-where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = HomologySummand<R>;
-    fn index(&self, i: I) -> &Self::Output {
-        self.get(i)
-    }
-}
-
-impl<R> Index<(isize, isize)> for Homology2<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = HomologySummand<R>;
-    fn index(&self, i: (isize, isize)) -> &Self::Output {
-        self.get(i.into())
-    }
-}
-
-impl<R> Index<(isize, isize, isize)> for Homology3<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = HomologySummand<R>;
-    fn index(&self, i: (isize, isize, isize)) -> &Self::Output {
-        self.get(i.into())
+        )
     }
 }
 
 #[cfg(test)]
 mod tests { 
     use yui_matrix::sparse::SpVec;
+    use crate::homology::ComputeHomology;
     use crate::{ChainComplex, RModStr};
 
     #[test]

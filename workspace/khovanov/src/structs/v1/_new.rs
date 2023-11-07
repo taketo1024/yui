@@ -1,4 +1,5 @@
 use yui_core::{Ring, RingOps, EucRing, EucRingOps};
+use yui_homology::ComputeHomology;
 use yui_link::Link;
 
 use super::canon_cycle::CanonCycles;
@@ -36,23 +37,23 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> KhHomology<R> 
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn new_v1(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
-        let c = KhComplex::new_v1(l, h, t, reduced);
-        Self::from(c)
+        KhComplex::new_v1(l, h, t, reduced).homology(false)
     }
 }
 
 impl<R> KhHomologyBigraded<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn new_v1(l: Link, reduced: bool) -> Self {
-        let c = KhComplexBigraded::new_v1(l, reduced);
-        Self::from(c)
+        KhComplexBigraded::new_v1(l, reduced).homology(false)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use yui_homology::{ChainComplexTrait, RModStr};
+    use yui_homology::{ChainComplexTrait, RModStr, ComputeHomology};
     use yui_link::Link;
+    use crate::KhHomology;
+
     use super::KhComplex;
 
     #[test]
@@ -69,7 +70,7 @@ mod tests {
 
         c.check_d_all();
 
-        let h = c.homology();
+        let h: KhHomology<_> = c.homology(false);
     
         assert_eq!(h.h_range(), -3..=0);
 

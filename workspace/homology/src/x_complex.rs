@@ -2,7 +2,7 @@ use std::ops::Index;
 
 use delegate::delegate;
 
-use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
+use yui_core::{Ring, RingOps, Deg, isize2, isize3};
 use yui_lin_comb::{Gen, LinComb};
 use yui_matrix::sparse::SpMat;
 
@@ -10,7 +10,6 @@ use crate::{GridBase, GridIter, ChainComplexDisplay, ChainComplexBase, XModStr};
 
 use super::grid::GridTrait;
 use super::complex::ChainComplexTrait;
-use super::homology::HomologyBase;
 
 pub type XChainComplex <X, R> = XChainComplexBase<isize,  X, R>;
 pub type XChainComplex2<X, R> = XChainComplexBase<isize2, X, R>;
@@ -100,17 +99,6 @@ where
 impl<I, X, R> ChainComplexDisplay<I> for XChainComplexBase<I, X, R>
 where I: Deg, X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {}
 
-impl<I, X, R> XChainComplexBase<I, X, R>
-where 
-    I: Deg,
-    X: Gen,
-    R: EucRing, for<'x> &'x R: EucRingOps<R>,
-{
-    pub fn homology(&self, with_trans: bool) -> HomologyBase<I, R> { 
-        HomologyBase::compute_from(self, with_trans)
-    }
-}
-
 impl<I, X, R> Index<I> for XChainComplexBase<I, X, R>
 where I: Deg, X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = XChainComplexSummand<X, R>;
@@ -139,7 +127,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
 mod tests { 
     use yui_lin_comb::Free;
 
-    use crate::RModStr;
+    use crate::{RModStr, ComputeHomology};
 
     use super::*;
 

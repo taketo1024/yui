@@ -5,7 +5,6 @@ use yui_homology::{Homology, HomologySummand, Homology2, GridTrait};
 use yui_core::{EucRing, EucRingOps, isize2};
 use yui_link::Link;
 
-use crate::{KhComplex, KhComplexBigraded};
 pub struct KhHomology<R> 
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     inner: Homology<R>
@@ -14,7 +13,11 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 impl<R> KhHomology<R> 
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn new(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
-        Self::new_v2(l, h, t, reduced)
+        KhHomology::new_v2(l, h, t, reduced)
+    }
+
+    pub(crate) fn _new(inner: Homology<R>) -> Self { 
+        Self { inner }
     }
 
     pub fn h_range(&self) -> RangeInclusive<isize> { 
@@ -22,14 +25,6 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         let h_min = h.support().min().unwrap_or(0);
         let h_max = h.support().max().unwrap_or(0);
         h_min ..= h_max
-    }
-}
-
-impl<R> From<KhComplex<R>> for KhHomology<R>
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    fn from(c: KhComplex<R>) -> Self {
-        let h = Homology::compute_from(&c, false);
-        Self { inner: h }
     }
 }
 
@@ -66,15 +61,11 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 impl<R> KhHomologyBigraded<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn new(l: Link, reduced: bool) -> Self {
-        Self::new_v2(l, reduced)
+        KhHomologyBigraded::new_v2(l, reduced)
     }
-}
 
-impl<R> From<KhComplexBigraded<R>> for KhHomologyBigraded<R>
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    fn from(c: KhComplexBigraded<R>) -> Self {
-        let h = Homology2::compute_from(&c, false);
-        Self { inner: h }
+    pub(crate) fn _new(inner: Homology2<R>) -> Self { 
+        Self { inner }
     }
 }
 

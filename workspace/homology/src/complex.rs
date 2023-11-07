@@ -3,14 +3,15 @@ use std::ops::Index;
 
 use itertools::{Itertools, Either};
 use delegate::delegate;
-use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
+use yui_core::{Ring, RingOps, Deg, isize2, isize3};
 use yui_matrix::sparse::{SpMat, SpVec, MatType, Trans};
 
 use crate::{GridBase, GridIter, RModStr, SimpleRModStr};
 
 use super::grid::GridTrait;
 use super::utils::ChainReducer;
-use super::homology::HomologyBase;
+
+pub type ChainComplexSummand<R> = SimpleRModStr<R>;
 
 pub type ChainComplex<R>  = ChainComplexBase<isize,  R>;
 pub type ChainComplex2<R> = ChainComplexBase<isize2, R>;
@@ -84,8 +85,6 @@ where
         println!("{}", self.display_d());
     }
 }
-
-pub type ChainComplexSummand<R> = SimpleRModStr<R>;
 
 pub struct ChainComplexBase<I, R>
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
@@ -179,13 +178,6 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<I, R> ChainComplexDisplay<I> for ChainComplexBase<I, R>
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {}
-
-impl<I, R> ChainComplexBase<I, R> 
-where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    pub fn homology(&self, with_trans: bool) -> HomologyBase<I, R> {
-        HomologyBase::compute_from(self, with_trans)
-    }
-}
 
 impl<R> ChainComplexBase<isize, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {

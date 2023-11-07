@@ -48,6 +48,10 @@ where I: Deg, E: Default {
         self.data.insert(i, e);
     }
 
+    pub fn remove(&mut self, i: I) -> Option<E> { 
+        self.data.remove(&i)
+    }
+
     pub fn get_mut(&mut self, i: I) -> Option<&mut E> { 
         self.data.get_mut(&i)
     }

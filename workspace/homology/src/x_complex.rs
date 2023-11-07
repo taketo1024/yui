@@ -40,7 +40,7 @@ where
         F2: Fn(I, &X) -> Vec<(X, R)>
     {
         let summands = GridBase::new(support, |i| 
-            XChainComplexSummand::from_iter(gens_map(i))
+            XChainComplexSummand::free_from(gens_map(i))
         );
 
         let inner = ChainComplexBase::new(summands.support(), d_deg, |i| {

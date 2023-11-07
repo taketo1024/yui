@@ -51,11 +51,30 @@ where
 
         for i in support.iter().cloned() { 
             for j in [i, i + d_deg] { 
-                if !reducer.is_init(j) {
+                if !reducer.is_set(j) {
                     let d = complex.d_matrix(j).clone();
-                    reducer.init(j, d);
+                    reducer.set_matrix(j, d);
                 }
             }
+            reducer.reduce_at(i);
+        }
+
+        reducer.as_complex(support.into_iter())
+    }
+
+    pub fn reduce_with<Itr, F>(support: Itr, d_deg: I, mut d_matrix: F) -> ReducedComplexBase<I, R> 
+    where
+        Itr: Iterator<Item = I>,
+        F: FnMut(I, Option<&Trans<R>>) -> SpMat<R>
+    {
+        let support = support.collect_vec();
+        let mut reducer = Self::new(d_deg, true);
+
+        for i in support.iter().cloned() { 
+            let t = reducer.trans(i);
+            let d = d_matrix(i, t);
+
+            reducer.set_matrix(i, d);
             reducer.reduce_at(i);
         }
 
@@ -84,20 +103,33 @@ where
         self.trans.remove(&i)
     }
 
-    pub fn is_init(&self, i: I) -> bool { 
+    pub fn is_set(&self, i: I) -> bool { 
         self.mats.contains_key(&i)
     }
 
-    pub fn init(&mut self, i: I, d: SpMat<R>) {
+    pub fn set_matrix(&mut self, i: I, d: SpMat<R>) {
         if self.with_trans { 
-            let n = d.cols();
-            self.trans.insert(i, Trans::id(n));
+            let (m, n) = d.shape();
+
+            if let Some(t) = self.trans(i) {
+                assert_eq!(t.tgt_dim(), n)
+            } else { 
+                self.trans.insert(i, Trans::id(n));
+            }
+
+            let i1 = i + self.d_deg;
+            if let Some(t) = self.trans(i1) {
+                assert_eq!(t.tgt_dim(), m)
+            } else { 
+                self.trans.insert(i1, Trans::id(m));
+            }
         }
+
         self.mats.insert(i, d);
     }
 
     pub fn reduce_at(&mut self, i: I) { 
-        assert!(self.is_init(i), "not initialized at {i}");
+        assert!(self.is_set(i), "not initialized at {i}");
 
         self.reduce_at_itr(i, 0)
     }
@@ -217,7 +249,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ChainComplex;
+    use crate::{ChainComplex, GridTrait};
 
     #[test]
     fn zero() { 
@@ -419,5 +451,24 @@ mod tests {
         let w = t1.backward(&v);
         
         assert!(c.d(1, &w).is_zero());
+    }
+
+    #[test]
+    fn t2_reduce_with() { 
+        let c = ChainComplex::<i32>::t2();
+        let r = ChainReducer::reduce_with(c.support(), c.d_deg(), |i, t| { 
+            let d = c.d_matrix(i);
+            if let Some(t) = t { 
+                d * t.backward_mat()
+            } else { 
+                d.clone()
+            }
+        });
+
+        r.check_d_all();
+
+        assert_eq!(r[0].rank(), 1);
+        assert_eq!(r[1].rank(), 2);
+        assert_eq!(r[2].rank(), 1);
     }
 }

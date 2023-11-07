@@ -168,7 +168,7 @@ mod tests {
 
         let h2 = &h[2];
         let t = h2.trans().unwrap();
-        let z = h2.gen_vec(0).unwrap();
+        let z = h2.gen_vec(0);
 
         assert!(!z.is_zero());
         assert!(c.d(2, &z).is_zero());
@@ -182,7 +182,7 @@ mod tests {
 
         let h2 = &h[2];
         let t2 = h2.trans().unwrap();
-        let z = h2.gen_vec(0).unwrap();
+        let z = h2.gen_vec(0);
 
         assert!(!z.is_zero());
         assert!(c.d(2, &z).is_zero());
@@ -190,8 +190,8 @@ mod tests {
 
         let h1 = &h[1];
         let t1 = h1.trans().unwrap();
-        let a = h1.gen_vec(0).unwrap();
-        let b = h1.gen_vec(1).unwrap();
+        let a = h1.gen_vec(0);
+        let b = h1.gen_vec(1);
 
         assert!(!a.is_zero());
         assert!(!b.is_zero());
@@ -208,7 +208,7 @@ mod tests {
 
         let h1 = &h[1];
         let t = h1.trans().unwrap();
-        let z = h1.gen_vec(0).unwrap();
+        let z = h1.gen_vec(0);
 
         assert!(!z.is_zero());
         assert!(c.d(1, &z).is_zero());

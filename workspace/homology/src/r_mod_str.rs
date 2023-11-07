@@ -83,15 +83,21 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.trans.as_ref()
     }
 
-    // The vector representing the i-th generator.
-    pub fn gen_vec(&self, i: usize) -> Option<SpVec<R>> {
-        let Some(t) = &self.trans else { 
-            return None 
-        };
+    pub fn ngens(&self) -> usize { 
+        self.rank + self.tors.len() // == trans.tgt_dim()
+    }
 
-        assert!(i < t.tgt_dim());
-        let v = t.backward_mat().col_vec(i);
-        Some(v)
+    // The vector representing the i-th generator.
+    pub fn gen_vec(&self, i: usize) -> SpVec<R> {
+        let n = self.ngens();
+
+        assert!(i < n);
+
+        if let Some(t) = &self.trans { 
+            t.backward_mat().col_vec(i)
+        } else { 
+            SpVec::unit(n, i)
+        }
     }
 }
 

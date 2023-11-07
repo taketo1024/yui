@@ -159,7 +159,7 @@ mod tests {
         assert_eq!(h.tors().len(), 0);
 
         let t = h.trans().unwrap();
-        let v = h.gen_vec(0).unwrap();
+        let v = h.gen_vec(0);
 
         assert_eq!(v.is_zero(), false);
         assert_eq!(c.d(0, &v).is_zero(), true);
@@ -189,7 +189,7 @@ mod tests {
         assert_eq!(h.tors().len(), 0);
 
         let t = h.trans().unwrap();
-        let v = h.gen_vec(0).unwrap();
+        let v = h.gen_vec(0);
 
         assert_eq!(v.is_zero(), false);
         assert_eq!(c.d(2, &v).is_zero(), true);
@@ -208,7 +208,7 @@ mod tests {
         assert_eq!(h.tors().len(), 0);
 
         let t = h.trans().unwrap();
-        let v = h.gen_vec(0).unwrap();
+        let v = h.gen_vec(0);
 
         assert_eq!(v.is_zero(), false);
         assert_eq!(c.d(0, &v).is_zero(), true);
@@ -229,7 +229,7 @@ mod tests {
         let t = h.trans().unwrap();
 
         for i in 0..2 { 
-            let v = h.gen_vec(i).unwrap();
+            let v = h.gen_vec(i);
             assert_eq!(v.is_zero(), false);
             assert_eq!(c.d(1, &v).is_zero(), true);
             assert_eq!(t.forward(&v), SpVec::unit(2, i));
@@ -248,7 +248,7 @@ mod tests {
         assert_eq!(h.tors().len(), 0);
 
         let t = h.trans().unwrap();
-        let v = h.gen_vec(0).unwrap();
+        let v = h.gen_vec(0);
 
         assert_eq!(v.is_zero(), false);
         assert_eq!(c.d(2, &v).is_zero(), true);
@@ -267,7 +267,7 @@ mod tests {
         assert_eq!(h.tors().len(), 0);
 
         let t = h.trans().unwrap();
-        let v = h.gen_vec(0).unwrap();
+        let v = h.gen_vec(0);
 
         assert_eq!(v.is_zero(), false);
         assert_eq!(c.d(0, &v).is_zero(), true);
@@ -286,7 +286,7 @@ mod tests {
         assert_eq!(h.tors(), &vec![2]);
 
         let t = h.trans().unwrap();
-        let v = h.gen_vec(0).unwrap();
+        let v = h.gen_vec(0);
 
         assert_eq!(v.is_zero(), false);
         assert_eq!(c.d(1, &v).is_zero(), true);

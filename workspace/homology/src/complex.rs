@@ -25,7 +25,7 @@ where
     type R;
 
     fn d_deg(&self) -> I;
-    fn d_matrix(&self, i: I) -> &SpMat<Self::R>;
+    fn d_matrix(&self, i: I) -> SpMat<Self::R>;
 
     fn check_d_at(&self, i0: I) { 
         let i1 = i0 + self.d_deg();
@@ -135,9 +135,13 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         Self { summands, d_deg, d_matrices }
     }
 
+    pub fn d_matrix_ref(&self, i: I) -> &SpMat<R> {
+        &self.d_matrices[i]
+    }
+
     pub fn d(&self, i: I, v: &SpVec<R>) -> SpVec<R> {
         assert_eq!(self.get(i).rank(), v.dim());
-        let d = self.d_matrix(i);
+        let d = self.d_matrix_ref(i);
         d * v
     }
 }
@@ -164,8 +168,8 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         self.d_deg
     }
 
-    fn d_matrix(&self, i: I) -> &SpMat<Self::R> {
-        &self.d_matrices[i]
+    fn d_matrix(&self, i: I) -> SpMat<Self::R> {
+        self.d_matrices[i].clone()
     }
 }
 

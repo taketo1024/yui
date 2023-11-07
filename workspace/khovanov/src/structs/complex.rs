@@ -135,7 +135,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     delegate! { 
         to self.inner { 
             fn d_deg(&self) -> isize;
-            fn d_matrix(&self, i: isize) -> &SpMat<R>;
+            fn d_matrix(&self, i: isize) -> SpMat<R>;
         }
     }
 }
@@ -203,7 +203,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     delegate! { 
         to self.inner { 
             fn d_deg(&self) -> isize2;
-            fn d_matrix(&self, i: isize2) -> &SpMat<Self::R>;
+            fn d_matrix(&self, i: isize2) -> SpMat<Self::R>;
         }
     }
 }

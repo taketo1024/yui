@@ -54,7 +54,7 @@ where
     }
 
     pub fn d(&self, i: I, z: &LinComb<X, R>) -> LinComb<X, R> { 
-        let d = self.d_matrix(i);
+        let d = self.inner.d_matrix_ref(i);
         let v = self[i].vectorize(z);
         let w = d * v;
 
@@ -92,7 +92,7 @@ where
     delegate! { 
         to self.inner { 
             fn d_deg(&self) -> I;
-            fn d_matrix(&self, i: I) -> &SpMat<Self::R>;
+            fn d_matrix(&self, i: I) -> SpMat<Self::R>;
         }
     }
 }
@@ -163,7 +163,7 @@ mod tests {
 
         assert_eq!(c[0].rank(), 1);
         assert_eq!(c[1].rank(), 1);
-        assert_eq!(c.d_matrix(1), &SpMat::from_vec((1,1), vec![1]));
+        assert_eq!(c.d_matrix(1), SpMat::from_vec((1,1), vec![1]));
 
         let h = c.homology(false);
         

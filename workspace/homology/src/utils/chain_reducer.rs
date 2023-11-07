@@ -52,7 +52,7 @@ where
         for i in support.clone() { 
             for j in [i, i + d_deg] { 
                 if !reducer.is_set(j) {
-                    let d = complex.d_matrix(j).clone();
+                    let d = complex.d_matrix(j);
                     reducer.set_matrix(j, d);
                 }
             }

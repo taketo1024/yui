@@ -46,7 +46,7 @@ where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
                 let i0 = i - complex.d_deg();
                 let d0 = complex.d_matrix(i0);
                 let d1 = complex.d_matrix(i );
-                HomologyCalc::calculate(d0, d1, with_trans)
+                HomologyCalc::calculate(&d0, &d1, with_trans)
             }
         );
         Self { summands }

@@ -8,7 +8,7 @@ use yui_matrix::sparse::pivot::{perms_by_pivots, find_pivots, PivotType};
 use yui_matrix::sparse::schur::Schur;
 use yui_core::{Ring, RingOps, Deg};
 
-use crate::{ChainComplexTrait, ReducedComplexBase, RModStr};
+use crate::{ChainComplexTrait, ChainComplexBase, RModStr};
 
 //       a0 = [x]      a1 = [a b]      a2 = [z w]
 //            [y]           [c d]     
@@ -39,17 +39,17 @@ where
     I: Deg,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
-    pub fn reduce<C>(complex: &C, with_trans: bool) -> ReducedComplexBase<I, R> 
+    pub fn reduce<C>(complex: &C, with_trans: bool) -> ChainComplexBase<I, R> 
     where
         C: ChainComplexTrait<I, R = R>,
         C::E: RModStr<R = R>
     {
-        let support = complex.support().collect_vec();
+        let support = complex.support().collect_vec().into_iter();
         let d_deg = complex.d_deg();
 
         let mut reducer = Self::new(d_deg, with_trans);
 
-        for i in support.iter().cloned() { 
+        for i in support.clone() { 
             for j in [i, i + d_deg] { 
                 if !reducer.is_set(j) {
                     let d = complex.d_matrix(j).clone();
@@ -59,18 +59,18 @@ where
             reducer.reduce_at(i);
         }
 
-        reducer.as_complex(support.into_iter())
+        reducer.as_complex(support)
     }
 
-    pub fn reduce_with<Itr, F>(support: Itr, d_deg: I, mut d_matrix: F) -> ReducedComplexBase<I, R> 
+    pub fn reduce_with<Itr, F>(support: Itr, d_deg: I, mut d_matrix: F) -> ChainComplexBase<I, R> 
     where
         Itr: Iterator<Item = I>,
         F: FnMut(I, Option<&Trans<R>>) -> SpMat<R>
     {
-        let support = support.collect_vec();
+        let support = support.collect_vec().into_iter();
         let mut reducer = Self::new(d_deg, true);
 
-        for i in support.iter().cloned() { 
+        for i in support.clone() { 
             let t = reducer.trans(i);
             let d = d_matrix(i, t);
 
@@ -203,7 +203,7 @@ where
         (i - deg, i, i + deg)
     }
 
-    fn as_complex<Itr>(mut self, support: Itr) -> ReducedComplexBase<I, R> 
+    fn as_complex<Itr>(mut self, support: Itr) -> ChainComplexBase<I, R> 
     where Itr: Iterator<Item = I> { 
         use std::mem::take;
 
@@ -212,10 +212,14 @@ where
         let mut mats = take(&mut self.mats);
         let mut trans = take(&mut self.trans);
 
-        ReducedComplexBase::new(
+        ChainComplexBase::new_with_trans(
             support, 
             d_deg, 
-            move |i| (mats.remove(&i).unwrap(), trans.remove(&i))
+            move |i| {
+                let d = mats.remove(&i).unwrap();
+                let t = trans.remove(&i); // optional
+                (d, t)
+            }
         )
     }
 }
@@ -357,9 +361,9 @@ mod tests {
         let c = ChainComplex::<i32>::s2();
         let r = ChainReducer::reduce(&c, true);
 
-        let t0 = r.trans(0).unwrap();
-        let t1 = r.trans(1).unwrap();
-        let t2 = r.trans(2).unwrap();
+        let t0 = r[0].trans().unwrap();
+        let t1 = r[1].trans().unwrap();
+        let t2 = r[2].trans().unwrap();
 
         assert_eq!(t0.src_dim(), 4);
         assert_eq!(t1.src_dim(), 6);
@@ -382,12 +386,11 @@ mod tests {
     #[test]
     fn t2_trans() {
         let c = ChainComplex::<i32>::t2();
-
         let r = ChainReducer::reduce(&c, true);
 
-        let t0 = r.trans(0).unwrap();
-        let t1 = r.trans(1).unwrap();
-        let t2 = r.trans(2).unwrap();
+        let t0 = r[0].trans().unwrap();
+        let t1 = r[1].trans().unwrap();
+        let t2 = r[2].trans().unwrap();
 
         assert_eq!(t0.src_dim(), 9);
         assert_eq!(t1.src_dim(), 27);
@@ -418,12 +421,11 @@ mod tests {
     #[test]
     fn rp2_trans() {
         let c = ChainComplex::<i32>::rp2();
-
         let r = ChainReducer::reduce(&c, true);
 
-        let t0 = r.trans(0).unwrap();
-        let t1 = r.trans(1).unwrap();
-        let t2 = r.trans(2).unwrap();
+        let t0 = r[0].trans().unwrap();
+        let t1 = r[1].trans().unwrap();
+        let t2 = r[2].trans().unwrap();
 
         assert_eq!(t0.src_dim(), 6);
         assert_eq!(t1.src_dim(), 15);

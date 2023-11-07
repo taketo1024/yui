@@ -6,7 +6,7 @@ use delegate::delegate;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps, Deg, isize2, isize3};
 use yui_matrix::sparse::{SpMat, SpVec, MatType, Trans};
 
-use crate::{ReducedComplexBase, GridBase, GridIter, RModStr, SimpleRModStr};
+use crate::{GridBase, GridIter, RModStr, SimpleRModStr};
 
 use super::grid::GridTrait;
 use super::utils::ChainReducer;
@@ -46,7 +46,7 @@ where
         }
     }
     
-    fn reduced(&self, with_trans: bool) -> ReducedComplexBase<I, Self::R> { 
+    fn reduced(&self, with_trans: bool) -> ChainComplexBase<I, Self::R> { 
         ChainReducer::reduce(self, with_trans)
     }
 }

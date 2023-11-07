@@ -75,6 +75,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         Self { rank, tors, trans }
     }
 
+    pub fn zero() -> Self { 
+        Self::new(0, vec![], Some(Trans::zero()))
+    }
+
     pub fn trans(&self) -> Option<&Trans<R>> { 
         self.trans.as_ref()
     }

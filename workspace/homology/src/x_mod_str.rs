@@ -106,8 +106,8 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         ) )
     }
 
-    pub fn compose(&self, other: Self) -> Self { 
-        let inner = self.inner.compose(other.inner);
+    pub fn compose(&self, other: &SimpleRModStr<R>) -> Self { 
+        let inner = self.inner.compose(other);
         Self::from(self.gens.clone(), inner)
     }
 }

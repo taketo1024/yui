@@ -103,14 +103,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         t.backward_mat().col_vec(i)
     }
 
-    pub fn compose(&self, other: SimpleRModStr<R>) -> SimpleRModStr<R> { 
+    pub fn compose(&self, other: &SimpleRModStr<R>) -> SimpleRModStr<R> { 
+        let rank = other.rank;
+        let tors = other.tors.clone();
+
         if let Some(t0) = &self.trans { 
             if let Some(t1) = &other.trans { 
                 let t = t0.compose(t1);
-                return Self::new(other.rank, other.tors, Some(t))
+                return Self::new(rank, tors, Some(t))
             }
         }
-        Self::new(other.rank, other.tors, None)
+        Self::new(rank, tors, None)
     }
 }
 

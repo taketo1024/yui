@@ -41,7 +41,7 @@ where
         F2: Fn(I, &X) -> Vec<(X, R)> + 'static
     {
         let summands = GridBase::new(support, |i| 
-            XChainComplexSummand::free_from(gens_map(i))
+            XChainComplexSummand::free(gens_map(i))
         );
 
         let d_map = Box::new(d_map);

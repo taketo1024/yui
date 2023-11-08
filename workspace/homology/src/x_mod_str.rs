@@ -38,7 +38,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         Self { gens, inner }
     }
 
-    pub fn free_from<Itr>(gens: Itr) -> Self 
+    pub fn free<Itr>(gens: Itr) -> Self 
     where Itr: IntoIterator<Item = X> {
         let gens = gens.into_iter().collect::<IndexList<X>>();
         let r = gens.len();
@@ -169,7 +169,7 @@ mod tests {
     
     #[test]
     fn vectorize() { 
-        let s = XModStr::free_from([e(0), e(1), e(2)]);
+        let s = XModStr::free([e(0), e(1), e(2)]);
         
         let x = LinComb::from(e(0));
         let y = LinComb::from(e(1));
@@ -184,7 +184,7 @@ mod tests {
         
     #[test]
     fn as_chain() { 
-        let s = XModStr::free_from([e(0), e(1), e(2)]);
+        let s = XModStr::free([e(0), e(1), e(2)]);
         
         let x = LinComb::from(e(0));
         let y = LinComb::from(e(1));

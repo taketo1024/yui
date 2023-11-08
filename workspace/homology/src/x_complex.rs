@@ -7,7 +7,7 @@ use itertools::Itertools;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use yui_core::{Ring, RingOps, Deg, isize2, isize3};
 use yui_lin_comb::{Gen, LinComb};
-use yui_matrix::sparse::{SpMat, Trans};
+use yui_matrix::sparse::{SpMat, Trans, MatType};
 
 use crate::utils::ChainReducer;
 use crate::{GridBase, GridIter, ChainComplexDisplay, XModStr, RModStr, SimpleRModStr};
@@ -56,15 +56,59 @@ where
         z.apply(|x| (self.d_map)(i, x))
     }
 
+    fn d_matrix_for(&self, i: I, q: &SpMat<R>) -> SpMat<R> { 
+        assert_eq!(q.rows(), self[i].rank());
+
+        let i1 = i + self.d_deg;
+        let (m, n) = (self[i1].rank(), q.cols());
+
+        let entries = (0..n).into_par_iter().flat_map(|j| {
+            let v = q.col_vec(j);
+            let z = v.iter().map(|(k, a)|
+                self[i].gen_chain(k) * a
+            ).sum::<LinComb<_, _>>();
+
+            let dz = self.d(i, &z);
+            let w = self[i1].vectorize(&dz);
+
+            w.iter().filter_map(|(i, a)| { 
+                if !a.is_zero() {
+                    Some((i, j, a.clone()))
+                } else { 
+                    None
+                }
+            }).collect_vec()
+        }).collect::<Vec<_>>();
+
+        SpMat::from_entries((m, n), entries)
+    }
+
     pub fn reduced(&self) -> XChainComplexBase<I, X, R> { 
-        let mut reducer = ChainReducer::from(self, true);
-        self.reduced_by(|i| { 
+        let support = self.support();
+        let d_deg = self.d_deg;
+
+        let mut reducer = ChainReducer::new(d_deg, true);
+
+        for i in support.clone() {
+            let d = if let Some(t) = reducer.trans(i) {
+                self.d_matrix_for(i, t.backward_mat())
+            } else { 
+                self.d_matrix(i)
+            };
+            reducer.set_matrix(i, d);
+            reducer.reduce_at(i);
+        }
+
+        self.reduced_by(|i| 
             reducer.take_trans(i).unwrap()
-        })
+        )
     }
 
     pub fn reduced_by<F>(&self, mut trans_map: F) -> XChainComplexBase<I, X, R>
     where F: FnMut(I) -> Trans<R> { 
+        let d_deg = self.d_deg;
+        let d_map = self.d_map.clone();
+
         let summands = self.summands.map(|i, summand| { 
             let t = trans_map(i);
 
@@ -75,9 +119,6 @@ where
 
             summand.compose(&s)
         });
-
-        let d_deg = self.d_deg;
-        let d_map = self.d_map.clone();
 
         Self { summands, d_deg, d_map }
     }
@@ -114,24 +155,9 @@ where
     }
 
     fn d_matrix(&self, i: I) -> SpMat<Self::R> { 
-        let i1 = i + self.d_deg;
-        let (m, n) = (self[i1].rank(), self[i].rank());
-
-        let entries = (0..n).into_par_iter().flat_map(|j| {
-            let z = self[i].gen_chain(j);
-            let dz = self.d(i, &z);
-            let w = self[i1].vectorize(&dz);
-
-            w.iter().filter_map(|(i, a)| { 
-                if !a.is_zero() {
-                    Some((i, j, a.clone()))
-                } else { 
-                    None
-                }
-            }).collect_vec()
-        }).collect::<Vec<_>>();
-
-        SpMat::from_entries((m, n), entries)
+        let n = self[i].rank();
+        let q = SpMat::id(n);
+        self.d_matrix_for(i, &q)
     }
 }
 

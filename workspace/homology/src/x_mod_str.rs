@@ -1,9 +1,7 @@
-use std::hash::Hash;
-
 use delegate::delegate;
 use yui_core::{Ring, RingOps, IndexList};
 use yui_lin_comb::{Gen, LinComb};
-use yui_matrix::sparse::{SpMat, SpVec, Trans};
+use yui_matrix::sparse::{SpVec, Trans};
 
 use crate::{DisplayForGrid, RModStr, SimpleRModStr};
 
@@ -138,24 +136,6 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn display_for_grid(&self) -> String {
         self.math_symbol()
     }
-}
-
-pub fn make_matrix<X, Y, R, F>(from: &IndexList<X>, to: &IndexList<Y>, f: F) -> SpMat<R>
-where 
-    X: Hash + Eq, Y: Hash + Eq, 
-    R: Ring, for<'x> &'x R: RingOps<R>,
-    F: Fn(&X) -> Vec<(Y, R)> 
-{
-    let (m, n) = (to.len(), from.len());
-    SpMat::generate((m, n), |set|
-        for (j, x) in from.iter().enumerate() {
-            let ys = f(x);
-            for (y, a) in ys {
-                let i = to.index_of(&y).unwrap();
-                set(i, j, a);
-            }
-        }
-    )
 }
 
 #[cfg(test)]

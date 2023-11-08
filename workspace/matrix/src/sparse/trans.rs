@@ -19,6 +19,7 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
 
         let f_id = f.is_id();
         let b_id = b.is_id();
+
         Self { f, b, f_id, b_id }
     }
 
@@ -92,17 +93,6 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         ) 
     }
 
-    pub fn append(&self, f: &SpMat<R>, b: &SpMat<R>) -> Self {
-        assert_eq!(f.cols(), self.tgt_dim());
-        assert_eq!(b.rows(), self.tgt_dim());
-        assert_eq!(f.rows(), b.cols());
-
-        self.modify(
-            |f0|  f * f0, 
-            |b0| b0 * b
-        )
-    }
-
     pub fn permute(&self, p: PermView) -> Self { 
         assert_eq!(p.dim(), self.f.rows());
         assert_eq!(p.dim(), self.b.cols());
@@ -115,10 +105,24 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
 
     pub fn compose(&self, other: &Trans<R>) -> Self { 
         assert_eq!(self.tgt_dim(), other.src_dim());
-        Self::new(
-            other.forward_mat() * self.forward_mat(), 
-            self.backward_mat() * other.backward_mat()
-        )
+
+        let f = if self.f_id { 
+            other.f.clone()
+        } else if other.f_id { 
+            self.f.clone()
+        } else { 
+            &other.f * &self.f // other after self
+        };
+        
+        let b = if self.b_id { 
+            other.b.clone()
+        } else if other.b_id { 
+            self.b.clone()
+        } else { 
+            &self.b * &other.b // self after other
+        };
+        
+        Self::new(f, b)
     }
 }
 

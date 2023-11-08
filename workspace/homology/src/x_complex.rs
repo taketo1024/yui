@@ -1,12 +1,14 @@
 use std::ops::Index;
+use std::rc::Rc;
 
 use delegate::delegate;
 
 use yui_core::{Ring, RingOps, Deg, isize2, isize3};
 use yui_lin_comb::{Gen, LinComb};
-use yui_matrix::sparse::SpMat;
+use yui_matrix::sparse::{SpMat, Trans};
 
-use crate::{GridBase, GridIter, ChainComplexDisplay, XModStr, RModStr};
+use crate::utils::ChainReducer;
+use crate::{GridBase, GridIter, ChainComplexDisplay, XModStr, RModStr, SimpleRModStr};
 
 use super::grid::GridTrait;
 use super::complex::ChainComplexTrait;
@@ -25,7 +27,7 @@ where
 {
     summands: GridBase<I, XChainComplexSummand<X, R>>,
     d_deg: I,
-    d_map: Box<dyn Fn(I, &X) -> Vec<(X, R)>>,
+    d_map: Rc<dyn Fn(I, &X) -> Vec<(X, R)>>,
 }
 
 impl<I, X, R> XChainComplexBase<I, X, R>
@@ -44,12 +46,38 @@ where
             XChainComplexSummand::free(gens_map(i))
         );
 
-        let d_map = Box::new(d_map);
+        let d_map = Rc::new(d_map);
         Self { summands, d_deg, d_map }
     }
 
     pub fn d(&self, i: I, z: &LinComb<X, R>) -> LinComb<X, R> { 
         z.apply(|x| (self.d_map)(i, x))
+    }
+
+    pub fn reduced(&self) -> XChainComplexBase<I, X, R> { 
+        let mut reducer = ChainReducer::from(self, true);
+        self.reduced_by(|i| { 
+            reducer.take_trans(i).unwrap()
+        })
+    }
+
+    pub fn reduced_by<F>(&self, mut trans_map: F) -> XChainComplexBase<I, X, R>
+    where F: FnMut(I) -> Trans<R> { 
+        let summands = self.summands.map(|i, summand| { 
+            let t = trans_map(i);
+
+            assert_eq!(t.src_dim(), self[i].rank());
+
+            let r = t.tgt_dim();
+            let s = SimpleRModStr::new(r, vec![], Some(t));
+
+            summand.compose(&s)
+        });
+
+        let d_deg = self.d_deg;
+        let d_map = self.d_map.clone();
+
+        Self { summands, d_deg, d_map }
     }
 }
 
@@ -131,6 +159,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 pub(crate) mod tests { 
     use itertools::Itertools;
+    use num_traits::Zero;
     use yui_lin_comb::Free;
     use yui_matrix::sparse::SpVec;
 
@@ -210,5 +239,92 @@ pub(crate) mod tests {
         assert_eq!(c[3].rank(), 0);
 
         c.check_d_all();
+    }
+
+    #[test]
+    fn s2_reduced() { 
+        let c = XChainComplex::from(ChainComplex::s2());
+        let r = c.reduced();
+
+        assert_eq!(r[0].rank(), 1);
+        assert_eq!(r[1].rank(), 0);
+        assert_eq!(r[2].rank(), 1);
+
+        r.check_d_all();
+
+        let z = r[0].gen_chain(0);
+        let dz = r.d(0, &z);
+
+        assert!(!z.is_zero());
+        assert!(dz.is_zero());
+
+        let z = r[2].gen_chain(0);
+        let dz = r.d(2, &z);
+
+        assert!(!z.is_zero());
+        assert!(dz.is_zero());
+    }
+
+    #[test]
+    fn t2_reduced() { 
+        let c = XChainComplex::from(ChainComplex::t2());
+        let r = c.reduced();
+
+        assert_eq!(r[0].rank(), 1);
+        assert_eq!(r[1].rank(), 2);
+        assert_eq!(r[2].rank(), 1);
+
+        r.check_d_all();
+
+        let z = r[0].gen_chain(0);
+        let dz = r.d(0, &z);
+
+        assert!(!z.is_zero());
+        assert!(dz.is_zero());
+
+        let z1 = r[1].gen_chain(0);
+        let z2 = r[1].gen_chain(1);
+        let dz1 = c.d(1, &z1);
+        let dz2 = c.d(1, &z2);
+
+        assert!(!z1.is_zero());
+        assert!(!z2.is_zero());
+        assert!(dz1.is_zero());
+        assert!(dz2.is_zero());
+
+        let z = r[2].gen_chain(0);
+        let dz = c.d(2, &z);
+
+        assert!(!z.is_zero());
+        assert!(dz.is_zero());
+    }
+
+    #[test]
+    fn rp2_reduced() { 
+        let c = XChainComplex::from(ChainComplex::rp2());
+        let r = c.reduced();
+        
+        assert_eq!(r[0].rank(), 1);
+        assert_eq!(r[1].rank(), 1);
+        assert_eq!(r[2].rank(), 1);
+
+        r.check_d_all();
+
+        let z = r[0].gen_chain(0);
+        let dz = c.d(0, &z);
+        assert!(!z.is_zero());
+        assert!(dz.is_zero());
+
+        let z = r[1].gen_chain(0);
+        let dz = c.d(1, &z);
+
+        assert!(!z.is_zero());
+        assert!(dz.is_zero());
+
+        let z = r[2].gen_chain(0);
+        let dz = c.d(2, &z);
+
+        assert!(!z.is_zero());
+        assert!(!dz.is_zero()); // == ±2
     }
 }

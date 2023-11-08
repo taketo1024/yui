@@ -1,8 +1,10 @@
 use std::ops::Index;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use delegate::delegate;
 
+use itertools::Itertools;
+use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use yui_core::{Ring, RingOps, Deg, isize2, isize3};
 use yui_lin_comb::{Gen, LinComb};
 use yui_matrix::sparse::{SpMat, Trans};
@@ -27,7 +29,7 @@ where
 {
     summands: GridBase<I, XChainComplexSummand<X, R>>,
     d_deg: I,
-    d_map: Rc<dyn Fn(I, &X) -> Vec<(X, R)>>,
+    d_map: Arc<dyn Fn(I, &X) -> Vec<(X, R)> + Send + Sync>,
 }
 
 impl<I, X, R> XChainComplexBase<I, X, R>
@@ -40,13 +42,13 @@ where
     where 
         It: Iterator<Item = I>, 
         F1: Fn(I) -> Vec<X>,
-        F2: Fn(I, &X) -> Vec<(X, R)> + 'static
+        F2: Fn(I, &X) -> Vec<(X, R)> + Send + Sync + 'static
     {
         let summands = GridBase::new(support, |i| 
             XChainComplexSummand::free(gens_map(i))
         );
 
-        let d_map = Rc::new(d_map);
+        let d_map = Arc::new(d_map);
         Self { summands, d_deg, d_map }
     }
 
@@ -115,17 +117,21 @@ where
         let i1 = i + self.d_deg;
         let (m, n) = (self[i1].rank(), self[i].rank());
 
-        SpMat::generate((m, n), |set| { 
-            for j in 0..n { 
-                let z = self[i].gen_chain(j);
-                let dz = self.d(i, &z);
-                let w = self[i1].vectorize(&dz);
-                
-                for (i, a) in w.iter() {
-                    set(i, j, a.clone())
+        let entries = (0..n).into_par_iter().flat_map(|j| {
+            let z = self[i].gen_chain(j);
+            let dz = self.d(i, &z);
+            let w = self[i1].vectorize(&dz);
+
+            w.iter().filter_map(|(i, a)| { 
+                if !a.is_zero() {
+                    Some((i, j, a.clone()))
+                } else { 
+                    None
                 }
-            }
-        })
+            }).collect_vec()
+        }).collect::<Vec<_>>();
+
+        SpMat::from_entries((m, n), entries)
     }
 }
 

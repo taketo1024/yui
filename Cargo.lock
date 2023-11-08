@@ -1244,6 +1244,7 @@ dependencies = [
  "itertools",
  "log",
  "num-traits",
+ "rayon",
  "sprs",
  "yui-core",
  "yui-lin-comb",

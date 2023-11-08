@@ -1,5 +1,5 @@
 use std::ops::{RangeInclusive, Index};
-use std::rc::Rc;
+use std::sync::Arc;
 use cartesian::cartesian;
 
 use delegate::delegate;
@@ -69,8 +69,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             isize2(i, j)
         );
 
-        let self0 = Rc::new(self);
-        let self1 = Rc::clone(&self0);
+        let self0 = Arc::new(self);
+        let self1 = Arc::clone(&self0);
 
         let complex = XChainComplex2::new(support, isize2(1, 0), 
             move |idx| {

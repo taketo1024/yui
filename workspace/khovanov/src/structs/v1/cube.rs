@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::ops::RangeInclusive;
-use std::rc::Rc;
+use std::sync::Arc;
 use itertools::Itertools;
 use yui_core::{Ring, RingOps, PowMod2, Sign, GetSign};
 use yui_homology::XChainComplex;
@@ -262,8 +262,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let range = self.h_range();
         let range = (range.start() + i0) ..= (range.end() + i0);
 
-        let self0 = Rc::new(self);
-        let self1 = Rc::clone(&self0);
+        let self0 = Arc::new(self);
+        let self1 = Arc::clone(&self0);
         
         XChainComplex::new(range, 1, 
             move |i| {

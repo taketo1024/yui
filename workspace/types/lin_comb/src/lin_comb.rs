@@ -7,7 +7,6 @@ use num_traits::Zero;
 use auto_impl_ops::auto_ops;
 
 use yui_core::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
-use yui_utils::map;
 
 use super::gen::*;
 
@@ -123,26 +122,33 @@ where
 
     pub fn filter_gens<F>(&self, f: F) -> Self
     where F: Fn(&X) -> bool { 
-        let data = self.data.iter().filter_map(|(x, a)| 
+        self.iter().filter_map(|(x, a)| 
             if f(x) { 
                 Some((x.clone(), a.clone()))
             } else { 
                 None
             }
-        ).collect::<AHashMap<_, _>>();
-        
-        Self::new(data)
+        ).collect()
+    }
+
+    pub fn into_filter_gens<F>(self, f: F) -> Self
+    where F: Fn(&X) -> bool { 
+        self.into_iter().filter_map(|(x, a)| 
+            if f(&x) { 
+                Some((x, a))
+            } else { 
+                None
+            }
+        ).collect()
     }
 
     pub fn apply<F>(&self, f: F) -> Self 
     where F: Fn(&X) -> Vec<(X, R)> {
-        let mut res = Self::zero();
-        for (x, r) in self.iter() { 
-            for (y, s) in f(x) { 
-                res += (y, r * &s);
-            }
-        }
-        res
+        self.iter().flat_map(|(x, r)| { 
+            f(x).into_iter().map(move |(y, s)| { 
+                (y, r * &s)
+            })
+        }).collect()
     }
 
     pub fn fmt(&self, f: &mut std::fmt::Formatter<'_>, ascending: bool) -> std::fmt::Result {
@@ -213,7 +219,11 @@ where
 {
     fn from(value: (X, R)) -> Self {
         let (x, r) = value;
-        Self::new(map!{ x => r })
+        let mut map = AHashMap::new();
+        if !r.is_zero() { 
+            map.insert(x, r);
+        }
+        Self::new(map)
     }
 }
 
@@ -232,7 +242,10 @@ where
                 data.insert(x, r);
             }
         }
-        Self::new(data)
+
+        let mut res = Self::new(data);
+        res.reduce();
+        res
     }
 }
 
@@ -310,6 +323,8 @@ where
         } else { 
             data.insert(x, r);
         }
+        
+        // no reduce here
     }
 }
 
@@ -329,6 +344,8 @@ where
         } else { 
             data.insert(x.clone(), r.clone());
         }
+        
+        // no reduce here
     }
 }
 
@@ -780,6 +797,6 @@ mod tests {
         type L = LinComb<X, i32>;
         let z = L::new( (0..10).map(|i| (e(i), i * 10)).collect() );
         let w = z.filter_gens(|x| x.0 % 3 == 0 );
-        assert_eq!(w, L::new(map!{ e(0) => 0, e(3) => 30, e(6) => 60, e(9) => 90}))
+        assert_eq!(w, L::new(map!{ e(3) => 30, e(6) => 60, e(9) => 90}))
     }
 }

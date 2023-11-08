@@ -325,6 +325,7 @@ pub(crate) mod tests {
         let dz = c.d(2, &z);
 
         assert!(!z.is_zero());
-        assert!(!dz.is_zero()); // == ±2
+        assert!(!dz.is_zero());
+        assert_eq!(r[1].vectorize(&dz).to_dense()[0].abs(), 2);
     }
 }

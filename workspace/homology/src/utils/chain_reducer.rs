@@ -430,15 +430,12 @@ mod tests {
         assert_eq!(t1.forward_mat() * t1.backward_mat(), SpMat::id(1));
         assert_eq!(t2.forward_mat() * t2.backward_mat(), SpMat::id(1));
 
-        let v = SpVec::unit(1, 0); // generates 2
+        let v = SpVec::unit(1, 0);
         let w = t2.backward(&v);
         let dw = c.d(2, &w);
         let dv = t1.forward(&dw);
 
-        assert!(
-            dv == SpVec::from(vec![ 2]) || 
-            dv == SpVec::from(vec![-2])
-        );
+        assert_eq!(dv.to_dense()[0].abs(), 2);
 
         let v = SpVec::unit(1, 0);
         let w = t1.backward(&v);

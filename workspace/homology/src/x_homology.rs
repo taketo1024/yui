@@ -126,12 +126,12 @@ pub(crate) mod tests {
         assert_eq!(h[2].rank(), 1);
         assert_eq!(h[2].is_free(), true);
 
-        let h2 = &h[2];
-        let z = h2.gen_chain(0);
+        let z = h[2].gen_chain(0);
+        let dz = c.d(2, &z);
 
         assert!(!z.is_zero());
-        assert!(c.d(2, &z).is_zero());
-        assert_eq!(h2.vectorize(&z), SpVec::from(vec![1]));
+        assert!(dz.is_zero());
+        assert_eq!(h[2].vectorize(&z), SpVec::from(vec![1]));
     }
 
     #[test]
@@ -148,23 +148,24 @@ pub(crate) mod tests {
         assert_eq!(h[2].rank(), 1);
         assert_eq!(h[2].is_free(), true);
 
-        let h2 = &h[2];
-        let z = h2.gen_chain(0);
+        let z = h[2].gen_chain(0);
+        let dz = c.d(2, &z);
 
         assert!(!z.is_zero());
-        assert!(c.d(2, &z).is_zero());
-        assert_eq!(h2.vectorize(&z), SpVec::from(vec![1]));
+        assert!(dz.is_zero());
+        assert_eq!(h[2].vectorize(&z), SpVec::from(vec![1]));
 
-        let h1 = &h[1];
-        let a = h1.gen_chain(0);
-        let b = h1.gen_chain(1);
+        let a = h[1].gen_chain(0);
+        let b = h[1].gen_chain(1);
+        let da = c.d(1, &a);
+        let db = c.d(1, &b);
 
         assert!(!a.is_zero());
         assert!(!b.is_zero());
-        assert!(c.d(1, &a).is_zero());
-        assert!(c.d(1, &b).is_zero());
-        assert_eq!(h1.vectorize(&a).reduced(), SpVec::from(vec![1, 0]));
-        assert_eq!(h1.vectorize(&b).reduced(), SpVec::from(vec![0, 1]));
+        assert!(da.is_zero());
+        assert!(db.is_zero());
+        assert_eq!(h[1].vectorize(&a).reduced(), SpVec::from(vec![1, 0]));
+        assert_eq!(h[1].vectorize(&b).reduced(), SpVec::from(vec![0, 1]));
     }
 
     #[test]
@@ -182,11 +183,111 @@ pub(crate) mod tests {
         assert_eq!(h[2].rank(), 0);
         assert_eq!(h[2].is_free(), true);
 
-        let h1 = &h[1];
-        let z = h1.gen_chain(0);
+        let z = h[1].gen_chain(0);
+        let dz = c.d(1, &z);
 
         assert!(!z.is_zero());
-        assert!(c.d(1, &z).is_zero());
-        assert_eq!(h1.vectorize(&z), SpVec::from(vec![1]));
+        assert!(dz.is_zero());
+        assert_eq!(h[1].vectorize(&z), SpVec::from(vec![1]));
+
+        let v = SpVec::from(vec![-1,1,-1,1,1,1,1,1,1,-1]);
+        let a = c[2].as_chain(&v);
+        let da = c.d(2, &a);
+        
+        assert!(!da.is_zero());
+        assert_eq!(h[1].vectorize(&da).to_dense()[0].abs(), 2);
+    }
+
+    #[test]
+    fn s2_reduced() {
+        let c = XChainComplex::from(ChainComplex::s2()).reduced();
+        let h = c.homology(true);
+
+        assert_eq!(h[0].rank(), 1);
+        assert_eq!(h[0].is_free(), true);
+
+        assert_eq!(h[1].rank(), 0);
+        assert_eq!(h[1].is_free(), true);
+
+        assert_eq!(h[2].rank(), 1);
+        assert_eq!(h[2].is_free(), true);
+
+        let z = h[2].gen_chain(0);
+        let dz = c.d(2, &z);
+
+        assert!(!z.is_zero());
+        assert!(dz.is_zero());
+        assert_eq!(h[2].vectorize(&z), SpVec::from(vec![1]));
+    }
+
+    #[test]
+    fn t2_reduced() {
+        let c = XChainComplex::from(ChainComplex::t2()).reduced();
+        let h = c.homology(true);
+
+        assert_eq!(h[0].rank(), 1);
+        assert_eq!(h[0].is_free(), true);
+
+        assert_eq!(h[1].rank(), 2);
+        assert_eq!(h[1].is_free(), true);
+
+        assert_eq!(h[2].rank(), 1);
+        assert_eq!(h[2].is_free(), true);
+
+        let z = h[2].gen_chain(0);
+        let dz = c.d(2, &z);
+
+        assert!(!z.is_zero());
+        assert!(dz.is_zero());
+        assert_eq!(h[2].vectorize(&z), SpVec::from(vec![1]));
+
+        let a = h[1].gen_chain(0);
+        let b = h[1].gen_chain(1);
+        let da = c.d(1, &a);
+        let db = c.d(1, &b);
+
+        assert!(!a.is_zero());
+        assert!(!b.is_zero());
+        assert!(da.is_zero());
+        assert!(db.is_zero());
+        assert_eq!(h[1].vectorize(&a).reduced(), SpVec::from(vec![1, 0]));
+        assert_eq!(h[1].vectorize(&b).reduced(), SpVec::from(vec![0, 1]));
+    }
+
+    #[test]
+    fn rp2_reduced() {
+        let c = XChainComplex::from(ChainComplex::rp2()).reduced();
+        let h = c.homology(true);
+
+        assert_eq!(h[0].rank(), 1);
+        assert_eq!(h[0].is_free(), true);
+
+        assert_eq!(h[1].rank(), 0);
+        assert_eq!(h[1].tors(), &vec![2]);
+        assert_eq!(h[1].is_free(), false);
+
+        assert_eq!(h[2].rank(), 0);
+        assert_eq!(h[2].is_free(), true);
+
+        let z = h[1].gen_chain(0);
+        let dz = c.d(1, &z);
+
+        assert!(!z.is_zero());
+        assert!(dz.is_zero());
+        assert_eq!(h[1].vectorize(&z), SpVec::from(vec![1]));
+
+        let z = h[1].gen_chain(0);
+        let dz = c.d(1, &z);
+
+        assert!(!z.is_zero());
+        assert!(dz.is_zero());
+        assert_eq!(h[1].vectorize(&z), SpVec::from(vec![1]));
+
+        assert_eq!(c[2].rank(), 1);
+        let a = c[2].gen_chain(0);
+        let da = c.d(2, &a);
+
+        assert!(!da.is_zero());
+        assert_eq!(h[1].vectorize(&da).to_dense()[0].abs(), 2);
     }
 }

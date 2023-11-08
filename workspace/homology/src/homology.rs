@@ -179,12 +179,12 @@ mod tests {
         let c = ChainComplex::<i32>::s2();
         let h = c.homology(true);
 
-        let h2 = &h[2];
-        let t = h2.trans().unwrap();
-        let z = h2.gen_vec(0);
+        let t = h[2].trans().unwrap();
+        let z = h[2].gen_vec(0);
+        let dz = c.d(2, &z);
 
         assert!(!z.is_zero());
-        assert!(c.d(2, &z).is_zero());
+        assert!(dz.is_zero());
         assert_eq!(t.forward(&z), SpVec::from(vec![1]));
     }
 
@@ -193,23 +193,24 @@ mod tests {
         let c = ChainComplex::<i32>::t2();
         let h = c.homology(true);
 
-        let h2 = &h[2];
-        let t2 = h2.trans().unwrap();
-        let z = h2.gen_vec(0);
+        let t2 = h[2].trans().unwrap();
+        let z = h[2].gen_vec(0);
+        let dz = c.d(2, &z);
 
         assert!(!z.is_zero());
-        assert!(c.d(2, &z).is_zero());
+        assert!(dz.is_zero());
         assert_eq!(t2.forward(&z), SpVec::from(vec![1]));
 
-        let h1 = &h[1];
-        let t1 = h1.trans().unwrap();
-        let a = h1.gen_vec(0);
-        let b = h1.gen_vec(1);
+        let t1 = h[1].trans().unwrap();
+        let a = h[1].gen_vec(0);
+        let b = h[1].gen_vec(1);
+        let da = c.d(1, &a);
+        let db = c.d(1, &b);
 
         assert!(!a.is_zero());
         assert!(!b.is_zero());
-        assert!(c.d(1, &a).is_zero());
-        assert!(c.d(1, &b).is_zero());
+        assert!(da.is_zero());
+        assert!(db.is_zero());
         assert_eq!(t1.forward(&a), SpVec::from(vec![1, 0]));
         assert_eq!(t1.forward(&b), SpVec::from(vec![0, 1]));
     }
@@ -219,12 +220,19 @@ mod tests {
         let c = ChainComplex::<i32>::rp2();
         let h = c.homology(true);
 
-        let h1 = &h[1];
-        let t = h1.trans().unwrap();
-        let z = h1.gen_vec(0);
+        let t = h[1].trans().unwrap();
+        let z = h[1].gen_vec(0);
+        let dz = c.d(1, &z);
 
         assert!(!z.is_zero());
-        assert!(c.d(1, &z).is_zero());
+        assert!(dz.is_zero());
         assert_eq!(t.forward(&z), SpVec::from(vec![1]));
+
+        let v = SpVec::from(vec![-1,1,-1,1,1,1,1,1,1,-1]);
+        let dv = c.d(2, &v);
+        let w = h[1].trans().unwrap().forward(&dv);
+
+        assert!(!dv.is_zero());
+        assert_eq!(w.to_dense()[0].abs(), 2);
     }
 }

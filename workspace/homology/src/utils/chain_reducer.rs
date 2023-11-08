@@ -197,7 +197,7 @@ where
         (i - deg, i, i + deg)
     }
 
-    fn make_complex<Itr>(mut self, support: Itr) -> ChainComplexBase<I, R> 
+    pub fn make_complex<Itr>(mut self, support: Itr) -> ChainComplexBase<I, R> 
     where Itr: Iterator<Item = I> { 
         use std::mem::take;
 

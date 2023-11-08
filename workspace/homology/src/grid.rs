@@ -21,6 +21,7 @@ pub type Grid3<E> = GridBase<isize3, E>;
 
 pub type GridIter<I> = std::vec::IntoIter<I>;
 
+#[derive(Clone)]
 pub struct GridBase<I, E>
 where I: Deg { 
     support: Vec<I>,
@@ -54,6 +55,17 @@ where I: Deg, E: Default {
 
     pub fn get_mut(&mut self, i: I) -> Option<&mut E> { 
         self.data.get_mut(&i)
+    }
+
+    pub fn map<E2, F>(&self, mut f: F) -> GridBase<I, E2>
+    where 
+        E2: Default,
+        F: FnMut(I, &E) -> E2
+    {
+        GridBase::new(
+            self.support(), 
+            move |i| f(i, &self[i])
+        )
     }
 }
 

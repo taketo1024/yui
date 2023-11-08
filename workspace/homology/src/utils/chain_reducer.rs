@@ -85,6 +85,10 @@ where
         self.trans.get(&i)
     }
 
+    pub fn rank(&self, i: I) -> Option<usize> { 
+        self.matrix(i).map(|d| d.cols())
+    }
+
     pub fn take_matrix(&mut self, i: I) -> Option<SpMat<R>> {
         self.mats.remove(&i)
     }

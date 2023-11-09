@@ -10,7 +10,7 @@ use yui_lin_comb::{Gen, LinComb};
 use yui_matrix::sparse::{SpMat, Trans, MatType};
 
 use crate::utils::ChainReducer;
-use crate::{GridBase, GridIter, ChainComplexDisplay, XModStr, RModStr, SimpleRModStr};
+use crate::{Grid, GridIter, ChainComplexDisplay, XModStr, RModStr, SimpleRModStr};
 
 use super::grid::GridTrait;
 use super::complex::ChainComplexTrait;
@@ -27,7 +27,7 @@ where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    summands: GridBase<I, XChainComplexSummand<X, R>>,
+    summands: Grid<I, XChainComplexSummand<X, R>>,
     d_deg: I,
     d_map: Arc<dyn Fn(I, &X) -> Vec<(X, R)> + Send + Sync>,
 }
@@ -38,7 +38,7 @@ where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
-    pub fn new<F>(summands: GridBase<I, XChainComplexSummand<X, R>>, d_deg: I, d_map: F) -> Self
+    pub fn new<F>(summands: Grid<I, XChainComplexSummand<X, R>>, d_deg: I, d_map: F) -> Self
     where F: Fn(I, &X) -> Vec<(X, R)> + Send + Sync + 'static {
         let d_map = Arc::new(d_map);
         Self { summands, d_deg, d_map }
@@ -50,7 +50,7 @@ where
         F1: Fn(I) -> Vec<X>,
         F2: Fn(I, &X) -> Vec<(X, R)> + Send + Sync + 'static
     {
-        let summands = GridBase::new(support, |i| 
+        let summands = Grid::generate(support, |i| 
             XChainComplexSummand::free(gens_map(i))
         );
 
@@ -197,7 +197,7 @@ pub(crate) mod tests {
     use yui_lin_comb::Free;
     use yui_matrix::sparse::SpVec;
 
-    use crate::{RModStr, ChainComplex, Grid};
+    use crate::{RModStr, ChainComplex, Grid1};
 
     use super::*;
 
@@ -208,7 +208,7 @@ pub(crate) mod tests {
 
     impl From<ChainComplex<i64>> for XChainComplex<X, i64> {
         fn from(c: ChainComplex<i64>) -> Self {
-            let gens = Grid::new(c.support(), |i| { 
+            let gens = Grid1::generate(c.support(), |i| { 
                 let n = c[i].rank();
                 let gens = (0..n).map(|j| e(j)).collect_vec();
                 gens

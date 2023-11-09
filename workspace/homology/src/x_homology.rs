@@ -1,10 +1,10 @@
 use yui_core::{Deg, isize2, isize3, EucRing, EucRingOps};
 use yui_lin_comb::Gen;
 
-use crate::{GridBase, XModStr, XChainComplexBase, GridTrait, ComputeHomology};
+use crate::{Grid, XModStr, XChainComplexBase, GridTrait, ComputeHomology};
 
 pub type XHomologySummand<X, R> = XModStr<X, R>;
-pub type XHomologyBase<I, X, R> = GridBase<I, XHomologySummand<X, R>>;
+pub type XHomologyBase<I, X, R> = Grid<I, XHomologySummand<X, R>>;
 
 pub type XHomology <X, R> = XHomologyBase<isize,  X, R>;
 pub type XHomology2<X, R> = XHomologyBase<isize2, X, R>;
@@ -23,7 +23,7 @@ where
     }
 
     pub fn homology(&self, with_trans: bool) -> XHomologyBase<I, X, R> {
-        XHomologyBase::new(
+        XHomologyBase::generate(
             self.support(), 
             |i| self.homology_at(i, with_trans)
         )

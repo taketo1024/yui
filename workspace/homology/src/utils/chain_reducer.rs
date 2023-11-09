@@ -8,7 +8,7 @@ use yui_matrix::sparse::pivot::{perms_by_pivots, find_pivots, PivotType};
 use yui_matrix::sparse::schur::Schur;
 use yui_core::{Ring, RingOps, Deg};
 
-use crate::{ChainComplexTrait, ChainComplexBase, RModStr, GridBase, SimpleRModStr, GridTrait};
+use crate::{ChainComplexTrait, ChainComplexBase, RModStr, Grid, SimpleRModStr, GridIter};
 
 //       a0 = [x]      a1 = [a b]      a2 = [z w]
 //            [y]           [c d]     
@@ -78,6 +78,10 @@ where
         let mats = HashMap::new();
         let trans = HashMap::new();
         Self { support, d_deg, with_trans, mats, trans }
+    }
+
+    pub fn support(&self) -> GridIter<I> { 
+        self.support.clone().into_iter()
     }
 
     pub fn matrix(&self, i: I) -> Option<&SpMat<R>> {
@@ -201,11 +205,8 @@ where
     }
 
     pub fn into_complex(mut self) -> ChainComplexBase<I, R> { 
-        let support = self.support.clone().into_iter();
-        let d_deg = self.d_deg;
-
-        let summands = GridBase::new(
-            support, 
+        let summands = Grid::generate(
+            self.support(), 
             |i| { 
                 let rank = self.rank(i).unwrap();
                 let trans = self.take_trans(i); // optional
@@ -213,8 +214,9 @@ where
             }
         );
 
-        let d_matrices = GridBase::new(
-            summands.support(),
+        let d_deg = self.d_deg;
+        let d_matrices = Grid::generate(
+            self.support(),
             |i| self.take_matrix(i).unwrap()
         );
 

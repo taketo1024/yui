@@ -1,10 +1,10 @@
 use yui_core::{EucRing, EucRingOps, Deg, isize2, isize3};
 
 use crate::utils::HomologyCalc;
-use crate::{GridBase, ChainComplexTrait, RModStr, SimpleRModStr, ChainComplexBase, GridTrait};
+use crate::{Grid, ChainComplexTrait, RModStr, SimpleRModStr, ChainComplexBase, GridTrait};
 
 pub type HomologySummand<R> = SimpleRModStr<R>;
-pub type HomologyBase<I, R> = GridBase<I, HomologySummand<R>>;
+pub type HomologyBase<I, R> = Grid<I, HomologySummand<R>>;
 
 pub type Homology<R>  = HomologyBase<isize,  R>;
 pub type Homology2<R> = HomologyBase<isize2, R>;
@@ -41,7 +41,7 @@ where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     pub fn homology(&self, with_trans: bool) -> HomologyBase<I, R> {
-        HomologyBase::new(
+        HomologyBase::generate(
             self.support(), 
             |i| self.homology_at(i, with_trans)
         )

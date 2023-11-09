@@ -6,7 +6,7 @@ use delegate::delegate;
 use yui_core::{Ring, RingOps, Deg, isize2, isize3};
 use yui_matrix::sparse::{SpMat, SpVec, MatType, Trans};
 
-use crate::{GridBase, GridIter, RModStr, SimpleRModStr};
+use crate::{Grid, GridIter, RModStr, SimpleRModStr};
 
 use super::grid::GridTrait;
 use super::utils::ChainReducer;
@@ -88,14 +88,14 @@ where
 
 pub struct ChainComplexBase<I, R>
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
-    summands: GridBase<I, ChainComplexSummand<R>>,
+    summands: Grid<I, ChainComplexSummand<R>>,
     d_deg: I,
-    d_matrices: GridBase<I, SpMat<R>>
+    d_matrices: Grid<I, SpMat<R>>
 }
 
 impl<I, R> ChainComplexBase<I, R> 
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new(summands: GridBase<I, ChainComplexSummand<R>>, d_deg: I, mut d_matrices: GridBase<I, SpMat<R>>) -> Self { 
+    pub fn new(summands: Grid<I, ChainComplexSummand<R>>, d_deg: I, mut d_matrices: Grid<I, SpMat<R>>) -> Self { 
         for i in summands.support() { 
             let r = summands[i].rank();
             if r > 0 && !d_matrices.is_supported(i - d_deg) { 
@@ -112,11 +112,11 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         It: Iterator<Item = I>, 
         F: FnMut(I) -> SpMat<R>
     {
-        let d_matrices = GridBase::new(support, |i| 
+        let d_matrices = Grid::generate(support, |i| 
             d_matrix_map(i)
         );
 
-        let summands = GridBase::new(d_matrices.support(), |i| {
+        let summands = Grid::generate(d_matrices.support(), |i| {
             let r = d_matrices[i].cols();
             let t = Trans::id(r);
             ChainComplexSummand::new(r, vec![], Some(t)) 

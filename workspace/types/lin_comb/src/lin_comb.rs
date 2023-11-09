@@ -143,7 +143,7 @@ where
     }
 
     pub fn apply<F>(&self, f: F) -> Self 
-    where F: Fn(&X) -> Vec<(X, R)> {
+    where F: Fn(&X) -> LinComb<X, R> {
         self.iter().flat_map(|(x, r)| { 
             f(x).into_iter().map(move |(y, s)| { 
                 (y, r * &s)

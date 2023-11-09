@@ -29,7 +29,7 @@ where
 {
     summands: Grid<I, XChainComplexSummand<X, R>>,
     d_deg: I,
-    d_map: Arc<dyn Fn(I, &X) -> Vec<(X, R)> + Send + Sync>,
+    d_map: Arc<dyn Fn(I, &X) -> LinComb<X, R> + Send + Sync>,
 }
 
 impl<I, X, R> XChainComplexBase<I, X, R>
@@ -39,7 +39,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
     pub fn new<F>(summands: Grid<I, XChainComplexSummand<X, R>>, d_deg: I, d_map: F) -> Self
-    where F: Fn(I, &X) -> Vec<(X, R)> + Send + Sync + 'static {
+    where F: Fn(I, &X) -> LinComb<X, R> + Send + Sync + 'static {
         let d_map = Arc::new(d_map);
         Self { summands, d_deg, d_map }
     }
@@ -48,7 +48,7 @@ where
     where 
         It: Iterator<Item = I>, 
         F1: Fn(I) -> Vec<X>,
-        F2: Fn(I, &X) -> Vec<(X, R)> + Send + Sync + 'static
+        F2: Fn(I, &X) -> LinComb<X, R> + Send + Sync + 'static
     {
         let summands = Grid::generate(support, |i| 
             XChainComplexSummand::free(gens_map(i))

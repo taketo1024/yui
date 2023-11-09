@@ -4,6 +4,7 @@ use std::sync::Arc;
 use itertools::Itertools;
 use yui_core::{Ring, RingOps, PowMod2, Sign, GetSign};
 use yui_homology::XChainComplex;
+use yui_lin_comb::LinComb;
 use yui_link::{Link, State, LinkComp, Edge};
 
 use crate::{KhAlgStr, KhLabel, KhEnhState};
@@ -187,11 +188,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn differentiate(&self, x: &KhEnhState) -> Vec<(KhEnhState, R)> {
+    pub fn differentiate(&self, x: &KhEnhState) -> LinComb<KhEnhState, R> {
         let edges = self.edges_from(&x.state);
         edges.iter().flat_map(|(t, e)| { 
             self.apply(x, t, e)
-        }).collect_vec()
+        }).collect()
     }
 
     pub fn vertex(&self, s: &State) -> &KhCubeVertex { 

@@ -18,10 +18,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         
         b.process();
 
-        let complex = b.complex().eval(h, t);
         let canon_cycles = b.canon_cycles().iter().map(|z| 
             z.eval(h, t)
         ).collect_vec();
+        let complex = b.into_complex().eval(h, t);
 
         assert!(canon_cycles.iter().all(|z| 
             complex.d(0, z).is_zero()

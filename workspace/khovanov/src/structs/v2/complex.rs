@@ -6,7 +6,7 @@ use itertools::Itertools;
 use num_traits::Zero;
 use cartesian::cartesian;
 use yui_core::{Ring, RingOps};
-use yui_homology::XChainComplex;
+use yui_homology::{XChainComplex, XModStr, Grid1};
 use yui_link::{Crossing, Edge};
 use yui_utils::bitseq::Bit;
 
@@ -448,7 +448,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug_assert!(self.validate_edges());
     }
 
-    pub fn eval(&self, h: &R, t: &R) -> XChainComplex<KhEnhState, R> {
+    pub fn eval(self, h: &R, t: &R) -> XChainComplex<KhEnhState, R> {
         debug_assert!(self.is_evalable());
 
         let (h, t) = (h.clone(), t.clone());
@@ -457,23 +457,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let i0 = self.deg_shift.0;
         let i1 = i0 + (n as isize) - 1;
 
-        let all_gens = self.vertices.keys().cloned().collect_vec();
-        let vertices = self.vertices.clone();
+        let summands = Grid1::generate(i0..=i1, |i| { 
+            let w = (i - i0) as usize;
+            let gens = self.vertices.keys().filter(|x| 
+                x.state.weight() == w
+            ).sorted().cloned();
+            XModStr::free(gens)
+        });
 
-        XChainComplex::generate(i0..=i1, 1, 
-            |i| { 
-                let w = (i - i0) as usize;
-                all_gens.iter().filter(|x| 
-                    x.state.weight() == w
-                ).sorted().cloned().collect()
-            }, 
-            move |_i, x| { 
-                let v = &vertices[&x];
-                v.out_edges.iter().map(|(y, f)| 
-                    (*y, f.eval(&h, &t))
-                ).collect()
-            }
-        )
+        XChainComplex::new(summands, 1, move |_, x| { 
+            let v = self.vertex(x);
+            v.out_edges.iter().map(|(y, f)| 
+                (*y, f.eval(&h, &t))
+            ).collect()
+        })
     }
 
     fn is_evalable(&self) -> bool { 

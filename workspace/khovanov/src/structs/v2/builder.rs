@@ -95,6 +95,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.complex
     }
 
+    pub fn into_complex(self) -> TngComplex<R> { 
+        self.complex
+    }
+
     pub fn canon_cycles(&self) -> &Vec<TngElem<R>> { 
         &self.canon_cycles
     }

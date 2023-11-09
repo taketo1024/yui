@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 use std::ops::RangeInclusive;
-use std::sync::Arc;
 use itertools::Itertools;
 use yui_core::{Ring, RingOps, PowMod2, Sign, GetSign};
-use yui_homology::XChainComplex;
+use yui_homology::{XChainComplex, Grid, XModStr};
 use yui_lin_comb::LinComb;
 use yui_link::{Link, State, LinkComp, Edge};
 
@@ -188,7 +187,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn differentiate(&self, x: &KhEnhState) -> LinComb<KhEnhState, R> {
+    pub fn d(&self, x: &KhEnhState) -> LinComb<KhEnhState, R> {
         let edges = self.edges_from(&x.state);
         edges.iter().flat_map(|(t, e)| { 
             self.apply(x, t, e)
@@ -259,28 +258,24 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn as_complex(self, i0: isize, reduced: bool) -> XChainComplex<KhEnhState, R> {
+    pub fn into_complex(self, i0: isize, reduced: bool) -> XChainComplex<KhEnhState, R> {
         let range = self.h_range();
         let range = (range.start() + i0) ..= (range.end() + i0);
 
-        let self0 = Arc::new(self);
-        let self1 = Arc::clone(&self0);
-        
-        XChainComplex::generate(range, 1, 
-            move |i| {
-                let i = i - i0;
-                let gens = if reduced {
-                    let e = self0.base_pt.unwrap();
-                    self0.reduced_generators(i, &e)
-                } else { 
-                    self0.generators(i) 
-                };
-                gens.into_iter().cloned().collect()
-            },
-            move |_i, x| { 
-                self1.differentiate(x)
-            }
-        )
+        let summands = Grid::generate(range.clone(), |i| { 
+            let i = i - i0;
+            let gens = if reduced {
+                let e = self.base_pt.unwrap();
+                self.reduced_generators(i, &e)
+            } else { 
+                self.generators(i) 
+            };
+            XModStr::free(gens.into_iter().cloned())
+        });
+
+        XChainComplex::new(summands, 1, move |_, x| { 
+            self.d(x)
+        })
     }   
 }
 

@@ -19,7 +19,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             vec![]
         };
         let cube = KhCube::new(l, h, t);
-        let complex = cube.as_complex(deg_shift.0, reduced);
+        let complex = cube.into_complex(deg_shift.0, reduced);
 
         KhComplex::_new(complex, canon_cycles, reduced, deg_shift)
     }        

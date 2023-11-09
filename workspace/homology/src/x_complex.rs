@@ -29,7 +29,7 @@ where
 {
     summands: Grid<I, XChainComplexSummand<X, R>>,
     d_deg: I,
-    d_map: Arc<dyn Fn(I, &X) -> LinComb<X, R> + Send + Sync>,
+    d_map: Arc<dyn Fn(I, &LinComb<X, R>) -> LinComb<X, R> + Send + Sync>,
 }
 
 impl<I, X, R> XChainComplexBase<I, X, R>
@@ -39,13 +39,13 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
     pub fn new<F>(summands: Grid<I, XChainComplexSummand<X, R>>, d_deg: I, d_map: F) -> Self
-    where F: Fn(I, &X) -> LinComb<X, R> + Send + Sync + 'static {
+    where F: Fn(I, &LinComb<X, R>) -> LinComb<X, R> + Send + Sync + 'static {
         let d_map = Arc::new(d_map);
         Self { summands, d_deg, d_map }
     }
 
     pub fn d(&self, i: I, z: &LinComb<X, R>) -> LinComb<X, R> { 
-        z.apply(|x| (self.d_map)(i, x))
+        (self.d_map)(i, z)
     }
 
     fn d_matrix_for(&self, i: I, q: &SpMat<R>) -> SpMat<R> { 
@@ -200,11 +200,13 @@ pub(crate) mod tests {
                 XModStr::free(gens)
             });
 
-            Self::new(summands, c.d_deg(), move |i, x| {
+            Self::new(summands, c.d_deg(), move |i, z| {
                 let n = c[i].rank();
-                let v = SpVec::unit(n, x.0 as usize);
-                let dv = c.d(i, &v);
-                dv.iter().map(|(i, a)| (e(i), a.clone())).collect()
+                z.apply(|x| {
+                    let v = SpVec::unit(n, x.0 as usize);
+                    let dv = c.d(i, &v);
+                    dv.iter().map(|(i, a)| (e(i), a.clone())).collect()
+                })
             })
         }
     }

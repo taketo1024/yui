@@ -273,8 +273,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             XModStr::free(gens.into_iter().cloned())
         });
 
-        XChainComplex::new(summands, 1, move |_, x| { 
-            self.d(x)
+        XChainComplex::new(summands, 1, move |_, z| { 
+            z.apply(|x| self.d(x))
         })
     }   
 }

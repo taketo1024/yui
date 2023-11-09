@@ -465,11 +465,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             XModStr::free(gens)
         });
 
-        XChainComplex::new(summands, 1, move |_, x| { 
-            let v = self.vertex(x);
-            v.out_edges.iter().map(|(y, f)| 
-                (*y, f.eval(&h, &t))
-            ).collect()
+        XChainComplex::new(summands, 1, move |_, z| { 
+            z.apply(|x| {
+                let v = self.vertex(x);
+                v.out_edges.iter().map(|(y, f)| 
+                    (*y, f.eval(&h, &t))
+                ).collect()
+            })
         })
     }
 

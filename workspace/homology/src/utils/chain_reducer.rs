@@ -8,7 +8,7 @@ use yui_matrix::sparse::pivot::{perms_by_pivots, find_pivots, PivotType};
 use yui_matrix::sparse::schur::Schur;
 use yui_core::{Ring, RingOps, Deg};
 
-use crate::{ChainComplexTrait, ChainComplexBase, RModStr};
+use crate::{ChainComplexTrait, ChainComplexBase, RModStr, GridBase, SimpleRModStr, GridTrait};
 
 //       a0 = [x]      a1 = [a b]      a2 = [z w]
 //            [y]           [c d]     
@@ -28,6 +28,7 @@ where
     I: Deg,
     R: Ring, for<'x> &'x R: RingOps<R>,
 { 
+    support: Vec<I>,
     d_deg: I,
     with_trans: bool,
     mats: HashMap<I, SpMat<R>>,
@@ -45,7 +46,7 @@ where
         C::E: RModStr<R = R>
     {
         let r = Self::from(complex, with_trans);
-        r.make_complex(complex.support())
+        r.into_complex()
     }
 
     pub fn from<C>(complex: &C, with_trans: bool) -> Self 
@@ -53,12 +54,12 @@ where
         C: ChainComplexTrait<I, R = R>,
         C::E: RModStr<R = R>
     {
-        let support = complex.support().collect_vec().into_iter();
+        let support = complex.support();
         let d_deg = complex.d_deg();
 
-        let mut reducer = Self::new(d_deg, with_trans);
+        let mut reducer = Self::new(support, d_deg, with_trans);
 
-        for i in support.clone() { 
+        for i in reducer.support.clone() { 
             for j in [i, i + d_deg] { 
                 if !reducer.is_set(j) {
                     let d = complex.d_matrix(j);
@@ -71,10 +72,12 @@ where
         reducer
     }
 
-    pub fn new(d_deg: I, with_trans: bool) -> Self {
+    pub fn new<Itr>(support: Itr, d_deg: I, with_trans: bool) -> Self
+    where Itr: Iterator<Item = I> {
+        let support = support.collect_vec();
         let mats = HashMap::new();
         let trans = HashMap::new();
-        Self { d_deg, with_trans, mats, trans }
+        Self { support, d_deg, with_trans, mats, trans }
     }
 
     pub fn matrix(&self, i: I) -> Option<&SpMat<R>> {
@@ -197,20 +200,28 @@ where
         (i - deg, i, i + deg)
     }
 
-    pub fn make_complex<Itr>(mut self, support: Itr) -> ChainComplexBase<I, R> 
-    where Itr: Iterator<Item = I> { 
-        use std::mem::take;
-
+    pub fn into_complex(mut self) -> ChainComplexBase<I, R> { 
+        let support = self.support.clone().into_iter();
         let d_deg = self.d_deg;
 
-        let mut mats  = take(&mut self.mats);
-        let mut trans = take(&mut self.trans);
-
-        ChainComplexBase::new_with_trans(
+        let summands = GridBase::new(
             support, 
-            d_deg, 
-            move |i| mats.remove(&i).unwrap(),
-            move |i| trans.remove(&i)
+            |i| { 
+                let rank = self.rank(i).unwrap();
+                let trans = self.take_trans(i); // optional
+                SimpleRModStr::new( rank, vec![], trans )
+            }
+        );
+
+        let d_matrices = GridBase::new(
+            summands.support(),
+            |i| self.take_matrix(i).unwrap()
+        );
+
+        ChainComplexBase::new(
+            summands,
+            d_deg,
+            d_matrices
         )
     }
 }

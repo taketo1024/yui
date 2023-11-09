@@ -84,12 +84,9 @@ where
     }
 
     pub fn reduced(&self) -> XChainComplexBase<I, X, R> { 
-        let support = self.support();
-        let d_deg = self.d_deg;
+        let mut reducer = ChainReducer::new(self.support(), self.d_deg, true);
 
-        let mut reducer = ChainReducer::new(d_deg, true);
-
-        for i in support.clone() {
+        for i in self.support() {
             let d = if let Some(t) = reducer.trans(i) {
                 self.d_matrix_for(i, t.backward_mat())
             } else { 

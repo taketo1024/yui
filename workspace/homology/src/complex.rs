@@ -48,7 +48,7 @@ where
     }
 
     fn as_generic(&self) -> ChainComplexBase<I, Self::R> {
-        ChainComplexBase::new(self.support(), self.d_deg(), |i| self.d_matrix(i))
+        ChainComplexBase::generate(self.support(), self.d_deg(), |i| self.d_matrix(i))
     }
 }
 
@@ -95,32 +95,8 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<I, R> ChainComplexBase<I, R> 
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new<It, F>(support: It, d_deg: I, d_matrix_map: F) -> Self
-    where 
-        It: Iterator<Item = I>, 
-        F: FnMut(I) -> SpMat<R>
-    {
-        Self::new_with_trans(support, d_deg, d_matrix_map, |_| None)
-    }
-
-    pub fn new_with_trans<It, F1, F2>(support: It, d_deg: I, mut d_matrix_map: F1, mut trans_map: F2) -> Self
-    where 
-        It: Iterator<Item = I>, 
-        F1: FnMut(I) -> SpMat<R>,
-        F2: FnMut(I) -> Option<Trans<R>>
-    {
-        let support = support.collect_vec().into_iter();
-        let mut d_matrices = GridBase::new(support.clone(), |i| 
-            d_matrix_map(i)
-        );
-
-        let summands = GridBase::new(support.clone(), |i| {
-            let r = d_matrices[i].cols();
-            let t = trans_map(i).unwrap_or(Trans::id(r));
-            ChainComplexSummand::new(r, vec![], Some(t)) 
-        });
-
-        for i in support.clone() { 
+    pub fn new(summands: GridBase<I, ChainComplexSummand<R>>, d_deg: I, mut d_matrices: GridBase<I, SpMat<R>>) -> Self { 
+        for i in summands.support() { 
             let r = summands[i].rank();
             if r > 0 && !d_matrices.is_supported(i - d_deg) { 
                 let d = SpMat::zero((r, 0));
@@ -129,6 +105,24 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         }
 
         Self { summands, d_deg, d_matrices }
+    }
+
+    pub fn generate<It, F>(support: It, d_deg: I, mut d_matrix_map: F) -> Self
+    where 
+        It: Iterator<Item = I>, 
+        F: FnMut(I) -> SpMat<R>
+    {
+        let d_matrices = GridBase::new(support, |i| 
+            d_matrix_map(i)
+        );
+
+        let summands = GridBase::new(d_matrices.support(), |i| {
+            let r = d_matrices[i].cols();
+            let t = Trans::id(r);
+            ChainComplexSummand::new(r, vec![], Some(t)) 
+        });
+
+        Self::new(summands, d_deg, d_matrices)
     }
 
     pub fn d_matrix_ref(&self, i: I) -> &SpMat<R> {
@@ -186,7 +180,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         } else { 
             Either::Right(range.rev())
         };
-        Self::new(
+        
+        Self::generate(
             range, d_deg, 
             move |i| {
                 let i = (i - offset) as usize;

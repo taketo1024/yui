@@ -44,19 +44,6 @@ where
         Self { summands, d_deg, d_map }
     }
 
-    pub fn generate<It, F1, F2>(support: It, d_deg: I, gens_map: F1, d_map: F2) -> Self
-    where 
-        It: Iterator<Item = I>, 
-        F1: Fn(I) -> Vec<X>,
-        F2: Fn(I, &X) -> LinComb<X, R> + Send + Sync + 'static
-    {
-        let summands = Grid::generate(support, |i| 
-            XChainComplexSummand::free(gens_map(i))
-        );
-
-        Self::new(summands, d_deg, d_map)
-    }
-
     pub fn d(&self, i: I, z: &LinComb<X, R>) -> LinComb<X, R> { 
         z.apply(|x| (self.d_map)(i, x))
     }
@@ -192,7 +179,6 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 pub(crate) mod tests { 
-    use itertools::Itertools;
     use num_traits::Zero;
     use yui_lin_comb::Free;
     use yui_matrix::sparse::SpVec;
@@ -208,22 +194,18 @@ pub(crate) mod tests {
 
     impl From<ChainComplex<i64>> for XChainComplex<X, i64> {
         fn from(c: ChainComplex<i64>) -> Self {
-            let gens = Grid1::generate(c.support(), |i| { 
+            let summands = Grid1::generate(c.support(), |i| { 
                 let n = c[i].rank();
-                let gens = (0..n).map(|j| e(j)).collect_vec();
-                gens
+                let gens = (0..n).map(|j| e(j));
+                XModStr::free(gens)
             });
 
-            Self::generate(
-                c.support(), c.d_deg(), 
-                move |i| gens[i].clone(), 
-                move |i, x| {
-                    let n = c[i].rank();
-                    let v = SpVec::unit(n, x.0 as usize);
-                    let dv = c.d(i, &v);
-                    dv.iter().map(|(i, a)| (e(i), a.clone())).collect()
-                }
-            )
+            Self::new(summands, c.d_deg(), move |i, x| {
+                let n = c[i].rank();
+                let v = SpVec::unit(n, x.0 as usize);
+                let dv = c.d(i, &v);
+                dv.iter().map(|(i, a)| (e(i), a.clone())).collect()
+            })
         }
     }
 

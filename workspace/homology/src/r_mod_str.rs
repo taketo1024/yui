@@ -1,7 +1,10 @@
+use std::iter::Sum;
+use std::ops::Add;
+
 use itertools::Itertools;
 
 use yui_core::{Elem, Ring, RingOps};
-use yui_matrix::sparse::{Trans, SpVec};
+use yui_matrix::sparse::{Trans, SpVec, SpMat};
 
 use crate::DisplayForGrid;
 
@@ -141,5 +144,52 @@ impl<R> DisplayForGrid for SimpleRModStr<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn display_for_grid(&self) -> String {
         self.math_symbol()
+    }
+}
+
+// direct sum
+impl<'a, R> Sum<&'a SimpleRModStr<R>> for SimpleRModStr<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn sum<I: Iterator<Item = &'a SimpleRModStr<R>>>(iter: I) -> Self {
+        let mut rank = 0;
+        let mut tors = vec![];
+        let mut src_rank = 0;
+        let mut f_entries = vec![];
+        let mut b_entries = vec![];
+        let mut trans_ok = true;
+
+        iter.for_each(|s| { 
+            if trans_ok {
+                if let Some(t) = s.trans() { 
+                    f_entries.extend( t.forward_mat() .iter().map(|(i, j, a)| (i + rank, j + src_rank, a.clone())) );
+                    b_entries.extend( t.backward_mat().iter().map(|(i, j, a)| (i + src_rank, j + rank, a.clone())) );
+                    src_rank += t.src_dim();
+                } else { 
+                    trans_ok = false;
+                }
+            }
+
+            rank += s.rank;
+            tors.append(&mut s.tors.clone());
+        });
+
+        let trans = if trans_ok { 
+            let f = SpMat::from_entries((rank, src_rank), f_entries);
+            let b = SpMat::from_entries((src_rank, rank), b_entries);
+            Some(Trans::new(f, b))
+        } else { 
+            None
+        };
+
+        SimpleRModStr::new(rank, tors, trans)
+    }
+}
+
+impl<'a, 'b, R> Add<&'b SimpleRModStr<R>> for &'a SimpleRModStr<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = SimpleRModStr<R>;
+
+    fn add(self, other: &'b SimpleRModStr<R>) -> Self::Output {
+        [self, other].into_iter().sum()
     }
 }

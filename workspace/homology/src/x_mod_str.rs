@@ -1,3 +1,6 @@
+use std::iter::Sum;
+use std::ops::Add;
+
 use delegate::delegate;
 use yui_core::{Ring, RingOps, IndexList};
 use yui_lin_comb::{Gen, LinComb};
@@ -138,9 +141,37 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
+// direct sum
+impl<'a, X, R> Sum<&'a XModStr<X, R>> for XModStr<X, R>
+where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+    fn sum<I: Iterator<Item = &'a XModStr<X, R>>>(iter: I) -> Self {
+        let (gens, inner) = iter.fold((vec![], vec![]), |mut res, s| {
+            let XModStr{ gens, inner } = s.clone();
+            res.0.extend(gens);
+            res.1.push(inner);
+            res
+        });
+
+        let gens = gens.into_iter().collect();
+        let inner = inner.iter().sum();
+
+        Self { gens, inner }
+    }
+}
+
+impl<'a, 'b, X, R> Add<&'b XModStr<X, R>> for &'a XModStr<X, R>
+where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = XModStr<X, R>;
+
+    fn add(self, other: &'b XModStr<X, R>) -> Self::Output {
+        [self, other].into_iter().sum()
+    }
+}
+
 #[cfg(test)]
 mod tests { 
     use yui_lin_comb::Free;
+    use yui_matrix::sparse::SpMat;
 
     use super::*;
 
@@ -176,5 +207,20 @@ mod tests {
         let w = s.as_chain(&v);
 
         assert_eq!(w, &x + &y * 2 - &z * 3);
+    }
+
+    #[test]
+    fn dir_sum() { 
+        let s1 = XModStr::<X, i32>::free([e(0), e(1), e(2)]);
+        let s2 = XModStr::free([e(3), e(4)]);
+        let s = &s1 + &s2;
+        
+        assert_eq!(s.rank(), 5);
+        assert_eq!(s.tors(), &vec![]);
+        assert_eq!(s.gens, [e(0), e(1), e(2), e(3), e(4)].into_iter().collect());
+
+        assert!(s.trans().is_some());
+        assert_eq!(s.trans().unwrap().forward_mat(), &SpMat::id(5));
+        assert_eq!(s.trans().unwrap().backward_mat(), &SpMat::id(5));
     }
 }

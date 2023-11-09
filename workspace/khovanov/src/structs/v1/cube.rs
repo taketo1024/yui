@@ -265,7 +265,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let self0 = Arc::new(self);
         let self1 = Arc::clone(&self0);
         
-        XChainComplex::new(range, 1, 
+        XChainComplex::generate(range, 1, 
             move |i| {
                 let i = i - i0;
                 let gens = if reduced {

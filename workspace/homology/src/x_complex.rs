@@ -38,7 +38,13 @@ where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
-    pub fn new<It, F1, F2>(support: It, d_deg: I, gens_map: F1, d_map: F2) -> Self
+    pub fn new<F>(summands: GridBase<I, XChainComplexSummand<X, R>>, d_deg: I, d_map: F) -> Self
+    where F: Fn(I, &X) -> Vec<(X, R)> + Send + Sync + 'static {
+        let d_map = Arc::new(d_map);
+        Self { summands, d_deg, d_map }
+    }
+
+    pub fn generate<It, F1, F2>(support: It, d_deg: I, gens_map: F1, d_map: F2) -> Self
     where 
         It: Iterator<Item = I>, 
         F1: Fn(I) -> Vec<X>,
@@ -48,8 +54,7 @@ where
             XChainComplexSummand::free(gens_map(i))
         );
 
-        let d_map = Arc::new(d_map);
-        Self { summands, d_deg, d_map }
+        Self::new(summands, d_deg, d_map)
     }
 
     pub fn d(&self, i: I, z: &LinComb<X, R>) -> LinComb<X, R> { 
@@ -209,7 +214,7 @@ pub(crate) mod tests {
                 gens
             });
 
-            Self::new(
+            Self::generate(
                 c.support(), c.d_deg(), 
                 move |i| gens[i].clone(), 
                 move |i, x| {

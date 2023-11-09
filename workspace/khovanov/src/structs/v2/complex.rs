@@ -460,7 +460,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let all_gens = self.vertices.keys().cloned().collect_vec();
         let vertices = self.vertices.clone();
 
-        XChainComplex::new(i0..=i1, 1, 
+        XChainComplex::generate(i0..=i1, 1, 
             |i| { 
                 let w = (i - i0) as usize;
                 all_gens.iter().filter(|x| 

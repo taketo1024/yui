@@ -72,7 +72,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let self0 = Arc::new(self);
         let self1 = Arc::clone(&self0);
 
-        let complex = XChainComplex2::new(support, isize2(1, 0), 
+        let complex = XChainComplex2::generate(support, isize2(1, 0), 
             move |idx| {
                 let isize2(i, j) = idx;
                 let q = j - deg_shift.1;

@@ -36,7 +36,7 @@ impl<R> KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn new_v2(l: Link, reduced: bool) -> Self { 
         let c = KhComplex::new_v2(&l, &R::zero(), &R::zero(), reduced);
-        c.as_bigraded()
+        c.into_bigraded()
     }
 }
 

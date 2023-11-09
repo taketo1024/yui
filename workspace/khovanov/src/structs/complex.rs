@@ -1,11 +1,10 @@
 use std::ops::{RangeInclusive, Index};
-use std::sync::Arc;
 use cartesian::cartesian;
 
 use delegate::delegate;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps, isize2};
 use yui_link::Link;
-use yui_homology::{ChainComplexTrait, XChainComplex, XChainComplex2, GridTrait, XChainComplexSummand, ChainComplexDisplay};
+use yui_homology::{ChainComplexTrait, XChainComplex, XChainComplex2, GridTrait, XChainComplexSummand, ChainComplexDisplay, Grid2, XModStr};
 use yui_matrix::sparse::SpMat;
 
 use crate::{KhEnhState, KhChain, KhHomology, KhHomologyBigraded};
@@ -59,7 +58,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.inner
     }
 
-    pub fn as_bigraded(self) -> KhComplexBigraded<R> {
+    pub fn into_bigraded(self) -> KhComplexBigraded<R> {
         let reduced = self.reduced;
         let deg_shift = self.deg_shift;
 
@@ -69,27 +68,23 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             isize2(i, j)
         );
 
-        let self0 = Arc::new(self);
-        let self1 = Arc::clone(&self0);
+        let summands = Grid2::generate(support, |idx| { 
+            let isize2(i, j) = idx;
+            let q = j - deg_shift.1;
+            let gens = self[i].gens().iter().filter(|x| { 
+                x.q_deg() == q
+            }).cloned();
+            XModStr::free(gens)
+        });
 
-        let complex = XChainComplex2::generate(support, isize2(1, 0), 
-            move |idx| {
-                let isize2(i, j) = idx;
-                let q = j - deg_shift.1;
+        let inner = XChainComplex2::new(summands, isize2(1, 0), move |idx, x| { 
+            let i = idx.0;
+            let x = KhChain::from(x.clone());
+            let dx = self.d(i, &x);
+            dx.into_iter().collect()
+        });
 
-                self0[i].gens().iter().filter(|x| { 
-                    x.q_deg() == q
-                }).cloned().collect()
-            },
-            move |idx, x| { 
-                let i = idx.0;
-                let x = KhChain::from(x.clone());
-                let dx = self1.d(i, &x);
-                dx.into_iter().collect()
-            }
-        );
-
-        KhComplexBigraded { inner: complex, reduced }
+        KhComplexBigraded { inner, reduced }
     }
 
     pub fn deg_shift_for(l: &Link, reduced: bool) -> (isize, isize) {

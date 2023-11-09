@@ -66,7 +66,7 @@ where R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
     let mut b = string_builder::Builder::new(1024);
 
     if args.bigraded {
-        let c = c.as_bigraded();
+        let c = c.into_bigraded();
         b.append(c.display_table() + "\n");
         b.append(c.display_d() + "\n");
     } else { 

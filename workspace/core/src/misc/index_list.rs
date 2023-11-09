@@ -6,7 +6,7 @@ use bimap::BiHashMap;
 use ahash::RandomState as ARandomState;
 use itertools::Itertools;
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, PartialEq, Eq)]
 pub struct IndexList<E>
 where E: Eq + Hash {
     data: BiHashMap<usize, E, ARandomState, ARandomState>

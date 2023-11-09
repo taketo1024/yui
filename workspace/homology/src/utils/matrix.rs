@@ -1,15 +1,14 @@
-use std::hash::Hash;
-
 use itertools::Itertools;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use yui_core::{Ring, RingOps, IndexList};
+use yui_lin_comb::{LinComb, Gen};
 use yui_matrix::sparse::SpMat;
 
 pub fn make_matrix<X, Y, R, F>(from: &IndexList<X>, to: &IndexList<Y>, f: F) -> SpMat<R>
 where 
-    X: Hash + Eq, Y: Hash + Eq, 
+    X: Gen, Y: Gen, 
     R: Ring, for<'x> &'x R: RingOps<R>,
-    F: Fn(&X) -> Vec<(Y, R)> 
+    F: Fn(&X) -> LinComb<Y, R> 
 {
     let (m, n) = (to.len(), from.len());
 
@@ -17,12 +16,9 @@ where
         let x = &from[j];
         let fx = f(x);
         
-        fx.iter().filter_map(|(y, a)| { 
-            if a.is_zero() { 
-                return None
-            }
+        fx.iter().map(|(y, a)| { 
             let i = to.index_of(&y).unwrap();
-            Some((i, j, a.clone()))
+            (i, j, a.clone())
         }).collect_vec()
     });
     
@@ -31,22 +27,18 @@ where
 
 pub fn make_matrix_async<X, Y, R, F>(from: &IndexList<X>, to: &IndexList<Y>, f: F) -> SpMat<R>
 where 
-    X: Hash + Eq + Send + Sync, 
-    Y: Hash + Eq + Send + Sync, 
+    X: Gen, Y: Gen, 
     R: Ring, for<'x> &'x R: RingOps<R>,
-    F: Fn(&X) -> Vec<(Y, R)> + Send + Sync
+    F: Fn(&X) -> LinComb<Y, R> + Send + Sync
 {
     let (m, n) = (to.len(), from.len());
 
     let entries = (0..n).into_par_iter().flat_map(|j| {
         let x = &from[j];
         let ys = f(x);
-        ys.iter().filter_map(|(y, a)| { 
-            if a.is_zero() { 
-                return None
-            }
+        ys.iter().map(|(y, a)| { 
             let i = to.index_of(&y).unwrap();
-            Some((i, j, a.clone()))
+            (i, j, a.clone())
         }).collect_vec()
     }).collect::<Vec<_>>();
 

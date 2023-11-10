@@ -80,15 +80,6 @@ impl<R> SpMat<R> where R: Clone + Zero {
         Self::from(cs_mat)
     }
 
-    pub fn generate<F>(shape: (usize, usize), init: F) -> Self
-    where F: FnOnce(&mut (dyn FnMut(usize, usize, R))) { 
-        let mut entries = vec![];
-        (init)( &mut |i, j, a| { 
-            entries.push((i, j, a))
-        });
-        Self::from_entries(shape, entries)
-    }
-
     pub fn transpose(&self) -> Self { 
         self.view().transpose().to_owned()
     }

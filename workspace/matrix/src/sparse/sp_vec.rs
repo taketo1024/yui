@@ -32,11 +32,7 @@ impl<R> From<CsVec<R>> for SpVec<R> {
 impl<R> From<Vec<R>> for SpVec<R>
 where R: Clone + Zero {
     fn from(vec: Vec<R>) -> Self {
-        Self::generate(vec.len(), |set| { 
-            vec.into_iter().enumerate().for_each(|(i, a)| { 
-                set(i, a)
-            })
-        })
+        Self::from_entries(vec.len(), vec.into_iter().enumerate())
     }
 }
 
@@ -71,11 +67,13 @@ where R: Clone + Zero {
     }
 
     pub fn reduced(&self) -> Self { 
-        Self::generate(self.dim(), |set| { 
-            for (i, a) in self.iter() { 
-                set(i, a.clone())
+        Self::from_entries(self.dim(), self.iter().filter_map(|(i, a)| 
+            if !a.is_zero() {
+                Some((i, a.clone()))
+            } else { 
+                None
             }
-        })
+        ))
     }
 
     pub fn permute<'b>(&self, p: PermView<'b>) -> SpVec<R> { 
@@ -88,14 +86,10 @@ where R: Clone + Zero {
 
     pub fn stack(&self, other: &SpVec<R>) -> SpVec<R> {
         let (n1, n2) = (self.dim(), other.dim());
-        Self::generate(n1 + n2, |set| { 
-            for (i, a) in self.iter() { 
-                set(i, a.clone())
-            }
-            for (i, a) in other.iter() { 
-                set(n1 + i, a.clone())
-            }
-        })
+        Self::from_entries(n1 + n2, Iterator::chain(
+            self.iter().map(|(i, a)| (i, a.clone())),
+            other.iter().map(|(i, a)| (n1 + i, a.clone()))
+        ))
     }
 
     pub fn to_dense(&self) -> Vec<R> { 
@@ -156,7 +150,7 @@ where R: Zero {
 impl<R> SpVec<R> 
 where R: Clone + Zero + One { 
     pub fn unit(n: usize, i: usize) -> Self {
-        Self::generate(n, |set| set(i, R::one()))
+        Self::from_entries(n, [(i, R::one())])
     }
 }
 
@@ -271,11 +265,9 @@ impl<'a, 'b, R> SpVecView<'a, 'b, R> {
 impl<'a, 'b, R> SpVecView<'a, 'b, R>
 where R: Clone + Zero {
     pub fn to_owned(&self) -> SpVec<R> {
-        SpVec::generate(self.dim(), |set| { 
-            for (i, a) in self.iter() { 
-                set(i, a.clone())
-            }
-        })
+        SpVec::from_entries(self.dim(), self.iter().map(|(i, a)|
+            (i, a.clone())
+        ))
     }
 
     pub fn to_dense(&self) -> Vec<R> { 
@@ -288,16 +280,6 @@ mod tests {
     use itertools::Itertools;
     use sprs::PermOwned;
     use super::*;
-
-    #[test]
-    fn init() {
-        let v = SpVec::generate(5, |set| { 
-            set(0, 1);
-            set(3, 5);
-            set(2, 3);
-        });
-        assert_eq!(v.cs_vec(), &CsVec::new_from_unsorted(5, vec![0, 2, 3], vec![1, 3, 5]).unwrap());
-    }
 
     #[test]
     fn from_vec() {

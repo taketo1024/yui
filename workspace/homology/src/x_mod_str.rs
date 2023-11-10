@@ -83,14 +83,12 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         };
 
         let n = self.gens.len();
-        let v = SpVec::generate(n, |set| { 
-            for (x, a) in z.iter() { 
-                let Some(i) = self.gens.index_of(x) else { 
-                    panic!("{x} not found in generators: {:?}", &self.gens);
-                };
-                set(i, a.clone());
-            }
-        });
+        let v = SpVec::from_entries(n, z.iter().map(|(x, a)| { 
+            let Some(i) = self.gens.index_of(x) else { 
+                panic!("{x} not found in generators: {:?}", &self.gens);
+            };
+            (i, a.clone())
+        }));
 
         t.forward(&v)
     }

@@ -10,7 +10,7 @@ use yui_lin_comb::{Gen, LinComb};
 use yui_matrix::sparse::{SpMat, Trans, MatType};
 
 use crate::utils::ChainReducer;
-use crate::{Grid, GridIter, ChainComplexDisplay, XModStr, RModStr, SimpleRModStr};
+use crate::{Grid, GridIter, XModStr, RModStr, SimpleRModStr};
 
 use super::grid::GridTrait;
 use super::complex::ChainComplexTrait;
@@ -154,9 +154,6 @@ where
     }
 }
 
-impl<I, X, R> ChainComplexDisplay<I> for XChainComplexBase<I, X, R>
-where I: Deg, X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {}
-
 impl<I, X, R> Index<I> for XChainComplexBase<I, X, R>
 where I: Deg, X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = XChainComplexSummand<X, R>;
@@ -187,7 +184,7 @@ pub(crate) mod tests {
     use yui_lin_comb::Free;
     use yui_matrix::sparse::SpVec;
 
-    use crate::{RModStr, ChainComplex, Grid1};
+    use crate::{RModStr, ChainComplex, Grid1, ChainComplexCommon};
 
     use super::*;
 

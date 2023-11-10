@@ -201,7 +201,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests { 
-    use yui_homology::{ChainComplexTrait, RModStr};
+    use yui_homology::{RModStr, ChainComplexCommon};
     use super::*;
 
     #[test]

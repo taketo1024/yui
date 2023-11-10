@@ -17,7 +17,7 @@ pub type ChainComplex<R>  = ChainComplexBase<isize,  R>;
 pub type ChainComplex2<R> = ChainComplexBase<isize2, R>;
 pub type ChainComplex3<R> = ChainComplexBase<isize3, R>;
 
-pub trait ChainComplexTrait<I>: GridTrait<I> + Sized
+pub trait ChainComplexTrait<I>: Sized
 where 
     I: Deg, 
     Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> 
@@ -27,7 +27,14 @@ where
     fn rank(&self, i: I) -> usize;
     fn d_deg(&self) -> I;
     fn d_matrix(&self, i: I) -> SpMat<Self::R>;
+}
 
+pub trait ChainComplexCommon<I>: GridTrait<I> + ChainComplexTrait<I>
+where 
+    I: Deg, 
+    Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>,
+    Self::E: RModStr<R = Self::R>,
+{
     fn check_d_at(&self, i0: I) { 
         let i1 = i0 + self.d_deg();
         if !(self.is_supported(i0) && self.is_supported(i1)) {
@@ -47,17 +54,6 @@ where
         }
     }
 
-    fn as_generic(&self) -> ChainComplexBase<I, Self::R> {
-        ChainComplexBase::generate(self.support(), self.d_deg(), |i| self.d_matrix(i))
-    }
-}
-
-pub trait ChainComplexDisplay<I>: ChainComplexTrait<I>
-where 
-    I: Deg, 
-    Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>,
-    Self::E: RModStr<R = Self::R>,
-{
     fn display_d_at(&self, i: I) -> String {
         let c = |i| self.get(i).math_symbol();
         let c0 = c(i);
@@ -84,7 +80,19 @@ where
     fn print_d(&self) {
         println!("{}", self.display_d());
     }
+
+    fn as_generic(&self) -> ChainComplexBase<I, Self::R> {
+        ChainComplexBase::generate(self.support(), self.d_deg(), |i| self.d_matrix(i))
+    }
 }
+
+impl<I, C> ChainComplexCommon<I> for C 
+where 
+    I: Deg,
+    C: GridTrait<I> + ChainComplexTrait<I>,
+    C::R: Ring, for<'x> &'x C::R: RingOps<C::R>,
+    C::E: RModStr<R = C::R> 
+{}
 
 pub struct ChainComplexBase<I, R>
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
@@ -170,9 +178,6 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         self.d_matrices[i].clone()
     }
 }
-
-impl<I, R> ChainComplexDisplay<I> for ChainComplexBase<I, R>
-where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {}
 
 impl<R> ChainComplexBase<isize, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {

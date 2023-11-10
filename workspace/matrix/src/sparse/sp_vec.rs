@@ -1,6 +1,7 @@
 use core::panic;
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, Range};
 use std::fmt::Display;
+use itertools::Itertools;
 use num_traits::{Zero, One};
 use sprs::{CsVec, PermView};
 use auto_impl_ops::auto_ops;
@@ -17,37 +18,25 @@ impl<R> SpVec<R> {
         &self.cs_vec
     }
 
-    pub fn cs_vec_into(self) -> CsVec<R> { 
-        self.cs_vec
-    }
-
     pub fn dim(&self) -> usize { 
         self.cs_vec.dim()
     }
+}
 
-    pub fn iter(&self) -> impl Iterator<Item = (usize, &R)> { 
-        self.cs_vec.iter().map(|(i, a)| {
-            (i, a)
+impl<R> From<CsVec<R>> for SpVec<R> {
+    fn from(cs_vec: CsVec<R>) -> Self {
+        Self { cs_vec }
+    }
+}
+
+impl<R> From<Vec<R>> for SpVec<R>
+where R: Clone + Zero {
+    fn from(vec: Vec<R>) -> Self {
+        Self::generate(vec.len(), |set| { 
+            vec.into_iter().enumerate().for_each(|(i, a)| { 
+                set(i, a)
+            })
         })
-    }
-}
-
-impl<R> SpVec<R> 
-where R: Zero { 
-    pub fn zero(dim: usize) -> Self { 
-        let cs_vec = CsVec::new(dim, vec![], vec![]);
-        Self::from(cs_vec)
-    }
-
-    pub fn is_zero(&self) -> bool {
-        self.cs_vec.data().iter().all(|a| a.is_zero())
-    }
-}
-
-impl<R> SpVec<R> 
-where R: Clone + Zero + One { 
-    pub fn unit(n: usize, i: usize) -> Self {
-        Self::generate(n, |set| set(i, R::one()))
     }
 }
 
@@ -118,20 +107,22 @@ where R: Clone + Zero {
     }
 }
 
-impl<R> From<CsVec<R>> for SpVec<R> {
-    fn from(cs_vec: CsVec<R>) -> Self {
-        Self { cs_vec }
+impl<R> SpVec<R> { 
+    pub fn iter(&self) -> impl Iterator<Item = (usize, &R)> { 
+        self.cs_vec.iter().map(|(i, a)| {
+            (i, a)
+        })
     }
 }
 
-impl<R> From<Vec<R>> for SpVec<R>
-where R: Clone + Zero {
-    fn from(vec: Vec<R>) -> Self {
-        Self::generate(vec.len(), |set| { 
-            vec.into_iter().enumerate().for_each(|(i, a)| { 
-                set(i, a)
-            })
-        })
+impl<R> IntoIterator for SpVec<R>
+where R: Clone {
+    type Item = (usize, R);
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        // MEMO improve this
+        self.iter().map(|(i, a)| (i, a.clone())).collect_vec().into_iter()
     }
 }
 
@@ -147,6 +138,25 @@ impl<R> Default for SpVec<R> {
     fn default() -> Self {
         let cs_vec = CsVec::new(0, vec![], vec![]);
         Self::from(cs_vec)
+    }
+}
+
+impl<R> SpVec<R> 
+where R: Zero { 
+    pub fn zero(dim: usize) -> Self { 
+        let cs_vec = CsVec::new(dim, vec![], vec![]);
+        Self::from(cs_vec)
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.cs_vec.data().iter().all(|a| a.is_zero())
+    }
+}
+
+impl<R> SpVec<R> 
+where R: Clone + Zero + One { 
+    pub fn unit(n: usize, i: usize) -> Self {
+        Self::generate(n, |set| set(i, R::one()))
     }
 }
 

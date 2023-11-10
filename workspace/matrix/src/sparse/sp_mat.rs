@@ -1,6 +1,7 @@
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, MulAssign, Range};
 use std::iter::zip;
 use std::fmt::Display;
+use itertools::Itertools;
 use num_traits::{Zero, One};
 use sprs::{TriMat, CsMat, PermView, CsVecView};
 use auto_impl_ops::auto_ops;
@@ -13,25 +14,15 @@ pub struct SpMat<R> {
     cs_mat: CsMat<R>
 }
 
-impl<R> MatType for SpMat<R> {
-    fn shape(&self) -> (usize, usize) {
-        self.cs_mat.shape()
-    }
-}
-
 impl<R> SpMat<R> { 
     pub fn cs_mat(&self) -> &CsMat<R> { 
         &self.cs_mat
     }
+}
 
-    pub fn cs_mat_into(self) -> CsMat<R> { 
-        self.cs_mat
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = (usize, usize, &R)> { 
-        self.cs_mat.iter().map(|(a, (i, j))| {
-            (i, j, a)
-        })
+impl<R> MatType for SpMat<R> {
+    fn shape(&self) -> (usize, usize) {
+        self.cs_mat.shape()
     }
 }
 
@@ -56,25 +47,10 @@ where R: Clone + Zero {
     }
 }
 
-impl<R> Display for SpMat<R>
-where R: Clone + Zero + Display {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.to_dense().fmt(f)
-    }
-}
-
 impl<R> Default for SpMat<R>
 where R: Clone + Default + Zero {
     fn default() -> Self {
         Self::zero((0, 0))
-    }
-}
-
-impl<R> SpMat<R>
-where R: Clone {
-    pub fn col_vec(&self, j: usize) -> SpVec<R> { 
-        let cs_vec = self.col_view(j).to_owned();
-        SpVec::from(cs_vec)
     }
 }
 
@@ -189,6 +165,40 @@ impl<R> SpMat<R> where R: Clone + Zero {
     }
 }
 
+impl<R> SpMat<R> { 
+    pub fn iter(&self) -> impl Iterator<Item = (usize, usize, &R)> { 
+        self.cs_mat.iter().map(|(a, (i, j))| {
+            (i, j, a)
+        })
+    }
+}
+
+impl<R> IntoIterator for SpMat<R>
+where R: Clone {
+    type Item = (usize, usize, R);
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        // MEMO improve this
+        self.iter().map(|(i, j, a)| (i, j, a.clone())).collect_vec().into_iter()
+    }
+}
+
+impl<R> SpMat<R>
+where R: Clone {
+    pub fn col_vec(&self, j: usize) -> SpVec<R> { 
+        let cs_vec = self.col_view(j).to_owned();
+        SpVec::from(cs_vec)
+    }
+}
+
+impl<R> Display for SpMat<R>
+where R: Clone + Zero + Display {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.to_dense().fmt(f)
+    }
+}
+
 impl<R> SpMat<R>
 where R: Clone + Zero { 
     pub fn zero(shape: (usize, usize)) -> Self {
@@ -300,7 +310,6 @@ impl<R> SpMat<R> where R: Clone + Zero + One {
         })
     }
 }
-
 pub struct SpMatView<'a, 'b, R>  {
     target: &'a SpMat<R>,
     shape: (usize, usize),

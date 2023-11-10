@@ -8,7 +8,7 @@ use yui_matrix::sparse::pivot::{perms_by_pivots, find_pivots, PivotType};
 use yui_matrix::sparse::schur::Schur;
 use yui_core::{Ring, RingOps, Deg};
 
-use crate::{ChainComplexTrait, ChainComplexBase, RModStr, Grid, SimpleRModStr, GridIter};
+use crate::{ChainComplexTrait, ChainComplexBase, Grid, SimpleRModStr, GridIter};
 
 //       a0 = [x]      a1 = [a b]      a2 = [z w]
 //            [y]           [c d]     
@@ -41,19 +41,13 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
     pub fn reduce<C>(complex: &C, with_trans: bool) -> ChainComplexBase<I, R> 
-    where
-        C: ChainComplexTrait<I, R = R>,
-        C::E: RModStr<R = R>
-    {
+    where C: ChainComplexTrait<I, R = R> {
         let r = Self::from(complex, with_trans);
         r.into_complex()
     }
 
     pub fn from<C>(complex: &C, with_trans: bool) -> Self 
-    where
-        C: ChainComplexTrait<I, R = R>,
-        C::E: RModStr<R = R>
-    {
+    where C: ChainComplexTrait<I, R = R> {
         let support = complex.support();
         let d_deg = complex.d_deg();
 
@@ -257,7 +251,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ChainComplex;
+    use crate::{ChainComplex, RModStr};
 
     #[test]
     fn zero() { 

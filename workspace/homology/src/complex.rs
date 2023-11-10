@@ -20,7 +20,6 @@ pub type ChainComplex3<R> = ChainComplexBase<isize3, R>;
 pub trait ChainComplexTrait<I>: GridTrait<I> + Sized
 where 
     I: Deg, 
-    Self::E: RModStr<R = Self::R>,
     Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> 
 { 
     type R;

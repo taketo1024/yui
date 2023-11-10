@@ -59,21 +59,24 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let mut x = vec![R::zero(); n];
     let mut b = vec![R::zero(); n];
 
-    SpMat::generate((n, k), |set| { 
-        for j in 0..k { 
-            for (i, r) in y.col_view(j).iter() { 
-                b[i] = r.clone();
-            }
-    
-            solve_triangular_into(t, &a, &diag, &mut b, &mut x);
-    
-            for i in 0..n { 
-                if x[i].is_zero() { continue }
-                let x_i = take(&mut x[i]);
-                set(i, j, x_i);
-            }
+    let entries = (0..k).flat_map(|j| { 
+        for (i, r) in y.col_view(j).iter() { 
+            b[i] = r.clone();
         }
-    })
+
+        solve_triangular_into(t, &a, &diag, &mut b, &mut x);
+
+        (0..n).filter_map(|i| { 
+            if !x[i].is_zero() { 
+                let x_i = take(&mut x[i]);
+                Some((i, j, x_i))
+            } else { 
+                None
+            }
+        }).collect_vec()
+    });
+
+    SpMat::from_entries((n, k), entries)
 }
 
 fn solve_triangular_m<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
@@ -93,7 +96,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let tls1 = Arc::new(ThreadLocal::new());
     let tls2 = Arc::new(ThreadLocal::new());
 
-    let entries: Vec<(usize, usize, R)> = (0..k).into_par_iter().map(|j| { 
+    let entries: Vec<(usize, usize, R)> = (0..k).into_par_iter().flat_map(|j| { 
         let mut x_st = tls1.get_or(|| {
             let x = vec![R::zero(); n];
             RefCell::new(x)
@@ -126,12 +129,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
 
         (0..n).into_iter().filter_map(|i| { 
-            if x[i].is_zero() { return None }
-            let x_i = take(&mut x[i]);
-            Some((i, j, x_i))
+            if !x[i].is_zero() { 
+                let x_i = take(&mut x[i]);
+                Some((i, j, x_i))    
+            } else { 
+                None
+            }
         }).collect_vec()
-
-    }).flatten().collect();
+    }).collect();
 
     SpMat::from_entries((n, k), entries)
 }

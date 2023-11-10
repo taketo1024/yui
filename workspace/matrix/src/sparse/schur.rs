@@ -47,14 +47,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         //  ~~~~~~
         //    p
         
-        let p = SpMat::generate((m, m), |set| { 
-            for (i, j, x) in a.view().submat_cols(0..r).iter() {
-                set(i, j, x.clone());
-            }
-            for i in r..m { 
-                set(i, i, R::one());
-            }
-        });
+        let p = SpMat::from_entries((m, m), Iterator::chain(
+            a.view().submat_cols(0..r).iter().map(|(i, j, x)| (i, j, x.clone())),
+            (r..m).map(|i| (i, i, R::one()))
+        ));
         let bd = a.submat_cols(r..n);
         
         let x = solve_triangular(TriangularType::Lower, &p, &bd);

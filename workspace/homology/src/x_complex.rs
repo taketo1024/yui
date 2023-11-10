@@ -139,6 +139,10 @@ where
 {
     type R = R;
 
+    fn rank(&self, i: I) -> usize {
+        self[i].rank()
+    }
+    
     fn d_deg(&self) -> I {
         self.d_deg
     }

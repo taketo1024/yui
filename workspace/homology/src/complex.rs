@@ -24,6 +24,7 @@ where
 { 
     type R;
 
+    fn rank(&self, i: I) -> usize;
     fn d_deg(&self) -> I;
     fn d_matrix(&self, i: I) -> SpMat<Self::R>;
 
@@ -156,6 +157,10 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 impl<I, R> ChainComplexTrait<I> for ChainComplexBase<I, R>
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     type R = R;
+
+    fn rank(&self, i: I) -> usize {
+        self[i].rank()
+    }
 
     fn d_deg(&self) -> I { 
         self.d_deg

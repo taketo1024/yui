@@ -6,7 +6,7 @@ use delegate::delegate;
 use yui_core::{Ring, RingOps, Deg, isize2, isize3};
 use yui_matrix::sparse::{SpMat, SpVec, MatType, Trans};
 
-use crate::{Grid, GridIter, RModStr, SimpleRModStr};
+use crate::{Grid, GridIter, RModStr, SimpleRModStr, rmod_str_symbol};
 
 use super::grid::GridTrait;
 use super::utils::ChainReducer;
@@ -32,8 +32,7 @@ where
 pub trait ChainComplexCommon<I>: GridTrait<I> + ChainComplexTrait<I>
 where 
     I: Deg, 
-    Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>,
-    Self::E: RModStr<R = Self::R>,
+    Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>
 {
     fn check_d_at(&self, i0: I) { 
         let i1 = i0 + self.d_deg();
@@ -55,7 +54,7 @@ where
     }
 
     fn display_d_at(&self, i: I) -> String {
-        let c = |i| self.get(i).math_symbol();
+        let c = |i| rmod_str_symbol(self.rank(i), &vec![], "0");
         let c0 = c(i);
         let c1 = c(i + self.d_deg());
         let d = self.d_matrix(i).to_dense();
@@ -69,7 +68,7 @@ where
 
     fn display_d(&self) -> String { 
         self.support().filter_map(|i| 
-            if self.get(i).rank() > 0 && self.get(i + self.d_deg()).rank() > 0 {
+            if self.rank(i) > 0 && self.rank(i + self.d_deg()) > 0 {
                 Some(self.display_d_at(i))
             } else { 
                 None
@@ -138,7 +137,7 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn d(&self, i: I, v: &SpVec<R>) -> SpVec<R> {
-        assert_eq!(self.get(i).rank(), v.dim());
+        assert_eq!(self.rank(i), v.dim());
         let d = self.d_matrix_ref(i);
         d * v
     }

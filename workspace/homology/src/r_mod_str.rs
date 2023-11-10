@@ -3,7 +3,7 @@ use std::ops::Add;
 
 use itertools::Itertools;
 
-use yui_core::{Elem, Ring, RingOps};
+use yui_core::{Ring, RingOps};
 use yui_matrix::sparse::{Trans, SpVec, SpMat};
 
 use crate::DisplayForGrid;
@@ -28,41 +28,45 @@ where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
     }
 
     fn math_symbol(&self) -> String { 
-        use yui_utils::superscript;
-
-        let rank = self.rank();
-        let tors = self.tors().iter()
-            .into_group_map_by(|r| r.to_string())
-            .into_iter().map(|(k, list)| (k, list.len()))
-            .collect_vec();
-    
-        if rank == 0 && tors.is_empty() { 
-            return "0".to_string()
-        }
-    
-        let mut res = vec![];
-        let symbol = Self::R::math_symbol();
-    
-        if rank > 1 {
-            let str = format!("{}{}", symbol, superscript(rank as isize));
-            res.push(str);
-        } else if rank == 1 { 
-            let str = format!("{}", symbol);
-            res.push(str);
-        }
-        
-        for (t, r) in tors.iter() { 
-            let str = if r > &1 { 
-                format!("({}/{}){}", symbol, t, superscript(*r as isize))
-            } else { 
-                format!("({}/{})", symbol, t)
-            };
-            res.push(str);
-        }
-    
-        let str = res.join(" ⊕ ");
-        str
+        rmod_str_symbol(self.rank(), self.tors(), "0")
     }
+}
+
+pub fn rmod_str_symbol<R>(rank: usize, tors: &Vec<R>, dflt: &str) -> String
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    use yui_utils::superscript;
+
+    let tors = tors.iter()
+        .into_group_map_by(|r| r.to_string())
+        .into_iter().map(|(k, list)| (k, list.len()))
+        .collect_vec();
+
+    if rank == 0 && tors.is_empty() { 
+        return dflt.to_string()
+    }
+
+    let mut res = vec![];
+    let symbol = R::math_symbol();
+
+    if rank > 1 {
+        let str = format!("{}{}", symbol, superscript(rank as isize));
+        res.push(str);
+    } else if rank == 1 { 
+        let str = format!("{}", symbol);
+        res.push(str);
+    }
+    
+    for (t, r) in tors.iter() { 
+        let str = if r > &1 { 
+            format!("({}/{}){}", symbol, t, superscript(*r as isize))
+        } else { 
+            format!("({}/{})", symbol, t)
+        };
+        res.push(str);
+    }
+
+    let str = res.join(" ⊕ ");
+    str
 }
 
 #[derive(Clone, Debug)]
@@ -143,7 +147,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> DisplayForGrid for SimpleRModStr<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn display_for_grid(&self) -> String {
-        self.math_symbol()
+        rmod_str_symbol(self.rank(), self.tors(), ".")
     }
 }
 

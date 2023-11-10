@@ -53,30 +53,32 @@ where R: Clone + Zero + One {
 
 impl<R> SpVec<R> 
 where R: Clone + Zero { 
-    pub fn generate<F>(n: usize, f: F) -> Self
+    pub fn generate<F>(dim: usize, init: F) -> Self
     where F: FnOnce(&mut (dyn FnMut(usize, R))) { 
+        let mut entries = vec![];
+        (init)( &mut |i, a| { 
+            entries.push((i, a))
+        });
+        Self::from_entries(dim, entries)
+    }
+
+    pub fn from_entries<T>(dim: usize, entries: T) -> Self
+    where T: IntoIterator<Item = (usize, R)> {
         let mut ind = Vec::new();
         let mut val = Vec::new();
 
-        (f)(&mut |i, a| { 
-            if !a.is_zero() { 
-                ind.push(i);
-                val.push(a);                    
+        for (i, a) in entries { 
+            if a.is_zero() { 
+                continue;
             }
-        });
+            ind.push(i);
+            val.push(a);                    
+        }
         
-        let Ok(cs_vec) = CsVec::new_from_unsorted(n, ind, val) else { 
+        let Ok(cs_vec) = CsVec::new_from_unsorted(dim, ind, val) else { 
             panic!();
         };
         Self::from(cs_vec)
-    }
-
-    pub fn from_entries<T: IntoIterator<Item = (usize, R)>>(dim: usize, iter: T) -> Self {
-        Self::generate(dim, |init| { 
-            for (i, a) in iter { 
-                init(i, a)
-            }
-        })
     }
 
     pub fn reduced(&self) -> Self { 

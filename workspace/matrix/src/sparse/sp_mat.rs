@@ -79,34 +79,37 @@ where R: Clone {
 }
 
 impl<R> SpMat<R> where R: Clone + Zero { 
-    pub fn generate<F>(shape: (usize, usize), init: F) -> Self
-    where F: FnOnce(&mut (dyn FnMut(usize, usize, R))) { 
+    pub fn from_vec(shape: (usize, usize), grid: Vec<R>) -> Self { 
+        let n = shape.1;
+        Self::from_entries(
+            shape, 
+            grid.into_iter().enumerate().map(|(k, a)| { 
+                let (i, j) = (k / n, k % n);
+                (i, j, a)
+            })
+        )
+    }
+
+    pub fn from_entries<T>(shape: (usize, usize), entries: T) -> Self
+    where T: IntoIterator<Item = (usize, usize, R)> {
         let mut t = TriMat::new(shape);
-        (init)( &mut |i, j, a| { 
-            if !a.is_zero() { 
-                t.add_triplet(i, j, a)
+        for (i, j, a) in entries { 
+            if a.is_zero() { 
+                continue;
             }
-        });
+            t.add_triplet(i, j, a)
+        }
         let cs_mat = t.to_csc();
         Self::from(cs_mat)
     }
 
-    pub fn from_vec(shape: (usize, usize), grid: Vec<R>) -> Self { 
-        let n = shape.1;
-        Self::generate(shape, |init| { 
-            grid.into_iter().enumerate().for_each(|(k, a)| { 
-                let (i, j) = (k / n, k % n);
-                init(i, j, a)
-            })
-        })
-    }
-
-    pub fn from_entries<T: IntoIterator<Item = (usize, usize, R)>>(shape: (usize, usize), iter: T) -> Self {
-        Self::generate(shape, |init| { 
-            for (i, j, a) in iter { 
-                init(i, j, a)
-            }
-        })
+    pub fn generate<F>(shape: (usize, usize), init: F) -> Self
+    where F: FnOnce(&mut (dyn FnMut(usize, usize, R))) { 
+        let mut entries = vec![];
+        (init)( &mut |i, j, a| { 
+            entries.push((i, j, a))
+        });
+        Self::from_entries(shape, entries)
     }
 
     pub fn transpose(&self) -> Self { 

@@ -127,18 +127,17 @@ impl<R> SpMat<R> where R: Clone + Zero {
 
         let (m, n) = (a.rows() + c.rows(), a.cols() + b.cols());
         let (k, l) = a.shape();
-        let targets = zip(
+
+        let entries = zip(
             [a, b, c, d], 
             [(0,0), (0,l), (k,0), (k,l)]
+        ).flat_map(|(x, (di, dj))| 
+            x.iter().map(move |(i, j, r)|
+                (i + di, j + dj, r.clone())
+            )
         );
 
-        Self::generate((m, n), |set| { 
-            for (x, (di, dj)) in targets { 
-                for (i, j, r) in x.iter() {
-                    set(i + di, j + dj, r.clone());
-                }
-            }    
-        })
+        Self::from_entries((m, n), entries)
     }
 
     pub fn concat(&self, b: &Self) -> Self { 
@@ -203,7 +202,7 @@ where R: Clone + Zero + Display {
 impl<R> SpMat<R>
 where R: Clone + Zero { 
     pub fn zero(shape: (usize, usize)) -> Self {
-        Self::generate(shape, |_| ())
+        Self::from_entries(shape, [])
     }
 
     pub fn is_zero(&self) -> bool {
@@ -294,21 +293,17 @@ impl<R> SpMat<R> where R: Clone + Zero + One {
     // row_perm(p) * a == a.permute_rows(p)
     pub fn from_row_perm(p: PermView) -> Self {
         let n = p.dim();
-        Self::generate((n, n), |set| { 
-            for i in 0..n { 
-                set(p.at(i), i, R::one())
-            }
-        })
+        Self::from_entries((n, n), (0..n).map(|i|
+            (p.at(i), i, R::one())
+        ))
     }
 
     // a * col_perm(p) == a.permute_cols(p)
     pub fn from_col_perm(p: PermView) -> Self {
         let n = p.dim();
-        Self::generate((n, n), |set| { 
-            for i in 0..n { 
-                set(i, p.at(i), R::one())
-            }
-        })
+        Self::from_entries((n, n), (0..n).map(|i|
+            (i, p.at(i), R::one())
+        ))
     }
 }
 pub struct SpMatView<'a, 'b, R>  {
@@ -395,11 +390,9 @@ impl<'a, 'b, R> SpMatView<'a, 'b, R> {
 impl<'a, 'b, R> SpMatView<'a, 'b, R>
 where R: Clone + Zero {
     pub fn to_owned(&self) -> SpMat<R> {
-        SpMat::generate(self.shape(), |set| { 
-            for (i, j, a) in self.iter() { 
-                set(i, j, a.clone())
-            }
-        })
+        SpMat::from_entries(self.shape(), self.iter().map(|(i, j, a)| 
+            (i, j, a.clone())
+        ))
     }
 
     pub fn to_dense(&self) -> Mat<R> { 
@@ -411,20 +404,20 @@ where R: Clone + Zero {
 impl<R> SpMat<R>
 where R: Ring, for<'a> &'a R: RingOps<R> { 
     pub fn rand(shape: (usize, usize), density: f64) -> Self {
+        use cartesian::cartesian;
         use rand::Rng;
     
         let (m, n) = shape;
+        let range = cartesian!(0..m, 0..n);
         let mut rng = rand::thread_rng();
     
-        Self::generate(shape, |set| { 
-            for i in 0..m { 
-                for j in 0..n { 
-                    if rng.gen::<f64>() < density { 
-                        set(i, j, R::one());
-                    }
-                }
+        Self::from_entries(shape, range.filter_map(|(i, j)|
+            if rng.gen::<f64>() < density { 
+                Some((i, j, R::one()))
+            } else { 
+                None
             }
-        })
+        ))
     }
 }
 
@@ -436,12 +429,12 @@ pub(super) mod tests {
 
     #[test]
     fn init() { 
-        let a = SpMat::generate((2, 2), |set| { 
-            set(0, 0, 1);
-            set(0, 1, 2);
-            set(1, 0, 3);
-            set(1, 1, 4);
-        });
+        let a = SpMat::from_entries((2, 2), [
+            (0, 0, 1),
+            (0, 1, 2),
+            (1, 0, 3),
+            (1, 1, 4)
+        ]);
         assert_eq!(&a.cs_mat, &CsMat::new_csc((2, 2), vec![0, 2, 4], vec![0, 1, 0, 1], vec![1, 3, 2, 4]));
     }
 
@@ -452,19 +445,13 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn from_entries() {
-        let a = SpMat::from_entries((3,3), vec![(0, 0, 1), (2, 1, 5), (1, 2, 3)]);
-        assert_eq!(&a.cs_mat, &CsMat::new_csc((3, 3), vec![0, 1, 2, 3], vec![0, 2, 1], vec![1, 5, 3]));
-    }
-
-    #[test]
     fn to_dense() { 
-        let a = SpMat::generate((2, 2), |set| { 
-            set(0, 0, 1);
-            set(0, 1, 2);
-            set(1, 0, 3);
-            set(1, 1, 4);
-        });
+        let a = SpMat::from_entries((2, 2), [
+            (0, 0, 1),
+            (0, 1, 2),
+            (1, 0, 3),
+            (1, 1, 4)
+        ]);
         assert_eq!(a.to_dense(), Mat::from(ndarray::array![[1, 2], [3, 4]]));
     }
 

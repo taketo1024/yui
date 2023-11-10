@@ -1305,6 +1305,7 @@ name = "yui-matrix"
 version = "0.1.0"
 dependencies = [
  "auto-impl-ops",
+ "cartesian",
  "derive_more",
  "either",
  "itertools",

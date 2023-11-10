@@ -32,7 +32,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     //  H2 = Ker(d2) / Im(d1)
     //     ≅ C22' (free) ⊕ (C21 / Im(d1')) (tor)
 
-    pub fn calculate(d1: &SpMat<R>, d2: &SpMat<R>, with_trans: bool) -> HomologySummand<R> {
+    pub fn calculate(d1: SpMat<R>, d2: SpMat<R>, with_trans: bool) -> HomologySummand<R> {
         info!("calculate homology: {:?}-{:?}", d1.shape(), d2.shape());
         
         assert_eq!(d1.rows(), d2.cols());
@@ -59,7 +59,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         return HomologySummand::new(rank, vec![], Some(t))
     }
 
-    fn process_snf(d1: &SpMat<R>, d2: &SpMat<R>, with_trans: bool) -> (SnfResult<R>, SnfResult<R>) {
+    fn process_snf(d1: SpMat<R>, d2: SpMat<R>, with_trans: bool) -> (SnfResult<R>, SnfResult<R>) {
         let n = d1.rows();
 
         let d1_dns = d1.to_dense();
@@ -153,7 +153,7 @@ mod tests {
         let d1 = c.d_matrix(1);
         let d0 = c.d_matrix(0); // zero
 
-        let h = HomologyCalc::calculate(&d1, &d0, true);
+        let h = HomologyCalc::calculate(d1, d0, true);
 
         assert_eq!(h.rank(), 1);
         assert_eq!(h.tors().len(), 0);
@@ -172,7 +172,7 @@ mod tests {
         let d1 = c.d_matrix(2);
         let d0 = c.d_matrix(1);
 
-        let h = HomologyCalc::calculate(&d1, &d0, true);
+        let h = HomologyCalc::calculate(d1, d0, true);
 
         assert_eq!(h.is_zero(), true);
     }
@@ -183,7 +183,7 @@ mod tests {
         let d3 = c.d_matrix(3); // zero
         let d2 = c.d_matrix(2);
 
-        let h = HomologyCalc::calculate(&d3, &d2, true);
+        let h = HomologyCalc::calculate(d3, d2, true);
 
         assert_eq!(h.rank(), 1);
         assert_eq!(h.tors().len(), 0);
@@ -202,7 +202,7 @@ mod tests {
         let d1 = c.d_matrix(1);
         let d0 = c.d_matrix(0); // zero
 
-        let h = HomologyCalc::calculate(&d1, &d0, true);
+        let h = HomologyCalc::calculate(d1, d0, true);
 
         assert_eq!(h.rank(), 1);
         assert_eq!(h.tors().len(), 0);
@@ -221,7 +221,7 @@ mod tests {
         let d2 = c.d_matrix(2);
         let d1 = c.d_matrix(1);
 
-        let h = HomologyCalc::calculate(&d2, &d1, true);
+        let h = HomologyCalc::calculate(d2, d1, true);
 
         assert_eq!(h.rank(), 2);
         assert_eq!(h.tors().len(), 0);
@@ -242,7 +242,7 @@ mod tests {
         let d3 = c.d_matrix(3); // zero
         let d2 = c.d_matrix(2);
 
-        let h = HomologyCalc::calculate(&d3, &d2, true);
+        let h = HomologyCalc::calculate(d3, d2, true);
 
         assert_eq!(h.rank(), 1);
         assert_eq!(h.tors().len(), 0);
@@ -261,7 +261,7 @@ mod tests {
         let d1 = c.d_matrix(1);
         let d0 = c.d_matrix(0); // zero
 
-        let h = HomologyCalc::calculate(&d1, &d0, true);
+        let h = HomologyCalc::calculate(d1, d0, true);
 
         assert_eq!(h.rank(), 1);
         assert_eq!(h.tors().len(), 0);
@@ -280,7 +280,7 @@ mod tests {
         let d2 = c.d_matrix(2);
         let d1 = c.d_matrix(1);
 
-        let h = HomologyCalc::calculate(&d2, &d1, true);
+        let h = HomologyCalc::calculate(d2, d1, true);
 
         assert_eq!(h.rank(), 0);
         assert_eq!(h.tors(), &vec![2]);

@@ -28,7 +28,7 @@ where
         let i0 = i - self.d_deg();
         let d0 = self.d_matrix(i0);
         let d1 = self.d_matrix(i );
-        HomologyCalc::calculate(&d0, &d1, with_trans)
+        HomologyCalc::calculate(d0, d1, with_trans)
     }
 }
 

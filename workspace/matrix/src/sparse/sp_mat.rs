@@ -33,17 +33,18 @@ impl<R> From<CsMat<R>> for SpMat<R> {
     }
 }
 
-impl<R> From<&Mat<R>> for SpMat<R>
+impl<R> From<Mat<R>> for SpMat<R>
 where R: Clone + Zero {
-    fn from(a: &Mat<R>) -> Self {
+    fn from(a: Mat<R>) -> Self {
         let n = a.cols();
-        SpMat::generate(a.shape(), |set| { 
-            for (k, a) in a.array().iter().enumerate() {
-                if a.is_zero() { continue }
-                let (i, j) = (k / n, k % n);
-                set(i, j, a.clone());
+        let entries = a.array().into_iter().enumerate().filter_map(|(k, a)| {
+            if !a.is_zero() { 
+                Some((k / n, k % n, a.clone()))
+            } else {
+                None 
             }
-        })
+        });
+        SpMat::from_entries(a.shape(), entries)
     }
 }
 
@@ -160,7 +161,7 @@ impl<R> SpMat<R> where R: Clone + Zero {
         ])
     }
 
-    pub fn to_dense(&self) -> Mat<R> { 
+    pub fn to_dense(self) -> Mat<R> { 
         self.into()
     }
 }
@@ -195,7 +196,7 @@ where R: Clone {
 impl<R> Display for SpMat<R>
 where R: Clone + Zero + Display {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.to_dense().fmt(f)
+        self.clone().to_dense().fmt(f)
     }
 }
 

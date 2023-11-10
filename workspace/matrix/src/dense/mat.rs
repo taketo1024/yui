@@ -56,9 +56,9 @@ impl<R> From<Array2<R>> for Mat<R> {
     }
 }
 
-impl<R> From<&SpMat<R>> for Mat<R>
+impl<R> From<SpMat<R>> for Mat<R>
 where R: Clone + Zero {
-    fn from(a: &SpMat<R>) -> Self {
+    fn from(a: SpMat<R>) -> Self {
         Mat::from(a.cs_mat().to_dense())
     }
 }
@@ -172,7 +172,7 @@ where R: Clone + Zero {
         self.array.indexed_iter().map(|((i, j), a)| (i, j, a))
     }
 
-    pub fn to_sparse(&self) -> SpMat<R> { 
+    pub fn to_sparse(self) -> SpMat<R> { 
         self.into()
     }
 }
@@ -559,7 +559,7 @@ mod tests {
     #[test]
     fn from_sparse() { 
         let sps = SpMat::from_vec((2, 3), vec![1,2,3,4,5,6]);
-        let dns = Mat::from(&sps);
+        let dns = Mat::from(sps);
         assert_eq!(dns, Mat::from(array![[1,2,3],[4,5,6]]));
     }
 

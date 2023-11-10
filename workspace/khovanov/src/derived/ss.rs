@@ -44,7 +44,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         _ => panic!()
     };
 
-    let kh = HomologyCalc::calculate(&a0, &a1, true);
+    let kh = HomologyCalc::calculate(a0, a1, true);
 
     info!("homology: {}", kh.math_symbol());
     

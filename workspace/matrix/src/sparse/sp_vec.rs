@@ -38,15 +38,6 @@ where R: Clone + Zero {
 
 impl<R> SpVec<R> 
 where R: Clone + Zero { 
-    pub fn generate<F>(dim: usize, init: F) -> Self
-    where F: FnOnce(&mut (dyn FnMut(usize, R))) { 
-        let mut entries = vec![];
-        (init)( &mut |i, a| { 
-            entries.push((i, a))
-        });
-        Self::from_entries(dim, entries)
-    }
-
     pub fn from_entries<T>(dim: usize, entries: T) -> Self
     where T: IntoIterator<Item = (usize, R)> {
         let mut ind = Vec::new();

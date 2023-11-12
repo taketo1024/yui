@@ -1,6 +1,7 @@
 use itertools::Itertools;
 use num_traits::Zero;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps};
+use yui_homology::ChainComplexTrait;
 use yui_link::Link;
 
 use crate::{KhComplex, KhComplexBigraded, KhHomology, KhHomologyBigraded};

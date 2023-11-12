@@ -44,10 +44,6 @@ where
         Self { summands, d_deg, d_map }
     }
 
-    pub fn d(&self, i: I, z: &LinComb<X, R>) -> LinComb<X, R> { 
-        (self.d_map)(i, z)
-    }
-
     fn d_matrix_for(&self, i: I, q: &SpMat<R>) -> SpMat<R> { 
         assert_eq!(q.rows(), self[i].rank());
 
@@ -138,6 +134,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
     type R = R;
+    type Element = LinComb<X, R>;
 
     fn rank(&self, i: I) -> usize {
         self[i].rank()
@@ -145,6 +142,10 @@ where
     
     fn d_deg(&self) -> I {
         self.d_deg
+    }
+
+    fn d(&self, i: I, z: &LinComb<X, R>) -> LinComb<X, R> { 
+        (self.d_map)(i, z)
     }
 
     fn d_matrix(&self, i: I) -> SpMat<Self::R> { 

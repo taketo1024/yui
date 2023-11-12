@@ -50,7 +50,7 @@ where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
 #[cfg(test)]
 mod tests { 
     use yui_matrix::sparse::SpVec;
-    use crate::{ChainComplex, RModStr};
+    use crate::{ChainComplex, RModStr, ChainComplexTrait};
 
     #[test]
     fn zero() { 

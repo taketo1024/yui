@@ -3,6 +3,7 @@ use cartesian::cartesian;
 
 use delegate::delegate;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps, isize2};
+use yui_lin_comb::LinComb;
 use yui_link::Link;
 use yui_homology::{ChainComplexTrait, XChainComplex, XChainComplex2, GridTrait, XChainComplexSummand, Grid2, XModStr};
 use yui_matrix::sparse::SpMat;
@@ -130,11 +131,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> ChainComplexTrait<isize> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type R = R;
+    type Element = LinComb<KhEnhState, R>;
 
     delegate! { 
         to self.inner { 
             fn rank(&self, i: isize) -> usize;
             fn d_deg(&self) -> isize;
+            fn d(&self, i: isize, z: &Self::Element) -> Self::Element;
             fn d_matrix(&self, i: isize) -> SpMat<R>;
         }
     }
@@ -197,11 +200,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> ChainComplexTrait<isize2> for KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type R = R;
+    type Element = LinComb<KhEnhState, R>;
 
     delegate! { 
         to self.inner { 
             fn rank(&self, i: isize2) -> usize;
             fn d_deg(&self) -> isize2;
+            fn d(&self, i: isize2, z: &Self::Element) -> Self::Element;
             fn d_matrix(&self, i: isize2) -> SpMat<Self::R>;
         }
     }

@@ -23,9 +23,11 @@ where
     Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> 
 { 
     type R;
+    type Element;
 
     fn rank(&self, i: I) -> usize;
     fn d_deg(&self) -> I;
+    fn d(&self, i: I, z: &Self::Element) -> Self::Element;
     fn d_matrix(&self, i: I) -> SpMat<Self::R>;
 }
 
@@ -136,12 +138,6 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         &self.d_matrices[i]
     }
 
-    pub fn d(&self, i: I, v: &SpVec<R>) -> SpVec<R> {
-        assert_eq!(self.rank(i), v.dim());
-        let d = self.d_matrix_ref(i);
-        d * v
-    }
-    
     pub fn reduced(&self, with_trans: bool) -> ChainComplexBase<I, R> { 
         ChainReducer::reduce(self, with_trans)
     }
@@ -164,6 +160,7 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 impl<I, R> ChainComplexTrait<I> for ChainComplexBase<I, R>
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     type R = R;
+    type Element = SpVec<R>;
 
     fn rank(&self, i: I) -> usize {
         self[i].rank()
@@ -175,6 +172,12 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn d_matrix(&self, i: I) -> SpMat<Self::R> {
         self.d_matrices[i].clone()
+    }
+
+    fn d(&self, i: I, v: &Self::Element) -> Self::Element {
+        assert_eq!(self.rank(i), v.dim());
+        let d = self.d_matrix_ref(i);
+        d * v
     }
 }
 

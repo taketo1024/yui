@@ -35,7 +35,7 @@ pub(crate) mod tests {
     use num_traits::Zero;
     use yui_matrix::sparse::SpVec;
 
-    use crate::{ChainComplex, XChainComplex, RModStr};
+    use crate::{ChainComplex, XChainComplex, RModStr, ChainComplexTrait};
  
     #[test]
     fn zero() { 

@@ -5,10 +5,9 @@ use std::str::FromStr;
 use num_traits::{Zero, One, Pow};
 use auto_impl_ops::auto_ops;
 
-use yui::Elem;
-use yui_lin_comb::Gen;
+use crate::{Elem, Gen};
 
-use crate::Mono;
+use super::Mono;
 use super::univar::fmt_mono;
 
 // `BiVar<X, Y, I>` : represents bivariant monomials X^i Y^j.

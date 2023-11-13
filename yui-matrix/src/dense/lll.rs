@@ -15,7 +15,7 @@ use log::{trace, info};
 use num_bigint::BigInt;
 
 use yui::{Ring, RingOps, EucRing, EucRingOps, DivRound, Integer, IntOps};
-use yui_quad_int::{QuadInt, GaussInt, EisenInt};
+use yui::{QuadInt, GaussInt, EisenInt};
 use crate::dense::*;
 
 pub fn lll<R>(b: &Mat<R>, with_trans: bool) -> (Mat<R>, Option<Mat<R>>)
@@ -985,7 +985,7 @@ pub(super) mod tests {
     pub(in super::super) mod helper { 
         use super::*;
         use std::ops::Div;
-        use yui_ratio::Ratio;
+        use yui::Ratio;
 
         pub fn assert_is_hnf<R>(b: &Mat<R>)
         where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {

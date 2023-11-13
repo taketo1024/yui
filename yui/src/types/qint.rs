@@ -4,7 +4,7 @@ use std::fmt::{Display, Debug};
 use std::ops::{Add, Neg, Sub, Mul, AddAssign, SubAssign, MulAssign, Rem, Div, RemAssign, DivAssign};
 use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
-use yui::{AddGrp, AddGrpOps, AddMon, AddMonOps, DivRound, Elem, EucRing, EucRingOps, Mon, MonOps, Ring, RingOps, Integer, IntOps};
+use crate::{AddGrp, AddGrpOps, AddMon, AddMonOps, DivRound, Elem, EucRing, EucRingOps, Mon, MonOps, Ring, RingOps, Integer, IntOps};
 
 #[derive(Clone, Default, PartialEq, Eq)]
 pub struct QuadInt<I, const D: i32>(I, I)

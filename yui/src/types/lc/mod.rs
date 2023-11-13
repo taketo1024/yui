@@ -1,7 +1,7 @@
 mod gen;
 mod free;
-mod lin_comb;
+mod lc;
 
 pub use gen::*;
 pub use free::*;
-pub use lin_comb::*;
+pub use lc::*;

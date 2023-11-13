@@ -7,7 +7,7 @@ use derive_more::{Display, DebugCustom};
 use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
 
-use yui::{Elem, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, EucRingOps, AddMon, AddGrp, Mon, Ring, EucRing, Field};
+use crate::{Elem, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, EucRingOps, AddMon, AddGrp, Mon, Ring, EucRing, Field};
 
 pub type I = i32;
 
@@ -155,7 +155,7 @@ impl_alg_ops!(FieldOps);
 
 impl<const p: I> Elem for FF<p> {
     fn math_symbol() -> String {
-        use yui::format::subscript;
+        use crate::format::subscript;
         format!("F{}", subscript(p as isize))
     }
 }

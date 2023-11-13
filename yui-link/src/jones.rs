@@ -1,6 +1,6 @@
 use num_traits::Pow;
 use yui::PowMod2;
-use yui_polynomial::LPoly;
+use yui::LPoly;
 use super::link::{Link, State};
 
 pub fn jones_polynomial(l: &Link) -> LPoly<'q', i32> {

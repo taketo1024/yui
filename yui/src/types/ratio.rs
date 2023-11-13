@@ -5,7 +5,7 @@ use std::iter::{Sum, Product};
 use std::ops::{Mul, Add, Sub, Neg, AddAssign, SubAssign, MulAssign, Div, DivAssign, Rem, RemAssign};
 use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
-use yui::{EucRing, EucRingOps, Elem, Mon, AddMon, AddGrp, AddMonOps, AddGrpOps, MonOps, RingOps, Ring, FieldOps, Field, Integer, IntOps};
+use crate::{EucRing, EucRingOps, Elem, Mon, AddMon, AddGrp, AddMonOps, AddGrpOps, MonOps, RingOps, Ring, FieldOps, Field, Integer, IntOps};
 
 #[derive(Copy, Clone)]
 pub struct Ratio<T> {

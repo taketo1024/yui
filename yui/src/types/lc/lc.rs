@@ -5,8 +5,7 @@ use ahash::AHashMap;
 use itertools::Itertools;
 use num_traits::Zero;
 use auto_impl_ops::auto_ops;
-
-use yui::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
+use crate::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
 
 use super::gen::*;
 
@@ -499,8 +498,8 @@ where
 #[cfg(test)]
 mod tests {
     use num_traits::Zero;
-    use yui::macros::map;
-    use yui::Elem;
+    use crate::Elem;
+    use crate::macros::map;
 
     use crate::{Free, LinComb};
  

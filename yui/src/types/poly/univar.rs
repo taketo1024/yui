@@ -5,11 +5,9 @@ use std::str::FromStr;
 use num_traits::{Zero, One, ToPrimitive, Pow};
 use auto_impl_ops::auto_ops;
 
-use yui::Elem;
-use yui_lin_comb::Gen;
-use yui::format::superscript;
-
-use crate::Mono;
+use crate::{Elem, Gen};
+use crate::format::superscript;
+use super::Mono;
 
 // `Univar<X, I>` : represents monomials X^d (univar) or ΠX_i^{d_i} (multivar).
 // `I` is one of `usize`, `isize`, `MultiDeg<usize>`, `MultiDeg<isize>`.

@@ -22,5 +22,3 @@ sprs = "0.11.1"
 thread_local = "1.1.7"
 
 yui = { path = "../yui" }
-yui-quad-int = { path = "../yui-types/quad_int" }
-yui-ratio = { path = "../yui-types/ratio" }

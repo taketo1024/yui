@@ -967,23 +967,16 @@ name = "yui"
 version = "0.1.0"
 dependencies = [
  "ahash",
+ "auto-impl-ops",
  "bimap",
+ "delegate",
  "derive_more",
  "is-even",
  "itertools",
  "num-bigint",
  "num-traits",
  "prettytable",
-]
-
-[[package]]
-name = "yui-ff"
-version = "0.1.0"
-dependencies = [
- "auto-impl-ops",
- "derive_more",
- "num-traits",
- "yui",
+ "regex",
 ]
 
 [[package]]
@@ -1001,20 +994,7 @@ dependencies = [
  "rayon",
  "sprs",
  "yui",
- "yui-lin-comb",
  "yui-matrix",
-]
-
-[[package]]
-name = "yui-lin-comb"
-version = "0.1.0"
-dependencies = [
- "ahash",
- "auto-impl-ops",
- "derive_more",
- "itertools",
- "num-traits",
- "yui",
 ]
 
 [[package]]
@@ -1027,7 +1007,6 @@ dependencies = [
  "serde",
  "serde_json",
  "yui",
- "yui-polynomial",
 ]
 
 [[package]]
@@ -1047,45 +1026,6 @@ dependencies = [
  "rayon",
  "sprs",
  "thread_local",
- "yui",
- "yui-quad-int",
- "yui-ratio",
-]
-
-[[package]]
-name = "yui-polynomial"
-version = "0.1.0"
-dependencies = [
- "ahash",
- "auto-impl-ops",
- "delegate",
- "derive_more",
- "itertools",
- "num-traits",
- "regex",
- "yui",
- "yui-lin-comb",
- "yui-ratio",
-]
-
-[[package]]
-name = "yui-quad-int"
-version = "0.1.0"
-dependencies = [
- "auto-impl-ops",
- "num-bigint",
- "num-traits",
- "regex",
- "yui",
-]
-
-[[package]]
-name = "yui-ratio"
-version = "0.1.0"
-dependencies = [
- "auto-impl-ops",
- "num-traits",
- "regex",
  "yui",
 ]
 

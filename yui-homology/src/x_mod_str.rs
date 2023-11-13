@@ -3,7 +3,7 @@ use std::ops::Add;
 
 use delegate::delegate;
 use yui::{Ring, RingOps, IndexList};
-use yui_lin_comb::{Gen, LinComb};
+use yui::{Gen, LinComb};
 use yui_matrix::sparse::{SpVec, Trans};
 
 use crate::{DisplayForGrid, RModStr, SimpleRModStr, rmod_str_symbol};
@@ -168,7 +168,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests { 
-    use yui_lin_comb::Free;
+    use yui::Free;
     use yui_matrix::sparse::SpMat;
 
     use super::*;

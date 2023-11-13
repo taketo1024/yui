@@ -1,5 +1,5 @@
 use yui::{Deg, isize2, isize3, EucRing, EucRingOps};
-use yui_lin_comb::Gen;
+use yui::Gen;
 
 use crate::{Grid, XModStr, XChainComplexBase, GridTrait, ComputeHomology};
 

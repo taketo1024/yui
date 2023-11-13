@@ -2,11 +2,9 @@ use std::fmt::{Display, Debug};
 use std::str::FromStr;
 use num_traits::{Zero, One};
 
-use yui::Elem;
-use yui_lin_comb::Gen;
-use yui::format::subscript;
-
-use crate::{Mono, MultiDeg, Univar, fmt_mono};
+use crate::{Elem, Gen};
+use crate::format::subscript;
+use super::{Mono, MultiDeg, Univar, fmt_mono};
 
 pub type MultiVar<const X: char, I> = Univar<X, MultiDeg<I>>;
 

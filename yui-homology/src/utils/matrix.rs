@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use yui::{Ring, RingOps, IndexList};
-use yui_lin_comb::{LinComb, Gen};
+use yui::{LinComb, Gen};
 use yui_matrix::sparse::SpMat;
 
 pub fn make_matrix<X, Y, R, F>(from: &IndexList<X>, to: &IndexList<Y>, f: F) -> SpMat<R>

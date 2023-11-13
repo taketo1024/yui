@@ -1,6 +1,6 @@
 use std::hash::Hash;
 use derive_more::Display;
-use yui::Elem;
+use crate::Elem;
 
 use crate::Gen;
 

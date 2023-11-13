@@ -5,10 +5,9 @@ use std::str::FromStr;
 use num_traits::{Zero, One, Pow};
 use auto_impl_ops::auto_ops;
 
-use yui::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Mon, MonOps, Ring, RingOps, EucRing, EucRingOps, Field, FieldOps};
-use yui_lin_comb::{LinComb, Gen};
-
-use crate::{MultiDeg, Univar, BiVar, MultiVar};
+use crate::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Mon, MonOps, Ring, RingOps, EucRing, EucRingOps, Field, FieldOps};
+use crate::{LinComb, Gen};
+use super::{MultiDeg, Univar, BiVar, MultiVar};
 
 // A polynomial is a linear combination of monomials over R.
 
@@ -579,7 +578,8 @@ where R: Field, for<'x> &'x R: FieldOps<R> {}
 
 #[cfg(test)]
 mod tests {
-    use yui::macros::map;
+    use crate::Ratio;
+    use crate::macros::map;
     use super::*;
 
     #[test]
@@ -868,7 +868,6 @@ mod tests {
 
     #[test]
     fn inv_rat() { 
-        use yui_ratio::Ratio;
         type R = Ratio<i32>;
         type P = Poly::<'x', R>;
 
@@ -927,7 +926,6 @@ mod tests {
 
     #[test]
     fn inv_laurent_rat() { 
-        use yui_ratio::Ratio;
         type R = Ratio<i32>;
         type P = LPoly::<'x', R>;
 
@@ -959,7 +957,6 @@ mod tests {
 
     #[test]
     fn div_rem() { 
-        use yui_ratio::Ratio;
         type R = Ratio<i32>;
         type P = Poly::<'x', R>;
 

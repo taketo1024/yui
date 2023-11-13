@@ -1,0 +1,24 @@
+[package]
+name = "yui-homology"
+description = ""
+
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+
+[dependencies]
+bimap = "0.6.3"
+cartesian = "0.2.1"
+delegate = "0.10.0"
+derive_more = "0.99.17"
+grouping_by = "0.2.2"
+itertools = "0.11.0"
+log = "0.4.20"
+num-traits = "0.2.16"
+rayon = "1.8.0"
+sprs = "0.11.1"
+# sprs = { git = "https://github.com/sparsemat/sprs", branch = "master" }
+
+yui = { path = "../yui" }
+yui-matrix = { path = "../yui-matrix" }

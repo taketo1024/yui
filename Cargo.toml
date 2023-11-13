@@ -1,55 +1,15 @@
-[package]
-name = "yui"
-version = "0.1.0"
-edition = "2021"
-authors = ["Taketo Sano <taketo1024@gmail.com>"]
-
-[features]
-all = ["poly", "qint"]
-poly = []
-qint = []
-i128 = []
-bigint = []
-
 [workspace]
 members = [ 
-    "workspace/core",
-    "workspace/utils",
-    "workspace/types/ratio",
-    "workspace/types/ff",
-    "workspace/types/quad_int",    
-    "workspace/types/lin_comb",
-    "workspace/types/polynomial",
-    "workspace/link",
-    "workspace/khovanov"
+    "yui",
+    "yui-matrix",
+    "yui-homology",
+    "yui-link",
 ]
+resolver = "2"
 
-[profile.release]
-debug = true
-overflow-checks = true
-
-[dependencies]
-clap = { version = "4.4.6", features = ["derive", "cargo"] }
-csv = "1.2.2"
-derive_more = "0.99.17"
-indexmap = { version = "2.0.2", features = ["serde"] }
-log = "0.4.20"
-num-bigint = "0.4.4"
-num-traits = "0.2.16"
-regex = "1.9.6"
-serde_json = "1.0.107"
-simplelog = "0.12.1"
-string-builder = "0.2.0"
-yui-core  = { version = "0.1.0", path = "workspace/core" }
-yui-ratio = { version = "0.1.0", path = "workspace/types/ratio" }
-yui-ff = { version = "0.1.0", path = "workspace/types/ff" }
-yui-quad-int = { version = "0.1.0", path = "workspace/types/quad_int" }
-yui-polynomial = { version = "0.1.0", path = "workspace/types/polynomial" }
-yui-matrix = { version = "0.1.0", path = "workspace/matrix" }
-yui-homology = { version = "0.1.0", path = "workspace/homology" }
-yui-link = { version = "0.1.0", path = "workspace/link" }
-yui-khovanov = { version = "0.1.0", path = "workspace/khovanov" }
-serde = { version = "1.0.188", features = ["derive"] }
-cfg-if = "1.0.0"
-yui-utils = { version = "0.1.0", path = "workspace/utils" }
-itertools = "0.11.0"
+[workspace.package]
+version = "0.2.0"
+authors = ["Taketo Sano"]
+description = "YUI <taketo1024@gmail.com>"
+license = "MIT"
+edition = "2021"

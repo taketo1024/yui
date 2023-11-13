@@ -1,0 +1,26 @@
+[package]
+name = "yui-matrix"
+description = ""
+
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+
+[dependencies]
+auto-impl-ops = "0.2.1"
+cartesian = "0.2.1"
+derive_more = "0.99.17"
+either = "1.9.0"
+itertools = "0.11.0"
+log = "0.4.20"
+ndarray = "0.15.6"
+num-bigint = "0.4.4"
+num-traits = "0.2.16"
+rand = "0.8.5"
+rayon = "1.8.0"
+sprs = "0.11.1"
+# sprs = { git = "https://github.com/sparsemat/sprs", branch = "master" }
+thread_local = "1.1.7"
+
+yui = { path = "../yui" }

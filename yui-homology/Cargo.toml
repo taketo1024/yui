@@ -21,4 +21,3 @@ sprs = "0.11.1"
 yui = { version = "0.1.0", path = "../yui" }
 yui-lin-comb = { version = "0.1.0", path = "../yui-types/lin_comb" }
 yui-matrix = { version = "0.1.0", path = "../yui-matrix" }
-yui-utils = { version = "0.1.0", path = "../yui-utils" }

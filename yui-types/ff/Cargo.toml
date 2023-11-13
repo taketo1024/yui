@@ -10,4 +10,3 @@ auto-impl-ops = "0.2.1"
 derive_more = "0.99.17"
 num-traits = "0.2.16"
 yui  = { version = "0.1.0", path = "../../yui" }
-yui-utils = { version = "0.1.0", path = "../../yui-utils" }

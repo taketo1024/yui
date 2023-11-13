@@ -139,7 +139,7 @@ macro_rules! impl_print_seq {
         impl<T> DisplaySeq<$t> for T
         where T: GridTrait<$t>, T::E: DisplayForGrid {
             fn display_seq(&self) -> String {
-                use yui_utils::table;
+                use yui::format::table;
                 let str = table("i", [""].iter(), self.support(), |_, &i| {
                     self.get(i).display_for_grid()
                 });
@@ -164,7 +164,7 @@ macro_rules! impl_print_table {
         impl<T> DisplayTable<$t> for T
         where T: GridTrait<$t>, T::E: DisplayForGrid {
             fn display_table(&self) -> String {
-                use yui_utils::table;
+                use yui::format::table;
         
                 let cols = self.support().map(|$t(i, _)| i).unique().sorted();
                 let rows = self.support().map(|$t(_, j)| j).unique().sorted().rev();

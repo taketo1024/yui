@@ -499,7 +499,7 @@ where
 #[cfg(test)]
 mod tests {
     use num_traits::Zero;
-    use yui_utils::map;
+    use yui::macros::map;
     use yui::Elem;
 
     use crate::{Free, LinComb};

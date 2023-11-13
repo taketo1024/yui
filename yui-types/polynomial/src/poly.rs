@@ -579,7 +579,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {}
 
 #[cfg(test)]
 mod tests {
-    use yui_utils::map;
+    use yui::macros::map;
     use super::*;
 
     #[test]

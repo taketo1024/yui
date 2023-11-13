@@ -30,7 +30,7 @@ pub fn jones_polynomial(l: &Link) -> LPoly<'q', i32> {
 mod tests { 
     use super::*;
     use num_traits::One;
-    use yui_utils::bitseq::Bit;
+    use yui::bitseq::Bit;
 
     type P = LPoly<'q', i32>;
 

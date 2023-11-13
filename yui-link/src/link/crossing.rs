@@ -1,6 +1,6 @@
 use std::fmt::Display;
 use derive_more::Display;
-use yui_utils::bitseq::Bit;
+use yui::bitseq::Bit;
 
 use crate::LinkComp;
 use super::Edge;

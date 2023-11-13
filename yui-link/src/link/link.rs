@@ -1,12 +1,12 @@
 use std::collections::HashSet;
 use itertools::Itertools;
 use yui::Sign;
-use yui_utils::bitseq::Bit;
+use yui::bitseq::Bit;
 
 use super::{Crossing, CrossingType, LinkComp};
 
 pub type Edge = u8;
-pub type State = yui_utils::bitseq::BitSeq;
+pub type State = yui::bitseq::BitSeq;
 
 // Planer Diagram code, represented by crossings:
 //

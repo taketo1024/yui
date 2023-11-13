@@ -12,4 +12,3 @@ derive_more = "0.99.17"
 itertools = "0.11.0"
 num-traits = "0.2.16"
 yui =  { path = "../../yui" }
-yui-utils = { path = "../../yui-utils" }

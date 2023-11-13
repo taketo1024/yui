@@ -16,4 +16,3 @@ regex = "1.9.6"
 yui = { path = "../../yui" }
 yui-lin-comb = { path = "../lin_comb" }
 yui-ratio = { path = "../ratio" }
-yui-utils = { path = "../../yui-utils" }

@@ -7,7 +7,7 @@ use auto_impl_ops::auto_ops;
 
 use yui::Elem;
 use yui_lin_comb::Gen;
-use yui_utils::superscript;
+use yui::format::superscript;
 
 use crate::Mono;
 

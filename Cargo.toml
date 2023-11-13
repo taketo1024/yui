@@ -1,12 +1,13 @@
 [workspace]
 members = [ 
     "yui",
-    "yui-utils",
     "yui-types/ratio",
     "yui-types/ff",
     "yui-types/quad_int",    
     "yui-types/lin_comb",
     "yui-types/polynomial",
+    "yui-matrix",
+    "yui-homology",
     "yui-link",
 ]
 resolver = "2"

@@ -14,4 +14,3 @@ serde_json = "1.0.107"
 
 yui = { path = "../yui" }
 yui-polynomial = { path = "../yui-types/polynomial" }
-yui-utils = { path = "../yui-utils" }

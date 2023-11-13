@@ -17,7 +17,7 @@ use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use sprs::PermOwned;
 use thread_local::ThreadLocal;
 use yui::{Ring, RingOps};
-use yui_utils::top_sort;
+use yui::top_sort::top_sort;
 use super::*;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -580,7 +580,7 @@ impl<'a> RowWorker {
 mod tests {
     use super::*;
     use num_traits::{Zero, One};
-    use yui_utils::set;
+    use yui::macros::set;
  
     #[test]
     fn str_init() {

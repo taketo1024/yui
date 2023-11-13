@@ -4,7 +4,7 @@ use num_traits::{Zero, One};
 
 use yui::Elem;
 use yui_lin_comb::Gen;
-use yui_utils::subscript;
+use yui::format::subscript;
 
 use crate::{Mono, MultiDeg, Univar, fmt_mono};
 

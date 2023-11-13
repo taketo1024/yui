@@ -14,3 +14,5 @@ macro_rules! set {
         FromIterator::from_iter([$($val,)*])
     }}
 }
+
+pub use {map, set};

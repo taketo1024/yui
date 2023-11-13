@@ -3,7 +3,7 @@ use std::ops::Add;
 
 use itertools::Itertools;
 
-use yui_core::{Ring, RingOps};
+use yui::{Ring, RingOps};
 use yui_matrix::sparse::{Trans, SpVec, SpMat};
 
 use crate::DisplayForGrid;

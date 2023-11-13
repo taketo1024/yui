@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 use log::*;
 
-use yui_core::{EucRing, EucRingOps};
+use yui::{EucRing, EucRingOps};
 use yui_matrix::dense::{*, snf::*};
 use yui_matrix::sparse::*;
 

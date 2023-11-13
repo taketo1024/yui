@@ -5,7 +5,7 @@ use itertools::Itertools;
 use num_traits::{Zero, One};
 use sprs::{CsVec, PermView};
 use auto_impl_ops::auto_ops;
-use yui_core::{Ring, RingOps, AddMonOps, AddGrpOps, AddMon, AddGrp};
+use yui::{Ring, RingOps, AddMonOps, AddGrpOps, AddMon, AddGrp};
 use super::SpMat;
 
 #[derive(Clone, Debug, PartialEq, Eq)]

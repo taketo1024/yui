@@ -2,7 +2,7 @@ use std::iter::Sum;
 use std::ops::Add;
 
 use delegate::delegate;
-use yui_core::{Ring, RingOps, IndexList};
+use yui::{Ring, RingOps, IndexList};
 use yui_lin_comb::{Gen, LinComb};
 use yui_matrix::sparse::{SpVec, Trans};
 

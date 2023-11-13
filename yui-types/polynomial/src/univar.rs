@@ -5,7 +5,7 @@ use std::str::FromStr;
 use num_traits::{Zero, One, ToPrimitive, Pow};
 use auto_impl_ops::auto_ops;
 
-use yui_core::Elem;
+use yui::Elem;
 use yui_lin_comb::Gen;
 use yui_utils::superscript;
 

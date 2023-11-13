@@ -14,7 +14,7 @@ use ndarray::{Array1, ArrayView1, Array2, ArrayView2};
 use log::{trace, info};
 use num_bigint::BigInt;
 
-use yui_core::{Ring, RingOps, EucRing, EucRingOps, DivRound, Integer, IntOps};
+use yui::{Ring, RingOps, EucRing, EucRingOps, DivRound, Integer, IntOps};
 use yui_quad_int::{QuadInt, GaussInt, EisenInt};
 use crate::dense::*;
 

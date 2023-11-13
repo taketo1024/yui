@@ -1,5 +1,5 @@
 use sprs::PermView;
-use yui_core::{RingOps, Ring};
+use yui::{RingOps, Ring};
 use crate::sparse::{SpMat, MatType, SpVec};
 
 #[derive(Clone, Debug)]

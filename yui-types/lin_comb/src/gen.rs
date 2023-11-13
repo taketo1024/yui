@@ -1,5 +1,5 @@
 use std::hash::Hash;
-use yui_core::Elem;
+use yui::Elem;
 
 pub trait OrdForDisplay {
     fn cmp_for_display(&self, other: &Self) -> std::cmp::Ordering;

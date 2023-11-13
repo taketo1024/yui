@@ -731,7 +731,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1a515f5799fe4961cb532f983ce2b23082366b898e52ffbce459c86f67c8378a"
 
 [[package]]
-name = "yui-core"
+name = "yui"
 version = "0.1.0"
 dependencies = [
  "ahash",
@@ -750,7 +750,7 @@ dependencies = [
  "auto-impl-ops",
  "derive_more",
  "num-traits",
- "yui-core",
+ "yui",
  "yui-utils",
 ]
 
@@ -763,7 +763,7 @@ dependencies = [
  "derive_more",
  "itertools",
  "num-traits",
- "yui-core",
+ "yui",
  "yui-utils",
 ]
 
@@ -776,7 +776,7 @@ dependencies = [
  "num-traits",
  "serde",
  "serde_json",
- "yui-core",
+ "yui",
  "yui-polynomial",
  "yui-utils",
 ]
@@ -792,7 +792,7 @@ dependencies = [
  "itertools",
  "num-traits",
  "regex",
- "yui-core",
+ "yui",
  "yui-lin-comb",
  "yui-ratio",
  "yui-utils",
@@ -806,7 +806,7 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "regex",
- "yui-core",
+ "yui",
 ]
 
 [[package]]
@@ -816,7 +816,7 @@ dependencies = [
  "auto-impl-ops",
  "num-traits",
  "regex",
- "yui-core",
+ "yui",
 ]
 
 [[package]]
@@ -828,7 +828,7 @@ dependencies = [
  "itertools",
  "num-traits",
  "prettytable",
- "yui-core",
+ "yui",
 ]
 
 [[package]]

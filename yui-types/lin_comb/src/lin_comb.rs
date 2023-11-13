@@ -6,7 +6,7 @@ use itertools::Itertools;
 use num_traits::Zero;
 use auto_impl_ops::auto_ops;
 
-use yui_core::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
+use yui::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
 
 use super::gen::*;
 
@@ -500,7 +500,7 @@ where
 mod tests {
     use num_traits::Zero;
     use yui_utils::map;
-    use yui_core::Elem;
+    use yui::Elem;
 
     use crate::{Free, LinComb};
  

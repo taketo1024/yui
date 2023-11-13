@@ -7,7 +7,7 @@ use num_traits::Zero;
 use rayon::prelude::*;
 use sprs::CsVecView;
 use thread_local::ThreadLocal;
-use yui_core::{Ring, RingOps};
+use yui::{Ring, RingOps};
 use super::*;
 
 #[derive(Clone, Copy, PartialEq, Eq)]

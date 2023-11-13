@@ -3,7 +3,7 @@ use std::ops::Index;
 use std::fmt::Display;
 
 use itertools::Itertools;
-use yui_core::{isize2, usize2, Deg, isize3, usize3};
+use yui::{isize2, usize2, Deg, isize3, usize3};
 
 pub trait GridTrait<I>
 where I: Deg { 

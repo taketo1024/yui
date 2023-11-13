@@ -1,5 +1,5 @@
 use num_traits::Pow;
-use yui_core::PowMod2;
+use yui::PowMod2;
 use yui_polynomial::LPoly;
 use super::link::{Link, State};
 

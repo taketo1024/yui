@@ -1,4 +1,4 @@
-use yui_core::{Ring, RingOps};
+use yui::{Ring, RingOps};
 use super::*;
 use super::triang::{TriangularType, solve_triangular};
 

@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use itertools::Itertools;
-use yui_core::Sign;
+use yui::Sign;
 use yui_utils::bitseq::Bit;
 
 use super::{Crossing, CrossingType, LinkComp};

@@ -1,4 +1,4 @@
-use yui_core::{Deg, isize2, isize3, EucRing, EucRingOps};
+use yui::{Deg, isize2, isize3, EucRing, EucRingOps};
 use yui_lin_comb::Gen;
 
 use crate::{Grid, XModStr, XChainComplexBase, GridTrait, ComputeHomology};

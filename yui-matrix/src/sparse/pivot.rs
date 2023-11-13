@@ -16,7 +16,7 @@ use log::info;
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use sprs::PermOwned;
 use thread_local::ThreadLocal;
-use yui_core::{Ring, RingOps};
+use yui::{Ring, RingOps};
 use yui_utils::top_sort;
 use super::*;
 

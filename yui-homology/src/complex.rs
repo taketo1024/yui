@@ -3,7 +3,7 @@ use std::ops::Index;
 
 use itertools::{Itertools, Either};
 use delegate::delegate;
-use yui_core::{Ring, RingOps, Deg, isize2, isize3};
+use yui::{Ring, RingOps, Deg, isize2, isize3};
 use yui_matrix::sparse::{SpMat, SpVec, MatType, Trans};
 
 use crate::{Grid, GridIter, RModStr, SimpleRModStr, rmod_str_symbol};

@@ -6,7 +6,7 @@ use sprs::PermOwned;
 use yui_matrix::sparse::*;
 use yui_matrix::sparse::pivot::{perms_by_pivots, find_pivots, PivotType};
 use yui_matrix::sparse::schur::Schur;
-use yui_core::{Ring, RingOps, Deg};
+use yui::{Ring, RingOps, Deg};
 
 use crate::{ChainComplexTrait, ChainComplexBase, Grid, SimpleRModStr, GridIter, GridTrait};
 

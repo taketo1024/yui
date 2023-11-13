@@ -5,7 +5,7 @@ use delegate::delegate;
 
 use itertools::Itertools;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
-use yui_core::{Ring, RingOps, Deg, isize2, isize3};
+use yui::{Ring, RingOps, Deg, isize2, isize3};
 use yui_lin_comb::{Gen, LinComb};
 use yui_matrix::sparse::{SpMat, Trans, MatType};
 

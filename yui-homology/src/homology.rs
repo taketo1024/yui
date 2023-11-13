@@ -1,4 +1,4 @@
-use yui_core::{EucRing, EucRingOps, Deg, isize2, isize3};
+use yui::{EucRing, EucRingOps, Deg, isize2, isize3};
 
 use crate::utils::HomologyCalc;
 use crate::{Grid, ChainComplexTrait, SimpleRModStr, ChainComplexBase, GridTrait};

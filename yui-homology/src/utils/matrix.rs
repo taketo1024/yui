@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
-use yui_core::{Ring, RingOps, IndexList};
+use yui::{Ring, RingOps, IndexList};
 use yui_lin_comb::{LinComb, Gen};
 use yui_matrix::sparse::SpMat;
 

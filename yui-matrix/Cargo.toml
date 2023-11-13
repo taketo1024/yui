@@ -21,7 +21,7 @@ sprs = "0.11.1"
 # sprs = { git = "https://github.com/sparsemat/sprs", branch = "master" }
 thread_local = "1.1.7"
 
-yui-core = { path = "../yui" }
+yui = { path = "../yui" }
 yui-quad-int = { path = "../yui-types/quad_int" }
 yui-ratio = { path = "../yui-types/ratio" }
 yui-utils = { path = "../yui-utils" }

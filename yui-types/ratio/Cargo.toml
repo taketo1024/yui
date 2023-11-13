@@ -10,4 +10,4 @@ auto-impl-ops = "0.2.1"
 num-traits = "0.2.16"
 regex = "1.9.6"
 
-yui-core = { path = "../../yui" }
+yui = { path = "../../yui" }

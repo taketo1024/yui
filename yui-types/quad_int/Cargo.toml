@@ -11,4 +11,4 @@ num-bigint = "0.4.4"
 num-traits = "0.2.16"
 regex = "1.9.6"
 
-yui-core = { path = "../../yui" }
+yui = { path = "../../yui" }

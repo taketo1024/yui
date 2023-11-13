@@ -4,7 +4,7 @@ use ndarray::{Array2, Axis, s, concatenate, array};
 use derive_more::Display;
 use auto_impl_ops::auto_ops;
 use num_traits::{Zero, One};
-use yui_core::{AddMon, AddMonOps, AddGrp, AddGrpOps, MonOps, Ring, RingOps};
+use yui::{AddMon, AddMonOps, AddGrp, AddGrpOps, MonOps, Ring, RingOps};
 use crate::sparse::SpMat;
 
 pub trait MatType {

@@ -1,4 +1,4 @@
-use yui_core::{Ring, RingOps};
+use yui::{Ring, RingOps};
 use yui_matrix::sparse::SpMat;
 
 use crate::ChainComplex;

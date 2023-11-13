@@ -6,3 +6,10 @@ members = [
     "yui-link",
 ]
 resolver = "2"
+
+[workspace.package]
+version = "0.2.0"
+authors = ["Taketo Sano"]
+description = "YUI <taketo1024@gmail.com>"
+license = "MIT"
+edition = "2021"

@@ -1,8 +1,0 @@
-The input data were kindly provided by Dr. Dirk Schuetz. 
-These are knots such that s_Q != s_F2 or s_Q != s_F3, computed by `KnotJob'.
-https://www.maths.dur.ac.uk/users/dirk.schuetz/knotjob.html
-
-The output data are ss-invariants: see https://arxiv.org/abs/2211.02494
-
-The results can be reproduced by running:
-$ cargo run -r --features bigint,poly,qint -- ss-batch computation/targets/14-15.json 

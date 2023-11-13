@@ -13,7 +13,7 @@ derive_more = "0.99.17"
 itertools = "0.11.0"
 num-traits = "0.2.16"
 regex = "1.9.6"
-yui-core = { version = "0.1.0", path = "../../core" }
-yui-lin-comb = { version = "0.1.0", path = "../lin_comb" }
-yui-ratio = { version = "0.1.0", path = "../ratio" }
-yui-utils = { version = "0.1.0", path = "../../utils" }
+yui-core = { path = "../../yui" }
+yui-lin-comb = { path = "../lin_comb" }
+yui-ratio = { path = "../ratio" }
+yui-utils = { path = "../../yui-utils" }

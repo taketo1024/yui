@@ -1,13 +1,15 @@
 [package]
-name = "yui-ff"
+name = "yui-lin-comb"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+ahash = "0.8.6"
 auto-impl-ops = "0.2.1"
 derive_more = "0.99.17"
+itertools = "0.11.0"
 num-traits = "0.2.16"
-yui-core  = { version = "0.1.0", path = "../../core" }
-yui-utils = { version = "0.1.0", path = "../../utils" }
+yui-core =  { path = "../../yui" }
+yui-utils = { path = "../../yui-utils" }

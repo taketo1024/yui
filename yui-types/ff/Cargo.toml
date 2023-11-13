@@ -1,5 +1,5 @@
 [package]
-name = "yui-quad-int"
+name = "yui-ff"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 auto-impl-ops = "0.2.1"
-num-bigint = "0.4.4"
+derive_more = "0.99.17"
 num-traits = "0.2.16"
-regex = "1.9.6"
-yui-core = { version = "0.1.0", path = "../../core" }
+yui-core  = { version = "0.1.0", path = "../../yui" }
+yui-utils = { version = "0.1.0", path = "../../yui-utils" }

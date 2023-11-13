@@ -500,8 +500,7 @@ mod tests {
     use num_traits::Zero;
     use crate::Elem;
     use crate::macros::map;
-
-    use crate::{Free, LinComb};
+    use crate::lc::{Free, LinComb};
  
     type X = Free<i32>;
     fn e(i: i32) -> X { 

@@ -6,7 +6,7 @@ use num_traits::{Zero, One, Pow};
 use auto_impl_ops::auto_ops;
 
 use crate::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Mon, MonOps, Ring, RingOps, EucRing, EucRingOps, Field, FieldOps};
-use crate::{LinComb, Gen};
+use crate::lc::{LinComb, Gen};
 use super::{MultiDeg, Univar, BiVar, MultiVar};
 
 // A polynomial is a linear combination of monomials over R.

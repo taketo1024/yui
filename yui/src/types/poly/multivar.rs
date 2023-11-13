@@ -2,7 +2,8 @@ use std::fmt::{Display, Debug};
 use std::str::FromStr;
 use num_traits::{Zero, One};
 
-use crate::{Elem, Gen};
+use crate::Elem;
+use crate::lc::Gen;
 use crate::format::subscript;
 use super::{Mono, MultiDeg, Univar, fmt_mono};
 

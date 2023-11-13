@@ -5,7 +5,8 @@ use std::str::FromStr;
 use num_traits::{Zero, One, Pow};
 use auto_impl_ops::auto_ops;
 
-use crate::{Elem, Gen};
+use crate::Elem;
+use crate::lc::Gen;
 
 use super::Mono;
 use super::univar::fmt_mono;

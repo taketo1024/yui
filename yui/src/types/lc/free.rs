@@ -1,8 +1,7 @@
 use std::hash::Hash;
 use derive_more::Display;
 use crate::Elem;
-
-use crate::Gen;
+use crate::lc::Gen;
 
 #[derive(Debug, Display, Default, Hash, PartialEq, Eq, Clone, PartialOrd, Ord)]
 #[display(fmt = "<{}>", _0)]

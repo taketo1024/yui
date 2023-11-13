@@ -6,7 +6,7 @@ use delegate::delegate;
 use itertools::Itertools;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use yui::{Ring, RingOps, Deg, isize2, isize3};
-use yui::{Gen, LinComb};
+use yui::lc::{Gen, LinComb};
 use yui_matrix::sparse::{SpMat, Trans, MatType};
 
 use crate::utils::ChainReducer;
@@ -182,7 +182,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 pub(crate) mod tests { 
     use num_traits::Zero;
-    use yui::Free;
+    use yui::lc::Free;
     use yui_matrix::sparse::SpVec;
 
     use crate::{RModStr, ChainComplex, Grid1, ChainComplexCommon};

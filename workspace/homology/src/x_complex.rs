@@ -50,7 +50,7 @@ where
         let i1 = i + self.d_deg;
         let (m, n) = (self[i1].rank(), q.cols());
 
-        let entries = (0..n).into_par_iter().flat_map(|j| {
+        let entries: Vec<_> = (0..n).into_par_iter().map(|j| {
             let v = q.col_vec(j);
             let z = v.iter().map(|(k, a)|
                 self[i].gen_chain(k) * a
@@ -66,9 +66,9 @@ where
                     None
                 }
             }).collect_vec()
-        }).collect::<Vec<_>>();
+        }).collect();
 
-        SpMat::from_entries((m, n), entries)
+        SpMat::from_entries((m, n), entries.into_iter().flatten())
     }
 
     pub fn reduced(&self) -> XChainComplexBase<I, X, R> { 

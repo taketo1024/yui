@@ -91,8 +91,7 @@ impl<I, C> ChainComplexCommon<I> for C
 where 
     I: Deg,
     C: GridTrait<I> + ChainComplexTrait<I>,
-    C::R: Ring, for<'x> &'x C::R: RingOps<C::R>,
-    C::E: RModStr<R = C::R> 
+    C::R: Ring, for<'x> &'x C::R: RingOps<C::R>
 {}
 
 pub struct ChainComplexBase<I, R>

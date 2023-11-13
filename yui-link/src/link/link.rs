@@ -284,6 +284,12 @@ impl Link {
         Ok(l)
     }
 
+    pub fn load_resource(name: &str) -> Result<Link, Box<dyn std::error::Error>> {
+        let dir = std::env!("CARGO_MANIFEST_DIR");
+        let path = format!("{dir}/resources/links/{name}.json");
+        Self::load(&path)
+    }
+
     pub fn unknot() -> Link { 
         Link::from_pd_code([[0, 1, 1, 0]]).resolved_at(0, Bit::Bit0)
     }

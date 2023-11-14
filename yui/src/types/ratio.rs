@@ -197,6 +197,12 @@ impl<'a, 'b, T> Mul<&'b Ratio<T>> for &'a Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     type Output = Ratio<T>;
     fn mul(self, rhs: &'b Ratio<T>) -> Self::Output {
+        if rhs.is_one() { 
+            return self.clone();
+        } else if self.is_one() { 
+            return rhs.clone();
+        }
+
         let gcd_ad = EucRing::gcd(&self.numer, &rhs.denom);
         let gcd_bc = EucRing::gcd(&self.denom, &rhs.numer);
 
@@ -350,7 +356,14 @@ macro_rules! impl_add_op {
         where T: EucRing, for<'x> &'x T: EucRingOps<T> {
             type Output = Ratio<T>;
             fn $method(self, rhs: &'b Ratio<T>) -> Self::Output {
-                if self.denom == rhs.denom {
+                if rhs.is_zero() { 
+                    return self.clone()
+                } else if self.is_zero() { 
+                    return Ratio::new_raw(
+                        T::zero().$method(&rhs.numer), 
+                        rhs.denom.clone()
+                    )
+                } else if self.denom == rhs.denom {
                     return Ratio::new( 
                         (&self.numer).$method(&rhs.numer), 
                         rhs.denom.clone()
@@ -450,6 +463,11 @@ mod tests {
         let a = Ratio::new(1, 2);
         let b = Ratio::new(3, 5);
         assert_eq!(a + b, Ratio::new(11, 10));
+
+        let a = Ratio::new(1, 2);
+        let o = Ratio::zero();
+        assert_eq!(&a + &o, a);
+        assert_eq!(&o + &a, a);
     }
 
     #[test]
@@ -471,6 +489,11 @@ mod tests {
         let a = Ratio::new(1, 2);
         let b = Ratio::new(3, 5);
         assert_eq!(a - b, Ratio::new(-1, 10));
+
+        let a = Ratio::new(1, 2);
+        let o = Ratio::zero();
+        assert_eq!(&a - &o, a);
+        assert_eq!(&o - &a, -a);
     }
 
     #[test]
@@ -485,6 +508,11 @@ mod tests {
         let a = Ratio::new(3, 10);
         let b = Ratio::new(2, 7);
         assert_eq!(a * b, Ratio::new(3, 35));
+
+        let a = Ratio::new(1, 2);
+        let e = Ratio::one();
+        assert_eq!(&a * &e, a);
+        assert_eq!(&e * &a, a);
     }
 
     #[test]

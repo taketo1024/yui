@@ -9,8 +9,9 @@
 use std::cell::RefCell;
 use std::slice::Iter;
 use std::cmp::Ordering;
-use std::collections::{HashSet, VecDeque, HashMap};
+use std::collections::VecDeque;
 use std::sync::{Mutex, RwLock};
+use ahash::AHashSet;
 use itertools::Itertools;
 use log::info;
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
@@ -86,20 +87,20 @@ impl PivotFinder {
     pub fn result(&self) -> Vec<(usize, usize)> { 
         info!("sort: {} pivots.", self.pivots.count());
 
-        let tree: HashMap<_, _> = self.pivots.iter().map(|(i, j)| { 
+        let is_row_type = self.piv_type == PivotType::Rows;
+
+        let tree = self.pivots.iter().map(|(i, j)| { 
             let list = self.str.cols_in(i).filter(|&&j2|
                 j != j2 && self.pivots.has_col(j2)
             ).copied().collect_vec();
             (j, list)
-        }).collect();
+        });
+        
+        let sorted = top_sort(tree).unwrap();
 
-        let ts = top_sort(tree).unwrap();
-
-        let row_type = self.piv_type == PivotType::Rows;
-
-        ts.into_iter().map(|j| {
+        sorted.into_iter().map(|j| {
             let i = self.pivots.row_for(j).unwrap();
-            if row_type { (i, j) } else { (j, i) }
+            if is_row_type { (i, j) } else { (j, i) }
         }).collect_vec()
     }
 
@@ -111,8 +112,8 @@ impl PivotFinder {
         self.str.shape.1
     }
 
-    fn remain_rows(&self) -> impl Iterator<Item = Row> + '_ { 
-        let piv_rows: HashSet<_> = self.pivots.iter().map(|(i, _)| i).collect();
+    fn remain_rows(&self) -> impl Iterator<Item = Row> { 
+        let piv_rows: AHashSet<_> = self.pivots.iter().map(|(i, _)| i).collect();
         let m = self.rows();
 
         (0 .. m).filter(|&i| 
@@ -122,8 +123,8 @@ impl PivotFinder {
         )
     }
 
-    fn occupied_cols(&self) -> HashSet<Col> {
-        self.pivots.iter().fold(HashSet::new(), |mut res, (i, _)| {
+    fn occupied_cols(&self) -> AHashSet<Col> {
+        self.pivots.iter().fold(AHashSet::new(), |mut res, (i, _)| {
             for &j in self.str.cols_in(i) { 
                 res.insert(j);
             }
@@ -306,7 +307,7 @@ impl PivotFinder {
 struct MatrixStr { 
     shape: (usize, usize),
     entries: Vec<Vec<Col>>,     // [row -> [col]]
-    cands: Vec<HashSet<Col>>,   // [row -> [col]]
+    cands: Vec<AHashSet<Col>>,  // [row -> [col]]
     row_wght: Vec<f32>,         // [row -> weight]
     col_wght: Vec<f32>,         // [col -> weight]
 }
@@ -326,7 +327,7 @@ impl MatrixStr {
         let mut entries = vec![vec![]; m];
         let mut row_wght = vec![0f32; m];
         let mut col_wght = vec![0f32; n];
-        let mut cands = vec![HashSet::new(); m];
+        let mut cands = vec![AHashSet::new(); m];
 
         for (i, j, r) in a.iter() { 
             if r.is_zero() { continue }
@@ -444,14 +445,14 @@ struct RowWorker {
     status: Vec<i8>,
     ncand: usize,
     queue: VecDeque<Col>,
-    queued: HashSet<Col>
+    queued: AHashSet<Col>
 }
 
 impl<'a> RowWorker {
     fn new(size: usize) -> Self { 
         let status = vec![0; size];
         let queue = VecDeque::new();
-        let queued = HashSet::new();
+        let queued = AHashSet::new();
         RowWorker {status, ncand: 0, queue, queued }
     }
 

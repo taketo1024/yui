@@ -1013,6 +1013,7 @@ dependencies = [
 name = "yui-matrix"
 version = "0.2.0"
 dependencies = [
+ "ahash",
  "auto-impl-ops",
  "cartesian",
  "derive_more",

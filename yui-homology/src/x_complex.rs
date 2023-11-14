@@ -116,13 +116,13 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
     type Itr = GridIter<I>;
-    type E = XChainComplexSummand<X, R>;
+    type Output = XChainComplexSummand<X, R>;
     
     delegate! { 
         to self.summands { 
             fn support(&self) -> Self::Itr;
             fn is_supported(&self, i: I) -> bool;
-            fn get(&self, i: I) -> &Self::E;
+            fn get(&self, i: I) -> &Self::Output;
         }
     }
 }

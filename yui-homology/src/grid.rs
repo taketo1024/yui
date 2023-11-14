@@ -8,11 +8,11 @@ use yui::{isize2, usize2, Deg, isize3, usize3};
 pub trait GridTrait<I>
 where I: Deg { 
     type Itr: Iterator<Item = I>;
-    type E;
+    type Output;
 
     fn support(&self) -> Self::Itr;
     fn is_supported(&self, i: I) -> bool;
-    fn get(&self, i: I) -> &Self::E;
+    fn get(&self, i: I) -> &Self::Output;
 }
 
 pub type Grid1<E> = Grid<isize,  E>;
@@ -75,7 +75,7 @@ where I: Deg, E: Default {
 impl<I, E> GridTrait<I> for Grid<I, E>
 where I: Deg { 
     type Itr = GridIter<I>;
-    type E = E;
+    type Output = E;
 
     fn support(&self) -> Self::Itr {
         self.support.clone().into_iter()
@@ -140,7 +140,7 @@ pub trait DisplaySeq<I> {
 macro_rules! impl_print_seq {
     ($t:ident) => {
         impl<T> DisplaySeq<$t> for T
-        where T: GridTrait<$t>, T::E: DisplayForGrid {
+        where T: GridTrait<$t>, T::Output: DisplayForGrid {
             fn display_seq(&self) -> String {
                 use yui::format::table;
                 let str = table("i", [""].iter(), self.support(), |_, &i| {
@@ -165,7 +165,7 @@ pub trait DisplayTable<I> {
 macro_rules! impl_print_table {
     ($t:ident) => {
         impl<T> DisplayTable<$t> for T
-        where T: GridTrait<$t>, T::E: DisplayForGrid {
+        where T: GridTrait<$t>, T::Output: DisplayForGrid {
             fn display_table(&self) -> String {
                 use yui::format::table;
         

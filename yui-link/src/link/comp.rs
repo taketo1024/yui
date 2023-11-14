@@ -28,6 +28,10 @@ impl LinkComp {
         self.edges.contains(&e)
     }
 
+    pub fn nedges(&self) -> usize { 
+        self.edges.len()
+    }
+    
     pub fn edges(&self) -> &Vec<Edge> { 
         &self.edges
     }
@@ -46,10 +50,6 @@ impl LinkComp {
         }
     }
 
-    pub fn len(&self) -> usize { 
-        self.edges.len()
-    }
-    
     pub fn is_arc(&self) -> bool { 
         !self.closed
     }
@@ -59,7 +59,7 @@ impl LinkComp {
     }
 
     pub fn reduce(&mut self) { 
-        if self.is_arc() && self.len() > 2 { 
+        if self.is_arc() && self.nedges() > 2 { 
             let e0 = self.edges.remove(0);
             let e1 = self.edges.pop().unwrap();
             let min = self.edges().iter().filter(|&e| e < min(&e0, &e1)).min();
@@ -69,7 +69,7 @@ impl LinkComp {
             } else { 
                 vec![e0, e1]
             };
-        } else if self.is_circle() && self.len() > 1 { 
+        } else if self.is_circle() && self.nedges() > 1 { 
             let e0 = *self.edges.iter().min().unwrap();
             self.edges = vec![e0];
         }

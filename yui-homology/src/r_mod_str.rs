@@ -32,7 +32,7 @@ where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
     }
 }
 
-pub fn rmod_str_symbol<R>(rank: usize, tors: &Vec<R>, dflt: &str) -> String
+pub fn rmod_str_symbol<R>(rank: usize, tors: &[R], dflt: &str) -> String
 where R: Ring, for<'x> &'x R: RingOps<R> {
     use yui::format::superscript;
 

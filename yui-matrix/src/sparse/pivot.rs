@@ -33,7 +33,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pf.result()
 }
 
-pub fn perms_by_pivots<R>(a: &SpMat<R>, pivs: &Vec<(usize, usize)>) -> (PermOwned, PermOwned)
+pub fn perms_by_pivots<R>(a: &SpMat<R>, pivs: &[(usize, usize)]) -> (PermOwned, PermOwned)
 where R: Ring, for<'x> &'x R: RingOps<R> {
     use std::collections::BTreeSet;
     fn perm(n: usize, v: Vec<usize>) -> PermOwned { 

@@ -372,40 +372,44 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 
     fn normalizing_unit(&self) -> Self {
         let (a, b) = self.pair();
-        if D == -1 { 
-            if a.is_positive() && !b.is_negative() {         // a > 0, b ≧ 0 -> 1
-                Self::one()
-            } else if !a.is_positive() && b.is_positive() {  // a ≦ 0, b > 0 -> -i
-                -Self::omega()
-            } else if a.is_negative() && !b.is_positive() {  // a < 0, b ≦ 0 -> -1
-                -Self::one()
-            } else if !a.is_negative() && b.is_negative() {  // a ≧ 0, b < 0 -> i
-                Self::omega()
-            } else {                                         // a = b = 0    -> 1
-                Self::one()
-            }
-        } else if D == -3 { 
-            let c = a + b;
-            if a.is_positive() && !b.is_negative() {         // a > 0, b ≧ 0     -> 1
-                Self::one()
-            } else if !a.is_positive() && c.is_positive() {  // a ≦ 0, a + b > 0 -> 1/ω   = 1 - ω
-                Self::new(I::one(), -I::one())
-            } else if !c.is_positive() && b.is_positive() {  // a + b ≦ 0, b > 0 -> 1/ω^2 = -ω
-                -Self::omega()
-            } else if a.is_negative() && !b.is_positive() {  // a < 0, b ≦ 0     -> 1/ω^3 = -1
-                -Self::one()
-            } else if !a.is_negative() && c.is_negative() {  // a ≧ 0, a + b < 0 -> 1/ω^4 = ω - 1
-                Self::new(-I::one(), I::one())
-            } else if !c.is_negative() && b.is_negative() {  // a + b ≧ 0, b < 0 -> 1/ω^5 = ω
-                Self::omega()
-            } else { 
-                Self::one()
-            }
-        } else { 
-            if a.is_negative() { 
-                -Self::one()
-            } else { 
-                Self::one()
+        match D { 
+            -1 => { 
+                if a.is_positive() && !b.is_negative() {         // a > 0, b ≧ 0 -> 1
+                    Self::one()
+                } else if !a.is_positive() && b.is_positive() {  // a ≦ 0, b > 0 -> -i
+                    -Self::omega()
+                } else if a.is_negative() && !b.is_positive() {  // a < 0, b ≦ 0 -> -1
+                    -Self::one()
+                } else if !a.is_negative() && b.is_negative() {  // a ≧ 0, b < 0 -> i
+                    Self::omega()
+                } else {                                         // a = b = 0    -> 1
+                    Self::one()
+                }
+            },
+            -3 => { 
+                let c = a + b;
+                if a.is_positive() && !b.is_negative() {         // a > 0, b ≧ 0     -> 1
+                    Self::one()
+                } else if !a.is_positive() && c.is_positive() {  // a ≦ 0, a + b > 0 -> 1/ω   = 1 - ω
+                    Self::new(I::one(), -I::one())
+                } else if !c.is_positive() && b.is_positive() {  // a + b ≦ 0, b > 0 -> 1/ω^2 = -ω
+                    -Self::omega()
+                } else if a.is_negative() && !b.is_positive() {  // a < 0, b ≦ 0     -> 1/ω^3 = -1
+                    -Self::one()
+                } else if !a.is_negative() && c.is_negative() {  // a ≧ 0, a + b < 0 -> 1/ω^4 = ω - 1
+                    Self::new(-I::one(), I::one())
+                } else if !c.is_negative() && b.is_negative() {  // a + b ≧ 0, b < 0 -> 1/ω^5 = ω
+                    Self::omega()
+                } else { 
+                    Self::one()
+                }
+            },
+            _ => {
+                if a.is_negative() { 
+                    -Self::one()
+                } else { 
+                    Self::one()
+                }
             }
         }
     }

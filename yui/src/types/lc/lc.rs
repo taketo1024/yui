@@ -37,9 +37,7 @@ where
     }
 
     pub fn as_gen(&self) -> Option<&X> { 
-        let Some((x, r)) = self.iter().next() else { 
-            return None 
-        };
+        let (x, r) = self.iter().next()?;
         if r.is_one() { 
             Some(x)
         } else { 

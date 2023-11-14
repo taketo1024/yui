@@ -126,7 +126,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     SpVec::from(x)
 }
 
-fn solve_triangular_into<R>(t: TriangularType, a: &SpMat<R>, diag: &Vec<&R>, b: &mut Vec<R>, x: &mut Vec<R>)
+fn solve_triangular_into<R>(t: TriangularType, a: &SpMat<R>, diag: &[&R], b: &mut [R], x: &mut [R])
 where R: Ring, for<'x> &'x R: RingOps<R> {
     debug_assert!(x.iter().all(|x_i| 
         x_i.is_zero())
@@ -193,7 +193,7 @@ where R: Clone + Zero + Send {
     )
 }
 
-fn copy_from<R>(x: &mut Vec<R>, v: CsVecView<R>)
+fn copy_from<R>(x: &mut [R], v: CsVecView<R>)
 where R: Clone { 
     for (i, r) in v.iter() { 
         x[i] = r.clone();

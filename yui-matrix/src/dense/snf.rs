@@ -76,7 +76,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
                 return i
             }
         }
-        return n
+        n
     }
 
     pub fn factors(&self) -> Vec<&R> { 
@@ -187,7 +187,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
         // eliminate row and col
         self.eliminate_at(i, i);
 
-        return true
+        true
     }
 
     fn row_nz(&self, i: usize) -> usize { 
@@ -200,38 +200,51 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
 
     fn swap_rows(&mut self, i: usize, j: usize) {
         self.target.swap_rows(i, j);
-        self.p.as_mut().map( |p| p.swap_rows(i, j) );
-        self.pinv.as_mut().map( |pinv| pinv.swap_cols(i, j) );
+        if let Some(p) = self.p.as_mut() { 
+            p.swap_rows(i, j) 
+        }
+        if let Some(pinv) = self.pinv.as_mut() { 
+            pinv.swap_cols(i, j) 
+        }
 
         trace!("swap-rows: ({i}, {j})\n{}", self.target);
     }
 
     fn swap_cols(&mut self, i: usize, j: usize) {
         self.target.swap_cols(i, j);
-        self.q.as_mut().map( |q| q.swap_cols(i, j) );
-        self.qinv.as_mut().map( |qinv| qinv.swap_rows(i, j) );
+        if let Some(q) = self.q.as_mut() { 
+            q.swap_cols(i, j) 
+        }
+        if let Some(qinv) = self.qinv.as_mut() { 
+            qinv.swap_rows(i, j) 
+        }
 
         trace!("swap-cols: ({i}, {j})\n{}", self.target);
     }
 
     fn mul_row(&mut self, i: usize, u: &R) {
         self.target.mul_row(i, u);
-        self.p.as_mut().map( |p| p.mul_row(i, u));
-        self.pinv.as_mut().map( |pinv| {
+        if let Some(p) = self.p.as_mut() { 
+            p.mul_row(i, u) 
+        }
+        
+        if let Some(pinv) = self.pinv.as_mut() {
             let Some(uinv) = &u.inv() else { panic!("`u` is not invertible.") };
             pinv.mul_col(i, uinv) 
-        });
+        }
 
         trace!("mul-row: {i} by {u})\n{}", self.target);
     }
     
     fn mul_col(&mut self, i: usize, u: &R) {
         self.target.mul_col(i, u);
-        self.q.as_mut().map( |q| q.mul_col(i, u) );
-        self.qinv.as_mut().map( |qinv| {
+        if let Some(q) = self.q.as_mut() { 
+            q.mul_col(i, u) 
+        }
+        if let Some(qinv) = self.qinv.as_mut() {
             let Some(uinv) = &u.inv() else { panic!("`u` is not invertible.") };
             qinv.mul_row(i, uinv) 
-        });
+        }
 
         trace!("mul-col: {i} by {u})\n{}", self.target);
     }
@@ -242,11 +255,13 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
         debug_assert!((a * d - b * c).is_one());
 
         self.target.left_elementary(comps, i, j);
-        self.p.as_mut().map( |p| p.left_elementary(comps, i, j) ); 
-        self.pinv.as_mut().map(|pinv| { 
+        if let Some(p) = self.p.as_mut() {
+            p.left_elementary(comps, i, j) 
+        } 
+        if let Some(pinv) = self.pinv.as_mut() { 
             let inv_t = [d, &-c, &-b, a];
             pinv.right_elementary(inv_t, i, j) 
-        }); 
+        }
 
         trace!("left-elem: [{a}, {b}; {c}, {d}] for rows ({i}, {j})).\n{}", self.target);
     }
@@ -257,11 +272,13 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
         debug_assert!((a * d - b * c).is_one());
         
         self.target.right_elementary(comps, i, j);
-        self.q.as_mut().map( |q| q.right_elementary(comps, i, j) ); 
-        self.qinv.as_mut().map(|qinv| { 
+        if let Some(q) = self.q.as_mut() { 
+            q.right_elementary(comps, i, j) 
+        } 
+        if let Some(qinv) = self.qinv.as_mut() { 
             let inv_t = [d, &-c, &-b, a];
             qinv.left_elementary(inv_t, i, j) 
-        }); 
+        }
 
         trace!("right-elem: [{a}, {b}; {c}, {d}] for cols ({i}, {j})).\n{}", self.target);
     }

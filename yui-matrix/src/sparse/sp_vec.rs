@@ -67,7 +67,7 @@ where R: Clone + Zero {
         ))
     }
 
-    pub fn permute<'b>(&self, p: PermView<'b>) -> SpVec<R> { 
+    pub fn permute(&self, p: PermView<'_>) -> SpVec<R> { 
         self.view().permute(p).to_owned()
     }
 
@@ -240,10 +240,7 @@ impl<'a, 'b, R> SpVecView<'a, 'b, R> {
         assert!(i0 <= i1 && i1 <= self.dim());
 
         SpVecView::new(self.target, i1 - i0, move |i| { 
-            let Some(i) = (self.trans)(i) else { 
-                return None
-            };
-
+            let i = (self.trans)(i)?;
             if range.contains(&i) {
                 Some(i - i0)
             } else { 

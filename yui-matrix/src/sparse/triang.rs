@@ -53,14 +53,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     info!("solve triangular: a = {:?}, y = {:?}", a.shape(), y.shape());
 
     let (n, k) = (a.rows(), y.cols());
-    let diag = collect_diag(t, &a);
+    let diag = collect_diag(t, a);
 
     let mut x = vec![R::zero(); n];
     let mut b = vec![R::zero(); n];    
 
     let entries = (0..k).fold(vec![], |mut entries, j| { 
         copy_from(&mut b, y.col_view(j));
-        solve_triangular_into(t, &a, &diag, &mut b, &mut x);
+        solve_triangular_into(t, a, &diag, &mut b, &mut x);
         move_into(&mut x, |i, x| entries.push((i, j, x)));
         entries
     });
@@ -75,7 +75,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     info!("solve triangular: a = {:?}, y = {:?} (multi-thread: {nth})", a.shape(), y.shape());
 
     let (n, k) = (a.rows(), y.cols());
-    let diag = collect_diag(t, &a);
+    let diag = collect_diag(t, a);
 
     let tl_x = Arc::new(ThreadLocal::new());
     let tl_b = Arc::new(ThreadLocal::new());
@@ -91,7 +91,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let b = b_st.deref_mut();
 
         copy_from(b, y.col_view(j));
-        solve_triangular_into(t, &a, &diag, b, x);
+        solve_triangular_into(t, a, &diag, b, x);
 
         if report { 
             incr_count(&count, k);
@@ -116,7 +116,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     let n = a.rows();
-    let diag = collect_diag(t, &a);
+    let diag = collect_diag(t, a);
 
     let mut x = vec![R::zero(); n];
     let mut b = b.to_dense().to_vec();
@@ -186,7 +186,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     )
 }
 
-fn init_tl_vec<'a, R>(tl: &'a ThreadLocal<RefCell<Vec<R>>>, n: usize) -> &'a RefCell<Vec<R>>
+fn init_tl_vec<R>(tl: &ThreadLocal<RefCell<Vec<R>>>, n: usize) -> &RefCell<Vec<R>>
 where R: Clone + Zero + Send {
     tl.get_or(|| 
         RefCell::new(vec![R::zero(); n])

@@ -22,14 +22,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     t_out: Option<SpMat<R>>, // [-ca⁻¹  1]
 }
 
-impl<'a, R> Schur<R>
+impl<R> Schur<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn from_partial_lower(a: &SpMat<R>, r: usize, with_trans: bool) -> Self {
         assert!(r <= a.rows());
         assert!(r <= a.cols());
 
         let orig_shape = a.shape();
-        let (compl, t_in, t_out) = Self::compute_from_partial_lower(&a, r, with_trans);
+        let (compl, t_in, t_out) = Self::compute_from_partial_lower(a, r, with_trans);
 
         Self { 
             orig_shape, 

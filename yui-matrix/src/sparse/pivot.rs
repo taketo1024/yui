@@ -448,7 +448,7 @@ struct RowWorker {
     queued: AHashSet<Col>
 }
 
-impl<'a> RowWorker {
+impl RowWorker {
     fn new(size: usize) -> Self { 
         let status = vec![0; size];
         let queue = VecDeque::new();
@@ -648,13 +648,13 @@ mod tests {
         let mut piv = PivotData::new(&a, PivotType::Rows);
 
         assert_eq!(piv.count(), 0);
-        assert_eq!(piv.has_col(0), false);
+        assert!(!piv.has_col(0));
         assert_eq!(piv.row_for(0), None);
 
         piv.set(1, 2);
 
         assert_eq!(piv.count(), 1);
-        assert_eq!(piv.has_col(2), true);
+        assert!(piv.has_col(2));
         assert_eq!(piv.row_for(2), Some(1));
     }
 

@@ -88,11 +88,11 @@ impl<R> SpMat<R> where R: Clone + Zero {
         self.view().permute(p, q).to_owned()
     }
 
-    pub fn permute_rows<'b>(&self, p: PermView<'b>) -> SpMat<R> { 
+    pub fn permute_rows(&self, p: PermView<'_>) -> SpMat<R> { 
         self.view().permute_rows(p).to_owned()
     }
     
-    pub fn permute_cols<'b>(&self, q: PermView<'b>) -> SpMat<R> { 
+    pub fn permute_cols(&self, q: PermView<'_>) -> SpMat<R> { 
         self.view().permute_cols(q).to_owned()
     }
 
@@ -355,10 +355,7 @@ impl<'a, 'b, R> SpMatView<'a, 'b, R> {
         assert!(j0 <= j1 && j1 <= self.cols());
 
         SpMatView::new(self.target, (i1 - i0, j1 - j0), move |i, j| { 
-            let Some((i, j)) = (self.trans)(i, j) else { 
-                return None
-            };
-
+            let (i, j) = (self.trans)(i, j)?;
             if rows.contains(&i) && cols.contains(&j) {
                 Some((i - i0, j - j0))
             } else { 

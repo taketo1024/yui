@@ -226,8 +226,12 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
             if i == j { break } 
 
             target.swap_rows(i, j);
-            p.as_mut().map(|p| p.swap_rows(i, j));
-            pinv.as_mut().map(|pinv| pinv.swap_cols(i, j));
+            if let Some(p) = p.as_mut() { 
+                p.swap_rows(i, j) 
+            }
+            if let Some(pinv) = pinv.as_mut() { 
+                pinv.swap_cols(i, j) 
+            }
         }
 
         (target, p, pinv)
@@ -352,8 +356,12 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 
         // b[k-1, ..] <--> b[k, ..]
         self.target.swap_rows(k - 1, k);
-        self.p.as_mut().map(|p| p.swap_rows(k-1, k));
-        self.pinv.as_mut().map(|pinv| pinv.swap_cols(k-1, k));
+        if let Some(p) = self.p.as_mut() { 
+            p.swap_rows(k-1, k) 
+        }
+        if let Some(pinv) = self.pinv.as_mut() { 
+            pinv.swap_cols(k-1, k) 
+        }
 
         //                   k 
         //      |                     |
@@ -407,11 +415,13 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         assert!(r.is_unit());
 
         self.target.mul_row(i, r);
-        self.p.as_mut().map(|p| p.mul_row(i, r));
+        if let Some(p) = self.p.as_mut() { 
+            p.mul_row(i, r) 
+        }
 
-        if self.pinv.is_some() { 
+        if let Some(pinv) = self.pinv.as_mut() { 
             let rinv = r.inv().unwrap();
-            self.pinv.as_mut().map(|pinv| pinv.mul_col(i, &rinv));
+            pinv.mul_col(i, &rinv) 
         }
 
         self.lambda.mul_row(i, r);
@@ -424,13 +434,14 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         assert!(i < k);
         
         self.target.add_row_to(i, k, r);
-        self.p.as_mut().map(|p| p.add_row_to(i, k, r));
-
-        if self.pinv.is_some() { 
-            let nr = -r;
-            self.pinv.as_mut().map(|pinv| pinv.add_col_to(k, i, &nr));
+        if let Some(p) = self.p.as_mut() { 
+            p.add_row_to(i, k, r) 
         }
 
+        if let Some(pinv) = self.pinv.as_mut() { 
+            let nr = -r;
+            pinv.add_col_to(k, i, &nr) 
+        }
 
         self.lambda[[k, i]] += r * &self.det[i];
 
@@ -499,7 +510,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         let c_i = &c.row(i);
         let d0 = &d[i - 1];
         
-        d[i] = &h_dot(&c_i, &c_i) / d0;
+        d[i] = &h_dot(c_i, c_i) / d0;
     }
 
     (c, l, d)
@@ -820,7 +831,7 @@ pub(super) mod tests {
     fn setup_gauss() { 
         type A = GaussInt<i64>;
 
-        let i = |a, b| A::new(a, b);
+        let i = A::new;
         let a = Mat::from(array![
             [i(-2, 3), i(7, 3), i(7, 3)],
             [i(3, 3), i(-2, 4), i(6, 2)],
@@ -845,7 +856,7 @@ pub(super) mod tests {
     #[test]
     fn swap_gauss() { 
         type A = GaussInt<i64>;
-        let i = |a, b| A::new(a, b);
+        let i = A::new;
         let a0 = Mat::from(array![
             [i(-2, 3), i(7, 3), i(7, 3)],
             [i(3, 3), i(-2, 4), i(6, 2)],
@@ -871,7 +882,7 @@ pub(super) mod tests {
     #[test]
     fn add_row_to_gauss() { 
         type A = GaussInt<i64>;
-        let i = |a, b| A::new(a, b);
+        let i = A::new;
         let a0 = Mat::from(array![
             [i(-2, 3), i(7, 3), i(7, 3)],
             [i(3, 3), i(-2, 4), i(6, 2)],
@@ -897,7 +908,7 @@ pub(super) mod tests {
     #[test]
     fn mul_row_gauss() { 
         type A = GaussInt<i64>;
-        let i = |a, b| A::new(a, b);
+        let i = A::new;
         let a0 = Mat::from(array![
             [i(-2, 3), i(7, 3), i(7, 3)],
             [i(3, 3), i(-2, 4), i(6, 2)],
@@ -924,7 +935,7 @@ pub(super) mod tests {
     #[test]
     fn hnf_gauss() { 
         type A = GaussInt<i64>;
-        let i = |a, b| A::new(a, b);
+        let i = A::new;
 
         let a: Mat<A> = Mat::from(array![
             [i(-2, 3), i(7, 3), i(7, 3)],
@@ -946,7 +957,7 @@ pub(super) mod tests {
     #[test]
     fn hnf_eisen() { 
         type A = EisenInt<i64>;
-        let i = |a, b| A::new(a, b);
+        let i = A::new;
 
         let a: Mat<A> = Mat::from(array![
             [i(-2, 3), i(7, 3), i(7, 3)],
@@ -996,7 +1007,7 @@ pub(super) mod tests {
 
             let mut j0 = 0;
             for i0 in 0..m {
-                let j1 = (0..n).filter(|&j| !b[[i0, j]].is_zero()).next().unwrap_or(n);
+                let j1 = (0..n).find(|&j| !b[[i0, j]].is_zero()).unwrap_or(n);
 
                 // assert: b[i0.., j0..j1] = 0
                 let s = s![i0..m, j0..j1];
@@ -1033,7 +1044,7 @@ pub(super) mod tests {
             let alpha = Ratio::from(R::alpha());
             let thr = Ratio::new(R::one(), R::from(2));
     
-            let size_reduced = l.iter().all(|r| &r.abs() <= &thr);
+            let size_reduced = l.iter().all(|r| r.abs() <= thr);
             let lovasz_ok = (1..m).all(|i| {
                 let c0 = &c.row(i - 1);
                 let c1 = &c.row(i);
@@ -1077,8 +1088,8 @@ pub(super) mod tests {
     
         fn proj_coeff<'a, R>(base: &ArrayView1<'a, R>, other: &ArrayView1<'a, R>) -> R
         where R: Ring + Div<Output = R>, for<'x> &'x R: RingOps<R> {
-            let p = dot(&base, &other);
-            let q = dot(&base, &base);
+            let p = dot(base, other);
+            let q = dot(base, base);
             p / q
         }
     

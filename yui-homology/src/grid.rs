@@ -52,10 +52,10 @@ impl<I, E> Grid<I, E>
 where I: Deg, E: Default { 
     pub fn generate<It, F>(support: It, mut e_map: F) -> Self
     where 
-        It: Iterator<Item = I>, 
+        It: IntoIterator<Item = I>, 
         F: FnMut(I) -> E
     {
-        let support = support.collect_vec();
+        let support = support.into_iter().collect_vec();
         let data = support.iter().map(|&i| (i, e_map(i))).collect();
         Self::new(support, data, E::default())
     }

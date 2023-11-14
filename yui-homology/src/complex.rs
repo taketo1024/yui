@@ -117,7 +117,7 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn generate<It, F>(support: It, d_deg: I, mut d_matrix_map: F) -> Self
     where 
-        It: Iterator<Item = I>, 
+        It: IntoIterator<Item = I>, 
         F: FnMut(I) -> SpMat<R>
     {
         let d_matrices = Grid::generate(support, |i| 

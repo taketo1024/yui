@@ -420,12 +420,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     }
 
     fn gcdx(x: &R, y: &R) -> (R, R, R) { 
-        let (mut d, mut s, mut t) = EucRing::gcdx(x, y);
-
-        let u = d.normalizing_unit();
-        if !u.is_one() {
-            (d, s, t) = (&d * &u, &s * &u, &t * &u);
-        }
+        let (d, s, t) = EucRing::gcdx(x, y);
 
         let a = x / &d;
         if a.is_unit() { 

@@ -51,10 +51,7 @@ impl Crossing {
     }
 
     pub fn is_resolved(&self) -> bool { 
-        match self.ctype { 
-            V | H => true,
-            _ => false
-        }
+        matches!(self.ctype, V | H)
     }
 
     pub fn resolve(&mut self, r: Bit) {

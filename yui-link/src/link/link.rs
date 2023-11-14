@@ -33,9 +33,7 @@ impl Link {
     pub fn from_pd_code<I>(pd_code: I) -> Self
     where I: IntoIterator<Item = [Edge; 4]> { 
         // TODO validate code
-        let data = pd_code.into_iter().map(|x| 
-            Crossing::from_pd_code(x)
-        ).collect();
+        let data = pd_code.into_iter().map(Crossing::from_pd_code).collect();
         Self::new(data)
     }
 
@@ -212,7 +210,7 @@ impl Link {
     }
 
     pub fn first_edge(&self) -> Option<Edge> { 
-        let Some(x) = self.data.first() else { return None };
+        let x = self.data.first()?;
         x.edges().iter().min().cloned()
     }
 

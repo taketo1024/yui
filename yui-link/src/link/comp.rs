@@ -33,7 +33,7 @@ impl LinkComp {
     }
 
     pub fn min_edge(&self) -> Edge { 
-        self.edges.iter().min().unwrap().clone()
+        *self.edges.iter().min().unwrap()
     }
 
     pub fn ends(&self) -> Option<(Edge, Edge)> { 
@@ -70,7 +70,7 @@ impl LinkComp {
                 vec![e0, e1]
             };
         } else if self.is_circle() && self.len() > 1 { 
-            let e0 = self.edges.iter().min().unwrap().clone();
+            let e0 = *self.edges.iter().min().unwrap();
             self.edges = vec![e0];
         }
     }
@@ -172,8 +172,8 @@ impl PartialEq for LinkComp {
             let Some(p) = other.edges.iter().position(|e| e == &self.edges[0]) else { 
                 return false
             };
-            (0 .. n).all(|i| &self.edges[i] == &other.edges[(p + i) % n]) || 
-            (0 .. n).all(|i| &self.edges[i] == &other.edges[(p + n - i) % n])
+            (0 .. n).all(|i| self.edges[i] == other.edges[(p + i) % n]) || 
+            (0 .. n).all(|i| self.edges[i] == other.edges[(p + n - i) % n])
         } else { 
             self.edges.iter().zip(other.edges.iter().rev()).all(|(e, f)| e == f)
         }
@@ -207,13 +207,13 @@ mod tests {
     fn is_connectable() { 
         let c = LinkComp::new(vec![1,2,3,4], false);
 
-        assert_eq!(c.is_connectable(&LinkComp::new(vec![4,5], false)), true);
-        assert_eq!(c.is_connectable(&LinkComp::new(vec![5,4], false)), true);
-        assert_eq!(c.is_connectable(&LinkComp::new(vec![1,5], false)), true);
-        assert_eq!(c.is_connectable(&LinkComp::new(vec![5,1], false)), true);
-        assert_eq!(c.is_connectable(&LinkComp::new(vec![5,6], false)), false);
-        assert_eq!(c.is_connectable(&LinkComp::new(vec![2,3], false)), false);
-        assert_eq!(c.is_connectable(&LinkComp::new(vec![0], true)), false);
+        assert!( c.is_connectable(&LinkComp::new(vec![4,5], false)));
+        assert!( c.is_connectable(&LinkComp::new(vec![5,4], false)));
+        assert!( c.is_connectable(&LinkComp::new(vec![1,5], false)));
+        assert!( c.is_connectable(&LinkComp::new(vec![5,1], false)));
+        assert!(!c.is_connectable(&LinkComp::new(vec![5,6], false)));
+        assert!(!c.is_connectable(&LinkComp::new(vec![2,3], false)));
+        assert!(!c.is_connectable(&LinkComp::new(vec![0],   true)));
     }
 
     #[test]

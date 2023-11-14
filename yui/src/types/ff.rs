@@ -9,7 +9,7 @@ use auto_impl_ops::auto_ops;
 
 use crate::{Elem, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, EucRingOps, AddMon, AddGrp, Mon, Ring, EucRing, Field};
 
-pub type I = i32;
+type I = i32;
 
 #[derive(Clone, Copy, PartialEq, Eq, Default, Display, DebugCustom)]
 #[display(fmt= "{}", _0)]

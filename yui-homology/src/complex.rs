@@ -104,6 +104,8 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 impl<I, R> ChainComplexBase<I, R> 
 where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(summands: Grid<I, ChainComplexSummand<R>>, d_deg: I, mut d_matrices: Grid<I, SpMat<R>>) -> Self { 
+        assert!(summands.iter().all(|(_, s)| s.is_free()));
+        
         for i in summands.support() { 
             let r = summands[i].rank();
             if r > 0 && !d_matrices.is_supported(i - d_deg) { 
@@ -131,6 +133,10 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         });
 
         Self::new(summands, d_deg, d_matrices)
+    }
+
+    pub fn summands(&self) -> &Grid<I, ChainComplexSummand<R>> { 
+        &self.summands
     }
 
     pub fn d_matrix_ref(&self, i: I) -> &SpMat<R> {

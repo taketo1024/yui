@@ -113,6 +113,18 @@ where I: Deg {
     }
 }
 
+impl<I, E> FromIterator<(I, E)> for Grid<I, E>
+where I: Deg, E: Default {
+    fn from_iter<T: IntoIterator<Item = (I, E)>>(iter: T) -> Self {
+        let (support, data) = iter.into_iter().fold((vec![], HashMap::new()), |(mut support, mut data), (i, e)| {
+            support.push(i);
+            data.insert(i, e);
+            (support, data)
+        });
+        Self::new(support, data, E::default())
+    }
+}
+
 macro_rules! impl_index {
     ($t:ident, $t2:ident, $t3:ident) => {
         impl<E> Index<($t, $t)> for Grid<$t2, E> {

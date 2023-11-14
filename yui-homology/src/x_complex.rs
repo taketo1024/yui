@@ -40,8 +40,14 @@ where
 {
     pub fn new<F>(summands: Grid<I, XChainComplexSummand<X, R>>, d_deg: I, d_map: F) -> Self
     where F: Fn(I, &LinComb<X, R>) -> LinComb<X, R> + Send + Sync + 'static {
+        assert!(summands.iter().all(|(_, s)| s.is_free()));
+
         let d_map = Arc::new(d_map);
         Self { summands, d_deg, d_map }
+    }
+
+    pub fn summands(&self) -> &Grid<I, XChainComplexSummand<X, R>> { 
+        &self.summands
     }
 
     fn d_matrix_for(&self, i: I, q: &SpMat<R>) -> SpMat<R> { 
@@ -185,7 +191,7 @@ pub(crate) mod tests {
     use yui::lc::Free;
     use yui_matrix::sparse::SpVec;
 
-    use crate::{RModStr, ChainComplex, Grid1, ChainComplexCommon};
+    use crate::{RModStr, ChainComplex, ChainComplexCommon};
 
     use super::*;
 
@@ -196,20 +202,21 @@ pub(crate) mod tests {
 
     impl From<ChainComplex<i64>> for XChainComplex<X, i64> {
         fn from(c: ChainComplex<i64>) -> Self {
-            let summands = Grid1::generate(c.support(), |i| { 
-                let n = c[i].rank();
-                let gens = (0..n).map(|j| e(j));
-                XModStr::free(gens)
-            });
-
-            Self::new(summands, c.d_deg(), move |i, z| {
-                let n = c[i].rank();
-                z.apply(|x| {
-                    let v = SpVec::unit(n, x.0 as usize);
-                    let dv = c.d(i, &v);
-                    dv.iter().map(|(i, a)| (e(i), a.clone())).collect()
-                })
-            })
+            Self::new(
+                c.summands().map(|_, s| {
+                    let n = s.rank();
+                    XModStr::free((0..n).map(|j| e(j)))
+                }), 
+                c.d_deg(), 
+                move |i, z| {
+                    let n = c[i].rank();
+                    z.apply(|x| {
+                        let v = SpVec::unit(n, x.0 as usize);
+                        let dv = c.d(i, &v);
+                        dv.iter().map(|(i, a)| (e(i), a.clone())).collect()
+                    })
+                }
+            )
         }
     }
 

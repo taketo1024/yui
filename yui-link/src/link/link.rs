@@ -277,17 +277,27 @@ impl Link {
 }
 
 impl Link { 
-    pub fn load(path: &str) -> Result<Link, Box<dyn std::error::Error>> {
+    pub fn load(name_or_path: &str) -> Result<Link, Box<dyn std::error::Error>> {
+        const RESOURCE_DIR: &str = "resources/links/";
+        
+        use regex::Regex;
+        let r1 = Regex::new(r"([1-9]|10)_[0-9]+").unwrap();
+        let r2 = Regex::new(r"(K|L)[1-9]+(a|n)[0-9]+").unwrap();
+
+        if r1.is_match(name_or_path) || r2.is_match(name_or_path) { 
+            let dir = std::env!("CARGO_MANIFEST_DIR");
+            let path = format!("{dir}/{RESOURCE_DIR}{name_or_path}.json");
+            Self::_load(&path)
+        } else { 
+            Self::_load(name_or_path)
+        }
+    }
+
+    fn _load(path: &str) -> Result<Link, Box<dyn std::error::Error>> {
         let json = std::fs::read_to_string(path)?;
         let data: Vec<[Edge; 4]> = serde_json::from_str(&json)?;
         let l = Link::from_pd_code(data);
         Ok(l)
-    }
-
-    pub fn load_resource(name: &str) -> Result<Link, Box<dyn std::error::Error>> {
-        let dir = std::env!("CARGO_MANIFEST_DIR");
-        let path = format!("{dir}/resources/links/{name}.json");
-        Self::load(&path)
     }
 
     pub fn unknot() -> Link { 
@@ -525,5 +535,14 @@ mod tests {
         assert_eq!(l.crossing_num(), 4);
         assert_eq!(l.writhe(), 4);
         assert_eq!(l.components().len(), 2);
+    }
+
+    #[test]
+    fn load() { 
+        let l = Link::load("3_1");
+        assert!(l.is_ok());
+
+        let l = l.unwrap();
+        assert_eq!(l.crossing_num(), 3);
     }
 }

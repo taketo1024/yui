@@ -24,25 +24,37 @@ where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 { 
-    pub fn new(data: AHashMap<X, R>) -> Self {
+    fn new(data: AHashMap<X, R>) -> Self {
+        debug_assert!(data.values().all(|r| !r.is_zero()));
         Self { data, r_zero: R::zero() }
     }
 
-    pub fn ngens(&self) -> usize {
+    fn clean(&mut self) { 
+        self.data.retain(|_, r| !r.is_zero());
+    }
+
+    pub fn nterms(&self) -> usize {
         self.data.len()
+    }
+
+    pub fn any_term(&self) -> Option<(&X, &R)> { 
+        self.iter().next()
     }
 
     pub fn gens(&self) -> impl Iterator<Item = &X> {
         self.data.keys()
     }
 
-    pub fn as_gen(&self) -> Option<&X> { 
-        let (x, r) = self.iter().next()?;
-        if r.is_one() { 
-            Some(x)
-        } else { 
-            None
+    pub fn is_gen(&self) -> bool { 
+        self.nterms() == 1 && 
+        self.iter().next().unwrap().1.is_one()
+    }
+
+    pub fn as_gen(&self) -> Option<X> { 
+        if !self.is_gen() { 
+            None?
         }
+        self.iter().next().map(|(x, _)| x.clone())
     }
 
     pub fn coeff(&self, x: &X) -> &R { 
@@ -51,16 +63,6 @@ where
 
     pub fn iter(&self) -> impl Iterator<Item = (&X, &R)> {
         self.data.iter()
-    }
-
-    pub fn reduce(&mut self) { 
-        self.data.retain(|_, r| !r.is_zero());
-    }
-
-    pub fn reduced(&self) -> Self { 
-        let mut copy = self.clone();
-        copy.reduce();
-        copy
     }
 
     pub fn map<Y, S, F>(&self, f: F) -> LinComb<Y, S>
@@ -126,13 +128,7 @@ where
 
     pub fn into_filter_gens<F>(self, f: F) -> Self
     where F: Fn(&X) -> bool { 
-        self.into_iter().filter_map(|(x, a)| 
-            if f(&x) { 
-                Some((x, a))
-            } else { 
-                None
-            }
-        ).collect()
+        self.into_iter().filter(|(x, _)| f(&x)).collect()
     }
 
     pub fn apply<F>(&self, f: F) -> Self 
@@ -211,12 +207,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn from(value: (X, R)) -> Self {
-        let (x, r) = value;
-        let mut map = AHashMap::new();
-        if !r.is_zero() { 
-            map.insert(x, r);
-        }
-        Self::new(map)
+        Self::from_iter([value])
     }
 }
 
@@ -226,18 +217,11 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn from_iter<T: IntoIterator<Item = (X, R)>>(iter: T) -> Self {
-        let mut data = AHashMap::<X, R>::new();
-        for (x, r) in iter.into_iter() { 
-            if r.is_zero() { continue }
-            if let Some(val) = data.get_mut(&x) { 
-                val.add_assign(r);
-            } else { 
-                data.insert(x, r);
-            }
+        let mut res = Self::zero();
+        for e in iter.into_iter() { 
+            res.add_pair(e);
         }
-
-        let mut res = Self::new(data);
-        res.reduce();
+        res.clean();
         res
     }
 }
@@ -285,7 +269,7 @@ where
     }
 
     fn is_zero(&self) -> bool {
-        self.data.values().all(|r| r.is_zero())
+        self.data.is_empty()
     }
 }
 
@@ -313,45 +297,35 @@ where
     }
 }
 
-impl<X, R> AddAssign<(X, R)> for LinComb<X, R>
+impl<X, R> LinComb<X, R>
 where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    fn add_assign(&mut self, rhs: (X, R)) {
-        if rhs.1.is_zero() { return }
-
-        let data = &mut self.data;
+    // must clean after call
+    fn add_pair(&mut self, rhs: (X, R)) { 
         let (x, r) = rhs;
-        if data.contains_key(&x) { 
-            let v = data.get_mut(&x).unwrap();
+        if r.is_zero() { return }
+
+        if self.data.contains_key(&x) { 
+            let v = self.data.get_mut(&x).unwrap();
             v.add_assign(r);
         } else { 
-            data.insert(x, r);
+            self.data.insert(x, r);
         }
-        
-        // no reduce here
-    }
-}
+    } 
 
-impl<X, R> AddAssign<(&X, &R)> for LinComb<X, R>
-where
-    X: Gen,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    fn add_assign(&mut self, rhs: (&X, &R)) {
-        if rhs.1.is_zero() { return }
-
-        let data = &mut self.data;
+    // must clean after call
+    fn add_pair_ref(&mut self, rhs: (&X, &R)) { 
         let (x, r) = rhs;
-        if data.contains_key(x) { 
-            let v = data.get_mut(x).unwrap();
+        if r.is_zero() { return }
+
+        if self.data.contains_key(x) { 
+            let v = self.data.get_mut(x).unwrap();
             v.add_assign(r);
         } else { 
-            data.insert(x.clone(), r.clone());
+            self.data.insert(x.clone(), r.clone());
         }
-        
-        // no reduce here
     }
 }
 
@@ -363,9 +337,9 @@ where
 {
     fn add_assign(&mut self, rhs: &Self) {
         for e in rhs.data.iter() { 
-            self.add_assign(e);
+            self.add_pair_ref(e);
         }
-        self.reduce()
+        self.clean()
     }
 }
 
@@ -377,10 +351,9 @@ where
 {
     fn sub_assign(&mut self, rhs: &Self) {
         for e in rhs.data.iter() { 
-            let e = (e.0, &-e.1);
-            self.add_assign(e);
+            self.add_pair_ref((e.0, &-e.1));
         }
-        self.reduce()
+        self.clean()
     }
 }
 
@@ -393,7 +366,7 @@ where
     fn mul_assign(&mut self, rhs: &R) {
         let data = std::mem::take(&mut self.data);
         self.data = data.into_iter().map(|(x, r)| (x, &r * rhs)).collect();
-        self.reduce()
+        self.clean()
     }
 }
 
@@ -407,17 +380,17 @@ where
 
     fn mul(self, rhs: Self) -> Self::Output {
         let mut res = Self::Output::zero();
-        res.data.reserve(self.ngens() * rhs.ngens());
+        res.data.reserve(self.nterms() * rhs.nterms());
 
-        for (x, r) in self.iter().filter(|(_, r)| !r.is_zero()) { 
-            for (y, s) in rhs.iter().filter(|(_, r)| !r.is_zero()) { 
+        for (x, r) in self.iter() { 
+            for (y, s) in rhs.iter() { 
                 let xy = x.clone() * y.clone();
                 let rs = r * s;
-                res += (xy, rs);
+                res.add_pair((xy, rs));
             }
         }
         
-        res.reduce();
+        res.clean();
         res
     }
 }
@@ -571,6 +544,34 @@ mod tests {
     }
 
     #[test]
+    fn from_iter() { 
+        type L = LinComb<X, i32>;
+        let z = L::from_iter([(e(0), 1), (e(1), 0), (e(2), 2)]);
+
+        assert!(!z.is_zero());
+        assert_eq!(z.nterms(), 2);
+        assert_eq!(z.coeff(&e(0)), &1);
+        assert_eq!(z.coeff(&e(2)), &2);
+    }
+
+    #[test]
+    fn into_gen() { 
+        type L = LinComb<X, i32>;
+        let z = L::from(e(0));
+
+        assert!(z.is_gen());
+        assert_eq!(z.as_gen(), Some(e(0)));
+
+        let z = L::from((e(0), 2));
+        assert!(!z.is_gen());
+        assert_eq!(z.as_gen(), None);
+
+        let z = L::from_iter([(e(0), 1), (e(1), 1)]);
+        assert!(!z.is_gen());
+        assert_eq!(z.as_gen(), None);
+    }
+
+    #[test]
     fn eq() { 
         type L = LinComb<X, i32>;
         let z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
@@ -588,21 +589,26 @@ mod tests {
 
         assert!(z.data.is_empty());
         assert!(z.is_zero());
+
+        let z = L::new(map!{ e(1) => 1 });
+
+        assert!(!z.data.is_empty());
+        assert!(!z.is_zero());
     }
 
     #[test]
-    fn reduce() { 
+    fn clean() { 
         type L = LinComb<X, i32>;
 
         let data = map!{ e(1) => 1, e(2) => 0, e(3) => 0 };
-        let mut z = L::new(data);
+        let mut z: L = LinComb { data, r_zero: 0 };
         
-        assert_eq!(z.ngens(), 3);
+        assert_eq!(z.nterms(), 3);
 
-        z.reduce();
+        z.clean();
 
         assert_eq!(z, L::new(map!{ e(1) => 1 }));
-        assert_eq!(z.ngens(), 1);
+        assert_eq!(z.nterms(), 1);
     }
 
     #[test]
@@ -800,7 +806,7 @@ mod tests {
     #[test]
     fn filter_gens() { 
         type L = LinComb<X, i32>;
-        let z = L::new( (0..10).map(|i| (e(i), i * 10)).collect() );
+        let z = L::new( (1..10).map(|i| (e(i), i * 10)).collect() );
         let w = z.filter_gens(|x| x.0 % 3 == 0 );
         assert_eq!(w, L::new(map!{ e(3) => 30, e(6) => 60, e(9) => 90}))
     }

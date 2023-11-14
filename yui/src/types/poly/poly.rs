@@ -2,6 +2,7 @@ use std::fmt::{Display, Debug};
 use std::iter::{Sum, Product};
 use std::ops::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Neg, DivAssign, RemAssign, Div, Rem};
 use std::str::FromStr;
+use delegate::delegate;
 use num_traits::{Zero, One, Pow};
 use auto_impl_ops::auto_ops;
 
@@ -64,40 +65,23 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
         &self.data
     }
 
-    pub fn ngens(&self) -> usize { 
-        self.data.ngens()
-    }
-
-    pub fn coeff(&self, x: &X) -> &R {
-        self.data.coeff(x)
+    delegate! { 
+        to self.data {
+            pub fn nterms(&self) -> usize;
+            pub fn any_term(&self) -> Option<(&X, &R)>;
+            #[call(is_gen)] pub fn is_mono(&self) -> bool;
+            #[call(as_gen)] pub fn as_mono(&self) -> Option<X>;
+            pub fn coeff(&self, x: &X) -> &R;
+            pub fn iter(&self) -> impl Iterator<Item = (&X, &R)>;
+        }
     }
 
     pub fn coeff_for(&self, i: X::Deg) -> &R {
         self.data.coeff(&X::from(i))
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&X, &R)> {
-        self.data.iter()
-    }
-
-    pub fn reduce(&mut self) { 
-        self.data.reduce()
-    }
-
-    pub fn reduced(&self) -> Self { 
-        Self::from(self.data.reduced())
-    }
-
     pub fn is_const(&self) -> bool { 
-        self.iter().all(|(i, r)| 
-            i.is_one() || !i.is_one() && r.is_zero()
-        )
-    }
-
-    pub fn is_mono(&self) -> bool { 
-        self.iter().filter(|(_, r)| 
-            !r.is_zero()
-        ).count() <= 1
+        self.iter().all(|(x, _)| x.is_one())
     }
 
     pub fn const_term(&self) -> &R { 
@@ -106,7 +90,6 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn lead_term(&self) -> (&X, &R) { 
         self.iter()
-            .filter(|(_, r)| !r.is_zero())
             .max_by_key(|(i, _)| *i)
             .unwrap_or((&self.zero.0, &self.zero.1))
     }
@@ -191,7 +174,7 @@ macro_rules! impl_polyn_funcs {
         where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn lead_term_for(&self, k: usize) -> Option<(&MultiVar<X, $I>, &R)> { 
                 self.iter()
-                    .filter(|(x, r)| !r.is_zero() && x.deg_for(k) > 0)
+                    .filter(|(x, _)| x.deg_for(k) > 0)
                     .max_by(|(x, _), (y, _)|
                         Ord::cmp(
                             &x.deg_for(k), &y.deg_for(k)
@@ -297,7 +280,7 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn is_zero(&self) -> bool {
-        self.is_const() && self.const_term().is_zero()
+        self.data.is_zero()
     }
 }
 
@@ -486,21 +469,19 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {}
 impl<X, R> Ring for PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     fn inv(&self) -> Option<Self> {
-        if !self.is_mono() { 
+        if self.nterms() != 1 { 
             return None
         }
 
-        let (x, a) = self.lead_term(); // (a x^i)^{-1} = a^{-1} x^{-i}
-        if let (Some(xinv), Some(ainv)) = (x.inv(), a.inv()) { 
-            Some(Self::from((xinv, ainv)))
-        } else { 
-            None
-        }
+        let (x, a) = self.any_term()?; // (a x^i)^{-1} = a^{-1} x^{-i}
+        let (xinv, ainv) = (x.inv()?, a.inv()?);
+        let inv = Self::from((xinv, ainv));
+        Some(inv)
     }
 
     fn is_unit(&self) -> bool {
-        if self.is_mono() { 
-            let (x, a) = self.lead_term();
+        if self.nterms() == 1 { 
+            let (x, a) = self.any_term().unwrap();
             x.is_unit() && a.is_unit()
         } else { 
             false
@@ -547,8 +528,6 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
             r = r1;
         }
 
-        r.reduce();
-
         (q, r)
     }
 }
@@ -585,7 +564,6 @@ where R: Field, for<'x> &'x R: FieldOps<R> {}
 #[cfg(test)]
 mod tests {
     use crate::Ratio;
-    use crate::macros::map;
     use super::*;
 
     #[test]
@@ -654,36 +632,12 @@ mod tests {
     }
 
     #[test]
-    fn reduce() { 
-        type P = Poly::<'x', i32>;
-
-        let x = P::mono;
-        let data = map!{
-            x(0) => 0, 
-            x(1) => 1, 
-            x(2) => 0 
-        };
-        let f = P::from(LinComb::new(data));
-        assert_eq!(f.ngens(), 3);
-
-        let f = f.reduced();
-        assert_eq!(f.ngens(), 1);
-    }
-
-    #[test]
     fn zero() {
         type P = Poly::<'x', i32>;
 
-        let zero = P::zero();
-        assert_eq!(zero, P::from_iter([]));
-
-        let x = P::mono;
-        let data = map!{
-            x(0) => 0 
-        };
-        let f = P::from(LinComb::new(data));
-
-        assert!(f.is_zero());
+        let z = P::zero();
+        assert_eq!(z, P::from_iter([]));
+        assert!(z.is_zero());
     }
 
     #[test]

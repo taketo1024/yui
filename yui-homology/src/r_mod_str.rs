@@ -13,7 +13,7 @@ where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
     type R;
 
     fn rank(&self) -> usize;
-    fn tors(&self) -> &Vec<Self::R>;
+    fn tors(&self) -> &[Self::R];
 
     fn dim(&self) -> usize { // not a good name...
         self.rank() + self.tors().len()
@@ -139,7 +139,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.rank
     }
 
-    fn tors(&self) -> &Vec<Self::R> {
+    fn tors(&self) -> &[R] {
         &self.tors
     }
 }

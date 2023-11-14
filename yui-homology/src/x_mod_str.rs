@@ -127,7 +127,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     delegate! { 
         to self.inner { 
             fn rank(&self) -> usize;
-            fn tors(&self) -> &Vec<Self::R>;
+            fn tors(&self) -> &[R];
         }
     }
 }

@@ -22,6 +22,10 @@ where E: Eq + Hash {
         self.data.len()
     }
 
+    pub fn is_empty(&self) -> bool { 
+        self.data.is_empty()
+    }
+
     pub fn contains(&self, x: &E) -> bool { 
         self.data.contains_right(x)
     }

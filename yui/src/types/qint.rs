@@ -124,7 +124,7 @@ where I: Integer + FromStr, for<'x> &'x I: IntOps<I> {
 fn parse_tuple<I, J>(s: &str) -> Result<(I, J), ()>
 where I: FromStr, J: FromStr {
     let r = regex::Regex::new(r"\((.+)?,\s*(.+)?\)").unwrap();
-    if let Some(c) = r.captures(&s) { 
+    if let Some(c) = r.captures(s) { 
         let (s1, s2) = (&c[1], &c[2]);
         if let (Ok(a), Ok(b)) = (s1.parse::<I>(), s2.parse::<J>()) {
             return Ok((a, b))
@@ -557,8 +557,8 @@ mod tests {
 
         let a = A::new(0, 0);
         let b = A::new(0, 1);
-        assert_eq!(a.is_zero(), true);
-        assert_eq!(b.is_zero(), false);
+        assert!(a.is_zero());
+        assert!(!b.is_zero());
     }
 
     #[test]
@@ -574,9 +574,9 @@ mod tests {
         let b = A::new(0, 1);
         let c = A::new(1, 1);
 
-        assert_eq!(a.is_one(), true);
-        assert_eq!(b.is_one(), false);
-        assert_eq!(c.is_one(), false);
+        assert!(a.is_one());
+        assert!(!b.is_one());
+        assert!(!c.is_one());
     }
 
     #[test]
@@ -653,23 +653,23 @@ mod tests {
     #[test]
     fn unit_gauss() { 
         type A = QuadInt<i32, -1>; // GaussInt
-        assert_eq!(A::new(1,  0).is_unit(), true);
-        assert_eq!(A::new(0,  1).is_unit(), true);
-        assert_eq!(A::new(-1, 0).is_unit(), true);
-        assert_eq!(A::new(0, -1).is_unit(), true);
-        assert_eq!(A::new(1,  1).is_unit(), false);
+        assert!(A::new(1,  0).is_unit());
+        assert!(A::new(0,  1).is_unit());
+        assert!(A::new(-1, 0).is_unit());
+        assert!(A::new(0, -1).is_unit());
+        assert!(!A::new(1,  1).is_unit());
     }
 
     #[test]
     fn unit_eisen() { 
         type A = QuadInt<i32, -3>; // EisenInt
-        assert_eq!(A::new(1,  0).is_unit(), true);
-        assert_eq!(A::new(0,  1).is_unit(), true);
-        assert_eq!(A::new(-1, 1).is_unit(), true);
-        assert_eq!(A::new(-1, 0).is_unit(), true);
-        assert_eq!(A::new(0, -1).is_unit(), true);
-        assert_eq!(A::new(1, -1).is_unit(), true);
-        assert_eq!(A::new(1,  1).is_unit(), false);
+        assert!(A::new(1,  0).is_unit());
+        assert!(A::new(0,  1).is_unit());
+        assert!(A::new(-1, 1).is_unit());
+        assert!(A::new(-1, 0).is_unit());
+        assert!(A::new(0, -1).is_unit());
+        assert!(A::new(1, -1).is_unit());
+        assert!(!A::new(1,  1).is_unit());
     }
 
     #[test]

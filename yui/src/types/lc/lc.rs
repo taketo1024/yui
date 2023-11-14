@@ -28,11 +28,11 @@ where
         Self { data, r_zero: R::zero() }
     }
 
-    pub fn len(&self) -> usize {
+    pub fn ngens(&self) -> usize {
         self.data.len()
     }
 
-    pub fn keys(&self) -> impl Iterator<Item = &X> {
+    pub fn gens(&self) -> impl Iterator<Item = &X> {
         self.data.keys()
     }
 
@@ -53,10 +53,6 @@ where
 
     pub fn iter(&self) -> impl Iterator<Item = (&X, &R)> {
         self.data.iter()
-    }
-
-    pub fn into_iter(self) -> impl Iterator<Item = (X, R)> {
-        self.data.into_iter()
     }
 
     pub fn reduce(&mut self) { 
@@ -182,8 +178,8 @@ where
             let r = r.to_string();
             let x = x.to_string();
 
-            let (op, r) = if r.starts_with("-") { 
-                ("-", &r[1..]) 
+            let (op, r) = if let Some(r) = r.strip_prefix('-') { 
+                ("-", r) 
             } else { 
                 ("+", r.as_str())
             };
@@ -245,6 +241,19 @@ where
         let mut res = Self::new(data);
         res.reduce();
         res
+    }
+}
+
+impl<X, R> IntoIterator for LinComb<X, R>
+where
+    X: Gen,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{
+    type Item = (X, R);
+    type IntoIter = std::collections::hash_map::IntoIter<X, R>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.data.into_iter()
     }
 }
 
@@ -400,7 +409,7 @@ where
 
     fn mul(self, rhs: Self) -> Self::Output {
         let mut res = Self::Output::zero();
-        res.data.reserve(self.len() * rhs.len());
+        res.data.reserve(self.ngens() * rhs.ngens());
 
         for (x, r) in self.iter().filter(|(_, r)| !r.is_zero()) { 
             for (y, s) in rhs.iter().filter(|(_, r)| !r.is_zero()) { 
@@ -590,12 +599,12 @@ mod tests {
         let data = map!{ e(1) => 1, e(2) => 0, e(3) => 0 };
         let mut z = L::new(data);
         
-        assert_eq!(z.len(), 3);
+        assert_eq!(z.ngens(), 3);
 
         z.reduce();
 
         assert_eq!(z, L::new(map!{ e(1) => 1 }));
-        assert_eq!(z.len(), 1);
+        assert_eq!(z.ngens(), 1);
     }
 
     #[test]
@@ -729,7 +738,7 @@ mod tests {
         type L = LinComb<X, i32>;
         let z = L::new(map!{ e(1) => 1, e(2) => 2 });
         let r = 2;
-        let w = &z * &r;
+        let w = z * r;
 
         assert_eq!(w, L::new(map!{ e(1) => 2, e(2) => 4 }));
     }

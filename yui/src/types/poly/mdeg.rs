@@ -32,6 +32,7 @@ impl<I> MultiDeg<I> {
     delegate! { 
         to self.data { 
             pub fn len(&self) -> usize;
+            pub fn is_empty(&self) -> bool;
             pub fn iter(&self) -> impl Iterator<Item = (&usize, &I)>;
         }
     }
@@ -122,7 +123,7 @@ where for<'x> I: AddAssign<&'x I> + Zero + Clone {
             if let Some(d_i) = data.get_mut(i) { 
                 d_i.add_assign(d);
             } else { 
-                data.insert(i.clone(), d.clone());
+                data.insert(*i, d.clone());
             }
         }
         self.reduce()
@@ -136,7 +137,7 @@ where for<'x> I: SubAssign<&'x I> + Zero + Clone {
         let data = &mut self.data;
         for (i, d) in rhs.iter() { 
             if !data.contains_key(i) {
-                data.insert(i.clone(), I::zero());
+                data.insert(*i, I::zero());
             }
             let d_i = data.get_mut(i).unwrap();
             d_i.sub_assign(d);

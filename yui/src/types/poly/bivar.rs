@@ -245,7 +245,7 @@ mod tests {
     #[test]
     fn from_str() { 
         type M = BiVar<'X','Y',usize>;
-        let xy = |i, j| BiVar::<'X','Y',usize>(i, j);
+        let xy = BiVar::<'X','Y',usize>;
         
         assert_eq!(M::from_str("1"), Ok(M::one()));
         assert_eq!(M::from_str("X"), Ok(xy(1, 0)));

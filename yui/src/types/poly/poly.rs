@@ -64,8 +64,8 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
         &self.data
     }
 
-    pub fn len(&self) -> usize { 
-        self.data.len()
+    pub fn ngens(&self) -> usize { 
+        self.data.ngens()
     }
 
     pub fn coeff(&self, x: &X) -> &R {
@@ -78,10 +78,6 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn iter(&self) -> impl Iterator<Item = (&X, &R)> {
         self.data.iter()
-    }
-
-    pub fn into_iter(self) -> impl Iterator<Item = (X, R)> {
-        self.data.into_iter()
     }
 
     pub fn reduce(&mut self) { 
@@ -267,6 +263,16 @@ where X: Mono + FromStr, R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
             // TODO support more complex format.
             Err(())
         }
+    }
+}
+
+impl<X, R> IntoIterator for PolyBase<X, R>
+where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
+    type Item = (X, R);
+    type IntoIter = std::collections::hash_map::IntoIter<X, R>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.data.into_iter()
     }
 }
 
@@ -616,7 +622,7 @@ mod tests {
     fn display_poly2() { 
         type P = Poly2::<'x', 'y', i32>; 
 
-        let xy = |i, j| P::mono(i, j);
+        let xy = P::mono;
         let f = P::from_iter([(xy(0, 0), 3), (xy(1, 0), 2), (xy(2, 3), 3)]);
         assert_eq!(&f.to_string(), "3x²y³ + 2x + 3");
     }
@@ -625,7 +631,7 @@ mod tests {
     fn display_mpoly() { 
         type P = PolyN::<'x', i32>; 
 
-        let xn = |i| P::mono(i);
+        let xn = P::mono;
         let f = P::from_iter([
             (xn([0,0,0]),  3),
             (xn([1,0,0]), -1),
@@ -638,7 +644,7 @@ mod tests {
     fn display_mlpoly() { 
         type P = LPolyN::<'x', i32>; 
 
-        let xn = |i| P::mono(i);
+        let xn = P::mono;
         let f = P::from_iter([
             (xn([ 0,0,0]), 3),
             (xn([ 1,0,0]), 1),
@@ -658,10 +664,10 @@ mod tests {
             x(2) => 0 
         };
         let f = P::from(LinComb::new(data));
-        assert_eq!(f.len(), 3);
+        assert_eq!(f.ngens(), 3);
 
         let f = f.reduced();
-        assert_eq!(f.len(), 1);
+        assert_eq!(f.ngens(), 1);
     }
 
     #[test]
@@ -702,7 +708,7 @@ mod tests {
     fn variable_bivar() {
         type P = Poly2::<'x', 'y', i32>;
 
-        let xy = |i, j| P::mono(i, j);
+        let xy = P::mono;
         let p = P::variable(0);
         let q = P::variable(1);
         assert_eq!(p, P::from_iter([(xy(1, 0), 1)]));
@@ -713,7 +719,7 @@ mod tests {
     fn variable_mvar() {
         type P = PolyN::<'x', i32>;
 
-        let xn = |i| P::mono(i);
+        let xn = P::mono;
         let p = P::variable(0);
         let q = P::variable(1);
         assert_eq!(p, P::from_iter([(xn([1, 0]), 1)]));
@@ -846,23 +852,23 @@ mod tests {
 
         let x = P::mono;
         let f = P::from_const(1);
-        assert_eq!(f.is_unit(), true);
+        assert!(f.is_unit());
         assert_eq!(f.inv(), Some(P::from_const(1)));
 
         let f = P::from_const(0);
-        assert_eq!(f.is_unit(), false);
+        assert!(!f.is_unit());
         assert_eq!(f.inv(), None);
 
         let f = P::from_const(2);
-        assert_eq!(f.is_unit(), false);
+        assert!(!f.is_unit());
         assert_eq!(f.inv(), None);
 
         let f = P::variable();
-        assert_eq!(f.is_unit(), false);
+        assert!(!f.is_unit());
         assert_eq!(f.inv(), None);
 
         let f = P::from_iter([(x(0), 1), (x(1), 1)]);
-        assert_eq!(f.is_unit(), false);
+        assert!(!f.is_unit());
         assert_eq!(f.inv(), None);
     }
 
@@ -874,23 +880,23 @@ mod tests {
         let x = P::mono;
         let f = P::from_const(R::from_numer(1));
 
-        assert_eq!(f.is_unit(), true);
+        assert!(f.is_unit());
         assert_eq!(f.inv(), Some(P::from_const(R::from_numer(1))));
 
         let f = P::from_const(R::zero());
-        assert_eq!(f.is_unit(), false);
+        assert!(!f.is_unit());
         assert_eq!(f.inv(), None);
 
         let f = P::from_const(R::from_numer(2));
-        assert_eq!(f.is_unit(), true);
+        assert!(f.is_unit());
         assert_eq!(f.inv(), Some(P::from_const(R::new(1, 2))));
 
         let f = P::variable();
-        assert_eq!(f.is_unit(), false);
+        assert!(!f.is_unit());
         assert_eq!(f.inv(), None);
 
         let f = P::from_iter([(x(0), R::one()), (x(1), R::one())]);
-        assert_eq!(f.is_unit(), false);
+        assert!(!f.is_unit());
         assert_eq!(f.inv(), None);
     }
 
@@ -900,27 +906,27 @@ mod tests {
 
         let x = P::mono;
         let f = P::from_const(1);
-        assert_eq!(f.is_unit(), true);
+        assert!(f.is_unit());
         assert_eq!(f.inv(), Some(P::from_const(1)));
 
         let f = P::from_const(0);
-        assert_eq!(f.is_unit(), false);
+        assert!(!f.is_unit());
         assert_eq!(f.inv(), None);
 
         let f = P::from_const(2);
-        assert_eq!(f.is_unit(), false);
+        assert!(!f.is_unit());
         assert_eq!(f.inv(), None);
 
         let f = P::variable();
-        assert_eq!(f.is_unit(), true);
+        assert!(f.is_unit());
         assert_eq!(f.inv(), Some(P::from((x(-1), 1))));
 
         let f = P::from((x(1), 2));
-        assert_eq!(f.is_unit(), false);
+        assert!(!f.is_unit());
         assert_eq!(f.inv(), None);
 
         let f = P::from_iter([(x(0), 1), (x(1), 1)]);
-        assert_eq!(f.is_unit(), false);
+        assert!(!f.is_unit());
         assert_eq!(f.inv(), None);
     }
 
@@ -931,27 +937,27 @@ mod tests {
 
         let x = P::mono;
         let f = P::from_const(R::from_numer(1));
-        assert_eq!(f.is_unit(), true);
+        assert!(f.is_unit());
         assert_eq!(f.inv(), Some(P::from_const(R::from_numer(1))));
 
         let f = P::from_const(R::zero());
-        assert_eq!(f.is_unit(), false);
+        assert!(!f.is_unit());
         assert_eq!(f.inv(), None);
 
         let f = P::from_const(R::from_numer(2));
-        assert_eq!(f.is_unit(), true);
+        assert!(f.is_unit());
         assert_eq!(f.inv(), Some(P::from_const(R::new(1, 2))));
 
         let f = P::variable();
-        assert_eq!(f.is_unit(), true);
+        assert!(f.is_unit());
         assert_eq!(f.inv(), Some(P::from((x(-1), R::one()))));
 
         let f = P::from((x(1), R::from_numer(2)));
-        assert_eq!(f.is_unit(), true);
+        assert!(f.is_unit());
         assert_eq!(f.inv(), Some(P::from((x(-1), R::new(1, 2)))));
 
         let f = P::from_iter([(x(0), R::one()), (x(1), R::one())]);
-        assert_eq!(f.is_unit(), false);
+        assert!(!f.is_unit());
         assert_eq!(f.inv(), None);
     }
 
@@ -989,7 +995,7 @@ mod tests {
     fn eval_bivar() { 
         type P = Poly2::<'x', 'y', i32>;
 
-        let xy = |i, j| P::mono(i, j);
+        let xy = P::mono;
         let p = P::from_iter([(xy(0,0),3), (xy(1,0),2), (xy(0,1),-1), (xy(1,1),4)]);
         let v = p.eval(&2, &3); // 3 + 2(2) - 1(3) + 4(2*3)
         assert_eq!(v, 28);
@@ -999,7 +1005,7 @@ mod tests {
     fn lead_term_for() {
         type P = PolyN::<'x', i32>;
 
-        let xn = |i| P::mono(i);
+        let xn = P::mono;
         let f = P::from_iter([
             (xn([1,2,3]), 1),
             (xn([2,1,3]), 2),

@@ -144,7 +144,7 @@ where T: EucRing + FromStr, for<'x> &'x T: EucRingOps<T> {
         } 
         
         let r = regex::Regex::new(r"(.+)/(.+)").unwrap();
-        if let Some(c) = r.captures(&s) { 
+        if let Some(c) = r.captures(s) { 
             let (s1, s2) = (&c[1], &c[2]);
             if let (Ok(a), Ok(b)) = (s1.parse::<T>(), s2.parse::<T>()) {
                 return Ok(Self::new(a, b))
@@ -397,7 +397,7 @@ macro_rules! decl_alg_ops {
     };
 }
 
-pub(self) use {impl_unop, impl_add_op, impl_accum, decl_alg_ops};
+use {impl_unop, impl_add_op, impl_accum, decl_alg_ops};
 
 #[cfg(test)]
 mod tests { 
@@ -537,7 +537,7 @@ mod tests {
         assert!(a.is_unit());
 
         let a = Ratio::<i32>::zero();
-        assert_eq!(a.is_unit(), false);
+        assert!(!a.is_unit());
     }
 
     #[test]

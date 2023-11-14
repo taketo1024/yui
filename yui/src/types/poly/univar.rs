@@ -181,7 +181,7 @@ mod tests {
     #[test]
     fn init() { 
         type M = Univar<'X',usize>;
-        let x = |i| M::from(i);
+        let x = M::from;
 
         let d = x(2);
 
@@ -193,7 +193,7 @@ mod tests {
     #[test]
     fn from_str() { 
         type M = Univar<'X',usize>;
-        let x = |i| M::from(i);
+        let x = M::from;
         
         assert_eq!(M::from_str("1"), Ok(M::one()));
         assert_eq!(M::from_str("X"), Ok(x(1)));
@@ -203,7 +203,7 @@ mod tests {
     #[test]
     fn display() { 
         type M = Univar<'X', isize>;
-        let x = |i| M::from(i);
+        let x = M::from;
 
         let d = x(0);
         assert_eq!(&d.to_string(), "1");
@@ -224,7 +224,7 @@ mod tests {
     #[test]
     fn neg_opt_unsigned() { 
         type M = Univar<'X',usize>;
-        let x = |i| M::from(i);
+        let x = M::from;
 
         let d = x(0);
         assert_eq!(d.inv(), Some(x(0)));
@@ -236,7 +236,7 @@ mod tests {
     #[test]
     fn neg_opt_signed() { 
         type M = Univar<'X',isize>;
-        let x = |i| M::from(i);
+        let x = M::from;
 
         let d = x(0);
         assert_eq!(d.inv(), Some(x(0)));
@@ -251,7 +251,7 @@ mod tests {
     #[test]
     fn eval() { 
         type M = Univar<'X', usize>;
-        let x = |i| M::from(i);
+        let x = M::from;
 
         let d = x(0);
         assert_eq!(d.eval(&2), 1);
@@ -266,7 +266,7 @@ mod tests {
     #[test]
     fn ord() { 
         type M = Univar<'X', isize>;
-        let x = |i| M::from(i);
+        let x = M::from;
 
         assert!(x(0) < x(1));
         assert!(x(1) < x(2));

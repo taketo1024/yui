@@ -90,7 +90,7 @@ mod tests {
     fn int_is_unit() { 
         assert!(1.is_unit());
         assert!((-1).is_unit());
-        assert_eq!(2.is_unit(), false);
+        assert!(!2.is_unit());
     }
 
     #[test]
@@ -110,8 +110,8 @@ mod tests {
     #[test]
     fn int_divides() {
         assert!(2.divides(&4));
-        assert_eq!(3.divides(&4), false);
-        assert_eq!(0.divides(&1), false);
+        assert!(!3.divides(&4));
+        assert!(!0.divides(&1));
     }
 
     #[test]
@@ -134,7 +134,7 @@ mod tests {
         let (a, b) = (240, 46);
         let (d, s, t) = i32::gcdx(&a, &b);
         assert_eq!(d, 2);
-        assert_eq!(&s * &a + &t * &b, d);
+        assert_eq!(s * a + t * b, d);
 
         let (a, b) = (24, 0);
         let (d, s, t) = i32::gcdx(&a, &b);
@@ -153,7 +153,7 @@ mod tests {
     fn div_round() { 
         assert_eq!(12.div_round(&5), 2);
         assert_eq!(13.div_round(&5), 3);
-        assert_eq!(-12.div_round(&5), -2);
-        assert_eq!(-13.div_round(&5), -3);
+        assert_eq!((-12).div_round(&5), -2);
+        assert_eq!((-13).div_round(&5), -3);
     }
 }

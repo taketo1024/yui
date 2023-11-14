@@ -122,7 +122,7 @@ impl BitSeq {
     pub fn iter(&self) -> impl Iterator<Item = Bit> {
         let mut val = self.val;
         
-        (0..self.len).into_iter().map(move |_| {
+        (0..self.len).map(move |_| {
             let b = val & 1;
             val >>= 1;
             Bit::from(b)
@@ -163,14 +163,14 @@ impl BitSeq {
 
     pub fn append(&mut self, b: BitSeq) {
         assert!(self.len + b.len <= Self::MAX_LEN);
-        self.val = b.val << self.len | self.val;
+        self.val |= b.val << self.len;
         self.len += b.len;
     }
 
     pub fn remove(&mut self, i: usize) { 
         assert!(i < self.len);
         
-        let a = self.val & !((1 << i + 1) - 1);
+        let a = self.val & !((1 << (i + 1)) - 1);
         let b = self.val & ((1 << i) - 1);
 
         self.val = a >> 1 | b;
@@ -200,7 +200,7 @@ impl BitSeq {
 
     pub fn edit<F>(&self, f: F) -> Self
     where F: FnOnce(&mut BitSeq) {
-        let mut copy = self.clone();
+        let mut copy = *self;
         f(&mut copy);
         copy
     }
@@ -283,7 +283,7 @@ impl Debug for BitSeq {
 
 impl PartialOrd for BitSeq {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(&other))
+        Some(self.cmp(other))
     }
 }
 

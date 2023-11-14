@@ -10,7 +10,7 @@ use crate::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RMo
 use super::gen::*;
 
 #[derive(PartialEq, Eq, Clone, Default)]
-pub struct LinComb<X, R>
+pub struct Lc<X, R>
 where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
@@ -19,7 +19,7 @@ where
     r_zero: R
 }
 
-impl<X, R> LinComb<X, R>
+impl<X, R> Lc<X, R>
 where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
@@ -65,7 +65,7 @@ where
         self.data.iter()
     }
 
-    pub fn map<Y, S, F>(&self, f: F) -> LinComb<Y, S>
+    pub fn map<Y, S, F>(&self, f: F) -> Lc<Y, S>
     where 
         Y: Gen, 
         S: Ring, for<'x> &'x S: RingOps<S>,
@@ -74,7 +74,7 @@ where
         self.iter().map(|(x, r)| f(x, r)).collect()
     }
 
-    pub fn into_map<Y, S, F>(self, f: F) -> LinComb<Y, S>
+    pub fn into_map<Y, S, F>(self, f: F) -> Lc<Y, S>
     where 
         Y: Gen, 
         S: Ring, for<'x> &'x S: RingOps<S>,
@@ -83,7 +83,7 @@ where
         self.into_iter().map(|(x, r)| f(x, r)).collect()
     }
 
-    pub fn map_coeffs<S, F>(&self, f: F) -> LinComb<X, S>
+    pub fn map_coeffs<S, F>(&self, f: F) -> Lc<X, S>
     where 
         S: Ring, for<'x> &'x S: RingOps<S>, 
         F: Fn(&R) -> S 
@@ -91,7 +91,7 @@ where
         self.map(|x, r| (x.clone(), f(r)))
     }
 
-    pub fn into_map_coeffs<S, F>(self, f: F) -> LinComb<X, S>
+    pub fn into_map_coeffs<S, F>(self, f: F) -> Lc<X, S>
     where 
         S: Ring, for<'x> &'x S: RingOps<S>, 
         F: Fn(R) -> S 
@@ -99,7 +99,7 @@ where
         self.into_map(|x, r| (x, f(r)))
     }
 
-    pub fn map_gens<Y, F>(&self, f: F) -> LinComb<Y, R>
+    pub fn map_gens<Y, F>(&self, f: F) -> Lc<Y, R>
     where 
         Y: Gen, 
         F: Fn(&X) -> Y 
@@ -107,7 +107,7 @@ where
         self.map(|x, r| (f(x), r.clone()))
     }
 
-    pub fn into_map_gens<Y, F>(self, f: F) -> LinComb<Y, R>
+    pub fn into_map_gens<Y, F>(self, f: F) -> Lc<Y, R>
     where 
         Y: Gen, 
         F: Fn(X) -> Y 
@@ -132,7 +132,7 @@ where
     }
 
     pub fn apply<F>(&self, f: F) -> Self 
-    where F: Fn(&X) -> LinComb<X, R> {
+    where F: Fn(&X) -> Lc<X, R> {
         self.iter().flat_map(|(x, r)| { 
             f(x).into_iter().map(move |(y, s)| { 
                 (y, r * &s)
@@ -191,7 +191,7 @@ where
     }
 }
 
-impl<X, R> From<X> for LinComb<X, R>
+impl<X, R> From<X> for Lc<X, R>
 where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
@@ -201,7 +201,7 @@ where
     }    
 }
 
-impl<X, R> From<(X, R)> for LinComb<X, R>
+impl<X, R> From<(X, R)> for Lc<X, R>
 where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
@@ -211,7 +211,7 @@ where
     }
 }
 
-impl<X, R> FromIterator<(X, R)> for LinComb<X, R>
+impl<X, R> FromIterator<(X, R)> for Lc<X, R>
 where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
@@ -226,7 +226,7 @@ where
     }
 }
 
-impl<X, R> IntoIterator for LinComb<X, R>
+impl<X, R> IntoIterator for Lc<X, R>
 where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
@@ -239,7 +239,7 @@ where
     }
 }
 
-impl<X, R> Display for LinComb<X, R>
+impl<X, R> Display for Lc<X, R>
 where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
@@ -249,7 +249,7 @@ where
     }
 }
 
-impl<X, R> Debug for LinComb<X, R>
+impl<X, R> Debug for Lc<X, R>
 where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
@@ -259,7 +259,7 @@ where
     }
 }
 
-impl<X, R> Zero for LinComb<X, R>
+impl<X, R> Zero for Lc<X, R>
 where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
@@ -273,7 +273,7 @@ where
     }
 }
 
-impl<X, R> Neg for LinComb<X, R>
+impl<X, R> Neg for Lc<X, R>
 where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
@@ -285,19 +285,19 @@ where
     }
 }
 
-impl<X, R> Neg for &LinComb<X, R>
+impl<X, R> Neg for &Lc<X, R>
 where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    type Output = LinComb<X, R>;
+    type Output = Lc<X, R>;
 
     fn neg(self) -> Self::Output {
         self.map_coeffs(|r| -r)
     }
 }
 
-impl<X, R> LinComb<X, R>
+impl<X, R> Lc<X, R>
 where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
@@ -330,7 +330,7 @@ where
 }
 
 #[auto_ops]
-impl<X, R> AddAssign<&LinComb<X, R>> for LinComb<X, R>
+impl<X, R> AddAssign<&Lc<X, R>> for Lc<X, R>
 where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
@@ -344,7 +344,7 @@ where
 }
 
 #[auto_ops]
-impl<X, R> SubAssign<&LinComb<X, R>> for LinComb<X, R>
+impl<X, R> SubAssign<&Lc<X, R>> for Lc<X, R>
 where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
@@ -358,7 +358,7 @@ where
 }
 
 #[auto_ops]
-impl<X, R> MulAssign<&R> for LinComb<X, R>
+impl<X, R> MulAssign<&R> for Lc<X, R>
 where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
@@ -371,12 +371,12 @@ where
 }
 
 #[auto_ops]
-impl<X, R> Mul for &LinComb<X, R>
+impl<X, R> Mul for &Lc<X, R>
 where 
     X: Gen + Mul<Output = X>,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    type Output = LinComb<X, R>;
+    type Output = Lc<X, R>;
 
     fn mul(self, rhs: Self) -> Self::Output {
         let mut res = Self::Output::zero();
@@ -397,7 +397,7 @@ where
 
 macro_rules! impl_accum {
     ($trait:ident, $method:ident, $accum_trait:ident, $accum_method:ident, $accum_init:ident) => {
-        impl<X, R> $trait<Self> for LinComb<X, R>
+        impl<X, R> $trait<Self> for Lc<X, R>
         where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
             fn $method<Iter: Iterator<Item = Self>>(iter: Iter) -> Self {
                 let mut res = Self::$accum_init();
@@ -406,7 +406,7 @@ macro_rules! impl_accum {
             }
         }
 
-        impl<'a, X, R> $trait<&'a Self> for LinComb<X, R>
+        impl<'a, X, R> $trait<&'a Self> for Lc<X, R>
         where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
             fn $method<Iter: Iterator<Item = &'a Self>>(iter: Iter) -> Self {
                 let mut res = Self::$accum_init();
@@ -421,10 +421,10 @@ impl_accum!(Sum, sum, AddAssign, add_assign, zero);
 
 macro_rules! impl_alg_ops {
     ($trait:ident) => {
-        impl<X, R> $trait<Self> for LinComb<X, R>
+        impl<X, R> $trait<Self> for Lc<X, R>
         where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {}
 
-        impl<X, R> $trait<LinComb<X, R>> for &LinComb<X, R>
+        impl<X, R> $trait<Lc<X, R>> for &Lc<X, R>
         where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {}
     };
 }
@@ -432,7 +432,7 @@ macro_rules! impl_alg_ops {
 impl_alg_ops!(AddMonOps);
 impl_alg_ops!(AddGrpOps);
 
-impl<X, R> Elem for LinComb<X, R>
+impl<X, R> Elem for Lc<X, R>
 where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
@@ -442,32 +442,32 @@ where
     }
 }
 
-impl<X, R> AddMon for LinComb<X, R>
+impl<X, R> AddMon for Lc<X, R>
 where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {}
 
-impl<X, R> AddGrp for LinComb<X, R>
+impl<X, R> AddGrp for Lc<X, R>
 where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {}
 
 
-impl<X, R> RModOps<R, Self> for LinComb<X, R>
+impl<X, R> RModOps<R, Self> for Lc<X, R>
 where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {}
 
-impl<X, R> RModOps<R, LinComb<X, R>> for &LinComb<X, R>
+impl<X, R> RModOps<R, Lc<X, R>> for &Lc<X, R>
 where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {}
 
-impl<X, R> RMod for LinComb<X, R>
+impl<X, R> RMod for Lc<X, R>
 where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
@@ -480,7 +480,7 @@ mod tests {
     use num_traits::Zero;
     use crate::Elem;
     use crate::macros::map;
-    use crate::lc::{Free, LinComb};
+    use crate::lc::{Free, Lc};
  
     type X = Free<i32>;
     fn e(i: i32) -> X { 
@@ -489,14 +489,14 @@ mod tests {
 
     #[test]
     fn math_symbol() { 
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let symbol = L::math_symbol();
         assert_eq!(symbol, "Z<Z>");
     }
 
     #[test]
     fn fmt() { 
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
 
         let z = L::new(map!{ e(1) => 1 });
         assert_eq!(z.to_string(), "<1>");
@@ -522,14 +522,14 @@ mod tests {
 
     #[test]
     fn default() { 
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let z = L::default();
         assert!(z.data.is_empty());
     }
 
     #[test]
     fn from_gen() { 
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let x = e(0);
         let z = L::from(x);
         assert_eq!(z, L::new(map!{ e(0) => 1 }));
@@ -537,7 +537,7 @@ mod tests {
 
     #[test]
     fn from_pair() { 
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let x = e(0);
         let z = L::from((x, 2));
         assert_eq!(z, L::new(map!{ e(0) => 2 }));
@@ -545,7 +545,7 @@ mod tests {
 
     #[test]
     fn from_iter() { 
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let z = L::from_iter([(e(0), 1), (e(1), 0), (e(2), 2)]);
 
         assert!(!z.is_zero());
@@ -556,7 +556,7 @@ mod tests {
 
     #[test]
     fn into_gen() { 
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let z = L::from(e(0));
 
         assert!(z.is_gen());
@@ -573,7 +573,7 @@ mod tests {
 
     #[test]
     fn eq() { 
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
         let z2 = L::new(map!{ e(2) => 2, e(1) => 1 });
         let z3 = L::new(map!{ e(1) => 1 });
@@ -584,7 +584,7 @@ mod tests {
 
     #[test]
     fn zero() { 
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let z = L::zero();
 
         assert!(z.data.is_empty());
@@ -598,10 +598,10 @@ mod tests {
 
     #[test]
     fn clean() { 
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
 
         let data = map!{ e(1) => 1, e(2) => 0, e(3) => 0 };
-        let mut z: L = LinComb { data, r_zero: 0 };
+        let mut z: L = Lc { data, r_zero: 0 };
         
         assert_eq!(z.nterms(), 3);
 
@@ -613,7 +613,7 @@ mod tests {
 
     #[test]
     fn add() {
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
         let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
         let w = z1 + z2;
@@ -623,7 +623,7 @@ mod tests {
 
     #[test]
     fn add_ref() {
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
         let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
         let w = &z1 + &z2;
@@ -633,7 +633,7 @@ mod tests {
 
     #[test]
     fn add_assign() {
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let mut z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
         let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
         z1 += z2;
@@ -643,7 +643,7 @@ mod tests {
 
     #[test]
     fn add_assign_ref() {
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let mut z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
         let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
         z1 += &z2;
@@ -653,7 +653,7 @@ mod tests {
 
     #[test]
     fn sum() {
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
         let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
         let z3 = L::new(map!{ e(3) => 300, e(4) => 400 });
@@ -664,7 +664,7 @@ mod tests {
 
     #[test]
     fn sum_ref() {
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
         let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
         let z3 = L::new(map!{ e(3) => 300, e(4) => 400 });
@@ -675,21 +675,21 @@ mod tests {
 
     #[test]
     fn neg() {
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let z = L::new(map!{ e(1) => 1, e(2) => 2 });
         assert_eq!(-z, L::new(map!{ e(1) => -1, e(2) => -2 }));
     }
 
     #[test]
     fn neg_ref() {
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let z = L::new(map!{ e(1) => 1, e(2) => 2 });
         assert_eq!(-(&z), L::new(map!{ e(1) => -1, e(2) => -2 }));
     }
 
     #[test]
     fn sub() {
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
         let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
         let w = z1 - z2;
@@ -699,7 +699,7 @@ mod tests {
 
     #[test]
     fn sub_ref() {
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
         let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
         let w = &z1 - &z2;
@@ -709,7 +709,7 @@ mod tests {
 
     #[test]
     fn sub_assign() {
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let mut z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
         let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
         z1 -= z2;
@@ -719,7 +719,7 @@ mod tests {
 
     #[test]
     fn sub_assign_ref() {
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let mut z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
         let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
         z1 -= &z2;
@@ -729,7 +729,7 @@ mod tests {
 
     #[test]
     fn mul() {
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let z = L::new(map!{ e(1) => 1, e(2) => 2 });
         let r = 2;
         let w = z * r;
@@ -739,7 +739,7 @@ mod tests {
 
     #[test]
     fn mul_ref() {
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let z = L::new(map!{ e(1) => 1, e(2) => 2 });
         let r = 2;
         let w = z * r;
@@ -749,7 +749,7 @@ mod tests {
 
     #[test]
     fn mul_assign() {
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let mut z = L::new(map!{ e(1) => 1, e(2) => 2 });
         let r = 2;
         z *= r;
@@ -759,7 +759,7 @@ mod tests {
 
     #[test]
     fn mul_assign_ref() {
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let mut z = L::new(map!{ e(1) => 1, e(2) => 2 });
         let r = 2;
         z *= &r;
@@ -769,7 +769,7 @@ mod tests {
 
     #[test]
     fn map_coeffs() {
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let z = L::new(map!{ e(1) => 1, e(2) => 2 });
         let w = z.map_coeffs(|a| a * 10);
 
@@ -778,7 +778,7 @@ mod tests {
 
     #[test]
     fn into_map_coeffs() {
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let z = L::new(map!{ e(1) => 1, e(2) => 2 });
         let w = z.into_map_coeffs(|a| a * 10);
 
@@ -787,7 +787,7 @@ mod tests {
 
     #[test]
     fn map_gens() {
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let z = L::new(map!{ e(1) => 1, e(2) => 2 });
         let w = z.map_gens(|x| e(x.0 * 10));
 
@@ -796,7 +796,7 @@ mod tests {
 
     #[test]
     fn into_map_gens() {
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let z = L::new(map!{ e(1) => 1, e(2) => 2 });
         let w = z.into_map_gens(|x| e(x.0 * 10));
 
@@ -805,7 +805,7 @@ mod tests {
 
     #[test]
     fn filter_gens() { 
-        type L = LinComb<X, i32>;
+        type L = Lc<X, i32>;
         let z = L::new( (1..10).map(|i| (e(i), i * 10)).collect() );
         let w = z.filter_gens(|x| x.0 % 3 == 0 );
         assert_eq!(w, L::new(map!{ e(3) => 30, e(6) => 60, e(9) => 90}))

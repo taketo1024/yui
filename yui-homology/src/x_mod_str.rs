@@ -3,7 +3,7 @@ use std::ops::Add;
 
 use delegate::delegate;
 use yui::{Ring, RingOps, IndexList};
-use yui::lc::{Gen, LinComb};
+use yui::lc::{Gen, Lc};
 use yui_matrix::sparse::{SpVec, Trans};
 
 use crate::{DisplayForGrid, RModStr, SimpleRModStr, rmod_str_symbol};
@@ -66,7 +66,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     // Maybe this should return Option<..>, 
     // and create XFreeModStr that unwraps it. 
 
-    pub fn gen_chain(&self, i: usize) -> LinComb<X, R> { 
+    pub fn gen_chain(&self, i: usize) -> Lc<X, R> { 
         if self.trans().is_none() { 
             panic!()
         }
@@ -77,7 +77,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         self.as_chain(&v)
     }
 
-    pub fn vectorize(&self, z: &LinComb<X, R>) -> SpVec<R> {
+    pub fn vectorize(&self, z: &Lc<X, R>) -> SpVec<R> {
         let Some(t) = self.trans() else { 
             panic!()
         };
@@ -93,7 +93,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         t.forward(&v)
     }
 
-    pub fn as_chain(&self, v: &SpVec<R>) -> LinComb<X, R> {
+    pub fn as_chain(&self, v: &SpVec<R>) -> Lc<X, R> {
         let Some(t) = self.trans() else { 
             panic!()
         };
@@ -102,7 +102,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
 
         let v = t.backward(v);
 
-        LinComb::from_iter( v.iter().map(|(i, a)| 
+        Lc::from_iter( v.iter().map(|(i, a)| 
             (self.gens[i].clone(), a.clone())
         ) )
     }
@@ -182,9 +182,9 @@ mod tests {
     fn vectorize() { 
         let s = XModStr::free([e(0), e(1), e(2)]);
         
-        let x = LinComb::from(e(0));
-        let y = LinComb::from(e(1));
-        let z = LinComb::from(e(2));
+        let x = Lc::from(e(0));
+        let y = Lc::from(e(1));
+        let z = Lc::from(e(2));
 
         let v = s.vectorize(&x);
         assert_eq!(v, SpVec::unit(3, 0));
@@ -197,9 +197,9 @@ mod tests {
     fn as_chain() { 
         let s = XModStr::free([e(0), e(1), e(2)]);
         
-        let x = LinComb::from(e(0));
-        let y = LinComb::from(e(1));
-        let z = LinComb::from(e(2));
+        let x = Lc::from(e(0));
+        let y = Lc::from(e(1));
+        let z = Lc::from(e(2));
 
         let v = SpVec::from(vec![1, 2, -3]);
         let w = s.as_chain(&v);

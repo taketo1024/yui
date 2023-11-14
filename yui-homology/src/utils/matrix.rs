@@ -1,14 +1,14 @@
 use itertools::Itertools;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use yui::{Ring, RingOps, IndexList};
-use yui::lc::{LinComb, Gen};
+use yui::lc::{Lc, Gen};
 use yui_matrix::sparse::SpMat;
 
 pub fn make_matrix<X, Y, R, F>(from: &IndexList<X>, to: &IndexList<Y>, f: F) -> SpMat<R>
 where 
     X: Gen, Y: Gen, 
     R: Ring, for<'x> &'x R: RingOps<R>,
-    F: Fn(&X) -> LinComb<Y, R> 
+    F: Fn(&X) -> Lc<Y, R> 
 {
     let (m, n) = (to.len(), from.len());
 
@@ -29,7 +29,7 @@ pub fn make_matrix_async<X, Y, R, F>(from: &IndexList<X>, to: &IndexList<Y>, f: 
 where 
     X: Gen, Y: Gen, 
     R: Ring, for<'x> &'x R: RingOps<R>,
-    F: Fn(&X) -> LinComb<Y, R> + Send + Sync
+    F: Fn(&X) -> Lc<Y, R> + Send + Sync
 {
     let (m, n) = (to.len(), from.len());
 

@@ -6,7 +6,7 @@ use delegate::delegate;
 use itertools::Itertools;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use yui::{Ring, RingOps, Deg, isize2, isize3};
-use yui::lc::{Gen, LinComb};
+use yui::lc::{Gen, Lc};
 use yui_matrix::sparse::{SpMat, Trans, MatType};
 
 use crate::utils::ChainReducer;
@@ -29,7 +29,7 @@ where
 {
     summands: Grid<I, XChainComplexSummand<X, R>>,
     d_deg: I,
-    d_map: Arc<dyn Fn(I, &LinComb<X, R>) -> LinComb<X, R> + Send + Sync>,
+    d_map: Arc<dyn Fn(I, &Lc<X, R>) -> Lc<X, R> + Send + Sync>,
 }
 
 impl<I, X, R> XChainComplexBase<I, X, R>
@@ -39,7 +39,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
     pub fn new<F>(summands: Grid<I, XChainComplexSummand<X, R>>, d_deg: I, d_map: F) -> Self
-    where F: Fn(I, &LinComb<X, R>) -> LinComb<X, R> + Send + Sync + 'static {
+    where F: Fn(I, &Lc<X, R>) -> Lc<X, R> + Send + Sync + 'static {
         assert!(summands.iter().all(|(_, s)| s.is_free()));
 
         let d_map = Arc::new(d_map);
@@ -60,7 +60,7 @@ where
             let v = q.col_vec(j);
             let z = v.iter().map(|(k, a)|
                 self[i].gen_chain(k) * a
-            ).sum::<LinComb<_, _>>();
+            ).sum::<Lc<_, _>>();
 
             let dz = self.d(i, &z);
             let w = self[i1].vectorize(&dz);
@@ -140,7 +140,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
     type R = R;
-    type Element = LinComb<X, R>;
+    type Element = Lc<X, R>;
 
     fn rank(&self, i: I) -> usize {
         self[i].rank()
@@ -150,7 +150,7 @@ where
         self.d_deg
     }
 
-    fn d(&self, i: I, z: &LinComb<X, R>) -> LinComb<X, R> { 
+    fn d(&self, i: I, z: &Lc<X, R>) -> Lc<X, R> { 
         (self.d_map)(i, z)
     }
 

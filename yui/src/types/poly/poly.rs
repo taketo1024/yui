@@ -7,7 +7,7 @@ use num_traits::{Zero, One, Pow};
 use auto_impl_ops::auto_ops;
 
 use crate::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Mon, MonOps, Ring, RingOps, EucRing, EucRingOps, Field, FieldOps};
-use crate::lc::{LinComb, Gen};
+use crate::lc::{Lc, Gen};
 use super::{MultiDeg, Univar, BiVar, MultiVar};
 
 // A polynomial is a linear combination of monomials over R.
@@ -47,13 +47,13 @@ where
     X: Mono, 
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    data: LinComb<X, R>,
+    data: Lc<X, R>,
     zero: (X, R)
 }
 
 impl<X, R> PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
-    fn new(data: LinComb<X, R>) -> Self { 
+    fn new(data: Lc<X, R>) -> Self { 
         Self { data, zero: (X::one(), R::zero()) }
     }
 
@@ -61,7 +61,7 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
         Self::from((X::one(), r))
     }
 
-    pub fn inner(&self) -> &LinComb<X, R> { 
+    pub fn inner(&self) -> &Lc<X, R> { 
         &self.data
     }
 
@@ -200,7 +200,7 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
 impl<X, R> From<(X, R)> for PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     fn from(pair: (X, R)) -> Self {
-        let t = LinComb::from(pair);
+        let t = Lc::from(pair);
         Self::from(t)
     }
 }
@@ -208,7 +208,7 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
 impl<X, R> FromIterator<(X, R)> for PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     fn from_iter<T: IntoIterator<Item = (X, R)>>(iter: T) -> Self {
-        Self::from(LinComb::from_iter(iter))
+        Self::from(Lc::from_iter(iter))
     }
 }
 
@@ -219,14 +219,14 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<X, R> From<LinComb<X, R>> for PolyBase<X, R>
+impl<X, R> From<Lc<X, R>> for PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
-    fn from(data: LinComb<X, R>) -> Self {
+    fn from(data: Lc<X, R>) -> Self {
         Self::new(data)
     }
 }
 
-impl<X, R> From<PolyBase<X, R>> for LinComb<X, R>
+impl<X, R> From<PolyBase<X, R>> for Lc<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     fn from(poly: PolyBase<X, R>) -> Self {
         poly.data
@@ -276,7 +276,7 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
 impl<X, R> Zero for PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     fn zero() -> Self {
-        Self::from(LinComb::zero())
+        Self::from(Lc::zero())
     }
 
     fn is_zero(&self) -> bool {

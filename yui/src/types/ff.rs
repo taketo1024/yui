@@ -171,13 +171,10 @@ impl<const p: I> Ring for FF<p> {
         } else { 
             // 1 = ax + py  ->  ax = 1 mod p. 
             let (d, x, _y) = I::gcdx(&self.0, &p);
-            assert!(d.abs().is_one());
             
-            let inv = if d.is_one() {
-                Self::new(x)
-            } else { 
-                Self::new(-x)
-            };
+            assert!(d.is_one());
+            
+            let inv = Self::new(x);
             Some(inv)
         }
     }

@@ -37,12 +37,7 @@ where
             (x, y) = (y, r);
         }
 
-        let u = x.normalizing_unit();
-
-        match u.is_one() { 
-            true  => x,
-            false => x * u
-        }
+        x.into_normalized()
     }
 
     fn gcdx(x: &Self, y: &Self) -> (Self, Self, Self) {
@@ -63,11 +58,18 @@ where
             (t1, t0) = (t0 - &q * &t1, t1);
         }
 
-        (x, s0, t0)
+        let (d, s, t) = (x, s0, t0);
+        
+        let u = d.normalizing_unit();
+        match u.is_one() { 
+            true  => (d, s, t),
+            false => (d * &u, s * &u, t * &u)
+        }
     }
 
     fn lcm(x: &Self, y: &Self) -> Self { 
         let g = Self::gcd(x, y);
-        x * (y / g)
+        let m = x * (y / g);
+        m.into_normalized()
     }
 }

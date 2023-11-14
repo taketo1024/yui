@@ -30,7 +30,7 @@ where I: Deg {
 }
 
 impl<I, E> Grid<I, E>
-where I: Deg, E: Default { 
+where I: Deg { 
     pub fn new(support: Vec<I>, data: HashMap<I, E>, dflt: E) -> Self { 
         Self { support, data, dflt }
     }
@@ -45,6 +45,10 @@ where I: Deg, E: Default {
 
     pub fn get_mut(&mut self, i: I) -> Option<&mut E> { 
         self.data.get_mut(&i)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (I, &E)> {
+        self.support.iter().map(|&i| (i, self.get(i)))
     }
 }
 
@@ -62,12 +66,23 @@ where I: Deg, E: Default {
 
     pub fn map<E2, F>(&self, mut f: F) -> Grid<I, E2>
     where 
-        E2: Default,
-        F: FnMut(I, &E) -> E2
+        E2: Default, 
+        F: FnMut(I, &E) -> E2 
     {
         Grid::generate(
             self.support(), 
-            move |i| f(i, &self[i])
+            |i| f(i, self.get(i))
+        )
+    }
+
+    pub fn into_map<E2, F>(mut self, mut f: F) -> Grid<I, E2>
+    where 
+        E2: Default, 
+        F: FnMut(I, E) -> E2 
+    {
+        Grid::generate(
+            self.support(), 
+            move |i| f(i, self.remove(i).unwrap_or_default())
         )
     }
 }

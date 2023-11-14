@@ -93,7 +93,7 @@ impl PivotFinder {
             (j, list)
         }).collect();
 
-        let ts = top_sort(tree);
+        let ts = top_sort(tree).unwrap();
 
         let row_type = self.piv_type == PivotType::Rows;
 

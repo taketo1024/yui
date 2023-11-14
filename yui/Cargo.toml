@@ -16,6 +16,7 @@ derive_more = "0.99.17"
 is-even = "1.0.0"
 itertools = "0.11.0"
 num-bigint = "0.4.4"
+num-integer = { version = "0.1.45", features = ["i128"] }
 num-traits = "0.2.16"
 prettytable = "0.10.0"
 regex = "1.9.6"

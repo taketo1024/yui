@@ -63,7 +63,22 @@ macro_rules! impl_integer {
                 }
             }
         }
-        impl EucRing for $type {}
+
+        impl EucRing for $type {
+            fn gcd(x: &Self, y: &Self) -> Self {
+                num_integer::Integer::gcd(x, y)
+            }
+
+            fn gcdx(x: &Self, y: &Self) -> (Self, Self, Self) {
+                let num_integer::ExtendedGcd{ gcd: d, x: s, y: t } = num_integer::Integer::extended_gcd(x, y);
+                (d, s, t)
+            }
+
+            fn lcm(x: &Self, y: &Self) -> Self {
+                num_integer::Integer::lcm(x, y)
+            }
+        }
+
         impl Integer for $type {}
     }
 }
@@ -124,6 +139,10 @@ mod tests {
         let d = i32::gcd(&a, &b);
         assert_eq!(d, 24);
 
+        let (a, b) = (0, -24);
+        let d = i32::gcd(&a, &b);
+        assert_eq!(d, 24);
+
         let (a, b) = (0, 0);
         let d = i32::gcd(&a, &b);
         assert_eq!(d, 0);
@@ -139,14 +158,12 @@ mod tests {
         let (a, b) = (24, 0);
         let (d, s, t) = i32::gcdx(&a, &b);
         assert_eq!(d, 24);
-        assert_eq!(s, 1);
-        assert_eq!(t, 0);
+        assert_eq!(s * a + t * b, d);
 
         let (a, b) = (0, 0);
         let (d, s, t) = i32::gcdx(&a, &b);
         assert_eq!(d, 0);
-        assert_eq!(s, 0);
-        assert_eq!(t, 0);
+        assert_eq!(s * a + t * b, d);
     }
 
     #[test]

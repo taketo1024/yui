@@ -220,8 +220,8 @@ mod tests {
     fn grid() { 
         let g = Grid1::generate(0..=3, |i| i * 10);
 
-        assert_eq!(g.is_supported( 1), true);
-        assert_eq!(g.is_supported(-1), false);
+        assert!( g.is_supported( 1));
+        assert!(!g.is_supported(-1));
         assert_eq!(g.get( 1), &10);
         assert_eq!(g.get(-1), &0); // default
 
@@ -234,8 +234,8 @@ mod tests {
         use cartesian::cartesian;
         let g = Grid2::generate(cartesian!(0..=3, 0..=2).map(|(i, j)| isize2(i, j)), |i| i.0 * 10 + i.1);
 
-        assert_eq!(g.is_supported(isize2(1, 2)), true);
-        assert_eq!(g.is_supported(isize2(3, 3)), false);
+        assert!( g.is_supported(isize2(1, 2)));
+        assert!(!g.is_supported(isize2(3, 3)));
         assert_eq!(g.get(isize2(1, 2)), &12);
         assert_eq!(g.get(isize2(3, 3)), &0);
 

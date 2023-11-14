@@ -205,7 +205,7 @@ pub(crate) mod tests {
             Self::new(
                 c.summands().map(|_, s| {
                     let n = s.rank();
-                    XModStr::free((0..n).map(|j| e(j)))
+                    XModStr::free((0..n).map(e))
                 }), 
                 c.d_deg(), 
                 move |i, z| {
@@ -213,7 +213,7 @@ pub(crate) mod tests {
                     z.apply(|x| {
                         let v = SpVec::unit(n, x.0 as usize);
                         let dv = c.d(i, &v);
-                        dv.iter().map(|(i, a)| (e(i), a.clone())).collect()
+                        dv.iter().map(|(i, a)| (e(i), *a)).collect()
                     })
                 }
             )

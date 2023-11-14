@@ -143,7 +143,7 @@ where
 
         info!("compute schur complement.");
 
-        let s = schur(&a, &p, &q, r, self.with_trans);
+        let s = schur(a, &p, &q, r, self.with_trans);
 
         info!("reduced {:?} -> {:?}.", a.shape(), s.complement().shape());
 
@@ -180,7 +180,7 @@ where
         let (i0, i1, i2) = self.deg_trip(i);
 
         if let Some(a0) = self.matrix(i0) {
-            let a0 = reduce_mat_rows(a0, &q, r);
+            let a0 = reduce_mat_rows(a0, q, r);
             self.mats.insert(i0, a0);
         }
 
@@ -188,7 +188,7 @@ where
         self.mats.insert(i1, a1);
 
         if let Some(a2) = self.matrix(i2) { 
-            let a2 = reduce_mat_cols(a2, &p, r);
+            let a2 = reduce_mat_cols(a2, p, r);
             self.mats.insert(i2, a2);
         }
     }

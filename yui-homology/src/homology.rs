@@ -115,16 +115,16 @@ mod tests {
         let h = c.homology(false);
 
         assert_eq!(h[0].rank(), 1);
-        assert_eq!(h[0].is_free(), true);
+        assert!(h[0].is_free());
 
         assert_eq!(h[1].rank(), 0);
-        assert_eq!(h[1].is_free(), true);
+        assert!(h[1].is_free());
 
         assert_eq!(h[2].rank(), 0);
-        assert_eq!(h[2].is_free(), true);
+        assert!(h[2].is_free());
 
         assert_eq!(h[3].rank(), 0);
-        assert_eq!(h[3].is_free(), true);
+        assert!(h[3].is_free());
     }
 
     #[test]
@@ -133,13 +133,13 @@ mod tests {
         let h = c.homology(false);
 
         assert_eq!(h[0].rank(), 1);
-        assert_eq!(h[0].is_free(), true);
+        assert!(h[0].is_free());
 
         assert_eq!(h[1].rank(), 0);
-        assert_eq!(h[1].is_free(), true);
+        assert!(h[1].is_free());
 
         assert_eq!(h[2].rank(), 1);
-        assert_eq!(h[2].is_free(), true);
+        assert!(h[2].is_free());
     }
 
     #[test]
@@ -148,13 +148,13 @@ mod tests {
         let h = c.homology(false);
 
         assert_eq!(h[0].rank(), 1);
-        assert_eq!(h[0].is_free(), true);
+        assert!(h[0].is_free());
 
         assert_eq!(h[1].rank(), 2);
-        assert_eq!(h[1].is_free(), true);
+        assert!(h[1].is_free());
 
         assert_eq!(h[2].rank(), 1);
-        assert_eq!(h[2].is_free(), true);
+        assert!(h[2].is_free());
     }
 
     #[test]
@@ -163,14 +163,14 @@ mod tests {
         let h = c.homology(false);
 
         assert_eq!(h[0].rank(), 1);
-        assert_eq!(h[0].is_free(), true);
+        assert!(h[0].is_free());
 
         assert_eq!(h[1].rank(), 0);
         assert_eq!(h[1].tors(), &vec![2]);
-        assert_eq!(h[1].is_free(), false);
+        assert!(!h[1].is_free());
 
         assert_eq!(h[2].rank(), 0);
-        assert_eq!(h[2].is_free(), true);
+        assert!(h[2].is_free());
     }
 
     #[test]

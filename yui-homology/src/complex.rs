@@ -117,14 +117,12 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
         Self { summands, d_deg, d_matrices }
     }
 
-    pub fn generate<It, F>(support: It, d_deg: I, mut d_matrix_map: F) -> Self
+    pub fn generate<It, F>(support: It, d_deg: I, d_matrix_map: F) -> Self
     where 
         It: IntoIterator<Item = I>, 
         F: FnMut(I) -> SpMat<R>
     {
-        let d_matrices = Grid::generate(support, |i| 
-            d_matrix_map(i)
-        );
+        let d_matrices = Grid::generate(support, d_matrix_map);
 
         let summands = Grid::generate(d_matrices.support(), |i| {
             let r = d_matrices[i].cols();

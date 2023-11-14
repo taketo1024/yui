@@ -51,8 +51,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     if rank > 1 {
         let str = format!("{}{}", symbol, superscript(rank as isize));
         res.push(str);
-    } else if rank == 1 { 
-        let str = format!("{}", symbol);
+    } else { 
+        let str = symbol.to_string();
         res.push(str);
     }
     
@@ -65,8 +65,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         res.push(str);
     }
 
-    let str = res.join(" ⊕ ");
-    str
+    
+    res.join(" ⊕ ")
 }
 
 #[derive(Clone, Debug)]

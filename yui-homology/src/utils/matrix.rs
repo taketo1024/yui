@@ -17,7 +17,7 @@ where
         let fx = f(x);
         
         fx.iter().map(|(y, a)| { 
-            let i = to.index_of(&y).unwrap();
+            let i = to.index_of(y).unwrap();
             (i, j, a.clone())
         }).collect_vec()
     });
@@ -37,7 +37,7 @@ where
         let x = &from[j];
         let ys = f(x);
         ys.iter().map(|(y, a)| { 
-            let i = to.index_of(&y).unwrap();
+            let i = to.index_of(y).unwrap();
             (i, j, a.clone())
         }).collect_vec()
     }).collect::<Vec<_>>();

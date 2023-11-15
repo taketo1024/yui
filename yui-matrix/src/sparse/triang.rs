@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
 use either::Either;
 use log::info;
@@ -76,32 +75,31 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let (n, k) = (a.rows(), y.cols());
     let diag = collect_diag(t, a);
 
+    let entries = Mutex::new(vec![]);
     let tl_x = Arc::new(ThreadLocal::new());
     let tl_b = Arc::new(ThreadLocal::new());
 
     let report = log::max_level() >= log::LevelFilter::Info;
     let count = Mutex::new(0);
     
-    let entries: Vec<_> = (0..k).into_par_iter().map(|j| { 
-        let mut x_st = init_tl_vec(&tl_x, n).borrow_mut();
-        let mut b_st = init_tl_vec(&tl_b, n).borrow_mut();
+    (0..k).into_par_iter().for_each(|j| { 
+        let mut x = init_tl_vec(&tl_x, n).borrow_mut();
+        let mut b = init_tl_vec(&tl_b, n).borrow_mut();
 
-        let x = x_st.deref_mut();
-        let b = b_st.deref_mut();
-
-        copy_from(b, y.col_view(j));
-        solve_triangular_into(t, a, &diag, b, x);
+        copy_from(&mut b, y.col_view(j));
+        solve_triangular_into(t, a, &diag, &mut b, &mut x);
+        { 
+            let mut entries = entries.lock().unwrap();
+            move_into(&mut x, |i, a| entries.push((i, j, a)));
+        }
 
         if report { 
             incr_count(&count, k);
         }
+    });
 
-        let mut entries = vec![];
-        move_into(x, |i, x| entries.push((i, j, x)));
-        entries
-    }).collect();
-
-    SpMat::from_entries((n, k), entries.into_iter().flatten())
+    let entries = entries.into_inner().unwrap();
+    SpMat::from_entries((n, k), entries)
 }
 
 pub fn solve_triangular_vec<R>(t: TriangularType, a: &SpMat<R>, b: &SpVec<R>) -> SpVec<R>
@@ -200,15 +198,14 @@ where R: Clone {
     }
 }
 
-fn move_into<R, F>(x: &mut Vec<R>, mut f: F)
-where R: Default + Zero, F: FnMut(usize, R) { 
-    let n = x.len();
-    (0..n).for_each(move |i| { 
-        if !x[i].is_zero() { 
-            let x_i = std::mem::take(&mut x[i]);
+fn move_into<R, F>(x: &mut [R], mut f: F)
+where R: Zero, F: FnMut(usize, R) { 
+    x.iter_mut().enumerate().for_each(|(i, x_i)|
+        if !x_i.is_zero() { 
+            let x_i = std::mem::replace(x_i, R::zero());
             f(i, x_i)
         }
-    })
+    )
 }
 
 fn incr_count(count: &Mutex<usize>, k: usize) { 

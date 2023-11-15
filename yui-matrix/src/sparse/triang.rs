@@ -19,6 +19,13 @@ impl TriangularType {
             Self::Lower => false
         }
     }
+
+    pub fn tranpose(&self) -> Self { 
+        match self { 
+            Self::Upper => Self::Lower,
+            Self::Lower => Self::Upper
+        }
+    }
 }
 
 pub fn inv_triangular<R>(t: TriangularType, a: &SpMat<R>) -> SpMat<R>
@@ -27,6 +34,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     solve_triangular(t, a, &e)
 }
 
+// solve ax = y.
 pub fn solve_triangular<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     assert_eq!(a.rows(), y.rows());
@@ -42,6 +50,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     } else { 
         solve_triangular_s(t, a, y)
     }
+}
+
+// solve xa = y.
+pub fn solve_triangular_left<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    solve_triangular(t.tranpose(), &a.transpose(), &y.transpose()).transpose()
 }
 
 pub fn solve_triangular_vec<R>(t: TriangularType, a: &SpMat<R>, b: &SpVec<R>) -> SpVec<R>

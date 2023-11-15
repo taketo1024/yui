@@ -2,9 +2,7 @@ use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
 use either::Either;
 use log::info;
-use num_traits::Zero;
 use rayon::prelude::*;
-use sprs::CsVecView;
 use thread_local::ThreadLocal;
 use yui::{Ring, RingOps};
 use super::*;
@@ -46,20 +44,38 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
+pub fn solve_triangular_vec<R>(t: TriangularType, a: &SpMat<R>, b: &SpVec<R>) -> SpVec<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    assert_eq!(a.rows(), b.dim());
+
+    if t.is_upper() { 
+        debug_assert!(is_upper_tri(a));
+    } else { 
+        // TODO
+    }
+
+    let n = a.rows();
+    let diag = collect_diag(t, a);
+    let mut b = b.to_dense().to_vec();
+
+    let x = _solve_triangular(t, a, &diag, &mut b);
+
+    SpVec::from_entries(n, x)
+}
+
 fn solve_triangular_s<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     info!("solve triangular: a = {:?}, y = {:?}", a.shape(), y.shape());
 
     let (n, k) = (a.rows(), y.cols());
     let diag = collect_diag(t, a);
-
-    let mut x = vec![R::zero(); n];
-    let mut b = vec![R::zero(); n];    
+    let mut b = vec![R::zero(); n];
 
     let entries = (0..k).fold(vec![], |mut entries, j| { 
-        copy_from(&mut b, y.col_view(j));
-        solve_triangular_into(t, a, &diag, &mut b, &mut x);
-        move_into(&mut x, |i, x| entries.push((i, j, x)));
+        copy_into(y.col_view(j).iter(), &mut b);
+
+        let res = _solve_triangular(t, a, &diag, &mut b);
+        entries.extend(res.into_iter().map(|(i, x)| (i, j, x)));
         entries
     });
 
@@ -74,27 +90,34 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     let (n, k) = (a.rows(), y.cols());
     let diag = collect_diag(t, a);
-
-    let entries = Mutex::new(vec![]);
-    let tl_x = Arc::new(ThreadLocal::new());
     let tl_b = Arc::new(ThreadLocal::new());
+    let entries = Mutex::new(vec![]);
 
-    let report = log::max_level() >= log::LevelFilter::Info;
-    let count = Mutex::new(0);
+    let report = log::max_level() >= log::LevelFilter::Info && k >= 10_000;
+    let col_count = Mutex::new(0);
     
     (0..k).into_par_iter().for_each(|j| { 
-        let mut x = init_tl_vec(&tl_x, n).borrow_mut();
-        let mut b = init_tl_vec(&tl_b, n).borrow_mut();
+        let mut b = tl_b.get_or(|| 
+            RefCell::new(vec![R::zero(); n])
+        ).borrow_mut();
 
-        copy_from(&mut b, y.col_view(j));
-        solve_triangular_into(t, a, &diag, &mut b, &mut x);
-        { 
+        copy_into(y.col_view(j).iter(), &mut b);
+
+        let res = _solve_triangular(t, a, &diag, &mut b);
+        {
             let mut entries = entries.lock().unwrap();
-            move_into(&mut x, |i, a| entries.push((i, j, a)));
+            entries.extend(res.into_iter().map(|(i, x)| (i, j, x)));
         }
 
         if report { 
-            incr_count(&count, k);
+            let c = {
+                let mut c = col_count.lock().unwrap();
+                *c += 1;
+                *c
+            };
+            if c > 0 && c % 10_000 == 0 { 
+                info!("  solved {c}/{k}");
+            }
         }
     });
 
@@ -102,33 +125,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     SpMat::from_entries((n, k), entries)
 }
 
-pub fn solve_triangular_vec<R>(t: TriangularType, a: &SpMat<R>, b: &SpVec<R>) -> SpVec<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    assert_eq!(a.rows(), b.dim());
-
-    if t.is_upper() { 
-        debug_assert!(is_upper_tri(a));
-    } else { 
-        // TODO
-    }
-
-    let n = a.rows();
-    let diag = collect_diag(t, a);
-
-    let mut x = vec![R::zero(); n];
-    let mut b = b.to_dense().to_vec();
-
-    solve_triangular_into(t, a, &diag, &mut b, &mut x);
-
-    SpVec::from(x)
-}
-
 #[inline(never)] // for profilability
-fn solve_triangular_into<R>(t: TriangularType, a: &SpMat<R>, diag: &[&R], b: &mut [R], x: &mut [R])
+fn _solve_triangular<R>(t: TriangularType, a: &SpMat<R>, diag: &[&R], b: &mut [R]) -> Vec<(usize, R)>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    debug_assert!(x.iter().all(|x_i| 
-        x_i.is_zero())
-    ); 
+    let mut entries = vec![];
 
     let n = a.rows();
     let range = if t.is_upper() { 
@@ -148,12 +148,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             b[i] -= u_ij * &x_j;
         }
 
-        x[j] = x_j;
+        entries.push((j, x_j));
     }
 
     debug_assert!(b.iter().all(|b_i| 
         b_i.is_zero())
     );
+
+    entries
 }
 
 fn collect_diag<'a, R>(t: TriangularType, a: &'a SpMat<R>) -> Vec<&'a R>
@@ -184,37 +186,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     )
 }
 
-fn init_tl_vec<R>(tl: &ThreadLocal<RefCell<Vec<R>>>, n: usize) -> &RefCell<Vec<R>>
-where R: Clone + Zero + Send {
-    tl.get_or(|| 
-        RefCell::new(vec![R::zero(); n])
-    )
-}
-
-fn copy_from<R>(x: &mut [R], v: CsVecView<R>)
-where R: Clone { 
-    for (i, r) in v.iter() { 
-        x[i] = r.clone();
-    }
-}
-
-fn move_into<R, F>(x: &mut [R], mut f: F)
-where R: Zero, F: FnMut(usize, R) { 
-    x.iter_mut().enumerate().for_each(|(i, x_i)|
-        if !x_i.is_zero() { 
-            let x_i = std::mem::replace(x_i, R::zero());
-            f(i, x_i)
-        }
-    )
-}
-
-fn incr_count(count: &Mutex<usize>, k: usize) { 
-    let mut c = count.lock().unwrap();
-    *c += 1;
-
-    if *c > 0 && *c % 10_000 == 0 { 
-        info!("  solved {c}/{k}");
-    }
+fn copy_into<'a, Itr, R>(itr: Itr, x: &mut [R])
+where Itr: Iterator<Item = (usize, &'a R)>, R: Clone + 'a { 
+    itr.for_each(|(i, r)| x[i] = r.clone())
 }
 
 #[cfg(test)]

@@ -56,9 +56,15 @@ where
         let m = self[i + self.d_deg].rank();
         let n = q.cols();
 
-        let entries: Vec<_> = (0..n).into_par_iter().map(|j|
-            self.d_matrix_col(i, q, j)
-        ).collect();
+        let entries = if crate::config::is_multithread_enabled() {
+            (0..n).into_par_iter().map(|j|
+                self.d_matrix_col(i, q, j)
+            ).collect::<Vec<_>>()
+        } else { 
+            (0..n).into_iter().map(|j|
+                self.d_matrix_col(i, q, j)
+            ).collect()
+        };
 
         SpMat::from_entries((m, n), entries.into_iter().flatten())
     }

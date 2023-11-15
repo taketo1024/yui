@@ -191,14 +191,14 @@ impl PivotFinder {
     }
 
     fn find_cycle_free_pivots_s(&mut self) {
-        let report = log::max_level() >= log::LevelFilter::Info;
-        let mut before_piv_count = self.pivots.count();
-        let mut count = 0;
-
         let remain_rows: Vec<_> = self.remain_rows().collect();
         let total = remain_rows.len();
 
-        if report && total > 10_000 { 
+        let report = log::max_level() >= log::LevelFilter::Info && total > 10_000;
+        let mut row_count = 0;
+        let mut piv_count = self.pivots.count();
+
+        if report { 
             info!("  start find-cycle-free-pivots: {total} rows");
         }
 
@@ -211,96 +211,106 @@ impl PivotFinder {
             }
 
             if report {
-                count += 1;
-                if count % 10_000 == 0 { 
-                    let piv_count = self.pivots.count();
-                    info!("    [{count}/{total}] +{}, total: {}.", piv_count - before_piv_count, piv_count);
-                    before_piv_count = piv_count;
+                row_count += 1;
+                if row_count % 10_000 == 0 { 
+                    let c = self.pivots.count();
+                    info!("    [{row_count}/{total}] +{}, total: {}.", c - piv_count, c);
+                    piv_count = c;
                 }
             }
         }
      }
 
      fn find_cycle_free_pivots_m(&mut self) {
-        let nth = std::thread::available_parallelism().map(|x| x.get()).unwrap_or(1);
-
-        let report = log::max_level() >= log::LevelFilter::Info;
-        let before_piv_count = Mutex::new(self.pivots.count());
-        let count = Mutex::new(0);
-
         let n = self.cols();
         let remain_rows = self.remain_rows().collect_vec();
-        let total = remain_rows.len();
+        let total_rows = remain_rows.len();
 
-        if report && total > 10_000 { 
-            info!("  start find-cycle-free-pivots: {total} rows (multi-thread: {nth})");
-        }
-
-        let rw_lock = RwLock::new(
+        let pivots = RwLock::new(
             std::mem::take(&mut self.pivots)
         );
-        let tls1 = ThreadLocal::new();
-        let tls2 = ThreadLocal::new();
+        let loc_pivots_tls = ThreadLocal::new();
+        let loc_worker_tls = ThreadLocal::new();
+
+        let report = log::max_level() >= log::LevelFilter::Info && total_rows > 10_000;
+        let (row_count, piv_count) = if report { 
+            let n_threads = std::thread::available_parallelism().map(|x| x.get()).unwrap_or(1);
+
+            info!("  start find-cycle-free-pivots: {total_rows} rows (multi-thread: {n_threads})");
+
+            let row_count = Mutex::new(0);
+            let piv_count = Mutex::new(self.pivots.count());
+
+            (Some(row_count), Some(piv_count))
+        } else { 
+            (None, None)
+        };
 
         remain_rows.par_iter().for_each(|&i| { 
-            let mut loc_pivots = tls1.get_or(|| {
-                let loc_pivots = rw_lock.read().unwrap().clone();
-                RefCell::new( loc_pivots )
-            }).borrow_mut();
+            let mut loc_pivots = init_tls(&loc_pivots_tls, || 
+                pivots.read().unwrap().clone()
+            ).borrow_mut();
 
-            let mut w = tls2.get_or(|| { 
-                let w = RowWorker::new(n);
-                RefCell::new( w )
-            }).borrow_mut();
+            let mut w = init_tls(&loc_worker_tls, || 
+                RowWorker::new(n)
+            ).borrow_mut();
 
-            {
-                let pivots = rw_lock.read().unwrap();
-                loc_pivots.update_from(&pivots);
-            }
+            loc_pivots.update_from(&pivots.read().unwrap());
 
             w.init(i, &self.str, &loc_pivots);
 
-            loop { 
-                w.traverse(&self.str, &loc_pivots);
-                
-                let Some(j) = w.choose_candidate(&self.str) else {
-                    break
-                };
-                
-                // If no changes are made in other threads, modify `pivots` and exit.
-                // Otherwise, update `loc_pivots` and retry.
-
-                let mut pivots = rw_lock.write().unwrap();
-                
-                w.update_diff(&loc_pivots, &pivots);
-                
-                if w.should_retry() { 
-                    loc_pivots.update_from(&pivots);
-                    continue
-                } else { 
-                    pivots.set(i, j);
-                    break
-                }
-            }
+            while find_cycle_free_pivots_in(&mut w, &self.str, &mut loc_pivots, &pivots) {}
 
             if report { 
-                let count = {
-                    let mut count = count.lock().unwrap();
-                    *count += 1;
-                    *count
-                };
-    
-                if count % 10_000 == 0 { 
-                    let mut before_piv_count = before_piv_count.lock().unwrap();
-                    let piv_count = loc_pivots.count();
-                    info!("    [{count}/{total}] +{}, total: {}.", piv_count - *before_piv_count, piv_count);
-                    *before_piv_count = piv_count;
-                }
+                let row_count = row_count.as_ref().unwrap();
+                let piv_count = piv_count.as_ref().unwrap();
+                incr_report_count(total_rows, row_count, piv_count, loc_pivots.count());
             }
         });
 
-        self.pivots = rw_lock.into_inner().unwrap();
+        self.pivots = pivots.into_inner().unwrap();
      }
+}
+
+fn init_tls<T, F>(tl: &ThreadLocal<RefCell<T>>, f: F) -> &RefCell<T>
+where T: Send, F: FnOnce() -> T {
+    tl.get_or(|| RefCell::new( f() ) )
+}
+
+fn find_cycle_free_pivots_in(w: &mut RowWorker, str: &MatrixStr, loc_pivots: &mut PivotData, pivots: &RwLock<PivotData>) -> bool { 
+    w.traverse(str, loc_pivots);
+    
+    let Some(j) = w.choose_candidate(str) else {
+        return false // exit
+    };
+    
+    // If changes are made in other threads, update `loc_pivots` and retry.
+    // Otherwise, modify `pivots` and exit.
+
+    let mut pivots = pivots.write().unwrap();
+    w.update_diff(&loc_pivots, &pivots);
+    
+    if w.should_retry() { 
+        loc_pivots.update_from(&pivots);
+        true // retry
+    } else { 
+        pivots.set(w.row, j);
+        false // exit
+    }
+}
+
+fn incr_report_count(total: usize, itr_count: &Mutex<usize>, before_piv: &Mutex<usize>, current_piv: usize) { 
+    let count = {
+        let mut count = itr_count.lock().unwrap();
+        *count += 1;
+        *count
+    };
+
+    if count % 10_000 == 0 { 
+        let mut before_piv = before_piv.lock().unwrap();
+        info!("    [{count}/{total}] +{}, total: {}.", current_piv - *before_piv, current_piv);
+        *before_piv = current_piv;
+    }
 }
 
 struct MatrixStr { 
@@ -441,6 +451,7 @@ impl PivotData {
 }
 
 struct RowWorker { 
+    row: usize,
     status: Vec<i8>,
     ncand: usize,
     queue: VecDeque<Col>,
@@ -452,10 +463,11 @@ impl RowWorker {
         let status = vec![0; size];
         let queue = VecDeque::new();
         let queued = AHashSet::new();
-        RowWorker {status, ncand: 0, queue, queued }
+        RowWorker {row: 0, status, ncand: 0, queue, queued }
     }
 
     fn clear(&mut self) {
+        self.row = 0;
         self.status.fill(0);
         self.ncand = 0;
         self.queue.clear();
@@ -478,6 +490,7 @@ impl RowWorker {
 
     fn init(&mut self, i: usize, str: &MatrixStr, pivots: &PivotData) { 
         self.clear();
+        self.row = i;
 
         for &j in str.cols_in(i) {
             if pivots.has_col(j) {

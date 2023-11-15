@@ -119,6 +119,34 @@ macro_rules! impl_multivar_unsigned {
                 self.0.all_leq(&other.0)
             }
         }
+
+        impl<const X: char> MultiVar<X, $I> {
+            pub fn generate(n: usize, tot_deg: usize) -> Vec<Self> { 
+                type Degs = Vec<(usize, usize)>;
+                fn generate(n: usize, tot_deg: usize, i: usize, res: &mut Vec<Degs>, prev: Degs) {
+                    if i < n - 1 { 
+                        for d_i in (0..=tot_deg).rev() { 
+                            let mut curr = prev.clone();
+                            curr.push((i, d_i));
+                            
+                            let rem = tot_deg - d_i;
+                            generate(n, rem, i + 1, res, curr)
+                        }
+                    } else { 
+                        let mut curr = prev;
+                        curr.push((i, tot_deg));
+                        res.push(curr);
+                    }
+                }
+            
+                let mut res = vec![];
+                generate(n, tot_deg, 0, &mut res, vec![]);
+            
+                res.into_iter().map(|d| {
+                    Self::from_iter(d)
+                }).collect()
+            }
+        }
     };
 }
 
@@ -268,5 +296,15 @@ mod tests {
         assert_eq!(&one / &d1, d1.inv().unwrap());
         assert_eq!(&d1 / &d2, M::from([1,0,2]));
         assert_eq!(&d2 / &d1, M::from([-1,0,-2]));
+    }
+
+    #[test]
+    fn gen_mons() { 
+        type M = MultiVar<'X', usize>;
+
+        let n = 3;
+        let tot = 5;
+        let mons = M::generate(n, tot);
+        assert_eq!(mons.len(), 21);
     }
 }

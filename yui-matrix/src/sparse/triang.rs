@@ -40,8 +40,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         // TODO
     }
 
-    const MULTI_THREAD: bool = true;
-    if MULTI_THREAD { 
+    if crate::config::is_multithread_enabled() { 
         solve_triangular_m(t, a, y)
     } else { 
         solve_triangular_s(t, a, y)

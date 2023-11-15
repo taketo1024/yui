@@ -180,8 +180,7 @@ impl PivotFinder {
     fn find_cycle_free_pivots(&mut self) {
         let before_piv_count = self.pivots.count();
 
-        const MULTI_THREAD: bool = true;
-        if MULTI_THREAD { 
+        if crate::config::is_multithread_enabled() { 
             self.find_cycle_free_pivots_m();
         } else {
             self.find_cycle_free_pivots_s();

@@ -176,11 +176,10 @@ macro_rules! impl_polyn_funcs {
                 self.iter()
                     .filter(|(x, _)| x.deg_for(k) > 0)
                     .max_by(|(x, _), (y, _)|
-                        Ord::cmp(
-                            &x.deg_for(k), &y.deg_for(k)
-                        ).then(Ord::cmp(
-                            &x, &y
-                        ))
+                        Ord::cmp( &x.deg_for(k), &y.deg_for(k))
+                        .then_with(|| 
+                            Ord::cmp(&x, &y)
+                        )
                     )
             }
         }

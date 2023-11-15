@@ -1,6 +1,6 @@
 use yui::{Ring, RingOps};
 use super::*;
-use super::triang::{TriangularType, solve_triangular};
+use super::triang::{TriangularType, solve_triangular, solve_triangular_left};
 
 //                [a  b]
 //                [c  d]
@@ -42,10 +42,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn compute_from_partial_lower(a: &SpMat<R>, r: usize, with_trans: bool) -> (SpMat<R>, Option<SpMat<R>>, Option<SpMat<R>>) {
         let (m, n) = a.shape();
 
-        //  [a   ][x] = [b]  ==>  [x] = [a⁻¹b     ]
-        //  [c  1][y]   [d]       [y]   [d - ca⁻¹b]
+        //  [a   ][a⁻¹b   ] = [b]
+        //  [c  1][d-ca⁻¹b]   [d]
         //  ~~~~~~
-        //    p
+        //    = p
         
         let p = SpMat::from_entries((m, m), Iterator::chain(
             a.view().submat_cols(0..r).iter().map(|(i, j, x)| (i, j, x.clone())),
@@ -61,16 +61,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             // t_in = [-a⁻¹b]
             //        [  1  ]
+            
             let ainvb = pinvbd.submat_rows(0..r);
             let t_in = (-ainvb).stack(&id(n - r));
     
-            // [a   ][x] = [1]  ==>  [x] = [a⁻¹  ] 
-            // [c  1][y]   [0]       [y]   [-ca⁻¹]
-            let i = SpMat::id(r).stack(&SpMat::zero((m - r, r)));
-            let ncainv = solve_triangular(TriangularType::Lower, &p, &i).submat_rows(r..m);
+            // [-ca⁻¹  1][a   ] = [0  1]
+            //           [c  1] 
+            // ~~~~~~~~~~
+            //   = t_out
 
-            // t_out = [-ca⁻¹  1]
-            let t_out = ncainv.concat(&id(m - r));
+            let i = SpMat::zero((m - r, r)).concat(&SpMat::id(m - r));
+            let t_out = solve_triangular_left(TriangularType::Lower, &p, &i);
 
             (Some(t_in), Some(t_out))
         } else { 
@@ -106,7 +107,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn schur_compl() {
+    fn schur() {
         let a = SpMat::from_vec((6, 5), vec![
             1, 0, 0, 1, 3,
             2,-1, 0, 2, 2,
@@ -115,15 +116,16 @@ mod tests {
             5, 3, 5, 2, 2,
             6, 2,-3, 1, 8
         ]);
-        let s = Schur::from_partial_lower(&a, 3, false);
+        let sch = Schur::from_partial_lower(&a, 3, false);
+        let s = sch.complement();
 
-        assert_eq!(s.complement(), &SpMat::from_vec((3,2), vec![5,36,12,45,-14,-60]));
-        assert_eq!(s.t_in,  None);
-        assert_eq!(s.t_out, None);
+        assert_eq!(s, &SpMat::from_vec((3,2), vec![5,36,12,45,-14,-60]));
+        assert!(sch.trans_in().is_none());
+        assert!(sch.trans_out().is_none());
     }
 
     #[test]
-    fn trans_vec() {
+    fn schur_with_trans() {
         let a = SpMat::from_vec((6, 5), vec![
             1, 0, 0, 1, 3,
             2,-1, 0, 2, 2,
@@ -132,18 +134,18 @@ mod tests {
             5, 3, 5, 2, 2,
             6, 2,-3, 1, 8
         ]);
-        let s = Schur::from_partial_lower(&a, 3, true);
+        let sch = Schur::from_partial_lower(&a, 3, true);
+        let s = sch.complement();
 
-        assert_eq!(s.complement(), &SpMat::from_vec((3,2), vec![5,36,12,45,-14,-60]));
-        assert_eq!(s.trans_in(),  Some(&SpMat::from_vec((5,2), vec![-1,-3,0,-4,3,14,1,0,0,1])));
-        assert_eq!(s.trans_out(), Some(&SpMat::from_vec((3,6), vec![20,-6,-4,1,0,0,24,-7,-5,0,1,0,-31,8,3,0,0,1])));
+        assert_eq!(s, &SpMat::from_vec((3,2), vec![5,36,12,45,-14,-60]));
+        assert!(sch.trans_in().is_some());
+        assert!(sch.trans_out().is_some());
 
-        let v = SpVec::from(vec![1,2]);
-        let w = s.trans_in().unwrap() * v;
-        assert_eq!(w, SpVec::from(vec![-7,-8,31,1,2]));
+        let t_in = sch.trans_in().unwrap();
+        let t_out = sch.trans_out().unwrap();
 
-        let v = SpVec::from(vec![1,2,0,-3,2,1]);
-        let w = s.trans_out().unwrap() * v;
-        assert_eq!(w, SpVec::from(vec![5,12,-14]));
+        assert_eq!(t_in,  &SpMat::from_vec((5,2), vec![-1,-3,0,-4,3,14,1,0,0,1]));
+        assert_eq!(t_out, &SpMat::from_vec((3,6), vec![20,-6,-4,1,0,0,24,-7,-5,0,1,0,-31,8,3,0,0,1]));
+        assert_eq!(&(t_out * &a * t_in), s);
     }
 }

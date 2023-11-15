@@ -2,11 +2,9 @@ use std::collections::BTreeMap;
 use std::ops::{Add, AddAssign, Neg, SubAssign, Sub, Index};
 use std::hash::Hash;
 
-use ahash::AHashSet;
 use auto_impl_ops::auto_ops;
 use delegate::delegate;
 use derive_more::{Display, DebugCustom};
-use itertools::Itertools;
 use num_traits::Zero;
 
 #[derive(Clone, Default, PartialEq, Eq, Hash, Display, DebugCustom)]
@@ -53,11 +51,11 @@ impl<I> MultiDeg<I> {
 impl<I> MultiDeg<I>
 where I: Zero + Ord { 
     pub fn all_leq(&self, other: &Self) -> bool {
-        let i0 = AHashSet::from_iter( self.indices());
-        let i1 = AHashSet::from_iter(other.indices());
-
-        i0.union(&i1).all(|&&i|
-            self[i] <= other[i]
+        self.iter().all(|(&i0, d0)| { 
+            d0 <= &other[i0]
+        }) &&
+        other.iter().all(|(&i1, d1)|
+            &self[i1] <= d1
         )
     }
 
@@ -174,17 +172,19 @@ where I: Clone + Zero + Ord + for<'x> Add<&'x I, Output = I> {
 
         Ord::cmp(&self.total(), &other.total())
         .then_with(|| { 
-            let i0 = AHashSet::from_iter( self.indices());
-            let i1 = AHashSet::from_iter(other.indices());
-            let indices = i0.union(&i1).sorted();
-            
-            for &&i in indices { 
-                let c = Ord::cmp(&self[i], &other[i]);
-                if !c.is_eq() { 
-                    return c
+            let mut itr0 =  self.iter();
+            let mut itr1 = other.iter();
+
+            // It is impossible that only either one of `next` is None, 
+            // since the `total`s are equal, and at each iteration the previous degrees have been equal.
+            while let (Some((i0, d0)), Some((i1, d1))) = (itr0.next(), itr1.next()) { 
+                // If i0 < i1, then x_i0 > x_i1. 
+                let c = Ord::cmp(i0, i1).reverse().then(Ord::cmp(d0, d1));
+                if c.is_ne() { 
+                    return c;
                 }
             }
-    
+
             Ordering::Equal
         })
     }

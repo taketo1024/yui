@@ -53,28 +53,25 @@ where
     fn d_matrix_for(&self, i: I, q: &SpMat<R>) -> SpMat<R> { 
         assert_eq!(q.rows(), self[i].rank());
 
-        let i1 = i + self.d_deg;
-        let (m, n) = (self[i1].rank(), q.cols());
+        let m = self[i + self.d_deg].rank();
+        let n = q.cols();
 
-        let entries: Vec<_> = (0..n).into_par_iter().map(|j| {
-            let v = q.col_vec(j);
-            let z = v.iter().map(|(k, a)|
-                self[i].gen_chain(k) * a
-            ).sum::<Lc<_, _>>();
-
-            let dz = self.d(i, &z);
-            let w = self[i1].vectorize(&dz);
-
-            w.iter().filter_map(|(i, a)| { 
-                if !a.is_zero() {
-                    Some((i, j, a.clone()))
-                } else { 
-                    None
-                }
-            }).collect_vec()
-        }).collect();
+        let entries: Vec<_> = (0..n).into_par_iter().map(|j|
+            self.d_matrix_col(i, q, j)
+        ).collect();
 
         SpMat::from_entries((m, n), entries.into_iter().flatten())
+    }
+
+    fn d_matrix_col(&self, i: I, q: &SpMat<R>, j: usize) -> Vec<(usize, usize, R)> { 
+        let qj = q.col_vec(j);
+        let z = self[i].as_chain(&qj);
+        let w = self.d(i, &z);
+        let dj = self[i + self.d_deg].vectorize(&w);
+
+        dj.iter().filter(|(_, a)| !a.is_zero()).map(|(i, a)| { 
+            (i, j, a.clone())
+        }).collect_vec()
     }
 
     pub fn reduced(&self) -> XChainComplexBase<I, X, R> { 

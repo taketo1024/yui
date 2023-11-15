@@ -130,22 +130,22 @@ fn _solve_triangular<R>(t: TriangularType, a: &SpMat<R>, diag: &[&R], b: &mut [R
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let mut entries = vec![];
 
-    let n = a.rows();
-    let range = if t.is_upper() { 
-        Either::Left((0..n).rev())
+    let itr = diag.iter().enumerate();
+    let itr = if t.is_upper() { 
+        Either::Left(itr.rev())
     } else { 
-        Either::Right(0..n)
+        Either::Right(itr)
     };
 
-    for j in range {
+    for (j, u) in itr { // u = a_jj
         if b[j].is_zero() { continue }
 
-        let u_jj_inv = diag[j].inv().unwrap();
-        let x_j = &b[j] * &u_jj_inv; // non-zero
+        let uinv = u.inv().unwrap();
+        let x_j = &b[j] * &uinv; // non-zero
 
-        for (i, u_ij) in a.col_vec(j).iter() {
-            if u_ij.is_zero() { continue }
-            b[i] -= u_ij * &x_j;
+        for (i, a_ij) in a.col_vec(j).iter() {
+            if a_ij.is_zero() { continue }
+            b[i] -= a_ij * &x_j;
         }
 
         entries.push((j, x_j));

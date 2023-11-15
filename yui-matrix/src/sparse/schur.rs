@@ -53,24 +53,24 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         ));
         let bd = a.submat_cols(r..n);
         
-        let x = solve_triangular(TriangularType::Lower, &p, &bd);
-        let s = x.submat_rows(r..m);
+        let pinvbd = solve_triangular(TriangularType::Lower, &p, &bd);
+        let s = pinvbd.submat_rows(r..m);
 
         let (t_in, t_out) = if with_trans { 
             let id = |n| SpMat::id(n);
 
             // t_in = [-a⁻¹b]
             //        [  1  ]
-            let n_ainvb = -x.submat_rows(0..r);
-            let t_in = n_ainvb.stack(&id(n - r));
+            let ainvb = pinvbd.submat_rows(0..r);
+            let t_in = (-ainvb).stack(&id(n - r));
     
             // [a   ][x] = [1]  ==>  [x] = [a⁻¹  ] 
             // [c  1][y]   [0]       [y]   [-ca⁻¹]
             let i = SpMat::id(r).stack(&SpMat::zero((m - r, r)));
-            let y = solve_triangular(TriangularType::Lower, &p, &i).submat_rows(r..m);
+            let ncainv = solve_triangular(TriangularType::Lower, &p, &i).submat_rows(r..m);
 
             // t_out = [-ca⁻¹  1]
-            let t_out = y.concat(&id(m - r));
+            let t_out = ncainv.concat(&id(m - r));
 
             (Some(t_in), Some(t_out))
         } else { 

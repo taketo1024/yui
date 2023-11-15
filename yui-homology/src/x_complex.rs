@@ -63,6 +63,7 @@ where
         SpMat::from_entries((m, n), entries.into_iter().flatten())
     }
 
+    #[inline(never)] // for profilability
     fn d_matrix_col(&self, i: I, q: &SpMat<R>, j: usize) -> Vec<(usize, usize, R)> { 
         let qj = q.col_vec(j);
         let z = self[i].as_chain(&qj);

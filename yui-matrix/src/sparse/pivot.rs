@@ -279,6 +279,7 @@ impl PivotFinder {
         self.pivots = pivots.into_inner().unwrap();
      }
 
+     #[inline(never)] // for profilability
      fn find_cycle_free_pivots_in(&self, pivots: &RwLock<PivotData>, loc_pivots: &mut PivotData, w: &mut RowWorker) {
         loop { 
             w.traverse(&self.str, loc_pivots);

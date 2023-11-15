@@ -125,6 +125,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     SpVec::from(x)
 }
 
+#[inline(never)] // for profilability
 fn solve_triangular_into<R>(t: TriangularType, a: &SpMat<R>, diag: &[&R], b: &mut [R], x: &mut [R])
 where R: Ring, for<'x> &'x R: RingOps<R> {
     debug_assert!(x.iter().all(|x_i| 

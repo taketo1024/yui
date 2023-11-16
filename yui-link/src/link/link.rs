@@ -5,8 +5,9 @@ use yui::bitseq::Bit;
 
 use super::{Crossing, CrossingType, LinkComp};
 
-pub type Edge = u8;
+pub type Edge = usize;
 pub type State = yui::bitseq::BitSeq;
+pub type XCode = [Edge; 4];
 
 // Planer Diagram code, represented by crossings:
 //
@@ -31,7 +32,7 @@ impl Link {
     }
 
     pub fn from_pd_code<I>(pd_code: I) -> Self
-    where I: IntoIterator<Item = [Edge; 4]> { 
+    where I: IntoIterator<Item = XCode> { 
         // TODO validate code
         let data = pd_code.into_iter().map(Crossing::from_pd_code).collect();
         Self::new(data)
@@ -293,7 +294,7 @@ impl Link {
 
     fn _load(path: &str) -> Result<Link, Box<dyn std::error::Error>> {
         let json = std::fs::read_to_string(path)?;
-        let data: Vec<[Edge; 4]> = serde_json::from_str(&json)?;
+        let data: Vec<XCode> = serde_json::from_str(&json)?;
         let l = Link::from_pd_code(data);
         Ok(l)
     }

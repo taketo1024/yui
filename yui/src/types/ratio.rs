@@ -7,7 +7,7 @@ use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
 use crate::{EucRing, EucRingOps, Elem, Mon, AddMon, AddGrp, AddMonOps, AddGrpOps, MonOps, RingOps, Ring, FieldOps, Field, Integer, IntOps};
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub struct Ratio<T> {
     numer: T,
     denom: T,
@@ -28,10 +28,44 @@ impl<T> Ratio<T> {
     pub const fn denom(&self) -> &T {
         &self.denom
     }
+}
 
+impl<T> Ratio<T>
+where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     #[inline]
-    fn inv_raw(self) -> Self {
-        Self::new_raw(self.denom, self.numer)
+    pub fn new(numer: T, denom: T) -> Ratio<T> {
+        assert!(!denom.is_zero());
+
+        let mut ret = Ratio::new_raw(numer, denom);
+        ret.reduce();
+        ret
+    }
+
+    fn reduce(&mut self) {
+        if self.numer.is_zero() {
+            if !self.denom.is_one() { 
+                self.denom.set_one();
+            }
+            return;
+        }
+
+        let u = self.denom.normalizing_unit();
+
+        if !u.is_one() { 
+            self.numer *= &u;
+            self.denom *= &u;
+        }
+
+        if self.denom.is_one() || self.numer.is_unit() { 
+            return
+        }
+
+        let g = EucRing::gcd(&self.numer, &self.denom); // normalized
+
+        if !g.is_one() {
+            self.numer /= &g;
+            self.denom /= &g;
+        }
     }
 }
 
@@ -46,6 +80,35 @@ impl<T> From<i32> for Ratio<T>
 where T: One + From<i32> {
     fn from(i: i32) -> Self {
         Self::from_numer(T::from(i))
+    }
+}
+
+impl<T> From<(T, T)> for Ratio<T>
+where T: EucRing, for<'x> &'x T: EucRingOps<T> {
+    fn from(pair: (T, T)) -> Self {
+        let (p, q) = pair;
+        Self::new(p, q)
+    }
+}
+
+impl<T> FromStr for Ratio<T>
+where T: EucRing + FromStr, for<'x> &'x T: EucRingOps<T> {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Ok(a) = s.parse::<T>() {
+            return Ok(Self::from_numer(a))
+        } 
+        
+        let r = regex::Regex::new(r"(.+)/(.+)").unwrap();
+        if let Some(c) = r.captures(s) { 
+            let (s1, s2) = (&c[1], &c[2]);
+            if let (Ok(a), Ok(b)) = (s1.parse::<T>(), s2.parse::<T>()) {
+                return Ok(Self::new(a, b))
+            }
+        }
+
+        Err(format!("cannot parse string: '{s}'"))
     }
 }
 
@@ -89,87 +152,10 @@ fn fmt(f: &mut std::fmt::Formatter<'_>, numer: String, denom: String) -> std::fm
     }
 }
 
-
-impl<T> Ratio<T>
-where T: EucRing, for<'x> &'x T: EucRingOps<T> {
-    #[inline]
-    pub fn new(numer: T, denom: T) -> Ratio<T> {
-        let mut ret = Ratio::new_raw(numer, denom);
-        ret.reduce();
-        ret
-    }
-
-    pub fn reduce(&mut self) {
-        if self.denom.is_zero() {
-            panic!("denominator = 0");
-        }
-
-        if self.denom.is_one() { 
-            return
-        }
-
-        if !self.denom.is_unit() { 
-            let g = EucRing::gcd(&self.numer, &self.denom);
-
-            if !g.is_one() {
-                self.numer /= &g;
-                self.denom /= &g;
-            }
-        }
-
-        let u = self.denom.normalizing_unit();
-
-        if !u.is_one() {
-            self.numer *= &u;
-            self.denom *= &u;
-        }
-    }
-}
-
-impl<T> From<(T, T)> for Ratio<T>
-where T: EucRing, for<'x> &'x T: EucRingOps<T> {
-    fn from(pair: (T, T)) -> Self {
-        let (p, q) = pair;
-        Self::new(p, q)
-    }
-}
-
-impl<T> FromStr for Ratio<T>
-where T: EucRing + FromStr, for<'x> &'x T: EucRingOps<T> {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if let Ok(a) = s.parse::<T>() {
-            return Ok(Self::from_numer(a))
-        } 
-        
-        let r = regex::Regex::new(r"(.+)/(.+)").unwrap();
-        if let Some(c) = r.captures(s) { 
-            let (s1, s2) = (&c[1], &c[2]);
-            if let (Ok(a), Ok(b)) = (s1.parse::<T>(), s2.parse::<T>()) {
-                return Ok(Self::new(a, b))
-            }
-        }
-        Err(())
-    }
-}
-
-impl<T> PartialEq for Ratio<T>
-where T: EucRing, for<'x> &'x T: EucRingOps<T> {
-    // MEMO: it is assumed that p/q is uniquely reduced.
-    fn eq(&self, other: &Self) -> bool {
-        self.numer == other.numer && 
-        self.denom == other.denom
-    }
-}
-
-impl<T> Eq for Ratio<T>
-where T: EucRing, for<'x> &'x T: EucRingOps<T> {}
-
 impl<T> Zero for Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     fn zero() -> Self {
-        Self::new(T::zero(), T::one())
+        Self::from_numer(T::zero())
     }
 
     fn is_zero(&self) -> bool {
@@ -180,7 +166,7 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
 impl<T> One for Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     fn one() -> Self {
-        Self::new_raw(T::one(), T::one())
+        Self::from_numer(T::one())
     }
 
     fn is_one(&self) -> bool {
@@ -188,38 +174,98 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     }
 }
 
-impl_unop!(Neg, neg);
-impl_add_op!(Add, add);
-impl_add_op!(Sub, sub);
+impl<T> Ratio<T>
+where T: One + PartialEq {
+    pub fn is_int(&self) -> bool { 
+        self.denom.is_one()
+    }
+}
 
-#[auto_ops]
-impl<'a, 'b, T> Mul<&'b Ratio<T>> for &'a Ratio<T>
+macro_rules! impl_add_assign_op {
+    ($trait:ident, $method:ident) => {
+        #[auto_ops]
+        impl<T> $trait<&Ratio<T>> for Ratio<T>
+        where T: EucRing, for<'x> &'x T: EucRingOps<T> {
+            fn $method(&mut self, rhs: &Ratio<T>) {
+                let (_, b) = (&self.numer, &self.denom);
+                let (c, d) = ( &rhs.numer,  &rhs.denom);
+                
+                if rhs.is_zero() { 
+                    // do nothing
+                } else if self.is_zero() { 
+                    self.numer.$method(c);  // 0 -> 0 ± c
+                    self.denom = d.clone(); // 1 -> d
+                } else if b == d { 
+                    self.numer.$method(c);  // a -> a ± c
+                    self.reduce()
+                } else { 
+                    let l = EucRing::lcm(b, d); // l = xb = yd
+                    self.numer *= (&l / b);     // a -> xa ± yc
+                    self.numer.$method((&l / d) * c);
+                    self.denom = l;             // b -> l
+                    self.reduce()
+                }
+            }
+        }
+    };
+}
+
+impl_add_assign_op!(AddAssign, add_assign);
+impl_add_assign_op!(SubAssign, sub_assign);
+
+impl<T> Neg for Ratio<T>
+where T: EucRing, for<'x> &'x T: EucRingOps<T> {
+    type Output = Self;
+    fn neg(self) -> Self::Output {
+        Ratio::new(-&self.numer, self.denom)
+    }
+}
+
+impl<T> Neg for &Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     type Output = Ratio<T>;
-    fn mul(self, rhs: &'b Ratio<T>) -> Self::Output {
-        if rhs.is_one() { 
-            return self.clone();
-        } else if self.is_one() { 
-            return rhs.clone();
-        }
-
-        let gcd_ad = EucRing::gcd(&self.numer, &rhs.denom);
-        let gcd_bc = EucRing::gcd(&self.denom, &rhs.numer);
-
-        Ratio::new(
-            &self.numer / &gcd_ad * (&rhs.numer / &gcd_bc),
-            &self.denom / &gcd_bc * (&rhs.denom / &gcd_ad),
-        )
+    fn neg(self) -> Self::Output {
+        Ratio::new(-&self.numer, self.denom.clone())
     }
 }
 
 #[auto_ops]
-impl<'a, 'b, T> Div<&'b Ratio<T>> for &'a Ratio<T>
+impl<T> MulAssign<&Ratio<T>> for Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {
-    type Output = Ratio<T>;
-    fn div(self, rhs: &'b Ratio<T>) -> Self::Output {
+    fn mul_assign(&mut self, rhs: &Ratio<T>) {
+        let (a, b) = (&self.numer, &self.denom);
+        let (c, d) = ( &rhs.numer,  &rhs.denom);
+
+        if self.is_zero() || rhs.is_one() { 
+            // do nothing
+        } else if rhs.is_zero() { 
+            self.set_zero();             // a -> 0, b -> 1
+        } else if rhs.is_int() { 
+            let k = EucRing::gcd(b, c);  // b = kb', c = kc'
+            self.numer *= c / &k;        // a -> a * c'
+            self.denom /= &k;            // b ->     b'
+        } else if self.is_int() { 
+            let k = EucRing::gcd(a, d);  // a = ka', d = kd'
+            self.numer /= &k;            // a -> a' * c
+            self.numer *= c;             // 
+            self.denom = d / &k;         // b ->      d'
+        } else {
+            let k = EucRing::gcd(a, d);  // a = ka', d = kd'
+            let l = EucRing::gcd(b, c);  // b = lb', c = lc'
+            self.numer /= &k;            // a -> a' * c'
+            self.numer *= c / &l;        //      
+            self.denom /= &l;            // b -> b' * d'
+            self.denom *= d / &k;        //      
+        }
+    }
+}
+
+#[auto_ops]
+impl<T> DivAssign<&Ratio<T>> for Ratio<T>
+where T: EucRing, for<'x> &'x T: EucRingOps<T> {
+    fn div_assign(&mut self, rhs: &Ratio<T>) {
         assert!(!rhs.is_zero());
-        self * rhs.clone().inv_raw()
+        *self *= rhs.inv().unwrap()
     }
 }
 
@@ -233,8 +279,42 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     }
 }
 
+macro_rules! impl_accum {
+    ($trait:ident, $method:ident, $accum_trait:ident, $accum_method:ident, $accum_init:ident) => {
+        impl<T> $trait for Ratio<T>
+        where T: EucRing, for<'x> &'x T: EucRingOps<T> {
+            fn $method<Iter: Iterator<Item = Self>>(iter: Iter) -> Self {
+                iter.fold(Self::$accum_init(), |mut res, r| { 
+                    Self::$accum_method(&mut res, r);
+                    res
+                })
+            }
+        }
+
+        impl<'a, T> $trait<&'a Ratio<T>> for Ratio<T>
+        where T: EucRing, for<'x> &'x T: EucRingOps<T> {
+            fn $method<Iter: Iterator<Item = &'a Ratio<T>>>(iter: Iter) -> Self {
+                iter.fold(Self::$accum_init(), |mut res, r| { 
+                    Self::$accum_method(&mut res, r);
+                    res
+                })
+            }
+        }
+    }
+}
+
 impl_accum!(Sum, sum, AddAssign, add_assign, zero);
 impl_accum!(Product, product, MulAssign, mul_assign, one);
+
+macro_rules! decl_alg_ops {
+    ($trait:ident) => {
+        impl<T> $trait for Ratio<T>
+        where T: EucRing, for<'x> &'x T: EucRingOps<T> {}
+
+        impl<T> $trait<Ratio<T>> for &Ratio<T>
+        where T: EucRing, for<'x> &'x T: EucRingOps<T> {}
+    };
+}
 
 decl_alg_ops!(AddMonOps);
 decl_alg_ops!(AddGrpOps);
@@ -250,7 +330,7 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
         if &t == "Z" { 
             String::from("Q")
         } else { 
-            format!("Frac({})", T::math_symbol())
+            format!("Q({})", T::math_symbol())
         }
     }
 }
@@ -270,8 +350,7 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
         if self.is_zero() { 
             None
         } else { 
-            let mut inv = self.clone().inv_raw();
-            inv.reduce();
+            let inv = Self::new(self.denom.clone(), self.numer.clone());
             Some(inv)
         }
     }
@@ -327,90 +406,6 @@ where T: Integer, for<'x> &'x T: IntOps<T> {
         Some(self.cmp(other))
     }
 }
-
-macro_rules! impl_unop {
-    ($trait:ident, $method:ident) => {
-        impl<T> $trait for Ratio<T>
-        where T: EucRing, for<'x> &'x T: EucRingOps<T> {
-            type Output = Self;
-            fn $method(self) -> Self::Output {
-                Ratio::new(self.numer.$method(), self.denom)
-            }
-        }
-
-        impl<'a, T> $trait for &'a Ratio<T>
-        where T: EucRing, for<'x> &'x T: EucRingOps<T> {
-            type Output = Ratio<T>;
-            #[inline]
-            fn $method(self) -> Self::Output {
-                Ratio::new((&self.numer).$method(), self.denom.clone())
-            }
-        }
-    };
-}
-
-macro_rules! impl_add_op {
-    ($trait:ident, $method:ident) => {
-        #[auto_ops]
-        impl<'a, 'b, T> $trait<&'b Ratio<T>> for &'a Ratio<T>
-        where T: EucRing, for<'x> &'x T: EucRingOps<T> {
-            type Output = Ratio<T>;
-            fn $method(self, rhs: &'b Ratio<T>) -> Self::Output {
-                if rhs.is_zero() { 
-                    return self.clone()
-                } else if self.is_zero() { 
-                    return Ratio::new_raw(
-                        T::zero().$method(&rhs.numer), 
-                        rhs.denom.clone()
-                    )
-                } else if self.denom == rhs.denom {
-                    return Ratio::new( 
-                        (&self.numer).$method(&rhs.numer), 
-                        rhs.denom.clone()
-                    );
-                }
-                let lcm = EucRing::lcm(&self.denom, &rhs.denom);
-                let lhs_numer = &self.numer * (&lcm / &self.denom);
-                let rhs_numer = &rhs.numer * (&lcm / &rhs.denom);
-                Ratio::new(lhs_numer.$method(rhs_numer), lcm)
-            }
-        }
-    };
-}
-
-macro_rules! impl_accum {
-    ($trait:ident, $method:ident, $accum_trait:ident, $accum_method:ident, $accum_init:ident) => {
-        impl<T> $trait for Ratio<T>
-        where T: EucRing, for<'x> &'x T: EucRingOps<T> {
-            fn $method<Iter: Iterator<Item = Self>>(iter: Iter) -> Self {
-                let mut res = Self::$accum_init();
-                for r in iter { Self::$accum_method(&mut res, r) }
-                return res;
-            }
-        }
-
-        impl<'a, T> $trait<&'a Ratio<T>> for Ratio<T>
-        where T: EucRing, for<'x> &'x T: EucRingOps<T> {
-            fn $method<Iter: Iterator<Item = &'a Ratio<T>>>(iter: Iter) -> Self {
-                let mut res = Self::$accum_init();
-                for r in iter { Self::$accum_method(&mut res, r) }
-                return res;
-            }
-        }
-    }
-}
-
-macro_rules! decl_alg_ops {
-    ($trait:ident) => {
-        impl<T> $trait for Ratio<T>
-        where T: EucRing, for<'x> &'x T: EucRingOps<T> {}
-
-        impl<T> $trait<Ratio<T>> for &Ratio<T>
-        where T: EucRing, for<'x> &'x T: EucRingOps<T> {}
-    };
-}
-
-use {impl_unop, impl_add_op, impl_accum, decl_alg_ops};
 
 #[cfg(test)]
 mod tests { 
@@ -468,6 +463,14 @@ mod tests {
         let o = Ratio::zero();
         assert_eq!(&a + &o, a);
         assert_eq!(&o + &a, a);
+
+        let a = Ratio::new(1, 3);
+        let b = Ratio::new(2, 3);
+        assert_eq!(a + b, Ratio::new(1, 1));
+
+        let a = Ratio::new(1, 6);
+        let b = Ratio::new(1, 3);
+        assert_eq!(a + b, Ratio::new(1, 2));
     }
 
     #[test]
@@ -506,13 +509,23 @@ mod tests {
     #[test]
     fn mul() { 
         let a = Ratio::new(3, 10);
-        let b = Ratio::new(2, 7);
-        assert_eq!(a * b, Ratio::new(3, 35));
+        let b = Ratio::new(-2, 7);
+        assert_eq!(a * b, Ratio::new(-3, 35));
 
-        let a = Ratio::new(1, 2);
+        let a = Ratio::new(3, 4);
         let e = Ratio::one();
         assert_eq!(&a * &e, a);
         assert_eq!(&e * &a, a);
+
+        let a = Ratio::new(3, 4);
+        let e = -Ratio::one();
+        assert_eq!(&a * &e, -a);
+        assert_eq!(&e * &a, -a);
+
+        let a = Ratio::new(3, 4);
+        let o = Ratio::zero();
+        assert_eq!(&a * &o, Ratio::zero());
+        assert_eq!(&o * &a, Ratio::zero());
     }
 
     #[test]

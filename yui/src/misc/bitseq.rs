@@ -111,12 +111,12 @@ impl BitSeq {
     } 
 
     pub fn weight(&self) -> usize { 
-        let mut v = self.val;
-        (0..self.len).filter(|_| {
-            let b = (v & 1) == 1;
+        let mut v = self.val as usize;
+        (0..self.len).fold(0, |res, _| {
+            let b = v & 1;
             v >>= 1;
-            b
-        }).count()
+            res + b
+        })
     }
 
     pub fn iter(&self) -> impl Iterator<Item = Bit> {

@@ -76,6 +76,13 @@ where T: One {
     }
 }
 
+impl<T> Ratio<T>
+where T: One + PartialEq {
+    pub fn is_numer(&self) -> bool { 
+        self.denom.is_one()
+    }
+}
+
 impl<T> From<i32> for Ratio<T>
 where T: One + From<i32> {
     fn from(i: i32) -> Self {
@@ -174,13 +181,6 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     }
 }
 
-impl<T> Ratio<T>
-where T: One + PartialEq {
-    pub fn is_int(&self) -> bool { 
-        self.denom.is_one()
-    }
-}
-
 macro_rules! impl_add_assign_op {
     ($trait:ident, $method:ident) => {
         #[auto_ops]
@@ -240,15 +240,15 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
             // do nothing
         } else if rhs.is_zero() { 
             self.set_zero();             // a -> 0, b -> 1
-        } else if rhs.is_int() { 
+        } else if rhs.is_numer() { 
             let k = EucRing::gcd(b, c);  // b = kb', c = kc'
             self.numer *= c / &k;        // a -> a * c'
-            self.denom /= &k;            // b ->     b'
-        } else if self.is_int() { 
+            self.denom /= &k;            // b -> b'
+        } else if self.is_numer() { 
             let k = EucRing::gcd(a, d);  // a = ka', d = kd'
             self.numer /= &k;            // a -> a' * c
             self.numer *= c;             // 
-            self.denom = d / &k;         // b ->      d'
+            self.denom = d / &k;         // 1 ->      d'
         } else {
             let k = EucRing::gcd(a, d);  // a = ka', d = kd'
             let l = EucRing::gcd(b, c);  // b = lb', c = lc'

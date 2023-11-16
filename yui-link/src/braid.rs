@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt;
 use std::ops::{MulAssign, Mul};
 use auto_impl_ops::auto_ops;
@@ -6,6 +7,8 @@ use itertools::Itertools;
 use num_traits::Zero;
 use yui::{GetSign, Sign};
 use yui::format::{subscript, superscript};
+
+use crate::{Link, XCode};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Generator(i32);
@@ -114,6 +117,52 @@ impl Braid {
         // TODO
     }
 
+    pub fn closure(&self) -> Link {
+        let mut count = self.strands;
+        let mut bottom_edges: Vec<usize> = (0..self.strands).collect();
+        let mut pd_code: Vec<XCode> = Vec::new();
+
+        for s in &self.elements {
+            /*        +       -
+             *  ↓   a   b   a   b
+             *       \ /     \ /
+             *  ↓     /       \
+             *       / \     / \
+             *  ↓   c   d   c   d
+             */
+            let i = s.index() - 1;
+            let (a, b) = (bottom_edges[i], bottom_edges[i + 1]);
+            let (c, d) = (count, count + 1);
+
+            if s.sign().is_positive() {
+                pd_code.push([a, c, d, b]);
+            } else {
+                pd_code.push([b, a, c, d]);
+            }
+
+            bottom_edges[i] = c;
+            bottom_edges[i + 1] = d;
+            count += 2;
+        }
+
+        assert!(
+            bottom_edges.iter().enumerate().all(|(i, &j)| i != j),
+            "braid closure contains free loop."
+        );
+
+        let conn: HashMap<_, _> = Iterator::zip(
+            bottom_edges.into_iter(),
+            0..self.strands
+        ).collect();
+
+        let pd_code = pd_code
+            .into_iter()
+            .map(|x| x.map(|a| *conn.get(&a).unwrap_or(&a)))
+            .collect_vec();
+
+        Link::from_pd_code(pd_code)
+    }
+
     pub fn display(&self) -> String { 
         fn row(strands: usize, gen: &Generator) -> String {
             let index = gen.index();
@@ -220,5 +269,12 @@ mod tests {
 
         let b = b.unwrap();
         assert_eq!(b.strands(), 2);
+    }
+
+    #[test]
+    fn closure() {
+        let b = Braid::from([-1,-1,-2,1,3,2,2,-4,-3,2,-3,-4]); // 9_41
+        let l = b.closure();
+        assert_eq!(l.crossing_num(), 12);
     }
 }

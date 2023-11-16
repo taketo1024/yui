@@ -1,44 +1,53 @@
 use std::fmt::Display;
 use itertools::Itertools;
+use num_traits::ToPrimitive;
 use super::digits::Digits;
 
-pub fn subscript(i: isize) -> String {
-    if i == 0 { return String::from('\u{2080}') }
+pub fn subscript<I>(i: I) -> String
+where I: ToPrimitive {
+    let i = i.to_isize().unwrap();
 
-    let (mut res, i) = if i > 0 { 
-        (vec![], i as usize)
+    if i == 0 { 
+        return '\u{2080}'.into()
+    }
+
+    let (init, i) = if i > 0 { 
+        (String::new(), i as usize)
     } else { 
-        (vec!['\u{208B}'], -i as usize)
+        ('\u{208B}'.into(), -i as usize)
     };
 
-    let mut s = i.digits().into_iter().map(|d| {
-        char::from_u32(('\u{2080}' as u32) + (d as u32)).unwrap()
-    }).collect_vec();
-
-    res.append(&mut s);
-    res.iter().collect()
+    i.digits().into_iter().fold(init, |mut res, d| {
+        let c = char::from_u32( ('\u{2080}' as u32) + (d as u32) ).unwrap();
+        res.push(c);
+        res
+    })
 }
 
-pub fn superscript(i: isize) -> String {
-    if i == 0 { return String::from('\u{2070}') }
+pub fn superscript<I>(i: I) -> String 
+where I: ToPrimitive {
+    let i = i.to_isize().unwrap();
 
-    let (mut res, i) = if i > 0 { 
-        (vec![], i as usize)
+    if i == 0 { 
+        return '\u{2070}'.into()
+    }
+
+    let (init, i) = if i > 0 { 
+        (String::new(), i as usize)
     } else { 
-        (vec!['\u{207B}'], -i as usize)
+        ('\u{207B}'.into(), -i as usize)
     };
 
-    let mut s = i.digits().into_iter().map(|d| {
-        match d { 
+    i.digits().into_iter().fold(init, |mut res, d| {
+        let c = match d { 
             1 => '\u{00B9}',
             2 => '\u{00B2}',
             3 => '\u{00B3}',
             _ => char::from_u32(('\u{2070}' as u32) + (d as u32)).unwrap()
-        }
-    }).collect_vec();
-
-    res.append(&mut s);
-    res.iter().collect()
+        };
+        res.push(c);
+        res
+    })
 }
 
 pub fn table<S, I, J, I1, I2, D, F>(head: S, rows: I1, cols: I2, entry: F) -> String

@@ -16,7 +16,7 @@ where
     for<'a> &'a Self: RingOps<Self>
 {
     fn from_sign(s: Sign) -> Self { 
-        Self::from(s.to_i32())
+        Self::from(s.into())
     }
 
     fn inv(&self) -> Option<Self>;

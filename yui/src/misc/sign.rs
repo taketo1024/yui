@@ -1,3 +1,4 @@
+use std::ops::Neg;
 use num_traits::Signed;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -5,6 +6,7 @@ pub enum Sign {
     Neg, 
     Pos
 }
+
 
 impl Sign { 
     pub fn is_positive(&self) -> bool { 
@@ -14,10 +16,6 @@ impl Sign {
     pub fn is_negative(&self) -> bool { 
         !self.is_positive()
     }
-
-    pub fn to_i32(&self) -> i32 { 
-        if self.is_positive() { 1 } else { -1 }
-    }
 }
 
 impl From<i32> for Sign {
@@ -26,6 +24,26 @@ impl From<i32> for Sign {
              1 => Sign::Pos,
             -1 => Sign::Neg,
              _ => panic!()
+        }
+    }
+}
+
+impl From<Sign> for i32 {
+    fn from(value: Sign) -> Self {
+        match value { 
+            Sign::Pos =>  1,
+            Sign::Neg => -1
+        }
+    }
+}
+
+impl Neg for Sign {
+    type Output = Self;
+    fn neg(self) -> Self {
+        use Sign::*;
+        match self { 
+            Neg => Pos,
+            Pos => Neg
         }
     }
 }

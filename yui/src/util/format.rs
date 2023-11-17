@@ -1,6 +1,7 @@
 use std::fmt::Display;
 use itertools::Itertools;
-use num_traits::{ToPrimitive, Zero};
+use num_traits::ToPrimitive;
+use crate::IntoDigits;
 
 pub fn subscript<I>(i: I) -> String
 where I: ToPrimitive {
@@ -16,7 +17,7 @@ where I: ToPrimitive {
         ('\u{208B}'.into(), -i as usize)
     };
 
-    i.digits().into_iter().fold(init, |mut res, d| {
+    i.into_digits().into_iter().fold(init, |mut res, d| {
         let c = char::from_u32( ('\u{2080}' as u32) + (d as u32) ).unwrap();
         res.push(c);
         res
@@ -37,7 +38,7 @@ where I: ToPrimitive {
         ('\u{207B}'.into(), -i as usize)
     };
 
-    i.digits().into_iter().fold(init, |mut res, d| {
+    i.into_digits().into_iter().fold(init, |mut res, d| {
         let c = match d { 
             1 => '\u{00B9}',
             2 => '\u{00B2}',
@@ -87,33 +88,6 @@ where
     }
 
     table.to_string()
-}
-
-trait Digits { 
-    fn digits(&self) -> Vec<u8> { 
-        self.digits_rev().into_iter().rev().collect()
-    }
-
-    fn digits_rev(&self) -> Vec<u8> { 
-        self.digits().into_iter().rev().collect()
-    }
-}
-
-impl Digits for usize { 
-    fn digits_rev(&self) -> Vec<u8> {
-        if self.is_zero() { return vec![0] }
-
-        let mut num = *self;
-        (0..).map_while(|_| { 
-            if num > 0 { 
-                let d = (num % 10) as u8;
-                num /= 10;
-                Some(d)
-            } else {
-                None
-            }
-        }).collect()
-    }
 }
 
 #[cfg(test)]

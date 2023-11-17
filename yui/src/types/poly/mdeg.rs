@@ -29,8 +29,8 @@ where I: Zero {
 impl<I> MultiDeg<I> {
     delegate! { 
         to self.data { 
-            pub fn len(&self) -> usize;
-            pub fn is_empty(&self) -> bool;
+            #[call(len)]
+            pub fn ninds(&self) -> usize;
             pub fn iter(&self) -> impl Iterator<Item = (&usize, &I)>;
         }
     }

@@ -122,28 +122,19 @@ macro_rules! impl_multivar_unsigned {
 
         impl<const X: char> MultiVar<X, $I> {
             pub fn generate(n: usize, tot_deg: usize) -> Vec<Self> { 
-                type Degs = Vec<(usize, usize)>;
-                fn generate(n: usize, tot_deg: usize, i: usize, res: &mut Vec<Degs>, prev: Degs) {
-                    if i < n - 1 { 
-                        for d_i in (0..=tot_deg).rev() { 
-                            let mut curr = prev.clone();
-                            curr.push((i, d_i));
-                            
-                            let rem = tot_deg - d_i;
-                            generate(n, rem, i + 1, res, curr)
-                        }
-                    } else { 
-                        let mut curr = prev;
-                        curr.push((i, tot_deg));
-                        res.push(curr);
-                    }
+                use dinglebit_combinatorics::Combination as C;
+                use crate::rep_comb::rep_comb;
+        
+                assert!(n > 0 || tot_deg == 0);
+        
+                if tot_deg == 0 { 
+                    return vec![Self::one()];
                 }
-            
-                let mut res = vec![];
-                generate(n, tot_deg, 0, &mut res, vec![]);
-            
-                res.into_iter().map(|d| {
-                    Self::from_iter(d)
+        
+                let c = C::new(n + tot_deg - 1, n - 1);
+                c.into_iter().map(|mut list| {
+                    list.push(n + tot_deg - 1); // the right-end wall
+                    Self::from_iter( rep_comb(&list) )
                 }).collect()
             }
         }
@@ -181,6 +172,8 @@ impl_multivar_signed!  (isize);
 
 #[cfg(test)]
 mod tests { 
+    use itertools::Itertools;
+
     use super::*;
 
     #[test]
@@ -305,6 +298,12 @@ mod tests {
         let n = 3;
         let tot = 5;
         let mons = M::generate(n, tot);
+
         assert_eq!(mons.len(), 21);
+        assert!(mons.iter().all(|x| x.total_deg() == tot));
+        assert!(mons.iter().all_unique());
+
+        assert_eq!(M::generate(0, 0), vec![M::one()]); // deg(1) = 0, using no vars.
+        assert_eq!(M::generate(n, 0), vec![M::one()]); // deg(1) = 0, using n-vars.
     }
 }

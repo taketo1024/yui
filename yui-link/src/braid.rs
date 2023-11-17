@@ -193,10 +193,7 @@ impl Braid {
     pub fn load(name_or_path: &str) -> Result<Braid, Box<dyn std::error::Error>> {
         const RESOURCE_DIR: &str = "resources/braid/";
         
-        use regex::Regex;
-        let r = Regex::new(r"([1-9]|10)_[0-9]+").unwrap();
-
-        if r.is_match(name_or_path) { 
+        if Link::is_valid_name(name_or_path) { 
             let dir = std::env!("CARGO_MANIFEST_DIR");
             let path = format!("{dir}/{RESOURCE_DIR}{name_or_path}.json");
             Self::_load(&path)

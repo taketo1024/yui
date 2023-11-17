@@ -1,7 +1,6 @@
 use std::fmt::Display;
 use itertools::Itertools;
-use num_traits::ToPrimitive;
-use super::digits::Digits;
+use num_traits::{ToPrimitive, Zero};
 
 pub fn subscript<I>(i: I) -> String
 where I: ToPrimitive {
@@ -88,6 +87,33 @@ where
     }
 
     table.to_string()
+}
+
+trait Digits { 
+    fn digits(&self) -> Vec<u8> { 
+        self.digits_rev().into_iter().rev().collect()
+    }
+
+    fn digits_rev(&self) -> Vec<u8> { 
+        self.digits().into_iter().rev().collect()
+    }
+}
+
+impl Digits for usize { 
+    fn digits_rev(&self) -> Vec<u8> {
+        if self.is_zero() { return vec![0] }
+
+        let mut num = *self;
+        (0..).map_while(|_| { 
+            if num > 0 { 
+                let d = (num % 10) as u8;
+                num /= 10;
+                Some(d)
+            } else {
+                None
+            }
+        }).collect()
+    }
 }
 
 #[cfg(test)]

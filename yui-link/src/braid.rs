@@ -6,7 +6,7 @@ use delegate::delegate;
 use itertools::Itertools;
 use num_traits::Zero;
 use yui::{GetSign, Sign};
-use yui::format::{subscript, superscript};
+use yui::util::format::{subscript, superscript};
 
 use crate::{Link, XCode};
 

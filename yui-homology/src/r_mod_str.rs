@@ -34,7 +34,7 @@ where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
 
 pub fn rmod_str_symbol<R>(rank: usize, tors: &[R], dflt: &str) -> String
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    use yui::format::superscript;
+    use yui::util::format::superscript;
 
     let tors = tors.iter()
         .into_group_map_by(|r| r.to_string())

@@ -590,7 +590,7 @@ impl RowWorker {
 mod tests {
     use super::*;
     use num_traits::{Zero, One};
-    use yui::macros::set;
+    use yui::util::macros::set;
  
     #[test]
     fn str_init() {

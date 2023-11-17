@@ -4,7 +4,7 @@ use num_traits::{Zero, One};
 
 use crate::Elem;
 use crate::lc::Gen;
-use crate::format::subscript;
+use crate::util::format::subscript;
 use super::{Mono, MultiDeg, Univar, fmt_mono};
 
 pub type MultiVar<const X: char, I> = Univar<X, MultiDeg<I>>;

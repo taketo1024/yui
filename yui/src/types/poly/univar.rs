@@ -7,7 +7,7 @@ use auto_impl_ops::auto_ops;
 
 use crate::Elem;
 use crate::lc::Gen;
-use crate::format::superscript;
+use crate::util::format::superscript;
 use super::Mono;
 
 // `Univar<X, I>` : represents monomials X^d (univar) or ΠX_i^{d_i} (multivar).

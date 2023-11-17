@@ -479,7 +479,7 @@ where
 mod tests {
     use num_traits::Zero;
     use crate::Elem;
-    use crate::macros::map;
+    use crate::util::macros::map;
     use crate::lc::{Free, Lc};
  
     type X = Free<i32>;

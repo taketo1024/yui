@@ -18,7 +18,7 @@ use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use sprs::PermOwned;
 use thread_local::ThreadLocal;
 use yui::{Ring, RingOps};
-use yui::top_sort::top_sort;
+use yui::algo::top_sort;
 use super::*;
 
 #[derive(PartialEq, Eq, Clone, Copy)]

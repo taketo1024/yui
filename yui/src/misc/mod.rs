@@ -6,8 +6,6 @@ mod div_round;
 mod index_list;
 
 pub mod bitseq;
-pub mod top_sort;
-pub mod rep_comb;
 pub mod macros;
 pub mod format;
 mod digits;

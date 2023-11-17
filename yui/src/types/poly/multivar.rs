@@ -123,7 +123,7 @@ macro_rules! impl_multivar_unsigned {
         impl<const X: char> MultiVar<X, $I> {
             pub fn generate(n: usize, tot_deg: usize) -> Vec<Self> { 
                 use dinglebit_combinatorics::Combination as C;
-                use crate::rep_comb::rep_comb;
+                use crate::algo::rep_comb;
         
                 assert!(n > 0 || tot_deg == 0);
         

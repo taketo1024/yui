@@ -3,10 +3,10 @@ use std::ops::Index;
 
 use itertools::{Itertools, Either};
 use delegate::delegate;
-use yui::{Ring, RingOps, Deg, isize2, isize3};
+use yui::{Ring, RingOps};
 use yui_matrix::sparse::{SpMat, SpVec, MatType, Trans};
 
-use crate::{Grid, GridIter, RModStr, SimpleRModStr, rmod_str_symbol};
+use crate::{GridDeg, isize2, isize3, Grid, GridIter, RModStr, SimpleRModStr, rmod_str_symbol};
 
 use super::grid::GridTrait;
 use super::utils::ChainReducer;
@@ -19,7 +19,7 @@ pub type ChainComplex3<R> = ChainComplexBase<isize3, R>;
 
 pub trait ChainComplexTrait<I>: Sized
 where 
-    I: Deg, 
+    I: GridDeg, 
     Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> 
 { 
     type R;
@@ -33,7 +33,7 @@ where
 
 pub trait ChainComplexCommon<I>: GridTrait<I> + ChainComplexTrait<I>
 where 
-    I: Deg, 
+    I: GridDeg, 
     Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>
 {
     fn check_d_at(&self, i0: I) { 
@@ -89,20 +89,20 @@ where
 
 impl<I, C> ChainComplexCommon<I> for C 
 where 
-    I: Deg,
+    I: GridDeg,
     C: GridTrait<I> + ChainComplexTrait<I>,
     C::R: Ring, for<'x> &'x C::R: RingOps<C::R>
 {}
 
 pub struct ChainComplexBase<I, R>
-where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
+where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {
     summands: Grid<I, ChainComplexSummand<R>>,
     d_deg: I,
     d_matrices: Grid<I, SpMat<R>>
 }
 
 impl<I, R> ChainComplexBase<I, R> 
-where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
+where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(summands: Grid<I, ChainComplexSummand<R>>, d_deg: I, mut d_matrices: Grid<I, SpMat<R>>) -> Self { 
         assert!(summands.iter().all(|(_, s)| s.is_free()));
         
@@ -147,7 +147,7 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 impl<I, R> GridTrait<I> for ChainComplexBase<I, R>
-where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
+where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {
     type Itr = GridIter<I>;
     type Output = ChainComplexSummand<R>;
 
@@ -161,7 +161,7 @@ where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 impl<I, R> ChainComplexTrait<I> for ChainComplexBase<I, R>
-where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
+where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {
     type R = R;
     type Element = SpVec<R>;
 
@@ -206,7 +206,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 impl<I, R> Index<I> for ChainComplexBase<I, R>
-where I: Deg, R: Ring, for<'x> &'x R: RingOps<R> {
+where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = ChainComplexSummand<R>;
     fn index(&self, i: I) -> &Self::Output {
         self.get(i)

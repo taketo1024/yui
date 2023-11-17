@@ -6,9 +6,9 @@ use sprs::PermOwned;
 use yui_matrix::sparse::*;
 use yui_matrix::sparse::pivot::{perms_by_pivots, find_pivots, PivotType};
 use yui_matrix::sparse::schur::Schur;
-use yui::{Ring, RingOps, Deg};
+use yui::{Ring, RingOps};
 
-use crate::{ChainComplexTrait, ChainComplexBase, Grid, SimpleRModStr, GridIter, GridTrait};
+use crate::{GridDeg, ChainComplexTrait, ChainComplexBase, Grid, SimpleRModStr, GridIter, GridTrait};
 
 //       a0 = [x]      a1 = [a b]      a2 = [z w]
 //            [y]           [c d]     
@@ -25,7 +25,7 @@ use crate::{ChainComplexTrait, ChainComplexBase, Grid, SimpleRModStr, GridIter, 
 
 pub struct ChainReducer<I, R>
 where 
-    I: Deg,
+    I: GridDeg,
     R: Ring, for<'x> &'x R: RingOps<R>,
 { 
     support: Vec<I>,
@@ -37,7 +37,7 @@ where
 
 impl<I, R> ChainReducer<I, R>
 where 
-    I: Deg,
+    I: GridDeg,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
     pub fn reduce<C>(complex: &C, with_trans: bool) -> ChainComplexBase<I, R> 

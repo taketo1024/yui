@@ -5,12 +5,12 @@ use delegate::delegate;
 
 use itertools::Itertools;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
-use yui::{Ring, RingOps, Deg, isize2, isize3};
+use yui::{Ring, RingOps};
 use yui::lc::{Gen, Lc};
 use yui_matrix::sparse::{SpMat, Trans, MatType};
 
 use crate::utils::ChainReducer;
-use crate::{Grid, GridIter, XModStr, RModStr, SimpleRModStr};
+use crate::{GridDeg, isize2, isize3, Grid, GridIter, XModStr, RModStr, SimpleRModStr};
 
 use super::grid::GridTrait;
 use super::complex::ChainComplexTrait;
@@ -23,7 +23,7 @@ pub type XChainComplexSummand<X, R> = XModStr<X, R>;
 
 pub struct XChainComplexBase<I, X, R>
 where 
-    I: Deg,
+    I: GridDeg,
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
@@ -34,7 +34,7 @@ where
 
 impl<I, X, R> XChainComplexBase<I, X, R>
 where 
-    I: Deg,
+    I: GridDeg,
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
@@ -121,7 +121,7 @@ where
 
 impl<I, X, R> GridTrait<I> for XChainComplexBase<I, X, R>
 where 
-    I: Deg,
+    I: GridDeg,
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
@@ -139,7 +139,7 @@ where
 
 impl<I, X, R> ChainComplexTrait<I> for XChainComplexBase<I, X, R>
 where 
-    I: Deg,
+    I: GridDeg,
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
@@ -166,7 +166,7 @@ where
 }
 
 impl<I, X, R> Index<I> for XChainComplexBase<I, X, R>
-where I: Deg, X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+where I: GridDeg, X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = XChainComplexSummand<X, R>;
     fn index(&self, i: I) -> &Self::Output {
         self.get(i)

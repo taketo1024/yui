@@ -1,7 +1,8 @@
-use yui::{EucRing, EucRingOps, Deg, isize2, isize3};
+use yui::{EucRing, EucRingOps};
 
 use crate::utils::HomologyCalc;
-use crate::{Grid, ChainComplexTrait, SimpleRModStr, ChainComplexBase, GridTrait};
+use crate::{GridDeg, isize2, isize3};
+use crate::{Grid, GridTrait, ChainComplexTrait, SimpleRModStr, ChainComplexBase};
 
 pub type HomologySummand<R> = SimpleRModStr<R>;
 pub type HomologyBase<I, R> = Grid<I, HomologySummand<R>>;
@@ -17,7 +18,7 @@ pub trait ComputeHomology<I> {
 
 impl<I, R, C> ComputeHomology<I> for C 
 where 
-    I: Deg, 
+    I: GridDeg, 
     R: EucRing, for<'x> &'x R: EucRingOps<R>,
     C: ChainComplexTrait<I, R = R>
 {
@@ -32,7 +33,7 @@ where
 }
 
 impl<I, R> ChainComplexBase<I, R> 
-where I: Deg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
+where I: GridDeg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn homology_at(&self, i: I, with_trans: bool) -> HomologySummand<R> {
         let c = &self[i];
         let h = self.compute_homology(i, with_trans);

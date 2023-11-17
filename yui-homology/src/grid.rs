@@ -3,10 +3,10 @@ use std::ops::Index;
 use std::fmt::Display;
 
 use itertools::Itertools;
-use yui::{isize2, usize2, Deg, isize3, usize3};
+use crate::{GridDeg, isize2, usize2, isize3, usize3};
 
 pub trait GridTrait<I>
-where I: Deg { 
+where I: GridDeg { 
     type Itr: Iterator<Item = I>;
     type Output;
 
@@ -23,14 +23,14 @@ pub type GridIter<I> = std::vec::IntoIter<I>;
 
 #[derive(Clone)]
 pub struct Grid<I, E>
-where I: Deg { 
+where I: GridDeg { 
     support: Vec<I>,
     data: HashMap<I, E>,
     dflt: E
 }
 
 impl<I, E> Grid<I, E>
-where I: Deg { 
+where I: GridDeg { 
     pub fn new(support: Vec<I>, data: HashMap<I, E>, dflt: E) -> Self { 
         Self { support, data, dflt }
     }
@@ -53,7 +53,7 @@ where I: Deg {
 }
 
 impl<I, E> Grid<I, E>
-where I: Deg, E: Default { 
+where I: GridDeg, E: Default { 
     pub fn generate<It, F>(support: It, mut e_map: F) -> Self
     where 
         It: IntoIterator<Item = I>, 
@@ -88,7 +88,7 @@ where I: Deg, E: Default {
 }
 
 impl<I, E> GridTrait<I> for Grid<I, E>
-where I: Deg { 
+where I: GridDeg { 
     type Itr = GridIter<I>;
     type Output = E;
 
@@ -106,7 +106,7 @@ where I: Deg {
 }
 
 impl<I, E> Index<I> for Grid<I, E>
-where I: Deg {
+where I: GridDeg {
     type Output = E;
     fn index(&self, i: I) -> &Self::Output {
         self.get(i)
@@ -114,7 +114,7 @@ where I: Deg {
 }
 
 impl<I, E> FromIterator<(I, E)> for Grid<I, E>
-where I: Deg, E: Default {
+where I: GridDeg, E: Default {
     fn from_iter<T: IntoIterator<Item = (I, E)>>(iter: T) -> Self {
         let (support, data) = iter.into_iter().fold((vec![], HashMap::new()), |(mut support, mut data), (i, e)| {
             support.push(i);

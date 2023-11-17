@@ -5,7 +5,7 @@ use std::ops::{Add, Sub};
 use derive_more::{Add, Display, Sub};
 use num_traits::Zero;
 
-pub trait Deg:
+pub trait GridDeg:
     Sized
     + Display
     + Clone
@@ -21,8 +21,8 @@ pub trait Deg:
     + 'static
 {}
 
-impl Deg for isize {}
-impl Deg for usize {}
+impl GridDeg for isize {}
+impl GridDeg for usize {}
 
 macro_rules! make2 {
     ($name:ident, $t:ty) => {
@@ -52,8 +52,8 @@ macro_rules! make2 {
 make2!(isize2, isize);
 make2!(usize2, usize);
 
-impl Deg for isize2 {}
-impl Deg for usize2 {}
+impl GridDeg for isize2 {}
+impl GridDeg for usize2 {}
 
 macro_rules! make3 {
     ($name:ident, $t:ty) => {
@@ -83,5 +83,5 @@ macro_rules! make3 {
 make3!(isize3, isize);
 make3!(usize3, usize);
 
-impl Deg for isize3 {}
-impl Deg for usize3 {}
+impl GridDeg for isize3 {}
+impl GridDeg for usize3 {}

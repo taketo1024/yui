@@ -1,7 +1,7 @@
-use yui::{Deg, isize2, isize3, EucRing, EucRingOps};
+use yui::{EucRing, EucRingOps};
 use yui::lc::Gen;
 
-use crate::{Grid, XModStr, XChainComplexBase, GridTrait, ComputeHomology};
+use crate::{GridDeg, isize2, isize3, Grid, XModStr, XChainComplexBase, GridTrait, ComputeHomology};
 
 pub type XHomologySummand<X, R> = XModStr<X, R>;
 pub type XHomologyBase<I, X, R> = Grid<I, XHomologySummand<X, R>>;
@@ -12,7 +12,7 @@ pub type XHomology3<X, R> = XHomologyBase<isize3, X, R>;
 
 impl<I, X, R> XChainComplexBase<I, X, R>
 where 
-    I: Deg,
+    I: GridDeg,
     X: Gen,
     R: EucRing, for<'x> &'x R: EucRingOps<R>
 {

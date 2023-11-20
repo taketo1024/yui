@@ -112,11 +112,12 @@ impl BitSeq {
 
     pub fn weight(&self) -> usize { 
         let mut v = self.val as usize;
-        (0..self.len).fold(0, |res, _| {
-            let b = v & 1;
-            v >>= 1;
-            res + b
-        })
+        let mut c = 0;
+        while v > 0 { 
+            v = v & (v - 1);
+            c += 1;
+        }
+        c
     }
 
     pub fn iter(&self) -> impl Iterator<Item = Bit> {
@@ -335,6 +336,9 @@ mod tests {
     fn weight() { 
         let b = BitSeq::new(0b10110, 5);
         assert_eq!(b.weight(), 3);
+
+        let b = BitSeq::new(0b0110101101, 10);
+        assert_eq!(b.weight(), 6);
     }
 
     #[test]

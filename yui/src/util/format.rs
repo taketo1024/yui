@@ -3,6 +3,16 @@ use itertools::Itertools;
 use num_traits::ToPrimitive;
 use crate::IntoDigits;
 
+pub fn paren_expr<S>(s: S) -> String
+where S: Display {
+    let s = s.to_string();
+    if s.contains(' ') { 
+        format!("({s})")
+    } else { 
+        s
+    }
+}
+
 pub fn subscript<I>(i: I) -> String
 where I: ToPrimitive {
     let i = i.to_isize().unwrap();

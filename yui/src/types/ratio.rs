@@ -129,33 +129,23 @@ where T: Default + One {
 impl<T> Display for Ratio<T>
 where T: Display {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fmt(f, self.numer.to_string(), self.denom.to_string())
+        use crate::util::format::paren_expr;
+
+        let p = paren_expr(&self.numer);
+        let q = paren_expr(&self.denom);
+    
+        if &q == "1" { 
+            write!(f, "{}", p)
+        } else { 
+            write!(f, "{}/{}", p, q)
+        }
     }
 }
 
 impl<T> Debug for Ratio<T>
-where T: Debug {
+where T: Display {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fmt(f, format!("{:?}", self.numer), format!("{:?}", self.denom))
-    }
-}
-
-fn fmt(f: &mut std::fmt::Formatter<'_>, numer: String, denom: String) -> std::fmt::Result { 
-    fn par(s: String) -> String {
-        if s.contains(' ') { 
-            format!("({s})")
-        } else { 
-            s
-        }
-    }
-
-    let p = par(numer);
-    let q = par(denom);
-
-    if &q == "1" { 
-        write!(f, "{}", p)
-    } else { 
-        write!(f, "{}/{}", p, q)
+        Display::fmt(&self, f)
     }
 }
 

@@ -141,6 +141,8 @@ where
     }
 
     pub fn fmt(&self, f: &mut std::fmt::Formatter<'_>, ascending: bool) -> std::fmt::Result {
+        use crate::util::format::paren_expr;
+
         if self.data.is_empty() { 
             return write!(f, "0");
         }
@@ -154,7 +156,7 @@ where
         );
         
         if let Some((x, r)) = elements.next() {
-            let r = r.to_string();
+            let r = paren_expr(r);
             let x = x.to_string();
 
             if r == "1" { 
@@ -169,7 +171,7 @@ where
         };
 
         for (x, r) in elements {
-            let r = r.to_string();
+            let r = paren_expr(r);
             let x = x.to_string();
 
             let (op, r) = if let Some(r) = r.strip_prefix('-') { 

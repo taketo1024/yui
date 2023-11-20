@@ -34,19 +34,16 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     //     ≅ C22' (free) ⊕ (C21 / Im(d1')) (tor)
 
     pub fn calculate(d1: SpMat<R>, d2: SpMat<R>, with_trans: bool) -> HomologySummand<R> {
-        if d1.rows().is_zero() { 
-            return HomologySummand::zero();
-        }
-        
-        info!("calculate homology: {:?}-{:?}", d1.shape(), d2.shape());
-        
         assert_eq!(d1.rows(), d2.cols());
 
-        // trivial case
-        if d1.is_zero() && d2.is_zero() { 
-            return Self::trivial_result(d2.cols());
+        if d1.rows().is_zero() { 
+            return HomologySummand::zero();
+        } else if d1.is_zero() && d2.is_zero() { 
+            return Self::trivial_result(d1.rows());
         }
 
+        info!("calculate homology: {} -> {} -> {}", d1.cols(), d1.rows(), d2.rows());
+        
         let (s1, s2) = Self::process_snf(d1, d2, with_trans);
         let (rank, tors) = Self::result(&s1, &s2);
 

@@ -28,6 +28,10 @@ pub enum PivotType {
 
 pub fn find_pivots<R>(a: &SpMat<R>, piv_type: PivotType) -> Vec<(usize, usize)>
 where R: Ring, for<'x> &'x R: RingOps<R> {
+    if a.is_zero() { 
+        return vec![];
+    }
+    
     let mut pf = PivotFinder::new(a, piv_type);
     pf.find_pivots();
     pf.result()

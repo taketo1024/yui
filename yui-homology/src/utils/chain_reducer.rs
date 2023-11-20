@@ -131,6 +131,9 @@ where
 
     fn reduce_at_itr(&mut self, i: I, itr: usize) { 
         let a = self.matrix(i).unwrap();
+        if a.is_zero() { 
+            return;
+        }
 
         info!("reduce at C[{i}] (itr: {itr}), size: {:?}.", a.shape());
 

@@ -1,6 +1,7 @@
 use std::marker::PhantomData;
 use log::*;
 
+use num_traits::Zero;
 use yui::{EucRing, EucRingOps};
 use yui_matrix::dense::{*, snf::*};
 use yui_matrix::sparse::*;
@@ -33,6 +34,10 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     //     ≅ C22' (free) ⊕ (C21 / Im(d1')) (tor)
 
     pub fn calculate(d1: SpMat<R>, d2: SpMat<R>, with_trans: bool) -> HomologySummand<R> {
+        if d1.rows().is_zero() { 
+            return HomologySummand::zero();
+        }
+        
         info!("calculate homology: {:?}-{:?}", d1.shape(), d2.shape());
         
         assert_eq!(d1.rows(), d2.cols());

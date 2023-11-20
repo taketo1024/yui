@@ -29,7 +29,7 @@ where
         Self { data, r_zero: R::zero() }
     }
 
-    fn clean(&mut self) { 
+    pub fn clean(&mut self) { 
         self.data.retain(|_, r| !r.is_zero());
     }
 
@@ -305,7 +305,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     // must clean after call
-    fn add_pair(&mut self, rhs: (X, R)) { 
+    pub fn add_pair(&mut self, rhs: (X, R)) { 
         let (x, r) = rhs;
         if r.is_zero() { return }
 
@@ -318,7 +318,7 @@ where
     } 
 
     // must clean after call
-    fn add_pair_ref(&mut self, rhs: (&X, &R)) { 
+    pub fn add_pair_ref(&mut self, rhs: (&X, &R)) { 
         let (x, r) = rhs;
         if r.is_zero() { return }
 

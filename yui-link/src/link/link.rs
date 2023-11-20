@@ -279,7 +279,7 @@ impl Link {
     pub fn is_valid_name(str: &str) -> bool { 
         use regex::Regex;
         let r1 = Regex::new(r"^([1-9]|10)_[0-9]+$").unwrap();
-        let r2 = Regex::new(r"^(K|L)[1-9]+(a|n)[0-9]+$").unwrap();
+        let r2 = Regex::new(r"^(K|L)?[1-9]+(a|n)_?[0-9]+$").unwrap(); // FIXME tmp
         r1.is_match(str) || r2.is_match(str)
     }
 

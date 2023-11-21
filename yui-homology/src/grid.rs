@@ -87,6 +87,20 @@ where I: GridDeg, E: Default {
     }
 }
 
+impl<I, E> IntoIterator for Grid<I, E>
+where I: GridDeg {
+    type Item = (I, E);
+    type IntoIter = std::vec::IntoIter<(I, E)>;
+
+    fn into_iter(mut self) -> Self::IntoIter {
+        let support = self.support();
+        support.flat_map(|i| { 
+            self.data.remove(&i).map(|e| (i, e))
+        }).collect_vec().into_iter()
+    }
+}
+
+
 impl<I, E> GridTrait<I> for Grid<I, E>
 where I: GridDeg { 
     type Itr = GridIter<I>;

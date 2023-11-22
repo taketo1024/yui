@@ -1,7 +1,6 @@
 mod link;
 mod braid;
-mod jones;
+pub mod util;
 
 pub use link::*;
 pub use braid::*;
-pub use jones::jones_polynomial;

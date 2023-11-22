@@ -1,7 +1,7 @@
 use num_traits::Pow;
 use yui::PowMod2;
 use yui::poly::LPoly;
-use super::link::{Link, State};
+use crate::{Link, State};
 
 pub fn jones_polynomial(l: &Link) -> LPoly<'q', i32> {
     type P = LPoly<'q', i32>;

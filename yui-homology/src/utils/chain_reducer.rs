@@ -140,11 +140,9 @@ where
         let (p, q, r) = pivots(a);
 
         if r == 0 { 
-            info!("no pivots found.");
+            info!("done.");
             return 
         }
-
-        info!("compute schur complement.");
 
         let s = schur(a, &p, &q, r, self.with_trans);
 

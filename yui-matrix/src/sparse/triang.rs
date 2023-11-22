@@ -7,6 +7,8 @@ use thread_local::ThreadLocal;
 use yui::{Ring, RingOps};
 use super::*;
 
+const LOG_THRESHOLD: usize = 10_000;
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum TriangularType { 
     Upper, Lower
@@ -79,7 +81,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 fn solve_triangular_s<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    info!("solve triangular: a = {:?}, y = {:?}", a.shape(), y.shape());
+    if y.cols() > LOG_THRESHOLD { 
+        info!("solve triangular: a = {:?}, y = {:?}", a.shape(), y.shape());
+    }
 
     let (n, k) = (a.rows(), y.cols());
     let diag = collect_diag(t, a);
@@ -98,16 +102,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 fn solve_triangular_m<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let nth = std::thread::available_parallelism().map(|x| x.get()).unwrap_or(1);
-
-    info!("solve triangular: a = {:?}, y = {:?} (multi-thread: {nth})", a.shape(), y.shape());
+    let report = y.cols() > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Info;
+    if report { 
+        info!("solve triangular: a = {:?}, y = {:?}", a.shape(), y.shape());
+    }
 
     let (n, k) = (a.rows(), y.cols());
     let diag = collect_diag(t, a);
     let tl_b = Arc::new(ThreadLocal::new());
     let entries = Mutex::new(vec![]);
-
-    let report = log::max_level() >= log::LevelFilter::Info && k >= 10_000;
     let col_count = Mutex::new(0);
     
     (0..k).into_par_iter().for_each(|j| { 
@@ -129,7 +132,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 *c += 1;
                 *c
             };
-            if c > 0 && c % 10_000 == 0 { 
+            if c > 0 && c % LOG_THRESHOLD == 0 { 
                 info!("  solved {c}/{k}");
             }
         }

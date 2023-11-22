@@ -21,6 +21,8 @@ use yui::{Ring, RingOps};
 use yui::algo::top_sort;
 use super::*;
 
+const LOG_THRESHOLD: usize = 10_000;
+
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum PivotType { 
     Rows, Cols
@@ -79,18 +81,20 @@ impl PivotFinder {
     }
 
     pub fn find_pivots(&mut self) {
-        info!("find pivots: {:?}", self.str.shape());
+        if self.should_report() {
+            info!("find pivots: {:?}", self.str.shape());
+        }
 
         self.find_fl_pivots();
         self.find_fl_col_pivots();
         self.find_cycle_free_pivots();
 
-        info!("found {} pivots.", self.pivots.count());
+        if self.should_report() {
+            info!("found {} pivots.", self.pivots.count());
+        }
     }
 
     pub fn result(&self) -> Vec<(usize, usize)> { 
-        info!("sort: {} pivots.", self.pivots.count());
-
         let is_row_type = self.piv_type == PivotType::Rows;
 
         let tree = self.pivots.iter().map(|(i, j)| { 
@@ -148,7 +152,10 @@ impl PivotFinder {
         }
 
         let piv_count = self.pivots.count();
-        info!("  fl-pivots: +{}.", piv_count);
+
+        if self.should_report() { 
+            info!("  fl-pivots: +{}.", piv_count);
+        }
     }
 
     fn find_fl_col_pivots(&mut self) {
@@ -178,7 +185,10 @@ impl PivotFinder {
         }
 
         let piv_count = self.pivots.count();
-        info!("  fl-col-pivots: +{}, total: {}.", piv_count - before_piv_count, piv_count);
+        
+        if self.should_report() { 
+            info!("  fl-col-pivots: +{}, total: {}.", piv_count - before_piv_count, piv_count);
+        }
     }
 
     fn find_cycle_free_pivots(&mut self) {
@@ -191,19 +201,21 @@ impl PivotFinder {
         }
 
         let piv_count = self.pivots.count();
-        info!("  cycle-free-pivots: +{}, total: {}.", piv_count - before_piv_count, piv_count);
+
+        if self.should_report() { 
+            info!("  cycle-free-pivots: +{}, total: {}.", piv_count - before_piv_count, piv_count);
+        }
     }
 
     fn find_cycle_free_pivots_s(&mut self) {
         let remain_rows: Vec<_> = self.remain_rows().collect();
-        let total = remain_rows.len();
+        let total_rows = remain_rows.len();
 
-        let report = log::max_level() >= log::LevelFilter::Info && total > 10_000;
         let mut row_count = 0;
         let mut piv_count = self.pivots.count();
 
-        if report { 
-            info!("  start find-cycle-free-pivots: {total} rows");
+        if self.should_report() { 
+            info!("  start find-cycle-free-pivots: {total_rows} rows");
         }
 
         let n = self.cols();
@@ -214,11 +226,11 @@ impl PivotFinder {
                 self.pivots.set(i, j);
             }
 
-            if report {
+            if self.should_report() {
                 row_count += 1;
-                if row_count % 10_000 == 0 { 
+                if row_count % LOG_THRESHOLD == 0 { 
                     let c = self.pivots.count();
-                    info!("    [{row_count}/{total}] +{}, total: {}.", c - piv_count, c);
+                    info!("    [{row_count}/{total_rows}] +{}, total: {}.", c - piv_count, c);
                     piv_count = c;
                 }
             }
@@ -236,8 +248,7 @@ impl PivotFinder {
         let loc_pivots_tls = ThreadLocal::new();
         let loc_worker_tls = ThreadLocal::new();
 
-        let report = log::max_level() >= log::LevelFilter::Info && total_rows > 10_000;
-        let (row_count, piv_count) = if report { 
+        let (row_count, piv_count) = if self.should_report() { 
             let n_threads = std::thread::available_parallelism().map(|x| x.get()).unwrap_or(1);
 
             info!("  start find-cycle-free-pivots: {total_rows} rows (multi-thread: {n_threads})");
@@ -264,7 +275,7 @@ impl PivotFinder {
 
             self.find_cycle_free_pivots_in(&pivots, &mut loc_pivots, &mut w);
 
-            if report { 
+            if self.should_report() { 
                 let row_count = {
                     let mut row_count = row_count.as_ref().unwrap().lock().unwrap();
                     *row_count += 1;
@@ -306,6 +317,10 @@ impl PivotFinder {
                 break
             }    
         }
+     }
+
+     fn should_report(&self) -> bool { 
+        self.rows() > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Info
      }
 }
 

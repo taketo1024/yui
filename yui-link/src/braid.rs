@@ -1,16 +1,17 @@
 use std::collections::HashMap;
-use std::fmt;
 use std::ops::{MulAssign, Mul};
 use auto_impl_ops::auto_ops;
 use delegate::delegate;
+use derive_more::{Display, DebugCustom};
 use itertools::Itertools;
 use num_traits::Zero;
 use yui::{GetSign, Sign};
-use yui::util::format::{subscript, superscript};
 
 use crate::{Link, XCode};
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Display, DebugCustom)]
+#[display(fmt = "{}", _0)]
+#[  debug(fmt = "{}", _0)]
 pub struct Generator(i32);
 
 impl Generator { 
@@ -43,23 +44,8 @@ impl From<i32> for Generator {
     }
 }
 
-impl fmt::Display for Generator {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.sign().is_positive() {
-            write!(f, "σ{}", subscript(self.index()))
-        } else { 
-            write!(f, "σ{}{}", subscript(self.index()), superscript(-1))
-        }
-    }
-}
-
-impl fmt::Debug for Generator {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(&self, f)
-    }
-}
-
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Display, Debug)]
+#[display(fmt = "{:?}", elements)]
 pub struct Braid {
     strands: usize,
     elements: Vec<Generator>
@@ -224,21 +210,6 @@ impl FromIterator<i32> for Braid {
     }
 }
 
-impl fmt::Display for Braid {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for gen in self.elements.iter() { // should reverse?
-            write!(f, "{gen}")?
-        }
-        Ok(())
-    }
-}
-
-impl fmt::Debug for Braid {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(&self, f)
-    }
-}
-
 #[auto_ops]
 impl MulAssign<&Braid> for Braid {
     fn mul_assign(&mut self, rhs: &Braid) {
@@ -254,7 +225,21 @@ mod tests {
     #[test]
     fn init_by_code() {
         let b = Braid::from([1, 1, -2, -1, 3]);
-        println!("{}", b.display());
+        assert_eq!(b.strands(), 4);
+        assert_eq!(b.len(), 5);
+    }
+
+    #[test]
+    fn to_string() {
+        let b = Braid::from([1, 1, -2, -1, 3]);
+        assert_eq!(b.to_string(), "[1, 1, -2, -1, 3]");
+    }
+
+    #[test]
+    fn display() {
+        let b = Braid::from([1, 1, -2, -1, 3]);
+        let display = b.display();
+        assert_ne!(display, "")
     }
 
     #[test]

@@ -217,9 +217,9 @@ impl BitSeq {
         self.val == (other.val & ((1 << self.len) - 1))
     }
 
-    pub fn generate(len: usize) -> Vec<BitSeq> {
+    pub fn generate(len: usize) -> impl Iterator<Item = BitSeq> {
         assert!(len <= Self::MAX_LEN);
-        (0..2_u64.pow(len as u32)).map(|v| Self::new(v, len)).collect()
+        (0..2_u64.pow(len as u32)).map(move |v| Self::new(v, len))
     }
 }
 
@@ -449,7 +449,7 @@ mod tests {
 
     #[test]
     fn generate() { 
-        let v = BitSeq::generate(3);
+        let v = BitSeq::generate(3).collect_vec();
         assert_eq!(v, vec![
             BitSeq::new(0b000, 3),
             BitSeq::new(0b001, 3),

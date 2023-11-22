@@ -1,12 +1,12 @@
+use std::fmt::{Display, Debug};
 use std::ops::Neg;
 use num_traits::Signed;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Sign { 
     Neg, 
     Pos
 }
-
 
 impl Sign { 
     pub fn is_positive(&self) -> bool { 
@@ -34,6 +34,21 @@ impl From<Sign> for i32 {
             Sign::Pos =>  1,
             Sign::Neg => -1
         }
+    }
+}
+
+impl Display for Sign {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Sign::Pos => write!(f, "+"),
+            Sign::Neg => write!(f, "-")
+        }
+    }
+}
+
+impl Debug for Sign {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self, f)
     }
 }
 

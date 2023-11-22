@@ -2,9 +2,9 @@
 #![allow(unused_imports)]
 
 #[macro_export]
-macro_rules! map {
+macro_rules! hashmap {
     {$( $key: expr => $val: expr ),*} => {{
-        FromIterator::from_iter([$(($key, $val),)*])
+        std::collections::HashMap::from_iter([$(($key, $val),)*])
     }}
 }
 
@@ -15,4 +15,4 @@ macro_rules! set {
     }}
 }
 
-pub use {map, set};
+pub use {hashmap, set};

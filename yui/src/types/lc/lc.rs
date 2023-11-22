@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::{Display, Debug};
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, MulAssign};
@@ -24,9 +25,11 @@ where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 { 
-    fn new(data: AHashMap<X, R>) -> Self {
-        debug_assert!(data.values().all(|r| !r.is_zero()));
-        Self { data, r_zero: R::zero() }
+    pub fn new() -> Self {
+        let hasher = ahash::RandomState::with_seeds(0, 0, 0, 0);
+        let data = AHashMap::with_hasher(hasher);
+        let r_zero = R::zero();
+        Self { data, r_zero }
     }
 
     pub fn clean(&mut self) { 
@@ -213,13 +216,23 @@ where
     }
 }
 
+impl<X, R> From<HashMap<X, R>> for Lc<X, R>
+where
+    X: Gen,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{
+    fn from(value: HashMap<X, R>) -> Self {
+        Self::from_iter(value.into_iter())
+    }
+}
+
 impl<X, R> FromIterator<(X, R)> for Lc<X, R>
 where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn from_iter<T: IntoIterator<Item = (X, R)>>(iter: T) -> Self {
-        let mut res = Self::zero();
+        let mut res = Self::new();
         for e in iter.into_iter() { 
             res.add_pair(e);
         }
@@ -267,7 +280,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn zero() -> Self {
-        Self::new(AHashMap::new())
+        Self::new()
     }
 
     fn is_zero(&self) -> bool {
@@ -481,7 +494,7 @@ where
 mod tests {
     use num_traits::Zero;
     use crate::Elem;
-    use crate::util::macros::map;
+    use crate::util::macros::hashmap;
     use crate::lc::{Free, Lc};
  
     type X = Free<i32>;
@@ -500,25 +513,25 @@ mod tests {
     fn fmt() { 
         type L = Lc<X, i32>;
 
-        let z = L::new(map!{ e(1) => 1 });
+        let z = L::from(hashmap!{ e(1) => 1 });
         assert_eq!(z.to_string(), "<1>");
 
-        let z = L::new(map!{ e(1) => -1 });
+        let z = L::from(hashmap!{ e(1) => -1 });
         assert_eq!(z.to_string(), "-<1>");
 
-        let z = L::new(map!{ e(1) => 2 });
+        let z = L::from(hashmap!{ e(1) => 2 });
         assert_eq!(z.to_string(), "2<1>");
 
-        let z = L::new(map!{ e(1) => 1, e(2) => 1 });
+        let z = L::from(hashmap!{ e(1) => 1, e(2) => 1 });
         assert_eq!(z.to_string(), "<1> + <2>");
 
-        let z = L::new(map!{ e(1) => -1, e(2) => -1 });
+        let z = L::from(hashmap!{ e(1) => -1, e(2) => -1 });
         assert_eq!(z.to_string(), "-<1> - <2>");
 
-        let z = L::new(map!{ e(1) => 2, e(2) => 3 });
+        let z = L::from(hashmap!{ e(1) => 2, e(2) => 3 });
         assert_eq!(z.to_string(), "2<1> + 3<2>");
 
-        let z = L::new(map!{ e(1) => -2, e(2) => -3 });
+        let z = L::from(hashmap!{ e(1) => -2, e(2) => -3 });
         assert_eq!(z.to_string(), "-2<1> - 3<2>");
     }
 
@@ -534,7 +547,7 @@ mod tests {
         type L = Lc<X, i32>;
         let x = e(0);
         let z = L::from(x);
-        assert_eq!(z, L::new(map!{ e(0) => 1 }));
+        assert_eq!(z, L::from(hashmap!{ e(0) => 1 }));
     }
 
     #[test]
@@ -542,7 +555,7 @@ mod tests {
         type L = Lc<X, i32>;
         let x = e(0);
         let z = L::from((x, 2));
-        assert_eq!(z, L::new(map!{ e(0) => 2 }));
+        assert_eq!(z, L::from(hashmap!{ e(0) => 2 }));
     }
 
     #[test]
@@ -576,9 +589,9 @@ mod tests {
     #[test]
     fn eq() { 
         type L = Lc<X, i32>;
-        let z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
-        let z2 = L::new(map!{ e(2) => 2, e(1) => 1 });
-        let z3 = L::new(map!{ e(1) => 1 });
+        let z1 = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
+        let z2 = L::from(hashmap!{ e(2) => 2, e(1) => 1 });
+        let z3 = L::from(hashmap!{ e(1) => 1 });
 
         assert_eq!(z1, z2);
         assert_ne!(z1, z3);
@@ -592,7 +605,7 @@ mod tests {
         assert!(z.data.is_empty());
         assert!(z.is_zero());
 
-        let z = L::new(map!{ e(1) => 1 });
+        let z = L::from(hashmap!{ e(1) => 1 });
 
         assert!(!z.data.is_empty());
         assert!(!z.is_zero());
@@ -602,214 +615,216 @@ mod tests {
     fn clean() { 
         type L = Lc<X, i32>;
 
-        let data = map!{ e(1) => 1, e(2) => 0, e(3) => 0 };
-        let mut z: L = Lc { data, r_zero: 0 };
+        let mut z = L::from(hashmap!{ e(1) => 1, e(2) => 2, e(3) => 1 });
+        z.add_pair((e(1), -1));
+        z.add_pair((e(2), -1));
+        z.add_pair((e(3), -1));
         
         assert_eq!(z.nterms(), 3);
 
         z.clean();
 
-        assert_eq!(z, L::new(map!{ e(1) => 1 }));
+        assert_eq!(z, L::from(hashmap!{ e(2) => 1 }));
         assert_eq!(z.nterms(), 1);
     }
 
     #[test]
     fn add() {
         type L = Lc<X, i32>;
-        let z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
-        let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
+        let z1 = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
+        let z2 = L::from(hashmap!{ e(2) => 20, e(3) => 30 });
         let w = z1 + z2;
 
-        assert_eq!(w, L::new(map!{ e(1) => 1, e(2) => 22, e(3) => 30 }));
+        assert_eq!(w, L::from(hashmap!{ e(1) => 1, e(2) => 22, e(3) => 30 }));
     }
 
     #[test]
     fn add_ref() {
         type L = Lc<X, i32>;
-        let z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
-        let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
+        let z1 = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
+        let z2 = L::from(hashmap!{ e(2) => 20, e(3) => 30 });
         let w = &z1 + &z2;
 
-        assert_eq!(w, L::new(map!{ e(1) => 1, e(2) => 22, e(3) => 30 }));
+        assert_eq!(w, L::from(hashmap!{ e(1) => 1, e(2) => 22, e(3) => 30 }));
     }
 
     #[test]
     fn add_assign() {
         type L = Lc<X, i32>;
-        let mut z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
-        let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
+        let mut z1 = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
+        let z2 = L::from(hashmap!{ e(2) => 20, e(3) => 30 });
         z1 += z2;
 
-        assert_eq!(z1, L::new(map!{ e(1) => 1, e(2) => 22, e(3) => 30 }));
+        assert_eq!(z1, L::from(hashmap!{ e(1) => 1, e(2) => 22, e(3) => 30 }));
     }
 
     #[test]
     fn add_assign_ref() {
         type L = Lc<X, i32>;
-        let mut z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
-        let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
+        let mut z1 = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
+        let z2 = L::from(hashmap!{ e(2) => 20, e(3) => 30 });
         z1 += &z2;
 
-        assert_eq!(z1, L::new(map!{ e(1) => 1, e(2) => 22, e(3) => 30 }));
+        assert_eq!(z1, L::from(hashmap!{ e(1) => 1, e(2) => 22, e(3) => 30 }));
     }
 
     #[test]
     fn sum() {
         type L = Lc<X, i32>;
-        let z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
-        let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
-        let z3 = L::new(map!{ e(3) => 300, e(4) => 400 });
+        let z1 = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
+        let z2 = L::from(hashmap!{ e(2) => 20, e(3) => 30 });
+        let z3 = L::from(hashmap!{ e(3) => 300, e(4) => 400 });
         let w: L = [z1, z2, z3].into_iter().sum();
 
-        assert_eq!(w, L::new(map!{ e(1) => 1, e(2) => 22, e(3) => 330, e(4) => 400 }));
+        assert_eq!(w, L::from(hashmap!{ e(1) => 1, e(2) => 22, e(3) => 330, e(4) => 400 }));
     }
 
     #[test]
     fn sum_ref() {
         type L = Lc<X, i32>;
-        let z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
-        let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
-        let z3 = L::new(map!{ e(3) => 300, e(4) => 400 });
+        let z1 = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
+        let z2 = L::from(hashmap!{ e(2) => 20, e(3) => 30 });
+        let z3 = L::from(hashmap!{ e(3) => 300, e(4) => 400 });
         let w: L = [&z1, &z2, &z3].into_iter().sum();
 
-        assert_eq!(w, L::new(map!{ e(1) => 1, e(2) => 22, e(3) => 330, e(4) => 400 }));
+        assert_eq!(w, L::from(hashmap!{ e(1) => 1, e(2) => 22, e(3) => 330, e(4) => 400 }));
     }
 
     #[test]
     fn neg() {
         type L = Lc<X, i32>;
-        let z = L::new(map!{ e(1) => 1, e(2) => 2 });
-        assert_eq!(-z, L::new(map!{ e(1) => -1, e(2) => -2 }));
+        let z = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
+        assert_eq!(-z, L::from(hashmap!{ e(1) => -1, e(2) => -2 }));
     }
 
     #[test]
     fn neg_ref() {
         type L = Lc<X, i32>;
-        let z = L::new(map!{ e(1) => 1, e(2) => 2 });
-        assert_eq!(-(&z), L::new(map!{ e(1) => -1, e(2) => -2 }));
+        let z = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
+        assert_eq!(-(&z), L::from(hashmap!{ e(1) => -1, e(2) => -2 }));
     }
 
     #[test]
     fn sub() {
         type L = Lc<X, i32>;
-        let z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
-        let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
+        let z1 = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
+        let z2 = L::from(hashmap!{ e(2) => 20, e(3) => 30 });
         let w = z1 - z2;
 
-        assert_eq!(w, L::new(map!{ e(1) => 1, e(2) => -18, e(3) => -30 }));
+        assert_eq!(w, L::from(hashmap!{ e(1) => 1, e(2) => -18, e(3) => -30 }));
     }
 
     #[test]
     fn sub_ref() {
         type L = Lc<X, i32>;
-        let z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
-        let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
+        let z1 = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
+        let z2 = L::from(hashmap!{ e(2) => 20, e(3) => 30 });
         let w = &z1 - &z2;
 
-        assert_eq!(w, L::new(map!{ e(1) => 1, e(2) => -18, e(3) => -30 }));
+        assert_eq!(w, L::from(hashmap!{ e(1) => 1, e(2) => -18, e(3) => -30 }));
     }
 
     #[test]
     fn sub_assign() {
         type L = Lc<X, i32>;
-        let mut z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
-        let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
+        let mut z1 = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
+        let z2 = L::from(hashmap!{ e(2) => 20, e(3) => 30 });
         z1 -= z2;
 
-        assert_eq!(z1, L::new(map!{ e(1) => 1, e(2) => -18, e(3) => -30 }));
+        assert_eq!(z1, L::from(hashmap!{ e(1) => 1, e(2) => -18, e(3) => -30 }));
     }
 
     #[test]
     fn sub_assign_ref() {
         type L = Lc<X, i32>;
-        let mut z1 = L::new(map!{ e(1) => 1, e(2) => 2 });
-        let z2 = L::new(map!{ e(2) => 20, e(3) => 30 });
+        let mut z1 = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
+        let z2 = L::from(hashmap!{ e(2) => 20, e(3) => 30 });
         z1 -= &z2;
 
-        assert_eq!(z1, L::new(map!{ e(1) => 1, e(2) => -18, e(3) => -30 }));
+        assert_eq!(z1, L::from(hashmap!{ e(1) => 1, e(2) => -18, e(3) => -30 }));
     }
 
     #[test]
     fn mul() {
         type L = Lc<X, i32>;
-        let z = L::new(map!{ e(1) => 1, e(2) => 2 });
+        let z = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
         let r = 2;
         let w = z * r;
 
-        assert_eq!(w, L::new(map!{ e(1) => 2, e(2) => 4 }));
+        assert_eq!(w, L::from(hashmap!{ e(1) => 2, e(2) => 4 }));
     }
 
     #[test]
     fn mul_ref() {
         type L = Lc<X, i32>;
-        let z = L::new(map!{ e(1) => 1, e(2) => 2 });
+        let z = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
         let r = 2;
         let w = z * r;
 
-        assert_eq!(w, L::new(map!{ e(1) => 2, e(2) => 4 }));
+        assert_eq!(w, L::from(hashmap!{ e(1) => 2, e(2) => 4 }));
     }
 
     #[test]
     fn mul_assign() {
         type L = Lc<X, i32>;
-        let mut z = L::new(map!{ e(1) => 1, e(2) => 2 });
+        let mut z = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
         let r = 2;
         z *= r;
 
-        assert_eq!(z, L::new(map!{ e(1) => 2, e(2) => 4 }));
+        assert_eq!(z, L::from(hashmap!{ e(1) => 2, e(2) => 4 }));
     }
 
     #[test]
     fn mul_assign_ref() {
         type L = Lc<X, i32>;
-        let mut z = L::new(map!{ e(1) => 1, e(2) => 2 });
+        let mut z = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
         let r = 2;
         z *= &r;
 
-        assert_eq!(z, L::new(map!{ e(1) => 2, e(2) => 4 }));
+        assert_eq!(z, L::from(hashmap!{ e(1) => 2, e(2) => 4 }));
     }
 
     #[test]
     fn map_coeffs() {
         type L = Lc<X, i32>;
-        let z = L::new(map!{ e(1) => 1, e(2) => 2 });
+        let z = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
         let w = z.map_coeffs(|a| a * 10);
 
-        assert_eq!(w, L::new(map!{ e(1) => 10, e(2) => 20 }));
+        assert_eq!(w, L::from(hashmap!{ e(1) => 10, e(2) => 20 }));
     }
 
     #[test]
     fn into_map_coeffs() {
         type L = Lc<X, i32>;
-        let z = L::new(map!{ e(1) => 1, e(2) => 2 });
+        let z = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
         let w = z.into_map_coeffs(|a| a * 10);
 
-        assert_eq!(w, L::new(map!{ e(1) => 10, e(2) => 20 }));
+        assert_eq!(w, L::from(hashmap!{ e(1) => 10, e(2) => 20 }));
     }
 
     #[test]
     fn map_gens() {
         type L = Lc<X, i32>;
-        let z = L::new(map!{ e(1) => 1, e(2) => 2 });
+        let z = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
         let w = z.map_gens(|x| e(x.0 * 10));
 
-        assert_eq!(w, L::new(map!{ e(10) => 1, e(20) => 2 }));
+        assert_eq!(w, L::from(hashmap!{ e(10) => 1, e(20) => 2 }));
     }
 
     #[test]
     fn into_map_gens() {
         type L = Lc<X, i32>;
-        let z = L::new(map!{ e(1) => 1, e(2) => 2 });
+        let z = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
         let w = z.into_map_gens(|x| e(x.0 * 10));
 
-        assert_eq!(w, L::new(map!{ e(10) => 1, e(20) => 2 }));
+        assert_eq!(w, L::from(hashmap!{ e(10) => 1, e(20) => 2 }));
     }
 
     #[test]
     fn filter_gens() { 
         type L = Lc<X, i32>;
-        let z = L::new( (1..10).map(|i| (e(i), i * 10)).collect() );
+        let z = L::from_iter( (1..10).map(|i| (e(i), i * 10)) );
         let w = z.filter_gens(|x| x.0 % 3 == 0 );
-        assert_eq!(w, L::new(map!{ e(3) => 30, e(6) => 60, e(9) => 90}))
+        assert_eq!(w, L::from(hashmap!{ e(3) => 30, e(6) => 60, e(9) => 90}))
     }
 }

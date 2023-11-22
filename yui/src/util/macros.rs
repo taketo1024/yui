@@ -9,10 +9,10 @@ macro_rules! hashmap {
 }
 
 #[macro_export]
-macro_rules! set {
+macro_rules! hashset {
     {$($val: expr ),*} => {{
-        FromIterator::from_iter([$($val,)*])
+        std::collections::HashSet::from_iter([$($val,)*])
     }}
 }
 
-pub use {hashmap, set};
+pub use {hashmap, hashset};

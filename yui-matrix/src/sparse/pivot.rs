@@ -594,7 +594,6 @@ impl RowWorker {
 mod tests {
     use super::*;
     use num_traits::{Zero, One};
-    use yui::util::macros::set;
  
     #[test]
     fn str_init() {
@@ -619,12 +618,12 @@ mod tests {
         assert_eq!(str.row_wght, vec![5f32,5f32,4f32,3f32,4f32,6f32]);
         assert_eq!(str.col_wght, vec![2f32,3f32,5f32,3f32,2f32,3f32,2f32,3f32,4f32]);
         assert_eq!(str.cands, vec![
-            set!{0,2,5,6,8},
-            set!{1,2,3,5},
-            set!{2,3,7,8},
-            set!{1,2},
-            set!{1,3,6,8},
-            set!{0,2,4,5,7,8}
+            AHashSet::from_iter([0,2,5,6,8]),
+            AHashSet::from_iter([1,2,3,5]),
+            AHashSet::from_iter([2,3,7,8]),
+            AHashSet::from_iter([1,2]),
+            AHashSet::from_iter([1,3,6,8]),
+            AHashSet::from_iter([0,2,4,5,7,8])
         ]);
     }
 
@@ -702,15 +701,15 @@ mod tests {
         ]);
         let mut pf = PivotFinder::new(&a, PivotType::Rows);
 
-        assert_eq!(pf.occupied_cols(), set!{});
+        assert_eq!(pf.occupied_cols(), AHashSet::new());
 
         pf.pivots.set(0, 0);
 
-        assert_eq!(pf.occupied_cols(), set!{0,2});
+        assert_eq!(pf.occupied_cols(), AHashSet::from_iter([0,2]));
 
         pf.pivots.set(1, 1);
 
-        assert_eq!(pf.occupied_cols(), set!{0,1,2,3});
+        assert_eq!(pf.occupied_cols(), AHashSet::from_iter([0,1,2,3]));
     }
 
     #[test]

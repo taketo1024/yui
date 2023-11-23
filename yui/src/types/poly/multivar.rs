@@ -121,22 +121,21 @@ macro_rules! impl_multivar_unsigned {
         }
 
         impl<const X: char> MultiVar<X, $I> {
-            pub fn generate(n: usize, tot_deg: usize) -> Vec<Self> { 
+            pub fn generate(n: usize, tot_deg: usize) -> impl Iterator<Item = Self> { 
                 use dinglebit_combinatorics::Combination as C;
                 use crate::algo::rep_comb;
         
-                assert!(n > 0 || tot_deg == 0);
-        
-                if tot_deg == 0 { 
-                    return vec![Self::one()];
-                }
+                // MEMO: 
+                // Mathematically this restriction is unnecessary, 
+                // but (n, tot_deg) = (0, 0) will fail. 
+                assert!(n > 0);
         
                 let c = C::new(n + tot_deg - 1, n - 1);
-                c.into_iter().map(|mut list| {
+                c.into_iter().map(move |mut list| {
                     list.push(n + tot_deg - 1); // the right-end wall
                     Self::from_iter( rep_comb(&list) )
-                }).collect()
-            }
+                })
+            }        
         }
     };
 }
@@ -173,6 +172,7 @@ impl_multivar_signed!  (isize);
 #[cfg(test)]
 mod tests { 
     use itertools::Itertools;
+    use num_integer::binomial;
 
     use super::*;
 
@@ -297,13 +297,12 @@ mod tests {
 
         let n = 3;
         let tot = 5;
-        let mons = M::generate(n, tot);
+        let mons = M::generate(n, tot).collect_vec();
 
-        assert_eq!(mons.len(), 21);
+        assert_eq!(mons.len(), binomial(n + tot - 1, n - 1));
         assert!(mons.iter().all(|x| x.total_deg() == tot));
         assert!(mons.iter().all_unique());
 
-        assert_eq!(M::generate(0, 0), vec![M::one()]); // deg(1) = 0, using no vars.
-        assert_eq!(M::generate(n, 0), vec![M::one()]); // deg(1) = 0, using n-vars.
+        assert_eq!(M::generate(n, 0).collect_vec(), vec![M::one()]); // deg(1) = 0, using n-vars.
     }
 }

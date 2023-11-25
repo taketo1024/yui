@@ -1,8 +1,10 @@
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, MulAssign, Range};
 use std::iter::zip;
 use std::fmt::Display;
+use std::sync::Mutex;
 use itertools::Itertools;
 use num_traits::{Zero, One};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sprs::{TriMat, CsMat, PermView, CsVecView};
 use auto_impl_ops::auto_ops;
 use yui::{Ring, RingOps, AddMonOps, AddGrpOps, MonOps, AddGrp};
@@ -77,6 +79,24 @@ impl<R> SpMat<R> where R: Clone + Zero {
             t.add_triplet(i, j, a)
         }
         let cs_mat = t.to_csc();
+        Self::from(cs_mat)
+    }
+
+    pub fn from_par_entries<T>(shape: (usize, usize), entries: T) -> Self
+    where 
+        R: Send + Sync,
+        T: IntoParallelIterator<Item = (usize, usize, R)>
+    {
+        let t = Mutex::new(TriMat::new(shape));
+        
+        entries.into_par_iter().for_each(|(i, j, a)| { 
+            if a.is_zero() { 
+                return;
+            }
+            t.lock().unwrap().add_triplet(i, j, a)
+        });
+
+        let cs_mat = t.into_inner().unwrap().to_csc();
         Self::from(cs_mat)
     }
 

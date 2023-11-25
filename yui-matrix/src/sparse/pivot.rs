@@ -355,7 +355,8 @@ impl MatrixStr {
         let mut cands = vec![AHashSet::new(); m];
 
         for (i, j, r) in a.iter() { 
-            if r.is_zero() { continue }
+            assert!(!r.is_zero());
+            
             entries[i].push(j);
 
             let w = 1f32; // TODO

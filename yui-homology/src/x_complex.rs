@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use delegate::delegate;
 
-use itertools::Itertools;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use yui::{Ring, RingOps};
 use yui::lc::{Gen, Lc};
@@ -56,17 +55,17 @@ where
         let m = self[i + self.d_deg].rank();
         let n = q.cols();
 
-        let entries = if crate::config::is_multithread_enabled() {
-            (0..n).into_par_iter().map(|j|
-                self.d_matrix_col(i, q, j)
-            ).collect::<Vec<_>>()
+        if crate::config::is_multithread_enabled() {
+            let entries = (0..n).into_par_iter().flat_map(|j|
+                self.d_matrix_col(i, q, j).into_par_iter()
+            );
+            SpMat::from_par_entries((m, n), entries)
         } else { 
-            (0..n).into_iter().map(|j|
+            let entries = (0..n).flat_map(|j|
                 self.d_matrix_col(i, q, j)
-            ).collect()
-        };
-
-        SpMat::from_entries((m, n), entries.into_iter().flatten())
+            );
+            SpMat::from_entries((m, n), entries)
+        }
     }
 
     #[inline(never)] // for profilability
@@ -76,9 +75,9 @@ where
         let w = self.d(i, &z);
         let dj = self[i + self.d_deg].vectorize(&w);
 
-        dj.iter().filter(|(_, a)| !a.is_zero()).map(|(i, a)| { 
+        dj.iter().map(move |(i, a)| { 
             (i, j, a.clone())
-        }).collect_vec()
+        }).collect()
     }
 
     pub fn reduced(&self) -> XChainComplexBase<I, X, R> { 

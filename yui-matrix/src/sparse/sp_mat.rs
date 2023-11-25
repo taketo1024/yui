@@ -176,16 +176,21 @@ impl<R> SpMat<R> where R: Clone + Zero {
     }
 }
 
-impl<R> SpMat<R> { 
+impl<R> SpMat<R> 
+where R: Zero { 
     pub fn iter(&self) -> impl Iterator<Item = (usize, usize, &R)> { 
-        self.cs_mat.iter().map(|(a, (i, j))| {
-            (i, j, a)
+        self.cs_mat.iter().filter_map(|(a, (i, j))| {
+            if !a.is_zero() { 
+                Some((i, j, a))
+            } else { 
+                None
+            }
         })
     }
 }
 
 impl<R> IntoIterator for SpMat<R>
-where R: Clone {
+where R: Clone + Zero {
     type Item = (usize, usize, R);
     type IntoIter = std::vec::IntoIter<Self::Item>;
 
@@ -341,12 +346,6 @@ impl<'a, 'b, R> SpMatView<'a, 'b, R> {
         self.shape.1
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (usize, usize, &R)> {
-        self.target.iter().filter_map(|(i, j, a)| { 
-            (self.trans)(i, j).map(|(i, j)| (i, j, a))
-        })
-    }
-
     pub fn transpose(&self) -> SpMatView<R> { 
         SpMatView::new(self.target, (self.shape.1, self.shape.0), move |i, j| (self.trans)(j, i))
     }
@@ -393,6 +392,15 @@ impl<'a, 'b, R> SpMatView<'a, 'b, R> {
         let m = self.rows();
         self.submat(0 .. m, cols)
     }
+}
+
+impl<'a, 'b, R> SpMatView<'a, 'b, R>
+where R: Zero {
+    pub fn iter(&self) -> impl Iterator<Item = (usize, usize, &R)> {
+        self.target.iter().filter_map(|(i, j, a)| { 
+            (self.trans)(i, j).map(|(i, j)| (i, j, a))
+        })
+    }    
 }
 
 impl<'a, 'b, R> SpMatView<'a, 'b, R>

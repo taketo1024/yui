@@ -92,16 +92,21 @@ where R: Clone + Zero {
     }
 }
 
-impl<R> SpVec<R> { 
+impl<R> SpVec<R> 
+where R: Zero { 
     pub fn iter(&self) -> impl Iterator<Item = (usize, &R)> { 
-        self.cs_vec.iter().map(|(i, a)| {
-            (i, a)
+        self.cs_vec.iter().filter_map(|(i, a)| {
+            if !a.is_zero() { 
+                Some((i, a))
+            } else { 
+                None
+            }
         })
     }
 }
 
 impl<R> IntoIterator for SpVec<R>
-where R: Clone {
+where R: Clone + Zero {
     type Item = (usize, R);
     type IntoIter = std::vec::IntoIter<Self::Item>;
 
@@ -224,12 +229,6 @@ impl<'a, 'b, R> SpVecView<'a, 'b, R> {
         self.dim
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (usize, &R)> {
-        self.target.iter().filter_map(|(i, a)| { 
-            (self.trans)(i).map(|i| (i, a))
-        })
-    }
-
     pub fn permute(&self, p: PermView<'b>) -> SpVecView<R> { 
         SpVecView::new(self.target, self.dim, move |i| Some(p.at(i)))
     }
@@ -246,6 +245,15 @@ impl<'a, 'b, R> SpVecView<'a, 'b, R> {
             } else { 
                 None
             }
+        })
+    }
+}
+
+impl<'a, 'b, R> SpVecView<'a, 'b, R> 
+where R: Zero { 
+    pub fn iter(&self) -> impl Iterator<Item = (usize, &R)> {
+        self.target.iter().filter_map(|(i, a)| { 
+            (self.trans)(i).map(|i| (i, a))
         })
     }
 }

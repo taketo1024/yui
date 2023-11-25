@@ -89,12 +89,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let diag = collect_diag(t, a);
     let mut b = vec![R::zero(); n];
 
-    let entries = (0..k).fold(vec![], |mut entries, j| { 
+    let entries = (0..k).flat_map(|j| { 
         copy_into(y.col_view(j).iter(), &mut b);
-
-        let res = _solve_triangular(t, a, &diag, &mut b);
-        entries.extend(res.into_iter().map(|(i, x)| (i, j, x)));
-        entries
+        let xj = _solve_triangular(t, a, &diag, &mut b);
+        xj.into_iter().map(move |(i, x)| (i, j, x))
     });
 
     SpMat::from_entries((n, k), entries)
@@ -107,39 +105,39 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         info!("solve triangular: a = {:?}, y = {:?}", a.shape(), y.shape());
     }
 
+    let col_count = Mutex::new(0);
+    fn incr_count(c: &Mutex<usize>, total: usize) { 
+        let c = {
+            let mut c = c.lock().unwrap();
+            *c += 1;
+            *c
+        };
+        if c > 0 && c % LOG_THRESHOLD == 0 { 
+            info!("  solved {c}/{total}");
+        }
+    }
+
     let (n, k) = (a.rows(), y.cols());
     let diag = collect_diag(t, a);
     let tl_b = Arc::new(ThreadLocal::new());
-    let entries = Mutex::new(vec![]);
-    let col_count = Mutex::new(0);
     
-    (0..k).into_par_iter().for_each(|j| { 
+    let entries = (0..k).into_par_iter().flat_map(|j| { 
         let mut b = tl_b.get_or(|| 
             RefCell::new(vec![R::zero(); n])
         ).borrow_mut();
 
         copy_into(y.col_view(j).iter(), &mut b);
-
-        let res = _solve_triangular(t, a, &diag, &mut b);
-        {
-            let mut entries = entries.lock().unwrap();
-            entries.extend(res.into_iter().map(|(i, x)| (i, j, x)));
-        }
+        let xj = _solve_triangular(t, a, &diag, &mut b);
+        let res = xj.into_par_iter().map(move |(i, x)| (i, j, x));
 
         if report { 
-            let c = {
-                let mut c = col_count.lock().unwrap();
-                *c += 1;
-                *c
-            };
-            if c > 0 && c % LOG_THRESHOLD == 0 { 
-                info!("  solved {c}/{k}");
-            }
+            incr_count(&col_count, k)
         }
+
+        res
     });
 
-    let entries = entries.into_inner().unwrap();
-    SpMat::from_entries((n, k), entries)
+    SpMat::from_par_entries((n, k), entries)
 }
 
 #[inline(never)] // for profilability

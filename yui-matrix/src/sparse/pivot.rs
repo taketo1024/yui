@@ -95,7 +95,9 @@ impl PivotFinder {
     }
 
     pub fn result(&self) -> Vec<(usize, usize)> { 
-        let is_row_type = self.piv_type == PivotType::Rows;
+        if self.should_report() {
+            info!("sort pivots.");
+        }
 
         let tree = self.pivots.iter().map(|(i, j)| { 
             let list = self.str.cols_in(i).filter(|&&j2|
@@ -105,7 +107,8 @@ impl PivotFinder {
         });
         
         let sorted = top_sort(tree).unwrap();
-
+        let is_row_type = self.piv_type == PivotType::Rows;
+        
         sorted.into_iter().map(|j| {
             let i = self.pivots.row_for(j).unwrap();
             if is_row_type { (i, j) } else { (j, i) }

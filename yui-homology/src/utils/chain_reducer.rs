@@ -125,7 +125,6 @@ where
 
     pub fn reduce_at(&mut self, i: I) { 
         assert!(self.is_set(i), "not initialized at {i}");
-
         self.reduce_at_itr(i, 0)
     }
 
@@ -140,7 +139,7 @@ where
         let (p, q, r) = pivots(a);
 
         if r == 0 { 
-            info!("done.");
+            info!("no more pivots.");
             return 
         }
 

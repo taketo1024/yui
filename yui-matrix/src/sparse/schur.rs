@@ -1,3 +1,4 @@
+use log::info;
 use yui::{Ring, RingOps};
 use super::*;
 use super::triang::{TriangularType, solve_triangular, solve_triangular_left};
@@ -14,6 +15,8 @@ use super::triang::{TriangularType, solve_triangular, solve_triangular_left};
 //
 // s = d - c a⁻¹ b
 
+const LOG_THRESHOLD: usize = 10_000;
+
 pub struct Schur<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     orig_shape: (usize, usize),
@@ -27,6 +30,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn from_partial_lower(a: &SpMat<R>, r: usize, with_trans: bool) -> Self {
         assert!(r <= a.rows());
         assert!(r <= a.cols());
+
+        if should_report(a) { 
+            info!("compute schur for: {:?}", a.shape());
+        }
 
         let orig_shape = a.shape();
         let (compl, t_in, t_out) = Self::compute_from_partial_lower(a, r, with_trans);
@@ -47,14 +54,26 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         //  ~~~~~~
         //    = p
         
+        if should_report(a) { 
+            info!("make p: {:?}", (m, m));
+        }
+
         let p = SpMat::from_entries((m, m), Iterator::chain(
             a.view().submat_cols(0..r).iter().map(|(i, j, x)| (i, j, x.clone())),
             (r..m).map(|i| (i, i, R::one()))
         ));
-        let bd = a.submat_cols(r..n);
         
+        if should_report(a) { 
+            info!("compute s: {:?}", (m-r, m-r));
+        }
+
+        let bd = a.submat_cols(r..n);
         let pinvbd = solve_triangular(TriangularType::Lower, &p, &bd);
         let s = pinvbd.submat_rows(r..m);
+
+        if should_report(a) { 
+            info!("schur: {:?}", s.shape());
+        }
 
         let (t_in, t_out) = if with_trans { 
             let id = |n| SpMat::id(n);
@@ -64,6 +83,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             
             let ainvb = pinvbd.submat_rows(0..r);
             let t_in = (-ainvb).stack(&id(n - r));
+
+            if should_report(a) { 
+                info!("t_in: {:?}", t_in.shape());
+            }    
     
             // [-ca⁻¹  1][a   ] = [0  1]
             //           [c  1] 
@@ -72,6 +95,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             let i = SpMat::zero((m - r, r)).concat(&SpMat::id(m - r));
             let t_out = solve_triangular_left(TriangularType::Lower, &p, &i);
+
+            if should_report(a) { 
+                info!("t_out: {:?}", t_out.shape());
+            }    
 
             (Some(t_in), Some(t_out))
         } else { 
@@ -100,6 +127,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn trans_out(&self) -> Option<&SpMat<R>> { 
         self.t_out.as_ref()
     }
+}
+
+fn should_report<R>(a: &SpMat<R>) -> bool { 
+    usize::min(a.rows(), a.cols()) > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Info
 }
 
 #[cfg(test)]

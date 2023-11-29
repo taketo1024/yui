@@ -31,10 +31,6 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
         Self(a, b)
     }
 
-    pub fn from_real(a: I) -> Self { 
-        Self::new(a, I::zero())
-    }
-
     pub fn omega() -> Self { 
         Self::new(I::zero(), I::one())
     }
@@ -108,7 +104,7 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 impl<I, const D: i32> From<I> for QuadInt<I, D>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     fn from(i: I) -> Self {
-        Self::from_real(i)
+        Self::new(i, I::zero())
     }
 }
 
@@ -118,7 +114,7 @@ where I: Integer + FromStr, for<'x> &'x I: IntOps<I> {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if let Ok(a) = s.parse::<I>() {
-            Ok(Self::from_real(a))
+            Ok(Self::from(a))
         } else if let Ok((a, b)) = parse_tuple::<I, I>(s) { 
             Ok(Self::new(a, b))
         } else { 
@@ -369,7 +365,7 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 
     fn inv(&self) -> Option<Self> {
         if let Some(u) = self.norm().inv() {
-            let u = Self::from_real(u);
+            let u = Self::from(u);
             Some(u * self.conj())
         } else { 
             None

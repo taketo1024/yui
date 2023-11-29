@@ -10,7 +10,7 @@ use std::cell::RefCell;
 use std::slice::Iter;
 use std::cmp::Ordering;
 use std::collections::VecDeque;
-use std::sync::{Mutex, RwLock};
+use std::sync::RwLock;
 use ahash::AHashSet;
 use itertools::Itertools;
 use log::info;
@@ -214,15 +214,13 @@ impl PivotFinder {
         let remain_rows: Vec<_> = self.remain_rows().collect();
         let total_rows = remain_rows.len();
 
-        let mut row_count = 0;
-        let mut piv_count = self.pivots.count();
-
         if self.should_report() { 
             info!("  start find-cycle-free-pivots: {total_rows} rows");
         }
 
         let n = self.cols();
         let mut w = RowWorker::new(n);
+        let mut row_count = 0;
 
         for i in remain_rows { 
             if let Some(j) = w.find_cycle_free_pivots(i, &self.str, &self.pivots) { 
@@ -233,36 +231,29 @@ impl PivotFinder {
                 row_count += 1;
                 if row_count % LOG_THRESHOLD == 0 { 
                     let c = self.pivots.count();
-                    info!("    [{row_count}/{total_rows}] +{}, total: {}.", c - piv_count, c);
-                    piv_count = c;
+                    info!("    [{row_count}/{total_rows}], {c} pivots.");
                 }
             }
         }
      }
 
      fn find_cycle_free_pivots_m(&mut self) {
-        let n = self.cols();
+        use yui::util::sync::sync_counter;
+
         let remain_rows = self.remain_rows().collect_vec();
         let total_rows = remain_rows.len();
 
+        if self.should_report() { 
+            info!("  start find-cycle-free-pivots: {total_rows} rows");
+        }
+        
+        let n = self.cols();
         let pivots = RwLock::new(
             std::mem::take(&mut self.pivots)
         );
         let loc_pivots_tls = ThreadLocal::new();
         let loc_worker_tls = ThreadLocal::new();
-
-        let (row_count, piv_count) = if self.should_report() { 
-            let n_threads = std::thread::available_parallelism().map(|x| x.get()).unwrap_or(1);
-
-            info!("  start find-cycle-free-pivots: {total_rows} rows (multi-thread: {n_threads})");
-
-            let row_count = Mutex::new(0);
-            let piv_count = Mutex::new(self.pivots.count());
-
-            (Some(row_count), Some(piv_count))
-        } else { 
-            (None, None)
-        };
+        let row_counter = sync_counter();
 
         remain_rows.par_iter().for_each(|&i| { 
             let mut loc_pivots = init_tls(&loc_pivots_tls, || 
@@ -279,17 +270,10 @@ impl PivotFinder {
             self.find_cycle_free_pivots_in(&pivots, &mut loc_pivots, &mut w);
 
             if self.should_report() { 
-                let row_count = {
-                    let mut row_count = row_count.as_ref().unwrap().lock().unwrap();
-                    *row_count += 1;
-                    *row_count
-                };
-            
-                if row_count % 10_000 == 0 { 
-                    let mut piv_count = piv_count.as_ref().unwrap().lock().unwrap();
+                let row_count = row_counter();            
+                if row_count % LOG_THRESHOLD == 0 { 
                     let c = loc_pivots.count();
-                    info!("    [{row_count}/{total_rows}] +{}, total: {}.", c - *piv_count, c);
-                    *piv_count = c;
+                    info!("    [{row_count}/{total_rows}], {c} pivots.");
                 }
             }
         });

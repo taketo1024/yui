@@ -81,7 +81,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 fn solve_triangular_s<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    if y.cols() > LOG_THRESHOLD { 
+    if should_report(a) { 
         info!("solve triangular: a = {:?}, y = {:?}", a.shape(), y.shape());
     }
 
@@ -100,27 +100,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 fn solve_triangular_m<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let report = y.cols() > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Info;
+    let report = should_report(a);
     if report { 
         info!("solve triangular: a = {:?}, y = {:?}", a.shape(), y.shape());
-    }
-
-    let col_count = Mutex::new(0);
-    fn incr_count(c: &Mutex<usize>, total: usize) { 
-        let c = {
-            let mut c = c.lock().unwrap();
-            *c += 1;
-            *c
-        };
-        if c > 0 && c % LOG_THRESHOLD == 0 { 
-            info!("  solved {c}/{total}");
-        }
     }
 
     let (n, k) = (a.rows(), y.cols());
     let diag = collect_diag(t, a);
     let tl_b = Arc::new(ThreadLocal::new());
-    
+    let counter = sync_counter();
+
     let entries = (0..k).into_par_iter().flat_map(|j| { 
         let mut b = tl_b.get_or(|| 
             RefCell::new(vec![R::zero(); n])
@@ -131,7 +120,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let res = xj.into_par_iter().map(move |(i, x)| (i, j, x));
 
         if report { 
-            incr_count(&col_count, k)
+            let c = counter();
+            if c > 0 && c % LOG_THRESHOLD == 0 { 
+                info!("  solved {c}/{k}");
+            }
         }
 
         res
@@ -204,6 +196,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 fn copy_into<'a, Itr, R>(itr: Itr, x: &mut [R])
 where Itr: Iterator<Item = (usize, &'a R)>, R: Clone + 'a { 
     itr.for_each(|(i, r)| x[i] = r.clone())
+}
+
+#[inline]
+fn should_report<R>(a: &SpMat<R>) -> bool { 
+    usize::min(a.rows(), a.cols()) > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Info
+}
+
+fn sync_counter() -> impl Fn() -> usize { 
+    let col_count = Mutex::new(0);
+    move || {
+        let mut c = col_count.lock().unwrap();
+        *c += 1;
+        *c
+    }
 }
 
 #[cfg(test)]

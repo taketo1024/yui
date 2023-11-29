@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use either::Either;
 use log::info;
 use rayon::prelude::*;
@@ -100,6 +100,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 fn solve_triangular_m<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
+    use yui::util::sync::sync_counter;
+    
     let report = should_report(a);
     if report { 
         info!("solve triangular: a = {:?}, y = {:?}", a.shape(), y.shape());
@@ -201,15 +203,6 @@ where Itr: Iterator<Item = (usize, &'a R)>, R: Clone + 'a {
 #[inline]
 fn should_report<R>(a: &SpMat<R>) -> bool { 
     usize::min(a.rows(), a.cols()) > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Info
-}
-
-fn sync_counter() -> impl Fn() -> usize { 
-    let col_count = Mutex::new(0);
-    move || {
-        let mut c = col_count.lock().unwrap();
-        *c += 1;
-        *c
-    }
 }
 
 #[cfg(test)]

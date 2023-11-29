@@ -81,8 +81,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 fn solve_triangular_s<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    if should_report(a) { 
-        info!("solve triangular: a = {:?}, y = {:?}", a.shape(), y.shape());
+    if should_report(y) { 
+        info!("solve triangular, y: {:?}", y.shape());
     }
 
     let (n, k) = (a.rows(), y.cols());
@@ -102,9 +102,9 @@ fn solve_triangular_m<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat
 where R: Ring, for<'x> &'x R: RingOps<R> {
     use yui::util::sync::SyncCounter;
 
-    let report = should_report(a);
+    let report = should_report(y);
     if report { 
-        info!("solve triangular: a = {:?}, y = {:?}", a.shape(), y.shape());
+        info!("solve triangular, y: {:?}", y.shape());
     }
 
     let (n, k) = (a.rows(), y.cols());

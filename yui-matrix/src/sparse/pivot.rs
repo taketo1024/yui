@@ -82,7 +82,7 @@ impl PivotFinder {
 
     pub fn find_pivots(&mut self) {
         if self.should_report() {
-            info!("find pivots: {:?}", self.str.shape());
+            info!("pivots: {:?} ..", self.str.shape());
         }
 
         self.find_fl_pivots();
@@ -90,15 +90,11 @@ impl PivotFinder {
         self.find_cycle_free_pivots();
 
         if self.should_report() {
-            info!("found {} pivots.", self.pivots.count());
+            info!("pivots: {:?} => {}.", self.str.shape(), self.pivots.count());
         }
     }
 
     pub fn result(&self) -> Vec<(usize, usize)> { 
-        if self.should_report() {
-            info!("sort pivots.");
-        }
-
         let tree = self.pivots.iter().map(|(i, j)| { 
             let list = self.str.cols_in(i).filter(|&&j2|
                 j != j2 && self.pivots.has_col(j2)

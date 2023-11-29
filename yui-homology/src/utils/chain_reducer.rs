@@ -134,7 +134,7 @@ where
             return;
         }
 
-        info!("reduce at C[{i}] (itr: {itr}), size: {:?}.", a.shape());
+        info!("red C[{i}]: {:?} (itr: {itr}) ..", a.shape());
 
         let (p, q, r) = pivots(a);
 
@@ -145,7 +145,7 @@ where
 
         let s = schur(a, &p, &q, r, self.with_trans);
 
-        info!("reduced {:?} -> {:?}.", a.shape(), s.complement().shape());
+        info!("red C[{i}]: {:?} -> {:?}.", a.shape(), s.complement().shape());
 
         if self.with_trans { 
             self.update_trans(i, &p, &q, r, &s);

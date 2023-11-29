@@ -31,10 +31,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(r <= a.rows());
         assert!(r <= a.cols());
 
-        if should_report(a) { 
-            info!("compute schur for: {:?}", a.shape());
-        }
-
         let orig_shape = a.shape();
         let (compl, t_in, t_out) = Self::compute_from_partial_lower(a, r, with_trans);
 
@@ -47,6 +43,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn compute_from_partial_lower(a: &SpMat<R>, r: usize, with_trans: bool) -> (SpMat<R>, Option<SpMat<R>>, Option<SpMat<R>>) {
+        let report = should_report(a);
+        if report { 
+            info!("schur, a: {:?}, r: {} ..", a.shape(), r);
+        }
+
         let (m, n) = a.shape();
 
         //  [a   ][a⁻¹b   ] = [b]
@@ -54,28 +55,24 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         //  ~~~~~~
         //    = p
         
-        if should_report(a) { 
-            info!("make p: {:?}", (m, m));
-        }
-
         let p = SpMat::from_entries((m, m), Iterator::chain(
             a.view().submat_cols(0..r).iter().map(|(i, j, x)| (i, j, x.clone())),
             (r..m).map(|i| (i, i, R::one()))
         ));
         
-        if should_report(a) { 
-            info!("compute s: {:?}", (m-r, n-r));
-        }
-
         let bd = a.submat_cols(r..n);
         let pinvbd = solve_triangular(TriangularType::Lower, &p, &bd);
         let s = pinvbd.submat_rows(r..m);
 
-        if should_report(a) { 
-            info!("schur: {:?}", s.shape());
+        if report { 
+            info!("schur-c: {:?}", s.shape());
         }
 
         let (t_in, t_out) = if with_trans { 
+            if report { 
+                info!("trans ..");
+            }    
+
             let id = |n| SpMat::id(n);
 
             // t_in = [-a⁻¹b]
@@ -84,7 +81,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let ainvb = pinvbd.submat_rows(0..r);
             let t_in = (-ainvb).stack(&id(n - r));
 
-            if should_report(a) { 
+            if report { 
                 info!("t_in: {:?}", t_in.shape());
             }    
     
@@ -96,7 +93,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let i = SpMat::zero((m - r, r)).concat(&SpMat::id(m - r));
             let t_out = solve_triangular_left(TriangularType::Lower, &p, &i);
 
-            if should_report(a) { 
+            if report { 
                 info!("t_out: {:?}", t_out.shape());
             }    
 

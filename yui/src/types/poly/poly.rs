@@ -416,9 +416,9 @@ macro_rules! impl_eval_bivar {
         where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn eval(&self, x: &R, y: &R) -> R
             where for<'x, 'y> &'x R: Pow<&'y $I, Output = R> { 
-                self.iter().map(|(i, r)| { 
+                R::sum(self.iter().map(|(i, r)| { 
                     r * i.eval(x, y)
-                }).sum()
+                }))
             }
         }
     };

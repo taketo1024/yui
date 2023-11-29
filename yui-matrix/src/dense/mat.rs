@@ -235,9 +235,9 @@ where R: AddGrp, for<'x> &'x R: AddGrpOps<R> + Mul<Output = R> {
         assert_eq!(self.cols(), rhs.rows());
         let (l, m, n) = (self.rows(), self.cols(), rhs.cols());
         let array = Array2::from_shape_fn((l, n), |(i, k)| {
-            (0..m).map(|j| {
+            R::sum((0..m).map(|j| {
                 &self[[i, j]] * &rhs[[j, k]]
-            }).sum()
+            }))
         });
         Mat::from(array)
     }

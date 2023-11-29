@@ -1,5 +1,4 @@
 use std::fmt::{Display, Debug};
-use std::iter::{Sum, Product};
 use std::ops::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Neg, DivAssign, RemAssign, Div, Rem};
 use std::str::FromStr;
 use delegate::delegate;
@@ -341,31 +340,6 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 }
-
-macro_rules! impl_accum {
-    ($trait:ident, $method:ident, $accum_trait:ident, $accum_method:ident, $accum_init:ident) => {
-        impl<X, R> $trait for PolyBase<X, R>
-        where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
-            fn $method<Iter: Iterator<Item = Self>>(iter: Iter) -> Self {
-                let mut res = Self::$accum_init();
-                for r in iter { Self::$accum_method(&mut res, r) }
-                return res;
-            }
-        }
-
-        impl<'a, X, R> $trait<&'a Self> for PolyBase<X, R>
-        where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
-            fn $method<Iter: Iterator<Item = &'a Self>>(iter: Iter) -> Self {
-                let mut res = Self::$accum_init();
-                for r in iter { Self::$accum_method(&mut res, r) }
-                return res;
-            }
-        }
-    };
-}
-
-impl_accum!(Sum, sum, AddAssign, add_assign, zero);
-impl_accum!(Product, product, MulAssign, mul_assign, one);
 
 macro_rules! impl_pow_unsigned {
     ($t:ty) => {

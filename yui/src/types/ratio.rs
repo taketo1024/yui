@@ -1,7 +1,6 @@
 use std::fmt::{Display, Debug};
 use std::str::FromStr;
 use std::cmp;
-use std::iter::{Sum, Product};
 use std::ops::{Mul, Add, Sub, Neg, AddAssign, SubAssign, MulAssign, Div, DivAssign, Rem, RemAssign};
 use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
@@ -258,33 +257,6 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
         Ratio::zero() // MEMO Frac<T> is a field. 
     }
 }
-
-macro_rules! impl_accum {
-    ($trait:ident, $method:ident, $accum_trait:ident, $accum_method:ident, $accum_init:ident) => {
-        impl<T> $trait for Ratio<T>
-        where T: EucRing, for<'x> &'x T: EucRingOps<T> {
-            fn $method<Iter: Iterator<Item = Self>>(iter: Iter) -> Self {
-                iter.fold(Self::$accum_init(), |mut res, r| { 
-                    Self::$accum_method(&mut res, r);
-                    res
-                })
-            }
-        }
-
-        impl<'a, T> $trait<&'a Ratio<T>> for Ratio<T>
-        where T: EucRing, for<'x> &'x T: EucRingOps<T> {
-            fn $method<Iter: Iterator<Item = &'a Ratio<T>>>(iter: Iter) -> Self {
-                iter.fold(Self::$accum_init(), |mut res, r| { 
-                    Self::$accum_method(&mut res, r);
-                    res
-                })
-            }
-        }
-    }
-}
-
-impl_accum!(Sum, sum, AddAssign, add_assign, zero);
-impl_accum!(Product, product, MulAssign, mul_assign, one);
 
 macro_rules! decl_alg_ops {
     ($trait:ident) => {

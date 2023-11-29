@@ -1,5 +1,5 @@
 use num_traits::Pow;
-use yui::{PowMod2, GetSign, Ring};
+use yui::{PowMod2, GetSign, Ring, AddMon};
 use yui::poly::LPoly;
 use crate::{Link, State};
 
@@ -15,13 +15,13 @@ pub fn jones_polynomial(l: &Link) -> LPoly<'q', i32> {
     let a = e * q.pow(n_pos - 2 * n_neg); // a = (-1)^{n^-} q^{n^+ - 2n^-}
 
     let q0: P = &q + q.pow(-1);
-    let body: P = State::generate(n).into_iter().map(|s| { 
+    let body = P::sum(State::generate(n).into_iter().map(|s| { 
         let w = s.weight();
         let l_s = l.resolved_by(&s);
         let r = l_s.components().len();
 
         (-&q).pow(w) * q0.pow(r) // (-q)^w (q + q^{-1})^r
-    }).sum();
+    }));
 
     a * body
 }

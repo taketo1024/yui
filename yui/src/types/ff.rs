@@ -1,6 +1,5 @@
 #![allow(non_upper_case_globals)]
 
-use std::iter::{Sum, Product};
 use std::ops::{Add, Neg, Sub, Mul, Div, Rem, AddAssign, SubAssign, MulAssign, DivAssign, RemAssign};
 use std::str::FromStr;
 use derive_more::{Display, DebugCustom};
@@ -115,29 +114,6 @@ impl<'a, 'b, const p: I> Rem<&'b FF<p>> for &'a FF<p> {
         FF::zero() // MEMO: FF<p> is a field. 
     }
 }
-
-macro_rules! impl_accum {
-    ($trait:ident, $method:ident, $accum_trait:ident, $accum_method:ident, $accum_init:ident) => {
-        impl<const p: I> $trait for FF<p> {
-            fn $method<Iter: Iterator<Item = Self>>(iter: Iter) -> Self {
-                let mut res = Self::$accum_init();
-                for r in iter { Self::$accum_method(&mut res, r) }
-                return res;
-            }
-        }
-
-        impl<'a, const p: I> $trait<&'a FF<p>> for FF<p> {
-            fn $method<Iter: Iterator<Item = &'a FF<p>>>(iter: Iter) -> Self {
-                let mut res = Self::$accum_init();
-                for r in iter { Self::$accum_method(&mut res, r) }
-                return res;
-            }
-        }
-    }
-}
-
-impl_accum!(Sum, sum, AddAssign, add_assign, zero);
-impl_accum!(Product, product, MulAssign, mul_assign, one);
 
 macro_rules! impl_alg_ops {
     ($trait:ident) => {

@@ -1,4 +1,3 @@
-use std::iter::{Sum, Product};
 use std::str::FromStr;
 use std::fmt::{Display, Debug};
 use std::ops::{Add, Neg, Sub, Mul, AddAssign, SubAssign, MulAssign, Rem, Div, RemAssign, DivAssign};
@@ -246,9 +245,6 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
     }
 }
 
-impl_accum!(Sum, sum, AddAssign, add_assign, zero);
-impl_accum!(Product, product, MulAssign, mul_assign, one);
-
 // Div / Rem for GaussInt (D = -1).
 
 impl<I> DivRound for GaussInt<I>
@@ -465,28 +461,6 @@ macro_rules! impl_add_op {
     };
 }
 
-macro_rules! impl_accum {
-    ($trait:ident, $method:ident, $accum_trait:ident, $accum_method:ident, $accum_init:ident) => {
-        impl<I, const D: i32> $trait for QuadInt<I, D>
-        where I: Integer, for<'x> &'x I: IntOps<I> {
-            fn $method<Iter: Iterator<Item = Self>>(iter: Iter) -> Self {
-                let mut res = Self::$accum_init();
-                for r in iter { Self::$accum_method(&mut res, r) }
-                return res;
-            }
-        }
-
-        impl<'a, I, const D: i32> $trait<&'a QuadInt<I, D>> for QuadInt<I, D>
-        where I: Integer, for<'x> &'x I: IntOps<I> {
-            fn $method<Iter: Iterator<Item = &'a QuadInt<I, D>>>(iter: Iter) -> Self {
-                let mut res = Self::$accum_init();
-                for r in iter { Self::$accum_method(&mut res, r) }
-                return res;
-            }
-        }
-    }
-}
-
 macro_rules! impl_alg_op {
     ($trait:ident) => {
         impl<I, const D: i32> $trait<Self> for QuadInt<I, D> 
@@ -507,7 +481,7 @@ macro_rules! impl_alg_op_d {
     };
 }
 
-use {impl_unop, impl_add_op, impl_accum, impl_alg_op, impl_alg_op_d};
+use {impl_unop, impl_add_op, impl_alg_op, impl_alg_op_d};
 
 #[cfg(test)]
 mod tests {

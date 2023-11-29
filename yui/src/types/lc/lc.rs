@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Debug};
-use std::iter::Sum;
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, MulAssign};
 use ahash::AHashMap;
 use itertools::Itertools;
@@ -410,30 +409,6 @@ where
     }
 }
 
-macro_rules! impl_accum {
-    ($trait:ident, $method:ident, $accum_trait:ident, $accum_method:ident, $accum_init:ident) => {
-        impl<X, R> $trait<Self> for Lc<X, R>
-        where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
-            fn $method<Iter: Iterator<Item = Self>>(iter: Iter) -> Self {
-                let mut res = Self::$accum_init();
-                for r in iter { Self::$accum_method(&mut res, r) }
-                return res;
-            }
-        }
-
-        impl<'a, X, R> $trait<&'a Self> for Lc<X, R>
-        where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
-            fn $method<Iter: Iterator<Item = &'a Self>>(iter: Iter) -> Self {
-                let mut res = Self::$accum_init();
-                for r in iter { Self::$accum_method(&mut res, r) }
-                return res;
-            }
-        }
-    }
-}
-
-impl_accum!(Sum, sum, AddAssign, add_assign, zero);
-
 macro_rules! impl_alg_ops {
     ($trait:ident) => {
         impl<X, R> $trait<Self> for Lc<X, R>
@@ -493,7 +468,7 @@ where
 #[cfg(test)]
 mod tests {
     use num_traits::Zero;
-    use crate::Elem;
+    use crate::{Elem, AddMon};
     use crate::util::macros::hashmap;
     use crate::lc::{Free, Lc};
  
@@ -674,7 +649,7 @@ mod tests {
         let z1 = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
         let z2 = L::from(hashmap!{ e(2) => 20, e(3) => 30 });
         let z3 = L::from(hashmap!{ e(3) => 300, e(4) => 400 });
-        let w: L = [z1, z2, z3].into_iter().sum();
+        let w  = L::sum([z1, z2, z3]);
 
         assert_eq!(w, L::from(hashmap!{ e(1) => 1, e(2) => 22, e(3) => 330, e(4) => 400 }));
     }
@@ -685,7 +660,7 @@ mod tests {
         let z1 = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
         let z2 = L::from(hashmap!{ e(2) => 20, e(3) => 30 });
         let z3 = L::from(hashmap!{ e(3) => 300, e(4) => 400 });
-        let w: L = [&z1, &z2, &z3].into_iter().sum();
+        let w  = L::sum([&z1, &z2, &z3]);
 
         assert_eq!(w, L::from(hashmap!{ e(1) => 1, e(2) => 22, e(3) => 330, e(4) => 400 }));
     }

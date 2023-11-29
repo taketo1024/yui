@@ -58,17 +58,6 @@ where R: Clone + Default + Zero {
 }
 
 impl<R> SpMat<R> where R: Clone + Zero { 
-    pub fn from_vec(shape: (usize, usize), grid: Vec<R>) -> Self { 
-        let n = shape.1;
-        Self::from_entries(
-            shape, 
-            grid.into_iter().enumerate().map(|(k, a)| { 
-                let (i, j) = (k / n, k % n);
-                (i, j, a)
-            })
-        )
-    }
-
     pub fn from_entries<T>(shape: (usize, usize), entries: T) -> Self
     where T: IntoIterator<Item = (usize, usize, R)> {
         let mut t = TriMat::new(shape);
@@ -98,6 +87,18 @@ impl<R> SpMat<R> where R: Clone + Zero {
 
         let cs_mat = t.into_inner().unwrap().to_csc();
         Self::from(cs_mat)
+    }
+
+    pub fn from_dense_data<I>(shape: (usize, usize), data: I) -> Self
+    where I: IntoIterator<Item = R> { 
+        let n = shape.1;
+        Self::from_entries(
+            shape, 
+            data.into_iter().enumerate().map(|(k, a)| { 
+                let (i, j) = (k / n, k % n);
+                (i, j, a)
+            })
+        )
     }
 
     pub fn transpose(&self) -> Self { 
@@ -456,7 +457,7 @@ pub(super) mod tests {
 
     #[test]
     fn from_grid() { 
-        let a = SpMat::from_vec((2, 2), vec![1,2,3,4]);
+        let a = SpMat::from_dense_data((2, 2), [1,2,3,4]);
         assert_eq!(&a.cs_mat, &CsMat::new_csc((2, 2), vec![0, 2, 4], vec![0, 1, 0, 1], vec![1, 3, 2, 4]));
     }
 
@@ -475,9 +476,9 @@ pub(super) mod tests {
     fn permute() { 
         let p = PermOwned::new(vec![1,2,3,0]);
         let q = PermOwned::new(vec![3,0,2,1]);
-        let a = SpMat::from_vec((4,4), (0..16).collect());
+        let a = SpMat::from_dense_data((4,4), 0..16);
         let b = a.permute(p.view(), q.view());
-        assert_eq!(b, SpMat::from_vec((4,4), vec![
+        assert_eq!(b, SpMat::from_dense_data((4,4), vec![
             13, 15, 14, 12,
              1,  3,  2,  0,
              5,  7,  6,  4,
@@ -487,10 +488,10 @@ pub(super) mod tests {
 
     #[test]
     fn transpose() { 
-        let a = SpMat::from_vec((3,4), (0..12).collect());
+        let a = SpMat::from_dense_data((3,4), 0..12);
         let b = a.transpose();
 
-        assert_eq!(b, SpMat::from_vec((4,3), vec![
+        assert_eq!(b, SpMat::from_dense_data((4,3), vec![
             0, 4, 8, 
             1, 5, 9, 
             2, 6, 10, 
@@ -500,7 +501,7 @@ pub(super) mod tests {
 
     #[test]
     fn row_perm() {
-        let a = SpMat::from_vec((3, 4), (0..12).collect());
+        let a = SpMat::from_dense_data((3, 4), 0..12);
         let p = PermOwned::new(vec![2,0,1]);
         let q = SpMat::from_row_perm(p.view());
         assert!(q * &a == a.permute_rows(p.view()))
@@ -508,7 +509,7 @@ pub(super) mod tests {
 
     #[test]
     fn col_perm() {
-        let a = SpMat::from_vec((3, 4), (0..12).collect());
+        let a = SpMat::from_dense_data((3, 4), 0..12);
         let p = PermOwned::new(vec![2,0,1,3]);
         let q = SpMat::from_col_perm(p.view());
         assert!(&a * q == a.permute_cols(p.view()))

@@ -64,7 +64,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         ));
         
         if should_report(a) { 
-            info!("compute s: {:?}", (m-r, m-r));
+            info!("compute s: {:?}", (m-r, n-r));
         }
 
         let bd = a.submat_cols(r..n);
@@ -139,7 +139,7 @@ mod tests {
 
     #[test]
     fn schur() {
-        let a = SpMat::from_vec((6, 5), vec![
+        let a = SpMat::from_dense_data((6, 5), [
             1, 0, 0, 1, 3,
             2,-1, 0, 2, 2,
             3, 2, 1, 0, 3,
@@ -150,14 +150,14 @@ mod tests {
         let sch = Schur::from_partial_lower(&a, 3, false);
         let s = sch.complement();
 
-        assert_eq!(s, &SpMat::from_vec((3,2), vec![5,36,12,45,-14,-60]));
+        assert_eq!(s, &SpMat::from_dense_data((3,2), [5,36,12,45,-14,-60]));
         assert!(sch.trans_in().is_none());
         assert!(sch.trans_out().is_none());
     }
 
     #[test]
     fn schur_with_trans() {
-        let a = SpMat::from_vec((6, 5), vec![
+        let a = SpMat::from_dense_data((6, 5), [
             1, 0, 0, 1, 3,
             2,-1, 0, 2, 2,
             3, 2, 1, 0, 3,
@@ -168,15 +168,15 @@ mod tests {
         let sch = Schur::from_partial_lower(&a, 3, true);
         let s = sch.complement();
 
-        assert_eq!(s, &SpMat::from_vec((3,2), vec![5,36,12,45,-14,-60]));
+        assert_eq!(s, &SpMat::from_dense_data((3,2), [5,36,12,45,-14,-60]));
         assert!(sch.trans_in().is_some());
         assert!(sch.trans_out().is_some());
 
         let t_in = sch.trans_in().unwrap();
         let t_out = sch.trans_out().unwrap();
 
-        assert_eq!(t_in,  &SpMat::from_vec((5,2), vec![-1,-3,0,-4,3,14,1,0,0,1]));
-        assert_eq!(t_out, &SpMat::from_vec((3,6), vec![20,-6,-4,1,0,0,24,-7,-5,0,1,0,-31,8,3,0,0,1]));
+        assert_eq!(t_in,  &SpMat::from_dense_data((5,2), [-1,-3,0,-4,3,14,1,0,0,1]));
+        assert_eq!(t_out, &SpMat::from_dense_data((3,6), [20,-6,-4,1,0,0,24,-7,-5,0,1,0,-31,8,3,0,0,1]));
         assert_eq!(&(t_out * &a * t_in), s);
     }
 }

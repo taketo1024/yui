@@ -824,16 +824,16 @@ mod tests {
         type P = Poly::<'x', R>;
 
         let x = P::mono;
-        let f = P::from_const(R::from_numer(1));
+        let f = P::from_const(R::from(1));
 
         assert!(f.is_unit());
-        assert_eq!(f.inv(), Some(P::from_const(R::from_numer(1))));
+        assert_eq!(f.inv(), Some(P::from_const(R::from(1))));
 
         let f = P::from_const(R::zero());
         assert!(!f.is_unit());
         assert_eq!(f.inv(), None);
 
-        let f = P::from_const(R::from_numer(2));
+        let f = P::from_const(R::from(2));
         assert!(f.is_unit());
         assert_eq!(f.inv(), Some(P::from_const(R::new(1, 2))));
 
@@ -882,15 +882,15 @@ mod tests {
         type P = LPoly::<'x', R>;
 
         let x = P::mono;
-        let f = P::from_const(R::from_numer(1));
+        let f = P::from_const(R::from(1));
         assert!(f.is_unit());
-        assert_eq!(f.inv(), Some(P::from_const(R::from_numer(1))));
+        assert_eq!(f.inv(), Some(P::from_const(R::from(1))));
 
         let f = P::from_const(R::zero());
         assert!(!f.is_unit());
         assert_eq!(f.inv(), None);
 
-        let f = P::from_const(R::from_numer(2));
+        let f = P::from_const(R::from(2));
         assert!(f.is_unit());
         assert_eq!(f.inv(), Some(P::from_const(R::new(1, 2))));
 
@@ -898,7 +898,7 @@ mod tests {
         assert!(f.is_unit());
         assert_eq!(f.inv(), Some(P::from((x(-1), R::one()))));
 
-        let f = P::from((x(1), R::from_numer(2)));
+        let f = P::from((x(1), R::from(2)));
         assert!(f.is_unit());
         assert_eq!(f.inv(), Some(P::from((x(-1), R::new(1, 2)))));
 
@@ -913,8 +913,8 @@ mod tests {
         type P = Poly::<'x', R>;
 
         let x = P::mono;
-        let f = P::from_iter([(x(0), R::from_numer(1)), (x(1), R::from_numer(2)), (x(2), R::from_numer(1))]);
-        let g = P::from_iter([(x(0), R::from_numer(3)), (x(1), R::from_numer(2))]);
+        let f = P::from_iter([(x(0), R::from(1)), (x(1), R::from(2)), (x(2), R::from(1))]);
+        let g = P::from_iter([(x(0), R::from(3)), (x(1), R::from(2))]);
         let (q, r) = f.div_rem(&g);
 
         assert_eq!(q, P::from_iter([(x(0), R::new(1, 4)), (x(1), R::new(1, 2))]));

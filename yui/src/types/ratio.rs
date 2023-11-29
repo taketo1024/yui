@@ -67,19 +67,16 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
             self.denom /= &g;
         }
     }
-}
 
-impl<T> Ratio<T>
-where T: One {
-    pub fn from_numer(a: T) -> Self {
-        Self::new_raw(a, T::one())
+    pub fn is_int(&self) -> bool { 
+        self.denom.is_one()
     }
 }
 
-impl<T> Ratio<T>
-where T: One + PartialEq {
-    pub fn is_numer(&self) -> bool { 
-        self.denom.is_one()
+impl<T> From<T> for Ratio<T>
+where T: One {
+    fn from(a: T) -> Self {
+        Self::new_raw(a, T::one())
     }
 }
 
@@ -97,7 +94,7 @@ where T: EucRing + FromStr, for<'x> &'x T: EucRingOps<T> {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if let Ok(a) = s.parse::<T>() {
-            return Ok(Self::from_numer(a))
+            return Ok(Self::from(a))
         } 
         
         let r = regex::Regex::new(r"(.+)/(.+)").unwrap();
@@ -115,7 +112,7 @@ where T: EucRing + FromStr, for<'x> &'x T: EucRingOps<T> {
 impl<T> Default for Ratio<T>
 where T: Default + One {
     fn default() -> Self {
-        Self::from_numer(T::default())
+        Self::from(T::default())
     }
 }
 
@@ -145,7 +142,7 @@ where T: Display {
 impl<T> Zero for Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     fn zero() -> Self {
-        Self::from_numer(T::zero())
+        Self::from(T::zero())
     }
 
     fn is_zero(&self) -> bool {
@@ -156,7 +153,7 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
 impl<T> One for Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     fn one() -> Self {
-        Self::from_numer(T::one())
+        Self::from(T::one())
     }
 
     fn is_one(&self) -> bool {
@@ -223,11 +220,11 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
             // do nothing
         } else if rhs.is_zero() { 
             self.set_zero();             // a -> 0, b -> 1
-        } else if rhs.is_numer() { 
+        } else if rhs.is_int() { 
             let k = EucRing::gcd(b, c);  // b = kb', c = kc'
             self.numer *= c / &k;        // a -> a * c'
             self.denom /= &k;            // b -> b'
-        } else if self.is_numer() { 
+        } else if self.is_int() { 
             let k = EucRing::gcd(a, d);  // a = ka', d = kd'
             self.numer /= &k;            // a -> a' * c
             self.numer *= c;             // 

@@ -2,17 +2,14 @@ use std::ops::Index;
 use std::sync::Arc;
 
 use delegate::delegate;
-
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use yui::{Ring, RingOps};
 use yui::lc::{Gen, Lc};
 use yui_matrix::sparse::{SpMat, Trans, MatType};
 
 use crate::utils::ChainReducer;
-use crate::{GridDeg, isize2, isize3, Grid, GridIter, XModStr, RModStr, SimpleRModStr};
-
-use super::grid::GridTrait;
-use super::complex::ChainComplexTrait;
+use crate::{GridTrait, GridDeg, Grid, GridIter, ChainComplexTrait, RModStr, SimpleRModStr, isize2, isize3};
+use super::XModStr;
 
 pub type XChainComplex <X, R> = XChainComplexBase<isize,  X, R>;
 pub type XChainComplex2<X, R> = XChainComplexBase<isize2, X, R>;

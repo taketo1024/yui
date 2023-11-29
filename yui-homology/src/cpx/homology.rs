@@ -1,8 +1,8 @@
 use yui::{EucRing, EucRingOps};
 
 use crate::utils::HomologyCalc;
-use crate::{GridDeg, isize2, isize3};
-use crate::{Grid, GridTrait, ChainComplexTrait, SimpleRModStr, ChainComplexBase};
+use crate::{GridDeg, Grid, GridTrait, isize2, isize3};
+use super::{ChainComplexTrait, SimpleRModStr, ChainComplexBase};
 
 pub type HomologySummand<R> = SimpleRModStr<R>;
 pub type HomologyBase<I, R> = Grid<I, HomologySummand<R>>;

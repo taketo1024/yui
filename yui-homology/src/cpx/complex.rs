@@ -6,10 +6,9 @@ use delegate::delegate;
 use yui::{Ring, RingOps};
 use yui_matrix::sparse::{SpMat, SpVec, MatType, Trans};
 
-use crate::{GridDeg, isize2, isize3, Grid, GridIter, RModStr, SimpleRModStr, rmod_str_symbol};
-
-use super::grid::GridTrait;
-use super::utils::ChainReducer;
+use crate::{GridTrait, GridDeg, Grid, GridIter, isize2, isize3};
+use crate::utils::ChainReducer;
+use super::{RModStr, SimpleRModStr, rmod_str_symbol};
 
 pub type ChainComplexSummand<R> = SimpleRModStr<R>;
 

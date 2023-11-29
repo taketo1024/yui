@@ -103,7 +103,9 @@ macro_rules! impl_for_quad_int {
             type Int = I;
 
             fn alpha() -> (Self, Self) {
-                (Self::from_real(I::from($p)), Self::from_real(I::from($q)))
+                let p = I::from_i32($p).unwrap();
+                let q = I::from_i32($q).unwrap();
+                (Self::from(p), Self::from(q))
             }
 
             fn as_int(&self) -> Option<Self::Int> {
@@ -1042,7 +1044,7 @@ pub(super) mod tests {
     
             let (c, l) = gram_schmidt(b);
             let alpha = Ratio::from(R::alpha());
-            let thr = Ratio::new(R::one(), R::from(2));
+            let thr = Ratio::new(R::one(), R::from_i32(2).unwrap());
     
             let size_reduced = l.iter().all(|r| r.abs() <= thr);
             let lovasz_ok = (1..m).all(|i| {

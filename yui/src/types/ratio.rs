@@ -83,13 +83,6 @@ where T: One + PartialEq {
     }
 }
 
-impl<T> From<i32> for Ratio<T>
-where T: One + From<i32> {
-    fn from(i: i32) -> Self {
-        Self::from_numer(T::from(i))
-    }
-}
-
 impl<T> From<(T, T)> for Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     fn from(pair: (T, T)) -> Self {

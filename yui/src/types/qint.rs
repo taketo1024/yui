@@ -92,17 +92,23 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
     pub fn norm(&self) -> I {
         let (a, b) = self.pair();
         match D.rem_euclid(4) { 
-            1     => a * a + a * b + b * b * I::from( (1 - D) / 4),
-            2 | 3 => a * a - b * b * I::from(D),
+            1 => {
+                let d = I::from_i32( (1 - D) / 4).unwrap();
+                a * a + a * b + b * b * d
+            },
+            2 | 3 => {
+                let d = I::from_i32(D).unwrap();
+                a * a - b * b * d
+            },
             _     => panic!()
         }    
     }
 }
 
-impl<I, const D: i32> From<i32> for QuadInt<I, D>
+impl<I, const D: i32> From<I> for QuadInt<I, D>
 where I: Integer, for<'x> &'x I: IntOps<I> {
-    fn from(i: i32) -> Self {
-        Self::from_real(I::from(i))
+    fn from(i: I) -> Self {
+        Self::from_real(i)
     }
 }
 
@@ -228,13 +234,13 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 
         match D.rem_euclid(4) { 
             1 => {
-                let e = I::from((D - 1) / 4);
+                let e = I::from_i32((D - 1) / 4).unwrap();
                 let x = a * c + b * d * e;
                 let y = a * d + b * c + b * d;
                 QuadInt(x, y)
             },
             2 | 3 => {
-                let e = I::from(D);
+                let e = I::from_i32(D).unwrap();
                 let x = a * c + b * d * e;
                 let y = a * d + b * c;
                 QuadInt(x, y)

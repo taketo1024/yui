@@ -10,13 +10,16 @@ pub trait RingOps<T = Self>:
 pub trait Ring: 
     AddGrp + 
     Mon + 
-    RingOps + 
-    From<i32>
+    RingOps
 where
     for<'a> &'a Self: RingOps<Self>
 {
     fn from_sign(s: Sign) -> Self { 
-        Self::from(s.into())
+        if s.is_positive() { 
+            Self::one()
+        } else { 
+            -Self::one()
+        }
     }
 
     fn inv(&self) -> Option<Self>;

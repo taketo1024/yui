@@ -4,7 +4,7 @@ use yui_matrix::sparse::SpMat;
 use crate::ChainComplex;
 
 impl<R> ChainComplex<R> 
-where R: Ring, for<'x> &'x R: RingOps<R> {
+where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> {
     fn mat(shape: (usize, usize), entries: Vec<i32>) -> SpMat<R> { 
         SpMat::from_vec(shape, entries.into_iter().map(|x| R::from(x)).collect())
     }

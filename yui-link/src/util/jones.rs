@@ -1,5 +1,5 @@
 use num_traits::Pow;
-use yui::PowMod2;
+use yui::{PowMod2, GetSign, Ring};
 use yui::poly::LPoly;
 use crate::{Link, State};
 
@@ -10,7 +10,7 @@ pub fn jones_polynomial(l: &Link) -> LPoly<'q', i32> {
     let n_signed = l.signed_crossing_nums();
     let (n_pos, n_neg) = (n_signed.0 as i32, n_signed.1 as i32);
 
-    let e = P::from( (-1).pow_mod2(n_neg) );
+    let e = P::from_sign( (-1).pow_mod2(n_neg).sign() );
     let q = P::variable();
     let a = e * q.pow(n_pos - 2 * n_neg); // a = (-1)^{n^-} q^{n^+ - 2n^-}
 

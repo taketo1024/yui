@@ -211,13 +211,6 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<X, R> From<i32> for PolyBase<X, R>
-where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
-    fn from(i: i32) -> Self {
-        Self::from_const(R::from(i))
-    }
-}
-
 impl<X, R> From<Lc<X, R>> for PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     fn from(data: Lc<X, R>) -> Self {

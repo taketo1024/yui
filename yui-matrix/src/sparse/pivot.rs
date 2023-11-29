@@ -238,7 +238,7 @@ impl PivotFinder {
      }
 
      fn find_cycle_free_pivots_m(&mut self) {
-        use yui::util::sync::sync_counter;
+        use yui::util::sync::SyncCounter;
 
         let remain_rows = self.remain_rows().collect_vec();
         let total_rows = remain_rows.len();
@@ -253,7 +253,7 @@ impl PivotFinder {
         );
         let loc_pivots_tls = ThreadLocal::new();
         let loc_worker_tls = ThreadLocal::new();
-        let row_counter = sync_counter();
+        let row_counter = SyncCounter::new();
 
         remain_rows.par_iter().for_each(|&i| { 
             let mut loc_pivots = init_tls(&loc_pivots_tls, || 
@@ -270,7 +270,7 @@ impl PivotFinder {
             self.find_cycle_free_pivots_in(&pivots, &mut loc_pivots, &mut w);
 
             if self.should_report() { 
-                let row_count = row_counter();            
+                let row_count = row_counter.incr();            
                 if row_count % LOG_THRESHOLD == 0 { 
                     let c = loc_pivots.count();
                     info!("    [{row_count}/{total_rows}], {c} pivots.");

@@ -100,8 +100,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 fn solve_triangular_m<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    use yui::util::sync::sync_counter;
-    
+    use yui::util::sync::SyncCounter;
+
     let report = should_report(a);
     if report { 
         info!("solve triangular: a = {:?}, y = {:?}", a.shape(), y.shape());
@@ -110,7 +110,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let (n, k) = (a.rows(), y.cols());
     let diag = collect_diag(t, a);
     let tl_b = Arc::new(ThreadLocal::new());
-    let counter = sync_counter();
+    let counter = SyncCounter::new();
 
     let entries = (0..k).into_par_iter().flat_map(|j| { 
         let mut b = tl_b.get_or(|| 
@@ -122,7 +122,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let res = xj.into_par_iter().map(move |(i, x)| (i, j, x));
 
         if report { 
-            let c = counter();
+            let c = counter.incr();
             if c > 0 && c % LOG_THRESHOLD == 0 { 
                 info!("  solved {c}/{k}");
             }

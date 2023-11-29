@@ -172,9 +172,9 @@ where T: Display {
 }
 
 pub trait DisplaySeq<I> {
-    fn display_seq(&self) -> String;
-    fn print_seq(&self) {
-        println!("{}", self.display_seq())
+    fn display_seq(&self, label: &str) -> String;
+    fn print_seq(&self, label: &str) {
+        println!("{}", self.display_seq(label))
     }
 }
 
@@ -182,9 +182,9 @@ macro_rules! impl_print_seq {
     ($t:ident) => {
         impl<T> DisplaySeq<$t> for T
         where T: GridTrait<$t>, T::Output: DisplayForGrid {
-            fn display_seq(&self) -> String {
+            fn display_seq(&self, label: &str) -> String {
                 use yui::util::format::table;
-                let str = table("i", [""].iter(), self.support(), |_, &i| {
+                let str = table(label, [""].iter(), self.support(), |_, &i| {
                     self.get(i).display_for_grid()
                 });
                 str
@@ -197,9 +197,9 @@ impl_print_seq!(isize);
 impl_print_seq!(usize);
 
 pub trait DisplayTable<I> {
-    fn display_table(&self) -> String;
-    fn print_table(&self) {
-        println!("{}", self.display_table())
+    fn display_table(&self, label0: &str, label1: &str) -> String;
+    fn print_table(&self, label0: &str, label1: &str) {
+        println!("{}", self.display_table(label0, label1))
     }
 }
 
@@ -207,13 +207,14 @@ macro_rules! impl_print_table {
     ($t:ident) => {
         impl<T> DisplayTable<$t> for T
         where T: GridTrait<$t>, T::Output: DisplayForGrid {
-            fn display_table(&self) -> String {
+            fn display_table(&self, label0: &str, label1: &str) -> String {
                 use yui::util::format::table;
         
+                let head = format!("{}\\{}", label1, label0);
                 let cols = self.support().map(|$t(i, _)| i).unique().sorted();
                 let rows = self.support().map(|$t(_, j)| j).unique().sorted().rev();
         
-                let str = table("j\\i", rows, cols, |&j, &i| {
+                let str = table(head, rows, cols, |&j, &i| {
                     self.get($t(i, j)).display_for_grid()
                 });
         
@@ -239,7 +240,7 @@ mod tests {
         assert_eq!(g.get( 1), &10);
         assert_eq!(g.get(-1), &0); // default
 
-        let _seq = g.display_seq();
+        let _seq = g.display_seq("i");
         // println!("{_seq}");
     }
 
@@ -253,7 +254,7 @@ mod tests {
         assert_eq!(g.get(isize2(1, 2)), &12);
         assert_eq!(g.get(isize2(3, 3)), &0);
 
-        let _table = g.display_table();
+        let _table = g.display_table("i", "j");
         // println!("{_table}");
     }
 }

@@ -3,7 +3,7 @@ use std::iter::zip;
 use std::fmt::{Display, Debug};
 use std::sync::Mutex;
 use delegate::delegate;
-use nalgebra_sparse::na::{Scalar, ClosedAdd, ClosedSub, ClosedMul, DMatrix};
+use nalgebra_sparse::na::{Scalar, ClosedAdd, ClosedSub, ClosedMul};
 use nalgebra_sparse::{CscMatrix, CooMatrix};
 use num_traits::{Zero, One};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -107,28 +107,6 @@ where R: Scalar + Zero + ClosedAdd {
     fn from(coo: CooMatrix<R>) -> Self {
         let csc = CscMatrix::from(&coo);
         Self::from(csc)
-    }
-}
-
-impl<R> From<Mat<R>> for SpMat<R>
-where R: Scalar + Zero + ClosedAdd {
-    fn from(a: Mat<R>) -> Self {
-        let n = a.cols();
-        let entries = a.array().into_iter().enumerate().filter_map(|(k, a)| {
-            if !a.is_zero() { 
-                Some((k / n, k % n, a.clone()))
-            } else {
-                None 
-            }
-        });
-        SpMat::from_entries(a.shape(), entries)
-    }
-}
-
-impl<R> From<SpMat<R>> for Mat<R>
-where R: Scalar + Zero + ClosedAdd {
-    fn from(a: SpMat<R>) -> Self {
-        a.to_dense()
     }
 }
 
@@ -310,25 +288,6 @@ where R: Scalar + Clone + Zero + ClosedAdd {
         Self::from_entries((n, n), (0..n).map(|i|
             (i, p.at(i), R::one())
         ))
-    }    
-
-    pub fn _to_dense(self) -> DMatrix<R>
-    where R: Scalar + Zero + ClosedAdd { 
-        DMatrix::from(&self.inner)
-    }
-
-    // TODO to be removed.
-    pub fn to_dense(self) -> Mat<R>
-    where R: Scalar + Zero + ClosedAdd { 
-        use ndarray::Array2;
-
-        let (m, n) = self.shape();
-        let mut data = vec![R::zero(); m * n];
-        for (i, j, a) in self.iter() { 
-            data[i * n + j] = a.clone();
-        }
-        let arr = Array2::from_shape_vec((m, n), data).unwrap();
-        Mat::from(arr)
     }
 }
 
@@ -515,7 +474,7 @@ pub(super) mod tests {
             (1, 0, 3),
             (1, 1, 4)
         ]);
-        assert_eq!(a._to_dense(), DMatrix::from_row_slice(2, 2, &[1,2,3,4]));
+        assert_eq!(a.to_dense(), Mat::from_data((2, 2), [1,2,3,4]));
     }
 
     #[test]

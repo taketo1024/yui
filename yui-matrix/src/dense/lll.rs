@@ -10,11 +10,13 @@
 // https://www.jstor.org/stable/43974220
 
 use std::fmt::Debug;
-use ndarray::{Array1, ArrayView1, Array2, ArrayView2};
+use std::iter::zip;
+use std::ops::{Mul, Div};
+use nalgebra::{DMatrix, MatrixView, U1, Dyn};
 use log::{trace, info};
 use num_bigint::BigInt;
 
-use yui::{Ring, RingOps, EucRing, EucRingOps, DivRound, Integer, IntOps};
+use yui::{EucRing, EucRingOps, DivRound, Integer, IntOps};
 use yui::{QuadInt, GaussInt, EisenInt};
 use crate::dense::*;
 
@@ -245,14 +247,14 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         let j = self.data.nz_col_in(i);
 
         if let Some(j) = j { 
-            let u = self.data.target[[i, j]].normalizing_unit();
+            let u = self.data.target[(i, j)].normalizing_unit();
             if !u.is_one() { 
                 self.data.mul_row(i, &u);
             }
 
             let a = &self.data.target;
-            let a0 = &a[[i, j]];
-            let a1 = &a[[k, j]];
+            let a0 = &a[(i, j)];
+            let a1 = &a[(k, j)];
             let q = a1.div_round(a0);
 
             if !q.is_zero() { 
@@ -306,9 +308,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     }
 
     fn setup(&mut self) { 
-        let b = self.target.array();
-        let (_, l, d) = orthogonalize(&b.view());
-
+        let (_, l, d) = orthogonalize(&self.target);
         self.lambda = Mat::from(l);
         self.det = d;
     }
@@ -329,7 +329,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         let d0 = if k >= 2 { &d[k - 2] } else { &one };
         let d1 = &d[k - 1];
         let d2 = &d[k];
-        let l0 = &l[[k, k - 1]];
+        let l0 = &l[(k, k - 1)];
 
         let lhs = q * (d0 * d2 + l0.norm());
         let rhs = p * (d1 * d1);
@@ -344,7 +344,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         assert!(i < k);
 
         let (d, l) = (&self.det, &self.lambda);
-        let l_ki = &l[[k, i]];
+        let l_ki = &l[(k, i)];
         let d_i = &d[i];
         let q = l_ki.div_round(d_i);
 
@@ -376,9 +376,8 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 
         // λ[k-1, ..] <--> λ[k, ..] 
         for j in 0..k-1 { 
-            let slice = ndarray::s![.., j];
-            let l_j = &mut self.lambda.array_mut().slice_mut(slice);
-            l_j.swap(k - 1, k);
+            let mut l_j = self.lambda.inner_mut().column_mut(j);
+            l_j.swap_rows(k - 1, k);
         }
 
         let one = R::one();
@@ -392,23 +391,23 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         // λ[.., k-1] <--> λ[.., k]
         for i in k+1..m { 
             let l = &self.lambda;
-            let l0 = &l[[k, k-1]];
-            let l1 = &l[[i, k-1]];
-            let l2 = &l[[i, k]];
+            let l0 = &l[(k, k-1)];
+            let l1 = &l[(i, k-1)];
+            let l2 = &l[(i, k)];
 
             let s = l0.conj() * l1 + l2 * d0;
             let t = l1 * d2 - l2 * l0;
 
-            self.lambda[[i, k-1]] = &s / d1;
-            self.lambda[[i, k]]   = &t / d1;
+            self.lambda[(i, k-1)] = &s / d1;
+            self.lambda[(i, k)]   = &t / d1;
         }
 
         // λ[k, k-1] remains unchanged.
 
-        let l0 = &self.lambda[[k,k-1]];
+        let l0 = &self.lambda[(k,k-1)];
 
         self.det[k-1] = (d0 * d2 + l0.norm()) / d1;
-        self.lambda[[k, k-1]] = l0.conj();
+        self.lambda[(k, k-1)] = l0.conj();
 
         trace!("swap-rows ({},{}).\n{}", k-1, k, self.dump());
     }
@@ -445,18 +444,18 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
             pinv.add_col_to(k, i, &nr) 
         }
 
-        self.lambda[[k, i]] += r * &self.det[i];
+        self.lambda[(k, i)] += r * &self.det[i];
 
         for j in 0..i { 
-            let a = r * &self.lambda[[i, j]];
-            self.lambda[[k, j]] += a;
+            let a = r * &self.lambda[(i, j)];
+            self.lambda[(k, j)] += a;
         }
 
         trace!("add-row {} to {}, mul {}.\n{}", i, k, r, self.dump());
     }
 
     fn nz_col_in(&self, i: Row) -> Option<Col> {
-        self.target.array().row(i).iter().enumerate().filter_map(|(j, a)| { 
+        self.target.inner().row(i).iter().enumerate().filter_map(|(j, a)| { 
             if !a.is_zero() { Some(j) } else { None }
         }).next()
     }
@@ -483,95 +482,86 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 
 // -- helper funcs -- //
 
-fn orthogonalize<R>(b: &ArrayView2<R>) -> (Array2<R>, Array2<R>, Vec<R>)
+type RowView<'a, R> = MatrixView<'a, R, U1, Dyn, U1, Dyn>;
+
+fn orthogonalize<R>(b: &Mat<R>) -> (Mat<R>, Mat<R>, Vec<R>)
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
+    let b = b.inner();
     let m = b.nrows();
     let one = R::one();
 
     let mut c = b.to_owned();
     let mut d = vec![R::one(); m];
-    let mut l = Array2::zeros((m, m));
+    let mut l = DMatrix::zeros(m, m);
 
-    d[0] = h_dot(&c.row(0), &c.row(0));
+    d[0] = h_dot(c.row(0), c.row(0));
 
     for i in 1..m { 
         for j in 0..i { 
             // c_i = (d[j] * c_i - l[i,j] * c_j) / d[j - 1];
             
-            let l0 = h_dot(&b.row(i), &c.row(j));
+            let l0 = h_dot(b.row(i), c.row(j));
             let d0 = if j > 0 { &d[j - 1] } else { &one };
             let d1 = &d[j];
             
-            let c_i = smul(d1, &c.row(i)) - smul(&l0, &c.row(j));
-            let c_i = sdiv(&c_i.view(), d0);
+            let c_i = c.row(i).mul(d1.clone()) - c.row(j).mul(l0.clone());
+            let c_i = c_i.div(d0.clone());
             
-            l[[i, j]] = l0;
-            c.row_mut(i).assign(&c_i);
+            l[(i, j)] = l0;
+            c.set_row(i, &c_i);
         }
 
-        let c_i = &c.row(i);
         let d0 = &d[i - 1];
-        
-        d[i] = &h_dot(c_i, c_i) / d0;
+        d[i] = h_dot(c.row(i), c.row(i)) / d0;
     }
+
+    let c = Mat::from(c);
+    let l = Mat::from(l);
 
     (c, l, d)
 }
 
-fn smul<'a, R>(r: &'a R, rhs: &ArrayView1<'a, R>) -> Array1<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    rhs.map(|x| r * x)
-}
-
-fn sdiv<'a, R>(lhs: &ArrayView1<'a, R>, r: &'a R) -> Array1<R>
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    lhs.map(|x| x / r)
-}
-
-fn h_dot<'a, R>(lhs: &ArrayView1<'a, R>, rhs: &ArrayView1<'a, R>) -> R
+fn h_dot<R>(lhs: RowView<R>, rhs: RowView<R>) -> R
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
-    assert_eq!(lhs.dim(), rhs.dim());
-    ndarray::Zip::from(lhs).and(rhs).fold(R::zero(), |mut acc, a, b| { 
-        acc += a * b.conj();
-        acc
-    })
+    R::sum(zip(lhs.iter(), rhs.iter()).map(|(a, b)| a * b.conj()))
 }
 
 #[cfg(test)]
 pub(super) mod tests {
     use super::*;
-    use ndarray::array;
  
     #[test]
     fn test_large_orth_basis() {
-        let a = array![
-            [1,-1, 3],
-            [1, 0, 5],
-            [1, 2, 6]
-        ];
-        let (c, l, d) = orthogonalize(&a.view());
+        let a = Mat::from_data((3, 3), [
+            1,-1, 3,
+            1, 0, 5,
+            1, 2, 6
+        ]);
+        let (c, l, d) = orthogonalize(&a);
 
-        assert_eq!(c.row(0), array![1, -1, 3].view());
-        assert_eq!(c.row(1), array![-5, 16, 7].view());
-        assert_eq!(c.row(2), array![15, 6, -3].view());
+        assert_eq!(c, Mat::from_data((3, 3), [
+            1, -1,  3,
+            -5, 16, 7,
+            15, 6, -3
+        ]));
 
         assert_eq!(d[0], 11);
         assert_eq!(d[1], 30);
         assert_eq!(d[2], 9);
 
-        assert_eq!(l, array![
-            [0,  0, 0],
-            [16, 0, 0],
-            [17,69, 0]
-        ]);
+        assert_eq!(l, Mat::from_data((3, 3), [
+            0,  0, 0,
+            16, 0, 0,
+            17,69, 0
+        ]));
     }
 
     #[test]
     fn data_init() { 
-        let a = Mat::from(array![
-            [1,-1, 3],
-            [1, 0, 5],
-            [1, 2, 6]
+        let a = Mat::from_data((3, 3), [
+            1,-1, 3,
+            1, 0, 5,
+            1, 2, 6
         ]);
 
         let data = LLLData::new(a.clone(), [false, false]);
@@ -592,10 +582,10 @@ pub(super) mod tests {
     
     #[test]
     fn setup() { 
-        let a = Mat::from(array![
-            [1,-1, 3],
-            [1, 0, 5],
-            [1, 2, 6]
+        let a = Mat::from_data((3, 3), [
+            1,-1, 3,
+            1, 0, 5,
+            1, 2, 6
         ]);
         let mut data = LLLData::new(a, [false, false]);
 
@@ -606,19 +596,19 @@ pub(super) mod tests {
         assert_eq!(data.det[1], 30);
         assert_eq!(data.det[2], 9);
 
-        assert_eq!(data.lambda, Mat::from(array![
-            [0,  0, 0],
-            [16, 0, 0],
-            [17,69, 0]
+        assert_eq!(data.lambda, Mat::from_data((3, 3), [
+            0,  0, 0,
+            16, 0, 0,
+            17,69, 0
         ]));
     }
 
     #[test]
     fn swap() { 
-        let a0 = Mat::from(array![
-            [1,-1, 3],
-            [1, 0, 5],
-            [1, 2, 6]
+        let a0 = Mat::from_data((3, 3), [
+            1,-1, 3,
+            1, 0, 5,
+            1, 2, 6
         ]);
         let mut data0 = LLLData::new(a0, [false, false]);
         data0.setup();
@@ -626,10 +616,10 @@ pub(super) mod tests {
         data0.swap(2);
         
         // compare data
-        let a1 = Mat::from(array![
-            [1, 0, 5],
-            [1, 2, 6],
-            [1,-1, 3]
+        let a1 = Mat::from_data((3, 3), [
+            1, 0, 5,
+            1, 2, 6,
+            1,-1, 3
         ]);
         let mut data1 = LLLData::new(a1, [false, false]);
         data1.setup();
@@ -639,10 +629,10 @@ pub(super) mod tests {
 
     #[test]
     fn swap_trans() { 
-        let a0 = Mat::from(array![
-            [1,-1, 3],
-            [1, 0, 5],
-            [1, 2, 6]
+        let a0 = Mat::from_data((3, 3), [
+            1,-1, 3,
+            1, 0, 5,
+            1, 2, 6
         ]);
         let mut data0 = LLLData::new(a0.clone(), [true, true]);
         data0.setup();
@@ -650,10 +640,10 @@ pub(super) mod tests {
         data0.swap(2);
 
         // compare data
-        let a1 = Mat::from(array![
-            [1, 0, 5],
-            [1, 2, 6],
-            [1,-1, 3]
+        let a1 = Mat::from_data((3, 3), [
+            1, 0, 5,
+            1, 2, 6,
+            1,-1, 3
         ]);
         
         let p = data0.p.unwrap().clone();
@@ -665,10 +655,10 @@ pub(super) mod tests {
 
     #[test]
     fn add_row_to() { 
-        let a0 = Mat::from(array![
-            [1,-1, 3],
-            [1, 0, 5],
-            [1, 2, 6]
+        let a0 = Mat::from_data((3, 3), [
+            1,-1, 3,
+            1, 0, 5,
+            1, 2, 6
         ]);
         let mut data0 = LLLData::new(a0, [false, false]);
         data0.setup();
@@ -676,10 +666,10 @@ pub(super) mod tests {
         data0.add_row_to(1, 2, &-3);
         
         // compare data
-        let a1 = Mat::from(array![
-            [1,-1, 3],
-            [3,-2,11],
-            [-8,8,-27]
+        let a1 = Mat::from_data((3, 3), [
+             1,-1,  3,
+             3,-2, 11,
+            -8, 8,-27
         ]);
         let mut data1 = LLLData::new(a1, [false, false]);
         data1.setup();
@@ -689,10 +679,10 @@ pub(super) mod tests {
 
     #[test]
     fn add_row_to_trans() { 
-        let a0 = Mat::from(array![
-            [1,-1, 3],
-            [1, 0, 5],
-            [1, 2, 6]
+        let a0 = Mat::from_data((3, 3), [
+            1,-1, 3,
+            1, 0, 5,
+            1, 2, 6
         ]);
         let mut data0 = LLLData::new(a0.clone(), [true, true]);
         data0.setup();
@@ -700,10 +690,10 @@ pub(super) mod tests {
         data0.add_row_to(1, 2, &-3);
         
         // compare data
-        let a1 = Mat::from(array![
-            [1,-1, 3],
-            [3,-2,11],
-            [-8,8,-27]
+        let a1 = Mat::from_data((3, 3), [
+            1,-1, 3,
+            3,-2,11,
+            -8,8,-27
         ]);
 
         let p = data0.p.unwrap().clone();
@@ -715,10 +705,10 @@ pub(super) mod tests {
 
     #[test]
     fn mul_row() { 
-        let a0 = Mat::from(array![
-            [1,-1, 3],
-            [1, 0, 5],
-            [1, 2, 6]
+        let a0 = Mat::from_data((3, 3), [
+            1,-1, 3,
+            1, 0, 5,
+            1, 2, 6
         ]);
         let mut data0 = LLLData::new(a0, [false, false]);
         data0.setup();
@@ -726,10 +716,10 @@ pub(super) mod tests {
         data0.mul_row(2, &-1);
         
         // compare data
-        let a1 = Mat::from(array![
-            [1,-1, 3],
-            [-1, 0, -5],
-            [-1, -2, -6]
+        let a1 = Mat::from_data((3, 3), [
+            1,-1, 3,
+            -1, 0, -5,
+            -1, -2, -6
         ]);
         let mut data1 = LLLData::new(a1, [false, false]);
         data1.setup();
@@ -739,10 +729,10 @@ pub(super) mod tests {
 
     #[test]
     fn mul_row_trans() { 
-       let a0 = Mat::from(array![
-           [1,-1, 3],
-           [1, 0, 5],
-           [1, 2, 6]
+       let a0 = Mat::from_data((3, 3), [
+           1,-1, 3,
+           1, 0, 5,
+           1, 2, 6
        ]);
        let mut data0 = LLLData::new(a0.clone(), [true, true]);
        data0.setup();
@@ -750,10 +740,10 @@ pub(super) mod tests {
        data0.mul_row(2, &-1);
        
        // compare data
-       let a1 = Mat::from(array![
-           [1,-1, 3],
-           [-1, 0, -5],
-           [-1, -2, -6]
+       let a1 = Mat::from_data((3, 3), [
+           1,-1, 3,
+           -1, 0, -5,
+           -1, -2, -6
        ]);
 
        let p = data0.p.unwrap().clone();
@@ -765,58 +755,57 @@ pub(super) mod tests {
 
     #[test]
     fn lll() { 
-        let a = Mat::from(array![
-            [1,-1, 3],
-            [1, 0, 5],
-            [1, 2, 6]
+        let a = Mat::from_data((3, 3), [
+            1,-1, 3,
+            1, 0, 5,
+            1, 2, 6
         ]);
         let mut calc = LLLCalc::new(a.clone(), true);
         calc.process();
 
         let (res, Some(p)) = calc.result() else { panic!() };
 
-        assert_eq!(res, Mat::from(array![
-            [0, 1, -1],
-            [1, 0, -1],
-            [1, 1, 1]
+        assert_eq!(res, Mat::from_data((3, 3), [
+            0, 1, -1,
+            1, 0, -1,
+            1, 1, 1
         ]));
 
-        helper::assert_is_reduced( &res.array().view() );
-
+        helper::assert_is_reduced(&res);
         assert_eq!(p * a, res);
     }
 
      #[test]
      fn lll_gcdx() { 
         // MEMO: γ = 10
-        let a = Mat::from(array![
-            [1, 0, 0, 40],
-            [0, 1, 0, 60],
-            [0, 0, 1, 90]
+        let a = Mat::from_data((3, 4), [
+            1, 0, 0, 40,
+            0, 1, 0, 60,
+            0, 0, 1, 90
         ]);
         let mut calc = LLLCalc::new(a.clone(), true);
         calc.process();
 
         let (res, Some(p)) = calc.result() else { panic!() };
 
-        assert_eq!(res, Mat::from(array![
-            [3, -2, 0, 0],
-            [0, 3, -2, 0],
-            [-2, 0, 1, 10]
+        assert_eq!(res, Mat::from_data((3, 4), [
+            3, -2, 0, 0,
+            0, 3, -2, 0,
+            -2, 0, 1, 10
         ]));
 
-        helper::assert_is_reduced( &res.array().view() );
+        helper::assert_is_reduced(&res);
 
         assert_eq!(p * a, res);
       }
 
      #[test]
      fn hnf() { 
-        let a: Mat<i64> = Mat::from(array![
-            [8,    44,   43],
-            [4,    10,   43],
-            [56, -550, -328],
-            [76,   10,   42]
+        let a: Mat<i64> = Mat::from_data((4, 3), [
+            8,    44,   43,
+            4,    10,   43,
+            56, -550, -328,
+            76,   10,   42
         ]);
         let mut calc = LLLHNFCalc::new(a.clone(), [true, true]);
         calc.process();
@@ -834,10 +823,10 @@ pub(super) mod tests {
         type A = GaussInt<i64>;
 
         let i = A::new;
-        let a = Mat::from(array![
-            [i(-2, 3), i(7, 3), i(7, 3)],
-            [i(3, 3), i(-2, 4), i(6, 2)],
-            [i(2, 2), i(-8, 0), i(-9, 1)],
+        let a = Mat::from_data((3, 3), [
+            i(-2, 3), i(7, 3), i(7, 3),
+            i(3, 3), i(-2, 4), i(6, 2),
+            i(2, 2), i(-8, 0), i(-9, 1),
         ]);
         let mut data = LLLData::new(a, [false, false]);
 
@@ -848,10 +837,10 @@ pub(super) mod tests {
         assert_eq!(data.det[1], i(7436, 0));
         assert_eq!(data.det[2], i(161408, 0));
 
-        assert_eq!(data.lambda, Mat::from(array![
-            [i(0, 0),     i(0, 0),      i(0, 0)],
-            [i(49, 15),   i(0, 0),      i(0, 0)],
-            [i(-114, 48), i(1770,3162), i(0, 0)]
+        assert_eq!(data.lambda, Mat::from_data((3, 3), [
+            i(0, 0),     i(0, 0),      i(0, 0),
+            i(49, 15),   i(0, 0),      i(0, 0),
+            i(-114, 48), i(1770,3162), i(0, 0)
         ]));
     }
 
@@ -859,10 +848,10 @@ pub(super) mod tests {
     fn swap_gauss() { 
         type A = GaussInt<i64>;
         let i = A::new;
-        let a0 = Mat::from(array![
-            [i(-2, 3), i(7, 3), i(7, 3)],
-            [i(3, 3), i(-2, 4), i(6, 2)],
-            [i(2, 2), i(-8, 0), i(-9, 1)],
+        let a0 = Mat::from_data((3, 3), [
+            i(-2, 3), i(7, 3), i(7, 3),
+            i(3, 3), i(-2, 4), i(6, 2),
+            i(2, 2), i(-8, 0), i(-9, 1),
         ]);
         let mut data0 = LLLData::new(a0, [false, false]);
         data0.setup();
@@ -870,10 +859,10 @@ pub(super) mod tests {
         data0.swap(2);
         
         // compare data
-        let a1 = Mat::from(array![
-            [i(3, 3), i(-2, 4), i(6, 2)],
-            [i(2, 2), i(-8, 0), i(-9, 1)],
-            [i(-2, 3), i(7, 3), i(7, 3)],
+        let a1 = Mat::from_data((3, 3), [
+            i(3, 3), i(-2, 4), i(6, 2),
+            i(2, 2), i(-8, 0), i(-9, 1),
+            i(-2, 3), i(7, 3), i(7, 3),
         ]);
         let mut data1 = LLLData::new(a1, [false, false]);
         data1.setup();
@@ -885,10 +874,10 @@ pub(super) mod tests {
     fn add_row_to_gauss() { 
         type A = GaussInt<i64>;
         let i = A::new;
-        let a0 = Mat::from(array![
-            [i(-2, 3), i(7, 3), i(7, 3)],
-            [i(3, 3), i(-2, 4), i(6, 2)],
-            [i(2, 2), i(-8, 0), i(-9, 1)],
+        let a0 = Mat::from_data((3, 3), [
+            i(-2, 3), i(7, 3), i(7, 3),
+            i(3, 3), i(-2, 4), i(6, 2),
+            i(2, 2), i(-8, 0), i(-9, 1),
         ]);
         let mut data0 = LLLData::new(a0, [false, false]);
         data0.setup();
@@ -896,10 +885,10 @@ pub(super) mod tests {
         data0.add_row_to(1, 2, &i(-3, 2));
         
         // compare data
-        let a1 = Mat::from(array![
-            [i(-2, 3), i(7, 3), i(7, 3)],
-            [i(-2, 4), i(2, 14), i(10, 12)],
-            [i(0, -14), i(-42, -38), i(-63, -15)],
+        let a1 = Mat::from_data((3, 3), [
+            i(-2, 3), i(7, 3), i(7, 3),
+            i(-2, 4), i(2, 14), i(10, 12),
+            i(0, -14), i(-42, -38), i(-63, -15),
         ]);
         let mut data1 = LLLData::new(a1, [false, false]);
         data1.setup();
@@ -911,10 +900,10 @@ pub(super) mod tests {
     fn mul_row_gauss() { 
         type A = GaussInt<i64>;
         let i = A::new;
-        let a0 = Mat::from(array![
-            [i(-2, 3), i(7, 3), i(7, 3)],
-            [i(3, 3), i(-2, 4), i(6, 2)],
-            [i(2, 2), i(-8, 0), i(-9, 1)],
+        let a0 = Mat::from_data((3, 3), [
+            i(-2, 3), i(7, 3), i(7, 3),
+            i(3, 3), i(-2, 4), i(6, 2),
+            i(2, 2), i(-8, 0), i(-9, 1),
         ]);
 
         let mut data0 = LLLData::new(a0.clone(), [false, false]);
@@ -923,10 +912,10 @@ pub(super) mod tests {
         data0.mul_row(2, &i(0, -1));
 
         // compare data
-        let a1 = Mat::from(array![
-            [i(-2, 3), i(7, 3), i(7, 3)],
-            [i(-3, 3), i(-4, -2), i(-2, 6)],
-            [i(2, -2), i(0, 8), i(1, 9)],
+        let a1 = Mat::from_data((3, 3), [
+            i(-2, 3), i(7, 3), i(7, 3),
+            i(-3, 3), i(-4, -2), i(-2, 6),
+            i(2, -2), i(0, 8), i(1, 9),
         ]);
         let mut data1 = LLLData::new(a1, [false, false]);
         data1.setup();
@@ -939,10 +928,10 @@ pub(super) mod tests {
         type A = GaussInt<i64>;
         let i = A::new;
 
-        let a: Mat<A> = Mat::from(array![
-            [i(-2, 3), i(7, 3), i(7, 3)],
-            [i(3, 3), i(-2, 4), i(6, 2)],
-            [i(2, 2), i(-8, 0), i(-9, 1)],
+        let a: Mat<A> = Mat::from_data((3, 3), [
+            i(-2, 3), i(7, 3), i(7, 3),
+            i(3, 3), i(-2, 4), i(6, 2),
+            i(2, 2), i(-8, 0), i(-9, 1),
         ]);
 
         let mut calc = LLLHNFCalc::new(a.clone(), [true, true]);
@@ -961,10 +950,10 @@ pub(super) mod tests {
         type A = EisenInt<i64>;
         let i = A::new;
 
-        let a: Mat<A> = Mat::from(array![
-            [i(-2, 3), i(7, 3), i(7, 3)],
-            [i(3, 3), i(-2, 4), i(6, 2)],
-            [i(2, 2), i(-8, 0), i(-9, 1)],
+        let a: Mat<A> = Mat::from_data((3, 3), [
+            i(-2, 3), i(7, 3), i(7, 3),
+            i(3, 3), i(-2, 4), i(6, 2),
+            i(2, 2), i(-8, 0), i(-9, 1),
         ]);
 
         let mut calc = LLLHNFCalc::new(a.clone(), [true, true]);
@@ -997,38 +986,35 @@ pub(super) mod tests {
 
     pub(in super::super) mod helper { 
         use super::*;
-        use std::ops::Div;
-        use yui::Ratio;
+        use nalgebra::ClosedDiv;
+        use yui::{Ratio, Ring, RingOps};
 
         pub fn assert_is_hnf<R>(b: &Mat<R>)
         where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
-            use ndarray::s;
-
             let (m, n) = b.shape();
-            let b = b.array();
+            let b = b.inner();
 
             let mut j0 = 0;
             for i0 in 0..m {
-                let j1 = (0..n).find(|&j| !b[[i0, j]].is_zero()).unwrap_or(n);
+                let j1 = (0..n).find(|&j| !b[(i0, j)].is_zero()).unwrap_or(n);
 
                 // assert: b[i0.., j0..j1] = 0
-                let s = s![i0..m, j0..j1];
-                assert!( b.slice(s).iter().all(|x| x.is_zero()) );
+                assert!( b.view((i0, j0), (m-i0, j1-j0)).iter().all(|x| x.is_zero()) );
 
                 if j1 < n { 
                     j0 = j1;
 
                     // assert: b[i0+1.., j0] = 0
-                    let s = s![i0+1..m, j0];
-                    assert!( b.slice(s).iter().all(|x| x.is_zero()) );
+                    assert!( b.view((i0+1, j0), (m-i0-1, 1)).iter().all(|x| x.is_zero()) );
 
-                    let a = &b[[i0, j0]];
+                    let a = &b[(i0, j0)];
                     assert!( !a.is_zero() );
                     assert!( a.normalizing_unit().is_one() );
 
                     let a0 = (a * &a.conj()).as_int().unwrap();
-                    let s = s![0..i0, j0];
-                    assert!( b.slice(s).iter().all(|x| {
+
+                    // assert: b[0..i0, j0]
+                    assert!( b.view((0, j0), (i0, 1)).iter().all(|x| {
                         let x0 = (x * &x.conj()).as_int().unwrap();
                         x0 < a0
                     }));
@@ -1038,19 +1024,19 @@ pub(super) mod tests {
             }
         }
     
-        pub fn assert_is_reduced<R>(b: &ArrayView2<R>)
+        pub fn assert_is_reduced<R>(b: &Mat<R>)
         where R: Integer + LLLRing, for<'x> &'x R: IntOps<R> + LLLRingOps<R> {
-            let m = b.nrows();
-    
+            let m = b.rows();    
             let (c, l) = gram_schmidt(b);
+
             let alpha = Ratio::from(R::alpha());
             let thr = Ratio::new(R::one(), R::from_i32(2).unwrap());
     
-            let size_reduced = l.iter().all(|r| r.abs() <= thr);
+            let size_reduced = l.iter().all(|r| r.2.abs() <= thr);
             let lovasz_ok = (1..m).all(|i| {
-                let c0 = &c.row(i - 1);
-                let c1 = &c.row(i);
-                let m = &l[[i, i - 1]];
+                let c0 = c.inner().row(i - 1);
+                let c1 = c.inner().row(i);
+                let m = &l[(i, i - 1)];
                 is_lovasz_ok(c0, c1, m, &alpha)
             });
     
@@ -1058,50 +1044,50 @@ pub(super) mod tests {
             assert!(lovasz_ok);
         }
     
-        fn is_lovasz_ok<R>(c0: &ArrayView1<Ratio<R>>, c1: &ArrayView1<Ratio<R>>, m: &Ratio<R>, alpha: &Ratio<R>) -> bool
+        fn is_lovasz_ok<R>(c0: RowView<Ratio<R>>, c1: RowView<Ratio<R>>, m: &Ratio<R>, alpha: &Ratio<R>) -> bool
         where R: Integer, for<'x> &'x R: IntOps<R> {
-            let r0 = dot::<Ratio<R>>(c0, c0);
-            let r1 = dot::<Ratio<R>>(c1, c1);
+            let r0 = dot::<Ratio<R>>(c0.clone(), c0);
+            let r1 = dot::<Ratio<R>>(c1.clone(), c1);
+            
             r1 >= (alpha - (m * m)) * r0
         }
     
-        fn gram_schmidt<R>(b: &ArrayView2<R>) -> (Array2<Ratio<R>>, Array2<Ratio<R>>)
+        fn gram_schmidt<R>(b: &Mat<R>) -> (Mat<Ratio<R>>, Mat<Ratio<R>>)
         where R: Integer, for<'x> &'x R: IntOps<R> {
+            let b = b.inner();
             let m = b.nrows();
     
             let mut c = b.map(|x| Ratio::from(x.clone()));
-            let mut l = Array2::zeros((m, m));
+            let mut l = DMatrix::zeros(m, m);
     
             for i in 1..m { 
                 for j in 0..i {
-                    let (c_i, c_j) = (c.row(i), c.row(j));
-                    let p_ij = proj_coeff::<Ratio<R>>(&c_j, &c_i);
-                    let v_ij = smul::<Ratio<R>>(&p_ij, &c_j);
+                    let p_ij = proj_coeff::<Ratio<R>>(c.row(j), c.row(i));
+                    let v_ij = c.row(j).mul(p_ij.clone());
     
                     let mut c_i = c.row_mut(i);
                     c_i -= &v_ij;
     
-                    l[[i, j]] = p_ij;
+                    l[(i, j)] = p_ij;
                 }
             }
+
+            let c = Mat::from(c);
+            let l = Mat::from(l);
     
             (c, l)
         }
     
-        fn proj_coeff<'a, R>(base: &ArrayView1<'a, R>, other: &ArrayView1<'a, R>) -> R
-        where R: Ring + Div<Output = R>, for<'x> &'x R: RingOps<R> {
-            let p = dot(base, other);
-            let q = dot(base, base);
+        fn proj_coeff<R>(base: RowView<R>, other: RowView<R>) -> R
+        where R: Ring + ClosedDiv, for<'x> &'x R: RingOps<R> {
+            let p = dot(base.clone(), other);
+            let q = dot(base.clone(), base.clone());
             p / q
         }
     
-        fn dot<'a, R>(lhs: &ArrayView1<'a, R>, rhs: &ArrayView1<'a, R>) -> R
+        fn dot<R>(lhs: RowView<R>, rhs: RowView<R>) -> R
         where R: Ring, for<'x> &'x R: RingOps<R> {
-            assert_eq!(lhs.dim(), rhs.dim());
-            ndarray::Zip::from(lhs).and(rhs).fold(R::zero(), |mut acc, a, b| { 
-                acc += a * b;
-                acc
-            })
+            R::sum(zip(lhs.iter(), rhs.iter()).map(|(a, b)| a * b))
         }
     }
 }

@@ -83,6 +83,22 @@ where R: Scalar {
         )
     }
 
+    pub fn diag<I>(shape: (usize, usize), entries: I) -> Self
+    where R: Zero, I: IntoIterator<Item = R> {
+        let mut mat = Self::zero(shape);
+        for (i, a) in entries.into_iter().enumerate() {
+            mat[(i, i)] = a;
+        }
+        mat
+    }
+
+    pub fn is_diag(&self) -> bool
+    where R: Zero { 
+        self.iter().all(|(i, j, a)| 
+            i == j || a.is_zero()
+        )
+    }
+
     pub fn submat(&self, rows: Range<usize>, cols: Range<usize>) -> Mat<R> { 
         let (i0, i1) = (rows.start, rows.end);
         let (j0, j1) = (cols.start, cols.end);
@@ -147,6 +163,21 @@ impl<R> IndexMut<(usize, usize)> for Mat<R> {
         to self.inner { 
             fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output;
         }
+    }
+}
+
+impl<R> Default for Mat<R>
+where R: Scalar + Zero {
+    fn default() -> Self {
+        Self::zero((0, 0))
+    }
+}
+
+// TODO move to SpMat.
+impl<R> SpMat<R> { 
+    pub fn to_dense(self) -> Mat<R>
+    where R: Scalar + Zero + ClosedAdd { 
+        self.into()
     }
 }
 

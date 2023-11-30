@@ -350,7 +350,7 @@ mod tests {
         assert!( r.d_matrix(1).is_zero());
         assert!(!r.d_matrix(2).is_zero());
 
-        let a = r.d_matrix(2).to_dense()[[0, 0]];
+        let a = r.d_matrix(2).to_dense()[(0, 0)];
         assert!(a == 2 || a == -2);
     }
 

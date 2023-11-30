@@ -843,9 +843,9 @@ mod tests {
         let (p, q) = perms_by_pivots(&a, &pivs);
         let b = a.permute(p.view(), q.view()).to_dense();
 
-        assert!((0..r).all(|i| b[[i, i]].is_one()));
+        assert!((0..r).all(|i| b[(i, i)].is_one()));
         assert!((0..r).all(|j| {
-            (j+1..r).all(|i| b[[i, j]].is_zero())
+            (j+1..r).all(|i| b[(i, j)].is_zero())
         }));
     }
 
@@ -866,9 +866,9 @@ mod tests {
         let (p, q) = perms_by_pivots(&a, &pivs);
         let b = a.permute(p.view(), q.view()).to_dense();
 
-        assert!((0..r).all(|i| b[[i, i]].is_one()));
+        assert!((0..r).all(|i| b[(i, i)].is_one()));
         assert!((0..r).all(|i| {
-            (i+1..r).all(|j| b[[i, j]].is_zero())
+            (i+1..r).all(|j| b[(i, j)].is_zero())
         }));
     }
 
@@ -885,9 +885,9 @@ mod tests {
         let (p, q) = perms_by_pivots(&a, &pivs);
         let b = a.permute(p.view(), q.view()).to_dense();
 
-        assert!((0..r).all(|i| b[[i, i]].is_one()));
+        assert!((0..r).all(|i| b[(i, i)].is_one()));
         assert!((0..r).all(|j| {
-            (j+1..r).all(|i| b[[i, j]].is_zero())
+            (j+1..r).all(|i| b[(i, j)].is_zero())
         }))
     }
 }

@@ -42,6 +42,10 @@ impl<R> Mat<R> {
         self.array
     }
 
+    pub fn inner(&self) -> &Array2<R> {
+        &self.array
+    }
+
     fn is_valid_row_index(&self, i: usize) -> bool { 
         i < self.rows()
     }
@@ -54,6 +58,28 @@ impl<R> Mat<R> {
 impl<R> From<Array2<R>> for Mat<R> {
     fn from(array: Array2<R>) -> Self {
         Self { array }
+    }
+}
+
+impl<R> From<Mat<R>> for SpMat<R>
+where R: Scalar + Zero + ClosedAdd {
+    fn from(a: Mat<R>) -> Self {
+        let n = a.cols();
+        let entries = a.array().into_iter().enumerate().filter_map(|(k, a)| {
+            if !a.is_zero() { 
+                Some((k / n, k % n, a.clone()))
+            } else {
+                None 
+            }
+        });
+        SpMat::from_entries(a.shape(), entries)
+    }
+}
+
+impl<R> From<SpMat<R>> for Mat<R>
+where R: Scalar + Zero + ClosedAdd {
+    fn from(a: SpMat<R>) -> Self {
+        a.to_dense()
     }
 }
 
@@ -410,6 +436,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             )
         });
     }
+}
+
+impl<R> SpMat<R> 
+where R: Scalar + Zero + ClosedAdd { 
+    pub fn to_dense(self) -> Mat<R> { 
+        let (m, n) = self.shape();
+        let mut data = vec![R::zero(); m * n];
+        for (i, j, a) in self.iter() { 
+            data[i * n + j] = a.clone();
+        }
+        let arr = Array2::from_shape_vec((m, n), data).unwrap();
+        Mat::from(arr)
+    }    
 }
 
 #[cfg(test)]

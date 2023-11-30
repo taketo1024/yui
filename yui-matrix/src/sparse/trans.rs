@@ -70,8 +70,8 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         let b = self.b_mats.pop().unwrap_or(SpMat::id(self.src_dim));
         let b = b.permute_cols(p);
 
-        self.tgt_dim = f.ncols();
-        self.append(f, b)
+        self.f_mats.push(f);
+        self.b_mats.push(b);
     }
 
     pub fn append(&mut self, f: SpMat<R>, b: SpMat<R>) { 

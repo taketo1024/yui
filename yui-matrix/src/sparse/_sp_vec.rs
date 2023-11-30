@@ -1,15 +1,11 @@
-#![allow(unused)]
-use core::panic;
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, Range};
 use std::fmt::{Display, Debug};
-use itertools::Itertools;
 use nalgebra_sparse::CscMatrix;
 use nalgebra_sparse::na::{Scalar, ClosedAdd, ClosedSub, ClosedMul};
 use num_traits::{Zero, One};
 use sprs::PermView;
 use auto_impl_ops::auto_ops;
-use yui::{Ring, RingOps, AddMonOps, AddGrpOps, AddMon, AddGrp};
-use crate::sparse::MatType;
+use yui::{Ring, RingOps, AddGrpOps,  AddGrp};
 use super::_sp_mat::SpMat;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -23,6 +19,7 @@ impl<R> SpVec<R> {
         Self { inner }
     }
 
+    #[allow(unused)]
     pub(crate) fn inner(&self) -> &CscMatrix<R> { 
         &self.inner
     }
@@ -60,7 +57,7 @@ impl<R> SpVec<R> {
     pub fn view(&self) -> SpVecView<R> { 
         SpVecView::new(self, self.dim(), |i| Some(i))
     }
-    
+
     pub fn iter(&self) -> impl Iterator<Item = (usize, &R)> { 
         self.inner.triplet_iter().map(|(i, _, a)| (i, a))
     }

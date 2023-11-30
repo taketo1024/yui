@@ -1,18 +1,14 @@
-#![allow(unused)]
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, MulAssign, Range};
 use std::iter::zip;
 use std::fmt::{Display, Debug};
 use std::sync::Mutex;
 use delegate::delegate;
-use derive_more::Display;
 use nalgebra_sparse::na::{Scalar, ClosedAdd, ClosedSub, ClosedMul, DMatrix};
 use nalgebra_sparse::{CscMatrix, CooMatrix};
-use itertools::Itertools;
 use num_traits::{Zero, One};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use auto_impl_ops::auto_ops;
 use sprs::PermView;
-use yui::{Ring, RingOps, AddMonOps, AddGrpOps, MonOps, AddGrp};
 use crate::dense::*;
 use super::_sp_vec::SpVec;
 
@@ -444,6 +440,7 @@ where 'a: 'b, R: Zero {
 
 #[cfg(test)]
 pub(super) mod tests { 
+    use itertools::Itertools;
     use sprs::PermOwned;
     use yui::Ratio;
 

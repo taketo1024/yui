@@ -5,7 +5,7 @@ use std::fmt::{Display, Debug};
 use std::sync::Mutex;
 use delegate::delegate;
 use derive_more::Display;
-use nalgebra_sparse::na::{Scalar, ClosedAdd, ClosedSub, ClosedMul};
+use nalgebra_sparse::na::{Scalar, ClosedAdd, ClosedSub, ClosedMul, DMatrix};
 use nalgebra_sparse::{CscMatrix, CooMatrix};
 use itertools::Itertools;
 use num_traits::{Zero, One};
@@ -21,7 +21,36 @@ pub struct SpMat<R> {
     inner: CscMatrix<R>
 }
 
+impl<R> MatType for SpMat<R> {
+    fn shape(&self) -> (usize, usize) {
+        (self.inner.nrows(), self.inner.ncols())
+    }
+}
+
 impl<R> SpMat<R> { 
+    pub fn zero(shape: (usize, usize)) -> Self {
+        let csc = CscMatrix::zeros(shape.0, shape.1);
+        Self::from(csc)
+    }
+
+    pub fn is_zero(&self) -> bool
+    where R: Zero {
+        self.inner.values().iter().all(|a| a.is_zero())
+    }
+
+    pub fn id(n: usize) -> Self
+    where R: Scalar + One { 
+        let csc = CscMatrix::identity(n);
+        Self::from(csc)
+    }
+
+    pub fn is_id(&self) -> bool
+    where R: Scalar + One + Zero {
+        self.is_square() && self.iter().all(|(i, j, a)| 
+            (i == j && a.is_one()) || (i != j && a.is_zero())
+        )
+    }
+    
     pub fn view(&self) -> SpMatView<R> { 
         SpMatView::from(self)
     }
@@ -35,10 +64,13 @@ impl<R> SpMat<R> {
         self.iter().filter(|e| !e.2.is_zero())
     }
 
-    pub fn col(&self, j: usize) -> SpVec<R>
+    pub fn col_vec(&self, j: usize) -> SpVec<R>
     where R: Clone + Zero { 
         let col = self.inner.col(j);
-        let iter = Iterator::zip(col.row_indices().iter().cloned(), col.values().iter().cloned());
+        let iter = Iterator::zip(
+            col.row_indices().iter().cloned(), 
+            col.values().iter().cloned()
+        );
         SpVec::from_entries(self.rows(), iter)
     }
 
@@ -49,12 +81,6 @@ impl<R> SpMat<R> {
 
     pub fn disassemble(self) -> (Vec<usize>, Vec<usize>, Vec<R>) { 
         self.inner.disassemble()
-    }
-}
-
-impl<R> MatType for SpMat<R> {
-    fn shape(&self) -> (usize, usize) {
-        (self.inner.nrows(), self.inner.ncols())
     }
 }
 
@@ -130,54 +156,9 @@ where R: Scalar + Clone + Zero + ClosedAdd {
     }
 }
 
-// impl<R> IntoIterator for SpMat<R>
-// where R: Clone + Zero {
-//     type Item = (usize, usize, R);
-//     type IntoIter = std::vec::IntoIter<Self::Item>;
-
-//     fn into_iter(self) -> Self::IntoIter {
-//         let
-//         // MEMO improve this
-//         self.iter().map(|(i, j, a)| (i, j, a.clone())).collect_vec().into_iter()
-//     }
-// }
-
-// impl<R> SpMat<R>
-// where R: Clone {
-//     pub fn col_vec(&self, j: usize) -> SpVec<R> { 
-//         let cs_vec = self.col_view(j).to_owned();
-//         SpVec::from(cs_vec)
-//     }
-// }
-
 impl<R> Default for SpMat<R> {
     fn default() -> Self {
         Self::zero((0, 0))
-    }
-}
-
-impl<R> SpMat<R> { 
-    pub fn zero(shape: (usize, usize)) -> Self {
-        let csc = CscMatrix::zeros(shape.0, shape.1);
-        Self::from(csc)
-    }
-
-    pub fn is_zero(&self) -> bool
-    where R: Zero {
-        self.inner.values().iter().all(|a| a.is_zero())
-    }
-
-    pub fn id(n: usize) -> Self
-    where R: Scalar + One { 
-        let csc = CscMatrix::identity(n);
-        Self::from(csc)
-    }
-
-    pub fn is_id(&self) -> bool
-    where R: Scalar + One + Zero {
-        self.is_square() && self.iter().all(|(i, j, a)| 
-            (i == j && a.is_one()) || (i != j && a.is_zero())
-        )
     }
 }
 
@@ -300,9 +281,28 @@ where R: Scalar + Clone + Zero + ClosedAdd {
         ])
     }
 
-    // pub fn to_dense(self) -> Mat<R> { 
-    //     self.into()
-    // }
+    // row_perm(p) * a == a.permute_rows(p)
+    pub fn from_row_perm(p: PermView) -> Self
+    where R: One {
+        let n = p.dim();
+        Self::from_entries((n, n), (0..n).map(|i|
+            (p.at(i), i, R::one())
+        ))
+    }
+
+    // a * col_perm(p) == a.permute_cols(p)
+    pub fn from_col_perm(p: PermView) -> Self
+    where R: One {
+        let n = p.dim();
+        Self::from_entries((n, n), (0..n).map(|i|
+            (i, p.at(i), R::one())
+        ))
+    }    
+
+    pub fn to_dense(self) -> DMatrix<R>
+    where R: Scalar + Zero + ClosedAdd { 
+        DMatrix::from(&self.inner)
+    }
 }
 
 impl<R> Display for SpMat<R>
@@ -415,24 +415,6 @@ where 'a: 'b, R: Zero {
     }    
 }
 
-// impl<R> SpMat<R> where R: Clone + Zero + One { 
-//     // row_perm(p) * a == a.permute_rows(p)
-//     pub fn from_row_perm(p: PermView) -> Self {
-//         let n = p.dim();
-//         Self::from_entries((n, n), (0..n).map(|i|
-//             (p.at(i), i, R::one())
-//         ))
-//     }
-
-//     // a * col_perm(p) == a.permute_cols(p)
-//     pub fn from_col_perm(p: PermView) -> Self {
-//         let n = p.dim();
-//         Self::from_entries((n, n), (0..n).map(|i|
-//             (i, p.at(i), R::one())
-//         ))
-//     }
-// }
-
 // #[cfg(test)]
 // impl<R> SpMat<R>
 // where R: Ring, for<'a> &'a R: RingOps<R> { 
@@ -491,16 +473,16 @@ pub(super) mod tests {
         assert_eq!(a.disassemble(), (vec![0, 2, 4], vec![0, 1, 0, 1], vec![1, 3, 2, 4]));
     }
 
-//     #[test]
-//     fn to_dense() { 
-//         let a = SpMat::from_entries((2, 2), [
-//             (0, 0, 1),
-//             (0, 1, 2),
-//             (1, 0, 3),
-//             (1, 1, 4)
-//         ]);
-//         assert_eq!(a.to_dense(), Mat::from(ndarray::array![[1, 2], [3, 4]]));
-//     }
+    #[test]
+    fn to_dense() { 
+        let a = SpMat::from_entries((2, 2), [
+            (0, 0, 1),
+            (0, 1, 2),
+            (1, 0, 3),
+            (1, 1, 4)
+        ]);
+        assert_eq!(a.to_dense(), DMatrix::from_row_slice(2, 2, &[1,2,3,4]));
+    }
 
     #[test]
     fn permute() { 
@@ -529,19 +511,19 @@ pub(super) mod tests {
         ]));
     }
 
-//     #[test]
-//     fn row_perm() {
-//         let a = SpMat::from_dense_data((3, 4), 0..12);
-//         let p = PermOwned::new(vec![2,0,1]);
-//         let q = SpMat::from_row_perm(p.view());
-//         assert!(q * &a == a.permute_rows(p.view()))
-//     }
+    #[test]
+    fn row_perm() {
+        let a = SpMat::from_dense_data((3, 4), 0..12);
+        let p = PermOwned::new(vec![2,0,1]);
+        let q = SpMat::from_row_perm(p.view());
+        assert!(q * &a == a.permute_rows(p.view()))
+    }
 
-//     #[test]
-//     fn col_perm() {
-//         let a = SpMat::from_dense_data((3, 4), 0..12);
-//         let p = PermOwned::new(vec![2,0,1,3]);
-//         let q = SpMat::from_col_perm(p.view());
-//         assert!(&a * q == a.permute_cols(p.view()))
-//     }
+    #[test]
+    fn col_perm() {
+        let a = SpMat::from_dense_data((3, 4), 0..12);
+        let p = PermOwned::new(vec![2,0,1,3]);
+        let q = SpMat::from_col_perm(p.view());
+        assert!(&a * q == a.permute_cols(p.view()))
+    }
 }

@@ -37,6 +37,10 @@ impl<R> SpMat<R> {
         self.inner.csc_data()
     }
 
+    pub fn disassemble(self) -> (Vec<usize>, Vec<usize>, Vec<R>) { 
+        self.inner.disassemble()
+    }
+
     pub fn zero(shape: (usize, usize)) -> Self {
         let csc = CscMatrix::zeros(shape.0, shape.1);
         Self::from(csc)
@@ -86,13 +90,9 @@ impl<R> SpMat<R> {
         self.iter().filter(|e| !e.2.is_zero())
     }
 
-    pub fn transpose(&self) -> Self
-    where R: Scalar { 
-        self.inner.transpose().into()
-    }
-
-    pub fn disassemble(self) -> (Vec<usize>, Vec<usize>, Vec<R>) { 
-        self.inner.disassemble()
+    pub fn into_dense(self) -> Mat<R>
+    where R: Scalar + Zero + ClosedAdd { 
+        self.into()
     }
 }
 
@@ -159,20 +159,6 @@ where R: Scalar + Clone + Zero + ClosedAdd {
             })
         )
     }
-
-    pub fn col_vec(&self, j: usize) -> SpVec<R> { 
-        let col = self.inner.col(j);
-        let iter = Iterator::zip(
-            col.row_indices().iter().cloned(), 
-            col.values().iter().cloned()
-        );
-        SpVec::from_entries(self.nrows(), iter)
-    }
-
-    pub fn into_dense(self) -> Mat<R>
-    where R: Scalar + Zero + ClosedAdd { 
-        self.into()
-    }
 }
 
 impl<R> Default for SpMat<R> {
@@ -218,6 +204,20 @@ impl_binop!(Mul, mul);
 
 impl<R> SpMat<R>
 where R: Scalar + Clone + Zero + ClosedAdd { 
+    pub fn col_vec(&self, j: usize) -> SpVec<R>
+    where R: Scalar + Zero + ClosedAdd { 
+        let col = self.inner.col(j);
+        let iter = Iterator::zip(
+            col.row_indices().iter().cloned(), 
+            col.values().iter().cloned()
+        );
+        SpVec::from_entries(self.nrows(), iter)
+    }
+
+    pub fn transpose(&self) -> Self { 
+        self.inner.transpose().into()
+    }
+
     pub fn permute(&self, p: PermView, q: PermView) -> SpMat<R> { 
         self.view().permute(p, q).collect()
     }

@@ -5,10 +5,10 @@ use delegate::delegate;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use yui::{Ring, RingOps};
 use yui::lc::{Gen, Lc};
-use yui_matrix::sparse::{SpMat, Trans, MatTrait};
+use yui_matrix::sparse::{SpMat, MatTrait};
 
 use crate::utils::ChainReducer;
-use crate::{GridTrait, GridDeg, Grid, GridIter, ChainComplexTrait, RModStr, SimpleRModStr, isize2, isize3};
+use crate::{GridTrait, GridDeg, Grid, GridIter, ChainComplexTrait, RModStr, isize2, isize3};
 use super::XModStr;
 
 pub type XChainComplex <X, R> = XChainComplexBase<isize,  X, R>;
@@ -78,41 +78,16 @@ where
     }
 
     pub fn reduced(&self) -> XChainComplexBase<I, X, R> { 
-        let mut reducer = ChainReducer::new(self.support(), self.d_deg, true);
-
-        for i in self.support() {
-            let d = if let Some(t) = reducer.trans(i) {
-                self.d_matrix_for(i, &t.backward_mat())
-            } else { 
-                self.d_matrix(i)
-            };
-            reducer.set_matrix(i, d);
-            reducer.reduce_at(i);
-        }
-
-        self.reduced_by(|i| 
-            reducer.take_trans(i).unwrap()
-        )
-    }
-
-    pub fn reduced_by<F>(&self, mut trans_map: F) -> XChainComplexBase<I, X, R>
-    where F: FnMut(I) -> Trans<R> { 
-        let d_deg = self.d_deg;
-        let d_map = self.d_map.clone();
-
+        let reduced = ChainReducer::reduce(self, true);
         let summands = self.summands.map(|i, s| { 
             let mut s = s.clone();
-            let t = trans_map(i);
-
-            assert_eq!(t.src_dim(), self[i].rank());
-
-            let r = t.tgt_dim();
-            let s1 = SimpleRModStr::new(r, vec![], Some(t));
-
+            let s1 = reduced[i].clone();
             s.merge(s1);
             s
         });
 
+        let d_deg = self.d_deg;
+        let d_map = self.d_map.clone();
         Self { summands, d_deg, d_map }
     }
 }

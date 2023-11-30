@@ -70,7 +70,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     }
 
     pub fn rank(&self) -> usize {
-        let n = min(self.result.rows(), self.result.cols());
+        let n = min(self.result.nrows(), self.result.ncols());
         for i in 0..n { 
             if self.result[(i, i)].is_zero() { 
                 return i
@@ -80,7 +80,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     }
 
     pub fn factors(&self) -> Vec<&R> { 
-        let n = min(self.result.rows(), self.result.cols());
+        let n = min(self.result.nrows(), self.result.ncols());
         (0..n).filter_map(|i| { 
             let a = &self.result[(i, i)];
             if !a.is_zero() { 
@@ -285,7 +285,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
 
     fn select_pivot(&self, below_i: usize, j: usize) -> Option<usize> { 
         // find row `i` below `below_i` with minimum nnz. 
-        (below_i..self.target.rows())
+        (below_i..self.target.nrows())
             .filter( |i| !self.target[(*i, j)].is_zero() )
             .map( |i| (i, self.row_nz(i)) )
             .min_by( |e1, e2| e1.1.cmp(&e2.1) )
@@ -307,7 +307,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     fn eliminate_row(&mut self, i: usize, j: usize) -> bool { 
         let mut modified = false;
 
-        for j1 in 0..self.target.cols() {
+        for j1 in 0..self.target.ncols() {
             if j == j1 || self.target[(i, j1)].is_zero() { continue }
 
             // d = sx + ty,
@@ -336,7 +336,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     fn eliminate_col(&mut self, i: usize, j: usize) -> bool { 
         let mut modified = false;
 
-        for i1 in 0..self.target.rows() {
+        for i1 in 0..self.target.nrows() {
             if i == i1 || self.target[(i1, j)].is_zero() { continue }
 
             // d = sx + ty,
@@ -365,7 +365,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     fn diag_normalize(&mut self) {
         debug_assert!(self.target.is_diag());
 
-        let r = min(self.target.rows(), self.target.cols());
+        let r = min(self.target.nrows(), self.target.ncols());
         if r == 0 { 
             return
         }

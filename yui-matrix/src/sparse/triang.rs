@@ -33,14 +33,14 @@ impl TriangularType {
 
 pub fn inv_triangular<R>(t: TriangularType, a: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let e = SpMat::id(a.rows());
+    let e = SpMat::id(a.nrows());
     solve_triangular(t, a, &e)
 }
 
 // solve ax = y.
 pub fn solve_triangular<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    assert_eq!(a.rows(), y.rows());
+    assert_eq!(a.nrows(), y.nrows());
     debug_assert!(a.is_triang(t));
 
     if crate::config::is_multithread_enabled() { 
@@ -58,10 +58,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 pub fn solve_triangular_vec<R>(t: TriangularType, a: &SpMat<R>, b: &SpVec<R>) -> SpVec<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    assert_eq!(a.rows(), b.dim());
+    assert_eq!(a.nrows(), b.dim());
     debug_assert!(a.is_triang(t));
 
-    let n = a.rows();
+    let n = a.nrows();
     let diag = collect_diag(a);
     let mut b = b.to_dense();
 
@@ -76,7 +76,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         info!("solve triangular, y: {:?}", y.shape());
     }
 
-    let (n, k) = (a.rows(), y.cols());
+    let (n, k) = (a.nrows(), y.ncols());
     let diag = collect_diag(a);
     let mut b = vec![R::zero(); n];
 
@@ -98,7 +98,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         info!("solve triangular, y: {:?}", y.shape());
     }
 
-    let (n, k) = (a.rows(), y.cols());
+    let (n, k) = (a.nrows(), y.ncols());
     let diag = collect_diag(a);
     let tl_b = Arc::new(ThreadLocal::new());
     let counter = SyncCounter::new();
@@ -172,7 +172,7 @@ where R: Clone + Zero {
 
 #[inline]
 fn should_report<R>(a: &SpMat<R>) -> bool { 
-    usize::min(a.rows(), a.cols()) > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Info
+    usize::min(a.nrows(), a.ncols()) > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Info
 }
 
 #[cfg(test)]

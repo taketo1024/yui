@@ -58,7 +58,7 @@ where
         let c = |i| rmod_str_symbol(self.rank(i), &[], "0");
         let c0 = c(i);
         let c1 = c(i + self.d_deg());
-        let d = self.d_matrix(i).to_dense();
+        let d = self.d_matrix(i).into_dense();
 
         if d.is_zero() { 
             format!("C[{i}] {c0} -> {c1}; zero.")
@@ -124,7 +124,7 @@ where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {
         let d_matrices = Grid::generate(support, d_matrix_map);
 
         let summands = Grid::generate(d_matrices.support(), |i| {
-            let r = d_matrices[i].cols();
+            let r = d_matrices[i].ncols();
             let t = Trans::id(r);
             ChainComplexSummand::new(r, vec![], Some(t)) 
         });

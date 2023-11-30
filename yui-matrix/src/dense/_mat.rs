@@ -1,7 +1,6 @@
 use std::ops::{Add, Neg, Sub, Mul, Index, IndexMut, AddAssign, SubAssign, MulAssign, Range};
 use std::fmt::Debug;
 use nalgebra::{ClosedSub, ClosedMul};
-use nalgebra_sparse::CscMatrix;
 use nalgebra_sparse::na::{Scalar, ClosedAdd, DMatrix};
 use delegate::delegate;
 use derive_more::Display;
@@ -11,8 +10,8 @@ use crate::sparse::SpMat;
 
 pub trait MatType {
     fn shape(&self) -> (usize, usize);
-    fn rows(&self) -> usize { self.shape().0 }
-    fn cols(&self) -> usize { self.shape().1 }
+    fn nrows(&self) -> usize { self.shape().0 }
+    fn ncols(&self) -> usize { self.shape().1 }
     fn is_square(&self) -> bool { 
         let (m, n) = self.shape();
         m == n
@@ -44,7 +43,7 @@ impl<R> Mat<R> {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (usize, usize, &R)> { 
-        let m = self.rows();
+        let m = self.nrows();
         self.inner.iter().enumerate().map(move |(i, a)| 
             (i % m, i / m, a)
         )
@@ -103,24 +102,24 @@ where R: Scalar {
         let (i0, i1) = (rows.start, rows.end);
         let (j0, j1) = (cols.start, cols.end);
 
-        assert!(i0 <= i1 && i1 <= self.rows());
-        assert!(j0 <= j1 && j1 <= self.cols());
+        assert!(i0 <= i1 && i1 <= self.nrows());
+        assert!(j0 <= j1 && j1 <= self.ncols());
 
         let slice = self.inner.view((i0, j0), (i1 - i0, j1 - j0));
         Self::from(slice.clone_owned())
     }
 
     pub fn submat_rows(&self, rows: Range<usize>) -> Mat<R> { 
-        let n = self.cols();
+        let n = self.ncols();
         self.submat(rows, 0 .. n)
     }
 
     pub fn submat_cols(&self, cols: Range<usize>) -> Mat<R> { 
-        let m = self.rows();
+        let m = self.nrows();
         self.submat(0 .. m, cols)
     }
 
-    pub fn to_sparse(self) -> SpMat<R>
+    pub fn into_sparse(self) -> SpMat<R>
     where R: Zero + ClosedAdd { 
         self.into()
     }
@@ -129,15 +128,6 @@ where R: Scalar {
 impl<R> From<DMatrix<R>> for Mat<R> {
     fn from(inner: DMatrix<R>) -> Self {
         Self { inner }
-    }
-}
-
-// TODO move to SpMat.
-impl<R> From<Mat<R>> for SpMat<R>
-where R: Scalar + Zero {
-    fn from(value: Mat<R>) -> Self {
-        let csc = CscMatrix::from(&value.inner);
-        Self::from(csc)
     }
 }
 
@@ -170,14 +160,6 @@ impl<R> Default for Mat<R>
 where R: Scalar + Zero {
     fn default() -> Self {
         Self::zero((0, 0))
-    }
-}
-
-// TODO move to SpMat.
-impl<R> SpMat<R> { 
-    pub fn to_dense(self) -> Mat<R>
-    where R: Scalar + Zero + ClosedAdd { 
-        self.into()
     }
 }
 
@@ -294,8 +276,8 @@ mod tests {
     fn init() { 
         let a = Mat::from_data((2, 3), [1,2,3,4,5,6]);
 
-        assert_eq!(a.rows(), 2);
-        assert_eq!(a.cols(), 3);
+        assert_eq!(a.nrows(), 2);
+        assert_eq!(a.ncols(), 3);
         assert_eq!(a.into_inner(), DMatrix::from_row_slice(2, 3, &[1,2,3,4,5,6]));
     }
 
@@ -415,7 +397,7 @@ mod tests {
     #[test]
     fn to_sparse() { 
         let dns = Mat::from_data((2, 3), [1,2,3,4,5,6]);
-        let sps = dns.to_sparse();
+        let sps = dns.into_sparse();
         assert_eq!(sps, SpMat::from_dense_data((2, 3), [1,2,3,4,5,6]));
     }
 

@@ -150,7 +150,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 
     pub fn process(&mut self) { 
         assert!(self.data.step == 1);
-        let m = self.data.rows();
+        let m = self.data.nrows();
 
         while self.data.step < m { 
             self.iterate()
@@ -196,7 +196,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 
     fn process(&mut self) { 
         assert!(self.data.step > 0);
-        let m = self.data.rows();
+        let m = self.data.nrows();
 
         while self.data.step < m { 
             self.iterate();
@@ -222,7 +222,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     }
 
     fn result(self) -> (Mat<R>, Option<Mat<R>>, Option<Mat<R>>) { 
-        let m = self.data.rows();
+        let m = self.data.nrows();
         let (mut target, mut p, mut pinv) = self.data.result();
 
         for i in 0..m/2 {
@@ -294,7 +294,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 impl<R> LLLData<R>
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     fn new(target: Mat<R>, flags: [bool; 2]) -> Self { 
-        let m = target.rows();
+        let m = target.nrows();
         let p =    if flags[0] { Some(Mat::id(m)) } else { None };
         let pinv = if flags[1] { Some(Mat::id(m)) } else { None };
         let det = vec![R::one(); m];
@@ -386,7 +386,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         let d1 = &d[k - 1];
         let d2 = &d[k];
 
-        let m = self.lambda.cols();
+        let m = self.lambda.ncols();
 
         // λ[.., k-1] <--> λ[.., k]
         for i in k+1..m { 
@@ -470,8 +470,8 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         }
     }
 
-    fn rows(&self) -> usize { 
-        self.target.rows()
+    fn nrows(&self) -> usize { 
+        self.target.nrows()
     }
 
     fn dump(&self) -> String { 
@@ -971,7 +971,7 @@ pub(super) mod tests {
     fn hnf_rand() {
         let d = 0.5;
         let shape = (8, 8);
-        let a = crate::sparse::SpMat::<i64>::rand(shape, d).to_dense();
+        let a = crate::sparse::SpMat::<i64>::rand(shape, d).into_dense();
 
         let mut calc = LLLHNFCalc::new(a.clone(), [true, true]);
         calc.process();
@@ -1026,7 +1026,7 @@ pub(super) mod tests {
     
         pub fn assert_is_reduced<R>(b: &Mat<R>)
         where R: Integer + LLLRing, for<'x> &'x R: IntOps<R> + LLLRingOps<R> {
-            let m = b.rows();    
+            let m = b.nrows();    
             let (c, l) = gram_schmidt(b);
 
             let alpha = Ratio::from(R::alpha());

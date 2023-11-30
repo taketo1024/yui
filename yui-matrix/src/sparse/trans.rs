@@ -14,8 +14,8 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
 impl<R> Trans<R> 
 where R: Ring, for <'x> &'x R: RingOps<R> { 
     pub fn new(f: SpMat<R>, b: SpMat<R>) -> Self {
-        assert_eq!(f.rows(), b.cols());
-        assert_eq!(f.cols(), b.rows());
+        assert_eq!(f.nrows(), b.ncols());
+        assert_eq!(f.ncols(), b.nrows());
 
         let f_id = f.is_id();
         let b_id = b.is_id();
@@ -39,11 +39,11 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
     }
 
     pub fn src_dim(&self) -> usize { 
-        self.f.cols()
+        self.f.ncols()
     }
 
     pub fn tgt_dim(&self) -> usize { 
-        self.f.rows()
+        self.f.nrows()
     }
 
     pub fn is_id(&self) -> bool { 
@@ -94,8 +94,8 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
     }
 
     pub fn permute(&self, p: PermView) -> Self { 
-        assert_eq!(p.dim(), self.f.rows());
-        assert_eq!(p.dim(), self.b.cols());
+        assert_eq!(p.dim(), self.f.nrows());
+        assert_eq!(p.dim(), self.b.ncols());
 
         self.modify(
             |f| f.permute_rows(p.clone()), 

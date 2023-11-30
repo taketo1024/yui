@@ -401,9 +401,9 @@ impl PivotData {
     fn new<R>(a: &SpMat<R>, piv_type: PivotType) -> Self
     where R: Ring, for<'x> &'x R: RingOps<R> { 
         let n = if piv_type == PivotType::Rows { 
-            a.cols()
+            a.ncols()
         } else { 
-            a.rows()
+            a.nrows()
         };
         let data = vec![None; n];
         let indices = vec![];
@@ -841,7 +841,7 @@ mod tests {
         assert_eq!(r, 5);
         
         let (p, q) = perms_by_pivots(&a, &pivs);
-        let b = a.permute(p.view(), q.view()).to_dense();
+        let b = a.permute(p.view(), q.view()).into_dense();
 
         assert!((0..r).all(|i| b[(i, i)].is_one()));
         assert!((0..r).all(|j| {
@@ -864,7 +864,7 @@ mod tests {
         assert_eq!(r, 6);
         
         let (p, q) = perms_by_pivots(&a, &pivs);
-        let b = a.permute(p.view(), q.view()).to_dense();
+        let b = a.permute(p.view(), q.view()).into_dense();
 
         assert!((0..r).all(|i| b[(i, i)].is_one()));
         assert!((0..r).all(|i| {
@@ -883,7 +883,7 @@ mod tests {
         assert!(r > 10);
         
         let (p, q) = perms_by_pivots(&a, &pivs);
-        let b = a.permute(p.view(), q.view()).to_dense();
+        let b = a.permute(p.view(), q.view()).into_dense();
 
         assert!((0..r).all(|i| b[(i, i)].is_one()));
         assert!((0..r).all(|j| {

@@ -62,7 +62,7 @@ impl<R> SpMat<R> {
 
     pub fn is_triang(&self, t: TriangularType) -> bool
     where R: Zero {
-        if self.rows() != self.cols() { 
+        if self.nrows() != self.ncols() { 
             return false
         }
 
@@ -106,6 +106,14 @@ impl<R> From<CooMatrix<R>> for SpMat<R>
 where R: Scalar + Zero + ClosedAdd {
     fn from(coo: CooMatrix<R>) -> Self {
         let csc = CscMatrix::from(&coo);
+        Self::from(csc)
+    }
+}
+
+impl<R> From<Mat<R>> for SpMat<R>
+where R: Scalar + Zero {
+    fn from(value: Mat<R>) -> Self {
+        let csc = CscMatrix::from(value.inner());
         Self::from(csc)
     }
 }
@@ -158,7 +166,12 @@ where R: Scalar + Clone + Zero + ClosedAdd {
             col.row_indices().iter().cloned(), 
             col.values().iter().cloned()
         );
-        SpVec::from_entries(self.rows(), iter)
+        SpVec::from_entries(self.nrows(), iter)
+    }
+
+    pub fn into_dense(self) -> Mat<R>
+    where R: Scalar + Zero + ClosedAdd { 
+        self.into()
     }
 }
 
@@ -232,12 +245,12 @@ where R: Scalar + Clone + Zero + ClosedAdd {
     pub fn combine_blocks(blocks: [&SpMat<R>; 4]) -> SpMat<R> {
         let [a, b, c, d] = blocks;
 
-        assert_eq!(a.rows(), b.rows());
-        assert_eq!(c.rows(), d.rows());
-        assert_eq!(a.cols(), c.cols());
-        assert_eq!(b.cols(), d.cols());
+        assert_eq!(a.nrows(), b.nrows());
+        assert_eq!(c.nrows(), d.nrows());
+        assert_eq!(a.ncols(), c.ncols());
+        assert_eq!(b.ncols(), d.ncols());
 
-        let (m, n) = (a.rows() + c.rows(), a.cols() + b.cols());
+        let (m, n) = (a.nrows() + c.nrows(), a.ncols() + b.ncols());
         let (k, l) = a.shape();
 
         let entries = zip(
@@ -257,8 +270,8 @@ where R: Scalar + Clone + Zero + ClosedAdd {
         Self::combine_blocks([
             self, 
             b, 
-            &zero(0, self.cols()), 
-            &zero(0, b.cols())
+            &zero(0, self.ncols()), 
+            &zero(0, b.ncols())
         ])
     }
 
@@ -266,9 +279,9 @@ where R: Scalar + Clone + Zero + ClosedAdd {
         let zero = |m, n| SpMat::<R>::zero((m, n));
         Self::combine_blocks([
             self, 
-            &zero(self.rows(), 0), 
+            &zero(self.nrows(), 0), 
             b, 
-            &zero(b.rows(), 0)
+            &zero(b.nrows(), 0)
         ])
     }
 
@@ -389,12 +402,6 @@ impl<'a, 'b, R> SpMatView<'a, 'b, R> {
             (i, j, a.clone())
         ))
     }
-
-    // TODO delete this.
-    pub fn to_owned(self) -> SpMat<R> 
-    where R: Scalar + Clone + Zero + ClosedAdd {
-        self.collect()
-    }
 }
 
 impl<'a, 'b, R> SpMatView<'a, 'b, R>
@@ -474,7 +481,7 @@ pub(super) mod tests {
             (1, 0, 3),
             (1, 1, 4)
         ]);
-        assert_eq!(a.to_dense(), Mat::from_data((2, 2), [1,2,3,4]));
+        assert_eq!(a.into_dense(), Mat::from_data((2, 2), [1,2,3,4]));
     }
 
     #[test]

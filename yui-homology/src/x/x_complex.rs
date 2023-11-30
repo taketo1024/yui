@@ -47,10 +47,10 @@ where
     }
 
     fn d_matrix_for(&self, i: I, q: &SpMat<R>) -> SpMat<R> { 
-        assert_eq!(q.rows(), self[i].rank());
+        assert_eq!(q.nrows(), self[i].rank());
 
         let m = self[i + self.d_deg].rank();
-        let n = q.cols();
+        let n = q.ncols();
 
         if crate::config::is_multithread_enabled() {
             let entries = (0..n).into_par_iter().flat_map(|j|

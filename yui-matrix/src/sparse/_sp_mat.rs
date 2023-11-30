@@ -14,7 +14,7 @@ use auto_impl_ops::auto_ops;
 use sprs::PermView;
 use yui::{Ring, RingOps, AddMonOps, AddGrpOps, MonOps, AddGrp};
 use crate::dense::*;
-use super::sp_vec::SpVec;
+use super::_sp_vec::SpVec;
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct SpMat<R> { 
@@ -70,16 +70,6 @@ impl<R> SpMat<R> {
     pub fn iter_nz(&self) -> impl Iterator<Item = (usize, usize, &R)>
     where R: Zero { 
         self.iter().filter(|e| !e.2.is_zero())
-    }
-
-    pub fn col_vec(&self, j: usize) -> SpVec<R>
-    where R: Clone + Zero { 
-        let col = self.inner.col(j);
-        let iter = Iterator::zip(
-            col.row_indices().iter().cloned(), 
-            col.values().iter().cloned()
-        );
-        SpVec::from_entries(self.rows(), iter)
     }
 
     pub fn transpose(&self) -> Self
@@ -161,6 +151,15 @@ where R: Scalar + Clone + Zero + ClosedAdd {
                 (i, j, a)
             })
         )
+    }
+
+    pub fn col_vec(&self, j: usize) -> SpVec<R> { 
+        let col = self.inner.col(j);
+        let iter = Iterator::zip(
+            col.row_indices().iter().cloned(), 
+            col.values().iter().cloned()
+        );
+        SpVec::from_entries(self.rows(), iter)
     }
 }
 

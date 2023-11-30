@@ -12,3 +12,4 @@ pub mod schur;
 pub mod triang;
 
 mod _sp_mat;
+mod _sp_vec;

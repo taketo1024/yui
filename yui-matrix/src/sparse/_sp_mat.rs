@@ -11,6 +11,7 @@ use auto_impl_ops::auto_ops;
 use sprs::PermView;
 use crate::dense::*;
 use super::_sp_vec::SpVec;
+use super::triang::TriangularType;
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct SpMat<R> { 
@@ -30,6 +31,10 @@ impl<R> SpMat<R> {
 
     pub(crate) fn into_inner(self) -> CscMatrix<R> { 
         self.inner
+    }
+
+    pub fn data(&self) -> (&[usize], &[usize], &[R]) { 
+        self.inner.csc_data()
     }
 
     pub fn zero(shape: (usize, usize)) -> Self {
@@ -53,6 +58,19 @@ impl<R> SpMat<R> {
         self.is_square() && self.iter().all(|(i, j, a)| 
             (i == j && a.is_one()) || (i != j && a.is_zero())
         )
+    }
+
+    pub fn is_triang(&self, t: TriangularType) -> bool
+    where R: Zero {
+        if self.rows() != self.cols() { 
+            return false
+        }
+
+        if t.is_upper() { 
+            self.iter_nz().all(|(i, j, _)| i <= j )
+        } else { 
+            self.iter_nz().all(|(i, j, _)| i >= j )
+        }
     }
     
     pub fn view(&self) -> SpMatView<R> { 

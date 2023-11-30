@@ -10,6 +10,7 @@ use auto_impl_ops::auto_ops;
 use yui::{Ring, RingOps, AddMonOps, AddGrpOps, MonOps, AddGrp};
 use crate::dense::*;
 use super::sp_vec::SpVec;
+use super::triang::TriangularType;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SpMat<R> { 
@@ -180,13 +181,23 @@ impl<R> SpMat<R> where R: Clone + Zero {
 impl<R> SpMat<R> 
 where R: Zero { 
     pub fn iter(&self) -> impl Iterator<Item = (usize, usize, &R)> { 
-        self.cs_mat.iter().filter_map(|(a, (i, j))| {
-            if !a.is_zero() { 
-                Some((i, j, a))
-            } else { 
-                None
-            }
-        })
+        self.cs_mat.iter().map(|(a, (i, j))| (i, j, a))
+    }
+
+    pub fn iter_nz(&self) -> impl Iterator<Item = (usize, usize, &R)> { 
+        self.iter().filter(|e| !e.2.is_zero())
+    }
+
+    pub fn is_triang(&self, t: TriangularType) -> bool {
+        if self.rows() != self.cols() { 
+            return false
+        }
+
+        if t.is_upper() { 
+            self.iter_nz().all(|(i, j, _)| i <= j )
+        } else { 
+            self.iter_nz().all(|(i, j, _)| i >= j )
+        }
     }
 }
 

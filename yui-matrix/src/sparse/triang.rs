@@ -40,12 +40,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 pub fn solve_triangular<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     assert_eq!(a.rows(), y.rows());
-
-    if t.is_upper() { 
-        debug_assert!(is_upper_tri(a));
-    } else { 
-        // TODO
-    }
+    debug_assert!(a.is_triang(t));
 
     if crate::config::is_multithread_enabled() { 
         solve_triangular_m(t, a, y)
@@ -63,12 +58,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 pub fn solve_triangular_vec<R>(t: TriangularType, a: &SpMat<R>, b: &SpVec<R>) -> SpVec<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     assert_eq!(a.rows(), b.dim());
-
-    if t.is_upper() { 
-        debug_assert!(is_upper_tri(a));
-    } else { 
-        // TODO
-    }
+    debug_assert!(a.is_triang(t));
 
     let n = a.rows();
     let diag = collect_diag(t, a);
@@ -185,14 +175,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             &data[p]
         }).collect()
     }
-}
-
-fn is_upper_tri<R>(u: &SpMat<R>) -> bool
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    u.rows() == u.cols() && 
-    u.iter().all(|(i, j, a)| 
-        i < j || (i == j && a.is_unit()) || (i > j && a.is_zero())
-    )
 }
 
 fn copy_into<'a, Itr, R>(itr: Itr, x: &mut [R])

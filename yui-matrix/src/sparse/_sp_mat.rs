@@ -417,26 +417,26 @@ where 'a: 'b, R: Zero {
     }    
 }
 
-// #[cfg(test)]
-// impl<R> SpMat<R>
-// where R: Ring, for<'a> &'a R: RingOps<R> { 
-//     pub fn rand(shape: (usize, usize), density: f64) -> Self {
-//         use cartesian::cartesian;
-//         use rand::Rng;
+#[cfg(test)]
+impl<R> SpMat<R>
+where R: Scalar + Zero + One + ClosedAdd { 
+    pub fn rand(shape: (usize, usize), density: f64) -> Self {
+        use cartesian::cartesian;
+        use rand::Rng;
     
-//         let (m, n) = shape;
-//         let range = cartesian!(0..m, 0..n);
-//         let mut rng = rand::thread_rng();
+        let (m, n) = shape;
+        let range = cartesian!(0..m, 0..n);
+        let mut rng = rand::thread_rng();
     
-//         Self::from_entries(shape, range.filter_map(|(i, j)|
-//             if rng.gen::<f64>() < density { 
-//                 Some((i, j, R::one()))
-//             } else { 
-//                 None
-//             }
-//         ))
-//     }
-// }
+        Self::from_entries(shape, range.filter_map(|(i, j)|
+            if rng.gen::<f64>() < density { 
+                Some((i, j, R::one()))
+            } else { 
+                None
+            }
+        ))
+    }
+}
 
 #[cfg(test)]
 pub(super) mod tests { 

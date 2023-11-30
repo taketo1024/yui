@@ -299,9 +299,23 @@ where R: Scalar + Clone + Zero + ClosedAdd {
         ))
     }    
 
-    pub fn to_dense(self) -> DMatrix<R>
+    pub fn _to_dense(self) -> DMatrix<R>
     where R: Scalar + Zero + ClosedAdd { 
         DMatrix::from(&self.inner)
+    }
+
+    // TODO to be removed.
+    pub fn to_dense(self) -> Mat<R>
+    where R: Scalar + Zero + ClosedAdd { 
+        use ndarray::Array2;
+
+        let (m, n) = self.shape();
+        let mut data = vec![R::zero(); m * n];
+        for (i, j, a) in self.iter() { 
+            data[i * n + j] = a.clone();
+        }
+        let arr = Array2::from_shape_vec((m, n), data).unwrap();
+        Mat::from(arr)
     }
 }
 
@@ -481,7 +495,7 @@ pub(super) mod tests {
             (1, 0, 3),
             (1, 1, 4)
         ]);
-        assert_eq!(a.to_dense(), DMatrix::from_row_slice(2, 2, &[1,2,3,4]));
+        assert_eq!(a._to_dense(), DMatrix::from_row_slice(2, 2, &[1,2,3,4]));
     }
 
     #[test]

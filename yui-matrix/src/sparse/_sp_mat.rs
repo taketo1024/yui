@@ -5,7 +5,7 @@ use std::fmt::{Display, Debug};
 use std::sync::Mutex;
 use delegate::delegate;
 use derive_more::Display;
-use nalgebra_sparse::na::Scalar;
+use nalgebra_sparse::na::{Scalar, ClosedAdd, ClosedSub, ClosedMul};
 use nalgebra_sparse::{CscMatrix, CooMatrix};
 use itertools::Itertools;
 use num_traits::{Zero, One};
@@ -21,8 +21,22 @@ pub struct SpMat<R> {
 }
 
 impl<R> SpMat<R> { 
-    pub fn inner(&self) -> &CscMatrix<R> { 
-        &self.inner
+    pub fn iter(&self) -> impl Iterator<Item = (usize, usize, &R)> { 
+        self.inner.triplet_iter()
+    }
+
+    pub fn iter_nz(&self) -> impl Iterator<Item = (usize, usize, &R)>
+    where R: Zero { 
+        self.iter().filter(|e| !e.2.is_zero())
+    }
+
+    pub fn transpose(&self) -> Self
+    where R: Scalar { 
+        self.inner.transpose().into()
+    }
+
+    pub fn disassemble(self) -> (Vec<usize>, Vec<usize>, Vec<R>) { 
+        self.inner.disassemble()
     }
 }
 
@@ -39,29 +53,30 @@ impl<R> From<CscMatrix<R>> for SpMat<R> {
 }
 
 impl<R> From<CooMatrix<R>> for SpMat<R>
-where R: Scalar + Zero + AddAssign {
+where R: Scalar + Zero + ClosedAdd {
     fn from(coo: CooMatrix<R>) -> Self {
         let csc = CscMatrix::from(&coo);
         Self::from(csc)
     }
 }
 
-// impl<R> From<Mat<R>> for SpMat<R>
-// where R: Clone + Zero {
-//     fn from(a: Mat<R>) -> Self {
-//         let n = a.cols();
-//         let entries = a.array().into_iter().enumerate().filter_map(|(k, a)| {
-//             if !a.is_zero() { 
-//                 Some((k / n, k % n, a.clone()))
-//             } else {
-//                 None 
-//             }
-//         });
-//         SpMat::from_entries(a.shape(), entries)
-//     }
-// }
+impl<R> From<Mat<R>> for SpMat<R>
+where R: Scalar + Zero + ClosedAdd {
+    fn from(a: Mat<R>) -> Self {
+        let n = a.cols();
+        let entries = a.array().into_iter().enumerate().filter_map(|(k, a)| {
+            if !a.is_zero() { 
+                Some((k / n, k % n, a.clone()))
+            } else {
+                None 
+            }
+        });
+        SpMat::from_entries(a.shape(), entries)
+    }
+}
 
-impl<R> SpMat<R> where R: Scalar + Clone + Zero + AddAssign { 
+impl<R> SpMat<R> 
+where R: Scalar + Clone + Zero + ClosedAdd { 
     pub fn from_entries<T>(shape: (usize, usize), entries: T) -> Self
     where T: IntoIterator<Item = (usize, usize, R)> {
         let mut coo = CooMatrix::new(shape.0, shape.1);
@@ -74,38 +89,144 @@ impl<R> SpMat<R> where R: Scalar + Clone + Zero + AddAssign {
         Self::from(coo)
     }
 
-//     pub fn from_par_entries<T>(shape: (usize, usize), entries: T) -> Self
-//     where 
-//         R: Send + Sync,
-//         T: IntoParallelIterator<Item = (usize, usize, R)>
-//     {
-//         let t = Mutex::new(TriMat::new(shape));
-        
-//         entries.into_par_iter().for_each(|(i, j, a)| { 
-//             if a.is_zero() { 
-//                 return;
-//             }
-//             t.lock().unwrap().add_triplet(i, j, a)
-//         });
+    pub fn from_par_entries<T>(shape: (usize, usize), entries: T) -> Self
+    where 
+        R: Send + Sync,
+        T: IntoParallelIterator<Item = (usize, usize, R)>
+    {
+        let t = Mutex::new(CooMatrix::new(shape.0, shape.1));
+        entries.into_par_iter().for_each(|(i, j, a)| { 
+            if a.is_zero() { 
+                return;
+            }
+            t.lock().unwrap().push(i, j, a)
+        });
+        let coo = t.into_inner().unwrap();
+        Self::from(coo)
+    }
 
-//         let inner = t.into_inner().unwrap().to_csc();
-//         Self::from(inner)
+    pub fn from_dense_data<I>(shape: (usize, usize), data: I) -> Self
+    where I: IntoIterator<Item = R> { 
+        let n = shape.1;
+        Self::from_entries(
+            shape, 
+            data.into_iter().enumerate().map(|(k, a)| { 
+                let (i, j) = (k / n, k % n);
+                (i, j, a)
+            })
+        )
+    }
+}
+
+// impl<R> IntoIterator for SpMat<R>
+// where R: Clone + Zero {
+//     type Item = (usize, usize, R);
+//     type IntoIter = std::vec::IntoIter<Self::Item>;
+
+//     fn into_iter(self) -> Self::IntoIter {
+//         let
+//         // MEMO improve this
+//         self.iter().map(|(i, j, a)| (i, j, a.clone())).collect_vec().into_iter()
+//     }
+// }
+
+// impl<R> SpMat<R>
+// where R: Clone {
+//     pub fn col_vec(&self, j: usize) -> SpVec<R> { 
+//         let cs_vec = self.col_view(j).to_owned();
+//         SpVec::from(cs_vec)
+//     }
+// }
+
+impl<R> Default for SpMat<R> {
+    fn default() -> Self {
+        Self::zero((0, 0))
+    }
+}
+
+impl<R> SpMat<R> { 
+    pub fn zero(shape: (usize, usize)) -> Self {
+        let csc = CscMatrix::zeros(shape.0, shape.1);
+        Self::from(csc)
+    }
+
+    pub fn is_zero(&self) -> bool
+    where R: Zero {
+        self.inner.values().iter().all(|a| a.is_zero())
+    }
+
+    pub fn id(n: usize) -> Self
+    where R: Scalar + One { 
+        let csc = CscMatrix::identity(n);
+        Self::from(csc)
+    }
+
+    pub fn is_id(&self) -> bool
+    where R: Scalar + One + Zero {
+        self.is_square() && self.iter().all(|(i, j, a)| 
+            (i == j && a.is_one()) || (i != j && a.is_zero())
+        )
+    }
+}
+
+impl<R> Neg for SpMat<R>
+where R: Scalar + Neg<Output = R> {
+    type Output = Self;
+    fn neg(self) -> Self::Output {
+        Self::from(-self.inner)
+    }
+}
+
+impl<R> Neg for &SpMat<R>
+where R: Scalar + Neg<Output = R> {
+    type Output = SpMat<R>;
+    fn neg(self) -> Self::Output {
+        SpMat::from(-&self.inner)
+    }
+}
+
+// see: nalgebra_sparse::ops::impl_std_ops.
+macro_rules! impl_binop {
+    ($trait:ident, $method:ident) => {
+        #[auto_ops]
+        impl<'a, 'b, R> $trait<&'b SpMat<R>> for &'a SpMat<R>
+        where R: Scalar + ClosedAdd + ClosedSub + ClosedMul + Zero + One + Neg<Output = R> {
+            type Output = SpMat<R>;
+            fn $method(self, rhs: &'b SpMat<R>) -> Self::Output {
+                let res = (&self.inner).$method(&rhs.inner);
+                SpMat::from(res)
+            }
+        }
+    };
+}
+
+impl_binop!(Add, add);
+impl_binop!(Sub, sub);
+impl_binop!(Mul, mul);
+
+macro_rules! impl_ops {
+    ($trait:ident) => {
+        impl<R> $trait<SpMat<R>> for SpMat<R>
+        where R: Scalar + ClosedAdd + ClosedSub + ClosedMul + Zero + One + Neg<Output = R> {}
+
+        impl<R> $trait<SpMat<R>> for &SpMat<R>
+        where R:Scalar + ClosedAdd + ClosedSub + ClosedMul + Zero + One + Neg<Output = R> {}
+    };
+}
+
+impl_ops!(AddMonOps);
+impl_ops!(AddGrpOps);
+impl_ops!(MonOps);
+impl_ops!(RingOps);
+
+// impl<R> SpMat<R> { 
+//     pub fn view(&self) -> SpMatView<R> { 
+//         SpMatView::new(self, self.shape(), |i, j| Some((i, j)))
 //     }
 
-//     pub fn from_dense_data<I>(shape: (usize, usize), data: I) -> Self
-//     where I: IntoIterator<Item = R> { 
-//         let n = shape.1;
-//         Self::from_entries(
-//             shape, 
-//             data.into_iter().enumerate().map(|(k, a)| { 
-//                 let (i, j) = (k / n, k % n);
-//                 (i, j, a)
-//             })
-//         )
-//     }
-
-//     pub fn transpose(&self) -> Self { 
-//         self.view().transpose().to_owned()
+//     pub fn col_view(&self, j: usize) -> CsVecView<R> { 
+//         assert!(j < self.cols());
+//         self.inner.outer_view(j).unwrap()
 //     }
 
 //     pub fn permute<'b>(&self, p: PermView<'b>, q: PermView<'b>) -> SpMat<R> { 
@@ -178,149 +299,6 @@ impl<R> SpMat<R> where R: Scalar + Clone + Zero + AddAssign {
 //     pub fn to_dense(self) -> Mat<R> { 
 //         self.into()
 //     }
-}
-
-// impl<R> SpMat<R> 
-// where R: Zero { 
-//     pub fn iter(&self) -> impl Iterator<Item = (usize, usize, &R)> { 
-//         self.inner.iter().filter_map(|(a, (i, j))| {
-//             if !a.is_zero() { 
-//                 Some((i, j, a))
-//             } else { 
-//                 None
-//             }
-//         })
-//     }
-// }
-
-// impl<R> IntoIterator for SpMat<R>
-// where R: Clone + Zero {
-//     type Item = (usize, usize, R);
-//     type IntoIter = std::vec::IntoIter<Self::Item>;
-
-//     fn into_iter(self) -> Self::IntoIter {
-//         // MEMO improve this
-//         self.iter().map(|(i, j, a)| (i, j, a.clone())).collect_vec().into_iter()
-//     }
-// }
-
-// impl<R> SpMat<R>
-// where R: Clone {
-//     pub fn col_vec(&self, j: usize) -> SpVec<R> { 
-//         let cs_vec = self.col_view(j).to_owned();
-//         SpVec::from(cs_vec)
-//     }
-// }
-
-// impl<R> Default for SpMat<R>
-// where R: Clone + Default + Zero {
-//     fn default() -> Self {
-//         Self::zero((0, 0))
-//     }
-// }
-
-impl<R> Display for SpMat<R>
-where R: Display + Debug {
-    delegate! { to self.inner { 
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
-    }}
-}
-
-impl<R> Debug for SpMat<R>
-where R: Display + Debug {
-    delegate! { to self.inner { 
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
-    }}
-}
-
-// impl<R> SpMat<R>
-// where R: Clone + Zero { 
-//     pub fn zero(shape: (usize, usize)) -> Self {
-//         Self::from_entries(shape, [])
-//     }
-
-//     pub fn is_zero(&self) -> bool {
-//         self.inner.data().iter().all(|a| a.is_zero())
-//     }
-// }
-
-// impl<R> SpMat<R>
-// where R: Clone + Zero + One { 
-//     pub fn id(n: usize) -> Self { 
-//         let indptr = (0..=n).collect();
-//         let indices = (0..n).collect();
-//         let data = vec![R::one(); n];
-//         let inner = CscMatrix::new_csc((n, n), indptr, indices, data);
-//         Self::from(inner)
-//     }
-
-//     pub fn is_id(&self) -> bool
-//     where R: PartialEq {
-//         self.is_square() && self.inner.into_iter().all(|(a, (i, j))| 
-//             (i == j && a.is_one()) || (i != j && a.is_zero())
-//         )
-//     }
-// }
-
-// impl<R> Neg for SpMat<R>
-// where R: AddGrp, for<'a> &'a R: AddGrpOps<R> {
-//     type Output = Self;
-//     fn neg(self) -> Self::Output {
-//         -&self
-//     }
-// }
-
-// impl<R> Neg for &SpMat<R>
-// where R: AddGrp, for<'a> &'a R: AddGrpOps<R> {
-//     type Output = SpMat<R>;
-//     fn neg(self) -> Self::Output {
-//         let neg = self.inner.map(|a| -a);
-//         SpMat::from(neg)
-//     }
-// }
-
-// macro_rules! impl_binop {
-//     ($trait:ident, $method:ident, $r_trait:ident, $r_op_trait:ident) => {
-//         #[auto_ops]
-//         impl<'a, 'b, R> $trait<&'b SpMat<R>> for &'a SpMat<R>
-//         where R: $r_trait, for<'x> &'x R: $r_op_trait<R> {
-//             type Output = SpMat<R>;
-//             fn $method(self, rhs: &'b SpMat<R>) -> Self::Output {
-//                 let res = self.inner.$method(&rhs.inner);
-//                 SpMat::from(res)
-//             }
-//         }
-//     };
-// }
-
-// impl_binop!(Add, add, AddGrp, AddGrpOps);
-// impl_binop!(Sub, sub, AddGrp, AddGrpOps);
-// impl_binop!(Mul, mul, Ring, RingOps);
-
-// macro_rules! impl_ops {
-//     ($trait:ident, $r_trait:ident, $r_op_trait:ident) => {
-//         impl<R> $trait<SpMat<R>> for SpMat<R>
-//         where R: $r_trait, for<'x> &'x R: $r_op_trait<R> {}
-
-//         impl<R> $trait<SpMat<R>> for &SpMat<R>
-//         where R: $r_trait, for<'x> &'x R: $r_op_trait<R> {}
-//     };
-// }
-
-// impl_ops!(AddMonOps, AddGrp, AddGrpOps);
-// impl_ops!(AddGrpOps, AddGrp, AddGrpOps);
-// impl_ops!(MonOps, Ring, RingOps);
-// impl_ops!(RingOps, Ring, RingOps);
-
-// impl<R> SpMat<R> { 
-//     pub fn view(&self) -> SpMatView<R> { 
-//         SpMatView::new(self, self.shape(), |i, j| Some((i, j)))
-//     }
-
-//     pub fn col_view(&self, j: usize) -> CsVecView<R> { 
-//         assert!(j < self.cols());
-//         self.inner.outer_view(j).unwrap()
-//     }
 // }
 
 // impl<R> SpMat<R> where R: Clone + Zero + One { 
@@ -340,6 +318,21 @@ where R: Display + Debug {
 //         ))
 //     }
 // }
+
+impl<R> Display for SpMat<R>
+where R: Display + Debug {
+    delegate! { to self.inner { 
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
+    }}
+}
+
+impl<R> Debug for SpMat<R>
+where R: Display + Debug {
+    delegate! { to self.inner { 
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
+    }}
+}
+
 // pub struct SpMatView<'a, 'b, R>  {
 //     target: &'a SpMat<R>,
 //     shape: (usize, usize),
@@ -470,26 +463,27 @@ pub(super) mod tests {
             (1, 0, 3),
             (1, 1, 4)
         ]);
-        // assert_eq!(&a.inner, &CscMatrix::new_csc((2, 2), vec![0, 2, 4], vec![0, 1, 0, 1], vec![1, 3, 2, 4]));
+        assert_eq!(a.disassemble(), (vec![0, 2, 4], vec![0, 1, 0, 1], vec![1, 3, 2, 4]));
     }
 
     #[test]
     fn init_ratio() { 
         type R = Ratio<i64>;
+        let vals = (0..4).map(|i| R::new(i + 1, 5)).collect_vec();
         let a = SpMat::from_entries((2, 2), [
-            (0, 0, R::new(1,10)),
-            (0, 1, R::new(2,10)),
-            (1, 0, R::new(3,10)),
-            (1, 1, R::new(4,10))
+            (0, 0, vals[0].clone()),
+            (0, 1, vals[2].clone()),
+            (1, 0, vals[1].clone()),
+            (1, 1, vals[3].clone())
         ]);
-        // assert_eq!(&a.inner, &CscMatrix::new_csc((2, 2), vec![0, 2, 4], vec![0, 1, 0, 1], vec![1, 3, 2, 4]));
+        assert_eq!(a.disassemble(), (vec![0, 2, 4], vec![0, 1, 0, 1], vals));
     }
 
-//     #[test]
-//     fn from_grid() { 
-//         let a = SpMat::from_dense_data((2, 2), [1,2,3,4]);
-//         assert_eq!(&a.inner, &CscMatrix::new_csc((2, 2), vec![0, 2, 4], vec![0, 1, 0, 1], vec![1, 3, 2, 4]));
-//     }
+    #[test]
+    fn from_grid() { 
+        let a = SpMat::from_dense_data((2, 2), [1,2,3,4]);
+        assert_eq!(a.disassemble(), (vec![0, 2, 4], vec![0, 1, 0, 1], vec![1, 3, 2, 4]));
+    }
 
 //     #[test]
 //     fn to_dense() { 
@@ -516,18 +510,18 @@ pub(super) mod tests {
 //         ]));
 //     }
 
-//     #[test]
-//     fn transpose() { 
-//         let a = SpMat::from_dense_data((3,4), 0..12);
-//         let b = a.transpose();
+    #[test]
+    fn transpose() { 
+        let a = SpMat::from_dense_data((3,4), 0..12);
+        let b = a.transpose();
 
-//         assert_eq!(b, SpMat::from_dense_data((4,3), vec![
-//             0, 4, 8, 
-//             1, 5, 9, 
-//             2, 6, 10, 
-//             3, 7, 11, 
-//         ]));
-//     }
+        assert_eq!(b, SpMat::from_dense_data((4,3), vec![
+            0, 4, 8, 
+            1, 5, 9, 
+            2, 6, 10, 
+            3, 7, 11, 
+        ]));
+    }
 
 //     #[test]
 //     fn row_perm() {

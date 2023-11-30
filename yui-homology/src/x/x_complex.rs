@@ -5,7 +5,7 @@ use delegate::delegate;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use yui::{Ring, RingOps};
 use yui::lc::{Gen, Lc};
-use yui_matrix::sparse::{SpMat, Trans, MatType};
+use yui_matrix::sparse::{SpMat, Trans, MatTrait};
 
 use crate::utils::ChainReducer;
 use crate::{GridTrait, GridDeg, Grid, GridIter, ChainComplexTrait, RModStr, SimpleRModStr, isize2, isize3};

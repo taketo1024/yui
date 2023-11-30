@@ -18,7 +18,7 @@ pub struct SpMat<R> {
     inner: CscMatrix<R>
 }
 
-impl<R> MatType for SpMat<R> {
+impl<R> MatTrait for SpMat<R> {
     fn shape(&self) -> (usize, usize) {
         (self.inner.nrows(), self.inner.ncols())
     }

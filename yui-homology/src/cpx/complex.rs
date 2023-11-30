@@ -4,7 +4,7 @@ use std::ops::Index;
 use itertools::{Itertools, Either};
 use delegate::delegate;
 use yui::{Ring, RingOps};
-use yui_matrix::sparse::{SpMat, SpVec, MatType, Trans};
+use yui_matrix::sparse::{SpMat, SpVec, MatTrait, Trans};
 
 use crate::{GridTrait, GridDeg, Grid, GridIter, isize2, isize3};
 use crate::utils::ChainReducer;

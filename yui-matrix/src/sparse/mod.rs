@@ -1,4 +1,4 @@
-pub use crate::dense::MatType;
+pub use crate::MatTrait;
 
 mod sp_mat;
 mod sp_vec;

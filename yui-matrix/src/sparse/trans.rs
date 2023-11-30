@@ -1,6 +1,6 @@
 use sprs::PermView;
 use yui::{RingOps, Ring};
-use crate::sparse::{SpMat, MatType, SpVec};
+use crate::sparse::{SpMat, MatTrait, SpVec};
 
 #[derive(Clone, Debug)]
 pub struct Trans<R> 

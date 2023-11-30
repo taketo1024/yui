@@ -6,24 +6,15 @@ use delegate::delegate;
 use derive_more::Display;
 use auto_impl_ops::auto_ops;
 use num_traits::{Zero, One};
+use crate::MatTrait;
 use crate::sparse::SpMat;
-
-pub trait MatType {
-    fn shape(&self) -> (usize, usize);
-    fn nrows(&self) -> usize { self.shape().0 }
-    fn ncols(&self) -> usize { self.shape().1 }
-    fn is_square(&self) -> bool { 
-        let (m, n) = self.shape();
-        m == n
-    }
-}
 
 #[derive(Clone, Debug, Display, PartialEq, Eq)]
 pub struct Mat<R> {
     inner: DMatrix<R>
 }
 
-impl<R> MatType for Mat<R> {
+impl<R> MatTrait for Mat<R> {
     fn shape(&self) -> (usize, usize) {
         (self.inner.nrows(), self.inner.ncols())
     }

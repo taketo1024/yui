@@ -86,6 +86,10 @@ where
         self.trans.get(&i)
     }
 
+    pub fn trans_mut(&mut self, i: I) -> Option<&mut Trans<R>> {
+        self.trans.get_mut(&i)
+    }
+
     pub fn rank(&self, i: I) -> Option<usize> { 
         self.matrix(i).map(|d| d.ncols())
     }
@@ -162,18 +166,25 @@ where
         let (m, n) = s.orig_shape(); // (m, n)
         let (_, i1, i2) = self.deg_trip(i);
         
-        let t1 = self.trans(i1).unwrap().permute(q.view()).modify(
-            |a| a.submat_rows(r..n),
-            |b| b * s.trans_in().unwrap()
-        );
+        let t1 = self.trans_mut(i1).unwrap();
+        t1.permute(q.view());
+        t1.modify(|fs, bs| { 
+            let f = fs.pop().unwrap().submat_rows(r..n);
+            fs.push(f);
 
-        let t2 = self.trans(i2).unwrap().permute(p.view()).modify(
-            |a| s.trans_out().unwrap() * a,
-            |b| b.submat_cols(r..m)
-        );
+            let b = s.trans_in().unwrap().clone();
+            bs.push(b);
+        });
 
-        self.trans.insert(i1, t1);
-        self.trans.insert(i2, t2);
+        let t2 = self.trans_mut(i2).unwrap();
+        t2.permute(p.view());
+        t2.modify(|fs, bs| { 
+            let f = s.trans_out().unwrap().clone();
+            fs.push(f);
+
+            let b = bs.pop().unwrap().submat_cols(r..m);
+            bs.push(b)
+        });
     }
 
     fn update_mats(&mut self, i: I, p: &PermOwned, q: &PermOwned, r: usize, s: Schur<R>) {

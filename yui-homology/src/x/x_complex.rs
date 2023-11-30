@@ -82,7 +82,7 @@ where
 
         for i in self.support() {
             let d = if let Some(t) = reducer.trans(i) {
-                self.d_matrix_for(i, t.backward_mat())
+                self.d_matrix_for(i, &t.backward_mat())
             } else { 
                 self.d_matrix(i)
             };
@@ -100,15 +100,17 @@ where
         let d_deg = self.d_deg;
         let d_map = self.d_map.clone();
 
-        let summands = self.summands.map(|i, summand| { 
+        let summands = self.summands.map(|i, s| { 
+            let mut s = s.clone();
             let t = trans_map(i);
 
             assert_eq!(t.src_dim(), self[i].rank());
 
             let r = t.tgt_dim();
-            let s = SimpleRModStr::new(r, vec![], Some(t));
+            let s1 = SimpleRModStr::new(r, vec![], Some(t));
 
-            summand.compose(&s)
+            s.merge(s1);
+            s
         });
 
         Self { summands, d_deg, d_map }

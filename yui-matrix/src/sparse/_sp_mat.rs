@@ -28,6 +28,14 @@ impl<R> MatType for SpMat<R> {
 }
 
 impl<R> SpMat<R> { 
+    pub(crate) fn inner(&self) -> &CscMatrix<R> { 
+        &self.inner
+    }
+
+    pub(crate) fn into_inner(self) -> CscMatrix<R> { 
+        self.inner
+    }
+
     pub fn zero(shape: (usize, usize)) -> Self {
         let csc = CscMatrix::zeros(shape.0, shape.1);
         Self::from(csc)
@@ -196,21 +204,6 @@ macro_rules! impl_binop {
 impl_binop!(Add, add);
 impl_binop!(Sub, sub);
 impl_binop!(Mul, mul);
-
-macro_rules! impl_ops {
-    ($trait:ident) => {
-        impl<R> $trait<SpMat<R>> for SpMat<R>
-        where R: Scalar + ClosedAdd + ClosedSub + ClosedMul + Zero + One + Neg<Output = R> {}
-
-        impl<R> $trait<SpMat<R>> for &SpMat<R>
-        where R:Scalar + ClosedAdd + ClosedSub + ClosedMul + Zero + One + Neg<Output = R> {}
-    };
-}
-
-impl_ops!(AddMonOps);
-impl_ops!(AddGrpOps);
-impl_ops!(MonOps);
-impl_ops!(RingOps);
 
 impl<R> SpMat<R>
 where R: Scalar + Clone + Zero + ClosedAdd { 

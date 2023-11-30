@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::sync::Arc;
 use either::Either;
 use log::info;
+use num_traits::Zero;
 use rayon::prelude::*;
 use thread_local::ThreadLocal;
 use yui::{Ring, RingOps};
@@ -80,7 +81,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let mut b = vec![R::zero(); n];
 
     let entries = (0..k).flat_map(|j| { 
-        copy_into(y.col_view(j).iter(), &mut b);
+        copy_into(y.col_vec(j), &mut b);
         let xj = _solve_triangular(t, a, &diag, &mut b);
         xj.into_iter().map(move |(i, x)| (i, j, x))
     });
@@ -107,7 +108,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             RefCell::new(vec![R::zero(); n])
         ).borrow_mut();
 
-        copy_into(y.col_view(j).iter(), &mut b);
+        copy_into(y.col_vec(j), &mut b);
         let xj = _solve_triangular(t, a, &diag, &mut b);
         let res = xj.into_par_iter().map(move |(i, x)| (i, j, x));
 
@@ -177,9 +178,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-fn copy_into<'a, Itr, R>(itr: Itr, x: &mut [R])
-where Itr: Iterator<Item = (usize, &'a R)>, R: Clone + 'a { 
-    itr.for_each(|(i, r)| x[i] = r.clone())
+fn copy_into<R>(vec: SpVec<R>, x: &mut [R])
+where R: Clone + Zero { 
+    vec.iter().for_each(|(i, r)| x[i] = r.clone())
 }
 
 #[inline]

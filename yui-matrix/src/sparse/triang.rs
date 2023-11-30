@@ -63,7 +63,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     let n = a.rows();
     let diag = collect_diag(a);
-    let mut b = b.to_dense().to_vec();
+    let mut b = b.to_dense();
 
     let x = _solve_triangular(t, a, &diag, &mut b);
 

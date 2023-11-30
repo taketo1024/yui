@@ -62,7 +62,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     debug_assert!(a.is_triang(t));
 
     let n = a.rows();
-    let diag = collect_diag(t, a);
+    let diag = collect_diag(a);
     let mut b = b.to_dense().to_vec();
 
     let x = _solve_triangular(t, a, &diag, &mut b);
@@ -77,7 +77,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     let (n, k) = (a.rows(), y.cols());
-    let diag = collect_diag(t, a);
+    let diag = collect_diag(a);
     let mut b = vec![R::zero(); n];
 
     let entries = (0..k).flat_map(|j| { 
@@ -99,7 +99,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     let (n, k) = (a.rows(), y.cols());
-    let diag = collect_diag(t, a);
+    let diag = collect_diag(a);
     let tl_b = Arc::new(ThreadLocal::new());
     let counter = SyncCounter::new();
 
@@ -158,24 +158,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     entries
 }
 
-fn collect_diag<'a, R>(t: TriangularType, a: &'a SpMat<R>) -> Vec<&'a R>
+fn collect_diag<'a, R>(a: &'a SpMat<R>) -> Vec<&'a R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    let a = &a.cs_mat();
-    let n = a.rows();
-    let indptr = a.indptr();
-    let data = a.data();
-
-    if t.is_upper() { 
-        (0..n).map( |i| {
-            let p = indptr.index(i + 1);
-            &data[p - 1]
-        }).collect()
-    } else { 
-        (0..n).map( |i| {
-            let p = indptr.index(i);
-            &data[p]
-        }).collect()
-    }
+    a.iter().filter_map(|(i, j, a)| 
+        if i == j { Some(a) } else { None }
+    ).collect()
 }
 
 fn copy_into<R>(vec: SpVec<R>, x: &mut [R])

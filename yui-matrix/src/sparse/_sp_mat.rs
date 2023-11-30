@@ -11,6 +11,7 @@ use itertools::Itertools;
 use num_traits::{Zero, One};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use auto_impl_ops::auto_ops;
+use sprs::PermView;
 use yui::{Ring, RingOps, AddMonOps, AddGrpOps, MonOps, AddGrp};
 use crate::dense::*;
 use super::sp_vec::SpVec;
@@ -21,6 +22,10 @@ pub struct SpMat<R> {
 }
 
 impl<R> SpMat<R> { 
+    pub fn view(&self) -> SpMatView<R> { 
+        SpMatView::from(self)
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = (usize, usize, &R)> { 
         self.inner.triplet_iter()
     }
@@ -28,6 +33,13 @@ impl<R> SpMat<R> {
     pub fn iter_nz(&self) -> impl Iterator<Item = (usize, usize, &R)>
     where R: Zero { 
         self.iter().filter(|e| !e.2.is_zero())
+    }
+
+    pub fn col(&self, j: usize) -> SpVec<R>
+    where R: Clone + Zero { 
+        let col = self.inner.col(j);
+        let iter = Iterator::zip(col.row_indices().iter().cloned(), col.values().iter().cloned());
+        SpVec::from_entries(self.rows(), iter)
     }
 
     pub fn transpose(&self) -> Self
@@ -219,87 +231,189 @@ impl_ops!(AddGrpOps);
 impl_ops!(MonOps);
 impl_ops!(RingOps);
 
-// impl<R> SpMat<R> { 
-//     pub fn view(&self) -> SpMatView<R> { 
-//         SpMatView::new(self, self.shape(), |i, j| Some((i, j)))
-//     }
+impl<R> SpMat<R>
+where R: Scalar + Clone + Zero + ClosedAdd { 
+    pub fn permute(&self, p: PermView, q: PermView) -> SpMat<R> { 
+        self.view().permute(p, q).collect()
+    }
 
-//     pub fn col_view(&self, j: usize) -> CsVecView<R> { 
-//         assert!(j < self.cols());
-//         self.inner.outer_view(j).unwrap()
-//     }
-
-//     pub fn permute<'b>(&self, p: PermView<'b>, q: PermView<'b>) -> SpMat<R> { 
-//         self.view().permute(p, q).to_owned()
-//     }
-
-//     pub fn permute_rows(&self, p: PermView<'_>) -> SpMat<R> { 
-//         self.view().permute_rows(p).to_owned()
-//     }
+    pub fn permute_rows(&self, p: PermView) -> SpMat<R> { 
+        self.view().permute_rows(p).collect()
+    }
     
-//     pub fn permute_cols(&self, q: PermView<'_>) -> SpMat<R> { 
-//         self.view().permute_cols(q).to_owned()
-//     }
+    pub fn permute_cols(&self, q: PermView) -> SpMat<R> { 
+        self.view().permute_cols(q).collect()
+    }
 
-//     pub fn submat(&self, rows: Range<usize>, cols: Range<usize>) -> SpMat<R> { 
-//         self.view().submat(rows, cols).to_owned()
-//     }
+    pub fn submat(&self, rows: Range<usize>, cols: Range<usize>) -> SpMat<R> { 
+        self.view().submat(rows, cols).collect()
+    }
 
-//     pub fn submat_rows(&self, rows: Range<usize>) -> SpMat<R> { 
-//         self.view().submat_rows(rows).to_owned()
-//     }
+    pub fn submat_rows(&self, rows: Range<usize>) -> SpMat<R> { 
+        self.view().submat_rows(rows).collect()
+    }
 
-//     pub fn submat_cols(&self, cols: Range<usize>) -> SpMat<R> { 
-//         self.view().submat_cols(cols).to_owned()
-//     }
+    pub fn submat_cols(&self, cols: Range<usize>) -> SpMat<R> { 
+        self.view().submat_cols(cols).collect()
+    }
 
-//     pub fn combine_blocks(blocks: [&SpMat<R>; 4]) -> SpMat<R> {
-//         let [a, b, c, d] = blocks;
+    pub fn combine_blocks(blocks: [&SpMat<R>; 4]) -> SpMat<R> {
+        let [a, b, c, d] = blocks;
 
-//         assert_eq!(a.rows(), b.rows());
-//         assert_eq!(c.rows(), d.rows());
-//         assert_eq!(a.cols(), c.cols());
-//         assert_eq!(b.cols(), d.cols());
+        assert_eq!(a.rows(), b.rows());
+        assert_eq!(c.rows(), d.rows());
+        assert_eq!(a.cols(), c.cols());
+        assert_eq!(b.cols(), d.cols());
 
-//         let (m, n) = (a.rows() + c.rows(), a.cols() + b.cols());
-//         let (k, l) = a.shape();
+        let (m, n) = (a.rows() + c.rows(), a.cols() + b.cols());
+        let (k, l) = a.shape();
 
-//         let entries = zip(
-//             [a, b, c, d], 
-//             [(0,0), (0,l), (k,0), (k,l)]
-//         ).flat_map(|(x, (di, dj))| 
-//             x.iter().map(move |(i, j, r)|
-//                 (i + di, j + dj, r.clone())
-//             )
-//         );
+        let entries = zip(
+            [a, b, c, d], 
+            [(0,0), (0,l), (k,0), (k,l)]
+        ).flat_map(|(x, (di, dj))| 
+            x.iter().map(move |(i, j, r)|
+                (i + di, j + dj, r.clone())
+            )
+        );
 
-//         Self::from_entries((m, n), entries)
-//     }
+        Self::from_entries((m, n), entries)
+    }
 
-//     pub fn concat(&self, b: &Self) -> Self { 
-//         let zero = |m, n| SpMat::<R>::zero((m, n));
-//         Self::combine_blocks([
-//             self, 
-//             b, 
-//             &zero(0, self.cols()), 
-//             &zero(0, b.cols())
-//         ])
-//     }
+    pub fn concat(&self, b: &Self) -> Self { 
+        let zero = |m, n| SpMat::<R>::zero((m, n));
+        Self::combine_blocks([
+            self, 
+            b, 
+            &zero(0, self.cols()), 
+            &zero(0, b.cols())
+        ])
+    }
 
-//     pub fn stack(&self, b: &Self) -> Self { 
-//         let zero = |m, n| SpMat::<R>::zero((m, n));
-//         Self::combine_blocks([
-//             self, 
-//             &zero(self.rows(), 0), 
-//             b, 
-//             &zero(b.rows(), 0)
-//         ])
-//     }
+    pub fn stack(&self, b: &Self) -> Self { 
+        let zero = |m, n| SpMat::<R>::zero((m, n));
+        Self::combine_blocks([
+            self, 
+            &zero(self.rows(), 0), 
+            b, 
+            &zero(b.rows(), 0)
+        ])
+    }
 
-//     pub fn to_dense(self) -> Mat<R> { 
-//         self.into()
-//     }
-// }
+    // pub fn to_dense(self) -> Mat<R> { 
+    //     self.into()
+    // }
+}
+
+impl<R> Display for SpMat<R>
+where R: Display + Debug {
+    delegate! { to self.inner { 
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
+    }}
+}
+
+impl<R> Debug for SpMat<R>
+where R: Display + Debug {
+    delegate! { to self.inner { 
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
+    }}
+}
+
+pub struct SpMatView<'a, 'b, R>  {
+    target: &'a SpMat<R>,
+    shape: (usize, usize),
+    trans: Box<dyn Fn(usize, usize) -> Option<(usize, usize)> + 'b>
+}
+
+impl<'a, R> From<&'a SpMat<R>> for SpMatView<'a, '_, R> {
+    fn from(target: &'a SpMat<R>) -> Self {
+        Self::new(target, target.shape(), |i, j| Some((i, j)))
+    }
+}
+
+impl<'a, 'b, R> SpMatView<'a, 'b, R> {
+    fn new<F>(target: &'a SpMat<R>, shape: (usize, usize), trans: F) -> Self
+    where F: Fn(usize, usize) -> Option<(usize, usize)> + 'b {
+        Self { target, shape, trans: Box::new(trans) }
+    }
+
+    pub fn shape(&self) -> (usize, usize) { 
+        self.shape
+    }
+
+    pub fn nrows(&self) -> usize { 
+        self.shape.0
+    }
+
+    pub fn ncols(&self) -> usize { 
+        self.shape.1
+    }
+
+    pub fn transpose(self) -> SpMatView<'a, 'b, R> { 
+        SpMatView::new(self.target, (self.shape.1, self.shape.0), move |i, j| (self.trans)(j, i))
+    }
+
+    pub fn permute(self, p: PermView<'b>, q: PermView<'b>) -> SpMatView<'a, 'b, R> { 
+        assert_eq!(self.nrows(), p.dim());
+        assert_eq!(self.ncols(), q.dim());
+        let trans = self.trans;
+        SpMatView::new(self.target, self.shape, move |i, j| (trans)(p.at(i), q.at(j)))
+    }
+
+    pub fn permute_rows(self, p: PermView<'b>) -> SpMatView<'a, 'b, R> { 
+        let id = PermView::identity(self.ncols());
+        self.permute(p, id)
+    }
+    
+    pub fn permute_cols(self, q: PermView<'b>) -> SpMatView<'a, 'b, R> { 
+        let id = PermView::identity(self.nrows());
+        self.permute(id, q)
+    }
+
+    pub fn submat(self, rows: Range<usize>, cols: Range<usize>) -> SpMatView<'a, 'b, R> { 
+        let (i0, i1) = (rows.start, rows.end);
+        let (j0, j1) = (cols.start, cols.end);
+
+        assert!(i0 <= i1 && i1 <= self.nrows());
+        assert!(j0 <= j1 && j1 <= self.ncols());
+
+        SpMatView::new(self.target, (i1 - i0, j1 - j0), move |i, j| { 
+            let (i, j) = (self.trans)(i, j)?;
+            if rows.contains(&i) && cols.contains(&j) {
+                Some((i - i0, j - j0))
+            } else { 
+                None
+            }
+        })
+    }
+
+    pub fn submat_rows(self, rows: Range<usize>) -> SpMatView<'a, 'b, R> { 
+        let n = self.ncols();
+        self.submat(rows, 0 .. n)
+    }
+
+    pub fn submat_cols(self, cols: Range<usize>) -> SpMatView<'a, 'b, R> { 
+        let m = self.nrows();
+        self.submat(0 .. m, cols)
+    }
+
+    pub fn collect(self) -> SpMat<R> 
+    where R: Scalar + Clone + Zero + ClosedAdd {
+        SpMat::from_entries(self.shape(), self.iter().map(|(i, j, a)| 
+            (i, j, a.clone())
+        ))
+    }
+}
+
+impl<'a, 'b, R> SpMatView<'a, 'b, R>
+where 'a: 'b, R: Zero {
+    pub fn iter(self) -> impl Iterator<Item = (usize, usize, &'a R)> + 'b {
+        let trans = self.trans;
+        self.target.iter().filter_map(move |(i, j, a)| { 
+            (trans)(i, j).map(|(i, j)| (i, j, a))
+        })
+    }    
+}
 
 // impl<R> SpMat<R> where R: Clone + Zero + One { 
 //     // row_perm(p) * a == a.permute_rows(p)
@@ -316,114 +430,6 @@ impl_ops!(RingOps);
 //         Self::from_entries((n, n), (0..n).map(|i|
 //             (i, p.at(i), R::one())
 //         ))
-//     }
-// }
-
-impl<R> Display for SpMat<R>
-where R: Display + Debug {
-    delegate! { to self.inner { 
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
-    }}
-}
-
-impl<R> Debug for SpMat<R>
-where R: Display + Debug {
-    delegate! { to self.inner { 
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
-    }}
-}
-
-// pub struct SpMatView<'a, 'b, R>  {
-//     target: &'a SpMat<R>,
-//     shape: (usize, usize),
-//     trans: Box<dyn Fn(usize, usize) -> Option<(usize, usize)> + 'b>
-// }
-
-// impl<'a, 'b, R> SpMatView<'a, 'b, R> {
-//     fn new<F>(target: &'a SpMat<R>, shape: (usize, usize), trans: F) -> Self
-//     where F: Fn(usize, usize) -> Option<(usize, usize)> + 'b {
-//         Self { target, shape, trans: Box::new(trans) }
-//     }
-
-//     pub fn shape(&self) -> (usize, usize) { 
-//         self.shape
-//     }
-
-//     pub fn rows(&self) -> usize { 
-//         self.shape.0
-//     }
-
-//     pub fn cols(&self) -> usize { 
-//         self.shape.1
-//     }
-
-//     pub fn transpose(&self) -> SpMatView<R> { 
-//         SpMatView::new(self.target, (self.shape.1, self.shape.0), move |i, j| (self.trans)(j, i))
-//     }
-
-//     pub fn permute(&self, p: PermView<'b>, q: PermView<'b>) -> SpMatView<R> { 
-//         assert_eq!(self.rows(), p.dim());
-//         assert_eq!(self.cols(), q.dim());
-//         SpMatView::new(self.target, self.shape, move |i, j| (self.trans)(p.at(i), q.at(j)))
-//     }
-
-//     pub fn permute_rows(&self, p: PermView<'b>) -> SpMatView<R> { 
-//         let id = PermView::identity(self.cols());
-//         self.permute(p, id)
-//     }
-    
-//     pub fn permute_cols(&self, q: PermView<'b>) -> SpMatView<R> { 
-//         let id = PermView::identity(self.rows());
-//         self.permute(id, q)
-//     }
-
-//     pub fn submat(&self, rows: Range<usize>, cols: Range<usize>) -> SpMatView<R> { 
-//         let (i0, i1) = (rows.start, rows.end);
-//         let (j0, j1) = (cols.start, cols.end);
-
-//         assert!(i0 <= i1 && i1 <= self.rows());
-//         assert!(j0 <= j1 && j1 <= self.cols());
-
-//         SpMatView::new(self.target, (i1 - i0, j1 - j0), move |i, j| { 
-//             let (i, j) = (self.trans)(i, j)?;
-//             if rows.contains(&i) && cols.contains(&j) {
-//                 Some((i - i0, j - j0))
-//             } else { 
-//                 None
-//             }
-//         })
-//     }
-
-//     pub fn submat_rows(&self, rows: Range<usize>) -> SpMatView<R> { 
-//         let n = self.cols();
-//         self.submat(rows, 0 .. n)
-//     }
-
-//     pub fn submat_cols(&self, cols: Range<usize>) -> SpMatView<R> { 
-//         let m = self.rows();
-//         self.submat(0 .. m, cols)
-//     }
-// }
-
-// impl<'a, 'b, R> SpMatView<'a, 'b, R>
-// where R: Zero {
-//     pub fn iter(&self) -> impl Iterator<Item = (usize, usize, &R)> {
-//         self.target.iter().filter_map(|(i, j, a)| { 
-//             (self.trans)(i, j).map(|(i, j)| (i, j, a))
-//         })
-//     }    
-// }
-
-// impl<'a, 'b, R> SpMatView<'a, 'b, R>
-// where R: Clone + Zero {
-//     pub fn to_owned(&self) -> SpMat<R> {
-//         SpMat::from_entries(self.shape(), self.iter().map(|(i, j, a)| 
-//             (i, j, a.clone())
-//         ))
-//     }
-
-//     pub fn to_dense(&self) -> Mat<R> { 
-//         self.to_owned().to_dense()
 //     }
 // }
 
@@ -496,19 +502,19 @@ pub(super) mod tests {
 //         assert_eq!(a.to_dense(), Mat::from(ndarray::array![[1, 2], [3, 4]]));
 //     }
 
-//     #[test]
-//     fn permute() { 
-//         let p = PermOwned::new(vec![1,2,3,0]);
-//         let q = PermOwned::new(vec![3,0,2,1]);
-//         let a = SpMat::from_dense_data((4,4), 0..16);
-//         let b = a.permute(p.view(), q.view());
-//         assert_eq!(b, SpMat::from_dense_data((4,4), vec![
-//             13, 15, 14, 12,
-//              1,  3,  2,  0,
-//              5,  7,  6,  4,
-//              9, 11, 10,  8,
-//         ]));
-//     }
+    #[test]
+    fn permute() { 
+        let p = PermOwned::new(vec![1,2,3,0]);
+        let q = PermOwned::new(vec![3,0,2,1]);
+        let a = SpMat::from_dense_data((4,4), 0..16);
+        let b = a.permute(p.view(), q.view());
+        assert_eq!(b, SpMat::from_dense_data((4,4), vec![
+            13, 15, 14, 12,
+             1,  3,  2,  0,
+             5,  7,  6,  4,
+             9, 11, 10,  8,
+        ]));
+    }
 
     #[test]
     fn transpose() { 

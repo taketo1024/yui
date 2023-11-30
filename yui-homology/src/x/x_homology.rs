@@ -154,7 +154,7 @@ pub(crate) mod tests {
 
         assert!(!z.is_zero());
         assert!(dz.is_zero());
-        assert_eq!(h[2].vectorize(&z), SpVec::from(vec![1]));
+        assert_eq!(h[2].vectorize(&z).into_vec(), vec![1]);
 
         let a = h[1].gen_chain(0);
         let b = h[1].gen_chain(1);
@@ -165,8 +165,8 @@ pub(crate) mod tests {
         assert!(!b.is_zero());
         assert!(da.is_zero());
         assert!(db.is_zero());
-        assert_eq!(h[1].vectorize(&a).reduced(), SpVec::from(vec![1, 0]));
-        assert_eq!(h[1].vectorize(&b).reduced(), SpVec::from(vec![0, 1]));
+        assert_eq!(h[1].vectorize(&a).into_vec(), vec![1, 0]);
+        assert_eq!(h[1].vectorize(&b).into_vec(), vec![0, 1]);
     }
 
     #[test]
@@ -240,7 +240,7 @@ pub(crate) mod tests {
 
         assert!(!z.is_zero());
         assert!(dz.is_zero());
-        assert_eq!(h[2].vectorize(&z), SpVec::from(vec![1]));
+        assert_eq!(h[2].vectorize(&z).into_vec(), vec![1]);
 
         let a = h[1].gen_chain(0);
         let b = h[1].gen_chain(1);
@@ -251,8 +251,8 @@ pub(crate) mod tests {
         assert!(!b.is_zero());
         assert!(da.is_zero());
         assert!(db.is_zero());
-        assert_eq!(h[1].vectorize(&a).reduced(), SpVec::from(vec![1, 0]));
-        assert_eq!(h[1].vectorize(&b).reduced(), SpVec::from(vec![0, 1]));
+        assert_eq!(h[1].vectorize(&a).into_vec(), vec![1, 0]);
+        assert_eq!(h[1].vectorize(&b).into_vec(), vec![0, 1]);
     }
 
     #[test]

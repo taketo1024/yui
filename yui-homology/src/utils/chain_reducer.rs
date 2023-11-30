@@ -87,7 +87,7 @@ where
     }
 
     pub fn rank(&self, i: I) -> Option<usize> { 
-        self.matrix(i).map(|d| d.cols())
+        self.matrix(i).map(|d| d.ncols())
     }
 
     pub fn take_matrix(&mut self, i: I) -> Option<SpMat<R>> {
@@ -238,14 +238,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 fn reduce_mat_rows<R>(a: &SpMat<R>, p: &PermOwned, r: usize) -> SpMat<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let m = a.rows();
-    a.view().permute_rows(p.view()).submat_rows(r..m).to_owned()
+    let m = a.nrows();
+    a.view().permute_rows(p.view()).submat_rows(r..m).collect()
 }
 
 fn reduce_mat_cols<R>(a: &SpMat<R>, p: &PermOwned, r: usize) -> SpMat<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let n = a.cols();
-    a.view().permute_cols(p.view()).submat_cols(r..n).to_owned()
+    let n = a.ncols();
+    a.view().permute_cols(p.view()).submat_cols(r..n).collect()
 }
 
 #[cfg(test)]
@@ -350,7 +350,7 @@ mod tests {
         assert!( r.d_matrix(1).is_zero());
         assert!(!r.d_matrix(2).is_zero());
 
-        let a = r.d_matrix(2).to_dense()[[0, 0]];
+        let a = r.d_matrix(2).into_dense()[(0, 0)];
         assert!(a == 2 || a == -2);
     }
 

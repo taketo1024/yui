@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::sync::Arc;
 use either::Either;
 use log::info;
+use num_traits::Zero;
 use rayon::prelude::*;
 use thread_local::ThreadLocal;
 use yui::{Ring, RingOps};
@@ -32,20 +33,15 @@ impl TriangularType {
 
 pub fn inv_triangular<R>(t: TriangularType, a: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let e = SpMat::id(a.rows());
+    let e = SpMat::id(a.nrows());
     solve_triangular(t, a, &e)
 }
 
 // solve ax = y.
 pub fn solve_triangular<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    assert_eq!(a.rows(), y.rows());
-
-    if t.is_upper() { 
-        debug_assert!(is_upper_tri(a));
-    } else { 
-        // TODO
-    }
+    assert_eq!(a.nrows(), y.nrows());
+    debug_assert!(a.is_triang(t));
 
     if crate::config::is_multithread_enabled() { 
         solve_triangular_m(t, a, y)
@@ -62,17 +58,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 pub fn solve_triangular_vec<R>(t: TriangularType, a: &SpMat<R>, b: &SpVec<R>) -> SpVec<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    assert_eq!(a.rows(), b.dim());
+    assert_eq!(a.nrows(), b.dim());
+    debug_assert!(a.is_triang(t));
 
-    if t.is_upper() { 
-        debug_assert!(is_upper_tri(a));
-    } else { 
-        // TODO
-    }
-
-    let n = a.rows();
-    let diag = collect_diag(t, a);
-    let mut b = b.to_dense().to_vec();
+    let n = a.nrows();
+    let diag = collect_diag(a);
+    let mut b = b.to_dense();
 
     let x = _solve_triangular(t, a, &diag, &mut b);
 
@@ -85,12 +76,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         info!("solve triangular, y: {:?}", y.shape());
     }
 
-    let (n, k) = (a.rows(), y.cols());
-    let diag = collect_diag(t, a);
+    let (n, k) = (a.nrows(), y.ncols());
+    let diag = collect_diag(a);
     let mut b = vec![R::zero(); n];
 
     let entries = (0..k).flat_map(|j| { 
-        copy_into(y.col_view(j).iter(), &mut b);
+        copy_into(y.col_vec(j), &mut b);
         let xj = _solve_triangular(t, a, &diag, &mut b);
         xj.into_iter().map(move |(i, x)| (i, j, x))
     });
@@ -107,8 +98,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         info!("solve triangular, y: {:?}", y.shape());
     }
 
-    let (n, k) = (a.rows(), y.cols());
-    let diag = collect_diag(t, a);
+    let (n, k) = (a.nrows(), y.ncols());
+    let diag = collect_diag(a);
     let tl_b = Arc::new(ThreadLocal::new());
     let counter = SyncCounter::new();
 
@@ -117,7 +108,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             RefCell::new(vec![R::zero(); n])
         ).borrow_mut();
 
-        copy_into(y.col_view(j).iter(), &mut b);
+        copy_into(y.col_vec(j), &mut b);
         let xj = _solve_triangular(t, a, &diag, &mut b);
         let res = xj.into_par_iter().map(move |(i, x)| (i, j, x));
 
@@ -167,42 +158,21 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     entries
 }
 
-fn collect_diag<'a, R>(t: TriangularType, a: &'a SpMat<R>) -> Vec<&'a R>
+fn collect_diag<'a, R>(a: &'a SpMat<R>) -> Vec<&'a R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    let a = &a.cs_mat();
-    let n = a.rows();
-    let indptr = a.indptr();
-    let data = a.data();
-
-    if t.is_upper() { 
-        (0..n).map( |i| {
-            let p = indptr.index(i + 1);
-            &data[p - 1]
-        }).collect()
-    } else { 
-        (0..n).map( |i| {
-            let p = indptr.index(i);
-            &data[p]
-        }).collect()
-    }
+    a.iter().filter_map(|(i, j, a)| 
+        if i == j { Some(a) } else { None }
+    ).collect()
 }
 
-fn is_upper_tri<R>(u: &SpMat<R>) -> bool
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    u.rows() == u.cols() && 
-    u.iter().all(|(i, j, a)| 
-        i < j || (i == j && a.is_unit()) || (i > j && a.is_zero())
-    )
-}
-
-fn copy_into<'a, Itr, R>(itr: Itr, x: &mut [R])
-where Itr: Iterator<Item = (usize, &'a R)>, R: Clone + 'a { 
-    itr.for_each(|(i, r)| x[i] = r.clone())
+fn copy_into<R>(vec: SpVec<R>, x: &mut [R])
+where R: Clone + Zero { 
+    vec.iter().for_each(|(i, r)| x[i] = r.clone())
 }
 
 #[inline]
 fn should_report<R>(a: &SpMat<R>) -> bool { 
-    usize::min(a.rows(), a.cols()) > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Info
+    usize::min(a.nrows(), a.ncols()) > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Info
 }
 
 #[cfg(test)]

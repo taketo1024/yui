@@ -34,15 +34,15 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     //     ≅ C22' (free) ⊕ (C21 / Im(d1')) (tor)
 
     pub fn calculate(d1: SpMat<R>, d2: SpMat<R>, with_trans: bool) -> HomologySummand<R> {
-        assert_eq!(d1.rows(), d2.cols());
+        assert_eq!(d1.nrows(), d2.ncols());
 
-        if d1.rows().is_zero() { 
+        if d1.nrows().is_zero() { 
             return HomologySummand::zero();
         } else if d1.is_zero() && d2.is_zero() { 
-            return Self::trivial_result(d1.rows());
+            return Self::trivial_result(d1.nrows());
         }
 
-        info!("calculate homology: {} -> {} -> {}", d1.cols(), d1.rows(), d2.rows());
+        info!("calculate homology: {} -> {} -> {}", d1.ncols(), d1.nrows(), d2.nrows());
         
         let (s1, s2) = Self::process_snf(d1, d2, with_trans);
         let (rank, tors) = Self::result(&s1, &s2);
@@ -62,19 +62,19 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     fn process_snf(d1: SpMat<R>, d2: SpMat<R>, with_trans: bool) -> (SnfResult<R>, SnfResult<R>) {
-        let n = d1.rows();
+        let n = d1.nrows();
 
-        let d1_dns = d1.to_dense();
+        let d1_dns = d1.into_dense();
         let s1 = snf_in_place(d1_dns, [with_trans, true, false, false]);
         let r1 = s1.rank();
 
         let d2_dns = if r1 > 0 { 
             let p1_inv = s1.pinv().unwrap();
-            let t2 = p1_inv.submat_cols(r1..n).to_sparse();
+            let t2 = p1_inv.submat_cols(r1..n).into_sparse();
             let d2 = d2 * &t2; // d2': C21' -> C3
-            d2.to_dense()
+            d2.into_dense()
         } else {
-            d2.to_dense()
+            d2.into_dense()
         };
 
         let s2 = snf_in_place(d2_dns, [false, false, with_trans, with_trans]);
@@ -83,7 +83,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     fn result(s1: &SnfResult<R>, s2: &SnfResult<R>) -> (usize, Vec<R>) {
-        let n = s1.result().rows();
+        let n = s1.result().nrows();
         let (r1, r2) = (s1.rank(), s2.rank());
 
         assert!(n >= r1 + r2);
@@ -102,22 +102,22 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     fn trans(s1: &SnfResult<R>, s2: &SnfResult<R>) -> Trans<R> {
-        let n = s1.result().rows();
+        let n = s1.result().nrows();
         let (r1, r2) = (s1.rank(), s2.rank());
         let r = n - r1 - r2;
         let t = s1.factors().iter().filter(|a| !a.is_unit()).count();
 
         let p1 = s1.p().unwrap();                 // size = (n, n)
         let p11 = p1.submat_rows(r1..n)           // size = (n - r1, n)
-                    .to_sparse();
+                    .into_sparse();
                 
         let p2 = s2.qinv().unwrap();              // size = (n - r1, n - r1)
         let p22 = p2.submat_rows(r2..n-r1)        // size = (n - (r1 + r2), n - r1)
-                    .to_sparse();
+                    .into_sparse();
 
         let p_free = p22 * p11;                   // size = (n - (r1 + r2), n)
         let p_tor = p1.submat_rows(r1-t..r1)      // size = (t, n)
-                      .to_sparse();
+                      .into_sparse();
 
         let p = p_free.stack(&p_tor);             // size = (r + t, n)
 
@@ -125,16 +125,16 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
         let q1 = s1.pinv().unwrap();              // size = (n, n)
         let q12 = q1.submat_cols(r1..n)           // size = (n, n - r1)
-                    .to_sparse();
+                    .into_sparse();
 
         let q2 = s2.q().unwrap();                 // size = (n - r1, n - r1)
         let q22 = q2.submat_cols(r2..n-r1)        // size = (n - r1, n - (r1 + r2))
-                    .to_sparse();
+                    .into_sparse();
 
 
         let q_free = q12 * q22;                   // size = (n, n - (r1 + r2))
         let q_tor = q1.submat_cols(r1-t..r1)      // size = (n, t)
-                      .to_sparse();
+                      .into_sparse();
 
         let q = q_free.concat(&q_tor);            // size = (n, r + t)
 

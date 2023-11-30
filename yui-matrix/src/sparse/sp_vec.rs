@@ -1,152 +1,157 @@
-use core::panic;
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, Range};
-use std::fmt::Display;
-use itertools::Itertools;
+use std::fmt::{Display, Debug};
+use nalgebra_sparse::CscMatrix;
+use nalgebra_sparse::na::{Scalar, ClosedAdd, ClosedSub, ClosedMul};
 use num_traits::{Zero, One};
-use sprs::{CsVec, PermView};
+use sprs::PermView;
 use auto_impl_ops::auto_ops;
-use yui::{Ring, RingOps, AddMonOps, AddGrpOps, AddMon, AddGrp};
-use super::SpMat;
+use yui::{Ring, RingOps, AddGrpOps,  AddGrp};
+use super::sp_mat::SpMat;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SpVec<R> { 
-    cs_vec: CsVec<R>
+    inner: CscMatrix<R> // ncols == 1
 }
 
 impl<R> SpVec<R> { 
-    pub fn cs_vec(&self) -> &CsVec<R> { 
-        &self.cs_vec
+    fn new(inner: CscMatrix<R>) -> Self { 
+        assert_eq!(inner.ncols(), 1);
+        Self { inner }
+    }
+
+    #[allow(unused)]
+    pub(crate) fn inner(&self) -> &CscMatrix<R> { 
+        &self.inner
+    }
+
+    pub(crate) fn into_inner(self) -> CscMatrix<R> { 
+        self.inner
+    }
+
+    pub fn data(&self) -> (&[usize], &[R]) { 
+        let (_, indices, values) = self.inner.csc_data();
+        (indices, values)
+    }
+
+    pub fn zero(dim: usize) -> Self {
+        let inner = CscMatrix::zeros(dim, 1);
+        Self::new(inner)
+    }
+
+    pub fn is_zero(&self) -> bool
+    where R: Zero {
+        self.inner.values().iter().all(|a| a.is_zero())
+    }
+
+    pub fn unit(n: usize, i: usize) -> Self
+    where R: One {
+        let inner = CscMatrix::try_from_csc_data(
+            n, 1, 
+            vec![0, 1], 
+            vec![i], 
+            vec![R::one()]
+        ).unwrap();
+
+        Self::new(inner)
     }
 
     pub fn dim(&self) -> usize { 
-        self.cs_vec.dim()
+        self.inner.nrows()
     }
-}
 
-impl<R> From<CsVec<R>> for SpVec<R> {
-    fn from(cs_vec: CsVec<R>) -> Self {
-        Self { cs_vec }
+    pub fn view(&self) -> SpVecView<R> { 
+        SpVecView::new(self, self.dim(), |i| Some(i))
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (usize, &R)> { 
+        self.inner.triplet_iter().map(|(i, _, a)| (i, a))
+    }
+
+    pub fn iter_nz(&self) -> impl Iterator<Item = (usize, &R)>
+    where R: Zero { 
+        self.iter().filter(|(_, a)| !a.is_zero())
+    }
+
+    pub fn into_vec(self) -> Vec<R>
+    where R: Clone + Zero { 
+        self.into()
+    }
+
+    pub fn into_mat(self) -> SpMat<R> { 
+        self.into()
     }
 }
 
 impl<R> From<Vec<R>> for SpVec<R>
-where R: Clone + Zero {
+where R: Scalar + Zero + ClosedAdd {
     fn from(vec: Vec<R>) -> Self {
         Self::from_entries(vec.len(), vec.into_iter().enumerate())
     }
 }
 
+impl<R> From<SpVec<R>> for Vec<R>
+where R: Clone + Zero {
+    fn from(value: SpVec<R>) -> Self {
+        let mut res = vec![R::zero(); value.dim()];
+        for (i, a) in value.iter_nz() { 
+            res[i] = a.clone();
+        }
+        res
+    }
+}
+
+// SpVec(n) as SpMat(n, 1)
+impl<R> From<SpVec<R>> for SpMat<R> { 
+    fn from(vec: SpVec<R>) -> Self {
+        SpMat::from(vec.into_inner())
+    }
+}
+
+impl<R> SpMat<R> {
+    fn into_spvec(self) -> SpVec<R> { 
+        assert_eq!(self.inner().ncols(), 1);
+        SpVec::new(self.into_inner())
+    }
+}
+
 impl<R> SpVec<R> 
-where R: Clone + Zero { 
+where R: Scalar + Zero + ClosedAdd { 
     pub fn from_entries<T>(dim: usize, entries: T) -> Self
     where T: IntoIterator<Item = (usize, R)> {
-        let mut ind = Vec::new();
-        let mut val = Vec::new();
-
-        for (i, a) in entries { 
-            if a.is_zero() { 
-                continue;
-            }
-            ind.push(i);
-            val.push(a);                    
-        }
-        
-        let Ok(cs_vec) = CsVec::new_from_unsorted(dim, ind, val) else { 
-            panic!();
-        };
-        Self::from(cs_vec)
-    }
-
-    pub fn reduced(&self) -> Self { 
-        Self::from_entries(self.dim(), self.iter().filter_map(|(i, a)| 
-            if !a.is_zero() {
-                Some((i, a.clone()))
-            } else { 
-                None
-            }
-        ))
+        SpMat::from_entries(
+            (dim, 1), 
+            entries.into_iter().map(|(i, a)| (i, 0, a))
+        ).into_spvec()
     }
 
     pub fn permute(&self, p: PermView<'_>) -> SpVec<R> { 
-        self.view().permute(p).to_owned()
+        self.view().permute(p).collect()
     }
 
     pub fn subvec(&self, range: Range<usize>) -> SpVec<R> { 
-        self.view().subvec(range).to_owned()
+        self.view().subvec(range).collect()
     }
 
     pub fn stack(&self, other: &SpVec<R>) -> SpVec<R> {
         let (n1, n2) = (self.dim(), other.dim());
         Self::from_entries(n1 + n2, Iterator::chain(
-            self.iter().map(|(i, a)| (i, a.clone())),
-            other.iter().map(|(i, a)| (n1 + i, a.clone()))
+            self.iter_nz().map(|(i, a)| (i, a.clone())),
+            other.iter_nz().map(|(i, a)| (n1 + i, a.clone()))
         ))
     }
 
     pub fn to_dense(&self) -> Vec<R> { 
         let mut vec = vec![R::zero(); self.dim()];
-        for (i, a) in self.iter() { 
+        for (i, a) in self.iter_nz() { 
             vec[i] = a.clone();
         }
         vec
     }
 }
 
-impl<R> SpVec<R> 
-where R: Zero { 
-    pub fn iter(&self) -> impl Iterator<Item = (usize, &R)> { 
-        self.cs_vec.iter().filter_map(|(i, a)| {
-            if !a.is_zero() { 
-                Some((i, a))
-            } else { 
-                None
-            }
-        })
-    }
-}
-
-impl<R> IntoIterator for SpVec<R>
-where R: Clone + Zero {
-    type Item = (usize, R);
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        // MEMO improve this
-        self.iter().map(|(i, a)| (i, a.clone())).collect_vec().into_iter()
-    }
-}
-
-impl<R> Display for SpVec<R>
-where R: Ring, for<'a> &'a R: RingOps<R> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let arr = ndarray::Array1::from(self.to_dense());
-        arr.fmt(f)
-    }
-}
-
 impl<R> Default for SpVec<R> {
     fn default() -> Self {
-        let cs_vec = CsVec::new(0, vec![], vec![]);
-        Self::from(cs_vec)
-    }
-}
-
-impl<R> SpVec<R> 
-where R: Zero { 
-    pub fn zero(dim: usize) -> Self { 
-        let cs_vec = CsVec::new(dim, vec![], vec![]);
-        Self::from(cs_vec)
-    }
-
-    pub fn is_zero(&self) -> bool {
-        self.cs_vec.data().iter().all(|a| a.is_zero())
-    }
-}
-
-impl<R> SpVec<R> 
-where R: Clone + Zero + One { 
-    pub fn unit(n: usize, i: usize) -> Self {
-        Self::from_entries(n, [(i, R::one())])
+        Self::zero(0)
     }
 }
 
@@ -154,62 +159,50 @@ impl<R> Neg for SpVec<R>
 where R: AddGrp, for<'a> &'a R: AddGrpOps<R> {
     type Output = Self;
     fn neg(self) -> Self::Output {
-        -&self
+        SpVec { inner: -self.inner }
     }
 }
 
 impl<R> Neg for &SpVec<R>
-where R: AddGrp, for<'a> &'a R: AddGrpOps<R> {
+where R: Scalar + Neg<Output = R> {
     type Output = SpVec<R>;
     fn neg(self) -> Self::Output {
-        let neg = self.cs_vec.map(|a| -a);
-        SpVec::from(neg)
+        SpVec { inner: -&self.inner }
     }
 }
 
 macro_rules! impl_binop {
-    ($trait:ident, $method:ident, $r_trait:ident, $r_op_trait:ident) => {
+    ($trait:ident, $method:ident) => {
         #[auto_ops]
         impl<'a, 'b, R> $trait<&'b SpVec<R>> for &'a SpVec<R>
-        where R: $r_trait, for<'x> &'x R: $r_op_trait<R> {
+        where R: Scalar + ClosedAdd + ClosedSub + ClosedMul + Zero + One + Neg<Output = R> {
             type Output = SpVec<R>;
             fn $method(self, rhs: &'b SpVec<R>) -> Self::Output {
-                let res = self.cs_vec().$method(&rhs.cs_vec);
-                SpVec::from(res)
+                let res = (&self.inner).$method(&rhs.inner);
+                SpVec::new(res)
             }
         }
     };
 }
 
-impl_binop!(Add, add, AddMon, AddMonOps);
-impl_binop!(Sub, sub, AddGrp, AddGrpOps);
+impl_binop!(Add, add);
+impl_binop!(Sub, sub);
 
-macro_rules! impl_ops {
-    ($trait:ident, $r_trait:ident, $r_op_trait:ident) => {
-        impl<R> $trait<SpVec<R>> for SpVec<R>
-        where R: $r_trait, for<'x> &'x R: $r_op_trait<R> {}
-
-        impl<R> $trait<SpVec<R>> for &SpVec<R>
-        where R: $r_trait, for<'x> &'x R: $r_op_trait<R> {}
-    };
-}
-
-impl_ops!(AddMonOps, AddMon, AddMonOps);
-impl_ops!(AddGrpOps, AddGrp, AddGrpOps);
-
+// SpMat * SpVec
 #[auto_ops(val_val, val_ref, ref_val)]
 impl<'a, 'b, R> Mul<&'b SpVec<R>> for &'a SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = SpVec<R>;
     fn mul(self, rhs: &'b SpVec<R>) -> Self::Output {
-        let res = self.cs_mat() * rhs.cs_vec();
-        SpVec::from(res)
+        let res = self.inner() * &rhs.inner;
+        SpVec::new(res)
     }
 }
 
-impl<R> SpVec<R> {
-    pub fn view(&self) -> SpVecView<R> { 
-        SpVecView::new(self, self.dim(), |i| Some(i))
+impl<R> Display for SpVec<R>
+where R: Ring, for<'a> &'a R: RingOps<R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.inner.fmt(f)
     }
 }
 
@@ -227,6 +220,19 @@ impl<'a, 'b, R> SpVecView<'a, 'b, R> {
 
     pub fn dim(&self) -> usize { 
         self.dim
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (usize, &R)> {
+        self.target.iter().filter_map(|(i, a)| { 
+            (self.trans)(i).map(|i| (i, a))
+        })
+    }
+
+    pub fn iter_nz(&self) -> impl Iterator<Item = (usize, &R)>
+    where R: Zero {
+        self.target.iter_nz().filter_map(|(i, a)| { 
+            (self.trans)(i).map(|i| (i, a))
+        })
     }
 
     pub fn permute(&self, p: PermView<'b>) -> SpVecView<R> { 
@@ -247,27 +253,12 @@ impl<'a, 'b, R> SpVecView<'a, 'b, R> {
             }
         })
     }
-}
 
-impl<'a, 'b, R> SpVecView<'a, 'b, R> 
-where R: Zero { 
-    pub fn iter(&self) -> impl Iterator<Item = (usize, &R)> {
-        self.target.iter().filter_map(|(i, a)| { 
-            (self.trans)(i).map(|i| (i, a))
-        })
-    }
-}
-
-impl<'a, 'b, R> SpVecView<'a, 'b, R>
-where R: Clone + Zero {
-    pub fn to_owned(&self) -> SpVec<R> {
+    pub fn collect(&self) -> SpVec<R>
+    where R: Scalar + Zero + ClosedAdd + Clone {
         SpVec::from_entries(self.dim(), self.iter().map(|(i, a)|
             (i, a.clone())
         ))
-    }
-
-    pub fn to_dense(&self) -> Vec<R> { 
-        self.to_owned().to_dense()
     }
 }
 
@@ -280,13 +271,13 @@ mod tests {
     #[test]
     fn from_vec() {
         let v = SpVec::from(vec![1,0,3,5,0]);
-        assert_eq!(v.cs_vec(), &CsVec::new_from_unsorted(5, vec![0, 2, 3], vec![1, 3, 5]).unwrap());
+        assert_eq!(v.inner.disassemble(), (vec![0, 3], vec![0, 2, 3], vec![1, 3, 5]));
     }
 
     #[test]
     fn from_entries() {
         let v = SpVec::from_entries(5, vec![(0, 1), (4, 5), (2, 3)]);
-        assert_eq!(v.cs_vec(), &CsVec::new_from_unsorted(5, vec![0, 2, 4], vec![1, 3, 5]).unwrap());
+        assert_eq!(v.inner.disassemble(), (vec![0, 3], vec![0, 2, 4], vec![1, 3, 5]));
     }
 
     #[test]
@@ -319,7 +310,7 @@ mod tests {
     fn view() {
         let v = SpVec::from(vec![0,1,2,3]);
         let w = v.view();
-        assert_eq!(w.to_owned(), v);
+        assert_eq!(w.collect(), v);
     }
 
     #[test]

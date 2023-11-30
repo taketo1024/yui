@@ -28,8 +28,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> Schur<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn from_partial_lower(a: &SpMat<R>, r: usize, with_trans: bool) -> Self {
-        assert!(r <= a.rows());
-        assert!(r <= a.cols());
+        assert!(r <= a.nrows());
+        assert!(r <= a.ncols());
 
         let orig_shape = a.shape();
         let (compl, t_in, t_out) = Self::compute_from_partial_lower(a, r, with_trans);
@@ -127,7 +127,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 fn should_report<R>(a: &SpMat<R>) -> bool { 
-    usize::min(a.rows(), a.cols()) > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Info
+    usize::min(a.nrows(), a.ncols()) > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Info
 }
 
 #[cfg(test)]

@@ -125,6 +125,13 @@ where R: Scalar + Zero + ClosedAdd {
     }
 }
 
+impl<R> From<SpMat<R>> for Mat<R>
+where R: Scalar + Zero + ClosedAdd {
+    fn from(a: SpMat<R>) -> Self {
+        a.to_dense()
+    }
+}
+
 impl<R> SpMat<R> 
 where R: Scalar + Clone + Zero + ClosedAdd { 
     pub fn from_entries<T>(shape: (usize, usize), entries: T) -> Self
@@ -422,6 +429,12 @@ impl<'a, 'b, R> SpMatView<'a, 'b, R> {
         SpMat::from_entries(self.shape(), self.iter().map(|(i, j, a)| 
             (i, j, a.clone())
         ))
+    }
+
+    // TODO delete this.
+    pub fn to_owned(self) -> SpMat<R> 
+    where R: Scalar + Clone + Zero + ClosedAdd {
+        self.collect()
     }
 }
 

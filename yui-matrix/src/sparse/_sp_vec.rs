@@ -28,6 +28,11 @@ impl<R> SpVec<R> {
         self.inner
     }
 
+    pub fn data(&self) -> (&[usize], &[R]) { 
+        let (_, indices, values) = self.inner.csc_data();
+        (indices, values)
+    }
+
     pub fn zero(dim: usize) -> Self {
         let inner = CscMatrix::zeros(dim, 1);
         Self::new(inner)
@@ -67,6 +72,11 @@ impl<R> SpVec<R> {
         self.iter().filter(|(_, a)| !a.is_zero())
     }
 
+    pub fn into_vec(self) -> Vec<R>
+    where R: Clone + Zero { 
+        self.into()
+    }
+
     pub fn into_mat(self) -> SpMat<R> { 
         self.into()
     }
@@ -79,6 +89,17 @@ where R: Scalar + Zero + ClosedAdd {
     }
 }
 
+impl<R> From<SpVec<R>> for Vec<R>
+where R: Clone + Zero {
+    fn from(value: SpVec<R>) -> Self {
+        let mut res = vec![R::zero(); value.dim()];
+        for (i, a) in value.iter_nz() { 
+            res[i] = a.clone();
+        }
+        res
+    }
+}
+
 // SpVec(n) as SpMat(n, 1)
 impl<R> From<SpVec<R>> for SpMat<R> { 
     fn from(vec: SpVec<R>) -> Self {
@@ -86,31 +107,10 @@ impl<R> From<SpVec<R>> for SpMat<R> {
     }
 }
 
-impl<R> TryFrom<CscMatrix<R>> for SpVec<R> {
-    type Error = ();
-    fn try_from(value: CscMatrix<R>) -> Result<Self, Self::Error> {
-        if value.ncols() == 1 {
-            Ok(Self::new(value))
-        } else { 
-            Err(())
-        }
-    }
-}
-
-impl<R> TryFrom<SpMat<R>> for SpVec<R> {
-    type Error = ();
-    fn try_from(mat: SpMat<R>) -> Result<Self, Self::Error> {
-        Self::try_from(mat.into_inner())
-    }
-}
-
 impl<R> SpMat<R> {
-    pub fn try_into_vec(self) -> Option<SpVec<R>> { 
-        SpVec::try_from(self).ok()
-    }
-
-    pub fn into_vec(self) -> SpVec<R> { 
-        SpVec::try_from(self).unwrap()
+    fn into_spvec(self) -> SpVec<R> { 
+        assert_eq!(self.inner().ncols(), 1);
+        SpVec::new(self.into_inner())
     }
 }
 
@@ -121,7 +121,7 @@ where R: Scalar + Zero + ClosedAdd {
         SpMat::from_entries(
             (dim, 1), 
             entries.into_iter().map(|(i, a)| (i, 0, a))
-        ).into_vec()
+        ).into_spvec()
     }
 
     pub fn permute(&self, p: PermView<'_>) -> SpVec<R> { 

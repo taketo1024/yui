@@ -1,5 +1,6 @@
 use std::ops::{Add, Neg, Sub, Mul, Index, IndexMut, AddAssign, SubAssign, MulAssign, Range};
 use std::fmt::Debug;
+use nalgebra_sparse::na::{Scalar, ClosedAdd};
 use ndarray::{Array2, Axis, s, concatenate, array};
 use derive_more::Display;
 use auto_impl_ops::auto_ops;
@@ -53,13 +54,6 @@ impl<R> Mat<R> {
 impl<R> From<Array2<R>> for Mat<R> {
     fn from(array: Array2<R>) -> Self {
         Self { array }
-    }
-}
-
-impl<R> From<SpMat<R>> for Mat<R>
-where R: Clone + Zero {
-    fn from(a: SpMat<R>) -> Self {
-        Mat::from(a.cs_mat().to_dense())
     }
 }
 
@@ -172,7 +166,8 @@ where R: Clone + Zero {
         self.array.indexed_iter().map(|((i, j), a)| (i, j, a))
     }
 
-    pub fn to_sparse(self) -> SpMat<R> { 
+    pub fn to_sparse(self) -> SpMat<R>
+    where R: Scalar + Zero + ClosedAdd { 
         self.into()
     }
 }

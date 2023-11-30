@@ -36,6 +36,17 @@ where R: Clone + Zero {
     }
 }
 
+impl<R> From<SpVec<R>> for Vec<R>
+where R: Clone + Zero {
+    fn from(value: SpVec<R>) -> Self {
+        let mut res = vec![R::zero(); value.dim()];
+        for (i, a) in value.iter() { 
+            res[i] = a.clone();
+        }
+        res
+    }
+}
+
 impl<R> SpVec<R> 
 where R: Clone + Zero { 
     pub fn from_entries<T>(dim: usize, entries: T) -> Self
@@ -65,6 +76,10 @@ where R: Clone + Zero {
                 None
             }
         ))
+    }
+
+    pub fn into_vec(self) -> Vec<R> { 
+        self.into()
     }
 
     pub fn permute(&self, p: PermView<'_>) -> SpVec<R> { 

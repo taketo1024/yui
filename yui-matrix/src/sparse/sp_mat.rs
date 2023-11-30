@@ -51,6 +51,13 @@ where R: Clone + Zero {
     }
 }
 
+impl<R> From<SpMat<R>> for Mat<R>
+where R: Clone + Zero {
+    fn from(a: SpMat<R>) -> Self {
+        Mat::from(a.cs_mat().to_dense())
+    }
+}
+
 impl<R> Default for SpMat<R>
 where R: Clone + Default + Zero {
     fn default() -> Self {

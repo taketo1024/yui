@@ -10,3 +10,5 @@ pub use crate::dense::MatType;
 pub mod pivot;
 pub mod schur;
 pub mod triang;
+
+mod _sp_mat;

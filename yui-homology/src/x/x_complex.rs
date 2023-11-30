@@ -5,7 +5,7 @@ use delegate::delegate;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use yui::{Ring, RingOps};
 use yui::lc::{Gen, Lc};
-use yui_matrix::sparse::{SpMat, MatTrait};
+use yui_matrix::sparse::SpMat;
 
 use crate::utils::ChainReducer;
 use crate::{GridTrait, GridDeg, Grid, GridIter, ChainComplexTrait, RModStr, isize2, isize3};
@@ -46,29 +46,26 @@ where
         &self.summands
     }
 
-    fn d_matrix_for(&self, i: I, q: &SpMat<R>) -> SpMat<R> { 
-        assert_eq!(q.nrows(), self[i].rank());
-
+    fn d_matrix(&self, i: I) -> SpMat<R> { 
         let m = self[i + self.d_deg].rank();
-        let n = q.ncols();
+        let n = self[i].rank();
 
         if crate::config::is_multithread_enabled() {
             let entries = (0..n).into_par_iter().flat_map(|j|
-                self.d_matrix_col(i, q, j).into_par_iter()
+                self.d_matrix_col(i, j).into_par_iter()
             );
             SpMat::from_par_entries((m, n), entries)
         } else { 
             let entries = (0..n).flat_map(|j|
-                self.d_matrix_col(i, q, j)
+                self.d_matrix_col(i, j)
             );
             SpMat::from_entries((m, n), entries)
         }
     }
 
     #[inline(never)] // for profilability
-    fn d_matrix_col(&self, i: I, q: &SpMat<R>, j: usize) -> Vec<(usize, usize, R)> { 
-        let qj = q.col_vec(j);
-        let z = self[i].as_chain(&qj);
+    fn d_matrix_col(&self, i: I, j: usize) -> Vec<(usize, usize, R)> { 
+        let z = self[i].gen_chain(j);
         let w = self.d(i, &z);
         let dj = self[i + self.d_deg].vectorize(&w);
 
@@ -132,9 +129,7 @@ where
     }
 
     fn d_matrix(&self, i: I) -> SpMat<Self::R> { 
-        let n = self[i].rank();
-        let q = SpMat::id(n);
-        self.d_matrix_for(i, &q)
+        self.d_matrix(i)
     }
 }
 

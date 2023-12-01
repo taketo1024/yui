@@ -8,7 +8,7 @@ use yui_matrix::sparse::pivot::{perms_by_pivots, find_pivots, PivotType};
 use yui_matrix::sparse::schur::Schur;
 use yui::{Ring, RingOps};
 
-use crate::{GridDeg, ChainComplexTrait, ChainComplexBase, Grid, SimpleRModStr, GridIter, GridTrait};
+use crate::{GridDeg, ChainComplexTrait, ChainComplexBase, Grid, SimpleRModStr, GridTrait};
 
 //       a0 = [x]      a1 = [a b]      a2 = [z w]
 //            [y]           [c d]     
@@ -74,8 +74,8 @@ where
         Self { support, d_deg, with_trans, mats, trans }
     }
 
-    pub fn support(&self) -> GridIter<I> { 
-        self.support.clone().into_iter()
+    pub fn support(&self) -> &[I] { 
+        &self.support
     }
 
     pub fn matrix(&self, i: I) -> Option<&SpMat<R>> {
@@ -92,14 +92,6 @@ where
 
     pub fn rank(&self, i: I) -> Option<usize> { 
         self.matrix(i).map(|d| d.ncols())
-    }
-
-    pub fn take_matrix(&mut self, i: I) -> Option<SpMat<R>> {
-        self.mats.remove(&i)
-    }
-
-    pub fn take_trans(&mut self, i: I) -> Option<Trans<R>> {
-        self.trans.remove(&i)
     }
 
     pub fn is_set(&self, i: I) -> bool { 
@@ -218,7 +210,8 @@ where
         let t1 = self.trans_mut(i1).unwrap();
         t1.permute(q.view());
         t1.modify(|fs, bs| { 
-            let f = fs.pop().unwrap().submat_rows(r..n);
+            let f = fs.pop().unwrap();
+            let f = f.submat_rows(r..n); // == [0  1] * f
             fs.push(f);
 
             let b = s.trans_in().unwrap().clone();
@@ -231,7 +224,8 @@ where
             let f = s.trans_out().unwrap().clone();
             fs.push(f);
 
-            let b = bs.pop().unwrap().submat_cols(r..m);
+            let b = bs.pop().unwrap();
+            let b = b.submat_cols(r..m); // == b * [0; 1]
             bs.push(b)
         });
     }
@@ -260,18 +254,18 @@ where
 
     pub fn into_complex(mut self) -> ChainComplexBase<I, R> { 
         let summands = Grid::generate(
-            self.support(), 
+            self.support.clone(), 
             |i| { 
                 let rank = self.rank(i).unwrap();
-                let trans = self.take_trans(i); // optional
+                let trans = self.trans.remove(&i); // optional
                 SimpleRModStr::new( rank, vec![], trans )
             }
         );
 
         let d_deg = self.d_deg;
         let d_matrices = Grid::generate(
-            self.support(),
-            |i| self.take_matrix(i).unwrap()
+            self.support.clone(), 
+            |i| self.mats.remove(&i).unwrap()
         );
 
         ChainComplexBase::new(

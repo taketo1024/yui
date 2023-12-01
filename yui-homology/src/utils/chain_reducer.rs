@@ -204,6 +204,14 @@ where
     fn update_trans(&mut self, i: I, p: &PermOwned, q: &PermOwned, r: usize, s: &Schur<R>) {
         assert!(self.with_trans);
 
+        //                d1
+        //      C[1] ------------> C[2]
+        //       |^                 |^
+        //  proj || t_in      t_out || incl
+        //       V|                 V|
+        //      C[1]'------------> C[2]'
+        //                 s
+
         let (m, n) = s.orig_shape(); // (m, n)
         let (_, i1, i2) = self.deg_trip(i);
         

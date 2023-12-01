@@ -42,52 +42,59 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    fn compute_from_partial_lower(a: &SpMat<R>, r: usize, with_trans: bool) -> (SpMat<R>, Option<SpMat<R>>, Option<SpMat<R>>) {
-        let report = should_report(a);
+    fn compute_from_partial_lower(abcd: &SpMat<R>, r: usize, with_trans: bool) -> (SpMat<R>, Option<SpMat<R>>, Option<SpMat<R>>) {
+        use TriangularType::Lower as L;
+        let id = |n| SpMat::<R>::id(n);
+        let zero = |m, n| SpMat::<R>::zero((m, n));
+
+        let report = should_report(abcd);
         if report { 
-            info!("schur, a: {:?}, r: {} ..", a.shape(), r);
+            info!("schur, a: {:?}, r: {} ..", abcd.shape(), r);
         }
 
-        let (m, n) = a.shape();
+        //  [a   ] [a⁻¹b   ] = [b]
+        //  [c  1] [d-ca⁻¹b]   [d]
+        //  ~~~~~~ ~~~~~~~~~   ~~~
+        //   = p    = pinvbd   = bd
 
-        //  [a   ][a⁻¹b   ] = [b]
-        //  [c  1][d-ca⁻¹b]   [d]
-        //  ~~~~~~
-        //    = p
+        let (m, n) = abcd.shape();
+
+        let pinvbd = { 
+            let p = abcd.submat_cols(0..r).concat(
+                &zero(r, m - r).stack(&id(m - r))
+            );
+            let bd = abcd.submat_cols(r..n);
+            solve_triangular(L, &p, &bd) // px = bd
+        };
         
-        let p = SpMat::from_entries((m, m), Iterator::chain(
-            a.view().submat_cols(0..r).iter().map(|(i, j, x)| (i, j, x.clone())),
-            (r..m).map(|i| (i, i, R::one()))
-        ));
-        
-        let bd = a.submat_cols(r..n);
-        let pinvbd = solve_triangular(TriangularType::Lower, &p, &bd);
         let s = pinvbd.submat_rows(r..m);
 
         if report { 
             info!("schur: {:?}", s.shape());
         }
 
-        let (t_in, t_out) = if with_trans { 
-            let id = |n| SpMat::id(n);
-
-            // t_in = [-a⁻¹b]
-            //        [  1  ]
-            
+        // t_in = [-a⁻¹b]
+        //        [  1  ]
+        let t_in = if with_trans { 
             let ainvb = pinvbd.submat_rows(0..r);
             let t_in = (-ainvb).stack(&id(n - r));
-
-            // [-ca⁻¹  1][a   ] = [0  1]
-            //           [c  1] 
-            // ~~~~~~~~~~
-            //   = t_out
-
-            let i = SpMat::zero((m - r, r)).concat(&SpMat::id(m - r));
-            let t_out = solve_triangular_left(TriangularType::Lower, &p, &i);
-
-            (Some(t_in), Some(t_out))
+            Some(t_in)
         } else { 
-            (None, None)
+            None
+        };
+
+        std::mem::drop(pinvbd);
+
+        // t_out = [-ca⁻¹  1]
+        let t_out = if with_trans { 
+            let a = abcd.submat(0..r, 0..r);
+            let c = abcd.submat(r..m, 0..r);
+            let cainv = solve_triangular_left(L, &a, &c); // xa = c
+            let t_out = (-cainv).concat(&id(m - r));
+
+            Some(t_out)
+        } else { 
+            None
         };
 
         (s, t_in, t_out)

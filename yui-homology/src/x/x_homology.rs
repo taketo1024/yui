@@ -18,9 +18,10 @@ where
     R: EucRing, for<'x> &'x R: EucRingOps<R>
 {
     pub fn homology_at(&self, i: I, with_trans: bool) -> XHomologySummand<X, R> {
-        let ci = &self[i];
+        let mut ci = self[i].clone();
         let hi = self.compute_homology(i, with_trans);
-        ci.compose(&hi)
+        ci.merge(hi);
+        ci
     }
 
     pub fn homology(&self, with_trans: bool) -> XHomologyBase<I, X, R> {

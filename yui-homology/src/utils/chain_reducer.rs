@@ -42,7 +42,8 @@ where
 {
     pub fn reduce<C>(complex: &C, with_trans: bool) -> ChainComplexBase<I, R> 
     where C: GridTrait<I> + ChainComplexTrait<I, R = R> {
-        let r = Self::from(complex, with_trans);
+        let mut r = Self::from(complex, with_trans);
+        r.reduce_all();
         r.into_complex()
     }
 
@@ -60,7 +61,6 @@ where
                     reducer.set_matrix(j, d);
                 }
             }
-            reducer.reduce_at(i);
         }
 
         reducer
@@ -86,6 +86,10 @@ where
         self.trans.get(&i)
     }
 
+    pub fn trans_mut(&mut self, i: I) -> Option<&mut Trans<R>> {
+        self.trans.get_mut(&i)
+    }
+
     pub fn rank(&self, i: I) -> Option<usize> { 
         self.matrix(i).map(|d| d.ncols())
     }
@@ -100,6 +104,12 @@ where
 
     pub fn is_set(&self, i: I) -> bool { 
         self.mats.contains_key(&i)
+    }
+
+    pub fn is_all_zero(&self) -> bool { 
+        self.support.iter().all(|&i| 
+            self.matrix(i).map(|d| d.is_zero()).unwrap_or(false)
+        )
     }
 
     pub fn set_matrix(&mut self, i: I, d: SpMat<R>) {
@@ -123,24 +133,60 @@ where
         self.mats.insert(i, d);
     }
 
-    pub fn reduce_at(&mut self, i: I) { 
-        assert!(self.is_set(i), "not initialized at {i}");
-        self.reduce_at_itr(i, 0)
-    }
+    pub fn reduce_all(&mut self) { 
+        if self.is_all_zero() { 
+            return
+        }
+        
+        let support = self.support.clone();
 
-    fn reduce_at_itr(&mut self, i: I, itr: usize) { 
-        let a = self.matrix(i).unwrap();
-        if a.is_zero() { 
-            return;
+        info!("initial run..");
+        
+        for &i in support.iter() { 
+            self.reduce_at(i, false); // shallow
         }
 
-        info!("red C[{i}]: {:?} (itr: {itr}) ..", a.shape());
+        if self.is_all_zero() { 
+            return
+        }
+
+        info!("second run..");
+
+        for &i in support.iter() { 
+            self.reduce_at(i, true); // deep
+        }
+    }
+
+    pub fn reduce_at(&mut self, i: I, repeat: bool) { 
+        assert!(self.is_set(i), "not initialized at {i}");
+
+        if repeat { 
+            let mut count = 1;
+            while self.reduce_at_itr(i, count) { 
+                count += 1;
+            }
+        } else { 
+            self.reduce_at_itr(i, 0);
+        }
+    }
+
+    fn reduce_at_itr(&mut self, i: I, itr: usize) -> bool { 
+        let a = self.matrix(i).unwrap();
+        if a.is_zero() { 
+            return false;
+        }
+
+        if itr > 0 { 
+            info!("red C[{i}]: {:?} (itr: {itr}) ..", a.shape());
+        } else {
+            info!("red C[{i}]: {:?} ..", a.shape());
+        }
 
         let (p, q, r) = pivots(a);
 
         if r == 0 { 
             info!("no more pivots.");
-            return 
+            return false;
         }
 
         let s = schur(a, &p, &q, r, self.with_trans);
@@ -152,8 +198,7 @@ where
         }
         self.update_mats(i, &p, &q, r, s);
 
-        // to next iteration
-        self.reduce_at_itr(i, itr + 1)
+        true
     }
 
     fn update_trans(&mut self, i: I, p: &PermOwned, q: &PermOwned, r: usize, s: &Schur<R>) {
@@ -162,18 +207,25 @@ where
         let (m, n) = s.orig_shape(); // (m, n)
         let (_, i1, i2) = self.deg_trip(i);
         
-        let t1 = self.trans(i1).unwrap().permute(q.view()).modify(
-            |a| a.submat_rows(r..n),
-            |b| b * s.trans_in().unwrap()
-        );
+        let t1 = self.trans_mut(i1).unwrap();
+        t1.permute(q.view());
+        t1.modify(|fs, bs| { 
+            let f = fs.pop().unwrap().submat_rows(r..n);
+            fs.push(f);
 
-        let t2 = self.trans(i2).unwrap().permute(p.view()).modify(
-            |a| s.trans_out().unwrap() * a,
-            |b| b.submat_cols(r..m)
-        );
+            let b = s.trans_in().unwrap().clone();
+            bs.push(b);
+        });
 
-        self.trans.insert(i1, t1);
-        self.trans.insert(i2, t2);
+        let t2 = self.trans_mut(i2).unwrap();
+        t2.permute(p.view());
+        t2.modify(|fs, bs| { 
+            let f = s.trans_out().unwrap().clone();
+            fs.push(f);
+
+            let b = bs.pop().unwrap().submat_cols(r..m);
+            bs.push(b)
+        });
     }
 
     fn update_mats(&mut self, i: I, p: &PermOwned, q: &PermOwned, r: usize, s: Schur<R>) {

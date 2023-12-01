@@ -65,14 +65,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let s = pinvbd.submat_rows(r..m);
 
         if report { 
-            info!("schur-c: {:?}", s.shape());
+            info!("schur: {:?}", s.shape());
         }
 
         let (t_in, t_out) = if with_trans { 
-            if report { 
-                info!("trans ..");
-            }    
-
             let id = |n| SpMat::id(n);
 
             // t_in = [-a⁻¹b]
@@ -81,10 +77,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let ainvb = pinvbd.submat_rows(0..r);
             let t_in = (-ainvb).stack(&id(n - r));
 
-            if report { 
-                info!("t_in: {:?}", t_in.shape());
-            }    
-    
             // [-ca⁻¹  1][a   ] = [0  1]
             //           [c  1] 
             // ~~~~~~~~~~
@@ -92,10 +84,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             let i = SpMat::zero((m - r, r)).concat(&SpMat::id(m - r));
             let t_out = solve_triangular_left(TriangularType::Lower, &p, &i);
-
-            if report { 
-                info!("t_out: {:?}", t_out.shape());
-            }    
 
             (Some(t_in), Some(t_out))
         } else { 

@@ -107,9 +107,8 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         ) )
     }
 
-    pub fn compose(&self, other: &SimpleRModStr<R>) -> Self { 
-        let inner = self.inner.compose(other);
-        Self::from(self.gens.clone(), inner)
+    pub fn merge(&mut self, other: SimpleRModStr<R>) { 
+        self.inner.merge(other)
     }
 }
 
@@ -218,7 +217,7 @@ mod tests {
         assert_eq!(s.gens, [e(0), e(1), e(2), e(3), e(4)].into_iter().collect());
 
         assert!(s.trans().is_some());
-        assert_eq!(s.trans().unwrap().forward_mat(), &SpMat::id(5));
-        assert_eq!(s.trans().unwrap().backward_mat(), &SpMat::id(5));
+        assert_eq!(s.trans().unwrap().forward_mat(),  SpMat::id(5));
+        assert_eq!(s.trans().unwrap().backward_mat(), SpMat::id(5));
     }
 }

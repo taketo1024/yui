@@ -35,9 +35,10 @@ where
 impl<I, R> ChainComplexBase<I, R> 
 where I: GridDeg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn homology_at(&self, i: I, with_trans: bool) -> HomologySummand<R> {
-        let c = &self[i];
+        let mut c = self[i].clone();
         let h = self.compute_homology(i, with_trans);
-        c.compose(&h)
+        c.merge(h);
+        c
     }
 
     pub fn homology(&self, with_trans: bool) -> HomologyBase<I, R> {

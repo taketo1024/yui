@@ -5,30 +5,31 @@ use crate::sparse::{SpMat, MatTrait, SpVec};
 #[derive(Clone, Debug)]
 pub struct Trans<R> 
 where R: Ring, for <'x> &'x R: RingOps<R> {
-    f: SpMat<R>,
-    b: SpMat<R>,
-    f_id: bool,
-    b_id: bool
+    src_dim: usize, 
+    tgt_dim: usize,
+    f_mats: Vec<SpMat<R>>,
+    b_mats: Vec<SpMat<R>>,
 }
 
 impl<R> Trans<R> 
 where R: Ring, for <'x> &'x R: RingOps<R> { 
-    pub fn new(f: SpMat<R>, b: SpMat<R>) -> Self {
-        assert_eq!(f.nrows(), b.ncols());
-        assert_eq!(f.ncols(), b.nrows());
-
-        let f_id = f.is_id();
-        let b_id = b.is_id();
-
-        Self { f, b, f_id, b_id }
-    }
-
     pub fn id(n: usize) -> Self { 
-        Self::new(SpMat::id(n), SpMat::id(n))
+        Self { 
+            src_dim: n, 
+            tgt_dim: n, 
+            f_mats: vec![], 
+            b_mats: vec![] 
+        }
     }
 
     pub fn zero() -> Self { 
         Self::id(0)
+    }
+
+    pub fn new(f: SpMat<R>, b: SpMat<R>) -> Self {
+        let mut t = Self::id(f.ncols());
+        t.append(f, b);
+        t
     }
 
     pub fn from_perm(p: PermView) -> Self { 
@@ -39,90 +40,85 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
     }
 
     pub fn src_dim(&self) -> usize { 
-        self.f.ncols()
+        self.src_dim
     }
 
     pub fn tgt_dim(&self) -> usize { 
-        self.f.nrows()
+        self.tgt_dim
     }
 
     pub fn is_id(&self) -> bool { 
-        self.f_id && self.b_id
-    }
-
-    pub fn is_forward_id(&self) -> bool { 
-        self.f_id
-    }
-
-    pub fn is_backward_id(&self) -> bool { 
-        self.b_id
-    }
-
-    pub fn forward_mat(&self) -> &SpMat<R> {
-        &self.f
-    }
-
-    pub fn backward_mat(&self) -> &SpMat<R> {
-        &self.b
+        self.f_mats.is_empty()
     }
 
     pub fn forward(&self, v: &SpVec<R>) -> SpVec<R> {
-        if self.f_id { 
-            v.clone() 
-        } else { 
-            &self.f * v
-        }
+        assert_eq!(v.dim(), self.src_dim);
+        self.f_mats.iter().fold(v.clone(), |v, f| f * v)
     }
 
     pub fn backward(&self, v: &SpVec<R>) -> SpVec<R> {
-        if self.b_id { 
-            v.clone()
+        assert_eq!(v.dim(), self.tgt_dim);
+        self.b_mats.iter().rev().fold(v.clone(), |v, f| f * v)
+    }
+
+    pub fn permute(&mut self, p: PermView) { 
+        assert_eq!(p.dim(), self.tgt_dim);
+
+        let f = self.f_mats.pop().unwrap_or(SpMat::id(self.src_dim));
+        let f = f.permute_rows(p.clone());
+
+        let b = self.b_mats.pop().unwrap_or(SpMat::id(self.src_dim));
+        let b = b.permute_cols(p);
+
+        self.f_mats.push(f);
+        self.b_mats.push(b);
+    }
+
+    pub fn append(&mut self, f: SpMat<R>, b: SpMat<R>) { 
+        assert_eq!(f.ncols(), b.nrows());
+        assert_eq!(f.nrows(), b.ncols());
+        assert_eq!(f.ncols(), self.tgt_dim);
+
+        self.tgt_dim = f.nrows();
+        self.f_mats.push(f);
+        self.b_mats.push(b);
+    }
+
+    pub fn merge(&mut self, mut other: Trans<R>) { 
+        assert_eq!(self.tgt_dim, other.src_dim);
+
+        self.tgt_dim = other.tgt_dim;
+        self.f_mats.append(&mut other.f_mats);
+        self.b_mats.append(&mut other.b_mats);
+    }
+
+    pub fn modify<F>(&mut self, modify_map: F)
+    where F: FnOnce(&mut Vec<SpMat<R>>, &mut Vec<SpMat<R>>) {
+        modify_map(&mut self.f_mats, &mut self.b_mats);
+
+        if let Some(f) = self.f_mats.last() { 
+            self.tgt_dim = f.nrows();
         } else { 
-            &self.b * v
+            self.tgt_dim = self.src_dim;
+        }
+
+        if let Some(b) = self.b_mats.last() { 
+            assert_eq!(b.ncols(), self.tgt_dim)
         }
     }
 
-    pub fn modify<F, B>(&self, f_map: F, b_map: B) -> Self
-    where 
-        F: FnOnce(&SpMat<R>) -> SpMat<R>,
-        B: FnOnce(&SpMat<R>) -> SpMat<R> 
-    {
-        Self::new(
-            f_map(&self.f), 
-            b_map(&self.b)
-        ) 
-    }
-
-    pub fn permute(&self, p: PermView) -> Self { 
-        assert_eq!(p.dim(), self.f.nrows());
-        assert_eq!(p.dim(), self.b.ncols());
-
-        self.modify(
-            |f| f.permute_rows(p.clone()), 
-            |b| b.permute_cols(p.clone())
+    pub fn forward_mat(&self) -> SpMat<R> {
+        self.f_mats.iter().fold(
+            SpMat::id(self.src_dim), 
+            |res, f| f * res
         )
     }
 
-    pub fn compose(&self, other: &Trans<R>) -> Self { 
-        assert_eq!(self.tgt_dim(), other.src_dim());
-
-        let f = if self.f_id { 
-            other.f.clone()
-        } else if other.f_id { 
-            self.f.clone()
-        } else { 
-            &other.f * &self.f // other after self
-        };
-        
-        let b = if self.b_id { 
-            other.b.clone()
-        } else if other.b_id { 
-            self.b.clone()
-        } else { 
-            &self.b * &other.b // self after other
-        };
-        
-        Self::new(f, b)
+    pub fn backward_mat(&self) -> SpMat<R> {
+        self.b_mats.iter().rev().fold(
+            SpMat::id(self.tgt_dim), 
+            |res, b| b * res
+        )
     }
 }
 
@@ -183,10 +179,11 @@ mod tests {
 
     #[test]
     fn compose_perm() {
-        let t = Trans::<i32>::new(
+        let mut t = Trans::<i32>::new(
             SpMat::id(5).submat_rows(0..3),
             SpMat::id(5).submat_cols(0..3),
-        ).permute(
+        );
+        t.permute(
             PermOwned::new(vec![1,2,0]).view()
         );
 
@@ -194,15 +191,13 @@ mod tests {
         let w = t.forward(&v);
         let x = t.backward(&w);
 
-        assert_eq!(w, SpVec::from(vec![2,0,1]));
-        assert_eq!(x, SpVec::from(vec![0,1,2,0,0]));
+        assert_eq!(w.into_vec(), vec![2,0,1]);
+        assert_eq!(x.into_vec(), vec![0,1,2,0,0]);
     }
 
     #[test]
     fn is_id() { 
         let t = Trans::<i64>::id(10);
-        assert!(t.is_forward_id());
-        assert!(t.is_backward_id());
         assert!(t.is_id());
     }
 }

@@ -10,12 +10,14 @@ use crate::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RMo
 use super::gen::*;
 
 #[derive(PartialEq, Eq, Clone, Default)]
+#[derive(serde::Deserialize, serde::Serialize)]
 pub struct Lc<X, R>
 where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 { 
     data: AHashMap<X, R>,
+    #[serde(skip)]
     r_zero: R
 }
 
@@ -801,5 +803,14 @@ mod tests {
         let z = L::from_iter( (1..10).map(|i| (e(i), i * 10)) );
         let w = z.filter_gens(|x| x.0 % 3 == 0 );
         assert_eq!(w, L::from(hashmap!{ e(3) => 30, e(6) => 60, e(9) => 90}))
+    }
+
+    #[test]
+    fn serialize() { 
+        type L = Lc<X, i32>;
+        let z = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
+        let ser = serde_json::to_string(&z).unwrap();
+        let deser = serde_json::from_str::<L>(&ser).unwrap();
+        assert_eq!(z, deser);
     }
 }

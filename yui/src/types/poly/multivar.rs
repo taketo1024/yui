@@ -6,7 +6,8 @@ use itertools::Itertools;
 use crate::Elem;
 use crate::lc::Gen;
 use crate::util::format::subscript;
-use super::{Mono, MultiDeg, Univar, fmt_mono};
+use super::{Mono, MultiDeg, Univar};
+use super::univar::{fmt_mono, parse_mono};
 
 pub type MultiVar<const X: char, I> = Univar<X, MultiDeg<I>>;
 
@@ -30,7 +31,7 @@ macro_rules! impl_multivar {
                     } else { 
                         format!("{X}_{}", i)
                     };
-                    fmt_mono(&x, d, true)
+                    fmt_mono(&x, d, unicode)
                 }).join("");
         
                 if s.is_empty() { 
@@ -73,24 +74,48 @@ macro_rules! impl_multivar {
         }
 
         impl<const X: char> FromStr for MultiVar<X, $I> {
-            type Err = ();
+            type Err = String;
             fn from_str(s: &str) -> Result<Self, Self::Err> {
+                use regex::Regex;
+
                 if s == "1" { 
                     return Ok(Univar::one())
                 }
 
-                let r = regex::Regex::new(&format!("^{X}([0-9]+)$")).unwrap();
-                if let Some(m) = r.captures(&s) { 
-                    let i = usize::from_str(&m[1]).unwrap();
-                    let mdeg = MultiDeg::from((i, 1));
-                    let m = MultiVar::from(mdeg);
-                    return Ok(m)
-                }
-
-                // TODO support more complex format. 
-                Err(())
+                // TODO validate s
+        
+                let p = format!(r"({X}_[0-9]+)(\^-?[0-9]+)?");
+                let r = Regex::new(&p).unwrap();
+                let mut degs = vec![];
+                
+                for c in r.captures_iter(&s) {
+                    let x = &c[1];
+                    let i = x.strip_prefix(&format!("{X}_")).unwrap();
+                    let i = usize::from_str(&i).map_err(|e| e.to_string())?;
+                    let d = parse_mono(x, &c[0])?;
+                    degs.push((i, d));
+                };
+        
+                let mvar = MultiVar::from_iter(degs);
+                Ok(mvar)
             }
         }
+
+        impl<const X: char> serde::Serialize for MultiVar<X, $I> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where S: serde::Serializer {
+                serializer.serialize_str(&self.fmt_impl(false))
+            }
+        }
+        
+        impl<'de, const X: char> serde::Deserialize<'de> for MultiVar<X, $I> {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where D: serde::Deserializer<'de> {
+                let s = String::deserialize(deserializer)?;
+                Self::from_str(&s).map_err(serde::de::Error::custom)
+            }
+        }        
+
 
         impl<const X: char> Elem for MultiVar<X, $I> { 
             fn math_symbol() -> String {
@@ -314,5 +339,64 @@ mod tests {
         assert!(mons.iter().all_unique());
 
         assert_eq!(M::generate(n, 0).collect_vec(), vec![M::one()]); // deg(1) = 0, using n-vars.
+    }
+
+    #[test]
+    fn from_str() { 
+        type M = MultiVar<'X', isize>;
+
+        let s = "1";
+        assert_eq!(M::from_str(s), Ok(M::one()));
+
+        let s = "X_0";
+        assert_eq!(M::from_str(s), Ok(M::from((0, 1))));
+
+        let s = "X_1";
+        assert_eq!(M::from_str(s), Ok(M::from((1, 1))));
+
+        let s = "X_1^2";
+        assert_eq!(M::from_str(s), Ok(M::from((1, 2))));
+
+        let s = "X_0X_2^3";
+        assert_eq!(M::from_str(s), Ok(M::from_iter([(0, 1), (2, 3)])));
+
+        let s = "X_0^-1";
+        assert_eq!(M::from_str(s), Ok(M::from((0, -1))));
+
+        let s = "X_0^-1X_2^4";
+        assert_eq!(M::from_str(s), Ok(M::from_iter([(0, -1), (2, 4)])));
+    }
+
+    #[test]
+    fn serialize() { 
+        type M = MultiVar<'X', isize>;
+
+        let d = M::from([]);
+        let ser = serde_json::to_string(&d).unwrap();
+        let des = serde_json::from_str::<M>(&ser).unwrap();
+        
+        assert_eq!(&ser, "\"1\"");
+        assert_eq!(d, des);
+
+        let d = M::from([1]);
+        let ser = serde_json::to_string(&d).unwrap();
+        let des = serde_json::from_str::<M>(&ser).unwrap();
+
+        assert_eq!(&ser, "\"X_0\"");
+        assert_eq!(d, des);
+
+        let d = M::from([2]);
+        let ser = serde_json::to_string(&d).unwrap();
+        let des = serde_json::from_str::<M>(&ser).unwrap();
+        
+        assert_eq!(&ser, "\"X_0^2\"");
+        assert_eq!(d, des);
+
+        let d = M::from([-1, 0, 3]);
+        let ser = serde_json::to_string(&d).unwrap();
+        let des = serde_json::from_str::<M>(&ser).unwrap();
+        
+        assert_eq!(&ser, "\"X_0^-1X_2^3\"");
+        assert_eq!(d, des);
     }
 }

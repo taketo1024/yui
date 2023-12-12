@@ -41,15 +41,15 @@ pub trait Mono:
 }
 
 #[derive(Clone, PartialEq, Eq, Default)]
-#[derive(serde::Deserialize, serde::Serialize)]
-#[serde(transparent)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(transparent))]
 pub struct PolyBase<X, R>
 where 
     X: Mono, 
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     data: Lc<X, R>,
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde", serde(skip))]
     zero: (X, R)
 }
 
@@ -942,6 +942,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serialize_univar() { 
         type P = Poly::<'x', i32>; 
 
@@ -954,6 +955,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serialize_bivar() { 
         type P = Poly2::<'x', 'y', i32>; 
 
@@ -966,6 +968,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serialize_mvar() { 
         type P = PolyN::<'x', i32>; 
 

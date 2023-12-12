@@ -86,6 +86,7 @@ macro_rules! impl_univar {
             }
         }
 
+        #[cfg(feature = "serde")]
         impl<const X: char> serde::Serialize for Univar<X, $I> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where S: serde::Serializer {
@@ -93,6 +94,7 @@ macro_rules! impl_univar {
             }
         }
         
+        #[cfg(feature = "serde")]
         impl<'de, const X: char> serde::Deserialize<'de> for Univar<X, $I> {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
             where D: serde::Deserializer<'de> {
@@ -304,6 +306,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serialize() { 
         type M = Univar<'X', isize>;
         let x = M::from;

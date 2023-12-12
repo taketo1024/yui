@@ -7,7 +7,7 @@ use auto_impl_ops::auto_ops;
 use crate::{EucRing, EucRingOps, Elem, Mon, AddMon, AddGrp, AddMonOps, AddGrpOps, MonOps, RingOps, Ring, FieldOps, Field, Integer, IntOps};
 
 #[derive(Copy, Clone, PartialEq, Eq)]
-#[derive(serde::Deserialize, serde::Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Ratio<T> {
     numer: T,
     denom: T,
@@ -551,6 +551,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serialize() { 
         let a = Ratio::new(3, 5);
         let ser = serde_json::to_string(&a).unwrap();

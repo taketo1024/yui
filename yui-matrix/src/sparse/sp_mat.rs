@@ -318,6 +318,7 @@ where R: Display + Debug {
     }}
 }
 
+#[cfg(feature = "serde")]
 impl<R> serde::Serialize for SpMat<R>
 where R: Clone + serde::Serialize {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -326,6 +327,7 @@ where R: Clone + serde::Serialize {
     }
 }
 
+#[cfg(feature = "serde")]
 impl<'de, R> serde::Deserialize<'de> for SpMat<R>
 where R: Clone + serde::Deserialize<'de> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -546,6 +548,7 @@ pub(super) mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serialize() { 
         let a = SpMat::from_dense_data((3, 4), (0..12).map(|x| x % 5));
         let ser = serde_json::to_string(&a).unwrap();

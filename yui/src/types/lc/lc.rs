@@ -10,15 +10,15 @@ use crate::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RMo
 use super::gen::*;
 
 #[derive(PartialEq, Eq, Clone, Default)]
-#[derive(serde::Deserialize, serde::Serialize)]
-#[serde(transparent)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(transparent))]
 pub struct Lc<X, R>
 where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 { 
     data: AHashMap<X, R>,
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde", serde(skip))]
     r_zero: R
 }
 
@@ -807,6 +807,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serialize() { 
         type L = Lc<X, i32>;
         let z = L::from(hashmap!{ e(1) => 1, e(2) => 2 });

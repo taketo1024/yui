@@ -11,6 +11,7 @@ use super::gen::*;
 
 #[derive(PartialEq, Eq, Clone, Default)]
 #[derive(serde::Deserialize, serde::Serialize)]
+#[serde(transparent)]
 pub struct Lc<X, R>
 where
     X: Gen,

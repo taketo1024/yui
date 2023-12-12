@@ -2,7 +2,7 @@ use std::fmt::{Display, Debug};
 use std::hash::Hash;
 use std::ops::{AddAssign, Mul, MulAssign, DivAssign, SubAssign, Div};
 use std::str::FromStr;
-use num_traits::{Zero, One, ToPrimitive, Pow};
+use num_traits::{Zero, One, ToPrimitive, Pow, FromPrimitive};
 use auto_impl_ops::auto_ops;
 
 use crate::Elem;
@@ -60,11 +60,15 @@ macro_rules! impl_univar {
             where R: Mul<Output = R>, for<'x, 'y> &'x R: Pow<&'y $I, Output = R> {
                 x.pow(&self.0)
             }
+
+            fn fmt_impl(&self, unicode: bool) -> String { 
+                fmt_mono(&X.to_string(), self.0, unicode)
+            }
         }
         
         impl<const X: char> Display for Univar<X, $I> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let s = fmt_mono(&X.to_string(), self.0, true);
+                let s = self.fmt_impl(true);
                 f.write_str(&s)
             }
         }
@@ -76,21 +80,26 @@ macro_rules! impl_univar {
         }
         
         impl<const X: char> FromStr for Univar<X, $I> {
-            type Err = ();
+            type Err = String;
             fn from_str(s: &str) -> Result<Self, Self::Err> {
-                if s.len() == 1 { 
-                    let x = s.chars().next().unwrap();
-                    if x == '1' { 
-                        return Ok(Self(0))
-                    } else if x == X {
-                        return Ok(Self(1))
-                    }
-                }
-
-                // TODO support more complex format. 
-                Err(())
+                parse_mono(&X.to_string(), s).map(Self)
             }
         }
+
+        impl<const X: char> serde::Serialize for Univar<X, $I> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where S: serde::Serializer {
+                serializer.serialize_str(&self.fmt_impl(false))
+            }
+        }
+        
+        impl<'de, const X: char> serde::Deserialize<'de> for Univar<X, $I> {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where D: serde::Deserializer<'de> {
+                let s = String::deserialize(deserializer)?;
+                Self::from_str(&s).map_err(serde::de::Error::custom)
+            }
+        }        
 
         impl<const X: char> Elem for Univar<X, $I> { 
             fn math_symbol() -> String {
@@ -176,6 +185,22 @@ where I: ToPrimitive {
     }
 }
 
+pub(crate) fn parse_mono<I, E>(x: &str, s: &str) -> Result<I, String>
+where I: FromStr<Err = E> + FromPrimitive, E: ToString {
+    if s == "1" { 
+        Ok(I::from_i32(0).unwrap())
+    } else if s == x { 
+        Ok(I::from_i32(1).unwrap())
+    } else if let Some(d) = s.strip_prefix(&format!("{x}^")) { 
+        match I::from_str(d) { 
+            Ok(d) => Ok(d),
+            Err(e) => Err(e.to_string())
+        }
+    } else { 
+        Err(format!("Failed to parse: {s}"))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -194,12 +219,15 @@ mod tests {
 
     #[test]
     fn from_str() { 
-        type M = Univar<'X',usize>;
+        type M = Univar<'X',isize>;
         let x = M::from;
         
         assert_eq!(M::from_str("1"), Ok(M::one()));
         assert_eq!(M::from_str("X"), Ok(x(1)));
-        assert_eq!(M::from_str("2"), Err(()));
+        assert_eq!(M::from_str("X^2"), Ok(x(2)));
+        assert_eq!(M::from_str("X^-2"), Ok(x(-2)));
+        assert!(M::from_str("2").is_err());
+        assert!(M::from_str("x").is_err());
     }
 
     #[test]
@@ -273,5 +301,39 @@ mod tests {
         assert!(x(0) < x(1));
         assert!(x(1) < x(2));
         assert!(x(-1) < x(0));
+    }
+
+    #[test]
+    fn serialize() { 
+        type M = Univar<'X', isize>;
+        let x = M::from;
+
+        let d = x(0);
+        let ser = serde_json::to_string(&d).unwrap();
+        let des = serde_json::from_str::<M>(&ser).unwrap();
+        
+        assert_eq!(&ser, "\"1\"");
+        assert_eq!(d, des);
+
+        let d = x(1);
+        let ser = serde_json::to_string(&d).unwrap();
+        let des = serde_json::from_str::<M>(&ser).unwrap();
+
+        assert_eq!(&ser, "\"X\"");
+        assert_eq!(d, des);
+
+        let d = x(2);
+        let ser = serde_json::to_string(&d).unwrap();
+        let des = serde_json::from_str::<M>(&ser).unwrap();
+        
+        assert_eq!(&ser, "\"X^2\"");
+        assert_eq!(d, des);
+
+        let d = x(-2);
+        let ser = serde_json::to_string(&d).unwrap();
+        let des = serde_json::from_str::<M>(&ser).unwrap();
+        
+        assert_eq!(&ser, "\"X^-2\"");
+        assert_eq!(d, des);
     }
 }

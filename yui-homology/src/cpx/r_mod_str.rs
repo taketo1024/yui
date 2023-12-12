@@ -70,6 +70,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 #[derive(Clone, Debug)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct SimpleRModStr<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     rank: usize, 

@@ -17,6 +17,7 @@ itertools = "0.11.0"
 log = "0.4.20"
 num-traits = "0.2.16"
 rayon = "1.8.0"
+serde = "1.0.193"
 sprs = "0.11.1"
 # sprs = { git = "https://github.com/sparsemat/sprs", branch = "master" }
 

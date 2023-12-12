@@ -22,10 +22,12 @@ pub type Grid3<E> = Grid<isize3, E>;
 pub type GridIter<I> = std::vec::IntoIter<I>;
 
 #[derive(Clone)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Grid<I, E>
 where I: GridDeg { 
     support: Vec<I>,
     data: HashMap<I, E>,
+    #[serde(skip)]
     dflt: E
 }
 

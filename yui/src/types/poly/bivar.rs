@@ -129,18 +129,24 @@ where I: Eq + Ord, for<'x> &'x I: Add<&'x I, Output = I> {
 
 macro_rules! impl_bivar {
     ($I:ty) => {
+        impl<const X: char, const Y: char> BiVar<X, Y, $I> { 
+            fn fmt_impl(&self, unicode: bool) -> String { 
+                let BiVar(d0, d1) = self;
+                let x = fmt_mono(&X.to_string(), *d0, unicode);
+                let y = fmt_mono(&Y.to_string(), *d1, unicode);
+                match (x.as_str(), y.as_str()) {
+                    ("1", "1") => "1".to_string(),
+                    ( _ , "1") => x,
+                    ("1",  _ ) => y,
+                    _          => format!("{x}{y}")
+                }
+            }
+        }
+        
         impl<const X: char, const Y: char> Display for BiVar<X, Y, $I> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let BiVar(d0, d1) = self;
-                let x = fmt_mono(X.to_string(), *d0);
-                let y = fmt_mono(Y.to_string(), *d1);
-                
-                match (x.as_str(), y.as_str()) {
-                    ("1", "1") => write!(f, "1"),
-                    ( _ , "1") => write!(f, "{x}"),
-                    ("1",  _ ) => write!(f, "{y}"),
-                    _          => write!(f, "{x}{y}")
-                }
+                let s = self.fmt_impl(true);
+                f.write_str(&s)
             }
         }
         

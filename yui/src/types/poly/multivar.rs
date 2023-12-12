@@ -1,6 +1,7 @@
 use std::fmt::{Display, Debug};
 use std::str::FromStr;
 use num_traits::{Zero, One};
+use itertools::Itertools;
 
 use crate::Elem;
 use crate::lc::Gen;
@@ -19,6 +20,24 @@ macro_rules! impl_multivar {
 
             pub fn total_deg(&self) -> $I {
                 self.0.total()
+            }
+
+            fn fmt_impl(&self, unicode: bool) -> String { 
+                let deg = self.deg();
+                let s = deg.iter().map(|(&i, &d)| {
+                    let x = if unicode { 
+                        format!("{X}{}", subscript(i))
+                    } else { 
+                        format!("{X}_{}", i)
+                    };
+                    fmt_mono(&x, d, true)
+                }).join("");
+        
+                if s.is_empty() { 
+                    "1".to_string()
+                } else { 
+                    s
+                }
             }
         }
 
@@ -42,17 +61,8 @@ macro_rules! impl_multivar {
         
         impl<const X: char> Display for MultiVar<X, $I> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let d = self.deg();
-                let s = d.iter().map(|(&i, &d_i)| {
-                    let x = format!("{X}{}", subscript(i as isize));
-                    let d = d_i as isize;
-                    fmt_mono(x, d)
-                }).filter(|s| s != "1").collect::<Vec<_>>().join("");
-                if s.is_empty() { 
-                    write!(f, "1")
-                } else { 
-                    write!(f, "{s}")
-                }
+                let s = self.fmt_impl(true);
+                f.write_str(&s)
             }
         }
 

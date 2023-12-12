@@ -64,8 +64,8 @@ macro_rules! impl_univar {
         
         impl<const X: char> Display for Univar<X, $I> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let x = X.to_string();
-                write!(f, "{}", fmt_mono(x, self.0))
+                let s = fmt_mono(&X.to_string(), self.0, true);
+                f.write_str(&s)
             }
         }
 
@@ -161,16 +161,18 @@ macro_rules! impl_univar_signed {
 impl_univar_unsigned!(usize);
 impl_univar_signed!  (isize);
 
-pub(crate) fn fmt_mono<I>(x: String, d: I) -> String
+pub(crate) fn fmt_mono<I>(x: &str, d: I, unicode: bool) -> String
 where I: ToPrimitive {
     let d = d.to_isize().unwrap();
     if d.is_zero() { 
         "1".to_string()
     } else if d.is_one() { 
-        x
-    } else {
+        x.to_string()
+    } else if unicode {
         let e = superscript(d); 
         format!("{x}{e}")
+    } else { 
+        format!("{x}^{d}")
     }
 }
 

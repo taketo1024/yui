@@ -121,7 +121,6 @@ macro_rules! impl_multivar {
             }
         }        
 
-
         impl<const X: char> Elem for MultiVar<X, $I> { 
             fn math_symbol() -> String {
                 format!("{X}")

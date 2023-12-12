@@ -41,12 +41,15 @@ pub trait Mono:
 }
 
 #[derive(Clone, PartialEq, Eq, Default)]
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(transparent)]
 pub struct PolyBase<X, R>
 where 
     X: Mono, 
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     data: Lc<X, R>,
+    #[serde(skip)]
     zero: (X, R)
 }
 
@@ -936,5 +939,45 @@ mod tests {
         assert_eq!(f.lead_term_for(1), Some((&xn([1,2,3]), &1)));
         assert_eq!(f.lead_term_for(2), Some((&xn([0,2,4]), &3)));
         assert_eq!(f.lead_term_for(3), None);
+    }
+
+    #[test]
+    fn serialize_univar() { 
+        type P = Poly::<'x', i32>; 
+
+        let x = P::mono;
+        let f = P::from_iter([(x(0), 1), (x(1), 2), (x(2), -3)]);
+
+        let ser = serde_json::to_string(&f).unwrap();
+        let des = serde_json::from_str(&ser).unwrap();
+        assert_eq!(f, des);
+    }
+
+    #[test]
+    fn serialize_bivar() { 
+        type P = Poly2::<'x', 'y', i32>; 
+
+        let xy = P::mono;
+        let f = P::from_iter([(xy(0, 0), 3), (xy(1, 0), 2), (xy(2, 3), 3)]);
+
+        let ser = serde_json::to_string(&f).unwrap();
+        let des = serde_json::from_str(&ser).unwrap();
+        assert_eq!(f, des);
+    }
+
+    #[test]
+    fn serialize_mvar() { 
+        type P = PolyN::<'x', i32>; 
+
+        let xn = P::mono;
+        let f = P::from_iter([
+            (xn([0,0,0]),  3),
+            (xn([1,0,0]), -1),
+            (xn([3,0,2]),  2),
+        ]);
+
+        let ser = serde_json::to_string(&f).unwrap();
+        let des = serde_json::from_str(&ser).unwrap();
+        assert_eq!(f, des);
     }
 }

@@ -84,14 +84,19 @@ macro_rules! impl_multivar {
 
                 // TODO validate s
         
-                let p = format!(r"({X}_[0-9]+)(\^-?[0-9]+)?");
+                let p = format!(r"({X}_([0-9]+))(\^-?[0-9]+)?");
+                let p_all = format!(r"^({p}\s?)+$");
+
+                if !Regex::new(&p_all).unwrap().is_match(&s) { 
+                    return Err(format!("Failed to parse: {s}"))
+                }
+
                 let r = Regex::new(&p).unwrap();
                 let mut degs = vec![];
                 
                 for c in r.captures_iter(&s) {
                     let x = &c[1];
-                    let i = x.strip_prefix(&format!("{X}_")).unwrap();
-                    let i = usize::from_str(&i).map_err(|e| e.to_string())?;
+                    let i = usize::from_str(&c[2]).map_err(|e| e.to_string())?;
                     let d = parse_mono(x, &c[0])?;
                     degs.push((i, d));
                 };
@@ -365,6 +370,12 @@ mod tests {
 
         let s = "X_0^-1X_2^4";
         assert_eq!(M::from_str(s), Ok(M::from_iter([(0, -1), (2, 4)])));
+
+        let s = "2";
+        assert!(M::from_str(s).is_err());
+
+        let s = "Y_0";
+        assert!(M::from_str(s).is_err());
     }
 
     #[test]

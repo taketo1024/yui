@@ -7,6 +7,7 @@ use ahash::RandomState as ARandomState;
 use itertools::Itertools;
 
 #[derive(Default, Clone, PartialEq, Eq)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct IndexList<E>
 where E: Eq + Hash {
     data: BiHashMap<usize, E, ARandomState, ARandomState>

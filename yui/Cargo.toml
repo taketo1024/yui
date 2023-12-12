@@ -10,7 +10,7 @@ edition.workspace = true
 [dependencies]
 ahash = { version = "0.8.6", features = ["serde"] }
 auto-impl-ops = "0.2.1"
-bimap = "0.6.3"
+bimap = { version = "0.6.3", features = ["serde"] }
 delegate = "0.10.0"
 derive_more = "0.99.17"
 dinglebit_combinatorics = "1.1.0"

@@ -10,17 +10,17 @@ use crate::Elem;
 use crate::lc::Gen;
 
 use super::Mono;
-use super::univar::{fmt_mono, parse_mono};
+use super::var::{fmt_mono, parse_mono};
 
-// `TriVar<X, Y, Z, I>` : represents trivariant monomials X^i Y^j Z^k.
+// `Var3<X, Y, Z, I>` : represents trivariant monomials X^i Y^j Z^k.
 // `I` is either `usize` or `isize`.
 
 #[derive(Clone, PartialEq, Eq, Hash, Default)]
-pub struct TriVar<const X: char, const Y: char, const Z: char, I>(
+pub struct Var3<const X: char, const Y: char, const Z: char, I>(
     I, I, I
 );
 
-impl<const X: char, const Y: char, const Z: char, I> TriVar<X, Y, Z, I> {
+impl<const X: char, const Y: char, const Z: char, I> Var3<X, Y, Z, I> {
     pub fn var_symbol(i: usize) -> char { 
         assert!(i < 3);
         match i { 
@@ -37,7 +37,7 @@ impl<const X: char, const Y: char, const Z: char, I> TriVar<X, Y, Z, I> {
     }
 }
 
-impl<const X: char, const Y: char, const Z: char, I> TriVar<X, Y, Z, I>
+impl<const X: char, const Y: char, const Z: char, I> Var3<X, Y, Z, I>
 where I: Copy {
     pub fn deg_for(&self, i: usize) -> I { 
         assert!(i < 3);
@@ -50,20 +50,20 @@ where I: Copy {
     }
 }
 
-impl<const X: char, const Y: char, const Z: char, I> TriVar<X, Y, Z, I>
+impl<const X: char, const Y: char, const Z: char, I> Var3<X, Y, Z, I>
 where I: Copy + Add<I, Output = I> {
     pub fn total_deg(&self) -> I { 
         self.0 + self.1 + self.2
     }
 }
 
-impl<const X: char, const Y: char, const Z: char, I> From<(I, I, I)> for TriVar<X, Y, Z, I> {
+impl<const X: char, const Y: char, const Z: char, I> From<(I, I, I)> for Var3<X, Y, Z, I> {
     fn from(d: (I, I, I)) -> Self {
         Self(d.0, d.1, d.2)
     }
 }
 
-impl<const X: char, const Y: char, const Z: char, I> FromStr for TriVar<X, Y, Z, I>
+impl<const X: char, const Y: char, const Z: char, I> FromStr for Var3<X, Y, Z, I>
 where I: Copy + Zero + FromStr + FromPrimitive, <I as FromStr>::Err: ToString {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -97,7 +97,7 @@ where I: Copy + Zero + FromStr + FromPrimitive, <I as FromStr>::Err: ToString {
     }
 }
 
-impl<const X: char, const Y: char, const Z: char, I> One for TriVar<X, Y, Z, I>
+impl<const X: char, const Y: char, const Z: char, I> One for Var3<X, Y, Z, I>
 where I: for<'x >AddAssign<&'x I> + Zero {
     fn one() -> Self {
         Self::from((I::zero(), I::zero(), I::zero())) // x^0 = 1.
@@ -105,9 +105,9 @@ where I: for<'x >AddAssign<&'x I> + Zero {
 }
 
 #[auto_ops]
-impl<const X: char, const Y: char, const Z: char, I> MulAssign<&TriVar<X, Y, Z, I>> for TriVar<X, Y, Z, I>
+impl<const X: char, const Y: char, const Z: char, I> MulAssign<&Var3<X, Y, Z, I>> for Var3<X, Y, Z, I>
 where I: for<'x >AddAssign<&'x I> {
-    fn mul_assign(&mut self, rhs: &TriVar<X, Y, Z, I>) {
+    fn mul_assign(&mut self, rhs: &Var3<X, Y, Z, I>) {
         self.0 += &rhs.0; // x^i * x^j = x^{i+j}
         self.1 += &rhs.1;
         self.2 += &rhs.2;
@@ -115,23 +115,23 @@ where I: for<'x >AddAssign<&'x I> {
 }
 
 #[auto_ops]
-impl<const X: char, const Y: char, const Z: char, I> DivAssign<&TriVar<X, Y, Z, I>> for TriVar<X, Y, Z, I>
+impl<const X: char, const Y: char, const Z: char, I> DivAssign<&Var3<X, Y, Z, I>> for Var3<X, Y, Z, I>
 where I: for<'x >SubAssign<&'x I> {
-    fn div_assign(&mut self, rhs: &TriVar<X, Y, Z, I>) {
+    fn div_assign(&mut self, rhs: &Var3<X, Y, Z, I>) {
         self.0 -= &rhs.0; // x^i / x^j = x^{i-j}
         self.1 -= &rhs.1;
         self.2 -= &rhs.2;
     }
 }
 
-impl<const X: char, const Y: char, const Z: char, I> PartialOrd for TriVar<X, Y, Z, I>
+impl<const X: char, const Y: char, const Z: char, I> PartialOrd for Var3<X, Y, Z, I>
 where I: Copy + Eq + Ord + Add<I, Output = I> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(Ord::cmp(self, other))
     }
 }
 
-impl<const X: char, const Y: char, const Z: char, I> Ord for TriVar<X, Y, Z, I>
+impl<const X: char, const Y: char, const Z: char, I> Ord for Var3<X, Y, Z, I>
 where I: Copy + Eq + Ord + Add<I, Output = I> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         use std::cmp::*;
@@ -147,9 +147,9 @@ where I: Copy + Eq + Ord + Add<I, Output = I> {
 
 macro_rules! impl_trivar {
     ($I:ty) => {
-        impl<const X: char, const Y: char, const Z: char> TriVar<X, Y, Z, $I> { 
+        impl<const X: char, const Y: char, const Z: char> Var3<X, Y, Z, $I> { 
             fn fmt_impl(&self, unicode: bool) -> String { 
-                let TriVar(d0, d1, d2) = self;
+                let Var3(d0, d1, d2) = self;
                 let s = [(X, d0), (Y, d1), (Z, d2)].into_iter().map(|(x, &d)|
                     fmt_mono(&x.to_string(), d, unicode)
                 ).filter(|s| s != "1").join("");
@@ -161,21 +161,21 @@ macro_rules! impl_trivar {
             }
         }
         
-        impl<const X: char, const Y: char, const Z: char> Display for TriVar<X, Y, Z, $I> { 
+        impl<const X: char, const Y: char, const Z: char> Display for Var3<X, Y, Z, $I> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let s = self.fmt_impl(true);
                 f.write_str(&s)
             }
         }
         
-        impl<const X: char, const Y: char, const Z: char> Debug for TriVar<X, Y, Z, $I> { 
+        impl<const X: char, const Y: char, const Z: char> Debug for Var3<X, Y, Z, $I> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 Display::fmt(self, f)
             }
         }
 
         #[cfg(feature = "serde")]
-        impl<const X: char, const Y: char, const Z: char> serde::Serialize for TriVar<X, Y, Z, $I> {
+        impl<const X: char, const Y: char, const Z: char> serde::Serialize for Var3<X, Y, Z, $I> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where S: serde::Serializer {
                 serializer.serialize_str(&self.fmt_impl(false))
@@ -183,7 +183,7 @@ macro_rules! impl_trivar {
         }
         
         #[cfg(feature = "serde")]
-        impl<'de, const X: char, const Y: char> serde::Deserialize<'de> for TriVar<X, Y, Z, $I> {
+        impl<'de, const X: char, const Y: char> serde::Deserialize<'de> for Var3<X, Y, Z, $I> {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
             where D: serde::Deserializer<'de> {
                 let s = String::deserialize(deserializer)?;
@@ -191,13 +191,13 @@ macro_rules! impl_trivar {
             }
         }        
 
-        impl<const X: char, const Y: char, const Z: char> Elem for TriVar<X, Y, Z, $I> { 
+        impl<const X: char, const Y: char, const Z: char> Elem for Var3<X, Y, Z, $I> { 
             fn math_symbol() -> String {
                 format!("{X}, {Y}, {Z}")
             }
         }
                 
-        impl<const X: char, const Y: char, const Z: char> Gen for TriVar<X, Y, Z, $I> {}
+        impl<const X: char, const Y: char, const Z: char> Gen for Var3<X, Y, Z, $I> {}
     }
 }
 
@@ -205,7 +205,7 @@ macro_rules! impl_trivar_unsigned {
     ($I:ty) => {
         impl_trivar!($I);
 
-        impl<const X: char, const Y: char, const Z: char> Mono for TriVar<X, Y, Z, $I> {
+        impl<const X: char, const Y: char, const Z: char> Mono for Var3<X, Y, Z, $I> {
             type Deg = ($I, $I, $I);
 
             fn deg(&self) -> Self::Deg {
@@ -235,7 +235,7 @@ macro_rules! impl_trivar_signed {
     ($I:ty) => {
         impl_trivar!($I);
 
-        impl<const X: char, const Y: char, const Z: char> Mono for TriVar<X, Y, Z, $I> {
+        impl<const X: char, const Y: char, const Z: char> Mono for Var3<X, Y, Z, $I> {
             type Deg = ($I, $I, $I);
 
             fn deg(&self) -> Self::Deg {
@@ -266,7 +266,7 @@ mod tests {
 
     #[test]
     fn var_symbol() { 
-        type M = TriVar<'X','Y','Z',usize>;
+        type M = Var3<'X','Y','Z',usize>;
         
         assert_eq!(M::var_symbol(0), 'X');
         assert_eq!(M::var_symbol(1), 'Y');
@@ -275,7 +275,7 @@ mod tests {
 
     #[test]
     fn init() { 
-        type M = TriVar<'X','Y','Z',usize>;
+        type M = Var3<'X','Y','Z',usize>;
         let xyz = |i, j, k| M::from((i, j, k));
 
         let d = xyz(2, 3, 1);
@@ -287,7 +287,7 @@ mod tests {
 
     #[test]
     fn from_str() { 
-        type M = TriVar<'X','Y','Z',usize>;
+        type M = Var3<'X','Y','Z',usize>;
         let xyz = |i, j, k| M::from((i, j, k));
         
         assert_eq!(M::from_str("1"), Ok(M::one()));
@@ -304,7 +304,7 @@ mod tests {
 
     #[test]
     fn display() { 
-        type M = TriVar<'X','Y','Z',usize>;
+        type M = Var3<'X','Y','Z',usize>;
         let xyz = |i, j, k| M::from((i, j, k));
 
         let d = xyz(0, 0, 0);
@@ -331,7 +331,7 @@ mod tests {
 
     #[test]
     fn neg_opt_unsigned() { 
-        type M = TriVar<'X','Y','Z',usize>;
+        type M = Var3<'X','Y','Z',usize>;
         let xyz = |i, j, k| M::from((i, j, k));
 
         let d = xyz(0, 0, 0);
@@ -349,7 +349,7 @@ mod tests {
 
     #[test]
     fn neg_opt_signed() { 
-        type M = TriVar<'X','Y','Z',isize>;
+        type M = Var3<'X','Y','Z',isize>;
         let xyz = |i, j,k| M::from((i, j, k));
 
         let d = xyz(0, 0, 0);
@@ -367,7 +367,7 @@ mod tests {
 
     #[test]
     fn eval() { 
-        type M = TriVar<'X','Y','Z',usize>;
+        type M = Var3<'X','Y','Z',usize>;
         let xyz = |i, j,k| M::from((i, j, k));
 
         let d = xyz(0, 0, 0);
@@ -388,7 +388,7 @@ mod tests {
 
     #[test]
     fn ord() { 
-        type M = TriVar<'X','Y','Z',usize>;
+        type M = Var3<'X','Y','Z',usize>;
         let xyz = |i, j,k| M::from((i, j, k));
 
         assert!(xyz(2, 1, 1) < xyz(1, 3, 1));

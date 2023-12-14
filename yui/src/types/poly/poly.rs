@@ -7,21 +7,25 @@ use auto_impl_ops::auto_ops;
 
 use crate::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Mon, MonOps, Ring, RingOps, EucRing, EucRingOps, Field, FieldOps};
 use crate::lc::{Lc, Gen};
-use super::{MultiDeg, Univar, BiVar, MultiVar};
+use super::{MultiDeg, Var, Var2, Var3,VarN};
 
 // A polynomial is a linear combination of monomials over R.
 
-// Univar-type (ordinary, Laurent)
-pub type Poly  <const X: char, R> = PolyBase<Univar<X, usize>, R>;          
-pub type LPoly <const X: char, R> = PolyBase<Univar<X, isize>, R>;
+// Var-type (ordinary, Laurent)
+pub type Poly  <const X: char, R> = PolyBase<Var<X, usize>, R>;          
+pub type LPoly <const X: char, R> = PolyBase<Var<X, isize>, R>;
 
 // Bivar-type (ordinary, Laurent)
-pub type Poly2 <const X: char, const Y: char, R> = PolyBase<BiVar<X, Y, usize>, R>;
-pub type LPoly2<const X: char, const Y: char, R> = PolyBase<BiVar<X, Y, isize>, R>;
+pub type Poly2 <const X: char, const Y: char, R> = PolyBase<Var2<X, Y, usize>, R>;
+pub type LPoly2<const X: char, const Y: char, R> = PolyBase<Var2<X, Y, isize>, R>;
+
+// Trivar-type (ordinary, Laurent)
+pub type Poly3 <const X: char, const Y: char, const Z: char, R> = PolyBase<Var3<X, Y, Z, usize>, R>;
+pub type LPoly3<const X: char, const Y: char, const Z: char, R> = PolyBase<Var3<X, Y, Z, isize>, R>;
 
 // Multivar-type (ordinary, Laurent)
-pub type PolyN <const X: char, R> = PolyBase<MultiVar<X, usize>, R>;
-pub type LPolyN<const X: char, R> = PolyBase<MultiVar<X, isize>, R>;
+pub type PolyN <const X: char, R> = PolyBase<VarN<X, usize>, R>;
+pub type LPolyN<const X: char, R> = PolyBase<VarN<X, isize>, R>;
 
 pub trait Mono: 
     Mul<Output = Self> + 
@@ -115,14 +119,14 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
 
 macro_rules! impl_univar {
     ($I:ty) => {
-        impl<const X: char, R> PolyBase<Univar<X, $I>, R>
+        impl<const X: char, R> PolyBase<Var<X, $I>, R>
         where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn variable() -> Self { 
                 Self::from(Self::mono(1))
             }
 
-            pub fn mono(i: $I) -> Univar<X, $I> {
-                Univar::from(i)
+            pub fn mono(i: $I) -> Var<X, $I> {
+                Var::from(i)
             }
         }
     };
@@ -133,16 +137,16 @@ impl_univar!(isize);
 
 macro_rules! impl_bivar {
     ($I:ty) => {
-        impl<const X: char, const Y: char, R> PolyBase<BiVar<X, Y, $I>, R>
+        impl<const X: char, const Y: char, R> PolyBase<Var2<X, Y, $I>, R>
         where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn variable(i: usize) -> Self { 
                 assert!(i < 2);
                 let d = if i == 0 { (1, 0) } else { (0, 1) };
-                Self::from(BiVar::from(d))
+                Self::from(Var2::from(d))
             }
 
-            pub fn mono(i: $I, j: $I) -> BiVar<X, Y, $I> {
-                BiVar::from((i, j))
+            pub fn mono(i: $I, j: $I) -> Var2<X, Y, $I> {
+                Var2::from((i, j))
             }
         }
     };
@@ -153,15 +157,15 @@ impl_bivar!(isize);
 
 macro_rules! impl_mvar {
     ($I:ty) => {
-        impl<const X: char, R> PolyBase<MultiVar<X, $I>, R>
+        impl<const X: char, R> PolyBase<VarN<X, $I>, R>
         where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn variable(i: usize) -> Self { 
                 let d = MultiDeg::from((i, 1));
-                Self::from(Univar::from(d)) // x^1
+                Self::from(Var::from(d)) // x^1
             }
 
-            pub fn mono<const N: usize>(degs: [$I; N]) -> MultiVar<X, $I> {
-                MultiVar::from(degs)
+            pub fn mono<const N: usize>(degs: [$I; N]) -> VarN<X, $I> {
+                VarN::from(degs)
             }
         }
     };
@@ -172,9 +176,9 @@ impl_mvar!(isize);
 
 macro_rules! impl_polyn_funcs {
     ($I:ty) => {
-        impl<const X: char, R> PolyBase<MultiVar<X, $I>, R>
+        impl<const X: char, R> PolyBase<VarN<X, $I>, R>
         where R: Ring, for<'x> &'x R: RingOps<R> {
-            pub fn lead_term_for(&self, k: usize) -> Option<(&MultiVar<X, $I>, &R)> { 
+            pub fn lead_term_for(&self, k: usize) -> Option<(&VarN<X, $I>, &R)> { 
                 self.iter()
                     .filter(|(x, _)| x.deg_for(k) > 0)
                     .max_by(|(x, _), (y, _)|
@@ -389,7 +393,7 @@ impl_pow_signed!(isize);
 
 macro_rules! impl_eval_bivar {
     ($I:ty) => {
-        impl<const X: char, const Y: char, R> PolyBase<BiVar<X, Y, $I>, R>
+        impl<const X: char, const Y: char, R> PolyBase<Var2<X, Y, $I>, R>
         where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn eval(&self, x: &R, y: &R) -> R
             where for<'x, 'y> &'x R: Pow<&'y $I, Output = R> { 
@@ -478,7 +482,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
             
             let k = i.deg() - j.deg(); // >= 0
             let c = a / b;
-            let x = Univar::from(k);
+            let x = Var::from(k);
             let q = Poly::from((x, c));   // cx^k = (a/b) x^{i-j}.
             let r = f - &q * g;
             

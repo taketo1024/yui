@@ -10,27 +10,27 @@ use crate::lc::Gen;
 use crate::util::format::superscript;
 use super::Mono;
 
-// `Univar<X, I>` : represents monomials X^d (univar) or ΠX_i^{d_i} (multivar).
+// `Var<X, I>` : represents monomials X^d (univar) or ΠX_i^{d_i} (multivar).
 // `I` is one of `usize`, `isize`, `MultiDeg<usize>`, `MultiDeg<isize>`.
 
 #[derive(Clone, PartialEq, Eq, Hash, Default, PartialOrd, Ord)]
-pub struct Univar<const X: char, I>(
+pub struct Var<const X: char, I>(
     pub(crate) I
 );
 
-impl<const X: char, I> Univar<X, I> {
+impl<const X: char, I> Var<X, I> {
     pub fn var_symbol() -> char { 
         X
     }
 }
 
-impl<const X: char, I> From<I> for Univar<X, I> {
+impl<const X: char, I> From<I> for Var<X, I> {
     fn from(d: I) -> Self {
         Self(d)
     }
 }
 
-impl<const X: char, I> One for Univar<X, I>
+impl<const X: char, I> One for Var<X, I>
 where I: for<'x >AddAssign<&'x I> + Zero {
     fn one() -> Self {
         Self::from(I::zero()) // x^0 = 1.
@@ -38,24 +38,24 @@ where I: for<'x >AddAssign<&'x I> + Zero {
 }
 
 #[auto_ops]
-impl<const X: char, I> MulAssign<&Univar<X, I>> for Univar<X, I>
+impl<const X: char, I> MulAssign<&Var<X, I>> for Var<X, I>
 where I: for<'x >AddAssign<&'x I> {
-    fn mul_assign(&mut self, rhs: &Univar<X, I>) {
+    fn mul_assign(&mut self, rhs: &Var<X, I>) {
         self.0 += &rhs.0 // x^i * x^j = x^{i+j}
     }
 }
 
 #[auto_ops]
-impl<const X: char, I> DivAssign<&Univar<X, I>> for Univar<X, I>
+impl<const X: char, I> DivAssign<&Var<X, I>> for Var<X, I>
 where I: for<'x >SubAssign<&'x I> {
-    fn div_assign(&mut self, rhs: &Univar<X, I>) {
+    fn div_assign(&mut self, rhs: &Var<X, I>) {
         self.0 -= &rhs.0 // x^i * x^j = x^{i+j}
     }
 }
 
 macro_rules! impl_univar {
     ($I:ty) => {
-        impl<const X: char> Univar<X, $I> {
+        impl<const X: char> Var<X, $I> {
             pub fn eval<R>(&self, x: &R) -> R
             where R: Mul<Output = R>, for<'x, 'y> &'x R: Pow<&'y $I, Output = R> {
                 x.pow(&self.0)
@@ -66,20 +66,20 @@ macro_rules! impl_univar {
             }
         }
         
-        impl<const X: char> Display for Univar<X, $I> { 
+        impl<const X: char> Display for Var<X, $I> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let s = self.fmt_impl(true);
                 f.write_str(&s)
             }
         }
 
-        impl<const X: char> Debug for Univar<X, $I> { 
+        impl<const X: char> Debug for Var<X, $I> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 Display::fmt(self, f)
             }
         }
         
-        impl<const X: char> FromStr for Univar<X, $I> {
+        impl<const X: char> FromStr for Var<X, $I> {
             type Err = String;
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 parse_mono(&X.to_string(), s).map(Self)
@@ -87,7 +87,7 @@ macro_rules! impl_univar {
         }
 
         #[cfg(feature = "serde")]
-        impl<const X: char> serde::Serialize for Univar<X, $I> {
+        impl<const X: char> serde::Serialize for Var<X, $I> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where S: serde::Serializer {
                 serializer.serialize_str(&self.fmt_impl(false))
@@ -95,7 +95,7 @@ macro_rules! impl_univar {
         }
         
         #[cfg(feature = "serde")]
-        impl<'de, const X: char> serde::Deserialize<'de> for Univar<X, $I> {
+        impl<'de, const X: char> serde::Deserialize<'de> for Var<X, $I> {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
             where D: serde::Deserializer<'de> {
                 let s = String::deserialize(deserializer)?;
@@ -103,13 +103,13 @@ macro_rules! impl_univar {
             }
         }        
 
-        impl<const X: char> Elem for Univar<X, $I> { 
+        impl<const X: char> Elem for Var<X, $I> { 
             fn math_symbol() -> String {
                 format!("{X}")
             }
         }
         
-        impl<const X: char> Gen for Univar<X, $I> {}
+        impl<const X: char> Gen for Var<X, $I> {}
     }
 }
 
@@ -117,7 +117,7 @@ macro_rules! impl_univar_unsigned {
     ($I:ty) => {
         impl_univar!($I);
 
-        impl<const X: char> Mono for Univar<X, $I> {
+        impl<const X: char> Mono for Var<X, $I> {
             type Deg = $I;
 
             fn deg(&self) -> Self::Deg {
@@ -147,7 +147,7 @@ macro_rules! impl_univar_signed {
     ($I:ty) => {
         impl_univar!($I);
 
-        impl<const X: char> Mono for Univar<X, $I> {
+        impl<const X: char> Mono for Var<X, $I> {
             type Deg = $I;
 
             fn deg(&self) -> Self::Deg {
@@ -209,7 +209,7 @@ mod tests {
 
     #[test]
     fn init() { 
-        type M = Univar<'X',usize>;
+        type M = Var<'X',usize>;
         let x = M::from;
 
         let d = x(2);
@@ -221,7 +221,7 @@ mod tests {
 
     #[test]
     fn from_str() { 
-        type M = Univar<'X',isize>;
+        type M = Var<'X',isize>;
         let x = M::from;
         
         assert_eq!(M::from_str("1"), Ok(M::one()));
@@ -234,7 +234,7 @@ mod tests {
 
     #[test]
     fn display() { 
-        type M = Univar<'X', isize>;
+        type M = Var<'X', isize>;
         let x = M::from;
 
         let d = x(0);
@@ -255,7 +255,7 @@ mod tests {
 
     #[test]
     fn neg_opt_unsigned() { 
-        type M = Univar<'X',usize>;
+        type M = Var<'X',usize>;
         let x = M::from;
 
         let d = x(0);
@@ -267,7 +267,7 @@ mod tests {
 
     #[test]
     fn neg_opt_signed() { 
-        type M = Univar<'X',isize>;
+        type M = Var<'X',isize>;
         let x = M::from;
 
         let d = x(0);
@@ -282,7 +282,7 @@ mod tests {
 
     #[test]
     fn eval() { 
-        type M = Univar<'X', usize>;
+        type M = Var<'X', usize>;
         let x = M::from;
 
         let d = x(0);
@@ -297,7 +297,7 @@ mod tests {
 
     #[test]
     fn ord() { 
-        type M = Univar<'X', isize>;
+        type M = Var<'X', isize>;
         let x = M::from;
 
         assert!(x(0) < x(1));
@@ -308,7 +308,7 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn serialize() { 
-        type M = Univar<'X', isize>;
+        type M = Var<'X', isize>;
         let x = M::from;
 
         let d = x(0);

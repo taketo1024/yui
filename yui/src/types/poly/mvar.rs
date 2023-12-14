@@ -6,15 +6,15 @@ use itertools::Itertools;
 use crate::Elem;
 use crate::lc::Gen;
 use crate::util::format::subscript;
-use super::{Mono, MultiDeg, Univar};
-use super::univar::{fmt_mono, parse_mono};
+use super::{Mono, MultiDeg, Var};
+use super::var::{fmt_mono, parse_mono};
 
-pub type MultiVar<const X: char, I> = Univar<X, MultiDeg<I>>;
+pub type VarN<const X: char, I> = Var<X, MultiDeg<I>>;
 
 // impls for multivar-type.
 macro_rules! impl_multivar {
     ($I:ty) => {
-        impl<const X: char> MultiVar<X, $I> {
+        impl<const X: char> VarN<X, $I> {
             pub fn deg_for(&self, i: usize) -> $I {
                 self.0[i]
             }
@@ -42,44 +42,44 @@ macro_rules! impl_multivar {
             }
         }
 
-        impl<const X: char> From<(usize, $I)> for MultiVar<X, $I> {
+        impl<const X: char> From<(usize, $I)> for VarN<X, $I> {
             fn from(value: (usize, $I)) -> Self {
                 Self::from_iter([value])
             }
         }
         
-        impl<const X: char, const N: usize> From<[$I; N]> for MultiVar<X, $I> {
+        impl<const X: char, const N: usize> From<[$I; N]> for VarN<X, $I> {
             fn from(degs: [$I; N]) -> Self {
                 Self::from(MultiDeg::from(degs))
             }
         }
 
-        impl<const X: char> FromIterator<(usize, $I)> for MultiVar<X, $I> {
+        impl<const X: char> FromIterator<(usize, $I)> for VarN<X, $I> {
             fn from_iter<T: IntoIterator<Item = (usize, $I)>>(iter: T) -> Self {
                 Self::from(MultiDeg::from_iter(iter))
             }
         }
         
-        impl<const X: char> Display for MultiVar<X, $I> { 
+        impl<const X: char> Display for VarN<X, $I> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let s = self.fmt_impl(true);
                 f.write_str(&s)
             }
         }
 
-        impl<const X: char> Debug for MultiVar<X, $I> { 
+        impl<const X: char> Debug for VarN<X, $I> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 Display::fmt(self, f)
             }
         }
 
-        impl<const X: char> FromStr for MultiVar<X, $I> {
+        impl<const X: char> FromStr for VarN<X, $I> {
             type Err = String;
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 use regex::Regex;
 
                 if s == "1" { 
-                    return Ok(Univar::one())
+                    return Ok(Var::one())
                 }
 
                 // TODO validate s
@@ -101,13 +101,13 @@ macro_rules! impl_multivar {
                     degs.push((i, d));
                 };
         
-                let mvar = MultiVar::from_iter(degs);
+                let mvar = VarN::from_iter(degs);
                 Ok(mvar)
             }
         }
 
         #[cfg(feature = "serde")]
-        impl<const X: char> serde::Serialize for MultiVar<X, $I> {
+        impl<const X: char> serde::Serialize for VarN<X, $I> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where S: serde::Serializer {
                 serializer.serialize_str(&self.fmt_impl(false))
@@ -115,7 +115,7 @@ macro_rules! impl_multivar {
         }
         
         #[cfg(feature = "serde")]
-        impl<'de, const X: char> serde::Deserialize<'de> for MultiVar<X, $I> {
+        impl<'de, const X: char> serde::Deserialize<'de> for VarN<X, $I> {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
             where D: serde::Deserializer<'de> {
                 let s = String::deserialize(deserializer)?;
@@ -123,13 +123,13 @@ macro_rules! impl_multivar {
             }
         }        
 
-        impl<const X: char> Elem for MultiVar<X, $I> { 
+        impl<const X: char> Elem for VarN<X, $I> { 
             fn math_symbol() -> String {
                 format!("{X}")
             }
         }
 
-        impl<const X: char> Gen for MultiVar<X, $I> {}
+        impl<const X: char> Gen for VarN<X, $I> {}
     };
 }
 
@@ -137,7 +137,7 @@ macro_rules! impl_multivar_unsigned {
     ($I:ty) => {
         impl_multivar!($I);
 
-        impl<const X: char> Mono for MultiVar<X, $I> {
+        impl<const X: char> Mono for VarN<X, $I> {
             type Deg = MultiDeg<$I>;
 
             fn deg(&self) -> Self::Deg {
@@ -161,7 +161,7 @@ macro_rules! impl_multivar_unsigned {
             }
         }
 
-        impl<const X: char> MultiVar<X, $I> {
+        impl<const X: char> VarN<X, $I> {
             pub fn generate(n: usize, tot_deg: usize) -> impl Iterator<Item = Self> { 
                 use dinglebit_combinatorics::Combination as C;
                 use crate::algo::rep_comb;
@@ -185,7 +185,7 @@ macro_rules! impl_multivar_signed {
     ($I:ty) => {
         impl_multivar!($I);
 
-        impl<const X: char> Mono for MultiVar<X, $I> {
+        impl<const X: char> Mono for VarN<X, $I> {
             type Deg = MultiDeg<$I>;
 
             fn deg(&self) -> Self::Deg {
@@ -219,7 +219,7 @@ mod tests {
 
     #[test]
     fn display() { 
-        type M = MultiVar<'X', usize>;
+        type M = VarN<'X', usize>;
 
         assert_eq!(format!("{}", M::from([])), "1");
         assert_eq!(format!("{}", M::from([0])), "1");
@@ -230,7 +230,7 @@ mod tests {
 
     #[test]
     fn from_pair() { 
-        type M = MultiVar<'X', usize>;
+        type M = VarN<'X', usize>;
 
         let d = M::from((2, 3)); // X₂³
         assert_eq!(d.0, MultiDeg::from_iter([(2, 3)]));
@@ -238,7 +238,7 @@ mod tests {
 
     #[test]
     fn from_arr() { 
-        type M = MultiVar<'X', usize>;
+        type M = VarN<'X', usize>;
 
         let d = M::from([1,0,3]); // X₀X₂³
         assert_eq!(d.0, MultiDeg::from_iter([(0, 1), (2, 3)]));
@@ -246,7 +246,7 @@ mod tests {
 
     #[test]
     fn from_iter() { 
-        type M = MultiVar<'X', usize>;
+        type M = VarN<'X', usize>;
 
         let d = M::from_iter([(0, 1), (2, 3)]); // X₀X₂³
         assert_eq!(d.0, MultiDeg::from_iter([(0, 1), (2, 3)]));
@@ -254,7 +254,7 @@ mod tests {
 
     #[test]
     fn deg_for() { 
-        type M = MultiVar<'X', usize>;
+        type M = VarN<'X', usize>;
 
         let d = M::from([1,0,3]); // X₀X₂³
         assert_eq!(d.deg_for(0), 1);
@@ -265,7 +265,7 @@ mod tests {
 
     #[test]
     fn total_deg() { 
-        type M = MultiVar<'X', usize>;
+        type M = VarN<'X', usize>;
 
         let d = M::from([1,0,3]); // X₀X₂³
         assert_eq!(d.total_deg(), 4);
@@ -273,7 +273,7 @@ mod tests {
 
     #[test]
     fn is_divisible() { 
-        type M = MultiVar<'X', usize>;
+        type M = VarN<'X', usize>;
 
         let one = M::from([]);
         let d1 = M::from([1,2,3]);
@@ -290,7 +290,7 @@ mod tests {
 
     #[test]
     fn div() { 
-        type M = MultiVar<'X', usize>;
+        type M = VarN<'X', usize>;
 
         let one = M::from([]);
         let d1 = M::from([1,2,3]);
@@ -303,7 +303,7 @@ mod tests {
 
     #[test]
     fn is_divisible_isize() { 
-        type M = MultiVar<'X', isize>;
+        type M = VarN<'X', isize>;
 
         let one = M::from([]);
         let d1 = M::from([1,2,3]);
@@ -320,7 +320,7 @@ mod tests {
 
     #[test]
     fn div_isize() { 
-        type M = MultiVar<'X', isize>;
+        type M = VarN<'X', isize>;
 
         let one = M::from([]);
         let d1 = M::from([1,2,3]);
@@ -334,7 +334,7 @@ mod tests {
 
     #[test]
     fn gen_mons() { 
-        type M = MultiVar<'X', usize>;
+        type M = VarN<'X', usize>;
 
         let n = 3;
         let tot = 5;
@@ -349,7 +349,7 @@ mod tests {
 
     #[test]
     fn from_str() { 
-        type M = MultiVar<'X', isize>;
+        type M = VarN<'X', isize>;
 
         let s = "1";
         assert_eq!(M::from_str(s), Ok(M::one()));
@@ -382,7 +382,7 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn serialize() { 
-        type M = MultiVar<'X', isize>;
+        type M = VarN<'X', isize>;
 
         let d = M::from([]);
         let ser = serde_json::to_string(&d).unwrap();

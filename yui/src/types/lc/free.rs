@@ -4,6 +4,7 @@ use crate::Elem;
 use crate::lc::Gen;
 
 #[derive(Debug, Display, Default, Hash, PartialEq, Eq, Clone, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[display(fmt = "<{}>", _0)]
 pub struct Free<T>(pub T) where T: Elem;
 

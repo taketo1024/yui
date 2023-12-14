@@ -3,6 +3,7 @@ use yui::{RingOps, Ring};
 use crate::sparse::{SpMat, MatTrait, SpVec};
 
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Trans<R> 
 where R: Ring, for <'x> &'x R: RingOps<R> {
     src_dim: usize, 

@@ -7,6 +7,9 @@ authors.workspace = true
 license.workspace = true
 edition.workspace = true
 
+[features]
+serde = ["dep:serde", "dep:serde_json"]
+
 [dependencies]
 bimap = "0.6.3"
 cartesian = "0.2.1"
@@ -17,8 +20,9 @@ itertools = "0.11.0"
 log = "0.4.20"
 num-traits = "0.2.16"
 rayon = "1.8.0"
+serde = { version = "1.0.193", optional = true }
+serde_json = { version = "1.0.108", optional = true }
 sprs = "0.11.1"
 # sprs = { git = "https://github.com/sparsemat/sprs", branch = "master" }
-
 yui = { path = "../yui" }
 yui-matrix = { path = "../yui-matrix" }

@@ -2,14 +2,14 @@ use core::panic;
 use std::fmt::{Display, Debug};
 use std::ops::{AddAssign, Mul, MulAssign, DivAssign, SubAssign, Div, Add};
 use std::str::FromStr;
-use num_traits::{Zero, One, Pow};
+use num_traits::{Zero, One, Pow, FromPrimitive};
 use auto_impl_ops::auto_ops;
 
 use crate::Elem;
 use crate::lc::Gen;
 
 use super::Mono;
-use super::univar::fmt_mono;
+use super::univar::{fmt_mono, parse_mono};
 
 // `BiVar<X, Y, I>` : represents bivariant monomials X^i Y^j.
 // `I` is either `usize` or `isize`.
@@ -62,22 +62,38 @@ impl<const X: char, const Y: char, I> From<(I, I)> for BiVar<X, Y, I> {
 }
 
 impl<const X: char, const Y: char, I> FromStr for BiVar<X, Y, I>
-where I: Zero + One {
-    type Err = ();
+where I: Zero + FromStr + FromPrimitive, I::Err: ToString {
+    type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() == 1 { 
-            let x = s.chars().next().unwrap();
-            if x == '1' { 
-                return Ok(Self(I::zero(), I::zero()));
-            } else if x == X { 
-                return Ok(Self(I::one(),  I::zero()));
-            } else if x == Y { 
-                return Ok(Self(I::zero(),  I::one()));
-            }
+        use regex::Regex;
+        if s == "1" { 
+            return Ok(Self(I::zero(), I::zero()))
         }
-        
-        // TODO support more complex format. 
-        Err(())
+
+        let p1 = format!(r"{X}(\^-?[0-9]+)?");
+        let p2 = format!(r"{Y}(\^-?[0-9]+)?");
+        let p_all = format!(r"^({p1})?\s?({p2})?$");
+
+        if !Regex::new(&p_all).unwrap().is_match(&s) { 
+            return Err(format!("Failed to parse: {s}"))
+        }
+
+        let r1 = Regex::new(&p1).unwrap();
+        let r2 = Regex::new(&p2).unwrap();
+
+        let d1 = if let Some(c) = r1.captures(s) { 
+            parse_mono(&X.to_string(), &c[0])?
+        } else { 
+            I::zero()
+        };
+
+        let d2 = if let Some(c) = r2.captures(s) { 
+            parse_mono(&Y.to_string(), &c[0])?
+        } else { 
+            I::zero()
+        };
+
+        Ok(Self(d1, d2))
     }
 }
 
@@ -129,18 +145,24 @@ where I: Eq + Ord, for<'x> &'x I: Add<&'x I, Output = I> {
 
 macro_rules! impl_bivar {
     ($I:ty) => {
+        impl<const X: char, const Y: char> BiVar<X, Y, $I> { 
+            fn fmt_impl(&self, unicode: bool) -> String { 
+                let BiVar(d0, d1) = self;
+                let x = fmt_mono(&X.to_string(), *d0, unicode);
+                let y = fmt_mono(&Y.to_string(), *d1, unicode);
+                match (x.as_str(), y.as_str()) {
+                    ("1", "1") => "1".to_string(),
+                    ( _ , "1") => x,
+                    ("1",  _ ) => y,
+                    _          => format!("{x}{y}")
+                }
+            }
+        }
+        
         impl<const X: char, const Y: char> Display for BiVar<X, Y, $I> { 
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let BiVar(d0, d1) = self;
-                let x = fmt_mono(X.to_string(), *d0);
-                let y = fmt_mono(Y.to_string(), *d1);
-                
-                match (x.as_str(), y.as_str()) {
-                    ("1", "1") => write!(f, "1"),
-                    ( _ , "1") => write!(f, "{x}"),
-                    ("1",  _ ) => write!(f, "{y}"),
-                    _          => write!(f, "{x}{y}")
-                }
+                let s = self.fmt_impl(true);
+                f.write_str(&s)
             }
         }
         
@@ -149,6 +171,23 @@ macro_rules! impl_bivar {
                 Display::fmt(self, f)
             }
         }
+
+        #[cfg(feature = "serde")]
+        impl<const X: char, const Y: char> serde::Serialize for BiVar<X, Y, $I> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where S: serde::Serializer {
+                serializer.serialize_str(&self.fmt_impl(false))
+            }
+        }
+        
+        #[cfg(feature = "serde")]
+        impl<'de, const X: char, const Y: char> serde::Deserialize<'de> for BiVar<X, Y, $I> {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where D: serde::Deserializer<'de> {
+                let s = String::deserialize(deserializer)?;
+                Self::from_str(&s).map_err(serde::de::Error::custom)
+            }
+        }        
 
         impl<const X: char, const Y: char> Elem for BiVar<X, Y, $I> { 
             fn math_symbol() -> String {
@@ -250,7 +289,11 @@ mod tests {
         assert_eq!(M::from_str("1"), Ok(M::one()));
         assert_eq!(M::from_str("X"), Ok(xy(1, 0)));
         assert_eq!(M::from_str("Y"), Ok(xy(0, 1)));
-        assert_eq!(M::from_str("2"), Err(()));
+        assert_eq!(M::from_str("X^2"), Ok(xy(2, 0)));
+        assert_eq!(M::from_str("Y^2"), Ok(xy(0, 2)));
+        assert_eq!(M::from_str("XY"), Ok(xy(1, 1)));
+        assert_eq!(M::from_str("X^2Y^3"), Ok(xy(2, 3)));
+        assert!(M::from_str("2").is_err());
     }
 
     #[test]

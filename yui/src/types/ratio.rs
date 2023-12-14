@@ -7,6 +7,7 @@ use auto_impl_ops::auto_ops;
 use crate::{EucRing, EucRingOps, Elem, Mon, AddMon, AddGrp, AddMonOps, AddGrpOps, MonOps, RingOps, Ring, FieldOps, Field, Integer, IntOps};
 
 #[derive(Copy, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Ratio<T> {
     numer: T,
     denom: T,
@@ -547,5 +548,14 @@ mod tests {
         let a = Ratio::new(3, 5);
         let b = Ratio::new(4, 7);
         assert!(a > b);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serialize() { 
+        let a = Ratio::new(3, 5);
+        let ser = serde_json::to_string(&a).unwrap();
+        let deser = serde_json::from_str::<Ratio<i32>>(&ser).unwrap();
+        assert_eq!(a, deser);
     }
 }

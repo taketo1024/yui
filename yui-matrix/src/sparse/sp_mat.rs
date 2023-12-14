@@ -318,6 +318,26 @@ where R: Display + Debug {
     }}
 }
 
+#[cfg(feature = "serde")]
+impl<R> serde::Serialize for SpMat<R>
+where R: Clone + serde::Serialize {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where S: serde::Serializer {
+        self.inner.serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, R> serde::Deserialize<'de> for SpMat<R>
+where R: Clone + serde::Deserialize<'de> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where D: serde::Deserializer<'de> {
+        let inner = CscMatrix::deserialize(deserializer)?;
+        let res = Self::from(inner);
+        Ok(res)
+    }
+}
+
 pub struct SpMatView<'a, 'b, R>  {
     target: &'a SpMat<R>,
     shape: (usize, usize),
@@ -525,5 +545,14 @@ pub(super) mod tests {
         let p = PermOwned::new(vec![2,0,1,3]);
         let q = SpMat::from_col_perm(p.view());
         assert!(&a * q == a.permute_cols(p.view()))
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serialize() { 
+        let a = SpMat::from_dense_data((3, 4), (0..12).map(|x| x % 5));
+        let ser = serde_json::to_string(&a).unwrap();
+        let des = serde_json::from_str(&ser).unwrap();
+        assert_eq!(a, des);
     }
 }

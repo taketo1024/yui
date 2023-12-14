@@ -7,10 +7,13 @@ authors.workspace = true
 license.workspace = true
 edition.workspace = true
 
+[features]
+serde = ["dep:serde", "dep:serde_json"]
+
 [dependencies]
-ahash = "0.8.6"
+ahash = { version = "0.8.6", features = ["serde"] }
 auto-impl-ops = "0.2.1"
-bimap = "0.6.3"
+bimap = { version = "0.6.3", features = ["serde"] }
 delegate = "0.10.0"
 derive_more = "0.99.17"
 dinglebit_combinatorics = "1.1.0"
@@ -21,3 +24,5 @@ num-integer = { version = "0.1.45", features = ["i128"] }
 num-traits = "0.2.16"
 prettytable = "0.10.0"
 regex = "1.9.6"
+serde = { version = "1.0.193", features = ["derive"], optional = true }
+serde_json = { version = "1.0.108", optional = true }

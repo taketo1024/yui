@@ -28,6 +28,7 @@ macro_rules! make2 {
     ($name:ident, $t:ty) => {
         #[allow(non_camel_case_types)]
         #[derive(Display, Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Add, Sub)]
+        #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
         #[display(fmt = "({}, {})", _0, _1)]
         pub struct $name(pub $t, pub $t);
 
@@ -59,6 +60,7 @@ macro_rules! make3 {
     ($name:ident, $t:ty) => {
         #[allow(non_camel_case_types)]
         #[derive(Display, Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Add, Sub)]
+        #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
         #[display(fmt = "({}, {}, {})", _0, _1, _2)]
         pub struct $name(pub $t, pub $t, pub $t);
 

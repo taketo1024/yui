@@ -9,5 +9,3 @@ pub use univar::Univar;
 pub use bivar::BiVar;
 pub use multivar::MultiVar;
 pub use poly::*;
-
-pub(crate) use univar::fmt_mono;

@@ -7,7 +7,7 @@ use auto_impl_ops::auto_ops;
 
 use crate::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Mon, MonOps, Ring, RingOps, EucRing, EucRingOps, Field, FieldOps};
 use crate::lc::{Lc, Gen};
-use super::{MultiDeg, Var, Var2, Var3,VarN};
+use super::{MultiDeg, Var, Var2, Var3,MultiVar};
 
 // A polynomial is a linear combination of monomials over R.
 
@@ -24,8 +24,8 @@ pub type Poly3 <const X: char, const Y: char, const Z: char, R> = PolyBase<Var3<
 pub type LPoly3<const X: char, const Y: char, const Z: char, R> = PolyBase<Var3<X, Y, Z, isize>, R>;
 
 // Multivar-type (ordinary, Laurent)
-pub type PolyN <const X: char, R> = PolyBase<VarN<X, usize>, R>;
-pub type LPolyN<const X: char, R> = PolyBase<VarN<X, isize>, R>;
+pub type PolyN <const X: char, R> = PolyBase<MultiVar<X, usize>, R>;
+pub type LPolyN<const X: char, R> = PolyBase<MultiVar<X, isize>, R>;
 
 pub trait Mono: 
     Mul<Output = Self> + 
@@ -186,18 +186,18 @@ macro_rules! impl_var_specific {
         }
 
         // MultiVar
-        impl<const X: char, R> PolyBase<VarN<X, $I>, R>
+        impl<const X: char, R> PolyBase<MultiVar<X, $I>, R>
         where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn variable(i: usize) -> Self { 
                 let d = MultiDeg::from((i, 1));
-                Self::from(VarN::from(d)) // x^1
+                Self::from(MultiVar::from(d)) // x^1
             }
 
-            pub fn mono<const N: usize>(degs: [$I; N]) -> VarN<X, $I> {
-                VarN::from(degs)
+            pub fn mono<const N: usize>(degs: [$I; N]) -> MultiVar<X, $I> {
+                MultiVar::from(degs)
             }
 
-            pub fn lead_term_for(&self, k: usize) -> Option<(&VarN<X, $I>, &R)> { 
+            pub fn lead_term_for(&self, k: usize) -> Option<(&MultiVar<X, $I>, &R)> { 
                 self.iter()
                     .filter(|(x, _)| x.deg_for(k) > 0)
                     .max_by(|(x, _), (y, _)|

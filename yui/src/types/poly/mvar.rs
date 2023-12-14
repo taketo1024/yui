@@ -13,11 +13,11 @@ use super::{Mono, MultiDeg};
 use super::var::{fmt_mono, parse_mono};
 
 #[derive(Clone, PartialEq, Eq, Hash, Default)]
-pub struct VarN<const X: char, I> (
+pub struct MultiVar<const X: char, I> (
     MultiDeg<I>
 );
 
-impl<const X: char, I> VarN<X, I> {
+impl<const X: char, I> MultiVar<X, I> {
     pub fn var_symbol() -> char { 
         X
     }
@@ -51,41 +51,41 @@ impl<const X: char, I> VarN<X, I> {
     }
 }
 
-impl<const X: char, I> From<MultiDeg<I>> for VarN<X, I> {
+impl<const X: char, I> From<MultiDeg<I>> for MultiVar<X, I> {
     fn from(d: MultiDeg<I>) -> Self {
         Self(d)
     }
 }
 
-impl<const X: char, I> From<(usize, I)> for VarN<X, I>
+impl<const X: char, I> From<(usize, I)> for MultiVar<X, I>
 where I: Zero {
     fn from(value: (usize, I)) -> Self {
         Self::from_iter([value])
     }
 }
 
-impl<const X: char, const N: usize, I> From<[I; N]> for VarN<X, I>
+impl<const X: char, const N: usize, I> From<[I; N]> for MultiVar<X, I>
 where I: Zero {
     fn from(degs: [I; N]) -> Self {
         Self::from(MultiDeg::from(degs))
     }
 }
 
-impl<const X: char, I> FromIterator<(usize, I)> for VarN<X, I>
+impl<const X: char, I> FromIterator<(usize, I)> for MultiVar<X, I>
 where I: Zero {
     fn from_iter<T: IntoIterator<Item = (usize, I)>>(iter: T) -> Self {
         Self::from(MultiDeg::from_iter(iter))
     }
 }
 
-impl<const X: char, I> FromStr for VarN<X, I>
+impl<const X: char, I> FromStr for MultiVar<X, I>
 where I: Zero + FromStr + FromPrimitive, <I as FromStr>::Err: ToString {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use regex::Regex;
 
         if s == "1" { 
-            return Ok(VarN::from(MultiDeg::empty()))
+            return Ok(MultiVar::from(MultiDeg::empty()))
         }
 
         let p = format!(r"({X}_([0-9]+))(\^-?[0-9]+)?");
@@ -105,35 +105,35 @@ where I: Zero + FromStr + FromPrimitive, <I as FromStr>::Err: ToString {
             degs.push((i, d));
         };
 
-        let mvar = VarN::from_iter(degs);
+        let mvar = MultiVar::from_iter(degs);
         Ok(mvar)
     }
 }
 
 #[auto_ops]
-impl<const X: char, I> MulAssign<&VarN<X, I>> for VarN<X, I>
+impl<const X: char, I> MulAssign<&MultiVar<X, I>> for MultiVar<X, I>
 where I: Zero + for<'x> AddAssign<&'x I> {
-    fn mul_assign(&mut self, rhs: &VarN<X, I>) {
+    fn mul_assign(&mut self, rhs: &MultiVar<X, I>) {
         self.0 += &rhs.0 // x^i * x^j = x^{i+j}
     }
 }
 
 #[auto_ops]
-impl<const X: char, I> DivAssign<&VarN<X, I>> for VarN<X, I>
+impl<const X: char, I> DivAssign<&MultiVar<X, I>> for MultiVar<X, I>
 where I: Zero + for<'x> SubAssign<&'x I> {
-    fn div_assign(&mut self, rhs: &VarN<X, I>) {
+    fn div_assign(&mut self, rhs: &MultiVar<X, I>) {
         self.0 -= &rhs.0 // x^i * x^j = x^{i+j}
     }
 }
 
-impl<const X: char, I> One for VarN<X, I>
+impl<const X: char, I> One for MultiVar<X, I>
 where I: Zero + for<'x> AddAssign<&'x I> {
     fn one() -> Self {
         Self::from(MultiDeg::zero()) // x^0 = 1.
     }
 }
 
-impl<const X: char, I> Display for VarN<X, I>
+impl<const X: char, I> Display for MultiVar<X, I>
 where I: ToPrimitive { 
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = self.fmt_impl(true);
@@ -141,21 +141,21 @@ where I: ToPrimitive {
     }
 }
 
-impl<const X: char, I> Debug for VarN<X, I>
+impl<const X: char, I> Debug for MultiVar<X, I>
 where I: ToPrimitive { 
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Display::fmt(self, f)
     }
 }
 
-impl<const X: char, I> PartialOrd for VarN<X, I>
+impl<const X: char, I> PartialOrd for MultiVar<X, I>
 where I: Zero + Ord + for<'x> Add<&'x I, Output = I> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> { 
         self.0.partial_cmp(&other.0)
     }
 }
 
-impl<const X: char, I> Ord for VarN<X, I>
+impl<const X: char, I> Ord for MultiVar<X, I>
 where I: Zero + Ord + for<'x> Add<&'x I, Output = I> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.0.cmp(&other.0)
@@ -163,7 +163,7 @@ where I: Zero + Ord + for<'x> Add<&'x I, Output = I> {
 }
 
 #[cfg(feature = "serde")]
-impl<const X: char, I> serde::Serialize for VarN<X, I>
+impl<const X: char, I> serde::Serialize for MultiVar<X, I>
 where I: ToPrimitive {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where S: serde::Serializer {
@@ -172,7 +172,7 @@ where I: ToPrimitive {
 }
 
 #[cfg(feature = "serde")]
-impl<'de, const X: char, I> serde::Deserialize<'de> for VarN<X, I>
+impl<'de, const X: char, I> serde::Deserialize<'de> for MultiVar<X, I>
 where Self: FromStr, <Self as FromStr>::Err: Display {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where D: serde::Deserializer<'de> {
@@ -181,19 +181,19 @@ where Self: FromStr, <Self as FromStr>::Err: Display {
     }
 }        
 
-impl<const X: char, I> Elem for VarN<X, I>
+impl<const X: char, I> Elem for MultiVar<X, I>
 where I: ElemBase + ToPrimitive { 
     fn math_symbol() -> String {
         format!("{X}")
     }
 }
 
-impl<const X: char, I> Gen for VarN<X, I>
+impl<const X: char, I> Gen for MultiVar<X, I>
 where I: ElemBase + Zero + Ord + Hash + ToPrimitive + for<'x> Add<&'x I, Output = I> {}
 
 macro_rules! impl_multivar_unsigned {
     ($I:ty) => {
-        impl<const X: char> Mono for VarN<X, $I> {
+        impl<const X: char> Mono for MultiVar<X, $I> {
             type Deg = MultiDeg<$I>;
 
             fn deg(&self) -> Self::Deg {
@@ -217,7 +217,7 @@ macro_rules! impl_multivar_unsigned {
             }
         }
 
-        impl<const X: char> VarN<X, $I> {
+        impl<const X: char> MultiVar<X, $I> {
             pub fn generate(n: usize, tot_deg: usize) -> impl Iterator<Item = Self> { 
                 use dinglebit_combinatorics::Combination as C;
                 use crate::algo::rep_comb;
@@ -239,7 +239,7 @@ macro_rules! impl_multivar_unsigned {
 
 macro_rules! impl_multivar_signed {
     ($I:ty) => {
-        impl<const X: char> Mono for VarN<X, $I> {
+        impl<const X: char> Mono for MultiVar<X, $I> {
             type Deg = MultiDeg<$I>;
 
             fn deg(&self) -> Self::Deg {
@@ -273,7 +273,7 @@ mod tests {
 
     #[test]
     fn display() { 
-        type M = VarN<'X', usize>;
+        type M = MultiVar<'X', usize>;
 
         assert_eq!(format!("{}", M::from([])), "1");
         assert_eq!(format!("{}", M::from([0])), "1");
@@ -284,7 +284,7 @@ mod tests {
 
     #[test]
     fn from_pair() { 
-        type M = VarN<'X', usize>;
+        type M = MultiVar<'X', usize>;
 
         let d = M::from((2, 3)); // X₂³
         assert_eq!(d.0, MultiDeg::from_iter([(2, 3)]));
@@ -292,7 +292,7 @@ mod tests {
 
     #[test]
     fn from_arr() { 
-        type M = VarN<'X', usize>;
+        type M = MultiVar<'X', usize>;
 
         let d = M::from([1,0,3]); // X₀X₂³
         assert_eq!(d.0, MultiDeg::from_iter([(0, 1), (2, 3)]));
@@ -300,7 +300,7 @@ mod tests {
 
     #[test]
     fn from_iter() { 
-        type M = VarN<'X', usize>;
+        type M = MultiVar<'X', usize>;
 
         let d = M::from_iter([(0, 1), (2, 3)]); // X₀X₂³
         assert_eq!(d.0, MultiDeg::from_iter([(0, 1), (2, 3)]));
@@ -308,7 +308,7 @@ mod tests {
 
     #[test]
     fn deg_for() { 
-        type M = VarN<'X', usize>;
+        type M = MultiVar<'X', usize>;
 
         let d = M::from([1,0,3]); // X₀X₂³
         assert_eq!(d.deg_for(0), 1);
@@ -319,7 +319,7 @@ mod tests {
 
     #[test]
     fn total_deg() { 
-        type M = VarN<'X', usize>;
+        type M = MultiVar<'X', usize>;
 
         let d = M::from([1,0,3]); // X₀X₂³
         assert_eq!(d.total_deg(), 4);
@@ -327,7 +327,7 @@ mod tests {
 
     #[test]
     fn is_divisible() { 
-        type M = VarN<'X', usize>;
+        type M = MultiVar<'X', usize>;
 
         let one = M::from([]);
         let d1 = M::from([1,2,3]);
@@ -344,7 +344,7 @@ mod tests {
 
     #[test]
     fn div() { 
-        type M = VarN<'X', usize>;
+        type M = MultiVar<'X', usize>;
 
         let one = M::from([]);
         let d1 = M::from([1,2,3]);
@@ -357,7 +357,7 @@ mod tests {
 
     #[test]
     fn is_divisible_isize() { 
-        type M = VarN<'X', isize>;
+        type M = MultiVar<'X', isize>;
 
         let one = M::from([]);
         let d1 = M::from([1,2,3]);
@@ -374,7 +374,7 @@ mod tests {
 
     #[test]
     fn div_isize() { 
-        type M = VarN<'X', isize>;
+        type M = MultiVar<'X', isize>;
 
         let one = M::from([]);
         let d1 = M::from([1,2,3]);
@@ -388,7 +388,7 @@ mod tests {
 
     #[test]
     fn gen_mons() { 
-        type M = VarN<'X', usize>;
+        type M = MultiVar<'X', usize>;
 
         let n = 3;
         let tot = 5;
@@ -403,7 +403,7 @@ mod tests {
 
     #[test]
     fn from_str() { 
-        type M = VarN<'X', isize>;
+        type M = MultiVar<'X', isize>;
 
         let s = "1";
         assert_eq!(M::from_str(s), Ok(M::one()));
@@ -436,7 +436,7 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn serialize() { 
-        type M = VarN<'X', isize>;
+        type M = MultiVar<'X', isize>;
 
         let d = M::from([]);
         let ser = serde_json::to_string(&d).unwrap();

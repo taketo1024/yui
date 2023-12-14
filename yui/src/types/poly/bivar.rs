@@ -3,6 +3,7 @@ use std::fmt::{Display, Debug};
 use std::ops::{AddAssign, Mul, MulAssign, DivAssign, SubAssign, Div, Add};
 use std::str::FromStr;
 use num_traits::{Zero, One, Pow, FromPrimitive};
+use itertools::Itertools;
 use auto_impl_ops::auto_ops;
 
 use crate::Elem;
@@ -15,9 +16,8 @@ use super::univar::{fmt_mono, parse_mono};
 // `I` is either `usize` or `isize`.
 
 #[derive(Clone, PartialEq, Eq, Hash, Default)]
-pub struct BiVar<const X: char, const Y: char, I>(
-    I, 
-    I
+pub struct BiVar<const X: char, const Y: char, I> (
+    I, I
 );
 
 impl<const X: char, const Y: char, I> BiVar<X, Y, I> {
@@ -37,21 +37,21 @@ impl<const X: char, const Y: char, I> BiVar<X, Y, I> {
 }
 
 impl<const X: char, const Y: char, I> BiVar<X, Y, I>
-where I: Clone {
+where I: Copy {
     pub fn deg_for(&self, i: usize) -> I { 
         assert!(i < 2);
         match i { 
-            0 => self.0.clone(),
-            1 => self.1.clone(),
+            0 => self.0,
+            1 => self.1,
             _ => panic!()
         }
     }
 }
 
 impl<const X: char, const Y: char, I> BiVar<X, Y, I>
-where for<'x> &'x I: Add<&'x I, Output = I> {
+where I: Copy + Add<I, Output = I> {
     pub fn total_deg(&self) -> I { 
-        &self.0 + &self.1
+        self.0 + self.1
     }
 }
 
@@ -62,7 +62,7 @@ impl<const X: char, const Y: char, I> From<(I, I)> for BiVar<X, Y, I> {
 }
 
 impl<const X: char, const Y: char, I> FromStr for BiVar<X, Y, I>
-where I: Zero + FromStr + FromPrimitive, I::Err: ToString {
+where I: Copy + Zero + FromStr + FromPrimitive, I::Err: ToString {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use regex::Regex;
@@ -81,19 +81,15 @@ where I: Zero + FromStr + FromPrimitive, I::Err: ToString {
         let r1 = Regex::new(&p1).unwrap();
         let r2 = Regex::new(&p2).unwrap();
 
-        let d1 = if let Some(c) = r1.captures(s) { 
-            parse_mono(&X.to_string(), &c[0])?
-        } else { 
-            I::zero()
-        };
+        let d = [(X, r1), (Y, r2)].into_iter().map(|(x, r)| 
+            if let Some(c) = r.captures(s) { 
+                parse_mono(&x.to_string(), &c[0])
+            } else { 
+                Ok(I::zero())
+            }
+        ).collect::<Result<Vec<_>, _>>()?;
 
-        let d2 = if let Some(c) = r2.captures(s) { 
-            parse_mono(&Y.to_string(), &c[0])?
-        } else { 
-            I::zero()
-        };
-
-        Ok(Self(d1, d2))
+        Ok(Self(d[0], d[1]))
     }
 }
 
@@ -123,14 +119,14 @@ where I: for<'x >SubAssign<&'x I> {
 }
 
 impl<const X: char, const Y: char, I> PartialOrd for BiVar<X, Y, I>
-where I: Eq + Ord, for<'x> &'x I: Add<&'x I, Output = I> {
+where I: Copy + Eq + Ord + Add<I, Output = I> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(Ord::cmp(self, other))
     }
 }
 
 impl<const X: char, const Y: char, I> Ord for BiVar<X, Y, I>
-where I: Eq + Ord, for<'x> &'x I: Add<&'x I, Output = I> {
+where I: Copy + Eq + Ord + Add<I, Output = I> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         use std::cmp::*;
 
@@ -148,13 +144,14 @@ macro_rules! impl_bivar {
         impl<const X: char, const Y: char> BiVar<X, Y, $I> { 
             fn fmt_impl(&self, unicode: bool) -> String { 
                 let BiVar(d0, d1) = self;
-                let x = fmt_mono(&X.to_string(), *d0, unicode);
-                let y = fmt_mono(&Y.to_string(), *d1, unicode);
-                match (x.as_str(), y.as_str()) {
-                    ("1", "1") => "1".to_string(),
-                    ( _ , "1") => x,
-                    ("1",  _ ) => y,
-                    _          => format!("{x}{y}")
+                let s = [(X, d0), (Y, d1)].into_iter().map(|(x, &d)|
+                    fmt_mono(&x.to_string(), d, unicode)
+                ).filter(|s| s != "1").join("");
+
+                if s == "" { 
+                    "1".to_string()
+                } else { 
+                    s
                 }
             }
         }

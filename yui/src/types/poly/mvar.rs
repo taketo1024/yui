@@ -1,142 +1,196 @@
 use std::fmt::{Display, Debug};
+use std::ops::{AddAssign, MulAssign, Mul, Div, DivAssign, SubAssign, Add};
 use std::str::FromStr;
-use num_traits::{Zero, One};
+use std::hash::Hash;
+use num_traits::{Zero, One, ToPrimitive, FromPrimitive};
 use itertools::Itertools;
+use auto_impl_ops::auto_ops;
 
-use crate::Elem;
+use crate::{Elem, ElemBase};
 use crate::lc::Gen;
 use crate::util::format::subscript;
-use super::{Mono, MultiDeg, Var};
+use super::{Mono, MultiDeg};
 use super::var::{fmt_mono, parse_mono};
 
-pub type VarN<const X: char, I> = Var<X, MultiDeg<I>>;
+#[derive(Clone, PartialEq, Eq, Hash, Default)]
+pub struct VarN<const X: char, I> (
+    MultiDeg<I>
+);
 
-// impls for multivar-type.
-macro_rules! impl_multivar {
-    ($I:ty) => {
-        impl<const X: char> VarN<X, $I> {
-            pub fn deg_for(&self, i: usize) -> $I {
-                self.0[i]
-            }
+impl<const X: char, I> VarN<X, I> {
+    pub fn var_symbol() -> char { 
+        X
+    }
 
-            pub fn total_deg(&self) -> $I {
-                self.0.total()
-            }
+    pub fn deg_for(&self, i: usize) -> I
+    where I: Clone {
+        self.0[i].clone()
+    }
 
-            fn fmt_impl(&self, unicode: bool) -> String { 
-                let deg = self.deg();
-                let s = deg.iter().map(|(&i, &d)| {
-                    let x = if unicode { 
-                        format!("{X}{}", subscript(i))
-                    } else { 
-                        format!("{X}_{}", i)
-                    };
-                    fmt_mono(&x, d, unicode)
-                }).join("");
-        
-                if s.is_empty() { 
-                    "1".to_string()
-                } else { 
-                    s
-                }
-            }
+    pub fn total_deg(&self) -> I
+    where I: Zero + for<'x> Add<&'x I, Output = I> {
+        self.0.total()
+    }
+
+    fn fmt_impl(&self, unicode: bool) -> String
+    where I: Clone + ToPrimitive { 
+        let s = self.0.iter().map(|(&i, d)| {
+            let x = if unicode { 
+                format!("{X}{}", subscript(i))
+            } else { 
+                format!("{X}_{}", i)
+            };
+            fmt_mono(&x, d.clone(), unicode)
+        }).join("");
+
+        if s.is_empty() { 
+            "1".to_string()
+        } else { 
+            s
         }
-
-        impl<const X: char> From<(usize, $I)> for VarN<X, $I> {
-            fn from(value: (usize, $I)) -> Self {
-                Self::from_iter([value])
-            }
-        }
-        
-        impl<const X: char, const N: usize> From<[$I; N]> for VarN<X, $I> {
-            fn from(degs: [$I; N]) -> Self {
-                Self::from(MultiDeg::from(degs))
-            }
-        }
-
-        impl<const X: char> FromIterator<(usize, $I)> for VarN<X, $I> {
-            fn from_iter<T: IntoIterator<Item = (usize, $I)>>(iter: T) -> Self {
-                Self::from(MultiDeg::from_iter(iter))
-            }
-        }
-        
-        impl<const X: char> Display for VarN<X, $I> { 
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let s = self.fmt_impl(true);
-                f.write_str(&s)
-            }
-        }
-
-        impl<const X: char> Debug for VarN<X, $I> { 
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                Display::fmt(self, f)
-            }
-        }
-
-        impl<const X: char> FromStr for VarN<X, $I> {
-            type Err = String;
-            fn from_str(s: &str) -> Result<Self, Self::Err> {
-                use regex::Regex;
-
-                if s == "1" { 
-                    return Ok(Var::one())
-                }
-
-                // TODO validate s
-        
-                let p = format!(r"({X}_([0-9]+))(\^-?[0-9]+)?");
-                let p_all = format!(r"^({p}\s?)+$");
-
-                if !Regex::new(&p_all).unwrap().is_match(&s) { 
-                    return Err(format!("Failed to parse: {s}"))
-                }
-
-                let r = Regex::new(&p).unwrap();
-                let mut degs = vec![];
-                
-                for c in r.captures_iter(&s) {
-                    let x = &c[1];
-                    let i = usize::from_str(&c[2]).map_err(|e| e.to_string())?;
-                    let d = parse_mono(x, &c[0])?;
-                    degs.push((i, d));
-                };
-        
-                let mvar = VarN::from_iter(degs);
-                Ok(mvar)
-            }
-        }
-
-        #[cfg(feature = "serde")]
-        impl<const X: char> serde::Serialize for VarN<X, $I> {
-            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-            where S: serde::Serializer {
-                serializer.serialize_str(&self.fmt_impl(false))
-            }
-        }
-        
-        #[cfg(feature = "serde")]
-        impl<'de, const X: char> serde::Deserialize<'de> for VarN<X, $I> {
-            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-            where D: serde::Deserializer<'de> {
-                let s = String::deserialize(deserializer)?;
-                Self::from_str(&s).map_err(serde::de::Error::custom)
-            }
-        }        
-
-        impl<const X: char> Elem for VarN<X, $I> { 
-            fn math_symbol() -> String {
-                format!("{X}")
-            }
-        }
-
-        impl<const X: char> Gen for VarN<X, $I> {}
-    };
+    }
 }
+
+impl<const X: char, I> From<MultiDeg<I>> for VarN<X, I> {
+    fn from(d: MultiDeg<I>) -> Self {
+        Self(d)
+    }
+}
+
+impl<const X: char, I> From<(usize, I)> for VarN<X, I>
+where I: Zero {
+    fn from(value: (usize, I)) -> Self {
+        Self::from_iter([value])
+    }
+}
+
+impl<const X: char, const N: usize, I> From<[I; N]> for VarN<X, I>
+where I: Zero {
+    fn from(degs: [I; N]) -> Self {
+        Self::from(MultiDeg::from(degs))
+    }
+}
+
+impl<const X: char, I> FromIterator<(usize, I)> for VarN<X, I>
+where I: Zero {
+    fn from_iter<T: IntoIterator<Item = (usize, I)>>(iter: T) -> Self {
+        Self::from(MultiDeg::from_iter(iter))
+    }
+}
+
+impl<const X: char, I> FromStr for VarN<X, I>
+where I: Clone + Zero + FromStr + FromPrimitive, <I as FromStr>::Err: ToString {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use regex::Regex;
+
+        if s == "1" { 
+            return Ok(VarN::from(MultiDeg::empty()))
+        }
+
+        let p = format!(r"({X}_([0-9]+))(\^-?[0-9]+)?");
+        let p_all = format!(r"^({p}\s?)+$");
+
+        if !Regex::new(&p_all).unwrap().is_match(&s) { 
+            return Err(format!("Failed to parse: {s}"))
+        }
+
+        let r = Regex::new(&p).unwrap();
+        let mut degs = vec![];
+        
+        for c in r.captures_iter(&s) {
+            let x = &c[1];
+            let i = usize::from_str(&c[2]).map_err(|e| e.to_string())?;
+            let d = parse_mono(x, &c[0])?;
+            degs.push((i, d));
+        };
+
+        let mvar = VarN::from_iter(degs);
+        Ok(mvar)
+    }
+}
+
+#[auto_ops]
+impl<const X: char, I> MulAssign<&VarN<X, I>> for VarN<X, I>
+where I: Zero + Clone + for<'x> AddAssign<&'x I> {
+    fn mul_assign(&mut self, rhs: &VarN<X, I>) {
+        self.0 += &rhs.0 // x^i * x^j = x^{i+j}
+    }
+}
+
+#[auto_ops]
+impl<const X: char, I> DivAssign<&VarN<X, I>> for VarN<X, I>
+where I: Zero + Clone + for<'x> SubAssign<&'x I> {
+    fn div_assign(&mut self, rhs: &VarN<X, I>) {
+        self.0 -= &rhs.0 // x^i * x^j = x^{i+j}
+    }
+}
+
+impl<const X: char, I> One for VarN<X, I>
+where I: Zero + Clone + for<'x> AddAssign<&'x I> {
+    fn one() -> Self {
+        Self::from(MultiDeg::zero()) // x^0 = 1.
+    }
+}
+
+impl<const X: char, I> Display for VarN<X, I>
+where I: Clone + ToPrimitive { 
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = self.fmt_impl(true);
+        f.write_str(&s)
+    }
+}
+
+impl<const X: char, I> Debug for VarN<X, I>
+where I: Clone + ToPrimitive { 
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
+    }
+}
+
+impl<const X: char, I> PartialOrd for VarN<X, I>
+where I: Clone + Zero + Ord + for<'x> Add<&'x I, Output = I> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> { 
+        self.0.partial_cmp(&other.0)
+    }
+}
+
+impl<const X: char, I> Ord for VarN<X, I>
+where I: Clone + Zero + Ord + for<'x> Add<&'x I, Output = I> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<const X: char, I> serde::Serialize for VarN<X, I> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where S: serde::Serializer {
+        serializer.serialize_str(&self.fmt_impl(false))
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, const X: char> serde::Deserialize<'de> for VarN<X, I> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where D: serde::Deserializer<'de> {
+        let s = String::deserialize(deserializer)?;
+        Self::from_str(&s).map_err(serde::de::Error::custom)
+    }
+}        
+
+impl<const X: char, I> Elem for VarN<X, I>
+where I: ElemBase + ToPrimitive { 
+    fn math_symbol() -> String {
+        format!("{X}")
+    }
+}
+
+impl<const X: char, I> Gen for VarN<X, I>
+where I: ElemBase + Zero + Ord + Hash + ToPrimitive + for<'x> Add<&'x I, Output = I> {}
 
 macro_rules! impl_multivar_unsigned {
     ($I:ty) => {
-        impl_multivar!($I);
-
         impl<const X: char> Mono for VarN<X, $I> {
             type Deg = MultiDeg<$I>;
 
@@ -183,8 +237,6 @@ macro_rules! impl_multivar_unsigned {
 
 macro_rules! impl_multivar_signed {
     ($I:ty) => {
-        impl_multivar!($I);
-
         impl<const X: char> Mono for VarN<X, $I> {
             type Deg = MultiDeg<$I>;
 

@@ -190,7 +190,7 @@ macro_rules! impl_var_specific {
         where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn variable(i: usize) -> Self { 
                 let d = MultiDeg::from((i, 1));
-                Self::from(Var::from(d)) // x^1
+                Self::from(VarN::from(d)) // x^1
             }
 
             pub fn mono<const N: usize>(degs: [$I; N]) -> VarN<X, $I> {

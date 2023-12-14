@@ -24,6 +24,10 @@ where I: Zero {
     fn reduce(&mut self) { 
         self.data.retain(|_, i| !i.is_zero())
     }
+
+    pub(crate) fn empty() -> Self { 
+        Self::new_reduced(BTreeMap::new())
+    }
 }
 
 impl<I> MultiDeg<I> {
@@ -65,7 +69,7 @@ where I: Zero + Ord {
 }
 
 impl<I> MultiDeg<I>
-where for<'x> I: Zero + Add<&'x I, Output = I> {
+where I: Zero + for<'x> Add<&'x I, Output = I> {
     pub fn total(&self) -> I { 
         self.iter().map(|(_, d)| d).fold(I::zero(), |res, d| res + d)
     }
@@ -102,9 +106,9 @@ impl<I> Index<usize> for MultiDeg<I> {
 }
 
 impl<I> Zero for MultiDeg<I>
-where for<'x> I: Clone + AddAssign<&'x I> + Zero {
+where I: Clone + Zero + for<'x> AddAssign<&'x I> {
     fn zero() -> Self {
-        Self::new_reduced(BTreeMap::new())
+        Self::empty()
     }
 
     fn is_zero(&self) -> bool {
@@ -114,7 +118,7 @@ where for<'x> I: Clone + AddAssign<&'x I> + Zero {
 
 #[auto_ops]
 impl<I> AddAssign<&MultiDeg<I>> for MultiDeg<I>
-where for<'x> I: AddAssign<&'x I> + Zero + Clone {
+where I: Zero + Clone + for<'x> AddAssign<&'x I> {
     fn add_assign(&mut self, rhs: &MultiDeg<I>) {
         let data = &mut self.data;
         for (i, d) in rhs.iter() { 
@@ -130,7 +134,7 @@ where for<'x> I: AddAssign<&'x I> + Zero + Clone {
 
 #[auto_ops]
 impl<I> SubAssign<&MultiDeg<I>> for MultiDeg<I>
-where for<'x> I: SubAssign<&'x I> + Zero + Clone {
+where I: Zero + Clone + for<'x> SubAssign<&'x I> {
     fn sub_assign(&mut self, rhs: &MultiDeg<I>) {
         let data = &mut self.data;
         for (i, d) in rhs.iter() { 

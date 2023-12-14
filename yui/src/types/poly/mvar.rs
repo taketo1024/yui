@@ -33,14 +33,14 @@ impl<const X: char, I> VarN<X, I> {
     }
 
     fn fmt_impl(&self, unicode: bool) -> String
-    where I: Clone + ToPrimitive { 
+    where I: ToPrimitive { 
         let s = self.0.iter().map(|(&i, d)| {
             let x = if unicode { 
                 format!("{X}{}", subscript(i))
             } else { 
                 format!("{X}_{}", i)
             };
-            fmt_mono(&x, d.clone(), unicode)
+            fmt_mono(&x, d, unicode)
         }).join("");
 
         if s.is_empty() { 

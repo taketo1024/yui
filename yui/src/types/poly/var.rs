@@ -62,7 +62,7 @@ macro_rules! impl_univar {
             }
 
             fn fmt_impl(&self, unicode: bool) -> String { 
-                fmt_mono(&X.to_string(), self.0, unicode)
+                fmt_mono(&X.to_string(), &self.0, unicode)
             }
         }
         
@@ -172,7 +172,7 @@ macro_rules! impl_univar_signed {
 impl_univar_unsigned!(usize);
 impl_univar_signed!  (isize);
 
-pub(crate) fn fmt_mono<I>(x: &str, d: I, unicode: bool) -> String
+pub(crate) fn fmt_mono<I>(x: &str, d: &I, unicode: bool) -> String
 where I: ToPrimitive {
     let d = d.to_isize().unwrap();
     if d.is_zero() { 

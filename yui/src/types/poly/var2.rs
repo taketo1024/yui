@@ -144,7 +144,7 @@ macro_rules! impl_bivar {
         impl<const X: char, const Y: char> Var2<X, Y, $I> { 
             fn fmt_impl(&self, unicode: bool) -> String { 
                 let Var2(d0, d1) = self;
-                let s = [(X, d0), (Y, d1)].into_iter().map(|(x, &d)|
+                let s = [(X, d0), (Y, d1)].into_iter().map(|(x, d)|
                     fmt_mono(&x.to_string(), d, unicode)
                 ).filter(|s| s != "1").join("");
 

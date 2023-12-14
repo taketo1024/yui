@@ -13,7 +13,7 @@ use super::Mono;
 // `Var<X, I>` : represents monomials X^d (univar).
 // `I` is either `usize` or `isize`.
 
-#[derive(Clone, PartialEq, Eq, Hash, Default, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Default, PartialOrd, Ord)]
 pub struct Var<const X: char, I>(
     I
 );

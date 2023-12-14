@@ -106,7 +106,7 @@ impl<I> Index<usize> for MultiDeg<I> {
 }
 
 impl<I> Zero for MultiDeg<I>
-where I: Clone + Zero + for<'x> AddAssign<&'x I> {
+where I: Zero + for<'x> AddAssign<&'x I> {
     fn zero() -> Self {
         Self::empty()
     }
@@ -118,15 +118,15 @@ where I: Clone + Zero + for<'x> AddAssign<&'x I> {
 
 #[auto_ops]
 impl<I> AddAssign<&MultiDeg<I>> for MultiDeg<I>
-where I: Zero + Clone + for<'x> AddAssign<&'x I> {
+where I: Zero + for<'x> AddAssign<&'x I> {
     fn add_assign(&mut self, rhs: &MultiDeg<I>) {
         let data = &mut self.data;
         for (i, d) in rhs.iter() { 
-            if let Some(d_i) = data.get_mut(i) { 
-                d_i.add_assign(d);
-            } else { 
-                data.insert(*i, d.clone());
+            if !data.contains_key(i) {
+                data.insert(*i, I::zero());
             }
+            let d_i = data.get_mut(i).unwrap();
+            d_i.add_assign(d);
         }
         self.reduce()
     }
@@ -134,7 +134,7 @@ where I: Zero + Clone + for<'x> AddAssign<&'x I> {
 
 #[auto_ops]
 impl<I> SubAssign<&MultiDeg<I>> for MultiDeg<I>
-where I: Zero + Clone + for<'x> SubAssign<&'x I> {
+where I: Zero + for<'x> SubAssign<&'x I> {
     fn sub_assign(&mut self, rhs: &MultiDeg<I>) {
         let data = &mut self.data;
         for (i, d) in rhs.iter() { 
@@ -160,14 +160,14 @@ where I: Zero, for<'x> &'x I: Neg<Output = I> {
 }
 
 impl<I> PartialOrd for MultiDeg<I>
-where I: Clone + Zero + Ord + for<'x> Add<&'x I, Output = I> {
+where I: Zero + Ord + for<'x> Add<&'x I, Output = I> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl<I> Ord for MultiDeg<I>
-where I: Clone + Zero + Ord + for<'x> Add<&'x I, Output = I> {
+where I: Zero + Ord + for<'x> Add<&'x I, Output = I> {
     // Graded lexicographic order, grlex
     // see: https://en.wikipedia.org/wiki/Monomial_order#Graded_lexicographic_order
 

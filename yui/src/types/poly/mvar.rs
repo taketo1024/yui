@@ -23,8 +23,8 @@ impl<const X: char, I> VarN<X, I> {
     }
 
     pub fn deg_for(&self, i: usize) -> I
-    where I: Clone {
-        self.0[i].clone()
+    where I: Copy {
+        self.0[i]
     }
 
     pub fn total_deg(&self) -> I
@@ -79,7 +79,7 @@ where I: Zero {
 }
 
 impl<const X: char, I> FromStr for VarN<X, I>
-where I: Clone + Zero + FromStr + FromPrimitive, <I as FromStr>::Err: ToString {
+where I: Zero + FromStr + FromPrimitive, <I as FromStr>::Err: ToString {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use regex::Regex;
@@ -112,7 +112,7 @@ where I: Clone + Zero + FromStr + FromPrimitive, <I as FromStr>::Err: ToString {
 
 #[auto_ops]
 impl<const X: char, I> MulAssign<&VarN<X, I>> for VarN<X, I>
-where I: Zero + Clone + for<'x> AddAssign<&'x I> {
+where I: Zero + for<'x> AddAssign<&'x I> {
     fn mul_assign(&mut self, rhs: &VarN<X, I>) {
         self.0 += &rhs.0 // x^i * x^j = x^{i+j}
     }
@@ -120,21 +120,21 @@ where I: Zero + Clone + for<'x> AddAssign<&'x I> {
 
 #[auto_ops]
 impl<const X: char, I> DivAssign<&VarN<X, I>> for VarN<X, I>
-where I: Zero + Clone + for<'x> SubAssign<&'x I> {
+where I: Zero + for<'x> SubAssign<&'x I> {
     fn div_assign(&mut self, rhs: &VarN<X, I>) {
         self.0 -= &rhs.0 // x^i * x^j = x^{i+j}
     }
 }
 
 impl<const X: char, I> One for VarN<X, I>
-where I: Zero + Clone + for<'x> AddAssign<&'x I> {
+where I: Zero + for<'x> AddAssign<&'x I> {
     fn one() -> Self {
         Self::from(MultiDeg::zero()) // x^0 = 1.
     }
 }
 
 impl<const X: char, I> Display for VarN<X, I>
-where I: Clone + ToPrimitive { 
+where I: ToPrimitive { 
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = self.fmt_impl(true);
         f.write_str(&s)
@@ -142,21 +142,21 @@ where I: Clone + ToPrimitive {
 }
 
 impl<const X: char, I> Debug for VarN<X, I>
-where I: Clone + ToPrimitive { 
+where I: ToPrimitive { 
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Display::fmt(self, f)
     }
 }
 
 impl<const X: char, I> PartialOrd for VarN<X, I>
-where I: Clone + Zero + Ord + for<'x> Add<&'x I, Output = I> {
+where I: Zero + Ord + for<'x> Add<&'x I, Output = I> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> { 
         self.0.partial_cmp(&other.0)
     }
 }
 
 impl<const X: char, I> Ord for VarN<X, I>
-where I: Clone + Zero + Ord + for<'x> Add<&'x I, Output = I> {
+where I: Zero + Ord + for<'x> Add<&'x I, Output = I> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.0.cmp(&other.0)
     }

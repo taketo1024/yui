@@ -42,8 +42,8 @@ impl<const X: char, const Y: char, I> Var2<X, Y, I> {
     }
 
     pub fn total_deg(&self) -> I
-    where I: Copy + Add<I, Output = I> { 
-        self.0 + self.1
+    where I: Copy + for<'x> Add<&'x I, Output = I> { 
+        self.0 + &self.1
     }
 
     pub fn eval<R>(&self, x: &R, y: &R) -> R
@@ -73,7 +73,7 @@ impl<const X: char, const Y: char, I> From<(I, I)> for Var2<X, Y, I> {
 }
 
 impl<const X: char, const Y: char, I> FromStr for Var2<X, Y, I>
-where I: Copy + Zero + FromStr + FromPrimitive, I::Err: ToString {
+where I: Zero + FromStr + FromPrimitive + Debug, I::Err: ToString {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use regex::Regex;
@@ -99,8 +99,9 @@ where I: Copy + Zero + FromStr + FromPrimitive, I::Err: ToString {
                 Ok(I::zero())
             }
         ).collect::<Result<Vec<_>, _>>()?;
+        let [d1, d2] = d.try_into().unwrap();
 
-        Ok(Self(d[0], d[1]))
+        Ok(Self(d1, d2))
     }
 }
 
@@ -130,14 +131,14 @@ where I: for<'x >SubAssign<&'x I> {
 }
 
 impl<const X: char, const Y: char, I> PartialOrd for Var2<X, Y, I>
-where I: Copy + Eq + Ord + Add<I, Output = I> {
+where I: Copy + Eq + Ord + for<'x> Add<&'x I, Output = I> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(Ord::cmp(self, other))
     }
 }
 
 impl<const X: char, const Y: char, I> Ord for Var2<X, Y, I>
-where I: Copy + Eq + Ord + Add<I, Output = I> {
+where I: Copy + Eq + Ord + for<'x> Add<&'x I, Output = I> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         use std::cmp::*;
 
@@ -192,7 +193,7 @@ where I: ElemBase + ToPrimitive {
 }
         
 impl<const X: char, const Y: char, I> Gen for Var2<X, Y, I>
-where I: ElemBase + Copy + Hash + Ord + Add<I, Output = I> + ToPrimitive {}
+where I: ElemBase + Copy + Hash + Ord + for<'x> Add<&'x I, Output = I> + ToPrimitive {}
 
 macro_rules! impl_bivar_unsigned {
     ($I:ty) => {

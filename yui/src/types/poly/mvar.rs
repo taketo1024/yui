@@ -163,7 +163,8 @@ where I: Clone + Zero + Ord + for<'x> Add<&'x I, Output = I> {
 }
 
 #[cfg(feature = "serde")]
-impl<const X: char, I> serde::Serialize for VarN<X, I> {
+impl<const X: char, I> serde::Serialize for VarN<X, I>
+where I: ToPrimitive {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where S: serde::Serializer {
         serializer.serialize_str(&self.fmt_impl(false))
@@ -171,7 +172,8 @@ impl<const X: char, I> serde::Serialize for VarN<X, I> {
 }
 
 #[cfg(feature = "serde")]
-impl<'de, const X: char> serde::Deserialize<'de> for VarN<X, I> {
+impl<'de, const X: char, I> serde::Deserialize<'de> for VarN<X, I>
+where Self: FromStr, <Self as FromStr>::Err: Display {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where D: serde::Deserializer<'de> {
         let s = String::deserialize(deserializer)?;

@@ -1,12 +1,13 @@
 use core::panic;
 use std::fmt::{Display, Debug};
+use std::hash::Hash;
 use std::ops::{AddAssign, Mul, MulAssign, DivAssign, SubAssign, Div, Add};
 use std::str::FromStr;
 use itertools::Itertools;
-use num_traits::{Zero, One, Pow, FromPrimitive};
+use num_traits::{Zero, One, Pow, FromPrimitive, ToPrimitive};
 use auto_impl_ops::auto_ops;
 
-use crate::Elem;
+use crate::{Elem, ElemBase};
 use crate::lc::Gen;
 
 use super::Mono;
@@ -31,15 +32,8 @@ impl<const X: char, const Y: char, const Z: char, I> Var3<X, Y, Z, I> {
         }
     }
 
-    pub fn eval<R>(&self, x: &R, y: &R, z: &R) -> R
-    where R: Mul<Output = R>, for<'x, 'y> &'x R: Pow<&'y I, Output = R> {
-        x.pow(&self.0) * y.pow(&self.1) * z.pow(&self.2)
-    }
-}
-
-impl<const X: char, const Y: char, const Z: char, I> Var3<X, Y, Z, I>
-where I: Copy {
-    pub fn deg_for(&self, i: usize) -> I { 
+    pub fn deg_for(&self, i: usize) -> I
+    where I: Copy { 
         assert!(i < 3);
         match i { 
             0 => self.0,
@@ -48,12 +42,28 @@ where I: Copy {
             _ => panic!()
         }
     }
-}
 
-impl<const X: char, const Y: char, const Z: char, I> Var3<X, Y, Z, I>
-where I: Copy + Add<I, Output = I> {
-    pub fn total_deg(&self) -> I { 
+    pub fn total_deg(&self) -> I
+    where I: Copy + Add<I, Output = I> { 
         self.0 + self.1 + self.2
+    }
+
+    pub fn eval<R>(&self, x: &R, y: &R, z: &R) -> R
+    where R: Mul<Output = R>, for<'x, 'y> &'x R: Pow<&'y I, Output = R> {
+        x.pow(&self.0) * y.pow(&self.1) * z.pow(&self.2)
+    }
+
+    fn fmt_impl(&self, unicode: bool) -> String
+    where I: ToPrimitive { 
+        let Var3(d0, d1, d2) = self;
+        let s = [(X, d0), (Y, d1), (Z, d2)].into_iter().map(|(x, d)|
+            fmt_mono(&x.to_string(), d, unicode)
+        ).filter(|s| s != "1").join("");
+        if s == "" { 
+            "1".to_string()
+        } else { 
+            s
+        }
     }
 }
 
@@ -141,70 +151,58 @@ where I: Copy + Eq + Ord + Add<I, Output = I> {
             Ord::cmp(&self.0, &other.0)
         ).then_with(|| 
             Ord::cmp(&self.1, &other.1)
+        ).then_with(|| 
+            Ord::cmp(&self.2, &other.2)
         )
     }
 }
 
-macro_rules! impl_trivar {
-    ($I:ty) => {
-        impl<const X: char, const Y: char, const Z: char> Var3<X, Y, Z, $I> { 
-            fn fmt_impl(&self, unicode: bool) -> String { 
-                let Var3(d0, d1, d2) = self;
-                let s = [(X, d0), (Y, d1), (Z, d2)].into_iter().map(|(x, d)|
-                    fmt_mono(&x.to_string(), d, unicode)
-                ).filter(|s| s != "1").join("");
-                if s == "" { 
-                    "1".to_string()
-                } else { 
-                    s
-                }
-            }
-        }
-        
-        impl<const X: char, const Y: char, const Z: char> Display for Var3<X, Y, Z, $I> { 
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let s = self.fmt_impl(true);
-                f.write_str(&s)
-            }
-        }
-        
-        impl<const X: char, const Y: char, const Z: char> Debug for Var3<X, Y, Z, $I> { 
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                Display::fmt(self, f)
-            }
-        }
-
-        #[cfg(feature = "serde")]
-        impl<const X: char, const Y: char, const Z: char> serde::Serialize for Var3<X, Y, Z, $I> {
-            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-            where S: serde::Serializer {
-                serializer.serialize_str(&self.fmt_impl(false))
-            }
-        }
-        
-        #[cfg(feature = "serde")]
-        impl<'de, const X: char, const Y: char> serde::Deserialize<'de> for Var3<X, Y, Z, $I> {
-            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-            where D: serde::Deserializer<'de> {
-                let s = String::deserialize(deserializer)?;
-                Self::from_str(&s).map_err(serde::de::Error::custom)
-            }
-        }        
-
-        impl<const X: char, const Y: char, const Z: char> Elem for Var3<X, Y, Z, $I> { 
-            fn math_symbol() -> String {
-                format!("{X}, {Y}, {Z}")
-            }
-        }
-                
-        impl<const X: char, const Y: char, const Z: char> Gen for Var3<X, Y, Z, $I> {}
+impl<const X: char, const Y: char, const Z: char, I> Display for Var3<X, Y, Z, I>
+where I: ToPrimitive { 
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = self.fmt_impl(true);
+        f.write_str(&s)
     }
 }
 
+impl<const X: char, const Y: char, const Z: char, I> Debug for Var3<X, Y, Z, I>
+where I: ToPrimitive { 
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<const X: char, const Y: char, const Z: char, I> serde::Serialize for Var3<X, Y, Z, I>
+where I: ToPrimitive {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where S: serde::Serializer {
+        serializer.serialize_str(&self.fmt_impl(false))
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, const X: char, const Y: char, const Z: char, I> serde::Deserialize<'de> for Var3<X, Y, Z, I>
+where Self: FromStr, <Self as FromStr>::Err: Display {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where D: serde::Deserializer<'de> {
+        let s = String::deserialize(deserializer)?;
+        Self::from_str(&s).map_err(serde::de::Error::custom)
+    }
+}        
+
+impl<const X: char, const Y: char, const Z: char, I> Elem for Var3<X, Y, Z, I>
+where I: ElemBase + ToPrimitive { 
+    fn math_symbol() -> String {
+        format!("{X}, {Y}, {Z}")
+    }
+}
+        
+impl<const X: char, const Y: char, const Z: char, I> Gen for Var3<X, Y, Z, I>
+where I: ElemBase + Copy + Hash + Ord + Add<I, Output = I> + ToPrimitive {}
+
 macro_rules! impl_trivar_unsigned {
     ($I:ty) => {
-        impl_trivar!($I);
-
         impl<const X: char, const Y: char, const Z: char> Mono for Var3<X, Y, Z, $I> {
             type Deg = ($I, $I, $I);
 
@@ -233,8 +231,6 @@ macro_rules! impl_trivar_unsigned {
 
 macro_rules! impl_trivar_signed {
     ($I:ty) => {
-        impl_trivar!($I);
-
         impl<const X: char, const Y: char, const Z: char> Mono for Var3<X, Y, Z, $I> {
             type Deg = ($I, $I, $I);
 

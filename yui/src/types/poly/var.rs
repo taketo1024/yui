@@ -5,22 +5,40 @@ use std::str::FromStr;
 use num_traits::{Zero, One, ToPrimitive, Pow, FromPrimitive};
 use auto_impl_ops::auto_ops;
 
-use crate::Elem;
+use crate::{Elem, ElemBase};
 use crate::lc::Gen;
 use crate::util::format::superscript;
 use super::Mono;
 
-// `Var<X, I>` : represents monomials X^d (univar) or ΠX_i^{d_i} (multivar).
-// `I` is one of `usize`, `isize`, `MultiDeg<usize>`, `MultiDeg<isize>`.
+// `Var<X, I>` : represents monomials X^d (univar).
+// `I` is either `usize` or `isize`.
 
 #[derive(Clone, PartialEq, Eq, Hash, Default, PartialOrd, Ord)]
 pub struct Var<const X: char, I>(
-    pub(crate) I
+    I
 );
 
 impl<const X: char, I> Var<X, I> {
     pub fn var_symbol() -> char { 
         X
+    }
+
+    pub fn eval<R>(&self, x: &R) -> R
+    where R: Mul<Output = R>, for<'x, 'y> &'x R: Pow<&'y I, Output = R> {
+        x.pow(&self.0)
+    }
+
+    fn fmt_impl(&self, unicode: bool) -> String
+    where I: ToPrimitive { 
+        fmt_mono(&X.to_string(), &self.0, unicode)
+    }
+}
+
+impl<const X: char, I> FromStr for Var<X, I>
+where I: FromStr + FromPrimitive, <I as FromStr>::Err: ToString {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        parse_mono(&X.to_string(), s).map(Self)
     }
 }
 
@@ -53,70 +71,52 @@ where I: for<'x >SubAssign<&'x I> {
     }
 }
 
-macro_rules! impl_univar {
-    ($I:ty) => {
-        impl<const X: char> Var<X, $I> {
-            pub fn eval<R>(&self, x: &R) -> R
-            where R: Mul<Output = R>, for<'x, 'y> &'x R: Pow<&'y $I, Output = R> {
-                x.pow(&self.0)
-            }
-
-            fn fmt_impl(&self, unicode: bool) -> String { 
-                fmt_mono(&X.to_string(), &self.0, unicode)
-            }
-        }
-        
-        impl<const X: char> Display for Var<X, $I> { 
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let s = self.fmt_impl(true);
-                f.write_str(&s)
-            }
-        }
-
-        impl<const X: char> Debug for Var<X, $I> { 
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                Display::fmt(self, f)
-            }
-        }
-        
-        impl<const X: char> FromStr for Var<X, $I> {
-            type Err = String;
-            fn from_str(s: &str) -> Result<Self, Self::Err> {
-                parse_mono(&X.to_string(), s).map(Self)
-            }
-        }
-
-        #[cfg(feature = "serde")]
-        impl<const X: char> serde::Serialize for Var<X, $I> {
-            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-            where S: serde::Serializer {
-                serializer.serialize_str(&self.fmt_impl(false))
-            }
-        }
-        
-        #[cfg(feature = "serde")]
-        impl<'de, const X: char> serde::Deserialize<'de> for Var<X, $I> {
-            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-            where D: serde::Deserializer<'de> {
-                let s = String::deserialize(deserializer)?;
-                Self::from_str(&s).map_err(serde::de::Error::custom)
-            }
-        }        
-
-        impl<const X: char> Elem for Var<X, $I> { 
-            fn math_symbol() -> String {
-                format!("{X}")
-            }
-        }
-        
-        impl<const X: char> Gen for Var<X, $I> {}
+impl<const X: char, I> Display for Var<X, I>
+where I: ToPrimitive { 
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = self.fmt_impl(true);
+        f.write_str(&s)
     }
 }
 
+impl<const X: char, I> Debug for Var<X, I>
+where I: ToPrimitive { 
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<const X: char, I> serde::Serialize for Var<X, I>
+where I: ToPrimitive {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where S: serde::Serializer {
+        serializer.serialize_str(&self.fmt_impl(false))
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, const X: char, I> serde::Deserialize<'de> for Var<X, I>
+where Self: FromStr, <Self as FromStr>::Err: Display {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where D: serde::Deserializer<'de> {
+        let s = String::deserialize(deserializer)?;
+        Self::from_str(&s).map_err(serde::de::Error::custom)
+    }
+}        
+
+impl<const X: char, I> Elem for Var<X, I>
+where I: ElemBase + ToPrimitive { 
+    fn math_symbol() -> String {
+        format!("{X}")
+    }
+}
+
+impl<const X: char, I> Gen for Var<X, I> 
+where I: ElemBase + Hash + Ord + ToPrimitive {}
+
 macro_rules! impl_univar_unsigned {
     ($I:ty) => {
-        impl_univar!($I);
-
         impl<const X: char> Mono for Var<X, $I> {
             type Deg = $I;
 
@@ -145,8 +145,6 @@ macro_rules! impl_univar_unsigned {
 
 macro_rules! impl_univar_signed {
     ($I:ty) => {
-        impl_univar!($I);
-
         impl<const X: char> Mono for Var<X, $I> {
             type Deg = $I;
 
@@ -187,8 +185,8 @@ where I: ToPrimitive {
     }
 }
 
-pub(crate) fn parse_mono<I, E>(x: &str, s: &str) -> Result<I, String>
-where I: FromStr<Err = E> + FromPrimitive, E: ToString {
+pub(crate) fn parse_mono<I>(x: &str, s: &str) -> Result<I, String>
+where I: FromStr + FromPrimitive, <I as FromStr>::Err: ToString {
     if s == "1" { 
         Ok(I::from_i32(0).unwrap())
     } else if s == x { 

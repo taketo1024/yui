@@ -117,8 +117,9 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-macro_rules! impl_univar {
+macro_rules! impl_var_specific {
     ($I:ty) => {
+        // Univar
         impl<const X: char, R> PolyBase<Var<X, $I>, R>
         where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn variable() -> Self { 
@@ -128,15 +129,16 @@ macro_rules! impl_univar {
             pub fn mono(i: $I) -> Var<X, $I> {
                 Var::from(i)
             }
+
+            pub fn eval(&self, x: &R) -> R
+            where for<'x, 'y> &'x R: Pow<&'y $I, Output = R> { 
+                R::sum(self.iter().map(|(i, r)| { 
+                    r * i.eval(x)
+                }))
+            }
         }
-    };
-}
 
-impl_univar!(usize);
-impl_univar!(isize);
-
-macro_rules! impl_bivar {
-    ($I:ty) => {
+        // Bivar
         impl<const X: char, const Y: char, R> PolyBase<Var2<X, Y, $I>, R>
         where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn variable(i: usize) -> Self { 
@@ -148,15 +150,42 @@ macro_rules! impl_bivar {
             pub fn mono(i: $I, j: $I) -> Var2<X, Y, $I> {
                 Var2::from((i, j))
             }
+
+            pub fn eval(&self, x: &R, y: &R) -> R
+            where for<'x, 'y> &'x R: Pow<&'y $I, Output = R> { 
+                R::sum(self.iter().map(|(i, r)| { 
+                    r * i.eval(x, y)
+                }))
+            }
         }
-    };
-}
 
-impl_bivar!(usize);
-impl_bivar!(isize);
+        // Trivar
+        impl<const X: char, const Y: char, const Z: char, R> PolyBase<Var3<X, Y, Z, $I>, R>
+        where R: Ring, for<'x> &'x R: RingOps<R> {
+            pub fn variable(i: usize) -> Self { 
+                assert!(i < 3);
+                let d = match i { 
+                    0 => (1, 0, 0),
+                    1 => (0, 1, 0),
+                    2 => (0, 0, 1),
+                    _ => panic!()
+                };
+                Self::from(Var3::from(d))
+            }
 
-macro_rules! impl_mvar {
-    ($I:ty) => {
+            pub fn mono(i: $I, j: $I, k: $I) -> Var3<X, Y, Z, $I> {
+                Var3::from((i, j, k))
+            }
+
+            pub fn eval(&self, x: &R, y: &R, z: &R) -> R
+            where for<'x, 'y> &'x R: Pow<&'y $I, Output = R> { 
+                R::sum(self.iter().map(|(i, r)| { 
+                    r * i.eval(x, y, z)
+                }))
+            }
+        }
+
+        // MultiVar
         impl<const X: char, R> PolyBase<VarN<X, $I>, R>
         where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn variable(i: usize) -> Self { 
@@ -167,17 +196,7 @@ macro_rules! impl_mvar {
             pub fn mono<const N: usize>(degs: [$I; N]) -> VarN<X, $I> {
                 VarN::from(degs)
             }
-        }
-    };
-}
 
-impl_mvar!(usize);
-impl_mvar!(isize);
-
-macro_rules! impl_polyn_funcs {
-    ($I:ty) => {
-        impl<const X: char, R> PolyBase<VarN<X, $I>, R>
-        where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn lead_term_for(&self, k: usize) -> Option<(&VarN<X, $I>, &R)> { 
                 self.iter()
                     .filter(|(x, _)| x.deg_for(k) > 0)
@@ -192,8 +211,8 @@ macro_rules! impl_polyn_funcs {
     };
 }
 
-impl_polyn_funcs!(usize);
-impl_polyn_funcs!(isize);
+impl_var_specific!(usize);
+impl_var_specific!(isize);
 
 impl<X, R> From<X> for PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
@@ -388,25 +407,6 @@ macro_rules! impl_pow_signed {
 impl_pow_signed!(i32);
 impl_pow_signed!(i64);
 impl_pow_signed!(isize);
-
-// TODO support eval for other cases
-
-macro_rules! impl_eval_bivar {
-    ($I:ty) => {
-        impl<const X: char, const Y: char, R> PolyBase<Var2<X, Y, $I>, R>
-        where R: Ring, for<'x> &'x R: RingOps<R> {
-            pub fn eval(&self, x: &R, y: &R) -> R
-            where for<'x, 'y> &'x R: Pow<&'y $I, Output = R> { 
-                R::sum(self.iter().map(|(i, r)| { 
-                    r * i.eval(x, y)
-                }))
-            }
-        }
-    };
-}
-
-impl_eval_bivar!(usize);
-impl_eval_bivar!(isize);
 
 macro_rules! impl_alg_op {
     ($trait:ident) => {

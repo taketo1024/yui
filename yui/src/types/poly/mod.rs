@@ -1,6 +1,7 @@
 mod mdeg;
 mod univar;
 mod bivar;
+mod trivar;
 mod multivar;
 mod poly;
 

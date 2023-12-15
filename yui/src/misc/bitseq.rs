@@ -1,19 +1,21 @@
 use core::fmt;
 use std::fmt::{Display, Debug};
 use std::ops::Index;
+use std::str::FromStr;
 
-use derive_more::{Display, DebugCustom};
-
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DebugCustom, Display, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(derive_more::DebugCustom, derive_more::Display)]
+#[cfg_attr(feature = "serde", derive(serde_repr::Serialize_repr, serde_repr::Deserialize_repr))]
+#[repr(u8)]
 pub enum Bit { 
     #[default]
     #[display(fmt="0")]
     #[debug(fmt="0")]
-    Bit0, 
+    Bit0 = 0, 
 
     #[display(fmt="1")]
-    #[debug(fmt="0")]
-    Bit1
+    #[debug(fmt="1")]
+    Bit1 = 1
 }
 
 impl Bit { 
@@ -253,6 +255,19 @@ where Bit: From<T> {
     }
 }
 
+impl FromStr for BitSeq {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.chars().map(|c|
+            match c { 
+                '0' => Ok(Bit::Bit0),
+                '1' => Ok(Bit::Bit1),
+                _   => Err("Invalid bit: {c}".into())
+            }
+        ).collect()
+    }
+}
+
 impl Index<usize> for BitSeq {
     type Output = Bit;
 
@@ -297,6 +312,24 @@ impl Ord for BitSeq {
         ).then_with(|| 
             self.as_u64().cmp(&other.as_u64())
         )
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for BitSeq {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where S: serde::Serializer {
+        let s = self.to_string();
+        serializer.serialize_str(&s)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for BitSeq {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where D: serde::Deserializer<'de> {
+        let s = String::deserialize(deserializer)?;
+        Self::from_str(&s).map_err(serde::de::Error::custom)
     }
 }
 
@@ -508,5 +541,16 @@ mod tests {
         let b = BitSeq::new(0b10110, 5);
         let c = b.edit(|b| b.set_1(0));
         assert_eq!(c, BitSeq::new(0b10111, 5))
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn serialize() { 
+        let b = BitSeq::new(0b10110, 5);
+        let ser = serde_json::to_string(&b).unwrap();
+        assert_eq!(ser, "\"01101\"");
+
+        let des = serde_json::from_str(&ser).unwrap();
+        assert_eq!(b, des);
     }
 }

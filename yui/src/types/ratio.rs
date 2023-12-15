@@ -7,7 +7,6 @@ use auto_impl_ops::auto_ops;
 use crate::{EucRing, EucRingOps, Elem, Mon, AddMon, AddGrp, AddMonOps, AddGrpOps, MonOps, RingOps, Ring, FieldOps, Field, Integer, IntOps};
 
 #[derive(Copy, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Ratio<T> {
     numer: T,
     denom: T,
@@ -360,6 +359,27 @@ where T: Integer, for<'x> &'x T: IntOps<T> {
     }
 }
 
+#[cfg(feature = "serde")]
+impl<T> serde::Serialize for Ratio<T>
+where T: Display {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where S: serde::Serializer {
+        let s = self.to_string();
+        serializer.serialize_str(&s)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, T> serde::Deserialize<'de> for Ratio<T>
+where T: EucRing + FromStr, for<'x> &'x T: EucRingOps<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where D: serde::Deserializer<'de> {
+        let s = String::deserialize(deserializer)?;
+        let r = Self::from_str(&s).map_err(serde::de::Error::custom)?;
+        Ok(r)
+    }
+}
+
 #[cfg(test)]
 mod tests { 
     use super::*;
@@ -554,7 +574,10 @@ mod tests {
     #[cfg(feature = "serde")]
     fn serialize() { 
         let a = Ratio::new(3, 5);
+        
         let ser = serde_json::to_string(&a).unwrap();
+        assert_eq!(ser, "\"3/5\"");
+
         let deser = serde_json::from_str::<Ratio<i32>>(&ser).unwrap();
         assert_eq!(a, deser);
     }

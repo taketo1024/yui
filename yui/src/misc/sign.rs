@@ -1,11 +1,19 @@
-use std::fmt::{Display, Debug};
 use std::ops::Neg;
 use num_traits::Signed;
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
+#[derive(derive_more::Display, derive_more::DebugCustom)]
+#[cfg_attr(feature = "serde", derive(serde_repr::Serialize_repr, serde_repr::Deserialize_repr))]
+#[repr(i8)]
 pub enum Sign { 
-    Neg, 
-    Pos
+    #[default]
+    #[display(fmt = "+")]
+    #[debug(fmt = "+")]
+    Pos = 1,
+
+    #[display(fmt = "-")]
+    #[debug(fmt = "-")]
+    Neg = -1
 }
 
 impl Sign { 
@@ -34,21 +42,6 @@ impl From<Sign> for i32 {
             Sign::Pos =>  1,
             Sign::Neg => -1
         }
-    }
-}
-
-impl Display for Sign {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Sign::Pos => write!(f, "+"),
-            Sign::Neg => write!(f, "-")
-        }
-    }
-}
-
-impl Debug for Sign {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self, f)
     }
 }
 
@@ -84,5 +77,29 @@ mod tests {
     #[test]
     fn ord() {
         assert!(Sign::Neg < Sign::Pos)
+    }
+
+    #[test]
+    fn to_string() { 
+        assert_eq!(&Sign::Neg.to_string(), "-");
+        assert_eq!(&Sign::Pos.to_string(), "+");
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn serialize() { 
+        let s = Sign::Pos;
+        let ser = serde_json::to_string(&s).unwrap();
+        assert_eq!(ser, "1");
+
+        let des = serde_json::from_str(&ser).unwrap();
+        assert_eq!(s, des);
+
+        let s = Sign::Neg;
+        let ser = serde_json::to_string(&s).unwrap();
+        assert_eq!(ser, "-1");
+        
+        let des = serde_json::from_str(&ser).unwrap();
+        assert_eq!(s, des);
     }
 }

@@ -13,6 +13,7 @@ use super::{Mono, MultiDeg};
 use super::var::{fmt_mono, parse_mono};
 
 #[derive(Clone, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(serde_with::DeserializeFromStr))]
 pub struct MultiVar<const X: char, I> (
     MultiDeg<I>
 );
@@ -170,16 +171,6 @@ where I: ToPrimitive {
         serializer.serialize_str(&self.fmt_impl(false))
     }
 }
-
-#[cfg(feature = "serde")]
-impl<'de, const X: char, I> serde::Deserialize<'de> for MultiVar<X, I>
-where Self: FromStr, <Self as FromStr>::Err: Display {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: serde::Deserializer<'de> {
-        let s = String::deserialize(deserializer)?;
-        Self::from_str(&s).map_err(serde::de::Error::custom)
-    }
-}        
 
 impl<const X: char, I> Elem for MultiVar<X, I>
 where I: ElemBase + ToPrimitive { 

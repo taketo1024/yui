@@ -17,6 +17,7 @@ use super::var::{fmt_mono, parse_mono};
 // `I` is either `usize` or `isize`.
 
 #[derive(Clone, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(serde_with::DeserializeFromStr))]
 pub struct Var2<const X: char, const Y: char, I> (
     I, I
 );
@@ -174,16 +175,6 @@ where I: ToPrimitive {
         serializer.serialize_str(&self.fmt_impl(false))
     }
 }
-
-#[cfg(feature = "serde")]
-impl<'de, const X: char, const Y: char, I> serde::Deserialize<'de> for Var2<X, Y, I>
-where Self: FromStr, <Self as FromStr>::Err: Display {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: serde::Deserializer<'de> {
-        let s = String::deserialize(deserializer)?;
-        Self::from_str(&s).map_err(serde::de::Error::custom)
-    }
-}        
 
 impl<const X: char, const Y: char, I> Elem for Var2<X, Y, I>
 where I: ElemBase + ToPrimitive { 

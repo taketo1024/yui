@@ -8,6 +8,7 @@ use itertools::Itertools;
 
 #[derive(Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(transparent))]
 pub struct IndexList<E>
 where E: Eq + Hash {
     data: BiHashMap<usize, E, ARandomState, ARandomState>

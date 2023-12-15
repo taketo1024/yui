@@ -68,6 +68,7 @@ impl_bit_from_int!(i64);
 impl_bit_from_int!(isize);
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(serde_with::SerializeDisplay, serde_with::DeserializeFromStr))]
 pub struct BitSeq { 
     val: u64,
     len: usize
@@ -312,24 +313,6 @@ impl Ord for BitSeq {
         ).then_with(|| 
             self.as_u64().cmp(&other.as_u64())
         )
-    }
-}
-
-#[cfg(feature = "serde")]
-impl serde::Serialize for BitSeq {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: serde::Serializer {
-        let s = self.to_string();
-        serializer.serialize_str(&s)
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de> serde::Deserialize<'de> for BitSeq {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: serde::Deserializer<'de> {
-        let s = String::deserialize(deserializer)?;
-        Self::from_str(&s).map_err(serde::de::Error::custom)
     }
 }
 

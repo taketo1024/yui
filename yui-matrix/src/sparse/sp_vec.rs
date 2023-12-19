@@ -126,19 +126,38 @@ where R: Scalar + Zero + ClosedAdd {
 
     pub fn from_sorted_entries<T>(dim: usize, entries: T) -> Self
     where T: IntoIterator<Item = (usize, R)> {
-        let mut row_indices = vec![];
-        let mut values = vec![];
-
-        for (i, a) in entries.into_iter() { 
+        let init = (vec![], vec![]);
+        let (row_indices, values) = entries.into_iter().fold(init, |mut res, (i, a)| { 
             assert!(i < dim);
-            row_indices.push(i);
-            values.push(a);
-        }
+            res.0.push(i);
+            res.1.push(a);
+            res
+        });
+        Self::from_raw_data(dim, row_indices, values)
+    }
 
+    fn from_raw_data(dim: usize, row_indices: Vec<usize>, values: Vec<R>) -> SpVec<R> { 
         let col_offsets = vec![0, row_indices.len()];
         let csc = CscMatrix::try_from_csc_data(dim, 1, col_offsets, row_indices, values).unwrap();
-
         SpMat::from(csc).into_spvec()
+    }
+    
+    pub fn stack_vecs<I>(vecs: I) -> Self 
+    where I: IntoIterator<Item = SpVec<R>> { 
+        let init = (0, vec![], vec![]);
+        let (dim, row_indices, values) = vecs.into_iter().fold(init, |mut res, v| { 
+            let n1 = res.0;
+            let n2 = v.dim();
+            
+            let (_, mut rows, mut vals) = v.inner.disassemble();
+            rows.iter_mut().for_each(|i| *i += n1);
+
+            res.0 += n2;
+            res.1.append(&mut rows);
+            res.2.append(&mut vals);
+            res
+        });
+        Self::from_raw_data(dim, row_indices, values)
     }
 
     pub fn permute(&self, p: PermView<'_>) -> SpVec<R> { 

@@ -1,12 +1,10 @@
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, MulAssign, Range};
 use std::iter::zip;
 use std::fmt::{Display, Debug};
-use std::sync::Mutex;
 use delegate::delegate;
 use nalgebra_sparse::na::{Scalar, ClosedAdd, ClosedSub, ClosedMul};
 use nalgebra_sparse::{CscMatrix, CooMatrix};
 use num_traits::{Zero, One};
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use auto_impl_ops::auto_ops;
 use sprs::PermView;
 use crate::dense::*;
@@ -121,23 +119,6 @@ where R: Scalar + Clone + Zero + ClosedAdd {
             }
             coo.push(i, j, a)
         }
-        let csc = CscMatrix::from(&coo);
-        Self::from(csc)
-    }
-
-    pub fn from_par_entries<T>(shape: (usize, usize), entries: T) -> Self
-    where 
-        R: Send + Sync,
-        T: IntoParallelIterator<Item = (usize, usize, R)>
-    {
-        let t = Mutex::new(CooMatrix::new(shape.0, shape.1));
-        entries.into_par_iter().for_each(|(i, j, a)| { 
-            if a.is_zero() { 
-                return;
-            }
-            t.lock().unwrap().push(i, j, a)
-        });
-        let coo = t.into_inner().unwrap();
         let csc = CscMatrix::from(&coo);
         Self::from(csc)
     }

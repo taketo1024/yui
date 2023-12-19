@@ -102,14 +102,6 @@ impl<R> From<CscMatrix<R>> for SpMat<R> {
     }
 }
 
-impl<R> From<CooMatrix<R>> for SpMat<R>
-where R: Scalar + Zero + ClosedAdd {
-    fn from(coo: CooMatrix<R>) -> Self {
-        let csc = CscMatrix::from(&coo);
-        Self::from(csc)
-    }
-}
-
 impl<R> From<Mat<R>> for SpMat<R>
 where R: Scalar + Zero {
     fn from(value: Mat<R>) -> Self {
@@ -129,7 +121,8 @@ where R: Scalar + Clone + Zero + ClosedAdd {
             }
             coo.push(i, j, a)
         }
-        Self::from(coo)
+        let csc = CscMatrix::from(&coo);
+        Self::from(csc)
     }
 
     pub fn from_par_entries<T>(shape: (usize, usize), entries: T) -> Self
@@ -145,7 +138,28 @@ where R: Scalar + Clone + Zero + ClosedAdd {
             t.lock().unwrap().push(i, j, a)
         });
         let coo = t.into_inner().unwrap();
-        Self::from(coo)
+        let csc = CscMatrix::from(&coo);
+        Self::from(csc)
+    }
+
+    pub fn from_col_vecs<I>(nrows: usize, vecs: I) -> Self 
+    where I: IntoIterator<Item = SpVec<R>> { 
+        let mut col_offsets = vec![0];
+        let mut row_indices = vec![];
+        let mut values = vec![];
+
+        for v in vecs.into_iter() { 
+            assert_eq!(nrows, v.dim());
+            let (_, mut v_rows, mut v_values) = v.into_inner().disassemble();
+
+            row_indices.append(&mut v_rows);
+            values.append(&mut v_values);
+            col_offsets.push(row_indices.len());
+        }
+
+        let ncols = col_offsets.len() - 1;
+        let csc = CscMatrix::try_from_csc_data(nrows, ncols, col_offsets, row_indices, values).unwrap();
+        Self::from(csc)
     }
 
     pub fn from_dense_data<I>(shape: (usize, usize), data: I) -> Self

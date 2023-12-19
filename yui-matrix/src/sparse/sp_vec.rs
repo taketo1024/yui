@@ -124,6 +124,23 @@ where R: Scalar + Zero + ClosedAdd {
         ).into_spvec()
     }
 
+    pub fn from_sorted_entries<T>(dim: usize, entries: T) -> Self
+    where T: IntoIterator<Item = (usize, R)> {
+        let mut row_indices = vec![];
+        let mut values = vec![];
+
+        for (i, a) in entries.into_iter() { 
+            assert!(i < dim);
+            row_indices.push(i);
+            values.push(a);
+        }
+
+        let col_offsets = vec![0, row_indices.len()];
+        let csc = CscMatrix::try_from_csc_data(dim, 1, col_offsets, row_indices, values).unwrap();
+
+        SpMat::from(csc).into_spvec()
+    }
+
     pub fn permute(&self, p: PermView<'_>) -> SpVec<R> { 
         self.view().permute(p).collect()
     }

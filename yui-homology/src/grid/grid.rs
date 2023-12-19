@@ -28,13 +28,36 @@ where I: GridDeg {
     support: Vec<I>,
     data: HashMap<I, E>,
     #[cfg_attr(feature = "serde", serde(skip))]
-    dflt: E
+    default: E
 }
 
 impl<I, E> Grid<I, E>
 where I: GridDeg { 
-    pub fn new(support: Vec<I>, data: HashMap<I, E>, dflt: E) -> Self { 
-        Self { support, data, dflt }
+    pub fn new(support: Vec<I>, data: HashMap<I, E>, default: E) -> Self { 
+        Self { support, data, default }
+    }
+
+    pub fn generate<It, F>(support: It, e_map: F) -> Self
+    where 
+        It: IntoIterator<Item = I>, 
+        F: FnMut(I) -> E,
+        E: Default
+    {
+        Self::generate_with_default(support, e_map, E::default())
+    }
+
+    pub fn generate_with_default<It, F>(support: It, mut e_map: F, default: E) -> Self
+    where 
+        It: IntoIterator<Item = I>, 
+        F: FnMut(I) -> E
+    {
+        let support = support.into_iter().collect_vec();
+        let data = support.iter().map(|&i| (i, e_map(i))).collect();
+        Self::new(support, data, default)
+    }
+
+    pub fn get_default(&self) -> &E { 
+        &self.default
     }
 
     pub fn insert(&mut self, i: I, e: E) {
@@ -52,40 +75,23 @@ where I: GridDeg {
     pub fn iter(&self) -> impl Iterator<Item = (I, &E)> {
         self.support.iter().map(|&i| (i, self.get(i)))
     }
-}
-
-impl<I, E> Grid<I, E>
-where I: GridDeg, E: Default { 
-    pub fn generate<It, F>(support: It, mut e_map: F) -> Self
-    where 
-        It: IntoIterator<Item = I>, 
-        F: FnMut(I) -> E
-    {
-        let support = support.into_iter().collect_vec();
-        let data = support.iter().map(|&i| (i, e_map(i))).collect();
-        Self::new(support, data, E::default())
-    }
 
     pub fn map<E2, F>(&self, mut f: F) -> Grid<I, E2>
-    where 
-        E2: Default, 
-        F: FnMut(I, &E) -> E2 
+    where F: FnMut(&E) -> E2 
     {
-        Grid::generate(
+        let d = f(self.get_default());
+        Grid::generate_with_default(
             self.support(), 
-            |i| f(i, self.get(i))
+            |i| f(self.get(i)),
+            d
         )
     }
+}
 
-    pub fn into_map<E2, F>(mut self, mut f: F) -> Grid<I, E2>
-    where 
-        E2: Default, 
-        F: FnMut(I, E) -> E2 
-    {
-        Grid::generate(
-            self.support(), 
-            move |i| f(i, self.remove(i).unwrap_or_default())
-        )
+impl<I, E> Default for Grid<I, E>
+where I: GridDeg, E: Default {
+    fn default() -> Self {
+        Self::new(Vec::default(), HashMap::default(), E::default())
     }
 }
 
@@ -117,7 +123,7 @@ where I: GridDeg {
     }
 
     fn get(&self, i: I) -> &E {
-        self.data.get(&i).unwrap_or(&self.dflt)
+        self.data.get(&i).unwrap_or(&self.default)
     }
 }
 

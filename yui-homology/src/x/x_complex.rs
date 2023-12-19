@@ -71,12 +71,14 @@ where
 
     pub fn reduced(&self) -> XChainComplexBase<I, X, R> { 
         let reduced = ChainReducer::reduce(self, true);
-        let summands = self.summands.map(|i, s| { 
-            let mut s = s.clone();
-            let s1 = reduced[i].clone();
-            s.merge(s1);
-            s
-        });
+        let summands = Grid::generate(
+            self.summands.support(),
+            |i| { 
+                let mut s = self.summands[i].clone();
+                s.merge(reduced[i].clone());
+                s
+            }
+        );
 
         let d_deg = self.d_deg;
         let d_map = self.d_map.clone();
@@ -170,7 +172,7 @@ pub(crate) mod tests {
     impl From<ChainComplex<i64>> for XChainComplex<X, i64> {
         fn from(c: ChainComplex<i64>) -> Self {
             Self::new(
-                c.summands().map(|_, s| {
+                c.summands().map(|s| {
                     let n = s.rank();
                     XModStr::free((0..n).map(e))
                 }), 

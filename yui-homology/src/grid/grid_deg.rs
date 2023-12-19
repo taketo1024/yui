@@ -38,6 +38,12 @@ macro_rules! make2 {
             }
         }
 
+        impl From<$name> for ($t, $t) {
+            fn from(i: $name) -> Self {
+                (i.0, i.1)
+            }
+        }
+
         impl Zero for $name {
             fn zero() -> Self {
                 Self(0, 0)
@@ -67,6 +73,12 @@ macro_rules! make3 {
         impl From<($t, $t, $t)> for $name {
             fn from(i: ($t, $t, $t)) -> Self {
                 Self(i.0, i.1, i.2)
+            }
+        }
+
+        impl From<$name> for ($t, $t, $t) {
+            fn from(i: $name) -> Self {
+                (i.0, i.1, i.2)
             }
         }
 

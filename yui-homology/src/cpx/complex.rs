@@ -132,6 +132,10 @@ where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {
         Self::new(summands, d_deg, d_matrices)
     }
 
+    pub fn zero() -> Self { 
+        Self::new(Grid::default(), I::zero(), Grid::default())
+    }
+
     pub fn summands(&self) -> &Grid<I, ChainComplexSummand<R>> { 
         &self.summands
     }

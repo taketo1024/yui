@@ -10,12 +10,6 @@ where R: Ring + From<i32>, for<'x> &'x R: RingOps<R> {
         SpMat::from_dense_data(shape, entries.into_iter().map(|x| R::from(x)))
     }
     
-    pub fn zero() -> ChainComplex<R> {
-        ChainComplex::from_mats(-1, 0,
-            vec![]
-        )
-    }
-
     pub fn one() -> ChainComplex<R> {
         ChainComplex::from_mats(-1, 0,
             vec![

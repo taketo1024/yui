@@ -150,7 +150,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         b_i.is_zero())
     );
 
-    SpVec::from_entries(a.ncols(), entries)
+    if t.is_upper() { 
+        entries.reverse()
+    };
+
+    SpVec::from_sorted_entries(a.ncols(), entries)
 }
 
 fn collect_diag<'a, R>(a: &'a SpMat<R>) -> Vec<&'a R>

@@ -8,9 +8,10 @@ license.workspace = true
 edition.workspace = true
 
 [features]
-serde = ["dep:serde", "dep:serde_json"]
+serde = ["dep:serde", "dep:serde_json", "ahash/serde"]
 
 [dependencies]
+ahash = "0.8.6"
 bimap = "0.6.3"
 cartesian = "0.2.1"
 delegate = "0.10.0"

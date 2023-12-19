@@ -1,7 +1,7 @@
-use std::collections::HashMap;
 use std::ops::Index;
 use std::fmt::Display;
 
+use ahash::AHashMap;
 use itertools::Itertools;
 use crate::{GridDeg, isize2, usize2, isize3, usize3};
 
@@ -26,14 +26,14 @@ pub type GridIter<I> = std::vec::IntoIter<I>;
 pub struct Grid<I, E>
 where I: GridDeg { 
     support: Vec<I>,
-    data: HashMap<I, E>,
+    data: AHashMap<I, E>,
     #[cfg_attr(feature = "serde", serde(skip))]
     default: E
 }
 
 impl<I, E> Grid<I, E>
 where I: GridDeg { 
-    pub fn new(support: Vec<I>, data: HashMap<I, E>, default: E) -> Self { 
+    fn new(support: Vec<I>, data: AHashMap<I, E>, default: E) -> Self { 
         Self { support, data, default }
     }
 
@@ -91,7 +91,7 @@ where I: GridDeg {
 impl<I, E> Default for Grid<I, E>
 where I: GridDeg, E: Default {
     fn default() -> Self {
-        Self::new(Vec::default(), HashMap::default(), E::default())
+        Self::new(Vec::default(), AHashMap::default(), E::default())
     }
 }
 
@@ -138,7 +138,8 @@ where I: GridDeg {
 impl<I, E> FromIterator<(I, E)> for Grid<I, E>
 where I: GridDeg, E: Default {
     fn from_iter<T: IntoIterator<Item = (I, E)>>(iter: T) -> Self {
-        let (support, data) = iter.into_iter().fold((vec![], HashMap::new()), |(mut support, mut data), (i, e)| {
+        let init = (vec![], AHashMap::new());
+        let (support, data) = iter.into_iter().fold(init, |(mut support, mut data), (i, e)| {
             support.push(i);
             data.insert(i, e);
             (support, data)

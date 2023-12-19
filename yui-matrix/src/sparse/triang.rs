@@ -61,13 +61,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     assert_eq!(a.nrows(), b.dim());
     debug_assert!(a.is_triang(t));
 
-    let n = a.nrows();
     let diag = collect_diag(a);
     let mut b = b.to_dense();
 
-    let x = _solve_triangular(t, a, &diag, &mut b);
-
-    SpVec::from_entries(n, x)
+    _solve_triangular(t, a, &diag, &mut b)
 }
 
 fn solve_triangular_s<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
@@ -80,13 +77,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let diag = collect_diag(a);
     let mut b = vec![R::zero(); n];
 
-    let entries = (0..k).flat_map(|j| { 
+    let cols = (0..k).map(|j| { 
         copy_into(y.col_vec(j), &mut b);
-        let xj = _solve_triangular(t, a, &diag, &mut b);
-        xj.into_iter().map(move |(i, x)| (i, j, x))
+        _solve_triangular(t, a, &diag, &mut b)
     });
 
-    SpMat::from_entries((n, k), entries)
+    SpMat::from_col_vecs(n, cols)
 }
 
 fn solve_triangular_m<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
@@ -103,14 +99,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let tl_b = Arc::new(ThreadLocal::new());
     let counter = SyncCounter::new();
 
-    let entries = (0..k).into_par_iter().flat_map(|j| { 
+    let cols = (0..k).into_par_iter().map(|j| { 
         let mut b = tl_b.get_or(|| 
             RefCell::new(vec![R::zero(); n])
         ).borrow_mut();
 
         copy_into(y.col_vec(j), &mut b);
-        let xj = _solve_triangular(t, a, &diag, &mut b);
-        let res = xj.into_par_iter().map(move |(i, x)| (i, j, x));
+        let col = _solve_triangular(t, a, &diag, &mut b);
 
         if report { 
             let c = counter.incr();
@@ -119,14 +114,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
         }
 
-        res
-    });
+        col
+    }).collect::<Vec<_>>();
 
-    SpMat::from_par_entries((n, k), entries)
+    SpMat::from_col_vecs(n, cols)
 }
 
 #[inline(never)] // for profilability
-fn _solve_triangular<R>(t: TriangularType, a: &SpMat<R>, diag: &[&R], b: &mut [R]) -> Vec<(usize, R)>
+fn _solve_triangular<R>(t: TriangularType, a: &SpMat<R>, diag: &[&R], b: &mut [R]) -> SpVec<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let mut entries = vec![];
 
@@ -155,7 +150,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         b_i.is_zero())
     );
 
-    entries
+    SpVec::from_entries(a.ncols(), entries)
 }
 
 fn collect_diag<'a, R>(a: &'a SpMat<R>) -> Vec<&'a R>

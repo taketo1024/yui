@@ -30,9 +30,9 @@ where
 { 
     support: Vec<I>,
     d_deg: I,
-    with_trans: bool,
     mats: HashMap<I, SpMat<R>>,
-    trans: HashMap<I, Trans<R>>
+    trans: HashMap<I, Trans<R>>,
+    with_trans: bool,
 }
 
 impl<I, R> ChainReducer<I, R>
@@ -43,7 +43,10 @@ where
     pub fn reduce<C>(complex: &C, with_trans: bool) -> ChainComplexBase<I, R> 
     where C: GridTrait<I> + ChainComplexTrait<I, R = R> {
         let mut r = Self::from(complex, with_trans);
-        r.reduce_all();
+
+        r.reduce_all(false);
+        r.reduce_all(true);
+
         r.into_complex()
     }
 
@@ -125,34 +128,28 @@ where
         self.mats.insert(i, d);
     }
 
-    pub fn reduce_all(&mut self) { 
+    pub fn reduce_all(&mut self, deep: bool) { 
         if self.is_all_zero() { 
             return
         }
         
+        if deep { 
+            trace!("reduce all (deep)");
+        } else { 
+            trace!("reduce all (shallow)");
+        }
+
         let support = self.support.clone();
 
-        trace!("initial run..");
-        
         for &i in support.iter() { 
-            self.reduce_at(i, false); // shallow
-        }
-
-        if self.is_all_zero() { 
-            return
-        }
-
-        trace!("second run..");
-
-        for &i in support.iter() { 
-            self.reduce_at(i, true); // deep
+            self.reduce_at(i, deep);
         }
     }
 
-    pub fn reduce_at(&mut self, i: I, repeat: bool) { 
+    pub fn reduce_at(&mut self, i: I, deep: bool) { 
         assert!(self.is_set(i), "not initialized at {i}");
 
-        if repeat { 
+        if deep { 
             let mut count = 1;
             while self.reduce_at_itr(i, count) { 
                 count += 1;
@@ -257,7 +254,11 @@ where
             self.support.clone(), 
             |i| { 
                 let rank = self.rank(i).unwrap();
-                let trans = self.trans.remove(&i); // optional
+                let trans = if self.with_trans {
+                    self.trans.remove(&i)
+                } else { 
+                    None
+                };
                 SimpleRModStr::new( rank, vec![], trans )
             }
         );

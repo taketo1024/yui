@@ -13,7 +13,7 @@ use std::fmt::Debug;
 use std::iter::zip;
 use std::ops::{Mul, Div};
 use nalgebra::{DMatrix, MatrixView, U1, Dyn};
-use log::{trace, info};
+use log::trace;
 use num_bigint::BigInt;
 
 use yui::{EucRing, EucRingOps, DivRound, Integer, IntOps};
@@ -27,7 +27,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 
 pub fn lll_in_place<R>(b: Mat<R>, with_trans: bool) -> (Mat<R>, Option<Mat<R>>)
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
-    info!("lll: {:?}", b.shape());
+    trace!("lll: {:?}", b.shape());
     
     let mut calc = LLLCalc::new(b, with_trans);
     calc.process();
@@ -41,7 +41,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 
 pub fn lll_hnf_in_place<R>(b: Mat<R>, with_trans: [bool; 2]) -> (Mat<R>, Option<Mat<R>>, Option<Mat<R>>)
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
-    info!("lll-hnf: {:?}", b.shape());
+    trace!("lll-hnf: {:?}", b.shape());
     
     let mut calc = LLLHNFCalc::new(b, with_trans);
     calc.process();

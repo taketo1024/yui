@@ -13,7 +13,7 @@ use std::collections::VecDeque;
 use std::sync::RwLock;
 use ahash::AHashSet;
 use itertools::Itertools;
-use log::info;
+use log::trace;
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use sprs::PermOwned;
 use thread_local::ThreadLocal;
@@ -81,17 +81,13 @@ impl PivotFinder {
     }
 
     pub fn find_pivots(&mut self) {
-        if self.should_report() {
-            info!("pivots: {:?} ..", self.str.shape());
-        }
+        trace!("pivots: {:?} ..", self.str.shape());
 
         self.find_fl_pivots();
         self.find_fl_col_pivots();
         self.find_cycle_free_pivots();
 
-        if self.should_report() {
-            info!("pivots: {:?} => {}.", self.str.shape(), self.pivots.count());
-        }
+        trace!("pivots: {:?} => {}.", self.str.shape(), self.pivots.count());
     }
 
     pub fn result(&self) -> Vec<(usize, usize)> { 
@@ -152,9 +148,7 @@ impl PivotFinder {
 
         let piv_count = self.pivots.count();
 
-        if self.should_report() { 
-            info!("  fl-pivots: +{}.", piv_count);
-        }
+        trace!("  fl-pivots: +{}.", piv_count);
     }
 
     fn find_fl_col_pivots(&mut self) {
@@ -185,9 +179,7 @@ impl PivotFinder {
 
         let piv_count = self.pivots.count();
         
-        if self.should_report() { 
-            info!("  fl-col-pivots: +{}, total: {}.", piv_count - before_piv_count, piv_count);
-        }
+        trace!("  fl-col-pivots: +{}, total: {}.", piv_count - before_piv_count, piv_count);
     }
 
     fn find_cycle_free_pivots(&mut self) {
@@ -201,18 +193,14 @@ impl PivotFinder {
 
         let piv_count = self.pivots.count();
 
-        if self.should_report() { 
-            info!("  cycle-free-pivots: +{}, total: {}.", piv_count - before_piv_count, piv_count);
-        }
+        trace!("  cycle-free-pivots: +{}, total: {}.", piv_count - before_piv_count, piv_count);
     }
 
     fn find_cycle_free_pivots_s(&mut self) {
         let remain_rows: Vec<_> = self.remain_rows().collect();
         let total_rows = remain_rows.len();
 
-        if self.should_report() { 
-            info!("  start find-cycle-free-pivots: {total_rows} rows");
-        }
+        trace!("  start find-cycle-free-pivots: {total_rows} rows");
 
         let n = self.cols();
         let mut w = RowWorker::new(n);
@@ -227,7 +215,7 @@ impl PivotFinder {
                 row_count += 1;
                 if row_count % LOG_THRESHOLD == 0 { 
                     let c = self.pivots.count();
-                    info!("    [{row_count}/{total_rows}], {c} pivots.");
+                    trace!("    [{row_count}/{total_rows}], {c} pivots.");
                 }
             }
         }
@@ -239,9 +227,7 @@ impl PivotFinder {
         let remain_rows = self.remain_rows().collect_vec();
         let total_rows = remain_rows.len();
 
-        if self.should_report() { 
-            info!("  start find-cycle-free-pivots: {total_rows} rows");
-        }
+        trace!("  start find-cycle-free-pivots: {total_rows} rows");
         
         let n = self.cols();
         let pivots = RwLock::new(
@@ -249,6 +235,8 @@ impl PivotFinder {
         );
         let loc_pivots_tls = ThreadLocal::new();
         let loc_worker_tls = ThreadLocal::new();
+
+        let report = self.should_report();
         let row_counter = SyncCounter::new();
 
         remain_rows.par_iter().for_each(|&i| { 
@@ -265,11 +253,11 @@ impl PivotFinder {
 
             self.find_cycle_free_pivots_in(&pivots, &mut loc_pivots, &mut w);
 
-            if self.should_report() { 
+            if report { 
                 let row_count = row_counter.incr();            
                 if row_count % LOG_THRESHOLD == 0 { 
                     let c = loc_pivots.count();
-                    info!("    [{row_count}/{total_rows}], {c} pivots.");
+                    trace!("    [{row_count}/{total_rows}], {c} pivots.");
                 }
             }
         });
@@ -303,7 +291,7 @@ impl PivotFinder {
      }
 
      fn should_report(&self) -> bool { 
-        self.rows() > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Info
+        self.rows() > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Trace
      }
 }
 

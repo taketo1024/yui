@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::sync::Arc;
 use either::Either;
-use log::info;
+use log::trace;
 use num_traits::Zero;
 use rayon::prelude::*;
 use thread_local::ThreadLocal;
@@ -69,9 +69,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 fn solve_triangular_s<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    if should_report(y) { 
-        info!("solve triangular, y: {:?}", y.shape());
-    }
+    trace!("solve triangular, y: {:?}", y.shape());
 
     let (n, k) = (a.nrows(), y.ncols());
     let diag = collect_diag(a);
@@ -89,14 +87,13 @@ fn solve_triangular_m<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat
 where R: Ring, for<'x> &'x R: RingOps<R> {
     use yui::util::sync::SyncCounter;
 
-    let report = should_report(y);
-    if report { 
-        info!("solve triangular, y: {:?}", y.shape());
-    }
+    trace!("solve triangular, y: {:?}", y.shape());
 
     let (n, k) = (a.nrows(), y.ncols());
     let diag = collect_diag(a);
     let tl_b = Arc::new(ThreadLocal::new());
+
+    let report = should_report(y);
     let counter = SyncCounter::new();
 
     let cols = (0..k).into_par_iter().map(|j| { 
@@ -110,7 +107,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         if report { 
             let c = counter.incr();
             if c > 0 && c % LOG_THRESHOLD == 0 { 
-                info!("  solved {c}/{k}");
+                trace!("  solved {c}/{k}");
             }
         }
 
@@ -171,7 +168,7 @@ where R: Clone + Zero {
 
 #[inline]
 fn should_report<R>(a: &SpMat<R>) -> bool { 
-    usize::min(a.nrows(), a.ncols()) > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Info
+    usize::min(a.nrows(), a.ncols()) > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Trace
 }
 
 #[cfg(test)]

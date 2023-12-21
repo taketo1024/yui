@@ -132,7 +132,7 @@ where
         
         let support = self.support.clone();
 
-        info!("initial run..");
+        trace!("initial run..");
         
         for &i in support.iter() { 
             self.reduce_at(i, false); // shallow
@@ -142,7 +142,7 @@ where
             return
         }
 
-        info!("second run..");
+        trace!("second run..");
 
         for &i in support.iter() { 
             self.reduce_at(i, true); // deep
@@ -169,21 +169,21 @@ where
         }
 
         if itr > 0 { 
-            info!("red C[{i}]: {:?} (itr: {itr}) ..", a.shape());
+            trace!("red C[{i}]: {:?} (itr: {itr}) ..", a.shape());
         } else {
-            info!("red C[{i}]: {:?} ..", a.shape());
+            trace!("red C[{i}]: {:?} ..", a.shape());
         }
 
         let (p, q, r) = pivots(a);
 
         if r == 0 { 
-            info!("no more pivots.");
+            trace!("no more pivots.");
             return false;
         }
 
         let s = schur(a, &p, &q, r, self.with_trans);
 
-        info!("red C[{i}]: {:?} -> {:?}.", a.shape(), s.complement().shape());
+        trace!("red C[{i}]: {:?} -> {:?}.", a.shape(), s.complement().shape());
 
         if self.with_trans { 
             self.update_trans(i, &p, &q, r, &s);

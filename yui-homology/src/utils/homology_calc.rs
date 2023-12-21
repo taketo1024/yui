@@ -42,7 +42,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
             return Self::trivial_result(d1.nrows());
         }
 
-        info!("calculate homology: {} -> {} -> {}", d1.ncols(), d1.nrows(), d2.nrows());
+        trace!("calculate homology: {} -> {} -> {}", d1.ncols(), d1.nrows(), d2.nrows());
         
         let (s1, s2) = Self::process_snf(d1, d2, with_trans);
         let (rank, tors) = Self::result(&s1, &s2);

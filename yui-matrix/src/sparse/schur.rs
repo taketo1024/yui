@@ -1,4 +1,4 @@
-use log::info;
+use log::trace;
 use yui::{Ring, RingOps};
 use super::*;
 use super::triang::{TriangularType, solve_triangular, solve_triangular_left};
@@ -14,8 +14,6 @@ use super::triang::{TriangularType, solve_triangular, solve_triangular_left};
 //                [   s]
 //
 // s = d - c a⁻¹ b
-
-const LOG_THRESHOLD: usize = 10_000;
 
 pub struct Schur<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
@@ -47,10 +45,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let id = |n| SpMat::<R>::id(n);
         let zero = |m, n| SpMat::<R>::zero((m, n));
 
-        let report = should_report(abcd);
-        if report { 
-            info!("schur, a: {:?}, r: {} ..", abcd.shape(), r);
-        }
+        trace!("schur, a: {:?}, r: {} ..", abcd.shape(), r);
 
         //  [a   ] [a⁻¹b   ] = [b]
         //  [c  1] [d-ca⁻¹b]   [d]
@@ -69,9 +64,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         
         let s = pinvbd.submat_rows(r..m);
 
-        if report { 
-            info!("schur: {:?}", s.shape());
-        }
+        trace!("schur: {:?}", s.shape());
 
         // t_in = [-a⁻¹b]
         //        [  1  ]
@@ -119,10 +112,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn trans_out(&self) -> Option<&SpMat<R>> { 
         self.t_out.as_ref()
     }
-}
-
-fn should_report<R>(a: &SpMat<R>) -> bool { 
-    usize::min(a.nrows(), a.ncols()) > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Info
 }
 
 #[cfg(test)]

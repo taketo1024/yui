@@ -93,9 +93,13 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         self.b_mats.append(&mut other.b_mats);
     }
 
-    pub fn modify<F>(&mut self, modify_map: F)
-    where F: FnOnce(&mut Vec<SpMat<R>>, &mut Vec<SpMat<R>>) {
-        modify_map(&mut self.f_mats, &mut self.b_mats);
+    pub fn modify<F1, F2>(&mut self, modify_fs: F1, modify_bs: F2)
+    where 
+        F1: FnOnce(&mut Vec<SpMat<R>>),
+        F2: FnOnce(&mut Vec<SpMat<R>>),
+    {
+        modify_fs(&mut self.f_mats);
+        modify_bs(&mut self.b_mats);
 
         if let Some(f) = self.f_mats.last() { 
             self.tgt_dim = f.nrows();

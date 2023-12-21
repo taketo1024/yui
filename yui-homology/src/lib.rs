@@ -6,5 +6,4 @@ pub use grid::*;
 pub use cpx::*;
 pub use x::*;
 
-pub mod config;
 pub mod utils;

@@ -1,8 +1,10 @@
 use itertools::Itertools;
-use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use yui::{Ring, RingOps, IndexList};
 use yui::lc::{Lc, Gen};
 use yui_matrix::sparse::SpMat;
+
+#[cfg(feature = "multithread")]
+use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
 pub fn make_matrix<X, Y, R, F>(from: &IndexList<X>, to: &IndexList<Y>, f: F) -> SpMat<R>
 where 
@@ -25,6 +27,7 @@ where
     SpMat::from_entries((m, n), entries)
 }
 
+#[cfg(feature = "multithread")]
 pub fn make_matrix_async<X, Y, R, F>(from: &IndexList<X>, to: &IndexList<Y>, f: F) -> SpMat<R>
 where 
     X: Gen, Y: Gen, 

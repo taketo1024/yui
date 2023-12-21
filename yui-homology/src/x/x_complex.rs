@@ -2,7 +2,6 @@ use std::ops::Index;
 use std::sync::Arc;
 
 use delegate::delegate;
-use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use yui::{Ring, RingOps};
 use yui::lc::{Gen, Lc};
 use yui_matrix::sparse::{SpMat, SpVec};
@@ -10,6 +9,9 @@ use yui_matrix::sparse::{SpMat, SpVec};
 use crate::utils::ChainReducer;
 use crate::{GridTrait, GridDeg, Grid, GridIter, ChainComplexTrait, RModStr, isize2, isize3};
 use super::XModStr;
+
+#[cfg(feature = "multithread")]
+use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
 pub type XChainComplex <X, R> = XChainComplexBase<isize,  X, R>;
 pub type XChainComplex2<X, R> = XChainComplexBase<isize2, X, R>;
@@ -49,16 +51,19 @@ where
     fn d_matrix(&self, i: I) -> SpMat<R> { 
         let m = self[i + self.d_deg].rank();
         let n = self[i].rank();
-        if crate::config::is_multithread_enabled() {
-            let cols = (0..n).into_par_iter().map(|j|
-                self.d_matrix_col(i, j)
-            ).collect::<Vec<_>>();
-            SpMat::from_col_vecs(m, cols)
-        } else { 
-            let cols = (0..n).map(|j|
-                self.d_matrix_col(i, j)
-            );
-            SpMat::from_col_vecs(m, cols)
+
+        cfg_if::cfg_if! { 
+            if #[cfg(feature = "multithread")] {
+                let cols = (0..n).into_par_iter().map(|j|
+                    self.d_matrix_col(i, j)
+                ).collect::<Vec<_>>();
+                SpMat::from_col_vecs(m, cols)
+            } else { 
+                let cols = (0..n).map(|j|
+                    self.d_matrix_col(i, j)
+                );
+                SpMat::from_col_vecs(m, cols)
+            }
         }
     }
 

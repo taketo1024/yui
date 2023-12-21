@@ -1,12 +1,18 @@
-use std::cell::RefCell;
-use std::sync::Arc;
 use either::Either;
 use log::trace;
 use num_traits::Zero;
-use rayon::prelude::*;
-use thread_local::ThreadLocal;
 use yui::{Ring, RingOps};
+
 use super::*;
+
+cfg_if::cfg_if! {
+    if #[cfg(feature = "multithread")] {
+        use std::cell::RefCell;
+        use std::sync::Arc;
+        use thread_local::ThreadLocal;
+        use rayon::prelude::*;
+    }
+}
 
 const LOG_THRESHOLD: usize = 10_000;
 
@@ -43,10 +49,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     assert_eq!(a.nrows(), y.nrows());
     debug_assert!(a.is_triang(t));
 
-    if crate::config::is_multithread_enabled() { 
-        solve_triangular_m(t, a, y)
-    } else { 
-        solve_triangular_s(t, a, y)
+    cfg_if::cfg_if! { 
+        if #[cfg(feature = "multithread")] { 
+            solve_triangular_m(t, a, y)
+        } else { 
+            solve_triangular_s(t, a, y)
+        }
     }
 }
 
@@ -67,6 +75,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     _solve_triangular(t, a, &diag, &mut b)
 }
 
+#[allow(unused)]
 fn solve_triangular_s<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     trace!("solve triangular, y: {:?}", y.shape());
@@ -83,6 +92,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     SpMat::from_col_vecs(n, cols)
 }
 
+#[cfg(feature = "multithread")]
 fn solve_triangular_m<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     use yui::util::sync::SyncCounter;
@@ -166,7 +176,7 @@ where R: Clone + Zero {
     vec.iter().for_each(|(i, r)| x[i] = r.clone())
 }
 
-#[inline]
+#[allow(unused)]
 fn should_report<R>(a: &SpMat<R>) -> bool { 
     usize::min(a.nrows(), a.ncols()) > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Trace
 }

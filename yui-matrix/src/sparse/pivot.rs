@@ -6,20 +6,26 @@
 // see also: SpaSM (Sparse direct Solver Modulo p)
 // https://github.com/cbouilla/spasm
 
-use std::cell::RefCell;
 use std::slice::Iter;
 use std::cmp::Ordering;
 use std::collections::VecDeque;
-use std::sync::RwLock;
 use ahash::AHashSet;
 use itertools::Itertools;
 use log::trace;
-use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use sprs::PermOwned;
-use thread_local::ThreadLocal;
+
 use yui::{Ring, RingOps};
 use yui::algo::top_sort;
 use super::*;
+
+cfg_if::cfg_if! {
+    if #[cfg(feature = "multithread")] {
+        use std::cell::RefCell;
+        use std::sync::RwLock;
+        use thread_local::ThreadLocal;
+        use rayon::prelude::*;
+    }
+}
 
 const LOG_THRESHOLD: usize = 10_000;
 
@@ -185,10 +191,12 @@ impl PivotFinder {
     fn find_cycle_free_pivots(&mut self) {
         let before_piv_count = self.pivots.count();
 
-        if crate::config::is_multithread_enabled() { 
-            self.find_cycle_free_pivots_m();
-        } else {
-            self.find_cycle_free_pivots_s();
+        cfg_if::cfg_if! { 
+            if #[cfg(feature = "multithread")] { 
+                self.find_cycle_free_pivots_m();
+            } else { 
+                self.find_cycle_free_pivots_s();
+            }
         }
 
         let piv_count = self.pivots.count();
@@ -196,6 +204,7 @@ impl PivotFinder {
         trace!("  cycle-free-pivots: +{}, total: {}.", piv_count - before_piv_count, piv_count);
     }
 
+    #[allow(unused)]
     fn find_cycle_free_pivots_s(&mut self) {
         let remain_rows: Vec<_> = self.remain_rows().collect();
         let total_rows = remain_rows.len();
@@ -221,6 +230,7 @@ impl PivotFinder {
         }
      }
 
+     #[cfg(feature = "multithread")]
      fn find_cycle_free_pivots_m(&mut self) {
         use yui::util::sync::SyncCounter;
 
@@ -265,7 +275,7 @@ impl PivotFinder {
         self.pivots = pivots.into_inner().unwrap();
      }
 
-     #[inline(never)] // for profilability
+     #[cfg(feature = "multithread")]
      fn find_cycle_free_pivots_in(&self, pivots: &RwLock<PivotData>, loc_pivots: &mut PivotData, w: &mut RowWorker) {
         loop { 
             w.traverse(&self.str, loc_pivots);
@@ -295,6 +305,7 @@ impl PivotFinder {
      }
 }
 
+#[cfg(feature = "multithread")]
 fn init_tls<T, F>(tl: &ThreadLocal<RefCell<T>>, f: F) -> &RefCell<T>
 where T: Send, F: FnOnce() -> T {
     tl.get_or(|| RefCell::new( f() ) )
@@ -423,6 +434,7 @@ impl PivotData {
         })
     }
 
+    #[allow(unused)]
     fn pivot_at(&self, k: usize) -> (Row, Col) { 
         let j = self.indices[k];
         let i = self.data[j].unwrap();
@@ -521,8 +533,9 @@ impl RowWorker {
             .sorted_by(|&j1, &j2| 
                 str.cmp_cols(j1, j2)
             ).next()
-        }
+    }
 
+    #[allow(dead_code)]
     fn update_diff(&mut self, loc_pivots: &PivotData, pivots: &PivotData) {
         debug_assert!(loc_pivots.count() <= pivots.count());
         for k in loc_pivots.count()..pivots.count() { 
@@ -771,6 +784,7 @@ mod tests {
         assert_eq!(pf.pivots.iter().collect_vec(), vec![(4, 2), (3, 4), (0, 0), (5, 1), (2, 3)]);
     }
 
+    #[cfg(feature = "multithread")]
     #[test]
     fn find_cycle_free_pivots_m() {
         let a = SpMat::from_dense_data((6, 9), [

@@ -12,6 +12,21 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>,
     F: Fn(&X) -> Lc<Y, R> 
 {
+    cfg_if::cfg_if! { 
+        if #[cfg(multithread)] { 
+            make_matrix_m(from, to, f)
+        } else { 
+            make_matrix_s(from, to, f)
+        }
+    }
+}
+
+pub fn make_matrix_s<X, Y, R, F>(from: &IndexList<X>, to: &IndexList<Y>, f: F) -> SpMat<R>
+where 
+    X: Gen, Y: Gen, 
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    F: Fn(&X) -> Lc<Y, R> 
+{
     let (m, n) = (to.len(), from.len());
 
     let entries = (0..n).flat_map(|j| {
@@ -28,7 +43,7 @@ where
 }
 
 #[cfg(feature = "multithread")]
-pub fn make_matrix_async<X, Y, R, F>(from: &IndexList<X>, to: &IndexList<Y>, f: F) -> SpMat<R>
+pub fn make_matrix_m<X, Y, R, F>(from: &IndexList<X>, to: &IndexList<Y>, f: F) -> SpMat<R>
 where 
     X: Gen, Y: Gen, 
     R: Ring, for<'x> &'x R: RingOps<R>,

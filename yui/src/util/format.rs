@@ -65,15 +65,15 @@ where
     S: Display,
     I: Display,
     J: Display,
-    I1: Iterator<Item = I>,
-    I2: Iterator<Item = J>,
+    I1: IntoIterator<Item = I>,
+    I2: IntoIterator<Item = J>,
     D: Display,
     F: Fn(&I, &J) -> D
 {
     use prettytable::*;
 
-    let rows = rows.collect_vec();
-    let cols = cols.collect_vec();
+    let rows = rows.into_iter().collect_vec();
+    let cols = cols.into_iter().collect_vec();
 
     fn row<I>(head: String, cols: I) -> Row
     where I: Iterator<Item = String> { 

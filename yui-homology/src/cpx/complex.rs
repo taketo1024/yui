@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::mem;
 use std::ops::Index;
 
@@ -6,9 +7,9 @@ use delegate::delegate;
 use yui::{Ring, RingOps};
 use yui_matrix::sparse::{SpMat, SpVec, MatTrait, Trans};
 
-use crate::{GridTrait, GridDeg, Grid, GridIter, isize2, isize3};
+use crate::{GridTrait, GridDeg, Grid, GridIter, isize2, isize3, DisplaySeq, DisplayAt, DisplayTable};
 use crate::utils::ChainReducer;
-use super::{RModStr, SimpleRModStr, rmod_str_symbol};
+use super::{RModStr, SimpleRModStr};
 
 pub type ChainComplexSummand<R> = SimpleRModStr<R>;
 
@@ -54,8 +55,9 @@ where
         }
     }
 
-    fn display_d_at(&self, i: I) -> String {
-        let c = |i| rmod_str_symbol(self.rank(i), &[], "0");
+    fn display_d_at(&self, i: I) -> String
+    where Self::Output: Display {
+        let c = |i| self.get(i).to_string();
         let c0 = c(i);
         let c1 = c(i + self.d_deg());
         let d = self.d_matrix(i).into_dense();
@@ -67,7 +69,8 @@ where
         }
     }
 
-    fn display_d(&self) -> String { 
+    fn display_d(&self) -> String
+    where Self::Output: Display { 
         self.support().filter_map(|i| 
             if self.rank(i) > 0 && self.rank(i + self.d_deg()) > 0 {
                 Some(self.display_d_at(i))
@@ -77,7 +80,8 @@ where
         ).join("\n\n")
     }
 
-    fn print_d(&self) {
+    fn print_d(&self)
+    where Self::Output: Display {
         println!("{}", self.display_d());
     }
 
@@ -231,6 +235,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.get(i.into())
     }
 }
+
+impl<I, R> DisplayAt<I> for ChainComplexBase<I, R>
+where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {
+    fn display_at(&self, i: I) -> String {
+        self.get(i).display_for_grid()
+    }
+}
+
+impl<R> DisplaySeq<isize> for ChainComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {}
+
+impl<R> DisplayTable<isize, isize2> for ChainComplex2<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {}
 
 #[cfg(test)]
 pub(crate) mod tests { 

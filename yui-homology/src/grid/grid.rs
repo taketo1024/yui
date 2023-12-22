@@ -3,7 +3,12 @@ use std::fmt::Display;
 
 use ahash::AHashMap;
 use itertools::Itertools;
-use crate::{GridDeg, isize2, usize2, isize3, usize3};
+use crate::{GridDeg, isize2, isize3};
+
+pub type Grid1<E> = Grid<isize,  E>;
+pub type Grid2<E> = Grid<isize2, E>;
+pub type Grid3<E> = Grid<isize3, E>;
+pub type GridIter<I> = std::vec::IntoIter<I>;
 
 pub trait GridTrait<I>
 where I: GridDeg { 
@@ -14,12 +19,6 @@ where I: GridDeg {
     fn is_supported(&self, i: I) -> bool;
     fn get(&self, i: I) -> &Self::Output;
 }
-
-pub type Grid1<E> = Grid<isize,  E>;
-pub type Grid2<E> = Grid<isize2, E>;
-pub type Grid3<E> = Grid<isize3, E>;
-
-pub type GridIter<I> = std::vec::IntoIter<I>;
 
 #[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -167,21 +166,28 @@ macro_rules! impl_index {
 }
 
 impl_index!(isize, isize2, isize3);
-impl_index!(usize, usize2, usize3);
 
-pub trait DisplayForGrid {
-    fn display_for_grid(&self) -> String;
+pub trait DisplayAt<I>: GridTrait<I>
+where I: GridDeg { 
+    fn display_at(&self, i: I) -> String;
 }
 
-impl<T> DisplayForGrid for T
-where T: Display {
-    fn display_for_grid(&self) -> String {
-        self.to_string()
+impl<I, E> DisplayAt<I> for Grid<I, E>
+where I: GridDeg, E: Display {
+    fn display_at(&self, i: I) -> String {
+        self.get(i).to_string()
     }
 }
 
-pub trait DisplaySeq<I> {
-    fn display_seq(&self, label: &str) -> String;
+pub trait DisplaySeq<I>: DisplayAt<I>
+where I: GridDeg {
+    fn display_seq(&self, label: &str) -> String {
+        use yui::util::format::table;
+        table(label, [""].iter(), self.support(), |_, &i| {
+            self.display_at(i)
+        })
+    }
+
     fn print_seq(&self, label: &str) {
         println!("{}", self.display_seq(label))
     }
@@ -189,52 +195,54 @@ pub trait DisplaySeq<I> {
 
 macro_rules! impl_print_seq {
     ($t:ident) => {
-        impl<T> DisplaySeq<$t> for T
-        where T: GridTrait<$t>, T::Output: DisplayForGrid {
-            fn display_seq(&self, label: &str) -> String {
-                use yui::util::format::table;
-                let str = table(label, [""].iter(), self.support(), |_, &i| {
-                    self.get(i).display_for_grid()
-                });
-                str
-            }
-        }                
+        impl<E> DisplaySeq<$t> for Grid<$t, E> where E: Display {}
     };
 }
 
 impl_print_seq!(isize);
-impl_print_seq!(usize);
 
-pub trait DisplayTable<I> {
-    fn display_table(&self, label0: &str, label1: &str) -> String;
+pub trait Grid2Trait<I, I2> {
+    fn rows(&self) -> Vec<I>;
+    fn cols(&self) -> Vec<I>;
+}
+
+impl<G> Grid2Trait<isize, isize2> for G
+where G: GridTrait<isize2> {
+    fn rows(&self) -> Vec<isize> {
+        self.support().map(|t| t.1).unique().sorted().collect_vec()
+    }
+
+    fn cols(&self) -> Vec<isize> {
+        self.support().map(|t| t.0).unique().sorted().collect_vec()
+    }
+}
+
+pub trait DisplayTable<I, I2>: DisplayAt<I2> + Grid2Trait<I, I2>
+where I: GridDeg, I2: GridDeg + From<(I, I)> {
+    fn display_table(&self, label0: &str, label1: &str) -> String {
+        use yui::util::format::table;
+
+        let head = format!("{}\\{}", label1, label0);
+        let rows = self.rows().into_iter().rev();
+        let cols = self.cols();
+
+        table(head, rows, cols, |&j, &i|
+            self.display_at((i, j).into())
+        )
+    }
+
     fn print_table(&self, label0: &str, label1: &str) {
         println!("{}", self.display_table(label0, label1))
     }
 }
 
 macro_rules! impl_print_table {
-    ($t:ident) => {
-        impl<T> DisplayTable<$t> for T
-        where T: GridTrait<$t>, T::Output: DisplayForGrid {
-            fn display_table(&self, label0: &str, label1: &str) -> String {
-                use yui::util::format::table;
-        
-                let head = format!("{}\\{}", label1, label0);
-                let cols = self.support().map(|$t(i, _)| i).unique().sorted();
-                let rows = self.support().map(|$t(_, j)| j).unique().sorted().rev();
-        
-                let str = table(head, rows, cols, |&j, &i| {
-                    self.get($t(i, j)).display_for_grid()
-                });
-        
-                str
-            }
-        }
+    ($i:ident, $i2:ident) => {
+        impl<E> DisplayTable<$i, $i2> for Grid<$i2, E> where E: Display {}
     };
 }
 
-impl_print_table!(isize2);
-impl_print_table!(usize2);
+impl_print_table!(isize, isize2);
 
 #[cfg(test)]
 mod tests { 

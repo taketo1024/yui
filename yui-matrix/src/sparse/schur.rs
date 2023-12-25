@@ -26,38 +26,40 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> Schur<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn from_partial_triangular(t: TriangularType, a: &SpMat<R>, r: usize, with_trans: bool) -> Self {
+        use TriangularType::*;
+
         assert!(r <= a.nrows());
         assert!(r <= a.ncols());
 
-        let orig_shape = a.shape();
-        let (compl, t_in, t_out) = match t {
-            TriangularType::Upper => todo!(),
-            TriangularType::Lower => Self::compute_from_partial_lower(a, r, with_trans)
-        };
-
-        Self { 
-            orig_shape, 
-            compl, 
-            t_in,
-            t_out
+        match t {
+            Upper => Self::from_partial_upper(a, r, with_trans),
+            Lower => Self::from_partial_lower(a, r, with_trans)
         }
     }
 
-    fn compute_from_partial_lower(abcd: &SpMat<R>, r: usize, with_trans: bool) -> (SpMat<R>, Option<SpMat<R>>, Option<SpMat<R>>) {
+    fn from_partial_upper(abcd: &SpMat<R>, r: usize, with_trans: bool) -> Self {
+        todo!()
+    }
+
+    fn from_partial_lower(abcd: &SpMat<R>, r: usize, with_trans: bool) -> Self {
         use TriangularType::Lower as L;
         let id = |n| SpMat::<R>::id(n);
         let zero = |m, n| SpMat::<R>::zero((m, n));
 
         trace!("schur, a: {:?}, r: {} ..", abcd.shape(), r);
 
-        //  [a   ] [a⁻¹b   ] = [b]
-        //  [c  1] [d-ca⁻¹b]   [d]
-        //  ~~~~~~ ~~~~~~~~~   ~~~
-        //   = p    = pinvbd   = bd
+        //  [a   ] [x] = [b]
+        //  [c  1] [y]   [d]
+        //  ~~~~~~
+        //   = p  
+        //
+        //  x = a⁻¹b,
+        //  y = d - ca⁻¹b
 
         let (m, n) = abcd.shape();
 
         let pinvbd = { 
+            // TODO improve
             let p = abcd.submat_cols(0..r).concat(
                 &zero(r, m - r).stack(&id(m - r))
             );
@@ -71,6 +73,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         // t_in = [-a⁻¹b]
         //        [  1  ]
+        
         let t_in = if with_trans { 
             let ainvb = pinvbd.submat_rows(0..r);
             let t_in = (-ainvb).stack(&id(n - r));
@@ -93,7 +96,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             None
         };
 
-        (s, t_in, t_out)
+        Self { 
+            orig_shape: (m, n), 
+            compl: s, 
+            t_in,
+            t_out
+        }
     }
 
     pub fn orig_shape(&self) -> (usize, usize) { 

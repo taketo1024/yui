@@ -25,52 +25,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> Schur<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn from_partial_triangular(t: TriangularType, a: &SpMat<R>, r: usize, with_trans: bool) -> Self {
-        use TriangularType::*;
-
-        assert!(r <= a.nrows());
-        assert!(r <= a.ncols());
-
-        match t {
-            Upper => Self::from_partial_upper(a, r, with_trans),
-            Lower => Self::from_partial_lower(a, r, with_trans)
-        }
-    }
-
-    fn from_partial_upper(abcd: &SpMat<R>, r: usize, with_trans: bool) -> Self {
-        Self::from_partial_lower(&abcd.transpose(), r, with_trans).transpose()
-    }
-
-    fn from_partial_lower(abcd: &SpMat<R>, r: usize, with_trans: bool) -> Self {
-        use TriangularType::Lower as L;
-        let id = |n| SpMat::<R>::id(n);
+    pub fn from_partial_triangular(t: TriangularType, abcd: &SpMat<R>, r: usize, with_trans: bool) -> Self {
+        assert!(r <= abcd.nrows());
+        assert!(r <= abcd.ncols());
 
         trace!("schur, a: {:?}, r: {} ..", abcd.shape(), r);
 
-        //  [a   ] [x] = [b]
-        //  [c  1] [y]   [d]
-        //  ~~~~~~
-        //   = p  
-        //
-        //  x = a⁻¹b,
-        //  y = d - ca⁻¹b
-
-        let (m, n) = abcd.shape();
-
-        let pinvbd = { 
-            let mut p = abcd.submat_cols(0..r);
-            let e = SpMat::from_entries(
-                (m, m - r), 
-                (0 .. m-r).map(|i| (r + i, i, R::one()))
-            );
-            p.extend_cols(e);
-
-            let bd = abcd.submat_cols(r..n);
-
-            solve_triangular(L, &p, &bd) // px = bd
-        };
+        let id = |n| SpMat::<R>::id(n);
         
-        let s = pinvbd.submat_rows(r..m);
+        let (m, n) = abcd.shape();
+        let [a, b, c, d] = abcd.divide4((r, r));
+
+        let ainvb = { 
+            solve_triangular(t, &a, &b) // ax = b
+        };
+
+        let s = { 
+            let s = d - &c * &ainvb;
+            SpMat::from(s)
+        };
 
         trace!("schur: {:?}", s.shape());
 
@@ -78,23 +51,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         //        [  1  ]
         
         let t_in = if with_trans { 
-            let ainvb = pinvbd.submat_rows(0..r);
             let t_in = (-ainvb).stack(&id(n - r));
             Some(t_in)
         } else { 
             None
         };
 
-        std::mem::drop(pinvbd);
-
         // t_out = [-ca⁻¹  1]
         let t_out = if with_trans { 
-            let a = abcd.submat(0..r, 0..r);
-            let c = abcd.submat(r..m, 0..r);
-            
-            let mut t_out = -solve_triangular_left(L, &a, &c); // (-x)a = c
+            let mut t_out = -solve_triangular_left(t, &a, &c); // (-x)a = c
             t_out.extend_cols(id(m - r));
-
             Some(t_out)
         } else { 
             None

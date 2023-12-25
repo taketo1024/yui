@@ -315,8 +315,8 @@ struct MatrixStr {
     shape: (usize, usize),
     entries: Vec<Vec<Col>>,     // [row -> [col]]
     cands: Vec<AHashSet<Col>>,  // [row -> [col]]
-    row_wght: Vec<f32>,         // [row -> weight]
-    col_wght: Vec<f32>,         // [col -> weight]
+    row_wght: Vec<f64>,         // [row -> weight]
+    col_wght: Vec<f64>,         // [col -> weight]
 }
 
 impl MatrixStr { 
@@ -332,8 +332,8 @@ impl MatrixStr {
         let shape = a.shape();
         let (m, n) = shape;
         let mut entries = vec![vec![]; m];
-        let mut row_wght = vec![0f32; m];
-        let mut col_wght = vec![0f32; n];
+        let mut row_wght = vec![0.0; m];
+        let mut col_wght = vec![0.0; n];
         let mut cands = vec![AHashSet::new(); m];
 
         for (i, j, r) in a.iter() { 
@@ -341,7 +341,7 @@ impl MatrixStr {
             
             entries[i].push(j);
 
-            let w = 1f32; // TODO
+            let w = r.c_weight();
             row_wght[i] += w;
             col_wght[j] += w;
 
@@ -615,8 +615,8 @@ mod tests {
             vec![1,3,6,8], 
             vec![0,2,4,5,7,8]]
         );
-        assert_eq!(str.row_wght, vec![5f32,5f32,4f32,3f32,4f32,6f32]);
-        assert_eq!(str.col_wght, vec![2f32,3f32,5f32,3f32,2f32,3f32,2f32,3f32,4f32]);
+        assert_eq!(str.row_wght, vec![5.0, 6.0, 4.0, 5.0, 4.0, 6.0]);
+        assert_eq!(str.col_wght, vec![2.0, 3.0, 5.0, 3.0, 4.0, 3.0, 2.0, 4.0, 4.0]);
         assert_eq!(str.cands, vec![
             AHashSet::from_iter([0,2,5,6,8]),
             AHashSet::from_iter([1,2,3,5]),

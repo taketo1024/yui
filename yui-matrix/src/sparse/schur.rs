@@ -38,7 +38,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn from_partial_upper(abcd: &SpMat<R>, r: usize, with_trans: bool) -> Self {
-        todo!()
+        Self::from_partial_lower(&abcd.transpose(), r, with_trans).transpose()
     }
 
     fn from_partial_lower(abcd: &SpMat<R>, r: usize, with_trans: bool) -> Self {
@@ -123,6 +123,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn trans_out(&self) -> Option<&SpMat<R>> { 
         self.t_out.as_ref()
     }
+
+    pub fn transpose(&self) -> Self { 
+        Self {
+            orig_shape: (self.orig_shape.1, self.orig_shape.0),
+            compl: self.compl.transpose(),
+            t_in: self.t_out.as_ref().map(|t| t.transpose()),
+            t_out: self.t_in.as_ref().map(|t| t.transpose()),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -130,7 +139,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn schur() {
+    fn schur_lower() {
         let a = SpMat::from_dense_data((6, 5), [
             1, 0, 0, 1, 3,
             2,-1, 0, 2, 2,
@@ -142,13 +151,17 @@ mod tests {
         let sch = Schur::from_partial_triangular(TriangularType::Lower, &a, 3, false);
         let s = sch.complement();
 
-        assert_eq!(s, &SpMat::from_dense_data((3,2), [5,36,12,45,-14,-60]));
+        assert_eq!(s, &SpMat::from_dense_data((3,2), [
+             5,  36, 
+             12, 45,
+            -14,-60
+        ]));
         assert!(sch.trans_in().is_none());
         assert!(sch.trans_out().is_none());
     }
 
     #[test]
-    fn schur_with_trans() {
+    fn schur_lower_with_trans() {
         let a = SpMat::from_dense_data((6, 5), [
             1, 0, 0, 1, 3,
             2,-1, 0, 2, 2,
@@ -160,15 +173,86 @@ mod tests {
         let sch = Schur::from_partial_triangular(TriangularType::Lower, &a, 3, true);
         let s = sch.complement();
 
-        assert_eq!(s, &SpMat::from_dense_data((3,2), [5,36,12,45,-14,-60]));
+        assert_eq!(s, &SpMat::from_dense_data((3,2), [
+             5,  36, 
+             12, 45,
+            -14,-60
+        ]));
         assert!(sch.trans_in().is_some());
         assert!(sch.trans_out().is_some());
 
         let t_in = sch.trans_in().unwrap();
         let t_out = sch.trans_out().unwrap();
 
-        assert_eq!(t_in,  &SpMat::from_dense_data((5,2), [-1,-3,0,-4,3,14,1,0,0,1]));
-        assert_eq!(t_out, &SpMat::from_dense_data((3,6), [20,-6,-4,1,0,0,24,-7,-5,0,1,0,-31,8,3,0,0,1]));
+        assert_eq!(t_in,  &SpMat::from_dense_data((5,2), [
+            -1, -3,
+             0, -4,
+             3, 14,
+             1,  0,
+             0,  1
+        ]));
+        assert_eq!(t_out, &SpMat::from_dense_data((3,6), [
+             20, -6, -4, 1, 0, 0,
+             24, -7, -5, 0, 1, 0,
+            -31,  8,  3, 0, 0, 1
+        ]));
+        assert_eq!(&(t_out * &a * t_in), s);
+    }
+
+    #[test]
+    fn schur_upper() {
+        let a = SpMat::from_dense_data((5, 6), [
+            1, 2, 3, 4, 5, 6,
+            0, -1, 2, 2, 3, 2,
+            0, 0, 1, 4, 5, -3,
+            1, 2, 0, -3, 2, 1,
+            3, 2, 3, 0, 2, 8,
+        ]);
+        let sch = Schur::from_partial_triangular(TriangularType::Upper, &a, 3, false);
+        let s = sch.complement();
+
+        assert_eq!(s, &SpMat::from_dense_data((2, 3), [
+            5, 12,-14,
+            36,45,-60
+        ]));
+        assert!(sch.trans_in().is_none());
+        assert!(sch.trans_out().is_none());
+    }
+
+    #[test]
+    fn schur_upper_with_trans() {
+        let a = SpMat::from_dense_data((5, 6), [
+            1, 2, 3, 4, 5, 6,
+            0, -1, 2, 2, 3, 2,
+            0, 0, 1, 4, 5, -3,
+            1, 2, 0, -3, 2, 1,
+            3, 2, 3, 0, 2, 8,
+        ]);
+        let sch = Schur::from_partial_triangular(TriangularType::Upper, &a, 3, true);
+        let s = sch.complement();
+
+        assert_eq!(s, &SpMat::from_dense_data((2, 3), [
+            5, 12,-14,
+            36,45,-60
+        ]));
+        assert!(sch.trans_in().is_some());
+        assert!(sch.trans_out().is_some());
+
+        let t_in = sch.trans_in().unwrap();
+        let t_out = sch.trans_out().unwrap();
+
+        assert_eq!(t_in,  &SpMat::from_dense_data((6,3), [
+            20, 24, -31,
+            -6, -7,   8,
+            -4, -5,   3,
+             1,  0,   0,
+             0,  1,   0,
+             0,  0,   1
+        ]));
+        assert_eq!(t_out, &SpMat::from_dense_data((2, 5), [
+            -1,  0,  3, 1, 0,
+            -3, -4, 14, 0, 1
+        ]));
         assert_eq!(&(t_out * &a * t_in), s);
     }
 }

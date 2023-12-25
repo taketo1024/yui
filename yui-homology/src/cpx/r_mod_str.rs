@@ -111,7 +111,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         t.backward_mat().col_vec(i)
     }
 
-    pub fn merge(&mut self, other: SimpleRModStr<R>) { 
+    pub fn merge(&mut self, other: SimpleRModStr<R>, reduce: bool) { 
         self.rank = other.rank;
         self.tors = other.tors.clone();
         
@@ -124,7 +124,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             return;
         };
 
-        t.merge(t1);
+        t.merge(t1, reduce);
     }
 }
 

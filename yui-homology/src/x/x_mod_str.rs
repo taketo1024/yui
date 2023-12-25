@@ -108,8 +108,8 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         ) )
     }
 
-    pub fn merge(&mut self, other: SimpleRModStr<R>) { 
-        self.inner.merge(other)
+    pub fn merge(&mut self, other: SimpleRModStr<R>, reduce: bool) { 
+        self.inner.merge(other, reduce)
     }
 }
 

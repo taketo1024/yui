@@ -85,12 +85,16 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         self.b_mats.push(b);
     }
 
-    pub fn merge(&mut self, mut other: Trans<R>) { 
+    pub fn merge(&mut self, mut other: Trans<R>, reduce: bool) { 
         assert_eq!(self.tgt_dim, other.src_dim);
 
         self.tgt_dim = other.tgt_dim;
         self.f_mats.append(&mut other.f_mats);
         self.b_mats.append(&mut other.b_mats);
+
+        if reduce {
+            self.reduce();
+        }
     }
 
     pub fn modify<F1, F2>(&mut self, modify_fs: F1, modify_bs: F2)
@@ -113,17 +117,26 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
     }
 
     pub fn forward_mat(&self) -> SpMat<R> {
-        self.f_mats.iter().fold(
-            SpMat::id(self.src_dim), 
-            |res, f| f * res
+        // f = fn * ... f1 * f0
+        self.f_mats.iter().rev().fold(
+            SpMat::id(self.tgt_dim), 
+            |res, f| res * f
         )
     }
 
     pub fn backward_mat(&self) -> SpMat<R> {
+        // b = b0 * b1 * ... * bn
         self.b_mats.iter().rev().fold(
             SpMat::id(self.tgt_dim), 
             |res, b| b * res
         )
+    }
+
+    pub fn reduce(&mut self) {
+        let f = self.forward_mat();
+        let b = self.backward_mat();
+        self.f_mats = vec![f];
+        self.b_mats = vec![b];
     }
 }
 

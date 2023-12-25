@@ -80,7 +80,7 @@ where
             self.summands.support(),
             |i| { 
                 let mut s = self.summands[i].clone();
-                s.merge(reduced[i].clone());
+                s.merge(reduced[i].clone(), false);
                 s
             }
         );

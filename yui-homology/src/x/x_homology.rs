@@ -20,7 +20,7 @@ where
     pub fn homology_at(&self, i: I, with_trans: bool) -> XHomologySummand<X, R> {
         let mut ci = self[i].clone();
         let hi = self.compute_homology(i, with_trans);
-        ci.merge(hi);
+        ci.merge(hi, true);
         ci
     }
 

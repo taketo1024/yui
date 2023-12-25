@@ -228,6 +228,33 @@ where R: Scalar + Clone + Zero + ClosedAdd {
         self.submat(0 .. m, cols)
     }
 
+    pub fn divide4(&self, point: (usize, usize)) -> [SpMat<R>; 4] { 
+        let (m, n) = self.shape();
+        let (k, l) = point;
+        assert!(k <= m);
+        assert!(l <= n);
+
+        let mut a = CooMatrix::new(k, l);
+        let mut b = CooMatrix::new(k, n - l);
+        let mut c = CooMatrix::new(m - k, l);
+        let mut d = CooMatrix::new(m - k, n - l);
+        
+        for (i, j, r) in self.iter() { 
+            if r.is_zero() { continue }
+            let r = r.clone();
+            match ((0..k).contains(&i), (0..l).contains(&j)) { 
+                (true , true ) => a.push(i, j, r),
+                (true , false) => b.push(i, j - l, r),
+                (false, true ) => c.push(i - k, j, r),
+                (false, false) => d.push(i - k, j - l, r),
+            }
+        }
+        
+        [a, b, c, d].map(|x| 
+            CscMatrix::from(&x).into()
+        )
+    }
+
     pub fn combine_blocks(blocks: [&SpMat<R>; 4]) -> SpMat<R> {
         let [a, b, c, d] = blocks;
 

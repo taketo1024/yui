@@ -234,6 +234,7 @@ where R: Scalar + Clone + Zero + ClosedAdd {
     }
 
     pub fn submat_cols(&self, cols: Range<usize>) -> SpMat<R> { 
+        // MEMO improve
         self.view().submat_cols(cols).collect()
     }
 
@@ -278,6 +279,33 @@ where R: Scalar + Clone + Zero + ClosedAdd {
             b, 
             &zero(b.nrows(), 0)
         ])
+    }
+
+    pub fn extend_cols(&mut self, b: Self) { 
+        assert_eq!(self.nrows(), b.nrows());
+
+        if b.ncols() == 0 { 
+            return
+        }
+
+        let shape = (self.nrows(), self.ncols() + b.ncols());
+        let l = std::mem::replace(&mut self.inner, CscMatrix::zeros(0, 0));
+        let r = b.inner;
+
+        let (mut col_offsets, mut row_indices, mut values) = l.disassemble();
+        let (c, mut r, mut v) = r.disassemble();
+        
+        let offset = col_offsets.pop().unwrap(); // pop last element.
+        col_offsets.extend(c.into_iter().map(|i| offset + i));
+        row_indices.append(&mut r);
+        values.append(&mut v);
+
+        self.inner = CscMatrix::try_from_csc_data(
+            shape.0, shape.1, 
+            col_offsets, 
+            row_indices, 
+            values
+        ).unwrap();
     }
 
     // row_perm(p) * a == a.permute_rows(p)
@@ -523,6 +551,20 @@ pub(super) mod tests {
             1, 5, 9, 
             2, 6, 10, 
             3, 7, 11, 
+        ]));
+    }
+
+    #[test]
+    fn extend_cols() {
+        let mut a = SpMat::from_dense_data((4, 3), 0..12);
+        let b = SpMat::from_dense_data((4, 2), 12..20);
+        a.extend_cols(b);
+
+        assert_eq!(a, SpMat::from_dense_data((4,5), vec![
+            0,  1,  2, 12, 13,
+            3,  4,  5, 14, 15,
+            6,  7,  8, 16, 17,
+            9, 10, 11, 18, 19,
         ]));
     }
 

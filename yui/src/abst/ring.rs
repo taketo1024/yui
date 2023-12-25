@@ -42,6 +42,15 @@ where
     fn is_pm_one(&self) -> bool { 
         self.is_one() || (-self).is_one()
     }
+
+    // computational weight
+    fn c_weight(&self) -> f64 { 
+        if self.is_zero() { 
+            0.0
+        } else { 
+            1.0
+        }
+    }
 }
 
 #[cfg(test)]

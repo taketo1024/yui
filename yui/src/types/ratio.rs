@@ -319,6 +319,10 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
             self.inv().unwrap()
         }
     }
+
+    fn c_weight(&self) -> f64 {
+        f64::max(self.numer.c_weight(), self.denom.c_weight())
+    }
 }
 
 impl<T> EucRing for Ratio<T> 
@@ -548,6 +552,15 @@ mod tests {
         let a = Ratio::new(3, 5);
         let b = Ratio::new(4, 7);
         assert!(a > b);
+    }
+
+    #[test]
+    fn c_weight() { 
+        let a = Ratio::new(-43, 31);
+        assert_eq!(a.c_weight(), 43_f64);
+
+        let a = Ratio::new(34, 123);
+        assert_eq!(a.c_weight(), 123_f64);
     }
 
     #[test]

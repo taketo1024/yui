@@ -62,6 +62,10 @@ macro_rules! impl_integer {
                     -Self::one() 
                 }
             }
+
+            fn c_weight(&self) -> f64 {
+                self.abs().to_f64().unwrap()
+            }
         }
 
         impl EucRing for $type {

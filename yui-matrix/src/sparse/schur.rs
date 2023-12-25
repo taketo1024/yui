@@ -25,12 +25,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> Schur<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn from_partial_lower(a: &SpMat<R>, r: usize, with_trans: bool) -> Self {
+    pub fn from_partial_triangular(t: TriangularType, a: &SpMat<R>, r: usize, with_trans: bool) -> Self {
         assert!(r <= a.nrows());
         assert!(r <= a.ncols());
 
         let orig_shape = a.shape();
-        let (compl, t_in, t_out) = Self::compute_from_partial_lower(a, r, with_trans);
+        let (compl, t_in, t_out) = match t {
+            TriangularType::Upper => todo!(),
+            TriangularType::Lower => Self::compute_from_partial_lower(a, r, with_trans)
+        };
 
         Self { 
             orig_shape, 
@@ -128,7 +131,7 @@ mod tests {
             5, 3, 5, 2, 2,
             6, 2,-3, 1, 8
         ]);
-        let sch = Schur::from_partial_lower(&a, 3, false);
+        let sch = Schur::from_partial_triangular(TriangularType::Lower, &a, 3, false);
         let s = sch.complement();
 
         assert_eq!(s, &SpMat::from_dense_data((3,2), [5,36,12,45,-14,-60]));
@@ -146,7 +149,7 @@ mod tests {
             5, 3, 5, 2, 2,
             6, 2,-3, 1, 8
         ]);
-        let sch = Schur::from_partial_lower(&a, 3, true);
+        let sch = Schur::from_partial_triangular(TriangularType::Lower, &a, 3, true);
         let s = sch.complement();
 
         assert_eq!(s, &SpMat::from_dense_data((3,2), [5,36,12,45,-14,-60]));

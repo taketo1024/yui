@@ -297,7 +297,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 fn schur<R>(a: &SpMat<R>, p: &PermOwned, q: &PermOwned, r: usize, with_trans: bool) -> Schur<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let b = a.permute(p.view(), q.view());
-    Schur::from_partial_lower(&b, r, with_trans)
+    Schur::from_partial_triangular(triang::TriangularType::Lower, &b, r, with_trans)
 }
 
 fn reduce_mat_rows<R>(a: &SpMat<R>, p: &PermOwned, r: usize) -> SpMat<R> 

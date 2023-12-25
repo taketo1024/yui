@@ -44,7 +44,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn from_partial_lower(abcd: &SpMat<R>, r: usize, with_trans: bool) -> Self {
         use TriangularType::Lower as L;
         let id = |n| SpMat::<R>::id(n);
-        let zero = |m, n| SpMat::<R>::zero((m, n));
 
         trace!("schur, a: {:?}, r: {} ..", abcd.shape(), r);
 
@@ -59,11 +58,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let (m, n) = abcd.shape();
 
         let pinvbd = { 
-            // TODO improve
-            let p = abcd.submat_cols(0..r).concat(
-                &zero(r, m - r).stack(&id(m - r))
+            let mut p = abcd.submat_cols(0..r);
+            let e = SpMat::from_entries(
+                (m, m - r), 
+                (0 .. m-r).map(|i| (r + i, i, R::one()))
             );
+            p.extend_cols(e);
+
             let bd = abcd.submat_cols(r..n);
+
             solve_triangular(L, &p, &bd) // px = bd
         };
         
@@ -88,8 +91,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let t_out = if with_trans { 
             let a = abcd.submat(0..r, 0..r);
             let c = abcd.submat(r..m, 0..r);
-            let cainv = solve_triangular_left(L, &a, &c); // xa = c
-            let t_out = (-cainv).concat(&id(m - r));
+            
+            let mut t_out = -solve_triangular_left(L, &a, &c); // (-x)a = c
+            t_out.extend_cols(id(m - r));
 
             Some(t_out)
         } else { 

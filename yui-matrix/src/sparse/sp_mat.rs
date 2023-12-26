@@ -212,11 +212,9 @@ where R: Scalar + Clone + Zero + ClosedAdd {
 
         let shape = (i1 - i0, j1 - j0);
         self.extract(shape, |i, j|
-            if rows.contains(&i) && cols.contains(&j) {
-                Some((i - i0, j - j0))
-            } else { 
-                None
-            }
+            (rows.contains(&i) && cols.contains(&j)).then( ||
+                (i - i0, j - j0)
+            )
         )
     }
 

@@ -308,11 +308,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let (m, n) = a.shape();
     a.extract((m - r, n), |i, j| { 
         let i = p.at(i);
-        if (r..m).contains(&i) { 
-            Some((i - r, j))
-        } else { 
-            None
-        }
+        (r..m).contains(&i).then(|| (i - r, j))
     })
 }
 
@@ -321,11 +317,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let (m, n) = a.shape();
     a.extract((m, n - r), |i, j| { 
         let j = p.at(j);
-        if (r..n).contains(&j) { 
-            Some((i, j - r))
-        } else { 
-            None
-        }
+        (r..n).contains(&j).then(|| (i, j - r))
     })
 }
 

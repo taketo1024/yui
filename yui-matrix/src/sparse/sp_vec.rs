@@ -59,10 +59,6 @@ impl<R> SpVec<R> {
         self.inner.nrows()
     }
 
-    pub fn view(&self) -> SpVecView<R> { 
-        SpVecView::new(self, self.dim(), |i| Some(i))
-    }
-
     pub fn iter(&self) -> impl Iterator<Item = (usize, &R)> { 
         self.inner.triplet_iter().map(|(i, _, a)| (i, a))
     }
@@ -160,12 +156,22 @@ where R: Scalar + Zero + ClosedAdd {
         Self::from_raw_data(dim, row_indices, values)
     }
 
+    pub fn extract<F>(&self, dim: usize, f: F) -> SpVec<R>
+    where F: Fn(usize) -> Option<usize> { 
+        SpVec::from_entries(dim, self.iter().filter_map(|(i, a)|
+            f(i).map(|i| (i, a.clone()))
+        ))
+    }
+
     pub fn permute(&self, p: PermView<'_>) -> SpVec<R> { 
-        self.view().permute(p).collect()
+        self.extract(self.dim(), |i| Some(p.at(i)))
     }
 
     pub fn subvec(&self, range: Range<usize>) -> SpVec<R> { 
-        self.view().subvec(range).collect()
+        self.extract(
+            range.end - range.start, 
+            |i| range.contains(&i).then(|| i - range.start)
+        )
     }
 
     pub fn stack(&self, other: &SpVec<R>) -> SpVec<R> {
@@ -242,62 +248,6 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     }
 }
 
-pub struct SpVecView<'a, 'b, R> {
-    target: &'a SpVec<R>,
-    dim: usize,
-    trans: Box<dyn Fn(usize) -> Option<usize> + 'b>
-}
-
-impl<'a, 'b, R> SpVecView<'a, 'b, R> {
-    fn new<F>(target: &'a SpVec<R>, dim: usize, trans: F) -> Self
-    where F: Fn(usize) -> Option<usize> + 'b {
-        Self { target, dim, trans: Box::new(trans) }
-    }
-
-    pub fn dim(&self) -> usize { 
-        self.dim
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = (usize, &R)> {
-        self.target.iter().filter_map(|(i, a)| { 
-            (self.trans)(i).map(|i| (i, a))
-        })
-    }
-
-    pub fn iter_nz(&self) -> impl Iterator<Item = (usize, &R)>
-    where R: Zero {
-        self.target.iter_nz().filter_map(|(i, a)| { 
-            (self.trans)(i).map(|i| (i, a))
-        })
-    }
-
-    pub fn permute(&self, p: PermView<'b>) -> SpVecView<R> { 
-        SpVecView::new(self.target, self.dim, move |i| Some(p.at(i)))
-    }
-
-    pub fn subvec(&self, range: Range<usize>) -> SpVecView<R> { 
-        let (i0, i1) = (range.start, range.end);
-
-        assert!(i0 <= i1 && i1 <= self.dim());
-
-        SpVecView::new(self.target, i1 - i0, move |i| { 
-            let i = (self.trans)(i)?;
-            if range.contains(&i) {
-                Some(i - i0)
-            } else { 
-                None
-            }
-        })
-    }
-
-    pub fn collect(&self) -> SpVec<R>
-    where R: Scalar + Zero + ClosedAdd + Clone {
-        SpVec::from_entries(self.dim(), self.iter().map(|(i, a)|
-            (i, a.clone())
-        ))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use itertools::Itertools;
@@ -340,13 +290,6 @@ mod tests {
     fn neg() {
         let v = SpVec::from(vec![1,0,3,5,0]);
         assert_eq!(-v, SpVec::from(vec![-1,0,-3,-5,0]));
-    }
-
-    #[test]
-    fn view() {
-        let v = SpVec::from(vec![0,1,2,3]);
-        let w = v.view();
-        assert_eq!(w.collect(), v);
     }
 
     #[test]

@@ -2,7 +2,7 @@ pub use crate::MatTrait;
 
 mod sp_mat;
 mod sp_vec;
-pub use sp_mat::{SpMat, SpMatView};
+pub use sp_mat::SpMat;
 pub use sp_vec::{SpVec, SpVecView};
 
 

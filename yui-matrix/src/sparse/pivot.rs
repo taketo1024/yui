@@ -455,9 +455,15 @@ impl PivotData {
     }
 }
 
+#[repr(u8)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum EntryStatus { 
+    None, Candidate, Occupied
+}
+
 struct RowWorker { 
     row: usize,
-    status: Vec<i8>,
+    status: Vec<EntryStatus>,
     ncand: usize,
     queue: VecDeque<Col>,
     queued: AHashSet<Col>
@@ -465,7 +471,7 @@ struct RowWorker {
 
 impl RowWorker {
     fn new(size: usize) -> Self { 
-        let status = vec![0; size];
+        let status = vec![EntryStatus::None; size];
         let queue = VecDeque::new();
         let queued = AHashSet::new();
         RowWorker {row: 0, status, ncand: 0, queue, queued }
@@ -473,7 +479,7 @@ impl RowWorker {
 
     fn clear(&mut self) {
         self.row = 0;
-        self.status.fill(0);
+        self.status.fill(EntryStatus::None);
         self.ncand = 0;
         self.queue.clear();
         self.queued.clear();
@@ -561,24 +567,24 @@ impl RowWorker {
     }
 
     fn is_candidate(&self, i: usize) -> bool { 
-        self.status[i] == 1
+        self.status[i] == EntryStatus::Candidate
     }
 
     fn set_candidate(&mut self, i: usize) { 
-        assert_eq!(self.status[i], 0);
-        self.status[i] = 1;
+        assert_eq!(self.status[i], EntryStatus::None);
+        self.status[i] = EntryStatus::Candidate;
         self.ncand += 1;
     }
 
     fn is_occupied(&self, i: usize) -> bool { 
-        self.status[i] == -1
+        self.status[i] == EntryStatus::Occupied
     }
 
     fn set_occupied(&mut self, i: usize) { 
         if self.is_candidate(i) { 
             self.ncand -= 1;
         }
-        self.status[i] = -1;
+        self.status[i] = EntryStatus::Occupied;
     }
 
     fn enqueue(&mut self, i: Col) { 

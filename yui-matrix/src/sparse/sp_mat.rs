@@ -186,29 +186,52 @@ where R: Scalar + Clone + Zero + ClosedAdd {
         self.inner.transpose().into()
     }
 
+    pub fn extract<F>(&self, shape: (usize, usize), f: F) -> SpMat<R>
+    where F: Fn(usize, usize) -> Option<(usize, usize)> { 
+        SpMat::from_entries(shape, self.iter().filter_map(|(i, j, a)|
+            f(i, j).map(|(i, j)| (i, j, a.clone()))
+        ))
+    }
+
     pub fn permute(&self, p: PermView, q: PermView) -> SpMat<R> { 
-        self.view().permute(p, q).collect()
+        self.extract(self.shape(), |i, j| Some((p.at(i), q.at(j))))
     }
 
     pub fn permute_rows(&self, p: PermView) -> SpMat<R> { 
-        self.view().permute_rows(p).collect()
+        let id = PermView::identity(self.ncols());
+        self.permute(p, id)
     }
     
     pub fn permute_cols(&self, q: PermView) -> SpMat<R> { 
-        self.view().permute_cols(q).collect()
+        let id = PermView::identity(self.nrows());
+        self.permute(id, q)
     }
 
     pub fn submat(&self, rows: Range<usize>, cols: Range<usize>) -> SpMat<R> { 
-        self.view().submat(rows, cols).collect()
+        let (i0, i1) = (rows.start, rows.end);
+        let (j0, j1) = (cols.start, cols.end);
+
+        assert!(i0 <= i1 && i1 <= self.nrows());
+        assert!(j0 <= j1 && j1 <= self.ncols());
+
+        let shape = (i1 - i0, j1 - j0);
+        self.extract(shape, |i, j|
+            if rows.contains(&i) && cols.contains(&j) {
+                Some((i - i0, j - j0))
+            } else { 
+                None
+            }
+        )
     }
 
     pub fn submat_rows(&self, rows: Range<usize>) -> SpMat<R> { 
-        self.view().submat_rows(rows).collect()
+        let n = self.ncols();
+        self.submat(rows, 0 .. n)
     }
 
     pub fn submat_cols(&self, cols: Range<usize>) -> SpMat<R> { 
-        // MEMO improve
-        self.view().submat_cols(cols).collect()
+        let m = self.nrows();
+        self.submat(0 .. m, cols)
     }
 
     pub fn combine_blocks(blocks: [&SpMat<R>; 4]) -> SpMat<R> {
@@ -299,7 +322,6 @@ where R: Scalar + Clone + Zero + ClosedAdd {
         ))
     }
 }
-
 
 impl<R> From<CscMatrix<R>> for SpMat<R> {
     fn from(inner: CscMatrix<R>) -> Self {
@@ -567,6 +589,16 @@ pub(super) mod tests {
              1,  3,  2,  0,
              5,  7,  6,  4,
              9, 11, 10,  8,
+        ]));
+    }
+
+    #[test]
+    fn submat() { 
+        let a = SpMat::from_dense_data((5, 6), 0..30);
+        let b = a.submat(1..3, 2..5);
+        assert_eq!(b, SpMat::from_dense_data((2,3), vec![
+             8,  9, 10,
+            14, 15, 16
         ]));
     }
 

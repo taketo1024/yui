@@ -36,14 +36,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let (m, n) = abcd.shape();
         let [a, b, c, d] = abcd.divide4((r, r));
 
-        let ainvb = { 
-            solve_triangular(t, &a, &b) // ax = b
-        };
-
-        let s = { 
-            let s = d - &c * &ainvb;
-            SpMat::from(s)
-        };
+        let ainvb = solve_triangular(t, &a, &b); // ax = b
+        let s = Self::compute_schur(&ainvb, &c, &d);
 
         trace!("schur: {:?}", s.shape());
 
@@ -72,6 +66,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             t_in,
             t_out
         }
+    }
+
+    fn compute_schur(ainvb: &SpMat<R>, c: &SpMat<R>, d: &SpMat<R>) -> SpMat<R> { 
+        d - c * ainvb
     }
 
     pub fn orig_shape(&self) -> (usize, usize) { 

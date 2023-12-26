@@ -146,7 +146,7 @@ where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn reduced(&self, with_trans: bool) -> ChainComplexBase<I, R> { 
-        ChainReducer::reduce(self, PivotCondition::AnyUnit, with_trans)
+        ChainReducer::reduce(self, PivotCondition::One, with_trans)
     }
 }
 

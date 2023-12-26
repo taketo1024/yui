@@ -76,7 +76,7 @@ where
     }
 
     pub fn reduced(&self) -> XChainComplexBase<I, X, R> { 
-        let reduced = ChainReducer::reduce(self, PivotCondition::AnyUnit, true);
+        let reduced = ChainReducer::reduce(self, PivotCondition::One, true);
         let summands = Grid::generate(
             self.summands.support(),
             |i| { 

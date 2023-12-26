@@ -170,6 +170,9 @@ where
         } else {
             trace!("red C[{i}]: {:?} ..", a.shape());
         }
+        
+        trace!("  density: {}", a.density());
+        trace!("  mean-weight: {}", a.mean_weight());
 
         let (p, q, r) = pivots(a);
 

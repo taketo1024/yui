@@ -322,14 +322,18 @@ struct MatrixStr {
 impl MatrixStr { 
     fn new<R>(a: &SpMat<R>, piv_type: PivotType) -> Self
     where R: Ring, for<'x> &'x R: RingOps<R> { 
-        let a_view = a.view();
-        let a = if piv_type == PivotType::Rows { 
-            a_view 
+        let shape = if piv_type == PivotType::Rows { 
+            a.shape() 
         } else { 
-            a_view.transpose()
+            (a.ncols(), a.nrows())
         };
 
-        let shape = a.shape();
+        let t = if piv_type == PivotType::Rows { 
+            |i, j| (i, j)
+        } else { 
+            |i, j| (j, i)
+        };
+
         let (m, n) = shape;
         let mut entries = vec![vec![]; m];
         let mut row_wght = vec![0.0; m];
@@ -339,6 +343,7 @@ impl MatrixStr {
         for (i, j, r) in a.iter() { 
             if r.is_zero() { continue }
             
+            let (i, j) = t(i, j);
             entries[i].push(j);
 
             let w = r.c_weight();

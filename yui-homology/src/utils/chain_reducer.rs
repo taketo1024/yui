@@ -305,14 +305,28 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 fn reduce_mat_rows<R>(a: &SpMat<R>, p: &PermOwned, r: usize) -> SpMat<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let m = a.nrows();
-    a.view().permute_rows(p.view()).submat_rows(r..m).collect()
+    let (m, n) = a.shape();
+    a.extract((m - r, n), |i, j| { 
+        let i = p.at(i);
+        if (r..m).contains(&i) { 
+            Some((i - r, j))
+        } else { 
+            None
+        }
+    })
 }
 
 fn reduce_mat_cols<R>(a: &SpMat<R>, p: &PermOwned, r: usize) -> SpMat<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let n = a.ncols();
-    a.view().permute_cols(p.view()).submat_cols(r..n).collect()
+    let (m, n) = a.shape();
+    a.extract((m, n - r), |i, j| { 
+        let j = p.at(j);
+        if (r..n).contains(&j) { 
+            Some((i, j - r))
+        } else { 
+            None
+        }
+    })
 }
 
 #[cfg(test)]

@@ -125,20 +125,6 @@ impl<R> SpMat<R> {
     }
 }
 
-impl<R> From<CscMatrix<R>> for SpMat<R> {
-    fn from(inner: CscMatrix<R>) -> Self {
-        Self { inner }
-    }
-}
-
-impl<R> From<Mat<R>> for SpMat<R>
-where R: Scalar + Zero {
-    fn from(value: Mat<R>) -> Self {
-        let csc = CscMatrix::from(value.inner());
-        Self::from(csc)
-    }
-}
-
 impl<R> SpMat<R> 
 where R: Scalar + Clone + Zero + ClosedAdd { 
     pub fn from_entries<T>(shape: (usize, usize), entries: T) -> Self
@@ -185,51 +171,7 @@ where R: Scalar + Clone + Zero + ClosedAdd {
             })
         )
     }
-}
 
-impl<R> Default for SpMat<R> {
-    fn default() -> Self {
-        Self::zero((0, 0))
-    }
-}
-
-impl<R> Neg for SpMat<R>
-where R: Scalar + Neg<Output = R> {
-    type Output = Self;
-    fn neg(self) -> Self::Output {
-        Self::from(-self.inner)
-    }
-}
-
-impl<R> Neg for &SpMat<R>
-where R: Scalar + Neg<Output = R> {
-    type Output = SpMat<R>;
-    fn neg(self) -> Self::Output {
-        SpMat::from(-&self.inner)
-    }
-}
-
-// see: nalgebra_sparse::ops::impl_std_ops.
-macro_rules! impl_binop {
-    ($trait:ident, $method:ident) => {
-        #[auto_ops]
-        impl<'a, 'b, R> $trait<&'b SpMat<R>> for &'a SpMat<R>
-        where R: Scalar + ClosedAdd + ClosedSub + ClosedMul + Zero + One + Neg<Output = R> {
-            type Output = SpMat<R>;
-            fn $method(self, rhs: &'b SpMat<R>) -> Self::Output {
-                let res = (&self.inner).$method(&rhs.inner);
-                SpMat::from(res)
-            }
-        }
-    };
-}
-
-impl_binop!(Add, add);
-impl_binop!(Sub, sub);
-impl_binop!(Mul, mul);
-
-impl<R> SpMat<R>
-where R: Scalar + Clone + Zero + ClosedAdd { 
     pub fn col_vec(&self, j: usize) -> SpVec<R>
     where R: Scalar + Zero + ClosedAdd { 
         let col = self.inner.col(j);
@@ -357,6 +299,62 @@ where R: Scalar + Clone + Zero + ClosedAdd {
         ))
     }
 }
+
+
+impl<R> From<CscMatrix<R>> for SpMat<R> {
+    fn from(inner: CscMatrix<R>) -> Self {
+        Self { inner }
+    }
+}
+
+impl<R> From<Mat<R>> for SpMat<R>
+where R: Scalar + Zero {
+    fn from(value: Mat<R>) -> Self {
+        let csc = CscMatrix::from(value.inner());
+        Self::from(csc)
+    }
+}
+
+impl<R> Default for SpMat<R> {
+    fn default() -> Self {
+        Self::zero((0, 0))
+    }
+}
+
+impl<R> Neg for SpMat<R>
+where R: Scalar + Neg<Output = R> {
+    type Output = Self;
+    fn neg(self) -> Self::Output {
+        Self::from(-self.inner)
+    }
+}
+
+impl<R> Neg for &SpMat<R>
+where R: Scalar + Neg<Output = R> {
+    type Output = SpMat<R>;
+    fn neg(self) -> Self::Output {
+        SpMat::from(-&self.inner)
+    }
+}
+
+// see: nalgebra_sparse::ops::impl_std_ops.
+macro_rules! impl_binop {
+    ($trait:ident, $method:ident) => {
+        #[auto_ops]
+        impl<'a, 'b, R> $trait<&'b SpMat<R>> for &'a SpMat<R>
+        where R: Scalar + ClosedAdd + ClosedSub + ClosedMul + Zero + One + Neg<Output = R> {
+            type Output = SpMat<R>;
+            fn $method(self, rhs: &'b SpMat<R>) -> Self::Output {
+                let res = (&self.inner).$method(&rhs.inner);
+                SpMat::from(res)
+            }
+        }
+    };
+}
+
+impl_binop!(Add, add);
+impl_binop!(Sub, sub);
+impl_binop!(Mul, mul);
 
 impl<R> Display for SpMat<R>
 where R: Display + Debug {

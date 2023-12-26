@@ -175,9 +175,13 @@ where
         trace!("  density: {}", a.density());
         trace!("  mean-weight: {}", a.mean_weight());
 
-        let piv_type = PivotType::Cols;
+        let piv_type = if a.nrows() >= a.ncols() { 
+            PivotType::Rows
+        } else { 
+            PivotType::Cols
+        };
         let pivot_cond = self.pivot_cond;
-
+        
         let (p, q, r) = pivots(a, piv_type, pivot_cond);
 
         if r == 0 { 

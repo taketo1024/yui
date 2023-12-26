@@ -4,7 +4,7 @@ use log::*;
 use sprs::PermOwned;
 
 use yui_matrix::sparse::*;
-use yui_matrix::sparse::pivot::{perms_by_pivots, find_pivots, PivotType, PivotCondition};
+use yui_matrix::sparse::pivot::{PivotType, PivotCondition, perms_by_pivots, find_pivots};
 use yui_matrix::sparse::schur::Schur;
 use yui::{Ring, RingOps};
 
@@ -33,6 +33,7 @@ where
     mats: HashMap<I, SpMat<R>>,
     trans: HashMap<I, Trans<R>>,
     with_trans: bool,
+    pivot_cond: PivotCondition
 }
 
 impl<I, R> ChainReducer<I, R>
@@ -40,9 +41,9 @@ where
     I: GridDeg,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
-    pub fn reduce<C>(complex: &C, with_trans: bool) -> ChainComplexBase<I, R> 
+    pub fn reduce<C>(complex: &C, pivot_cond: PivotCondition, with_trans: bool) -> ChainComplexBase<I, R> 
     where C: GridTrait<I> + ChainComplexTrait<I, R = R> {
-        let mut r = Self::from(complex, with_trans);
+        let mut r = Self::from(complex, pivot_cond, with_trans);
 
         r.reduce_all(false);
         r.reduce_all(true);
@@ -50,12 +51,12 @@ where
         r.into_complex()
     }
 
-    pub fn from<C>(complex: &C, with_trans: bool) -> Self 
+    pub fn from<C>(complex: &C, pivot_cond: PivotCondition, with_trans: bool) -> Self 
     where C: GridTrait<I> + ChainComplexTrait<I, R = R> {
         let support = complex.support();
         let d_deg = complex.d_deg();
 
-        let mut reducer = Self::new(support, d_deg, with_trans);
+        let mut reducer = Self::new(support, d_deg, pivot_cond, with_trans);
 
         for i in reducer.support.clone() { 
             for j in [i, i + d_deg] { 
@@ -69,12 +70,12 @@ where
         reducer
     }
 
-    pub fn new<Itr>(support: Itr, d_deg: I, with_trans: bool) -> Self
+    pub fn new<Itr>(support: Itr, d_deg: I, pivot_cond: PivotCondition, with_trans: bool) -> Self
     where Itr: Iterator<Item = I> {
         let support = support.collect_vec();
         let mats = HashMap::new();
         let trans = HashMap::new();
-        Self { support, d_deg, with_trans, mats, trans }
+        Self { support, d_deg, with_trans, mats, trans, pivot_cond }
     }
 
     pub fn support(&self) -> &[I] { 
@@ -174,14 +175,17 @@ where
         trace!("  density: {}", a.density());
         trace!("  mean-weight: {}", a.mean_weight());
 
-        let (p, q, r) = pivots(a);
+        let piv_type = PivotType::Cols;
+        let pivot_cond = self.pivot_cond;
+
+        let (p, q, r) = pivots(a, piv_type, pivot_cond);
 
         if r == 0 { 
             trace!("no more pivots.");
             return false;
         }
 
-        let s = schur(a, &p, &q, r, self.with_trans);
+        let s = schur(a, piv_type, &p, &q, r, self.with_trans);
 
         trace!("red C[{i}]: {:?} -> {:?}.", a.shape(), s.complement().shape());
 
@@ -289,18 +293,23 @@ where
     }
 }
 
-fn pivots<R>(a: &SpMat<R>) -> (PermOwned, PermOwned, usize) 
+fn pivots<R>(a: &SpMat<R>, piv_type: PivotType, pivot_cond: PivotCondition) -> (PermOwned, PermOwned, usize) 
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let pivs = find_pivots(a, PivotType::Cols, PivotCondition::AnyUnit);
+    let pivs = find_pivots(a, piv_type, pivot_cond);
     let (p, q) = perms_by_pivots(a, &pivs);
     let r = pivs.len();
     (p, q, r)
 }
 
-fn schur<R>(a: &SpMat<R>, p: &PermOwned, q: &PermOwned, r: usize, with_trans: bool) -> Schur<R> 
+fn schur<R>(a: &SpMat<R>, piv_type: PivotType, p: &PermOwned, q: &PermOwned, r: usize, with_trans: bool) -> Schur<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> {
+    use yui_matrix::sparse::triang::TriangularType::*;
+    
     let b = a.permute(p.view(), q.view());
-    Schur::from_partial_triangular(triang::TriangularType::Lower, &b, r, with_trans)
+    match piv_type { 
+        PivotType::Rows => Schur::from_partial_triangular(Upper, &b, r, with_trans),
+        PivotType::Cols => Schur::from_partial_triangular(Lower, &b, r, with_trans),
+    }
 }
 
 fn reduce_mat_rows<R>(a: &SpMat<R>, p: &PermOwned, r: usize) -> SpMat<R> 
@@ -329,7 +338,7 @@ mod tests {
     #[test]
     fn zero() { 
         let c = ChainComplex::<i32>::zero();
-        let r = ChainReducer::reduce(&c, true);
+        let r = ChainReducer::reduce(&c, PivotCondition::AnyUnit, true);
 
         r.check_d_all();
 
@@ -339,7 +348,7 @@ mod tests {
     #[test]
     fn acyclic() { 
         let c = ChainComplex::<i32>::one_one(1);
-        let r = ChainReducer::reduce(&c, true);
+        let r = ChainReducer::reduce(&c, PivotCondition::AnyUnit, true);
 
         r.check_d_all();
 
@@ -350,7 +359,7 @@ mod tests {
     #[test]
     fn tor() { 
         let c = ChainComplex::<i32>::one_one(2);
-        let r = ChainReducer::reduce(&c, true);
+        let r = ChainReducer::reduce(&c, PivotCondition::AnyUnit, true);
 
         r.check_d_all();
 
@@ -361,7 +370,7 @@ mod tests {
     #[test]
     fn d3() {
         let c = ChainComplex::<i32>::d3();
-        let r = ChainReducer::reduce(&c, false);
+        let r = ChainReducer::reduce(&c, PivotCondition::AnyUnit, false);
 
         r.check_d_all();
 
@@ -379,7 +388,7 @@ mod tests {
     #[test]
     fn s2() {
         let c = ChainComplex::<i32>::s2();
-        let r = ChainReducer::reduce(&c, false);
+        let r = ChainReducer::reduce(&c, PivotCondition::AnyUnit, false);
 
         r.check_d_all();
 
@@ -395,7 +404,7 @@ mod tests {
     #[test]
     fn t2() {
         let c = ChainComplex::<i32>::t2();
-        let r = ChainReducer::reduce(&c, false);
+        let r = ChainReducer::reduce(&c, PivotCondition::AnyUnit, false);
 
         r.check_d_all();
 
@@ -411,7 +420,7 @@ mod tests {
     #[test]
     fn rp2() {
         let c = ChainComplex::<i32>::rp2();
-        let r = ChainReducer::reduce(&c, false);
+        let r = ChainReducer::reduce(&c, PivotCondition::AnyUnit, false);
 
         r.check_d_all();
 
@@ -430,7 +439,7 @@ mod tests {
     #[test]
     fn s2_trans() {
         let c = ChainComplex::<i32>::s2();
-        let r = ChainReducer::reduce(&c, true);
+        let r = ChainReducer::reduce(&c, PivotCondition::AnyUnit, true);
 
         let t0 = r[0].trans().unwrap();
         let t1 = r[1].trans().unwrap();
@@ -457,7 +466,7 @@ mod tests {
     #[test]
     fn t2_trans() {
         let c = ChainComplex::<i32>::t2();
-        let r = ChainReducer::reduce(&c, true);
+        let r = ChainReducer::reduce(&c, PivotCondition::AnyUnit, true);
 
         let t0 = r[0].trans().unwrap();
         let t1 = r[1].trans().unwrap();
@@ -492,7 +501,7 @@ mod tests {
     #[test]
     fn rp2_trans() {
         let c = ChainComplex::<i32>::rp2();
-        let r = ChainReducer::reduce(&c, true);
+        let r = ChainReducer::reduce(&c, PivotCondition::AnyUnit, true);
 
         let t0 = r[0].trans().unwrap();
         let t1 = r[1].trans().unwrap();

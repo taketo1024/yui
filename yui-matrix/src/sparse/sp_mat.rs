@@ -110,6 +110,13 @@ impl<R> SpMat<R> {
         nnz / total
     }
 
+    pub fn redundancy(&self) -> f64
+    where R: Zero { 
+        let nnz = self.nnz().to_f64().unwrap();
+        let red = self.iter().filter(|(_, _, a)| a.is_zero()).count().to_f64().unwrap();
+        red / nnz
+    }
+
     pub fn mean_weight(&self) -> f64
     where R: Ring, for<'x> &'x R: RingOps<R> { 
         let nnz = self.nnz().to_f64().unwrap();

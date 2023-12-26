@@ -4,9 +4,10 @@ use std::fmt::{Display, Debug};
 use delegate::delegate;
 use nalgebra_sparse::na::{Scalar, ClosedAdd, ClosedSub, ClosedMul};
 use nalgebra_sparse::{CscMatrix, CooMatrix};
-use num_traits::{Zero, One};
+use num_traits::{Zero, One, ToPrimitive};
 use auto_impl_ops::auto_ops;
 use sprs::PermView;
+use yui::{Ring, RingOps};
 use crate::dense::*;
 use super::sp_vec::SpVec;
 use super::triang::TriangularType;
@@ -91,6 +92,29 @@ impl<R> SpMat<R> {
     pub fn into_dense(self) -> Mat<R>
     where R: Scalar + Zero + ClosedAdd { 
         self.into()
+    }
+
+    pub fn nnz(&self) -> usize { 
+        self.inner.nnz()
+    }
+
+    pub fn density(&self) -> f64 { 
+        let (m, n) = self.shape();
+        if m == 0 || n == 0 { 
+            return 0.0
+        }
+
+        let nnz = self.nnz().to_f64().unwrap();
+        let total = (m * n).to_f64().unwrap();
+
+        nnz / total
+    }
+
+    pub fn mean_weight(&self) -> f64
+    where R: Ring, for<'x> &'x R: RingOps<R> { 
+        let nnz = self.nnz().to_f64().unwrap();
+        let w = self.iter().map(|(_, _, a)| a.c_weight()).sum::<f64>(); 
+        w / nnz
     }
 }
 

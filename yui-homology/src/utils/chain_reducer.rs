@@ -135,7 +135,7 @@ where
         let support = self.support.clone();
 
         for &i in support.iter() { 
-            self.reduce_at(i, false);
+            self.reduce_at(i);
         }
 
         if self.is_done() { 
@@ -145,45 +145,32 @@ where
         trace!("reduce all (deep)");
 
         for &i in support.iter() { 
-            self.reduce_at(i, true);
-        }
-    }
+            let mut c = 1;
+            trace!("deep red: {i}, itr: {c}");
 
-    pub fn preferred_strategy(&self, i: I) -> (PivotType, PivotCondition) { 
-        // TODO 
-        (PivotType::Cols, PivotCondition::AnyUnit)
-    }
-
-    pub fn reduce_at(&mut self, i: I, deep: bool) { 
-        let (piv_type, piv_cond) = self.preferred_strategy(i);
-        self.reduce_at_spec(i, piv_type, piv_cond, false);
-    }
-
-    pub fn reduce_at_spec(&mut self, i: I, piv_type: PivotType, piv_cond: PivotCondition, deep: bool) { 
-        assert!(self.is_set(i), "not initialized at {i}");
-
-        if deep { 
-            let mut count = 1;
-            while self.reduce_at_itr(i, piv_type, piv_cond, count) { 
-                count += 1;
+            while self.reduce_at(i) { 
+                c += 1;
+                trace!("itr: {c}");
             }
-        } else { 
-            self.reduce_at_itr(i, piv_type, piv_cond, 0);
         }
     }
 
-    fn reduce_at_itr(&mut self, i: I, piv_type: PivotType, piv_cond: PivotCondition, itr: usize) -> bool { 
-        let a = self.matrix(i).unwrap();
+    pub fn reduce_at(&mut self, i: I) -> bool { 
+        let (piv_type, piv_cond) = self.preferred_strategy(i);
+        self.reduce_at_spec(i, piv_type, piv_cond)
+    }
+
+    pub fn reduce_at_spec(&mut self, i: I, piv_type: PivotType, piv_cond: PivotCondition) -> bool { 
+        let Some(a) = self.matrix(i) else { 
+            panic!("not initialized at {i}");
+        };
+
         if a.is_zero() { 
             return false;
         }
 
-        if itr > 0 { 
-            trace!("red C[{i}]: {:?} (itr: {itr}) ..", a.shape());
-        } else {
-            trace!("red C[{i}]: {:?} ..", a.shape());
-        }
-        
+        trace!("reduce C[{i}]: {:?} ..", a.shape());
+        trace!("  nnz: {}", a.nnz());
         trace!("  density: {}", a.density());
         trace!("  mean-weight: {}", a.mean_weight());
 
@@ -201,9 +188,27 @@ where
         if self.with_trans { 
             self.update_trans(i, &p, &q, r, &s);
         }
+
         self.update_mats(i, &p, &q, r, s);
 
         true
+    }
+
+    pub fn preferred_strategy(&self, i: I) -> (PivotType, PivotCondition) { 
+        let Some(a) = self.matrix(i) else { 
+            panic!("not initialized at {i}");
+        };
+
+        // TODO improve
+        let piv_type = PivotType::Cols;
+
+        let piv_cond = if a.iter().any(|(_, _, r)| r.is_pm_one()) { 
+            PivotCondition::One
+        } else { 
+            PivotCondition::AnyUnit
+        };
+
+        (piv_type, piv_cond)
     }
 
     fn update_trans(&mut self, i: I, p: &PermOwned, q: &PermOwned, r: usize, s: &Schur<R>) {

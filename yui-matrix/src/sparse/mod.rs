@@ -12,4 +12,4 @@ pub use trans::*;
 pub mod pivot;
 pub mod schur;
 pub mod triang;
-
+pub mod decomp;

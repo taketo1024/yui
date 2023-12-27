@@ -43,7 +43,8 @@ where
     pub fn reduce<C>(complex: &C, with_trans: bool) -> ChainComplexBase<I, R> 
     where C: GridTrait<I> + ChainComplexTrait<I, R = R> {
         let mut r = Self::from(complex, with_trans);
-        r.reduce_all();
+        r.reduce_all(false);
+        r.reduce_all(true);
         r.into_complex()
     }
 
@@ -125,39 +126,37 @@ where
         self.mats.insert(i, d);
     }
 
-    pub fn reduce_all(&mut self) { 
+    pub fn reduce_all(&mut self, deep: bool) { 
         if self.is_done() { 
             return
         }
         
-        trace!("reduce all (shallow)");
+        if deep { 
+            trace!("reduce all (deep)");
+        } else {
+            trace!("reduce all (shallow)");
+        }
 
         let support = self.support.clone();
 
         for &i in support.iter() { 
-            self.reduce_at(i);
-        }
-
-        if self.is_done() { 
-            return
-        }
-
-        trace!("reduce all (deep)");
-
-        for &i in support.iter() { 
-            let mut c = 1;
-            trace!("deep red: {i}, itr: {c}");
-
-            while self.reduce_at(i) { 
-                c += 1;
-                trace!("itr: {c}");
-            }
+            self.reduce_at(i, deep);
         }
     }
 
-    pub fn reduce_at(&mut self, i: I) -> bool { 
-        let (piv_type, piv_cond) = self.preferred_strategy(i);
-        self.reduce_at_spec(i, piv_type, piv_cond)
+    pub fn reduce_at(&mut self, i: I, deep: bool) { 
+        let mut c = 1;
+        loop { 
+            let (piv_type, piv_cond) = self.preferred_strategy(i);
+            let cont = self.reduce_at_spec(i, piv_type, piv_cond);
+
+            if !deep || !cont { 
+                break
+            }
+
+            c += 1;
+            trace!("next itr: {c}");
+        }
     }
 
     pub fn reduce_at_spec(&mut self, i: I, piv_type: PivotType, piv_cond: PivotCondition) -> bool { 

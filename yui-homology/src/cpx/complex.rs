@@ -4,7 +4,6 @@ use std::ops::Index;
 use itertools::{Itertools, Either};
 use delegate::delegate;
 use yui::{Ring, RingOps};
-use yui_matrix::sparse::pivot::PivotCondition;
 use yui_matrix::sparse::{SpMat, SpVec, MatTrait, Trans};
 
 use crate::{GridTrait, GridDeg, Grid, GridIter, isize2, isize3};
@@ -146,7 +145,7 @@ where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn reduced(&self, with_trans: bool) -> ChainComplexBase<I, R> { 
-        ChainReducer::reduce(self, PivotCondition::One, with_trans)
+        ChainReducer::reduce(self, with_trans)
     }
 }
 

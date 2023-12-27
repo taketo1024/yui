@@ -4,7 +4,6 @@ use std::sync::Arc;
 use delegate::delegate;
 use yui::{Ring, RingOps};
 use yui::lc::{Gen, Lc};
-use yui_matrix::sparse::pivot::PivotCondition;
 use yui_matrix::sparse::{SpMat, SpVec};
 
 use crate::utils::ChainReducer;
@@ -76,7 +75,7 @@ where
     }
 
     pub fn reduced(&self) -> XChainComplexBase<I, X, R> { 
-        let reduced = ChainReducer::reduce(self, PivotCondition::One, true);
+        let reduced = ChainReducer::reduce(self, true);
         let summands = Grid::generate(
             self.summands.support(),
             |i| { 

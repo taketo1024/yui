@@ -32,8 +32,7 @@ where
     d_deg: I,
     mats: HashMap<I, SpMat<R>>,
     trans: HashMap<I, Trans<R>>,
-    with_trans: bool,
-    pivot_cond: PivotCondition
+    with_trans: bool
 }
 
 impl<I, R> ChainReducer<I, R>
@@ -41,22 +40,19 @@ where
     I: GridDeg,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
-    pub fn reduce<C>(complex: &C, pivot_cond: PivotCondition, with_trans: bool) -> ChainComplexBase<I, R> 
+    pub fn reduce<C>(complex: &C, with_trans: bool) -> ChainComplexBase<I, R> 
     where C: GridTrait<I> + ChainComplexTrait<I, R = R> {
-        let mut r = Self::from(complex, pivot_cond, with_trans);
-
-        r.reduce_all(false);
-        r.reduce_all(true);
-
+        let mut r = Self::from(complex, with_trans);
+        r.reduce_all();
         r.into_complex()
     }
 
-    pub fn from<C>(complex: &C, pivot_cond: PivotCondition, with_trans: bool) -> Self 
+    pub fn from<C>(complex: &C, with_trans: bool) -> Self 
     where C: GridTrait<I> + ChainComplexTrait<I, R = R> {
         let support = complex.support();
         let d_deg = complex.d_deg();
 
-        let mut reducer = Self::new(support, d_deg, pivot_cond, with_trans);
+        let mut reducer = Self::new(support, d_deg, with_trans);
 
         for i in reducer.support.clone() { 
             for j in [i, i + d_deg] { 
@@ -70,12 +66,12 @@ where
         reducer
     }
 
-    pub fn new<Itr>(support: Itr, d_deg: I, pivot_cond: PivotCondition, with_trans: bool) -> Self
+    pub fn new<Itr>(support: Itr, d_deg: I, with_trans: bool) -> Self
     where Itr: Iterator<Item = I> {
         let support = support.collect_vec();
         let mats = HashMap::new();
         let trans = HashMap::new();
-        Self { support, d_deg, with_trans, mats, trans, pivot_cond }
+        Self { support, d_deg, with_trans, mats, trans }
     }
 
     pub fn support(&self) -> &[I] { 
@@ -102,7 +98,7 @@ where
         self.mats.contains_key(&i)
     }
 
-    pub fn is_all_zero(&self) -> bool { 
+    pub fn is_done(&self) -> bool { 
         self.support.iter().all(|&i| 
             self.matrix(i).map(|d| d.is_zero()).unwrap_or(false)
         )
@@ -129,38 +125,54 @@ where
         self.mats.insert(i, d);
     }
 
-    pub fn reduce_all(&mut self, deep: bool) { 
-        if self.is_all_zero() { 
+    pub fn reduce_all(&mut self) { 
+        if self.is_done() { 
             return
         }
         
-        if deep { 
-            trace!("reduce all (deep)");
-        } else { 
-            trace!("reduce all (shallow)");
-        }
+        trace!("reduce all (shallow)");
 
         let support = self.support.clone();
 
         for &i in support.iter() { 
-            self.reduce_at(i, deep);
+            self.reduce_at(i, false);
+        }
+
+        if self.is_done() { 
+            return
+        }
+
+        trace!("reduce all (deep)");
+
+        for &i in support.iter() { 
+            self.reduce_at(i, true);
         }
     }
 
+    pub fn preferred_strategy(&self, i: I) -> (PivotType, PivotCondition) { 
+        // TODO 
+        (PivotType::Cols, PivotCondition::AnyUnit)
+    }
+
     pub fn reduce_at(&mut self, i: I, deep: bool) { 
+        let (piv_type, piv_cond) = self.preferred_strategy(i);
+        self.reduce_at_spec(i, piv_type, piv_cond, false);
+    }
+
+    pub fn reduce_at_spec(&mut self, i: I, piv_type: PivotType, piv_cond: PivotCondition, deep: bool) { 
         assert!(self.is_set(i), "not initialized at {i}");
 
         if deep { 
             let mut count = 1;
-            while self.reduce_at_itr(i, count) { 
+            while self.reduce_at_itr(i, piv_type, piv_cond, count) { 
                 count += 1;
             }
         } else { 
-            self.reduce_at_itr(i, 0);
+            self.reduce_at_itr(i, piv_type, piv_cond, 0);
         }
     }
 
-    fn reduce_at_itr(&mut self, i: I, itr: usize) -> bool { 
+    fn reduce_at_itr(&mut self, i: I, piv_type: PivotType, piv_cond: PivotCondition, itr: usize) -> bool { 
         let a = self.matrix(i).unwrap();
         if a.is_zero() { 
             return false;
@@ -175,10 +187,7 @@ where
         trace!("  density: {}", a.density());
         trace!("  mean-weight: {}", a.mean_weight());
 
-        let piv_type = PivotType::Cols;
-        let pivot_cond = self.pivot_cond;
-
-        let (p, q, r) = pivots(a, piv_type, pivot_cond);
+        let (p, q, r) = pivots(a, piv_type, piv_cond);
 
         if r == 0 { 
             trace!("no more pivots.");
@@ -338,7 +347,7 @@ mod tests {
     #[test]
     fn zero() { 
         let c = ChainComplex::<i32>::zero();
-        let r = ChainReducer::reduce(&c, PivotCondition::AnyUnit, true);
+        let r = ChainReducer::reduce(&c, true);
 
         r.check_d_all();
 
@@ -348,7 +357,7 @@ mod tests {
     #[test]
     fn acyclic() { 
         let c = ChainComplex::<i32>::one_one(1);
-        let r = ChainReducer::reduce(&c, PivotCondition::AnyUnit, true);
+        let r = ChainReducer::reduce(&c, true);
 
         r.check_d_all();
 
@@ -359,7 +368,7 @@ mod tests {
     #[test]
     fn tor() { 
         let c = ChainComplex::<i32>::one_one(2);
-        let r = ChainReducer::reduce(&c, PivotCondition::AnyUnit, true);
+        let r = ChainReducer::reduce(&c, true);
 
         r.check_d_all();
 
@@ -370,7 +379,7 @@ mod tests {
     #[test]
     fn d3() {
         let c = ChainComplex::<i32>::d3();
-        let r = ChainReducer::reduce(&c, PivotCondition::AnyUnit, false);
+        let r = ChainReducer::reduce(&c, false);
 
         r.check_d_all();
 
@@ -388,7 +397,7 @@ mod tests {
     #[test]
     fn s2() {
         let c = ChainComplex::<i32>::s2();
-        let r = ChainReducer::reduce(&c, PivotCondition::AnyUnit, false);
+        let r = ChainReducer::reduce(&c, false);
 
         r.check_d_all();
 
@@ -404,7 +413,7 @@ mod tests {
     #[test]
     fn t2() {
         let c = ChainComplex::<i32>::t2();
-        let r = ChainReducer::reduce(&c, PivotCondition::AnyUnit, false);
+        let r = ChainReducer::reduce(&c, false);
 
         r.check_d_all();
 
@@ -420,7 +429,7 @@ mod tests {
     #[test]
     fn rp2() {
         let c = ChainComplex::<i32>::rp2();
-        let r = ChainReducer::reduce(&c, PivotCondition::AnyUnit, false);
+        let r = ChainReducer::reduce(&c, false);
 
         r.check_d_all();
 
@@ -439,7 +448,7 @@ mod tests {
     #[test]
     fn s2_trans() {
         let c = ChainComplex::<i32>::s2();
-        let r = ChainReducer::reduce(&c, PivotCondition::AnyUnit, true);
+        let r = ChainReducer::reduce(&c, true);
 
         let t0 = r[0].trans().unwrap();
         let t1 = r[1].trans().unwrap();
@@ -466,7 +475,7 @@ mod tests {
     #[test]
     fn t2_trans() {
         let c = ChainComplex::<i32>::t2();
-        let r = ChainReducer::reduce(&c, PivotCondition::AnyUnit, true);
+        let r = ChainReducer::reduce(&c, true);
 
         let t0 = r[0].trans().unwrap();
         let t1 = r[1].trans().unwrap();
@@ -501,7 +510,7 @@ mod tests {
     #[test]
     fn rp2_trans() {
         let c = ChainComplex::<i32>::rp2();
-        let r = ChainReducer::reduce(&c, PivotCondition::AnyUnit, true);
+        let r = ChainReducer::reduce(&c, true);
 
         let t0 = r[0].trans().unwrap();
         let t1 = r[1].trans().unwrap();

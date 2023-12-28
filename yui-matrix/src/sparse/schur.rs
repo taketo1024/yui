@@ -68,18 +68,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.s
     }
 
-    pub fn complement_into(self) -> SpMat<R> {
-        self.s
-    }
-    
-    // TODO remove this
-    pub fn trans_in(&self) -> Option<SpMat<R>> { 
-        self.t_src.as_ref().map(|t| t.backward_mat())
+    pub fn trans_src(&self) -> Option<&Trans<R>> { 
+        self.t_src.as_ref()
     }
 
-    // TODO remove this
-    pub fn trans_out(&self) -> Option<SpMat<R>> { 
-        self.t_tgt.as_ref().map(|t| t.forward_mat())
+    pub fn trans_tgt(&self) -> Option<&Trans<R>> { 
+        self.t_tgt.as_ref()
+    }
+
+    pub fn disassemble(self) -> (SpMat<R>, Option<Trans<R>>, Option<Trans<R>>) {
+        (self.s, self.t_src, self.t_tgt)
     }
 }
 
@@ -105,8 +103,8 @@ mod tests {
              12, 45,
             -14,-60
         ]));
-        assert!(sch.trans_in().is_none());
-        assert!(sch.trans_out().is_none());
+        assert!(sch.trans_src().is_none());
+        assert!(sch.trans_tgt().is_none());
     }
 
     #[test]
@@ -127,11 +125,11 @@ mod tests {
              12, 45,
             -14,-60
         ]));
-        assert!(sch.trans_in().is_some());
-        assert!(sch.trans_out().is_some());
+        assert!(sch.trans_src().is_some());
+        assert!(sch.trans_tgt().is_some());
 
-        let t_in = sch.trans_in().unwrap();
-        let t_out = sch.trans_out().unwrap();
+        let t_in  = sch.trans_src().unwrap().backward_mat();
+        let t_out = sch.trans_tgt().unwrap().forward_mat();
 
         assert_eq!(t_in, SpMat::from_dense_data((5,2), [
             -1, -3,
@@ -166,8 +164,8 @@ mod tests {
             5, 12,-14,
             36,45,-60
         ]));
-        assert!(sch.trans_in().is_none());
-        assert!(sch.trans_out().is_none());
+        assert!(sch.trans_src().is_none());
+        assert!(sch.trans_tgt().is_none());
     }
 
     #[test]
@@ -186,11 +184,11 @@ mod tests {
             5, 12,-14,
             36,45,-60
         ]));
-        assert!(sch.trans_in().is_some());
-        assert!(sch.trans_out().is_some());
+        assert!(sch.trans_src().is_some());
+        assert!(sch.trans_tgt().is_some());
 
-        let t_in = sch.trans_in().unwrap();
-        let t_out = sch.trans_out().unwrap();
+        let t_in  = sch.trans_src().unwrap().backward_mat();
+        let t_out = sch.trans_tgt().unwrap().forward_mat();
 
         assert_eq!(t_in,  SpMat::from_dense_data((6,3), [
             20, 24, -31,

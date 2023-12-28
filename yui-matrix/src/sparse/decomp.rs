@@ -30,7 +30,7 @@ where R: Clone + Scalar + Zero + ClosedAdd + Send + Sync + Display {
     }
 }
 
-pub fn dir_sum_decomp<R>(a: &SpMat<R>) -> Option<(Vec<SpMat<R>>, PermOwned, PermOwned)>
+pub fn dir_sum_decomp<R>(a: &SpMat<R>) -> Option<(PermOwned, PermOwned, Vec<SpMat<R>>)>
 where R: Clone + Scalar + Zero + ClosedAdd + Send + Sync + Display {
     let Some((rows, cols)) = dir_sum_indices(a) else { 
         return None
@@ -43,7 +43,7 @@ where R: Clone + Scalar + Zero + ClosedAdd + Send + Sync + Display {
 
     // println!("{} -> {} summands:\n{}-----", a.clone().into_dense(), s.len(), s.iter().map(|s| s.clone().into_dense()).join("  (+)\n"));
 
-    Some((s, p, q))
+    Some((p, q, s))
 }
 
 fn group_cols<R>(a: &SpMat<R>) -> Vec<Vec<usize>>
@@ -196,7 +196,7 @@ mod tests {
 
         assert!(decomp.is_some());
 
-        let (s, p, q) = decomp.unwrap();
+        let (p, q, s) = decomp.unwrap();
 
         assert_eq!(s.len(), 3);
         assert_eq!(s, vec![

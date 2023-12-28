@@ -30,20 +30,22 @@ where R: Clone + Scalar + Zero + ClosedAdd + Send + Sync + Display {
     }
 }
 
-pub fn dir_sum_decomp<R>(a: &SpMat<R>) -> Option<(PermOwned, PermOwned, Vec<SpMat<R>>)>
+pub fn dir_sum_decomp<R>(a: SpMat<R>) -> (PermOwned, PermOwned, Vec<SpMat<R>>)
 where R: Clone + Scalar + Zero + ClosedAdd + Send + Sync + Display {
-    let Some((rows, cols)) = dir_sum_indices(a) else { 
-        return None
+    let (m, n) = a.shape();
+    let Some((rows, cols)) = dir_sum_indices(&a) else { 
+        let p = PermOwned::identity(m);
+        let q = PermOwned::identity(n);
+        return (p, q, vec![a])
     };
 
-    let (m, n) = a.shape();
     let p = perm_for_indices(m, rows.iter().flatten());
     let q = perm_for_indices(n, cols.iter().flatten());
     let s = decomp_by(a, &rows, &cols, &p, &q);
 
     // println!("{} -> {} summands:\n{}-----", a.clone().into_dense(), s.len(), s.iter().map(|s| s.clone().into_dense()).join("  (+)\n"));
 
-    Some((p, q, s))
+    (p, q, s)
 }
 
 fn group_cols<R>(a: &SpMat<R>) -> Vec<Vec<usize>>
@@ -143,7 +145,7 @@ fn rows_in<R>(a: &SpMat<R>, cols: &[usize]) -> Vec<usize> {
     set.into_iter().sorted().collect()
 }
 
-fn decomp_by<R>(a: &SpMat<R>, rows: &Vec<Vec<usize>>, cols: &Vec<Vec<usize>>, p: &PermOwned, q: &PermOwned) -> Vec<SpMat<R>>
+fn decomp_by<R>(a: SpMat<R>, rows: &Vec<Vec<usize>>, cols: &Vec<Vec<usize>>, p: &PermOwned, q: &PermOwned) -> Vec<SpMat<R>>
 where R: Clone + Zero + Scalar + ClosedAdd {
     assert_eq!(rows.len(), cols.len());
 
@@ -192,11 +194,7 @@ mod tests {
             0, 0, 0, 0, 1, 0, 0, 
             0, 0, 0, 0, 0, 0, 0, 
         ]);
-        let decomp = dir_sum_decomp(&a);
-
-        assert!(decomp.is_some());
-
-        let (p, q, s) = decomp.unwrap();
+        let (p, q, s) = dir_sum_decomp(a.clone());
 
         assert_eq!(s.len(), 3);
         assert_eq!(s, vec![
@@ -229,7 +227,10 @@ mod tests {
              0,  1,  0,  0,  0,  0,  1,  1,  0,  0,
              0,  0,  1,  0,  0,  0,  0,  0,  1,  1,
         ]);
-        let decomp = dir_sum_decomp(&a);
-        assert!(decomp.is_none());
+        let (p, q, s) = dir_sum_decomp(a.clone());
+        assert!(p.is_identity());
+        assert!(q.is_identity());
+        assert_eq!(s.len(), 1);
+        assert_eq!(s, vec![a]);
     }
 }

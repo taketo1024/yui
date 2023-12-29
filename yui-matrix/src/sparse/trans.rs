@@ -84,25 +84,6 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn modify<F1, F2>(&mut self, modify_fs: F1, modify_bs: F2)
-    where 
-        F1: FnOnce(&mut Vec<SpMat<R>>),
-        F2: FnOnce(&mut Vec<SpMat<R>>),
-    {
-        modify_fs(&mut self.f_mats);
-        modify_bs(&mut self.b_mats);
-
-        if let Some(f) = self.f_mats.last() { 
-            self.tgt_dim = f.nrows();
-        } else { 
-            self.tgt_dim = self.src_dim;
-        }
-
-        if let Some(b) = self.b_mats.last() { 
-            assert_eq!(b.ncols(), self.tgt_dim)
-        }
-    }
-
     pub fn forward_mat(&self) -> SpMat<R> {
         // f = fn * ... f1 * f0
         self.f_mats.iter().rev().fold(

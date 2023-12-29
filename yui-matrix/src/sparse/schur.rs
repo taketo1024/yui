@@ -32,10 +32,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         trace!("schur, a: {:?}, r: {} ..", abcd.shape(), r);
 
-        let id = |n| SpMat::<R>::id(n);
-        let incl = |n, k| SpMat::<R>::from_entries((n, k), (0..k).map(|i| (n - k + i, i, R::one()))); // [O, I_k]^T
-        let proj = |n, k| SpMat::<R>::from_entries((k, n), (0..k).map(|i| (i, n - k + i, R::one()))); // [O, I_k]
-
         let (m, n) = abcd.shape();
         let [a, b, c, d] = abcd.divide4((r, r));
 
@@ -44,16 +40,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         trace!("schur: {:?}", s.shape());
 
+        let id = |n| SpMat::<R>::id(n);
+        let incl = |n, k| SpMat::<R>::from_entries((n, k), (0..k).map(|i| (n - k + i, i, R::one()))); // [0, 1]^T
+        let proj = |n, k| SpMat::<R>::from_entries((k, n), (0..k).map(|i| (i, n - k + i, R::one()))); // [0, 1]
+
         let t_src = with_trans.then(|| { 
-            let f = proj(n, n - r);
-            let b = (-ainvb).stack(&id(n - r)); // [-a⁻¹b, I]^T
+            let f = proj(n, n - r);             // [0, 1]
+            let b = (-ainvb).stack(&id(n - r)); // [-a⁻¹b, 1]^T
             Trans::new(f, b)
         });
 
         let t_tgt = with_trans.then(|| { 
             let mut f = -solve_triangular_left(t, &a, &c); // (-x)a = c
-            f.extend_cols(id(m - r));
-            let b = incl(m, m - r);
+            f.extend_cols(id(m - r)); // [-ca⁻¹, 1]
+            let b = incl(m, m - r);   // [0, 1]^T
             Trans::new(f, b)
         });
 

@@ -226,12 +226,12 @@ where
         let (_, i1, i2) = self.deg_trip(i);
         
         if let Some(t1) = self.trans_mut(i1) { 
-            t1.permute(q.view());
+            t1.append_perm(q.view());
             t1.merge(t_src, false);
         }
 
         if let Some(t2) = self.trans_mut(i2) {
-            t2.permute(p.view());
+            t2.append_perm(p.view());
             t2.merge(t_tgt, false);
         }
     }

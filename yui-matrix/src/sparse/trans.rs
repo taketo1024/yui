@@ -33,13 +33,6 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         t
     }
 
-    pub fn from_perm(p: PermView) -> Self { 
-        Self::new(
-            SpMat::from_row_perm(p.clone()), 
-            SpMat::from_col_perm(p)
-        )
-    }
-
     pub fn src_dim(&self) -> usize { 
         self.src_dim
     }
@@ -62,19 +55,6 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         self.b_mats.iter().rev().fold(v.clone(), |v, f| f * v)
     }
 
-    pub fn permute(&mut self, p: PermView) { 
-        assert_eq!(p.dim(), self.tgt_dim);
-
-        let f = self.f_mats.pop().unwrap_or(SpMat::id(self.src_dim));
-        let f = f.permute_rows(p.clone());
-
-        let b = self.b_mats.pop().unwrap_or(SpMat::id(self.src_dim));
-        let b = b.permute_cols(p);
-
-        self.f_mats.push(f);
-        self.b_mats.push(b);
-    }
-
     pub fn append(&mut self, f: SpMat<R>, b: SpMat<R>) { 
         assert_eq!(f.ncols(), b.nrows());
         assert_eq!(f.nrows(), b.ncols());
@@ -83,6 +63,13 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         self.tgt_dim = f.nrows();
         self.f_mats.push(f);
         self.b_mats.push(b);
+    }
+
+    pub fn append_perm(&mut self, p: PermView) { 
+        assert_eq!(p.dim(), self.tgt_dim);
+        let f = SpMat::from_row_perm(p.clone());
+        let b = SpMat::from_col_perm(p);
+        self.append(f, b)
     }
 
     pub fn merge(&mut self, mut other: Trans<R>, reduce: bool) { 
@@ -182,26 +169,12 @@ mod tests {
     }
 
     #[test]
-    fn from_perm() {
-        let t = Trans::<i32>::from_perm(
-            PermOwned::new(vec![2,3,1,0,4]).view()
-        );
-
-        let v = SpVec::from(vec![0,1,2,3,4]);
-        let w = t.forward(&v);
-        let x = t.backward(&v);
-
-        assert_eq!(w, SpVec::from(vec![3,2,0,1,4]));
-        assert_eq!(x, SpVec::from(vec![2,3,1,0,4]));
-    }
-
-    #[test]
-    fn compose_perm() {
+    fn append_perm() {
         let mut t = Trans::<i32>::new(
             SpMat::id(5).submat_rows(0..3),
             SpMat::id(5).submat_cols(0..3),
         );
-        t.permute(
+        t.append_perm(
             PermOwned::new(vec![1,2,0]).view()
         );
 

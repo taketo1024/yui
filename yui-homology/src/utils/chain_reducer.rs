@@ -190,7 +190,7 @@ where
         if self.with_trans { 
             let t_src = t_src.unwrap();
             let t_tgt = t_tgt.unwrap();
-            self.update_trans(i, &p, &q, r, t_src, t_tgt);
+            self.update_trans(i, &p, &q, t_src, t_tgt);
         }
 
         true
@@ -213,16 +213,7 @@ where
         (piv_type, piv_cond)
     }
 
-    fn update_trans(&mut self, i: I, p: &PermOwned, q: &PermOwned, r: usize, t_src: Trans<R>, t_tgt: Trans<R>) {
-        //                d1
-        //      C[1] ------------> C[2]
-        //       |^                 |^
-        //  proj || t_in      t_out || incl
-        //       V|                 V|
-        //      C[1]'------------> C[2]'
-        //                 s
-
-        let (m, n) = (p.dim(), q.dim());
+    fn update_trans(&mut self, i: I, p: &PermOwned, q: &PermOwned, t_src: Trans<R>, t_tgt: Trans<R>) {
         let (_, i1, i2) = self.deg_trip(i);
         
         if let Some(t1) = self.trans_mut(i1) { 

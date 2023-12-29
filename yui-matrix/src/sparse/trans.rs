@@ -72,39 +72,48 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         self.append(f, b)
     }
 
-    pub fn merge(&mut self, mut other: Trans<R>, reduce: bool) { 
+    pub fn merge(&mut self, mut other: Trans<R>) { 
         assert_eq!(self.tgt_dim, other.src_dim);
 
         self.tgt_dim = other.tgt_dim;
         self.f_mats.append(&mut other.f_mats);
         self.b_mats.append(&mut other.b_mats);
-
-        if reduce {
-            self.reduce();
-        }
     }
 
     pub fn forward_mat(&self) -> SpMat<R> {
         // f = fn * ... f1 * f0
-        self.f_mats.iter().rev().fold(
-            SpMat::id(self.tgt_dim), 
-            |res, f| res * f
-        )
+        if self.f_mats.len() == 1 { 
+            self.f_mats[0].clone()
+        } else { 
+            self.f_mats.iter().rev().fold(
+                SpMat::id(self.tgt_dim), 
+                |res, f| res * f
+            )
+        }
     }
 
     pub fn backward_mat(&self) -> SpMat<R> {
         // b = b0 * b1 * ... * bn
-        self.b_mats.iter().rev().fold(
-            SpMat::id(self.tgt_dim), 
-            |res, b| b * res
-        )
+        if self.b_mats.len() == 1 { 
+            self.b_mats[0].clone()
+        } else { 
+            self.b_mats.iter().rev().fold(
+                SpMat::id(self.tgt_dim), 
+                |res, b| b * res
+            )
+        }
     }
 
     pub fn reduce(&mut self) {
-        let f = self.forward_mat();
-        let b = self.backward_mat();
-        self.f_mats = vec![f];
-        self.b_mats = vec![b];
+        if self.f_mats.len() > 1 { 
+            let f = self.forward_mat();
+            self.f_mats = vec![f];
+        }
+
+        if self.b_mats.len() > 1 { 
+            let b = self.backward_mat();
+            self.b_mats = vec![b];
+        }
     }
 }
 

@@ -124,7 +124,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             return;
         };
 
-        t.merge(t1, reduce);
+        t.merge(t1);
+        
+        if reduce { 
+            t.reduce()
+        }
     }
 }
 

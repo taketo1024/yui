@@ -17,6 +17,7 @@ use sprs::PermOwned;
 use yui::{Ring, RingOps};
 use yui::algo::top_sort;
 use super::*;
+use super::util::perm_for_indices;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "multithread")] {
@@ -63,26 +64,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 pub fn perms_by_pivots<R>(a: &SpMat<R>, pivs: &[(usize, usize)]) -> (PermOwned, PermOwned)
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    use std::collections::BTreeSet;
-    fn perm(n: usize, v: Vec<usize>) -> PermOwned { 
-        let mut set: BTreeSet<_> = (0..n).collect();
-        let mut vec: Vec<usize> = vec![];
-        for i in v { 
-            vec.push(i);
-            set.remove(&i);
-        }
-        for i in set { 
-            vec.push(i);
-        }
-        let mut inv = vec![0; n];
-        for (i, j) in vec.into_iter().enumerate() {
-            inv[j] = i;
-        }
-        PermOwned::new(inv)
-    }
     let (m, n) = a.shape();
-    let (rows, cols) = pivs.iter().cloned().unzip();
-    (perm(m, rows), perm(n, cols))
+    (
+        perm_for_indices(m, pivs.iter().map(|(i, _)| i)), 
+        perm_for_indices(n, pivs.iter().map(|(_, j)| j))
+    )
 }
 
 type Row = usize;

@@ -7,134 +7,77 @@ use super::triang::{TriangularType, solve_triangular, solve_triangular_left};
 //                [c  d]
 //            X ----------> Y
 //  [1 -a⁻¹b] ^             | [1      ]
-//  [     1 ] |             | [-ca⁻¹ 1]
-//            |             V
+//  [     1 ] |   [a   ]    | [-ca⁻¹ 1]
+//            |   [   s]    V
 //            X ----------> Y
-//                [a   ] 
-//                [   s]
+//       [0]  ^             | 
+//       [1]  |             | [0  1]
+//            |      s      V
+//            X'----------> Y'
 //
 // s = d - c a⁻¹ b
 
 pub struct Schur<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    orig_shape: (usize, usize),
-    compl: SpMat<R>,
-    t_in: Option<SpMat<R>>,  // [-a⁻¹b; 1]
-    t_out: Option<SpMat<R>>, // [-ca⁻¹  1]
+    s: SpMat<R>,
+    t_src: Option<Trans<R>>,
+    t_tgt: Option<Trans<R>>,
 }
 
 impl<R> Schur<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn from_partial_triangular(t: TriangularType, a: &SpMat<R>, r: usize, with_trans: bool) -> Self {
-        use TriangularType::*;
-
-        assert!(r <= a.nrows());
-        assert!(r <= a.ncols());
-
-        match t {
-            Upper => Self::from_partial_upper(a, r, with_trans),
-            Lower => Self::from_partial_lower(a, r, with_trans)
-        }
-    }
-
-    fn from_partial_upper(abcd: &SpMat<R>, r: usize, with_trans: bool) -> Self {
-        Self::from_partial_lower(&abcd.transpose(), r, with_trans).transpose()
-    }
-
-    fn from_partial_lower(abcd: &SpMat<R>, r: usize, with_trans: bool) -> Self {
-        use TriangularType::Lower as L;
-        let id = |n| SpMat::<R>::id(n);
+    pub fn from_partial_triangular(t: TriangularType, abcd: &SpMat<R>, r: usize, with_trans: bool) -> Self {
+        assert!(r <= abcd.nrows());
+        assert!(r <= abcd.ncols());
 
         trace!("schur, a: {:?}, r: {} ..", abcd.shape(), r);
 
-        //  [a   ] [x] = [b]
-        //  [c  1] [y]   [d]
-        //  ~~~~~~
-        //   = p  
-        //
-        //  x = a⁻¹b,
-        //  y = d - ca⁻¹b
-
         let (m, n) = abcd.shape();
+        let [a, b, c, d] = abcd.divide4((r, r));
 
-        let pinvbd = { 
-            let mut p = abcd.submat_cols(0..r);
-            let e = SpMat::from_entries(
-                (m, m - r), 
-                (0 .. m-r).map(|i| (r + i, i, R::one()))
-            );
-            p.extend_cols(e);
-
-            let bd = abcd.submat_cols(r..n);
-
-            solve_triangular(L, &p, &bd) // px = bd
-        };
-        
-        let s = pinvbd.submat_rows(r..m);
+        let ainvb = solve_triangular(t, &a, &b); // ax = b
+        let s = Self::compute_schur(&ainvb, &c, &d);
 
         trace!("schur: {:?}", s.shape());
 
-        // t_in = [-a⁻¹b]
-        //        [  1  ]
-        
-        let t_in = if with_trans { 
-            let ainvb = pinvbd.submat_rows(0..r);
-            let t_in = (-ainvb).stack(&id(n - r));
-            Some(t_in)
-        } else { 
-            None
-        };
+        let id = |n| SpMat::<R>::id(n);
+        let incl = |n, k| SpMat::<R>::from_entries((n, k), (0..k).map(|i| (n - k + i, i, R::one()))); // [0, 1]^T
+        let proj = |n, k| SpMat::<R>::from_entries((k, n), (0..k).map(|i| (i, n - k + i, R::one()))); // [0, 1]
 
-        std::mem::drop(pinvbd);
+        let t_src = with_trans.then(|| { 
+            let f = proj(n, n - r);             // [0, 1]
+            let b = (-ainvb).stack(&id(n - r)); // [-a⁻¹b, 1]^T
+            Trans::new(f, b)
+        });
 
-        // t_out = [-ca⁻¹  1]
-        let t_out = if with_trans { 
-            let a = abcd.submat(0..r, 0..r);
-            let c = abcd.submat(r..m, 0..r);
-            
-            let mut t_out = -solve_triangular_left(L, &a, &c); // (-x)a = c
-            t_out.extend_cols(id(m - r));
+        let t_tgt = with_trans.then(|| { 
+            let mut f = -solve_triangular_left(t, &a, &c); // (-x)a = c
+            f.extend_cols(id(m - r)); // [-ca⁻¹, 1]
+            let b = incl(m, m - r);   // [0, 1]^T
+            Trans::new(f, b)
+        });
 
-            Some(t_out)
-        } else { 
-            None
-        };
-
-        Self { 
-            orig_shape: (m, n), 
-            compl: s, 
-            t_in,
-            t_out
-        }
+        Self { s, t_src, t_tgt }
     }
 
-    pub fn orig_shape(&self) -> (usize, usize) { 
-        self.orig_shape
+    fn compute_schur(ainvb: &SpMat<R>, c: &SpMat<R>, d: &SpMat<R>) -> SpMat<R> {
+        d - c * ainvb
     }
 
     pub fn complement(&self) -> &SpMat<R> {
-        &self.compl
+        &self.s
     }
 
-    pub fn complement_into(self) -> SpMat<R> {
-        self.compl
+    pub fn trans_src(&self) -> Option<&Trans<R>> { 
+        self.t_src.as_ref()
     }
 
-    pub fn trans_in(&self) -> Option<&SpMat<R>> { 
-        self.t_in.as_ref()
+    pub fn trans_tgt(&self) -> Option<&Trans<R>> { 
+        self.t_tgt.as_ref()
     }
 
-    pub fn trans_out(&self) -> Option<&SpMat<R>> { 
-        self.t_out.as_ref()
-    }
-
-    pub fn transpose(&self) -> Self { 
-        Self {
-            orig_shape: (self.orig_shape.1, self.orig_shape.0),
-            compl: self.compl.transpose(),
-            t_in: self.t_out.as_ref().map(|t| t.transpose()),
-            t_out: self.t_in.as_ref().map(|t| t.transpose()),
-        }
+    pub fn disassemble(self) -> (SpMat<R>, Option<Trans<R>>, Option<Trans<R>>) {
+        (self.s, self.t_src, self.t_tgt)
     }
 }
 
@@ -160,8 +103,8 @@ mod tests {
              12, 45,
             -14,-60
         ]));
-        assert!(sch.trans_in().is_none());
-        assert!(sch.trans_out().is_none());
+        assert!(sch.trans_src().is_none());
+        assert!(sch.trans_tgt().is_none());
     }
 
     #[test]
@@ -182,24 +125,26 @@ mod tests {
              12, 45,
             -14,-60
         ]));
-        assert!(sch.trans_in().is_some());
-        assert!(sch.trans_out().is_some());
+        assert!(sch.trans_src().is_some());
+        assert!(sch.trans_tgt().is_some());
 
-        let t_in = sch.trans_in().unwrap();
-        let t_out = sch.trans_out().unwrap();
+        let t_in  = sch.trans_src().unwrap().backward_mat();
+        let t_out = sch.trans_tgt().unwrap().forward_mat();
 
-        assert_eq!(t_in,  &SpMat::from_dense_data((5,2), [
+        assert_eq!(t_in, SpMat::from_dense_data((5,2), [
             -1, -3,
              0, -4,
              3, 14,
              1,  0,
              0,  1
         ]));
-        assert_eq!(t_out, &SpMat::from_dense_data((3,6), [
+        
+        assert_eq!(t_out, SpMat::from_dense_data((3,6), [
              20, -6, -4, 1, 0, 0,
              24, -7, -5, 0, 1, 0,
             -31,  8,  3, 0, 0, 1
         ]));
+
         assert_eq!(&(t_out * &a * t_in), s);
     }
 
@@ -219,8 +164,8 @@ mod tests {
             5, 12,-14,
             36,45,-60
         ]));
-        assert!(sch.trans_in().is_none());
-        assert!(sch.trans_out().is_none());
+        assert!(sch.trans_src().is_none());
+        assert!(sch.trans_tgt().is_none());
     }
 
     #[test]
@@ -239,13 +184,13 @@ mod tests {
             5, 12,-14,
             36,45,-60
         ]));
-        assert!(sch.trans_in().is_some());
-        assert!(sch.trans_out().is_some());
+        assert!(sch.trans_src().is_some());
+        assert!(sch.trans_tgt().is_some());
 
-        let t_in = sch.trans_in().unwrap();
-        let t_out = sch.trans_out().unwrap();
+        let t_in  = sch.trans_src().unwrap().backward_mat();
+        let t_out = sch.trans_tgt().unwrap().forward_mat();
 
-        assert_eq!(t_in,  &SpMat::from_dense_data((6,3), [
+        assert_eq!(t_in,  SpMat::from_dense_data((6,3), [
             20, 24, -31,
             -6, -7,   8,
             -4, -5,   3,
@@ -253,10 +198,12 @@ mod tests {
              0,  1,   0,
              0,  0,   1
         ]));
-        assert_eq!(t_out, &SpMat::from_dense_data((2, 5), [
+
+        assert_eq!(t_out, SpMat::from_dense_data((2, 5), [
             -1,  0,  3, 1, 0,
             -3, -4, 14, 0, 1
         ]));
+
         assert_eq!(&(t_out * &a * t_in), s);
     }
 }

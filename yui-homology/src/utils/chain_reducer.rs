@@ -181,14 +181,17 @@ where
         }
 
         let s = schur(a, piv_type, &p, &q, r, self.with_trans);
+        let (s, t_src, t_tgt) = s.disassemble();
 
-        trace!("red C[{i}]: {:?} -> {:?}.", a.shape(), s.complement().shape());
-
-        if self.with_trans { 
-            self.update_trans(i, &p, &q, r, &s);
-        }
+        trace!("red C[{i}]: {:?} -> {:?}.", a.shape(), s.shape());
 
         self.update_mats(i, &p, &q, r, s);
+
+        if self.with_trans { 
+            let t_src = t_src.unwrap();
+            let t_tgt = t_tgt.unwrap();
+            self.update_trans(i, &p, &q, t_src, t_tgt);
+        }
 
         true
     }
@@ -210,52 +213,23 @@ where
         (piv_type, piv_cond)
     }
 
-    fn update_trans(&mut self, i: I, p: &PermOwned, q: &PermOwned, r: usize, s: &Schur<R>) {
-        //                d1
-        //      C[1] ------------> C[2]
-        //       |^                 |^
-        //  proj || t_in      t_out || incl
-        //       V|                 V|
-        //      C[1]'------------> C[2]'
-        //                 s
-
-        let (m, n) = s.orig_shape(); // (m, n)
+    fn update_trans(&mut self, i: I, p: &PermOwned, q: &PermOwned, t_src: Trans<R>, t_tgt: Trans<R>) {
         let (_, i1, i2) = self.deg_trip(i);
         
         if let Some(t1) = self.trans_mut(i1) { 
-            t1.permute(q.view());
-            t1.modify(
-                |fs| { 
-                    let f = fs.pop().unwrap();
-                    let f = f.submat_rows(r..n); // == [0  1] * f
-                    fs.push(f);
-                }, 
-                |bs| {
-                    let b = s.trans_in().unwrap().clone();
-                    bs.push(b);
-                }    
-            );
+            t1.append_perm(q.view());
+            t1.merge(t_src);
         }
 
         if let Some(t2) = self.trans_mut(i2) {
-            t2.permute(p.view());
-            t2.modify(
-                |fs| { 
-                    let f = s.trans_out().unwrap().clone();
-                    fs.push(f);
-                },
-                |bs| {
-                    let b = bs.pop().unwrap();
-                    let b = b.submat_cols(r..m); // == b * [0; 1]
-                    bs.push(b)
-                }
-            );
+            t2.append_perm(p.view());
+            t2.merge(t_tgt);
         }
     }
 
-    fn update_mats(&mut self, i: I, p: &PermOwned, q: &PermOwned, r: usize, s: Schur<R>) {
+    fn update_mats(&mut self, i: I, p: &PermOwned, q: &PermOwned, r: usize, s: SpMat<R>) {
+        let (m, n) = (p.dim(), q.dim());
         let (i0, i1, i2) = self.deg_trip(i);
-        let (m, n) = s.orig_shape();
 
         if let Some(a0) = self.matrix(i0) {
             assert_eq!(a0.nrows(), n);
@@ -263,8 +237,7 @@ where
             self.mats.insert(i0, a0);
         }
 
-        let a1 = s.complement_into();
-        self.mats.insert(i1, a1);
+        self.mats.insert(i1, s);
 
         if let Some(a2) = self.matrix(i2) { 
             assert_eq!(a2.ncols(), m);

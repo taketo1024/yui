@@ -134,9 +134,10 @@ where I: for<'x >SubAssign<&'x I> {
 impl<const X: char, const Y: char, I> MonoOrd for Var2<X, Y, I>
 where I: Copy + Eq + Ord + for<'x> Add<&'x I, Output = I> {
     fn cmp_lex(&self, other: &Self) -> std::cmp::Ordering {
-        I::cmp(&self.0, &other.0).then_with(|| 
-            I::cmp(&self.1, &other.1)
-        )
+        // must have x_0 > x_1
+        I::cmp(&self.0, &other.0).reverse().then_with(|| 
+            I::cmp(&self.1, &other.1).reverse()
+        ).reverse()
     }
 
     fn cmp_grlex(&self, other: &Self) -> std::cmp::Ordering {
@@ -365,12 +366,28 @@ mod tests {
     }
 
     #[test]
-    fn ord() { 
+    fn cmp_lex() { 
         type M = Var2<'X','Y',usize>;
         let xy = |i, j| M::from((i, j));
 
-        assert!(Var2::cmp_grlex(&xy(2, 1), &xy(1, 3)).is_lt());
-        assert!(Var2::cmp_grlex(&xy(1, 2), &xy(2, 1)).is_lt());
-        assert!(Var2::cmp_grlex(&xy(1, 2), &xy(1, 3)).is_lt());
+        // x^2 y > x y^2 > x > y^2 > y > 1
+        assert!(Var2::cmp_lex(&xy(2, 1), &xy(1, 2)).is_gt());
+        assert!(Var2::cmp_lex(&xy(1, 2), &xy(1, 0)).is_gt());
+        assert!(Var2::cmp_lex(&xy(1, 0), &xy(0, 2)).is_gt());
+        assert!(Var2::cmp_lex(&xy(0, 2), &xy(0, 1)).is_gt());
+        assert!(Var2::cmp_lex(&xy(0, 1), &xy(0, 0)).is_gt());
+    }
+
+    #[test]
+    fn cmp_grlex() { 
+        type M = Var2<'X','Y',usize>;
+        let xy = |i, j| M::from((i, j));
+
+        // x^2 y > x y^2 > y^2 > x > y > 1
+        assert!(Var2::cmp_grlex(&xy(2, 1), &xy(1, 2)).is_gt());
+        assert!(Var2::cmp_grlex(&xy(1, 2), &xy(0, 2)).is_gt());
+        assert!(Var2::cmp_grlex(&xy(0, 2), &xy(1, 0)).is_gt());
+        assert!(Var2::cmp_grlex(&xy(1, 0), &xy(0, 1)).is_gt());
+        assert!(Var2::cmp_grlex(&xy(0, 1), &xy(0, 0)).is_gt());
     }
 }

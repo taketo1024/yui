@@ -139,11 +139,12 @@ where I: for<'x >SubAssign<&'x I> {
 impl<const X: char, const Y: char, const Z: char, I> MonoOrd for Var3<X, Y, Z, I>
 where I: Copy + Eq + Ord + for<'x> Add<&'x I, Output = I> {
     fn cmp_lex(&self, other: &Self) -> std::cmp::Ordering {
-        I::cmp(&self.0, &other.0).then_with(|| 
-            I::cmp(&self.1, &other.1)
+        // must have x_0 > x_1 > x_2
+        I::cmp(&self.0, &other.0).reverse().then_with(|| 
+            I::cmp(&self.1, &other.1).reverse()
         ).then_with(||
-            I::cmp(&self.2, &other.2)
-        )
+            I::cmp(&self.2, &other.2).reverse()
+        ).reverse()
     }
 
     fn cmp_grlex(&self, other: &Self) -> std::cmp::Ordering {
@@ -376,14 +377,30 @@ mod tests {
     }
 
     #[test]
-    fn ord() { 
+    fn cmp_lex() { 
         type M = Var3<'X','Y','Z',usize>;
         let xyz = |i, j,k| M::from((i, j, k));
 
-        assert!(Var3::cmp_grlex(&xyz(2, 1, 1), &xyz(1, 3, 1)).is_lt());
-        assert!(Var3::cmp_grlex(&xyz(1, 2, 1), &xyz(2, 1, 1)).is_lt());
-        assert!(Var3::cmp_grlex(&xyz(1, 2, 1), &xyz(1, 3, 1)).is_lt());
-        assert!(Var3::cmp_grlex(&xyz(1, 2, 2), &xyz(2, 1, 2)).is_lt());
-        assert!(Var3::cmp_grlex(&xyz(1, 2, 1), &xyz(1, 2, 2)).is_lt());
+        // x^2 y z > x y^2 z > x y z^2 > x > y^2 > z^3 > 1
+        assert!(Var3::cmp_lex(&xyz(2, 1, 1), &xyz(1, 2, 1)).is_gt());
+        assert!(Var3::cmp_lex(&xyz(1, 2, 1), &xyz(1, 1, 2)).is_gt());
+        assert!(Var3::cmp_lex(&xyz(1, 1, 2), &xyz(1, 0, 0)).is_gt());
+        assert!(Var3::cmp_lex(&xyz(1, 0, 0), &xyz(0, 2, 0)).is_gt());
+        assert!(Var3::cmp_lex(&xyz(0, 2, 0), &xyz(0, 0, 3)).is_gt());
+        assert!(Var3::cmp_lex(&xyz(0, 0, 3), &xyz(0, 0, 0)).is_gt());
+    }
+
+    #[test]
+    fn cmp_grlex() { 
+        type M = Var3<'X','Y','Z',usize>;
+        let xyz = |i, j,k| M::from((i, j, k));
+
+        // x^2 y z > x y^2 z > x y z^2 > z^3 > y^2 > x > 1
+        assert!(Var3::cmp_grlex(&xyz(2, 1, 1), &xyz(1, 2, 1)).is_gt());
+        assert!(Var3::cmp_grlex(&xyz(1, 2, 1), &xyz(1, 1, 2)).is_gt());
+        assert!(Var3::cmp_grlex(&xyz(1, 1, 2), &xyz(0, 0, 3)).is_gt());
+        assert!(Var3::cmp_grlex(&xyz(0, 0, 3), &xyz(0, 2, 0)).is_gt());
+        assert!(Var3::cmp_grlex(&xyz(0, 2, 0), &xyz(1, 0, 0)).is_gt());
+        assert!(Var3::cmp_grlex(&xyz(1, 0, 0), &xyz(0, 0, 0)).is_gt());
     }
 }

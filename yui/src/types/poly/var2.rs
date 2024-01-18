@@ -239,6 +239,19 @@ macro_rules! impl_bivar_signed {
 impl_bivar_unsigned!(usize);
 impl_bivar_signed!  (isize);
 
+cfg_if::cfg_if! { 
+    if #[cfg(feature = "tex")] {
+        use crate::TeX;
+
+        impl<const X: char, const Y: char, I> TeX for Var2<X, Y, I>
+        where I: ToPrimitive {
+            fn to_tex_string(&self) -> String {
+                self.to_string_u(false)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

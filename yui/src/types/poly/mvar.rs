@@ -276,6 +276,19 @@ where X: ToString, I: 'a + ToPrimitive, S: IntoIterator<Item = (X, &'a I)> {
     }
 }
 
+cfg_if::cfg_if! { 
+    if #[cfg(feature = "tex")] {
+        use crate::TeX;
+
+        impl<const X: char, I> TeX for MultiVar<X, I>
+        where I: ToPrimitive {
+            fn to_tex_string(&self) -> String {
+                self.to_string_u(false)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests { 
     use itertools::Itertools;

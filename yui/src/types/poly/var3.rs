@@ -247,6 +247,19 @@ macro_rules! impl_trivar_signed {
 impl_trivar_unsigned!(usize);
 impl_trivar_signed!  (isize);
 
+cfg_if::cfg_if! { 
+    if #[cfg(feature = "tex")] {
+        use crate::TeX;
+
+        impl<const X: char, const Y: char, const Z: char, I> TeX for Var3<X, Y, Z, I>
+        where I: ToPrimitive {
+            fn to_tex_string(&self) -> String {
+                self.to_string_u(false)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -526,6 +526,23 @@ where R: Field, for<'x> &'x R: FieldOps<R> {}
 impl<const X: char, R> EucRing for Poly<X, R>
 where R: Field, for<'x> &'x R: FieldOps<R> {}
 
+cfg_if::cfg_if! { 
+    if #[cfg(feature = "tex")] {
+        use crate::TeX;
+
+        impl<X, R> TeX for PolyBase<X, R>
+        where X: Mono + TeX, R: Ring + TeX, for<'x> &'x R: RingOps<R> {
+            fn to_tex_string(&self) -> String {
+                use crate::util::format::lc;
+                let terms = self.sort_terms_by(|x, y| X::cmp_lex(x, y).reverse()).map(|(x, r)|
+                    (x.to_tex_string(), r.to_tex_string())
+                );
+                lc(terms)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::Ratio;
@@ -983,5 +1000,20 @@ mod tests {
         let ser = serde_json::to_string(&f).unwrap();
         let des = serde_json::from_str(&ser).unwrap();
         assert_eq!(f, des);
+    }
+
+    #[test]
+    #[cfg(feature = "tex")]
+    fn tex() { 
+        type P = LPolyN::<'x', i32>; 
+
+        let xn = P::mono;
+        let f = P::from_iter([
+            (xn([ 0,0,0]),   3),
+            (xn([ 3,0,1]),  -1),
+            (xn([-2,1,3]), -2),
+        ]);
+
+        assert_eq!(f.to_tex_string(), "-x_0^3x_2 + 3 - 2x_0^{-2}x_1x_2^3");
     }
 }

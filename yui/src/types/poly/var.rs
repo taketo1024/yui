@@ -178,6 +178,19 @@ macro_rules! impl_univar_signed {
 impl_univar_unsigned!(usize);
 impl_univar_signed!  (isize);
 
+cfg_if::cfg_if! { 
+    if #[cfg(feature = "tex")] {
+        use crate::TeX;
+
+        impl<const X: char, I> TeX for Var<X, I>
+        where I: ToPrimitive {
+            fn to_tex_string(&self) -> String {
+                self.to_string_u(false)
+            }
+        }
+    }
+}
+
 pub(crate) fn fmt_mono<I>(x: &str, d: &I, unicode: bool) -> String
 where I: ToPrimitive {
     let d = d.to_isize().unwrap();

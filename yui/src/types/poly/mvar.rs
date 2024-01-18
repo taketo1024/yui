@@ -10,7 +10,7 @@ use crate::{Elem, ElemBase};
 use crate::lc::{Gen, OrdForDisplay};
 use crate::util::format::subscript;
 use super::{Mono, MultiDeg, MonoOrd};
-use super::var::{fmt_mono, parse_mono};
+use super::var::{fmt_mono, parse_mono_deg};
 
 #[derive(Clone, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde_with::DeserializeFromStr))]
@@ -80,7 +80,7 @@ where I: Zero {
 }
 
 impl<const X: char, I> FromStr for MultiVar<X, I>
-where I: Zero + FromStr + FromPrimitive, <I as FromStr>::Err: ToString {
+where I: Zero + FromStr + FromPrimitive {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use regex::Regex;
@@ -89,7 +89,9 @@ where I: Zero + FromStr + FromPrimitive, <I as FromStr>::Err: ToString {
             return Ok(MultiVar::from(MultiDeg::empty()))
         }
 
-        let p = format!(r"({X}_([0-9]+))(\^-?[0-9]+)?");
+        // TODO must support braced indices.
+        
+        let p = format!(r"({X}_([0-9]+))(\^\{{?-?[0-9]+\}}?)?");
         let p_all = format!(r"^({p}\s?)+$");
 
         if !Regex::new(&p_all).unwrap().is_match(&s) { 
@@ -102,8 +104,9 @@ where I: Zero + FromStr + FromPrimitive, <I as FromStr>::Err: ToString {
         for c in r.captures_iter(&s) {
             let x = &c[1];
             let i = usize::from_str(&c[2]).map_err(|e| e.to_string())?;
-            let d = parse_mono(x, &c[0])?;
-            degs.push((i, d));
+            if let Some(d) = parse_mono_deg(x, &c[0]) { 
+                degs.push((i, d));
+            }
         };
 
         let mvar = MultiVar::from_iter(degs);
@@ -416,11 +419,11 @@ mod tests {
         let s = "X_0X_2^3";
         assert_eq!(M::from_str(s), Ok(M::from_iter([(0, 1), (2, 3)])));
 
-        let s = "X_0^-1";
+        let s = "X_0^{-1}";
         assert_eq!(M::from_str(s), Ok(M::from((0, -1))));
 
-        let s = "X_0^-1X_2^4";
-        assert_eq!(M::from_str(s), Ok(M::from_iter([(0, -1), (2, 4)])));
+        let s = "X_0^{-1}X_2^{12}";
+        assert_eq!(M::from_str(s), Ok(M::from_iter([(0, -1), (2, 12)])));
 
         let s = "2";
         assert!(M::from_str(s).is_err());
@@ -459,7 +462,7 @@ mod tests {
         let ser = serde_json::to_string(&d).unwrap();
         let des = serde_json::from_str::<M>(&ser).unwrap();
         
-        assert_eq!(&ser, "\"X_0^-1X_2^3\"");
+        assert_eq!(&ser, "\"X_0^{-1}X_2^3\"");
         assert_eq!(d, des);
     }
 }

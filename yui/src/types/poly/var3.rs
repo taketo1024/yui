@@ -11,7 +11,7 @@ use crate::{Elem, ElemBase};
 use crate::lc::{Gen, OrdForDisplay};
 
 use super::{Mono, MonoOrd};
-use super::var::{fmt_mono, parse_mono};
+use super::var::{fmt_mono, parse_mono_deg};
 
 // `Var3<X, Y, Z, I>` : represents trivariant monomials X^i Y^j Z^k.
 // `I` is either `usize` or `isize`.
@@ -75,37 +75,40 @@ impl<const X: char, const Y: char, const Z: char, I> From<(I, I, I)> for Var3<X,
 }
 
 impl<const X: char, const Y: char, const Z: char, I> FromStr for Var3<X, Y, Z, I>
-where I: Zero + FromStr + FromPrimitive + Debug, <I as FromStr>::Err: ToString {
+where I: Zero + AddAssign + FromStr + FromPrimitive {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use regex::Regex;
+
         if s == "1" { 
             return Ok(Self(I::zero(), I::zero(), I::zero()))
         }
 
-        let p1 = format!(r"{X}(\^-?[0-9]+)?");
-        let p2 = format!(r"{Y}(\^-?[0-9]+)?");
-        let p3 = format!(r"{Z}(\^-?[0-9]+)?");
-        let p_all = format!(r"^({p1})?\s?({p2})?\s?({p3})?$");
+        let p = format!(r"({X}|{Y}|{Z})(\^\{{?-?[0-9]+\}}?)?");
+        let p_all = format!(r"^({p}\s?)+$");
 
-        if !Regex::new(&p_all).unwrap().is_match(&s) { 
+        let r = Regex::new(&p).unwrap();
+        let r_all = Regex::new(&p_all).unwrap();
+
+        if !r_all.is_match(&s) { 
             return Err(format!("Failed to parse: {s}"))
         }
 
-        let r1 = Regex::new(&p1).unwrap();
-        let r2 = Regex::new(&p2).unwrap();
-        let r3 = Regex::new(&p3).unwrap();
-
-        let d = [(X, r1), (Y, r2), (Z, r3)].into_iter().map(|(x, r)| { 
-            if let Some(c) = r.captures(s) { 
-                parse_mono(&x.to_string(), &c[0])
+        let mut deg = (I::zero(), I::zero(), I::zero());
+        
+        for c in r.captures_iter(&s) {
+            let x = &c[1];
+            let i = parse_mono_deg(x, &c[0]).unwrap();
+            if x.starts_with(X) { 
+                deg.0 += i;
+            } else if x.starts_with(Y) { 
+                deg.1 += i;
             } else { 
-                Ok(I::zero())
+                deg.2 += i;
             }
-        }).collect::<Result<Vec<_>, _>>()?;
-        let [d1, d2, d3] = d.try_into().unwrap();
+        };
 
-        Ok(Self(d1, d2, d3))
+        Ok(Self::from(deg))
     }
 }
 
@@ -277,7 +280,7 @@ mod tests {
 
     #[test]
     fn from_str() { 
-        type M = Var3<'X','Y','Z',usize>;
+        type M = Var3<'X','Y','Z',isize>;
         let xyz = |i, j, k| M::from((i, j, k));
         
         assert_eq!(M::from_str("1"), Ok(M::one()));
@@ -289,6 +292,7 @@ mod tests {
         assert_eq!(M::from_str("Z^2"), Ok(xyz(0, 0, 2)));
         assert_eq!(M::from_str("XYZ"), Ok(xyz(1, 1, 1)));
         assert_eq!(M::from_str("X^2Y^3Z"), Ok(xyz(2, 3, 1)));
+        assert_eq!(M::from_str("X^{21}Y^{-3}Z^{2}"), Ok(xyz(21, -3, 2)));
         assert!(M::from_str("2").is_err());
     }
 

@@ -11,7 +11,7 @@ use crate::{Elem, ElemBase};
 use crate::lc::{Gen, OrdForDisplay};
 
 use super::{Mono, MonoOrd};
-use super::var::{fmt_mono, parse_mono};
+use super::var::{fmt_mono, parse_mono_deg};
 
 // `Var2<X, Y, I>` : represents bivariant monomials X^i Y^j.
 // `I` is either `usize` or `isize`.
@@ -74,35 +74,38 @@ impl<const X: char, const Y: char, I> From<(I, I)> for Var2<X, Y, I> {
 }
 
 impl<const X: char, const Y: char, I> FromStr for Var2<X, Y, I>
-where I: Zero + FromStr + FromPrimitive + Debug, I::Err: ToString {
+where I: Zero + AddAssign + FromStr + FromPrimitive {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use regex::Regex;
+
         if s == "1" { 
             return Ok(Self(I::zero(), I::zero()))
         }
 
-        let p1 = format!(r"{X}(\^-?[0-9]+)?");
-        let p2 = format!(r"{Y}(\^-?[0-9]+)?");
-        let p_all = format!(r"^({p1})?\s?({p2})?$");
+        let p = format!(r"({X}|{Y})(\^\{{?-?[0-9]+\}}?)?");
+        let p_all = format!(r"^({p}\s?)+$");
 
-        if !Regex::new(&p_all).unwrap().is_match(&s) { 
+        let r = Regex::new(&p).unwrap();
+        let r_all = Regex::new(&p_all).unwrap();
+
+        if !r_all.is_match(&s) { 
             return Err(format!("Failed to parse: {s}"))
         }
 
-        let r1 = Regex::new(&p1).unwrap();
-        let r2 = Regex::new(&p2).unwrap();
-
-        let d = [(X, r1), (Y, r2)].into_iter().map(|(x, r)| 
-            if let Some(c) = r.captures(s) { 
-                parse_mono(&x.to_string(), &c[0])
+        let mut deg = (I::zero(), I::zero());
+        
+        for c in r.captures_iter(&s) {
+            let x = &c[1];
+            let i = parse_mono_deg(x, &c[0]).unwrap();
+            if x.starts_with(X) { 
+                deg.0 += i;
             } else { 
-                Ok(I::zero())
+                deg.1 += i;
             }
-        ).collect::<Result<Vec<_>, _>>()?;
-        let [d1, d2] = d.try_into().unwrap();
+        };
 
-        Ok(Self(d1, d2))
+        Ok(Self::from(deg))
     }
 }
 
@@ -268,8 +271,8 @@ mod tests {
 
     #[test]
     fn from_str() { 
-        type M = Var2<'X','Y',usize>;
-        let xy = Var2::<'X','Y',usize>;
+        type M = Var2<'X','Y', isize>;
+        let xy = |i, j| M::from((i, j));
         
         assert_eq!(M::from_str("1"), Ok(M::one()));
         assert_eq!(M::from_str("X"), Ok(xy(1, 0)));
@@ -278,6 +281,8 @@ mod tests {
         assert_eq!(M::from_str("Y^2"), Ok(xy(0, 2)));
         assert_eq!(M::from_str("XY"), Ok(xy(1, 1)));
         assert_eq!(M::from_str("X^2Y^3"), Ok(xy(2, 3)));
+        assert_eq!(M::from_str(r"X^{21}Y^{32}"), Ok(xy(21, 32)));
+        assert_eq!(M::from_str(r"X^{-2}Y^{-3}"), Ok(xy(-2, -3)));
         assert!(M::from_str("2").is_err());
     }
 

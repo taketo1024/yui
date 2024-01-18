@@ -36,10 +36,16 @@ impl<const X: char, I> Var<X, I> {
 }
 
 impl<const X: char, I> FromStr for Var<X, I>
-where I: FromStr + FromPrimitive, <I as FromStr>::Err: ToString {
+where I: Zero + FromStr + FromPrimitive {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        parse_mono(&X.to_string(), s).map(Self)
+        if s == "1" { 
+            Ok(Self(I::zero()))
+        } else if let Some(d) = parse_mono_deg(&X.to_string(), s) { 
+            Ok(Self(d))
+        } else { 
+            Err(format!("failed to parse '{}'", s))
+        }
     }
 }
 
@@ -183,23 +189,35 @@ where I: ToPrimitive {
         let e = superscript(d); 
         format!("{x}{e}")
     } else { 
-        format!("{x}^{d}")
+        let d = d.to_string();
+        if d.len() == 1 { 
+            format!("{x}^{d}")
+        } else { 
+            format!("{x}^{{{d}}}")
+        }
     }
 }
 
-pub(crate) fn parse_mono<I>(x: &str, s: &str) -> Result<I, String>
-where I: FromStr + FromPrimitive, <I as FromStr>::Err: ToString {
+pub(crate) fn parse_mono_deg<I>(x: &str, s: &str) -> Option<I>
+where I: FromStr + FromPrimitive {
+    use regex::Regex;
+
+    let p1 = format!(r"^{x}\^([0-9])$");
+    let p2 = format!(r"^{x}\^\{{(-?[0-9]+)\}}$");
+
+    let r1 = Regex::new(&p1).unwrap();
+    let r2 = Regex::new(&p2).unwrap();
+
     if s == "1" { 
-        Ok(I::from_i32(0).unwrap())
+        I::from_i32(0)
     } else if s == x { 
-        Ok(I::from_i32(1).unwrap())
-    } else if let Some(d) = s.strip_prefix(&format!("{x}^")) { 
-        match I::from_str(d) { 
-            Ok(d) => Ok(d),
-            Err(e) => Err(e.to_string())
-        }
+        I::from_i32(1)
+    } else if let Some(c) = r1.captures(s) { 
+        I::from_str(&c[1]).ok()
+    } else if let Some(c) = r2.captures(s) { 
+        I::from_str(&c[1]).ok()
     } else { 
-        Err(format!("Failed to parse: {s}"))
+        None
     }
 }
 
@@ -227,7 +245,7 @@ mod tests {
         assert_eq!(M::from_str("1"), Ok(M::one()));
         assert_eq!(M::from_str("X"), Ok(x(1)));
         assert_eq!(M::from_str("X^2"), Ok(x(2)));
-        assert_eq!(M::from_str("X^-2"), Ok(x(-2)));
+        assert_eq!(M::from_str("X^{-2}"), Ok(x(-2)));
         assert!(M::from_str("2").is_err());
         assert!(M::from_str("x").is_err());
     }
@@ -332,11 +350,18 @@ mod tests {
         assert_eq!(&ser, "\"X^2\"");
         assert_eq!(d, des);
 
+        let d = x(21);
+        let ser = serde_json::to_string(&d).unwrap();
+        let des = serde_json::from_str::<M>(&ser).unwrap();
+        
+        assert_eq!(&ser, "\"X^{21}\"");
+        assert_eq!(d, des);
+
         let d = x(-2);
         let ser = serde_json::to_string(&d).unwrap();
         let des = serde_json::from_str::<M>(&ser).unwrap();
         
-        assert_eq!(&ser, "\"X^-2\"");
+        assert_eq!(&ser, "\"X^{-2}\"");
         assert_eq!(d, des);
     }
 }

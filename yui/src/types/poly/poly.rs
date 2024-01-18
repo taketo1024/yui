@@ -953,12 +953,17 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn serialize_bivar() { 
-        type P = Poly2::<'x', 'y', i32>; 
+        type P = LPoly2::<'x', 'y', i32>; 
 
         let xy = P::mono;
-        let f = P::from_iter([(xy(0, 0), 3), (xy(1, 0), 2), (xy(2, 3), 3)]);
+        let f = P::from_iter([
+            (xy(0, 0), 3), 
+            (xy(1, 0), 1), 
+            (xy(-2, 13), -3)
+        ]);
 
         let ser = serde_json::to_string(&f).unwrap();
+        dbg!(&ser);
         let des = serde_json::from_str(&ser).unwrap();
         assert_eq!(f, des);
     }
@@ -966,13 +971,13 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn serialize_mvar() { 
-        type P = PolyN::<'x', i32>; 
+        type P = LPolyN::<'x', i32>; 
 
         let xn = P::mono;
         let f = P::from_iter([
             (xn([0,0,0]),  3),
             (xn([1,0,0]), -1),
-            (xn([3,0,2]),  2),
+            (xn([12,0,-2]),  12),
         ]);
 
         let ser = serde_json::to_string(&f).unwrap();

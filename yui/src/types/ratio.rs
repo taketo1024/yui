@@ -4,6 +4,7 @@ use std::cmp;
 use std::ops::{Mul, Add, Sub, Neg, AddAssign, SubAssign, MulAssign, Div, DivAssign, Rem, RemAssign};
 use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
+
 use crate::{EucRing, EucRingOps, Elem, Mon, AddMon, AddGrp, AddMonOps, AddGrpOps, MonOps, RingOps, Ring, FieldOps, Field, Integer, IntOps};
 
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -364,6 +365,29 @@ where T: Integer, for<'x> &'x T: IntOps<T> {
     }
 }
 
+cfg_if::cfg_if! { 
+    if #[cfg(feature = "tex")] {
+        use crate::TeX;
+
+        impl<T> TeX for Ratio<T> 
+        where T: TeX {
+            fn to_tex_string(&self) -> String {
+                let p = self.numer.to_tex_string();
+                let q = self.denom.to_tex_string();
+        
+                if &q == "1" { 
+                    p
+                } else if !p.starts_with('-') && !p.contains(' ') { 
+                    format!(r"\frac{{{p}}}{{{q}}}")
+                } else { 
+                    let p = p.strip_prefix('-').unwrap();
+                    format!(r"-\frac{{{p}}}{{{q}}}")
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests { 
     use super::*;
@@ -573,5 +597,17 @@ mod tests {
 
         let deser = serde_json::from_str::<Ratio<i32>>(&ser).unwrap();
         assert_eq!(a, deser);
+    }
+
+    #[test]
+    #[cfg(feature = "tex")]
+    fn tex() { 
+        let a = Ratio::new(43, 1);
+        let b = Ratio::new(43, 31);
+        let c = Ratio::new(-43, 31);
+
+        assert_eq!(a.to_tex_string(), "43");
+        assert_eq!(b.to_tex_string(), r"\frac{43}{31}");
+        assert_eq!(c.to_tex_string(), r"-\frac{43}{31}");
     }
 }

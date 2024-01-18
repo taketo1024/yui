@@ -2,7 +2,6 @@ use std::fmt::{Display, Debug};
 use std::ops::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Neg, DivAssign, RemAssign, Div, Rem};
 use std::str::FromStr;
 use delegate::delegate;
-use itertools::Itertools;
 use num_traits::{Zero, One, Pow};
 use auto_impl_ops::auto_ops;
 
@@ -115,6 +114,11 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
         F: Fn(&R) -> R2
     {
         PolyBase::<X, R2>::from( self.data.map_coeffs(f) )
+    }
+
+    pub fn sort_terms_by<F>(&self, cmp: F) -> impl Iterator<Item = (&X, &R)>
+    where F: Fn(&X, &X) -> std::cmp::Ordering { 
+        self.data.sort_terms_by(cmp)
     }
 }
 
@@ -281,7 +285,7 @@ impl<X, R> Display for PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use crate::util::format::lc;
-        let str = lc(self.iter().sorted_by(|(x, _), (y, _)| X::cmp_for_display(x, y).reverse()));
+        let str = lc(self.sort_terms_by(|x, y| X::cmp_for_display(x, y).reverse()));
         f.write_str(&str)
     }
 }

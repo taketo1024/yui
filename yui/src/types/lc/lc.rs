@@ -144,6 +144,11 @@ where
             })
         }).collect()
     }
+
+    pub fn sort_terms_by<F>(&self, cmp: F) -> impl Iterator<Item = (&X, &R)>
+    where F: Fn(&X, &X) -> std::cmp::Ordering { 
+        self.iter().sorted_by(|(x, _), (y, _)| cmp(x, y))
+    }
 }
 
 impl<X, R> From<X> for Lc<X, R>
@@ -211,7 +216,7 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use crate::util::format::lc;
-        let str = lc(self.iter().sorted_by(|(x, _), (y, _)| X::cmp_for_display(x, y)));
+        let str = lc(self.sort_terms_by(X::cmp_for_display));
         f.write_str(&str)
     }
 }

@@ -8,7 +8,7 @@ use auto_impl_ops::auto_ops;
 use crate::{Elem, ElemBase};
 use crate::lc::Gen;
 use crate::util::format::superscript;
-use super::Mono;
+use super::{Mono, MonoOrd};
 
 // `Var<X, I>` : represents monomials X^d (univar).
 // `I` is either `usize` or `isize`.
@@ -100,6 +100,17 @@ impl<const X: char, I> Elem for Var<X, I>
 where I: ElemBase + ToPrimitive { 
     fn math_symbol() -> String {
         format!("{X}")
+    }
+}
+
+impl<const X: char, I> MonoOrd for Var<X, I> 
+where I: ElemBase + Hash + Ord + ToPrimitive {
+    fn cmp_lex(&self, other: &Self) -> std::cmp::Ordering {
+        I::cmp(&self.0, &other.0)
+    }
+
+    fn cmp_grlex(&self, other: &Self) -> std::cmp::Ordering {
+        I::cmp(&self.0, &other.0)
     }
 }
 

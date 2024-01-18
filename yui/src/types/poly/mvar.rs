@@ -7,9 +7,9 @@ use itertools::Itertools;
 use auto_impl_ops::auto_ops;
 
 use crate::{Elem, ElemBase};
-use crate::lc::Gen;
+use crate::lc::{Gen, OrdForDisplay};
 use crate::util::format::subscript;
-use super::{Mono, MultiDeg};
+use super::{Mono, MultiDeg, MonoOrd};
 use super::var::{fmt_mono, parse_mono};
 
 #[derive(Clone, PartialEq, Eq, Hash, Default)]
@@ -149,19 +149,24 @@ where I: ToPrimitive {
     }
 }
 
-impl<const X: char, I> PartialOrd for MultiVar<X, I>
+impl<const X: char, I> MonoOrd for MultiVar<X, I>
 where I: Zero + Ord + for<'x> Add<&'x I, Output = I> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> { 
-        self.0.partial_cmp(&other.0)
+    fn cmp_lex(&self, other: &Self) -> std::cmp::Ordering { 
+        MultiDeg::cmp_lex(&self.0, &other.0)
+    }
+
+    fn cmp_grlex(&self, other: &Self) -> std::cmp::Ordering { 
+        MultiDeg::cmp_grlex(&self.0, &other.0)
     }
 }
 
-impl<const X: char, I> Ord for MultiVar<X, I>
+impl<const X: char, I> OrdForDisplay for MultiVar<X, I>
 where I: Zero + Ord + for<'x> Add<&'x I, Output = I> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.0.cmp(&other.0)
+    fn cmp_for_display(&self, other: &Self) -> std::cmp::Ordering {
+        Self::cmp_grlex(self, other)
     }
 }
+
 
 #[cfg(feature = "serde")]
 impl<const X: char, I> serde::Serialize for MultiVar<X, I>

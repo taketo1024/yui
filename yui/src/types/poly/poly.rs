@@ -6,8 +6,8 @@ use num_traits::{Zero, One, Pow};
 use auto_impl_ops::auto_ops;
 
 use crate::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Mon, MonOps, Ring, RingOps, EucRing, EucRingOps, Field, FieldOps};
-use crate::lc::{Lc, Gen};
-use super::{MultiDeg, Var, Var2, Var3,MultiVar};
+use crate::lc::Lc;
+use super::{MultiDeg, Var, Var2, Var3,MultiVar, Mono, MonoOrd};
 
 // A polynomial is a linear combination of monomials over R.
 
@@ -26,23 +26,6 @@ pub type LPoly3<const X: char, const Y: char, const Z: char, R> = PolyBase<Var3<
 // Multivar-type (ordinary, Laurent)
 pub type PolyN <const X: char, R> = PolyBase<MultiVar<X, usize>, R>;
 pub type LPolyN<const X: char, R> = PolyBase<MultiVar<X, isize>, R>;
-
-pub trait Mono: 
-    Mul<Output = Self> + 
-    Div<Output = Self> + 
-    One + 
-    PartialOrd + 
-    Ord + 
-    From<Self::Deg> +
-    Gen
-{
-    type Deg;
-
-    fn deg(&self) -> Self::Deg;
-    fn is_unit(&self) -> bool;
-    fn inv(&self) -> Option<Self>;
-    fn divides(&self, other: &Self) -> bool;
-}
 
 #[derive(Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -95,8 +78,7 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn lead_term(&self) -> (&X, &R) { 
-        self.iter()
-            .max_by_key(|(i, _)| *i)
+        self.iter().max_by(|t1, t2| MonoOrd::cmp_grlex(t1.0, t2.0))
             .unwrap_or((&self.zero.0, &self.zero.1))
     }
 
@@ -208,7 +190,7 @@ macro_rules! impl_var_specific {
                     .max_by(|(x, _), (y, _)|
                         Ord::cmp( &x.deg_for(k), &y.deg_for(k))
                         .then_with(|| 
-                            Ord::cmp(&x, &y)
+                            MultiVar::cmp_grlex(&x, &y)
                         )
                     )
             }

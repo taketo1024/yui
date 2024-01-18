@@ -8,9 +8,9 @@ use num_traits::{Zero, One, Pow, FromPrimitive, ToPrimitive};
 use auto_impl_ops::auto_ops;
 
 use crate::{Elem, ElemBase};
-use crate::lc::Gen;
+use crate::lc::{Gen, OrdForDisplay};
 
-use super::Mono;
+use super::{Mono, MonoOrd};
 use super::var::{fmt_mono, parse_mono};
 
 // `Var3<X, Y, Z, I>` : represents trivariant monomials X^i Y^j Z^k.
@@ -136,26 +136,27 @@ where I: for<'x >SubAssign<&'x I> {
     }
 }
 
-impl<const X: char, const Y: char, const Z: char, I> PartialOrd for Var3<X, Y, Z, I>
+impl<const X: char, const Y: char, const Z: char, I> MonoOrd for Var3<X, Y, Z, I>
 where I: Copy + Eq + Ord + for<'x> Add<&'x I, Output = I> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(Ord::cmp(self, other))
+    fn cmp_lex(&self, other: &Self) -> std::cmp::Ordering {
+        I::cmp(&self.0, &other.0).then_with(|| 
+            I::cmp(&self.1, &other.1)
+        ).then_with(||
+            I::cmp(&self.2, &other.2)
+        )
+    }
+
+    fn cmp_grlex(&self, other: &Self) -> std::cmp::Ordering {
+        I::cmp(&self.total_deg(), &other.total_deg()).then_with(|| 
+            Self::cmp_lex(self, other)
+        )
     }
 }
 
-impl<const X: char, const Y: char, const Z: char, I> Ord for Var3<X, Y, Z, I>
+impl<const X: char, const Y: char, const Z: char, I> OrdForDisplay for Var3<X, Y, Z, I>
 where I: Copy + Eq + Ord + for<'x> Add<&'x I, Output = I> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        use std::cmp::*;
-
-        Ord::cmp(&self.total_deg(), &other.total_deg())
-        .then_with(|| 
-            Ord::cmp(&self.0, &other.0)
-        ).then_with(|| 
-            Ord::cmp(&self.1, &other.1)
-        ).then_with(|| 
-            Ord::cmp(&self.2, &other.2)
-        )
+    fn cmp_for_display(&self, other: &Self) -> std::cmp::Ordering {
+        Self::cmp_grlex(self, other)
     }
 }
 
@@ -379,10 +380,10 @@ mod tests {
         type M = Var3<'X','Y','Z',usize>;
         let xyz = |i, j,k| M::from((i, j, k));
 
-        assert!(xyz(2, 1, 1) < xyz(1, 3, 1));
-        assert!(xyz(1, 2, 1) < xyz(2, 1, 1));
-        assert!(xyz(1, 2, 1) < xyz(1, 3, 1));
-        assert!(xyz(1, 2, 2) < xyz(2, 1, 2));
-        assert!(xyz(1, 2, 1) < xyz(1, 2, 2));
+        assert!(Var3::cmp_grlex(&xyz(2, 1, 1), &xyz(1, 3, 1)).is_lt());
+        assert!(Var3::cmp_grlex(&xyz(1, 2, 1), &xyz(2, 1, 1)).is_lt());
+        assert!(Var3::cmp_grlex(&xyz(1, 2, 1), &xyz(1, 3, 1)).is_lt());
+        assert!(Var3::cmp_grlex(&xyz(1, 2, 2), &xyz(2, 1, 2)).is_lt());
+        assert!(Var3::cmp_grlex(&xyz(1, 2, 1), &xyz(1, 2, 2)).is_lt());
     }
 }

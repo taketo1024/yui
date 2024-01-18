@@ -8,9 +8,9 @@ use itertools::Itertools;
 use auto_impl_ops::auto_ops;
 
 use crate::{Elem, ElemBase};
-use crate::lc::Gen;
+use crate::lc::{Gen, OrdForDisplay};
 
-use super::Mono;
+use super::{Mono, MonoOrd};
 use super::var::{fmt_mono, parse_mono};
 
 // `Var2<X, Y, I>` : represents bivariant monomials X^i Y^j.
@@ -131,24 +131,25 @@ where I: for<'x >SubAssign<&'x I> {
     }
 }
 
-impl<const X: char, const Y: char, I> PartialOrd for Var2<X, Y, I>
+impl<const X: char, const Y: char, I> MonoOrd for Var2<X, Y, I>
 where I: Copy + Eq + Ord + for<'x> Add<&'x I, Output = I> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(Ord::cmp(self, other))
+    fn cmp_lex(&self, other: &Self) -> std::cmp::Ordering {
+        I::cmp(&self.0, &other.0).then_with(|| 
+            I::cmp(&self.1, &other.1)
+        )
+    }
+
+    fn cmp_grlex(&self, other: &Self) -> std::cmp::Ordering {
+        I::cmp(&self.total_deg(), &other.total_deg()).then_with(|| 
+            Self::cmp_lex(self, other)
+        )
     }
 }
 
-impl<const X: char, const Y: char, I> Ord for Var2<X, Y, I>
+impl<const X: char, const Y: char, I> OrdForDisplay for Var2<X, Y, I>
 where I: Copy + Eq + Ord + for<'x> Add<&'x I, Output = I> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        use std::cmp::*;
-
-        Ord::cmp(&self.total_deg(), &other.total_deg())
-        .then_with(|| 
-            Ord::cmp(&self.0, &other.0)
-        ).then_with(|| 
-            Ord::cmp(&self.1, &other.1)
-        )
+    fn cmp_for_display(&self, other: &Self) -> std::cmp::Ordering {
+        Self::cmp_grlex(self, other)
     }
 }
 
@@ -368,8 +369,8 @@ mod tests {
         type M = Var2<'X','Y',usize>;
         let xy = |i, j| M::from((i, j));
 
-        assert!(xy(2, 1) < xy(1, 3));
-        assert!(xy(1, 2) < xy(2, 1));
-        assert!(xy(1, 2) < xy(1, 3));
+        assert!(Var2::cmp_grlex(&xy(2, 1), &xy(1, 3)).is_lt());
+        assert!(Var2::cmp_grlex(&xy(1, 2), &xy(2, 1)).is_lt());
+        assert!(Var2::cmp_grlex(&xy(1, 2), &xy(1, 3)).is_lt());
     }
 }

@@ -13,17 +13,15 @@ where S: Display {
     }
 }
 
-pub fn lc<'a, X, R, S, F>(terms: S, mut cmp: F) -> String
+pub fn lc<X, R, S>(mut terms: S) -> String
 where 
-    X: 'a + Display, 
-    R: 'a + Display, 
-    S: Iterator<Item = (&'a X, &'a R)>,
-    F: FnMut(&X, &X) -> std::cmp::Ordering
+    X: Display, 
+    R: Display, 
+    S: Iterator<Item = (X, R)>
 { 
     let mut res: Vec<String> = vec![];
-    let mut elements = terms.sorted_by(|(x, _), (y, _)| cmp(x, y));
     
-    if let Some((x, r)) = elements.next() {
+    if let Some((x, r)) = terms.next() {
         let r = paren_expr(r);
         let x = x.to_string();
 
@@ -40,7 +38,7 @@ where
         res.push(term)
     };
 
-    for (x, r) in elements {
+    for (x, r) in terms {
         let r = paren_expr(r);
         let x = x.to_string();
 

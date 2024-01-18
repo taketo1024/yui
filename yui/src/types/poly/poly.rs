@@ -2,6 +2,7 @@ use std::fmt::{Display, Debug};
 use std::ops::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Neg, DivAssign, RemAssign, Div, Rem};
 use std::str::FromStr;
 use delegate::delegate;
+use itertools::Itertools;
 use num_traits::{Zero, One, Pow};
 use auto_impl_ops::auto_ops;
 
@@ -280,7 +281,7 @@ impl<X, R> Display for PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use crate::util::format::lc;
-        let str = lc(self.iter(), |x, y| X::cmp(x, y).reverse());
+        let str = lc(self.iter().sorted_by(|(x, _), (y, _)| X::cmp_for_display(x, y).reverse()));
         f.write_str(&str)
     }
 }

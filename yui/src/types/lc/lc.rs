@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fmt::{Display, Debug};
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, MulAssign};
 use ahash::AHashMap;
+use itertools::Itertools;
 use num_traits::Zero;
 use auto_impl_ops::auto_ops;
 use crate::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
@@ -210,7 +211,7 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use crate::util::format::lc;
-        let str = lc(self.iter(), X::cmp_for_display);
+        let str = lc(self.iter().sorted_by(|(x, _), (y, _)| X::cmp_for_display(x, y)));
         f.write_str(&str)
     }
 }

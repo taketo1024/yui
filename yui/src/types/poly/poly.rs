@@ -279,14 +279,16 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
 impl<X, R> Display for PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.data.fmt(f, false) // descending order
+        use crate::util::format::lc;
+        let str = lc(self.iter(), |x, y| X::cmp(x, y).reverse());
+        f.write_str(&str)
     }
 }
 
 impl<X, R> Debug for PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.data.fmt(f, false) // descending order
+        Display::fmt(self, f)
     }
 }
 

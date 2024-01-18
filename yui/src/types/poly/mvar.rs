@@ -33,22 +33,17 @@ impl<const X: char, I> MultiVar<X, I> {
         self.0.total()
     }
 
-    fn fmt_impl(&self, unicode: bool) -> String
+    fn to_string_u(&self, unicode: bool) -> String
     where I: ToPrimitive { 
-        let s = self.0.iter().map(|(&i, d)| {
+        let seq = self.0.iter().map(|(&i, d)| {
             let x = if unicode { 
                 format!("{X}{}", subscript(i))
             } else { 
                 format!("{X}_{}", i)
             };
-            fmt_mono(&x, d, unicode)
-        }).join("");
-
-        if s.is_empty() { 
-            "1".to_string()
-        } else { 
-            s
-        }
+            (x, d)
+        });
+        fmt_mono_n(seq, unicode)
     }
 }
 
@@ -140,7 +135,7 @@ where I: Zero + for<'x> AddAssign<&'x I> {
 impl<const X: char, I> Display for MultiVar<X, I>
 where I: ToPrimitive { 
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = self.fmt_impl(true);
+        let s = self.to_string_u(true);
         f.write_str(&s)
     }
 }
@@ -176,7 +171,7 @@ impl<const X: char, I> serde::Serialize for MultiVar<X, I>
 where I: ToPrimitive {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where S: serde::Serializer {
-        serializer.serialize_str(&self.fmt_impl(false))
+        serializer.serialize_str(&self.to_string_u(false))
     }
 }
 
@@ -262,6 +257,24 @@ macro_rules! impl_multivar_signed {
 
 impl_multivar_unsigned!(usize);
 impl_multivar_signed!  (isize);
+
+pub(crate) fn fmt_mono_n<'a, X, I, S>(seq: S, unicode: bool) -> String
+where X: ToString, I: 'a + ToPrimitive, S: IntoIterator<Item = (X, &'a I)> { 
+    let s = seq.into_iter().map(|(x, d)| {
+        let m = fmt_mono(&x.to_string(), d, unicode);
+        if m == "1" { 
+            "".to_string()
+        } else {
+            m
+        }
+    }).join("");
+
+    if s.is_empty() { 
+        "1".to_string()
+    } else { 
+        s
+    }
+}
 
 #[cfg(test)]
 mod tests { 

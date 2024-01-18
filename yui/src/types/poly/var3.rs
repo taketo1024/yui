@@ -3,7 +3,6 @@ use std::fmt::{Display, Debug};
 use std::hash::Hash;
 use std::ops::{AddAssign, Mul, MulAssign, DivAssign, SubAssign, Div, Add};
 use std::str::FromStr;
-use itertools::Itertools;
 use num_traits::{Zero, One, Pow, FromPrimitive, ToPrimitive};
 use auto_impl_ops::auto_ops;
 
@@ -11,7 +10,8 @@ use crate::{Elem, ElemBase};
 use crate::lc::{Gen, OrdForDisplay};
 
 use super::{Mono, MonoOrd};
-use super::var::{fmt_mono, parse_mono_deg};
+use super::var::parse_mono_deg;
+use super::mvar::fmt_mono_n;
 
 // `Var3<X, Y, Z, I>` : represents trivariant monomials X^i Y^j Z^k.
 // `I` is either `usize` or `isize`.
@@ -54,17 +54,11 @@ impl<const X: char, const Y: char, const Z: char, I> Var3<X, Y, Z, I> {
         x.pow(&self.0) * y.pow(&self.1) * z.pow(&self.2)
     }
 
-    fn fmt_impl(&self, unicode: bool) -> String
+    fn to_string_u(&self, unicode: bool) -> String
     where I: ToPrimitive { 
         let Var3(d0, d1, d2) = self;
-        let s = [(X, d0), (Y, d1), (Z, d2)].into_iter().map(|(x, d)|
-            fmt_mono(&x.to_string(), d, unicode)
-        ).filter(|s| s != "1").join("");
-        if s == "" { 
-            "1".to_string()
-        } else { 
-            s
-        }
+        let seq = [(X, d0), (Y, d1), (Z, d2)];
+        fmt_mono_n(seq, unicode)
     }
 }
 
@@ -167,7 +161,7 @@ where I: Copy + Eq + Ord + for<'x> Add<&'x I, Output = I> {
 impl<const X: char, const Y: char, const Z: char, I> Display for Var3<X, Y, Z, I>
 where I: ToPrimitive { 
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = self.fmt_impl(true);
+        let s = self.to_string_u(true);
         f.write_str(&s)
     }
 }
@@ -184,7 +178,7 @@ impl<const X: char, const Y: char, const Z: char, I> serde::Serialize for Var3<X
 where I: ToPrimitive {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where S: serde::Serializer {
-        serializer.serialize_str(&self.fmt_impl(false))
+        serializer.serialize_str(&self.to_string_u(false))
     }
 }
 

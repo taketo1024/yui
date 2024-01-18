@@ -590,7 +590,7 @@ mod tests {
             (xn([ 1,0,0]), 1),
             (xn([-3,1,3]), 2),
         ]);
-        assert_eq!(&f.to_string(), "x₀ + 2x₀⁻³x₁x₂³ + 3");
+        assert_eq!(&f.to_string(), "x₀ + 3 + 2x₀⁻³x₁x₂³");
     }
 
     #[test]

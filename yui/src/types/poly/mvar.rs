@@ -163,7 +163,7 @@ where I: Zero + Ord + for<'x> Add<&'x I, Output = I> {
 impl<const X: char, I> OrdForDisplay for MultiVar<X, I>
 where I: Zero + Ord + for<'x> Add<&'x I, Output = I> {
     fn cmp_for_display(&self, other: &Self) -> std::cmp::Ordering {
-        Self::cmp_grlex(self, other)
+        Self::cmp_lex(self, other)
     }
 }
 

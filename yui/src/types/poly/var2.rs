@@ -150,7 +150,7 @@ where I: Copy + Eq + Ord + for<'x> Add<&'x I, Output = I> {
 impl<const X: char, const Y: char, I> OrdForDisplay for Var2<X, Y, I>
 where I: Copy + Eq + Ord + for<'x> Add<&'x I, Output = I> {
     fn cmp_for_display(&self, other: &Self) -> std::cmp::Ordering {
-        Self::cmp_grlex(self, other)
+        Self::cmp_lex(self, other)
     }
 }
 

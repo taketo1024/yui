@@ -149,6 +149,16 @@ where
     where F: Fn(&X, &X) -> std::cmp::Ordering { 
         self.iter().sorted_by(|(x, _), (y, _)| cmp(x, y))
     }
+
+    pub fn to_string_by<F>(&self, cmp: F, descending: bool) -> String
+    where F: Fn(&X, &X) -> std::cmp::Ordering {
+        use crate::util::format::lc;
+        if descending { 
+            lc( self.sort_terms_by(|x, y| cmp(x, y).reverse()) )
+        } else { 
+            lc( self.sort_terms_by(cmp) )
+        }
+    }
 }
 
 impl<X, R> From<X> for Lc<X, R>
@@ -215,9 +225,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use crate::util::format::lc;
-        let str = lc(self.sort_terms_by(X::cmp_for_display));
-        f.write_str(&str)
+        f.write_str(&self.to_string_by(X::cmp_for_display, false))
     }
 }
 

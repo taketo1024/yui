@@ -102,6 +102,11 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     where F: Fn(&X, &X) -> std::cmp::Ordering { 
         self.data.sort_terms_by(cmp)
     }
+
+    pub fn to_string_by<F>(&self, cmp: F, descending: bool) -> String
+    where F: Fn(&X, &X) -> std::cmp::Ordering {
+        self.data.to_string_by(cmp, descending)
+    }
 }
 
 macro_rules! impl_var_specific {
@@ -266,9 +271,7 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
 impl<X, R> Display for PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use crate::util::format::lc;
-        let str = lc(self.sort_terms_by(|x, y| X::cmp_for_display(x, y).reverse()));
-        f.write_str(&str)
+        f.write_str(&self.to_string_by(X::cmp_for_display, true))
     }
 }
 

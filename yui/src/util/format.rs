@@ -13,6 +13,58 @@ where S: Display {
     }
 }
 
+pub fn lc<'a, X, R, S, F>(terms: S, mut cmp: F) -> String
+where 
+    X: 'a + Display, 
+    R: 'a + Display, 
+    S: Iterator<Item = (&'a X, &'a R)>,
+    F: FnMut(&X, &X) -> std::cmp::Ordering
+{ 
+    let mut res: Vec<String> = vec![];
+    let mut elements = terms.sorted_by(|(x, _), (y, _)| cmp(x, y));
+    
+    if let Some((x, r)) = elements.next() {
+        let r = paren_expr(r);
+        let x = x.to_string();
+
+        let term = if r == "1" { 
+            x
+        } else if r == "-1" { 
+            format!("-{x}")
+        } else if x == "1" {
+            format!("{r}")
+        } else { 
+            format!("{r}{x}")
+        };
+
+        res.push(term)
+    };
+
+    for (x, r) in elements {
+        let r = paren_expr(r);
+        let x = x.to_string();
+
+        let (op, r) = if let Some(r) = r.strip_prefix('-') { 
+            ("-", r.to_owned()) 
+        } else { 
+            ("+", r.to_owned())
+        };
+
+        let term = if r == "1" { 
+            x
+        } else if x == "1" { 
+            r.to_string()
+        } else { 
+            format!("{r}{x}")
+        };
+
+        res.push(op.to_string());
+        res.push(term);
+    }
+
+    res.join(" ")
+}
+
 pub fn subscript<I>(i: I) -> String
 where I: ToPrimitive {
     let i = i.to_isize().unwrap();

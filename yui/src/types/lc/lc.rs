@@ -145,56 +145,19 @@ where
         }).collect()
     }
 
-    pub fn fmt(&self, f: &mut std::fmt::Formatter<'_>, ascending: bool) -> std::fmt::Result {
-        use crate::util::format::paren_expr;
+    pub fn sort_terms_by<F>(&self, cmp: F) -> impl Iterator<Item = (&X, &R)>
+    where F: Fn(&X, &X) -> std::cmp::Ordering { 
+        self.iter().sorted_by(|(x, _), (y, _)| cmp(x, y))
+    }
 
-        if self.data.is_empty() { 
-            return write!(f, "0");
+    pub fn to_string_by<F>(&self, cmp: F, descending: bool) -> String
+    where F: Fn(&X, &X) -> std::cmp::Ordering {
+        use crate::util::format::lc;
+        if descending { 
+            lc( self.sort_terms_by(|x, y| cmp(x, y).reverse()) )
+        } else { 
+            lc( self.sort_terms_by(cmp) )
         }
-
-        let mut elements = self.iter().sorted_by(|(x, _), (y, _)| 
-            if ascending { 
-                x.cmp_for_display(y) 
-            } else {
-                x.cmp_for_display(y).reverse()
-            }
-        );
-        
-        if let Some((x, r)) = elements.next() {
-            let r = paren_expr(r);
-            let x = x.to_string();
-
-            if r == "1" { 
-                write!(f, "{x}")?
-            } else if r == "-1" { 
-                write!(f, "-{x}")?
-            } else if x == "1" {
-                write!(f, "{r}")?
-            } else { 
-                write!(f, "{r}{x}")?
-            };
-        };
-
-        for (x, r) in elements {
-            let r = paren_expr(r);
-            let x = x.to_string();
-
-            let (op, r) = if let Some(r) = r.strip_prefix('-') { 
-                ("-", r) 
-            } else { 
-                ("+", r.as_str())
-            };
-
-            if r == "1" { 
-                write!(f, " {op} {x}")?
-            } else if x == "1" { 
-                write!(f, " {op} {r}")?
-            } else { 
-                write!(f, " {op} {r}{x}")?
-            };
-        }
-
-        Ok(())
     }
 }
 
@@ -262,7 +225,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.fmt(f, true)
+        f.write_str(&self.to_string_by(X::cmp_for_display, false))
     }
 }
 
@@ -272,7 +235,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.fmt(f, true)
+        Display::fmt(self, f)
     }
 }
 

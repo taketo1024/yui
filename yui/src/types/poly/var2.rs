@@ -4,14 +4,14 @@ use std::hash::Hash;
 use std::ops::{AddAssign, Mul, MulAssign, DivAssign, SubAssign, Div, Add};
 use std::str::FromStr;
 use num_traits::{Zero, One, Pow, FromPrimitive, ToPrimitive};
-use itertools::Itertools;
 use auto_impl_ops::auto_ops;
 
 use crate::{Elem, ElemBase};
-use crate::lc::Gen;
+use crate::lc::{Gen, OrdForDisplay};
 
-use super::Mono;
-use super::var::{fmt_mono, parse_mono};
+use super::{Mono, MonoOrd};
+use super::var::parse_mono_deg;
+use super::mvar::fmt_mono_n;
 
 // `Var2<X, Y, I>` : represents bivariant monomials X^i Y^j.
 // `I` is either `usize` or `isize`.
@@ -52,18 +52,11 @@ impl<const X: char, const Y: char, I> Var2<X, Y, I> {
         x.pow(&self.0) * y.pow(&self.1)
     }
 
-    fn fmt_impl(&self, unicode: bool) -> String
+    fn to_string_u(&self, unicode: bool) -> String
     where I: ToPrimitive { 
         let Var2(d0, d1) = self;
-        let s = [(X, d0), (Y, d1)].into_iter().map(|(x, d)|
-            fmt_mono(&x.to_string(), d, unicode)
-        ).filter(|s| s != "1").join("");
-
-        if s == "" { 
-            "1".to_string()
-        } else { 
-            s
-        }
+        let seq = [(X, d0), (Y, d1)];
+        fmt_mono_n(seq, unicode)
     }
 }
 
@@ -74,35 +67,38 @@ impl<const X: char, const Y: char, I> From<(I, I)> for Var2<X, Y, I> {
 }
 
 impl<const X: char, const Y: char, I> FromStr for Var2<X, Y, I>
-where I: Zero + FromStr + FromPrimitive + Debug, I::Err: ToString {
+where I: Zero + AddAssign + FromStr + FromPrimitive {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use regex::Regex;
+
         if s == "1" { 
             return Ok(Self(I::zero(), I::zero()))
         }
 
-        let p1 = format!(r"{X}(\^-?[0-9]+)?");
-        let p2 = format!(r"{Y}(\^-?[0-9]+)?");
-        let p_all = format!(r"^({p1})?\s?({p2})?$");
+        let p = format!(r"({X}|{Y})(\^\{{?-?[0-9]+\}}?)?");
+        let p_all = format!(r"^({p}\s?)+$");
 
-        if !Regex::new(&p_all).unwrap().is_match(&s) { 
+        let r = Regex::new(&p).unwrap();
+        let r_all = Regex::new(&p_all).unwrap();
+
+        if !r_all.is_match(&s) { 
             return Err(format!("Failed to parse: {s}"))
         }
 
-        let r1 = Regex::new(&p1).unwrap();
-        let r2 = Regex::new(&p2).unwrap();
-
-        let d = [(X, r1), (Y, r2)].into_iter().map(|(x, r)| 
-            if let Some(c) = r.captures(s) { 
-                parse_mono(&x.to_string(), &c[0])
+        let mut deg = (I::zero(), I::zero());
+        
+        for c in r.captures_iter(&s) {
+            let x = &c[1];
+            let i = parse_mono_deg(x, &c[0]).unwrap();
+            if x.starts_with(X) { 
+                deg.0 += i;
             } else { 
-                Ok(I::zero())
+                deg.1 += i;
             }
-        ).collect::<Result<Vec<_>, _>>()?;
-        let [d1, d2] = d.try_into().unwrap();
+        };
 
-        Ok(Self(d1, d2))
+        Ok(Self::from(deg))
     }
 }
 
@@ -131,31 +127,33 @@ where I: for<'x >SubAssign<&'x I> {
     }
 }
 
-impl<const X: char, const Y: char, I> PartialOrd for Var2<X, Y, I>
+impl<const X: char, const Y: char, I> MonoOrd for Var2<X, Y, I>
 where I: Copy + Eq + Ord + for<'x> Add<&'x I, Output = I> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(Ord::cmp(self, other))
+    fn cmp_lex(&self, other: &Self) -> std::cmp::Ordering {
+        // must have x_0 > x_1
+        I::cmp(&self.0, &other.0).then_with(|| 
+            I::cmp(&self.1, &other.1)
+        )
+    }
+
+    fn cmp_grlex(&self, other: &Self) -> std::cmp::Ordering {
+        I::cmp(&self.total_deg(), &other.total_deg()).then_with(|| 
+            Self::cmp_lex(self, other)
+        )
     }
 }
 
-impl<const X: char, const Y: char, I> Ord for Var2<X, Y, I>
+impl<const X: char, const Y: char, I> OrdForDisplay for Var2<X, Y, I>
 where I: Copy + Eq + Ord + for<'x> Add<&'x I, Output = I> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        use std::cmp::*;
-
-        Ord::cmp(&self.total_deg(), &other.total_deg())
-        .then_with(|| 
-            Ord::cmp(&self.0, &other.0)
-        ).then_with(|| 
-            Ord::cmp(&self.1, &other.1)
-        )
+    fn cmp_for_display(&self, other: &Self) -> std::cmp::Ordering {
+        Self::cmp_lex(self, other)
     }
 }
 
 impl<const X: char, const Y: char, I> Display for Var2<X, Y, I>
 where I: ToPrimitive { 
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = self.fmt_impl(true);
+        let s = self.to_string_u(true);
         f.write_str(&s)
     }
 }
@@ -172,7 +170,7 @@ impl<const X: char, const Y: char, I> serde::Serialize for Var2<X, Y, I>
 where I: ToPrimitive {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where S: serde::Serializer {
-        serializer.serialize_str(&self.fmt_impl(false))
+        serializer.serialize_str(&self.to_string_u(false))
     }
 }
 
@@ -241,6 +239,19 @@ macro_rules! impl_bivar_signed {
 impl_bivar_unsigned!(usize);
 impl_bivar_signed!  (isize);
 
+cfg_if::cfg_if! { 
+    if #[cfg(feature = "tex")] {
+        use crate::TeX;
+
+        impl<const X: char, const Y: char, I> TeX for Var2<X, Y, I>
+        where I: ToPrimitive {
+            fn to_tex_string(&self) -> String {
+                self.to_string_u(false)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -266,8 +277,8 @@ mod tests {
 
     #[test]
     fn from_str() { 
-        type M = Var2<'X','Y',usize>;
-        let xy = Var2::<'X','Y',usize>;
+        type M = Var2<'X','Y', isize>;
+        let xy = |i, j| M::from((i, j));
         
         assert_eq!(M::from_str("1"), Ok(M::one()));
         assert_eq!(M::from_str("X"), Ok(xy(1, 0)));
@@ -276,6 +287,8 @@ mod tests {
         assert_eq!(M::from_str("Y^2"), Ok(xy(0, 2)));
         assert_eq!(M::from_str("XY"), Ok(xy(1, 1)));
         assert_eq!(M::from_str("X^2Y^3"), Ok(xy(2, 3)));
+        assert_eq!(M::from_str(r"X^{21}Y^{32}"), Ok(xy(21, 32)));
+        assert_eq!(M::from_str(r"X^{-2}Y^{-3}"), Ok(xy(-2, -3)));
         assert!(M::from_str("2").is_err());
     }
 
@@ -364,12 +377,28 @@ mod tests {
     }
 
     #[test]
-    fn ord() { 
+    fn cmp_lex() { 
         type M = Var2<'X','Y',usize>;
         let xy = |i, j| M::from((i, j));
 
-        assert!(xy(2, 1) < xy(1, 3));
-        assert!(xy(1, 2) < xy(2, 1));
-        assert!(xy(1, 2) < xy(1, 3));
+        // x^2 y > x y^2 > x > y^2 > y > 1
+        assert!(Var2::cmp_lex(&xy(2, 1), &xy(1, 2)).is_gt());
+        assert!(Var2::cmp_lex(&xy(1, 2), &xy(1, 0)).is_gt());
+        assert!(Var2::cmp_lex(&xy(1, 0), &xy(0, 2)).is_gt());
+        assert!(Var2::cmp_lex(&xy(0, 2), &xy(0, 1)).is_gt());
+        assert!(Var2::cmp_lex(&xy(0, 1), &xy(0, 0)).is_gt());
+    }
+
+    #[test]
+    fn cmp_grlex() { 
+        type M = Var2<'X','Y',usize>;
+        let xy = |i, j| M::from((i, j));
+
+        // x^2 y > x y^2 > y^2 > x > y > 1
+        assert!(Var2::cmp_grlex(&xy(2, 1), &xy(1, 2)).is_gt());
+        assert!(Var2::cmp_grlex(&xy(1, 2), &xy(0, 2)).is_gt());
+        assert!(Var2::cmp_grlex(&xy(0, 2), &xy(1, 0)).is_gt());
+        assert!(Var2::cmp_grlex(&xy(1, 0), &xy(0, 1)).is_gt());
+        assert!(Var2::cmp_grlex(&xy(0, 1), &xy(0, 0)).is_gt());
     }
 }

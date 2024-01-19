@@ -13,6 +13,56 @@ where S: Display {
     }
 }
 
+pub fn lc<X, R, S>(mut terms: S) -> String
+where 
+    X: Display, 
+    R: Display, 
+    S: Iterator<Item = (X, R)>
+{ 
+    let mut res: Vec<String> = vec![];
+    
+    if let Some((x, r)) = terms.next() {
+        let r = paren_expr(r);
+        let x = x.to_string();
+
+        let term = if r == "1" { 
+            x
+        } else if r == "-1" { 
+            format!("-{x}")
+        } else if x == "1" {
+            format!("{r}")
+        } else { 
+            format!("{r}{x}")
+        };
+
+        res.push(term)
+    };
+
+    for (x, r) in terms {
+        let r = paren_expr(r);
+        let x = x.to_string();
+
+        let (op, r) = if let Some(r) = r.strip_prefix('-') { 
+            ("-", r.to_owned()) 
+        } else { 
+            ("+", r.to_owned())
+        };
+
+        let term = if r == "1" { 
+            x
+        } else if x == "1" { 
+            r.to_string()
+        } else { 
+            format!("{r}{x}")
+        };
+
+        res.push(op.to_string());
+        res.push(term);
+    }
+
+    res.join(" ")
+}
+
 pub fn subscript<I>(i: I) -> String
 where I: ToPrimitive {
     let i = i.to_isize().unwrap();

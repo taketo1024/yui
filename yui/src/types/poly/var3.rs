@@ -3,15 +3,15 @@ use std::fmt::{Display, Debug};
 use std::hash::Hash;
 use std::ops::{AddAssign, Mul, MulAssign, DivAssign, SubAssign, Div, Add};
 use std::str::FromStr;
-use itertools::Itertools;
 use num_traits::{Zero, One, Pow, FromPrimitive, ToPrimitive};
 use auto_impl_ops::auto_ops;
 
 use crate::{Elem, ElemBase};
-use crate::lc::Gen;
+use crate::lc::{Gen, OrdForDisplay};
 
-use super::Mono;
-use super::var::{fmt_mono, parse_mono};
+use super::{Mono, MonoOrd};
+use super::var::parse_mono_deg;
+use super::mvar::fmt_mono_n;
 
 // `Var3<X, Y, Z, I>` : represents trivariant monomials X^i Y^j Z^k.
 // `I` is either `usize` or `isize`.
@@ -54,17 +54,11 @@ impl<const X: char, const Y: char, const Z: char, I> Var3<X, Y, Z, I> {
         x.pow(&self.0) * y.pow(&self.1) * z.pow(&self.2)
     }
 
-    fn fmt_impl(&self, unicode: bool) -> String
+    fn to_string_u(&self, unicode: bool) -> String
     where I: ToPrimitive { 
         let Var3(d0, d1, d2) = self;
-        let s = [(X, d0), (Y, d1), (Z, d2)].into_iter().map(|(x, d)|
-            fmt_mono(&x.to_string(), d, unicode)
-        ).filter(|s| s != "1").join("");
-        if s == "" { 
-            "1".to_string()
-        } else { 
-            s
-        }
+        let seq = [(X, d0), (Y, d1), (Z, d2)];
+        fmt_mono_n(seq, unicode)
     }
 }
 
@@ -75,37 +69,40 @@ impl<const X: char, const Y: char, const Z: char, I> From<(I, I, I)> for Var3<X,
 }
 
 impl<const X: char, const Y: char, const Z: char, I> FromStr for Var3<X, Y, Z, I>
-where I: Zero + FromStr + FromPrimitive + Debug, <I as FromStr>::Err: ToString {
+where I: Zero + AddAssign + FromStr + FromPrimitive {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use regex::Regex;
+
         if s == "1" { 
             return Ok(Self(I::zero(), I::zero(), I::zero()))
         }
 
-        let p1 = format!(r"{X}(\^-?[0-9]+)?");
-        let p2 = format!(r"{Y}(\^-?[0-9]+)?");
-        let p3 = format!(r"{Z}(\^-?[0-9]+)?");
-        let p_all = format!(r"^({p1})?\s?({p2})?\s?({p3})?$");
+        let p = format!(r"({X}|{Y}|{Z})(\^\{{?-?[0-9]+\}}?)?");
+        let p_all = format!(r"^({p}\s?)+$");
 
-        if !Regex::new(&p_all).unwrap().is_match(&s) { 
+        let r = Regex::new(&p).unwrap();
+        let r_all = Regex::new(&p_all).unwrap();
+
+        if !r_all.is_match(&s) { 
             return Err(format!("Failed to parse: {s}"))
         }
 
-        let r1 = Regex::new(&p1).unwrap();
-        let r2 = Regex::new(&p2).unwrap();
-        let r3 = Regex::new(&p3).unwrap();
-
-        let d = [(X, r1), (Y, r2), (Z, r3)].into_iter().map(|(x, r)| { 
-            if let Some(c) = r.captures(s) { 
-                parse_mono(&x.to_string(), &c[0])
+        let mut deg = (I::zero(), I::zero(), I::zero());
+        
+        for c in r.captures_iter(&s) {
+            let x = &c[1];
+            let i = parse_mono_deg(x, &c[0]).unwrap();
+            if x.starts_with(X) { 
+                deg.0 += i;
+            } else if x.starts_with(Y) { 
+                deg.1 += i;
             } else { 
-                Ok(I::zero())
+                deg.2 += i;
             }
-        }).collect::<Result<Vec<_>, _>>()?;
-        let [d1, d2, d3] = d.try_into().unwrap();
+        };
 
-        Ok(Self(d1, d2, d3))
+        Ok(Self::from(deg))
     }
 }
 
@@ -136,33 +133,35 @@ where I: for<'x >SubAssign<&'x I> {
     }
 }
 
-impl<const X: char, const Y: char, const Z: char, I> PartialOrd for Var3<X, Y, Z, I>
+impl<const X: char, const Y: char, const Z: char, I> MonoOrd for Var3<X, Y, Z, I>
 where I: Copy + Eq + Ord + for<'x> Add<&'x I, Output = I> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(Ord::cmp(self, other))
+    fn cmp_lex(&self, other: &Self) -> std::cmp::Ordering {
+        // must have x_0 > x_1 > x_2
+        I::cmp(&self.0, &other.0).then_with(|| 
+            I::cmp(&self.1, &other.1)
+        ).then_with(||
+            I::cmp(&self.2, &other.2)
+        )
+    }
+
+    fn cmp_grlex(&self, other: &Self) -> std::cmp::Ordering {
+        I::cmp(&self.total_deg(), &other.total_deg()).then_with(|| 
+            Self::cmp_lex(self, other)
+        )
     }
 }
 
-impl<const X: char, const Y: char, const Z: char, I> Ord for Var3<X, Y, Z, I>
+impl<const X: char, const Y: char, const Z: char, I> OrdForDisplay for Var3<X, Y, Z, I>
 where I: Copy + Eq + Ord + for<'x> Add<&'x I, Output = I> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        use std::cmp::*;
-
-        Ord::cmp(&self.total_deg(), &other.total_deg())
-        .then_with(|| 
-            Ord::cmp(&self.0, &other.0)
-        ).then_with(|| 
-            Ord::cmp(&self.1, &other.1)
-        ).then_with(|| 
-            Ord::cmp(&self.2, &other.2)
-        )
+    fn cmp_for_display(&self, other: &Self) -> std::cmp::Ordering {
+        Self::cmp_lex(self, other)
     }
 }
 
 impl<const X: char, const Y: char, const Z: char, I> Display for Var3<X, Y, Z, I>
 where I: ToPrimitive { 
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = self.fmt_impl(true);
+        let s = self.to_string_u(true);
         f.write_str(&s)
     }
 }
@@ -179,7 +178,7 @@ impl<const X: char, const Y: char, const Z: char, I> serde::Serialize for Var3<X
 where I: ToPrimitive {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where S: serde::Serializer {
-        serializer.serialize_str(&self.fmt_impl(false))
+        serializer.serialize_str(&self.to_string_u(false))
     }
 }
 
@@ -248,6 +247,19 @@ macro_rules! impl_trivar_signed {
 impl_trivar_unsigned!(usize);
 impl_trivar_signed!  (isize);
 
+cfg_if::cfg_if! { 
+    if #[cfg(feature = "tex")] {
+        use crate::TeX;
+
+        impl<const X: char, const Y: char, const Z: char, I> TeX for Var3<X, Y, Z, I>
+        where I: ToPrimitive {
+            fn to_tex_string(&self) -> String {
+                self.to_string_u(false)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -275,7 +287,7 @@ mod tests {
 
     #[test]
     fn from_str() { 
-        type M = Var3<'X','Y','Z',usize>;
+        type M = Var3<'X','Y','Z',isize>;
         let xyz = |i, j, k| M::from((i, j, k));
         
         assert_eq!(M::from_str("1"), Ok(M::one()));
@@ -287,6 +299,7 @@ mod tests {
         assert_eq!(M::from_str("Z^2"), Ok(xyz(0, 0, 2)));
         assert_eq!(M::from_str("XYZ"), Ok(xyz(1, 1, 1)));
         assert_eq!(M::from_str("X^2Y^3Z"), Ok(xyz(2, 3, 1)));
+        assert_eq!(M::from_str("X^{21}Y^{-3}Z^{2}"), Ok(xyz(21, -3, 2)));
         assert!(M::from_str("2").is_err());
     }
 
@@ -375,14 +388,30 @@ mod tests {
     }
 
     #[test]
-    fn ord() { 
+    fn cmp_lex() { 
         type M = Var3<'X','Y','Z',usize>;
         let xyz = |i, j,k| M::from((i, j, k));
 
-        assert!(xyz(2, 1, 1) < xyz(1, 3, 1));
-        assert!(xyz(1, 2, 1) < xyz(2, 1, 1));
-        assert!(xyz(1, 2, 1) < xyz(1, 3, 1));
-        assert!(xyz(1, 2, 2) < xyz(2, 1, 2));
-        assert!(xyz(1, 2, 1) < xyz(1, 2, 2));
+        // x^2 y z > x y^2 z > x y z^2 > x > y^2 > z^3 > 1
+        assert!(Var3::cmp_lex(&xyz(2, 1, 1), &xyz(1, 2, 1)).is_gt());
+        assert!(Var3::cmp_lex(&xyz(1, 2, 1), &xyz(1, 1, 2)).is_gt());
+        assert!(Var3::cmp_lex(&xyz(1, 1, 2), &xyz(1, 0, 0)).is_gt());
+        assert!(Var3::cmp_lex(&xyz(1, 0, 0), &xyz(0, 2, 0)).is_gt());
+        assert!(Var3::cmp_lex(&xyz(0, 2, 0), &xyz(0, 0, 3)).is_gt());
+        assert!(Var3::cmp_lex(&xyz(0, 0, 3), &xyz(0, 0, 0)).is_gt());
+    }
+
+    #[test]
+    fn cmp_grlex() { 
+        type M = Var3<'X','Y','Z',usize>;
+        let xyz = |i, j,k| M::from((i, j, k));
+
+        // x^2 y z > x y^2 z > x y z^2 > z^3 > y^2 > x > 1
+        assert!(Var3::cmp_grlex(&xyz(2, 1, 1), &xyz(1, 2, 1)).is_gt());
+        assert!(Var3::cmp_grlex(&xyz(1, 2, 1), &xyz(1, 1, 2)).is_gt());
+        assert!(Var3::cmp_grlex(&xyz(1, 1, 2), &xyz(0, 0, 3)).is_gt());
+        assert!(Var3::cmp_grlex(&xyz(0, 0, 3), &xyz(0, 2, 0)).is_gt());
+        assert!(Var3::cmp_grlex(&xyz(0, 2, 0), &xyz(1, 0, 0)).is_gt());
+        assert!(Var3::cmp_grlex(&xyz(1, 0, 0), &xyz(0, 0, 0)).is_gt());
     }
 }

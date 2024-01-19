@@ -6,8 +6,8 @@ use num_traits::{Zero, One, Pow};
 use auto_impl_ops::auto_ops;
 
 use crate::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Mon, MonOps, Ring, RingOps, EucRing, EucRingOps, Field, FieldOps};
-use crate::lc::{Lc, Gen};
-use super::{MultiDeg, Var, Var2, Var3,MultiVar};
+use crate::lc::Lc;
+use super::{MultiDeg, Var, Var2, Var3,MultiVar, Mono, MonoOrd};
 
 // A polynomial is a linear combination of monomials over R.
 
@@ -26,23 +26,6 @@ pub type LPoly3<const X: char, const Y: char, const Z: char, R> = PolyBase<Var3<
 // Multivar-type (ordinary, Laurent)
 pub type PolyN <const X: char, R> = PolyBase<MultiVar<X, usize>, R>;
 pub type LPolyN<const X: char, R> = PolyBase<MultiVar<X, isize>, R>;
-
-pub trait Mono: 
-    Mul<Output = Self> + 
-    Div<Output = Self> + 
-    One + 
-    PartialOrd + 
-    Ord + 
-    From<Self::Deg> +
-    Gen
-{
-    type Deg;
-
-    fn deg(&self) -> Self::Deg;
-    fn is_unit(&self) -> bool;
-    fn inv(&self) -> Option<Self>;
-    fn divides(&self, other: &Self) -> bool;
-}
 
 #[derive(Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -95,8 +78,7 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn lead_term(&self) -> (&X, &R) { 
-        self.iter()
-            .max_by_key(|(i, _)| *i)
+        self.iter().max_by(|t1, t2| MonoOrd::cmp_grlex(t1.0, t2.0))
             .unwrap_or((&self.zero.0, &self.zero.1))
     }
 
@@ -114,6 +96,16 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
         F: Fn(&R) -> R2
     {
         PolyBase::<X, R2>::from( self.data.map_coeffs(f) )
+    }
+
+    pub fn sort_terms_by<F>(&self, cmp: F) -> impl Iterator<Item = (&X, &R)>
+    where F: Fn(&X, &X) -> std::cmp::Ordering { 
+        self.data.sort_terms_by(cmp)
+    }
+
+    pub fn to_string_by<F>(&self, cmp: F, descending: bool) -> String
+    where F: Fn(&X, &X) -> std::cmp::Ordering {
+        self.data.to_string_by(cmp, descending)
     }
 }
 
@@ -203,7 +195,7 @@ macro_rules! impl_var_specific {
                     .max_by(|(x, _), (y, _)|
                         Ord::cmp( &x.deg_for(k), &y.deg_for(k))
                         .then_with(|| 
-                            Ord::cmp(&x, &y)
+                            MultiVar::cmp_grlex(&x, &y)
                         )
                     )
             }
@@ -279,14 +271,14 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
 impl<X, R> Display for PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.data.fmt(f, false) // descending order
+        f.write_str(&self.to_string_by(X::cmp_for_display, true))
     }
 }
 
 impl<X, R> Debug for PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.data.fmt(f, false) // descending order
+        Display::fmt(self, f)
     }
 }
 
@@ -534,6 +526,23 @@ where R: Field, for<'x> &'x R: FieldOps<R> {}
 impl<const X: char, R> EucRing for Poly<X, R>
 where R: Field, for<'x> &'x R: FieldOps<R> {}
 
+cfg_if::cfg_if! { 
+    if #[cfg(feature = "tex")] {
+        use crate::TeX;
+
+        impl<X, R> TeX for PolyBase<X, R>
+        where X: Mono + TeX, R: Ring + TeX, for<'x> &'x R: RingOps<R> {
+            fn to_tex_string(&self) -> String {
+                use crate::util::format::lc;
+                let terms = self.sort_terms_by(|x, y| X::cmp_lex(x, y).reverse()).map(|(x, r)|
+                    (x.to_tex_string(), r.to_tex_string())
+                );
+                lc(terms)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::Ratio;
@@ -601,7 +610,7 @@ mod tests {
             (xn([ 1,0,0]), 1),
             (xn([-3,1,3]), 2),
         ]);
-        assert_eq!(&f.to_string(), "x₀ + 2x₀⁻³x₁x₂³ + 3");
+        assert_eq!(&f.to_string(), "x₀ + 3 + 2x₀⁻³x₁x₂³");
     }
 
     #[test]
@@ -961,12 +970,17 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn serialize_bivar() { 
-        type P = Poly2::<'x', 'y', i32>; 
+        type P = LPoly2::<'x', 'y', i32>; 
 
         let xy = P::mono;
-        let f = P::from_iter([(xy(0, 0), 3), (xy(1, 0), 2), (xy(2, 3), 3)]);
+        let f = P::from_iter([
+            (xy(0, 0), 3), 
+            (xy(1, 0), 1), 
+            (xy(-2, 13), -3)
+        ]);
 
         let ser = serde_json::to_string(&f).unwrap();
+        dbg!(&ser);
         let des = serde_json::from_str(&ser).unwrap();
         assert_eq!(f, des);
     }
@@ -974,17 +988,32 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn serialize_mvar() { 
-        type P = PolyN::<'x', i32>; 
+        type P = LPolyN::<'x', i32>; 
 
         let xn = P::mono;
         let f = P::from_iter([
             (xn([0,0,0]),  3),
             (xn([1,0,0]), -1),
-            (xn([3,0,2]),  2),
+            (xn([12,0,-2]),  12),
         ]);
 
         let ser = serde_json::to_string(&f).unwrap();
         let des = serde_json::from_str(&ser).unwrap();
         assert_eq!(f, des);
+    }
+
+    #[test]
+    #[cfg(feature = "tex")]
+    fn tex() { 
+        type P = LPolyN::<'x', i32>; 
+
+        let xn = P::mono;
+        let f = P::from_iter([
+            (xn([ 0,0,0]),   3),
+            (xn([ 3,0,1]),  -1),
+            (xn([-2,1,3]), -2),
+        ]);
+
+        assert_eq!(f.to_tex_string(), "-x_0^3x_2 + 3 - 2x_0^{-2}x_1x_2^3");
     }
 }

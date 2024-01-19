@@ -7,10 +7,10 @@ use itertools::Itertools;
 use auto_impl_ops::auto_ops;
 
 use crate::{Elem, ElemBase};
-use crate::lc::Gen;
+use crate::lc::{Gen, OrdForDisplay};
 use crate::util::format::subscript;
-use super::{Mono, MultiDeg};
-use super::var::{fmt_mono, parse_mono};
+use super::{Mono, MultiDeg, MonoOrd};
+use super::var::{fmt_mono, parse_mono_deg};
 
 #[derive(Clone, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde_with::DeserializeFromStr))]
@@ -33,22 +33,17 @@ impl<const X: char, I> MultiVar<X, I> {
         self.0.total()
     }
 
-    fn fmt_impl(&self, unicode: bool) -> String
+    fn to_string_u(&self, unicode: bool) -> String
     where I: ToPrimitive { 
-        let s = self.0.iter().map(|(&i, d)| {
+        let seq = self.0.iter().map(|(&i, d)| {
             let x = if unicode { 
                 format!("{X}{}", subscript(i))
             } else { 
                 format!("{X}_{}", i)
             };
-            fmt_mono(&x, d, unicode)
-        }).join("");
-
-        if s.is_empty() { 
-            "1".to_string()
-        } else { 
-            s
-        }
+            (x, d)
+        });
+        fmt_mono_n(seq, unicode)
     }
 }
 
@@ -80,7 +75,7 @@ where I: Zero {
 }
 
 impl<const X: char, I> FromStr for MultiVar<X, I>
-where I: Zero + FromStr + FromPrimitive, <I as FromStr>::Err: ToString {
+where I: Zero + FromStr + FromPrimitive {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use regex::Regex;
@@ -89,7 +84,9 @@ where I: Zero + FromStr + FromPrimitive, <I as FromStr>::Err: ToString {
             return Ok(MultiVar::from(MultiDeg::empty()))
         }
 
-        let p = format!(r"({X}_([0-9]+))(\^-?[0-9]+)?");
+        // TODO must support braced indices.
+        
+        let p = format!(r"({X}_([0-9]+))(\^\{{?-?[0-9]+\}}?)?");
         let p_all = format!(r"^({p}\s?)+$");
 
         if !Regex::new(&p_all).unwrap().is_match(&s) { 
@@ -102,8 +99,9 @@ where I: Zero + FromStr + FromPrimitive, <I as FromStr>::Err: ToString {
         for c in r.captures_iter(&s) {
             let x = &c[1];
             let i = usize::from_str(&c[2]).map_err(|e| e.to_string())?;
-            let d = parse_mono(x, &c[0])?;
-            degs.push((i, d));
+            if let Some(d) = parse_mono_deg(x, &c[0]) { 
+                degs.push((i, d));
+            }
         };
 
         let mvar = MultiVar::from_iter(degs);
@@ -137,7 +135,7 @@ where I: Zero + for<'x> AddAssign<&'x I> {
 impl<const X: char, I> Display for MultiVar<X, I>
 where I: ToPrimitive { 
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = self.fmt_impl(true);
+        let s = self.to_string_u(true);
         f.write_str(&s)
     }
 }
@@ -149,26 +147,31 @@ where I: ToPrimitive {
     }
 }
 
-impl<const X: char, I> PartialOrd for MultiVar<X, I>
+impl<const X: char, I> MonoOrd for MultiVar<X, I>
 where I: Zero + Ord + for<'x> Add<&'x I, Output = I> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> { 
-        self.0.partial_cmp(&other.0)
+    fn cmp_lex(&self, other: &Self) -> std::cmp::Ordering { 
+        MultiDeg::cmp_lex(&self.0, &other.0)
+    }
+
+    fn cmp_grlex(&self, other: &Self) -> std::cmp::Ordering { 
+        MultiDeg::cmp_grlex(&self.0, &other.0)
     }
 }
 
-impl<const X: char, I> Ord for MultiVar<X, I>
+impl<const X: char, I> OrdForDisplay for MultiVar<X, I>
 where I: Zero + Ord + for<'x> Add<&'x I, Output = I> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.0.cmp(&other.0)
+    fn cmp_for_display(&self, other: &Self) -> std::cmp::Ordering {
+        Self::cmp_lex(self, other)
     }
 }
+
 
 #[cfg(feature = "serde")]
 impl<const X: char, I> serde::Serialize for MultiVar<X, I>
 where I: ToPrimitive {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where S: serde::Serializer {
-        serializer.serialize_str(&self.fmt_impl(false))
+        serializer.serialize_str(&self.to_string_u(false))
     }
 }
 
@@ -254,6 +257,37 @@ macro_rules! impl_multivar_signed {
 
 impl_multivar_unsigned!(usize);
 impl_multivar_signed!  (isize);
+
+pub(crate) fn fmt_mono_n<'a, X, I, S>(seq: S, unicode: bool) -> String
+where X: ToString, I: 'a + ToPrimitive, S: IntoIterator<Item = (X, &'a I)> { 
+    let s = seq.into_iter().map(|(x, d)| {
+        let m = fmt_mono(&x.to_string(), d, unicode);
+        if m == "1" { 
+            "".to_string()
+        } else {
+            m
+        }
+    }).join("");
+
+    if s.is_empty() { 
+        "1".to_string()
+    } else { 
+        s
+    }
+}
+
+cfg_if::cfg_if! { 
+    if #[cfg(feature = "tex")] {
+        use crate::TeX;
+
+        impl<const X: char, I> TeX for MultiVar<X, I>
+        where I: ToPrimitive {
+            fn to_tex_string(&self) -> String {
+                self.to_string_u(false)
+            }
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests { 
@@ -411,11 +445,11 @@ mod tests {
         let s = "X_0X_2^3";
         assert_eq!(M::from_str(s), Ok(M::from_iter([(0, 1), (2, 3)])));
 
-        let s = "X_0^-1";
+        let s = "X_0^{-1}";
         assert_eq!(M::from_str(s), Ok(M::from((0, -1))));
 
-        let s = "X_0^-1X_2^4";
-        assert_eq!(M::from_str(s), Ok(M::from_iter([(0, -1), (2, 4)])));
+        let s = "X_0^{-1}X_2^{12}";
+        assert_eq!(M::from_str(s), Ok(M::from_iter([(0, -1), (2, 12)])));
 
         let s = "2";
         assert!(M::from_str(s).is_err());
@@ -454,7 +488,7 @@ mod tests {
         let ser = serde_json::to_string(&d).unwrap();
         let des = serde_json::from_str::<M>(&ser).unwrap();
         
-        assert_eq!(&ser, "\"X_0^-1X_2^3\"");
+        assert_eq!(&ser, "\"X_0^{-1}X_2^3\"");
         assert_eq!(d, des);
     }
 }

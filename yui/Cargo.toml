@@ -9,11 +9,13 @@ edition.workspace = true
 
 [features]
 serde = ["dep:serde", "dep:serde_json", "dep:serde_repr", "dep:serde_with"]
+tex = []
 
 [dependencies]
 ahash = { version = "0.8.6", features = ["serde"] }
 auto-impl-ops = "0.2.1"
 bimap = { version = "0.6.3", features = ["serde"] }
+cfg-if = "1.0.0"
 delegate = "0.10.0"
 derive_more = "0.99.17"
 dinglebit_combinatorics = "1.1.0"

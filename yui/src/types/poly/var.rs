@@ -8,7 +8,7 @@ use auto_impl_ops::auto_ops;
 use crate::{Elem, ElemBase};
 use crate::lc::Gen;
 use crate::util::format::superscript;
-use super::Mono;
+use super::{Mono, MonoOrd};
 
 // `Var<X, I>` : represents monomials X^d (univar).
 // `I` is either `usize` or `isize`.
@@ -29,17 +29,23 @@ impl<const X: char, I> Var<X, I> {
         x.pow(&self.0)
     }
 
-    fn fmt_impl(&self, unicode: bool) -> String
+    fn to_string_u(&self, unicode: bool) -> String
     where I: ToPrimitive { 
         fmt_mono(&X.to_string(), &self.0, unicode)
     }
 }
 
 impl<const X: char, I> FromStr for Var<X, I>
-where I: FromStr + FromPrimitive, <I as FromStr>::Err: ToString {
+where I: Zero + FromStr + FromPrimitive {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        parse_mono(&X.to_string(), s).map(Self)
+        if s == "1" { 
+            Ok(Self(I::zero()))
+        } else if let Some(d) = parse_mono_deg(&X.to_string(), s) { 
+            Ok(Self(d))
+        } else { 
+            Err(format!("failed to parse '{}'", s))
+        }
     }
 }
 
@@ -75,7 +81,7 @@ where I: for<'x >SubAssign<&'x I> {
 impl<const X: char, I> Display for Var<X, I>
 where I: ToPrimitive { 
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = self.fmt_impl(true);
+        let s = self.to_string_u(true);
         f.write_str(&s)
     }
 }
@@ -92,7 +98,7 @@ impl<const X: char, I> serde::Serialize for Var<X, I>
 where I: ToPrimitive {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where S: serde::Serializer {
-        serializer.serialize_str(&self.fmt_impl(false))
+        serializer.serialize_str(&self.to_string_u(false))
     }
 }
 
@@ -100,6 +106,17 @@ impl<const X: char, I> Elem for Var<X, I>
 where I: ElemBase + ToPrimitive { 
     fn math_symbol() -> String {
         format!("{X}")
+    }
+}
+
+impl<const X: char, I> MonoOrd for Var<X, I> 
+where I: ElemBase + Hash + Ord + ToPrimitive {
+    fn cmp_lex(&self, other: &Self) -> std::cmp::Ordering {
+        I::cmp(&self.0, &other.0)
+    }
+
+    fn cmp_grlex(&self, other: &Self) -> std::cmp::Ordering {
+        I::cmp(&self.0, &other.0)
     }
 }
 
@@ -161,6 +178,19 @@ macro_rules! impl_univar_signed {
 impl_univar_unsigned!(usize);
 impl_univar_signed!  (isize);
 
+cfg_if::cfg_if! { 
+    if #[cfg(feature = "tex")] {
+        use crate::TeX;
+
+        impl<const X: char, I> TeX for Var<X, I>
+        where I: ToPrimitive {
+            fn to_tex_string(&self) -> String {
+                self.to_string_u(false)
+            }
+        }
+    }
+}
+
 pub(crate) fn fmt_mono<I>(x: &str, d: &I, unicode: bool) -> String
 where I: ToPrimitive {
     let d = d.to_isize().unwrap();
@@ -172,23 +202,35 @@ where I: ToPrimitive {
         let e = superscript(d); 
         format!("{x}{e}")
     } else { 
-        format!("{x}^{d}")
+        let d = d.to_string();
+        if d.len() == 1 { 
+            format!("{x}^{d}")
+        } else { 
+            format!("{x}^{{{d}}}")
+        }
     }
 }
 
-pub(crate) fn parse_mono<I>(x: &str, s: &str) -> Result<I, String>
-where I: FromStr + FromPrimitive, <I as FromStr>::Err: ToString {
+pub(crate) fn parse_mono_deg<I>(x: &str, s: &str) -> Option<I>
+where I: FromStr + FromPrimitive {
+    use regex::Regex;
+
+    let p1 = format!(r"^{x}\^([0-9])$");
+    let p2 = format!(r"^{x}\^\{{(-?[0-9]+)\}}$");
+
+    let r1 = Regex::new(&p1).unwrap();
+    let r2 = Regex::new(&p2).unwrap();
+
     if s == "1" { 
-        Ok(I::from_i32(0).unwrap())
+        I::from_i32(0)
     } else if s == x { 
-        Ok(I::from_i32(1).unwrap())
-    } else if let Some(d) = s.strip_prefix(&format!("{x}^")) { 
-        match I::from_str(d) { 
-            Ok(d) => Ok(d),
-            Err(e) => Err(e.to_string())
-        }
+        I::from_i32(1)
+    } else if let Some(c) = r1.captures(s) { 
+        I::from_str(&c[1]).ok()
+    } else if let Some(c) = r2.captures(s) { 
+        I::from_str(&c[1]).ok()
     } else { 
-        Err(format!("Failed to parse: {s}"))
+        None
     }
 }
 
@@ -216,7 +258,7 @@ mod tests {
         assert_eq!(M::from_str("1"), Ok(M::one()));
         assert_eq!(M::from_str("X"), Ok(x(1)));
         assert_eq!(M::from_str("X^2"), Ok(x(2)));
-        assert_eq!(M::from_str("X^-2"), Ok(x(-2)));
+        assert_eq!(M::from_str("X^{-2}"), Ok(x(-2)));
         assert!(M::from_str("2").is_err());
         assert!(M::from_str("x").is_err());
     }
@@ -321,11 +363,18 @@ mod tests {
         assert_eq!(&ser, "\"X^2\"");
         assert_eq!(d, des);
 
+        let d = x(21);
+        let ser = serde_json::to_string(&d).unwrap();
+        let des = serde_json::from_str::<M>(&ser).unwrap();
+        
+        assert_eq!(&ser, "\"X^{21}\"");
+        assert_eq!(d, des);
+
         let d = x(-2);
         let ser = serde_json::to_string(&d).unwrap();
         let des = serde_json::from_str::<M>(&ser).unwrap();
         
-        assert_eq!(&ser, "\"X^-2\"");
+        assert_eq!(&ser, "\"X^{-2}\"");
         assert_eq!(d, des);
     }
 }

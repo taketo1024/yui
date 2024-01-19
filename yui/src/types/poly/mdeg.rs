@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::ops::{Add, AddAssign, Neg, SubAssign, Sub, Index};
 use std::hash::Hash;
@@ -6,6 +7,10 @@ use auto_impl_ops::auto_ops;
 use delegate::delegate;
 use derive_more::{Display, DebugCustom};
 use num_traits::Zero;
+
+use crate::lc::OrdForDisplay;
+
+use super::MonoOrd;
 
 #[derive(Clone, Default, PartialEq, Eq, Hash, Display, DebugCustom)]
 #[display(fmt = "{:?}", data)]
@@ -159,38 +164,30 @@ where I: Zero, for<'x> &'x I: Neg<Output = I> {
     }
 }
 
-impl<I> PartialOrd for MultiDeg<I>
+impl<I> MonoOrd for MultiDeg<I>
 where I: Zero + Ord + for<'x> Add<&'x I, Output = I> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
+    fn cmp_lex(&self, other: &Self) -> std::cmp::Ordering {
+        let i0 = usize::min(self.min_index().unwrap_or(0), other.min_index().unwrap_or(0));
+        let i1 = usize::max(self.max_index().unwrap_or(0), other.max_index().unwrap_or(0));
+
+        (i0..=i1).fold(Ordering::Equal, |res, i| { 
+            res.then_with(|| 
+                I::cmp(&self[i], &other[i])
+            )
+        })
+    }
+
+    fn cmp_grlex(&self, other: &Self) -> std::cmp::Ordering {
+        I::cmp(&self.total(), &other.total()).then_with(|| 
+            Self::cmp_lex(self, other)
+        )
     }
 }
 
-impl<I> Ord for MultiDeg<I>
+impl<I> OrdForDisplay for MultiDeg<I>
 where I: Zero + Ord + for<'x> Add<&'x I, Output = I> {
-    // Graded lexicographic order, grlex
-    // see: https://en.wikipedia.org/wiki/Monomial_order#Graded_lexicographic_order
-
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        use std::cmp::*;
-
-        Ord::cmp(&self.total(), &other.total())
-        .then_with(|| { 
-            let mut itr0 =  self.iter();
-            let mut itr1 = other.iter();
-
-            // It is impossible that only either one of `next` is None, 
-            // since the `total`s are equal, and at each iteration the previous degrees have been equal.
-            while let (Some((i0, d0)), Some((i1, d1))) = (itr0.next(), itr1.next()) { 
-                // If i0 < i1, then x_i0 > x_i1. 
-                let c = Ord::cmp(i0, i1).reverse().then(Ord::cmp(d0, d1));
-                if c.is_ne() { 
-                    return c;
-                }
-            }
-
-            Ordering::Equal
-        })
+    fn cmp_for_display(&self, other: &Self) -> std::cmp::Ordering {
+        Self::cmp_lex(self, other)
     }
 }
 
@@ -250,16 +247,29 @@ mod tests {
     }
 
     #[test]
-    fn ord() { 
-        let d0 = MultiDeg::<isize>::from_iter([]);
-        let d1 = MultiDeg::from_iter([(0, 1), (1, -2), (2, 3)]); // total: 2
-        let d2 = MultiDeg::from_iter([(0, 1), (1,  2), (2, 3)]); // total: 6
-        let d3 = MultiDeg::from_iter([(0,-1), (1,  2), (2, 3)]); // total: 4
+    fn cmp_lex() { 
+        let d0 = MultiDeg::<isize>::from_iter([]);                // total: 0
+        let d1 = MultiDeg::from_iter([(0, 1), (1, -2), (2,  3)]); // total: 2
+        let d2 = MultiDeg::from_iter([(0, 1), (1,  2), (2,  3)]); // total: 6
+        let d3 = MultiDeg::from_iter([(0, 2), (1,  2), (2, -2)]); // total: 2
 
-        assert!(!(d1 < d1 || d1 > d1));
-        assert!(d0 < d1);
-        assert!(d1 < d2);
-        assert!(d0 < d3);
+        assert!(MultiDeg::cmp_lex(&d0, &d0).is_eq());
+        assert!(MultiDeg::cmp_lex(&d0, &d1).is_lt());
+        assert!(MultiDeg::cmp_lex(&d1, &d2).is_lt());
+        assert!(MultiDeg::cmp_lex(&d2, &d3).is_lt());
+    }
+
+    #[test]
+    fn cmp_grlex() { 
+        let d0 = MultiDeg::<isize>::from_iter([]);                // total: 0
+        let d1 = MultiDeg::from_iter([(0, 1), (1, -2), (2,  3)]); // total: 2
+        let d2 = MultiDeg::from_iter([(0, 1), (1,  2), (2,  3)]); // total: 6
+        let d3 = MultiDeg::from_iter([(0, 2), (1,  2), (2, -2)]); // total: 2
+
+        assert!(MultiDeg::cmp_grlex(&d0, &d0).is_eq());
+        assert!(MultiDeg::cmp_grlex(&d0, &d1).is_lt());
+        assert!(MultiDeg::cmp_grlex(&d1, &d3).is_lt());
+        assert!(MultiDeg::cmp_grlex(&d3, &d2).is_lt());
     }
 
     #[test]

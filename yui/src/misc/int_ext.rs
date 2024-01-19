@@ -92,6 +92,27 @@ impl_integer!(i64);
 impl_integer!(i128);
 impl_integer!(BigInt);
 
+cfg_if::cfg_if! { 
+    if #[cfg(feature = "tex")] {
+        use crate::TeX;
+
+        macro_rules! impl_tex {
+            ($type:ident) => {
+                impl TeX for $type {
+                    fn to_tex_string(&self) -> String {
+                        self.to_string()
+                    }
+                }
+            }
+        }
+
+        impl_tex!(i32);
+        impl_tex!(i64);
+        impl_tex!(i128);
+        impl_tex!(BigInt);        
+    }
+}
+
 #[cfg(test)]
 mod tests { 
     use super::*;

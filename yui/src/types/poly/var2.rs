@@ -131,9 +131,9 @@ impl<const X: char, const Y: char, I> MonoOrd for Var2<X, Y, I>
 where I: Copy + Eq + Ord + for<'x> Add<&'x I, Output = I> {
     fn cmp_lex(&self, other: &Self) -> std::cmp::Ordering {
         // must have x_0 > x_1
-        I::cmp(&self.0, &other.0).reverse().then_with(|| 
-            I::cmp(&self.1, &other.1).reverse()
-        ).reverse()
+        I::cmp(&self.0, &other.0).then_with(|| 
+            I::cmp(&self.1, &other.1)
+        )
     }
 
     fn cmp_grlex(&self, other: &Self) -> std::cmp::Ordering {

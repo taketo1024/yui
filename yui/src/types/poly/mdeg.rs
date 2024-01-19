@@ -172,9 +172,9 @@ where I: Zero + Ord + for<'x> Add<&'x I, Output = I> {
 
         (i0..=i1).fold(Ordering::Equal, |res, i| { 
             res.then_with(|| 
-                I::cmp(&self[i], &other[i]).reverse()
+                I::cmp(&self[i], &other[i])
             )
-        }).reverse()
+        })
     }
 
     fn cmp_grlex(&self, other: &Self) -> std::cmp::Ordering {

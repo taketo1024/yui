@@ -60,7 +60,11 @@ where
         res.push(term);
     }
 
-    res.join(" ")
+    if res.is_empty() { 
+        "0".to_string()
+    } else {
+        res.join(" ")
+    }
 }
 
 pub fn subscript<I>(i: I) -> String

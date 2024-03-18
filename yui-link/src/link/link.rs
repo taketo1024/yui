@@ -210,6 +210,10 @@ impl Link {
         Link { data }
     }
 
+    pub fn edges(&self) -> HashSet<Edge> {
+        self.data.iter().flat_map(|x| x.edges()).cloned().collect()
+    }
+
     pub fn first_edge(&self) -> Option<Edge> { 
         let x = self.data.first()?;
         x.edges().iter().min().cloned()

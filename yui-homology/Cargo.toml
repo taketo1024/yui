@@ -13,19 +13,19 @@ multithread = ["rayon"]
 serde = ["dep:serde", "dep:serde_json", "ahash/serde"]
 
 [dependencies]
-ahash = "0.8.6"
+ahash = "0.8.11"
 bimap = "0.6.3"
 cartesian = "0.2.1"
 cfg-if = "1.0.0"
-delegate = "0.10.0"
+delegate = "0.12.0"
 derive_more = "0.99.17"
 grouping_by = "0.2.2"
-itertools = "0.11.0"
-log = "0.4.20"
-num-traits = "0.2.16"
-rayon = { version = "1.8.0", optional = true }
-serde = { version = "1.0.193", optional = true }
-serde_json = { version = "1.0.108", optional = true }
+itertools = "0.12.1"
+log = "0.4.21"
+num-traits = "0.2.18"
+rayon = { version = "1.9.0", optional = true }
+serde = { version = "1.0.197", optional = true }
+serde_json = { version = "1.0.114", optional = true }
 sprs = "0.11.1"
 yui = { path = "../yui" }
 yui-matrix = { path = "../yui-matrix" }

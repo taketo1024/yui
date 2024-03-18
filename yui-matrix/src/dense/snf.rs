@@ -365,17 +365,22 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     fn diag_normalize(&mut self) {
         debug_assert!(self.target.is_diag());
 
-        let r = min(self.target.nrows(), self.target.ncols());
+        let n = min(self.target.nrows(), self.target.ncols());
+        let r = (0..n).filter(|&i| 
+            self.target[(i, i)].is_zero()
+        ).next().unwrap_or(n);
+
         if r == 0 { 
             return
         }
 
-        loop { 
-            let mut done = true;
+        'outer: loop { 
             for i in 0..r-1 { 
-                done &= self.diag_normalize_step(i);
+                if !self.diag_normalize_step(i) { 
+                    continue 'outer
+                }
             }
-            if done { break }
+            break
         }
 
         for i in 0..r { 
@@ -391,13 +396,21 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
         let x = &self.target[(i, i)];
         let y = &self.target[(i + 1, i + 1)];
 
-        if 
-             x.is_zero() && y.is_zero() || 
-            !x.is_zero() && x.divides(y)
-        { 
+        assert!(!x.is_zero());
+        assert!(!y.is_zero());
+
+        if x.divides(y) { 
             return true
         }
 
+        if y.divides(x) { 
+            self.swap_rows(i, i + 1);
+            self.swap_cols(i, i + 1);
+            return false
+        }
+
+        // perform gcd:
+        //
         // sx + ty = d, a = x/d, b = y/d.
         //
         // [1   1 ][x   ][s  -b] = [d      ]

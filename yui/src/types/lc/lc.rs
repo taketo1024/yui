@@ -344,6 +344,10 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn mul_assign(&mut self, rhs: &R) {
+        if rhs.is_one() { 
+            return
+        }
+
         let data = std::mem::take(&mut self.data);
         self.data = data.into_iter().map(|(x, r)| (x, &r * rhs)).collect();
         self.clean()

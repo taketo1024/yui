@@ -178,7 +178,7 @@ where R: Clone + Zero {
 
 #[allow(unused)]
 fn should_report<R>(a: &SpMat<R>) -> bool { 
-    usize::min(a.nrows(), a.ncols()) > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Trace
+    usize::min(a.nrows(), a.ncols()) > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Debug
 }
 
 #[cfg(test)]

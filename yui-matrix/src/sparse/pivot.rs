@@ -303,7 +303,7 @@ impl PivotFinder {
      }
 
      fn should_report(&self) -> bool { 
-        self.rows() > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Trace
+        self.rows() > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Debug
      }
 }
 

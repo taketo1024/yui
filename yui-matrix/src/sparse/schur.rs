@@ -30,15 +30,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(r <= abcd.nrows());
         assert!(r <= abcd.ncols());
 
-        trace!("schur, a: {:?}, r: {} ..", abcd.shape(), r);
-
         let (m, n) = abcd.shape();
         let [a, b, c, d] = abcd.divide4((r, r));
 
         let ainvb = solve_triangular(t, &a, &b); // ax = b
         let s = Self::compute_schur(&ainvb, &c, &d);
-
-        trace!("schur: {:?}", s.shape());
 
         let id = |n| SpMat::<R>::id(n);
         let incl = |n, k| SpMat::<R>::from_entries((n, k), (0..k).map(|i| (n - k + i, i, R::one()))); // [0, 1]^T
@@ -61,7 +57,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn compute_schur(ainvb: &SpMat<R>, c: &SpMat<R>, d: &SpMat<R>) -> SpMat<R> {
-        d - c * ainvb
+        trace!("compute schur..");
+
+        let s = d - c * ainvb;
+        
+        trace!("schur: {:?}", s.shape());
+
+        s
     }
 
     pub fn complement(&self) -> &SpMat<R> {

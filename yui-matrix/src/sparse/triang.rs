@@ -116,8 +116,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         if report { 
             let c = counter.incr();
-            if c > 0 && c % LOG_THRESHOLD == 0 { 
-                trace!("  solved {c}/{k}");
+            if (c > 0 && c % LOG_THRESHOLD == 0) || c == k { 
+                trace!("  solved {c}/{k}.");
             }
         }
 

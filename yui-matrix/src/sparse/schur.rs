@@ -1,4 +1,4 @@
-use log::trace;
+use log::debug;
 use yui::{Ring, RingOps};
 use super::*;
 use super::triang::{TriangularType, solve_triangular, solve_triangular_left};
@@ -57,11 +57,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn compute_schur(ainvb: &SpMat<R>, c: &SpMat<R>, d: &SpMat<R>) -> SpMat<R> {
-        trace!("compute schur..");
+        debug!("compute schur..");
 
         let s = d - c * ainvb;
         
-        trace!("schur: {:?}", s.shape());
+        debug!("schur: {:?}", s.shape());
 
         s
     }

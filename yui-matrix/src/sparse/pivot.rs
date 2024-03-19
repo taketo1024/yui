@@ -11,7 +11,7 @@ use std::cmp::Ordering;
 use std::collections::VecDeque;
 use ahash::AHashSet;
 use itertools::Itertools;
-use log::trace;
+use log::debug;
 use sprs::PermOwned;
 
 use yui::{Ring, RingOps};
@@ -89,13 +89,13 @@ impl PivotFinder {
     }
 
     pub fn find_pivots(&mut self) {
-        trace!("pivots: {:?} ..", self.str.shape());
+        debug!("pivots: {:?} ..", self.str.shape());
 
         self.find_fl_pivots();
         self.find_fl_col_pivots();
         self.find_cycle_free_pivots();
 
-        trace!("pivots: {:?} => {}.", self.str.shape(), self.pivots.count());
+        debug!("pivots: {:?} => {}.", self.str.shape(), self.pivots.count());
     }
 
     pub fn result(&self) -> Vec<(usize, usize)> { 
@@ -156,7 +156,7 @@ impl PivotFinder {
 
         let piv_count = self.pivots.count();
 
-        trace!("  fl-pivots: +{}.", piv_count);
+        debug!("  fl-pivots: +{}.", piv_count);
     }
 
     fn find_fl_col_pivots(&mut self) {
@@ -187,7 +187,7 @@ impl PivotFinder {
 
         let piv_count = self.pivots.count();
         
-        trace!("  fl-col-pivots: +{}, total: {}.", piv_count - before_piv_count, piv_count);
+        debug!("  fl-col-pivots: +{}, total: {}.", piv_count - before_piv_count, piv_count);
     }
 
     fn find_cycle_free_pivots(&mut self) {
@@ -203,7 +203,7 @@ impl PivotFinder {
 
         let piv_count = self.pivots.count();
 
-        trace!("  cycle-free-pivots: +{}, total: {}.", piv_count - before_piv_count, piv_count);
+        debug!("  cycle-free-pivots: +{}, total: {}.", piv_count - before_piv_count, piv_count);
     }
 
     #[allow(unused)]
@@ -211,7 +211,7 @@ impl PivotFinder {
         let remain_rows: Vec<_> = self.remain_rows().collect();
         let total_rows = remain_rows.len();
 
-        trace!("  start find-cycle-free-pivots: {total_rows} rows");
+        debug!("  start find-cycle-free-pivots: {total_rows} rows");
 
         let n = self.cols();
         let mut w = RowWorker::new(n);
@@ -226,7 +226,7 @@ impl PivotFinder {
                 row_count += 1;
                 if row_count % LOG_THRESHOLD == 0 { 
                     let c = self.pivots.count();
-                    trace!("    [{row_count}/{total_rows}], {c} pivots.");
+                    debug!("    [{row_count}/{total_rows}], {c} pivots.");
                 }
             }
         }
@@ -239,7 +239,7 @@ impl PivotFinder {
         let remain_rows = self.remain_rows().collect_vec();
         let total_rows = remain_rows.len();
 
-        trace!("  start find-cycle-free-pivots: {total_rows} rows");
+        debug!("  start find-cycle-free-pivots: {total_rows} rows");
         
         let n = self.cols();
         let pivots = RwLock::new(
@@ -269,7 +269,7 @@ impl PivotFinder {
                 let row_count = row_counter.incr();            
                 if row_count % LOG_THRESHOLD == 0 { 
                     let c = loc_pivots.count();
-                    trace!("    [{row_count}/{total_rows}], {c} pivots.");
+                    debug!("    [{row_count}/{total_rows}], {c} pivots.");
                 }
             }
         });

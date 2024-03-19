@@ -1,5 +1,5 @@
 use either::Either;
-use log::trace;
+use log::debug;
 use num_traits::Zero;
 use yui::{Ring, RingOps};
 
@@ -78,7 +78,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 #[allow(unused)]
 fn solve_triangular_s<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    trace!("solve triangular, y: {:?}", y.shape());
+    debug!("solve triangular, y: {:?}", y.shape());
 
     let (n, k) = (a.nrows(), y.ncols());
     let diag = collect_diag(a);
@@ -97,7 +97,7 @@ fn solve_triangular_m<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat
 where R: Ring, for<'x> &'x R: RingOps<R> {
     use yui::util::sync::SyncCounter;
 
-    trace!("solve triangular, y: {:?}", y.shape());
+    debug!("solve triangular, y: {:?}", y.shape());
 
     let (n, k) = (a.nrows(), y.ncols());
     let diag = collect_diag(a);
@@ -117,7 +117,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         if report { 
             let c = counter.incr();
             if (c > 0 && c % LOG_THRESHOLD == 0) || c == k { 
-                trace!("  solved {c}/{k}.");
+                debug!("  solved {c}/{k}.");
             }
         }
 

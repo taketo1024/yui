@@ -1,6 +1,6 @@
 use core::panic;
 use std::cmp::min;
-use log::trace;
+use log::{debug, trace};
 use yui::{EucRing, EucRingOps};
 use crate::dense::*;
 use super::lll::{LLLRing, LLLRingOps, lll_hnf_in_place};
@@ -15,13 +15,15 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
 
 pub fn snf_in_place<R>(target: Mat<R>, flags: SnfFlags) -> SnfResult<R>
 where R: EucRing, for<'a> &'a R: EucRingOps<R> {
-    trace!("start snf: {:?}, flags: {:?}.\n{}", target.shape(), flags, target);
+    debug!("start snf: {:?}, flags: {:?}.", target.shape(), flags);
+    trace!("{}", target);
 
     let mut calc = SnfCalc::new(target, flags);
 
     calc.process();
 
-    trace!("snf done.\n{}", calc.target);
+    debug!("snf done.");
+    trace!("{}", calc.target);
 
     calc.result()
 }
@@ -447,7 +449,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
 impl<R> SnfCalc<R>
 where R: LLLRing, for<'a> &'a R: LLLRingOps<R> {
     fn preprocess_lll(&mut self) {
-        trace!("start lll-preprocess, type = {}", std::any::type_name::<R>());
+        debug!("start lll-preprocess, type = {}", std::any::type_name::<R>());
 
         let flag = [self.p.is_some(), self.pinv.is_some()];
         
@@ -458,7 +460,8 @@ where R: LLLRing, for<'a> &'a R: LLLRingOps<R> {
         self.p = p;
         self.pinv = pinv;
 
-        trace!("preprocess done.\n{}", self.target);
+        debug!("preprocess done.");
+        trace!("{}", self.target);
     }
 }
 

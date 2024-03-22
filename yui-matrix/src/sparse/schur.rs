@@ -1,4 +1,5 @@
 use log::debug;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use yui::{Ring, RingOps};
 use super::*;
 use super::triang::{TriangularType, solve_triangular, solve_triangular_left};
@@ -57,9 +58,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn compute_schur(ainvb: &SpMat<R>, c: &SpMat<R>, d: &SpMat<R>) -> SpMat<R> {
-        debug!("compute schur..");
+        debug!("compute schur.. d{:?} - c{:?} * a⁻¹b{:?}", d.shape(), c.shape(), ainvb.shape());
 
-        let s = d - c * ainvb;
+        let (m, n) = d.shape();
+
+        cfg_if::cfg_if! { 
+            if #[cfg(feature = "multithread")] { 
+                let itr = (0..n).into_par_iter();
+            } else { 
+                let itr = (0..n).into_iter();
+            }
+        };
+
+        let vecs = itr.map(|j| { 
+            let x = c * ainvb.col_vec(j);
+            let y = d.col_vec(j);
+            y - x
+        }).collect::<Vec<_>>();
+
+        let s = SpMat::from_col_vecs(m, vecs);
         
         debug!("schur: {:?}", s.shape());
 

@@ -31,8 +31,7 @@ where
     support: Vec<I>,
     d_deg: I,
     mats: HashMap<I, SpMat<R>>,
-    trans: HashMap<I, Trans<R>>,
-    with_trans: bool
+    trans: HashMap<I, Trans<R>>
 }
 
 impl<I, R> ChainReducer<I, R>
@@ -53,13 +52,13 @@ where
         let support = complex.support();
         let d_deg = complex.d_deg();
 
-        let mut reducer = Self::new(support, d_deg, with_trans);
+        let mut reducer = Self::new(support, d_deg);
 
         for i in reducer.support.clone() { 
             for j in [i, i + d_deg] { 
                 if !reducer.is_set(j) {
                     let d = complex.d_matrix(j);
-                    reducer.set_matrix(j, d);
+                    reducer.set_matrix(j, d, with_trans);
                 }
             }
         }
@@ -67,12 +66,12 @@ where
         reducer
     }
 
-    pub fn new<Itr>(support: Itr, d_deg: I, with_trans: bool) -> Self
+    pub fn new<Itr>(support: Itr, d_deg: I) -> Self
     where Itr: Iterator<Item = I> {
         let support = support.collect_vec();
         let mats = HashMap::new();
         let trans = HashMap::new();
-        Self { support, d_deg, with_trans, mats, trans }
+        Self { support, d_deg, mats, trans }
     }
 
     pub fn support(&self) -> &[I] { 
@@ -105,24 +104,11 @@ where
         )
     }
 
-    pub fn set_matrix(&mut self, i: I, d: SpMat<R>) {
-        if self.with_trans { 
-            let (m, n) = d.shape();
-
-            if let Some(t) = self.trans(i) {
-                assert_eq!(t.tgt_dim(), n)
-            } else { 
-                self.trans.insert(i, Trans::id(n));
-            }
-
-            let i1 = i + self.d_deg;
-            if let Some(t) = self.trans(i1) {
-                assert_eq!(t.tgt_dim(), m)
-            } else { 
-                self.trans.insert(i1, Trans::id(m));
-            }
+    pub fn set_matrix(&mut self, i: I, d: SpMat<R>, with_trans: bool) {
+        if with_trans { 
+            let n = d.ncols();
+            self.trans.insert(i, Trans::id(n));
         }
-
         self.mats.insert(i, d);
     }
 
@@ -180,14 +166,18 @@ where
             return false;
         }
 
-        let s = schur(a, piv_type, &p, &q, r, self.with_trans);
+        let with_trans = 
+            self.trans.contains_key(&i) || 
+            self.trans.contains_key(&(i + self.d_deg));
+
+        let s = schur(a, piv_type, &p, &q, r, with_trans);
         let (s, t_src, t_tgt) = s.disassemble();
 
         debug!("red C[{i}]: {:?} -> {:?}.", a.shape(), s.shape());
 
         self.update_mats(i, &p, &q, r, s);
 
-        if self.with_trans { 
+        if with_trans { 
             let t_src = t_src.unwrap();
             let t_tgt = t_tgt.unwrap();
             self.update_trans(i, &p, &q, t_src, t_tgt);
@@ -256,11 +246,7 @@ where
             self.support.clone(), 
             |i| { 
                 let rank = self.rank(i).unwrap();
-                let trans = if self.with_trans {
-                    self.trans.remove(&i)
-                } else { 
-                    None
-                };
+                let trans = self.trans.remove(&i); // optional
                 SimpleRModStr::new( rank, vec![], trans )
             }
         );

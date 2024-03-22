@@ -182,6 +182,25 @@ where R: Scalar + Zero + ClosedAdd {
         ))
     }
 
+    pub fn split(&self, at: usize) -> (SpVec<R>, SpVec<R>) { 
+        let n = self.dim();
+        let k = at;
+        assert!(k <= n);
+
+        let mut e1 = vec![];
+        let mut e2 = vec![];
+
+        for (i, a) in self.iter() { 
+            if i < k { 
+                e1.push((i, a.clone()));
+            } else { 
+                e2.push((i - k, a.clone()));
+            }
+        }
+
+        (SpVec::from_entries(k, e1), SpVec::from_entries(n - k, e2))
+    }
+
     pub fn to_dense(&self) -> Vec<R> { 
         let mut vec = vec![R::zero(); self.dim()];
         for (i, a) in self.iter_nz() { 
@@ -321,5 +340,13 @@ mod tests {
         let v2 = SpVec::from((5..8).collect_vec());
         let w = v1.stack(&v2);
         assert_eq!(w, SpVec::from(vec![0,1,2,5,6,7]));
+    }
+
+    #[test]
+    fn split() { 
+        let v = SpVec::from((0..10).collect_vec());
+        let (x, y) = v.split(4);
+        assert_eq!(x, SpVec::from((0..4).collect_vec()));
+        assert_eq!(y, SpVec::from((4..10).collect_vec()));
     }
 }

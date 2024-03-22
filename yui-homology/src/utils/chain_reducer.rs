@@ -132,9 +132,9 @@ where
         }
         
         if deep { 
-            trace!("reduce all (deep)");
+            debug!("reduce all (deep)");
         } else {
-            trace!("reduce all (shallow)");
+            debug!("reduce all (shallow)");
         }
 
         let support = self.support.clone();
@@ -155,7 +155,7 @@ where
             }
 
             c += 1;
-            trace!("next itr: {c}");
+            debug!("next itr: {c}");
         }
     }
 
@@ -168,22 +168,22 @@ where
             return false;
         }
 
-        trace!("reduce C[{i}]: {:?} ..", a.shape());
-        trace!("  nnz: {}", a.nnz());
-        trace!("  density: {}", a.density());
-        trace!("  mean-weight: {}", a.mean_weight());
+        debug!("reduce C[{i}]: {:?} ..", a.shape());
+        debug!("  nnz: {}", a.nnz());
+        debug!("  density: {}", a.density());
+        debug!("  mean-weight: {}", a.mean_weight());
 
         let (p, q, r) = pivots(a, piv_type, piv_cond);
 
         if r == 0 { 
-            trace!("no more pivots.");
+            debug!("no more pivots.");
             return false;
         }
 
         let s = schur(a, piv_type, &p, &q, r, self.with_trans);
         let (s, t_src, t_tgt) = s.disassemble();
 
-        trace!("red C[{i}]: {:?} -> {:?}.", a.shape(), s.shape());
+        debug!("red C[{i}]: {:?} -> {:?}.", a.shape(), s.shape());
 
         self.update_mats(i, &p, &q, r, s);
 

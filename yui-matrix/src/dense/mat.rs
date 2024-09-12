@@ -1,7 +1,7 @@
 use std::ops::{Add, Neg, Sub, Mul, Index, IndexMut, AddAssign, SubAssign, MulAssign, Range};
 use std::fmt::Debug;
-use nalgebra::{ClosedSub, ClosedMul};
-use nalgebra_sparse::na::{Scalar, ClosedAdd, DMatrix};
+use nalgebra::{ClosedSubAssign, ClosedMulAssign};
+use nalgebra_sparse::na::{Scalar, ClosedAddAssign, DMatrix};
 use delegate::delegate;
 use derive_more::Display;
 use auto_impl_ops::auto_ops;
@@ -111,7 +111,7 @@ where R: Scalar {
     }
 
     pub fn into_sparse(self) -> SpMat<R>
-    where R: Zero + ClosedAdd { 
+    where R: Zero + ClosedAddAssign { 
         self.into()
     }
 }
@@ -123,7 +123,7 @@ impl<R> From<DMatrix<R>> for Mat<R> {
 }
 
 impl<R> From<SpMat<R>> for Mat<R>
-where R: Scalar + Zero + ClosedAdd {
+where R: Scalar + Zero + ClosedAddAssign {
     fn from(value: SpMat<R>) -> Self {
         let inner = DMatrix::from(value.inner());
         Self::from(inner)
@@ -172,7 +172,7 @@ where R: Scalar + Neg<Output = R> {
 
 #[auto_ops]
 impl<R> AddAssign<&Mat<R>> for Mat<R>
-where R: Scalar + ClosedAdd {
+where R: Scalar + ClosedAddAssign {
     fn add_assign(&mut self, rhs: &Self) {
         self.inner += &rhs.inner;
     }
@@ -180,7 +180,7 @@ where R: Scalar + ClosedAdd {
 
 #[auto_ops]
 impl<R> SubAssign<&Mat<R>> for Mat<R>
-where R: Scalar + ClosedSub {
+where R: Scalar + ClosedSubAssign {
     fn sub_assign(&mut self, rhs: &Self) {
         self.inner -= &rhs.inner
     }
@@ -188,7 +188,7 @@ where R: Scalar + ClosedSub {
 
 #[auto_ops]
 impl<'a, 'b, R> Mul<&'b Mat<R>> for &'a Mat<R>
-where R: Scalar + Zero + One + ClosedAdd + ClosedMul {
+where R: Scalar + Zero + One + ClosedAddAssign + ClosedMulAssign {
     type Output = Mat<R>;
     fn mul(self, rhs: &'b Mat<R>) -> Self::Output {
         let prod = &self.inner * &rhs.inner;
@@ -207,30 +207,30 @@ where R: Scalar {
     }
 
     pub fn mul_row(&mut self, i: usize, r: &R)
-    where R: ClosedMul {
+    where R: ClosedMulAssign {
         self.inner.row_mut(i).mul_assign(r.clone())
     }
 
     pub fn mul_col(&mut self, j: usize, r: &R)
-    where R: ClosedMul {
+    where R: ClosedMulAssign {
         self.inner.column_mut(j).mul_assign(r.clone())
     }
 
     pub fn add_row_to(&mut self, i: usize, j: usize, r: &R)
-    where R: ClosedAdd + ClosedMul { 
+    where R: ClosedAddAssign + ClosedMulAssign { 
         let row = self.inner.row(i).mul(r.clone());
         self.inner.row_mut(j).add_assign(row)
     }
 
     pub fn add_col_to(&mut self, i: usize, j: usize, r: &R)
-    where R: ClosedAdd + ClosedMul {  
+    where R: ClosedAddAssign + ClosedMulAssign {  
         let col = self.inner.column(i).mul(r.clone());
         self.inner.column_mut(j).add_assign(col)
     }
 
     // Multiply [a, b; c, d] from left. 
     pub fn left_elementary(&mut self, comps: [&R; 4], i: usize, j: usize)
-    where R: ClosedAdd + ClosedMul { 
+    where R: ClosedAddAssign + ClosedMulAssign { 
         let [a, b, c, d] = comps.map(Clone::clone);
 
         let r_i = self.inner.row(i);
@@ -245,7 +245,7 @@ where R: Scalar {
 
     // Multiply [a, c; b, d] from right. 
     pub fn right_elementary(&mut self, comps: [&R; 4], i: usize, j: usize) 
-    where R: ClosedAdd + ClosedMul { 
+    where R: ClosedAddAssign + ClosedMulAssign { 
         let [a, b, c, d] = comps.map(Clone::clone);
 
         let r_i = self.inner.column(i);

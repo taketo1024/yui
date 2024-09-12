@@ -2,7 +2,7 @@ use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, MulAssign, Range};
 use std::iter::zip;
 use std::fmt::{Display, Debug};
 use delegate::delegate;
-use nalgebra_sparse::na::{Scalar, ClosedAdd, ClosedSub, ClosedMul};
+use nalgebra_sparse::na::{Scalar, ClosedAddAssign, ClosedSubAssign, ClosedMulAssign};
 use nalgebra_sparse::{CscMatrix, CooMatrix};
 use num_traits::{Zero, One, ToPrimitive};
 use auto_impl_ops::auto_ops;
@@ -86,7 +86,7 @@ impl<R> SpMat<R> {
     }
 
     pub fn into_dense(self) -> Mat<R>
-    where R: Scalar + Zero + ClosedAdd { 
+    where R: Scalar + Zero + ClosedAddAssign { 
         self.into()
     }
 
@@ -122,7 +122,7 @@ impl<R> SpMat<R> {
 }
 
 impl<R> SpMat<R> 
-where R: Scalar + Clone + Zero + ClosedAdd { 
+where R: Scalar + Clone + Zero + ClosedAddAssign { 
     pub fn from_entries<T>(shape: (usize, usize), entries: T) -> Self
     where T: IntoIterator<Item = (usize, usize, R)> {
         let mut coo = CooMatrix::new(shape.0, shape.1);
@@ -169,7 +169,7 @@ where R: Scalar + Clone + Zero + ClosedAdd {
     }
 
     pub fn col_vec(&self, j: usize) -> SpVec<R>
-    where R: Scalar + Zero + ClosedAdd { 
+    where R: Scalar + Zero + ClosedAddAssign { 
         let col = self.inner.col(j);
         let iter = Iterator::zip(
             col.row_indices().iter().cloned(), 
@@ -385,7 +385,7 @@ macro_rules! impl_binop {
     ($trait:ident, $method:ident) => {
         #[auto_ops]
         impl<'a, 'b, R> $trait<&'b SpMat<R>> for &'a SpMat<R>
-        where R: Scalar + ClosedAdd + ClosedSub + ClosedMul + Zero + One + Neg<Output = R> {
+        where R: Scalar + ClosedAddAssign + ClosedSubAssign + ClosedMulAssign + Zero + One + Neg<Output = R> {
             type Output = SpMat<R>;
             fn $method(self, rhs: &'b SpMat<R>) -> Self::Output {
                 let res = (&self.inner).$method(&rhs.inner);
@@ -435,7 +435,7 @@ where R: Clone + serde::Deserialize<'de> {
 
 #[cfg(test)]
 impl<R> SpMat<R>
-where R: Scalar + Zero + One + ClosedAdd { 
+where R: Scalar + Zero + One + ClosedAddAssign { 
     pub fn rand(shape: (usize, usize), density: f64) -> Self {
         use cartesian::cartesian;
         use rand::Rng;

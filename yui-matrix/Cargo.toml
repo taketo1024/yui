@@ -22,8 +22,8 @@ derive_more = { version = "1.0.0", features = ["display", "debug"] }
 either = "1.13.0"
 itertools = "0.13.0"
 log = "0.4.22"
-nalgebra = { version = "0.32.6", features = ["serde-serialize"] }
-nalgebra-sparse = { version = "0.9.0", features = ["serde-serialize"] }
+nalgebra = { version = "0.33.0", features = ["serde-serialize"] }
+nalgebra-sparse = { version = "0.10.0", features = ["serde-serialize"] }
 num-bigint = "0.4.6"
 num-traits = "0.2.19"
 rand = "0.8.5"

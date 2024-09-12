@@ -986,7 +986,6 @@ pub(super) mod tests {
 
     pub(in super::super) mod helper { 
         use super::*;
-        use nalgebra::ClosedDiv;
         use yui::{Ratio, Ring, RingOps};
 
         pub fn assert_is_hnf<R>(b: &Mat<R>)
@@ -1079,7 +1078,7 @@ pub(super) mod tests {
         }
     
         fn proj_coeff<R>(base: RowView<R>, other: RowView<R>) -> R
-        where R: Ring + ClosedDiv, for<'x> &'x R: RingOps<R> {
+        where R: Ring + Div<Output = R>, for<'x> &'x R: RingOps<R> {
             let p = dot(base.clone(), other);
             let q = dot(base.clone(), base.clone());
             p / q

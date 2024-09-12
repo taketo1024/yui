@@ -1,7 +1,7 @@
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, Range};
 use std::fmt::{Display, Debug};
 use nalgebra_sparse::CscMatrix;
-use nalgebra_sparse::na::{Scalar, ClosedAdd, ClosedSub, ClosedMul};
+use nalgebra_sparse::na::{Scalar, ClosedAddAssign, ClosedSubAssign, ClosedMulAssign};
 use num_traits::{Zero, One};
 use sprs::PermView;
 use auto_impl_ops::auto_ops;
@@ -79,7 +79,7 @@ impl<R> SpVec<R> {
 }
 
 impl<R> From<Vec<R>> for SpVec<R>
-where R: Scalar + Zero + ClosedAdd {
+where R: Scalar + Zero + ClosedAddAssign {
     fn from(vec: Vec<R>) -> Self {
         Self::from_entries(vec.len(), vec.into_iter().enumerate())
     }
@@ -111,7 +111,7 @@ impl<R> SpMat<R> {
 }
 
 impl<R> SpVec<R> 
-where R: Scalar + Zero + ClosedAdd { 
+where R: Scalar + Zero + ClosedAddAssign { 
     pub fn from_entries<T>(dim: usize, entries: T) -> Self
     where T: IntoIterator<Item = (usize, R)> {
         SpMat::from_entries(
@@ -236,7 +236,7 @@ macro_rules! impl_binop {
     ($trait:ident, $method:ident) => {
         #[auto_ops]
         impl<'a, 'b, R> $trait<&'b SpVec<R>> for &'a SpVec<R>
-        where R: Scalar + ClosedAdd + ClosedSub + ClosedMul + Zero + One + Neg<Output = R> {
+        where R: Scalar + ClosedAddAssign + ClosedSubAssign + ClosedMulAssign + Zero + One + Neg<Output = R> {
             type Output = SpVec<R>;
             fn $method(self, rhs: &'b SpVec<R>) -> Self::Output {
                 let res = (&self.inner).$method(&rhs.inner);

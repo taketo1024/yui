@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use ahash::AHashSet;
 use itertools::Itertools;
-use nalgebra::{Scalar, ClosedAdd};
+use nalgebra::{Scalar, ClosedAddAssign};
 use num_traits::Zero;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sprs::PermOwned;
@@ -18,7 +18,7 @@ use super::SpMat;
 use super::util::perm_for_indices;
 
 pub fn dir_sum_indices<R>(a: &SpMat<R>) -> Option<(Vec<Vec<usize>>, Vec<Vec<usize>>)>
-where R: Clone + Scalar + Zero + ClosedAdd + Send + Sync + Display {
+where R: Clone + Scalar + Zero + ClosedAddAssign + Send + Sync + Display {
     let (m, n) = a.shape();
     let cols = group_cols(a);
     let rows = cols.iter().map(|c| rows_in(a, c)).collect_vec();
@@ -31,7 +31,7 @@ where R: Clone + Scalar + Zero + ClosedAdd + Send + Sync + Display {
 }
 
 pub fn dir_sum_decomp<R>(a: SpMat<R>) -> (PermOwned, PermOwned, Vec<SpMat<R>>)
-where R: Clone + Scalar + Zero + ClosedAdd + Send + Sync + Display {
+where R: Clone + Scalar + Zero + ClosedAddAssign + Send + Sync + Display {
     let (m, n) = a.shape();
     let Some((rows, cols)) = dir_sum_indices(&a) else { 
         let p = PermOwned::identity(m);
@@ -146,7 +146,7 @@ fn rows_in<R>(a: &SpMat<R>, cols: &[usize]) -> Vec<usize> {
 }
 
 fn decomp_by<R>(a: SpMat<R>, rows: &Vec<Vec<usize>>, cols: &Vec<Vec<usize>>, p: &PermOwned, q: &PermOwned) -> Vec<SpMat<R>>
-where R: Clone + Zero + Scalar + ClosedAdd {
+where R: Clone + Zero + Scalar + ClosedAddAssign {
     assert_eq!(rows.len(), cols.len());
 
     let l = rows.len();

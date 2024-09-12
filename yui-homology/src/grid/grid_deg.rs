@@ -1,7 +1,4 @@
-use std::fmt::Display;
 use std::hash::Hash;
-use std::ops::{Add, Sub};
-
 use derive_more::{Add, Display, Sub};
 use num_traits::Zero;
 
@@ -29,7 +26,7 @@ macro_rules! make2 {
         #[allow(non_camel_case_types)]
         #[derive(Display, Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Add, Sub)]
         #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-        #[display(fmt = "({}, {})", _0, _1)]
+        #[display("({}, {})", _0, _1)]
         pub struct $name(pub $t, pub $t);
 
         impl From<($t, $t)> for $name {
@@ -67,7 +64,7 @@ macro_rules! make3 {
         #[allow(non_camel_case_types)]
         #[derive(Display, Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Add, Sub)]
         #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-        #[display(fmt = "({}, {}, {})", _0, _1, _2)]
+        #[display("({}, {}, {})", _0, _1, _2)]
         pub struct $name(pub $t, pub $t, pub $t);
 
         impl From<($t, $t, $t)> for $name {

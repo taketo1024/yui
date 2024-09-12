@@ -1,4 +1,3 @@
-use std::fmt::Display;
 use derive_more::Display;
 use yui::bitseq::Bit;
 

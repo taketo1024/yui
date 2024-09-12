@@ -5,16 +5,16 @@ use std::hash::Hash;
 
 use auto_impl_ops::auto_ops;
 use delegate::delegate;
-use derive_more::{Display, DebugCustom};
+use derive_more::{Display, Debug};
 use num_traits::Zero;
 
 use crate::lc::OrdForDisplay;
 
 use super::MonoOrd;
 
-#[derive(Clone, Default, PartialEq, Eq, Hash, Display, DebugCustom)]
-#[display(fmt = "{:?}", data)]
-#[debug  (fmt = "{:?}", data)]
+#[derive(Clone, Default, PartialEq, Eq, Hash, Display, Debug)]
+#[display("{:?}", data)]
+#[debug("{:?}", data)]
 pub struct MultiDeg<I> { 
     data: BTreeMap<usize, I>, // { index => degree }
     _zero: I

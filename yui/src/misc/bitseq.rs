@@ -1,20 +1,19 @@
 use core::fmt;
-use std::fmt::{Display, Debug};
 use std::ops::Index;
 use std::str::FromStr;
+use derive_more::{Display, Debug};
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-#[derive(derive_more::DebugCustom, derive_more::Display)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Display, Debug)]
 #[cfg_attr(feature = "serde", derive(serde_repr::Serialize_repr, serde_repr::Deserialize_repr))]
 #[repr(u8)]
 pub enum Bit { 
     #[default]
-    #[display(fmt="0")]
-    #[debug(fmt="0")]
+    #[display("0")]
+    #[debug("0")]
     Bit0 = 0, 
 
-    #[display(fmt="1")]
-    #[debug(fmt="1")]
+    #[display("1")]
+    #[debug("1")]
     Bit1 = 1
 }
 

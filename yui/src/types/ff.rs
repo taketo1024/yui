@@ -2,7 +2,7 @@
 
 use std::ops::{Add, Neg, Sub, Mul, Div, Rem, AddAssign, SubAssign, MulAssign, DivAssign, RemAssign};
 use std::str::FromStr;
-use derive_more::{Display, DebugCustom};
+use derive_more::{Display, Debug};
 use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
 
@@ -10,9 +10,9 @@ use crate::{Elem, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, EucRingOps, A
 
 type I = i32;
 
-#[derive(Clone, Copy, PartialEq, Eq, Default, Display, DebugCustom)]
-#[display(fmt= "{}", _0)]
-#[debug(fmt= "{}", _0)]
+#[derive(Clone, Copy, PartialEq, Eq, Default, Display, Debug)]
+#[display( "{}", _0)]
+#[debug( "{}", _0)]
 pub struct FF<const p: I>(I);
 
 impl<const p: I> FF<p> { 

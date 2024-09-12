@@ -2,16 +2,16 @@ use std::collections::HashMap;
 use std::ops::{MulAssign, Mul};
 use auto_impl_ops::auto_ops;
 use delegate::delegate;
-use derive_more::{Display, DebugCustom};
+use derive_more::{Display, Debug};
 use itertools::Itertools;
 use num_traits::Zero;
 use yui::{GetSign, Sign};
 
 use crate::{Link, XCode};
 
-#[derive(Clone, Copy, PartialEq, Eq, Display, DebugCustom)]
-#[display(fmt = "{}", _0)]
-#[  debug(fmt = "{}", _0)]
+#[derive(Clone, Copy, PartialEq, Eq, Display, Debug)]
+#[display("{}", _0)]
+#[  debug("{}", _0)]
 pub struct Generator(i32);
 
 impl Generator { 
@@ -45,7 +45,7 @@ impl From<i32> for Generator {
 }
 
 #[derive(Clone, PartialEq, Eq, Display, Debug)]
-#[display(fmt = "{:?}", elements)]
+#[display("{:?}", elements)]
 pub struct Braid {
     strands: usize,
     elements: Vec<Generator>

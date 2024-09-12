@@ -1,18 +1,18 @@
 use std::ops::Neg;
+use derive_more::{Display, Debug};
 use num_traits::Signed;
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
-#[derive(derive_more::Display, derive_more::DebugCustom)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default, Display, Debug)]
 #[cfg_attr(feature = "serde", derive(serde_repr::Serialize_repr, serde_repr::Deserialize_repr))]
 #[repr(i8)]
 pub enum Sign { 
     #[default]
-    #[display(fmt = "+")]
-    #[debug(fmt = "+")]
+    #[display("+")]
+    #[debug("+")]
     Pos = 1,
 
-    #[display(fmt = "-")]
-    #[debug(fmt = "-")]
+    #[display("-")]
+    #[debug("-")]
     Neg = -1
 }
 

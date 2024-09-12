@@ -10,10 +10,10 @@ pub fn make_matrix<X, Y, R, F>(from: &IndexList<X>, to: &IndexList<Y>, f: F) -> 
 where 
     X: Gen, Y: Gen, 
     R: Ring, for<'x> &'x R: RingOps<R>,
-    F: Fn(&X) -> Lc<Y, R> 
+    F: Fn(&X) -> Lc<Y, R> + Send + Sync
 {
     cfg_if::cfg_if! { 
-        if #[cfg(multithread)] { 
+        if #[cfg(feature="multithread")] { 
             make_matrix_m(from, to, f)
         } else { 
             make_matrix_s(from, to, f)

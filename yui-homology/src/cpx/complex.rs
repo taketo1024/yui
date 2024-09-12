@@ -59,22 +59,17 @@ where
         let c0 = c(i);
         let c1 = c(i + self.d_deg());
         let d = self.d_matrix(i).into_dense();
-
-        if d.is_zero() { 
-            format!("C[{i}] {c0} -> {c1}; zero.")
-        } else { 
-            format!("C[{i}] {c0} -> {c1}\n{d}.")
-        }
+        format!("C[{i}] {c0} -> {c1}\n{d}")
     }
 
     fn display_d(&self) -> String { 
         self.support().filter_map(|i| 
-            if self.rank(i) > 0 && self.rank(i + self.d_deg()) > 0 {
+            if self.rank(i) > 0 && self.rank(i + self.d_deg()) > 0 && !self.d_matrix(i).is_zero() {
                 Some(self.display_d_at(i))
             } else { 
                 None
             }
-        ).join("\n\n")
+        ).join("")
     }
 
     fn print_d(&self) {

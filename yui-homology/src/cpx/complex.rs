@@ -59,7 +59,7 @@ where
         let c0 = c(i);
         let c1 = c(i + self.d_deg());
         let d = self.d_matrix(i).into_dense();
-        format!("C[{i}] {c0} -> {c1}\n{d}")
+        format!("d[{i}]: {c0} -> {c1}\n{d}")
     }
 
     fn display_d(&self) -> String { 

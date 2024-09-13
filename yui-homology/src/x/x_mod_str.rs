@@ -2,7 +2,7 @@ use std::iter::Sum;
 use std::ops::Add;
 
 use delegate::delegate;
-use yui::{Ring, RingOps, IndexList};
+use yui::{EucRing, EucRingOps, IndexList, Ring, RingOps};
 use yui::lc::{Gen, Lc};
 use yui_matrix::sparse::{SpVec, Trans};
 
@@ -92,6 +92,21 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         }));
 
         t.forward(&v)
+    }
+
+    pub fn vectorize_euc(&self, z: &Lc<X, R>) -> SpVec<R>
+    where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+        let r = self.rank();
+        let v = self.vectorize(z);
+
+        SpVec::from_sorted_entries(v.dim(), v.iter().map(|(i, a)| { 
+            if i < r { 
+                (i, a.clone())
+            } else { 
+                let t = &self.tors()[i - r];
+                (i, a % t)
+            }
+        }))
     }
 
     pub fn as_chain(&self, v: &SpVec<R>) -> Lc<X, R> {

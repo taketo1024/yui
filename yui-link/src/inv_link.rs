@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use itertools::Itertools;
+use num_integer::Integer;
 use crate::{Edge, Link, XCode};
 
 // Involutive link
@@ -57,6 +58,21 @@ impl InvLink {
         Self::new(l, symm, base_pt)
     }
 
+    pub fn sinv_knot_from_code<I1>(pd_code: I1) -> Self
+    where I1: IntoIterator<Item = XCode> { 
+        let code = pd_code.into_iter().collect_vec();
+        let l = Link::from_pd_code(code);
+        let n = l.edges().len();
+
+        assert!(n.is_even(), "number of edges must be even.");
+        assert_eq!(l.edges().iter().min(), Some(&1), "edge must start from index 1.");
+        assert_eq!(l.edges().iter().max(), Some(&n), "edges must have sequential indexing.");
+
+        let symm = (2..=n/2).map(|i| (i, n - i + 2));
+        
+        Self::new(l, symm, Some(1))
+    }
+
     pub fn link(&self) -> &Link { 
         &self.link
     }
@@ -86,120 +102,74 @@ impl InvLink {
 impl InvLink {
     pub fn load(name: &str) -> Result<InvLink, Box<dyn std::error::Error>> {
         match name {
-            "3_1" => Ok(InvLink::from_code(
-                [[1,5,2,4],[3,1,4,6],[5,3,6,2]],
-                [(2,6),(3,5)],
-                Some(1)
+            "3_1" => Ok(InvLink::sinv_knot_from_code(
+                [[1,5,2,4],[3,1,4,6],[5,3,6,2]]
             )),
-            "4_1" => Ok(InvLink::from_code(
+            "4_1" => Ok(InvLink::sinv_knot_from_code(
                 [[2,7,3,8],[4,2,5,1],[6,3,7,4],[8,6,1,5]],
-                [(2,8),(3,7),(4,6)],
-                Some(1)
             )),
-            "5_1" => Ok(InvLink::from_code(
+            "5_1" => Ok(InvLink::sinv_knot_from_code(
                 [[1,7,2,6],[3,9,4,8],[5,1,6,10],[7,3,8,2],[9,5,10,4]],
-                [(2,10),(3,9),(4,8),(5,7)],
-                Some(1)
             )), 
-            "5_2a" => Ok(InvLink::from_code(
+            "5_2a" => Ok(InvLink::sinv_knot_from_code(
                 [[3,11,4,10],[5,9,6,8],[6,2,7,1],[9,5,10,4],[11,3,12,2],[12,8,1,7]],
-                [(2,12),(3,11),(4,10),(5,9),(6,8)],
-                Some(1)
             )), 
-            "5_2b" => Ok(InvLink::from_code(
+            "5_2b" => Ok(InvLink::sinv_knot_from_code(
                 [[1,7,2,6],[4,10,5,9],[5,3,6,2],[7,1,8,12],[10,4,11,3],[11,9,12,8]],
-                [(2,12),(3,11),(4,10),(5,9),(6,8)],
-                Some(1)
             )), 
-            "6_1a" => Ok(InvLink::from_code(
+            "6_1a" => Ok(InvLink::sinv_knot_from_code(
                 [[1,6,2,7],[3,11,4,10],[5,9,6,8],[7,12,8,1],[9,5,10,4],[11,3,12,2]],
-                [(2,12),(3,11),(4,10),(5,9),(6,8)],
-                Some(1)
             )), 
-            "6_1b" => Ok(InvLink::from_code(
+            "6_1b" => Ok(InvLink::sinv_knot_from_code(
                 [[1,7,2,6],[3,10,4,11],[5,3,6,2],[7,1,8,12],[9,4,10,5],[11,9,12,8]],
-                [(2,12),(3,11),(4,10),(5,9),(6,8)],
-                Some(1)
             )), 
-            "6_2a" => Ok(InvLink::from_code(
+            "6_2a" => Ok(InvLink::sinv_knot_from_code(
                 [[1,6,2,7],[3,11,4,10],[5,9,6,8],[7,12,8,1],[9,3,10,2],[11,5,12,4]],
-                [(2,12),(3,11),(4,10),(5,9),(6,8)],
-                Some(1)
             )), 
-            "6_2b" => Ok(InvLink::from_code(
+            "6_2b" => Ok(InvLink::sinv_knot_from_code(
                 [[1,9,2,8],[4,11,5,12],[7,1,8,14],[9,3,10,2],[10,5,11,6],[12,3,13,4],[13,7,14,6]],
-                [(2,14),(3,13),(4,12),(5,11),(6,10),(7,9)],
-                Some(1)
             )), 
-            "6_3" => Ok(InvLink::from_code(
+            "6_3" => Ok(InvLink::sinv_knot_from_code(
                 [[3,13,4,12],[6,9,7,10],[8,1,9,2],[10,5,11,6],[11,3,12,2],[13,5,14,4],[14,7,1,8]],
-                [(2,14),(3,13),(4,12),(5,11),(6,10),(7,9)],
-                Some(1)
             )), 
-            "7_1" => Ok(InvLink::from_code(
+            "7_1" => Ok(InvLink::sinv_knot_from_code(
                 [[1,9,2,8],[3,11,4,10],[5,13,6,12],[7,1,8,14],[9,3,10,2],[11,5,12,4],[13,7,14,6]],
-                [(2,14),(3,13),(4,12),(5,11),(6,10),(7,9)],
-                Some(1)
             )), 
-            "7_2a" => Ok(InvLink::from_code(
+            "7_2a" => Ok(InvLink::sinv_knot_from_code(
                 [[3,15,4,14],[5,13,6,12],[7,11,8,10],[8,2,9,1],[11,7,12,6],[13,5,14,4],[15,3,16,2],[16,10,1,9]],
-                [(2,16),(3,15),(4,14),(5,13),(6,12),(7,11),(8,10)],
-                Some(1)
             )), 
-            "7_2b" => Ok(InvLink::from_code(
+            "7_2b" => Ok(InvLink::sinv_knot_from_code(
                 [[1,9,2,8],[3,7,4,6],[4,14,5,13],[7,3,8,2],[9,1,10,16],[11,15,12,14],[12,6,13,5],[15,11,16,10]],
-                [(2,16),(3,15),(4,14),(5,13),(6,12),(7,11),(8,10)],
-                Some(1)
             )), 
-            "7_3a" => Ok(InvLink::from_code(
+            "7_3a" => Ok(InvLink::sinv_knot_from_code(
                 [[1,9,2,8],[3,13,4,12],[5,11,6,10],[7,1,8,14],[9,3,10,2],[11,5,12,4],[13,7,14,6]],
-                [(2,14),(3,13),(4,12),(5,11),(6,10),(7,9)],
-                Some(1)
             )), 
-            "7_3b" => Ok(InvLink::from_code(
+            "7_3b" => Ok(InvLink::sinv_knot_from_code(
                 [[3,13,4,12],[5,15,6,14],[8,2,9,1],[10,7,11,8],[11,3,12,2],[13,5,14,4],[15,7,16,6],[16,10,1,9]],
-                [(2,16),(3,15),(4,14),(5,13),(6,12),(7,11),(8,10)],
-                Some(1)
             )), 
-            "7_4a" => Ok(InvLink::from_code(
+            "7_4a" => Ok(InvLink::sinv_knot_from_code(
                 [[2,8,3,7],[3,15,4,14],[5,13,6,12],[8,2,9,1],[10,16,11,15],[11,7,12,6],[13,5,14,4],[16,10,1,9]],
-                [(2,16),(3,15),(4,14),(5,13),(6,12),(7,11),(8,10)],
-                Some(1)
             )), 
-            "7_4b" => Ok(InvLink::from_code(
+            "7_4b" => Ok(InvLink::sinv_knot_from_code(
                 [[2,10,3,9],[4,12,5,11],[6,14,7,13],[8,4,9,3],[10,2,11,1],[12,8,13,7],[14,6,1,5]],
-                [(2,14),(3,13),(4,12),(5,11),(6,10),(7,9)],
-                Some(1)
             )), 
-            "7_5a" => Ok(InvLink::from_code(
+            "7_5a" => Ok(InvLink::sinv_knot_from_code(
                 [[1,9,2,8],[3,13,4,12],[5,11,6,10],[7,1,8,14],[9,7,10,6],[11,3,12,2],[13,5,14,4]],
-                [(2,14),(3,13),(4,12),(5,11),(6,10),(7,9)],
-                Some(1)
             )), 
-            "7_5b" => Ok(InvLink::from_code(
+            "7_5b" => Ok(InvLink::sinv_knot_from_code(
                 [[1,11,2,10],[4,8,5,7],[5,15,6,14],[9,1,10,18],[11,3,12,2],[12,16,13,15],[13,7,14,6],[16,3,17,4],[17,9,18,8]],
-                [(2,18),(3,17),(4,16),(5,15),(6,14),(7,13),(8,12),(9,11)],
-                Some(1)
             )), 
-            "7_6a" => Ok(InvLink::from_code(
+            "7_6a" => Ok(InvLink::sinv_knot_from_code(
                 [[2,13,3,14],[4,11,5,12],[6,4,7,3],[8,1,9,2],[10,5,11,6],[12,10,13,9],[14,7,1,8]],
-                [(2,14),(3,13),(4,12),(5,11),(6,10),(7,9)],
-                Some(1)
             )), 
-            "7_6b" => Ok(InvLink::from_code(
+            "7_6b" => Ok(InvLink::sinv_knot_from_code(
                 [[1,8,2,9],[3,15,4,14],[6,11,7,12],[7,4,8,5],[9,16,10,1],[12,5,13,6],[13,10,14,11],[15,3,16,2]],
-                [(2,16),(3,15),(4,14),(5,13),(6,12),(7,11),(8,10)],
-                Some(1)
             )), 
-            "7_7a" => Ok(InvLink::from_code(
+            "7_7a" => Ok(InvLink::sinv_knot_from_code(
                 [[1,8,2,9],[4,13,5,14],[7,11,8,10],[9,16,10,1],[11,3,12,2],[12,5,13,6],[14,3,15,4],[15,7,16,6]],
-                [(2,16),(3,15),(4,14),(5,13),(6,12),(7,11),(8,10)],
-                Some(1)
             )), 
-            "7_7b" => Ok(InvLink::from_code(
+            "7_7b" => Ok(InvLink::sinv_knot_from_code(
                 [[1,10,2,11],[3,13,4,12],[5,14,6,1],[7,5,8,4],[9,2,10,3],[11,9,12,8],[13,6,14,7]],
-                [(2,14),(3,13),(4,12),(5,11),(6,10),(7,9)],
-                Some(1)
             )), 
             _ => todo!()
         }
@@ -231,5 +201,17 @@ mod tests {
         assert_eq!(l.inv_x(0), 0);
         assert_eq!(l.inv_x(1), 2);
         assert_eq!(l.inv_x(2), 1);
+    }
+
+    #[test]
+    fn load_3_1() { 
+        let l = InvLink::load("3_1").unwrap();
+        assert_eq!(l.link().crossing_num(), 3);
+    }
+
+    #[test]
+    fn load_4_1() { 
+        let l = InvLink::load("4_1").unwrap();
+        assert_eq!(l.link().crossing_num(), 4);
     }
 }

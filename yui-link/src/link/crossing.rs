@@ -6,7 +6,7 @@ use super::Edge;
 
 use CrossingType::{X, Xm, V, H};
 
-#[derive(Debug, Clone, Copy, PartialEq, Display)]
+#[derive(Display, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CrossingType { 
     X, Xm, V, H 
 }
@@ -21,7 +21,7 @@ impl CrossingType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Crossing { 
     ctype: CrossingType,
     edges: [Edge; 4]
@@ -85,7 +85,12 @@ impl Crossing {
 
     pub fn arcs(&self) -> (LinkComp, LinkComp) {
         let comp = |i: usize, j: usize| {
-            LinkComp::new(vec![self.edges[i], self.edges[j]], false)
+            let (ei, ej) = (self.edges[i], self.edges[j]);
+            if ei == ej { 
+                LinkComp::new(vec![ei], true)
+            } else { 
+                LinkComp::new(vec![ei, ej], false)
+            }
         };
         match self.ctype { 
             X | 

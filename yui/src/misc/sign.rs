@@ -1,5 +1,6 @@
 use std::ops::Neg;
 use derive_more::{Display, Debug};
+use is_even::IsEven;
 use num_traits::Signed;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default, Display, Debug)]
@@ -24,26 +25,44 @@ impl Sign {
     pub fn is_negative(&self) -> bool { 
         !self.is_positive()
     }
-}
 
-impl From<i32> for Sign {
-    fn from(value: i32) -> Self {
-        match value { 
-             1 => Sign::Pos,
-            -1 => Sign::Neg,
-             _ => panic!()
+    pub fn from_parity<I: IsEven>(val: I) -> Self { 
+        if val.is_even() { 
+            Sign::Pos
+        } else { 
+            Sign::Neg
         }
     }
 }
 
-impl From<Sign> for i32 {
-    fn from(value: Sign) -> Self {
-        match value { 
-            Sign::Pos =>  1,
-            Sign::Neg => -1
+macro_rules! impl_int_conversion {
+    ($t:tt) => {
+        impl From<$t> for Sign {
+            fn from(value: $t) -> Self {
+                match value { 
+                     1 => Sign::Pos,
+                    -1 => Sign::Neg,
+                     _ => panic!()
+                }
+            }
         }
-    }
+        
+        impl From<Sign> for $t {
+            fn from(value: Sign) -> Self {
+                match value { 
+                    Sign::Pos =>  1,
+                    Sign::Neg => -1
+                }
+            }
+        }                
+    };
 }
+
+impl_int_conversion!(i8);
+impl_int_conversion!(i16);
+impl_int_conversion!(i32);
+impl_int_conversion!(i64);
+impl_int_conversion!(isize);
 
 impl Neg for Sign {
     type Output = Self;

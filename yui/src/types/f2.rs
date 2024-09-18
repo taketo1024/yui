@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Display};
 use std::ops::{Add, Neg, Sub, Mul, Div, Rem, AddAssign, SubAssign, MulAssign, DivAssign, RemAssign};
+use std::str::FromStr;
 use num_integer::Integer;
 use num_traits::{One, ToPrimitive, Zero};
 use auto_impl_ops::auto_ops;
@@ -14,6 +15,14 @@ where I: ToPrimitive {
     fn from(a: I) -> Self {
         let b = a.to_i64().unwrap().is_odd();
         Self(b)
+    }
+}
+
+impl FromStr for FF2 {
+    type Err = <i64 as FromStr>::Err;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let a = s.parse::<i64>()?;
+        Ok(Self::from(a))
     }
 }
 

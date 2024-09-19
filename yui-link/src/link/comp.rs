@@ -4,23 +4,27 @@ use itertools::Itertools;
 
 use crate::{Edge, Link};
 
-#[derive(Debug, Clone, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LinkComp { 
     edges:Vec<Edge>,
     closed:bool
 }
 
 impl LinkComp { 
-    pub fn new(edges: Vec<Edge>, closed: bool) -> Self { 
+    pub fn new<I>(edges: I, closed: bool) -> Self
+    where I: IntoIterator<Item = Edge> { 
+        let edges = edges.into_iter().collect_vec();
         assert!(!edges.is_empty());
         Self { edges, closed }
     }
 
-    pub fn arc(edges: Vec<Edge>) -> Self { 
+    pub fn arc<I>(edges: I) -> Self
+    where I: IntoIterator<Item = Edge> { 
         Self::new(edges, false)
     }
 
-    pub fn circ(edges: Vec<Edge>) -> Self { 
+    pub fn circ<I>(edges: I) -> Self
+    where I: IntoIterator<Item = Edge> { 
         Self::new(edges, true)
     }
 
@@ -28,7 +32,7 @@ impl LinkComp {
         self.edges.contains(&e)
     }
 
-    pub fn nedges(&self) -> usize { 
+    pub fn len(&self) -> usize { 
         self.edges.len()
     }
     
@@ -59,7 +63,7 @@ impl LinkComp {
     }
 
     pub fn reduce(&mut self) { 
-        if self.is_arc() && self.nedges() > 2 { 
+        if self.is_arc() && self.len() > 2 { 
             let e0 = self.edges.remove(0);
             let e1 = self.edges.pop().unwrap();
             let min = self.edges().iter().filter(|&e| e < min(&e0, &e1)).min();
@@ -69,7 +73,7 @@ impl LinkComp {
             } else { 
                 vec![e0, e1]
             };
-        } else if self.is_circle() && self.nedges() > 1 { 
+        } else if self.is_circle() && self.len() > 1 { 
             let e0 = *self.edges.iter().min().unwrap();
             self.edges = vec![e0];
         }
@@ -88,7 +92,7 @@ impl LinkComp {
         let (e0, e1) =  self.ends().unwrap();
         let (f0, f1) = other.ends().unwrap();
 
-        let LinkComp {mut edges, ..} = other;
+        let LinkComp {mut edges, ..} = other.clone();
 
         if e1 == f0 {        // [.., e1) + [f0, ..)
             edges.remove(0);
@@ -142,21 +146,8 @@ impl LinkComp {
 
         false
     }
-}
 
-impl Display for LinkComp {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let c = self.edges.iter().map(|e| e.to_string()).join("-");
-        if self.is_circle() { 
-            write!(f, "[-{c}-]")
-        } else {
-            write!(f, "[{c}]")
-        }
-    }
-}
-
-impl PartialEq for LinkComp {
-    fn eq(&self, other: &Self) -> bool {
+    pub fn unori_eq(&self, other: &Self) -> bool {
         if self.closed != other.closed { 
             return false;
         }
@@ -176,6 +167,17 @@ impl PartialEq for LinkComp {
             (0 .. n).all(|i| self.edges[i] == other.edges[(p + n - i) % n])
         } else { 
             self.edges.iter().zip(other.edges.iter().rev()).all(|(e, f)| e == f)
+        }
+    }
+}
+
+impl Display for LinkComp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let c = self.edges.iter().map(|e| e.to_string()).join("-");
+        if self.is_circle() { 
+            write!(f, "⚪︎({c})")
+        } else {
+            write!(f, "[{c}]")
         }
     }
 }
@@ -244,30 +246,30 @@ mod tests {
     }
 
     #[test]
-    fn eq_arc() { 
+    fn unori_eq_arc() { 
         let c = LinkComp::arc(vec![1,2,3]);
 
-        assert_eq!(c, LinkComp::arc(vec![1,2,3]));
-        assert_eq!(c, LinkComp::arc(vec![3,2,1]));
+        assert!(c.unori_eq(&LinkComp::arc(vec![1,2,3])));
+        assert!(c.unori_eq(&LinkComp::arc(vec![3,2,1])));
 
-        assert!(c != LinkComp::arc(vec![1,2]));
-        assert!(c != LinkComp::arc(vec![1,2,3,4]));
-        assert!(c != LinkComp::circ(vec![1,2,3]));
+        assert!(!c.unori_eq(&LinkComp::arc(vec![1,2])));
+        assert!(!c.unori_eq(&LinkComp::arc(vec![1,2,3,4])));
+        assert!(!c.unori_eq(&LinkComp::circ(vec![1,2,3])));
     }
 
     #[test]
-    fn eq_circ() { 
+    fn unori_eq_circ() { 
         let c = LinkComp::circ(vec![1,2,3,4]);
 
-        assert_eq!(c, LinkComp::circ(vec![1,2,3,4]));
-        assert_eq!(c, LinkComp::circ(vec![2,3,4,1]));
-        assert_eq!(c, LinkComp::circ(vec![3,4,1,2]));
-        assert_eq!(c, LinkComp::circ(vec![2,3,4,1]));
-        assert_eq!(c, LinkComp::circ(vec![4,3,2,1]));
-        assert_eq!(c, LinkComp::circ(vec![3,2,1,4]));
+        assert!(c.unori_eq(&LinkComp::circ(vec![1,2,3,4])));
+        assert!(c.unori_eq(&LinkComp::circ(vec![2,3,4,1])));
+        assert!(c.unori_eq(&LinkComp::circ(vec![3,4,1,2])));
+        assert!(c.unori_eq(&LinkComp::circ(vec![2,3,4,1])));
+        assert!(c.unori_eq(&LinkComp::circ(vec![4,3,2,1])));
+        assert!(c.unori_eq(&LinkComp::circ(vec![3,2,1,4])));
         
-        assert!(c != LinkComp::circ(vec![1,2,3]));
-        assert!(c != LinkComp::circ(vec![1,2,3,4,5]));
-        assert!(c != LinkComp::circ(vec![1,2,4,3]));
+        assert!(!c.unori_eq(&LinkComp::circ(vec![1,2,3])));
+        assert!(!c.unori_eq(&LinkComp::circ(vec![1,2,3,4,5])));
+        assert!(!c.unori_eq(&LinkComp::circ(vec![1,2,4,3])));
     }
 }

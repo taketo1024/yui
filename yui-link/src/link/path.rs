@@ -86,6 +86,13 @@ impl Path {
         e0 == f0 || e0 == f1 || e1 == f0 || e1 == f1
     }
 
+    pub fn is_connectable_bothends(&self, other: &Self) -> bool { 
+        let Some((e0, e1)) =  self.ends() else { return false };
+        let Some((f0, f1)) = other.ends() else { return false };
+
+        (e0, e1) == (f0, f1) || (e0, e1) == (f1, f0)
+    }
+
     pub fn connect(&mut self, other: Self) { 
         assert!(self.is_connectable(&other), "{self} and {other} is not connectable.");
 

@@ -1,7 +1,7 @@
 use derive_more::Display;
 use yui::bitseq::Bit;
 
-use crate::LinkComp;
+use crate::Path;
 use super::Edge;
 
 use CrossingType::{X, Xm, V, H};
@@ -83,13 +83,13 @@ impl Crossing {
         }
     }
 
-    pub fn arcs(&self) -> (LinkComp, LinkComp) {
+    pub fn arcs(&self) -> (Path, Path) {
         let comp = |i: usize, j: usize| {
             let (ei, ej) = (self.edges[i], self.edges[j]);
             if ei == ej { 
-                LinkComp::new(vec![ei], true)
+                Path::new(vec![ei], true)
             } else { 
-                LinkComp::new(vec![ei, ej], false)
+                Path::new(vec![ei, ej], false)
             }
         };
         match self.ctype { 

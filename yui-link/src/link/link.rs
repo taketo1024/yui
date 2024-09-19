@@ -3,7 +3,7 @@ use itertools::Itertools;
 use yui::Sign;
 use yui::bitseq::Bit;
 
-use super::{Crossing, CrossingType, LinkComp};
+use super::{Crossing, CrossingType, Path};
 
 pub type Edge = usize;
 pub type State = yui::bitseq::BitSeq;
@@ -119,7 +119,7 @@ impl Link {
         (p as i32) - (n as i32)
     }
 
-    pub fn components(&self) -> Vec<LinkComp> {
+    pub fn components(&self) -> Vec<Path> {
         let n = self.data.len();
 
         let mut comps = vec![];
@@ -142,9 +142,9 @@ impl Link {
 
                 let c = if edges.len() > 1 && edges.first() == edges.last() { 
                     edges.pop();
-                    LinkComp::circ(edges)
+                    Path::circ(edges)
                 } else { 
-                    LinkComp::arc(edges)
+                    Path::arc(edges)
                 };
 
                 comps.push(c);
@@ -274,7 +274,7 @@ impl Link {
         ))
     }
 
-    pub fn seifert_circles(&self) -> Vec<LinkComp> { 
+    pub fn seifert_circles(&self) -> Vec<Path> { 
         self.resolved_by(&self.ori_pres_state()).components()
     }
 }
@@ -447,12 +447,12 @@ mod tests {
         let pd_code = [[0,0,1,1]];
         let l = Link::from_pd_code(pd_code);
         let comps = l.components();
-        assert_eq!(comps, vec![ LinkComp::new(vec![0, 1], true)]);
+        assert_eq!(comps, vec![ Path::new(vec![0, 1], true)]);
 
         let pd_code = [[0,3,1,4],[3,2,2,1]];
         let l = Link::from_pd_code(pd_code);
         let comps = l.components();
-        assert_eq!(comps, vec![ LinkComp::new(vec![0,1,2,3,4], false) ]);
+        assert_eq!(comps, vec![ Path::new(vec![0,1,2,3,4], false) ]);
     }
 
     #[test]

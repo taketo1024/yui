@@ -5,12 +5,12 @@ use itertools::Itertools;
 use crate::{Edge, Link};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LinkComp { 
+pub struct Path { 
     edges:Vec<Edge>,
     closed:bool
 }
 
-impl LinkComp { 
+impl Path { 
     pub fn new<I>(edges: I, closed: bool) -> Self
     where I: IntoIterator<Item = Edge> { 
         let edges = edges.into_iter().collect_vec();
@@ -92,7 +92,7 @@ impl LinkComp {
         let (e0, e1) =  self.ends().unwrap();
         let (f0, f1) = other.ends().unwrap();
 
-        let LinkComp {mut edges, ..} = other.clone();
+        let Path {mut edges, ..} = other.clone();
 
         if e1 == f0 {        // [.., e1) + [f0, ..)
             edges.remove(0);
@@ -122,7 +122,7 @@ impl LinkComp {
         }
     }
 
-    pub fn is_adj(&self, other: &LinkComp, link: &Link) -> bool { 
+    pub fn is_adj(&self, other: &Path, link: &Link) -> bool { 
         // 1) find crossings `x` that touche `self`. 
         // 2) check if `x` also touches `other`.
         
@@ -171,7 +171,7 @@ impl LinkComp {
     }
 }
 
-impl Display for LinkComp {
+impl Display for Path {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let c = self.edges.iter().map(|e| e.to_string()).join("-");
         if self.is_circle() { 
@@ -188,88 +188,88 @@ mod tests {
 
     #[test]
     fn reduce() { 
-        let mut c = LinkComp::new(vec![0], false);
+        let mut c = Path::new(vec![0], false);
         c.reduce();
-        assert_eq!(c, LinkComp::new(vec![0], false));
+        assert_eq!(c, Path::new(vec![0], false));
         
-        let mut c = LinkComp::new(vec![0,1,2,3], false);
+        let mut c = Path::new(vec![0,1,2,3], false);
         c.reduce();
-        assert_eq!(c, LinkComp::new(vec![0, 3], false));
+        assert_eq!(c, Path::new(vec![0, 3], false));
         
-        let mut c = LinkComp::new(vec![0], true);
+        let mut c = Path::new(vec![0], true);
         c.reduce();
-        assert_eq!(c, LinkComp::new(vec![0], true));
+        assert_eq!(c, Path::new(vec![0], true));
 
-        let mut c = LinkComp::new(vec![0,1,2,3], true);
+        let mut c = Path::new(vec![0,1,2,3], true);
         c.reduce();
-        assert_eq!(c, LinkComp::new(vec![0], true));
+        assert_eq!(c, Path::new(vec![0], true));
     }
 
     #[test]
     fn is_connectable() { 
-        let c = LinkComp::new(vec![1,2,3,4], false);
+        let c = Path::new(vec![1,2,3,4], false);
 
-        assert!( c.is_connectable(&LinkComp::new(vec![4,5], false)));
-        assert!( c.is_connectable(&LinkComp::new(vec![5,4], false)));
-        assert!( c.is_connectable(&LinkComp::new(vec![1,5], false)));
-        assert!( c.is_connectable(&LinkComp::new(vec![5,1], false)));
-        assert!(!c.is_connectable(&LinkComp::new(vec![5,6], false)));
-        assert!(!c.is_connectable(&LinkComp::new(vec![2,3], false)));
-        assert!(!c.is_connectable(&LinkComp::new(vec![0],   true)));
+        assert!( c.is_connectable(&Path::new(vec![4,5], false)));
+        assert!( c.is_connectable(&Path::new(vec![5,4], false)));
+        assert!( c.is_connectable(&Path::new(vec![1,5], false)));
+        assert!( c.is_connectable(&Path::new(vec![5,1], false)));
+        assert!(!c.is_connectable(&Path::new(vec![5,6], false)));
+        assert!(!c.is_connectable(&Path::new(vec![2,3], false)));
+        assert!(!c.is_connectable(&Path::new(vec![0],   true)));
     }
 
     #[test]
     fn connect() { 
-        let mut c = LinkComp::new(vec![1,2,3,4], false);
-        c.connect(LinkComp::new(vec![4,5], false));
-        assert_eq!(c, LinkComp::new(vec![1,2,3,4,5], false));
+        let mut c = Path::new(vec![1,2,3,4], false);
+        c.connect(Path::new(vec![4,5], false));
+        assert_eq!(c, Path::new(vec![1,2,3,4,5], false));
 
-        let mut c = LinkComp::new(vec![1,2,3,4], false);
-        c.connect(LinkComp::new(vec![5,4], false));
-        assert_eq!(c, LinkComp::new(vec![1,2,3,4,5], false));
+        let mut c = Path::new(vec![1,2,3,4], false);
+        c.connect(Path::new(vec![5,4], false));
+        assert_eq!(c, Path::new(vec![1,2,3,4,5], false));
 
-        let mut c = LinkComp::new(vec![1,2,3,4], false);
-        c.connect(LinkComp::new(vec![6,1], false));
-        assert_eq!(c, LinkComp::new(vec![6,1,2,3,4], false));
+        let mut c = Path::new(vec![1,2,3,4], false);
+        c.connect(Path::new(vec![6,1], false));
+        assert_eq!(c, Path::new(vec![6,1,2,3,4], false));
 
-        let mut c = LinkComp::new(vec![1,2,3,4], false);
-        c.connect(LinkComp::new(vec![1,6], false));
-        assert_eq!(c, LinkComp::new(vec![6,1,2,3,4], false));
+        let mut c = Path::new(vec![1,2,3,4], false);
+        c.connect(Path::new(vec![1,6], false));
+        assert_eq!(c, Path::new(vec![6,1,2,3,4], false));
 
-        let mut c = LinkComp::new(vec![1,2,3,4], false);
-        c.connect(LinkComp::new(vec![1], false));
-        assert_eq!(c, LinkComp::new(vec![1,2,3,4], false));
+        let mut c = Path::new(vec![1,2,3,4], false);
+        c.connect(Path::new(vec![1], false));
+        assert_eq!(c, Path::new(vec![1,2,3,4], false));
 
-        let mut c = LinkComp::new(vec![1,2,3,4], false);
-        c.connect(LinkComp::new(vec![4], false));
-        assert_eq!(c, LinkComp::new(vec![1,2,3,4], false));
+        let mut c = Path::new(vec![1,2,3,4], false);
+        c.connect(Path::new(vec![4], false));
+        assert_eq!(c, Path::new(vec![1,2,3,4], false));
     }
 
     #[test]
     fn unori_eq_arc() { 
-        let c = LinkComp::arc(vec![1,2,3]);
+        let c = Path::arc(vec![1,2,3]);
 
-        assert!(c.unori_eq(&LinkComp::arc(vec![1,2,3])));
-        assert!(c.unori_eq(&LinkComp::arc(vec![3,2,1])));
+        assert!(c.unori_eq(&Path::arc(vec![1,2,3])));
+        assert!(c.unori_eq(&Path::arc(vec![3,2,1])));
 
-        assert!(!c.unori_eq(&LinkComp::arc(vec![1,2])));
-        assert!(!c.unori_eq(&LinkComp::arc(vec![1,2,3,4])));
-        assert!(!c.unori_eq(&LinkComp::circ(vec![1,2,3])));
+        assert!(!c.unori_eq(&Path::arc(vec![1,2])));
+        assert!(!c.unori_eq(&Path::arc(vec![1,2,3,4])));
+        assert!(!c.unori_eq(&Path::circ(vec![1,2,3])));
     }
 
     #[test]
     fn unori_eq_circ() { 
-        let c = LinkComp::circ(vec![1,2,3,4]);
+        let c = Path::circ(vec![1,2,3,4]);
 
-        assert!(c.unori_eq(&LinkComp::circ(vec![1,2,3,4])));
-        assert!(c.unori_eq(&LinkComp::circ(vec![2,3,4,1])));
-        assert!(c.unori_eq(&LinkComp::circ(vec![3,4,1,2])));
-        assert!(c.unori_eq(&LinkComp::circ(vec![2,3,4,1])));
-        assert!(c.unori_eq(&LinkComp::circ(vec![4,3,2,1])));
-        assert!(c.unori_eq(&LinkComp::circ(vec![3,2,1,4])));
+        assert!(c.unori_eq(&Path::circ(vec![1,2,3,4])));
+        assert!(c.unori_eq(&Path::circ(vec![2,3,4,1])));
+        assert!(c.unori_eq(&Path::circ(vec![3,4,1,2])));
+        assert!(c.unori_eq(&Path::circ(vec![2,3,4,1])));
+        assert!(c.unori_eq(&Path::circ(vec![4,3,2,1])));
+        assert!(c.unori_eq(&Path::circ(vec![3,2,1,4])));
         
-        assert!(!c.unori_eq(&LinkComp::circ(vec![1,2,3])));
-        assert!(!c.unori_eq(&LinkComp::circ(vec![1,2,3,4,5])));
-        assert!(!c.unori_eq(&LinkComp::circ(vec![1,2,4,3])));
+        assert!(!c.unori_eq(&Path::circ(vec![1,2,3])));
+        assert!(!c.unori_eq(&Path::circ(vec![1,2,3,4,5])));
+        assert!(!c.unori_eq(&Path::circ(vec![1,2,4,3])));
     }
 }

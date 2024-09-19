@@ -1,8 +1,8 @@
 use petgraph::Graph;
-use crate::{Link, LinkComp, CrossingType};
+use crate::{Link, Path, CrossingType};
 
-pub fn seifert_graph(link: &Link) -> Graph<LinkComp, usize> { 
-    type G = Graph<LinkComp, usize>;
+pub fn seifert_graph(link: &Link) -> Graph<Path, usize> { 
+    type G = Graph<Path, usize>;
     let s0 = link.ori_pres_state();
     let l0 = link.resolved_by(&s0);
     let mut graph = Graph::new();

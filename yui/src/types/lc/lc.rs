@@ -9,7 +9,7 @@ use crate::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RMo
 
 use super::gen::*;
 
-#[derive(PartialEq, Eq, Clone, Default)]
+#[derive(PartialEq, Eq, Clone, Default, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
 pub struct Lc<X, R>
@@ -226,16 +226,6 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.to_string_by(X::cmp_for_display, false))
-    }
-}
-
-impl<X, R> Debug for Lc<X, R>
-where
-    X: Gen,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(self, f)
     }
 }
 

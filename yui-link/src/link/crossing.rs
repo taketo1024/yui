@@ -99,6 +99,14 @@ impl Crossing {
             H  => (comp(0, 1), comp(2, 3))
         }
     }
+
+    pub fn convert_edges<F>(&self, f: F) -> Self
+    where F: Fn(Edge) -> Edge { 
+        Self { 
+            ctype: self.ctype, 
+            edges: self.edges.map(|e| f(e)) 
+        }
+    }
 }
 
 impl Display for Crossing {

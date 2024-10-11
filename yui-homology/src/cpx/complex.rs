@@ -8,7 +8,6 @@ use yui_matrix::sparse::{SpMat, SpVec, MatTrait, Trans};
 
 use crate::generic::GenericChainComplexBase;
 use crate::{GridTrait, GridDeg, Grid, GridIter, isize2, isize3};
-use crate::utils::ChainReducer;
 use super::{RModStr, SimpleRModStr, rmod_str_symbol};
 
 pub type ChainComplexSummand<R> = SimpleRModStr<R>;
@@ -129,8 +128,8 @@ where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {
         &self.d_matrices[i]
     }
 
-    pub fn reduced(&self, with_trans: bool) -> ChainComplexBase<I, R> { 
-        ChainReducer::reduce(self, with_trans)
+    pub fn reduced(&self, _with_trans: bool) -> ChainComplexBase<I, R> { 
+        todo!("to be removed")
     }
 }
 

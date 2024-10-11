@@ -9,7 +9,8 @@ use yui_matrix::sparse::schur::Schur;
 use yui_matrix::sparse::triang::{solve_triangular_vec, TriangularType};
 use yui::{Ring, RingOps};
 
-use crate::{GridDeg, ChainComplexTrait, ChainComplexBase, Grid, SimpleRModStr, GridTrait};
+use crate::generic::GenericChainComplexBase;
+use crate::{GridDeg, ChainComplexTrait, GridTrait};
 
 //       a0 = [x]      a1 = [a b]      a2 = [z w]
 //            [y]           [c d]     
@@ -41,12 +42,12 @@ where
     I: GridDeg,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
-    pub fn reduce<C>(complex: &C, with_trans: bool) -> ChainComplexBase<I, R> 
+    pub fn reduce<C>(complex: &C, with_trans: bool) -> Self
     where C: GridTrait<I> + ChainComplexTrait<I, R = R> {
         let mut r = Self::from(complex, with_trans);
         r.reduce_all(false);
         r.reduce_all(true);
-        r.into_complex()
+        r
     }
 
     pub fn from<C>(complex: &C, with_trans: bool) -> Self 
@@ -295,26 +296,9 @@ where
         (i - deg, i, i + deg)
     }
 
-    pub fn into_complex(mut self) -> ChainComplexBase<I, R> { 
-        let summands = Grid::generate(
-            self.support.clone(), 
-            |i| { 
-                let rank = self.rank(i).unwrap();
-                let trans = self.trans.remove(&i); // optional
-                SimpleRModStr::new( rank, vec![], trans )
-            }
-        );
-
-        let d_deg = self.d_deg;
-        let d_matrices = Grid::generate(
-            self.support.clone(), 
-            |i| self.mats.remove(&i).unwrap()
-        );
-
-        ChainComplexBase::new(
-            summands,
-            d_deg,
-            d_matrices
+    pub fn into_complex(self) -> GenericChainComplexBase<I, R> { 
+        GenericChainComplexBase::generate(
+            self.support.clone(), self.d_deg, |i| self.mats[&i].clone()
         )
     }
 }
@@ -355,7 +339,7 @@ mod tests {
     #[test]
     fn zero() { 
         let c = GenericChainComplex::<i32>::zero();
-        let r = ChainReducer::reduce(&c, true);
+        let r = ChainReducer::reduce(&c, false).into_complex();
 
         r.check_d_all();
 
@@ -365,7 +349,7 @@ mod tests {
     #[test]
     fn acyclic() { 
         let c = GenericChainComplex::<i32>::one_one(1);
-        let r = ChainReducer::reduce(&c, true);
+        let r = ChainReducer::reduce(&c, false).into_complex();
 
         r.check_d_all();
 
@@ -376,7 +360,7 @@ mod tests {
     #[test]
     fn tor() { 
         let c = GenericChainComplex::<i32>::one_one(2);
-        let r = ChainReducer::reduce(&c, true);
+        let r = ChainReducer::reduce(&c, false).into_complex();
 
         r.check_d_all();
 
@@ -387,7 +371,7 @@ mod tests {
     #[test]
     fn d3() {
         let c = GenericChainComplex::<i32>::d3();
-        let r = ChainReducer::reduce(&c, false);
+        let r = ChainReducer::reduce(&c, false).into_complex();
 
         r.check_d_all();
 
@@ -405,7 +389,7 @@ mod tests {
     #[test]
     fn s2() {
         let c = GenericChainComplex::<i32>::s2();
-        let r = ChainReducer::reduce(&c, false);
+        let r = ChainReducer::reduce(&c, false).into_complex();
 
         r.check_d_all();
 
@@ -421,7 +405,7 @@ mod tests {
     #[test]
     fn t2() {
         let c = GenericChainComplex::<i32>::t2();
-        let r = ChainReducer::reduce(&c, false);
+        let r = ChainReducer::reduce(&c, false).into_complex();
 
         r.check_d_all();
 
@@ -437,7 +421,7 @@ mod tests {
     #[test]
     fn rp2() {
         let c = GenericChainComplex::<i32>::rp2();
-        let r = ChainReducer::reduce(&c, false);
+        let r = ChainReducer::reduce(&c, false).into_complex();
 
         r.check_d_all();
 
@@ -458,9 +442,9 @@ mod tests {
         let c = GenericChainComplex::<i32>::s2();
         let r = ChainReducer::reduce(&c, true);
 
-        let t0 = r[0].trans().unwrap();
-        let t1 = r[1].trans().unwrap();
-        let t2 = r[2].trans().unwrap();
+        let t0 = r.trans(0).unwrap();
+        let t1 = r.trans(1).unwrap();
+        let t2 = r.trans(2).unwrap();
 
         assert_eq!(t0.src_dim(), 4);
         assert_eq!(t1.src_dim(), 6);
@@ -486,9 +470,9 @@ mod tests {
         let c = GenericChainComplex::<i32>::t2();
         let r = ChainReducer::reduce(&c, true);
 
-        let t0 = r[0].trans().unwrap();
-        let t1 = r[1].trans().unwrap();
-        let t2 = r[2].trans().unwrap();
+        let t0 = r.trans(0).unwrap();
+        let t1 = r.trans(1).unwrap();
+        let t2 = r.trans(2).unwrap();
 
         assert_eq!(t0.src_dim(), 9);
         assert_eq!(t1.src_dim(), 27);
@@ -525,9 +509,9 @@ mod tests {
         let c = GenericChainComplex::<i32>::rp2();
         let r = ChainReducer::reduce(&c, true);
 
-        let t0 = r[0].trans().unwrap();
-        let t1 = r[1].trans().unwrap();
-        let t2 = r[2].trans().unwrap();
+        let t0 = r.trans(0).unwrap();
+        let t1 = r.trans(1).unwrap();
+        let t2 = r.trans(2).unwrap();
 
         assert_eq!(t0.src_dim(), 6);
         assert_eq!(t1.src_dim(), 15);

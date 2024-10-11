@@ -142,12 +142,78 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 pub(crate) mod tests { 
+    use num_traits::Zero;
+
     use crate::{ChainComplexTrait, RModStr};
 
     use super::*;
 
     #[test]
-    fn d3() { 
+    fn zero() { 
+        let c = SimpleChainComplex::<i32>::zero();
+        assert_eq!(c[0].rank(), 0);
+        
+        c.check_d_all();
+
+        let h = c.homology(false);
+        assert!(h[0].is_zero());
+    }
+
+    #[test]
+    fn single() { 
+        let c = SimpleChainComplex::<i32>::one();
+        assert_eq!(c[0].rank(), 1);
+
+        c.check_d_all();
+
+        let h = c.homology(false);
+        
+        assert_eq!(h[0].rank(), 1);
+        assert!( h[0].is_free());
+        assert!(!h[0].is_zero());
+    }
+
+    #[test]
+    fn one_to_one() { 
+        let c = SimpleChainComplex::<i32>::one_one(1);
+        let h = c.homology(false);
+
+        assert!(h[0].is_zero());
+        assert!(h[1].is_zero());
+    }
+
+    #[test]
+    fn two_to_one() { 
+        let c = SimpleChainComplex::<i32>::two_one(1, -1);
+        let h = c.homology(false);
+
+        assert!(h[0].is_zero());
+        assert_eq!(h[1].rank(), 1);
+        assert!(h[1].is_free());
+    }
+
+    #[test]
+    fn one_to_two() { 
+        let c = SimpleChainComplex::<i32>::one_two(1, -1);
+        let h = c.homology(false);
+
+        assert_eq!(h[0].rank(), 1);
+        assert!(h[0].is_free());
+        assert!(h[1].is_zero());
+    }
+
+    #[test]
+    fn torsion() { 
+        let c = SimpleChainComplex::<i32>::one_one(2);
+        let h = c.homology(false);
+
+        assert_eq!(h[0].rank(), 0);
+        assert_eq!(h[0].tors(), &vec![2]);
+        assert!(!h[0].is_free());
+    }
+
+    #[test]
+    fn d3() {
         let c = SimpleChainComplex::<i32>::d3();
 
         assert_eq!(c[0].rank(), 4);
@@ -156,10 +222,24 @@ pub(crate) mod tests {
         assert_eq!(c[3].rank(), 1);
 
         c.check_d_all();
+
+        let h = c.homology(false);
+
+        assert_eq!(h[0].rank(), 1);
+        assert!(h[0].is_free());
+
+        assert_eq!(h[1].rank(), 0);
+        assert!(h[1].is_free());
+
+        assert_eq!(h[2].rank(), 0);
+        assert!(h[2].is_free());
+
+        assert_eq!(h[3].rank(), 0);
+        assert!(h[3].is_free());
     }
 
     #[test]
-    fn s2() { 
+    fn s2() {
         let c = SimpleChainComplex::<i32>::s2();
 
         assert_eq!(c[0].rank(), 4);
@@ -168,10 +248,21 @@ pub(crate) mod tests {
         assert_eq!(c[3].rank(), 0);
 
         c.check_d_all();
+
+        let h = c.homology(false);
+
+        assert_eq!(h[0].rank(), 1);
+        assert!(h[0].is_free());
+
+        assert_eq!(h[1].rank(), 0);
+        assert!(h[1].is_free());
+
+        assert_eq!(h[2].rank(), 1);
+        assert!(h[2].is_free());
     }
 
     #[test]
-    fn t2() { 
+    fn t2() {
         let c = SimpleChainComplex::<i32>::t2();
 
         assert_eq!(c[0].rank(), 9);
@@ -180,17 +271,89 @@ pub(crate) mod tests {
         assert_eq!(c[3].rank(), 0);
 
         c.check_d_all();
+
+        let h = c.homology(false);
+
+        assert_eq!(h[0].rank(), 1);
+        assert!(h[0].is_free());
+
+        assert_eq!(h[1].rank(), 2);
+        assert!(h[1].is_free());
+
+        assert_eq!(h[2].rank(), 1);
+        assert!(h[2].is_free());
     }
 
     #[test]
-    fn rp2() { 
+    fn rp2() {
         let c = SimpleChainComplex::<i32>::rp2();
-        
+
         assert_eq!(c[0].rank(), 6);
         assert_eq!(c[1].rank(), 15);
         assert_eq!(c[2].rank(), 10);
         assert_eq!(c[3].rank(), 0);
 
         c.check_d_all();
+        
+        let h = c.homology(false);
+
+        assert_eq!(h[0].rank(), 1);
+        assert!(h[0].is_free());
+
+        assert_eq!(h[1].rank(), 0);
+        assert_eq!(h[1].tors(), &vec![2]);
+        assert!(!h[1].is_free());
+
+        assert_eq!(h[2].rank(), 0);
+        assert!(h[2].is_free());
+    }
+
+    #[test]
+    fn s2_gens() {
+        let c = SimpleChainComplex::<i32>::s2();
+        let h = c.homology(true);
+
+        let z = h[2].gen_chain(0);
+        let dz = c.d(2, &z);
+
+        assert!(!z.is_zero());
+        assert!(dz.is_zero());
+    }
+
+    #[test]
+    fn t2_gens() {
+        let c = SimpleChainComplex::<i32>::t2();
+        let h = c.homology(true);
+
+        let z = h[2].gen_chain(0);
+        let dz = c.d(2, &z);
+
+        assert!(!z.is_zero());
+        assert!(dz.is_zero());
+
+        let a = h[1].gen_chain(0);
+        let b = h[1].gen_chain(1);
+        let da = c.d(1, &a);
+        let db = c.d(1, &b);
+
+        assert!(!a.is_zero());
+        assert!(!b.is_zero());
+        assert!(da.is_zero());
+        assert!(db.is_zero());
+    }
+
+    #[test]
+    fn rp2_gens() {
+        let c = SimpleChainComplex::<i32>::rp2();
+        let h = c.homology(true);
+
+        let z = h[1].gen_chain(0);
+        let dz = c.d(1, &z);
+
+        assert!(!z.is_zero());
+        assert!(dz.is_zero());
+
+        assert!(!h[1].vectorize_euc(&z).is_zero());
+        assert!(h[1].vectorize_euc(&(z * 2)).is_zero()); // order 2
     }
 }

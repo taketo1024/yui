@@ -81,14 +81,18 @@ where
     }
 
     pub fn reduced(&self) -> XChainComplexBase<I, X, R> { 
-        let reduced = ChainReducer::reduce(self, true);
+        let r = ChainReducer::reduce(self, true);
+
         let summands = Grid::generate(
             self.summands.support(),
-            |i| { 
-                let mut s = self.summands[i].clone();
-                s.merge(reduced[i].clone(), false);
-                s
-            }
+            |i| {
+                XModStr::new(
+                    self[i].gens().clone(), 
+                    r.rank(i).unwrap(), 
+                    vec![], 
+                    r.trans(i).cloned() // TODO should merge
+                )
+            } 
         );
 
         let d_deg = self.d_deg;

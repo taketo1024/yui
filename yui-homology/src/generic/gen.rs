@@ -1,15 +1,21 @@
-use derive_more::derive::Display;
+use derive_more::derive::{Display, Debug};
 use yui::lc::Gen;
 use yui::Elem;
 
+use crate::GridDeg;
+
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Display, Debug, Default)]
 #[display("e({},{})", _0, _1)]
-pub struct EnumGen(pub isize, pub usize);
+#[  debug("e({},{})", _0, _1)]
+pub struct EnumGen<I>(pub I, pub usize) 
+where I: GridDeg;
 
-impl Elem for EnumGen {
+impl<I> Elem for EnumGen<I>
+where I: GridDeg {
     fn math_symbol() -> String {
         "E".into()
     }
 }
 
-impl Gen for EnumGen {}
+impl<I> Gen for EnumGen<I>
+where I: GridDeg {}

@@ -4,7 +4,8 @@ use yui_matrix::sparse::SpMat;
 use yui_matrix::MatTrait;
 use super::gen::EnumGen;
 
-pub type GenericChainComplex<R> = XChainComplexBase<isize, EnumGen, R>;
+pub type GenericChainComplexBase<I, R> = XChainComplexBase<I, EnumGen<I>, R>;
+pub type GenericChainComplex<R> = GenericChainComplexBase<isize, R>;
 
 use crate::{Grid1, XChainComplexBase, XModStr};
 

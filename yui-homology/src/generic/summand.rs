@@ -1,11 +1,11 @@
 use yui::{Ring, RingOps};
 use yui_matrix::sparse::Trans;
 
-use crate::{GridDeg, XModStr};
+use crate::{GridDeg, Summand};
 
 use super::EnumGen;
 
-pub type GenericSummand<I, R> = XModStr<EnumGen<I>, R>;
+pub type GenericSummand<I, R> = Summand<EnumGen<I>, R>;
 
 impl<I, R> GenericSummand<I, R>
 where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> { 

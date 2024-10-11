@@ -333,7 +333,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 mod tests {
     use num_traits::Zero;
     use crate::generic::GenericChainComplex;
-    use crate::RModStr;
+    use crate::SummandTrait;
     use super::*;
 
     #[test]

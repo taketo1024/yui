@@ -4,10 +4,10 @@ use yui_matrix::MatTrait;
 use super::gen::EnumGen;
 use super::GenericSummand;
 
-pub type GenericChainComplexBase<I, R> = XChainComplexBase<I, EnumGen<I>, R>;
+pub type GenericChainComplexBase<I, R> = ChainComplexBase<I, EnumGen<I>, R>;
 pub type GenericChainComplex<R> = GenericChainComplexBase<isize, R>;
 
-use crate::{Grid, GridDeg, GridTrait, XChainComplexBase};
+use crate::{Grid, GridDeg, GridTrait, ChainComplexBase};
 
 impl<I, R> GenericChainComplexBase<I, R> 
 where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {
@@ -142,7 +142,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 pub(crate) mod tests { 
     use num_traits::Zero;
 
-    use crate::{ChainComplexTrait, RModStr};
+    use crate::{ChainComplexTrait, SummandTrait};
 
     use super::*;
 

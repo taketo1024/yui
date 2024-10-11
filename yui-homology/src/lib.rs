@@ -1,7 +1,7 @@
 mod grid;
 mod cpx;
 mod x;
-pub mod simple;
+pub mod generic;
 
 pub use grid::*;
 pub use cpx::*;

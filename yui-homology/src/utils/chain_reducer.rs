@@ -350,13 +350,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 mod tests {
     use num_traits::Zero;
-    use crate::simple::SimpleChainComplex;
+    use crate::generic::GenericChainComplex;
     use crate::RModStr;
     use super::*;
 
     #[test]
     fn zero() { 
-        let c = SimpleChainComplex::<i32>::zero();
+        let c = GenericChainComplex::<i32>::zero();
         let r = ChainReducer::reduce(&c, true);
 
         r.check_d_all();
@@ -366,7 +366,7 @@ mod tests {
 
     #[test]
     fn acyclic() { 
-        let c = SimpleChainComplex::<i32>::one_one(1);
+        let c = GenericChainComplex::<i32>::one_one(1);
         let r = ChainReducer::reduce(&c, true);
 
         r.check_d_all();
@@ -377,7 +377,7 @@ mod tests {
 
     #[test]
     fn tor() { 
-        let c = SimpleChainComplex::<i32>::one_one(2);
+        let c = GenericChainComplex::<i32>::one_one(2);
         let r = ChainReducer::reduce(&c, true);
 
         r.check_d_all();
@@ -388,7 +388,7 @@ mod tests {
     
     #[test]
     fn d3() {
-        let c = SimpleChainComplex::<i32>::d3();
+        let c = GenericChainComplex::<i32>::d3();
         let r = ChainReducer::reduce(&c, false);
 
         r.check_d_all();
@@ -406,7 +406,7 @@ mod tests {
 
     #[test]
     fn s2() {
-        let c = SimpleChainComplex::<i32>::s2();
+        let c = GenericChainComplex::<i32>::s2();
         let r = ChainReducer::reduce(&c, false);
 
         r.check_d_all();
@@ -422,7 +422,7 @@ mod tests {
 
     #[test]
     fn t2() {
-        let c = SimpleChainComplex::<i32>::t2();
+        let c = GenericChainComplex::<i32>::t2();
         let r = ChainReducer::reduce(&c, false);
 
         r.check_d_all();
@@ -438,7 +438,7 @@ mod tests {
 
     #[test]
     fn rp2() {
-        let c = SimpleChainComplex::<i32>::rp2();
+        let c = GenericChainComplex::<i32>::rp2();
         let r = ChainReducer::reduce(&c, false);
 
         r.check_d_all();
@@ -457,7 +457,7 @@ mod tests {
 
     #[test]
     fn s2_trans() {
-        let c = SimpleChainComplex::<i32>::s2();
+        let c = GenericChainComplex::<i32>::s2();
         let r = ChainReducer::reduce(&c, true);
 
         let t0 = r[0].trans().unwrap();
@@ -485,7 +485,7 @@ mod tests {
 
     #[test]
     fn t2_trans() {
-        let c = SimpleChainComplex::<i32>::t2();
+        let c = GenericChainComplex::<i32>::t2();
         let r = ChainReducer::reduce(&c, true);
 
         let t0 = r[0].trans().unwrap();
@@ -524,7 +524,7 @@ mod tests {
 
     #[test]
     fn rp2_trans() {
-        let c = SimpleChainComplex::<i32>::rp2();
+        let c = GenericChainComplex::<i32>::rp2();
         let r = ChainReducer::reduce(&c, true);
 
         let t0 = r[0].trans().unwrap();

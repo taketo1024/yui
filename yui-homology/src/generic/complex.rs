@@ -18,11 +18,11 @@ impl Elem for EnumGen {
 
 impl Gen for EnumGen {}
 
-pub type SimpleChainComplex<R> = XChainComplexBase<isize, EnumGen, R>;
+pub type GenericChainComplex<R> = XChainComplexBase<isize, EnumGen, R>;
 
 use crate::{Grid1, XChainComplexBase, XModStr};
 
-impl<R> SimpleChainComplex<R> 
+impl<R> GenericChainComplex<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn mat<I>(shape: (usize, usize), entries: I) -> SpMat<R>
     where R: From<i32>, I: IntoIterator<Item = i32> { 
@@ -57,16 +57,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         )
     }
     
-    pub fn one() -> SimpleChainComplex<R> {
-        SimpleChainComplex::from_mats(-1, 0,
+    pub fn one() -> GenericChainComplex<R> {
+        GenericChainComplex::from_mats(-1, 0,
             vec![
                 SpMat::from_dense_data((0, 1), [])
             ]
         )
     }
 
-    pub fn one_one(r: R) -> SimpleChainComplex<R> {
-        SimpleChainComplex::from_mats(-1, 0,
+    pub fn one_one(r: R) -> GenericChainComplex<R> {
+        GenericChainComplex::from_mats(-1, 0,
             vec![
                 SpMat::from_dense_data((0, 1), []),
                 SpMat::from_dense_data((1, 1), [r])
@@ -74,8 +74,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         )
     }
 
-    pub fn two_one(r1: R, r2: R) -> SimpleChainComplex<R> {
-        SimpleChainComplex::from_mats(-1, 0,
+    pub fn two_one(r1: R, r2: R) -> GenericChainComplex<R> {
+        GenericChainComplex::from_mats(-1, 0,
             vec![
                 SpMat::from_dense_data((0, 1), []),
                 SpMat::from_dense_data((1, 2), [r1, r2])
@@ -83,8 +83,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         )
     }
 
-    pub fn one_two(r1: R, r2: R) -> SimpleChainComplex<R> {
-        SimpleChainComplex::from_mats(-1, 0,
+    pub fn one_two(r1: R, r2: R) -> GenericChainComplex<R> {
+        GenericChainComplex::from_mats(-1, 0,
             vec![
                 SpMat::from_dense_data((0, 2), []),
                 SpMat::from_dense_data((2, 1), [r1, r2])
@@ -92,9 +92,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         )
     }
 
-    pub fn d3() -> SimpleChainComplex<R>
+    pub fn d3() -> GenericChainComplex<R>
     where R: From<i32> {
-        SimpleChainComplex::from_mats(-1, 0,
+        GenericChainComplex::from_mats(-1, 0,
             vec![
                 Self::mat((0, 4), []),
                 Self::mat((4, 6), [-1, -1, 0, -1, 0, 0, 1, 0, -1, 0, -1, 0, 0, 1, 1, 0, 0, -1, 0, 0, 0, 1, 1, 1] ),
@@ -104,9 +104,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         )
     }
 
-    pub fn s2() -> SimpleChainComplex<R>
+    pub fn s2() -> GenericChainComplex<R>
     where R: From<i32> {
-        SimpleChainComplex::from_mats(-1, 0,
+        GenericChainComplex::from_mats(-1, 0,
             vec![
                 Self::mat((0, 4), []),
                 Self::mat((4, 6), [-1, -1, 0, -1, 0, 0, 1, 0, -1, 0, -1, 0, 0, 1, 1, 0, 0, -1, 0, 0, 0, 1, 1, 1]),
@@ -115,9 +115,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         )
     }
 
-    pub fn t2() -> SimpleChainComplex<R>
+    pub fn t2() -> GenericChainComplex<R>
     where R: From<i32> {
-        SimpleChainComplex::from_mats(-1, 0,
+        GenericChainComplex::from_mats(-1, 0,
             vec![
                 Self::mat((0, 9), []),
                 Self::mat((9, 27), [-1, -1, 0, -1, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1, 1, 0, -1, 0, 0, 0, 0, 0, 0, -1, -1, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, -1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, -1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, -1, 0, 1, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0, 1, -1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, -1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1, 1]),
@@ -126,9 +126,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         )
     }
 
-    pub fn rp2() -> SimpleChainComplex<R>
+    pub fn rp2() -> GenericChainComplex<R>
     where R: From<i32> { 
-        SimpleChainComplex::from_mats(-1, 0,
+        GenericChainComplex::from_mats(-1, 0,
             vec![
                 Self::mat((0, 6), []),
                 Self::mat((6, 15), [-1, -1, 0, 0, 0, 0, 0, -1, -1, 0, -1, 0, 0, 0, 0, 1, 0, -1, -1, 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 1, 1, 0, 1, 1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 1, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1] ),
@@ -148,7 +148,7 @@ pub(crate) mod tests {
 
     #[test]
     fn zero() { 
-        let c = SimpleChainComplex::<i32>::zero();
+        let c = GenericChainComplex::<i32>::zero();
         assert_eq!(c[0].rank(), 0);
         
         c.check_d_all();
@@ -159,7 +159,7 @@ pub(crate) mod tests {
 
     #[test]
     fn single() { 
-        let c = SimpleChainComplex::<i32>::one();
+        let c = GenericChainComplex::<i32>::one();
         assert_eq!(c[0].rank(), 1);
 
         c.check_d_all();
@@ -173,7 +173,7 @@ pub(crate) mod tests {
 
     #[test]
     fn one_to_one() { 
-        let c = SimpleChainComplex::<i32>::one_one(1);
+        let c = GenericChainComplex::<i32>::one_one(1);
         let h = c.homology(false);
 
         assert!(h[0].is_zero());
@@ -182,7 +182,7 @@ pub(crate) mod tests {
 
     #[test]
     fn two_to_one() { 
-        let c = SimpleChainComplex::<i32>::two_one(1, -1);
+        let c = GenericChainComplex::<i32>::two_one(1, -1);
         let h = c.homology(false);
 
         assert!(h[0].is_zero());
@@ -192,7 +192,7 @@ pub(crate) mod tests {
 
     #[test]
     fn one_to_two() { 
-        let c = SimpleChainComplex::<i32>::one_two(1, -1);
+        let c = GenericChainComplex::<i32>::one_two(1, -1);
         let h = c.homology(false);
 
         assert_eq!(h[0].rank(), 1);
@@ -202,7 +202,7 @@ pub(crate) mod tests {
 
     #[test]
     fn torsion() { 
-        let c = SimpleChainComplex::<i32>::one_one(2);
+        let c = GenericChainComplex::<i32>::one_one(2);
         let h = c.homology(false);
 
         assert_eq!(h[0].rank(), 0);
@@ -212,7 +212,7 @@ pub(crate) mod tests {
 
     #[test]
     fn d3() {
-        let c = SimpleChainComplex::<i32>::d3();
+        let c = GenericChainComplex::<i32>::d3();
 
         assert_eq!(c[0].rank(), 4);
         assert_eq!(c[1].rank(), 6);
@@ -238,7 +238,7 @@ pub(crate) mod tests {
 
     #[test]
     fn s2() {
-        let c = SimpleChainComplex::<i32>::s2();
+        let c = GenericChainComplex::<i32>::s2();
 
         assert_eq!(c[0].rank(), 4);
         assert_eq!(c[1].rank(), 6);
@@ -261,7 +261,7 @@ pub(crate) mod tests {
 
     #[test]
     fn t2() {
-        let c = SimpleChainComplex::<i32>::t2();
+        let c = GenericChainComplex::<i32>::t2();
 
         assert_eq!(c[0].rank(), 9);
         assert_eq!(c[1].rank(), 27);
@@ -284,7 +284,7 @@ pub(crate) mod tests {
 
     #[test]
     fn rp2() {
-        let c = SimpleChainComplex::<i32>::rp2();
+        let c = GenericChainComplex::<i32>::rp2();
 
         assert_eq!(c[0].rank(), 6);
         assert_eq!(c[1].rank(), 15);
@@ -308,7 +308,7 @@ pub(crate) mod tests {
 
     #[test]
     fn s2_gens() {
-        let c = SimpleChainComplex::<i32>::s2();
+        let c = GenericChainComplex::<i32>::s2();
         let h = c.homology(true);
 
         let z = h[2].gen_chain(0);
@@ -320,7 +320,7 @@ pub(crate) mod tests {
 
     #[test]
     fn t2_gens() {
-        let c = SimpleChainComplex::<i32>::t2();
+        let c = GenericChainComplex::<i32>::t2();
         let h = c.homology(true);
 
         let z = h[2].gen_chain(0);
@@ -342,7 +342,7 @@ pub(crate) mod tests {
 
     #[test]
     fn rp2_gens() {
-        let c = SimpleChainComplex::<i32>::rp2();
+        let c = GenericChainComplex::<i32>::rp2();
         let h = c.homology(true);
 
         let z = h[1].gen_chain(0);

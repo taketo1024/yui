@@ -4,10 +4,17 @@ use yui_matrix::MatTrait;
 use super::gen::EnumGen;
 use super::GenericSummand;
 
-pub type GenericChainComplexBase<I, R> = ChainComplexBase<I, EnumGen<I>, R>;
-pub type GenericChainComplex<R> = GenericChainComplexBase<isize, R>;
+use crate::{isize2, isize3, ChainComplexBase, Grid, GridDeg, GridTrait};
 
-use crate::{Grid, GridDeg, GridTrait, ChainComplexBase};
+pub type GenericChainComplexBase<I, R> = ChainComplexBase<I, EnumGen<I>, R>;
+pub type GenericChainComplex<R>  = GenericChainComplexBase<isize,  R>;
+pub type GenericChainComplex2<R> = GenericChainComplexBase<isize2, R>;
+pub type GenericChainComplex3<R> = GenericChainComplexBase<isize3, R>;
+
+pub type GenericHomologyBase<I, R> = Grid<I, GenericSummand<I, R>>;
+pub type GenericHomology<R>  = GenericHomologyBase<isize,  R>;
+pub type GenericHomology2<R> = GenericHomologyBase<isize2, R>;
+pub type GenericHomology3<R> = GenericHomologyBase<isize3, R>;
 
 impl<I, R> GenericChainComplexBase<I, R> 
 where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {

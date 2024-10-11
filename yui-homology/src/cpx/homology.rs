@@ -3,15 +3,8 @@ use yui::{EucRing, EucRingOps, Ring, RingOps};
 
 use crate::generic::GenericSummand;
 use crate::utils::HomologyCalc;
-use crate::{GridDeg, Grid, isize2, isize3, rmod_str_symbol};
-use super::{ChainComplexTrait, SimpleRModStr};
-
-pub type HomologySummand<R> = SimpleRModStr<R>;
-pub type HomologyBase<I, R> = Grid<I, HomologySummand<R>>;
-
-pub type Homology<R>  = HomologyBase<isize,  R>;
-pub type Homology2<R> = HomologyBase<isize2, R>;
-pub type Homology3<R> = HomologyBase<isize3, R>;
+use crate::{GridDeg, Grid, rmod_str_symbol};
+use super::ChainComplexTrait;
 
 pub trait ComputeHomology<I, R>
 where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {

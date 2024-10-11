@@ -2,11 +2,12 @@ use yui::{Ring, RingOps};
 use yui_matrix::sparse::SpMat;
 use yui_matrix::MatTrait;
 use super::gen::EnumGen;
+use super::GenericSummand;
 
 pub type GenericChainComplexBase<I, R> = XChainComplexBase<I, EnumGen<I>, R>;
 pub type GenericChainComplex<R> = GenericChainComplexBase<isize, R>;
 
-use crate::{Grid, GridDeg, GridTrait, XChainComplexBase, XModStr};
+use crate::{Grid, GridDeg, GridTrait, XChainComplexBase};
 
 impl<I, R> GenericChainComplexBase<I, R> 
 where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {
@@ -19,7 +20,7 @@ where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {
 
         let summands = Grid::generate(d_matrices.support(), |i| {
             let r = d_matrices[i].ncols();
-            XModStr::free((0..r).map(|j| EnumGen(i, j)))
+            GenericSummand::generate_free(i, r)
         });
 
         Self::new(

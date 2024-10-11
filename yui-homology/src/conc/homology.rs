@@ -15,7 +15,7 @@ where
         let h = self.compute_homology_at(i, true);
 
         Summand::new(
-            c.gens().clone(),
+            c.raw_gens().clone(),
             h.rank(),
             h.tors().iter().cloned().collect(),
             c.trans().merged(h.trans())

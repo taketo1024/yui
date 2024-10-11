@@ -13,7 +13,7 @@ where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    gens: IndexList<X>,
+    raw_gens: IndexList<X>,
     rank: usize, 
     tors: Vec<R>,
     trans: Trans<R>
@@ -21,18 +21,17 @@ where
 
 impl<X, R> Summand<X, R>
 where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new(gens: IndexList<X>, rank: usize, tors: Vec<R>, trans: Trans<R>) -> Self { 
-        assert_eq!(trans.src_dim(), gens.len());
+    pub fn new(raw_gens: IndexList<X>, rank: usize, tors: Vec<R>, trans: Trans<R>) -> Self { 
+        assert_eq!(trans.src_dim(), raw_gens.len());
         assert_eq!(trans.tgt_dim(), rank + tors.len());
 
-        Self { gens, rank, tors, trans }
+        Self { raw_gens, rank, tors, trans }
     }
 
-    pub fn free<Itr>(gens: Itr) -> Self 
+    pub fn from_raw_gens<Itr>(raw_gens: Itr) -> Self 
     where Itr: IntoIterator<Item = X> {
-        let gens = gens.into_iter().collect::<IndexList<X>>();
+        let gens = raw_gens.into_iter().collect::<IndexList<X>>();
         let r = gens.len();
-
         Self::new(gens, r, vec![], Trans::id(r)) 
     }
 
@@ -40,31 +39,25 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         Self::new(IndexList::new(), 0, vec![], Trans::zero())
     }
 
+    pub fn raw_gens(&self) -> &IndexList<X> { 
+        &self.raw_gens
+    }
+
     pub fn trans(&self) -> &Trans<R> { 
         &self.trans
     }
 
-    // TODO rename to `raw_gens`
-    pub fn gens(&self) -> &IndexList<X> { 
-        &self.gens
-    }
-
-    // MEMO Panicking is not good. 
-    // Maybe this should return Option<..>, 
-    // and create XFreeModStr that unwraps it. 
-
-    pub fn gen_chain(&self, i: usize) -> Lc<X, R> { 
+    pub fn gen(&self, i: usize) -> Lc<X, R> { 
         let n = self.dim();
         let v = SpVec::unit(n, i);
-
-        self.as_chain(&v)
+        self.devectorize(&v)
     }
 
     pub fn vectorize(&self, z: &Lc<X, R>) -> SpVec<R> {
-        let n = self.gens.len();
+        let n = self.raw_gens.len();
         let v = SpVec::from_entries(n, z.iter().map(|(x, a)| { 
-            let Some(i) = self.gens.index_of(x) else { 
-                panic!("{x} not found in generators: {:?}", &self.gens);
+            let Some(i) = self.raw_gens.index_of(x) else { 
+                panic!("{x} not found in generators: {:?}", &self.raw_gens);
             };
             (i, a.clone())
         }));
@@ -87,18 +80,20 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         }))
     }
 
-    pub fn as_chain(&self, v: &SpVec<R>) -> Lc<X, R> {
+    pub fn devectorize(&self, v: &SpVec<R>) -> Lc<X, R> {
         assert_eq!(v.dim(), self.dim());
 
         let v = self.trans.backward(v);
 
         Lc::from_iter( v.iter().map(|(i, a)| 
-            (self.gens[i].clone(), a.clone())
+            (self.raw_gens[i].clone(), a.clone())
         ) )
     }
 
     pub fn merge<Y>(&mut self, other: Summand<Y, R>)
     where Y: Gen { 
+        assert_eq!(self.trans.tgt_dim(), other.trans.src_dim());
+
         self.rank = other.rank;
         self.tors = other.tors.clone();
         self.trans.merge(other.trans);
@@ -146,7 +141,7 @@ mod tests {
     
     #[test]
     fn vectorize() { 
-        let s = Summand::free([e(0), e(1), e(2)]);
+        let s = Summand::from_raw_gens([e(0), e(1), e(2)]);
         
         let x = Lc::from(e(0));
         let y = Lc::from(e(1));
@@ -161,14 +156,14 @@ mod tests {
         
     #[test]
     fn as_chain() { 
-        let s = Summand::free([e(0), e(1), e(2)]);
+        let s = Summand::from_raw_gens([e(0), e(1), e(2)]);
         
         let x = Lc::from(e(0));
         let y = Lc::from(e(1));
         let z = Lc::from(e(2));
 
         let v = SpVec::from(vec![1, 2, -3]);
-        let w = s.as_chain(&v);
+        let w = s.devectorize(&v);
 
         assert_eq!(w, &x + &y * 2 - &z * 3);
     }

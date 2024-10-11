@@ -161,7 +161,7 @@ mod tests {
 
         let t = t.unwrap();
         let v = t.backward_mat().col_vec(0);
-        let z = c[0].as_chain(&v);
+        let z = c[0].devectorize(&v);
 
         assert!(!v.is_zero());
         assert!(c.d(0, &z).is_zero());
@@ -193,7 +193,7 @@ mod tests {
 
         let t = t.unwrap();
         let v = t.backward_mat().col_vec(0);
-        let z = c[2].as_chain(&v);
+        let z = c[2].devectorize(&v);
 
         assert!(!v.is_zero());
         assert!(c.d(2, &z).is_zero());
@@ -213,7 +213,7 @@ mod tests {
 
         let t = t.unwrap();
         let v = t.backward_mat().col_vec(0);
-        let z = c[0].as_chain(&v);
+        let z = c[0].devectorize(&v);
 
         assert!(!v.is_zero());
         assert!(c.d(0, &z).is_zero());
@@ -235,7 +235,7 @@ mod tests {
 
         for i in 0..2 { 
             let v = t.backward_mat().col_vec(i);
-            let z = c[1].as_chain(&v);
+            let z = c[1].devectorize(&v);
 
             assert!(!v.is_zero());
             assert!(c.d(1, &z).is_zero());
@@ -256,7 +256,7 @@ mod tests {
 
         let t = t.unwrap();
         let v = t.backward_mat().col_vec(0);
-        let z = c[2].as_chain(&v);
+        let z = c[2].devectorize(&v);
 
         assert!(!v.is_zero());
         assert!(c.d(2, &z).is_zero());
@@ -276,7 +276,7 @@ mod tests {
 
         let t = t.unwrap();
         let v = t.backward_mat().col_vec(0);
-        let z = c[0].as_chain(&v);
+        let z = c[0].devectorize(&v);
 
         assert!(!v.is_zero());
         assert!(c.d(0, &z).is_zero());
@@ -296,7 +296,7 @@ mod tests {
 
         let t = t.unwrap();
         let v = t.backward_mat().col_vec(0);
-        let z = c[1].as_chain(&v);
+        let z = c[1].devectorize(&v);
 
         assert!(!v.is_zero());
         assert!(c.d(1, &z).is_zero());

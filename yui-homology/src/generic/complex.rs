@@ -153,7 +153,7 @@ pub(crate) mod tests {
         
         c.check_d_all();
 
-        let h = c.homology(false);
+        let h = c.homology();
         assert!(h[0].is_zero());
     }
 
@@ -164,7 +164,7 @@ pub(crate) mod tests {
 
         c.check_d_all();
 
-        let h = c.homology(false);
+        let h = c.homology();
         
         assert_eq!(h[0].rank(), 1);
         assert!( h[0].is_free());
@@ -174,7 +174,7 @@ pub(crate) mod tests {
     #[test]
     fn one_to_one() { 
         let c = GenericChainComplex::<i32>::one_one(1);
-        let h = c.homology(false);
+        let h = c.homology();
 
         assert!(h[0].is_zero());
         assert!(h[1].is_zero());
@@ -183,7 +183,7 @@ pub(crate) mod tests {
     #[test]
     fn two_to_one() { 
         let c = GenericChainComplex::<i32>::two_one(1, -1);
-        let h = c.homology(false);
+        let h = c.homology();
 
         assert!(h[0].is_zero());
         assert_eq!(h[1].rank(), 1);
@@ -193,7 +193,7 @@ pub(crate) mod tests {
     #[test]
     fn one_to_two() { 
         let c = GenericChainComplex::<i32>::one_two(1, -1);
-        let h = c.homology(false);
+        let h = c.homology();
 
         assert_eq!(h[0].rank(), 1);
         assert!(h[0].is_free());
@@ -203,7 +203,7 @@ pub(crate) mod tests {
     #[test]
     fn torsion() { 
         let c = GenericChainComplex::<i32>::one_one(2);
-        let h = c.homology(false);
+        let h = c.homology();
 
         assert_eq!(h[0].rank(), 0);
         assert_eq!(h[0].tors(), &vec![2]);
@@ -221,7 +221,7 @@ pub(crate) mod tests {
 
         c.check_d_all();
 
-        let h = c.homology(false);
+        let h = c.homology();
 
         assert_eq!(h[0].rank(), 1);
         assert!(h[0].is_free());
@@ -247,7 +247,7 @@ pub(crate) mod tests {
 
         c.check_d_all();
 
-        let h = c.homology(false);
+        let h = c.homology();
 
         assert_eq!(h[0].rank(), 1);
         assert!(h[0].is_free());
@@ -270,7 +270,7 @@ pub(crate) mod tests {
 
         c.check_d_all();
 
-        let h = c.homology(false);
+        let h = c.homology();
 
         assert_eq!(h[0].rank(), 1);
         assert!(h[0].is_free());
@@ -293,7 +293,7 @@ pub(crate) mod tests {
 
         c.check_d_all();
         
-        let h = c.homology(false);
+        let h = c.homology();
 
         assert_eq!(h[0].rank(), 1);
         assert!(h[0].is_free());
@@ -309,7 +309,7 @@ pub(crate) mod tests {
     #[test]
     fn s2_gens() {
         let c = GenericChainComplex::<i32>::s2();
-        let h = c.homology(true);
+        let h = c.homology();
 
         let z = h[2].gen_chain(0);
         let dz = c.d(2, &z);
@@ -321,7 +321,7 @@ pub(crate) mod tests {
     #[test]
     fn t2_gens() {
         let c = GenericChainComplex::<i32>::t2();
-        let h = c.homology(true);
+        let h = c.homology();
 
         let z = h[2].gen_chain(0);
         let dz = c.d(2, &z);
@@ -343,7 +343,7 @@ pub(crate) mod tests {
     #[test]
     fn rp2_gens() {
         let c = GenericChainComplex::<i32>::rp2();
-        let h = c.homology(true);
+        let h = c.homology();
 
         let z = h[1].gen_chain(0);
         let dz = c.d(1, &z);
@@ -366,7 +366,7 @@ pub(crate) mod tests {
 
         c.check_d_all();
 
-        let h = c.homology(true);
+        let h = c.homology();
 
         assert_eq!(h[0].rank(), 1);
         assert_eq!(h[1].rank(), 0);
@@ -388,7 +388,7 @@ pub(crate) mod tests {
 
         c.check_d_all();
 
-        let h = c.homology(false);
+        let h = c.homology();
 
         assert_eq!(h[0].rank(), 1);
         assert_eq!(h[1].rank(), 0);
@@ -413,7 +413,7 @@ pub(crate) mod tests {
 
         c.check_d_all();
 
-        let h = c.homology(false);
+        let h = c.homology();
 
         assert_eq!(h[0].rank(), 1);
         assert_eq!(h[1].rank(), 2);
@@ -438,7 +438,7 @@ pub(crate) mod tests {
 
         c.check_d_all();
         
-        let h = c.homology(false);
+        let h = c.homology();
 
         assert_eq!(h[0].rank(), 1);
         assert_eq!(h[1].rank(), 0);

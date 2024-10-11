@@ -1,7 +1,7 @@
 use yui::{EucRing, EucRingOps};
 use yui::lc::Gen;
 
-use crate::{GridDeg, isize2, isize3, Grid, GridTrait, ComputeHomology};
+use crate::{isize2, isize3, ComputeHomology, Grid, GridDeg, GridTrait, RModStr};
 use super::{XModStr, XChainComplexBase};
 
 pub type XHomologySummand<X, R> = XModStr<X, R>;
@@ -17,17 +17,23 @@ where
     X: Gen,
     R: EucRing, for<'x> &'x R: EucRingOps<R>
 {
-    pub fn homology_at(&self, i: I, with_trans: bool) -> XHomologySummand<X, R> {
-        let mut ci = self[i].clone();
-        let hi = self.compute_homology(i, with_trans);
-        ci.merge(hi, true);
-        ci
+    pub fn homology_at(&self, i: I) -> XHomologySummand<X, R> {
+        let c = &self[i];
+        let h = self.compute_homology_at(i, true);
+
+        XHomologySummand::new(
+            c.gens().clone(),
+            h.rank(),
+            h.tors().iter().cloned().collect(),
+            // Some(c.trans().unwrap().merged(&h.trans().unwrap()))
+            todo!()
+        )
     }
 
-    pub fn homology(&self, with_trans: bool) -> XHomologyBase<I, X, R> {
+    pub fn homology(&self) -> XHomologyBase<I, X, R> {
         XHomologyBase::generate(
             self.support(), 
-            |i| self.homology_at(i, with_trans)
+            |i| self.homology_at(i)
         )
     }
 }

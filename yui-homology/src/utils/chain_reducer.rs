@@ -348,7 +348,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ChainComplex, RModStr, ChainComplexCommon};
+    use crate::{ChainComplex, RModStr};
 
     #[test]
     fn zero() { 

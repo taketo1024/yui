@@ -1,22 +1,8 @@
-use derive_more::derive::Display;
 use itertools::Either;
-use yui::lc::Gen;
-use yui::Elem;
 use yui::{Ring, RingOps};
 use yui_matrix::sparse::SpMat;
 use yui_matrix::MatTrait;
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Display, Debug, Default)]
-#[display("e({},{})", _0, _1)]
-pub struct EnumGen(isize, usize);
-
-impl Elem for EnumGen {
-    fn math_symbol() -> String {
-        "E".into()
-    }
-}
-
-impl Gen for EnumGen {}
+use super::gen::EnumGen;
 
 pub type GenericChainComplex<R> = XChainComplexBase<isize, EnumGen, R>;
 

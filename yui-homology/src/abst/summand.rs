@@ -1,6 +1,6 @@
 use yui::{Ring, RingOps};
 
-pub trait RModStr
+pub trait SummandTrait
 where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
     type R;
 

@@ -8,20 +8,20 @@ use yui::lc::{Gen, Lc};
 use yui_matrix::sparse::{SpMat, SpVec};
 
 use crate::utils::ChainReducer;
-use crate::{isize2, isize3, ChainComplexTrait, Grid, GridDeg, GridIter, GridTrait, RModStr};
-use super::XModStr;
+use crate::{isize2, isize3, ChainComplexTrait, Grid, Grid1, GridDeg, GridIter, GridTrait, SummandTrait};
+use super::Summand;
 
 #[cfg(feature = "multithread")]
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
-pub type XChainComplex <X, R> = XChainComplexBase<isize,  X, R>;
-pub type XChainComplex2<X, R> = XChainComplexBase<isize2, X, R>;
-pub type XChainComplex3<X, R> = XChainComplexBase<isize3, X, R>;
+pub type ChainComplex <X, R> = ChainComplexBase<isize,  X, R>;
+pub type ChainComplex2<X, R> = ChainComplexBase<isize2, X, R>;
+pub type ChainComplex3<X, R> = ChainComplexBase<isize3, X, R>;
 
-pub type XChainComplexSummand<X, R> = XModStr<X, R>;
+pub type XChainComplexSummand<X, R> = Summand<X, R>;
 
 #[derive(Clone)]
-pub struct XChainComplexBase<I, X, R>
+pub struct ChainComplexBase<I, X, R>
 where 
     I: GridDeg,
     X: Gen,
@@ -32,7 +32,7 @@ where
     d_map: Arc<dyn Fn(I, &Lc<X, R>) -> Lc<X, R> + Send + Sync>,
 }
 
-impl<I, X, R> XChainComplexBase<I, X, R>
+impl<I, X, R> ChainComplexBase<I, X, R>
 where 
     I: GridDeg,
     X: Gen,
@@ -80,13 +80,13 @@ where
         self[i + self.d_deg].vectorize(&w)
     }
 
-    pub fn reduced(&self) -> XChainComplexBase<I, X, R> { 
+    pub fn reduced(&self) -> ChainComplexBase<I, X, R> { 
         let r = ChainReducer::reduce(self, true);
 
         let summands = Grid::generate(
             self.summands.support(),
             |i| {
-                XModStr::new(
+                Summand::new(
                     self[i].gens().clone(), 
                     r.rank(i).unwrap(), 
                     vec![], 
@@ -101,7 +101,7 @@ where
     }
 }
 
-impl<X, R> XChainComplex<X, R>
+impl<X, R> ChainComplex<X, R>
 where 
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>,
@@ -121,7 +121,7 @@ where
     }
 }
 
-impl<I, X, R> GridTrait<I> for XChainComplexBase<I, X, R>
+impl<I, X, R> GridTrait<I> for ChainComplexBase<I, X, R>
 where 
     I: GridDeg,
     X: Gen,
@@ -139,7 +139,7 @@ where
     }
 }
 
-impl<I, X, R> ChainComplexTrait<I> for XChainComplexBase<I, X, R>
+impl<I, X, R> ChainComplexTrait<I> for ChainComplexBase<I, X, R>
 where 
     I: GridDeg,
     X: Gen,
@@ -165,7 +165,7 @@ where
     }
 }
 
-impl<I, X, R> Index<I> for XChainComplexBase<I, X, R>
+impl<I, X, R> Index<I> for ChainComplexBase<I, X, R>
 where I: GridDeg, X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = XChainComplexSummand<X, R>;
     fn index(&self, i: I) -> &Self::Output {
@@ -173,7 +173,7 @@ where I: GridDeg, X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<X, R> Index<(isize, isize)> for XChainComplex2<X, R>
+impl<X, R> Index<(isize, isize)> for ChainComplex2<X, R>
 where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = XChainComplexSummand<X, R>;
     fn index(&self, i: (isize, isize)) -> &Self::Output {
@@ -181,7 +181,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<X, R> Index<(isize, isize, isize)> for XChainComplex3<X, R>
+impl<X, R> Index<(isize, isize, isize)> for ChainComplex3<X, R>
 where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = XChainComplexSummand<X, R>;
     fn index(&self, i: (isize, isize, isize)) -> &Self::Output {

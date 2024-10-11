@@ -1,10 +1,11 @@
 mod grid;
-mod cpx;
-mod x;
-pub mod generic;
+mod abst;
+mod conc;
+mod generic;
 
 pub use grid::*;
-pub use cpx::*;
-pub use x::*;
+pub use abst::*;
+pub use conc::*;
+pub use generic::*;
 
 pub mod utils;

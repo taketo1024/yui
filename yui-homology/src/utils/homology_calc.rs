@@ -147,13 +147,13 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 #[cfg(test)]
 mod tests {
     use num_traits::Zero;
-    use crate::simple::SimpleChainComplex;
+    use crate::generic::GenericChainComplex;
     use crate::{ChainComplexTrait, RModStr};
     use super::*;
  
     #[test]
     fn s2_0th() {
-        let c = SimpleChainComplex::<i32>::s2();
+        let c = GenericChainComplex::<i32>::s2();
         let d1 = c.d_matrix(1);
         let d0 = c.d_matrix(0); // zero
 
@@ -173,7 +173,7 @@ mod tests {
 
     #[test]
     fn s2_1st() {
-        let c = SimpleChainComplex::<i32>::s2();
+        let c = GenericChainComplex::<i32>::s2();
         let d1 = c.d_matrix(2);
         let d0 = c.d_matrix(1);
 
@@ -184,7 +184,7 @@ mod tests {
 
     #[test]
     fn s2_2nd() {
-        let c = SimpleChainComplex::<i32>::s2();
+        let c = GenericChainComplex::<i32>::s2();
         let d3 = c.d_matrix(3); // zero
         let d2 = c.d_matrix(2);
 
@@ -204,7 +204,7 @@ mod tests {
 
     #[test]
     fn t2_0th() {
-        let c = SimpleChainComplex::<i32>::t2();
+        let c = GenericChainComplex::<i32>::t2();
         let d1 = c.d_matrix(1);
         let d0 = c.d_matrix(0); // zero
 
@@ -224,7 +224,7 @@ mod tests {
 
     #[test]
     fn t2_1st() {
-        let c = SimpleChainComplex::<i32>::t2();
+        let c = GenericChainComplex::<i32>::t2();
         let d2 = c.d_matrix(2);
         let d1 = c.d_matrix(1);
 
@@ -247,7 +247,7 @@ mod tests {
 
     #[test]
     fn t2_2nd() {
-        let c = SimpleChainComplex::<i32>::t2();
+        let c = GenericChainComplex::<i32>::t2();
         let d3 = c.d_matrix(3); // zero
         let d2 = c.d_matrix(2);
 
@@ -267,7 +267,7 @@ mod tests {
 
     #[test]
     fn rp2_0th() {
-        let c = SimpleChainComplex::<i32>::rp2();
+        let c = GenericChainComplex::<i32>::rp2();
         let d1 = c.d_matrix(1);
         let d0 = c.d_matrix(0); // zero
 
@@ -287,7 +287,7 @@ mod tests {
 
     #[test]
     fn rp2_1st() {
-        let c = SimpleChainComplex::<i32>::rp2();
+        let c = GenericChainComplex::<i32>::rp2();
         let d2 = c.d_matrix(2);
         let d1 = c.d_matrix(1);
 

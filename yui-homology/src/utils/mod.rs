@@ -1,4 +1,3 @@
-mod samples;
 mod matrix;
 mod chain_reducer;
 mod homology_calc;

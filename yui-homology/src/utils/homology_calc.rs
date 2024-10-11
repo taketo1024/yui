@@ -146,12 +146,14 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 #[cfg(test)]
 mod tests {
+    use num_traits::Zero;
+    use crate::simple::SimpleChainComplex;
+    use crate::{ChainComplexTrait, RModStr};
     use super::*;
-    use crate::{ChainComplex, ChainComplexTrait, RModStr};
  
     #[test]
     fn s2_0th() {
-        let c = ChainComplex::<i32>::s2();
+        let c = SimpleChainComplex::<i32>::s2();
         let d1 = c.d_matrix(1);
         let d0 = c.d_matrix(0); // zero
 
@@ -162,15 +164,16 @@ mod tests {
 
         let t = h.trans().unwrap();
         let v = h.gen_vec(0);
+        let z = c[0].as_chain(&v);
 
         assert!(!v.is_zero());
-        assert!(c.d(0, &v).is_zero());
+        assert!(c.d(0, &z).is_zero());
         assert_eq!(t.forward(&v), SpVec::unit(1, 0));
     }
 
     #[test]
     fn s2_1st() {
-        let c = ChainComplex::<i32>::s2();
+        let c = SimpleChainComplex::<i32>::s2();
         let d1 = c.d_matrix(2);
         let d0 = c.d_matrix(1);
 
@@ -181,7 +184,7 @@ mod tests {
 
     #[test]
     fn s2_2nd() {
-        let c = ChainComplex::<i32>::s2();
+        let c = SimpleChainComplex::<i32>::s2();
         let d3 = c.d_matrix(3); // zero
         let d2 = c.d_matrix(2);
 
@@ -192,15 +195,16 @@ mod tests {
 
         let t = h.trans().unwrap();
         let v = h.gen_vec(0);
+        let z = c[2].as_chain(&v);
 
         assert!(!v.is_zero());
-        assert!(c.d(2, &v).is_zero());
+        assert!(c.d(2, &z).is_zero());
         assert_eq!(t.forward(&v), SpVec::unit(1, 0));
     }
 
     #[test]
     fn t2_0th() {
-        let c = ChainComplex::<i32>::t2();
+        let c = SimpleChainComplex::<i32>::t2();
         let d1 = c.d_matrix(1);
         let d0 = c.d_matrix(0); // zero
 
@@ -211,15 +215,16 @@ mod tests {
 
         let t = h.trans().unwrap();
         let v = h.gen_vec(0);
+        let z = c[0].as_chain(&v);
 
         assert!(!v.is_zero());
-        assert!(c.d(0, &v).is_zero());
+        assert!(c.d(0, &z).is_zero());
         assert_eq!(t.forward(&v), SpVec::unit(1, 0));
     }
 
     #[test]
     fn t2_1st() {
-        let c = ChainComplex::<i32>::t2();
+        let c = SimpleChainComplex::<i32>::t2();
         let d2 = c.d_matrix(2);
         let d1 = c.d_matrix(1);
 
@@ -232,15 +237,17 @@ mod tests {
 
         for i in 0..2 { 
             let v = h.gen_vec(i);
+            let z = c[1].as_chain(&v);
+
             assert!(!v.is_zero());
-            assert!(c.d(1, &v).is_zero());
+            assert!(c.d(1, &z).is_zero());
             assert_eq!(t.forward(&v), SpVec::unit(2, i));
         }
     }
 
     #[test]
     fn t2_2nd() {
-        let c = ChainComplex::<i32>::t2();
+        let c = SimpleChainComplex::<i32>::t2();
         let d3 = c.d_matrix(3); // zero
         let d2 = c.d_matrix(2);
 
@@ -251,15 +258,16 @@ mod tests {
 
         let t = h.trans().unwrap();
         let v = h.gen_vec(0);
+        let z = c[2].as_chain(&v);
 
         assert!(!v.is_zero());
-        assert!(c.d(2, &v).is_zero());
+        assert!(c.d(2, &z).is_zero());
         assert_eq!(t.forward(&v), SpVec::unit(1, 0));
     }
 
     #[test]
     fn rp2_0th() {
-        let c = ChainComplex::<i32>::rp2();
+        let c = SimpleChainComplex::<i32>::rp2();
         let d1 = c.d_matrix(1);
         let d0 = c.d_matrix(0); // zero
 
@@ -270,15 +278,16 @@ mod tests {
 
         let t = h.trans().unwrap();
         let v = h.gen_vec(0);
+        let z = c[0].as_chain(&v);
 
         assert!(!v.is_zero());
-        assert!(c.d(0, &v).is_zero());
+        assert!(c.d(0, &z).is_zero());
         assert_eq!(t.forward(&v), SpVec::unit(1, 0));
     }
 
     #[test]
     fn rp2_1st() {
-        let c = ChainComplex::<i32>::rp2();
+        let c = SimpleChainComplex::<i32>::rp2();
         let d2 = c.d_matrix(2);
         let d1 = c.d_matrix(1);
 
@@ -289,9 +298,10 @@ mod tests {
 
         let t = h.trans().unwrap();
         let v = h.gen_vec(0);
+        let z = c[1].as_chain(&v);
 
         assert!(!v.is_zero());
-        assert!(c.d(1, &v).is_zero());
+        assert!(c.d(1, &z).is_zero());
         assert_eq!(t.forward(&v), SpVec::unit(1, 0));
     }
 }

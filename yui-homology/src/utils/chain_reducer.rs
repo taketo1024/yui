@@ -347,12 +347,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests {
+    use num_traits::Zero;
+    use crate::simple::SimpleChainComplex;
+    use crate::RModStr;
     use super::*;
-    use crate::{ChainComplex, RModStr};
 
     #[test]
     fn zero() { 
-        let c = ChainComplex::<i32>::zero();
+        let c = SimpleChainComplex::<i32>::zero();
         let r = ChainReducer::reduce(&c, true);
 
         r.check_d_all();
@@ -362,7 +364,7 @@ mod tests {
 
     #[test]
     fn acyclic() { 
-        let c = ChainComplex::<i32>::one_one(1);
+        let c = SimpleChainComplex::<i32>::one_one(1);
         let r = ChainReducer::reduce(&c, true);
 
         r.check_d_all();
@@ -373,7 +375,7 @@ mod tests {
 
     #[test]
     fn tor() { 
-        let c = ChainComplex::<i32>::one_one(2);
+        let c = SimpleChainComplex::<i32>::one_one(2);
         let r = ChainReducer::reduce(&c, true);
 
         r.check_d_all();
@@ -384,7 +386,7 @@ mod tests {
     
     #[test]
     fn d3() {
-        let c = ChainComplex::<i32>::d3();
+        let c = SimpleChainComplex::<i32>::d3();
         let r = ChainReducer::reduce(&c, false);
 
         r.check_d_all();
@@ -402,7 +404,7 @@ mod tests {
 
     #[test]
     fn s2() {
-        let c = ChainComplex::<i32>::s2();
+        let c = SimpleChainComplex::<i32>::s2();
         let r = ChainReducer::reduce(&c, false);
 
         r.check_d_all();
@@ -418,7 +420,7 @@ mod tests {
 
     #[test]
     fn t2() {
-        let c = ChainComplex::<i32>::t2();
+        let c = SimpleChainComplex::<i32>::t2();
         let r = ChainReducer::reduce(&c, false);
 
         r.check_d_all();
@@ -434,7 +436,7 @@ mod tests {
 
     #[test]
     fn rp2() {
-        let c = ChainComplex::<i32>::rp2();
+        let c = SimpleChainComplex::<i32>::rp2();
         let r = ChainReducer::reduce(&c, false);
 
         r.check_d_all();
@@ -453,7 +455,7 @@ mod tests {
 
     #[test]
     fn s2_trans() {
-        let c = ChainComplex::<i32>::s2();
+        let c = SimpleChainComplex::<i32>::s2();
         let r = ChainReducer::reduce(&c, true);
 
         let t0 = r[0].trans().unwrap();
@@ -474,13 +476,14 @@ mod tests {
 
         let v = SpVec::unit(1, 0);
         let w = t2.backward(&v);
+        let z = c[2].as_chain(&w);
         
-        assert!(c.d(2, &w).is_zero());
+        assert!(c.d(2, &z).is_zero());
     }
 
     #[test]
     fn t2_trans() {
-        let c = ChainComplex::<i32>::t2();
+        let c = SimpleChainComplex::<i32>::t2();
         let r = ChainReducer::reduce(&c, true);
 
         let t0 = r[0].trans().unwrap();
@@ -501,13 +504,17 @@ mod tests {
 
         let v = SpVec::unit(1, 0);
         let w = t2.backward(&v);
-        
-        assert!(c.d(2, &w).is_zero());
+        let z = c[2].as_chain(&w);
+
+        assert!(c.d(2, &z).is_zero());
 
         let a = SpVec::unit(2, 0);
-        let b = SpVec::unit(2, 1);
         let a = t1.backward(&a);
+        let a = c[1].as_chain(&a);
+        
+        let b = SpVec::unit(2, 1);
         let b = t1.backward(&b);
+        let b = c[1].as_chain(&b);
         
         assert!(c.d(1, &a).is_zero());
         assert!(c.d(1, &b).is_zero());
@@ -515,7 +522,7 @@ mod tests {
 
     #[test]
     fn rp2_trans() {
-        let c = ChainComplex::<i32>::rp2();
+        let c = SimpleChainComplex::<i32>::rp2();
         let r = ChainReducer::reduce(&c, true);
 
         let t0 = r[0].trans().unwrap();
@@ -536,14 +543,17 @@ mod tests {
 
         let v = SpVec::unit(1, 0);
         let w = t2.backward(&v);
-        let dw = c.d(2, &w);
+        let x = c[2].as_chain(&w);
+        let dx = c.d(2, &x);
+        let dw = c[1].vectorize(&dx);
         let dv = t1.forward(&dw);
 
         assert_eq!(dv.to_dense()[0].abs(), 2);
 
         let v = SpVec::unit(1, 0);
         let w = t1.backward(&v);
+        let z = c[1].as_chain(&w);
         
-        assert!(c.d(1, &w).is_zero());
+        assert!(c.d(1, &z).is_zero());
     }
 }

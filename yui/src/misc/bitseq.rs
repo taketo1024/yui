@@ -1,5 +1,6 @@
 use core::fmt;
-use std::ops::Index;
+use auto_impl_ops::auto_ops;
+use std::ops::{Add, AddAssign, Index};
 use std::str::FromStr;
 use derive_more::{Display, Debug};
 
@@ -315,6 +316,20 @@ impl Ord for BitSeq {
     }
 }
 
+#[auto_ops]
+impl AddAssign<&BitSeq> for BitSeq {
+    fn add_assign(&mut self, rhs: &Self) {
+        self.append(*rhs);
+    }
+}
+
+#[auto_ops]
+impl AddAssign<Bit> for BitSeq {
+    fn add_assign(&mut self, b: Bit) {
+        self.push(b);
+    }
+}
+
 #[cfg(test)]
 mod tests { 
     use Bit::*;
@@ -453,11 +468,32 @@ mod tests {
     }
 
     #[test]
+    fn push_by_add() { 
+        let mut b = BitSeq::new(0b01101, 5);
+
+        b += Bit::Bit0;
+        assert_eq!(b, BitSeq::new(0b001101, 6));
+
+        b += Bit::Bit1;
+        assert_eq!(b, BitSeq::new(0b1001101, 7));
+    }
+
+    #[test]
     fn append() { 
         let mut b0 = BitSeq::new(0b10110, 5);
         let b1 = BitSeq::new(0b0101, 4);
 
         b0.append(b1);
+
+        assert_eq!(b0, BitSeq::new(0b010110110, 9));
+    }
+
+    #[test]
+    fn append_by_add() { 
+        let mut b0 = BitSeq::new(0b10110, 5);
+        let b1 = BitSeq::new(0b0101, 4);
+
+        b0 += b1;
 
         assert_eq!(b0, BitSeq::new(0b010110110, 9));
     }

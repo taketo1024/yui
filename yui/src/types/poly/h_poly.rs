@@ -1,10 +1,14 @@
 use std::fmt::Display;
 use std::ops::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Neg, DivAssign, RemAssign, Div, Rem};
+use std::str::FromStr;
 use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
 
 use crate::poly::var::fmt_mono;
+use crate::poly::Poly;
 use crate::{AddGrp, AddGrpOps, AddMon, AddMonOps, Elem, EucRing, EucRingOps, Field, FieldOps, Mon, MonOps, Ring, RingOps};
+
+use super::Mono;
 
 // Homogeneous polynomial
 #[derive(Clone, Copy, Debug, Default)]
@@ -43,6 +47,24 @@ where R: Display {
         let x = fmt_mono(&X.to_string(), &self.deg, true);
         let t = lc([(x, &self.coeff)].into_iter());
         t.fmt(f)
+    }
+}
+
+impl<const X: char, R> FromStr for HPoly<X, R>
+where R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let p = Poly::<X, R>::from_str(s)?;
+        if p.is_zero() { 
+            Ok(Self::zero())
+        } else if p.nterms() == 1 { 
+            let (x, a) = p.any_term().unwrap();
+            let p = Self::new(x.deg(), a.clone());
+            Ok(p)
+        } else {
+            Err(())
+        }
     }
 }
 
@@ -373,5 +395,18 @@ mod tests {
 
         assert_eq!(a % b, o);
         assert_eq!(b % a, b);
+    }
+
+    #[test]
+    fn from_str() {
+        type R = i64;
+        type P = HPoly<'x', R>;
+
+        assert_eq!(P::from_str("0"), Ok(P::zero()));
+        assert_eq!(P::from_str("3"), Ok(P::from_const(3)));
+        assert_eq!(P::from_str("x"), Ok(P::variable()));
+        assert_eq!(P::from_str("x^2"), Ok(P::new(2, 1)));
+        // assert_eq!(P::from_str("3x^2"), Ok(P::new(2, 3))); // not supported yet
+        assert_eq!(P::from_str("x + 1"), Err(()));
     }
 }

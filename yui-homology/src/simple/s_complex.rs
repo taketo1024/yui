@@ -20,9 +20,7 @@ impl Gen for EnumGen {}
 
 pub type SimpleChainComplex<R> = XChainComplexBase<isize, EnumGen, R>;
 
-use crate::{Grid1, XChainComplexBase};
-
-use super::XModStr;
+use crate::{Grid1, XChainComplexBase, XModStr};
 
 impl<R> SimpleChainComplex<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> {

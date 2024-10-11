@@ -6,6 +6,7 @@ use delegate::delegate;
 use yui::{Ring, RingOps};
 use yui_matrix::sparse::{SpMat, SpVec, MatTrait, Trans};
 
+use crate::generic::GenericChainComplexBase;
 use crate::{GridTrait, GridDeg, Grid, GridIter, isize2, isize3};
 use crate::utils::ChainReducer;
 use super::{RModStr, SimpleRModStr, rmod_str_symbol};
@@ -72,8 +73,8 @@ where
         println!("{}", self.display_d());
     }
 
-    fn as_generic(&self) -> ChainComplexBase<I, Self::R> {
-        ChainComplexBase::generate(self.support(), self.d_deg(), |i| self.d_matrix(i))
+    fn as_generic(&self) -> GenericChainComplexBase<I, Self::R> {
+        GenericChainComplexBase::generate(self.support(), self.d_deg(), |i| self.d_matrix(i))
     }
 }
 

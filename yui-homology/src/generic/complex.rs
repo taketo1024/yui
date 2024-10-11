@@ -29,7 +29,7 @@ where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {
                 let d = &d_matrices[i];
                 let v = summands[i].vectorize(z);
                 let dv = d * v;
-                let dz = summands[i + d_deg].as_chain(&dv);
+                let dz = summands[i + d_deg].devectorize(&dv);
                 dz
             }
         )
@@ -311,7 +311,7 @@ pub(crate) mod tests {
         let c = GenericChainComplex::<i32>::s2();
         let h = c.homology();
 
-        let z = h[2].gen_chain(0);
+        let z = h[2].gen(0);
         let dz = c.d(2, &z);
 
         assert!(!z.is_zero());
@@ -323,14 +323,14 @@ pub(crate) mod tests {
         let c = GenericChainComplex::<i32>::t2();
         let h = c.homology();
 
-        let z = h[2].gen_chain(0);
+        let z = h[2].gen(0);
         let dz = c.d(2, &z);
 
         assert!(!z.is_zero());
         assert!(dz.is_zero());
 
-        let a = h[1].gen_chain(0);
-        let b = h[1].gen_chain(1);
+        let a = h[1].gen(0);
+        let b = h[1].gen(1);
         let da = c.d(1, &a);
         let db = c.d(1, &b);
 
@@ -345,7 +345,7 @@ pub(crate) mod tests {
         let c = GenericChainComplex::<i32>::rp2();
         let h = c.homology();
 
-        let z = h[1].gen_chain(0);
+        let z = h[1].gen(0);
         let dz = c.d(1, &z);
 
         assert!(!z.is_zero());
@@ -373,7 +373,7 @@ pub(crate) mod tests {
         assert_eq!(h[2].rank(), 0);
         assert_eq!(h[3].rank(), 0);
 
-        let z = h[0].gen_chain(0);
+        let z = h[0].gen(0);
         assert!(!z.is_zero());
         assert!(c.d(0, &z).is_zero());
     }
@@ -396,7 +396,7 @@ pub(crate) mod tests {
 
         for i in 0..=2 { 
             for j in 0..h[i].rank() { 
-                let z = h[i].gen_chain(j);
+                let z = h[i].gen(j);
                 assert!(!z.is_zero());
                 assert!(c.d(i, &z).is_zero());
             }
@@ -421,7 +421,7 @@ pub(crate) mod tests {
 
         for i in 0..=2 { 
             for j in 0..h[i].rank() { 
-                let z = h[i].gen_chain(j);
+                let z = h[i].gen(j);
                 assert!(!z.is_zero());
                 assert!(c.d(i, &z).is_zero());
             }
@@ -447,7 +447,7 @@ pub(crate) mod tests {
 
         for i in 0..=2 { 
             for j in 0..h[i].rank() { 
-                let z = h[i].gen_chain(j);
+                let z = h[i].gen(j);
                 assert!(!z.is_zero());
                 assert!(c.d(i, &z).is_zero());
             }

@@ -462,7 +462,7 @@ mod tests {
 
         let v = SpVec::unit(1, 0);
         let w = t2.backward(&v);
-        let z = c[2].as_chain(&w);
+        let z = c[2].devectorize(&w);
         
         assert!(c.d(2, &z).is_zero());
     }
@@ -490,17 +490,17 @@ mod tests {
 
         let v = SpVec::unit(1, 0);
         let w = t2.backward(&v);
-        let z = c[2].as_chain(&w);
+        let z = c[2].devectorize(&w);
 
         assert!(c.d(2, &z).is_zero());
 
         let a = SpVec::unit(2, 0);
         let a = t1.backward(&a);
-        let a = c[1].as_chain(&a);
+        let a = c[1].devectorize(&a);
         
         let b = SpVec::unit(2, 1);
         let b = t1.backward(&b);
-        let b = c[1].as_chain(&b);
+        let b = c[1].devectorize(&b);
         
         assert!(c.d(1, &a).is_zero());
         assert!(c.d(1, &b).is_zero());
@@ -529,7 +529,7 @@ mod tests {
 
         let v = SpVec::unit(1, 0);
         let w = t2.backward(&v);
-        let x = c[2].as_chain(&w);
+        let x = c[2].devectorize(&w);
         let dx = c.d(2, &x);
         let dw = c[1].vectorize(&dx);
         let dv = t1.forward(&dw);
@@ -538,7 +538,7 @@ mod tests {
 
         let v = SpVec::unit(1, 0);
         let w = t1.backward(&v);
-        let z = c[1].as_chain(&w);
+        let z = c[1].devectorize(&w);
         
         assert!(c.d(1, &z).is_zero());
     }

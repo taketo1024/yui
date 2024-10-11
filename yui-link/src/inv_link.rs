@@ -49,6 +49,10 @@ impl InvLink {
             x_map.insert(j, i);
         }
 
+        if let Some(p) = base_pt { 
+            assert_eq!(p, e_map[&p], "base-pt must be on-axis.");
+        }
+
         Self { link, base_pt, e_map, x_map }
     }
 
@@ -201,6 +205,16 @@ mod tests {
         assert_eq!(l.inv_x(0), 0);
         assert_eq!(l.inv_x(1), 2);
         assert_eq!(l.inv_x(2), 1);
+    }
+
+    #[test]
+    fn from_sinv() { 
+        let l = InvLink::sinv_knot_from_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
+
+        assert_eq!(l.inv_e(1), 1);
+        assert_eq!(l.inv_e(2), 6);
+        assert_eq!(l.inv_e(3), 5);
+        assert_eq!(l.inv_e(4), 4);
     }
 
     #[test]

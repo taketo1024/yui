@@ -1,13 +1,14 @@
-use std::ops::Index;
+use std::ops::{Index, RangeInclusive};
 use std::sync::Arc;
 
 use delegate::delegate;
+use num_traits::Zero;
 use yui::{Ring, RingOps};
 use yui::lc::{Gen, Lc};
 use yui_matrix::sparse::{SpMat, SpVec};
 
 use crate::utils::ChainReducer;
-use crate::{GridTrait, GridDeg, Grid, GridIter, ChainComplexTrait, RModStr, isize2, isize3};
+use crate::{isize2, isize3, ChainComplexTrait, Grid, Grid1, GridDeg, GridIter, GridTrait, RModStr};
 use super::XModStr;
 
 #[cfg(feature = "multithread")]
@@ -19,6 +20,7 @@ pub type XChainComplex3<X, R> = XChainComplexBase<isize3, X, R>;
 
 pub type XChainComplexSummand<X, R> = XModStr<X, R>;
 
+#[derive(Clone)]
 pub struct XChainComplexBase<I, X, R>
 where 
     I: GridDeg,
@@ -88,6 +90,26 @@ where
         let d_deg = self.d_deg;
         let d_map = self.d_map.clone();
         Self { summands, d_deg, d_map }
+    }
+}
+
+impl<X, R> XChainComplex<X, R>
+where 
+    X: Gen,
+    R: Ring, for<'x> &'x R: RingOps<R>,
+{
+    pub fn truncated(&self, range: RangeInclusive<isize>) -> Self { 
+        let summands = Grid1::generate(range.clone(), |i| self[i].clone());
+        let d_deg = self.d_deg;
+        let d_map = self.d_map.clone();
+
+        Self::new(summands, d_deg, move |i, z| 
+            if range.contains(&(i + d_deg)) { 
+                d_map(i, z)
+            } else { 
+                Lc::zero()
+            }
+        )
     }
 }
 

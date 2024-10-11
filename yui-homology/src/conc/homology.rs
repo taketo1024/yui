@@ -18,7 +18,7 @@ where
             c.gens().clone(),
             h.rank(),
             h.tors().iter().cloned().collect(),
-            Some(c.trans().unwrap().merged(&h.trans().unwrap()))
+            c.trans().merged(h.trans())
         )
     }
 

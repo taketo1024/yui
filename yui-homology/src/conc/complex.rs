@@ -86,11 +86,12 @@ where
         let summands = Grid::generate(
             self.summands.support(),
             |i| {
+                let c = &self[i];
                 Summand::new(
-                    self[i].gens().clone(), 
+                    c.gens().clone(), 
                     r.rank(i).unwrap(), 
                     vec![], 
-                    r.trans(i).cloned() // TODO should merge
+                    c.trans().merged(r.trans(i).unwrap())
                 )
             } 
         );

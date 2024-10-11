@@ -115,6 +115,27 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
             self.b_mats = vec![b];
         }
     }
+
+    pub fn sub(&self, indices: &[usize]) -> Self { 
+        let n = self.tgt_dim();
+        let p = indices.len();
+        let f = SpMat::from_entries(
+            (p, n), 
+            indices.iter().enumerate().map(|(i, &j)|
+                (i, j, R::one())
+            )
+        );
+        let b = SpMat::from_entries(
+            (n, p), 
+            indices.iter().enumerate().map(|(i, &j)|
+                (j, i, R::one())
+            )
+        );
+
+        let mut sub = self.clone();
+        sub.append(f, b);
+        sub
+    }
 }
 
 impl<R> Default for Trans<R>

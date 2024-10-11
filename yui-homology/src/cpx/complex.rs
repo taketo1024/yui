@@ -16,7 +16,7 @@ pub type ChainComplex<R>  = ChainComplexBase<isize,  R>;
 pub type ChainComplex2<R> = ChainComplexBase<isize2, R>;
 pub type ChainComplex3<R> = ChainComplexBase<isize3, R>;
 
-pub trait ChainComplexTrait<I>: Sized
+pub trait ChainComplexTrait<I>: Sized + GridTrait<I>
 where 
     I: GridDeg, 
     Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> 
@@ -24,17 +24,13 @@ where
     type R;
     type Element;
 
+    // required methods
     fn rank(&self, i: I) -> usize;
     fn d_deg(&self) -> I;
     fn d(&self, i: I, z: &Self::Element) -> Self::Element;
     fn d_matrix(&self, i: I) -> SpMat<Self::R>;
-}
 
-pub trait ChainComplexCommon<I>: GridTrait<I> + ChainComplexTrait<I>
-where 
-    I: GridDeg, 
-    Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R>
-{
+    // convenient methods
     fn check_d_at(&self, i0: I) { 
         let i1 = i0 + self.d_deg();
         if !(self.is_supported(i0) && self.is_supported(i1)) {
@@ -80,13 +76,6 @@ where
         ChainComplexBase::generate(self.support(), self.d_deg(), |i| self.d_matrix(i))
     }
 }
-
-impl<I, C> ChainComplexCommon<I> for C 
-where 
-    I: GridDeg,
-    C: GridTrait<I> + ChainComplexTrait<I>,
-    C::R: Ring, for<'x> &'x C::R: RingOps<C::R>
-{}
 
 pub struct ChainComplexBase<I, R>
 where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {

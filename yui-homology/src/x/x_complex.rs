@@ -187,7 +187,7 @@ pub(crate) mod tests {
     use yui::lc::Free;
     use yui_matrix::sparse::SpVec;
 
-    use crate::{RModStr, ChainComplex, ChainComplexCommon};
+    use crate::{RModStr, ChainComplex};
 
     use super::*;
 

@@ -46,6 +46,10 @@ where
         Self { summands, d_deg, d_map }
     }
 
+    pub fn zero() -> Self { 
+        Self::new(Grid::default(), I::zero(), |_, _| Lc::zero())
+    }
+
     pub fn summands(&self) -> &Grid<I, XChainComplexSummand<X, R>> { 
         &self.summands
     }

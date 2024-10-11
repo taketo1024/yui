@@ -1,20 +1,10 @@
-use std::mem;
-use std::ops::Index;
-
-use itertools::{Itertools, Either};
-use delegate::delegate;
+use itertools::Itertools;
 use yui::{Ring, RingOps};
-use yui_matrix::sparse::{SpMat, SpVec, MatTrait, Trans};
+use yui_matrix::sparse::SpMat;
 
 use crate::generic::GenericChainComplexBase;
-use crate::{GridTrait, GridDeg, Grid, GridIter, isize2, isize3};
-use super::{RModStr, SimpleRModStr, rmod_str_symbol};
-
-pub type ChainComplexSummand<R> = SimpleRModStr<R>;
-
-pub type ChainComplex<R>  = ChainComplexBase<isize,  R>;
-pub type ChainComplex2<R> = ChainComplexBase<isize2, R>;
-pub type ChainComplex3<R> = ChainComplexBase<isize3, R>;
+use crate::{GridTrait, GridDeg};
+use super::rmod_str_symbol;
 
 pub trait ChainComplexTrait<I>: Sized + GridTrait<I>
 where 
@@ -74,144 +64,5 @@ where
 
     fn as_generic(&self) -> GenericChainComplexBase<I, Self::R> {
         GenericChainComplexBase::generate(self.support(), self.d_deg(), |i| self.d_matrix(i))
-    }
-}
-
-pub struct ChainComplexBase<I, R>
-where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {
-    summands: Grid<I, ChainComplexSummand<R>>,
-    d_deg: I,
-    d_matrices: Grid<I, SpMat<R>>
-}
-
-impl<I, R> ChainComplexBase<I, R> 
-where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new(summands: Grid<I, ChainComplexSummand<R>>, d_deg: I, mut d_matrices: Grid<I, SpMat<R>>) -> Self { 
-        assert!(summands.iter().all(|(_, s)| s.is_free()));
-        
-        for i in summands.support() { 
-            let r = summands[i].rank();
-            if r > 0 && !d_matrices.is_supported(i - d_deg) { 
-                let d = SpMat::zero((r, 0));
-                d_matrices.insert(i - d_deg, d);
-            }
-        }
-
-        Self { summands, d_deg, d_matrices }
-    }
-
-    pub fn generate<It, F>(support: It, d_deg: I, d_matrix_map: F) -> Self
-    where 
-        It: IntoIterator<Item = I>, 
-        F: FnMut(I) -> SpMat<R>
-    {
-        let d_matrices = Grid::generate(support, d_matrix_map);
-
-        let summands = Grid::generate(d_matrices.support(), |i| {
-            let r = d_matrices[i].ncols();
-            let t = Trans::id(r);
-            ChainComplexSummand::new(r, vec![], Some(t)) 
-        });
-
-        Self::new(summands, d_deg, d_matrices)
-    }
-
-    pub fn zero() -> Self { 
-        Self::new(Grid::default(), I::zero(), Grid::default())
-    }
-
-    pub fn summands(&self) -> &Grid<I, ChainComplexSummand<R>> { 
-        &self.summands
-    }
-
-    pub fn d_matrix_ref(&self, i: I) -> &SpMat<R> {
-        &self.d_matrices[i]
-    }
-
-    pub fn reduced(&self, _with_trans: bool) -> ChainComplexBase<I, R> { 
-        todo!("to be removed")
-    }
-}
-
-impl<I, R> GridTrait<I> for ChainComplexBase<I, R>
-where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {
-    type Itr = GridIter<I>;
-    type Output = ChainComplexSummand<R>;
-
-    delegate! { 
-        to self.summands { 
-            fn support(&self) -> Self::Itr;        
-            fn is_supported(&self, i: I) -> bool;
-            fn get(&self, i: I) -> &Self::Output;
-        }
-    }
-}
-
-impl<I, R> ChainComplexTrait<I> for ChainComplexBase<I, R>
-where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {
-    type R = R;
-    type Element = SpVec<R>;
-
-    fn rank(&self, i: I) -> usize {
-        self[i].rank()
-    }
-
-    fn d_deg(&self) -> I { 
-        self.d_deg
-    }
-
-    fn d_matrix(&self, i: I) -> SpMat<Self::R> {
-        self.d_matrices[i].clone()
-    }
-
-    fn d(&self, i: I, v: &Self::Element) -> Self::Element {
-        assert_eq!(self.rank(i), v.dim());
-        let d = self.d_matrix_ref(i);
-        d * v
-    }
-}
-
-impl<R> ChainComplexBase<isize, R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn from_mats(d_deg: isize, offset: isize, mut mats: Vec<SpMat<R>>) -> Self { 
-        let n = mats.len() as isize;
-        let range = offset .. offset + n;
-        let range = if d_deg.is_positive() { 
-            Either::Left(range) 
-        } else { 
-            Either::Right(range.rev())
-        };
-        
-        Self::generate(
-            range, d_deg, 
-            move |i| {
-                let i = (i - offset) as usize;
-                mem::take(&mut mats[i])
-            }
-        )
-    }
-}
-
-impl<I, R> Index<I> for ChainComplexBase<I, R>
-where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = ChainComplexSummand<R>;
-    fn index(&self, i: I) -> &Self::Output {
-        self.get(i)
-    }
-}
-
-impl<R> Index<(isize, isize)> for ChainComplex2<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = ChainComplexSummand<R>;
-    fn index(&self, i: (isize, isize)) -> &Self::Output {
-        self.get(i.into())
-    }
-}
-
-impl<R> Index<(isize, isize, isize)> for ChainComplex3<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = ChainComplexSummand<R>;
-    fn index(&self, i: (isize, isize, isize)) -> &Self::Output {
-        self.get(i.into())
     }
 }

@@ -2,8 +2,8 @@ use yui::{EucRing, EucRingOps, Ring, RingOps};
 
 use crate::generic::GenericSummand;
 use crate::utils::HomologyCalc;
-use crate::{GridDeg, Grid, GridTrait, isize2, isize3};
-use super::{ChainComplexTrait, SimpleRModStr, ChainComplexBase};
+use crate::{GridDeg, Grid, isize2, isize3};
+use super::{ChainComplexTrait, SimpleRModStr};
 
 pub type HomologySummand<R> = SimpleRModStr<R>;
 pub type HomologyBase<I, R> = Grid<I, HomologySummand<R>>;
@@ -34,19 +34,5 @@ where
 
     fn compute_homology(&self, with_trans: bool) -> Grid<I, GenericSummand<I, R>> {
         Grid::generate(self.support(), |i| self.compute_homology_at(i, with_trans))
-    }
-}
-
-impl<I, R> ChainComplexBase<I, R> 
-where I: GridDeg, R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    pub fn homology_at(&self, _i: I, _with_trans: bool) -> HomologySummand<R> {
-        todo!("to be removed")
-    }
-
-    pub fn homology(&self, with_trans: bool) -> HomologyBase<I, R> {
-        HomologyBase::generate(
-            self.support(), 
-            |i| self.homology_at(i, with_trans)
-        )
     }
 }

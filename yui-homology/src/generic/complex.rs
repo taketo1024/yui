@@ -354,4 +354,103 @@ pub(crate) mod tests {
         assert!(!h[1].vectorize_euc(&z).is_zero());
         assert!(h[1].vectorize_euc(&(z * 2)).is_zero()); // order 2
     }
+
+    #[test]
+    fn d3_red() {
+        let c = GenericChainComplex::<i32>::d3().reduced();
+
+        assert_eq!(c[0].rank(), 1);
+        assert_eq!(c[1].rank(), 0);
+        assert_eq!(c[2].rank(), 0);
+        assert_eq!(c[3].rank(), 0);
+
+        c.check_d_all();
+
+        let h = c.homology(true);
+
+        assert_eq!(h[0].rank(), 1);
+        assert_eq!(h[1].rank(), 0);
+        assert_eq!(h[2].rank(), 0);
+        assert_eq!(h[3].rank(), 0);
+
+        let z = h[0].gen_chain(0);
+        assert!(!z.is_zero());
+        assert!(c.d(0, &z).is_zero());
+    }
+
+    #[test]
+    fn s2_red() {
+        let c = GenericChainComplex::<i32>::s2().reduced();
+
+        assert_eq!(c[0].rank(), 1);
+        assert_eq!(c[1].rank(), 0);
+        assert_eq!(c[2].rank(), 1);
+
+        c.check_d_all();
+
+        let h = c.homology(false);
+
+        assert_eq!(h[0].rank(), 1);
+        assert_eq!(h[1].rank(), 0);
+        assert_eq!(h[2].rank(), 1);
+
+        for i in 0..=2 { 
+            for j in 0..h[i].rank() { 
+                let z = h[i].gen_chain(j);
+                assert!(!z.is_zero());
+                assert!(c.d(i, &z).is_zero());
+            }
+        }
+    }
+
+    #[test]
+    fn t2_red() {
+        let c = GenericChainComplex::<i32>::t2().reduced();
+
+        assert_eq!(c[0].rank(), 1);
+        assert_eq!(c[1].rank(), 2);
+        assert_eq!(c[2].rank(), 1);
+
+        c.check_d_all();
+
+        let h = c.homology(false);
+
+        assert_eq!(h[0].rank(), 1);
+        assert_eq!(h[1].rank(), 2);
+        assert_eq!(h[2].rank(), 1);
+
+        for i in 0..=2 { 
+            for j in 0..h[i].rank() { 
+                let z = h[i].gen_chain(j);
+                assert!(!z.is_zero());
+                assert!(c.d(i, &z).is_zero());
+            }
+        }
+    }
+
+    #[test]
+    fn rp2_red() {
+        let c = GenericChainComplex::<i32>::rp2().reduced();
+
+        assert_eq!(c[0].rank(), 1);
+        assert_eq!(c[1].rank(), 1);
+        assert_eq!(c[2].rank(), 1);
+
+        c.check_d_all();
+        
+        let h = c.homology(false);
+
+        assert_eq!(h[0].rank(), 1);
+        assert_eq!(h[1].rank(), 0);
+        assert_eq!(h[1].tors(), &vec![2]);
+        assert_eq!(h[2].rank(), 0);
+
+        for i in 0..=2 { 
+            for j in 0..h[i].rank() { 
+                let z = h[i].gen_chain(j);
+                assert!(!z.is_zero());
+                assert!(c.d(i, &z).is_zero());
+            }
+        }
+    }
 }

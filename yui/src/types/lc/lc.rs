@@ -150,6 +150,23 @@ where
         self.iter().sorted_by(|(x, _), (y, _)| cmp(x, y))
     }
 
+    pub fn combine<F>(&self, other: &Self, x_map: F) -> Self 
+    where F: Fn(&X, &X) -> X { 
+        let mut res = Self::zero();
+        res.data.reserve(self.nterms() * other.nterms());
+
+        for (x, r) in self.iter() { 
+            for (y, s) in other.iter() { 
+                let xy = x_map(x, y);
+                let rs = r * s;
+                res.add_pair((xy, rs));
+            }
+        }
+        
+        res.clean();
+        res
+    }
+
     pub fn to_string_by<F>(&self, cmp: F, descending: bool) -> String
     where F: Fn(&X, &X) -> std::cmp::Ordering {
         use crate::util::format::lc;
@@ -353,19 +370,7 @@ where
     type Output = Lc<X, R>;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        let mut res = Self::Output::zero();
-        res.data.reserve(self.nterms() * rhs.nterms());
-
-        for (x, r) in self.iter() { 
-            for (y, s) in rhs.iter() { 
-                let xy = x.clone() * y.clone();
-                let rs = r * s;
-                res.add_pair((xy, rs));
-            }
-        }
-        
-        res.clean();
-        res
+        self.combine(rhs, |x, y| x.clone() * y.clone())
     }
 }
 

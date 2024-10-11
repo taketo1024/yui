@@ -16,18 +16,14 @@ where
     gens: IndexList<X>,
     rank: usize, 
     tors: Vec<R>,
-    trans: Option<Trans<R>>
+    trans: Trans<R>
 }
 
 impl<X, R> Summand<X, R>
 where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new(gens: IndexList<X>, rank: usize, tors: Vec<R>, trans: Option<Trans<R>>) -> Self { 
-        if let Some(t) = &trans { 
-            assert_eq!(t.src_dim(), gens.len());
-            assert_eq!(t.tgt_dim(), rank + tors.len());
-        } else { 
-            assert_eq!(gens.len(), rank + tors.len());
-        }
+    pub fn new(gens: IndexList<X>, rank: usize, tors: Vec<R>, trans: Trans<R>) -> Self { 
+        assert_eq!(trans.src_dim(), gens.len());
+        assert_eq!(trans.tgt_dim(), rank + tors.len());
 
         Self { gens, rank, tors, trans }
     }
@@ -37,15 +33,15 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         let gens = gens.into_iter().collect::<IndexList<X>>();
         let r = gens.len();
 
-        Self::new(gens, r, vec![], Some(Trans::id(r))) 
+        Self::new(gens, r, vec![], Trans::id(r)) 
     }
 
     pub fn zero() -> Self { 
-        Self::new(IndexList::new(), 0, vec![], Some(Trans::zero()))
+        Self::new(IndexList::new(), 0, vec![], Trans::zero())
     }
 
-    pub fn trans(&self) -> Option<&Trans<R>> { 
-        self.trans.as_ref()
+    pub fn trans(&self) -> &Trans<R> { 
+        &self.trans
     }
 
     // TODO rename to `raw_gens`
@@ -58,10 +54,6 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     // and create XFreeModStr that unwraps it. 
 
     pub fn gen_chain(&self, i: usize) -> Lc<X, R> { 
-        if self.trans().is_none() { 
-            panic!()
-        }
-
         let n = self.dim();
         let v = SpVec::unit(n, i);
 
@@ -69,10 +61,6 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn vectorize(&self, z: &Lc<X, R>) -> SpVec<R> {
-        let Some(t) = self.trans() else { 
-            panic!()
-        };
-
         let n = self.gens.len();
         let v = SpVec::from_entries(n, z.iter().map(|(x, a)| { 
             let Some(i) = self.gens.index_of(x) else { 
@@ -81,7 +69,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
             (i, a.clone())
         }));
 
-        t.forward(&v)
+        self.trans.forward(&v)
     }
 
     pub fn vectorize_euc(&self, z: &Lc<X, R>) -> SpVec<R>
@@ -100,38 +88,21 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn as_chain(&self, v: &SpVec<R>) -> Lc<X, R> {
-        let Some(t) = self.trans() else { 
-            panic!()
-        };
-
         assert_eq!(v.dim(), self.dim());
 
-        let v = t.backward(v);
+        let v = self.trans.backward(v);
 
         Lc::from_iter( v.iter().map(|(i, a)| 
             (self.gens[i].clone(), a.clone())
         ) )
     }
 
-    pub fn merge<Y>(&mut self, other: Summand<Y, R>, reduce: bool)
+    pub fn merge<Y>(&mut self, other: Summand<Y, R>)
     where Y: Gen { 
         self.rank = other.rank;
         self.tors = other.tors.clone();
-        
-        let Some(t) = self.trans.as_mut() else { 
-            return;
-        };
-
-        let Some(t1) = other.trans else { 
-            self.trans = None;
-            return;
-        };
-
-        t.merge(t1);
-        
-        if reduce { 
-            t.reduce()
-        }
+        self.trans.merge(other.trans);
+        self.trans.reduce();
     }
 }
 

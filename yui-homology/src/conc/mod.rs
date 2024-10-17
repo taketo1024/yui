@@ -4,3 +4,4 @@ mod homology;
 
 pub use summand::*;
 pub use complex::*;
+pub use homology::*;

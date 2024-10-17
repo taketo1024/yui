@@ -18,8 +18,6 @@ pub type ChainComplex <X, R> = ChainComplexBase<isize,  X, R>;
 pub type ChainComplex2<X, R> = ChainComplexBase<isize2, X, R>;
 pub type ChainComplex3<X, R> = ChainComplexBase<isize3, X, R>;
 
-pub type XChainComplexSummand<X, R> = Summand<X, R>;
-
 #[derive(Clone)]
 pub struct ChainComplexBase<I, X, R>
 where 
@@ -27,7 +25,7 @@ where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    summands: Grid<I, XChainComplexSummand<X, R>>,
+    summands: Grid<I, Summand<X, R>>,
     d_deg: I,
     d_map: Arc<dyn Fn(I, &Lc<X, R>) -> Lc<X, R> + Send + Sync>,
 }
@@ -38,7 +36,7 @@ where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
-    pub fn new<F>(summands: Grid<I, XChainComplexSummand<X, R>>, d_deg: I, d_map: F) -> Self
+    pub fn new<F>(summands: Grid<I, Summand<X, R>>, d_deg: I, d_map: F) -> Self
     where F: Fn(I, &Lc<X, R>) -> Lc<X, R> + Send + Sync + 'static {
         assert!(summands.iter().all(|(_, s)| s.is_free()));
 
@@ -50,7 +48,7 @@ where
         Self::new(Grid::default(), I::zero(), |_, _| Lc::zero())
     }
 
-    pub fn summands(&self) -> &Grid<I, XChainComplexSummand<X, R>> { 
+    pub fn summands(&self) -> &Grid<I, Summand<X, R>> { 
         &self.summands
     }
 
@@ -129,7 +127,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
     type Itr = GridIter<I>;
-    type Output = XChainComplexSummand<X, R>;
+    type Output = Summand<X, R>;
     
     delegate! { 
         to self.summands { 
@@ -168,7 +166,7 @@ where
 
 impl<I, X, R> Index<I> for ChainComplexBase<I, X, R>
 where I: GridDeg, X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = XChainComplexSummand<X, R>;
+    type Output = Summand<X, R>;
     fn index(&self, i: I) -> &Self::Output {
         self.get(i)
     }
@@ -176,7 +174,7 @@ where I: GridDeg, X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<X, R> Index<(isize, isize)> for ChainComplex2<X, R>
 where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = XChainComplexSummand<X, R>;
+    type Output = Summand<X, R>;
     fn index(&self, i: (isize, isize)) -> &Self::Output {
         self.get(i.into())
     }
@@ -184,7 +182,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<X, R> Index<(isize, isize, isize)> for ChainComplex3<X, R>
 where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = XChainComplexSummand<X, R>;
+    type Output = Summand<X, R>;
     fn index(&self, i: (isize, isize, isize)) -> &Self::Output {
         self.get(i.into())
     }

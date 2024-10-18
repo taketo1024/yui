@@ -8,7 +8,7 @@ use yui::lc::{Gen, Lc};
 use yui_matrix::sparse::{SpMat, SpVec};
 
 use crate::utils::ChainReducer;
-use crate::{isize2, isize3, ChainComplexTrait, Grid, Grid1, GridDeg, GridIter, GridTrait, RModStr};
+use crate::{isize2, isize3, ChainComplexTrait, Grid, GridDeg, GridIter, GridTrait, RModStr};
 use super::XModStr;
 
 #[cfg(feature = "multithread")]
@@ -99,9 +99,9 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
     pub fn truncated(&self, range: RangeInclusive<isize>) -> Self { 
-        let summands = Grid1::generate(range.clone(), |i| self[i].clone());
         let d_deg = self.d_deg;
         let d_map = self.d_map.clone();
+        let summands = self.summands.truncated(range.clone());
 
         Self::new(summands, d_deg, move |i, z| 
             if range.contains(&(i + d_deg)) { 

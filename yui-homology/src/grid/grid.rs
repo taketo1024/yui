@@ -1,4 +1,4 @@
-use std::ops::Index;
+use std::ops::{Index, RangeInclusive};
 use std::fmt::Display;
 
 use ahash::AHashMap;
@@ -87,6 +87,15 @@ where I: GridDeg {
         )
     }
 }
+
+impl<E> Grid1<E> {
+    pub fn truncated(&self, range: RangeInclusive<isize>) -> Self
+    where E: Clone { 
+        let support = self.support().filter(|i| range.contains(i));
+        Self::generate_with_default(support, |i| self[i].clone(), self.default.clone())
+    }
+}
+
 
 impl<I, E> Default for Grid<I, E>
 where I: GridDeg, E: Default {

@@ -14,25 +14,9 @@ pub struct InvLink {
 }
 
 impl InvLink { 
-    pub fn new<I>(link: Link, symm: I, base_pt: Option<Edge>) -> InvLink
-    where I: IntoIterator<Item = (Edge, Edge)> { 
-        let mut edges = link.edges();
-        let mut e_map = HashMap::new();
-
-        for (e1, e2) in symm { 
-            assert!(edges.contains(&e1));
-            assert!(edges.contains(&e2));
-
-            e_map.insert(e1, e2);
-            e_map.insert(e2, e1);
-            edges.remove(&e1);
-            edges.remove(&e2);
-        }
-
-        for e in edges { 
-            e_map.insert(e, e);
-        }
-
+    pub fn new<F>(link: Link, e_map: F, base_pt: Option<Edge>) -> InvLink
+    where F: Fn(Edge) -> Edge { 
+        let e_map = link.edges().iter().map(|&e| (e, e_map(e))).collect::<HashMap<_, _>>();
         let mut x_map = HashMap::new();
 
         // TODO? check resolution
@@ -63,12 +47,6 @@ impl InvLink {
         Self { link, base_pt, e_map, x_map }
     }
 
-    pub fn from_code<I1, I2>(pd_code: I1, symm: I2, base_pt: Option<Edge>) -> Self
-    where I1: IntoIterator<Item = XCode>, I2: IntoIterator<Item = (Edge, Edge)> { 
-        let l = Link::from_pd_code(pd_code);
-        Self::new(l, symm, base_pt)
-    }
-
     pub fn sinv_knot_from_code<I1>(pd_code: I1) -> Self
     where I1: IntoIterator<Item = XCode> { 
         let code = pd_code.into_iter().collect_vec();
@@ -79,9 +57,7 @@ impl InvLink {
         assert_eq!(l.edges().iter().min(), Some(&1), "edge must start from index 1.");
         assert_eq!(l.edges().iter().max(), Some(&n), "edges must have sequential indexing.");
 
-        let symm = (2..=n/2).map(|i| (i, n - i + 2));
-        
-        Self::new(l, symm, Some(1))
+        Self::new(l, |e| (n + 1 - e) % n + 1, Some(1))
     }
 
     pub fn link(&self) -> &Link { 
@@ -194,25 +170,25 @@ mod tests {
     #[test]
     fn inv_e() { 
         let l = Link::from_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
-        let l = InvLink::new(l, [(1,5), (2,4)], None);
+        let l = InvLink::new(l, |e| (7 - e) % 6 + 1, None);
 
-        assert_eq!(l.inv_e(1), 5);
-        assert_eq!(l.inv_e(2), 4);
-        assert_eq!(l.inv_e(3), 3);
-        assert_eq!(l.inv_e(4), 2);
-        assert_eq!(l.inv_e(5), 1);
-        assert_eq!(l.inv_e(6), 6);
+        assert_eq!(l.inv_e(1), 1);
+        assert_eq!(l.inv_e(2), 6);
+        assert_eq!(l.inv_e(3), 5);
+        assert_eq!(l.inv_e(4), 4);
+        assert_eq!(l.inv_e(5), 3);
+        assert_eq!(l.inv_e(6), 2);
     }
     
     #[test]
     fn inv_x() { 
         let l = Link::from_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
-        let l = InvLink::new(l, [(1,5), (2,4)], None);
+        let l = InvLink::new(l, |e| (7 - e) % 6 + 1, None);
         let data = l.link.data();
 
-        assert_eq!(l.inv_x(&data[0]), &data[0]);
-        assert_eq!(l.inv_x(&data[1]), &data[2]);
-        assert_eq!(l.inv_x(&data[2]), &data[1]);
+        assert_eq!(l.inv_x(&data[0]), &data[1]);
+        assert_eq!(l.inv_x(&data[1]), &data[0]);
+        assert_eq!(l.inv_x(&data[2]), &data[2]);
     }
 
     #[test]
@@ -223,6 +199,8 @@ mod tests {
         assert_eq!(l.inv_e(2), 6);
         assert_eq!(l.inv_e(3), 5);
         assert_eq!(l.inv_e(4), 4);
+        assert_eq!(l.inv_e(5), 3);
+        assert_eq!(l.inv_e(6), 2);
     }
 
     #[test]

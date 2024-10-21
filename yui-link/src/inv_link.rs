@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use itertools::Itertools;
 use num_integer::Integer;
-use crate::{Edge, Link, XCode};
+use crate::{Crossing, Edge, Link, XCode};
 
 // Involutive link
 #[derive(Debug, Clone)]
@@ -10,7 +10,7 @@ pub struct InvLink {
     link: Link,
     base_pt: Option<Edge>,
     e_map: HashMap<Edge, Edge>,
-    x_map: HashMap<usize, usize>
+    x_map: HashMap<Crossing, Crossing>
 }
 
 impl InvLink { 
@@ -36,7 +36,7 @@ impl InvLink {
         let mut x_map = HashMap::new();
 
         // TODO? check resolution
-        for (i, x) in link.data().iter().enumerate() { 
+        for x in link.data().iter() { 
             let edges = x.edges().map(|e| e_map.get(&e).unwrap());
             let find = link.data().iter().find_position(|y|
                 edges.iter().all(|e| y.edges().contains(e))
@@ -45,9 +45,16 @@ impl InvLink {
             assert!(find.is_some(), "no match for x: {x} -> {edges:?}");
 
             let j = find.unwrap().0;
-            x_map.insert(i, j);
-            x_map.insert(j, i);
+            let y = &link.data()[j];
+
+            x_map.insert(x.clone(), y.clone());
+
+            if x != y { 
+                x_map.insert(y.clone(), x.clone());
+            }
         }
+
+        assert_eq!(x_map.len(), link.data().len());
 
         if let Some(p) = base_pt { 
             assert_eq!(p, e_map[&p], "base-pt must be on-axis.");
@@ -89,8 +96,8 @@ impl InvLink {
         self.e_map.get(&e).cloned().unwrap()
     }
 
-    pub fn inv_x(&self, i: usize) -> usize { 
-        self.x_map.get(&i).cloned().unwrap()
+    pub fn inv_x(&self, x: &Crossing) -> &Crossing { 
+        self.x_map.get(x).unwrap()
     }
 
     pub fn mirror(&self) -> Self { 
@@ -98,7 +105,7 @@ impl InvLink {
             link: self.link.mirror(),
             base_pt: self.base_pt,
             e_map: self.e_map.clone(),
-            x_map: self.x_map.clone(), 
+            x_map: self.x_map.iter().map(|(x, y)| (x.mirror(), y.mirror())).collect(), 
         }
     }
 }
@@ -201,10 +208,11 @@ mod tests {
     fn inv_x() { 
         let l = Link::from_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
         let l = InvLink::new(l, [(1,5), (2,4)], None);
+        let data = l.link.data();
 
-        assert_eq!(l.inv_x(0), 0);
-        assert_eq!(l.inv_x(1), 2);
-        assert_eq!(l.inv_x(2), 1);
+        assert_eq!(l.inv_x(&data[0]), &data[0]);
+        assert_eq!(l.inv_x(&data[1]), &data[2]);
+        assert_eq!(l.inv_x(&data[2]), &data[1]);
     }
 
     #[test]

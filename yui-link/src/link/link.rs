@@ -205,8 +205,7 @@ impl Link {
     }
 
     pub fn mirror(&self) -> Self {
-        let mut data = self.data.clone();
-        data.iter_mut().for_each(|x| x.mirror());
+        let data = self.data.iter().map(|x| x.mirror()).collect();
         Link { data }
     }
 

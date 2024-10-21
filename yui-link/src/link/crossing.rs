@@ -69,8 +69,15 @@ impl Crossing {
         x
     }
 
-    pub fn mirror(&mut self) { 
-        self.ctype = self.ctype.mirror();
+    pub fn mirror(&self) -> Self { 
+        Self { 
+            ctype: self.ctype.mirror(),
+            edges: self.edges.clone()
+        }
+    }
+
+    pub fn is_adj_to(&self, x: &Crossing) -> bool { 
+        self.edges.iter().any(|e| x.edges.contains(e))
     }
 
     pub fn pass(&self, index:usize) -> usize { 
@@ -172,20 +179,16 @@ mod tests {
 
     #[test]
     fn crossing_mirror() {
-        let mut c = a_crossing(X);
-        c.mirror();
+        let c = a_crossing(X).mirror();
         assert_eq!(c.ctype(), Xm);
 
-        let mut c = a_crossing(Xm);
-        c.mirror();
+        let c = a_crossing(Xm).mirror();
         assert_eq!(c.ctype(), X);
 
-        let mut c = a_crossing(H);
-        c.mirror();
+        let c = a_crossing(H).mirror();
         assert_eq!(c.ctype(), H);
 
-        let mut c = a_crossing(V);
-        c.mirror();
+        let c = a_crossing(V).mirror();
         assert_eq!(c.ctype(), V);
     }
 

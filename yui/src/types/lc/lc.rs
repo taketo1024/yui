@@ -355,8 +355,7 @@ where
             return
         }
 
-        let data = std::mem::take(&mut self.data);
-        self.data = data.into_iter().map(|(x, r)| (x, &r * rhs)).collect();
+        self.data.iter_mut().for_each(|(_, r)| *r *= rhs);
         self.clean()
     }
 }

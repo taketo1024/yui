@@ -116,6 +116,12 @@ impl Crossing {
     }
 }
 
+impl From<[Edge; 4]> for Crossing {
+    fn from(edges: [Edge; 4]) -> Self {
+        Self::new(CrossingType::X, edges)
+    }
+}
+
 impl Display for Crossing {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}{:?}", self.ctype, self.edges)

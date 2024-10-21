@@ -108,12 +108,12 @@ where R: Eq + Zero {}
 impl<const X: char, R> AddAssign<&HPoly<X, R>> for HPoly<X, R>
 where R: AddMon, for<'x> &'x R: AddMonOps<R> {
     fn add_assign(&mut self, rhs: &HPoly<X, R>) {
-        if self.coeff.is_zero() { 
+        if self.is_zero() { 
             *self = rhs.clone()
         } else if rhs.is_zero() { 
             return
         } else { 
-            assert_eq!(self.deg, rhs.deg);
+            assert_eq!(self.deg, rhs.deg, "{self} + {rhs} is not homogeneous.");
             self.coeff.add_assign(&rhs.coeff)
         }
     }
@@ -123,12 +123,12 @@ where R: AddMon, for<'x> &'x R: AddMonOps<R> {
 impl<const X: char, R> SubAssign<&HPoly<X, R>> for HPoly<X, R>
 where R: AddGrp, for<'x> &'x R: AddGrpOps<R> {
     fn sub_assign(&mut self, rhs: &HPoly<X, R>) {
-        if self.coeff.is_zero() { 
+        if self.is_zero() { 
             *self = -rhs
         } else if rhs.is_zero() { 
             return
         } else { 
-            assert_eq!(self.deg, rhs.deg);
+            assert_eq!(self.deg, rhs.deg, "{self} - {rhs} is not homogeneous.");
             self.coeff.sub_assign(&rhs.coeff)
         }
     }

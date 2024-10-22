@@ -226,6 +226,19 @@ mod tests {
     }
 
     #[test]
+    fn is_connectable_bothends() { 
+        let c = Path::new(vec![1,2,3,4], false);
+
+        assert!(!c.is_connectable_bothends(&Path::new(vec![4,5], false)));
+        assert!(!c.is_connectable_bothends(&Path::new(vec![5,4], false)));
+        assert!(!c.is_connectable_bothends(&Path::new(vec![1,5], false)));
+        assert!(!c.is_connectable_bothends(&Path::new(vec![5,1], false)));
+        assert!( c.is_connectable_bothends(&Path::new(vec![1,4], false)));
+        assert!( c.is_connectable_bothends(&Path::new(vec![4,1], false)));
+        assert!(!c.is_connectable_bothends(&Path::new(vec![0],   true)));
+    }
+
+    #[test]
     fn connect() { 
         let mut c = Path::new(vec![1,2,3,4], false);
         c.connect(Path::new(vec![4,5], false));

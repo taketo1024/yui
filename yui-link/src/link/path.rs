@@ -154,13 +154,19 @@ impl Path {
         false
     }
 
+    fn edge_sum(&self) -> usize { 
+        self.edges.iter().sum()
+    }
+
     pub fn unori_eq(&self, other: &Self) -> bool {
-        if self.closed != other.closed { 
+        // early failure
+        if self.closed != other.closed ||
+           self.edges.len() != other.edges.len() || 
+           self.edge_sum() != other.edge_sum()
+        { 
             return false;
         }
-        if self.edges.len() != other.edges.len() { 
-            return false;
-        }
+
         if self.edges == other.edges { 
             return true
         } 
@@ -173,7 +179,12 @@ impl Path {
             (0 .. n).all(|i| self.edges[i] == other.edges[(p + i) % n]) || 
             (0 .. n).all(|i| self.edges[i] == other.edges[(p + n - i) % n])
         } else { 
-            self.edges.iter().zip(other.edges.iter().rev()).all(|(e, f)| e == f)
+            Iterator::zip(
+                self.edges.iter(), 
+                other.edges.iter().rev()
+            ).all(|(e, f)| 
+                e == f
+            )
         }
     }
 }

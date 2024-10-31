@@ -173,12 +173,12 @@ where
         let (p, q, r) = pivots(a, piv_type, piv_cond);
 
         if r == 0 { 
-            info!("  done C[{i}]: {:?}", a.shape());
+            info!("  done.");
             return false;
-        } else { 
-            info!("  found {r} pivots.")
         }
 
+        info!("  found {r} pivots.");
+        
         let a = a.permute(p.view(), q.view());
 
         let t = match piv_type { 

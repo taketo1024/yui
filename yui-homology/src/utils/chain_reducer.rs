@@ -129,9 +129,9 @@ where
         }
         
         if deep { 
-            debug!("reduce all (deep)");
+            info!("reduce all (deep)");
         } else {
-            debug!("reduce all (shallow)");
+            info!("reduce all (shallow)");
         }
 
         let support = self.support.clone();
@@ -165,7 +165,7 @@ where
             return false;
         }
 
-        debug!("reduce C[{i}]: {:?} ..", a.shape());
+        info!("reduce C[{i}]: {:?} ..", a.shape());
         debug!("  nnz: {}", a.nnz());
         debug!("  density: {}", a.density());
         debug!("  mean-weight: {}", a.mean_weight());
@@ -173,8 +173,10 @@ where
         let (p, q, r) = pivots(a, piv_type, piv_cond);
 
         if r == 0 { 
-            debug!("no more pivots.");
+            info!("  done C[{i}]: {:?}", a.shape());
             return false;
+        } else { 
+            info!("  found {r} pivots.")
         }
 
         let a = a.permute(p.view(), q.view());
@@ -191,7 +193,7 @@ where
         let sch = Schur::from_partial_triangular(t, &a, r, with_trans);
         let (s, t_src, t_tgt) = sch.disassemble();
 
-        debug!("red C[{i}]: {:?} -> {:?}.", a.shape(), s.shape());
+        info!("  reduced C[{i}]: {:?} -> {:?}", a.shape(), s.shape());
 
         self.update_mats(i, &p, &q, r, s);
 

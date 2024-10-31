@@ -1,7 +1,8 @@
+use log::info;
 use yui::{EucRing, EucRingOps};
 
 use crate::utils::HomologyCalc;
-use crate::{GridDeg, Grid, GridTrait, isize2, isize3};
+use crate::{isize2, isize3, rmod_str_symbol, Grid, GridDeg, GridTrait, RModStr};
 use super::{ChainComplexTrait, SimpleRModStr, ChainComplexBase};
 
 pub type HomologySummand<R> = SimpleRModStr<R>;
@@ -25,10 +26,21 @@ where
     type Output = HomologySummand<R>;
 
     fn compute_homology(&self, i: I, with_trans: bool) -> HomologySummand<R> {
-        let i0 = i - self.d_deg();
-        let d0 = self.d_matrix(i0);
-        let d1 = self.d_matrix(i );
-        HomologyCalc::calculate(d0, d1, with_trans)
+        info!("compute H[{i}]: {} -> {} -> {} ..", 
+            rmod_str_symbol(self.rank(i - self.d_deg()), &[], "0"), 
+            rmod_str_symbol(self.rank(i),                &[], "0"), 
+            rmod_str_symbol(self.rank(i + self.d_deg()), &[], "0"), 
+        );
+        
+        let d0 = self.d_matrix(i - self.d_deg());
+        let d1 = self.d_matrix(i);
+        let h = HomologyCalc::calculate(d0, d1, with_trans);
+
+        info!("  H[{i}] = {}.", 
+            rmod_str_symbol(h.rank(), h.tors(), "0")
+        );
+
+        h
     }
 }
 

@@ -1,38 +1,36 @@
 use itertools::Itertools;
 use yui::{Ring, RingOps};
 
-pub fn rmod_str_symbol<R>(rank: usize, tors: &[R], dflt: &str) -> String
+pub fn rmod_str_symbol<R>(rank: usize, tors: &[R]) -> String
 where R: Ring, for<'x> &'x R: RingOps<R> {
     use yui::util::format::superscript;
     make_string(
         R::math_symbol(), 
         rank, 
         &tors.iter().map(|t| t.to_string()).collect_vec(), 
-        dflt, 
         superscript, 
         "⊕"
     )
 }
 
 #[cfg(feature = "tex")]
-pub fn tex_rmod_str_symbol<R>(rank: usize, tors: &[R], dflt: &str) -> String
+pub fn tex_rmod_str_symbol<R>(rank: usize, tors: &[R]) -> String
 where R: Ring + yui::TeX, for<'x> &'x R: RingOps<R> {
     make_string(
         R::tex_math_symbol(), 
         rank, 
         &tors.iter().map(|t| t.tex_string()).collect_vec(), 
-        dflt, 
         |a| format!("^{a}"), 
         "\\oplus"
     )
 }
 
-fn make_string<F>(symbol: String, rank: usize, tors: &[String], dflt: &str, superscript: F, oplus: &str) -> String
+fn make_string<F>(symbol: String, rank: usize, tors: &[String], superscript: F, oplus: &str) -> String
 where F: Fn(usize) -> String {
     use std::collections::BTreeMap;
 
     if rank == 0 && tors.is_empty() { 
-        return dflt.to_string()
+        return "0".to_string()
     }
 
     let mut res = vec![];
@@ -71,44 +69,44 @@ mod tests {
  
     #[test]
     fn zero() { 
-        let s = rmod_str_symbol::<i32>(0, &[], "0");
+        let s = rmod_str_symbol::<i32>(0, &[]);
         assert_eq!(s, "0");
     }
 
     #[test]
     fn rank1() { 
-        let s = rmod_str_symbol::<i32>(1, &[], "0");
+        let s = rmod_str_symbol::<i32>(1, &[]);
         assert_eq!(s, "Z");
     }
 
     #[test]
     fn rank2() { 
-        let s = rmod_str_symbol::<i32>(2, &[], "0");
+        let s = rmod_str_symbol::<i32>(2, &[]);
         assert_eq!(s, "Z²");
     }
 
     #[test]
     fn tor() { 
-        let s = rmod_str_symbol(0, &[2], "0");
+        let s = rmod_str_symbol(0, &[2]);
         assert_eq!(s, "(Z/2)");
     }
 
     #[test]
     fn tor2() { 
-        let s = rmod_str_symbol(0, &[2,2,3], "0");
+        let s = rmod_str_symbol(0, &[2,2,3]);
         assert_eq!(s, "(Z/2)² ⊕ (Z/3)");
     }
 
     #[test]
     fn mix() { 
-        let s = rmod_str_symbol(2, &[2,2,3], "0");
+        let s = rmod_str_symbol(2, &[2,2,3]);
         assert_eq!(s, "Z² ⊕ (Z/2)² ⊕ (Z/3)");
     }
 
     #[cfg(feature = "tex")]
     #[test]
     fn tex() { 
-        let s = tex_rmod_str_symbol(2, &[2,2,3], "0");
+        let s = tex_rmod_str_symbol(2, &[2,2,3]);
         assert_eq!(s, "\\mathbb{Z}^2 \\oplus (\\mathbb{Z}/2)^2 \\oplus (\\mathbb{Z}/3)");
     }
 }

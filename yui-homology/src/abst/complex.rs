@@ -41,7 +41,7 @@ where
     }
 
     fn display_d_at(&self, i: I) -> String {
-        let c = |i| rmod_str_symbol(self.rank(i), &[], "0");
+        let c = |i| rmod_str_symbol(self.rank(i), &[]);
         let c0 = c(i);
         let c1 = c(i + self.d_deg());
         let d = self.d_matrix(i).into_dense();

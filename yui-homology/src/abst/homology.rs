@@ -20,9 +20,9 @@ where
 {
     fn compute_homology_at(&self, i: I, with_trans: bool) -> GenericSummand<I, R> {
         info!("compute H[{i}]: {} -> {} -> {} ..", 
-            rmod_str_symbol(self.rank(i - self.d_deg()), &[], "0"), 
-            rmod_str_symbol(self.rank(i),                &[], "0"), 
-            rmod_str_symbol(self.rank(i + self.d_deg()), &[], "0"), 
+            rmod_str_symbol(self.rank(i - self.d_deg()), &[]), 
+            rmod_str_symbol(self.rank(i),                &[]), 
+            rmod_str_symbol(self.rank(i + self.d_deg()), &[]), 
         );
         
         let i0 = i - self.d_deg();
@@ -31,7 +31,7 @@ where
         let (rank, tors, trans) = HomologyCalc::calculate(d0, d1, with_trans);
 
         info!("  H[{i}] = {}.", 
-            rmod_str_symbol(rank, &tors, "0")
+            rmod_str_symbol(rank, &tors)
         );
 
         GenericSummand::generate(i, rank, tors, trans)

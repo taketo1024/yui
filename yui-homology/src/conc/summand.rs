@@ -124,7 +124,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
 impl<X, R> DisplayForGrid for Summand<X, R>
 where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn display_for_grid(&self) -> String {
-        rmod_str_symbol(self.rank(), self.tors(), ".")
+        rmod_str_symbol(self.rank(), self.tors())
     }
 }
 

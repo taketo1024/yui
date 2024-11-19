@@ -247,15 +247,18 @@ macro_rules! impl_trivar_signed {
 impl_trivar_unsigned!(usize);
 impl_trivar_signed!  (isize);
 
-cfg_if::cfg_if! { 
-    if #[cfg(feature = "tex")] {
-        use crate::TeX;
+#[cfg(feature = "tex")] 
+mod tex {
+    use crate::TeX;
+    use super::*;
 
-        impl<const X: char, const Y: char, const Z: char, I> TeX for Var3<X, Y, Z, I>
-        where I: ToPrimitive {
-            fn to_tex_string(&self) -> String {
-                self.to_string_u(false)
-            }
+    impl<const X: char, const Y: char, const Z: char, I> TeX for Var3<X, Y, Z, I>
+    where I: ToPrimitive {
+        fn tex_math_symbol() -> String { 
+            format!("{},{},{}", X, Y, Z)
+        }
+        fn tex_string(&self) -> String {
+            self.to_string_u(false)
         }
     }
 }

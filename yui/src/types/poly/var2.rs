@@ -239,15 +239,18 @@ macro_rules! impl_bivar_signed {
 impl_bivar_unsigned!(usize);
 impl_bivar_signed!  (isize);
 
-cfg_if::cfg_if! { 
-    if #[cfg(feature = "tex")] {
-        use crate::TeX;
+#[cfg(feature = "tex")] 
+mod tex {
+    use crate::TeX;
+    use super::*;
 
-        impl<const X: char, const Y: char, I> TeX for Var2<X, Y, I>
-        where I: ToPrimitive {
-            fn to_tex_string(&self) -> String {
-                self.to_string_u(false)
-            }
+    impl<const X: char, const Y: char, I> TeX for Var2<X, Y, I>
+    where I: ToPrimitive {
+        fn tex_math_symbol() -> String { 
+            format!("{},{}", X, Y)
+        }
+        fn tex_string(&self) -> String {
+            self.to_string_u(false)
         }
     }
 }

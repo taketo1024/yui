@@ -365,24 +365,33 @@ where T: Integer, for<'x> &'x T: IntOps<T> {
     }
 }
 
-cfg_if::cfg_if! { 
-    if #[cfg(feature = "tex")] {
-        use crate::TeX;
+#[cfg(feature = "tex")] 
+mod tex {
+    use crate::TeX;
+    use super::*;
 
-        impl<T> TeX for Ratio<T> 
-        where T: TeX {
-            fn to_tex_string(&self) -> String {
-                let p = self.numer.to_tex_string();
-                let q = self.denom.to_tex_string();
-        
-                if &q == "1" { 
-                    p
-                } else if !p.starts_with('-') && !p.contains(' ') { 
-                    format!(r"\frac{{{p}}}{{{q}}}")
-                } else { 
-                    let p = p.strip_prefix('-').unwrap();
-                    format!(r"-\frac{{{p}}}{{{q}}}")
-                }
+    impl<T> TeX for Ratio<T> 
+    where T: TeX + Elem {
+        fn tex_math_symbol() -> String { 
+            let t = T::math_symbol();
+            if &t == "Z" { 
+                String::from("\\mathbb{Q}")
+            } else { 
+                format!("Q({})", T::math_symbol())
+            }        
+        }
+
+        fn tex_string(&self) -> String {
+            let p = self.numer.tex_string();
+            let q = self.denom.tex_string();
+    
+            if &q == "1" { 
+                p
+            } else if !p.starts_with('-') && !p.contains(' ') { 
+                format!(r"\frac{{{p}}}{{{q}}}")
+            } else { 
+                let p = p.strip_prefix('-').unwrap();
+                format!(r"-\frac{{{p}}}{{{q}}}")
             }
         }
     }
@@ -602,12 +611,15 @@ mod tests {
     #[test]
     #[cfg(feature = "tex")]
     fn tex() { 
+        use crate::TeX;
+        assert_eq!(Ratio::<i32>::tex_math_symbol(), "\\mathbb{Q}");
+
         let a = Ratio::new(43, 1);
         let b = Ratio::new(43, 31);
         let c = Ratio::new(-43, 31);
 
-        assert_eq!(a.to_tex_string(), "43");
-        assert_eq!(b.to_tex_string(), r"\frac{43}{31}");
-        assert_eq!(c.to_tex_string(), r"-\frac{43}{31}");
+        assert_eq!(a.tex_string(), "43");
+        assert_eq!(b.tex_string(), r"\frac{43}{31}");
+        assert_eq!(c.tex_string(), r"-\frac{43}{31}");
     }
 }

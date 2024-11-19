@@ -20,6 +20,6 @@ where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
     }
 
     fn display(&self) -> String { 
-        crate::rmod_str_symbol(self.rank(), self.tors())
+        crate::rmod_str(self.rank(), self.tors())
     }
 }

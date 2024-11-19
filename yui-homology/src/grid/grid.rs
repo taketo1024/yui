@@ -178,32 +178,29 @@ macro_rules! impl_index {
 impl_index!(isize, isize2, isize3);
 impl_index!(usize, usize2, usize3);
 
-pub trait DisplayForGrid {
-    fn display_for_grid(&self) -> String;
-}
-
-impl<T> DisplayForGrid for T
-where T: Display {
-    fn display_for_grid(&self) -> String {
-        self.to_string()
-    }
-}
-
-pub trait DisplaySeq<I> {
-    fn display_seq(&self, label: &str) -> String;
-    fn print_seq(&self, label: &str) {
-        println!("{}", self.display_seq(label))
+pub trait DisplaySeq<I>: GridTrait<I>
+where I: GridDeg {
+    fn display_seq(&self, label: &str, dflt: &str) -> String;
+    fn print_seq(&self, label: &str, dflt: &str) {
+        println!("{}", self.display_seq(label, dflt))
     }
 }
 
 macro_rules! impl_print_seq {
     ($t:ident) => {
-        impl<T> DisplaySeq<$t> for T
-        where T: GridTrait<$t>, T::Output: DisplayForGrid {
-            fn display_seq(&self, label: &str) -> String {
+        impl<G> DisplaySeq<$t> for G
+        where G: GridTrait<$t>, G::Output: Display + Default + Eq {
+            fn display_seq(&self, label: &str, dflt: &str) -> String { 
                 use yui::util::format::table;
+                let d = G::Output::default();
+
                 let str = table(label, [""].iter(), self.support(), |_, &i| {
-                    self.get(i).display_for_grid()
+                    let item = self.get(i);
+                    if item == &d { 
+                        dflt.to_string()
+                    } else { 
+                        item.to_string()
+                    }
                 });
                 str
             }
@@ -215,25 +212,31 @@ impl_print_seq!(isize);
 impl_print_seq!(usize);
 
 pub trait DisplayTable<I> {
-    fn display_table(&self, label0: &str, label1: &str) -> String;
-    fn print_table(&self, label0: &str, label1: &str) {
-        println!("{}", self.display_table(label0, label1))
+    fn display_table(&self, label0: &str, label1: &str, dflt: &str) -> String;
+    fn print_table(&self, label0: &str, label1: &str, dflt: &str) {
+        println!("{}", self.display_table(label0, label1, dflt))
     }
 }
 
 macro_rules! impl_print_table {
     ($t:ident) => {
-        impl<T> DisplayTable<$t> for T
-        where T: GridTrait<$t>, T::Output: DisplayForGrid {
-            fn display_table(&self, label0: &str, label1: &str) -> String {
+        impl<G> DisplayTable<$t> for G
+        where G: GridTrait<$t>, G::Output: Display + Default + Eq {
+            fn display_table(&self, label0: &str, label1: &str, dflt: &str) -> String {
                 use yui::util::format::table;
-        
+                let d = G::Output::default();
+
                 let head = format!("{}\\{}", label1, label0);
                 let cols = self.support().map(|$t(i, _)| i).unique().sorted();
                 let rows = self.support().map(|$t(_, j)| j).unique().sorted().rev();
         
                 let str = table(head, rows, cols, |&j, &i| {
-                    self.get($t(i, j)).display_for_grid()
+                    let item = self.get($t(i, j));
+                    if item == &d { 
+                        dflt.to_string()
+                    } else { 
+                        item.to_string()
+                    }
                 });
         
                 str
@@ -258,7 +261,7 @@ mod tests {
         assert_eq!(g.get( 1), &10);
         assert_eq!(g.get(-1), &0); // default
 
-        let _seq = g.display_seq("i");
+        let _seq = g.display_seq("i", "0");
         // println!("{_seq}");
     }
 
@@ -272,7 +275,7 @@ mod tests {
         assert_eq!(g.get(isize2(1, 2)), &12);
         assert_eq!(g.get(isize2(3, 3)), &0);
 
-        let _table = g.display_table("i", "j");
+        let _table = g.display_table("i", "j", "0");
         // println!("{_table}");
     }
 }

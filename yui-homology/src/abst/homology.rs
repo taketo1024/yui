@@ -3,7 +3,7 @@ use yui::{EucRing, EucRingOps, Ring, RingOps};
 
 use crate::generic::GenericSummand;
 use crate::utils::HomologyCalc;
-use crate::{GenericHomologyBase, Grid, GridDeg, rmod_str_symbol};
+use crate::{GenericHomologyBase, Grid, GridDeg, SummandTrait};
 use super::ChainComplexTrait;
 
 pub trait ComputeHomology<I, R>
@@ -20,9 +20,9 @@ where
 {
     fn compute_homology_at(&self, i: I, with_trans: bool) -> GenericSummand<I, R> {
         info!("compute H[{i}]: {} -> {} -> {} ..", 
-            rmod_str_symbol(self.rank(i - self.d_deg()), &[]), 
-            rmod_str_symbol(self.rank(i),                &[]), 
-            rmod_str_symbol(self.rank(i + self.d_deg()), &[]), 
+            self.display_at(i - self.d_deg()), 
+            self.display_at(i), 
+            self.display_at(i + self.d_deg()), 
         );
         
         let i0 = i - self.d_deg();
@@ -30,11 +30,11 @@ where
         let d1 = self.d_matrix(i);
         let (rank, tors, trans) = HomologyCalc::calculate(d0, d1, with_trans);
 
-        info!("  H[{i}] = {}.", 
-            rmod_str_symbol(rank, &tors)
-        );
+        let h = GenericSummand::generate(i, rank, tors, trans);
 
-        GenericSummand::generate(i, rank, tors, trans)
+        info!("  H[{i}] = {}.", h.display());
+
+        h
     }
 
     fn compute_homology(&self, with_trans: bool) -> GenericHomologyBase<I, R> {

@@ -18,4 +18,8 @@ where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
     fn is_free(&self) -> bool { 
         self.tors().is_empty()
     }
+
+    fn display(&self) -> String { 
+        crate::rmod_str_symbol(self.rank(), self.tors())
+    }
 }

@@ -4,7 +4,7 @@ use yui_matrix::sparse::SpMat;
 
 use crate::generic::GenericChainComplexBase;
 use crate::{GridTrait, GridDeg};
-use super::rmod_str_symbol;
+use crate::rmod_str_symbol;
 
 pub trait ChainComplexTrait<I>: Sized + GridTrait<I>
 where 

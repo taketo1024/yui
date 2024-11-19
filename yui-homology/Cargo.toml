@@ -11,6 +11,7 @@ edition.workspace = true
 default = ["multithread"]
 multithread = ["rayon"]
 serde = ["dep:serde", "dep:serde_json", "ahash/serde"]
+tex = ["yui/tex"]
 
 [dependencies]
 ahash = "0.8.11"

@@ -13,6 +13,7 @@ where I: GridDeg {
     fn support(&self) -> Self::Support;
     fn is_supported(&self, i: I) -> bool;
     fn get(&self, i: I) -> &Self::Item;
+    fn get_default(&self) -> &Self::Item;
 }
 
 pub type Grid1<E> = Grid<isize,  E>;
@@ -54,10 +55,6 @@ where I: GridDeg {
         let support = support.into_iter().collect_vec();
         let data = support.iter().map(|&i| (i, e_map(i))).collect();
         Self::new(support, data, default)
-    }
-
-    pub fn get_default(&self) -> &E { 
-        &self.default
     }
 
     pub fn insert(&mut self, i: I, e: E) {
@@ -134,6 +131,10 @@ where I: GridDeg {
     fn get(&self, i: I) -> &E {
         self.data.get(&i).unwrap_or(&self.default)
     }
+
+    fn get_default(&self) -> &E { 
+        &self.default
+    }
 }
 
 impl<I, E> Index<I> for Grid<I, E>
@@ -178,31 +179,23 @@ macro_rules! impl_index {
 impl_index!(isize, isize2, isize3);
 impl_index!(usize, usize2, usize3);
 
-pub trait DisplaySeq<I>: GridTrait<I>
-where I: GridDeg {
-    fn display_seq(&self, label: &str, dflt: &str) -> String;
-    fn print_seq(&self, label: &str, dflt: &str) {
-        println!("{}", self.display_seq(label, dflt))
+pub trait DisplaySeq<I> {
+    fn display_seq(&self, label: &str) -> String;
+    fn print_seq(&self, label: &str) {
+        println!("{}", self.display_seq(label))
     }
 }
 
 macro_rules! impl_print_seq {
     ($t:ident) => {
         impl<G> DisplaySeq<$t> for G
-        where G: GridTrait<$t>, G::Item: Display + Default + Eq {
-            fn display_seq(&self, label: &str, dflt: &str) -> String { 
+        where G: GridTrait<$t>, G::Item: Display {
+            fn display_seq(&self, label: &str) -> String { 
                 use yui::util::format::table;
-                let d = G::Item::default();
 
-                let str = table(label, [""].iter(), self.support(), |_, &i| {
-                    let item = self.get(i);
-                    if item == &d { 
-                        dflt.to_string()
-                    } else { 
-                        item.to_string()
-                    }
-                });
-                str
+                table(label, [""].iter(), self.support(), |_, &i| {
+                    self.get(i).to_string()
+                })
             }
         }                
     };
@@ -212,34 +205,32 @@ impl_print_seq!(isize);
 impl_print_seq!(usize);
 
 pub trait DisplayTable<I> {
-    fn display_table(&self, label0: &str, label1: &str, dflt: &str) -> String;
-    fn print_table(&self, label0: &str, label1: &str, dflt: &str) {
-        println!("{}", self.display_table(label0, label1, dflt))
+    fn display_table(&self, label0: &str, label1: &str) -> String;
+    fn print_table(&self, label0: &str, label1: &str) {
+        println!("{}", self.display_table(label0, label1))
     }
 }
 
 macro_rules! impl_print_table {
     ($t:ident) => {
         impl<G> DisplayTable<$t> for G
-        where G: GridTrait<$t>, G::Item: Display + Default + Eq {
-            fn display_table(&self, label0: &str, label1: &str, dflt: &str) -> String {
+        where G: GridTrait<$t>, G::Item: Display {
+            fn display_table(&self, label0: &str, label1: &str) -> String {
                 use yui::util::format::table;
-                let d = G::Item::default();
 
+                let def_str = self.get_default().to_string();
                 let head = format!("{}\\{}", label1, label0);
                 let cols = self.support().map(|$t(i, _)| i).unique().sorted();
                 let rows = self.support().map(|$t(_, j)| j).unique().sorted().rev();
         
-                let str = table(head, rows, cols, |&j, &i| {
-                    let item = self.get($t(i, j));
-                    if item == &d { 
-                        dflt.to_string()
+                table(head, rows, cols, |&j, &i| {
+                    let str = self.get($t(i, j)).to_string();
+                    if str == def_str { 
+                        ".".to_string()
                     } else { 
-                        item.to_string()
+                        str
                     }
-                });
-        
-                str
+                })
             }
         }
     };
@@ -247,6 +238,40 @@ macro_rules! impl_print_table {
 
 impl_print_table!(isize2);
 impl_print_table!(usize2);
+
+#[cfg(feature = "tex")]
+pub mod tex { 
+    use super::*;
+    use yui::tex::{TeX, tex_table};
+
+    pub trait TeXTable<I> {
+        fn tex_table(&self, caption: &str, head: &str) -> String;
+    }
+
+    macro_rules! impl_tex_table {
+        ($t:ident) => {
+            impl<G> TeXTable<$t> for G
+            where G: GridTrait<$t>, G::Item: TeX {
+                fn tex_table(&self, caption: &str, head: &str) -> String {
+                    let def_str = self.get_default().tex_string();
+                    let cols = self.support().map(|$t(i, _)| i).unique().sorted();
+                    let rows = self.support().map(|$t(_, j)| j).unique().sorted().rev();
+            
+                    tex_table(caption, head, rows, cols, |&j, &i| {
+                        let str = self.get($t(i, j)).tex_string();
+                        if str == def_str { 
+                            ".".to_string()
+                        } else { 
+                            str
+                        }
+                    }, true, false)
+                }
+            }
+        };
+    }
+    
+    impl_tex_table!(isize2);
+}
 
 #[cfg(test)]
 mod tests { 
@@ -261,21 +286,66 @@ mod tests {
         assert_eq!(g.get( 1), &10);
         assert_eq!(g.get(-1), &0); // default
 
-        let _seq = g.display_seq("i", "0");
+        let _seq = g.display_seq("i");
         // println!("{_seq}");
     }
 
     #[test]
     fn grid2() { 
         use cartesian::cartesian;
-        let g = Grid2::generate(cartesian!(0..=3, 0..=2).map(|(i, j)| isize2(i, j)), |i| i.0 * 10 + i.1);
+        let g = Grid2::generate(
+            cartesian!(0..=3, 0..=2).map(|(i, j)| isize2(i, j)), 
+            |i| i.0 * 10 + i.1
+        );
 
         assert!( g.is_supported(isize2(1, 2)));
         assert!(!g.is_supported(isize2(3, 3)));
         assert_eq!(g.get(isize2(1, 2)), &12);
         assert_eq!(g.get(isize2(3, 3)), &0);
 
-        let _table = g.display_table("i", "j", "0");
+        let _table = g.display_table("i", "j");
+        // println!("{_table}");
+    }
+
+    #[test]
+    fn table_rmod() { 
+        use yui::FF2;
+        use crate::GenericSummand;
+        use cartesian::cartesian;
+        
+        let g = Grid2::generate(
+            cartesian!(0..=3, 0..=2).map(|(i, j)| isize2(i, j)), 
+            |i| GenericSummand::<_, FF2>::generate(i.0, (i.0 * 10 + i.1) as usize, vec![], None)
+        );
+        let _table = g.display_table("i", "j");
+        // println!("{_table}");
+    }
+
+    #[cfg(feature = "tex")]
+    #[test]
+    fn tex_table() { 
+        use super::tex::TeXTable;
+        use cartesian::cartesian;
+        let g = Grid2::generate(
+            cartesian!(0..=3, 0..=2).map(|(i, j)| isize2(i, j)), 
+            |i| (i.0 * 10 + i.1) as i32
+        );
+        let _table = g.tex_table("Caption", "i, j");
+        // println!("{_table}");
+    }
+
+    #[cfg(feature = "tex")]
+    #[test]
+    fn tex_table_rmod() { 
+        use super::tex::TeXTable;
+        use crate::GenericSummand;
+        use cartesian::cartesian;
+        
+        let g = Grid2::generate(
+            cartesian!(0..=3, 0..=2).map(|(i, j)| isize2(i, j)), 
+            |i| GenericSummand::<_, i32>::generate(i.0, (i.0 * 10 + i.1) as usize, vec![], None)
+        );
+        let _table = g.tex_table("Caption", "i, j");
         // println!("{_table}");
     }
 }

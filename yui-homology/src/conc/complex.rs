@@ -134,6 +134,7 @@ where
             fn support(&self) -> Self::Support;
             fn is_supported(&self, i: I) -> bool;
             fn get(&self, i: I) -> &Self::Item;
+            fn get_default(&self) -> &Self::Item;
         }
     }
 }

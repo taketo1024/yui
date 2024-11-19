@@ -130,6 +130,25 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
+#[cfg(feature = "tex")]
+mod tex { 
+    use crate::tex_rmod_str;
+
+    use super::*;
+    use yui::tex::TeX;
+
+    impl<X, R> TeX for Summand<X, R>
+    where X: Gen, R: Ring + TeX, for<'x> &'x R: RingOps<R> {
+        fn tex_math_symbol() -> String {
+            "".to_string()
+        }
+    
+        fn tex_string(&self) -> String {
+            tex_rmod_str(self.rank(), self.tors())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests { 
     use yui::lc::Free;

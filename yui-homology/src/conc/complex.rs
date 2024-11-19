@@ -126,14 +126,14 @@ where
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
-    type Itr = GridIter<I>;
-    type Output = Summand<X, R>;
+    type Support = GridIter<I>;
+    type Item = Summand<X, R>;
     
     delegate! { 
         to self.summands { 
-            fn support(&self) -> Self::Itr;
+            fn support(&self) -> Self::Support;
             fn is_supported(&self, i: I) -> bool;
-            fn get(&self, i: I) -> &Self::Output;
+            fn get(&self, i: I) -> &Self::Item;
         }
     }
 }

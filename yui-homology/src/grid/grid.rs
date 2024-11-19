@@ -7,12 +7,12 @@ use crate::{GridDeg, isize2, usize2, isize3, usize3};
 
 pub trait GridTrait<I>
 where I: GridDeg { 
-    type Itr: Iterator<Item = I>;
-    type Output;
+    type Support: Iterator<Item = I>;
+    type Item;
 
-    fn support(&self) -> Self::Itr;
+    fn support(&self) -> Self::Support;
     fn is_supported(&self, i: I) -> bool;
-    fn get(&self, i: I) -> &Self::Output;
+    fn get(&self, i: I) -> &Self::Item;
 }
 
 pub type Grid1<E> = Grid<isize,  E>;
@@ -120,10 +120,10 @@ where I: GridDeg {
 
 impl<I, E> GridTrait<I> for Grid<I, E>
 where I: GridDeg { 
-    type Itr = GridIter<I>;
-    type Output = E;
+    type Support = GridIter<I>;
+    type Item = E;
 
-    fn support(&self) -> Self::Itr {
+    fn support(&self) -> Self::Support {
         self.support.clone().into_iter()
     }
 
@@ -189,10 +189,10 @@ where I: GridDeg {
 macro_rules! impl_print_seq {
     ($t:ident) => {
         impl<G> DisplaySeq<$t> for G
-        where G: GridTrait<$t>, G::Output: Display + Default + Eq {
+        where G: GridTrait<$t>, G::Item: Display + Default + Eq {
             fn display_seq(&self, label: &str, dflt: &str) -> String { 
                 use yui::util::format::table;
-                let d = G::Output::default();
+                let d = G::Item::default();
 
                 let str = table(label, [""].iter(), self.support(), |_, &i| {
                     let item = self.get(i);
@@ -221,10 +221,10 @@ pub trait DisplayTable<I> {
 macro_rules! impl_print_table {
     ($t:ident) => {
         impl<G> DisplayTable<$t> for G
-        where G: GridTrait<$t>, G::Output: Display + Default + Eq {
+        where G: GridTrait<$t>, G::Item: Display + Default + Eq {
             fn display_table(&self, label0: &str, label1: &str, dflt: &str) -> String {
                 use yui::util::format::table;
-                let d = G::Output::default();
+                let d = G::Item::default();
 
                 let head = format!("{}\\{}", label1, label0);
                 let cols = self.support().map(|$t(i, _)| i).unique().sorted();

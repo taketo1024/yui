@@ -1,45 +1,68 @@
+use itertools::Itertools;
 use yui::{Ring, RingOps};
 
 pub fn rmod_str_symbol<R>(rank: usize, tors: &[R], dflt: &str) -> String
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    use std::collections::BTreeMap;
     use yui::util::format::superscript;
+    make_string(
+        R::math_symbol(), 
+        rank, 
+        &tors.iter().map(|t| t.to_string()).collect_vec(), 
+        dflt, 
+        superscript, 
+        "⊕"
+    )
+}
+
+#[cfg(feature = "tex")]
+pub fn tex_rmod_str_symbol<R>(rank: usize, tors: &[R], dflt: &str) -> String
+where R: Ring + yui::TeX, for<'x> &'x R: RingOps<R> {
+    make_string(
+        R::tex_math_symbol(), 
+        rank, 
+        &tors.iter().map(|t| t.tex_string()).collect_vec(), 
+        dflt, 
+        |a| format!("^{a}"), 
+        "\\oplus"
+    )
+}
+
+fn make_string<F>(symbol: String, rank: usize, tors: &[String], dflt: &str, superscript: F, oplus: &str) -> String
+where F: Fn(usize) -> String {
+    use std::collections::BTreeMap;
 
     if rank == 0 && tors.is_empty() { 
         return dflt.to_string()
     }
 
     let mut res = vec![];
-    let symbol = R::math_symbol();
 
     if rank > 1 {
-        let str = format!("{}{}", symbol, superscript(rank as isize));
+        let str = format!("{}{}", symbol, superscript(rank));
         res.push(str);
     } else if rank == 1 { 
-        let str = symbol.to_string();
-        res.push(str);
+        res.push(symbol.clone());
     }
 
     let mut tors_acc = BTreeMap::<String, usize>::new();
     for t in tors { 
-        let t_str = t.to_string();
-        if let Some(v) = tors_acc.get_mut(&t_str) { 
+        if let Some(v) = tors_acc.get_mut(t) { 
             *v += 1;
         } else { 
-            tors_acc.insert(t_str, 1);
+            tors_acc.insert(t.clone(), 1);
         }
     }
     
     for (t, r) in tors_acc.iter() { 
         let str = if r > &1 { 
-            format!("({}/{}){}", symbol, t, superscript(*r as isize))
+            format!("({}/{}){}", symbol, t, superscript(*r))
         } else { 
             format!("({}/{})", symbol, t)
         };
         res.push(str);
     }
 
-    res.join(" ⊕ ")
+    res.join(&format!(" {oplus} "))
 }
 
 #[cfg(test)]
@@ -80,5 +103,12 @@ mod tests {
     fn mix() { 
         let s = rmod_str_symbol(2, &[2,2,3], "0");
         assert_eq!(s, "Z² ⊕ (Z/2)² ⊕ (Z/3)");
+    }
+
+    #[cfg(feature = "tex")]
+    #[test]
+    fn tex() { 
+        let s = tex_rmod_str_symbol(2, &[2,2,3], "0");
+        assert_eq!(s, "\\mathbb{Z}^2 \\oplus (\\mathbb{Z}/2)^2 \\oplus (\\mathbb{Z}/3)");
     }
 }

@@ -8,7 +8,7 @@ use yui::lc::{Gen, Lc};
 use yui_matrix::sparse::{SpMat, SpVec};
 
 use crate::utils::ChainReducer;
-use crate::{isize2, isize3, ChainComplexTrait, Grid, Grid1, GridDeg, GridIter, GridTrait, SummandTrait};
+use crate::{isize2, isize3, ChainComplexTrait, Grid, GridDeg, GridIter, GridTrait, SummandTrait};
 use super::Summand;
 
 #[cfg(feature = "multithread")]

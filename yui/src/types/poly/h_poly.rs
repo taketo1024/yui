@@ -281,7 +281,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {}
 
 #[cfg(feature = "tex")]
 mod tex {
-    use crate::TeX;
+    use crate::tex::TeX;
     use super::*;
 
     impl<const X: char, R> TeX for HPoly<X, R>
@@ -432,7 +432,7 @@ mod tests {
     #[test]
     #[cfg(feature = "tex")]
     fn tex() { 
-        use crate::TeX;
+        use crate::tex::TeX;
         type R = i64;
         type P = HPoly<'x', R>;
 

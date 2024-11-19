@@ -94,7 +94,7 @@ impl_integer!(BigInt);
 
 #[cfg(feature = "tex")] 
 mod tex {
-    use crate::TeX;
+    use crate::tex::TeX;
     use num_bigint::BigInt;
 
     macro_rules! impl_tex {
@@ -205,6 +205,7 @@ mod tests {
     #[cfg(feature = "tex")]
     #[test]
     fn tex() { 
+        use crate::tex::*;
         assert_eq!(i32::tex_math_symbol(), "\\mathbb{Z}");
         assert_eq!((-2).tex_string(), "-2");
     }

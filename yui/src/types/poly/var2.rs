@@ -241,7 +241,7 @@ impl_bivar_signed!  (isize);
 
 #[cfg(feature = "tex")] 
 mod tex {
-    use crate::TeX;
+    use crate::tex::TeX;
     use super::*;
 
     impl<const X: char, const Y: char, I> TeX for Var2<X, Y, I>

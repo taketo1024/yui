@@ -15,7 +15,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(feature = "tex")]
 pub fn tex_rmod_str<R>(rank: usize, tors: &[R]) -> String
-where R: Ring + yui::TeX, for<'x> &'x R: RingOps<R> {
+where R: Ring + yui::tex::TeX, for<'x> &'x R: RingOps<R> {
     make_rmod_str(
         R::tex_math_symbol(), 
         rank, 

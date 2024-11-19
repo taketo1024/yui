@@ -167,6 +167,21 @@ impl Ring for FF2 {
 impl EucRing for FF2 {}
 impl Field for FF2 {}
 
+#[cfg(feature = "tex")] 
+mod tex {
+    use crate::TeX;
+    use super::*;
+
+    impl TeX for FF2 {
+        fn tex_math_symbol() -> String { 
+            String::from("\\mathbb{F}_2")
+        }
+        fn tex_string(&self) -> String {
+            self.to_string()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests { 
     use super::*;
@@ -285,5 +300,13 @@ mod tests {
         let mut a = FF2::from(5);
         a %= FF2::from(3);
         assert_eq!(a, FF2::zero());
+    }
+
+    #[cfg(feature = "tex")]
+    #[test]
+    fn tex() { 
+        use crate::TeX;
+        assert_eq!(FF2::tex_math_symbol(), "\\mathbb{F}_2");
+        assert_eq!(FF2::from(5).tex_string(), "1");
     }
 }

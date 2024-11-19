@@ -1,12 +1,11 @@
 use std::marker::PhantomData;
 use log::*;
 
-use num_traits::Zero;
 use yui::{EucRing, EucRingOps};
 use yui_matrix::dense::{*, snf::*};
 use yui_matrix::sparse::*;
 
-use crate::HomologySummand;
+pub type HomologyCalcResult<R> = (usize, Vec<R>, Option<Trans<R>>);
 
 pub struct HomologyCalc<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
@@ -33,13 +32,11 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     //  H2 = Ker(d2) / Im(d1)
     //     ≅ C22' (free) ⊕ (C21 / Im(d1')) (tor)
 
-    pub fn calculate(d1: SpMat<R>, d2: SpMat<R>, with_trans: bool) -> HomologySummand<R> {
+    pub fn calculate(d1: SpMat<R>, d2: SpMat<R>, with_trans: bool) -> HomologyCalcResult<R> {
         assert_eq!(d1.nrows(), d2.ncols());
 
-        if d1.nrows().is_zero() { 
-            return HomologySummand::zero();
-        } else if d1.is_zero() && d2.is_zero() { 
-            return Self::trivial_result(d1.nrows());
+        if d1.is_zero() && d2.is_zero() { 
+            return Self::trivial_result(d1.nrows(), with_trans);
         }
 
         trace!("calculate homology: {} -> {} -> {}", d1.ncols(), d1.nrows(), d2.nrows());
@@ -53,12 +50,12 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
             None
         };
 
-        HomologySummand::new(rank, tors, trans)
+        (rank, tors, trans)
     }
 
-    fn trivial_result(rank: usize) -> HomologySummand<R> {
-        let t = Trans::id(rank);
-        HomologySummand::new(rank, vec![], Some(t))
+    fn trivial_result(rank: usize, with_trans: bool) -> HomologyCalcResult<R> {
+        let t = with_trans.then(|| Trans::id(rank));
+        (rank, vec![], t)
     }
 
     fn process_snf(d1: SpMat<R>, d2: SpMat<R>, with_trans: bool) -> (SnfResult<R>, SnfResult<R>) {
@@ -146,152 +143,163 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 #[cfg(test)]
 mod tests {
+    use num_traits::Zero;
+    use crate::generic::GenericChainComplex;
+    use crate::ChainComplexTrait;
     use super::*;
-    use crate::{ChainComplex, ChainComplexTrait, RModStr};
  
     #[test]
     fn s2_0th() {
-        let c = ChainComplex::<i32>::s2();
+        let c = GenericChainComplex::<i32>::s2();
         let d1 = c.d_matrix(1);
         let d0 = c.d_matrix(0); // zero
 
-        let h = HomologyCalc::calculate(d1, d0, true);
+        let (rank, tors, t) = HomologyCalc::calculate(d1, d0, true);
 
-        assert_eq!(h.rank(), 1);
-        assert_eq!(h.tors().len(), 0);
+        assert_eq!(rank, 1);
+        assert_eq!(tors.len(), 0);
 
-        let t = h.trans().unwrap();
-        let v = h.gen_vec(0);
+        let t = t.unwrap();
+        let v = t.backward_mat().col_vec(0);
+        let z = c[0].devectorize(&v);
 
         assert!(!v.is_zero());
-        assert!(c.d(0, &v).is_zero());
+        assert!(c.d(0, &z).is_zero());
         assert_eq!(t.forward(&v), SpVec::unit(1, 0));
     }
 
     #[test]
     fn s2_1st() {
-        let c = ChainComplex::<i32>::s2();
+        let c = GenericChainComplex::<i32>::s2();
         let d1 = c.d_matrix(2);
         let d0 = c.d_matrix(1);
 
-        let h = HomologyCalc::calculate(d1, d0, true);
+        let (rank, tors, _) = HomologyCalc::calculate(d1, d0, true);
 
-        assert!(h.is_zero());
+        assert_eq!(rank, 0);
+        assert_eq!(tors, vec![]);
     }
 
     #[test]
     fn s2_2nd() {
-        let c = ChainComplex::<i32>::s2();
+        let c = GenericChainComplex::<i32>::s2();
         let d3 = c.d_matrix(3); // zero
         let d2 = c.d_matrix(2);
 
-        let h = HomologyCalc::calculate(d3, d2, true);
+        let (rank, tors, t) = HomologyCalc::calculate(d3, d2, true);
 
-        assert_eq!(h.rank(), 1);
-        assert_eq!(h.tors().len(), 0);
+        assert_eq!(rank, 1);
+        assert_eq!(tors.len(), 0);
 
-        let t = h.trans().unwrap();
-        let v = h.gen_vec(0);
+        let t = t.unwrap();
+        let v = t.backward_mat().col_vec(0);
+        let z = c[2].devectorize(&v);
 
         assert!(!v.is_zero());
-        assert!(c.d(2, &v).is_zero());
+        assert!(c.d(2, &z).is_zero());
         assert_eq!(t.forward(&v), SpVec::unit(1, 0));
     }
 
     #[test]
     fn t2_0th() {
-        let c = ChainComplex::<i32>::t2();
+        let c = GenericChainComplex::<i32>::t2();
         let d1 = c.d_matrix(1);
         let d0 = c.d_matrix(0); // zero
 
-        let h = HomologyCalc::calculate(d1, d0, true);
+        let (rank, tors, t) = HomologyCalc::calculate(d1, d0, true);
 
-        assert_eq!(h.rank(), 1);
-        assert_eq!(h.tors().len(), 0);
+        assert_eq!(rank, 1);
+        assert_eq!(tors.len(), 0);
 
-        let t = h.trans().unwrap();
-        let v = h.gen_vec(0);
+        let t = t.unwrap();
+        let v = t.backward_mat().col_vec(0);
+        let z = c[0].devectorize(&v);
 
         assert!(!v.is_zero());
-        assert!(c.d(0, &v).is_zero());
+        assert!(c.d(0, &z).is_zero());
         assert_eq!(t.forward(&v), SpVec::unit(1, 0));
     }
 
     #[test]
     fn t2_1st() {
-        let c = ChainComplex::<i32>::t2();
+        let c = GenericChainComplex::<i32>::t2();
         let d2 = c.d_matrix(2);
         let d1 = c.d_matrix(1);
 
-        let h = HomologyCalc::calculate(d2, d1, true);
+        let (rank, tors, t) = HomologyCalc::calculate(d2, d1, true);
 
-        assert_eq!(h.rank(), 2);
-        assert_eq!(h.tors().len(), 0);
+        assert_eq!(rank, 2);
+        assert_eq!(tors.len(), 0);
 
-        let t = h.trans().unwrap();
+        let t = t.unwrap();
 
         for i in 0..2 { 
-            let v = h.gen_vec(i);
+            let v = t.backward_mat().col_vec(i);
+            let z = c[1].devectorize(&v);
+
             assert!(!v.is_zero());
-            assert!(c.d(1, &v).is_zero());
+            assert!(c.d(1, &z).is_zero());
             assert_eq!(t.forward(&v), SpVec::unit(2, i));
         }
     }
 
     #[test]
     fn t2_2nd() {
-        let c = ChainComplex::<i32>::t2();
+        let c = GenericChainComplex::<i32>::t2();
         let d3 = c.d_matrix(3); // zero
         let d2 = c.d_matrix(2);
 
-        let h = HomologyCalc::calculate(d3, d2, true);
+        let (rank, tors, t) = HomologyCalc::calculate(d3, d2, true);
 
-        assert_eq!(h.rank(), 1);
-        assert_eq!(h.tors().len(), 0);
+        assert_eq!(rank, 1);
+        assert_eq!(tors.len(), 0);
 
-        let t = h.trans().unwrap();
-        let v = h.gen_vec(0);
+        let t = t.unwrap();
+        let v = t.backward_mat().col_vec(0);
+        let z = c[2].devectorize(&v);
 
         assert!(!v.is_zero());
-        assert!(c.d(2, &v).is_zero());
+        assert!(c.d(2, &z).is_zero());
         assert_eq!(t.forward(&v), SpVec::unit(1, 0));
     }
 
     #[test]
     fn rp2_0th() {
-        let c = ChainComplex::<i32>::rp2();
+        let c = GenericChainComplex::<i32>::rp2();
         let d1 = c.d_matrix(1);
         let d0 = c.d_matrix(0); // zero
 
-        let h = HomologyCalc::calculate(d1, d0, true);
+        let (rank, tors, t) = HomologyCalc::calculate(d1, d0, true);
 
-        assert_eq!(h.rank(), 1);
-        assert_eq!(h.tors().len(), 0);
+        assert_eq!(rank, 1);
+        assert_eq!(tors.len(), 0);
 
-        let t = h.trans().unwrap();
-        let v = h.gen_vec(0);
+        let t = t.unwrap();
+        let v = t.backward_mat().col_vec(0);
+        let z = c[0].devectorize(&v);
 
         assert!(!v.is_zero());
-        assert!(c.d(0, &v).is_zero());
+        assert!(c.d(0, &z).is_zero());
         assert_eq!(t.forward(&v), SpVec::unit(1, 0));
     }
 
     #[test]
     fn rp2_1st() {
-        let c = ChainComplex::<i32>::rp2();
+        let c = GenericChainComplex::<i32>::rp2();
         let d2 = c.d_matrix(2);
         let d1 = c.d_matrix(1);
 
-        let h = HomologyCalc::calculate(d2, d1, true);
+        let (rank, tors, t) = HomologyCalc::calculate(d2, d1, true);
 
-        assert_eq!(h.rank(), 0);
-        assert_eq!(h.tors(), &vec![2]);
+        assert_eq!(rank, 0);
+        assert_eq!(tors, vec![2]);
 
-        let t = h.trans().unwrap();
-        let v = h.gen_vec(0);
+        let t = t.unwrap();
+        let v = t.backward_mat().col_vec(0);
+        let z = c[1].devectorize(&v);
 
         assert!(!v.is_zero());
-        assert!(c.d(1, &v).is_zero());
+        assert!(c.d(1, &z).is_zero());
         assert_eq!(t.forward(&v), SpVec::unit(1, 0));
     }
 }

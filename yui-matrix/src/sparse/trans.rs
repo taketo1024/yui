@@ -80,6 +80,12 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         self.b_mats.append(&mut other.b_mats);
     }
 
+    pub fn merged(&self, other: &Trans<R>) -> Self { 
+        let mut res = self.clone();
+        res.merge(other.clone());
+        res
+    }
+
     pub fn forward_mat(&self) -> SpMat<R> {
         // f = fn * ... f1 * f0
         if self.f_mats.len() == 1 { 

@@ -5,10 +5,13 @@ use num_traits::Zero;
 pub trait GridDeg:
     Sized
     + Display
+    + Default
     + Clone
     + Copy
     + PartialEq
     + Eq
+    + PartialOrd
+    + Ord
     + Hash
     + Zero
     + Add<Output = Self>
@@ -24,7 +27,7 @@ impl GridDeg for usize {}
 macro_rules! make2 {
     ($name:ident, $t:ty) => {
         #[allow(non_camel_case_types)]
-        #[derive(Display, Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Add, Sub)]
+        #[derive(Display, Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Add, Sub)]
         #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
         #[display("({}, {})", _0, _1)]
         pub struct $name(pub $t, pub $t);
@@ -62,7 +65,7 @@ impl GridDeg for usize2 {}
 macro_rules! make3 {
     ($name:ident, $t:ty) => {
         #[allow(non_camel_case_types)]
-        #[derive(Display, Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Add, Sub)]
+        #[derive(Display, Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Add, Sub)]
         #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
         #[display("({}, {}, {})", _0, _1, _2)]
         pub struct $name(pub $t, pub $t, pub $t);

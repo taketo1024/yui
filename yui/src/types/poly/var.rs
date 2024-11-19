@@ -178,15 +178,18 @@ macro_rules! impl_univar_signed {
 impl_univar_unsigned!(usize);
 impl_univar_signed!  (isize);
 
-cfg_if::cfg_if! { 
-    if #[cfg(feature = "tex")] {
-        use crate::TeX;
+#[cfg(feature = "tex")] 
+mod tex {
+    use crate::tex::TeX;
+    use super::*;
 
-        impl<const X: char, I> TeX for Var<X, I>
-        where I: ToPrimitive {
-            fn to_tex_string(&self) -> String {
-                self.to_string_u(false)
-            }
+    impl<const X: char, I> TeX for Var<X, I>
+    where I: ToPrimitive {
+        fn tex_math_symbol() -> String { 
+            String::from(X)
+        }
+        fn tex_string(&self) -> String {
+            self.to_string_u(false)
         }
     }
 }

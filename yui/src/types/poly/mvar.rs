@@ -276,15 +276,18 @@ where X: ToString, I: 'a + ToPrimitive, S: IntoIterator<Item = (X, &'a I)> {
     }
 }
 
-cfg_if::cfg_if! { 
-    if #[cfg(feature = "tex")] {
-        use crate::TeX;
+#[cfg(feature = "tex")]
+mod tex {
+    use crate::tex::TeX;
+    use super::*;
 
-        impl<const X: char, I> TeX for MultiVar<X, I>
-        where I: ToPrimitive {
-            fn to_tex_string(&self) -> String {
-                self.to_string_u(false)
-            }
+    impl<const X: char, I> TeX for MultiVar<X, I>
+    where I: ToPrimitive {
+        fn tex_math_symbol() -> String { 
+            format!("{X}_1,\\ldots")
+        }
+        fn tex_string(&self) -> String {
+            self.to_string_u(false)
         }
     }
 }

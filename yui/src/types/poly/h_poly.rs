@@ -279,6 +279,25 @@ where R: Field, for<'x> &'x R: FieldOps<R> {}
 impl<const X: char, R> EucRing for HPoly<X, R>
 where R: Field, for<'x> &'x R: FieldOps<R> {}
 
+#[cfg(feature = "tex")]
+mod tex {
+    use crate::tex::TeX;
+    use super::*;
+
+    impl<const X: char, R> TeX for HPoly<X, R>
+    where R: Ring + TeX, for<'x> &'x R: RingOps<R> {
+        fn tex_math_symbol() -> String { 
+            format!("{}[{X}]", R::tex_math_symbol())
+        }
+
+        fn tex_string(&self) -> String {
+            use crate::util::format::lc;
+            let x = fmt_mono(&X.to_string(), &self.deg, false);
+            lc([(x, self.coeff.tex_string())].into_iter())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests { 
     use crate::Ratio;
@@ -408,5 +427,21 @@ mod tests {
         assert_eq!(P::from_str("x^2"), Ok(P::new(2, 1)));
         // assert_eq!(P::from_str("3x^2"), Ok(P::new(2, 3))); // not supported yet
         assert_eq!(P::from_str("x + 1"), Err(()));
+    }
+
+    #[test]
+    #[cfg(feature = "tex")]
+    fn tex() { 
+        use crate::tex::TeX;
+        type R = i64;
+        type P = HPoly<'x', R>;
+
+        assert_eq!(P::tex_math_symbol(), "\\mathbb{Z}[x]");
+
+        assert_eq!(&P::zero().tex_string(), "0");
+        assert_eq!(&P::from_const(3).tex_string(), "3");
+        assert_eq!(&P::variable().tex_string(), "x");
+        assert_eq!(&P::new(2, 1).tex_string(), "x^2");
+        assert_eq!(&P::new(2, 3).tex_string(), "3x^2");
     }
 }

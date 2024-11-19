@@ -16,9 +16,5 @@ pub use union_find::*;
 
 pub mod bitseq;
 
-cfg_if::cfg_if! { 
-    if #[cfg(feature = "tex")] { 
-        mod tex;
-        pub use tex::*;
-    }
-}
+#[cfg(feature = "tex")]
+pub mod tex;

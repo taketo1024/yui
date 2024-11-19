@@ -4,7 +4,7 @@ use yui_matrix::sparse::SpMat;
 
 use crate::generic::GenericChainComplexBase;
 use crate::{GridTrait, GridDeg};
-use super::rmod_str_symbol;
+use crate::rmod_str;
 
 pub trait ChainComplexTrait<I>: Sized + GridTrait<I>
 where 
@@ -40,10 +40,13 @@ where
         }
     }
 
+    fn display_at(&self, i: I) -> String {
+        rmod_str(self.rank(i), &[])
+    }
+
     fn display_d_at(&self, i: I) -> String {
-        let c = |i| rmod_str_symbol(self.rank(i), &[], "0");
-        let c0 = c(i);
-        let c1 = c(i + self.d_deg());
+        let c0 = self.display_at(i);
+        let c1 = self.display_at(i + self.d_deg());
         let d = self.d_matrix(i).into_dense();
         format!("d[{i}]: {c0} -> {c1}\n{d}")
     }

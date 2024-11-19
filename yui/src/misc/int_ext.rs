@@ -92,25 +92,28 @@ impl_integer!(i64);
 impl_integer!(i128);
 impl_integer!(BigInt);
 
-cfg_if::cfg_if! { 
-    if #[cfg(feature = "tex")] {
-        use crate::TeX;
+#[cfg(feature = "tex")] 
+mod tex {
+    use crate::tex::TeX;
+    use num_bigint::BigInt;
 
-        macro_rules! impl_tex {
-            ($type:ident) => {
-                impl TeX for $type {
-                    fn to_tex_string(&self) -> String {
-                        self.to_string()
-                    }
+    macro_rules! impl_tex {
+        ($type:ident) => {
+            impl TeX for $type {
+                fn tex_math_symbol() -> String { 
+                    String::from("\\mathbb{Z}")
+                }
+                fn tex_string(&self) -> String {
+                    self.to_string()
                 }
             }
         }
-
-        impl_tex!(i32);
-        impl_tex!(i64);
-        impl_tex!(i128);
-        impl_tex!(BigInt);        
     }
+
+    impl_tex!(i32);
+    impl_tex!(i64);
+    impl_tex!(i128);
+    impl_tex!(BigInt);        
 }
 
 #[cfg(test)]
@@ -197,5 +200,13 @@ mod tests {
         assert_eq!(13.div_round(&5), 3);
         assert_eq!((-12).div_round(&5), -2);
         assert_eq!((-13).div_round(&5), -3);
+    }
+
+    #[cfg(feature = "tex")]
+    #[test]
+    fn tex() { 
+        use crate::tex::*;
+        assert_eq!(i32::tex_math_symbol(), "\\mathbb{Z}");
+        assert_eq!((-2).tex_string(), "-2");
     }
 }

@@ -171,6 +171,21 @@ impl<const p: I> Ring for FF<p> {
 impl<const p: I> EucRing for FF<p> {}
 impl<const p: I> Field for FF<p> {}
 
+#[cfg(feature = "tex")] 
+mod tex {
+    use crate::tex::TeX;
+    use super::*;
+
+    impl<const p: I> TeX for FF<p> {
+        fn tex_math_symbol() -> String { 
+            format!("\\mathbb{{F}}_{p}")
+        }
+        fn tex_string(&self) -> String {
+            self.to_string()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests { 
     use super::*;
@@ -282,5 +297,13 @@ mod tests {
         let mut a = F5::new(4);
         a %= F5::new(3);
         assert_eq!(a, F5::zero());
+    }
+
+    #[cfg(feature = "tex")]
+    #[test]
+    fn tex() { 
+        use crate::tex::TeX;
+        assert_eq!(F3::tex_math_symbol(), "\\mathbb{F}_3");
+        assert_eq!(F3::from(5).tex_string(), "2");
     }
 }

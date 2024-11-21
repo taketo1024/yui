@@ -19,7 +19,12 @@ where
 {
     fn disp<S>(s: S, math_mode: bool) -> String where S: Display { 
         if math_mode {
-            format!("${}$", s.to_string())
+            let s = s.to_string;
+            if s.is_empty { 
+                "$ $".to_string()
+            } else {
+                format!("${}$", s.to_string())
+            }
         } else { 
             s.to_string()
         }

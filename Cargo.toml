@@ -5,6 +5,7 @@ members = [
     "yui-homology",
     "yui-link",
     "yui-khovanov",
+    "yui-kr",
     "bin-ykh"
 ]
 resolver = "2"

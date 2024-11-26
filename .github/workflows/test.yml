@@ -14,7 +14,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - name: Build
-      run: cargo build --verbose --all-features
-    - name: Run tests
-      run: cargo test --verbose --workspace --all-features
+    - name: Build yui
+      run: cargo build --verbose -p yui
+    - name: Test yui
+      run: cargo test --verbose -p yui
+    - name: Build yui-matrix
+      run: cargo build --verbose -p yui-matrix
+    - name: Test yui-matrix
+      run: cargo test --verbose -p yui-matrix
+    - name: Build yui-homology
+      run: cargo build --verbose -p yui-homology
+    - name: Test yui-homology
+      run: cargo test --verbose -p yui-homology
+    - name: Build yui-link
+      run: cargo build --verbose -p yui-link
+    - name: Test yui-link
+      run: cargo test --verbose -p yui-link
+    - name: Build yui-kh
+      run: cargo build --verbose -p yui-kh
+    - name: Test yui-kh
+      run: cargo test --verbose -p yui-kh
+    - name: Build bin-ykh
+      run: cargo build --verbose -p ykh
+    - name: Test bin-ykh
+      run: cargo test --verbose -p ykh
+

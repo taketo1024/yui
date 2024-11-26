@@ -6,7 +6,8 @@ members = [
     "yui-link",
     "yui-khovanov",
     "yui-kr",
-    "bin-ykh"
+    "bin-ykh",
+    "bin-ykr"
 ]
 resolver = "2"
 

@@ -4,6 +4,8 @@ members = [
     "yui-matrix",
     "yui-homology",
     "yui-link",
+    "yui-khovanov",
+    "bin-ykh"
 ]
 resolver = "2"
 
@@ -13,3 +15,7 @@ authors = ["Taketo Sano <taketo1024@gmail.com>"]
 description = "YUI"
 license = "MIT"
 edition = "2021"
+
+[profile.release]
+overflow-checks = true
+# debug = true

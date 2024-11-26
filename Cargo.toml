@@ -4,6 +4,7 @@ members = [
     "yui-matrix",
     "yui-homology",
     "yui-link",
+    "yui-khovanov",
 ]
 resolver = "2"
 

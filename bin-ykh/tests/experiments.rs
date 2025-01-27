@@ -1,3 +1,6 @@
+// run test by:
+// $ cargo test -r -- --nocapture --include-ignored --exact [NAME] 
+
 #![allow(non_snake_case, unused)]
 use itertools::Itertools;
 use num_traits::Zero;
@@ -26,9 +29,6 @@ fn ssi_of(khi: &KhIHomology<P>) -> (isize, isize) {
     let s1 = (khi[1].gen(0).q_deg() + khi[1].gen(1).q_deg()) / 2;
     (s0, s1)
 }
-
-// run test by:
-// cargo test -r -- --exact [NAME] --nocapture --include-ignored
 
 #[test]
 #[ignore]
@@ -69,6 +69,28 @@ fn knotJ() {
     println!("s0 = {s0}, s1 = {s1}");
     assert_eq!(s0, 0);
     assert_eq!(s1, 2);
+}
+
+#[test]
+#[ignore]
+fn k9_46_conn_sum() { 
+    init_logger();
+    
+    let l = InvLink::sinv_knot_from_code([
+        [2,30,3,29],[5,32,6,33],[8,36,9,35],[10,22,11,21],[12,20,13,19],
+        [13,24,14,25],[15,22,16,23],[16,28,17,27],[18,26,19,25],[20,12,21,11],
+        [23,14,24,15],[26,18,27,17],[28,4,29,3],[30,2,31,1],[31,6,32,7],
+        [33,4,34,5],[34,10,35,9],[36,8,1,7]
+    ]);
+
+    let khi = KhIHomology::new(&l, &P::variable(), &P::zero(), false);
+    let (s0, s1) = ssi_of(&khi);
+
+    khi.into_bigraded().print_table("i", "j");
+    
+    println!("s0 = {s0}, s1 = {s1}");
+    assert_eq!(s0, 0);
+    assert_eq!(s1, 2    );
 }
 
 #[test]
@@ -124,6 +146,32 @@ fn k15n_interlock() {
 
 #[test]
 #[ignore]
+fn k9_46_interlock_k15n() { 
+    init_logger();
+    
+    let l = InvLink::sinv_knot_from_code([
+        [2,62,3,61],[4,60,5,59],[7,28,8,29],[9,64,10,65],[12,72,13,71],
+        [14,70,15,69],[16,44,17,43],[18,42,19,41],[20,38,21,37],[21,50,22,51],
+        [23,52,24,53],[25,35,26,34],[27,46,28,47],[29,6,30,7],[30,58,31,57],
+        [32,56,33,55],[35,25,36,24],[36,54,37,53],[39,49,40,48],[40,20,41,19],
+        [42,18,43,17],[45,66,46,67],[47,26,48,27],[49,39,50,38],[51,22,52,23],
+        [54,34,55,33],[56,32,57,31],[58,6,59,5],[60,4,61,3],[62,2,63,1],
+        [63,10,64,11],[65,8,66,9],[67,44,68,45],[68,16,69,15],[70,14,71,13],
+        [72,12,1,11]
+    ]);
+
+    let khi = KhIHomology::new(&l, &P::variable(), &P::zero(), false);
+    let (s0, s1) = ssi_of(&khi);
+
+    khi.into_bigraded().print_table("i", "j");
+    
+    println!("s0 = {s0}, s1 = {s1}");
+    assert_eq!(s0, 0);
+    assert_eq!(s1, 4);
+}
+
+#[test]
+#[ignore]
 fn knotJ_interlock_truncated() { 
     init_logger();
     
@@ -154,7 +202,7 @@ fn knotJ_interlock_truncated() {
     let c = b.into_khi_complex().truncated(-n..=2);
     c.check_d_all();
 
-    let khi = KhIHomology::new(&l, &P::variable(), &P::zero(), false);
+    let khi = c.homology().truncated(-n..=1);
     let (s0, s1) = ssi_of(&khi);
 
     khi.into_bigraded().print_table("i", "j");
@@ -162,4 +210,44 @@ fn knotJ_interlock_truncated() {
     println!("s0 = {s0}, s1 = {s1}");
     assert_eq!(s0, 0);
     assert_eq!(s1, 4);
+}
+
+#[test]
+#[ignore]
+fn k9_46_interlock_conn_sum() { 
+    init_logger();
+    
+    let l = InvLink::sinv_knot_from_code([
+        [2,110,3,109],[4,108,5,107],[7,24,8,25],[9,112,10,113],[12,120,13,119],
+        [14,118,15,117],[16,96,17,95],[18,94,19,93],[20,92,21,91],[21,100,22,101],
+        [23,98,24,99],[25,6,26,7],[26,106,27,105],[28,104,29,103],[30,102,31,101],
+        [32,80,33,79],[34,78,35,77],[37,54,38,55],[39,82,40,83],[42,90,43,89],
+        [44,88,45,87],[46,66,47,65],[48,64,49,63],[50,62,51,61],[51,70,52,71],
+        [53,68,54,69],[55,36,56,37],[56,76,57,75],[58,74,59,73],[60,72,61,71],
+        [62,50,63,49],[64,48,65,47],[67,84,68,85],[69,52,70,53],[72,60,73,59],
+        [74,58,75,57],[76,36,77,35],[78,34,79,33],[80,32,81,31],[81,40,82,41],
+        [83,38,84,39],[85,66,86,67],[86,46,87,45],[88,44,89,43],[90,42,91,41],
+        [92,20,93,19],[94,18,95,17],[97,114,98,115],[99,22,100,23],[102,30,103,29],
+        [104,28,105,27],[106,6,107,5],[108,4,109,3],[110,2,111,1],[111,10,112,11],
+        [113,8,114,9],[115,96,116,97],[116,16,117,15],[118,14,119,13],[120,12,1,11]
+    ]);
+
+    let n = l.link().signed_crossing_nums().1 as isize;
+    let (h, t) = (P::variable(), P::zero());
+    let mut b = SymTngBuilder::new(&l, &h, &t, false);
+
+    b.set_h_range(-n ..= 2);
+    b.preprocess();
+    b.process_all();
+    b.finalize();
+    
+    let c = b.into_khi_complex().truncated(-n..=2);
+    c.check_d_all();
+
+    let khi = c.homology().truncated(-n..=1);
+    let (s0, s1) = ssi_of(&khi);
+
+    khi.into_bigraded().print_table("i", "j");
+    
+    println!("s0 = {s0}, s1 = {s1}");
 }

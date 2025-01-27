@@ -141,7 +141,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             v.tng().comps().map(|c| 
                 arcs.iter().map(|a| 
                     match c.path() {
-                        p if p.is_connectable_bothends(a) => 2,
+                        p if p.is_connectable_bothends(a) => 10,
                         p if p.is_connectable(a)          => 1,
                         _                                 => 0
                     }

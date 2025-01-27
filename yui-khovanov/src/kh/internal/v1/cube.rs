@@ -182,7 +182,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.vertices_of_weight(i).into_iter().flat_map(|v| 
                 v.generators() 
             ).sorted_by_key(|x| 
-                x.q_deg()
+                -x.q_deg()
             ).collect()
         } else {
             vec![]

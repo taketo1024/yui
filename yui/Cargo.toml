@@ -20,7 +20,7 @@ delegate = "0.13.3"
 derive_more = { version = "1.0.0", features = ["display", "debug"] }
 dinglebit_combinatorics = "1.1.0"
 is-even = "1.0.0"
-itertools = "0.13.0"
+itertools = "0.14.0"
 log = "0.4.27"
 num-bigint = "0.4.6"
 num-integer = { version = "0.1.46", features = ["i128"] }

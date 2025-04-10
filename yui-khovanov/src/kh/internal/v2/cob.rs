@@ -8,7 +8,7 @@ use itertools::Itertools;
 use num_traits::Zero;
 use cartesian::cartesian;
 use yui::{AddMon, Elem, Ring, RingOps};
-use yui::lc::{Gen, OrdForDisplay, Lc};
+use yui::lc::{Gen, Lc};
 use yui::poly::Var2;
 use yui_link::{Edge, Crossing};
 use yui::bitseq::Bit;
@@ -827,8 +827,15 @@ impl Display for Cob {
     }
 }
 
-impl OrdForDisplay for Cob {
-    fn cmp_for_display(&self, _other: &Self) -> std::cmp::Ordering {
+impl PartialOrd for Cob {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Cob {
+    fn cmp(&self, _other: &Self) -> std::cmp::Ordering {
+        // TODO
         std::cmp::Ordering::Equal
     }
 }

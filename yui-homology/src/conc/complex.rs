@@ -52,6 +52,10 @@ where
         &self.summands
     }
 
+    pub fn raw_d(&self) -> Arc<dyn Fn(I, &Lc<X, R>) -> Lc<X, R> + Send + Sync> { 
+        self.d_map.clone()
+    }
+
     fn d_matrix(&self, i: I) -> SpMat<R> { 
         let m = self[i + self.d_deg].rank();
         let n = self[i].rank();

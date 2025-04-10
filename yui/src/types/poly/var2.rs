@@ -7,7 +7,7 @@ use num_traits::{Zero, One, Pow, FromPrimitive, ToPrimitive};
 use auto_impl_ops::auto_ops;
 
 use crate::{Elem, ElemBase};
-use crate::lc::{Gen, OrdForDisplay};
+use crate::lc::Gen;
 
 use super::{Mono, MonoOrd};
 use super::var::parse_mono_deg;
@@ -143,9 +143,16 @@ where I: Copy + Eq + Ord + for<'x> Add<&'x I, Output = I> {
     }
 }
 
-impl<const X: char, const Y: char, I> OrdForDisplay for Var2<X, Y, I>
+impl<const X: char, const Y: char, I> PartialOrd for Var2<X, Y, I>
 where I: Copy + Eq + Ord + for<'x> Add<&'x I, Output = I> {
-    fn cmp_for_display(&self, other: &Self) -> std::cmp::Ordering {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(Self::cmp(self, other))
+    }
+}
+
+impl<const X: char, const Y: char, I> Ord for Var2<X, Y, I>
+where I: Copy + Eq + Ord + for<'x> Add<&'x I, Output = I> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         Self::cmp_lex(self, other)
     }
 }

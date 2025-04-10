@@ -242,7 +242,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.to_string_by(X::cmp_for_display, false))
+        f.write_str(&self.to_string_by(X::cmp, false))
     }
 }
 

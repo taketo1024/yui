@@ -7,7 +7,7 @@ use itertools::Itertools;
 use auto_impl_ops::auto_ops;
 
 use crate::{Elem, ElemBase};
-use crate::lc::{Gen, OrdForDisplay};
+use crate::lc::Gen;
 use crate::util::format::subscript;
 use super::{Mono, MultiDeg, MonoOrd};
 use super::var::{fmt_mono, parse_mono_deg};
@@ -158,9 +158,16 @@ where I: Zero + Ord + for<'x> Add<&'x I, Output = I> {
     }
 }
 
-impl<const X: char, I> OrdForDisplay for MultiVar<X, I>
+impl<const X: char, I> PartialOrd for MultiVar<X, I>
 where I: Zero + Ord + for<'x> Add<&'x I, Output = I> {
-    fn cmp_for_display(&self, other: &Self) -> std::cmp::Ordering {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(Self::cmp(self, other))
+    }
+}
+
+impl<const X: char, I> Ord for MultiVar<X, I>
+where I: Zero + Ord + for<'x> Add<&'x I, Output = I> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         Self::cmp_lex(self, other)
     }
 }

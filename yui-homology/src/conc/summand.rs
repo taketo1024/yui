@@ -41,12 +41,16 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         Self::new(IndexList::new(), 0, vec![], Trans::zero())
     }
 
-    pub fn raw_gens(&self) -> &IndexList<X> { 
-        &self.raw_gens
-    }
-
     pub fn trans(&self) -> &Trans<R> { 
         &self.trans
+    }
+
+    pub fn raw_gen(&self, i: usize) -> &X { 
+        &self.raw_gens[i]
+    }
+
+    pub fn raw_gens(&self) -> &IndexList<X> { 
+        &self.raw_gens
     }
 
     pub fn gen(&self, i: usize) -> Lc<X, R> { 
@@ -59,7 +63,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         let n = self.raw_gens.len();
         let v = SpVec::from_entries(n, z.iter().map(|(x, a)| { 
             let Some(i) = self.raw_gens.index_of(x) else { 
-                panic!("{x} not found in generators: {:?}", &self.raw_gens);
+                panic!("{x} not found in generators ({}).", &self.raw_gens.len());
             };
             (i, a.clone())
         }));
@@ -100,6 +104,18 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         self.tors = other.tors.clone();
         self.trans.merge(other.trans);
         self.trans.reduce();
+    }
+
+    pub fn print_gens(&self) {
+        for i in 0..self.rank() { 
+            println!("{}: {}", i, self.gen(i));
+        }
+    }
+
+    pub fn print_raw_gens(&self) {
+        for (i, x) in self.raw_gens.iter().enumerate() { 
+            println!("{}: {}", i, x);
+        }
     }
 }
 

@@ -9,13 +9,13 @@ use yui_link::Link;
 use crate::kh::KhGen;
 use crate::misc::{collect_gen_info, range_of};
 
-use super::{KhChain, KhComplex, KhComplexBigraded};
+use super::{KhAlgStr, KhChain, KhComplex, KhComplexBigraded};
 
 #[derive(Clone)]
 pub struct KhHomology<R> 
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     inner: Homology<KhGen, R>,
-    ht: (R, R),
+    str: KhAlgStr<R>,
     deg_shift: (isize, isize),
     reduced: bool,
     canon_cycles: Vec<KhChain<R>>
@@ -28,12 +28,12 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         Self::from(&c)
     }
     
-    pub(crate) fn new_impl(inner: Homology<KhGen, R>, ht: (R, R), deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self { 
-        Self { inner, ht, deg_shift, reduced, canon_cycles }
+    pub(crate) fn new_impl(inner: Homology<KhGen, R>, str: KhAlgStr<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self { 
+        Self { inner, str, deg_shift, reduced, canon_cycles }
     }
 
-    pub fn ht(&self) -> &(R, R) { 
-        &self.ht
+    pub fn str(&self) -> &KhAlgStr<R> { 
+        &self.str
     }
 
     pub fn deg_shift(&self) -> (isize, isize) { 
@@ -59,7 +59,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn truncated(&self, range: RangeInclusive<isize>) -> Self {
         Self::new_impl(
             self.inner.truncated(range), 
-            self.ht.clone(), 
+            self.str.clone(), 
             self.deg_shift, 
             self.reduced, 
             self.canon_cycles.clone()
@@ -70,7 +70,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn into_bigraded(&self) -> KhHomologyBigraded<R> { 
         // TODO: check (h, t)
 
-        let ht = self.ht.clone();
+        let str = self.str.clone();
         let deg_shift = self.deg_shift;
         let reduced = self.reduced;
         let canon_cycles = self.canon_cycles.clone();
@@ -94,7 +94,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
             Summand::new(gens, *rank, tors.clone(), trans)
         });
 
-        KhHomologyBigraded::new_impl(inner, ht, deg_shift, reduced, canon_cycles)
+        KhHomologyBigraded::new_impl(inner, str, deg_shift, reduced, canon_cycles)
     }
 }
 
@@ -103,7 +103,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     fn from(c: &KhComplex<R>) -> Self {
         KhHomology::new_impl(
             c.inner().reduced().homology(), 
-            c.ht().clone(), 
+            c.str().clone(), 
             c.deg_shift(), 
             c.is_reduced(),
             c.canon_cycles().clone()
@@ -141,7 +141,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 pub struct KhHomologyBigraded<R> 
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     inner: Homology2<KhGen, R>,
-    ht: (R, R),
+    str: KhAlgStr<R>,
     deg_shift: (isize, isize),
     reduced: bool,
     canon_cycles: Vec<KhChain<R>>
@@ -154,12 +154,12 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         h.into_bigraded()
     }
 
-    fn new_impl(inner: Homology2<KhGen, R>, ht: (R, R), deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self { 
-        Self { inner, ht, deg_shift, reduced, canon_cycles }
+    fn new_impl(inner: Homology2<KhGen, R>, str: KhAlgStr<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self { 
+        Self { inner, str, deg_shift, reduced, canon_cycles }
     }
 
-    pub fn ht(&self) -> &(R, R) { 
-        &self.ht
+    pub fn str(&self) -> &KhAlgStr<R> { 
+        &self.str
     }
 
     pub fn deg_shift(&self) -> (isize, isize) { 
@@ -192,7 +192,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     fn from(c: &KhComplexBigraded<R>) -> Self {
         KhHomologyBigraded::new_impl(
             c.inner().reduced().homology(), 
-            c.ht().clone(), 
+            c.str().clone(), 
             c.deg_shift(), 
             c.is_reduced(),
             c.canon_cycles().clone()

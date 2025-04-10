@@ -12,7 +12,7 @@ old = []
 
 [dependencies]
 auto-impl-ops = "0.2.1"
-cartesian = "0.2.1"
+cartesian = "0.3.0"
 delegate = "0.13.3"
 derive_more = { version = "1.0.0", features = ["display", "debug"] }
 grouping_by = "0.2.2"

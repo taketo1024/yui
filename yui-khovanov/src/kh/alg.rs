@@ -1,9 +1,12 @@
 use std::fmt::Display;
-use yui::{Ring, RingOps};
+use yui::lc::Gen;
+use yui::{Elem, Ring, RingOps};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub enum KhAlgGen { 
-    I, X
+    #[default] 
+    I, 
+    X
 }
 
 impl KhAlgGen { 
@@ -32,6 +35,14 @@ impl Display for KhAlgGen {
         }
     }
 }
+
+impl Elem for KhAlgGen {
+    fn math_symbol() -> String {
+        format!("A")
+    }
+}
+
+impl Gen for KhAlgGen {}
 
 #[derive(Clone)]
 pub struct KhAlgStr<R>

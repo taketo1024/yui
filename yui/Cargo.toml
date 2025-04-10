@@ -16,19 +16,19 @@ ahash = { version = "0.8.11", features = ["serde"] }
 auto-impl-ops = "0.2.1"
 bimap = { version = "0.6.3", features = ["serde"] }
 cfg-if = "1.0.0"
-delegate = "0.13.0"
+delegate = "0.13.3"
 derive_more = { version = "1.0.0", features = ["display", "debug"] }
 dinglebit_combinatorics = "1.1.0"
 is-even = "1.0.0"
 itertools = "0.13.0"
-log = "0.4.22"
+log = "0.4.27"
 num-bigint = "0.4.6"
 num-integer = { version = "0.1.46", features = ["i128"] }
 num-traits = "0.2.19"
 prettytable = "0.10.0"
-regex = "1.10.6"
-serde = { version = "1.0.210", features = ["derive"], optional = true }
-serde_json = { version = "1.0.128", optional = true }
-serde_repr = { version = "0.1.19", optional = true }
-serde_with = {version = "3.9.0", optional = true } 
+regex = "1.11.1"
+serde = { version = "1.0.219", features = ["derive"], optional = true }
+serde_json = { version = "1.0.140", optional = true }
+serde_repr = { version = "0.1.20", optional = true }
+serde_with = {version = "3.12.0", optional = true } 
 simplelog = "0.12.2"

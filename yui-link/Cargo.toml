@@ -9,14 +9,14 @@ edition.workspace = true
 
 [dependencies]
 auto-impl-ops = "0.2.1"
-delegate = "0.13.0"
+delegate = "0.13.3"
 derive_more = { version = "1.0.0", features = ["display", "debug"] }
 itertools = "0.13.0"
 num-integer = "0.1.46"
 num-traits = "0.2.19"
 petgraph = "0.6.5"
-regex = "1.10.6"
-serde = "1.0.210"
-serde_json = "1.0.128"
+regex = "1.11.1"
+serde = "1.0.219"
+serde_json = "1.0.140"
 
 yui = { path = "../yui" }

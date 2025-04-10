@@ -434,9 +434,9 @@ mod tests {
     use num_traits::Zero;
     use crate::{Elem, AddMon};
     use crate::util::macros::hashmap;
-    use crate::lc::{Free, Lc};
+    use crate::lc::{FreeGen, Lc};
  
-    type X = Free<i32>;
+    type X = FreeGen<i32>;
     fn e(i: i32) -> X { 
         X::from(i)
     }
@@ -445,7 +445,7 @@ mod tests {
     fn math_symbol() { 
         type L = Lc<X, i32>;
         let symbol = L::math_symbol();
-        assert_eq!(symbol, "Z<Z>");
+        assert_eq!(symbol, "Z<Free<i32>>");
     }
 
     #[test]

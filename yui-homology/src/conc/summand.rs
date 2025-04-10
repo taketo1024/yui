@@ -151,11 +151,11 @@ mod tex {
 
 #[cfg(test)]
 mod tests { 
-    use yui::lc::Free;
+    use yui::lc::FreeGen;
 
     use super::*;
 
-    type X = Free<i32>;
+    type X = FreeGen<i32>;
     fn e(i: isize) -> X { 
         X::from(i as i32)
     }

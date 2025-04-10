@@ -19,7 +19,7 @@ bimap = "0.6.3"
 cartesian = "0.3.0"
 cfg-if = "1.0.0"
 delegate = "0.13.3"
-derive_more = { version = "1.0.0", features = ["display", "debug", "add"] }
+derive_more = { version = "2.0.1", features = ["display", "debug", "add"] }
 grouping_by = "0.2.2"
 itertools = "0.14.0"
 log = "0.4.27"

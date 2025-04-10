@@ -10,7 +10,7 @@ edition.workspace = true
 [dependencies]
 auto-impl-ops = "0.2.1"
 delegate = "0.13.3"
-derive_more = { version = "1.0.0", features = ["display", "debug"] }
+derive_more = { version = "2.0.1", features = ["display", "debug"] }
 itertools = "0.14.0"
 num-integer = "0.1.46"
 num-traits = "0.2.19"

@@ -1,9 +1,9 @@
 use core::panic;
+use std::fmt::Display;
 use std::hash::Hash;
 use std::collections::{HashSet, VecDeque};
 use std::ops::{Mul, MulAssign};
 use auto_impl_ops::auto_ops;
-use derive_more::Display;
 use itertools::Itertools;
 use num_traits::Zero;
 use cartesian::cartesian;
@@ -14,12 +14,12 @@ use yui_link::{Edge, Crossing};
 use yui::bitseq::Bit;
 use super::tng::{Tng, TngComp};
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Display)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, derive_more::Display)]
 pub enum Dot { 
     None, X, Y
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Display)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, derive_more::Display)]
 pub enum Bottom { 
     Src, Tgt
 }

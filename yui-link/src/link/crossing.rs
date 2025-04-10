@@ -1,4 +1,5 @@
-use derive_more::Display;
+use std::fmt::Display;
+
 use yui::bitseq::Bit;
 
 use crate::Path;
@@ -6,7 +7,7 @@ use super::Edge;
 
 use CrossingType::{X, Xm, V, H};
 
-#[derive(Display, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, derive_more::Display, Debug)]
 pub enum CrossingType { 
     X, Xm, V, H 
 }

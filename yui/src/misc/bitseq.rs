@@ -1,10 +1,10 @@
 use core::fmt;
+use std::fmt::{Display, Debug};
 use auto_impl_ops::auto_ops;
 use std::ops::{Add, AddAssign, Index};
 use std::str::FromStr;
-use derive_more::{Display, Debug};
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Display, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, derive_more::Display, derive_more::Debug)]
 #[cfg_attr(feature = "serde", derive(serde_repr::Serialize_repr, serde_repr::Deserialize_repr))]
 #[repr(u8)]
 pub enum Bit { 

@@ -11,6 +11,8 @@ use yui_matrix::sparse::SpMat;
 use crate::kh::{KhGen, KhHomology, KhHomologyBigraded};
 use crate::misc::range_of;
 
+use super::KhAlgStr;
+
 pub type KhChain<R> = Lc<KhGen, R>;
 pub trait KhChainExt { 
     fn h_deg(&self) -> isize;
@@ -34,7 +36,7 @@ pub type KhComplexSummand<R> = Summand<KhGen, R>;
 pub struct KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     inner: ChainComplex<KhGen, R>,
-    ht: (R, R),
+    str: KhAlgStr<R>,
     deg_shift: (isize, isize),
     reduced: bool,
     canon_cycles: Vec<KhChain<R>>,
@@ -66,11 +68,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         assert!(!reduced || (!l.is_empty() && t.is_zero()));
 
-        let ht = (h.clone(), t.clone());
         let red_e = reduced.then(|| l.first_edge().unwrap());
         let deg_shift = Self::deg_shift_for(l, reduced);
         
         let cube = KhCube::new(l, h, t, red_e, deg_shift);
+        let str = cube.str().clone();
         let complex = cube.into_complex();
 
         let canon_cycles = if t.is_zero() && l.is_knot() {
@@ -80,15 +82,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             vec![]
         };
 
-        KhComplex::new_impl(complex, ht, deg_shift, reduced, canon_cycles)
+        KhComplex::new_impl(complex, str, deg_shift, reduced, canon_cycles)
     }
 
-    pub(crate) fn new_impl(inner: ChainComplex<KhGen, R>, ht: (R, R), deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self { 
-        KhComplex { inner, ht, deg_shift, reduced, canon_cycles }
+    pub(crate) fn new_impl(inner: ChainComplex<KhGen, R>, str: KhAlgStr<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self { 
+        KhComplex { inner, str, deg_shift, reduced, canon_cycles }
     }
 
-    pub fn ht(&self) -> &(R, R) { 
-        &self.ht
+    pub fn str(&self) -> &KhAlgStr<R> { 
+        &self.str
     }
 
     pub fn deg_shift(&self) -> (isize, isize) { 
@@ -120,7 +122,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn truncated(&self, range: RangeInclusive<isize>) -> Self {
         Self::new_impl(
             self.inner.truncated(range), 
-            self.ht.clone(), 
+            self.str.clone(), 
             self.deg_shift, 
             self.reduced, 
             self.canon_cycles.clone()
@@ -144,9 +146,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn into_bigraded(self) -> KhComplexBigraded<R> {
-        assert_eq!(self.ht(), &(R::zero(), R::zero()));
+        assert!(self.str.h().is_zero());
+        assert!(self.str.t().is_zero());
 
-        let ht = self.ht.clone();
+        let str = self.str.clone();
         let deg_shift = self.deg_shift;
         let reduced = self.reduced;
         let canon_cycles = self.canon_cycles.clone();
@@ -159,7 +162,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             dx.into_iter().collect()
         });
 
-        KhComplexBigraded::new_impl(inner, ht, deg_shift, reduced, canon_cycles)
+        KhComplexBigraded::new_impl(inner, str, deg_shift, reduced, canon_cycles)
     }
 
     pub fn deg_shift_for(l: &Link, reduced: bool) -> (isize, isize) {
@@ -230,7 +233,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 pub struct KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     inner: ChainComplex2<KhGen, R>,
-    ht: (R, R),
+    str: KhAlgStr<R>,
     deg_shift: (isize, isize),
     reduced: bool,
     canon_cycles: Vec<KhChain<R>>,
@@ -247,16 +250,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn new_impl(
         inner: ChainComplex2<KhGen, R>,
-        ht: (R, R),
+        str: KhAlgStr<R>,
         deg_shift: (isize, isize),
         reduced: bool,
         canon_cycles: Vec<KhChain<R>>
     ) -> Self {
-        Self { inner, ht, deg_shift, reduced, canon_cycles }
+        Self { inner, str, deg_shift, reduced, canon_cycles }
     }
 
-    pub fn ht(&self) -> &(R, R) { 
-        &self.ht
+    pub fn str(&self) -> &KhAlgStr<R> { 
+        &self.str
     }
 
     pub fn h_range(&self) -> RangeInclusive<isize> { 

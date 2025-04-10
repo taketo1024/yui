@@ -146,7 +146,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         })
     }
 
-    pub fn structure(&self) -> &KhAlgStr<R> {
+    pub fn str(&self) -> &KhAlgStr<R> {
         &self.str
     }
 

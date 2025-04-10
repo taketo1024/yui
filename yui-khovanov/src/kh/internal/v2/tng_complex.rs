@@ -13,7 +13,7 @@ use yui_homology::{ChainComplex, Summand, Grid1};
 use yui_link::{Crossing, Edge, State};
 use yui::bitseq::Bit;
 
-use crate::kh::{KhAlgGen, KhChain, KhComplex, KhGen, KhLabel};
+use crate::kh::{KhAlgGen, KhAlgStr, KhChain, KhComplex, KhGen, KhLabel};
 use super::cob::{Cob, Dot, Bottom, CobComp, LcCob, LcCobTrait};
 use super::tng::{Tng, TngComp};
 
@@ -615,12 +615,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn into_kh_complex(self, canon_cycles: Vec<KhChain<R>>) -> KhComplex<R> { 
         assert!(self.is_completely_delooped());
 
-        let ht = self.ht().clone();
+        let (h, t) = self.ht();
+        let str = KhAlgStr::new(h, t);
         let deg_shift = self.deg_shift;
         let reduced = self.base_pt.is_some();
         let inner = self.into_raw_complex();
 
-        KhComplex::new_impl(inner, ht, deg_shift, reduced, canon_cycles)
+        KhComplex::new_impl(inner, str, deg_shift, reduced, canon_cycles)
     }
 
     pub fn is_completely_delooped(&self) -> bool { 

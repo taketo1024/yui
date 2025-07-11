@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use itertools::Either;
 use num_traits::Zero;
 use yui::lc::{EitherGen, Gen, Lc};
 use yui::{Ring, RingOps};
@@ -60,15 +59,21 @@ where
         (self.map)(i, &z)
     }
 
-    pub fn check_at(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I) {
+    pub fn check_for(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I, x: &X) {
         let d_deg = source.d_deg();
+        let x = Lc::from(x.clone());
+        let dx = source.d(i, &x);
+        let fdx = self.apply(i + d_deg, &dx);
+        let fx = self.apply(i, &x);
+        let dfx = target.d(i, &fx);
+
+        assert!(dfx == fdx, "df != fd for x = {x}.\n  df = {dfx},\n  fd = {fdx}.");
+    }
+
+
+    pub fn check_at(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I) {
         for x in source.get(i).raw_gens().iter() {
-            let x = Lc::from(x.clone());
-            let dx = source.d(i, &x);
-            let fdx = self.apply(i + d_deg, &dx);
-            let fx = self.apply(i, &x);
-            let dfx = target.d(i, &fx);
-            assert!(dfx == fdx, "df != fd for x = {x}.");
+            self.check_for(source, target, i, x);
         }
     }
 
@@ -110,20 +115,14 @@ where
 
         let d_map = move |i: I, z: &Lc<EitherGen<X, Y>, R>| {
             let (i, j) = degs(i);
-            z.apply(|x| match x.entity() {
-                Either::Left(x) => {
-                    let dx = d1(i, &Lc::from(x.clone()))
-                        .map_gens(|x2| EitherGen::from_left(x2.clone()));
-                    let fx = f(i, &Lc::from(x.clone()))
-                        .map_gens(|y| EitherGen::from_right(y.clone()));
-                    dx + fx
-                },
-                Either::Right(y) => {
-                    let dy = d2(j, &Lc::from(y.clone()))
-                        .map_gens(|y2| EitherGen::from_right(y2.clone()));
-                    -dy 
-                }
-            })
+            let x = z.filter_gens(|x| x.is_left()).map_gens(|x| x.clone().into_left());
+            let y = z.filter_gens(|x| x.is_right()).map_gens(|x| x.clone().into_right());
+
+            let dx = d1(i, &x).map_gens(|x2| EitherGen::from_left(x2.clone()));
+            let fx = f(i, &x).map_gens(|y2| EitherGen::from_right(y2.clone()));
+            let dy = d2(j, &y).map_gens(|y2| EitherGen::from_right(y2.clone()));
+
+            dx + fx - dy
         };
 
         ChainComplexBase::new(summands, d_deg, d_map)
@@ -165,6 +164,7 @@ mod tests {
         );
 
         let cone = f.cone(&s2, &d3, (0..=4).rev(), true);
+        cone.check_d_all();
 
         let x = T::from_left(s2[0].raw_gen(0).clone());
         let y = T::from_left(s2[1].raw_gen(0).clone());

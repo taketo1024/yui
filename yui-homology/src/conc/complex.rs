@@ -102,6 +102,16 @@ where
         let d_map = self.d_map.clone();
         Self { summands, d_deg, d_map }
     }
+
+    fn check_d_for(&self, i0: I, x: &X) { 
+        let i1 = i0 + self.d_deg();
+        assert!(self.is_supported(i0), "Not supported: {i0}.");
+
+        let dx = self.d(i0, &Lc::from(x.clone()));
+        let ddx = self.d(i1, &dx);
+        
+        assert!(ddx.is_zero(), "d² is non-zero for {x} at {i0}.\n  dx: {dx}\n  ddx: {ddx}.");
+    }
 }
 
 impl<X, R> ChainComplex<X, R>
@@ -166,6 +176,12 @@ where
 
     fn d_matrix(&self, i: I) -> SpMat<Self::R> { 
         self.d_matrix(i)
+    }
+
+    fn check_d_at(&self, i0: I) { 
+        for x in self.get(i0).raw_gens().iter() {
+            self.check_d_for(i0, x);
+        }
     }
 }
 

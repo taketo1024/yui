@@ -31,7 +31,7 @@ where T: ElemBase {
 impl<T> Gen for FreeGen<T> 
 where T: ElemBase + Hash + Ord {}
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Debug, Display)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub struct EitherGen<X, Y>(Either<X, Y>) where X: Gen, Y: Gen;
 
 impl<X, Y> EitherGen<X, Y> where X: Gen, Y: Gen {
@@ -48,6 +48,28 @@ impl<X, Y> EitherGen<X, Y> where X: Gen, Y: Gen {
             Either::Left(x) => Either::Left(x),
             Either::Right(y) => Either::Right(y),
         }
+    }
+
+    pub fn is_left(&self) -> bool {
+        matches!(self.0, Either::Left(_))
+    }
+
+    pub fn is_right(&self) -> bool {
+        matches!(self.0, Either::Right(_))
+    }
+
+    pub fn into_left(self) -> X {
+        let Either::Left(x) = self.0 else {
+            panic!();
+        };
+        x
+    }
+
+    pub fn into_right(self) -> Y {
+        let Either::Right(y) = self.0 else {
+            panic!();
+        };
+        y
     }
 }
 
@@ -66,6 +88,15 @@ impl<X, Y> From<EitherGen<X, Y>> for Either<X, Y> where X: Gen, Y: Gen {
 impl<X, Y> Default for EitherGen<X, Y> where X: Gen, Y: Gen {
     fn default() -> Self {
         Self(Either::Left(X::default()))
+    }
+}
+
+impl <X, Y> std::fmt::Display for EitherGen<X, Y> where X: Gen, Y: Gen {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.0 {
+            Either::Left(x) => write!(f, "{}_L", x),
+            Either::Right(y) => write!(f, "{}_R", y),
+        }
     }
 }
 

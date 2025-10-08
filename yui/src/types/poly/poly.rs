@@ -2,10 +2,11 @@ use std::fmt::{Display, Debug};
 use std::ops::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Neg, DivAssign, RemAssign, Div, Rem};
 use std::str::FromStr;
 use delegate::delegate;
+use itertools::Itertools;
 use num_traits::{Zero, One, Pow};
 use auto_impl_ops::auto_ops;
 
-use crate::combi::combi;
+use crate::combi::{combi, Partition};
 use crate::{AddGrp, AddGrpOps, AddMon, AddMonOps, Elem, EucRing, EucRingOps, Field, FieldOps, Mon, MonOps, Ring, RingOps};
 use crate::lc::Lc;
 use super::{MultiDeg, Var, Var2, Var3,MultiVar, Mono, MonoOrd};
@@ -548,6 +549,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn pow_sum(n: usize, d: usize) -> Self {
         let mons = (0..n).map(|i| (MultiVar::from((i, d)), R::one()));
         Self::from_iter(mons)
+    }
+
+    // ref: https://en.wikipedia.org/wiki/Schur_polynomial#Jacobi%E2%88%92Trudi_identities
+    pub fn schur_poly(p: &Partition) -> Self { 
+        use crate::algo::naive_det;
+
+        let n = p.len();
+        let mat = (0..n).flat_map(|i| 
+            (0..n).map(move |j| { 
+                if p[i] + j < i { 
+                    Self::zero()
+                } else { 
+                    let d = p[i] + j - i;
+                    Self::h_sym(n, d)
+                }
+            })
+        ).collect_vec();
+
+        naive_det::<Self>(n, &mat)
     }
 }
 
@@ -1148,5 +1168,47 @@ mod tests {
         ));
 
         assert_eq!(s, P::zero())
+    }
+
+    #[test]
+    fn test_schur_poly() {
+        type P = PolyN::<'x', i32>;
+
+        // Partition [2,1] for n = 2 variables
+        let p = Partition::from([2, 1]);
+        let schur = P::schur_poly(&p);
+
+        // The Schur polynomial s_{2,1}(x0, x1) = x0^2 x1 + x0 x1^2
+        let xn = P::mono;
+        let expected = P::from_iter([
+            (xn([2, 1]), 1),
+            (xn([1, 2]), 1),
+        ]);
+        assert_eq!(schur, expected);
+
+        // Partition [1,1,1] for n = 3 variables
+        let p = Partition::from([1, 1, 1]);
+        let schur = P::schur_poly(&p);
+
+        // The Schur polynomial s_{1,1,1}(x0, x1, x2) = x0 x1 x2
+        let xn = P::mono;
+        let expected = P::from_iter([
+            (xn([1, 1, 1]), 1),
+        ]);
+        assert_eq!(schur, expected);
+
+        // Partition [3,0] for n = 2 variables
+        let p = Partition::from([3, 0]);
+        let schur = P::schur_poly(&p);
+
+        // The Schur polynomial s_{3,0}(x0, x1) = x0^3 + x0^2 x1 + x0 x1^2 + x1^3
+        let xn = P::mono;
+        let expected = P::from_iter([
+            (xn([3, 0]), 1),
+            (xn([2, 1]), 1),
+            (xn([1, 2]), 1),
+            (xn([0, 3]), 1),
+        ]);
+        assert_eq!(schur, expected);
     }
 }

@@ -220,18 +220,10 @@ macro_rules! impl_multivar_unsigned {
 
         impl<const X: char> MultiVar<X, $I> {
             pub fn generate(n: usize, tot_deg: usize) -> impl Iterator<Item = Self> { 
-                use dinglebit_combinatorics::Combination as C;
-                use crate::algo::rep_comb;
+                use crate::combi::rep_combi_count;
         
-                // MEMO: 
-                // Mathematically this restriction is unnecessary, 
-                // but (n, tot_deg) = (0, 0) will fail. 
-                assert!(n > 0);
-        
-                let c = C::new(n + tot_deg - 1, n - 1);
-                c.into_iter().map(move |mut list| {
-                    list.push(n + tot_deg - 1); // the right-end wall
-                    Self::from_iter( rep_comb(&list) )
+                rep_combi_count(n, tot_deg).map(move |indices| {
+                    Self::from_iter(indices)
                 })
             }        
         }
@@ -434,6 +426,18 @@ mod tests {
         assert!(mons.iter().all_unique());
 
         assert_eq!(M::generate(n, 0).collect_vec(), vec![M::one()]); // deg(1) = 0, using n-vars.
+    }
+
+    #[test]
+    fn gen_mons_zero_vars() { 
+        type M = MultiVar<'X', usize>;
+
+        let n = 0;
+        let mons = M::generate(n, 0).collect_vec();
+        assert_eq!(mons.len(), 1);
+
+        let mons = M::generate(n, 1).collect_vec();
+        assert_eq!(mons.len(), 0);
     }
 
     #[test]

@@ -57,6 +57,16 @@ impl Partition {
     }
 }
 
+impl<I> From<I> for Partition
+where
+    I: IntoIterator<Item = usize>,
+{
+    fn from(iter: I) -> Self {
+        let parts = iter.into_iter().collect();
+        Partition::new(parts)
+    }
+}
+
 impl Index<usize> for Partition {
     type Output = usize;
 
@@ -92,7 +102,7 @@ impl Partition {
     pub fn young_diagram(&self) -> String {
         self.parts
             .iter()
-            .map(|&n| "◻︎".repeat(n))
+            .map(|&n| "⬜︎".repeat(n))
             .collect::<Vec<_>>()
             .join("\n")
     }

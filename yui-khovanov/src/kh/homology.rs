@@ -1,13 +1,12 @@
 use std::ops::{RangeInclusive, Index};
 use delegate::delegate;
-use cartesian::cartesian;
 
-use yui_homology::{isize2, Grid2, GridTrait, Homology, Homology2, Summand};
+use yui_homology::{isize2, GridTrait, Homology, Homology2, Summand};
 use yui::{EucRing, EucRingOps};
 use yui_link::Link;
 
 use crate::kh::KhGen;
-use crate::misc::{collect_gen_info, range_of};
+use crate::misc::{make_gen_grid, range_of};
 
 use super::{KhAlgStr, KhChain, KhComplex, KhComplexBigraded};
 
@@ -80,25 +79,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         let reduced = self.reduced;
         let canon_cycles = self.canon_cycles.clone();
 
-        let table = collect_gen_info(self.inner());
-        let h_range = range_of(table.keys().map(|i| i.0));
-        let q_range = range_of(table.keys().map(|i| i.1)).step_by(2);
-        let support = cartesian!(h_range, q_range.clone()).map(|(i, j)| 
-            isize2(i, j)
-        );
-
-        let inner = Grid2::generate(support, move |idx| { 
-            let i = idx.0;
-            let Some(e) = table.get(&idx) else { 
-                return Summand::zero()
-            };
-            
-            let (rank, tors, indices) = e;
-            let gens = self[i].raw_gens().clone(); 
-            let trans = self[i].trans().sub(indices);
-            Summand::new(gens, *rank, tors.clone(), trans)
-        });
-
+        let inner = make_gen_grid(self.inner());
         KhHomologyBigraded::new_impl(inner, str, deg_shift, reduced, canon_cycles)
     }
 }

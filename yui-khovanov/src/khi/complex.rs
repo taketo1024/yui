@@ -53,6 +53,9 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         assert!(!reduced || (l.base_pt().is_some() && t.is_zero()));
 
         let deg_shift = KhComplex::deg_shift_for(l.link(), reduced);
+
+        // TODO use mapping cone
+
         let cube = KhICube::new(l, h, t, reduced, deg_shift);
         let inner = cube.into_complex();
 
@@ -81,6 +84,8 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
             let qz = z.map_gens(|x| KhIGen::Q(*x));
             [bz, qz]
         }).sorted_by_key(|z| z.h_deg()).collect_vec();
+
+        // TODO use mapping cone
 
         let summands = Grid1::generate(h_range, |i| { 
             let b_gens = c[i].raw_gens().iter().map(|x| KhIGen::B(*x));

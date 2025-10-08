@@ -58,6 +58,10 @@ impl<X, Y> EitherGen<X, Y> where X: Gen, Y: Gen {
         matches!(self.0, Either::Right(_))
     }
 
+    pub fn inner(&self) -> &Either<X, Y> {
+        &self.0
+    }
+
     pub fn into_left(self) -> X {
         let Either::Left(x) = self.0 else {
             panic!();

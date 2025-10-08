@@ -98,8 +98,8 @@ impl<X, Y> Default for EitherGen<X, Y> where X: Gen, Y: Gen {
 impl <X, Y> std::fmt::Display for EitherGen<X, Y> where X: Gen, Y: Gen {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.0 {
-            Either::Left(x) => write!(f, "{}_L", x),
-            Either::Right(y) => write!(f, "{}_R", y),
+            Either::Left(x)  => std::fmt::Display::fmt(x, f),
+            Either::Right(y) => std::fmt::Display::fmt(y, f),
         }
     }
 }

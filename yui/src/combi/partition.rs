@@ -179,11 +179,7 @@ mod tests {
     #[test]
     fn test_young_diagram() {
         let p = Partition::new(vec![3, 2, 1]);
-        let expected = "◻︎◻︎◻︎\n◻︎◻︎\n◻︎";
+        let expected = "⬜︎⬜︎⬜︎\n⬜︎⬜︎\n⬜︎";
         assert_eq!(p.young_diagram(), expected);
-
-        for p in Partition::all_partitions(5) { 
-            println!("{p}\n{}\n", p.young_diagram())
-        }
     }
 }

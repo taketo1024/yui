@@ -9,4 +9,5 @@ pub use misc::*;
 pub use ext::*;
 
 pub mod algo;
+pub mod combi;
 pub mod util;

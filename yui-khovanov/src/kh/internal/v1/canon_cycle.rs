@@ -73,7 +73,7 @@ mod tests {
         let l = Link::trefoil().mirror();
         let p = l.first_edge().unwrap();
         let r = false;
-        let c = KhComplex::new(&l, &1, &0, r);
+        let c = KhComplex::new_no_simplify(&l, &1, &0, r);
         let zs = KhComplex::make_canon_cycles(&l, p, &0, &1, r, c.deg_shift());
 
         assert_eq!(zs.len(), 2);
@@ -93,7 +93,7 @@ mod tests {
         let l = Link::figure8();
         let p = l.first_edge().unwrap();
         let r = false;
-        let c = KhComplex::new(&l, &1, &0, r);
+        let c = KhComplex::new_no_simplify(&l, &1, &0, r);
         let zs = KhComplex::make_canon_cycles(&l, p, &0, &1, r, c.deg_shift());
         
         assert_eq!(zs.len(), 2);
@@ -113,7 +113,7 @@ mod tests {
         let l = Link::trefoil().mirror();
         let p = l.first_edge().unwrap();
         let r = true;
-        let c = KhComplex::new(&l, &1, &0, r);
+        let c = KhComplex::new_no_simplify(&l, &1, &0, r);
         let zs = KhComplex::make_canon_cycles(&l, p, &0, &1, r, c.deg_shift());
 
         assert_eq!(zs.len(), 1);
@@ -132,7 +132,7 @@ mod tests {
         let l = Link::figure8();
         let p = l.first_edge().unwrap();
         let r = true;
-        let c = KhComplex::new(&l, &1, &0, r);
+        let c = KhComplex::new_no_simplify(&l, &1, &0, r);
         let zs = KhComplex::make_canon_cycles(&l, p, &0, &1, r, c.deg_shift());
         
         assert_eq!(zs.len(), 1);

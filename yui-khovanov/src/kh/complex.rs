@@ -44,17 +44,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn new(link: &Link, h: &R, t: &R, reduced: bool) -> Self {
-        cfg_if::cfg_if! { 
-        if #[cfg(feature = "old")] { 
-            Self::new_v1(link, h, t, reduced)
-        } else { 
-            Self::new_v2(link, h, t, reduced)
-        }}
-    }
-
-    #[cfg(not(feature = "old"))]
-    fn new_v2(l: &Link, h: &R, t: &R, reduced: bool) -> Self { 
+    pub fn new(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
         use crate::kh::internal::v2::builder::TngComplexBuilder;
 
         assert!(!reduced || (!l.is_empty() && t.is_zero()));
@@ -62,8 +52,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         TngComplexBuilder::build_kh_complex(l, h, t, reduced)
     }
 
-    #[cfg(feature = "old")]
-    fn new_v1(l: &Link, h: &R, t: &R, reduced: bool) -> Self { 
+    pub fn new_no_simplify(l: &Link, h: &R, t: &R, reduced: bool) -> Self { 
         use crate::kh::internal::v1::cube::KhCube;
 
         assert!(!reduced || (!l.is_empty() && t.is_zero()));
@@ -241,13 +230,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn new(l: &Link, h: &R, t: &R, reduced: bool) -> Self { 
-        assert!(h.is_zero() && t.is_zero());
-
-        let c = KhComplex::new(&l, h, t, reduced);
-        c.into_bigraded()
-    }
-
     fn new_impl(
         inner: ChainComplex2<KhGen, R>,
         str: KhAlgStr<R>,
@@ -340,8 +322,6 @@ mod tests {
     use yui_homology::{ChainComplexTrait, SummandTrait};
     use yui_link::Link;
 
-    use crate::kh::KhComplexBigraded;
-
     use super::KhComplex;
 
     #[test]
@@ -350,19 +330,10 @@ mod tests {
         let c = KhComplex::new(&l, &0, &0, false);
 
         assert_eq!(c.h_range(), -3..=0);
-
-        cfg_if::cfg_if! { 
-        if #[cfg(feature = "old")] { 
-            assert_eq!(c[-3].rank(), 8);
-            assert_eq!(c[-2].rank(), 12);
-            assert_eq!(c[-1].rank(), 6);
-            assert_eq!(c[ 0].rank(), 4);    
-        } else { 
-            assert_eq!(c[-3].rank(), 2);
-            assert_eq!(c[-2].rank(), 2);
-            assert_eq!(c[-1].rank(), 0);
-            assert_eq!(c[ 0].rank(), 2);
-        }}  
+        assert_eq!(c[-3].rank(), 2);
+        assert_eq!(c[-2].rank(), 2);
+        assert_eq!(c[-1].rank(), 0);
+        assert_eq!(c[ 0].rank(), 2);
 
         c.check_d_all();
     }
@@ -373,19 +344,10 @@ mod tests {
         let c = KhComplex::new(&l, &0, &0, true);
 
         assert_eq!(c.h_range(), -3..=0);
-
-        cfg_if::cfg_if! { 
-        if #[cfg(feature = "old")] { 
-            assert_eq!(c[-3].rank(), 4);
-            assert_eq!(c[-2].rank(), 6);
-            assert_eq!(c[-1].rank(), 3);
-            assert_eq!(c[ 0].rank(), 2);
-        } else {
-            assert_eq!(c[-3].rank(), 1);
-            assert_eq!(c[-2].rank(), 1);
-            assert_eq!(c[-1].rank(), 0);
-            assert_eq!(c[ 0].rank(), 1);
-        }}
+        assert_eq!(c[-3].rank(), 1);
+        assert_eq!(c[-2].rank(), 1);
+        assert_eq!(c[-1].rank(), 0);
+        assert_eq!(c[ 0].rank(), 1);
 
         c.check_d_all();
     }
@@ -393,22 +355,17 @@ mod tests {
     #[test]
     fn ckh_bigr_trefoil() {
         let l = Link::trefoil();
-        let c = KhComplexBigraded::new(&l, &0, &0, false);
+        let c = KhComplex::new(&l, &0, &0, false).into_bigraded();
 
         assert_eq!(c.h_range(), -3..=0);
         assert_eq!(c.q_range(), -9..=-1);
 
-        cfg_if::cfg_if! { 
-        if #[cfg(feature = "old")] { 
-            // TODO
-        } else { 
-            assert_eq!(c[(-3, -9)].rank(), 1);
-            assert_eq!(c[(-3, -7)].rank(), 1);
-            assert_eq!(c[(-2, -7)].rank(), 1);
-            assert_eq!(c[(-2, -5)].rank(), 1);
-            assert_eq!(c[(0, -3)].rank(), 1);
-            assert_eq!(c[(0, -1)].rank(), 1);
-        }}
+        assert_eq!(c[(-3, -9)].rank(), 1);
+        assert_eq!(c[(-3, -7)].rank(), 1);
+        assert_eq!(c[(-2, -7)].rank(), 1);
+        assert_eq!(c[(-2, -5)].rank(), 1);
+        assert_eq!(c[(0, -3)].rank(), 1);
+        assert_eq!(c[(0, -1)].rank(), 1);
 
         c.check_d_all();
     }
@@ -416,19 +373,50 @@ mod tests {
     #[test]
     fn ckh_bigr_red_trefoil() {
         let l = Link::trefoil();
-        let c = KhComplexBigraded::new(&l, &0, &0, true);
+        let c = KhComplex::new(&l, &0, &0, true).into_bigraded();
 
         assert_eq!(c.h_range(), -3..=0);
         assert_eq!(c.q_range(), -8..=-2);
 
-        cfg_if::cfg_if! { 
-        if #[cfg(feature = "old")] { 
-            // TODO
-        } else { 
-            assert_eq!(c[(-3, -8)].rank(), 1);
-            assert_eq!(c[(-2, -6)].rank(), 1);
-            assert_eq!(c[(0, -2)].rank(), 1);
-        }}
+        assert_eq!(c[(-3, -8)].rank(), 1);
+        assert_eq!(c[(-2, -6)].rank(), 1);
+        assert_eq!(c[(0, -2)].rank(), 1);
+
+        c.check_d_all();
+    }
+}
+
+#[cfg(test)]
+mod tests_v1 {
+    use yui_homology::{ChainComplexTrait, SummandTrait};
+    use yui_link::Link;
+
+    use super::KhComplex;
+
+    #[test]
+    fn ckh_trefoil() {
+        let l = Link::trefoil();
+        let c = KhComplex::new_no_simplify(&l, &0, &0, false);
+
+        assert_eq!(c.h_range(), -3..=0);
+        assert_eq!(c[-3].rank(), 8);
+        assert_eq!(c[-2].rank(), 12);
+        assert_eq!(c[-1].rank(), 6);
+        assert_eq!(c[ 0].rank(), 4);    
+
+        c.check_d_all();
+    }
+
+    #[test]
+    fn ckh_trefoil_red() {
+        let l = Link::trefoil();
+        let c = KhComplex::new_no_simplify(&l, &0, &0, true);
+
+        assert_eq!(c.h_range(), -3..=0);
+        assert_eq!(c[-3].rank(), 4);
+        assert_eq!(c[-2].rank(), 6);
+        assert_eq!(c[-1].rank(), 3);
+        assert_eq!(c[ 0].rank(), 2);
 
         c.check_d_all();
     }

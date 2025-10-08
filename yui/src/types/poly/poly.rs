@@ -5,7 +5,8 @@ use delegate::delegate;
 use num_traits::{Zero, One, Pow};
 use auto_impl_ops::auto_ops;
 
-use crate::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Mon, MonOps, Ring, RingOps, EucRing, EucRingOps, Field, FieldOps};
+use crate::combi::combi;
+use crate::{AddGrp, AddGrpOps, AddMon, AddMonOps, Elem, EucRing, EucRingOps, Field, FieldOps, Mon, MonOps, Ring, RingOps};
 use crate::lc::Lc;
 use super::{MultiDeg, Var, Var2, Var3,MultiVar, Mono, MonoOrd};
 
@@ -526,6 +527,30 @@ where R: Field, for<'x> &'x R: FieldOps<R> {}
 impl<const X: char, R> EucRing for Poly<X, R>
 where R: Field, for<'x> &'x R: FieldOps<R> {}
 
+// Symmetric polynomials
+
+impl<const X: char, R> PolyN<X, R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    pub fn e_sym(n: usize, d: usize) -> Self {
+        let mons = combi(n, d).map(|indices| 
+            MultiVar::from_iter(indices.into_iter().map(|i| (i, 1)))
+        );
+        let terms = mons.map(|m| (m, R::one()));
+        Self::from_iter(terms)
+    }
+
+    pub fn h_sym(n: usize, d: usize) -> Self {
+        let mons = MultiVar::generate(n, d);
+        let terms = mons.map(|m| (m, R::one()));
+        Self::from_iter(terms)
+    }
+
+    pub fn pow_sum(n: usize, d: usize) -> Self {
+        let mons = (0..n).map(|i| (MultiVar::from((i, d)), R::one()));
+        Self::from_iter(mons)
+    }
+}
+
 #[cfg(feature = "tex")]
 mod tex {
     use crate::tex::TeX;
@@ -549,7 +574,9 @@ mod tex {
 
 #[cfg(test)]
 mod tests {
-    use crate::Ratio;
+    use itertools::Itertools;
+
+    use crate::{Ratio, Sign};
     use super::*;
 
     #[test]
@@ -1022,5 +1049,104 @@ mod tests {
         ]);
 
         assert_eq!(f.tex_string(), "-x_0^3x_2 + 3 - 2x_0^{-2}x_1x_2^3");
+    }
+
+    #[test]
+    fn test_e_sym() { 
+        type P = PolyN::<'x', i32>; 
+
+        let n = 4;
+        let e = (0..=5).map(|i| P::e_sym(n, i)).collect_vec();
+
+        assert_eq!(e[0].iter().count(), 1);
+        assert_eq!(e[1].iter().count(), 4);
+        assert_eq!(e[2].iter().count(), 6);
+        assert_eq!(e[3].iter().count(), 4);
+        assert_eq!(e[4].iter().count(), 1);
+        assert_eq!(e[5].iter().count(), 0);
+
+        assert_eq!(e[0].lead_deg().total(), 0);
+        assert_eq!(e[1].lead_deg().total(), 1);
+        assert_eq!(e[2].lead_deg().total(), 2);
+        assert_eq!(e[3].lead_deg().total(), 3);
+        assert_eq!(e[4].lead_deg().total(), 4);
+    }
+
+    #[test]
+    fn test_h_sym() { 
+        type P = PolyN::<'x', i32>; 
+
+        let n = 4;
+        let h = (0..=5).map(|i| P::h_sym(n, i)).collect_vec();
+
+        assert_eq!(h[0].iter().count(), 1);
+        assert_eq!(h[1].iter().count(), 4);
+        assert_eq!(h[2].iter().count(), 10);
+        assert_eq!(h[3].iter().count(), 20);
+        assert_eq!(h[4].iter().count(), 35);
+        assert_eq!(h[5].iter().count(), 56);
+
+        assert_eq!(h[0].lead_deg().total(), 0);
+        assert_eq!(h[1].lead_deg().total(), 1);
+        assert_eq!(h[2].lead_deg().total(), 2);
+        assert_eq!(h[3].lead_deg().total(), 3);
+        assert_eq!(h[4].lead_deg().total(), 4);
+        assert_eq!(h[5].lead_deg().total(), 5);
+    }
+
+    #[test]
+    fn test_pow_sum() { 
+        type P = PolyN::<'x', i32>; 
+
+        let n = 4;
+        let p = (0..=5).map(|i| P::pow_sum(n, i)).collect_vec();
+
+        assert_eq!(p[0].iter().count(), 1); // p[0] = n
+        assert_eq!(p[1].iter().count(), 4);
+        assert_eq!(p[2].iter().count(), 4);
+        assert_eq!(p[3].iter().count(), 4);
+        assert_eq!(p[4].iter().count(), 4);
+        assert_eq!(p[5].iter().count(), 4);
+
+        assert_eq!(p[0].lead_deg().total(), 0);
+        assert_eq!(p[1].lead_deg().total(), 1);
+        assert_eq!(p[2].lead_deg().total(), 2);
+        assert_eq!(p[3].lead_deg().total(), 3);
+        assert_eq!(p[4].lead_deg().total(), 4);
+        assert_eq!(p[5].lead_deg().total(), 5);
+    }
+
+    // ref: https://en.wikipedia.org/wiki/Complete_homogeneous_symmetric_polynomial#Relation_with_the_elementary_symmetric_polynomials
+    #[test]
+    fn e_sym_and_h_sym() { 
+        type P = PolyN::<'x', i32>; 
+
+        let n = 5;
+        let e = (0..=n).map(|i| P::e_sym(n, i)).collect_vec();
+        let h = (0..=n).map(|i| P::h_sym(n, i)).collect_vec();
+
+        let s = P::sum((0..=n).map(|i| 
+            P::from_sign(Sign::from_parity(i as u8)) 
+            * &e[i] * &h[n - i]
+        ));
+
+        assert_eq!(s, P::zero())
+    }
+
+    // ref: https://en.wikipedia.org/wiki/Newton%27s_identities#A_variant_using_complete_homogeneous_symmetric_polynomials
+    #[test]
+    fn e_sym_and_pow_sum() { 
+        type P = PolyN::<'x', i32>; 
+
+        let n = 5;
+        let e = (0..=n).map(|i| P::e_sym(n, i)).collect_vec();
+        let h = (0..=n).map(|i| P::pow_sum(n, i)).collect_vec();
+
+        let s = P::sum((0..=n).map(|i| 
+            P::from_sign(Sign::from_parity(i as u8)) 
+            * &e[i] * &h[n - i]
+        ));
+
+        assert_eq!(s, P::zero())
     }
 }

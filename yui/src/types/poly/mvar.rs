@@ -9,6 +9,8 @@ use auto_impl_ops::auto_ops;
 use crate::{Elem, ElemBase};
 use crate::lc::Gen;
 use crate::util::format::subscript;
+use crate::combi::rep_combi_count;
+        
 use super::{Mono, MultiDeg, MonoOrd};
 use super::var::{fmt_mono, parse_mono_deg};
 
@@ -220,8 +222,6 @@ macro_rules! impl_multivar_unsigned {
 
         impl<const X: char> MultiVar<X, $I> {
             pub fn generate(n: usize, tot_deg: usize) -> impl Iterator<Item = Self> { 
-                use crate::combi::rep_combi_count;
-        
                 rep_combi_count(n, tot_deg).map(move |indices| {
                     Self::from_iter(indices)
                 })

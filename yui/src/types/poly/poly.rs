@@ -552,12 +552,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     // ref: https://en.wikipedia.org/wiki/Schur_polynomial#Jacobi%E2%88%92Trudi_identities
-    pub fn schur_poly(p: &Partition) -> Self { 
+    pub fn schur_poly(n: usize, p: &Partition) -> Self { 
         use crate::algo::naive_det;
 
-        let n = p.len();
-        let mat = (0..n).flat_map(|i| 
-            (0..n).map(move |j| { 
+        if n < p.len() { 
+            return Self::zero();
+        }
+
+        let l = p.len();
+        let mat = (0..l).flat_map(|i| 
+            (0..l).map(move |j| { 
                 if p[i] + j < i { 
                     Self::zero()
                 } else { 
@@ -567,7 +571,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             })
         ).collect_vec();
 
-        naive_det::<Self>(n, &mat)
+        naive_det::<Self>(l, &mat)
     }
 }
 
@@ -1176,7 +1180,7 @@ mod tests {
 
         // Partition [2,1] for n = 2 variables
         let p = Partition::from([2, 1]);
-        let schur = P::schur_poly(&p);
+        let schur = P::schur_poly(2, &p);
 
         // The Schur polynomial s_{2,1}(x0, x1) = x0^2 x1 + x0 x1^2
         let xn = P::mono;
@@ -1188,7 +1192,7 @@ mod tests {
 
         // Partition [1,1,1] for n = 3 variables
         let p = Partition::from([1, 1, 1]);
-        let schur = P::schur_poly(&p);
+        let schur = P::schur_poly(3, &p);
 
         // The Schur polynomial s_{1,1,1}(x0, x1, x2) = x0 x1 x2
         let xn = P::mono;
@@ -1197,9 +1201,9 @@ mod tests {
         ]);
         assert_eq!(schur, expected);
 
-        // Partition [3,0] for n = 2 variables
-        let p = Partition::from([3, 0]);
-        let schur = P::schur_poly(&p);
+        // Partition [3] for n = 2 variables
+        let p = Partition::from([3]);
+        let schur = P::schur_poly(2, &p);
 
         // The Schur polynomial s_{3,0}(x0, x1) = x0^3 + x0^2 x1 + x0 x1^2 + x1^3
         let xn = P::mono;
@@ -1210,5 +1214,10 @@ mod tests {
             (xn([0, 3]), 1),
         ]);
         assert_eq!(schur, expected);
+
+        // Partition [1,1,1] for n = 2 variables
+        let p = Partition::from([1,1,1]);
+        let schur = P::schur_poly(2, &p);
+        assert_eq!(schur, P::zero());
     }
 }

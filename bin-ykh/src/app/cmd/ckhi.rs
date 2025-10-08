@@ -38,6 +38,9 @@ pub struct Args {
     #[arg(short = 'a', long)]
     pub show_alpha: bool,
 
+    #[arg(short = 'n', long)]
+    pub no_simplify: bool,
+
     #[arg(short, long, default_value = "unicode")]
     pub format: Format,
 
@@ -78,7 +81,12 @@ where
         }
     
         let l = load_sinv_knot(&self.args.link, self.args.mirror)?;
-        let ckhi = KhIComplex::new(&l, &h, &t, self.args.reduced);
+
+        let ckhi = if self.args.no_simplify {
+            KhIComplex::new_no_simplify(&l, &h, &t, self.args.reduced)
+        } else { 
+            KhIComplex::new(&l, &h, &t, self.args.reduced)
+        };
         
         // CKh generators
         let grid = ckhi.gen_grid();

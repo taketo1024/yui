@@ -38,6 +38,9 @@ pub struct Args {
     #[arg(short = 's', long)]
     pub show_ss: bool,
 
+    #[arg(short = 'n', long)]
+    pub no_simplify: bool,
+
     #[arg(short, long, default_value = "unicode")]
     pub format: Format,
 
@@ -83,7 +86,12 @@ where
             ["H", "0,T"].contains(&self.args.c_value.as_str());
     
         let l = load_link(&self.args.link, self.args.mirror)?;
-        let kh = KhHomology::new(&l, &h, &t, self.args.reduced);
+        
+        let kh = if self.args.no_simplify {
+            KhHomology::new_no_simplify(&l, &h, &t, self.args.reduced)
+        } else { 
+            KhHomology::new(&l, &h, &t, self.args.reduced)
+        } ;
 
         // print Kh
         let table = if bigraded { 

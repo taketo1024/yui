@@ -37,6 +37,9 @@ pub struct Args {
     #[arg(short = 'a', long)]
     pub show_alpha: bool,
 
+    #[arg(short = 'n', long)]
+    pub no_simplify: bool,
+
     #[arg(short, long, default_value = "unicode")]
     pub format: Format,
 
@@ -75,7 +78,12 @@ where
         }
     
         let l = load_link(&self.args.link, self.args.mirror)?;
-        let ckh = KhComplex::new(&l, &h, &t, self.args.reduced);
+
+        let ckh = if self.args.no_simplify {
+            KhComplex::new_no_simplify(&l, &h, &t, self.args.reduced)
+        } else { 
+            KhComplex::new(&l, &h, &t, self.args.reduced)
+        };
         
         // CKh generators
         let grid = ckh.gen_grid();

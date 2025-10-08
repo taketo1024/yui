@@ -3,7 +3,7 @@ use std::str::FromStr;
 use yui::tex::TeX;
 use yui::{EucRing, EucRingOps};
 use yui_homology::{DisplaySeq, DisplayTable, GridTrait, SummandTrait, tex::TeXTable};
-use yui_kh::kh::KhHomology;
+use yui_kh::kh::{KhComplex, KhHomology};
 use yui_kh::kh::KhChainExt;
 use yui_link::Link;
 use crate::app::utils::*;
@@ -40,6 +40,9 @@ pub struct Args {
 
     #[arg(short = 'n', long)]
     pub no_simplify: bool,
+
+    #[arg(long)]
+    pub sigma: bool,
 
     #[arg(short, long, default_value = "unicode")]
     pub format: Format,
@@ -86,7 +89,15 @@ where
             ["H", "0,T"].contains(&self.args.c_value.as_str());
     
         let l = load_link(&self.args.link, self.args.mirror)?;
-        
+
+        // temporal
+        if self.args.sigma { 
+            let h = KhComplex::sigma_homology(&l, &h, &t);
+            self.out(&h.display_table("i", "j"));
+            return Ok(self.flush());
+        }
+        // --
+
         let kh = if self.args.no_simplify {
             KhHomology::new_no_simplify(&l, &h, &t, self.args.reduced)
         } else { 

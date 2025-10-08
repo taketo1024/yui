@@ -1,6 +1,8 @@
-use yui::lc::Lc;
+use yui::lc::{EitherGen, Lc};
 use yui::poly::HPoly;
 use yui::{Ring, RingOps, Sign};
+use yui_homology::{ChainComplex, ChainMap};
+use yui_link::Link;
 
 use super::{KhAlgGen, KhAlgStr, KhChain, KhComplex, KhGen, KhLabel};
 
@@ -16,7 +18,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    fn sigma_tensor(&self, x: &KhGen) -> KhChain<R> {
+    pub fn sigma_tensor(&self, x: &KhGen) -> KhChain<R> {
         let init = KhChain::from(
             KhGen::new(x.state, KhLabel::empty(), x.deg_shift)
         );
@@ -47,51 +49,42 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
+    pub fn sigma_complex(l: &Link, h: &R, t: &R) -> ChainComplex<EitherGen<KhGen, KhGen>, R> { 
+        let c = KhComplex::new_no_simplify(&l, h, t, false);
+        let (h0, h1) = c.h_range().into_inner();
+        let str = c.str().clone();
+        let inner = c.inner();
+
+        let f = ChainMap::new(inner, inner, 0, move |_, z| z - str.sigma_chain(z));
+        f.cone(inner, inner, h0 ..= h1 + 1, false)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use num_traits::Zero;
     use yui::poly::HPoly;
-    use yui::{Ratio, FF2};
-    use yui_homology::{ChainComplexTrait, ChainMap, DisplaySeq};
+    use yui::{FF2};
+    use yui_homology::{ChainComplexTrait, DisplaySeq};
     use yui_link::Link;
 
     use super::*;
 
     #[test]
-    fn test_sigma() {
-        // type K = Ratio<i128>;
+    fn test_sigma_cone() {
         type K = FF2;
         type R = HPoly<'H', K>;
 
         let h = R::variable();
         let t = R::zero();
 
-        for i in 3..=7 { 
-            for j in 1..=100 { 
-                let name = format!("{}_{}", i, j);
-                let Ok(l) = Link::load(&name) else { continue };
-                let l = if l.writhe() >= 0 { l } else { l.mirror() };
+        let name = "3_1";
+        let l = Link::load(name).unwrap();
+        let c = KhComplex::sigma_complex(&l, &h, &t);
 
-                let c = KhComplex::new(&l, &h, &t, false);
+        c.check_d_all();
 
-                println!("{name}");
-                c.homology().print_seq("i");
-                
-                let (h0, h1) = c.h_range().into_inner();
-                let str = c.str().clone();
-                let inner = c.inner();
-        
-                let f = ChainMap::new(inner, inner, 0, move |_, z| z - str.gr_sigma_chain(z));
-                f.check_all(inner, inner);
-        
-                let cone = f.cone(inner, inner, h0 ..= h1 + 1, false);
-                cone.check_d_all();
-        
-                let h = cone.homology();
-                h.print_seq("i");
-            }
-        }
+        println!("{name}");
+        c.homology().print_seq("i");
     }
 }

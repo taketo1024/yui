@@ -68,6 +68,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.t
     }
 
+    pub fn ht(&self) -> (&R, &R) { 
+        (&self.h, &self.t)
+    }
+
     pub fn prod(&self, x: KhAlgGen, y: KhAlgGen) -> Vec<(KhAlgGen, R)> {
         use KhAlgGen::{I, X};
         let (h, t) = (self.h(), self.t());

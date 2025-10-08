@@ -1,14 +1,12 @@
-use ahash::AHashSet;
-
 use crate::{Ring, RingOps};
 
 pub fn naive_det<R>(n: usize, matrix: &[R]) -> R 
 where R: Ring, for<'x> &'x R: RingOps<R> {
     assert_eq!(matrix.len(), n * n);
 
-    fn det_rec<R>(n: usize, matrix: &[R], used: AHashSet<usize>) -> R
+    fn det_rec<R>(n: usize, matrix: &[R], stack: &mut Vec<usize>) -> R
     where R: Ring, for<'x> &'x R: RingOps<R> {
-        let i = used.len();
+        let i = stack.len();
         if i == n { 
             return R::one();
         }
@@ -16,7 +14,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let mut e = -R::one();
 
         R::sum((0..n).flat_map(move |j| { 
-            if used.contains(&j) { 
+            if stack.contains(&j) { 
                 return None
             }
 
@@ -27,16 +25,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 return None
             }
 
-            let mut next = used.clone();
-            next.insert(j);
+            stack.push(j);
 
-            let d = &e * a * det_rec(n, matrix, next);
+            let d = &e * a * det_rec(n, matrix, stack);
             
+            stack.pop();
+
             Some(d)
         }))
     }
 
-    det_rec(n, matrix, [].into())
+    let mut stack = vec![];
+    det_rec(n, matrix, &mut stack)
 }
 
 #[cfg(test)]

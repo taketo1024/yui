@@ -1,8 +1,12 @@
+use itertools::Either;
 use yui::lc::{EitherGen, Lc};
 use yui::poly::HPoly;
-use yui::{Ring, RingOps, Sign};
-use yui_homology::{ChainComplex, ChainMap};
+use yui::{EucRing, EucRingOps, Ring, RingOps, Sign};
+use yui_homology::{ChainComplex, ChainMap, Grid2, Summand};
 use yui_link::Link;
+
+use crate::khi::KhIGen;
+use crate::misc::make_gen_grid;
 
 use super::{KhAlgGen, KhAlgStr, KhChain, KhComplex, KhGen, KhLabel};
 
@@ -58,6 +62,23 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let f = ChainMap::new(inner, inner, 0, move |_, z| z - str.sigma_chain(z));
         f.cone(inner, inner, h0 ..= h1 + 1, false)
     }
+
+    // TODO should unify KhIGen and EitherGen<KhGen, KhGen>.
+    pub fn sigma_homology(l: &Link, h: &R, t: &R) -> Grid2<Summand<KhIGen, R>>
+    where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
+        let c = Self::sigma_complex(l, h, t);
+        let h = c.homology();
+
+        // convert EitherGen -> KhIGen
+        let gens = h.map(|s| s.map_raw_gens(|x| { 
+            match x.inner() {
+                Either::Left(x)  => KhIGen::B(x.clone()),
+                Either::Right(y) => KhIGen::Q(y.clone())
+            }
+        }));
+
+        make_gen_grid(&gens)
+    }
 }
 
 #[cfg(test)]
@@ -65,7 +86,7 @@ mod tests {
     use num_traits::Zero;
     use yui::poly::HPoly;
     use yui::{FF2};
-    use yui_homology::{ChainComplexTrait, DisplaySeq};
+    use yui_homology::{ChainComplexTrait, SummandTrait};
     use yui_link::Link;
 
     use super::*;
@@ -83,8 +104,30 @@ mod tests {
         let c = KhComplex::sigma_complex(&l, &h, &t);
 
         c.check_d_all();
+    }
 
-        println!("{name}");
-        c.homology().print_seq("i");
+
+    #[test]
+    fn test_sigma_homology() {
+        type K = FF2;
+        type R = HPoly<'H', K>;
+
+        let h = R::variable();
+        let t = R::zero();
+
+        let name = "3_1";
+        let l = Link::load(name).unwrap();
+        let h = KhComplex::sigma_homology(&l, &h, &t);
+
+        assert_eq!(h[(0, -1)].rank(), 1);
+        assert_eq!(h[(1, -3)].rank(), 1);
+        assert_eq!(h[(-2, -7)].tors().len(), 1);
+        assert_eq!(h[(-2, -5)].tors().len(), 1);
+        assert_eq!(h[(-1, -7)].tors().len(), 1);
+        assert_eq!(h[(-1, -5)].tors().len(), 1);
+        assert_eq!(h[( 1, -1)].tors().len(), 1);
+
+        // use yui_homology::DisplayTable;
+        // h.print_table("i", "j");
     }
 }

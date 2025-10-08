@@ -106,6 +106,16 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         self.trans.reduce();
     }
 
+    pub fn map_raw_gens<Y>(&self, f: impl Fn(&X) -> Y) -> Summand<Y, R>
+    where Y: Gen {
+        Summand::new(
+            self.raw_gens.iter().map(|x| f(x)).collect(),
+            self.rank,
+            self.tors.clone(),
+            self.trans.clone()
+        )
+    }
+
     pub fn print_gens(&self) {
         for i in 0..self.rank() { 
             println!("{}: {}", i, self.gen(i));

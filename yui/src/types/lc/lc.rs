@@ -150,9 +150,9 @@ where
         self.iter().sorted_by(|(x, _), (y, _)| cmp(x, y))
     }
 
-    pub fn combine<F>(&self, other: &Self, x_map: F) -> Self 
-    where F: Fn(&X, &X) -> X { 
-        let mut res = Self::zero();
+    pub fn combine<Y, Z, F>(&self, other: &Lc<Y, R>, x_map: F) -> Lc<Z, R>
+    where Y: Gen, Z: Gen, F: Fn(&X, &Y) -> Z { 
+        let mut res = Lc::zero();
         res.data.reserve(self.nterms() * other.nterms());
 
         for (x, r) in self.iter() { 
@@ -242,7 +242,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.to_string_by(X::cmp_for_display, false))
+        f.write_str(&self.to_string_by(X::cmp, false))
     }
 }
 
@@ -434,9 +434,9 @@ mod tests {
     use num_traits::Zero;
     use crate::{Elem, AddMon};
     use crate::util::macros::hashmap;
-    use crate::lc::{Free, Lc};
+    use crate::lc::{FreeGen, Lc};
  
-    type X = Free<i32>;
+    type X = FreeGen<i32>;
     fn e(i: i32) -> X { 
         X::from(i)
     }
@@ -445,7 +445,7 @@ mod tests {
     fn math_symbol() { 
         type L = Lc<X, i32>;
         let symbol = L::math_symbol();
-        assert_eq!(symbol, "Z<Z>");
+        assert_eq!(symbol, "Z<Free<i32>>");
     }
 
     #[test]

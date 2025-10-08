@@ -4,12 +4,18 @@ members = [
     "yui-matrix",
     "yui-homology",
     "yui-link",
+    "yui-khovanov",
+    "bin-ykh"
 ]
 resolver = "2"
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Taketo Sano <taketo1024@gmail.com>"]
 description = "YUI"
 license = "MIT"
 edition = "2021"
+
+[profile.release]
+overflow-checks = true
+# debug = true

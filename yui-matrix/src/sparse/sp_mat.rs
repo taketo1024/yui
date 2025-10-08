@@ -442,10 +442,10 @@ where R: Scalar + Zero + One + ClosedAddAssign {
     
         let (m, n) = shape;
         let range = cartesian!(0..m, 0..n);
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
     
         Self::from_entries(shape, range.filter_map(|(i, j)|
-            if rng.gen::<f64>() < density { 
+            if rng.random::<f64>() < density { 
                 Some((i, j, R::one()))
             } else { 
                 None

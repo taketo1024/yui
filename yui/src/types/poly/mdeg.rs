@@ -8,8 +8,6 @@ use delegate::delegate;
 use derive_more::{Display, Debug};
 use num_traits::Zero;
 
-use crate::lc::OrdForDisplay;
-
 use super::MonoOrd;
 
 #[derive(Clone, Default, PartialEq, Eq, Hash, Display, Debug)]
@@ -184,9 +182,16 @@ where I: Zero + Ord + for<'x> Add<&'x I, Output = I> {
     }
 }
 
-impl<I> OrdForDisplay for MultiDeg<I>
+impl<I> PartialOrd for MultiDeg<I>
 where I: Zero + Ord + for<'x> Add<&'x I, Output = I> {
-    fn cmp_for_display(&self, other: &Self) -> std::cmp::Ordering {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(Self::cmp(self, other))
+    }
+}
+
+impl<I> Ord for MultiDeg<I>
+where I: Zero + Ord + for<'x> Add<&'x I, Output = I> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         Self::cmp_lex(self, other)
     }
 }

@@ -1,11 +1,10 @@
 use std::ops::{Index, RangeInclusive};
-use cartesian::cartesian;
 use delegate::delegate;
 use yui::{EucRing, EucRingOps};
-use yui_homology::{isize2, Grid2, GridTrait, Homology, Summand};
+use yui_homology::{Grid2, GridTrait, Homology, Summand};
 use yui_link::InvLink;
 use crate::khi::{KhIComplex, KhIGen};
-use crate::misc::{collect_gen_info, range_of};
+use crate::misc::{make_gen_grid, range_of};
 
 use super::KhIChain;
 
@@ -52,24 +51,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     pub fn into_bigraded(self) -> Grid2<Summand<KhIGen, R>> { 
-        let table = collect_gen_info(self.inner());
-        let h_range = range_of(table.keys().map(|i| i.0));
-        let q_range = range_of(table.keys().map(|i| i.1)).step_by(2);
-        let support = cartesian!(h_range, q_range.clone()).map(|(i, j)| 
-            isize2(i, j)
-        );
-
-        Grid2::generate(support, move |idx| { 
-            let i = idx.0;
-            let Some(e) = table.get(&idx) else { 
-                return Summand::zero()
-            };
-            
-            let (rank, tors, indices) = e;
-            let gens = self[i].raw_gens().clone(); 
-            let trans = self[i].trans().sub(indices);
-            Summand::new(gens, *rank, tors.clone(), trans)
-        })
+        make_gen_grid(self.inner())
     }
 }
 

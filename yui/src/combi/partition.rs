@@ -37,23 +37,9 @@ impl Partition {
     }
 
     /// Generates all partitions of a non-negative integer `n`.
-    pub fn all_partitions(n: usize) -> Vec<Partition> {
-        fn helper(n: usize, max: usize, prefix: &mut Vec<usize>, result: &mut Vec<Partition>) {
-            if n == 0 {
-                result.push(Partition::new(prefix.clone()));
-                return;
-            }
-            for i in (1..=std::cmp::min(n, max)).rev() {
-                prefix.push(i);
-                helper(n - i, i, prefix, result);
-                prefix.pop();
-            }
-        }
-
-        let mut result = Vec::new();
-        let mut prefix = Vec::new();
-        helper(n, n, &mut prefix, &mut result);
-        result
+    /// Returns an iterator over all partitions of a non-negative integer `n`.
+    pub fn all_partitions(n: usize) -> PartitionIter {
+        PartitionIter::new(n)
     }
 }
 
@@ -105,6 +91,65 @@ impl Partition {
             .map(|&n| "⬜︎".repeat(n))
             .collect::<Vec<_>>()
             .join("\n")
+    }
+}
+
+/// Iterator over all partitions of a non-negative integer n.
+pub struct PartitionIter {
+    a: Vec<usize>,
+    k: usize,
+    done: bool,
+}
+
+impl PartitionIter {
+    pub fn new(n: usize) -> Self {
+        let mut a = vec![0; n + 1];
+        a[0] = n;
+        PartitionIter {
+            a,
+            k: 1,
+            done: n == 0,
+        }
+    }
+}
+
+impl Iterator for PartitionIter {
+    type Item = Partition;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.done {
+            return None;
+        }
+
+        // First call: return the initial partition
+        let k = self.k;
+        let result = Partition::new(self.a[..k].to_vec());
+
+        // Generate the next partition using the standard algorithm
+        // (see e.g. https://jeromekelleher.net/generating-integer-partitions.html)
+
+        // Find the lowest index whose part is greater than 1
+        if let Some(i) = (0..k).rev().find(|&i| self.a[i] > 1) { 
+            self.a[i] -= 1;
+
+            let a = self.a[i];
+            let mut rem_val = k - i; // (1's between (i + 1)..k) + 1
+
+            for j in i + 1 .. { 
+                if rem_val > a {
+                    self.a[j] = a;
+                    rem_val -= a;
+                } else { 
+                    self.a[j] = rem_val;
+                    self.k = j + 1;
+                    break;
+                }
+            }
+        } else { 
+            self.done = true
+        }
+
+        Some(result)
     }
 }
 

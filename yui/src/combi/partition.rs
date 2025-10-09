@@ -36,6 +36,11 @@ impl Partition {
         self.parts.is_empty()
     }
 
+    /// Returns true if the Young diagram of self contains that of partition `p`.
+    pub fn contains(&self, p: &Partition) -> bool {
+        (0..p.len()).all(|i| self[i] >= p[i])
+    }
+
     /// Generates all partitions of a non-negative integer `n`.
     /// Returns an iterator over all partitions of a non-negative integer `n`.
     pub fn all_partitions(n: usize) -> PartitionIter {
@@ -50,6 +55,12 @@ where
     fn from(iter: I) -> Self {
         let parts = iter.into_iter().collect();
         Partition::new(parts)
+    }
+}
+
+impl FromIterator<usize> for Partition {
+    fn from_iter<T: IntoIterator<Item = usize>>(iter: T) -> Self {
+        Partition::from(iter)
     }
 }
 
@@ -105,10 +116,12 @@ impl PartitionIter {
     pub fn new(n: usize) -> Self {
         let mut a = vec![0; n + 1];
         a[0] = n;
+        let k = if n > 0 { 1 } else { 0 };
+        
         PartitionIter {
             a,
-            k: 1,
-            done: n == 0,
+            k,
+            done: false,
         }
     }
 }
@@ -170,6 +183,20 @@ mod tests {
     }
 
     #[test]
+    fn test_from() {
+        let v = vec![3, 2, 1];
+        let p = Partition::from(v);
+        assert_eq!(p.parts(), &[3, 2, 1]);
+    }
+
+    #[test]
+    fn test_from_iterator() {
+        let v = vec![3, 2, 1];
+        let p: Partition = v.iter().cloned().collect::<Vec<_>>().into();
+        assert_eq!(p.parts(), &[3, 2, 1]);
+    }
+
+    #[test]
     fn test_sum() {
         let p = Partition::new(vec![3, 2, 1]);
         assert_eq!(p.sum(), 6);
@@ -219,6 +246,49 @@ mod tests {
         ];
         let actual: Vec<Vec<usize>> = parts.into_iter().map(|p| p.parts().to_vec()).collect();
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_all_partitions_zero() {
+        let mut iter = Partition::all_partitions(0);
+        let p = iter.next();
+        assert_eq!(p, Some(Partition::from([])));
+        assert!(iter.next().is_none());
+    }
+
+    #[test]
+    fn test_all_partitions_one() {
+        let mut iter = Partition::all_partitions(1);
+        let p = iter.next();
+        assert_eq!(p.unwrap().parts(), &[1]);
+        assert!(iter.next().is_none());
+    }
+
+    #[test]
+    fn test_contains() {
+        let p = Partition::new(vec![5, 3, 2]);
+        let q = Partition::new(vec![4, 2, 1]);
+        let r = Partition::new(vec![5, 3, 2]);
+        let s = Partition::new(vec![6, 3, 2]);
+        let t = Partition::new(vec![5, 4, 2]);
+        let u = Partition::new(vec![5, 3, 2, 1]);
+        let v = Partition::new(vec![]);
+
+        // p contains q (all parts of p >= q)
+        assert!(p.contains(&q));
+        // p contains itself
+        assert!(p.contains(&r));
+        // p does not contain s (5 < 6)
+        assert!(!p.contains(&s));
+        // p does not contain t (3 < 4)
+        assert!(!p.contains(&t));
+        // p does not contain u (u has more parts)
+        assert!(!p.contains(&u));
+        // Any partition contains the empty partition
+        assert!(p.contains(&v));
+        // The empty partition contains only itself
+        assert!(v.contains(&v));
+        assert!(!v.contains(&p));
     }
 
     #[test]

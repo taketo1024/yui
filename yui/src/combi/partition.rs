@@ -41,6 +41,10 @@ impl Partition {
         (0..p.len()).all(|i| self[i] >= p[i])
     }
 
+    pub fn contains_pt(&self, i: usize, j: usize) -> bool { 
+        j < self[i]
+    }
+
     /// Generates all partitions of a non-negative integer `n`.
     /// Returns an iterator over all partitions of a non-negative integer `n`.
     pub fn all_partitions(n: usize) -> PartitionIter {

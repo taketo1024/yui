@@ -189,13 +189,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn d(&self, x: &KhChainGen) -> KhChain<R> {
-        let edges = self.edges_from(&x.state);
-        edges.iter().flat_map(|(t, e)| { 
-            self.apply(x, t, e)
-        }).collect()
-    }
-
     pub fn vertex(&self, s: &State) -> &KhCubeVertex { 
         &self.vertices[s]
     }
@@ -222,42 +215,33 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.edges[s]
     }
 
-    fn apply(&self, x: &KhChainGen, to: &State, e: &KhCubeEdge) -> Vec<(KhChainGen, R)> {
+    fn apply_edge_map(&self, x: &KhChainGen, target: &State) -> KhChain<R> {
         use KhCubeEdgeTrans::*;
         
-        let sign = R::from_sign(e.sign);
+        let Some(e) = self.edge(&x.state, target) else { 
+            panic!()
+        };
 
         match e.trans { 
-            Merge((i, j), k) => {
-                let (x_i, x_j) = (x.tensor[i], x.tensor[j]);
-                self.str.mul(x_i, x_j).into_iter().map(|(y_k, a)| { 
-                    let mut label = x.tensor;
-                    label.remove(j);
-                    label.remove(i);
-                    label.insert(k, y_k);
-
-                    let t = *to;
-                    let y = KhChainGen::new(t, label, x.deg_shift);
-                    let r = &sign * &a;
-                    (y, r)
-                }).collect_vec()
+            Merge(ij, k) => {
+                self.str.mul_tensor(&x.tensor, ij, k).into_map_gens(|y| { 
+                    KhChainGen::new(*target, y, x.deg_shift)
+                })
             },
-            Split(i, (j, k)) => {
-                let x_i = x.tensor[i];
-                self.str.comul(x_i).into_iter().map(|(y, a)| { 
-                    let mut label = x.tensor;
-                    label.remove(i);
-                    label.insert(j, y[0]);
-                    label.insert(k, y[1]);
-
-                    let t = *to;
-                    let y = KhChainGen::new(t, label, x.deg_shift);
-                    let r = &sign * &a;
-
-                    (y, r)
-                }).collect_vec()
+            Split(i, jk) => {
+                self.str.comul_tensor(&x.tensor, i, jk).into_map_gens(|y| { 
+                    KhChainGen::new(*target, y, x.deg_shift)
+                })
             }
         }
+    }
+
+    pub fn d(&self, x: &KhChainGen) -> KhChain<R> {
+        let edges = self.edges_from(&x.state);
+        edges.iter().flat_map(|(target, e)| { 
+            let sign = R::from_sign(e.sign());
+            self.apply_edge_map(x, target) * sign
+        }).collect()
     }
 
     pub fn into_complex(self) -> ChainComplex<KhChainGen, R> {

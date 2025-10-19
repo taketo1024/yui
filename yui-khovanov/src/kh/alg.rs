@@ -49,6 +49,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
+    pub fn mul_tensor(&self, x: &KhTensor, in_index: (usize, usize), out_index: usize) -> Lc<KhTensor, R> { 
+        assert_ne!(in_index.0, in_index.1);
+
+        let (i, j) = if in_index.0 < in_index.1 {
+            in_index
+        } else { 
+            (in_index.1, in_index.0)
+        };
+        let k = out_index;
+
+        self.mul(x[i], x[j]).into_map_gens(|y| { 
+            let mut t = x.clone();
+            t.remove(j);
+            t.remove(i);
+            t.insert(k, y);
+            t
+        })
+    }
+
     pub fn comul(&self, x: KhGen) -> Lc<KhTensor, R> {
         use KhGen::{I, X};
         let (h, t) = (self.h(), self.t());
@@ -78,6 +97,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 ])
             }
         }
+    }
+
+    pub fn comul_tensor(&self, x: &KhTensor, in_index: usize, out_index: (usize, usize)) -> Lc<KhTensor, R> { 
+        assert_ne!(out_index.0, out_index.1);
+
+        let i = in_index;
+        let (j, k) = if out_index.0 < out_index.1 {
+            out_index
+        } else { 
+            (out_index.1, out_index.0)
+        };
+
+        self.comul(x[i]).into_map_gens(|y| { 
+            let mut t = x.clone();
+            t.remove(i);
+            t.insert(j, y[0]);
+            t.insert(k, y[1]);
+            t
+        })
     }
 
     pub fn sigma(&self, x: &KhGen) -> Lc<KhGen, R> {

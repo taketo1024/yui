@@ -4,7 +4,7 @@ use itertools::{join, Itertools};
 use auto_impl_ops::auto_ops;
 use yui::util::format::subscript;
 use yui::{Elem, Ring, RingOps};
-use yui::bitseq::BitSeq;
+use yui::bitseq::{Bit, BitSeq};
 use yui::lc::{Gen, Lc};
 use yui_link::State;
 
@@ -31,6 +31,20 @@ impl KhGen {
             KhGen::X => -2
         }
     }
+
+    fn from_bit(b: Bit) -> Self { 
+        match b {
+            Bit::Bit0 => KhGen::I,
+            Bit::Bit1 => KhGen::X,
+        }
+    }
+
+    fn into_bit(self) -> Bit { 
+        match self { 
+            KhGen::I => Bit::Bit0,
+            KhGen::X => Bit::Bit1
+        }
+    }
 }
 
 impl Display for KhGen {
@@ -52,7 +66,7 @@ impl Gen for KhGen {}
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub struct KhTensor(
-    pub(crate) BitSeq
+    BitSeq
 );
 
 impl KhTensor { 
@@ -70,20 +84,17 @@ impl KhTensor {
 
     pub fn iter(&self) -> impl Iterator<Item = KhGen> {
         self.0.iter().map(|b| 
-            if b.is_zero() { 
-                KhGen::X
-            } else { 
-                KhGen::I
-            }
+            KhGen::from_bit(b)
         )
     }
 
+    pub fn set(&mut self, i: usize, x: KhGen) { 
+        assert!(i < self.len());
+        self.0.set(i, x.into_bit());
+    }
+
     pub fn push(&mut self, x: KhGen) {
-        if x.is_X() { 
-            self.0.push_0()
-        } else { 
-            self.0.push_1()
-        }
+        self.0.push(x.into_bit());
     }
 
     pub fn append(&mut self, other: KhTensor) { 
@@ -95,11 +106,7 @@ impl KhTensor {
     }
 
     pub fn insert(&mut self, i: usize, x: KhGen) { 
-        if x.is_X() { 
-            self.0.insert_0(i)
-        } else { 
-            self.0.insert_1(i)
-        }
+        self.0.insert(i, x.into_bit());
     }
 
     pub fn sub(&self, l: usize) -> Self { 
@@ -117,8 +124,7 @@ impl KhTensor {
 
 impl From<KhGen> for KhTensor {
     fn from(x: KhGen) -> Self {
-        let v = if x.is_X() { 0 } else { 1 };
-        Self(BitSeq::from(v))
+        Self(BitSeq::from(x.into_bit()))
     }
 }
 
@@ -131,7 +137,7 @@ impl<const N: usize> From<[KhGen; N]> for KhTensor {
 impl FromIterator<KhGen> for KhTensor {
     fn from_iter<I: IntoIterator<Item = KhGen>>(iter: I) -> Self {
         Self(BitSeq::from_iter(iter.into_iter().map(|x| 
-            if x.is_X() { 0 } else { 1 }
+            x.into_bit()
         )))
     }
 }
@@ -140,10 +146,11 @@ impl Index<usize> for KhTensor {
     type Output = KhGen;
 
     fn index(&self, index: usize) -> &Self::Output {
+        assert!(index < self.len());
         if self.0[index].is_zero() { 
-            &KhGen::X
-        } else { 
             &KhGen::I
+        } else { 
+            &KhGen::X
         }
     }
 }

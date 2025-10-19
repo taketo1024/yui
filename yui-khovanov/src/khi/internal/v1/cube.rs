@@ -2,13 +2,12 @@ use std::collections::HashMap;
 use std::ops::RangeInclusive;
 
 use itertools::Itertools;
-use yui::bitseq::BitSeq;
 use yui::lc::Lc;
 use yui::{Ring, RingOps};
 use yui_homology::{Grid, ChainComplex, Summand};
 use yui_link::{InvLink, State};
 
-use crate::kh::{KhChainGen, KhTensor};
+use crate::kh::{KhChainGen, KhGen, KhTensor};
 use crate::kh::internal::v1::cube::KhCube;
 use crate::khi::KhIGen;
 
@@ -78,16 +77,16 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         debug_assert_eq!(l.len(), self.cube.vertex(&s).circles().len());
 
         let map = self.label_map.get(&s).unwrap();
-        let mut seq = BitSeq::zeros(l.len());
+        let mut seq = vec![KhGen::I; l.len()];
 
         for (i, e) in  l.iter().enumerate() { 
-            if e.is_1() { 
+            if e.is_X() { 
                 let j = map.get(&i).cloned().unwrap();
-                seq.set_1(j);
+                seq[j] = KhGen::X;
             }
         }
 
-        KhTensor(seq)
+        KhTensor::from_iter(seq)
     }
 
     fn t(&self, x: &KhChainGen) -> KhChainGen {

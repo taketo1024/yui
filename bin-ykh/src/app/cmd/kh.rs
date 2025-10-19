@@ -95,7 +95,7 @@ where
 
         // print Kh
         let table = if bigraded { 
-            let grid = kh.into_bigraded();
+            let grid = kh.gen_grid();
             match self.args.format {
                 Format::Unicode => grid.display_table("i", "j"),
                 Format::TeX     => grid.tex_table("$\\mathit{Kh}$", " ")

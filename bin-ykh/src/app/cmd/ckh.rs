@@ -130,12 +130,7 @@ where
     }
 
     fn show_diff(&mut self, ckh: &KhComplex<R>, bigraded: bool) { 
-        if bigraded { 
-            let ckh = ckh.clone().into_bigraded();
-            self.out(&ckh.display_d());
-        } else { 
-            self.out(&ckh.display_d());
-        }
+        self.out(&ckh.display_d());
     }
 
     fn show_alpha(&mut self, ckh: &KhComplex<R>) { 

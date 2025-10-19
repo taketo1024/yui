@@ -4,11 +4,11 @@ use cartesian::cartesian;
 use delegate::delegate;
 use yui::{Ring, RingOps, EucRing, EucRingOps};
 use yui_link::Link;
-use yui_homology::{isize2, ChainComplexTrait, Grid2, GridTrait, ChainComplex, ChainComplex2, Summand};
+use yui_homology::{isize2, ChainComplexTrait, Grid2, GridTrait, ChainComplex, Summand};
 use yui_matrix::sparse::SpMat;
 
 use crate::kh::r#gen::KhChain;
-use crate::kh::{KhChainGen, KhHomology, KhHomologyBigraded};
+use crate::kh::{KhChainGen, KhHomology};
 use crate::misc::range_of;
 
 use super::KhAlg;
@@ -117,26 +117,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         })
     }
 
-    pub fn into_bigraded(self) -> KhComplexBigraded<R> {
-        assert!(self.str.h().is_zero());
-        assert!(self.str.t().is_zero());
-
-        let str = self.str.clone();
-        let deg_shift = self.deg_shift;
-        let reduced = self.reduced;
-        let canon_cycles = self.canon_cycles.clone();
-        let summands = self.gen_grid();
-
-        let inner = ChainComplex2::new(summands, isize2(1, 0), move |idx, x| { 
-            let i = idx.0;
-            let x = KhChain::from(x.clone());
-            let dx = self.d(i, &x);
-            dx.into_iter().collect()
-        });
-
-        KhComplexBigraded::new_impl(inner, str, deg_shift, reduced, canon_cycles)
-    }
-
     pub fn deg_shift_for(l: &Link, reduced: bool) -> (isize, isize) {
         let (n_pos, n_neg) = l.signed_crossing_nums();
         let (n_pos, n_neg) = (n_pos as isize, n_neg as isize);
@@ -201,105 +181,6 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 }
 
-#[derive(Clone)]
-pub struct KhComplexBigraded<R>
-where R: Ring, for<'x> &'x R: RingOps<R> { 
-    inner: ChainComplex2<KhChainGen, R>,
-    str: KhAlg<R>,
-    deg_shift: (isize, isize),
-    reduced: bool,
-    canon_cycles: Vec<KhChain<R>>,
-}
-
-impl<R> KhComplexBigraded<R>
-where R: Ring, for<'x> &'x R: RingOps<R> { 
-    fn new_impl(
-        inner: ChainComplex2<KhChainGen, R>,
-        str: KhAlg<R>,
-        deg_shift: (isize, isize),
-        reduced: bool,
-        canon_cycles: Vec<KhChain<R>>
-    ) -> Self {
-        Self { inner, str, deg_shift, reduced, canon_cycles }
-    }
-
-    pub fn str(&self) -> &KhAlg<R> { 
-        &self.str
-    }
-
-    pub fn h_range(&self) -> RangeInclusive<isize> { 
-        range_of(self.support().map(|idx| idx.0))
-    }
-
-    pub fn q_range(&self) -> RangeInclusive<isize> {
-        range_of(self.support().map(|idx| idx.1))
-    }
-
-    pub fn deg_shift(&self) -> (isize, isize) { 
-        self.deg_shift
-    }
-
-    pub fn is_reduced(&self) -> bool { 
-        self.reduced
-    }
-
-    pub fn canon_cycles(&self) -> &Vec<KhChain<R>> { 
-        &self.canon_cycles
-    }
-
-    pub fn inner(&self) -> &ChainComplex2<KhChainGen, R> {
-        &self.inner
-    }
-}
-
-impl<R> Index<(isize, isize)> for KhComplexBigraded<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = KhComplexSummand<R>;
-
-    delegate! { 
-        to self.inner { 
-            fn index(&self, index: (isize, isize)) -> &Self::Output;
-        }
-    }
-}
-
-impl<R> GridTrait<isize2> for KhComplexBigraded<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Support = std::vec::IntoIter<isize2>;
-    type Item = KhComplexSummand<R>;
-
-    delegate! { 
-        to self.inner { 
-            fn support(&self) -> Self::Support;
-            fn is_supported(&self, i: isize2) -> bool;
-            fn get(&self, i: isize2) -> &Self::Item;
-            fn get_default(&self) -> &Self::Item;
-        }
-    }
-}
-
-impl<R> ChainComplexTrait<isize2> for KhComplexBigraded<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type R = R;
-    type Element = KhChain<R>;
-
-    delegate! { 
-        to self.inner { 
-            fn rank(&self, i: isize2) -> usize;
-            fn d_deg(&self) -> isize2;
-            fn d(&self, i: isize2, z: &Self::Element) -> Self::Element;
-            fn d_matrix(&self, i: isize2) -> SpMat<Self::R>;
-        }
-    }
-}
-
-impl<R> KhComplexBigraded<R>
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    pub fn homology(&self) -> KhHomologyBigraded<R> {
-        self.into()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use yui_homology::{ChainComplexTrait, SummandTrait};
@@ -313,6 +194,8 @@ mod tests {
         let c = KhComplex::new(&l, &0, &0, false);
 
         assert_eq!(c.h_range(), -3..=0);
+        assert_eq!(c.q_range(), -9..=-1);
+
         assert_eq!(c[-3].rank(), 2);
         assert_eq!(c[-2].rank(), 2);
         assert_eq!(c[-1].rank(), 0);
@@ -327,6 +210,8 @@ mod tests {
         let c = KhComplex::new(&l, &0, &0, true);
 
         assert_eq!(c.h_range(), -3..=0);
+        assert_eq!(c.q_range(), -8..=-2);
+
         assert_eq!(c[-3].rank(), 1);
         assert_eq!(c[-2].rank(), 1);
         assert_eq!(c[-1].rank(), 0);
@@ -336,12 +221,9 @@ mod tests {
     }
 
     #[test]
-    fn ckh_bigr_trefoil() {
+    fn gen_grid() {
         let l = Link::trefoil();
-        let c = KhComplex::new(&l, &0, &0, false).into_bigraded();
-
-        assert_eq!(c.h_range(), -3..=0);
-        assert_eq!(c.q_range(), -9..=-1);
+        let c = KhComplex::new(&l, &0, &0, false).gen_grid();
 
         assert_eq!(c[(-3, -9)].rank(), 1);
         assert_eq!(c[(-3, -7)].rank(), 1);
@@ -349,23 +231,16 @@ mod tests {
         assert_eq!(c[(-2, -5)].rank(), 1);
         assert_eq!(c[(0, -3)].rank(), 1);
         assert_eq!(c[(0, -1)].rank(), 1);
-
-        c.check_d_all();
     }
 
     #[test]
-    fn ckh_bigr_red_trefoil() {
+    fn gen_grid_red() {
         let l = Link::trefoil();
-        let c = KhComplex::new(&l, &0, &0, true).into_bigraded();
-
-        assert_eq!(c.h_range(), -3..=0);
-        assert_eq!(c.q_range(), -8..=-2);
+        let c = KhComplex::new(&l, &0, &0, true).gen_grid();
 
         assert_eq!(c[(-3, -8)].rank(), 1);
         assert_eq!(c[(-2, -6)].rank(), 1);
         assert_eq!(c[(0, -2)].rank(), 1);
-
-        c.check_d_all();
     }
 }
 

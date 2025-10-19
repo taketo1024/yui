@@ -79,6 +79,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
         }
     }
+
+    pub fn sigma(&self, x: &KhGen) -> Lc<KhGen, R> {
+        match x { 
+            KhGen::I => Lc::from((KhGen::I, R::one())),
+            KhGen::X => Lc::from_iter([
+                (KhGen::X, -R::one()), 
+                (KhGen::I, self.h().clone())
+            ])
+        }
+    }
 }
 
 #[cfg(test)]

@@ -5,7 +5,7 @@ use yui_homology::{Grid2, GridTrait, Homology, Summand, SummandTrait};
 use yui::{EucRing, EucRingOps};
 use yui_link::Link;
 
-use crate::kh::KhChainGen;
+use crate::kh::{KhChainExt, KhChainGen};
 use crate::misc::{make_gen_grid, range_of};
 
 use super::{KhAlg, KhChain, KhComplex};
@@ -49,18 +49,14 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     pub fn h_range(&self) -> RangeInclusive<isize> { 
-        range_of(self.support().flat_map(|i| 
-            if !self[i].is_zero() { 
-                Some(i)
-            } else { 
-                None
-            }
+        range_of(self.support().filter(|&i| 
+            !self[i].is_zero()
         ))
     }
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
         range_of(self.support().flat_map(|i| 
-            self[i].gens().flat_map(|z| z.any_term().map(|(x, _)| x.q_deg()))
+            self[i].gens().map(|z| z.q_deg())
         ))
     }
 

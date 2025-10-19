@@ -1,5 +1,6 @@
 use std::fmt::Display;
-use yui::lc::Gen;
+use num_traits::Zero;
+use yui::lc::{Gen, Lc};
 use yui::{Elem, Ring, RingOps};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
@@ -72,18 +73,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         (&self.h, &self.t)
     }
 
-    pub fn prod(&self, x: KhAlgGen, y: KhAlgGen) -> Vec<(KhAlgGen, R)> {
+    pub fn prod(&self, x: KhAlgGen, y: KhAlgGen) -> Lc<KhAlgGen, R> {
         use KhAlgGen::{I, X};
         let (h, t) = (self.h(), self.t());
 
         match (x, y) { 
-            (I, I) => vec![(I, R::one())],
-            (X, I) | (I, X) => vec![(X, R::one())],
+            (I, I) => Lc::from(I),
+            (X, I) | (I, X) => Lc::from(X),
             (X, X) => match (h.is_zero(), t.is_zero()) { 
-                (true,  true ) => vec![],
-                (false, true ) => vec![(X, h.clone())],
-                (true,  false) => vec![(I, t.clone())],
-                (false, false) => vec![(X, h.clone()), (I, t.clone())]
+                (true,  true ) => Lc::zero(),
+                (false, true ) => Lc::from((X, h.clone())),
+                (true,  false) => Lc::from((I, t.clone())),
+                (false, false) => Lc::from_iter([(X, h.clone()), (I, t.clone())])
             } 
         }
     }
@@ -109,6 +110,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 pub mod tests {
+    use num_traits::Zero;
+    use yui::lc::Lc;
+
     use super::{KhAlgGen, KhAlgStr};
  
     #[test]
@@ -122,10 +126,10 @@ pub mod tests {
     fn str_prod_kh() { 
         use KhAlgGen::{I, X};
         let a = KhAlgStr::new(&0, &0);
-        assert_eq!(a.prod(I, I), vec![(I, 1)]);
-        assert_eq!(a.prod(X, I), vec![(X, 1)]);
-        assert_eq!(a.prod(I, X), vec![(X, 1)]);
-        assert_eq!(a.prod(X, X), vec![]);
+        assert_eq!(a.prod(I, I), Lc::from((I, 1)));
+        assert_eq!(a.prod(X, I), Lc::from((X, 1)));
+        assert_eq!(a.prod(I, X), Lc::from((X, 1)));
+        assert_eq!(a.prod(X, X), Lc::zero());
     }
 
     #[test]
@@ -139,10 +143,10 @@ pub mod tests {
     fn str_prod_bn() { 
         use KhAlgGen::{I, X};
         let a = KhAlgStr::new(&1, &0);
-        assert_eq!(a.prod(I, I), vec![(I, 1)]);
-        assert_eq!(a.prod(X, I), vec![(X, 1)]);
-        assert_eq!(a.prod(I, X), vec![(X, 1)]);
-        assert_eq!(a.prod(X, X), vec![(X, 1)]);
+        assert_eq!(a.prod(I, I), Lc::from((I, 1)));
+        assert_eq!(a.prod(X, I), Lc::from((X, 1)));
+        assert_eq!(a.prod(I, X), Lc::from((X, 1)));
+        assert_eq!(a.prod(X, X), Lc::from((X, 1)));
     }
 
     #[test]
@@ -156,10 +160,10 @@ pub mod tests {
     fn str_prod_lee() { 
         use KhAlgGen::{I, X};
         let a = KhAlgStr::new(&0, &1);
-        assert_eq!(a.prod(I, I), vec![(I, 1)]);
-        assert_eq!(a.prod(X, I), vec![(X, 1)]);
-        assert_eq!(a.prod(I, X), vec![(X, 1)]);
-        assert_eq!(a.prod(X, X), vec![(I, 1)]);
+        assert_eq!(a.prod(I, I), Lc::from((I, 1)));
+        assert_eq!(a.prod(X, I), Lc::from((X, 1)));
+        assert_eq!(a.prod(I, X), Lc::from((X, 1)));
+        assert_eq!(a.prod(X, X), Lc::from((I, 1)));
     }
 
     #[test]

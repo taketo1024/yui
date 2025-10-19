@@ -76,25 +76,34 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         use KhAlgGen::{I, X};
         let (h, t) = (self.h(), self.t());
 
-        let res = match (x, y) { 
+        match (x, y) { 
             (I, I) => vec![(I, R::one())],
             (X, I) | (I, X) => vec![(X, R::one())],
-            (X, X) => vec![(X, h.clone()), (I, t.clone())]
-        };
-
-        res.into_iter().filter(|(_, a)| !a.is_zero()).collect()
+            (X, X) => match (h.is_zero(), t.is_zero()) { 
+                (true,  true ) => vec![],
+                (false, true ) => vec![(X, h.clone())],
+                (true,  false) => vec![(I, t.clone())],
+                (false, false) => vec![(X, h.clone()), (I, t.clone())]
+            } 
+        }
     }
 
     pub fn coprod(&self, x: KhAlgGen) -> Vec<(KhAlgGen, KhAlgGen, R)> {
         use KhAlgGen::{I, X};
         let (h, t) = (self.h(), self.t());
 
-        let res = match x { 
-            I => vec![(X, I, R::one()), (I, X, R::one()), (I, I, -h.clone())],
-            X => vec![(X, X, R::one()), (I, I, t.clone())]
-        };
-
-        res.into_iter().filter(|(_, _, a)| !a.is_zero()).collect()
+        match x { 
+            I => if h.is_zero() { 
+                vec![(X, I, R::one()), (I, X, R::one())]
+            } else {
+                vec![(X, I, R::one()), (I, X, R::one()), (I, I, -h.clone())]
+            },
+            X => if t.is_zero() { 
+                vec![(X, X, R::one())]
+            } else { 
+                vec![(X, X, R::one()), (I, I, t.clone())]
+            }
+        }
     }
 }
 

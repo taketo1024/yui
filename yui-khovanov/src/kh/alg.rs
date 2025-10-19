@@ -1,60 +1,18 @@
-use std::fmt::Display;
 use num_traits::Zero;
-use yui::lc::{Gen, Lc};
-use yui::{Elem, Ring, RingOps};
+use yui::lc::Lc;
+use yui::{Ring, RingOps};
 
-use crate::kh::KhLabel;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
-pub enum KhAlgGen { 
-    #[default] 
-    I, 
-    X
-}
-
-impl KhAlgGen { 
-    #[allow(non_snake_case)]
-    pub fn is_X(&self) -> bool { 
-        self == &KhAlgGen::X
-    }
-
-    pub fn is_1(&self) -> bool { 
-        self == &KhAlgGen::I
-    }
-
-    pub fn deg(&self) -> isize {
-        match self { 
-            KhAlgGen::I => 0,
-            KhAlgGen::X => -2
-        }
-    }
-}
-
-impl Display for KhAlgGen {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self { 
-            KhAlgGen::I => f.write_str("1"),
-            KhAlgGen::X => f.write_str("X")
-        }
-    }
-}
-
-impl Elem for KhAlgGen {
-    fn math_symbol() -> String {
-        format!("A")
-    }
-}
-
-impl Gen for KhAlgGen {}
+use crate::kh::r#gen::KhGen;
+use crate::kh::KhTensor;
 
 #[derive(Clone)]
-pub struct KhAlgStr<R>
+pub struct KhAlg<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     h: R,
     t: R
 }
 
-impl<R> KhAlgStr<R>
+impl<R> KhAlg<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn new(h: &R, t: &R) -> Self { 
         Self { 
@@ -75,8 +33,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         (&self.h, &self.t)
     }
 
-    pub fn prod(&self, x: KhAlgGen, y: KhAlgGen) -> Lc<KhAlgGen, R> {
-        use KhAlgGen::{I, X};
+    pub fn mul(&self, x: KhGen, y: KhGen) -> Lc<KhGen, R> {
+        use KhGen::{I, X};
         let (h, t) = (self.h(), self.t());
 
         match (x, y) { 
@@ -91,10 +49,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn coprod(&self, x: KhAlgGen) -> Lc<KhLabel, R> {
-        use KhAlgGen::{I, X};
+    pub fn comul(&self, x: KhGen) -> Lc<KhTensor, R> {
+        use KhGen::{I, X};
         let (h, t) = (self.h(), self.t());
-        let tsr = |x, y| KhLabel::from_iter([x, y]);
+        let tsr = |x, y| KhTensor::from_iter([x, y]);
 
         match x { 
             I => if h.is_zero() { 
@@ -128,83 +86,83 @@ pub mod tests {
     use num_traits::Zero;
     use yui::lc::Lc;
 
-    use crate::kh::KhLabel;
+    use crate::kh::KhTensor;
 
-    use super::{KhAlgGen, KhAlgStr};
+    use super::{KhGen, KhAlg};
  
     #[test]
     fn alg_gen() { 
-        use KhAlgGen::{I, X};
+        use KhGen::{I, X};
         assert_eq!(I.deg(), 0);
         assert_eq!(X.deg(), -2);
     }
 
     #[test]
     fn str_prod_kh() { 
-        use KhAlgGen::{I, X};
-        let a = KhAlgStr::new(&0, &0);
-        assert_eq!(a.prod(I, I), Lc::from((I, 1)));
-        assert_eq!(a.prod(X, I), Lc::from((X, 1)));
-        assert_eq!(a.prod(I, X), Lc::from((X, 1)));
-        assert_eq!(a.prod(X, X), Lc::zero());
+        use KhGen::{I, X};
+        let a = KhAlg::new(&0, &0);
+        assert_eq!(a.mul(I, I), Lc::from((I, 1)));
+        assert_eq!(a.mul(X, I), Lc::from((X, 1)));
+        assert_eq!(a.mul(I, X), Lc::from((X, 1)));
+        assert_eq!(a.mul(X, X), Lc::zero());
     }
 
     #[test]
     fn str_coprod_kh() { 
-        use KhAlgGen::{I, X};
-        let a = KhAlgStr::new(&0, &0);
-        assert_eq!(a.coprod(I), Lc::from_iter([
-            (KhLabel::from_iter([X, I]), 1),
-            (KhLabel::from_iter([I, X]), 1),
+        use KhGen::{I, X};
+        let a = KhAlg::new(&0, &0);
+        assert_eq!(a.comul(I), Lc::from_iter([
+            (KhTensor::from_iter([X, I]), 1),
+            (KhTensor::from_iter([I, X]), 1),
         ]));
-        assert_eq!(a.coprod(X), Lc::from(
-            (KhLabel::from_iter([X, X]), 1)
+        assert_eq!(a.comul(X), Lc::from(
+            (KhTensor::from_iter([X, X]), 1)
         ));
     }
     #[test]
     fn str_prod_bn() { 
-        use KhAlgGen::{I, X};
-        let a = KhAlgStr::new(&1, &0);
-        assert_eq!(a.prod(I, I), Lc::from((I, 1)));
-        assert_eq!(a.prod(X, I), Lc::from((X, 1)));
-        assert_eq!(a.prod(I, X), Lc::from((X, 1)));
-        assert_eq!(a.prod(X, X), Lc::from((X, 1)));
+        use KhGen::{I, X};
+        let a = KhAlg::new(&1, &0);
+        assert_eq!(a.mul(I, I), Lc::from((I, 1)));
+        assert_eq!(a.mul(X, I), Lc::from((X, 1)));
+        assert_eq!(a.mul(I, X), Lc::from((X, 1)));
+        assert_eq!(a.mul(X, X), Lc::from((X, 1)));
     }
 
     #[test]
     fn str_coprod_bn() { 
-        use KhAlgGen::{I, X};
-        let a = KhAlgStr::new(&1, &0);
-        assert_eq!(a.coprod(I), Lc::from_iter([
-            (KhLabel::from_iter([X, I]), 1),
-            (KhLabel::from_iter([I, X]), 1),
-            (KhLabel::from_iter([I, I]), -1),
+        use KhGen::{I, X};
+        let a = KhAlg::new(&1, &0);
+        assert_eq!(a.comul(I), Lc::from_iter([
+            (KhTensor::from_iter([X, I]), 1),
+            (KhTensor::from_iter([I, X]), 1),
+            (KhTensor::from_iter([I, I]), -1),
         ]));
-        assert_eq!(a.coprod(X), Lc::from(
-            (KhLabel::from_iter([X, X]), 1)
+        assert_eq!(a.comul(X), Lc::from(
+            (KhTensor::from_iter([X, X]), 1)
         ));
     }
     #[test]
     fn str_prod_lee() { 
-        use KhAlgGen::{I, X};
-        let a = KhAlgStr::new(&0, &1);
-        assert_eq!(a.prod(I, I), Lc::from((I, 1)));
-        assert_eq!(a.prod(X, I), Lc::from((X, 1)));
-        assert_eq!(a.prod(I, X), Lc::from((X, 1)));
-        assert_eq!(a.prod(X, X), Lc::from((I, 1)));
+        use KhGen::{I, X};
+        let a = KhAlg::new(&0, &1);
+        assert_eq!(a.mul(I, I), Lc::from((I, 1)));
+        assert_eq!(a.mul(X, I), Lc::from((X, 1)));
+        assert_eq!(a.mul(I, X), Lc::from((X, 1)));
+        assert_eq!(a.mul(X, X), Lc::from((I, 1)));
     }
 
     #[test]
     fn str_coprod_lee() { 
-        use KhAlgGen::{I, X};
-        let a = KhAlgStr::new(&0, &1);
-        assert_eq!(a.coprod(I), Lc::from_iter([
-            (KhLabel::from_iter([X, I]), 1),
-            (KhLabel::from_iter([I, X]), 1),
+        use KhGen::{I, X};
+        let a = KhAlg::new(&0, &1);
+        assert_eq!(a.comul(I), Lc::from_iter([
+            (KhTensor::from_iter([X, I]), 1),
+            (KhTensor::from_iter([I, X]), 1),
         ]));
-        assert_eq!(a.coprod(X), Lc::from_iter([
-            (KhLabel::from_iter([X, X]), 1),
-            (KhLabel::from_iter([I, I]), 1),
+        assert_eq!(a.comul(X), Lc::from_iter([
+            (KhTensor::from_iter([X, X]), 1),
+            (KhTensor::from_iter([I, I]), 1),
         ]));
     }
 }

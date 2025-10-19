@@ -11,7 +11,7 @@ use yui::{KeyedUnionFind, Ring, RingOps};
 use yui_homology::DisplaySeq;
 use yui_link::{Crossing, Edge, InvLink};
 
-use crate::kh::{KhComplex, KhGen, KhLabel};
+use crate::kh::{KhComplex, KhChainGen, KhTensor};
 use crate::khi::KhIComplex;
 use crate::kh::internal::v2::builder::{BuildElem, TngComplexBuilder};
 use crate::kh::internal::v2::cob::LcCobTrait;
@@ -205,7 +205,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let c = self.complex().make_x(x);
         let key_map = if !x.is_resolved() { 
             [Bit::Bit0, Bit::Bit1].map(|b| { 
-                let k = TngKey { state: BitSeq::from(b), label: KhLabel::empty() };
+                let k = TngKey { state: BitSeq::from(b), label: KhTensor::empty() };
                 (k, k)
             }).into_iter().collect()
         } else { 
@@ -236,8 +236,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 ([0, 1], [1, 0]),
                 ([1, 1], [1, 1])
             ].map(|(b0, b1)| { 
-                let k = TngKey { state: BitSeq::from_iter(b0), label: KhLabel::empty() };
-                let l = TngKey { state: BitSeq::from_iter(b1), label: KhLabel::empty() };
+                let k = TngKey { state: BitSeq::from_iter(b0), label: KhTensor::empty() };
+                let l = TngKey { state: BitSeq::from_iter(b1), label: KhTensor::empty() };
                 (k, l)
             }).into_iter().collect()
         } else {
@@ -564,7 +564,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let deg_shift = self.complex().deg_shift();
         let key_map = std::mem::take(&mut self.key_map);
 
-        let map = move |x: &KhGen| -> KhGen { 
+        let map = move |x: &KhChainGen| -> KhChainGen { 
             let k = TngKey::from(x);
             let tk = key_map[&k];
             let tx = tk.as_gen(deg_shift);

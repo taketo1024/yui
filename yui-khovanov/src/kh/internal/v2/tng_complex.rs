@@ -13,19 +13,19 @@ use yui_homology::{ChainComplex, Summand, Grid1};
 use yui_link::{Crossing, Edge, State};
 use yui::bitseq::Bit;
 
-use crate::kh::{KhAlgGen, KhAlgStr, KhChain, KhComplex, KhGen, KhLabel};
+use crate::kh::{KhGen, KhAlg, KhChain, KhComplex, KhChainGen, KhTensor};
 use super::cob::{Cob, Dot, Bottom, CobComp, LcCob, LcCobTrait};
 use super::tng::{Tng, TngComp};
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub struct TngKey { 
     pub state: State,
-    pub label: KhLabel
+    pub label: KhTensor
 }
 
 impl TngKey { 
     pub(crate) fn init() -> Self { 
-        Self { state: State::empty(), label: KhLabel::empty() }
+        Self { state: State::empty(), label: KhTensor::empty() }
     }
 
     pub fn weight(&self) -> usize { 
@@ -37,8 +37,8 @@ impl TngKey {
         self.label.append(other.label);
     }
 
-    pub fn as_gen(&self, deg_shift: (isize, isize)) -> KhGen { 
-        KhGen::new(self.state, self.label, deg_shift)
+    pub fn as_gen(&self, deg_shift: (isize, isize)) -> KhChainGen { 
+        KhChainGen::new(self.state, self.label, deg_shift)
     }
 }
 
@@ -53,18 +53,18 @@ impl<'a> Add for &'a TngKey {
 }
 
 #[auto_ops]
-impl<'a> Add<KhAlgGen> for &'a TngKey {
+impl<'a> Add<KhGen> for &'a TngKey {
     type Output = TngKey;
-    fn add(self, rhs: KhAlgGen) -> Self::Output {
+    fn add(self, rhs: KhGen) -> Self::Output {
         let mut res = *self;
         res.label.push(rhs);
         res
     }
 }
 
-impl From<&KhGen> for TngKey {
-    fn from(x: &KhGen) -> Self {
-        TngKey { state: x.state, label: x.label }
+impl From<&KhChainGen> for TngKey {
+    fn from(x: &KhChainGen) -> Self {
+        TngKey { state: x.state, label: x.tensor }
     }
 }
 
@@ -490,15 +490,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         #[allow(non_snake_case)]
         let updated_keys = if based { 
-            let k_X = k + KhAlgGen::X;
+            let k_X = k + KhGen::X;
 
             self.rename_vertex_key(k, k_X);
             self.deloop_with(&k_X, r, Dot::X, Dot::None);
 
             vec![k_X]
         } else { 
-            let k_X = k + KhAlgGen::X;
-            let k_1 = k + KhAlgGen::I;
+            let k_X = k + KhGen::X;
+            let k_1 = k + KhGen::I;
 
             self.rename_vertex_key(k, k_X);
             self.duplicate_vertex(&k_X, k_1);
@@ -586,7 +586,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.remove_vertex(k1);
     }
 
-    pub fn into_raw_complex(self) -> ChainComplex<KhGen, R> {
+    pub fn into_raw_complex(self) -> ChainComplex<KhChainGen, R> {
         assert!(self.is_completely_delooped());
 
         let summands = Grid1::generate(self.h_range(), |i| { 
@@ -598,7 +598,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             Summand::from_raw_gens(gens)
         });
 
-        let d = move |x: &KhGen| { 
+        let d = move |x: &KhChainGen| { 
             let (h, t) = self.ht();
             let k = TngKey::from(x);
             let v = self.vertex(&k);
@@ -616,7 +616,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(self.is_completely_delooped());
 
         let (h, t) = self.ht();
-        let str = KhAlgStr::new(h, t);
+        let str = KhAlg::new(h, t);
         let deg_shift = self.deg_shift;
         let reduced = self.base_pt.is_some();
         let inner = self.into_raw_complex();
@@ -722,7 +722,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 mod tests { 
     use super::*;
-    use crate::kh::KhLabel;
+    use crate::kh::KhTensor;
 
     #[test]
     fn empty() { 
@@ -801,11 +801,11 @@ mod tests {
         assert_eq!(updated, vec![
             TngKey {
                 state: State::empty(), 
-                label: KhLabel::from_iter([KhAlgGen::X])
+                label: KhTensor::from_iter([KhGen::X])
             },
             TngKey {
                 state: State::empty(), 
-                label: KhLabel::from_iter([KhAlgGen::I])
+                label: KhTensor::from_iter([KhGen::I])
             }
         ]);
     }
@@ -826,7 +826,7 @@ mod tests {
 
         let k = TngKey {
             state: State::from([1,0]), 
-            label: KhLabel::from_iter([])
+            label: KhTensor::from_iter([])
         };
         let r = 2;
 
@@ -842,11 +842,11 @@ mod tests {
         assert_eq!(updated, vec![
             TngKey {
                 state: State::from([1,0]), 
-                label: KhLabel::from_iter([KhAlgGen::X])
+                label: KhTensor::from_iter([KhGen::X])
             },
             TngKey {
                 state: State::from([1,0]), 
-                label: KhLabel::from_iter([KhAlgGen::I])
+                label: KhTensor::from_iter([KhGen::I])
             }
         ]);
     }
@@ -869,7 +869,7 @@ mod tests {
         assert_eq!(updated, vec![
             TngKey {
                 state: State::empty(), 
-                label: KhLabel::from_iter([KhAlgGen::X])
+                label: KhTensor::from_iter([KhGen::X])
             },
         ]);
     }

@@ -8,28 +8,28 @@ use yui_link::Link;
 use crate::khi::KhIGen;
 use crate::misc::make_gen_grid;
 
-use super::{KhAlgGen, KhAlgStr, KhChain, KhComplex, KhGen, KhLabel};
+use super::{KhGen, KhAlg, KhChain, KhComplex, KhChainGen, KhTensor};
 
-impl<R> KhAlgStr<R>
+impl<R> KhAlg<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn sigma(&self, x: &KhAlgGen) -> Lc<KhAlgGen, R> {
+    pub fn sigma(&self, x: &KhGen) -> Lc<KhGen, R> {
         match x { 
-            KhAlgGen::I => Lc::from((KhAlgGen::I, R::one())),
-            KhAlgGen::X => Lc::from_iter([
-                (KhAlgGen::X, -R::one()), 
-                (KhAlgGen::I, self.h().clone())
+            KhGen::I => Lc::from((KhGen::I, R::one())),
+            KhGen::X => Lc::from_iter([
+                (KhGen::X, -R::one()), 
+                (KhGen::I, self.h().clone())
             ])
         }
     }
 
-    pub fn sigma_tensor(&self, x: &KhGen) -> KhChain<R> {
+    pub fn sigma_tensor(&self, x: &KhChainGen) -> KhChain<R> {
         let init = KhChain::from(
-            KhGen::new(x.state, KhLabel::empty(), x.deg_shift)
+            KhChainGen::new(x.state, KhTensor::empty(), x.deg_shift)
         );
 
-        x.label.iter().map(|x| self.sigma(&x)).fold(init, |res, next| { 
+        x.tensor.iter().map(|x| self.sigma(&x)).fold(init, |res, next| { 
             res.combine(&next, |a, b| 
-                KhGen::new(a.state, a.label + b, a.deg_shift)
+                KhChainGen::new(a.state, a.tensor + b, a.deg_shift)
             )
         })
     }
@@ -39,11 +39,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<R> KhAlgStr<HPoly<'H', R>>
+impl<R> KhAlg<HPoly<'H', R>>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn gr_sigma_chain(&self, z: &KhChain<HPoly<'H', R>>) -> KhChain<HPoly<'H', R>> {
         z.iter().flat_map(|(x, r)| {
-            let deg = (r.deg() + x.label.iter().filter(|x| x.is_X()).count()) as i32;
+            let deg = (r.deg() + x.tensor.iter().filter(|x| x.is_X()).count()) as i32;
             let e = HPoly::from_sign(Sign::from_parity(deg));
             let sx = self.sigma_tensor(x) * (e * r);
             sx.into_iter() 
@@ -53,7 +53,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn sigma_complex(l: &Link, h: &R, t: &R) -> ChainComplex<EitherGen<KhGen, KhGen>, R> { 
+    pub fn sigma_complex(l: &Link, h: &R, t: &R) -> ChainComplex<EitherGen<KhChainGen, KhChainGen>, R> { 
         let c = KhComplex::new_no_simplify(&l, h, t, false);
         let (h0, h1) = c.h_range().into_inner();
         let str = c.str().clone();

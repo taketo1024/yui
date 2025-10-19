@@ -2,41 +2,24 @@ use std::ops::{RangeInclusive, Index};
 use cartesian::cartesian;
 
 use delegate::delegate;
-use yui::lc::Lc;
 use yui::{Ring, RingOps, EucRing, EucRingOps};
 use yui_link::Link;
 use yui_homology::{isize2, ChainComplexTrait, Grid2, GridTrait, ChainComplex, ChainComplex2, Summand};
 use yui_matrix::sparse::SpMat;
 
-use crate::kh::{KhGen, KhHomology, KhHomologyBigraded};
+use crate::kh::r#gen::KhChain;
+use crate::kh::{KhChainGen, KhHomology, KhHomologyBigraded};
 use crate::misc::range_of;
 
-use super::KhAlgStr;
+use super::KhAlg;
 
-pub type KhChain<R> = Lc<KhGen, R>;
-pub trait KhChainExt { 
-    fn h_deg(&self) -> isize;
-    fn q_deg(&self) -> isize;
-}
-
-impl<R> KhChainExt for KhChain<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn h_deg(&self) -> isize {
-        self.gens().map(|x| x.h_deg()).min().unwrap_or(0)
-    }
-    
-    fn q_deg(&self) -> isize {
-        self.gens().map(|x| x.q_deg()).min().unwrap_or(0)
-    }
-}
-
-pub type KhComplexSummand<R> = Summand<KhGen, R>;
+pub type KhComplexSummand<R> = Summand<KhChainGen, R>;
 
 #[derive(Clone)]
 pub struct KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    inner: ChainComplex<KhGen, R>,
-    str: KhAlgStr<R>,
+    inner: ChainComplex<KhChainGen, R>,
+    str: KhAlg<R>,
     deg_shift: (isize, isize),
     reduced: bool,
     canon_cycles: Vec<KhChain<R>>,
@@ -74,11 +57,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         KhComplex::new_impl(complex, str, deg_shift, reduced, canon_cycles)
     }
 
-    pub(crate) fn new_impl(inner: ChainComplex<KhGen, R>, str: KhAlgStr<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self { 
+    pub(crate) fn new_impl(inner: ChainComplex<KhChainGen, R>, str: KhAlg<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self { 
         KhComplex { inner, str, deg_shift, reduced, canon_cycles }
     }
 
-    pub fn str(&self) -> &KhAlgStr<R> { 
+    pub fn str(&self) -> &KhAlg<R> { 
         &self.str
     }
 
@@ -104,7 +87,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.canon_cycles
     }
 
-    pub fn inner(&self) -> &ChainComplex<KhGen, R> {
+    pub fn inner(&self) -> &ChainComplex<KhChainGen, R> {
         &self.inner
     }
 
@@ -118,7 +101,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         )
     }
 
-    pub fn gen_grid(&self) -> Grid2<Summand<KhGen, R>> { 
+    pub fn gen_grid(&self) -> Grid2<Summand<KhChainGen, R>> { 
         let h_range = self.h_range();
         let q_range = self.q_range().step_by(2);
         let support = cartesian!(h_range, q_range.clone()).map(|(i, j)| 
@@ -221,8 +204,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 #[derive(Clone)]
 pub struct KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    inner: ChainComplex2<KhGen, R>,
-    str: KhAlgStr<R>,
+    inner: ChainComplex2<KhChainGen, R>,
+    str: KhAlg<R>,
     deg_shift: (isize, isize),
     reduced: bool,
     canon_cycles: Vec<KhChain<R>>,
@@ -231,8 +214,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> KhComplexBigraded<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     fn new_impl(
-        inner: ChainComplex2<KhGen, R>,
-        str: KhAlgStr<R>,
+        inner: ChainComplex2<KhChainGen, R>,
+        str: KhAlg<R>,
         deg_shift: (isize, isize),
         reduced: bool,
         canon_cycles: Vec<KhChain<R>>
@@ -240,7 +223,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         Self { inner, str, deg_shift, reduced, canon_cycles }
     }
 
-    pub fn str(&self) -> &KhAlgStr<R> { 
+    pub fn str(&self) -> &KhAlg<R> { 
         &self.str
     }
 
@@ -264,7 +247,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.canon_cycles
     }
 
-    pub fn inner(&self) -> &ChainComplex2<KhGen, R> {
+    pub fn inner(&self) -> &ChainComplex2<KhChainGen, R> {
         &self.inner
     }
 }

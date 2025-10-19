@@ -5,16 +5,16 @@ use yui_homology::{isize2, GridTrait, Homology, Homology2, Summand};
 use yui::{EucRing, EucRingOps};
 use yui_link::Link;
 
-use crate::kh::KhGen;
+use crate::kh::KhChainGen;
 use crate::misc::{make_gen_grid, range_of};
 
-use super::{KhAlgStr, KhChain, KhComplex, KhComplexBigraded};
+use super::{KhAlg, KhChain, KhComplex, KhComplexBigraded};
 
 #[derive(Clone)]
 pub struct KhHomology<R> 
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    inner: Homology<KhGen, R>,
-    str: KhAlgStr<R>,
+    inner: Homology<KhChainGen, R>,
+    str: KhAlg<R>,
     deg_shift: (isize, isize),
     reduced: bool,
     canon_cycles: Vec<KhChain<R>>
@@ -32,11 +32,11 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         Self::from(&c)
     }
     
-    pub(crate) fn new_impl(inner: Homology<KhGen, R>, str: KhAlgStr<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self { 
+    pub(crate) fn new_impl(inner: Homology<KhChainGen, R>, str: KhAlg<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self { 
         Self { inner, str, deg_shift, reduced, canon_cycles }
     }
 
-    pub fn str(&self) -> &KhAlgStr<R> { 
+    pub fn str(&self) -> &KhAlg<R> { 
         &self.str
     }
 
@@ -56,7 +56,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         &self.canon_cycles
     }
 
-    pub fn inner(&self) -> &Homology<KhGen, R> { 
+    pub fn inner(&self) -> &Homology<KhChainGen, R> { 
         &self.inner
     }
 
@@ -100,7 +100,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 impl<R> GridTrait<isize> for KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     type Support = std::vec::IntoIter<isize>;
-    type Item = Summand<KhGen, R>;
+    type Item = Summand<KhChainGen, R>;
 
     delegate! { 
         to self.inner { 
@@ -114,7 +114,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 impl<R> Index<isize> for KhHomology<R> 
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    type Output = Summand<KhGen, R>;
+    type Output = Summand<KhChainGen, R>;
 
     delegate! { 
         to self.inner { 
@@ -126,8 +126,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 #[derive(Clone)]
 pub struct KhHomologyBigraded<R> 
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    inner: Homology2<KhGen, R>,
-    str: KhAlgStr<R>,
+    inner: Homology2<KhChainGen, R>,
+    str: KhAlg<R>,
     deg_shift: (isize, isize),
     reduced: bool,
     canon_cycles: Vec<KhChain<R>>
@@ -135,11 +135,11 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 impl<R> KhHomologyBigraded<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    fn new_impl(inner: Homology2<KhGen, R>, str: KhAlgStr<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self { 
+    fn new_impl(inner: Homology2<KhChainGen, R>, str: KhAlg<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self { 
         Self { inner, str, deg_shift, reduced, canon_cycles }
     }
 
-    pub fn str(&self) -> &KhAlgStr<R> { 
+    pub fn str(&self) -> &KhAlg<R> { 
         &self.str
     }
 
@@ -163,7 +163,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         &self.canon_cycles
     }
 
-    pub fn inner(&self) -> &Homology2<KhGen, R> { 
+    pub fn inner(&self) -> &Homology2<KhChainGen, R> { 
         &self.inner
     }
 }
@@ -184,7 +184,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 impl<R> GridTrait<isize2> for KhHomologyBigraded<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     type Support = std::vec::IntoIter<isize2>;
-    type Item = Summand<KhGen, R>;
+    type Item = Summand<KhChainGen, R>;
 
     delegate! { 
         to self.inner { 
@@ -198,7 +198,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 impl<R> Index<(isize, isize)> for KhHomologyBigraded<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    type Output = Summand<KhGen, R>;
+    type Output = Summand<KhChainGen, R>;
 
     delegate! { 
         to self.inner { 

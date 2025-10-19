@@ -5,13 +5,13 @@ use yui::{Ring, RingOps, PowMod2, Sign, GetSign};
 use yui_homology::{ChainComplex, Grid, Summand};
 use yui_link::{Link, State, Path, Edge};
 
-use crate::kh::{KhAlgStr, KhChain, KhGen, KhLabel};
+use crate::kh::{KhAlg, KhChain, KhChainGen, KhTensor};
 
 #[derive(Debug)]
 pub struct KhCubeVertex { 
     state: State,
     circles: Vec<Path>,
-    gens: Vec<KhGen>
+    gens: Vec<KhChainGen>
 }
 
 impl KhCubeVertex { 
@@ -25,21 +25,21 @@ impl KhCubeVertex {
             )
         });
 
-        let gens = KhLabel::generate(r).filter_map(|label| { 
+        let gens = KhTensor::generate(r).filter_map(|label| { 
             let ok = if let Some(red_i) = red_i { 
                 label[red_i].is_X()
             } else { 
                 true
             };
             ok.then(|| 
-                KhGen::new(state, label, deg_shift)
+                KhChainGen::new(state, label, deg_shift)
             )
         }).collect();
 
         KhCubeVertex { state, circles, gens }
     }
 
-    pub fn generators(&self) -> Vec<&KhGen> { 
+    pub fn generators(&self) -> Vec<&KhChainGen> { 
         self.gens.iter().collect()
     }
 
@@ -107,7 +107,7 @@ impl KhCubeEdge {
 
 pub struct KhCube<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    str: KhAlgStr<R>,
+    str: KhAlg<R>,
     dim: usize,
     vertices: HashMap<State, KhCubeVertex>,
     edges: HashMap<State, Vec<(State, KhCubeEdge)>>,
@@ -120,7 +120,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(reduce_e.is_none() || t.is_zero());
 
         let n = l.crossing_num();
-        let str = KhAlgStr::new(h, t);
+        let str = KhAlg::new(h, t);
 
         let vertices: HashMap<_, _> = State::generate(n).map(|s| { 
             let v = KhCubeVertex::new(l, s, reduce_e, deg_shift);
@@ -146,7 +146,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         })
     }
 
-    pub fn str(&self) -> &KhAlgStr<R> {
+    pub fn str(&self) -> &KhAlg<R> {
         &self.str
     }
 
@@ -175,7 +175,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         q0 ..= q1
     }
 
-    pub fn generators(&self, i: isize) -> Vec<&KhGen> { 
+    pub fn generators(&self, i: isize) -> Vec<&KhChainGen> { 
         let i0 = self.deg_shift.0;
         if self.h_range().contains(&i) { 
             let i = (i - i0) as usize;
@@ -189,7 +189,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn d(&self, x: &KhGen) -> KhChain<R> {
+    pub fn d(&self, x: &KhChainGen) -> KhChain<R> {
         let edges = self.edges_from(&x.state);
         edges.iter().flat_map(|(t, e)| { 
             self.apply(x, t, e)
@@ -222,36 +222,36 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.edges[s]
     }
 
-    fn apply(&self, x: &KhGen, to: &State, e: &KhCubeEdge) -> Vec<(KhGen, R)> {
+    fn apply(&self, x: &KhChainGen, to: &State, e: &KhCubeEdge) -> Vec<(KhChainGen, R)> {
         use KhCubeEdgeTrans::*;
         
         let sign = R::from_sign(e.sign);
 
         match e.trans { 
             Merge((i, j), k) => {
-                let (x_i, x_j) = (x.label[i], x.label[j]);
-                self.str.prod(x_i, x_j).into_iter().map(|(y_k, a)| { 
-                    let mut label = x.label;
+                let (x_i, x_j) = (x.tensor[i], x.tensor[j]);
+                self.str.mul(x_i, x_j).into_iter().map(|(y_k, a)| { 
+                    let mut label = x.tensor;
                     label.remove(j);
                     label.remove(i);
                     label.insert(k, y_k);
 
                     let t = *to;
-                    let y = KhGen::new(t, label, x.deg_shift);
+                    let y = KhChainGen::new(t, label, x.deg_shift);
                     let r = &sign * &a;
                     (y, r)
                 }).collect_vec()
             },
             Split(i, (j, k)) => {
-                let x_i = x.label[i];
-                self.str.coprod(x_i).into_iter().map(|(y, a)| { 
-                    let mut label = x.label;
+                let x_i = x.tensor[i];
+                self.str.comul(x_i).into_iter().map(|(y, a)| { 
+                    let mut label = x.tensor;
                     label.remove(i);
                     label.insert(j, y[0]);
                     label.insert(k, y[1]);
 
                     let t = *to;
-                    let y = KhGen::new(t, label, x.deg_shift);
+                    let y = KhChainGen::new(t, label, x.deg_shift);
                     let r = &sign * &a;
 
                     (y, r)
@@ -260,7 +260,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn into_complex(self) -> ChainComplex<KhGen, R> {
+    pub fn into_complex(self) -> ChainComplex<KhChainGen, R> {
         let summands = Grid::generate(self.h_range(), |i| { 
             let gens = self.generators(i);
             Summand::from_raw_gens(gens.into_iter().cloned())

@@ -8,7 +8,7 @@ use yui::{Ring, RingOps};
 use yui_homology::{Grid, ChainComplex, Summand};
 use yui_link::{InvLink, State};
 
-use crate::kh::{KhGen, KhLabel};
+use crate::kh::{KhChainGen, KhTensor};
 use crate::kh::internal::v1::cube::KhCube;
 use crate::khi::KhIGen;
 
@@ -74,7 +74,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         self.state_map.get(&s).cloned().unwrap()
     }
 
-    fn t_label(&self, s: State, l: KhLabel) -> KhLabel { 
+    fn t_label(&self, s: State, l: KhTensor) -> KhTensor { 
         debug_assert_eq!(l.len(), self.cube.vertex(&s).circles().len());
 
         let map = self.label_map.get(&s).unwrap();
@@ -87,18 +87,18 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
             }
         }
 
-        KhLabel(seq)
+        KhTensor(seq)
     }
 
-    fn t(&self, x: &KhGen) -> KhGen {
+    fn t(&self, x: &KhChainGen) -> KhChainGen {
         let s = x.state;
         let t = self.t_state(s);
-        let l = self.t_label(s, x.label);
-        KhGen::new(t, l, x.deg_shift)
+        let l = self.t_label(s, x.tensor);
+        KhChainGen::new(t, l, x.deg_shift)
     }
 
     // f = 1 + τ
-    fn f(&self, x: &KhGen) -> Lc<KhGen, R> { 
+    fn f(&self, x: &KhChainGen) -> Lc<KhChainGen, R> { 
         let x = x.clone();
         let tx = self.t(&x);
         Lc::from_iter([
@@ -171,7 +171,7 @@ mod tests {
     use num_traits::{Zero, One};
     use yui_homology::{ChainComplexTrait, DisplaySeq};
     use yui_link::Link;
-    use crate::kh::{KhAlgGen, KhAlgGen::*, KhHomology};
+    use crate::kh::{KhGen, KhGen::*, KhHomology};
 
     use super::*;
  
@@ -233,23 +233,23 @@ mod tests {
         let c = KhICube::new(&l, &h, &t, false, (0, 0));
 
         assert_eq!(
-            c.t_label(State::from([0,0,0]), KhLabel::from([I, X])), 
-            KhLabel::from([I, X])
+            c.t_label(State::from([0,0,0]), KhTensor::from([I, X])), 
+            KhTensor::from([I, X])
         );
 
         assert_eq!(
-            c.t_label(State::from([0,1,0]), KhLabel::from([X])), 
-            KhLabel::from([X])
+            c.t_label(State::from([0,1,0]), KhTensor::from([X])), 
+            KhTensor::from([X])
         );
 
         assert_eq!(
-            c.t_label(State::from([1,1,0]), KhLabel::from([I, X])), 
-            KhLabel::from([X, I])
+            c.t_label(State::from([1,1,0]), KhTensor::from([I, X])), 
+            KhTensor::from([X, I])
         );
 
         assert_eq!(
-            c.t_label(State::from([1,1,1]), KhLabel::from([I, I, X])), 
-            KhLabel::from([X, I, I])
+            c.t_label(State::from([1,1,1]), KhTensor::from([I, I, X])), 
+            KhTensor::from([X, I, I])
         );
     }
 
@@ -277,9 +277,9 @@ mod tests {
         let c = KhICube::new(&l, &h, &t, false, (0, 0));
 
         let x = KhIGen::B(
-            KhGen::new(
+            KhChainGen::new(
                 State::from([0,0,0]),
-                KhLabel::from([X, I]),
+                KhTensor::from([X, I]),
                 (0, 0)
             )
         );
@@ -287,25 +287,25 @@ mod tests {
 
         assert_eq!(dx, Lc::from_iter([
             (KhIGen::B(
-                KhGen::new(
+                KhChainGen::new(
                     State::from([1,0,0]),
-                    KhLabel::from([X]),
+                    KhTensor::from([X]),
                     (0, 0)
                 )
             ), R::one()),
 
             (KhIGen::B(
-                KhGen::new(
+                KhChainGen::new(
                     State::from([0,1,0]),
-                    KhLabel::from([X]),
+                    KhTensor::from([X]),
                     (0, 0)
                 )
             ), R::one()),
             
             (KhIGen::B(
-                KhGen::new(
+                KhChainGen::new(
                     State::from([0,0,1]),
-                    KhLabel::from([X]),
+                    KhTensor::from([X]),
                     (0, 0)
                 )
             ), R::one())
@@ -321,9 +321,9 @@ mod tests {
         let c = KhICube::new(&l, &h, &t, false, (0, 0));
 
         let x = KhIGen::B(
-            KhGen::new(
+            KhChainGen::new(
                 State::from([0,1,0]),
-                KhLabel::from([X]),
+                KhTensor::from([X]),
                 (0, 0)
             )
         );
@@ -331,34 +331,34 @@ mod tests {
 
         assert_eq!(dx, Lc::from_iter([
             (KhIGen::B(
-                KhGen::new(
+                KhChainGen::new(
                     State::from([1,1,0]),
-                    KhLabel::from([X,X]),
+                    KhTensor::from([X,X]),
                     (0, 0)
                 )
             ), R::one()),
 
             (KhIGen::B(
-                KhGen::new(
+                KhChainGen::new(
                     State::from([0,1,1]),
-                    KhLabel::from([X,X]),
+                    KhTensor::from([X,X]),
                     (0, 0)
                 )
             ), R::one()),
             
             (KhIGen::Q(
-                KhGen::new(
+                KhChainGen::new(
                     State::from([0,1,0]),
-                    KhLabel::from([X]),
+                    KhTensor::from([X]),
                     (0, 0)
                 )
             ), R::one()),
 
                         
             (KhIGen::Q(
-                KhGen::new(
+                KhChainGen::new(
                     State::from([0,0,1]),
-                    KhLabel::from([X]),
+                    KhTensor::from([X]),
                     (0, 0)
                 )
             ), R::one())
@@ -375,9 +375,9 @@ mod tests {
         let c = KhICube::new(&l, &h, &t, false, (0, 0));
 
         let x = KhIGen::Q(
-            KhGen::new(
+            KhChainGen::new(
                 State::from([0,1,0]),
-                KhLabel::from([X]),
+                KhTensor::from([X]),
                 (0, 0)
             )
         );
@@ -385,17 +385,17 @@ mod tests {
 
         assert_eq!(dx, Lc::from_iter([
             (KhIGen::Q(
-                KhGen::new(
+                KhChainGen::new(
                     State::from([1,1,0]),
-                    KhLabel::from([X,X]),
+                    KhTensor::from([X,X]),
                     (0, 0)
                 )
             ), R::one()),
 
             (KhIGen::Q(
-                KhGen::new(
+                KhChainGen::new(
                     State::from([0,1,1]),
-                    KhLabel::from([X,X]),
+                    KhTensor::from([X,X]),
                     (0, 0)
                 )
             ), R::one()),

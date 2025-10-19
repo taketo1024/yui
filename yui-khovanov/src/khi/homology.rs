@@ -1,8 +1,9 @@
 use std::ops::{Index, RangeInclusive};
 use delegate::delegate;
 use yui::{EucRing, EucRingOps};
-use yui_homology::{Grid2, GridTrait, Homology, Summand};
+use yui_homology::{Grid2, GridTrait, Homology, Summand, SummandTrait};
 use yui_link::InvLink;
+use crate::kh::KhChainExt;
 use crate::khi::{KhIComplex, KhIGen};
 use crate::misc::{make_gen_grid, range_of};
 
@@ -32,9 +33,17 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     pub fn h_range(&self) -> RangeInclusive<isize> { 
-        range_of(self.support())
+        range_of(self.support().filter(|&i| 
+            !self[i].is_zero()
+        ))
     }
 
+    pub fn q_range(&self) -> RangeInclusive<isize> {
+        range_of(self.support().flat_map(|i| 
+            self[i].gens().map(|z| z.q_deg())
+        ))
+    }
+    
     pub fn canon_cycles(&self) -> &[KhIChain<R>] { 
         &self.canon_cycles
     }
@@ -126,7 +135,7 @@ mod tests {
         let (h, t) = (R::one(), R::zero());
         let khi = KhIHomology::new(&l, &h, &t, false);
 
-        assert_eq!(khi.h_range(), 0..=4);
+        assert_eq!(khi.h_range(), 0..=1);
         assert_eq!(khi[0].rank(), 2);
         assert_eq!(khi[1].rank(), 2);
         assert_eq!(khi[2].rank(), 0);
@@ -178,7 +187,7 @@ mod tests {
         let (h, t) = (R::one(), R::zero());
         let khi = KhIHomology::new(&l, &h, &t, true);
 
-        assert_eq!(khi.h_range(), 0..=4);
+        assert_eq!(khi.h_range(), 0..=1);
         assert_eq!(khi[0].rank(), 1);
         assert_eq!(khi[1].rank(), 1);
         assert_eq!(khi[2].rank(), 0);
@@ -279,7 +288,7 @@ mod tests_v1 {
         let (h, t) = (R::one(), R::zero());
         let khi = KhIHomology::new_no_simplify(&l, &h, &t, false);
 
-        assert_eq!(khi.h_range(), 0..=4);
+        assert_eq!(khi.h_range(), 0..=1);
         assert_eq!(khi[0].rank(), 2);
         assert_eq!(khi[1].rank(), 2);
         assert_eq!(khi[2].rank(), 0);
@@ -331,7 +340,7 @@ mod tests_v1 {
         let (h, t) = (R::one(), R::zero());
         let khi = KhIHomology::new_no_simplify(&l, &h, &t, true);
 
-        assert_eq!(khi.h_range(), 0..=4);
+        assert_eq!(khi.h_range(), 0..=1);
         assert_eq!(khi[0].rank(), 1);
         assert_eq!(khi[1].rank(), 1);
         assert_eq!(khi[2].rank(), 0);

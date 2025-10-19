@@ -5,7 +5,7 @@ use delegate::delegate;
 use itertools::Itertools;
 use yui::lc::Lc;
 use yui::{EucRing, EucRingOps, Ring, RingOps};
-use yui_homology::{isize2, ChainComplexTrait, Grid1, Grid2, GridTrait, ChainComplex, ChainComplex2, Summand};
+use yui_homology::{isize2, ChainComplexTrait, Grid1, Grid2, GridTrait, ChainComplex, Summand};
 use yui_link::InvLink;
 use yui_matrix::sparse::SpMat;
 
@@ -165,18 +165,6 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         })
     }
 
-    pub fn into_bigraded(self) -> ChainComplex2<KhIGen, R> {
-        // TODO assert h == 0
-        let summands = self.gen_grid();
-
-        ChainComplex2::new(summands, isize2(1, 0), move |idx, x| { 
-            let i = idx.0;
-            let x = KhIChain::from(x.clone());
-            let dx = self.d(i, &x);
-            dx.into_iter().collect()
-        })
-    }
-
     pub fn homology(&self) -> KhIHomology<R>
     where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
         KhIHomology::from(self)
@@ -308,7 +296,7 @@ mod tests {
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
-        let c = KhIComplex::new(&l, &h, &t, false).into_bigraded();
+        let c = KhIComplex::new(&l, &h, &t, false).gen_grid();
 
         assert_eq!(c[(0, 1)].rank(), 1);
         assert_eq!(c[(0, 3)].rank(), 1);
@@ -321,8 +309,6 @@ mod tests {
         assert_eq!(c[(3, 9)].rank(), 1);
         assert_eq!(c[(4, 7)].rank(), 1);
         assert_eq!(c[(4, 9)].rank(), 1);        
-
-        c.check_d_all();
     }
 
     #[test]
@@ -331,7 +317,7 @@ mod tests {
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
-        let c = KhIComplex::new(&l, &h, &t, true).into_bigraded();
+        let c = KhIComplex::new(&l, &h, &t, true).gen_grid();
 
         assert_eq!(c[(0, 2)].rank(), 1);
         assert_eq!(c[(1, 2)].rank(), 1);
@@ -339,8 +325,6 @@ mod tests {
         assert_eq!(c[(3, 6)].rank(), 1);
         assert_eq!(c[(3, 8)].rank(), 1);
         assert_eq!(c[(4, 8)].rank(), 1);
-        
-        c.check_d_all();
     }
 
     #[test]

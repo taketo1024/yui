@@ -97,7 +97,7 @@ where
             ["H", "0,T"].contains(&self.args.c_value.as_str());
 
         let table = if bigraded { 
-            let grid = khi.clone().into_bigraded();
+            let grid = khi.clone().gen_grid();
             match self.args.format {
                 Format::Unicode => grid.display_table("i", "j"),
                 Format::TeX     => grid.tex_table("$\\mathit{KhI}$", " ")

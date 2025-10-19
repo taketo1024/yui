@@ -50,7 +50,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         )
     }
 
-    pub fn into_bigraded(self) -> Grid2<Summand<KhIGen, R>> { 
+    pub fn gen_grid(self) -> Grid2<Summand<KhIGen, R>> { 
         make_gen_grid(self.inner())
     }
 }
@@ -212,7 +212,7 @@ mod tests {
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
-        let khi = KhIHomology::new(&l, &h, &t, false).into_bigraded();
+        let khi = KhIHomology::new(&l, &h, &t, false).gen_grid();
 
         assert_eq!(khi[(0, 1)].rank(), 1);
         assert_eq!(khi[(0, 3)].rank(), 1);
@@ -233,7 +233,7 @@ mod tests {
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
-        let khi = KhIHomology::new(&l, &h, &t, true).into_bigraded();
+        let khi = KhIHomology::new(&l, &h, &t, true).gen_grid();
 
         assert_eq!(khi[(0, 2)].rank(), 1);
         assert_eq!(khi[(1, 2)].rank(), 1);
@@ -365,7 +365,7 @@ mod tests_v1 {
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
-        let khi = KhIHomology::new_no_simplify(&l, &h, &t, false).into_bigraded();
+        let khi = KhIHomology::new_no_simplify(&l, &h, &t, false).gen_grid();
 
         assert_eq!(khi[(0, 1)].rank(), 1);
         assert_eq!(khi[(0, 3)].rank(), 1);
@@ -386,7 +386,7 @@ mod tests_v1 {
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
-        let khi = KhIHomology::new_no_simplify(&l, &h, &t, true).into_bigraded();
+        let khi = KhIHomology::new_no_simplify(&l, &h, &t, true).gen_grid();
 
         assert_eq!(khi[(0, 2)].rank(), 1);
         assert_eq!(khi[(1, 2)].rank(), 1);

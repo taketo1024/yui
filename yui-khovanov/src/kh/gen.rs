@@ -114,6 +114,14 @@ impl Display for KhLabel {
     }
 }
 
+impl Elem for KhLabel {
+    fn math_symbol() -> String {
+        String::from("KhT")
+    }
+}
+
+impl Gen for KhLabel {}
+
 #[auto_ops]
 impl AddAssign<KhLabel> for KhLabel {
     fn add_assign(&mut self, rhs: Self) {

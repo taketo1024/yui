@@ -3,6 +3,8 @@ use num_traits::Zero;
 use yui::lc::{Gen, Lc};
 use yui::{Elem, Ring, RingOps};
 
+use crate::kh::KhLabel;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub enum KhAlgGen { 
     #[default] 
@@ -89,20 +91,33 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn coprod(&self, x: KhAlgGen) -> Vec<(KhAlgGen, KhAlgGen, R)> {
+    pub fn coprod(&self, x: KhAlgGen) -> Lc<KhLabel, R> {
         use KhAlgGen::{I, X};
         let (h, t) = (self.h(), self.t());
+        let tsr = |x, y| KhLabel::from_iter([x, y]);
 
         match x { 
             I => if h.is_zero() { 
-                vec![(X, I, R::one()), (I, X, R::one())]
+                Lc::from_iter([
+                    (tsr(X, I), R::one()), 
+                    (tsr(I, X), R::one())
+                ])
             } else {
-                vec![(X, I, R::one()), (I, X, R::one()), (I, I, -h.clone())]
+                Lc::from_iter([
+                    (tsr(X, I), R::one()), 
+                    (tsr(I, X), R::one()),
+                    (tsr(I, I), -h)
+                ])
             },
             X => if t.is_zero() { 
-                vec![(X, X, R::one())]
+                Lc::from(
+                    (tsr(X, X), R::one()) 
+                )
             } else { 
-                vec![(X, X, R::one()), (I, I, t.clone())]
+                Lc::from_iter([
+                    (tsr(X, X), R::one()), 
+                    (tsr(I, I), t.clone())
+                ])
             }
         }
     }
@@ -112,6 +127,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 pub mod tests {
     use num_traits::Zero;
     use yui::lc::Lc;
+
+    use crate::kh::KhLabel;
 
     use super::{KhAlgGen, KhAlgStr};
  
@@ -136,8 +153,13 @@ pub mod tests {
     fn str_coprod_kh() { 
         use KhAlgGen::{I, X};
         let a = KhAlgStr::new(&0, &0);
-        assert_eq!(a.coprod(I), vec![(X, I, 1), (I, X, 1)]);
-        assert_eq!(a.coprod(X), vec![(X, X, 1)]);
+        assert_eq!(a.coprod(I), Lc::from_iter([
+            (KhLabel::from_iter([X, I]), 1),
+            (KhLabel::from_iter([I, X]), 1),
+        ]));
+        assert_eq!(a.coprod(X), Lc::from(
+            (KhLabel::from_iter([X, X]), 1)
+        ));
     }
     #[test]
     fn str_prod_bn() { 
@@ -153,8 +175,14 @@ pub mod tests {
     fn str_coprod_bn() { 
         use KhAlgGen::{I, X};
         let a = KhAlgStr::new(&1, &0);
-        assert_eq!(a.coprod(I), vec![(X, I, 1), (I, X, 1), (I, I, -1)]);
-        assert_eq!(a.coprod(X), vec![(X, X, 1)]);
+        assert_eq!(a.coprod(I), Lc::from_iter([
+            (KhLabel::from_iter([X, I]), 1),
+            (KhLabel::from_iter([I, X]), 1),
+            (KhLabel::from_iter([I, I]), -1),
+        ]));
+        assert_eq!(a.coprod(X), Lc::from(
+            (KhLabel::from_iter([X, X]), 1)
+        ));
     }
     #[test]
     fn str_prod_lee() { 
@@ -170,7 +198,13 @@ pub mod tests {
     fn str_coprod_lee() { 
         use KhAlgGen::{I, X};
         let a = KhAlgStr::new(&0, &1);
-        assert_eq!(a.coprod(I), vec![(X, I, 1), (I, X, 1)]);
-        assert_eq!(a.coprod(X), vec![(X, X, 1), (I, I, 1)]);
+        assert_eq!(a.coprod(I), Lc::from_iter([
+            (KhLabel::from_iter([X, I]), 1),
+            (KhLabel::from_iter([I, X]), 1),
+        ]));
+        assert_eq!(a.coprod(X), Lc::from_iter([
+            (KhLabel::from_iter([X, X]), 1),
+            (KhLabel::from_iter([I, I]), 1),
+        ]));
     }
 }

@@ -244,11 +244,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             },
             Split(i, (j, k)) => {
                 let x_i = x.label[i];
-                self.str.coprod(x_i).into_iter().map(|(y_j, y_k, a)| { 
+                self.str.coprod(x_i).into_iter().map(|(y, a)| { 
                     let mut label = x.label;
                     label.remove(i);
-                    label.insert(j, y_j);
-                    label.insert(k, y_k);
+                    label.insert(j, y[0]);
+                    label.insert(k, y[1]);
 
                     let t = *to;
                     let y = KhGen::new(t, label, x.deg_shift);

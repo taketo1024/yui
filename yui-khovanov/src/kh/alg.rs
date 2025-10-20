@@ -160,8 +160,8 @@ pub mod tests {
         use KhGen::{I, X};
         let a = KhAlg::new(&0, &0);
         assert_eq!(a.comul(I), Lc::from_iter([
-            (KhTensor::from_iter([X, I]), 1),
-            (KhTensor::from_iter([I, X]), 1),
+            (KhTensor::from([X, I]), 1),
+            (KhTensor::from([I, X]), 1),
         ]));
         assert_eq!(a.comul(X), Lc::from(
             (KhTensor::from_iter([X, X]), 1)
@@ -182,9 +182,9 @@ pub mod tests {
         use KhGen::{I, X};
         let a = KhAlg::new(&1, &0);
         assert_eq!(a.comul(I), Lc::from_iter([
-            (KhTensor::from_iter([X, I]), 1),
-            (KhTensor::from_iter([I, X]), 1),
-            (KhTensor::from_iter([I, I]), -1),
+            (KhTensor::from([X, I]), 1),
+            (KhTensor::from([I, X]), 1),
+            (KhTensor::from([I, I]), -1),
         ]));
         assert_eq!(a.comul(X), Lc::from(
             (KhTensor::from_iter([X, X]), 1)
@@ -205,12 +205,35 @@ pub mod tests {
         use KhGen::{I, X};
         let a = KhAlg::new(&0, &1);
         assert_eq!(a.comul(I), Lc::from_iter([
-            (KhTensor::from_iter([X, I]), 1),
-            (KhTensor::from_iter([I, X]), 1),
+            (KhTensor::from([X, I]), 1),
+            (KhTensor::from([I, X]), 1),
         ]));
         assert_eq!(a.comul(X), Lc::from_iter([
-            (KhTensor::from_iter([X, X]), 1),
-            (KhTensor::from_iter([I, I]), 1),
+            (KhTensor::from([X, X]), 1),
+            (KhTensor::from([I, I]), 1),
         ]));
+    }
+
+    #[test]
+    fn mul_x_at() { 
+        use KhGen::{I, X};
+        let a = KhAlg::new(&2, &1);
+        let x = KhTensor::from_iter([I, X, I]);
+
+        assert_eq!(
+            x.apply_at(0, |&x| a.mul(x, X)), 
+            Lc::from(KhTensor::from_iter([X, X, I]))
+        );
+        assert_eq!(
+            x.apply_at(1, |&x| a.mul(x, X)), 
+            Lc::from_iter([
+                (KhTensor::from([I, X, I]), 2),
+                (KhTensor::from([I, I, I]), 1),
+            ]
+        ));
+        assert_eq!(
+            x.apply_at(2, |&x| a.mul(x, X)), 
+            Lc::from(KhTensor::from_iter([I, X, X]))
+        );
     }
 }

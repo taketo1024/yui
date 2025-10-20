@@ -3,7 +3,7 @@ use std::ops::{Add, AddAssign, Index};
 use itertools::{join, Itertools};
 use auto_impl_ops::auto_ops;
 use yui::util::format::subscript;
-use yui::{Elem, Ring, RingOps};
+use yui::{AddMon, Elem, Ring, RingOps};
 use yui::bitseq::{Bit, BitSeq};
 use yui::lc::{Gen, Lc};
 use yui_link::State;
@@ -120,6 +120,30 @@ impl KhTensor {
     pub fn generate(len: usize) -> impl Iterator<Item = Self> { 
         BitSeq::generate(len).map(KhTensor)
     }
+
+    pub fn apply_at<F, R>(&self, i: usize, f: F) -> Lc<KhTensor, R> 
+    where F: Fn(&KhGen) -> Lc<KhGen, R>, R: Ring, for<'x> &'x R: RingOps<R> { 
+        assert!(i < self.len());
+
+        f(&self[i]).into_map_gens(|y| { 
+            let mut t = self.clone();
+            t.set(i, y);
+            t
+        })
+    }
+
+    pub fn apply_each<F, R>(&self, f: F) -> Lc<KhTensor, R> 
+    where F: Fn(&KhGen) -> Lc<KhGen, R>, R: Ring, for<'x> &'x R: RingOps<R> { 
+        let l = self.len();
+        let init = Lc::from(self.clone());
+
+        (0..l).fold(init, |res, i| { 
+            Lc::sum(res.iter().map(|(x, r)|
+                x.apply_at(i, &f) * r
+            ))
+        })
+    }
+
 }
 
 impl From<KhGen> for KhTensor {
@@ -211,6 +235,20 @@ impl KhChainGen {
         let r = self.tensor.len() as isize;
         let s = self.state.weight() as isize;
         q0 + d + r + s
+    }
+
+    pub fn apply_at<F, R>(&self, i: usize, f: F) -> KhChain<R> 
+    where F: Fn(&KhGen) -> Lc<KhGen, R>, R: Ring, for<'x> &'x R: RingOps<R> { 
+        self.tensor.apply_at(i, f).into_map_gens(|t| { 
+            Self::new(self.state, t, self.deg_shift)
+        })
+    }
+
+    pub fn apply_each<F, R>(&self, f: F) -> KhChain<R>  
+    where F: Fn(&KhGen) -> Lc<KhGen, R>, R: Ring, for<'x> &'x R: RingOps<R> { 
+        self.tensor.apply_each(f).into_map_gens(|t| { 
+            Self::new(self.state, t, self.deg_shift)
+        })
     }
 }
 

@@ -14,11 +14,11 @@ pub enum CrossingType {
 }
 
 impl CrossingType { 
-    pub fn mirror(self) -> CrossingType {
+    pub fn cc(&mut self) {
         match self { 
-            Xm => X,
-            X => Xm,
-            other => other
+            Xm => *self = X,
+            X  => *self = Xm,
+            _ => ()
         }
     }
 }
@@ -71,11 +71,8 @@ impl Crossing {
         )
     }
 
-    pub fn mirror(&self) -> Self { 
-        Self { 
-            ctype: self.ctype.mirror(),
-            edges: self.edges.clone()
-        }
+    pub fn cc(&mut self) { 
+        self.ctype.cc()
     }
 
     pub fn is_adj_to(&self, x: &Crossing) -> bool { 
@@ -187,16 +184,16 @@ mod tests {
 
     #[test]
     fn crossing_mirror() {
-        let c = a_crossing(X).mirror();
+        let c = a_crossing(X).clone_and(|c| c.cc());
         assert_eq!(c.ctype(), Xm);
 
-        let c = a_crossing(Xm).mirror();
+        let c = a_crossing(Xm).clone_and(|c| c.cc());
         assert_eq!(c.ctype(), X);
 
-        let c = a_crossing(H).mirror();
+        let c = a_crossing(H).clone_and(|c| c.cc());
         assert_eq!(c.ctype(), H);
 
-        let c = a_crossing(V).mirror();
+        let c = a_crossing(V).clone_and(|c| c.cc());
         assert_eq!(c.ctype(), V);
     }
 

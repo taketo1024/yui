@@ -186,7 +186,7 @@ impl Link {
         let j = self.crossing_index(i);
 
         let data = self.data.clone_and(|data|
-            data[j] = data[j].mirror()
+            data[j].cc()
         );
         Link { data }
     }
@@ -210,8 +210,9 @@ impl Link {
     }
 
     pub fn mirror(&self) -> Self {
-        let data = self.data.iter().map(|x| x.mirror()).collect();
-        Link { data }
+        self.clone_and(|l|
+            l.data.iter_mut().for_each(|x| x.cc())
+        )
     }
 
     pub fn edges(&self) -> HashSet<Edge> {

@@ -57,7 +57,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let deg_shift = KhComplex::deg_shift_for(l, reduced);
 
         let mut b = Self::init(h, t, deg_shift, base_pt);
-        b.set_crossings(l.data().clone());
+        b.set_crossings(l.nodes().clone());
 
         if t.is_zero() && l.is_knot() {
             let canon = Self::make_canon_cycles(l, base_pt);

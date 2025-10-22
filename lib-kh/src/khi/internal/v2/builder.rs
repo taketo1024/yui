@@ -47,12 +47,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn new(l: &InvLink, h: &R, t: &R, reduced: bool) -> SymTngBuilder<R> { 
-        assert!(l.link().data().iter().all(|x| !x.is_resolved()));
+        assert!(l.link().nodes().iter().all(|x| !x.is_resolved()));
         assert!(!reduced || l.base_pt().is_some());
 
         let base_pt = if reduced { l.base_pt() } else { None };
         let inner = TngComplexBuilder::new(l.link(), h, t, base_pt);
-        let x_map = l.link().data().iter().map(|x| (x.clone(), l.inv_x(x).clone())).collect();
+        let x_map = l.link().nodes().iter().map(|x| 
+            (x.clone(), l.inv_x(x).clone())
+        ).collect();
         let e_map = l.link().edges().iter().map(|&e| (e, l.inv_e(e))).collect();
 
         Self::new_impl(inner, x_map, e_map)

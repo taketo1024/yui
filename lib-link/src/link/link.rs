@@ -25,46 +25,54 @@ pub type XCode = [Edge; 4];
 
 #[derive(Debug, Clone)]
 pub struct Link { 
-    data: Vec<Node>
+    nodes: Vec<Node>
 }
 
 impl Link {
-    pub fn new(data: Vec<Node>) -> Self { 
-        let l = Self { data };
+    pub fn new(nodes: Vec<Node>) -> Self { 
+        let l = Self { nodes };
         l.validate();
         l
     }
 
     fn validate(&self) { 
-        assert_eq!(self.edges().len(), self.data.len() * 2, "Invalid data.");
+        assert_eq!(self.edges().len(), self.nodes.len() * 2, "Invalid data.");
         assert!(self.components().iter().all(|c| c.is_circle()), "Non-closed components.")
     }
 
     pub fn from_pd_code<I>(pd_code: I) -> Self
     where I: IntoIterator<Item = XCode> { 
-        let data = pd_code.into_iter().map(Node::from_pd_code).collect();
-        Self::new(data)
+        let nodes = pd_code.into_iter().map(Node::from_pd_code).collect();
+        Self::new(nodes)
     }
 
     pub fn empty() -> Link {
-        Link { data: vec![] }
+        Link { nodes: vec![] }
     }
 
     pub fn is_empty(&self) -> bool {
-        self.data.is_empty()
+        self.nodes.is_empty()
     }
 
     pub fn is_knot(&self) -> bool { 
         self.components().len() == 1
     }
 
-    pub fn data(&self) -> &Vec<Node> { 
-        &self.data
+    pub fn nodes(&self) -> &Vec<Node> { 
+        &self.nodes
+    }
+
+    pub fn node(&self, i: usize) -> &Node { 
+        &self.nodes[i]
+    }
+
+    pub fn node_mut(&mut self, i: usize) -> &mut Node { 
+        &mut self.nodes[i]
     }
 
     pub fn crossing_num(&self) -> usize { 
-        self.data.iter()
-            .filter(|x| !x.is_resolved())
+        self.nodes.iter()
+            .filter(|x| x.is_crossing())
             .count()
     }
 
@@ -83,19 +91,19 @@ impl Link {
     pub fn crossing_signs(&self) -> Vec<Sign> {
         use NodeType::{X, Xm};
 
-        let n = self.data.len();
+        let n = self.nodes.len();
         let mut signs = vec![None; n];
         let mut remain = self.edges();
 
         for j0 in [0, 1, 2] { 
             for i0 in 0..n {
-                let start_edge = self.data[i0].edge(j0);
+                let start_edge = self.nodes[i0].edge(j0);
                 if !remain.remove(&start_edge) { 
                     continue 
                 }
 
                 self.traverse_from((i0, j0), |i, j| { 
-                    let c = &self.data[i];
+                    let c = &self.nodes[i];
                     let e = c.edge(j);
                     remain.remove(&e);
 
@@ -121,14 +129,14 @@ impl Link {
     }
     
     pub fn components(&self) -> Vec<Path> {
-        let n = self.data.len();
+        let n = self.nodes.len();
 
         let mut comps = vec![];
         let mut remain = self.edges();
 
         for j0 in [0, 1, 2] {
             for i0 in 0..n {
-                let start_edge = self.data[i0].edge(j0);
+                let start_edge = self.node(i0).edge(j0);
                 if !remain.remove(&start_edge) { 
                     continue 
                 }
@@ -136,7 +144,7 @@ impl Link {
                 let mut edges = vec![];
 
                 self.traverse_from((i0, j0), |i, j| { 
-                    let e = self.data[i].edge(j);
+                    let e = self.node(i).edge(j);
                     edges.push(e);
                     remain.remove(&e);
                 });
@@ -156,10 +164,10 @@ impl Link {
         comps
     }
 
-    // index of data for the i-th `actual' crossing.
+    // node-index for the i-th crossing.
     fn crossing_index(&self, i: usize) -> usize {
-        let n = self.data.len();
-        let Some(k) = (0..n).filter(|&j| !self.data[j].is_resolved()).skip(i).next() else { 
+        let n = self.nodes.len();
+        let Some(k) = (0..n).filter(|&j| self.node(j).is_crossing()).skip(i).next() else { 
             panic!("Index exceeds number of crossings.")
         };
         k
@@ -167,21 +175,21 @@ impl Link {
 
     pub fn crossing_at(&self, i: usize) -> &Node {
         let j = self.crossing_index(i);
-        &self.data[j]
+        self.node(j)
     }
 
     pub fn crossing_at_mut(&mut self, i: usize) -> &mut Node {
         let j = self.crossing_index(i);
-        &mut self.data[j]
+        self.node_mut(j)
     }
 
     pub fn crossing_change(&self, i: usize) -> Self { 
         let j = self.crossing_index(i);
 
-        let data = self.data.clone_and(|data|
-            data[j].cc()
+        let nodes = self.nodes.clone_and(|nodes|
+            nodes[j].cc()
         );
-        Link { data }
+        Link::new(nodes)
     }
 
     pub fn resolve_crossing(&self, i: usize, r: Bit) -> Self {
@@ -202,16 +210,16 @@ impl Link {
 
     pub fn mirror(&self) -> Self {
         self.clone_and(|l|
-            l.data.iter_mut().for_each(|x| x.cc())
+            l.nodes.iter_mut().for_each(|x| x.cc())
         )
     }
 
     pub fn edges(&self) -> HashSet<Edge> {
-        self.data.iter().flat_map(|x| x.edges()).cloned().collect()
+        self.nodes.iter().flat_map(|x| x.edges()).cloned().collect()
     }
 
     pub fn first_edge(&self) -> Option<Edge> { 
-        let x = self.data.first()?;
+        let x = self.nodes.first()?;
         x.edges().iter().min().cloned()
     }
 
@@ -229,7 +237,7 @@ impl Link {
     fn traverse_from<F>(&self, start: (usize, usize), mut f:F) where
         F: FnMut(usize, usize)
     {
-        let n = self.data.len();
+        let n = self.nodes.len();
         assert!((0..n).contains(&start.0));
         assert!((0..4).contains(&start.1));
 
@@ -238,7 +246,7 @@ impl Link {
         let (mut i, mut j) = start;
 
         loop {
-            let c = &self.data[i];
+            let c = self.node(i);
             let k = c.traverse_inner(j);
             let next = self.traverse_outer(i, k);
 
@@ -253,10 +261,10 @@ impl Link {
     }
 
     fn traverse_outer(&self, c_index:usize, e_index:usize) -> (usize, usize) {
-        let e = &self.data[c_index].edge(e_index);
+        let e = self.nodes[c_index].edge(e_index);
 
-        for (i, c) in self.data.iter().enumerate() { 
-            for (j, f) in c.edges().iter().enumerate() { 
+        for (i, c) in self.nodes.iter().enumerate() { 
+            for (j, &f) in c.edges().iter().enumerate() { 
                 if e == f && (c_index != i || (c_index == i && e_index != j)) { 
                     return (i, j)
                 }
@@ -313,7 +321,7 @@ impl Link {
 
 impl Display for Link {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "L[{}]", self.data.iter().map(|x| x.to_string()).join(", "))
+        write!(f, "L[{}]", self.nodes.iter().map(|x| x.to_string()).join(", "))
     }
 }
 
@@ -324,16 +332,16 @@ mod tests {
 
     #[test]
     fn link_init() { 
-        let l = Link { data: vec![] };
-        assert_eq!(l.data.len(), 0);
+        let l = Link { nodes: vec![] };
+        assert_eq!(l.nodes.len(), 0);
     }
 
     #[test]
     fn link_from_pd_code() { 
         let pd_code = [[0,0,1,1]];
         let l = Link::from_pd_code(pd_code);
-        assert_eq!(l.data.len(), 1);
-        assert_eq!(l.data[0].ntype(), X);
+        assert_eq!(l.nodes.len(), 1);
+        assert_eq!(l.node(0).ntype(), X);
     }
 
     #[test]
@@ -429,10 +437,10 @@ mod tests {
     fn link_mirror() { 
         let pd_code = [[0,0,1,1]];
         let l = Link::from_pd_code(pd_code);
-        assert_eq!(l.data[0].ntype(), X);
+        assert_eq!(l.node(0).ntype(), X);
 
         let l = l.mirror();
-        assert_eq!(l.data[0].ntype(), Xm);
+        assert_eq!(l.node(0).ntype(), Xm);
     }
 
     #[test]
@@ -527,7 +535,7 @@ mod tests {
         let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]);
         let l2 = l.crossing_change(1);
 
-        assert_eq!(l.data[1],  Node::new(NodeType::X, [3,6,4,1]));
-        assert_eq!(l2.data[1], Node::new(NodeType::Xm, [3,6,4,1]));
+        assert_eq!(l.node(1),  &Node::new(NodeType::X, [3,6,4,1]));
+        assert_eq!(l2.node(1), &Node::new(NodeType::Xm, [3,6,4,1]));
     }
 }

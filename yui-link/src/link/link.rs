@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::fmt::Display;
 use itertools::Itertools;
-use yui::Sign;
+use yui::{CloneAnd, Sign};
 use yui::bitseq::Bit;
 
 use super::{Crossing, CrossingType, Path};
@@ -189,27 +189,29 @@ impl Link {
 
     pub fn crossing_changed_at(&self, i: usize) -> Self { 
         let j = self.crossing_index(i);
-        let mut data = self.data.clone();
-        data[j] = data[j].mirror();
+
+        let data = self.data.clone_and(|data|
+            data[j] = data[j].mirror()
+        );
         Link { data }
     }
 
     pub fn resolved_at(&self, i: usize, r: Bit) -> Self {
         debug_assert!(i < self.crossing_num());
 
-        let mut l = self.clone();
-        l.crossing_at_mut(i).resolve(r);
-        l
+        self.clone_and(|l|
+            l.crossing_at_mut(i).resolve(r)
+        )
     }
 
     pub fn resolved_by(&self, s: &State) -> Self {
         debug_assert!(s.len() == self.crossing_num());
 
-        let mut l = self.clone();
-        for r in s.iter() {
-            l.crossing_at_mut(0).resolve(r)
-        }
-        l
+        self.clone_and(|l|
+            for r in s.iter() {
+                l.crossing_at_mut(0).resolve(r)
+            }
+        )
     }
 
     pub fn mirror(&self) -> Self {

@@ -1,5 +1,5 @@
 use sprs::PermView;
-use yui::{RingOps, Ring};
+use yui::{CloneAnd, Ring, RingOps};
 use crate::sparse::{SpMat, MatTrait, SpVec};
 
 #[derive(Clone, Debug)]
@@ -81,9 +81,9 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
     }
 
     pub fn merged(&self, other: &Trans<R>) -> Self { 
-        let mut res = self.clone();
-        res.merge(other.clone());
-        res
+        self.clone_and(|t| 
+            t.merge(other.clone())
+        )
     }
 
     pub fn forward_mat(&self) -> SpMat<R> {
@@ -137,10 +137,9 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
                 (j, i, R::one())
             )
         );
-
-        let mut sub = self.clone();
-        sub.append(f, b);
-        sub
+        self.clone_and(|sub|
+            sub.append(f, b)
+        )
     }
 }
 

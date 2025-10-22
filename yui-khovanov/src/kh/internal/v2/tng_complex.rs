@@ -8,7 +8,7 @@ use itertools::Itertools;
 use num_traits::Zero;
 use rayon::prelude::*;
 use cartesian::cartesian;
-use yui::{Ring, RingOps, Sign};
+use yui::{CloneAnd, Ring, RingOps, Sign};
 use yui_homology::{ChainComplex, Summand, Grid1};
 use yui_link::{Crossing, Edge, State};
 use yui::bitseq::Bit;
@@ -285,10 +285,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let in_edges = self.vertex(k).in_edges.clone(); 
         let out_edges = self.vertex(k).out_edges.keys().cloned().collect_vec();
 
-        let mut v_new = self.vertex(k).clone();
-        v_new.key = k_new;
-        v_new.in_edges.clear();
-        v_new.out_edges.clear();
+        let v_new = self.vertex(k).clone_and(|v| { 
+            v.key = k_new;
+            v.in_edges.clear();
+            v.out_edges.clear();
+        });
 
         self.add_vertex(v_new);
 

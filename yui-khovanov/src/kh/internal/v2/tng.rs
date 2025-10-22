@@ -3,6 +3,7 @@ use std::fmt::Display;
 use std::hash::Hash;
 use delegate::delegate;
 use itertools::Itertools;
+use yui::CloneAnd;
 use yui_link::{Edge, Crossing, Path};
 
 #[derive(Debug, Clone, Eq)]
@@ -199,9 +200,9 @@ impl Tng {
     }
 
     pub fn connected(&self, other: &Self) -> Self { 
-        let mut res = self.clone();
-        res.connect(other.clone());
-        res
+        self.clone_and(|tng| 
+            tng.connect(other.clone())
+        )
     }
 
     pub fn find_comp<F>(&self, pred: F) -> Option<usize>

@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use yui::bitseq::Bit;
+use yui::CloneAnd;
 
 use crate::Path;
 use super::Edge;
@@ -65,9 +66,9 @@ impl Crossing {
     }
 
     pub fn resolved(&self, r: Bit) -> Self { 
-        let mut x = self.clone();
-        x.resolve(r);
-        x
+        self.clone_and(|x|
+            x.resolve(r)
+        )
     }
 
     pub fn mirror(&self) -> Self { 

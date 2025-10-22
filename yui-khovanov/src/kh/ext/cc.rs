@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use yui::bitseq::Bit;
 use yui::lc::Lc;
-use yui::{Ring, RingOps, Sign};
+use yui::{CloneAnd, Ring, RingOps, Sign};
 use yui_homology::ChainMap;
 use yui_link::{Link, Path, State};
 use num_traits::Zero;
@@ -31,9 +31,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 }
 
                 let e = Sign::from_parity( count_1s(&x.state, i) );
-                let mut y = x.clone();
-                y.state.set_1(i);
-                y.deg_shift = c2_deg_shift;
+                let y = x.clone_and(|y| { 
+                    y.state.set_1(i);
+                    y.deg_shift = c2_deg_shift;
+                });
 
                 KhChain::from(y) * R::from_sign(e)
             })

@@ -3,7 +3,7 @@ use std::ops::{Add, AddAssign, Index};
 use itertools::{join, Itertools};
 use auto_impl_ops::auto_ops;
 use yui::util::format::subscript;
-use yui::{AddMon, Elem, Ring, RingOps};
+use yui::{AddMon, CloneAnd, Elem, Ring, RingOps};
 use yui::bitseq::{Bit, BitSeq};
 use yui::lc::{Gen, Lc};
 use yui_link::State;
@@ -125,11 +125,9 @@ impl KhTensor {
     where F: Fn(&KhGen) -> Lc<KhGen, R>, R: Ring, for<'x> &'x R: RingOps<R> { 
         assert!(i < self.len());
 
-        f(&self[i]).into_map_gens(|y| { 
-            let mut t = self.clone();
-            t.set(i, y);
-            t
-        })
+        f(&self[i]).into_map_gens(|y| 
+            self.clone_and(|t| t.set(i, y))
+        )
     }
 
     pub fn apply_each<F, R>(&self, f: F) -> Lc<KhTensor, R> 

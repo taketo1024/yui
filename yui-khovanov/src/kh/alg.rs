@@ -1,6 +1,6 @@
 use num_traits::Zero;
 use yui::lc::Lc;
-use yui::{Ring, RingOps};
+use yui::{CloneAnd, Ring, RingOps};
 
 use crate::kh::r#gen::KhGen;
 use crate::kh::KhTensor;
@@ -59,12 +59,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         };
         let k = out_index;
 
-        self.mul(x[i], x[j]).into_map_gens(|y| { 
-            let mut t = x.clone();
-            t.remove(j);
-            t.remove(i);
-            t.insert(k, y);
-            t
+        self.mul(x[i], x[j]).into_map_gens(|a| { 
+            x.clone_and(|y| {
+                y.remove(j);
+                y.remove(i);
+                y.insert(k, a);
+            })
         })
     }
 
@@ -109,13 +109,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             (out_index.1, out_index.0)
         };
 
-        self.comul(x[i]).into_map_gens(|y| { 
-            let mut t = x.clone();
-            t.remove(i);
-            t.insert(j, y[0]);
-            t.insert(k, y[1]);
-            t
-        })
+        self.comul(x[i]).into_map_gens(|a| 
+            x.clone_and(|y| { 
+                y.remove(i);
+                y.insert(j, a[0]);
+                y.insert(k, a[1]);
+            })
+        )
     }
 
     pub fn sigma(&self, x: &KhGen) -> Lc<KhGen, R> {

@@ -7,7 +7,7 @@ use auto_impl_ops::auto_ops;
 use itertools::Itertools;
 use num_traits::Zero;
 use cartesian::cartesian;
-use yui::{AddMon, Elem, Ring, RingOps};
+use yui::{AddMon, CloneAnd, Elem, Ring, RingOps};
 use yui::lc::{Gen, Lc};
 use yui::poly::Var2;
 use yui_link::{Edge, Crossing};
@@ -644,9 +644,9 @@ impl Cob {
     }
 
     pub fn connected(&self, other: &Cob) -> Self {
-        let mut res = self.clone();
-        res.connect(other.clone());
-        res
+        self.clone_and(|c|
+            c.connect(other.clone())
+        )
     }
 
     pub fn is_stackable(&self, other: &Self) -> bool { 
@@ -1234,14 +1234,16 @@ mod tests {
         assert!(!c1.is_invertible());
         assert_eq!(c1.inv(), None);
 
-        let mut c2 = c0.clone();
-        c2.comps[0].add_dot(Dot::X);
+        let c2 = c0.clone_and(|c2|
+            c2.comps[0].add_dot(Dot::X)
+        );
 
         assert!(!c2.is_invertible());
         assert_eq!(c2.inv(), None);
 
-        let mut c3 = c0.clone();
-        c3.comps[0].genus += 1;
+        let c3 = c0.clone_and(|c3|
+            c3.comps[0].genus += 1
+        );
 
         assert!(!c3.is_invertible());
         assert_eq!(c3.inv(), None);
@@ -1330,13 +1332,15 @@ mod tests {
         let c0 = Cob::id(&c1.src());
         let c2 = Cob::id(&c1.tgt());
 
-        let mut e = c1.clone();
-        e.stack(c2);
+        let e = c1.clone_and(|e|
+            e.stack(c2)
+        );
 
         assert_eq!(e, c1);
 
-        let mut e = c0.clone();
-        e.stack(c1.clone());
+        let e = c0.clone_and(|e|
+            e.stack(c1.clone())
+        );
         assert_eq!(e, c1);
     }
    

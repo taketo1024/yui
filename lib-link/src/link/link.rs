@@ -130,12 +130,13 @@ impl Link {
         let n = self.data.len();
 
         let mut comps = vec![];
-        let mut passed: HashSet<Edge> = HashSet::new();
+        let mut remain = self.edges();
 
         let mut traverse = |j0: usize| {
             for i0 in 0..n {
                 let start_edge = self.data[i0].edge(j0);
-                if passed.contains(&start_edge) { 
+
+                if !remain.remove(&start_edge) { 
                     continue 
                 }
 
@@ -144,10 +145,10 @@ impl Link {
                 self.traverse_from((i0, j0), |i, j| { 
                     let e = self.data[i].edge(j);
                     edges.push(e);
-                    passed.insert(e);
+                    remain.remove(&e);
                 });
 
-                let c =Path::circ(edges);
+                let c = Path::circ(edges);
 
                 comps.push(c);
             }
@@ -156,6 +157,8 @@ impl Link {
         for i in [0, 1, 2] { 
             traverse(i);
         }
+
+        assert!(remain.is_empty());
 
         comps
     }
@@ -168,9 +171,9 @@ impl Link {
         for (j, x) in self.data.iter().enumerate() {
             if !x.is_resolved() {
                 if i > 0 { 
-                    i -= 1;
-                } else { 
-                    return j
+            i -= 1;
+        } else { 
+            return j
                 }
             }
         }

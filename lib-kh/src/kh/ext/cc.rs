@@ -14,7 +14,7 @@ type KhChainMap<R> = ChainMap<isize, KhChainGen, KhChainGen, R>;
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn cc_pair(l: &Link, h: &R, t: &R, reduced: bool, i: usize) -> (KhComplex<R>, KhComplex<R>) {
-        let l2 = l.crossing_changed_at(i);
+        let l2 = l.crossing_change(i);
         let c1 = KhComplex::new_no_simplify(l, h, t, reduced);
         let c2 = KhComplex::new_no_simplify(&l2, h, t, reduced);
         (c1, c2)
@@ -115,7 +115,7 @@ mod tests {
     #[test]
     fn test_cc0_pos_to_neg() { 
         let i = 0;
-        let l = Link::load("5_1").unwrap().crossing_changed_at(i);
+        let l = Link::load("5_1").unwrap().crossing_change(i);
         let (h, t) = (0, 0);
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, false, i);
@@ -129,7 +129,7 @@ mod tests {
     #[test]
     fn test_cc0_neg_to_pos() { 
         let i = 0;
-        let l = Link::load("5_1").unwrap().mirror().crossing_changed_at(i);
+        let l = Link::load("5_1").unwrap().mirror().crossing_change(i);
         let (h, t) = (0, 0);
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, false, i);
@@ -143,7 +143,7 @@ mod tests {
     #[test]
     fn test_cc1_pos_to_neg() { 
         let i = 0;
-        let l = Link::load("5_1").unwrap().crossing_changed_at(i);
+        let l = Link::load("5_1").unwrap().crossing_change(i);
         let (h, t) = (0, 0);
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, false, i);
@@ -157,7 +157,7 @@ mod tests {
     #[test]
     fn test_cc1_neg_to_pos() { 
         let i = 0;
-        let l = Link::load("5_1").unwrap().mirror().crossing_changed_at(i);
+        let l = Link::load("5_1").unwrap().mirror().crossing_change(i);
         let (h, t) = (0, 0);
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, false, i);
@@ -171,7 +171,7 @@ mod tests {
     #[test]
     fn test_red_cc0_pos_to_neg() { 
         let i = 0;
-        let l = Link::load("5_1").unwrap().crossing_changed_at(i);
+        let l = Link::load("5_1").unwrap().crossing_change(i);
         let (h, t) = (0, 0);
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, true, i);
@@ -185,7 +185,7 @@ mod tests {
     #[test]
     fn test_red_cc0_neg_to_pos() { 
         let i = 0;
-        let l = Link::load("5_1").unwrap().mirror().crossing_changed_at(i);
+        let l = Link::load("5_1").unwrap().mirror().crossing_change(i);
         let (h, t) = (0, 0);
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, true, i);
@@ -199,7 +199,7 @@ mod tests {
     #[test]
     fn test_red_cc1_pos_to_neg() { 
         let i = 0;
-        let l = Link::load("5_1").unwrap().crossing_changed_at(i);
+        let l = Link::load("5_1").unwrap().crossing_change(i);
         let (h, t) = (0, 0);
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, true, i);
@@ -213,7 +213,7 @@ mod tests {
     #[test]
     fn test_red_cc1_neg_to_pos() { 
         let i = 0;
-        let l = Link::load("5_1").unwrap().mirror().crossing_changed_at(i);
+        let l = Link::load("5_1").unwrap().mirror().crossing_change(i);
         let (h, t) = (0, 0);
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, true, i);
@@ -229,7 +229,7 @@ mod tests {
         type P = Poly2<'h', 't', i64>;
 
         let i = 0;
-        let l = Link::load("5_1").unwrap().crossing_changed_at(i);
+        let l = Link::load("5_1").unwrap().crossing_change(i);
         let (h, t) = (P::variable(0), P::variable(1));
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, false, i);
@@ -245,7 +245,7 @@ mod tests {
         type P = Poly2<'h', 't', i64>;
 
         let i = 0;
-        let l = Link::load("5_1").unwrap().mirror().crossing_changed_at(i);
+        let l = Link::load("5_1").unwrap().mirror().crossing_change(i);
         let (h, t) = (P::variable(0), P::variable(1));
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, false, i);

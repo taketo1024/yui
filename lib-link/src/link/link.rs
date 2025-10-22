@@ -182,7 +182,7 @@ impl Link {
         &mut self.data[j]
     }
 
-    pub fn crossing_changed_at(&self, i: usize) -> Self { 
+    pub fn crossing_change(&self, i: usize) -> Self { 
         let j = self.crossing_index(i);
 
         let data = self.data.clone_and(|data|
@@ -191,16 +191,14 @@ impl Link {
         Link { data }
     }
 
-    pub fn resolved_at(&self, i: usize, r: Bit) -> Self {
-        debug_assert!(i < self.crossing_num());
-
+    pub fn resolve_crossing(&self, i: usize, r: Bit) -> Self {
         self.clone_and(|l|
             l.crossing_at_mut(i).resolve(r)
         )
     }
 
-    pub fn resolved_by(&self, s: &State) -> Self {
-        debug_assert!(s.len() == self.crossing_num());
+    pub fn resolve_all_crossings(&self, s: &State) -> Self {
+        assert!(s.len() == self.crossing_num());
 
         self.clone_and(|l|
             for r in s.iter() {
@@ -232,7 +230,7 @@ impl Link {
     }
 
     pub fn seifert_circles(&self) -> Vec<Path> { 
-        self.resolved_by(&self.ori_pres_state()).components()
+        self.resolve_all_crossings(&self.ori_pres_state()).components()
     }
 
     fn traverse_from<F>(&self, start: (usize, usize), mut f:F) where
@@ -304,7 +302,7 @@ impl Link {
     }
 
     pub fn unknot() -> Link { 
-        Link::from_pd_code([[0, 1, 1, 0]]).resolved_at(0, Bit::Bit0)
+        Link::from_pd_code([[0, 1, 1, 0]]).resolve_crossing(0, Bit::Bit0)
     }
 
     pub fn trefoil() -> Link { 
@@ -406,7 +404,7 @@ mod tests {
         assert_eq!(l.crossing_signs(), vec![Sign::Neg]);
 
         let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code).resolved_at(0, Bit::Bit0);
+        let l = Link::from_pd_code(pd_code).resolve_crossing(0, Bit::Bit0);
         assert_eq!(l.crossing_signs(), vec![]);
     }
 
@@ -421,7 +419,7 @@ mod tests {
         assert_eq!(l.writhe(), -1);
 
         let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code).resolved_at(0, Bit::Bit0);
+        let l = Link::from_pd_code(pd_code).resolve_crossing(0, Bit::Bit0);
         assert_eq!(l.writhe(), 0);
 
     }
@@ -448,7 +446,7 @@ mod tests {
     fn link_resolve() {
         let s = State::from([0, 0, 0]);
         let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]) // trefoil
-            .resolved_by(&s);
+            .resolve_all_crossings(&s);
 
         let comps = l.components();
         assert_eq!(comps.len(), 3);
@@ -456,7 +454,7 @@ mod tests {
 
         let s = State::from([1, 1, 1]);
         let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]) // trefoil
-            .resolved_by(&s);
+            .resolve_all_crossings(&s);
 
         let comps = l.components();
         assert_eq!(comps.len(), 2);
@@ -534,7 +532,7 @@ mod tests {
     #[test]
     fn crossing_change() { 
         let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]);
-        let l2 = l.crossing_changed_at(1);
+        let l2 = l.crossing_change(1);
 
         assert_eq!(l.data[1],  Crossing::new(CrossingType::X, [3,6,4,1]));
         assert_eq!(l2.data[1], Crossing::new(CrossingType::Xm, [3,6,4,1]));

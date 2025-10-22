@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::fmt::Display;
 use itertools::Itertools;
 use yui::Sign;
 use yui::bitseq::Bit;
@@ -160,7 +161,7 @@ impl Link {
 
     // index of data for the i-th `actual' crossing.
     fn crossing_index(&self, i: usize) -> usize {
-        debug_assert!(i < self.crossing_num());
+        assert!(i < self.crossing_num());
 
         let mut i = i;
         for (j, x) in self.data.iter().enumerate() {
@@ -184,6 +185,13 @@ impl Link {
     pub fn crossing_at_mut(&mut self, i: usize) -> &mut Crossing {
         let j = self.crossing_index(i);
         &mut self.data[j]
+    }
+
+    pub fn crossing_changed_at(&self, i: usize) -> Self { 
+        let j = self.crossing_index(i);
+        let mut data = self.data.clone();
+        data[j] = data[j].mirror();
+        Link { data }
     }
 
     pub fn resolved_at(&self, i: usize, r: Bit) -> Self {
@@ -319,6 +327,12 @@ impl Link {
 
     pub fn hopf_link() -> Link { 
         Link::from_pd_code([[4,1,3,2],[2,3,1,4]])
+    }
+}
+
+impl Display for Link {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "L[{}]", self.data.iter().map(|x| x.to_string()).join(", "))
     }
 }
 
@@ -549,5 +563,14 @@ mod tests {
 
         let l = l.unwrap();
         assert_eq!(l.crossing_num(), 3);
+    }
+
+    #[test]
+    fn crossing_change() { 
+        let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]);
+        let l2 = l.crossing_changed_at(1);
+
+        assert_eq!(l.data[1],  Crossing::new(CrossingType::X, [3,6,4,1]));
+        assert_eq!(l2.data[1], Crossing::new(CrossingType::Xm, [3,6,4,1]));
     }
 }

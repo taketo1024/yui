@@ -4,7 +4,7 @@ use std::hash::Hash;
 use delegate::delegate;
 use itertools::Itertools;
 use yui::CloneAnd;
-use yui_link::{Edge, Crossing, Path};
+use yui_link::{Edge, Node, Path};
 
 #[derive(Debug, Clone, Eq)]
 pub struct TngComp(Path);
@@ -105,7 +105,7 @@ impl Tng {
         Self { comps }
     }
 
-    pub fn from_resolved(x: &Crossing) -> Self { 
+    pub fn from_resolved(x: &Node) -> Self { 
         assert!(x.is_resolved());
 
         let (r0, r1) = x.arcs();

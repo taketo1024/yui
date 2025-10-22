@@ -5,7 +5,7 @@ use itertools::Itertools;
 use yui::{CloneAnd, Sign};
 use yui::bitseq::Bit;
 
-use super::{Crossing, CrossingType, Path};
+use super::{Node, NodeType, Path};
 
 pub type Edge = usize;
 pub type State = yui::bitseq::BitSeq;
@@ -25,11 +25,11 @@ pub type XCode = [Edge; 4];
 
 #[derive(Debug, Clone)]
 pub struct Link { 
-    data: Vec<Crossing>
+    data: Vec<Node>
 }
 
 impl Link {
-    pub fn new(data: Vec<Crossing>) -> Self { 
+    pub fn new(data: Vec<Node>) -> Self { 
         let l = Self { data };
         l.validate();
         l
@@ -42,7 +42,7 @@ impl Link {
 
     pub fn from_pd_code<I>(pd_code: I) -> Self
     where I: IntoIterator<Item = XCode> { 
-        let data = pd_code.into_iter().map(Crossing::from_pd_code).collect();
+        let data = pd_code.into_iter().map(Node::from_pd_code).collect();
         Self::new(data)
     }
 
@@ -58,7 +58,7 @@ impl Link {
         self.components().len() == 1
     }
 
-    pub fn data(&self) -> &Vec<Crossing> { 
+    pub fn data(&self) -> &Vec<Node> { 
         &self.data
     }
 
@@ -81,7 +81,7 @@ impl Link {
     }
 
     pub fn crossing_signs(&self) -> Vec<Sign> {
-        use CrossingType::{X, Xm};
+        use NodeType::{X, Xm};
 
         let n = self.data.len();
         let mut signs = vec![None; n];
@@ -99,7 +99,7 @@ impl Link {
                     let e = c.edge(j);
                     remain.remove(&e);
 
-                    let sign = match (c.ctype(), j) { 
+                    let sign = match (c.ntype(), j) { 
                         (Xm, 1) | (X, 3) => Some(Sign::Pos),
                         (Xm, 3) | (X, 1) => Some(Sign::Neg),
                         _                => None
@@ -165,12 +165,12 @@ impl Link {
         k
     }
 
-    pub fn crossing_at(&self, i: usize) -> &Crossing {
+    pub fn crossing_at(&self, i: usize) -> &Node {
         let j = self.crossing_index(i);
         &self.data[j]
     }
 
-    pub fn crossing_at_mut(&mut self, i: usize) -> &mut Crossing {
+    pub fn crossing_at_mut(&mut self, i: usize) -> &mut Node {
         let j = self.crossing_index(i);
         &mut self.data[j]
     }
@@ -320,7 +320,7 @@ impl Display for Link {
 #[cfg(test)]
 mod tests { 
     use super::*;
-    use super::CrossingType::{X, Xm};
+    use super::NodeType::{X, Xm};
 
     #[test]
     fn link_init() { 
@@ -333,7 +333,7 @@ mod tests {
         let pd_code = [[0,0,1,1]];
         let l = Link::from_pd_code(pd_code);
         assert_eq!(l.data.len(), 1);
-        assert_eq!(l.data[0].ctype(), X);
+        assert_eq!(l.data[0].ntype(), X);
     }
 
     #[test]
@@ -429,10 +429,10 @@ mod tests {
     fn link_mirror() { 
         let pd_code = [[0,0,1,1]];
         let l = Link::from_pd_code(pd_code);
-        assert_eq!(l.data[0].ctype(), X);
+        assert_eq!(l.data[0].ntype(), X);
 
         let l = l.mirror();
-        assert_eq!(l.data[0].ctype(), Xm);
+        assert_eq!(l.data[0].ntype(), Xm);
     }
 
     #[test]
@@ -527,7 +527,7 @@ mod tests {
         let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]);
         let l2 = l.crossing_change(1);
 
-        assert_eq!(l.data[1],  Crossing::new(CrossingType::X, [3,6,4,1]));
-        assert_eq!(l2.data[1], Crossing::new(CrossingType::Xm, [3,6,4,1]));
+        assert_eq!(l.data[1],  Node::new(NodeType::X, [3,6,4,1]));
+        assert_eq!(l2.data[1], Node::new(NodeType::Xm, [3,6,4,1]));
     }
 }

@@ -6,14 +6,14 @@ use yui::CloneAnd;
 use crate::Path;
 use super::Edge;
 
-use CrossingType::{X, Xm, V, H};
+use NodeType::{X, Xm, V, H};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, derive_more::Display, Debug)]
-pub enum CrossingType { 
+pub enum NodeType { 
     X, Xm, V, H 
 }
 
-impl CrossingType { 
+impl NodeType { 
     pub fn cc(&mut self) {
         match self { 
             Xm => *self = X,
@@ -24,22 +24,22 @@ impl CrossingType {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Crossing { 
-    ctype: CrossingType,
+pub struct Node { 
+    ntype: NodeType,
     edges: [Edge; 4]
 }
 
-impl Crossing {
-    pub fn new(ctype: CrossingType, edges: [Edge; 4]) -> Self { 
-        Crossing { ctype, edges }
+impl Node {
+    pub fn new(ntype: NodeType, edges: [Edge; 4]) -> Self { 
+        Node { ntype, edges }
     }
 
     pub fn from_pd_code(edges: [Edge; 4]) -> Self { 
-        Crossing::new(CrossingType::X, edges)
+        Node::new(NodeType::X, edges)
     }
 
-    pub fn ctype(&self) -> CrossingType { 
-        self.ctype
+    pub fn ntype(&self) -> NodeType { 
+        self.ntype
     }
 
     pub fn edge(&self, i: usize) -> Edge { 
@@ -51,16 +51,20 @@ impl Crossing {
         &self.edges
     }
 
+    pub fn is_crossing(&self) -> bool { 
+        matches!(self.ntype, X | Xm)
+    }
+
     pub fn is_resolved(&self) -> bool { 
-        matches!(self.ctype, V | H)
+        matches!(self.ntype, V | H)
     }
 
     pub fn resolve(&mut self, r: Bit) {
         use Bit::{Bit0, Bit1};
 
-        match (self.ctype, r) {
-            (X, Bit0) | (Xm, Bit1) => self.ctype = H,
-            (X, Bit1) | (Xm, Bit0) => self.ctype = V,
+        match (self.ntype, r) {
+            (X, Bit0) | (Xm, Bit1) => self.ntype = H,
+            (X, Bit1) | (Xm, Bit0) => self.ntype = V,
             _ => panic!()
         }
     }
@@ -72,10 +76,10 @@ impl Crossing {
     }
 
     pub fn cc(&mut self) { 
-        self.ctype.cc()
+        self.ntype.cc()
     }
 
-    pub fn is_adj_to(&self, x: &Crossing) -> bool { 
+    pub fn is_adj_to(&self, x: &Node) -> bool { 
         self.edges.iter().any(|e| x.edges.contains(e))
     }
 
@@ -88,7 +92,7 @@ impl Crossing {
                 Path::new(vec![ei, ej], false)
             }
         };
-        match self.ctype { 
+        match self.ntype { 
             X | 
             Xm => (comp(0, 2), comp(1, 3)),
             V  => (comp(0, 3), comp(1, 2)),
@@ -99,7 +103,7 @@ impl Crossing {
     pub fn convert_edges<F>(&self, f: F) -> Self
     where F: Fn(Edge) -> Edge { 
         Self { 
-            ctype: self.ctype, 
+            ntype: self.ntype, 
             edges: self.edges.map(|e| f(e)) 
         }
     }
@@ -107,7 +111,7 @@ impl Crossing {
     pub(crate) fn traverse_inner(&self, index:usize) -> usize { 
         debug_assert!((0..4).contains(&index));
 
-        match self.ctype {
+        match self.ntype {
             X | Xm => (index + 2) % 4,
             V => 3 - index,
             H => (5 - index) % 4
@@ -115,15 +119,15 @@ impl Crossing {
     }
 }
 
-impl From<[Edge; 4]> for Crossing {
+impl From<[Edge; 4]> for Node {
     fn from(edges: [Edge; 4]) -> Self {
-        Self::new(CrossingType::X, edges)
+        Self::new(NodeType::X, edges)
     }
 }
 
-impl Display for Crossing {
+impl Display for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{:?}", self.ctype, self.edges)
+        write!(f, "{}{:?}", self.ntype, self.edges)
     }
 }
 
@@ -131,9 +135,9 @@ impl Display for Crossing {
 mod tests { 
     use super::*;
     
-    fn a_crossing(ctype:CrossingType) -> Crossing {
-        Crossing{
-            ctype, 
+    fn a_crossing(ntype:NodeType) -> Node {
+        Node{
+            ntype, 
             edges: [0,1,2,3]
         }
     }
@@ -161,40 +165,40 @@ mod tests {
         
         c.resolve(Bit0);
         assert!(c.is_resolved());
-        assert_eq!(c.ctype(), H);
+        assert_eq!(c.ntype(), H);
 
         let mut c = a_crossing(X);
         
         c.resolve(Bit1);
         assert!(c.is_resolved());
-        assert_eq!(c.ctype(), V);
+        assert_eq!(c.ntype(), V);
 
         let mut c = a_crossing(Xm);
         
         c.resolve(Bit0);
         assert!(c.is_resolved());
-        assert_eq!(c.ctype(), V);
+        assert_eq!(c.ntype(), V);
 
         let mut c = a_crossing(Xm);
         
         c.resolve(Bit1);
         assert!(c.is_resolved());
-        assert_eq!(c.ctype(), H);
+        assert_eq!(c.ntype(), H);
     }
 
     #[test]
     fn crossing_mirror() {
         let c = a_crossing(X).clone_and(|c| c.cc());
-        assert_eq!(c.ctype(), Xm);
+        assert_eq!(c.ntype(), Xm);
 
         let c = a_crossing(Xm).clone_and(|c| c.cc());
-        assert_eq!(c.ctype(), X);
+        assert_eq!(c.ntype(), X);
 
         let c = a_crossing(H).clone_and(|c| c.cc());
-        assert_eq!(c.ctype(), H);
+        assert_eq!(c.ntype(), H);
 
         let c = a_crossing(V).clone_and(|c| c.cc());
-        assert_eq!(c.ctype(), V);
+        assert_eq!(c.ntype(), V);
     }
 
     #[test]

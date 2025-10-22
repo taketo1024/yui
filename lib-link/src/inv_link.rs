@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use itertools::Itertools;
 use num_integer::Integer;
 use yui::CloneAnd;
-use crate::{Crossing, Edge, Link, XCode};
+use crate::{Node, Edge, Link, XCode};
 
 // Involutive link
 #[derive(Debug, Clone)]
@@ -11,7 +11,7 @@ pub struct InvLink {
     link: Link,
     base_pt: Option<Edge>,
     e_map: HashMap<Edge, Edge>,
-    x_map: HashMap<Crossing, Crossing>
+    x_map: HashMap<Node, Node>
 }
 
 impl InvLink { 
@@ -73,7 +73,7 @@ impl InvLink {
         self.e_map.get(&e).cloned().unwrap()
     }
 
-    pub fn inv_x(&self, x: &Crossing) -> &Crossing { 
+    pub fn inv_x(&self, x: &Node) -> &Node { 
         self.x_map.get(x).unwrap()
     }
 

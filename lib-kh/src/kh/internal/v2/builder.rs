@@ -9,7 +9,7 @@ use num_traits::Zero;
 use yui::bitseq::Bit;
 use yui::{hashmap, Ring, RingOps};
 use yui_homology::DisplaySeq;
-use yui_link::{Crossing, Edge, Link};
+use yui_link::{Node, Edge, Link};
 
 use crate::ext::LinkExt;
 use crate::kh::{KhGen, KhChain, KhComplex};
@@ -20,7 +20,7 @@ use super::tng_complex::{TngComplex, TngKey};
 
 pub struct TngComplexBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    crossings: Vec<Crossing>,
+    crossings: Vec<Node>,
     complex: TngComplex<R>,
     elements: Vec<BuildElem<R>>,
     h_range: Option<RangeInclusive<isize>>,
@@ -80,17 +80,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &mut self.complex
     }
 
-    pub fn crossings(&self) -> impl Iterator<Item = &Crossing> { 
+    pub fn crossings(&self) -> impl Iterator<Item = &Node> { 
         self.crossings.iter()
     }
 
     pub fn set_crossings<I>(&mut self, crossings: I)
-    where I: IntoIterator<Item = Crossing> {
+    where I: IntoIterator<Item = Node> {
         self.crossings = crossings.into_iter().collect_vec();
     }
 
     pub(crate) fn remove_crossings<'a, I>(&mut self, crossings: I) 
-    where I: IntoIterator<Item = &'a Crossing> { 
+    where I: IntoIterator<Item = &'a Node> { 
         let drop = crossings.into_iter().collect::<HashSet<_>>();
         self.crossings.retain(|x| !drop.contains(x));
     }
@@ -114,7 +114,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.retain_supported();
     }
 
-    pub fn choose_next(&mut self) -> Option<Crossing> { 
+    pub fn choose_next(&mut self) -> Option<Node> { 
         let Some((i, _)) = self.crossings.iter().enumerate().max_by_key(|(_, x)|
             self.count_connections(x)
         ) else { 
@@ -125,7 +125,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         Some(x)
     }
 
-    fn count_connections(&self, x: &Crossing) -> usize { 
+    fn count_connections(&self, x: &Node) -> usize { 
         let arcs = if x.is_resolved() { 
             let a = x.arcs();
             vec![a.0, a.1]
@@ -158,7 +158,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub(crate) fn append(&mut self, x: &Crossing) { 
+    pub(crate) fn append(&mut self, x: &Node) { 
         assert!(!self.complex.crossings().contains(x));
         
         info!("({}) append: {x}", self.stat());
@@ -170,7 +170,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.connect_incr(&left, &right);
     }
 
-    pub(crate) fn append_prepare(&mut self, x: &Crossing) { 
+    pub(crate) fn append_prepare(&mut self, x: &Node) { 
         if let Some(i) = self.crossings.iter().find_position(|&e| e == x) { 
             self.crossings.remove(i.0);
         }
@@ -458,20 +458,20 @@ pub struct BuildElem<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     init_cob: Cob,                       // initial cob, precomposed at the final step.
     retr_cob: HashMap<TngKey, LcCob<R>>, // building cob, src must always match init_cob. 
-    state: HashMap<Crossing, Bit>,
+    state: HashMap<Node, Bit>,
     base_pt: Option<Edge>
 }
 
 impl<R> BuildElem<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn new(init_cob: Cob, state: HashMap<Crossing, Bit>, base_pt: Option<Edge>) -> Self { 
+    pub fn new(init_cob: Cob, state: HashMap<Node, Bit>, base_pt: Option<Edge>) -> Self { 
         let k0 = TngKey::init();
         let f0 = LcCob::from(Cob::empty());
         let retr_cob = hashmap! { k0 => f0 };
         Self{ init_cob, retr_cob, state, base_pt }
     }
 
-    pub fn append(&mut self, x: &Crossing) { 
+    pub fn append(&mut self, x: &Node) { 
         if !x.is_resolved() { 
             self.append_x(x)
         } else { 
@@ -479,7 +479,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    fn append_x(&mut self, x: &Crossing) {
+    fn append_x(&mut self, x: &Node) {
         assert!(!x.is_resolved());
 
         let r = self.state[x];
@@ -495,7 +495,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }).collect();
     }
 
-    fn append_a(&mut self, x: &Crossing) {
+    fn append_a(&mut self, x: &Node) {
         assert!(x.is_resolved());
 
         let tng = Tng::from_resolved(x);
@@ -667,8 +667,8 @@ mod tests {
     fn test_tangle() { 
         let mut c = TngComplexBuilder::init(&0, &0, (0, 0), None);
         c.set_crossings([
-            Crossing::from_pd_code([4,2,5,1]),
-            Crossing::from_pd_code([3,6,4,1])
+            Node::from_pd_code([4,2,5,1]),
+            Node::from_pd_code([3,6,4,1])
         ]);
 
         c.process_all();

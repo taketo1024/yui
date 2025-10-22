@@ -1,3 +1,4 @@
+use core::panic;
 use std::collections::HashSet;
 use std::fmt::Display;
 use itertools::Itertools;
@@ -67,6 +68,11 @@ impl Link {
             .count()
     }
 
+    pub fn writhe(&self) -> i32 { 
+        let (p, n) = self.signed_crossing_nums();
+        (p as i32) - (n as i32)
+    }
+
     pub fn signed_crossing_nums(&self) -> (usize, usize) {
         let signs = self.crossing_signs().into_iter().counts();
         let pos = signs.get(&Sign::Pos).cloned().unwrap_or(0);
@@ -78,21 +84,20 @@ impl Link {
         use CrossingType::{X, Xm};
 
         let n = self.data.len();
-
         let mut signs = vec![None; n];
-        let mut passed: HashSet<Edge> = HashSet::new();
+        let mut remain = self.edges();
 
-        let mut traverse = |signs: &mut Vec<Option<Sign>>, j0: usize| {
+        for j0 in [0, 1, 2] { 
             for i0 in 0..n {
                 let start_edge = self.data[i0].edge(j0);
-                if passed.contains(&start_edge) { 
+                if !remain.remove(&start_edge) { 
                     continue 
                 }
 
                 self.traverse_from((i0, j0), |i, j| { 
                     let c = &self.data[i];
                     let e = c.edge(j);
-                    passed.insert(e);
+                    remain.remove(&e);
 
                     let sign = match (c.ctype(), j) { 
                         (Xm, 1) | (X, 3) => Some(Sign::Pos),
@@ -104,38 +109,26 @@ impl Link {
                     }
                 });
             }
-        };
 
-        traverse(&mut signs, 0);
-
-        if (0..n).any(|i| !self.data[i].is_resolved() && signs[i].is_none()) { 
-            for j in [1,2] {
-                traverse(&mut signs, j);
+            if remain.is_empty() { 
+                break
             }
-        };
+        }
 
-        let signs = signs.into_iter().flatten().collect_vec();
+        assert!(remain.is_empty());
 
-        assert_eq!(signs.len(), self.crossing_num());
-
-        signs
+        signs.into_iter().flatten().collect_vec()
     }
     
-    pub fn writhe(&self) -> i32 { 
-        let (p, n) = self.signed_crossing_nums();
-        (p as i32) - (n as i32)
-    }
-
     pub fn components(&self) -> Vec<Path> {
         let n = self.data.len();
 
         let mut comps = vec![];
         let mut remain = self.edges();
 
-        let mut traverse = |j0: usize| {
+        for j0 in [0, 1, 2] {
             for i0 in 0..n {
                 let start_edge = self.data[i0].edge(j0);
-
                 if !remain.remove(&start_edge) { 
                     continue 
                 }
@@ -152,10 +145,10 @@ impl Link {
 
                 comps.push(c);
             }
-        };
 
-        for i in [0, 1, 2] { 
-            traverse(i);
+            if remain.is_empty() { 
+                break
+            }
         }
 
         assert!(remain.is_empty());

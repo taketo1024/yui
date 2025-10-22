@@ -112,7 +112,7 @@ mod tests {
     use crate::kh::KhComplex;
  
     #[test]
-    fn test_cc0_neg_to_pos() { 
+    fn test_cc0_pos_to_neg() { 
         let i = 0;
         let l = Link::load("5_1").unwrap().crossing_changed_at(i);
         let (h, t) = (0, 0);
@@ -126,7 +126,7 @@ mod tests {
     }
 
     #[test]
-    fn test_cc0_pos_to_neg() { 
+    fn test_cc0_neg_to_pos() { 
         let i = 0;
         let l = Link::load("5_1").unwrap().mirror().crossing_changed_at(i);
         let (h, t) = (0, 0);
@@ -140,7 +140,7 @@ mod tests {
     }
 
     #[test]
-    fn test_cc1_neg_to_pos() { 
+    fn test_cc1_pos_to_neg() { 
         let i = 0;
         let l = Link::load("5_1").unwrap().crossing_changed_at(i);
         let (h, t) = (0, 0);
@@ -154,7 +154,7 @@ mod tests {
     }
 
     #[test]
-    fn test_cc1_pos_to_neg() { 
+    fn test_cc1_neg_to_pos() { 
         let i = 0;
         let l = Link::load("5_1").unwrap().mirror().crossing_changed_at(i);
         let (h, t) = (0, 0);
@@ -168,7 +168,63 @@ mod tests {
     }
 
     #[test]
-    fn test_cc1_neg_to_pos_ht() { 
+    fn test_red_cc0_pos_to_neg() { 
+        let i = 0;
+        let l = Link::load("5_1").unwrap().crossing_changed_at(i);
+        let (h, t) = (0, 0);
+
+        let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, true, i);
+        let f = KhComplex::cc_map0(&c1, &c2, i);
+
+        assert_eq!(f.deg(), 0);
+
+        f.check_all(c1.inner(), c2.inner());
+    }
+
+    #[test]
+    fn test_red_cc0_neg_to_pos() { 
+        let i = 0;
+        let l = Link::load("5_1").unwrap().mirror().crossing_changed_at(i);
+        let (h, t) = (0, 0);
+
+        let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, true, i);
+        let f = KhComplex::cc_map0(&c1, &c2, i);
+
+        assert_eq!(f.deg(), 2);
+
+        f.check_all(c1.inner(), c2.inner());
+    }
+
+    #[test]
+    fn test_red_cc1_pos_to_neg() { 
+        let i = 0;
+        let l = Link::load("5_1").unwrap().crossing_changed_at(i);
+        let (h, t) = (0, 0);
+
+        let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, true, i);
+        let f = KhComplex::cc_map1(&c1, &c2, &l, i);
+
+        assert_eq!(f.deg(), -2);
+
+        f.check_all(c1.inner(), c2.inner());
+    }
+
+    #[test]
+    fn test_red_cc1_neg_to_pos() { 
+        let i = 0;
+        let l = Link::load("5_1").unwrap().mirror().crossing_changed_at(i);
+        let (h, t) = (0, 0);
+
+        let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, true, i);
+        let f = KhComplex::cc_map1(&c1, &c2, &l, i);
+
+        assert_eq!(f.deg(), 0);
+
+        f.check_all(c1.inner(), c2.inner());
+    }
+
+    #[test]
+    fn test_cc1_pos_to_neg_ht() { 
         type P = Poly2<'h', 't', i64>;
 
         let i = 0;
@@ -184,7 +240,7 @@ mod tests {
     }
 
     #[test]
-    fn test_cc1_pos_to_neg_ht() { 
+    fn test_cc1_neg_to_pos_ht() { 
         type P = Poly2<'h', 't', i64>;
 
         let i = 0;

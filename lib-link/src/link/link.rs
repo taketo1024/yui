@@ -165,20 +165,11 @@ impl Link {
 
     // index of data for the i-th `actual' crossing.
     fn crossing_index(&self, i: usize) -> usize {
-        assert!(i < self.crossing_num());
-
-        let mut i = i;
-        for (j, x) in self.data.iter().enumerate() {
-            if !x.is_resolved() {
-                if i > 0 { 
-            i -= 1;
-        } else { 
-            return j
-                }
-            }
-        }
-        
-        panic!()
+        let n = self.data.len();
+        let Some(k) = (0..n).filter(|&j| !self.data[j].is_resolved()).skip(i).next() else { 
+            panic!("Index exceeds number of crossings.")
+        };
+        k
     }
 
     pub fn crossing_at(&self, i: usize) -> &Crossing {

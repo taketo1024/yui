@@ -1,11 +1,11 @@
 [workspace]
 members = [ 
-    "yui",
-    "yui-matrix",
-    "yui-homology",
-    "yui-link",
-    "yui-khovanov",
-    "bin-ykh"
+    "bin-ykh",
+    "lib-core",
+    "lib-matrix",
+    "lib-homology",
+    "lib-link",
+    "lib-kh"
 ]
 resolver = "2"
 

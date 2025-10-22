@@ -27,7 +27,7 @@ cfg-if = "1.0.0"
 itertools = "0.14.0"
 ahash = "0.8.11"
 rayon = "1.10.0"
-yui  =         { path = "../yui" }
-yui-link =     { path = "../yui-link" }
-yui-matrix =   { path = "../yui-matrix" }
-yui-homology = { path = "../yui-homology" }
+yui  =         { path = "../lib-core" }
+yui-link =     { path = "../lib-link" }
+yui-matrix =   { path = "../lib-matrix" }
+yui-homology = { path = "../lib-homology" }

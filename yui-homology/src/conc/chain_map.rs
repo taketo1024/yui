@@ -87,6 +87,22 @@ where
         }
     }
 
+    pub fn print_map(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>) { 
+        for i in source.support() { 
+            self.print_map_at(source, target, i);
+            println!();
+        }
+    }
+
+    pub fn print_map_at(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I) { 
+        let j = i + self.deg();
+        println!("({i}) {} -> ({j}) {}", source[i], target[j]);
+        for z in source[i].gens() { 
+            let w = self.apply(i, &z);
+            println!("\t{z} -> {w}");
+        }
+    }
+
     pub fn cone<It>(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, support: It, target_based: bool) -> ChainComplexBase<I, EitherGen<X, Y>, R>
     where It: IntoIterator<Item = I> {
         assert!(source.d_deg() == target.d_deg());

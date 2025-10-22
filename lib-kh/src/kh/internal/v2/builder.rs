@@ -472,7 +472,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn append(&mut self, x: &Node) { 
-        if !x.is_resolved() { 
+        if x.is_crossing() { 
             self.append_x(x)
         } else { 
             self.append_a(x)
@@ -480,7 +480,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn append_x(&mut self, x: &Node) {
-        assert!(!x.is_resolved());
+        assert!(x.is_crossing());
 
         let r = self.state[x];
         let a = x.resolved(r);

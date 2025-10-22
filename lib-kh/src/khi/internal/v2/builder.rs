@@ -47,7 +47,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn new(l: &InvLink, h: &R, t: &R, reduced: bool) -> SymTngBuilder<R> { 
-        assert!(l.link().nodes().iter().all(|x| !x.is_resolved()));
+        assert!(l.link().nodes().iter().all(|x| x.is_crossing()));
         assert!(!reduced || l.base_pt().is_some());
 
         let base_pt = if reduced { l.base_pt() } else { None };
@@ -205,7 +205,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.inner.append_prepare(&x);
 
         let c = self.complex().make_x(x);
-        let key_map = if !x.is_resolved() { 
+        let key_map = if x.is_crossing() { 
             [Bit::Bit0, Bit::Bit1].map(|b| { 
                 let k = TngKey { state: BitSeq::from(b), label: KhTensor::empty() };
                 (k, k)
@@ -231,7 +231,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             c.append(tx);
             c
         };
-        let key_map = if !x.is_resolved() { 
+        let key_map = if x.is_crossing() { 
             [
                 ([0, 0], [0, 0]),
                 ([1, 0], [0, 1]),

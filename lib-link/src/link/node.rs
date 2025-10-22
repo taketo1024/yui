@@ -145,10 +145,10 @@ mod tests {
     #[test]
     fn crossing_is_resolved() {
         let c = a_crossing(X);
-        assert!(!c.is_resolved());
+        assert!(c.is_crossing());
 
         let c = a_crossing(Xm);
-        assert!(!c.is_resolved());
+        assert!(c.is_crossing());
 
         let c = a_crossing(H);
         assert!(c.is_resolved());

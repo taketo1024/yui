@@ -34,7 +34,7 @@ pub struct CobComp {
 
 impl CobComp { 
     pub fn sdl_from(x: &Node) -> Self {
-        assert!(!x.is_resolved());
+        assert!(x.is_crossing());
 
         use Bit::{Bit0, Bit1};
         let src = Tng::from_resolved(&x.resolved(Bit0));

@@ -171,7 +171,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn dim(&self) -> usize { 
-        self.crossings.iter().filter(|x| !x.is_resolved()).count()
+        self.crossings.iter().filter(|x| x.is_crossing()).count()
     }
     
     pub fn h_range(&self) -> RangeInclusive<isize> { 

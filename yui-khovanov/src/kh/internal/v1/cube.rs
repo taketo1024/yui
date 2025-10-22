@@ -16,7 +16,9 @@ pub struct KhCubeVertex {
 
 impl KhCubeVertex { 
     pub fn new(l: &Link, state: State, red_e: Option<Edge>, deg_shift: (isize, isize)) -> Self {
-        let circles = l.resolved_by(&state).components();
+        let mut circles = l.resolved_by(&state).components();
+        circles.sort_by_key(|c| c.min_edge());
+        
         let r = circles.len();
 
         let red_i = red_e.and_then(|e| { 

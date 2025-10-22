@@ -29,12 +29,18 @@ pub struct Link {
 
 impl Link {
     pub fn new(data: Vec<Crossing>) -> Self { 
-        Self { data }
+        let l = Self { data };
+        l.validate();
+        l
+    }
+
+    fn validate(&self) { 
+        assert_eq!(self.edges().len(), self.data.len() * 2, "Invalid edges.");
+        assert!(self.components().iter().all(|c| c.is_circle()), "Non-closed components.")
     }
 
     pub fn from_pd_code<I>(pd_code: I) -> Self
     where I: IntoIterator<Item = XCode> { 
-        // TODO validate code
         let data = pd_code.into_iter().map(Crossing::from_pd_code).collect();
         Self::new(data)
     }
@@ -351,7 +357,7 @@ mod tests {
 
     #[test]
     fn link_from_pd_code() { 
-        let pd_code = [[1,2,3,4]];
+        let pd_code = [[0,0,1,1]];
         let l = Link::from_pd_code(pd_code);
         assert_eq!(l.data.len(), 1);
         assert_eq!(l.data[0].ctype(), X);
@@ -362,7 +368,7 @@ mod tests {
         let l = Link::empty();
         assert!(l.is_empty());
 
-        let pd_code = [[1,2,3,4]];
+        let pd_code = [[0,0,1,1]];
         let l = Link::from_pd_code(pd_code);
         assert!(!l.is_empty());
     }
@@ -372,9 +378,13 @@ mod tests {
         let l = Link::empty();
         assert_eq!(l.crossing_num(), 0);
 
-        let pd_code = [[1,2,3,4]];
+        let pd_code = [[0,0,1,1]];
         let l = Link::from_pd_code(pd_code);
         assert_eq!(l.crossing_num(), 1);
+        
+        let pd_code = [[1,4,2,5],[3,6,4,1],[5,2,6,3]];
+        let l = Link::from_pd_code(pd_code);
+        assert_eq!(l.crossing_num(), 3);
     }
 
     #[test]
@@ -386,15 +396,6 @@ mod tests {
         assert_eq!(l.pass_edge(0, 1), Some((0, 0)));
         assert_eq!(l.pass_edge(0, 2), Some((0, 3)));
         assert_eq!(l.pass_edge(0, 3), Some((0, 2)));
-
-        let pd_code = [[0,3,1,4],[3,2,2,1]];
-        let l = Link::from_pd_code(pd_code);
-
-        assert_eq!(l.pass_edge(0, 0), None);
-        assert_eq!(l.pass_edge(0, 2), Some((1, 3)));
-        assert_eq!(l.pass_edge(1, 1), Some((1, 2)));
-        assert_eq!(l.pass_edge(1, 0), Some((0, 1)));
-        assert_eq!(l.pass_edge(0, 3), None);
     }
 
     #[test]
@@ -405,25 +406,11 @@ mod tests {
             queue
         };
 
-        // single crossing
-        let pd_code = [[0,1,2,3]];
-        let l = Link::from_pd_code(pd_code);
-        let path = traverse(&l, (0, 0));
-        assert_eq!(path, [(0, 0), (0, 2)]);
-
-        // unknot with one crossing
         let pd_code = [[0,0,1,1]];
         let l = Link::from_pd_code(pd_code);
         let path = traverse(&l, (0, 0));
         
         assert_eq!(path, [(0, 0), (0, 3), (0, 0)]); // loop
-
-        // open arc with one crossing
-        let pd_code = [[0,3,1,4],[3,2,2,1]];
-        let l = Link::from_pd_code(pd_code);
-        let path = traverse(&l, (0, 0));
-
-        assert_eq!(path, [(0, 0), (1, 3), (1, 2), (0, 1), (0, 3)]); // no loop
     }
 
     #[test]
@@ -463,11 +450,6 @@ mod tests {
         let l = Link::from_pd_code(pd_code);
         let comps = l.components();
         assert_eq!(comps, vec![ Path::new(vec![0, 1], true)]);
-
-        let pd_code = [[0,3,1,4],[3,2,2,1]];
-        let l = Link::from_pd_code(pd_code);
-        let comps = l.components();
-        assert_eq!(comps, vec![ Path::new(vec![0,1,2,3,4], false) ]);
     }
 
     #[test]

@@ -86,31 +86,6 @@ macro_rules! try_std {
             CType::Q     => run!(Q,  $app, $args),
             CType::F2    => run!(F2, $app, $args),
             CType::F3    => run!(F3, $app, $args),
-            CType::Gauss | 
-            CType::Eisen => try_qint!($app, $args),
-        }
-    }}
-}
-
-macro_rules! try_qint {
-    ($app:ident, $args:expr) => {{
-        cfg_if::cfg_if! {
-            if #[cfg(any(feature = "qint", feature = "all"))] {
-                type GaussInt = yui::GaussInt<Int>;
-                type EisenInt = yui::EisenInt<Int>;
-
-                match $args.c_type {
-                    CType::Gauss => run!(GaussInt, $app, $args),
-                    CType::Eisen => run!(EisenInt, $app, $args),
-                    _            => None
-                }
-            } else {
-                match $args.c_type {
-                    CType::Gauss |
-                    CType::Eisen => Some(err!("build with `--features qint` to enable quad-int types.")),
-                    _            => None
-                }
-            }
         }
     }}
 }
@@ -194,4 +169,4 @@ macro_rules! run {
     }}
 }
 
-pub(crate) use {run, try_ring, try_eucring, try_std, try_euc_poly, try_noneuc_poly, try_qint};
+pub(crate) use {run, try_ring, try_eucring, try_std, try_euc_poly, try_noneuc_poly};

@@ -82,16 +82,6 @@ impl Crossing {
         self.edges.iter().any(|e| x.edges.contains(e))
     }
 
-    pub fn pass(&self, index:usize) -> usize { 
-        debug_assert!((0..4).contains(&index));
-
-        match self.ctype {
-            X | Xm => (index + 2) % 4,
-            V => 3 - index,
-            H => (5 - index) % 4
-        }
-    }
-
     pub fn arcs(&self) -> (Path, Path) {
         let comp = |i: usize, j: usize| {
             let (ei, ej) = (self.edges[i], self.edges[j]);
@@ -114,6 +104,16 @@ impl Crossing {
         Self { 
             ctype: self.ctype, 
             edges: self.edges.map(|e| f(e)) 
+        }
+    }
+
+    pub(crate) fn traverse_inner(&self, index:usize) -> usize { 
+        debug_assert!((0..4).contains(&index));
+
+        match self.ctype {
+            X | Xm => (index + 2) % 4,
+            V => 3 - index,
+            H => (5 - index) % 4
         }
     }
 }
@@ -203,27 +203,27 @@ mod tests {
     #[test]
     fn crossing_pass() {
         let c = a_crossing(X);
-        assert_eq!(c.pass(0), 2);
-        assert_eq!(c.pass(1), 3);
-        assert_eq!(c.pass(2), 0);
-        assert_eq!(c.pass(3), 1);
+        assert_eq!(c.traverse_inner(0), 2);
+        assert_eq!(c.traverse_inner(1), 3);
+        assert_eq!(c.traverse_inner(2), 0);
+        assert_eq!(c.traverse_inner(3), 1);
 
         let c = a_crossing(Xm);
-        assert_eq!(c.pass(0), 2);
-        assert_eq!(c.pass(1), 3);
-        assert_eq!(c.pass(2), 0);
-        assert_eq!(c.pass(3), 1);
+        assert_eq!(c.traverse_inner(0), 2);
+        assert_eq!(c.traverse_inner(1), 3);
+        assert_eq!(c.traverse_inner(2), 0);
+        assert_eq!(c.traverse_inner(3), 1);
 
         let c = a_crossing(V);
-        assert_eq!(c.pass(0), 3);
-        assert_eq!(c.pass(1), 2);
-        assert_eq!(c.pass(2), 1);
-        assert_eq!(c.pass(3), 0);
+        assert_eq!(c.traverse_inner(0), 3);
+        assert_eq!(c.traverse_inner(1), 2);
+        assert_eq!(c.traverse_inner(2), 1);
+        assert_eq!(c.traverse_inner(3), 0);
 
         let c = a_crossing(H);
-        assert_eq!(c.pass(0), 1);
-        assert_eq!(c.pass(1), 0);
-        assert_eq!(c.pass(2), 3);
-        assert_eq!(c.pass(3), 2);
+        assert_eq!(c.traverse_inner(0), 1);
+        assert_eq!(c.traverse_inner(1), 0);
+        assert_eq!(c.traverse_inner(2), 3);
+        assert_eq!(c.traverse_inner(3), 2);
     }
 }

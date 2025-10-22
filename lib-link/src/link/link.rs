@@ -35,7 +35,7 @@ impl Link {
     }
 
     fn validate(&self) { 
-        assert_eq!(self.edges().len(), self.data.len() * 2, "Invalid edges.");
+        assert_eq!(self.edges().len(), self.data.len() * 2, "Invalid data.");
         assert!(self.components().iter().all(|c| c.is_circle()), "Non-closed components.")
     }
 
@@ -89,7 +89,7 @@ impl Link {
                     continue 
                 }
 
-                self.traverse_edges((i0, j0), |i, j| { 
+                self.traverse_from((i0, j0), |i, j| { 
                     let c = &self.data[i];
                     let e = c.edge(j);
                     passed.insert(e);
@@ -141,18 +141,13 @@ impl Link {
 
                 let mut edges = vec![];
 
-                self.traverse_edges((i0, j0), |i, j| { 
+                self.traverse_from((i0, j0), |i, j| { 
                     let e = self.data[i].edge(j);
                     edges.push(e);
                     passed.insert(e);
                 });
 
-                let c = if edges.len() > 1 && edges.first() == edges.last() { 
-                    edges.pop();
-                    Path::circ(edges)
-                } else { 
-                    Path::arc(edges)
-                };
+                let c =Path::circ(edges);
 
                 comps.push(c);
             }
@@ -234,54 +229,6 @@ impl Link {
         x.edges().iter().min().cloned()
     }
 
-    fn pass_edge(&self, c_index:usize, e_index:usize) -> Option<(usize, usize)> {
-        let n = self.data.len();
-        debug_assert!((0..n).contains(&c_index));
-        debug_assert!((0..4).contains(&e_index));
-
-        let e = &self.data[c_index].edge(e_index);
-
-        for (i, c) in self.data.iter().enumerate() { 
-            for (j, f) in c.edges().iter().enumerate() { 
-                if e == f && (c_index != i || (c_index == i && e_index != j)) { 
-                    return Some((i, j))
-                }
-            }
-        }
-        None
-    }
-
-    pub fn traverse_edges<F>(&self, start: (usize, usize), mut f:F) where
-        F: FnMut(usize, usize)
-    {
-        let n = self.data.len();
-        debug_assert!((0..n).contains(&start.0));
-        debug_assert!((0..4).contains(&start.1));
-
-        let (mut i, mut j) = start;
-
-        loop {
-            f(i, j);
-
-            let c = &self.data[i];
-            let k = c.pass(j);
-            
-            let Some(next) = self.pass_edge(i, k) else {
-                // reached end
-                f(i, k);
-                break
-            } ;
-
-            if next == start {
-                // returned to start
-                f(start.0, start.1);
-                break
-            }
-
-            (i, j) = next;
-        }
-    }
-
     pub fn ori_pres_state(&self) -> State { 
         let signs = self.crossing_signs(); 
         State::from_iter(signs.into_iter().map( |s|
@@ -291,6 +238,46 @@ impl Link {
 
     pub fn seifert_circles(&self) -> Vec<Path> { 
         self.resolved_by(&self.ori_pres_state()).components()
+    }
+
+    fn traverse_from<F>(&self, start: (usize, usize), mut f:F) where
+        F: FnMut(usize, usize)
+    {
+        let n = self.data.len();
+        assert!((0..n).contains(&start.0));
+        assert!((0..4).contains(&start.1));
+
+        f(start.0, start.1); // call starting point
+
+        let (mut i, mut j) = start;
+
+        loop {
+            let c = &self.data[i];
+            let k = c.traverse_inner(j);
+            let next = self.traverse_outer(i, k);
+
+            if next == start {
+                break
+            }
+
+            (i, j) = next;
+
+            f(i, j)
+        }
+    }
+
+    fn traverse_outer(&self, c_index:usize, e_index:usize) -> (usize, usize) {
+        let e = &self.data[c_index].edge(e_index);
+
+        for (i, c) in self.data.iter().enumerate() { 
+            for (j, f) in c.edges().iter().enumerate() { 
+                if e == f && (c_index != i || (c_index == i && e_index != j)) { 
+                    return (i, j)
+                }
+            }
+        }
+
+        panic!("Broken data")
     }
 }
 
@@ -392,17 +379,17 @@ mod tests {
         let pd_code = [[0,0,1,1]];
         let l = Link::from_pd_code(pd_code);
 
-        assert_eq!(l.pass_edge(0, 0), Some((0, 1)));
-        assert_eq!(l.pass_edge(0, 1), Some((0, 0)));
-        assert_eq!(l.pass_edge(0, 2), Some((0, 3)));
-        assert_eq!(l.pass_edge(0, 3), Some((0, 2)));
+        assert_eq!(l.traverse_outer(0, 0), (0, 1));
+        assert_eq!(l.traverse_outer(0, 1), (0, 0));
+        assert_eq!(l.traverse_outer(0, 2), (0, 3));
+        assert_eq!(l.traverse_outer(0, 3), (0, 2));
     }
 
     #[test]
     fn link_traverse() {
         let traverse = |l: &Link, (i0, j0)| { 
             let mut queue = vec![];
-            l.traverse_edges((i0, j0), |i, j| queue.push((i, j)));
+            l.traverse_from((i0, j0), |i, j| queue.push((i, j)));
             queue
         };
 
@@ -410,7 +397,7 @@ mod tests {
         let l = Link::from_pd_code(pd_code);
         let path = traverse(&l, (0, 0));
         
-        assert_eq!(path, [(0, 0), (0, 3), (0, 0)]); // loop
+        assert_eq!(path, [(0, 0), (0, 3)]); // loop
     }
 
     #[test]

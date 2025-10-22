@@ -11,3 +11,4 @@ pub use homology::KhHomology;
 pub use ss::ss_invariant;
 
 pub mod internal;
+pub mod ext;

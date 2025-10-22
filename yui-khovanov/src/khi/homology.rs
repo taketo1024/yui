@@ -1,8 +1,9 @@
 use std::ops::{Index, RangeInclusive};
 use delegate::delegate;
 use yui::{EucRing, EucRingOps};
-use yui_homology::{Grid2, GridTrait, Homology, Summand};
+use yui_homology::{Grid2, GridTrait, Homology, Summand, SummandTrait};
 use yui_link::InvLink;
+use crate::kh::KhChainExt;
 use crate::khi::{KhIComplex, KhIGen};
 use crate::misc::{make_gen_grid, range_of};
 
@@ -32,9 +33,17 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     pub fn h_range(&self) -> RangeInclusive<isize> { 
-        range_of(self.support())
+        range_of(self.support().filter(|&i| 
+            !self[i].is_zero()
+        ))
     }
 
+    pub fn q_range(&self) -> RangeInclusive<isize> {
+        range_of(self.support().flat_map(|i| 
+            self[i].gens().map(|z| z.q_deg())
+        ))
+    }
+    
     pub fn canon_cycles(&self) -> &[KhIChain<R>] { 
         &self.canon_cycles
     }
@@ -50,7 +59,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         )
     }
 
-    pub fn into_bigraded(self) -> Grid2<Summand<KhIGen, R>> { 
+    pub fn gen_grid(self) -> Grid2<Summand<KhIGen, R>> { 
         make_gen_grid(self.inner())
     }
 }
@@ -126,7 +135,7 @@ mod tests {
         let (h, t) = (R::one(), R::zero());
         let khi = KhIHomology::new(&l, &h, &t, false);
 
-        assert_eq!(khi.h_range(), 0..=4);
+        assert_eq!(khi.h_range(), 0..=1);
         assert_eq!(khi[0].rank(), 2);
         assert_eq!(khi[1].rank(), 2);
         assert_eq!(khi[2].rank(), 0);
@@ -178,7 +187,7 @@ mod tests {
         let (h, t) = (R::one(), R::zero());
         let khi = KhIHomology::new(&l, &h, &t, true);
 
-        assert_eq!(khi.h_range(), 0..=4);
+        assert_eq!(khi.h_range(), 0..=1);
         assert_eq!(khi[0].rank(), 1);
         assert_eq!(khi[1].rank(), 1);
         assert_eq!(khi[2].rank(), 0);
@@ -212,7 +221,7 @@ mod tests {
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
-        let khi = KhIHomology::new(&l, &h, &t, false).into_bigraded();
+        let khi = KhIHomology::new(&l, &h, &t, false).gen_grid();
 
         assert_eq!(khi[(0, 1)].rank(), 1);
         assert_eq!(khi[(0, 3)].rank(), 1);
@@ -233,7 +242,7 @@ mod tests {
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
-        let khi = KhIHomology::new(&l, &h, &t, true).into_bigraded();
+        let khi = KhIHomology::new(&l, &h, &t, true).gen_grid();
 
         assert_eq!(khi[(0, 2)].rank(), 1);
         assert_eq!(khi[(1, 2)].rank(), 1);
@@ -279,7 +288,7 @@ mod tests_v1 {
         let (h, t) = (R::one(), R::zero());
         let khi = KhIHomology::new_no_simplify(&l, &h, &t, false);
 
-        assert_eq!(khi.h_range(), 0..=4);
+        assert_eq!(khi.h_range(), 0..=1);
         assert_eq!(khi[0].rank(), 2);
         assert_eq!(khi[1].rank(), 2);
         assert_eq!(khi[2].rank(), 0);
@@ -331,7 +340,7 @@ mod tests_v1 {
         let (h, t) = (R::one(), R::zero());
         let khi = KhIHomology::new_no_simplify(&l, &h, &t, true);
 
-        assert_eq!(khi.h_range(), 0..=4);
+        assert_eq!(khi.h_range(), 0..=1);
         assert_eq!(khi[0].rank(), 1);
         assert_eq!(khi[1].rank(), 1);
         assert_eq!(khi[2].rank(), 0);
@@ -365,7 +374,7 @@ mod tests_v1 {
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
-        let khi = KhIHomology::new_no_simplify(&l, &h, &t, false).into_bigraded();
+        let khi = KhIHomology::new_no_simplify(&l, &h, &t, false).gen_grid();
 
         assert_eq!(khi[(0, 1)].rank(), 1);
         assert_eq!(khi[(0, 3)].rank(), 1);
@@ -386,7 +395,7 @@ mod tests_v1 {
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
-        let khi = KhIHomology::new_no_simplify(&l, &h, &t, true).into_bigraded();
+        let khi = KhIHomology::new_no_simplify(&l, &h, &t, true).gen_grid();
 
         assert_eq!(khi[(0, 2)].rank(), 1);
         assert_eq!(khi[(1, 2)].rank(), 1);

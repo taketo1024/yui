@@ -1,20 +1,20 @@
 use std::ops::{RangeInclusive, Index};
 use delegate::delegate;
 
-use yui_homology::{isize2, GridTrait, Homology, Homology2, Summand};
+use yui_homology::{Grid2, GridTrait, Homology, Summand, SummandTrait};
 use yui::{EucRing, EucRingOps};
 use yui_link::Link;
 
-use crate::kh::KhGen;
+use crate::kh::{KhChainExt, KhChainGen};
 use crate::misc::{make_gen_grid, range_of};
 
-use super::{KhAlgStr, KhChain, KhComplex, KhComplexBigraded};
+use super::{KhAlg, KhChain, KhComplex};
 
 #[derive(Clone)]
 pub struct KhHomology<R> 
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    inner: Homology<KhGen, R>,
-    str: KhAlgStr<R>,
+    inner: Homology<KhChainGen, R>,
+    str: KhAlg<R>,
     deg_shift: (isize, isize),
     reduced: bool,
     canon_cycles: Vec<KhChain<R>>
@@ -32,11 +32,11 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         Self::from(&c)
     }
     
-    pub(crate) fn new_impl(inner: Homology<KhGen, R>, str: KhAlgStr<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self { 
+    pub(crate) fn new_impl(inner: Homology<KhChainGen, R>, str: KhAlg<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self { 
         Self { inner, str, deg_shift, reduced, canon_cycles }
     }
 
-    pub fn str(&self) -> &KhAlgStr<R> { 
+    pub fn str(&self) -> &KhAlg<R> { 
         &self.str
     }
 
@@ -49,14 +49,22 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     pub fn h_range(&self) -> RangeInclusive<isize> { 
-        range_of(self.support())
+        range_of(self.support().filter(|&i| 
+            !self[i].is_zero()
+        ))
+    }
+
+    pub fn q_range(&self) -> RangeInclusive<isize> {
+        range_of(self.support().flat_map(|i| 
+            self[i].gens().map(|z| z.q_deg())
+        ))
     }
 
     pub fn canon_cycles(&self) -> &Vec<KhChain<R>> { 
         &self.canon_cycles
     }
 
-    pub fn inner(&self) -> &Homology<KhGen, R> { 
+    pub fn inner(&self) -> &Homology<KhChainGen, R> { 
         &self.inner
     }
 
@@ -70,17 +78,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         )
     }
 
-    // TODO take self instead of &self
-    pub fn into_bigraded(&self) -> KhHomologyBigraded<R> { 
-        // TODO: check (h, t)
-
-        let str = self.str.clone();
-        let deg_shift = self.deg_shift;
-        let reduced = self.reduced;
-        let canon_cycles = self.canon_cycles.clone();
-
-        let inner = make_gen_grid(self.inner());
-        KhHomologyBigraded::new_impl(inner, str, deg_shift, reduced, canon_cycles)
+    pub fn gen_grid(&self) -> Grid2<Summand<KhChainGen, R>> { 
+        make_gen_grid(self.inner())
     }
 }
 
@@ -100,7 +99,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 impl<R> GridTrait<isize> for KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     type Support = std::vec::IntoIter<isize>;
-    type Item = Summand<KhGen, R>;
+    type Item = Summand<KhChainGen, R>;
 
     delegate! { 
         to self.inner { 
@@ -114,95 +113,11 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 impl<R> Index<isize> for KhHomology<R> 
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    type Output = Summand<KhGen, R>;
+    type Output = Summand<KhChainGen, R>;
 
     delegate! { 
         to self.inner { 
             fn index(&self, index: isize) -> &Self::Output;
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct KhHomologyBigraded<R> 
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    inner: Homology2<KhGen, R>,
-    str: KhAlgStr<R>,
-    deg_shift: (isize, isize),
-    reduced: bool,
-    canon_cycles: Vec<KhChain<R>>
-}
-
-impl<R> KhHomologyBigraded<R>
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    fn new_impl(inner: Homology2<KhGen, R>, str: KhAlgStr<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self { 
-        Self { inner, str, deg_shift, reduced, canon_cycles }
-    }
-
-    pub fn str(&self) -> &KhAlgStr<R> { 
-        &self.str
-    }
-
-    pub fn deg_shift(&self) -> (isize, isize) { 
-        self.deg_shift
-    }
-
-    pub fn is_reduced(&self) -> bool { 
-        self.reduced
-    }
-
-    pub fn h_range(&self) -> RangeInclusive<isize> { 
-        range_of(self.support().map(|i| i.0))
-    }
-
-    pub fn q_range(&self) -> RangeInclusive<isize> { 
-        range_of(self.support().map(|i| i.1))
-    }
-
-    pub fn canon_cycles(&self) -> &Vec<KhChain<R>> { 
-        &self.canon_cycles
-    }
-
-    pub fn inner(&self) -> &Homology2<KhGen, R> { 
-        &self.inner
-    }
-}
-
-impl<R> From<&KhComplexBigraded<R>> for KhHomologyBigraded<R>
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    fn from(c: &KhComplexBigraded<R>) -> Self {
-        KhHomologyBigraded::new_impl(
-            c.inner().reduced().homology(), 
-            c.str().clone(), 
-            c.deg_shift(), 
-            c.is_reduced(),
-            c.canon_cycles().clone()
-        )
-    }
-}
-
-impl<R> GridTrait<isize2> for KhHomologyBigraded<R>
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    type Support = std::vec::IntoIter<isize2>;
-    type Item = Summand<KhGen, R>;
-
-    delegate! { 
-        to self.inner { 
-            fn support(&self) -> Self::Support;
-            fn is_supported(&self, i: isize2) -> bool;
-            fn get(&self, i: isize2) -> &Self::Item;
-            fn get_default(&self) -> &Self::Item;
-        }
-    }
-}
-
-impl<R> Index<(isize, isize)> for KhHomologyBigraded<R>
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    type Output = Summand<KhGen, R>;
-
-    delegate! { 
-        to self.inner { 
-            fn index(&self, index: (isize, isize)) -> &Self::Output;
         }
     }
 }
@@ -212,6 +127,7 @@ mod tests {
     use num_traits::Zero;
     use yui::poly::HPoly;
     use yui::FF2;
+    
     use yui_homology::SummandTrait;
     use yui_link::Link;
     use super::*;
@@ -222,6 +138,7 @@ mod tests {
         let h = KhHomology::new(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), 0..=0);
+        assert_eq!(h.q_range(), 0..=0);
 
         assert_eq!(h[0].rank(), 1);
         assert!(h[0].is_free());
@@ -233,6 +150,7 @@ mod tests {
         let h = KhHomology::new(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), 0..=0);
+        assert_eq!(h.q_range(), -1..=1);
         
         assert_eq!(h[0].rank(), 2);
         assert!(h[0].is_free());
@@ -244,6 +162,7 @@ mod tests {
         let h = KhHomology::new(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), -3..=0);
+        assert_eq!(h.q_range(), -9..=-1);
 
         assert_eq!(h[-3].rank(), 1);
         assert!(h[-3].is_free());
@@ -263,6 +182,7 @@ mod tests {
         let h = KhHomology::new(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), 0..=3);
+        assert_eq!(h.q_range(), 1..=9);
 
         assert_eq!(h[0].rank(), 2);
         assert!(h[0].is_free());
@@ -282,6 +202,7 @@ mod tests {
         let h = KhHomology::new(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), -2..=2);
+        assert_eq!(h.q_range(), -5..=5);
 
         assert_eq!(h[-2].rank(), 1);
         assert!(h[-2].is_free());
@@ -302,9 +223,12 @@ mod tests {
     #[test]
     fn kh_empty_bigr() {
         let l = Link::empty();
-        let h = KhHomology::new(&l, &0, &0, false).into_bigraded();
+        let h = KhHomology::new(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), 0..=0);
+        assert_eq!(h.q_range(), 0..=0);
+
+        let h = h.gen_grid();
         assert_eq!(h[(0,0)].rank(), 1);
         assert!(h[(0,0)].is_free());
     }
@@ -312,11 +236,12 @@ mod tests {
     #[test]
     fn kh_unknot_bigr() {
         let l = Link::unknot();
-        let h = KhHomology::new(&l, &0, &0, false).into_bigraded();
+        let h = KhHomology::new(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), 0..=0);
         assert_eq!(h.q_range(), -1..=1);
 
+        let h = h.gen_grid();
         assert_eq!(h[(0,-1)].rank(), 1);
         assert!(h[(0,-1)].is_free());
         assert_eq!(h[(0, 1)].rank(), 1);
@@ -326,11 +251,9 @@ mod tests {
     #[test]
     fn kh_unknot_bigr_red() {
         let l = Link::unknot();
-        let h = KhHomology::new(&l, &0, &0, true).into_bigraded();
+        let h = KhHomology::new(&l, &0, &0, true);
 
-        assert_eq!(h.h_range(), 0..=0);
-        assert_eq!(h.q_range(), 0..=0);
-
+        let h = h.gen_grid();
         assert_eq!(h[(0, 0)].rank(), 1);
         assert!(h[(0, 0)].is_free());
     }
@@ -338,11 +261,12 @@ mod tests {
     #[test]
     fn kh_trefoil_bigr() {
         let l = Link::trefoil();
-        let h = KhHomology::new(&l, &0, &0, false).into_bigraded();
+        let h = KhHomology::new(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), -3..=0);
         assert_eq!(h.q_range(), -9..=-1);
 
+        let h = h.gen_grid();
         assert_eq!(h[(-3,-9)].rank(), 1);
         assert!(h[(-3,-9)].is_free());
         assert_eq!(h[(-2,-7)].rank(), 0);
@@ -358,11 +282,12 @@ mod tests {
     #[test]
     fn kh_trefoil_mirror_bigr() {
         let l = Link::trefoil().mirror();
-        let h = KhHomology::new(&l, &0, &0, false).into_bigraded();
+        let h = KhHomology::new(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), 0..=3);
         assert_eq!(h.q_range(), 1..=9);
 
+        let h = h.gen_grid();
         assert_eq!(h[(0, 1)].rank(), 1);
         assert!(h[(0, 1)].is_free());
         assert_eq!(h[(0, 3)].rank(), 1);
@@ -378,11 +303,12 @@ mod tests {
     #[test]
     fn kh_trefoil_bigr_red() {
         let l = Link::trefoil();
-        let h = KhHomology::new(&l, &0, &0, true).into_bigraded();
+        let h = KhHomology::new(&l, &0, &0, true);
 
         assert_eq!(h.h_range(), -3..=0);
         assert_eq!(h.q_range(), -8..=-2);
 
+        let h = h.gen_grid();
         assert_eq!(h[(-3,-8)].rank(), 1);
         assert!(h[(-3,-8)].is_free());
         assert_eq!(h[(-2,-6)].rank(), 1);
@@ -394,11 +320,12 @@ mod tests {
     #[test]
     fn kh_figure8_bigr() {
         let l = Link::figure8();
-        let h = KhHomology::new(&l, &0, &0, false).into_bigraded();
+        let h = KhHomology::new(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), -2..=2);
         assert_eq!(h.q_range(), -5..=5);
 
+        let h = h.gen_grid();
         assert_eq!(h[(-2,-5)].rank(), 1);
         assert!(h[(-2,-5)].is_free());
         assert_eq!(h[(-1,-3)].rank(), 0);
@@ -420,11 +347,12 @@ mod tests {
     #[test]
     fn kh_figure8_bigr_red() {
         let l = Link::figure8();
-        let h = KhHomology::new(&l, &0, &0, true).into_bigraded();
+        let h = KhHomology::new(&l, &0, &0, true);
 
         assert_eq!(h.h_range(), -2..=2);
         assert_eq!(h.q_range(), -4..=4);
 
+        let h = h.gen_grid();
         assert_eq!(h[(-2,-4)].rank(), 1);
         assert!(h[(-2,-4)].is_free());
         assert_eq!(h[(-1,-2)].rank(), 1);
@@ -438,38 +366,18 @@ mod tests {
     }
 
     #[test]
-    fn into_bigr() {
-        let l = Link::trefoil();
-        let (h, t) = (0, 0);
-        let kh = KhHomology::new(&l, &h, &t, false).into_bigraded();
- 
-        assert_eq!(kh.h_range(), -3..=0);
-        assert_eq!(kh.q_range(), -9..=-1);
- 
-        assert_eq!(kh[(-3,-9)].rank(), 1);
-        assert!(kh[(-3,-9)].is_free());
-        assert_eq!(kh[(-2,-7)].rank(), 0);
-        assert_eq!(kh[(-2,-7)].tors(), &vec![2]);
-        assert_eq!(kh[(-2,-5)].rank(), 1);
-        assert!(kh[(-2,-5)].is_free());
-        assert_eq!(kh[( 0,-3)].rank(), 1);
-        assert!(kh[( 0,-3)].is_free());
-        assert_eq!(kh[( 0,-1)].rank(), 1);
-        assert!(kh[( 0,-1)].is_free());
-    }
- 
-    #[test]
-    fn into_bigr_bn() {
+    fn bn_trefoil() {
         type R = FF2;
         type P = HPoly<'H', R>;
 
         let l = Link::trefoil();
         let (h, t) = (P::variable(), P::zero());
-        let kh = KhHomology::new(&l, &h, &t, false).into_bigraded();
+        let kh = KhHomology::new(&l, &h, &t, false);
 
         assert_eq!(kh.h_range(), -2..=0);
         assert_eq!(kh.q_range(), -7..=-1);
 
+        let kh = kh.gen_grid();
         assert_eq!(kh[(-2,-7)].rank(), 0);
         assert_eq!(kh[(-2,-7)].tors(), &vec![h.clone()]);
         assert_eq!(kh[(-2,-5)].rank(), 0);
@@ -576,9 +484,12 @@ mod tests_v1 {
     #[test]
     fn kh_empty_bigr() {
         let l = Link::empty();
-        let h = KhHomology::new_no_simplify(&l, &0, &0, false).into_bigraded();
+        let h = KhHomology::new_no_simplify(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), 0..=0);
+        assert_eq!(h.q_range(), 0..=0);
+        
+        let h = h.gen_grid();
         assert_eq!(h[(0,0)].rank(), 1);
         assert!(h[(0,0)].is_free());
     }
@@ -586,11 +497,12 @@ mod tests_v1 {
     #[test]
     fn kh_unknot_bigr() {
         let l = Link::unknot();
-        let h = KhHomology::new_no_simplify(&l, &0, &0, false).into_bigraded();
+        let h = KhHomology::new_no_simplify(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), 0..=0);
         assert_eq!(h.q_range(), -1..=1);
 
+        let h = h.gen_grid();
         assert_eq!(h[(0,-1)].rank(), 1);
         assert!(h[(0,-1)].is_free());
         assert_eq!(h[(0, 1)].rank(), 1);
@@ -600,11 +512,12 @@ mod tests_v1 {
     #[test]
     fn kh_unknot_bigr_red() {
         let l = Link::unknot();
-        let h = KhHomology::new_no_simplify(&l, &0, &0, true).into_bigraded();
+        let h = KhHomology::new_no_simplify(&l, &0, &0, true);
 
         assert_eq!(h.h_range(), 0..=0);
         assert_eq!(h.q_range(), 0..=0);
 
+        let h = h.gen_grid();
         assert_eq!(h[(0, 0)].rank(), 1);
         assert!(h[(0, 0)].is_free());
     }
@@ -612,11 +525,12 @@ mod tests_v1 {
     #[test]
     fn kh_trefoil_bigr() {
         let l = Link::trefoil();
-        let h = KhHomology::new_no_simplify(&l, &0, &0, false).into_bigraded();
+        let h = KhHomology::new_no_simplify(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), -3..=0);
         assert_eq!(h.q_range(), -9..=-1);
 
+        let h = h.gen_grid();
         assert_eq!(h[(-3,-9)].rank(), 1);
         assert!(h[(-3,-9)].is_free());
         assert_eq!(h[(-2,-7)].rank(), 0);
@@ -632,11 +546,12 @@ mod tests_v1 {
     #[test]
     fn kh_trefoil_mirror_bigr() {
         let l = Link::trefoil().mirror();
-        let h = KhHomology::new_no_simplify(&l, &0, &0, false).into_bigraded();
+        let h = KhHomology::new_no_simplify(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), 0..=3);
         assert_eq!(h.q_range(), 1..=9);
 
+        let h = h.gen_grid();
         assert_eq!(h[(0, 1)].rank(), 1);
         assert!(h[(0, 1)].is_free());
         assert_eq!(h[(0, 3)].rank(), 1);
@@ -652,11 +567,12 @@ mod tests_v1 {
     #[test]
     fn kh_trefoil_bigr_red() {
         let l = Link::trefoil();
-        let h = KhHomology::new_no_simplify(&l, &0, &0, true).into_bigraded();
+        let h = KhHomology::new_no_simplify(&l, &0, &0, true);
 
         assert_eq!(h.h_range(), -3..=0);
         assert_eq!(h.q_range(), -8..=-2);
 
+        let h = h.gen_grid();
         assert_eq!(h[(-3,-8)].rank(), 1);
         assert!(h[(-3,-8)].is_free());
         assert_eq!(h[(-2,-6)].rank(), 1);
@@ -668,11 +584,12 @@ mod tests_v1 {
     #[test]
     fn kh_figure8_bigr() {
         let l = Link::figure8();
-        let h = KhHomology::new_no_simplify(&l, &0, &0, false).into_bigraded();
+        let h = KhHomology::new_no_simplify(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), -2..=2);
         assert_eq!(h.q_range(), -5..=5);
 
+        let h = h.gen_grid();
         assert_eq!(h[(-2,-5)].rank(), 1);
         assert!(h[(-2,-5)].is_free());
         assert_eq!(h[(-1,-3)].rank(), 0);
@@ -694,11 +611,12 @@ mod tests_v1 {
     #[test]
     fn kh_figure8_bigr_red() {
         let l = Link::figure8();
-        let h = KhHomology::new_no_simplify(&l, &0, &0, true).into_bigraded();
+        let h = KhHomology::new_no_simplify(&l, &0, &0, true);
 
         assert_eq!(h.h_range(), -2..=2);
         assert_eq!(h.q_range(), -4..=4);
 
+        let h = h.gen_grid();
         assert_eq!(h[(-2,-4)].rank(), 1);
         assert!(h[(-2,-4)].is_free());
         assert_eq!(h[(-1,-2)].rank(), 1);
@@ -712,14 +630,15 @@ mod tests_v1 {
     }
 
     #[test]
-    fn into_bigr() {
+    fn gen_grid() {
         let l = Link::trefoil();
         let (h, t) = (0, 0);
-        let kh = KhHomology::new_no_simplify(&l, &h, &t, false).into_bigraded();
+        let kh = KhHomology::new_no_simplify(&l, &h, &t, false);
  
         assert_eq!(kh.h_range(), -3..=0);
         assert_eq!(kh.q_range(), -9..=-1);
  
+        let kh = kh.gen_grid();
         assert_eq!(kh[(-3,-9)].rank(), 1);
         assert!(kh[(-3,-9)].is_free());
         assert_eq!(kh[(-2,-7)].rank(), 0);
@@ -733,17 +652,18 @@ mod tests_v1 {
     }
  
     #[test]
-    fn into_bigr_bn() {
+    fn gen_grid_bn() {
         type R = FF2;
         type P = HPoly<'H', R>;
 
         let l = Link::trefoil();
         let (h, t) = (P::variable(), P::zero());
-        let kh = KhHomology::new_no_simplify(&l, &h, &t, false).into_bigraded();
+        let kh = KhHomology::new_no_simplify(&l, &h, &t, false);
 
         assert_eq!(kh.h_range(), -2..=0);
         assert_eq!(kh.q_range(), -7..=-1);
 
+        let kh = kh.gen_grid();
         assert_eq!(kh[(-2,-7)].rank(), 0);
         assert_eq!(kh[(-2,-7)].tors(), &vec![h.clone()]);
         assert_eq!(kh[(-2,-5)].rank(), 0);

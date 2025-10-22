@@ -42,7 +42,7 @@ fn k15n_103488() {
     let khi = KhIHomology::new(&l, &P::variable(), &P::zero(), false);
     let (s0, s1) = ssi_of(&khi);
 
-    khi.into_bigraded().print_table("i", "j");
+    khi.gen_grid().print_table("i", "j");
     
     println!("s0 = {s0}, s1 = {s1}");
     assert_eq!(s0, 0);
@@ -64,7 +64,7 @@ fn knotJ() {
     let khi = KhIHomology::new(&l, &P::variable(), &P::zero(), false);
     let (s0, s1) = ssi_of(&khi);
 
-    khi.into_bigraded().print_table("i", "j");
+    khi.gen_grid().print_table("i", "j");
     
     println!("s0 = {s0}, s1 = {s1}");
     assert_eq!(s0, 0);
@@ -88,7 +88,7 @@ fn k9_46_interlock() {
     let khi = KhIHomology::new(&l, &P::variable(), &P::zero(), false);
     let (s0, s1) = ssi_of(&khi);
 
-    khi.into_bigraded().print_table("i", "j");
+    khi.gen_grid().print_table("i", "j");
     
     println!("s0 = {s0}, s1 = {s1}");
     assert_eq!(s0, 0);
@@ -115,7 +115,7 @@ fn k15n_interlock() {
     let khi = KhIHomology::new(&l, &P::variable(), &P::zero(), false);
     let (s0, s1) = ssi_of(&khi);
 
-    khi.into_bigraded().print_table("i", "j");
+    khi.gen_grid().print_table("i", "j");
     
     println!("s0 = {s0}, s1 = {s1}");
     assert_eq!(s0, 0);
@@ -157,7 +157,7 @@ fn knotJ_interlock_truncated() {
     let khi = KhIHomology::new(&l, &P::variable(), &P::zero(), false);
     let (s0, s1) = ssi_of(&khi);
 
-    khi.into_bigraded().print_table("i", "j");
+    khi.gen_grid().print_table("i", "j");
     
     println!("s0 = {s0}, s1 = {s1}");
     assert_eq!(s0, 0);

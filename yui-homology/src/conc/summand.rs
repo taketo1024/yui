@@ -58,6 +58,10 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         let v = SpVec::unit(n, i);
         self.devectorize(&v)
     }
+    
+    pub fn gens(&self) -> impl Iterator<Item = Lc<X, R>> + use<'_, X, R> { 
+        (0 .. self.rank + self.tors.len()).map(|i| self.gen(i))
+    }
 
     pub fn vectorize(&self, z: &Lc<X, R>) -> SpVec<R> {
         let n = self.raw_gens.len();
@@ -117,14 +121,14 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn print_gens(&self) {
-        for i in 0..self.rank() { 
-            println!("{}: {}", i, self.gen(i));
+        for (i, x) in self.gens().enumerate() {
+            println!("{i}: {x}")
         }
     }
 
     pub fn print_raw_gens(&self) {
         for (i, x) in self.raw_gens.iter().enumerate() { 
-            println!("{}: {}", i, x);
+            println!("{i}: {x}");
         }
     }
 }
@@ -204,7 +208,7 @@ mod tests {
     #[test]
     fn as_chain() { 
         let s = Summand::from_raw_gens([e(0), e(1), e(2)]);
-        
+
         let x = Lc::from(e(0));
         let y = Lc::from(e(1));
         let z = Lc::from(e(2));

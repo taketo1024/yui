@@ -12,7 +12,7 @@ use yui_homology::DisplaySeq;
 use yui_link::{Crossing, Edge, Link};
 
 use crate::ext::LinkExt;
-use crate::kh::{KhAlgGen, KhChain, KhComplex};
+use crate::kh::{KhGen, KhChain, KhComplex};
 
 use super::cob::{Bottom, Dot, Cob, CobComp, LcCobTrait, LcCob};
 use super::tng::{Tng, TngComp};
@@ -512,12 +512,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let Some(f) = self.retr_cob.remove(k) else { return };
         let marked = self.base_pt.map(|e| c.contains(e)).unwrap_or(false);
 
-        let k0 = k + KhAlgGen::X;
+        let k0 = k + KhGen::X;
         let f0 = f.clone().cap_off(Bottom::Tgt, c, Dot::None);
         self.retr_cob.insert(k0, f0);
 
         if !marked { 
-            let k1 = k + KhAlgGen::I;
+            let k1 = k + KhGen::I;
             let f1 = f.cap_off(Bottom::Tgt, c, Dot::Y);
             self.retr_cob.insert(k1, f1);    
         }

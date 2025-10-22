@@ -2,11 +2,11 @@ use std::fmt::Display;
 
 use yui::lc::Gen;
 use yui::Elem;
-use crate::kh::KhGen;
+use crate::kh::KhChainGen;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum KhIGen { 
-    B(KhGen), Q(KhGen)
+    B(KhChainGen), Q(KhChainGen)
 }
 
 impl KhIGen { 
@@ -36,7 +36,7 @@ impl Display for KhIGen {
 
 impl Default for KhIGen {
     fn default() -> Self {
-        KhIGen::B(KhGen::default())
+        KhIGen::B(KhChainGen::default())
     }
 }
 

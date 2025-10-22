@@ -1,57 +1,18 @@
-use std::fmt::Display;
-use yui::lc::Gen;
-use yui::{Elem, Ring, RingOps};
+use num_traits::Zero;
+use yui::lc::Lc;
+use yui::{Ring, RingOps};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
-pub enum KhAlgGen { 
-    #[default] 
-    I, 
-    X
-}
-
-impl KhAlgGen { 
-    #[allow(non_snake_case)]
-    pub fn is_X(&self) -> bool { 
-        self == &KhAlgGen::X
-    }
-
-    pub fn is_1(&self) -> bool { 
-        self == &KhAlgGen::I
-    }
-
-    pub fn deg(&self) -> isize {
-        match self { 
-            KhAlgGen::I => 0,
-            KhAlgGen::X => -2
-        }
-    }
-}
-
-impl Display for KhAlgGen {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self { 
-            KhAlgGen::I => f.write_str("1"),
-            KhAlgGen::X => f.write_str("X")
-        }
-    }
-}
-
-impl Elem for KhAlgGen {
-    fn math_symbol() -> String {
-        format!("A")
-    }
-}
-
-impl Gen for KhAlgGen {}
+use crate::kh::r#gen::KhGen;
+use crate::kh::KhTensor;
 
 #[derive(Clone)]
-pub struct KhAlgStr<R>
+pub struct KhAlg<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     h: R,
     t: R
 }
 
-impl<R> KhAlgStr<R>
+impl<R> KhAlg<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn new(h: &R, t: &R) -> Self { 
         Self { 
@@ -72,92 +33,207 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         (&self.h, &self.t)
     }
 
-    pub fn prod(&self, x: KhAlgGen, y: KhAlgGen) -> Vec<(KhAlgGen, R)> {
-        use KhAlgGen::{I, X};
+    pub fn mul(&self, x: KhGen, y: KhGen) -> Lc<KhGen, R> {
+        use KhGen::{I, X};
         let (h, t) = (self.h(), self.t());
 
-        let res = match (x, y) { 
-            (I, I) => vec![(I, R::one())],
-            (X, I) | (I, X) => vec![(X, R::one())],
-            (X, X) => vec![(X, h.clone()), (I, t.clone())]
-        };
-
-        res.into_iter().filter(|(_, a)| !a.is_zero()).collect()
+        match (x, y) { 
+            (I, I) => Lc::from(I),
+            (X, I) | (I, X) => Lc::from(X),
+            (X, X) => match (h.is_zero(), t.is_zero()) { 
+                (true,  true ) => Lc::zero(),
+                (false, true ) => Lc::from((X, h.clone())),
+                (true,  false) => Lc::from((I, t.clone())),
+                (false, false) => Lc::from_iter([(X, h.clone()), (I, t.clone())])
+            } 
+        }
     }
 
-    pub fn coprod(&self, x: KhAlgGen) -> Vec<(KhAlgGen, KhAlgGen, R)> {
-        use KhAlgGen::{I, X};
-        let (h, t) = (self.h(), self.t());
+    pub fn mul_tensor(&self, x: &KhTensor, in_index: (usize, usize), out_index: usize) -> Lc<KhTensor, R> { 
+        assert_ne!(in_index.0, in_index.1);
 
-        let res = match x { 
-            I => vec![(X, I, R::one()), (I, X, R::one()), (I, I, -h.clone())],
-            X => vec![(X, X, R::one()), (I, I, t.clone())]
+        let (i, j) = if in_index.0 < in_index.1 {
+            in_index
+        } else { 
+            (in_index.1, in_index.0)
+        };
+        let k = out_index;
+
+        self.mul(x[i], x[j]).into_map_gens(|y| { 
+            let mut t = x.clone();
+            t.remove(j);
+            t.remove(i);
+            t.insert(k, y);
+            t
+        })
+    }
+
+    pub fn comul(&self, x: KhGen) -> Lc<KhTensor, R> {
+        use KhGen::{I, X};
+        let (h, t) = (self.h(), self.t());
+        let tsr = |x, y| KhTensor::from_iter([x, y]);
+
+        match x { 
+            I => if h.is_zero() { 
+                Lc::from_iter([
+                    (tsr(X, I), R::one()), 
+                    (tsr(I, X), R::one())
+                ])
+            } else {
+                Lc::from_iter([
+                    (tsr(X, I), R::one()), 
+                    (tsr(I, X), R::one()),
+                    (tsr(I, I), -h)
+                ])
+            },
+            X => if t.is_zero() { 
+                Lc::from(
+                    (tsr(X, X), R::one()) 
+                )
+            } else { 
+                Lc::from_iter([
+                    (tsr(X, X), R::one()), 
+                    (tsr(I, I), t.clone())
+                ])
+            }
+        }
+    }
+
+    pub fn comul_tensor(&self, x: &KhTensor, in_index: usize, out_index: (usize, usize)) -> Lc<KhTensor, R> { 
+        assert_ne!(out_index.0, out_index.1);
+
+        let i = in_index;
+        let (j, k) = if out_index.0 < out_index.1 {
+            out_index
+        } else { 
+            (out_index.1, out_index.0)
         };
 
-        res.into_iter().filter(|(_, _, a)| !a.is_zero()).collect()
+        self.comul(x[i]).into_map_gens(|y| { 
+            let mut t = x.clone();
+            t.remove(i);
+            t.insert(j, y[0]);
+            t.insert(k, y[1]);
+            t
+        })
+    }
+
+    pub fn sigma(&self, x: &KhGen) -> Lc<KhGen, R> {
+        match x { 
+            KhGen::I => Lc::from((KhGen::I, R::one())),
+            KhGen::X => Lc::from_iter([
+                (KhGen::X, -R::one()), 
+                (KhGen::I, self.h().clone())
+            ])
+        }
     }
 }
 
 #[cfg(test)]
 pub mod tests {
-    use super::{KhAlgGen, KhAlgStr};
+    use num_traits::Zero;
+    use yui::lc::Lc;
+
+    use crate::kh::KhTensor;
+
+    use super::{KhGen, KhAlg};
  
     #[test]
     fn alg_gen() { 
-        use KhAlgGen::{I, X};
+        use KhGen::{I, X};
         assert_eq!(I.deg(), 0);
         assert_eq!(X.deg(), -2);
     }
 
     #[test]
     fn str_prod_kh() { 
-        use KhAlgGen::{I, X};
-        let a = KhAlgStr::new(&0, &0);
-        assert_eq!(a.prod(I, I), vec![(I, 1)]);
-        assert_eq!(a.prod(X, I), vec![(X, 1)]);
-        assert_eq!(a.prod(I, X), vec![(X, 1)]);
-        assert_eq!(a.prod(X, X), vec![]);
+        use KhGen::{I, X};
+        let a = KhAlg::new(&0, &0);
+        assert_eq!(a.mul(I, I), Lc::from((I, 1)));
+        assert_eq!(a.mul(X, I), Lc::from((X, 1)));
+        assert_eq!(a.mul(I, X), Lc::from((X, 1)));
+        assert_eq!(a.mul(X, X), Lc::zero());
     }
 
     #[test]
     fn str_coprod_kh() { 
-        use KhAlgGen::{I, X};
-        let a = KhAlgStr::new(&0, &0);
-        assert_eq!(a.coprod(I), vec![(X, I, 1), (I, X, 1)]);
-        assert_eq!(a.coprod(X), vec![(X, X, 1)]);
+        use KhGen::{I, X};
+        let a = KhAlg::new(&0, &0);
+        assert_eq!(a.comul(I), Lc::from_iter([
+            (KhTensor::from([X, I]), 1),
+            (KhTensor::from([I, X]), 1),
+        ]));
+        assert_eq!(a.comul(X), Lc::from(
+            (KhTensor::from_iter([X, X]), 1)
+        ));
     }
     #[test]
     fn str_prod_bn() { 
-        use KhAlgGen::{I, X};
-        let a = KhAlgStr::new(&1, &0);
-        assert_eq!(a.prod(I, I), vec![(I, 1)]);
-        assert_eq!(a.prod(X, I), vec![(X, 1)]);
-        assert_eq!(a.prod(I, X), vec![(X, 1)]);
-        assert_eq!(a.prod(X, X), vec![(X, 1)]);
+        use KhGen::{I, X};
+        let a = KhAlg::new(&1, &0);
+        assert_eq!(a.mul(I, I), Lc::from((I, 1)));
+        assert_eq!(a.mul(X, I), Lc::from((X, 1)));
+        assert_eq!(a.mul(I, X), Lc::from((X, 1)));
+        assert_eq!(a.mul(X, X), Lc::from((X, 1)));
     }
 
     #[test]
     fn str_coprod_bn() { 
-        use KhAlgGen::{I, X};
-        let a = KhAlgStr::new(&1, &0);
-        assert_eq!(a.coprod(I), vec![(X, I, 1), (I, X, 1), (I, I, -1)]);
-        assert_eq!(a.coprod(X), vec![(X, X, 1)]);
+        use KhGen::{I, X};
+        let a = KhAlg::new(&1, &0);
+        assert_eq!(a.comul(I), Lc::from_iter([
+            (KhTensor::from([X, I]), 1),
+            (KhTensor::from([I, X]), 1),
+            (KhTensor::from([I, I]), -1),
+        ]));
+        assert_eq!(a.comul(X), Lc::from(
+            (KhTensor::from_iter([X, X]), 1)
+        ));
     }
     #[test]
     fn str_prod_lee() { 
-        use KhAlgGen::{I, X};
-        let a = KhAlgStr::new(&0, &1);
-        assert_eq!(a.prod(I, I), vec![(I, 1)]);
-        assert_eq!(a.prod(X, I), vec![(X, 1)]);
-        assert_eq!(a.prod(I, X), vec![(X, 1)]);
-        assert_eq!(a.prod(X, X), vec![(I, 1)]);
+        use KhGen::{I, X};
+        let a = KhAlg::new(&0, &1);
+        assert_eq!(a.mul(I, I), Lc::from((I, 1)));
+        assert_eq!(a.mul(X, I), Lc::from((X, 1)));
+        assert_eq!(a.mul(I, X), Lc::from((X, 1)));
+        assert_eq!(a.mul(X, X), Lc::from((I, 1)));
     }
 
     #[test]
     fn str_coprod_lee() { 
-        use KhAlgGen::{I, X};
-        let a = KhAlgStr::new(&0, &1);
-        assert_eq!(a.coprod(I), vec![(X, I, 1), (I, X, 1)]);
-        assert_eq!(a.coprod(X), vec![(X, X, 1), (I, I, 1)]);
+        use KhGen::{I, X};
+        let a = KhAlg::new(&0, &1);
+        assert_eq!(a.comul(I), Lc::from_iter([
+            (KhTensor::from([X, I]), 1),
+            (KhTensor::from([I, X]), 1),
+        ]));
+        assert_eq!(a.comul(X), Lc::from_iter([
+            (KhTensor::from([X, X]), 1),
+            (KhTensor::from([I, I]), 1),
+        ]));
+    }
+
+    #[test]
+    fn mul_x_at() { 
+        use KhGen::{I, X};
+        let a = KhAlg::new(&2, &1);
+        let x = KhTensor::from_iter([I, X, I]);
+
+        assert_eq!(
+            x.apply_at(0, |&x| a.mul(x, X)), 
+            Lc::from(KhTensor::from_iter([X, X, I]))
+        );
+        assert_eq!(
+            x.apply_at(1, |&x| a.mul(x, X)), 
+            Lc::from_iter([
+                (KhTensor::from([I, X, I]), 2),
+                (KhTensor::from([I, I, I]), 1),
+            ]
+        ));
+        assert_eq!(
+            x.apply_at(2, |&x| a.mul(x, X)), 
+            Lc::from(KhTensor::from_iter([I, X, X]))
+        );
     }
 }

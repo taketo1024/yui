@@ -4,11 +4,11 @@ mod complex;
 mod homology;
 mod ss;
 
-pub use alg::{KhAlgGen, KhAlgStr};
-pub use gen::{KhLabel, KhGen};
-pub use complex::{KhChain, KhChainExt, KhComplex, KhComplexBigraded};
-pub use homology::{KhHomology, KhHomologyBigraded};
+pub use alg::KhAlg;
+pub use gen::{KhGen, KhTensor, KhChainGen, KhChain, KhChainExt};
+pub use complex::KhComplex;
+pub use homology::KhHomology;
 pub use ss::ss_invariant;
 
 pub mod internal;
-pub mod sigma;
+pub mod ext;

@@ -243,12 +243,12 @@ mod tests {
 
         assert_eq!(
             c.t_label(State::from([1,1,0]), KhTensor::from([I, X])), 
-            KhTensor::from([X, I])
+            KhTensor::from([I, X])
         );
 
         assert_eq!(
             c.t_label(State::from([1,1,1]), KhTensor::from([I, I, X])), 
-            KhTensor::from([X, I, I])
+            KhTensor::from([I, X, I])
         );
     }
 

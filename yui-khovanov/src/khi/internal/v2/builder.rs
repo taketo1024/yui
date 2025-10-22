@@ -662,7 +662,7 @@ mod tests {
     use super::*;
     use num_traits::Zero;
 
-    use yui::FF2;
+    use yui::num::FF2;
     use yui::poly::HPoly;
     use yui_homology::{ChainComplexTrait, DisplaySeq, DisplayTable, SummandTrait};
 

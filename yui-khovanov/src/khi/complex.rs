@@ -215,7 +215,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 mod tests {
     use yui::poly::HPoly;
-    use yui::FF2;
+    use yui::num::FF2;
     use num_traits::{Zero, One};
     use yui_homology::{ChainComplexTrait, SummandTrait};
     use super::*;
@@ -417,7 +417,7 @@ mod tests {
 #[cfg(test)]
 mod tests_v1 {
     use yui::poly::HPoly;
-    use yui::FF2;
+    use yui::num::FF2;
     use num_traits::{Zero, One};
     use yui_homology::{ChainComplexTrait, SummandTrait};
     use super::*;

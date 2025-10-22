@@ -126,7 +126,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 mod tests {
     use num_traits::Zero;
     use yui::poly::HPoly;
-    use yui::FF2;
+    use yui::num::FF2;
     
     use yui_homology::SummandTrait;
     use yui_link::Link;
@@ -393,7 +393,7 @@ mod tests {
 mod tests_v1 {
     use num_traits::Zero;
     use yui::poly::HPoly;
-    use yui::FF2;
+    use yui::num::FF2;
     use yui_homology::SummandTrait;
     use yui_link::Link;
     use super::*;

@@ -105,7 +105,7 @@ mod tests {
 
     use itertools::Itertools;
     use yui::poly::HPoly;
-    use yui::FF2;
+    use yui::num::FF2;
     use num_traits::{Zero, One};
     use yui_homology::{ChainComplexTrait, DisplaySeq, DisplayTable, SummandTrait};
     use yui_link::Link;
@@ -258,7 +258,7 @@ mod tests_v1 {
 
     use itertools::Itertools;
     use yui::poly::HPoly;
-    use yui::FF2;
+    use yui::num::FF2;
     use num_traits::{Zero, One};
     use yui_homology::{ChainComplexTrait, DisplaySeq, DisplayTable, SummandTrait};
     use yui_link::Link;

@@ -458,7 +458,7 @@ where R: Scalar + Zero + One + ClosedAddAssign {
 pub(super) mod tests { 
     use itertools::Itertools;
     use sprs::PermOwned;
-    use yui::Ratio;
+    use yui::num::Ratio;
 
     use super::*;
 

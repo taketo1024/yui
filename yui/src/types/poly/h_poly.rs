@@ -300,7 +300,7 @@ mod tex {
 
 #[cfg(test)]
 mod tests { 
-    use crate::Ratio;
+    use crate::num::Ratio;
 
     use super::*;
 

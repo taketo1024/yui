@@ -309,7 +309,7 @@ mod tests {
 
     #[test]
     fn table_rmod() { 
-        use yui::FF2;
+        use yui::num::FF2;
         use crate::GenericSummand;
         use cartesian::cartesian;
         

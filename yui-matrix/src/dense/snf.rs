@@ -142,7 +142,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
 
     fn preprocess(&mut self) {
         use num_bigint::BigInt;
-        use yui::{GaussInt, EisenInt};        
+        use yui::num::{GaussInt, EisenInt};        
         preprocess_lll_for!(self, 
             i64, i128, BigInt, 
             GaussInt<i64>, GaussInt<i128>, GaussInt<BigInt>, 

@@ -80,7 +80,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 #[cfg(test)]
 mod tests {
     use yui::poly::HPoly;
-    use yui::FF2;
+    use yui::num::FF2;
     use yui_link::Link;
 
     use super::*;

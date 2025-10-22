@@ -978,7 +978,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn is_homogeneous(&self) -> bool {
         use std::any::Any;
-        use yui::{FF2, poly::HPoly};
+        use yui::{num::FF2, poly::HPoly};
 
         if let Some(_self) = (self as &dyn Any).downcast_ref::<LcCob<HPoly<'H', FF2>>>() { 
             _self.iter().map(|(cob, r)| cob.deg() - 2 * (r.deg() as i32)).all_equal()

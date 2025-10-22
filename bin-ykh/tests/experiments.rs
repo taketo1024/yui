@@ -4,7 +4,8 @@ use num_traits::Zero;
 
 use log::*;
 use yui::poly::HPoly;
-use yui::{EucRing, EucRingOps, FF2};
+use yui::num::FF2;
+use yui::{EucRing, EucRingOps};
 use yui_homology::{ChainComplexTrait, DisplaySeq, DisplayTable, SummandTrait};
 use yui_kh::kh::KhChainExt;
 use yui_kh::khi::internal::v2::builder::SymTngBuilder;

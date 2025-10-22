@@ -166,7 +166,7 @@ mod tests {
     #![allow(unused)]
 
     use yui::poly::Poly;
-    use yui::FF2;
+    use yui::num::FF2;
     use num_traits::{Zero, One};
     use yui_homology::{ChainComplexTrait, DisplaySeq};
     use yui_link::Link;

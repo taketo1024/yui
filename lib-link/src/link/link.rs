@@ -196,11 +196,14 @@ impl Link {
     pub fn resolve_all_crossings(&self, s: &State) -> Self {
         assert!(s.len() == self.crossing_num());
 
-        self.clone_and(|l|
-            for r in s.iter() {
-                l.crossing_at_mut(0).resolve(r)
+        let n = self.nodes.len();
+        let itr = (0..n).filter(|&i| self.node(i).is_crossing());
+
+        self.clone_and(|l| {
+            for (i, r) in Iterator::zip(itr, s.iter()) {
+                l.node_mut(i).resolve(r); 
             }
-        )
+        })
     }
 
     pub fn mirror(&self) -> Self {

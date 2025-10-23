@@ -57,7 +57,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let deg_shift = KhComplex::deg_shift_for(l, reduced);
 
         let mut b = Self::init(h, t, deg_shift, base_pt);
-        b.set_crossings(l.nodes().clone());
+        b.set_crossings(l.nodes().cloned());
 
         if t.is_zero() && l.is_knot() {
             let canon = Self::make_canon_cycles(l, base_pt);
@@ -411,7 +411,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let start_p = base_pt.or(l.first_edge()).unwrap();
         let circles = l.colored_seifert_circles(start_p);
 
-        let crossings = l.nodes().iter().filter(|x| x.is_crossing()).cloned();
+        let crossings = l.nodes().filter(|x| x.is_crossing()).cloned();
         let state = l.ori_pres_state();
         let state_map = Iterator::zip(crossings.into_iter(), state.iter()).collect::<HashMap<_, _>>();
 

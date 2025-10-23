@@ -17,7 +17,7 @@ pub fn seifert_graph(link: &Link) -> Graph<Path, usize> {
         )
     };
 
-    for (i, x) in l0.nodes().iter().enumerate() {
+    for (i, x) in l0.nodes().enumerate() {
         let (e1, e2) = if x.ntype() == NodeType::V {
             (x.edge(0), x.edge(1))
         } else { 

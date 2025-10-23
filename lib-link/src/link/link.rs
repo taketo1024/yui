@@ -51,8 +51,12 @@ impl Link {
         )
     }
 
-    pub fn nodes(&self) -> &Vec<Node> { 
-        &self.nodes
+    pub fn n_nodes(&self) -> usize { 
+        self.nodes.len()
+    }
+
+    pub fn nodes(&self) -> impl Iterator<Item = &Node> { 
+        self.nodes.iter()
     }
 
     pub fn node(&self, i: usize) -> &Node { 

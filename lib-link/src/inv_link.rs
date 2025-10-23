@@ -21,9 +21,9 @@ impl InvLink {
         let mut x_map = HashMap::new();
 
         // TODO? check resolution
-        for x in link.nodes().iter() { 
+        for x in link.nodes() { 
             let edges = x.edges().map(|e| e_map.get(&e).unwrap());
-            let find = link.nodes().iter().find_position(|y|
+            let find = link.nodes().find_position(|y|
                 edges.iter().all(|e| y.edges().contains(e))
             );
 
@@ -39,7 +39,7 @@ impl InvLink {
             }
         }
 
-        assert_eq!(x_map.len(), link.nodes().len());
+        assert_eq!(x_map.len(), link.n_nodes());
 
         if let Some(p) = base_pt { 
             assert_eq!(p, e_map[&p], "base-pt must be on-axis.");
@@ -187,11 +187,11 @@ mod tests {
     fn inv_x() { 
         let l = Link::from_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
         let l = InvLink::new(l, |e| (7 - e) % 6 + 1, None);
-        let nodes = l.link.nodes();
+        let nodes = l.link.nodes().collect_vec();
 
-        assert_eq!(l.inv_x(&nodes[0]), &nodes[1]);
-        assert_eq!(l.inv_x(&nodes[1]), &nodes[0]);
-        assert_eq!(l.inv_x(&nodes[2]), &nodes[2]);
+        assert_eq!(l.inv_x(&nodes[0]), nodes[1]);
+        assert_eq!(l.inv_x(&nodes[1]), nodes[0]);
+        assert_eq!(l.inv_x(&nodes[2]), nodes[2]);
     }
 
     #[test]

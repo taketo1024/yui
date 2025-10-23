@@ -23,7 +23,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     pub fn new(l: &InvLink, h: &R, t: &R, reduced: bool, deg_shift: (isize, isize)) -> Self { 
         assert_eq!(R::one() + R::one(), R::zero(), "char(R) != 2");
         assert!(!reduced || (l.base_pt().is_some() && t.is_zero()));
-        assert!(l.link().nodes().iter().all(|x| x.is_crossing()));
+        assert!(l.link().nodes().all(|x| x.is_crossing()));
 
         let n = l.link().count_crossings();
         let reduce_e = if reduced { l.base_pt() } else { None };

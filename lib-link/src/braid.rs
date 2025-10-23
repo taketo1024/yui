@@ -257,6 +257,6 @@ mod tests {
     fn closure() {
         let b = Braid::from([-1,-1,-2,1,3,2,2,-4,-3,2,-3,-4]); // 9_41
         let l = b.closure();
-        assert_eq!(l.crossing_num(), 12);
+        assert_eq!(l.count_crossings(), 12);
     }
 }

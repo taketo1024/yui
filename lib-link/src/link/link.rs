@@ -11,18 +11,6 @@ pub type Edge = usize;
 pub type State = yui::bitseq::BitSeq;
 pub type XCode = [Edge; 4];
 
-// Planer Diagram code, represented by crossings:
-//
-//     3   2
-//      \ /
-//       \      = (0, 1, 2, 3)
-//      / \
-//     0   1
-//
-// The lower edge has direction 0 -> 2.
-// The crossing is +1 if the upper goes 3 -> 1.
-// see: http://katlas.math.toronto.edu/wiki/Planar_Diagrams
-
 #[derive(Debug, Clone)]
 pub struct Link { 
     nodes: Vec<Node>
@@ -40,12 +28,6 @@ impl Link {
         assert!(self.components().iter().all(|c| c.is_circle()), "Non-closed components.")
     }
 
-    pub fn from_pd_code<I>(pd_code: I) -> Self
-    where I: IntoIterator<Item = XCode> { 
-        let nodes = pd_code.into_iter().map(Node::from_pd_code).collect();
-        Self::new(nodes)
-    }
-
     pub fn empty() -> Link {
         Link { nodes: vec![] }
     }
@@ -56,6 +38,17 @@ impl Link {
 
     pub fn is_knot(&self) -> bool { 
         self.components().len() == 1
+    }
+
+    pub fn writhe(&self) -> i32 { 
+        let (p, n) = self.count_signed_crossings();
+        (p as i32) - (n as i32)
+    }
+
+    pub fn mirror(&self) -> Self {
+        self.clone_and(|l|
+            l.nodes.iter_mut().for_each(|x| x.cc())
+        )
     }
 
     pub fn nodes(&self) -> &Vec<Node> { 
@@ -74,25 +67,20 @@ impl Link {
         self.nodes.iter().filter(|x| x.is_crossing())
     }
 
-    pub fn crossing_num(&self) -> usize { 
+    pub fn count_crossings(&self) -> usize { 
         self.nodes.iter()
             .filter(|x| x.is_crossing())
             .count()
     }
 
-    pub fn writhe(&self) -> i32 { 
-        let (p, n) = self.signed_crossing_nums();
-        (p as i32) - (n as i32)
-    }
-
-    pub fn signed_crossing_nums(&self) -> (usize, usize) {
-        let signs = self.crossing_signs().into_iter().counts();
+    pub fn count_signed_crossings(&self) -> (usize, usize) {
+        let signs = self.collect_crossing_signs().into_iter().counts();
         let pos = signs.get(&Sign::Pos).cloned().unwrap_or(0);
         let neg = signs.get(&Sign::Neg).cloned().unwrap_or(0);
         (pos, neg)
     }
 
-    pub fn crossing_signs(&self) -> Vec<Sign> {
+    pub fn collect_crossing_signs(&self) -> Vec<Sign> {
         use NodeType::{X, Xm};
 
         let n = self.nodes.len();
@@ -132,6 +120,15 @@ impl Link {
         signs.into_iter().flatten().collect_vec()
     }
     
+    pub fn edges(&self) -> HashSet<Edge> {
+        self.nodes.iter().flat_map(|x| x.edges()).cloned().collect()
+    }
+
+    pub fn first_edge(&self) -> Option<Edge> { 
+        let x = self.nodes.first()?;
+        x.edges().iter().min().cloned()
+    }
+
     pub fn components(&self) -> Vec<Path> {
         let n = self.nodes.len();
 
@@ -179,7 +176,7 @@ impl Link {
     }
 
     pub fn resolve_all_crossings(&self, s: &State) -> Self {
-        assert!(s.len() == self.crossing_num());
+        assert!(s.len() == self.count_crossings());
 
         let n = self.nodes.len();
         let itr = (0..n).filter(|&i| self.node(i).is_crossing());
@@ -191,23 +188,8 @@ impl Link {
         })
     }
 
-    pub fn mirror(&self) -> Self {
-        self.clone_and(|l|
-            l.nodes.iter_mut().for_each(|x| x.cc())
-        )
-    }
-
-    pub fn edges(&self) -> HashSet<Edge> {
-        self.nodes.iter().flat_map(|x| x.edges()).cloned().collect()
-    }
-
-    pub fn first_edge(&self) -> Option<Edge> { 
-        let x = self.nodes.first()?;
-        x.edges().iter().min().cloned()
-    }
-
     pub fn ori_pres_state(&self) -> State { 
-        let signs = self.crossing_signs(); 
+        let signs = self.collect_crossing_signs(); 
         State::from_iter(signs.into_iter().map( |s|
             if s.is_positive() { 0 } else { 1 }
         ))
@@ -259,6 +241,24 @@ impl Link {
 }
 
 impl Link { 
+    // Planer Diagram code, represented by crossings:
+    //
+    //     3   2
+    //      \ /
+    //       \      = (0, 1, 2, 3)
+    //      / \
+    //     0   1
+    //
+    // The lower edge has direction 0 -> 2.
+    // The crossing is +1 if the upper goes 3 -> 1.
+    // see: http://katlas.math.toronto.edu/wiki/Planar_Diagrams
+
+    pub fn from_pd_code<I>(pd_code: I) -> Self
+    where I: IntoIterator<Item = XCode> { 
+        let nodes = pd_code.into_iter().map(Node::from_pd_code).collect();
+        Self::new(nodes)
+    }
+
     pub fn is_valid_name(str: &str) -> bool { 
         use regex::Regex;
         let r1 = Regex::new(r"^([1-9]|10)_[0-9]+$").unwrap();
@@ -340,15 +340,15 @@ mod tests {
     #[test]
     fn link_crossing_num() {
         let l = Link::empty();
-        assert_eq!(l.crossing_num(), 0);
+        assert_eq!(l.count_crossings(), 0);
 
         let pd_code = [[0,0,1,1]];
         let l = Link::from_pd_code(pd_code);
-        assert_eq!(l.crossing_num(), 1);
+        assert_eq!(l.count_crossings(), 1);
         
         let pd_code = [[1,4,2,5],[3,6,4,1],[5,2,6,3]];
         let l = Link::from_pd_code(pd_code);
-        assert_eq!(l.crossing_num(), 3);
+        assert_eq!(l.count_crossings(), 3);
     }
 
     #[test]
@@ -381,15 +381,15 @@ mod tests {
     fn link_crossing_signs() {
         let pd_code = [[0,0,1,1]];
         let l = Link::from_pd_code(pd_code);
-        assert_eq!(l.crossing_signs(), vec![Sign::Pos]);
+        assert_eq!(l.collect_crossing_signs(), vec![Sign::Pos]);
 
         let pd_code = [[0,1,1,0]];
         let l = Link::from_pd_code(pd_code);
-        assert_eq!(l.crossing_signs(), vec![Sign::Neg]);
+        assert_eq!(l.collect_crossing_signs(), vec![Sign::Neg]);
 
         let pd_code = [[0,0,1,1]];
         let l = Link::from_pd_code(pd_code).resolve_crossing(0, Bit::Bit0);
-        assert_eq!(l.crossing_signs(), vec![]);
+        assert_eq!(l.collect_crossing_signs(), vec![]);
     }
 
     #[test]
@@ -448,7 +448,7 @@ mod tests {
     #[test]
     fn empty_link() {
         let l = Link::empty();
-        assert_eq!(l.crossing_num(), 0);
+        assert_eq!(l.count_crossings(), 0);
         assert_eq!(l.writhe(), 0);
         assert_eq!(l.components().len(), 0);
     }
@@ -456,7 +456,7 @@ mod tests {
     #[test]
     fn unknot() { 
         let l = Link::unknot();
-        assert_eq!(l.crossing_num(), 0);
+        assert_eq!(l.count_crossings(), 0);
         assert_eq!(l.writhe(), 0);
         assert_eq!(l.components().len(), 1);
     }
@@ -464,7 +464,7 @@ mod tests {
     #[test]
     fn trefoil() { 
         let l = Link::trefoil();
-        assert_eq!(l.crossing_num(), 3);
+        assert_eq!(l.count_crossings(), 3);
         assert_eq!(l.writhe(), -3);
         assert_eq!(l.components().len(), 1);
     }
@@ -472,7 +472,7 @@ mod tests {
     #[test]
     fn figure8() { 
         let l = Link::figure8();
-        assert_eq!(l.crossing_num(), 4);
+        assert_eq!(l.count_crossings(), 4);
         assert_eq!(l.writhe(), 0);
         assert_eq!(l.components().len(), 1);
     }
@@ -480,7 +480,7 @@ mod tests {
     #[test]
     fn hopf_link() { 
         let l = Link::hopf_link();
-        assert_eq!(l.crossing_num(), 2);
+        assert_eq!(l.count_crossings(), 2);
         assert_eq!(l.writhe(), -2);
         assert_eq!(l.components().len(), 2);
     }
@@ -489,7 +489,7 @@ mod tests {
     fn unlink_2() {
         let pd_code = [[1,2,3,4], [3,2,1,4]];
         let l = Link::from_pd_code(pd_code);
-        assert_eq!(l.crossing_num(), 2);
+        assert_eq!(l.count_crossings(), 2);
         assert_eq!(l.writhe(), 0);
         assert_eq!(l.components().len(), 2);
     }
@@ -499,7 +499,7 @@ mod tests {
     fn l2x4() {
         let pd_code = [[1,5,2,8],[5,3,6,2],[3,7,4,6],[7,1,8,4]];
         let l = Link::from_pd_code(pd_code);
-        assert_eq!(l.crossing_num(), 4);
+        assert_eq!(l.count_crossings(), 4);
         assert_eq!(l.writhe(), 4);
         assert_eq!(l.components().len(), 2);
     }
@@ -510,7 +510,7 @@ mod tests {
         assert!(l.is_ok());
 
         let l = l.unwrap();
-        assert_eq!(l.crossing_num(), 3);
+        assert_eq!(l.count_crossings(), 3);
     }
 
     #[test]

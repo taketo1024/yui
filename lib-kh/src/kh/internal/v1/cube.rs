@@ -121,7 +121,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(l: &Link, h: &R, t: &R, reduce_e: Option<Edge>, deg_shift: (isize, isize)) -> Self { 
         assert!(reduce_e.is_none() || t.is_zero());
 
-        let n = l.crossing_num();
+        let n = l.count_crossings();
         let str = KhAlg::new(h, t);
 
         let vertices: HashMap<_, _> = State::generate(n).map(|s| { 

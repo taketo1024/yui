@@ -25,7 +25,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         assert!(!reduced || (l.base_pt().is_some() && t.is_zero()));
         assert!(l.link().nodes().iter().all(|x| x.is_crossing()));
 
-        let n = l.link().crossing_num();
+        let n = l.link().count_crossings();
         let reduce_e = if reduced { l.base_pt() } else { None };
         let cube = KhCube::new(l.link(), h, t, reduce_e, deg_shift);
 

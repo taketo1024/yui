@@ -209,12 +209,12 @@ mod tests {
     #[test]
     fn load_3_1() { 
         let l = InvLink::load("3_1").unwrap();
-        assert_eq!(l.link().crossing_num(), 3);
+        assert_eq!(l.link().count_crossings(), 3);
     }
 
     #[test]
     fn load_4_1() { 
         let l = InvLink::load("4_1").unwrap();
-        assert_eq!(l.link().crossing_num(), 4);
+        assert_eq!(l.link().count_crossings(), 4);
     }
 }

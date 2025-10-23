@@ -118,7 +118,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn deg_shift_for(l: &Link, reduced: bool) -> (isize, isize) {
-        let (n_pos, n_neg) = l.signed_crossing_nums();
+        let (n_pos, n_neg) = l.count_signed_crossings();
         let (n_pos, n_neg) = (n_pos as isize, n_neg as isize);
         let h = -n_neg;
         let q = n_pos - 2 * n_neg;

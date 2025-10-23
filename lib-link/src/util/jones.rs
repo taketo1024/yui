@@ -17,7 +17,7 @@ pub fn jones_polynomial(l: &Link) -> LPoly<'q', i32> {
     let q0: P = &q + q.pow(-1);
     let body = P::sum(State::generate(n).into_iter().map(|s| { 
         let w = s.weight();
-        let l_s = l.resolve_all_crossings(&s);
+        let l_s = l.resolved_by(&s);
         let r = l_s.components().len();
 
         (-&q).pow(w) * q0.pow(r) // (-q)^w (q + q^{-1})^r
@@ -51,7 +51,7 @@ mod tests {
 
     #[test]
     fn unlink_2() {
-        let l = Link::from_pd_code([[0, 1, 1, 0]]).resolve_crossing(0, Bit::Bit1);
+        let l = Link::from_pd_code([[0, 1, 1, 0]]).resolved_at(0, Bit::Bit1);
         let p = jones_polynomial(&l);
         let q = P::mono;
         assert_eq!(p, P::from_iter([(q(-2), 1), (q(0), 2), (q(2), 1)]));

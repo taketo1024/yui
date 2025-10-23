@@ -16,7 +16,7 @@ pub struct KhCubeVertex {
 
 impl KhCubeVertex { 
     pub fn new(l: &Link, state: State, red_e: Option<Edge>, deg_shift: (isize, isize)) -> Self {
-        let mut circles = l.resolve_all_crossings(&state).components();
+        let mut circles = l.resolved_by(&state).components();
         circles.sort_by_key(|c| c.min_edge());
         
         let r = circles.len();
@@ -298,7 +298,7 @@ mod tests {
 
     #[test]
     fn unlink_2() {
-        let l = Link::from_pd_code([[0, 0, 1, 1]]).resolve_crossing(0, Bit::Bit0);
+        let l = Link::from_pd_code([[0, 0, 1, 1]]).resolved_at(0, Bit::Bit0);
         let s = State::empty();
         let v = KhCubeVertex::new(&l, s, None, (0, 0));
 

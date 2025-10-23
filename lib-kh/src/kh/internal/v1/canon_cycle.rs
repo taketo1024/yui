@@ -20,7 +20,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn make_canon_cycle(l: &Link, base: Edge, a: &R, b: &R, deg_shift: (isize, isize)) -> KhChain<R> {
-        let s = l.ori_pres_state();
+        let s = l.seifert_state();
         let x_a = Self::color_factor(a); // X - a
         let x_b = Self::color_factor(b); // X - b
 

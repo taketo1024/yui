@@ -171,12 +171,12 @@ impl Link {
         self.clone_and(|l| l.node_mut(i).cc())
     }
 
-    pub fn resolve_crossing(&self, i: usize, r: Bit) -> Self {
+    pub fn resolved_at(&self, i: usize, r: Bit) -> Self {
         assert!(self.node(i).is_crossing());
         self.clone_and(|l| l.node_mut(i).resolve(r))
     }
 
-    pub fn resolve_all_crossings(&self, s: &State) -> Self {
+    pub fn resolved_by(&self, s: &State) -> Self {
         assert!(s.len() == self.count_crossings());
 
         let n = self.nodes.len();
@@ -189,7 +189,7 @@ impl Link {
         })
     }
 
-    pub fn ori_pres_state(&self) -> State { 
+    pub fn seifert_state(&self) -> State { 
         let signs = self.collect_crossing_signs();
         let seq = signs.iter().sorted_by_key(|(&i, _)| i).map(|(_, s)| 
             match s { 
@@ -201,7 +201,7 @@ impl Link {
     }
 
     pub fn seifert_circles(&self) -> Vec<Path> { 
-        self.resolve_all_crossings(&self.ori_pres_state()).components()
+        self.resolved_by(&self.seifert_state()).components()
     }
 
     fn traverse_from<F>(&self, start: (usize, usize), mut f:F) where
@@ -291,7 +291,7 @@ impl Link {
     }
 
     pub fn unknot() -> Link { 
-        Link::from_pd_code([[0, 1, 1, 0]]).resolve_crossing(0, Bit::Bit0)
+        Link::from_pd_code([[0, 1, 1, 0]]).resolved_at(0, Bit::Bit0)
     }
 
     pub fn trefoil() -> Link { 
@@ -395,7 +395,7 @@ mod tests {
         assert_eq!(l.collect_crossing_signs(), hashmap!{ 0 => Sign::Neg} );
 
         let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code).resolve_crossing(0, Bit::Bit0);
+        let l = Link::from_pd_code(pd_code).resolved_at(0, Bit::Bit0);
         assert_eq!(l.collect_crossing_signs(), hashmap!{});
     }
 
@@ -410,7 +410,7 @@ mod tests {
         assert_eq!(l.writhe(), -1);
 
         let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code).resolve_crossing(0, Bit::Bit0);
+        let l = Link::from_pd_code(pd_code).resolved_at(0, Bit::Bit0);
         assert_eq!(l.writhe(), 0);
 
     }
@@ -437,7 +437,7 @@ mod tests {
     fn link_resolve() {
         let s = State::from([0, 0, 0]);
         let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]) // trefoil
-            .resolve_all_crossings(&s);
+            .resolved_by(&s);
 
         let comps = l.components();
         assert_eq!(comps.len(), 3);
@@ -445,7 +445,7 @@ mod tests {
 
         let s = State::from([1, 1, 1]);
         let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]) // trefoil
-            .resolve_all_crossings(&s);
+            .resolved_by(&s);
 
         let comps = l.components();
         assert_eq!(comps.len(), 2);

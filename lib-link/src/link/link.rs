@@ -70,6 +70,10 @@ impl Link {
         &mut self.nodes[i]
     }
 
+    pub fn crossings(&self) -> impl Iterator<Item = &Node> { 
+        self.nodes.iter().filter(|x| x.is_crossing())
+    }
+
     pub fn crossing_num(&self) -> usize { 
         self.nodes.iter()
             .filter(|x| x.is_crossing())
@@ -162,25 +166,6 @@ impl Link {
         assert!(remain.is_empty());
 
         comps
-    }
-
-    // node-index for the i-th crossing.
-    fn crossing_index(&self, i: usize) -> usize {
-        let n = self.nodes.len();
-        let Some(k) = (0..n).filter(|&j| self.node(j).is_crossing()).skip(i).next() else { 
-            panic!("Index exceeds number of crossings.")
-        };
-        k
-    }
-
-    pub fn crossing_at(&self, i: usize) -> &Node {
-        let j = self.crossing_index(i);
-        self.node(j)
-    }
-
-    pub fn crossing_at_mut(&mut self, i: usize) -> &mut Node {
-        let j = self.crossing_index(i);
-        self.node_mut(j)
     }
 
     pub fn crossing_change(&self, i: usize) -> Self { 

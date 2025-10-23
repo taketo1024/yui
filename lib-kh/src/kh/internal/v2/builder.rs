@@ -411,9 +411,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let start_p = base_pt.or(l.first_edge()).unwrap();
         let circles = l.colored_seifert_circles(start_p);
 
-        let state_map = l.ori_pres_state().iter().enumerate().map(|(i, b)|
-            (l.crossing_at(i).clone(), b)
-        ).collect::<HashMap<_, _>>();
+        let crossings = l.nodes().iter().filter(|x| x.is_crossing()).cloned();
+        let state = l.ori_pres_state();
+        let state_map = Iterator::zip(crossings.into_iter(), state.iter()).collect::<HashMap<_, _>>();
 
         let ori = if reduced { 
             vec![true]

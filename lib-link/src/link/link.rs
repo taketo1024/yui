@@ -1,8 +1,8 @@
 use core::panic;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use itertools::Itertools;
-use yui::{CloneAnd, Sign};
+use yui::{hashmap, CloneAnd, Sign};
 use yui::bitseq::Bit;
 
 use super::{Node, NodeType, Path};
@@ -78,23 +78,23 @@ impl Link {
     }
 
     pub fn count_signed_crossings(&self) -> (usize, usize) {
-        let signs = self.collect_crossing_signs().into_iter().counts();
-        let pos = signs.get(&Sign::Pos).cloned().unwrap_or(0);
-        let neg = signs.get(&Sign::Neg).cloned().unwrap_or(0);
+        let signs = self.collect_crossing_signs();
+        let pos = signs.iter().filter(|(_, s)| s.is_positive()).count();
+        let neg = signs.len() - pos;
         (pos, neg)
     }
 
-    pub fn collect_crossing_signs(&self) -> Vec<Sign> {
+    pub fn collect_crossing_signs(&self) -> HashMap<usize, Sign> {
         use NodeType::{X, Xm};
 
         let n = self.nodes.len();
-        let mut signs = vec![None; n];
+        let mut result = hashmap!{};
         let mut remain = self.edges();
 
         for j0 in [0, 1, 2] { 
             for i0 in 0..n {
-                let start_edge = self.nodes[i0].edge(j0);
-                if !remain.remove(&start_edge) { 
+                let e0 = self.node(i0).edge(j0);
+                if !remain.remove(&e0) { 
                     continue 
                 }
 
@@ -103,14 +103,11 @@ impl Link {
                     let e = c.edge(j);
                     remain.remove(&e);
 
-                    let sign = match (c.ntype(), j) { 
-                        (Xm, 1) | (X, 3) => Some(Sign::Pos),
-                        (Xm, 3) | (X, 1) => Some(Sign::Neg),
-                        _                => None
+                    match (c.ntype(), j) { 
+                        (Xm, 1) | (X, 3) => result.insert(i, Sign::Pos),
+                        (Xm, 3) | (X, 1) => result.insert(i, Sign::Neg),
+                        _ => None
                     };
-                    if sign.is_some() { 
-                        signs[i] = sign;
-                    }
                 });
             }
 
@@ -121,7 +118,7 @@ impl Link {
 
         assert!(remain.is_empty());
 
-        signs.into_iter().flatten().collect_vec()
+        result
     }
     
     pub fn edges(&self) -> HashSet<Edge> {
@@ -141,8 +138,8 @@ impl Link {
 
         for j0 in [0, 1, 2] {
             for i0 in 0..n {
-                let start_edge = self.node(i0).edge(j0);
-                if !remain.remove(&start_edge) { 
+                let e0 = self.node(i0).edge(j0);
+                if !remain.remove(&e0) { 
                     continue 
                 }
 
@@ -193,10 +190,14 @@ impl Link {
     }
 
     pub fn ori_pres_state(&self) -> State { 
-        let signs = self.collect_crossing_signs(); 
-        State::from_iter(signs.into_iter().map( |s|
-            if s.is_positive() { 0 } else { 1 }
-        ))
+        let signs = self.collect_crossing_signs();
+        let seq = signs.iter().sorted_by_key(|(&i, _)| i).map(|(_, s)| 
+            match s { 
+                Sign::Pos => 0, 
+                Sign::Neg => 1
+            }
+        ); 
+        State::from_iter(seq)
     }
 
     pub fn seifert_circles(&self) -> Vec<Path> { 
@@ -314,6 +315,8 @@ impl Display for Link {
 
 #[cfg(test)]
 mod tests { 
+    use yui::hashmap;
+
     use super::*;
     use super::NodeType::{X, Xm};
 
@@ -385,15 +388,15 @@ mod tests {
     fn link_crossing_signs() {
         let pd_code = [[0,0,1,1]];
         let l = Link::from_pd_code(pd_code);
-        assert_eq!(l.collect_crossing_signs(), vec![Sign::Pos]);
+        assert_eq!(l.collect_crossing_signs(), hashmap!{ 0 => Sign::Pos});
 
         let pd_code = [[0,1,1,0]];
         let l = Link::from_pd_code(pd_code);
-        assert_eq!(l.collect_crossing_signs(), vec![Sign::Neg]);
+        assert_eq!(l.collect_crossing_signs(), hashmap!{ 0 => Sign::Neg} );
 
         let pd_code = [[0,0,1,1]];
         let l = Link::from_pd_code(pd_code).resolve_crossing(0, Bit::Bit0);
-        assert_eq!(l.collect_crossing_signs(), vec![]);
+        assert_eq!(l.collect_crossing_signs(), hashmap!{});
     }
 
     #[test]

@@ -87,36 +87,16 @@ impl Link {
     pub fn collect_crossing_signs(&self) -> HashMap<usize, Sign> {
         use NodeType::{X, Xm};
 
-        let n = self.nodes.len();
         let mut result = hashmap!{};
-        let mut remain = self.edges();
 
-        for j0 in [0, 1, 2] { 
-            for i0 in 0..n {
-                let e0 = self.node(i0).edge(j0);
-                if !remain.remove(&e0) { 
-                    continue 
-                }
-
-                self.traverse_from((i0, j0), |i, j| { 
-                    let c = &self.nodes[i];
-                    let e = c.edge(j);
-                    remain.remove(&e);
-
-                    match (c.ntype(), j) { 
-                        (Xm, 1) | (X, 3) => result.insert(i, Sign::Pos),
-                        (Xm, 3) | (X, 1) => result.insert(i, Sign::Neg),
-                        _ => None
-                    };
-                });
-            }
-
-            if remain.is_empty() { 
-                break
-            }
-        }
-
-        assert!(remain.is_empty());
+        self.traverse(|_, i, j| { 
+            let c = self.node(i);
+            match (c.ntype(), j) { 
+                (Xm, 1) | (X, 3) => result.insert(i, Sign::Pos),
+                (Xm, 3) | (X, 1) => result.insert(i, Sign::Neg),
+                _ => None
+            };
+        });
 
         result
     }
@@ -131,39 +111,20 @@ impl Link {
     }
 
     pub fn components(&self) -> Vec<Path> {
-        let n = self.nodes.len();
-
         let mut comps = vec![];
-        let mut remain = self.edges();
 
-        for j0 in [0, 1, 2] {
-            for i0 in 0..n {
-                let e0 = self.node(i0).edge(j0);
-                if !remain.remove(&e0) { 
-                    continue 
-                }
-
-                let mut edges = vec![];
-
-                self.traverse_from((i0, j0), |i, j| { 
-                    let e = self.node(i).edge(j);
-                    edges.push(e);
-                    remain.remove(&e);
-                });
-
-                let c = Path::circ(edges);
-
-                comps.push(c);
+        self.traverse(|c, i, j| { 
+            if c == comps.len() { 
+                comps.push(vec![]);
             }
 
-            if remain.is_empty() { 
-                break
-            }
-        }
+            let e = self.node(i).edge(j);
+            comps[c].push(e);
+        });
 
-        assert!(remain.is_empty());
-
-        comps
+        comps.into_iter().map(|edges| 
+            Path::circ(edges)
+        ).collect()
     }
 
     pub fn crossing_change(&self, i: usize) -> Self { 
@@ -204,16 +165,47 @@ impl Link {
         self.resolved_by(&self.seifert_state()).components()
     }
 
+    fn traverse<F>(&self, mut f: F) where 
+    F: FnMut(usize, usize, usize) { 
+        let n = self.n_nodes();
+
+        let mut c = 0; // component counter
+        let mut remain = self.edges();
+
+        // MEMO: For a link obtained from a PD-code, 
+        // the following loop should break after the first iteration: j0 = 0.
+
+        for j0 in [0, 1, 2] { 
+            for i0 in 0..n {
+                let e0 = self.node(i0).edge(j0);
+                if !remain.remove(&e0) { 
+                    continue 
+                }
+
+                self.traverse_from((i0, j0), |i, j| { 
+                    let e = self.node(i).edge(j);
+                    remain.remove(&e);
+
+                    f(c, i, j);
+                });
+
+                c += 1;
+            }
+
+            if remain.is_empty() { 
+                break
+            }
+        }
+
+        assert!(remain.is_empty())
+    }
+
     fn traverse_from<F>(&self, start: (usize, usize), mut f:F) where
         F: FnMut(usize, usize)
     {
-        let n = self.nodes.len();
-        assert!((0..n).contains(&start.0));
-        assert!((0..4).contains(&start.1));
-
-        f(start.0, start.1); // call starting point
-
         let (mut i, mut j) = start;
+
+        f(i, j); // call starting point
 
         loop {
             let c = self.node(i);
@@ -230,12 +222,12 @@ impl Link {
         }
     }
 
-    fn traverse_outer(&self, c_index:usize, e_index:usize) -> (usize, usize) {
-        let e = self.nodes[c_index].edge(e_index);
+    fn traverse_outer(&self, n_index: usize, e_index: usize) -> (usize, usize) {
+        let e = self.nodes[n_index].edge(e_index);
 
         for (i, c) in self.nodes.iter().enumerate() { 
             for (j, &f) in c.edges().iter().enumerate() { 
-                if e == f && (c_index != i || (c_index == i && e_index != j)) { 
+                if e == f && (n_index != i || (n_index == i && e_index != j)) { 
                     return (i, j)
                 }
             }

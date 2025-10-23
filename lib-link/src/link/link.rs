@@ -184,18 +184,13 @@ impl Link {
     }
 
     pub fn crossing_change(&self, i: usize) -> Self { 
-        let j = self.crossing_index(i);
-
-        let nodes = self.nodes.clone_and(|nodes|
-            nodes[j].cc()
-        );
-        Link::new(nodes)
+        assert!(self.node(i).is_crossing());
+        self.clone_and(|l| l.node_mut(i).cc())
     }
 
     pub fn resolve_crossing(&self, i: usize, r: Bit) -> Self {
-        self.clone_and(|l|
-            l.crossing_at_mut(i).resolve(r)
-        )
+        assert!(self.node(i).is_crossing());
+        self.clone_and(|l| l.node_mut(i).resolve(r))
     }
 
     pub fn resolve_all_crossings(&self, s: &State) -> Self {

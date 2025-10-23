@@ -14,6 +14,8 @@ type KhChainMap<R> = ChainMap<isize, KhChainGen, KhChainGen, R>;
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn cc_pair(l: &Link, h: &R, t: &R, reduced: bool, i: usize) -> (KhComplex<R>, KhComplex<R>) {
+        assert!(l.node(i).is_crossing());
+        
         let l2 = l.crossing_change(i);
         let c1 = KhComplex::new_no_simplify(l, h, t, reduced);
         let c2 = KhComplex::new_no_simplify(&l2, h, t, reduced);
@@ -42,11 +44,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn cc_map1(c1: &KhComplex<R>, c2: &KhComplex<R>, l: &Link, i: usize) -> KhChainMap<R> {
+        assert!(l.node(i).is_crossing());
+
         let deg = c2.deg_shift().0 - c1.deg_shift().0 - 1;
         let c2_deg_shift = c2.deg_shift();
 
         let alg = c1.str().clone();
-        let (a0, a1) = l.crossing_at(i).resolved(Bit::Bit0).arcs();
+        let (a0, a1) = l.node(i).resolved(Bit::Bit0).arcs();
 
         // TODO We don't want to reproduce the cube. 
         let (h, t) = c1.str().ht();

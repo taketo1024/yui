@@ -40,7 +40,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         assert!(!reduced || (!l.is_empty() && t.is_zero()));
 
-        let red_e = reduced.then(|| l.first_edge().unwrap());
+        let red_e = reduced.then(|| l.min_edge().unwrap());
         let deg_shift = Self::deg_shift_for(l, reduced);
         
         let cube = KhCube::new(l, h, t, red_e, deg_shift);
@@ -48,7 +48,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let complex = cube.into_complex();
 
         let canon_cycles = if t.is_zero() && l.is_knot() {
-            let p = l.first_edge().unwrap();
+            let p = l.min_edge().unwrap();
             Self::make_canon_cycles(l, p, &R::zero(), h, reduced, deg_shift)
         } else { 
             vec![]
@@ -118,7 +118,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn deg_shift_for(l: &Link, reduced: bool) -> (isize, isize) {
-        let (n_pos, n_neg) = l.signed_crossing_nums();
+        let (n_pos, n_neg) = l.count_signed_crossings();
         let (n_pos, n_neg) = (n_pos as isize, n_neg as isize);
         let h = -n_neg;
         let q = n_pos - 2 * n_neg;

@@ -9,7 +9,7 @@ use num_traits::Zero;
 use yui::bitseq::Bit;
 use yui::{hashmap, Ring, RingOps};
 use yui_homology::DisplaySeq;
-use yui_link::{Crossing, Edge, Link};
+use yui_link::{Node, Edge, Link};
 
 use crate::ext::LinkExt;
 use crate::kh::{KhGen, KhChain, KhComplex};
@@ -20,7 +20,7 @@ use super::tng_complex::{TngComplex, TngKey};
 
 pub struct TngComplexBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    crossings: Vec<Crossing>,
+    crossings: Vec<Node>,
     complex: TngComplex<R>,
     elements: Vec<BuildElem<R>>,
     h_range: Option<RangeInclusive<isize>>,
@@ -45,7 +45,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> TngComplexBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn build_kh_complex(l: &Link, h: &R, t: &R, reduced: bool) -> KhComplex<R> { 
-        let base_pt = if reduced { l.first_edge() } else { None };
+        let base_pt = if reduced { l.min_edge() } else { None };
         let mut b = Self::new(l, h, t, base_pt);
         b.process_all();
         b.finalize();
@@ -57,7 +57,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let deg_shift = KhComplex::deg_shift_for(l, reduced);
 
         let mut b = Self::init(h, t, deg_shift, base_pt);
-        b.set_crossings(l.data().clone());
+        b.set_crossings(l.nodes().cloned());
 
         if t.is_zero() && l.is_knot() {
             let canon = Self::make_canon_cycles(l, base_pt);
@@ -80,17 +80,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &mut self.complex
     }
 
-    pub fn crossings(&self) -> impl Iterator<Item = &Crossing> { 
+    pub fn crossings(&self) -> impl Iterator<Item = &Node> { 
         self.crossings.iter()
     }
 
     pub fn set_crossings<I>(&mut self, crossings: I)
-    where I: IntoIterator<Item = Crossing> {
+    where I: IntoIterator<Item = Node> {
         self.crossings = crossings.into_iter().collect_vec();
     }
 
     pub(crate) fn remove_crossings<'a, I>(&mut self, crossings: I) 
-    where I: IntoIterator<Item = &'a Crossing> { 
+    where I: IntoIterator<Item = &'a Node> { 
         let drop = crossings.into_iter().collect::<HashSet<_>>();
         self.crossings.retain(|x| !drop.contains(x));
     }
@@ -114,7 +114,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.retain_supported();
     }
 
-    pub fn choose_next(&mut self) -> Option<Crossing> { 
+    pub fn choose_next(&mut self) -> Option<Node> { 
         let Some((i, _)) = self.crossings.iter().enumerate().max_by_key(|(_, x)|
             self.count_connections(x)
         ) else { 
@@ -125,7 +125,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         Some(x)
     }
 
-    fn count_connections(&self, x: &Crossing) -> usize { 
+    fn count_connections(&self, x: &Node) -> usize { 
         let arcs = if x.is_resolved() { 
             let a = x.arcs();
             vec![a.0, a.1]
@@ -158,7 +158,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub(crate) fn append(&mut self, x: &Crossing) { 
+    pub(crate) fn append(&mut self, x: &Node) { 
         assert!(!self.complex.crossings().contains(x));
         
         info!("({}) append: {x}", self.stat());
@@ -170,7 +170,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.connect_incr(&left, &right);
     }
 
-    pub(crate) fn append_prepare(&mut self, x: &Crossing) { 
+    pub(crate) fn append_prepare(&mut self, x: &Node) { 
         if let Some(i) = self.crossings.iter().find_position(|&e| e == x) { 
             self.crossings.remove(i.0);
         }
@@ -408,12 +408,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(l.is_knot());
 
         let reduced = base_pt.is_some();
-        let start_p = base_pt.or(l.first_edge()).unwrap();
+        let start_p = base_pt.or(l.min_edge()).unwrap();
         let circles = l.colored_seifert_circles(start_p);
 
-        let state_map = l.ori_pres_state().iter().enumerate().map(|(i, b)|
-            (l.crossing_at(i).clone(), b)
-        ).collect::<HashMap<_, _>>();
+        let crossings = l.nodes().filter(|x| x.is_crossing()).cloned();
+        let state = l.seifert_state();
+        let state_map = Iterator::zip(crossings.into_iter(), state.iter()).collect::<HashMap<_, _>>();
 
         let ori = if reduced { 
             vec![true]
@@ -458,29 +458,29 @@ pub struct BuildElem<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     init_cob: Cob,                       // initial cob, precomposed at the final step.
     retr_cob: HashMap<TngKey, LcCob<R>>, // building cob, src must always match init_cob. 
-    state: HashMap<Crossing, Bit>,
+    state: HashMap<Node, Bit>,
     base_pt: Option<Edge>
 }
 
 impl<R> BuildElem<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn new(init_cob: Cob, state: HashMap<Crossing, Bit>, base_pt: Option<Edge>) -> Self { 
+    pub fn new(init_cob: Cob, state: HashMap<Node, Bit>, base_pt: Option<Edge>) -> Self { 
         let k0 = TngKey::init();
         let f0 = LcCob::from(Cob::empty());
         let retr_cob = hashmap! { k0 => f0 };
         Self{ init_cob, retr_cob, state, base_pt }
     }
 
-    pub fn append(&mut self, x: &Crossing) { 
-        if !x.is_resolved() { 
+    pub fn append(&mut self, x: &Node) { 
+        if x.is_crossing() { 
             self.append_x(x)
         } else { 
             self.append_a(x)
         }
     }
 
-    fn append_x(&mut self, x: &Crossing) {
-        assert!(!x.is_resolved());
+    fn append_x(&mut self, x: &Node) {
+        assert!(x.is_crossing());
 
         let r = self.state[x];
         let a = x.resolved(r);
@@ -495,7 +495,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }).collect();
     }
 
-    fn append_a(&mut self, x: &Crossing) {
+    fn append_a(&mut self, x: &Node) {
         assert!(x.is_resolved());
 
         let tng = Tng::from_resolved(x);
@@ -667,8 +667,8 @@ mod tests {
     fn test_tangle() { 
         let mut c = TngComplexBuilder::init(&0, &0, (0, 0), None);
         c.set_crossings([
-            Crossing::from_pd_code([4,2,5,1]),
-            Crossing::from_pd_code([3,6,4,1])
+            Node::from_pd_code([4,2,5,1]),
+            Node::from_pd_code([3,6,4,1])
         ]);
 
         c.process_all();

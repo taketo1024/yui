@@ -133,7 +133,7 @@ impl Path {
         // 1) find crossings `x` that touche `self`. 
         // 2) check if `x` also touches `other`.
         
-        for x in link.data().iter() { 
+        for x in link.nodes() { 
             if !x.edges().iter().any(|e| 
                 self.edges.contains(e)
             ) { 

@@ -10,7 +10,7 @@ use rayon::prelude::*;
 use cartesian::cartesian;
 use yui::{CloneAnd, Ring, RingOps, Sign};
 use yui_homology::{ChainComplex, Summand, Grid1};
-use yui_link::{Crossing, Edge, State};
+use yui_link::{Node, Edge, State};
 use yui::bitseq::Bit;
 
 use crate::kh::{KhGen, KhAlg, KhChain, KhComplex, KhChainGen, KhTensor};
@@ -131,12 +131,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     deg_shift: (isize, isize),
     base_pt: Option<Edge>,
     vertices: AHashMap<TngKey, TngVertex<R>>,
-    crossings: Vec<Crossing>,
+    crossings: Vec<Node>,
 }
 
 impl<R> TngComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn new(h: &R, t: &R, deg_shift: (isize, isize), base_pt: Option<Edge>, vertices: AHashMap<TngKey, TngVertex<R>>, crossings: Vec<Crossing>) -> Self { 
+    fn new(h: &R, t: &R, deg_shift: (isize, isize), base_pt: Option<Edge>, vertices: AHashMap<TngKey, TngVertex<R>>, crossings: Vec<Node>) -> Self { 
         let ht = (h.clone(), t.clone());
         TngComplex{ ht, deg_shift, base_pt, vertices, crossings }
     }
@@ -171,7 +171,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn dim(&self) -> usize { 
-        self.crossings.iter().filter(|x| !x.is_resolved()).count()
+        self.crossings.iter().filter(|x| x.is_crossing()).count()
     }
     
     pub fn h_range(&self) -> RangeInclusive<isize> { 
@@ -184,11 +184,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.keys_of(i).count()
     }
 
-    pub fn crossing(&self, i: usize) -> &Crossing {
+    pub fn crossing(&self, i: usize) -> &Node {
         &self.crossings[i]
     }
 
-    pub fn crossings(&self) -> &[Crossing] {
+    pub fn crossings(&self) -> &[Node] {
         &self.crossings
     }
 
@@ -348,12 +348,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn append(&mut self, x: &Crossing) {
+    pub fn append(&mut self, x: &Node) {
         let c = self.make_x(x);
         self.connect(c);
     }
 
-    pub(crate) fn make_x(&self, x: &Crossing) -> Self { 
+    pub(crate) fn make_x(&self, x: &Node) -> Self { 
         let (h, t) = self.ht();
         let mut c = Self::new(h, t, (0, 0), None, AHashMap::new(), vec![]);
 
@@ -736,7 +736,7 @@ mod tests {
     #[test]
     fn single_x() { 
         let mut c = TngComplex::init(&0, &0, (0, 0), None);
-        let x = Crossing::from_pd_code([0,1,2,3]);
+        let x = Node::from_pd_code([0,1,2,3]);
         c.append(&x);
 
         assert_eq!(c.dim(), 1);
@@ -747,7 +747,7 @@ mod tests {
     #[test]
     fn single_x_resolved() { 
         let mut c = TngComplex::init(&0, &0, (0, 0), None);
-        let x = Crossing::from_pd_code([0,1,2,3]).resolved(Bit::Bit0);
+        let x = Node::from_pd_code([0,1,2,3]).resolved(Bit::Bit0);
         c.append(&x);
 
         assert_eq!(c.dim(), 0);
@@ -757,8 +757,8 @@ mod tests {
     #[test]
     fn two_x_disj() { 
         let mut c = TngComplex::init(&0, &0, (0, 0), None);
-        let x0 = Crossing::from_pd_code([0,1,2,3]);
-        let x1 = Crossing::from_pd_code([4,5,6,7]);
+        let x0 = Node::from_pd_code([0,1,2,3]);
+        let x1 = Node::from_pd_code([4,5,6,7]);
 
         c.append(&x0);
         c.append(&x1);
@@ -772,8 +772,8 @@ mod tests {
     #[test]
     fn two_x() { 
         let mut c = TngComplex::init(&0, &0, (0, 0), None);
-        let x0 = Crossing::from_pd_code([0,4,1,5]);
-        let x1 = Crossing::from_pd_code([3,1,4,2]);
+        let x0 = Node::from_pd_code([0,4,1,5]);
+        let x1 = Node::from_pd_code([3,1,4,2]);
 
         c.append(&x0);
         c.append(&x1);
@@ -787,7 +787,7 @@ mod tests {
     #[test]
     fn deloop() { 
         let mut c = TngComplex::init(&0, &0, (0, 0), None);
-        let x0 = Crossing::from_pd_code([0, 1, 1, 0]).resolved(Bit::Bit0); // unknot
+        let x0 = Node::from_pd_code([0, 1, 1, 0]).resolved(Bit::Bit0); // unknot
         c.append(&x0);
 
         assert_eq!(c.dim(), 0);
@@ -814,8 +814,8 @@ mod tests {
     #[test]
     fn deloop_tangle() { 
         let mut c = TngComplex::init(&0, &0, (0, 0), None);
-        let x0 = Crossing::from_pd_code([4,2,5,1]);
-        let x1 = Crossing::from_pd_code([3,6,4,1]);
+        let x0 = Node::from_pd_code([4,2,5,1]);
+        let x1 = Node::from_pd_code([3,6,4,1]);
 
         c.append(&x0);
         c.append(&x1);
@@ -855,7 +855,7 @@ mod tests {
     #[test]
     fn deloop_based() { 
         let mut c = TngComplex::init(&0, &0, (0, 0), Some(0)); // base point = 0
-        let x0 = Crossing::from_pd_code([0, 1, 1, 0]).resolved(Bit::Bit0); // unknot
+        let x0 = Node::from_pd_code([0, 1, 1, 0]).resolved(Bit::Bit0); // unknot
         c.append(&x0);
 
         assert_eq!(c.dim(), 0);
@@ -879,8 +879,8 @@ mod tests {
     fn connect() {
         let mut c0 = TngComplex::init(&0, &0, (0, 0), None);
         let mut c1 = TngComplex::init(&0, &0, (0, 0), None);
-        let x0 = Crossing::from_pd_code([4,2,5,1]);
-        let x1 = Crossing::from_pd_code([3,6,4,1]);
+        let x0 = Node::from_pd_code([4,2,5,1]);
+        let x1 = Node::from_pd_code([3,6,4,1]);
 
         c0.append(&x0);
         c1.append(&x1);
@@ -899,9 +899,9 @@ mod tests {
     fn connect_trefoil() {
         let mut c0 = TngComplex::init(&0, &0, (0, 0), None);
         let mut c1 = TngComplex::init(&0, &0, (0, 0), None);
-        let x0 = Crossing::from_pd_code([1,4,2,5]);
-        let x1 = Crossing::from_pd_code([3,6,4,1]);
-        let x2 = Crossing::from_pd_code([5,2,6,3]);
+        let x0 = Node::from_pd_code([1,4,2,5]);
+        let x1 = Node::from_pd_code([3,6,4,1]);
+        let x2 = Node::from_pd_code([5,2,6,3]);
 
         c0.append(&x0);
         c0.append(&x1);

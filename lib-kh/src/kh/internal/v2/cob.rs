@@ -10,7 +10,7 @@ use cartesian::cartesian;
 use yui::{AddMon, CloneAnd, Elem, Ring, RingOps};
 use yui::lc::{Gen, Lc};
 use yui::poly::Var2;
-use yui_link::{Edge, Crossing};
+use yui_link::{Edge, Node};
 use yui::bitseq::Bit;
 use super::tng::{Tng, TngComp};
 
@@ -33,8 +33,8 @@ pub struct CobComp {
 }
 
 impl CobComp { 
-    pub fn sdl_from(x: &Crossing) -> Self {
-        assert!(!x.is_resolved());
+    pub fn sdl_from(x: &Node) -> Self {
+        assert!(x.is_crossing());
 
         use Bit::{Bit0, Bit1};
         let src = Tng::from_resolved(&x.resolved(Bit0));
@@ -1325,7 +1325,7 @@ mod tests {
     #[test]
     fn stack_id() {
         let c1 = Cob::new(vec![
-            CobComp::sdl_from(&Crossing::from_pd_code([0,1,2,3])),
+            CobComp::sdl_from(&Node::from_pd_code([0,1,2,3])),
             CobComp::cup(TngComp::circ([4])),
             CobComp::cap(TngComp::circ([5])),
         ]);

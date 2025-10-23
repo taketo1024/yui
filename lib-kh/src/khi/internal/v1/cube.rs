@@ -23,19 +23,20 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     pub fn new(l: &InvLink, h: &R, t: &R, reduced: bool, deg_shift: (isize, isize)) -> Self { 
         assert_eq!(R::one() + R::one(), R::zero(), "char(R) != 2");
         assert!(!reduced || (l.base_pt().is_some() && t.is_zero()));
+        assert!(l.link().nodes().all(|x| x.is_crossing()));
 
-        let n = l.link().crossing_num();
+        let n = l.link().count_crossings();
         let reduce_e = if reduced { l.base_pt() } else { None };
         let cube = KhCube::new(l.link(), h, t, reduce_e, deg_shift);
 
         let x_index = (0..n).map(|i| { 
-            let x = l.link().crossing_at(i);
+            let x = l.link().node(i);
             (x, i)
         }).collect::<HashMap<_, _>>();
 
         let state_map = State::generate(n).map(|s| { 
             let t = State::from_iter((0..n).map(|i| {
-                let x = l.link().crossing_at(i);
+                let x = l.link().node(i);
                 let tx = l.inv_x(x);
                 let ti = x_index[tx];
                 s[ti]

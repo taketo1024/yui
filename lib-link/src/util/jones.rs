@@ -6,8 +6,8 @@ use crate::{Link, State};
 pub fn jones_polynomial(l: &Link) -> LPoly<'q', i32> {
     type P = LPoly<'q', i32>;
 
-    let n = l.crossing_num();
-    let n_signed = l.signed_crossing_nums();
+    let n = l.count_crossings();
+    let n_signed = l.count_signed_crossings();
     let (n_pos, n_neg) = (n_signed.0 as i32, n_signed.1 as i32);
 
     let e = P::from_sign( (-1).pow_mod2(n_neg).sign() );
@@ -18,7 +18,7 @@ pub fn jones_polynomial(l: &Link) -> LPoly<'q', i32> {
     let body = P::sum(State::generate(n).into_iter().map(|s| { 
         let w = s.weight();
         let l_s = l.resolved_by(&s);
-        let r = l_s.components().len();
+        let r = l_s.n_components();
 
         (-&q).pow(w) * q0.pow(r) // (-q)^w (q + q^{-1})^r
     }));

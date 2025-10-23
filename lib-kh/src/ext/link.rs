@@ -25,7 +25,7 @@ pub trait LinkExt {
 
 impl LinkExt for Link { 
     fn colored_seifert_circles(&self, base: Edge) -> Vec<(Path, Color)> {
-        assert_eq!(self.components().len(), 1, "Only knots are supported.");
+        assert!(self.is_knot(), "Only knots are supported.");
 
         let circles = self.seifert_circles();
         let n = circles.len();

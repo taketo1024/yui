@@ -9,7 +9,7 @@ use rayon::prelude::*;
 use yui::bitseq::{Bit, BitSeq};
 use yui::{KeyedUnionFind, Ring, RingOps};
 use yui_homology::DisplaySeq;
-use yui_link::{Crossing, Edge, InvLink};
+use yui_link::{Node, Edge, InvLink};
 
 use crate::kh::{KhComplex, KhChainGen, KhTensor};
 use crate::khi::KhIComplex;
@@ -21,7 +21,7 @@ use crate::kh::internal::v2::tng_complex::{TngComplex, TngKey};
 pub struct SymTngBuilder<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> {
     inner: TngComplexBuilder<R>,
-    x_map: AHashMap<Crossing, Crossing>,
+    x_map: AHashMap<Node, Node>,
     e_map: AHashMap<Edge, Edge>,
     key_map: AHashMap<TngKey, TngKey>,
     pub auto_deloop: bool,
@@ -47,18 +47,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn new(l: &InvLink, h: &R, t: &R, reduced: bool) -> SymTngBuilder<R> { 
-        assert!(l.link().data().iter().all(|x| !x.is_resolved()));
+        assert!(l.link().nodes().all(|x| x.is_crossing()));
         assert!(!reduced || l.base_pt().is_some());
 
         let base_pt = if reduced { l.base_pt() } else { None };
         let inner = TngComplexBuilder::new(l.link(), h, t, base_pt);
-        let x_map = l.link().data().iter().map(|x| (x.clone(), l.inv_x(x).clone())).collect();
-        let e_map = l.link().edges().iter().map(|&e| (e, l.inv_e(e))).collect();
+        let x_map = l.link().nodes().map(|x| 
+            (x.clone(), l.inv_x(x).clone())
+        ).collect();
+        let e_map = l.link().edges().map(|&e| (e, l.inv_e(e))).collect();
 
         Self::new_impl(inner, x_map, e_map)
     }
 
-    fn new_impl(mut inner: TngComplexBuilder<R>, x_map: AHashMap<Crossing, Crossing>, e_map: AHashMap<Edge, Edge>) -> Self { 
+    fn new_impl(mut inner: TngComplexBuilder<R>, x_map: AHashMap<Node, Node>, e_map: AHashMap<Edge, Edge>) -> Self { 
         inner.auto_deloop = false;
         inner.auto_elim = false;
 
@@ -72,8 +74,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     delegate! { 
         to self.inner { 
             pub fn complex(&self) -> &TngComplex<R>;
-            pub fn crossings(&self) -> impl Iterator<Item = &Crossing>;
-            pub fn set_crossings<I>(&mut self, crossings: I) where I: IntoIterator<Item = Crossing>;
+            pub fn crossings(&self) -> impl Iterator<Item = &Node>;
+            pub fn set_crossings<I>(&mut self, crossings: I) where I: IntoIterator<Item = Node>;
             pub fn elements(&self) -> impl Iterator<Item = &BuildElem<R>>;
             pub fn set_elements<I>(&mut self, elements: I) where I: IntoIterator<Item = BuildElem<R>>;
             pub fn set_h_range(&mut self, h_range: RangeInclusive<isize>);
@@ -104,7 +106,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         info!("({}) preprocess done.", self.stat());
     }
 
-    fn off_axis_crossings(&self, take_half: bool) -> Vec<&Crossing> { 
+    fn off_axis_crossings(&self, take_half: bool) -> Vec<&Node> { 
         let off_axis = self.crossings().filter(|&x|
             self.inv_x(x) != x
         ).collect_vec();
@@ -113,7 +115,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             return off_axis
         }
 
-        let is_adj = |x: &Crossing, y: &Crossing| {
+        let is_adj = |x: &Node, y: &Node| {
             x.edges().iter().filter(|&&e| 
                 self.inv_e(e) != e // no axis-crossing edge
             ).any(|e| 
@@ -144,7 +146,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn build_from_half<'a, I>(&self, crossings: I, elements: Vec<BuildElem<R>>) -> (TngComplex<R>, TngComplex<R>, AHashMap<TngKey, TngKey>, Vec<BuildElem<R>>) 
-    where I: IntoIterator<Item = &'a Crossing> { 
+    where I: IntoIterator<Item = &'a Node> { 
         let (h, t) = self.complex().ht();
         let mut b = TngComplexBuilder::init(h, t, (0, 0), None);
 
@@ -197,13 +199,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    fn append_on_axis(&mut self, x: &Crossing) { 
+    fn append_on_axis(&mut self, x: &Node) { 
         info!("({}) append on-axis: {x}", self.stat());
 
         self.inner.append_prepare(&x);
 
         let c = self.complex().make_x(x);
-        let key_map = if !x.is_resolved() { 
+        let key_map = if x.is_crossing() { 
             [Bit::Bit0, Bit::Bit1].map(|b| { 
                 let k = TngKey { state: BitSeq::from(b), label: KhTensor::empty() };
                 (k, k)
@@ -216,7 +218,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.connect(c, key_map);
     }
 
-    fn append_off_axis(&mut self, x: &Crossing, tx: &Crossing) { 
+    fn append_off_axis(&mut self, x: &Node, tx: &Node) { 
         assert_eq!(self.inv_x(x), tx);
 
         info!("({}) append off-axis: {x}, {tx}", self.stat());
@@ -229,7 +231,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             c.append(tx);
             c
         };
-        let key_map = if !x.is_resolved() { 
+        let key_map = if x.is_crossing() { 
             [
                 ([0, 0], [0, 0]),
                 ([1, 0], [0, 1]),
@@ -580,7 +582,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         c
     }
 
-    fn inv_x(&self, x: &Crossing) -> &Crossing { 
+    fn inv_x(&self, x: &Node) -> &Node { 
         &self.x_map[x]
     }
 

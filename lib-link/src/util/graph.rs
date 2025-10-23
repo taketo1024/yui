@@ -1,13 +1,13 @@
 use petgraph::Graph;
-use crate::{Link, Path, CrossingType};
+use crate::{Link, Path, NodeType};
 
 pub fn seifert_graph(link: &Link) -> Graph<Path, usize> { 
     type G = Graph<Path, usize>;
-    let s0 = link.ori_pres_state();
+    let s0 = link.seifert_state();
     let l0 = link.resolved_by(&s0);
     let mut graph = Graph::new();
 
-    for c in l0.components() {
+    for c in l0.collect_components() {
         graph.add_node(c);
     }
 
@@ -17,8 +17,8 @@ pub fn seifert_graph(link: &Link) -> Graph<Path, usize> {
         )
     };
 
-    for (i, x) in l0.data().iter().enumerate() {
-        let (e1, e2) = if x.ctype() == CrossingType::V {
+    for (i, x) in l0.nodes().enumerate() {
+        let (e1, e2) = if x.ntype() == NodeType::V {
             (x.edge(0), x.edge(1))
         } else { 
             (x.edge(0), x.edge(2))

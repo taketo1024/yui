@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use itertools::Itertools;
 use num_integer::Integer;
-use crate::{Crossing, Edge, Link, XCode};
+use yui::CloneAnd;
+use crate::{Node, Edge, Link, XCode};
 
 // Involutive link
 #[derive(Debug, Clone)]
@@ -10,26 +11,26 @@ pub struct InvLink {
     link: Link,
     base_pt: Option<Edge>,
     e_map: HashMap<Edge, Edge>,
-    x_map: HashMap<Crossing, Crossing>
+    x_map: HashMap<Node, Node>
 }
 
 impl InvLink { 
     pub fn new<F>(link: Link, e_map: F, base_pt: Option<Edge>) -> InvLink
     where F: Fn(Edge) -> Edge { 
-        let e_map = link.edges().iter().map(|&e| (e, e_map(e))).collect::<HashMap<_, _>>();
+        let e_map = link.edges().map(|&e| (e, e_map(e))).collect::<HashMap<_, _>>();
         let mut x_map = HashMap::new();
 
         // TODO? check resolution
-        for x in link.data().iter() { 
+        for x in link.nodes() { 
             let edges = x.edges().map(|e| e_map.get(&e).unwrap());
-            let find = link.data().iter().find_position(|y|
+            let find = link.nodes().find_position(|y|
                 edges.iter().all(|e| y.edges().contains(e))
             );
 
             assert!(find.is_some(), "no match for x: {x} -> {edges:?}");
 
             let j = find.unwrap().0;
-            let y = &link.data()[j];
+            let y = link.node(j);
 
             x_map.insert(x.clone(), y.clone());
 
@@ -38,7 +39,7 @@ impl InvLink {
             }
         }
 
-        assert_eq!(x_map.len(), link.data().len());
+        assert_eq!(x_map.len(), link.n_nodes());
 
         if let Some(p) = base_pt { 
             assert_eq!(p, e_map[&p], "base-pt must be on-axis.");
@@ -51,11 +52,11 @@ impl InvLink {
     where I1: IntoIterator<Item = XCode> { 
         let code = pd_code.into_iter().collect_vec();
         let l = Link::from_pd_code(code);
-        let n = l.edges().len();
+        let n = l.n_edges();
 
         assert!(n.is_even(), "number of edges must be even.");
-        assert_eq!(l.edges().iter().min(), Some(&1), "edge must start from index 1.");
-        assert_eq!(l.edges().iter().max(), Some(&n), "edges must have sequential indexing.");
+        assert_eq!(l.edges().min(), Some(&1), "edge must start from index 1.");
+        assert_eq!(l.edges().max(), Some(&n), "edges must have sequential indexing.");
 
         Self::new(l, |e| (n + 1 - e) % n + 1, Some(1))
     }
@@ -72,7 +73,7 @@ impl InvLink {
         self.e_map.get(&e).cloned().unwrap()
     }
 
-    pub fn inv_x(&self, x: &Crossing) -> &Crossing { 
+    pub fn inv_x(&self, x: &Node) -> &Node { 
         self.x_map.get(x).unwrap()
     }
 
@@ -81,7 +82,9 @@ impl InvLink {
             link: self.link.mirror(),
             base_pt: self.base_pt,
             e_map: self.e_map.clone(),
-            x_map: self.x_map.iter().map(|(x, y)| (x.mirror(), y.mirror())).collect(), 
+            x_map: self.x_map.iter().map(|(x, y)| 
+                (x.clone_and(|x| x.cc()), y.clone_and(|y| y.cc()))
+            ).collect(), 
         }
     }
 }
@@ -184,11 +187,11 @@ mod tests {
     fn inv_x() { 
         let l = Link::from_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
         let l = InvLink::new(l, |e| (7 - e) % 6 + 1, None);
-        let data = l.link.data();
+        let nodes = l.link.nodes().collect_vec();
 
-        assert_eq!(l.inv_x(&data[0]), &data[1]);
-        assert_eq!(l.inv_x(&data[1]), &data[0]);
-        assert_eq!(l.inv_x(&data[2]), &data[2]);
+        assert_eq!(l.inv_x(&nodes[0]), nodes[1]);
+        assert_eq!(l.inv_x(&nodes[1]), nodes[0]);
+        assert_eq!(l.inv_x(&nodes[2]), nodes[2]);
     }
 
     #[test]
@@ -206,12 +209,12 @@ mod tests {
     #[test]
     fn load_3_1() { 
         let l = InvLink::load("3_1").unwrap();
-        assert_eq!(l.link().crossing_num(), 3);
+        assert_eq!(l.link().count_crossings(), 3);
     }
 
     #[test]
     fn load_4_1() { 
         let l = InvLink::load("4_1").unwrap();
-        assert_eq!(l.link().crossing_num(), 4);
+        assert_eq!(l.link().count_crossings(), 4);
     }
 }

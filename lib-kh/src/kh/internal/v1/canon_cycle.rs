@@ -20,7 +20,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn make_canon_cycle(l: &Link, base: Edge, a: &R, b: &R, deg_shift: (isize, isize)) -> KhChain<R> {
-        let s = l.ori_pres_state();
+        let s = l.seifert_state();
         let x_a = Self::color_factor(a); // X - a
         let x_b = Self::color_factor(b); // X - b
 
@@ -71,7 +71,7 @@ mod tests {
     #[test]
     fn trefoil() { 
         let l = Link::trefoil().mirror();
-        let p = l.first_edge().unwrap();
+        let p = l.min_edge().unwrap();
         let r = false;
         let c = KhComplex::new_no_simplify(&l, &1, &0, r);
         let zs = KhComplex::make_canon_cycles(&l, p, &0, &1, r, c.deg_shift());
@@ -91,7 +91,7 @@ mod tests {
     #[test]
     fn figure8() { 
         let l = Link::figure8();
-        let p = l.first_edge().unwrap();
+        let p = l.min_edge().unwrap();
         let r = false;
         let c = KhComplex::new_no_simplify(&l, &1, &0, r);
         let zs = KhComplex::make_canon_cycles(&l, p, &0, &1, r, c.deg_shift());
@@ -111,7 +111,7 @@ mod tests {
     #[test]
     fn trefoil_red() { 
         let l = Link::trefoil().mirror();
-        let p = l.first_edge().unwrap();
+        let p = l.min_edge().unwrap();
         let r = true;
         let c = KhComplex::new_no_simplify(&l, &1, &0, r);
         let zs = KhComplex::make_canon_cycles(&l, p, &0, &1, r, c.deg_shift());
@@ -130,7 +130,7 @@ mod tests {
     #[test]
     fn figure8_red() { 
         let l = Link::figure8();
-        let p = l.first_edge().unwrap();
+        let p = l.min_edge().unwrap();
         let r = true;
         let c = KhComplex::new_no_simplify(&l, &1, &0, r);
         let zs = KhComplex::make_canon_cycles(&l, p, &0, &1, r, c.deg_shift());

@@ -51,6 +51,10 @@ impl Node {
         &self.edges
     }
 
+    pub fn min_edge(&self) -> Edge { 
+        self.edges.iter().min().unwrap().clone()
+    }
+
     pub fn is_crossing(&self) -> bool { 
         matches!(self.ntype, X | Xm)
     }

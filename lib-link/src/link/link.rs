@@ -13,23 +13,25 @@ pub type XCode = [Edge; 4];
 
 #[derive(Debug, Clone)]
 pub struct Link { 
-    nodes: Vec<Node>
+    nodes: Vec<Node>,
+    edges: HashSet<Edge>
 }
 
 impl Link {
     pub fn new(nodes: Vec<Node>) -> Self { 
-        let l = Self { nodes };
+        let edges = nodes.iter().flat_map(|x| x.edges()).cloned().collect();
+        let l = Self { nodes, edges };
         l.validate();
         l
     }
 
     fn validate(&self) { 
-        assert_eq!(self.edges().len(), self.nodes.len() * 2, "Invalid data.");
+        assert_eq!(self.edges.len(), self.nodes.len() * 2, "Invalid data.");
         self.traverse(|_, _, _| ());
     }
 
     pub fn empty() -> Link {
-        Link { nodes: vec![] }
+        Link { nodes: vec![], edges: HashSet::new() }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -100,14 +102,17 @@ impl Link {
 
         result
     }
+
+    pub fn n_edges(&self) -> usize { 
+        self.edges.len()
+    }
     
-    pub fn edges(&self) -> HashSet<Edge> {
-        self.nodes.iter().flat_map(|x| x.edges()).cloned().collect()
+    pub fn edges(&self) -> impl Iterator<Item = &Edge> {
+        self.edges.iter()
     }
 
-    pub fn first_edge(&self) -> Option<Edge> { 
-        let x = self.nodes.first()?;
-        x.edges().iter().min().cloned()
+    pub fn min_edge(&self) -> Option<Edge> { 
+        self.nodes.first().map(|x| x.min_edge())
     }
 
     pub fn n_components(&self) -> usize { 
@@ -178,7 +183,7 @@ impl Link {
         let n = self.n_nodes();
 
         let mut c = 0; // component counter
-        let mut remain = self.edges();
+        let mut remain = self.edges.clone();
 
         // MEMO: For a link obtained from a PD-code, 
         // the following loop should break after the first iteration: j0 = 0.
@@ -322,7 +327,7 @@ mod tests {
 
     #[test]
     fn link_init() { 
-        let l = Link { nodes: vec![] };
+        let l = Link::new(vec![]);
         assert_eq!(l.nodes.len(), 0);
     }
 

@@ -17,7 +17,7 @@ pub struct InvLink {
 impl InvLink { 
     pub fn new<F>(link: Link, e_map: F, base_pt: Option<Edge>) -> InvLink
     where F: Fn(Edge) -> Edge { 
-        let e_map = link.edges().iter().map(|&e| (e, e_map(e))).collect::<HashMap<_, _>>();
+        let e_map = link.edges().map(|&e| (e, e_map(e))).collect::<HashMap<_, _>>();
         let mut x_map = HashMap::new();
 
         // TODO? check resolution
@@ -52,11 +52,11 @@ impl InvLink {
     where I1: IntoIterator<Item = XCode> { 
         let code = pd_code.into_iter().collect_vec();
         let l = Link::from_pd_code(code);
-        let n = l.edges().len();
+        let n = l.n_edges();
 
         assert!(n.is_even(), "number of edges must be even.");
-        assert_eq!(l.edges().iter().min(), Some(&1), "edge must start from index 1.");
-        assert_eq!(l.edges().iter().max(), Some(&n), "edges must have sequential indexing.");
+        assert_eq!(l.edges().min(), Some(&1), "edge must start from index 1.");
+        assert_eq!(l.edges().max(), Some(&n), "edges must have sequential indexing.");
 
         Self::new(l, |e| (n + 1 - e) % n + 1, Some(1))
     }

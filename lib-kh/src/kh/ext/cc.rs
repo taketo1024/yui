@@ -54,7 +54,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         // TODO We don't want to reproduce the cube. 
         let (h, t) = c1.str().ht();
-        let red_e = if c1.is_reduced() { l.first_edge() } else { None };
+        let red_e = if c1.is_reduced() { l.min_edge() } else { None };
         let cube = KhCube::new(l, h, t, red_e, c1.deg_shift());
 
         ChainMap::new(c1.inner(), c2.inner(), deg, move |_, z| { 

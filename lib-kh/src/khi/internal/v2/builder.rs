@@ -55,7 +55,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let x_map = l.link().nodes().map(|x| 
             (x.clone(), l.inv_x(x).clone())
         ).collect();
-        let e_map = l.link().edges().iter().map(|&e| (e, l.inv_e(e))).collect();
+        let e_map = l.link().edges().map(|&e| (e, l.inv_e(e))).collect();
 
         Self::new_impl(inner, x_map, e_map)
     }

@@ -18,7 +18,7 @@ pub fn jones_polynomial(l: &Link) -> LPoly<'q', i32> {
     let body = P::sum(State::generate(n).into_iter().map(|s| { 
         let w = s.weight();
         let l_s = l.resolved_by(&s);
-        let r = l_s.components().len();
+        let r = l_s.n_components();
 
         (-&q).pow(w) * q0.pow(r) // (-q)^w (q + q^{-1})^r
     }));

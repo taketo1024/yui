@@ -25,7 +25,7 @@ impl Link {
 
     fn validate(&self) { 
         assert_eq!(self.edges().len(), self.nodes.len() * 2, "Invalid data.");
-        assert!(self.components().iter().all(|c| c.is_circle()), "Non-closed components.")
+        self.traverse(|_, _, _| ());
     }
 
     pub fn empty() -> Link {
@@ -37,7 +37,7 @@ impl Link {
     }
 
     pub fn is_knot(&self) -> bool { 
-        self.components().len() == 1
+        self.n_components() == 1
     }
 
     pub fn writhe(&self) -> i32 { 
@@ -110,7 +110,15 @@ impl Link {
         x.edges().iter().min().cloned()
     }
 
-    pub fn components(&self) -> Vec<Path> {
+    pub fn n_components(&self) -> usize { 
+        let mut count = 0;
+        self.traverse(|c, _, _| 
+            if count <= c { count = c + 1 } 
+        );
+        count
+    }
+
+    pub fn collect_components(&self) -> Vec<Path> {
         let mut comps = vec![];
 
         self.traverse(|c, i, j| { 
@@ -162,7 +170,7 @@ impl Link {
     }
 
     pub fn seifert_circles(&self) -> Vec<Path> { 
-        self.resolved_by(&self.seifert_state()).components()
+        self.resolved_by(&self.seifert_state()).collect_components()
     }
 
     fn traverse<F>(&self, mut f: F) where 
@@ -411,7 +419,7 @@ mod tests {
     fn link_components() {
         let pd_code = [[0,0,1,1]];
         let l = Link::from_pd_code(pd_code);
-        let comps = l.components();
+        let comps = l.collect_components();
         assert_eq!(comps, vec![ Path::new(vec![0, 1], true)]);
     }
 
@@ -431,7 +439,7 @@ mod tests {
         let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]) // trefoil
             .resolved_by(&s);
 
-        let comps = l.components();
+        let comps = l.collect_components();
         assert_eq!(comps.len(), 3);
         assert!(comps.iter().all(|c| c.is_circle()));
 
@@ -439,7 +447,7 @@ mod tests {
         let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]) // trefoil
             .resolved_by(&s);
 
-        let comps = l.components();
+        let comps = l.collect_components();
         assert_eq!(comps.len(), 2);
         assert!(comps.iter().all(|c| c.is_circle()));
     }
@@ -449,7 +457,7 @@ mod tests {
         let l = Link::empty();
         assert_eq!(l.count_crossings(), 0);
         assert_eq!(l.writhe(), 0);
-        assert_eq!(l.components().len(), 0);
+        assert_eq!(l.n_components(), 0);
     }
 
     #[test]
@@ -457,7 +465,7 @@ mod tests {
         let l = Link::unknot();
         assert_eq!(l.count_crossings(), 0);
         assert_eq!(l.writhe(), 0);
-        assert_eq!(l.components().len(), 1);
+        assert_eq!(l.n_components(), 1);
     }
 
     #[test]
@@ -465,7 +473,7 @@ mod tests {
         let l = Link::trefoil();
         assert_eq!(l.count_crossings(), 3);
         assert_eq!(l.writhe(), -3);
-        assert_eq!(l.components().len(), 1);
+        assert_eq!(l.n_components(), 1);
     }
 
     #[test]
@@ -473,7 +481,7 @@ mod tests {
         let l = Link::figure8();
         assert_eq!(l.count_crossings(), 4);
         assert_eq!(l.writhe(), 0);
-        assert_eq!(l.components().len(), 1);
+        assert_eq!(l.n_components(), 1);
     }
 
     #[test]
@@ -481,7 +489,7 @@ mod tests {
         let l = Link::hopf_link();
         assert_eq!(l.count_crossings(), 2);
         assert_eq!(l.writhe(), -2);
-        assert_eq!(l.components().len(), 2);
+        assert_eq!(l.n_components(), 2);
     }
 
     #[test]
@@ -490,7 +498,7 @@ mod tests {
         let l = Link::from_pd_code(pd_code);
         assert_eq!(l.count_crossings(), 2);
         assert_eq!(l.writhe(), 0);
-        assert_eq!(l.components().len(), 2);
+        assert_eq!(l.n_components(), 2);
     }
 
 
@@ -500,7 +508,7 @@ mod tests {
         let l = Link::from_pd_code(pd_code);
         assert_eq!(l.count_crossings(), 4);
         assert_eq!(l.writhe(), 4);
-        assert_eq!(l.components().len(), 2);
+        assert_eq!(l.n_components(), 2);
     }
 
     #[test]

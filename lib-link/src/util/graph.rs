@@ -7,7 +7,7 @@ pub fn seifert_graph(link: &Link) -> Graph<Path, usize> {
     let l0 = link.resolved_by(&s0);
     let mut graph = Graph::new();
 
-    for c in l0.components() {
+    for c in l0.collect_components() {
         graph.add_node(c);
     }
 

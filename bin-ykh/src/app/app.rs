@@ -1,7 +1,7 @@
 use log::info;
 use clap::{Parser, Subcommand};
 
-use super::cmd::{ckh, ckhi, kh, khi};
+use super::cmd::{ckh, ckhi, kh, khi, cc};
 use super::utils::*;
 
 #[derive(Parser, Debug)]
@@ -18,7 +18,8 @@ pub enum Cmd {
     CKh(ckh::Args),
     Kh(kh::Args),
     CKhI(ckhi::Args),    
-    KhI(khi::Args),    
+    KhI(khi::Args),
+    CC(cc::Args),
 }
 
 impl CliArgs { 
@@ -29,6 +30,7 @@ impl CliArgs {
             Cmd::Kh(args)   => args.log,
             Cmd::CKhI(args) => args.log,
             Cmd::KhI(args)  => args.log,
+            Cmd::CC(args)   => args.log,
         };
         match level {
             1 => Info,
@@ -76,6 +78,7 @@ impl App {
                 Cmd::Kh(args)   => kh::dispatch(args),
                 Cmd::CKhI(args) => ckhi::dispatch(args),
                 Cmd::KhI(args)  => khi::dispatch(args),
+                Cmd::CC(args)   => cc::dispatch(args),
             }
         )
     }

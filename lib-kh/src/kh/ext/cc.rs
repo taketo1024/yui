@@ -9,7 +9,7 @@ use num_traits::Zero;
 use crate::kh::internal::v1::cube::KhCube;
 use crate::kh::{KhAlg, KhChain, KhChainGen, KhComplex, KhGen, KhTensor};
 
-type KhChainMap<R> = ChainMap<isize, KhChainGen, KhChainGen, R>;
+pub type KhChainMap<R> = ChainMap<isize, KhChainGen, KhChainGen, R>;
 
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 

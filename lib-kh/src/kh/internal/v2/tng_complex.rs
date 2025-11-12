@@ -8,10 +8,10 @@ use itertools::Itertools;
 use num_traits::Zero;
 use rayon::prelude::*;
 use cartesian::cartesian;
-use yui::{CloneAnd, Ring, RingOps, Sign};
+use yui_core::{CloneAnd, Ring, RingOps, Sign};
 use yui_homology::{ChainComplex, Summand, Grid1};
 use yui_link::{Node, Edge, State};
-use yui::bitseq::Bit;
+use yui_core::bitseq::Bit;
 
 use crate::kh::{KhGen, KhAlg, KhChain, KhComplex, KhChainGen, KhTensor};
 use super::cob::{Cob, Dot, Bottom, CobComp, LcCob, LcCobTrait};

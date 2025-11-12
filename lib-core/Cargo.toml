@@ -1,5 +1,5 @@
 [package]
-name = "yui"
+name = "yui-core"
 description = "Core Library for YUI"
 
 version.workspace = true

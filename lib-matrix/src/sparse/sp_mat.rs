@@ -7,7 +7,7 @@ use nalgebra_sparse::{CscMatrix, CooMatrix};
 use num_traits::{Zero, One, ToPrimitive};
 use auto_impl_ops::auto_ops;
 use sprs::PermView;
-use yui::{Ring, RingOps};
+use yui_core::{Ring, RingOps};
 use crate::dense::*;
 use super::sp_vec::SpVec;
 use super::triang::TriangularType;
@@ -458,7 +458,7 @@ where R: Scalar + Zero + One + ClosedAddAssign {
 pub(super) mod tests { 
     use itertools::Itertools;
     use sprs::PermOwned;
-    use yui::num::Ratio;
+    use yui_core::num::Ratio;
 
     use super::*;
 

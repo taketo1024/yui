@@ -4,7 +4,7 @@ use crate::app::err::*;
 use std::str::FromStr;
 use itertools::Itertools;
 use num_traits::Zero;
-use yui::{Ring, RingOps};
+use yui_core::{Ring, RingOps};
 use yui_link::{Edge, InvLink, Link};
 use yui_matrix::sparse::SpVec;
 

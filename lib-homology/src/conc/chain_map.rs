@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use num_traits::Zero;
-use yui::lc::{EitherGen, Gen, Lc};
-use yui::{Ring, RingOps};
+use yui_core::lc::{EitherGen, Gen, Lc};
+use yui_core::{Ring, RingOps};
 
 use crate::{ChainComplexTrait, Grid, GridDeg, GridTrait, Summand};
 

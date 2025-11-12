@@ -7,7 +7,7 @@ use yui_matrix::sparse::*;
 use yui_matrix::sparse::pivot::{PivotType, PivotCondition, perms_by_pivots, find_pivots};
 use yui_matrix::sparse::schur::Schur;
 use yui_matrix::sparse::triang::{solve_triangular_vec, TriangularType};
-use yui::{Ring, RingOps};
+use yui_core::{Ring, RingOps};
 
 use crate::generic::GenericChainComplexBase;
 use crate::{GridDeg, ChainComplexTrait, GridTrait};

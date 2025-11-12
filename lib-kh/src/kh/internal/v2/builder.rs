@@ -6,8 +6,8 @@ use std::ops::RangeInclusive;
 use itertools::Itertools;
 use log::{debug, info};
 use num_traits::Zero;
-use yui::bitseq::Bit;
-use yui::{hashmap, Ring, RingOps};
+use yui_core::bitseq::Bit;
+use yui_core::{hashmap, Ring, RingOps};
 use yui_homology::DisplaySeq;
 use yui_link::{Node, Edge, Link};
 

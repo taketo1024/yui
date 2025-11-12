@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::ops::RangeInclusive;
 
 use itertools::Itertools;
-use yui::lc::Lc;
-use yui::{Ring, RingOps};
+use yui_core::lc::Lc;
+use yui_core::{Ring, RingOps};
 use yui_homology::{Grid, ChainComplex, Summand};
 use yui_link::{InvLink, State};
 
@@ -166,8 +166,8 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 mod tests {
     #![allow(unused)]
 
-    use yui::poly::Poly;
-    use yui::num::FF2;
+    use yui_core::poly::Poly;
+    use yui_core::num::FF2;
     use num_traits::{Zero, One};
     use yui_homology::{ChainComplexTrait, DisplaySeq};
     use yui_link::Link;

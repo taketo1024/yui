@@ -5,7 +5,7 @@ use delegate::delegate;
 use derive_more::{Display, Debug};
 use itertools::Itertools;
 use num_traits::Zero;
-use yui::{GetSign, Sign};
+use yui_core::{GetSign, Sign};
 
 use crate::{Link, XCode};
 

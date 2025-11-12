@@ -32,4 +32,4 @@ serde = { version = "1.0.219", features = ["derive"], optional = true }
 serde_json = { version = "1.0.140", optional = true }
 sprs = "0.11.3"
 thread_local = "1.1.8"
-yui = { path = "../lib-core" }
+yui-core = { path = "../lib-core" }

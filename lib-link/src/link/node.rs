@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
-use yui::bitseq::Bit;
-use yui::CloneAnd;
+use yui_core::bitseq::Bit;
+use yui_core::CloneAnd;
 
 use crate::Path;
 use super::Edge;

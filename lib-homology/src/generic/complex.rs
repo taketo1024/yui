@@ -1,4 +1,4 @@
-use yui::{Ring, RingOps};
+use yui_core::{Ring, RingOps};
 use yui_matrix::sparse::SpMat;
 use yui_matrix::MatTrait;
 use super::gen::EnumGen;

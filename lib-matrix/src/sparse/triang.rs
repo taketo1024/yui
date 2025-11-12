@@ -1,7 +1,7 @@
 use either::Either;
 use log::debug;
 use num_traits::Zero;
-use yui::{Ring, RingOps};
+use yui_core::{Ring, RingOps};
 
 use super::*;
 
@@ -95,7 +95,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(feature = "multithread")]
 fn solve_triangular_m<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    use yui::util::sync::SyncCounter;
+    use yui_core::util::sync::SyncCounter;
 
     debug!("solve triangular, y: {:?}", y.shape());
 

@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use yui::{Ring, RingOps};
+use yui_core::{Ring, RingOps};
 use yui_matrix::sparse::SpMat;
 
 use crate::generic::GenericChainComplexBase;

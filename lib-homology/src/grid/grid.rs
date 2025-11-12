@@ -191,7 +191,7 @@ macro_rules! impl_print_seq {
         impl<G> DisplaySeq<$t> for G
         where G: GridTrait<$t>, G::Item: Display {
             fn display_seq(&self, label: &str) -> String { 
-                use yui::util::format::table;
+                use yui_core::util::format::table;
 
                 table(label, [""].iter(), self.support(), |_, &i| {
                     self.get(i).to_string()
@@ -216,7 +216,7 @@ macro_rules! impl_print_table {
         impl<G> DisplayTable<$t> for G
         where G: GridTrait<$t>, G::Item: Display {
             fn display_table(&self, label0: &str, label1: &str) -> String {
-                use yui::util::format::table;
+                use yui_core::util::format::table;
 
                 let def_str = self.get_default().to_string();
                 let head = format!("{}\\{}", label1, label0);
@@ -242,7 +242,7 @@ impl_print_table!(usize2);
 #[cfg(feature = "tex")]
 pub mod tex { 
     use super::*;
-    use yui::tex::{TeX, tex_table};
+    use yui_core::tex::{TeX, tex_table};
 
     pub trait TeXTable<I> {
         fn tex_table(&self, caption: &str, head: &str) -> String;
@@ -309,7 +309,7 @@ mod tests {
 
     #[test]
     fn table_rmod() { 
-        use yui::num::FF2;
+        use yui_core::num::FF2;
         use crate::GenericSummand;
         use cartesian::cartesian;
         

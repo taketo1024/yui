@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
-use yui::{EucRing, EucRingOps, IndexList, Ring, RingOps};
-use yui::lc::{Gen, Lc};
+use yui_core::{EucRing, EucRingOps, IndexList, Ring, RingOps};
+use yui_core::lc::{Gen, Lc};
 use yui_matrix::sparse::{SpVec, Trans};
 
 use crate::SummandTrait;
@@ -165,7 +165,7 @@ mod tex {
     use crate::tex_rmod_str;
 
     use super::*;
-    use yui::tex::TeX;
+    use yui_core::tex::TeX;
 
     impl<X, R> TeX for Summand<X, R>
     where X: Gen, R: Ring + TeX, for<'x> &'x R: RingOps<R> {
@@ -181,7 +181,7 @@ mod tex {
 
 #[cfg(test)]
 mod tests { 
-    use yui::lc::FreeGen;
+    use yui_core::lc::FreeGen;
 
     use super::*;
 

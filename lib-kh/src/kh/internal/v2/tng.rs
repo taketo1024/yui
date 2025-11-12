@@ -3,7 +3,7 @@ use std::fmt::Display;
 use std::hash::Hash;
 use delegate::delegate;
 use itertools::Itertools;
-use yui::CloneAnd;
+use yui_core::CloneAnd;
 use yui_link::{Edge, Node, Path};
 
 #[derive(Debug, Clone, Eq)]

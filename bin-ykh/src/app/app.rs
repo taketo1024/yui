@@ -68,7 +68,7 @@ impl App {
 
     fn init_logger(&self) {
         let l = self.args.log_level();
-        yui::util::log::init_simple_logger(l).unwrap()
+        yui_core::util::log::init_simple_logger(l).unwrap()
     }
 
     fn dispatch(&self) -> Result<String, Box<dyn std::error::Error>> { 

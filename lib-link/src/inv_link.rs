@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use itertools::Itertools;
 use num_integer::Integer;
-use yui::CloneAnd;
+use yui_core::CloneAnd;
 use crate::{Node, Edge, Link, XCode};
 
 // Involutive link

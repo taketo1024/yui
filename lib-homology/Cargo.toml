@@ -11,7 +11,7 @@ edition.workspace = true
 default = ["multithread"]
 multithread = ["rayon"]
 serde = ["dep:serde", "dep:serde_json", "ahash/serde"]
-tex = ["yui/tex"]
+tex = ["yui-core/tex"]
 
 [dependencies]
 ahash = "0.8.11"
@@ -28,5 +28,5 @@ rayon = { version = "1.10.0", optional = true }
 serde = { version = "1.0.219", optional = true }
 serde_json = { version = "1.0.140", optional = true }
 sprs = "0.11.3"
-yui = { path = "../lib-core" }
+yui-core = { path = "../lib-core" }
 yui-matrix = { path = "../lib-matrix" }

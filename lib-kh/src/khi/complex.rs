@@ -3,8 +3,8 @@ use cartesian::cartesian;
 use delegate::delegate;
 
 use itertools::Itertools;
-use yui::lc::Lc;
-use yui::{EucRing, EucRingOps, Ring, RingOps};
+use yui_core::lc::Lc;
+use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 use yui_homology::{isize2, ChainComplexTrait, Grid1, Grid2, GridTrait, ChainComplex, Summand};
 use yui_link::InvLink;
 use yui_matrix::sparse::SpMat;
@@ -214,8 +214,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests {
-    use yui::poly::HPoly;
-    use yui::num::FF2;
+    use yui_core::poly::HPoly;
+    use yui_core::num::FF2;
     use num_traits::{Zero, One};
     use yui_homology::{ChainComplexTrait, SummandTrait};
     use super::*;
@@ -416,8 +416,8 @@ mod tests {
 
 #[cfg(test)]
 mod tests_v1 {
-    use yui::poly::HPoly;
-    use yui::num::FF2;
+    use yui_core::poly::HPoly;
+    use yui_core::num::FF2;
     use num_traits::{Zero, One};
     use yui_homology::{ChainComplexTrait, SummandTrait};
     use super::*;

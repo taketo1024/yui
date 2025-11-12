@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::ops::RangeInclusive;
 use itertools::Itertools;
-use yui::{Ring, RingOps, PowMod2, Sign, GetSign};
+use yui_core::{Ring, RingOps, PowMod2, Sign, GetSign};
 use yui_homology::{ChainComplex, Grid, Summand};
 use yui_link::{Link, State, Path, Edge};
 
@@ -260,7 +260,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests { 
-    use yui::bitseq::Bit;
+    use yui_core::bitseq::Bit;
     use super::*;
     
     #[test]

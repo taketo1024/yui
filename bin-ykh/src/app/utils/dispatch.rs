@@ -74,7 +74,7 @@ macro_rules! try_eucring {
 
 macro_rules! try_std {
     ($app:ident, $args:expr) => {{
-        use yui::num::{Ratio, FF};
+        use yui_core::num::{Ratio, FF};
 
         type Z = Int;
         type Q = Ratio<Int>;
@@ -94,9 +94,9 @@ macro_rules! try_euc_poly {
     ($app:ident, $args:expr) => {{
         cfg_if::cfg_if! {
             if #[cfg(any(feature = "poly", feature = "all"))] {
-                use yui::num::Ratio;
-                use yui::num::FF;
-                use yui::poly::Poly;
+                use yui_core::num::Ratio;
+                use yui_core::num::FF;
+                use yui_core::poly::Poly;
 
                 type Q = Ratio<Int>;
                 type F2 = FF<2>;
@@ -129,9 +129,9 @@ macro_rules! try_noneuc_poly {
     ($app:ident, $args:expr) => {{
         cfg_if::cfg_if! {
             if #[cfg(any(feature = "poly", feature = "all"))] {
-                use yui::num::Ratio;
-                use yui::num::FF;
-                use yui::poly::{Poly, Poly2};
+                use yui_core::num::Ratio;
+                use yui_core::num::FF;
+                use yui_core::poly::{Poly, Poly2};
 
                 type Z = Int;
                 type Q = Ratio<Int>;

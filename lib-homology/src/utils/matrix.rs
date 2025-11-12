@@ -1,6 +1,6 @@
 use itertools::Itertools;
-use yui::{Ring, RingOps, IndexList};
-use yui::lc::{Lc, Gen};
+use yui_core::{Ring, RingOps, IndexList};
+use yui_core::lc::{Lc, Gen};
 use yui_matrix::sparse::SpMat;
 
 #[cfg(feature = "multithread")]

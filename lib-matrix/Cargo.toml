@@ -1,11 +1,11 @@
 [package]
 name = "yui-matrix"
-description = ""
+version = "0.4.0"
 
-version.workspace = true
 authors.workspace = true
 license.workspace = true
 edition.workspace = true
+repository.workspace  = true
 
 [features]
 default = ["multithread"]
@@ -32,4 +32,4 @@ serde = { version = "1.0.219", features = ["derive"], optional = true }
 serde_json = { version = "1.0.140", optional = true }
 sprs = "0.11.3"
 thread_local = "1.1.8"
-yui-core = { path = "../lib-core" }
+yui-core = { version = "0.4.0", path = "../lib-core" }

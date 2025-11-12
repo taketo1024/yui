@@ -1,6 +1,6 @@
 [package]
 name = "ykh"
-description = ""
+description = "CLI for Khovanov Homology Computation"
 version = "0.4.0"
 
 authors.workspace = true

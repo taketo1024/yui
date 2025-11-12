@@ -1,6 +1,6 @@
 [package]
 name = "yui-kh"
-description = ""
+description = "Khovanov Homology Library for YUI"
 version = "0.4.0"
 
 authors.workspace = true

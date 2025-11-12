@@ -90,10 +90,12 @@ where
         };
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, r, i);
+
+        // MEMO: f0, f1 are named after the paper. 
         let (f_name, f) = if self.args.map_type == 0 { 
-            ("f0", KhComplex::cc_map0(&c1, &c2, i)) 
+            ("f0", KhComplex::cc_map1(&c1, &c2, &l, i))
         } else { 
-            ("f1", KhComplex::cc_map1(&c1, &c2, &l, i))
+            ("f1", KhComplex::cc_map0(&c1, &c2, i)) 
         };
 
         let (h1, h2) = (c1.homology(), c2.homology());

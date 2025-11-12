@@ -5,11 +5,10 @@ A CLI tool for Khovanov homology computations.
 ## Setup
 
 * Install [Rust](https://www.rust-lang.org/tools/install).
-* Download [`yui`](https://github.com/taketo1024/yui.git).
 * Install `ykh` by
 
 ```sh
-$ cargo install --path ./bin-ykh
+$ cargo install ykh
 ```
 
 ## Usage

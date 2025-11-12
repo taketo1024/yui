@@ -14,10 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - name: Build yui
-      run: cargo build --verbose -p yui
-    - name: Test yui
-      run: cargo test --verbose -p yui
+    - name: Build yui-core
+      run: cargo build --verbose -p yui-core
+    - name: Test yui-core
+      run: cargo test --verbose -p yui-core
     - name: Build yui-matrix
       run: cargo build --verbose -p yui-matrix
     - name: Test yui-matrix

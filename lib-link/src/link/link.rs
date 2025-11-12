@@ -1,0 +1,536 @@
+use core::panic;
+use std::collections::{HashMap, HashSet};
+use std::fmt::Display;
+use itertools::Itertools;
+use yui::{hashmap, CloneAnd, Sign};
+use yui::bitseq::Bit;
+
+use super::{Node, NodeType, Path};
+
+pub type Edge = usize;
+pub type State = yui::bitseq::BitSeq;
+pub type XCode = [Edge; 4];
+
+#[derive(Debug, Clone)]
+pub struct Link { 
+    nodes: Vec<Node>,
+    edges: HashSet<Edge>
+}
+
+impl Link {
+    pub fn new(nodes: Vec<Node>) -> Self { 
+        let edges = nodes.iter().flat_map(|x| x.edges()).cloned().collect();
+        let l = Self { nodes, edges };
+        l.validate();
+        l
+    }
+
+    fn validate(&self) { 
+        assert_eq!(self.edges.len(), self.nodes.len() * 2, "Invalid data.");
+        self.traverse(|_, _, _| ());
+    }
+
+    pub fn empty() -> Link {
+        Link { nodes: vec![], edges: HashSet::new() }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
+    }
+
+    pub fn is_knot(&self) -> bool { 
+        self.n_components() == 1
+    }
+
+    pub fn writhe(&self) -> i32 { 
+        let (p, n) = self.count_signed_crossings();
+        (p as i32) - (n as i32)
+    }
+
+    pub fn mirror(&self) -> Self {
+        self.clone_and(|l|
+            l.nodes.iter_mut().for_each(|x| x.cc())
+        )
+    }
+
+    pub fn n_nodes(&self) -> usize { 
+        self.nodes.len()
+    }
+
+    pub fn nodes(&self) -> impl Iterator<Item = &Node> { 
+        self.nodes.iter()
+    }
+
+    pub fn node(&self, i: usize) -> &Node { 
+        &self.nodes[i]
+    }
+
+    pub fn node_mut(&mut self, i: usize) -> &mut Node { 
+        &mut self.nodes[i]
+    }
+
+    pub fn crossings(&self) -> impl Iterator<Item = &Node> { 
+        self.nodes.iter().filter(|x| x.is_crossing())
+    }
+
+    pub fn count_crossings(&self) -> usize { 
+        self.nodes.iter()
+            .filter(|x| x.is_crossing())
+            .count()
+    }
+
+    pub fn count_signed_crossings(&self) -> (usize, usize) {
+        let signs = self.collect_crossing_signs();
+        let pos = signs.iter().filter(|(_, s)| s.is_positive()).count();
+        let neg = signs.len() - pos;
+        (pos, neg)
+    }
+
+    pub fn collect_crossing_signs(&self) -> HashMap<usize, Sign> {
+        use NodeType::{X, Xm};
+
+        let mut result = hashmap!{};
+
+        self.traverse(|_, i, j| { 
+            let c = self.node(i);
+            match (c.ntype(), j) { 
+                (Xm, 1) | (X, 3) => result.insert(i, Sign::Pos),
+                (Xm, 3) | (X, 1) => result.insert(i, Sign::Neg),
+                _ => None
+            };
+        });
+
+        result
+    }
+
+    pub fn n_edges(&self) -> usize { 
+        self.edges.len()
+    }
+    
+    pub fn edges(&self) -> impl Iterator<Item = &Edge> {
+        self.edges.iter()
+    }
+
+    pub fn min_edge(&self) -> Option<Edge> { 
+        self.nodes.first().map(|x| x.min_edge())
+    }
+
+    pub fn n_components(&self) -> usize { 
+        let mut count = 0;
+        self.traverse(|c, _, _| 
+            if count <= c { count = c + 1 } 
+        );
+        count
+    }
+
+    pub fn collect_components(&self) -> Vec<Path> {
+        let mut comps = vec![];
+
+        self.traverse(|c, i, j| { 
+            if c == comps.len() { 
+                comps.push(vec![]);
+            }
+
+            let e = self.node(i).edge(j);
+            comps[c].push(e);
+        });
+
+        comps.into_iter().map(|edges| 
+            Path::circ(edges)
+        ).collect()
+    }
+
+    pub fn crossing_change(&self, i: usize) -> Self { 
+        assert!(self.node(i).is_crossing());
+        self.clone_and(|l| l.node_mut(i).cc())
+    }
+
+    pub fn resolved_at(&self, i: usize, r: Bit) -> Self {
+        assert!(self.node(i).is_crossing());
+        self.clone_and(|l| l.node_mut(i).resolve(r))
+    }
+
+    pub fn resolved_by(&self, s: &State) -> Self {
+        assert!(s.len() == self.count_crossings());
+
+        let n = self.nodes.len();
+        let itr = (0..n).filter(|&i| self.node(i).is_crossing());
+
+        self.clone_and(|l| {
+            for (i, r) in Iterator::zip(itr, s.iter()) {
+                l.node_mut(i).resolve(r); 
+            }
+        })
+    }
+
+    pub fn seifert_state(&self) -> State { 
+        let signs = self.collect_crossing_signs();
+        let seq = signs.iter().sorted_by_key(|(&i, _)| i).map(|(_, s)| 
+            match s { 
+                Sign::Pos => 0, 
+                Sign::Neg => 1
+            }
+        ); 
+        State::from_iter(seq)
+    }
+
+    pub fn seifert_circles(&self) -> Vec<Path> { 
+        self.resolved_by(&self.seifert_state()).collect_components()
+    }
+
+    fn traverse<F>(&self, mut f: F) where 
+    F: FnMut(usize, usize, usize) { 
+        let n = self.n_nodes();
+
+        let mut c = 0; // component counter
+        let mut remain = self.edges.clone();
+
+        // MEMO: For a link obtained from a PD-code, 
+        // the following loop should break after the first iteration: j0 = 0.
+
+        for j0 in [0, 1, 2] { 
+            for i0 in 0..n {
+                let e0 = self.node(i0).edge(j0);
+                if !remain.remove(&e0) { 
+                    continue 
+                }
+
+                self.traverse_from((i0, j0), |i, j| { 
+                    let e = self.node(i).edge(j);
+                    remain.remove(&e);
+
+                    f(c, i, j);
+                });
+
+                c += 1;
+            }
+
+            if remain.is_empty() { 
+                break
+            }
+        }
+
+        assert!(remain.is_empty())
+    }
+
+    fn traverse_from<F>(&self, start: (usize, usize), mut f:F) where
+        F: FnMut(usize, usize)
+    {
+        let (mut i, mut j) = start;
+
+        f(i, j); // call starting point
+
+        loop {
+            let c = self.node(i);
+            let k = c.traverse_inner(j);
+            let next = self.traverse_outer(i, k);
+
+            if next == start {
+                break
+            }
+
+            (i, j) = next;
+
+            f(i, j)
+        }
+    }
+
+    fn traverse_outer(&self, n_index: usize, e_index: usize) -> (usize, usize) {
+        let e = self.nodes[n_index].edge(e_index);
+
+        for (i, c) in self.nodes.iter().enumerate() { 
+            for (j, &f) in c.edges().iter().enumerate() { 
+                if e == f && (n_index != i || (n_index == i && e_index != j)) { 
+                    return (i, j)
+                }
+            }
+        }
+
+        panic!("Broken data")
+    }
+}
+
+impl Link { 
+    // Planer Diagram code, represented by crossings:
+    //
+    //     3   2
+    //      \ /
+    //       \      = (0, 1, 2, 3)
+    //      / \
+    //     0   1
+    //
+    // The lower edge has direction 0 -> 2.
+    // The crossing is +1 if the upper goes 3 -> 1.
+    // see: http://katlas.math.toronto.edu/wiki/Planar_Diagrams
+
+    pub fn from_pd_code<I>(pd_code: I) -> Self
+    where I: IntoIterator<Item = XCode> { 
+        let nodes = pd_code.into_iter().map(Node::from_pd_code).collect();
+        Self::new(nodes)
+    }
+
+    pub fn is_valid_name(str: &str) -> bool { 
+        use regex::Regex;
+        let r1 = Regex::new(r"^([1-9]|10)_[0-9]+$").unwrap();
+        let r2 = Regex::new(r"^(K|L)?[1-9]+(a|n)_?[0-9]+$").unwrap(); // FIXME tmp
+        r1.is_match(str) || r2.is_match(str)
+    }
+
+    pub fn load(name_or_path: &str) -> Result<Link, Box<dyn std::error::Error>> {
+        const RESOURCE_DIR: &str = "resources/links/";
+        
+        if Self::is_valid_name(name_or_path) { 
+            let dir = std::env!("CARGO_MANIFEST_DIR");
+            let path = format!("{dir}/{RESOURCE_DIR}{name_or_path}.json");
+            Self::_load(&path)
+        } else { 
+            Self::_load(name_or_path)
+        }
+    }
+
+    fn _load(path: &str) -> Result<Link, Box<dyn std::error::Error>> {
+        let json = std::fs::read_to_string(path)?;
+        let data: Vec<XCode> = serde_json::from_str(&json)?;
+        let l = Link::from_pd_code(data);
+        Ok(l)
+    }
+
+    pub fn unknot() -> Link { 
+        Link::from_pd_code([[0, 1, 1, 0]]).resolved_at(0, Bit::Bit0)
+    }
+
+    pub fn trefoil() -> Link { 
+        Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]])
+    }
+
+    pub fn figure8() -> Link { 
+        Link::from_pd_code([[4,2,5,1],[8,6,1,5],[6,3,7,4],[2,7,3,8]])
+    }
+
+    pub fn hopf_link() -> Link { 
+        Link::from_pd_code([[4,1,3,2],[2,3,1,4]])
+    }
+}
+
+impl Display for Link {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "L[{}]", self.nodes.iter().map(|x| x.to_string()).join(", "))
+    }
+}
+
+#[cfg(test)]
+mod tests { 
+    use yui::hashmap;
+
+    use super::*;
+    use super::NodeType::{X, Xm};
+
+    #[test]
+    fn link_init() { 
+        let l = Link::new(vec![]);
+        assert_eq!(l.nodes.len(), 0);
+    }
+
+    #[test]
+    fn link_from_pd_code() { 
+        let pd_code = [[0,0,1,1]];
+        let l = Link::from_pd_code(pd_code);
+        assert_eq!(l.nodes.len(), 1);
+        assert_eq!(l.node(0).ntype(), X);
+    }
+
+    #[test]
+    fn link_is_empty() {
+        let l = Link::empty();
+        assert!(l.is_empty());
+
+        let pd_code = [[0,0,1,1]];
+        let l = Link::from_pd_code(pd_code);
+        assert!(!l.is_empty());
+    }
+
+    #[test]
+    fn link_crossing_num() {
+        let l = Link::empty();
+        assert_eq!(l.count_crossings(), 0);
+
+        let pd_code = [[0,0,1,1]];
+        let l = Link::from_pd_code(pd_code);
+        assert_eq!(l.count_crossings(), 1);
+        
+        let pd_code = [[1,4,2,5],[3,6,4,1],[5,2,6,3]];
+        let l = Link::from_pd_code(pd_code);
+        assert_eq!(l.count_crossings(), 3);
+    }
+
+    #[test]
+    fn link_next() {
+        let pd_code = [[0,0,1,1]];
+        let l = Link::from_pd_code(pd_code);
+
+        assert_eq!(l.traverse_outer(0, 0), (0, 1));
+        assert_eq!(l.traverse_outer(0, 1), (0, 0));
+        assert_eq!(l.traverse_outer(0, 2), (0, 3));
+        assert_eq!(l.traverse_outer(0, 3), (0, 2));
+    }
+
+    #[test]
+    fn link_traverse() {
+        let traverse = |l: &Link, (i0, j0)| { 
+            let mut queue = vec![];
+            l.traverse_from((i0, j0), |i, j| queue.push((i, j)));
+            queue
+        };
+
+        let pd_code = [[0,0,1,1]];
+        let l = Link::from_pd_code(pd_code);
+        let path = traverse(&l, (0, 0));
+        
+        assert_eq!(path, [(0, 0), (0, 3)]); // loop
+    }
+
+    #[test]
+    fn link_crossing_signs() {
+        let pd_code = [[0,0,1,1]];
+        let l = Link::from_pd_code(pd_code);
+        assert_eq!(l.collect_crossing_signs(), hashmap!{ 0 => Sign::Pos});
+
+        let pd_code = [[0,1,1,0]];
+        let l = Link::from_pd_code(pd_code);
+        assert_eq!(l.collect_crossing_signs(), hashmap!{ 0 => Sign::Neg} );
+
+        let pd_code = [[0,0,1,1]];
+        let l = Link::from_pd_code(pd_code).resolved_at(0, Bit::Bit0);
+        assert_eq!(l.collect_crossing_signs(), hashmap!{});
+    }
+
+    #[test]
+    fn link_writhe() {
+        let pd_code = [[0,0,1,1]];
+        let l = Link::from_pd_code(pd_code);
+        assert_eq!(l.writhe(), 1);
+
+        let pd_code = [[0,1,1,0]];
+        let l = Link::from_pd_code(pd_code);
+        assert_eq!(l.writhe(), -1);
+
+        let pd_code = [[0,0,1,1]];
+        let l = Link::from_pd_code(pd_code).resolved_at(0, Bit::Bit0);
+        assert_eq!(l.writhe(), 0);
+
+    }
+
+    #[test]
+    fn link_components() {
+        let pd_code = [[0,0,1,1]];
+        let l = Link::from_pd_code(pd_code);
+        let comps = l.collect_components();
+        assert_eq!(comps, vec![ Path::new(vec![0, 1], true)]);
+    }
+
+    #[test]
+    fn link_mirror() { 
+        let pd_code = [[0,0,1,1]];
+        let l = Link::from_pd_code(pd_code);
+        assert_eq!(l.node(0).ntype(), X);
+
+        let l = l.mirror();
+        assert_eq!(l.node(0).ntype(), Xm);
+    }
+
+    #[test]
+    fn link_resolve() {
+        let s = State::from([0, 0, 0]);
+        let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]) // trefoil
+            .resolved_by(&s);
+
+        let comps = l.collect_components();
+        assert_eq!(comps.len(), 3);
+        assert!(comps.iter().all(|c| c.is_circle()));
+
+        let s = State::from([1, 1, 1]);
+        let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]) // trefoil
+            .resolved_by(&s);
+
+        let comps = l.collect_components();
+        assert_eq!(comps.len(), 2);
+        assert!(comps.iter().all(|c| c.is_circle()));
+    }
+
+    #[test]
+    fn empty_link() {
+        let l = Link::empty();
+        assert_eq!(l.count_crossings(), 0);
+        assert_eq!(l.writhe(), 0);
+        assert_eq!(l.n_components(), 0);
+    }
+
+    #[test]
+    fn unknot() { 
+        let l = Link::unknot();
+        assert_eq!(l.count_crossings(), 0);
+        assert_eq!(l.writhe(), 0);
+        assert_eq!(l.n_components(), 1);
+    }
+
+    #[test]
+    fn trefoil() { 
+        let l = Link::trefoil();
+        assert_eq!(l.count_crossings(), 3);
+        assert_eq!(l.writhe(), -3);
+        assert_eq!(l.n_components(), 1);
+    }
+
+    #[test]
+    fn figure8() { 
+        let l = Link::figure8();
+        assert_eq!(l.count_crossings(), 4);
+        assert_eq!(l.writhe(), 0);
+        assert_eq!(l.n_components(), 1);
+    }
+
+    #[test]
+    fn hopf_link() { 
+        let l = Link::hopf_link();
+        assert_eq!(l.count_crossings(), 2);
+        assert_eq!(l.writhe(), -2);
+        assert_eq!(l.n_components(), 2);
+    }
+
+    #[test]
+    fn unlink_2() {
+        let pd_code = [[1,2,3,4], [3,2,1,4]];
+        let l = Link::from_pd_code(pd_code);
+        assert_eq!(l.count_crossings(), 2);
+        assert_eq!(l.writhe(), 0);
+        assert_eq!(l.n_components(), 2);
+    }
+
+
+    #[test]
+    fn l2x4() {
+        let pd_code = [[1,5,2,8],[5,3,6,2],[3,7,4,6],[7,1,8,4]];
+        let l = Link::from_pd_code(pd_code);
+        assert_eq!(l.count_crossings(), 4);
+        assert_eq!(l.writhe(), 4);
+        assert_eq!(l.n_components(), 2);
+    }
+
+    #[test]
+    fn load() { 
+        let l = Link::load("3_1");
+        assert!(l.is_ok());
+
+        let l = l.unwrap();
+        assert_eq!(l.count_crossings(), 3);
+    }
+
+    #[test]
+    fn crossing_change() { 
+        let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]);
+        let l2 = l.crossing_change(1);
+
+        assert_eq!(l.node(1),  &Node::new(NodeType::X, [3,6,4,1]));
+        assert_eq!(l2.node(1), &Node::new(NodeType::Xm, [3,6,4,1]));
+    }
+}

@@ -5,7 +5,7 @@ use derive_more::Display;
 #[clap(rename_all="verbatim")]
 pub enum CType { 
     #[default] Z, 
-    Q, F2, F3, Gauss, Eisen
+    Q, F2, F3
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, ValueEnum, Display, Debug, Default)]

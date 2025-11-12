@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
-use yui::lc::Gen;
-use yui::Elem;
+use yui_core::lc::Gen;
+use yui_core::Elem;
 use crate::kh::KhChainGen;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]

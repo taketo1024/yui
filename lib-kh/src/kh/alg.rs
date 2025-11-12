@@ -1,6 +1,6 @@
 use num_traits::Zero;
-use yui::lc::Lc;
-use yui::{CloneAnd, Ring, RingOps};
+use yui_core::lc::Lc;
+use yui_core::{CloneAnd, Ring, RingOps};
 
 use crate::kh::r#gen::KhGen;
 use crate::kh::KhTensor;
@@ -132,7 +132,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 pub mod tests {
     use num_traits::Zero;
-    use yui::lc::Lc;
+    use yui_core::lc::Lc;
 
     use crate::kh::KhTensor;
 

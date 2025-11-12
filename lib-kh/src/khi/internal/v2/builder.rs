@@ -6,8 +6,8 @@ use delegate::delegate;
 use itertools::Itertools;
 use log::info;
 use rayon::prelude::*;
-use yui::bitseq::{Bit, BitSeq};
-use yui::{KeyedUnionFind, Ring, RingOps};
+use yui_core::bitseq::{Bit, BitSeq};
+use yui_core::{KeyedUnionFind, Ring, RingOps};
 use yui_homology::DisplaySeq;
 use yui_link::{Node, Edge, InvLink};
 
@@ -664,8 +664,8 @@ mod tests {
     use super::*;
     use num_traits::Zero;
 
-    use yui::num::FF2;
-    use yui::poly::HPoly;
+    use yui_core::num::FF2;
+    use yui_core::poly::HPoly;
     use yui_homology::{ChainComplexTrait, DisplaySeq, DisplayTable, SummandTrait};
 
     #[test]

@@ -1,6 +1,6 @@
 use log::debug;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use yui::{Ring, RingOps};
+use yui_core::{Ring, RingOps};
 use super::*;
 use super::triang::{TriangularType, solve_triangular, solve_triangular_left};
 

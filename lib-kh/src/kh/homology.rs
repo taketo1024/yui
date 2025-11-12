@@ -2,7 +2,7 @@ use std::ops::{RangeInclusive, Index};
 use delegate::delegate;
 
 use yui_homology::{Grid2, GridTrait, Homology, Summand, SummandTrait};
-use yui::{EucRing, EucRingOps};
+use yui_core::{EucRing, EucRingOps};
 use yui_link::Link;
 
 use crate::kh::{KhChainExt, KhChainGen};
@@ -125,8 +125,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 #[cfg(test)]
 mod tests {
     use num_traits::Zero;
-    use yui::poly::HPoly;
-    use yui::num::FF2;
+    use yui_core::poly::HPoly;
+    use yui_core::num::FF2;
     
     use yui_homology::SummandTrait;
     use yui_link::Link;
@@ -392,8 +392,8 @@ mod tests {
  #[cfg(test)]
 mod tests_v1 {
     use num_traits::Zero;
-    use yui::poly::HPoly;
-    use yui::num::FF2;
+    use yui_core::poly::HPoly;
+    use yui_core::num::FF2;
     use yui_homology::SummandTrait;
     use yui_link::Link;
     use super::*;

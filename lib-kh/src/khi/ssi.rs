@@ -7,7 +7,7 @@ use num_traits::Zero;
 use log::info;
 
 use yui_homology::SummandTrait;
-use yui::{EucRing, EucRingOps};
+use yui_core::{EucRing, EucRingOps};
 use yui_link::InvLink;
 
 use crate::kh::KhChainExt;
@@ -79,8 +79,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 #[cfg(test)]
 mod tests {
-    use yui::poly::HPoly;
-    use yui::num::FF2;
+    use yui_core::poly::HPoly;
+    use yui_core::num::FF2;
     use yui_link::Link;
 
     use super::*;

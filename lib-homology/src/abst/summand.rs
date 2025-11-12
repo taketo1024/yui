@@ -1,4 +1,4 @@
-use yui::{Ring, RingOps};
+use yui_core::{Ring, RingOps};
 
 pub trait SummandTrait
 where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {

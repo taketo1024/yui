@@ -1,4 +1,4 @@
-use yui::{Ring, RingOps};
+use yui_core::{Ring, RingOps};
 use yui_matrix::sparse::Trans;
 
 use crate::{GridDeg, Summand};

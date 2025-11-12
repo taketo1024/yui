@@ -7,7 +7,7 @@ use log::info;
 use num_traits::Zero;
 use yui_homology::SummandTrait;
 use yui_link::Link;
-use yui::{EucRing, EucRingOps};
+use yui_core::{EucRing, EucRingOps};
 
 use crate::misc::div_vec;
 use crate::kh::{KhChainExt, KhHomology};

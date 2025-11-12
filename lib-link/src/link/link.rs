@@ -2,13 +2,13 @@ use core::panic;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use itertools::Itertools;
-use yui::{hashmap, CloneAnd, Sign};
-use yui::bitseq::Bit;
+use yui_core::{hashmap, CloneAnd, Sign};
+use yui_core::bitseq::Bit;
 
 use super::{Node, NodeType, Path};
 
 pub type Edge = usize;
-pub type State = yui::bitseq::BitSeq;
+pub type State = yui_core::bitseq::BitSeq;
 pub type XCode = [Edge; 4];
 
 #[derive(Debug, Clone)]
@@ -320,7 +320,7 @@ impl Display for Link {
 
 #[cfg(test)]
 mod tests { 
-    use yui::hashmap;
+    use yui_core::hashmap;
 
     use super::*;
     use super::NodeType::{X, Xm};

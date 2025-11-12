@@ -5,7 +5,7 @@ use nalgebra_sparse::na::{Scalar, ClosedAddAssign, ClosedSubAssign, ClosedMulAss
 use num_traits::{Zero, One};
 use sprs::PermView;
 use auto_impl_ops::auto_ops;
-use yui::{Ring, RingOps, AddGrpOps,  AddGrp};
+use yui_core::{Ring, RingOps, AddGrpOps,  AddGrp};
 use super::sp_mat::SpMat;
 
 #[derive(Clone, Debug, PartialEq, Eq)]

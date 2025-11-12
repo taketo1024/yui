@@ -1,6 +1,6 @@
 use derive_more::derive::{Display, Debug};
-use yui::lc::Gen;
-use yui::Elem;
+use yui_core::lc::Gen;
+use yui_core::Elem;
 
 use crate::GridDeg;
 

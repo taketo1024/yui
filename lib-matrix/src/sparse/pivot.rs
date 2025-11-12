@@ -14,8 +14,8 @@ use itertools::Itertools;
 use log::debug;
 use sprs::PermOwned;
 
-use yui::{Ring, RingOps};
-use yui::algo::top_sort;
+use yui_core::{Ring, RingOps};
+use yui_core::algo::top_sort;
 use super::*;
 use super::util::perm_for_indices;
 
@@ -234,7 +234,7 @@ impl PivotFinder {
 
      #[cfg(feature = "multithread")]
      fn find_cycle_free_pivots_m(&mut self) {
-        use yui::util::sync::SyncCounter;
+        use yui_core::util::sync::SyncCounter;
 
         let remain_rows = self.remain_rows().collect_vec();
         let total_rows = remain_rows.len();

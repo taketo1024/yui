@@ -1,11 +1,12 @@
 [package]
 name = "yui-kh"
-description = ""
+description = "Khovanov Homology Library for YUI"
+version = "0.4.0"
 
-version.workspace = true
 authors.workspace = true
 license.workspace = true
 edition.workspace = true
+repository.workspace  = true
 
 [features]
 default = []
@@ -27,7 +28,7 @@ cfg-if = "1.0.0"
 itertools = "0.14.0"
 ahash = "0.8.11"
 rayon = "1.10.0"
-yui  =         { path = "../lib-core" }
-yui-link =     { path = "../lib-link" }
-yui-matrix =   { path = "../lib-matrix" }
-yui-homology = { path = "../lib-homology" }
+yui-core  =    { version = "0.4.0", path = "../lib-core" }
+yui-link =     { version = "0.4.0", path = "../lib-link" }
+yui-matrix =   { version = "0.4.0", path = "../lib-matrix" }
+yui-homology = { version = "0.4.0", path = "../lib-homology" }

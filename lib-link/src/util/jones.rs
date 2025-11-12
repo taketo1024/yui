@@ -1,6 +1,6 @@
 use num_traits::Pow;
-use yui::{PowMod2, GetSign, Ring, AddMon};
-use yui::poly::LPoly;
+use yui_core::{PowMod2, GetSign, Ring, AddMon};
+use yui_core::poly::LPoly;
 use crate::{Link, State};
 
 pub fn jones_polynomial(l: &Link) -> LPoly<'q', i32> {
@@ -30,7 +30,7 @@ pub fn jones_polynomial(l: &Link) -> LPoly<'q', i32> {
 mod tests { 
     use super::*;
     use num_traits::One;
-    use yui::bitseq::Bit;
+    use yui_core::bitseq::Bit;
 
     type P = LPoly<'q', i32>;
 

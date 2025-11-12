@@ -7,11 +7,11 @@ use auto_impl_ops::auto_ops;
 use itertools::Itertools;
 use num_traits::Zero;
 use cartesian::cartesian;
-use yui::{AddMon, CloneAnd, Elem, Ring, RingOps};
-use yui::lc::{Gen, Lc};
-use yui::poly::Var2;
+use yui_core::{AddMon, CloneAnd, Elem, Ring, RingOps};
+use yui_core::lc::{Gen, Lc};
+use yui_core::poly::Var2;
 use yui_link::{Edge, Node};
-use yui::bitseq::Bit;
+use yui_core::bitseq::Bit;
 use super::tng::{Tng, TngComp};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, derive_more::Display)]
@@ -467,7 +467,7 @@ impl Display for CobComp {
         };
 
         let g = if self.genus > 0 { 
-            yui::util::format::subscript(self.genus as isize)
+            yui_core::util::format::subscript(self.genus as isize)
         } else { 
             "".to_string()
         };
@@ -978,7 +978,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn is_homogeneous(&self) -> bool {
         use std::any::Any;
-        use yui::{num::FF2, poly::HPoly};
+        use yui_core::{num::FF2, poly::HPoly};
 
         if let Some(_self) = (self as &dyn Any).downcast_ref::<LcCob<HPoly<'H', FF2>>>() { 
             _self.iter().map(|(cob, r)| cob.deg() - 2 * (r.deg() as i32)).all_equal()
@@ -991,8 +991,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 mod tests {
     use num_traits::Zero;
-    use yui::hashmap;
-    use yui::poly::Poly2;
+    use yui_core::hashmap;
+    use yui_core::poly::Poly2;
 
     use super::CobComp;
     use super::*;

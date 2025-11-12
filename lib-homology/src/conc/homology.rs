@@ -1,5 +1,5 @@
-use yui::{EucRing, EucRingOps};
-use yui::lc::Gen;
+use yui_core::{EucRing, EucRingOps};
+use yui_core::lc::Gen;
 
 use crate::{isize2, isize3, ComputeHomology, Grid, GridDeg, GridTrait, SummandTrait};
 use super::{Summand, ChainComplexBase};

@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use delegate::delegate;
 use num_traits::Zero;
-use yui::{Ring, RingOps};
-use yui::lc::{Gen, Lc};
+use yui_core::{Ring, RingOps};
+use yui_core::lc::{Gen, Lc};
 use yui_matrix::sparse::{SpMat, SpVec};
 
 use crate::utils::ChainReducer;

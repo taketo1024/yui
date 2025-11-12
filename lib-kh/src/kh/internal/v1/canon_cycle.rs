@@ -1,4 +1,4 @@
-use yui::{Ring, RingOps};
+use yui_core::{Ring, RingOps};
 use yui_link::{Edge, Link, State};
 
 use crate::ext::LinkExt;

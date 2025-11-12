@@ -2,10 +2,10 @@ use std::fmt::Display;
 use std::ops::{Add, AddAssign, Index};
 use itertools::{join, Itertools};
 use auto_impl_ops::auto_ops;
-use yui::util::format::subscript;
-use yui::{AddMon, CloneAnd, Elem, Ring, RingOps};
-use yui::bitseq::{Bit, BitSeq};
-use yui::lc::{Gen, Lc};
+use yui_core::util::format::subscript;
+use yui_core::{AddMon, CloneAnd, Elem, Ring, RingOps};
+use yui_core::bitseq::{Bit, BitSeq};
+use yui_core::lc::{Gen, Lc};
 use yui_link::State;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]

@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::ops::RangeInclusive;
 
-use yui::lc::{Gen, Lc};
-use yui::{EucRing, EucRingOps, Ring, RingOps};
+use yui_core::lc::{Gen, Lc};
+use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 use yui_homology::{isize2, Grid1, Grid2, Summand, SummandTrait};
 use yui_matrix::sparse::SpVec;
 

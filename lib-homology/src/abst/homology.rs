@@ -1,5 +1,5 @@
 use log::info;
-use yui::{EucRing, EucRingOps, Ring, RingOps};
+use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 
 use crate::generic::GenericSummand;
 use crate::utils::HomologyCalc;

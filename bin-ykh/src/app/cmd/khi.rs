@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 use std::str::FromStr;
-use yui::tex::TeX;
-use yui::{EucRing, EucRingOps};
+use yui_core::tex::TeX;
+use yui_core::{EucRing, EucRingOps};
 use yui_homology::{DisplaySeq, DisplayTable, GridTrait, SummandTrait, tex::TeXTable};
 use yui_kh::kh::KhChainExt;
 use yui_kh::khi::{KhIChain, KhIComplex, KhIHomology};

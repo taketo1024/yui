@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use yui_core::bitseq::Bit;
-use yui_core::CloneAnd;
+use yui_core::{CloneAnd, Sign};
 
 use crate::Path;
 use super::Edge;
@@ -77,6 +77,14 @@ impl Node {
         self.clone_and(|x|
             x.resolve(r)
         )
+    }
+
+    pub fn sign(&self, j: usize) -> Option<Sign> {
+        match (self.ntype, j) { 
+            (Xm, 1) | (X, 3) => Some(Sign::Pos),
+            (Xm, 3) | (X, 1) => Some(Sign::Neg),
+            _ => None
+        }
     }
 
     pub fn cc(&mut self) { 

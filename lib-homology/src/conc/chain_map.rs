@@ -9,6 +9,9 @@ use crate::{ChainComplexTrait, Grid, GridDeg, GridTrait, Summand};
 use super::ChainComplexBase;
 
 /// Represents a chain map between chain complexes.
+
+// TODO: possess source and target by reference. 
+
 pub struct ChainMap<I, X, Y, R>
 where 
     I: GridDeg,

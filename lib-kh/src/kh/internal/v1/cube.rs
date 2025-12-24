@@ -7,7 +7,7 @@ use yui_link::{Link, State, Path, Edge};
 
 use crate::kh::{KhAlg, KhChain, KhChainGen, KhTensor};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct KhCubeVertex { 
     state: State,
     circles: Vec<Path>,
@@ -107,6 +107,7 @@ impl KhCubeEdge {
     }
 }
 
+#[derive(Clone)]
 pub struct KhCube<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     str: KhAlg<R>,

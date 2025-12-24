@@ -10,9 +10,10 @@ use rayon::prelude::*;
 use cartesian::cartesian;
 use yui_core::{CloneAnd, Ring, RingOps, Sign};
 use yui_homology::{ChainComplex, Summand, Grid1};
-use yui_link::{Node, Edge, State};
+use yui_link::{Edge, Link, Node, State};
 use yui_core::bitseq::Bit;
 
+use crate::kh::internal::v1::cube::KhCube;
 use crate::kh::{KhGen, KhAlg, KhChain, KhComplex, KhChainGen, KhTensor};
 use super::cob::{Cob, Dot, Bottom, CobComp, LcCob, LcCobTrait};
 use super::tng::{Tng, TngComp};
@@ -620,9 +621,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let str = KhAlg::new(h, t);
         let deg_shift = self.deg_shift;
         let reduced = self.base_pt.is_some();
+        let cube = KhCube::new(&Link::empty(), h, t, None, deg_shift); // dummy
+
         let inner = self.into_raw_complex();
 
-        KhComplex::new_impl(inner, str, deg_shift, reduced, canon_cycles)
+        KhComplex::new_impl(inner, str, cube, deg_shift, reduced, canon_cycles)
     }
 
     pub fn is_completely_delooped(&self) -> bool { 

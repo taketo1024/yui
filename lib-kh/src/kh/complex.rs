@@ -8,6 +8,7 @@ use yui_homology::{isize2, ChainComplexTrait, Grid2, GridTrait, ChainComplex, Su
 use yui_matrix::sparse::SpMat;
 
 use crate::kh::r#gen::KhChain;
+use crate::kh::internal::v1::cube::KhCube;
 use crate::kh::{KhChainGen, KhHomology};
 use crate::misc::range_of;
 
@@ -15,11 +16,14 @@ use super::KhAlg;
 
 pub type KhComplexSummand<R> = Summand<KhChainGen, R>;
 
+// TODO: Make KhComplexTrait, and split impl into KhComplexV1 and V2. 
+
 #[derive(Clone)]
 pub struct KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     inner: ChainComplex<KhChainGen, R>,
     str: KhAlg<R>,
+    cube: KhCube<R>,
     deg_shift: (isize, isize),
     reduced: bool,
     canon_cycles: Vec<KhChain<R>>,
@@ -45,7 +49,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         
         let cube = KhCube::new(l, h, t, red_e, deg_shift);
         let str = cube.str().clone();
-        let complex = cube.into_complex();
+        let complex = cube.clone().into_complex();
 
         let canon_cycles = if t.is_zero() && l.is_knot() {
             let p = l.min_edge().unwrap();
@@ -54,15 +58,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             vec![]
         };
 
-        KhComplex::new_impl(complex, str, deg_shift, reduced, canon_cycles)
+        KhComplex::new_impl(complex, str, cube, deg_shift, reduced, canon_cycles)
     }
 
-    pub(crate) fn new_impl(inner: ChainComplex<KhChainGen, R>, str: KhAlg<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self { 
-        KhComplex { inner, str, deg_shift, reduced, canon_cycles }
+    pub(crate) fn new_impl(inner: ChainComplex<KhChainGen, R>, str: KhAlg<R>, cube: KhCube<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self { 
+        KhComplex { inner, str, cube, deg_shift, reduced, canon_cycles }
     }
 
     pub fn str(&self) -> &KhAlg<R> { 
         &self.str
+    }
+
+    pub fn cube(&self) -> &KhCube<R> {
+        &self.cube
     }
 
     pub fn deg_shift(&self) -> (isize, isize) { 
@@ -89,16 +97,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn inner(&self) -> &ChainComplex<KhChainGen, R> {
         &self.inner
-    }
-
-    pub fn truncated(&self, range: RangeInclusive<isize>) -> Self {
-        Self::new_impl(
-            self.inner.truncated(range), 
-            self.str.clone(), 
-            self.deg_shift, 
-            self.reduced, 
-            self.canon_cycles.clone()
-        )
     }
 
     pub fn gen_grid(&self) -> Grid2<Summand<KhChainGen, R>> { 

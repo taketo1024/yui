@@ -1,6 +1,8 @@
 use log::info;
 use clap::{Parser, Subcommand};
 
+use crate::app::cmd::sl2;
+
 use super::cmd::{ckh, ckhi, kh, khi, cc};
 use super::utils::*;
 
@@ -20,6 +22,7 @@ pub enum Cmd {
     CKhI(ckhi::Args),    
     KhI(khi::Args),
     CC(cc::Args),
+    SL2(sl2::Args),
 }
 
 impl CliArgs { 
@@ -31,6 +34,7 @@ impl CliArgs {
             Cmd::CKhI(args) => args.log,
             Cmd::KhI(args)  => args.log,
             Cmd::CC(args)   => args.log,
+            Cmd::SL2(args)  => args.log,
         };
         match level {
             1 => Info,
@@ -79,6 +83,7 @@ impl App {
                 Cmd::CKhI(args) => ckhi::dispatch(args),
                 Cmd::KhI(args)  => khi::dispatch(args),
                 Cmd::CC(args)   => cc::dispatch(args),
+                Cmd::SL2(args)  => sl2::dispatch(args),
             }
         )
     }

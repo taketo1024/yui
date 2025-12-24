@@ -184,7 +184,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn edge(&self, from: &State, to: &State) -> Option<&KhCubeEdge> { 
-        self.edges[from].iter().find(|(t, _)| t == to).map(|(_, e)| e)
+        self.edges.get(from)?.iter().find(|(t, _)| t == to).map(|(_, e)| e)
     }
 
     pub fn targets_from(&self, s: &State) -> impl Iterator<Item = &State> {
@@ -201,6 +201,26 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let res = match e.trans { 
             Merge(ij, k) => self.merge(x, ij, k, *target),
             Split(i, jk) => self.split(x, i, jk, *target)
+        };
+
+        if signed { 
+            let sign = R::from_sign(e.sign());
+            res * sign
+        } else { 
+            res
+        }
+    }
+
+    pub fn rev_d_to(&self, x: &KhChainGen, target: &State, signed: bool) -> KhChain<R> {
+        use KhCubeEdgeTrans::*;
+        
+        let Some(e) = self.edge(target, &x.state) else { 
+            return KhChain::zero();
+        };
+
+        let res = match e.trans { 
+            Merge(ij, k) => self.split(x, k, ij, *target),
+            Split(i, jk) => self.merge(x, jk, i, *target)
         };
 
         if signed { 
@@ -246,7 +266,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn states_of_weight(&self, k: usize) -> impl Iterator<Item = &State> { 
         self.vertices
             .iter()
-            .filter_map(|(s, v)| {
+            .filter_map(|(s, _)| {
                 if s.weight() == k { 
                     Some(s)
                 } else {

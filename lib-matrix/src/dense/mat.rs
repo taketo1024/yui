@@ -6,6 +6,8 @@ use delegate::delegate;
 use derive_more::Display;
 use auto_impl_ops::auto_ops;
 use num_traits::{Zero, One};
+use yui_core::{EucRing, EucRingOps};
+use crate::dense::snf::SnfCalc;
 use crate::MatTrait;
 use crate::sparse::SpMat;
 
@@ -113,6 +115,13 @@ where R: Scalar {
     pub fn into_sparse(self) -> SpMat<R>
     where R: Zero + ClosedAddAssign { 
         self.into()
+    }
+
+    pub fn rank(&self) -> usize
+    where R: EucRing, for<'a> &'a R: EucRingOps<R> { 
+        let mut calc = SnfCalc::new(self.clone(), [false; 4]);
+        calc.process();
+        calc.result().rank()
     }
 }
 

@@ -1,7 +1,9 @@
 use crate::app::utils::*;
 use crate::app::err::*;
+use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::str::FromStr;
+use itertools::Itertools;
 use yui_core::tex::TeX;
 use yui_core::{EucRing, EucRingOps};
 use yui_homology::DisplaySeq;
@@ -32,6 +34,9 @@ pub struct Args {
 
     #[arg(short = 'g', long)]
     pub show_gens: bool,
+
+    #[arg(short = 'M', long)]
+    pub show_matrix: bool,
 
     #[arg(long, default_value = "0")]
     pub log: u8,
@@ -73,10 +78,13 @@ where
 
         let c = KhComplex::new_no_simplify(&l, &h, &t, r);
         let e = c.e_map(&l);
+
+        e.check_all(c.inner(), c.inner());
+
         let h = c.homology();
 
         self.show_table(&h, bigraded);
-        self.show_map("e", &h, &e);
+        self.show_map("e", &h, &e, (-2, -4));
         
         let res = self.flush();
         Ok(res)
@@ -109,23 +117,55 @@ where
         }
     }
 
-    fn show_map(&mut self, f_name: &str, h: &KhHomology<R>, f: &KhChainMap<R>) { 
-        self.out(&format!("{f_name}: deg {}\n", f.deg()));
+    fn show_map(&mut self, f_name: &str, h: &KhHomology<R>, f: &KhChainMap<R>, deg: (isize, isize)) { 
+        self.out(&format!("{f_name}: deg {deg:?}\n"));
 
-        for i in h.h_range().rev() { 
-            let j = i + f.deg();
-            if h[i].is_zero() || h[j].is_zero() { continue; }
+        let mut ranks: HashMap<isize, HashMap<isize, usize>> = HashMap::new();
 
-            self.out(&format!("({i}) {} -> ({j}) {}", h[i], h[j]));
-
-            for z in h[i].gens() { 
-                let w = f.apply(i, &z);
-                let x = h[i].vectorize_euc(&z).into_vec();
-                let y = h[j].vectorize_euc(&w).into_vec();
-                self.out(&format!("\t{:?} -> {:?}", x, y));
+        let grid = h.gen_grid();
+        for d in h.delta_range().step_by(2) { 
+            if self.args.show_matrix { 
+                self.out(&format!("delta: {d}"));
             }
+
+            let mut ranks_d = HashMap::new();
+
+            for i1 in h.h_range() { 
+                let j1 = 2 * i1 - d;
+                let i2 = i1 + deg.0;
+                let j2 = j1 + deg.1;
+
+                if grid[(i1, j1)].is_zero() || grid[(i2, j2)].is_zero() { continue; }
+
+                let mat = f.as_matrix(i1, &grid[(i1, j1)], &grid[(i2, j2)]).into_dense();
+                let r = mat.rank();
+                
+                if self.args.show_matrix { 
+                    self.out(&format!("  ({i1}, {j1}) {} -> ({i2}, {j2}) {}; rank: {}", grid[(i1, j1)], grid[(i2, j2)], r));
+                    self.out(&format!("{}", mat));
+                }
+
+                ranks_d.insert(i1, r);
+            }
+
+            ranks.insert(d, ranks_d);
+        }
+
+        if self.args.show_matrix { 
             self.out("");
         }
+
+        for d in h.delta_range().step_by(2) { 
+            let ranks_d = &ranks[&d];
+
+            if ranks_d.is_empty() { continue; }
+
+            let i0 = ranks_d.keys().min().unwrap();
+            let rank_str = ranks_d.iter().sorted_by_key(|v| v.0).map(|(_, r)| r).join(", ");            
+
+            self.out(&format!("rank({d}):\t[{i0}; {rank_str}]"));
+        }
+        self.out("");
     }
 
     fn out(&mut self, str: &str) { 

@@ -3,6 +3,7 @@ use num_traits::Zero;
 use yui_core::{AddMon, Ring, RingOps, Sign};
 use yui_link::Link;
 
+use crate::ext::{Color, LinkExt};
 use crate::kh::ext::cc::KhChainMap;
 use crate::kh::internal::v1::cube::KhCube;
 use crate::kh::{KhChain, KhChainGen, KhComplex};
@@ -37,25 +38,24 @@ impl<R> KhSl2Map<R> where
     for<'x> &'x R: RingOps<R>
 { 
     fn new(l: &Link, cube: KhCube<R>) -> Self { 
+        assert!(l.is_knot());
+
         let path = Self::make_path(l);
         Self { path, cube }
     }
 
     fn make_path(l: &Link) -> Vec<(usize, Sign)> {
         let mut res = vec![];
-        let mut data = vec![0; l.n_nodes()];
+        let color = l.colored_seifert_circles(l.min_edge().unwrap());
 
         l.traverse_from((0, 0), |i, j| {
             if l.node(i).is_resolved() { return }
-            data[i] += j;
-        });
 
-        l.traverse_from((0, 0), |i, j| {
-            if l.node(i).is_resolved() { return }
-            let e = match (data[i], j) { 
-                (1, 0) | (3, 1) | (5, 2) | (3, 3) => Sign::Pos, // Left
-                (1, 1) | (3, 2) | (5, 3) | (3, 0) => Sign::Neg, // Right
-                _ => panic!("Invalid knot data.")
+            let edge = l.node(i).edge(j);
+            let c = color.iter().find(|(c, _)| c.contains(edge)).unwrap();
+            let e = match c.1 {
+                Color::A => Sign::Pos,
+                Color::B => Sign::Neg
             };
             res.push((i, e));
         });
@@ -116,7 +116,7 @@ mod tests {
         let map = KhSl2Map::new(&l, cube);
 
         assert_eq!(map.path.len(), 4);
-        assert_eq!(map.path, vec![(0, Sign::Neg), (1, Sign::Pos), (1, Sign::Neg), (0, Sign::Pos)])
+        assert_eq!(map.path, vec![(0, Sign::Pos), (1, Sign::Neg), (1, Sign::Pos), (0, Sign::Neg)])
     } 
 
     #[test]
@@ -156,7 +156,7 @@ mod tests {
     } 
 
     #[test]
-    fn test_unknot() {
+    fn test_ch_map_unknot() {
         let l = Link::unknot();
         let c = KhComplex::new_no_simplify(&l, &0, &0, false);
         let e = c.e_map(&l);
@@ -165,8 +165,26 @@ mod tests {
     }
 
     #[test]
-    fn test_trefoil() {
+    fn test_ch_map_2twist_unknot() {
+        let l = Link::from_pd_code([[1,1,2,4],[3,3,4,2]]);
+        let c = KhComplex::new_no_simplify(&l, &0, &0, false);
+        let e = c.e_map(&l);
+
+        e.check_all(c.inner(), c.inner());
+    } 
+
+    #[test]
+    fn test_ch_map_trefoil() {
         let l = Link::trefoil();
+        let c = KhComplex::new_no_simplify(&l, &0, &0, false);
+        let e = c.e_map(&l);
+
+        e.check_all(c.inner(), c.inner());
+    }
+
+    #[test]
+    fn test_ch_map_6_2() {
+        let l = Link::load("6_2").unwrap();
         let c = KhComplex::new_no_simplify(&l, &0, &0, false);
         let e = c.e_map(&l);
 

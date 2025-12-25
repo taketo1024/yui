@@ -1,4 +1,4 @@
-use std::ops::Neg;
+use std::ops::{Mul, Neg};
 use derive_more::{Display, Debug};
 use is_even::IsEven;
 use num_traits::Signed;
@@ -71,6 +71,18 @@ impl Neg for Sign {
         match self { 
             Neg => Pos,
             Pos => Neg
+        }
+    }
+}
+
+impl Mul for Sign {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        use Sign::*;
+        match (self, rhs) {
+            (Pos, Pos) | (Neg, Neg) => Pos,
+            _ => Neg
         }
     }
 }

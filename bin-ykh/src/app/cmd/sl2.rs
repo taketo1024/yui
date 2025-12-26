@@ -38,6 +38,9 @@ pub struct Args {
     #[arg(short = 'M', long)]
     pub show_matrix: bool,
 
+    #[arg(long)]
+    pub verify: bool,
+
     #[arg(long, default_value = "0")]
     pub log: u8,
 }
@@ -79,7 +82,9 @@ where
         let c = KhComplex::new_no_simplify(&l, &h, &t, r);
         let e = c.e_map(&l);
 
-        e.check_all(c.inner(), c.inner());
+        if self.args.verify {
+            e.check_all(c.inner(), c.inner());
+        }
 
         let h = c.homology();
 

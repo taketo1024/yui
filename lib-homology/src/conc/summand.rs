@@ -65,11 +65,15 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn vectorize(&self, z: &Lc<X, R>) -> SpVec<R> {
         let n = self.raw_gens.len();
-        let v = SpVec::from_entries(n, z.iter().map(|(x, a)| { 
-            let Some(i) = self.raw_gens.index_of(x) else { 
-                panic!("{x} not found in generators ({}).", &self.raw_gens.len());
-            };
-            (i, a.clone())
+
+        // MEMO should add strict option. 
+
+        let v = SpVec::from_entries(n, z.iter().flat_map(|(x, a)| { 
+            if let Some(i) = self.raw_gens.index_of(x) {
+                Some((i, a.clone()))
+            } else {
+                None
+            }
         }));
 
         self.trans.forward(&v)

@@ -19,13 +19,13 @@ where
         let cube = self.cube().clone();
         let map = KhSl2Map::new(l, cube);
 
-        KhChainMap::new(self.inner(), self.inner(), -2, move |_, z| {
+        KhChainMap::new(-2, move |_, z| {
             z.apply(|x| map.apply_u(x))
         })
     }
 }
 
-struct KhSl2Map<R> where
+pub struct KhSl2Map<R> where
     R: Ring,
     for<'x> &'x R: RingOps<R>
 { 
@@ -37,7 +37,7 @@ impl<R> KhSl2Map<R> where
     R: Ring,
     for<'x> &'x R: RingOps<R>
 { 
-    fn new(l: &Link, cube: KhCube<R>) -> Self { 
+    pub fn new(l: &Link, cube: KhCube<R>) -> Self { 
         assert!(l.is_knot());
 
         let path = Self::make_path(l);

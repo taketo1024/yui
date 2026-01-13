@@ -26,8 +26,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let deg = c2.deg_shift().0 - c1.deg_shift().0 + 1;
         let c2_deg_shift = c2.deg_shift();
 
-        ChainMap::new(c1.inner(), c2.inner(), deg, move |_, z| { 
-            z.apply(|x| {
+        ChainMap::new(deg, move |_, z| { 
+            z.apply(|x: &KhChainGen| {
                 if !x.state[i].is_zero() { 
                     return KhChain::zero();
                 }
@@ -57,8 +57,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let red_e = if c1.is_reduced() { l.min_edge() } else { None };
         let cube = KhCube::new(l, h, t, red_e, c1.deg_shift());
 
-        ChainMap::new(c1.inner(), c2.inner(), deg, move |_, z| { 
-            z.apply(|x| {
+        ChainMap::new(deg, move |_, z| { 
+            z.apply(|x: &KhChainGen| {
                 if !x.state[i].is_one() { 
                     return KhChain::zero();
                 }

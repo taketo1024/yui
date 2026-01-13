@@ -31,15 +31,11 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     pub fn new<F>(
-        source: &ChainComplexBase<I, X, R>,
-        target: &ChainComplexBase<I, Y, R>,
         deg: I,
         map: F,
     ) -> Self
         where F: Fn(I, &Lc<X, R>) -> Lc<Y, R> + Send + Sync + 'static 
     {
-        assert!(source.d_deg() == target.d_deg());
-
         let map = Arc::new(map);
         Self {
             deg,
@@ -168,8 +164,6 @@ mod tests {
         let d3 = GenericChainComplex::<i32>::d3();
 
         let f = ChainMap::new(
-            &s2, 
-            &d3, 
             0, 
             |_, z| z.clone()
         );
@@ -184,8 +178,6 @@ mod tests {
         let d3 = GenericChainComplex::<i32>::d3();
 
         let f = ChainMap::new(
-            &s2, 
-            &d3, 
             0, 
             |_, z| z.clone()
         );

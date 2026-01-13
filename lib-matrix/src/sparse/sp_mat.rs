@@ -148,6 +148,15 @@ impl<R> SpMat<R> {
 
         SpMat::from(csc)
     }
+
+    pub fn map_values<F, S>(self, f: F) -> SpMat<S>
+    where F: Fn(R) -> S {
+        let (m, n) = self.shape();
+        let (cols, rows, vals) = self.disassemble();
+        let vals = vals.into_iter().map(|r| f(r)).collect_vec();
+        let csc = CscMatrix::try_from_csc_data(m, n, cols, rows, vals).expect("Broken CSC data");
+        SpMat::<S>::from(csc)
+    }
 }
 
 impl<R> SpMat<R> 
@@ -195,6 +204,10 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
                 (i, j, a)
             })
         )
+    }
+
+    pub fn scalar(n: usize, a: &R) -> Self { 
+        Self::from_entries((n, n), (0..n).map(|i| (i, i, a.clone())))
     }
 
     pub fn col_vec(&self, j: usize) -> SpVec<R>

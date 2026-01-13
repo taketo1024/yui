@@ -2,10 +2,10 @@ use std::sync::Arc;
 
 use num_traits::Zero;
 use yui_core::lc::{EitherGen, Gen, Lc};
-use yui_core::{Ring, RingOps};
+use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 use yui_matrix::sparse::SpMat;
 
-use crate::{ChainComplexTrait, Grid, GridDeg, GridTrait, Summand, SummandTrait};
+use crate::{ChainComplexTrait, Grid, GridDeg, GridTrait, Summand};
 
 use super::ChainComplexBase;
 
@@ -59,11 +59,13 @@ where
         (self.map)(i, &z)
     }
 
-    pub fn as_matrix(&self, i: I, source: &Summand<X, R>, target: &Summand<Y, R>) -> SpMat<R> {
-        SpMat::from_col_vecs(target.dim(), source.gens().map(|z| { 
-            let w = self.apply(i, &z);
-            target.vectorize(&w)
-        }))
+    pub fn make_matrix(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I) -> SpMat<R> {
+        source[i].make_matrix(&target[i + self.deg], |z| self.apply(i, z))
+    }
+
+    pub fn make_matrix_euc(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I) -> SpMat<R>
+    where Y: Gen, R: EucRing, for<'x> &'x R: EucRingOps<R> {
+        source[i].make_matrix_euc(&target[i + self.deg], |z| self.apply(i, z))
     }
 
     pub fn check_for(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I, x: &X) {

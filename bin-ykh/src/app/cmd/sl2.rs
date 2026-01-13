@@ -140,9 +140,12 @@ where
                 let i2 = i1 + deg.0;
                 let j2 = j1 + deg.1;
 
-                if grid[(i1, j1)].is_zero() || grid[(i2, j2)].is_zero() { continue; }
+                let h1 = &grid[(i1, j1)];
+                let h2 = &grid[(i2, j2)];
 
-                let mat = f.as_matrix(i1, &grid[(i1, j1)], &grid[(i2, j2)]).into_dense();
+                if h1.is_zero() || h2.is_zero() { continue; }
+
+                let mat = h1.make_matrix_euc(h2, |z| f.apply(i1, z)).into_dense();
                 let r = mat.rank();
                 
                 if self.args.show_matrix { 

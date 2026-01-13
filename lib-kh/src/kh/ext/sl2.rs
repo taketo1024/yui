@@ -13,15 +13,11 @@ where
     R: Ring,
     for<'x> &'x R: RingOps<R>,
 {
-    pub fn e_map(&self, l: &Link) -> KhChainMap<R> {
+    pub fn sl2_map(&self, l: &Link) -> KhSl2Map<R> {
         assert!(l.is_knot());
 
         let cube = self.cube().clone();
-        let map = KhSl2Map::new(l, cube);
-
-        KhChainMap::new(-2, move |_, z| {
-            z.apply(|x| map.apply_u(x))
-        })
+        KhSl2Map::new(l, cube)
     }
 }
 
@@ -91,6 +87,16 @@ impl<R> KhSl2Map<R> where
                 self.apply_chi(x, i2) * R::from_sign(e2)
             )
         }))
+    }
+
+    pub fn apply(&self, z: &KhChain<R>) -> KhChain<R> { 
+        z.apply(|x| self.apply_u(x))
+    }
+
+    pub fn into_chain_map(self) -> KhChainMap<R> { 
+        KhChainMap::new(-2, move |_, z| {
+            self.apply(z)
+        })
     }
 }
 
@@ -179,7 +185,7 @@ mod tests {
     fn test_ch_map_unknot() {
         let l = Link::unknot();
         let c = KhComplex::new_no_simplify(&l, &0, &0, false);
-        let e = c.e_map(&l);
+        let e = c.sl2_map(&l).into_chain_map();
 
         assert_eq!(e.deg(), -2);
         e.check_all(c.inner(), c.inner());
@@ -189,7 +195,7 @@ mod tests {
     fn test_ch_map_2twist_unknot() {
         let l = Link::from_pd_code([[1,1,2,4],[3,3,4,2]]);
         let c = KhComplex::new_no_simplify(&l, &0, &0, false);
-        let e = c.e_map(&l);
+        let e = c.sl2_map(&l).into_chain_map();
 
         assert_eq!(e.deg(), -2);
         e.check_all(c.inner(), c.inner());
@@ -199,7 +205,7 @@ mod tests {
     fn test_ch_map_trefoil() {
         let l = Link::trefoil();
         let c = KhComplex::new_no_simplify(&l, &0, &0, false);
-        let e = c.e_map(&l);
+        let e = c.sl2_map(&l).into_chain_map();
 
         assert_eq!(e.deg(), -2);
         e.check_all(c.inner(), c.inner());
@@ -219,7 +225,7 @@ mod tests {
     fn test_ch_map_6_1() {
         let l = Link::load("6_1").unwrap();
         let c = KhComplex::new_no_simplify(&l, &0, &0, false);
-        let e = c.e_map(&l);
+        let e = c.sl2_map(&l).into_chain_map();
 
         e.check_all(c.inner(), c.inner());
     }
@@ -228,7 +234,7 @@ mod tests {
     fn test_ch_map_6_2() {
         let l = Link::load("6_2").unwrap();
         let c = KhComplex::new_no_simplify(&l, &0, &0, false);
-        let e = c.e_map(&l);
+        let e = c.sl2_map(&l).into_chain_map();
 
         e.check_all(c.inner(), c.inner());
     }
@@ -237,7 +243,7 @@ mod tests {
     fn test_ch_map_6_3() {
         let l = Link::load("6_3").unwrap();
         let c = KhComplex::new_no_simplify(&l, &0, &0, false);
-        let e = c.e_map(&l);
+        let e = c.sl2_map(&l).into_chain_map();
 
         e.check_all(c.inner(), c.inner());
     }

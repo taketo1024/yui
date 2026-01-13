@@ -80,7 +80,7 @@ where
         assert!(l.is_knot());
 
         let c = KhComplex::new_no_simplify(&l, &h, &t, r);
-        let e = c.e_map(&l);
+        let e = c.sl2_map(&l).into_chain_map();
 
         if self.args.verify {
             e.check_all(c.inner(), c.inner());

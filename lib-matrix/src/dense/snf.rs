@@ -3,7 +3,8 @@ use std::cmp::min;
 use log::{debug, trace};
 use yui_core::{EucRing, EucRingOps};
 use crate::dense::*;
-use super::lll::{LLLRing, LLLRingOps, lll_hnf_in_place};
+use crate::dispatch::lll_dispatcher;
+use crate::utils::dispatcher::RefPtr;
 
 pub type SnfFlags = [bool; 4];
 
@@ -141,10 +142,16 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     }
 
     fn preprocess(&mut self) {
-        use num_bigint::BigInt;
-        preprocess_lll_for!(self, 
-            i64, i128, BigInt
-        );
+        let reg = lll_dispatcher();
+        if !reg.is_callable::<R>() { return }
+
+        let flag = [self.p.is_some(), self.pinv.is_some()];
+        let input = (RefPtr::new(&self.target), flag);
+        let (res, p, pinv) = reg.try_call(&input).expect("broken registry");
+
+        self.target = res;
+        self.p = p;
+        self.pinv = pinv;
     }
 
     fn eliminate_all(&mut self) {
@@ -442,45 +449,6 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
         }
     }
 }
-
-impl<R> SnfCalc<R>
-where R: LLLRing, for<'a> &'a R: LLLRingOps<R> {
-    fn preprocess_lll(&mut self) {
-        debug!("start lll-preprocess, type = {}", std::any::type_name::<R>());
-
-        let flag = [self.p.is_some(), self.pinv.is_some()];
-        
-        let b = std::mem::take(&mut self.target);
-        let (res, p, pinv) = lll_hnf_in_place(b, flag);
-
-        self.target = res;
-        self.p = p;
-        self.pinv = pinv;
-
-        debug!("preprocess done.");
-        trace!("{}", self.target);
-    }
-}
-
-macro_rules! preprocess_lll_expand {
-    ($any:ident) => {};
-    ($any:ident, $t:ty $(,$next:ty)*) => {{
-        if let Some(_self) = $any.downcast_mut::<SnfCalc<$t>>() {
-            _self.preprocess_lll()
-        } else {
-            preprocess_lll_expand!($any $(,$next)*);
-        }
-    }};
-}
-
-macro_rules! preprocess_lll_for {
-    ($self:ident, $t:ty $(,$next:ty)*) => {{
-        let any: &mut dyn std::any::Any = $self;
-        preprocess_lll_expand!(any, $t, $($next),*);
-    }};
-}
-
-use {preprocess_lll_for, preprocess_lll_expand};
 
 #[cfg(test)]
 mod tests {

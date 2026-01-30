@@ -174,6 +174,12 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         Self::from(csc)
     }
 
+    pub fn from_generator<F>(shape: (usize, usize), generator: F) -> Self
+    where F: Fn(usize, usize) -> R { 
+        let f = &generator;
+        Self::from_entries(shape, (0..shape.0).flat_map(|i| (0..shape.1).map(move |j| (i, j, f(i, j)))))
+    }
+
     pub fn from_col_vecs<I>(nrows: usize, vecs: I) -> Self 
     where I: IntoIterator<Item = SpVec<R>> { 
         let mut col_offsets = vec![0];
@@ -532,6 +538,16 @@ pub(super) mod tests {
     fn from_grid() { 
         let a = SpMat::from_dense_data((2, 2), [1,2,3,4]);
         assert_eq!(a.disassemble(), (vec![0, 2, 4], vec![0, 1, 0, 1], vec![1, 3, 2, 4]));
+    }
+
+    #[test]
+    fn from_generator() {
+        let a = SpMat::from_generator((3, 4), |i, j| (i + j) as i32);
+        assert_eq!(a, SpMat::from_dense_data((3, 4), vec![
+            0, 1, 2, 3,
+            1, 2, 3, 4,
+            2, 3, 4, 5,
+        ]));
     }
 
     #[test]

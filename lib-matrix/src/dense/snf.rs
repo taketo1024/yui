@@ -1,7 +1,8 @@
 use core::panic;
 use std::cmp::min;
 use log::{debug, trace};
-use yui_core::{EucRing, EucRingOps};
+use yui_core::poly::Poly;
+use yui_core::{EucRing, EucRingOps, Field, FieldOps};
 use crate::dense::*;
 use super::lll::{LLLRing, LLLRingOps, lll_hnf_in_place};
 
@@ -26,6 +27,24 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     trace!("{}", calc.target);
 
     calc.result()
+}
+
+// Frobenius normal form
+// ref: https://en.wikipedia.org/wiki/Frobenius_normal_form
+pub fn fnf<R>(a: &Mat<R>, flags: SnfFlags) -> SnfResult<Poly<'x', R>>
+where R: Field, for<'x> &'x R: FieldOps<R> { 
+    assert!(a.is_square());
+
+    let data = a.iter().map(|(i, j, r)| {
+        let r = Poly::from_const(r.clone());
+        if i == j { 
+            Poly::variable() - r
+        } else { 
+            -r
+        }
+    });
+    let target = Mat::from_data(a.shape(), data);
+    snf_in_place::<Poly<'x', R>>(target, flags)
 }
 
 #[derive(Debug)]

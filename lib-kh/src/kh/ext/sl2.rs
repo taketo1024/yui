@@ -1,12 +1,16 @@
 
+use itertools::Itertools;
 use num_traits::Zero;
-use yui_core::{AddMon, Ring, RingOps, Sign};
+use yui_core::{AddMon, Field, FieldOps, RangeExt, Ring, RingOps, Sign};
+use yui_homology::{GridTrait, SummandTrait};
 use yui_link::Link;
+use yui_matrix::MatTrait;
+use yui_matrix::dense::snf::fnf;
 
 use crate::ext::{Color, LinkExt};
 use crate::kh::ext::cc::KhChainMap;
 use crate::kh::internal::v1::cube::KhCube;
-use crate::kh::{KhChain, KhChainGen, KhComplex};
+use crate::kh::{KhChain, KhChainGen, KhComplex, KhHomology};
 
 impl<R> KhComplex<R>
 where
@@ -59,6 +63,9 @@ impl<R> KhSl2Map<R> where
         res
     }
 
+    pub fn h_deg(&self) -> isize{ -2 }
+    pub fn q_deg(&self) -> isize{ -4 }
+
     fn apply_chi(&self, x: &KhChainGen, i: usize) -> KhChain<R> {
         if x.state[i].is_zero() {
             return KhChain::zero();
@@ -94,14 +101,45 @@ impl<R> KhSl2Map<R> where
     }
 
     pub fn into_chain_map(self) -> KhChainMap<R> { 
-        KhChainMap::new(-2, move |_, z| {
+        KhChainMap::new(self.h_deg(), move |_, z| {
             self.apply(z)
         })
+    }
+
+    pub fn string_decomp(&self, kh: &KhHomology<R>)
+    where R: Field, for<'x> &'x R: FieldOps<R> {
+        use yui_matrix::sparse::SpMat;
+        
+        let n = kh.support().map(|i| kh[i].rank()).sum();
+        let h_range = kh.h_range().mv(0, -self.h_deg());
+        let blocks = h_range.map(|i|
+            kh[i].make_matrix(&kh[i + self.h_deg()], |z| self.apply(z))
+        );
+        let e_mat = SpMat::block_diag(blocks);
+
+        assert_eq!(e_mat.shape(), (n, n));
+
+        let flags = [false, true, false, false]; // pinv
+        let fnf = fnf(&e_mat.into_dense(), flags);
+        let (res, _trans) = fnf.destruct();
+
+        let gens = (0..n).flat_map(|i| { 
+            let l = res[(i, i)].lead_deg(); // extract torsion order l from x^l.
+            if l == 0 { return None; }
+
+            // let v = pinv.col_vec(i);
+            // println!("{i}) order: {l}{}", v.into_mat().into_dense());
+            Some(l)
+        }).collect_vec();
+
+        println!("{gens:?}");
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use yui_core::num::Ratio;
+    use yui_homology::DisplaySeq;
     use yui_link::State;
 
     use crate::kh::KhChainExt;
@@ -246,5 +284,18 @@ mod tests {
         let e = c.sl2_map(&l).into_chain_map();
 
         e.check_all(c.inner(), c.inner());
+    }
+
+    #[test]
+    fn test_string_decomp_3_1() { 
+        type R = Ratio<i64>;
+        let l = Link::load("3_1").unwrap().mirror();
+        let c = KhComplex::new_no_simplify(&l, &R::zero(), &R::zero(), true);
+        let e = c.sl2_map(&l);
+        let h = c.homology();
+
+        h.print_seq("i");
+
+        e.string_decomp(&h);
     }
 }

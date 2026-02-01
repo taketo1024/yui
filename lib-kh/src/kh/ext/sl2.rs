@@ -10,7 +10,7 @@ use yui_matrix::dense::snf::fnf;
 use crate::ext::{Color, LinkExt};
 use crate::kh::ext::cc::KhChainMap;
 use crate::kh::internal::v1::cube::KhCube;
-use crate::kh::{KhChain, KhChainGen, KhComplex, KhHomology};
+use crate::kh::{KhChain, KhChainExt, KhChainGen, KhComplex, KhHomology};
 
 impl<R> KhComplex<R>
 where
@@ -106,41 +106,66 @@ impl<R> KhSl2Map<R> where
         })
     }
 
-    pub fn string_decomp(&self, kh: &KhHomology<R>)
+    pub fn string_decomp(&self, kh: &KhHomology<R>) -> Vec<(isize, isize, usize)>
     where R: Field, for<'x> &'x R: FieldOps<R> {
         use yui_matrix::sparse::SpMat;
         
         let n = kh.support().map(|i| kh[i].rank()).sum();
+        let gens = kh.support().flat_map(|i| kh[i].gens()).collect_vec();
+
         let h_range = kh.h_range().mv(0, -self.h_deg());
         let blocks = h_range.map(|i|
             kh[i].make_matrix(&kh[i + self.h_deg()], |z| self.apply(z))
         );
         let e_mat = SpMat::block_diag(blocks);
 
+        assert_eq!(gens.len(), n);
         assert_eq!(e_mat.shape(), (n, n));
 
-        let flags = [false, true, false, false]; // pinv
+        let flags = [false, false, true, false]; // only need q
         let fnf = fnf(&e_mat.into_dense(), flags);
-        let (res, _trans) = fnf.destruct();
+        let (res, [_, _, q, _]) = fnf.destruct();
+        let q = q.unwrap().into_sparse();
 
-        let gens = (0..n).flat_map(|i| { 
-            let l = res[(i, i)].lead_deg(); // extract torsion order l from x^l.
-            if l == 0 { return None; }
+        let e_str = (0..n).flat_map(|i| { 
+            let ord = res[(i, i)].lead_deg(); // extract torsion order l from x^l.
+            if ord == 0 { return None; }
 
-            // let v = pinv.col_vec(i);
-            // println!("{i}) order: {l}{}", v.into_mat().into_dense());
-            Some(l)
-        }).collect_vec();
+            let v = q.col_vec(i);
 
-        println!("{gens:?}");
+            // println!("{i}) order: {l}\n{:?}", v.to_dense());
+
+            let indices = v.iter_nz().filter_map(|(j, r)| 
+                if r.is_const() { 
+                    Some(j) 
+                } else { 
+                    None 
+                }
+            ).collect_vec();
+
+            assert!(!indices.is_empty());
+            assert!(indices.iter().map(|&j| gens[j].q_deg()).all_equal());
+
+            let j = *indices.first().unwrap();
+            let z = &gens[j];
+            let t = z.h_deg();
+            let q = z.q_deg();
+            let d = 2 * t - q;
+
+            Some((d, q, ord))
+        }).sorted_by_key(|(d, q, _)| [*d, *q]).collect_vec();
+
+        e_str
     }
 }
 
 #[cfg(test)]
 mod tests {
     use yui_core::num::Ratio;
-    use yui_homology::DisplaySeq;
     use yui_link::State;
+    
+    #[allow(unused)]
+    use yui_homology::DisplayTable;
 
     use crate::kh::KhChainExt;
 
@@ -286,16 +311,40 @@ mod tests {
         e.check_all(c.inner(), c.inner());
     }
 
+    type QQ = Ratio<i64>;
+
     #[test]
     fn test_string_decomp_3_1() { 
-        type R = Ratio<i64>;
-        let l = Link::load("3_1").unwrap().mirror();
-        let c = KhComplex::new_no_simplify(&l, &R::zero(), &R::zero(), true);
+        let l = Link::load("3_1").unwrap();
+        let c = KhComplex::new_no_simplify(&l, &QQ::zero(), &QQ::zero(), true);
         let e = c.sl2_map(&l);
         let h = c.homology();
 
-        h.print_seq("i");
+        // h.gen_grid().print_table("i", "j");
 
-        e.string_decomp(&h);
+        let e_str = e.string_decomp(&h);
+        // println!("{e_str:?}");
+
+        assert_eq!(e_str.len(), 2);
+        assert_eq!(e_str[0], (2, -8, 1));
+        assert_eq!(e_str[1], (2, -2, 2));
+    }
+
+    #[test]
+    fn test_string_decomp_unred_3_1() { 
+        let l = Link::load("3_1").unwrap();
+        let c = KhComplex::new_no_simplify(&l, &QQ::zero(), &QQ::zero(), false);
+        let e = c.sl2_map(&l);
+        let h = c.homology();
+
+        // h.gen_grid().print_table("i", "j");
+
+        let e_str = e.string_decomp(&h);
+        // println!("{e_str:?}");
+
+        assert_eq!(e_str.len(), 3);
+        assert_eq!(e_str[0], (1, -1, 2));
+        assert_eq!(e_str[1], (3, -9, 1));
+        assert_eq!(e_str[2], (3, -3, 1));
     }
 }

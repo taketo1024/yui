@@ -6,7 +6,7 @@ members = [
     "lib-homology",
     "lib-link",
     "lib-kh"
-]
+, "bin-exp"]
 resolver = "2"
 
 [workspace.package]

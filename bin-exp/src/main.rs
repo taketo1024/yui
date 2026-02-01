@@ -2,15 +2,27 @@ use std::collections::HashMap;
 
 use itertools::Itertools;
 use yui_core::num::Ratio;
-use yui_homology::{DisplaySeq, SummandTrait};
-use yui_kh::kh::KhHomology;
+use yui_homology::{DisplaySeq, DisplayTable, SummandTrait};
+use yui_kh::kh::{KhComplex, KhHomology};
 use yui_link::Link;
 
 type Dict = HashMap<String, Vec<String>>;
 fn main() {
-    let dict = make_dict(10);
-    let list = dupl_list(dict);
-    println!("{list:?}");
+    let n = 11;
+    let dict = make_dict(n);
+    let targets = dupl_list(dict);
+    let res = targets.iter().map(|list| { 
+        println!("distinguish: {list:?}");
+        distinguish(&list)
+    }).collect_vec();
+
+    for (i, list) in res.into_iter().enumerate() { 
+        println!("group: {i}");
+        for l in list { 
+            println!("\t{}", l.join(" = "));
+        }
+        println!();
+    }
 }
 
 fn compute_kh(name: &String, l: &Link) -> String { 
@@ -84,4 +96,44 @@ fn update_dict(name: &String, l: &Link, dict: &mut Dict) {
 
 fn dupl_list(dict: Dict) -> Vec<Vec<String>> { 
     dict.into_values().sorted_by_key(|v| v.first().unwrap().clone()).collect()
+}
+
+fn distinguish(targets: &Vec<String>) -> Vec<Vec<String>> { 
+    let mut res: HashMap<String, Vec<String>> = HashMap::new();
+    
+    for name in targets { 
+        let l = load_link(name).unwrap();
+        let e_str = compute_e_str(name, &l);
+        if res.contains_key(&e_str) { 
+            res.get_mut(&e_str).unwrap().push(name.clone());
+        } else { 
+            res.insert(e_str, vec![name.clone()]);
+        }
+    }
+
+    res.into_values().collect()
+}
+
+fn compute_e_str(name: &String, l: &Link) -> String { 
+    println!("compute: {name}");
+
+    let c = Ratio::from(0_i128);
+    let ckh = KhComplex::new_no_simplify(l, &c, &c, true);
+    let kh = ckh.homology();
+    let e_str = ckh.sl2_map(l).string_decomp(&kh);
+
+    println!("{name}");
+    kh.gen_grid().print_table("i", "j");
+    println!("{e_str:?}\n");
+
+    format!("{e_str:?}")
+}
+
+fn load_link(name: &str) -> Result<Link, Box<dyn std::error::Error>> { 
+    if name.starts_with("m") { 
+        let name = String::from(&name[1..]);
+        Link::load(&name).map(|l| l.mirror())
+    } else {
+        Link::load(name)
+    }
 }

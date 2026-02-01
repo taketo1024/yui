@@ -1,0 +1,135 @@
+group: 3
+        10_137
+        m10_155 = K11n37
+
+group: 7
+        10_25 = m10_56
+
+group: 10
+        10_40 = m10_103
+
+group: 12
+        10_43
+        10_91 = m10_91 // chiral
+
+group: 14
+        10_48 = m10_48
+
+group: 17
+        10_71 = m10_71
+        10_104 = m10_104
+
+group: 26
+        8_16 = 10_156
+
+group: 30
+        8_8 = m10_129
+
+group: 41
+        K11n11 = K11n112
+
+group: 42
+        mK11n4 = mK11n21
+
+group: 44
+        K11a1 = K11a149
+
+group: 46
+        K11a104 = K11a168
+
+group: 47
+        K11a11 = K11a167
+
+group: 52
+        K11a138 = mK11a285
+
+group: 57
+        K11a185 = mK11a265
+
+group: 58
+        K11a186 = K11a241
+
+group: 59
+        K11a19 = K11a25
+
+group: 60
+        K11a192 = K11a299
+
+group: 61
+        K11a196 = mK11a216
+
+group: 62
+        K11a2 = K11a116
+
+group: 63
+        K11a251 = K11a253
+        K11a228
+
+group: 64
+        K11a24 = K11a26 = K11a315
+
+group: 65
+        K11a252 = K11a254
+
+group: 68
+        mK11a189
+        K11a30 = K11a272
+
+group: 69
+        K11a33 = K11a82
+
+group: 71
+        mK11a36
+        K11a35 = K11a316
+
+group: 72
+        K11a41 = mK11a183
+
+group: 73
+        K11a44 = K11a47
+
+group: 76
+        K11a57 = K11a231
+
+group: 82
+        K11a71 = mK11a248
+
+group: 83
+        K11a76 = mK11a160 = mK11a289
+
+group: 84
+        K11a79 = K11a255
+
+group: 86
+        K11a81 = mK11a282
+
+group: 90
+        K11n10 = mK11n144
+
+group: 95
+        K11n22 = mK11n127
+
+group: 97
+        K11n35 = K11n43
+
+group: 99
+        K11n40 = K11n46
+
+group: 100
+        K11n41 = K11n47
+
+group: 101
+        K11n50 = K11n132
+
+group: 102
+        K11n56 = mK11n58
+
+group: 104
+        K11n7
+        K11n36 = K11n44
+
+group: 105
+        K11n71 = mK11n75
+
+group: 107
+        K11n76 = mK11n78

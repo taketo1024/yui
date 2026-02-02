@@ -1,6 +1,8 @@
-group: 3
-        10_137
-        m10_155 = K11n37
+group: 30
+        8_8 = m10_129
+
+group: 26
+        8_16 = 10_156
 
 group: 7
         10_25 = m10_56
@@ -8,28 +10,8 @@ group: 7
 group: 10
         10_40 = m10_103
 
-group: 12
-        10_43
-        10_91 = m10_91 // chiral
-
-group: 14
-        10_48 = m10_48
-
-group: 17
-        10_71 = m10_71
-        10_104 = m10_104
-
-group: 26
-        8_16 = 10_156
-
-group: 30
-        8_8 = m10_129
-
-group: 41
-        K11n11 = K11n112
-
-group: 42
-        mK11n4 = mK11n21
+group: 3
+        m10_155 = K11n37
 
 group: 44
         K11a1 = K11a149
@@ -63,7 +45,6 @@ group: 62
 
 group: 63
         K11a251 = K11a253
-        K11a228
 
 group: 64
         K11a24 = K11a26 = K11a315
@@ -72,14 +53,12 @@ group: 65
         K11a252 = K11a254
 
 group: 68
-        mK11a189
         K11a30 = K11a272
 
 group: 69
         K11a33 = K11a82
 
 group: 71
-        mK11a36
         K11a35 = K11a316
 
 group: 72
@@ -103,6 +82,15 @@ group: 84
 group: 86
         K11a81 = mK11a282
 
+group: 42
+        mK11n4 = mK11n21
+
+group: 104
+        K11n36 = K11n44
+
+group: 41
+        K11n11 = K11n112
+
 group: 90
         K11n10 = mK11n144
 
@@ -124,12 +112,21 @@ group: 101
 group: 102
         K11n56 = mK11n58
 
-group: 104
-        K11n7
-        K11n36 = K11n44
-
 group: 105
         K11n71 = mK11n75
 
 group: 107
         K11n76 = mK11n78
+
+// chiral
+
+group: 12
+        10_91 = m10_91 // chiral
+
+group: 14
+        10_48 = m10_48 // chiral
+
+group: 17
+        10_71 = m10_71 // chiral
+        10_104 = m10_104 // chiral
+

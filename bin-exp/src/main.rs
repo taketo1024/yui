@@ -16,13 +16,15 @@ fn main() {
         distinguish(&list)
     }).collect_vec();
 
-    for (i, list) in res.into_iter().enumerate() { 
+    for (i, list) in res.iter().enumerate() { 
         println!("group: {i}");
         for l in list { 
             println!("\t{}", l.join(" = "));
         }
         println!();
     }
+
+    println!("{res:?}");
 }
 
 fn compute_kh(name: &String, l: &Link) -> String { 

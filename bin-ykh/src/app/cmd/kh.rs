@@ -6,7 +6,7 @@ use yui_homology::{DisplaySeq, DisplayTable, GridTrait, SummandTrait, tex::TeXTa
 use yui_kh::kh::KhHomology;
 use yui_kh::kh::KhChainExt;
 use yui_link::Link;
-use crate::app::app::AppArgs;
+use crate::app::args::*;
 use crate::app::utils::*;
 use crate::app::err::*;
 
@@ -52,7 +52,7 @@ pub struct Args {
 impl AppArgs for Args {
     fn c_type(&self) -> CType { self.c_type }
     fn c_value(&self) -> &String { &self.c_value }
-    fn log_level(&self) -> u8 { self.log }
+    fn log(&self) -> u8 { self.log }
 }
 
 pub struct App<R>

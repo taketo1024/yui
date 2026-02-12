@@ -1,9 +1,8 @@
 use log::info;
 use clap::{Parser, Subcommand};
 
-use crate::app::cmd::sl2;
-
-use super::cmd::{ckh, ckhi, kh, khi, cc};
+use super::cmd::{ckh, ckhi, kh, khi, cc, sl2};
+use super::args::*;
 use super::utils::*;
 
 #[derive(Parser, Debug)]
@@ -26,22 +25,19 @@ pub enum Cmd {
 }
 
 impl CliArgs { 
-    fn log_level(&self) -> log::LevelFilter { 
-        use log::LevelFilter::*;
-        let level = match &self.command { 
-            Cmd::CKh(args)  => args.log,
-            Cmd::Kh(args)   => args.log,
-            Cmd::CKhI(args) => args.log,
-            Cmd::KhI(args)  => args.log,
-            Cmd::CC(args)   => args.log,
-            Cmd::SL2(args)  => args.log,
-        };
-        match level {
-            1 => Info,
-            2 => Debug,
-            3 => Trace,
-            _ => Off,
+    fn app_args(&self) -> &dyn AppArgs { 
+        match &self.command { 
+            Cmd::CKh(args)  => args,
+            Cmd::Kh(args)   => args,
+            Cmd::CKhI(args) => args,
+            Cmd::KhI(args)  => args,
+            Cmd::CC(args)   => args,
+            Cmd::SL2(args)  => args,
         }
+    }
+
+    fn log_level(&self) -> log::LevelFilter { 
+        self.app_args().log_level()
     }
 }
 
@@ -86,28 +82,5 @@ impl App {
                 Cmd::SL2(args)  => sl2::dispatch(args),
             }
         )
-    }
-}
-
-pub trait AppArgs { 
-    fn c_type(&self) -> CType; 
-    fn c_value(&self) -> &String; 
-    fn log_level(&self) -> u8; 
-
-    fn poly_vars(&self) -> PolyVars { 
-        parse_poly_vars(self.c_value())
-    }
-
-    fn is_poly(&self) -> bool { 
-        self.poly_vars() != PolyVars::None
-    }
-
-    fn is_field(&self) -> bool { 
-        self.c_type().is_field() && !self.is_poly()
-    }
-
-    fn is_euc_ring(&self) -> bool { 
-        self.c_type() == CType::Z && !self.is_poly() || 
-        self.c_type().is_field() && self.poly_vars().nvars() == 1
     }
 }

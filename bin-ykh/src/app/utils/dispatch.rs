@@ -33,7 +33,14 @@ macro_rules! dispatch_eucring {
     }};
 }
 
-pub(crate) use {dispatch, dispatch_ring, dispatch_eucring};
+macro_rules! dispatch_field {
+    ($app:ident, $method:ident, $args:expr) => {{
+        use crate::app::utils::dispatch::*;
+        dispatch!(try_field, $app, $method, $args)
+    }};
+}
+
+pub(crate) use {dispatch, dispatch_ring, dispatch_eucring, dispatch_field};
 
 // -- internal -- //
 
@@ -86,6 +93,22 @@ macro_rules! try_std {
 
         match $args.c_type {
             CType::Z     => invoke!(Z,  $app, $method, $args),
+            CType::Q     => invoke!(Q,  $app, $method, $args),
+            CType::F2    => invoke!(F2, $app, $method, $args),
+            CType::F3    => invoke!(F3, $app, $method, $args),
+        }
+    }}
+}
+
+macro_rules! try_field {
+    ($app:ident, $method:ident, $args:expr) => {{
+        use yui_core::num::{Ratio, FF};
+
+        type Q = Ratio<Int>;
+        type F2 = FF<2>;
+        type F3 = FF<3>;
+
+        match $args.c_type {
             CType::Q     => invoke!(Q,  $app, $method, $args),
             CType::F2    => invoke!(F2, $app, $method, $args),
             CType::F3    => invoke!(F3, $app, $method, $args),
@@ -172,4 +195,4 @@ macro_rules! invoke {
     }}
 }
 
-pub(crate) use {invoke, try_ring, try_eucring, try_std, try_euc_poly, try_noneuc_poly};
+pub(crate) use {invoke, try_field, try_ring, try_eucring, try_std, try_euc_poly, try_noneuc_poly};

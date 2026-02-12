@@ -9,7 +9,7 @@ use yui_kh::kh::KhChainExt;
 use yui_kh::kh::KhComplex;
 
 pub fn dispatch(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
-    dispatch_ring!(App, args)
+    dispatch_ring!(App, boot, args)
 }
 
 #[derive(Clone, Default, Debug, clap::Args)]
@@ -62,6 +62,11 @@ where
     R: Ring + FromStr + TeX,
     for<'x> &'x R: RingOps<R>,
 {
+    pub fn boot(args: &Args) -> Result<String, Box<dyn std::error::Error>> { 
+        let mut app = Self::new(args.clone());
+        app.run()
+    }
+
     pub fn new(args: Args) -> Self { 
         let buff = String::with_capacity(1024);
         App { args, buff, _ring: PhantomData }

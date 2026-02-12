@@ -10,7 +10,7 @@ use crate::app::utils::*;
 use crate::app::err::*;
 
 pub fn dispatch(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
-    dispatch_eucring!(App, args)
+    dispatch_eucring!(App, boot, args)
 }
 
 #[derive(Clone, Default, Debug, clap::Args)]
@@ -63,6 +63,11 @@ where
     R: EucRing + FromStr + TeX,
     for<'x> &'x R: EucRingOps<R>,
 {
+    pub fn boot(args: &Args) -> Result<String, Box<dyn std::error::Error>> { 
+        let mut app = Self::new(args.clone());
+        app.run()
+    }
+
     pub fn new(args: Args) -> Self { 
         let buff = String::with_capacity(1024);
         App { args, buff, _ring: PhantomData }

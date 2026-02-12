@@ -33,6 +33,11 @@ impl<const X: char, const Y: char, const Z: char, I> Var3<X, Y, Z, I> {
         }
     }
 
+    pub fn multi_deg(&self) -> (I, I, I) 
+    where I: Copy { 
+        (self.0, self.1, self.2)
+    }
+
     pub fn deg_for(&self, i: usize) -> I
     where I: Copy { 
         assert!(i < 3);

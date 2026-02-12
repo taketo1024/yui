@@ -1,8 +1,13 @@
 
+use std::collections::HashMap;
+use std::fmt::Display;
+use std::marker::PhantomData;
+use std::ops::Index;
+
 use itertools::Itertools;
 use num_traits::Zero;
 use yui_core::{AddMon, Field, FieldOps, RangeExt, Ring, RingOps, Sign};
-use yui_homology::{GridTrait, SummandTrait};
+use yui_homology::{GridTrait, SummandTrait, isize3};
 use yui_link::Link;
 use yui_matrix::MatTrait;
 use yui_matrix::dense::snf::fnf;
@@ -106,7 +111,7 @@ impl<R> KhSl2Map<R> where
         })
     }
 
-    pub fn string_decomp(&self, kh: &KhHomology<R>) -> Vec<(isize, isize, usize)>
+    pub fn string_decomp(&self, kh: &KhHomology<R>) -> StringDecomp<R>
     where R: Field, for<'x> &'x R: FieldOps<R> {
         use yui_matrix::sparse::SpMat;
         
@@ -122,18 +127,18 @@ impl<R> KhSl2Map<R> where
         assert_eq!(gens.len(), n);
         assert_eq!(e_mat.shape(), (n, n));
 
-        let flags = [false, false, true, false]; // only need q
-        let fnf = fnf(&e_mat.into_dense(), flags);
-        let (res, [_, _, q, _]) = fnf.destruct();
-        let q = q.unwrap().into_sparse();
+        let flags = [false, true, false, false]; // only need pinv
+        let fnf = fnf(&e_mat.clone().into_dense(), flags);
+        let (res, [_, pinv, ..]) = fnf.destruct();
+        let pinv = pinv.unwrap().into_sparse();
 
-        let e_str = (0..n).flat_map(|i| { 
+        let data = (0..n).flat_map(|i| { 
             let ord = res[(i, i)].lead_deg(); // extract torsion order l from x^l.
             if ord == 0 { return None; }
 
-            let v = q.col_vec(i);
+            let v = pinv.col_vec(i);
 
-            // println!("{i}) order: {l}\n{:?}", v.to_dense());
+            // println!("{i}) order: {ord}\n{:?}", v.to_dense());
 
             let indices = v.iter_nz().filter_map(|(j, r)| 
                 if r.is_const() { 
@@ -149,13 +154,94 @@ impl<R> KhSl2Map<R> where
             let j = *indices.first().unwrap();
             let z = &gens[j];
             let t = z.h_deg();
-            let q = z.q_deg();
-            let d = 2 * t - q;
+            let q = -z.q_deg(); // TODO: must modify q_deg later.
+            let d = 2 * t + q;
 
-            Some((d, q, ord))
-        }).sorted_by_key(|(d, q, _)| [*d, *q]).collect_vec();
+            Some(isize3(d, q, ord as isize))
+        }).counts();
 
-        e_str
+        StringDecomp::new(data)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct StringDecomp<R> where
+    R: Ring,
+    for<'x> &'x R: RingOps<R>
+{ 
+    data: HashMap<isize3, usize>, // {(i, j, l) : n} => t^i q^j (R[x]/(x^l))^n
+    _phantom: PhantomData<R>
+}
+
+impl<R> StringDecomp<R> where
+    R: Ring,
+    for<'x> &'x R: RingOps<R>
+{
+    fn new(data: HashMap<isize3, usize>) -> Self { 
+        Self { data, _phantom: PhantomData }
+    } 
+
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+}
+
+impl<R> Index<(isize, isize, isize)> for StringDecomp<R>
+where
+    R: Ring,
+    for<'x> &'x R: RingOps<R>,
+{
+    type Output = usize;
+
+    fn index(&self, index: (isize, isize, isize)) -> &Self::Output {
+        self.data.get(&index.into()).unwrap_or(&0)
+    }
+}
+
+impl<R> From<HashMap<isize3, usize>> for StringDecomp<R>
+where
+    R: Ring,
+    for<'x> &'x R: RingOps<R>
+{
+    fn from(data: HashMap<isize3, usize>) -> Self {
+        Self::new(data)
+    }
+}
+
+impl<R> FromIterator<(isize3, usize)> for StringDecomp<R>
+where
+    R: Ring,
+    for<'x> &'x R: RingOps<R>
+{
+    fn from_iter<T>(iter: T) -> Self
+    where T: IntoIterator<Item = (isize3, usize)> {
+        let data = HashMap::from_iter(iter);
+        Self::new(data)
+    }
+}
+
+impl<R> Display for StringDecomp<R>
+where
+    R: Ring,
+    for<'x> &'x R: RingOps<R>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use yui_core::util::format;
+        use yui_core::poly::Var2;
+        type V = Var2<'δ', 'q', isize>;
+
+        let list = self.data.iter().sorted_by_key(|(i, _)| *i);
+        let str = format::lc(list.map(|(&i, n)| {
+            let (d, q, l) = i.into();
+            let v = V::from((d, q));
+            let t = if v.total_deg() == 0 { 
+                format!("e({l})")
+            } else { 
+                format!("{v}e({l})")
+            };
+            (t, n)
+        }));
+        write!(f, "{str}")
     }
 }
 
@@ -320,14 +406,15 @@ mod tests {
         let e = c.sl2_map(&l);
         let h = c.homology();
 
-        // h.gen_grid().print_table("i", "j");
+        h.gen_grid().print_table("i", "j");
 
         let e_str = e.string_decomp(&h);
-        // println!("{e_str:?}");
 
         assert_eq!(e_str.len(), 2);
-        assert_eq!(e_str[0], (2, -8, 1));
-        assert_eq!(e_str[1], (2, -2, 2));
+        assert_eq!(e_str[(2, 8, 1)], 1);
+        assert_eq!(e_str[(2, 2, 2)], 1);
+
+        assert_eq!(e_str.to_string(), String::from("δ²q²e(2) + δ²q⁸e(1)"))
     }
 
     #[test]
@@ -337,14 +424,16 @@ mod tests {
         let e = c.sl2_map(&l);
         let h = c.homology();
 
-        // h.gen_grid().print_table("i", "j");
+        h.gen_grid().print_table("i", "j");
 
         let e_str = e.string_decomp(&h);
-        // println!("{e_str:?}");
+        println!("{e_str}");
 
         assert_eq!(e_str.len(), 3);
-        assert_eq!(e_str[0], (1, -1, 2));
-        assert_eq!(e_str[1], (3, -9, 1));
-        assert_eq!(e_str[2], (3, -3, 1));
+        assert_eq!(e_str[(1, 1, 2)], 1);
+        assert_eq!(e_str[(3, 3, 1)], 1);
+        assert_eq!(e_str[(3, 9, 1)], 1);
+
+        assert_eq!(e_str.to_string(), String::from("δqe(2) + δ³q³e(1) + δ³q⁹e(1)"))
     }
 }

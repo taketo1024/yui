@@ -18,13 +18,11 @@ fn main() {
 
     for (i, list) in res.iter().enumerate() { 
         println!("group: {i}");
-        for l in list { 
-            println!("\t{}", l.join(" = "));
+        for (e, l) in list { 
+            println!("\t{}\n\t{e}", l.join(" = "));
         }
         println!();
     }
-
-    println!("{res:?}");
 }
 
 fn compute_kh(name: &String, l: &Link) -> String { 
@@ -97,10 +95,10 @@ fn update_dict(name: &String, l: &Link, dict: &mut Dict) {
 }
 
 fn dupl_list(dict: Dict) -> Vec<Vec<String>> { 
-    dict.into_values().sorted_by_key(|v| v.first().unwrap().clone()).collect()
+    dict.into_values().sorted_by_key(|v| name_to_code(&v[0])).collect()
 }
 
-fn distinguish(targets: &Vec<String>) -> Vec<Vec<String>> { 
+fn distinguish(targets: &Vec<String>) -> Vec<(String, Vec<String>)> { 
     let mut res: HashMap<String, Vec<String>> = HashMap::new();
     
     for name in targets { 
@@ -113,7 +111,7 @@ fn distinguish(targets: &Vec<String>) -> Vec<Vec<String>> {
         }
     }
 
-    res.into_values().collect()
+    res.into_iter().sorted_by_key(|(_, list)| name_to_code(&list[0])).collect()
 }
 
 fn compute_e_str(name: &String, l: &Link) -> String { 
@@ -126,9 +124,9 @@ fn compute_e_str(name: &String, l: &Link) -> String {
 
     println!("{name}");
     kh.gen_grid().print_table("i", "j");
-    println!("{e_str:?}\n");
+    println!("{e_str}\n");
 
-    format!("{e_str:?}")
+    e_str.to_string()
 }
 
 fn load_link(name: &str) -> Result<Link, Box<dyn std::error::Error>> { 
@@ -137,5 +135,46 @@ fn load_link(name: &str) -> Result<Link, Box<dyn std::error::Error>> {
         Link::load(&name).map(|l| l.mirror())
     } else {
         Link::load(name)
+    }
+}
+
+fn name_to_code(name: &str) -> [usize; 4] { // [crossing-num, a/n, index, mirror] 
+    let re = regex::Regex::new(r"^(m?)(\d+)_(\d+)$").unwrap();
+    if let Some(caps) = re.captures(name) {
+        let m = if &caps[1] == "m" { 1 } else { 0 };
+        let n: usize = caps[2].parse().unwrap();
+        let i: usize = caps[3].parse().unwrap();
+        return [n, 0, i, m];
+    }
+
+    let re = regex::Regex::new(r"^(m)?K(\d+)([a|n])(\d+)$").unwrap();
+    if let Some(caps) = re.captures(name) {
+        let m = if caps.get(1).is_some() { 1 } else { 0 };
+        let n: usize = caps[2].parse().unwrap();
+        let t = if &caps[3] == "a" { 0 } else { 1 };
+        let i: usize = caps[4].parse().unwrap();
+        return [n, t, i, m];
+    }
+
+    panic!("Invalid name format: {}", name);
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_name_to_code() {
+        let cases = vec![
+            ("3_1",   [3, 0, 1, 0]),
+            ("m4_2",  [4, 0, 2, 1]),
+            ("K5a3",  [5, 0, 3, 0]),
+            ("K6n4",  [6, 1, 4, 0]),
+            ("mK7a5", [7, 0, 5, 1]),
+            ("mK8n6", [8, 1, 6, 1]),
+        ];
+
+        for (input, expected) in cases {
+            assert_eq!(name_to_code(input), expected);
+        }
     }
 }

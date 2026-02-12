@@ -6,6 +6,7 @@ use std::ops::Index;
 
 use itertools::Itertools;
 use num_traits::Zero;
+use yui_core::tex::TeX;
 use yui_core::{AddMon, Field, FieldOps, RangeExt, Ring, RingOps, Sign};
 use yui_homology::{GridTrait, SummandTrait, isize3};
 use yui_link::Link;
@@ -234,10 +235,10 @@ where
         let str = format::lc(list.map(|(&i, n)| {
             let (d, q, l) = i.into();
             let v = V::from((d, q));
-            let t = if v.total_deg() == 0 { 
+            let t = if v.multi_deg() == (0, 0) { 
                 format!("e({l})")
             } else { 
-                format!("{v}e({l})")
+                format!("{}e({l})", v)
             };
             (t, n)
         }));

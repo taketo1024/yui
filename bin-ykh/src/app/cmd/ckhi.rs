@@ -198,44 +198,39 @@ mod tests {
         assert!(res.is_ok());
     }
 
-    #[cfg(feature = "poly")]
-    mod poly_tests {
-        use super::*;
+    #[test]
+    fn test_poly_h() {
+        let args = Args {
+            link: "3_1".to_string(),
+            c_value: "H".to_string(),
+            c_type: CType::F2,
+            ..Default::default()
+        };
+        let res = dispatch(&args);
+        assert!(res.is_ok());
+    }
 
-        #[test]
-        fn test_poly_h() {
-            let args = Args {
-                link: "3_1".to_string(),
-                c_value: "H".to_string(),
-                c_type: CType::F2,
-                ..Default::default()
-            };
-            let res = dispatch(&args);
-            assert!(res.is_ok());
-        }
+    #[test]
+    fn test_poly_t() {
+        let args = Args {
+            link: "3_1".to_string(),
+            c_value: "0,T".to_string(),
+            c_type: CType::F2,
+            ..Default::default()
+        };
+        let res = dispatch(&args);
+        assert!(res.is_ok());
+    }
 
-        #[test]
-        fn test_poly_t() {
-            let args = Args {
-                link: "3_1".to_string(),
-                c_value: "0,T".to_string(),
-                c_type: CType::F2,
-                ..Default::default()
-            };
-            let res = dispatch(&args);
-            assert!(res.is_ok());
-        }
-
-        #[test]
-        fn test_poly_ht() {
-            let args = Args {
-                link: "3_1".to_string(),
-                c_value: "H,T".to_string(),
-                c_type: CType::F2,
-                ..Default::default()
-            };
-            let res = dispatch(&args);
-            assert!(res.is_ok());
-        }
+    #[test]
+    fn test_poly_ht() {
+        let args = Args {
+            link: "3_1".to_string(),
+            c_value: "H,T".to_string(),
+            c_type: CType::F2,
+            ..Default::default()
+        };
+        let res = dispatch(&args);
+        assert!(res.is_ok());
     }
 }

@@ -226,20 +226,15 @@ mod tests {
         assert!(res.is_ok());
     }
 
-    #[cfg(feature = "poly")]
-    mod poly_tests { 
-        use super::*;
-        
-        #[test]
-        fn test_poly_h() { 
-            let args = Args {
-                link: "3_1".to_string(),
-                c_type: CType::F2,
-                c_value: "H".to_string(),
-                ..Default::default()
-            };
-            let res = dispatch(&args);
-            assert!(res.is_ok());
-        }
+    #[test]
+    fn test_poly_h() { 
+        let args = Args {
+            link: "3_1".to_string(),
+            c_type: CType::F2,
+            c_value: "H".to_string(),
+            ..Default::default()
+        };
+        let res = dispatch(&args);
+        assert!(res.is_ok());
     }
 }

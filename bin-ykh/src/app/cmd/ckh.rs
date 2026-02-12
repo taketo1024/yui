@@ -193,7 +193,6 @@ mod tests {
         assert!(res.is_ok());
     }
 
-    #[cfg(feature = "poly")]
     mod poly_tests {
         use super::*;
 

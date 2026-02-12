@@ -103,72 +103,49 @@ macro_rules! try_field {
 
 macro_rules! try_euc_poly {
     ($app:ident, $method:ident, $args:expr) => {{
-        cfg_if::cfg_if! {
-            if #[cfg(any(feature = "poly", feature = "all"))] {
-                use yui_core::num::Ratio;
-                use yui_core::num::FF;
-                use yui_core::poly::Poly;
+        use yui_core::num::Ratio;
+        use yui_core::num::FF;
+        use yui_core::poly::Poly;
 
-                type Q = Ratio<Int>;
-                type F2 = FF<2>;
-                type F3 = FF<3>;
+        type Q = Ratio<Int>;
+        type F2 = FF<2>;
+        type F3 = FF<3>;
 
-                let vars = $args.poly_vars();
+        let vars = $args.poly_vars();
 
-                match ($args.c_type(), vars) {
-                    (CType::Q,  PolyVars::H) => invoke!(Poly<'H', Q>,  $app, $method, $args),
-                    (CType::Q,  PolyVars::T) => invoke!(Poly<'T', Q>,  $app, $method, $args),
-                    (CType::F2, PolyVars::H) => invoke!(Poly<'H', F2>, $app, $method, $args),
-                    (CType::F2, PolyVars::T) => invoke!(Poly<'T', F2>, $app, $method, $args),
-                    (CType::F3, PolyVars::H) => invoke!(Poly<'H', F3>, $app, $method, $args),
-                    (CType::F3, PolyVars::T) => invoke!(Poly<'T', F3>, $app, $method, $args),
-                    _ => None
-                }
-            } else {
-                match $c_type {
-                    CType::Q  |
-                    CType::F2 |
-                    CType::F3 => Some(err!("build with `--features poly` to enable polynomial types.")),
-                    _         => None
-                }
-            }
+        match ($args.c_type(), vars) {
+            (CType::Q,  PolyVars::H) => invoke!(Poly<'H', Q>,  $app, $method, $args),
+            (CType::Q,  PolyVars::T) => invoke!(Poly<'T', Q>,  $app, $method, $args),
+            (CType::F2, PolyVars::H) => invoke!(Poly<'H', F2>, $app, $method, $args),
+            (CType::F2, PolyVars::T) => invoke!(Poly<'T', F2>, $app, $method, $args),
+            (CType::F3, PolyVars::H) => invoke!(Poly<'H', F3>, $app, $method, $args),
+            (CType::F3, PolyVars::T) => invoke!(Poly<'T', F3>, $app, $method, $args),
+            _ => None
         }
     }}
 }
 
 macro_rules! try_noneuc_poly {
     ($app:ident, $method:ident, $args:expr) => {{
-        cfg_if::cfg_if! {
-            if #[cfg(any(feature = "poly", feature = "all"))] {
-                use yui_core::num::Ratio;
-                use yui_core::num::FF;
-                use yui_core::poly::{Poly, Poly2};
+        use yui_core::num::Ratio;
+        use yui_core::num::FF;
+        use yui_core::poly::{Poly, Poly2};
 
-                type Z = Int;
-                type Q = Ratio<Int>;
-                type F2 = FF<2>;
-                type F3 = FF<3>;
+        type Z = Int;
+        type Q = Ratio<Int>;
+        type F2 = FF<2>;
+        type F3 = FF<3>;
 
-                let vars = $args.poly_vars();
+        let vars = $args.poly_vars();
 
-                match ($args.c_type(), vars) {
-                    (CType::Z,  PolyVars::H ) => invoke!(Poly<'H', Z>, $app, $method, $args),
-                    (CType::Z,  PolyVars::T ) => invoke!(Poly<'T', Z>, $app, $method, $args),
-                    (CType::Z,  PolyVars::HT) => invoke!(Poly2<'H', 'T', Z>, $app, $method, $args),
-                    (CType::Q,  PolyVars::HT) => invoke!(Poly2<'H', 'T', Q>, $app, $method, $args),
-                    (CType::F2, PolyVars::HT) => invoke!(Poly2<'H', 'T', F2>, $app, $method, $args),
-                    (CType::F3, PolyVars::HT) => invoke!(Poly2<'H', 'T', F3>, $app, $method, $args),
-                    _ => None
-                }
-            } else {
-                match $c_type {
-                    CType::Z  |
-                    CType::Q  |
-                    CType::F2 |
-                    CType::F3 => Some(err!("build with `--features poly` to enable polynomial types.")),
-                    _         => None
-                }
-            }
+        match ($args.c_type(), vars) {
+            (CType::Z,  PolyVars::H ) => invoke!(Poly<'H', Z>, $app, $method, $args),
+            (CType::Z,  PolyVars::T ) => invoke!(Poly<'T', Z>, $app, $method, $args),
+            (CType::Z,  PolyVars::HT) => invoke!(Poly2<'H', 'T', Z>, $app, $method, $args),
+            (CType::Q,  PolyVars::HT) => invoke!(Poly2<'H', 'T', Q>, $app, $method, $args),
+            (CType::F2, PolyVars::HT) => invoke!(Poly2<'H', 'T', F2>, $app, $method, $args),
+            (CType::F3, PolyVars::HT) => invoke!(Poly2<'H', 'T', F3>, $app, $method, $args),
+            _ => None
         }
     }}
 }

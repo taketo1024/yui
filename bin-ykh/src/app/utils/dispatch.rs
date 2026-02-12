@@ -14,7 +14,7 @@ macro_rules! dispatch {
 
         $mode!($app, $method, $args)
         .unwrap_or_else(|| 
-            err!("`{}::{}` is not supported for: -t {} -c {}", stringify!($app), stringify!($method), $args.c_type, $args.c_value)
+            err!("`{}::{}` is not supported for: -t {} -c {}", stringify!($app), stringify!($method), $args.c_type(), $args.c_value)
         )
     }};
 }
@@ -46,18 +46,19 @@ pub(crate) use {dispatch, dispatch_ring, dispatch_eucring, dispatch_field};
 
 macro_rules! try_ring {
     ($app:ident, $method:ident, $args:expr) => {{
-        if poly_vars(&$args.c_value) == PolyVars::None { 
+        if !$args.is_poly() { 
             try_std!($app, $method, $args)
-        } else { 
+        } else if $args.is_euc_ring() { 
             try_euc_poly!($app, $method, $args)
-            .or_else(|| try_noneuc_poly!($app, $method, $args))
+        } else {
+            try_noneuc_poly!($app, $method, $args)
         }
     }}
 }
 
 macro_rules! try_eucring {
     ($app:ident, $method:ident, $args:expr) => {{
-        if poly_vars(&$args.c_value) == PolyVars::None { 
+        if !$args.is_poly() { 
             try_std!($app, $method, $args)
         } else { 
             try_euc_poly!($app, $method, $args)
@@ -74,7 +75,7 @@ macro_rules! try_std {
         type F2 = FF<2>;
         type F3 = FF<3>;
 
-        match $args.c_type {
+        match $args.c_type() {
             CType::Z     => invoke!(Z,  $app, $method, $args),
             CType::Q     => invoke!(Q,  $app, $method, $args),
             CType::F2    => invoke!(F2, $app, $method, $args),
@@ -91,10 +92,11 @@ macro_rules! try_field {
         type F2 = FF<2>;
         type F3 = FF<3>;
 
-        match $args.c_type {
+        match $args.c_type() {
             CType::Q     => invoke!(Q,  $app, $method, $args),
             CType::F2    => invoke!(F2, $app, $method, $args),
             CType::F3    => invoke!(F3, $app, $method, $args),
+            _ => None
         }
     }}
 }
@@ -111,9 +113,9 @@ macro_rules! try_euc_poly {
                 type F2 = FF<2>;
                 type F3 = FF<3>;
 
-                let vars = poly_vars(&$args.c_value);
+                let vars = $args.poly_vars();
 
-                match ($args.c_type, vars) {
+                match ($args.c_type(), vars) {
                     (CType::Q,  PolyVars::H) => invoke!(Poly<'H', Q>,  $app, $method, $args),
                     (CType::Q,  PolyVars::T) => invoke!(Poly<'T', Q>,  $app, $method, $args),
                     (CType::F2, PolyVars::H) => invoke!(Poly<'H', F2>, $app, $method, $args),
@@ -147,9 +149,9 @@ macro_rules! try_noneuc_poly {
                 type F2 = FF<2>;
                 type F3 = FF<3>;
 
-                let vars = poly_vars(&$args.c_value);
+                let vars = $args.poly_vars();
 
-                match ($args.c_type, vars) {
+                match ($args.c_type(), vars) {
                     (CType::Z,  PolyVars::H ) => invoke!(Poly<'H', Z>, $app, $method, $args),
                     (CType::Z,  PolyVars::T ) => invoke!(Poly<'T', Z>, $app, $method, $args),
                     (CType::Z,  PolyVars::HT) => invoke!(Poly2<'H', 'T', Z>, $app, $method, $args),

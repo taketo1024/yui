@@ -88,3 +88,26 @@ impl App {
         )
     }
 }
+
+pub trait AppArgs { 
+    fn c_type(&self) -> CType; 
+    fn c_value(&self) -> &String; 
+    fn log_level(&self) -> u8; 
+
+    fn poly_vars(&self) -> PolyVars { 
+        parse_poly_vars(self.c_value())
+    }
+
+    fn is_poly(&self) -> bool { 
+        self.poly_vars() != PolyVars::None
+    }
+
+    fn is_field(&self) -> bool { 
+        self.c_type().is_field() && !self.is_poly()
+    }
+
+    fn is_euc_ring(&self) -> bool { 
+        self.c_type() == CType::Z && !self.is_poly() || 
+        self.c_type().is_field() && self.poly_vars().nvars() == 1
+    }
+}

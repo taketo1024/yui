@@ -23,7 +23,17 @@ pub(crate) enum PolyVars {
     H, T, HT, None
 }
 
-pub(crate) fn poly_vars(c_value: &String) -> PolyVars { 
+impl PolyVars {
+    pub fn nvars(&self) -> usize { 
+        match self {
+            PolyVars::H | PolyVars::T  => 1,
+            PolyVars::HT => 2,
+            _ => 0,
+        }
+    }
+}
+
+pub(crate) fn parse_poly_vars(c_value: &String) -> PolyVars { 
     use std::collections::HashSet;
     
     let s: HashSet<_> = c_value.split(',').collect();

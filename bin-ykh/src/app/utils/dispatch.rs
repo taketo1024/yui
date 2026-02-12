@@ -44,23 +44,6 @@ pub(crate) use {dispatch, dispatch_ring, dispatch_eucring, dispatch_field};
 
 // -- internal -- //
 
-#[derive(PartialEq, Eq)]
-pub(crate) enum PolyVars { 
-    H, T, HT, None
-}
-
-pub(crate) fn poly_vars(c_value: &String) -> PolyVars { 
-    use std::collections::HashSet;
-    
-    let s: HashSet<_> = c_value.split(',').collect();
-    match (s.contains("H"), s.contains("T")) { 
-        (true,  true)  => PolyVars::HT,
-        (true,  false) => PolyVars::H,
-        (false, true)  => PolyVars::T,
-        (false, false) => PolyVars::None
-    }
-}
-
 macro_rules! try_ring {
     ($app:ident, $method:ident, $args:expr) => {{
         if poly_vars(&$args.c_value) == PolyVars::None { 

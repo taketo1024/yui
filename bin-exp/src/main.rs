@@ -7,6 +7,32 @@ use yui_kh::kh::{KhComplex, KhHomology};
 use yui_link::Link;
 
 type Dict = HashMap<String, Vec<String>>;
+
+static AMPH: &[&str] = &[
+    // FULLY AMPH
+    "4_1", 
+    "6_3", 
+    "8_3", 
+    "8_9", 
+    "8_12", 
+    "8_18", 
+    "10_17", 
+    "10_33", 
+    "10_37", 
+    "10_43", 
+    "10_45", 
+    "10_99", 
+    "10_123",
+    // NEG AMPH
+    "8_17", 
+    "10_79", 
+    "10_81", 
+    "10_88", 
+    "10_109", 
+    "10_115", 
+    "10_118"
+];
+
 fn main() {
     let n = 11;
     let dict = make_dict(n);
@@ -89,7 +115,7 @@ fn update_dict(name: &String, l: &Link, dict: &mut Dict) {
         dict.insert(a.clone(), vec![name.clone()]);
     }
 
-    if a == b { 
+    if a == b && !AMPH.contains(&name.as_str()) { 
         dict.get_mut(&a).unwrap().push(m_name);
     }
 }

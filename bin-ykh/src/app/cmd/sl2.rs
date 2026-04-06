@@ -91,36 +91,47 @@ where
 
     pub fn run_field(&mut self) -> Result<String, Box<dyn std::error::Error>>
     where R: Field, for<'x> &'x R: FieldOps<R> {
-        let (h, map, bigraded) = self.compute()?;
+        let (kh, e, ht) = self.compute()?;
 
-        self.show_table(&h, bigraded);
-        self.show_e_string(&h, &map);
+        let e_str = e.string_decomp(&kh);
+        let e = e.into_chain_map();
 
-        if self.args.show_matrix { 
-            self.show_matrix(&h, &map.into_chain_map(), (-2, -4));
-        }
+        self.show_results(&kh, &e, &ht);
+        self.out(&e_str.to_string());
+        self.out("");
         
         let res = self.flush();
         Ok(res)
     }
 
     pub fn run(&mut self) -> Result<String, Box<dyn std::error::Error>> {
-        let (h, e, bigraded) = self.compute()?;
+        let (kh, e, ht) = self.compute()?;
+        let e = e.into_chain_map();
 
-        self.show_table(&h, bigraded);
+        self.show_results(&kh, &e, &ht);
 
-        if self.args.show_matrix { 
-            self.show_matrix(&h, &e.into_chain_map(), (-2, -4));
-        }
-        
         let res = self.flush();
         Ok(res)
     }
 
-    fn compute(&self) -> Result<(KhHomology<R>, KhSl2Map<R>, bool), Box<dyn std::error::Error>> { 
+    pub fn show_results(&mut self, kh: &KhHomology<R>, e: &KhChainMap<R>, ht: &(R, R)) {
+        let (h, t) = ht;
+        let is_zero = h.is_zero() && t.is_zero();
+        let bigraded = is_zero || ["H", "0,T"].contains(&self.args.c_value.as_str());
+
+        self.show_table(&kh, bigraded);
+
+        if self.args.show_matrix { 
+            if is_zero {
+                self.show_matrix_bigr(kh, e, (-2, -4));
+            } else { 
+                self.show_matrix(&kh, e, -2);
+            }
+        }
+    }
+
+    fn compute(&self) -> Result<(KhHomology<R>, KhSl2Map<R>, (R, R)), Box<dyn std::error::Error>> { 
         let (h, t) = parse_pair::<R>(&self.args.c_value)?;
-        let bigraded = (h.is_zero() && t.is_zero()) || 
-            ["H", "0,T"].contains(&self.args.c_value.as_str());
 
         if self.args.reduced {
             ensure!(t.is_zero(), "`t` must be zero for reduced.");
@@ -132,9 +143,9 @@ where
 
         let c = KhComplex::new_no_simplify(&l, &h, &t, r);
         let e = c.sl2_map(&l);
-        let h = c.homology();
+        let kh = c.homology();
 
-        Ok((h, e, bigraded))
+        Ok((kh, e, (h, t)))
     }
 
     fn show_table(&mut self, h: &KhHomology<R>, bigraded: bool) { 
@@ -164,21 +175,12 @@ where
         }
     }
 
-    fn show_e_string(&mut self, kh: &KhHomology<R>, map: &KhSl2Map<R>)
-    where R: Field, for<'x> &'x R: FieldOps<R> { 
-        let e_str = map.string_decomp(kh);
-        self.out(&e_str.to_string());
-        self.out("");
-    }
-
-    fn show_matrix(&mut self, h: &KhHomology<R>, f: &KhChainMap<R>, deg: (isize, isize)) { 
+    fn show_matrix_bigr(&mut self, h: &KhHomology<R>, f: &KhChainMap<R>, deg: (isize, isize)) { 
         let grid = h.gen_grid();
         for d in h.delta_range().step_by(2) { 
-            if self.args.show_matrix { 
-                self.out(&format!("delta: {d}\n"));
-            }
+            self.out(&format!("delta: {d}\n"));
 
-            for i1 in h.h_range() { 
+            for i1 in h.h_range().rev() { 
                 let j1 = 2 * i1 - d;
                 let i2 = i1 + deg.0;
                 let j2 = j1 + deg.1;
@@ -191,13 +193,29 @@ where
                 let mat = h1.make_matrix_euc(h2, |z| f.apply(i1, z)).into_dense();
                 let r = mat.rank();
                 
-                if self.args.show_matrix { 
-                    self.out(&format!("  {}({i1}, {j1}) -> {}({i2}, {j2}); rank: {}", grid[(i1, j1)], grid[(i2, j2)], r));
-                    self.out(&format!("{}\n", mat.to_string().trim_end()));
-                }
+                self.out(&format!("  ({i1}, {j1}): {} -> ({i2}, {j2}): {}; rank: {}", grid[(i1, j1)], grid[(i2, j2)], r));
+                self.out(&format!("{}\n", mat.to_string().trim_end()));
             }
         }
+        self.out("");
+    }
 
+    fn show_matrix(&mut self, h: &KhHomology<R>, f: &KhChainMap<R>, deg: isize) { 
+        for i1 in h.h_range().rev() { 
+            let i2 = i1 + deg;
+            let h1 = &h[i1];
+            let h2 = &h[i2];
+
+            if h1.is_zero() || h2.is_zero() { continue; }
+
+            let mat = h1.make_matrix_euc(h2, |z| f.apply(i1, z)).into_dense();
+            let r = mat.rank();
+            
+            if self.args.show_matrix { 
+                self.out(&format!("  {i1}: {} -> {i2}: {}; rank: {}", h[i1], h[i2], r));
+                self.out(&format!("{}\n", mat.to_string().trim_end()));
+            }
+        }
         self.out("");
     }
 

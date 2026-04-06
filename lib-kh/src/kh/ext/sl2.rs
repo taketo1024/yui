@@ -6,7 +6,6 @@ use std::ops::Index;
 
 use itertools::Itertools;
 use num_traits::Zero;
-use yui_core::tex::TeX;
 use yui_core::{AddMon, Field, FieldOps, RangeExt, Ring, RingOps, Sign};
 use yui_homology::{GridTrait, SummandTrait, isize3};
 use yui_link::Link;
@@ -116,6 +115,9 @@ impl<R> KhSl2Map<R> where
     where R: Field, for<'x> &'x R: FieldOps<R> {
         use yui_matrix::sparse::SpMat;
         
+        assert!(self.cube.str().h().is_zero());
+        assert!(self.cube.str().t().is_zero());
+
         let n = kh.support().map(|i| kh[i].rank()).sum();
         let gens = kh.support().flat_map(|i| kh[i].gens()).collect_vec();
 

@@ -9,6 +9,7 @@ mod trans;
 pub use trans::*;
 
 pub mod pivot;
+pub mod pluq;
 pub mod schur;
 pub mod triang;
 pub mod decomp;

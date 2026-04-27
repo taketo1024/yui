@@ -8,17 +8,19 @@ use crate::dense::Mat;
 /// Result of a PLUQ decomposition satisfying `p_mat * A * q_mat = L * U + rem`:
 ///   - `p`: row permutation (pivot rows first)
 ///   - `q`: column permutation (pivot columns first)
-///   - `rank`: number of unit pivots found
 ///   - `l`: `m × rank`, unit lower triangular — elimination multipliers
 ///   - `u`: `rank × n`, upper echelon — the reduced pivot rows
 ///   - `rem`: `m × n`, remainder — zero when `R` is a field
 pub struct Pluq<R> {
     pub p: PermOwned,
     pub q: PermOwned,
-    pub rank: usize,
     pub l: Mat<R>,
     pub u: Mat<R>,
     pub rem: Mat<R>,
+}
+
+impl<R> Pluq<R> {
+    pub fn rank(&self) -> usize { self.l.ncols() }
 }
 
 /// Computes a PLUQ decomposition of `a` over a ring by Gaussian elimination.
@@ -40,7 +42,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let u = build_u(&work, &cols, rank, n);
     let rem = build_rem(&work, &cols, rank, m, n);
 
-    Pluq { p, q, rank, l, u, rem }
+    Pluq { p, q, l, u, rem }
 }
 
 /// Solves `A * x = y` over a field using PLUQ decomposition.
@@ -52,7 +54,8 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
     assert_eq!(y.len(), m);
 
     let pp = pluq(a);
-    let Pluq { p, q, rank, l, u, .. } = pp;
+    let rank = pp.rank();
+    let Pluq { p, q, l, u, .. } = pp;
 
     // y' = P * y
     let mut yp = vec![R::zero(); m];
@@ -240,7 +243,7 @@ mod tests {
     fn check(a: &Mat<R>) -> Pluq<R> {
         let (m, n) = a.shape();
         let pp = pluq(a);
-        let rank = pp.rank;
+        let rank = pp.rank();
 
         assert_eq!(pp.l.shape(),   (m, rank), "L shape");
         assert_eq!(pp.u.shape(),   (rank, n), "U shape");
@@ -278,21 +281,21 @@ mod tests {
     #[test]
     fn test_sample() {
         let pp = check(&sample());
-        assert_eq!(pp.rank, 2);
+        assert_eq!(pp.rank(), 2);
         assert!(pp.rem.is_zero());
     }
 
     #[test]
     fn test_zero() {
         let pp = check(&Mat::<R>::zero((3, 4)));
-        assert_eq!(pp.rank, 0);
+        assert_eq!(pp.rank(), 0);
         assert!(pp.rem.is_zero());
     }
 
     #[test]
     fn test_identity() {
         let pp = check(&Mat::id(3));
-        assert_eq!(pp.rank, 3);
+        assert_eq!(pp.rank(), 3);
         assert!(pp.rem.is_zero());
     }
 
@@ -303,7 +306,7 @@ mod tests {
             r(0), r(1), r(3),
         ]);
         let pp = check(&a);
-        assert_eq!(pp.rank, 2);
+        assert_eq!(pp.rank(), 2);
         assert!(pp.rem.is_zero());
     }
 
@@ -315,7 +318,7 @@ mod tests {
             r(5), r(6),
         ]);
         let pp = check(&a);
-        assert_eq!(pp.rank, 2);
+        assert_eq!(pp.rank(), 2);
         assert!(pp.rem.is_zero());
     }
 
@@ -328,7 +331,7 @@ mod tests {
             r(3), r(2), r(6),
         ]);
         let pp = check(&a);
-        assert_eq!(pp.rank, 2);
+        assert_eq!(pp.rank(), 2);
         assert_eq!(pp.q.at(0), 0);
         assert_eq!(pp.q.at(1), 1);
         assert_eq!(pp.q.at(2), 2); // col 2 is non-pivot
@@ -343,8 +346,8 @@ mod tests {
             r(0), r(3), r(4),
         ]);
         let pp = check(&a);
-        assert_eq!(pp.rank, 2);
-        assert!(pp.q.at(0) >= pp.rank, "col 0 is non-pivot");
+        assert_eq!(pp.rank(), 2);
+        assert!(pp.q.at(0) >= pp.rank(), "col 0 is non-pivot");
         assert!(pp.rem.is_zero());
     }
 
@@ -357,7 +360,7 @@ mod tests {
             r(2), r(1), r(4),
         ]);
         let pp = check(&a);
-        assert_eq!(pp.rank, 3);
+        assert_eq!(pp.rank(), 3);
         assert_eq!(pp.p.at(1), 0, "original row 1 should move to position 0");
         assert!(pp.rem.is_zero());
     }
@@ -369,7 +372,7 @@ mod tests {
             rf(1, 4), rf(1, 5),
         ]);
         let pp = check(&a);
-        assert_eq!(pp.rank, 2);
+        assert_eq!(pp.rank(), 2);
         assert!(pp.rem.is_zero());
     }
 
@@ -377,7 +380,7 @@ mod tests {
     fn test_single_row() {
         let a = Mat::from_data((1, 4), [r(0), r(2), r(0), r(3)]);
         let pp = check(&a);
-        assert_eq!(pp.rank, 1);
+        assert_eq!(pp.rank(), 1);
         assert!(pp.rem.is_zero());
     }
 
@@ -385,7 +388,7 @@ mod tests {
     fn test_single_col() {
         let a = Mat::from_data((3, 1), [r(2), r(0), r(4)]);
         let pp = check(&a);
-        assert_eq!(pp.rank, 1);
+        assert_eq!(pp.rank(), 1);
         assert!(pp.rem.is_zero());
     }
 
@@ -398,7 +401,7 @@ mod tests {
         let pp = pluq(&a);
 
         // rank 1: only the unit entry (1) at row 1, col 0 becomes a pivot
-        assert_eq!(pp.rank, 1);
+        assert_eq!(pp.rank(), 1);
         assert_eq!(pp.l.shape(),   (2, 1));
         assert_eq!(pp.u.shape(),   (1, 2));
         assert_eq!(pp.rem.shape(), (2, 2));

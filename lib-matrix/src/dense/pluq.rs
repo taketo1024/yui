@@ -1,7 +1,7 @@
 // Implemented with the help of Claude Code. 
 
 use sprs::PermOwned;
-use yui_core::{Ring, RingOps};
+use yui_core::{Ring, RingOps, Field, FieldOps};
 use crate::MatTrait;
 use crate::dense::Mat;
 
@@ -41,6 +41,63 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let rem = build_rem(&work, &cols, rank, m, n);
 
     Pluq { p, q, rank, l, u, rem }
+}
+
+/// Solves `A * x = y` over a field using PLUQ decomposition.
+///
+/// Returns `Some(x)` if a solution exists, `None` otherwise.
+pub fn solve_pluq<R>(a: &Mat<R>, y: &[R]) -> Option<Vec<R>>
+where R: Field, for<'x> &'x R: FieldOps<R> {
+    let (m, n) = a.shape();
+    assert_eq!(y.len(), m);
+
+    let pp = pluq(a);
+    let Pluq { p, q, rank, l, u, .. } = pp;
+
+    // y' = P * y
+    let mut yp = vec![R::zero(); m];
+    for i in 0..m {
+        yp[p.at(i)] = y[i].clone();
+    }
+
+    // Forward substitution: solve L * z = y' (L is unit lower triangular, m × rank)
+    let mut z = vec![R::zero(); rank];
+    for k in 0..rank {
+        let mut val = yp[k].clone();
+        for j in 0..k {
+            val = val - &l[(k, j)] * &z[j];
+        }
+        z[k] = val; // L[k,k] = 1
+    }
+
+    // Consistency check for non-pivot rows
+    for i in rank..m {
+        let mut lhs = R::zero();
+        for j in 0..rank {
+            lhs = lhs + &l[(i, j)] * &z[j];
+        }
+        if lhs != yp[i] {
+            return None;
+        }
+    }
+
+    // Back substitution: solve U * x' = z, free variables x'[rank..n] = 0
+    let mut xp = vec![R::zero(); n];
+    for k in (0..rank).rev() {
+        let mut val = z[k].clone();
+        for j in (k + 1)..rank {
+            val = val - &u[(k, j)] * &xp[j];
+        }
+        xp[k] = val * u[(k, k)].inv().unwrap();
+    }
+
+    // Recover x: x = Q * x', i.e., x[j] = x'[q.at(j)]
+    let mut x = vec![R::zero(); n];
+    for j in 0..n {
+        x[j] = xp[q.at(j)].clone();
+    }
+
+    Some(x)
 }
 
 // Gaussian elimination in place, eliminating only below each pivot.
@@ -148,6 +205,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests {
+    use num_traits::Zero;
     use yui_core::num::Ratio;
 
     use super::*;
@@ -356,5 +414,66 @@ mod tests {
 
         // rem is non-zero (2 is not a unit in Z)
         assert!(!pp.rem.is_zero());
+    }
+
+    // ---- solve_pluq tests ----
+
+    fn solve_check(a: &Mat<R>, y: &[R]) -> Vec<R> {
+        let x = solve_pluq(a, y).expect("expected a solution");
+        // verify A * x = y
+        let (m, n) = a.shape();
+        assert_eq!(x.len(), n);
+        for i in 0..m {
+            let ax_i: R = (0..n).fold(R::zero(), |acc, j| acc + &a[(i, j)] * &x[j]);
+            assert_eq!(ax_i, y[i], "row {i}: (A*x)[{i}] != y[{i}]");
+        }
+        x
+    }
+
+    #[test]
+    fn test_solve_square_full_rank() {
+        // 2×2 invertible matrix
+        let a = Mat::from_data((2, 2), [r(1), r(2), r(3), r(4)]);
+        let y = vec![r(5), r(6)];
+        solve_check(&a, &y);
+    }
+
+    #[test]
+    fn test_solve_overdetermined_consistent() {
+        // 3×2 matrix, consistent y
+        let a = Mat::from_data((3, 2), [r(1), r(0), r(0), r(1), r(1), r(1)]);
+        let y = vec![r(2), r(3), r(5)]; // y = a * [2, 3]
+        solve_check(&a, &y);
+    }
+
+    #[test]
+    fn test_solve_overdetermined_inconsistent() {
+        let a = Mat::from_data((3, 2), [r(1), r(0), r(0), r(1), r(1), r(1)]);
+        let y = vec![r(1), r(1), r(0)]; // 1+1 != 0, inconsistent
+        assert!(solve_pluq(&a, &y).is_none());
+    }
+
+    #[test]
+    fn test_solve_underdetermined() {
+        // 2×3 matrix, rank 2; infinitely many solutions — we just get one
+        let a = Mat::from_data((2, 3), [r(1), r(0), r(2), r(0), r(1), r(3)]);
+        let y = vec![r(4), r(5)];
+        solve_check(&a, &y);
+    }
+
+    #[test]
+    fn test_solve_zero_rhs() {
+        let a = Mat::from_data((2, 2), [r(1), r(2), r(3), r(4)]);
+        let y = vec![r(0), r(0)];
+        let x = solve_check(&a, &y);
+        assert_eq!(x, vec![r(0), r(0)]);
+    }
+
+    #[test]
+    fn test_solve_no_solution_rank_deficient() {
+        // rank-1 matrix; y not in column space
+        let a = Mat::from_data((2, 2), [r(1), r(2), r(2), r(4)]);
+        let y = vec![r(1), r(0)]; // not in column space
+        assert!(solve_pluq(&a, &y).is_none());
     }
 }

@@ -13,10 +13,18 @@ use crate::dense::*;
 use super::sp_vec::SpVec;
 use super::triang::TriangularType;
 
-#[derive(Clone, PartialEq, Eq)]
-pub struct SpMat<R> { 
+#[derive(Clone)]
+pub struct SpMat<R> {
     inner: CscMatrix<R>
 }
+
+impl<R: PartialEq + Zero> PartialEq for SpMat<R> {
+    fn eq(&self, other: &Self) -> bool {
+        self.shape() == other.shape() && self.iter_nz().eq(other.iter_nz())
+    }
+}
+
+impl<R: Eq + Zero> Eq for SpMat<R> {}
 
 impl<R> MatTrait for SpMat<R> {
     fn shape(&self) -> (usize, usize) {

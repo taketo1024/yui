@@ -1,5 +1,6 @@
 // Implemented with the help of Claude Code.
 
+use log::debug;
 use sprs::PermOwned;
 use yui_core::{Ring, RingOps, Field, FieldOps};
 use crate::MatTrait;
@@ -30,6 +31,8 @@ impl<R> Pluq<R> {
 /// and is zero when `R` is a field (every non-zero element is a unit).
 pub fn pluq<R>(a: &Mat<R>) -> Pluq<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
+    debug!("dense pluq: {:?}", a.shape());
+
     let (m, n) = a.shape();
     let mut work = a.clone();
     let mut row_of: Vec<usize> = (0..m).collect();
@@ -50,11 +53,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 /// Returns `Some(x)` if a solution exists, `None` otherwise.
 pub fn solve_pluq<R>(a: &Mat<R>, y: &[R]) -> Option<Vec<R>>
 where R: Field, for<'x> &'x R: FieldOps<R> {
+    debug!("dense solve: {:?}", a.shape());
+
     assert_eq!(y.len(), a.nrows());
     let Pluq { p, q, l, u, .. } = pluq(a);
     let yp = apply_perm(&p, y);
+
+    debug!("forward sub: {:?}", l.shape());
+
     let z  = forward_sub(&l, &yp);
     if !check_consistent(&l, &yp, &z) { return None; }
+
+    debug!("back sub: {:?}", u.shape());
+
     let xp = back_sub(&u, &z);
     Some((0..xp.len()).map(|j| xp[q.at(j)].clone()).collect())
 }

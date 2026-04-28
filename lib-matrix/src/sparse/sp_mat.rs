@@ -311,6 +311,22 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         )
     }
 
+    pub fn divide_at_col(&self, k: usize) -> [SpMat<R>; 2] { 
+        let (m, n) = self.shape();
+        assert!(k <= n);
+
+        let [a, b, ..] = self.divide4((m, k));
+        [a, b]
+    }
+
+    pub fn divide_at_row(&self, k: usize) -> [SpMat<R>; 2] { 
+        let (m, n) = self.shape();
+        assert!(k <= m);
+
+        let [a, _, b, _] = self.divide4((k, n));
+        [a, b]
+    }
+
     pub fn combine_blocks(blocks: [&SpMat<R>; 4]) -> SpMat<R> {
         let [a, b, c, d] = blocks;
 

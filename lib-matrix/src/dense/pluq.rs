@@ -1,22 +1,22 @@
-// Implemented with the help of Claude Code. 
+// Implemented with the help of Claude Code.
 
 use sprs::PermOwned;
 use yui_core::{Ring, RingOps, Field, FieldOps};
 use crate::MatTrait;
 use crate::dense::Mat;
 
-/// Result of a PLUQ decomposition satisfying `p_mat * A * q_mat = L * U + rem`:
+/// Result of a PLUQ decomposition satisfying `p_mat * A * q_mat = L * U + s`:
 ///   - `p`: row permutation (pivot rows first)
 ///   - `q`: column permutation (pivot columns first)
 ///   - `l`: `m × rank`, unit lower triangular — elimination multipliers
 ///   - `u`: `rank × n`, upper echelon — the reduced pivot rows
-///   - `rem`: `m × n`, remainder — zero when `R` is a field
+///   - `s`: `(m - rank) × (n - rank)`, Schur complement — zero when `R` is a field
 pub struct Pluq<R> {
     pub p: PermOwned,
     pub q: PermOwned,
     pub l: Mat<R>,
     pub u: Mat<R>,
-    pub rem: Mat<R>,
+    pub s: Mat<R>,
 }
 
 impl<R> Pluq<R> {
@@ -26,8 +26,8 @@ impl<R> Pluq<R> {
 /// Computes a PLUQ decomposition of `a` over a ring by Gaussian elimination.
 ///
 /// Only unit elements are used as pivots, so every elimination step is exact.
-/// Satisfies `p_mat * a * q_mat = l * u + rem`, where `rem` is zero when `R`
-/// is a field (every non-zero element is a unit).
+/// Satisfies `p_mat * a * q_mat = l * u + s`, where `s` is the Schur complement
+/// and is zero when `R` is a field (every non-zero element is a unit).
 pub fn pluq<R>(a: &Mat<R>) -> Pluq<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let (m, n) = a.shape();
@@ -39,10 +39,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let p = row_perm(&row_of, m);
     let cols = col_order(&pivot_cols, n);
     let q = col_perm(&cols, n);
-    let u = build_u(&work, &cols, rank, n);
-    let rem = build_rem(&work, &cols, rank, m, n);
+    let u = build_u(&work, &cols, rank);
+    let s = build_s(&work, &cols, rank);
 
-    Pluq { p, q, l, u, rem }
+    Pluq { p, q, l, u, s }
 }
 
 /// Solves `A * x = y` over a field using PLUQ decomposition.
@@ -50,57 +50,49 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 /// Returns `Some(x)` if a solution exists, `None` otherwise.
 pub fn solve_pluq<R>(a: &Mat<R>, y: &[R]) -> Option<Vec<R>>
 where R: Field, for<'x> &'x R: FieldOps<R> {
-    let (m, n) = a.shape();
-    assert_eq!(y.len(), m);
+    assert_eq!(y.len(), a.nrows());
+    let Pluq { p, q, l, u, .. } = pluq(a);
+    let yp = apply_perm(&p, y);
+    let z  = forward_sub(&l, &yp);
+    if !check_consistent(&l, &yp, &z) { return None; }
+    let xp = back_sub(&u, &z);
+    Some((0..xp.len()).map(|j| xp[q.at(j)].clone()).collect())
+}
 
-    let pp = pluq(a);
-    let rank = pp.rank();
-    let Pluq { p, q, l, u, .. } = pp;
+// Applies permutation p to y: result[k] = y[p^{-1}(k)], i.e., result[p(i)] = y[i].
+fn apply_perm<R: Clone>(p: &PermOwned, y: &[R]) -> Vec<R> {
+    let pinv = p.inv();
+    (0..y.len()).map(|k| y[pinv.at(k)].clone()).collect()
+}
 
-    // y' = P * y
-    let mut yp = vec![R::zero(); m];
-    for i in 0..m {
-        yp[p.at(i)] = y[i].clone();
-    }
+// Solves L * z = yp[0..rank] by forward substitution (L is unit lower triangular).
+fn forward_sub<R>(l: &Mat<R>, yp: &[R]) -> Vec<R>
+where R: Field, for<'x> &'x R: FieldOps<R> {
+    (0..l.ncols()).fold(vec![], |mut z, k| {
+        let val = (0..k).fold(yp[k].clone(), |v, j| v - &l[(k, j)] * &z[j]);
+        z.push(val);
+        z
+    })
+}
 
-    // Forward substitution: solve L * z = y' (L is unit lower triangular, m × rank)
-    let mut z = vec![R::zero(); rank];
-    for k in 0..rank {
-        let mut val = yp[k].clone();
-        for j in 0..k {
-            val = val - &l[(k, j)] * &z[j];
-        }
-        z[k] = val; // L[k,k] = 1
-    }
+// Returns true if L[i,:] * z == yp[i] for every non-pivot row i >= rank.
+fn check_consistent<R>(l: &Mat<R>, yp: &[R], z: &[R]) -> bool
+where R: Ring + PartialEq, for<'x> &'x R: RingOps<R> {
+    let rank = z.len();
+    (rank..yp.len()).all(|i| {
+        (0..rank).fold(R::zero(), |acc, j| acc + &l[(i, j)] * &z[j]) == yp[i]
+    })
+}
 
-    // Consistency check for non-pivot rows
-    for i in rank..m {
-        let mut lhs = R::zero();
-        for j in 0..rank {
-            lhs = lhs + &l[(i, j)] * &z[j];
-        }
-        if lhs != yp[i] {
-            return None;
-        }
-    }
-
-    // Back substitution: solve U * x' = z, free variables x'[rank..n] = 0
-    let mut xp = vec![R::zero(); n];
-    for k in (0..rank).rev() {
-        let mut val = z[k].clone();
-        for j in (k + 1)..rank {
-            val = val - &u[(k, j)] * &xp[j];
-        }
-        xp[k] = val * u[(k, k)].inv().unwrap();
-    }
-
-    // Recover x: x = Q * x', i.e., x[j] = x'[q.at(j)]
-    let mut x = vec![R::zero(); n];
-    for j in 0..n {
-        x[j] = xp[q.at(j)].clone();
-    }
-
-    Some(x)
+// Solves U * xp = z by back substitution; free variables xp[rank..n] stay zero.
+fn back_sub<R>(u: &Mat<R>, z: &[R]) -> Vec<R>
+where R: Field, for<'x> &'x R: FieldOps<R> {
+    let (rank, n) = (z.len(), u.ncols());
+    (0..rank).rev().fold(vec![R::zero(); n], |mut xp, k| {
+        xp[k] = (k + 1..rank).fold(z[k].clone(), |v, j| v - &u[(k, j)] * &xp[j])
+            * u[(k, k)].inv().unwrap();
+        xp
+    })
 }
 
 // Gaussian elimination in place, eliminating only below each pivot.
@@ -119,18 +111,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     for j in 0..n {
         if r >= m { break; }
-
         let Some(pivot_pos) = (r..m).find(|&i| work[(i, j)].is_unit()) else { continue; };
-
         if pivot_pos != r {
             work.swap_rows(r, pivot_pos);
             row_of.swap(r, pivot_pos);
-            for col in l_cols.iter_mut() { col.swap(r, pivot_pos); }
+            l_cols.iter_mut().for_each(|col| col.swap(r, pivot_pos));
         }
-
         let l_col = build_l_col(work, r, j);
         eliminate_below(work, &l_col, r);
-
         l_cols.push(l_col);
         pivot_cols.push(j);
         r += 1;
@@ -144,66 +132,57 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 // Builds column r of L: 1 on the diagonal, multipliers (entry * pivot_inv) below, 0 above.
 fn build_l_col<R>(work: &Mat<R>, r: usize, j: usize) -> Vec<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let m = work.nrows();
+    use std::cmp::Ordering::*;
     let pivot_inv = work[(r, j)].inv().unwrap();
-    let mut col = vec![R::zero(); m];
-    col[r] = R::one();
-    for i in (r + 1)..m {
-        col[i] = work[(i, j)].clone() * pivot_inv.clone();
-    }
-    col
+    (0..work.nrows()).map(|i| match i.cmp(&r) {
+        Less    => R::zero(),
+        Equal   => R::one(),
+        Greater => work[(i, j)].clone() * pivot_inv.clone(),
+    }).collect()
 }
 
 // Subtracts `l_col[i] * row_r` from each row `i > r`, zeroing out the pivot column below.
 fn eliminate_below<R>(work: &mut Mat<R>, l_col: &[R], r: usize)
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let m = work.nrows();
-    for i in (r + 1)..m {
-        if l_col[i].is_zero() { continue; }
-        work.add_row_to(r, i, &-l_col[i].clone());
-    }
+    (r + 1..m)
+        .filter(|&i| !l_col[i].is_zero())
+        .for_each(|i| work.add_row_to(r, i, &-l_col[i].clone()));
 }
 
 // Builds the row permutation: p.at(orig) = current position of that row.
 fn row_perm(row_of: &[usize], m: usize) -> PermOwned {
-    let mut fwd = vec![0usize; m];
-    for (pos, &orig) in row_of.iter().enumerate() {
-        fwd[orig] = pos;
-    }
-    PermOwned::new(fwd)
+    PermOwned::new(row_of.iter().enumerate().fold(vec![0usize; m], |mut v, (pos, &orig)| {
+        v[orig] = pos; v
+    }))
 }
 
 // Returns the full column reordering: pivot columns first, non-pivot columns last.
 fn col_order(pivot_cols: &[usize], n: usize) -> Vec<usize> {
-    let mut is_pivot = vec![false; n];
-    for &j in pivot_cols { is_pivot[j] = true; }
-    let non_pivot: Vec<usize> = (0..n).filter(|&j| !is_pivot[j]).collect();
-    pivot_cols.iter().chain(non_pivot.iter()).cloned().collect()
+    use std::collections::HashSet;
+    let pivot_set: HashSet<usize> = pivot_cols.iter().cloned().collect();
+    pivot_cols.iter().cloned().chain((0..n).filter(|j| !pivot_set.contains(j))).collect()
 }
 
 // Builds the column permutation from the full ordered column list.
 fn col_perm(cols: &[usize], n: usize) -> PermOwned {
-    let mut fwd = vec![0usize; n];
-    for (new_j, &old_j) in cols.iter().enumerate() {
-        fwd[old_j] = new_j;
-    }
-    PermOwned::new(fwd)
+    PermOwned::new(cols.iter().enumerate().fold(vec![0usize; n], |mut v, (new_j, &old_j)| {
+        v[old_j] = new_j; v
+    }))
 }
 
 // Extracts U: the first `rank` rows of the reduced matrix with columns reordered by `cols`.
-fn build_u<R>(work: &Mat<R>, cols: &[usize], rank: usize, n: usize) -> Mat<R>
+fn build_u<R>(work: &Mat<R>, cols: &[usize], rank: usize) -> Mat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    Mat::from_generator((rank, n), |i, j| work[(i, cols[j])].clone())
+    Mat::from_generator((rank, work.ncols()), |i, j| work[(i, cols[j])].clone())
 }
 
-// Builds rem: m×n, with zero rows for the pivot rows and the column-reordered
-// remaining rows for the non-pivot rows.  Satisfies p*A*q = L*U + rem.
-fn build_rem<R>(work: &Mat<R>, cols: &[usize], rank: usize, m: usize, n: usize) -> Mat<R>
+// Builds the Schur complement s: (m-rank)×(n-rank), the bottom-right non-pivot block.
+// Satisfies p*A*q = L*U + [[0,0],[0,s]].
+fn build_s<R>(work: &Mat<R>, cols: &[usize], rank: usize) -> Mat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    Mat::from_generator((m, n), |i, j| {
-        if i < rank { R::zero() }
-        else { work[(i, cols[j])].clone() }
-    })
+    let (m, n) = work.shape();
+    Mat::from_generator((m - rank, n - rank), |i, j| work[(i + rank, cols[j + rank])].clone())
 }
 
 #[cfg(test)]
@@ -239,15 +218,15 @@ mod tests {
     }
 
     // Checks structural invariants and the main decomposition identity.
-    // Returns the Pluq so callers can assert field-specific properties (rem.is_zero, rank, …).
+    // Returns the Pluq so callers can assert field-specific properties (s.is_zero, rank, …).
     fn check(a: &Mat<R>) -> Pluq<R> {
         let (m, n) = a.shape();
         let pp = pluq(a);
         let rank = pp.rank();
 
-        assert_eq!(pp.l.shape(),   (m, rank), "L shape");
-        assert_eq!(pp.u.shape(),   (rank, n), "U shape");
-        assert_eq!(pp.rem.shape(), (m, n),    "rem shape");
+        assert_eq!(pp.l.shape(), (m, rank),         "L shape");
+        assert_eq!(pp.u.shape(), (rank, n),          "U shape");
+        assert_eq!(pp.s.shape(), (m - rank, n - rank), "s shape");
 
         // L is unit lower triangular: 1s on diagonal, 0 above diagonal
         for k in 0..rank {
@@ -264,16 +243,12 @@ mod tests {
             }
         }
 
-        // rem has zero rows in the pivot positions
-        for k in 0..rank {
-            for j in 0..n {
-                assert_eq!(pp.rem[(k, j)], r(0), "rem[{k},{j}] should be 0 (pivot row)");
-            }
-        }
-
-        // Main invariant: p_mat * A * q_mat = L * U + rem
+        // Main invariant: p_mat * A * q_mat = L * U + [[0,0],[0,s]]
         let paq = apply_perms(a, &pp.p, &pp.q);
-        assert_eq!(paq, &pp.l * &pp.u + &pp.rem, "p*A*q should equal L*U + rem");
+        let rem_full = Mat::from_generator((m, n), |i, j| {
+            if i >= rank && j >= rank { pp.s[(i - rank, j - rank)].clone() } else { R::zero() }
+        });
+        assert_eq!(paq, &pp.l * &pp.u + &rem_full, "p*A*q should equal L*U + s");
 
         pp
     }
@@ -282,21 +257,21 @@ mod tests {
     fn test_sample() {
         let pp = check(&sample());
         assert_eq!(pp.rank(), 2);
-        assert!(pp.rem.is_zero());
+        assert!(pp.s.is_zero());
     }
 
     #[test]
     fn test_zero() {
         let pp = check(&Mat::<R>::zero((3, 4)));
         assert_eq!(pp.rank(), 0);
-        assert!(pp.rem.is_zero());
+        assert!(pp.s.is_zero());
     }
 
     #[test]
     fn test_identity() {
         let pp = check(&Mat::id(3));
         assert_eq!(pp.rank(), 3);
-        assert!(pp.rem.is_zero());
+        assert!(pp.s.is_zero());
     }
 
     #[test]
@@ -307,7 +282,7 @@ mod tests {
         ]);
         let pp = check(&a);
         assert_eq!(pp.rank(), 2);
-        assert!(pp.rem.is_zero());
+        assert!(pp.s.is_zero());
     }
 
     #[test]
@@ -319,7 +294,7 @@ mod tests {
         ]);
         let pp = check(&a);
         assert_eq!(pp.rank(), 2);
-        assert!(pp.rem.is_zero());
+        assert!(pp.s.is_zero());
     }
 
     #[test]
@@ -335,7 +310,7 @@ mod tests {
         assert_eq!(pp.q.at(0), 0);
         assert_eq!(pp.q.at(1), 1);
         assert_eq!(pp.q.at(2), 2); // col 2 is non-pivot
-        assert!(pp.rem.is_zero());
+        assert!(pp.s.is_zero());
     }
 
     #[test]
@@ -348,7 +323,7 @@ mod tests {
         let pp = check(&a);
         assert_eq!(pp.rank(), 2);
         assert!(pp.q.at(0) >= pp.rank(), "col 0 is non-pivot");
-        assert!(pp.rem.is_zero());
+        assert!(pp.s.is_zero());
     }
 
     #[test]
@@ -362,7 +337,7 @@ mod tests {
         let pp = check(&a);
         assert_eq!(pp.rank(), 3);
         assert_eq!(pp.p.at(1), 0, "original row 1 should move to position 0");
-        assert!(pp.rem.is_zero());
+        assert!(pp.s.is_zero());
     }
 
     #[test]
@@ -373,7 +348,7 @@ mod tests {
         ]);
         let pp = check(&a);
         assert_eq!(pp.rank(), 2);
-        assert!(pp.rem.is_zero());
+        assert!(pp.s.is_zero());
     }
 
     #[test]
@@ -381,7 +356,7 @@ mod tests {
         let a = Mat::from_data((1, 4), [r(0), r(2), r(0), r(3)]);
         let pp = check(&a);
         assert_eq!(pp.rank(), 1);
-        assert!(pp.rem.is_zero());
+        assert!(pp.s.is_zero());
     }
 
     #[test]
@@ -389,10 +364,10 @@ mod tests {
         let a = Mat::from_data((3, 1), [r(2), r(0), r(4)]);
         let pp = check(&a);
         assert_eq!(pp.rank(), 1);
-        assert!(pp.rem.is_zero());
+        assert!(pp.s.is_zero());
     }
 
-    // Over a ring (Z), only ±1 are units.  Check that rem is non-zero when
+    // Over a ring (Z), only ±1 are units.  Check that s is non-zero when
     // the matrix has non-unit entries that cannot be fully eliminated.
     #[test]
     fn test_ring_nonzero_rem() {
@@ -402,9 +377,9 @@ mod tests {
 
         // rank 1: only the unit entry (1) at row 1, col 0 becomes a pivot
         assert_eq!(pp.rank(), 1);
-        assert_eq!(pp.l.shape(),   (2, 1));
-        assert_eq!(pp.u.shape(),   (1, 2));
-        assert_eq!(pp.rem.shape(), (2, 2));
+        assert_eq!(pp.l.shape(), (2, 1));
+        assert_eq!(pp.u.shape(), (1, 2));
+        assert_eq!(pp.s.shape(), (1, 1)); // (m-rank, n-rank) = (1, 1)
 
         // Invariant holds over Z
         let paq: Mat<i32> = {
@@ -413,10 +388,13 @@ mod tests {
             for i in 0..m { for j in 0..n { out[(pp.p.at(i), pp.q.at(j))] = a[(i, j)]; } }
             out
         };
-        assert_eq!(paq, &pp.l * &pp.u + &pp.rem);
+        let rem_full = Mat::from_generator((2, 2), |i, j| {
+            if i >= 1 && j >= 1 { pp.s[(i - 1, j - 1)] } else { 0 }
+        });
+        assert_eq!(paq, &pp.l * &pp.u + &rem_full);
 
-        // rem is non-zero (2 is not a unit in Z)
-        assert!(!pp.rem.is_zero());
+        // s is non-zero (2 is not a unit in Z)
+        assert!(!pp.s.is_zero());
     }
 
     // ---- solve_pluq tests ----

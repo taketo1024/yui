@@ -1,9 +1,5 @@
-// Partial sparse PLUQ decomposition.
+// Sparse PLUQ decomposition & linear solver.
 // Implemented with the help of Claude Code.
-//
-// Reference:
-//   "Parallel Sparse PLUQ Factorization modulo p", Bouillaguet–Delaplace–Voge.
-//   https://hal.inria.fr/hal-01646133/document
 
 use sprs::PermOwned;
 use sprs::PermView;
@@ -39,9 +35,75 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let pivots = find_pivots(a, piv_type, piv_cond);
     let r = pivots.len();
     let (p, q) = perms_by_pivots(a, &pivots);
-    let (l, u, s) = split(a, piv_type, &p, &q, r);
-    let (l, u, s) = extend(piv_type, l, u, s);
+    let paq = split(a, &p, &q, r);
+    let (l, u, s) = build(piv_type, paq);
     PartialPluq { p, q, l, u, s }
+}
+
+// Applies permutations (p, q) to `a` and partitions the result into four blocks at row/col r:
+//
+//   paq = [[a0 | a1],   a0: r×r,     a1: r×(n-r)
+//          [a2 | a3]]   a2: (m-r)×r, a3: (m-r)×(n-r)
+fn split<R>(a: &SpMat<R>, p: &PermOwned, q: &PermOwned, r: usize) -> [SpMat<R>; 4]
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    use std::cmp::Ordering::Less;
+
+    let (m, n) = a.shape();
+    let [mut a0, mut a1, mut a2, mut a3] = [vec![], vec![], vec![], vec![]];
+
+    for (i, j, v) in a.iter() {
+        let (pi, qj) = (p.at(i), q.at(j));
+        let v = v.clone();
+        match (pi.cmp(&r), qj.cmp(&r)) {
+            (Less, Less) => a0.push((pi,     qj,     v)),
+            (Less, _   ) => a1.push((pi,     qj - r, v)),
+            (_   , Less) => a2.push((pi - r, qj,     v)),
+            (_   , _   ) => a3.push((pi - r, qj - r, v)),
+        }
+    }
+    [
+        SpMat::from_entries((r,     r    ), a0),
+        SpMat::from_entries((r,     n - r), a1),
+        SpMat::from_entries((m - r, r    ), a2),
+        SpMat::from_entries((m - r, n - r), a3),
+    ]
+}
+
+// Builds (l, u, s) from the four blocks paq = [[a0|a1],[a2|a3]].
+// Satisfies p*A*q = l*u + [[0,0],[0,s]].
+//
+// Rows: (u0,u1,r0,r1) = (a0,a1,a2,a3).  l1 = r0*u0^{-1},  l = [I_r;l1],  u = [u0|u1],  s = r1-l1*u1.
+// Cols: (l0,l1,r0,r1) = (a0,a2,a1,a3).  u1 = l0^{-1}*r0,  l = [l0;l1],  u = [I_r|u1],  s = r1-l1*u1.
+fn build<R>(piv_type: PivotType, paq: [SpMat<R>; 4]) -> (SpMat<R>, SpMat<R>, SpMat<R>)
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    let [a0, a1, a2, a3] = paq;
+    let (m, n) = (a0.nrows() + a2.nrows(), a0.ncols() + a1.ncols());
+    let r = a0.ncols();
+
+    if r == 0 {
+        return (SpMat::zero((m, 0)), SpMat::zero((0, n)), a3);
+    }
+
+    match piv_type {
+        PivotType::Rows => {
+            let [u0, u1] = [a0, a1];
+            let [r0, r1] = [a2, a3];
+            let l1 = solve_triangular_left(TriangularType::Upper, &u0, &r0);
+            let l = SpMat::id(r).stack(&l1);
+            let u = u0.concat(&u1);
+            let s = r1 - &l1 * &u1;
+            (l, u, s)
+        },
+        PivotType::Cols => {
+            let [l0, l1] = [a0, a2];
+            let [r0, r1] = [a1, a3];
+            let u1 = solve_triangular(TriangularType::Lower, &l0, &r0);
+            let l = l0.stack(&l1);
+            let u = SpMat::id(r).concat(&u1);
+            let s = r1 - &l1 * &u1;
+            (l, u, s)
+        }
+    }
 }
 
 /// Solves `a * x = y` over a field using sparse PLUQ.
@@ -51,10 +113,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 /// Uses `pre_pluq` with column pivots. After the Schur extension:
 ///   `p * a * q = l * u + s`,  u = [I_r | U1].
 /// Algorithm:
-///   z        = L0^{-1} * yp[0..r]  (forward substitution)
+///   z      = L0^{-1} * yp[0..r]  (forward substitution)
 ///   yp_res = yp[r..m] - L1 * z
 ///   xq_res: solve S * xq_res = yp_res  (S = pp.s)
-///   xq_top  = z - U1 * xq_res            (U1 = u[0..r, r..n])
+///   xq_top  = z - U1 * xq_res          (U1 = u[0..r, r..n])
 pub fn solve_pluq<R>(a: &SpMat<R>, y: &[R]) -> Option<Vec<R>>
 where R: Field, for<'x> &'x R: FieldOps<R> {
     let (m, n) = a.shape();
@@ -67,76 +129,11 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
     let z = solve_top(&pp.l, &yp);
     let yp_res = compute_yp_res(&pp.l, &yp, &z);
     let xq_res = solve_res(&pp.s, &yp_res)?;
+    
     let u1 = pp.u.submat(0..r, r..n);
     let xq_top = back_sub_piv(&z, &u1, &xq_res);
+
     Some(reconstruct_x(&pp.q, r, &xq_top, &xq_res))
-}
-
-// Splits permuted `a` into `(l, u, rem)` satisfying `p * a * q = l * u + rem`.
-//
-// Rows: l = I_r (r×r), u = pivot rows (r×n), rem zeros in rows 0..r.
-// Cols: l = pivot cols (m×r), u = I_r (r×r), rem zeros in cols 0..r.
-// extend() will expand l (Rows) and u (Cols) to their full shapes.
-fn split<R>(a: &SpMat<R>, piv_type: PivotType, p: &PermOwned, q: &PermOwned, r: usize) -> (SpMat<R>, SpMat<R>, SpMat<R>)
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    let (m, n) = a.shape();
-    match piv_type {
-        PivotType::Rows => {
-            let (mut u_ent, mut rem_ent) = (vec![], vec![]);
-            for (i, j, v) in a.iter() {
-                let (pi, qj) = (p.at(i), q.at(j));
-                if pi < r { u_ent.push((pi, qj, v.clone())); }
-                else      { rem_ent.push((pi, qj, v.clone())); }
-            }
-            (SpMat::id(r), SpMat::from_entries((r, n), u_ent), SpMat::from_entries((m, n), rem_ent))
-        }
-        PivotType::Cols => {
-            let (mut l_ent, mut rem_ent) = (vec![], vec![]);
-            for (i, j, v) in a.iter() {
-                let (pi, qj) = (p.at(i), q.at(j));
-                if qj < r { l_ent.push((pi, qj, v.clone())); }
-                else      { rem_ent.push((pi, qj, v.clone())); }
-            }
-            (SpMat::from_entries((m, r), l_ent), SpMat::id(r), SpMat::from_entries((m, n), rem_ent))
-        }
-    }
-}
-
-// Extends (l, u, rem) by absorbing the coupling block into u (Cols) or l (Rows)
-// via a Schur complement, so that rem has zeros in all pivot rows/cols.
-//
-// Cols: U1 = L0^{-1} * rem[0..r, r..n], u_new = [I_r | U1], S = rem[r..m, r..n] - L1*U1
-// Rows: U1 = rem[r..m, 0..r] * U0^{-1}, l_new = [I_r; U1], S = rem[r..m, r..n] - U1*U_right
-fn extend<R>(piv_type: PivotType, l: SpMat<R>, u: SpMat<R>, rem: SpMat<R>) -> (SpMat<R>, SpMat<R>, SpMat<R>)
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    let r = l.ncols();
-    let (m, n) = rem.shape();
-    if r == 0 {
-        return match piv_type {
-            PivotType::Cols => (l, SpMat::zero((0, n)), rem),
-            PivotType::Rows => (SpMat::zero((m, 0)), u, rem),
-        };
-    }
-    match piv_type {
-        PivotType::Cols => {
-            let l0 = l.submat(0..r, 0..r);
-            let l1 = l.submat(r..m, 0..r);
-            let rem_top = rem.submat(0..r, r..n);
-            let u1 = solve_triangular(TriangularType::Lower, &l0, &rem_top);
-            let u_new = u.concat(&u1);
-            let s = rem.submat(r..m, r..n) - &l1 * &u1;
-            (l, u_new, s)
-        }
-        PivotType::Rows => {
-            let u0 = u.submat(0..r, 0..r);
-            let u_right = u.submat(0..r, r..n);
-            let rem_left = rem.submat(r..m, 0..r);
-            let u1 = solve_triangular_left(TriangularType::Upper, &u0, &rem_left);
-            let l_new = l.stack(&u1);
-            let s = rem.submat(r..m, r..n) - &u1 * &u_right;
-            (l_new, u, s)
-        }
-    }
 }
 
 // Applies permutation p to y: yp[p(i)] = y[i].
@@ -152,9 +149,10 @@ fn solve_top<R>(l: &SpMat<R>, yp: &[R]) -> Vec<R>
 where R: Field, for<'x> &'x R: FieldOps<R> {
     let r = l.ncols();
     if r == 0 { return vec![]; }
-    let l_top = l.submat(0..r, 0..r);
+
+    let l0 = l.submat(0..r, 0..r);
     let b = SpVec::from(yp[..r].to_vec());
-    solve_triangular_vec(TriangularType::Lower, &l_top, &b).to_dense()
+    solve_triangular_vec(TriangularType::Lower, &l0, &b).to_dense()
 }
 
 // Computes yp[r..m] - l[r..m, :] * x_piv where r = x_piv.len().
@@ -177,38 +175,40 @@ fn solve_res<R>(s: &SpMat<R>, yp_res: &[R]) -> Option<Vec<R>>
 where R: Field, for<'x> &'x R: FieldOps<R> {
     use std::collections::BTreeSet;
 
-    let (mr, nc) = s.shape();
-    assert_eq!(yp_res.len(), mr);
+    let (m, n) = s.shape();
+    assert_eq!(yp_res.len(), m);
 
     let mut row_set: BTreeSet<usize> = BTreeSet::new();
     let mut col_set: BTreeSet<usize> = BTreeSet::new();
-    for (i, j, _) in s.iter_nz() { row_set.insert(i); col_set.insert(j); }
+    for (i, j, _) in s.iter_nz() { 
+        row_set.insert(i); 
+        col_set.insert(j); 
+    }
 
-    let nr = row_set.len();
-    let ncc = col_set.len();
-    let row_perm = perm_for_indices(mr, row_set.iter());
-    let col_perm = perm_for_indices(nc, col_set.iter());
+    let m0 = row_set.len();
+    let n0 = col_set.len();
+    let row_perm = perm_for_indices(m, row_set.iter());
+    let col_perm = perm_for_indices(n, col_set.iter());
 
     // Consistency check: zero rows must have zero yp_res.
-    if (0..mr).any(|i| row_perm.at(i) >= nr && !yp_res[i].is_zero()) {
+    if (0..m).any(|i| row_perm.at(i) >= m0 && !yp_res[i].is_zero()) {
         return None;
     }
 
-    if nr == 0 {
-        return Some(vec![R::zero(); nc]);
+    if m0 == 0 {
+        return Some(vec![R::zero(); n]);
     }
 
-    let s0 = s.extract((nr, ncc), |i, j| {
+    let s0 = s.extract((m0, n0), |i, j| {
         let (ri, ci) = (row_perm.at(i), col_perm.at(j));
-        (ri < nr && ci < ncc).then_some((ri, ci))
+        (ri < m0 && ci < n0).then_some((ri, ci))
     }).into_dense();
 
     let rhs = perm_apply(row_perm.view(), yp_res);
-    let x_nz = dense_solve_pluq(&s0, &rhs[..nr])?;
+    let mut xq = dense_solve_pluq(&s0, &rhs[..m0])?;
+    xq.resize(n, R::zero());
 
-    let mut x_nz = x_nz;
-    x_nz.resize(nc, R::zero());
-    Some(perm_apply(col_perm.inv(), &x_nz))
+    Some(perm_apply(col_perm.inv(), &xq))
 }
 
 // Computes xq_top = z - U1 * xq_res.
@@ -341,6 +341,45 @@ mod tests {
     fn test_rand_cols() { check_cols(&SpMat::<i32>::rand((40, 60), 0.1)); }
 
     // ---- helper unit tests ----
+
+    #[test]
+    fn test_split() {
+        use sprs::PermOwned;
+        // a = [[1,2],[3,4]], r=1, identity perms → paq = a, partition at row/col 1:
+        // a0=[[1]], a1=[[2]], a2=[[3]], a3=[[4]]
+        let a = sp((2, 2), [r(1), r(2), r(3), r(4)]);
+        let p = PermOwned::new(vec![0, 1]);
+        let q = PermOwned::new(vec![0, 1]);
+        let [a0, a1, a2, a3] = split(&a, &p, &q, 1);
+        assert_eq!(a0, sp((1, 1), [r(1)]));
+        assert_eq!(a1, sp((1, 1), [r(2)]));
+        assert_eq!(a2, sp((1, 1), [r(3)]));
+        assert_eq!(a3, sp((1, 1), [r(4)]));
+    }
+
+    #[test]
+    fn test_build_cols() {
+        // paq = [[1,2],[3,4]], r=1: a0=[[1]], a1=[[2]], a2=[[3]], a3=[[4]]
+        // l0=a0=[[1]], l1=a2=[[3]], r0=a1=[[2]], r1=a3=[[4]]
+        // u1 = [[1]]^{-1}*[[2]] = [[2]], l = [[1],[3]], u = [[1,2]], s = [[4]]-[[3]]*[[2]] = [[-2]]
+        let paq = [sp((1,1),[r(1)]), sp((1,1),[r(2)]), sp((1,1),[r(3)]), sp((1,1),[r(4)])];
+        let (l, u, s) = build(PivotType::Cols, paq);
+        assert_eq!(l, sp((2, 1), [r(1), r(3)]));
+        assert_eq!(u, sp((1, 2), [r(1), r(2)]));
+        assert_eq!(s, sp((1, 1), [r(-2)]));
+    }
+
+    #[test]
+    fn test_build_rows() {
+        // paq = [[1,2],[3,4]], r=1: a0=[[1]], a1=[[2]], a2=[[3]], a3=[[4]]
+        // u0=a0=[[1]], u1=a1=[[2]], r0=a2=[[3]], r1=a3=[[4]]
+        // l1 = [[3]]*[[1]]^{-1} = [[3]], l = [[1],[3]], u = [[1,2]], s = [[4]]-[[3]]*[[2]] = [[-2]]
+        let paq = [sp((1,1),[r(1)]), sp((1,1),[r(2)]), sp((1,1),[r(3)]), sp((1,1),[r(4)])];
+        let (l, u, s) = build(PivotType::Rows, paq);
+        assert_eq!(l, sp((2, 1), [r(1), r(3)]));
+        assert_eq!(u, sp((1, 2), [r(1), r(2)]));
+        assert_eq!(s, sp((1, 1), [r(-2)]));
+    }
 
     use yui_core::num::Ratio;
     type R = Ratio<i64>;

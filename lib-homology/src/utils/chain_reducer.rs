@@ -52,6 +52,8 @@ where
 
     pub fn from<C>(complex: &C, with_trans: bool) -> Self 
     where C: GridTrait<I> + ChainComplexTrait<I, R = R> {
+        // TODO computation should not depend on the order of the support.
+        
         let support = complex.support();
         let d_deg = complex.d_deg();
 
@@ -130,9 +132,9 @@ where
         }
         
         if deep { 
-            info!("reduce all (deep)");
+            debug!("reduce all (deep)");
         } else {
-            info!("reduce all (shallow)");
+            debug!("reduce all (shallow)");
         }
 
         let support = self.support.clone();
@@ -153,7 +155,7 @@ where
             }
 
             c += 1;
-            debug!("next itr: {c}");
+            trace!("next itr: {c}");
         }
     }
 
@@ -166,19 +168,19 @@ where
             return false;
         }
 
-        info!("reduce C[{i}]: {:?} ..", a.shape());
-        debug!("  nnz: {}", a.nnz());
-        debug!("  density: {}", a.density());
-        debug!("  mean-weight: {}", a.mean_weight());
+        debug!("reduce C[{i}]: {:?} ..", a.shape());
+        trace!("  nnz: {}", a.nnz());
+        trace!("  density: {}", a.density());
+        trace!("  mean-weight: {}", a.mean_weight());
 
         let (p, q, r) = pivots(a, piv_type, piv_cond);
 
         if r == 0 { 
-            info!("  done.");
+            debug!("  done.");
             return false;
         }
 
-        info!("  found {r} pivots.");
+        debug!("  found {r} pivots.");
         
         let a = a.permute(p.view(), q.view());
 
@@ -194,7 +196,7 @@ where
         let sch = Schur::from_partial_triangular(t, &a, r, with_trans);
         let (s, t_src, t_tgt) = sch.disassemble();
 
-        info!("  reduced C[{i}]: {:?} -> {:?}", a.shape(), s.shape());
+        debug!("  reduced C[{i}]: {:?} -> {:?}", a.shape(), s.shape());
 
         self.update_mats(i, &p, &q, r, s);
 
@@ -277,7 +279,7 @@ where
         }
 
         if let Some(vs) = self.vecs.get_mut(&i2) { 
-            debug!("update {} vecs in C[{i2}] ..", vs.len());
+            trace!("update {} vecs in C[{i2}] ..", vs.len());
 
             let [a, _, c, _] = a.divide4((r, r));
             

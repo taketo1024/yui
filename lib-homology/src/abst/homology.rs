@@ -1,4 +1,4 @@
-use log::info;
+use log::*;
 use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 
 use crate::generic::GenericSummand;
@@ -19,7 +19,7 @@ where
     C: ChainComplexTrait<I, R = R>
 {
     fn compute_homology_at(&self, i: I, with_trans: bool) -> GenericSummand<I, R> {
-        info!("compute H[{i}]: {} -> {} -> {} ..", 
+        debug!("compute H[{i}]: {} -> {} -> {} ..", 
             self.display_at(i - self.d_deg()), 
             self.display_at(i), 
             self.display_at(i + self.d_deg()), 
@@ -32,7 +32,7 @@ where
 
         let h = GenericSummand::generate(i, rank, tors, trans);
 
-        info!("  H[{i}] = {}.", h.display());
+        debug!("  H[{i}] = {}.", h.display());
 
         h
     }

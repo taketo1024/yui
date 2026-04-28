@@ -1,6 +1,6 @@
 use core::panic;
 use std::cmp::min;
-use log::{debug, trace};
+use log::trace;
 use yui_core::poly::Poly;
 use yui_core::{EucRing, EucRingOps, Field, FieldOps};
 use crate::dense::*;
@@ -16,14 +16,14 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
 
 pub fn snf_in_place<R>(target: Mat<R>, flags: SnfFlags) -> SnfResult<R>
 where R: EucRing, for<'a> &'a R: EucRingOps<R> {
-    debug!("start snf: {:?}, flags: {:?}.", target.shape(), flags);
+    trace!("start snf: {:?}, flags: {:?}.", target.shape(), flags);
     trace!("{}", target);
 
     let mut calc = SnfCalc::new(target, flags);
 
     calc.process();
 
-    debug!("snf done.");
+    trace!("snf done.");
     trace!("{}", calc.target);
 
     calc.result()
@@ -462,7 +462,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
 impl<R> SnfCalc<R>
 where R: LLLRing, for<'a> &'a R: LLLRingOps<R> {
     fn preprocess_lll(&mut self) {
-        debug!("start lll-preprocess, type = {}", std::any::type_name::<R>());
+        trace!("start lll-preprocess, type = {}", std::any::type_name::<R>());
 
         let flag = [self.p.is_some(), self.pinv.is_some()];
         
@@ -473,7 +473,7 @@ where R: LLLRing, for<'a> &'a R: LLLRingOps<R> {
         self.p = p;
         self.pinv = pinv;
 
-        debug!("preprocess done.");
+        trace!("preprocess done.");
         trace!("{}", self.target);
     }
 }

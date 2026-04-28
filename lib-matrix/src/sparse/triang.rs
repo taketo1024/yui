@@ -1,5 +1,5 @@
 use either::Either;
-use log::debug;
+use log::*;
 use num_traits::Zero;
 use yui_core::{Ring, RingOps};
 
@@ -117,7 +117,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         if report { 
             let c = counter.incr();
             if (c > 0 && c % LOG_THRESHOLD == 0) || c == k { 
-                debug!("  solved {c}/{k}.");
+                trace!("  solved {c}/{k}.");
             }
         }
 

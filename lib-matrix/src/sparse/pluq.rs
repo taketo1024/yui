@@ -1,6 +1,7 @@
 // Sparse PLUQ decomposition & linear solver.
 // Implemented with the help of Claude Code.
 
+use log::debug;
 use sprs::PermOwned;
 use sprs::PermView;
 use yui_core::{Ring, RingOps, Field, FieldOps};
@@ -32,11 +33,14 @@ impl<R> PartialPluq<R> {
 /// Computes a partial PLUQ decomposition of `a`.
 pub fn pre_pluq<R>(a: &SpMat<R>, piv_type: PivotType, piv_cond: PivotCondition) -> PartialPluq<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
+    debug!("pre PLUQ: {:?}", a.shape());
+    
     let pivots = find_pivots(a, piv_type, piv_cond);
     let r = pivots.len();
     let (p, q) = perms_by_pivots(a, &pivots);
     let paq = split(a, &p, &q, r);
     let (l, u, s) = build(piv_type, paq);
+
     PartialPluq { p, q, l, u, s }
 }
 
@@ -122,14 +126,20 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
     let (m, n) = a.shape();
     assert_eq!(y.len(), m);
 
+    debug!("sparse solve: {:?}", a.shape());
+
     let pp = pre_pluq(a, PivotType::Cols, PivotCondition::AnyUnit);
     let r = pp.rank();
-
     let yp = perm_apply(pp.p.view(), y);
+
+    debug!("solve top: {:?}", pp.l.shape());
+
     let z = solve_top(&pp.l, &yp);
     let yp_res = compute_yp_res(&pp.l, &yp, &z);
-    let xq_res = solve_res(&pp.s, &yp_res)?;
+
+    debug!("solve res: {:?}", pp.s.shape());
     
+    let xq_res = solve_res(&pp.s, &yp_res)?;
     let u1 = pp.u.submat(0..r, r..n);
     let xq_top = back_sub_piv(&z, &u1, &xq_res);
 

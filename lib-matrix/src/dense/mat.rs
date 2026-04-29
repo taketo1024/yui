@@ -243,16 +243,20 @@ where R: Scalar {
         self.inner.column_mut(j).mul_assign(r.clone())
     }
 
-    pub fn add_row_to(&mut self, i: usize, j: usize, r: &R)
-    where R: ClosedAddAssign + ClosedMulAssign { 
-        let row = self.inner.row(i).mul(r.clone());
-        self.inner.row_mut(j).add_assign(row)
+    pub fn add_row_to(&mut self, i0: usize, i1: usize, r: &R)
+    where R: ClosedAddAssign, for<'x> &'x R: Mul<Output = R> {
+        for j in 0..self.ncols() {
+            let v = &self[(i0, j)] * r;
+            self[(i1, j)] += v;
+        }
     }
 
-    pub fn add_col_to(&mut self, i: usize, j: usize, r: &R)
-    where R: ClosedAddAssign + ClosedMulAssign {  
-        let col = self.inner.column(i).mul(r.clone());
-        self.inner.column_mut(j).add_assign(col)
+    pub fn add_col_to(&mut self, j0: usize, j1: usize, r: &R)
+    where R: ClosedAddAssign, for<'x> &'x R: Mul<Output = R> {
+        for i in 0..self.nrows() {
+            let v = &self[(i, j0)] * r;
+            self[(i, j1)] += v;
+        }
     }
 
     // Multiply [a, b; c, d] from left. 

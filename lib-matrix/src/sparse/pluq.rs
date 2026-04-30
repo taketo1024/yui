@@ -10,7 +10,7 @@ use crate::MatTrait;
 use crate::dense::pluq::solve_pluq as dense_solve_pluq;
 use super::SpMat;
 use super::SpVec;
-use super::pivot::{PivotCondition, PivotType, find_pivots, perms_by_pivots};
+use super::pivot::{PivotCondition, PivotFinderConfig, PivotType, find_pivots, perms_by_pivots};
 use super::triang::{TriangularType, solve_triangular, solve_triangular_left, solve_triangular_vec};
 use super::util::perm_for_indices;
 
@@ -34,8 +34,9 @@ impl<R> PartialPluq<R> {
 pub fn pre_pluq<R>(a: &SpMat<R>, piv_type: PivotType, piv_cond: PivotCondition) -> PartialPluq<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     debug!("pre PLUQ: {:?}", a.shape());
-    
-    let pivots = find_pivots(a, piv_type, piv_cond);
+
+    let config = PivotFinderConfig { piv_type, piv_cond, ..Default::default() };
+    let pivots = find_pivots(a, config);
     let r = pivots.len();
     let (p, q) = perms_by_pivots(a, &pivots);
     let paq = split(a, &p, &q, r);

@@ -4,7 +4,7 @@ use log::*;
 use sprs::PermOwned;
 
 use yui_matrix::sparse::*;
-use yui_matrix::sparse::pivot::{PivotType, PivotCondition, perms_by_pivots, find_pivots};
+use yui_matrix::sparse::pivot::{PivotCondition, PivotFinderConfig, PivotType, find_pivots, perms_by_pivots};
 use yui_matrix::sparse::schur::Schur;
 use yui_matrix::sparse::triang::{solve_triangular_vec, TriangularType};
 use yui_core::{Ring, RingOps};
@@ -307,9 +307,10 @@ where
     }
 }
 
-fn pivots<R>(a: &SpMat<R>, piv_type: PivotType, pivot_cond: PivotCondition) -> (PermOwned, PermOwned, usize) 
+fn pivots<R>(a: &SpMat<R>, piv_type: PivotType, piv_cond: PivotCondition) -> (PermOwned, PermOwned, usize) 
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let pivs = find_pivots(a, piv_type, pivot_cond);
+    let config = PivotFinderConfig { piv_type, piv_cond, ..Default::default() };
+    let pivs = find_pivots(a, config);
     let (p, q) = perms_by_pivots(a, &pivs);
     let r = pivs.len();
     (p, q, r)

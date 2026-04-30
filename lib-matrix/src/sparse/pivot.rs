@@ -31,16 +31,33 @@ cfg_if::cfg_if! {
 const LOG_THRESHOLD: usize = 10_000;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum PivotType { 
+pub enum PivotType {
     Rows, Cols
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum PivotCondition { 
+pub enum PivotCondition {
     One, Weight(f64), AnyUnit
 }
 
-impl PivotCondition { 
+#[derive(Clone, Copy, Debug)]
+pub struct PivotFinderConfig {
+    pub piv_type: PivotType,
+    pub piv_cond: PivotCondition,
+    pub max_pivots: usize,
+}
+
+impl Default for PivotFinderConfig {
+    fn default() -> Self {
+        Self {
+            piv_type: PivotType::Rows,
+            piv_cond: PivotCondition::One,
+            max_pivots: 65_536,
+        }
+    }
+}
+
+impl PivotCondition {
     fn is_cand<R>(&self, r: &R) -> bool 
     where R: Ring, for<'x> &'x R: RingOps<R> {
         match self {
@@ -51,15 +68,15 @@ impl PivotCondition {
     }
 }
 
-pub fn find_pivots<R>(a: &SpMat<R>, piv_type: PivotType, pivot_cond: PivotCondition) -> Vec<(usize, usize)>
+pub fn find_pivots<R>(a: &SpMat<R>, config: PivotFinderConfig) -> Vec<(usize, usize)>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    if a.is_zero() { 
+    if a.is_zero() {
         return vec![];
     }
-    
+
     debug!("find pivots: {:?}", a.shape());
 
-    let mut pf = PivotFinder::new(a, piv_type, pivot_cond);
+    let mut pf = PivotFinder::new(a, &config);
     pf.find_pivots();
 
     debug!("found {} pivots", pf.result().len());
@@ -82,23 +99,28 @@ type Col = usize;
 pub struct PivotFinder {
     str: MatrixStr,
     pivots: PivotData,
-    piv_type: PivotType
+    piv_type: PivotType,
+    max_pivots: usize,
 }
 
-impl PivotFinder { 
-    pub fn new<R>(a: &SpMat<R>, piv_type: PivotType, pivot_cond: PivotCondition) -> Self
+impl PivotFinder {
+    pub fn new<R>(a: &SpMat<R>, config: &PivotFinderConfig) -> Self
     where R: Ring, for<'x> &'x R: RingOps<R> {
-        let str = MatrixStr::new(a, piv_type, pivot_cond);
-        let pivots = PivotData::new(a, piv_type);
-        PivotFinder{ str, pivots, piv_type }
+        let str = MatrixStr::new(a, config.piv_type, config.piv_cond);
+        let pivots = PivotData::new(a, config.piv_type);
+        PivotFinder { str, pivots, piv_type: config.piv_type, max_pivots: config.max_pivots }
     }
 
     pub fn find_pivots(&mut self) {
         trace!("pivots: {:?} ..", self.str.shape());
 
         self.find_fl_pivots();
-        self.find_fl_col_pivots();
-        self.find_cycle_free_pivots();
+        if self.pivots.count() < self.max_pivots {
+            self.find_fl_col_pivots();
+        }
+        if self.pivots.count() < self.max_pivots {
+            self.find_cycle_free_pivots();
+        }
 
         trace!("pivots: {:?} => {}.", self.str.shape(), self.pivots.count());
     }
@@ -156,6 +178,7 @@ impl PivotFinder {
 
             if !self.pivots.has_col(j) && self.str.is_candidate(i, j) {
                 self.pivots.set(i, j);
+                if self.pivots.count() >= self.max_pivots { break; }
             }
         }
 
@@ -170,28 +193,30 @@ impl PivotFinder {
         let remain_rows: Vec<_> = self.remain_rows().collect();
         let mut occ_cols = self.occupied_cols();
 
-        for i in remain_rows { 
+        for i in remain_rows {
             let mut cands = vec![];
 
-            for &j in self.str.cols_in(i) { 
+            for &j in self.str.cols_in(i) {
                 if !occ_cols.contains(&j) && self.str.is_candidate(i, j) {
                     cands.push(j);
                 }
             }
 
-            let Some(j) = cands.into_iter().sorted_by(|&j1, &j2| 
+            let Some(j) = cands.into_iter().sorted_by(|&j1, &j2|
                 self.str.cmp_cols(j1, j2)
             ).next() else { continue };
 
             self.pivots.set(i, j);
 
-            for &j in self.str.cols_in(i) { 
+            for &j in self.str.cols_in(i) {
                 occ_cols.insert(j);
             }
+
+            if self.pivots.count() >= self.max_pivots { break; }
         }
 
         let piv_count = self.pivots.count();
-        
+
         trace!("  fl-col-pivots: +{}, total: {}.", piv_count - before_piv_count, piv_count);
     }
 
@@ -222,20 +247,22 @@ impl PivotFinder {
         let mut w = RowWorker::new(n);
         let mut row_count = 0;
 
-        for i in remain_rows { 
-            if let Some(j) = w.find_cycle_free_pivots(i, &self.str, &self.pivots) { 
+        for i in remain_rows {
+            if self.pivots.count() >= self.max_pivots { break; }
+
+            if let Some(j) = w.find_cycle_free_pivots(i, &self.str, &self.pivots) {
                 self.pivots.set(i, j);
             }
 
             if self.should_report() {
                 row_count += 1;
-                if row_count % LOG_THRESHOLD == 0 { 
+                if row_count % LOG_THRESHOLD == 0 {
                     let c = self.pivots.count();
                     trace!("    [{row_count}/{total_rows}], {c} pivots.");
                 }
             }
         }
-     }
+    }
 
      #[cfg(feature = "multithread")]
      fn find_cycle_free_pivots_m(&mut self) {
@@ -256,12 +283,14 @@ impl PivotFinder {
         let report = self.should_report();
         let row_counter = SyncCounter::new();
 
-        remain_rows.par_iter().for_each(|&i| { 
-            let mut loc_pivots = init_tls(&loc_pivots_tls, || 
+        remain_rows.par_iter().for_each(|&i| {
+            if pivots.read().unwrap().count() >= self.max_pivots { return; }
+
+            let mut loc_pivots = init_tls(&loc_pivots_tls, ||
                 pivots.read().unwrap().clone()
             ).borrow_mut();
 
-            let mut w = init_tls(&loc_worker_tls, || 
+            let mut w = init_tls(&loc_worker_tls, ||
                 RowWorker::new(n)
             ).borrow_mut();
 
@@ -284,26 +313,28 @@ impl PivotFinder {
 
      #[cfg(feature = "multithread")]
      fn find_cycle_free_pivots_in(&self, pivots: &RwLock<PivotData>, loc_pivots: &mut PivotData, w: &mut RowWorker) {
-        loop { 
+        loop {
             w.traverse(&self.str, loc_pivots);
-    
+
             let Some(j) = w.choose_candidate(&self.str) else {
                 break
             };
-            
+
             // If changes are made in other threads, update `loc_pivots` and retry.
             // Otherwise, modify `pivots` and exit.
-        
+
             let mut pivots = pivots.write().unwrap();
             w.update_diff(&loc_pivots, &pivots);
-            
-            if w.should_retry() { 
+
+            if w.should_retry() {
                 loc_pivots.update_from(&pivots);
                 continue
-            } else { 
-                pivots.set(w.row, j);
+            } else {
+                if pivots.count() < self.max_pivots {
+                    pivots.set(w.row, j);
+                }
                 break
-            }    
+            }
         }
      }
 
@@ -661,7 +692,7 @@ mod tests {
     #[test]
     fn rows_cols() {
         let a = SpMat::<i32>::from_dense_data((4, 3), []);
-        let pf = PivotFinder::new(&a, PivotType::Rows, PivotCondition::One);
+        let pf = PivotFinder::new(&a, &Default::default());
         assert_eq!(pf.rows(), 4);
         assert_eq!(pf.cols(), 3);
     }
@@ -693,7 +724,7 @@ mod tests {
             0, 0, 0, 0,
             0, 0, 1, 1,
         ]);
-        let mut pf = PivotFinder::new(&a, PivotType::Rows, PivotCondition::One);
+        let mut pf = PivotFinder::new(&a, &Default::default());
 
         assert_eq!(pf.remain_rows().collect_vec(), vec![0,3,1]);
 
@@ -714,7 +745,7 @@ mod tests {
             0, 0, 0, 0,
             0, 0, 1, 1,
         ]);
-        let mut pf = PivotFinder::new(&a, PivotType::Rows, PivotCondition::One);
+        let mut pf = PivotFinder::new(&a, &Default::default());
 
         assert_eq!(pf.occupied_cols(), AHashSet::new());
 
@@ -737,7 +768,7 @@ mod tests {
             0, 0, 1, 1, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 1, 0, 1, 1
         ]);
-        let mut pf = PivotFinder::new(&a, PivotType::Rows, PivotCondition::One);
+        let mut pf = PivotFinder::new(&a, &Default::default());
 
         pf.find_fl_pivots();
 
@@ -754,7 +785,7 @@ mod tests {
             0, 0, 1, 0, 0, 0, 0, 0, 0,
             0, 1, 0, 0, 0, 1, 0, 1, 0
         ]);
-        let mut pf = PivotFinder::new(&a, PivotType::Rows, PivotCondition::One);
+        let mut pf = PivotFinder::new(&a, &Default::default());
 
         pf.find_fl_col_pivots();
 
@@ -771,7 +802,7 @@ mod tests {
             0, 0, 1, 0, 0, 0, 0, 0, 0,
             0, 1, 0, 0, 0, 1, 0, 1, 0
         ]);
-        let mut pf = PivotFinder::new(&a, PivotType::Rows, PivotCondition::One);
+        let mut pf = PivotFinder::new(&a, &Default::default());
 
         pf.find_fl_pivots();
 
@@ -792,7 +823,7 @@ mod tests {
             0, 0, 1, 0, 0, 0, 0, 0, 0,
             0, 1, 0, 0, 0, 1, 0, 1, 0
         ]);
-        let mut pf = PivotFinder::new(&a, PivotType::Rows, PivotCondition::One);
+        let mut pf = PivotFinder::new(&a, &Default::default());
 
         pf.find_cycle_free_pivots_s();
 
@@ -810,7 +841,7 @@ mod tests {
             0, 0, 1, 0, 0, 0, 0, 0, 0,
             0, 1, 0, 0, 0, 1, 0, 1, 0
         ]);
-        let mut pf = PivotFinder::new(&a, PivotType::Rows, PivotCondition::One);
+        let mut pf = PivotFinder::new(&a, &Default::default());
 
         pf.find_cycle_free_pivots_m();
 
@@ -820,7 +851,7 @@ mod tests {
     #[test]
     fn zero() { 
         let a = SpMat::from_dense_data((1, 1), [0]);
-        let pivs = find_pivots(&a, PivotType::Rows, PivotCondition::One);
+        let pivs = find_pivots(&a, Default::default());
         let r = pivs.len();
         assert_eq!(r, 0);
     }
@@ -828,7 +859,7 @@ mod tests {
     #[test]
     fn id_1() { 
         let a = SpMat::from_dense_data((1, 1), [1]);
-        let pivs = find_pivots(&a, PivotType::Rows, PivotCondition::One);
+        let pivs = find_pivots(&a, Default::default());
         let r = pivs.len();
         assert_eq!(r, 1);
     }
@@ -838,7 +869,7 @@ mod tests {
         let a = SpMat::from_dense_data((2, 2), [
             1, 0, 0, 1
         ]);
-        let pivs = find_pivots(&a, PivotType::Rows, PivotCondition::One);
+        let pivs = find_pivots(&a, Default::default());
         let r = pivs.len();
         assert_eq!(r, 2);
     }
@@ -853,7 +884,7 @@ mod tests {
             0, 0, 1, 0, 0, 0, 0, 0, 0,
             0, 1, 0, 0, 0, 1, 0, 1, 0
         ]);
-        let pivs = find_pivots(&a, PivotType::Rows, PivotCondition::One);
+        let pivs = find_pivots(&a, Default::default());
         let r = pivs.len();
         assert_eq!(r, 5);
         
@@ -876,7 +907,8 @@ mod tests {
             0, 0, 1, 0, 0, 0, 0, 0, 0,
             0, 1, 0, 0, 0, 1, 0, 1, 0
         ]);
-        let pivs = find_pivots(&a, PivotType::Cols, PivotCondition::One);
+        let config = PivotFinderConfig { piv_type: PivotType::Cols, ..Default::default() };
+        let pivs = find_pivots(&a, config);
         let r = pivs.len();
         assert_eq!(r, 6);
         
@@ -895,7 +927,7 @@ mod tests {
         let shape = (60, 80);
         let a = SpMat::<i32>::rand(shape, d);
 
-        let pivs = find_pivots(&a, PivotType::Rows, PivotCondition::One);
+        let pivs = find_pivots(&a, Default::default());
         let r = pivs.len();
         assert!(r > 10);
         
@@ -906,5 +938,29 @@ mod tests {
         assert!((0..r).all(|j| {
             (j+1..r).all(|i| b[(i, j)].is_zero())
         }))
+    }
+
+    #[test]
+    fn max_pivots() {
+        // Full rank of this matrix is 5; limiting to 3 must return ≤ 3 pivots.
+        let a = SpMat::from_dense_data((6, 9), [
+            1, 0, 0, 0, 0, 1, 0, 0, 1,
+            0, 1, 1, 1, 0, 1, 0, 1, 0,
+            0, 0, 1, 1, 0, 0, 0, 1, 1,
+            0, 1, 0, 0, 1, 0, 0, 0, 0,
+            0, 0, 1, 0, 0, 0, 0, 0, 0,
+            0, 1, 0, 0, 0, 1, 0, 1, 0
+        ]);
+        let config = PivotFinderConfig { max_pivots: 3, ..Default::default() };
+        let pivs = find_pivots(&a, config);
+        assert!(pivs.len() <= 3);
+
+        let (p, q) = perms_by_pivots(&a, &pivs);
+        let b = a.permute(p.view(), q.view()).into_dense();
+        let r = pivs.len();
+        assert!((0..r).all(|i| b[(i, i)].is_one()));
+        assert!((0..r).all(|j| {
+            (j+1..r).all(|i| b[(i, j)].is_zero())
+        }));
     }
 }

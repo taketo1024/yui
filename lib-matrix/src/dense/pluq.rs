@@ -1,6 +1,7 @@
 // Implemented with the help of Claude Code.
 
 use log::debug;
+use nalgebra::Scalar;
 use sprs::PermOwned;
 use yui_core::{Ring, RingOps, Field, FieldOps};
 use crate::MatTrait;
@@ -22,6 +23,16 @@ pub struct Pluq<R> {
 
 impl<R> Pluq<R> {
     pub fn rank(&self) -> usize { self.l.ncols() }
+}
+
+impl<R: Scalar> Pluq<R> {
+    /// Returns the PLUQ decomposition of `A^T`.
+    /// If `self` satisfies `p * A * q = l * u + rest` (Cols convention),
+    /// then `self.transpose()` satisfies `q * A^T * p = u^T * l^T + rest^T` (Rows convention).
+    pub fn transpose(self) -> Self {
+        let Pluq { p, q, l, u, s } = self;
+        Pluq { p: q, q: p, l: u.transpose(), u: l.transpose(), s: s.transpose() }
+    }
 }
 
 /// Computes a PLUQ decomposition of `a` over a ring by Gaussian elimination.
@@ -206,6 +217,33 @@ mod tests {
     use yui_core::num::Ratio;
 
     use super::*;
+
+    // ---- Pluq::transpose tests ----
+
+    #[test]
+    fn test_pluq_transpose() {
+        // a = [[1,2,3],[4,5,6]], rank 2.
+        // pluq(a) factors a; pluq(a).transpose() should factor a^T.
+        type R = Ratio<i64>;
+        let r = |n: i64| R::from(n);
+
+        let a = Mat::from_data((2, 3), [r(1),r(2),r(3),r(4),r(5),r(6)]);
+        let at = a.transpose(); // 3×2
+
+        let dp = pluq(&a).transpose();
+        let rank = dp.rank();
+
+        let (m, n) = at.shape(); // (3, 2)
+        assert_eq!(dp.l.shape(), (m, rank));
+        assert_eq!(dp.u.shape(), (rank, n));
+
+        // p * A^T * q = l * u + rest
+        let paq = apply_perms(&at, &dp.p, &dp.q);
+        let rem_full = Mat::from_generator((m, n), |i, j| {
+            if i >= rank && j >= rank { dp.s[(i - rank, j - rank)].clone() } else { R::zero() }
+        });
+        assert_eq!(paq, &dp.l * &dp.u + &rem_full);
+    }
 
     type R = Ratio<i64>;
 

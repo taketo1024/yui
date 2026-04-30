@@ -135,8 +135,12 @@ where R: Scalar {
         calc.result().rank()
     }
 
+    pub fn transpose(&self) -> Self {
+        Self::from(self.inner.transpose())
+    }
+
     pub fn map<S, F>(&self, f: F) -> Mat<S>
-    where S: Scalar, F: Fn(&R) -> S { 
+    where S: Scalar, F: Fn(&R) -> S {
         let data = self.inner.iter().map(f);
         let inner = DMatrix::from_iterator(self.nrows(), self.ncols(), data);
         Mat::from(inner)
@@ -314,6 +318,14 @@ mod tests {
         assert_eq!(a, a);
         assert_ne!(a, b);
         assert_ne!(a, c);
+    }
+
+    #[test]
+    fn transpose() {
+        let a = Mat::from_data((2, 3), [1,2,3,4,5,6]);
+        let t = a.transpose();
+        assert_eq!(t.shape(), (3, 2));
+        assert_eq!(t, Mat::from_data((3, 2), [1,4,2,5,3,6]));
     }
 
     #[test]

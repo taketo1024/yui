@@ -397,6 +397,18 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         ).unwrap();
     }
 
+    pub fn extend_by_zero(&mut self, add_rows: usize, add_cols: usize) {
+        let (m, n) = self.shape();
+        let l = std::mem::replace(&mut self.inner, CscMatrix::zeros(0, 0));
+        let (mut col_offsets, row_indices, values) = l.disassemble();
+        let last = *col_offsets.last().unwrap();
+        col_offsets.extend(std::iter::repeat(last).take(add_cols));
+        self.inner = CscMatrix::try_from_csc_data(
+            m + add_rows, n + add_cols,
+            col_offsets, row_indices, values
+        ).unwrap();
+    }
+
     // row_perm(p) * a == a.permute_rows(p)
     pub fn from_row_perm(p: PermView) -> Self
     where R: One {
@@ -634,6 +646,15 @@ pub(super) mod tests {
             6,  7,  8, 16, 17,
             9, 10, 11, 18, 19,
         ]));
+    }
+
+    #[test]
+    fn extend_by_zero() {
+        // [[1,2],[3,4]] extended by 1 row and 2 cols → [[1,2,0,0],[3,4,0,0],[0,0,0,0]]
+        let mut a = SpMat::from_dense_data((2, 2), [1,2,3,4]);
+        a.extend_by_zero(1, 2);
+        assert_eq!(a.shape(), (3, 4));
+        assert_eq!(a, SpMat::from_dense_data((3, 4), [1,2,0,0, 3,4,0,0, 0,0,0,0]));
     }
 
     #[test]

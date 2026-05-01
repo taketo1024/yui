@@ -504,6 +504,146 @@ mod tests {
         ])
     }
 
+    // ---- split_by_pqr ----
+
+    #[test]
+    fn test_split() {
+        use sprs::PermOwned;
+        // a = [[1,2],[3,4]], r=1, identity perms → paq = a, partition at row/col 1:
+        // a0=[[1]], a1=[[2]], a2=[[3]], a3=[[4]]
+        let a = sp((2, 2), [r(1), r(2), r(3), r(4)]);
+        let p = PermOwned::new(vec![0, 1]);
+        let q = PermOwned::new(vec![0, 1]);
+        let [a0, a1, a2, a3] = split_by_pqr(&a, &p, &q, 1);
+        assert_eq!(a0, sp((1, 1), [r(1)]));
+        assert_eq!(a1, sp((1, 1), [r(2)]));
+        assert_eq!(a2, sp((1, 1), [r(3)]));
+        assert_eq!(a3, sp((1, 1), [r(4)]));
+    }
+
+    // ---- build_lus ----
+
+    #[test]
+    fn test_build_cols() {
+        // paq = [[1,2],[3,4]], r=1: a0=[[1]], a1=[[2]], a2=[[3]], a3=[[4]]
+        // l0=a0=[[1]], l1=a2=[[3]], r0=a1=[[2]], r1=a3=[[4]]
+        // u1 = [[1]]^{-1}*[[2]] = [[2]], l = [[1],[3]], u = [[1,2]], s = [[4]]-[[3]]*[[2]] = [[-2]]
+        let paq = [sp((1,1),[r(1)]), sp((1,1),[r(2)]), sp((1,1),[r(3)]), sp((1,1),[r(4)])];
+        let (l, u, s) = build_lus(PivotType::Cols, paq);
+        assert_eq!(l, sp((2, 1), [r(1), r(3)]));
+        assert_eq!(u, sp((1, 2), [r(1), r(2)]));
+        assert_eq!(s, sp((1, 1), [r(-2)]));
+    }
+
+    #[test]
+    fn test_build_rows() {
+        // paq = [[1,2],[3,4]], r=1: a0=[[1]], a1=[[2]], a2=[[3]], a3=[[4]]
+        // u0=a0=[[1]], u1=a1=[[2]], r0=a2=[[3]], r1=a3=[[4]]
+        // l1 = [[3]]*[[1]]^{-1} = [[3]], l = [[1],[3]], u = [[1,2]], s = [[4]]-[[3]]*[[2]] = [[-2]]
+        let paq = [sp((1,1),[r(1)]), sp((1,1),[r(2)]), sp((1,1),[r(3)]), sp((1,1),[r(4)])];
+        let (l, u, s) = build_lus(PivotType::Rows, paq);
+        assert_eq!(l, sp((2, 1), [r(1), r(3)]));
+        assert_eq!(u, sp((1, 2), [r(1), r(2)]));
+        assert_eq!(s, sp((1, 1), [r(-2)]));
+    }
+
+    // ---- pre_pluq ----
+
+    fn check_pre_pluq_rows(a: &SpMat<i32>) {
+        let pp = pre_pluq(a, cfg(PivotType::Rows));
+        let (m, n) = a.shape();
+        let r = pp.rank();
+
+        assert_eq!(pp.l.shape(), (m, r));
+        assert_eq!(pp.u.shape(), (r, n));
+        assert_eq!(pp.s.shape(), (m - r, n - r));
+
+        let paq = a.permute(pp.p.view(), pp.q.view());
+        let rem_full = SpMat::from_entries((m, n),
+            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
+        );
+        assert_eq!(paq, &pp.l * &pp.u + &rem_full);
+
+        let b = pp.u.clone().into_dense();
+        for k in 0..r {
+            assert!(b[(k, k)].is_one(), "u[{k},{k}] should be a pivot (=1)");
+        }
+        for j in 0..r {
+            for i in j + 1..r {
+                assert_eq!(b[(i, j)], 0, "u[{i},{j}] should be zero (below diagonal)");
+            }
+        }
+    }
+
+    fn check_pre_pluq_cols(a: &SpMat<i32>) {
+        let pp = pre_pluq(a, cfg(PivotType::Cols));
+        let (m, n) = a.shape();
+        let r = pp.rank();
+
+        assert_eq!(pp.l.shape(), (m, r));
+        assert_eq!(pp.u.shape(), (r, n));
+        assert_eq!(pp.s.shape(), (m - r, n - r));
+
+        let paq = a.permute(pp.p.view(), pp.q.view());
+        let rem_full = SpMat::from_entries((m, n),
+            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
+        );
+        assert_eq!(paq, &pp.l * &pp.u + &rem_full);
+
+        let b = pp.l.clone().into_dense();
+        for k in 0..r {
+            assert!(b[(k, k)].is_one(), "l[{k},{k}] should be a pivot (=1)");
+        }
+        for i in 0..r {
+            for j in i + 1..r {
+                assert_eq!(b[(i, j)], 0, "l[{i},{j}] should be zero (above diagonal)");
+            }
+        }
+    }
+
+    #[test]
+    fn test_pre_pluq_rows() { check_pre_pluq_rows(&sample()); }
+
+    #[test]
+    fn test_pre_pluq_cols() { check_pre_pluq_cols(&sample()); }
+
+    #[test]
+    fn test_pre_pluq_zero() {
+        let a = SpMat::<i32>::zero((4, 5));
+        let pp = pre_pluq(&a, cfg(PivotType::Rows));
+        assert_eq!(pp.rank(), 0);
+        assert_eq!(pp.l.shape(), (4, 0));
+        assert_eq!(pp.u.shape(), (0, 5));
+        assert_eq!(pp.s.shape(), (4, 5)); // (m-r, n-r) = (4, 5) when r=0
+        assert_eq!(pp.s, a.permute(pp.p.view(), pp.q.view()));
+    }
+
+    #[test]
+    fn test_pre_pluq_square_full_rank() {
+        let a = SpMat::from_dense_data((3, 3), [1, 0, 0, 0, 1, 0, 0, 0, 1]);
+        let pp = pre_pluq(&a, cfg(PivotType::Rows));
+        assert_eq!(pp.rank(), 3);
+        assert_eq!(pp.s.shape(), (0, 0)); // full rank: Schur complement is empty
+    }
+
+    #[test]
+    fn test_pre_pluq_rank_rows() {
+        assert_eq!(pre_pluq(&sample(), cfg(PivotType::Rows)).rank(), 5);
+    }
+
+    #[test]
+    fn test_pre_pluq_rank_cols() {
+        assert_eq!(pre_pluq(&sample(), cfg(PivotType::Cols)).rank(), 6);
+    }
+
+    #[test]
+    fn test_pre_pluq_rand_rows() { check_pre_pluq_rows(&SpMat::<i32>::rand((40, 60), 0.1)); }
+
+    #[test]
+    fn test_pre_pluq_rand_cols() { check_pre_pluq_cols(&SpMat::<i32>::rand((40, 60), 0.1)); }
+
+    // ---- pluq ----
+
     fn check_pluq_rows(a: &SpMat<i32>) {
         let pp = pluq(a, cfg(PivotType::Rows));
         let (m, n) = a.shape();
@@ -550,6 +690,77 @@ mod tests {
         }
     }
 
+    // ---- extract_dense ----
+
+    #[test]
+    fn test_extract_dense_no_transpose() {
+        // S has a zero row (row 1) and a zero col (col 1).
+        // Non-zero entries: (0,0)=1, (0,2)=2, (2,0)=3, (2,2)=4.
+        // row_idx=[0,2], col_idx=[0,2].
+        // S0 (2×2) = [[1,2],[3,4]].
+        let s = SpMat::from_dense_data((3, 3), [1i32, 0, 2, 0, 0, 0, 3, 0, 4]);
+        let (row_idx, col_idx, mat) = extract_dense(&s, false);
+        assert_eq!(row_idx, vec![0usize, 2]);
+        assert_eq!(col_idx, vec![0usize, 2]);
+        assert_eq!(mat, crate::dense::Mat::from_data((2, 2), [1i32, 2, 3, 4]));
+    }
+
+    #[test]
+    fn test_extract_dense_transpose() {
+        // Same S, but with transpose=true.  S0^T (2×2) = [[1,3],[2,4]].
+        let s = SpMat::from_dense_data((3, 3), [1i32, 0, 2, 0, 0, 0, 3, 0, 4]);
+        let (row_idx, col_idx, mat) = extract_dense(&s, true);
+        assert_eq!(row_idx, vec![0usize, 2]);
+        assert_eq!(col_idx, vec![0usize, 2]);
+        assert_eq!(mat, crate::dense::Mat::from_data((2, 2), [1i32, 3, 2, 4]));
+    }
+
+    // ---- dense_pluq_in ----
+
+    fn check_dense_pluq_in(s: &SpMat<i32>, piv_type: PivotType) {
+        let pp = dense_pluq_in(s, piv_type);
+        let (ms, ns) = s.shape();
+        let r = pp.rank();
+
+        assert_eq!(pp.l.shape(), (ms, r));
+        assert_eq!(pp.u.shape(), (r, ns));
+        assert_eq!(pp.s.shape(), (ms - r, ns - r));
+
+        let psq = s.permute(pp.p.view(), pp.q.view());
+        let rem = SpMat::from_entries((ms, ns),
+            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
+        );
+        assert_eq!(psq, &pp.l * &pp.u + &rem, "p*s*q != l*u + rest");
+    }
+
+    #[test]
+    fn test_dense_pluq_in_cols_with_zero_row_and_col() {
+        // S has a zero row (row 1) and a zero col (col 1).
+        let s = SpMat::from_dense_data((3, 3), [1i32, 0, 2, 0, 0, 0, 3, 0, 4]);
+        check_dense_pluq_in(&s, PivotType::Cols);
+    }
+
+    #[test]
+    fn test_dense_pluq_in_rows_with_zero_row_and_col() {
+        let s = SpMat::from_dense_data((3, 3), [1i32, 0, 2, 0, 0, 0, 3, 0, 4]);
+        check_dense_pluq_in(&s, PivotType::Rows);
+    }
+
+    #[test]
+    fn test_dense_pluq_in_all_zero() {
+        let s = SpMat::<i32>::zero((4, 5));
+        check_dense_pluq_in(&s, PivotType::Cols);
+        check_dense_pluq_in(&s, PivotType::Rows);
+    }
+
+    #[test]
+    fn test_dense_pluq_in_no_zero_rows_or_cols() {
+        // No zero rows/cols: compact_dense gives the full matrix.
+        let s = SpMat::from_dense_data((3, 3), [1i32,2,3,4,5,6,7,8,9]);
+        check_dense_pluq_in(&s, PivotType::Cols);
+        check_dense_pluq_in(&s, PivotType::Rows);
+    }
+
     #[test]
     fn test_pluq_rows() { check_pluq_rows(&sample()); }
 
@@ -569,326 +780,120 @@ mod tests {
     #[test]
     fn test_pluq_rand_cols() { check_pluq_cols(&SpMat::<i32>::rand((40, 60), 0.1)); }
 
-    fn check_extend_chunk(s: &SpMat<i32>, c: usize) {
-        let (m, n) = s.shape();
-        assert!(c <= m);
-        let [s_top, s_rest] = s.divide_at_row(c);
-        let pp_chunk = pluq(&s_top, cfg(PivotType::Rows));
-        let pp = extend_chunk_to_full(pp_chunk, &s_rest);
-        let r = pp.rank();
-
-        assert_eq!(pp.l.shape(), (m, r));
-        assert_eq!(pp.u.shape(), (r, n));
-        assert_eq!(pp.s.shape(), (m - r, n - r));
-
-        let psq = s.permute(pp.p.view(), pp.q.view());
-        let rem = SpMat::from_entries((m, n),
-            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
-        );
-        assert_eq!(psq, &pp.l * &pp.u + &rem, "p*s*q != l*u + rest (c = {c})");
-    }
-
-    #[test]
-    fn test_extend_chunk_top() { check_extend_chunk(&sample(), 3); }
-
-    #[test]
-    fn test_extend_chunk_full() { check_extend_chunk(&sample(), 6); }
-
-    #[test]
-    fn test_extend_chunk_empty() { check_extend_chunk(&sample(), 0); }
-
-    #[test]
-    fn test_extend_chunk_rand() { check_extend_chunk(&SpMat::<i32>::rand((40, 60), 0.1), 17); }
-
-    #[test]
-    fn test_chunk_pluq() {
-        let s = sample();
-        let (m, n) = s.shape();
-        let (pp, r_chunk, c) = chunk_pluq(&s, 3);
-        let r = pp.rank();
-
-        assert_eq!(c, 3);
-        assert_eq!(r, r_chunk);
-        assert_eq!(pp.l.shape(), (m, r));
-        assert_eq!(pp.u.shape(), (r, n));
-        assert_eq!(pp.s.shape(), (m - r, n - r));
-
-        let psq = s.permute(pp.p.view(), pp.q.view());
-        let rem = SpMat::from_entries((m, n),
-            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
-        );
-        assert_eq!(psq, &pp.l * &pp.u + &rem);
-    }
-
-    #[test]
-    fn test_chunk_pluq_oversize() {
-        let s = sample();
-        let m = s.nrows();
-        let (_, _, c) = chunk_pluq(&s, 100);
-        assert_eq!(c, m);
-    }
-
-    fn check_rows(a: &SpMat<i32>) {
-        let pp = pre_pluq(a, cfg(PivotType::Rows));
-        let (m, n) = a.shape();
-        let r = pp.rank();
-
-        assert_eq!(pp.l.shape(), (m, r));
-        assert_eq!(pp.u.shape(), (r, n));
-        assert_eq!(pp.s.shape(), (m - r, n - r));
-
-        let paq = a.permute(pp.p.view(), pp.q.view());
-        let rem_full = SpMat::from_entries((m, n),
-            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
-        );
-        assert_eq!(paq, &pp.l * &pp.u + &rem_full);
-
-        let b = pp.u.clone().into_dense();
-        for k in 0..r {
-            assert!(b[(k, k)].is_one(), "u[{k},{k}] should be a pivot (=1)");
-        }
-        for j in 0..r {
-            for i in j + 1..r {
-                assert_eq!(b[(i, j)], 0, "u[{i},{j}] should be zero (below diagonal)");
-            }
-        }
-    }
-
-    fn check_cols(a: &SpMat<i32>) {
-        let pp = pre_pluq(a, cfg(PivotType::Cols));
-        let (m, n) = a.shape();
-        let r = pp.rank();
-
-        assert_eq!(pp.l.shape(), (m, r));
-        assert_eq!(pp.u.shape(), (r, n));
-        assert_eq!(pp.s.shape(), (m - r, n - r));
-
-        let paq = a.permute(pp.p.view(), pp.q.view());
-        let rem_full = SpMat::from_entries((m, n),
-            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
-        );
-        assert_eq!(paq, &pp.l * &pp.u + &rem_full);
-
-        let b = pp.l.clone().into_dense();
-        for k in 0..r {
-            assert!(b[(k, k)].is_one(), "l[{k},{k}] should be a pivot (=1)");
-        }
-        for i in 0..r {
-            for j in i + 1..r {
-                assert_eq!(b[(i, j)], 0, "l[{i},{j}] should be zero (above diagonal)");
-            }
-        }
-    }
-
-    #[test]
-    fn test_rows() { check_rows(&sample()); }
-
-    #[test]
-    fn test_cols() { check_cols(&sample()); }
-
-    #[test]
-    fn test_zero() {
-        let a = SpMat::<i32>::zero((4, 5));
-        let pp = pre_pluq(&a, cfg(PivotType::Rows));
-        assert_eq!(pp.rank(), 0);
-        assert_eq!(pp.l.shape(), (4, 0));
-        assert_eq!(pp.u.shape(), (0, 5));
-        assert_eq!(pp.s.shape(), (4, 5)); // (m-r, n-r) = (4, 5) when r=0
-        assert_eq!(pp.s, a.permute(pp.p.view(), pp.q.view()));
-    }
-
-    #[test]
-    fn test_square_full_rank() {
-        let a = SpMat::from_dense_data((3, 3), [1, 0, 0, 0, 1, 0, 0, 0, 1]);
-        let pp = pre_pluq(&a, cfg(PivotType::Rows));
-        assert_eq!(pp.rank(), 3);
-        assert_eq!(pp.s.shape(), (0, 0)); // full rank: Schur complement is empty
-    }
-
-    #[test]
-    fn test_rank_rows() {
-        assert_eq!(pre_pluq(&sample(), cfg(PivotType::Rows)).rank(), 5);
-    }
-
-    #[test]
-    fn test_rank_cols() {
-        assert_eq!(pre_pluq(&sample(), cfg(PivotType::Cols)).rank(), 6);
-    }
-
-    #[test]
-    fn test_rand_rows() { check_rows(&SpMat::<i32>::rand((40, 60), 0.1)); }
-
-    #[test]
-    fn test_rand_cols() { check_cols(&SpMat::<i32>::rand((40, 60), 0.1)); }
-
-    // ---- helper unit tests ----
-
-    #[test]
-    fn test_lift_perm() {
-        use sprs::PermOwned;
-        // compact_idx = [1, 3] in full space of size 5.
-        // compact_perm swaps the two: at(0)=1, at(1)=0.
-        // Expected:
-        //   i=1 (compact_idx[0]) -> compact_perm.at(0) = 1
-        //   i=3 (compact_idx[1]) -> compact_perm.at(1) = 0
-        //   rest = [0,2,4] -> positions [2,3,4]
-        //     i=0 -> 2,  i=2 -> 3,  i=4 -> 4
-        let cp = PermOwned::new(vec![1, 0]);
-        let idx = vec![1usize, 3];
-        let p = lift_perm(&cp, &idx, 5);
-        assert_eq!(p.at(0), 2);
-        assert_eq!(p.at(1), 1);
-        assert_eq!(p.at(2), 3);
-        assert_eq!(p.at(3), 0);
-        assert_eq!(p.at(4), 4);
-    }
-
-    #[test]
-    fn test_lift_perm_identity() {
-        use sprs::PermOwned;
-        // compact_idx = [0, 2, 5] with identity compact_perm.
-        // lift_perm should equal perm_for_indices(7, [0,2,5]).
-        let cp = PermOwned::identity(3);
-        let idx = vec![0usize, 2, 5];
-        let p = lift_perm(&cp, &idx, 7);
-        let expected = perm_for_indices(7, idx.iter());
-        for i in 0..7 {
-            assert_eq!(p.at(i), expected.at(i), "mismatch at i={i}");
-        }
-    }
-
-    #[test]
-    fn test_compact_dense_no_transpose() {
-        // S has a zero row (row 1) and a zero col (col 1).
-        // Non-zero entries: (0,0)=1, (0,2)=2, (2,0)=3, (2,2)=4.
-        // row_idx=[0,2], col_idx=[0,2].
-        // S0 (2×2) = [[1,2],[3,4]].
-        let s = SpMat::from_dense_data((3, 3), [1i32, 0, 2, 0, 0, 0, 3, 0, 4]);
-        let (row_idx, col_idx, mat) = extract_dense(&s, false);
-        assert_eq!(row_idx, vec![0usize, 2]);
-        assert_eq!(col_idx, vec![0usize, 2]);
-        assert_eq!(mat, crate::dense::Mat::from_data((2, 2), [1i32, 2, 3, 4]));
-    }
-
-    #[test]
-    fn test_compact_dense_transpose() {
-        // Same S, but with transpose=true.  S0^T (2×2) = [[1,3],[2,4]].
-        let s = SpMat::from_dense_data((3, 3), [1i32, 0, 2, 0, 0, 0, 3, 0, 4]);
-        let (row_idx, col_idx, mat) = extract_dense(&s, true);
-        assert_eq!(row_idx, vec![0usize, 2]);
-        assert_eq!(col_idx, vec![0usize, 2]);
-        assert_eq!(mat, crate::dense::Mat::from_data((2, 2), [1i32, 3, 2, 4]));
-    }
-
-    fn check_compact_pluq(s: &SpMat<i32>, piv_type: PivotType) {
-        let pp = dense_pluq_in(s, piv_type);
-        let (ms, ns) = s.shape();
-        let r = pp.rank();
-
-        assert_eq!(pp.l.shape(), (ms, r));
-        assert_eq!(pp.u.shape(), (r, ns));
-        assert_eq!(pp.s.shape(), (ms - r, ns - r));
-
-        let psq = s.permute(pp.p.view(), pp.q.view());
-        let rem = SpMat::from_entries((ms, ns),
-            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
-        );
-        assert_eq!(psq, &pp.l * &pp.u + &rem, "p*s*q != l*u + rest");
-    }
-
-    #[test]
-    fn test_compact_pluq_cols_with_zero_row_and_col() {
-        // S has a zero row (row 1) and a zero col (col 1).
-        let s = SpMat::from_dense_data((3, 3), [1i32, 0, 2, 0, 0, 0, 3, 0, 4]);
-        check_compact_pluq(&s, PivotType::Cols);
-    }
-
-    #[test]
-    fn test_compact_pluq_rows_with_zero_row_and_col() {
-        let s = SpMat::from_dense_data((3, 3), [1i32, 0, 2, 0, 0, 0, 3, 0, 4]);
-        check_compact_pluq(&s, PivotType::Rows);
-    }
-
-    #[test]
-    fn test_compact_pluq_all_zero() {
-        let s = SpMat::<i32>::zero((4, 5));
-        check_compact_pluq(&s, PivotType::Cols);
-        check_compact_pluq(&s, PivotType::Rows);
-    }
-
-    #[test]
-    fn test_compact_pluq_no_zero_rows_or_cols() {
-        // No zero rows/cols: compact_dense gives the full matrix.
-        let s = SpMat::from_dense_data((3, 3), [1i32,2,3,4,5,6,7,8,9]);
-        check_compact_pluq(&s, PivotType::Cols);
-        check_compact_pluq(&s, PivotType::Rows);
-    }
-
-    #[test]
-    fn test_split() {
-        use sprs::PermOwned;
-        // a = [[1,2],[3,4]], r=1, identity perms → paq = a, partition at row/col 1:
-        // a0=[[1]], a1=[[2]], a2=[[3]], a3=[[4]]
-        let a = sp((2, 2), [r(1), r(2), r(3), r(4)]);
-        let p = PermOwned::new(vec![0, 1]);
-        let q = PermOwned::new(vec![0, 1]);
-        let [a0, a1, a2, a3] = split_by_pqr(&a, &p, &q, 1);
-        assert_eq!(a0, sp((1, 1), [r(1)]));
-        assert_eq!(a1, sp((1, 1), [r(2)]));
-        assert_eq!(a2, sp((1, 1), [r(3)]));
-        assert_eq!(a3, sp((1, 1), [r(4)]));
-    }
-
-    #[test]
-    fn test_build_cols() {
-        // paq = [[1,2],[3,4]], r=1: a0=[[1]], a1=[[2]], a2=[[3]], a3=[[4]]
-        // l0=a0=[[1]], l1=a2=[[3]], r0=a1=[[2]], r1=a3=[[4]]
-        // u1 = [[1]]^{-1}*[[2]] = [[2]], l = [[1],[3]], u = [[1,2]], s = [[4]]-[[3]]*[[2]] = [[-2]]
-        let paq = [sp((1,1),[r(1)]), sp((1,1),[r(2)]), sp((1,1),[r(3)]), sp((1,1),[r(4)])];
-        let (l, u, s) = build_lus(PivotType::Cols, paq);
-        assert_eq!(l, sp((2, 1), [r(1), r(3)]));
-        assert_eq!(u, sp((1, 2), [r(1), r(2)]));
-        assert_eq!(s, sp((1, 1), [r(-2)]));
-    }
-
-    #[test]
-    fn test_build_rows() {
-        // paq = [[1,2],[3,4]], r=1: a0=[[1]], a1=[[2]], a2=[[3]], a3=[[4]]
-        // u0=a0=[[1]], u1=a1=[[2]], r0=a2=[[3]], r1=a3=[[4]]
-        // l1 = [[3]]*[[1]]^{-1} = [[3]], l = [[1],[3]], u = [[1,2]], s = [[4]]-[[3]]*[[2]] = [[-2]]
-        let paq = [sp((1,1),[r(1)]), sp((1,1),[r(2)]), sp((1,1),[r(3)]), sp((1,1),[r(4)])];
-        let (l, u, s) = build_lus(PivotType::Rows, paq);
-        assert_eq!(l, sp((2, 1), [r(1), r(3)]));
-        assert_eq!(u, sp((1, 2), [r(1), r(2)]));
-        assert_eq!(s, sp((1, 1), [r(-2)]));
-    }
+    // ---- solve_l ----
 
     use yui_core::num::Ratio;
     type R = Ratio<i64>;
     fn r(n: i64) -> R { R::from(n) }
-
+    
     fn sp(shape: (usize, usize), data: impl IntoIterator<Item = R>) -> SpMat<R> {
         SpMat::from_dense_data(shape, data)
     }
 
     #[test]
-    fn test_perm_apply() {
-        use sprs::PermOwned;
-        let p = PermOwned::new(vec![1, 2, 0]); // 0→1, 1→2, 2→0
-        let y = vec![r(10), r(20), r(30)];
-        let yp = perm_apply(p.view(), &y);
-        // yp[p(0)=1]=10, yp[p(1)=2]=20, yp[p(2)=0]=30
-        assert_eq!(yp, vec![r(30), r(10), r(20)]);
+    fn test_solve_l_square() {
+        // l = [[2, 0], [3, 4]], y = [4, 11]
+        // l[0..2,0..2]*x = [4,11] → x = [2, 5/4]
+        let l = sp((2, 2), [r(2), r(0), r(3), r(4)]);
+        let y = vec![r(4), r(11)];
+        let x = solve_l(&l, &y, true);
+        assert_eq!(x, Some(vec![r(2), r(5)/r(4)]));
     }
 
     #[test]
-    fn test_solve_top() {
-        // l = [[2, 0], [3, 4]], yp = [4, 11]
-        // l[0..2,0..2]*x = [4,11] → x = [2, 5/4]
-        let l = sp((2, 2), [r(2), r(0), r(3), r(4)]);
-        let yp = vec![r(4), r(11)];
-        let x = solve_l(&l, &yp, true);
-        assert_eq!(x, Some(vec![r(2), r(5)/r(4)]));
+    fn test_solve_l_rectangular_consistent() {
+        // l = [[1,0],[2,1],[3,4]] (3×2 lower triangular with extra row), y = [1,2,3].
+        // Forward sub on top 2×2: z = [1, 2 - 2*1] = [1, 0].
+        // Residual at row 2: 3 - 3*1 - 4*0 = 0 → consistent.
+        let l = sp((3, 2), [r(1), r(0), r(2), r(1), r(3), r(4)]);
+        let y = vec![r(1), r(2), r(3)];
+        assert_eq!(solve_l(&l, &y, true), Some(vec![r(1), r(0)]));
+    }
+
+    #[test]
+    fn test_solve_l_rectangular_inconsistent() {
+        // Same l as above but y = [1,2,4]. Residual at row 2: 4 - 3 - 0 = 1 ≠ 0 → None.
+        let l = sp((3, 2), [r(1), r(0), r(2), r(1), r(3), r(4)]);
+        let y = vec![r(1), r(2), r(4)];
+        assert_eq!(solve_l(&l, &y, true), None);
+    }
+
+    #[test]
+    fn test_solve_l_no_check() {
+        // Same inconsistent input as above; with check=false the residual is ignored
+        // and Some(z) is still returned (z is the forward-sub solution on the top).
+        let l = sp((3, 2), [r(1), r(0), r(2), r(1), r(3), r(4)]);
+        let y = vec![r(1), r(2), r(4)];
+        assert_eq!(solve_l(&l, &y, false), Some(vec![r(1), r(0)]));
+    }
+
+    #[test]
+    fn test_solve_l_zero_cols_consistent() {
+        // r = 0, y = 0 → returns Some(empty) (third branch with empty submat).
+        let l: SpMat<R> = SpMat::zero((3, 0));
+        assert_eq!(solve_l(&l, &[r(0); 3], true), Some(vec![]));
+    }
+
+    #[test]
+    fn test_solve_l_zero_cols_inconsistent() {
+        // r = 0 with non-zero y → residual = y ≠ 0 → None when check=true.
+        let l: SpMat<R> = SpMat::zero((3, 0));
+        assert_eq!(solve_l(&l, &[r(1), r(0), r(0)], true), None);
+    }
+
+    // ---- is_consistent / is_consistent_upto ----
+
+    #[test]
+    fn test_is_consistent_full() {
+        // l = [[1,0],[2,1],[3,4]], x = [1, 0]:
+        //   y = [1, 2, 3]: residual = [0, 0] → consistent.
+        //   y = [1, 2, 4]: residual at row 2 = 1 ≠ 0 → inconsistent.
+        let l = sp((3, 2), [r(1), r(0), r(2), r(1), r(3), r(4)]);
+        let x = vec![r(1), r(0)];
+        assert!( is_consistent(&l, &[r(1), r(2), r(3)], &x));
+        assert!(!is_consistent(&l, &[r(1), r(2), r(4)], &x));
+    }
+
+    #[test]
+    fn test_is_consistent_upto_partial() {
+        // l = [[1,0],[2,1],[3,4],[5,6]], x = [1, 0], y = [1, 2, 3, 99]:
+        //   row-2 residual = 0; row-3 residual = 99 - 5 = 94.
+        //   k=2: checks rows in [2..2] (none) → trivially true.
+        //   k=3: checks row 2 only → true.
+        //   k=4: checks rows 2 and 3 → false (row 3 fails).
+        let l = sp((4, 2), [r(1), r(0), r(2), r(1), r(3), r(4), r(5), r(6)]);
+        let y = vec![r(1), r(2), r(3), r(99)];
+        let x = vec![r(1), r(0)];
+        assert!( is_consistent_upto(&l, &y, &x, 2));
+        assert!( is_consistent_upto(&l, &y, &x, 3));
+        assert!(!is_consistent_upto(&l, &y, &x, 4));
+    }
+
+    // ---- solve_u ----
+
+    #[test]
+    fn test_solve_u_square() {
+        // u = [[1, 2], [0, 3]], y = [4, 6].
+        // Back sub: x[1] = 6/3 = 2; x[0] = (4 - 2*2)/1 = 0.
+        let u = sp((2, 2), [r(1), r(2), r(0), r(3)]);
+        let y = vec![r(4), r(6)];
+        assert_eq!(solve_u(&u, &y), vec![r(0), r(2)]);
+    }
+
+    #[test]
+    fn test_solve_u_rectangular() {
+        // u = [[1, 2, 5, 6], [0, 3, 7, 8]], y = [4, 6].
+        // Top 2×2 same as above → x[..2] = [0, 2]; trailing entries are zeros.
+        let u = sp((2, 4), [r(1), r(2), r(5), r(6), r(0), r(3), r(7), r(8)]);
+        let y = vec![r(4), r(6)];
+        assert_eq!(solve_u(&u, &y), vec![r(0), r(2), r(0), r(0)]);
+    }
+
+    #[test]
+    fn test_solve_u_empty() {
+        // r = 0, n = 0 → empty input/output.
+        let u: SpMat<R> = SpMat::zero((0, 0));
+        assert_eq!(solve_u(&u, &[]), Vec::<R>::new());
     }
 
     // ---- solve_pluq integration tests ----
@@ -947,6 +952,69 @@ mod tests {
         let y = [r(1), r(2), r(3), r(4)];
         let x = solve_check(&a, &y);
         assert_eq!(x, y);
+    }
+
+    // ---- extend_chunk_to_full ----
+
+    fn check_extend_chunk(s: &SpMat<i32>, c: usize) {
+        let (m, n) = s.shape();
+        assert!(c <= m);
+        let [s_top, s_rest] = s.divide_at_row(c);
+        let pp_chunk = pluq(&s_top, cfg(PivotType::Rows));
+        let pp = extend_chunk_to_full(pp_chunk, &s_rest);
+        let r = pp.rank();
+
+        assert_eq!(pp.l.shape(), (m, r));
+        assert_eq!(pp.u.shape(), (r, n));
+        assert_eq!(pp.s.shape(), (m - r, n - r));
+
+        let psq = s.permute(pp.p.view(), pp.q.view());
+        let rem = SpMat::from_entries((m, n),
+            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
+        );
+        assert_eq!(psq, &pp.l * &pp.u + &rem, "p*s*q != l*u + rest (c = {c})");
+    }
+
+    #[test]
+    fn test_extend_chunk_top() { check_extend_chunk(&sample(), 3); }
+
+    #[test]
+    fn test_extend_chunk_full() { check_extend_chunk(&sample(), 6); }
+
+    #[test]
+    fn test_extend_chunk_empty() { check_extend_chunk(&sample(), 0); }
+
+    #[test]
+    fn test_extend_chunk_rand() { check_extend_chunk(&SpMat::<i32>::rand((40, 60), 0.1), 17); }
+
+    // ---- chunk_pluq ----
+
+    #[test]
+    fn test_chunk_pluq() {
+        let s = sample();
+        let (m, n) = s.shape();
+        let (pp, r_chunk, c) = chunk_pluq(&s, 3);
+        let r = pp.rank();
+
+        assert_eq!(c, 3);
+        assert_eq!(r, r_chunk);
+        assert_eq!(pp.l.shape(), (m, r));
+        assert_eq!(pp.u.shape(), (r, n));
+        assert_eq!(pp.s.shape(), (m - r, n - r));
+
+        let psq = s.permute(pp.p.view(), pp.q.view());
+        let rem = SpMat::from_entries((m, n),
+            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
+        );
+        assert_eq!(psq, &pp.l * &pp.u + &rem);
+    }
+
+    #[test]
+    fn test_chunk_pluq_oversize() {
+        let s = sample();
+        let m = s.nrows();
+        let (_, _, c) = chunk_pluq(&s, 100);
+        assert_eq!(c, m);
     }
 
     // ---- solve_pluq_incr integration tests ----
@@ -1056,5 +1124,51 @@ mod tests {
             // Always-consistent y: both must succeed and produce a solution.
             solve_incr_check(&a, &y_consistent, mp, ch);
         }
+    }
+
+    // ---- perm helpers ----
+
+    #[test]
+    fn test_lift_perm() {
+        use sprs::PermOwned;
+        // compact_idx = [1, 3] in full space of size 5.
+        // compact_perm swaps the two: at(0)=1, at(1)=0.
+        // Expected:
+        //   i=1 (compact_idx[0]) -> compact_perm.at(0) = 1
+        //   i=3 (compact_idx[1]) -> compact_perm.at(1) = 0
+        //   rest = [0,2,4] -> positions [2,3,4]
+        //     i=0 -> 2,  i=2 -> 3,  i=4 -> 4
+        let cp = PermOwned::new(vec![1, 0]);
+        let idx = vec![1usize, 3];
+        let p = lift_perm(&cp, &idx, 5);
+        assert_eq!(p.at(0), 2);
+        assert_eq!(p.at(1), 1);
+        assert_eq!(p.at(2), 3);
+        assert_eq!(p.at(3), 0);
+        assert_eq!(p.at(4), 4);
+    }
+
+    #[test]
+    fn test_lift_perm_identity() {
+        use sprs::PermOwned;
+        // compact_idx = [0, 2, 5] with identity compact_perm.
+        // lift_perm should equal perm_for_indices(7, [0,2,5]).
+        let cp = PermOwned::identity(3);
+        let idx = vec![0usize, 2, 5];
+        let p = lift_perm(&cp, &idx, 7);
+        let expected = perm_for_indices(7, idx.iter());
+        for i in 0..7 {
+            assert_eq!(p.at(i), expected.at(i), "mismatch at i={i}");
+        }
+    }
+
+    #[test]
+    fn test_perm_apply() {
+        use sprs::PermOwned;
+        let p = PermOwned::new(vec![1, 2, 0]); // 0→1, 1→2, 2→0
+        let y = vec![r(10), r(20), r(30)];
+        let yp = perm_apply(p.view(), &y);
+        // yp[p(0)=1]=10, yp[p(1)=2]=20, yp[p(2)=0]=30
+        assert_eq!(yp, vec![r(30), r(10), r(20)]);
     }
 }

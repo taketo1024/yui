@@ -180,8 +180,6 @@ where
             return false;
         }
 
-        debug!("  found {r} pivots.");
-        
         let a = a.permute(p.view(), q.view());
 
         let t = match piv_type { 

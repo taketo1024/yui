@@ -133,6 +133,10 @@ pub fn pluq<R>(a: &SpMat<R>, config: PivotFinderConfig) -> SpPluq<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let piv_type = config.piv_type;
     let pp1 = pre_pluq(a, config);
+    if pp1.s.is_zero() { 
+        return pp1
+    }
+    
     let pp2 = dense_pluq_in(&pp1.s, piv_type);
     merge_pluq(pp1, pp2)
 }
@@ -204,6 +208,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     assert_eq!(pp1.s.shape(), (m - r1, n - r1));
     assert_eq!(pp2.l.nrows(), m - r1);
     assert_eq!(pp2.u.ncols(), n - r1);
+
+    // Fast path: when pp2 contributes no new pivots, the merged result equals
+    // pp1 (its schur complement is unchanged: pp2.s has the same shape as
+    // pp1.s and represents the same residual when r2 == 0).
+    if r2 == 0 {
+        return pp1;
+    }
 
     let p = merge_perm(&pp1.p, &pp2.p);
     let q = merge_perm(&pp1.q, &pp2.q);
@@ -367,6 +378,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
         let r_old = pp.rank();
         let (pp_chunk_full, r_chunk, c) = chunk_pluq(&pp.s, chunk);
         let p_chunk = pp_chunk_full.p.clone();
+        
         pp = merge_pluq(pp, pp_chunk_full);
 
         // Apply the chunk's row perm to the tail of yp so it stays in sync with pp.l.

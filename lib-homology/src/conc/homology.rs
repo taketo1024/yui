@@ -28,9 +28,12 @@ where
     }
 
     pub fn homology(&self) -> HomologyBase<I, X, R> {
-        Grid::generate(
+        Grid::generate_filtered(
             self.support().copied(),
-            |i| self.homology_at(i)
+            |i| {
+                let hi = self.homology_at(i);
+                (!hi.is_zero()).then_some(hi)
+            }
         )
     }
 }

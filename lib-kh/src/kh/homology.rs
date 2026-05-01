@@ -1,7 +1,8 @@
 use std::ops::{RangeInclusive, Index};
+use std::sync::OnceLock;
 use delegate::delegate;
 
-use yui_homology::{DisplaySeq, DisplayTable, Grid2, GridIter, GridTrait, Homology, Summand, SummandTrait, rmod_str};
+use yui_homology::{DisplaySeq, DisplayTable, Grid2, GridIter, GridTrait, Homology, Summand, SummandTrait};
 use yui_core::{EucRing, EucRingOps};
 use yui_link::Link;
 
@@ -11,13 +12,14 @@ use crate::misc::{make_gen_grid, range_of};
 use super::{KhAlg, KhChain, KhComplex};
 
 #[derive(Clone)]
-pub struct KhHomology<R> 
+pub struct KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     inner: Homology<KhChainGen, R>,
     str: KhAlg<R>,
     deg_shift: (isize, isize),
     reduced: bool,
-    canon_cycles: Vec<KhChain<R>>
+    canon_cycles: Vec<KhChain<R>>,
+    gen_grid: OnceLock<Grid2<Summand<KhChainGen, R>>>,
 }
 
 impl<R> KhHomology<R> 
@@ -32,8 +34,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         Self::from(&c)
     }
     
-    pub(crate) fn new_impl(inner: Homology<KhChainGen, R>, str: KhAlg<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self { 
-        Self { inner, str, deg_shift, reduced, canon_cycles }
+    pub(crate) fn new_impl(inner: Homology<KhChainGen, R>, str: KhAlg<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
+        Self { inner, str, deg_shift, reduced, canon_cycles, gen_grid: OnceLock::new() }
     }
 
     pub fn str(&self) -> &KhAlg<R> { 
@@ -84,8 +86,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         )
     }
 
-    pub fn gen_grid(&self) -> Grid2<Summand<KhChainGen, R>> { 
-        make_gen_grid(self.inner())
+    fn gen_grid(&self) -> &Grid2<Summand<KhChainGen, R>> {
+        self.gen_grid.get_or_init(|| make_gen_grid(self.inner()))
     }
 }
 
@@ -117,13 +119,24 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 }
 
-impl<R> Index<isize> for KhHomology<R> 
+impl<R> Index<isize> for KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     type Output = Summand<KhChainGen, R>;
 
-    delegate! { 
-        to self.inner { 
+    delegate! {
+        to self.inner {
             fn index(&self, index: isize) -> &Self::Output;
+        }
+    }
+}
+
+impl<R> Index<(isize, isize)> for KhHomology<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    type Output = Summand<KhChainGen, R>;
+
+    delegate! {
+        to self.gen_grid() {
+            fn index(&self, index: (isize, isize)) -> &Self::Output;
         }
     }
 }
@@ -149,8 +162,12 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         (self.h_range().collect(), self.q_range().step_by(2).collect())
     }
 
-    fn display_at(&self, i: &isize, j: &isize) -> String { 
-        todo!()
+    fn display_at(&self, i: &isize, j: &isize) -> String {
+        if self[(*i, *j)].is_zero() {
+            ".".to_string()
+        } else {
+            self[(*i, *j)].to_string()
+        }
     }
 }
 
@@ -521,7 +538,6 @@ mod tests_v1 {
         assert_eq!(h.h_range(), 0..=0);
         assert_eq!(h.q_range(), 0..=0);
         
-        let h = h.gen_grid();
         assert_eq!(h[(0,0)].rank(), 1);
         assert!(h[(0,0)].is_free());
     }
@@ -534,7 +550,6 @@ mod tests_v1 {
         assert_eq!(h.h_range(), 0..=0);
         assert_eq!(h.q_range(), -1..=1);
 
-        let h = h.gen_grid();
         assert_eq!(h[(0,-1)].rank(), 1);
         assert!(h[(0,-1)].is_free());
         assert_eq!(h[(0, 1)].rank(), 1);
@@ -549,7 +564,6 @@ mod tests_v1 {
         assert_eq!(h.h_range(), 0..=0);
         assert_eq!(h.q_range(), 0..=0);
 
-        let h = h.gen_grid();
         assert_eq!(h[(0, 0)].rank(), 1);
         assert!(h[(0, 0)].is_free());
     }
@@ -562,7 +576,6 @@ mod tests_v1 {
         assert_eq!(h.h_range(), -3..=0);
         assert_eq!(h.q_range(), -9..=-1);
 
-        let h = h.gen_grid();
         assert_eq!(h[(-3,-9)].rank(), 1);
         assert!(h[(-3,-9)].is_free());
         assert_eq!(h[(-2,-7)].rank(), 0);
@@ -583,7 +596,6 @@ mod tests_v1 {
         assert_eq!(h.h_range(), 0..=3);
         assert_eq!(h.q_range(), 1..=9);
 
-        let h = h.gen_grid();
         assert_eq!(h[(0, 1)].rank(), 1);
         assert!(h[(0, 1)].is_free());
         assert_eq!(h[(0, 3)].rank(), 1);
@@ -604,7 +616,6 @@ mod tests_v1 {
         assert_eq!(h.h_range(), -3..=0);
         assert_eq!(h.q_range(), -8..=-2);
 
-        let h = h.gen_grid();
         assert_eq!(h[(-3,-8)].rank(), 1);
         assert!(h[(-3,-8)].is_free());
         assert_eq!(h[(-2,-6)].rank(), 1);
@@ -621,7 +632,6 @@ mod tests_v1 {
         assert_eq!(h.h_range(), -2..=2);
         assert_eq!(h.q_range(), -5..=5);
 
-        let h = h.gen_grid();
         assert_eq!(h[(-2,-5)].rank(), 1);
         assert!(h[(-2,-5)].is_free());
         assert_eq!(h[(-1,-3)].rank(), 0);
@@ -648,7 +658,6 @@ mod tests_v1 {
         assert_eq!(h.h_range(), -2..=2);
         assert_eq!(h.q_range(), -4..=4);
 
-        let h = h.gen_grid();
         assert_eq!(h[(-2,-4)].rank(), 1);
         assert!(h[(-2,-4)].is_free());
         assert_eq!(h[(-1,-2)].rank(), 1);
@@ -662,29 +671,7 @@ mod tests_v1 {
     }
 
     #[test]
-    fn gen_grid() {
-        let l = Link::trefoil();
-        let (h, t) = (0, 0);
-        let kh = KhHomology::new_no_simplify(&l, &h, &t, false);
- 
-        assert_eq!(kh.h_range(), -3..=0);
-        assert_eq!(kh.q_range(), -9..=-1);
- 
-        let kh = kh.gen_grid();
-        assert_eq!(kh[(-3,-9)].rank(), 1);
-        assert!(kh[(-3,-9)].is_free());
-        assert_eq!(kh[(-2,-7)].rank(), 0);
-        assert_eq!(kh[(-2,-7)].tors(), &vec![2]);
-        assert_eq!(kh[(-2,-5)].rank(), 1);
-        assert!(kh[(-2,-5)].is_free());
-        assert_eq!(kh[( 0,-3)].rank(), 1);
-        assert!(kh[( 0,-3)].is_free());
-        assert_eq!(kh[( 0,-1)].rank(), 1);
-        assert!(kh[( 0,-1)].is_free());
-    }
- 
-    #[test]
-    fn gen_grid_bn() {
+    fn trefoil_bn() {
         type R = FF2;
         type P = HPoly<'H', R>;
 
@@ -695,7 +682,6 @@ mod tests_v1 {
         assert_eq!(kh.h_range(), -2..=0);
         assert_eq!(kh.q_range(), -7..=-1);
 
-        let kh = kh.gen_grid();
         assert_eq!(kh[(-2,-7)].rank(), 0);
         assert_eq!(kh[(-2,-7)].tors(), &vec![h.clone()]);
         assert_eq!(kh[(-2,-5)].rank(), 0);

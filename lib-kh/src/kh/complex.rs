@@ -1,10 +1,11 @@
 use std::ops::{RangeInclusive, Index};
+use std::sync::OnceLock;
 use cartesian::cartesian;
 
 use delegate::delegate;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps};
 use yui_link::Link;
-use yui_homology::{ChainComplex, ChainComplexTrait, DisplaySeq, DisplayTable, Grid2, GridIter, GridTrait, Summand, isize2};
+use yui_homology::{ChainComplex, ChainComplexTrait, DisplaySeq, DisplayTable, Grid2, GridIter, GridTrait, Summand, SummandTrait, isize2};
 use yui_matrix::sparse::SpMat;
 
 use crate::kh::r#gen::KhChain;
@@ -27,6 +28,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     deg_shift: (isize, isize),
     reduced: bool,
     canon_cycles: Vec<KhChain<R>>,
+    gen_grid: OnceLock<Grid2<KhComplexSummand<R>>>,
 }
 
 impl<R> KhComplex<R>
@@ -61,8 +63,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         KhComplex::new_impl(complex, str, cube, deg_shift, reduced, canon_cycles)
     }
 
-    pub(crate) fn new_impl(inner: ChainComplex<KhChainGen, R>, str: KhAlg<R>, cube: KhCube<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self { 
-        KhComplex { inner, str, cube, deg_shift, reduced, canon_cycles }
+    pub(crate) fn new_impl(inner: ChainComplex<KhChainGen, R>, str: KhAlg<R>, cube: KhCube<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
+        KhComplex { inner, str, cube, deg_shift, reduced, canon_cycles, gen_grid: OnceLock::new() }
     }
 
     pub fn str(&self) -> &KhAlg<R> { 
@@ -99,16 +101,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.inner
     }
 
-    pub fn gen_grid(&self) -> Grid2<Summand<KhChainGen, R>> { 
+    fn gen_grid(&self) -> &Grid2<KhComplexSummand<R>> {
+        self.gen_grid.get_or_init(|| self.compute_gen_grid())
+    }
+
+    fn compute_gen_grid(&self) -> Grid2<KhComplexSummand<R>> {
         let h_range = self.h_range();
         let q_range = self.q_range().step_by(2);
-        let support = cartesian!(h_range, q_range.clone()).map(|(i, j)| 
+        let support = cartesian!(h_range, q_range.clone()).map(|(i, j)|
             isize2(i, j)
         );
 
-        Grid2::generate(support, |idx| { 
+        Grid2::generate(support, |idx| {
             let isize2(i, j) = idx;
-            let gens = self[i].raw_gens().iter().filter(|x| { 
+            let gens = self[i].raw_gens().iter().filter(|x| {
                 x.q_deg() == j
             }).cloned();
             Summand::from_raw_gens(gens)
@@ -145,6 +151,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     delegate! { 
         to self.inner {
             fn index(&self, index: isize) -> &Self::Output;
+        }
+    }
+}
+
+impl<R> Index<(isize, isize)> for KhComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = KhComplexSummand<R>;
+
+    delegate! { 
+        to self.gen_grid() {
+            fn index(&self, index: (isize, isize)) -> &Self::Output;
         }
     }
 }
@@ -201,7 +218,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn display_at(&self, i: &isize, j: &isize) -> String { 
-        todo!()
+        if self[(*i, *j)].is_zero() { 
+            ".".to_string()
+        } else { 
+            self[(*i, *j)].to_string()
+        }
     }
 }
 
@@ -245,9 +266,9 @@ mod tests {
     }
 
     #[test]
-    fn gen_grid() {
+    fn ckh_trefoil_bigr() {
         let l = Link::trefoil();
-        let c = KhComplex::new(&l, &0, &0, false).gen_grid();
+        let c = KhComplex::new(&l, &0, &0, false);
 
         assert_eq!(c[(-3, -9)].rank(), 1);
         assert_eq!(c[(-3, -7)].rank(), 1);
@@ -258,9 +279,9 @@ mod tests {
     }
 
     #[test]
-    fn gen_grid_red() {
+    fn ckh_trefoil_bigr_red() {
         let l = Link::trefoil();
-        let c = KhComplex::new(&l, &0, &0, true).gen_grid();
+        let c = KhComplex::new(&l, &0, &0, true);
 
         assert_eq!(c[(-3, -8)].rank(), 1);
         assert_eq!(c[(-2, -6)].rank(), 1);

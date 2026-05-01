@@ -410,8 +410,6 @@ mod tests {
         let e = c.sl2_map(&l);
         let h = c.homology();
 
-        h.gen_grid().print_table();
-
         let e_str = e.string_decomp(&h);
 
         assert_eq!(e_str.len(), 2);
@@ -428,11 +426,7 @@ mod tests {
         let e = c.sl2_map(&l);
         let h = c.homology();
 
-        h.gen_grid().print_table();
-
         let e_str = e.string_decomp(&h);
-        println!("{e_str}");
-
         assert_eq!(e_str.len(), 3);
         assert_eq!(e_str[(1, 1, 2)], 1);
         assert_eq!(e_str[(3, 3, 1)], 1);

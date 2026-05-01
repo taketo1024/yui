@@ -49,7 +49,7 @@ impl<R> SpPluq<R> {
 /// configuration.
 pub fn pre_pluq<R>(a: &SpMat<R>, config: PivotFinderConfig) -> SpPluq<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    debug!("pre PLUQ: {:?}", a.shape());
+    debug!("compute sparse pluq: {:?}", a.shape());
 
     let piv_type = config.piv_type;
     let pivots = find_pivots(a, config);
@@ -138,6 +138,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
     
     let pp2 = dense_pluq_in(&pp1.s, piv_type);
+
+    debug!("merge pluq: {} + {}", pp1.rank(), pp2.rank());
+
     merge_pluq(pp1, pp2)
 }
 
@@ -251,6 +254,8 @@ pub fn solve_pluq<R>(a: &SpMat<R>, y: &[R]) -> Option<Vec<R>>
 where R: Field, for<'x> &'x R: FieldOps<R> {
     assert_eq!(y.len(), a.nrows());
 
+    debug!("solve pluq, a: {:?}", a.shape());
+
     let pp = pluq(a, PivotFinderConfig {
         piv_type: PivotType::Rows,
         ..Default::default()
@@ -303,7 +308,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
         let y0 = SpVec::from(y[..r].to_vec());
         let x = solve_triangular_vec(TriangularType::Lower, &l0, &y0).to_dense();
 
-        if check_consistency && !is_consistent(l, y, &x){ 
+        if check_consistency && !is_consistent(l, y, &x) { 
             return None;
         }
         x
@@ -367,6 +372,8 @@ pub fn solve_pluq_incr<R>(a: &SpMat<R>, y: &[R], max_piv: usize, chunk: usize) -
 where R: Field, for<'x> &'x R: FieldOps<R> {
     assert_eq!(y.len(), a.nrows());
 
+    debug!("solve pluq (incremental), a: {:?}", a.shape());
+
     let mut pp = pre_pluq(a, PivotFinderConfig {
         piv_type: PivotType::Rows,
         max_pivots: max_piv,
@@ -374,27 +381,38 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
     });
     let mut yp = perm_apply(pp.p.view(), y);
 
+    let mut step = 1;
+    let total_step = (a.nrows() - pp.rank()) / chunk;
+
     while pp.s.nrows() > 0 {
+        debug!("solve pluq ({}/{})", step, total_step);
+        debug!("  current rank: {}", pp.rank());
+
         let r_old = pp.rank();
-        let (pp_chunk_full, r_chunk, c) = chunk_pluq(&pp.s, chunk);
-        let p_chunk = pp_chunk_full.p.clone();
+        let (pp_next, r_next, c) = chunk_pluq(&pp.s, chunk);
+        let p_next = pp_next.p.clone();
         
-        pp = merge_pluq(pp, pp_chunk_full);
+        debug!("merge pluq: {} + {}", pp.rank(), pp_next.rank());
+
+        pp = merge_pluq(pp, pp_next);
 
         // Apply the chunk's row perm to the tail of yp so it stays in sync with pp.l.
-        let yp_tail = perm_apply(p_chunk.view(), &yp[r_old..]);
+        let yp_tail = perm_apply(p_next.view(), &yp[r_old..]);
         yp[r_old..].clone_from_slice(&yp_tail);
 
         // The top `k` rows of pp.s are zero rows (chunk's PLUQ leftover);
         // they demand `yp[r_new..r_new+k] == L[r_new..r_new+k, :] * z` for
         // consistency, regardless of future chunks.
-        let k = c - r_chunk;
+        let k = c - r_next;
         let z = solve_l(&pp.l, &yp, false).unwrap();
+
         if !is_consistent_upto(&pp.l, &yp, &z, z.len() + k) {
+            debug!("found inconsistency at step {}/{}.", step, total_step);
             return None;
         }
 
         trim_zero_rows(&mut pp, &mut yp, k);
+        step += 1;
     }
 
     let xq = solve_lu(&pp.l, &pp.u, &yp)?;
@@ -415,8 +433,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         ..Default::default()
     });
     let r_chunk = pp_chunk.rank();
-    let pp_chunk_full = extend_chunk_to_full(pp_chunk, &s_rest);
-    (pp_chunk_full, r_chunk, c)
+    let pp_full = extend_chunk_to_full(pp_chunk, &s_rest);
+    (pp_full, r_chunk, c)
 }
 
 // Lifts a PLUQ of the top `c` rows of some matrix `s` (= `pp_chunk`) to a

@@ -45,7 +45,7 @@ impl<R: Scalar> Pluq<R> {
 /// which aligns with `DMatrix`'s column-major storage and avoids strided row access.
 pub fn pluq<R>(a: &Mat<R>) -> Pluq<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    debug!("dense pluq: {:?}", a.shape());
+    debug!("compute dense pluq: {:?}", a.shape());
 
     let (m, n) = a.shape();
     let mut work = a.clone();

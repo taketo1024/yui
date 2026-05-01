@@ -35,6 +35,13 @@ impl TriangularType {
             Self::Lower => Self::Upper
         }
     }
+
+    fn str(&self) -> &'static str { 
+        match self { 
+            Self::Upper => "upper",
+            Self::Lower => "lower"
+        }
+    }
 }
 
 pub fn inv_triangular<R>(t: TriangularType, a: &SpMat<R>) -> SpMat<R>
@@ -69,6 +76,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     assert_eq!(a.nrows(), b.dim());
     debug_assert!(a.is_triang(t));
 
+    debug!("solve {} triangular-vec", t.str());
+    debug!("  a: {:?}", a.shape());
+
     let diag = collect_diag(a);
     let mut b = b.to_dense();
 
@@ -78,7 +88,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 #[allow(unused)]
 fn solve_triangular_s<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    debug!("solve triangular, y: {:?}", y.shape());
+    debug!("solve {} triangular", t.str());
+    debug!("  a: {:?}, y: {:?}", a.shape(), y.shape());
 
     let (n, k) = (a.nrows(), y.ncols());
     let diag = collect_diag(a);
@@ -97,7 +108,8 @@ fn solve_triangular_m<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat
 where R: Ring, for<'x> &'x R: RingOps<R> {
     use yui_core::util::sync::SyncCounter;
 
-    debug!("solve triangular, y: {:?}", y.shape());
+    debug!("solve {} triangular (threads: {})", t.str(), rayon::max_num_threads());
+    debug!("  a: {:?}, y: {:?}", a.shape(), y.shape());
 
     let (n, k) = (a.nrows(), y.ncols());
     let diag = collect_diag(a);

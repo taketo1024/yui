@@ -94,8 +94,6 @@ where
             }
         }
 
-        println!("sorted: [{}]", res.iter().map(|x| x.to_string()).join(","));
-
         res
     }
 

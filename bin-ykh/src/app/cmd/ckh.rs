@@ -125,7 +125,7 @@ where
     }
 
     fn show_gens(&mut self, ckh: &KhComplex<R>) { 
-        for i in ckh.support() {
+        for &i in ckh.support() {
             let c = &ckh[i];
             if c.is_zero() { continue }
             

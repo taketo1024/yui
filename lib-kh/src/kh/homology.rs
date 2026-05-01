@@ -1,7 +1,7 @@
 use std::ops::{RangeInclusive, Index};
 use delegate::delegate;
 
-use yui_homology::{Grid2, GridTrait, Homology, Summand, SummandTrait};
+use yui_homology::{Grid2, GridIter, GridTrait, Homology, Summand, SummandTrait};
 use yui_core::{EucRing, EucRingOps};
 use yui_link::Link;
 
@@ -48,20 +48,20 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         self.reduced
     }
 
-    pub fn h_range(&self) -> RangeInclusive<isize> { 
-        range_of(self.support().filter(|&i| 
+    pub fn h_range(&self) -> RangeInclusive<isize> {
+        range_of(self.support().filter(|&&i|
             !self[i].is_zero()
-        ))
+        ).copied())
     }
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
-        range_of(self.support().flat_map(|i| 
+        range_of(self.support().flat_map(|&i|
             self[i].gens().map(|z| z.q_deg())
         ))
     }
 
     pub fn delta_range(&self) -> RangeInclusive<isize> {
-        range_of(self.support().flat_map(|i| 
+        range_of(self.support().flat_map(|&i|
             self[i].gens().map(|z| 2 * z.h_deg() - z.q_deg())
         ))
     }
@@ -104,12 +104,12 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 impl<R> GridTrait<isize> for KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    type Support = std::vec::IntoIter<isize>;
     type Item = Summand<KhChainGen, R>;
+    type Support<'a> = GridIter<'a, isize, Self::Item> where Self: 'a, R: 'a;
 
-    delegate! { 
-        to self.inner { 
-            fn support(&self) -> Self::Support;
+    delegate! {
+        to self.inner {
+            fn support(&self) -> Self::Support<'_>;
             fn is_supported(&self, i: isize) -> bool;
             fn get(&self, i: isize) -> &Self::Item;
             fn get_default(&self) -> &Self::Item;

@@ -86,7 +86,7 @@ where
         let r = ChainReducer::reduce(self, true);
 
         let summands = Grid::generate(
-            self.summands.support(),
+            self.summands.support().copied(),
             |i| {
                 let c = &self[i];
                 Summand::new(
@@ -135,17 +135,17 @@ where
 }
 
 impl<I, X, R> GridTrait<I> for ChainComplexBase<I, X, R>
-where 
+where
     I: GridDeg,
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
-    type Support = GridIter<I>;
     type Item = Summand<X, R>;
-    
-    delegate! { 
-        to self.summands { 
-            fn support(&self) -> Self::Support;
+    type Support<'a> = GridIter<'a, I, Self::Item> where Self: 'a, I: 'a, X: 'a, R: 'a;
+
+    delegate! {
+        to self.summands {
+            fn support(&self) -> Self::Support<'_>;
             fn is_supported(&self, i: I) -> bool;
             fn get(&self, i: I) -> &Self::Item;
             fn get_default(&self) -> &Self::Item;

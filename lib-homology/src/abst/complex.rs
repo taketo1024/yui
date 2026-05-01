@@ -35,7 +35,7 @@ where
     }
 
     fn check_d_all(&self) {
-        for i in self.support() { 
+        for &i in self.support() {
             self.check_d_at(i);
         }
     }
@@ -51,11 +51,11 @@ where
         format!("d[{i}]: {c0} -> {c1}\n{d}")
     }
 
-    fn display_d(&self) -> String { 
-        self.support().filter_map(|i| 
+    fn display_d(&self) -> String {
+        self.support().filter_map(|&i|
             if self.rank(i) > 0 && self.rank(i + self.d_deg()) > 0 && !self.d_matrix(i).is_zero() {
                 Some(self.display_d_at(i))
-            } else { 
+            } else {
                 None
             }
         ).join("")
@@ -66,6 +66,10 @@ where
     }
 
     fn as_generic(&self) -> GenericChainComplexBase<I, Self::R> {
-        GenericChainComplexBase::generate(self.support(), self.d_deg(), |i| self.d_matrix(i))
+        GenericChainComplexBase::generate(
+            self.support().copied(), 
+            self.d_deg(), 
+            |i| self.d_matrix(i)
+        )
     }
 }

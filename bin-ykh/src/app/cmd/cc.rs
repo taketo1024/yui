@@ -136,7 +136,7 @@ where
     }
 
     fn show_gens(&mut self, h: &KhHomology<R>) { 
-        for i in h.support() {
+        for &i in h.support() {
             if h[i].is_zero() { continue }
 
             self.out(&format!("({i}): {}", h[i]));

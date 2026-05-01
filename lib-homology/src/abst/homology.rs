@@ -38,6 +38,9 @@ where
     }
 
     fn compute_homology(&self, with_trans: bool) -> GenericHomologyBase<I, R> {
-        Grid::generate(self.support(), |i| self.compute_homology_at(i, with_trans))
+        Grid::generate(
+            self.support().copied(), 
+            |i| self.compute_homology_at(i, with_trans)
+        )
     }
 }

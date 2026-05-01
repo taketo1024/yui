@@ -137,7 +137,7 @@ where
     }
 
     fn show_gens(&mut self, khi: &KhIHomology<R>) { 
-        for i in khi.support() {
+        for &i in khi.support() {
             let h = &khi[i];
             if h.is_zero() { continue }
 

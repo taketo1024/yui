@@ -6,11 +6,11 @@ use itertools::Itertools;
 use crate::{GridDeg, isize2, usize2, isize3, usize3};
 
 pub trait GridTrait<I>
-where I: GridDeg { 
-    type Support: Iterator<Item = I>;
+where I: GridDeg {
+    type Support<'a>: Iterator<Item = &'a I> where Self: 'a;
     type Item;
 
-    fn support(&self) -> Self::Support;
+    fn support(&self) -> Self::Support<'_>;
     fn is_supported(&self, i: I) -> bool;
     fn get(&self, i: I) -> &Self::Item;
     fn get_default(&self) -> &Self::Item;
@@ -20,27 +20,26 @@ pub type Grid1<E> = Grid<isize,  E>;
 pub type Grid2<E> = Grid<isize2, E>;
 pub type Grid3<E> = Grid<isize3, E>;
 
-pub type GridIter<I> = std::vec::IntoIter<I>;
+pub type GridIter<'a, I, V> = std::collections::hash_map::Keys<'a, I, V>;
 
 #[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Grid<I, E>
-where I: GridDeg { 
-    support: Vec<I>,
+where I: GridDeg {
     data: AHashMap<I, E>,
     #[cfg_attr(feature = "serde", serde(skip))]
     default: E
 }
 
 impl<I, E> Grid<I, E>
-where I: GridDeg { 
-    fn new(support: Vec<I>, data: AHashMap<I, E>, default: E) -> Self { 
-        Self { support, data, default }
+where I: GridDeg {
+    fn new(data: AHashMap<I, E>, default: E) -> Self {
+        Self { data, default }
     }
 
     pub fn generate<It, F>(support: It, e_map: F) -> Self
-    where 
-        It: IntoIterator<Item = I>, 
+    where
+        It: IntoIterator<Item = I>,
         F: FnMut(I) -> E,
         E: Default
     {
@@ -48,37 +47,36 @@ where I: GridDeg {
     }
 
     pub fn generate_with_default<It, F>(support: It, mut e_map: F, default: E) -> Self
-    where 
-        It: IntoIterator<Item = I>, 
+    where
+        It: IntoIterator<Item = I>,
         F: FnMut(I) -> E
     {
-        let support = support.into_iter().collect_vec();
-        let data = support.iter().map(|&i| (i, e_map(i))).collect();
-        Self::new(support, data, default)
+        let data = support.into_iter().map(|i| (i, e_map(i))).collect();
+        Self::new(data, default)
     }
 
     pub fn insert(&mut self, i: I, e: E) {
         self.data.insert(i, e);
     }
 
-    pub fn remove(&mut self, i: I) -> Option<E> { 
+    pub fn remove(&mut self, i: I) -> Option<E> {
         self.data.remove(&i)
     }
 
-    pub fn get_mut(&mut self, i: I) -> Option<&mut E> { 
+    pub fn get_mut(&mut self, i: I) -> Option<&mut E> {
         self.data.get_mut(&i)
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (I, &E)> {
-        self.support.iter().map(|&i| (i, self.get(i)))
+        self.data.iter().map(|(&i, e)| (i, e))
     }
 
     pub fn map<E2, F>(&self, mut f: F) -> Grid<I, E2>
-    where F: FnMut(&E) -> E2 
+    where F: FnMut(&E) -> E2
     {
         let d = f(self.get_default());
         Grid::generate_with_default(
-            self.support(), 
+            self.support().copied(),
             |i| f(self.get(i)),
             d
         )
@@ -87,8 +85,8 @@ where I: GridDeg {
 
 impl<E> Grid1<E> {
     pub fn truncated(&self, range: RangeInclusive<isize>) -> Self
-    where E: Clone { 
-        let support = self.support().filter(|i| range.contains(i));
+    where E: Clone {
+        let support = self.support().copied().filter(|i| range.contains(i));
         Self::generate_with_default(support, |i| self[i].clone(), self.default.clone())
     }
 }
@@ -97,31 +95,28 @@ impl<E> Grid1<E> {
 impl<I, E> Default for Grid<I, E>
 where I: GridDeg, E: Default {
     fn default() -> Self {
-        Self::new(Vec::default(), AHashMap::default(), E::default())
+        Self::new(AHashMap::default(), E::default())
     }
 }
 
 impl<I, E> IntoIterator for Grid<I, E>
 where I: GridDeg {
     type Item = (I, E);
-    type IntoIter = std::vec::IntoIter<(I, E)>;
+    type IntoIter = std::collections::hash_map::IntoIter<I, E>;
 
-    fn into_iter(mut self) -> Self::IntoIter {
-        let support = self.support();
-        support.flat_map(|i| { 
-            self.data.remove(&i).map(|e| (i, e))
-        }).collect_vec().into_iter()
+    fn into_iter(self) -> Self::IntoIter {
+        self.data.into_iter()
     }
 }
 
 
 impl<I, E> GridTrait<I> for Grid<I, E>
-where I: GridDeg { 
-    type Support = GridIter<I>;
+where I: GridDeg {
     type Item = E;
+    type Support<'a> = GridIter<'a, I, E> where Self: 'a, I: 'a, E: 'a;
 
-    fn support(&self) -> Self::Support {
-        self.support.clone().into_iter()
+    fn support(&self) -> Self::Support<'_> {
+        self.data.keys()
     }
 
     fn is_supported(&self, i: I) -> bool {
@@ -132,7 +127,7 @@ where I: GridDeg {
         self.data.get(&i).unwrap_or(&self.default)
     }
 
-    fn get_default(&self) -> &E { 
+    fn get_default(&self) -> &E {
         &self.default
     }
 }
@@ -148,13 +143,8 @@ where I: GridDeg {
 impl<I, E> FromIterator<(I, E)> for Grid<I, E>
 where I: GridDeg, E: Default {
     fn from_iter<T: IntoIterator<Item = (I, E)>>(iter: T) -> Self {
-        let init = (vec![], AHashMap::new());
-        let (support, data) = iter.into_iter().fold(init, |(mut support, mut data), (i, e)| {
-            support.push(i);
-            data.insert(i, e);
-            (support, data)
-        });
-        Self::new(support, data, E::default())
+        let data = iter.into_iter().collect();
+        Self::new(data, E::default())
     }
 }
 
@@ -190,14 +180,14 @@ macro_rules! impl_print_seq {
     ($t:ident) => {
         impl<G> DisplaySeq<$t> for G
         where G: GridTrait<$t>, G::Item: Display {
-            fn display_seq(&self, label: &str) -> String { 
+            fn display_seq(&self, label: &str) -> String {
                 use yui_core::util::format::table;
 
-                table(label, [""].iter(), self.support(), |_, &i| {
+                table(label, [""].iter(), self.support().copied(), |_, &i| {
                     self.get(i).to_string()
                 })
             }
-        }                
+        }
     };
 }
 
@@ -220,9 +210,9 @@ macro_rules! impl_print_table {
 
                 let def_str = self.get_default().to_string();
                 let head = format!("{}\\{}", label1, label0);
-                let cols = self.support().map(|$t(i, _)| i).unique().sorted();
-                let rows = self.support().map(|$t(_, j)| j).unique().sorted().rev();
-        
+                let cols = self.support().map(|&$t(i, _)| i).unique().sorted();
+                let rows = self.support().map(|&$t(_, j)| j).unique().sorted().rev();
+
                 table(head, rows, cols, |&j, &i| {
                     let str = self.get($t(i, j)).to_string();
                     if str == def_str { 
@@ -254,8 +244,8 @@ pub mod tex {
             where G: GridTrait<$t>, G::Item: TeX {
                 fn tex_table(&self, caption: &str, head: &str) -> String {
                     let def_str = self.get_default().tex_string();
-                    let cols = self.support().map(|$t(i, _)| i).unique().sorted();
-                    let rows = self.support().map(|$t(_, j)| j).unique().sorted().rev();
+                    let cols = self.support().map(|&$t(i, _)| i).unique().sorted();
+                    let rows = self.support().map(|&$t(_, j)| j).unique().sorted().rev();
             
                     tex_table(caption, head, rows, cols, |&j, &i| {
                         let str = self.get($t(i, j)).tex_string();

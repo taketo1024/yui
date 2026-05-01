@@ -29,7 +29,7 @@ where
 
     pub fn homology(&self) -> HomologyBase<I, X, R> {
         Grid::generate(
-            self.support(), 
+            self.support().copied(),
             |i| self.homology_at(i)
         )
     }

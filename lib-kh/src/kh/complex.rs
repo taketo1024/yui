@@ -4,7 +4,7 @@ use cartesian::cartesian;
 use delegate::delegate;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps};
 use yui_link::Link;
-use yui_homology::{isize2, ChainComplexTrait, Grid2, GridTrait, ChainComplex, Summand};
+use yui_homology::{isize2, ChainComplexTrait, Grid2, GridIter, GridTrait, ChainComplex, Summand};
 use yui_matrix::sparse::SpMat;
 
 use crate::kh::r#gen::KhChain;
@@ -81,12 +81,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.reduced
     }
 
-    pub fn h_range(&self) -> RangeInclusive<isize> { 
-        range_of(self.support())
+    pub fn h_range(&self) -> RangeInclusive<isize> {
+        range_of(self.support().copied())
     }
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
-        range_of(self.support().flat_map(|i| 
+        range_of(self.support().flat_map(|&i|
             self[i].raw_gens().iter().map(|x| x.q_deg())
         ))
     }
@@ -144,12 +144,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> GridTrait<isize> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Support = std::vec::IntoIter<isize>;
     type Item = KhComplexSummand<R>;
+    type Support<'a> = GridIter<'a, isize, Self::Item> where Self: 'a, R: 'a;
 
-    delegate! { 
-        to self.inner { 
-            fn support(&self) -> Self::Support;
+    delegate! {
+        to self.inner {
+            fn support(&self) -> Self::Support<'_>;
             fn is_supported(&self, i: isize) -> bool;
             fn get(&self, i: isize) -> &Self::Item;
             fn get_default(&self) -> &Self::Item;

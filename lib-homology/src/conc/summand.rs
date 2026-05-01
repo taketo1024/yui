@@ -183,7 +183,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
 impl<I, X, R> Grid<I, Summand<X, R>>
 where I: GridDeg, X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn total_rank(&self) -> usize { 
-        self.support().map(|i| self[i].rank()).sum()
+        self.support().map(|&i| self[i].rank()).sum()
     }
 }
 

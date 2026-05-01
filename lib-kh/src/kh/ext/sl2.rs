@@ -118,10 +118,11 @@ impl<R> KhSl2Map<R> where
         assert!(self.cube.str().h().is_zero());
         assert!(self.cube.str().t().is_zero());
 
-        let n = kh.support().map(|i| kh[i].rank()).sum();
-        let gens = kh.support().flat_map(|i| kh[i].gens()).collect_vec();
-
         let h_range = kh.h_range().mv(0, -self.h_deg());
+
+        let n = kh.support().map(|&i| kh[i].rank()).sum();
+        let gens = h_range.clone().flat_map(|i| kh[i].gens()).collect_vec();
+
         let blocks = h_range.map(|i|
             kh[i].make_matrix(&kh[i + self.h_deg()], |z| self.apply(z))
         );

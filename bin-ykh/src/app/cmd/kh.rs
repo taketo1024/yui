@@ -133,7 +133,7 @@ where
     }
 
     fn show_gens(&mut self, kh: &KhHomology<R>) { 
-        for i in kh.support() {
+        for &i in kh.support() {
             let h = &kh[i];
             if h.is_zero() { continue }
 

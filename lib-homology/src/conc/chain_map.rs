@@ -91,13 +91,13 @@ where
         source: &ChainComplexBase<I, X, R>,
         target: &ChainComplexBase<I, Y, R>,
     ) {
-        for i in source.support() {
+        for &i in source.support() {
             self.check_at(source, target, i);
         }
     }
 
-    pub fn print_map(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>) { 
-        for i in source.support() { 
+    pub fn print_map(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>) {
+        for &i in source.support() {
             self.print_map_at(source, target, i);
             println!();
         }

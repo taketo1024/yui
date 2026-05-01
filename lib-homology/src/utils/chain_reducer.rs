@@ -52,7 +52,7 @@ where
 
     pub fn from<C>(complex: &C, with_trans: bool) -> Self 
     where C: GridTrait<I> + ChainComplexTrait<I, R = R> {
-        let support = complex.support();
+        let support = complex.support().copied();
         let d_deg = complex.d_deg();
 
         let mut reducer = Self::new(support, d_deg);

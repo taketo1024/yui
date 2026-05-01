@@ -28,6 +28,20 @@ pub struct PartialPluq<R> {
 }
 
 impl<R> PartialPluq<R> {
+    /// Constructs a `PartialPluq` after asserting the shapes are mutually
+    /// consistent: `l.ncols() == u.nrows() = r`, `l.nrows() == p.dim() = m`,
+    /// `u.ncols() == q.dim() = n`, and `s.shape() == (m - r, n - r)`.
+    pub fn new(p: PermOwned, q: PermOwned, l: SpMat<R>, u: SpMat<R>, s: SpMat<R>) -> Self {
+        let r = l.ncols();
+        let m = l.nrows();
+        let n = u.ncols();
+        assert_eq!(r, u.nrows(), "l.ncols() must match u.nrows()");
+        assert_eq!(m, p.dim(), "l.nrows() must match p.dim()");
+        assert_eq!(n, q.dim(), "u.ncols() must match q.dim()");
+        assert_eq!(s.shape(), (m - r, n - r), "s shape must be (m - r, n - r)");
+        Self { p, q, l, u, s }
+    }
+
     pub fn rank(&self) -> usize { self.l.ncols() }
 }
 
@@ -45,7 +59,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let paq = split_by_pqr(a, &p, &q, r);
     let (l, u, s) = build_lus(piv_type, paq);
 
-    PartialPluq { p, q, l, u, s }
+    PartialPluq::new(p, q, l, u, s)
 }
 
 // Applies permutations (p, q) to `a` and partitions the result into four blocks at row/col r:
@@ -145,7 +159,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let mut s2 = SpMat::from(dp.s);
     s2.extend_by_zero(ms - m0, ns - n0);
 
-    PartialPluq { p: p2, q: q2, l: l2, u: u2, s: s2 }
+    PartialPluq::new(p2, q2, l2, u2, s2)
 }
 
 // Extracts the compact dense submatrix of `s` using only its non-zero rows/cols.
@@ -216,7 +230,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     let s = pp2.s;
 
-    PartialPluq { p, q, l, u, s }
+    PartialPluq::new(p, q, l, u, s)
 }
 
 /// Solves `a * x = y` over a field using sparse PLUQ.
@@ -233,7 +247,9 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
 
     let yp = perm_apply(pp.p.view(), y);
     let xq = solve_lu(&pp.l, &pp.u, &yp)?;
-    Some(perm_apply(pp.q.view().inv().view(), &xq))
+    let x = perm_apply(pp.q.inv(), &xq);
+
+    Some(x)
 }
 
 // Solves `L * U * x = y` and returns `x` of length `n = u.ncols()` with
@@ -370,7 +386,9 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
     }
 
     let xq = solve_lu(&pp.l, &pp.u, &yp)?;
-    Some(perm_apply(pp.q.view().inv().view(), &xq))
+    let x = perm_apply(pp.q.inv(), &xq);
+
+    Some(x)
 }
 
 // Takes the top `min(chunk_size, s.nrows())` rows of `s`, runs `pluq` on them,
@@ -420,11 +438,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let u = u_top.concat(&u_right);
     let s = pp_chunk.s.stack(&s_ext);
 
-    PartialPluq { p, q, l, u, s }
+    PartialPluq::new(p, q, l, u, s)
 }
 
-// Drops the top `k` zero rows of `pp.s` from `pp.l`, `pp.s`, and `yp`.
-// `pp.p` is left untouched (no longer used after the initial yp permutation).
+// Drops the top `k` zero rows of `pp.s` from `pp.l`, `pp.s`, `pp.p`, and `yp`.
 //
 // Caller is responsible for verifying via `is_consistent_upto` that the
 // `k` rows being removed have zero residual; otherwise the resulting system
@@ -437,6 +454,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let m = pp.l.nrows();
     assert!(r + k <= m);
     assert_eq!(yp.len(), m);
+    assert_eq!(pp.p.dim(), m);
 
     // Drop rows [r..r+k] from pp.l: keep [0..r] and [r+k..m], shifted down.
     pp.l = pp.l.extract((m - k, r), |i, j| {
@@ -454,6 +472,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     // Drop yp entries [r..r+k] to stay in sync with pp.l.
     yp.drain(r..r + k);
+
+    // Drop pp.p entries that map to [r..r+k]; shift later positions down by k.
+    let new_p_at: Vec<usize> = (0..m).filter_map(|i| {
+        let pos = pp.p.at(i);
+        if pos < r {
+            Some(pos)
+        } else if pos < r + k {
+            None
+        } else {
+            Some(pos - k)
+        }
+    }).collect();
+    pp.p = PermOwned::new(new_p_at);
 }
 
 // Composes perm1 with perm2: the first `r` positions stay, the rest are

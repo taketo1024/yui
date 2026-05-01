@@ -31,12 +31,13 @@ impl<R> PartialPluq<R> {
     pub fn rank(&self) -> usize { self.l.ncols() }
 }
 
-/// Computes a partial PLUQ decomposition of `a`.
-pub fn pre_pluq<R>(a: &SpMat<R>, piv_type: PivotType, piv_cond: PivotCondition) -> PartialPluq<R>
+/// Computes a partial PLUQ decomposition of `a` under the given pivot-finder
+/// configuration.
+pub fn pre_pluq<R>(a: &SpMat<R>, config: PivotFinderConfig) -> PartialPluq<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     debug!("pre PLUQ: {:?}", a.shape());
 
-    let config = PivotFinderConfig { piv_type, piv_cond, ..Default::default() };
+    let piv_type = config.piv_type;
     let pivots = find_pivots(a, config);
     let (p, q) = perms_by_pivots(a, &pivots);
     let r = pivots.len();
@@ -114,32 +115,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 /// Computes a full PLUQ decomposition of `a`.
-pub fn pluq<R>(a: &SpMat<R>, piv_type: PivotType) -> PartialPluq<R>
+pub fn pluq<R>(a: &SpMat<R>, config: PivotFinderConfig) -> PartialPluq<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let (m, n) = a.shape();
-    let pp1 = pre_pluq(a, piv_type, PivotCondition::AnyUnit);
-    let r1 = pp1.rank();
+    let piv_type = config.piv_type;
+    let pp1 = pre_pluq(a, config);
     let pp2 = dense_pluq_in(&pp1.s, piv_type);
-    let r2 = pp2.rank();
-
-    let p = extend_perm(&pp1.p, &pp2.p, r1, m);
-    let q = extend_perm(&pp1.q, &pp2.q, r1, n);
-
-    let l = {
-        let l1_bot = pp1.l.submat(r1..m, 0..r1).permute_rows(pp2.p.view());
-        let l1_perm = pp1.l.submat(0..r1, 0..r1).stack(&l1_bot);
-        let l2_ext = SpMat::zero((r1, r2)).stack(&pp2.l);
-        l1_perm.concat(&l2_ext)
-    };
-
-    let u = {
-        let u1_right = pp1.u.submat(0..r1, r1..n).permute_cols(pp2.q.view());
-        let u1_perm = pp1.u.submat(0..r1, 0..r1).concat(&u1_right);
-        let u2_ext = SpMat::zero((r2, r1)).concat(&pp2.u);
-        u1_perm.stack(&u2_ext)
-    };
-
-    PartialPluq { p, q, l, u, s: pp2.s }
+    merge_pluq(pp1, pp2)
 }
 
 // Extracts the compact dense submatrix of `s` using only its non-zero rows/cols.
@@ -204,7 +185,11 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
     let (m, n) = a.shape();
     assert_eq!(y.len(), m);
 
-    let pp = pluq(a, PivotType::Rows);
+    let pp = pluq(a, PivotFinderConfig {
+        piv_type: PivotType::Rows,
+        piv_cond: PivotCondition::AnyUnit,
+        ..Default::default()
+    });
     let r = pp.rank();
 
     let yp = perm_apply(pp.p.view(), y);
@@ -218,6 +203,64 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
     let u11 = pp.u.submat(0..r, 0..r);
     let xq_top = solve_triangular_vec(TriangularType::Upper, &u11, &SpVec::from(z0)).to_dense();
     Some(reconstruct_x(&pp.q, r, &xq_top, &vec![R::zero(); n - r]))
+}
+
+pub fn solve_pluq_incr<R>(a: &SpMat<R>, y: &[R], max_piv: usize, chunk: usize) -> Option<Vec<R>>
+where R: Field, for<'x> &'x R: FieldOps<R> {
+    todo!("Implement here")
+}
+
+// Merges two partial PLUQ decompositions. `pp1` has rank `r1` and shape (m, n);
+// `pp2` is a partial PLUQ of `pp1.s` with rank `r2` and shape (m - r1, n - r1).
+// Returns a partial PLUQ of the same matrix as `pp1` with rank `r1 + r2` and
+// schur complement `pp2.s`.
+fn merge_pluq<R>(pp1: PartialPluq<R>, pp2: PartialPluq<R>) -> PartialPluq<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    let (m, n) = (pp1.l.nrows(), pp1.u.ncols());
+    let r1 = pp1.rank();
+    let r2 = pp2.rank();
+
+    assert_eq!(pp1.s.shape(), (m - r1, n - r1));
+    assert_eq!(pp2.l.nrows(), m - r1);
+    assert_eq!(pp2.u.ncols(), n - r1);
+
+    let p = extend_perm(&pp1.p, &pp2.p, r1, m);
+    let q = extend_perm(&pp1.q, &pp2.q, r1, n);
+
+    let l = {
+        let [l_top, l_bot] = pp1.l.divide_at_row(r1);
+        let l_bot = l_bot.permute_rows(pp2.p.view());
+        let zero_tr = SpMat::zero((r1, r2));
+        SpMat::combine_blocks([
+            &l_top, &zero_tr, 
+            &l_bot, &pp2.l
+        ])
+    };
+
+    let u = {
+        let [u_left, u_right] = pp1.u.divide_at_col(r1);
+        let u_right = u_right.permute_cols(pp2.q.view());
+        let zero_bl = SpMat::zero((r2, r1));
+        SpMat::combine_blocks([
+            &u_left, &u_right, 
+            &zero_bl, &pp2.u
+        ])
+    };
+
+    let s = pp2.s;
+
+    PartialPluq { p, q, l, u, s }
+}
+
+// Lifts a PLUQ of the top `c` rows of some matrix `s` (= `pp_chunk`) to a
+// partial PLUQ acting on all rows of `s`, by absorbing the untouched bottom
+// rows `s_rest` (shape (m_s - c, n_s)) into L (below the new pivots) and into
+// the new schur complement.
+//
+// Sparse analog of `dense_pluq_in`, applied to a single chunk.
+fn extend_chunk_to_full<R>(pp_chunk: PartialPluq<R>, s_rest: &SpMat<R>) -> PartialPluq<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    todo!("extend_chunk_to_full")
 }
 
 // Solves l[0..r, 0..r] * x = yp[0..r] by forward substitution.
@@ -321,6 +364,10 @@ mod tests {
     use super::*;
     use num_traits::One;
 
+    fn cfg(piv_type: PivotType) -> PivotFinderConfig {
+        PivotFinderConfig { piv_type, piv_cond: PivotCondition::AnyUnit, ..Default::default() }
+    }
+
     fn sample() -> SpMat<i32> {
         SpMat::from_dense_data((6, 9), [
             1, 0, 0, 0, 0, 1, 0, 0, 1,
@@ -333,7 +380,7 @@ mod tests {
     }
 
     fn check_pluq_rows(a: &SpMat<i32>) {
-        let pp = pluq(a, PivotType::Rows);
+        let pp = pluq(a, cfg(PivotType::Rows));
         let (m, n) = a.shape();
         let r = pp.rank();
 
@@ -356,7 +403,7 @@ mod tests {
     }
 
     fn check_pluq_cols(a: &SpMat<i32>) {
-        let pp = pluq(a, PivotType::Cols);
+        let pp = pluq(a, cfg(PivotType::Cols));
         let (m, n) = a.shape();
         let r = pp.rank();
 
@@ -398,7 +445,7 @@ mod tests {
     fn test_pluq_rand_cols() { check_pluq_cols(&SpMat::<i32>::rand((40, 60), 0.1)); }
 
     fn check_rows(a: &SpMat<i32>) {
-        let pp = pre_pluq(a, PivotType::Rows, PivotCondition::AnyUnit);
+        let pp = pre_pluq(a, cfg(PivotType::Rows));
         let (m, n) = a.shape();
         let r = pp.rank();
 
@@ -424,7 +471,7 @@ mod tests {
     }
 
     fn check_cols(a: &SpMat<i32>) {
-        let pp = pre_pluq(a, PivotType::Cols, PivotCondition::AnyUnit);
+        let pp = pre_pluq(a, cfg(PivotType::Cols));
         let (m, n) = a.shape();
         let r = pp.rank();
 
@@ -458,7 +505,7 @@ mod tests {
     #[test]
     fn test_zero() {
         let a = SpMat::<i32>::zero((4, 5));
-        let pp = pre_pluq(&a, PivotType::Rows, PivotCondition::AnyUnit);
+        let pp = pre_pluq(&a, cfg(PivotType::Rows));
         assert_eq!(pp.rank(), 0);
         assert_eq!(pp.l.shape(), (4, 0));
         assert_eq!(pp.u.shape(), (0, 5));
@@ -469,19 +516,19 @@ mod tests {
     #[test]
     fn test_square_full_rank() {
         let a = SpMat::from_dense_data((3, 3), [1, 0, 0, 0, 1, 0, 0, 0, 1]);
-        let pp = pre_pluq(&a, PivotType::Rows, PivotCondition::AnyUnit);
+        let pp = pre_pluq(&a, cfg(PivotType::Rows));
         assert_eq!(pp.rank(), 3);
         assert_eq!(pp.s.shape(), (0, 0)); // full rank: Schur complement is empty
     }
 
     #[test]
     fn test_rank_rows() {
-        assert_eq!(pre_pluq(&sample(), PivotType::Rows, PivotCondition::AnyUnit).rank(), 5);
+        assert_eq!(pre_pluq(&sample(), cfg(PivotType::Rows)).rank(), 5);
     }
 
     #[test]
     fn test_rank_cols() {
-        assert_eq!(pre_pluq(&sample(), PivotType::Cols, PivotCondition::AnyUnit).rank(), 6);
+        assert_eq!(pre_pluq(&sample(), cfg(PivotType::Cols)).rank(), 6);
     }
 
     #[test]

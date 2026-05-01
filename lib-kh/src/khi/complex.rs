@@ -1,11 +1,12 @@
 use std::ops::{Index, RangeInclusive};
+use std::sync::OnceLock;
 use cartesian::cartesian;
 use delegate::delegate;
 
 use itertools::Itertools;
 use yui_core::lc::Lc;
 use yui_core::{EucRing, EucRingOps, Ring, RingOps};
-use yui_homology::{ChainComplex, ChainComplexTrait, DisplaySeq, DisplayTable, Grid1, Grid2, GridIter, GridTrait, Summand, isize2};
+use yui_homology::{ChainComplex, ChainComplexTrait, DisplaySeq, DisplayTable, Grid1, Grid2, GridIter, GridTrait, Summand, SummandTrait, isize2};
 use yui_link::InvLink;
 use yui_matrix::sparse::SpMat;
 
@@ -31,10 +32,11 @@ pub type KhIComplexSummand<R> = Summand<KhIGen, R>;
 
 #[derive(Clone)]
 pub struct KhIComplex<R>
-where R: Ring, for<'a> &'a R: RingOps<R> { 
+where R: Ring, for<'a> &'a R: RingOps<R> {
     inner: ChainComplex<KhIGen, R>,
     canon_cycles: Vec<KhIChain<R>>,
-    deg_shift: (isize, isize)
+    deg_shift: (isize, isize),
+    gen_grid: OnceLock<Grid2<KhIComplexSummand<R>>>,
 }
 
 impl<R> KhIComplex<R>
@@ -119,8 +121,8 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         KhIComplex::new_impl(inner, canon_cycles, deg_shift)
     }
 
-    pub(crate) fn new_impl(inner: ChainComplex<KhIGen, R>, canon_cycles: Vec<KhIChain<R>>, deg_shift: (isize, isize)) -> Self { 
-        Self { inner, canon_cycles, deg_shift }
+    pub(crate) fn new_impl(inner: ChainComplex<KhIGen, R>, canon_cycles: Vec<KhIChain<R>>, deg_shift: (isize, isize)) -> Self {
+        Self { inner, canon_cycles, deg_shift, gen_grid: OnceLock::new() }
     }
 
     pub fn inner(&self) -> &ChainComplex<KhIGen, R> {
@@ -149,16 +151,20 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         )
     }
 
-    pub fn gen_grid(&self) -> Grid2<Summand<KhIGen, R>> {
+    fn gen_grid(&self) -> &Grid2<KhIComplexSummand<R>> {
+        self.gen_grid.get_or_init(|| self.compute_gen_grid())
+    }
+
+    fn compute_gen_grid(&self) -> Grid2<KhIComplexSummand<R>> {
         let h_range = self.h_range();
         let q_range = self.q_range().step_by(2);
-        let support = cartesian!(h_range, q_range.clone()).map(|(i, j)| 
+        let support = cartesian!(h_range, q_range.clone()).map(|(i, j)|
             isize2(i, j)
         );
 
-        Grid2::generate(support, |idx| { 
+        Grid2::generate(support, |idx| {
             let isize2(i, j) = idx;
-            let gens = self[i].raw_gens().iter().filter(|x| { 
+            let gens = self[i].raw_gens().iter().filter(|x| {
                 x.q_deg() == j
             }).cloned();
             Summand::from_raw_gens(gens)
@@ -175,9 +181,20 @@ impl<R> Index<isize> for KhIComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = KhIComplexSummand<R>;
 
-    delegate! { 
+    delegate! {
         to self.inner {
             fn index(&self, index: isize) -> &Self::Output;
+        }
+    }
+}
+
+impl<R> Index<(isize, isize)> for KhIComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = KhIComplexSummand<R>;
+
+    delegate! {
+        to self.gen_grid() {
+            fn index(&self, index: (isize, isize)) -> &Self::Output;
         }
     }
 }
@@ -230,11 +247,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn display_indices(&self) -> (Vec<isize>, Vec<isize>) { 
-        (self.h_range().into_iter().collect(), self.q_range().skip(2).collect())
+        (self.h_range().into_iter().collect(), self.q_range().step_by(2).collect())
     }
 
-    fn display_at(&self, i: &isize, j: &isize) -> String { 
-        todo!()
+    fn display_at(&self, i: &isize, j: &isize) -> String {
+        if self[(*i, *j)].is_zero() {
+            ".".to_string()
+        } else {
+            self[(*i, *j)].to_string()
+        }
     }
 }
 
@@ -322,7 +343,7 @@ mod tests {
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
-        let c = KhIComplex::new(&l, &h, &t, false).gen_grid();
+        let c = KhIComplex::new(&l, &h, &t, false);
 
         assert_eq!(c[(0, 1)].rank(), 1);
         assert_eq!(c[(0, 3)].rank(), 1);
@@ -343,7 +364,7 @@ mod tests {
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
-        let c = KhIComplex::new(&l, &h, &t, true).gen_grid();
+        let c = KhIComplex::new(&l, &h, &t, true);
 
         assert_eq!(c[(0, 2)].rank(), 1);
         assert_eq!(c[(1, 2)].rank(), 1);

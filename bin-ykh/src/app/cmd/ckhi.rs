@@ -6,7 +6,7 @@ use std::str::FromStr;
 use yui_core::tex::TeX;
 use yui_core::{Ring, RingOps};
 use yui_homology::DisplayTable;
-use yui_homology::{ChainComplexTrait, GridTrait, SummandTrait, tex::TeXTable};
+use yui_homology::{ChainComplexTrait, GridTrait, SummandTrait};
 use yui_kh::kh::KhChainExt;
 use yui_kh::khi::KhIComplex;
 
@@ -41,9 +41,6 @@ pub struct Args {
 
     #[arg(short = 'n', long)]
     pub no_simplify: bool,
-
-    #[arg(short, long, default_value = "unicode")]
-    pub format: Format,
 
     #[arg(long, default_value = "0")]
     pub log: u8,
@@ -101,11 +98,7 @@ where
         };
         
         // CKh generators
-        let grid = ckhi.gen_grid();
-        let table = match self.args.format {
-            Format::Unicode => grid.display_table(),
-            Format::TeX     => grid.tex_table("$\\mathit{CKhI}$", " ")
-        };
+        let table = ckhi.display_table();
         self.out(&table);
 
         // Generators

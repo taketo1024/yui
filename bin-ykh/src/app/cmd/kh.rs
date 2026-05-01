@@ -109,11 +109,11 @@ where
         let table = if bigraded { 
             let grid = kh.gen_grid();
             match self.args.format {
-                Format::Unicode => grid.display_table("i", "j"),
+                Format::Unicode => grid.display_table(),
                 Format::TeX     => grid.tex_table("$\\mathit{Kh}$", " ")
             }
         } else { 
-            kh.display_seq("i")
+            kh.display_seq()
         };
         self.out(&table);
 

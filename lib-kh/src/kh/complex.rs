@@ -4,7 +4,7 @@ use cartesian::cartesian;
 use delegate::delegate;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps};
 use yui_link::Link;
-use yui_homology::{isize2, ChainComplexTrait, Grid2, GridIter, GridTrait, ChainComplex, Summand};
+use yui_homology::{ChainComplex, ChainComplexTrait, DisplaySeq, DisplayTable, Grid2, GridIter, GridTrait, Summand, isize2};
 use yui_matrix::sparse::SpMat;
 
 use crate::kh::r#gen::KhChain;
@@ -131,6 +131,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
+impl<R> KhComplex<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    pub fn homology(&self) -> KhHomology<R> {
+        self.into()
+    }
+}
+
 impl<R> Index<isize> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = KhComplexSummand<R>;
@@ -172,10 +179,29 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<R> KhComplex<R>
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    pub fn homology(&self) -> KhHomology<R> {
-        self.into()
+impl<R> DisplaySeq<isize> for KhComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    delegate! {
+        to self.inner { 
+            fn display_label(&self) -> String;
+            fn display_indices(&self) -> Vec<isize>;
+            fn display_at(&self, i: &isize) -> String;
+        }
+    }
+}
+
+impl<R> DisplayTable<isize> for KhComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn display_labels(&self) -> (String, String) { 
+        ("i".to_string(), "j".to_string())
+    }
+
+    fn display_indices(&self) -> (Vec<isize>, Vec<isize>) { 
+        (self.h_range().collect(), self.q_range().step_by(2).collect())
+    }
+
+    fn display_at(&self, i: &isize, j: &isize) -> String { 
+        todo!()
     }
 }
 

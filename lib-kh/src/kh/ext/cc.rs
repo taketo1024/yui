@@ -267,10 +267,10 @@ mod tests {
         let h2 = c2.homology();
 
         println!("L1");
-        h1.print_seq("i");
+        h1.print_seq();
 
         println!("L2");
-        h2.print_seq("i");
+        h2.print_seq();
 
         println!("f: deg {}\n", f.deg());
 

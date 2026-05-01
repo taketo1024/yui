@@ -1,7 +1,7 @@
 use std::ops::{RangeInclusive, Index};
 use delegate::delegate;
 
-use yui_homology::{Grid2, GridIter, GridTrait, Homology, Summand, SummandTrait};
+use yui_homology::{DisplaySeq, DisplayTable, Grid2, GridIter, GridTrait, Homology, Summand, SummandTrait, rmod_str};
 use yui_core::{EucRing, EucRingOps};
 use yui_link::Link;
 
@@ -125,6 +125,32 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         to self.inner { 
             fn index(&self, index: isize) -> &Self::Output;
         }
+    }
+}
+
+impl<R> DisplaySeq<isize> for KhHomology<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    delegate! {
+        to self.inner { 
+            fn display_label(&self) -> String;
+            fn display_indices(&self) -> Vec<isize>;
+            fn display_at(&self, i: &isize) -> String;
+        }
+    }
+}
+
+impl<R> DisplayTable<isize> for KhHomology<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    fn display_labels(&self) -> (String, String) { 
+        ("i".to_string(), "j".to_string())
+    }
+
+    fn display_indices(&self) -> (Vec<isize>, Vec<isize>) { 
+        (self.h_range().collect(), self.q_range().step_by(2).collect())
+    }
+
+    fn display_at(&self, i: &isize, j: &isize) -> String { 
+        todo!()
     }
 }
 

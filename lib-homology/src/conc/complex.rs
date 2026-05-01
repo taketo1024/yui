@@ -8,7 +8,7 @@ use yui_core::lc::{Gen, Lc};
 use yui_matrix::sparse::{SpMat, SpVec};
 
 use crate::utils::ChainReducer;
-use crate::{isize2, isize3, ChainComplexTrait, Grid, GridDeg, GridIter, GridTrait, SummandTrait};
+use crate::{ChainComplexTrait, DisplaySeq, DisplayTable, Grid, GridDeg, GridIter, GridTrait, SummandTrait, isize2, isize3};
 use super::Summand;
 
 #[cfg(feature = "multithread")]
@@ -206,5 +206,27 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = Summand<X, R>;
     fn index(&self, i: (isize, isize, isize)) -> &Self::Output {
         self.get(i.into())
+    }
+}
+
+impl<X, R> DisplaySeq<isize> for ChainComplex<X, R>
+where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+    delegate! {
+        to self.summands { 
+            fn display_label(&self) -> String;
+            fn display_indices(&self) -> Vec<isize>;
+            fn display_at(&self, i: &isize) -> String;
+        }
+    }
+}
+
+impl<X, R> DisplayTable<isize> for ChainComplex2<X, R>
+where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+    delegate! {
+        to self.summands { 
+            fn display_labels(&self) -> (String, String);
+            fn display_indices(&self) -> (Vec<isize>, Vec<isize>);
+            fn display_at(&self, i: &isize, j: &isize) -> String;
+        }
     }
 }

@@ -410,7 +410,7 @@ mod tests {
         let e = c.sl2_map(&l);
         let h = c.homology();
 
-        h.gen_grid().print_table("i", "j");
+        h.gen_grid().print_table();
 
         let e_str = e.string_decomp(&h);
 
@@ -428,7 +428,7 @@ mod tests {
         let e = c.sl2_map(&l);
         let h = c.homology();
 
-        h.gen_grid().print_table("i", "j");
+        h.gen_grid().print_table();
 
         let e_str = e.string_decomp(&h);
         println!("{e_str}");

@@ -103,7 +103,7 @@ where
         // CKh generators
         let grid = ckhi.gen_grid();
         let table = match self.args.format {
-            Format::Unicode => grid.display_table("i", "j"),
+            Format::Unicode => grid.display_table(),
             Format::TeX     => grid.tex_table("$\\mathit{CKhI}$", " ")
         };
         self.out(&table);

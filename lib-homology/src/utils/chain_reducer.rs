@@ -10,7 +10,7 @@ use yui_matrix::sparse::triang::{solve_triangular_vec, TriangularType};
 use yui_core::{Ring, RingOps};
 
 use crate::generic::GenericChainComplexBase;
-use crate::{GridDeg, ChainComplexTrait, GridTrait};
+use crate::{ChainComplexTrait, GridDeg, GridTrait, SummandTrait};
 
 //       a0 = [x]      a1 = [a b]      a2 = [z w]
 //            [y]           [c d]     
@@ -43,7 +43,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
     pub fn reduce<C>(complex: &C, with_trans: bool) -> Self
-    where C: GridTrait<I> + ChainComplexTrait<I, R = R> {
+    where C: GridTrait<I> + ChainComplexTrait<I, R = R>, C::Item: SummandTrait<R = R> {
         let mut r = Self::from(complex, with_trans);
         r.reduce_all(false);
         r.reduce_all(true);
@@ -51,7 +51,7 @@ where
     }
 
     pub fn from<C>(complex: &C, with_trans: bool) -> Self 
-    where C: GridTrait<I> + ChainComplexTrait<I, R = R> {
+    where C: GridTrait<I> + ChainComplexTrait<I, R = R>, C::Item: SummandTrait<R = R> {
         let support = complex.support().copied();
         let d_deg = complex.d_deg();
 

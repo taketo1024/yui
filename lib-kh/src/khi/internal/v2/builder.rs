@@ -577,7 +577,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         info!("build KhI complex...");
         let c = KhIComplex::from_kh_complex(c, map);
-        info!("  done\n{}", c.display_seq("i"));
+        info!("  done\n{}", c.display_seq());
 
         c
     }

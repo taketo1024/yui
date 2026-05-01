@@ -150,9 +150,9 @@ where
 
     fn show_table(&mut self, h: &KhHomology<R>, bigraded: bool) { 
         let table = if bigraded { 
-            h.gen_grid().display_table("i", "j")
+            h.display_table()
         } else { 
-            h.display_seq("i")
+            h.display_seq()
         };
 
         self.out(&table);

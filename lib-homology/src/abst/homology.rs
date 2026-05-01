@@ -16,13 +16,14 @@ impl<I, R, C> ComputeHomology<I, R> for C
 where 
     I: GridDeg, 
     R: EucRing, for<'x> &'x R: EucRingOps<R>,
-    C: ChainComplexTrait<I, R = R>
+    C: ChainComplexTrait<I, R = R>,
+    C::Item: SummandTrait<R = R>,
 {
     fn compute_homology_at(&self, i: I, with_trans: bool) -> GenericSummand<I, R> {
         debug!("compute H[{i}]: {} -> {} -> {} ..", 
-            self.display_at(i - self.d_deg()), 
-            self.display_at(i), 
-            self.display_at(i + self.d_deg()), 
+            self.get(i - self.d_deg()).display(), 
+            self.get(i).display(), 
+            self.get(i + self.d_deg()).display(), 
         );
         
         let i0 = i - self.d_deg();

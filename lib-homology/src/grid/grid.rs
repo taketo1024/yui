@@ -168,65 +168,76 @@ macro_rules! impl_index {
 impl_index!(isize, isize2, isize3);
 impl_index!(usize, usize2, usize3);
 
-pub trait DisplaySeq<I> {
-    fn display_seq(&self, label: &str) -> String;
-    fn print_seq(&self, label: &str) {
-        println!("{}", self.display_seq(label))
+pub trait DisplaySeq<I: Display> {
+    fn display_label(&self) -> String;
+    fn display_indices(&self) -> Vec<I>;
+    fn display_at(&self, i: &I) -> String;
+    fn display_seq(&self) -> String {
+        use yui_core::util::format::table;
+        table(self.display_label(), [""].iter(), self.display_indices().iter(), |_, &i| {
+            self.display_at(i)
+        })
+    }
+    fn print_seq(&self) {
+        println!("{}", self.display_seq())
     }
 }
 
-macro_rules! impl_print_seq {
-    ($t:ident) => {
-        impl<G> DisplaySeq<$t> for G
-        where G: GridTrait<$t>, G::Item: Display {
-            fn display_seq(&self, label: &str) -> String {
-                use yui_core::util::format::table;
+impl<E: Display> DisplaySeq<isize> for Grid<isize, E> {
+    fn display_label(&self) -> String {
+        "i".to_string()
+    }
 
-                table(label, [""].iter(), self.support().copied(), |_, &i| {
-                    self.get(i).to_string()
-                })
-            }
-        }
-    };
-}
+    fn display_indices(&self) -> Vec<isize> {
+        self.support().sorted().cloned().collect()
+    }
 
-impl_print_seq!(isize);
-impl_print_seq!(usize);
-
-pub trait DisplayTable<I> {
-    fn display_table(&self, label0: &str, label1: &str) -> String;
-    fn print_table(&self, label0: &str, label1: &str) {
-        println!("{}", self.display_table(label0, label1))
+    fn display_at(&self, i: &isize) -> String {
+        self.get(*i).to_string()
     }
 }
 
-macro_rules! impl_print_table {
-    ($t:ident) => {
-        impl<G> DisplayTable<$t> for G
-        where G: GridTrait<$t>, G::Item: Display {
-            fn display_table(&self, label0: &str, label1: &str) -> String {
-                use yui_core::util::format::table;
+pub trait DisplayTable<I: Display> {
+    fn display_labels(&self) -> (String, String);
+    fn display_indices(&self) -> (Vec<I>, Vec<I>);
+    fn display_at(&self, i: &I, j: &I) -> String;
+    fn display_table(&self) -> String {
+        use yui_core::util::format::table;
 
-                let def_str = self.get_default().to_string();
-                let head = format!("{}\\{}", label1, label0);
-                let cols = self.support().map(|&$t(i, _)| i).unique().sorted();
-                let rows = self.support().map(|&$t(_, j)| j).unique().sorted().rev();
+        let (label0, label1) = self.display_labels();
+        let (ind0, ind1) = self.display_indices();
+        let head = format!("{}\\{}", label1, label0);
 
-                table(head, rows, cols, |&j, &i| {
-                    let str = self.get($t(i, j)).to_string();
-                    if str == def_str { 
-                        ".".to_string()
-                    } else { 
-                        str
-                    }
-                })
-            }
-        }
-    };
+        table(head, ind1.iter().rev(), ind0.iter(), |&j, &i| {
+            self.display_at(i, j)
+        })
+    }
+
+    fn print_table(&self) {
+        println!("{}", self.display_table())
+    }
 }
 
-impl_print_table!(isize2);
-impl_print_table!(usize2);
+impl<E: Display> DisplayTable<isize> for Grid<isize2, E> {
+    fn display_labels(&self) -> (String, String) {
+        ("i".to_string(), "j".to_string())
+    }
+
+    fn display_indices(&self) -> (Vec<isize>, Vec<isize>) {
+        let is = self.support().map(|&isize2(i, _)| i).unique().sorted().collect();
+        let js = self.support().map(|&isize2(_, j)| j).unique().sorted().collect();
+        (is, js)
+    }
+
+    fn display_at(&self, i: &isize, j: &isize) -> String {
+        let s = self[(*i, *j)].to_string();
+        if s == self.default.to_string() { 
+            ".".to_string()
+        } else { 
+            s
+        }
+    }
+}
 
 #[cfg(feature = "tex")]
 pub mod tex { 
@@ -275,7 +286,7 @@ mod tests {
         assert_eq!(g.get( 1), &10);
         assert_eq!(g.get(-1), &0); // default
 
-        let _seq = g.display_seq("i");
+        let _seq = g.display_seq();
         // println!("{_seq}");
     }
 
@@ -292,7 +303,7 @@ mod tests {
         assert_eq!(g.get(isize2(1, 2)), &12);
         assert_eq!(g.get(isize2(3, 3)), &0);
 
-        let _table = g.display_table("i", "j");
+        let _table = g.display_table();
         // println!("{_table}");
     }
 
@@ -306,7 +317,7 @@ mod tests {
             cartesian!(0..=3, 0..=2).map(|(i, j)| isize2(i, j)), 
             |i| GenericSummand::<_, FF2>::generate(i.0, (i.0 * 10 + i.1) as usize, vec![], None)
         );
-        let _table = g.display_table("i", "j");
+        let _table = g.display_table();
         // println!("{_table}");
     }
 

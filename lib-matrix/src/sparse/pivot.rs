@@ -29,10 +29,20 @@ cfg_if::cfg_if! {
 }
 
 const LOG_THRESHOLD: usize = 10_000;
+const DEFAULT_MAX_PIVOT: usize = usize::MAX;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum PivotType {
     Rows, Cols
+}
+
+impl PivotType {
+    fn str(&self) -> &'static str { 
+        match self {
+            PivotType::Rows => "row",
+            PivotType::Cols => "col"
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -52,7 +62,7 @@ impl Default for PivotFinderConfig {
         Self {
             piv_type: PivotType::Rows,
             piv_cond: PivotCondition::One,
-            max_pivots: 65_536,
+            max_pivots: DEFAULT_MAX_PIVOT,
         }
     }
 }
@@ -74,12 +84,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         return vec![];
     }
 
-    debug!("find pivots: {:?}", a.shape());
+    debug!("find {} pivots: {:?}", config.piv_type.str(), a.shape());
 
     let mut pf = PivotFinder::new(a, &config);
     pf.find_pivots();
 
-    debug!("found {} pivots", pf.result().len());
+    debug!("  found {} {} pivots", pf.result().len(), config.piv_type.str());
 
     pf.result()
 }

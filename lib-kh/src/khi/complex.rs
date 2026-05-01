@@ -1,19 +1,18 @@
 use std::ops::{Index, RangeInclusive};
 use std::sync::OnceLock;
-use cartesian::cartesian;
 use delegate::delegate;
 
 use itertools::Itertools;
 use yui_core::lc::Lc;
 use yui_core::{EucRing, EucRingOps, Ring, RingOps};
-use yui_homology::{ChainComplex, ChainComplexTrait, DisplaySeq, DisplayTable, Grid1, Grid2, GridIter, GridTrait, Summand, SummandTrait, isize2};
+use yui_homology::{ChainComplex, ChainComplexTrait, DisplaySeq, DisplayTable, Grid1, Grid2, GridIter, GridTrait, Summand, SummandTrait};
 use yui_link::InvLink;
 use yui_matrix::sparse::SpMat;
 
 use crate::kh::{KhChain, KhChainExt, KhComplex, KhChainGen};
 use crate::khi::KhIHomology;
 use crate::khi::KhIGen;
-use crate::misc::range_of;
+use crate::misc::{make_gen_grid, range_of};
 
 pub type KhIChain<R> = Lc<KhIGen, R>;
 
@@ -152,23 +151,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     }
 
     fn gen_grid(&self) -> &Grid2<KhIComplexSummand<R>> {
-        self.gen_grid.get_or_init(|| self.compute_gen_grid())
-    }
-
-    fn compute_gen_grid(&self) -> Grid2<KhIComplexSummand<R>> {
-        let h_range = self.h_range();
-        let q_range = self.q_range().step_by(2);
-        let support = cartesian!(h_range, q_range.clone()).map(|(i, j)|
-            isize2(i, j)
-        );
-
-        Grid2::generate(support, |idx| {
-            let isize2(i, j) = idx;
-            let gens = self[i].raw_gens().iter().filter(|x| {
-                x.q_deg() == j
-            }).cloned();
-            Summand::from_raw_gens(gens)
-        })
+        self.gen_grid.get_or_init(|| make_gen_grid(self.inner.summands()))
     }
 
     pub fn homology(&self) -> KhIHomology<R>

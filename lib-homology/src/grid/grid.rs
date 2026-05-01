@@ -33,26 +33,29 @@ where I: GridDeg {
 
 impl<I, E> Grid<I, E>
 where I: GridDeg {
-    fn new(data: AHashMap<I, E>, default: E) -> Self {
+    fn new(data: impl IntoIterator<Item = (I, E)>, default: E) -> Self {
+        let data = data.into_iter().collect();
         Self { data, default }
     }
 
-    pub fn generate<It, F>(support: It, e_map: F) -> Self
+    pub fn generate<It, F>(support: It, mut e_map: F) -> Self
     where
         It: IntoIterator<Item = I>,
         F: FnMut(I) -> E,
         E: Default
     {
-        Self::generate_with_default(support, e_map, E::default())
+        let data = support.into_iter().map(|i| (i, e_map(i)));
+        Self::new(data, E::default())
     }
 
-    pub fn generate_with_default<It, F>(support: It, mut e_map: F, default: E) -> Self
+    pub fn generate_filtered<It, F>(support: It, mut e_map: F) -> Self
     where
         It: IntoIterator<Item = I>,
-        F: FnMut(I) -> E
+        F: FnMut(I) -> Option<E>,
+        E: Default
     {
-        let data = support.into_iter().map(|i| (i, e_map(i))).collect();
-        Self::new(data, default)
+        let data = support.into_iter().filter_map(|i| e_map(i).map(|e| (i, e)));
+        Self::new(data, E::default())
     }
 
     pub fn insert(&mut self, i: I, e: E) {
@@ -74,20 +77,17 @@ where I: GridDeg {
     pub fn map<E2, F>(&self, mut f: F) -> Grid<I, E2>
     where F: FnMut(&E) -> E2
     {
-        let d = f(self.get_default());
-        Grid::generate_with_default(
-            self.support().copied(),
-            |i| f(self.get(i)),
-            d
-        )
+        let dfl = f(&self.default);
+        let data = self.data.iter().map(|(&i, e)| (i, f(e)));
+        Grid::new(data, dfl)
     }
 }
 
 impl<E> Grid1<E> {
     pub fn truncated(&self, range: RangeInclusive<isize>) -> Self
     where E: Clone {
-        let support = self.support().copied().filter(|i| range.contains(i));
-        Self::generate_with_default(support, |i| self[i].clone(), self.default.clone())
+        let data = self.data.iter().filter_map(|(&i, e)| range.contains(&i).then_some((i, e.clone())));
+        Grid::new(data, self.default.clone())
     }
 }
 
@@ -143,8 +143,7 @@ where I: GridDeg {
 impl<I, E> FromIterator<(I, E)> for Grid<I, E>
 where I: GridDeg, E: Default {
     fn from_iter<T: IntoIterator<Item = (I, E)>>(iter: T) -> Self {
-        let data = iter.into_iter().collect();
-        Self::new(data, E::default())
+        Self::new(iter, E::default())
     }
 }
 

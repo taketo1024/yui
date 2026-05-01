@@ -15,11 +15,11 @@ use super::pivot::{PivotFinderConfig, PivotType, find_pivots, perms_by_pivots};
 use super::triang::{TriangularType, solve_triangular, solve_triangular_left, solve_triangular_vec};
 use super::util::perm_for_indices;
 
-/// Result of a partial PLUQ decomposition.
+/// Result of a sparse PLUQ decomposition.
 ///
 /// Satisfies `p * A * q = l * u + s` where `s` is the
 /// `(m - rank) × (n - rank)` Schur complement (bottom-right block).
-pub struct PartialPluq<R> {
+pub struct SpPluq<R> {
     pub p: PermOwned,
     pub q: PermOwned,
     pub l: SpMat<R>,
@@ -27,7 +27,7 @@ pub struct PartialPluq<R> {
     pub s: SpMat<R>,
 }
 
-impl<R> PartialPluq<R> {
+impl<R> SpPluq<R> {
     /// Constructs a `PartialPluq` after asserting the shapes are mutually
     /// consistent: `l.ncols() == u.nrows() = r`, `l.nrows() == p.dim() = m`,
     /// `u.ncols() == q.dim() = n`, and `s.shape() == (m - r, n - r)`.
@@ -47,7 +47,7 @@ impl<R> PartialPluq<R> {
 
 /// Computes a partial PLUQ decomposition of `a` under the given pivot-finder
 /// configuration.
-pub fn pre_pluq<R>(a: &SpMat<R>, config: PivotFinderConfig) -> PartialPluq<R>
+pub fn pre_pluq<R>(a: &SpMat<R>, config: PivotFinderConfig) -> SpPluq<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     debug!("pre PLUQ: {:?}", a.shape());
 
@@ -59,7 +59,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let paq = split_by_pqr(a, &p, &q, r);
     let (l, u, s) = build_lus(piv_type, paq);
 
-    PartialPluq::new(p, q, l, u, s)
+    SpPluq::new(p, q, l, u, s)
 }
 
 // Applies permutations (p, q) to `a` and partitions the result into four blocks at row/col r:
@@ -129,7 +129,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 /// Computes a full PLUQ decomposition of `a`.
-pub fn pluq<R>(a: &SpMat<R>, config: PivotFinderConfig) -> PartialPluq<R>
+pub fn pluq<R>(a: &SpMat<R>, config: PivotFinderConfig) -> SpPluq<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let piv_type = config.piv_type;
     let pp1 = pre_pluq(a, config);
@@ -137,7 +137,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     merge_pluq(pp1, pp2)
 }
 
-fn dense_pluq_in<R>(s: &SpMat<R>, piv_type: PivotType) -> PartialPluq<R>
+fn dense_pluq_in<R>(s: &SpMat<R>, piv_type: PivotType) -> SpPluq<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let transpose = piv_type == PivotType::Rows;
     let (ms, ns) = s.shape();
@@ -159,7 +159,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let mut s2 = SpMat::from(dp.s);
     s2.extend_by_zero(ms - m0, ns - n0);
 
-    PartialPluq::new(p2, q2, l2, u2, s2)
+    SpPluq::new(p2, q2, l2, u2, s2)
 }
 
 // Extracts the compact dense submatrix of `s` using only its non-zero rows/cols.
@@ -195,7 +195,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 // `pp2` is a partial PLUQ of `pp1.s` with rank `r2` and shape (m - r1, n - r1).
 // Returns a partial PLUQ of the same matrix as `pp1` with rank `r1 + r2` and
 // schur complement `pp2.s`.
-fn merge_pluq<R>(pp1: PartialPluq<R>, pp2: PartialPluq<R>) -> PartialPluq<R>
+fn merge_pluq<R>(pp1: SpPluq<R>, pp2: SpPluq<R>) -> SpPluq<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let (m, n) = (pp1.l.nrows(), pp1.u.ncols());
     let r1 = pp1.rank();
@@ -230,7 +230,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     let s = pp2.s;
 
-    PartialPluq::new(p, q, l, u, s)
+    SpPluq::new(p, q, l, u, s)
 }
 
 /// Solves `a * x = y` over a field using sparse PLUQ.
@@ -394,7 +394,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
 // Takes the top `min(chunk_size, s.nrows())` rows of `s`, runs `pluq` on them,
 // and lifts the result to act on all of `s` via `extend_chunk_to_full`.
 // Returns `(pp_chunk_full, r_chunk, c)`.
-fn chunk_pluq<R>(s: &SpMat<R>, chunk_size: usize) -> (PartialPluq<R>, usize, usize)
+fn chunk_pluq<R>(s: &SpMat<R>, chunk_size: usize) -> (SpPluq<R>, usize, usize)
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let c = chunk_size.min(s.nrows());
     let [s_chunk, s_rest] = s.divide_at_row(c);
@@ -413,7 +413,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 // the new schur complement.
 //
 // Sparse analog of `dense_pluq_in`, applied to a single chunk.
-fn extend_chunk_to_full<R>(pp_chunk: PartialPluq<R>, s_rest: &SpMat<R>) -> PartialPluq<R>
+fn extend_chunk_to_full<R>(pp_chunk: SpPluq<R>, s_rest: &SpMat<R>) -> SpPluq<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let (c, n_s) = (pp_chunk.l.nrows(), pp_chunk.u.ncols());
     let r_chunk = pp_chunk.rank();
@@ -438,7 +438,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let u = u_top.concat(&u_right);
     let s = pp_chunk.s.stack(&s_ext);
 
-    PartialPluq::new(p, q, l, u, s)
+    SpPluq::new(p, q, l, u, s)
 }
 
 // Drops the top `k` zero rows of `pp.s` from `pp.l`, `pp.s`, `pp.p`, and `yp`.
@@ -446,7 +446,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 // Caller is responsible for verifying via `is_consistent_upto` that the
 // `k` rows being removed have zero residual; otherwise the resulting system
 // would silently lose constraints.
-fn trim_zero_rows<R>(pp: &mut PartialPluq<R>, yp: &mut Vec<R>, k: usize)
+fn trim_zero_rows<R>(pp: &mut SpPluq<R>, yp: &mut Vec<R>, k: usize)
 where R: Ring, for<'x> &'x R: RingOps<R> {
     if k == 0 { return; }
 

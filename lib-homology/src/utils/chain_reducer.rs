@@ -52,8 +52,6 @@ where
 
     pub fn from<C>(complex: &C, with_trans: bool) -> Self 
     where C: GridTrait<I> + ChainComplexTrait<I, R = R> {
-        // TODO computation should not depend on the order of the support.
-        
         let support = complex.support();
         let d_deg = complex.d_deg();
 
@@ -73,11 +71,32 @@ where
 
     pub fn new<Itr>(support: Itr, d_deg: I) -> Self
     where Itr: Iterator<Item = I> {
-        let support = support.collect_vec();
+        let support = Self::sort_support(support, d_deg);
         let mats = HashMap::new();
         let trans = HashMap::new();
         let vecs = HashMap::new();
         Self { support, d_deg, mats, trans, vecs }
+    }
+
+    // MEMO: not efficient, but usually the support set is small. 
+    fn sort_support(support: impl Iterator<Item = I>, d_deg: I) -> Vec<I> { 
+        let mut res: Vec<I> = Vec::new();
+
+        for i0 in support.sorted() { 
+            let next = i0 + d_deg;
+            let prev = i0 - d_deg;
+            if let Some(p) = res.iter().find_position(|i| i == &&prev) { 
+                res.insert(p.0 + 1, i0);
+            } else if let Some(p) = res.iter().find_position(|i| i == &&next) {
+                res.insert(p.0, i0);
+            } else { 
+                res.push(i0);
+            }
+        }
+
+        println!("sorted: [{}]", res.iter().map(|x| x.to_string()).join(","));
+
+        res
     }
 
     pub fn support(&self) -> &[I] { 
@@ -334,10 +353,26 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use num_traits::Zero;
     use crate::generic::GenericChainComplex;
     use crate::SummandTrait;
     use super::*;
+
+    #[test]
+    fn sort_asc() { 
+        let supp: HashSet<isize> = HashSet::from_iter(0isize..10);
+        let sort = ChainReducer::<_, i32>::sort_support(supp.into_iter(), 1);
+        assert_eq!(sort, (0..10).collect_vec());
+    }
+
+    #[test]
+    fn sort_desc() { 
+        let supp: HashSet<isize> = HashSet::from_iter(0isize..10);
+        let sort = ChainReducer::<_, i32>::sort_support(supp.into_iter(), -1);
+        assert_eq!(sort, (0..10).rev().collect_vec());
+    }
 
     #[test]
     fn zero() { 

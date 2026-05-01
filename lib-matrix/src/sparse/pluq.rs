@@ -133,8 +133,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let raw = dense_pluq(&mat);
     let dp = if transpose { raw.transpose() } else { raw };
 
-    let p2 = lift_perm(&dp.p, &row_idx, ms);
-    let q2 = lift_perm(&dp.q, &col_idx, ns);
+    let p2 = extend_perm(&dp.p, &row_idx, ms);
+    let q2 = extend_perm(&dp.q, &col_idx, ns);
 
     let mut l2 = SpMat::from(dp.l);
     l2.extend_by_zero(ms - m0, 0);
@@ -191,8 +191,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     assert_eq!(pp2.l.nrows(), m - r1);
     assert_eq!(pp2.u.ncols(), n - r1);
 
-    let p = extend_perm(&pp1.p, &pp2.p, r1, m);
-    let q = extend_perm(&pp1.q, &pp2.q, r1, n);
+    let p = merge_perm(&pp1.p, &pp2.p);
+    let q = merge_perm(&pp1.q, &pp2.q);
 
     let l = {
         let [l0, l1] = pp1.l.divide_at_row(r1);
@@ -414,7 +414,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let s_ext = s_rest_right - &l_ext * &u_right;
 
     let chunk_idx: Vec<usize> = (0..c).collect();
-    let p = lift_perm(&pp_chunk.p, &chunk_idx, m_s);
+    let p = extend_perm(&pp_chunk.p, &chunk_idx, m_s);
     let q = pp_chunk.q;
     let l = pp_chunk.l.stack(&l_ext);
     let u = u_top.concat(&u_right);
@@ -456,9 +456,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     yp.drain(r..r + k);
 }
 
-// Composes perm1 with extend(perm2, r): the first `r` positions stay, the rest are
-// shifted by r and remapped by perm2.
-fn extend_perm(perm1: &PermOwned, perm2: &PermOwned, r: usize, n: usize) -> PermOwned {
+// Composes perm1 with perm2: the first `r` positions stay, the rest are
+// shifted by `r` and remapped by perm2 (where `r = perm1.dim() - perm2.dim()`).
+fn merge_perm(perm1: &PermOwned, perm2: &PermOwned) -> PermOwned {
+    assert!(perm1.dim() >= perm2.dim());
+    let n = perm1.dim();
+    let r = n - perm2.dim();
     PermOwned::new((0..n).map(|i| {
         let j = perm1.at(i);
         if j < r { j } else { r + perm2.at(j - r) }
@@ -468,7 +471,7 @@ fn extend_perm(perm1: &PermOwned, perm2: &PermOwned, r: usize, n: usize) -> Perm
 // Lifts a compact permutation (acting on compact_idx elements of [0..full_n]) to the
 // full index space.  compact_idx[k] maps to compact_perm.at(k) (within [0..mr]);
 // all other indices map to consecutive positions starting at mr (in sorted order).
-fn lift_perm(compact_perm: &PermOwned, compact_idx: &[usize], full_n: usize) -> PermOwned {
+fn extend_perm(compact_perm: &PermOwned, compact_idx: &[usize], full_n: usize) -> PermOwned {
     let front = perm_for_indices(full_n, compact_idx.iter());
     let mr = compact_idx.len();
     PermOwned::new((0..full_n).map(|i| {
@@ -1126,10 +1129,30 @@ mod tests {
         }
     }
 
-    // ---- perm helpers ----
+    // ---- merge_perm ----
 
     #[test]
-    fn test_lift_perm() {
+    fn test_merge_perm() {
+        use sprs::PermOwned;
+        // perm1 (size 5) = [2, 0, 3, 1, 4]; r = 2; perm2 (size 3) = [1, 2, 0].
+        // For each i in 0..5, let j = perm1.at(i):
+        //   i=0: j=2 ≥ r → r + perm2.at(0) = 2 + 1 = 3
+        //   i=1: j=0 < r → 0
+        //   i=2: j=3 ≥ r → r + perm2.at(1) = 2 + 2 = 4
+        //   i=3: j=1 < r → 1
+        //   i=4: j=4 ≥ r → r + perm2.at(2) = 2 + 0 = 2
+        let perm1 = PermOwned::new(vec![2, 0, 3, 1, 4]);
+        let perm2 = PermOwned::new(vec![1, 2, 0]);
+        let p = merge_perm(&perm1, &perm2);
+        for (i, expected) in [3, 0, 4, 1, 2].iter().enumerate() {
+            assert_eq!(p.at(i), *expected, "mismatch at i={i}");
+        }
+    }
+
+    // ---- extend_perm ----
+
+    #[test]
+    fn test_extend_perm() {
         use sprs::PermOwned;
         // compact_idx = [1, 3] in full space of size 5.
         // compact_perm swaps the two: at(0)=1, at(1)=0.
@@ -1140,7 +1163,7 @@ mod tests {
         //     i=0 -> 2,  i=2 -> 3,  i=4 -> 4
         let cp = PermOwned::new(vec![1, 0]);
         let idx = vec![1usize, 3];
-        let p = lift_perm(&cp, &idx, 5);
+        let p = extend_perm(&cp, &idx, 5);
         assert_eq!(p.at(0), 2);
         assert_eq!(p.at(1), 1);
         assert_eq!(p.at(2), 3);
@@ -1149,18 +1172,20 @@ mod tests {
     }
 
     #[test]
-    fn test_lift_perm_identity() {
+    fn test_extend_perm_identity() {
         use sprs::PermOwned;
         // compact_idx = [0, 2, 5] with identity compact_perm.
-        // lift_perm should equal perm_for_indices(7, [0,2,5]).
+        // extend_perm should equal perm_for_indices(7, [0,2,5]).
         let cp = PermOwned::identity(3);
         let idx = vec![0usize, 2, 5];
-        let p = lift_perm(&cp, &idx, 7);
+        let p = extend_perm(&cp, &idx, 7);
         let expected = perm_for_indices(7, idx.iter());
         for i in 0..7 {
             assert_eq!(p.at(i), expected.at(i), "mismatch at i={i}");
         }
     }
+
+    // ---- perm_apply ----
 
     #[test]
     fn test_perm_apply() {

@@ -11,7 +11,7 @@ use crate::dense::Mat;
 use crate::dense::pluq::pluq as dense_pluq;
 use super::SpMat;
 use super::SpVec;
-use super::pivot::{PivotCondition, PivotFinderConfig, PivotType, find_pivots, perms_by_pivots};
+use super::pivot::{PivotFinderConfig, PivotType, find_pivots, perms_by_pivots};
 use super::triang::{TriangularType, solve_triangular, solve_triangular_left, solve_triangular_vec};
 use super::util::perm_for_indices;
 
@@ -123,6 +123,31 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     merge_pluq(pp1, pp2)
 }
 
+fn dense_pluq_in<R>(s: &SpMat<R>, piv_type: PivotType) -> PartialPluq<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    let transpose = piv_type == PivotType::Rows;
+    let (ms, ns) = s.shape();
+    let (row_idx, col_idx, mat) = extract_dense(s, transpose);
+    let (m0, n0) = (row_idx.len(), col_idx.len());
+
+    let raw = dense_pluq(&mat);
+    let dp = if transpose { raw.transpose() } else { raw };
+
+    let p2 = lift_perm(&dp.p, &row_idx, ms);
+    let q2 = lift_perm(&dp.q, &col_idx, ns);
+
+    let mut l2 = SpMat::from(dp.l);
+    l2.extend_by_zero(ms - m0, 0);
+
+    let mut u2 = SpMat::from(dp.u);
+    u2.extend_by_zero(0, ns - n0);
+
+    let mut s2 = SpMat::from(dp.s);
+    s2.extend_by_zero(ms - m0, ns - n0);
+
+    PartialPluq { p: p2, q: q2, l: l2, u: u2, s: s2 }
+}
+
 // Extracts the compact dense submatrix of `s` using only its non-zero rows/cols.
 // If `transpose` is true, returns S0^T (n0 × m0); otherwise returns S0 (m0 × n0).
 // Also returns the sorted non-zero row/col indices of `s`.
@@ -152,64 +177,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     (row_idx, col_idx, mat)
 }
 
-fn dense_pluq_in<R>(s: &SpMat<R>, piv_type: PivotType) -> PartialPluq<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    let transpose = piv_type == PivotType::Rows;
-    let (ms, ns) = s.shape();
-    let (row_idx, col_idx, mat) = extract_dense(s, transpose);
-    let (m0, n0) = (row_idx.len(), col_idx.len());
-
-    let raw = dense_pluq(&mat);
-    let dp = if transpose { raw.transpose() } else { raw };
-
-    let p2 = lift_perm(&dp.p, &row_idx, ms);
-    let q2 = lift_perm(&dp.q, &col_idx, ns);
-
-    let mut l2 = SpMat::from(dp.l);
-    l2.extend_by_zero(ms - m0, 0);
-
-    let mut u2 = SpMat::from(dp.u);
-    u2.extend_by_zero(0, ns - n0);
-
-    let mut s2 = SpMat::from(dp.s);
-    s2.extend_by_zero(ms - m0, ns - n0);
-
-    PartialPluq { p: p2, q: q2, l: l2, u: u2, s: s2 }
-}
-
-/// Solves `a * x = y` over a field using sparse PLUQ.
-///
-/// Returns `Some(x)` if a solution exists, `None` otherwise.
-pub fn solve_pluq<R>(a: &SpMat<R>, y: &[R]) -> Option<Vec<R>>
-where R: Field, for<'x> &'x R: FieldOps<R> {
-    let (m, n) = a.shape();
-    assert_eq!(y.len(), m);
-
-    let pp = pluq(a, PivotFinderConfig {
-        piv_type: PivotType::Rows,
-        piv_cond: PivotCondition::AnyUnit,
-        ..Default::default()
-    });
-    let r = pp.rank();
-
-    let yp = perm_apply(pp.p.view(), y);
-    let z0 = solve_top(&pp.l, &yp);
-    let z1 = compute_yp_res(&pp.l, &yp, &z0);
-
-    if z1.iter().any(|v| !v.is_zero()) {
-        return None;
-    }
-
-    let u11 = pp.u.submat(0..r, 0..r);
-    let xq_top = solve_triangular_vec(TriangularType::Upper, &u11, &SpVec::from(z0)).to_dense();
-    Some(reconstruct_x(&pp.q, r, &xq_top, &vec![R::zero(); n - r]))
-}
-
-pub fn solve_pluq_incr<R>(a: &SpMat<R>, y: &[R], max_piv: usize, chunk: usize) -> Option<Vec<R>>
-where R: Field, for<'x> &'x R: FieldOps<R> {
-    todo!("Implement here")
-}
-
 // Merges two partial PLUQ decompositions. `pp1` has rank `r1` and shape (m, n);
 // `pp2` is a partial PLUQ of `pp1.s` with rank `r2` and shape (m - r1, n - r1).
 // Returns a partial PLUQ of the same matrix as `pp1` with rank `r1 + r2` and
@@ -228,21 +195,21 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let q = extend_perm(&pp1.q, &pp2.q, r1, n);
 
     let l = {
-        let [l_top, l_bot] = pp1.l.divide_at_row(r1);
-        let l_bot = l_bot.permute_rows(pp2.p.view());
+        let [l0, l1] = pp1.l.divide_at_row(r1);
+        let l1 = l1.permute_rows(pp2.p.view());
         let zero_tr = SpMat::zero((r1, r2));
         SpMat::combine_blocks([
-            &l_top, &zero_tr, 
-            &l_bot, &pp2.l
+            &l0, &zero_tr, 
+            &l1, &pp2.l
         ])
     };
 
     let u = {
-        let [u_left, u_right] = pp1.u.divide_at_col(r1);
-        let u_right = u_right.permute_cols(pp2.q.view());
+        let [u0, u1] = pp1.u.divide_at_col(r1);
+        let u1 = u1.permute_cols(pp2.q.view());
         let zero_bl = SpMat::zero((r2, r1));
         SpMat::combine_blocks([
-            &u_left, &u_right, 
+            &u0, &u1, 
             &zero_bl, &pp2.u
         ])
     };
@@ -250,6 +217,176 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let s = pp2.s;
 
     PartialPluq { p, q, l, u, s }
+}
+
+/// Solves `a * x = y` over a field using sparse PLUQ.
+///
+/// Returns `Some(x)` if a solution exists, `None` otherwise.
+pub fn solve_pluq<R>(a: &SpMat<R>, y: &[R]) -> Option<Vec<R>>
+where R: Field, for<'x> &'x R: FieldOps<R> {
+    assert_eq!(y.len(), a.nrows());
+
+    let pp = pluq(a, PivotFinderConfig {
+        piv_type: PivotType::Rows,
+        ..Default::default()
+    });
+
+    let yp = perm_apply(pp.p.view(), y);
+    let xq = solve_lu(&pp.l, &pp.u, &yp)?;
+    Some(perm_apply(pp.q.view().inv().view(), &xq))
+}
+
+// Solves `L * U * x = y` and returns `x` of length `n = u.ncols()` with
+// entries beyond `r = l.ncols()` set to zero (free variables = 0).
+//
+// Requires the top r × r block of L to be unit lower triangular and the top
+// r × r block of U to be invertible upper triangular.
+//
+// Returns `None` when `solve_l(l, y, true)` detects an inconsistent residual.
+// When `l` is square (`l.nrows() == r`) the residual is empty and the call
+// always succeeds.
+fn solve_lu<R>(l: &SpMat<R>, u: &SpMat<R>, y: &[R]) -> Option<Vec<R>>
+where R: Field, for<'x> &'x R: FieldOps<R> {
+    assert_eq!(l.ncols(), u.nrows());
+    assert_eq!(y.len(), l.nrows());
+
+    let z = solve_l(l, y, true)?;
+    let x = solve_u(u, &z);
+
+    Some(x)
+}
+
+// Solves `l[0..r, 0..r] * z = y[0..r]` by forward substitution, where
+// `r = l.ncols()`. The top r × r block of L must be lower triangular with
+// non-zero diagonal.
+//
+// If `check_consistency` is true and `r < y.len()`, also verifies the residual
+// `y[r..] - l[r.., :] * z` is zero, returning `None` when it isn't. When `r ==
+// y.len()` the residual is trivially empty so the check is skipped.
+fn solve_l<R>(l: &SpMat<R>, y: &[R], check_consistency: bool) -> Option<Vec<R>>
+where R: Field, for<'x> &'x R: FieldOps<R> {
+    assert_eq!(l.nrows(), y.len());
+    let r = l.ncols();
+
+    let x = if r == y.len() { 
+        let y = SpVec::from(y.to_vec());
+        solve_triangular_vec(TriangularType::Lower, l, &y).to_dense()
+    } else { 
+        let l0 = l.submat(0..r, 0..r);
+        let y0 = SpVec::from(y[..r].to_vec());
+        let x = solve_triangular_vec(TriangularType::Lower, &l0, &y0).to_dense();
+
+        if check_consistency && !is_consistent(l, y, &x){ 
+            return None;
+        }
+        x
+    };
+
+    Some(x)
+}
+
+// check l * x == y
+fn is_consistent<R>(l: &SpMat<R>, y: &[R], x: &[R]) -> bool
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    is_consistent_upto(l, y, x, y.len())
+}
+
+fn is_consistent_upto<R>(l: &SpMat<R>, y: &[R], x: &[R], k: usize) -> bool
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    assert_eq!(l.nrows(), y.len());
+    assert_eq!(l.ncols(), x.len());
+    assert!(x.len() <= k && k <= y.len());
+
+    let r = x.len();
+    let mut res = y[r..k].to_vec();
+
+    for (i, j, v) in l.iter_nz() {
+        if r <= i && i < k {
+            res[i - r] -= v * &x[j];
+        }
+    }
+
+    res.iter().all(|v| v.is_zero())
+}
+
+// Solves `u[0..r, 0..r] * x[..r] = y` by back-substitution, where
+// `r = u.nrows()`, and returns `x` of length `n = u.ncols()` with entries
+// beyond `r` set to zero. The top r × r block of U must be upper triangular
+// with non-zero diagonal.
+fn solve_u<R>(u: &SpMat<R>, y: &[R]) -> Vec<R>
+where R: Field, for<'x> &'x R: FieldOps<R> {
+    let (r, n) = u.shape();
+    assert_eq!(y.len(), r);
+    assert!(n >= r);
+
+    let mut x = if n == r {
+        solve_triangular_vec(TriangularType::Upper, u, &SpVec::from(y.to_vec())).to_dense()
+    } else {
+        let u0 = u.submat(0..r, 0..r);
+        solve_triangular_vec(TriangularType::Upper, &u0, &SpVec::from(y.to_vec())).to_dense()
+    };
+
+    x.resize(n, R::zero());
+    x
+}
+
+/// Solves `a * x = y` over a field using an incremental sparse PLUQ.
+///
+/// Behaves like [`solve_pluq`] but designed for huge matrices: caps the initial
+/// sparse pre-PLUQ at `max_piv` pivots, then incrementally processes the
+/// remaining Schur complement `chunk` rows at a time. Returns `None` (without
+/// completing the full PLUQ) as soon as a chunk reveals inconsistency.
+pub fn solve_pluq_incr<R>(a: &SpMat<R>, y: &[R], max_piv: usize, chunk: usize) -> Option<Vec<R>>
+where R: Field, for<'x> &'x R: FieldOps<R> {
+    assert_eq!(y.len(), a.nrows());
+
+    let mut pp = pre_pluq(a, PivotFinderConfig {
+        piv_type: PivotType::Rows,
+        max_pivots: max_piv,
+        ..Default::default()
+    });
+    let mut yp = perm_apply(pp.p.view(), y);
+
+    while pp.s.nrows() > 0 {
+        let r_old = pp.rank();
+        let (pp_chunk_full, r_chunk, c) = chunk_pluq(&pp.s, chunk);
+        let p_chunk = pp_chunk_full.p.clone();
+        pp = merge_pluq(pp, pp_chunk_full);
+
+        // Apply the chunk's row perm to the tail of yp so it stays in sync with pp.l.
+        let yp_tail = perm_apply(p_chunk.view(), &yp[r_old..]);
+        yp[r_old..].clone_from_slice(&yp_tail);
+
+        // The top `k` rows of pp.s are zero rows (chunk's PLUQ leftover);
+        // they demand `yp[r_new..r_new+k] == L[r_new..r_new+k, :] * z` for
+        // consistency, regardless of future chunks.
+        let k = c - r_chunk;
+        let z = solve_l(&pp.l, &yp, false).unwrap();
+        if !is_consistent_upto(&pp.l, &yp, &z, z.len() + k) {
+            return None;
+        }
+
+        trim_zero_rows(&mut pp, &mut yp, k);
+    }
+
+    let xq = solve_lu(&pp.l, &pp.u, &yp)?;
+    Some(perm_apply(pp.q.view().inv().view(), &xq))
+}
+
+// Takes the top `min(chunk_size, s.nrows())` rows of `s`, runs `pluq` on them,
+// and lifts the result to act on all of `s` via `extend_chunk_to_full`.
+// Returns `(pp_chunk_full, r_chunk, c)`.
+fn chunk_pluq<R>(s: &SpMat<R>, chunk_size: usize) -> (PartialPluq<R>, usize, usize)
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    let c = chunk_size.min(s.nrows());
+    let [s_chunk, s_rest] = s.divide_at_row(c);
+    let pp_chunk = pluq(&s_chunk, PivotFinderConfig {
+        piv_type: PivotType::Rows,
+        ..Default::default()
+    });
+    let r_chunk = pp_chunk.rank();
+    let pp_chunk_full = extend_chunk_to_full(pp_chunk, &s_rest);
+    (pp_chunk_full, r_chunk, c)
 }
 
 // Lifts a PLUQ of the top `c` rows of some matrix `s` (= `pp_chunk`) to a
@@ -260,75 +397,63 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 // Sparse analog of `dense_pluq_in`, applied to a single chunk.
 fn extend_chunk_to_full<R>(pp_chunk: PartialPluq<R>, s_rest: &SpMat<R>) -> PartialPluq<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    todo!("extend_chunk_to_full")
+    let (c, n_s) = (pp_chunk.l.nrows(), pp_chunk.u.ncols());
+    let r_chunk = pp_chunk.rank();
+    let m_rest = s_rest.nrows();
+    let m_s = c + m_rest;
+
+    assert_eq!(s_rest.ncols(), n_s);
+    assert_eq!(pp_chunk.s.shape(), (c - r_chunk, n_s - r_chunk));
+
+    let s_rest_q = s_rest.permute_cols(pp_chunk.q.view());
+    let [s_rest_left, s_rest_right] = s_rest_q.divide_at_col(r_chunk);
+
+    let [u_top, u_right] = pp_chunk.u.divide_at_col(r_chunk);
+
+    let l_ext = solve_triangular_left(TriangularType::Upper, &u_top, &s_rest_left);
+    let s_ext = s_rest_right - &l_ext * &u_right;
+
+    let chunk_idx: Vec<usize> = (0..c).collect();
+    let p = lift_perm(&pp_chunk.p, &chunk_idx, m_s);
+    let q = pp_chunk.q;
+    let l = pp_chunk.l.stack(&l_ext);
+    let u = u_top.concat(&u_right);
+    let s = pp_chunk.s.stack(&s_ext);
+
+    PartialPluq { p, q, l, u, s }
 }
 
-// Solves l[0..r, 0..r] * x = yp[0..r] by forward substitution.
-// Requires l[0..r, 0..r] to be lower triangular with non-zero diagonal.
-fn solve_top<R>(l: &SpMat<R>, yp: &[R]) -> Vec<R>
-where R: Field, for<'x> &'x R: FieldOps<R> {
-    let r = l.ncols();
-    if r == 0 { return vec![]; }
-
-    let l0 = l.submat(0..r, 0..r);
-    let b = SpVec::from(yp[..r].to_vec());
-    solve_triangular_vec(TriangularType::Lower, &l0, &b).to_dense()
-}
-
-// Computes yp[r..m] - l[r..m, :] * x_piv where r = x_piv.len().
-fn compute_yp_res<R>(l: &SpMat<R>, yp: &[R], x_piv: &[R]) -> Vec<R>
+// Drops the top `k` zero rows of `pp.s` from `pp.l`, `pp.s`, and `yp`.
+// `pp.p` is left untouched (no longer used after the initial yp permutation).
+//
+// Caller is responsible for verifying via `is_consistent_upto` that the
+// `k` rows being removed have zero residual; otherwise the resulting system
+// would silently lose constraints.
+fn trim_zero_rows<R>(pp: &mut PartialPluq<R>, yp: &mut Vec<R>, k: usize)
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let r = x_piv.len();
-    let mut yp_res = yp[r..].to_vec();
-    for (i, j, v) in l.iter_nz() {
-        if i >= r {
-            yp_res[i - r] = yp_res[i - r].clone() - v * &x_piv[j];
-        }
-    }
-    yp_res
-}
+    if k == 0 { return; }
 
-// Solves s * xq_res = yp_res using compact_pluq.
-// Returns None if the system is inconsistent (including zero rows of s with non-zero rhs).
-fn solve_res<R>(s: &SpMat<R>, yp_res: &[R]) -> Option<Vec<R>>
-where R: Field, for<'x> &'x R: FieldOps<R> {
-    let (m, n) = s.shape();
-    assert_eq!(yp_res.len(), m);
-
-    let pp = dense_pluq_in(s, PivotType::Cols);
     let r = pp.rank();
+    let m = pp.l.nrows();
+    assert!(r + k <= m);
+    assert_eq!(yp.len(), m);
 
-    let yp = perm_apply(pp.p.view(), yp_res);
-    let z0 = solve_top(&pp.l, &yp);
-    let z1 = compute_yp_res(&pp.l, &yp, &z0);
+    // Drop rows [r..r+k] from pp.l: keep [0..r] and [r+k..m], shifted down.
+    pp.l = pp.l.extract((m - k, r), |i, j| {
+        if i < r {
+            Some((i, j))
+        } else if i < r + k {
+            None
+        } else {
+            Some((i - k, j))
+        }
+    });
 
-    if z1.iter().any(|v| !v.is_zero()) {
-        return None;
-    }
+    // Drop the top k rows of pp.s.
+    pp.s = pp.s.submat_rows(k..pp.s.nrows());
 
-    let u1 = pp.u.submat(0..r, r..n);
-    let xq_top = back_sub_piv(&z0, &u1, &[]);
-    Some(reconstruct_x(&pp.q, r, &xq_top, &vec![R::zero(); n - r]))
-}
-
-// Computes xq_top = z - U1 * xq_res.
-// After Cols extension, u = [I_r | U1], so U1 = u[0..r, r..n].
-fn back_sub_piv<R>(z: &[R], u1: &SpMat<R>, xq_res: &[R]) -> Vec<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    let mut xq_top = z.to_vec();
-    for (i, j, v) in u1.iter_nz() {
-        xq_top[i] = xq_top[i].clone() - v * &xq_res[j];
-    }
-    xq_top
-}
-
-// Reconstructs x from permuted solution: x[j] = x'[q(j)], x' = [x_piv | x_free].
-fn reconstruct_x<R: Clone>(q: &PermOwned, r: usize, x_piv: &[R], x_free: &[R]) -> Vec<R> {
-    let n = r + x_free.len();
-    (0..n).map(|j| {
-        let qj = q.at(j);
-        if qj < r { x_piv[qj].clone() } else { x_free[qj - r].clone() }
-    }).collect()
+    // Drop yp entries [r..r+k] to stay in sync with pp.l.
+    yp.drain(r..r + k);
 }
 
 // Composes perm1 with extend(perm2, r): the first `r` positions stay, the rest are
@@ -365,7 +490,7 @@ mod tests {
     use num_traits::One;
 
     fn cfg(piv_type: PivotType) -> PivotFinderConfig {
-        PivotFinderConfig { piv_type, piv_cond: PivotCondition::AnyUnit, ..Default::default() }
+        PivotFinderConfig { piv_type, ..Default::default() }
     }
 
     fn sample() -> SpMat<i32> {
@@ -443,6 +568,65 @@ mod tests {
 
     #[test]
     fn test_pluq_rand_cols() { check_pluq_cols(&SpMat::<i32>::rand((40, 60), 0.1)); }
+
+    fn check_extend_chunk(s: &SpMat<i32>, c: usize) {
+        let (m, n) = s.shape();
+        assert!(c <= m);
+        let [s_top, s_rest] = s.divide_at_row(c);
+        let pp_chunk = pluq(&s_top, cfg(PivotType::Rows));
+        let pp = extend_chunk_to_full(pp_chunk, &s_rest);
+        let r = pp.rank();
+
+        assert_eq!(pp.l.shape(), (m, r));
+        assert_eq!(pp.u.shape(), (r, n));
+        assert_eq!(pp.s.shape(), (m - r, n - r));
+
+        let psq = s.permute(pp.p.view(), pp.q.view());
+        let rem = SpMat::from_entries((m, n),
+            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
+        );
+        assert_eq!(psq, &pp.l * &pp.u + &rem, "p*s*q != l*u + rest (c = {c})");
+    }
+
+    #[test]
+    fn test_extend_chunk_top() { check_extend_chunk(&sample(), 3); }
+
+    #[test]
+    fn test_extend_chunk_full() { check_extend_chunk(&sample(), 6); }
+
+    #[test]
+    fn test_extend_chunk_empty() { check_extend_chunk(&sample(), 0); }
+
+    #[test]
+    fn test_extend_chunk_rand() { check_extend_chunk(&SpMat::<i32>::rand((40, 60), 0.1), 17); }
+
+    #[test]
+    fn test_chunk_pluq() {
+        let s = sample();
+        let (m, n) = s.shape();
+        let (pp, r_chunk, c) = chunk_pluq(&s, 3);
+        let r = pp.rank();
+
+        assert_eq!(c, 3);
+        assert_eq!(r, r_chunk);
+        assert_eq!(pp.l.shape(), (m, r));
+        assert_eq!(pp.u.shape(), (r, n));
+        assert_eq!(pp.s.shape(), (m - r, n - r));
+
+        let psq = s.permute(pp.p.view(), pp.q.view());
+        let rem = SpMat::from_entries((m, n),
+            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
+        );
+        assert_eq!(psq, &pp.l * &pp.u + &rem);
+    }
+
+    #[test]
+    fn test_chunk_pluq_oversize() {
+        let s = sample();
+        let m = s.nrows();
+        let (_, _, c) = chunk_pluq(&s, 100);
+        assert_eq!(c, m);
+    }
 
     fn check_rows(a: &SpMat<i32>) {
         let pp = pre_pluq(a, cfg(PivotType::Rows));
@@ -703,59 +887,8 @@ mod tests {
         // l[0..2,0..2]*x = [4,11] → x = [2, 5/4]
         let l = sp((2, 2), [r(2), r(0), r(3), r(4)]);
         let yp = vec![r(4), r(11)];
-        let x = solve_top(&l, &yp);
-        assert_eq!(x, vec![r(2), r(5)/r(4)]);
-    }
-
-    #[test]
-    fn test_compute_yp_res() {
-        // l = [[1,0],[2,1],[3,0]], x_piv = [3,2], yp = [*,*,7,8]
-        // yp_res = yp[2..] - l[2..,:]*x_piv = [7-9, 8-0] = [-2, 8]
-        let l = sp((3, 2), [r(1), r(0), r(2), r(1), r(3), r(0)]);
-        let yp = vec![r(0), r(0), r(7), r(8)]; // only [2..] matters
-        let x_piv = vec![r(3), r(2)];
-        let res = compute_yp_res(&l, &yp, &x_piv);
-        assert_eq!(res, vec![r(7) - r(9), r(8)]);
-    }
-
-    #[test]
-    fn test_solve_res_trivial() {
-        // all-zero s, zero yp_res → x_free = [0, 0]
-        let rem = SpMat::<R>::zero((2, 2));
-        let yp_res = vec![r(0), r(0)];
-        assert_eq!(solve_res(&rem, &yp_res), Some(vec![r(0), r(0)]));
-    }
-
-    #[test]
-    fn test_solve_res_inconsistent() {
-        // zero rem, nonzero yp_res → None
-        let rem = SpMat::<R>::zero((2, 2));
-        let yp_res = vec![r(1), r(0)];
-        assert!(solve_res(&rem, &yp_res).is_none());
-    }
-
-    #[test]
-    fn test_solve_res_nontrivial() {
-        // rem = [[2, 0], [0, 3]], yp_res = [4, 6] → x_free = [2, 2]
-        let rem = sp((2, 2), [r(2), r(0), r(0), r(3)]);
-        let yp_res = vec![r(4), r(6)];
-        let x = solve_res(&rem, &yp_res).unwrap();
-        // check rem * x = yp_res
-        let ax0 = r(2) * x[0].clone();
-        let ax1 = r(3) * x[1].clone();
-        assert_eq!(ax0, r(4));
-        assert_eq!(ax1, r(6));
-    }
-
-    #[test]
-    fn test_reconstruct_x() {
-        use sprs::PermOwned;
-        // q = [1, 0] (swap), r=1, x_piv=[10], x_free=[20]
-        // j=0: q(0)=1 >= r=1 → x_free[0]=20
-        // j=1: q(1)=0 < r=1  → x_piv[0]=10
-        let q = PermOwned::new(vec![1, 0]);
-        let x = reconstruct_x(&q, 1, &[r(10)], &[r(20)]);
-        assert_eq!(x, vec![r(20), r(10)]);
+        let x = solve_l(&l, &yp, true);
+        assert_eq!(x, Some(vec![r(2), r(5)/r(4)]));
     }
 
     // ---- solve_pluq integration tests ----
@@ -814,5 +947,114 @@ mod tests {
         let y = [r(1), r(2), r(3), r(4)];
         let x = solve_check(&a, &y);
         assert_eq!(x, y);
+    }
+
+    // ---- solve_pluq_incr integration tests ----
+
+    fn solve_incr_check(a: &SpMat<R>, y: &[R], max_piv: usize, chunk: usize) -> Vec<R> {
+        let x = solve_pluq_incr(a, y, max_piv, chunk).expect("expected a solution");
+        let (m, _) = a.shape();
+        let mut ax = vec![r(0); m];
+        for (i, j, v) in a.iter_nz() { ax[i] = ax[i].clone() + v * &x[j]; }
+        for i in 0..m {
+            assert_eq!(ax[i], y[i], "row {i}: (A*x)[{i}] != y[{i}] (max_piv={max_piv}, chunk={chunk})");
+        }
+        x
+    }
+
+    #[test]
+    fn test_solve_incr_square() {
+        let a = sp((2, 2), [r(1), r(2), r(3), r(4)]);
+        // exercise different (max_piv, chunk) combinations
+        for (mp, ch) in [(0, 1), (0, 2), (1, 1), (usize::MAX, 1), (usize::MAX, 100)] {
+            solve_incr_check(&a, &[r(5), r(6)], mp, ch);
+        }
+    }
+
+    #[test]
+    fn test_solve_incr_overdetermined_consistent() {
+        let a = sp((3, 2), [r(1), r(0), r(0), r(1), r(1), r(1)]);
+        solve_incr_check(&a, &[r(2), r(3), r(5)], 0, 2);
+        solve_incr_check(&a, &[r(2), r(3), r(5)], 1, 1);
+    }
+
+    #[test]
+    fn test_solve_incr_overdetermined_inconsistent() {
+        let a = sp((3, 2), [r(1), r(0), r(0), r(1), r(1), r(1)]);
+        for (mp, ch) in [(0, 1), (0, 3), (usize::MAX, 1)] {
+            assert!(solve_pluq_incr(&a, &[r(1), r(1), r(0)], mp, ch).is_none());
+        }
+    }
+
+    #[test]
+    fn test_solve_incr_underdetermined() {
+        let a = sp((2, 3), [r(1), r(0), r(2), r(0), r(1), r(3)]);
+        solve_incr_check(&a, &[r(4), r(5)], 0, 1);
+        solve_incr_check(&a, &[r(4), r(5)], 1, 1);
+    }
+
+    #[test]
+    fn test_solve_incr_zero_rhs() {
+        let a = sp((2, 2), [r(1), r(2), r(3), r(4)]);
+        let x = solve_incr_check(&a, &[r(0), r(0)], 0, 1);
+        assert_eq!(x, vec![r(0), r(0)]);
+    }
+
+    #[test]
+    fn test_solve_incr_no_solution() {
+        let a = sp((2, 2), [r(1), r(2), r(2), r(4)]);
+        for (mp, ch) in [(0, 1), (0, 2), (usize::MAX, 1)] {
+            assert!(solve_pluq_incr(&a, &[r(1), r(0)], mp, ch).is_none());
+        }
+    }
+
+    #[test]
+    fn test_solve_incr_identity() {
+        let a: SpMat<R> = SpMat::from_entries((4, 4), (0..4).map(|k| (k, k, r(1))));
+        let y = [r(1), r(2), r(3), r(4)];
+        let x = solve_incr_check(&a, &y, 0, 2);
+        assert_eq!(x, y);
+    }
+
+    #[test]
+    fn test_solve_incr_zero_matrix_zero_rhs() {
+        let a = SpMat::<R>::zero((3, 4));
+        // Ax = 0 with A=0 has any x as a solution; expect all-zero free vars.
+        let x = solve_pluq_incr(&a, &vec![r(0); 3], 0, 1).expect("zero rhs is consistent");
+        assert_eq!(x, vec![r(0); 4]);
+    }
+
+    #[test]
+    fn test_solve_incr_zero_matrix_nonzero_rhs() {
+        let a = SpMat::<R>::zero((3, 4));
+        assert!(solve_pluq_incr(&a, &[r(1), r(0), r(0)], 0, 1).is_none());
+    }
+
+    #[test]
+    fn test_solve_incr_matches_solve_pluq() {
+        // Random sparse system of moderate size; the two solvers should agree.
+        let a: SpMat<R> = sp((6, 9), [
+            r(1), r(0), r(0), r(0), r(0), r(1), r(0), r(0), r(1),
+            r(0), r(1), r(1), r(1), r(0), r(1), r(0), r(1), r(0),
+            r(0), r(0), r(1), r(1), r(0), r(0), r(0), r(1), r(1),
+            r(0), r(1), r(0), r(0), r(1), r(0), r(0), r(0), r(0),
+            r(0), r(0), r(1), r(0), r(0), r(0), r(0), r(0), r(0),
+            r(0), r(1), r(0), r(0), r(0), r(1), r(0), r(1), r(0),
+        ]);
+        let y = vec![r(1), r(2), r(3), r(0), r(1), r(0)];
+
+        // Pick y that's reachable: y = a * (1, 1, ..., 1) is guaranteed consistent.
+        let mut y_consistent = vec![r(0); 6];
+        for (i, _, v) in a.iter_nz() { y_consistent[i] = y_consistent[i].clone() + v.clone(); }
+
+        for (mp, ch) in [(0, 1), (0, 3), (2, 2), (usize::MAX, 2)] {
+            // Inputs may be inconsistent for this `y`; check both behave the same.
+            let x_full = solve_pluq(&a, &y);
+            let x_incr = solve_pluq_incr(&a, &y, mp, ch);
+            assert_eq!(x_full.is_some(), x_incr.is_some(), "mp={mp}, ch={ch}");
+
+            // Always-consistent y: both must succeed and produce a solution.
+            solve_incr_check(&a, &y_consistent, mp, ch);
+        }
     }
 }

@@ -1,6 +1,5 @@
 use either::Either;
 use log::*;
-use num_traits::Zero;
 use yui_core::{Ring, RingOps};
 
 use super::*;
@@ -95,10 +94,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     debug!("solve {} triangular-vec", t.str());
     debug!("  a: {:?}", a.shape());
 
+    let n = a.nrows();
     let diag = collect_diag(a);
-    let mut b = b.to_dense();
+    let mut b_buf = vec![R::zero(); n];
+    scatter_into(b.data(), &mut b_buf);
 
-    _solve_triangular(t, a, &diag, &mut b)
+    _solve_triangular(t, a, &diag, &mut b_buf)
 }
 
 #[allow(unused)]
@@ -117,7 +118,7 @@ where
     let mut b = vec![R::zero(); n];
 
     (0..k).map(|j| {
-        copy_into(y.col_vec(j), &mut b);
+        scatter_into(y.col_data(j), &mut b);
         let x = _solve_triangular(t, a, &diag, &mut b);
         f(j, x)
     }).collect()
@@ -149,7 +150,7 @@ where
             RefCell::new(vec![R::zero(); n])
         ).borrow_mut();
 
-        copy_into(y.col_vec(j), &mut b);
+        scatter_into(y.col_data(j), &mut b);
         let x = _solve_triangular(t, a, &diag, &mut b);
         let result = f(j, x);
 
@@ -170,9 +171,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let mut entries = vec![];
 
     let itr = diag.iter().enumerate();
-    let itr = if t.is_upper() { 
+    let itr = if t.is_upper() {
         Either::Left(itr.rev())
-    } else { 
+    } else {
         Either::Right(itr)
     };
 
@@ -182,7 +183,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let uinv = u.inv().unwrap();
         let x_j = &b[j] * &uinv; // non-zero
 
-        for (i, a_ij) in a.col_vec(j).iter() {
+        let (idx, val) = a.col_data(j);
+        for (&i, a_ij) in idx.iter().zip(val.iter()) {
             if a_ij.is_zero() { continue }
             b[i] -= a_ij * &x_j;
         }
@@ -190,11 +192,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         entries.push((j, x_j));
     }
 
-    debug_assert!(b.iter().all(|b_i| 
+    debug_assert!(b.iter().all(|b_i|
         b_i.is_zero())
     );
 
-    if t.is_upper() { 
+    if t.is_upper() {
         entries.reverse()
     };
 
@@ -202,15 +204,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 fn collect_diag<'a, R>(a: &'a SpMat<R>) -> Vec<&'a R>
-where R: Ring, for<'x> &'x R: RingOps<R> { 
-    a.iter().filter_map(|(i, j, a)| 
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    a.iter().filter_map(|(i, j, a)|
         if i == j { Some(a) } else { None }
     ).collect()
 }
 
-fn copy_into<R>(vec: SpVec<R>, x: &mut [R])
-where R: Clone + Zero { 
-    vec.iter().for_each(|(i, r)| x[i] = r.clone())
+fn scatter_into<R: Clone>(data: (&[usize], &[R]), dst: &mut [R]) {
+    let (idx, val) = data;
+    for (&i, v) in idx.iter().zip(val.iter()) {
+        dst[i] = v.clone();
+    }
 }
 
 #[allow(unused)]

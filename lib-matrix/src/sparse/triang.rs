@@ -53,14 +53,30 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 // solve ax = y.
 pub fn solve_triangular<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
+    let n = a.nrows();
+    let cols = solve_triangular_with(t, a, y, |_, x| x);
+    SpMat::from_col_vecs(n, cols)
+}
+
+// Solve `ax = y` column by column, invoking `f(j, x_j)` on each solved
+// column. Hoists the diagonal collection and RHS buffer out of the per-column
+// loop, and (under `multithread`) reuses one buffer per thread.
+pub(crate) fn solve_triangular_with<R, F, T>(
+    t: TriangularType, a: &SpMat<R>, y: &SpMat<R>, f: F
+) -> Vec<T>
+where
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    F: Fn(usize, SpVec<R>) -> T + Sync,
+    T: Send,
+{
     assert_eq!(a.nrows(), y.nrows());
     debug_assert!(a.is_triang(t));
 
-    cfg_if::cfg_if! { 
-        if #[cfg(feature = "multithread")] { 
-            solve_triangular_m(t, a, y)
-        } else { 
-            solve_triangular_s(t, a, y)
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "multithread")] {
+            solve_triangular_m(t, a, y, f)
+        } else {
+            solve_triangular_s(t, a, y, f)
         }
     }
 }
@@ -86,8 +102,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 #[allow(unused)]
-fn solve_triangular_s<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
+fn solve_triangular_s<R, F, T>(
+    t: TriangularType, a: &SpMat<R>, y: &SpMat<R>, f: F
+) -> Vec<T>
+where
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    F: Fn(usize, SpVec<R>) -> T,
+{
     debug!("solve {} triangular", t.str());
     debug!("  a: {:?}, y: {:?}", a.shape(), y.shape());
 
@@ -95,17 +116,22 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let diag = collect_diag(a);
     let mut b = vec![R::zero(); n];
 
-    let cols = (0..k).map(|j| { 
+    (0..k).map(|j| {
         copy_into(y.col_vec(j), &mut b);
-        _solve_triangular(t, a, &diag, &mut b)
-    });
-
-    SpMat::from_col_vecs(n, cols)
+        let x = _solve_triangular(t, a, &diag, &mut b);
+        f(j, x)
+    }).collect()
 }
 
 #[cfg(feature = "multithread")]
-fn solve_triangular_m<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
+fn solve_triangular_m<R, F, T>(
+    t: TriangularType, a: &SpMat<R>, y: &SpMat<R>, f: F
+) -> Vec<T>
+where
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    F: Fn(usize, SpVec<R>) -> T + Sync,
+    T: Send,
+{
     use yui_core::util::sync::SyncCounter;
 
     debug!("solve {} triangular (threads: {})", t.str(), rayon::max_num_threads());
@@ -118,25 +144,24 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let report = should_report(y);
     let counter = SyncCounter::new();
 
-    let cols = (0..k).into_par_iter().map(|j| { 
-        let mut b = tl_b.get_or(|| 
+    (0..k).into_par_iter().map(|j| {
+        let mut b = tl_b.get_or(||
             RefCell::new(vec![R::zero(); n])
         ).borrow_mut();
 
         copy_into(y.col_vec(j), &mut b);
-        let col = _solve_triangular(t, a, &diag, &mut b);
+        let x = _solve_triangular(t, a, &diag, &mut b);
+        let result = f(j, x);
 
-        if report { 
+        if report {
             let c = counter.incr();
-            if (c > 0 && c % LOG_THRESHOLD == 0) || c == k { 
+            if (c > 0 && c % LOG_THRESHOLD == 0) || c == k {
                 trace!("  solved {c}/{k}.");
             }
         }
 
-        col
-    }).collect::<Vec<_>>();
-
-    SpMat::from_col_vecs(n, cols)
+        result
+    }).collect()
 }
 
 #[inline(never)] // for profilability

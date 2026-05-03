@@ -208,7 +208,7 @@ where
             self.trans.contains_key(&i) || 
             self.trans.contains_key(&(i + self.d_deg));
 
-        let sch = Schur::from_partial_triangular(t, &a, r, with_trans);
+        let sch = Schur::from_partial_triangular(t, &a, r, with_trans, with_trans);
         let (s, t_src, t_tgt) = sch.disassemble();
 
         debug!("  reduced C[{i}]: {:?} -> {:?}", a.shape(), s.shape());

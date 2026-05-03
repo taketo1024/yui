@@ -33,63 +33,79 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> Schur<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn from_pivots(a: &SpMat<R>, t: PivotType, p: &PermOwned, q: &PermOwned, r: usize, with_trans: bool) -> Self {
+    pub fn from_pivots(
+        a: &SpMat<R>,
+        t: PivotType,
+        p: &PermOwned,
+        q: &PermOwned,
+        r: usize,
+        with_trans_src: bool,
+        with_trans_tgt: bool,
+    ) -> Self {
         let (m, n) = a.shape();
         assert!(r <= m);
         assert!(r <= n);
 
         let t = if t == PivotType::Rows { TriangularType::Upper } else { TriangularType::Lower };
         let blocks = split_by_pqr(a, p, q, r);
-        Self::from_blocks(t, blocks, with_trans)
+        Self::from_blocks(t, blocks, with_trans_src, with_trans_tgt)
     }
 
-    pub fn from_partial_triangular(t: TriangularType, a: &SpMat<R>, r: usize, with_trans: bool) -> Self {
+    pub fn from_partial_triangular(
+        t: TriangularType,
+        a: &SpMat<R>,
+        r: usize,
+        with_trans_src: bool,
+        with_trans_tgt: bool,
+    ) -> Self {
         let (m, n) = a.shape();
         assert!(r <= m);
         assert!(r <= n);
 
         let blocks = a.divide4((r, r));
-        Self::from_blocks(t, blocks, with_trans)
+        Self::from_blocks(t, blocks, with_trans_src, with_trans_tgt)
     }
 
-    pub(crate) fn from_blocks(t: TriangularType, blocks: [SpMat<R>; 4], with_trans: bool) -> Self {
+    pub(crate) fn from_blocks(
+        t: TriangularType,
+        blocks: [SpMat<R>; 4],
+        with_trans_src: bool,
+        with_trans_tgt: bool,
+    ) -> Self {
         let [a, b, c, d] = blocks;
         assert!(a.is_square());
 
         let r = a.nrows();
         let (m_d, n_b) = (d.nrows(), b.ncols());
 
-        debug!("schur: a{:?}, b{:?}, c{:?}, d{:?}", a.shape(), b.shape(), c.shape(), d.shape());
+        debug!("compute schur: a{:?}, r: {r}", (m_d + r, n_b + r));
 
-        // Fuse the triangular solve `a · x_j = b_j` with the Schur update `s_j = d_j - c · x_j`. 
-        // When `with_trans` is false, `x_j` is dropped immediately, so `a⁻¹b` is never materialized.
-        let (s, t_src) = if with_trans {
-            let pairs = solve_triangular_with(t, &a, &b, |j, x_j| {
-                let s_j = d.col_vec(j) - &c * &x_j;
-                (x_j, s_j)
-            });
-            let (x_cols, s_cols): (Vec<_>, Vec<_>) = pairs.into_iter().unzip();
-            let x = SpMat::from_col_vecs(r, x_cols);   // x = a⁻¹b
-            let s = SpMat::from_col_vecs(m_d, s_cols);
+        // Compute `s` via one of three fused paths, picking whichever matches the
+        // requested transforms — never materializing a `(m_d × n_b)` matmul:
+        //   - with_trans_src:    right-solve fusion → `s` and `a⁻¹b` together.
+        //   - with_trans_tgt only: left-solve fusion (transposed view) → `s` and `c·a⁻¹` together.
+        //   - neither:           right-solve streaming, `s` only.
+        let pairs = solve_triangular_with(t, &a, &b, |j, x_j| {
+            let s_j = d.col_vec(j) - &c * &x_j;
+            let x_j = (with_trans_src).then_some(x_j);
+            (s_j, x_j)
+        });
+        
+        let (s_cols, x_cols): (Vec<_>, Vec<_>) = pairs.into_iter().unzip();
+        let s = SpMat::from_col_vecs(m_d, s_cols);
 
-            let t_src_f = proj_mat(r + n_b, n_b);
-            let t_src_b = (-x).stack(&id_mat(n_b)); // [-x, 1]^T
+        let t_src = with_trans_src.then(|| {
+            let x = SpMat::from_col_vecs(r, x_cols.into_iter().map(|x| x.unwrap())); // x = a⁻¹b
+            let f = proj_mat(r + n_b, n_b);
+            let b = (-x).stack(&id_mat(n_b)); // [-a⁻¹b, 1]^T
+            Trans::new(f, b)
+        });
 
-            (s, Some(Trans::new(t_src_f, t_src_b)))
-        } else {
-            let s_cols = solve_triangular_with(t, &a, &b, |j, x| {
-                d.col_vec(j) - &c * x
-            });
-            (SpMat::from_col_vecs(m_d, s_cols), None)
-        };
-
-        debug!("schur: {:?}", s.shape());
-
-        let t_tgt = with_trans.then(|| {
-            let mut t_tgt_f = -solve_triangular_left(t, &a, &c); // (-x)a = c
-            t_tgt_f.extend_cols(id_mat(m_d)); // [-ca⁻¹, 1]
-            let t_tgt_b = incl_mat(r + m_d, m_d);   // [0, 1]^T
-            Trans::new(t_tgt_f, t_tgt_b)
+        let t_tgt = with_trans_tgt.then(|| {
+            let mut f = -solve_triangular_left(t, &a, &c); // f = -ca⁻¹
+            f.extend_cols(id_mat(m_d)); // [-c·a⁻¹, 1]
+            let b = incl_mat(r + m_d, m_d); // [0, 1]^T
+            Trans::new(f, b)
         });
 
         Self { s, t_src, t_tgt }
@@ -99,12 +115,32 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.s
     }
 
-    pub fn trans_src(&self) -> Option<&Trans<R>> { 
+    pub fn trans_src(&self) -> Option<&Trans<R>> {
         self.t_src.as_ref()
     }
 
-    pub fn trans_tgt(&self) -> Option<&Trans<R>> { 
+    pub fn trans_tgt(&self) -> Option<&Trans<R>> {
         self.t_tgt.as_ref()
+    }
+
+    /// Returns `a⁻¹b` if it was retained (i.e. `with_trans_src=true`).
+    pub fn ainvb(&self) -> Option<SpMat<R>> {
+        self.t_src.as_ref().map(|trans| {
+            // backward_mat = [-a⁻¹b ; I], shape (r + n_b, n_b); top r rows are -a⁻¹b.
+            let bb = trans.backward_mat();
+            let r = bb.nrows() - bb.ncols();
+            -bb.submat_rows(0..r)
+        })
+    }
+
+    /// Returns `c·a⁻¹` if it was retained (i.e. `with_trans_tgt=true`).
+    pub fn ca_inv(&self) -> Option<SpMat<R>> {
+        self.t_tgt.as_ref().map(|trans| {
+            // forward_mat = [-c·a⁻¹, I], shape (m_d, r + m_d); first r cols are -c·a⁻¹.
+            let f = trans.forward_mat();
+            let r = f.ncols() - f.nrows();
+            -f.submat_cols(0..r)
+        })
     }
 
     pub fn disassemble(self) -> (SpMat<R>, Option<Trans<R>>, Option<Trans<R>>) {
@@ -138,7 +174,7 @@ mod tests {
             5, 3, 5, 2, 2,
             6, 2,-3, 1, 8
         ]);
-        let sch = Schur::from_partial_triangular(TriangularType::Lower, &a, 3, false);
+        let sch = Schur::from_partial_triangular(TriangularType::Lower, &a, 3, false, false);
         let s = sch.complement();
 
         assert_eq!(s, &SpMat::from_dense_data((3,2), [
@@ -160,7 +196,7 @@ mod tests {
             5, 3, 5, 2, 2,
             6, 2,-3, 1, 8
         ]);
-        let sch = Schur::from_partial_triangular(TriangularType::Lower, &a, 3, true);
+        let sch = Schur::from_partial_triangular(TriangularType::Lower, &a, 3, true, true);
         let s = sch.complement();
 
         assert_eq!(s, &SpMat::from_dense_data((3,2), [
@@ -200,7 +236,7 @@ mod tests {
             1, 2, 0, -3, 2, 1,
             3, 2, 3, 0, 2, 8,
         ]);
-        let sch = Schur::from_partial_triangular(TriangularType::Upper, &a, 3, false);
+        let sch = Schur::from_partial_triangular(TriangularType::Upper, &a, 3, false, false);
         let s = sch.complement();
 
         assert_eq!(s, &SpMat::from_dense_data((2, 3), [
@@ -220,7 +256,7 @@ mod tests {
             1, 2, 0, -3, 2, 1,
             3, 2, 3, 0, 2, 8,
         ]);
-        let sch = Schur::from_partial_triangular(TriangularType::Upper, &a, 3, true);
+        let sch = Schur::from_partial_triangular(TriangularType::Upper, &a, 3, true, true);
         let s = sch.complement();
 
         assert_eq!(s, &SpMat::from_dense_data((2, 3), [

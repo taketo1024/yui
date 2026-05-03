@@ -13,7 +13,8 @@ use crate::sparse::pivot::split_by_pqr;
 use super::SpMat;
 use super::SpVec;
 use super::pivot::{PivotFinderConfig, PivotType, find_pivots, perms_by_pivots};
-use super::triang::{TriangularType, solve_triangular, solve_triangular_left, solve_triangular_vec};
+use super::schur::Schur;
+use super::triang::{TriangularType, solve_triangular_vec};
 use super::util::perm_for_indices;
 
 /// Result of a sparse PLUQ decomposition.
@@ -48,56 +49,52 @@ impl<R> SpPluq<R> {
 
 /// Computes a partial PLUQ decomposition of `a` under the given pivot-finder
 /// configuration.
+///
+/// Splits the permuted matrix into four blocks `[[a0|a1],[a2|a3]]` at row/col
+/// `r`, then asks Schur to fuse the triangular solve with the Schur update.
+///
+/// Rows: top half [a0|a1] is `u` (upper triangular on the left). Schur produces
+///   `l1 = a2·a0⁻¹` and `s = a3 - l1·a1`; final `l = [I_r; l1]`.
+/// Cols: left half [a0;a2] is `l` (lower triangular on top). Schur produces
+///   `u1 = a0⁻¹·a1` and `s = a3 - a2·u1`; final `u = [I_r | u1]`.
 pub fn pre_pluq<R>(a: &SpMat<R>, config: PivotFinderConfig) -> SpPluq<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     debug!("compute sparse pluq: {:?}", a.shape());
 
+    let (m, n) = a.shape();
     let piv_type = config.piv_type;
     let pivots = find_pivots(a, config);
-    let (p, q) = perms_by_pivots(a, &pivots);
     let r = pivots.len();
 
-    let paq = split_by_pqr(a, &p, &q, r);
-    let (l, u, s) = build_lus(piv_type, paq);
-
-    SpPluq::new(p, q, l, u, s)
-}
-
-// Builds (l, u, s) from the four blocks paq = [[a0|a1],[a2|a3]].
-// Satisfies p*A*q = l*u + [[0,0],[0,s]].
-//
-// Rows: (u0,u1,r0,r1) = (a0,a1,a2,a3).  l1 = r0*u0^{-1},  l = [I_r;l1],  u = [u0|u1],  s = r1-l1*u1.
-// Cols: (l0,l1,r0,r1) = (a0,a2,a1,a3).  u1 = l0^{-1}*r0,  l = [l0;l1],  u = [I_r|u1],  s = r1-l1*u1.
-fn build_lus<R>(piv_type: PivotType, paq: [SpMat<R>; 4]) -> (SpMat<R>, SpMat<R>, SpMat<R>)
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    let [a0, a1, a2, a3] = paq;
-    let (m, n) = (a0.nrows() + a2.nrows(), a0.ncols() + a1.ncols());
-    let r = a0.ncols();
-
     if r == 0 {
-        return (SpMat::zero((m, 0)), SpMat::zero((0, n)), a3);
+        return SpPluq::new(PermOwned::identity(m), PermOwned::identity(n), SpMat::zero((m, 0)), SpMat::zero((0, n)), a.clone());
     }
 
-    match piv_type {
+    let (p, q) = perms_by_pivots(a, &pivots);
+    let paq = split_by_pqr(a, &p, &q, r);
+
+    let (l, u, s) = match piv_type {
         PivotType::Rows => {
-            let [u0, u1] = [a0, a1];
-            let [r0, r1] = [a2, a3];
-            let l1 = solve_triangular_left(TriangularType::Upper, &u0, &r0);
+            // u = [a0 | a1]; clone a0 (the small r×r block) since paq is consumed below.
+            let u = paq[0].concat(&paq[1]);
+            let sch = Schur::from_blocks(TriangularType::Upper, paq, false, true);
+            let l1 = sch.ca_inv().unwrap();
+            let s = sch.disassemble().0;
             let l = SpMat::id(r).stack(&l1);
-            let u = u0.concat(&u1);
-            let s = r1 - &l1 * &u1;
             (l, u, s)
         },
         PivotType::Cols => {
-            let [l0, l1] = [a0, a2];
-            let [r0, r1] = [a1, a3];
-            let u1 = solve_triangular(TriangularType::Lower, &l0, &r0);
-            let l = l0.stack(&l1);
+            // l = [a0 ; a2]; clone a0 (the small r×r block) since paq is consumed below.
+            let l = paq[0].stack(&paq[2]);
+            let sch = Schur::from_blocks(TriangularType::Lower, paq, true, false);
+            let u1 = sch.ainvb().unwrap();
+            let s = sch.disassemble().0;
             let u = SpMat::id(r).concat(&u1);
-            let s = r1 - &l1 * &u1;
             (l, u, s)
         }
-    }
+    };
+
+    SpPluq::new(p, q, l, u, s)
 }
 
 /// Computes a full PLUQ decomposition of `a`.
@@ -427,17 +424,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     let s_rest_q = s_rest.permute_cols(pp_chunk.q.view());
     let [s_rest_left, s_rest_right] = s_rest_q.divide_at_col(r_chunk);
-
     let [u_top, u_right] = pp_chunk.u.divide_at_col(r_chunk);
 
-    let l_ext = solve_triangular_left(TriangularType::Upper, &u_top, &s_rest_left);
-    let s_ext = s_rest_right - &l_ext * &u_right;
+    // Same Schur shape as pre_pluq's Rows branch: u_top (upper triangular) plays
+    // the role of `a`, with `c = s_rest_left`, `b = u_right`, `d = s_rest_right`.
+    let blocks = [u_top, u_right, s_rest_left, s_rest_right];
+    let sch = Schur::from_blocks(TriangularType::Upper, blocks, false, true);
+    let l_ext = sch.ca_inv().unwrap();
+    let s_ext = sch.disassemble().0;
 
     let chunk_idx: Vec<usize> = (0..c).collect();
     let p = extend_perm(&pp_chunk.p, &chunk_idx, m_s);
     let q = pp_chunk.q;
     let l = pp_chunk.l.stack(&l_ext);
-    let u = u_top.concat(&u_right);
+    let u = pp_chunk.u;
     let s = pp_chunk.s.stack(&s_ext);
 
     SpPluq::new(p, q, l, u, s)
@@ -538,32 +538,6 @@ mod tests {
             0, 0, 1, 0, 0, 0, 0, 0, 0,
             0, 1, 0, 0, 0, 1, 0, 1, 0,
         ])
-    }
-
-    // ---- build_lus ----
-
-    #[test]
-    fn test_build_cols() {
-        // paq = [[1,2],[3,4]], r=1: a0=[[1]], a1=[[2]], a2=[[3]], a3=[[4]]
-        // l0=a0=[[1]], l1=a2=[[3]], r0=a1=[[2]], r1=a3=[[4]]
-        // u1 = [[1]]^{-1}*[[2]] = [[2]], l = [[1],[3]], u = [[1,2]], s = [[4]]-[[3]]*[[2]] = [[-2]]
-        let paq = [sp((1,1),[r(1)]), sp((1,1),[r(2)]), sp((1,1),[r(3)]), sp((1,1),[r(4)])];
-        let (l, u, s) = build_lus(PivotType::Cols, paq);
-        assert_eq!(l, sp((2, 1), [r(1), r(3)]));
-        assert_eq!(u, sp((1, 2), [r(1), r(2)]));
-        assert_eq!(s, sp((1, 1), [r(-2)]));
-    }
-
-    #[test]
-    fn test_build_rows() {
-        // paq = [[1,2],[3,4]], r=1: a0=[[1]], a1=[[2]], a2=[[3]], a3=[[4]]
-        // u0=a0=[[1]], u1=a1=[[2]], r0=a2=[[3]], r1=a3=[[4]]
-        // l1 = [[3]]*[[1]]^{-1} = [[3]], l = [[1],[3]], u = [[1,2]], s = [[4]]-[[3]]*[[2]] = [[-2]]
-        let paq = [sp((1,1),[r(1)]), sp((1,1),[r(2)]), sp((1,1),[r(3)]), sp((1,1),[r(4)])];
-        let (l, u, s) = build_lus(PivotType::Rows, paq);
-        assert_eq!(l, sp((2, 1), [r(1), r(3)]));
-        assert_eq!(u, sp((1, 2), [r(1), r(2)]));
-        assert_eq!(s, sp((1, 1), [r(-2)]));
     }
 
     // ---- pre_pluq ----

@@ -8,7 +8,7 @@ use yui_core::lc::{Gen, Lc};
 use yui_matrix::sparse::{SpMat, SpVec};
 
 use crate::utils::ChainReducer;
-use crate::{ChainComplexTrait, DisplaySeq, DisplayTable, Grid, GridDeg, GridIter, GridTrait, SummandTrait, isize2, isize3};
+use crate::{ChainComplexTrait, DisplaySeq, DisplayTable, GenericChainComplexBase, Grid, GridDeg, GridIter, GridTrait, SummandTrait, isize2, isize3};
 use super::Summand;
 
 #[cfg(feature = "multithread")]
@@ -101,6 +101,11 @@ where
         let d_deg = self.d_deg;
         let d_map = self.d_map.clone();
         Self { summands, d_deg, d_map }
+    }
+
+    pub fn reduced_generic(&self) -> GenericChainComplexBase<I, R> { 
+        let r = ChainReducer::reduce(self, false);
+        r.into_complex()
     }
 
     fn check_d_for(&self, i0: I, x: &X) { 

@@ -9,6 +9,7 @@ use yui_core::{Ring, RingOps, Field, FieldOps};
 use crate::MatTrait;
 use crate::dense::Mat;
 use crate::dense::pluq::pluq as dense_pluq;
+use crate::sparse::pivot::split_by_pqr;
 use super::SpMat;
 use super::SpVec;
 use super::pivot::{PivotFinderConfig, PivotType, find_pivots, perms_by_pivots};
@@ -60,35 +61,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let (l, u, s) = build_lus(piv_type, paq);
 
     SpPluq::new(p, q, l, u, s)
-}
-
-// Applies permutations (p, q) to `a` and partitions the result into four blocks at row/col r:
-//
-//   paq = [[a0 | a1],   a0: r×r,     a1: r×(n-r)
-//          [a2 | a3]]   a2: (m-r)×r, a3: (m-r)×(n-r)
-fn split_by_pqr<R>(a: &SpMat<R>, p: &PermOwned, q: &PermOwned, r: usize) -> [SpMat<R>; 4]
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    use std::cmp::Ordering::Less;
-
-    let (m, n) = a.shape();
-    let [mut a0, mut a1, mut a2, mut a3] = [vec![], vec![], vec![], vec![]];
-
-    for (i, j, v) in a.iter() {
-        let (pi, qj) = (p.at(i), q.at(j));
-        let v = v.clone();
-        match (pi.cmp(&r), qj.cmp(&r)) {
-            (Less, Less) => a0.push((pi,     qj,     v)),
-            (Less, _   ) => a1.push((pi,     qj - r, v)),
-            (_   , Less) => a2.push((pi - r, qj,     v)),
-            (_   , _   ) => a3.push((pi - r, qj - r, v)),
-        }
-    }
-    [
-        SpMat::from_entries((r,     r    ), a0),
-        SpMat::from_entries((r,     n - r), a1),
-        SpMat::from_entries((m - r, r    ), a2),
-        SpMat::from_entries((m - r, n - r), a3),
-    ]
 }
 
 // Builds (l, u, s) from the four blocks paq = [[a0|a1],[a2|a3]].
@@ -566,23 +538,6 @@ mod tests {
             0, 0, 1, 0, 0, 0, 0, 0, 0,
             0, 1, 0, 0, 0, 1, 0, 1, 0,
         ])
-    }
-
-    // ---- split_by_pqr ----
-
-    #[test]
-    fn test_split() {
-        use sprs::PermOwned;
-        // a = [[1,2],[3,4]], r=1, identity perms → paq = a, partition at row/col 1:
-        // a0=[[1]], a1=[[2]], a2=[[3]], a3=[[4]]
-        let a = sp((2, 2), [r(1), r(2), r(3), r(4)]);
-        let p = PermOwned::new(vec![0, 1]);
-        let q = PermOwned::new(vec![0, 1]);
-        let [a0, a1, a2, a3] = split_by_pqr(&a, &p, &q, 1);
-        assert_eq!(a0, sp((1, 1), [r(1)]));
-        assert_eq!(a1, sp((1, 1), [r(2)]));
-        assert_eq!(a2, sp((1, 1), [r(3)]));
-        assert_eq!(a3, sp((1, 1), [r(4)]));
     }
 
     // ---- build_lus ----

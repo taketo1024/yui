@@ -95,7 +95,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     debug!("  a: {:?}", a.shape());
 
     let n = a.nrows();
-    let diag = collect_diag(a);
+    let diag = collect_diag(t, a);
     let mut b_buf = vec![R::zero(); n];
     scatter_into(b.data(), &mut b_buf);
 
@@ -114,7 +114,7 @@ where
     debug!("  a: {:?}, y: {:?}", a.shape(), y.shape());
 
     let (n, k) = (a.nrows(), y.ncols());
-    let diag = collect_diag(a);
+    let diag = collect_diag(t, a);
     let mut b = vec![R::zero(); n];
 
     (0..k).map(|j| {
@@ -139,7 +139,7 @@ where
     debug!("  a: {:?}, y: {:?}", a.shape(), y.shape());
 
     let (n, k) = (a.nrows(), y.ncols());
-    let diag = collect_diag(a);
+    let diag = collect_diag(t, a);
     let tl_b = Arc::new(ThreadLocal::new());
 
     let report = should_report(y);
@@ -203,11 +203,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     SpVec::from_sorted_entries(a.ncols(), entries)
 }
 
-fn collect_diag<'a, R>(a: &'a SpMat<R>) -> Vec<&'a R>
+fn collect_diag<'a, R>(t: TriangularType, a: &'a SpMat<R>) -> Vec<&'a R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    a.iter().filter_map(|(i, j, a)|
-        if i == j { Some(a) } else { None }
-    ).collect()
+    let (col_offsets, row_indices, values) = a.csc_data();
+    (0..a.ncols()).map(|j| {
+        let p = if t.is_upper() {
+            col_offsets[j + 1] - 1
+        } else {
+            col_offsets[j]
+        };
+        assert_eq!(row_indices[p], j, "broken input: missing diagonal at column {j}");
+        &values[p]
+    }).collect()
 }
 
 fn scatter_into<R: Clone>(data: (&[usize], &[R]), dst: &mut [R]) {

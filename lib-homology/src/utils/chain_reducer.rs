@@ -6,7 +6,6 @@ use sprs::PermOwned;
 use yui_matrix::sparse::*;
 use yui_matrix::sparse::pivot::{PivotCondition, PivotFinderConfig, PivotType, find_pivots, perms_by_pivots};
 use yui_matrix::sparse::schur::Schur;
-use yui_matrix::sparse::triang::TriangularType;
 use yui_core::{Ring, RingOps};
 
 use crate::generic::GenericChainComplexBase;
@@ -187,18 +186,11 @@ where
             return false;
         }
 
-        let a = a.permute(p.view(), q.view());
-
-        let t = match piv_type { 
-            PivotType::Rows => TriangularType::Upper,
-            PivotType::Cols => TriangularType::Lower
-        };
-
         let with_trans = 
             self.trans.contains_key(&i) || 
             self.trans.contains_key(&(i + self.d_deg));
 
-        let sch = Schur::from_partial_triangular(t, &a, r, with_trans, with_trans);
+        let sch = Schur::from_pivots(&a, piv_type, &p, &q, r, with_trans, with_trans);
         let (s, t_src, t_tgt) = sch.disassemble();
 
         debug!("  reduced C[{i}]: {:?} -> {:?}", a.shape(), s.shape());
@@ -214,21 +206,8 @@ where
         true
     }
 
-    pub fn preferred_strategy(&self, i: I) -> (PivotType, PivotCondition) { 
-        let Some(a) = self.matrix(i) else { 
-            panic!("not initialized at {i}");
-        };
-
-        // TODO improve
-        let piv_type = PivotType::Cols;
-
-        let piv_cond = if a.iter().any(|(_, _, r)| r.is_pm_one()) { 
-            PivotCondition::One
-        } else { 
-            PivotCondition::AnyUnit
-        };
-
-        (piv_type, piv_cond)
+    pub fn preferred_strategy(&self, _i: I) -> (PivotType, PivotCondition) { 
+        (PivotType::Cols, PivotCondition::One)
     }
 
     fn update_trans(&mut self, i: I, p: &PermOwned, q: &PermOwned, t_src: Trans<R>, t_tgt: Trans<R>) {

@@ -3,7 +3,10 @@ use std::ops::AddAssign;
 use log::debug;
 use nalgebra::Scalar;
 use num_traits::{One, Zero};
+use sprs::PermOwned;
 use yui_core::{Ring, RingOps};
+use crate::sparse::pivot::PivotType;
+
 use super::*;
 use super::triang::{TriangularType, solve_triangular_left, solve_triangular_with};
 
@@ -30,13 +33,23 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> Schur<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn from_partial_triangular(t: TriangularType, abcd: &SpMat<R>, r: usize, with_trans: bool) -> Self {
-        assert!(r <= abcd.nrows());
-        assert!(r <= abcd.ncols());
+    pub fn from_partial_triangular(t: TriangularType, a: &SpMat<R>, r: usize, with_trans: bool) -> Self {
+        let (m, n) = a.shape();
+        assert!(r <= m);
+        assert!(r <= n);
 
-        let (m, n) = abcd.shape();
-        let [a, b, c, d] = abcd.divide4((r, r));
+        let t = if t.is_upper() { PivotType::Rows } else { PivotType::Cols };
+        Self::from_pivots(a, t, &PermOwned::identity(m), &PermOwned::identity(n), r, with_trans)
+    }
+
+    pub fn from_pivots(a: &SpMat<R>, t: PivotType, p: &PermOwned, q: &PermOwned, r: usize, with_trans: bool) -> Self {
+        let (m, n) = a.shape();
+        assert!(r <= m);
+        assert!(r <= n);
+
+        let [a, b, c, d] = split_by_pqr(a, p, q, r);
         let (m_d, n_b) = (m - r, n - r);
+        let t = if t == PivotType::Rows { TriangularType::Upper } else { TriangularType::Lower };
 
         debug!("schur: a{:?}, b{:?}, c{:?}, d{:?}", a.shape(), b.shape(), c.shape(), d.shape());
 
@@ -89,6 +102,35 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn disassemble(self) -> (SpMat<R>, Option<Trans<R>>, Option<Trans<R>>) {
         (self.s, self.t_src, self.t_tgt)
     }
+}
+
+// Applies permutations (p, q) to `a` and partitions the result into four blocks at row/col r:
+//
+//   paq = [[a0 | a1],   a0: r×r,     a1: r×(n-r)
+//          [a2 | a3]]   a2: (m-r)×r, a3: (m-r)×(n-r)
+fn split_by_pqr<R>(a: &SpMat<R>, p: &PermOwned, q: &PermOwned, r: usize) -> [SpMat<R>; 4]
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    use std::cmp::Ordering::Less;
+
+    let (m, n) = a.shape();
+    let [mut a0, mut a1, mut a2, mut a3] = [vec![], vec![], vec![], vec![]];
+
+    for (i, j, v) in a.iter() {
+        let (pi, qj) = (p.at(i), q.at(j));
+        let v = v.clone();
+        match (pi.cmp(&r), qj.cmp(&r)) {
+            (Less, Less) => a0.push((pi,     qj,     v)),
+            (Less, _   ) => a1.push((pi,     qj - r, v)),
+            (_   , Less) => a2.push((pi - r, qj,     v)),
+            (_   , _   ) => a3.push((pi - r, qj - r, v)),
+        }
+    }
+    [
+        SpMat::from_entries((r,     r    ), a0),
+        SpMat::from_entries((r,     n - r), a1),
+        SpMat::from_entries((m - r, r    ), a2),
+        SpMat::from_entries((m - r, n - r), a3),
+    ]
 }
 
 fn id_mat<R: Scalar + One>(n: usize) -> SpMat<R> { 

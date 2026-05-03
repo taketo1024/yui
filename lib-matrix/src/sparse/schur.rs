@@ -1,8 +1,11 @@
+use std::ops::AddAssign;
+
 use log::debug;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use nalgebra::Scalar;
+use num_traits::{One, Zero};
 use yui_core::{Ring, RingOps};
 use super::*;
-use super::triang::{TriangularType, solve_triangular, solve_triangular_left};
+use super::triang::{TriangularType, solve_triangular_left, solve_triangular_with};
 
 //                [a  b]
 //                [c  d]
@@ -33,54 +36,42 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let (m, n) = abcd.shape();
         let [a, b, c, d] = abcd.divide4((r, r));
+        let (m_d, n_b) = (m - r, n - r);
 
-        let ainvb = solve_triangular(t, &a, &b); // ax = b
-        let s = Self::compute_schur(&ainvb, &c, &d);
+        debug!("schur: a{:?}, b{:?}, c{:?}, d{:?}", a.shape(), b.shape(), c.shape(), d.shape());
 
-        let id = |n| SpMat::<R>::id(n);
-        let incl = |n, k| SpMat::<R>::from_entries((n, k), (0..k).map(|i| (n - k + i, i, R::one()))); // [0, 1]^T
-        let proj = |n, k| SpMat::<R>::from_entries((k, n), (0..k).map(|i| (i, n - k + i, R::one()))); // [0, 1]
+        // Fuse the triangular solve `a · x_j = b_j` with the Schur update `s_j = d_j - c · x_j`. 
+        // When `with_trans` is false, `x_j` is dropped immediately, so `a⁻¹b` is never materialized.
+        let (s, t_src) = if with_trans {
+            let pairs = solve_triangular_with(t, &a, &b, |j, x_j| {
+                let s_j = d.col_vec(j) - &c * &x_j;
+                (x_j, s_j)
+            });
+            let (x_cols, s_cols): (Vec<_>, Vec<_>) = pairs.into_iter().unzip();
+            let x = SpMat::from_col_vecs(r, x_cols);   // x = a⁻¹b
+            let s = SpMat::from_col_vecs(m_d, s_cols);
 
-        let t_src = with_trans.then(|| { 
-            let f = proj(n, n - r);             // [0, 1]
-            let b = (-ainvb).stack(&id(n - r)); // [-a⁻¹b, 1]^T
-            Trans::new(f, b)
-        });
+            let t_src_f = proj_mat(n, n_b);
+            let t_src_b = (-x).stack(&id_mat(n_b)); // [-x, 1]^T
 
-        let t_tgt = with_trans.then(|| { 
-            let mut f = -solve_triangular_left(t, &a, &c); // (-x)a = c
-            f.extend_cols(id(m - r)); // [-ca⁻¹, 1]
-            let b = incl(m, m - r);   // [0, 1]^T
-            Trans::new(f, b)
+            (s, Some(Trans::new(t_src_f, t_src_b)))
+        } else {
+            let s_cols = solve_triangular_with(t, &a, &b, |j, x| {
+                d.col_vec(j) - &c * x
+            });
+            (SpMat::from_col_vecs(m_d, s_cols), None)
+        };
+
+        debug!("schur: {:?}", s.shape());
+
+        let t_tgt = with_trans.then(|| {
+            let mut t_tgt_f = -solve_triangular_left(t, &a, &c); // (-x)a = c
+            t_tgt_f.extend_cols(id_mat(m_d)); // [-ca⁻¹, 1]
+            let t_tgt_b = incl_mat(m, m_d);   // [0, 1]^T
+            Trans::new(t_tgt_f, t_tgt_b)
         });
 
         Self { s, t_src, t_tgt }
-    }
-
-    fn compute_schur(ainvb: &SpMat<R>, c: &SpMat<R>, d: &SpMat<R>) -> SpMat<R> {
-        debug!("compute schur.. d{:?} - c{:?} * a⁻¹b{:?}", d.shape(), c.shape(), ainvb.shape());
-
-        let (m, n) = d.shape();
-
-        cfg_if::cfg_if! { 
-            if #[cfg(feature = "multithread")] { 
-                let itr = (0..n).into_par_iter();
-            } else { 
-                let itr = (0..n).into_iter();
-            }
-        };
-
-        let vecs = itr.map(|j| { 
-            let x = c * ainvb.col_vec(j);
-            let y = d.col_vec(j);
-            y - x
-        }).collect::<Vec<_>>();
-
-        let s = SpMat::from_col_vecs(m, vecs);
-        
-        debug!("schur: {:?}", s.shape());
-
-        s
     }
 
     pub fn complement(&self) -> &SpMat<R> {
@@ -98,6 +89,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn disassemble(self) -> (SpMat<R>, Option<Trans<R>>, Option<Trans<R>>) {
         (self.s, self.t_src, self.t_tgt)
     }
+}
+
+fn id_mat<R: Scalar + One>(n: usize) -> SpMat<R> { 
+    SpMat::<R>::id(n)
+}
+
+fn incl_mat<R: Scalar + One + Zero + AddAssign>(n: usize, k: usize) -> SpMat<R> {
+    SpMat::from_entries((n, k), (0..k).map(|i| (n - k + i, i, R::one()))) // [0, 1]^T
+}
+
+fn proj_mat<R: Scalar + One + Zero + AddAssign>(n: usize, k: usize) -> SpMat<R> {
+    SpMat::from_entries((k, n), (0..k).map(|i| (i, n - k + i, R::one()))) // [0, 1]
 }
 
 #[cfg(test)]

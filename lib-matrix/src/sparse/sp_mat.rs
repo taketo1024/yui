@@ -85,12 +85,12 @@ impl<R> SpMat<R> {
         }
     }
     
-    pub fn iter(&self) -> impl Iterator<Item = (usize, usize, &R)> { 
+    pub fn iter(&self) -> impl Iterator<Item = (usize, usize, &R)> {
         self.inner.triplet_iter()
     }
 
     pub fn iter_nz(&self) -> impl Iterator<Item = (usize, usize, &R)>
-    where R: Zero { 
+    where R: Zero {
         self.iter().filter(|e| !e.2.is_zero())
     }
 
@@ -164,6 +164,14 @@ impl<R> SpMat<R> {
         let vals = vals.into_iter().map(|r| f(r)).collect_vec();
         let csc = CscMatrix::try_from_csc_data(m, n, cols, rows, vals).expect("Broken CSC data");
         SpMat::<S>::from(csc)
+    }
+
+    /// Returns the raw `(row_indices, values)` slices of column `j`.
+    /// Borrow-only — no allocation, no value clones.
+    pub fn col_data(&self, j: usize) -> (&[usize], &[R]) {
+        let (col_offsets, row_indices, values) = self.inner.csc_data();
+        let range = col_offsets[j]..col_offsets[j + 1];
+        (&row_indices[range.clone()], &values[range])
     }
 }
 

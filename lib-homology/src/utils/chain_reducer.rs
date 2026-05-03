@@ -6,7 +6,7 @@ use sprs::PermOwned;
 use yui_matrix::sparse::*;
 use yui_matrix::sparse::pivot::{PivotCondition, PivotFinderConfig, PivotType, find_pivots, perms_by_pivots};
 use yui_matrix::sparse::schur::Schur;
-use yui_matrix::sparse::triang::{solve_triangular_vec, TriangularType};
+use yui_matrix::sparse::triang::TriangularType;
 use yui_core::{Ring, RingOps};
 
 use crate::generic::GenericChainComplexBase;
@@ -34,7 +34,6 @@ where
     d_deg: I,
     mats: HashMap<I, SpMat<R>>,
     trans: HashMap<I, Trans<R>>,
-    vecs: HashMap<I, Vec<SpVec<R>>>
 }
 
 impl<I, R> ChainReducer<I, R>
@@ -74,8 +73,7 @@ where
         let support = Self::sort_support(support, d_deg);
         let mats = HashMap::new();
         let trans = HashMap::new();
-        let vecs = HashMap::new();
-        Self { support, d_deg, mats, trans, vecs }
+        Self { support, d_deg, mats, trans }
     }
 
     // MEMO: not efficient, but usually the support set is small. 
@@ -109,10 +107,6 @@ where
         self.trans.get(&i)
     }
 
-    pub fn vecs(&self, i: I) -> Option<&Vec<SpVec<R>>> { 
-        self.vecs.get(&i)
-    }
-
     pub fn trans_mut(&mut self, i: I) -> Option<&mut Trans<R>> {
         self.trans.get_mut(&i)
     }
@@ -137,10 +131,6 @@ where
             self.trans.insert(i, Trans::id(n));
         }
         self.mats.insert(i, d);
-    }
-
-    pub fn add_vec(&mut self, i: I, v: SpVec<R>) { 
-        self.vecs.entry(i).or_default().push(v)
     }
 
     pub fn reduce_all(&mut self, deep: bool) { 
@@ -221,8 +211,6 @@ where
             self.update_trans(i, &p, &q, t_src, t_tgt);
         }
 
-        self.update_vecs(i, &a, &p, &q, r, t);
-
         true
     }
 
@@ -273,40 +261,6 @@ where
             assert_eq!(a2.ncols(), m);
             let a2 = reduce_mat_cols(a2, p, r);
             self.mats.insert(i2, a2);
-        }
-    }
-
-    fn update_vecs(&mut self, i: I, a: &SpMat<R>, p: &PermOwned, q: &PermOwned, r: usize, t: TriangularType) {
-        let (m, n) = a.shape();
-        let (_, i1, i2) = self.deg_trip(i);
-        
-        if let Some(vs) = self.vecs.get_mut(&i1) { 
-            for v in vs.iter_mut() { 
-                assert_eq!(v.dim(), n);
-
-                let w = v.extract(n - r, |i| {
-                    let i = q.at(i);
-                    (r..n).contains(&i).then(|| i - r)
-                });
-
-                *v = w;
-            }
-        }
-
-        if let Some(vs) = self.vecs.get_mut(&i2) { 
-            trace!("update {} vecs in C[{i2}] ..", vs.len());
-
-            let [a, _, c, _] = a.divide4((r, r));
-            
-            for v in vs.iter_mut() { 
-                assert_eq!(v.dim(), m);
-
-                let (x, y) = v.permute(p.view()).split(r);
-                let ainvx = solve_triangular_vec(t, &a, &x);
-                let w = y - &c * ainvx;
-
-                *v = w;
-            }
         }
     }
 

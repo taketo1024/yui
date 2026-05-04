@@ -241,9 +241,9 @@ impl PivotFinder {
                 }
             }
 
-            let Some(j) = cands.into_iter().sorted_by(|&j1, &j2|
+            let Some(j) = cands.into_iter().min_by(|&j1, &j2|
                 self.str.cmp_cols(j1, j2)
-            ).next() else { continue };
+            ) else { continue };
 
             self.pivots.set(i, j);
 
@@ -611,13 +611,13 @@ impl RowWorker {
         }
     }
 
-    fn choose_candidate(&self, str: &MatrixStr) -> Option<Col> { 
+    fn choose_candidate(&self, str: &MatrixStr) -> Option<Col> {
         let n = self.status.len();
         (0 .. n)
             .filter(|&j| self.is_candidate(j))
-            .sorted_by(|&j1, &j2| 
+            .min_by(|&j1, &j2|
                 str.cmp_cols(j1, j2)
-            ).next()
+            )
     }
 
     #[allow(dead_code)]

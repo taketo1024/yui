@@ -351,7 +351,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
     let mut yp = perm_apply(pp.p.view(), y);
 
     let mut step = 1;
-    let total_step = (a.nrows() - pp.rank()) / chunk;
+    let total_step = (a.nrows() - pp.rank()) / chunk + 1;
 
     while pp.s.nrows() > 0 {
         debug!("solve pluq ({}/{})", step, total_step);

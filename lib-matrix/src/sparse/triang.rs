@@ -135,7 +135,7 @@ where
 {
     use yui_core::util::sync::SyncCounter;
 
-    debug!("solve {} triangular (threads: {})", t.str(), rayon::max_num_threads());
+    debug!("solve {} triangular (threads: {})", t.str(), rayon::current_num_threads());
     debug!("  a: {:?}, y: {:?}", a.shape(), y.shape());
 
     let (n, k) = (a.nrows(), y.ncols());
@@ -196,8 +196,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         b_i.is_zero())
     );
 
-    if t.is_upper() {
-        entries.reverse()
+    let entries = if t.is_upper() {
+        Either::Left(entries.into_iter().rev())
+    } else {
+        Either::Right(entries.into_iter())
     };
 
     SpVec::from_sorted_entries(a.ncols(), entries)

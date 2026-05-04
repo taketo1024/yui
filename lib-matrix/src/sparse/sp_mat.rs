@@ -32,6 +32,17 @@ impl<R> MatTrait for SpMat<R> {
 }
 
 impl<R> SpMat<R> { 
+    pub(crate) fn try_from_csc_data(
+        num_rows: usize,
+        num_cols: usize,
+        col_offsets: Vec<usize>,
+        row_indices: Vec<usize>,
+        values: Vec<R>,
+    ) -> Option<Self> { 
+        let csc = CscMatrix::try_from_csc_data(num_rows, num_cols, col_offsets, row_indices, values);
+        csc.ok().map(|csc| SpMat::from(csc))
+    }
+
     pub(crate) fn inner(&self) -> &CscMatrix<R> { 
         &self.inner
     }
@@ -150,10 +161,7 @@ impl<R> SpMat<R> {
         }
         col_offsets.push(values.len());
 
-        let csc = CscMatrix::try_from_csc_data(shape.0, shape.1, col_offsets, row_indices, values)
-            .expect("Broken CSC data");
-
-        SpMat::from(csc)
+        SpMat::try_from_csc_data(shape.0, shape.1, col_offsets, row_indices, values).unwrap()
     }
 
     pub fn map_values<F, S>(self, f: F) -> SpMat<S>
@@ -161,8 +169,7 @@ impl<R> SpMat<R> {
         let (m, n) = self.shape();
         let (cols, rows, vals) = self.disassemble();
         let vals = vals.into_iter().map(|r| f(r)).collect_vec();
-        let csc = CscMatrix::try_from_csc_data(m, n, cols, rows, vals).expect("Broken CSC data");
-        SpMat::<S>::from(csc)
+        SpMat::<S>::try_from_csc_data(m, n, cols, rows, vals).unwrap()
     }
 
     /// Returns the raw `(row_indices, values)` slices of column `j`.
@@ -211,8 +218,7 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         }
 
         let ncols = col_offsets.len() - 1;
-        let csc = CscMatrix::try_from_csc_data(nrows, ncols, col_offsets, row_indices, values).unwrap();
-        Self::from(csc)
+        SpMat::try_from_csc_data(nrows, ncols, col_offsets, row_indices, values).unwrap()
     }
 
     pub fn from_dense_data<I>(shape: (usize, usize), data: I) -> Self
@@ -225,17 +231,6 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
                 (i, j, a)
             })
         )
-    }
-
-    pub fn try_from_csc_data(
-        num_rows: usize,
-        num_cols: usize,
-        col_offsets: Vec<usize>,
-        row_indices: Vec<usize>,
-        values: Vec<R>,
-    ) -> Option<Self> { 
-        let csc = CscMatrix::try_from_csc_data(num_rows, num_cols, col_offsets, row_indices, values);
-        csc.ok().map(|csc| SpMat::from(csc))
     }
 
     pub fn scalar(n: usize, a: &R) -> Self { 
@@ -398,9 +393,7 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         for j in 0..n0 { push_col(a, c, j); }
         for j in 0..n1 { push_col(b, d, j); }
 
-        let csc = CscMatrix::try_from_csc_data(m, n, col_offsets, row_indices, values)
-            .expect("Broken CSC data");
-        SpMat::from(csc)
+        SpMat::try_from_csc_data(m, n, col_offsets, row_indices, values).unwrap()
     }
 
     pub fn concat(&self, b: &Self) -> Self { 

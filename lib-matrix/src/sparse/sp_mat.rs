@@ -227,6 +227,17 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         )
     }
 
+    pub fn try_from_csc_data(
+        num_rows: usize,
+        num_cols: usize,
+        col_offsets: Vec<usize>,
+        row_indices: Vec<usize>,
+        values: Vec<R>,
+    ) -> Option<Self> { 
+        let csc = CscMatrix::try_from_csc_data(num_rows, num_cols, col_offsets, row_indices, values);
+        csc.ok().map(|csc| SpMat::from(csc))
+    }
+
     pub fn scalar(n: usize, a: &R) -> Self { 
         Self::from_entries((n, n), (0..n).map(|i| (i, i, a.clone())))
     }
@@ -291,31 +302,49 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         self.submat(0 .. m, cols)
     }
 
-    pub fn divide4(&self, point: (usize, usize)) -> [SpMat<R>; 4] { 
+    pub fn divide4(&self, point: (usize, usize)) -> [SpMat<R>; 4] {
         let (m, n) = self.shape();
         let (k, l) = point;
         assert!(k <= m);
         assert!(l <= n);
 
-        let mut a = CooMatrix::new(k, l);
-        let mut b = CooMatrix::new(k, n - l);
-        let mut c = CooMatrix::new(m - k, l);
-        let mut d = CooMatrix::new(m - k, n - l);
-        
-        for (i, j, r) in self.iter() { 
-            if r.is_zero() { continue }
-            let r = r.clone();
-            match ((0..k).contains(&i), (0..l).contains(&j)) { 
-                (true , true ) => a.push(i, j, r),
-                (true , false) => b.push(i, j - l, r),
-                (false, true ) => c.push(i - k, j, r),
-                (false, false) => d.push(i - k, j - l, r),
-            }
+        let (csc_offsets, csc_rows, csc_vals) = self.csc_data();
+
+        let (mut a_rows, mut a_vals, mut a_offs) = (vec![], vec![], vec![0]);
+        let (mut b_rows, mut b_vals, mut b_offs) = (vec![], vec![], vec![0]);
+        let (mut c_rows, mut c_vals, mut c_offs) = (vec![], vec![], vec![0]);
+        let (mut d_rows, mut d_vals, mut d_offs) = (vec![], vec![], vec![0]);
+
+        let push_col = |j: usize,
+                        top_rows: &mut Vec<usize>, top_vals: &mut Vec<R>, top_offs: &mut Vec<usize>,
+                        bot_rows: &mut Vec<usize>, bot_vals: &mut Vec<R>, bot_offs: &mut Vec<usize>| {
+            let range = csc_offsets[j]..csc_offsets[j + 1];
+            let rows = &csc_rows[range.clone()];
+            let vals = &csc_vals[range];
+            let split = rows.partition_point(|&i| i < k);
+
+            top_rows.extend_from_slice(&rows[..split]);
+            top_vals.extend_from_slice(&vals[..split]);
+            top_offs.push(top_rows.len());
+
+            bot_rows.extend(rows[split..].iter().map(|&i| i - k));
+            bot_vals.extend_from_slice(&vals[split..]);
+            bot_offs.push(bot_rows.len());
+        };
+
+        for j in 0..l { 
+            push_col(j, &mut a_rows, &mut a_vals, &mut a_offs, &mut c_rows, &mut c_vals, &mut c_offs); 
         }
-        
-        [a, b, c, d].map(|x| 
-            CscMatrix::from(&x).into()
-        )
+        for j in l..n { 
+            push_col(j, &mut b_rows, &mut b_vals, &mut b_offs, &mut d_rows, &mut d_vals, &mut d_offs); 
+        }
+
+        [
+            SpMat::try_from_csc_data(k,     l,     a_offs, a_rows, a_vals).unwrap(),
+            SpMat::try_from_csc_data(k,     n - l, b_offs, b_rows, b_vals).unwrap(),
+            SpMat::try_from_csc_data(m - k, l,     c_offs, c_rows, c_vals).unwrap(),
+            SpMat::try_from_csc_data(m - k, n - l, d_offs, d_rows, d_vals).unwrap(),
+        ]
     }
 
     pub fn divide_at_col(&self, k: usize) -> [SpMat<R>; 2] { 

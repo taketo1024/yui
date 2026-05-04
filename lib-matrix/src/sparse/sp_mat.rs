@@ -1,5 +1,4 @@
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, MulAssign, Range};
-use std::iter::zip;
 use std::fmt::{Display, Debug};
 use delegate::delegate;
 use itertools::Itertools;
@@ -343,19 +342,36 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         assert_eq!(a.ncols(), c.ncols());
         assert_eq!(b.ncols(), d.ncols());
 
-        let (m, n) = (a.nrows() + c.nrows(), a.ncols() + b.ncols());
-        let (k, l) = a.shape();
+        let (m0, m1) = (a.nrows(), c.nrows());
+        let m = m0 + m1;
+        let (n0, n1) = (a.ncols(), b.ncols());
+        let n = n0 + n1;
+        let nnz = a.nnz() + b.nnz() + c.nnz() + d.nnz();
 
-        let entries = zip(
-            [a, b, c, d], 
-            [(0,0), (0,l), (k,0), (k,l)]
-        ).flat_map(|(x, (di, dj))| 
-            x.iter().map(move |(i, j, r)|
-                (i + di, j + dj, r.clone())
-            )
-        );
+        let mut col_offsets = Vec::with_capacity(n + 1);
+        let mut row_indices = Vec::with_capacity(nnz);
+        let mut values = Vec::with_capacity(nnz);
 
-        Self::from_entries((m, n), entries)
+        col_offsets.push(0);
+
+        let mut push_col = |top: &SpMat<R>, bot: &SpMat<R>, j: usize| {
+            let (top_rows, top_vals) = top.col_data(j);
+            row_indices.extend_from_slice(top_rows);
+            values.extend_from_slice(top_vals);
+
+            let (bot_rows, bot_vals) = bot.col_data(j);
+            row_indices.extend(bot_rows.iter().map(|i| i + m0));
+            values.extend_from_slice(bot_vals);
+
+            col_offsets.push(row_indices.len());
+        };
+
+        for j in 0..n0 { push_col(a, c, j); }
+        for j in 0..n1 { push_col(b, d, j); }
+
+        let csc = CscMatrix::try_from_csc_data(m, n, col_offsets, row_indices, values)
+            .expect("Broken CSC data");
+        SpMat::from(csc)
     }
 
     pub fn concat(&self, b: &Self) -> Self { 

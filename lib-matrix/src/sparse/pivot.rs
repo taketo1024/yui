@@ -188,15 +188,9 @@ impl PivotFinder {
         self.str.shape.1
     }
 
-    fn remain_rows(&self) -> impl Iterator<Item = Row> { 
-        let piv_rows: AHashSet<_> = self.pivots.iter().map(|(i, _)| i).collect();
-        let m = self.rows();
-
-        (0 .. m).filter(|&i| 
-            !piv_rows.contains(&i) && !self.str.is_empty_row(i)
-        ).sorted_by(|&i1, &i2| 
-            self.str.cmp_rows(i1, i2)
-        )
+    fn remain_rows(&self) -> impl Iterator<Item = Row> + '_ {
+        self.str.target_rows.iter().copied()
+            .filter(|&i| !self.pivots.is_piv_row(i))
     }
 
     fn occupied_cols(&self) -> AHashSet<Col> {
@@ -390,7 +384,7 @@ where T: Send, F: FnOnce() -> T {
 struct MatrixStr {
     shape: (usize, usize),
     entries: Vec<Vec<(Col, bool)>>,    // [row -> sorted [(col, is_cand)]]
-    row_wght: Vec<f64>,                // [row -> weight]
+    target_rows: Vec<Row>,             // non-empty rows, sorted by (row_wght, row index)
     col_wght: Vec<f64>,                // [col -> weight]
 }
 
@@ -422,15 +416,18 @@ impl MatrixStr {
             col_wght[j] += w;
         }
 
-        Self { shape, entries, row_wght, col_wght }
+        let mut target_rows: Vec<Row> = (0..m).filter(|&i| !entries[i].is_empty()).collect();
+        target_rows.sort_unstable_by(|&i1, &i2| {
+            row_wght[i1].partial_cmp(&row_wght[i2])
+                .unwrap_or(Ordering::Equal)
+                .then(i1.cmp(&i2))
+        });
+
+        Self { shape, entries, col_wght, target_rows }
     }
 
     fn shape(&self) -> (usize, usize) {
         self.shape
-    }
-
-    fn is_empty_row(&self, i: Row) -> bool {
-        self.entries[i].is_empty()
     }
 
     fn head(&self, i: Row) -> Option<(Col, bool)> {
@@ -445,14 +442,6 @@ impl MatrixStr {
         self.entries[i].iter().map(|(c, _)| *c)
     }
 
-    fn cmp_rows(&self, i1: Row, i2: Row) -> Ordering {
-        if let Some(o) = self.row_wght[i1].partial_cmp(&self.row_wght[i2]) {
-            o.then(Ord::cmp(&i1, &i2))
-        } else {
-            Ordering::Equal
-        }
-    }
-
     fn cmp_cols(&self, j1: Col, j2: Col) -> Ordering {
         if let Some(o) = self.col_wght[j1].partial_cmp(&self.col_wght[j2]) {
             o.then(Ord::cmp(&j1, &j2))
@@ -463,33 +452,38 @@ impl MatrixStr {
 }
 
 #[derive(Clone, Default)]
-struct PivotData { 
+struct PivotData {
     data: Vec<Option<Row>>,   // col -> row
-    indices: Vec<Col>
+    indices: Vec<Col>,
+    is_piv_row: Vec<bool>,    // row -> is this a pivot row?
 }
 
-impl PivotData { 
+impl PivotData {
     fn new<R>(a: &SpMat<R>, piv_type: PivotType) -> Self
-    where R: Ring, for<'x> &'x R: RingOps<R> { 
-        let n = if piv_type == PivotType::Rows { 
-            a.ncols()
-        } else { 
-            a.nrows()
+    where R: Ring, for<'x> &'x R: RingOps<R> {
+        let (m, n) = match piv_type {
+            PivotType::Rows => (a.nrows(), a.ncols()),
+            PivotType::Cols => (a.ncols(), a.nrows()),
         };
         let data = vec![None; n];
         let indices = vec![];
-        Self { data, indices }
+        let is_piv_row = vec![false; m];
+        Self { data, indices, is_piv_row }
     }
 
-    fn count(&self) -> usize { 
+    fn count(&self) -> usize {
         self.indices.len()
     }
 
-    fn has_col(&self, j: Col) -> bool { 
+    fn has_col(&self, j: Col) -> bool {
         self.data[j].is_some()
     }
 
-    fn row_for(&self, j: Col) -> Option<Row> { 
+    fn is_piv_row(&self, i: Row) -> bool {
+        self.is_piv_row[i]
+    }
+
+    fn row_for(&self, j: Col) -> Option<Row> {
         self.data[j]
     }
 
@@ -497,6 +491,7 @@ impl PivotData {
         assert!(!self.has_col(j));
         self.data[j] = Some(i);
         self.indices.push(j);
+        self.is_piv_row[i] = true;
     }
 
     fn iter(&self) -> impl Iterator<Item = (Row, Col)> + '_ { 
@@ -697,8 +692,8 @@ mod tests {
             vec![(1,true), (3,true), (6,true), (8,true)],
             vec![(0,true), (2,true), (4,true), (5,true), (7,true), (8,true)],
         ]);
-        assert_eq!(str.row_wght, vec![5.0, 6.0, 4.0, 5.0, 4.0, 6.0]);
         assert_eq!(str.col_wght, vec![2.0, 3.0, 5.0, 3.0, 4.0, 3.0, 2.0, 4.0, 4.0]);
+        assert_eq!(str.target_rows, vec![2, 4, 0, 3, 1, 5]);
     }
 
     #[test]

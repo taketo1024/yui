@@ -6,7 +6,6 @@
 // see also: SpaSM (Sparse direct Solver Modulo p)
 // https://github.com/cbouilla/spasm
 
-use std::slice::Iter;
 use std::cmp::Ordering;
 use std::collections::VecDeque;
 use ahash::AHashSet;
@@ -164,11 +163,11 @@ impl PivotFinder {
         trace!("pivots: {:?} => {}.", self.str.shape(), self.pivots.count());
     }
 
-    pub fn result(&self) -> Vec<(usize, usize)> { 
-        let tree = self.pivots.iter().map(|(i, j)| { 
-            let list = self.str.cols_in(i).filter(|&&j2|
+    pub fn result(&self) -> Vec<(usize, usize)> {
+        let tree = self.pivots.iter().map(|(i, j)| {
+            let list = self.str.cols_in(i).filter(|&j2|
                 j != j2 && self.pivots.has_col(j2)
-            ).copied().collect_vec();
+            ).collect_vec();
             (j, list)
         });
         
@@ -202,7 +201,7 @@ impl PivotFinder {
 
     fn occupied_cols(&self) -> AHashSet<Col> {
         self.pivots.iter().fold(AHashSet::new(), |mut res, (i, _)| {
-            for &j in self.str.cols_in(i) { 
+            for j in self.str.cols_in(i) {
                 res.insert(j);
             }
             res
@@ -213,9 +212,9 @@ impl PivotFinder {
         let remain_rows: Vec<_> = self.remain_rows().collect();
 
         for i in remain_rows {
-            let Some(j) = self.str.head_col_in(i) else { continue };
+            let Some((j, is_cand)) = self.str.head(i) else { continue };
 
-            if !self.pivots.has_col(j) && self.str.is_candidate(i, j) {
+            if is_cand && !self.pivots.has_col(j) {
                 self.pivots.set(i, j);
                 if self.pivots.count() >= self.max_pivots { break; }
             }
@@ -235,8 +234,8 @@ impl PivotFinder {
         for i in remain_rows {
             let mut cands = vec![];
 
-            for &j in self.str.cols_in(i) {
-                if !occ_cols.contains(&j) && self.str.is_candidate(i, j) {
+            for (j, is_cand) in self.str.entries_in(i) {
+                if is_cand && !occ_cols.contains(&j) {
                     cands.push(j);
                 }
             }
@@ -247,7 +246,7 @@ impl PivotFinder {
 
             self.pivots.set(i, j);
 
-            for &j in self.str.cols_in(i) {
+            for j in self.str.cols_in(i) {
                 occ_cols.insert(j);
             }
 
@@ -388,17 +387,16 @@ where T: Send, F: FnOnce() -> T {
     tl.get_or(|| RefCell::new( f() ) )
 }
 
-struct MatrixStr { 
+struct MatrixStr {
     shape: (usize, usize),
-    entries: Vec<Vec<Col>>,     // [row -> [col]]
-    cands: Vec<AHashSet<Col>>,  // [row -> [col]]
-    row_wght: Vec<f64>,         // [row -> weight]
-    col_wght: Vec<f64>,         // [col -> weight]
+    entries: Vec<Vec<(Col, bool)>>,    // [row -> sorted [(col, is_cand)]]
+    row_wght: Vec<f64>,                // [row -> weight]
+    col_wght: Vec<f64>,                // [col -> weight]
 }
 
-impl MatrixStr { 
+impl MatrixStr {
     fn new<R>(a: &SpMat<R>, piv_type: PivotType, pivot_cond: PivotCondition) -> Self
-    where R: Ring, for<'x> &'x R: RingOps<R> { 
+    where R: Ring, for<'x> &'x R: RingOps<R> {
         let shape = match piv_type {
             PivotType::Rows => a.shape(),
             PivotType::Cols => (a.ncols(), a.nrows())
@@ -412,60 +410,55 @@ impl MatrixStr {
         let mut entries = vec![vec![]; m];
         let mut row_wght = vec![0.0; m];
         let mut col_wght = vec![0.0; n];
-        let mut cands = vec![AHashSet::new(); m];
 
-        for (i, j, r) in a.iter() { 
+        for (i, j, r) in a.iter() {
             if r.is_zero() { continue }
-            
+
             let (i, j) = t(i, j);
-            entries[i].push(j);
+            entries[i].push((j, pivot_cond.is_cand(r)));
 
             let w = r.c_weight();
             row_wght[i] += w;
             col_wght[j] += w;
-
-            if pivot_cond.is_cand(r) { 
-                cands[i].insert(j);
-            }
         }
 
-        Self { shape, entries, cands, row_wght, col_wght }
+        Self { shape, entries, row_wght, col_wght }
     }
 
     fn shape(&self) -> (usize, usize) {
         self.shape
     }
 
-    fn is_empty_row(&self, i: Row) -> bool { 
+    fn is_empty_row(&self, i: Row) -> bool {
         self.entries[i].is_empty()
     }
 
-    fn head_col_in(&self, i: Row) -> Option<Col> {
+    fn head(&self, i: Row) -> Option<(Col, bool)> {
         self.entries[i].first().copied()
     }
 
-    fn cols_in(&self, i: Row) -> Iter<Col> {
-        self.entries[i].iter()
+    fn entries_in(&self, i: Row) -> impl Iterator<Item = (Col, bool)> + '_ {
+        self.entries[i].iter().copied()
+    }
+
+    fn cols_in(&self, i: Row) -> impl Iterator<Item = Col> + '_ {
+        self.entries[i].iter().map(|(c, _)| *c)
     }
 
     fn cmp_rows(&self, i1: Row, i2: Row) -> Ordering {
-        if let Some(o) = self.row_wght[i1].partial_cmp(&self.row_wght[i2]) { 
+        if let Some(o) = self.row_wght[i1].partial_cmp(&self.row_wght[i2]) {
             o.then(Ord::cmp(&i1, &i2))
-        } else { 
-            Ordering::Equal
-        }
-    }
-
-    fn cmp_cols(&self, j1: Col, j2: Col) -> Ordering {
-        if let Some(o) = self.col_wght[j1].partial_cmp(&self.col_wght[j2]) { 
-            o.then(Ord::cmp(&j1, &j2))
         } else {
             Ordering::Equal
         }
     }
 
-    fn is_candidate(&self, i: Row, j: Col) -> bool { 
-        self.cands[i].contains(&j)
+    fn cmp_cols(&self, j1: Col, j2: Col) -> Ordering {
+        if let Some(o) = self.col_wght[j1].partial_cmp(&self.col_wght[j2]) {
+            o.then(Ord::cmp(&j1, &j2))
+        } else {
+            Ordering::Equal
+        }
     }
 }
 
@@ -535,28 +528,31 @@ enum EntryStatus {
     None, Candidate, Occupied
 }
 
-struct RowWorker { 
+struct RowWorker {
     row: usize,
     status: Vec<EntryStatus>,
     ncand: usize,
+    candidates: Vec<Col>,    // columns ever marked Candidate (may include stale entries reclassified to Occupied)
     queue: VecDeque<Col>,
-    queued: AHashSet<Col>
+    queued: Vec<bool>,       // queued[j] = true iff j has ever been pushed to `queue`
 }
 
 impl RowWorker {
-    fn new(size: usize) -> Self { 
+    fn new(size: usize) -> Self {
         let status = vec![EntryStatus::None; size];
+        let candidates = Vec::new();
         let queue = VecDeque::new();
-        let queued = AHashSet::new();
-        RowWorker {row: 0, status, ncand: 0, queue, queued }
+        let queued = vec![false; size];
+        RowWorker { row: 0, status, ncand: 0, candidates, queue, queued }
     }
 
     fn clear(&mut self) {
         self.row = 0;
         self.status.fill(EntryStatus::None);
         self.ncand = 0;
+        self.candidates.clear();
         self.queue.clear();
-        self.queued.clear();
+        self.queued.fill(false);
     }
 
     //  i [  o       #     # ]     [  o   x   x      # ]     [  o   x   x   x  # ]
@@ -573,47 +569,47 @@ impl RowWorker {
         self.choose_candidate(str)
     }
 
-    fn init(&mut self, i: usize, str: &MatrixStr, pivots: &PivotData) { 
+    fn init(&mut self, i: usize, str: &MatrixStr, pivots: &PivotData) {
         self.clear();
         self.row = i;
 
-        for &j in str.cols_in(i) {
+        for (j, is_cand) in str.entries_in(i) {
             if pivots.has_col(j) {
                 self.enqueue(j);
                 self.set_occupied(j);
-            } else if str.is_candidate(i, j) {
+            } else if is_cand {
                 self.set_candidate(j);
-            } else { 
+            } else {
                 self.set_occupied(j);
             }
         }
     }
 
     fn traverse(&mut self, str: &MatrixStr, pivots: &PivotData) {
-        if !self.has_candidate() { 
+        if !self.has_candidate() {
             return
         }
 
-        while let Some(j) = self.dequeue() { 
+        while let Some(j) = self.dequeue() {
             let i2 = pivots.row_for(j).unwrap();
 
-            for &j2 in str.cols_in(i2) { 
-                if pivots.has_col(j2) && !self.is_queued(j2) { 
+            for j2 in str.cols_in(i2) {
+                if pivots.has_col(j2) && !self.is_queued(j2) {
                     self.enqueue(j2);
                 }
 
                 self.set_occupied(j2);
 
-                if !self.has_candidate() { 
-                    break 
+                if !self.has_candidate() {
+                    break
                 }
             }
         }
     }
 
     fn choose_candidate(&self, str: &MatrixStr) -> Option<Col> {
-        let n = self.status.len();
-        (0 .. n)
+        if self.ncand == 0 { return None; }
+        self.candidates.iter().copied()
             .filter(|&j| self.is_candidate(j))
             .min_by(|&j1, &j2|
                 str.cmp_cols(j1, j2)
@@ -644,9 +640,10 @@ impl RowWorker {
         self.status[i] == EntryStatus::Candidate
     }
 
-    fn set_candidate(&mut self, i: usize) { 
+    fn set_candidate(&mut self, i: usize) {
         assert_eq!(self.status[i], EntryStatus::None);
         self.status[i] = EntryStatus::Candidate;
+        self.candidates.push(i);
         self.ncand += 1;
     }
 
@@ -661,17 +658,17 @@ impl RowWorker {
         self.status[i] = EntryStatus::Occupied;
     }
 
-    fn enqueue(&mut self, i: Col) { 
+    fn enqueue(&mut self, i: Col) {
         self.queue.push_back(i);
-        self.queued.insert(i);
+        self.queued[i] = true;
     }
 
-    fn dequeue(&mut self) -> Option<Col> { 
+    fn dequeue(&mut self) -> Option<Col> {
         self.queue.pop_front()
     }
 
-    fn is_queued(&self, i: Col) -> bool { 
-        self.queued.contains(&i)
+    fn is_queued(&self, i: Col) -> bool {
+        self.queued[i]
     }
 }
 
@@ -693,23 +690,15 @@ mod tests {
         let str = MatrixStr::new(&a, PivotType::Rows, PivotCondition::One);
 
         assert_eq!(str.entries, vec![
-            vec![0,2,5,6,8], 
-            vec![1,2,3,5,7], 
-            vec![2,3,7,8], 
-            vec![1,2,4], 
-            vec![1,3,6,8], 
-            vec![0,2,4,5,7,8]]
-        );
+            vec![(0,true), (2,true), (5,true), (6,true), (8,true)],
+            vec![(1,true), (2,true), (3,true), (5,true), (7,false)],
+            vec![(2,true), (3,true), (7,true), (8,true)],
+            vec![(1,true), (2,true), (4,false)],
+            vec![(1,true), (3,true), (6,true), (8,true)],
+            vec![(0,true), (2,true), (4,true), (5,true), (7,true), (8,true)],
+        ]);
         assert_eq!(str.row_wght, vec![5.0, 6.0, 4.0, 5.0, 4.0, 6.0]);
         assert_eq!(str.col_wght, vec![2.0, 3.0, 5.0, 3.0, 4.0, 3.0, 2.0, 4.0, 4.0]);
-        assert_eq!(str.cands, vec![
-            AHashSet::from_iter([0,2,5,6,8]),
-            AHashSet::from_iter([1,2,3,5]),
-            AHashSet::from_iter([2,3,7,8]),
-            AHashSet::from_iter([1,2]),
-            AHashSet::from_iter([1,3,6,8]),
-            AHashSet::from_iter([0,2,4,5,7,8])
-        ]);
     }
 
     #[test]
@@ -722,10 +711,10 @@ mod tests {
         ]);
         let str = MatrixStr::new(&a, PivotType::Rows, PivotCondition::One);
 
-        assert_eq!(str.head_col_in(0), Some(0));
-        assert_eq!(str.head_col_in(1), Some(1));
-        assert_eq!(str.head_col_in(2), None);
-        assert_eq!(str.head_col_in(3), Some(2));
+        assert_eq!(str.head(0), Some((0, true)));
+        assert_eq!(str.head(1), Some((1, true)));
+        assert_eq!(str.head(2), None);
+        assert_eq!(str.head(3), Some((2, true)));
     }
 
     #[test]

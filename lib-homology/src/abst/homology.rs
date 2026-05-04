@@ -1,4 +1,3 @@
-use log::*;
 use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 
 use crate::generic::GenericSummand;
@@ -20,22 +19,11 @@ where
     C::Item: SummandTrait<R = R>,
 {
     fn compute_homology_at(&self, i: I, with_trans: bool) -> GenericSummand<I, R> {
-        debug!("compute H[{i}]: {} -> {} -> {} ..", 
-            self.get(i - self.d_deg()).display(), 
-            self.get(i).display(), 
-            self.get(i + self.d_deg()).display(), 
-        );
-        
         let i0 = i - self.d_deg();
         let d0 = self.d_matrix(i0);
         let d1 = self.d_matrix(i);
         let (rank, tors, trans) = HomologyCalc::calculate(d0, d1, with_trans);
-
-        let h = GenericSummand::generate(i, rank, tors, trans);
-
-        debug!("  H[{i}] = {}.", h.display());
-
-        h
+        GenericSummand::generate(i, rank, tors, trans)
     }
 
     fn compute_homology(&self, with_trans: bool) -> GenericHomologyBase<I, R> {

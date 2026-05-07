@@ -2,7 +2,7 @@ use std::fmt::{Debug, Display};
 use std::ops::{Add, Neg, Sub, Mul, Div, Rem, AddAssign, SubAssign, MulAssign, DivAssign, RemAssign};
 use std::str::FromStr;
 use num_integer::Integer;
-use num_traits::{One, ToPrimitive, Zero};
+use num_traits::{One, Pow, ToPrimitive, Zero};
 use auto_impl_ops::auto_ops;
 
 use crate::{Elem, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, EucRingOps, AddMon, AddGrp, Mon, Ring, EucRing, Field};
@@ -115,6 +115,13 @@ impl<'a, 'b> Rem<&'b FF2> for &'a FF2 {
     fn rem(self, rhs: &'b FF2) -> Self::Output {
         assert!(!rhs.is_zero());
         FF2::zero()
+    }
+}
+
+impl<'a, 'b> Pow<&'b usize> for &'a FF2 {
+    type Output = FF2;
+    fn pow(self, rhs: &'b usize) -> Self::Output {
+        if *rhs == 0 { FF2::one() } else { *self }
     }
 }
 

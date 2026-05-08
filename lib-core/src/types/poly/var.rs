@@ -25,8 +25,8 @@ impl<const X: char, I> Var<X, I> {
     }
 
     pub fn eval<R>(&self, x: &R) -> R
-    where R: Mul<Output = R>, for<'x, 'y> &'x R: Pow<&'y I, Output = R> {
-        x.pow(&self.0)
+    where R: Mul<Output = R>, I: Copy, for<'x> &'x R: Pow<I, Output = R> {
+        x.pow(self.0)
     }
 
     fn to_string_u(&self, unicode: bool) -> String

@@ -136,8 +136,8 @@ where
         self.into_iter().filter(|(x, _)| f(&x)).collect()
     }
 
-    pub fn apply<F>(&self, f: F) -> Self 
-    where F: Fn(&X) -> Lc<X, R> {
+    pub fn apply<F, Y: Gen>(&self, f: F) -> Lc<Y, R>
+    where F: Fn(&X) -> Lc<Y, R> {
         self.iter().flat_map(|(x, r)| { 
             f(x).into_iter().map(move |(y, s)| { 
                 (y, r * &s)

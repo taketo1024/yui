@@ -11,7 +11,7 @@ pub fn init_simple_logger(l: log::LevelFilter) -> Result<(), log::SetLoggerError
     TermLogger::init(
         l,
         config,
-        TerminalMode::Mixed,
+        TerminalMode::Stderr,
         ColorChoice::Always
     )
 }

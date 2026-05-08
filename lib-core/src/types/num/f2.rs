@@ -118,10 +118,10 @@ impl<'a, 'b> Rem<&'b FF2> for &'a FF2 {
     }
 }
 
-impl<'a, 'b> Pow<&'b usize> for &'a FF2 {
+impl<'a> Pow<usize> for &'a FF2 {
     type Output = FF2;
-    fn pow(self, rhs: &'b usize) -> Self::Output {
-        if *rhs == 0 { FF2::one() } else { *self }
+    fn pow(self, rhs: usize) -> Self::Output {
+        if rhs == 0 { FF2::one() } else { *self }
     }
 }
 

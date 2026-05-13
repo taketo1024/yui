@@ -191,14 +191,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     assert_eq!(pp2.l.nrows(), m - r1);
     assert_eq!(pp2.u.ncols(), n - r1);
 
-    // Fast path: pp2 contributes no new pivots. The schur complement is
-    // unchanged in content; we still assign `pp2.s` to `pp1.s` because callers
-    // may have moved out of `pp1.s` (e.g. `solve_pluq_incr` does `mem::take`
-    // to feed `chunk_pluq`).
-    if r2 == 0 {
-        pp1.s = pp2.s;
-        return;
-    }
+    // MEMO: Even if r2 == 0, there could be non-trivial permutations 
+    // when R is not a field. 
 
     pp1.p = merge_perm(&pp1.p, &pp2.p);
     pp1.q = merge_perm(&pp1.q, &pp2.q);

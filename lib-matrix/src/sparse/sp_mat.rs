@@ -238,13 +238,11 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
     }
 
     pub fn col_vec(&self, j: usize) -> SpVec<R>
-    where R: Scalar + Zero + ClosedAddAssign { 
+    where R: Scalar + Zero + ClosedAddAssign {
         let col = self.inner.col(j);
-        let iter = Iterator::zip(
-            col.row_indices().iter().cloned(), 
-            col.values().iter().cloned()
-        );
-        SpVec::from_entries(self.nrows(), iter)
+        let row_indices = col.row_indices().to_vec();
+        let values = col.values().to_vec();
+        SpVec::try_from_csc_data(self.nrows(), row_indices, values).unwrap()
     }
 
     pub fn transpose(&self) -> Self { 

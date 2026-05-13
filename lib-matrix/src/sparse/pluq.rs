@@ -788,11 +788,11 @@ mod tests {
     type R = Ratio<i64>;
     fn r(n: i64) -> R { R::from(n) }
     
-    fn sp(shape: (usize, usize), data: impl IntoIterator<Item = R>) -> SpMat<R> {
+    fn sp_mat(shape: (usize, usize), data: impl IntoIterator<Item = R>) -> SpMat<R> {
         SpMat::from_dense_data(shape, data)
     }
 
-    fn sv(data: impl IntoIterator<Item = R>) -> SpVec<R> {
+    fn sp_vec(data: impl IntoIterator<Item = R>) -> SpVec<R> {
         SpVec::from(data.into_iter().collect::<Vec<_>>())
     }
 
@@ -800,7 +800,7 @@ mod tests {
     fn test_solve_l_square() {
         // l = [[2, 0], [3, 4]], y = [4, 11]
         // l[0..2,0..2]*x = [4,11] → x = [2, 5/4]
-        let l = sp((2, 2), [r(2), r(0), r(3), r(4)]);
+        let l = sp_mat((2, 2), [r(2), r(0), r(3), r(4)]);
         let y = vec![r(4), r(11)];
         let x = solve_l(&l, &y, true);
         assert_eq!(x, Some(vec![r(2), r(5)/r(4)]));
@@ -811,7 +811,7 @@ mod tests {
         // l = [[1,0],[2,1],[3,4]] (3×2 lower triangular with extra row), y = [1,2,3].
         // Forward sub on top 2×2: z = [1, 2 - 2*1] = [1, 0].
         // Residual at row 2: 3 - 3*1 - 4*0 = 0 → consistent.
-        let l = sp((3, 2), [r(1), r(0), r(2), r(1), r(3), r(4)]);
+        let l = sp_mat((3, 2), [r(1), r(0), r(2), r(1), r(3), r(4)]);
         let y = vec![r(1), r(2), r(3)];
         assert_eq!(solve_l(&l, &y, true), Some(vec![r(1), r(0)]));
     }
@@ -819,7 +819,7 @@ mod tests {
     #[test]
     fn test_solve_l_rectangular_inconsistent() {
         // Same l as above but y = [1,2,4]. Residual at row 2: 4 - 3 - 0 = 1 ≠ 0 → None.
-        let l = sp((3, 2), [r(1), r(0), r(2), r(1), r(3), r(4)]);
+        let l = sp_mat((3, 2), [r(1), r(0), r(2), r(1), r(3), r(4)]);
         let y = vec![r(1), r(2), r(4)];
         assert_eq!(solve_l(&l, &y, true), None);
     }
@@ -828,7 +828,7 @@ mod tests {
     fn test_solve_l_no_check() {
         // Same inconsistent input as above; with check=false the residual is ignored
         // and Some(z) is still returned (z is the forward-sub solution on the top).
-        let l = sp((3, 2), [r(1), r(0), r(2), r(1), r(3), r(4)]);
+        let l = sp_mat((3, 2), [r(1), r(0), r(2), r(1), r(3), r(4)]);
         let y = vec![r(1), r(2), r(4)];
         assert_eq!(solve_l(&l, &y, false), Some(vec![r(1), r(0)]));
     }
@@ -854,7 +854,7 @@ mod tests {
         // l = [[1,0],[2,1],[3,4]], x = [1, 0]:
         //   y = [1, 2, 3]: residual = [0, 0] → consistent.
         //   y = [1, 2, 4]: residual at row 2 = 1 ≠ 0 → inconsistent.
-        let l = sp((3, 2), [r(1), r(0), r(2), r(1), r(3), r(4)]);
+        let l = sp_mat((3, 2), [r(1), r(0), r(2), r(1), r(3), r(4)]);
         let x = vec![r(1), r(0)];
         assert!( is_consistent(&l, &[r(1), r(2), r(3)], &x));
         assert!(!is_consistent(&l, &[r(1), r(2), r(4)], &x));
@@ -867,7 +867,7 @@ mod tests {
         //   k=2: checks rows in [2..2] (none) → trivially true.
         //   k=3: checks row 2 only → true.
         //   k=4: checks rows 2 and 3 → false (row 3 fails).
-        let l = sp((4, 2), [r(1), r(0), r(2), r(1), r(3), r(4), r(5), r(6)]);
+        let l = sp_mat((4, 2), [r(1), r(0), r(2), r(1), r(3), r(4), r(5), r(6)]);
         let y = vec![r(1), r(2), r(3), r(99)];
         let x = vec![r(1), r(0)];
         assert!( is_consistent_upto(&l, &y, &x, 2));
@@ -881,7 +881,7 @@ mod tests {
     fn test_solve_u_square() {
         // u = [[1, 2], [0, 3]], y = [4, 6].
         // Back sub: x[1] = 6/3 = 2; x[0] = (4 - 2*2)/1 = 0.
-        let u = sp((2, 2), [r(1), r(2), r(0), r(3)]);
+        let u = sp_mat((2, 2), [r(1), r(2), r(0), r(3)]);
         let y = vec![r(4), r(6)];
         assert_eq!(solve_u(&u, &y), vec![r(0), r(2)]);
     }
@@ -890,7 +890,7 @@ mod tests {
     fn test_solve_u_rectangular() {
         // u = [[1, 2, 5, 6], [0, 3, 7, 8]], y = [4, 6].
         // Top 2×2 same as above → x[..2] = [0, 2]; trailing entries are zeros.
-        let u = sp((2, 4), [r(1), r(2), r(5), r(6), r(0), r(3), r(7), r(8)]);
+        let u = sp_mat((2, 4), [r(1), r(2), r(5), r(6), r(0), r(3), r(7), r(8)]);
         let y = vec![r(4), r(6)];
         assert_eq!(solve_u(&u, &y), vec![r(0), r(2), r(0), r(0)]);
     }
@@ -912,45 +912,45 @@ mod tests {
 
     #[test]
     fn test_solve_square() {
-        let a = sp((2, 2), [r(1), r(2), r(3), r(4)]);
-        solve_check(&a, &sv([r(5), r(6)]));
+        let a = sp_mat((2, 2), [r(1), r(2), r(3), r(4)]);
+        solve_check(&a, &sp_vec([r(5), r(6)]));
     }
 
     #[test]
     fn test_solve_overdetermined_consistent() {
-        let a = sp((3, 2), [r(1), r(0), r(0), r(1), r(1), r(1)]);
-        solve_check(&a, &sv([r(2), r(3), r(5)]));
+        let a = sp_mat((3, 2), [r(1), r(0), r(0), r(1), r(1), r(1)]);
+        solve_check(&a, &sp_vec([r(2), r(3), r(5)]));
     }
 
     #[test]
     fn test_solve_overdetermined_inconsistent() {
-        let a = sp((3, 2), [r(1), r(0), r(0), r(1), r(1), r(1)]);
-        assert!(solve_pluq(&a, &sv([r(1), r(1), r(0)])).is_none());
+        let a = sp_mat((3, 2), [r(1), r(0), r(0), r(1), r(1), r(1)]);
+        assert!(solve_pluq(&a, &sp_vec([r(1), r(1), r(0)])).is_none());
     }
 
     #[test]
     fn test_solve_underdetermined() {
-        let a = sp((2, 3), [r(1), r(0), r(2), r(0), r(1), r(3)]);
-        solve_check(&a, &sv([r(4), r(5)]));
+        let a = sp_mat((2, 3), [r(1), r(0), r(2), r(0), r(1), r(3)]);
+        solve_check(&a, &sp_vec([r(4), r(5)]));
     }
 
     #[test]
     fn test_solve_zero_rhs() {
-        let a = sp((2, 2), [r(1), r(2), r(3), r(4)]);
-        let x = solve_check(&a, &sv([r(0), r(0)]));
-        assert_eq!(x, sv([r(0), r(0)]));
+        let a = sp_mat((2, 2), [r(1), r(2), r(3), r(4)]);
+        let x = solve_check(&a, &sp_vec([r(0), r(0)]));
+        assert_eq!(x, sp_vec([r(0), r(0)]));
     }
 
     #[test]
     fn test_solve_no_solution() {
-        let a = sp((2, 2), [r(1), r(2), r(2), r(4)]);
-        assert!(solve_pluq(&a, &sv([r(1), r(0)])).is_none());
+        let a = sp_mat((2, 2), [r(1), r(2), r(2), r(4)]);
+        assert!(solve_pluq(&a, &sp_vec([r(1), r(0)])).is_none());
     }
 
     #[test]
     fn test_solve_identity() {
         let a: SpMat<R> = SpMat::from_entries((4, 4), (0..4).map(|k| (k, k, r(1))));
-        let y = sv([r(1), r(2), r(3), r(4)]);
+        let y = sp_vec([r(1), r(2), r(3), r(4)]);
         let x = solve_check(&a, &y);
         assert_eq!(x, y);
     }
@@ -1028,54 +1028,54 @@ mod tests {
 
     #[test]
     fn test_solve_incr_square() {
-        let a = sp((2, 2), [r(1), r(2), r(3), r(4)]);
+        let a = sp_mat((2, 2), [r(1), r(2), r(3), r(4)]);
         // exercise different (max_piv, chunk) combinations
         for (mp, ch) in [(0, 1), (0, 2), (1, 1), (usize::MAX, 1), (usize::MAX, 100)] {
-            solve_incr_check(&a, &sv([r(5), r(6)]), mp, ch);
+            solve_incr_check(&a, &sp_vec([r(5), r(6)]), mp, ch);
         }
     }
 
     #[test]
     fn test_solve_incr_overdetermined_consistent() {
-        let a = sp((3, 2), [r(1), r(0), r(0), r(1), r(1), r(1)]);
-        solve_incr_check(&a, &sv([r(2), r(3), r(5)]), 0, 2);
-        solve_incr_check(&a, &sv([r(2), r(3), r(5)]), 1, 1);
+        let a = sp_mat((3, 2), [r(1), r(0), r(0), r(1), r(1), r(1)]);
+        solve_incr_check(&a, &sp_vec([r(2), r(3), r(5)]), 0, 2);
+        solve_incr_check(&a, &sp_vec([r(2), r(3), r(5)]), 1, 1);
     }
 
     #[test]
     fn test_solve_incr_overdetermined_inconsistent() {
-        let a = sp((3, 2), [r(1), r(0), r(0), r(1), r(1), r(1)]);
+        let a = sp_mat((3, 2), [r(1), r(0), r(0), r(1), r(1), r(1)]);
         for (mp, ch) in [(0, 1), (0, 3), (usize::MAX, 1)] {
-            assert!(solve_pluq_incr(&a, &sv([r(1), r(1), r(0)]), mp, ch).is_none());
+            assert!(solve_pluq_incr(&a, &sp_vec([r(1), r(1), r(0)]), mp, ch).is_none());
         }
     }
 
     #[test]
     fn test_solve_incr_underdetermined() {
-        let a = sp((2, 3), [r(1), r(0), r(2), r(0), r(1), r(3)]);
-        solve_incr_check(&a, &sv([r(4), r(5)]), 0, 1);
-        solve_incr_check(&a, &sv([r(4), r(5)]), 1, 1);
+        let a = sp_mat((2, 3), [r(1), r(0), r(2), r(0), r(1), r(3)]);
+        solve_incr_check(&a, &sp_vec([r(4), r(5)]), 0, 1);
+        solve_incr_check(&a, &sp_vec([r(4), r(5)]), 1, 1);
     }
 
     #[test]
     fn test_solve_incr_zero_rhs() {
-        let a = sp((2, 2), [r(1), r(2), r(3), r(4)]);
-        let x = solve_incr_check(&a, &sv([r(0), r(0)]), 0, 1);
-        assert_eq!(x, sv([r(0), r(0)]));
+        let a = sp_mat((2, 2), [r(1), r(2), r(3), r(4)]);
+        let x = solve_incr_check(&a, &sp_vec([r(0), r(0)]), 0, 1);
+        assert_eq!(x, sp_vec([r(0), r(0)]));
     }
 
     #[test]
     fn test_solve_incr_no_solution() {
-        let a = sp((2, 2), [r(1), r(2), r(2), r(4)]);
+        let a = sp_mat((2, 2), [r(1), r(2), r(2), r(4)]);
         for (mp, ch) in [(0, 1), (0, 2), (usize::MAX, 1)] {
-            assert!(solve_pluq_incr(&a, &sv([r(1), r(0)]), mp, ch).is_none());
+            assert!(solve_pluq_incr(&a, &sp_vec([r(1), r(0)]), mp, ch).is_none());
         }
     }
 
     #[test]
     fn test_solve_incr_identity() {
         let a: SpMat<R> = SpMat::from_entries((4, 4), (0..4).map(|k| (k, k, r(1))));
-        let y = sv([r(1), r(2), r(3), r(4)]);
+        let y = sp_vec([r(1), r(2), r(3), r(4)]);
         let x = solve_incr_check(&a, &y, 0, 2);
         assert_eq!(x, y);
     }
@@ -1084,20 +1084,20 @@ mod tests {
     fn test_solve_incr_zero_matrix_zero_rhs() {
         let a = SpMat::<R>::zero((3, 4));
         // Ax = 0 with A=0 has any x as a solution; expect all-zero free vars.
-        let x = solve_pluq_incr(&a, &sv([r(0); 3]), 0, 1).expect("zero rhs is consistent");
-        assert_eq!(x, sv([r(0); 4]));
+        let x = solve_pluq_incr(&a, &sp_vec([r(0); 3]), 0, 1).expect("zero rhs is consistent");
+        assert_eq!(x, sp_vec([r(0); 4]));
     }
 
     #[test]
     fn test_solve_incr_zero_matrix_nonzero_rhs() {
         let a = SpMat::<R>::zero((3, 4));
-        assert!(solve_pluq_incr(&a, &sv([r(1), r(0), r(0)]), 0, 1).is_none());
+        assert!(solve_pluq_incr(&a, &sp_vec([r(1), r(0), r(0)]), 0, 1).is_none());
     }
 
     #[test]
     fn test_solve_incr_matches_solve_pluq() {
         // Random sparse system of moderate size; the two solvers should agree.
-        let a: SpMat<R> = sp((6, 9), [
+        let a: SpMat<R> = sp_mat((6, 9), [
             r(1), r(0), r(0), r(0), r(0), r(1), r(0), r(0), r(1),
             r(0), r(1), r(1), r(1), r(0), r(1), r(0), r(1), r(0),
             r(0), r(0), r(1), r(1), r(0), r(0), r(0), r(1), r(1),
@@ -1105,10 +1105,10 @@ mod tests {
             r(0), r(0), r(1), r(0), r(0), r(0), r(0), r(0), r(0),
             r(0), r(1), r(0), r(0), r(0), r(1), r(0), r(1), r(0),
         ]);
-        let y = sv([r(1), r(2), r(3), r(0), r(1), r(0)]);
+        let y = sp_vec([r(1), r(2), r(3), r(0), r(1), r(0)]);
 
         // Pick y that's reachable: y = a * (1, 1, ..., 1) is guaranteed consistent.
-        let y_consistent = &a * &sv(vec![r(1); 9]);
+        let y_consistent = &a * &sp_vec(vec![r(1); 9]);
 
         for (mp, ch) in [(0, 1), (0, 3), (2, 2), (usize::MAX, 2)] {
             // Inputs may be inconsistent for this `y`; check both behave the same.

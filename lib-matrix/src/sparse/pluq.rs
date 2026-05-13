@@ -59,6 +59,21 @@ impl<R> SpPluq<R> {
     }
 }
 
+/// Converts `a` into the trivial PLUQ whose Schur complement is `a` itself
+impl<R> From<SpMat<R>> for SpPluq<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn from(a: SpMat<R>) -> Self {
+        let (m, n) = a.shape();
+        Self::new(
+            PermOwned::identity(m),
+            PermOwned::identity(n),
+            SpMat::zero((m, 0)),
+            SpMat::zero((0, n)),
+            a,
+        )
+    }
+}
+
 /// Computes a partial PLUQ decomposition of `a` under the given pivot-finder
 /// configuration.
 ///
@@ -108,20 +123,29 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 /// Computes a full PLUQ decomposition of `a`.
+///
+/// Iterates `pre_pluq` on the current Schur complement while it keeps finding
+/// sparse pivots; falls back to `dense_pluq_in` once the Schur complement is
+/// non-zero but admits no further sparse pivots.
 pub fn pluq<R>(a: &SpMat<R>, config: PivotFinderConfig) -> SpPluq<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let piv_type = config.piv_type;
-    let mut pp1 = pre_pluq(a, config);
-    if pp1.s.is_zero() {
-        return pp1
+    let mut pp = SpPluq::from(a.clone());
+
+    while !pp.s.is_zero() {
+        let pp_next = pre_pluq(&pp.s, config);
+        if pp_next.rank() == 0 { break; }
+
+        debug!("merge pluq: {} + {}", pp.rank(), pp_next.rank());
+        merge_pluq(&mut pp, pp_next);
     }
 
-    let pp2 = dense_pluq_in(&pp1.s, piv_type);
+    if pp.s.is_zero() { return pp; }
 
-    debug!("merge pluq: {} + {}", pp1.rank(), pp2.rank());
-
-    merge_pluq(&mut pp1, pp2);
-    pp1
+    let pp_dense = dense_pluq_in(&pp.s, piv_type);
+    debug!("merge pluq (dense): {} + {}", pp.rank(), pp_dense.rank());
+    merge_pluq(&mut pp, pp_dense);
+    pp
 }
 
 fn dense_pluq_in<R>(s: &SpMat<R>, piv_type: PivotType) -> SpPluq<R>

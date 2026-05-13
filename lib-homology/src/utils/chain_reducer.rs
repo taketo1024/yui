@@ -501,7 +501,7 @@ mod tests {
         let dw = c[1].vectorize(&dx);
         let dv = t1.forward(&dw);
 
-        assert_eq!(dv.to_dense()[0].abs(), 2);
+        assert_eq!(dv.into_dense()[0].abs(), 2);
 
         let v = SpVec::unit(1, 0);
         let w = t1.backward(&v);

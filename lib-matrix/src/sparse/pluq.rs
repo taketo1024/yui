@@ -273,13 +273,13 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
     assert_eq!(l.nrows(), y.len());
     let r = l.ncols();
 
-    let x = if r == y.len() { 
+    let x = if r == y.len() {
         let y = SpVec::from(y.to_vec());
-        solve_triangular_vec(TriangularType::Lower, l, &y).to_dense()
-    } else { 
+        solve_triangular_vec(TriangularType::Lower, l, &y).into_dense()
+    } else {
         let l0 = l.submat(0..r, 0..r);
         let y0 = SpVec::from(y[..r].to_vec());
-        let x = solve_triangular_vec(TriangularType::Lower, &l0, &y0).to_dense();
+        let x = solve_triangular_vec(TriangularType::Lower, &l0, &y0).into_dense();
 
         if check_consistency && !is_consistent(l, y, &x) { 
             return None;
@@ -325,10 +325,10 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
     assert!(n >= r);
 
     let mut x = if n == r {
-        solve_triangular_vec(TriangularType::Upper, u, &SpVec::from(y.to_vec())).to_dense()
+        solve_triangular_vec(TriangularType::Upper, u, &SpVec::from(y.to_vec())).into_dense()
     } else {
         let u0 = u.submat(0..r, 0..r);
-        solve_triangular_vec(TriangularType::Upper, &u0, &SpVec::from(y.to_vec())).to_dense()
+        solve_triangular_vec(TriangularType::Upper, &u0, &SpVec::from(y.to_vec())).into_dense()
     };
 
     x.resize(n, R::zero());

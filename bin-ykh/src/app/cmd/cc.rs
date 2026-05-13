@@ -157,8 +157,8 @@ where
 
             for z in h1[i].gens() { 
                 let w = f.apply(i, &z);
-                let x = h1[i].vectorize_euc(&z).into_vec();
-                let y = h2[j].vectorize_euc(&w).into_vec();
+                let x = h1[i].vectorize_euc(&z).into_dense();
+                let y = h2[j].vectorize_euc(&w).into_dense();
                 self.out(&format!("\t{:?} -> {:?}", x, y));
             }
             self.out("");

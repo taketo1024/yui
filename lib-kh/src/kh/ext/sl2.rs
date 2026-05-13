@@ -142,7 +142,7 @@ impl<R> KhSl2Map<R> where
 
             let v = pinv.col_vec(i);
 
-            // println!("{i}) order: {ord}\n{:?}", v.to_dense());
+            // println!("{i}) order: {ord}\n{:?}", v.clone().into_dense());
 
             let indices = v.iter_nz().filter_map(|(j, r)| 
                 if r.is_const() { 

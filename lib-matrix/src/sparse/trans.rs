@@ -198,8 +198,8 @@ mod tests {
         let w = t.forward(&v);
         let x = t.backward(&w);
 
-        assert_eq!(w.into_vec(), vec![2,0,1]);
-        assert_eq!(x.into_vec(), vec![0,1,2,0,0]);
+        assert_eq!(w.into_dense(), vec![2,0,1]);
+        assert_eq!(x.into_dense(), vec![0,1,2,0,0]);
     }
 
     #[test]

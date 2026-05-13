@@ -68,8 +68,8 @@ impl<R> SpVec<R> {
         self.iter().filter(|(_, a)| !a.is_zero())
     }
 
-    pub fn into_vec(self) -> Vec<R>
-    where R: Clone + Zero { 
+    pub fn into_dense(self) -> Vec<R>
+    where R: Clone + Zero {
         self.into()
     }
 
@@ -89,8 +89,9 @@ impl<R> From<SpVec<R>> for Vec<R>
 where R: Clone + Zero {
     fn from(value: SpVec<R>) -> Self {
         let mut res = vec![R::zero(); value.dim()];
-        for (i, a) in value.iter_nz() { 
-            res[i] = a.clone();
+        let (_, rows, vals) = value.inner.disassemble();
+        for (i, a) in rows.into_iter().zip(vals.into_iter()) {
+            res[i] = a;
         }
         res
     }
@@ -200,13 +201,6 @@ where R: Scalar + Zero + ClosedAddAssign {
         (top, bot)
     }
 
-    pub fn to_dense(&self) -> Vec<R> { 
-        let mut vec = vec![R::zero(); self.dim()];
-        for (i, a) in self.iter_nz() { 
-            vec[i] = a.clone();
-        }
-        vec
-    }
 }
 
 impl<R: PartialEq + Zero> PartialEq for SpVec<R> {
@@ -295,7 +289,7 @@ mod tests {
     #[test]
     fn to_dense() {
         let v = SpVec::from(vec![1,0,3,5,0]);
-        assert_eq!(v.to_dense(), vec![1,0,3,5,0]);
+        assert_eq!(v.into_dense(), vec![1,0,3,5,0]);
     }
 
     #[test]

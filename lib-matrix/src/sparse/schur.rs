@@ -27,8 +27,8 @@ use super::triang::{TriangularType, solve_triangular_left, solve_triangular_with
 pub struct Schur<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     s: SpMat<R>,
-    t_src: Option<Trans<R>>,
-    t_tgt: Option<Trans<R>>,
+    col_mult: Option<SpMat<R>>, // a⁻¹·b — column-elimination multiplier
+    row_mult: Option<SpMat<R>>, // c·a⁻¹ — row-elimination multiplier
 }
 
 impl<R> Schur<R>
@@ -79,56 +79,55 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let (s_cols, x_cols): (Vec<_>, Vec<_>) = pairs.into_iter().unzip();
         let s = SpMat::from_col_vecs(m_d, s_cols);
 
-        let t_src = with_trans_src.then(|| {
-            let x = SpMat::from_col_vecs(r, x_cols.into_iter().map(|x| x.unwrap())); // x = a⁻¹b
-            let f = proj_mat(r + n_b, n_b);
-            let b = SpMat::stack(-x, id_mat(n_b)); // [-a⁻¹b, 1]^T
-            Trans::new(f, b)
+        let col_mult = with_trans_src.then(|| {
+            SpMat::from_col_vecs(r, x_cols.into_iter().map(|x| x.unwrap())) // a⁻¹b
         });
 
-        let t_tgt = with_trans_tgt.then(|| {
-            let f = SpMat::concat(-solve_triangular_left(t, a, c), id_mat(m_d)); // [-ca⁻¹, 1]
-            let b = incl_mat(r + m_d, m_d); // [0, 1]^T
-            Trans::new(f, b)
+        let row_mult = with_trans_tgt.then(|| {
+            solve_triangular_left(t, a, c) // c·a⁻¹
         });
 
-        Self { s, t_src, t_tgt }
+        Self { s, col_mult, row_mult }
     }
 
     pub fn complement(&self) -> &SpMat<R> {
         &self.s
     }
 
-    pub fn trans_src(&self) -> Option<&Trans<R>> {
-        self.t_src.as_ref()
-    }
-
-    pub fn trans_tgt(&self) -> Option<&Trans<R>> {
-        self.t_tgt.as_ref()
-    }
-
-    /// Returns `a⁻¹b` if it was retained (i.e. `with_trans_src=true`).
-    pub fn ainvb(&self) -> Option<SpMat<R>> {
-        self.t_src.as_ref().map(|trans| {
-            // backward_mat = [-a⁻¹b ; I], shape (r + n_b, n_b); top r rows are -a⁻¹b.
-            let bb = trans.backward_mat();
-            let r = bb.nrows() - bb.ncols();
-            -bb.submat_rows(0..r)
-        })
+    /// Returns `a⁻¹·b` if it was retained (i.e. `with_trans_src=true`).
+    pub fn col_mult(&self) -> Option<&SpMat<R>> {
+        self.col_mult.as_ref()
     }
 
     /// Returns `c·a⁻¹` if it was retained (i.e. `with_trans_tgt=true`).
-    pub fn ca_inv(&self) -> Option<SpMat<R>> {
-        self.t_tgt.as_ref().map(|trans| {
-            // forward_mat = [-c·a⁻¹, I], shape (m_d, r + m_d); first r cols are -c·a⁻¹.
-            let f = trans.forward_mat();
-            let r = f.ncols() - f.nrows();
-            -f.submat_cols(0..r)
+    pub fn row_mult(&self) -> Option<&SpMat<R>> {
+        self.row_mult.as_ref()
+    }
+
+    pub fn trans_src(&self) -> Option<Trans<R>> {
+        self.col_mult.as_ref().map(|x| {
+            let (r, n_b) = (x.nrows(), x.ncols());
+            let f = proj_mat(r + n_b, n_b);
+            let b = SpMat::stack(-x, id_mat(n_b)); // [-a⁻¹b ; I]
+            Trans::new(f, b)
         })
     }
 
-    pub fn disassemble(self) -> (SpMat<R>, Option<Trans<R>>, Option<Trans<R>>) {
-        (self.s, self.t_src, self.t_tgt)
+    pub fn trans_tgt(&self) -> Option<Trans<R>> {
+        self.row_mult.as_ref().map(|y| {
+            let (m_d, r) = (y.nrows(), y.ncols());
+            let f = SpMat::concat(-y, id_mat(m_d)); // [-c·a⁻¹, I]
+            let b = incl_mat(r + m_d, m_d);
+            Trans::new(f, b)
+        })
+    }
+
+    pub fn disassemble(self) -> (SpMat<R>, Option<SpMat<R>>, Option<SpMat<R>>) {
+        (self.s, self.col_mult, self.row_mult)
+    }
+
+    pub fn into_s(self) -> SpMat<R> {
+        self.s
     }
 }
 

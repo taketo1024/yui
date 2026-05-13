@@ -88,16 +88,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let (l, u, s) = match piv_type {
         PivotType::Rows => {
             let sch = Schur::from_blocks(TriangularType::Upper, [&a0, &a1, &a2, &a3], false, true);
-            let l1 = sch.ca_inv().unwrap();
-            let s = sch.disassemble().0;
+            let (s, _, row_mult) = sch.disassemble();
+            let l1 = row_mult.unwrap();
             let u = SpMat::concat(a0, a1);          // u = [a0 | a1]
             let l = SpMat::stack(SpMat::id(r), l1); // l = [I_r ; l1]
             (l, u, s)
         },
         PivotType::Cols => {
             let sch = Schur::from_blocks(TriangularType::Lower, [&a0, &a1, &a2, &a3], true, false);
-            let u1 = sch.ainvb().unwrap();
-            let s = sch.disassemble().0;
+            let (s, col_mult, _) = sch.disassemble();
+            let u1 = col_mult.unwrap();
             let l = SpMat::stack(a0, a2);            // l = [a0 ; a2]
             let u = SpMat::concat(SpMat::id(r), u1); // u = [I_r | u1]
             (l, u, s)
@@ -439,8 +439,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         [&u_top, &u_right, &s_rest_left, &s_rest_right],
         false, true
     );
-    let l_ext = sch.ca_inv().unwrap();
-    let s_ext = sch.disassemble().0;
+    let (s_ext, _, row_mult) = sch.disassemble();
+    let l_ext = row_mult.unwrap();
 
     let chunk_idx: Vec<usize> = (0..c).collect();
     let p = extend_perm(&pp_chunk.p, &chunk_idx, m_s);

@@ -191,16 +191,16 @@ where
             self.trans.contains_key(&(i + self.d_deg));
 
         let sch = Schur::from_pivots(&a, piv_type, &p, &q, r, with_trans, with_trans);
-        let (s, t_src, t_tgt) = sch.disassemble();
+        let t_src = sch.trans_src();
+        let t_tgt = sch.trans_tgt();
+        let s = sch.into_s();
 
         debug!("  reduced C[{i}]: {:?} -> {:?}", a.shape(), s.shape());
 
         self.update_mats(i, &p, &q, r, s);
 
-        if with_trans { 
-            let t_src = t_src.unwrap();
-            let t_tgt = t_tgt.unwrap();
-            self.update_trans(i, &p, &q, t_src, t_tgt);
+        if with_trans {
+            self.update_trans(i, &p, &q, t_src.unwrap(), t_tgt.unwrap());
         }
 
         true

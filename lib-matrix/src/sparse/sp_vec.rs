@@ -174,31 +174,30 @@ where R: Scalar + Zero + ClosedAddAssign {
         )
     }
 
-    pub fn stack(&self, other: &SpVec<R>) -> SpVec<R> {
-        let (n1, n2) = (self.dim(), other.dim());
-        Self::from_entries(n1 + n2, Iterator::chain(
-            self.iter_nz().map(|(i, a)| (i, a.clone())),
-            other.iter_nz().map(|(i, a)| (n1 + i, a.clone()))
-        ))
+    pub fn stack(top: Self, bot: Self) -> SpVec<R> {
+        let (n1, n2) = (top.dim(), bot.dim());
+        let (_, mut rows, mut vals) = top.inner.disassemble();
+        let (_, bot_rows, bot_vals) = bot.inner.disassemble();
+
+        rows.extend(bot_rows.into_iter().map(|i| i + n1));
+        vals.extend(bot_vals);
+
+        Self::from_raw_data(n1 + n2, rows, vals)
     }
 
-    pub fn split(&self, at: usize) -> (SpVec<R>, SpVec<R>) { 
+    pub fn split(self, at: usize) -> (SpVec<R>, SpVec<R>) {
         let n = self.dim();
-        let k = at;
-        assert!(k <= n);
+        assert!(at <= n);
 
-        let mut e1 = vec![];
-        let mut e2 = vec![];
+        let (_, mut rows, mut vals) = self.inner.disassemble();
+        let split_idx = rows.partition_point(|&i| i < at);
 
-        for (i, a) in self.iter() { 
-            if i < k { 
-                e1.push((i, a.clone()));
-            } else { 
-                e2.push((i - k, a.clone()));
-            }
-        }
+        let bot_rows: Vec<usize> = rows.split_off(split_idx).into_iter().map(|i| i - at).collect();
+        let bot_vals = vals.split_off(split_idx);
 
-        (SpVec::from_entries(k, e1), SpVec::from_entries(n - k, e2))
+        let top = Self::from_raw_data(at, rows, vals);
+        let bot = Self::from_raw_data(n - at, bot_rows, bot_vals);
+        (top, bot)
     }
 
     pub fn to_dense(&self) -> Vec<R> { 
@@ -346,7 +345,7 @@ mod tests {
     fn stack() {
         let v1 = SpVec::from((0..3).collect_vec());
         let v2 = SpVec::from((5..8).collect_vec());
-        let w = v1.stack(&v2);
+        let w = SpVec::stack(v1, v2);
         assert_eq!(w, SpVec::from(vec![0,1,2,5,6,7]));
     }
 

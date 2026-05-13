@@ -17,20 +17,6 @@ pub struct SpMat<R> {
     inner: CscMatrix<R>
 }
 
-impl<R: PartialEq + Zero> PartialEq for SpMat<R> {
-    fn eq(&self, other: &Self) -> bool {
-        self.shape() == other.shape() && self.iter_nz().eq(other.iter_nz())
-    }
-}
-
-impl<R: Eq + Zero> Eq for SpMat<R> {}
-
-impl<R> MatTrait for SpMat<R> {
-    fn shape(&self) -> (usize, usize) {
-        (self.inner.nrows(), self.inner.ncols())
-    }
-}
-
 impl<R> SpMat<R> { 
     pub fn try_from_csc_data(
         num_rows: usize,
@@ -476,6 +462,12 @@ impl<R> ColSource<R> {
     }
 }
 
+impl<R> MatTrait for SpMat<R> {
+    fn shape(&self) -> (usize, usize) {
+        (self.inner.nrows(), self.inner.ncols())
+    }
+}
+
 impl<R> From<CscMatrix<R>> for SpMat<R> {
     fn from(inner: CscMatrix<R>) -> Self {
         Self { inner }
@@ -495,6 +487,14 @@ impl<R> Default for SpMat<R> {
         Self::zero((0, 0))
     }
 }
+
+impl<R: PartialEq + Zero> PartialEq for SpMat<R> {
+    fn eq(&self, other: &Self) -> bool {
+        self.shape() == other.shape() && self.iter_nz().eq(other.iter_nz())
+    }
+}
+
+impl<R: Eq + Zero> Eq for SpMat<R> {}
 
 impl<R> Neg for SpMat<R>
 where R: Scalar + Neg<Output = R> {

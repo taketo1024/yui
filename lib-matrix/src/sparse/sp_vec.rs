@@ -185,6 +185,12 @@ where R: Scalar + Zero + ClosedAddAssign {
 
 }
 
+impl<R> Default for SpVec<R> {
+    fn default() -> Self {
+        Self::zero(0)
+    }
+}
+
 impl<R: PartialEq + Zero> PartialEq for SpVec<R> {
     fn eq(&self, other: &Self) -> bool {
         self.dim() == other.dim() && self.iter_nz().eq(other.iter_nz())
@@ -192,12 +198,6 @@ impl<R: PartialEq + Zero> PartialEq for SpVec<R> {
 }
 
 impl<R: Eq + Zero> Eq for SpVec<R> {}
-
-impl<R> Default for SpVec<R> {
-    fn default() -> Self {
-        Self::zero(0)
-    }
-}
 
 impl<R> Neg for SpVec<R>
 where R: AddGrp, for<'a> &'a R: AddGrpOps<R> {

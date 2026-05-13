@@ -16,22 +16,17 @@ pub struct Mat<R> {
     inner: DMatrix<R>
 }
 
-impl<R> MatTrait for Mat<R> {
-    fn shape(&self) -> (usize, usize) {
-        (self.inner.nrows(), self.inner.ncols())
-    }
-}
-
 impl<R> Mat<R> {
-    pub fn inner(&self) -> &DMatrix<R> {
+    pub(crate) fn inner(&self) -> &DMatrix<R> {
         &self.inner
     }
 
-    pub fn inner_mut(&mut self) -> &mut DMatrix<R> {
+    pub(crate) fn inner_mut(&mut self) -> &mut DMatrix<R> {
         &mut self.inner
     }
 
-    pub fn into_inner(self) -> DMatrix<R> {
+    #[allow(unused)]
+    pub(crate) fn into_inner(self) -> DMatrix<R> {
         self.inner
     }
 
@@ -144,6 +139,12 @@ where R: Scalar {
         let data = self.inner.iter().map(f);
         let inner = DMatrix::from_iterator(self.nrows(), self.ncols(), data);
         Mat::from(inner)
+    }
+}
+
+impl<R> MatTrait for Mat<R> {
+    fn shape(&self) -> (usize, usize) {
+        (self.inner.nrows(), self.inner.ncols())
     }
 }
 

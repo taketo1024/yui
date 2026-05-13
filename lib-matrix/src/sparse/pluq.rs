@@ -45,6 +45,18 @@ impl<R> SpPluq<R> {
     }
 
     pub fn rank(&self) -> usize { self.l.ncols() }
+
+    pub fn take_l(&mut self) -> SpMat<R> {
+        std::mem::take(&mut self.l)
+    }
+
+    pub fn take_u(&mut self) -> SpMat<R> {
+        std::mem::take(&mut self.u)
+    }
+
+    pub fn take_s(&mut self) -> SpMat<R> {
+        std::mem::take(&mut self.s)
+    }
 }
 
 /// Computes a partial PLUQ decomposition of `a` under the given pivot-finder
@@ -101,16 +113,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 pub fn pluq<R>(a: &SpMat<R>, config: PivotFinderConfig) -> SpPluq<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let piv_type = config.piv_type;
-    let pp1 = pre_pluq(a, config);
-    if pp1.s.is_zero() { 
+    let mut pp1 = pre_pluq(a, config);
+    if pp1.s.is_zero() {
         return pp1
     }
-    
+
     let pp2 = dense_pluq_in(&pp1.s, piv_type);
 
     debug!("merge pluq: {} + {}", pp1.rank(), pp2.rank());
 
-    merge_pluq(pp1, pp2)
+    merge_pluq(&mut pp1, pp2);
+    pp1
 }
 
 fn dense_pluq_in<R>(s: &SpMat<R>, piv_type: PivotType) -> SpPluq<R>
@@ -171,49 +184,48 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 // `pp2` is a partial PLUQ of `pp1.s` with rank `r2` and shape (m - r1, n - r1).
 // Returns a partial PLUQ of the same matrix as `pp1` with rank `r1 + r2` and
 // schur complement `pp2.s`.
-fn merge_pluq<R>(pp1: SpPluq<R>, pp2: SpPluq<R>) -> SpPluq<R>
+fn merge_pluq<R>(pp1: &mut SpPluq<R>, pp2: SpPluq<R>)
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let (m, n) = (pp1.l.nrows(), pp1.u.ncols());
     let r1 = pp1.rank();
     let r2 = pp2.rank();
 
-    assert_eq!(pp1.s.shape(), (m - r1, n - r1));
     assert_eq!(pp2.l.nrows(), m - r1);
     assert_eq!(pp2.u.ncols(), n - r1);
 
-    // Fast path: when pp2 contributes no new pivots, the merged result equals
-    // pp1 (its schur complement is unchanged: pp2.s has the same shape as
-    // pp1.s and represents the same residual when r2 == 0).
+    // Fast path: pp2 contributes no new pivots. The schur complement is
+    // unchanged in content; we still assign `pp2.s` to `pp1.s` because callers
+    // may have moved out of `pp1.s` (e.g. `solve_pluq_incr` does `mem::take`
+    // to feed `chunk_pluq`).
     if r2 == 0 {
-        return pp1;
+        pp1.s = pp2.s;
+        return;
     }
 
-    let p = merge_perm(&pp1.p, &pp2.p);
-    let q = merge_perm(&pp1.q, &pp2.q);
+    pp1.p = merge_perm(&pp1.p, &pp2.p);
+    pp1.q = merge_perm(&pp1.q, &pp2.q);
 
-    let l = {
-        let [l0, l1] = pp1.l.divide_at_row(r1);
+    pp1.l = {
+        let [l0, l1] = pp1.take_l().divide_at_row(r1);
         let l1 = l1.permute_rows(pp2.p.view());
         let zero_tr = SpMat::zero((r1, r2));
         SpMat::combine_blocks([
-            &l0, &zero_tr, 
+            &l0, &zero_tr,
             &l1, &pp2.l
         ])
     };
 
-    let u = {
-        let [u0, u1] = pp1.u.divide_at_col(r1);
+    pp1.u = {
+        let [u0, u1] = pp1.take_u().divide_at_col(r1);
         let u1 = u1.permute_cols(pp2.q.view());
         let zero_bl = SpMat::zero((r2, r1));
         SpMat::combine_blocks([
-            &u0, &u1, 
+            &u0, &u1,
             &zero_bl, &pp2.u
         ])
     };
 
-    let s = pp2.s;
-
-    SpPluq::new(p, q, l, u, s)
+    pp1.s = pp2.s;
 }
 
 /// Solves `a * x = y` over a field using sparse PLUQ.
@@ -358,12 +370,12 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
         debug!("  current rank: {}", pp.rank());
 
         let r_old = pp.rank();
-        let (pp_next, r_next, c) = chunk_pluq(&pp.s, chunk);
+        let (pp_next, r_next, c) = chunk_pluq(pp.take_s(), chunk);
         let p_next = pp_next.p.clone();
         
         debug!("merge pluq: {} + {}", pp.rank(), pp_next.rank());
 
-        pp = merge_pluq(pp, pp_next);
+        merge_pluq(&mut pp, pp_next);
 
         // Apply the chunk's row perm to the tail of yp so it stays in sync with pp.l.
         let yp_tail = perm_apply(p_next.view(), &yp[r_old..]);
@@ -393,7 +405,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
 // Takes the top `min(chunk_size, s.nrows())` rows of `s`, runs `pluq` on them,
 // and lifts the result to act on all of `s` via `extend_chunk_to_full`.
 // Returns `(pp_chunk_full, r_chunk, c)`.
-fn chunk_pluq<R>(s: &SpMat<R>, chunk_size: usize) -> (SpPluq<R>, usize, usize)
+fn chunk_pluq<R>(s: SpMat<R>, chunk_size: usize) -> (SpPluq<R>, usize, usize)
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let c = chunk_size.min(s.nrows());
     let [s_chunk, s_rest] = s.divide_at_row(c);
@@ -402,7 +414,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         ..Default::default()
     });
     let r_chunk = pp_chunk.rank();
-    let pp_full = extend_chunk_to_full(pp_chunk, &s_rest);
+    let pp_full = extend_chunk_to_full(pp_chunk, s_rest);
     (pp_full, r_chunk, c)
 }
 
@@ -412,7 +424,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 // the new schur complement.
 //
 // Sparse analog of `dense_pluq_in`, applied to a single chunk.
-fn extend_chunk_to_full<R>(pp_chunk: SpPluq<R>, s_rest: &SpMat<R>) -> SpPluq<R>
+fn extend_chunk_to_full<R>(pp_chunk: SpPluq<R>, s_rest: SpMat<R>) -> SpPluq<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let (c, n_s) = (pp_chunk.l.nrows(), pp_chunk.u.ncols());
     let r_chunk = pp_chunk.rank();
@@ -424,7 +436,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     let s_rest_q = s_rest.permute_cols(pp_chunk.q.view());
     let [s_rest_left, s_rest_right] = s_rest_q.divide_at_col(r_chunk);
-    let [u_top, u_right] = pp_chunk.u.divide_at_col(r_chunk);
+    let [u_top, u_right] = pp_chunk.u.clone().divide_at_col(r_chunk);
 
     // Same Schur shape as pre_pluq's Rows branch: u_top (upper triangular) plays
     // the role of `a`, with `c = s_rest_left`, `b = u_right`, `d = s_rest_right`.
@@ -952,9 +964,9 @@ mod tests {
     fn check_extend_chunk(s: &SpMat<i32>, c: usize) {
         let (m, n) = s.shape();
         assert!(c <= m);
-        let [s_top, s_rest] = s.divide_at_row(c);
+        let [s_top, s_rest] = s.clone().divide_at_row(c);
         let pp_chunk = pluq(&s_top, cfg(PivotType::Rows));
-        let pp = extend_chunk_to_full(pp_chunk, &s_rest);
+        let pp = extend_chunk_to_full(pp_chunk, s_rest);
         let r = pp.rank();
 
         assert_eq!(pp.l.shape(), (m, r));
@@ -986,7 +998,7 @@ mod tests {
     fn test_chunk_pluq() {
         let s = sample();
         let (m, n) = s.shape();
-        let (pp, r_chunk, c) = chunk_pluq(&s, 3);
+        let (pp, r_chunk, c) = chunk_pluq(s.clone(), 3);
         let r = pp.rank();
 
         assert_eq!(c, 3);
@@ -1006,7 +1018,7 @@ mod tests {
     fn test_chunk_pluq_oversize() {
         let s = sample();
         let m = s.nrows();
-        let (_, _, c) = chunk_pluq(&s, 100);
+        let (_, _, c) = chunk_pluq(s, 100);
         assert_eq!(c, m);
     }
 

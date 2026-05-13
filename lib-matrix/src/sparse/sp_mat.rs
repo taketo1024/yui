@@ -297,41 +297,40 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         self.submat(0 .. m, cols)
     }
 
-    pub fn divide4(&self, point: (usize, usize)) -> [SpMat<R>; 4] {
+    pub fn divide_into_blocks(self, point: (usize, usize)) -> [SpMat<R>; 4] {
         let (m, n) = self.shape();
         let (k, l) = point;
         assert!(k <= m);
         assert!(l <= n);
 
-        let (csc_offsets, csc_rows, csc_vals) = self.csc_data();
+        let (offsets, rows, vals) = self.disassemble();
 
         let (mut a_rows, mut a_vals, mut a_offs) = (vec![], vec![], vec![0]);
         let (mut b_rows, mut b_vals, mut b_offs) = (vec![], vec![], vec![0]);
         let (mut c_rows, mut c_vals, mut c_offs) = (vec![], vec![], vec![0]);
         let (mut d_rows, mut d_vals, mut d_offs) = (vec![], vec![], vec![0]);
 
-        let push_col = |j: usize,
-                        top_rows: &mut Vec<usize>, top_vals: &mut Vec<R>, top_offs: &mut Vec<usize>,
-                        bot_rows: &mut Vec<usize>, bot_vals: &mut Vec<R>, bot_offs: &mut Vec<usize>| {
-            let range = csc_offsets[j]..csc_offsets[j + 1];
-            let rows = &csc_rows[range.clone()];
-            let vals = &csc_vals[range];
-            let split = rows.partition_point(|&i| i < k);
+        let mut vals_iter = vals.into_iter();
 
-            top_rows.extend_from_slice(&rows[..split]);
-            top_vals.extend_from_slice(&vals[..split]);
+        for j in 0..n {
+            let range = offsets[j]..offsets[j + 1];
+            let col_rows = &rows[range];
+            let split = col_rows.partition_point(|&i| i < k);
+            let (top_rows_src, bot_rows_src) = col_rows.split_at(split);
+
+            let (top_rows, top_vals, top_offs, bot_rows, bot_vals, bot_offs) = if j < l {
+                (&mut a_rows, &mut a_vals, &mut a_offs, &mut c_rows, &mut c_vals, &mut c_offs)
+            } else {
+                (&mut b_rows, &mut b_vals, &mut b_offs, &mut d_rows, &mut d_vals, &mut d_offs)
+            };
+
+            top_rows.extend_from_slice(top_rows_src);
+            top_vals.extend(vals_iter.by_ref().take(top_rows_src.len()));
             top_offs.push(top_rows.len());
 
-            bot_rows.extend(rows[split..].iter().map(|&i| i - k));
-            bot_vals.extend_from_slice(&vals[split..]);
+            bot_rows.extend(bot_rows_src.iter().map(|&i| i - k));
+            bot_vals.extend(vals_iter.by_ref().take(bot_rows_src.len()));
             bot_offs.push(bot_rows.len());
-        };
-
-        for j in 0..l { 
-            push_col(j, &mut a_rows, &mut a_vals, &mut a_offs, &mut c_rows, &mut c_vals, &mut c_offs); 
-        }
-        for j in l..n { 
-            push_col(j, &mut b_rows, &mut b_vals, &mut b_offs, &mut d_rows, &mut d_vals, &mut d_offs); 
         }
 
         [
@@ -342,19 +341,19 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         ]
     }
 
-    pub fn divide_at_col(&self, k: usize) -> [SpMat<R>; 2] { 
+    pub fn divide_at_col(self, k: usize) -> [SpMat<R>; 2] {
         let (m, n) = self.shape();
         assert!(k <= n);
 
-        let [a, b, ..] = self.divide4((m, k));
+        let [a, b, ..] = self.divide_into_blocks((m, k));
         [a, b]
     }
 
-    pub fn divide_at_row(&self, k: usize) -> [SpMat<R>; 2] { 
+    pub fn divide_at_row(self, k: usize) -> [SpMat<R>; 2] {
         let (m, n) = self.shape();
         assert!(k <= m);
 
-        let [a, _, b, _] = self.divide4((k, n));
+        let [a, _, b, _] = self.divide_into_blocks((k, n));
         [a, b]
     }
 

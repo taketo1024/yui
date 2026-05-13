@@ -51,9 +51,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         Self::from_blocks(t, blocks, with_trans_src, with_trans_tgt)
     }
 
-    pub fn from_partial_triangular(
+    pub(crate) fn from_partial_triangular(
         t: TriangularType,
-        a: &SpMat<R>,
+        a: SpMat<R>,
         r: usize,
         with_trans_src: bool,
         with_trans_tgt: bool,
@@ -62,7 +62,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(r <= m);
         assert!(r <= n);
 
-        let blocks = a.divide4((r, r));
+        let blocks = a.divide_into_blocks((r, r));
         Self::from_blocks(t, blocks, with_trans_src, with_trans_tgt)
     }
 
@@ -174,11 +174,11 @@ mod tests {
             5, 3, 5, 2, 2,
             6, 2,-3, 1, 8
         ]);
-        let sch = Schur::from_partial_triangular(TriangularType::Lower, &a, 3, false, false);
+        let sch = Schur::from_partial_triangular(TriangularType::Lower, a, 3, false, false);
         let s = sch.complement();
 
         assert_eq!(s, &SpMat::from_dense_data((3,2), [
-             5,  36, 
+             5,  36,
              12, 45,
             -14,-60
         ]));
@@ -196,7 +196,7 @@ mod tests {
             5, 3, 5, 2, 2,
             6, 2,-3, 1, 8
         ]);
-        let sch = Schur::from_partial_triangular(TriangularType::Lower, &a, 3, true, true);
+        let sch = Schur::from_partial_triangular(TriangularType::Lower, a.clone(), 3, true, true);
         let s = sch.complement();
 
         assert_eq!(s, &SpMat::from_dense_data((3,2), [
@@ -236,7 +236,7 @@ mod tests {
             1, 2, 0, -3, 2, 1,
             3, 2, 3, 0, 2, 8,
         ]);
-        let sch = Schur::from_partial_triangular(TriangularType::Upper, &a, 3, false, false);
+        let sch = Schur::from_partial_triangular(TriangularType::Upper, a, 3, false, false);
         let s = sch.complement();
 
         assert_eq!(s, &SpMat::from_dense_data((2, 3), [
@@ -256,7 +256,7 @@ mod tests {
             1, 2, 0, -3, 2, 1,
             3, 2, 3, 0, 2, 8,
         ]);
-        let sch = Schur::from_partial_triangular(TriangularType::Upper, &a, 3, true, true);
+        let sch = Schur::from_partial_triangular(TriangularType::Upper, a.clone(), 3, true, true);
         let s = sch.complement();
 
         assert_eq!(s, &SpMat::from_dense_data((2, 3), [

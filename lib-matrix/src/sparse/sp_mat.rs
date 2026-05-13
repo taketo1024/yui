@@ -32,7 +32,7 @@ impl<R> MatTrait for SpMat<R> {
 }
 
 impl<R> SpMat<R> { 
-    pub(crate) fn try_from_csc_data(
+    pub fn try_from_csc_data(
         num_rows: usize,
         num_cols: usize,
         col_offsets: Vec<usize>,

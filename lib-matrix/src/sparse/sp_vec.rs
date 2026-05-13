@@ -113,6 +113,12 @@ impl<R> SpMat<R> {
 
 impl<R> SpVec<R> 
 where R: Scalar + Zero + ClosedAddAssign { 
+    pub fn try_from_csc_data(dim: usize, row_indices: Vec<usize>, values: Vec<R>) -> Option<SpVec<R>> {
+        let col_offsets = vec![0, row_indices.len()];
+        let csc = CscMatrix::try_from_csc_data(dim, 1, col_offsets, row_indices, values).ok()?;
+        Some(SpMat::from(csc).into_spvec())
+    }
+    
     pub fn from_entries<T>(dim: usize, entries: T) -> Self
     where T: IntoIterator<Item = (usize, R)> {
         SpMat::from_entries(
@@ -130,31 +136,7 @@ where R: Scalar + Zero + ClosedAddAssign {
             res.1.push(a);
             res
         });
-        Self::from_raw_data(dim, row_indices, values)
-    }
-
-    fn from_raw_data(dim: usize, row_indices: Vec<usize>, values: Vec<R>) -> SpVec<R> { 
-        let col_offsets = vec![0, row_indices.len()];
-        let csc = CscMatrix::try_from_csc_data(dim, 1, col_offsets, row_indices, values).unwrap();
-        SpMat::from(csc).into_spvec()
-    }
-    
-    pub fn stack_vecs<I>(vecs: I) -> Self 
-    where I: IntoIterator<Item = SpVec<R>> { 
-        let init = (0, vec![], vec![]);
-        let (dim, row_indices, values) = vecs.into_iter().fold(init, |mut res, v| { 
-            let n1 = res.0;
-            let n2 = v.dim();
-            
-            let (_, mut rows, mut vals) = v.inner.disassemble();
-            rows.iter_mut().for_each(|i| *i += n1);
-
-            res.0 += n2;
-            res.1.append(&mut rows);
-            res.2.append(&mut vals);
-            res
-        });
-        Self::from_raw_data(dim, row_indices, values)
+        Self::try_from_csc_data(dim, row_indices, values).unwrap()
     }
 
     pub fn extract<F>(&self, dim: usize, f: F) -> SpVec<R>
@@ -183,7 +165,7 @@ where R: Scalar + Zero + ClosedAddAssign {
         rows.extend(bot_rows.into_iter().map(|i| i + n1));
         vals.extend(bot_vals);
 
-        Self::from_raw_data(n1 + n2, rows, vals)
+        Self::try_from_csc_data(n1 + n2, rows, vals).unwrap()
     }
 
     pub fn split(self, at: usize) -> (SpVec<R>, SpVec<R>) {
@@ -196,8 +178,8 @@ where R: Scalar + Zero + ClosedAddAssign {
         let bot_rows: Vec<usize> = rows.split_off(split_idx).into_iter().map(|i| i - at).collect();
         let bot_vals = vals.split_off(split_idx);
 
-        let top = Self::from_raw_data(at, rows, vals);
-        let bot = Self::from_raw_data(n - at, bot_rows, bot_vals);
+        let top = Self::try_from_csc_data(at, rows, vals).unwrap();
+        let bot = Self::try_from_csc_data(n - at, bot_rows, bot_vals).unwrap();
         (top, bot)
     }
 

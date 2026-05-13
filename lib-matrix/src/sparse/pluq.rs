@@ -223,9 +223,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 /// Solves `a * x = y` over a field using sparse PLUQ.
 ///
 /// Returns `Some(x)` if a solution exists, `None` otherwise.
-pub fn solve_pluq<R>(a: &SpMat<R>, y: &[R]) -> Option<Vec<R>>
+pub fn solve_pluq<R>(a: &SpMat<R>, y: &SpVec<R>) -> Option<SpVec<R>>
 where R: Field, for<'x> &'x R: FieldOps<R> {
-    assert_eq!(y.len(), a.nrows());
+    assert_eq!(y.dim(), a.nrows());
 
     debug!("solve pluq, a: {:?}", a.shape());
 
@@ -234,11 +234,12 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
         ..Default::default()
     });
 
-    let yp = perm_apply(pp.p.view(), y);
+    let y_dense = y.clone().into_dense();
+    let yp = perm_apply(pp.p.view(), &y_dense);
     let xq = solve_lu(&pp.l, &pp.u, &yp)?;
     let x = perm_apply(pp.q.inv(), &xq);
 
-    Some(x)
+    Some(SpVec::from(x))
 }
 
 // Solves `L * U * x = y` and returns `x` of length `n = u.ncols()` with
@@ -341,9 +342,9 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
 /// sparse pre-PLUQ at `max_piv` pivots, then incrementally processes the
 /// remaining Schur complement `chunk` rows at a time. Returns `None` (without
 /// completing the full PLUQ) as soon as a chunk reveals inconsistency.
-pub fn solve_pluq_incr<R>(a: &SpMat<R>, y: &[R], max_piv: usize, chunk: usize) -> Option<Vec<R>>
+pub fn solve_pluq_incr<R>(a: &SpMat<R>, y: &SpVec<R>, max_piv: usize, chunk: usize) -> Option<SpVec<R>>
 where R: Field, for<'x> &'x R: FieldOps<R> {
-    assert_eq!(y.len(), a.nrows());
+    assert_eq!(y.dim(), a.nrows());
 
     debug!("solve pluq (incremental), a: {:?}", a.shape());
 
@@ -352,7 +353,8 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
         max_pivots: max_piv,
         ..Default::default()
     });
-    let mut yp = perm_apply(pp.p.view(), y);
+    let y_dense = y.clone().into_dense();
+    let mut yp = perm_apply(pp.p.view(), &y_dense);
 
     let mut step = 1;
     let total_step = (a.nrows() - pp.rank()) / chunk + 1;
@@ -391,7 +393,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
     let xq = solve_lu(&pp.l, &pp.u, &yp)?;
     let x = perm_apply(pp.q.inv(), &xq);
 
-    Some(x)
+    Some(SpVec::from(x))
 }
 
 // Takes the top `min(chunk_size, s.nrows())` rows of `s`, runs `pluq` on them,
@@ -790,6 +792,10 @@ mod tests {
         SpMat::from_dense_data(shape, data)
     }
 
+    fn sv(data: impl IntoIterator<Item = R>) -> SpVec<R> {
+        SpVec::from(data.into_iter().collect::<Vec<_>>())
+    }
+
     #[test]
     fn test_solve_l_square() {
         // l = [[2, 0], [3, 4]], y = [4, 11]
@@ -898,58 +904,53 @@ mod tests {
 
     // ---- solve_pluq integration tests ----
 
-    fn solve_check(a: &SpMat<R>, y: &[R]) -> Vec<R> {
+    fn solve_check(a: &SpMat<R>, y: &SpVec<R>) -> SpVec<R> {
         let x = solve_pluq(a, y).expect("expected a solution");
-        let (m, _n) = a.shape();
-        let mut ax = vec![r(0); m];
-        for (i, j, v) in a.iter_nz() { ax[i] = ax[i].clone() + v * &x[j]; }
-        for i in 0..m {
-            assert_eq!(ax[i], y[i], "row {i}: (A*x)[{i}] != y[{i}]");
-        }
+        assert_eq!(&(a * &x), y, "A*x != y");
         x
     }
 
     #[test]
     fn test_solve_square() {
         let a = sp((2, 2), [r(1), r(2), r(3), r(4)]);
-        solve_check(&a, &[r(5), r(6)]);
+        solve_check(&a, &sv([r(5), r(6)]));
     }
 
     #[test]
     fn test_solve_overdetermined_consistent() {
         let a = sp((3, 2), [r(1), r(0), r(0), r(1), r(1), r(1)]);
-        solve_check(&a, &[r(2), r(3), r(5)]);
+        solve_check(&a, &sv([r(2), r(3), r(5)]));
     }
 
     #[test]
     fn test_solve_overdetermined_inconsistent() {
         let a = sp((3, 2), [r(1), r(0), r(0), r(1), r(1), r(1)]);
-        assert!(solve_pluq(&a, &[r(1), r(1), r(0)]).is_none());
+        assert!(solve_pluq(&a, &sv([r(1), r(1), r(0)])).is_none());
     }
 
     #[test]
     fn test_solve_underdetermined() {
         let a = sp((2, 3), [r(1), r(0), r(2), r(0), r(1), r(3)]);
-        solve_check(&a, &[r(4), r(5)]);
+        solve_check(&a, &sv([r(4), r(5)]));
     }
 
     #[test]
     fn test_solve_zero_rhs() {
         let a = sp((2, 2), [r(1), r(2), r(3), r(4)]);
-        let x = solve_check(&a, &[r(0), r(0)]);
-        assert_eq!(x, vec![r(0), r(0)]);
+        let x = solve_check(&a, &sv([r(0), r(0)]));
+        assert_eq!(x, sv([r(0), r(0)]));
     }
 
     #[test]
     fn test_solve_no_solution() {
         let a = sp((2, 2), [r(1), r(2), r(2), r(4)]);
-        assert!(solve_pluq(&a, &[r(1), r(0)]).is_none());
+        assert!(solve_pluq(&a, &sv([r(1), r(0)])).is_none());
     }
 
     #[test]
     fn test_solve_identity() {
         let a: SpMat<R> = SpMat::from_entries((4, 4), (0..4).map(|k| (k, k, r(1))));
-        let y = [r(1), r(2), r(3), r(4)];
+        let y = sv([r(1), r(2), r(3), r(4)]);
         let x = solve_check(&a, &y);
         assert_eq!(x, y);
     }
@@ -1019,14 +1020,9 @@ mod tests {
 
     // ---- solve_pluq_incr integration tests ----
 
-    fn solve_incr_check(a: &SpMat<R>, y: &[R], max_piv: usize, chunk: usize) -> Vec<R> {
+    fn solve_incr_check(a: &SpMat<R>, y: &SpVec<R>, max_piv: usize, chunk: usize) -> SpVec<R> {
         let x = solve_pluq_incr(a, y, max_piv, chunk).expect("expected a solution");
-        let (m, _) = a.shape();
-        let mut ax = vec![r(0); m];
-        for (i, j, v) in a.iter_nz() { ax[i] = ax[i].clone() + v * &x[j]; }
-        for i in 0..m {
-            assert_eq!(ax[i], y[i], "row {i}: (A*x)[{i}] != y[{i}] (max_piv={max_piv}, chunk={chunk})");
-        }
+        assert_eq!(&(a * &x), y, "A*x != y (max_piv={max_piv}, chunk={chunk})");
         x
     }
 
@@ -1035,51 +1031,51 @@ mod tests {
         let a = sp((2, 2), [r(1), r(2), r(3), r(4)]);
         // exercise different (max_piv, chunk) combinations
         for (mp, ch) in [(0, 1), (0, 2), (1, 1), (usize::MAX, 1), (usize::MAX, 100)] {
-            solve_incr_check(&a, &[r(5), r(6)], mp, ch);
+            solve_incr_check(&a, &sv([r(5), r(6)]), mp, ch);
         }
     }
 
     #[test]
     fn test_solve_incr_overdetermined_consistent() {
         let a = sp((3, 2), [r(1), r(0), r(0), r(1), r(1), r(1)]);
-        solve_incr_check(&a, &[r(2), r(3), r(5)], 0, 2);
-        solve_incr_check(&a, &[r(2), r(3), r(5)], 1, 1);
+        solve_incr_check(&a, &sv([r(2), r(3), r(5)]), 0, 2);
+        solve_incr_check(&a, &sv([r(2), r(3), r(5)]), 1, 1);
     }
 
     #[test]
     fn test_solve_incr_overdetermined_inconsistent() {
         let a = sp((3, 2), [r(1), r(0), r(0), r(1), r(1), r(1)]);
         for (mp, ch) in [(0, 1), (0, 3), (usize::MAX, 1)] {
-            assert!(solve_pluq_incr(&a, &[r(1), r(1), r(0)], mp, ch).is_none());
+            assert!(solve_pluq_incr(&a, &sv([r(1), r(1), r(0)]), mp, ch).is_none());
         }
     }
 
     #[test]
     fn test_solve_incr_underdetermined() {
         let a = sp((2, 3), [r(1), r(0), r(2), r(0), r(1), r(3)]);
-        solve_incr_check(&a, &[r(4), r(5)], 0, 1);
-        solve_incr_check(&a, &[r(4), r(5)], 1, 1);
+        solve_incr_check(&a, &sv([r(4), r(5)]), 0, 1);
+        solve_incr_check(&a, &sv([r(4), r(5)]), 1, 1);
     }
 
     #[test]
     fn test_solve_incr_zero_rhs() {
         let a = sp((2, 2), [r(1), r(2), r(3), r(4)]);
-        let x = solve_incr_check(&a, &[r(0), r(0)], 0, 1);
-        assert_eq!(x, vec![r(0), r(0)]);
+        let x = solve_incr_check(&a, &sv([r(0), r(0)]), 0, 1);
+        assert_eq!(x, sv([r(0), r(0)]));
     }
 
     #[test]
     fn test_solve_incr_no_solution() {
         let a = sp((2, 2), [r(1), r(2), r(2), r(4)]);
         for (mp, ch) in [(0, 1), (0, 2), (usize::MAX, 1)] {
-            assert!(solve_pluq_incr(&a, &[r(1), r(0)], mp, ch).is_none());
+            assert!(solve_pluq_incr(&a, &sv([r(1), r(0)]), mp, ch).is_none());
         }
     }
 
     #[test]
     fn test_solve_incr_identity() {
         let a: SpMat<R> = SpMat::from_entries((4, 4), (0..4).map(|k| (k, k, r(1))));
-        let y = [r(1), r(2), r(3), r(4)];
+        let y = sv([r(1), r(2), r(3), r(4)]);
         let x = solve_incr_check(&a, &y, 0, 2);
         assert_eq!(x, y);
     }
@@ -1088,14 +1084,14 @@ mod tests {
     fn test_solve_incr_zero_matrix_zero_rhs() {
         let a = SpMat::<R>::zero((3, 4));
         // Ax = 0 with A=0 has any x as a solution; expect all-zero free vars.
-        let x = solve_pluq_incr(&a, &vec![r(0); 3], 0, 1).expect("zero rhs is consistent");
-        assert_eq!(x, vec![r(0); 4]);
+        let x = solve_pluq_incr(&a, &sv([r(0); 3]), 0, 1).expect("zero rhs is consistent");
+        assert_eq!(x, sv([r(0); 4]));
     }
 
     #[test]
     fn test_solve_incr_zero_matrix_nonzero_rhs() {
         let a = SpMat::<R>::zero((3, 4));
-        assert!(solve_pluq_incr(&a, &[r(1), r(0), r(0)], 0, 1).is_none());
+        assert!(solve_pluq_incr(&a, &sv([r(1), r(0), r(0)]), 0, 1).is_none());
     }
 
     #[test]
@@ -1109,11 +1105,10 @@ mod tests {
             r(0), r(0), r(1), r(0), r(0), r(0), r(0), r(0), r(0),
             r(0), r(1), r(0), r(0), r(0), r(1), r(0), r(1), r(0),
         ]);
-        let y = vec![r(1), r(2), r(3), r(0), r(1), r(0)];
+        let y = sv([r(1), r(2), r(3), r(0), r(1), r(0)]);
 
         // Pick y that's reachable: y = a * (1, 1, ..., 1) is guaranteed consistent.
-        let mut y_consistent = vec![r(0); 6];
-        for (i, _, v) in a.iter_nz() { y_consistent[i] = y_consistent[i].clone() + v.clone(); }
+        let y_consistent = &a * &sv(vec![r(1); 9]);
 
         for (mp, ch) in [(0, 1), (0, 3), (2, 2), (usize::MAX, 2)] {
             // Inputs may be inconsistent for this `y`; check both behave the same.

@@ -83,25 +83,23 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     let (p, q) = perms_by_pivots(a, &pivots);
-    let paq = split_by_pqr(a, &p, &q, r);
+    let [a0, a1, a2, a3] = split_by_pqr(a, &p, &q, r);
 
     let (l, u, s) = match piv_type {
         PivotType::Rows => {
-            // u = [a0 | a1]; clone a0 (the small r×r block) since paq is consumed below.
-            let u = paq[0].concat(&paq[1]);
-            let sch = Schur::from_blocks(TriangularType::Upper, paq, false, true);
+            let sch = Schur::from_blocks(TriangularType::Upper, [&a0, &a1, &a2, &a3], false, true);
             let l1 = sch.ca_inv().unwrap();
             let s = sch.disassemble().0;
-            let l = SpMat::id(r).stack(&l1);
+            let u = SpMat::concat(a0, a1);          // u = [a0 | a1]
+            let l = SpMat::stack(SpMat::id(r), l1); // l = [I_r ; l1]
             (l, u, s)
         },
         PivotType::Cols => {
-            // l = [a0 ; a2]; clone a0 (the small r×r block) since paq is consumed below.
-            let l = paq[0].stack(&paq[2]);
-            let sch = Schur::from_blocks(TriangularType::Lower, paq, true, false);
+            let sch = Schur::from_blocks(TriangularType::Lower, [&a0, &a1, &a2, &a3], true, false);
             let u1 = sch.ainvb().unwrap();
             let s = sch.disassemble().0;
-            let u = SpMat::id(r).concat(&u1);
+            let l = SpMat::stack(a0, a2);            // l = [a0 ; a2]
+            let u = SpMat::concat(SpMat::id(r), u1); // u = [I_r | u1]
             (l, u, s)
         }
     };
@@ -209,20 +207,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let [l0, l1] = pp1.take_l().divide_at_row(r1);
         let l1 = l1.permute_rows(pp2.p.view());
         let zero_tr = SpMat::zero((r1, r2));
-        SpMat::combine_blocks([
-            &l0, &zero_tr,
-            &l1, &pp2.l
-        ])
+        SpMat::combine_blocks([l0, zero_tr, l1, pp2.l])
     };
 
     pp1.u = {
         let [u0, u1] = pp1.take_u().divide_at_col(r1);
         let u1 = u1.permute_cols(pp2.q.view());
         let zero_bl = SpMat::zero((r2, r1));
-        SpMat::combine_blocks([
-            &u0, &u1,
-            &zero_bl, &pp2.u
-        ])
+        SpMat::combine_blocks([u0, u1, zero_bl, pp2.u])
     };
 
     pp1.s = pp2.s;
@@ -440,17 +432,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     // Same Schur shape as pre_pluq's Rows branch: u_top (upper triangular) plays
     // the role of `a`, with `c = s_rest_left`, `b = u_right`, `d = s_rest_right`.
-    let blocks = [u_top, u_right, s_rest_left, s_rest_right];
-    let sch = Schur::from_blocks(TriangularType::Upper, blocks, false, true);
+    let sch = Schur::from_blocks(
+        TriangularType::Upper,
+        [&u_top, &u_right, &s_rest_left, &s_rest_right],
+        false, true
+    );
     let l_ext = sch.ca_inv().unwrap();
     let s_ext = sch.disassemble().0;
 
     let chunk_idx: Vec<usize> = (0..c).collect();
     let p = extend_perm(&pp_chunk.p, &chunk_idx, m_s);
     let q = pp_chunk.q;
-    let l = pp_chunk.l.stack(&l_ext);
+    let l = SpMat::stack(pp_chunk.l, l_ext);
     let u = pp_chunk.u;
-    let s = pp_chunk.s.stack(&s_ext);
+    let s = SpMat::stack(pp_chunk.s, s_ext);
 
     SpPluq::new(p, q, l, u, s)
 }

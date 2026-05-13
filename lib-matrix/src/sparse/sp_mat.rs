@@ -357,7 +357,7 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         [a, b]
     }
 
-    pub fn combine_blocks(blocks: [&SpMat<R>; 4]) -> SpMat<R> {
+    pub fn combine_blocks(blocks: [SpMat<R>; 4]) -> SpMat<R> {
         let [a, b, c, d] = blocks;
 
         assert_eq!(a.nrows(), b.nrows());
@@ -371,75 +371,54 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         let n = n0 + n1;
         let nnz = a.nnz() + b.nnz() + c.nnz() + d.nnz();
 
+        let mut a = ColSource::from(a);
+        let mut b = ColSource::from(b);
+        let mut c = ColSource::from(c);
+        let mut d = ColSource::from(d);
+
         let mut col_offsets = Vec::with_capacity(n + 1);
         let mut row_indices = Vec::with_capacity(nnz);
         let mut values = Vec::with_capacity(nnz);
-
         col_offsets.push(0);
 
-        let mut push_col = |top: &SpMat<R>, bot: &SpMat<R>, j: usize| {
-            let (top_rows, top_vals) = top.col_data(j);
+        let mut push_col = |top: &mut ColSource<R>, bot: &mut ColSource<R>, j: usize| {
+            let (top_rows, top_vals) = top.take_col(j);
             row_indices.extend_from_slice(top_rows);
-            values.extend_from_slice(top_vals);
+            values.extend(top_vals);
 
-            let (bot_rows, bot_vals) = bot.col_data(j);
+            let (bot_rows, bot_vals) = bot.take_col(j);
             row_indices.extend(bot_rows.iter().map(|i| i + m0));
-            values.extend_from_slice(bot_vals);
+            values.extend(bot_vals);
 
             col_offsets.push(row_indices.len());
         };
 
-        for j in 0..n0 { push_col(a, c, j); }
-        for j in 0..n1 { push_col(b, d, j); }
+        for j in 0..n0 { push_col(&mut a, &mut c, j); }
+        for j in 0..n1 { push_col(&mut b, &mut d, j); }
 
         SpMat::try_from_csc_data(m, n, col_offsets, row_indices, values).unwrap()
     }
 
-    pub fn concat(&self, b: &Self) -> Self { 
-        let zero = |m, n| SpMat::<R>::zero((m, n));
+    pub fn concat(left: Self, right: Self) -> Self {
+        assert_eq!(left.nrows(), right.nrows());
+        let (l_cols, r_cols) = (left.ncols(), right.ncols());
         Self::combine_blocks([
-            self, 
-            b, 
-            &zero(0, self.ncols()), 
-            &zero(0, b.ncols())
+            left,
+            right,
+            SpMat::zero((0, l_cols)),
+            SpMat::zero((0, r_cols)),
         ])
     }
 
-    pub fn stack(&self, b: &Self) -> Self { 
-        let zero = |m, n| SpMat::<R>::zero((m, n));
+    pub fn stack(top: Self, bot: Self) -> Self {
+        assert_eq!(top.ncols(), bot.ncols());
+        let (t_rows, b_rows) = (top.nrows(), bot.nrows());
         Self::combine_blocks([
-            self, 
-            &zero(self.nrows(), 0), 
-            b, 
-            &zero(b.nrows(), 0)
+            top,
+            SpMat::zero((t_rows, 0)),
+            bot,
+            SpMat::zero((b_rows, 0)),
         ])
-    }
-
-    pub fn extend_cols(&mut self, b: Self) { 
-        assert_eq!(self.nrows(), b.nrows());
-
-        if b.ncols() == 0 { 
-            return
-        }
-
-        let shape = (self.nrows(), self.ncols() + b.ncols());
-        let l = std::mem::replace(&mut self.inner, CscMatrix::zeros(0, 0));
-        let r = b.inner;
-
-        let (mut col_offsets, mut row_indices, mut values) = l.disassemble();
-        let (c, mut r, mut v) = r.disassemble();
-        
-        let offset = col_offsets.pop().unwrap(); // pop last element.
-        col_offsets.extend(c.into_iter().map(|i| offset + i));
-        row_indices.append(&mut r);
-        values.append(&mut v);
-
-        self.inner = CscMatrix::try_from_csc_data(
-            shape.0, shape.1, 
-            col_offsets, 
-            row_indices, 
-            values
-        ).unwrap();
     }
 
     pub fn extend_by_zero(&mut self, add_rows: usize, add_cols: usize) {
@@ -470,6 +449,32 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         Self::from_entries((n, n), (0..n).map(|i|
             (i, p.at(i), R::one())
         ))
+    }
+}
+
+// A column-major view of a disassembled matrix that yields one column at a
+// time, moving values out without cloning. Used by `combine_blocks`.
+struct ColSource<R> {
+    offsets: Vec<usize>,
+    rows: Vec<usize>,
+    vals: std::vec::IntoIter<R>,
+    pos: usize,
+}
+
+impl<R> ColSource<R> {
+    fn from(m: SpMat<R>) -> Self {
+        let (offsets, rows, vals) = m.disassemble();
+        Self { offsets, rows, vals: vals.into_iter(), pos: 0 }
+    }
+
+    // Returns `(row_indices, values)` for column `j`. Must be called with
+    // monotonically increasing `j` since values are moved out lazily.
+    fn take_col(&mut self, j: usize) -> (&[usize], impl Iterator<Item = R> + '_) {
+        debug_assert_eq!(self.pos, self.offsets[j]);
+        let range = self.offsets[j]..self.offsets[j + 1];
+        let count = range.len();
+        self.pos += count;
+        (&self.rows[range], self.vals.by_ref().take(count))
     }
 }
 
@@ -680,16 +685,31 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn extend_cols() {
-        let mut a = SpMat::from_dense_data((4, 3), 0..12);
+    fn concat() {
+        let a = SpMat::from_dense_data((4, 3), 0..12);
         let b = SpMat::from_dense_data((4, 2), 12..20);
-        a.extend_cols(b);
+        let c = SpMat::concat(a, b);
 
-        assert_eq!(a, SpMat::from_dense_data((4,5), vec![
+        assert_eq!(c, SpMat::from_dense_data((4,5), vec![
             0,  1,  2, 12, 13,
             3,  4,  5, 14, 15,
             6,  7,  8, 16, 17,
             9, 10, 11, 18, 19,
+        ]));
+    }
+
+    #[test]
+    fn stack() {
+        let a = SpMat::from_dense_data((2, 3), 0..6);
+        let b = SpMat::from_dense_data((3, 3), 6..15);
+        let c = SpMat::stack(a, b);
+
+        assert_eq!(c, SpMat::from_dense_data((5, 3), vec![
+            0,  1,  2,
+            3,  4,  5,
+            6,  7,  8,
+            9, 10, 11,
+           12, 13, 14,
         ]));
     }
 

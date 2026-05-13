@@ -47,13 +47,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(r <= n);
 
         let t = if t == PivotType::Rows { TriangularType::Upper } else { TriangularType::Lower };
-        let blocks = split_by_pqr(a, p, q, r);
-        Self::from_blocks(t, blocks, with_trans_src, with_trans_tgt)
+        let [a0, a1, a2, a3] = split_by_pqr(a, p, q, r);
+        Self::from_blocks(t, [&a0, &a1, &a2, &a3], with_trans_src, with_trans_tgt)
     }
 
     pub(crate) fn from_blocks(
         t: TriangularType,
-        blocks: [SpMat<R>; 4],
+        blocks: [&SpMat<R>; 4],
         with_trans_src: bool,
         with_trans_tgt: bool,
     ) -> Self {
@@ -70,25 +70,24 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         //   - with_trans_src:    right-solve fusion → `s` and `a⁻¹b` together.
         //   - with_trans_tgt only: left-solve fusion (transposed view) → `s` and `c·a⁻¹` together.
         //   - neither:           right-solve streaming, `s` only.
-        let pairs = solve_triangular_with(t, &a, &b, |j, x_j| {
-            let s_j = d.col_vec(j) - &c * &x_j;
+        let pairs = solve_triangular_with(t, a, b, |j, x_j| {
+            let s_j = d.col_vec(j) - c * &x_j;
             let x_j = (with_trans_src).then_some(x_j);
             (s_j, x_j)
         });
-        
+
         let (s_cols, x_cols): (Vec<_>, Vec<_>) = pairs.into_iter().unzip();
         let s = SpMat::from_col_vecs(m_d, s_cols);
 
         let t_src = with_trans_src.then(|| {
             let x = SpMat::from_col_vecs(r, x_cols.into_iter().map(|x| x.unwrap())); // x = a⁻¹b
             let f = proj_mat(r + n_b, n_b);
-            let b = (-x).stack(&id_mat(n_b)); // [-a⁻¹b, 1]^T
+            let b = SpMat::stack(-x, id_mat(n_b)); // [-a⁻¹b, 1]^T
             Trans::new(f, b)
         });
 
         let t_tgt = with_trans_tgt.then(|| {
-            let mut f = -solve_triangular_left(t, &a, &c); // f = -ca⁻¹
-            f.extend_cols(id_mat(m_d)); // [-c·a⁻¹, 1]
+            let f = SpMat::concat(-solve_triangular_left(t, a, c), id_mat(m_d)); // [-ca⁻¹, 1]
             let b = incl_mat(r + m_d, m_d); // [0, 1]^T
             Trans::new(f, b)
         });

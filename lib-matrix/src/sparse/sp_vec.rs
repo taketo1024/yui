@@ -8,7 +8,7 @@ use auto_impl_ops::auto_ops;
 use yui_core::{Ring, RingOps, AddGrpOps,  AddGrp};
 use super::sp_mat::SpMat;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct SpVec<R> { 
     inner: CscMatrix<R> // ncols == 1
 }
@@ -209,6 +209,14 @@ where R: Scalar + Zero + ClosedAddAssign {
         vec
     }
 }
+
+impl<R: PartialEq + Zero> PartialEq for SpVec<R> {
+    fn eq(&self, other: &Self) -> bool {
+        self.dim() == other.dim() && self.iter_nz().eq(other.iter_nz())
+    }
+}
+
+impl<R: Eq + Zero> Eq for SpVec<R> {}
 
 impl<R> Default for SpVec<R> {
     fn default() -> Self {

@@ -86,7 +86,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 ///   `u1 = a0⁻¹·a1` and `s = a3 - a2·u1`; final `u = [I_r | u1]`.
 pub fn pre_pluq<R>(a: &SpMat<R>, config: PivotFinderConfig) -> SpPluq<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    debug!("compute sparse pluq: {:?}", a.shape());
+    debug!("compute sparse pre-pluq: {:?}", a.shape());
 
     let (m, n) = a.shape();
     let piv_type = config.piv_type;
@@ -129,6 +129,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 /// non-zero but admits no further sparse pivots.
 pub fn pluq<R>(a: &SpMat<R>, config: PivotFinderConfig) -> SpPluq<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
+    debug!("compute sparse pluq: {:?}", a.shape());
+
     let piv_type = config.piv_type;
     let mut pp = SpPluq::from(a.clone());
 
@@ -136,14 +138,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let pp_next = pre_pluq(&pp.s, config);
         if pp_next.rank() == 0 { break; }
 
-        debug!("merge pluq: {} + {}", pp.rank(), pp_next.rank());
         merge_pluq(&mut pp, pp_next);
     }
 
     if pp.s.is_zero() { return pp; }
 
     let pp_dense = dense_pluq_in(&pp.s, piv_type);
-    debug!("merge pluq (dense): {} + {}", pp.rank(), pp_dense.rank());
     merge_pluq(&mut pp, pp_dense);
     pp
 }
@@ -208,6 +208,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 // schur complement `pp2.s`.
 fn merge_pluq<R>(pp1: &mut SpPluq<R>, pp2: SpPluq<R>)
 where R: Ring, for<'x> &'x R: RingOps<R> {
+    debug!("merge pluq: {} + {}", pp1.rank(), pp2.rank());
+
     let (m, n) = (pp1.l.nrows(), pp1.u.ncols());
     let r1 = pp1.rank();
     let r2 = pp2.rank();
@@ -243,9 +245,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 /// Returns `Some(x)` if a solution exists, `None` otherwise.
 pub fn solve_pluq<R>(a: &SpMat<R>, y: &SpVec<R>) -> Option<SpVec<R>>
 where R: Field, for<'x> &'x R: FieldOps<R> {
-    assert_eq!(y.dim(), a.nrows());
-
     debug!("solve pluq, a: {:?}", a.shape());
+
+    assert_eq!(y.dim(), a.nrows());
 
     let pp = pluq(a, PivotFinderConfig {
         piv_type: PivotType::Rows,
@@ -362,9 +364,9 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
 /// completing the full PLUQ) as soon as a chunk reveals inconsistency.
 pub fn solve_pluq_incr<R>(a: &SpMat<R>, y: &SpVec<R>, max_piv: usize, chunk: usize) -> Option<SpVec<R>>
 where R: Field, for<'x> &'x R: FieldOps<R> {
-    assert_eq!(y.dim(), a.nrows());
-
     debug!("solve pluq (incremental), a: {:?}", a.shape());
+
+    assert_eq!(y.dim(), a.nrows());
 
     let mut pp = pre_pluq(a, PivotFinderConfig {
         piv_type: PivotType::Rows,
@@ -378,15 +380,13 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
     let total_step = (a.nrows() - pp.rank()) / chunk + 1;
 
     while pp.s.nrows() > 0 {
-        debug!("solve pluq ({}/{})", step, total_step);
+        debug!("(step {}/{})", step, total_step);
         debug!("  current rank: {}", pp.rank());
 
         let r_old = pp.rank();
         let (pp_next, r_next, c) = chunk_pluq(pp.take_s(), chunk);
         let p_next = pp_next.p.clone();
         
-        debug!("merge pluq: {} + {}", pp.rank(), pp_next.rank());
-
         merge_pluq(&mut pp, pp_next);
 
         // Apply the chunk's row perm to the tail of yp so it stays in sync with pp.l.
@@ -407,6 +407,9 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
         trim_zero_rows(&mut pp, &mut yp, k);
         step += 1;
     }
+
+    debug!("pluq complete, rank: {}", pp.rank());
+    debug!("solve pluq..");
 
     let xq = solve_lu(&pp.l, &pp.u, &yp)?;
     let x = perm_apply(pp.q.inv(), &xq);

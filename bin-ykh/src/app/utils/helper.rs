@@ -32,42 +32,36 @@ where F: FnOnce() -> Result<R, Box<dyn std::error::Error>> + std::panic::UnwindS
     })
 }
 
-pub fn load_link(input: &String, mirror: bool) -> Result<Link, Box<dyn std::error::Error>> { 
+pub fn load_link(input: &String, mirror: bool) -> Result<Link, Box<dyn std::error::Error>> {
     type PDCode = Vec<[Edge; 4]>;
-    
-    let l = { 
-        if let Ok(pd_code) = serde_json::from_str::<PDCode>(input) { 
-            Link::from_pd_code(pd_code)
-        } else if let Ok(link) = Link::load(input) { 
-            link
-        } else { 
-            return err!("invalid input link: '{}'", input);
-        }
+
+    let l = if input.trim_start().starts_with('[') {
+        let pd_code: PDCode = serde_json::from_str(input)?;
+        Link::from_pd_code(pd_code)
+    } else {
+        Link::load(input)?
     };
 
-    if mirror { 
+    if mirror {
         Ok(l.mirror())
-    } else { 
+    } else {
         Ok(l)
     }
 }
 
-pub fn load_sinv_knot(input: &String, mirror: bool) -> Result<InvLink, Box<dyn std::error::Error>> { 
+pub fn load_sinv_knot(input: &String, mirror: bool) -> Result<InvLink, Box<dyn std::error::Error>> {
     type PDCode = Vec<[Edge; 4]>;
-    
-    let l = { 
-        if let Ok(pd_code) = serde_json::from_str::<PDCode>(input) { 
-            InvLink::sinv_knot_from_code(pd_code)
-        } else if let Ok(link) = InvLink::load(input) { 
-            link
-        } else { 
-            return err!("invalid input link: '{}'", input);
-        }
+
+    let l = if input.trim_start().starts_with('[') {
+        let pd_code: PDCode = serde_json::from_str(input)?;
+        InvLink::sinv_knot_from_code(pd_code)
+    } else {
+        InvLink::load(input)?
     };
 
-    if mirror { 
+    if mirror {
         Ok(l.mirror())
-    } else { 
+    } else {
         Ok(l)
     }
 }

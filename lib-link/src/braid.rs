@@ -176,23 +176,10 @@ impl Braid {
         ).join("\n")
     }
 
-    pub fn load(name_or_path: &str) -> Result<Braid, Box<dyn std::error::Error>> {
-        const RESOURCE_DIR: &str = "resources/braid/";
-        
-        if Link::is_valid_name(name_or_path) { 
-            let dir = std::env!("CARGO_MANIFEST_DIR");
-            let path = format!("{dir}/{RESOURCE_DIR}{name_or_path}.json");
-            Self::_load(&path)
-        } else { 
-            Self::_load(name_or_path)
-        }
-    }
-
-    fn _load(path: &str) -> Result<Braid, Box<dyn std::error::Error>> {
-        let json = std::fs::read_to_string(path)?;
+    pub fn load(name: &str) -> Result<Braid, Box<dyn std::error::Error>> {
+        let json = yui_core::util::data_dir::load_json("braid", name)?;
         let code: Vec<i32> = serde_json::from_str(&json)?;
-        let braid = Braid::from_iter(code);
-        Ok(braid)
+        Ok(Braid::from_iter(code))
     }
 }
 

@@ -268,30 +268,10 @@ impl Link {
         Self::new(nodes)
     }
 
-    pub fn is_valid_name(str: &str) -> bool { 
-        use regex::Regex;
-        let r1 = Regex::new(r"^([1-9]|10)_[0-9]+$").unwrap();
-        let r2 = Regex::new(r"^(K|L)?[1-9]+(a|n)_?[0-9]+$").unwrap(); // FIXME tmp
-        r1.is_match(str) || r2.is_match(str)
-    }
-
-    pub fn load(name_or_path: &str) -> Result<Link, Box<dyn std::error::Error>> {
-        const RESOURCE_DIR: &str = "resources/links/";
-        
-        if Self::is_valid_name(name_or_path) { 
-            let dir = std::env!("CARGO_MANIFEST_DIR");
-            let path = format!("{dir}/{RESOURCE_DIR}{name_or_path}.json");
-            Self::_load(&path)
-        } else { 
-            Self::_load(name_or_path)
-        }
-    }
-
-    fn _load(path: &str) -> Result<Link, Box<dyn std::error::Error>> {
-        let json = std::fs::read_to_string(path)?;
+    pub fn load(name: &str) -> Result<Link, Box<dyn std::error::Error>> {
+        let json = yui_core::util::data_dir::load_json("links", name)?;
         let data: Vec<XCode> = serde_json::from_str(&json)?;
-        let l = Link::from_pd_code(data);
-        Ok(l)
+        Ok(Link::from_pd_code(data))
     }
 }
 

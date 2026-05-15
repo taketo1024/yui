@@ -38,6 +38,10 @@ impl Link {
         self.nodes.is_empty()
     }
 
+    pub fn unknot() -> Link {
+        Link::from_pd_code([[0, 1, 1, 0]]).resolved_at(0, Bit::Bit0)
+    }
+
     pub fn is_knot(&self) -> bool { 
         self.n_components() == 1
     }
@@ -289,14 +293,6 @@ impl Link {
         let l = Link::from_pd_code(data);
         Ok(l)
     }
-
-    pub fn unknot() -> Link {
-        Link::from_pd_code([[0, 1, 1, 0]]).resolved_at(0, Bit::Bit0)
-    }
-
-    pub fn hopf_link() -> Link {
-        Link::from_pd_code([[4,1,3,2],[2,3,1,4]])
-    }
 }
 
 impl Display for Link {
@@ -477,8 +473,8 @@ mod tests {
     }
 
     #[test]
-    fn hopf_link() { 
-        let l = Link::hopf_link();
+    fn hopf_link() {
+        let l = Link::test_data("L2a1").unwrap();
         assert_eq!(l.count_crossings(), 2);
         assert_eq!(l.writhe(), -2);
         assert_eq!(l.n_components(), 2);

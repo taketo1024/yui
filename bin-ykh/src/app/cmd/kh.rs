@@ -194,7 +194,7 @@ mod tests {
     #[test]
     fn test1() { 
         let args = Args { 
-            link: "3_1".to_string(), 
+            link: "[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string(), 
             c_value: "0".to_string(), 
             ..Default::default()
         };
@@ -219,7 +219,7 @@ mod tests {
     #[test]
     fn test_qpoly_h() { 
         let args = Args {
-            link: "3_1".to_string(),
+            link: "[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string(),
             c_value: "H".to_string(),
             c_type: CType::Q,
             ..Default::default()
@@ -231,7 +231,7 @@ mod tests {
     #[test]
     fn test_qpoly_t() { 
         let args = Args {
-            link: "3_1".to_string(),
+            link: "[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string(),
             c_value: "0,T".to_string(),
             c_type: CType::Q,
             ..Default::default()

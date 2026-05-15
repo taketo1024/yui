@@ -459,7 +459,7 @@ mod tests {
 
     #[test]
     fn cube_hopf_link() { 
-        let l = Link::hopf_link();
+        let l = Link::test_data("L2a1").unwrap();
         let cube = KhCube::<i32>::new(&l, &0, &0, None, (0, 0));
 
         assert_eq!(cube.dim, 2);

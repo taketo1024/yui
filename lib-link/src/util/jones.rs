@@ -75,7 +75,7 @@ mod tests {
 
     #[test]
     fn hopf_link() { 
-        let l = Link::hopf_link();
+        let l = Link::test_data("L2a1").unwrap();
         let p = jones_polynomial(&l);
         let q = P::mono;
         assert_eq!(p, P::from_iter([(q(-6), 1), (q(-4), 1), (q(-2), 1), (q(0), 1)]));

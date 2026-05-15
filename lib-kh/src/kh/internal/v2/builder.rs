@@ -678,7 +678,7 @@ mod tests {
 
     #[test]
     fn test_hopf_link() {
-        let l = Link::hopf_link();
+        let l = Link::test_data("L2a1").unwrap();
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
         c.check_d_all();

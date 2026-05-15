@@ -218,7 +218,7 @@ mod tests {
 
     #[test]
     fn ckh_trefoil() {
-        let l = Link::trefoil();
+        let l = Link::test_data("3_1").unwrap();
         let c = KhComplex::new(&l, &0, &0, false);
 
         assert_eq!(c.h_range(), -3..=0);
@@ -234,7 +234,7 @@ mod tests {
 
     #[test]
     fn ckh_trefoil_red() {
-        let l = Link::trefoil();
+        let l = Link::test_data("3_1").unwrap();
         let c = KhComplex::new(&l, &0, &0, true);
 
         assert_eq!(c.h_range(), -3..=0);
@@ -250,7 +250,7 @@ mod tests {
 
     #[test]
     fn ckh_trefoil_bigr() {
-        let l = Link::trefoil();
+        let l = Link::test_data("3_1").unwrap();
         let c = KhComplex::new(&l, &0, &0, false);
 
         assert_eq!(c[(-3, -9)].rank(), 1);
@@ -263,7 +263,7 @@ mod tests {
 
     #[test]
     fn ckh_trefoil_bigr_red() {
-        let l = Link::trefoil();
+        let l = Link::test_data("3_1").unwrap();
         let c = KhComplex::new(&l, &0, &0, true);
 
         assert_eq!(c[(-3, -8)].rank(), 1);
@@ -281,7 +281,7 @@ mod tests_v1 {
 
     #[test]
     fn ckh_trefoil() {
-        let l = Link::trefoil();
+        let l = Link::test_data("3_1").unwrap();
         let c = KhComplex::new_no_simplify(&l, &0, &0, false);
 
         assert_eq!(c.h_range(), -3..=0);
@@ -295,7 +295,7 @@ mod tests_v1 {
 
     #[test]
     fn ckh_trefoil_red() {
-        let l = Link::trefoil();
+        let l = Link::test_data("3_1").unwrap();
         let c = KhComplex::new_no_simplify(&l, &0, &0, true);
 
         assert_eq!(c.h_range(), -3..=0);

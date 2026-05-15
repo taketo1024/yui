@@ -70,7 +70,7 @@ mod tests {
  
     #[test]
     fn trefoil() { 
-        let l = Link::trefoil().mirror();
+        let l = Link::test_data("3_1").unwrap().mirror();
         let p = l.min_edge().unwrap();
         let r = false;
         let c = KhComplex::new_no_simplify(&l, &1, &0, r);
@@ -90,7 +90,7 @@ mod tests {
  
     #[test]
     fn figure8() { 
-        let l = Link::figure8();
+        let l = Link::test_data("4_1").unwrap();
         let p = l.min_edge().unwrap();
         let r = false;
         let c = KhComplex::new_no_simplify(&l, &1, &0, r);
@@ -110,7 +110,7 @@ mod tests {
 
     #[test]
     fn trefoil_red() { 
-        let l = Link::trefoil().mirror();
+        let l = Link::test_data("3_1").unwrap().mirror();
         let p = l.min_edge().unwrap();
         let r = true;
         let c = KhComplex::new_no_simplify(&l, &1, &0, r);
@@ -129,7 +129,7 @@ mod tests {
  
     #[test]
     fn figure8_red() { 
-        let l = Link::figure8();
+        let l = Link::test_data("4_1").unwrap();
         let p = l.min_edge().unwrap();
         let r = true;
         let c = KhComplex::new_no_simplify(&l, &1, &0, r);

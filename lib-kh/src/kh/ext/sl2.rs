@@ -282,7 +282,7 @@ mod tests {
 
     #[test]
     fn test_sl2map_trefoil() {
-        let l = Link::trefoil();
+        let l = Link::test_data("3_1").unwrap();
         let cube = KhCube::new(&l, &0, &0, None, (0, 0));
         let map = KhSl2Map::new(&l, cube);
 
@@ -318,7 +318,7 @@ mod tests {
 
     #[test]
     fn test_u_trefoil() {
-        let l = Link::trefoil();
+        let l = Link::test_data("3_1").unwrap();
         let cube = KhCube::new(&l, &0, &0, None, (0, 0));
         let map = KhSl2Map::new(&l, cube.clone());
 
@@ -356,7 +356,7 @@ mod tests {
 
     #[test]
     fn test_ch_map_trefoil() {
-        let l = Link::trefoil();
+        let l = Link::test_data("3_1").unwrap();
         let c = KhComplex::new_no_simplify(&l, &0, &0, false);
         let e = c.sl2_map(&l).into_chain_map();
 
@@ -376,7 +376,7 @@ mod tests {
 
     #[test]
     fn test_ch_map_6_1() {
-        let l = Link::load("6_1").unwrap();
+        let l = Link::test_data("6_1").unwrap();
         let c = KhComplex::new_no_simplify(&l, &0, &0, false);
         let e = c.sl2_map(&l).into_chain_map();
 
@@ -385,7 +385,7 @@ mod tests {
 
     #[test]
     fn test_ch_map_6_2() {
-        let l = Link::load("6_2").unwrap();
+        let l = Link::test_data("6_2").unwrap();
         let c = KhComplex::new_no_simplify(&l, &0, &0, false);
         let e = c.sl2_map(&l).into_chain_map();
 
@@ -394,7 +394,7 @@ mod tests {
 
     #[test]
     fn test_ch_map_6_3() {
-        let l = Link::load("6_3").unwrap();
+        let l = Link::test_data("6_3").unwrap();
         let c = KhComplex::new_no_simplify(&l, &0, &0, false);
         let e = c.sl2_map(&l).into_chain_map();
 
@@ -405,7 +405,7 @@ mod tests {
 
     #[test]
     fn test_string_decomp_3_1() { 
-        let l = Link::load("3_1").unwrap();
+        let l = Link::test_data("3_1").unwrap();
         let c = KhComplex::new_no_simplify(&l, &QQ::zero(), &QQ::zero(), true);
         let e = c.sl2_map(&l);
         let h = c.homology();
@@ -421,7 +421,7 @@ mod tests {
 
     #[test]
     fn test_string_decomp_unred_3_1() { 
-        let l = Link::load("3_1").unwrap();
+        let l = Link::test_data("3_1").unwrap();
         let c = KhComplex::new_no_simplify(&l, &QQ::zero(), &QQ::zero(), false);
         let e = c.sl2_map(&l);
         let h = c.homology();

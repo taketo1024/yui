@@ -207,7 +207,7 @@ mod tests {
 
     #[test]
     fn kh_trefoil() {
-        let l = Link::trefoil();
+        let l = Link::test_data("3_1").unwrap();
         let h = KhHomology::new(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), -3..=0);
@@ -227,7 +227,7 @@ mod tests {
 
     #[test]
     fn kh_trefoil_mirror() {
-        let l = Link::trefoil().mirror();
+        let l = Link::test_data("3_1").unwrap().mirror();
         let h = KhHomology::new(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), 0..=3);
@@ -247,7 +247,7 @@ mod tests {
 
     #[test]
     fn kh_figure8() {
-        let l = Link::figure8();
+        let l = Link::test_data("4_1").unwrap();
         let h = KhHomology::new(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), -2..=2);
@@ -309,7 +309,7 @@ mod tests {
 
     #[test]
     fn kh_trefoil_bigr() {
-        let l = Link::trefoil();
+        let l = Link::test_data("3_1").unwrap();
         let h = KhHomology::new(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), -3..=0);
@@ -330,7 +330,7 @@ mod tests {
 
     #[test]
     fn kh_trefoil_mirror_bigr() {
-        let l = Link::trefoil().mirror();
+        let l = Link::test_data("3_1").unwrap().mirror();
         let h = KhHomology::new(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), 0..=3);
@@ -351,7 +351,7 @@ mod tests {
 
     #[test]
     fn kh_trefoil_bigr_red() {
-        let l = Link::trefoil();
+        let l = Link::test_data("3_1").unwrap();
         let h = KhHomology::new(&l, &0, &0, true);
 
         assert_eq!(h.h_range(), -3..=0);
@@ -368,7 +368,7 @@ mod tests {
 
     #[test]
     fn kh_figure8_bigr() {
-        let l = Link::figure8();
+        let l = Link::test_data("4_1").unwrap();
         let h = KhHomology::new(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), -2..=2);
@@ -395,7 +395,7 @@ mod tests {
 
     #[test]
     fn kh_figure8_bigr_red() {
-        let l = Link::figure8();
+        let l = Link::test_data("4_1").unwrap();
         let h = KhHomology::new(&l, &0, &0, true);
 
         assert_eq!(h.h_range(), -2..=2);
@@ -419,7 +419,7 @@ mod tests {
         type R = FF2;
         type P = HPoly<'H', R>;
 
-        let l = Link::trefoil();
+        let l = Link::test_data("3_1").unwrap();
         let (h, t) = (P::variable(), P::zero());
         let kh = KhHomology::new(&l, &h, &t, false);
 
@@ -471,7 +471,7 @@ mod tests_v1 {
 
     #[test]
     fn kh_trefoil() {
-        let l = Link::trefoil();
+        let l = Link::test_data("3_1").unwrap();
         let h = KhHomology::new_no_simplify(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), -3..=0);
@@ -490,7 +490,7 @@ mod tests_v1 {
 
     #[test]
     fn kh_trefoil_mirror() {
-        let l = Link::trefoil().mirror();
+        let l = Link::test_data("3_1").unwrap().mirror();
         let h = KhHomology::new_no_simplify(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), 0..=3);
@@ -509,7 +509,7 @@ mod tests_v1 {
 
     #[test]
     fn kh_figure8() {
-        let l = Link::figure8();
+        let l = Link::test_data("4_1").unwrap();
         let h = KhHomology::new_no_simplify(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), -2..=2);
@@ -570,7 +570,7 @@ mod tests_v1 {
 
     #[test]
     fn kh_trefoil_bigr() {
-        let l = Link::trefoil();
+        let l = Link::test_data("3_1").unwrap();
         let h = KhHomology::new_no_simplify(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), -3..=0);
@@ -590,7 +590,7 @@ mod tests_v1 {
 
     #[test]
     fn kh_trefoil_mirror_bigr() {
-        let l = Link::trefoil().mirror();
+        let l = Link::test_data("3_1").unwrap().mirror();
         let h = KhHomology::new_no_simplify(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), 0..=3);
@@ -610,7 +610,7 @@ mod tests_v1 {
 
     #[test]
     fn kh_trefoil_bigr_red() {
-        let l = Link::trefoil();
+        let l = Link::test_data("3_1").unwrap();
         let h = KhHomology::new_no_simplify(&l, &0, &0, true);
 
         assert_eq!(h.h_range(), -3..=0);
@@ -626,7 +626,7 @@ mod tests_v1 {
 
     #[test]
     fn kh_figure8_bigr() {
-        let l = Link::figure8();
+        let l = Link::test_data("4_1").unwrap();
         let h = KhHomology::new_no_simplify(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), -2..=2);
@@ -652,7 +652,7 @@ mod tests_v1 {
 
     #[test]
     fn kh_figure8_bigr_red() {
-        let l = Link::figure8();
+        let l = Link::test_data("4_1").unwrap();
         let h = KhHomology::new_no_simplify(&l, &0, &0, true);
 
         assert_eq!(h.h_range(), -2..=2);
@@ -675,7 +675,7 @@ mod tests_v1 {
         type R = FF2;
         type P = HPoly<'H', R>;
 
-        let l = Link::trefoil();
+        let l = Link::test_data("3_1").unwrap();
         let (h, t) = (P::variable(), P::zero());
         let kh = KhHomology::new_no_simplify(&l, &h, &t, false);
 

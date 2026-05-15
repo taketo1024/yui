@@ -468,7 +468,7 @@ mod tests {
 
    #[test]
    fn cube_trefoil() { 
-       let l = Link::trefoil();
+       let l = Link::test_data("3_1").unwrap();
        let cube = KhCube::<i32>::new(&l, &0, &0, None, (0, 0));
 
        assert_eq!(cube.dim, 3);

@@ -32,3 +32,6 @@ yui-core  =    { version = "0.4.0", path = "../lib-core" }
 yui-link =     { version = "0.4.0", path = "../lib-link" }
 yui-matrix =   { version = "0.4.0", path = "../lib-matrix" }
 yui-homology = { version = "0.4.0", path = "../lib-homology" }
+
+[dev-dependencies]
+yui-link = { version = "0.4.0", path = "../lib-link", features = ["test-utils"] }

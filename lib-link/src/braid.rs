@@ -243,17 +243,6 @@ mod tests {
     }
 
     #[test]
-    fn load() {
-        let name = "3_1";
-        let b = Braid::load(name);
-
-        assert!(b.is_ok());
-
-        let b = b.unwrap();
-        assert_eq!(b.strands(), 2);
-    }
-
-    #[test]
     fn closure() {
         let b = Braid::from([-1,-1,-2,1,3,2,2,-4,-3,2,-3,-4]); // 9_41
         let l = b.closure();

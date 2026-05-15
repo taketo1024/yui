@@ -59,7 +59,7 @@ mod tests {
 
     #[test]
     fn trefoil() {
-        let l = Link::trefoil();
+        let l = Link::test_data("3_1").unwrap();
         let p = jones_polynomial(&l);
         let q = P::mono;
         assert_eq!(p, P::from_iter([(q(-9), -1), (q(-5), 1), (q(-3), 1), (q(-1), 1)]));
@@ -67,7 +67,7 @@ mod tests {
 
     #[test]
     fn figure8() {
-        let l = Link::figure8();
+        let l = Link::test_data("4_1").unwrap();
         let p = jones_polynomial(&l);
         let q = P::mono;
         assert_eq!(p, P::from_iter([(q(-5), 1), (q(5), 1)]));

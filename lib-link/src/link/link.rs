@@ -469,16 +469,16 @@ mod tests {
     }
 
     #[test]
-    fn trefoil() { 
-        let l = Link::trefoil();
+    fn trefoil() {
+        let l = Link::test_data("3_1").unwrap();
         assert_eq!(l.count_crossings(), 3);
         assert_eq!(l.writhe(), -3);
         assert_eq!(l.n_components(), 1);
     }
 
     #[test]
-    fn figure8() { 
-        let l = Link::figure8();
+    fn figure8() {
+        let l = Link::test_data("4_1").unwrap();
         assert_eq!(l.count_crossings(), 4);
         assert_eq!(l.writhe(), 0);
         assert_eq!(l.n_components(), 1);
@@ -512,16 +512,7 @@ mod tests {
     }
 
     #[test]
-    fn load() { 
-        let l = Link::load("3_1");
-        assert!(l.is_ok());
-
-        let l = l.unwrap();
-        assert_eq!(l.count_crossings(), 3);
-    }
-
-    #[test]
-    fn crossing_change() { 
+    fn crossing_change() {
         let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]);
         let l2 = l.crossing_change(1);
 

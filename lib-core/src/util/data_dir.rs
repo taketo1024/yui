@@ -30,7 +30,7 @@ pub fn load_json(kind: &str, name: &str) -> Result<String, Box<dyn std::error::E
     if !path.exists() {
         return Err(format!(
             "no `{kind}/{name}.json` under {}. \
-             Set ${ENV_VAR} or run scripts/fetch-knotdata.sh to populate it.",
+             Set ${ENV_VAR}, or run a script under `scripts/` to populate it.",
             dir.display()
         ).into());
     }

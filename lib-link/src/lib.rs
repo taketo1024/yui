@@ -3,6 +3,9 @@ mod inv_link;
 mod braid;
 pub mod util;
 
+#[cfg(any(test, feature = "test-utils"))]
+mod test_data;
+
 pub use link::*;
 pub use inv_link::*;
 pub use braid::*;

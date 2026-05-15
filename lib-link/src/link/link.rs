@@ -290,19 +290,11 @@ impl Link {
         Ok(l)
     }
 
-    pub fn unknot() -> Link { 
+    pub fn unknot() -> Link {
         Link::from_pd_code([[0, 1, 1, 0]]).resolved_at(0, Bit::Bit0)
     }
 
-    pub fn trefoil() -> Link { 
-        Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]])
-    }
-
-    pub fn figure8() -> Link { 
-        Link::from_pd_code([[4,2,5,1],[8,6,1,5],[6,3,7,4],[2,7,3,8]])
-    }
-
-    pub fn hopf_link() -> Link { 
+    pub fn hopf_link() -> Link {
         Link::from_pd_code([[4,1,3,2],[2,3,1,4]])
     }
 }

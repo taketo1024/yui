@@ -285,7 +285,7 @@ impl Display for Link {
 #[cfg(test)]
 mod tests { 
     use yui_core::hashmap;
-    use crate::NodeType::{X, Xm};
+    use crate::NodeType::{XL, XR};
 
     use super::*;
 
@@ -300,7 +300,7 @@ mod tests {
         let pd_code = [[0,0,1,1]];
         let l = Link::from_pd_code(pd_code);
         assert_eq!(l.nodes.len(), 1);
-        assert_eq!(l.node(0).ntype(), X);
+        assert_eq!(l.node(0).ntype(), XL);
     }
 
     #[test]
@@ -396,10 +396,10 @@ mod tests {
     fn link_mirror() { 
         let pd_code = [[0,0,1,1]];
         let l = Link::from_pd_code(pd_code);
-        assert_eq!(l.node(0).ntype(), X);
+        assert_eq!(l.node(0).ntype(), XL);
 
         let l = l.mirror();
-        assert_eq!(l.node(0).ntype(), Xm);
+        assert_eq!(l.node(0).ntype(), XR);
     }
 
     #[test]
@@ -485,7 +485,7 @@ mod tests {
         let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]);
         let l2 = l.cc_at(1);
 
-        assert_eq!(l.node(1),  &Node::new(X,  [3,6,4,1]));
-        assert_eq!(l2.node(1), &Node::new(Xm, [3,6,4,1]));
+        assert_eq!(l.node(1),  &Node::new(XL,  [3,6,4,1]));
+        assert_eq!(l2.node(1), &Node::new(XR, [3,6,4,1]));
     }
 }

@@ -6,18 +6,18 @@ use yui_core::{CloneAnd, Sign};
 use crate::Path;
 use super::Edge;
 
-use NodeType::{X, Xm, V, H};
+use NodeType::{XL, XR, V, H};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, derive_more::Display, Debug)]
 pub enum NodeType { 
-    X, Xm, V, H 
+    XL, XR, V, H 
 }
 
 impl NodeType { 
     pub fn mirror(&self) -> Self {
         match self { 
-            Xm => X,
-            X  => Xm,
+            XR => XL,
+            XL => XR,
             _  => *self
         }
     }
@@ -35,7 +35,7 @@ impl Node {
     }
 
     pub fn from_pd_code(edges: [Edge; 4]) -> Self { 
-        Node::new(NodeType::X, edges)
+        Node::new(NodeType::XL, edges)
     }
 
     pub fn ntype(&self) -> NodeType { 
@@ -56,7 +56,7 @@ impl Node {
     }
 
     pub fn is_crossing(&self) -> bool { 
-        matches!(self.ntype, X | Xm)
+        matches!(self.ntype, XL | XR)
     }
 
     pub fn is_resolved(&self) -> bool { 
@@ -68,8 +68,8 @@ impl Node {
 
         self.clone_and(|x| 
             x.ntype = match (x.ntype, r) {
-                (X, Bit0) | (Xm, Bit1) => H,
-                (X, Bit1) | (Xm, Bit0) => V,
+                (XL, Bit0) | (XR, Bit1) => H,
+                (XL, Bit1) | (XR, Bit0) => V,
                 _ => panic!()
             }
         )
@@ -77,8 +77,8 @@ impl Node {
 
     pub fn sign(&self, j: usize) -> Option<Sign> {
         match (self.ntype, j) { 
-            (Xm, 1) | (X, 3) => Some(Sign::Pos),
-            (Xm, 3) | (X, 1) => Some(Sign::Neg),
+            (XR, 1) | (XL, 3) => Some(Sign::Pos),
+            (XR, 3) | (XL, 1) => Some(Sign::Neg),
             _ => None
         }
     }
@@ -103,8 +103,8 @@ impl Node {
             }
         };
         match self.ntype { 
-            X | 
-            Xm => (comp(0, 2), comp(1, 3)),
+            XL | 
+            XR => (comp(0, 2), comp(1, 3)),
             V  => (comp(0, 3), comp(1, 2)),
             H  => (comp(0, 1), comp(2, 3))
         }
@@ -122,7 +122,7 @@ impl Node {
         debug_assert!((0..4).contains(&index));
 
         match self.ntype {
-            X | Xm => (index + 2) % 4,
+            XL | XR => (index + 2) % 4,
             V => 3 - index,
             H => (5 - index) % 4
         }
@@ -131,7 +131,7 @@ impl Node {
 
 impl From<[Edge; 4]> for Node {
     fn from(edges: [Edge; 4]) -> Self {
-        Self::new(NodeType::X, edges)
+        Self::new(NodeType::XL, edges)
     }
 }
 
@@ -154,10 +154,10 @@ mod tests {
 
     #[test]
     fn crossing_is_resolved() {
-        let c = a_crossing(X);
+        let c = a_crossing(XL);
         assert!(c.is_crossing());
 
-        let c = a_crossing(Xm);
+        let c = a_crossing(XR);
         assert!(c.is_crossing());
 
         let c = a_crossing(H);
@@ -171,30 +171,30 @@ mod tests {
     fn crossing_resolve() {
         use Bit::{Bit0, Bit1};
 
-        let c = a_crossing(X).resolve(Bit0);
+        let c = a_crossing(XL).resolve(Bit0);
         assert!(c.is_resolved());
         assert_eq!(c.ntype(), H);
 
-        let c = a_crossing(X).resolve(Bit1);
+        let c = a_crossing(XL).resolve(Bit1);
         assert!(c.is_resolved());
         assert_eq!(c.ntype(), V);
 
-        let c = a_crossing(Xm).resolve(Bit0);
+        let c = a_crossing(XR).resolve(Bit0);
         assert!(c.is_resolved());
         assert_eq!(c.ntype(), V);
 
-        let c = a_crossing(Xm).resolve(Bit1);
+        let c = a_crossing(XR).resolve(Bit1);
         assert!(c.is_resolved());
         assert_eq!(c.ntype(), H);
     }
 
     #[test]
     fn crossing_mirror() {
-        let c = a_crossing(X).mirror();
-        assert_eq!(c.ntype(), Xm);
+        let c = a_crossing(XL).mirror();
+        assert_eq!(c.ntype(), XR);
 
-        let c = a_crossing(Xm).mirror();
-        assert_eq!(c.ntype(), X);
+        let c = a_crossing(XR).mirror();
+        assert_eq!(c.ntype(), XL);
 
         let c = a_crossing(H).mirror();
         assert_eq!(c.ntype(), H);
@@ -205,13 +205,13 @@ mod tests {
 
     #[test]
     fn crossing_pass() {
-        let c = a_crossing(X);
+        let c = a_crossing(XL);
         assert_eq!(c.traverse_inner(0), 2);
         assert_eq!(c.traverse_inner(1), 3);
         assert_eq!(c.traverse_inner(2), 0);
         assert_eq!(c.traverse_inner(3), 1);
 
-        let c = a_crossing(Xm);
+        let c = a_crossing(XR);
         assert_eq!(c.traverse_inner(0), 2);
         assert_eq!(c.traverse_inner(1), 3);
         assert_eq!(c.traverse_inner(2), 0);

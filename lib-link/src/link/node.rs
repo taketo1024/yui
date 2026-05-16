@@ -8,6 +8,15 @@ use super::Edge;
 
 use NodeType::{XL, XR, V, H};
 
+// NodeType:
+//
+//     3   2         3   2         3   2         3   2        
+//      \ /           \ /           \ /           \_/         
+//       \    = XL,    /    = XR,   | |   = V,     _    = H, 
+//      / \           / \           / \           / \         
+//     0   1         0   1         0   1         0   1        
+//
+
 #[derive(Clone, Copy, PartialEq, Eq, Hash, derive_more::Display, Debug)]
 pub enum NodeType { 
     XL, XR, V, H 

@@ -37,8 +37,8 @@ impl CobComp {
         assert!(x.is_crossing());
 
         use Bit::{Bit0, Bit1};
-        let src = Tng::from_resolved(&x.resolved(Bit0));
-        let tgt = Tng::from_resolved(&x.resolved(Bit1));
+        let src = Tng::from_resolved(&x.resolve(Bit0));
+        let tgt = Tng::from_resolved(&x.resolve(Bit1));
 
         Self::plain(src, tgt, 0)
     }

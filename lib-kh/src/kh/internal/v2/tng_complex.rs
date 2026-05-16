@@ -365,12 +365,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         } else { 
             let mut v0 = TngVertex::init();
             v0.key.state.push_0();
-            v0.tng = Tng::from_resolved(&x.resolved(Bit::Bit0));
+            v0.tng = Tng::from_resolved(&x.resolve(Bit::Bit0));
             let k0 = v0.key;
 
             let mut v1 = TngVertex::init();
             v1.key.state.push_1();
-            v1.tng = Tng::from_resolved(&x.resolved(Bit::Bit1));
+            v1.tng = Tng::from_resolved(&x.resolve(Bit::Bit1));
             let k1 = v1.key;
 
             c.add_vertex(v0);
@@ -750,7 +750,7 @@ mod tests {
     #[test]
     fn single_x_resolved() { 
         let mut c = TngComplex::init(&0, &0, (0, 0), None);
-        let x = Node::from_pd_code([0,1,2,3]).resolved(Bit::Bit0);
+        let x = Node::from_pd_code([0,1,2,3]).resolve(Bit::Bit0);
         c.append(&x);
 
         assert_eq!(c.dim(), 0);
@@ -790,7 +790,7 @@ mod tests {
     #[test]
     fn deloop() { 
         let mut c = TngComplex::init(&0, &0, (0, 0), None);
-        let x0 = Node::from_pd_code([0, 1, 1, 0]).resolved(Bit::Bit0); // unknot
+        let x0 = Node::from_pd_code([0, 1, 1, 0]).resolve(Bit::Bit0); // unknot
         c.append(&x0);
 
         assert_eq!(c.dim(), 0);
@@ -858,7 +858,7 @@ mod tests {
     #[test]
     fn deloop_based() { 
         let mut c = TngComplex::init(&0, &0, (0, 0), Some(0)); // base point = 0
-        let x0 = Node::from_pd_code([0, 1, 1, 0]).resolved(Bit::Bit0); // unknot
+        let x0 = Node::from_pd_code([0, 1, 1, 0]).resolve(Bit::Bit0); // unknot
         c.append(&x0);
 
         assert_eq!(c.dim(), 0);

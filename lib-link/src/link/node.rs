@@ -14,11 +14,11 @@ pub enum NodeType {
 }
 
 impl NodeType { 
-    pub fn cc(&mut self) {
+    pub fn mirror(&self) -> Self {
         match self { 
-            Xm => *self = X,
-            X  => *self = Xm,
-            _ => ()
+            Xm => X,
+            X  => Xm,
+            _  => *self
         }
     }
 }
@@ -63,19 +63,15 @@ impl Node {
         matches!(self.ntype, V | H)
     }
 
-    pub fn resolve(&mut self, r: Bit) {
+    pub fn resolve(&self, r: Bit) -> Self {
         use Bit::{Bit0, Bit1};
 
-        match (self.ntype, r) {
-            (X, Bit0) | (Xm, Bit1) => self.ntype = H,
-            (X, Bit1) | (Xm, Bit0) => self.ntype = V,
-            _ => panic!()
-        }
-    }
-
-    pub fn resolved(&self, r: Bit) -> Self { 
-        self.clone_and(|x|
-            x.resolve(r)
+        self.clone_and(|x| 
+            x.ntype = match (x.ntype, r) {
+                (X, Bit0) | (Xm, Bit1) => H,
+                (X, Bit1) | (Xm, Bit0) => V,
+                _ => panic!()
+            }
         )
     }
 
@@ -87,8 +83,10 @@ impl Node {
         }
     }
 
-    pub fn cc(&mut self) { 
-        self.ntype.cc()
+    pub fn mirror(&self) -> Self { 
+        self.clone_and(|x| 
+            x.ntype = self.ntype.mirror()
+        )
     }
 
     pub fn is_adj_to(&self, x: &Node) -> bool { 
@@ -173,43 +171,35 @@ mod tests {
     fn crossing_resolve() {
         use Bit::{Bit0, Bit1};
 
-        let mut c = a_crossing(X);
-        
-        c.resolve(Bit0);
+        let c = a_crossing(X).resolve(Bit0);
         assert!(c.is_resolved());
         assert_eq!(c.ntype(), H);
 
-        let mut c = a_crossing(X);
-        
-        c.resolve(Bit1);
+        let c = a_crossing(X).resolve(Bit1);
         assert!(c.is_resolved());
         assert_eq!(c.ntype(), V);
 
-        let mut c = a_crossing(Xm);
-        
-        c.resolve(Bit0);
+        let c = a_crossing(Xm).resolve(Bit0);
         assert!(c.is_resolved());
         assert_eq!(c.ntype(), V);
 
-        let mut c = a_crossing(Xm);
-        
-        c.resolve(Bit1);
+        let c = a_crossing(Xm).resolve(Bit1);
         assert!(c.is_resolved());
         assert_eq!(c.ntype(), H);
     }
 
     #[test]
     fn crossing_mirror() {
-        let c = a_crossing(X).clone_and(|c| c.cc());
+        let c = a_crossing(X).mirror();
         assert_eq!(c.ntype(), Xm);
 
-        let c = a_crossing(Xm).clone_and(|c| c.cc());
+        let c = a_crossing(Xm).mirror();
         assert_eq!(c.ntype(), X);
 
-        let c = a_crossing(H).clone_and(|c| c.cc());
+        let c = a_crossing(H).mirror();
         assert_eq!(c.ntype(), H);
 
-        let c = a_crossing(V).clone_and(|c| c.cc());
+        let c = a_crossing(V).mirror();
         assert_eq!(c.ntype(), V);
     }
 

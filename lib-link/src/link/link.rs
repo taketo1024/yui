@@ -18,7 +18,8 @@ pub struct Link {
 }
 
 impl Link {
-    pub fn new(nodes: Vec<Node>) -> Self { 
+    pub fn new(nodes: impl IntoIterator<Item = Node>) -> Self { 
+        let nodes = nodes.into_iter().collect_vec();
         let edges = nodes.iter().flat_map(|x| x.edges()).cloned().collect();
         let l = Self { nodes, edges };
         l.validate();
@@ -44,7 +45,7 @@ impl Link {
 
     pub fn from_pd_code<I>(pd_code: I) -> Self
     where I: IntoIterator<Item = XCode> { 
-        let nodes = pd_code.into_iter().map(Node::from_pd_code).collect();
+        let nodes = pd_code.into_iter().map(Node::from_pd_code).collect_vec();
         Self::new(nodes)
     }
 
@@ -63,7 +64,7 @@ impl Link {
     }
 
     pub fn unknot() -> Link {
-        Link::from_pd_code([[0, 1, 1, 0]]).resolved_at(0, Bit::Bit0)
+        Link::from_pd_code([[0, 1, 1, 0]]).resolve_at(0, Bit::Bit0)
     }
 
     pub fn is_knot(&self) -> bool { 
@@ -76,9 +77,7 @@ impl Link {
     }
 
     pub fn mirror(&self) -> Self {
-        self.clone_and(|l|
-            l.nodes.iter_mut().for_each(|x| x.cc())
-        )
+        Self::new(self.nodes().map(|x| x.mirror()))
     }
 
     pub fn n_nodes(&self) -> usize { 
@@ -165,15 +164,19 @@ impl Link {
 
     pub fn cc_at(&self, i: usize) -> Self { 
         assert!(self.node(i).is_crossing());
-        self.clone_and(|l| l.node_mut(i).cc())
+        self.clone_and(|l| 
+            *l.node_mut(i) = l.node(i).mirror()
+        )
     }
 
-    pub fn resolved_at(&self, i: usize, r: Bit) -> Self {
+    pub fn resolve_at(&self, i: usize, r: Bit) -> Self {
         assert!(self.node(i).is_crossing());
-        self.clone_and(|l| l.node_mut(i).resolve(r))
+        self.clone_and(|l| 
+            *l.node_mut(i) = l.node(i).resolve(r)
+        )
     }
 
-    pub fn resolved_by(&self, s: &State) -> Self {
+    pub fn resolve_by(&self, s: &State) -> Self {
         assert!(s.len() == self.n_crossings());
 
         let n = self.nodes.len();
@@ -181,7 +184,7 @@ impl Link {
 
         self.clone_and(|l| {
             for (i, r) in Iterator::zip(itr, s.iter()) {
-                l.node_mut(i).resolve(r); 
+                *l.node_mut(i) = self.node(i).resolve(r); 
             }
         })
     }
@@ -198,7 +201,7 @@ impl Link {
     }
 
     pub fn seifert_circles(&self) -> Vec<Path> { 
-        self.resolved_by(&self.seifert_state()).comps()
+        self.resolve_by(&self.seifert_state()).comps()
     }
 
     pub fn traverse<F>(&self, mut f: F) where 
@@ -361,7 +364,7 @@ mod tests {
         assert_eq!(l.iter_signed_crossings(), hashmap!{ 0 => Sign::Neg} );
 
         let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code).resolved_at(0, Bit::Bit0);
+        let l = Link::from_pd_code(pd_code).resolve_at(0, Bit::Bit0);
         assert_eq!(l.iter_signed_crossings(), hashmap!{});
     }
 
@@ -376,7 +379,7 @@ mod tests {
         assert_eq!(l.writhe(), -1);
 
         let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code).resolved_at(0, Bit::Bit0);
+        let l = Link::from_pd_code(pd_code).resolve_at(0, Bit::Bit0);
         assert_eq!(l.writhe(), 0);
 
     }
@@ -403,7 +406,7 @@ mod tests {
     fn link_resolve() {
         let s = State::from([0, 0, 0]);
         let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]) // trefoil
-            .resolved_by(&s);
+            .resolve_by(&s);
 
         let comps = l.comps();
         assert_eq!(comps.len(), 3);
@@ -411,7 +414,7 @@ mod tests {
 
         let s = State::from([1, 1, 1]);
         let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]) // trefoil
-            .resolved_by(&s);
+            .resolve_by(&s);
 
         let comps = l.comps();
         assert_eq!(comps.len(), 2);

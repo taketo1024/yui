@@ -130,8 +130,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let a = x.arcs();
             vec![a.0, a.1]
         } else { 
-            let a0 = x.resolved(Bit::Bit0).arcs();
-            let a1 = x.resolved(Bit::Bit1).arcs();
+            let a0 = x.resolve(Bit::Bit0).arcs();
+            let a1 = x.resolve(Bit::Bit1).arcs();
             vec![a0.0, a0.1, a1.0, a1.1]
         }.into_iter().filter(|a|
             self.complex.base_pt().map(|e| !a.contains(e)).unwrap_or(true)
@@ -483,7 +483,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(x.is_crossing());
 
         let r = self.state[x];
-        let a = x.resolved(r);
+        let a = x.resolve(r);
         let tng = Tng::from_resolved(&a);
         let id = Cob::id(&tng);
 

@@ -50,7 +50,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let c2_deg_shift = c2.deg_shift();
 
         let alg = c1.str().clone();
-        let (a0, a1) = l.node(i).resolved(Bit::Bit0).arcs();
+        let (a0, a1) = l.node(i).resolve(Bit::Bit0).arcs();
 
         // TODO We don't want to reproduce the cube. 
         let (h, t) = c1.str().ht();

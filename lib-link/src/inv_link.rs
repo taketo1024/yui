@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use itertools::Itertools;
 use num_integer::Integer;
-use yui_core::CloneAnd;
 use crate::{Node, Edge, Link, XCode};
 
 // Involutive link
@@ -83,7 +82,7 @@ impl InvLink {
             base_pt: self.base_pt,
             e_map: self.e_map.clone(),
             x_map: self.x_map.iter().map(|(x, y)| 
-                (x.clone_and(|x| x.cc()), y.clone_and(|y| y.cc()))
+                (x.mirror(), y.mirror())
             ).collect(), 
         }
     }

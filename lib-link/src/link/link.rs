@@ -114,12 +114,17 @@ impl Link {
     }
 
     pub fn iter_signed_crossings(&self) -> HashMap<usize, Sign> {
+        // TODO replace this. 
+        use super::node::NodeType::*;
+
         let mut result = hashmap!{};
 
         self.traverse(|_, i, j| {
-            if let Some(e) = self.node(i).sign(j) {
-                result.insert(i, e);
-            } 
+            match (self.node(i).ntype(), j) { 
+                (XR, 1) | (XL, 3) => result.insert(i, Sign::Pos),
+                (XR, 3) | (XL, 1) => result.insert(i, Sign::Neg),
+                _ => None
+            };
         });
 
         result
@@ -482,10 +487,13 @@ mod tests {
 
     #[test]
     fn crossing_change() {
+        use crate::link::node::NodeOri;
+
         let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]);
         let l2 = l.cc_at(1);
 
-        assert_eq!(l.node(1),  &Node::new(XL,  [3,6,4,1]));
-        assert_eq!(l2.node(1), &Node::new(XR, [3,6,4,1]));
+        // TODO must change. 
+        assert_eq!(l.node(1),  &Node::new(XL, NodeOri::None, [3,6,4,1]));
+        assert_eq!(l2.node(1), &Node::new(XR, NodeOri::None, [3,6,4,1]));
     }
 }

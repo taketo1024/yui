@@ -2,7 +2,8 @@ use std::hash::Hash;
 use derive_more::Display;
 use itertools::Either;
 
-use crate::{Elem, ElemBase};
+use crate::lc::Lc;
+use crate::{Elem, ElemBase, Ring, RingOps};
 
 pub trait Gen: Elem + Hash + Ord {}
 
@@ -115,6 +116,20 @@ impl<X, Y> Elem for EitherGen<X, Y> where X: Gen, Y: Gen {
 }
 
 impl <X, Y> Gen for EitherGen<X, Y> where X: Gen, Y: Gen {
+}
+
+pub fn split_lr<X, Y, R>(z: &Lc<EitherGen<X, Y>, R>) -> (Lc<X, R>, Lc<Y, R>)
+where X: Gen, Y: Gen, R: Ring, for<'x> &'x R: RingOps<R>{
+    let mut x = vec![];
+    let mut y = vec![];
+    for (e, r) in z.iter() { 
+        if e.is_left() { 
+            x.push((e.clone().into_left(), r.clone()));
+        } else { 
+            y.push((e.clone().into_right(), r.clone()));
+        }
+    } 
+    (Lc::from_iter(x), Lc::from_iter(y))
 }
 
 #[cfg(test)]

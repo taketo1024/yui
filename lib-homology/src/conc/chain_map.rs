@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use num_traits::Zero;
-use yui_core::lc::{EitherGen, Gen, Lc};
+use yui_core::lc::{EitherGen, Gen, Lc, split_lr};
 use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 use yui_matrix::sparse::SpMat;
 
@@ -140,9 +140,8 @@ where
 
         let d_map = move |i: I, z: &Lc<EitherGen<X, Y>, R>| {
             let (i, j) = degs(i);
-            let x = z.filtered(|x| x.is_left()) .map_gens(|x| x.into_left());
-            let y = z.filtered(|x| x.is_right()).map_gens(|x| x.into_right());
-
+            let (x, y) = split_lr(z);
+            
             let dx = d1(i, &x).map_gens(|x2| EitherGen::from_left (x2));
             let fx =  f(i, &x).map_gens(|y2| EitherGen::from_right(y2));
             let dy = d2(j, &y).map_gens(|y2| EitherGen::from_right(y2));

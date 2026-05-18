@@ -455,8 +455,7 @@ mod tests {
 
     #[test]
     fn unlink_2() {
-        let pd_code = [[1,2,3,4], [3,2,1,4]];
-        let l = Link::from_pd_code(pd_code);
+        let l = Link::unlink2();
         assert_eq!(l.n_crossings(), 2);
         assert_eq!(l.writhe(), 0);
         assert_eq!(l.n_comps(), 2);
@@ -465,10 +464,9 @@ mod tests {
 
     #[test]
     fn l2x4() {
-        let pd_code = [[1,5,2,8],[5,3,6,2],[3,7,4,6],[7,1,8,4]];
-        let l = Link::from_pd_code(pd_code);
+        let l = Link::test_data("L4a1").unwrap();
         assert_eq!(l.n_crossings(), 4);
-        assert_eq!(l.writhe(), 4);
+        assert_eq!(l.writhe(), -4);
         assert_eq!(l.n_comps(), 2);
     }
 

@@ -177,7 +177,7 @@ mod tests {
 
     #[test]
     fn test_7_1() { 
-        let l = Link::from_pd_code([[1,8,2,9],[3,10,4,11],[5,12,6,13],[7,14,8,1],[9,2,10,3],[11,4,12,5],[13,6,14,7]]);
+        let l = Link::test_data("7_1").unwrap();
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), -6);
@@ -188,7 +188,7 @@ mod tests {
 
     #[test]
     fn test_7_2() { 
-        let l = Link::from_pd_code([[1,4,2,5],[3,10,4,11],[5,14,6,1],[7,12,8,13],[11,8,12,9],[13,6,14,7],[9,2,10,3]]);
+        let l = Link::test_data("7_2").unwrap();
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), -2);
@@ -199,7 +199,7 @@ mod tests {
 
     #[test]
     fn test_7_3() { 
-        let l = Link::from_pd_code([[6,2,7,1],[10,4,11,3],[14,8,1,7],[8,14,9,13],[12,6,13,5],[2,10,3,9],[4,12,5,11]]);
+        let l = Link::test_data("7_3").unwrap();
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), 4);
@@ -210,7 +210,7 @@ mod tests {
 
     #[test]
     fn test_8_19() { 
-        let l = Link::from_pd_code([[4,2,5,1],[8,4,9,3],[9,15,10,14],[5,13,6,12],[13,7,14,6],[11,1,12,16],[15,11,16,10],[2,8,3,7]]);
+        let l = Link::test_data("8_19").unwrap();
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), 6);
@@ -222,7 +222,7 @@ mod tests {
     #[test]
     #[ignore]
     fn test_k14_c2() { 
-        let l = Link::from_pd_code([[1,19,2,18],[19,1,20,28],[20,13,21,14],[12,17,13,18],[16,21,17,22],[5,15,6,14],[15,5,16,4],[6,27,7,28],[2,7,3,8],[26,3,27,4],[25,23,26,22],[11,9,12,8],[23,10,24,11],[9,24,10,25]]);
+        let l = Link::test_data("14n_19265").unwrap();
         let c = 2_i64;
         
         assert_eq!(ss_invariant(&l, &c, false), -2);
@@ -234,7 +234,7 @@ mod tests {
     #[test]
     #[ignore]
     fn test_k14_c3() { 
-        let l = Link::from_pd_code([[1,19,2,18],[19,1,20,28],[20,13,21,14],[12,17,13,18],[16,21,17,22],[5,15,6,14],[15,5,16,4],[6,27,7,28],[2,7,3,8],[26,3,27,4],[25,23,26,22],[11,9,12,8],[23,10,24,11],[9,24,10,25]]);
+        let l = Link::test_data("14n_19265").unwrap();
         let c = 3_i64;
         
         assert_eq!(ss_invariant(&l, &c, false), 0);

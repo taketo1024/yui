@@ -272,7 +272,7 @@ mod tests {
 
     #[test]
     fn test_sl2map_2twist_unknot() {
-        let l = Link::from_pd_code([[1,1,2,4],[3,3,4,2]]);
+        let l = Link::unknot_l_twist2();
         let cube = KhCube::new(&l, &0, &0, None, (0, 0));
         let map = KhSl2Map::new(&l, cube);
 
@@ -303,7 +303,7 @@ mod tests {
 
     #[test]
     fn test_u_2twist_unknot() {
-        let l = Link::from_pd_code([[1,1,2,4],[3,3,4,2]]);
+        let l = Link::unknot_l_twist2();
         let cube = KhCube::new(&l, &0, &0, None, (0, 0));
         let map = KhSl2Map::new(&l, cube.clone());
 
@@ -346,7 +346,7 @@ mod tests {
 
     #[test]
     fn test_ch_map_2twist_unknot() {
-        let l = Link::from_pd_code([[1,1,2,4],[3,3,4,2]]);
+        let l = Link::unknot_l_twist2();
         let c = KhComplex::new_no_simplify(&l, &0, &0, false);
         let e = c.sl2_map(&l).into_chain_map();
 

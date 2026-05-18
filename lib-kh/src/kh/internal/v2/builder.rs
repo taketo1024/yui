@@ -640,7 +640,7 @@ mod tests {
 
     #[test]
     fn test_unknot_rm2() {
-        let l = Link::from_pd_code([[1,4,2,1],[2,4,3,3]]);
+        let l = Link::unknot_lr_twist();
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
         c.check_d_all();
@@ -652,8 +652,7 @@ mod tests {
 
     #[test]
     fn test_unlink_2() {
-        let pd_code = [[1,2,3,4], [3,2,1,4]];
-        let l = Link::from_pd_code(pd_code);
+        let l = Link::unlink2();
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
         c.check_d_all();
@@ -690,7 +689,7 @@ mod tests {
 
     #[test]
     fn test_8_19() {
-        let l = Link::from_pd_code([[4,2,5,1],[8,4,9,3],[9,15,10,14],[5,13,6,12],[13,7,14,6],[11,1,12,16],[15,11,16,10],[2,8,3,7]]);
+        let l = Link::test_data("8_19").unwrap();
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
         c.check_d_all();

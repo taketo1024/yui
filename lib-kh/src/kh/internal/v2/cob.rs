@@ -870,7 +870,6 @@ pub trait LcCobTrait: Sized {
     fn convert_edges<F>(&self, f: F) -> Self where F: Fn(Edge) -> Edge;
     fn modify<F>(self, f: F) -> Self where F: Fn(&mut Cob);
     fn connect(self, c: &Cob) -> Self;
-    fn connected(&self, c: &Cob) -> Self;
     fn cap_off(self, b: Bottom, c: &TngComp, dot: Dot) -> Self;
     fn should_part_eval(&self) -> bool;
     fn part_eval(self, h: &Self::R, t: &Self::R) -> Self;
@@ -942,13 +941,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn connect(self, c: &Cob) -> Self {
-        self.modify(|cob| cob.connect(c.clone()) )
-    }
-
-    fn connected(&self, c: &Cob) -> Self {
-        self.map_ref(|cob, r| {
-            (cob.connected(c), r.clone())
-        })
+        self.modify(|cob| cob.connect(c.clone()))
     }
 
     fn cap_off(self, b: Bottom, c: &TngComp, dot: Dot) -> Self {

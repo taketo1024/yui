@@ -137,16 +137,16 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     fn d(&self, x: &KhIGen) -> Lc<KhIGen, R> { 
         match x {
             KhIGen::B(x) => {
-                let dx = self.cube.d(x).map_gens_ref(|&y| 
+                let dx = self.cube.d(x).map_gens(|y| 
                     KhIGen::B(y)
                 );
-                let fx = self.f(x).map_gens_ref(|&y| 
+                let fx = self.f(x).map_gens(|y| 
                     KhIGen::Q(y)
                 );
                 dx + fx
             },
             KhIGen::Q(x) => {
-                self.cube.d(x).map_gens_ref(|&y| 
+                self.cube.d(x).map_gens(|y| 
                     KhIGen::Q(y)
                 )
             },

@@ -70,15 +70,6 @@ where
         self.data.iter()
     }
 
-    pub fn map_ref<Y, S, F>(&self, f: F) -> Lc<Y, S>
-    where
-        Y: Gen,
-        S: Ring, for<'x> &'x S: RingOps<S>,
-        F: Fn(&X, &R) -> (Y, S)
-    {
-        self.iter().map(|(x, r)| f(x, r)).collect()
-    }
-
     pub fn map<Y, S, F>(self, f: F) -> Lc<Y, S>
     where
         Y: Gen,
@@ -86,14 +77,6 @@ where
         F: Fn(X, R) -> (Y, S)
     {
         self.into_iter().map(|(x, r)| f(x, r)).collect()
-    }
-
-    pub fn map_coeffs_ref<S, F>(&self, f: F) -> Lc<X, S>
-    where
-        S: Ring, for<'x> &'x S: RingOps<S>,
-        F: Fn(&R) -> S
-    {
-        self.map_ref(|x, r| (x.clone(), f(r)))
     }
 
     pub fn map_coeffs<S, F>(self, f: F) -> Lc<X, S>
@@ -104,20 +87,37 @@ where
         self.map(|x, r| (x, f(r)))
     }
 
-    pub fn map_gens_ref<Y, F>(&self, f: F) -> Lc<Y, R>
-    where
-        Y: Gen,
-        F: Fn(&X) -> Y
-    {
-        self.map_ref(|x, r| (f(x), r.clone()))
-    }
-
     pub fn map_gens<Y, F>(self, f: F) -> Lc<Y, R>
     where
         Y: Gen,
         F: Fn(X) -> Y
     {
         self.map(|x, r| (f(x), r))
+    }
+
+    pub fn map_ref<Y, S, F>(&self, f: F) -> Lc<Y, S>
+    where
+        Y: Gen,
+        S: Ring, for<'x> &'x S: RingOps<S>,
+        F: Fn(&X, &R) -> (Y, S)
+    {
+        self.iter().map(|(x, r)| f(x, r)).collect()
+    }
+
+    pub fn map_coeffs_ref<S, F>(&self, f: F) -> Lc<X, S>
+    where
+        S: Ring, for<'x> &'x S: RingOps<S>,
+        F: Fn(&R) -> S
+    {
+        self.map_ref(|x, r| (x.clone(), f(r)))
+    }
+
+    pub fn map_gens_ref<Y, F>(&self, f: F) -> Lc<Y, R>
+    where
+        Y: Gen,
+        F: Fn(&X) -> Y
+    {
+        self.map_ref(|x, r| (f(x), r.clone()))
     }
 
     pub fn filter_gens<F>(&self, f: F) -> Self

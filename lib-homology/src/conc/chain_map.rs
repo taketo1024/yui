@@ -140,12 +140,12 @@ where
 
         let d_map = move |i: I, z: &Lc<EitherGen<X, Y>, R>| {
             let (i, j) = degs(i);
-            let x = z.filter_gens(|x| x.is_left()).map_gens_ref(|x| x.clone().into_left());
-            let y = z.filter_gens(|x| x.is_right()).map_gens_ref(|x| x.clone().into_right());
+            let x = z.filter_gens(|x| x.is_left() ).map_gens(|x| x.into_left());
+            let y = z.filter_gens(|x| x.is_right()).map_gens(|x| x.into_right());
 
-            let dx = d1(i, &x).map_gens_ref(|x2| EitherGen::from_left(x2.clone()));
-            let fx = f(i, &x).map_gens_ref(|y2| EitherGen::from_right(y2.clone()));
-            let dy = d2(j, &y).map_gens_ref(|y2| EitherGen::from_right(y2.clone()));
+            let dx = d1(i, &x).map_gens(|x2| EitherGen::from_left (x2));
+            let fx =  f(i, &x).map_gens(|y2| EitherGen::from_right(y2));
+            let dy = d2(j, &y).map_gens(|y2| EitherGen::from_right(y2));
 
             dx + fx - dy
         };

@@ -7,7 +7,7 @@ use itertools::Itertools;
 use num_traits::Zero;
 use yui_core::{GetSign, Sign};
 
-use crate::{Link, XCode};
+use crate::{Link, Node};
 
 #[derive(Clone, Copy, PartialEq, Eq, Display, Debug)]
 #[display("{}", _0)]
@@ -104,9 +104,11 @@ impl Braid {
     }
 
     pub fn closure(&self) -> Link {
+        use crate::{NodeType, NodeOri};
+
         let mut count = self.strands;
-        let mut bottom_edges: Vec<usize> = (0..self.strands).collect();
-        let mut pd_code: Vec<XCode> = Vec::new();
+        let mut front_edges: Vec<usize> = (0..self.strands).collect();
+        let mut nodes: Vec<Node> = Vec::new();
 
         for s in &self.elements {
             /*        +       -
@@ -117,36 +119,33 @@ impl Braid {
              *  ↓   c   d   c   d
              */
             let i = s.index() - 1;
-            let (a, b) = (bottom_edges[i], bottom_edges[i + 1]);
+            let (a, b) = (front_edges[i], front_edges[i + 1]);
             let (c, d) = (count, count + 1);
 
-            if s.sign().is_positive() {
-                pd_code.push([a, c, d, b]);
-            } else {
-                pd_code.push([b, a, c, d]);
-            }
+            let nt = if s.sign().is_positive() { NodeType::XR } else { NodeType::XL };
+            let n = Node::new(nt, NodeOri::Up, [b,a,c,d]);
+            nodes.push(n);
 
-            bottom_edges[i] = c;
-            bottom_edges[i + 1] = d;
+            front_edges[i] = c;
+            front_edges[i + 1] = d;
             count += 2;
         }
 
         assert!(
-            bottom_edges.iter().enumerate().all(|(i, &j)| i != j),
+            front_edges.iter().enumerate().all(|(i, &j)| i != j),
             "braid closure contains free loop."
         );
 
         let conn: HashMap<_, _> = Iterator::zip(
-            bottom_edges.into_iter(),
+            front_edges.into_iter(),
             0..self.strands
         ).collect();
 
-        let pd_code = pd_code
-            .into_iter()
-            .map(|x| x.map(|a| *conn.get(&a).unwrap_or(&a)))
-            .collect_vec();
+        nodes.iter_mut().for_each(|n|
+            *n = n.convert_edges(|e| conn.get(&e).cloned().unwrap_or(e))
+        );
 
-        Link::from_pd_code(pd_code)
+        Link::from_nodes(nodes)
     }
 
     pub fn display(&self) -> String { 
@@ -231,8 +230,11 @@ mod tests {
 
     #[test]
     fn closure() {
-        let b = Braid::from([-1,-1,-2,1,3,2,2,-4,-3,2,-3,-4]); // 9_41
+        let b = Braid::test_data("3_1");
         let l = b.closure();
-        assert_eq!(l.n_crossings(), 12);
+
+        assert_eq!(l.n_crossings(), 3);
+        assert_eq!(l.writhe(), 3);
+        assert_eq!(l.n_comps(), 1);
     }
 }

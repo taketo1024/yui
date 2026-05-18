@@ -104,20 +104,9 @@ where
         self.iter().map(|(x, r)| f(x, r)).collect()
     }
 
-    pub fn map_coeffs_ref<S, F>(&self, f: F) -> Lc<X, S>
-    where
-        S: Ring, for<'x> &'x S: RingOps<S>,
-        F: Fn(&R) -> S
-    {
-        self.map_ref(|x, r| (x.clone(), f(r)))
-    }
-
-    pub fn map_gens_ref<Y, F>(&self, f: F) -> Lc<Y, R>
-    where
-        Y: Gen,
-        F: Fn(&X) -> Y
-    {
-        self.map_ref(|x, r| (f(x), r.clone()))
+    pub fn into_filter_gens<F>(self, f: F) -> Self
+    where F: Fn(&X) -> bool { 
+        self.into_iter().filter(|(x, _)| f(&x)).collect()
     }
 
     pub fn filter_gens<F>(&self, f: F) -> Self
@@ -129,11 +118,6 @@ where
                 None
             }
         ).collect()
-    }
-
-    pub fn into_filter_gens<F>(self, f: F) -> Self
-    where F: Fn(&X) -> bool { 
-        self.into_iter().filter(|(x, _)| f(&x)).collect()
     }
 
     pub fn apply<F, Y: Gen>(&self, f: F) -> Lc<Y, R>
@@ -280,7 +264,7 @@ where
     type Output = Lc<X, R>;
 
     fn neg(self) -> Self::Output {
-        self.map_coeffs_ref(|r| -r)
+        self.map_ref(|x, r| (x.clone(), -r))
     }
 }
 
@@ -724,30 +708,12 @@ mod tests {
     }
 
     #[test]
-    fn map_coeffs_ref() {
-        type L = Lc<X, i32>;
-        let z = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
-        let w = z.map_coeffs_ref(|a| a * 10);
-
-        assert_eq!(w, L::from(hashmap!{ e(1) => 10, e(2) => 20 }));
-    }
-
-    #[test]
     fn map_coeffs() {
         type L = Lc<X, i32>;
         let z = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
         let w = z.map_coeffs(|a| a * 10);
 
         assert_eq!(w, L::from(hashmap!{ e(1) => 10, e(2) => 20 }));
-    }
-
-    #[test]
-    fn map_gens_ref() {
-        type L = Lc<X, i32>;
-        let z = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
-        let w = z.map_gens_ref(|x| e(x.0 * 10));
-
-        assert_eq!(w, L::from(hashmap!{ e(10) => 1, e(20) => 2 }));
     }
 
     #[test]

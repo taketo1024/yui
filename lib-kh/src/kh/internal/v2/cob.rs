@@ -925,7 +925,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn convert_edges<F>(&self, f: F) -> Self 
     where F: Fn(Edge) -> Edge { 
-        self.map_gens_ref(|c| c.convert_edges(&f))
+        self.map_ref(|c, r| (c.convert_edges(&f), r.clone()))
     }
 
     fn modify<F>(self, f: F) -> Self 

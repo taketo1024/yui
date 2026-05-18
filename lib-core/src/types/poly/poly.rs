@@ -90,14 +90,6 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
         self.lead_term().0.deg()
     }
 
-    pub fn map_coeffs<R2, F>(&self, f: F) -> PolyBase<X, R2>
-    where 
-        R2: Ring, for<'x> &'x R2: RingOps<R2>, 
-        F: Fn(&R) -> R2
-    {
-        PolyBase::<X, R2>::from( self.data.map_coeffs_ref(f) )
-    }
-
     pub fn sort_terms_by<F>(&self, cmp: F) -> impl Iterator<Item = (&X, &R)>
     where F: Fn(&X, &X) -> std::cmp::Ordering { 
         self.data.sort_terms_by(cmp)

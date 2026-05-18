@@ -104,12 +104,12 @@ where
         self.iter().map(|(x, r)| f(x, r)).collect()
     }
 
-    pub fn into_filter_gens<F>(self, f: F) -> Self
+    pub fn filter<F>(self, f: F) -> Self
     where F: Fn(&X) -> bool { 
         self.into_iter().filter(|(x, _)| f(&x)).collect()
     }
 
-    pub fn filter_gens<F>(&self, f: F) -> Self
+    pub fn filtered<F>(&self, f: F) -> Self
     where F: Fn(&X) -> bool { 
         self.iter().filter_map(|(x, a)| 
             if f(x) { 
@@ -129,12 +129,7 @@ where
         }).collect()
     }
 
-    pub fn sort_terms_by<F>(&self, cmp: F) -> impl Iterator<Item = (&X, &R)>
-    where F: Fn(&X, &X) -> std::cmp::Ordering { 
-        self.iter().sorted_by(|(x, _), (y, _)| cmp(x, y))
-    }
-
-    pub fn combine<Y, Z, F>(&self, other: &Lc<Y, R>, x_map: F) -> Lc<Z, R>
+    pub fn apply_bilin<Y, Z, F>(&self, other: &Lc<Y, R>, x_map: F) -> Lc<Z, R>
     where Y: Gen, Z: Gen, F: Fn(&X, &Y) -> Z { 
         let mut res = Lc::zero();
         res.data.reserve(self.nterms() * other.nterms());
@@ -149,6 +144,11 @@ where
         
         res.clean();
         res
+    }
+
+    pub fn sort_terms_by<F>(&self, cmp: F) -> impl Iterator<Item = (&X, &R)>
+    where F: Fn(&X, &X) -> std::cmp::Ordering { 
+        self.iter().sorted_by(|(x, _), (y, _)| cmp(x, y))
     }
 
     pub fn to_string_by<F>(&self, cmp: F, descending: bool) -> String
@@ -353,7 +353,7 @@ where
     type Output = Lc<X, R>;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        self.combine(rhs, |x, y| x.clone() * y.clone())
+        self.apply_bilin(rhs, |x, y| x.clone() * y.clone())
     }
 }
 
@@ -729,7 +729,7 @@ mod tests {
     fn filter_gens() { 
         type L = Lc<X, i32>;
         let z = L::from_iter( (1..10).map(|i| (e(i), i * 10)) );
-        let w = z.filter_gens(|x| x.0 % 3 == 0 );
+        let w = z.filtered(|x| x.0 % 3 == 0 );
         assert_eq!(w, L::from(hashmap!{ e(3) => 30, e(6) => 60, e(9) => 90}))
     }
 

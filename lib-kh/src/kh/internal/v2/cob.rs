@@ -791,7 +791,7 @@ impl Cob {
         let init = LcCob::from(Cob::empty());
         self.comps.iter().fold(init, |res, c| {
             let e = c.part_eval(h, t);
-            res.combine(&e, |c1, c2| c1.connected(c2))
+            res.apply_bilin(&e, |c1, c2| c1.connected(c2))
         })
     }
 

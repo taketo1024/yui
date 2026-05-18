@@ -36,7 +36,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         );
 
         xs.fold(init, |res, next| { 
-            res.combine(next, |a, b| 
+            res.apply_bilin(next, |a, b| 
                 KhChainGen::new(s, a.tensor + b.tensor, deg_shift)
             )
         })

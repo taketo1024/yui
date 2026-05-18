@@ -328,7 +328,7 @@ mod tests {
 
     #[test]
     fn unlink_2() {
-        let l = Link::unknot_l_twist().resolve_at(0, Bit::Bit0);
+        let l = Link::test_data("unknot_l_twist").resolve_at(0, Bit::Bit0);
         let s = State::empty();
         let v = KhCubeVertex::new(&l, s, None, (0, 0));
 
@@ -339,7 +339,7 @@ mod tests {
 
     #[test]
     fn edge_merge() { 
-        let l = Link::unknot_l_twist();
+        let l = Link::test_data("unknot_l_twist");
         let s = State::from([0]);
         let t = State::from([1]);
         let v = KhCubeVertex::new(&l, s, None, (0, 0));
@@ -357,7 +357,7 @@ mod tests {
 
     #[test]
     fn edge_split() { 
-        let l = Link::unknot_r_twist();
+        let l = Link::test_data("unknot_r_twist");
         let s = State::from([0]);
         let t = State::from([1]);
         let v = KhCubeVertex::new(&l, s, None, (0, 0));
@@ -433,7 +433,7 @@ mod tests {
 
     #[test]
     fn cube_twist_unknot() { 
-        let l = Link::unknot_l_twist();
+        let l = Link::test_data("unknot_l_twist");
         let cube = KhCube::<i32>::new(&l, &0, &0, None, (0, 0));
 
         assert_eq!(cube.dim, 1);
@@ -459,7 +459,7 @@ mod tests {
 
     #[test]
     fn cube_hopf_link() { 
-        let l = Link::test_data("L2a1").unwrap();
+        let l = Link::test_data("L2a1");
         let cube = KhCube::<i32>::new(&l, &0, &0, None, (0, 0));
 
         assert_eq!(cube.dim, 2);
@@ -468,7 +468,7 @@ mod tests {
 
    #[test]
    fn cube_trefoil() { 
-       let l = Link::test_data("3_1").unwrap();
+       let l = Link::test_data("3_1");
        let cube = KhCube::<i32>::new(&l, &0, &0, None, (0, 0));
 
        assert_eq!(cube.dim, 3);

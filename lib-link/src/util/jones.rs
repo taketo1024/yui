@@ -51,7 +51,7 @@ mod tests {
 
     #[test]
     fn unlink_2() {
-        let l = Link::unknot_r_twist().resolve_at(0, Bit::Bit1);
+        let l = Link::test_data("unknot_r_twist").resolve_at(0, Bit::Bit1);
         let p = jones_polynomial(&l);
         let q = P::mono;
         assert_eq!(p, P::from_iter([(q(-2), 1), (q(0), 2), (q(2), 1)]));
@@ -59,7 +59,7 @@ mod tests {
 
     #[test]
     fn trefoil() {
-        let l = Link::test_data("3_1").unwrap();
+        let l = Link::test_data("3_1");
         let p = jones_polynomial(&l);
         let q = P::mono;
         assert_eq!(p, P::from_iter([(q(-9), -1), (q(-5), 1), (q(-3), 1), (q(-1), 1)]));
@@ -67,7 +67,7 @@ mod tests {
 
     #[test]
     fn figure8() {
-        let l = Link::test_data("4_1").unwrap();
+        let l = Link::test_data("4_1");
         let p = jones_polynomial(&l);
         let q = P::mono;
         assert_eq!(p, P::from_iter([(q(-5), 1), (q(5), 1)]));
@@ -75,7 +75,7 @@ mod tests {
 
     #[test]
     fn hopf_link() { 
-        let l = Link::test_data("L2a1").unwrap();
+        let l = Link::test_data("L2a1");
         let p = jones_polynomial(&l);
         let q = P::mono;
         assert_eq!(p, P::from_iter([(q(-6), 1), (q(-4), 1), (q(-2), 1), (q(0), 1)]));

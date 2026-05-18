@@ -78,7 +78,7 @@ mod tests {
 
     #[test]
     fn test_unknot_rm1() { 
-        let l = Link::unknot_l_twist();
+        let l = Link::test_data("unknot_l_twist");
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), 0);
@@ -89,7 +89,7 @@ mod tests {
 
     #[test]
     fn test_unknot_rm1_neg() { 
-        let l = Link::unknot_r_twist();
+        let l = Link::test_data("unknot_r_twist");
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), 0);
@@ -100,7 +100,7 @@ mod tests {
 
     #[test]
     fn test_3_1() { 
-        let l = Link::test_data("3_1").unwrap();
+        let l = Link::test_data("3_1");
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), -2);
@@ -111,7 +111,7 @@ mod tests {
 
     #[test]
     fn test_4_1() { 
-        let l = Link::test_data("4_1").unwrap();
+        let l = Link::test_data("4_1");
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), 0);
@@ -122,7 +122,7 @@ mod tests {
 
     #[test]
     fn test_5_1() { 
-        let l = Link::test_data("5_1").unwrap();
+        let l = Link::test_data("5_1");
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), -4);
@@ -133,7 +133,7 @@ mod tests {
 
     #[test]
     fn test_5_2() { 
-        let l = Link::test_data("5_2").unwrap();
+        let l = Link::test_data("5_2");
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), -2);
@@ -144,7 +144,7 @@ mod tests {
 
     #[test]
     fn test_6_1() { 
-        let l = Link::test_data("6_1").unwrap();
+        let l = Link::test_data("6_1");
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), 0);
@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn test_6_2() { 
-        let l = Link::test_data("6_2").unwrap();
+        let l = Link::test_data("6_2");
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), -2);
@@ -166,7 +166,7 @@ mod tests {
 
     #[test]
     fn test_6_3() { 
-        let l = Link::test_data("6_3").unwrap();
+        let l = Link::test_data("6_3");
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), 0);
@@ -177,7 +177,7 @@ mod tests {
 
     #[test]
     fn test_7_1() { 
-        let l = Link::test_data("7_1").unwrap();
+        let l = Link::test_data("7_1");
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), -6);
@@ -188,7 +188,7 @@ mod tests {
 
     #[test]
     fn test_7_2() { 
-        let l = Link::test_data("7_2").unwrap();
+        let l = Link::test_data("7_2");
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), -2);
@@ -199,7 +199,7 @@ mod tests {
 
     #[test]
     fn test_7_3() { 
-        let l = Link::test_data("7_3").unwrap();
+        let l = Link::test_data("7_3");
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), 4);
@@ -210,7 +210,7 @@ mod tests {
 
     #[test]
     fn test_8_19() { 
-        let l = Link::test_data("8_19").unwrap();
+        let l = Link::test_data("8_19");
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), 6);
@@ -222,7 +222,7 @@ mod tests {
     #[test]
     #[ignore]
     fn test_k14_c2() { 
-        let l = Link::test_data("14n_19265").unwrap();
+        let l = Link::test_data("14n_19265");
         let c = 2_i64;
         
         assert_eq!(ss_invariant(&l, &c, false), -2);
@@ -234,7 +234,7 @@ mod tests {
     #[test]
     #[ignore]
     fn test_k14_c3() { 
-        let l = Link::test_data("14n_19265").unwrap();
+        let l = Link::test_data("14n_19265");
         let c = 3_i64;
         
         assert_eq!(ss_invariant(&l, &c, false), 0);

@@ -119,7 +119,7 @@ mod tests {
     #[test]
     fn test_cc0_pos_to_neg() { 
         let i = 0;
-        let l = Link::test_data("5_1").unwrap().cc_at(i);
+        let l = Link::test_data("5_1").cc_at(i);
         let (h, t) = (0, 0);
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, false, i);
@@ -133,7 +133,7 @@ mod tests {
     #[test]
     fn test_cc0_neg_to_pos() { 
         let i = 0;
-        let l = Link::test_data("5_1").unwrap().mirror().cc_at(i);
+        let l = Link::test_data("5_1").mirror().cc_at(i);
         let (h, t) = (0, 0);
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, false, i);
@@ -147,7 +147,7 @@ mod tests {
     #[test]
     fn test_cc1_pos_to_neg() { 
         let i = 0;
-        let l = Link::test_data("5_1").unwrap().cc_at(i);
+        let l = Link::test_data("5_1").cc_at(i);
         let (h, t) = (0, 0);
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, false, i);
@@ -161,7 +161,7 @@ mod tests {
     #[test]
     fn test_cc1_neg_to_pos() { 
         let i = 0;
-        let l = Link::test_data("5_1").unwrap().mirror().cc_at(i);
+        let l = Link::test_data("5_1").mirror().cc_at(i);
         let (h, t) = (0, 0);
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, false, i);
@@ -175,7 +175,7 @@ mod tests {
     #[test]
     fn test_red_cc0_pos_to_neg() { 
         let i = 0;
-        let l = Link::test_data("5_1").unwrap().cc_at(i);
+        let l = Link::test_data("5_1").cc_at(i);
         let (h, t) = (0, 0);
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, true, i);
@@ -189,7 +189,7 @@ mod tests {
     #[test]
     fn test_red_cc0_neg_to_pos() { 
         let i = 0;
-        let l = Link::test_data("5_1").unwrap().mirror().cc_at(i);
+        let l = Link::test_data("5_1").mirror().cc_at(i);
         let (h, t) = (0, 0);
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, true, i);
@@ -203,7 +203,7 @@ mod tests {
     #[test]
     fn test_red_cc1_pos_to_neg() { 
         let i = 0;
-        let l = Link::test_data("5_1").unwrap().cc_at(i);
+        let l = Link::test_data("5_1").cc_at(i);
         let (h, t) = (0, 0);
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, true, i);
@@ -217,7 +217,7 @@ mod tests {
     #[test]
     fn test_red_cc1_neg_to_pos() { 
         let i = 0;
-        let l = Link::test_data("5_1").unwrap().mirror().cc_at(i);
+        let l = Link::test_data("5_1").mirror().cc_at(i);
         let (h, t) = (0, 0);
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, true, i);
@@ -233,7 +233,7 @@ mod tests {
         type P = Poly2<'h', 't', i64>;
 
         let i = 0;
-        let l = Link::test_data("5_1").unwrap().cc_at(i);
+        let l = Link::test_data("5_1").cc_at(i);
         let (h, t) = (P::variable(0), P::variable(1));
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, false, i);
@@ -249,7 +249,7 @@ mod tests {
         type P = Poly2<'h', 't', i64>;
 
         let i = 0;
-        let l = Link::test_data("5_1").unwrap().mirror().cc_at(i);
+        let l = Link::test_data("5_1").mirror().cc_at(i);
         let (h, t) = (P::variable(0), P::variable(1));
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, false, i);

@@ -37,7 +37,7 @@ mod tests {
 
     #[test]
     fn seif_graph() { 
-        let l = Link::test_data("3_1").unwrap();
+        let l = Link::test_data("3_1");
         let g = seifert_graph(&l);
         assert_eq!(g.node_count(), 2);
         assert_eq!(g.edge_count(), 3);

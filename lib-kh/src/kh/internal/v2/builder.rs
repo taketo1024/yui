@@ -620,7 +620,7 @@ mod tests {
 
     #[test]
     fn test_unknot_rm1() {
-        let l = Link::unknot_l_twist();
+        let l = Link::test_data("unknot_l_twist");
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
         assert_eq!(c[0].rank(), 2);
@@ -629,7 +629,7 @@ mod tests {
 
     #[test]
     fn test_unknot_rm1_neg() {
-        let l = Link::unknot_r_twist();
+        let l = Link::test_data("unknot_r_twist");
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
         c.check_d_all();
@@ -640,7 +640,7 @@ mod tests {
 
     #[test]
     fn test_unknot_rm2() {
-        let l = Link::unknot_lr_twist();
+        let l = Link::test_data("unknot_lr_twist");
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
         c.check_d_all();
@@ -652,7 +652,7 @@ mod tests {
 
     #[test]
     fn test_unlink_2() {
-        let l = Link::unlink2();
+        let l = Link::test_data("unlink2");
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
         c.check_d_all();
@@ -677,7 +677,7 @@ mod tests {
 
     #[test]
     fn test_hopf_link() {
-        let l = Link::test_data("L2a1").unwrap();
+        let l = Link::test_data("L2a1");
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
         c.check_d_all();
@@ -689,7 +689,7 @@ mod tests {
 
     #[test]
     fn test_8_19() {
-        let l = Link::test_data("8_19").unwrap();
+        let l = Link::test_data("8_19");
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
         c.check_d_all();
@@ -715,7 +715,7 @@ mod tests {
 
     #[test]
     fn canon_cycle_trefoil() { 
-        let l = Link::test_data("3_1").unwrap();
+        let l = Link::test_data("3_1");
         let c = TngComplexBuilder::build_kh_complex(&l, &2, &0, false);
         let zs = c.canon_cycles();
 
@@ -730,7 +730,7 @@ mod tests {
 
     #[test]
     fn h_range() { 
-        let l = Link::test_data("6_3").unwrap();
+        let l = Link::test_data("6_3");
         let h_range = -1..=1;
 
         let mut b = TngComplexBuilder::new(&l, &0, &0, None);

@@ -7,7 +7,7 @@
 use crate::{Braid, Link};
 
 impl Link {
-    pub fn test_data(name: &str) -> Result<Link, String> {
+    pub fn test_data(name: &str) -> Link {
         let pd: &[[usize; 4]] = match name {
             "3_1"  => &[[1,4,2,5],[3,6,4,1],[5,2,6,3]],
             "4_1"  => &[[4,2,5,1],[8,6,1,5],[6,3,7,4],[2,7,3,8]],
@@ -23,34 +23,20 @@ impl Link {
             "14n_19265" => &[[1,19,2,18],[19,1,20,28],[20,13,21,14],[12,17,13,18],[16,21,17,22],[5,15,6,14],[15,5,16,4],[6,27,7,28],[2,7,3,8],[26,3,27,4],[25,23,26,22],[11,9,12,8],[23,10,24,11],[9,24,10,25]],
             "L2a1" => &[[4,1,3,2],[2,3,1,4]],
             "L4a1" => &[[6,1,7,2],[8,3,5,4],[2,5,3,6],[4,7,1,8]],
-            _ => return Err(format!("no test data for `{name}`")),
+            // non-canonical diagrams of the unknot / unlink.
+            "unknot_l_twist" => &[[1,1,2,2]],
+            "unknot_l_twist2" => &[[1,1,2,4],[3,3,4,2]],
+            "unknot_r_twist" => &[[1,2,2,1]],
+            "unknot_lr_twist" => &[[1,1,2,4],[2,3,3,4]],
+            "unlink2" => &[[1,4,2,3],[2,4,1,3]],
+            _ => panic!("no test data for `{name}`"),
         };
-        Ok(Link::from_pd_code(pd.iter().copied()))
-    }
-
-    pub fn unknot_l_twist() -> Link {
-        Link::from_pd_code([[1, 1, 2, 2]])
-    }
-
-    pub fn unknot_l_twist2() -> Link {
-        Link::from_pd_code([[1, 1, 2, 4], [3, 3, 4, 2]])
-    }
-
-    pub fn unknot_r_twist() -> Link {
-        Link::from_pd_code([[1, 2, 2, 1]])
-    }
-
-    pub fn unknot_lr_twist() -> Link {
-        Link::from_pd_code([[1, 1, 2, 4], [2, 3, 3, 4]])
-    }
-
-    pub fn unlink2() -> Link {
-        Link::from_pd_code([[1, 4, 2, 3], [2, 4, 1, 3]])
+        Link::from_pd_code(pd.iter().copied())
     }
 }
 
 impl Braid {
-    pub fn test_data(name: &str) -> Result<Braid, String> {
+    pub fn test_data(name: &str) -> Braid {
         let word: &[i32] = match name {
             "3_1" => &[1, 1, 1],
             "4_1" => &[1, -2, 1, -2],
@@ -59,8 +45,8 @@ impl Braid {
             "6_1" => &[1, 1, 2, -1, -3, 2, -3],
             "6_2" => &[1, 1, 1, -2, 1, -2],
             "6_3" => &[1, 1, -2, 1, -2, -2],
-            _ => return Err(format!("no test data for `{name}`")),
+            _ => panic!("no test data for `{name}`"),
         };
-        Ok(Braid::from_iter(word.iter().copied()))
+        Braid::from_iter(word.iter().copied())
     }
 }

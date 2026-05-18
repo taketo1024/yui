@@ -52,7 +52,6 @@ impl Link {
         let nodes = pd_code.into_iter().map(Node::from_pd_code).collect_vec();
         let mut l = Self::from_nodes(nodes); // unoriented
         
-        let n = l.n_crossings();
         let mut ori = vec![None; l.n_nodes()];
         let mut remain = l.edges.clone();
 
@@ -61,22 +60,22 @@ impl Link {
             let e0 = remain.iter().min().cloned().unwrap();
 
             // Find node & point where edge-id increases. 
-            let (i0, j0) = (0..n).flat_map(|i| 
-                [0usize, 1, 3].map(move |j| (i, j)) // no incoming from index 2
-            ).find(|&(i, j)| 
-                l.node(i).edge(j) == e0 && (l.node(i).counter_edge(j) == e0 + 1)
-            ).unwrap();
+            let (i0, j0) = l.find_edge_pos(|i, j| 
+                j != 2 && // no incoming from pos 2.
+                l.node(i).edge(j) == e0 && 
+                l.node(i).counter_edge(j) == e0 + 1
+            ).expect("edges must be enumerated increasingly.");
 
             l.traverse_from((i0, j0), |i, j| { 
                 let e = l.node(i).edge(j);
-                if !remain.remove(&e) { 
-                    panic!("Invalid data");
-                }
+                remain.remove(&e);
 
-                if j == 1 { 
-                    ori[i] = Up 
-                } else if j == 3 { 
-                    ori[i] = Right
+                if j != 0 { 
+                    ori[i] = match j { 
+                        1 => Up,
+                        3 => Right,
+                        _ => panic!("absurd")
+                    }
                 }
             });
         }
@@ -201,8 +200,6 @@ impl Link {
 
     fn traverse_comps<F>(&self, mut f: F) where 
     F: FnMut(usize, usize, usize) { 
-        let n = self.n_nodes();
-
         let mut c = 0; // component counter
         let mut remain = self.edges.clone();
 
@@ -211,9 +208,7 @@ impl Link {
             let e0 = remain.iter().min().cloned().unwrap();
 
             // Find node & point having edge e0. 
-            let (i0, j0) = (0..n).flat_map(|i| 
-                (0usize..4).map(move |j| (i, j))
-            ).find(|&(i, j)| 
+            let (i0, j0) = self.find_edge_pos(|i, j| 
                 self.node(i).edge(j) == e0
             ).unwrap();
 
@@ -307,6 +302,15 @@ impl Link {
         }
 
         panic!("Broken data")
+    }
+
+    fn find_edge_pos(&self, f: impl Fn(usize, usize) -> bool) -> Option<(usize, usize)> { 
+        let n = self.n_nodes();
+        (0..n).flat_map(|i| 
+            [0usize, 1, 3].map(move |j| (i, j)) // no incoming from index 2
+        ).find(|&(i, j)| 
+            f(i, j)
+        )
     }
 }
 

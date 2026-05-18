@@ -92,6 +92,11 @@ impl Node {
         self.edges[i]
     }
 
+    pub fn counter_edge(&self, i: usize) -> Edge { 
+        assert!(i < 4);
+        self.edge(self.counter_pos(i))
+    }
+
     pub fn edges(&self) -> &[Edge; 4] { 
         &self.edges
     }
@@ -188,8 +193,8 @@ impl Node {
         }
     }
 
-    pub(crate) fn traverse_inner(&self, index:usize) -> usize { 
-        debug_assert!((0..4).contains(&index));
+    pub(crate) fn counter_pos(&self, index:usize) -> usize { 
+        assert!((0..4).contains(&index));
 
         match self.ntype {
             XL | XR => (index + 2) % 4,
@@ -317,27 +322,27 @@ mod tests {
     #[test]
     fn test_traverse() {
         let c = node(XL, NodeOri::None);
-        assert_eq!(c.traverse_inner(0), 2);
-        assert_eq!(c.traverse_inner(1), 3);
-        assert_eq!(c.traverse_inner(2), 0);
-        assert_eq!(c.traverse_inner(3), 1);
+        assert_eq!(c.counter_pos(0), 2);
+        assert_eq!(c.counter_pos(1), 3);
+        assert_eq!(c.counter_pos(2), 0);
+        assert_eq!(c.counter_pos(3), 1);
 
         let c = node(XR, NodeOri::None);
-        assert_eq!(c.traverse_inner(0), 2);
-        assert_eq!(c.traverse_inner(1), 3);
-        assert_eq!(c.traverse_inner(2), 0);
-        assert_eq!(c.traverse_inner(3), 1);
+        assert_eq!(c.counter_pos(0), 2);
+        assert_eq!(c.counter_pos(1), 3);
+        assert_eq!(c.counter_pos(2), 0);
+        assert_eq!(c.counter_pos(3), 1);
 
         let c = node(V, NodeOri::None);
-        assert_eq!(c.traverse_inner(0), 3);
-        assert_eq!(c.traverse_inner(1), 2);
-        assert_eq!(c.traverse_inner(2), 1);
-        assert_eq!(c.traverse_inner(3), 0);
+        assert_eq!(c.counter_pos(0), 3);
+        assert_eq!(c.counter_pos(1), 2);
+        assert_eq!(c.counter_pos(2), 1);
+        assert_eq!(c.counter_pos(3), 0);
 
         let c = node(H, NodeOri::None);
-        assert_eq!(c.traverse_inner(0), 1);
-        assert_eq!(c.traverse_inner(1), 0);
-        assert_eq!(c.traverse_inner(2), 3);
-        assert_eq!(c.traverse_inner(3), 2);
+        assert_eq!(c.counter_pos(0), 1);
+        assert_eq!(c.counter_pos(1), 0);
+        assert_eq!(c.counter_pos(2), 3);
+        assert_eq!(c.counter_pos(3), 2);
     }
 }

@@ -36,13 +36,13 @@ impl Link {
 
     // Planer Diagram code, represented by sequence of crossings of the form:
     //
-    //     3   2
+    //     d   c
     //      \ /
-    //       \     = [0, 1, 2, 3]
+    //       \     = [a, b, c, d]
     //      / \
-    //     0   1
+    //     a   b
     //
-    // The lower edge is always oriented 0 -> 2.
+    // The lower edge is always oriented a -> c.
     // see: http://katlas.math.toronto.edu/wiki/Planar_Diagrams
 
     pub fn from_pd_code<I>(pd_code: I) -> Self
@@ -50,28 +50,42 @@ impl Link {
         use crate::NodeOri::{Up, Right, None};
         
         let nodes = pd_code.into_iter().map(Node::from_pd_code).collect_vec();
-        let mut l = Self::from_nodes(nodes);
-        let mut ori = vec![None; l.n_nodes()];
-
-        // determine orientation
-        l.traverse(|_, i, j| {
-            if ori[i] == None { 
-                ori[i] = match j { 
-                    0 => None,
-                    1 => Up,
-                    3 => Right,
-                    _ => panic!("Invalid pd-code.")
-                }
-            } else if j != 0 { 
-                panic!("Invalid pd-code.")
-            }
-        });
+        let mut l = Self::from_nodes(nodes); // unoriented
         
-        assert!(ori.iter().all(|o| o != &None));
+        let n = l.n_crossings();
+        let mut ori = vec![None; l.n_nodes()];
+        let mut remain = l.edges.clone();
+
+        while !remain.is_empty() {
+            // Take minimal edge-id. 
+            let e0 = remain.iter().min().cloned().unwrap();
+
+            // Find node & point where edge-id increases. 
+            let (i0, j0) = (0..n).flat_map(|i| 
+                [0usize, 1, 3].map(move |j| (i, j)) // no incoming from index 2
+            ).find(|&(i, j)| 
+                l.node(i).edge(j) == e0 && (l.node(i).counter_edge(j) == e0 + 1)
+            ).unwrap();
+
+            l.traverse_from((i0, j0), |i, j| { 
+                let e = l.node(i).edge(j);
+                if !remain.remove(&e) { 
+                    panic!("Invalid data");
+                }
+
+                if j == 1 { 
+                    ori[i] = Up 
+                } else if j == 3 { 
+                    ori[i] = Right
+                }
+            });
+        }
 
         for (i, o) in ori.into_iter().enumerate() { 
             l.node_mut(i).ori = o;
         }
+
+        assert!(l.is_oriented());
 
         l
     }
@@ -162,7 +176,7 @@ impl Link {
 
     pub fn n_comps(&self) -> usize { 
         let mut count = 0;
-        self.traverse(|c, _, _| 
+        self.traverse_comps(|c, _, _| 
             if count <= c { count = c + 1 } 
         );
         count
@@ -171,7 +185,7 @@ impl Link {
     pub fn comps(&self) -> Vec<Path> {
         let mut comps = vec![];
 
-        self.traverse(|c, i, j| { 
+        self.traverse_comps(|c, i, j| { 
             if c == comps.len() { 
                 comps.push(vec![]);
             }
@@ -183,6 +197,35 @@ impl Link {
         comps.into_iter().map(|edges| 
             Path::circ(edges)
         ).collect()
+    }
+
+    fn traverse_comps<F>(&self, mut f: F) where 
+    F: FnMut(usize, usize, usize) { 
+        let n = self.n_nodes();
+
+        let mut c = 0; // component counter
+        let mut remain = self.edges.clone();
+
+        while !remain.is_empty() {
+            // Take minimal edge-id. 
+            let e0 = remain.iter().min().cloned().unwrap();
+
+            // Find node & point having edge e0. 
+            let (i0, j0) = (0..n).flat_map(|i| 
+                (0usize..4).map(move |j| (i, j))
+            ).find(|&(i, j)| 
+                self.node(i).edge(j) == e0
+            ).unwrap();
+
+            self.traverse_from((i0, j0), |i, j| { 
+                let e = self.node(i).edge(j);
+                remain.remove(&e);
+                f(c, i, j);
+            });
+
+            // Onto next component.
+            c += 1;
+        }
     }
 
     pub fn cc_at(&self, i: usize) -> Self { 
@@ -230,41 +273,6 @@ impl Link {
         self.resolve_by(&self.seifert_state()).comps()
     }
 
-    pub fn traverse<F>(&self, mut f: F) where 
-    F: FnMut(usize, usize, usize) { 
-        let n = self.n_nodes();
-
-        let mut c = 0; // component counter
-        let mut remain = self.edges.clone();
-
-        // MEMO: For a link obtained from a PD-code, 
-        // the following loop should break after the first iteration: j0 = 0.
-
-        for j0 in [0, 1, 2] { 
-            for i0 in 0..n {
-                let e0 = self.node(i0).edge(j0);
-                if !remain.remove(&e0) { 
-                    continue 
-                }
-
-                self.traverse_from((i0, j0), |i, j| { 
-                    let e = self.node(i).edge(j);
-                    remain.remove(&e);
-
-                    f(c, i, j);
-                });
-
-                c += 1;
-            }
-
-            if remain.is_empty() { 
-                break
-            }
-        }
-
-        assert!(remain.is_empty())
-    }
-
     pub fn traverse_from<F>(&self, start: (usize, usize), mut f:F) where
         F: FnMut(usize, usize)
     {
@@ -274,7 +282,7 @@ impl Link {
 
         loop {
             let c = self.node(i);
-            let k = c.traverse_inner(j);
+            let k = c.counter_pos(j);
             let next = self.traverse_outer(i, k);
 
             if next == start {

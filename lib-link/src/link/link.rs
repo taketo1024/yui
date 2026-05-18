@@ -5,6 +5,9 @@ use itertools::Itertools;
 use yui_core::{hashmap, CloneAnd, Sign};
 use yui_core::bitseq::Bit;
 
+use crate::NodeType;
+use crate::link::node::NodeOri;
+
 use super::{Node, Path};
 
 pub type Edge = usize;
@@ -18,7 +21,7 @@ pub struct Link {
 }
 
 impl Link {
-    pub fn new(nodes: impl IntoIterator<Item = Node>) -> Self { 
+    pub fn from_nodes(nodes: impl IntoIterator<Item = Node>) -> Self { 
         let nodes = nodes.into_iter().collect_vec();
         let edges = nodes.iter().flat_map(|x| x.edges()).cloned().collect();
         let l = Self { nodes, edges };
@@ -46,7 +49,7 @@ impl Link {
     pub fn from_pd_code<I>(pd_code: I) -> Self
     where I: IntoIterator<Item = XCode> { 
         let nodes = pd_code.into_iter().map(Node::from_pd_code).collect_vec();
-        Self::new(nodes)
+        Self::from_nodes(nodes)
     }
 
     pub fn load(name: &str) -> Result<Link, Box<dyn std::error::Error>> {
@@ -64,7 +67,8 @@ impl Link {
     }
 
     pub fn unknot() -> Link {
-        Link::from_pd_code([[0, 1, 1, 0]]).resolve_at(0, Bit::Bit0)
+        let n = Node::new(NodeType::H, NodeOri::None, [1, 2, 2, 1]);
+        Link::from_nodes([n])
     }
 
     pub fn is_knot(&self) -> bool { 
@@ -77,7 +81,7 @@ impl Link {
     }
 
     pub fn mirror(&self) -> Self {
-        Self::new(self.nodes().map(|x| x.mirror()))
+        Self::from_nodes(self.nodes().map(|x| x.mirror()))
     }
 
     pub fn n_nodes(&self) -> usize { 
@@ -296,7 +300,7 @@ mod tests {
 
     #[test]
     fn link_init() { 
-        let l = Link::new(vec![]);
+        let l = Link::from_nodes(vec![]);
         assert_eq!(l.nodes.len(), 0);
     }
 

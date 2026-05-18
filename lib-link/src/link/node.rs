@@ -69,7 +69,7 @@ impl NodeOri {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Node { 
     ntype: NodeType,
-    ori: NodeOri,
+    pub(crate) ori: NodeOri,
     edges: [Edge; 4],
 }
 

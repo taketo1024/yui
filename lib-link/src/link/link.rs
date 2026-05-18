@@ -1,8 +1,8 @@
 use core::panic;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fmt::Display;
 use itertools::Itertools;
-use yui_core::{hashmap, CloneAnd, Sign};
+use yui_core::{CloneAnd, Sign};
 use yui_core::bitseq::Bit;
 
 use crate::NodeType;
@@ -23,33 +23,57 @@ pub struct Link {
 impl Link {
     pub fn from_nodes(nodes: impl IntoIterator<Item = Node>) -> Self { 
         let nodes = nodes.into_iter().collect_vec();
-        let edges = nodes.iter().flat_map(|x| x.edges()).cloned().collect();
-        let l = Self { nodes, edges };
-        l.validate();
-        l
+        let edge_counts = nodes.iter().flat_map(|x| x.edges()).cloned().counts();
+
+        assert!(
+            edge_counts.values().all(|&c| c == 2),
+            "Invalid data: each edge must appear exactly twice."
+        );
+
+        let edges: HashSet<_> = edge_counts.into_keys().collect();
+        Self { nodes, edges }
     }
 
-    fn validate(&self) { 
-        assert_eq!(self.edges.len(), self.nodes.len() * 2, "Invalid data.");
-        self.traverse(|_, _, _| ());
-    }
-
-    // Planer Diagram code, represented by crossings:
+    // Planer Diagram code, represented by sequence of crossings of the form:
     //
     //     3   2
     //      \ /
-    //       \      = (0, 1, 2, 3)
+    //       \     = [0, 1, 2, 3]
     //      / \
     //     0   1
     //
-    // The lower edge has direction 0 -> 2.
-    // The crossing is +1 if the upper goes 3 -> 1.
+    // The lower edge is always oriented 0 -> 2.
     // see: http://katlas.math.toronto.edu/wiki/Planar_Diagrams
 
     pub fn from_pd_code<I>(pd_code: I) -> Self
     where I: IntoIterator<Item = XCode> { 
+        use crate::NodeOri::{Up, Right, None};
+        
         let nodes = pd_code.into_iter().map(Node::from_pd_code).collect_vec();
-        Self::from_nodes(nodes)
+        let mut l = Self::from_nodes(nodes);
+        let mut ori = vec![None; l.n_nodes()];
+
+        // determine orientation
+        l.traverse(|_, i, j| {
+            if ori[i] == None { 
+                ori[i] = match j { 
+                    0 => None,
+                    1 => Up,
+                    3 => Right,
+                    _ => panic!("Invalid pd-code.")
+                }
+            } else if j != 0 { 
+                panic!("Invalid pd-code.")
+            }
+        });
+        
+        assert!(ori.iter().all(|o| o != &None));
+
+        for (i, o) in ori.into_iter().enumerate() { 
+            l.node_mut(i).ori = o;
+        }
+
+        l
     }
 
     pub fn load(name: &str) -> Result<Link, Box<dyn std::error::Error>> {
@@ -76,7 +100,7 @@ impl Link {
     }
 
     pub fn writhe(&self) -> i32 { 
-        let (p, n) = self.count_signed_crossings();
+        let (p, n) = self.n_signed_crossings();
         (p as i32) - (n as i32)
     }
 
@@ -110,28 +134,18 @@ impl Link {
             .count()
     }
 
-    pub fn count_signed_crossings(&self) -> (usize, usize) {
-        let signs = self.iter_signed_crossings();
-        let pos = signs.iter().filter(|(_, s)| s.is_positive()).count();
-        let neg = signs.len() - pos;
+    pub fn n_signed_crossings(&self) -> (usize, usize) {
+        let mut pos = 0;
+        let mut neg = 0;
+        for n in self.nodes.iter() { 
+            if n.is_pos() { pos += 1 } 
+            else if n.is_neg() { neg += 1}
+        }
         (pos, neg)
     }
 
-    pub fn iter_signed_crossings(&self) -> HashMap<usize, Sign> {
-        // TODO replace this. 
-        use super::node::NodeType::*;
-
-        let mut result = hashmap!{};
-
-        self.traverse(|_, i, j| {
-            match (self.node(i).ntype(), j) { 
-                (XR, 1) | (XL, 3) => result.insert(i, Sign::Pos),
-                (XR, 3) | (XL, 1) => result.insert(i, Sign::Neg),
-                _ => None
-            };
-        });
-
-        result
+    pub fn is_oriented(&self) -> bool { 
+        self.nodes().all(|n| n.is_oriented())
     }
 
     pub fn n_edges(&self) -> usize { 
@@ -199,11 +213,14 @@ impl Link {
     }
 
     pub fn seifert_state(&self) -> State { 
-        let signs = self.iter_signed_crossings();
-        let seq = signs.iter().sorted_by_key(|(&i, _)| i).map(|(_, s)| 
-            match s { 
-                Sign::Pos => 0, 
-                Sign::Neg => 1
+        // MEMO: no assertion here since `unknot` is not oriented. 
+        // assert!(self.is_oriented());
+
+        let seq = self.crossings().map(|x| 
+            match x.sign() {
+                Some(Sign::Pos) => 0,
+                Some(Sign::Neg) => 1,
+                None => panic!("Impossible.")
             }
         ); 
         State::from_iter(seq)
@@ -293,7 +310,6 @@ impl Display for Link {
 
 #[cfg(test)]
 mod tests { 
-    use yui_core::hashmap;
     use crate::NodeType::{XL, XR};
 
     use super::*;
@@ -359,13 +375,13 @@ mod tests {
     #[test]
     fn link_crossing_signs() {
         let l = Link::test_data("unknot_l_twist");
-        assert_eq!(l.iter_signed_crossings(), hashmap!{ 0 => Sign::Pos});
+        assert_eq!(l.n_signed_crossings(), (1, 0));
 
         let l = Link::test_data("unknot_r_twist");
-        assert_eq!(l.iter_signed_crossings(), hashmap!{ 0 => Sign::Neg} );
+        assert_eq!(l.n_signed_crossings(), (0, 1));
 
         let l = Link::test_data("unknot_l_twist").resolve_at(0, Bit::Bit0);
-        assert_eq!(l.iter_signed_crossings(), hashmap!{});
+        assert_eq!(l.n_signed_crossings(), (0, 0));
     }
 
     #[test]
@@ -477,8 +493,7 @@ mod tests {
         let l = Link::test_data("3_1");
         let l2 = l.cc_at(1);
 
-        // TODO must change. 
-        assert_eq!(l.node(1),  &Node::new(XL, NodeOri::None, [3,6,4,1]));
-        assert_eq!(l2.node(1), &Node::new(XR, NodeOri::None, [3,6,4,1]));
+        assert_eq!(l.node(1),  &Node::new(XL, NodeOri::Up, [3,6,4,1]));
+        assert_eq!(l2.node(1), &Node::new(XR, NodeOri::Up, [3,6,4,1]));
     }
 }

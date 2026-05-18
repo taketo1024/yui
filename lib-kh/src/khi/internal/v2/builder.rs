@@ -172,7 +172,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let elements = elements.into_par_iter().map(|mut e| { 
             e.modify(|k, c| {
                 let kk = k + k;
-                let cc = c.into_map(|mut c, r| { 
+                let cc = c.map(|mut c, r| {
                     let r = &r * &r;
                     let tc = c.convert_edges(|e| self.inv_e(e));
                     c.connect(tc);

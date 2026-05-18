@@ -931,7 +931,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn modify<F>(self, f: F) -> Self 
     where F: Fn(&mut Cob) {
-        self.into_map(|mut cob, r| { 
+        self.map(|mut cob, r| {
             f(&mut cob);
             if cob.is_zero_cob() { 
                 (cob, R::zero())

@@ -232,13 +232,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn merge(&self, x: &KhChainGen, in_indices: (usize, usize), out_index: usize, target: State) -> KhChain<R> { 
-        self.str.mul_tensor(&x.tensor, in_indices, out_index).into_map_gens(|y| { 
+        self.str.mul_tensor(&x.tensor, in_indices, out_index).map_gens(|y| { 
             KhChainGen::new(target, y, x.deg_shift)
         })
     }
 
     fn split(&self, x: &KhChainGen, in_index: usize, out_indices: (usize, usize), target: State) -> KhChain<R> { 
-        self.str.comul_tensor(&x.tensor, in_index, out_indices).into_map_gens(|y| { 
+        self.str.comul_tensor(&x.tensor, in_index, out_indices).map_gens(|y| { 
             KhChainGen::new(target, y, x.deg_shift)
         })
     }

@@ -23,20 +23,20 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     pub fn new(l: &InvLink, h: &R, t: &R, reduced: bool, deg_shift: (isize, isize)) -> Self { 
         assert_eq!(R::one() + R::one(), R::zero(), "char(R) != 2");
         assert!(!reduced || (l.base_pt().is_some() && t.is_zero()));
-        assert!(l.link().nodes().all(|x| x.is_crossing()));
+        assert!(l.nodes().all(|x| x.is_crossing()));
 
-        let n = l.link().n_crossings();
+        let n = l.n_crossings();
         let reduce_e = if reduced { l.base_pt() } else { None };
-        let cube = KhCube::new(l.link(), h, t, reduce_e, deg_shift);
+        let cube = KhCube::new(l.inner(), h, t, reduce_e, deg_shift);
 
         let x_index = (0..n).map(|i| { 
-            let x = l.link().node(i);
+            let x = l.node(i);
             (x, i)
         }).collect::<HashMap<_, _>>();
 
         let state_map = State::generate(n).map(|s| { 
             let t = State::from_iter((0..n).map(|i| {
-                let x = l.link().node(i);
+                let x = l.node(i);
                 let tx = l.inv_x(x);
                 let ti = x_index[tx];
                 s[ti]
@@ -177,7 +177,7 @@ mod tests {
  
     #[test]
     fn tau_state() { 
-        let l = InvLink::sinv_knot_from_code([[5,3,6,2],[1,5,2,4],[3,1,4,6]]);
+        let l = InvLink::from_symmetric_pd_code([[5,3,6,2],[1,5,2,4],[3,1,4,6]]);
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
@@ -226,7 +226,7 @@ mod tests {
 
     #[test]
     fn tau_label() { 
-        let l = InvLink::sinv_knot_from_code([[5,3,6,2],[1,5,2,4],[3,1,4,6]]);
+        let l = InvLink::from_symmetric_pd_code([[5,3,6,2],[1,5,2,4],[3,1,4,6]]);
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
@@ -255,7 +255,7 @@ mod tests {
 
     #[test]
     fn generators() { 
-        let l = InvLink::sinv_knot_from_code([[5,3,6,2],[1,5,2,4],[3,1,4,6]]);
+        let l = InvLink::from_symmetric_pd_code([[5,3,6,2],[1,5,2,4],[3,1,4,6]]);
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
@@ -270,7 +270,7 @@ mod tests {
 
     #[test]
     fn d_lower_sym() { 
-        let l = InvLink::sinv_knot_from_code([[5,3,6,2],[1,5,2,4],[3,1,4,6]]);
+        let l = InvLink::from_symmetric_pd_code([[5,3,6,2],[1,5,2,4],[3,1,4,6]]);
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
@@ -314,7 +314,7 @@ mod tests {
 
     #[test]
     fn d_lower_asym() { 
-        let l = InvLink::sinv_knot_from_code([[5,3,6,2],[1,5,2,4],[3,1,4,6]]);
+        let l = InvLink::from_symmetric_pd_code([[5,3,6,2],[1,5,2,4],[3,1,4,6]]);
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
@@ -368,7 +368,7 @@ mod tests {
 
     #[test]
     fn d_upper() { 
-        let l = InvLink::sinv_knot_from_code([[5,3,6,2],[1,5,2,4],[3,1,4,6]]);
+        let l = InvLink::from_symmetric_pd_code([[5,3,6,2],[1,5,2,4],[3,1,4,6]]);
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());

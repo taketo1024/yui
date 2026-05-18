@@ -53,16 +53,16 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         assert_eq!(R::one() + R::one(), R::zero(), "char(R) != 2");
         assert!(!reduced || (l.base_pt().is_some() && t.is_zero()));
 
-        let deg_shift = KhComplex::deg_shift_for(l.link(), reduced);
+        let deg_shift = KhComplex::deg_shift_for(l.inner(), reduced);
 
         // TODO use mapping cone
 
         let cube = KhICube::new(l, h, t, reduced, deg_shift);
         let inner = cube.into_complex();
 
-        let canon_cycles = if l.base_pt().is_some() && l.link().is_knot() {
+        let canon_cycles = if l.base_pt().is_some() && l.is_knot() {
             let p = l.base_pt().unwrap();
-            let zs = KhComplex::make_canon_cycles(l.link(), p, &R::zero(), h, reduced, deg_shift);
+            let zs = KhComplex::make_canon_cycles(l.inner(), p, &R::zero(), h, reduced, deg_shift);
             Iterator::chain(
                 zs.iter().map(|z| z.map_gens(|x| KhIGen::B(*x))),
                 zs.iter().map(|z| z.map_gens(|x| KhIGen::Q(*x)))

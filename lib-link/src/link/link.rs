@@ -306,8 +306,7 @@ mod tests {
 
     #[test]
     fn link_from_pd_code() { 
-        let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code);
+        let l = Link::unknot_l_twist();
         assert_eq!(l.nodes.len(), 1);
         assert_eq!(l.node(0).ntype(), XL);
     }
@@ -317,8 +316,7 @@ mod tests {
         let l = Link::empty();
         assert!(l.is_empty());
 
-        let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code);
+        let l = Link::unknot_l_twist();
         assert!(!l.is_empty());
     }
 
@@ -327,19 +325,16 @@ mod tests {
         let l = Link::empty();
         assert_eq!(l.n_crossings(), 0);
 
-        let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code);
+        let l = Link::unknot_l_twist();
         assert_eq!(l.n_crossings(), 1);
         
-        let pd_code = [[1,4,2,5],[3,6,4,1],[5,2,6,3]];
-        let l = Link::from_pd_code(pd_code);
+        let l = Link::test_data("3_1").unwrap();
         assert_eq!(l.n_crossings(), 3);
     }
 
     #[test]
     fn link_next() {
-        let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code);
+        let l = Link::unknot_l_twist();
 
         assert_eq!(l.traverse_outer(0, 0), (0, 1));
         assert_eq!(l.traverse_outer(0, 1), (0, 0));
@@ -355,8 +350,7 @@ mod tests {
             queue
         };
 
-        let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code);
+        let l = Link::unknot_l_twist();
         let path = traverse(&l, (0, 0));
         
         assert_eq!(path, [(0, 0), (0, 3)]); // loop
@@ -364,47 +358,38 @@ mod tests {
 
     #[test]
     fn link_crossing_signs() {
-        let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code);
+        let l = Link::unknot_l_twist();
         assert_eq!(l.iter_signed_crossings(), hashmap!{ 0 => Sign::Pos});
 
-        let pd_code = [[0,1,1,0]];
-        let l = Link::from_pd_code(pd_code);
+        let l = Link::unknot_r_twist();
         assert_eq!(l.iter_signed_crossings(), hashmap!{ 0 => Sign::Neg} );
 
-        let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code).resolve_at(0, Bit::Bit0);
+        let l = Link::unknot_l_twist().resolve_at(0, Bit::Bit0);
         assert_eq!(l.iter_signed_crossings(), hashmap!{});
     }
 
     #[test]
     fn link_writhe() {
-        let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code);
+        let l = Link::unknot_l_twist();
         assert_eq!(l.writhe(), 1);
 
-        let pd_code = [[0,1,1,0]];
-        let l = Link::from_pd_code(pd_code);
+        let l = Link::unknot_r_twist();
         assert_eq!(l.writhe(), -1);
 
-        let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code).resolve_at(0, Bit::Bit0);
+        let l = Link::unknot_l_twist().resolve_at(0, Bit::Bit0);
         assert_eq!(l.writhe(), 0);
-
     }
 
     #[test]
     fn link_components() {
-        let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code);
+        let l = Link::unknot_l_twist();
         let comps = l.comps();
-        assert_eq!(comps, vec![ Path::new(vec![0, 1], true)]);
+        assert_eq!(comps, vec![ Path::new(vec![1, 2], true)]);
     }
 
     #[test]
     fn link_mirror() { 
-        let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code);
+        let l = Link::unknot_l_twist();
         assert_eq!(l.node(0).ntype(), XL);
 
         let l = l.mirror();
@@ -414,16 +399,14 @@ mod tests {
     #[test]
     fn link_resolve() {
         let s = State::from([0, 0, 0]);
-        let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]) // trefoil
-            .resolve_by(&s);
+        let l = Link::test_data("3_1").unwrap().resolve_by(&s);
 
         let comps = l.comps();
         assert_eq!(comps.len(), 3);
         assert!(comps.iter().all(|c| c.is_circle()));
 
         let s = State::from([1, 1, 1]);
-        let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]) // trefoil
-            .resolve_by(&s);
+        let l = Link::test_data("3_1").unwrap().resolve_by(&s);
 
         let comps = l.comps();
         assert_eq!(comps.len(), 2);
@@ -493,7 +476,7 @@ mod tests {
     fn crossing_change() {
         use crate::link::node::NodeOri;
 
-        let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]);
+        let l = Link::test_data("3_1").unwrap();
         let l2 = l.cc_at(1);
 
         // TODO must change. 

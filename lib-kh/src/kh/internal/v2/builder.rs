@@ -620,7 +620,7 @@ mod tests {
 
     #[test]
     fn test_unknot_rm1() {
-        let l = Link::from_pd_code([[0,0,1,1]]);
+        let l = Link::unknot_l_twist();
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
         assert_eq!(c[0].rank(), 2);
@@ -629,7 +629,7 @@ mod tests {
 
     #[test]
     fn test_unknot_rm1_neg() {
-        let l = Link::from_pd_code([[0,1,1,0]]);
+        let l = Link::unknot_r_twist();
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
         c.check_d_all();

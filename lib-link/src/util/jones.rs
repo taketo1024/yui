@@ -51,7 +51,7 @@ mod tests {
 
     #[test]
     fn unlink_2() {
-        let l = Link::from_pd_code([[0, 1, 1, 0]]).resolve_at(0, Bit::Bit1);
+        let l = Link::unknot_r_twist().resolve_at(0, Bit::Bit1);
         let p = jones_polynomial(&l);
         let q = P::mono;
         assert_eq!(p, P::from_iter([(q(-2), 1), (q(0), 2), (q(2), 1)]));

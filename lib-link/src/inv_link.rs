@@ -41,7 +41,7 @@ impl InvLink {
         assert_eq!(x_map.len(), link.n_nodes());
 
         if let Some(p) = base_pt { 
-            assert_eq!(p, e_map[&p], "base-pt must be on-axis.");
+              assert_eq!(p, e_map[&p], "base-pt must be on-axis.");
         }
 
         Self { link, base_pt, e_map, x_map }
@@ -170,9 +170,20 @@ mod tests {
     use super::*;
 
     #[test]
+    fn load_3_1() { 
+        let l = InvLink::load("3_1").unwrap();
+        assert_eq!(l.link().n_crossings(), 3);
+    }
+
+    #[test]
+    fn load_4_1() { 
+        let l = InvLink::load("4_1").unwrap();
+        assert_eq!(l.link().n_crossings(), 4);
+    }
+    
+    #[test]
     fn inv_e() { 
-        let l = Link::from_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
-        let l = InvLink::new(l, |e| (7 - e) % 6 + 1, None);
+        let l = InvLink::load("3_1").unwrap();
 
         assert_eq!(l.inv_e(1), 1);
         assert_eq!(l.inv_e(2), 6);
@@ -184,8 +195,7 @@ mod tests {
     
     #[test]
     fn inv_x() { 
-        let l = Link::from_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
-        let l = InvLink::new(l, |e| (7 - e) % 6 + 1, None);
+        let l = InvLink::load("3_1").unwrap();
         let nodes = l.link.nodes().collect_vec();
 
         assert_eq!(l.inv_x(&nodes[0]), nodes[1]);
@@ -195,7 +205,7 @@ mod tests {
 
     #[test]
     fn from_sinv() { 
-        let l = InvLink::sinv_knot_from_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
+        let l = InvLink::load("3_1").unwrap();
 
         assert_eq!(l.inv_e(1), 1);
         assert_eq!(l.inv_e(2), 6);
@@ -203,17 +213,5 @@ mod tests {
         assert_eq!(l.inv_e(4), 4);
         assert_eq!(l.inv_e(5), 3);
         assert_eq!(l.inv_e(6), 2);
-    }
-
-    #[test]
-    fn load_3_1() { 
-        let l = InvLink::load("3_1").unwrap();
-        assert_eq!(l.link().n_crossings(), 3);
-    }
-
-    #[test]
-    fn load_4_1() { 
-        let l = InvLink::load("4_1").unwrap();
-        assert_eq!(l.link().n_crossings(), 4);
     }
 }

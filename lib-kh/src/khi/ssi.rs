@@ -91,9 +91,9 @@ mod tests {
     #[test]
     fn test_unknot_pos_twist() { 
         let l = InvLink::new(
-            Link::from_pd_code([[0,0,1,1]]),
+            Link::unknot_l_twist(),
             |e| e,
-            Some(0)
+            Some(1)
         );
         let c = P::variable();
 
@@ -105,9 +105,9 @@ mod tests {
     #[test]
     fn test_unknot_neg_twist() { 
         let l = InvLink::new(
-            Link::from_pd_code([[0,1,1,0]]),
+            Link::unknot_r_twist(),
             |e| e,
-            Some(0)
+            Some(1)
         );
         let c = P::variable();
 

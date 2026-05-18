@@ -78,7 +78,7 @@ mod tests {
 
     #[test]
     fn test_unknot_rm1() { 
-        let l = Link::from_pd_code([[0,0,1,1]]);
+        let l = Link::unknot_l_twist();
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), 0);
@@ -89,7 +89,7 @@ mod tests {
 
     #[test]
     fn test_unknot_rm1_neg() { 
-        let l = Link::from_pd_code([[0,1,1,0]]);
+        let l = Link::unknot_r_twist();
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), 0);
@@ -100,7 +100,7 @@ mod tests {
 
     #[test]
     fn test_3_1() { 
-        let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]);
+        let l = Link::test_data("3_1").unwrap();
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), -2);
@@ -111,7 +111,7 @@ mod tests {
 
     #[test]
     fn test_4_1() { 
-        let l = Link::from_pd_code([[4,2,5,1],[8,6,1,5],[6,3,7,4],[2,7,3,8]]);
+        let l = Link::test_data("4_1").unwrap();
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), 0);
@@ -122,7 +122,7 @@ mod tests {
 
     #[test]
     fn test_5_1() { 
-        let l = Link::from_pd_code([[1,6,2,7],[3,8,4,9],[5,10,6,1],[7,2,8,3],[9,4,10,5]]);
+        let l = Link::test_data("5_1").unwrap();
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), -4);
@@ -133,7 +133,7 @@ mod tests {
 
     #[test]
     fn test_5_2() { 
-        let l = Link::from_pd_code([[1,4,2,5],[3,8,4,9],[5,10,6,1],[9,6,10,7],[7,2,8,3]]);
+        let l = Link::test_data("5_2").unwrap();
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), -2);
@@ -144,7 +144,7 @@ mod tests {
 
     #[test]
     fn test_6_1() { 
-        let l = Link::from_pd_code([[1,4,2,5],[7,10,8,11],[3,9,4,8],[9,3,10,2],[5,12,6,1],[11,6,12,7]]);
+        let l = Link::test_data("6_1").unwrap();
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), 0);
@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn test_6_2() { 
-        let l = Link::from_pd_code([[1,4,2,5],[5,10,6,11],[3,9,4,8],[9,3,10,2],[7,12,8,1],[11,6,12,7]]);
+        let l = Link::test_data("6_2").unwrap();
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), -2);
@@ -166,7 +166,7 @@ mod tests {
 
     #[test]
     fn test_6_3() { 
-        let l = Link::from_pd_code([[4,2,5,1],[8,4,9,3],[12,9,1,10],[10,5,11,6],[6,11,7,12],[2,8,3,7]]);
+        let l = Link::test_data("6_3").unwrap();
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), 0);

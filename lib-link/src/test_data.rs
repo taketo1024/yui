@@ -21,6 +21,14 @@ impl Link {
         };
         Ok(Link::from_pd_code(pd.iter().copied()))
     }
+
+    pub fn unknot_l_twist() -> Link { 
+        Link::from_pd_code([[1, 1, 2, 2]])
+    }
+
+    pub fn unknot_r_twist() -> Link { 
+        Link::from_pd_code([[1, 2, 2, 1]])
+    }
 }
 
 impl Braid {

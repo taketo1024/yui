@@ -1325,9 +1325,9 @@ mod tests {
     #[test]
     fn stack_id() {
         let c1 = Cob::new(vec![
-            CobComp::sdl_from(&Node::from_pd_code([0,1,2,3])),
-            CobComp::cup(TngComp::circ([4])),
-            CobComp::cap(TngComp::circ([5])),
+            CobComp::sdl_from(&Node::from_pd_code([1,4,2,5])),
+            CobComp::cup(TngComp::circ([10])),
+            CobComp::cap(TngComp::circ([11])),
         ]);
         let c0 = Cob::id(&c1.src());
         let c2 = Cob::id(&c1.tgt());

@@ -64,8 +64,8 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
             let p = l.base_pt().unwrap();
             let zs = KhComplex::make_canon_cycles(l.inner(), p, &R::zero(), h, reduced, deg_shift);
             Iterator::chain(
-                zs.iter().map(|z| z.map_gens(|x| KhIGen::B(*x))),
-                zs.iter().map(|z| z.map_gens(|x| KhIGen::Q(*x)))
+                zs.iter().map(|z| z.map_gens_ref(|x| KhIGen::B(*x))),
+                zs.iter().map(|z| z.map_gens_ref(|x| KhIGen::Q(*x)))
             ).collect()
         } else { 
             vec![]
@@ -81,8 +81,8 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         let h_range = *h_range.start() ..= (h_range.end() + 1);
 
         let canon_cycles = c.canon_cycles().iter().flat_map(|z| { 
-            let bz = z.map_gens(|x| KhIGen::B(*x));
-            let qz = z.map_gens(|x| KhIGen::Q(*x));
+            let bz = z.map_gens_ref(|x| KhIGen::B(*x));
+            let qz = z.map_gens_ref(|x| KhIGen::Q(*x));
             [bz, qz]
         }).sorted_by_key(|z| z.h_deg()).collect_vec();
 
@@ -98,7 +98,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
             match x { 
                 KhIGen::B(x) => {
                     let z = KhChain::from(*x);
-                    let dx = c.d(i, &z).map_gens(|y| KhIGen::B(*y));
+                    let dx = c.d(i, &z).map_gens_ref(|y| KhIGen::B(*y));
                     let qx = KhIChain::from(KhIGen::Q(*x));
                     let qtx = {
                         let tx = map(x);
@@ -108,7 +108,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
                 },
                 KhIGen::Q(x) => {
                     let z = KhChain::from(*x);
-                    c.d(i, &z).map_gens(|y| KhIGen::Q(*y))
+                    c.d(i, &z).map_gens_ref(|y| KhIGen::Q(*y))
                 }
             }
         };

@@ -926,7 +926,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn convert_edges<F>(&self, f: F) -> Self 
     where F: Fn(Edge) -> Edge { 
-        self.map_gens(|c| c.convert_edges(&f))
+        self.map_gens_ref(|c| c.convert_edges(&f))
     }
 
     fn modify<F>(self, f: F) -> Self 
@@ -945,8 +945,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.modify(|cob| cob.connect(c.clone()) )
     }
 
-    fn connected(&self, c: &Cob) -> Self { 
-        self.map(|cob, r| { 
+    fn connected(&self, c: &Cob) -> Self {
+        self.map_ref(|cob, r| {
             (cob.connected(c), r.clone())
         })
     }

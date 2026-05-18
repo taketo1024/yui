@@ -95,7 +95,7 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
         R2: Ring, for<'x> &'x R2: RingOps<R2>, 
         F: Fn(&R) -> R2
     {
-        PolyBase::<X, R2>::from( self.data.map_coeffs(f) )
+        PolyBase::<X, R2>::from( self.data.map_coeffs_ref(f) )
     }
 
     pub fn sort_terms_by<F>(&self, cmp: F) -> impl Iterator<Item = (&X, &R)>

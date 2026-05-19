@@ -4,20 +4,18 @@ use std::str::FromStr;
 use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
 
-use crate::poly::var::fmt_mono;
-use crate::poly::Poly;
-use crate::{AddGrp, AddGrpOps, AddMon, AddMonOps, Elem, EucRing, EucRingOps, Field, FieldOps, Mon, MonOps, Ring, RingOps};
-
-use super::Mono;
+use yui_core::poly::{Mono, Poly};
+use yui_core::util::format::{lc, superscript};
+use yui_core::{AddGrp, AddGrpOps, AddMon, AddMonOps, Elem, EucRing, EucRingOps, Field, FieldOps, Mon, MonOps, Ring, RingOps};
 
 // Homogeneous polynomial
 #[derive(Clone, Copy, Debug, Default)]
-pub struct HPoly<const X: char, R> { 
+pub struct FastPoly<const X: char, R> { 
     deg: usize,
     coeff: R
 }
 
-impl<const X: char, R> HPoly<X, R> { 
+impl<const X: char, R> FastPoly<X, R> { 
     pub fn new(deg: usize, coeff: R) -> Self { 
         Self { deg, coeff }
     }
@@ -40,17 +38,22 @@ impl<const X: char, R> HPoly<X, R> {
     }
 }
 
-impl<const X: char, R> Display for HPoly<X, R>
+impl<const X: char, R> Display for FastPoly<X, R>
 where R: Display {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use crate::util::format::lc;
-        let x = fmt_mono(&X.to_string(), &self.deg, true);
+        let x = if self.deg == 0 {
+            "1".to_string()
+        } else if self.deg == 1 {
+            X.to_string()
+        } else {
+            format!("{X}{}", superscript(self.deg as isize))
+        };
         let t = lc([(x, &self.coeff)].into_iter());
         t.fmt(f)
     }
 }
 
-impl<const X: char, R> FromStr for HPoly<X, R>
+impl<const X: char, R> FromStr for FastPoly<X, R>
 where R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
     type Err = ();
 
@@ -68,7 +71,7 @@ where R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<const X: char, R> Zero for HPoly<X, R>
+impl<const X: char, R> Zero for FastPoly<X, R>
 where R: AddMon, for<'x> &'x R: AddMonOps<R> {
     fn zero() -> Self {
         Self::new(0, R::zero())
@@ -79,7 +82,7 @@ where R: AddMon, for<'x> &'x R: AddMonOps<R> {
     }
 }
 
-impl<const X: char, R> One for HPoly<X, R>
+impl<const X: char, R> One for FastPoly<X, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn one() -> Self {
         Self::new(0, R::one())
@@ -90,7 +93,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<const X: char, R> PartialEq for HPoly<X, R>
+impl<const X: char, R> PartialEq for FastPoly<X, R>
 where R: PartialEq + Zero {
     fn eq(&self, other: &Self) -> bool {
         if self.coeff.is_zero() && other.coeff.is_zero() {
@@ -101,13 +104,13 @@ where R: PartialEq + Zero {
     }
 }
 
-impl<const X: char, R> Eq for HPoly<X, R>
+impl<const X: char, R> Eq for FastPoly<X, R>
 where R: Eq + Zero {}
 
 #[auto_ops]
-impl<const X: char, R> AddAssign<&HPoly<X, R>> for HPoly<X, R>
+impl<const X: char, R> AddAssign<&FastPoly<X, R>> for FastPoly<X, R>
 where R: AddMon, for<'x> &'x R: AddMonOps<R> {
-    fn add_assign(&mut self, rhs: &HPoly<X, R>) {
+    fn add_assign(&mut self, rhs: &FastPoly<X, R>) {
         if self.is_zero() { 
             *self = rhs.clone()
         } else if rhs.is_zero() { 
@@ -120,9 +123,9 @@ where R: AddMon, for<'x> &'x R: AddMonOps<R> {
 }
 
 #[auto_ops]
-impl<const X: char, R> SubAssign<&HPoly<X, R>> for HPoly<X, R>
+impl<const X: char, R> SubAssign<&FastPoly<X, R>> for FastPoly<X, R>
 where R: AddGrp, for<'x> &'x R: AddGrpOps<R> {
-    fn sub_assign(&mut self, rhs: &HPoly<X, R>) {
+    fn sub_assign(&mut self, rhs: &FastPoly<X, R>) {
         if self.is_zero() { 
             *self = -rhs
         } else if rhs.is_zero() { 
@@ -134,7 +137,7 @@ where R: AddGrp, for<'x> &'x R: AddGrpOps<R> {
     }
 }
 
-impl<const X: char, R> Neg for HPoly<X, R>
+impl<const X: char, R> Neg for FastPoly<X, R>
 where R: AddGrp, for<'x> &'x R: AddGrpOps<R> {
     type Output = Self;
     fn neg(self) -> Self::Output {
@@ -142,16 +145,16 @@ where R: AddGrp, for<'x> &'x R: AddGrpOps<R> {
     }
 }
 
-impl<const X: char, R> Neg for &HPoly<X, R>
+impl<const X: char, R> Neg for &FastPoly<X, R>
 where R: AddGrp, for<'x> &'x R: AddGrpOps<R> {
-    type Output = HPoly<X, R>;
+    type Output = FastPoly<X, R>;
     fn neg(self) -> Self::Output {
-        HPoly::new(self.deg, -&self.coeff)
+        FastPoly::new(self.deg, -&self.coeff)
     }
 }
 
 #[auto_ops]
-impl<const X: char, R> MulAssign<&R> for HPoly<X, R>
+impl<const X: char, R> MulAssign<&R> for FastPoly<X, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn mul_assign(&mut self, rhs: &R) {
         if rhs.is_one() { 
@@ -162,9 +165,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 #[auto_ops]
-impl<const X: char, R> MulAssign<&HPoly<X, R>> for HPoly<X, R>
+impl<const X: char, R> MulAssign<&FastPoly<X, R>> for FastPoly<X, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn mul_assign(&mut self, rhs: &HPoly<X, R>) {
+    fn mul_assign(&mut self, rhs: &FastPoly<X, R>) {
         if rhs.is_one() { 
             return
         }
@@ -175,10 +178,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 macro_rules! impl_alg_op {
     ($trait:ident) => {
-        impl<const X: char, R> $trait<Self> for HPoly<X, R>
+        impl<const X: char, R> $trait<Self> for FastPoly<X, R>
         where R: Ring, for<'x> &'x R: RingOps<R> {}
 
-        impl<const X: char, R> $trait<HPoly<X, R>> for &HPoly<X, R>
+        impl<const X: char, R> $trait<FastPoly<X, R>> for &FastPoly<X, R>
         where R: Ring, for<'x> &'x R: RingOps<R> {}
     };
 }
@@ -188,23 +191,23 @@ impl_alg_op!(AddGrpOps);
 impl_alg_op!(MonOps);
 impl_alg_op!(RingOps);
 
-impl<const X: char, R> Elem for HPoly<X, R>
+impl<const X: char, R> Elem for FastPoly<X, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn math_symbol() -> String {
         format!("{}[{}]", R::math_symbol(), X)
     }
 }
 
-impl<const X: char, R> AddMon for HPoly<X, R>
+impl<const X: char, R> AddMon for FastPoly<X, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {}
 
-impl<const X: char, R> AddGrp for HPoly<X, R>
+impl<const X: char, R> AddGrp for FastPoly<X, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {}
 
-impl<const X: char, R> Mon for HPoly<X, R>
+impl<const X: char, R> Mon for FastPoly<X, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {}
 
-impl<const X: char, R> Ring for HPoly<X, R>
+impl<const X: char, R> Ring for FastPoly<X, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn inv(&self) -> Option<Self> {
         if self.deg > 0 { 
@@ -229,7 +232,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<const X: char, R> HPoly<X, R>
+impl<const X: char, R> FastPoly<X, R>
 where R: Field, for<'x> &'x R: FieldOps<R> {
     pub fn div_rem(&self, rhs: &Self) -> (Self, Self) { 
         assert!(!rhs.is_zero());
@@ -243,7 +246,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
         
         let k = i - j; // >= 0
         let c = a / b;
-        let q = HPoly::new(k, c); // cx^k = (a/b) x^{i-j}.
+        let q = FastPoly::new(k, c); // cx^k = (a/b) x^{i-j}.
         let r = Self::zero();
         
         (q, r)
@@ -251,48 +254,57 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
 }
 
 #[auto_ops]
-impl<const X: char, R> Div<&HPoly<X, R>> for HPoly<X, R>
+impl<const X: char, R> Div<&FastPoly<X, R>> for FastPoly<X, R>
 where R: Field, for<'x> &'x R: FieldOps<R> {
     type Output = Self;
 
-    fn div(self, rhs: &HPoly<X, R>) -> Self {
+    fn div(self, rhs: &FastPoly<X, R>) -> Self {
         self.div_rem(rhs).0
     }
 }
 
 #[auto_ops]
-impl<const X: char, R> Rem<&HPoly<X, R>> for HPoly<X, R>
+impl<const X: char, R> Rem<&FastPoly<X, R>> for FastPoly<X, R>
 where R: Field, for<'x> &'x R: FieldOps<R> {
     type Output = Self;
 
-    fn rem(self, rhs: &HPoly<X, R>) -> Self::Output {
+    fn rem(self, rhs: &FastPoly<X, R>) -> Self::Output {
         self.div_rem(rhs).1
     }
 }
 
-impl<const X: char, R> EucRingOps<HPoly<X, R>> for HPoly<X, R>
+impl<const X: char, R> EucRingOps<FastPoly<X, R>> for FastPoly<X, R>
 where R: Field, for<'x> &'x R: FieldOps<R> {}
 
-impl<const X: char, R> EucRingOps<HPoly<X, R>> for &HPoly<X, R>
+impl<const X: char, R> EucRingOps<FastPoly<X, R>> for &FastPoly<X, R>
 where R: Field, for<'x> &'x R: FieldOps<R> {}
 
-impl<const X: char, R> EucRing for HPoly<X, R>
+impl<const X: char, R> EucRing for FastPoly<X, R>
 where R: Field, for<'x> &'x R: FieldOps<R> {}
 
-#[cfg(feature = "tex")]
 mod tex {
-    use crate::tex::TeX;
+    use yui_core::tex::TeX;
     use super::*;
 
-    impl<const X: char, R> TeX for HPoly<X, R>
+    impl<const X: char, R> TeX for FastPoly<X, R>
     where R: Ring + TeX, for<'x> &'x R: RingOps<R> {
-        fn tex_math_symbol() -> String { 
+        fn tex_math_symbol() -> String {
             format!("{}[{X}]", R::tex_math_symbol())
         }
 
         fn tex_string(&self) -> String {
-            use crate::util::format::lc;
-            let x = fmt_mono(&X.to_string(), &self.deg, false);
+            let x = if self.deg == 0 {
+                "1".to_string()
+            } else if self.deg == 1 {
+                X.to_string()
+            } else {
+                let d = self.deg;
+                if d.to_string().len() == 1 {
+                    format!("{X}^{d}")
+                } else {
+                    format!("{X}^{{{d}}}")
+                }
+            };
             lc([(x, self.coeff.tex_string())].into_iter())
         }
     }
@@ -300,14 +312,14 @@ mod tex {
 
 #[cfg(test)]
 mod tests { 
-    use crate::num::Ratio;
+    use yui_core::num::Ratio;
 
     use super::*;
 
     #[test]
     fn zero() { 
         type R = i64;
-        type P = HPoly<'x', R>;
+        type P = FastPoly<'x', R>;
 
         let a = P::new(0, R::zero());
         let b = P::new(0, R::one());
@@ -321,7 +333,7 @@ mod tests {
     #[test]
     fn one() { 
         type R = i64;
-        type P = HPoly<'x', R>;
+        type P = FastPoly<'x', R>;
 
         let a = P::new(0, R::zero());
         let b = P::new(0, R::one());
@@ -335,7 +347,7 @@ mod tests {
     #[test]
     fn eq() { 
         type R = i64;
-        type P = HPoly<'x', R>;
+        type P = FastPoly<'x', R>;
 
         let a = P::new(0, R::zero());
         let b = P::new(0, R::one());
@@ -351,7 +363,7 @@ mod tests {
     #[test]
     fn add() { 
         type R = i64;
-        type P = HPoly<'x', R>;
+        type P = FastPoly<'x', R>;
 
         let o = P::zero();
         let a = P::new(2, 1);
@@ -365,7 +377,7 @@ mod tests {
     #[test]
     fn sub() { 
         type R = i64;
-        type P = HPoly<'x', R>;
+        type P = FastPoly<'x', R>;
 
         let o = P::zero();
         let a = P::new(2, 1);
@@ -379,7 +391,7 @@ mod tests {
     #[test]
     fn mul() { 
         type R = i64;
-        type P = HPoly<'x', R>;
+        type P = FastPoly<'x', R>;
 
         let o = P::zero();
         let a = P::new(2, 4);
@@ -393,7 +405,7 @@ mod tests {
     #[test]
     fn div() { 
         type R = Ratio<i64>;
-        type P = HPoly<'x', R>;
+        type P = FastPoly<'x', R>;
 
         let o = P::zero();
         let a = P::new(5, R::from(4));
@@ -406,7 +418,7 @@ mod tests {
     #[test]
     fn rem() { 
         type R = Ratio<i64>;
-        type P = HPoly<'x', R>;
+        type P = FastPoly<'x', R>;
 
         let o = P::zero();
         let a = P::new(5, R::from(4));
@@ -419,7 +431,7 @@ mod tests {
     #[test]
     fn from_str() {
         type R = i64;
-        type P = HPoly<'x', R>;
+        type P = FastPoly<'x', R>;
 
         assert_eq!(P::from_str("0"), Ok(P::zero()));
         assert_eq!(P::from_str("3"), Ok(P::from_const(3)));
@@ -430,11 +442,10 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "tex")]
-    fn tex() { 
-        use crate::tex::TeX;
+    fn tex() {
+        use yui_core::tex::TeX;
         type R = i64;
-        type P = HPoly<'x', R>;
+        type P = FastPoly<'x', R>;
 
         assert_eq!(P::tex_math_symbol(), "\\mathbb{Z}[x]");
 

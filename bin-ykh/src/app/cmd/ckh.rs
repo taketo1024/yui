@@ -126,7 +126,7 @@ where
     
             let r = c.rank() + c.tors().len();
             for i in 0..r { 
-                let z = c.gen(i);
+                let z = c.generator(i);
                 self.out(&format!("  {i}: {z}"));
             }
             self.out("");

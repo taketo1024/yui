@@ -597,7 +597,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             ).sorted_by_key(|x|
                 -x.q_deg()
             );
-            Summand::from_raw_gens(gens)
+            Summand::from_raw_generators(gens)
         });
 
         let d = move |x: &KhChainGen| { 

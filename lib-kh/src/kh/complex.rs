@@ -88,7 +88,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
         range_of(self.support().flat_map(|&i|
-            self[i].raw_gens().iter().map(|x| x.q_deg())
+            self[i].raw_generators().iter().map(|x| x.q_deg())
         ))
     }
 

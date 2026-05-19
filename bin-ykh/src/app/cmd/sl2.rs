@@ -168,7 +168,7 @@ where
 
             self.out(&format!("({i}): {}", h[i]));
 
-            for (k, z) in h[i].gens().enumerate() { 
+            for (k, z) in h[i].generators().enumerate() { 
                 self.out(&format!("  {k}: {z}"));
             }
             self.out("");

@@ -20,7 +20,7 @@ where
         let h = self.compute_homology_at(i, true);
 
         Summand::new(
-            c.raw_gens().clone(),
+            c.raw_generators().clone(),
             h.rank(),
             h.tors().iter().cloned().collect(),
             c.trans().merged(h.trans())

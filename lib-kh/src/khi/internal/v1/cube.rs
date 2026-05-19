@@ -127,7 +127,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     }
 
     pub fn summand(&self, i: isize) -> Summand<KhIGen, R> { 
-        Summand::from_raw_gens(self.generators(i))
+        Summand::from_raw_generators(self.generators(i))
     }
 
     pub fn differentiate(&self, z: &Lc<KhIGen, R>) -> Lc<KhIGen, R> { 

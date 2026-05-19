@@ -60,7 +60,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R>, Lc<X, R>: KhChainExt {
         let t = h.tors().len();
 
         for k in 0..r + t { 
-            let z = h.gen(k);
+            let z = h.generator(k);
             let q = z.q_deg();
             let e = table.entry(isize2(i, q)).or_insert_with(|| init_entry.clone());
             if k < r { 
@@ -92,7 +92,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R>, Lc<X, R>: KhChainExt {
         };
         
         let (rank, tors, indices) = e;
-        let gens = grid[i].raw_gens().clone(); 
+        let gens = grid[i].raw_generators().clone();
         let trans = grid[i].trans().sub(indices);
         Summand::new(gens, *rank, tors.clone(), trans)
     })

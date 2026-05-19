@@ -277,7 +277,7 @@ mod tests {
         for i in h1.h_range() { 
             let j = i + f.deg();
             println!("({i}) {} -> ({j}) {}", h1[i], h2[j]);
-            for z in h1[i].gens() { 
+            for z in h1[i].generators() {
                 let w = f.apply(i, &z);
                 let x = h1[i].vectorize_euc(&z).into_dense();
                 let y = h2[j].vectorize_euc(&w).into_dense();

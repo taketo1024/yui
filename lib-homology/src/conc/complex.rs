@@ -77,7 +77,7 @@ where
 
     #[inline(never)] // for profilability
     fn d_matrix_col(&self, i: I, j: usize) -> SpVec<R> { 
-        let z = self[i].gen(j);
+        let z = self[i].generator(j);
         let w = self.d(i, &z);
         self[i + self.d_deg].vectorize(&w)
     }
@@ -90,7 +90,7 @@ where
             |i| {
                 let c = &self[i];
                 Summand::new(
-                    c.raw_gens().clone(), 
+                    c.raw_generators().clone(), 
                     r.rank(i).unwrap(), 
                     vec![], 
                     c.trans().merged(r.trans(i).unwrap())
@@ -184,7 +184,7 @@ where
     }
 
     fn check_d_at(&self, i0: I) { 
-        for x in self.get(i0).raw_gens().iter() {
+        for x in self.get(i0).raw_generators().iter() {
             self.check_d_for(i0, x);
         }
     }

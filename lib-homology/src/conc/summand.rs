@@ -30,11 +30,11 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         Self { raw_gens, rank, tors, trans }
     }
 
-    pub fn from_raw_gens<Itr>(raw_gens: Itr) -> Self 
+    pub fn from_raw_generators<Itr>(raw_gens: Itr) -> Self
     where Itr: IntoIterator<Item = X> {
         let gens = raw_gens.into_iter().collect::<IndexList<X>>();
         let r = gens.len();
-        Self::new(gens, r, vec![], Trans::id(r)) 
+        Self::new(gens, r, vec![], Trans::id(r))
     }
 
     pub fn zero() -> Self { 
@@ -45,22 +45,22 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         &self.trans
     }
 
-    pub fn raw_gen(&self, i: usize) -> &X { 
+    pub fn raw_generator(&self, i: usize) -> &X {
         &self.raw_gens[i]
     }
 
-    pub fn raw_gens(&self) -> &IndexList<X> { 
+    pub fn raw_generators(&self) -> &IndexList<X> {
         &self.raw_gens
     }
 
-    pub fn gen(&self, i: usize) -> Lc<X, R> { 
+    pub fn generator(&self, i: usize) -> Lc<X, R> {
         let n = self.dim();
         let v = SpVec::unit(n, i);
         self.devectorize(&v)
     }
-    
-    pub fn gens(&self) -> impl Iterator<Item = Lc<X, R>> + use<'_, X, R> { 
-        (0 .. self.rank + self.tors.len()).map(|i| self.gen(i))
+
+    pub fn generators(&self) -> impl Iterator<Item = Lc<X, R>> + use<'_, X, R> {
+        (0 .. self.rank + self.tors.len()).map(|i| self.generator(i))
     }
 
     pub fn vectorize(&self, z: &Lc<X, R>) -> SpVec<R> {
@@ -106,7 +106,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn make_matrix<Y, F>(&self, target: &Summand<Y, R>, map: F) -> SpMat<R>
     where Y: Gen, F: Fn(&Lc<X, R>) -> Lc<Y, R> { 
-        SpMat::from_col_vecs(target.dim(), self.gens().map(|z| { 
+        SpMat::from_col_vecs(target.dim(), self.generators().map(|z| { 
             let w = map(&z);
             target.vectorize(&w)
         }))
@@ -114,7 +114,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn make_matrix_euc<Y, F>(&self, target: &Summand<Y, R>, map: F) -> SpMat<R>
     where R: EucRing, for<'x> &'x R: EucRingOps<R>, Y: Gen, F: Fn(&Lc<X, R>) -> Lc<Y, R> { 
-        SpMat::from_col_vecs(target.dim(), self.gens().map(|z| { 
+        SpMat::from_col_vecs(target.dim(), self.generators().map(|z| { 
             let w = map(&z);
             target.vectorize_euc(&w)
         }))
@@ -130,7 +130,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         self.trans.reduce();
     }
 
-    pub fn map_raw_gens<Y>(&self, f: impl Fn(&X) -> Y) -> Summand<Y, R>
+    pub fn map_raw_generators<Y>(&self, f: impl Fn(&X) -> Y) -> Summand<Y, R>
     where Y: Gen {
         Summand::new(
             self.raw_gens.iter().map(|x| f(x)).collect(),
@@ -141,12 +141,12 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn print_gens(&self) {
-        for (i, x) in self.gens().enumerate() {
+        for (i, x) in self.generators().enumerate() {
             println!("{i}: {x}")
         }
     }
 
-    pub fn print_raw_gens(&self) {
+    pub fn print_raw_generators(&self) {
         for (i, x) in self.raw_gens.iter().enumerate() { 
             println!("{i}: {x}");
         }
@@ -219,7 +219,7 @@ mod tests {
     
     #[test]
     fn vectorize() { 
-        let s = Summand::from_raw_gens([e(0), e(1), e(2)]);
+        let s = Summand::from_raw_generators([e(0), e(1), e(2)]);
         
         let x = Lc::from(e(0));
         let y = Lc::from(e(1));
@@ -234,7 +234,7 @@ mod tests {
         
     #[test]
     fn as_chain() { 
-        let s = Summand::from_raw_gens([e(0), e(1), e(2)]);
+        let s = Summand::from_raw_generators([e(0), e(1), e(2)]);
 
         let x = Lc::from(e(0));
         let y = Lc::from(e(1));

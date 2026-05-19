@@ -42,7 +42,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
         range_of(self.support().flat_map(|&i|
-            self[i].gens().map(|z| z.q_deg())
+            self[i].generators().map(|z| z.q_deg())
         ))
     }
     

@@ -279,7 +279,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn into_complex(self) -> ChainComplex<KhChainGen, R> {
         let summands = Grid::generate(self.h_range(), |i| { 
             let gens = self.generators(i);
-            Summand::from_raw_gens(gens.into_iter().cloned())
+            Summand::from_raw_generators(gens.into_iter().cloned())
         });
 
         ChainComplex::new(summands, 1, move |_, z| { 

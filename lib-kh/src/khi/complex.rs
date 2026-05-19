@@ -89,9 +89,9 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         // TODO use mapping cone
 
         let summands = Grid1::generate(h_range, |i| { 
-            let b_gens = c[i].raw_gens().iter().map(|x| KhIGen::B(*x));
-            let q_gens = c[i - 1].raw_gens().iter().map(|x| KhIGen::Q(*x));
-            Summand::from_raw_gens(Iterator::chain(b_gens, q_gens))
+            let b_gens = c[i].raw_generators().iter().map(|x| KhIGen::B(*x));
+            let q_gens = c[i - 1].raw_generators().iter().map(|x| KhIGen::Q(*x));
+            Summand::from_raw_generators(Iterator::chain(b_gens, q_gens))
         });
 
         let d = move |i: isize, x: &KhIGen| -> KhIChain<R> { 
@@ -134,7 +134,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
         range_of(self.support().flat_map(|&i|
-            self[i].raw_gens().iter().map(|x| x.q_deg())
+            self[i].raw_generators().iter().map(|x| x.q_deg())
         ))
     }
 

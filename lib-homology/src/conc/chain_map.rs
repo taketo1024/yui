@@ -81,7 +81,7 @@ where
 
 
     pub fn check_at(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I) {
-        for x in source.get(i).raw_gens().iter() {
+        for x in source.get(i).raw_generators().iter() {
             self.check_for(source, target, i, x);
         }
     }
@@ -106,7 +106,7 @@ where
     pub fn print_map_at(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I) { 
         let j = i + self.deg();
         println!("({i}) {} -> ({j}) {}", source[i], target[j]);
-        for z in source[i].gens() { 
+        for z in source[i].generators() {
             let w = self.apply(i, &z);
             println!("\t{z} -> {w}");
         }
@@ -128,10 +128,10 @@ where
         let summands = Grid::generate(support, |i| {
             let (i, j) = degs(i);
             let gens = Iterator::chain(
-                source.get(i).raw_gens().iter().map(|x| EitherGen::from_left(x.clone())), 
-                target.get(j).raw_gens().iter().map(|y| EitherGen::from_right(y.clone()))
+                source.get(i).raw_generators().iter().map(|x| EitherGen::from_left(x.clone())), 
+                target.get(j).raw_generators().iter().map(|y| EitherGen::from_right(y.clone()))
             );
-            Summand::from_raw_gens(gens)
+            Summand::from_raw_generators(gens)
         });
 
         let d1 = source.raw_d();
@@ -186,13 +186,13 @@ mod tests {
         let cone = f.cone(&s2, &d3, (0..=4).rev(), true);
         cone.check_d_all();
 
-        let x = T::from_left(s2[0].raw_gen(0).clone());
-        let y = T::from_left(s2[1].raw_gen(0).clone());
-        let z = T::from_right(d3[1].raw_gen(0).clone());
+        let x = T::from_left(s2[0].raw_generator(0).clone());
+        let y = T::from_left(s2[1].raw_generator(0).clone());
+        let z = T::from_right(d3[1].raw_generator(0).clone());
 
-        assert_eq!(cone[1].raw_gens().index_of(&x), Some(0));
-        assert_eq!(cone[2].raw_gens().index_of(&y), Some(0));
-        assert_eq!(cone[1].raw_gens().index_of(&z), Some(4));
+        assert_eq!(cone[1].raw_generators().index_of(&x), Some(0));
+        assert_eq!(cone[2].raw_generators().index_of(&y), Some(0));
+        assert_eq!(cone[1].raw_generators().index_of(&z), Some(4));
 
         let dx = cone.d(1, &Lc::from(x.clone()));
         assert_eq!(dx, Lc::from(T::from_right(EnumGen(0, 0))));

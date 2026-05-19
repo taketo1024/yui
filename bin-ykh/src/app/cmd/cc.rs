@@ -141,7 +141,7 @@ where
 
             self.out(&format!("({i}): {}", h[i]));
 
-            for (k, z) in h[i].gens().enumerate() { 
+            for (k, z) in h[i].generators().enumerate() { 
                 self.out(&format!("  {k}: {z}"));
             }
             self.out("");
@@ -155,7 +155,7 @@ where
             let j = i + f.deg();
             self.out(&format!("({i}) {} -> ({j}) {}", h1[i], h2[j]));
 
-            for z in h1[i].gens() { 
+            for z in h1[i].generators() { 
                 let w = f.apply(i, &z);
                 let x = h1[i].vectorize_euc(&z).into_dense();
                 let y = h2[j].vectorize_euc(&w).into_dense();

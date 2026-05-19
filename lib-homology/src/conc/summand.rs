@@ -140,7 +140,7 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
         )
     }
 
-    pub fn print_gens(&self) {
+    pub fn print_generators(&self) {
         for (i, x) in self.generators().enumerate() {
             println!("{i}: {x}")
         }

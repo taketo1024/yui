@@ -70,10 +70,6 @@ impl Braid {
         )
     }
 
-    pub fn all_gens(strands: usize) -> Vec<Self> {
-        (1..strands).map(|index| Self::generator(strands, index)).collect()
-    }
-
     pub fn strands(&self) -> usize { 
         self.strands
     }
@@ -94,7 +90,7 @@ impl Braid {
         Self::new(
             self.strands,
             self.elements.iter().rev().map(
-                |gen| gen.inv()
+                |g| g.inv()
             ).collect()
         )
     }
@@ -149,9 +145,9 @@ impl Braid {
     }
 
     pub fn display(&self) -> String { 
-        fn row(strands: usize, gen: &Generator) -> String {
-            let index = gen.index();
-            let sign = gen.sign();
+        fn row(strands: usize, g: &Generator) -> String {
+            let index = g.index();
+            let sign = g.sign();
 
             (0..3).map(|r| {
                 (1..=strands).map(|i| {
@@ -170,8 +166,8 @@ impl Braid {
             }).join("\n")
         }
 
-        self.elements.iter().map(|gen| 
-            row(self.strands, gen)
+        self.elements.iter().map(|g|
+            row(self.strands, g)
         ).join("\n")
     }
 

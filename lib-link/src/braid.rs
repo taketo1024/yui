@@ -63,7 +63,7 @@ impl Braid {
         )
     }
 
-    pub fn gen(strands: usize, index: usize) -> Self {
+    pub fn generator(strands: usize, index: usize) -> Self {
         Self::new(
             strands,
             vec![(Generator::new(index, Sign::Pos))]
@@ -71,7 +71,7 @@ impl Braid {
     }
 
     pub fn all_gens(strands: usize) -> Vec<Self> {
-        (1..strands).map(|index| Self::gen(strands, index)).collect()
+        (1..strands).map(|index| Self::generator(strands, index)).collect()
     }
 
     pub fn strands(&self) -> usize { 

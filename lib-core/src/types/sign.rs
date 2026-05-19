@@ -1,12 +1,16 @@
+//! The sign `±` as a two-element type, isomorphic to the multiplicative
+//! group `{+1, -1} ⊂ ℤ`.
+
 use std::ops::{Mul, Neg};
 use derive_more::{Display, Debug};
 use is_even::IsEven;
 use num_traits::Signed;
 
+/// A sign, either `+` or `-`. Behaves as the multiplicative group `{±1}`.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default, Display, Debug)]
 #[cfg_attr(feature = "serde", derive(serde_repr::Serialize_repr, serde_repr::Deserialize_repr))]
 #[repr(i8)]
-pub enum Sign { 
+pub enum Sign {
     #[default]
     #[display("+")]
     #[debug("+")]
@@ -17,19 +21,20 @@ pub enum Sign {
     Neg = -1
 }
 
-impl Sign { 
-    pub fn is_positive(&self) -> bool { 
+impl Sign {
+    pub fn is_positive(&self) -> bool {
         self == &Sign::Pos
     }
 
-    pub fn is_negative(&self) -> bool { 
+    pub fn is_negative(&self) -> bool {
         !self.is_positive()
     }
 
-    pub fn from_parity<I: IsEven>(val: I) -> Self { 
-        if val.is_even() { 
+    /// `(-1)^val`: `Pos` if `val` is even, `Neg` if odd.
+    pub fn from_parity<I: IsEven>(val: I) -> Self {
+        if val.is_even() {
             Sign::Pos
-        } else { 
+        } else {
             Sign::Neg
         }
     }
@@ -87,7 +92,8 @@ impl Mul for Sign {
     }
 }
 
-pub trait GetSign { 
+/// Types that have a sign (e.g. signed integers).
+pub trait GetSign {
     fn sign(&self) -> Sign;
 }
 

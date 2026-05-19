@@ -13,7 +13,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@1.85
     - name: Build yui-core
       run: cargo build --verbose -p yui-core
     - name: Test yui-core

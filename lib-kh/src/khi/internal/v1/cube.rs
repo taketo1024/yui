@@ -9,7 +9,7 @@ use yui_link::{InvLink, State};
 
 use crate::kh::{KhState, KhAlgGen, KhTensor};
 use crate::kh::internal::v1::cube::KhCube;
-use crate::khi::KhIGen;
+use crate::khi::KhIState;
 
 pub struct KhICube<R>
 where R: Ring, for<'a> &'a R: RingOps<R> { 
@@ -115,45 +115,45 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         self.cube.q_range()
     }
 
-    pub fn generators(&self, i: isize) -> Vec<KhIGen> { 
+    pub fn generators(&self, i: isize) -> Vec<KhIState> { 
         Iterator::chain(
             self.cube.generators(i).iter().map(|&&x| 
-                KhIGen::B(x)
+                KhIState::B(x)
             ),
             self.cube.generators(i - 1).iter().map(|&&x|
-                KhIGen::Q(x)
+                KhIState::Q(x)
             )
         ).collect()
     }
 
-    pub fn summand(&self, i: isize) -> Summand<KhIGen, R> { 
+    pub fn summand(&self, i: isize) -> Summand<KhIState, R> { 
         Summand::from_raw_generators(self.generators(i))
     }
 
-    pub fn differentiate(&self, z: &Lc<KhIGen, R>) -> Lc<KhIGen, R> { 
+    pub fn differentiate(&self, z: &Lc<KhIState, R>) -> Lc<KhIState, R> { 
         z.apply(|x| self.d(x))
     }
 
-    fn d(&self, x: &KhIGen) -> Lc<KhIGen, R> { 
+    fn d(&self, x: &KhIState) -> Lc<KhIState, R> { 
         match x {
-            KhIGen::B(x) => {
+            KhIState::B(x) => {
                 let dx = self.cube.d(x).map_keys(|y| 
-                    KhIGen::B(y)
+                    KhIState::B(y)
                 );
                 let fx = self.f(x).map_keys(|y| 
-                    KhIGen::Q(y)
+                    KhIState::Q(y)
                 );
                 dx + fx
             },
-            KhIGen::Q(x) => {
+            KhIState::Q(x) => {
                 self.cube.d(x).map_keys(|y| 
-                    KhIGen::Q(y)
+                    KhIState::Q(y)
                 )
             },
         }
     }
 
-    pub fn into_complex(self) -> ChainComplex<KhIGen, R> {
+    pub fn into_complex(self) -> ChainComplex<KhIState, R> {
         ChainComplex::new(
             Grid::generate(self.h_range(), |i| self.summand(i)),
             1, 
@@ -276,7 +276,7 @@ mod tests {
         let (h, t) = (R::zero(), R::zero());
         let c = KhICube::new(&l, &h, &t, false, (0, 0));
 
-        let x = KhIGen::B(
+        let x = KhIState::B(
             KhState::new(
                 State::from([0,0,0]),
                 KhTensor::from([X, I]),
@@ -286,7 +286,7 @@ mod tests {
         let dx = c.d(&x);
 
         assert_eq!(dx, Lc::from_iter([
-            (KhIGen::B(
+            (KhIState::B(
                 KhState::new(
                     State::from([1,0,0]),
                     KhTensor::from([X]),
@@ -294,7 +294,7 @@ mod tests {
                 )
             ), R::one()),
 
-            (KhIGen::B(
+            (KhIState::B(
                 KhState::new(
                     State::from([0,1,0]),
                     KhTensor::from([X]),
@@ -302,7 +302,7 @@ mod tests {
                 )
             ), R::one()),
             
-            (KhIGen::B(
+            (KhIState::B(
                 KhState::new(
                     State::from([0,0,1]),
                     KhTensor::from([X]),
@@ -320,7 +320,7 @@ mod tests {
         let (h, t) = (R::zero(), R::zero());
         let c = KhICube::new(&l, &h, &t, false, (0, 0));
 
-        let x = KhIGen::B(
+        let x = KhIState::B(
             KhState::new(
                 State::from([0,1,0]),
                 KhTensor::from([X]),
@@ -330,7 +330,7 @@ mod tests {
         let dx = c.d(&x);
 
         assert_eq!(dx, Lc::from_iter([
-            (KhIGen::B(
+            (KhIState::B(
                 KhState::new(
                     State::from([1,1,0]),
                     KhTensor::from([X,X]),
@@ -338,7 +338,7 @@ mod tests {
                 )
             ), R::one()),
 
-            (KhIGen::B(
+            (KhIState::B(
                 KhState::new(
                     State::from([0,1,1]),
                     KhTensor::from([X,X]),
@@ -346,7 +346,7 @@ mod tests {
                 )
             ), R::one()),
             
-            (KhIGen::Q(
+            (KhIState::Q(
                 KhState::new(
                     State::from([0,1,0]),
                     KhTensor::from([X]),
@@ -355,7 +355,7 @@ mod tests {
             ), R::one()),
 
                         
-            (KhIGen::Q(
+            (KhIState::Q(
                 KhState::new(
                     State::from([0,0,1]),
                     KhTensor::from([X]),
@@ -374,7 +374,7 @@ mod tests {
         let (h, t) = (R::zero(), R::zero());
         let c = KhICube::new(&l, &h, &t, false, (0, 0));
 
-        let x = KhIGen::Q(
+        let x = KhIState::Q(
             KhState::new(
                 State::from([0,1,0]),
                 KhTensor::from([X]),
@@ -384,7 +384,7 @@ mod tests {
         let dx = c.d(&x);
 
         assert_eq!(dx, Lc::from_iter([
-            (KhIGen::Q(
+            (KhIState::Q(
                 KhState::new(
                     State::from([1,1,0]),
                     KhTensor::from([X,X]),
@@ -392,7 +392,7 @@ mod tests {
                 )
             ), R::one()),
 
-            (KhIGen::Q(
+            (KhIState::Q(
                 KhState::new(
                     State::from([0,1,1]),
                     KhTensor::from([X,X]),

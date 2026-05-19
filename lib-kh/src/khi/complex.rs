@@ -11,10 +11,10 @@ use yui_matrix::sparse::SpMat;
 
 use crate::kh::{KhChain, KhChainExt, KhComplex, KhState};
 use crate::khi::KhIHomology;
-use crate::khi::KhIGen;
+use crate::khi::KhIState;
 use crate::misc::{make_gen_grid, range_of};
 
-pub type KhIChain<R> = Lc<KhIGen, R>;
+pub type KhIChain<R> = Lc<KhIState, R>;
 
 impl<R> KhChainExt for KhIChain<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
@@ -27,12 +27,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-pub type KhIComplexSummand<R> = Summand<KhIGen, R>;
+pub type KhIComplexSummand<R> = Summand<KhIState, R>;
 
 #[derive(Clone)]
 pub struct KhIComplex<R>
 where R: Ring, for<'a> &'a R: RingOps<R> {
-    inner: ChainComplex<KhIGen, R>,
+    inner: ChainComplex<KhIState, R>,
     canon_cycles: Vec<KhIChain<R>>,
     deg_shift: (isize, isize),
     gen_grid: OnceLock<Grid2<KhIComplexSummand<R>>>,
@@ -64,8 +64,8 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
             let p = l.base_pt().unwrap();
             let zs = KhComplex::make_canon_cycles(l.inner(), p, &R::zero(), h, reduced, deg_shift);
             Iterator::chain(
-                zs.iter().map(|z| z.clone().map_keys(|x| KhIGen::B(x))),
-                zs.iter().map(|z| z.clone().map_keys(|x| KhIGen::Q(x)))
+                zs.iter().map(|z| z.clone().map_keys(|x| KhIState::B(x))),
+                zs.iter().map(|z| z.clone().map_keys(|x| KhIState::Q(x)))
             ).collect()
         } else { 
             vec![]
@@ -81,34 +81,34 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         let h_range = *h_range.start() ..= (h_range.end() + 1);
 
         let canon_cycles = c.canon_cycles().iter().flat_map(|z| { 
-            let bz = z.clone().map_keys(|x| KhIGen::B(x));
-            let qz = z.clone().map_keys(|x| KhIGen::Q(x));
+            let bz = z.clone().map_keys(|x| KhIState::B(x));
+            let qz = z.clone().map_keys(|x| KhIState::Q(x));
             [bz, qz]
         }).sorted_by_key(|z| z.h_deg()).collect_vec();
 
         // TODO use mapping cone
 
         let summands = Grid1::generate(h_range, |i| { 
-            let b_gens = c[i].raw_generators().iter().map(|x| KhIGen::B(*x));
-            let q_gens = c[i - 1].raw_generators().iter().map(|x| KhIGen::Q(*x));
+            let b_gens = c[i].raw_generators().iter().map(|x| KhIState::B(*x));
+            let q_gens = c[i - 1].raw_generators().iter().map(|x| KhIState::Q(*x));
             Summand::from_raw_generators(Iterator::chain(b_gens, q_gens))
         });
 
-        let d = move |i: isize, x: &KhIGen| -> KhIChain<R> { 
+        let d = move |i: isize, x: &KhIState| -> KhIChain<R> { 
             match x { 
-                KhIGen::B(x) => {
+                KhIState::B(x) => {
                     let z = KhChain::from(*x);
-                    let dx = c.d(i, &z).map_keys(|y| KhIGen::B(y));
-                    let qx = KhIChain::from(KhIGen::Q(*x));
+                    let dx = c.d(i, &z).map_keys(|y| KhIState::B(y));
+                    let qx = KhIChain::from(KhIState::Q(*x));
                     let qtx = {
                         let tx = map(x);
-                        KhIChain::from(KhIGen::Q(tx))
+                        KhIChain::from(KhIState::Q(tx))
                     };
                     dx + qx + qtx
                 },
-                KhIGen::Q(x) => {
+                KhIState::Q(x) => {
                     let z = KhChain::from(*x);
-                    c.d(i, &z).map_keys(|y| KhIGen::Q(y))
+                    c.d(i, &z).map_keys(|y| KhIState::Q(y))
                 }
             }
         };
@@ -120,11 +120,11 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         KhIComplex::new_impl(inner, canon_cycles, deg_shift)
     }
 
-    pub(crate) fn new_impl(inner: ChainComplex<KhIGen, R>, canon_cycles: Vec<KhIChain<R>>, deg_shift: (isize, isize)) -> Self {
+    pub(crate) fn new_impl(inner: ChainComplex<KhIState, R>, canon_cycles: Vec<KhIChain<R>>, deg_shift: (isize, isize)) -> Self {
         Self { inner, canon_cycles, deg_shift, gen_grid: OnceLock::new() }
     }
 
-    pub fn inner(&self) -> &ChainComplex<KhIGen, R> {
+    pub fn inner(&self) -> &ChainComplex<KhIState, R> {
         &self.inner
     }
 

@@ -5,7 +5,7 @@ use yui_core::{EucRing, EucRingOps};
 use yui_homology::{DisplaySeq, DisplayTable, Grid2, GridIter, GridTrait, Homology, Summand, SummandTrait};
 use yui_link::InvLink;
 use crate::kh::KhChainExt;
-use crate::khi::{KhIComplex, KhIGen};
+use crate::khi::{KhIComplex, KhIState};
 use crate::misc::{make_gen_grid, range_of};
 
 use super::KhIChain;
@@ -13,9 +13,9 @@ use super::KhIChain;
 #[derive(Clone)]
 pub struct KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    inner: Homology<KhIGen, R>,
+    inner: Homology<KhIState, R>,
     canon_cycles: Vec<KhIChain<R>>,
-    gen_grid: OnceLock<Grid2<Summand<KhIGen, R>>>,
+    gen_grid: OnceLock<Grid2<Summand<KhIState, R>>>,
 }
 
 impl<R> KhIHomology<R> 
@@ -30,7 +30,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         Self::from(&c)
     }
 
-    pub(crate) fn new_impl(inner: Homology<KhIGen, R>, canon_cycles: Vec<KhIChain<R>>) -> Self {
+    pub(crate) fn new_impl(inner: Homology<KhIState, R>, canon_cycles: Vec<KhIChain<R>>) -> Self {
         Self { inner, canon_cycles, gen_grid: OnceLock::new() }
     }
 
@@ -50,7 +50,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         &self.canon_cycles
     }
 
-    pub fn inner(&self) -> &Homology<KhIGen, R> { 
+    pub fn inner(&self) -> &Homology<KhIState, R> { 
         &self.inner
     }
 
@@ -61,7 +61,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         )
     }
 
-    fn gen_grid(&self) -> &Grid2<Summand<KhIGen, R>> {
+    fn gen_grid(&self) -> &Grid2<Summand<KhIState, R>> {
         self.gen_grid.get_or_init(|| make_gen_grid(self.inner()))
     }
 }
@@ -78,7 +78,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 impl<R> GridTrait<isize> for KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    type Item = Summand<KhIGen, R>;
+    type Item = Summand<KhIState, R>;
     type Support<'a> = GridIter<'a, isize, Self::Item> where Self: 'a, R: 'a;
 
     delegate! {
@@ -93,7 +93,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 impl<R> Index<isize> for KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    type Output = Summand<KhIGen, R>;
+    type Output = Summand<KhIState, R>;
 
     delegate! {
         to self.inner {
@@ -104,7 +104,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 impl<R> Index<(isize, isize)> for KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    type Output = Summand<KhIGen, R>;
+    type Output = Summand<KhIState, R>;
 
     delegate! {
         to self.gen_grid() {

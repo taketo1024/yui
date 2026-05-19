@@ -64,8 +64,8 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
             let p = l.base_pt().unwrap();
             let zs = KhComplex::make_canon_cycles(l.inner(), p, &R::zero(), h, reduced, deg_shift);
             Iterator::chain(
-                zs.iter().map(|z| z.clone().map_keys(|x| KhIState::B(x))),
-                zs.iter().map(|z| z.clone().map_keys(|x| KhIState::Q(x)))
+                zs.iter().map(|z| z.clone().map_keys(KhIState::B)),
+                zs.iter().map(|z| z.clone().map_keys(KhIState::Q))
             ).collect()
         } else { 
             vec![]
@@ -81,8 +81,8 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         let h_range = *h_range.start() ..= (h_range.end() + 1);
 
         let canon_cycles = c.canon_cycles().iter().flat_map(|z| { 
-            let bz = z.clone().map_keys(|x| KhIState::B(x));
-            let qz = z.clone().map_keys(|x| KhIState::Q(x));
+            let bz = z.clone().map_keys(KhIState::B);
+            let qz = z.clone().map_keys(KhIState::Q);
             [bz, qz]
         }).sorted_by_key(|z| z.h_deg()).collect_vec();
 
@@ -98,7 +98,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
             match x { 
                 KhIState::B(x) => {
                     let z = KhChain::from(*x);
-                    let dx = c.d(i, &z).map_keys(|y| KhIState::B(y));
+                    let dx = c.d(i, &z).map_keys(KhIState::B);
                     let qx = KhIChain::from(KhIState::Q(*x));
                     let qtx = {
                         let tx = map(x);
@@ -108,7 +108,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
                 },
                 KhIState::Q(x) => {
                     let z = KhChain::from(*x);
-                    c.d(i, &z).map_keys(|y| KhIState::Q(y))
+                    c.d(i, &z).map_keys(KhIState::Q)
                 }
             }
         };

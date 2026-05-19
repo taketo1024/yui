@@ -710,7 +710,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn convert_edges<F>(&self, f: F) -> Self
     where F: Fn(Edge) -> Edge { 
         let (h, t) = self.ht();
-        let base_pt = self.base_pt.map(|e| f(e));
+        let base_pt = self.base_pt.map(&f);
         let crossings = self.crossings.iter().map(|x| x.convert_edges(&f)).collect();
 
         let vertices = self.iter_verts().map(|(k1, v1)| {

@@ -440,12 +440,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn choose_pivot_col(&self, k: &TngKey) -> Option<(&TngKey, usize)> { 
-        self.complex().keys_out_from(k).filter_map(|l|
-            self.is_equiv_inv_edge(k, l).then(|| {
+        self.complex().keys_out_from(k).filter(|&l| self.is_equiv_inv_edge(k, l)).map(|l| {
                 let s = self.inner.edge_weight(k, l);
                 (l, s)
             })
-        )
         .min_by_key(|(_, s)| *s)
     }
 
@@ -569,8 +567,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let map = move |x: &KhState| -> KhState { 
             let k = TngKey::from(x);
             let tk = key_map[&k];
-            let tx = tk.as_gen(deg_shift);
-            tx
+            
+            tk.as_gen(deg_shift)
         };
 
         let c = self.into_kh_complex();

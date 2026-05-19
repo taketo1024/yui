@@ -149,7 +149,7 @@ where R: Clone + Zero + Scalar + ClosedAddAssign {
     assert_eq!(rows.len(), cols.len());
 
     let l = rows.len();
-    let row_inds = rows.iter().map(|r| AHashSet::from_iter(r)).collect_vec();
+    let row_inds = rows.iter().map(AHashSet::from_iter).collect_vec();
     let row_offsets = rows.iter().fold(vec![0], |mut res, next| { 
         let offset = res.last().unwrap();
         res.push(offset + next.len());

@@ -189,7 +189,7 @@ impl Node {
         Self { 
             ntype: self.ntype, 
             ori:   self.ori,
-            edges: self.edges.map(|e| f(e))
+            edges: self.edges.map(f)
         }
     }
 

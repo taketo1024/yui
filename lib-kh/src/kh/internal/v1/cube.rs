@@ -264,16 +264,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn states_of_weight(&self, k: usize) -> impl Iterator<Item = &State> { 
-        self.vertices
-            .iter()
-            .filter_map(|(s, _)| {
+        self.vertices.keys().filter_map(|s| {
                 if s.weight() == k { 
                     Some(s)
                 } else {
                     None
                 }
             })
-            .sorted_by(|s1, s2| Ord::cmp(s1, s2))
+            .sorted_by(Ord::cmp)
     }
 
     pub fn into_complex(self) -> ChainComplex<KhState, R> {

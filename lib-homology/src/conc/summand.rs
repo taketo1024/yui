@@ -69,11 +69,7 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
         // MEMO should add strict option. 
 
         let v = SpVec::from_entries(n, z.iter().flat_map(|(x, a)| { 
-            if let Some(i) = self.raw_gens.index_of(x) {
-                Some((i, a.clone()))
-            } else {
-                None
-            }
+            self.raw_gens.index_of(x).map(|i| (i, a.clone()))
         }));
 
         self.trans.forward(&v)
@@ -133,7 +129,7 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn map_raw_generators<Y>(&self, f: impl Fn(&X) -> Y) -> Summand<Y, R>
     where Y: LcKey {
         Summand::new(
-            self.raw_gens.iter().map(|x| f(x)).collect(),
+            self.raw_gens.iter().map(f).collect(),
             self.rank,
             self.tors.clone(),
             self.trans.clone()

@@ -22,7 +22,7 @@ where
         Summand::new(
             c.raw_generators().clone(),
             h.rank(),
-            h.tors().iter().cloned().collect(),
+            h.tors().to_vec(),
             c.trans().merged(h.trans())
         )
     }

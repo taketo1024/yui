@@ -82,8 +82,7 @@ impl KhTensor {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = KhAlgGen> + use<> {
-        self.0.iter().map(|b|
-            KhAlgGen::from_bit(b)
+        self.0.iter().map(KhAlgGen::from_bit
         )
     }
 

@@ -26,7 +26,7 @@ impl<R> SpMat<R> {
         values: Vec<R>,
     ) -> Option<Self> { 
         let csc = CscMatrix::try_from_csc_data(num_rows, num_cols, col_offsets, row_indices, values);
-        csc.ok().map(|csc| SpMat::from(csc))
+        csc.ok().map(SpMat::from)
     }
 
     pub(crate) fn inner(&self) -> &CscMatrix<R> { 
@@ -154,7 +154,7 @@ impl<R> SpMat<R> {
     where F: Fn(R) -> S {
         let (m, n) = self.shape();
         let (cols, rows, vals) = self.disassemble();
-        let vals = vals.into_iter().map(|r| f(r)).collect_vec();
+        let vals = vals.into_iter().map(f).collect_vec();
         SpMat::<S>::try_from_csc_data(m, n, cols, rows, vals).unwrap()
     }
 

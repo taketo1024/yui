@@ -71,7 +71,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     fn from(c: &KhIComplex<R>) -> Self {
         KhIHomology::new_impl(
             c.inner().reduced().homology(), 
-            c.canon_cycles().iter().cloned().collect()
+            c.canon_cycles().to_vec()
         )
     }
 }

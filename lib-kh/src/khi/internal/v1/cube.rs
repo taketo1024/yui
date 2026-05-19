@@ -137,17 +137,14 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     fn d(&self, x: &KhIState) -> Lc<KhIState, R> { 
         match x {
             KhIState::B(x) => {
-                let dx = self.cube.d(x).map_keys(|y| 
-                    KhIState::B(y)
+                let dx = self.cube.d(x).map_keys(KhIState::B
                 );
-                let fx = self.f(x).map_keys(|y| 
-                    KhIState::Q(y)
+                let fx = self.f(x).map_keys(KhIState::Q
                 );
                 dx + fx
             },
             KhIState::Q(x) => {
-                self.cube.d(x).map_keys(|y| 
-                    KhIState::Q(y)
+                self.cube.d(x).map_keys(KhIState::Q
                 )
             },
         }

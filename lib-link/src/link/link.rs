@@ -193,8 +193,7 @@ impl Link {
             comps[c].push(e);
         });
 
-        comps.into_iter().map(|edges| 
-            Path::circ(edges)
+        comps.into_iter().map(Path::circ
         ).collect()
     }
 

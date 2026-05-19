@@ -20,7 +20,7 @@ cfg-if = "1.0.4"
 delegate = "0.13.5"
 derive_more = { version = "2.1.1", features = ["display", "debug"] }
 dinglebit_combinatorics = "1.1.0"
-directories = "5.0.1"
+directories = "6.0.0"
 is-even = "1.0.0"
 itertools = "0.14.0"
 log = "0.4.29"

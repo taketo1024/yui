@@ -1,3 +1,10 @@
+//! The finite field 𝔽_p = ℤ/pℤ for prime `p`.
+//!
+//! Primality of `p` is **not** checked; the [`Field`] impl is only valid when
+//! `p` is prime. For `p = 2`, prefer [`FF2`](super::FF2).
+//!
+//! See: <https://en.wikipedia.org/wiki/Finite_field>
+
 #![allow(non_upper_case_globals)]
 
 use std::ops::{Add, Neg, Sub, Mul, Div, Rem, AddAssign, SubAssign, MulAssign, DivAssign, RemAssign};
@@ -10,6 +17,7 @@ use crate::{Elem, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, EucRingOps, A
 
 type I = i32;
 
+/// An element of 𝔽_p, stored as a representative in `0 .. p`.
 #[derive(Clone, Copy, PartialEq, Eq, Default, Display, Debug)]
 #[display( "{}", _0)]
 #[debug( "{}", _0)]

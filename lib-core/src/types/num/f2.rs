@@ -1,3 +1,7 @@
+//! The finite field 𝔽₂ = ℤ/2ℤ with two elements `0` and `1`.
+//!
+//! See: <https://en.wikipedia.org/wiki/GF(2)>
+
 use std::fmt::{Debug, Display};
 use std::ops::{Add, Neg, Sub, Mul, Div, Rem, AddAssign, SubAssign, MulAssign, DivAssign, RemAssign};
 use std::str::FromStr;
@@ -7,6 +11,7 @@ use auto_impl_ops::auto_ops;
 
 use crate::{Elem, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, EucRingOps, AddMon, AddGrp, Mon, Ring, EucRing, Field};
 
+/// An element of the finite field 𝔽₂.
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
 pub struct FF2(bool);
 

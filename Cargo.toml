@@ -17,11 +17,11 @@ rust-version = "1.85"
 repository = "https://github.com/taketo1024/yui"
 
 [workspace.dependencies]
-yui-core     = { version = "0.4.0", path = "lib-core" }
-yui-link     = { version = "0.4.0", path = "lib-link" }
-yui-matrix   = { version = "0.4.0", path = "lib-matrix" }
-yui-homology = { version = "0.4.0", path = "lib-homology" }
-yui-kh       = { version = "0.4.0", path = "lib-kh" }
+yui-core     = { version = "0.5.0", path = "lib-core" }
+yui-link     = { version = "0.5.0", path = "lib-link" }
+yui-matrix   = { version = "0.5.0", path = "lib-matrix" }
+yui-homology = { version = "0.5.0", path = "lib-homology" }
+yui-kh       = { version = "0.5.0", path = "lib-kh" }
 
 [profile.release]
 overflow-checks = true

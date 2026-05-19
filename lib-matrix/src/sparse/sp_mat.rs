@@ -1,7 +1,7 @@
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, MulAssign, Range};
 use std::fmt::{Display, Debug};
 use delegate::delegate;
-use itertools::Itertools;
+use itertools::{Itertools, repeat_n};
 use nalgebra_sparse::na::{Scalar, ClosedAddAssign, ClosedSubAssign, ClosedMulAssign};
 use nalgebra_sparse::{CscMatrix, CooMatrix};
 use num_traits::{Zero, One, ToPrimitive};
@@ -407,10 +407,11 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
 
     pub fn extend_by_zero(&mut self, add_rows: usize, add_cols: usize) {
         let (m, n) = self.shape();
-        let l = std::mem::replace(&mut self.inner, CscMatrix::zeros(0, 0));
+        let l = std::mem::take(&mut self.inner);
         let (mut col_offsets, row_indices, values) = l.disassemble();
         let last = *col_offsets.last().unwrap();
-        col_offsets.extend(std::iter::repeat(last).take(add_cols));
+        col_offsets.extend(repeat_n(last, add_cols));
+        
         self.inner = CscMatrix::try_from_csc_data(
             m + add_rows, n + add_cols,
             col_offsets, row_indices, values

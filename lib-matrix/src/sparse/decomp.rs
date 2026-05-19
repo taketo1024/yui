@@ -4,12 +4,12 @@ use ahash::AHashSet;
 use itertools::Itertools;
 use nalgebra::{Scalar, ClosedAddAssign};
 use num_traits::Zero;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sprs::PermOwned;
 use yui_core::UnionFind;
 
-cfg_if::cfg_if! { if #[cfg(feature = "multithread")] { 
+cfg_if::cfg_if! { if #[cfg(feature = "multithread")] {
     use std::sync::Mutex;
+    use rayon::iter::{IntoParallelIterator, ParallelIterator};
 }}
 
 use crate::MatTrait;

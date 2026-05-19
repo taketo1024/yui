@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use yui_core::lc::Gen;
+use yui_core::lc::LcGen;
 use yui_core::Elem;
 use crate::kh::KhChainGen;
 
@@ -46,5 +46,5 @@ impl Elem for KhIGen {
     }
 }
 
-impl Gen for KhIGen {}
+impl LcGen for KhIGen {}
 

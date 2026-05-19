@@ -7,7 +7,7 @@ use num_traits::{Zero, One, Pow, FromPrimitive, ToPrimitive};
 use auto_impl_ops::auto_ops;
 
 use crate::{Elem, ElemBase};
-use crate::lc::Gen;
+use crate::lc::LcGen;
 
 use super::{Mono, MonoOrd};
 use super::var::parse_mono_deg;
@@ -193,7 +193,7 @@ where I: ElemBase + ToPrimitive {
     }
 }
         
-impl<const X: char, const Y: char, I> Gen for Var2<X, Y, I>
+impl<const X: char, const Y: char, I> LcGen for Var2<X, Y, I>
 where I: ElemBase + Copy + Hash + Ord + for<'x> Add<&'x I, Output = I> + ToPrimitive {}
 
 macro_rules! impl_bivar_unsigned {

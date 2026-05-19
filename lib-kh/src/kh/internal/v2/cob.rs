@@ -8,7 +8,7 @@ use itertools::Itertools;
 use num_traits::Zero;
 use cartesian::cartesian;
 use yui_core::{AddMon, CloneAnd, Elem, Ring, RingOps};
-use yui_core::lc::{Gen, Lc};
+use yui_core::lc::{LcGen, Lc};
 use yui_core::poly::Var2;
 use yui_link::{Edge, Node};
 use yui_core::bitseq::Bit;
@@ -504,7 +504,7 @@ impl Elem for CobComp {
     }
 }
 
-impl Gen for CobComp {}
+impl LcGen for CobComp {}
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Default)]
 pub struct Cob { 
@@ -846,7 +846,7 @@ impl Elem for Cob {
     }
 }
 
-impl Gen for Cob {}
+impl LcGen for Cob {}
 
 #[auto_ops]
 impl Mul for Cob {

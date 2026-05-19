@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use num_traits::Zero;
-use yui_core::lc::{EitherGen, Gen, Lc, split_lr};
+use yui_core::lc::{EitherGen, LcGen, Lc, split_lr};
 use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 use yui_matrix::sparse::SpMat;
 
@@ -16,7 +16,7 @@ use super::ChainComplexBase;
 pub struct ChainMap<I, X, Y, R>
 where 
     I: GridDeg,
-    X: Gen, Y: Gen,
+    X: LcGen, Y: LcGen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     deg: I,
@@ -26,8 +26,8 @@ where
 impl<I, X, Y, R> ChainMap<I, X, Y, R>
 where 
     I: GridDeg,
-    X: Gen,
-    Y: Gen,
+    X: LcGen,
+    Y: LcGen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     pub fn new<F>(
@@ -64,7 +64,7 @@ where
     }
 
     pub fn make_matrix_euc(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I) -> SpMat<R>
-    where Y: Gen, R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    where Y: LcGen, R: EucRing, for<'x> &'x R: EucRingOps<R> {
         source[i].make_matrix_euc(&target[i + self.deg], |z| self.apply(i, z))
     }
 

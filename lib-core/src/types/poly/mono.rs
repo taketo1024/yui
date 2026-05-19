@@ -1,6 +1,6 @@
 use std::ops::{Mul, Div};
 use num_traits::One;
-use crate::lc::Gen;
+use crate::lc::LcGen;
 
 pub trait MonoOrd { 
     fn cmp_lex(&self, other: &Self) -> std::cmp::Ordering;
@@ -13,7 +13,7 @@ pub trait Mono:
     Mul<Output = Self> + 
     Div<Output = Self> + 
     MonoOrd + 
-    Gen
+    LcGen
 {
     type Deg;
 

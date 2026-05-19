@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use yui_core::{EucRing, EucRingOps, IndexList, Ring, RingOps};
-use yui_core::lc::{Gen, Lc};
+use yui_core::lc::{LcGen, Lc};
 use yui_matrix::sparse::{SpMat, SpVec, Trans};
 
 use crate::{Grid, GridDeg, GridTrait, SummandTrait};
@@ -12,7 +12,7 @@ use crate::{Grid, GridDeg, GridTrait, SummandTrait};
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Summand<X, R>
 where 
-    X: Gen,
+    X: LcGen,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     raw_gens: IndexList<X>,
@@ -22,7 +22,7 @@ where
 }
 
 impl<X, R> Summand<X, R>
-where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+where X: LcGen, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(raw_gens: IndexList<X>, rank: usize, tors: Vec<R>, trans: Trans<R>) -> Self { 
         assert_eq!(trans.src_dim(), raw_gens.len());
         assert_eq!(trans.tgt_dim(), rank + tors.len());
@@ -105,7 +105,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn make_matrix<Y, F>(&self, target: &Summand<Y, R>, map: F) -> SpMat<R>
-    where Y: Gen, F: Fn(&Lc<X, R>) -> Lc<Y, R> { 
+    where Y: LcGen, F: Fn(&Lc<X, R>) -> Lc<Y, R> { 
         SpMat::from_col_vecs(target.dim(), self.generators().map(|z| { 
             let w = map(&z);
             target.vectorize(&w)
@@ -113,7 +113,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn make_matrix_euc<Y, F>(&self, target: &Summand<Y, R>, map: F) -> SpMat<R>
-    where R: EucRing, for<'x> &'x R: EucRingOps<R>, Y: Gen, F: Fn(&Lc<X, R>) -> Lc<Y, R> { 
+    where R: EucRing, for<'x> &'x R: EucRingOps<R>, Y: LcGen, F: Fn(&Lc<X, R>) -> Lc<Y, R> { 
         SpMat::from_col_vecs(target.dim(), self.generators().map(|z| { 
             let w = map(&z);
             target.vectorize_euc(&w)
@@ -121,7 +121,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn merge<Y>(&mut self, other: Summand<Y, R>)
-    where Y: Gen { 
+    where Y: LcGen { 
         assert_eq!(self.trans.tgt_dim(), other.trans.src_dim());
 
         self.rank = other.rank;
@@ -131,7 +131,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn map_raw_generators<Y>(&self, f: impl Fn(&X) -> Y) -> Summand<Y, R>
-    where Y: Gen {
+    where Y: LcGen {
         Summand::new(
             self.raw_gens.iter().map(|x| f(x)).collect(),
             self.rank,
@@ -154,21 +154,21 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 impl<X, R> Default for Summand<X, R>
-where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+where X: LcGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn default() -> Self {
         Self::zero()
     }
 }
 
 impl<X, R> Display for Summand<X, R>
-where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+where X: LcGen, R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.display().fmt(f)
     }
 }
 
 impl<X, R> SummandTrait for Summand<X, R>
-where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+where X: LcGen, R: Ring, for<'x> &'x R: RingOps<R> {
     type R = R;
 
     fn rank(&self) -> usize {
@@ -181,7 +181,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 impl<I, X, R> Grid<I, Summand<X, R>>
-where I: GridDeg, X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+where I: GridDeg, X: LcGen, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn total_rank(&self) -> usize { 
         self.support().map(|&i| self[i].rank()).sum()
     }
@@ -195,7 +195,7 @@ mod tex {
     use yui_core::tex::TeX;
 
     impl<X, R> TeX for Summand<X, R>
-    where X: Gen, R: Ring + TeX, for<'x> &'x R: RingOps<R> {
+    where X: LcGen, R: Ring + TeX, for<'x> &'x R: RingOps<R> {
         fn tex_math_symbol() -> String {
             "".to_string()
         }

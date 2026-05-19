@@ -5,7 +5,7 @@ use auto_impl_ops::auto_ops;
 use yui_core::util::format::subscript;
 use yui_core::{AddMon, CloneAnd, Elem, Ring, RingOps};
 use yui_core::bitseq::{Bit, BitSeq};
-use yui_core::lc::{Gen, Lc};
+use yui_core::lc::{LcGen, Lc};
 use yui_link::State;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
@@ -62,7 +62,7 @@ impl Elem for KhGen {
     }
 }
 
-impl Gen for KhGen {}
+impl LcGen for KhGen {}
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub struct KhTensor(
@@ -189,7 +189,7 @@ impl Elem for KhTensor {
     }
 }
 
-impl Gen for KhTensor {}
+impl LcGen for KhTensor {}
 
 #[auto_ops]
 impl AddAssign<KhTensor> for KhTensor {
@@ -262,7 +262,7 @@ impl Display for KhChainGen {
     }
 }
 
-impl Gen for KhChainGen {}
+impl LcGen for KhChainGen {}
 
 pub type KhChain<R> = Lc<KhChainGen, R>;
 pub trait KhChainExt { 

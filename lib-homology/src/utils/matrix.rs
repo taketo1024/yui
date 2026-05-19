@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use yui_core::{Ring, RingOps, IndexList};
-use yui_core::lc::{Lc, Gen};
+use yui_core::lc::{Lc, LcGen};
 use yui_matrix::sparse::SpMat;
 
 #[cfg(feature = "multithread")]
@@ -8,7 +8,7 @@ use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
 pub fn make_matrix<X, Y, R, F>(from: &IndexList<X>, to: &IndexList<Y>, f: F) -> SpMat<R>
 where 
-    X: Gen, Y: Gen, 
+    X: LcGen, Y: LcGen, 
     R: Ring, for<'x> &'x R: RingOps<R>,
     F: Fn(&X) -> Lc<Y, R> + Send + Sync
 {
@@ -23,7 +23,7 @@ where
 
 pub fn make_matrix_s<X, Y, R, F>(from: &IndexList<X>, to: &IndexList<Y>, f: F) -> SpMat<R>
 where 
-    X: Gen, Y: Gen, 
+    X: LcGen, Y: LcGen, 
     R: Ring, for<'x> &'x R: RingOps<R>,
     F: Fn(&X) -> Lc<Y, R> 
 {
@@ -45,7 +45,7 @@ where
 #[cfg(feature = "multithread")]
 pub fn make_matrix_m<X, Y, R, F>(from: &IndexList<X>, to: &IndexList<Y>, f: F) -> SpMat<R>
 where 
-    X: Gen, Y: Gen, 
+    X: LcGen, Y: LcGen, 
     R: Ring, for<'x> &'x R: RingOps<R>,
     F: Fn(&X) -> Lc<Y, R> + Send + Sync
 {

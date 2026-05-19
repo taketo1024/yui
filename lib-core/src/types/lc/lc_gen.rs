@@ -5,7 +5,7 @@ use itertools::Either;
 use crate::lc::Lc;
 use crate::{Elem, ElemBase, Ring, RingOps};
 
-pub trait Gen: Elem + Hash + Ord {}
+pub trait LcGen: Elem + Hash + Ord {}
 
 #[derive(Debug, Display, Default, Hash, PartialEq, Eq, Clone, PartialOrd, Ord)]
 #[display("<{}>", _0)]
@@ -29,13 +29,13 @@ where T: ElemBase {
     }
 }
 
-impl<T> Gen for FreeGen<T> 
+impl<T> LcGen for FreeGen<T> 
 where T: ElemBase + Hash + Ord {}
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
-pub struct EitherGen<X, Y>(Either<X, Y>) where X: Gen, Y: Gen;
+pub struct EitherGen<X, Y>(Either<X, Y>) where X: LcGen, Y: LcGen;
 
-impl<X, Y> EitherGen<X, Y> where X: Gen, Y: Gen {
+impl<X, Y> EitherGen<X, Y> where X: LcGen, Y: LcGen {
     pub fn from_left(x: X) -> Self {
         Self(Either::Left(x))
     }
@@ -78,25 +78,25 @@ impl<X, Y> EitherGen<X, Y> where X: Gen, Y: Gen {
     }
 }
 
-impl<X, Y> From<Either<X, Y>> for EitherGen<X, Y> where X: Gen, Y: Gen {
+impl<X, Y> From<Either<X, Y>> for EitherGen<X, Y> where X: LcGen, Y: LcGen {
     fn from(e: Either<X, Y>) -> Self {
         Self(e)
     }
 }
 
-impl<X, Y> From<EitherGen<X, Y>> for Either<X, Y> where X: Gen, Y: Gen {
+impl<X, Y> From<EitherGen<X, Y>> for Either<X, Y> where X: LcGen, Y: LcGen {
     fn from(e: EitherGen<X, Y>) -> Self {
         e.0
     }
 }
 
-impl<X, Y> Default for EitherGen<X, Y> where X: Gen, Y: Gen {
+impl<X, Y> Default for EitherGen<X, Y> where X: LcGen, Y: LcGen {
     fn default() -> Self {
         Self(Either::Left(X::default()))
     }
 }
 
-impl <X, Y> std::fmt::Display for EitherGen<X, Y> where X: Gen, Y: Gen {
+impl <X, Y> std::fmt::Display for EitherGen<X, Y> where X: LcGen, Y: LcGen {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.0 {
             Either::Left(x)  => std::fmt::Display::fmt(x, f),
@@ -105,7 +105,7 @@ impl <X, Y> std::fmt::Display for EitherGen<X, Y> where X: Gen, Y: Gen {
     }
 }
 
-impl<X, Y> Elem for EitherGen<X, Y> where X: Gen, Y: Gen {
+impl<X, Y> Elem for EitherGen<X, Y> where X: LcGen, Y: LcGen {
     fn math_symbol() -> String {
         if X::math_symbol() == Y::math_symbol() {
             X::math_symbol()
@@ -115,11 +115,11 @@ impl<X, Y> Elem for EitherGen<X, Y> where X: Gen, Y: Gen {
     }
 }
 
-impl <X, Y> Gen for EitherGen<X, Y> where X: Gen, Y: Gen {
+impl <X, Y> LcGen for EitherGen<X, Y> where X: LcGen, Y: LcGen {
 }
 
 pub fn split_lr<X, Y, R>(z: &Lc<EitherGen<X, Y>, R>) -> (Lc<X, R>, Lc<Y, R>)
-where X: Gen, Y: Gen, R: Ring, for<'x> &'x R: RingOps<R>{
+where X: LcGen, Y: LcGen, R: Ring, for<'x> &'x R: RingOps<R>{
     let mut x = vec![];
     let mut y = vec![];
     for (e, r) in z.iter() { 

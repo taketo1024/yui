@@ -6,6 +6,7 @@ version = "0.4.0"
 authors.workspace = true
 license.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 repository.workspace  = true
 
 [features]
@@ -33,4 +34,4 @@ serde = { version = "1.0.228", features = ["derive"], optional = true }
 serde_json = { version = "1.0.149", optional = true }
 sprs = "0.11.4"
 thread_local = "1.1.8"
-yui-core = { version = "0.4.0", path = "../lib-core" }
+yui-core.workspace = true

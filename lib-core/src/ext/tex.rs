@@ -2,7 +2,8 @@
 
 use itertools::Itertools;
 use std::fmt::Display;
-pub trait TeX { 
+
+pub trait TeX {
     fn tex_math_symbol() -> String;
     fn tex_string(&self) -> String;
 }

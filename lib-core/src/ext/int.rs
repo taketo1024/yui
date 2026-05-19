@@ -92,15 +92,16 @@ impl_integer!(i64);
 impl_integer!(i128);
 impl_integer!(BigInt);
 
+
 #[cfg(feature = "tex")] 
 mod tex {
     use crate::tex::TeX;
     use num_bigint::BigInt;
-
-    macro_rules! impl_tex {
+    
+    macro_rules! impl_tex_int {
         ($type:ident) => {
             impl TeX for $type {
-                fn tex_math_symbol() -> String { 
+                fn tex_math_symbol() -> String {
                     String::from("\\mathbb{Z}")
                 }
                 fn tex_string(&self) -> String {
@@ -110,10 +111,10 @@ mod tex {
         }
     }
 
-    impl_tex!(i32);
-    impl_tex!(i64);
-    impl_tex!(i128);
-    impl_tex!(BigInt);        
+    impl_tex_int!(i32);
+    impl_tex_int!(i64);
+    impl_tex_int!(i128);
+    impl_tex_int!(BigInt);
 }
 
 #[cfg(test)]

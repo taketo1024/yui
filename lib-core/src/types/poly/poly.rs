@@ -21,7 +21,7 @@ use delegate::delegate;
 use num_traits::{Zero, One, Pow};
 use auto_impl_ops::auto_ops;
 
-use crate::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Mon, MonOps, Ring, RingOps, EucRing, EucRingOps, Field, FieldOps};
+use crate::{MathType, AddMon, AddMonOps, AddGrp, AddGrpOps, Mon, MonOps, Ring, RingOps, EucRing, EucRingOps, Field, FieldOps};
 use crate::lc::Lc;
 use super::{MultiDeg, Var, Var2, Var3,MultiVar, Mono, MonoOrd};
 
@@ -428,7 +428,7 @@ impl_alg_op!(AddGrpOps);
 impl_alg_op!(MonOps);
 impl_alg_op!(RingOps);
 
-impl<X, R> Elem for PolyBase<X, R>
+impl<X, R> MathType for PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     fn math_symbol() -> String {
         format!("{}[{}]", R::math_symbol(), X::math_symbol())

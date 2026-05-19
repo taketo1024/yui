@@ -7,7 +7,7 @@ use auto_impl_ops::auto_ops;
 use itertools::Itertools;
 use num_traits::Zero;
 use cartesian::cartesian;
-use yui_core::{AddMon, CloneAnd, Elem, Ring, RingOps};
+use yui_core::{AddMon, CloneAnd, MathType, Ring, RingOps};
 use yui_core::lc::{LcKey, Lc};
 use yui_core::poly::Var2;
 use yui_link::{Edge, Node};
@@ -498,7 +498,7 @@ impl Default for CobComp {
     }
 }
 
-impl Elem for CobComp {
+impl MathType for CobComp {
     fn math_symbol() -> String {
         "CobComp".to_string()
     }
@@ -840,7 +840,7 @@ impl Ord for Cob {
     }
 }
 
-impl Elem for Cob {
+impl MathType for Cob {
     fn math_symbol() -> String {
         "Cob".to_string()
     }

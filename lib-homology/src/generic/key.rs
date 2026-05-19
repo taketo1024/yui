@@ -1,6 +1,6 @@
 use derive_more::derive::{Display, Debug};
 use yui_core::lc::LcKey;
-use yui_core::Elem;
+use yui_core::MathType;
 
 use crate::GridDeg;
 
@@ -10,7 +10,7 @@ use crate::GridDeg;
 pub struct GenericKey<I>(pub I, pub usize) 
 where I: GridDeg;
 
-impl<I> Elem for GenericKey<I>
+impl<I> MathType for GenericKey<I>
 where I: GridDeg {
     fn math_symbol() -> String {
         "E".into()

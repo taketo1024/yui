@@ -9,7 +9,7 @@ use num_integer::Integer;
 use num_traits::{One, Pow, ToPrimitive, Zero};
 use auto_impl_ops::auto_ops;
 
-use crate::{Elem, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, EucRingOps, AddMon, AddGrp, Mon, Ring, EucRing, Field};
+use crate::{MathType, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, EucRingOps, AddMon, AddGrp, Mon, Ring, EucRing, Field};
 
 /// An element of the finite field 𝔽₂.
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
@@ -144,7 +144,7 @@ impl_alg_ops!(RingOps);
 impl_alg_ops!(EucRingOps);
 impl_alg_ops!(FieldOps);
 
-impl Elem for FF2 {
+impl MathType for FF2 {
     fn math_symbol() -> String {
         String::from("F₂")
     }

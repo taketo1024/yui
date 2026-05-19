@@ -14,7 +14,7 @@ use ahash::AHashMap;
 use itertools::Itertools;
 use num_traits::Zero;
 use auto_impl_ops::auto_ops;
-use crate::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
+use crate::{MathType, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
 
 use super::lc_key::*;
 
@@ -382,7 +382,7 @@ macro_rules! impl_alg_ops {
 impl_alg_ops!(AddMonOps);
 impl_alg_ops!(AddGrpOps);
 
-impl<X, R> Elem for Lc<X, R>
+impl<X, R> MathType for Lc<X, R>
 where
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
@@ -428,7 +428,7 @@ where
 #[cfg(test)]
 mod tests {
     use num_traits::Zero;
-    use crate::{Elem, AddMon};
+    use crate::{MathType, AddMon};
     use crate::util::macros::hashmap;
     use crate::lc::{AsKey, Lc};
  

@@ -3,7 +3,7 @@ use std::ops::{Add, AddAssign, Index};
 use itertools::join;
 use auto_impl_ops::auto_ops;
 use num_traits::Zero;
-use yui_core::{AddMon, CloneAnd, Elem, Ring, RingOps};
+use yui_core::{AddMon, CloneAnd, MathType, Ring, RingOps};
 use yui_core::bitseq::{Bit, BitSeq};
 use yui_core::lc::{LcKey, Lc};
 
@@ -55,7 +55,7 @@ impl Display for KhAlgGen {
     }
 }
 
-impl Elem for KhAlgGen {
+impl MathType for KhAlgGen {
     fn math_symbol() -> String {
         "A".to_string()
     }
@@ -180,7 +180,7 @@ impl Display for KhTensor {
     }
 }
 
-impl Elem for KhTensor {
+impl MathType for KhTensor {
     fn math_symbol() -> String {
         String::from("KhT")
     }

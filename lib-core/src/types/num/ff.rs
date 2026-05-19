@@ -13,7 +13,7 @@ use derive_more::{Display, Debug};
 use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
 
-use crate::{Elem, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, EucRingOps, AddMon, AddGrp, Mon, Ring, EucRing, Field};
+use crate::{MathType, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, EucRingOps, AddMon, AddGrp, Mon, Ring, EucRing, Field};
 
 type I = i32;
 
@@ -137,7 +137,7 @@ impl_alg_ops!(RingOps);
 impl_alg_ops!(EucRingOps);
 impl_alg_ops!(FieldOps);
 
-impl<const p: I> Elem for FF<p> {
+impl<const p: I> MathType for FF<p> {
     fn math_symbol() -> String {
         use crate::util::format::subscript;
         format!("F{}", subscript(p as isize))

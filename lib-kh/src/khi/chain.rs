@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use yui_core::lc::LcKey;
-use yui_core::Elem;
+use yui_core::MathType;
 use crate::kh::KhState;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -40,7 +40,7 @@ impl Default for KhIState {
     }
 }
 
-impl Elem for KhIState {
+impl MathType for KhIState {
     fn math_symbol() -> String {
         String::new()
     }

@@ -33,7 +33,7 @@ macro_rules! impl_integer {
         impl_ops!(EucRingOps, $type);
         impl_ops!(IntOps, $type);
 
-        impl Elem for $type {
+        impl MathType for $type {
             fn math_symbol() -> String { 
                 String::from("Z")
             }

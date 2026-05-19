@@ -28,7 +28,7 @@ use std::fmt::{Display, Debug};
 use std::ops::{Add, Neg, Sub, Mul, AddAssign, SubAssign, MulAssign, Rem, Div, RemAssign, DivAssign};
 use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
-use crate::{AddGrp, AddGrpOps, AddMon, AddMonOps, DivRound, Elem, EucRing, EucRingOps, Mon, MonOps, Ring, RingOps, Integer, IntOps};
+use crate::{AddGrp, AddGrpOps, AddMon, AddMonOps, DivRound, MathType, EucRing, EucRingOps, Mon, MonOps, Ring, RingOps, Integer, IntOps};
 
 /// A quadratic integer in `ℤ[ω]`, represented by `(a, b)` for `a + b·ω`.
 ///
@@ -352,7 +352,7 @@ impl_alg_op!(RingOps);
 impl_alg_op_d!(EucRingOps, -1);
 impl_alg_op_d!(EucRingOps, -3);
 
-impl<I, const D: i32> Elem for QuadInt<I, D>
+impl<I, const D: i32> MathType for QuadInt<I, D>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     fn math_symbol() -> String {
         if D == -1 { 

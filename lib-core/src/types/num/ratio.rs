@@ -13,7 +13,7 @@ use std::ops::{Mul, Add, Sub, Neg, AddAssign, SubAssign, MulAssign, Div, DivAssi
 use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
 
-use crate::{EucRing, EucRingOps, Elem, Mon, AddMon, AddGrp, AddMonOps, AddGrpOps, MonOps, RingOps, Ring, FieldOps, Field, Integer, IntOps};
+use crate::{EucRing, EucRingOps, MathType, Mon, AddMon, AddGrp, AddMonOps, AddGrpOps, MonOps, RingOps, Ring, FieldOps, Field, Integer, IntOps};
 
 /// A fraction `numer / denom` over a [`EucRing`] `T`, kept in reduced form.
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -286,7 +286,7 @@ decl_alg_ops!(RingOps);
 decl_alg_ops!(EucRingOps);
 decl_alg_ops!(FieldOps);
 
-impl<T> Elem for Ratio<T> 
+impl<T> MathType for Ratio<T> 
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     fn math_symbol() -> String {
         let t = T::math_symbol();
@@ -380,7 +380,7 @@ mod tex {
     use super::*;
 
     impl<T> TeX for Ratio<T> 
-    where T: TeX + Elem {
+    where T: TeX + MathType {
         fn tex_math_symbol() -> String { 
             let t = T::math_symbol();
             if &t == "Z" { 

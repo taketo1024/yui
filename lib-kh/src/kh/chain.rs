@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use itertools::Itertools;
 use yui_core::util::format::subscript;
-use yui_core::{Elem, Ring, RingOps};
+use yui_core::{MathType, Ring, RingOps};
 use yui_core::lc::{LcKey, Lc};
 use yui_link::State;
 
@@ -52,7 +52,7 @@ impl KhState {
     }
 }
 
-impl Elem for KhState {
+impl MathType for KhState {
     fn math_symbol() -> String {
         String::from("Kh")
     }

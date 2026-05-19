@@ -2,35 +2,34 @@
 //! constructions [`AsKey`] (wrap an arbitrary element as a key) and
 //! [`EitherKey`] (disjoint union of two key sets).
 
-use std::hash::Hash;
 use derive_more::Display;
 use itertools::Either;
 
 use crate::lc::Lc;
-use crate::{Elem, ElemBase, Ring, RingOps};
+use crate::{MathType, IndexType, Ring, RingOps};
 
 /// Marker trait for types usable as keys in [`Lc`](super::Lc) — i.e.
 /// elements that are hashable and totally ordered.
-pub trait LcKey: Elem + Hash + Ord {}
+pub trait LcKey: MathType + IndexType {}
 
 /// Wraps an arbitrary element `T` so it can be used as an [`LcKey`].
 ///
-/// Used to build the [free module](crate::RMod) over any `T: ElemBase + Hash + Ord`.
+/// Used to build the [free module](crate::RMod) over any `T: IndexType`.
 #[derive(Debug, Display, Default, Hash, PartialEq, Eq, Clone, PartialOrd, Ord)]
 #[display("<{}>", _0)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
-pub struct AsKey<T>(pub T) where T: ElemBase;
+pub struct AsKey<T>(pub T) where T: IndexType;
 
 impl<T> From<T> for AsKey<T> 
-where T: ElemBase {
+where T: IndexType {
     fn from(value: T) -> Self {
         Self(value)
     }
 }
 
-impl<T> Elem for AsKey<T> 
-where T: ElemBase { 
+impl<T> MathType for AsKey<T> 
+where T: IndexType { 
     fn math_symbol() -> String {
         let full_name = std::any::type_name::<T>();
         let name = full_name.split("::").last().unwrap_or(full_name);
@@ -39,7 +38,7 @@ where T: ElemBase {
 }
 
 impl<T> LcKey for AsKey<T> 
-where T: ElemBase + Hash + Ord {}
+where T: IndexType {}
 
 /// A disjoint union `X ⊔ Y` of two key sets, used to form direct sums of
 /// linear combinations, e.g. the basis for `Lc<X, R> ⊕ Lc<Y, R> ≅ Lc<EitherKey<X, Y>, R>`.
@@ -116,7 +115,7 @@ impl <X, Y> std::fmt::Display for EitherKey<X, Y> where X: LcKey, Y: LcKey {
     }
 }
 
-impl<X, Y> Elem for EitherKey<X, Y> where X: LcKey, Y: LcKey {
+impl<X, Y> MathType for EitherKey<X, Y> where X: LcKey, Y: LcKey {
     fn math_symbol() -> String {
         if X::math_symbol() == Y::math_symbol() {
             X::math_symbol()

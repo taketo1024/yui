@@ -2,7 +2,7 @@ use yui_core::{Ring, RingOps};
 use yui_link::{Edge, Link, State};
 
 use crate::ext::LinkExt;
-use crate::kh::{KhGen, KhChain, KhComplex, KhChainGen, KhTensor};
+use crate::kh::{KhAlgGen, KhChain, KhComplex, KhState, KhTensor};
 
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
@@ -32,22 +32,22 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         });
 
         let init = KhChain::from(
-            KhChainGen::new(s, KhTensor::empty(), deg_shift)
+            KhState::new(s, KhTensor::empty(), deg_shift)
         );
 
         xs.fold(init, |res, next| { 
             res.apply_bilin(next, |a, b| 
-                KhChainGen::new(s, a.tensor + b.tensor, deg_shift)
+                KhState::new(s, a.tensor + b.tensor, deg_shift)
             )
         })
     }
 
     fn color_factor(a: &R) -> KhChain<R> // a -> X - a
     where R: Ring, for<'x> &'x R: RingOps<R> { 
-        use KhGen::{I, X};
+        use KhAlgGen::{I, X};
     
-        fn init(x: KhGen) -> KhChainGen { 
-            KhChainGen::new(
+        fn init(x: KhAlgGen) -> KhState { 
+            KhState::new(
                 State::empty(),
                 KhTensor::from(x),
                 (0, 0)

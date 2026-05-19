@@ -15,7 +15,7 @@ use yui_matrix::dense::snf::fnf;
 use crate::ext::{Color, LinkExt};
 use crate::kh::ext::cc::KhChainMap;
 use crate::kh::internal::v1::cube::KhCube;
-use crate::kh::{KhChain, KhChainExt, KhChainGen, KhComplex, KhHomology};
+use crate::kh::{KhChain, KhChainExt, KhState, KhComplex, KhHomology};
 
 impl<R> KhComplex<R>
 where
@@ -71,7 +71,7 @@ impl<R> KhSl2Map<R> where
     pub fn h_deg(&self) -> isize{ -2 }
     pub fn q_deg(&self) -> isize{ -4 }
 
-    fn apply_chi(&self, x: &KhChainGen, i: usize) -> KhChain<R> {
+    fn apply_chi(&self, x: &KhState, i: usize) -> KhChain<R> {
         if x.state[i].is_zero() {
             return KhChain::zero();
         }
@@ -80,7 +80,7 @@ impl<R> KhSl2Map<R> where
         self.cube.rev_d_to(x, &t, true)
     }
 
-    fn apply_u(&self, x: &KhChainGen) -> KhChain<R> { 
+    fn apply_u(&self, x: &KhState) -> KhChain<R> { 
         let n = self.path.len();
         if n < 2 { 
             return KhChain::zero();

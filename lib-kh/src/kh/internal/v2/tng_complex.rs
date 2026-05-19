@@ -14,7 +14,7 @@ use yui_link::{Edge, Link, Node, State};
 use yui_core::bitseq::Bit;
 
 use crate::kh::internal::v1::cube::KhCube;
-use crate::kh::{KhGen, KhAlg, KhChain, KhComplex, KhChainGen, KhTensor};
+use crate::kh::{KhAlgGen, KhAlg, KhChain, KhComplex, KhState, KhTensor};
 use super::cob::{Cob, Dot, Bottom, CobComp, LcCob, LcCobTrait};
 use super::tng::{Tng, TngComp};
 
@@ -38,8 +38,8 @@ impl TngKey {
         self.label.append(other.label);
     }
 
-    pub fn as_gen(&self, deg_shift: (isize, isize)) -> KhChainGen {
-        KhChainGen::new(self.state, self.label, deg_shift)
+    pub fn as_gen(&self, deg_shift: (isize, isize)) -> KhState {
+        KhState::new(self.state, self.label, deg_shift)
     }
 }
 
@@ -54,17 +54,17 @@ impl<'a> Add for &'a TngKey {
 }
 
 #[auto_ops]
-impl<'a> Add<KhGen> for &'a TngKey {
+impl<'a> Add<KhAlgGen> for &'a TngKey {
     type Output = TngKey;
-    fn add(self, rhs: KhGen) -> Self::Output {
+    fn add(self, rhs: KhAlgGen) -> Self::Output {
         let mut res = *self;
         res.label.push(rhs);
         res
     }
 }
 
-impl From<&KhChainGen> for TngKey {
-    fn from(x: &KhChainGen) -> Self {
+impl From<&KhState> for TngKey {
+    fn from(x: &KhState) -> Self {
         TngKey { state: x.state, label: x.tensor }
     }
 }
@@ -492,15 +492,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         #[allow(non_snake_case)]
         let updated_keys = if based { 
-            let k_X = k + KhGen::X;
+            let k_X = k + KhAlgGen::X;
 
             self.rename_vertex_key(k, k_X);
             self.deloop_with(&k_X, r, Dot::X, Dot::None);
 
             vec![k_X]
         } else { 
-            let k_X = k + KhGen::X;
-            let k_1 = k + KhGen::I;
+            let k_X = k + KhAlgGen::X;
+            let k_1 = k + KhAlgGen::I;
 
             self.rename_vertex_key(k, k_X);
             self.duplicate_vertex(&k_X, k_1);
@@ -588,7 +588,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.remove_vertex(k1);
     }
 
-    pub fn into_raw_complex(self) -> ChainComplex<KhChainGen, R> {
+    pub fn into_raw_complex(self) -> ChainComplex<KhState, R> {
         assert!(self.is_completely_delooped());
 
         let summands = Grid1::generate(self.h_range(), |i| { 
@@ -600,7 +600,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             Summand::from_raw_generators(gens)
         });
 
-        let d = move |x: &KhChainGen| { 
+        let d = move |x: &KhState| { 
             let (h, t) = self.ht();
             let k = TngKey::from(x);
             let v = self.vertex(&k);
@@ -805,11 +805,11 @@ mod tests {
         assert_eq!(updated, vec![
             TngKey {
                 state: State::empty(), 
-                label: KhTensor::from_iter([KhGen::X])
+                label: KhTensor::from_iter([KhAlgGen::X])
             },
             TngKey {
                 state: State::empty(), 
-                label: KhTensor::from_iter([KhGen::I])
+                label: KhTensor::from_iter([KhAlgGen::I])
             }
         ]);
     }
@@ -846,11 +846,11 @@ mod tests {
         assert_eq!(updated, vec![
             TngKey {
                 state: State::from([1,0]), 
-                label: KhTensor::from_iter([KhGen::X])
+                label: KhTensor::from_iter([KhAlgGen::X])
             },
             TngKey {
                 state: State::from([1,0]), 
-                label: KhTensor::from_iter([KhGen::I])
+                label: KhTensor::from_iter([KhAlgGen::I])
             }
         ]);
     }
@@ -873,7 +873,7 @@ mod tests {
         assert_eq!(updated, vec![
             TngKey {
                 state: State::empty(), 
-                label: KhTensor::from_iter([KhGen::X])
+                label: KhTensor::from_iter([KhAlgGen::X])
             },
         ]);
     }

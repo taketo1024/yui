@@ -9,7 +9,7 @@ use yui_homology::{ChainComplex, ChainComplexTrait, DisplaySeq, DisplayTable, Gr
 use yui_link::InvLink;
 use yui_matrix::sparse::SpMat;
 
-use crate::kh::{KhChain, KhChainExt, KhComplex, KhChainGen};
+use crate::kh::{KhChain, KhChainExt, KhComplex, KhState};
 use crate::khi::KhIHomology;
 use crate::khi::KhIGen;
 use crate::misc::{make_gen_grid, range_of};
@@ -75,7 +75,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     }
 
     pub fn from_kh_complex<'a, F>(c: KhComplex<R>, map: F) -> Self
-    where F: Fn(&KhChainGen) -> KhChainGen + Send + Sync + 'static {
+    where F: Fn(&KhState) -> KhState + Send + Sync + 'static {
         let deg_shift = c.deg_shift();
         let h_range = c.h_range();
         let h_range = *h_range.start() ..= (h_range.end() + 1);

@@ -174,7 +174,7 @@ pub trait DisplaySeq<I: Display> {
     fn display_at(&self, i: &I) -> String;
     fn display_seq(&self) -> String {
         use yui_core::util::format::table;
-        table(self.display_label(), [""].iter(), self.display_indices().iter(), |_, &i| {
+        table(self.display_label(), [""], self.display_indices(), |_, i| {
             self.display_at(i)
         })
     }
@@ -208,7 +208,7 @@ pub trait DisplayTable<I: Display> {
         let (ind0, ind1) = self.display_indices();
         let head = format!("{}\\{}", label1, label0);
 
-        table(head, ind1.iter().rev(), ind0.iter(), |&j, &i| {
+        table(head, ind1.into_iter().rev(), ind0, |j, i| {
             self.display_at(i, j)
         })
     }

@@ -874,7 +874,6 @@ pub trait LcCobTrait: Sized {
     fn should_part_eval(&self) -> bool;
     fn part_eval(self, h: &Self::R, t: &Self::R) -> Self;
     fn eval(&self, h: &Self::R, t: &Self::R) -> Self::R;
-    fn is_homogeneous(&self) -> bool; // only for debug
 }
 
 impl<R> LcCobTrait for LcCob<R>
@@ -967,17 +966,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             a * c.eval(h, t)
         );
         R::sum(coeffs)
-    }
-
-    fn is_homogeneous(&self) -> bool {
-        use std::any::Any;
-        use yui_core::{num::FF2, poly::HPoly};
-
-        if let Some(_self) = (self as &dyn Any).downcast_ref::<LcCob<HPoly<'H', FF2>>>() { 
-            _self.iter().map(|(cob, r)| cob.deg() - 2 * (r.deg() as i32)).all_equal()
-        } else { 
-            true
-        }
     }
 }
 

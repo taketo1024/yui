@@ -174,7 +174,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 #[cfg(test)]
 mod tests {
     use num_traits::Zero;
-    use yui_core::poly::HPoly;
+    use yui_core::poly::Poly;
     use yui_core::num::FF2;
     
     use yui_homology::SummandTrait;
@@ -417,7 +417,7 @@ mod tests {
     #[test]
     fn bn_trefoil() {
         type R = FF2;
-        type P = HPoly<'H', R>;
+        type P = Poly<'H', R>;
 
         let l = Link::test_data("3_1");
         let (h, t) = (P::variable(), P::zero());
@@ -441,7 +441,7 @@ mod tests {
  #[cfg(test)]
 mod tests_v1 {
     use num_traits::Zero;
-    use yui_core::poly::HPoly;
+    use yui_core::poly::Poly;
     use yui_core::num::FF2;
     use yui_homology::SummandTrait;
     use yui_link::Link;
@@ -673,7 +673,7 @@ mod tests_v1 {
     #[test]
     fn trefoil_bn() {
         type R = FF2;
-        type P = HPoly<'H', R>;
+        type P = Poly<'H', R>;
 
         let l = Link::test_data("3_1");
         let (h, t) = (P::variable(), P::zero());

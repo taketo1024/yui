@@ -244,7 +244,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests {
-    use yui_core::poly::HPoly;
+    use yui_core::poly::Poly;
     use yui_core::num::FF2;
     use num_traits::{Zero, One};
     use yui_homology::{ChainComplexTrait, SummandTrait};
@@ -289,7 +289,7 @@ mod tests {
         let l = InvLink::load("3_1").unwrap();
 
         type R = FF2;
-        type P = HPoly<'H', R>;
+        type P = Poly<'H', R>;
         let (h, t) = (P::variable(), P::zero());
 
         let c = KhIComplex::new(&l, &h, &t, false);
@@ -404,7 +404,7 @@ mod tests {
         let l = InvLink::load("3_1").unwrap();
 
         type R = FF2;
-        type P = HPoly<'H', R>;
+        type P = Poly<'H', R>;
         let (h, t) = (P::variable(), P::zero());
         let c = KhIComplex::new(&l, &h, &t, false);
 
@@ -427,7 +427,7 @@ mod tests {
         let l = InvLink::load("3_1").unwrap();
 
         type R = FF2;
-        type P = HPoly<'H', R>;
+        type P = Poly<'H', R>;
         let (h, t) = (P::variable(), P::zero());
         let c = KhIComplex::new(&l, &h, &t, true);
         
@@ -446,7 +446,7 @@ mod tests {
 
 #[cfg(test)]
 mod tests_v1 {
-    use yui_core::poly::HPoly;
+    use yui_core::poly::Poly;
     use yui_core::num::FF2;
     use num_traits::{Zero, One};
     use yui_homology::{ChainComplexTrait, SummandTrait};
@@ -491,7 +491,7 @@ mod tests_v1 {
         let l = InvLink::load("3_1").unwrap();
 
         type R = FF2;
-        type P = HPoly<'H', R>;
+        type P = Poly<'H', R>;
         let (h, t) = (P::variable(), P::zero());
 
         let c = KhIComplex::new_no_simplify(&l, &h, &t, false);
@@ -569,7 +569,7 @@ mod tests_v1 {
         let l = InvLink::load("3_1").unwrap();
 
         type R = FF2;
-        type P = HPoly<'H', R>;
+        type P = Poly<'H', R>;
         let (h, t) = (P::variable(), P::zero());
         let c = KhIComplex::new_no_simplify(&l, &h, &t, false);
 
@@ -592,7 +592,7 @@ mod tests_v1 {
         let l = InvLink::load("3_1").unwrap();
 
         type R = FF2;
-        type P = HPoly<'H', R>;
+        type P = Poly<'H', R>;
         let (h, t) = (P::variable(), P::zero());
         let c = KhIComplex::new_no_simplify(&l, &h, &t, true);
         

@@ -79,14 +79,14 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 #[cfg(test)]
 mod tests {
-    use yui_core::poly::HPoly;
+    use yui_core::poly::Poly;
     use yui_core::num::FF2;
     use yui_link::Link;
 
     use super::*;
 
     type R = FF2;
-    type P = HPoly<'H', R>;
+    type P = Poly<'H', R>;
 
     #[test]
     fn test_unknot_pos_twist() { 
@@ -166,7 +166,7 @@ mod tests {
             #[test]
             fn $test() -> Result<(), Box<dyn std::error::Error>> { 
                 type R = FF2;
-                type P = HPoly<'H', R>;
+                type P = Poly<'H', R>;
                 let c = P::variable();
     
                 let l = InvLink::load($name)?;

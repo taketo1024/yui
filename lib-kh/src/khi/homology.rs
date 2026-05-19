@@ -147,7 +147,7 @@ mod tests {
     #![allow(unused)]
 
     use itertools::Itertools;
-    use yui_core::poly::HPoly;
+    use yui_core::poly::Poly;
     use yui_core::num::FF2;
     use num_traits::{Zero, One};
     use yui_homology::{ChainComplexTrait, DisplaySeq, DisplayTable, SummandTrait};
@@ -191,7 +191,7 @@ mod tests {
         let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 
         type R = FF2;
-        type P = HPoly<'H', R>;
+        type P = Poly<'H', R>;
         let (h, t) = (P::variable(), P::zero());
 
         let khi = KhIHomology::new(&l, &h, &t, false);
@@ -243,7 +243,7 @@ mod tests {
         let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 
         type R = FF2;
-        type P = HPoly<'H', R>;
+        type P = Poly<'H', R>;
         let (h, t) = (P::variable(), P::zero());
 
         let khi = KhIHomology::new(&l, &h, &t, true);
@@ -300,7 +300,7 @@ mod tests_v1 {
     #![allow(unused)]
 
     use itertools::Itertools;
-    use yui_core::poly::HPoly;
+    use yui_core::poly::Poly;
     use yui_core::num::FF2;
     use num_traits::{Zero, One};
     use yui_homology::{ChainComplexTrait, DisplaySeq, DisplayTable, SummandTrait};
@@ -344,7 +344,7 @@ mod tests_v1 {
         let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 
         type R = FF2;
-        type P = HPoly<'H', R>;
+        type P = Poly<'H', R>;
         let (h, t) = (P::variable(), P::zero());
 
         let khi = KhIHomology::new_no_simplify(&l, &h, &t, false);
@@ -396,7 +396,7 @@ mod tests_v1 {
         let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 
         type R = FF2;
-        type P = HPoly<'H', R>;
+        type P = Poly<'H', R>;
         let (h, t) = (P::variable(), P::zero());
 
         let khi = KhIHomology::new_no_simplify(&l, &h, &t, true);

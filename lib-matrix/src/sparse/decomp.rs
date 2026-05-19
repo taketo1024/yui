@@ -81,8 +81,7 @@ where R: Zero + Send + Sync {
 
             (0 .. l - 1).for_each(|i|
                 (i + 1 .. l).for_each(|j| {
-                    println!("{}, {} -> {}", cols[i], cols[j], col_intersects(a, cols[i], cols[j]));
-                    if !u.is_same(i, j) && col_intersects(a, cols[i], cols[j]) { 
+                    if !u.is_same(i, j) && col_intersects(a, cols[i], cols[j]) {
                         u.union(i, j)
                     }
                 })

@@ -123,7 +123,7 @@ impl BitSeq {
         c
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = Bit> {
+    pub fn iter(&self) -> impl Iterator<Item = Bit> + use<> {
         let mut val = self.val;
         
         (0..self.len).map(move |_| {

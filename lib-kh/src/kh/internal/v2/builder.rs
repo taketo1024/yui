@@ -551,9 +551,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             let c = complex.edge(i, k);
             let cab = c * &ainv * &b;
-            let s = if let Some(d) = self.retr_cob.remove(k) { 
+            let s = if let Some(d) = self.retr_cob.remove(k) {
                 d - cab
-            } else { 
+            } else {
                 -cab
             }.part_eval(h, t);
 
@@ -595,7 +595,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> Display for BuildElem<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mors = self.retr_cob.iter().sorted_by_key(|(&k, _)| k).map(|(k, f)| { 
+        let mors = self.retr_cob.iter().sorted_by_key(|&(&k, _)| k).map(|(k, f)| { 
             format!("{}: {}", k, f)
         }).join(", ");
         write!(f, "[{}]", mors)

@@ -187,7 +187,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.edges.get(from)?.iter().find(|(t, _)| t == to).map(|(_, e)| e)
     }
 
-    pub fn targets_from(&self, s: &State) -> impl Iterator<Item = &State> {
+    pub fn targets_from(&self, s: &State) -> impl Iterator<Item = &State> + use<'_, R> {
         self.edges[s].iter().map(|e| &e.0)
     }
 

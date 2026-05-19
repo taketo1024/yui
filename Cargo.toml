@@ -7,12 +7,12 @@ members = [
     "lib-link",
     "lib-kh"
 ]
-resolver = "2"
+resolver = "3"
 
 [workspace.package]
 authors = ["Taketo Sano <taketo1024@gmail.com>"]
 license = "MIT"
-edition = "2021"
+edition = "2024"
 repository = "https://github.com/taketo1024/yui"
 
 [profile.release]

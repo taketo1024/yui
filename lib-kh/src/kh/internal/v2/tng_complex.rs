@@ -220,11 +220,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         )
     }
 
-    pub fn keys_into(&self, k: &TngKey) -> impl Iterator<Item = &TngKey> { 
+    pub fn keys_into(&self, k: &TngKey) -> impl Iterator<Item = &TngKey> + use<'_, R> { 
         self.vertex(k).in_edges()
     }
 
-    pub fn keys_out_from(&self, k: &TngKey) -> impl Iterator<Item = &TngKey> { 
+    pub fn keys_out_from(&self, k: &TngKey) -> impl Iterator<Item = &TngKey> + use<'_, R> { 
         self.vertex(k).out_edges()
     }
 

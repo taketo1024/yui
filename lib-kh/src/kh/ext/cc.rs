@@ -76,7 +76,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 let e = Sign::from_parity( count_1s(&x.state, i) );
                 let t = apply_f1(&alg, &x.tensor, k0, k1) * R::from_sign(e);
                 
-                t.map_gens(|y| {
+                t.map_keys(|y| {
                     KhChainGen::new(s, y, c2_deg_shift)
                 })
             })

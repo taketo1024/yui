@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use num_traits::Zero;
-use yui_core::lc::{EitherGen, LcGen, Lc, split_lr};
+use yui_core::lc::{EitherKey, LcKey, Lc, split_lr};
 use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 use yui_matrix::sparse::SpMat;
 
@@ -16,7 +16,7 @@ use super::ChainComplexBase;
 pub struct ChainMap<I, X, Y, R>
 where 
     I: GridDeg,
-    X: LcGen, Y: LcGen,
+    X: LcKey, Y: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     deg: I,
@@ -26,8 +26,8 @@ where
 impl<I, X, Y, R> ChainMap<I, X, Y, R>
 where 
     I: GridDeg,
-    X: LcGen,
-    Y: LcGen,
+    X: LcKey,
+    Y: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     pub fn new<F>(
@@ -64,7 +64,7 @@ where
     }
 
     pub fn make_matrix_euc(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I) -> SpMat<R>
-    where Y: LcGen, R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    where Y: LcKey, R: EucRing, for<'x> &'x R: EucRingOps<R> {
         source[i].make_matrix_euc(&target[i + self.deg], |z| self.apply(i, z))
     }
 
@@ -112,7 +112,7 @@ where
         }
     }
 
-    pub fn cone<It>(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, support: It, target_based: bool) -> ChainComplexBase<I, EitherGen<X, Y>, R>
+    pub fn cone<It>(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, support: It, target_based: bool) -> ChainComplexBase<I, EitherKey<X, Y>, R>
     where It: IntoIterator<Item = I> {
         assert!(source.d_deg() == target.d_deg());
 
@@ -128,8 +128,8 @@ where
         let summands = Grid::generate(support, |i| {
             let (i, j) = degs(i);
             let gens = Iterator::chain(
-                source.get(i).raw_generators().iter().map(|x| EitherGen::from_left(x.clone())), 
-                target.get(j).raw_generators().iter().map(|y| EitherGen::from_right(y.clone()))
+                source.get(i).raw_generators().iter().map(|x| EitherKey::from_left(x.clone())), 
+                target.get(j).raw_generators().iter().map(|y| EitherKey::from_right(y.clone()))
             );
             Summand::from_raw_generators(gens)
         });
@@ -138,13 +138,13 @@ where
         let d2 = target.raw_d();
         let f = self.map.clone();
 
-        let d_map = move |i: I, z: &Lc<EitherGen<X, Y>, R>| {
+        let d_map = move |i: I, z: &Lc<EitherKey<X, Y>, R>| {
             let (i, j) = degs(i);
             let (x, y) = split_lr(z);
             
-            let dx = d1(i, &x).map_gens(|x2| EitherGen::from_left (x2));
-            let fx =  f(i, &x).map_gens(|y2| EitherGen::from_right(y2));
-            let dy = d2(j, &y).map_gens(|y2| EitherGen::from_right(y2));
+            let dx = d1(i, &x).map_keys(|x2| EitherKey::from_left (x2));
+            let fx =  f(i, &x).map_keys(|y2| EitherKey::from_right(y2));
+            let dy = d2(j, &y).map_keys(|y2| EitherKey::from_right(y2));
 
             dx + fx - dy
         };
@@ -174,7 +174,7 @@ mod tests {
 
     #[test]
     fn test_cone() { 
-        type T = EitherGen<EnumGen<isize>, EnumGen<isize>>;
+        type T = EitherKey<EnumGen<isize>, EnumGen<isize>>;
         let s2 = GenericChainComplex::<i32>::s2();
         let d3 = GenericChainComplex::<i32>::d3();
 

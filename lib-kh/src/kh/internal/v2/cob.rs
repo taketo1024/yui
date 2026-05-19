@@ -8,7 +8,7 @@ use itertools::Itertools;
 use num_traits::Zero;
 use cartesian::cartesian;
 use yui_core::{AddMon, CloneAnd, Elem, Ring, RingOps};
-use yui_core::lc::{LcGen, Lc};
+use yui_core::lc::{LcKey, Lc};
 use yui_core::poly::Var2;
 use yui_link::{Edge, Node};
 use yui_core::bitseq::Bit;
@@ -504,7 +504,7 @@ impl Elem for CobComp {
     }
 }
 
-impl LcGen for CobComp {}
+impl LcKey for CobComp {}
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Default)]
 pub struct Cob { 
@@ -846,7 +846,7 @@ impl Elem for Cob {
     }
 }
 
-impl LcGen for Cob {}
+impl LcKey for Cob {}
 
 #[auto_ops]
 impl Mul for Cob {
@@ -907,7 +907,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn is_stackable(&self, other: &Self) -> bool { 
-        cartesian!(self.gens(), other.gens()).all(|(a, b)| 
+        cartesian!(self.keys(), other.keys()).all(|(a, b)| 
             a.is_stackable(b)
         )
     }
@@ -949,7 +949,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn should_part_eval(&self) -> bool {
-        self.gens().any(|c| c.should_part_eval())
+        self.keys().any(|c| c.should_part_eval())
     }
 
     fn part_eval(self, h: &Self::R, t: &Self::R) -> Self {

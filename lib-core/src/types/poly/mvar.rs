@@ -7,7 +7,7 @@ use itertools::Itertools;
 use auto_impl_ops::auto_ops;
 
 use crate::{Elem, ElemBase};
-use crate::lc::LcGen;
+use crate::lc::LcKey;
 use crate::util::format::subscript;
 use super::{Mono, MultiDeg, MonoOrd};
 use super::var::{fmt_mono, parse_mono_deg};
@@ -195,7 +195,7 @@ where I: ElemBase + ToPrimitive {
     }
 }
 
-impl<const X: char, I> LcGen for MultiVar<X, I>
+impl<const X: char, I> LcKey for MultiVar<X, I>
 where I: ElemBase + Zero + Ord + Hash + ToPrimitive + for<'x> Add<&'x I, Output = I> {}
 
 macro_rules! impl_multivar_unsigned {

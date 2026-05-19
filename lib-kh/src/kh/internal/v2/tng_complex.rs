@@ -38,7 +38,7 @@ impl TngKey {
         self.label.append(other.label);
     }
 
-    pub fn as_gen(&self, deg_shift: (isize, isize)) -> KhChainGen { 
+    pub fn as_gen(&self, deg_shift: (isize, isize)) -> KhChainGen {
         KhChainGen::new(self.state, self.label, deg_shift)
     }
 }

@@ -7,14 +7,14 @@ use num_traits::Zero;
 use auto_impl_ops::auto_ops;
 use crate::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
 
-use super::lc_gen::*;
+use super::lc_key::*;
 
 #[derive(PartialEq, Eq, Clone, Default, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
 pub struct Lc<X, R>
 where
-    X: LcGen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 { 
     data: AHashMap<X, R>,
@@ -24,7 +24,7 @@ where
 
 impl<X, R> Lc<X, R>
 where
-    X: LcGen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 { 
     pub fn new() -> Self {
@@ -46,17 +46,17 @@ where
         self.iter().next()
     }
 
-    pub fn gens(&self) -> impl Iterator<Item = &X> {
+    pub fn keys(&self) -> impl Iterator<Item = &X> {
         self.data.keys()
     }
 
-    pub fn is_gen(&self) -> bool { 
+    pub fn is_singleton(&self) -> bool { 
         self.nterms() == 1 && 
         self.iter().next().unwrap().1.is_one()
     }
 
-    pub fn as_gen(&self) -> Option<X> { 
-        if !self.is_gen() { 
+    pub fn as_singleton(&self) -> Option<X> { 
+        if !self.is_singleton() { 
             None?
         }
         self.iter().next().map(|(x, _)| x.clone())
@@ -72,7 +72,7 @@ where
 
     pub fn map<Y, S, F>(self, f: F) -> Lc<Y, S>
     where
-        Y: LcGen,
+        Y: LcKey,
         S: Ring, for<'x> &'x S: RingOps<S>,
         F: Fn(X, R) -> (Y, S)
     {
@@ -87,9 +87,9 @@ where
         self.map(|x, r| (x, f(r)))
     }
 
-    pub fn map_gens<Y, F>(self, f: F) -> Lc<Y, R>
+    pub fn map_keys<Y, F>(self, f: F) -> Lc<Y, R>
     where
-        Y: LcGen,
+        Y: LcKey,
         F: Fn(X) -> Y
     {
         self.map(|x, r| (f(x), r))
@@ -97,7 +97,7 @@ where
 
     pub fn map_ref<Y, S, F>(&self, f: F) -> Lc<Y, S>
     where
-        Y: LcGen,
+        Y: LcKey,
         S: Ring, for<'x> &'x S: RingOps<S>,
         F: Fn(&X, &R) -> (Y, S)
     {
@@ -120,7 +120,7 @@ where
         ).collect()
     }
 
-    pub fn apply<F, Y: LcGen>(&self, f: F) -> Lc<Y, R>
+    pub fn apply<F, Y: LcKey>(&self, f: F) -> Lc<Y, R>
     where F: Fn(&X) -> Lc<Y, R> {
         self.iter().flat_map(|(x, r)| { 
             f(x).into_iter().map(move |(y, s)| { 
@@ -130,7 +130,7 @@ where
     }
 
     pub fn apply_bilin<Y, Z, F>(&self, other: &Lc<Y, R>, x_map: F) -> Lc<Z, R>
-    where Y: LcGen, Z: LcGen, F: Fn(&X, &Y) -> Z { 
+    where Y: LcKey, Z: LcKey, F: Fn(&X, &Y) -> Z { 
         let mut res = Lc::zero();
         res.data.reserve(self.nterms() * other.nterms());
 
@@ -164,7 +164,7 @@ where
 
 impl<X, R> From<X> for Lc<X, R>
 where
-    X: LcGen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn from(x: X) -> Self {
@@ -174,7 +174,7 @@ where
 
 impl<X, R> From<(X, R)> for Lc<X, R>
 where
-    X: LcGen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn from(value: (X, R)) -> Self {
@@ -184,7 +184,7 @@ where
 
 impl<X, R> From<HashMap<X, R>> for Lc<X, R>
 where
-    X: LcGen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn from(value: HashMap<X, R>) -> Self {
@@ -194,7 +194,7 @@ where
 
 impl<X, R> FromIterator<(X, R)> for Lc<X, R>
 where
-    X: LcGen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn from_iter<T: IntoIterator<Item = (X, R)>>(iter: T) -> Self {
@@ -209,7 +209,7 @@ where
 
 impl<X, R> IntoIterator for Lc<X, R>
 where
-    X: LcGen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     type Item = (X, R);
@@ -222,7 +222,7 @@ where
 
 impl<X, R> Display for Lc<X, R>
 where
-    X: LcGen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -232,7 +232,7 @@ where
 
 impl<X, R> Zero for Lc<X, R>
 where
-    X: LcGen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn zero() -> Self {
@@ -246,7 +246,7 @@ where
 
 impl<X, R> Neg for Lc<X, R>
 where
-    X: LcGen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     type Output = Self;
@@ -258,7 +258,7 @@ where
 
 impl<X, R> Neg for &Lc<X, R>
 where
-    X: LcGen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     type Output = Lc<X, R>;
@@ -270,7 +270,7 @@ where
 
 impl<X, R> Lc<X, R>
 where
-    X: LcGen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     // must clean after call
@@ -303,7 +303,7 @@ where
 #[auto_ops]
 impl<X, R> AddAssign<&Lc<X, R>> for Lc<X, R>
 where
-    X: LcGen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn add_assign(&mut self, rhs: &Self) {
@@ -317,7 +317,7 @@ where
 #[auto_ops]
 impl<X, R> SubAssign<&Lc<X, R>> for Lc<X, R>
 where
-    X: LcGen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn sub_assign(&mut self, rhs: &Self) {
@@ -331,7 +331,7 @@ where
 #[auto_ops]
 impl<X, R> MulAssign<&R> for Lc<X, R>
 where
-    X: LcGen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn mul_assign(&mut self, rhs: &R) {
@@ -347,7 +347,7 @@ where
 #[auto_ops]
 impl<X, R> Mul for &Lc<X, R>
 where 
-    X: LcGen + Mul<Output = X>,
+    X: LcKey + Mul<Output = X>,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     type Output = Lc<X, R>;
@@ -360,10 +360,10 @@ where
 macro_rules! impl_alg_ops {
     ($trait:ident) => {
         impl<X, R> $trait<Self> for Lc<X, R>
-        where X: LcGen, R: Ring, for<'x> &'x R: RingOps<R> {}
+        where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {}
 
         impl<X, R> $trait<Lc<X, R>> for &Lc<X, R>
-        where X: LcGen, R: Ring, for<'x> &'x R: RingOps<R> {}
+        where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {}
     };
 }
 
@@ -372,7 +372,7 @@ impl_alg_ops!(AddGrpOps);
 
 impl<X, R> Elem for Lc<X, R>
 where
-    X: LcGen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn math_symbol() -> String {
@@ -382,32 +382,32 @@ where
 
 impl<X, R> AddMon for Lc<X, R>
 where
-    X: LcGen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {}
 
 impl<X, R> AddGrp for Lc<X, R>
 where
-    X: LcGen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {}
 
 
 impl<X, R> RModOps<R, Self> for Lc<X, R>
 where
-    X: LcGen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {}
 
 impl<X, R> RModOps<R, Lc<X, R>> for &Lc<X, R>
 where
-    X: LcGen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {}
 
 impl<X, R> RMod for Lc<X, R>
 where
-    X: LcGen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     type R = R;
@@ -418,9 +418,9 @@ mod tests {
     use num_traits::Zero;
     use crate::{Elem, AddMon};
     use crate::util::macros::hashmap;
-    use crate::lc::{FreeGen, Lc};
+    use crate::lc::{AsKey, Lc};
  
-    type X = FreeGen<i32>;
+    type X = AsKey<i32>;
     fn e(i: i32) -> X { 
         X::from(i)
     }
@@ -466,7 +466,7 @@ mod tests {
     }
 
     #[test]
-    fn from_gen() { 
+    fn from_singleton() { 
         type L = Lc<X, i32>;
         let x = e(0);
         let z = L::from(x);
@@ -493,20 +493,20 @@ mod tests {
     }
 
     #[test]
-    fn into_gen() { 
+    fn into_singleton() { 
         type L = Lc<X, i32>;
         let z = L::from(e(0));
 
-        assert!(z.is_gen());
-        assert_eq!(z.as_gen(), Some(e(0)));
+        assert!(z.is_singleton());
+        assert_eq!(z.as_singleton(), Some(e(0)));
 
         let z = L::from((e(0), 2));
-        assert!(!z.is_gen());
-        assert_eq!(z.as_gen(), None);
+        assert!(!z.is_singleton());
+        assert_eq!(z.as_singleton(), None);
 
         let z = L::from_iter([(e(0), 1), (e(1), 1)]);
-        assert!(!z.is_gen());
-        assert_eq!(z.as_gen(), None);
+        assert!(!z.is_singleton());
+        assert_eq!(z.as_singleton(), None);
     }
 
     #[test]
@@ -717,16 +717,16 @@ mod tests {
     }
 
     #[test]
-    fn map_gens() {
+    fn map_keys() {
         type L = Lc<X, i32>;
         let z = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
-        let w = z.map_gens(|x| e(x.0 * 10));
+        let w = z.map_keys(|x| e(x.0 * 10));
 
         assert_eq!(w, L::from(hashmap!{ e(10) => 1, e(20) => 2 }));
     }
 
     #[test]
-    fn filter_gens() { 
+    fn filter_keys() { 
         type L = Lc<X, i32>;
         let z = L::from_iter( (1..10).map(|i| (e(i), i * 10)) );
         let w = z.filtered(|x| x.0 % 3 == 0 );

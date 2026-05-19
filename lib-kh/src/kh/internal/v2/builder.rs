@@ -723,7 +723,7 @@ mod tests {
         assert_ne!(zs[0], zs[1]);
         
         for z in zs { 
-            assert!(z.gens().all(|x| x.h_deg() == 0));
+            assert!(z.keys().all(|x| x.h_deg() == 0));
             assert!(c.d(0, &z).is_zero());
         }
     }

@@ -59,7 +59,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         };
         let k = out_index;
 
-        self.mul(x[i], x[j]).map_gens(|a| { 
+        self.mul(x[i], x[j]).map_keys(|a| { 
             x.clone_and(|y| {
                 y.remove(j);
                 y.remove(i);
@@ -109,7 +109,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             (out_index.1, out_index.0)
         };
 
-        self.comul(x[i]).map_gens(|a| 
+        self.comul(x[i]).map_keys(|a| 
             x.clone_and(|y| { 
                 y.remove(i);
                 y.insert(j, a[0]);

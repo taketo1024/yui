@@ -1,5 +1,5 @@
 use derive_more::derive::{Display, Debug};
-use yui_core::lc::LcGen;
+use yui_core::lc::LcKey;
 use yui_core::Elem;
 
 use crate::GridDeg;
@@ -17,5 +17,5 @@ where I: GridDeg {
     }
 }
 
-impl<I> LcGen for EnumGen<I>
+impl<I> LcKey for EnumGen<I>
 where I: GridDeg {}

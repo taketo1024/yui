@@ -5,7 +5,7 @@ use auto_impl_ops::auto_ops;
 use yui_core::util::format::subscript;
 use yui_core::{AddMon, CloneAnd, Elem, Ring, RingOps};
 use yui_core::bitseq::{Bit, BitSeq};
-use yui_core::lc::{LcGen, Lc};
+use yui_core::lc::{LcKey, Lc};
 use yui_link::State;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
@@ -62,7 +62,7 @@ impl Elem for KhGen {
     }
 }
 
-impl LcGen for KhGen {}
+impl LcKey for KhGen {}
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub struct KhTensor(
@@ -125,7 +125,7 @@ impl KhTensor {
     where F: Fn(&KhGen) -> Lc<KhGen, R>, R: Ring, for<'x> &'x R: RingOps<R> { 
         assert!(i < self.len());
 
-        f(&self[i]).map_gens(|y| 
+        f(&self[i]).map_keys(|y| 
             self.clone_and(|t| t.set(i, y))
         )
     }
@@ -189,7 +189,7 @@ impl Elem for KhTensor {
     }
 }
 
-impl LcGen for KhTensor {}
+impl LcKey for KhTensor {}
 
 #[auto_ops]
 impl AddAssign<KhTensor> for KhTensor {
@@ -237,14 +237,14 @@ impl KhChainGen {
 
     pub fn apply_at<F, R>(&self, i: usize, f: F) -> KhChain<R> 
     where F: Fn(&KhGen) -> Lc<KhGen, R>, R: Ring, for<'x> &'x R: RingOps<R> { 
-        self.tensor.apply_at(i, f).map_gens(|t| { 
+        self.tensor.apply_at(i, f).map_keys(|t| { 
             Self::new(self.state, t, self.deg_shift)
         })
     }
 
     pub fn apply_each<F, R>(&self, f: F) -> KhChain<R>  
     where F: Fn(&KhGen) -> Lc<KhGen, R>, R: Ring, for<'x> &'x R: RingOps<R> { 
-        self.tensor.apply_each(f).map_gens(|t| { 
+        self.tensor.apply_each(f).map_keys(|t| { 
             Self::new(self.state, t, self.deg_shift)
         })
     }
@@ -262,7 +262,7 @@ impl Display for KhChainGen {
     }
 }
 
-impl LcGen for KhChainGen {}
+impl LcKey for KhChainGen {}
 
 pub type KhChain<R> = Lc<KhChainGen, R>;
 pub trait KhChainExt { 
@@ -273,10 +273,10 @@ pub trait KhChainExt {
 impl<R> KhChainExt for KhChain<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn h_deg(&self) -> isize {
-        self.gens().map(|x| x.h_deg()).min().unwrap_or(0)
+        self.keys().map(|x| x.h_deg()).min().unwrap_or(0)
     }
     
     fn q_deg(&self) -> isize {
-        self.gens().map(|x| x.q_deg()).min().unwrap_or(0)
+        self.keys().map(|x| x.q_deg()).min().unwrap_or(0)
     }
 }

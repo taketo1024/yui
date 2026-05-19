@@ -19,11 +19,11 @@ pub type KhIChain<R> = Lc<KhIGen, R>;
 impl<R> KhChainExt for KhIChain<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn h_deg(&self) -> isize {
-        self.gens().map(|x| x.h_deg()).min().unwrap_or(0)
+        self.keys().map(|x| x.h_deg()).min().unwrap_or(0)
     }
     
     fn q_deg(&self) -> isize {
-        self.gens().map(|x| x.q_deg()).min().unwrap_or(0)
+        self.keys().map(|x| x.q_deg()).min().unwrap_or(0)
     }
 }
 
@@ -64,8 +64,8 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
             let p = l.base_pt().unwrap();
             let zs = KhComplex::make_canon_cycles(l.inner(), p, &R::zero(), h, reduced, deg_shift);
             Iterator::chain(
-                zs.iter().map(|z| z.clone().map_gens(|x| KhIGen::B(x))),
-                zs.iter().map(|z| z.clone().map_gens(|x| KhIGen::Q(x)))
+                zs.iter().map(|z| z.clone().map_keys(|x| KhIGen::B(x))),
+                zs.iter().map(|z| z.clone().map_keys(|x| KhIGen::Q(x)))
             ).collect()
         } else { 
             vec![]
@@ -81,8 +81,8 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         let h_range = *h_range.start() ..= (h_range.end() + 1);
 
         let canon_cycles = c.canon_cycles().iter().flat_map(|z| { 
-            let bz = z.clone().map_gens(|x| KhIGen::B(x));
-            let qz = z.clone().map_gens(|x| KhIGen::Q(x));
+            let bz = z.clone().map_keys(|x| KhIGen::B(x));
+            let qz = z.clone().map_keys(|x| KhIGen::Q(x));
             [bz, qz]
         }).sorted_by_key(|z| z.h_deg()).collect_vec();
 
@@ -98,7 +98,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
             match x { 
                 KhIGen::B(x) => {
                     let z = KhChain::from(*x);
-                    let dx = c.d(i, &z).map_gens(|y| KhIGen::B(y));
+                    let dx = c.d(i, &z).map_keys(|y| KhIGen::B(y));
                     let qx = KhIChain::from(KhIGen::Q(*x));
                     let qtx = {
                         let tx = map(x);
@@ -108,7 +108,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
                 },
                 KhIGen::Q(x) => {
                     let z = KhChain::from(*x);
-                    c.d(i, &z).map_gens(|y| KhIGen::Q(y))
+                    c.d(i, &z).map_keys(|y| KhIGen::Q(y))
                 }
             }
         };
@@ -368,10 +368,10 @@ mod tests {
         let zs = c.canon_cycles.clone();
 
         assert_eq!(zs.len(), 4);
-        assert!(zs[0].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[1].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[2].gens().all(|x| x.h_deg() == 1));
-        assert!(zs[3].gens().all(|x| x.h_deg() == 1));
+        assert!(zs[0].keys().all(|x| x.h_deg() == 0));
+        assert!(zs[1].keys().all(|x| x.h_deg() == 0));
+        assert!(zs[2].keys().all(|x| x.h_deg() == 1));
+        assert!(zs[3].keys().all(|x| x.h_deg() == 1));
 
         for (i, z) in zs.iter().enumerate() { 
             let i = (i / 2) as isize;
@@ -390,8 +390,8 @@ mod tests {
         let zs = c.canon_cycles.clone();
 
         assert_eq!(zs.len(), 2);
-        assert!(zs[0].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[1].gens().all(|x| x.h_deg() == 1));
+        assert!(zs[0].keys().all(|x| x.h_deg() == 0));
+        assert!(zs[1].keys().all(|x| x.h_deg() == 1));
 
         for (i, z) in zs.iter().enumerate() { 
             let i = i as isize;
@@ -411,10 +411,10 @@ mod tests {
         let zs = c.canon_cycles.clone();
 
         assert_eq!(zs.len(), 4);
-        assert!(zs[0].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[1].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[2].gens().all(|x| x.h_deg() == 1));
-        assert!(zs[3].gens().all(|x| x.h_deg() == 1));
+        assert!(zs[0].keys().all(|x| x.h_deg() == 0));
+        assert!(zs[1].keys().all(|x| x.h_deg() == 0));
+        assert!(zs[2].keys().all(|x| x.h_deg() == 1));
+        assert!(zs[3].keys().all(|x| x.h_deg() == 1));
 
         for (i, z) in zs.iter().enumerate() { 
             let i = (i / 2) as isize;
@@ -434,8 +434,8 @@ mod tests {
         let zs = c.canon_cycles.clone();
 
         assert_eq!(zs.len(), 2);
-        assert!(zs[0].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[1].gens().all(|x| x.h_deg() == 1));
+        assert!(zs[0].keys().all(|x| x.h_deg() == 0));
+        assert!(zs[1].keys().all(|x| x.h_deg() == 1));
 
         for (i, z) in zs.iter().enumerate() { 
             let i = i as isize;
@@ -533,10 +533,10 @@ mod tests_v1 {
         let zs = c.canon_cycles.clone();
 
         assert_eq!(zs.len(), 4);
-        assert!(zs[0].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[1].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[2].gens().all(|x| x.h_deg() == 1));
-        assert!(zs[3].gens().all(|x| x.h_deg() == 1));
+        assert!(zs[0].keys().all(|x| x.h_deg() == 0));
+        assert!(zs[1].keys().all(|x| x.h_deg() == 0));
+        assert!(zs[2].keys().all(|x| x.h_deg() == 1));
+        assert!(zs[3].keys().all(|x| x.h_deg() == 1));
 
         for (i, z) in zs.iter().enumerate() { 
             let i = (i / 2) as isize;
@@ -555,8 +555,8 @@ mod tests_v1 {
         let zs = c.canon_cycles.clone();
 
         assert_eq!(zs.len(), 2);
-        assert!(zs[0].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[1].gens().all(|x| x.h_deg() == 1));
+        assert!(zs[0].keys().all(|x| x.h_deg() == 0));
+        assert!(zs[1].keys().all(|x| x.h_deg() == 1));
 
         for (i, z) in zs.iter().enumerate() { 
             let i = i as isize;
@@ -576,10 +576,10 @@ mod tests_v1 {
         let zs = c.canon_cycles.clone();
 
         assert_eq!(zs.len(), 4);
-        assert!(zs[0].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[1].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[2].gens().all(|x| x.h_deg() == 1));
-        assert!(zs[3].gens().all(|x| x.h_deg() == 1));
+        assert!(zs[0].keys().all(|x| x.h_deg() == 0));
+        assert!(zs[1].keys().all(|x| x.h_deg() == 0));
+        assert!(zs[2].keys().all(|x| x.h_deg() == 1));
+        assert!(zs[3].keys().all(|x| x.h_deg() == 1));
 
         for (i, z) in zs.iter().enumerate() { 
             let i = (i / 2) as isize;
@@ -599,8 +599,8 @@ mod tests_v1 {
         let zs = c.canon_cycles.clone();
 
         assert_eq!(zs.len(), 2);
-        assert!(zs[0].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[1].gens().all(|x| x.h_deg() == 1));
+        assert!(zs[0].keys().all(|x| x.h_deg() == 0));
+        assert!(zs[1].keys().all(|x| x.h_deg() == 1));
 
         for (i, z) in zs.iter().enumerate() { 
             let i = i as isize;

@@ -58,8 +58,8 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
         to self.data {
             pub fn nterms(&self) -> usize;
             pub fn any_term(&self) -> Option<(&X, &R)>;
-            #[call(is_gen)] pub fn is_mono(&self) -> bool;
-            #[call(as_gen)] pub fn as_mono(&self) -> Option<X>;
+            #[call(is_singleton)] pub fn is_mono(&self) -> bool;
+            #[call(as_singleton)] pub fn as_mono(&self) -> Option<X>;
             pub fn coeff(&self, x: &X) -> &R;
             pub fn iter(&self) -> impl Iterator<Item = (&X, &R)>;
         }

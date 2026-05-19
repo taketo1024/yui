@@ -57,7 +57,7 @@ impl Display for KhAlgGen {
 
 impl Elem for KhAlgGen {
     fn math_symbol() -> String {
-        format!("A")
+        "A".to_string()
     }
 }
 

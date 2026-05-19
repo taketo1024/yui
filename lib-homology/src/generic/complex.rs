@@ -1,12 +1,12 @@
 use yui_core::{Ring, RingOps};
 use yui_matrix::sparse::SpMat;
 use yui_matrix::MatTrait;
-use super::gen::EnumGen;
+use super::key::GenericKey;
 use super::GenericSummand;
 
 use crate::{isize2, isize3, ChainComplexBase, Grid, GridDeg, GridTrait};
 
-pub type GenericChainComplexBase<I, R> = ChainComplexBase<I, EnumGen<I>, R>;
+pub type GenericChainComplexBase<I, R> = ChainComplexBase<I, GenericKey<I>, R>;
 pub type GenericChainComplex<R>  = GenericChainComplexBase<isize,  R>;
 pub type GenericChainComplex2<R> = GenericChainComplexBase<isize2, R>;
 pub type GenericChainComplex3<R> = GenericChainComplexBase<isize3, R>;

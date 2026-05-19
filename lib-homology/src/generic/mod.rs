@@ -1,7 +1,7 @@
-mod gen;
+mod key;
 mod summand;
 mod complex;
 
-pub use gen::*;
+pub use key::*;
 pub use summand::*;
 pub use complex::*;

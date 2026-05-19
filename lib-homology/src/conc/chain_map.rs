@@ -155,7 +155,7 @@ where
 
 #[cfg(test)]
 mod tests { 
-    use crate::{EnumGen, GenericChainComplex};
+    use crate::{GenericKey, GenericChainComplex};
 
     use super::*;
 
@@ -174,7 +174,7 @@ mod tests {
 
     #[test]
     fn test_cone() { 
-        type T = EitherKey<EnumGen<isize>, EnumGen<isize>>;
+        type T = EitherKey<GenericKey<isize>, GenericKey<isize>>;
         let s2 = GenericChainComplex::<i32>::s2();
         let d3 = GenericChainComplex::<i32>::d3();
 
@@ -195,19 +195,19 @@ mod tests {
         assert_eq!(cone[1].raw_generators().index_of(&z), Some(4));
 
         let dx = cone.d(1, &Lc::from(x.clone()));
-        assert_eq!(dx, Lc::from(T::from_right(EnumGen(0, 0))));
+        assert_eq!(dx, Lc::from(T::from_right(GenericKey(0, 0))));
 
         let dy = cone.d(2, &Lc::from(y.clone()));
         assert_eq!(dy, Lc::from_iter([
-            (T::from_left(EnumGen(0, 0)), -1),
-            (T::from_left(EnumGen(0, 1)), 1),
-            (T::from_right(EnumGen(1, 0)), 1),
+            (T::from_left(GenericKey(0, 0)), -1),
+            (T::from_left(GenericKey(0, 1)), 1),
+            (T::from_right(GenericKey(1, 0)), 1),
         ]));
 
         let dz = cone.d(1, &Lc::from(z.clone()));
         assert_eq!(dz, Lc::from_iter([
-            (T::from_right(EnumGen(0, 0)), 1),
-            (T::from_right(EnumGen(0, 1)), -1),
+            (T::from_right(GenericKey(0, 0)), 1),
+            (T::from_right(GenericKey(0, 1)), -1),
         ]));
     }
 }

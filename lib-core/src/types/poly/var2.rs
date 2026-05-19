@@ -1,3 +1,5 @@
+//! Bivariate monomial `X^i Y^j`. With `I = isize` it is a Laurent monomial.
+
 use core::panic;
 use std::fmt::{Display, Debug};
 use std::hash::Hash;
@@ -13,9 +15,8 @@ use super::{Mono, MonoOrd};
 use super::var::parse_mono_deg;
 use super::mvar::fmt_mono_n;
 
-// `Var2<X, Y, I>` : represents bivariant monomials X^i Y^j.
-// `I` is either `usize` or `isize`.
-
+/// A bivariate monomial `X^i Y^j`, with variable symbols `X`, `Y` as const
+/// generics and exponent type `I` (`usize` or `isize`).
 #[derive(Clone, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde_with::DeserializeFromStr))]
 pub struct Var2<const X: char, const Y: char, I> (

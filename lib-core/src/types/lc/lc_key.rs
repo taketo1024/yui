@@ -1,3 +1,7 @@
+//! Key types for [`Lc`](super::Lc): the trait [`LcKey`] and the two
+//! constructions [`AsKey`] (wrap an arbitrary element as a key) and
+//! [`EitherKey`] (disjoint union of two key sets).
+
 use std::hash::Hash;
 use derive_more::Display;
 use itertools::Either;
@@ -5,8 +9,13 @@ use itertools::Either;
 use crate::lc::Lc;
 use crate::{Elem, ElemBase, Ring, RingOps};
 
+/// Marker trait for types usable as keys in [`Lc`](super::Lc) — i.e.
+/// elements that are hashable and totally ordered.
 pub trait LcKey: Elem + Hash + Ord {}
 
+/// Wraps an arbitrary element `T` so it can be used as an [`LcKey`].
+///
+/// Used to build the [free module](crate::RMod) over any `T: ElemBase + Hash + Ord`.
 #[derive(Debug, Display, Default, Hash, PartialEq, Eq, Clone, PartialOrd, Ord)]
 #[display("<{}>", _0)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -32,6 +41,8 @@ where T: ElemBase {
 impl<T> LcKey for AsKey<T> 
 where T: ElemBase + Hash + Ord {}
 
+/// A disjoint union `X ⊔ Y` of two key sets, used to form direct sums of
+/// linear combinations, e.g. the basis for `Lc<X, R> ⊕ Lc<Y, R> ≅ Lc<EitherKey<X, Y>, R>`.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub struct EitherKey<X, Y>(Either<X, Y>) where X: LcKey, Y: LcKey;
 

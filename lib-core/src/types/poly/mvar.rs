@@ -1,3 +1,7 @@
+//! Multivariate monomial in indexed variables `X₀^{d₀} X₁^{d₁} ⋯ Xₙ^{dₙ}`,
+//! with the base symbol `X` as a const generic and a [`MultiDeg`] holding
+//! the exponents. With `I = isize` it is a Laurent monomial.
+
 use std::fmt::{Display, Debug};
 use std::ops::{AddAssign, MulAssign, Mul, Div, DivAssign, SubAssign, Add};
 use std::str::FromStr;
@@ -12,6 +16,9 @@ use crate::util::format::subscript;
 use super::{Mono, MultiDeg, MonoOrd};
 use super::var::{fmt_mono, parse_mono_deg};
 
+/// A multivariate monomial in indexed variables `Xᵢ`, with exponents stored
+/// in a [`MultiDeg`]. The base symbol `X` is a const generic; the actual
+/// variables are `X₀, X₁, …` (displayed with subscripts).
 #[derive(Clone, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde_with::DeserializeFromStr))]
 pub struct MultiVar<const X: char, I> (

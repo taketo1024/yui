@@ -1,3 +1,19 @@
+//! Polynomial: a linear combination of monomials over a ring `R`.
+//!
+//! The base type [`PolyBase<X, R>`] is parameterized by the monomial type `X`
+//! (any [`Mono`]) and the coefficient ring `R`. Concrete aliases cover the
+//! common cases:
+//!
+//! | Variables | Ordinary             | Laurent              |
+//! |-----------|----------------------|----------------------|
+//! | 1         | [`Poly<X, R>`]       | [`LPoly<X, R>`]      |
+//! | 2         | [`Poly2<X, Y, R>`]   | [`LPoly2<X, Y, R>`]  |
+//! | 3         | [`Poly3<X, Y, Z, R>`]| [`LPoly3<X, Y, Z, R>`] |
+//! | n (indexed `Xᵢ`) | [`PolyN<X, R>`]      | [`LPolyN<X, R>`]     |
+//!
+//! See: <https://en.wikipedia.org/wiki/Polynomial_ring>,
+//! <https://en.wikipedia.org/wiki/Laurent_polynomial>
+
 use std::fmt::{Display, Debug};
 use std::ops::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Neg, DivAssign, RemAssign, Div, Rem};
 use std::str::FromStr;
@@ -9,30 +25,35 @@ use crate::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Mon, MonOps, Ring, RingO
 use crate::lc::Lc;
 use super::{MultiDeg, Var, Var2, Var3,MultiVar, Mono, MonoOrd};
 
-// A polynomial is a linear combination of monomials over R.
-
-// Var-type (ordinary, Laurent)
-pub type Poly  <const X: char, R> = PolyBase<Var<X, usize>, R>;          
+/// Univariate polynomial `R[X]`.
+pub type Poly  <const X: char, R> = PolyBase<Var<X, usize>, R>;
+/// Univariate Laurent polynomial `R[X, X⁻¹]`.
 pub type LPoly <const X: char, R> = PolyBase<Var<X, isize>, R>;
 
-// Bivar-type (ordinary, Laurent)
+/// Bivariate polynomial `R[X, Y]`.
 pub type Poly2 <const X: char, const Y: char, R> = PolyBase<Var2<X, Y, usize>, R>;
+/// Bivariate Laurent polynomial `R[X, X⁻¹, Y, Y⁻¹]`.
 pub type LPoly2<const X: char, const Y: char, R> = PolyBase<Var2<X, Y, isize>, R>;
 
-// Trivar-type (ordinary, Laurent)
+/// Trivariate polynomial `R[X, Y, Z]`.
 pub type Poly3 <const X: char, const Y: char, const Z: char, R> = PolyBase<Var3<X, Y, Z, usize>, R>;
+/// Trivariate Laurent polynomial.
 pub type LPoly3<const X: char, const Y: char, const Z: char, R> = PolyBase<Var3<X, Y, Z, isize>, R>;
 
-// Multivar-type (ordinary, Laurent)
+/// Multivariate polynomial in indexed variables `X₀, X₁, …`.
 pub type PolyN <const X: char, R> = PolyBase<MultiVar<X, usize>, R>;
+/// Multivariate Laurent polynomial in indexed variables `X₀, X₁, …`.
 pub type LPolyN<const X: char, R> = PolyBase<MultiVar<X, isize>, R>;
 
+/// A polynomial: a linear combination of monomials `X` with coefficients in `R`.
+///
+/// Internally a [`Lc<X, R>`](crate::lc::Lc) — a sparse map from monomial to coefficient.
 #[derive(Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
 pub struct PolyBase<X, R>
-where 
-    X: Mono, 
+where
+    X: Mono,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     data: Lc<X, R>,

@@ -1,3 +1,12 @@
+//! Linear combination: a finite formal sum `Σ rᵢ · xᵢ` with `xᵢ` keys and
+//! `rᵢ` coefficients in a ring `R`.
+//!
+//! Implements the [free `R`-module](crate::RMod) over the key set, i.e. the
+//! polynomial ring viewpoint without any multiplicative structure on keys.
+//!
+//! See: <https://en.wikipedia.org/wiki/Linear_combination>,
+//! <https://en.wikipedia.org/wiki/Free_module>
+
 use std::collections::HashMap;
 use std::fmt::{Display, Debug};
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, MulAssign};
@@ -9,6 +18,9 @@ use crate::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RMo
 
 use super::lc_key::*;
 
+/// A linear combination `Σ rᵢ · xᵢ` with keys `X: LcKey` and coefficients in a
+/// ring `R`. Stored sparsely as a hashmap from key to coefficient; zero entries
+/// are pruned automatically.
 #[derive(PartialEq, Eq, Clone, Default, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
@@ -16,7 +28,7 @@ pub struct Lc<X, R>
 where
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
-{ 
+{
     data: AHashMap<X, R>,
     #[cfg_attr(feature = "serde", serde(skip))]
     r_zero: R

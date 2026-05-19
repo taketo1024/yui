@@ -1,3 +1,5 @@
+//! Trivariate monomial `X^i Y^j Z^k`. With `I = isize` it is a Laurent monomial.
+
 use core::panic;
 use std::fmt::{Display, Debug};
 use std::hash::Hash;
@@ -13,9 +15,8 @@ use super::{Mono, MonoOrd};
 use super::var::parse_mono_deg;
 use super::mvar::fmt_mono_n;
 
-// `Var3<X, Y, Z, I>` : represents trivariant monomials X^i Y^j Z^k.
-// `I` is either `usize` or `isize`.
-
+/// A trivariate monomial `X^i Y^j Z^k`, with variable symbols `X`, `Y`, `Z`
+/// as const generics and exponent type `I` (`usize` or `isize`).
 #[derive(Clone, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde_with::DeserializeFromStr))]
 pub struct Var3<const X: char, const Y: char, const Z: char, I>(

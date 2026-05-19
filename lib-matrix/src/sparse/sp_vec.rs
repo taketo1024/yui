@@ -90,7 +90,7 @@ where R: Clone + Zero {
     fn from(value: SpVec<R>) -> Self {
         let mut res = vec![R::zero(); value.dim()];
         let (_, rows, vals) = value.inner.disassemble();
-        for (i, a) in rows.into_iter().zip(vals.into_iter()) {
+        for (i, a) in rows.into_iter().zip(vals) {
             res[i] = a;
         }
         res
@@ -234,7 +234,7 @@ impl_binop!(Sub, sub);
 
 // SpMat * SpVec
 #[auto_ops(val_val, val_ref, ref_val)]
-impl<'a, 'b, R> Mul<&'b SpVec<R>> for &'a SpMat<R>
+impl<'b, R> Mul<&'b SpVec<R>> for &SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = SpVec<R>;
     fn mul(self, rhs: &'b SpVec<R>) -> Self::Output {

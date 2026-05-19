@@ -230,7 +230,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn display_indices(&self) -> (Vec<isize>, Vec<isize>) { 
-        (self.h_range().into_iter().collect(), self.q_range().step_by(2).collect())
+        (self.h_range().collect(), self.q_range().step_by(2).collect())
     }
 
     fn display_at(&self, i: &isize, j: &isize) -> String {

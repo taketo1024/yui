@@ -72,12 +72,12 @@ impl Neg for FF2 {
 impl Neg for &FF2 {
     type Output = FF2;
     fn neg(self) -> Self::Output {
-        self.clone()
+        *self
     }
 }
 
 #[auto_ops]
-impl<'a, 'b> Add<&'b FF2> for &'a FF2 {
+impl<'b> Add<&'b FF2> for &FF2 {
     type Output = FF2;
     fn add(self, rhs: &'b FF2) -> Self::Output {
         FF2(self.0 != rhs.0)
@@ -85,7 +85,7 @@ impl<'a, 'b> Add<&'b FF2> for &'a FF2 {
 }
 
 #[auto_ops]
-impl<'a, 'b> Sub<&'b FF2> for &'a FF2 {
+impl<'b> Sub<&'b FF2> for &FF2 {
     type Output = FF2;
     fn sub(self, rhs: &'b FF2) -> Self::Output {
         Add::add(self, rhs)
@@ -93,7 +93,7 @@ impl<'a, 'b> Sub<&'b FF2> for &'a FF2 {
 }
 
 #[auto_ops]
-impl<'a, 'b> Mul<&'b FF2> for &'a FF2 {
+impl<'b> Mul<&'b FF2> for &FF2 {
     type Output = FF2;
     fn mul(self, rhs: &'b FF2) -> Self::Output {
         FF2(self.0 && rhs.0)
@@ -101,16 +101,16 @@ impl<'a, 'b> Mul<&'b FF2> for &'a FF2 {
 }
 
 #[auto_ops]
-impl<'a, 'b> Div<&'b FF2> for &'a FF2 {
+impl<'b> Div<&'b FF2> for &FF2 {
     type Output = FF2;
     fn div(self, rhs: &'b FF2) -> Self::Output {
         assert!(!rhs.is_zero());
-        self.clone()
+        *self
     }
 }
 
 #[auto_ops]
-impl<'a, 'b> Rem<&'b FF2> for &'a FF2 {
+impl<'b> Rem<&'b FF2> for &FF2 {
     type Output = FF2;
     fn rem(self, rhs: &'b FF2) -> Self::Output {
         assert!(!rhs.is_zero());
@@ -118,7 +118,7 @@ impl<'a, 'b> Rem<&'b FF2> for &'a FF2 {
     }
 }
 
-impl<'a> Pow<usize> for &'a FF2 {
+impl Pow<usize> for &FF2 {
     type Output = FF2;
     fn pow(self, rhs: usize) -> Self::Output {
         if rhs == 0 { FF2::one() } else { *self }

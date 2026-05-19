@@ -190,7 +190,7 @@ where
             self.trans.contains_key(&i) || 
             self.trans.contains_key(&(i + self.d_deg));
 
-        let sch = Schur::from_pivots(&a, piv_type, &p, &q, r, with_trans, with_trans);
+        let sch = Schur::from_pivots(a, piv_type, &p, &q, r, with_trans, with_trans);
         let t_src = sch.trans_src();
         let t_tgt = sch.trans_tgt();
         let s = sch.into_s();

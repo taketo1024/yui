@@ -112,7 +112,7 @@ fn col_intersects<R>(a: &SpMat<R>, j1: usize, j2: usize) -> bool {
     };
 
     loop { 
-        match usize::cmp(&i1, &i2) {
+        match usize::cmp(i1, i2) {
             Less => {
                 if let Some(j1) = itr1.next() { 
                     i1 = j1

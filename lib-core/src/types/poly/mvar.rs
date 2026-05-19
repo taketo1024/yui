@@ -95,14 +95,14 @@ where I: Zero + FromStr + FromPrimitive {
         let p = format!(r"({X}_([0-9]+))(\^\{{?-?[0-9]+\}}?)?");
         let p_all = format!(r"^({p}\s?)+$");
 
-        if !Regex::new(&p_all).unwrap().is_match(&s) { 
+        if !Regex::new(&p_all).unwrap().is_match(s) { 
             return Err(format!("Failed to parse: {s}"))
         }
 
         let r = Regex::new(&p).unwrap();
         let mut degs = vec![];
         
-        for c in r.captures_iter(&s) {
+        for c in r.captures_iter(s) {
             let x = &c[1];
             let i = usize::from_str(&c[2]).map_err(|e| e.to_string())?;
             if let Some(d) = parse_mono_deg(x, &c[0]) { 

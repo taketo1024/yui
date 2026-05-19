@@ -44,7 +44,7 @@ impl TngKey {
 }
 
 #[auto_ops]
-impl<'a> Add for &'a TngKey {
+impl Add for &TngKey {
     type Output = TngKey;
     fn add(self, rhs: Self) -> Self::Output {
         let mut res = *self;
@@ -54,7 +54,7 @@ impl<'a> Add for &'a TngKey {
 }
 
 #[auto_ops]
-impl<'a> Add<KhAlgGen> for &'a TngKey {
+impl Add<KhAlgGen> for &TngKey {
     type Output = TngKey;
     fn add(self, rhs: KhAlgGen) -> Self::Output {
         let mut res = *self;
@@ -112,7 +112,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let tng = self.tng.convert_edges(&f);
         let in_edges = self.in_edges.clone();
         let out_edges = self.out_edges.iter().map(|(k, cob)|
-            (k.clone(), cob.convert_edges(&f))
+            (*k, cob.convert_edges(&f))
         ).collect();
         TngVertex { key, tng, in_edges, out_edges }
     }
@@ -376,7 +376,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             c.add_vertex(v0);
             c.add_vertex(v1);
 
-            let sdl = LcCob::from(Cob::from(CobComp::sdl_from(&x)));
+            let sdl = LcCob::from(Cob::from(CobComp::sdl_from(x)));
             c.add_edge(&k0, &k1, sdl);
 
             c.crossings.push(x.clone());
@@ -390,8 +390,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn connect(&mut self, other: TngComplex<R>) { 
         let mut new = Self::connect_init(self, &other);
         for i in new.h_range() { 
-            new.connect_vertices(&self, &other, i);
-            new.connect_edges(&self, &other, i - 1);
+            new.connect_vertices(self, &other, i);
+            new.connect_edges(self, &other, i - 1);
         }
         *self = new
     }
@@ -436,20 +436,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         
         keys.into_par_iter().for_each(|(k0, l0)| { 
             let k0_l0 = k0 + l0;
-            let v0 = left.vertex(&k0);
-            let w0 = right.vertex(&l0);
+            let v0 = left.vertex(k0);
+            let w0 = right.vertex(l0);
             let i0 = (k0.state.weight() as isize) - left.deg_shift.0;
 
-            let e1 = left.keys_out_from(&k0).map(|k1| { 
+            let e1 = left.keys_out_from(k0).map(|k1| { 
                 let k1_l0 = k1 + l0;
-                let f = left.edge(&k0, k1).clone();
+                let f = left.edge(k0, k1).clone();
                 let f_id = f.connect(&Cob::id(w0.tng())); // D(f, 1) 
                 (k0_l0, k1_l0, f_id.part_eval(&h, &t))
             });
 
-            let e2 = right.keys_out_from(&l0).map(|l1| { 
+            let e2 = right.keys_out_from(l0).map(|l1| { 
                 let k0_l1 = k0 + l1;
-                let f = right.edge(&l0, l1).clone();
+                let f = right.edge(l0, l1).clone();
                 let e = R::from_sign(Sign::from_parity(i0 as i64));
                 let id_f = f.connect(&Cob::id(v0.tng())) * e; // (-1)^{deg(k0)} D(1, f) 
                 (k0_l0, k0_l1, id_f.part_eval(&h, &t))
@@ -714,7 +714,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let crossings = self.crossings.iter().map(|x| x.convert_edges(&f)).collect();
 
         let vertices = self.iter_verts().map(|(k1, v1)| {
-            let k2 = k1.clone();
+            let k2 = *k1;
             let v2 = v1.convert_edges(&f);
             (k2, v2)
         }).collect();

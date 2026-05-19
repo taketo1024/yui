@@ -132,7 +132,7 @@ impl KhTensor {
     pub fn apply_each<F, R>(&self, f: F) -> Lc<KhTensor, R>
     where F: Fn(&KhAlgGen) -> Lc<KhAlgGen, R>, R: Ring, for<'x> &'x R: RingOps<R> {
         let l = self.len();
-        let init = Lc::from(self.clone());
+        let init = Lc::from(*self);
 
         (0..l).fold(init, |res, i| {
             Lc::sum(res.iter().map(|(x, r)|

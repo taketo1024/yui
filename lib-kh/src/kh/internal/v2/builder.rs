@@ -197,11 +197,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let h_range = self.current_h_range();
 
         for i in h_range.clone() { 
-            self.complex.connect_vertices(&left, &right, i);
+            self.complex.connect_vertices(left, right, i);
         }
 
         for i in h_range { 
-            self.complex.connect_edges(&left, &right, i);
+            self.complex.connect_edges(left, right, i);
             if self.auto_deloop {
                 self.deloop_in(i, false);
             }

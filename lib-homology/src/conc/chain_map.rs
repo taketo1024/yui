@@ -56,7 +56,7 @@ where
     }
 
     pub fn apply(&self, i: I, z: &Lc<X, R>) -> Lc<Y, R> {
-        (self.map)(i, &z)
+        (self.map)(i, z)
     }
 
     pub fn make_matrix(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I) -> SpMat<R> {

@@ -251,7 +251,7 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
 }
 
 #[auto_ops]
-impl<'a, 'b, T> Rem<&'b Ratio<T>> for &'a Ratio<T>
+impl<'b, T> Rem<&'b Ratio<T>> for &Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     type Output = Ratio<T>;
     fn rem(self, rhs: &'b Ratio<T>) -> Self::Output {

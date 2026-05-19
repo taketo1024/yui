@@ -98,7 +98,7 @@ impl_binop!(Sub, sub);
 impl_binop!(Mul, mul);
 
 #[auto_ops]
-impl<'a, 'b, const p: I> Div<&'b FF<p>> for &'a FF<p> {
+impl<'b, const p: I> Div<&'b FF<p>> for &FF<p> {
     type Output = FF<p>;
     fn div(self, rhs: &'b FF<p>) -> Self::Output {
         assert!(!rhs.is_zero());
@@ -107,7 +107,7 @@ impl<'a, 'b, const p: I> Div<&'b FF<p>> for &'a FF<p> {
 }
 
 #[auto_ops]
-impl<'a, 'b, const p: I> Rem<&'b FF<p>> for &'a FF<p> {
+impl<'b, const p: I> Rem<&'b FF<p>> for &FF<p> {
     type Output = FF<p>;
     fn rem(self, rhs: &'b FF<p>) -> Self::Output {
         assert!(!rhs.is_zero());

@@ -106,7 +106,7 @@ where
 
     pub fn filter<F>(self, f: F) -> Self
     where F: Fn(&X) -> bool { 
-        self.into_iter().filter(|(x, _)| f(&x)).collect()
+        self.into_iter().filter(|(x, _)| f(x)).collect()
     }
 
     pub fn filtered<F>(&self, f: F) -> Self
@@ -188,7 +188,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn from(value: HashMap<X, R>) -> Self {
-        Self::from_iter(value.into_iter())
+        Self::from_iter(value)
     }
 }
 

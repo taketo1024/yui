@@ -25,12 +25,12 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 impl<R> KhHomology<R> 
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn new(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
-        let c = KhComplex::new(&l, h, t, reduced); 
+        let c = KhComplex::new(l, h, t, reduced); 
         Self::from(&c)
     }
     
     pub fn new_no_simplify(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
-        let c = KhComplex::new_no_simplify(&l, h, t, reduced); 
+        let c = KhComplex::new_no_simplify(l, h, t, reduced); 
         Self::from(&c)
     }
     

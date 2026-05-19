@@ -99,7 +99,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
     // f = 1 + τ
     fn f(&self, x: &KhState) -> Lc<KhState, R> { 
-        let x = x.clone();
+        let x = *x;
         let tx = self.t(&x);
         Lc::from_iter([
             (x,  R::one()), 

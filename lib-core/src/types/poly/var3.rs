@@ -89,13 +89,13 @@ where I: Zero + AddAssign + FromStr + FromPrimitive {
         let r = Regex::new(&p).unwrap();
         let r_all = Regex::new(&p_all).unwrap();
 
-        if !r_all.is_match(&s) { 
+        if !r_all.is_match(s) { 
             return Err(format!("Failed to parse: {s}"))
         }
 
         let mut deg = (I::zero(), I::zero(), I::zero());
         
-        for c in r.captures_iter(&s) {
+        for c in r.captures_iter(s) {
             let x = &c[1];
             let i = parse_mono_deg(x, &c[0]).unwrap();
             if x.starts_with(X) { 

@@ -194,7 +194,7 @@ impl_add_op!(Add, add);
 impl_add_op!(Sub, sub);
 
 #[auto_ops]
-impl<'a, 'b, I, const D: i32> Mul<&'b QuadInt<I, D>> for &'a QuadInt<I, D>
+impl<'b, I, const D: i32> Mul<&'b QuadInt<I, D>> for &QuadInt<I, D>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     type Output = QuadInt<I, D>;
 
@@ -261,7 +261,7 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 }
 
 #[auto_ops]
-impl<'a, 'b, I> Div<&'b GaussInt<I>> for &'a GaussInt<I>
+impl<'b, I> Div<&'b GaussInt<I>> for &GaussInt<I>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     type Output = GaussInt<I>;
 
@@ -271,7 +271,7 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 }
 
 #[auto_ops]
-impl<'a, 'b, I> Rem<&'b GaussInt<I>> for &'a GaussInt<I>
+impl<'b, I> Rem<&'b GaussInt<I>> for &GaussInt<I>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     type Output = QuadInt<I, -1>;
 
@@ -305,7 +305,7 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 }
 
 #[auto_ops]
-impl<'a, 'b, I> Div<&'b EisenInt<I>> for &'a EisenInt<I>
+impl<'b, I> Div<&'b EisenInt<I>> for &EisenInt<I>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     type Output = EisenInt<I>;
 
@@ -315,7 +315,7 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 }
 
 #[auto_ops]
-impl<'a, 'b, I> Rem<&'b EisenInt<I>> for &'a EisenInt<I>
+impl<'b, I> Rem<&'b EisenInt<I>> for &EisenInt<I>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     type Output = EisenInt<I>;
 

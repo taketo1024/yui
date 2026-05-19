@@ -102,7 +102,7 @@ impl Node {
     }
 
     pub fn min_edge(&self) -> Edge { 
-        self.edges.iter().min().unwrap().clone()
+        *self.edges.iter().min().unwrap()
     }
 
     pub fn is_crossing(&self) -> bool { 

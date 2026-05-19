@@ -309,7 +309,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 
     fn setup(&mut self) { 
         let (_, l, d) = orthogonalize(&self.target);
-        self.lambda = Mat::from(l);
+        self.lambda = l;
         self.det = d;
     }
 

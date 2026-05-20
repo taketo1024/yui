@@ -1,67 +1,89 @@
 //! Permutation of `0..n`, used to track row/column reorderings during
 //! matrix decompositions (PLUQ, pivot search, Schur complement).
 //!
-//! Stored as a `Vec<usize>` where `perm[i]` is the image of `i`.
+//! Internally, the identity permutation is represented by just its size,
+//! making `Perm::id(n)` zero-cost.
 
 use std::ops::{Mul, MulAssign};
 use auto_impl_ops::auto_ops;
+use either::Either;
 
 /// A permutation of `0..n`.
+///
+/// Stored as `Either<usize, Vec<usize>>`: `Left(n)` is the identity
+/// permutation on `0..n`, and `Right(v)` is an explicit image vector
+/// where `v[i]` is the image of `i`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Perm {
-    data: Vec<usize>,
+    data: Either<usize, Vec<usize>>,
 }
 
 impl Perm {
     /// Create from the image vector. `data[i]` is the image of `i`.
     /// Panics (debug) if `data` is not a valid permutation of `0..data.len()`.
-    pub fn new(data: Vec<usize>) -> Self {
+    pub(crate) fn new(data: Vec<usize>) -> Self {
         debug_assert!(is_valid_perm(&data), "not a valid permutation: {:?}", data);
-        Self { data }
+        Self { data: Either::Right(data) }
     }
 
-    /// The identity permutation on `0..n`.
+    /// Create from an iterator of images. The `i`-th item is the image of `i`.
+    /// Panics (debug) if the resulting sequence is not a valid permutation.
+    pub fn from_indices<I>(images: I) -> Self
+    where I: IntoIterator<Item = usize> {
+        Self::new(images.into_iter().collect())
+    }
+
+    /// The identity permutation on `0..n`. Zero-cost.
     pub fn id(n: usize) -> Self {
-        Self { data: (0..n).collect() }
+        Self { data: Either::Left(n) }
     }
 
     pub fn len(&self) -> usize {
-        self.data.len()
+        match &self.data {
+            Either::Left(n) => *n,
+            Either::Right(v) => v.len(),
+        }
     }
 
     /// Alias for [`len`](Self::len), matching `sprs`'s naming.
     pub fn dim(&self) -> usize {
-        self.data.len()
+        self.len()
     }
 
     /// The image of `i`.
     pub fn at(&self, i: usize) -> usize {
-        self.data[i]
+        match &self.data {
+            Either::Left(_) => i,
+            Either::Right(v) => v[i],
+        }
     }
 
     /// `true` iff this is the identity permutation.
     pub fn is_id(&self) -> bool {
-        self.data.iter().enumerate().all(|(i, &x)| i == x)
+        match &self.data {
+            Either::Left(_) => true,
+            Either::Right(v) => v.iter().enumerate().all(|(i, &x)| i == x),
+        }
     }
 
     /// The inverse permutation.
     pub fn inv(&self) -> Self {
-        let n = self.data.len();
-        let mut inv = vec![0; n];
-        for (i, &j) in self.data.iter().enumerate() {
-            inv[j] = i;
+        match &self.data {
+            Either::Left(n) => Self::id(*n),
+            Either::Right(v) => {
+                let mut inv = vec![0; v.len()];
+                for (i, &j) in v.iter().enumerate() {
+                    inv[j] = i;
+                }
+                Self { data: Either::Right(inv) }
+            }
         }
-        Self { data: inv }
-    }
-
-    /// Underlying image slice (`raw()[i]` is the image of `i`).
-    pub fn raw(&self) -> &[usize] {
-        &self.data
     }
 
     /// Permutation `p` of `0..n` that sends each index in `prefix` to a
     /// position `0, 1, 2, ...` (in the order given), with the remaining
     /// indices filling positions in sorted order.
+    /// If `prefix` is empty, returns the identity (zero-cost).
     pub fn pull_and_fill<I>(n: usize, prefix: I) -> Self
     where I: IntoIterator<Item = usize> {
         let mut data = vec![0usize; n];
@@ -73,6 +95,9 @@ impl Perm {
             data[i] = k;
             taken[i] = true;
             k += 1;
+        }
+        if k == 0 {
+            return Self::id(n);
         }
         let mut pos = k;
         for j in 0..n {
@@ -91,7 +116,13 @@ impl<'a, 'b> Mul<&'b Perm> for &'a Perm {
     type Output = Perm;
     fn mul(self, rhs: &'b Perm) -> Perm {
         assert_eq!(self.len(), rhs.len(), "permutations must have the same length");
-        Perm::new(rhs.data.iter().map(|&i| self.at(i)).collect())
+        match (&self.data, &rhs.data) {
+            (Either::Left(_), _) => rhs.clone(),
+            (_, Either::Left(_)) => self.clone(),
+            (Either::Right(_), Either::Right(qv)) => {
+                Perm::new(qv.iter().map(|&i| self.at(i)).collect())
+            }
+        }
     }
 }
 
@@ -148,6 +179,8 @@ mod tests {
     #[test]
     fn is_id_true_false() {
         assert!(Perm::id(3).is_id());
+        // identity image vector via `new` is still detected as identity
+        assert!(Perm::new(vec![0, 1, 2]).is_id());
         assert!(!Perm::new(vec![1, 0]).is_id());
     }
 
@@ -157,7 +190,6 @@ mod tests {
         let p = Perm::new(v.clone());
         assert_eq!(p.len(), 4);
         assert_eq!(p.dim(), p.len());
-        assert_eq!(p.raw(), v.as_slice());
         for (i, &expected) in v.iter().enumerate() {
             assert_eq!(p.at(i), expected);
         }
@@ -209,6 +241,12 @@ mod tests {
     }
 
     #[test]
+    fn mul_id_with_id() {
+        let id = Perm::id(4);
+        assert_eq!(&id * &id, id);
+    }
+
+    #[test]
     fn mul_by_inverse_is_id() {
         let p = Perm::new(vec![2, 0, 3, 1]);
         assert!((&p * &p.inv()).is_id());
@@ -231,17 +269,16 @@ mod tests {
         let _ = &p * &q;
     }
 
-    // --- auto_ops-derived variants ---
-
     // --- pull_and_fill ---
 
     #[test]
     fn pull_and_fill_basic() {
         // n=5, prefix=[3,1] → sends 3→0, 1→1, others fill sorted: 0→2, 2→3, 4→4.
         let p = Perm::pull_and_fill(5, [3, 1]);
-        assert_eq!(p.raw(), &[2, 1, 3, 0, 4]);
-        assert_eq!(p.at(3), 0);
-        assert_eq!(p.at(1), 1);
+        let expected = [2, 1, 3, 0, 4];
+        for (i, &x) in expected.iter().enumerate() {
+            assert_eq!(p.at(i), x);
+        }
     }
 
     #[test]

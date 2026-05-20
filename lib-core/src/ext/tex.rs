@@ -1,13 +1,19 @@
+//! LaTeX rendering helpers, gated on the `tex` feature.
+//!
+//! See: <https://en.wikipedia.org/wiki/LaTeX>
+
 #![cfg(feature = "tex")]
 
 use itertools::Itertools;
 use std::fmt::Display;
 
+/// Types that can be rendered as LaTeX math.
 pub trait TeX {
     fn tex_math_symbol() -> String;
     fn tex_string(&self) -> String;
 }
 
+/// Render a 2D table as a LaTeX `\begin{tabular}` environment.
 pub fn tex_table<S, I, J, I1, I2, D, F>(caption: &str, head: S, rows: I1, cols: I2, entry: F, math_mode: bool, hor_at_top: bool) -> String
 where 
     S: Display,

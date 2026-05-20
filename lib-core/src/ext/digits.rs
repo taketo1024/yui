@@ -1,4 +1,5 @@
-pub trait IntoDigits: Sized { 
+/// Decompose a non-negative integer into its base-10 digits.
+pub trait IntoDigits: Sized {
     type Digit;
     fn into_digits(self) -> Vec<Self::Digit> { 
         self.into_rev_digits().into_iter().rev().collect()

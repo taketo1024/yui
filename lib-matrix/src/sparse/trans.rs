@@ -67,8 +67,8 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
 
     pub fn append_perm(&mut self, p: &Perm) {
         assert_eq!(p.len(), self.tgt_dim);
-        let f = SpMat::from_row_perm(p);
-        let b = SpMat::from_col_perm(p);
+        let f = SpMat::row_perm_mat(p);
+        let b = SpMat::col_perm_mat(p);
         self.append(f, b)
     }
 

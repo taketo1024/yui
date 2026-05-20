@@ -182,12 +182,6 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         Self::from(csc)
     }
 
-    pub fn from_generator<F>(shape: (usize, usize), generator: F) -> Self
-    where F: Fn(usize, usize) -> R { 
-        let f = &generator;
-        Self::from_entries(shape, (0..shape.0).flat_map(|i| (0..shape.1).map(move |j| (i, j, f(i, j)))))
-    }
-
     pub fn from_col_vecs<I>(nrows: usize, vecs: I) -> Self 
     where I: IntoIterator<Item = SpVec<R>> { 
         let mut col_offsets = vec![0];
@@ -452,7 +446,7 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
     }
 
     // row_perm(p) * a == a.permute_rows(p)
-    pub fn from_row_perm(p: &Perm) -> Self
+    pub fn row_perm_mat(p: &Perm) -> Self
     where R: One {
         let n = p.len();
         Self::from_entries((n, n), (0..n).map(|i|
@@ -461,7 +455,7 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
     }
 
     // a * col_perm(p) == a.permute_cols(p)
-    pub fn from_col_perm(p: &Perm) -> Self
+    pub fn col_perm_mat(p: &Perm) -> Self
     where R: One {
         let n = p.len();
         Self::from_entries((n, n), (0..n).map(|i|
@@ -659,16 +653,6 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn from_generator() {
-        let a = SpMat::from_generator((3, 4), |i, j| (i + j) as i32);
-        assert_eq!(a, SpMat::from_dense_data((3, 4), vec![
-            0, 1, 2, 3,
-            1, 2, 3, 4,
-            2, 3, 4, 5,
-        ]));
-    }
-
-    #[test]
     fn to_dense() { 
         let a = SpMat::from_entries((2, 2), [
             (0, 0, 1),
@@ -795,7 +779,7 @@ pub(super) mod tests {
     fn row_perm() {
         let a = SpMat::from_dense_data((3, 4), 0..12);
         let p = Perm::new(vec![2,0,1]);
-        let q = SpMat::from_row_perm(&p);
+        let q = SpMat::row_perm_mat(&p);
         assert!(q * &a == a.permute_rows(&p))
     }
 
@@ -803,7 +787,7 @@ pub(super) mod tests {
     fn col_perm() {
         let a = SpMat::from_dense_data((3, 4), 0..12);
         let p = Perm::new(vec![2,0,1,3]);
-        let q = SpMat::from_col_perm(&p);
+        let q = SpMat::col_perm_mat(&p);
         assert!(&a * q == a.permute_cols(&p))
     }
 

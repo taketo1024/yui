@@ -183,7 +183,7 @@ where
 
     fn flush(&mut self) -> String { 
         let res = std::mem::take(&mut self.buff);
-        res.trim().to_string()
+        res.trim_end().to_string()
     }
 }
 

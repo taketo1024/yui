@@ -28,7 +28,7 @@ where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {
         let summands = Grid::generate(
             d_matrices.support().copied(), 
             |i| {
-                let r = d_matrices[i].ncols();
+                let r = d_matrices[i].n_cols();
                 GenericSummand::generate_free(i, r)
             }
         );

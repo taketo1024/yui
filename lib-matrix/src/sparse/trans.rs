@@ -28,7 +28,7 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
     }
 
     pub fn new(f: SpMat<R>, b: SpMat<R>) -> Self {
-        let mut t = Self::id(f.ncols());
+        let mut t = Self::id(f.n_cols());
         t.append(f, b);
         t
     }
@@ -56,11 +56,11 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
     }
 
     pub fn append(&mut self, f: SpMat<R>, b: SpMat<R>) { 
-        assert_eq!(f.ncols(), b.nrows());
-        assert_eq!(f.nrows(), b.ncols());
-        assert_eq!(f.ncols(), self.tgt_dim);
+        assert_eq!(f.n_cols(), b.n_rows());
+        assert_eq!(f.n_rows(), b.n_cols());
+        assert_eq!(f.n_cols(), self.tgt_dim);
 
-        self.tgt_dim = f.nrows();
+        self.tgt_dim = f.n_rows();
         self.f_mats.push(f);
         self.b_mats.push(b);
     }

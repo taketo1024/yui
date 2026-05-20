@@ -31,7 +31,7 @@ impl<R> Mat<R> {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (usize, usize, &R)> { 
-        let m = self.nrows();
+        let m = self.n_rows();
         self.inner.iter().enumerate().map(move |(i, a)| 
             (i % m, i / m, a)
         )
@@ -101,20 +101,20 @@ where R: Scalar {
         let (i0, i1) = (rows.start, rows.end);
         let (j0, j1) = (cols.start, cols.end);
 
-        assert!(i0 <= i1 && i1 <= self.nrows());
-        assert!(j0 <= j1 && j1 <= self.ncols());
+        assert!(i0 <= i1 && i1 <= self.n_rows());
+        assert!(j0 <= j1 && j1 <= self.n_cols());
 
         let slice = self.inner.view((i0, j0), (i1 - i0, j1 - j0));
         Self::from(slice.clone_owned())
     }
 
     pub fn submat_rows(&self, rows: Range<usize>) -> Mat<R> { 
-        let n = self.ncols();
+        let n = self.n_cols();
         self.submat(rows, 0 .. n)
     }
 
     pub fn submat_cols(&self, cols: Range<usize>) -> Mat<R> { 
-        let m = self.nrows();
+        let m = self.n_rows();
         self.submat(0 .. m, cols)
     }
 
@@ -137,7 +137,7 @@ where R: Scalar {
     pub fn map<S, F>(&self, f: F) -> Mat<S>
     where S: Scalar, F: Fn(&R) -> S {
         let data = self.inner.iter().map(f);
-        let inner = DMatrix::from_iterator(self.nrows(), self.ncols(), data);
+        let inner = DMatrix::from_iterator(self.n_rows(), self.n_cols(), data);
         Mat::from(inner)
     }
 }
@@ -250,7 +250,7 @@ where R: Scalar {
 
     pub fn add_row_to(&mut self, i0: usize, i1: usize, r: &R)
     where R: ClosedAddAssign, for<'x> &'x R: Mul<Output = R> {
-        for j in 0..self.ncols() {
+        for j in 0..self.n_cols() {
             let v = &self[(i0, j)] * r;
             self[(i1, j)] += v;
         }
@@ -258,7 +258,7 @@ where R: Scalar {
 
     pub fn add_col_to(&mut self, j0: usize, j1: usize, r: &R)
     where R: ClosedAddAssign, for<'x> &'x R: Mul<Output = R> {
-        for i in 0..self.nrows() {
+        for i in 0..self.n_rows() {
             let v = &self[(i, j0)] * r;
             self[(i, j1)] += v;
         }
@@ -305,8 +305,8 @@ mod tests {
     fn init() { 
         let a = Mat::from_data((2, 3), [1,2,3,4,5,6]);
 
-        assert_eq!(a.nrows(), 2);
-        assert_eq!(a.ncols(), 3);
+        assert_eq!(a.n_rows(), 2);
+        assert_eq!(a.n_cols(), 3);
         assert_eq!(a.into_inner(), DMatrix::from_row_slice(2, 3, &[1,2,3,4,5,6]));
     }
 

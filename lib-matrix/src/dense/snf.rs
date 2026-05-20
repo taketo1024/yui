@@ -37,7 +37,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
 
     type P<R> = Poly<'x', R>;
 
-    let x = Mat::scalar(a.nrows(), &P::variable());
+    let x = Mat::scalar(a.n_rows(), &P::variable());
     let a = a.map(|r| P::from_const(r.clone()) );
     let target = x - a;
     
@@ -88,7 +88,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     }
 
     pub fn rank(&self) -> usize {
-        let n = min(self.result.nrows(), self.result.ncols());
+        let n = min(self.result.n_rows(), self.result.n_cols());
         for i in 0..n { 
             if self.result[(i, i)].is_zero() { 
                 return i
@@ -98,7 +98,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     }
 
     pub fn factors(&self) -> Vec<&R> { 
-        let n = min(self.result.nrows(), self.result.ncols());
+        let n = min(self.result.n_rows(), self.result.n_cols());
         (0..n).filter_map(|i| { 
             let a = &self.result[(i, i)];
             if !a.is_zero() { 
@@ -300,7 +300,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
 
     fn select_pivot(&self, below_i: usize, j: usize) -> Option<usize> { 
         // find row `i` below `below_i` with minimum nnz. 
-        (below_i..self.target.nrows())
+        (below_i..self.target.n_rows())
             .filter( |i| !self.target[(*i, j)].is_zero() )
             .map( |i| (i, self.row_nz(i)) )
             .min_by( |e1, e2| e1.1.cmp(&e2.1) )
@@ -322,7 +322,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     fn eliminate_row(&mut self, i: usize, j: usize) -> bool { 
         let mut modified = false;
 
-        for j1 in 0..self.target.ncols() {
+        for j1 in 0..self.target.n_cols() {
             if j == j1 || self.target[(i, j1)].is_zero() { continue }
 
             // d = sx + ty,
@@ -351,7 +351,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     fn eliminate_col(&mut self, i: usize, j: usize) -> bool { 
         let mut modified = false;
 
-        for i1 in 0..self.target.nrows() {
+        for i1 in 0..self.target.n_rows() {
             if i == i1 || self.target[(i1, j)].is_zero() { continue }
 
             // d = sx + ty,
@@ -380,7 +380,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     fn diag_normalize(&mut self) {
         debug_assert!(self.target.is_diag());
 
-        let n = min(self.target.nrows(), self.target.ncols());
+        let n = min(self.target.n_rows(), self.target.n_cols());
         let r = (0..n).filter(|&i| 
             self.target[(i, i)].is_zero()
         ).next().unwrap_or(n);

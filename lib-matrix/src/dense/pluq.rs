@@ -21,7 +21,7 @@ pub struct Pluq<R> {
 }
 
 impl<R> Pluq<R> {
-    pub fn rank(&self) -> usize { self.l.ncols() }
+    pub fn rank(&self) -> usize { self.l.n_cols() }
 }
 
 impl<R: Scalar> Pluq<R> {
@@ -69,7 +69,7 @@ pub fn solve_pluq<R>(a: &Mat<R>, y: &[R]) -> Option<Vec<R>>
 where R: Field, for<'x> &'x R: FieldOps<R> {
     debug!("dense solve: {:?}", a.shape());
 
-    assert_eq!(y.len(), a.nrows());
+    assert_eq!(y.len(), a.n_rows());
     let Pluq { p, q, l, u, .. } = pluq(a);
     let yp = p.apply_to(y.to_vec());
 
@@ -87,7 +87,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
 // Solves L * z = yp[0..rank] by forward substitution (L is lower triangular, pivot values on diagonal).
 fn forward_sub<R>(l: &Mat<R>, yp: &[R]) -> Vec<R>
 where R: Field, for<'x> &'x R: FieldOps<R> {
-    (0..l.ncols()).fold(vec![], |mut z, k| {
+    (0..l.n_cols()).fold(vec![], |mut z, k| {
         let pivot_inv = l[(k, k)].inv().unwrap();
         let val = (0..k).fold(yp[k].clone(), |v, j| v - &l[(k, j)] * &z[j]) * pivot_inv;
         z.push(val);
@@ -107,7 +107,7 @@ where R: Ring + PartialEq, for<'x> &'x R: RingOps<R> {
 // Solves U * xp = z by back substitution (U is unit upper triangular); free variables xp[rank..n] stay zero.
 fn back_sub<R>(u: &Mat<R>, z: &[R]) -> Vec<R>
 where R: Field, for<'x> &'x R: FieldOps<R> {
-    let (rank, n) = (z.len(), u.ncols());
+    let (rank, n) = (z.len(), u.n_cols());
     (0..rank).rev().fold(vec![R::zero(); n], |mut xp, k| {
         xp[k] = (k + 1..rank).fold(z[k].clone(), |v, j| v - &u[(k, j)] * &xp[j]);
         xp
@@ -153,7 +153,7 @@ fn build_u_row<R>(work: &Mat<R>, i: usize, c: usize) -> Vec<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     use std::cmp::Ordering::*;
     let pivot_inv = work[(i, c)].inv().unwrap();
-    (0..work.ncols()).map(|j| match j.cmp(&c) {
+    (0..work.n_cols()).map(|j| match j.cmp(&c) {
         Less    => R::zero(),
         Equal   => R::one(),
         Greater => work[(i, j)].clone() * pivot_inv.clone(),
@@ -163,7 +163,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 // Subtracts `u_row[j] * col_c` from each column `j > c`, zeroing out the pivot row to the right.
 fn eliminate_right<R>(work: &mut Mat<R>, u_row: &[R], c: usize)
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let n = work.ncols();
+    let n = work.n_cols();
     (c + 1..n)
         .filter(|&j| !u_row[j].is_zero())
         .for_each(|j| work.add_col_to(c, j, &-u_row[j].clone()));
@@ -172,7 +172,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 // Extracts L: the first `rank` columns of the reduced matrix with rows reordered by `p_inv`.
 fn build_l<R>(work: &Mat<R>, p_inv: &Perm, rank: usize) -> Mat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    Mat::generate((work.nrows(), rank), |i, k| work[(p_inv.at(i), k)].clone())
+    Mat::generate((work.n_rows(), rank), |i, k| work[(p_inv.at(i), k)].clone())
 }
 
 // Builds the Schur complement s: (m-rank)×(n-rank), the bottom-right non-pivot block.

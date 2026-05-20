@@ -33,13 +33,13 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     //     ≅ C22' (free) ⊕ (C21 / Im(d1')) (tor)
 
     pub fn calculate(d1: SpMat<R>, d2: SpMat<R>, with_trans: bool) -> HomologyCalcResult<R> {
-        assert_eq!(d1.nrows(), d2.ncols());
+        assert_eq!(d1.n_rows(), d2.n_cols());
 
         if d1.is_zero() && d2.is_zero() { 
-            return Self::trivial_result(d1.nrows(), with_trans);
+            return Self::trivial_result(d1.n_rows(), with_trans);
         }
 
-        debug!("calculate homology: {} -> {} -> {}", d1.ncols(), d1.nrows(), d2.nrows());
+        debug!("calculate homology: {} -> {} -> {}", d1.n_cols(), d1.n_rows(), d2.n_rows());
         
         let (s1, s2) = Self::process_snf(d1, d2, with_trans);
         let (rank, tors) = Self::result(&s1, &s2);
@@ -59,7 +59,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     fn process_snf(d1: SpMat<R>, d2: SpMat<R>, with_trans: bool) -> (SnfResult<R>, SnfResult<R>) {
-        let n = d1.nrows();
+        let n = d1.n_rows();
 
         let d1_dns = d1.into_dense();
         let s1 = snf_in_place(d1_dns, [with_trans, true, false, false]);
@@ -80,7 +80,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     fn result(s1: &SnfResult<R>, s2: &SnfResult<R>) -> (usize, Vec<R>) {
-        let n = s1.result().nrows();
+        let n = s1.result().n_rows();
         let (r1, r2) = (s1.rank(), s2.rank());
 
         assert!(n >= r1 + r2);
@@ -99,7 +99,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     fn trans(s1: &SnfResult<R>, s2: &SnfResult<R>) -> Trans<R> {
-        let n = s1.result().nrows();
+        let n = s1.result().n_rows();
         let (r1, r2) = (s1.rank(), s2.rank());
         let r = n - r1 - r2;
         let t = s1.factors().iter().filter(|a| !a.is_unit()).count();
@@ -116,7 +116,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         let p_tor = p1.submat_rows(r1-t..r1)      // size = (t, n)
                       .into_sparse();
 
-        let p = SpMat::stack(p_free, p_tor);      // size = (r + t, n)
+        let p = SpMat::v_stack(p_free, p_tor);      // size = (r + t, n)
 
         assert_eq!(p.shape(), (r + t, n));
 
@@ -133,7 +133,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         let q_tor = q1.submat_cols(r1-t..r1)      // size = (n, t)
                       .into_sparse();
 
-        let q = SpMat::concat(q_free, q_tor);     // size = (n, r + t)
+        let q = SpMat::h_stack(q_free, q_tor);     // size = (n, r + t)
 
         assert_eq!(q.shape(), (n, r + t));
 

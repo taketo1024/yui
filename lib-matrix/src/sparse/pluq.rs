@@ -27,20 +27,20 @@ pub struct SpPluq<R> {
 
 impl<R> SpPluq<R> {
     /// Constructs a `PartialPluq` after asserting the shapes are mutually
-    /// consistent: `l.ncols() == u.nrows() = r`, `l.nrows() == p.dim() = m`,
-    /// `u.ncols() == q.dim() = n`, and `s.shape() == (m - r, n - r)`.
+    /// consistent: `l.n_cols() == u.n_rows() = r`, `l.n_rows() == p.dim() = m`,
+    /// `u.n_cols() == q.dim() = n`, and `s.shape() == (m - r, n - r)`.
     pub fn new(p: Perm, q: Perm, l: SpMat<R>, u: SpMat<R>, s: SpMat<R>) -> Self {
-        let r = l.ncols();
-        let m = l.nrows();
-        let n = u.ncols();
-        assert_eq!(r, u.nrows(), "l.ncols() must match u.nrows()");
-        assert_eq!(m, p.len(), "l.nrows() must match p.len()");
-        assert_eq!(n, q.len(), "u.ncols() must match q.len()");
+        let r = l.n_cols();
+        let m = l.n_rows();
+        let n = u.n_cols();
+        assert_eq!(r, u.n_rows(), "l.n_cols() must match u.n_rows()");
+        assert_eq!(m, p.len(), "l.n_rows() must match p.len()");
+        assert_eq!(n, q.len(), "u.n_cols() must match q.len()");
         assert_eq!(s.shape(), (m - r, n - r), "s shape must be (m - r, n - r)");
         Self { p, q, l, u, s }
     }
 
-    pub fn rank(&self) -> usize { self.l.ncols() }
+    pub fn rank(&self) -> usize { self.l.n_cols() }
 
     pub fn take_l(&mut self) -> SpMat<R> {
         std::mem::take(&mut self.l)
@@ -99,16 +99,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let sch = Schur::from_blocks(TriangularType::Upper, [&a0, &a1, &a2, &a3], false, true);
             let (s, _, row_mult) = sch.disassemble();
             let l1 = row_mult.unwrap();
-            let u = SpMat::concat(a0, a1);          // u = [a0 | a1]
-            let l = SpMat::stack(SpMat::id(r), l1); // l = [I_r ; l1]
+            let u = SpMat::h_stack(a0, a1);          // u = [a0 | a1]
+            let l = SpMat::v_stack(SpMat::id(r), l1); // l = [I_r ; l1]
             (l, u, s)
         },
         PivotType::Cols => {
             let sch = Schur::from_blocks(TriangularType::Lower, [&a0, &a1, &a2, &a3], true, false);
             let (s, col_mult, _) = sch.disassemble();
             let u1 = col_mult.unwrap();
-            let l = SpMat::stack(a0, a2);            // l = [a0 ; a2]
-            let u = SpMat::concat(SpMat::id(r), u1); // u = [I_r | u1]
+            let l = SpMat::v_stack(a0, a2);            // l = [a0 ; a2]
+            let u = SpMat::h_stack(SpMat::id(r), u1); // u = [I_r | u1]
             (l, u, s)
         }
     };
@@ -178,8 +178,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let col_idx: Vec<usize> = s.iter_nz().map(|(_, j, _)| j).collect::<BTreeSet<_>>().into_iter().collect();
     let (m0, n0) = (row_idx.len(), col_idx.len());
 
-    let row_perm = Perm::forward_and_fill(s.nrows(), row_idx.iter().copied());
-    let col_perm = Perm::forward_and_fill(s.ncols(), col_idx.iter().copied());
+    let row_perm = Perm::forward_and_fill(s.n_rows(), row_idx.iter().copied());
+    let col_perm = Perm::forward_and_fill(s.n_cols(), col_idx.iter().copied());
 
     let shape = if transpose { (n0, m0) } else { (m0, n0) };
     let mut mat = Mat::zero(shape);
@@ -204,28 +204,28 @@ fn merge_pluq<R>(pp1: &mut SpPluq<R>, pp2: SpPluq<R>)
 where R: Ring, for<'x> &'x R: RingOps<R> {
     debug!("merge pluq: {} + {}", pp1.rank(), pp2.rank());
 
-    let (m, n) = (pp1.l.nrows(), pp1.u.ncols());
+    let (m, n) = (pp1.l.n_rows(), pp1.u.n_cols());
     let r1 = pp1.rank();
     let r2 = pp2.rank();
 
-    assert_eq!(pp2.l.nrows(), m - r1);
-    assert_eq!(pp2.u.ncols(), n - r1);
+    assert_eq!(pp2.l.n_rows(), m - r1);
+    assert_eq!(pp2.u.n_cols(), n - r1);
 
     // MEMO: Even if r2 == 0, there could be non-trivial permutations
     // when R is not a field.
 
     pp1.l = {
-        let [l0, l1] = pp1.take_l().divide_at_row(r1);
+        let [l0, l1] = pp1.take_l().v_split(r1);
         let l1 = l1.permute_rows(&pp2.p);
         let zero_tr = SpMat::zero((r1, r2));
-        SpMat::combine_blocks([l0, zero_tr, l1, pp2.l])
+        SpMat::block_combine([l0, zero_tr, l1, pp2.l])
     };
 
     pp1.u = {
-        let [u0, u1] = pp1.take_u().divide_at_col(r1);
+        let [u0, u1] = pp1.take_u().h_split(r1);
         let u1 = u1.permute_cols(&pp2.q);
         let zero_bl = SpMat::zero((r2, r1));
-        SpMat::combine_blocks([u0, u1, zero_bl, pp2.u])
+        SpMat::block_combine([u0, u1, zero_bl, pp2.u])
     };
 
     pp1.s = pp2.s;
@@ -240,7 +240,7 @@ pub fn solve_pluq<R>(a: &SpMat<R>, y: &SpVec<R>) -> Option<SpVec<R>>
 where R: Field, for<'x> &'x R: FieldOps<R> {
     debug!("solve pluq, a: {:?}", a.shape());
 
-    assert_eq!(y.dim(), a.nrows());
+    assert_eq!(y.dim(), a.n_rows());
 
     let pp = pluq(a, PivotFinderConfig {
         piv_type: PivotType::Rows,
@@ -255,19 +255,19 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
     Some(SpVec::from(x))
 }
 
-// Solves `L * U * x = y` and returns `x` of length `n = u.ncols()` with
-// entries beyond `r = l.ncols()` set to zero (free variables = 0).
+// Solves `L * U * x = y` and returns `x` of length `n = u.n_cols()` with
+// entries beyond `r = l.n_cols()` set to zero (free variables = 0).
 //
 // Requires the top r × r block of L to be unit lower triangular and the top
 // r × r block of U to be invertible upper triangular.
 //
 // Returns `None` when `solve_l(l, y, true)` detects an inconsistent residual.
-// When `l` is square (`l.nrows() == r`) the residual is empty and the call
+// When `l` is square (`l.n_rows() == r`) the residual is empty and the call
 // always succeeds.
 fn solve_lu<R>(l: &SpMat<R>, u: &SpMat<R>, y: &[R]) -> Option<Vec<R>>
 where R: Field, for<'x> &'x R: FieldOps<R> {
-    assert_eq!(l.ncols(), u.nrows());
-    assert_eq!(y.len(), l.nrows());
+    assert_eq!(l.n_cols(), u.n_rows());
+    assert_eq!(y.len(), l.n_rows());
 
     let z = solve_l(l, y, true)?;
     let x = solve_u(u, &z);
@@ -276,7 +276,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
 }
 
 // Solves `l[0..r, 0..r] * z = y[0..r]` by forward substitution, where
-// `r = l.ncols()`. The top r × r block of L must be lower triangular with
+// `r = l.n_cols()`. The top r × r block of L must be lower triangular with
 // non-zero diagonal.
 //
 // If `check_consistency` is true and `r < y.len()`, also verifies the residual
@@ -284,8 +284,8 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
 // y.len()` the residual is trivially empty so the check is skipped.
 fn solve_l<R>(l: &SpMat<R>, y: &[R], check_consistency: bool) -> Option<Vec<R>>
 where R: Field, for<'x> &'x R: FieldOps<R> {
-    assert_eq!(l.nrows(), y.len());
-    let r = l.ncols();
+    assert_eq!(l.n_rows(), y.len());
+    let r = l.n_cols();
 
     let x = if r == y.len() {
         let y = SpVec::from(y.to_vec());
@@ -312,8 +312,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 fn is_consistent_upto<R>(l: &SpMat<R>, y: &[R], x: &[R], k: usize) -> bool
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    assert_eq!(l.nrows(), y.len());
-    assert_eq!(l.ncols(), x.len());
+    assert_eq!(l.n_rows(), y.len());
+    assert_eq!(l.n_cols(), x.len());
     assert!(x.len() <= k && k <= y.len());
 
     let r = x.len();
@@ -329,7 +329,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 // Solves `u[0..r, 0..r] * x[..r] = y` by back-substitution, where
-// `r = u.nrows()`, and returns `x` of length `n = u.ncols()` with entries
+// `r = u.n_rows()`, and returns `x` of length `n = u.n_cols()` with entries
 // beyond `r` set to zero. The top r × r block of U must be upper triangular
 // with non-zero diagonal.
 fn solve_u<R>(u: &SpMat<R>, y: &[R]) -> Vec<R>
@@ -359,7 +359,7 @@ pub fn solve_pluq_incr<R>(a: &SpMat<R>, y: &SpVec<R>, max_piv: usize, chunk: usi
 where R: Field, for<'x> &'x R: FieldOps<R> {
     debug!("solve pluq (incremental), a: {:?}", a.shape());
 
-    assert_eq!(y.dim(), a.nrows());
+    assert_eq!(y.dim(), a.n_rows());
 
     let mut pp = pre_pluq(a, PivotFinderConfig {
         piv_type: PivotType::Rows,
@@ -370,9 +370,9 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
     let mut yp = pp.p.apply_to(y_dense);
 
     let mut step = 1;
-    let total_step = (a.nrows() - pp.rank()) / chunk + 1;
+    let total_step = (a.n_rows() - pp.rank()) / chunk + 1;
 
-    while pp.s.nrows() > 0 {
+    while pp.s.n_rows() > 0 {
         debug!("(step {}/{})", step, total_step);
         debug!("  current rank: {}", pp.rank());
 
@@ -410,13 +410,13 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
     Some(SpVec::from(x))
 }
 
-// Takes the top `min(chunk_size, s.nrows())` rows of `s`, runs `pluq` on them,
+// Takes the top `min(chunk_size, s.n_rows())` rows of `s`, runs `pluq` on them,
 // and lifts the result to act on all of `s` via `extend_chunk_to_full`.
 // Returns `(pp_chunk_full, r_chunk, c)`.
 fn chunk_pluq<R>(s: SpMat<R>, chunk_size: usize) -> (SpPluq<R>, usize, usize)
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let c = chunk_size.min(s.nrows());
-    let [s_chunk, s_rest] = s.divide_at_row(c);
+    let c = chunk_size.min(s.n_rows());
+    let [s_chunk, s_rest] = s.v_split(c);
     let pp_chunk = pluq(&s_chunk, PivotFinderConfig {
         piv_type: PivotType::Rows,
         ..Default::default()
@@ -434,17 +434,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 // Sparse analog of `dense_pluq_in`, applied to a single chunk.
 fn extend_chunk_to_full<R>(pp_chunk: SpPluq<R>, s_rest: SpMat<R>) -> SpPluq<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let (c, n_s) = (pp_chunk.l.nrows(), pp_chunk.u.ncols());
+    let (c, n_s) = (pp_chunk.l.n_rows(), pp_chunk.u.n_cols());
     let r_chunk = pp_chunk.rank();
-    let m_rest = s_rest.nrows();
+    let m_rest = s_rest.n_rows();
     let m_s = c + m_rest;
 
-    assert_eq!(s_rest.ncols(), n_s);
+    assert_eq!(s_rest.n_cols(), n_s);
     assert_eq!(pp_chunk.s.shape(), (c - r_chunk, n_s - r_chunk));
 
     let s_rest_q = s_rest.permute_cols(&pp_chunk.q);
-    let [s_rest_left, s_rest_right] = s_rest_q.divide_at_col(r_chunk);
-    let [u_top, u_right] = pp_chunk.u.clone().divide_at_col(r_chunk);
+    let [s_rest_left, s_rest_right] = s_rest_q.h_split(r_chunk);
+    let [u_top, u_right] = pp_chunk.u.clone().h_split(r_chunk);
 
     // Same Schur shape as pre_pluq's Rows branch: u_top (upper triangular) plays
     // the role of `a`, with `c = s_rest_left`, `b = u_right`, `d = s_rest_right`.
@@ -459,9 +459,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let chunk_idx: Vec<usize> = (0..c).collect();
     let p = extend_perm(m_s, &chunk_idx, pp_chunk.p);
     let q = pp_chunk.q;
-    let l = SpMat::stack(pp_chunk.l, l_ext);
+    let l = SpMat::v_stack(pp_chunk.l, l_ext);
     let u = pp_chunk.u;
-    let s = SpMat::stack(pp_chunk.s, s_ext);
+    let s = SpMat::v_stack(pp_chunk.s, s_ext);
 
     SpPluq::new(p, q, l, u, s)
 }
@@ -476,7 +476,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     if k == 0 { return; }
 
     let r = pp.rank();
-    let m = pp.l.nrows();
+    let m = pp.l.n_rows();
     assert!(r + k <= m);
     assert_eq!(yp.len(), m);
     assert_eq!(pp.p.len(), m);
@@ -493,7 +493,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     });
 
     // Drop the top k rows of pp.s.
-    pp.s = pp.s.submat_rows(k..pp.s.nrows());
+    pp.s = pp.s.submat_rows(k..pp.s.n_rows());
 
     // Drop yp entries [r..r+k] to stay in sync with pp.l.
     yp.drain(r..r + k);
@@ -964,7 +964,7 @@ mod tests {
     fn check_extend_chunk(s: &SpMat<i32>, c: usize) {
         let (m, n) = s.shape();
         assert!(c <= m);
-        let [s_top, s_rest] = s.clone().divide_at_row(c);
+        let [s_top, s_rest] = s.clone().v_split(c);
         let pp_chunk = pluq(&s_top, cfg(PivotType::Rows));
         let pp = extend_chunk_to_full(pp_chunk, s_rest);
         let r = pp.rank();
@@ -1017,7 +1017,7 @@ mod tests {
     #[test]
     fn test_chunk_pluq_oversize() {
         let s = sample();
-        let m = s.nrows();
+        let m = s.n_rows();
         let (_, _, c) = chunk_pluq(s, 100);
         assert_eq!(c, m);
     }

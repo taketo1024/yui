@@ -364,7 +364,7 @@ impl MatrixStr {
     where R: Ring, for<'x> &'x R: RingOps<R> {
         let shape = match piv_type {
             PivotType::Rows => a.shape(),
-            PivotType::Cols => (a.ncols(), a.nrows())
+            PivotType::Cols => (a.n_cols(), a.n_rows())
         };
         let t = match piv_type {
             PivotType::Rows => |i: usize, j: usize| (i, j),
@@ -433,8 +433,8 @@ impl PivotData {
     fn new<R>(a: &SpMat<R>, piv_type: PivotType) -> Self
     where R: Ring, for<'x> &'x R: RingOps<R> {
         let (m, n) = match piv_type {
-            PivotType::Rows => (a.nrows(), a.ncols()),
-            PivotType::Cols => (a.ncols(), a.nrows()),
+            PivotType::Rows => (a.n_rows(), a.n_cols()),
+            PivotType::Cols => (a.n_cols(), a.n_rows()),
         };
         let data = vec![None; n];
         let indices = vec![];

@@ -111,7 +111,7 @@ where
     }
 
     pub fn rank(&self, i: I) -> Option<usize> { 
-        self.matrix(i).map(|d| d.ncols())
+        self.matrix(i).map(|d| d.n_cols())
     }
 
     pub fn is_set(&self, i: I) -> bool { 
@@ -126,7 +126,7 @@ where
 
     pub fn set_matrix(&mut self, i: I, d: SpMat<R>, with_trans: bool) {
         if with_trans { 
-            let n = d.ncols();
+            let n = d.n_cols();
             self.trans.insert(i, Trans::id(n));
         }
         self.mats.insert(i, d);
@@ -230,7 +230,7 @@ where
         let (i0, i1, i2) = self.deg_trip(i);
 
         if let Some(a0) = self.matrix(i0) {
-            assert_eq!(a0.nrows(), n);
+            assert_eq!(a0.n_rows(), n);
             let a0 = reduce_mat_rows(a0, q, r);
             self.mats.insert(i0, a0);
         }
@@ -238,7 +238,7 @@ where
         self.mats.insert(i1, s);
 
         if let Some(a2) = self.matrix(i2) { 
-            assert_eq!(a2.ncols(), m);
+            assert_eq!(a2.n_cols(), m);
             let a2 = reduce_mat_cols(a2, p, r);
             self.mats.insert(i2, a2);
         }

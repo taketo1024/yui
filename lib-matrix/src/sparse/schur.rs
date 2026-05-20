@@ -60,8 +60,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let [a, b, c, d] = blocks;
         assert!(a.is_square());
 
-        let r = a.nrows();
-        let (m_d, n_b) = (d.nrows(), b.ncols());
+        let r = a.n_rows();
+        let (m_d, n_b) = (d.n_rows(), b.n_cols());
 
         debug!("compute schur: a{:?}, r: {r}", (m_d + r, n_b + r));
 
@@ -106,17 +106,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn trans_src(&self) -> Option<Trans<R>> {
         self.col_mult.as_ref().map(|x| {
-            let (r, n_b) = (x.nrows(), x.ncols());
+            let (r, n_b) = (x.n_rows(), x.n_cols());
             let f = proj_mat(r + n_b, n_b);
-            let b = SpMat::stack(-x, id_mat(n_b)); // [-a⁻¹b ; I]
+            let b = SpMat::v_stack(-x, id_mat(n_b)); // [-a⁻¹b ; I]
             Trans::new(f, b)
         })
     }
 
     pub fn trans_tgt(&self) -> Option<Trans<R>> {
         self.row_mult.as_ref().map(|y| {
-            let (m_d, r) = (y.nrows(), y.ncols());
-            let f = SpMat::concat(-y, id_mat(m_d)); // [-c·a⁻¹, I]
+            let (m_d, r) = (y.n_rows(), y.n_cols());
+            let f = SpMat::h_stack(-y, id_mat(m_d)); // [-c·a⁻¹, I]
             let b = incl_mat(r + m_d, m_d);
             Trans::new(f, b)
         })

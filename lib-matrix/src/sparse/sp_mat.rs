@@ -70,7 +70,7 @@ impl<R> SpMat<R> {
 
     pub fn is_triang(&self, t: TriangularType) -> bool
     where R: Zero {
-        if self.nrows() != self.ncols() { 
+        if self.n_rows() != self.n_cols() { 
             return false
         }
 
@@ -222,7 +222,7 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         let col = self.inner.col(j);
         let row_indices = col.row_indices().to_vec();
         let values = col.values().to_vec();
-        SpVec::try_from_csc_data(self.nrows(), row_indices, values).unwrap()
+        SpVec::try_from_csc_data(self.n_rows(), row_indices, values).unwrap()
     }
 
     pub fn transpose(&self) -> Self { 
@@ -241,12 +241,12 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
     }
 
     pub fn permute_rows(&self, p: &Perm) -> SpMat<R> {
-        let id = Perm::id(self.ncols());
+        let id = Perm::id(self.n_cols());
         self.permute(p, &id)
     }
 
     pub fn permute_cols(&self, q: &Perm) -> SpMat<R> {
-        let id = Perm::id(self.nrows());
+        let id = Perm::id(self.n_rows());
         self.permute(&id, q)
     }
 
@@ -287,8 +287,8 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         let (i0, i1) = (rows.start, rows.end);
         let (j0, j1) = (cols.start, cols.end);
 
-        assert!(i0 <= i1 && i1 <= self.nrows());
-        assert!(j0 <= j1 && j1 <= self.ncols());
+        assert!(i0 <= i1 && i1 <= self.n_rows());
+        assert!(j0 <= j1 && j1 <= self.n_cols());
 
         let shape = (i1 - i0, j1 - j0);
         self.extract(shape, |i, j|
@@ -299,16 +299,16 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
     }
 
     pub fn submat_rows(&self, rows: Range<usize>) -> SpMat<R> { 
-        let n = self.ncols();
+        let n = self.n_cols();
         self.submat(rows, 0 .. n)
     }
 
     pub fn submat_cols(&self, cols: Range<usize>) -> SpMat<R> { 
-        let m = self.nrows();
+        let m = self.n_rows();
         self.submat(0 .. m, cols)
     }
 
-    pub fn divide_into_blocks(self, point: (usize, usize)) -> [SpMat<R>; 4] {
+    pub fn block_split(self, point: (usize, usize)) -> [SpMat<R>; 4] {
         let (m, n) = self.shape();
         let (k, l) = point;
         assert!(k <= m);
@@ -352,33 +352,33 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         ]
     }
 
-    pub fn divide_at_col(self, k: usize) -> [SpMat<R>; 2] {
+    pub fn h_split(self, k: usize) -> [SpMat<R>; 2] {
         let (m, n) = self.shape();
         assert!(k <= n);
 
-        let [a, b, ..] = self.divide_into_blocks((m, k));
+        let [a, b, ..] = self.block_split((m, k));
         [a, b]
     }
 
-    pub fn divide_at_row(self, k: usize) -> [SpMat<R>; 2] {
+    pub fn v_split(self, k: usize) -> [SpMat<R>; 2] {
         let (m, n) = self.shape();
         assert!(k <= m);
 
-        let [a, _, b, _] = self.divide_into_blocks((k, n));
+        let [a, _, b, _] = self.block_split((k, n));
         [a, b]
     }
 
-    pub fn combine_blocks(blocks: [SpMat<R>; 4]) -> SpMat<R> {
+    pub fn block_combine(blocks: [SpMat<R>; 4]) -> SpMat<R> {
         let [a, b, c, d] = blocks;
 
-        assert_eq!(a.nrows(), b.nrows());
-        assert_eq!(c.nrows(), d.nrows());
-        assert_eq!(a.ncols(), c.ncols());
-        assert_eq!(b.ncols(), d.ncols());
+        assert_eq!(a.n_rows(), b.n_rows());
+        assert_eq!(c.n_rows(), d.n_rows());
+        assert_eq!(a.n_cols(), c.n_cols());
+        assert_eq!(b.n_cols(), d.n_cols());
 
-        let (m0, m1) = (a.nrows(), c.nrows());
+        let (m0, m1) = (a.n_rows(), c.n_rows());
         let m = m0 + m1;
-        let (n0, n1) = (a.ncols(), b.ncols());
+        let (n0, n1) = (a.n_cols(), b.n_cols());
         let n = n0 + n1;
         let nnz = a.nnz() + b.nnz() + c.nnz() + d.nnz();
 
@@ -410,10 +410,10 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         SpMat::try_from_csc_data(m, n, col_offsets, row_indices, values).unwrap()
     }
 
-    pub fn concat(left: Self, right: Self) -> Self {
-        assert_eq!(left.nrows(), right.nrows());
-        let (l_cols, r_cols) = (left.ncols(), right.ncols());
-        Self::combine_blocks([
+    pub fn h_stack(left: Self, right: Self) -> Self {
+        assert_eq!(left.n_rows(), right.n_rows());
+        let (l_cols, r_cols) = (left.n_cols(), right.n_cols());
+        Self::block_combine([
             left,
             right,
             SpMat::zero((0, l_cols)),
@@ -421,10 +421,10 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         ])
     }
 
-    pub fn stack(top: Self, bot: Self) -> Self {
-        assert_eq!(top.ncols(), bot.ncols());
-        let (t_rows, b_rows) = (top.nrows(), bot.nrows());
-        Self::combine_blocks([
+    pub fn v_stack(top: Self, bot: Self) -> Self {
+        assert_eq!(top.n_cols(), bot.n_cols());
+        let (t_rows, b_rows) = (top.n_rows(), bot.n_rows());
+        Self::block_combine([
             top,
             SpMat::zero((t_rows, 0)),
             bot,
@@ -465,7 +465,7 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
 }
 
 // A column-major view of a disassembled matrix that yields one column at a
-// time, moving values out without cloning. Used by `combine_blocks`.
+// time, moving values out without cloning. Used by `block_combine`.
 struct ColSource<R> {
     offsets: Vec<usize>,
     rows: Vec<usize>,
@@ -738,10 +738,10 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn concat() {
+    fn h_stack() {
         let a = SpMat::from_dense_data((4, 3), 0..12);
         let b = SpMat::from_dense_data((4, 2), 12..20);
-        let c = SpMat::concat(a, b);
+        let c = SpMat::h_stack(a, b);
 
         assert_eq!(c, SpMat::from_dense_data((4,5), vec![
             0,  1,  2, 12, 13,
@@ -752,10 +752,10 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn stack() {
+    fn v_stack() {
         let a = SpMat::from_dense_data((2, 3), 0..6);
         let b = SpMat::from_dense_data((3, 3), 6..15);
-        let c = SpMat::stack(a, b);
+        let c = SpMat::v_stack(a, b);
 
         assert_eq!(c, SpMat::from_dense_data((5, 3), vec![
             0,  1,  2,

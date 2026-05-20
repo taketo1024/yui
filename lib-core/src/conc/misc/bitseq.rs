@@ -1,13 +1,16 @@
+//! A single [`Bit`], and a packed sequence of bits [`BitSeq`] of length up to 64.
+
 use core::fmt;
 use std::fmt::{Display, Debug};
 use auto_impl_ops::auto_ops;
 use std::ops::{Add, AddAssign, Index};
 use std::str::FromStr;
 
+/// A single binary digit, `0` or `1`.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, derive_more::Display, derive_more::Debug)]
 #[cfg_attr(feature = "serde", derive(serde_repr::Serialize_repr, serde_repr::Deserialize_repr))]
 #[repr(u8)]
-pub enum Bit { 
+pub enum Bit {
     #[default]
     #[display("0")]
     #[debug("0")]
@@ -67,23 +70,28 @@ impl_bit_from_int!(i32);
 impl_bit_from_int!(i64);
 impl_bit_from_int!(isize);
 
+/// A sequence of [`Bit`]s of length up to [`MAX_LEN`](BitSeq::MAX_LEN) = 64,
+/// packed into a single `u64`. The bit at index `i` is stored at position `i`
+/// of `val`, i.e. the least-significant bit of `val` is `self[0]`.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde_with::SerializeDisplay, serde_with::DeserializeFromStr))]
-pub struct BitSeq { 
+pub struct BitSeq {
     val: u64,
     len: usize
 }
 
-impl BitSeq { 
+impl BitSeq {
     pub const MAX_LEN: usize = 64;
 
-    pub fn new(val: u64, len: usize) -> Self { 
+    pub fn new(val: u64, len: usize) -> Self {
         assert!(len <= Self::MAX_LEN);
         assert!(val < (1 << len));
         Self { val, len }
     }
 
-    pub fn new_rev(val: u64, len: usize) -> Self { 
+    /// Like [`new`](Self::new), but interprets `val` as bit-reversed so that
+    /// the most-significant bit becomes `self[0]`.
+    pub fn new_rev(val: u64, len: usize) -> Self {
         let val = val.reverse_bits() >> (64 - len);
         Self::new(val, len)
     }
@@ -113,7 +121,8 @@ impl BitSeq {
         self.len == 0
     } 
 
-    pub fn weight(&self) -> usize { 
+    /// The number of bits set to `1` (Hamming weight).
+    pub fn weight(&self) -> usize {
         let mut v = self.val as usize;
         let mut c = 0;
         while v > 0 { 
@@ -215,11 +224,13 @@ impl BitSeq {
         Self::new(val, l)
     }
 
-    pub fn is_sub(&self, other: &Self) -> bool { 
+    /// `true` if `self` is a prefix of `other`.
+    pub fn is_sub(&self, other: &Self) -> bool {
         self.len <= other.len && 
         self.val == (other.val & ((1 << self.len) - 1))
     }
 
+    /// Enumerate all `2^len` sequences of the given length, in ascending order of `val`.
     pub fn generate(len: usize) -> impl Iterator<Item = BitSeq> {
         assert!(len <= Self::MAX_LEN);
         (0..2_u64.pow(len as u32)).map(move |v| Self::new(v, len))
@@ -306,6 +317,7 @@ impl PartialOrd for BitSeq {
 
 // TODO support lex-order (using generic parameter).
 
+/// Ordered by `len`, then [`weight`](BitSeq::weight), then raw `val`.
 impl Ord for BitSeq {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.len().cmp(&other.len()).then_with( ||

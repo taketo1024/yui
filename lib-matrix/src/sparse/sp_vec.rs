@@ -3,10 +3,10 @@ use std::fmt::{Display, Debug};
 use nalgebra_sparse::CscMatrix;
 use nalgebra_sparse::na::{Scalar, ClosedAddAssign, ClosedSubAssign, ClosedMulAssign};
 use num_traits::{Zero, One};
-use sprs::PermView;
 use auto_impl_ops::auto_ops;
 use yui_core::{Ring, RingOps, AddGrpOps,  AddGrp};
 use super::sp_mat::SpMat;
+use crate::Perm;
 
 #[derive(Clone, Debug)]
 pub struct SpVec<R> { 
@@ -146,7 +146,7 @@ where R: Scalar + Zero + ClosedAddAssign {
         ))
     }
 
-    pub fn permute(&self, p: PermView<'_>) -> SpVec<R> { 
+    pub fn permute(&self, p: &Perm) -> SpVec<R> {
         self.extract(self.dim(), |i| Some(p.at(i)))
     }
 
@@ -253,7 +253,6 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 #[cfg(test)]
 mod tests {
     use itertools::Itertools;
-    use sprs::PermOwned;
     use super::*;
 
     #[test]
@@ -311,9 +310,9 @@ mod tests {
 
     #[test]
     fn permute() {
-        let p = PermOwned::new(vec![1,3,0,2]);
+        let p = Perm::new(vec![1,3,0,2]);
         let v = SpVec::from(vec![0,1,2,3]);
-        let w = v.permute(p.view());
+        let w = v.permute(&p);
         assert_eq!(w, SpVec::from(vec![2,0,3,1]));
     }
 

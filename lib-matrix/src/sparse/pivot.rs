@@ -95,8 +95,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     debug!("  found {} {} pivots", pivs.len(), config.piv_type.str());
 
-    let p = Perm::forward_and_fill(m, pivs.iter().map(|(i, _)| *i));
-    let q = Perm::forward_and_fill(n, pivs.iter().map(|(_, j)| *j));
+    let p = Perm::forward_indices(m, pivs.iter().map(|(i, _)| *i));
+    let q = Perm::forward_indices(n, pivs.iter().map(|(_, j)| *j));
     let r = pivs.len();
     
     (p, q, r)

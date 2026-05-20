@@ -178,8 +178,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let col_idx: Vec<usize> = s.iter_nz().map(|(_, j, _)| j).collect::<BTreeSet<_>>().into_iter().collect();
     let (m0, n0) = (row_idx.len(), col_idx.len());
 
-    let row_perm = Perm::forward_and_fill(s.n_rows(), row_idx.iter().copied());
-    let col_perm = Perm::forward_and_fill(s.n_cols(), col_idx.iter().copied());
+    let row_perm = Perm::forward_indices(s.n_rows(), row_idx.iter().copied());
+    let col_perm = Perm::forward_indices(s.n_cols(), col_idx.iter().copied());
 
     let shape = if transpose { (n0, m0) } else { (m0, n0) };
     let mut mat = Mat::zero(shape);
@@ -529,7 +529,7 @@ fn extend_perm(n: usize, compact_idx: &[usize], compact_perm: Perm) -> Perm {
     assert!(n >= c);
     assert_eq!(compact_perm.len(), c);
 
-    let front = Perm::forward_and_fill(n, compact_idx.iter().copied());
+    let front = Perm::forward_indices(n, compact_idx.iter().copied());
     compact_perm.extend(n - c) * front
 }
 
@@ -1168,11 +1168,11 @@ mod tests {
     #[test]
     fn test_extend_perm_identity() {
         // compact_idx = [0, 2, 5] with identity compact_perm.
-        // extend_perm should equal Perm::forward_and_fill(7, [0,2,5]).
+        // extend_perm should equal Perm::forward_indices(7, [0,2,5]).
         let cp = Perm::id(3);
         let idx = vec![0usize, 2, 5];
         let p = extend_perm(7, &idx, cp);
-        let expected = Perm::forward_and_fill(7, idx.iter().copied());
+        let expected = Perm::forward_indices(7, idx.iter().copied());
         for i in 0..7 {
             assert_eq!(p.at(i), expected.at(i), "mismatch at i={i}");
         }

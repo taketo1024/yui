@@ -52,7 +52,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     let (pivot_rows, u) = reduce(&mut work, &mut col_of);
     let rank = pivot_rows.len();
-    let p = Perm::forward_and_fill(m, pivot_rows.iter().copied());
+    let p = Perm::forward_indices(m, pivot_rows.iter().copied());
     let q = Perm::from_indices(col_of).inv();
     let p_inv = p.inv();
     let l = build_l(&work, &p_inv, rank);

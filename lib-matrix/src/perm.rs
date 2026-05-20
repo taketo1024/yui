@@ -150,7 +150,7 @@ impl Perm {
     /// position `0, 1, 2, ...` (in the order given), with the remaining
     /// indices filling positions in sorted order.
     /// If `prefix` is empty, returns the identity (zero-cost).
-    pub fn forward_and_fill<I>(n: usize, prefix: I) -> Self
+    pub fn forward_indices<I>(n: usize, prefix: I) -> Self
     where I: IntoIterator<Item = usize> {
         let mut data = vec![0usize; n];
         let mut taken = vec![false; n];
@@ -429,12 +429,12 @@ mod tests {
         assert_eq!(s.len(), 5);
     }
 
-    // --- forward_and_fill ---
+    // --- forward_indices ---
 
     #[test]
-    fn forward_and_fill_basic() {
+    fn forward_indices_basic() {
         // n=5, prefix=[3,1] → sends 3→0, 1→1, others fill sorted: 0→2, 2→3, 4→4.
-        let p = Perm::forward_and_fill(5, [3, 1]);
+        let p = Perm::forward_indices(5, [3, 1]);
         let expected = [2, 1, 3, 0, 4];
         for (i, &x) in expected.iter().enumerate() {
             assert_eq!(p.at(i), x);
@@ -442,15 +442,15 @@ mod tests {
     }
 
     #[test]
-    fn forward_and_fill_empty_prefix() {
-        let p = Perm::forward_and_fill(4, std::iter::empty());
+    fn forward_indices_empty_prefix() {
+        let p = Perm::forward_indices(4, std::iter::empty());
         assert!(p.is_id());
     }
 
     #[test]
-    fn forward_and_fill_full_prefix() {
+    fn forward_indices_full_prefix() {
         // Specifying every index reduces to: p(prefix[k]) = k.
-        let p = Perm::forward_and_fill(4, [2, 0, 3, 1]);
+        let p = Perm::forward_indices(4, [2, 0, 3, 1]);
         assert_eq!(p.at(2), 0);
         assert_eq!(p.at(0), 1);
         assert_eq!(p.at(3), 2);

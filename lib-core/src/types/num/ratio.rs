@@ -376,7 +376,7 @@ where T: Integer, for<'x> &'x T: IntOps<T> {
 
 #[cfg(feature = "tex")] 
 mod tex {
-    use crate::tex::TeX;
+    use crate::TeX;
     use super::*;
 
     impl<T> TeX for Ratio<T> 
@@ -620,7 +620,7 @@ mod tests {
     #[test]
     #[cfg(feature = "tex")]
     fn tex() { 
-        use crate::tex::TeX;
+        use crate::TeX;
         assert_eq!(Ratio::<i32>::tex_math_symbol(), "\\mathbb{Q}");
 
         let a = Ratio::new(43, 1);

@@ -188,7 +188,7 @@ mod tex {
     use crate::tex_rmod_str;
 
     use super::*;
-    use yui_core::tex::TeX;
+    use yui_core::TeX;
 
     impl<X, R> TeX for Summand<X, R>
     where X: LcKey, R: Ring + TeX, for<'x> &'x R: RingOps<R> {

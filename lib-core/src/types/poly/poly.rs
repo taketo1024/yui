@@ -541,7 +541,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {}
 
 #[cfg(feature = "tex")]
 mod tex {
-    use crate::tex::TeX;
+    use crate::TeX;
     use super::*;
 
     impl<X, R> TeX for PolyBase<X, R>
@@ -1022,7 +1022,7 @@ mod tests {
     #[test]
     #[cfg(feature = "tex")]
     fn tex() { 
-        use crate::tex::TeX;
+        use crate::TeX;
         type P = LPolyN::<'x', i32>; 
 
         assert_eq!(P::tex_math_symbol(), "\\mathbb{Z}[x_1,\\ldots]");

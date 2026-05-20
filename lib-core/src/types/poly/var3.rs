@@ -261,7 +261,7 @@ impl_trivar_signed!  (isize);
 
 #[cfg(feature = "tex")] 
 mod tex {
-    use crate::tex::TeX;
+    use crate::TeX;
     use super::*;
 
     impl<const X: char, const Y: char, const Z: char, I> TeX for Var3<X, Y, Z, I>

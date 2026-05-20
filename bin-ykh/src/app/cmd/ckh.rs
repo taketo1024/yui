@@ -3,7 +3,7 @@ use crate::app::utils::*;
 use crate::app::err::*;
 use std::marker::PhantomData;
 use std::str::FromStr;
-use yui_core::tex::TeX;
+use yui_core::TeX;
 use yui_core::{Ring, RingOps};
 use yui_homology::{ChainComplexTrait, DisplayTable, GridTrait, SummandTrait};
 use yui_kh::kh::KhChainExt;

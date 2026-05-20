@@ -181,7 +181,7 @@ impl Field for FF2 {}
 
 #[cfg(feature = "tex")] 
 mod tex {
-    use crate::tex::TeX;
+    use crate::TeX;
     use super::*;
 
     impl TeX for FF2 {
@@ -317,7 +317,7 @@ mod tests {
     #[cfg(feature = "tex")]
     #[test]
     fn tex() { 
-        use crate::tex::TeX;
+        use crate::TeX;
         assert_eq!(FF2::tex_math_symbol(), "\\mathbb{F}_2");
         assert_eq!(FF2::from(5).tex_string(), "1");
     }

@@ -181,7 +181,7 @@ impl<const p: I> Field for FF<p> {}
 
 #[cfg(feature = "tex")] 
 mod tex {
-    use crate::tex::TeX;
+    use crate::TeX;
     use super::*;
 
     impl<const p: I> TeX for FF<p> {
@@ -310,7 +310,7 @@ mod tests {
     #[cfg(feature = "tex")]
     #[test]
     fn tex() { 
-        use crate::tex::TeX;
+        use crate::TeX;
         assert_eq!(F3::tex_math_symbol(), "\\mathbb{F}_3");
         assert_eq!(F3::from(5).tex_string(), "2");
     }

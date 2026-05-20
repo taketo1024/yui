@@ -184,7 +184,7 @@ impl_univar_signed!  (isize);
 
 #[cfg(feature = "tex")] 
 mod tex {
-    use crate::tex::TeX;
+    use crate::TeX;
     use super::*;
 
     impl<const X: char, I> TeX for Var<X, I>

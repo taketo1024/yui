@@ -3,7 +3,7 @@ use crate::app::utils::*;
 use crate::app::err::*;
 use std::marker::PhantomData;
 use std::str::FromStr;
-use yui_core::tex::TeX;
+use yui_core::TeX;
 use yui_core::{EucRing, EucRingOps};
 use yui_homology::DisplaySeq;
 use yui_homology::{DisplayTable, GridTrait, SummandTrait};

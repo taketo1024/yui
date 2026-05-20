@@ -12,5 +12,9 @@ pub use int::*;
 pub use pow_mod2::*;
 pub use range::*;
 
-#[cfg(feature = "tex")]
-pub mod tex;
+cfg_if::cfg_if! {
+    if #[cfg(feature = "tex")] {
+        mod tex;
+        pub use tex::*;
+    }
+}

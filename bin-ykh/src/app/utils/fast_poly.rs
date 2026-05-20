@@ -283,7 +283,7 @@ impl<const X: char, R> EucRing for FastPoly<X, R>
 where R: Field, for<'x> &'x R: FieldOps<R> {}
 
 mod tex {
-    use yui_core::tex::TeX;
+    use yui_core::TeX;
     use super::*;
 
     impl<const X: char, R> TeX for FastPoly<X, R>
@@ -443,7 +443,7 @@ mod tests {
 
     #[test]
     fn tex() {
-        use yui_core::tex::TeX;
+        use yui_core::TeX;
         type R = i64;
         type P = FastPoly<'x', R>;
 

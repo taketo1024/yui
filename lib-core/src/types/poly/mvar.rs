@@ -297,7 +297,7 @@ where X: ToString, I: 'a + ToPrimitive, S: IntoIterator<Item = (X, &'a I)> {
 
 #[cfg(feature = "tex")]
 mod tex {
-    use crate::tex::TeX;
+    use crate::TeX;
     use super::*;
 
     impl<const X: char, I> TeX for MultiVar<X, I>

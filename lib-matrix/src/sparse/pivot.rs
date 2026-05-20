@@ -77,28 +77,30 @@ impl PivotCondition {
     }
 }
 
-pub fn find_pivots<R>(a: &SpMat<R>, config: PivotFinderConfig) -> Vec<(usize, usize)>
+/// Searches for pivots in `a` and returns row/column permutations `(p, q)`
+/// that bring the chosen pivots to the leading r×r block of `p·a·q⁻¹`, along
+/// with the rank `r` (number of pivots found).
+pub fn find_pivots<R>(a: &SpMat<R>, config: PivotFinderConfig) -> (Perm, Perm, usize)
 where R: Ring, for<'x> &'x R: RingOps<R> {
+    let (m, n) = a.shape();
+
     if a.is_zero() {
-        return vec![];
+        return (Perm::id(m), Perm::id(n), 0);
     }
 
     debug!("find {} pivots: {:?}", config.piv_type.str(), a.shape());
 
     let mut pf = PivotFinder::new(a, &config);
     pf.find_pivots();
+    let pivs = pf.result();
 
-    debug!("  found {} {} pivots", pf.result().len(), config.piv_type.str());
+    debug!("  found {} {} pivots", pivs.len(), config.piv_type.str());
 
-    pf.result()
-}
-
-pub fn perms_by_pivots<R>(a: &SpMat<R>, pivs: &[(usize, usize)]) -> (PermOwned, PermOwned)
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    let (m, n) = a.shape();
     let p = Perm::pull_and_fill(m, pivs.iter().map(|(i, _)| *i));
     let q = Perm::pull_and_fill(n, pivs.iter().map(|(_, j)| *j));
-    (PermOwned::new(p.raw().to_vec()), PermOwned::new(q.raw().to_vec()))
+    let r = pivs.len();
+    
+    (p, q, r)
 }
 
 // Applies permutations (p, q) to `a` and partitions the result into four blocks at row/col r:
@@ -669,7 +671,6 @@ impl RowWorker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Perm;
     use num_traits::{Zero, One};
  
     #[test]
@@ -872,33 +873,40 @@ mod tests {
     }
 
     #[test]
-    fn zero() { 
+    fn zero() {
         let a = SpMat::from_dense_data((1, 1), [0]);
-        let pivs = find_pivots(&a, Default::default());
-        let r = pivs.len();
+        let (p, q, r) = find_pivots(&a, Default::default());
         assert_eq!(r, 0);
+        assert_eq!(p.dim(), 1);
+        assert_eq!(q.dim(), 1);
+        assert!(p.is_id());
+        assert!(q.is_id());
     }
 
     #[test]
-    fn id_1() { 
+    fn id_1() {
         let a = SpMat::from_dense_data((1, 1), [1]);
-        let pivs = find_pivots(&a, Default::default());
-        let r = pivs.len();
+        let (p, q, r) = find_pivots(&a, Default::default());
         assert_eq!(r, 1);
+        assert_eq!(p.dim(), 1);
+        assert_eq!(q.dim(), 1);
+        assert!(p.is_id());
+        assert!(q.is_id());
     }
 
     #[test]
-    fn id_2() { 
+    fn id_2() {
         let a = SpMat::from_dense_data((2, 2), [
             1, 0, 0, 1
         ]);
-        let pivs = find_pivots(&a, Default::default());
-        let r = pivs.len();
+        let (p, q, r) = find_pivots(&a, Default::default());
         assert_eq!(r, 2);
+        assert_eq!(p.dim(), 2);
+        assert_eq!(q.dim(), 2);
     }
 
     #[test]
-    fn result() { 
+    fn result() {
         let a = SpMat::from_dense_data((6, 9), [
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
@@ -907,12 +915,12 @@ mod tests {
             0, 0, 1, 0, 0, 0, 0, 0, 0,
             0, 1, 0, 0, 0, 1, 0, 1, 0
         ]);
-        let pivs = find_pivots(&a, Default::default());
-        let r = pivs.len();
+        let (p, q, r) = find_pivots(&a, Default::default());
         assert_eq!(r, 5);
-        
-        let (p, q) = perms_by_pivots(&a, &pivs);
-        let b = a.permute(&Perm::new(p.vec()), &Perm::new(q.vec())).into_dense();
+        assert_eq!(p.dim(), 6);
+        assert_eq!(q.dim(), 9);
+
+        let b = a.permute(&p, &q).into_dense();
 
         assert!((0..r).all(|i| b[(i, i)].is_one()));
         assert!((0..r).all(|j| {
@@ -921,7 +929,7 @@ mod tests {
     }
 
     #[test]
-    fn result_cols() { 
+    fn result_cols() {
         let a = SpMat::from_dense_data((6, 9), [
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
@@ -931,12 +939,12 @@ mod tests {
             0, 1, 0, 0, 0, 1, 0, 1, 0
         ]);
         let config = PivotFinderConfig { piv_type: PivotType::Cols, ..Default::default() };
-        let pivs = find_pivots(&a, config);
-        let r = pivs.len();
+        let (p, q, r) = find_pivots(&a, config);
         assert_eq!(r, 6);
-        
-        let (p, q) = perms_by_pivots(&a, &pivs);
-        let b = a.permute(&Perm::new(p.vec()), &Perm::new(q.vec())).into_dense();
+        assert_eq!(p.dim(), 6);
+        assert_eq!(q.dim(), 9);
+
+        let b = a.permute(&p, &q).into_dense();
 
         assert!((0..r).all(|i| b[(i, i)].is_one()));
         assert!((0..r).all(|i| {
@@ -950,12 +958,12 @@ mod tests {
         let shape = (60, 80);
         let a = SpMat::<i32>::rand(shape, d);
 
-        let pivs = find_pivots(&a, Default::default());
-        let r = pivs.len();
+        let (p, q, r) = find_pivots(&a, Default::default());
         assert!(r > 10);
-        
-        let (p, q) = perms_by_pivots(&a, &pivs);
-        let b = a.permute(&Perm::new(p.vec()), &Perm::new(q.vec())).into_dense();
+        assert_eq!(p.dim(), shape.0);
+        assert_eq!(q.dim(), shape.1);
+
+        let b = a.permute(&p, &q).into_dense();
 
         assert!((0..r).all(|i| b[(i, i)].is_one()));
         assert!((0..r).all(|j| {
@@ -975,12 +983,12 @@ mod tests {
             0, 1, 0, 0, 0, 1, 0, 1, 0
         ]);
         let config = PivotFinderConfig { max_pivots: 3, ..Default::default() };
-        let pivs = find_pivots(&a, config);
-        assert!(pivs.len() <= 3);
+        let (p, q, r) = find_pivots(&a, config);
+        assert!(r <= 3);
+        assert_eq!(p.dim(), 6);
+        assert_eq!(q.dim(), 9);
 
-        let (p, q) = perms_by_pivots(&a, &pivs);
-        let b = a.permute(&Perm::new(p.vec()), &Perm::new(q.vec())).into_dense();
-        let r = pivs.len();
+        let b = a.permute(&p, &q).into_dense();
         assert!((0..r).all(|i| b[(i, i)].is_one()));
         assert!((0..r).all(|j| {
             (j+1..r).all(|i| b[(i, j)].is_zero())

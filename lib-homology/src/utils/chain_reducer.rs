@@ -4,7 +4,8 @@ use log::*;
 use sprs::PermOwned;
 
 use yui_matrix::sparse::*;
-use yui_matrix::sparse::pivot::{PivotCondition, PivotFinderConfig, PivotType, find_pivots, perms_by_pivots};
+use yui_matrix::Perm;
+use yui_matrix::sparse::pivot::{PivotCondition, PivotFinderConfig, PivotType, find_pivots};
 use yui_matrix::sparse::schur::Schur;
 use yui_core::{Ring, RingOps};
 
@@ -255,13 +256,12 @@ where
     }
 }
 
-fn pivots<R>(a: &SpMat<R>, piv_type: PivotType, piv_cond: PivotCondition) -> (PermOwned, PermOwned, usize) 
+fn pivots<R>(a: &SpMat<R>, piv_type: PivotType, piv_cond: PivotCondition) -> (PermOwned, PermOwned, usize)
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let config = PivotFinderConfig { piv_type, piv_cond, ..Default::default() };
-    let pivs = find_pivots(a, config);
-    let (p, q) = perms_by_pivots(a, &pivs);
-    let r = pivs.len();
-    (p, q, r)
+    let (p, q, r) = find_pivots(a, config);
+    let to_owned = |p: &Perm| PermOwned::new((0..p.dim()).map(|i| p.at(i)).collect());
+    (to_owned(&p), to_owned(&q), r)
 }
 
 fn reduce_mat_rows<R>(a: &SpMat<R>, p: &PermOwned, r: usize) -> SpMat<R> 

@@ -15,8 +15,10 @@ cfg_if::cfg_if! {
 
 const LOG_THRESHOLD: usize = 10_000;
 
+/// Selector for whether a matrix is upper- or lower-triangular, used by
+/// the triangular solvers and Schur reduction.
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum TriangularType { 
+pub enum TriangularType {
     Upper, Lower
 }
 

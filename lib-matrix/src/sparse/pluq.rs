@@ -76,9 +76,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 /// Splits the permuted matrix into four blocks `[[a0|a1],[a2|a3]]` at row/col
 /// `r`, then asks Schur to fuse the triangular solve with the Schur update.
 ///
-/// Rows: top half [a0|a1] is `u` (upper triangular on the left). Schur produces
+/// Rows: top half `[a0|a1]` is `u` (upper triangular on the left). Schur produces
 ///   `l1 = a2·a0⁻¹` and `s = a3 - l1·a1`; final `l = [I_r; l1]`.
-/// Cols: left half [a0;a2] is `l` (lower triangular on top). Schur produces
+/// Cols: left half `[a0;a2]` is `l` (lower triangular on top). Schur produces
 ///   `u1 = a0⁻¹·a1` and `s = a3 - a2·u1`; final `u = [I_r | u1]`.
 pub fn pre_pluq<R>(a: &SpMat<R>, config: PivotFinderConfig) -> SpPluq<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {

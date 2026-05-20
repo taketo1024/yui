@@ -10,20 +10,24 @@ use crate::sparse::pivot::PivotType;
 use super::*;
 use super::triang::{TriangularType, solve_triangular_left, solve_triangular_with};
 
-//                [a  b]
-//                [c  d]
-//            X ----------> Y
-//  [1 -a⁻¹b] ^             | [1      ]
-//  [     1 ] |   [a   ]    | [-ca⁻¹ 1]
-//            |   [   s]    V
-//            X ----------> Y
-//       [0]  ^             | 
-//       [1]  |             | [0  1]
-//            |      s      V
-//            X'----------> Y'
-//
-// s = d - c a⁻¹ b
-
+/// Schur complement `s = d - c·a⁻¹·b` of a 2×2 block matrix
+/// `[[a, b], [c, d]]` whose top-left block `a` is triangular (and
+/// invertible). Optionally retains the source / target elimination
+/// multipliers `a⁻¹·b` and `c·a⁻¹` for use as basis-change transforms.
+///
+/// ```text
+///                [a  b]
+///                [c  d]
+///            X ──────────→ Y
+///  [1 -a⁻¹b] ↑             │ [1      ]
+///  [     1 ] │   [a   ]    │ [-ca⁻¹ 1]
+///            │   [   s]    ↓
+///            X ──────────→ Y
+///       [0]  ↑             │
+///       [1]  │             │ [0  1]
+///            │      s      ↓
+///            X'──────────→ Y'
+/// ```
 pub struct Schur<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     s: SpMat<R>,

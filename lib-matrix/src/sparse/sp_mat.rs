@@ -12,6 +12,15 @@ use crate::dense::*;
 use super::sp_vec::SpVec;
 use super::triang::TriangularType;
 
+/// Sparse matrix in compressed sparse column (CSC) format, backed by
+/// `nalgebra_sparse::CscMatrix`.
+///
+/// The fundamental matrix type for all differential maps in the homology
+/// pipeline. Generic over the element ring `R`; bounds are applied per-method.
+///
+/// Note: the underlying CSC may carry explicit zero entries (e.g. after an
+/// in-place subtraction). [`iter`](Self::iter) walks all stored triplets;
+/// [`iter_nz`](Self::iter_nz) filters them.
 #[derive(Clone)]
 pub struct SpMat<R> {
     inner: CscMatrix<R>

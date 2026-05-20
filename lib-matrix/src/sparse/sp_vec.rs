@@ -8,8 +8,10 @@ use yui_core::{Ring, RingOps, AddGrpOps,  AddGrp};
 use super::sp_mat::SpMat;
 use crate::Perm;
 
+/// Sparse column vector, stored as a single-column [`SpMat`] (CSC with
+/// `n_cols == 1`).
 #[derive(Clone, Debug)]
-pub struct SpVec<R> { 
+pub struct SpVec<R> {
     inner: CscMatrix<R> // ncols == 1
 }
 

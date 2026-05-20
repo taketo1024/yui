@@ -29,6 +29,9 @@ cfg_if::cfg_if! {
 const LOG_THRESHOLD: usize = 10_000;
 const DEFAULT_MAX_PIVOT: usize = usize::MAX;
 
+/// Whether pivots are picked along rows (each pivot eliminates a row's
+/// other entries) or along columns. Affects how the resulting `L`/`U`
+/// blocks are oriented after reduction.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum PivotType {
     Rows, Cols
@@ -43,11 +46,16 @@ impl PivotType {
     }
 }
 
+/// Which entries are eligible as pivots:
+/// - `One` — only `±1`.
+/// - `Weight(w)` — any unit whose `c_weight()` is at most `w`.
+/// - `AnyUnit` — any unit of the ring.
 #[derive(Clone, Copy, Debug)]
 pub enum PivotCondition {
     One, Weight(f64), AnyUnit
 }
 
+/// Knobs for [`find_pivots`].
 #[derive(Clone, Copy, Debug)]
 pub struct PivotFinderConfig {
     pub piv_type: PivotType,

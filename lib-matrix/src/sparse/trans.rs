@@ -2,11 +2,22 @@ use yui_core::{CloneAnd, Ring, RingOps};
 use crate::Perm;
 use crate::sparse::{SpMat, MatTrait, SpVec};
 
+/// A composable forward/backward sparse linear map, used to track basis
+/// changes through a chain of reductions.
+///
+/// Internally stores two parallel sequences `(f_0, ..., f_k)` and
+/// `(b_0, ..., b_k)` such that the forward map is `f_k * ... * f_0` and the
+/// backward map is `b_0 * ... * b_k` (so applying `forward` followed by
+/// `backward` recovers a vector in the source space).
+///
+/// New stages are appended with [`append`](Self::append) /
+/// [`append_perm`](Self::append_perm); two `Trans`es can be composed via
+/// [`merge`](Self::merge).
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Trans<R> 
+pub struct Trans<R>
 where R: Ring, for <'x> &'x R: RingOps<R> {
-    src_dim: usize, 
+    src_dim: usize,
     tgt_dim: usize,
     f_mats: Vec<SpMat<R>>,
     b_mats: Vec<SpMat<R>>,

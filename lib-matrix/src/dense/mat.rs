@@ -10,6 +10,10 @@ use yui_core::{EucRing, EucRingOps};
 use crate::dense::snf::SnfCalc;
 use crate::sparse::SpMat;
 
+/// Minimal shape-based interface shared by [`Mat`] and [`crate::sparse::SpMat`].
+///
+/// Implementors only need to provide [`shape`](Self::shape); the rest are
+/// derived defaults.
 pub trait MatTrait {
     fn shape(&self) -> (usize, usize);
     fn n_rows(&self) -> usize { self.shape().0 }
@@ -20,6 +24,10 @@ pub trait MatTrait {
     }
 }
 
+/// Dense matrix, backed by `nalgebra::DMatrix` (column-major storage).
+///
+/// Generic over the element ring `R`; bounds are applied per-method (most
+/// constructors and basic algebra only need `R: Scalar`).
 #[derive(Clone, Debug, Display, PartialEq, Eq)]
 pub struct Mat<R> {
     inner: DMatrix<R>

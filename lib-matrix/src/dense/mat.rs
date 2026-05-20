@@ -45,7 +45,7 @@ where R: Scalar {
         DMatrix::from_row_iterator(shape.0, shape.1, data).into()
     }
 
-    pub fn from_generator<F>(shape: (usize, usize), generator: F) -> Self
+    pub fn generate<F>(shape: (usize, usize), generator: F) -> Self
     where F: Fn(usize, usize) -> R { 
         let f = &generator;
         Self::from_data(shape, (0..shape.0).flat_map(|i| (0..shape.1).map(move |j| f(i, j))))
@@ -460,8 +460,8 @@ mod tests {
     }
 
     #[test]
-    fn from_generator() {
-        let a = Mat::from_generator((2, 3), |i, j| (i * 3 + j) as i32);
+    fn generate() {
+        let a = Mat::generate((2, 3), |i, j| (i * 3 + j) as i32);
         assert_eq!(a, Mat::from_data((2, 3), [0, 1, 2, 3, 4, 5]));
     }
 

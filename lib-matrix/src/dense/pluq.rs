@@ -144,7 +144,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     let rank = pivot_rows.len();
-    let u = Mat::from_generator((rank, n), |k, j| u_rows[k][j].clone());
+    let u = Mat::generate((rank, n), |k, j| u_rows[k][j].clone());
     (pivot_rows, u)
 }
 
@@ -172,7 +172,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 // Extracts L: the first `rank` columns of the reduced matrix with rows reordered by `p_inv`.
 fn build_l<R>(work: &Mat<R>, p_inv: &Perm, rank: usize) -> Mat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    Mat::from_generator((work.nrows(), rank), |i, k| work[(p_inv.at(i), k)].clone())
+    Mat::generate((work.nrows(), rank), |i, k| work[(p_inv.at(i), k)].clone())
 }
 
 // Builds the Schur complement s: (m-rank)×(n-rank), the bottom-right non-pivot block.
@@ -180,7 +180,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 fn build_s<R>(work: &Mat<R>, p_inv: &Perm, rank: usize) -> Mat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let (m, n) = work.shape();
-    Mat::from_generator((m - rank, n - rank), |i, j| work[(p_inv.at(i + rank), rank + j)].clone())
+    Mat::generate((m - rank, n - rank), |i, j| work[(p_inv.at(i + rank), rank + j)].clone())
 }
 
 #[cfg(test)]
@@ -211,7 +211,7 @@ mod tests {
 
         // p * A^T * q = l * u + rest
         let paq = apply_perms(&at, &dp.p, &dp.q);
-        let rem_full = Mat::from_generator((m, n), |i, j| {
+        let rem_full = Mat::generate((m, n), |i, j| {
             if i >= rank && j >= rank { dp.s[(i - rank, j - rank)].clone() } else { R::zero() }
         });
         assert_eq!(paq, &dp.l * &dp.u + &rem_full);
@@ -270,7 +270,7 @@ mod tests {
 
         // Main invariant: p_mat * A * q_mat = L * U + [[0,0],[0,s]]
         let paq = apply_perms(a, &pp.p, &pp.q);
-        let rem_full = Mat::from_generator((m, n), |i, j| {
+        let rem_full = Mat::generate((m, n), |i, j| {
             if i >= rank && j >= rank { pp.s[(i - rank, j - rank)].clone() } else { R::zero() }
         });
         assert_eq!(paq, &pp.l * &pp.u + &rem_full, "p*A*q should equal L*U + s");
@@ -409,7 +409,7 @@ mod tests {
             for i in 0..m { for j in 0..n { out[(pp.p.at(i), pp.q.at(j))] = a[(i, j)]; } }
             out
         };
-        let rem_full = Mat::from_generator((2, 2), |i, j| {
+        let rem_full = Mat::generate((2, 2), |i, j| {
             if i >= 1 && j >= 1 { pp.s[(i - 1, j - 1)] } else { 0 }
         });
         assert_eq!(paq, &pp.l * &pp.u + &rem_full);

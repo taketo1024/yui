@@ -52,11 +52,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     let (pivot_rows, u) = reduce(&mut work, &mut col_of);
     let rank = pivot_rows.len();
-    let q = col_perm(&col_of, n);
-    let rows = row_order(&pivot_rows, m);
-    let p = row_perm(&rows, m);
-    let l = build_l(&work, &rows, rank);
-    let s = build_s(&work, &rows, rank);
+    let p = Perm::pull_and_fill(m, pivot_rows.iter().copied());
+    let q = Perm::from_indices(col_of).inv();
+    let p_inv = p.inv();
+    let l = build_l(&work, &p_inv, rank);
+    let s = build_s(&work, &p_inv, rank);
 
     Pluq { p, q, l, u, s }
 }
@@ -169,39 +169,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         .for_each(|j| work.add_col_to(c, j, &-u_row[j].clone()));
 }
 
-// Builds the row permutation: p.at(orig) = current position of that row.
-fn row_perm(row_of: &[usize], m: usize) -> Perm {
-    Perm::new(row_of.iter().enumerate().fold(vec![0usize; m], |mut v, (pos, &orig)| {
-        v[orig] = pos; v
-    }))
-}
-
-// Returns the full row reordering: pivot rows first, non-pivot rows last.
-fn row_order(pivot_rows: &[usize], m: usize) -> Vec<usize> {
-    use std::collections::HashSet;
-    let pivot_set: HashSet<usize> = pivot_rows.iter().cloned().collect();
-    pivot_rows.iter().cloned().chain((0..m).filter(|i| !pivot_set.contains(i))).collect()
-}
-
-// Builds the column permutation from the full ordered column list.
-fn col_perm(cols: &[usize], n: usize) -> Perm {
-    Perm::new(cols.iter().enumerate().fold(vec![0usize; n], |mut v, (new_j, &old_j)| {
-        v[old_j] = new_j; v
-    }))
-}
-
-// Extracts L: the first `rank` columns of the reduced matrix with rows reordered by `rows`.
-fn build_l<R>(work: &Mat<R>, rows: &[usize], rank: usize) -> Mat<R>
+// Extracts L: the first `rank` columns of the reduced matrix with rows reordered by `p_inv`.
+fn build_l<R>(work: &Mat<R>, p_inv: &Perm, rank: usize) -> Mat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    Mat::from_generator((work.nrows(), rank), |i, k| work[(rows[i], k)].clone())
+    Mat::from_generator((work.nrows(), rank), |i, k| work[(p_inv.at(i), k)].clone())
 }
 
 // Builds the Schur complement s: (m-rank)×(n-rank), the bottom-right non-pivot block.
 // Satisfies p*A*q = L*U + [[0,0],[0,s]].
-fn build_s<R>(work: &Mat<R>, rows: &[usize], rank: usize) -> Mat<R>
+fn build_s<R>(work: &Mat<R>, p_inv: &Perm, rank: usize) -> Mat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let (m, n) = work.shape();
-    Mat::from_generator((m - rank, n - rank), |i, j| work[(rows[i + rank], rank + j)].clone())
+    Mat::from_generator((m - rank, n - rank), |i, j| work[(p_inv.at(i + rank), rank + j)].clone())
 }
 
 #[cfg(test)]

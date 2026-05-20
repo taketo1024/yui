@@ -1,5 +1,9 @@
 # yui-core
 
+[![crates.io](https://img.shields.io/crates/v/yui-core.svg)](https://crates.io/crates/yui-core)
+[![docs.rs](https://docs.rs/yui-core/badge.svg)](https://docs.rs/yui-core)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 The foundational crate of the [`yui`](https://github.com/taketo1024/yui) workspace: algebraic trait hierarchy, concrete numeric types, polynomials, linear combinations, and supporting algorithms / extension traits.
 
 ## Layout

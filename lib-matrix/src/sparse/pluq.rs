@@ -15,7 +15,6 @@ use super::SpVec;
 use super::pivot::{PivotFinderConfig, PivotType, find_pivots, perms_by_pivots};
 use super::schur::Schur;
 use super::triang::{TriangularType, solve_triangular_vec};
-use super::util::perm_for_indices;
 
 /// Result of a sparse PLUQ decomposition.
 ///
@@ -184,8 +183,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let col_idx: Vec<usize> = s.iter_nz().map(|(_, j, _)| j).collect::<BTreeSet<_>>().into_iter().collect();
     let (m0, n0) = (row_idx.len(), col_idx.len());
 
-    let row_perm = perm_for_indices(s.nrows(), row_idx.iter());
-    let col_perm = perm_for_indices(s.ncols(), col_idx.iter());
+    let row_perm = Perm::pull_and_fill(s.nrows(), row_idx.iter().copied());
+    let col_perm = Perm::pull_and_fill(s.ncols(), col_idx.iter().copied());
 
     let shape = if transpose { (n0, m0) } else { (m0, n0) };
     let mut mat = Mat::zero(shape);
@@ -535,7 +534,7 @@ fn merge_perm(perm1: &PermOwned, perm2: &PermOwned) -> PermOwned {
 // full index space.  compact_idx[k] maps to compact_perm.at(k) (within [0..mr]);
 // all other indices map to consecutive positions starting at mr (in sorted order).
 fn extend_perm(compact_perm: &PermOwned, compact_idx: &[usize], full_n: usize) -> PermOwned {
-    let front = perm_for_indices(full_n, compact_idx.iter());
+    let front = Perm::pull_and_fill(full_n, compact_idx.iter().copied());
     let mr = compact_idx.len();
     PermOwned::new((0..full_n).map(|i| {
         let k = front.at(i);
@@ -1188,11 +1187,11 @@ mod tests {
     fn test_extend_perm_identity() {
         use sprs::PermOwned;
         // compact_idx = [0, 2, 5] with identity compact_perm.
-        // extend_perm should equal perm_for_indices(7, [0,2,5]).
+        // extend_perm should equal Perm::pull_and_fill(7, [0,2,5]).
         let cp = PermOwned::identity(3);
         let idx = vec![0usize, 2, 5];
         let p = extend_perm(&cp, &idx, 7);
-        let expected = perm_for_indices(7, idx.iter());
+        let expected = Perm::pull_and_fill(7, idx.iter().copied());
         for i in 0..7 {
             assert_eq!(p.at(i), expected.at(i), "mismatch at i={i}");
         }

@@ -15,8 +15,8 @@ use sprs::PermOwned;
 
 use yui_core::{Ring, RingOps};
 use yui_core::algo::TopSort;
+use crate::Perm;
 use super::*;
-use super::util::perm_for_indices;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "multithread")] {
@@ -96,10 +96,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 pub fn perms_by_pivots<R>(a: &SpMat<R>, pivs: &[(usize, usize)]) -> (PermOwned, PermOwned)
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let (m, n) = a.shape();
-    (
-        perm_for_indices(m, pivs.iter().map(|(i, _)| i)), 
-        perm_for_indices(n, pivs.iter().map(|(_, j)| j))
-    )
+    let p = Perm::pull_and_fill(m, pivs.iter().map(|(i, _)| *i));
+    let q = Perm::pull_and_fill(n, pivs.iter().map(|(_, j)| *j));
+    (PermOwned::new(p.raw().to_vec()), PermOwned::new(q.raw().to_vec()))
 }
 
 // Applies permutations (p, q) to `a` and partitions the result into four blocks at row/col r:

@@ -58,6 +58,31 @@ impl Perm {
     pub fn raw(&self) -> &[usize] {
         &self.data
     }
+
+    /// Permutation `p` of `0..n` that sends each index in `prefix` to a
+    /// position `0, 1, 2, ...` (in the order given), with the remaining
+    /// indices filling positions in sorted order.
+    pub fn pull_and_fill<I>(n: usize, prefix: I) -> Self
+    where I: IntoIterator<Item = usize> {
+        let mut data = vec![0usize; n];
+        let mut taken = vec![false; n];
+        let mut k = 0;
+        for i in prefix {
+            debug_assert!(i < n, "index {i} out of range 0..{n}");
+            debug_assert!(!taken[i], "duplicate index {i} in prefix");
+            data[i] = k;
+            taken[i] = true;
+            k += 1;
+        }
+        let mut pos = k;
+        for j in 0..n {
+            if !taken[j] {
+                data[j] = pos;
+                pos += 1;
+            }
+        }
+        Self::new(data)
+    }
 }
 
 /// Composition `(p * q)(i) = p(q(i))` (right-to-left, math convention).
@@ -204,6 +229,35 @@ mod tests {
         let p = Perm::id(3);
         let q = Perm::id(4);
         let _ = &p * &q;
+    }
+
+    // --- auto_ops-derived variants ---
+
+    // --- pull_and_fill ---
+
+    #[test]
+    fn pull_and_fill_basic() {
+        // n=5, prefix=[3,1] → sends 3→0, 1→1, others fill sorted: 0→2, 2→3, 4→4.
+        let p = Perm::pull_and_fill(5, [3, 1]);
+        assert_eq!(p.raw(), &[2, 1, 3, 0, 4]);
+        assert_eq!(p.at(3), 0);
+        assert_eq!(p.at(1), 1);
+    }
+
+    #[test]
+    fn pull_and_fill_empty_prefix() {
+        let p = Perm::pull_and_fill(4, std::iter::empty());
+        assert!(p.is_id());
+    }
+
+    #[test]
+    fn pull_and_fill_full_prefix() {
+        // Specifying every index reduces to: p(prefix[k]) = k.
+        let p = Perm::pull_and_fill(4, [2, 0, 3, 1]);
+        assert_eq!(p.at(2), 0);
+        assert_eq!(p.at(0), 1);
+        assert_eq!(p.at(3), 2);
+        assert_eq!(p.at(1), 3);
     }
 
     // --- auto_ops-derived variants ---

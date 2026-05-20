@@ -4,7 +4,7 @@ use delegate::delegate;
 
 use itertools::Itertools;
 use yui_core::lc::Lc;
-use yui_core::{EucRing, EucRingOps, Ring, RingOps};
+use yui_core::{EucRing, EucRingOps, IteratorExt, Ring, RingOps};
 use yui_homology::{ChainComplex, ChainComplexTrait, DisplaySeq, DisplayTable, Grid1, Grid2, GridIter, GridTrait, Summand, SummandTrait};
 use yui_link::InvLink;
 use yui_matrix::sparse::SpMat;
@@ -12,7 +12,7 @@ use yui_matrix::sparse::SpMat;
 use crate::kh::{KhChain, KhChainExt, KhComplex, KhState};
 use crate::khi::KhIHomology;
 use crate::khi::KhIState;
-use crate::misc::{make_gen_grid, range_of};
+use crate::misc::make_gen_grid;
 
 pub type KhIChain<R> = Lc<KhIState, R>;
 
@@ -129,13 +129,13 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     }
 
     pub fn h_range(&self) -> RangeInclusive<isize> {
-        range_of(self.support().copied())
+        self.support().copied().range().unwrap_or(0..=-1)
     }
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
-        range_of(self.support().flat_map(|&i|
+        self.support().flat_map(|&i|
             self[i].raw_generators().iter().map(|x| x.q_deg())
-        ))
+        ).range().unwrap_or(0..=-1)
     }
 
     pub fn canon_cycles(&self) -> &[KhIChain<R>] { 

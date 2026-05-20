@@ -2,7 +2,7 @@ use std::ops::{RangeInclusive, Index};
 use std::sync::OnceLock;
 
 use delegate::delegate;
-use yui_core::{Ring, RingOps, EucRing, EucRingOps};
+use yui_core::{IteratorExt, Ring, RingOps, EucRing, EucRingOps};
 use yui_link::Link;
 use yui_homology::{ChainComplex, ChainComplexTrait, DisplaySeq, DisplayTable, Grid2, GridIter, GridTrait, Summand, SummandTrait};
 use yui_matrix::sparse::SpMat;
@@ -10,7 +10,7 @@ use yui_matrix::sparse::SpMat;
 use crate::kh::chain::KhChain;
 use crate::kh::internal::v1::cube::KhCube;
 use crate::kh::{KhState, KhHomology};
-use crate::misc::{make_gen_grid, range_of};
+use crate::misc::make_gen_grid;
 
 use super::KhAlg;
 
@@ -83,13 +83,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn h_range(&self) -> RangeInclusive<isize> {
-        range_of(self.support().copied())
+        self.support().copied().range().unwrap_or(0..=-1)
     }
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
-        range_of(self.support().flat_map(|&i|
+        self.support().flat_map(|&i|
             self[i].raw_generators().iter().map(|x| x.q_deg())
-        ))
+        ).range().unwrap_or(0..=-1)
     }
 
     pub fn canon_cycles(&self) -> &Vec<KhChain<R>> { 

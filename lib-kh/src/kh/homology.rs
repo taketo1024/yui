@@ -3,11 +3,11 @@ use std::sync::OnceLock;
 use delegate::delegate;
 
 use yui_homology::{DisplaySeq, DisplayTable, Grid2, GridIter, GridTrait, Homology, Summand, SummandTrait};
-use yui_core::{EucRing, EucRingOps};
+use yui_core::{EucRing, EucRingOps, IteratorExt};
 use yui_link::Link;
 
 use crate::kh::{KhChainExt, KhState};
-use crate::misc::{make_gen_grid, range_of};
+use crate::misc::make_gen_grid;
 
 use super::{KhAlg, KhChain, KhComplex};
 
@@ -51,21 +51,21 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     pub fn h_range(&self) -> RangeInclusive<isize> {
-        range_of(self.support().filter(|&&i|
+        self.support().filter(|&&i|
             !self[i].is_zero()
-        ).copied())
+        ).copied().range().unwrap_or(0..=-1)
     }
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
-        range_of(self.support().flat_map(|&i|
+        self.support().flat_map(|&i|
             self[i].generators().map(|z| z.q_deg())
-        ))
+        ).range().unwrap_or(0..=-1)
     }
 
     pub fn delta_range(&self) -> RangeInclusive<isize> {
-        range_of(self.support().flat_map(|&i|
+        self.support().flat_map(|&i|
             self[i].generators().map(|z| 2 * z.h_deg() - z.q_deg())
-        ))
+        ).range().unwrap_or(0..=-1)
     }
 
     pub fn canon_cycles(&self) -> &Vec<KhChain<R>> { 

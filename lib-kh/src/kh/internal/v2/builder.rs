@@ -7,7 +7,8 @@ use itertools::Itertools;
 use log::{debug, info};
 use num_traits::Zero;
 use yui_core::bitseq::Bit;
-use yui_core::{hashmap, Ring, RingOps};
+use maplit::hashmap;
+use yui_core::{Ring, RingOps};
 use yui_homology::DisplaySeq;
 use yui_link::{Node, Edge, Link};
 

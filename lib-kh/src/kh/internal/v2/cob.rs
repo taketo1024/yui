@@ -972,7 +972,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 mod tests {
     use num_traits::Zero;
-    use yui_core::hashmap;
+    use maplit::hashmap;
     use yui_core::poly::Poly2;
 
     use super::CobComp;

@@ -25,6 +25,7 @@ indexmap = "2.14.0"
 is-even = "1.0.0"
 itertools = "0.14.0"
 log = "0.4.29"
+maplit = "1.0.2"
 num-bigint = "0.4.6"
 num-integer = { version = "0.1.46", features = ["i128"] }
 num-traits = "0.2.19"

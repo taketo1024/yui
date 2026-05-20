@@ -428,8 +428,8 @@ where
 #[cfg(test)]
 mod tests {
     use num_traits::Zero;
+    use maplit::hashmap;
     use crate::{MathType, AddMon};
-    use crate::util::macros::hashmap;
     use crate::lc::{AsKey, Lc};
  
     type X = AsKey<i32>;

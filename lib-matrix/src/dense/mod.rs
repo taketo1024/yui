@@ -1,7 +1,5 @@
-pub use crate::MatTrait;
-
 mod mat;
-pub use mat::Mat;
+pub use mat::{Mat, MatTrait};
 
 pub mod pluq;
 pub mod snf;

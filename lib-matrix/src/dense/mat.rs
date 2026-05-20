@@ -8,8 +8,17 @@ use auto_impl_ops::auto_ops;
 use num_traits::{Zero, One};
 use yui_core::{EucRing, EucRingOps};
 use crate::dense::snf::SnfCalc;
-use crate::MatTrait;
 use crate::sparse::SpMat;
+
+pub trait MatTrait {
+    fn shape(&self) -> (usize, usize);
+    fn n_rows(&self) -> usize { self.shape().0 }
+    fn n_cols(&self) -> usize { self.shape().1 }
+    fn is_square(&self) -> bool {
+        let (m, n) = self.shape();
+        m == n
+    }
+}
 
 #[derive(Clone, Debug, Display, PartialEq, Eq)]
 pub struct Mat<R> {

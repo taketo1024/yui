@@ -801,7 +801,24 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn block_diag() { 
+    fn diag() {
+        let d = SpMat::diag((3, 4), [1, 2, 3]);
+        assert_eq!(d, SpMat::from_row_major((3, 4), [
+            1, 0, 0, 0,
+            0, 2, 0, 0,
+            0, 0, 3, 0,
+        ]));
+        assert!(d.is_diag());
+    }
+
+    #[test]
+    fn is_diag_false() {
+        let a = SpMat::from_row_major((2, 2), [1, 2, 0, 3]);
+        assert!(!a.is_diag());
+    }
+
+    #[test]
+    fn block_diag() {
         let a = SpMat::from_row_major((2, 2), 1..=4);
         let b = SpMat::from_row_major((1, 3), 5..=7);
         let c = SpMat::from_row_major((2, 1), 8..=9);

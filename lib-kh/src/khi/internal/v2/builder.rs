@@ -7,7 +7,8 @@ use itertools::Itertools;
 use log::info;
 use rayon::prelude::*;
 use yui_core::bitseq::{Bit, BitSeq};
-use yui_core::{KeyedUnionFind, Ring, RingOps};
+use yui_core::algo::KeyedUnionFind;
+use yui_core::{Ring, RingOps};
 use yui_homology::DisplaySeq;
 use yui_link::{Node, Edge, InvLink};
 

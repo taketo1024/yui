@@ -5,7 +5,7 @@ use itertools::Itertools;
 use nalgebra::{Scalar, ClosedAddAssign};
 use num_traits::Zero;
 use sprs::PermOwned;
-use yui_core::UnionFind;
+use yui_core::algo::UnionFind;
 
 cfg_if::cfg_if! { if #[cfg(feature = "multithread")] {
     use std::sync::Mutex;

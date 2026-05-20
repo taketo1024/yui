@@ -36,9 +36,7 @@ src/
 
 ### Dense
 
-- **`Mat<R>`** — dense matrix. Constructors: `zero`, `id`, `from_row_major`, `generate`, `diag`, `scalar`. Algorithms: `rank`, `transpose`, `map`, plus the entry-level mutators `swap_rows`, `add_row_to`, `left_elementary`, etc.
-
-- **`Pluq<R>`** — result of a dense PLUQ decomposition satisfying `p·A·q = L·U + s` where `s` is the Schur complement (zero over a field).
+- **`Mat<R>`** — dense matrix. Constructors: `zero`, `id`, `from_row_major`, `generate`, `diag`, `scalar`. Operations: `transpose`, `map`, plus the entry-level mutators `swap_rows`, `add_row_to`, `left_elementary`, etc.
 
 ### Sparse
 
@@ -48,9 +46,19 @@ src/
 
 - **`Trans<R>`** — composable forward/backward transformation (a sequence of sparse matrices), used to track basis changes through reductions.
 
-- **`SpPluq<R>`** — result of a sparse PLUQ decomposition (same equation as `Pluq<R>`, sparse blocks).
+## Algorithms
 
-- **`Schur<R>`** — Schur-complement reduction with optional source / target trans-tracking.
+These are tailored to the needs of the homology-computation pipeline rather than being a general-purpose linear-algebra library; coverage is intentionally narrow.
+
+| Algorithm | Dense | Sparse |
+|---|---|---|
+| Heuristic pivot finder (Bouillaguet–Delaplace–Voge) | — | `sparse::pivot::find_pivots` |
+| Schur-complement reduction | — | `sparse::schur::Schur` |
+| Triangular solve | (used internally by dense PLUQ) | `sparse::triang` |
+| PLUQ decomposition over a ring | `dense::pluq::pluq` | `sparse::pluq::pluq` / `pre_pluq` |
+| Linear solve over a field (`A·x = y`) | `dense::pluq::solve_pluq` | `sparse::pluq::solve_pluq` (+ incremental `solve_pluq_incr`) |
+| Smith normal form | `dense::snf` | — |
+| LLL lattice reduction / Hermite normal form | `dense::lll::{lll, lll_hnf}` | — |
 
 ## Conventions
 

@@ -81,7 +81,7 @@ where I: ToPrimitive {
         ('\u{208B}'.into(), -i as usize)
     };
 
-    i.into_digits().into_iter().fold(init, |mut res, d| {
+    i.into_digits().fold(init, |mut res, d| {
         let c = char::from_u32( ('\u{2080}' as u32) + (d as u32) ).unwrap();
         res.push(c);
         res
@@ -102,7 +102,7 @@ where I: ToPrimitive {
         ('\u{207B}'.into(), -i as usize)
     };
 
-    i.into_digits().into_iter().fold(init, |mut res, d| {
+    i.into_digits().fold(init, |mut res, d| {
         let c = match d { 
             1 => '\u{00B9}',
             2 => '\u{00B2}',

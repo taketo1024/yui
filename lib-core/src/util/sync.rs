@@ -1,22 +1,20 @@
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
-pub struct SyncCounter { 
-    count: Mutex<usize>
+/// A thread-safe `usize` counter, backed by [`AtomicUsize`].
+pub struct SyncCounter {
+    count: AtomicUsize,
 }
 
-impl SyncCounter { 
-    pub fn new() -> Self { 
-        let count = Mutex::new(0);
-        Self { count }
+impl SyncCounter {
+    pub fn new() -> Self {
+        Self { count: AtomicUsize::new(0) }
     }
 
-    pub fn incr(&self) -> usize { 
-        let mut c = self.count.lock().unwrap();
-        *c += 1;
-        *c
+    pub fn incr(&self) -> usize {
+        self.count.fetch_add(1, Ordering::Relaxed) + 1
     }
 
-    pub fn count(&self) -> usize { 
-        *self.count.lock().unwrap()
+    pub fn count(&self) -> usize {
+        self.count.load(Ordering::Relaxed)
     }
 }

@@ -256,6 +256,39 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         self.permute(&id, q)
     }
 
+    /// Applies the permutations `(p, q)` to `self` and partitions the result
+    /// into four blocks at row/col `r`:
+    ///
+    /// ```text
+    ///   paq = [[a0 | a1],   a0: r×r,     a1: r×(n-r)
+    ///          [a2 | a3]]   a2: (m-r)×r, a3: (m-r)×(n-r)
+    /// ```
+    pub fn permute_and_split(&self, p: &Perm, q: &Perm, r: usize) -> [SpMat<R>; 4] {
+        use std::cmp::Ordering::Less;
+
+        let (m, n) = self.shape();
+        assert!(r <= m && r <= n);
+
+        let [mut a0, mut a1, mut a2, mut a3] = [vec![], vec![], vec![], vec![]];
+
+        for (i, j, v) in self.iter() {
+            let (pi, qj) = (p.at(i), q.at(j));
+            let v = v.clone();
+            match (pi.cmp(&r), qj.cmp(&r)) {
+                (Less, Less) => a0.push((pi,     qj,     v)),
+                (Less, _   ) => a1.push((pi,     qj - r, v)),
+                (_   , Less) => a2.push((pi - r, qj,     v)),
+                (_   , _   ) => a3.push((pi - r, qj - r, v)),
+            }
+        }
+        [
+            SpMat::from_entries((r,     r    ), a0),
+            SpMat::from_entries((r,     n - r), a1),
+            SpMat::from_entries((m - r, r    ), a2),
+            SpMat::from_entries((m - r, n - r), a3),
+        ]
+    }
+
     pub fn submat(&self, rows: Range<usize>, cols: Range<usize>) -> SpMat<R> { 
         let (i0, i1) = (rows.start, rows.end);
         let (j0, j1) = (cols.start, cols.end);
@@ -647,7 +680,7 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn permute() { 
+    fn permute() {
         let p = Perm::new(vec![1,2,3,0]);
         let q = Perm::new(vec![3,0,2,1]);
         let a = SpMat::from_dense_data((4,4), 0..16);
@@ -658,6 +691,43 @@ pub(super) mod tests {
              5,  7,  6,  4,
              9, 11, 10,  8,
         ]));
+    }
+
+    #[test]
+    fn permute_and_split_identity() {
+        // a = [[1,2],[3,4]], r=1, identity perms → paq = a, partition at row/col 1:
+        // a0=[[1]], a1=[[2]], a2=[[3]], a3=[[4]]
+        let a = SpMat::from_dense_data((2, 2), [1, 2, 3, 4]);
+        let id = Perm::id(2);
+        let [a0, a1, a2, a3] = a.permute_and_split(&id, &id, 1);
+        assert_eq!(a0, SpMat::from_dense_data((1, 1), [1]));
+        assert_eq!(a1, SpMat::from_dense_data((1, 1), [2]));
+        assert_eq!(a2, SpMat::from_dense_data((1, 1), [3]));
+        assert_eq!(a3, SpMat::from_dense_data((1, 1), [4]));
+    }
+
+    #[test]
+    fn permute_and_split_with_perm() {
+        // a (3×3) with row perm p = [2,0,1] (sends row 0→2, 1→0, 2→1)
+        // and col perm q = [1,2,0] (sends col 0→1, 1→2, 2→0).
+        // PAQ⁻¹[p(i), q(j)] = A[i, j]. Splitting at r=2 yields the 2×2 top-left,
+        // 2×1 top-right, 1×2 bottom-left, 1×1 bottom-right blocks.
+        let a = SpMat::from_dense_data((3, 3), [
+            1, 2, 3,
+            4, 5, 6,
+            7, 8, 9,
+        ]);
+        let p = Perm::new(vec![2, 0, 1]);
+        let q = Perm::new(vec![1, 2, 0]);
+        let [a0, a1, a2, a3] = a.permute_and_split(&p, &q, 2);
+        // PAQ⁻¹ rows in image order = [row 1, row 2, row 0], cols = [col 2, col 0, col 1]:
+        //   [[6, 4, 5],
+        //    [9, 7, 8],
+        //    [3, 1, 2]]
+        assert_eq!(a0, SpMat::from_dense_data((2, 2), [6, 4, 9, 7]));
+        assert_eq!(a1, SpMat::from_dense_data((2, 1), [5, 8]));
+        assert_eq!(a2, SpMat::from_dense_data((1, 2), [3, 1]));
+        assert_eq!(a3, SpMat::from_dense_data((1, 1), [2]));
     }
 
     #[test]

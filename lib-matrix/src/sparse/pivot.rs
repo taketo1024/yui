@@ -11,7 +11,6 @@ use std::collections::VecDeque;
 use ahash::AHashSet;
 use itertools::Itertools;
 use log::*;
-use sprs::PermOwned;
 
 use yui_core::{Ring, RingOps};
 use yui_core::algo::TopSort;
@@ -101,35 +100,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let r = pivs.len();
     
     (p, q, r)
-}
-
-// Applies permutations (p, q) to `a` and partitions the result into four blocks at row/col r:
-//
-//   paq = [[a0 | a1],   a0: r×r,     a1: r×(n-r)
-//          [a2 | a3]]   a2: (m-r)×r, a3: (m-r)×(n-r)
-pub fn split_by_pqr<R>(a: &SpMat<R>, p: &PermOwned, q: &PermOwned, r: usize) -> [SpMat<R>; 4]
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    use std::cmp::Ordering::Less;
-
-    let (m, n) = a.shape();
-    let [mut a0, mut a1, mut a2, mut a3] = [vec![], vec![], vec![], vec![]];
-
-    for (i, j, v) in a.iter() {
-        let (pi, qj) = (p.at(i), q.at(j));
-        let v = v.clone();
-        match (pi.cmp(&r), qj.cmp(&r)) {
-            (Less, Less) => a0.push((pi,     qj,     v)),
-            (Less, _   ) => a1.push((pi,     qj - r, v)),
-            (_   , Less) => a2.push((pi - r, qj,     v)),
-            (_   , _   ) => a3.push((pi - r, qj - r, v)),
-        }
-    }
-    [
-        SpMat::from_entries((r,     r    ), a0),
-        SpMat::from_entries((r,     n - r), a1),
-        SpMat::from_entries((m - r, r    ), a2),
-        SpMat::from_entries((m - r, n - r), a3),
-    ]
 }
 
 type Row = usize;
@@ -995,18 +965,4 @@ mod tests {
         }));
     }
 
-    #[test]
-    fn test_split_by_pqr() {
-        use sprs::PermOwned;
-        // a = [[1,2],[3,4]], r=1, identity perms → paq = a, partition at row/col 1:
-        // a0=[[1]], a1=[[2]], a2=[[3]], a3=[[4]]
-        let a = SpMat::from_dense_data((2, 2), [1, 2, 3, 4]);
-        let p = PermOwned::new(vec![0, 1]);
-        let q = PermOwned::new(vec![0, 1]);
-        let [a0, a1, a2, a3] = split_by_pqr(&a, &p, &q, 1);
-        assert_eq!(a0, SpMat::from_dense_data((1, 1), [1]));
-        assert_eq!(a1, SpMat::from_dense_data((1, 1), [2]));
-        assert_eq!(a2, SpMat::from_dense_data((1, 1), [3]));
-        assert_eq!(a3, SpMat::from_dense_data((1, 1), [4]));
-    }
 }

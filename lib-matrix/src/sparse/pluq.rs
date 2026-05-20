@@ -9,7 +9,6 @@ use yui_core::{Ring, RingOps, Field, FieldOps};
 use crate::{MatTrait, Perm};
 use crate::dense::Mat;
 use crate::dense::pluq::pluq as dense_pluq;
-use crate::sparse::pivot::split_by_pqr;
 use super::SpMat;
 use super::SpVec;
 use super::pivot::{PivotFinderConfig, PivotType, find_pivots};
@@ -95,9 +94,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         return SpPluq::new(PermOwned::identity(m), PermOwned::identity(n), SpMat::zero((m, 0)), SpMat::zero((0, n)), a.clone());
     }
 
+    let [a0, a1, a2, a3] = a.permute_and_split(&p, &q, r);
     let to_owned = |p: &Perm| PermOwned::new((0..p.dim()).map(|i| p.at(i)).collect());
     let (p, q) = (to_owned(&p), to_owned(&q));
-    let [a0, a1, a2, a3] = split_by_pqr(a, &p, &q, r);
 
     let (l, u, s) = match piv_type {
         PivotType::Rows => {

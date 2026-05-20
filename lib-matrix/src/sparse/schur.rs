@@ -5,7 +5,8 @@ use nalgebra::Scalar;
 use num_traits::{One, Zero};
 use sprs::PermOwned;
 use yui_core::{Ring, RingOps};
-use crate::sparse::pivot::{PivotType, split_by_pqr};
+use crate::Perm;
+use crate::sparse::pivot::PivotType;
 
 use super::*;
 use super::triang::{TriangularType, solve_triangular_left, solve_triangular_with};
@@ -47,7 +48,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(r <= n);
 
         let t = if t == PivotType::Rows { TriangularType::Upper } else { TriangularType::Lower };
-        let [a0, a1, a2, a3] = split_by_pqr(a, p, q, r);
+        let (p_new, q_new) = (Perm::new(p.vec()), Perm::new(q.vec()));
+        let [a0, a1, a2, a3] = a.permute_and_split(&p_new, &q_new, r);
         Self::from_blocks(t, [&a0, &a1, &a2, &a3], with_trans_src, with_trans_tgt)
     }
 

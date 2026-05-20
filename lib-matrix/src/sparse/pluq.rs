@@ -152,9 +152,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let raw = dense_pluq(&mat);
     let dp = if transpose { raw.transpose() } else { raw };
 
-    let (dp_p, dp_q) = (Perm::new(dp.p.vec()), Perm::new(dp.q.vec()));
-    let p2 = extend_perm(&dp_p, &row_idx, ms);
-    let q2 = extend_perm(&dp_q, &col_idx, ns);
+    let p2 = extend_perm(&dp.p, &row_idx, ms);
+    let q2 = extend_perm(&dp.q, &col_idx, ns);
 
     let mut l2 = SpMat::from(dp.l);
     l2.extend_by_zero(ms - m0, 0);

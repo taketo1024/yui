@@ -2,9 +2,8 @@
 
 use log::debug;
 use nalgebra::Scalar;
-use sprs::PermOwned;
 use yui_core::{Ring, RingOps, Field, FieldOps};
-use crate::MatTrait;
+use crate::{MatTrait, Perm};
 use crate::dense::Mat;
 
 /// Result of a PLUQ decomposition satisfying `p_mat * A * q_mat = L * U + s`:
@@ -14,8 +13,8 @@ use crate::dense::Mat;
 ///   - `u`: `rank × n`, unit upper triangular — elimination multipliers
 ///   - `s`: `(m - rank) × (n - rank)`, Schur complement — zero when `R` is a field
 pub struct Pluq<R> {
-    pub p: PermOwned,
-    pub q: PermOwned,
+    pub p: Perm,
+    pub q: Perm,
     pub l: Mat<R>,
     pub u: Mat<R>,
     pub s: Mat<R>,
@@ -86,7 +85,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
 }
 
 // Applies permutation p to y: result[k] = y[p^{-1}(k)], i.e., result[p(i)] = y[i].
-fn apply_perm<R: Clone>(p: &PermOwned, y: &[R]) -> Vec<R> {
+fn apply_perm<R: Clone>(p: &Perm, y: &[R]) -> Vec<R> {
     let pinv = p.inv();
     (0..y.len()).map(|k| y[pinv.at(k)].clone()).collect()
 }
@@ -177,8 +176,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 // Builds the row permutation: p.at(orig) = current position of that row.
-fn row_perm(row_of: &[usize], m: usize) -> PermOwned {
-    PermOwned::new(row_of.iter().enumerate().fold(vec![0usize; m], |mut v, (pos, &orig)| {
+fn row_perm(row_of: &[usize], m: usize) -> Perm {
+    Perm::new(row_of.iter().enumerate().fold(vec![0usize; m], |mut v, (pos, &orig)| {
         v[orig] = pos; v
     }))
 }
@@ -191,8 +190,8 @@ fn row_order(pivot_rows: &[usize], m: usize) -> Vec<usize> {
 }
 
 // Builds the column permutation from the full ordered column list.
-fn col_perm(cols: &[usize], n: usize) -> PermOwned {
-    PermOwned::new(cols.iter().enumerate().fold(vec![0usize; n], |mut v, (new_j, &old_j)| {
+fn col_perm(cols: &[usize], n: usize) -> Perm {
+    Perm::new(cols.iter().enumerate().fold(vec![0usize; n], |mut v, (new_j, &old_j)| {
         v[old_j] = new_j; v
     }))
 }
@@ -259,7 +258,7 @@ mod tests {
     }
 
     // Applies permutations to compute p_mat * a * q_mat as a plain matrix.
-    fn apply_perms(a: &Mat<R>, p: &PermOwned, q: &PermOwned) -> Mat<R> {
+    fn apply_perms(a: &Mat<R>, p: &Perm, q: &Perm) -> Mat<R> {
         let (m, n) = a.shape();
         let mut out = Mat::zero((m, n));
         for i in 0..m {

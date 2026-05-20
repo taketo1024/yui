@@ -45,11 +45,6 @@ impl Perm {
         }
     }
 
-    /// Alias for [`len`](Self::len), matching `sprs`'s naming.
-    pub fn dim(&self) -> usize {
-        self.len()
-    }
-
     /// The image of `i`.
     pub fn at(&self, i: usize) -> usize {
         match &self.data {
@@ -83,7 +78,7 @@ impl Perm {
     /// Left group action consuming `y`: returns a vector `result` such that
     /// `result[self.at(i)] = y[i]` for every `i`.
     pub fn apply_to<R>(&self, y: Vec<R>) -> Vec<R> {
-        assert_eq!(y.len(), self.dim());
+        assert_eq!(y.len(), self.len());
         match &self.data {
             Either::Left(_) => y,
             Either::Right(v) => {
@@ -106,7 +101,7 @@ impl Perm {
     /// `result[k] = y[self.at(k)]` for every `k`. Equivalent to
     /// `self.inv().apply_to(y)` but without allocating an inverse permutation.
     pub fn apply_inv_to<R>(&self, y: Vec<R>) -> Vec<R> {
-        assert_eq!(y.len(), self.dim());
+        assert_eq!(y.len(), self.len());
         match &self.data {
             Either::Left(_) => y,
             Either::Right(v) => {
@@ -123,9 +118,9 @@ impl Perm {
         }
     }
 
-    /// Returns a permutation of dimension `self.dim() + r` that is the
+    /// Returns a permutation of dimension `self.len() + r` that is the
     /// identity on `[0..r)` and acts as `self` (shifted by `r`) on
-    /// `[r..r + self.dim())`. Identity is preserved (zero-cost).
+    /// `[r..r + self.len())`. Identity is preserved (zero-cost).
     pub fn shift(self, r: usize) -> Self {
         match self.data {
             Either::Left(n) => Self::id(n + r),
@@ -137,9 +132,9 @@ impl Perm {
         }
     }
 
-    /// Returns a permutation of dimension `self.dim() + r` that acts as
-    /// `self` on `[0..self.dim())` and the identity on the appended
-    /// `[self.dim()..self.dim() + r)`. Identity is preserved (zero-cost).
+    /// Returns a permutation of dimension `self.len() + r` that acts as
+    /// `self` on `[0..self.len())` and the identity on the appended
+    /// `[self.len()..self.len() + r)`. Identity is preserved (zero-cost).
     pub fn extend(self, r: usize) -> Self {
         match self.data {
             Either::Left(n) => Self::id(n + r),
@@ -260,7 +255,6 @@ mod tests {
         let v = vec![2, 0, 1, 3];
         let p = Perm::new(v.clone());
         assert_eq!(p.len(), 4);
-        assert_eq!(p.dim(), p.len());
         for (i, &expected) in v.iter().enumerate() {
             assert_eq!(p.at(i), expected);
         }
@@ -386,7 +380,7 @@ mod tests {
         // perm = [1, 2, 0], shift by 2 → [0, 1, 3, 4, 2]
         let p = Perm::from_indices([1, 2, 0]);
         let s = p.shift(2);
-        assert_eq!(s.dim(), 5);
+        assert_eq!(s.len(), 5);
         for (i, &x) in [0, 1, 3, 4, 2].iter().enumerate() {
             assert_eq!(s.at(i), x);
         }
@@ -404,7 +398,7 @@ mod tests {
         // Shifting an identity stays identity, and its dim grows.
         let s = Perm::id(3).shift(2);
         assert!(s.is_id());
-        assert_eq!(s.dim(), 5);
+        assert_eq!(s.len(), 5);
     }
 
     // --- extend ---
@@ -414,7 +408,7 @@ mod tests {
         // perm = [1, 2, 0], extend by 2 → [1, 2, 0, 3, 4]
         let p = Perm::from_indices([1, 2, 0]);
         let s = p.extend(2);
-        assert_eq!(s.dim(), 5);
+        assert_eq!(s.len(), 5);
         for (i, &x) in [1, 2, 0, 3, 4].iter().enumerate() {
             assert_eq!(s.at(i), x);
         }
@@ -432,7 +426,7 @@ mod tests {
         // Extending an identity stays identity, and its dim grows.
         let s = Perm::id(3).extend(2);
         assert!(s.is_id());
-        assert_eq!(s.dim(), 5);
+        assert_eq!(s.len(), 5);
     }
 
     // --- forward_and_fill ---

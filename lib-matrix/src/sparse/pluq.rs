@@ -34,8 +34,8 @@ impl<R> SpPluq<R> {
         let m = l.nrows();
         let n = u.ncols();
         assert_eq!(r, u.nrows(), "l.ncols() must match u.nrows()");
-        assert_eq!(m, p.dim(), "l.nrows() must match p.dim()");
-        assert_eq!(n, q.dim(), "u.ncols() must match q.dim()");
+        assert_eq!(m, p.len(), "l.nrows() must match p.len()");
+        assert_eq!(n, q.len(), "u.ncols() must match q.len()");
         assert_eq!(s.shape(), (m - r, n - r), "s shape must be (m - r, n - r)");
         Self { p, q, l, u, s }
     }
@@ -479,7 +479,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let m = pp.l.nrows();
     assert!(r + k <= m);
     assert_eq!(yp.len(), m);
-    assert_eq!(pp.p.dim(), m);
+    assert_eq!(pp.p.len(), m);
 
     // Drop rows [r..r+k] from pp.l: keep [0..r] and [r+k..m], shifted down.
     pp.l = pp.l.extract((m - k, r), |i, j| {
@@ -513,10 +513,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 // Composes perm1 with perm2: the first `r` positions stay, the rest are
-// shifted by `r` and remapped by perm2 (where `r = perm1.dim() - perm2.dim()`).
+// shifted by `r` and remapped by perm2 (where `r = perm1.len() - perm2.len()`).
 fn merge_perm(perm1: &Perm, perm2: Perm) -> Perm {
-    assert!(perm1.dim() >= perm2.dim());
-    let r = perm1.dim() - perm2.dim();
+    assert!(perm1.len() >= perm2.len());
+    let r = perm1.len() - perm2.len();
     perm2.shift(r) * perm1
 }
 
@@ -527,7 +527,7 @@ fn extend_perm(n: usize, compact_idx: &[usize], compact_perm: Perm) -> Perm {
     let c = compact_idx.len();
 
     assert!(n >= c);
-    assert_eq!(compact_perm.dim(), c);
+    assert_eq!(compact_perm.len(), c);
 
     let front = Perm::forward_and_fill(n, compact_idx.iter().copied());
     compact_perm.extend(n - c) * front

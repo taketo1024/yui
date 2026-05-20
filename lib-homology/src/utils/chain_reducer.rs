@@ -226,7 +226,7 @@ where
     }
 
     fn update_mats(&mut self, i: I, p: &Perm, q: &Perm, r: usize, s: SpMat<R>) {
-        let (m, n) = (p.dim(), q.dim());
+        let (m, n) = (p.len(), q.len());
         let (i0, i1, i2) = self.deg_trip(i);
 
         if let Some(a0) = self.matrix(i0) {

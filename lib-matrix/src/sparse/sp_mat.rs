@@ -454,7 +454,7 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
     // row_perm(p) * a == a.permute_rows(p)
     pub fn from_row_perm(p: &Perm) -> Self
     where R: One {
-        let n = p.dim();
+        let n = p.len();
         Self::from_entries((n, n), (0..n).map(|i|
             (p.at(i), i, R::one())
         ))
@@ -463,7 +463,7 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
     // a * col_perm(p) == a.permute_cols(p)
     pub fn from_col_perm(p: &Perm) -> Self
     where R: One {
-        let n = p.dim();
+        let n = p.len();
         Self::from_entries((n, n), (0..n).map(|i|
             (i, p.at(i), R::one())
         ))

@@ -847,8 +847,8 @@ mod tests {
         let a = SpMat::from_dense_data((1, 1), [0]);
         let (p, q, r) = find_pivots(&a, Default::default());
         assert_eq!(r, 0);
-        assert_eq!(p.dim(), 1);
-        assert_eq!(q.dim(), 1);
+        assert_eq!(p.len(), 1);
+        assert_eq!(q.len(), 1);
         assert!(p.is_id());
         assert!(q.is_id());
     }
@@ -858,8 +858,8 @@ mod tests {
         let a = SpMat::from_dense_data((1, 1), [1]);
         let (p, q, r) = find_pivots(&a, Default::default());
         assert_eq!(r, 1);
-        assert_eq!(p.dim(), 1);
-        assert_eq!(q.dim(), 1);
+        assert_eq!(p.len(), 1);
+        assert_eq!(q.len(), 1);
         assert!(p.is_id());
         assert!(q.is_id());
     }
@@ -871,8 +871,8 @@ mod tests {
         ]);
         let (p, q, r) = find_pivots(&a, Default::default());
         assert_eq!(r, 2);
-        assert_eq!(p.dim(), 2);
-        assert_eq!(q.dim(), 2);
+        assert_eq!(p.len(), 2);
+        assert_eq!(q.len(), 2);
     }
 
     #[test]
@@ -887,8 +887,8 @@ mod tests {
         ]);
         let (p, q, r) = find_pivots(&a, Default::default());
         assert_eq!(r, 5);
-        assert_eq!(p.dim(), 6);
-        assert_eq!(q.dim(), 9);
+        assert_eq!(p.len(), 6);
+        assert_eq!(q.len(), 9);
 
         let b = a.permute(&p, &q).into_dense();
 
@@ -911,8 +911,8 @@ mod tests {
         let config = PivotFinderConfig { piv_type: PivotType::Cols, ..Default::default() };
         let (p, q, r) = find_pivots(&a, config);
         assert_eq!(r, 6);
-        assert_eq!(p.dim(), 6);
-        assert_eq!(q.dim(), 9);
+        assert_eq!(p.len(), 6);
+        assert_eq!(q.len(), 9);
 
         let b = a.permute(&p, &q).into_dense();
 
@@ -930,8 +930,8 @@ mod tests {
 
         let (p, q, r) = find_pivots(&a, Default::default());
         assert!(r > 10);
-        assert_eq!(p.dim(), shape.0);
-        assert_eq!(q.dim(), shape.1);
+        assert_eq!(p.len(), shape.0);
+        assert_eq!(q.len(), shape.1);
 
         let b = a.permute(&p, &q).into_dense();
 
@@ -955,8 +955,8 @@ mod tests {
         let config = PivotFinderConfig { max_pivots: 3, ..Default::default() };
         let (p, q, r) = find_pivots(&a, config);
         assert!(r <= 3);
-        assert_eq!(p.dim(), 6);
-        assert_eq!(q.dim(), 9);
+        assert_eq!(p.len(), 6);
+        assert_eq!(q.len(), 9);
 
         let b = a.permute(&p, &q).into_dense();
         assert!((0..r).all(|i| b[(i, i)].is_one()));

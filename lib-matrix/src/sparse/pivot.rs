@@ -14,7 +14,7 @@ use log::*;
 use sprs::PermOwned;
 
 use yui_core::{Ring, RingOps};
-use yui_core::algo::top_sort;
+use yui_core::algo::TopSort;
 use super::*;
 use super::util::perm_for_indices;
 
@@ -164,14 +164,14 @@ impl PivotFinder {
     }
 
     pub fn result(&self) -> Vec<(usize, usize)> {
-        let tree = self.pivots.iter().map(|(i, j)| {
-            let list = self.str.cols_in(i).filter(|&j2|
-                j != j2 && self.pivots.has_col(j2)
-            ).collect_vec();
-            (j, list)
-        });
-        
-        let sorted = top_sort(tree).unwrap();
+        let mut ts = TopSort::new();
+        for (i, j) in self.pivots.iter() {
+            ts.add_node(j);
+            for j2 in self.str.cols_in(i).filter(|&j2| j != j2 && self.pivots.has_col(j2)) {
+                ts.add_edge(j, j2);
+            }
+        }
+        let sorted = ts.into_sorted().unwrap();
         let is_row_type = self.piv_type == PivotType::Rows;
         
         sorted.into_iter().map(|j| {

@@ -4,7 +4,7 @@ The foundational crate of the [`yui`](https://github.com/taketo1024/yui) workspa
 
 ## Layout
 
-```
+```text
 src/
 ├── abst/    — algebraic trait hierarchy: Ring, EucRing, Field, RMod, ...
 ├── conc/    — concrete instantiations: Ratio, FF, Poly, Lc, Sign, BitSeq
@@ -17,7 +17,7 @@ src/
 
 The traits in `abst/` form the algebraic supertrait stack that everything else is generic over:
 
-```
+```text
 MathType / IndexType    — basic shape (Display, Eq, Hash, ...)
        ↓
 AddMon → AddGrp         — additive monoid → group
@@ -28,7 +28,7 @@ RMod                    — modules over a ring
 
 A typical `where`-clause:
 
-```rust
+```rust,ignore
 fn foo<R: Ring>(x: R) -> R
 where for<'x> &'x R: RingOps<R>
 { ... }
@@ -61,15 +61,11 @@ The `for<'x>` HRTB on the reference impl is required throughout; the [`auto_impl
 
 ```rust
 use yui_core::num::Ratio;
-use yui_core::poly::Poly;
 
-type Q = Ratio<i64>;
-type P = Poly<'x', Q>;
-
-let x = P::variable();
-let p = &x * &x + Q::from(2) * &x + Q::from(1); // 1 + 2x + x^2
-let q = &x + Q::from(1);                        // 1 + x
-assert_eq!(&p / &q, q);                         // (1+x)^2 / (1+x) = 1+x
+let a = Ratio::new(1_i64, 2);
+let b = Ratio::new(1_i64, 3);
+assert_eq!((&a + &b).to_string(), "5/6");
+assert_eq!((&a * &b).to_string(), "1/6");
 ```
 
 ## Feature flags
@@ -79,7 +75,7 @@ assert_eq!(&p / &q, q);                         // (1+x)^2 / (1+x) = 1+x
 
 ## License
 
-MIT — see [LICENSE](../LICENSE).
+[MIT](https://opensource.org/licenses/MIT).
 
 ---
 

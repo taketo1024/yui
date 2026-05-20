@@ -1,5 +1,8 @@
 //! The finite field 𝔽₂ = ℤ/2ℤ with two elements `0` and `1`.
 //!
+//! Specialized over [`FF<2>`](super::FF) — stores a single `bool` and
+//! implements addition/multiplication as direct `^` (XOR) / `&` (AND).
+//!
 //! See: <https://en.wikipedia.org/wiki/GF(2)>
 
 use std::fmt::{Debug, Display};

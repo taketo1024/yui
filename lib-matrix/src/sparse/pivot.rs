@@ -670,6 +670,7 @@ impl RowWorker {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Perm;
     use num_traits::{Zero, One};
  
     #[test]
@@ -912,7 +913,7 @@ mod tests {
         assert_eq!(r, 5);
         
         let (p, q) = perms_by_pivots(&a, &pivs);
-        let b = a.permute(p.view(), q.view()).into_dense();
+        let b = a.permute(&Perm::new(p.vec()), &Perm::new(q.vec())).into_dense();
 
         assert!((0..r).all(|i| b[(i, i)].is_one()));
         assert!((0..r).all(|j| {
@@ -936,7 +937,7 @@ mod tests {
         assert_eq!(r, 6);
         
         let (p, q) = perms_by_pivots(&a, &pivs);
-        let b = a.permute(p.view(), q.view()).into_dense();
+        let b = a.permute(&Perm::new(p.vec()), &Perm::new(q.vec())).into_dense();
 
         assert!((0..r).all(|i| b[(i, i)].is_one()));
         assert!((0..r).all(|i| {
@@ -955,7 +956,7 @@ mod tests {
         assert!(r > 10);
         
         let (p, q) = perms_by_pivots(&a, &pivs);
-        let b = a.permute(p.view(), q.view()).into_dense();
+        let b = a.permute(&Perm::new(p.vec()), &Perm::new(q.vec())).into_dense();
 
         assert!((0..r).all(|i| b[(i, i)].is_one()));
         assert!((0..r).all(|j| {
@@ -979,7 +980,7 @@ mod tests {
         assert!(pivs.len() <= 3);
 
         let (p, q) = perms_by_pivots(&a, &pivs);
-        let b = a.permute(p.view(), q.view()).into_dense();
+        let b = a.permute(&Perm::new(p.vec()), &Perm::new(q.vec())).into_dense();
         let r = pivs.len();
         assert!((0..r).all(|i| b[(i, i)].is_one()));
         assert!((0..r).all(|j| {

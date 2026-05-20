@@ -6,8 +6,8 @@ use nalgebra_sparse::na::{Scalar, ClosedAddAssign, ClosedSubAssign, ClosedMulAss
 use nalgebra_sparse::{CscMatrix, CooMatrix};
 use num_traits::{Zero, One, ToPrimitive};
 use auto_impl_ops::auto_ops;
-use sprs::PermView;
 use yui_core::{Ring, RingOps};
+use crate::Perm;
 use crate::dense::*;
 use super::sp_vec::SpVec;
 use super::triang::TriangularType;
@@ -242,18 +242,18 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         ))
     }
 
-    pub fn permute(&self, p: PermView, q: PermView) -> SpMat<R> { 
+    pub fn permute(&self, p: &Perm, q: &Perm) -> SpMat<R> {
         self.extract(self.shape(), |i, j| Some((p.at(i), q.at(j))))
     }
 
-    pub fn permute_rows(&self, p: PermView) -> SpMat<R> { 
-        let id = PermView::identity(self.ncols());
-        self.permute(p, id)
+    pub fn permute_rows(&self, p: &Perm) -> SpMat<R> {
+        let id = Perm::id(self.ncols());
+        self.permute(p, &id)
     }
-    
-    pub fn permute_cols(&self, q: PermView) -> SpMat<R> { 
-        let id = PermView::identity(self.nrows());
-        self.permute(id, q)
+
+    pub fn permute_cols(&self, q: &Perm) -> SpMat<R> {
+        let id = Perm::id(self.nrows());
+        self.permute(&id, q)
     }
 
     pub fn submat(&self, rows: Range<usize>, cols: Range<usize>) -> SpMat<R> { 
@@ -419,7 +419,7 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
     }
 
     // row_perm(p) * a == a.permute_rows(p)
-    pub fn from_row_perm(p: PermView) -> Self
+    pub fn from_row_perm(p: &Perm) -> Self
     where R: One {
         let n = p.dim();
         Self::from_entries((n, n), (0..n).map(|i|
@@ -428,7 +428,7 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
     }
 
     // a * col_perm(p) == a.permute_cols(p)
-    pub fn from_col_perm(p: PermView) -> Self
+    pub fn from_col_perm(p: &Perm) -> Self
     where R: One {
         let n = p.dim();
         Self::from_entries((n, n), (0..n).map(|i|
@@ -590,8 +590,8 @@ where R: Scalar + Zero + One + ClosedAddAssign {
 #[cfg(test)]
 pub(super) mod tests { 
     use itertools::Itertools;
-    use sprs::PermOwned;
     use yui_core::num::Ratio;
+    use crate::Perm;
 
     use super::*;
 
@@ -648,10 +648,10 @@ pub(super) mod tests {
 
     #[test]
     fn permute() { 
-        let p = PermOwned::new(vec![1,2,3,0]);
-        let q = PermOwned::new(vec![3,0,2,1]);
+        let p = Perm::new(vec![1,2,3,0]);
+        let q = Perm::new(vec![3,0,2,1]);
         let a = SpMat::from_dense_data((4,4), 0..16);
-        let b = a.permute(p.view(), q.view());
+        let b = a.permute(&p, &q);
         assert_eq!(b, SpMat::from_dense_data((4,4), vec![
             13, 15, 14, 12,
              1,  3,  2,  0,
@@ -724,17 +724,17 @@ pub(super) mod tests {
     #[test]
     fn row_perm() {
         let a = SpMat::from_dense_data((3, 4), 0..12);
-        let p = PermOwned::new(vec![2,0,1]);
-        let q = SpMat::from_row_perm(p.view());
-        assert!(q * &a == a.permute_rows(p.view()))
+        let p = Perm::new(vec![2,0,1]);
+        let q = SpMat::from_row_perm(&p);
+        assert!(q * &a == a.permute_rows(&p))
     }
 
     #[test]
     fn col_perm() {
         let a = SpMat::from_dense_data((3, 4), 0..12);
-        let p = PermOwned::new(vec![2,0,1,3]);
-        let q = SpMat::from_col_perm(p.view());
-        assert!(&a * q == a.permute_cols(p.view()))
+        let p = Perm::new(vec![2,0,1,3]);
+        let q = SpMat::from_col_perm(&p);
+        assert!(&a * q == a.permute_cols(&p))
     }
 
     #[test]

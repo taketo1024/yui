@@ -6,7 +6,7 @@ use sprs::PermOwned;
 use sprs::PermView;
 use yui_core::{Ring, RingOps, Field, FieldOps};
 
-use crate::MatTrait;
+use crate::{MatTrait, Perm};
 use crate::dense::Mat;
 use crate::dense::pluq::pluq as dense_pluq;
 use crate::sparse::pivot::split_by_pqr;
@@ -225,14 +225,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pp1.l = {
         let [l0, l1] = pp1.take_l().divide_at_row(r1);
-        let l1 = l1.permute_rows(pp2.p.view());
+        let l1 = l1.permute_rows(&Perm::new(pp2.p.vec()));
         let zero_tr = SpMat::zero((r1, r2));
         SpMat::combine_blocks([l0, zero_tr, l1, pp2.l])
     };
 
     pp1.u = {
         let [u0, u1] = pp1.take_u().divide_at_col(r1);
-        let u1 = u1.permute_cols(pp2.q.view());
+        let u1 = u1.permute_cols(&Perm::new(pp2.q.vec()));
         let zero_bl = SpMat::zero((r2, r1));
         SpMat::combine_blocks([u0, u1, zero_bl, pp2.u])
     };
@@ -449,7 +449,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     assert_eq!(s_rest.ncols(), n_s);
     assert_eq!(pp_chunk.s.shape(), (c - r_chunk, n_s - r_chunk));
 
-    let s_rest_q = s_rest.permute_cols(pp_chunk.q.view());
+    let s_rest_q = s_rest.permute_cols(&Perm::new(pp_chunk.q.vec()));
     let [s_rest_left, s_rest_right] = s_rest_q.divide_at_col(r_chunk);
     let [u_top, u_right] = pp_chunk.u.clone().divide_at_col(r_chunk);
 
@@ -581,7 +581,7 @@ mod tests {
         assert_eq!(pp.u.shape(), (r, n));
         assert_eq!(pp.s.shape(), (m - r, n - r));
 
-        let paq = a.permute(pp.p.view(), pp.q.view());
+        let paq = a.permute(&Perm::new(pp.p.vec()), &Perm::new(pp.q.vec()));
         let rem_full = SpMat::from_entries((m, n),
             pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
         );
@@ -607,7 +607,7 @@ mod tests {
         assert_eq!(pp.u.shape(), (r, n));
         assert_eq!(pp.s.shape(), (m - r, n - r));
 
-        let paq = a.permute(pp.p.view(), pp.q.view());
+        let paq = a.permute(&Perm::new(pp.p.vec()), &Perm::new(pp.q.vec()));
         let rem_full = SpMat::from_entries((m, n),
             pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
         );
@@ -638,7 +638,7 @@ mod tests {
         assert_eq!(pp.l.shape(), (4, 0));
         assert_eq!(pp.u.shape(), (0, 5));
         assert_eq!(pp.s.shape(), (4, 5)); // (m-r, n-r) = (4, 5) when r=0
-        assert_eq!(pp.s, a.permute(pp.p.view(), pp.q.view()));
+        assert_eq!(pp.s, a.permute(&Perm::new(pp.p.vec()), &Perm::new(pp.q.vec())));
     }
 
     #[test]
@@ -676,7 +676,7 @@ mod tests {
         assert_eq!(pp.u.shape(), (r, n));
         assert_eq!(pp.s.shape(), (m - r, n - r));
 
-        let paq = a.permute(pp.p.view(), pp.q.view());
+        let paq = a.permute(&Perm::new(pp.p.vec()), &Perm::new(pp.q.vec()));
         let rem = SpMat::from_entries((m, n),
             pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
         );
@@ -699,7 +699,7 @@ mod tests {
         assert_eq!(pp.u.shape(), (r, n));
         assert_eq!(pp.s.shape(), (m - r, n - r));
 
-        let paq = a.permute(pp.p.view(), pp.q.view());
+        let paq = a.permute(&Perm::new(pp.p.vec()), &Perm::new(pp.q.vec()));
         let rem = SpMat::from_entries((m, n),
             pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
         );
@@ -749,7 +749,7 @@ mod tests {
         assert_eq!(pp.u.shape(), (r, ns));
         assert_eq!(pp.s.shape(), (ms - r, ns - r));
 
-        let psq = s.permute(pp.p.view(), pp.q.view());
+        let psq = s.permute(&Perm::new(pp.p.vec()), &Perm::new(pp.q.vec()));
         let rem = SpMat::from_entries((ms, ns),
             pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
         );
@@ -990,7 +990,7 @@ mod tests {
         assert_eq!(pp.u.shape(), (r, n));
         assert_eq!(pp.s.shape(), (m - r, n - r));
 
-        let psq = s.permute(pp.p.view(), pp.q.view());
+        let psq = s.permute(&Perm::new(pp.p.vec()), &Perm::new(pp.q.vec()));
         let rem = SpMat::from_entries((m, n),
             pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
         );
@@ -1024,7 +1024,7 @@ mod tests {
         assert_eq!(pp.u.shape(), (r, n));
         assert_eq!(pp.s.shape(), (m - r, n - r));
 
-        let psq = s.permute(pp.p.view(), pp.q.view());
+        let psq = s.permute(&Perm::new(pp.p.vec()), &Perm::new(pp.q.vec()));
         let rem = SpMat::from_entries((m, n),
             pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
         );

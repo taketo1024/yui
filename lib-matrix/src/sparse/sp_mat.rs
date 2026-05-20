@@ -201,7 +201,7 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         SpMat::try_from_csc_data(nrows, ncols, col_offsets, row_indices, values).unwrap()
     }
 
-    pub fn from_dense_data<I>(shape: (usize, usize), data: I) -> Self
+    pub fn from_row_major<I>(shape: (usize, usize), data: I) -> Self
     where I: IntoIterator<Item = R> { 
         let n = shape.1;
         Self::from_entries(
@@ -647,8 +647,8 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn from_dense_data() {
-        let a = SpMat::from_dense_data((2, 2), [1,2,3,4]);
+    fn from_row_major() {
+        let a = SpMat::from_row_major((2, 2), [1,2,3,4]);
         assert_eq!(a.disassemble(), (vec![0, 2, 4], vec![0, 1, 0, 1], vec![1, 3, 2, 4]));
     }
 
@@ -667,9 +667,9 @@ pub(super) mod tests {
     fn permute() {
         let p = Perm::new(vec![1,2,3,0]);
         let q = Perm::new(vec![3,0,2,1]);
-        let a = SpMat::from_dense_data((4,4), 0..16);
+        let a = SpMat::from_row_major((4,4), 0..16);
         let b = a.permute(&p, &q);
-        assert_eq!(b, SpMat::from_dense_data((4,4), vec![
+        assert_eq!(b, SpMat::from_row_major((4,4), vec![
             13, 15, 14, 12,
              1,  3,  2,  0,
              5,  7,  6,  4,
@@ -681,13 +681,13 @@ pub(super) mod tests {
     fn permute_and_split_identity() {
         // a = [[1,2],[3,4]], r=1, identity perms → paq = a, partition at row/col 1:
         // a0=[[1]], a1=[[2]], a2=[[3]], a3=[[4]]
-        let a = SpMat::from_dense_data((2, 2), [1, 2, 3, 4]);
+        let a = SpMat::from_row_major((2, 2), [1, 2, 3, 4]);
         let id = Perm::id(2);
         let [a0, a1, a2, a3] = a.permute_and_split(&id, &id, 1);
-        assert_eq!(a0, SpMat::from_dense_data((1, 1), [1]));
-        assert_eq!(a1, SpMat::from_dense_data((1, 1), [2]));
-        assert_eq!(a2, SpMat::from_dense_data((1, 1), [3]));
-        assert_eq!(a3, SpMat::from_dense_data((1, 1), [4]));
+        assert_eq!(a0, SpMat::from_row_major((1, 1), [1]));
+        assert_eq!(a1, SpMat::from_row_major((1, 1), [2]));
+        assert_eq!(a2, SpMat::from_row_major((1, 1), [3]));
+        assert_eq!(a3, SpMat::from_row_major((1, 1), [4]));
     }
 
     #[test]
@@ -696,7 +696,7 @@ pub(super) mod tests {
         // and col perm q = [1,2,0] (sends col 0→1, 1→2, 2→0).
         // PAQ⁻¹[p(i), q(j)] = A[i, j]. Splitting at r=2 yields the 2×2 top-left,
         // 2×1 top-right, 1×2 bottom-left, 1×1 bottom-right blocks.
-        let a = SpMat::from_dense_data((3, 3), [
+        let a = SpMat::from_row_major((3, 3), [
             1, 2, 3,
             4, 5, 6,
             7, 8, 9,
@@ -708,17 +708,17 @@ pub(super) mod tests {
         //   [[6, 4, 5],
         //    [9, 7, 8],
         //    [3, 1, 2]]
-        assert_eq!(a0, SpMat::from_dense_data((2, 2), [6, 4, 9, 7]));
-        assert_eq!(a1, SpMat::from_dense_data((2, 1), [5, 8]));
-        assert_eq!(a2, SpMat::from_dense_data((1, 2), [3, 1]));
-        assert_eq!(a3, SpMat::from_dense_data((1, 1), [2]));
+        assert_eq!(a0, SpMat::from_row_major((2, 2), [6, 4, 9, 7]));
+        assert_eq!(a1, SpMat::from_row_major((2, 1), [5, 8]));
+        assert_eq!(a2, SpMat::from_row_major((1, 2), [3, 1]));
+        assert_eq!(a3, SpMat::from_row_major((1, 1), [2]));
     }
 
     #[test]
     fn submat() { 
-        let a = SpMat::from_dense_data((5, 6), 0..30);
+        let a = SpMat::from_row_major((5, 6), 0..30);
         let b = a.submat(1..3, 2..5);
-        assert_eq!(b, SpMat::from_dense_data((2,3), vec![
+        assert_eq!(b, SpMat::from_row_major((2,3), vec![
              8,  9, 10,
             14, 15, 16
         ]));
@@ -726,10 +726,10 @@ pub(super) mod tests {
 
     #[test]
     fn transpose() { 
-        let a = SpMat::from_dense_data((3,4), 0..12);
+        let a = SpMat::from_row_major((3,4), 0..12);
         let b = a.transpose();
 
-        assert_eq!(b, SpMat::from_dense_data((4,3), vec![
+        assert_eq!(b, SpMat::from_row_major((4,3), vec![
             0, 4, 8, 
             1, 5, 9, 
             2, 6, 10, 
@@ -739,11 +739,11 @@ pub(super) mod tests {
 
     #[test]
     fn h_stack() {
-        let a = SpMat::from_dense_data((4, 3), 0..12);
-        let b = SpMat::from_dense_data((4, 2), 12..20);
+        let a = SpMat::from_row_major((4, 3), 0..12);
+        let b = SpMat::from_row_major((4, 2), 12..20);
         let c = SpMat::h_stack(a, b);
 
-        assert_eq!(c, SpMat::from_dense_data((4,5), vec![
+        assert_eq!(c, SpMat::from_row_major((4,5), vec![
             0,  1,  2, 12, 13,
             3,  4,  5, 14, 15,
             6,  7,  8, 16, 17,
@@ -753,11 +753,11 @@ pub(super) mod tests {
 
     #[test]
     fn v_stack() {
-        let a = SpMat::from_dense_data((2, 3), 0..6);
-        let b = SpMat::from_dense_data((3, 3), 6..15);
+        let a = SpMat::from_row_major((2, 3), 0..6);
+        let b = SpMat::from_row_major((3, 3), 6..15);
         let c = SpMat::v_stack(a, b);
 
-        assert_eq!(c, SpMat::from_dense_data((5, 3), vec![
+        assert_eq!(c, SpMat::from_row_major((5, 3), vec![
             0,  1,  2,
             3,  4,  5,
             6,  7,  8,
@@ -769,15 +769,15 @@ pub(super) mod tests {
     #[test]
     fn extend_by_zero() {
         // [[1,2],[3,4]] extended by 1 row and 2 cols → [[1,2,0,0],[3,4,0,0],[0,0,0,0]]
-        let mut a = SpMat::from_dense_data((2, 2), [1,2,3,4]);
+        let mut a = SpMat::from_row_major((2, 2), [1,2,3,4]);
         a.extend_by_zero(1, 2);
         assert_eq!(a.shape(), (3, 4));
-        assert_eq!(a, SpMat::from_dense_data((3, 4), [1,2,0,0, 3,4,0,0, 0,0,0,0]));
+        assert_eq!(a, SpMat::from_row_major((3, 4), [1,2,0,0, 3,4,0,0, 0,0,0,0]));
     }
 
     #[test]
     fn row_perm() {
-        let a = SpMat::from_dense_data((3, 4), 0..12);
+        let a = SpMat::from_row_major((3, 4), 0..12);
         let p = Perm::new(vec![2,0,1]);
         let q = SpMat::row_perm_mat(&p);
         assert!(q * &a == a.permute_rows(&p))
@@ -785,7 +785,7 @@ pub(super) mod tests {
 
     #[test]
     fn col_perm() {
-        let a = SpMat::from_dense_data((3, 4), 0..12);
+        let a = SpMat::from_row_major((3, 4), 0..12);
         let p = Perm::new(vec![2,0,1,3]);
         let q = SpMat::col_perm_mat(&p);
         assert!(&a * q == a.permute_cols(&p))
@@ -793,11 +793,11 @@ pub(super) mod tests {
 
     #[test]
     fn block_diag() { 
-        let a = SpMat::from_dense_data((2, 2), 1..=4);
-        let b = SpMat::from_dense_data((1, 3), 5..=7);
-        let c = SpMat::from_dense_data((2, 1), 8..=9);
+        let a = SpMat::from_row_major((2, 2), 1..=4);
+        let b = SpMat::from_row_major((1, 3), 5..=7);
+        let c = SpMat::from_row_major((2, 1), 8..=9);
         let d = SpMat::block_diag([a, b, c]);
-        assert_eq!(d, SpMat::from_dense_data((5, 6), [
+        assert_eq!(d, SpMat::from_row_major((5, 6), [
             1,2,0,0,0,0,
             3,4,0,0,0,0,
             0,0,5,6,7,0,
@@ -809,7 +809,7 @@ pub(super) mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn serialize() { 
-        let a = SpMat::from_dense_data((3, 4), (0..12).map(|x| x % 5));
+        let a = SpMat::from_row_major((3, 4), (0..12).map(|x| x % 5));
         let ser = serde_json::to_string(&a).unwrap();
         let des = serde_json::from_str(&ser).unwrap();
         assert_eq!(a, des);

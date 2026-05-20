@@ -238,7 +238,7 @@ mod tests {
 
     #[test]
     fn solve_upper() { 
-        let u = SpMat::from_dense_data((5, 5), vec![
+        let u = SpMat::from_row_major((5, 5), vec![
             1, -2, 1,  3, 5,
             0, -1, 4,  2, 1,
             0,  0, 1,  0, 3,
@@ -252,7 +252,7 @@ mod tests {
 
     #[test]
     fn inv_upper() { 
-        let u = SpMat::from_dense_data((5, 5), [
+        let u = SpMat::from_row_major((5, 5), [
             1, -2, 1,  3, 5,
             0, -1, 4,  2, 1,
             0,  0, 1,  0, 3,
@@ -266,7 +266,7 @@ mod tests {
 
     #[test]
     fn solve_lower() { 
-        let l = SpMat::from_dense_data((5, 5), [
+        let l = SpMat::from_row_major((5, 5), [
             1,  0, 0,  0, 0,
            -2, -1, 0,  0, 0,
             1,  4, 1,  0, 0,
@@ -280,7 +280,7 @@ mod tests {
 
     #[test]
     fn inv_lower() { 
-        let l = SpMat::from_dense_data((5, 5), [
+        let l = SpMat::from_row_major((5, 5), [
             1,  0, 0,  0, 0,
            -2, -1, 0,  0, 0,
             1,  4, 1,  0, 0,

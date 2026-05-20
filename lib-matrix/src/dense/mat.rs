@@ -435,12 +435,12 @@ mod tests {
     fn to_sparse() { 
         let dns = Mat::from_data((2, 3), [1,2,3,4,5,6]);
         let sps = dns.into_sparse();
-        assert_eq!(sps, SpMat::from_dense_data((2, 3), [1,2,3,4,5,6]));
+        assert_eq!(sps, SpMat::from_row_major((2, 3), [1,2,3,4,5,6]));
     }
 
     #[test]
     fn from_sparse() { 
-        let sps = SpMat::from_dense_data((2, 3), [1,2,3,4,5,6]);
+        let sps = SpMat::from_row_major((2, 3), [1,2,3,4,5,6]);
         let dns = Mat::from(sps);
         assert_eq!(dns, Mat::from_data((2, 3), [1,2,3,4,5,6]));
     }

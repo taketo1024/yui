@@ -543,7 +543,7 @@ mod tests {
     }
 
     fn sample() -> SpMat<i32> {
-        SpMat::from_dense_data((6, 9), [
+        SpMat::from_row_major((6, 9), [
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -626,7 +626,7 @@ mod tests {
 
     #[test]
     fn test_pre_pluq_square_full_rank() {
-        let a = SpMat::from_dense_data((3, 3), [1, 0, 0, 0, 1, 0, 0, 0, 1]);
+        let a = SpMat::from_row_major((3, 3), [1, 0, 0, 0, 1, 0, 0, 0, 1]);
         let pp = pre_pluq(&a, cfg(PivotType::Rows));
         assert_eq!(pp.rank(), 3);
         assert_eq!(pp.s.shape(), (0, 0)); // full rank: Schur complement is empty
@@ -704,7 +704,7 @@ mod tests {
         // Non-zero entries: (0,0)=1, (0,2)=2, (2,0)=3, (2,2)=4.
         // row_idx=[0,2], col_idx=[0,2].
         // S0 (2×2) = [[1,2],[3,4]].
-        let s = SpMat::from_dense_data((3, 3), [1i32, 0, 2, 0, 0, 0, 3, 0, 4]);
+        let s = SpMat::from_row_major((3, 3), [1i32, 0, 2, 0, 0, 0, 3, 0, 4]);
         let (row_idx, col_idx, mat) = extract_dense(&s, false);
         assert_eq!(row_idx, vec![0usize, 2]);
         assert_eq!(col_idx, vec![0usize, 2]);
@@ -714,7 +714,7 @@ mod tests {
     #[test]
     fn test_extract_dense_transpose() {
         // Same S, but with transpose=true.  S0^T (2×2) = [[1,3],[2,4]].
-        let s = SpMat::from_dense_data((3, 3), [1i32, 0, 2, 0, 0, 0, 3, 0, 4]);
+        let s = SpMat::from_row_major((3, 3), [1i32, 0, 2, 0, 0, 0, 3, 0, 4]);
         let (row_idx, col_idx, mat) = extract_dense(&s, true);
         assert_eq!(row_idx, vec![0usize, 2]);
         assert_eq!(col_idx, vec![0usize, 2]);
@@ -742,13 +742,13 @@ mod tests {
     #[test]
     fn test_dense_pluq_in_cols_with_zero_row_and_col() {
         // S has a zero row (row 1) and a zero col (col 1).
-        let s = SpMat::from_dense_data((3, 3), [1i32, 0, 2, 0, 0, 0, 3, 0, 4]);
+        let s = SpMat::from_row_major((3, 3), [1i32, 0, 2, 0, 0, 0, 3, 0, 4]);
         check_dense_pluq_in(&s, PivotType::Cols);
     }
 
     #[test]
     fn test_dense_pluq_in_rows_with_zero_row_and_col() {
-        let s = SpMat::from_dense_data((3, 3), [1i32, 0, 2, 0, 0, 0, 3, 0, 4]);
+        let s = SpMat::from_row_major((3, 3), [1i32, 0, 2, 0, 0, 0, 3, 0, 4]);
         check_dense_pluq_in(&s, PivotType::Rows);
     }
 
@@ -762,7 +762,7 @@ mod tests {
     #[test]
     fn test_dense_pluq_in_no_zero_rows_or_cols() {
         // No zero rows/cols: compact_dense gives the full matrix.
-        let s = SpMat::from_dense_data((3, 3), [1i32,2,3,4,5,6,7,8,9]);
+        let s = SpMat::from_row_major((3, 3), [1i32,2,3,4,5,6,7,8,9]);
         check_dense_pluq_in(&s, PivotType::Cols);
         check_dense_pluq_in(&s, PivotType::Rows);
     }
@@ -793,7 +793,7 @@ mod tests {
     fn r(n: i64) -> R { R::from(n) }
     
     fn sp_mat(shape: (usize, usize), data: impl IntoIterator<Item = R>) -> SpMat<R> {
-        SpMat::from_dense_data(shape, data)
+        SpMat::from_row_major(shape, data)
     }
 
     fn sp_vec(data: impl IntoIterator<Item = R>) -> SpVec<R> {

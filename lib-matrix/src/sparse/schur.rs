@@ -149,7 +149,7 @@ mod tests {
 
     #[test]
     fn schur_lower() {
-        let a = SpMat::from_dense_data((6, 5), [
+        let a = SpMat::from_row_major((6, 5), [
             1, 0, 0, 1, 3,
             2,-1, 0, 2, 2,
             3, 2, 1, 0, 3,
@@ -160,7 +160,7 @@ mod tests {
         let sch = Schur::from_pivots(&a, PivotType::Cols, &Perm::id(6), &Perm::id(5), 3, false, false);
         let s = sch.complement();
 
-        assert_eq!(s, &SpMat::from_dense_data((3,2), [
+        assert_eq!(s, &SpMat::from_row_major((3,2), [
              5,  36,
              12, 45,
             -14,-60
@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn schur_lower_with_trans() {
-        let a = SpMat::from_dense_data((6, 5), [
+        let a = SpMat::from_row_major((6, 5), [
             1, 0, 0, 1, 3,
             2,-1, 0, 2, 2,
             3, 2, 1, 0, 3,
@@ -182,7 +182,7 @@ mod tests {
         let sch = Schur::from_pivots(&a, PivotType::Cols, &Perm::id(6), &Perm::id(5), 3, true, true);
         let s = sch.complement();
 
-        assert_eq!(s, &SpMat::from_dense_data((3,2), [
+        assert_eq!(s, &SpMat::from_row_major((3,2), [
              5,  36, 
              12, 45,
             -14,-60
@@ -193,7 +193,7 @@ mod tests {
         let t_in  = sch.trans_src().unwrap().backward_mat();
         let t_out = sch.trans_tgt().unwrap().forward_mat();
 
-        assert_eq!(t_in, SpMat::from_dense_data((5,2), [
+        assert_eq!(t_in, SpMat::from_row_major((5,2), [
             -1, -3,
              0, -4,
              3, 14,
@@ -201,7 +201,7 @@ mod tests {
              0,  1
         ]));
         
-        assert_eq!(t_out, SpMat::from_dense_data((3,6), [
+        assert_eq!(t_out, SpMat::from_row_major((3,6), [
              20, -6, -4, 1, 0, 0,
              24, -7, -5, 0, 1, 0,
             -31,  8,  3, 0, 0, 1
@@ -212,7 +212,7 @@ mod tests {
 
     #[test]
     fn schur_upper() {
-        let a = SpMat::from_dense_data((5, 6), [
+        let a = SpMat::from_row_major((5, 6), [
             1, 2, 3, 4, 5, 6,
             0, -1, 2, 2, 3, 2,
             0, 0, 1, 4, 5, -3,
@@ -222,7 +222,7 @@ mod tests {
         let sch = Schur::from_pivots(&a, PivotType::Rows, &Perm::id(5), &Perm::id(6), 3, false, false);
         let s = sch.complement();
 
-        assert_eq!(s, &SpMat::from_dense_data((2, 3), [
+        assert_eq!(s, &SpMat::from_row_major((2, 3), [
             5, 12,-14,
             36,45,-60
         ]));
@@ -232,7 +232,7 @@ mod tests {
 
     #[test]
     fn schur_upper_with_trans() {
-        let a = SpMat::from_dense_data((5, 6), [
+        let a = SpMat::from_row_major((5, 6), [
             1, 2, 3, 4, 5, 6,
             0, -1, 2, 2, 3, 2,
             0, 0, 1, 4, 5, -3,
@@ -242,7 +242,7 @@ mod tests {
         let sch = Schur::from_pivots(&a, PivotType::Rows, &Perm::id(5), &Perm::id(6), 3, true, true);
         let s = sch.complement();
 
-        assert_eq!(s, &SpMat::from_dense_data((2, 3), [
+        assert_eq!(s, &SpMat::from_row_major((2, 3), [
             5, 12,-14,
             36,45,-60
         ]));
@@ -252,7 +252,7 @@ mod tests {
         let t_in  = sch.trans_src().unwrap().backward_mat();
         let t_out = sch.trans_tgt().unwrap().forward_mat();
 
-        assert_eq!(t_in,  SpMat::from_dense_data((6,3), [
+        assert_eq!(t_in,  SpMat::from_row_major((6,3), [
             20, 24, -31,
             -6, -7,   8,
             -4, -5,   3,
@@ -261,7 +261,7 @@ mod tests {
              0,  0,   1
         ]));
 
-        assert_eq!(t_out, SpMat::from_dense_data((2, 5), [
+        assert_eq!(t_out, SpMat::from_row_major((2, 5), [
             -1,  0,  3, 1, 0,
             -3, -4, 14, 0, 1
         ]));

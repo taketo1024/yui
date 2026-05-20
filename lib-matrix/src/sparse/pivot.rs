@@ -645,7 +645,7 @@ mod tests {
  
     #[test]
     fn str_init() {
-        let a = SpMat::from_dense_data((6, 9), [
+        let a = SpMat::from_row_major((6, 9), [
             1, 0, 1, 0, 0, 1, 1, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 2, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -669,7 +669,7 @@ mod tests {
 
     #[test]
     fn str_row_head() {
-        let a = SpMat::from_dense_data((4, 4), [
+        let a = SpMat::from_row_major((4, 4), [
             1, 0, 1, 0,
             0, 1, 1, 1,
             0, 0, 0, 0,
@@ -685,7 +685,7 @@ mod tests {
 
     #[test]
     fn rows_cols() {
-        let a = SpMat::<i32>::from_dense_data((4, 3), []);
+        let a = SpMat::<i32>::from_row_major((4, 3), []);
         let pf = PivotFinder::new(&a, &Default::default());
         assert_eq!(pf.rows(), 4);
         assert_eq!(pf.cols(), 3);
@@ -693,7 +693,7 @@ mod tests {
 
     #[test]
     fn pivot_data() { 
-        let a = SpMat::from_dense_data((2, 4), [
+        let a = SpMat::from_row_major((2, 4), [
             1, 0, 1, 0,
             0, 0, 1, 1,
         ]);
@@ -712,7 +712,7 @@ mod tests {
 
     #[test]
     fn remain_rows() {
-        let a = SpMat::from_dense_data((4, 4), [
+        let a = SpMat::from_row_major((4, 4), [
             1, 0, 1, 0,
             0, 1, 1, 1,
             0, 0, 0, 0,
@@ -733,7 +733,7 @@ mod tests {
 
     #[test]
     fn pivots() {
-        let a = SpMat::from_dense_data((4, 4), [
+        let a = SpMat::from_row_major((4, 4), [
             1, 0, 1, 0,
             0, 1, 1, 1,
             0, 0, 0, 0,
@@ -754,7 +754,7 @@ mod tests {
 
     #[test]
     fn find_fl_pivots() {
-        let a = SpMat::from_dense_data((6, 9), [
+        let a = SpMat::from_row_major((6, 9), [
             1, 0, 1, 0, 0, 1, 1, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -771,7 +771,7 @@ mod tests {
 
     #[test]
     fn find_fl_col_pivots() { 
-        let a = SpMat::from_dense_data((6, 9), [
+        let a = SpMat::from_row_major((6, 9), [
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -788,7 +788,7 @@ mod tests {
 
     #[test]
     fn find_fl_row_col_pivots() { 
-        let a = SpMat::from_dense_data((6, 9), [
+        let a = SpMat::from_row_major((6, 9), [
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -809,7 +809,7 @@ mod tests {
 
     #[test]
     fn find_cycle_free_pivots_s() {
-        let a = SpMat::from_dense_data((6, 9), [
+        let a = SpMat::from_row_major((6, 9), [
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -827,7 +827,7 @@ mod tests {
     #[cfg(feature = "multithread")]
     #[test]
     fn find_cycle_free_pivots_m() {
-        let a = SpMat::from_dense_data((6, 9), [
+        let a = SpMat::from_row_major((6, 9), [
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -844,7 +844,7 @@ mod tests {
 
     #[test]
     fn zero() {
-        let a = SpMat::from_dense_data((1, 1), [0]);
+        let a = SpMat::from_row_major((1, 1), [0]);
         let (p, q, r) = find_pivots(&a, Default::default());
         assert_eq!(r, 0);
         assert_eq!(p.len(), 1);
@@ -855,7 +855,7 @@ mod tests {
 
     #[test]
     fn id_1() {
-        let a = SpMat::from_dense_data((1, 1), [1]);
+        let a = SpMat::from_row_major((1, 1), [1]);
         let (p, q, r) = find_pivots(&a, Default::default());
         assert_eq!(r, 1);
         assert_eq!(p.len(), 1);
@@ -866,7 +866,7 @@ mod tests {
 
     #[test]
     fn id_2() {
-        let a = SpMat::from_dense_data((2, 2), [
+        let a = SpMat::from_row_major((2, 2), [
             1, 0, 0, 1
         ]);
         let (p, q, r) = find_pivots(&a, Default::default());
@@ -877,7 +877,7 @@ mod tests {
 
     #[test]
     fn result() {
-        let a = SpMat::from_dense_data((6, 9), [
+        let a = SpMat::from_row_major((6, 9), [
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -900,7 +900,7 @@ mod tests {
 
     #[test]
     fn result_cols() {
-        let a = SpMat::from_dense_data((6, 9), [
+        let a = SpMat::from_row_major((6, 9), [
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -944,7 +944,7 @@ mod tests {
     #[test]
     fn max_pivots() {
         // Full rank of this matrix is 5; limiting to 3 must return ≤ 3 pivots.
-        let a = SpMat::from_dense_data((6, 9), [
+        let a = SpMat::from_row_major((6, 9), [
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,

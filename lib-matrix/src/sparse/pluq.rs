@@ -249,9 +249,9 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
     });
 
     let y_dense = y.clone().into_dense();
-    let yp = perm_apply(&pp.p, &y_dense);
+    let yp = pp.p.apply_to(y_dense);
     let xq = solve_lu(&pp.l, &pp.u, &yp)?;
-    let x = perm_apply(&pp.q.inv(), &xq);
+    let x = pp.q.apply_inv_to(xq);
 
     Some(SpVec::from(x))
 }
@@ -368,7 +368,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
         ..Default::default()
     });
     let y_dense = y.clone().into_dense();
-    let mut yp = perm_apply(&pp.p, &y_dense);
+    let mut yp = pp.p.apply_to(y_dense);
 
     let mut step = 1;
     let total_step = (a.nrows() - pp.rank()) / chunk + 1;
@@ -384,7 +384,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
         merge_pluq(&mut pp, pp_next);
 
         // Apply the chunk's row perm to the tail of yp so it stays in sync with pp.l.
-        let yp_tail = perm_apply(&p_next, &yp[r_old..]);
+        let yp_tail = p_next.apply_to(yp[r_old..].to_vec());
         yp[r_old..].clone_from_slice(&yp_tail);
 
         // The top `k` rows of pp.s are zero rows (chunk's PLUQ leftover);
@@ -406,7 +406,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
     debug!("solve pluq..");
 
     let xq = solve_lu(&pp.l, &pp.u, &yp)?;
-    let x = perm_apply(&pp.q.inv(), &xq);
+    let x = pp.q.apply_inv_to(xq);
 
     Some(SpVec::from(x))
 }
@@ -532,13 +532,6 @@ fn extend_perm(n: usize, compact_idx: &[usize], compact_perm: &Perm) -> Perm {
 
     let front = Perm::pull_and_fill(n, compact_idx.iter().copied());
     compact_perm.extend(n - c) * front
-}
-
-// Applies permutation p to y: yp[p(i)] = y[i].
-fn perm_apply<R>(p: &Perm, y: &[R]) -> Vec<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    let pinv = p.inv();
-    (0..y.len()).map(|i| y[pinv.at(i)].clone()).collect()
 }
 
 #[cfg(test)]
@@ -1186,14 +1179,4 @@ mod tests {
         }
     }
 
-    // ---- perm_apply ----
-
-    #[test]
-    fn test_perm_apply() {
-        let p = Perm::from_indices([1, 2, 0]); // 0→1, 1→2, 2→0
-        let y = vec![r(10), r(20), r(30)];
-        let yp = perm_apply(&p, &y);
-        // yp[p(0)=1]=10, yp[p(1)=2]=20, yp[p(2)=0]=30
-        assert_eq!(yp, vec![r(30), r(10), r(20)]);
-    }
 }

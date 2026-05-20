@@ -80,6 +80,49 @@ impl Perm {
         }
     }
 
+    /// Left group action consuming `y`: returns a vector `result` such that
+    /// `result[self.at(i)] = y[i]` for every `i`.
+    pub fn apply_to<R>(&self, y: Vec<R>) -> Vec<R> {
+        assert_eq!(y.len(), self.dim());
+        match &self.data {
+            Either::Left(_) => y,
+            Either::Right(v) => {
+                let n = v.len();
+                let mut result: Vec<R> = Vec::with_capacity(n);
+                let dst = result.as_mut_ptr();
+                for (i, x) in y.into_iter().enumerate() {
+                    // SAFETY: v is a permutation of 0..n (Perm invariant),
+                    // so dst.add(v[i]) is in bounds and each slot is written exactly once.
+                    unsafe { dst.add(v[i]).write(x); }
+                }
+                // SAFETY: all n slots have been written.
+                unsafe { result.set_len(n); }
+                result
+            }
+        }
+    }
+
+    /// Inverse-left action consuming `y`: returns a vector `result` such that
+    /// `result[k] = y[self.at(k)]` for every `k`. Equivalent to
+    /// `self.inv().apply_to(y)` but without allocating an inverse permutation.
+    pub fn apply_inv_to<R>(&self, y: Vec<R>) -> Vec<R> {
+        assert_eq!(y.len(), self.dim());
+        match &self.data {
+            Either::Left(_) => y,
+            Either::Right(v) => {
+                let mut y = std::mem::ManuallyDrop::new(y);
+                let src = y.as_mut_ptr();
+                let cap = y.capacity();
+                // SAFETY: v is a permutation of 0..n, so each y[k] is read exactly once.
+                let result: Vec<R> = v.iter().map(|&k| unsafe { src.add(k).read() }).collect();
+                // SAFETY: every element of y has been moved out; deallocate the buffer
+                // by reconstructing a zero-length Vec with the original capacity.
+                unsafe { drop(Vec::from_raw_parts(src, 0, cap)); }
+                result
+            }
+        }
+    }
+
     /// Returns a permutation of dimension `self.dim() + r` that is the
     /// identity on `[0..r)` and acts as `self` (shifted by `r`) on
     /// `[r..r + self.dim())`. Identity is preserved (zero-cost).
@@ -296,6 +339,45 @@ mod tests {
         let p = Perm::id(3);
         let q = Perm::id(4);
         let _ = &p * &q;
+    }
+
+    // --- apply_to / apply_inv_to (group actions) ---
+
+    #[test]
+    fn apply_to_consumes() {
+        // p = [1, 2, 0]: 0→1, 1→2, 2→0.
+        // result[p(i)] = y[i] ⇒ result = [y[2], y[0], y[1]] = [30, 10, 20].
+        let p = Perm::from_indices([1, 2, 0]);
+        assert_eq!(p.apply_to(vec![10, 20, 30]), vec![30, 10, 20]);
+    }
+
+    #[test]
+    fn apply_to_by_id() {
+        let id = Perm::id(4);
+        assert_eq!(id.apply_to(vec![1, 2, 3, 4]), vec![1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn apply_inv_to_consumes() {
+        // p = [1, 2, 0]; result[k] = y[p(k)] ⇒ result = [y[1], y[2], y[0]] = [20, 30, 10].
+        let p = Perm::from_indices([1, 2, 0]);
+        assert_eq!(p.apply_inv_to(vec![10, 20, 30]), vec![20, 30, 10]);
+    }
+
+    #[test]
+    fn apply_inv_to_inverts_apply_to() {
+        // For any p and y: p.apply_inv_to(p.apply_to(y)) == y.
+        let p = Perm::from_indices([2, 0, 3, 1]);
+        let y = vec![10, 20, 30, 40];
+        let permuted = p.apply_to(y.clone());
+        assert_eq!(p.apply_inv_to(permuted), y);
+    }
+
+    #[test]
+    #[should_panic]
+    fn apply_to_panics_on_len_mismatch() {
+        let p = Perm::id(3);
+        let _ = p.apply_to(vec![1, 2]);
     }
 
     // --- shift ---

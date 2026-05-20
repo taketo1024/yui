@@ -71,7 +71,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
 
     assert_eq!(y.len(), a.nrows());
     let Pluq { p, q, l, u, .. } = pluq(a);
-    let yp = apply_perm(&p, y);
+    let yp = p.apply_to(y.to_vec());
 
     debug!("forward sub: {:?}", l.shape());
 
@@ -82,12 +82,6 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
 
     let xp = back_sub(&u, &z);
     Some((0..xp.len()).map(|j| xp[q.at(j)].clone()).collect())
-}
-
-// Applies permutation p to y: result[k] = y[p^{-1}(k)], i.e., result[p(i)] = y[i].
-fn apply_perm<R: Clone>(p: &Perm, y: &[R]) -> Vec<R> {
-    let pinv = p.inv();
-    (0..y.len()).map(|k| y[pinv.at(k)].clone()).collect()
 }
 
 // Solves L * z = yp[0..rank] by forward substitution (L is lower triangular, pivot values on diagonal).

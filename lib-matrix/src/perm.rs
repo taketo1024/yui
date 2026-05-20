@@ -80,6 +80,35 @@ impl Perm {
         }
     }
 
+    /// Returns a permutation of dimension `self.dim() + r` that is the
+    /// identity on `[0..r)` and acts as `self` (shifted by `r`) on
+    /// `[r..r + self.dim())`. Identity is preserved (zero-cost).
+    pub fn shift(&self, r: usize) -> Self {
+        match &self.data {
+            Either::Left(n) => Self::id(n + r),
+            Either::Right(v) => {
+                let mut data: Vec<usize> = (0..r).collect();
+                data.extend(v.iter().map(|&x| r + x));
+                Self::new(data)
+            }
+        }
+    }
+
+    /// Returns a permutation of dimension `self.dim() + r` that acts as
+    /// `self` on `[0..self.dim())` and the identity on the appended
+    /// `[self.dim()..self.dim() + r)`. Identity is preserved (zero-cost).
+    pub fn extend(&self, r: usize) -> Self {
+        match &self.data {
+            Either::Left(n) => Self::id(n + r),
+            Either::Right(v) => {
+                let m = v.len();
+                let mut data = v.clone();
+                data.extend(m..m + r);
+                Self::new(data)
+            }
+        }
+    }
+
     /// Permutation `p` of `0..n` that sends each index in `prefix` to a
     /// position `0, 1, 2, ...` (in the order given), with the remaining
     /// indices filling positions in sorted order.
@@ -267,6 +296,62 @@ mod tests {
         let p = Perm::id(3);
         let q = Perm::id(4);
         let _ = &p * &q;
+    }
+
+    // --- shift ---
+
+    #[test]
+    fn shift_basic() {
+        // perm = [1, 2, 0], shift by 2 → [0, 1, 3, 4, 2]
+        let p = Perm::from_indices([1, 2, 0]);
+        let s = p.shift(2);
+        assert_eq!(s.dim(), 5);
+        for (i, &x) in [0, 1, 3, 4, 2].iter().enumerate() {
+            assert_eq!(s.at(i), x);
+        }
+    }
+
+    #[test]
+    fn shift_zero() {
+        let p = Perm::from_indices([2, 0, 1]);
+        let s = p.shift(0);
+        assert_eq!(s, p);
+    }
+
+    #[test]
+    fn shift_of_id() {
+        // Shifting an identity stays identity, and its dim grows.
+        let s = Perm::id(3).shift(2);
+        assert!(s.is_id());
+        assert_eq!(s.dim(), 5);
+    }
+
+    // --- extend ---
+
+    #[test]
+    fn extend_basic() {
+        // perm = [1, 2, 0], extend by 2 → [1, 2, 0, 3, 4]
+        let p = Perm::from_indices([1, 2, 0]);
+        let s = p.extend(2);
+        assert_eq!(s.dim(), 5);
+        for (i, &x) in [1, 2, 0, 3, 4].iter().enumerate() {
+            assert_eq!(s.at(i), x);
+        }
+    }
+
+    #[test]
+    fn extend_zero() {
+        let p = Perm::from_indices([2, 0, 1]);
+        let s = p.extend(0);
+        assert_eq!(s, p);
+    }
+
+    #[test]
+    fn extend_of_id() {
+        // Extending an identity stays identity, and its dim grows.
+        let s = Perm::id(3).extend(2);
+        assert!(s.is_id());
+        assert_eq!(s.dim(), 5);
     }
 
     // --- pull_and_fill ---

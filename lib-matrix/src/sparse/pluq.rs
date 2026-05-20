@@ -152,8 +152,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let raw = dense_pluq(&mat);
     let dp = if transpose { raw.transpose() } else { raw };
 
-    let p2 = extend_perm(&dp.p, &row_idx, ms);
-    let q2 = extend_perm(&dp.q, &col_idx, ns);
+    let p2 = extend_perm(ms, &row_idx, &dp.p);
+    let q2 = extend_perm(ns, &col_idx, &dp.q);
 
     let mut l2 = SpMat::from(dp.l);
     l2.extend_by_zero(ms - m0, 0);
@@ -458,7 +458,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let l_ext = row_mult.unwrap();
 
     let chunk_idx: Vec<usize> = (0..c).collect();
-    let p = extend_perm(&pp_chunk.p, &chunk_idx, m_s);
+    let p = extend_perm(m_s, &chunk_idx, &pp_chunk.p);
     let q = pp_chunk.q;
     let l = SpMat::stack(pp_chunk.l, l_ext);
     let u = pp_chunk.u;
@@ -517,24 +517,21 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 // shifted by `r` and remapped by perm2 (where `r = perm1.dim() - perm2.dim()`).
 fn merge_perm(perm1: &Perm, perm2: &Perm) -> Perm {
     assert!(perm1.dim() >= perm2.dim());
-    let n = perm1.dim();
-    let r = n - perm2.dim();
-    Perm::new((0..n).map(|i| {
-        let j = perm1.at(i);
-        if j < r { j } else { r + perm2.at(j - r) }
-    }).collect())
+    let r = perm1.dim() - perm2.dim();
+    perm2.shift(r) * perm1
 }
 
-// Lifts a compact permutation (acting on compact_idx elements of [0..full_n]) to the
+// Lifts a compact permutation (acting on compact_idx elements of [0..n]) to the
 // full index space.  compact_idx[k] maps to compact_perm.at(k) (within [0..mr]);
 // all other indices map to consecutive positions starting at mr (in sorted order).
-fn extend_perm(compact_perm: &Perm, compact_idx: &[usize], full_n: usize) -> Perm {
-    let front = Perm::pull_and_fill(full_n, compact_idx.iter().copied());
-    let mr = compact_idx.len();
-    Perm::new((0..full_n).map(|i| {
-        let k = front.at(i);
-        if k < mr { compact_perm.at(k) } else { k }
-    }).collect())
+fn extend_perm(n: usize, compact_idx: &[usize], compact_perm: &Perm) -> Perm {
+    let c = compact_idx.len();
+
+    assert!(n >= c);
+    assert_eq!(compact_perm.dim(), c);
+
+    let front = Perm::pull_and_fill(n, compact_idx.iter().copied());
+    compact_perm.extend(n - c) * front
 }
 
 // Applies permutation p to y: yp[p(i)] = y[i].
@@ -1168,7 +1165,7 @@ mod tests {
         //     i=0 -> 2,  i=2 -> 3,  i=4 -> 4
         let cp = Perm::from_indices([1, 0]);
         let idx = vec![1usize, 3];
-        let p = extend_perm(&cp, &idx, 5);
+        let p = extend_perm(5, &idx, &cp);
         assert_eq!(p.at(0), 2);
         assert_eq!(p.at(1), 1);
         assert_eq!(p.at(2), 3);
@@ -1182,7 +1179,7 @@ mod tests {
         // extend_perm should equal Perm::pull_and_fill(7, [0,2,5]).
         let cp = Perm::id(3);
         let idx = vec![0usize, 2, 5];
-        let p = extend_perm(&cp, &idx, 7);
+        let p = extend_perm(7, &idx, &cp);
         let expected = Perm::pull_and_fill(7, idx.iter().copied());
         for i in 0..7 {
             assert_eq!(p.at(i), expected.at(i), "mismatch at i={i}");

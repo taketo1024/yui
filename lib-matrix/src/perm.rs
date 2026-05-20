@@ -126,12 +126,12 @@ impl Perm {
     /// Returns a permutation of dimension `self.dim() + r` that is the
     /// identity on `[0..r)` and acts as `self` (shifted by `r`) on
     /// `[r..r + self.dim())`. Identity is preserved (zero-cost).
-    pub fn shift(&self, r: usize) -> Self {
-        match &self.data {
+    pub fn shift(self, r: usize) -> Self {
+        match self.data {
             Either::Left(n) => Self::id(n + r),
             Either::Right(v) => {
                 let mut data: Vec<usize> = (0..r).collect();
-                data.extend(v.iter().map(|&x| r + x));
+                data.extend(v.into_iter().map(|x| x + r));
                 Self::new(data)
             }
         }
@@ -140,14 +140,13 @@ impl Perm {
     /// Returns a permutation of dimension `self.dim() + r` that acts as
     /// `self` on `[0..self.dim())` and the identity on the appended
     /// `[self.dim()..self.dim() + r)`. Identity is preserved (zero-cost).
-    pub fn extend(&self, r: usize) -> Self {
-        match &self.data {
+    pub fn extend(self, r: usize) -> Self {
+        match self.data {
             Either::Left(n) => Self::id(n + r),
-            Either::Right(v) => {
+            Either::Right(mut v) => {
                 let m = v.len();
-                let mut data = v.clone();
-                data.extend(m..m + r);
-                Self::new(data)
+                v.extend(m..m + r);
+                Self::new(v)
             }
         }
     }
@@ -396,7 +395,7 @@ mod tests {
     #[test]
     fn shift_zero() {
         let p = Perm::from_indices([2, 0, 1]);
-        let s = p.shift(0);
+        let s = p.clone().shift(0);
         assert_eq!(s, p);
     }
 
@@ -424,7 +423,7 @@ mod tests {
     #[test]
     fn extend_zero() {
         let p = Perm::from_indices([2, 0, 1]);
-        let s = p.extend(0);
+        let s = p.clone().extend(0);
         assert_eq!(s, p);
     }
 

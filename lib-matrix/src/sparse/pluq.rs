@@ -152,8 +152,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let raw = dense_pluq(&mat);
     let dp = if transpose { raw.transpose() } else { raw };
 
-    let p2 = extend_perm(ms, &row_idx, &dp.p);
-    let q2 = extend_perm(ns, &col_idx, &dp.q);
+    let p2 = extend_perm(ms, &row_idx, dp.p);
+    let q2 = extend_perm(ns, &col_idx, dp.q);
 
     let mut l2 = SpMat::from(dp.l);
     l2.extend_by_zero(ms - m0, 0);
@@ -211,11 +211,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     assert_eq!(pp2.l.nrows(), m - r1);
     assert_eq!(pp2.u.ncols(), n - r1);
 
-    // MEMO: Even if r2 == 0, there could be non-trivial permutations 
-    // when R is not a field. 
-
-    pp1.p = merge_perm(&pp1.p, &pp2.p);
-    pp1.q = merge_perm(&pp1.q, &pp2.q);
+    // MEMO: Even if r2 == 0, there could be non-trivial permutations
+    // when R is not a field.
 
     pp1.l = {
         let [l0, l1] = pp1.take_l().divide_at_row(r1);
@@ -232,6 +229,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     };
 
     pp1.s = pp2.s;
+    pp1.p = merge_perm(&pp1.p, pp2.p);
+    pp1.q = merge_perm(&pp1.q, pp2.q);
 }
 
 /// Solves `a * x = y` over a field using sparse PLUQ.
@@ -458,7 +457,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let l_ext = row_mult.unwrap();
 
     let chunk_idx: Vec<usize> = (0..c).collect();
-    let p = extend_perm(m_s, &chunk_idx, &pp_chunk.p);
+    let p = extend_perm(m_s, &chunk_idx, pp_chunk.p);
     let q = pp_chunk.q;
     let l = SpMat::stack(pp_chunk.l, l_ext);
     let u = pp_chunk.u;
@@ -515,7 +514,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 // Composes perm1 with perm2: the first `r` positions stay, the rest are
 // shifted by `r` and remapped by perm2 (where `r = perm1.dim() - perm2.dim()`).
-fn merge_perm(perm1: &Perm, perm2: &Perm) -> Perm {
+fn merge_perm(perm1: &Perm, perm2: Perm) -> Perm {
     assert!(perm1.dim() >= perm2.dim());
     let r = perm1.dim() - perm2.dim();
     perm2.shift(r) * perm1
@@ -524,7 +523,7 @@ fn merge_perm(perm1: &Perm, perm2: &Perm) -> Perm {
 // Lifts a compact permutation (acting on compact_idx elements of [0..n]) to the
 // full index space.  compact_idx[k] maps to compact_perm.at(k) (within [0..mr]);
 // all other indices map to consecutive positions starting at mr (in sorted order).
-fn extend_perm(n: usize, compact_idx: &[usize], compact_perm: &Perm) -> Perm {
+fn extend_perm(n: usize, compact_idx: &[usize], compact_perm: Perm) -> Perm {
     let c = compact_idx.len();
 
     assert!(n >= c);
@@ -1139,7 +1138,7 @@ mod tests {
         //   i=4: j=4 ≥ r → r + perm2.at(2) = 2 + 0 = 2
         let perm1 = Perm::from_indices([2, 0, 3, 1, 4]);
         let perm2 = Perm::from_indices([1, 2, 0]);
-        let p = merge_perm(&perm1, &perm2);
+        let p = merge_perm(&perm1, perm2);
         for (i, expected) in [3, 0, 4, 1, 2].iter().enumerate() {
             assert_eq!(p.at(i), *expected, "mismatch at i={i}");
         }
@@ -1158,7 +1157,7 @@ mod tests {
         //     i=0 -> 2,  i=2 -> 3,  i=4 -> 4
         let cp = Perm::from_indices([1, 0]);
         let idx = vec![1usize, 3];
-        let p = extend_perm(5, &idx, &cp);
+        let p = extend_perm(5, &idx, cp);
         assert_eq!(p.at(0), 2);
         assert_eq!(p.at(1), 1);
         assert_eq!(p.at(2), 3);
@@ -1172,7 +1171,7 @@ mod tests {
         // extend_perm should equal Perm::pull_and_fill(7, [0,2,5]).
         let cp = Perm::id(3);
         let idx = vec![0usize, 2, 5];
-        let p = extend_perm(7, &idx, &cp);
+        let p = extend_perm(7, &idx, cp);
         let expected = Perm::pull_and_fill(7, idx.iter().copied());
         for i in 0..7 {
             assert_eq!(p.at(i), expected.at(i), "mismatch at i={i}");

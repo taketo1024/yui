@@ -38,6 +38,7 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         Self::id(0)
     }
 
+    /// Single-stage transform with forward map `f` and backward map `b`.
     pub fn new(f: SpMat<R>, b: SpMat<R>) -> Self {
         let mut t = Self::id(f.n_cols());
         t.append(f, b);
@@ -83,7 +84,8 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         self.append(f, b)
     }
 
-    pub fn merge(&mut self, mut other: Trans<R>) { 
+    /// Appends `other`'s stages onto `self`; requires `self.tgt_dim == other.src_dim`.
+    pub fn merge(&mut self, mut other: Trans<R>) {
         assert_eq!(self.tgt_dim, other.src_dim);
 
         self.tgt_dim = other.tgt_dim;
@@ -121,6 +123,7 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         }
     }
 
+    /// Collapses the stored stages into a single pair of forward/backward matrices.
     pub fn reduce(&mut self) {
         if self.f_mats.len() > 1 { 
             let f = self.forward_mat();
@@ -133,7 +136,9 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn sub(&self, indices: &[usize]) -> Self { 
+    /// Restricts the target to the given index subset, appending an extra
+    /// projection / inclusion stage.
+    pub fn sub(&self, indices: &[usize]) -> Self {
         let n = self.tgt_dim();
         let p = indices.len();
         let f = SpMat::from_entries(

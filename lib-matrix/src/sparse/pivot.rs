@@ -1,10 +1,12 @@
-// Implementation based on:
-// 
-// "Parallel Sparse PLUQ Factorization modulo p", Charles Bouillaguet, Claire Delaplace, Marie-Emilie Voge.
-// https://hal.inria.fr/hal-01646133/document
-// 
-// see also: SpaSM (Sparse direct Solver Modulo p)
-// https://github.com/cbouilla/spasm
+//! Heuristic pivot finder for sparse PLUQ.
+//!
+//! Implementation based on:
+//!
+//! - "Parallel Sparse PLUQ Factorization modulo p", Charles Bouillaguet,
+//!   Claire Delaplace, Marie-Emilie Voge.
+//!   <https://hal.inria.fr/hal-01646133/document>
+//! - see also: SpaSM (Sparse direct Solver Modulo p),
+//!   <https://github.com/cbouilla/spasm>.
 
 use std::cmp::Ordering;
 use std::collections::VecDeque;

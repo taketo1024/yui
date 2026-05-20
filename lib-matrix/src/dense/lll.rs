@@ -1,13 +1,14 @@
-// "Extended GCD and Hermite Normal Form Algorithms via Lattice Basis Reduction",
-// George Havas, Bohdan S. Majewski, and Keith R. Matthews
-// https://projecteuclid.org/journals/experimental-mathematics/volume-7/issue-2/Extended-GCD-and-Hermite-normal-form-algorithms-via-lattice-basis/em/1048515660.full
-//
-// see also: "Keith Matthews' LLL page", 
-// http://www.numbertheory.org/lll.html
-//
-// "A generalization of the LLL-algorithm over euclidean rings or orders",
-// Huguette Napias
-// https://www.jstor.org/stable/43974220
+//! LLL lattice reduction and Hermite normal form.
+//!
+//! Based on:
+//!
+//! - "Extended GCD and Hermite Normal Form Algorithms via Lattice Basis Reduction",
+//!   George Havas, Bohdan S. Majewski, and Keith R. Matthews.
+//!   <https://projecteuclid.org/journals/experimental-mathematics/volume-7/issue-2/Extended-GCD-and-Hermite-normal-form-algorithms-via-lattice-basis/em/1048515660.full>
+//! - see also: "Keith Matthews' LLL page", <http://www.numbertheory.org/lll.html>.
+//! - "A generalization of the LLL-algorithm over euclidean rings or orders",
+//!   Huguette Napias.
+//!   <https://www.jstor.org/stable/43974220>
 
 use std::fmt::Debug;
 use std::iter::zip;

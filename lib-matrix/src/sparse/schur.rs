@@ -37,6 +37,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> Schur<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
+    /// Reduces `a` by permuting `(p, q)` and treating the leading `r × r`
+    /// block (now triangular by `t`) as the pivot block `a` in the 2×2
+    /// decomposition.
     pub fn from_pivots(
         a: &SpMat<R>,
         t: PivotType,

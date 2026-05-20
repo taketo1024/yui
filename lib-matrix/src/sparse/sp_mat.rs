@@ -90,10 +90,12 @@ impl<R> SpMat<R> {
         }
     }
     
+    /// Iterates the stored `(row, col, value)` triplets — may include explicit zeros.
     pub fn iter(&self) -> impl Iterator<Item = (usize, usize, &R)> {
         self.inner.triplet_iter()
     }
 
+    /// [`iter`](Self::iter), filtered to non-zero values.
     pub fn iter_nz(&self) -> impl Iterator<Item = (usize, usize, &R)>
     where R: Zero {
         self.iter().filter(|e| !e.2.is_zero())
@@ -178,6 +180,8 @@ impl<R> SpMat<R> {
 
 impl<R> SpMat<R> 
 where R: Scalar + Clone + Zero + ClosedAddAssign { 
+    /// Builds an `SpMat` of `shape` from `(row, col, value)` triplets. Zero
+    /// values are skipped; duplicates at the same position are summed.
     pub fn from_entries<T>(shape: (usize, usize), entries: T) -> Self
     where T: IntoIterator<Item = (usize, usize, R)> {
         let mut coo = CooMatrix::new(shape.0, shape.1);
@@ -247,6 +251,8 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         self.inner.transpose().into()
     }
 
+    /// New `shape`-d matrix whose entry at `f(i, j)` (if `Some`) is `self[(i, j)]`.
+    /// Entries where `f` returns `None` are dropped.
     pub fn extract<F>(&self, shape: (usize, usize), f: F) -> SpMat<R>
     where F: Fn(usize, usize) -> Option<(usize, usize)> { 
         SpMat::from_entries(shape, self.iter().filter_map(|(i, j, a)|

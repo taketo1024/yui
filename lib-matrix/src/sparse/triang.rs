@@ -45,13 +45,14 @@ impl TriangularType {
     }
 }
 
+/// Inverse of a triangular matrix `a`.
 pub fn inv_triangular<R>(t: TriangularType, a: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let e = SpMat::id(a.n_rows());
     solve_triangular(t, a, &e)
 }
 
-// solve ax = y.
+/// Solves `a · x = y` for triangular `a`.
 pub fn solve_triangular<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let n = a.n_rows();
@@ -82,12 +83,13 @@ where
     }
 }
 
-// solve xa = y.
+/// Solves `x · a = y` for triangular `a`.
 pub fn solve_triangular_left<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     solve_triangular(t.transpose(), &a.transpose(), &y.transpose()).transpose()
 }
 
+/// Vector form of [`solve_triangular`]: solves `a · x = b`.
 pub fn solve_triangular_vec<R>(t: TriangularType, a: &SpMat<R>, b: &SpVec<R>) -> SpVec<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     assert_eq!(a.n_rows(), b.dim());

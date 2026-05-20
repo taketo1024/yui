@@ -190,9 +190,9 @@ mod tests {
         let y = T::from_left(s2[1].raw_generator(0).clone());
         let z = T::from_right(d3[1].raw_generator(0).clone());
 
-        assert_eq!(cone[1].raw_generators().index_of(&x), Some(0));
-        assert_eq!(cone[2].raw_generators().index_of(&y), Some(0));
-        assert_eq!(cone[1].raw_generators().index_of(&z), Some(4));
+        assert_eq!(cone[1].raw_generators().get_index_of(&x), Some(0));
+        assert_eq!(cone[2].raw_generators().get_index_of(&y), Some(0));
+        assert_eq!(cone[1].raw_generators().get_index_of(&z), Some(4));
 
         let dx = cone.d(1, &Lc::from(x.clone()));
         assert_eq!(dx, Lc::from(T::from_right(GenericKey(0, 0))));

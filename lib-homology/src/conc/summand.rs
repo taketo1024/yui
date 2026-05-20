@@ -1,6 +1,9 @@
 use std::fmt::Display;
 
-use yui_core::{EucRing, EucRingOps, IndexList, Ring, RingOps};
+use ahash::RandomState;
+use yui_core::{EucRing, EucRingOps, Ring, RingOps};
+
+type IndexSet<X> = indexmap::IndexSet<X, RandomState>;
 use yui_core::lc::{LcKey, Lc};
 use yui_matrix::sparse::{SpMat, SpVec, Trans};
 
@@ -15,7 +18,7 @@ where
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    raw_gens: IndexList<X>,
+    raw_gens: IndexSet<X>,
     rank: usize, 
     tors: Vec<R>,
     trans: Trans<R>
@@ -23,7 +26,7 @@ where
 
 impl<X, R> Summand<X, R>
 where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new(raw_gens: IndexList<X>, rank: usize, tors: Vec<R>, trans: Trans<R>) -> Self { 
+    pub fn new(raw_gens: IndexSet<X>, rank: usize, tors: Vec<R>, trans: Trans<R>) -> Self { 
         assert_eq!(trans.src_dim(), raw_gens.len());
         assert_eq!(trans.tgt_dim(), rank + tors.len());
 
@@ -32,13 +35,13 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn from_raw_generators<Itr>(raw_gens: Itr) -> Self
     where Itr: IntoIterator<Item = X> {
-        let gens = raw_gens.into_iter().collect::<IndexList<X>>();
+        let gens = raw_gens.into_iter().collect::<IndexSet<X>>();
         let r = gens.len();
         Self::new(gens, r, vec![], Trans::id(r))
     }
 
     pub fn zero() -> Self { 
-        Self::new(IndexList::new(), 0, vec![], Trans::zero())
+        Self::new(IndexSet::default(), 0, vec![], Trans::zero())
     }
 
     pub fn trans(&self) -> &Trans<R> { 
@@ -49,7 +52,7 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
         &self.raw_gens[i]
     }
 
-    pub fn raw_generators(&self) -> &IndexList<X> {
+    pub fn raw_generators(&self) -> &IndexSet<X> {
         &self.raw_gens
     }
 
@@ -69,7 +72,7 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
         // MEMO should add strict option. 
 
         let v = SpVec::from_entries(n, z.iter().flat_map(|(x, a)| { 
-            self.raw_gens.index_of(x).map(|i| (i, a.clone()))
+            self.raw_gens.get_index_of(x).map(|i| (i, a.clone()))
         }));
 
         self.trans.forward(&v)

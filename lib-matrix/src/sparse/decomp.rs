@@ -75,7 +75,7 @@ where R: Zero + Send + Sync {
                 })
             );
 
-            res = u.into_inner().unwrap().group();
+            res = u.into_inner().unwrap().into_disjoint();
         } else { 
             let mut u = u;
 
@@ -87,7 +87,7 @@ where R: Zero + Send + Sync {
                 })
             );
 
-            res = u.group();
+            res = u.into_disjoint();
         }
     }
 

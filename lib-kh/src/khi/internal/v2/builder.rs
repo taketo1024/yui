@@ -134,10 +134,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
         }
 
-        u.group().into_iter().fold(vec![], |mut res, next| { 
-            if let Some(x) = next.iter().next() { 
+        u.into_disjoint().into_iter().fold(vec![], |mut res, next| {
+            if let Some(x) = next.first() {
                 let tx = self.inv_x(x);
-                if !res.contains(&tx) { 
+                if !res.contains(&tx) {
                     res.extend(next);
                 }
             }

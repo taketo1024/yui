@@ -12,5 +12,4 @@ pub mod pivot;
 pub mod pluq;
 pub mod schur;
 pub mod triang;
-pub mod decomp;
 mod util;

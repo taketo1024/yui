@@ -1,8 +1,11 @@
+//! Math-flavored string formatting helpers.
+
 use std::fmt::Display;
 use itertools::Itertools;
 use num_traits::ToPrimitive;
 use crate::IntoDigits;
 
+/// Wrap `s` in parentheses if its `Display` form contains a space; otherwise return as-is.
 pub fn paren_expr<S>(s: S) -> String
 where S: Display {
     let s = s.to_string();
@@ -13,6 +16,9 @@ where S: Display {
     }
 }
 
+/// Format a sequence of `(generator, coefficient)` pairs as a sum
+/// `r₁·x₁ + r₂·x₂ + …`, with sign flips for negative coefficients and
+/// `1`/`-1` coefficients elided. Returns `"0"` if the iterator is empty.
 pub fn lc<X, R, S>(mut terms: S) -> String
 where 
     X: Display, 
@@ -67,6 +73,7 @@ where
     }
 }
 
+/// Render an integer as Unicode subscript digits (`₀..₉`, with `₋` for negatives).
 pub fn subscript<I>(i: I) -> String
 where I: ToPrimitive {
     let i = i.to_isize().unwrap();
@@ -88,7 +95,8 @@ where I: ToPrimitive {
     })
 }
 
-pub fn superscript<I>(i: I) -> String 
+/// Render an integer as Unicode superscript digits (`⁰..⁹`, with `⁻` for negatives).
+pub fn superscript<I>(i: I) -> String
 where I: ToPrimitive {
     let i = i.to_isize().unwrap();
 
@@ -114,6 +122,8 @@ where I: ToPrimitive {
     })
 }
 
+/// Render a 2D table with the given header label, row keys, column keys,
+/// and a function producing each cell entry. Backed by `prettytable`.
 pub fn table<S, I, J, I1, I2, D, F>(head: S, rows: I1, cols: I2, entry: F) -> String
 where 
     S: Display,

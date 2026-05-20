@@ -160,7 +160,7 @@ impl<R> SpMat<R> {
 
     /// Returns the raw `(row_indices, values)` slices of column `j`.
     /// Borrow-only — no allocation, no value clones.
-    pub fn col_data(&self, j: usize) -> (&[usize], &[R]) {
+    pub(crate) fn col_data(&self, j: usize) -> (&[usize], &[R]) {
         let (col_offsets, row_indices, values) = self.inner.csc_data();
         let range = col_offsets[j]..col_offsets[j + 1];
         (&row_indices[range.clone()], &values[range])
@@ -647,7 +647,7 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn from_grid() { 
+    fn from_dense_data() {
         let a = SpMat::from_dense_data((2, 2), [1,2,3,4]);
         assert_eq!(a.disassemble(), (vec![0, 2, 4], vec![0, 1, 0, 1], vec![1, 3, 2, 4]));
     }

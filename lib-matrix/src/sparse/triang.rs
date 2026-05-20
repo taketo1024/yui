@@ -28,7 +28,7 @@ impl TriangularType {
         }
     }
 
-    pub fn tranpose(&self) -> Self { 
+    pub fn transpose(&self) -> Self {
         match self { 
             Self::Upper => Self::Lower,
             Self::Lower => Self::Upper
@@ -83,7 +83,7 @@ where
 // solve xa = y.
 pub fn solve_triangular_left<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    solve_triangular(t.tranpose(), &a.transpose(), &y.transpose()).transpose()
+    solve_triangular(t.transpose(), &a.transpose(), &y.transpose()).transpose()
 }
 
 pub fn solve_triangular_vec<R>(t: TriangularType, a: &SpMat<R>, b: &SpVec<R>) -> SpVec<R>

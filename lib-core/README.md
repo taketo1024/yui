@@ -12,8 +12,8 @@ The foundational crate of the [`yui`](https://github.com/taketo1024/yui) workspa
 src/
 ├── abst/    — algebraic trait hierarchy: Ring, EucRing, Field, RMod, ...
 ├── conc/    — concrete instantiations: Ratio, FF, Poly, Lc, Sign, BitSeq
-├── algo/    — TopSort, UnionFind, KeyedUnionFind, rep_comb
 ├── ext/     — extension traits: IteratorExt, RangeExt, IntoDigits, ...
+├── algo/    — TopSort, UnionFind, KeyedUnionFind, rep_comb
 └── util/    — formatting, data-dir resolution, thread-safe counter
 ```
 
@@ -22,19 +22,30 @@ src/
 The traits in `abst/` form the algebraic supertrait stack that everything else is generic over:
 
 ```text
-MathType / IndexType    — basic shape (Display, Eq, Hash, ...)
-       ↓
-AddMon → AddGrp         — additive monoid → group
-Mon → Ring → EucRing → Field
-       ↓
-RMod                    — modules over a ring
+              MathType                  (basic shape + math_symbol())
+                 │
+           ┌─────┴─────┐
+           ↓           ↓
+         AddMon       Mon               (zero, +)        (one, ×)
+           ↓           │
+         AddGrp        │                (negation)
+           └─────┬─────┘
+                 ↓
+               Ring     ──────►  RMod   (module over a ring R)
+                 ↓
+              EucRing                   (gcd, div_rem)
+                 ↓
+               Field                    (every nonzero invertible)
 ```
+
+Arrows `↓` denote supertrait inheritance: `Ring: AddGrp + Mon`, `EucRing: Ring`, etc.
+`RMod` takes its scalar ring `R: Ring` as an associated type, not a supertrait.
 
 A typical `where`-clause:
 
 ```rust,ignore
-fn foo<R: Ring>(x: R) -> R
-where for<'x> &'x R: RingOps<R>
+fn foo<R>(x: &R) -> R
+where R: Ring, for<'x> &'x R: RingOps<R>
 { ... }
 ```
 
@@ -43,22 +54,21 @@ The `for<'x>` HRTB on the reference impl is required throughout; the [`auto_impl
 ## Concrete types
 
 `conc/num/`:
-- `Ratio<T>` — fractions over a Euclidean ring; `Ratio<i64>` and `Ratio<BigInt>` are the rationals.
-- `FF<P>` — finite field 𝔽ₚ for prime `P`. Use `FF2` for the (faster) bit-packed 𝔽₂.
-- `QuadInt<I, D>` — quadratic integers in ℤ[ω] for `ω = (1+√D)/2` or `√D`; aliases `GaussInt`, `EisenInt`.
 - `IntType` impls for `i32 / i64 / i128 / BigInt`.
+- `Ratio<T>` — fractions over a Euclidean ring; `Ratio<i64>` and `Ratio<BigInt>` are the rationals.
+- `FF<p>` — finite field 𝔽ₚ for prime `p`. For 𝔽₂, prefer the specialized `FF2` (uses XOR/AND directly on a `bool`).
+- `QuadInt<I, D>` — quadratic integers in ℤ[ω] for `ω = (1+√D)/2` or `√D`; aliases `GaussInt`, `EisenInt`.
 
 `conc/poly/`:
-- `Poly<X, R>` — univariate polynomial. `LPoly` is the Laurent variant.
-- `PolyN<X, R>` (multivariate), `Poly2`, `Poly3` (fixed arity), plus their Laurent variants.
-- `Var<X, I>`, `Var2`, `Var3`, `MultiVar` — monomial types.
+- `Poly<X, R>` — univariate polynomial. 
+- `LPoly<X, R>` — univariate Laurent variant.
+- `Poly2`, `Poly3` (fixed arity), `PolyN<X, R>` (multivariate), plus their Laurent variants.
 
 `conc/lc/`:
-- `Lc<X, R>` — formal linear combination `Σ rᵢ · xᵢ` with keys `X: LcKey` and coefficients in `R: Ring`. The free `R`-module over the key set.
-- `LcKey: MathType + IndexType` — any math object that's hashable and ordered. Wrap a non-math type with `AsKey<T>` if needed.
+- `Lc<X, R>` — formal linear combination `Σ rᵢxᵢ` with keys `X: LcKey` and coefficients in `R: Ring`. Elements of the free `R`-module over the key set.
 
 `conc/misc/`:
-- `Sign` — multiplicative group `{±1}`.
+- `Sign` — represents signs `{±1}`.
 - `bitseq::BitSeq` — packed sequence of bits, length up to 64.
 
 ## Quick example
@@ -79,7 +89,7 @@ assert_eq!((&a * &b).to_string(), "1/6");
 
 ## License
 
-[MIT](https://opensource.org/licenses/MIT).
+This library is licensed under the [MIT License](https://opensource.org/licenses/MIT).
 
 ---
 

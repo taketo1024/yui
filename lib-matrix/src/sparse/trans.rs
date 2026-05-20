@@ -1,4 +1,3 @@
-use sprs::PermView;
 use yui_core::{CloneAnd, Ring, RingOps};
 use crate::Perm;
 use crate::sparse::{SpMat, MatTrait, SpVec};
@@ -66,11 +65,10 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         self.b_mats.push(b);
     }
 
-    pub fn append_perm(&mut self, p: PermView) {
+    pub fn append_perm(&mut self, p: &Perm) {
         assert_eq!(p.dim(), self.tgt_dim);
-        let p_new = Perm::new(p.vec());
-        let f = SpMat::from_row_perm(&p_new);
-        let b = SpMat::from_col_perm(&p_new);
+        let f = SpMat::from_row_perm(p);
+        let b = SpMat::from_col_perm(p);
         self.append(f, b)
     }
 
@@ -154,8 +152,6 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests {
-    use sprs::PermOwned;
-
     use super::*;
     use crate::sparse::*;
 
@@ -192,9 +188,7 @@ mod tests {
             SpMat::id(5).submat_rows(0..3),
             SpMat::id(5).submat_cols(0..3),
         );
-        t.append_perm(
-            PermOwned::new(vec![1,2,0]).view()
-        );
+        t.append_perm(&Perm::from_indices([1,2,0]));
 
         let v = SpVec::from(vec![0,1,2,3,4]);
         let w = t.forward(&v);

@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use itertools::Itertools;
 use log::*;
-use sprs::PermOwned;
 
 use yui_matrix::sparse::*;
 use yui_matrix::Perm;
@@ -180,7 +179,8 @@ where
         trace!("  density: {}", a.density());
         trace!("  mean-weight: {}", a.mean_weight());
 
-        let (p, q, r) = pivots(a, piv_type, piv_cond);
+        let config = PivotFinderConfig { piv_type, piv_cond, ..Default::default() };
+        let (p, q, r) = find_pivots(a, config);
 
         if r == 0 { 
             debug!("  done.");
@@ -211,21 +211,21 @@ where
         (PivotType::Cols, PivotCondition::One)
     }
 
-    fn update_trans(&mut self, i: I, p: &PermOwned, q: &PermOwned, t_src: Trans<R>, t_tgt: Trans<R>) {
+    fn update_trans(&mut self, i: I, p: &Perm, q: &Perm, t_src: Trans<R>, t_tgt: Trans<R>) {
         let (_, i1, i2) = self.deg_trip(i);
-        
-        if let Some(t1) = self.trans_mut(i1) { 
-            t1.append_perm(q.view());
+
+        if let Some(t1) = self.trans_mut(i1) {
+            t1.append_perm(q);
             t1.merge(t_src);
         }
 
         if let Some(t2) = self.trans_mut(i2) {
-            t2.append_perm(p.view());
+            t2.append_perm(p);
             t2.merge(t_tgt);
         }
     }
 
-    fn update_mats(&mut self, i: I, p: &PermOwned, q: &PermOwned, r: usize, s: SpMat<R>) {
+    fn update_mats(&mut self, i: I, p: &Perm, q: &Perm, r: usize, s: SpMat<R>) {
         let (m, n) = (p.dim(), q.dim());
         let (i0, i1, i2) = self.deg_trip(i);
 
@@ -256,27 +256,19 @@ where
     }
 }
 
-fn pivots<R>(a: &SpMat<R>, piv_type: PivotType, piv_cond: PivotCondition) -> (PermOwned, PermOwned, usize)
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    let config = PivotFinderConfig { piv_type, piv_cond, ..Default::default() };
-    let (p, q, r) = find_pivots(a, config);
-    let to_owned = |p: &Perm| PermOwned::new((0..p.dim()).map(|i| p.at(i)).collect());
-    (to_owned(&p), to_owned(&q), r)
-}
-
-fn reduce_mat_rows<R>(a: &SpMat<R>, p: &PermOwned, r: usize) -> SpMat<R> 
+fn reduce_mat_rows<R>(a: &SpMat<R>, p: &Perm, r: usize) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let (m, n) = a.shape();
-    a.extract((m - r, n), |i, j| { 
+    a.extract((m - r, n), |i, j| {
         let i = p.at(i);
         (r..m).contains(&i).then(|| (i - r, j))
     })
 }
 
-fn reduce_mat_cols<R>(a: &SpMat<R>, p: &PermOwned, r: usize) -> SpMat<R> 
+fn reduce_mat_cols<R>(a: &SpMat<R>, p: &Perm, r: usize) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let (m, n) = a.shape();
-    a.extract((m, n - r), |i, j| { 
+    a.extract((m, n - r), |i, j| {
         let j = p.at(j);
         (r..n).contains(&j).then(|| (i, j - r))
     })

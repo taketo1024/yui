@@ -2,8 +2,6 @@
 // Implemented with the help of Claude Code.
 
 use log::debug;
-use sprs::PermOwned;
-use sprs::PermView;
 use yui_core::{Ring, RingOps, Field, FieldOps};
 
 use crate::{MatTrait, Perm};
@@ -20,8 +18,8 @@ use super::triang::{TriangularType, solve_triangular_vec};
 /// Satisfies `p * A * q = l * u + s` where `s` is the
 /// `(m - rank) × (n - rank)` Schur complement (bottom-right block).
 pub struct SpPluq<R> {
-    pub p: PermOwned,
-    pub q: PermOwned,
+    pub p: Perm,
+    pub q: Perm,
     pub l: SpMat<R>,
     pub u: SpMat<R>,
     pub s: SpMat<R>,
@@ -31,7 +29,7 @@ impl<R> SpPluq<R> {
     /// Constructs a `PartialPluq` after asserting the shapes are mutually
     /// consistent: `l.ncols() == u.nrows() = r`, `l.nrows() == p.dim() = m`,
     /// `u.ncols() == q.dim() = n`, and `s.shape() == (m - r, n - r)`.
-    pub fn new(p: PermOwned, q: PermOwned, l: SpMat<R>, u: SpMat<R>, s: SpMat<R>) -> Self {
+    pub fn new(p: Perm, q: Perm, l: SpMat<R>, u: SpMat<R>, s: SpMat<R>) -> Self {
         let r = l.ncols();
         let m = l.nrows();
         let n = u.ncols();
@@ -63,8 +61,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn from(a: SpMat<R>) -> Self {
         let (m, n) = a.shape();
         Self::new(
-            PermOwned::identity(m),
-            PermOwned::identity(n),
+            Perm::id(m),
+            Perm::id(n),
             SpMat::zero((m, 0)),
             SpMat::zero((0, n)),
             a,
@@ -91,12 +89,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let (p, q, r) = find_pivots(a, config);
 
     if r == 0 {
-        return SpPluq::new(PermOwned::identity(m), PermOwned::identity(n), SpMat::zero((m, 0)), SpMat::zero((0, n)), a.clone());
+        return SpPluq::new(Perm::id(m), Perm::id(n), SpMat::zero((m, 0)), SpMat::zero((0, n)), a.clone());
     }
 
     let [a0, a1, a2, a3] = a.permute_and_split(&p, &q, r);
-    let to_owned = |p: &Perm| PermOwned::new((0..p.dim()).map(|i| p.at(i)).collect());
-    let (p, q) = (to_owned(&p), to_owned(&q));
 
     let (l, u, s) = match piv_type {
         PivotType::Rows => {
@@ -156,8 +152,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let raw = dense_pluq(&mat);
     let dp = if transpose { raw.transpose() } else { raw };
 
-    let p2 = extend_perm(&dp.p, &row_idx, ms);
-    let q2 = extend_perm(&dp.q, &col_idx, ns);
+    let (dp_p, dp_q) = (Perm::new(dp.p.vec()), Perm::new(dp.q.vec()));
+    let p2 = extend_perm(&dp_p, &row_idx, ms);
+    let q2 = extend_perm(&dp_q, &col_idx, ns);
 
     let mut l2 = SpMat::from(dp.l);
     l2.extend_by_zero(ms - m0, 0);
@@ -223,14 +220,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pp1.l = {
         let [l0, l1] = pp1.take_l().divide_at_row(r1);
-        let l1 = l1.permute_rows(&Perm::new(pp2.p.vec()));
+        let l1 = l1.permute_rows(&pp2.p);
         let zero_tr = SpMat::zero((r1, r2));
         SpMat::combine_blocks([l0, zero_tr, l1, pp2.l])
     };
 
     pp1.u = {
         let [u0, u1] = pp1.take_u().divide_at_col(r1);
-        let u1 = u1.permute_cols(&Perm::new(pp2.q.vec()));
+        let u1 = u1.permute_cols(&pp2.q);
         let zero_bl = SpMat::zero((r2, r1));
         SpMat::combine_blocks([u0, u1, zero_bl, pp2.u])
     };
@@ -253,9 +250,9 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
     });
 
     let y_dense = y.clone().into_dense();
-    let yp = perm_apply(pp.p.view(), &y_dense);
+    let yp = perm_apply(&pp.p, &y_dense);
     let xq = solve_lu(&pp.l, &pp.u, &yp)?;
-    let x = perm_apply(pp.q.inv(), &xq);
+    let x = perm_apply(&pp.q.inv(), &xq);
 
     Some(SpVec::from(x))
 }
@@ -372,7 +369,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
         ..Default::default()
     });
     let y_dense = y.clone().into_dense();
-    let mut yp = perm_apply(pp.p.view(), &y_dense);
+    let mut yp = perm_apply(&pp.p, &y_dense);
 
     let mut step = 1;
     let total_step = (a.nrows() - pp.rank()) / chunk + 1;
@@ -388,7 +385,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
         merge_pluq(&mut pp, pp_next);
 
         // Apply the chunk's row perm to the tail of yp so it stays in sync with pp.l.
-        let yp_tail = perm_apply(p_next.view(), &yp[r_old..]);
+        let yp_tail = perm_apply(&p_next, &yp[r_old..]);
         yp[r_old..].clone_from_slice(&yp_tail);
 
         // The top `k` rows of pp.s are zero rows (chunk's PLUQ leftover);
@@ -410,7 +407,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
     debug!("solve pluq..");
 
     let xq = solve_lu(&pp.l, &pp.u, &yp)?;
-    let x = perm_apply(pp.q.inv(), &xq);
+    let x = perm_apply(&pp.q.inv(), &xq);
 
     Some(SpVec::from(x))
 }
@@ -447,7 +444,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     assert_eq!(s_rest.ncols(), n_s);
     assert_eq!(pp_chunk.s.shape(), (c - r_chunk, n_s - r_chunk));
 
-    let s_rest_q = s_rest.permute_cols(&Perm::new(pp_chunk.q.vec()));
+    let s_rest_q = s_rest.permute_cols(&pp_chunk.q);
     let [s_rest_left, s_rest_right] = s_rest_q.divide_at_col(r_chunk);
     let [u_top, u_right] = pp_chunk.u.clone().divide_at_col(r_chunk);
 
@@ -514,16 +511,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             Some(pos - k)
         }
     }).collect();
-    pp.p = PermOwned::new(new_p_at);
+    pp.p = Perm::new(new_p_at);
 }
 
 // Composes perm1 with perm2: the first `r` positions stay, the rest are
 // shifted by `r` and remapped by perm2 (where `r = perm1.dim() - perm2.dim()`).
-fn merge_perm(perm1: &PermOwned, perm2: &PermOwned) -> PermOwned {
+fn merge_perm(perm1: &Perm, perm2: &Perm) -> Perm {
     assert!(perm1.dim() >= perm2.dim());
     let n = perm1.dim();
     let r = n - perm2.dim();
-    PermOwned::new((0..n).map(|i| {
+    Perm::new((0..n).map(|i| {
         let j = perm1.at(i);
         if j < r { j } else { r + perm2.at(j - r) }
     }).collect())
@@ -532,17 +529,17 @@ fn merge_perm(perm1: &PermOwned, perm2: &PermOwned) -> PermOwned {
 // Lifts a compact permutation (acting on compact_idx elements of [0..full_n]) to the
 // full index space.  compact_idx[k] maps to compact_perm.at(k) (within [0..mr]);
 // all other indices map to consecutive positions starting at mr (in sorted order).
-fn extend_perm(compact_perm: &PermOwned, compact_idx: &[usize], full_n: usize) -> PermOwned {
+fn extend_perm(compact_perm: &Perm, compact_idx: &[usize], full_n: usize) -> Perm {
     let front = Perm::pull_and_fill(full_n, compact_idx.iter().copied());
     let mr = compact_idx.len();
-    PermOwned::new((0..full_n).map(|i| {
+    Perm::new((0..full_n).map(|i| {
         let k = front.at(i);
         if k < mr { compact_perm.at(k) } else { k }
     }).collect())
 }
 
 // Applies permutation p to y: yp[p(i)] = y[i].
-fn perm_apply<R>(p: PermView, y: &[R]) -> Vec<R>
+fn perm_apply<R>(p: &Perm, y: &[R]) -> Vec<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let pinv = p.inv();
     (0..y.len()).map(|i| y[pinv.at(i)].clone()).collect()
@@ -579,7 +576,7 @@ mod tests {
         assert_eq!(pp.u.shape(), (r, n));
         assert_eq!(pp.s.shape(), (m - r, n - r));
 
-        let paq = a.permute(&Perm::new(pp.p.vec()), &Perm::new(pp.q.vec()));
+        let paq = a.permute(&pp.p, &pp.q);
         let rem_full = SpMat::from_entries((m, n),
             pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
         );
@@ -605,7 +602,7 @@ mod tests {
         assert_eq!(pp.u.shape(), (r, n));
         assert_eq!(pp.s.shape(), (m - r, n - r));
 
-        let paq = a.permute(&Perm::new(pp.p.vec()), &Perm::new(pp.q.vec()));
+        let paq = a.permute(&pp.p, &pp.q);
         let rem_full = SpMat::from_entries((m, n),
             pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
         );
@@ -636,7 +633,7 @@ mod tests {
         assert_eq!(pp.l.shape(), (4, 0));
         assert_eq!(pp.u.shape(), (0, 5));
         assert_eq!(pp.s.shape(), (4, 5)); // (m-r, n-r) = (4, 5) when r=0
-        assert_eq!(pp.s, a.permute(&Perm::new(pp.p.vec()), &Perm::new(pp.q.vec())));
+        assert_eq!(pp.s, a.permute(&pp.p, &pp.q));
     }
 
     #[test]
@@ -674,7 +671,7 @@ mod tests {
         assert_eq!(pp.u.shape(), (r, n));
         assert_eq!(pp.s.shape(), (m - r, n - r));
 
-        let paq = a.permute(&Perm::new(pp.p.vec()), &Perm::new(pp.q.vec()));
+        let paq = a.permute(&pp.p, &pp.q);
         let rem = SpMat::from_entries((m, n),
             pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
         );
@@ -697,7 +694,7 @@ mod tests {
         assert_eq!(pp.u.shape(), (r, n));
         assert_eq!(pp.s.shape(), (m - r, n - r));
 
-        let paq = a.permute(&Perm::new(pp.p.vec()), &Perm::new(pp.q.vec()));
+        let paq = a.permute(&pp.p, &pp.q);
         let rem = SpMat::from_entries((m, n),
             pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
         );
@@ -747,7 +744,7 @@ mod tests {
         assert_eq!(pp.u.shape(), (r, ns));
         assert_eq!(pp.s.shape(), (ms - r, ns - r));
 
-        let psq = s.permute(&Perm::new(pp.p.vec()), &Perm::new(pp.q.vec()));
+        let psq = s.permute(&pp.p, &pp.q);
         let rem = SpMat::from_entries((ms, ns),
             pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
         );
@@ -988,7 +985,7 @@ mod tests {
         assert_eq!(pp.u.shape(), (r, n));
         assert_eq!(pp.s.shape(), (m - r, n - r));
 
-        let psq = s.permute(&Perm::new(pp.p.vec()), &Perm::new(pp.q.vec()));
+        let psq = s.permute(&pp.p, &pp.q);
         let rem = SpMat::from_entries((m, n),
             pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
         );
@@ -1022,7 +1019,7 @@ mod tests {
         assert_eq!(pp.u.shape(), (r, n));
         assert_eq!(pp.s.shape(), (m - r, n - r));
 
-        let psq = s.permute(&Perm::new(pp.p.vec()), &Perm::new(pp.q.vec()));
+        let psq = s.permute(&pp.p, &pp.q);
         let rem = SpMat::from_entries((m, n),
             pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
         );
@@ -1144,7 +1141,6 @@ mod tests {
 
     #[test]
     fn test_merge_perm() {
-        use sprs::PermOwned;
         // perm1 (size 5) = [2, 0, 3, 1, 4]; r = 2; perm2 (size 3) = [1, 2, 0].
         // For each i in 0..5, let j = perm1.at(i):
         //   i=0: j=2 ≥ r → r + perm2.at(0) = 2 + 1 = 3
@@ -1152,8 +1148,8 @@ mod tests {
         //   i=2: j=3 ≥ r → r + perm2.at(1) = 2 + 2 = 4
         //   i=3: j=1 < r → 1
         //   i=4: j=4 ≥ r → r + perm2.at(2) = 2 + 0 = 2
-        let perm1 = PermOwned::new(vec![2, 0, 3, 1, 4]);
-        let perm2 = PermOwned::new(vec![1, 2, 0]);
+        let perm1 = Perm::from_indices([2, 0, 3, 1, 4]);
+        let perm2 = Perm::from_indices([1, 2, 0]);
         let p = merge_perm(&perm1, &perm2);
         for (i, expected) in [3, 0, 4, 1, 2].iter().enumerate() {
             assert_eq!(p.at(i), *expected, "mismatch at i={i}");
@@ -1164,7 +1160,6 @@ mod tests {
 
     #[test]
     fn test_extend_perm() {
-        use sprs::PermOwned;
         // compact_idx = [1, 3] in full space of size 5.
         // compact_perm swaps the two: at(0)=1, at(1)=0.
         // Expected:
@@ -1172,7 +1167,7 @@ mod tests {
         //   i=3 (compact_idx[1]) -> compact_perm.at(1) = 0
         //   rest = [0,2,4] -> positions [2,3,4]
         //     i=0 -> 2,  i=2 -> 3,  i=4 -> 4
-        let cp = PermOwned::new(vec![1, 0]);
+        let cp = Perm::from_indices([1, 0]);
         let idx = vec![1usize, 3];
         let p = extend_perm(&cp, &idx, 5);
         assert_eq!(p.at(0), 2);
@@ -1184,10 +1179,9 @@ mod tests {
 
     #[test]
     fn test_extend_perm_identity() {
-        use sprs::PermOwned;
         // compact_idx = [0, 2, 5] with identity compact_perm.
         // extend_perm should equal Perm::pull_and_fill(7, [0,2,5]).
-        let cp = PermOwned::identity(3);
+        let cp = Perm::id(3);
         let idx = vec![0usize, 2, 5];
         let p = extend_perm(&cp, &idx, 7);
         let expected = Perm::pull_and_fill(7, idx.iter().copied());
@@ -1200,10 +1194,9 @@ mod tests {
 
     #[test]
     fn test_perm_apply() {
-        use sprs::PermOwned;
-        let p = PermOwned::new(vec![1, 2, 0]); // 0→1, 1→2, 2→0
+        let p = Perm::from_indices([1, 2, 0]); // 0→1, 1→2, 2→0
         let y = vec![r(10), r(20), r(30)];
-        let yp = perm_apply(p.view(), &y);
+        let yp = perm_apply(&p, &y);
         // yp[p(0)=1]=10, yp[p(1)=2]=20, yp[p(2)=0]=30
         assert_eq!(yp, vec![r(30), r(10), r(20)]);
     }

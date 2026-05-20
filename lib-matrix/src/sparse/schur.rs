@@ -3,7 +3,6 @@ use std::ops::AddAssign;
 use log::debug;
 use nalgebra::Scalar;
 use num_traits::{One, Zero};
-use sprs::PermOwned;
 use yui_core::{Ring, RingOps};
 use crate::Perm;
 use crate::sparse::pivot::PivotType;
@@ -37,8 +36,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn from_pivots(
         a: &SpMat<R>,
         t: PivotType,
-        p: &PermOwned,
-        q: &PermOwned,
+        p: &Perm,
+        q: &Perm,
         r: usize,
         with_trans_src: bool,
         with_trans_tgt: bool,
@@ -48,8 +47,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(r <= n);
 
         let t = if t == PivotType::Rows { TriangularType::Upper } else { TriangularType::Lower };
-        let (p_new, q_new) = (Perm::new(p.vec()), Perm::new(q.vec()));
-        let [a0, a1, a2, a3] = a.permute_and_split(&p_new, &q_new, r);
+        let [a0, a1, a2, a3] = a.permute_and_split(p, q, r);
         Self::from_blocks(t, [&a0, &a1, &a2, &a3], with_trans_src, with_trans_tgt)
     }
 
@@ -159,7 +157,7 @@ mod tests {
             5, 3, 5, 2, 2,
             6, 2,-3, 1, 8
         ]);
-        let sch = Schur::from_pivots(&a, PivotType::Cols, &PermOwned::identity(6), &PermOwned::identity(5), 3, false, false);
+        let sch = Schur::from_pivots(&a, PivotType::Cols, &Perm::id(6), &Perm::id(5), 3, false, false);
         let s = sch.complement();
 
         assert_eq!(s, &SpMat::from_dense_data((3,2), [
@@ -181,7 +179,7 @@ mod tests {
             5, 3, 5, 2, 2,
             6, 2,-3, 1, 8
         ]);
-        let sch = Schur::from_pivots(&a, PivotType::Cols, &PermOwned::identity(6), &PermOwned::identity(5), 3, true, true);
+        let sch = Schur::from_pivots(&a, PivotType::Cols, &Perm::id(6), &Perm::id(5), 3, true, true);
         let s = sch.complement();
 
         assert_eq!(s, &SpMat::from_dense_data((3,2), [
@@ -221,7 +219,7 @@ mod tests {
             1, 2, 0, -3, 2, 1,
             3, 2, 3, 0, 2, 8,
         ]);
-        let sch = Schur::from_pivots(&a, PivotType::Rows, &PermOwned::identity(5), &PermOwned::identity(6), 3, false, false);
+        let sch = Schur::from_pivots(&a, PivotType::Rows, &Perm::id(5), &Perm::id(6), 3, false, false);
         let s = sch.complement();
 
         assert_eq!(s, &SpMat::from_dense_data((2, 3), [
@@ -241,7 +239,7 @@ mod tests {
             1, 2, 0, -3, 2, 1,
             3, 2, 3, 0, 2, 8,
         ]);
-        let sch = Schur::from_pivots(&a, PivotType::Rows, &PermOwned::identity(5), &PermOwned::identity(6), 3, true, true);
+        let sch = Schur::from_pivots(&a, PivotType::Rows, &Perm::id(5), &Perm::id(6), 3, true, true);
         let s = sch.complement();
 
         assert_eq!(s, &SpMat::from_dense_data((2, 3), [

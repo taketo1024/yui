@@ -1,14 +1,21 @@
+//! Integer extension traits and concrete impls for `i32`, `i64`, `i128`, and `BigInt`.
+//!
+//! See: <https://en.wikipedia.org/wiki/Integer>
+
 use num_bigint::BigInt;
 use num_traits::{One, Signed, ToPrimitive, FromPrimitive};
 use crate::*;
 
+/// Helper trait bundling [`EucRingOps`] for [`IntType`].
 pub trait IntOps<T = Self>: EucRingOps<T> {}
 
-pub trait Integer: EucRing + IntOps + Signed + PartialOrd + Ord + FromPrimitive + ToPrimitive
+/// Integers: a signed, totally-ordered [`EucRing`] convertible to and from
+/// the native numeric types.
+pub trait IntType: EucRing + IntOps + Signed + PartialOrd + Ord + FromPrimitive + ToPrimitive
 where for<'a> &'a Self: EucRingOps<Self> {}
 
 impl<T> DivRound for T
-where T: Integer, for<'x> &'x T: IntOps<T> {
+where T: IntType, for<'x> &'x T: IntOps<T> {
     fn div_round(&self, q: &Self) -> Self {
         let a = self.to_f64().unwrap();
         let b = q.to_f64().unwrap();
@@ -83,7 +90,7 @@ macro_rules! impl_integer {
             }
         }
 
-        impl Integer for $type {}
+        impl IntType for $type {}
     }
 }
 
@@ -123,7 +130,7 @@ mod tests {
 
     #[test]
     fn check_type() {
-        fn check<T>() where T: Integer, for<'a> &'a T: IntOps<T> {}
+        fn check<T>() where T: IntType, for<'a> &'a T: IntOps<T> {}
         check::<i32>();
         check::<i64>();
         check::<i128>();

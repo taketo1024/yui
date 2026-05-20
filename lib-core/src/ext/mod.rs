@@ -1,13 +1,11 @@
 mod clone_and;
 mod digits;
 mod div_round;
-mod int;
 mod range;
 
 pub use clone_and::*;
 pub use digits::*;
 pub use div_round::*;
-pub use int::*;
 pub use range::*;
 
 cfg_if::cfg_if! {

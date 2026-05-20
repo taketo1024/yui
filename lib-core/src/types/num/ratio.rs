@@ -13,7 +13,8 @@ use std::ops::{Mul, Add, Sub, Neg, AddAssign, SubAssign, MulAssign, Div, DivAssi
 use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
 
-use crate::{EucRing, EucRingOps, MathType, Mon, AddMon, AddGrp, AddMonOps, AddGrpOps, MonOps, RingOps, Ring, FieldOps, Field, Integer, IntOps};
+use crate::{EucRing, EucRingOps, MathType, Mon, AddMon, AddGrp, AddMonOps, AddGrpOps, MonOps, RingOps, Ring, FieldOps, Field};
+use super::int::{IntType, IntOps};
 
 /// A fraction `numer / denom` over a [`EucRing`] `T`, kept in reduced form.
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -342,7 +343,7 @@ impl<T> Field for Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {}
 
 impl<T> Ratio<T>
-where T: Integer, for<'x> &'x T: IntOps<T> {
+where T: IntType, for<'x> &'x T: IntOps<T> {
     pub fn abs(&self) -> Self {
         if self.numer.is_negative() { 
             -self
@@ -359,7 +360,7 @@ where T: Integer, for<'x> &'x T: IntOps<T> {
 }
 
 impl<T> Ord for Ratio<T>
-where T: Integer, for<'x> &'x T: IntOps<T> {
+where T: IntType, for<'x> &'x T: IntOps<T> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let l = self.to_f64();
         let r = other.to_f64();
@@ -368,7 +369,7 @@ where T: Integer, for<'x> &'x T: IntOps<T> {
 }
 
 impl<T> PartialOrd for Ratio<T> 
-where T: Integer, for<'x> &'x T: IntOps<T> {
+where T: IntType, for<'x> &'x T: IntOps<T> {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         Some(self.cmp(other))
     }

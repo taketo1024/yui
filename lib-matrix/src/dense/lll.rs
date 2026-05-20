@@ -16,8 +16,8 @@ use nalgebra::{DMatrix, MatrixView, U1, Dyn};
 use log::trace;
 use num_bigint::BigInt;
 
-use yui_core::{EucRing, EucRingOps, DivRound, Integer, IntOps};
-use yui_core::num::{QuadInt, GaussInt, EisenInt};
+use yui_core::{EucRing, EucRingOps, DivRound};
+use yui_core::num::{QuadInt, GaussInt, EisenInt, IntType, IntOps};
 use crate::dense::*;
 
 pub fn lll<R>(b: &Mat<R>, with_trans: bool) -> (Mat<R>, Option<Mat<R>>)
@@ -95,13 +95,13 @@ impl_for_int!(BigInt);
 macro_rules! impl_for_quad_int {
     ($type:ident, $p:literal, $q:literal) => {
         impl<I> LLLRingOps<Self> for $type<I>
-        where I: Integer, for<'x> &'x I: IntOps<I> {}
+        where I: IntType, for<'x> &'x I: IntOps<I> {}
 
         impl<'a, I> LLLRingOps<$type<I>> for &'a $type<I>
-        where I: Integer, for<'x> &'x I: IntOps<I> {}
+        where I: IntType, for<'x> &'x I: IntOps<I> {}
 
         impl<I> LLLRing for $type<I>
-        where I: Integer, for<'x> &'x I: IntOps<I> {
+        where I: IntType, for<'x> &'x I: IntOps<I> {
             type Int = I;
 
             fn alpha() -> (Self, Self) {
@@ -1025,7 +1025,7 @@ pub(super) mod tests {
         }
     
         pub fn assert_is_reduced<R>(b: &Mat<R>)
-        where R: Integer + LLLRing, for<'x> &'x R: IntOps<R> + LLLRingOps<R> {
+        where R: IntType + LLLRing, for<'x> &'x R: IntOps<R> + LLLRingOps<R> {
             let m = b.nrows();    
             let (c, l) = gram_schmidt(b);
 
@@ -1045,7 +1045,7 @@ pub(super) mod tests {
         }
     
         fn is_lovasz_ok<R>(c0: RowView<Ratio<R>>, c1: RowView<Ratio<R>>, m: &Ratio<R>, alpha: &Ratio<R>) -> bool
-        where R: Integer, for<'x> &'x R: IntOps<R> {
+        where R: IntType, for<'x> &'x R: IntOps<R> {
             let r0 = dot::<Ratio<R>>(c0.clone(), c0);
             let r1 = dot::<Ratio<R>>(c1.clone(), c1);
             
@@ -1053,7 +1053,7 @@ pub(super) mod tests {
         }
     
         fn gram_schmidt<R>(b: &Mat<R>) -> (Mat<Ratio<R>>, Mat<Ratio<R>>)
-        where R: Integer, for<'x> &'x R: IntOps<R> {
+        where R: IntType, for<'x> &'x R: IntOps<R> {
             let b = b.inner();
             let m = b.nrows();
     

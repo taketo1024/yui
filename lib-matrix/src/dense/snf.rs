@@ -506,11 +506,11 @@ mod tests {
 
     #[test]
     fn init() { 
-        let a = Mat::from_data((2, 3), [1,2,3,4,5,6]);
+        let a = Mat::from_row_major((2, 3), [1,2,3,4,5,6]);
         let calc = SnfCalc::new(a, [true; 4]);
         let (res, [p, pinv, q, qinv]) = calc.result().destruct();
 
-        assert_eq!(res, Mat::from_data((2, 3), [1,2,3,4,5,6]));
+        assert_eq!(res, Mat::from_row_major((2, 3), [1,2,3,4,5,6]));
         assert_eq!(p,    Some(Mat::id(2)));
         assert_eq!(pinv, Some(Mat::id(2)));
         assert_eq!(q,    Some(Mat::id(3)));
@@ -519,12 +519,12 @@ mod tests {
 
     #[test]
     fn init_no_pq() { 
-        let a = Mat::from_data((2, 3), [1,2,3,4,5,6]);
+        let a = Mat::from_row_major((2, 3), [1,2,3,4,5,6]);
         let calc = SnfCalc::new(a, [false; 4]);
         
         let (res, [p, pinv, q, qinv]) = calc.result().destruct();
 
-        assert_eq!(res, Mat::from_data((2, 3), [1,2,3,4,5,6]));
+        assert_eq!(res, Mat::from_row_major((2, 3), [1,2,3,4,5,6]));
         assert_eq!(p,    None);
         assert_eq!(pinv, None);
         assert_eq!(q,    None);
@@ -533,7 +533,7 @@ mod tests {
 
     #[test]
     fn row_nz() { 
-        let a = Mat::from_data((3, 3), [1,0,0,0,5,6,7,8,9]);
+        let a = Mat::from_row_major((3, 3), [1,0,0,0,5,6,7,8,9]);
         let calc = SnfCalc::new(a, [false; 4]);
         assert_eq!(calc.row_nz(0), 1);
         assert_eq!(calc.row_nz(1), 2);
@@ -542,7 +542,7 @@ mod tests {
 
     #[test]
     fn col_nz() { 
-        let a = Mat::from_data((3, 3), [1,0,0,0,5,6,7,8,9]);
+        let a = Mat::from_row_major((3, 3), [1,0,0,0,5,6,7,8,9]);
         let calc = SnfCalc::new(a, [false; 4]);
         assert_eq!(calc.col_nz(0), 2);
         assert_eq!(calc.col_nz(1), 2);
@@ -551,14 +551,14 @@ mod tests {
 
     #[test]
     fn swap_rows() { 
-        let a = Mat::from_data((3, 3), [1,2,3,4,5,6,7,8,9]);
+        let a = Mat::from_row_major((3, 3), [1,2,3,4,5,6,7,8,9]);
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.swap_rows(0, 1);
 
         let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
-        assert_eq!(res,  Mat::from_data((3, 3), [4,5,6,1,2,3,7,8,9]));
+        assert_eq!(res,  Mat::from_row_major((3, 3), [4,5,6,1,2,3,7,8,9]));
         assert_eq!(p * a.clone(), res);
         assert_eq!(pinv * res, a);
         assert!(q.is_id());
@@ -567,14 +567,14 @@ mod tests {
 
     #[test]
     fn swap_cols() { 
-        let a = Mat::from_data((3, 3), [1,2,3,4,5,6,7,8,9]);
+        let a = Mat::from_row_major((3, 3), [1,2,3,4,5,6,7,8,9]);
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.swap_cols(0, 1);
 
         let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
-        assert_eq!(res,  Mat::from_data((3, 3), [2,1,3,5,4,6,8,7,9]));
+        assert_eq!(res,  Mat::from_row_major((3, 3), [2,1,3,5,4,6,8,7,9]));
         assert!(p   .is_id());
         assert!(pinv.is_id());
         assert_eq!(a.clone() * q, res);
@@ -583,14 +583,14 @@ mod tests {
 
     #[test]
     fn mul_row() { 
-        let a = Mat::from_data((3, 3), [1,2,3,4,5,6,7,8,9]);
+        let a = Mat::from_row_major((3, 3), [1,2,3,4,5,6,7,8,9]);
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.mul_row(0, &-1);
         
         let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
-        assert_eq!(res,  Mat::from_data((3, 3), [-1,-2,-3,4,5,6,7,8,9]));
+        assert_eq!(res,  Mat::from_row_major((3, 3), [-1,-2,-3,4,5,6,7,8,9]));
         assert_eq!(p * a.clone(), res);
         assert_eq!(pinv * res, a);
         assert!(q.is_id());
@@ -599,14 +599,14 @@ mod tests {
 
     #[test]
     fn mul_col() { 
-        let a = Mat::from_data((3, 3), [1,2,3,4,5,6,7,8,9]);
+        let a = Mat::from_row_major((3, 3), [1,2,3,4,5,6,7,8,9]);
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.mul_col(0, &-1);
         
         let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
-        assert_eq!(res,  Mat::from_data((3, 3), [-1,2,3,-4,5,6,-7,8,9]));
+        assert_eq!(res,  Mat::from_row_major((3, 3), [-1,2,3,-4,5,6,-7,8,9]));
         assert!(p.is_id());
         assert!(pinv.is_id());
         assert_eq!(a.clone() * q, res);
@@ -615,7 +615,7 @@ mod tests {
 
     #[test]
     fn left_elementary() { 
-        let a = Mat::from_data((3, 3), [1,2,3,4,5,6,7,8,9]);
+        let a = Mat::from_row_major((3, 3), [1,2,3,4,5,6,7,8,9]);
         let e = [&3,&2,&4,&3]; // det = 1
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.left_elementary(e, 0, 1);
@@ -623,7 +623,7 @@ mod tests {
         let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
-        assert_eq!(res,  Mat::from_data((3, 3), [11,16,21,16,23,30,7,8,9]));
+        assert_eq!(res,  Mat::from_row_major((3, 3), [11,16,21,16,23,30,7,8,9]));
         assert_eq!(p * a.clone(), res);
         assert_eq!(pinv * res, a);
         assert!(q.is_id());
@@ -632,7 +632,7 @@ mod tests {
 
     #[test]
     fn right_elementary() { 
-        let a = Mat::from_data((3, 3), [1,2,3,4,5,6,7,8,9]);
+        let a = Mat::from_row_major((3, 3), [1,2,3,4,5,6,7,8,9]);
         let e = [&3,&2,&4,&3]; // det = 1
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.right_elementary(e, 0, 1);
@@ -640,7 +640,7 @@ mod tests {
         let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
-        assert_eq!(res,  Mat::from_data((3, 3), [7,10,3,22,31,6,37,52,9]));
+        assert_eq!(res,  Mat::from_row_major((3, 3), [7,10,3,22,31,6,37,52,9]));
         assert!(p.is_id());
         assert!(pinv.is_id());
         assert_eq!(a.clone() * q, res);
@@ -669,7 +669,7 @@ mod tests {
 
     #[test]
     fn eliminate_row1() {
-        let a = Mat::from_data((3, 3), [1,2,3,4,5,6,7,8,9]);
+        let a = Mat::from_row_major((3, 3), [1,2,3,4,5,6,7,8,9]);
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.eliminate_row(0,0);
 
@@ -687,7 +687,7 @@ mod tests {
 
     #[test]
     fn eliminate_row2() {
-        let a = Mat::from_data((3, 3), [1,2,3,4,5,6,7,8,9]);
+        let a = Mat::from_row_major((3, 3), [1,2,3,4,5,6,7,8,9]);
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.eliminate_row(1,1);
 
@@ -705,7 +705,7 @@ mod tests {
 
     #[test]
     fn eliminate_col1() {
-        let a = Mat::from_data((3, 3), [1,2,3,4,5,6,7,8,9]);
+        let a = Mat::from_row_major((3, 3), [1,2,3,4,5,6,7,8,9]);
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.eliminate_col(0,0);
 
@@ -723,7 +723,7 @@ mod tests {
 
     #[test]
     fn eliminate_col2() {
-        let a = Mat::from_data((3, 3), [1,2,3,4,5,6,7,8,9]);
+        let a = Mat::from_row_major((3, 3), [1,2,3,4,5,6,7,8,9]);
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.eliminate_col(1,1);
 
@@ -741,7 +741,7 @@ mod tests {
 
     #[test]
     fn eliminate_at1() {
-        let a = Mat::from_data((3, 3), [1,2,3,4,5,6,7,8,9]);
+        let a = Mat::from_row_major((3, 3), [1,2,3,4,5,6,7,8,9]);
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.eliminate_at(0,0);
 
@@ -759,7 +759,7 @@ mod tests {
 
     #[test]
     fn eliminate_at2() {
-        let a = Mat::from_data((3, 3), [1,2,3,4,5,6,7,8,9]);
+        let a = Mat::from_row_major((3, 3), [1,2,3,4,5,6,7,8,9]);
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.eliminate_at(1,1);
 
@@ -777,7 +777,7 @@ mod tests {
 
     #[test]
     fn select_pivot() {
-        let a = Mat::from_data((3, 3), [1,0,1,0,1,0,0,1,1]);
+        let a = Mat::from_row_major((3, 3), [1,0,1,0,1,0,0,1,1]);
         let calc = SnfCalc::new(a.clone(), [true; 4]);
 
         assert_eq!(calc.select_pivot(0, 0), Some(0));
@@ -793,21 +793,21 @@ mod tests {
 
     #[test]
     fn eliminate_all1() {
-        let a = Mat::from_data((3, 3), [1,2,3,4,5,6,7,8,9]);
+        let a = Mat::from_row_major((3, 3), [1,2,3,4,5,6,7,8,9]);
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.eliminate_all();
 
         let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
-        assert_eq!(res, Mat::from_data((3, 3), [1,0,0,0,3,0,0,0,0]));
+        assert_eq!(res, Mat::from_row_major((3, 3), [1,0,0,0,3,0,0,0,0]));
         assert_eq!(p * a.clone() * q, res);
         assert_eq!(pinv * res * qinv, a.clone());
     }
 
     #[test]
     fn eliminate_all2() {
-        let a = Mat::from_data((6, 9), [
+        let a = Mat::from_row_major((6, 9), [
             1, 0, 1, 0, 0, 1, 1, 0, 1,
             0, 1, 3, 1, 0, 1, 0, 2, 0,
             0, 0, 1, 1, 0, 0, 0, 5, 1,
@@ -828,7 +828,7 @@ mod tests {
 
     #[test]
     fn eliminate_all3() {
-        let a: Mat<i64> = Mat::from_data((5, 5), [
+        let a: Mat<i64> = Mat::from_row_major((5, 5), [
             -20, -7, -27, 2, 29, 
             17, 8, 14, -4, -10, 
             13, 8, 10, -4, -6, 
@@ -876,7 +876,7 @@ mod tests {
     fn lll_preprocess_i64() { 
         use super::super::lll::tests::helper::assert_is_hnf;
 
-        let a: Mat<i64> = Mat::from_data((6, 9), [
+        let a: Mat<i64> = Mat::from_row_major((6, 9), [
             1, 0, 1, 0, 0, 1, 1, 0, 1,
             0, 1, 3, 1, 0, 1, 0, 2, 0,
             0, 0, 1, 1, 0, 0, 0, 5, 1,
@@ -901,7 +901,7 @@ mod tests {
         use super::super::lll::tests::helper::assert_is_hnf;
         use num_bigint::BigInt;
 
-        let a: Mat<BigInt> = Mat::from_data((6, 9), [
+        let a: Mat<BigInt> = Mat::from_row_major((6, 9), [
             1, 0, 1, 0, 0, 1, 1, 0, 1,
             0, 1, 3, 1, 0, 1, 0, 2, 0,
             0, 0, 1, 1, 0, 0, 0, 5, 1,
@@ -924,7 +924,7 @@ mod tests {
 
     #[test]
     fn test_snf() { 
-        let a = Mat::from_data((3, 3), [1,2,3,4,5,6,7,8,9]);
+        let a = Mat::from_row_major((3, 3), [1,2,3,4,5,6,7,8,9]);
         let (res, trans) = snf(&a, [true; 4]).destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
@@ -941,7 +941,7 @@ mod tests {
         type R = Ratio<i64>;
         type P = Poly<'x', R>;
 
-        let a = Mat::from_data((3, 3), [1,2,3,4,5,6,7,8,9]).map(|r| R::from(*r));
+        let a = Mat::from_row_major((3, 3), [1,2,3,4,5,6,7,8,9]).map(|r| R::from(*r));
         let (res, trans) = fnf(&a, [true; 4]).destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 

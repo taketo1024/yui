@@ -150,7 +150,7 @@ impl<R> SpMat<R> {
         SpMat::try_from_csc_data(shape.0, shape.1, col_offsets, row_indices, values).unwrap()
     }
 
-    pub fn map_values<F, S>(self, f: F) -> SpMat<S>
+    pub fn map<F, S>(self, f: F) -> SpMat<S>
     where F: Fn(R) -> S {
         let (m, n) = self.shape();
         let (cols, rows, vals) = self.disassemble();
@@ -213,8 +213,17 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         )
     }
 
-    pub fn scalar(n: usize, a: &R) -> Self { 
+    pub fn scalar(n: usize, a: &R) -> Self {
         Self::from_entries((n, n), (0..n).map(|i| (i, i, a.clone())))
+    }
+
+    pub fn diag<I>(shape: (usize, usize), entries: I) -> Self
+    where I: IntoIterator<Item = R> {
+        Self::from_entries(shape, entries.into_iter().enumerate().map(|(i, a)| (i, i, a)))
+    }
+
+    pub fn is_diag(&self) -> bool {
+        self.iter_nz().all(|(i, j, _)| i == j)
     }
 
     pub fn col_vec(&self, j: usize) -> SpVec<R>
@@ -660,7 +669,7 @@ pub(super) mod tests {
             (1, 0, 3),
             (1, 1, 4)
         ]);
-        assert_eq!(a.into_dense(), Mat::from_data((2, 2), [1,2,3,4]));
+        assert_eq!(a.into_dense(), Mat::from_row_major((2, 2), [1,2,3,4]));
     }
 
     #[test]

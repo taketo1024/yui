@@ -708,7 +708,7 @@ mod tests {
         let (row_idx, col_idx, mat) = extract_dense(&s, false);
         assert_eq!(row_idx, vec![0usize, 2]);
         assert_eq!(col_idx, vec![0usize, 2]);
-        assert_eq!(mat, crate::dense::Mat::from_data((2, 2), [1i32, 2, 3, 4]));
+        assert_eq!(mat, crate::dense::Mat::from_row_major((2, 2), [1i32, 2, 3, 4]));
     }
 
     #[test]
@@ -718,7 +718,7 @@ mod tests {
         let (row_idx, col_idx, mat) = extract_dense(&s, true);
         assert_eq!(row_idx, vec![0usize, 2]);
         assert_eq!(col_idx, vec![0usize, 2]);
-        assert_eq!(mat, crate::dense::Mat::from_data((2, 2), [1i32, 3, 2, 4]));
+        assert_eq!(mat, crate::dense::Mat::from_row_major((2, 2), [1i32, 3, 2, 4]));
     }
 
     // ---- dense_pluq_in ----

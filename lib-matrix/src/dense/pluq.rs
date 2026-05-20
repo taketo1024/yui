@@ -199,7 +199,7 @@ mod tests {
         type R = Ratio<i64>;
         let r = |n: i64| R::from(n);
 
-        let a = Mat::from_data((2, 3), [r(1),r(2),r(3),r(4),r(5),r(6)]);
+        let a = Mat::from_row_major((2, 3), [r(1),r(2),r(3),r(4),r(5),r(6)]);
         let at = a.transpose(); // 3×2
 
         let dp = pluq(&a).transpose();
@@ -223,7 +223,7 @@ mod tests {
     fn rf(n: i64, d: i64) -> R { R::new(n, d) }
 
     fn sample() -> Mat<R> {
-        Mat::from_data((3, 4), [
+        Mat::from_row_major((3, 4), [
             r(1), r(2), r(3), r(4),
             r(2), r(4), r(5), r(6),
             r(3), r(6), r(7), r(8),
@@ -301,7 +301,7 @@ mod tests {
 
     #[test]
     fn test_full_row_rank() {
-        let a = Mat::from_data((2, 3), [
+        let a = Mat::from_row_major((2, 3), [
             r(1), r(0), r(2),
             r(0), r(1), r(3),
         ]);
@@ -312,7 +312,7 @@ mod tests {
 
     #[test]
     fn test_full_col_rank() {
-        let a = Mat::from_data((3, 2), [
+        let a = Mat::from_row_major((3, 2), [
             r(1), r(2),
             r(3), r(4),
             r(5), r(6),
@@ -325,7 +325,7 @@ mod tests {
     #[test]
     fn test_rank_deficient_cols() {
         // Column 2 = 2 * column 0
-        let a = Mat::from_data((3, 3), [
+        let a = Mat::from_row_major((3, 3), [
             r(1), r(0), r(2),
             r(2), r(1), r(4),
             r(3), r(2), r(6),
@@ -338,7 +338,7 @@ mod tests {
     #[test]
     fn test_pivot_not_in_first_col() {
         // First column is all zeros
-        let a = Mat::from_data((2, 3), [
+        let a = Mat::from_row_major((2, 3), [
             r(0), r(1), r(2),
             r(0), r(3), r(4),
         ]);
@@ -351,7 +351,7 @@ mod tests {
     #[test]
     fn test_col_swap() {
         // First column has no unit in row 0
-        let a = Mat::from_data((3, 3), [
+        let a = Mat::from_row_major((3, 3), [
             r(0), r(1), r(2),
             r(1), r(0), r(3),
             r(2), r(1), r(4),
@@ -364,7 +364,7 @@ mod tests {
 
     #[test]
     fn test_fractions() {
-        let a = Mat::from_data((2, 2), [
+        let a = Mat::from_row_major((2, 2), [
             rf(1, 2), rf(1, 3),
             rf(1, 4), rf(1, 5),
         ]);
@@ -375,7 +375,7 @@ mod tests {
 
     #[test]
     fn test_single_row() {
-        let a = Mat::from_data((1, 4), [r(0), r(2), r(0), r(3)]);
+        let a = Mat::from_row_major((1, 4), [r(0), r(2), r(0), r(3)]);
         let pp = check(&a);
         assert_eq!(pp.rank(), 1);
         assert!(pp.s.is_zero());
@@ -383,7 +383,7 @@ mod tests {
 
     #[test]
     fn test_single_col() {
-        let a = Mat::from_data((3, 1), [r(2), r(0), r(4)]);
+        let a = Mat::from_row_major((3, 1), [r(2), r(0), r(4)]);
         let pp = check(&a);
         assert_eq!(pp.rank(), 1);
         assert!(pp.s.is_zero());
@@ -394,7 +394,7 @@ mod tests {
     #[test]
     fn test_ring_nonzero_rem() {
         // Row 0 has no units; row 1 col 0 has unit 1 → rank 1.
-        let a = Mat::<i32>::from_data((2, 2), [2, 3, 1, 4]);
+        let a = Mat::<i32>::from_row_major((2, 2), [2, 3, 1, 4]);
         let pp = pluq(&a);
 
         assert_eq!(pp.rank(), 1);
@@ -435,7 +435,7 @@ mod tests {
     #[test]
     fn test_solve_square_full_rank() {
         // 2×2 invertible matrix
-        let a = Mat::from_data((2, 2), [r(1), r(2), r(3), r(4)]);
+        let a = Mat::from_row_major((2, 2), [r(1), r(2), r(3), r(4)]);
         let y = vec![r(5), r(6)];
         solve_check(&a, &y);
     }
@@ -443,14 +443,14 @@ mod tests {
     #[test]
     fn test_solve_overdetermined_consistent() {
         // 3×2 matrix, consistent y
-        let a = Mat::from_data((3, 2), [r(1), r(0), r(0), r(1), r(1), r(1)]);
+        let a = Mat::from_row_major((3, 2), [r(1), r(0), r(0), r(1), r(1), r(1)]);
         let y = vec![r(2), r(3), r(5)]; // y = a * [2, 3]
         solve_check(&a, &y);
     }
 
     #[test]
     fn test_solve_overdetermined_inconsistent() {
-        let a = Mat::from_data((3, 2), [r(1), r(0), r(0), r(1), r(1), r(1)]);
+        let a = Mat::from_row_major((3, 2), [r(1), r(0), r(0), r(1), r(1), r(1)]);
         let y = vec![r(1), r(1), r(0)]; // 1+1 != 0, inconsistent
         assert!(solve_pluq(&a, &y).is_none());
     }
@@ -458,14 +458,14 @@ mod tests {
     #[test]
     fn test_solve_underdetermined() {
         // 2×3 matrix, rank 2; infinitely many solutions — we just get one
-        let a = Mat::from_data((2, 3), [r(1), r(0), r(2), r(0), r(1), r(3)]);
+        let a = Mat::from_row_major((2, 3), [r(1), r(0), r(2), r(0), r(1), r(3)]);
         let y = vec![r(4), r(5)];
         solve_check(&a, &y);
     }
 
     #[test]
     fn test_solve_zero_rhs() {
-        let a = Mat::from_data((2, 2), [r(1), r(2), r(3), r(4)]);
+        let a = Mat::from_row_major((2, 2), [r(1), r(2), r(3), r(4)]);
         let y = vec![r(0), r(0)];
         let x = solve_check(&a, &y);
         assert_eq!(x, vec![r(0), r(0)]);
@@ -474,7 +474,7 @@ mod tests {
     #[test]
     fn test_solve_no_solution_rank_deficient() {
         // rank-1 matrix; y not in column space
-        let a = Mat::from_data((2, 2), [r(1), r(2), r(2), r(4)]);
+        let a = Mat::from_row_major((2, 2), [r(1), r(2), r(2), r(4)]);
         let y = vec![r(1), r(0)]; // not in column space
         assert!(solve_pluq(&a, &y).is_none());
     }

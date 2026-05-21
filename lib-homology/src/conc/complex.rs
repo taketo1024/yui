@@ -177,7 +177,7 @@ where
 
     pub fn reduced_generic(&self) -> GenericChainComplexBase<I, R> { 
         let r = ChainReducer::reduce(self, false);
-        r.into_complex()
+        r.into_generic_complex()
     }
 
     #[cfg(debug_assertions)]

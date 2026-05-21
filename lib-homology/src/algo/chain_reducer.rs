@@ -257,7 +257,7 @@ where
         (i - deg, i, i + deg)
     }
 
-    pub fn into_complex(self) -> GenericChainComplexBase<I, R> {
+    pub fn into_generic_complex(self) -> GenericChainComplexBase<I, R> {
         let d_deg = self.d_deg;
         GenericChainComplexBase::from_d_matrices(
             d_deg,
@@ -309,7 +309,7 @@ mod tests {
     #[test]
     fn zero() { 
         let c = GenericChainComplex::<i32>::zero();
-        let r = ChainReducer::reduce(&c, false).into_complex();
+        let r = ChainReducer::reduce(&c, false).into_generic_complex();
 
         r.check_d_all();
 
@@ -319,7 +319,7 @@ mod tests {
     #[test]
     fn acyclic() { 
         let c = GenericChainComplex::<i32>::one_one(1);
-        let r = ChainReducer::reduce(&c, false).into_complex();
+        let r = ChainReducer::reduce(&c, false).into_generic_complex();
 
         r.check_d_all();
 
@@ -330,7 +330,7 @@ mod tests {
     #[test]
     fn tor() { 
         let c = GenericChainComplex::<i32>::one_one(2);
-        let r = ChainReducer::reduce(&c, false).into_complex();
+        let r = ChainReducer::reduce(&c, false).into_generic_complex();
 
         r.check_d_all();
 
@@ -341,7 +341,7 @@ mod tests {
     #[test]
     fn d3() {
         let c = GenericChainComplex::<i32>::d3();
-        let r = ChainReducer::reduce(&c, false).into_complex();
+        let r = ChainReducer::reduce(&c, false).into_generic_complex();
 
         r.check_d_all();
 
@@ -359,7 +359,7 @@ mod tests {
     #[test]
     fn s2() {
         let c = GenericChainComplex::<i32>::s2();
-        let r = ChainReducer::reduce(&c, false).into_complex();
+        let r = ChainReducer::reduce(&c, false).into_generic_complex();
 
         r.check_d_all();
 
@@ -375,7 +375,7 @@ mod tests {
     #[test]
     fn t2() {
         let c = GenericChainComplex::<i32>::t2();
-        let r = ChainReducer::reduce(&c, false).into_complex();
+        let r = ChainReducer::reduce(&c, false).into_generic_complex();
 
         r.check_d_all();
 
@@ -391,7 +391,7 @@ mod tests {
     #[test]
     fn rp2() {
         let c = GenericChainComplex::<i32>::rp2();
-        let r = ChainReducer::reduce(&c, false).into_complex();
+        let r = ChainReducer::reduce(&c, false).into_generic_complex();
 
         r.check_d_all();
 

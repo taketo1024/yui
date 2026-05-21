@@ -8,7 +8,7 @@ use yui_core::{Ring, RingOps};
 use yui_core::lc::{LcKey, Lc};
 use yui_matrix::sparse::{SpMat, SpVec};
 
-use crate::utils::ChainReducer;
+use crate::algo::ChainReducer;
 use crate::{ToSeqString, ToTableString, GenericChainComplexBase, GrMod, AddInd, isize2, isize3};
 use super::Summand;
 

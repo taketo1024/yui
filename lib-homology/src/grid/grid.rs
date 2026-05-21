@@ -1,6 +1,9 @@
+use std::fmt::Display;
 use std::ops::{Index, RangeInclusive};
 
 use ahash::AHashMap;
+use itertools::Itertools;
+use crate::utils::{ToSeqString, ToTableString};
 use crate::{GridDeg, isize2, usize2, isize3, usize3};
 
 pub type Grid1<E> = Grid<isize,  E>;
@@ -119,18 +122,6 @@ macro_rules! impl_index {
 impl_index!(isize, isize2, isize3);
 impl_index!(usize, usize2, usize3);
 
-pub trait ToSeqString<I: Display> {
-    fn label(&self) -> String;
-    fn indices(&self) -> Vec<I>;
-    fn entry_at(&self, i: &I) -> String;
-    fn to_seq_string(&self) -> String {
-        use yui_core::util::format::table;
-        table(self.label(), [""], self.indices(), |_, i| {
-            self.entry_at(i)
-        })
-    }
-}
-
 impl<E: Display> ToSeqString<isize> for Grid<isize, E> {
     fn label(&self) -> String {
         "i".to_string()
@@ -143,24 +134,6 @@ impl<E: Display> ToSeqString<isize> for Grid<isize, E> {
     fn entry_at(&self, i: &isize) -> String {
         self.get(*i).map(|e| e.to_string()).unwrap_or_else(|| ".".to_string())
     }
-}
-
-pub trait ToTableString<I: Display> {
-    fn labels(&self) -> (String, String);
-    fn indices(&self) -> (Vec<I>, Vec<I>);
-    fn entry_at(&self, i: &I, j: &I) -> String;
-    fn to_table_string(&self) -> String {
-        use yui_core::util::format::table;
-
-        let (label0, label1) = self.labels();
-        let (ind0, ind1) = self.indices();
-        let head = format!("{}\\{}", label1, label0);
-
-        table(head, ind1.into_iter().rev(), ind0, |j, i| {
-            self.entry_at(i, j)
-        })
-    }
-
 }
 
 impl<E: Display> ToTableString<isize> for Grid<isize2, E> {
@@ -180,13 +153,10 @@ impl<E: Display> ToTableString<isize> for Grid<isize2, E> {
 }
 
 #[cfg(feature = "tex")]
-pub mod tex { 
+mod tex_impl {
     use super::*;
     use yui_core::{TeX, tex_table};
-
-    pub trait TeXTable<I> {
-        fn tex_table(&self, caption: &str, head: &str) -> String;
-    }
+    use crate::utils::tex::TeXTable;
 
     macro_rules! impl_tex_table {
         ($t:ident) => {
@@ -205,32 +175,29 @@ pub mod tex {
             }
         };
     }
-    
+
     impl_tex_table!(isize2);
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     use super::*;
 
     #[test]
-    fn grid() { 
+    fn grid() {
         let g = Grid1::generate(0..=3, |i| i * 10);
 
         assert!( g.is_supported( 1));
         assert!(!g.is_supported(-1));
         assert_eq!(g.get( 1), Some(&10));
         assert_eq!(g.get(-1), None);
-
-        let _seq = g.to_seq_string();
-        // println!("{_seq}");
     }
 
     #[test]
-    fn grid2() { 
+    fn grid2() {
         use cartesian::cartesian;
         let g = Grid2::generate(
-            cartesian!(0..=3, 0..=2).map(|(i, j)| isize2(i, j)), 
+            cartesian!(0..=3, 0..=2).map(|(i, j)| isize2(i, j)),
             |i| i.0 * 10 + i.1
         );
 
@@ -238,50 +205,5 @@ mod tests {
         assert!(!g.is_supported(isize2(3, 3)));
         assert_eq!(g.get(isize2(1, 2)), Some(&12));
         assert_eq!(g.get(isize2(3, 3)), None);
-
-        let _table = g.to_table_string();
-        // println!("{_table}");
-    }
-
-    #[test]
-    fn table_rmod() { 
-        use yui_core::num::FF2;
-        use crate::GenericSummand;
-        use cartesian::cartesian;
-        
-        let g = Grid2::generate(
-            cartesian!(0..=3, 0..=2).map(|(i, j)| isize2(i, j)), 
-            |i| GenericSummand::<_, FF2>::generate(i.0, (i.0 * 10 + i.1) as usize, vec![], None)
-        );
-        let _table = g.to_table_string();
-        // println!("{_table}");
-    }
-
-    #[cfg(feature = "tex")]
-    #[test]
-    fn tex_table() { 
-        use super::tex::TeXTable;
-        use cartesian::cartesian;
-        let g = Grid2::generate(
-            cartesian!(0..=3, 0..=2).map(|(i, j)| isize2(i, j)), 
-            |i| (i.0 * 10 + i.1) as i32
-        );
-        let _table = g.tex_table("Caption", "i, j");
-        // println!("{_table}");
-    }
-
-    #[cfg(feature = "tex")]
-    #[test]
-    fn tex_table_rmod() { 
-        use super::tex::TeXTable;
-        use crate::GenericSummand;
-        use cartesian::cartesian;
-        
-        let g = Grid2::generate(
-            cartesian!(0..=3, 0..=2).map(|(i, j)| isize2(i, j)), 
-            |i| GenericSummand::<_, i32>::generate(i.0, (i.0 * 10 + i.1) as usize, vec![], None)
-        );
-        let _table = g.tex_table("Caption", "i, j");
-        // println!("{_table}");
     }
 }

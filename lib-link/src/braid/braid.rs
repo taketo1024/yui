@@ -58,6 +58,10 @@ impl Braid {
         )
     }
 
+    pub fn extend(&self, by: usize) -> Self {
+        Self::new(self.strands + by, self.elements.clone())
+    }
+
     pub fn reduced(&self) -> Self {
         let mut stack: Vec<BraidGen> = Vec::new();
         for g in self.elements.iter().copied() {
@@ -252,6 +256,30 @@ mod tests {
         assert_eq!(l.n_crossings(), 3);
         assert_eq!(l.writhe(), 3);
         assert_eq!(l.n_comps(), 1);
+    }
+
+    #[test]
+    fn extend() {
+        let b = Braid::from([1, 2]).extend(2);
+        assert_eq!(b.strands(), 5);
+        assert_eq!(b.len(), 2);
+    }
+
+    #[test]
+    fn extend_zero() {
+        let b0 = Braid::from([1, 2]);
+        let b1 = b0.extend(0);
+        assert_eq!(b1, b0);
+    }
+
+    #[test]
+    fn extend_closure_adds_loops() {
+        // extending a braid by k adds k free loops to the closure.
+        let b = Braid::from([1, 1, 1]).extend(2);
+        let l = b.closure();
+        assert_eq!(l.n_crossings(), 3);
+        assert_eq!(l.n_loops(), 2);
+        assert_eq!(l.n_comps(), 1 + 2); // original trefoil component + 2 free loops
     }
 
     #[test]

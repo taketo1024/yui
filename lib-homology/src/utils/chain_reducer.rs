@@ -47,13 +47,13 @@ where
 {
     pub fn reduce<C>(complex: &C, with_trans: bool) -> Self
     where C: GridTrait<I> + ChainComplexTrait<I, R = R>, C::Item: SummandTrait<R = R> {
-        let mut r = Self::from(complex, with_trans);
+        let mut r = Self::from_complex(complex, with_trans);
         r.reduce_all(false);
         r.reduce_all(true);
         r
     }
 
-    pub fn from<C>(complex: &C, with_trans: bool) -> Self 
+    pub fn from_complex<C>(complex: &C, with_trans: bool) -> Self
     where C: GridTrait<I> + ChainComplexTrait<I, R = R>, C::Item: SummandTrait<R = R> {
         let support = complex.support().copied();
         let d_deg = complex.d_deg();

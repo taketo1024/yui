@@ -145,26 +145,15 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(feature = "tex")]
 mod tex_impl {
     use super::*;
-    use yui_core::{TeX, tex_table};
+    use yui_core::TeX;
     use crate::utils::tex::TeXTable;
 
-    macro_rules! impl_tex_table {
-        ($t:ident) => {
-            impl<X, R> TeXTable<$t> for GrMod<$t, X, R>
-            where X: LcKey, R: Ring + TeX, for<'x> &'x R: RingOps<R> {
-                fn tex_table(&self, caption: &str, head: &str) -> String {
-                    let cols = self.support().map(|&$t(i, _)| i).unique().sorted();
-                    let rows = self.support().map(|&$t(_, j)| j).unique().sorted().rev();
-
-                    tex_table(caption, head, rows, cols, |&j, &i| {
-                        self.get($t(i, j))
-                            .map(|e| e.tex_string())
-                            .unwrap_or_else(|| ".".to_string())
-                    }, true, false)
-                }
+    impl<X, R> TeXTable<isize2> for GrMod<isize2, X, R>
+    where X: LcKey, R: Ring + TeX, for<'x> &'x R: RingOps<R> {
+        delegate! {
+            to self.data {
+                fn tex_table(&self, caption: &str, head: &str) -> String;
             }
-        };
+        }
     }
-
-    impl_tex_table!(isize2);
 }

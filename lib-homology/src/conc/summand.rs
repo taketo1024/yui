@@ -189,8 +189,8 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 #[cfg(feature = "tex")]
-mod tex { 
-    use crate::tex_rmod_str;
+mod tex {
+    use crate::utils::tex::tex_rmod_str;
 
     use super::*;
     use yui_core::TeX;

@@ -29,9 +29,3 @@ pub trait ToTableString<I: Display> {
     }
 }
 
-#[cfg(feature = "tex")]
-pub mod tex {
-    pub trait TeXTable<I> {
-        fn tex_table(&self, caption: &str, head: &str) -> String;
-    }
-}

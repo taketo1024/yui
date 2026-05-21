@@ -264,10 +264,26 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
 impl<X, R> ToTableString<isize> for ChainComplex2<X, R>
 where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     delegate! {
-        to self.summands { 
+        to self.summands {
             fn labels(&self) -> (String, String);
             fn indices(&self) -> (Vec<isize>, Vec<isize>);
             fn entry_at(&self, i: &isize, j: &isize) -> String;
+        }
+    }
+}
+
+#[cfg(feature = "tex")]
+mod tex_impl {
+    use super::*;
+    use yui_core::TeX;
+    use crate::utils::tex::TeXTable;
+
+    impl<X, R> TeXTable<isize2> for ChainComplex2<X, R>
+    where X: LcKey, R: Ring + TeX, for<'x> &'x R: RingOps<R> {
+        delegate! {
+            to self.summands {
+                fn tex_table(&self, caption: &str, head: &str) -> String;
+            }
         }
     }
 }

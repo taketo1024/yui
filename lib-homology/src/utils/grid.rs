@@ -127,3 +127,18 @@ impl<V: Display + Default> ToTableString<isize> for Grid<isize2, V> {
         self.get(isize2(*i, *j)).map(|v| v.to_string()).unwrap_or_else(|| ".".to_string())
     }
 }
+
+#[cfg(feature = "tex")]
+impl<V> crate::utils::tex::TeXTable<isize2> for Grid<isize2, V>
+where V: yui_core::TeX + Default {
+    fn tex_table(&self, caption: &str, head: &str) -> String {
+        let cols = self.keys().map(|&isize2(i, _)| i).unique().sorted();
+        let rows = self.keys().map(|&isize2(_, j)| j).unique().sorted().rev();
+
+        yui_core::tex_table(caption, head, rows, cols, |&j, &i| {
+            self.get(isize2(i, j))
+                .map(|e| e.tex_string())
+                .unwrap_or_else(|| ".".to_string())
+        }, true, false)
+    }
+}

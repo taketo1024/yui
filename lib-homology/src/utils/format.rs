@@ -5,27 +5,15 @@ pub fn rmod_str<R>(rank: usize, tors: &[R]) -> String
 where R: Ring, for<'x> &'x R: RingOps<R> {
     use yui_core::util::format::superscript;
     make_rmod_str(
-        R::math_symbol(), 
-        rank, 
-        &tors.iter().map(|t| t.to_string()).collect_vec(), 
-        superscript, 
+        R::math_symbol(),
+        rank,
+        &tors.iter().map(|t| t.to_string()).collect_vec(),
+        superscript,
         "⊕"
     )
 }
 
-#[cfg(feature = "tex")]
-pub fn tex_rmod_str<R>(rank: usize, tors: &[R]) -> String
-where R: Ring + yui_core::TeX, for<'x> &'x R: RingOps<R> {
-    make_rmod_str(
-        R::tex_math_symbol(), 
-        rank, 
-        &tors.iter().map(|t| t.tex_string()).collect_vec(), 
-        |a| format!("^{{{a}}}"), 
-        "\\oplus"
-    )
-}
-
-fn make_rmod_str<F>(symbol: String, rank: usize, tors: &[String], superscript: F, oplus: &str) -> String
+pub(crate) fn make_rmod_str<F>(symbol: String, rank: usize, tors: &[String], superscript: F, oplus: &str) -> String
 where F: Fn(usize) -> String {
     use std::collections::BTreeMap;
 
@@ -98,15 +86,8 @@ mod tests {
     }
 
     #[test]
-    fn mix() { 
+    fn mix() {
         let s = rmod_str(2, &[2,2,3]);
         assert_eq!(s, "Z² ⊕ (Z/2)² ⊕ (Z/3)");
-    }
-
-    #[cfg(feature = "tex")]
-    #[test]
-    fn tex() { 
-        let s = tex_rmod_str(2, &[2,2,3]);
-        assert_eq!(s, "\\mathbb{Z}^{2} \\oplus (\\mathbb{Z}/2)^{2} \\oplus (\\mathbb{Z}/3)");
     }
 }

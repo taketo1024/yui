@@ -1,8 +1,6 @@
 use std::ops::{Index, RangeInclusive};
-use std::fmt::Display;
 
 use ahash::AHashMap;
-use itertools::Itertools;
 use crate::{GridDeg, isize2, usize2, isize3, usize3};
 
 pub type Grid1<E> = Grid<isize,  E>;
@@ -17,58 +15,31 @@ pub struct Grid<I, E>
 where I: GridDeg {
     data: AHashMap<I, E>,
     #[cfg_attr(feature = "serde", serde(skip))]
-    default: E
+    default: E,
 }
 
 impl<I, E> Grid<I, E>
 where I: GridDeg {
     fn new(data: impl IntoIterator<Item = (I, E)>, default: E) -> Self {
-        let data = data.into_iter().collect();
-        Self { data, default }
+        Self { data: data.into_iter().collect(), default }
     }
 
     pub fn generate<It, F>(support: It, mut e_map: F) -> Self
     where
         It: IntoIterator<Item = I>,
         F: FnMut(I) -> E,
-        E: Default
+        E: Default,
     {
-        let data = support.into_iter().map(|i| (i, e_map(i)));
-        Self::new(data, E::default())
+        Self::new(support.into_iter().map(|i| (i, e_map(i))), E::default())
     }
 
     pub fn generate_filtered<It, F>(support: It, mut e_map: F) -> Self
     where
         It: IntoIterator<Item = I>,
         F: FnMut(I) -> Option<E>,
-        E: Default
+        E: Default,
     {
-        let data = support.into_iter().filter_map(|i| e_map(i).map(|e| (i, e)));
-        Self::new(data, E::default())
-    }
-
-    pub fn insert(&mut self, i: I, e: E) {
-        self.data.insert(i, e);
-    }
-
-    pub fn remove(&mut self, i: I) -> Option<E> {
-        self.data.remove(&i)
-    }
-
-    pub fn get_mut(&mut self, i: I) -> Option<&mut E> {
-        self.data.get_mut(&i)
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = (I, &E)> {
-        self.data.iter().map(|(&i, e)| (i, e))
-    }
-
-    pub fn map<E2, F>(&self, mut f: F) -> Grid<I, E2>
-    where F: FnMut(&E) -> E2
-    {
-        let dfl = f(&self.default);
-        let data = self.data.iter().map(|(&i, e)| (i, f(e)));
-        Grid::new(data, dfl)
+        Self::new(support.into_iter().filter_map(|i| e_map(i).map(|e| (i, e))), E::default())
     }
 
     pub fn support(&self) -> GridIter<'_, I, E> {
@@ -79,23 +50,28 @@ where I: GridDeg {
         self.data.contains_key(&i)
     }
 
-    pub fn get(&self, i: I) -> &E {
-        self.data.get(&i).unwrap_or(&self.default)
+    pub fn get(&self, i: I) -> Option<&E> {
+        self.data.get(&i)
     }
 
     pub fn get_default(&self) -> &E {
         &self.default
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (I, &E)> {
+        self.data.iter().map(|(&i, e)| (i, e))
     }
 }
 
 impl<E> Grid1<E> {
     pub fn truncated(&self, range: RangeInclusive<isize>) -> Self
     where E: Clone {
-        let data = self.data.iter().filter_map(|(&i, e)| range.contains(&i).then_some((i, e.clone())));
-        Grid::new(data, self.default.clone())
+        Self::new(
+            self.data.iter().filter_map(|(&i, e)| range.contains(&i).then_some((i, e.clone()))),
+            self.default.clone(),
+        )
     }
 }
-
 
 impl<I, E> Default for Grid<I, E>
 where I: GridDeg, E: Default {
@@ -114,19 +90,11 @@ where I: GridDeg {
     }
 }
 
-
 impl<I, E> Index<I> for Grid<I, E>
 where I: GridDeg {
     type Output = E;
     fn index(&self, i: I) -> &Self::Output {
-        self.get(i)
-    }
-}
-
-impl<I, E> FromIterator<(I, E)> for Grid<I, E>
-where I: GridDeg, E: Default {
-    fn from_iter<T: IntoIterator<Item = (I, E)>>(iter: T) -> Self {
-        Self::new(iter, E::default())
+        self.data.get(&i).unwrap_or(&self.default)
     }
 }
 
@@ -135,14 +103,14 @@ macro_rules! impl_index {
         impl<E> Index<($t, $t)> for Grid<$t2, E> {
             type Output = E;
             fn index(&self, i: ($t, $t)) -> &Self::Output {
-                self.get(i.into())
+                &self[$t2::from(i)]
             }
         }
-        
+
         impl<E> Index<($t, $t, $t)> for Grid<$t3, E> {
             type Output = E;
             fn index(&self, i: ($t, $t, $t)) -> &Self::Output {
-                self.get(i.into())
+                &self[$t3::from(i)]
             }
         }
     };
@@ -173,7 +141,7 @@ impl<E: Display> ToSeqString<isize> for Grid<isize, E> {
     }
 
     fn entry_at(&self, i: &isize) -> String {
-        self.get(*i).to_string()
+        self.get(*i).map(|e| e.to_string()).unwrap_or_else(|| ".".to_string())
     }
 }
 
@@ -207,12 +175,7 @@ impl<E: Display> ToTableString<isize> for Grid<isize2, E> {
     }
 
     fn entry_at(&self, i: &isize, j: &isize) -> String {
-        let s = self[(*i, *j)].to_string();
-        if s == self.default.to_string() { 
-            ".".to_string()
-        } else { 
-            s
-        }
+        self.get(isize2(*i, *j)).map(|e| e.to_string()).unwrap_or_else(|| ".".to_string())
     }
 }
 
@@ -230,17 +193,13 @@ pub mod tex {
             impl<E> TeXTable<$t> for Grid<$t, E>
             where E: TeX {
                 fn tex_table(&self, caption: &str, head: &str) -> String {
-                    let def_str = self.get_default().tex_string();
                     let cols = self.support().map(|&$t(i, _)| i).unique().sorted();
                     let rows = self.support().map(|&$t(_, j)| j).unique().sorted().rev();
 
                     tex_table(caption, head, rows, cols, |&j, &i| {
-                        let str = self.get($t(i, j)).tex_string();
-                        if str == def_str {
-                            ".".to_string()
-                        } else {
-                            str
-                        }
+                        self.get($t(i, j))
+                            .map(|e| e.tex_string())
+                            .unwrap_or_else(|| ".".to_string())
                     }, true, false)
                 }
             }
@@ -260,8 +219,8 @@ mod tests {
 
         assert!( g.is_supported( 1));
         assert!(!g.is_supported(-1));
-        assert_eq!(g.get( 1), &10);
-        assert_eq!(g.get(-1), &0); // default
+        assert_eq!(g.get( 1), Some(&10));
+        assert_eq!(g.get(-1), None);
 
         let _seq = g.to_seq_string();
         // println!("{_seq}");
@@ -277,8 +236,8 @@ mod tests {
 
         assert!( g.is_supported(isize2(1, 2)));
         assert!(!g.is_supported(isize2(3, 3)));
-        assert_eq!(g.get(isize2(1, 2)), &12);
-        assert_eq!(g.get(isize2(3, 3)), &0);
+        assert_eq!(g.get(isize2(1, 2)), Some(&12));
+        assert_eq!(g.get(isize2(3, 3)), None);
 
         let _table = g.to_table_string();
         // println!("{_table}");

@@ -1,12 +1,12 @@
 use std::ops::{Index, RangeInclusive};
 
-use ahash::AHashMap;
+use delegate::delegate;
 use itertools::Itertools;
 use yui_core::lc::LcKey;
 use yui_core::{Ring, RingOps};
 
-use crate::utils::{ToSeqString, ToTableString};
-use crate::{AddInd, Summand, isize2, usize2, isize3, usize3};
+use crate::utils::{Grid, ToSeqString, ToTableString};
+use crate::{AddInd, Summand, isize2, isize3};
 
 pub type GrMod1<X, R> = GrMod<isize,  X, R>;
 pub type GrMod2<X, R> = GrMod<isize2, X, R>;
@@ -14,18 +14,15 @@ pub type GrMod3<X, R> = GrMod<isize3, X, R>;
 
 /// An `I`-graded R-module: a sparse map from indices `I` to free / finitely
 /// generated R-modules `Summand<X, R>`. Missing entries are treated as the
-/// zero module via the `default` field.
-#[derive(Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// zero module.
+#[derive(Clone, Default)]
 pub struct GrMod<I, X, R>
 where
     I: AddInd,
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
-    data: AHashMap<I, Summand<X, R>>,
-    #[cfg_attr(feature = "serde", serde(skip))]
-    zero_summand: Summand<X, R>,
+    data: Grid<I, Summand<X, R>>,
 }
 
 impl<I, X, R> GrMod<I, X, R>
@@ -34,16 +31,12 @@ where
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
-    fn new(data: impl IntoIterator<Item = (I, Summand<X, R>)>) -> Self {
-        Self { data: data.into_iter().collect(), zero_summand: Summand::zero() }
-    }
-
     pub fn generate<It, F>(support: It, mut e_map: F) -> Self
     where
         It: IntoIterator<Item = I>,
         F: FnMut(I) -> Summand<X, R>,
     {
-        Self::new(support.into_iter().map(|i| (i, e_map(i))))
+        Self { data: support.into_iter().map(|i| (i, e_map(i))).collect() }
     }
 
     pub fn generate_filtered<It, F>(support: It, mut e_map: F) -> Self
@@ -51,27 +44,20 @@ where
         It: IntoIterator<Item = I>,
         F: FnMut(I) -> Option<Summand<X, R>>,
     {
-        Self::new(support.into_iter().filter_map(|i| e_map(i).map(|e| (i, e))))
+        Self { data: support.into_iter().filter_map(|i| e_map(i).map(|e| (i, e))).collect() }
     }
 
-    pub fn support(&self) -> impl Iterator<Item = &I> + '_ {
-        self.data.keys()
-    }
-
-    pub fn is_supported(&self, i: I) -> bool {
-        self.data.contains_key(&i)
-    }
-
-    pub fn get(&self, i: I) -> Option<&Summand<X, R>> {
-        self.data.get(&i)
-    }
-
-    pub fn zero_summand(&self) -> &Summand<X, R> {
-        &self.zero_summand
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = (I, &Summand<X, R>)> {
-        self.data.iter().map(|(&i, e)| (i, e))
+    delegate! {
+        to self.data {
+            #[call(keys)]
+            pub fn support(&self) -> impl Iterator<Item = &I> + '_;
+            #[call(contains_key)]
+            pub fn is_supported(&self, i: I) -> bool;
+            pub fn get(&self, i: I) -> Option<&Summand<X, R>>;
+            #[call(get_default)]
+            pub fn zero_summand(&self) -> &Summand<X, R>;
+            pub fn iter(&self) -> impl Iterator<Item = (&I, &Summand<X, R>)> + '_;
+        }
     }
 
     pub fn total_rank(&self) -> usize {
@@ -82,20 +68,11 @@ where
 impl<X, R> GrMod1<X, R>
 where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn truncated(&self, range: RangeInclusive<isize>) -> Self {
-        Self::new(
-            self.data.iter().filter_map(|(&i, e)| range.contains(&i).then_some((i, e.clone())))
-        )
-    }
-}
-
-impl<I, X, R> Default for GrMod<I, X, R>
-where
-    I: AddInd,
-    X: LcKey,
-    R: Ring, for<'x> &'x R: RingOps<R>,
-{
-    fn default() -> Self {
-        Self::new(AHashMap::default())
+        Self {
+            data: self.data.iter()
+                .filter_map(|(&i, e)| range.contains(&i).then_some((i, e.clone())))
+                .collect()
+        }
     }
 }
 
@@ -107,7 +84,7 @@ where
 {
     type Output = Summand<X, R>;
     fn index(&self, i: I) -> &Self::Output {
-        self.data.get(&i).unwrap_or(&self.zero_summand)
+        &self.data[i]
     }
 }
 
@@ -132,7 +109,6 @@ macro_rules! impl_index {
 }
 
 impl_index!(isize, isize2, isize3);
-impl_index!(usize, usize2, usize3);
 
 impl<X, R> ToSeqString<isize> for GrMod1<X, R>
 where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {

@@ -35,11 +35,11 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R>, Lc<X, R>: KhChainExt {
     let mut table = HashMap::new();
     let init_entry = (0, vec![], vec![]);
 
-    for (i, h) in grid.iter() { 
+    for (&i, h) in grid.iter() {
         let r = h.rank();
         let t = h.tors().len();
 
-        for k in 0..r + t { 
+        for k in 0..r + t {
             let z = h.generator(k);
             let q = z.q_deg();
             let e = table.entry(isize2(i, q)).or_insert_with(|| init_entry.clone());

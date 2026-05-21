@@ -665,7 +665,7 @@ mod tests {
 
     use yui_core::num::FF2;
     use yui_core::poly::Poly;
-    use yui_homology::{ChainComplexTrait, ToSeqString, ToTableString};
+    use yui_homology::{ToSeqString, ToTableString};
 
     #[test]
     fn test_kh_3_1() { 
@@ -673,7 +673,7 @@ mod tests {
         let (h, t) = (FF2::zero(), FF2::zero());
 
         let c = SymTngBuilder::build_kh_complex(&l, &h, &t, false);
-        c.check_d_all();
+        c.inner().check_d_all();
 
         let h = c.inner().homology();
 
@@ -689,7 +689,7 @@ mod tests {
         let (h, t) = (FF2::zero(), FF2::zero());
 
         let c = SymTngBuilder::build_khi_complex(&l, &h, &t, false);
-        c.check_d_all();;
+        c.inner().check_d_all();;
 
         let h = c.homology();
 
@@ -709,7 +709,7 @@ mod tests {
         b.process_all();
 
         let c = b.into_khi_complex();
-        c.check_d_all();;
+        c.inner().check_d_all();;
 
         let h = c.inner().homology();
 
@@ -738,7 +738,7 @@ mod tests {
         b.finalize();
 
         let c = b.into_khi_complex();
-        c.check_d_all();
+        c.inner().check_d_all();
 
         assert!(c.canon_cycles().is_empty()); // TODO
 
@@ -820,7 +820,7 @@ mod tests {
         b.finalize();
 
         let c = b.into_khi_complex().truncated(-1..=2);
-        c.check_d_all();
+        c.inner().check_d_all();
 
         let h = c.homology().truncated(0..=1);
         assert_eq!(h[0].rank(), 10);

@@ -8,8 +8,11 @@ use yui_matrix::sparse::pivot::{PivotCondition, PivotFinderConfig, PivotType, fi
 use yui_matrix::sparse::schur::Schur;
 use yui_core::{Ring, RingOps};
 
+use yui_core::lc::LcKey;
+
+use crate::conc::ChainComplexBase;
 use crate::generic::GenericChainComplexBase;
-use crate::{ChainComplexTrait, GridDeg, GridTrait};
+use crate::{GridDeg, GridTrait};
 
 /// Reduces a chain complex by repeatedly cancelling pivot pairs `(a, d)` —
 /// applying a Schur-complement style change of basis at each step — and
@@ -45,16 +48,16 @@ where
     I: GridDeg,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
-    pub fn reduce<C>(complex: &C, with_trans: bool) -> Self
-    where C: GridTrait<I> + ChainComplexTrait<I, R = R> {
+    pub fn reduce<X>(complex: &ChainComplexBase<I, X, R>, with_trans: bool) -> Self
+    where X: LcKey {
         let mut r = Self::from_complex(complex, with_trans);
         r.reduce_all(false);
         r.reduce_all(true);
         r
     }
 
-    pub fn from_complex<C>(complex: &C, with_trans: bool) -> Self
-    where C: GridTrait<I> + ChainComplexTrait<I, R = R> {
+    pub fn from_complex<X>(complex: &ChainComplexBase<I, X, R>, with_trans: bool) -> Self
+    where X: LcKey {
         let support = complex.support().copied();
         let d_deg = complex.d_deg();
 

@@ -1,7 +1,9 @@
 use yui_core::{EucRing, EucRingOps};
 use yui_core::lc::LcKey;
 
-use crate::{isize2, isize3, ComputeHomology, Grid, GridDeg, GridTrait};
+use crate::generic::GenericSummand;
+use crate::utils::HomologyCalc;
+use crate::{isize2, isize3, GenericHomologyBase, Grid, GridDeg, GridTrait};
 use super::{Summand, ChainComplexBase};
 
 pub type HomologyBase<I, X, R> = Grid<I, Summand<X, R>>;
@@ -10,20 +12,23 @@ pub type Homology2<X, R> = HomologyBase<isize2, X, R>;
 pub type Homology3<X, R> = HomologyBase<isize3, X, R>;
 
 impl<I, X, R> ChainComplexBase<I, X, R>
-where 
+where
     I: GridDeg,
     X: LcKey,
     R: EucRing, for<'x> &'x R: EucRingOps<R>
 {
     pub fn homology_at(&self, i: I) -> Summand<X, R> {
         let c = &self[i];
-        let h = self.compute_homology_at(i, true);
+        let d0 = self.d_matrix(i - self.d_deg());
+        let d1 = self.d_matrix(i);
+        let (rank, tors, trans) = HomologyCalc::calculate(d0, d1, true);
+        let trans = trans.unwrap();
 
         Summand::new(
             c.raw_generators().clone(),
-            h.rank(),
-            h.tors().to_vec(),
-            c.trans().merged(h.trans())
+            rank,
+            tors,
+            c.trans().merged(&trans)
         )
     }
 
@@ -32,6 +37,25 @@ where
             self.support().copied(),
             |i| {
                 let hi = self.homology_at(i);
+                (!hi.is_zero()).then_some(hi)
+            }
+        )
+    }
+
+    /// Compute the homology at index `i` without tracking the basis change.
+    /// Faster than `homology_at` when only the rank/torsion are needed.
+    pub fn generic_homology_at(&self, i: I) -> GenericSummand<I, R> {
+        let d0 = self.d_matrix(i - self.d_deg());
+        let d1 = self.d_matrix(i);
+        let (rank, tors, _) = HomologyCalc::calculate(d0, d1, false);
+        GenericSummand::generate(i, rank, tors, None)
+    }
+
+    pub fn generic_homology(&self) -> GenericHomologyBase<I, R> {
+        Grid::generate_filtered(
+            self.support().copied(),
+            |i| {
+                let hi = self.generic_homology_at(i);
                 (!hi.is_zero()).then_some(hi)
             }
         )

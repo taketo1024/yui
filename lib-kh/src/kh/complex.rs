@@ -4,8 +4,7 @@ use std::sync::OnceLock;
 use delegate::delegate;
 use yui_core::{IteratorExt, Ring, RingOps, EucRing, EucRingOps};
 use yui_link::Link;
-use yui_homology::{ChainComplex, ChainComplexTrait, ToSeqString, ToTableString, Grid2, GridIter, GridTrait, Summand};
-use yui_matrix::sparse::SpMat;
+use yui_homology::{ChainComplex, ToSeqString, ToTableString, Grid2, GridIter, GridTrait, Summand};
 
 use crate::kh::chain::KhChain;
 use crate::kh::internal::v1::cube::KhCube;
@@ -113,9 +112,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         (h, q + e)
     }
 
-    delegate! { 
-        to self.inner { 
+    delegate! {
+        to self.inner {
+            pub fn d_deg(&self) -> isize;
             pub fn d(&self, i: isize, z: &KhChain<R>) -> KhChain<R>;
+            pub fn describe_d(&self) -> String;
+            pub fn describe_d_at(&self, i: isize) -> String;
         }
     }
 }
@@ -164,21 +166,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<R> ChainComplexTrait<isize> for KhComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type R = R;
-    type Element = KhChain<R>;
-
-    delegate! { 
-        to self.inner { 
-            fn rank(&self, i: isize) -> usize;
-            fn d_deg(&self) -> isize;
-            fn d(&self, i: isize, z: &Self::Element) -> Self::Element;
-            fn d_matrix(&self, i: isize) -> SpMat<R>;
-        }
-    }
-}
-
 impl<R> ToSeqString<isize> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     delegate! {
@@ -211,8 +198,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests {
-    use yui_homology::{ChainComplexTrait};
-    use yui_link::Link;
+        use yui_link::Link;
 
     use super::KhComplex;
 
@@ -229,7 +215,7 @@ mod tests {
         assert_eq!(c[-1].rank(), 0);
         assert_eq!(c[ 0].rank(), 2);
 
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 
     #[test]
@@ -245,7 +231,7 @@ mod tests {
         assert_eq!(c[-1].rank(), 0);
         assert_eq!(c[ 0].rank(), 1);
 
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 
     #[test]
@@ -274,8 +260,7 @@ mod tests {
 
 #[cfg(test)]
 mod tests_v1 {
-    use yui_homology::{ChainComplexTrait};
-    use yui_link::Link;
+        use yui_link::Link;
 
     use super::KhComplex;
 
@@ -290,7 +275,7 @@ mod tests_v1 {
         assert_eq!(c[-1].rank(), 6);
         assert_eq!(c[ 0].rank(), 4);    
 
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 
     #[test]
@@ -304,6 +289,6 @@ mod tests_v1 {
         assert_eq!(c[-1].rank(), 3);
         assert_eq!(c[ 0].rank(), 2);
 
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 }

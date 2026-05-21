@@ -5,7 +5,7 @@ use yui_core::lc::{EitherKey, LcKey, Lc, split_lr};
 use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 use yui_matrix::sparse::SpMat;
 
-use crate::{ChainComplexTrait, Grid, GridDeg, GridTrait, Summand};
+use crate::{Grid, GridDeg, GridTrait, Summand};
 
 use super::ChainComplexBase;
 

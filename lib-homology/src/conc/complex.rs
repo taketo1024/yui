@@ -2,13 +2,14 @@ use std::ops::{Index, RangeInclusive};
 use std::sync::Arc;
 
 use delegate::delegate;
+use itertools::Itertools;
 use num_traits::Zero;
 use yui_core::{Ring, RingOps};
 use yui_core::lc::{LcKey, Lc};
 use yui_matrix::sparse::{SpMat, SpVec};
 
 use crate::utils::ChainReducer;
-use crate::{ChainComplexTrait, ToSeqString, ToTableString, GenericChainComplexBase, Grid, GridDeg, GridIter, GridTrait, isize2, isize3};
+use crate::{ToSeqString, ToTableString, GenericChainComplexBase, Grid, GridDeg, GridIter, GridTrait, isize2, isize3};
 use super::Summand;
 
 #[cfg(feature = "multithread")]
@@ -52,21 +53,29 @@ where
         &self.summands
     }
 
-    pub fn raw_d(&self) -> Arc<dyn Fn(I, &Lc<X, R>) -> Lc<X, R> + Send + Sync> { 
+    pub fn d_deg(&self) -> I {
+        self.d_deg
+    }
+
+    pub(crate) fn raw_d(&self) -> Arc<dyn Fn(I, &Lc<X, R>) -> Lc<X, R> + Send + Sync> {
         self.d_map.clone()
     }
 
-    fn d_matrix(&self, i: I) -> SpMat<R> { 
+    pub fn d(&self, i: I, z: &Lc<X, R>) -> Lc<X, R> {
+        (self.d_map)(i, z)
+    }
+
+    pub fn d_matrix(&self, i: I) -> SpMat<R> {
         let m = self[i + self.d_deg].rank();
         let n = self[i].rank();
 
-        cfg_if::cfg_if! { 
+        cfg_if::cfg_if! {
             if #[cfg(feature = "multithread")] {
                 let cols = (0..n).into_par_iter().map(|j|
                     self.d_matrix_col(i, j)
                 ).collect::<Vec<_>>();
                 SpMat::from_col_vecs(m, cols)
-            } else { 
+            } else {
                 let cols = (0..n).map(|j|
                     self.d_matrix_col(i, j)
                 );
@@ -80,6 +89,31 @@ where
         let z = self[i].generator(j);
         let w = self.d(i, &z);
         self[i + self.d_deg].vectorize(&w)
+    }
+
+    pub fn describe_d_at(&self, i: I) -> String {
+        let c0 = &self[i];
+        let c1 = &self[i + self.d_deg];
+        let d = self.d_matrix(i).into_dense();
+        format!("d[{i}]: {c0} -> {c1}\n{d}")
+    }
+
+    pub fn describe_d(&self) -> String {
+        self.support().filter_map(|&i|
+            if self[i].rank() > 0 && self[i + self.d_deg].rank() > 0 && !self.d_matrix(i).is_zero() {
+                Some(self.describe_d_at(i))
+            } else {
+                None
+            }
+        ).join("")
+    }
+
+    pub fn as_generic(&self) -> GenericChainComplexBase<I, R> {
+        GenericChainComplexBase::generate(
+            self.support().copied(),
+            self.d_deg,
+            |i| self.d_matrix(i)
+        )
     }
 
     pub fn reduced(&self) -> ChainComplexBase<I, X, R> { 
@@ -118,6 +152,20 @@ where
 
         assert!(ddx.is_zero(), "d² is non-zero for {x} at {i0}.\n  dx: {dx}\n  ddx: {ddx}.");
     }
+
+    #[cfg(debug_assertions)]
+    pub fn check_d_at(&self, i0: I) {
+        for x in self[i0].raw_generators().iter() {
+            self.check_d_for(i0, x);
+        }
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn check_d_all(&self) {
+        for &i in self.support() {
+            self.check_d_at(i);
+        }
+    }
 }
 
 impl<X, R> ChainComplex<X, R>
@@ -155,39 +203,6 @@ where
             fn is_supported(&self, i: I) -> bool;
             fn get(&self, i: I) -> &Self::Item;
             fn get_default(&self) -> &Self::Item;
-        }
-    }
-}
-
-impl<I, X, R> ChainComplexTrait<I> for ChainComplexBase<I, X, R>
-where 
-    I: GridDeg,
-    X: LcKey,
-    R: Ring, for<'x> &'x R: RingOps<R>,
-{
-    type R = R;
-    type Element = Lc<X, R>;
-
-    fn rank(&self, i: I) -> usize {
-        self[i].rank()
-    }
-    
-    fn d_deg(&self) -> I {
-        self.d_deg
-    }
-
-    fn d(&self, i: I, z: &Lc<X, R>) -> Lc<X, R> { 
-        (self.d_map)(i, z)
-    }
-
-    fn d_matrix(&self, i: I) -> SpMat<Self::R> { 
-        self.d_matrix(i)
-    }
-
-    #[cfg(debug_assertions)]
-    fn check_d_at(&self, i0: I) {
-        for x in self.get(i0).raw_generators().iter() {
-            self.check_d_for(i0, x);
         }
     }
 }

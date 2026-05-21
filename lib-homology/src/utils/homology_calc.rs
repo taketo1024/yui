@@ -149,7 +149,6 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 mod tests {
     use num_traits::Zero;
     use crate::generic::GenericChainComplex;
-    use crate::ChainComplexTrait;
     use super::*;
  
     #[test]

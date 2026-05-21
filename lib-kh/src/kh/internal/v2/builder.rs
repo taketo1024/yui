@@ -606,8 +606,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 mod tests { 
     use num_traits::Zero;
-    use yui_homology::{ChainComplexTrait};
-
+    
     use super::*;
 
     #[test]
@@ -633,7 +632,7 @@ mod tests {
         let l = Link::test_data("unknot_r_twist");
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
-        c.check_d_all();
+        c.inner().check_d_all();
 
         assert_eq!(c[-1].rank(), 0);
         assert_eq!(c[ 0].rank(), 2);
@@ -644,7 +643,7 @@ mod tests {
         let l = Link::test_data("unknot_lr_twist");
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
-        c.check_d_all();
+        c.inner().check_d_all();
 
         assert_eq!(c[-1].rank(), 0);
         assert_eq!(c[ 0].rank(), 2);
@@ -656,7 +655,7 @@ mod tests {
         let l = Link::test_data("unlink2");
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
-        c.check_d_all();
+        c.inner().check_d_all();
 
         assert_eq!(c[-1].rank(), 0);
         assert_eq!(c[ 0].rank(), 4);
@@ -681,7 +680,7 @@ mod tests {
         let l = Link::test_data("L2a1");
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
-        c.check_d_all();
+        c.inner().check_d_all();
 
         assert_eq!(c[-2].rank(), 2);
         assert_eq!(c[-1].rank(), 0);
@@ -693,7 +692,7 @@ mod tests {
         let l = Link::test_data("8_19");
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
-        c.check_d_all();
+        c.inner().check_d_all();
 
         let h = c.inner().homology();
 
@@ -740,7 +739,7 @@ mod tests {
         b.finalize();
 
         let c = b.into_kh_complex();
-        c.check_d_all();
+        c.inner().check_d_all();
 
         let h = c.homology();
         assert_eq!(h[0].rank(), 4);

@@ -5,9 +5,8 @@ use delegate::delegate;
 use itertools::Itertools;
 use yui_core::lc::Lc;
 use yui_core::{EucRing, EucRingOps, IteratorExt, Ring, RingOps};
-use yui_homology::{ChainComplex, ChainComplexTrait, ToSeqString, ToTableString, Grid1, Grid2, GridIter, GridTrait, Summand};
+use yui_homology::{ChainComplex, ToSeqString, ToTableString, Grid1, Grid2, GridIter, GridTrait, Summand};
 use yui_link::InvLink;
-use yui_matrix::sparse::SpMat;
 
 use crate::kh::{KhChain, KhChainExt, KhComplex, KhState};
 use crate::khi::KhIHomology;
@@ -197,17 +196,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<R> ChainComplexTrait<isize> for KhIComplex<R>
+impl<R> KhIComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    type R = R;
-    type Element = KhIChain<R>;
-
-    delegate! { 
-        to self.inner { 
-            fn rank(&self, i: isize) -> usize;
-            fn d_deg(&self) -> isize;
-            fn d(&self, i: isize, z: &Self::Element) -> Self::Element;
-            fn d_matrix(&self, i: isize) -> SpMat<R>;
+    delegate! {
+        to self.inner {
+            pub fn d_deg(&self) -> isize;
+            pub fn d(&self, i: isize, z: &KhIChain<R>) -> KhIChain<R>;
+            pub fn describe_d(&self) -> String;
+            pub fn describe_d_at(&self, i: isize) -> String;
         }
     }
 }
@@ -247,8 +243,7 @@ mod tests {
     use yui_core::poly::Poly;
     use yui_core::num::FF2;
     use num_traits::{Zero, One};
-    use yui_homology::{ChainComplexTrait};
-    use super::*;
+        use super::*;
 
     #[test]
     fn complex_kh() { 
@@ -264,7 +259,7 @@ mod tests {
         assert_eq!(c[3].rank(), 4);
         assert_eq!(c[4].rank(), 2);
             
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 
     #[test]
@@ -281,7 +276,7 @@ mod tests {
         assert_eq!(c[3].rank(), 0);
         assert_eq!(c[4].rank(), 0);
         
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 
     #[test]
@@ -300,7 +295,7 @@ mod tests {
         assert_eq!(c[3].rank(), 4);
         assert_eq!(c[4].rank(), 2);
         
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 
     #[test]
@@ -317,7 +312,7 @@ mod tests {
         assert_eq!(c[3].rank(), 2);
         assert_eq!(c[4].rank(), 1);
         
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 
     #[test]
@@ -449,8 +444,7 @@ mod tests_v1 {
     use yui_core::poly::Poly;
     use yui_core::num::FF2;
     use num_traits::{Zero, One};
-    use yui_homology::{ChainComplexTrait};
-    use super::*;
+        use super::*;
 
     #[test]
     fn complex_kh() { 
@@ -466,7 +460,7 @@ mod tests_v1 {
         assert_eq!(c[3].rank(), 20);
         assert_eq!(c[4].rank(), 8);
             
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 
     #[test]
@@ -483,7 +477,7 @@ mod tests_v1 {
         assert_eq!(c[3].rank(), 20);
         assert_eq!(c[4].rank(), 8);
         
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 
     #[test]
@@ -502,7 +496,7 @@ mod tests_v1 {
         assert_eq!(c[3].rank(), 20);
         assert_eq!(c[4].rank(), 8);
         
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 
     #[test]
@@ -519,7 +513,7 @@ mod tests_v1 {
         assert_eq!(c[3].rank(), 10);
         assert_eq!(c[4].rank(), 4);
         
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 
     #[test]

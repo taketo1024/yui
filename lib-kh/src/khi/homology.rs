@@ -150,7 +150,7 @@ mod tests {
     use yui_core::poly::Poly;
     use yui_core::num::FF2;
     use num_traits::{Zero, One};
-    use yui_homology::{ChainComplexTrait, ToSeqString, ToTableString};
+    use yui_homology::{ToSeqString, ToTableString};
     use yui_link::Link;
     use super::*;
 
@@ -303,7 +303,7 @@ mod tests_v1 {
     use yui_core::poly::Poly;
     use yui_core::num::FF2;
     use num_traits::{Zero, One};
-    use yui_homology::{ChainComplexTrait, ToSeqString, ToTableString};
+    use yui_homology::{ToSeqString, ToTableString};
     use yui_link::Link;
     use super::*;
 

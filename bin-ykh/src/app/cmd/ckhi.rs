@@ -6,7 +6,7 @@ use std::str::FromStr;
 use yui_core::TeX;
 use yui_core::{Ring, RingOps};
 use yui_homology::ToTableString;
-use yui_homology::{ChainComplexTrait, GridTrait};
+use yui_homology::{GridTrait};
 use yui_kh::kh::KhChainExt;
 use yui_kh::khi::KhIComplex;
 

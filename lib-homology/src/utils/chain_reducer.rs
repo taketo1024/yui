@@ -12,7 +12,7 @@ use yui_core::lc::LcKey;
 
 use crate::conc::ChainComplexBase;
 use crate::generic::GenericChainComplexBase;
-use crate::GridDeg;
+use crate::AddInd;
 
 /// Reduces a chain complex by repeatedly cancelling pivot pairs `(a, d)` —
 /// applying a Schur-complement style change of basis at each step — and
@@ -34,7 +34,7 @@ use crate::GridDeg;
 /// ```
 pub struct ChainReducer<I, R>
 where 
-    I: GridDeg,
+    I: AddInd,
     R: Ring, for<'x> &'x R: RingOps<R>,
 { 
     support: Vec<I>,
@@ -45,7 +45,7 @@ where
 
 impl<I, R> ChainReducer<I, R>
 where 
-    I: GridDeg,
+    I: AddInd,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
     pub fn reduce<X>(complex: &ChainComplexBase<I, X, R>, with_trans: bool) -> Self

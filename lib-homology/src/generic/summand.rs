@@ -1,14 +1,14 @@
 use yui_core::{Ring, RingOps};
 use yui_matrix::sparse::Trans;
 
-use crate::{GridDeg, Summand};
+use crate::{AddInd, Summand};
 
 use super::GenericKey;
 
 pub type GenericSummand<I, R> = Summand<GenericKey<I>, R>;
 
 impl<I, R> GenericSummand<I, R>
-where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> { 
+where I: AddInd, R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn generate(i: I, rank: usize, tors: Vec<R>, trans: Option<Trans<R>>) -> Self { 
         let (n, trans) = if let Some(t) = trans { 
             (t.src_dim(), t)

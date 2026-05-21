@@ -4,7 +4,7 @@ use std::ops::{Index, RangeInclusive};
 use ahash::AHashMap;
 use itertools::Itertools;
 use crate::utils::{ToSeqString, ToTableString};
-use crate::{GridDeg, isize2, usize2, isize3, usize3};
+use crate::{AddInd, isize2, usize2, isize3, usize3};
 
 pub type Grid1<E> = Grid<isize,  E>;
 pub type Grid2<E> = Grid<isize2, E>;
@@ -15,14 +15,14 @@ pub type GridIter<'a, I, V> = std::collections::hash_map::Keys<'a, I, V>;
 #[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Grid<I, E>
-where I: GridDeg {
+where I: AddInd {
     data: AHashMap<I, E>,
     #[cfg_attr(feature = "serde", serde(skip))]
     default: E,
 }
 
 impl<I, E> Grid<I, E>
-where I: GridDeg {
+where I: AddInd {
     fn new(data: impl IntoIterator<Item = (I, E)>, default: E) -> Self {
         Self { data: data.into_iter().collect(), default }
     }
@@ -77,14 +77,14 @@ impl<E> Grid1<E> {
 }
 
 impl<I, E> Default for Grid<I, E>
-where I: GridDeg, E: Default {
+where I: AddInd, E: Default {
     fn default() -> Self {
         Self::new(AHashMap::default(), E::default())
     }
 }
 
 impl<I, E> IntoIterator for Grid<I, E>
-where I: GridDeg {
+where I: AddInd {
     type Item = (I, E);
     type IntoIter = std::collections::hash_map::IntoIter<I, E>;
 
@@ -94,7 +94,7 @@ where I: GridDeg {
 }
 
 impl<I, E> Index<I> for Grid<I, E>
-where I: GridDeg {
+where I: AddInd {
     type Output = E;
     fn index(&self, i: I) -> &Self::Output {
         self.data.get(&i).unwrap_or(&self.default)

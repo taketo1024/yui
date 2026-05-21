@@ -4,7 +4,7 @@ use yui_matrix::MatTrait;
 use super::key::GenericKey;
 use super::GenericSummand;
 
-use crate::{isize2, isize3, ChainComplexBase, Grid, GridDeg};
+use crate::{isize2, isize3, ChainComplexBase, Grid, AddInd};
 
 pub type GenericChainComplexBase<I, R> = ChainComplexBase<I, GenericKey<I>, R>;
 pub type GenericChainComplex<R>  = GenericChainComplexBase<isize,  R>;
@@ -17,7 +17,7 @@ pub type GenericHomology2<R> = GenericHomologyBase<isize2, R>;
 pub type GenericHomology3<R> = GenericHomologyBase<isize3, R>;
 
 impl<I, R> GenericChainComplexBase<I, R> 
-where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {
+where I: AddInd, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn generate<It, F>(support: It, d_deg: I, d_matrix_map: F) -> Self
     where 
         It: IntoIterator<Item = I>, 

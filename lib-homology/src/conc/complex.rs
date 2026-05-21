@@ -9,7 +9,7 @@ use yui_core::lc::{LcKey, Lc};
 use yui_matrix::sparse::{SpMat, SpVec};
 
 use crate::utils::ChainReducer;
-use crate::{ToSeqString, ToTableString, GenericChainComplexBase, Grid, GridDeg, GridIter, isize2, isize3};
+use crate::{ToSeqString, ToTableString, GenericChainComplexBase, Grid, AddInd, GridIter, isize2, isize3};
 use super::Summand;
 
 #[cfg(feature = "multithread")]
@@ -22,7 +22,7 @@ pub type ChainComplex3<X, R> = ChainComplexBase<isize3, X, R>;
 #[derive(Clone)]
 pub struct ChainComplexBase<I, X, R>
 where 
-    I: GridDeg,
+    I: AddInd,
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
@@ -33,7 +33,7 @@ where
 
 impl<I, X, R> ChainComplexBase<I, X, R>
 where 
-    I: GridDeg,
+    I: AddInd,
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
@@ -196,7 +196,7 @@ where
 }
 
 impl<I, X, R> Index<I> for ChainComplexBase<I, X, R>
-where I: GridDeg, X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
+where I: AddInd, X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = Summand<X, R>;
     fn index(&self, i: I) -> &Self::Output {
         &self.summands[i]

@@ -3,7 +3,7 @@ use yui_core::lc::LcKey;
 
 use crate::generic::GenericSummand;
 use crate::utils::HomologyCalc;
-use crate::{isize2, isize3, GenericHomologyBase, Grid, GridDeg};
+use crate::{isize2, isize3, GenericHomologyBase, Grid, AddInd};
 use super::{Summand, ChainComplexBase};
 
 pub type HomologyBase<I, X, R> = Grid<I, Summand<X, R>>;
@@ -13,7 +13,7 @@ pub type Homology3<X, R> = HomologyBase<isize3, X, R>;
 
 impl<I, X, R> ChainComplexBase<I, X, R>
 where
-    I: GridDeg,
+    I: AddInd,
     X: LcKey,
     R: EucRing, for<'x> &'x R: EucRingOps<R>
 {

@@ -5,7 +5,7 @@ use yui_core::lc::{EitherKey, LcKey, Lc, split_lr};
 use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 use yui_matrix::sparse::SpMat;
 
-use crate::{Grid, GridDeg, Summand};
+use crate::{Grid, AddInd, Summand};
 
 use super::ChainComplexBase;
 
@@ -15,7 +15,7 @@ use super::ChainComplexBase;
 
 pub struct ChainMap<I, X, Y, R>
 where 
-    I: GridDeg,
+    I: AddInd,
     X: LcKey, Y: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
@@ -25,7 +25,7 @@ where
 
 impl<I, X, Y, R> ChainMap<I, X, Y, R>
 where 
-    I: GridDeg,
+    I: AddInd,
     X: LcKey,
     Y: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>

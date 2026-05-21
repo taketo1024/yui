@@ -7,6 +7,8 @@ use itertools::Itertools;
 use num_traits::Zero;
 use yui_core::{Ring, RingOps};
 use yui_core::lc::{LcKey, Lc};
+
+#[cfg(debug_assertions)]
 use yui_matrix::MatTrait;
 use yui_matrix::sparse::{SpMat, SpVec};
 
@@ -51,6 +53,7 @@ where
 
     pub(crate) fn with_d_matrices(mut self, matrices: impl IntoIterator<Item = (I, SpMat<R>)>) -> Self {
         let map: HashMap<I, SpMat<R>> = matrices.into_iter().collect();
+
         #[cfg(debug_assertions)]
         for (&i, m) in &map {
             let (n_rows, n_cols) = m.shape();
@@ -60,6 +63,7 @@ where
             assert_eq!(n_rows, self[j].rank(),
                 "d_matrix at {i}: n_rows {n_rows} != rank(C[{j}]) {}", self[j].rank());
         }
+
         self.d_matrices = Arc::new(map);
         self
     }

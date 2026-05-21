@@ -257,9 +257,11 @@ where
         (i - deg, i, i + deg)
     }
 
-    pub fn into_complex(self) -> GenericChainComplexBase<I, R> { 
-        GenericChainComplexBase::generate(
-            self.support.clone(), self.d_deg, |i| self.mats[&i].clone()
+    pub fn into_complex(self) -> GenericChainComplexBase<I, R> {
+        let d_deg = self.d_deg;
+        GenericChainComplexBase::from_d_matrices(
+            d_deg,
+            self.support.iter().map(|&i| (i, self.mats[&i].clone()))
         )
     }
 }

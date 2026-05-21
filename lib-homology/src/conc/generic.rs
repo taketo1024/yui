@@ -63,14 +63,8 @@ pub type GenericHomology3<R> = GenericHomologyBase<isize3, R>;
 
 impl<I, R> GenericChainComplexBase<I, R>
 where I: AddInd, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn generate<It, F>(support: It, d_deg: I, mut d_matrix_map: F) -> Self
-    where
-        It: IntoIterator<Item = I>,
-        F: FnMut(I) -> SpMat<R>,
-    {
-        let d_matrices: HashMap<I, SpMat<R>> = support.into_iter()
-            .map(|i| (i, d_matrix_map(i)))
-            .collect();
+    pub fn from_d_matrices(d_deg: I, matrices: impl IntoIterator<Item = (I, SpMat<R>)>) -> Self {
+        let d_matrices: HashMap<I, SpMat<R>> = matrices.into_iter().collect();
 
         let summands = GrMod::generate(
             d_matrices.keys().copied(),

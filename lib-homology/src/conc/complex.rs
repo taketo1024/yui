@@ -116,10 +116,9 @@ where
     }
 
     pub fn as_generic(&self) -> GenericChainComplexBase<I, R> {
-        GenericChainComplexBase::generate(
-            self.support().copied(),
+        GenericChainComplexBase::from_d_matrices(
             self.d_deg,
-            |i| self.d_matrix(i)
+            self.support().map(|&i| (i, self.d_matrix(i)))
         )
     }
 

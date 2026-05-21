@@ -5,16 +5,11 @@ use yui_core::{GetSign, Sign};
 #[derive(Clone, Copy, PartialEq, Eq, Display, Debug)]
 #[display("{}", _0)]
 #[  debug("{}", _0)]
-pub struct BraidGen(i32);
+pub struct BraidGen(i8);
 
 impl BraidGen {
-    pub fn new(index: usize, sign: Sign) -> Self {
-        assert!(!index.is_zero());
-        if sign.is_positive() {
-            Self(index as i32 )
-        } else {
-            Self(-(index as i32))
-        }
+    pub fn new(val: i8) -> Self {
+        Self::from(val)
     }
 
     pub fn index(&self) -> usize {
@@ -30,14 +25,23 @@ impl BraidGen {
     }
 }
 
-impl From<i32> for BraidGen {
-    fn from(value: i32) -> Self {
-        assert!(!value.is_zero());
-        Self(value)
-    }
+macro_rules! impl_from_int {
+    ($($t:ty),* $(,)?) => {
+        $(
+            impl From<$t> for BraidGen {
+                fn from(value: $t) -> Self {
+                    assert!(!value.is_zero());
+                    let v = i8::try_from(value).expect("BraidGen value must fit in i8");
+                    Self(v)
+                }
+            }
+        )*
+    };
 }
 
-pub(super) fn from_raw(value: i32) -> BraidGen {
+impl_from_int!(i8, i16, i32, i64);
+
+pub(super) fn from_raw(value: i8) -> BraidGen {
     BraidGen(value)
 }
 
@@ -47,14 +51,14 @@ mod tests {
 
     #[test]
     fn new_pos() {
-        let g = BraidGen::new(1, Sign::Pos);
+        let g = BraidGen::new(1);
         assert_eq!(g.index(), 1);
         assert!(g.sign().is_positive());
     }
 
     #[test]
     fn new_neg() {
-        let g = BraidGen::new(2, Sign::Neg);
+        let g = BraidGen::new(-2);
         assert_eq!(g.index(), 2);
         assert!(g.sign().is_negative());
     }
@@ -62,7 +66,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn new_zero_panics() {
-        BraidGen::new(0, Sign::Pos);
+        BraidGen::new(0);
     }
 
     #[test]

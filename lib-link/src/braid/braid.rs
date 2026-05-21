@@ -4,7 +4,6 @@ use auto_impl_ops::auto_ops;
 use delegate::delegate;
 use derive_more::{Display, Debug};
 use itertools::Itertools;
-use yui_core::Sign;
 
 use crate::{Link, Node};
 
@@ -30,10 +29,8 @@ impl Braid {
     }
 
     pub fn generator(strands: usize, index: usize) -> Self {
-        Self::new(
-            strands,
-            vec![(BraidGen::new(index, Sign::Pos))]
-        )
+        let val = i8::try_from(index).expect("index must fit in i8");
+        Self::new(strands, vec![BraidGen::new(val)])
     }
 
     pub fn strands(&self) -> usize {
@@ -140,19 +137,29 @@ impl Braid {
     }
 }
 
-impl<const N: usize> From<[i32; N]> for Braid {
-    fn from(value: [i32; N]) -> Self {
-        Self::from_iter(value)
-    }
+macro_rules! impl_from_int {
+    ($($t:ty),* $(,)?) => {
+        $(
+            impl<const N: usize> From<[$t; N]> for Braid {
+                fn from(value: [$t; N]) -> Self {
+                    Self::from_iter(value)
+                }
+            }
+
+            impl FromIterator<$t> for Braid {
+                fn from_iter<T: IntoIterator<Item = $t>>(iter: T) -> Self {
+                    let elements = iter.into_iter().map(|v|
+                        from_raw(i8::try_from(v).expect("BraidGen value must fit in i8"))
+                    ).collect_vec();
+                    let strands = elements.iter().map(|g| g.index() + 1).max().unwrap_or(0);
+                    Self::new(strands, elements)
+                }
+            }
+        )*
+    };
 }
 
-impl FromIterator<i32> for Braid {
-    fn from_iter<T: IntoIterator<Item = i32>>(iter: T) -> Self {
-        let elements = iter.into_iter().map(from_raw).collect_vec();
-        let strands = elements.iter().map(|g| g.index() + 1).max().unwrap_or(0);
-        Self::new(strands, elements)
-    }
-}
+impl_from_int!(i8, i16, i32, i64);
 
 #[auto_ops]
 impl MulAssign<&Braid> for Braid {

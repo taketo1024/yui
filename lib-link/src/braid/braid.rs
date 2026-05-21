@@ -97,21 +97,22 @@ impl Braid {
             count += 2;
         }
 
-        assert!(
-            front_edges.iter().enumerate().all(|(i, &j)| i != j),
-            "braid closure contains free loop."
-        );
+        let mut conn: HashMap<usize, usize> = HashMap::new();
+        let mut loops: Vec<usize> = Vec::new();
 
-        let conn: HashMap<_, _> = Iterator::zip(
-            front_edges.into_iter(),
-            0..self.strands
-        ).collect();
+        for (k, front) in front_edges.into_iter().enumerate() {
+            if front == k {
+                loops.push(k);
+            } else {
+                conn.insert(front, k);
+            }
+        }
 
         nodes.iter_mut().for_each(|n|
             *n = n.convert_edges(|e| conn.get(&e).cloned().unwrap_or(e))
         );
 
-        Link::from_nodes(nodes)
+        Link::new(nodes, loops)
     }
 
     pub fn display(&self) -> String {
@@ -251,5 +252,28 @@ mod tests {
         assert_eq!(l.n_crossings(), 3);
         assert_eq!(l.writhe(), 3);
         assert_eq!(l.n_comps(), 1);
+    }
+
+    #[test]
+    fn closure_identity_braid() {
+        // closure of the identity braid on n strands is an unlink of n components.
+        let b = Braid::id(3);
+        let l = b.closure();
+
+        assert_eq!(l.n_crossings(), 0);
+        assert_eq!(l.n_loops(), 3);
+        assert_eq!(l.n_comps(), 3);
+    }
+
+    #[test]
+    fn closure_with_free_strand() {
+        // 3 strands, σ_1 once: strands 1-2 form the σ_1 closure (one component),
+        // strand 3 is a free loop.
+        let b = Braid::new(3, vec![BraidGen::new(1)]);
+        let l = b.closure();
+
+        assert_eq!(l.n_crossings(), 1);
+        assert_eq!(l.n_loops(), 1);
+        assert_eq!(l.n_comps(), 2);
     }
 }

@@ -1,7 +1,7 @@
 use yui_core::{EucRing, EucRingOps};
 use yui_core::lc::LcKey;
 
-use crate::generic::GenericSummand;
+use crate::GenericSummand;
 use crate::algo::HomologyCalc;
 use crate::{isize2, isize3, GenericHomologyBase, GrMod, AddInd};
 use super::{Summand, ChainComplexBase};

@@ -4,6 +4,7 @@ mod summand;
 mod complex;
 mod chain_map;
 mod homology;
+mod generic;
 
 pub use add_ind::*;
 pub use gr_mod::*;
@@ -11,3 +12,4 @@ pub use summand::*;
 pub use complex::*;
 pub use chain_map::*;
 pub use homology::*;
+pub use generic::*;

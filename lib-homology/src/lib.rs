@@ -1,8 +1,9 @@
 mod conc;
-mod generic;
 
 pub use conc::*;
-pub use generic::*;
+
+#[cfg(test)]
+mod test_data;
 
 pub mod algo;
 pub mod utils;

@@ -11,7 +11,7 @@ use yui_core::{Ring, RingOps};
 use yui_core::lc::LcKey;
 
 use crate::conc::ChainComplexBase;
-use crate::generic::GenericChainComplexBase;
+use crate::GenericChainComplexBase;
 use crate::AddInd;
 
 /// Reduces a chain complex by repeatedly cancelling pivot pairs `(a, d)` —
@@ -287,7 +287,7 @@ mod tests {
     use std::collections::HashSet;
 
     use num_traits::Zero;
-    use crate::generic::GenericChainComplex;
+    use crate::GenericChainComplex;
     use super::*;
 
     #[test]

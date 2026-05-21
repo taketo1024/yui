@@ -24,7 +24,8 @@ where
     }
 }
 
-pub fn make_matrix_s<X, Y, R, F, S1, S2>(from: &IndexSet<X, S1>, to: &IndexSet<Y, S2>, f: F) -> SpMat<R>
+#[cfg(not(feature = "multithread"))]
+pub(crate) fn make_matrix_s<X, Y, R, F, S1, S2>(from: &IndexSet<X, S1>, to: &IndexSet<Y, S2>, f: F) -> SpMat<R>
 where
     X: LcKey, Y: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>,
@@ -47,7 +48,7 @@ where
 }
 
 #[cfg(feature = "multithread")]
-pub fn make_matrix_m<X, Y, R, F, S1, S2>(from: &IndexSet<X, S1>, to: &IndexSet<Y, S2>, f: F) -> SpMat<R>
+pub(crate) fn make_matrix_m<X, Y, R, F, S1, S2>(from: &IndexSet<X, S1>, to: &IndexSet<Y, S2>, f: F) -> SpMat<R>
 where
     X: LcKey, Y: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>,

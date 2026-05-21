@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::ops::{Index, RangeInclusive};
 use std::sync::Arc;
 
@@ -6,6 +7,7 @@ use itertools::Itertools;
 use num_traits::Zero;
 use yui_core::{Ring, RingOps};
 use yui_core::lc::{LcKey, Lc};
+use yui_matrix::MatTrait;
 use yui_matrix::sparse::{SpMat, SpVec};
 
 use crate::algo::ChainReducer;
@@ -29,6 +31,7 @@ where
     summands: GrMod<I, X, R>,
     d_deg: I,
     d_map: Arc<dyn Fn(I, &Lc<X, R>) -> Lc<X, R> + Send + Sync>,
+    d_matrices: Arc<HashMap<I, SpMat<R>>>,
 }
 
 impl<I, X, R> ChainComplexBase<I, X, R>
@@ -42,7 +45,23 @@ where
         assert!(summands.iter().all(|(_, s)| s.is_free()));
 
         let d_map = Arc::new(d_map);
-        Self { summands, d_deg, d_map }
+        let d_matrices = Arc::new(HashMap::new());
+        Self { summands, d_deg, d_map, d_matrices }
+    }
+
+    pub(crate) fn with_d_matrices(mut self, matrices: impl IntoIterator<Item = (I, SpMat<R>)>) -> Self {
+        let map: HashMap<I, SpMat<R>> = matrices.into_iter().collect();
+        #[cfg(debug_assertions)]
+        for (&i, m) in &map {
+            let (n_rows, n_cols) = m.shape();
+            assert_eq!(n_cols, self[i].rank(),
+                "d_matrix at {i}: n_cols {n_cols} != rank(C[{i}]) {}", self[i].rank());
+            let j = i + self.d_deg;
+            assert_eq!(n_rows, self[j].rank(),
+                "d_matrix at {i}: n_rows {n_rows} != rank(C[{j}]) {}", self[j].rank());
+        }
+        self.d_matrices = Arc::new(map);
+        self
     }
 
     pub fn zero() -> Self {
@@ -73,6 +92,10 @@ where
     }
 
     pub fn d_matrix(&self, i: I) -> SpMat<R> {
+        if let Some(d) = self.d_matrices.get(&i) {
+            return d.clone();
+        }
+
         let m = self[i + self.d_deg].rank();
         let n = self[i].rank();
 
@@ -122,7 +145,7 @@ where
         )
     }
 
-    pub fn reduced(&self) -> ChainComplexBase<I, X, R> { 
+    pub fn reduced(&self) -> ChainComplexBase<I, X, R> {
         let r = ChainReducer::reduce(self, true);
 
         let summands = GrMod::generate(
@@ -130,17 +153,22 @@ where
             |i| {
                 let c = &self[i];
                 Summand::new(
-                    c.raw_generators().clone(), 
-                    r.rank(i).unwrap(), 
-                    vec![], 
+                    c.raw_generators().clone(),
+                    r.rank(i).unwrap(),
+                    vec![],
                     c.trans().merged(r.trans(i).unwrap())
                 )
-            } 
+            }
         );
+
+        let matrices = self.summands.support()
+            .filter_map(|&i| r.matrix(i).map(|m| (i, m.clone())))
+            .collect::<Vec<_>>();
 
         let d_deg = self.d_deg;
         let d_map = self.d_map.clone();
-        Self { summands, d_deg, d_map }
+        Self { summands, d_deg, d_map, d_matrices: Arc::new(HashMap::new()) }
+            .with_d_matrices(matrices)
     }
 
     pub fn reduced_generic(&self) -> GenericChainComplexBase<I, R> { 

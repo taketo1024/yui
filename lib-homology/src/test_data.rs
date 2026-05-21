@@ -365,6 +365,109 @@ mod tests {
     }
 
     #[test]
+    fn single_coh() {
+        let c = GenericChainComplex::<i32>::one().dual();
+        let h = c.homology();
+
+        assert_eq!(h[0].rank(), 1);
+        assert!(h[0].is_free());
+    }
+
+    #[test]
+    fn one_to_one_coh() {
+        let c = GenericChainComplex::<i32>::one_one(1).dual();
+        let h = c.homology();
+
+        assert!(h[0].is_zero());
+        assert!(h[1].is_zero());
+    }
+
+    #[test]
+    fn torsion_coh() {
+        let c = GenericChainComplex::<i32>::one_one(2).dual();
+        let h = c.homology();
+
+        assert!(h[0].is_zero());
+        assert_eq!(h[1].rank(), 0);
+        assert_eq!(h[1].tors(), &vec![2]);
+        assert!(!h[1].is_free());
+    }
+
+    #[test]
+    fn two_to_one_coh() {
+        let c = GenericChainComplex::<i32>::two_one(1, -1).dual();
+        let h = c.homology();
+
+        assert!(h[0].is_zero());
+        assert_eq!(h[1].rank(), 1);
+        assert!(h[1].is_free());
+    }
+
+    #[test]
+    fn one_to_two_coh() {
+        let c = GenericChainComplex::<i32>::one_two(1, -1).dual();
+        let h = c.homology();
+
+        assert_eq!(h[0].rank(), 1);
+        assert!(h[0].is_free());
+        assert!(h[1].is_zero());
+    }
+
+    #[test]
+    fn d3_coh() {
+        let c = GenericChainComplex::<i32>::d3().dual();
+        c.check_d_all();
+        let h = c.homology();
+
+        assert_eq!(h[0].rank(), 1);
+        assert!(h[0].is_free());
+        assert!(h[1].is_zero());
+        assert!(h[2].is_zero());
+        assert!(h[3].is_zero());
+    }
+
+    #[test]
+    fn s2_coh() {
+        let c = GenericChainComplex::<i32>::s2().dual();
+        c.check_d_all();
+        let h = c.homology();
+
+        assert_eq!(h[0].rank(), 1);
+        assert!(h[0].is_free());
+        assert!(h[1].is_zero());
+        assert_eq!(h[2].rank(), 1);
+        assert!(h[2].is_free());
+    }
+
+    #[test]
+    fn t2_coh() {
+        let c = GenericChainComplex::<i32>::t2().dual();
+        c.check_d_all();
+        let h = c.homology();
+
+        assert_eq!(h[0].rank(), 1);
+        assert!(h[0].is_free());
+        assert_eq!(h[1].rank(), 2);
+        assert!(h[1].is_free());
+        assert_eq!(h[2].rank(), 1);
+        assert!(h[2].is_free());
+    }
+
+    #[test]
+    fn rp2_coh() {
+        let c = GenericChainComplex::<i32>::rp2().dual();
+        c.check_d_all();
+        let h = c.homology();
+
+        assert_eq!(h[0].rank(), 1);
+        assert!(h[0].is_free());
+        assert!(h[1].is_zero());
+        assert_eq!(h[2].rank(), 0);
+        assert_eq!(h[2].tors(), &vec![2]);
+        assert!(!h[2].is_free());
+    }
+
+    #[test]
     fn rp2_red() {
         let c = GenericChainComplex::<i32>::rp2().reduced();
 

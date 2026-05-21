@@ -86,4 +86,19 @@ where I: AddInd, R: Ring, for<'x> &'x R: RingOps<R> {
             }
         )
     }
+
+    pub fn dual(&self) -> Self {
+        let d_deg = self.d_deg();
+        let new_d_deg = I::zero() - d_deg;
+        let matrices = self.support().map(|&i| {
+            let prev = i - d_deg;
+            let m = if self.is_supported(prev) {
+                self.d_matrix(prev).transpose()
+            } else {
+                SpMat::zero((0, self[i].rank()))
+            };
+            (i, m)
+        }).collect::<Vec<_>>();
+        Self::from_d_matrices(new_d_deg, matrices)
+    }
 }

@@ -4,55 +4,21 @@ use auto_impl_ops::auto_ops;
 use delegate::delegate;
 use derive_more::{Display, Debug};
 use itertools::Itertools;
-use num_traits::Zero;
-use yui_core::{GetSign, Sign};
+use yui_core::Sign;
 
 use crate::{Link, Node};
 
-#[derive(Clone, Copy, PartialEq, Eq, Display, Debug)]
-#[display("{}", _0)]
-#[  debug("{}", _0)]
-pub struct Generator(i32);
-
-impl Generator { 
-    pub fn new(index: usize, sign: Sign) -> Self { 
-        assert!(!index.is_zero());
-        if sign.is_positive() { 
-            Self(index as i32 )
-        } else { 
-            Self(-(index as i32))
-        }
-    }
-
-    pub fn index(&self) -> usize {
-        self.0.unsigned_abs() as usize
-    }
-    
-    pub fn sign(&self) -> Sign { 
-        self.0.sign()
-    }
-
-    pub fn inv(&self) -> Self { 
-        Self(-self.0)
-    }
-}
-
-impl From<i32> for Generator {
-    fn from(value: i32) -> Self {
-        assert!(!value.is_zero());
-        Self(value)
-    }
-}
+use super::braid_gen::{BraidGen, from_raw};
 
 #[derive(Clone, PartialEq, Eq, Display, Debug)]
 #[display("{:?}", elements)]
 pub struct Braid {
     strands: usize,
-    elements: Vec<Generator>
+    elements: Vec<BraidGen>
 }
 
 impl Braid {
-    pub fn new(strands: usize, elements: Vec<Generator>) -> Self {
+    pub fn new(strands: usize, elements: Vec<BraidGen>) -> Self {
         Self { strands, elements }
     }
 
@@ -66,25 +32,25 @@ impl Braid {
     pub fn generator(strands: usize, index: usize) -> Self {
         Self::new(
             strands,
-            vec![(Generator::new(index, Sign::Pos))]
+            vec![(BraidGen::new(index, Sign::Pos))]
         )
     }
 
-    pub fn strands(&self) -> usize { 
+    pub fn strands(&self) -> usize {
         self.strands
     }
 
-    pub fn elements(&self) -> &[Generator] { 
+    pub fn elements(&self) -> &[BraidGen] {
         &self.elements
     }
 
-    delegate! { 
-        to self.elements { 
+    delegate! {
+        to self.elements {
             pub fn len(&self) -> usize;
-            #[call(is_empty)] 
+            #[call(is_empty)]
             pub fn is_triv(&self) -> bool;
         }
-    }    
+    }
 
     pub fn inv(&self) -> Self {
         Self::new(
@@ -93,10 +59,6 @@ impl Braid {
                 |g| g.inv()
             ).collect()
         )
-    }
-
-    pub fn reduce(&mut self) {
-        // TODO
     }
 
     pub fn closure(&self) -> Link {
@@ -144,22 +106,22 @@ impl Braid {
         Link::from_nodes(nodes)
     }
 
-    pub fn display(&self) -> String { 
-        fn row(strands: usize, g: &Generator) -> String {
+    pub fn display(&self) -> String {
+        fn row(strands: usize, g: &BraidGen) -> String {
             let index = g.index();
             let sign = g.sign();
 
             (0..3).map(|r| {
                 (1..=strands).map(|i| {
-                    if i == index { 
-                        match r { 
+                    if i == index {
+                        match r {
                             0 => "\\ /",
                             1 => if sign.is_positive() { " / " } else { " \\ " },
                             _ => "/ \\",
                         }
-                    } else if i == index + 1 { 
+                    } else if i == index + 1 {
                         " "
-                    } else { 
+                    } else {
                         "| "
                     }
                 }).join("")
@@ -186,7 +148,7 @@ impl<const N: usize> From<[i32; N]> for Braid {
 
 impl FromIterator<i32> for Braid {
     fn from_iter<T: IntoIterator<Item = i32>>(iter: T) -> Self {
-        let elements = iter.into_iter().map(Generator).collect_vec();
+        let elements = iter.into_iter().map(from_raw).collect_vec();
         let strands = elements.iter().map(|g| g.index() + 1).max().unwrap_or(0);
         Self::new(strands, elements)
     }

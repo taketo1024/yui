@@ -12,7 +12,7 @@ use yui_homology::{ToSeqString, ToTableString};
 use yui_kh::kh::ext::cc::KhChainMap;
 use yui_kh::kh::KhComplex;
 use yui_kh::kh::KhHomology;
-use yui_kh::kh::ext::sl2::KhSl2Map;
+use yui_link::Link;
 
 pub fn dispatch(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
     if args.is_field() { 
@@ -90,7 +90,8 @@ where
 
     pub fn run_field(&mut self) -> Result<String, Box<dyn std::error::Error>>
     where R: Field, for<'x> &'x R: FieldOps<R> {
-        let (kh, e, ht) = self.compute()?;
+        let (c, l, kh, ht) = self.compute()?;
+        let e = c.sl2_map(&l);
 
         let e_str = e.string_decomp(&kh);
         let e = e.into_chain_map();
@@ -98,14 +99,14 @@ where
         self.show_results(&kh, &e, &ht);
         self.out(&e_str.to_string());
         self.out("");
-        
+
         let res = self.flush();
         Ok(res)
     }
 
     pub fn run(&mut self) -> Result<String, Box<dyn std::error::Error>> {
-        let (kh, e, ht) = self.compute()?;
-        let e = e.into_chain_map();
+        let (c, l, kh, ht) = self.compute()?;
+        let e = c.sl2_map(&l).into_chain_map();
 
         self.show_results(&kh, &e, &ht);
 
@@ -129,22 +130,21 @@ where
         }
     }
 
-    fn compute(&self) -> Result<(KhHomology<R>, KhSl2Map<R>, (R, R)), Box<dyn std::error::Error>> { 
+    fn compute(&self) -> Result<(KhComplex<R>, Link, KhHomology<R>, (R, R)), Box<dyn std::error::Error>> {
         let (h, t) = parse_pair::<R>(&self.args.c_value)?;
 
         if self.args.reduced {
             ensure!(t.is_zero(), "`t` must be zero for reduced.");
         }
-    
+
         let r = self.args.reduced;
         let l = load_link(&self.args.link, self.args.mirror)?;
         assert!(l.is_knot());
 
         let c = KhComplex::new_no_simplify(&l, &h, &t, r);
-        let e = c.sl2_map(&l);
         let kh = c.homology();
 
-        Ok((kh, e, (h, t)))
+        Ok((c, l, kh, (h, t)))
     }
 
     fn show_table(&mut self, h: &KhHomology<R>, bigraded: bool) { 

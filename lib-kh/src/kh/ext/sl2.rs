@@ -22,31 +22,32 @@ where
     R: Ring,
     for<'x> &'x R: RingOps<R>,
 {
-    pub fn sl2_map(&self, l: &Link) -> KhSl2Map<R> {
-        assert!(l.is_knot());
-
-        let cube = self.cube().clone();
-        KhSl2Map::new(l, cube)
+    pub fn sl2_map(&self, l: &Link) -> KhSl2Map<'_, R> {
+        KhSl2Map::new(self, l)
     }
 }
 
-pub struct KhSl2Map<R> where
+pub struct KhSl2Map<'a, R> where
     R: Ring,
     for<'x> &'x R: RingOps<R>
-{ 
+{
+    complex: &'a KhComplex<R>,
     path: Vec<(usize, Sign)>,
-    cube: KhCube<R>
 }
 
-impl<R> KhSl2Map<R> where
+impl<'a, R> KhSl2Map<'a, R> where
     R: Ring,
     for<'x> &'x R: RingOps<R>
-{ 
-    pub fn new(l: &Link, cube: KhCube<R>) -> Self { 
+{
+    pub fn new(complex: &'a KhComplex<R>, l: &Link) -> Self {
         assert!(l.is_knot());
 
         let path = Self::make_path(l);
-        Self { path, cube }
+        Self { complex, path }
+    }
+
+    fn cube(&self) -> &KhCube<R> {
+        self.complex.cube()
     }
 
     fn make_path(l: &Link) -> Vec<(usize, Sign)> {
@@ -77,12 +78,12 @@ impl<R> KhSl2Map<R> where
         }
 
         let t = x.state.edit(|s| s.set_0(i));
-        self.cube.rev_d_to(x, &t, true)
+        self.cube().rev_d_to(x, &t, true)
     }
 
-    fn apply_u(&self, x: &KhState) -> KhChain<R> { 
+    fn apply_u(&self, x: &KhState) -> KhChain<R> {
         let n = self.path.len();
-        if n < 2 { 
+        if n < 2 {
             return KhChain::zero();
         }
 
@@ -90,7 +91,7 @@ impl<R> KhSl2Map<R> where
             (j1 + 1 .. n).map(move |j2| (j1, j2) )
         });
 
-        KhChain::sum(indices.map(|(j1, j2)| { 
+        KhChain::sum(indices.map(|(j1, j2)| {
             let (i1, e1) = self.path[j1];
             let (i2, e2) = self.path[j2];
             KhChain::from(*x).apply(|x|
@@ -101,22 +102,22 @@ impl<R> KhSl2Map<R> where
         }))
     }
 
-    pub fn apply(&self, z: &KhChain<R>) -> KhChain<R> { 
+    pub fn apply(&self, z: &KhChain<R>) -> KhChain<R> {
         z.apply(|x| self.apply_u(x))
     }
 
-    pub fn into_chain_map(self) -> KhChainMap<R> { 
-        KhChainMap::new(self.h_deg(), move |_, z| {
-            self.apply(z)
-        })
+    pub fn into_chain_map(self) -> KhChainMap<'a, 'a, R> {
+        let c = self.complex.inner();
+        let h_deg = self.h_deg();
+        KhChainMap::new(c, c, h_deg, move |_, z| self.apply(z))
     }
 
     pub fn string_decomp(&self, kh: &KhHomology<R>) -> StringDecomp<R>
     where R: Field, for<'x> &'x R: FieldOps<R> {
         use yui_matrix::sparse::SpMat;
         
-        assert!(self.cube.str().h().is_zero());
-        assert!(self.cube.str().t().is_zero());
+        assert!(self.cube().str().h().is_zero());
+        assert!(self.cube().str().t().is_zero());
 
         let h_range = kh.h_range().mv(0, -self.h_deg());
 
@@ -264,8 +265,8 @@ mod tests {
     #[test]
     fn test_sl2map_unknot() {
         let l = Link::unknot();
-        let cube = KhCube::new(&l, &0, &0, None, (0, 0));
-        let map = KhSl2Map::new(&l, cube);
+        let c = KhComplex::<i32>::new_no_simplify(&l, &0, &0, false);
+        let map = c.sl2_map(&l);
 
         assert_eq!(map.path.len(), 0);
     } 
@@ -273,8 +274,8 @@ mod tests {
     #[test]
     fn test_sl2map_2twist_unknot() {
         let l = Link::test_data("unknot_l_twist2");
-        let cube = KhCube::new(&l, &0, &0, None, (0, 0));
-        let map = KhSl2Map::new(&l, cube);
+        let c = KhComplex::<i32>::new_no_simplify(&l, &0, &0, false);
+        let map = c.sl2_map(&l);
 
         assert_eq!(map.path.len(), 4);
         assert_eq!(map.path, vec![(0, Sign::Pos), (1, Sign::Neg), (1, Sign::Pos), (0, Sign::Neg)])
@@ -283,8 +284,8 @@ mod tests {
     #[test]
     fn test_sl2map_trefoil() {
         let l = Link::test_data("3_1");
-        let cube = KhCube::new(&l, &0, &0, None, (0, 0));
-        let map = KhSl2Map::new(&l, cube);
+        let c = KhComplex::<i32>::new_no_simplify(&l, &0, &0, false);
+        let map = c.sl2_map(&l);
 
         assert_eq!(map.path.len(), 6);
         assert_eq!(map.path, vec![(0, Sign::Pos), (2, Sign::Neg), (1, Sign::Pos), (0, Sign::Neg), (2, Sign::Pos), (1, Sign::Neg)])
@@ -293,46 +294,46 @@ mod tests {
     #[test]
     fn test_u_unknot() {
         let l = Link::unknot();
-        let cube = KhCube::new(&l, &0, &0, None, (0, 0));
-        let map = KhSl2Map::new(&l, cube.clone());
+        let c = KhComplex::<i32>::new_no_simplify(&l, &0, &0, false);
+        let map = c.sl2_map(&l);
 
         let v = State::empty();
-        let x = cube.vertex(&v).generators()[0];
+        let x = c.cube().vertex(&v).generators()[0];
         assert_eq!(map.apply_u(x), KhChain::zero());
-    } 
+    }
 
     #[test]
     fn test_u_2twist_unknot() {
         let l = Link::test_data("unknot_l_twist2");
-        let cube = KhCube::new(&l, &0, &0, None, (0, 0));
-        let map = KhSl2Map::new(&l, cube.clone());
+        let c = KhComplex::<i32>::new_no_simplify(&l, &0, &0, false);
+        let map = c.sl2_map(&l);
 
         let v = State::from([0,0]);
-        let x = cube.vertex(&v).generators()[0]; // 111
+        let x = c.cube().vertex(&v).generators()[0]; // 111
         assert_eq!(map.apply_u(x), KhChain::zero());
 
         let v = State::from([1,1]);
-        let x = cube.vertex(&v).generators()[0]; // 1
+        let x = c.cube().vertex(&v).generators()[0]; // 1
         assert_eq!(map.apply_u(x), KhChain::zero());
-    } 
+    }
 
     #[test]
     fn test_u_trefoil() {
         let l = Link::test_data("3_1");
-        let cube = KhCube::new(&l, &0, &0, None, (0, 0));
-        let map = KhSl2Map::new(&l, cube.clone());
+        let c = KhComplex::<i32>::new_no_simplify(&l, &0, &0, false);
+        let map = c.sl2_map(&l);
 
         let v = State::from([1,1,1]);
-        let z = cube.vertex(&v).generators()[0]; // (11)₁₁₁
+        let z = c.cube().vertex(&v).generators()[0]; // (11)₁₁₁
         let w = map.apply_u(z);
 
         assert_ne!(w, KhChain::zero());
 
-        assert_eq!(z.h_deg(), 3);
-        assert_eq!(z.q_deg(), 5);
-        assert_eq!(w.h_deg(), 1);
-        assert_eq!(w.q_deg(), 1);
-    } 
+        assert_eq!(z.h_deg(), 0);
+        assert_eq!(z.q_deg(), -1);
+        assert_eq!(w.h_deg(), -2);
+        assert_eq!(w.q_deg(), -5);
+    }
 
     #[test]
     fn test_ch_map_unknot() {
@@ -341,7 +342,7 @@ mod tests {
         let e = c.sl2_map(&l).into_chain_map();
 
         assert_eq!(e.deg(), -2);
-        e.check_all(c.inner(), c.inner());
+        e.check_all();
     }
 
     #[test]
@@ -351,7 +352,7 @@ mod tests {
         let e = c.sl2_map(&l).into_chain_map();
 
         assert_eq!(e.deg(), -2);
-        e.check_all(c.inner(), c.inner());
+        e.check_all();
     } 
 
     #[test]
@@ -361,7 +362,7 @@ mod tests {
         let e = c.sl2_map(&l).into_chain_map();
 
         assert_eq!(e.deg(), -2);
-        e.check_all(c.inner(), c.inner());
+        e.check_all();
 
         let z = c[0].generator(0); // (11)₁₁₁
         let w = e.apply(0, &z);
@@ -380,7 +381,7 @@ mod tests {
         let c = KhComplex::new_no_simplify(&l, &0, &0, false);
         let e = c.sl2_map(&l).into_chain_map();
 
-        e.check_all(c.inner(), c.inner());
+        e.check_all();
     }
 
     #[test]
@@ -389,7 +390,7 @@ mod tests {
         let c = KhComplex::new_no_simplify(&l, &0, &0, false);
         let e = c.sl2_map(&l).into_chain_map();
 
-        e.check_all(c.inner(), c.inner());
+        e.check_all();
     }
 
     #[test]
@@ -398,7 +399,7 @@ mod tests {
         let c = KhComplex::new_no_simplify(&l, &0, &0, false);
         let e = c.sl2_map(&l).into_chain_map();
 
-        e.check_all(c.inner(), c.inner());
+        e.check_all();
     }
 
     type QQ = Ratio<i64>;

@@ -11,19 +11,24 @@ use yui_core::{Ring, RingOps};
 use crate::generic::GenericChainComplexBase;
 use crate::{ChainComplexTrait, GridDeg, GridTrait, SummandTrait};
 
-//       a0 = [x]      a1 = [a b]      a2 = [z w]
-//            [y]           [c d]     
-//  C[0] --------> C[1] ---------> C[2] -------> C[3]
-//    |    [1 a⁻¹b] |             | [ 1     ]    |
-//    |    [    1 ] |             | [-ca⁻¹ 1]    |
-//    |             V             V              |    
-//  C[0] --------> C[1] ---------> C[2] -------> C[3]
-//    |     [0]     |    [a 0]    |    [0  w]    |
-//    |     [y]     |    [0 s]    |              |
-//    |             V             V              |
-//  C[0] --------> C[1]'---------> C[2]'-------> C[3]
-//          [y]           [s]           [w]
-
+/// Reduces a chain complex by repeatedly cancelling pivot pairs `(a, d)` —
+/// applying a Schur-complement style change of basis at each step — and
+/// accumulates the resulting basis change as a [`Trans<R>`] per index.
+///
+/// ```text
+///       a0 = [x]      a1 = [a b]      a2 = [z w]
+///            [y]           [c d]
+///  C[0] ────────→ C[1] ─────────→ C[2] ───────→ C[3]
+///    │    [1 a⁻¹b] │             │ [ 1     ]    │
+///    │    [    1 ] │             │ [-ca⁻¹ 1]    │
+///    │             ↓             ↓              │
+///  C[0] ────────→ C[1] ─────────→ C[2] ───────→ C[3]
+///    │     [0]     │    [a 0]    │    [0  w]    │
+///    │     [y]     │    [0 s]    │              │
+///    │             ↓             ↓              │
+///  C[0] ────────→ C[1]'─────────→ C[2]'───────→ C[3]
+///          [y]           [s]           [w]
+/// ```
 pub struct ChainReducer<I, R>
 where 
     I: GridDeg,

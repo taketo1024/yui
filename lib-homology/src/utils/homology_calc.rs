@@ -14,24 +14,28 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 impl<R> HomologyCalc<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    //            d1             d2
-    //    C1 ----------> C2 -----------> C3
-    //     |              |               |
-    //     |           p1 |               |
-    //     V      d1'     V               |
-    //    C11 ---------> C21              |
-    //     ⊕              ⊕      d2'      |
-    //    C11'           C21'----------> C3
-    //                    |               |
-    //                q2⁻¹|               |
-    //                    V      d2''     V
-    //                   C22 ----------> C31
-    //                    ⊕               ⊕
-    //                   C22'            C31'
-    // 
-    //  H2 = Ker(d2) / Im(d1)
-    //     ≅ C22' (free) ⊕ (C21 / Im(d1')) (tor)
-
+    /// Computes the homology of `d1 → d2` (i.e. `H = ker(d2) / im(d1)`) via two
+    /// successive SNF reductions.
+    ///
+    /// ```text
+    ///            d1             d2
+    ///    C1 ──────────→ C2 ───────────→ C3
+    ///     │              │               │
+    ///     │           p1 │               │
+    ///     ↓      d1'     ↓               │
+    ///    C11 ─────────→ C21              │
+    ///     ⊕              ⊕      d2'      │
+    ///    C11'           C21'──────────→ C3
+    ///                    │               │
+    ///                q2⁻¹│               │
+    ///                    ↓      d2''     ↓
+    ///                   C22 ──────────→ C31
+    ///                    ⊕               ⊕
+    ///                   C22'            C31'
+    ///
+    ///  H2 = Ker(d2) / Im(d1)
+    ///     ≅ C22' (free) ⊕ (C21 / Im(d1')) (tor)
+    /// ```
     pub fn calculate(d1: SpMat<R>, d2: SpMat<R>, with_trans: bool) -> HomologyCalcResult<R> {
         assert_eq!(d1.n_rows(), d2.n_cols());
 

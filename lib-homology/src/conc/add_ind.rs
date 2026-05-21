@@ -1,4 +1,4 @@
-use std::ops::{Add, Sub};
+use std::ops::{Add, Neg, Sub};
 use num_traits::Zero;
 use yui_core::IndexType;
 
@@ -8,10 +8,10 @@ pub trait AddInd:
     + Zero
     + Add<Output = Self>
     + Sub<Output = Self>
+    + Neg<Output = Self>
 {}
 
 impl AddInd for isize {}
-impl AddInd for usize {}
 
 macro_rules! make {
     ($name:ident, $t:ty, $($idx:tt),+) => {
@@ -19,7 +19,7 @@ macro_rules! make {
         #[derive(
             Clone, Copy, Default,
             PartialEq, Eq, PartialOrd, Ord, Hash, Debug,
-            derive_more::Add, derive_more::Sub,
+            derive_more::Add, derive_more::Sub, derive_more::Neg,
         )]
         #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
         pub struct $name($(pub make!(@unit $idx, $t)),+);
@@ -60,6 +60,4 @@ macro_rules! make {
 }
 
 make!(isize2, isize, 0, 1);
-make!(usize2, usize, 0, 1);
 make!(isize3, isize, 0, 1, 2);
-make!(usize3, usize, 0, 1, 2);

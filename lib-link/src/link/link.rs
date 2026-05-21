@@ -5,9 +5,6 @@ use itertools::Itertools;
 use yui_core::{CloneAnd, Sign};
 use yui_core::bitseq::Bit;
 
-use crate::NodeType;
-use crate::link::node::NodeOri;
-
 use super::{Node, Path};
 
 pub type Edge = usize;
@@ -15,23 +12,39 @@ pub type State = yui_core::bitseq::BitSeq;
 pub type XCode = [Edge; 4];
 
 #[derive(Debug, Clone)]
-pub struct Link { 
+pub struct Link {
     nodes: Vec<Node>,
-    edges: HashSet<Edge>
+    edges: HashSet<Edge>,
+    loops: Vec<Edge>,
 }
 
 impl Link {
-    pub fn from_nodes(nodes: impl IntoIterator<Item = Node>) -> Self { 
+    pub fn new(
+        nodes: impl IntoIterator<Item = Node>,
+        loops: impl IntoIterator<Item = Edge>,
+    ) -> Self {
         let nodes = nodes.into_iter().collect_vec();
-        let edge_counts = nodes.iter().flat_map(|x| x.edges()).cloned().counts();
+        let loops = loops.into_iter().collect_vec();
 
+        let edge_counts = nodes.iter().flat_map(|x| x.edges()).cloned().counts();
         assert!(
             edge_counts.values().all(|&c| c == 2),
-            "Invalid data: each edge must appear exactly twice."
+            "Invalid data: each edge in the diagram must appear exactly twice."
         );
 
         let edges: HashSet<_> = edge_counts.into_keys().collect();
-        Self { nodes, edges }
+
+        let mut loop_set: HashSet<Edge> = HashSet::new();
+        for &e in &loops {
+            assert!(!edges.contains(&e), "loop edge {e} is already used in a node");
+            assert!(loop_set.insert(e), "duplicate loop edge: {e}");
+        }
+
+        Self { nodes, edges, loops }
+    }
+
+    pub fn from_nodes(nodes: impl IntoIterator<Item = Node>) -> Self {
+        Self::new(nodes, [])
     }
 
     // Planer Diagram code, represented by sequence of crossings of the form:
@@ -96,16 +109,19 @@ impl Link {
     }
 
     pub fn empty() -> Link {
-        Link { nodes: vec![], edges: HashSet::new() }
+        Self::new([], [])
     }
 
     pub fn is_empty(&self) -> bool {
-        self.nodes.is_empty()
+        self.nodes.is_empty() && self.loops.is_empty()
     }
 
     pub fn unknot() -> Link {
-        let n = Node::new(NodeType::H, NodeOri::None, [1, 2, 2, 1]);
-        Link::from_nodes([n])
+        Self::unlink(1)
+    }
+
+    pub fn unlink(n: usize) -> Link {
+        Self::new([], 1..=n)
     }
 
     pub fn is_knot(&self) -> bool { 
@@ -118,7 +134,10 @@ impl Link {
     }
 
     pub fn mirror(&self) -> Self {
-        Self::from_nodes(self.nodes().map(|x| x.mirror()))
+        Self::new(
+            self.nodes().map(|x| x.mirror()),
+            self.loops.iter().copied(),
+        )
     }
 
     pub fn n_nodes(&self) -> usize { 
@@ -161,31 +180,39 @@ impl Link {
         self.nodes().all(|n| n.is_oriented())
     }
 
-    pub fn n_edges(&self) -> usize { 
-        self.edges.len()
+    pub fn n_edges(&self) -> usize {
+        self.edges.len() + self.loops.len()
     }
-    
+
     pub fn edges(&self) -> impl Iterator<Item = &Edge> {
-        self.edges.iter()
+        self.edges.iter().chain(self.loops.iter())
+    }
+
+    pub fn loops(&self) -> &[Edge] {
+        &self.loops
+    }
+
+    pub fn n_loops(&self) -> usize {
+        self.loops.len()
     }
 
     pub fn min_edge(&self) -> Option<Edge> { 
         self.nodes.first().map(|x| x.min_edge())
     }
 
-    pub fn n_comps(&self) -> usize { 
+    pub fn n_comps(&self) -> usize {
         let mut count = 0;
-        self.traverse_comps(|c, _, _| 
-            if count <= c { count = c + 1 } 
+        self.traverse_comps(|c, _, _|
+            if count <= c { count = c + 1 }
         );
-        count
+        count + self.loops.len()
     }
 
     pub fn comps(&self) -> Vec<Path> {
         let mut comps = vec![];
 
-        self.traverse_comps(|c, i, j| { 
-            if c == comps.len() { 
+        self.traverse_comps(|c, i, j| {
+            if c == comps.len() {
                 comps.push(vec![]);
             }
 
@@ -193,8 +220,11 @@ impl Link {
             comps[c].push(e);
         });
 
-        comps.into_iter().map(Path::circ
-        ).collect()
+        let mut result: Vec<Path> = comps.into_iter().map(Path::circ).collect();
+        for &e in &self.loops {
+            result.push(Path::circ(vec![e]));
+        }
+        result
     }
 
     fn traverse_comps<F>(&self, mut f: F) where 
@@ -249,11 +279,10 @@ impl Link {
         })
     }
 
-    pub fn seifert_state(&self) -> State { 
-        // MEMO: no assertion here since `unknot` is not oriented. 
-        // assert!(self.is_oriented());
+    pub fn seifert_state(&self) -> State {
+        assert!(self.is_oriented());
 
-        let seq = self.crossings().map(|x| 
+        let seq = self.crossings().map(|x|
             match x.sign() {
                 Some(Sign::Pos) => 0,
                 Some(Sign::Neg) => 1,
@@ -449,11 +478,67 @@ mod tests {
     }
 
     #[test]
-    fn unknot() { 
+    fn unknot() {
         let l = Link::unknot();
+
+        assert!(!l.is_empty());
+        assert!(l.is_oriented());
+        assert!(l.is_knot());
+
         assert_eq!(l.n_crossings(), 0);
         assert_eq!(l.writhe(), 0);
+        assert_eq!(l.n_edges(), 1);
         assert_eq!(l.n_comps(), 1);
+        assert_eq!(l.n_loops(), 1);
+
+        assert_eq!(l.loops(), &[1]);
+        assert_eq!(l.comps(), vec![Path::circ(vec![1])]);
+    }
+
+    #[test]
+    fn unlink_zero() {
+        let l = Link::unlink(0);
+
+        assert!(l.is_empty());
+        assert!(l.is_oriented());
+        assert!(!l.is_knot());
+
+        assert_eq!(l.n_crossings(), 0);
+        assert_eq!(l.writhe(), 0);
+        assert_eq!(l.n_edges(), 0);
+        assert_eq!(l.n_comps(), 0);
+        assert_eq!(l.n_loops(), 0);
+
+        assert_eq!(l.loops(), &[] as &[Edge]);
+        assert_eq!(l.comps(), vec![] as Vec<Path>);
+    }
+
+    #[test]
+    fn unlink_n() {
+        let l = Link::unlink(3);
+
+        assert!(!l.is_empty());
+        assert!(l.is_oriented());
+        assert!(!l.is_knot());
+
+        assert_eq!(l.n_crossings(), 0);
+        assert_eq!(l.writhe(), 0);
+        assert_eq!(l.n_edges(), 3);
+        assert_eq!(l.n_comps(), 3);
+        assert_eq!(l.n_loops(), 3);
+
+        assert_eq!(l.loops(), &[1, 2, 3]);
+        assert_eq!(
+            l.comps(),
+            vec![Path::circ(vec![1]), Path::circ(vec![2]), Path::circ(vec![3])]
+        );
+    }
+
+    #[test]
+    fn mirror_preserves_loops() {
+        let l = Link::unknot().mirror();
+        assert_eq!(l.n_loops(), 1);
+        assert_eq!(l.loops(), &[1]);
     }
 
     #[test]

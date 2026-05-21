@@ -2,7 +2,7 @@ use std::ops::{Index, RangeInclusive};
 use std::sync::OnceLock;
 use delegate::delegate;
 use yui_core::{EucRing, EucRingOps, IteratorExt};
-use yui_homology::{ToSeqString, ToTableString, Grid2, GridIter, Homology, Summand};
+use yui_homology::{ToSeqString, ToTableString, GrMod2, Homology, Summand};
 use yui_link::InvLink;
 use crate::kh::KhChainExt;
 use crate::khi::{KhIComplex, KhIState};
@@ -15,7 +15,7 @@ pub struct KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     inner: Homology<KhIState, R>,
     canon_cycles: Vec<KhIChain<R>>,
-    gen_grid: OnceLock<Grid2<Summand<KhIState, R>>>,
+    gen_grid: OnceLock<GrMod2<KhIState, R>>,
 }
 
 impl<R> KhIHomology<R> 
@@ -40,7 +40,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     delegate! {
         to self.inner {
-            pub fn support(&self) -> GridIter<'_, isize, Summand<KhIState, R>>;
+            pub fn support(&self) -> impl Iterator<Item = &isize> + '_;
             pub fn is_supported(&self, i: isize) -> bool;
         }
     }
@@ -68,7 +68,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         )
     }
 
-    fn gen_grid(&self) -> &Grid2<Summand<KhIState, R>> {
+    fn gen_grid(&self) -> &GrMod2<KhIState, R> {
         self.gen_grid.get_or_init(|| make_gen_grid(self.inner()))
     }
 }

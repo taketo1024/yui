@@ -1,46 +1,51 @@
+use std::collections::HashMap;
+use num_traits::Zero;
 use yui_core::{Ring, RingOps};
 use yui_matrix::sparse::SpMat;
 use yui_matrix::MatTrait;
 use super::key::GenericKey;
 use super::GenericSummand;
 
-use crate::{isize2, isize3, ChainComplexBase, Grid, AddInd};
+use crate::{isize2, isize3, ChainComplexBase, GrMod, AddInd};
 
 pub type GenericChainComplexBase<I, R> = ChainComplexBase<I, GenericKey<I>, R>;
 pub type GenericChainComplex<R>  = GenericChainComplexBase<isize,  R>;
 pub type GenericChainComplex2<R> = GenericChainComplexBase<isize2, R>;
 pub type GenericChainComplex3<R> = GenericChainComplexBase<isize3, R>;
 
-pub type GenericHomologyBase<I, R> = Grid<I, GenericSummand<I, R>>;
+pub type GenericHomologyBase<I, R> = GrMod<I, GenericKey<I>, R>;
 pub type GenericHomology<R>  = GenericHomologyBase<isize,  R>;
 pub type GenericHomology2<R> = GenericHomologyBase<isize2, R>;
 pub type GenericHomology3<R> = GenericHomologyBase<isize3, R>;
 
-impl<I, R> GenericChainComplexBase<I, R> 
+impl<I, R> GenericChainComplexBase<I, R>
 where I: AddInd, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn generate<It, F>(support: It, d_deg: I, d_matrix_map: F) -> Self
-    where 
-        It: IntoIterator<Item = I>, 
-        F: FnMut(I) -> SpMat<R>
+    pub fn generate<It, F>(support: It, d_deg: I, mut d_matrix_map: F) -> Self
+    where
+        It: IntoIterator<Item = I>,
+        F: FnMut(I) -> SpMat<R>,
     {
-        let d_matrices = Grid::generate(support, d_matrix_map);
+        let d_matrices: HashMap<I, SpMat<R>> = support.into_iter()
+            .map(|i| (i, d_matrix_map(i)))
+            .collect();
 
-        let summands = Grid::generate(
-            d_matrices.support().copied(), 
+        let summands = GrMod::generate(
+            d_matrices.keys().copied(),
             |i| {
-                let r = d_matrices[i].n_cols();
+                let r = d_matrices[&i].n_cols();
                 GenericSummand::generate_free(i, r)
             }
         );
 
         Self::new(
-            summands.clone(), d_deg, 
+            summands.clone(), d_deg,
             move |i, z| {
-                let d = &d_matrices[i];
+                let Some(d) = d_matrices.get(&i) else {
+                    return yui_core::lc::Lc::zero();
+                };
                 let v = summands[i].vectorize(z);
                 let dv = d * v;
-                let dz = summands[i + d_deg].devectorize(&dv);
-                dz
+                summands[i + d_deg].devectorize(&dv)
             }
         )
     }

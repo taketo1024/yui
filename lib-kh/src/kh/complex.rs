@@ -4,7 +4,7 @@ use std::sync::OnceLock;
 use delegate::delegate;
 use yui_core::{IteratorExt, Ring, RingOps, EucRing, EucRingOps};
 use yui_link::Link;
-use yui_homology::{ChainComplex, ToSeqString, ToTableString, Grid2, GridIter, Summand};
+use yui_homology::{ChainComplex, ToSeqString, ToTableString, GrMod2, Summand};
 
 use crate::kh::chain::KhChain;
 use crate::kh::internal::v1::cube::KhCube;
@@ -26,7 +26,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     deg_shift: (isize, isize),
     reduced: bool,
     canon_cycles: Vec<KhChain<R>>,
-    gen_grid: OnceLock<Grid2<KhComplexSummand<R>>>,
+    gen_grid: OnceLock<GrMod2<KhState, R>>,
 }
 
 impl<R> KhComplex<R>
@@ -99,7 +99,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.inner
     }
 
-    fn gen_grid(&self) -> &Grid2<KhComplexSummand<R>> {
+    fn gen_grid(&self) -> &GrMod2<KhState, R> {
         self.gen_grid.get_or_init(|| make_gen_grid(self.inner.summands()))
     }
 
@@ -114,7 +114,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     delegate! {
         to self.inner {
-            pub fn support(&self) -> GridIter<'_, isize, KhComplexSummand<R>>;
+            pub fn support(&self) -> impl Iterator<Item = &isize> + '_;
             pub fn is_supported(&self, i: isize) -> bool;
             pub fn d_deg(&self) -> isize;
             pub fn d(&self, i: isize, z: &KhChain<R>) -> KhChain<R>;

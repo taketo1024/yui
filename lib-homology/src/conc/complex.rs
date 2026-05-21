@@ -9,7 +9,7 @@ use yui_core::lc::{LcKey, Lc};
 use yui_matrix::sparse::{SpMat, SpVec};
 
 use crate::utils::ChainReducer;
-use crate::{ToSeqString, ToTableString, GenericChainComplexBase, Grid, AddInd, GridIter, isize2, isize3};
+use crate::{ToSeqString, ToTableString, GenericChainComplexBase, GrMod, AddInd, isize2, isize3};
 use super::Summand;
 
 #[cfg(feature = "multithread")]
@@ -26,18 +26,18 @@ where
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    summands: Grid<I, Summand<X, R>>,
+    summands: GrMod<I, X, R>,
     d_deg: I,
     d_map: Arc<dyn Fn(I, &Lc<X, R>) -> Lc<X, R> + Send + Sync>,
 }
 
 impl<I, X, R> ChainComplexBase<I, X, R>
-where 
+where
     I: AddInd,
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
-    pub fn new<F>(summands: Grid<I, Summand<X, R>>, d_deg: I, d_map: F) -> Self
+    pub fn new<F>(summands: GrMod<I, X, R>, d_deg: I, d_map: F) -> Self
     where F: Fn(I, &Lc<X, R>) -> Lc<X, R> + Send + Sync + 'static {
         assert!(summands.iter().all(|(_, s)| s.is_free()));
 
@@ -45,17 +45,17 @@ where
         Self { summands, d_deg, d_map }
     }
 
-    pub fn zero() -> Self { 
-        Self::new(Grid::default(), I::zero(), |_, _| Lc::zero())
+    pub fn zero() -> Self {
+        Self::new(GrMod::default(), I::zero(), |_, _| Lc::zero())
     }
 
-    pub fn summands(&self) -> &Grid<I, Summand<X, R>> {
+    pub fn summands(&self) -> &GrMod<I, X, R> {
         &self.summands
     }
 
     delegate! {
         to self.summands {
-            pub fn support(&self) -> GridIter<'_, I, Summand<X, R>>;
+            pub fn support(&self) -> impl Iterator<Item = &I> + '_;
             pub fn is_supported(&self, i: I) -> bool;
         }
     }
@@ -126,7 +126,7 @@ where
     pub fn reduced(&self) -> ChainComplexBase<I, X, R> { 
         let r = ChainReducer::reduce(self, true);
 
-        let summands = Grid::generate(
+        let summands = GrMod::generate(
             self.summands.support().copied(),
             |i| {
                 let c = &self[i];

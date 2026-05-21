@@ -5,7 +5,7 @@ use yui_core::lc::{EitherKey, LcKey, Lc, split_lr};
 use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 use yui_matrix::sparse::SpMat;
 
-use crate::{Grid, AddInd, Summand};
+use crate::{GrMod, AddInd, Summand};
 
 use super::ChainComplexBase;
 
@@ -98,7 +98,7 @@ where
             }
         };
 
-        let summands = Grid::generate(support, |i| {
+        let summands = GrMod::generate(support, |i| {
             let (i, j) = degs(i);
             let gens = Iterator::chain(
                 source[i].raw_generators().iter().map(|x| EitherKey::from_left(x.clone())),

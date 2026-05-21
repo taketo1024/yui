@@ -5,7 +5,7 @@ use delegate::delegate;
 use itertools::Itertools;
 use yui_core::lc::Lc;
 use yui_core::{EucRing, EucRingOps, IteratorExt, Ring, RingOps};
-use yui_homology::{ChainComplex, ToSeqString, ToTableString, Grid1, Grid2, GridIter, Summand};
+use yui_homology::{ChainComplex, ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_link::InvLink;
 
 use crate::kh::{KhChain, KhChainExt, KhComplex, KhState};
@@ -34,7 +34,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     inner: ChainComplex<KhIState, R>,
     canon_cycles: Vec<KhIChain<R>>,
     deg_shift: (isize, isize),
-    gen_grid: OnceLock<Grid2<KhIComplexSummand<R>>>,
+    gen_grid: OnceLock<GrMod2<KhIState, R>>,
 }
 
 impl<R> KhIComplex<R>
@@ -87,7 +87,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
         // TODO use mapping cone
 
-        let summands = Grid1::generate(h_range, |i| { 
+        let summands = GrMod1::generate(h_range, |i| { 
             let b_gens = c[i].raw_generators().iter().map(|x| KhIState::B(*x));
             let q_gens = c[i - 1].raw_generators().iter().map(|x| KhIState::Q(*x));
             Summand::from_raw_generators(Iterator::chain(b_gens, q_gens))
@@ -129,7 +129,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
     delegate! {
         to self.inner {
-            pub fn support(&self) -> GridIter<'_, isize, KhIComplexSummand<R>>;
+            pub fn support(&self) -> impl Iterator<Item = &isize> + '_;
             pub fn is_supported(&self, i: isize) -> bool;
             pub fn d_deg(&self) -> isize;
             pub fn d(&self, i: isize, z: &KhIChain<R>) -> KhIChain<R>;
@@ -160,7 +160,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         )
     }
 
-    fn gen_grid(&self) -> &Grid2<KhIComplexSummand<R>> {
+    fn gen_grid(&self) -> &GrMod2<KhIState, R> {
         self.gen_grid.get_or_init(|| make_gen_grid(self.inner.summands()))
     }
 

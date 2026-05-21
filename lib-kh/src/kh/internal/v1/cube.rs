@@ -3,7 +3,7 @@ use std::ops::RangeInclusive;
 use itertools::Itertools;
 use num_traits::Zero;
 use yui_core::{Ring, RingOps, Sign};
-use yui_homology::{ChainComplex, Grid, Summand};
+use yui_homology::{ChainComplex, GrMod, Summand};
 use yui_link::{Link, State, Path, Edge};
 
 use crate::kh::{KhAlg, KhChain, KhState, KhTensor};
@@ -275,7 +275,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn into_complex(self) -> ChainComplex<KhState, R> {
-        let summands = Grid::generate(self.h_range(), |i| { 
+        let summands = GrMod::generate(self.h_range(), |i| { 
             let gens = self.generators(i);
             Summand::from_raw_generators(gens.into_iter().cloned())
         });

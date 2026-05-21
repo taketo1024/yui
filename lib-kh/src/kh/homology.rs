@@ -2,7 +2,7 @@ use std::ops::{RangeInclusive, Index};
 use std::sync::OnceLock;
 use delegate::delegate;
 
-use yui_homology::{ToSeqString, ToTableString, Grid2, GridIter, Homology, Summand};
+use yui_homology::{ToSeqString, ToTableString, GrMod2, Homology, Summand};
 use yui_core::{EucRing, EucRingOps, IteratorExt};
 use yui_link::Link;
 
@@ -19,7 +19,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     deg_shift: (isize, isize),
     reduced: bool,
     canon_cycles: Vec<KhChain<R>>,
-    gen_grid: OnceLock<Grid2<Summand<KhState, R>>>,
+    gen_grid: OnceLock<GrMod2<KhState, R>>,
 }
 
 impl<R> KhHomology<R> 
@@ -44,7 +44,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     delegate! {
         to self.inner {
-            pub fn support(&self) -> GridIter<'_, isize, Summand<KhState, R>>;
+            pub fn support(&self) -> impl Iterator<Item = &isize> + '_;
             pub fn is_supported(&self, i: isize) -> bool;
         }
     }
@@ -93,7 +93,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         )
     }
 
-    fn gen_grid(&self) -> &Grid2<Summand<KhState, R>> {
+    fn gen_grid(&self) -> &GrMod2<KhState, R> {
         self.gen_grid.get_or_init(|| make_gen_grid(self.inner()))
     }
 }

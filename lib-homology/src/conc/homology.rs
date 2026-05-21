@@ -3,10 +3,10 @@ use yui_core::lc::LcKey;
 
 use crate::generic::GenericSummand;
 use crate::utils::HomologyCalc;
-use crate::{isize2, isize3, GenericHomologyBase, Grid, AddInd};
+use crate::{isize2, isize3, GenericHomologyBase, GrMod, AddInd};
 use super::{Summand, ChainComplexBase};
 
-pub type HomologyBase<I, X, R> = Grid<I, Summand<X, R>>;
+pub type HomologyBase<I, X, R> = GrMod<I, X, R>;
 pub type Homology <X, R> = HomologyBase<isize,  X, R>;
 pub type Homology2<X, R> = HomologyBase<isize2, X, R>;
 pub type Homology3<X, R> = HomologyBase<isize3, X, R>;
@@ -33,7 +33,7 @@ where
     }
 
     pub fn homology(&self) -> HomologyBase<I, X, R> {
-        Grid::generate_filtered(
+        GrMod::generate_filtered(
             self.support().copied(),
             |i| {
                 let hi = self.homology_at(i);
@@ -52,7 +52,7 @@ where
     }
 
     pub fn generic_homology(&self) -> GenericHomologyBase<I, R> {
-        Grid::generate_filtered(
+        GrMod::generate_filtered(
             self.support().copied(),
             |i| {
                 let hi = self.generic_homology_at(i);

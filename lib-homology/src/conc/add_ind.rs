@@ -21,7 +21,6 @@ macro_rules! make {
             PartialEq, Eq, PartialOrd, Ord, Hash, Debug,
             derive_more::Add, derive_more::Sub, derive_more::Neg,
         )]
-        #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
         pub struct $name($(pub make!(@unit $idx, $t)),+);
 
         impl Zero for $name {

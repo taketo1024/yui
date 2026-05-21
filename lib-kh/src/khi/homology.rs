@@ -2,7 +2,7 @@ use std::ops::{Index, RangeInclusive};
 use std::sync::OnceLock;
 use delegate::delegate;
 use yui_core::{EucRing, EucRingOps, IteratorExt};
-use yui_homology::{DisplaySeq, DisplayTable, Grid2, GridIter, GridTrait, Homology, Summand, SummandTrait};
+use yui_homology::{ToSeqString, ToTableString, Grid2, GridIter, GridTrait, Homology, Summand, SummandTrait};
 use yui_link::InvLink;
 use crate::kh::KhChainExt;
 use crate::khi::{KhIComplex, KhIState};
@@ -113,28 +113,28 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 }
 
-impl<R> DisplaySeq<isize> for KhIHomology<R>
+impl<R> ToSeqString<isize> for KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     delegate! {
         to self.inner { 
-            fn display_label(&self) -> String;
-            fn display_indices(&self) -> Vec<isize>;
-            fn display_at(&self, i: &isize) -> String;
+            fn label(&self) -> String;
+            fn indices(&self) -> Vec<isize>;
+            fn entry_at(&self, i: &isize) -> String;
         }
     }
 }
 
-impl<R> DisplayTable<isize> for KhIHomology<R>
+impl<R> ToTableString<isize> for KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    fn display_labels(&self) -> (String, String) { 
+    fn labels(&self) -> (String, String) { 
         ("i".to_string(), "j".to_string())
     }
 
-    fn display_indices(&self) -> (Vec<isize>, Vec<isize>) { 
+    fn indices(&self) -> (Vec<isize>, Vec<isize>) { 
         (self.h_range().collect(), self.q_range().step_by(2).collect())
     }
 
-    fn display_at(&self, i: &isize, j: &isize) -> String {
+    fn entry_at(&self, i: &isize, j: &isize) -> String {
         if self[(*i, *j)].is_zero() {
             ".".to_string()
         } else {
@@ -150,7 +150,7 @@ mod tests {
     use yui_core::poly::Poly;
     use yui_core::num::FF2;
     use num_traits::{Zero, One};
-    use yui_homology::{ChainComplexTrait, DisplaySeq, DisplayTable, SummandTrait};
+    use yui_homology::{ChainComplexTrait, ToSeqString, ToTableString, SummandTrait};
     use yui_link::Link;
     use super::*;
 
@@ -303,7 +303,7 @@ mod tests_v1 {
     use yui_core::poly::Poly;
     use yui_core::num::FF2;
     use num_traits::{Zero, One};
-    use yui_homology::{ChainComplexTrait, DisplaySeq, DisplayTable, SummandTrait};
+    use yui_homology::{ChainComplexTrait, ToSeqString, ToTableString, SummandTrait};
     use yui_link::Link;
     use super::*;
 

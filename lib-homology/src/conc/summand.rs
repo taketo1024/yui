@@ -139,17 +139,16 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
         )
     }
 
-    pub fn print_generators(&self) {
-        for (i, x) in self.generators().enumerate() {
-            println!("{i}: {x}")
-        }
+    pub fn describe_generators(&self) -> String {
+        use itertools::Itertools;
+        self.generators().enumerate().map(|(i, x)| format!("{i}: {x}")).join("\n")
     }
 
-    pub fn print_raw_generators(&self) {
-        for (i, x) in self.raw_gens.iter().enumerate() { 
-            println!("{i}: {x}");
-        }
+    pub fn describe_raw_generators(&self) -> String {
+        use itertools::Itertools;
+        self.raw_gens.iter().enumerate().map(|(i, x)| format!("{i}: {x}")).join("\n")
     }
+
 }
 
 impl<X, R> Default for Summand<X, R>

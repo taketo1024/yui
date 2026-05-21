@@ -255,7 +255,7 @@ mod tests {
     use yui_link::State;
     
     #[allow(unused)]
-    use yui_homology::DisplayTable;
+    use yui_homology::ToTableString;
 
     use crate::kh::KhChainExt;
 

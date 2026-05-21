@@ -168,68 +168,62 @@ macro_rules! impl_index {
 impl_index!(isize, isize2, isize3);
 impl_index!(usize, usize2, usize3);
 
-pub trait DisplaySeq<I: Display> {
-    fn display_label(&self) -> String;
-    fn display_indices(&self) -> Vec<I>;
-    fn display_at(&self, i: &I) -> String;
-    fn display_seq(&self) -> String {
+pub trait ToSeqString<I: Display> {
+    fn label(&self) -> String;
+    fn indices(&self) -> Vec<I>;
+    fn entry_at(&self, i: &I) -> String;
+    fn to_seq_string(&self) -> String {
         use yui_core::util::format::table;
-        table(self.display_label(), [""], self.display_indices(), |_, i| {
-            self.display_at(i)
+        table(self.label(), [""], self.indices(), |_, i| {
+            self.entry_at(i)
         })
-    }
-    fn print_seq(&self) {
-        println!("{}", self.display_seq())
     }
 }
 
-impl<E: Display> DisplaySeq<isize> for Grid<isize, E> {
-    fn display_label(&self) -> String {
+impl<E: Display> ToSeqString<isize> for Grid<isize, E> {
+    fn label(&self) -> String {
         "i".to_string()
     }
 
-    fn display_indices(&self) -> Vec<isize> {
+    fn indices(&self) -> Vec<isize> {
         self.support().sorted().cloned().collect()
     }
 
-    fn display_at(&self, i: &isize) -> String {
+    fn entry_at(&self, i: &isize) -> String {
         self.get(*i).to_string()
     }
 }
 
-pub trait DisplayTable<I: Display> {
-    fn display_labels(&self) -> (String, String);
-    fn display_indices(&self) -> (Vec<I>, Vec<I>);
-    fn display_at(&self, i: &I, j: &I) -> String;
-    fn display_table(&self) -> String {
+pub trait ToTableString<I: Display> {
+    fn labels(&self) -> (String, String);
+    fn indices(&self) -> (Vec<I>, Vec<I>);
+    fn entry_at(&self, i: &I, j: &I) -> String;
+    fn to_table_string(&self) -> String {
         use yui_core::util::format::table;
 
-        let (label0, label1) = self.display_labels();
-        let (ind0, ind1) = self.display_indices();
+        let (label0, label1) = self.labels();
+        let (ind0, ind1) = self.indices();
         let head = format!("{}\\{}", label1, label0);
 
         table(head, ind1.into_iter().rev(), ind0, |j, i| {
-            self.display_at(i, j)
+            self.entry_at(i, j)
         })
     }
 
-    fn print_table(&self) {
-        println!("{}", self.display_table())
-    }
 }
 
-impl<E: Display> DisplayTable<isize> for Grid<isize2, E> {
-    fn display_labels(&self) -> (String, String) {
+impl<E: Display> ToTableString<isize> for Grid<isize2, E> {
+    fn labels(&self) -> (String, String) {
         ("i".to_string(), "j".to_string())
     }
 
-    fn display_indices(&self) -> (Vec<isize>, Vec<isize>) {
+    fn indices(&self) -> (Vec<isize>, Vec<isize>) {
         let is = self.support().map(|&isize2(i, _)| i).unique().sorted().collect();
         let js = self.support().map(|&isize2(_, j)| j).unique().sorted().collect();
         (is, js)
     }
 
-    fn display_at(&self, i: &isize, j: &isize) -> String {
+    fn entry_at(&self, i: &isize, j: &isize) -> String {
         let s = self[(*i, *j)].to_string();
         if s == self.default.to_string() { 
             ".".to_string()
@@ -286,7 +280,7 @@ mod tests {
         assert_eq!(g.get( 1), &10);
         assert_eq!(g.get(-1), &0); // default
 
-        let _seq = g.display_seq();
+        let _seq = g.to_seq_string();
         // println!("{_seq}");
     }
 
@@ -303,7 +297,7 @@ mod tests {
         assert_eq!(g.get(isize2(1, 2)), &12);
         assert_eq!(g.get(isize2(3, 3)), &0);
 
-        let _table = g.display_table();
+        let _table = g.to_table_string();
         // println!("{_table}");
     }
 
@@ -317,7 +311,7 @@ mod tests {
             cartesian!(0..=3, 0..=2).map(|(i, j)| isize2(i, j)), 
             |i| GenericSummand::<_, FF2>::generate(i.0, (i.0 * 10 + i.1) as usize, vec![], None)
         );
-        let _table = g.display_table();
+        let _table = g.to_table_string();
         // println!("{_table}");
     }
 

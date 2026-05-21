@@ -5,7 +5,7 @@ use delegate::delegate;
 use itertools::Itertools;
 use yui_core::lc::Lc;
 use yui_core::{EucRing, EucRingOps, IteratorExt, Ring, RingOps};
-use yui_homology::{ChainComplex, ChainComplexTrait, DisplaySeq, DisplayTable, Grid1, Grid2, GridIter, GridTrait, Summand, SummandTrait};
+use yui_homology::{ChainComplex, ChainComplexTrait, ToSeqString, ToTableString, Grid1, Grid2, GridIter, GridTrait, Summand, SummandTrait};
 use yui_link::InvLink;
 use yui_matrix::sparse::SpMat;
 
@@ -212,28 +212,28 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<R> DisplaySeq<isize> for KhIComplex<R>
+impl<R> ToSeqString<isize> for KhIComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     delegate! {
         to self.inner { 
-            fn display_label(&self) -> String;
-            fn display_indices(&self) -> Vec<isize>;
-            fn display_at(&self, i: &isize) -> String;
+            fn label(&self) -> String;
+            fn indices(&self) -> Vec<isize>;
+            fn entry_at(&self, i: &isize) -> String;
         }
     }
 }
 
-impl<R> DisplayTable<isize> for KhIComplex<R>
+impl<R> ToTableString<isize> for KhIComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn display_labels(&self) -> (String, String) { 
+    fn labels(&self) -> (String, String) { 
         ("i".to_string(), "j".to_string())
     }
 
-    fn display_indices(&self) -> (Vec<isize>, Vec<isize>) { 
+    fn indices(&self) -> (Vec<isize>, Vec<isize>) { 
         (self.h_range().collect(), self.q_range().step_by(2).collect())
     }
 
-    fn display_at(&self, i: &isize, j: &isize) -> String {
+    fn entry_at(&self, i: &isize, j: &isize) -> String {
         if self[(*i, *j)].is_zero() {
             ".".to_string()
         } else {

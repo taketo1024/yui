@@ -96,21 +96,22 @@ where
         }
     }
 
-    pub fn print_map(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>) {
-        for &i in source.support() {
-            self.print_map_at(source, target, i);
-            println!();
-        }
+    pub fn describe_map(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>) -> String {
+        use itertools::Itertools;
+        source.support().map(|&i| self.describe_map_at(source, target, i)).join("\n\n")
     }
 
-    pub fn print_map_at(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I) { 
+    pub fn describe_map_at(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I) -> String {
+        use std::fmt::Write;
         let j = i + self.deg();
-        println!("({i}) {} -> ({j}) {}", source[i], target[j]);
+        let mut s = format!("({i}) {} -> ({j}) {}", source[i], target[j]);
         for z in source[i].generators() {
             let w = self.apply(i, &z);
-            println!("\t{z} -> {w}");
+            write!(s, "\n\t{z} -> {w}").unwrap();
         }
+        s
     }
+
 
     pub fn cone<It>(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, support: It, target_based: bool) -> ChainComplexBase<I, EitherKey<X, Y>, R>
     where It: IntoIterator<Item = I> {

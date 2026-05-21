@@ -9,7 +9,7 @@ use num_traits::Zero;
 use yui_core::bitseq::Bit;
 use maplit::hashmap;
 use yui_core::{Ring, RingOps};
-use yui_homology::DisplaySeq;
+use yui_homology::ToSeqString;
 use yui_link::{Node, Edge, Link};
 
 use crate::ext::LinkExt;
@@ -400,7 +400,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let canon_cycles = self.eval_elements();
         let c = self.into_tng_complex().into_kh_complex(canon_cycles);
         
-        info!("  done\n{}", c.display_seq());
+        info!("  done\n{}", c.to_seq_string());
 
         c
     }

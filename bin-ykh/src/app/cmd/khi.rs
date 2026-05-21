@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use yui_core::TeX;
 use yui_core::{EucRing, EucRingOps};
-use yui_homology::{DisplaySeq, DisplayTable, GridTrait, SummandTrait};
+use yui_homology::{ToSeqString, ToTableString, GridTrait, SummandTrait};
 use yui_kh::kh::KhChainExt;
 use yui_kh::khi::{KhIChain, KhIComplex, KhIHomology};
 use yui_link::InvLink;
@@ -109,9 +109,9 @@ where
             ["H", "0,T"].contains(&self.args.c_value.as_str());
 
         let table = if bigraded { 
-            khi.display_table()
+            khi.to_table_string()
         } else { 
-            khi.display_seq()
+            khi.to_seq_string()
         };
         self.out(&table);
 

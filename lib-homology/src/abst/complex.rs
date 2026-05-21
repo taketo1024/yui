@@ -43,25 +43,21 @@ where
         }
     }
 
-    fn display_d_at(&self, i: I) -> String {
+    fn describe_d_at(&self, i: I) -> String {
         let c0 = self.get(i).display();
         let c1 = self.get(i + self.d_deg()).display();
         let d = self.d_matrix(i).into_dense();
         format!("d[{i}]: {c0} -> {c1}\n{d}")
     }
 
-    fn display_d(&self) -> String {
+    fn describe_d(&self) -> String {
         self.support().filter_map(|&i|
             if self.rank(i) > 0 && self.rank(i + self.d_deg()) > 0 && !self.d_matrix(i).is_zero() {
-                Some(self.display_d_at(i))
+                Some(self.describe_d_at(i))
             } else {
                 None
             }
         ).join("")
-    }
-
-    fn print_d(&self) {
-        println!("{}", self.display_d());
     }
 
     fn as_generic(&self) -> GenericChainComplexBase<I, Self::R> {

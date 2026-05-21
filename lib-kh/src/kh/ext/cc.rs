@@ -110,7 +110,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 mod tests {
     use yui_core::poly::Poly2;
     use yui_core::{EucRing, EucRingOps};
-    use yui_homology::DisplaySeq;
+    use yui_homology::ToSeqString;
     use yui_link::Link;
 
     use crate::kh::ext::cc::KhChainMap;
@@ -267,10 +267,10 @@ mod tests {
         let h2 = c2.homology();
 
         println!("L1");
-        h1.print_seq();
+        println!("{}", h1.to_seq_string());
 
         println!("L2");
-        h2.print_seq();
+        println!("{}", h2.to_seq_string());
 
         println!("f: deg {}\n", f.deg());
 

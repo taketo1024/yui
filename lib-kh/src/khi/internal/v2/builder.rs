@@ -9,7 +9,7 @@ use rayon::prelude::*;
 use yui_core::bitseq::{Bit, BitSeq};
 use yui_core::algo::KeyedUnionFind;
 use yui_core::{Ring, RingOps};
-use yui_homology::DisplaySeq;
+use yui_homology::ToSeqString;
 use yui_link::{Node, Edge, InvLink};
 
 use crate::kh::{KhComplex, KhState, KhTensor};
@@ -576,7 +576,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         info!("build KhI complex...");
         let c = KhIComplex::from_kh_complex(c, map);
-        info!("  done\n{}", c.display_seq());
+        info!("  done\n{}", c.to_seq_string());
 
         c
     }
@@ -665,7 +665,7 @@ mod tests {
 
     use yui_core::num::FF2;
     use yui_core::poly::Poly;
-    use yui_homology::{ChainComplexTrait, DisplaySeq, DisplayTable, SummandTrait};
+    use yui_homology::{ChainComplexTrait, ToSeqString, ToTableString, SummandTrait};
 
     #[test]
     fn test_kh_3_1() { 

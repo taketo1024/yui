@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use yui_core::TeX;
 use yui_core::{Ring, RingOps};
-use yui_homology::DisplayTable;
+use yui_homology::ToTableString;
 use yui_homology::{ChainComplexTrait, GridTrait, SummandTrait};
 use yui_kh::kh::KhChainExt;
 use yui_kh::khi::KhIComplex;
@@ -98,7 +98,7 @@ where
         };
         
         // CKh generators
-        let table = ckhi.display_table();
+        let table = ckhi.to_table_string();
         self.out(&table);
 
         // Generators
@@ -137,7 +137,7 @@ where
     }
 
     fn show_diff(&mut self, ckh: &KhIComplex<R>) { 
-        self.out(&ckh.display_d());
+        self.out(&ckh.describe_d());
     }
 
     fn show_alpha(&mut self, ckh: &KhIComplex<R>) { 

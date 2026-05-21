@@ -5,8 +5,8 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use yui_core::TeX;
 use yui_core::{EucRing, EucRingOps};
-use yui_homology::DisplaySeq;
-use yui_homology::{DisplayTable, GridTrait, SummandTrait};
+use yui_homology::ToSeqString;
+use yui_homology::{ToTableString, GridTrait, SummandTrait};
 use yui_kh::kh::ext::cc::KhChainMap;
 use yui_kh::kh::KhComplex;
 use yui_kh::kh::KhHomology;
@@ -122,9 +122,9 @@ where
 
     fn show_table(&mut self, label: &str, h: &KhHomology<R>, bigraded: bool, with_gens: bool) { 
         let table = if bigraded { 
-            h.display_table()
+            h.to_table_string()
         } else { 
-            h.display_seq()
+            h.to_seq_string()
         };
 
         self.out(label);

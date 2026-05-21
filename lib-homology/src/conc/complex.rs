@@ -5,15 +5,15 @@ use std::sync::Arc;
 use delegate::delegate;
 use itertools::Itertools;
 use num_traits::Zero;
-use yui_core::{Ring, RingOps};
+use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 use yui_core::lc::{LcKey, Lc};
 
 #[cfg(debug_assertions)]
 use yui_matrix::MatTrait;
 use yui_matrix::sparse::{SpMat, SpVec};
 
-use crate::algo::ChainReducer;
-use crate::{ToSeqString, ToTableString, GenericChainComplexBase, GrMod, AddInd, isize2, isize3};
+use crate::algo::{ChainReducer, HomologyCalc};
+use crate::{ToSeqString, ToTableString, GenericChainComplexBase, GenericGrMod, GenericSummand, GrMod, AddInd, isize2, isize3};
 use super::Summand;
 
 #[cfg(feature = "multithread")]
@@ -206,8 +206,59 @@ where
     }
 }
 
+impl<I, X, R> ChainComplexBase<I, X, R>
+where
+    I: AddInd,
+    X: LcKey,
+    R: EucRing, for<'x> &'x R: EucRingOps<R>,
+{
+    pub fn homology_at(&self, i: I) -> Summand<X, R> {
+        let c = &self[i];
+        let d0 = self.d_matrix(i - self.d_deg());
+        let d1 = self.d_matrix(i);
+        let (rank, tors, trans) = HomologyCalc::calculate(d0, d1, true);
+        let trans = trans.unwrap();
+
+        Summand::new(
+            c.raw_generators().clone(),
+            rank,
+            tors,
+            c.trans().merged(&trans)
+        )
+    }
+
+    pub fn homology(&self) -> GrMod<I, X, R> {
+        GrMod::generate_filtered(
+            self.support().copied(),
+            |i| {
+                let hi = self.homology_at(i);
+                (!hi.is_zero()).then_some(hi)
+            }
+        )
+    }
+
+    /// Compute the homology at index `i` without tracking the basis change.
+    /// Faster than `homology_at` when only the rank/torsion are needed.
+    pub fn generic_homology_at(&self, i: I) -> GenericSummand<I, R> {
+        let d0 = self.d_matrix(i - self.d_deg());
+        let d1 = self.d_matrix(i);
+        let (rank, tors, _) = HomologyCalc::calculate(d0, d1, false);
+        GenericSummand::generate(i, rank, tors, None)
+    }
+
+    pub fn generic_homology(&self) -> GenericGrMod<I, R> {
+        GrMod::generate_filtered(
+            self.support().copied(),
+            |i| {
+                let hi = self.generic_homology_at(i);
+                (!hi.is_zero()).then_some(hi)
+            }
+        )
+    }
+}
+
 impl<X, R> ChainComplex<X, R>
-where 
+where
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {

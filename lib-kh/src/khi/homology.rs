@@ -2,7 +2,7 @@ use std::ops::{Index, RangeInclusive};
 use std::sync::OnceLock;
 use delegate::delegate;
 use yui_core::{EucRing, EucRingOps, IteratorExt};
-use yui_homology::{ToSeqString, ToTableString, GrMod2, Homology, Summand};
+use yui_homology::{ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_link::InvLink;
 use crate::kh::KhChainExt;
 use crate::khi::{KhIComplex, KhIState};
@@ -13,7 +13,7 @@ use super::KhIChain;
 #[derive(Clone)]
 pub struct KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    inner: Homology<KhIState, R>,
+    inner: GrMod1<KhIState, R>,
     canon_cycles: Vec<KhIChain<R>>,
     gen_grid: OnceLock<GrMod2<KhIState, R>>,
 }
@@ -30,11 +30,11 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         Self::from(&c)
     }
 
-    pub(crate) fn new_impl(inner: Homology<KhIState, R>, canon_cycles: Vec<KhIChain<R>>) -> Self {
+    pub(crate) fn new_impl(inner: GrMod1<KhIState, R>, canon_cycles: Vec<KhIChain<R>>) -> Self {
         Self { inner, canon_cycles, gen_grid: OnceLock::new() }
     }
 
-    pub fn inner(&self) -> &Homology<KhIState, R> { 
+    pub fn inner(&self) -> &GrMod1<KhIState, R> { 
         &self.inner
     }
 

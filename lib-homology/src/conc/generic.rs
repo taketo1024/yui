@@ -49,17 +49,17 @@ where I: AddInd, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-// --- GenericChainComplex / GenericHomology aliases --------------------------
+// --- GenericChainComplex / GenericGrMod aliases -----------------------------
 
 pub type GenericChainComplexBase<I, R> = ChainComplexBase<I, GenericKey<I>, R>;
 pub type GenericChainComplex<R>  = GenericChainComplexBase<isize,  R>;
 pub type GenericChainComplex2<R> = GenericChainComplexBase<isize2, R>;
 pub type GenericChainComplex3<R> = GenericChainComplexBase<isize3, R>;
 
-pub type GenericHomologyBase<I, R> = GrMod<I, GenericKey<I>, R>;
-pub type GenericHomology<R>  = GenericHomologyBase<isize,  R>;
-pub type GenericHomology2<R> = GenericHomologyBase<isize2, R>;
-pub type GenericHomology3<R> = GenericHomologyBase<isize3, R>;
+pub type GenericGrMod<I, R> = GrMod<I, GenericKey<I>, R>;
+pub type GenericGrMod1<R> = GenericGrMod<isize,  R>;
+pub type GenericGrMod2<R> = GenericGrMod<isize2, R>;
+pub type GenericGrMod3<R> = GenericGrMod<isize3, R>;
 
 impl<I, R> GenericChainComplexBase<I, R>
 where I: AddInd, R: Ring, for<'x> &'x R: RingOps<R> {

@@ -2,7 +2,7 @@ use std::ops::{RangeInclusive, Index};
 use std::sync::OnceLock;
 use delegate::delegate;
 
-use yui_homology::{ToSeqString, ToTableString, GrMod2, Homology, Summand};
+use yui_homology::{ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_core::{EucRing, EucRingOps, IteratorExt};
 use yui_link::Link;
 
@@ -14,7 +14,7 @@ use super::{KhAlg, KhChain, KhComplex};
 #[derive(Clone)]
 pub struct KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    inner: Homology<KhState, R>,
+    inner: GrMod1<KhState, R>,
     str: KhAlg<R>,
     deg_shift: (isize, isize),
     reduced: bool,
@@ -34,11 +34,11 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         Self::from(&c)
     }
     
-    pub(crate) fn new_impl(inner: Homology<KhState, R>, str: KhAlg<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
+    pub(crate) fn new_impl(inner: GrMod1<KhState, R>, str: KhAlg<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
         Self { inner, str, deg_shift, reduced, canon_cycles, gen_grid: OnceLock::new() }
     }
 
-    pub fn inner(&self) -> &Homology<KhState, R> { 
+    pub fn inner(&self) -> &GrMod1<KhState, R> { 
         &self.inner
     }
 

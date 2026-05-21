@@ -5,7 +5,7 @@ use yui_core::lc::{EitherKey, LcKey, Lc, split_lr};
 use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 use yui_matrix::sparse::SpMat;
 
-use crate::{Grid, GridDeg, GridTrait, Summand};
+use crate::{Grid, GridDeg, Summand};
 
 use super::ChainComplexBase;
 
@@ -101,8 +101,8 @@ where
         let summands = Grid::generate(support, |i| {
             let (i, j) = degs(i);
             let gens = Iterator::chain(
-                source.get(i).raw_generators().iter().map(|x| EitherKey::from_left(x.clone())), 
-                target.get(j).raw_generators().iter().map(|y| EitherKey::from_right(y.clone()))
+                source[i].raw_generators().iter().map(|x| EitherKey::from_left(x.clone())),
+                target[j].raw_generators().iter().map(|y| EitherKey::from_right(y.clone()))
             );
             Summand::from_raw_generators(gens)
         });
@@ -139,7 +139,7 @@ where
 
     #[cfg(debug_assertions)]
     pub fn check_at(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I) {
-        for x in source.get(i).raw_generators().iter() {
+        for x in source[i].raw_generators().iter() {
             self.check_for(source, target, i, x);
         }
     }

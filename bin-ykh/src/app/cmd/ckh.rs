@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use yui_core::TeX;
 use yui_core::{Ring, RingOps};
-use yui_homology::{ToTableString, GridTrait};
+use yui_homology::ToTableString;
 use yui_kh::kh::KhChainExt;
 use yui_kh::kh::KhComplex;
 

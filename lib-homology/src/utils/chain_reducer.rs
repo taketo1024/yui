@@ -12,7 +12,7 @@ use yui_core::lc::LcKey;
 
 use crate::conc::ChainComplexBase;
 use crate::generic::GenericChainComplexBase;
-use crate::{GridDeg, GridTrait};
+use crate::GridDeg;
 
 /// Reduces a chain complex by repeatedly cancelling pivot pairs `(a, d)` —
 /// applying a Schur-complement style change of basis at each step — and

@@ -2,7 +2,7 @@ use std::ops::{Index, RangeInclusive};
 use std::sync::OnceLock;
 use delegate::delegate;
 use yui_core::{EucRing, EucRingOps, IteratorExt};
-use yui_homology::{ToSeqString, ToTableString, Grid2, GridIter, GridTrait, Homology, Summand};
+use yui_homology::{ToSeqString, ToTableString, Grid2, GridIter, Homology, Summand};
 use yui_link::InvLink;
 use crate::kh::KhChainExt;
 use crate::khi::{KhIComplex, KhIState};
@@ -34,6 +34,17 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         Self { inner, canon_cycles, gen_grid: OnceLock::new() }
     }
 
+    pub fn inner(&self) -> &Homology<KhIState, R> { 
+        &self.inner
+    }
+
+    delegate! {
+        to self.inner {
+            pub fn support(&self) -> GridIter<'_, isize, Summand<KhIState, R>>;
+            pub fn is_supported(&self, i: isize) -> bool;
+        }
+    }
+    
     pub fn h_range(&self) -> RangeInclusive<isize> {
         self.support().filter(|&&i|
             !self[i].is_zero()
@@ -48,10 +59,6 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     
     pub fn canon_cycles(&self) -> &[KhIChain<R>] { 
         &self.canon_cycles
-    }
-
-    pub fn inner(&self) -> &Homology<KhIState, R> { 
-        &self.inner
     }
 
     pub fn truncated(&self, range: RangeInclusive<isize>) -> Self {
@@ -73,21 +80,6 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
             c.inner().reduced().homology(), 
             c.canon_cycles().to_vec()
         )
-    }
-}
-
-impl<R> GridTrait<isize> for KhIHomology<R>
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    type Item = Summand<KhIState, R>;
-    type Support<'a> = GridIter<'a, isize, Self::Item> where Self: 'a, R: 'a;
-
-    delegate! {
-        to self.inner {
-            fn support(&self) -> Self::Support<'_>;
-            fn is_supported(&self, i: isize) -> bool;
-            fn get(&self, i: isize) -> &Self::Item;
-            fn get_default(&self) -> &Self::Item;
-        }
     }
 }
 

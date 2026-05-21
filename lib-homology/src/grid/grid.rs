@@ -5,17 +5,6 @@ use ahash::AHashMap;
 use itertools::Itertools;
 use crate::{GridDeg, isize2, usize2, isize3, usize3};
 
-pub trait GridTrait<I>
-where I: GridDeg {
-    type Support<'a>: Iterator<Item = &'a I> where Self: 'a;
-    type Item;
-
-    fn support(&self) -> Self::Support<'_>;
-    fn is_supported(&self, i: I) -> bool;
-    fn get(&self, i: I) -> &Self::Item;
-    fn get_default(&self) -> &Self::Item;
-}
-
 pub type Grid1<E> = Grid<isize,  E>;
 pub type Grid2<E> = Grid<isize2, E>;
 pub type Grid3<E> = Grid<isize3, E>;
@@ -81,6 +70,22 @@ where I: GridDeg {
         let data = self.data.iter().map(|(&i, e)| (i, f(e)));
         Grid::new(data, dfl)
     }
+
+    pub fn support(&self) -> GridIter<'_, I, E> {
+        self.data.keys()
+    }
+
+    pub fn is_supported(&self, i: I) -> bool {
+        self.data.contains_key(&i)
+    }
+
+    pub fn get(&self, i: I) -> &E {
+        self.data.get(&i).unwrap_or(&self.default)
+    }
+
+    pub fn get_default(&self) -> &E {
+        &self.default
+    }
 }
 
 impl<E> Grid1<E> {
@@ -109,28 +114,6 @@ where I: GridDeg {
     }
 }
 
-
-impl<I, E> GridTrait<I> for Grid<I, E>
-where I: GridDeg {
-    type Item = E;
-    type Support<'a> = GridIter<'a, I, E> where Self: 'a, I: 'a, E: 'a;
-
-    fn support(&self) -> Self::Support<'_> {
-        self.data.keys()
-    }
-
-    fn is_supported(&self, i: I) -> bool {
-        self.data.contains_key(&i)
-    }
-
-    fn get(&self, i: I) -> &E {
-        self.data.get(&i).unwrap_or(&self.default)
-    }
-
-    fn get_default(&self) -> &E {
-        &self.default
-    }
-}
 
 impl<I, E> Index<I> for Grid<I, E>
 where I: GridDeg {
@@ -244,18 +227,18 @@ pub mod tex {
 
     macro_rules! impl_tex_table {
         ($t:ident) => {
-            impl<G> TeXTable<$t> for G
-            where G: GridTrait<$t>, G::Item: TeX {
+            impl<E> TeXTable<$t> for Grid<$t, E>
+            where E: TeX {
                 fn tex_table(&self, caption: &str, head: &str) -> String {
                     let def_str = self.get_default().tex_string();
                     let cols = self.support().map(|&$t(i, _)| i).unique().sorted();
                     let rows = self.support().map(|&$t(_, j)| j).unique().sorted().rev();
-            
+
                     tex_table(caption, head, rows, cols, |&j, &i| {
                         let str = self.get($t(i, j)).tex_string();
-                        if str == def_str { 
+                        if str == def_str {
                             ".".to_string()
-                        } else { 
+                        } else {
                             str
                         }
                     }, true, false)

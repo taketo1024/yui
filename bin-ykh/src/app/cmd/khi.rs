@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use yui_core::TeX;
 use yui_core::{EucRing, EucRingOps};
-use yui_homology::{ToSeqString, ToTableString, GridTrait};
+use yui_homology::{ToSeqString, ToTableString};
 use yui_kh::kh::KhChainExt;
 use yui_kh::khi::{KhIChain, KhIComplex, KhIHomology};
 use yui_link::InvLink;

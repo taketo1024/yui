@@ -4,7 +4,7 @@ use yui_matrix::MatTrait;
 use super::key::GenericKey;
 use super::GenericSummand;
 
-use crate::{isize2, isize3, ChainComplexBase, Grid, GridDeg, GridTrait};
+use crate::{isize2, isize3, ChainComplexBase, Grid, GridDeg};
 
 pub type GenericChainComplexBase<I, R> = ChainComplexBase<I, GenericKey<I>, R>;
 pub type GenericChainComplex<R>  = GenericChainComplexBase<isize,  R>;

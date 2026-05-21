@@ -4,7 +4,7 @@ use std::sync::OnceLock;
 use delegate::delegate;
 use yui_core::{IteratorExt, Ring, RingOps, EucRing, EucRingOps};
 use yui_link::Link;
-use yui_homology::{ChainComplex, ToSeqString, ToTableString, Grid2, GridIter, GridTrait, Summand};
+use yui_homology::{ChainComplex, ToSeqString, ToTableString, Grid2, GridIter, Summand};
 
 use crate::kh::chain::KhChain;
 use crate::kh::internal::v1::cube::KhCube;
@@ -114,6 +114,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     delegate! {
         to self.inner {
+            pub fn support(&self) -> GridIter<'_, isize, KhComplexSummand<R>>;
+            pub fn is_supported(&self, i: isize) -> bool;
             pub fn d_deg(&self) -> isize;
             pub fn d(&self, i: isize, z: &KhChain<R>) -> KhChain<R>;
             pub fn describe_d(&self) -> String;
@@ -151,20 +153,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<R> GridTrait<isize> for KhComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Item = KhComplexSummand<R>;
-    type Support<'a> = GridIter<'a, isize, Self::Item> where Self: 'a, R: 'a;
-
-    delegate! {
-        to self.inner {
-            fn support(&self) -> Self::Support<'_>;
-            fn is_supported(&self, i: isize) -> bool;
-            fn get(&self, i: isize) -> &Self::Item;
-            fn get_default(&self) -> &Self::Item;
-        }
-    }
-}
 
 impl<R> ToSeqString<isize> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {

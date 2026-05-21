@@ -9,7 +9,7 @@ use yui_core::lc::{LcKey, Lc};
 use yui_matrix::sparse::{SpMat, SpVec};
 
 use crate::utils::ChainReducer;
-use crate::{ToSeqString, ToTableString, GenericChainComplexBase, Grid, GridDeg, GridIter, GridTrait, isize2, isize3};
+use crate::{ToSeqString, ToTableString, GenericChainComplexBase, Grid, GridDeg, GridIter, isize2, isize3};
 use super::Summand;
 
 #[cfg(feature = "multithread")]
@@ -49,8 +49,15 @@ where
         Self::new(Grid::default(), I::zero(), |_, _| Lc::zero())
     }
 
-    pub fn summands(&self) -> &Grid<I, Summand<X, R>> { 
+    pub fn summands(&self) -> &Grid<I, Summand<X, R>> {
         &self.summands
+    }
+
+    delegate! {
+        to self.summands {
+            pub fn support(&self) -> GridIter<'_, I, Summand<X, R>>;
+            pub fn is_supported(&self, i: I) -> bool;
+        }
     }
 
     pub fn d_deg(&self) -> I {
@@ -188,30 +195,11 @@ where
     }
 }
 
-impl<I, X, R> GridTrait<I> for ChainComplexBase<I, X, R>
-where
-    I: GridDeg,
-    X: LcKey,
-    R: Ring, for<'x> &'x R: RingOps<R>,
-{
-    type Item = Summand<X, R>;
-    type Support<'a> = GridIter<'a, I, Self::Item> where Self: 'a, I: 'a, X: 'a, R: 'a;
-
-    delegate! {
-        to self.summands {
-            fn support(&self) -> Self::Support<'_>;
-            fn is_supported(&self, i: I) -> bool;
-            fn get(&self, i: I) -> &Self::Item;
-            fn get_default(&self) -> &Self::Item;
-        }
-    }
-}
-
 impl<I, X, R> Index<I> for ChainComplexBase<I, X, R>
 where I: GridDeg, X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = Summand<X, R>;
     fn index(&self, i: I) -> &Self::Output {
-        self.get(i)
+        &self.summands[i]
     }
 }
 
@@ -219,7 +207,7 @@ impl<X, R> Index<(isize, isize)> for ChainComplex2<X, R>
 where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = Summand<X, R>;
     fn index(&self, i: (isize, isize)) -> &Self::Output {
-        self.get(i.into())
+        &self[isize2::from(i)]
     }
 }
 
@@ -227,7 +215,7 @@ impl<X, R> Index<(isize, isize, isize)> for ChainComplex3<X, R>
 where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = Summand<X, R>;
     fn index(&self, i: (isize, isize, isize)) -> &Self::Output {
-        self.get(i.into())
+        &self[isize3::from(i)]
     }
 }
 

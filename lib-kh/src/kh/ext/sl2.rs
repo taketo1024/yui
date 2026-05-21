@@ -7,7 +7,7 @@ use std::ops::Index;
 use itertools::Itertools;
 use num_traits::Zero;
 use yui_core::{AddMon, Field, FieldOps, RangeExt, Ring, RingOps, Sign};
-use yui_homology::{GridTrait, isize3};
+use yui_homology::isize3;
 use yui_link::Link;
 use yui_matrix::MatTrait;
 use yui_matrix::dense::snf::fnf;

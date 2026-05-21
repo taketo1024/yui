@@ -5,7 +5,7 @@ use delegate::delegate;
 use itertools::Itertools;
 use yui_core::lc::Lc;
 use yui_core::{EucRing, EucRingOps, IteratorExt, Ring, RingOps};
-use yui_homology::{ChainComplex, ToSeqString, ToTableString, Grid1, Grid2, GridIter, GridTrait, Summand};
+use yui_homology::{ChainComplex, ToSeqString, ToTableString, Grid1, Grid2, GridIter, Summand};
 use yui_link::InvLink;
 
 use crate::kh::{KhChain, KhChainExt, KhComplex, KhState};
@@ -127,6 +127,17 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         &self.inner
     }
 
+    delegate! {
+        to self.inner {
+            pub fn support(&self) -> GridIter<'_, isize, KhIComplexSummand<R>>;
+            pub fn is_supported(&self, i: isize) -> bool;
+            pub fn d_deg(&self) -> isize;
+            pub fn d(&self, i: isize, z: &KhIChain<R>) -> KhIChain<R>;
+            pub fn describe_d(&self) -> String;
+            pub fn describe_d_at(&self, i: isize) -> String;
+        }
+    }
+
     pub fn h_range(&self) -> RangeInclusive<isize> {
         self.support().copied().range().unwrap_or(0..=-1)
     }
@@ -177,33 +188,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     delegate! {
         to self.gen_grid() {
             fn index(&self, index: (isize, isize)) -> &Self::Output;
-        }
-    }
-}
-
-impl<R> GridTrait<isize> for KhIComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Item = KhIComplexSummand<R>;
-    type Support<'a> = GridIter<'a, isize, Self::Item> where Self: 'a, R: 'a;
-
-    delegate! {
-        to self.inner {
-            fn support(&self) -> Self::Support<'_>;
-            fn is_supported(&self, i: isize) -> bool;
-            fn get(&self, i: isize) -> &Self::Item;
-            fn get_default(&self) -> &Self::Item;
-        }
-    }
-}
-
-impl<R> KhIComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    delegate! {
-        to self.inner {
-            pub fn d_deg(&self) -> isize;
-            pub fn d(&self, i: isize, z: &KhIChain<R>) -> KhIChain<R>;
-            pub fn describe_d(&self) -> String;
-            pub fn describe_d_at(&self, i: isize) -> String;
         }
     }
 }

@@ -45,7 +45,7 @@ impl Braid {
         to self.elements {
             pub fn len(&self) -> usize;
             #[call(is_empty)]
-            pub fn is_triv(&self) -> bool;
+            pub fn is_id(&self) -> bool;
         }
     }
 
@@ -56,6 +56,17 @@ impl Braid {
                 |g| g.inv()
             ).collect()
         )
+    }
+
+    pub fn reduced(&self) -> Self {
+        let mut stack: Vec<BraidGen> = Vec::new();
+        for g in self.elements.iter().copied() {
+            match stack.last() {
+                Some(&top) if top.inv() == g => { stack.pop(); }
+                _ => stack.push(g),
+            }
+        }
+        Self::new(self.strands, stack)
     }
 
     pub fn closure(&self) -> Link {
@@ -191,6 +202,45 @@ mod tests {
         let b = Braid::from([1, 1, -2, -1, 3]);
         let display = b.display();
         assert_ne!(display, "")
+    }
+
+    #[test]
+    fn reduced_empty() {
+        let b = Braid::from([] as [i32; 0]);
+        assert_eq!(b.reduced(), b);
+    }
+
+    #[test]
+    fn reduced_no_cancel() {
+        let b = Braid::from([1, 2, 3]);
+        assert_eq!(b.reduced(), b);
+    }
+
+    #[test]
+    fn reduced_single_pair() {
+        let b = Braid::from([1, -1]);
+        let r = b.reduced();
+        assert!(r.is_id());
+        assert_eq!(r.strands(), b.strands());
+    }
+
+    #[test]
+    fn reduced_cascading() {
+        let b = Braid::from([1, 2, -2, -1]);
+        assert!(b.reduced().is_id());
+    }
+
+    #[test]
+    fn reduced_mid_sequence() {
+        let b = Braid::from([1, 2, -2, 3]);
+        assert_eq!(b.reduced(), Braid::new(b.strands(), vec![BraidGen::new(1), BraidGen::new(3)]));
+    }
+
+    #[test]
+    fn reduced_non_inverse_pair() {
+        // σ_1 σ_2^{-1} does not reduce (different indices).
+        let b = Braid::from([1, -2]);
+        assert_eq!(b.reduced(), b);
     }
 
     #[test]

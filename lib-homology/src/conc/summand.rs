@@ -57,7 +57,7 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn generator(&self, i: usize) -> Lc<X, R> {
-        let n = self.dim();
+        let n = self.total_rank();
         let v = SpVec::unit(n, i);
         self.devectorize(&v)
     }
@@ -94,7 +94,7 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn devectorize(&self, v: &SpVec<R>) -> Lc<X, R> {
-        assert_eq!(v.dim(), self.dim());
+        assert_eq!(v.dim(), self.total_rank());
 
         let v = self.trans.backward(v);
 
@@ -105,7 +105,7 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn make_matrix<Y, F>(&self, target: &Summand<Y, R>, map: F) -> SpMat<R>
     where Y: LcKey, F: Fn(&Lc<X, R>) -> Lc<Y, R> { 
-        SpMat::from_col_vecs(target.dim(), self.generators().map(|z| { 
+        SpMat::from_col_vecs(target.total_rank(), self.generators().map(|z| {
             let w = map(&z);
             target.vectorize(&w)
         }))
@@ -113,7 +113,7 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn make_matrix_euc<Y, F>(&self, target: &Summand<Y, R>, map: F) -> SpMat<R>
     where R: EucRing, for<'x> &'x R: EucRingOps<R>, Y: LcKey, F: Fn(&Lc<X, R>) -> Lc<Y, R> { 
-        SpMat::from_col_vecs(target.dim(), self.generators().map(|z| { 
+        SpMat::from_col_vecs(target.total_rank(), self.generators().map(|z| {
             let w = map(&z);
             target.vectorize_euc(&w)
         }))

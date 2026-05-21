@@ -7,7 +7,7 @@ where Self::R: Ring, for<'x> &'x Self::R: RingOps<Self::R> {
     fn rank(&self) -> usize;
     fn tors(&self) -> &[Self::R];
 
-    fn dim(&self) -> usize { // not a good name...
+    fn total_rank(&self) -> usize {
         self.rank() + self.tors().len()
     }
 

@@ -68,34 +68,6 @@ where
         source[i].make_matrix_euc(&target[i + self.deg], |z| self.apply(i, z))
     }
 
-    pub fn check_for(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I, x: &X) {
-        let d_deg = source.d_deg();
-        let x = Lc::from(x.clone());
-        let dx = source.d(i, &x);
-        let fdx = self.apply(i + d_deg, &dx);
-        let fx = self.apply(i, &x);
-        let dfx = target.d(i, &fx);
-
-        assert!(dfx == fdx, "df != fd for x = {x}.\n  df = {dfx},\n  fd = {fdx}.");
-    }
-
-
-    pub fn check_at(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I) {
-        for x in source.get(i).raw_generators().iter() {
-            self.check_for(source, target, i, x);
-        }
-    }
-
-    pub fn check_all(
-        &self,
-        source: &ChainComplexBase<I, X, R>,
-        target: &ChainComplexBase<I, Y, R>,
-    ) {
-        for &i in source.support() {
-            self.check_at(source, target, i);
-        }
-    }
-
     pub fn describe_map(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>) -> String {
         use itertools::Itertools;
         source.support().map(|&i| self.describe_map_at(source, target, i)).join("\n\n")
@@ -151,6 +123,36 @@ where
         };
 
         ChainComplexBase::new(summands, d_deg, d_map)
+    }
+
+        #[cfg(debug_assertions)]
+    pub fn check_for(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I, x: &X) {
+        let d_deg = source.d_deg();
+        let x = Lc::from(x.clone());
+        let dx = source.d(i, &x);
+        let fdx = self.apply(i + d_deg, &dx);
+        let fx = self.apply(i, &x);
+        let dfx = target.d(i, &fx);
+
+        assert!(dfx == fdx, "df != fd for x = {x}.\n  df = {dfx},\n  fd = {fdx}.");
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn check_at(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I) {
+        for x in source.get(i).raw_generators().iter() {
+            self.check_for(source, target, i, x);
+        }
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn check_all(
+        &self,
+        source: &ChainComplexBase<I, X, R>,
+        target: &ChainComplexBase<I, Y, R>,
+    ) {
+        for &i in source.support() {
+            self.check_at(source, target, i);
+        }
     }
 }
 

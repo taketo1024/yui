@@ -23,26 +23,6 @@ where
         self.get(i).rank()
     }
 
-    // convenient methods
-    fn check_d_at(&self, i0: I) { 
-        let i1 = i0 + self.d_deg();
-        if !(self.is_supported(i0) && self.is_supported(i1)) {
-            return 
-        }
-
-        let d0 = self.d_matrix(i0);
-        let d1 = self.d_matrix(i1);
-        let res = d1 * d0;
-
-        assert!( res.is_zero(), "d² is non-zero at {i0}." );
-    }
-
-    fn check_d_all(&self) {
-        for &i in self.support() {
-            self.check_d_at(i);
-        }
-    }
-
     fn describe_d_at(&self, i: I) -> String {
         let c0 = self.get(i).display();
         let c1 = self.get(i + self.d_deg()).display();
@@ -66,5 +46,26 @@ where
             self.d_deg(), 
             |i| self.d_matrix(i)
         )
+    }
+
+    #[cfg(debug_assertions)]
+    fn check_d_at(&self, i0: I) {
+        let i1 = i0 + self.d_deg();
+        if !(self.is_supported(i0) && self.is_supported(i1)) {
+            return
+        }
+
+        let d0 = self.d_matrix(i0);
+        let d1 = self.d_matrix(i1);
+        let res = d1 * d0;
+
+        assert!( res.is_zero(), "d² is non-zero at {i0}." );
+    }
+
+    #[cfg(debug_assertions)]
+    fn check_d_all(&self) {
+        for &i in self.support() {
+            self.check_d_at(i);
+        }
     }
 }

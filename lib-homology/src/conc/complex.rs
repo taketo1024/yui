@@ -108,13 +108,14 @@ where
         r.into_complex()
     }
 
-    fn check_d_for(&self, i0: I, x: &X) { 
+    #[cfg(debug_assertions)]
+    fn check_d_for(&self, i0: I, x: &X) {
         let i1 = i0 + self.d_deg();
         assert!(self.is_supported(i0), "Not supported: {i0}.");
 
         let dx = self.d(i0, &Lc::from(x.clone()));
         let ddx = self.d(i1, &dx);
-        
+
         assert!(ddx.is_zero(), "d² is non-zero for {x} at {i0}.\n  dx: {dx}\n  ddx: {ddx}.");
     }
 }
@@ -183,7 +184,8 @@ where
         self.d_matrix(i)
     }
 
-    fn check_d_at(&self, i0: I) { 
+    #[cfg(debug_assertions)]
+    fn check_d_at(&self, i0: I) {
         for x in self.get(i0).raw_generators().iter() {
             self.check_d_for(i0, x);
         }

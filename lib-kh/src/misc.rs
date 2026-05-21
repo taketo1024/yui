@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use yui_core::lc::{LcKey, Lc};
 use yui_core::{EucRing, EucRingOps, IteratorExt, Ring, RingOps};
-use yui_homology::{isize2, Grid1, Grid2, Summand, SummandTrait};
+use yui_homology::{isize2, Grid1, Grid2, Summand};
 use yui_matrix::sparse::SpVec;
 
 use crate::kh::KhChainExt;

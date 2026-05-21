@@ -2,7 +2,7 @@ use std::ops::{RangeInclusive, Index};
 use std::sync::OnceLock;
 use delegate::delegate;
 
-use yui_homology::{ToSeqString, ToTableString, Grid2, GridIter, GridTrait, Homology, Summand, SummandTrait};
+use yui_homology::{ToSeqString, ToTableString, Grid2, GridIter, GridTrait, Homology, Summand};
 use yui_core::{EucRing, EucRingOps, IteratorExt};
 use yui_link::Link;
 
@@ -177,7 +177,6 @@ mod tests {
     use yui_core::poly::Poly;
     use yui_core::num::FF2;
     
-    use yui_homology::SummandTrait;
     use yui_link::Link;
     use super::*;
     
@@ -443,7 +442,6 @@ mod tests_v1 {
     use num_traits::Zero;
     use yui_core::poly::Poly;
     use yui_core::num::FF2;
-    use yui_homology::SummandTrait;
     use yui_link::Link;
     use super::*;
     

@@ -4,7 +4,7 @@ use std::sync::OnceLock;
 use delegate::delegate;
 use yui_core::{IteratorExt, Ring, RingOps, EucRing, EucRingOps};
 use yui_link::Link;
-use yui_homology::{ChainComplex, ChainComplexTrait, ToSeqString, ToTableString, Grid2, GridIter, GridTrait, Summand, SummandTrait};
+use yui_homology::{ChainComplex, ChainComplexTrait, ToSeqString, ToTableString, Grid2, GridIter, GridTrait, Summand};
 use yui_matrix::sparse::SpMat;
 
 use crate::kh::chain::KhChain;
@@ -211,7 +211,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests {
-    use yui_homology::{ChainComplexTrait, SummandTrait};
+    use yui_homology::{ChainComplexTrait};
     use yui_link::Link;
 
     use super::KhComplex;
@@ -274,7 +274,7 @@ mod tests {
 
 #[cfg(test)]
 mod tests_v1 {
-    use yui_homology::{ChainComplexTrait, SummandTrait};
+    use yui_homology::{ChainComplexTrait};
     use yui_link::Link;
 
     use super::KhComplex;

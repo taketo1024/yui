@@ -5,7 +5,7 @@ use delegate::delegate;
 use itertools::Itertools;
 use yui_core::lc::Lc;
 use yui_core::{EucRing, EucRingOps, IteratorExt, Ring, RingOps};
-use yui_homology::{ChainComplex, ChainComplexTrait, ToSeqString, ToTableString, Grid1, Grid2, GridIter, GridTrait, Summand, SummandTrait};
+use yui_homology::{ChainComplex, ChainComplexTrait, ToSeqString, ToTableString, Grid1, Grid2, GridIter, GridTrait, Summand};
 use yui_link::InvLink;
 use yui_matrix::sparse::SpMat;
 
@@ -247,7 +247,7 @@ mod tests {
     use yui_core::poly::Poly;
     use yui_core::num::FF2;
     use num_traits::{Zero, One};
-    use yui_homology::{ChainComplexTrait, SummandTrait};
+    use yui_homology::{ChainComplexTrait};
     use super::*;
 
     #[test]
@@ -449,7 +449,7 @@ mod tests_v1 {
     use yui_core::poly::Poly;
     use yui_core::num::FF2;
     use num_traits::{Zero, One};
-    use yui_homology::{ChainComplexTrait, SummandTrait};
+    use yui_homology::{ChainComplexTrait};
     use super::*;
 
     #[test]

@@ -606,7 +606,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 mod tests { 
     use num_traits::Zero;
-    use yui_homology::{ChainComplexTrait, SummandTrait};
+    use yui_homology::{ChainComplexTrait};
 
     use super::*;
 

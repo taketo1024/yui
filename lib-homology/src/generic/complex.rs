@@ -152,7 +152,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 pub(crate) mod tests { 
     use num_traits::Zero;
 
-    use crate::{ChainComplexTrait, SummandTrait};
+    use crate::{ChainComplexTrait};
 
     use super::*;
 

@@ -2,7 +2,7 @@ use std::ops::{Index, RangeInclusive};
 use std::sync::OnceLock;
 use delegate::delegate;
 use yui_core::{EucRing, EucRingOps, IteratorExt};
-use yui_homology::{ToSeqString, ToTableString, Grid2, GridIter, GridTrait, Homology, Summand, SummandTrait};
+use yui_homology::{ToSeqString, ToTableString, Grid2, GridIter, GridTrait, Homology, Summand};
 use yui_link::InvLink;
 use crate::kh::KhChainExt;
 use crate::khi::{KhIComplex, KhIState};
@@ -150,7 +150,7 @@ mod tests {
     use yui_core::poly::Poly;
     use yui_core::num::FF2;
     use num_traits::{Zero, One};
-    use yui_homology::{ChainComplexTrait, ToSeqString, ToTableString, SummandTrait};
+    use yui_homology::{ChainComplexTrait, ToSeqString, ToTableString};
     use yui_link::Link;
     use super::*;
 
@@ -303,7 +303,7 @@ mod tests_v1 {
     use yui_core::poly::Poly;
     use yui_core::num::FF2;
     use num_traits::{Zero, One};
-    use yui_homology::{ChainComplexTrait, ToSeqString, ToTableString, SummandTrait};
+    use yui_homology::{ChainComplexTrait, ToSeqString, ToTableString};
     use yui_link::Link;
     use super::*;
 

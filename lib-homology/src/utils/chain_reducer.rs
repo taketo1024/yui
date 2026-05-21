@@ -9,7 +9,7 @@ use yui_matrix::sparse::schur::Schur;
 use yui_core::{Ring, RingOps};
 
 use crate::generic::GenericChainComplexBase;
-use crate::{ChainComplexTrait, GridDeg, GridTrait, SummandTrait};
+use crate::{ChainComplexTrait, GridDeg, GridTrait};
 
 /// Reduces a chain complex by repeatedly cancelling pivot pairs `(a, d)` —
 /// applying a Schur-complement style change of basis at each step — and
@@ -46,7 +46,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
     pub fn reduce<C>(complex: &C, with_trans: bool) -> Self
-    where C: GridTrait<I> + ChainComplexTrait<I, R = R>, C::Item: SummandTrait<R = R> {
+    where C: GridTrait<I> + ChainComplexTrait<I, R = R> {
         let mut r = Self::from_complex(complex, with_trans);
         r.reduce_all(false);
         r.reduce_all(true);
@@ -54,7 +54,7 @@ where
     }
 
     pub fn from_complex<C>(complex: &C, with_trans: bool) -> Self
-    where C: GridTrait<I> + ChainComplexTrait<I, R = R>, C::Item: SummandTrait<R = R> {
+    where C: GridTrait<I> + ChainComplexTrait<I, R = R> {
         let support = complex.support().copied();
         let d_deg = complex.d_deg();
 
@@ -285,7 +285,6 @@ mod tests {
 
     use num_traits::Zero;
     use crate::generic::GenericChainComplex;
-    use crate::SummandTrait;
     use super::*;
 
     #[test]

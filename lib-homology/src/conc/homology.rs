@@ -1,7 +1,7 @@
 use yui_core::{EucRing, EucRingOps};
 use yui_core::lc::LcKey;
 
-use crate::{isize2, isize3, ComputeHomology, Grid, GridDeg, GridTrait, SummandTrait};
+use crate::{isize2, isize3, ComputeHomology, Grid, GridDeg, GridTrait};
 use super::{Summand, ChainComplexBase};
 
 pub type HomologyBase<I, X, R> = Grid<I, Summand<X, R>>;

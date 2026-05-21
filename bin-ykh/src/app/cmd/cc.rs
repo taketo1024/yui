@@ -6,7 +6,7 @@ use std::str::FromStr;
 use yui_core::TeX;
 use yui_core::{EucRing, EucRingOps};
 use yui_homology::ToSeqString;
-use yui_homology::{ToTableString, GridTrait, SummandTrait};
+use yui_homology::{ToTableString, GridTrait};
 use yui_kh::kh::ext::cc::KhChainMap;
 use yui_kh::kh::KhComplex;
 use yui_kh::kh::KhHomology;

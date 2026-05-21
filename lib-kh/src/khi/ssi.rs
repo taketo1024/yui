@@ -6,7 +6,6 @@ use itertools::Itertools;
 use num_traits::Zero;
 use log::info;
 
-use yui_homology::SummandTrait;
 use yui_core::{EucRing, EucRingOps};
 use yui_link::InvLink;
 

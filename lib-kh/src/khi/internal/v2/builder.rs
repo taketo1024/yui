@@ -665,7 +665,7 @@ mod tests {
 
     use yui_core::num::FF2;
     use yui_core::poly::Poly;
-    use yui_homology::{ChainComplexTrait, ToSeqString, ToTableString, SummandTrait};
+    use yui_homology::{ChainComplexTrait, ToSeqString, ToTableString};
 
     #[test]
     fn test_kh_3_1() { 

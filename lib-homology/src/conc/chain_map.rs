@@ -1,3 +1,6 @@
+//! [`ChainMap`]: borrowed view of a chain map between two chain complexes,
+//! plus its mapping cone construction.
+
 use std::sync::Arc;
 
 use num_traits::Zero;
@@ -9,7 +12,9 @@ use crate::{GrMod, AddInd, Summand};
 
 use super::ChainComplex;
 
-/// Represents a chain map between chain complexes.
+/// A chain map between two chain complexes. Holds references to source and
+/// target (`'a`) and a stored closure (`'c`). [`Self::cone`] produces a fresh
+/// owned [`ChainComplex`] and so requires `'c: 'static`.
 pub struct ChainMap<'a, 'c, I, X, Y, R>
 where
     I: AddInd,
@@ -89,6 +94,9 @@ where
         s
     }
 
+    /// Build the mapping cone `Cone(f)` of this chain map. Requires the closure
+    /// lifetime `'c: 'static` because the resulting [`ChainComplex`]'s
+    /// differential is stored as `+ 'static`.
     pub fn cone<It>(&self, support: It, target_based: bool) -> ChainComplex<I, EitherKey<X, Y>, R>
     where It: IntoIterator<Item = I>, 'c: 'static {
         assert!(self.source.d_deg() == self.target.d_deg());

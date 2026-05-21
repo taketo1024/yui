@@ -1,3 +1,6 @@
+//! [`ChainComplex<I, X, R>`]: the central chain-complex type, together with
+//! homology computation via SNF.
+
 use std::collections::HashMap;
 use std::ops::{Index, RangeInclusive};
 use std::sync::Arc;
@@ -23,9 +26,12 @@ pub type ChainComplex1<X, R> = ChainComplex<isize,  X, R>;
 pub type ChainComplex2<X, R> = ChainComplex<isize2, X, R>;
 pub type ChainComplex3<X, R> = ChainComplex<isize3, X, R>;
 
+/// An `I`-graded chain complex: a [`GrMod`] of [`Summand`]s, a degree shift
+/// `d_deg`, and a differential closure `Fn(I, &Lc<X, R>) -> Lc<X, R>`. Optionally
+/// caches per-index `SpMat<R>`s so [`Self::d_matrix`] becomes a clone.
 #[derive(Clone)]
 pub struct ChainComplex<I, X, R>
-where 
+where
     I: AddInd,
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
@@ -95,6 +101,9 @@ where
         (self.d_map)(i, z)
     }
 
+    /// Returns the differential matrix `d_i: C_i → C_{i + d_deg}` in the
+    /// stored basis. Hits the precomputed cache if populated; otherwise builds
+    /// the matrix by applying `d_map` to each basis element.
     pub fn d_matrix(&self, i: I) -> SpMat<R> {
         if let Some(d) = self.d_matrices.get(&i) {
             return d.clone();
@@ -142,6 +151,8 @@ where
         ).join("")
     }
 
+    /// Forget the symbolic generators and return an equivalent
+    /// [`GenericChainComplex`] built from the differential matrices.
     pub fn as_generic(&self) -> GenericChainComplex<I, R> {
         GenericChainComplex::from_d_matrices(
             self.d_deg,
@@ -149,6 +160,10 @@ where
         )
     }
 
+    /// Reduce the complex via pivot cancellation (Schur complement), preserving
+    /// symbolic generators. The returned complex has fewer raw generators but
+    /// the same homology; basis-change tracking lets cycles pull back to the
+    /// original generators.
     pub fn reduced(&self) -> ChainComplex<I, X, R> {
         let r = ChainReducer::reduce(self, true);
 
@@ -175,7 +190,9 @@ where
             .with_d_matrices(matrices)
     }
 
-    pub fn reduced_generic(&self) -> GenericChainComplex<I, R> { 
+    /// Like [`Self::reduced`] but skips the basis-change tracking and discards
+    /// symbolic generators, returning a [`GenericChainComplex`].
+    pub fn reduced_generic(&self) -> GenericChainComplex<I, R> {
         let r = ChainReducer::reduce(self, false);
         r.into_generic_complex()
     }

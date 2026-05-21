@@ -1,3 +1,5 @@
+//! Algorithms over chain complexes: homology computation and reduction.
+
 mod chain_reducer;
 mod homology_calc;
 

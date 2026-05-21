@@ -1,3 +1,7 @@
+//! Generic (matrix-only) chain complexes: a [`ChainComplex`] whose generators
+//! are anonymous [`GenericKey`] placeholders, fully described by its
+//! differential matrices.
+
 use std::collections::HashMap;
 use derive_more::derive::{Display, Debug};
 use num_traits::Zero;
@@ -10,6 +14,7 @@ use crate::{isize2, isize3, AddInd, ChainComplex, GrMod, Summand};
 
 // --- GenericKey -------------------------------------------------------------
 
+/// Anonymous generator key: grading index `I` and an ordinal within that grade.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Display, Debug, Default)]
 #[display("e({},{})", _0, _1)]
 #[  debug("e({},{})", _0, _1)]
@@ -63,6 +68,9 @@ pub type GenericGrMod3<R> = GenericGrMod<isize3, R>;
 
 impl<I, R> GenericChainComplex<I, R>
 where I: AddInd, R: Ring, for<'x> &'x R: RingOps<R> {
+    /// Build a chain complex from a degree shift and a map of differentials.
+    /// Each `(i, M_i)` declares both `d_i: C_i → C_{i + d_deg}` and the rank
+    /// of `C_i` (`= M_i.n_cols()`).
     pub fn from_d_matrices(d_deg: I, matrices: impl IntoIterator<Item = (I, SpMat<R>)>) -> Self {
         let d_matrices: HashMap<I, SpMat<R>> = matrices.into_iter().collect();
 
@@ -87,6 +95,9 @@ where I: AddInd, R: Ring, for<'x> &'x R: RingOps<R> {
         )
     }
 
+    /// The dual cochain complex: same indexing, but `d_deg` is negated and
+    /// each differential matrix is transposed. `c.dual().homology()` thus
+    /// computes the cohomology of `c`.
     pub fn dual(&self) -> Self {
         let d_deg = self.d_deg();
         let matrices = self.support().map(|&i| {

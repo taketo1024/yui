@@ -1,3 +1,6 @@
+//! Concrete chain-complex types: gradings, summands, graded modules,
+//! chain complexes, chain maps, and matrix-only ("generic") variants.
+
 mod add_ind;
 mod gr_mod;
 mod summand;

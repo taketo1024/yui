@@ -1,5 +1,6 @@
-mod conc;
+#![doc = include_str!("../README.md")]
 
+mod conc;
 pub use conc::*;
 
 #[cfg(test)]

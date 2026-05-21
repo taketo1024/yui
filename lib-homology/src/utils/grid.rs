@@ -1,3 +1,6 @@
+//! [`Grid<K, V>`]: a sparse `K`-indexed table backed by a hash map plus a
+//! stored default value, used as the storage primitive for [`GrMod`].
+
 use std::fmt::Display;
 use std::hash::Hash;
 use std::ops::Index;

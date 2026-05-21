@@ -1,6 +1,11 @@
+//! Plain-text formatting of finitely-generated R-modules — e.g.
+//! `"Z² ⊕ Z/2 ⊕ Z/2"`.
+
 use itertools::Itertools;
 use yui_core::{Ring, RingOps};
 
+/// Format a free-plus-torsion summand `R^rank ⊕ R/tors[0] ⊕ R/tors[1] ⊕ …`
+/// as a human-readable string.
 pub fn rmod_str<R>(rank: usize, tors: &[R]) -> String
 where R: Ring, for<'x> &'x R: RingOps<R> {
     use yui_core::util::format::superscript;

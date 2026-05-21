@@ -1,5 +1,8 @@
+//! Render-as-string traits for singly- and bi-graded objects.
+
 use std::fmt::Display;
 
+/// Render a singly-graded object as a one-row table.
 pub trait ToSeqString<I: Display> {
     fn label(&self) -> String;
     fn indices(&self) -> Vec<I>;
@@ -12,6 +15,7 @@ pub trait ToSeqString<I: Display> {
     }
 }
 
+/// Render a bi-graded object as a 2D table.
 pub trait ToTableString<I: Display> {
     fn labels(&self) -> (String, String);
     fn indices(&self) -> (Vec<I>, Vec<I>);

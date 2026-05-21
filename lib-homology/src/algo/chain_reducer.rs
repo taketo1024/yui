@@ -1,3 +1,6 @@
+//! [`ChainReducer`]: iterative reduction of a chain complex by pivot
+//! cancellation (Schur complement), with optional basis-change tracking.
+
 use std::collections::HashMap;
 use itertools::Itertools;
 use log::*;

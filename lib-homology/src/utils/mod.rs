@@ -1,3 +1,7 @@
+//! Shared utilities: the sparse [`Grid`] storage, plain-text/LaTeX
+//! formatting helpers, and the [`ToSeqString`] / [`ToTableString`] display
+//! traits.
+
 mod matrix;
 pub(crate) mod format;
 mod grid;

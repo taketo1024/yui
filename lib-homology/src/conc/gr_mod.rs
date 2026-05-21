@@ -1,3 +1,6 @@
+//! [`GrMod<I, X, R>`]: a sparse `I`-graded R-module — the storage that backs
+//! both chain complexes and their homology.
+
 use std::ops::{Index, RangeInclusive};
 
 use delegate::delegate;

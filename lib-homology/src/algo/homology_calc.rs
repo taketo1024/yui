@@ -1,3 +1,6 @@
+//! [`HomologyCalc`]: computes the homology at one grading index from two
+//! consecutive differential matrices via Smith normal form.
+
 use std::marker::PhantomData;
 use log::*;
 
@@ -5,8 +8,11 @@ use yui_core::{EucRing, EucRingOps};
 use yui_matrix::dense::{*, snf::*};
 use yui_matrix::sparse::*;
 
+/// `(rank, torsion_coefficients, optional_basis_change)` returned by
+/// [`HomologyCalc::calculate`].
 pub type HomologyCalcResult<R> = (usize, Vec<R>, Option<Trans<R>>);
 
+/// Stateless namespace for SNF-based homology computation.
 pub struct HomologyCalc<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     _r: PhantomData<R>

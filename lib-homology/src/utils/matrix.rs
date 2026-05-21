@@ -1,3 +1,5 @@
+//! Helper for building a sparse matrix from a linear map on indexed bases.
+
 use std::hash::BuildHasher;
 use itertools::Itertools;
 use indexmap::IndexSet;
@@ -8,6 +10,9 @@ use yui_matrix::sparse::SpMat;
 #[cfg(feature = "multithread")]
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
+/// Build a sparse matrix representing the linear map `f: ⟨from⟩ → ⟨to⟩`.
+/// Each input basis element `x ∈ from` gets a column whose nonzeros come from
+/// `f(x).iter()`; the corresponding row indices come from `to.get_index_of(y)`.
 pub fn make_matrix<X, Y, R, F, S1, S2>(from: &IndexSet<X, S1>, to: &IndexSet<Y, S2>, f: F) -> SpMat<R>
 where
     X: LcKey, Y: LcKey,

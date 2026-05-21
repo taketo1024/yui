@@ -1,7 +1,13 @@
+//! Grading-index types used throughout `lib-homology`: the [`AddInd`] trait
+//! and its tuple-shaped implementors [`isize2`] and [`isize3`].
+
 use std::ops::{Add, Neg, Sub};
 use num_traits::Zero;
 use yui_core::IndexType;
 
+/// Marker trait for grading types. Implemented for [`isize`], [`isize2`],
+/// [`isize3`]; not implemented for `usize`-based variants because they are not
+/// closed under subtraction.
 pub trait AddInd:
     IndexType
     + Copy
@@ -58,5 +64,7 @@ macro_rules! make {
     (@unit $_idx:tt, $($body:tt)*) => { $($body)* };
 }
 
+// 2-tuple of `isize` for bigraded indices (e.g. `(h, q)` in Khovanov).
 make!(isize2, isize, 0, 1);
+// 3-tuple of `isize` for trigraded indices.
 make!(isize3, isize, 0, 1, 2);

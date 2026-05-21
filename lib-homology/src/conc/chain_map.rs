@@ -7,7 +7,7 @@ use yui_matrix::sparse::SpMat;
 
 use crate::{GrMod, AddInd, Summand};
 
-use super::ChainComplexBase;
+use super::ChainComplex;
 
 /// Represents a chain map between chain complexes.
 pub struct ChainMap<'a, 'c, I, X, Y, R>
@@ -16,8 +16,8 @@ where
     X: LcKey, Y: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    source: &'a ChainComplexBase<I, X, R>,
-    target: &'a ChainComplexBase<I, Y, R>,
+    source: &'a ChainComplex<I, X, R>,
+    target: &'a ChainComplex<I, Y, R>,
     deg: I,
     map: Arc<dyn Fn(I, &Lc<X, R>) -> Lc<Y, R> + Send + Sync + 'c>,
 }
@@ -30,8 +30,8 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     pub fn new<F>(
-        source: &'a ChainComplexBase<I, X, R>,
-        target: &'a ChainComplexBase<I, Y, R>,
+        source: &'a ChainComplex<I, X, R>,
+        target: &'a ChainComplex<I, Y, R>,
         deg: I,
         map: F,
     ) -> Self
@@ -41,18 +41,18 @@ where
     }
 
     pub fn zero(
-        source: &'a ChainComplexBase<I, X, R>,
-        target: &'a ChainComplexBase<I, Y, R>,
+        source: &'a ChainComplex<I, X, R>,
+        target: &'a ChainComplex<I, Y, R>,
         deg: I,
     ) -> Self {
         Self { source, target, deg, map: Arc::new(|_, _| Lc::zero()) }
     }
 
-    pub fn source(&self) -> &'a ChainComplexBase<I, X, R> {
+    pub fn source(&self) -> &'a ChainComplex<I, X, R> {
         self.source
     }
 
-    pub fn target(&self) -> &'a ChainComplexBase<I, Y, R> {
+    pub fn target(&self) -> &'a ChainComplex<I, Y, R> {
         self.target
     }
 
@@ -89,7 +89,7 @@ where
         s
     }
 
-    pub fn cone<It>(&self, support: It, target_based: bool) -> ChainComplexBase<I, EitherKey<X, Y>, R>
+    pub fn cone<It>(&self, support: It, target_based: bool) -> ChainComplex<I, EitherKey<X, Y>, R>
     where It: IntoIterator<Item = I>, 'c: 'static {
         assert!(self.source.d_deg() == self.target.d_deg());
 
@@ -128,7 +128,7 @@ where
             dx + fx - dy
         };
 
-        ChainComplexBase::new(summands, d_deg, d_map)
+        ChainComplex::new(summands, d_deg, d_map)
     }
 
     #[cfg(debug_assertions)]
@@ -160,14 +160,14 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{GenericKey, GenericChainComplex};
+    use crate::{GenericKey, GenericChainComplex1};
 
     use super::*;
 
     #[test]
     fn test_s2_to_d3() {
-        let s2 = GenericChainComplex::<i32>::s2();
-        let d3 = GenericChainComplex::<i32>::d3();
+        let s2 = GenericChainComplex1::<i32>::s2();
+        let d3 = GenericChainComplex1::<i32>::d3();
 
         let f = ChainMap::new(&s2, &d3, 0, |_, z| z.clone());
 
@@ -177,8 +177,8 @@ mod tests {
     #[test]
     fn test_cone() {
         type T = EitherKey<GenericKey<isize>, GenericKey<isize>>;
-        let s2 = GenericChainComplex::<i32>::s2();
-        let d3 = GenericChainComplex::<i32>::d3();
+        let s2 = GenericChainComplex1::<i32>::s2();
+        let d3 = GenericChainComplex1::<i32>::d3();
 
         let f = ChainMap::new(&s2, &d3, 0, |_, z| z.clone());
 

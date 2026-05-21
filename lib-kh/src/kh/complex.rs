@@ -4,7 +4,7 @@ use std::sync::OnceLock;
 use delegate::delegate;
 use yui_core::{IteratorExt, Ring, RingOps, EucRing, EucRingOps};
 use yui_link::Link;
-use yui_homology::{ChainComplex, ToSeqString, ToTableString, GrMod2, Summand};
+use yui_homology::{ChainComplex1, ToSeqString, ToTableString, GrMod2, Summand};
 
 use crate::kh::chain::KhChain;
 use crate::kh::internal::v1::cube::KhCube;
@@ -20,7 +20,7 @@ pub type KhComplexSummand<R> = Summand<KhState, R>;
 #[derive(Clone)]
 pub struct KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    inner: ChainComplex<KhState, R>,
+    inner: ChainComplex1<KhState, R>,
     str: KhAlg<R>,
     cube: KhCube<R>,
     deg_shift: (isize, isize),
@@ -61,7 +61,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         KhComplex::new_impl(complex, str, cube, deg_shift, reduced, canon_cycles)
     }
 
-    pub(crate) fn new_impl(inner: ChainComplex<KhState, R>, str: KhAlg<R>, cube: KhCube<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
+    pub(crate) fn new_impl(inner: ChainComplex1<KhState, R>, str: KhAlg<R>, cube: KhCube<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
         KhComplex { inner, str, cube, deg_shift, reduced, canon_cycles, gen_grid: OnceLock::new() }
     }
 
@@ -95,7 +95,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.canon_cycles
     }
 
-    pub fn inner(&self) -> &ChainComplex<KhState, R> {
+    pub fn inner(&self) -> &ChainComplex1<KhState, R> {
         &self.inner
     }
 

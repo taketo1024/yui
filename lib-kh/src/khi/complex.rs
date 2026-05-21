@@ -5,7 +5,7 @@ use delegate::delegate;
 use itertools::Itertools;
 use yui_core::lc::Lc;
 use yui_core::{EucRing, EucRingOps, IteratorExt, Ring, RingOps};
-use yui_homology::{ChainComplex, ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
+use yui_homology::{ChainComplex1, ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_link::InvLink;
 
 use crate::kh::{KhChain, KhChainExt, KhComplex, KhState};
@@ -31,7 +31,7 @@ pub type KhIComplexSummand<R> = Summand<KhIState, R>;
 #[derive(Clone)]
 pub struct KhIComplex<R>
 where R: Ring, for<'a> &'a R: RingOps<R> {
-    inner: ChainComplex<KhIState, R>,
+    inner: ChainComplex1<KhIState, R>,
     canon_cycles: Vec<KhIChain<R>>,
     deg_shift: (isize, isize),
     gen_grid: OnceLock<GrMod2<KhIState, R>>,
@@ -112,18 +112,18 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
             }
         };
 
-        let inner = ChainComplex::new(summands, 1, move |i, z| { 
+        let inner = ChainComplex1::new(summands, 1, move |i, z| { 
             z.apply(|x| d(i, x))
         });
 
         KhIComplex::new_impl(inner, canon_cycles, deg_shift)
     }
 
-    pub(crate) fn new_impl(inner: ChainComplex<KhIState, R>, canon_cycles: Vec<KhIChain<R>>, deg_shift: (isize, isize)) -> Self {
+    pub(crate) fn new_impl(inner: ChainComplex1<KhIState, R>, canon_cycles: Vec<KhIChain<R>>, deg_shift: (isize, isize)) -> Self {
         Self { inner, canon_cycles, deg_shift, gen_grid: OnceLock::new() }
     }
 
-    pub fn inner(&self) -> &ChainComplex<KhIState, R> {
+    pub fn inner(&self) -> &ChainComplex1<KhIState, R> {
         &self.inner
     }
 

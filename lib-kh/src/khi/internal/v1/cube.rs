@@ -4,7 +4,7 @@ use std::ops::RangeInclusive;
 use itertools::Itertools;
 use yui_core::lc::Lc;
 use yui_core::{Ring, RingOps};
-use yui_homology::{GrMod, ChainComplex, Summand};
+use yui_homology::{GrMod, ChainComplex1, Summand};
 use yui_link::{InvLink, State};
 
 use crate::kh::{KhState, KhAlgGen, KhTensor};
@@ -150,8 +150,8 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         }
     }
 
-    pub fn into_complex(self) -> ChainComplex<KhIState, R> {
-        ChainComplex::new(
+    pub fn into_complex(self) -> ChainComplex1<KhIState, R> {
+        ChainComplex1::new(
             GrMod::generate(self.h_range(), |i| self.summand(i)),
             1, 
             move |_, z| self.differentiate(z)

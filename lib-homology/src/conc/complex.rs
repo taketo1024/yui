@@ -13,18 +13,18 @@ use yui_matrix::MatTrait;
 use yui_matrix::sparse::{SpMat, SpVec};
 
 use crate::algo::{ChainReducer, HomologyCalc};
-use crate::{ToSeqString, ToTableString, GenericChainComplexBase, GenericGrMod, GenericSummand, GrMod, AddInd, isize2, isize3};
+use crate::{ToSeqString, ToTableString, GenericChainComplex, GenericGrMod, GenericSummand, GrMod, AddInd, isize2, isize3};
 use super::Summand;
 
 #[cfg(feature = "multithread")]
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
-pub type ChainComplex <X, R> = ChainComplexBase<isize,  X, R>;
-pub type ChainComplex2<X, R> = ChainComplexBase<isize2, X, R>;
-pub type ChainComplex3<X, R> = ChainComplexBase<isize3, X, R>;
+pub type ChainComplex1<X, R> = ChainComplex<isize,  X, R>;
+pub type ChainComplex2<X, R> = ChainComplex<isize2, X, R>;
+pub type ChainComplex3<X, R> = ChainComplex<isize3, X, R>;
 
 #[derive(Clone)]
-pub struct ChainComplexBase<I, X, R>
+pub struct ChainComplex<I, X, R>
 where 
     I: AddInd,
     X: LcKey,
@@ -36,7 +36,7 @@ where
     d_matrices: Arc<HashMap<I, SpMat<R>>>,
 }
 
-impl<I, X, R> ChainComplexBase<I, X, R>
+impl<I, X, R> ChainComplex<I, X, R>
 where
     I: AddInd,
     X: LcKey,
@@ -142,14 +142,14 @@ where
         ).join("")
     }
 
-    pub fn as_generic(&self) -> GenericChainComplexBase<I, R> {
-        GenericChainComplexBase::from_d_matrices(
+    pub fn as_generic(&self) -> GenericChainComplex<I, R> {
+        GenericChainComplex::from_d_matrices(
             self.d_deg,
             self.support().map(|&i| (i, self.d_matrix(i)))
         )
     }
 
-    pub fn reduced(&self) -> ChainComplexBase<I, X, R> {
+    pub fn reduced(&self) -> ChainComplex<I, X, R> {
         let r = ChainReducer::reduce(self, true);
 
         let summands = GrMod::generate(
@@ -175,7 +175,7 @@ where
             .with_d_matrices(matrices)
     }
 
-    pub fn reduced_generic(&self) -> GenericChainComplexBase<I, R> { 
+    pub fn reduced_generic(&self) -> GenericChainComplex<I, R> { 
         let r = ChainReducer::reduce(self, false);
         r.into_generic_complex()
     }
@@ -206,7 +206,7 @@ where
     }
 }
 
-impl<I, X, R> ChainComplexBase<I, X, R>
+impl<I, X, R> ChainComplex<I, X, R>
 where
     I: AddInd,
     X: LcKey,
@@ -257,7 +257,7 @@ where
     }
 }
 
-impl<X, R> ChainComplex<X, R>
+impl<X, R> ChainComplex1<X, R>
 where
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>,
@@ -277,7 +277,7 @@ where
     }
 }
 
-impl<I, X, R> Index<I> for ChainComplexBase<I, X, R>
+impl<I, X, R> Index<I> for ChainComplex<I, X, R>
 where I: AddInd, X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = Summand<X, R>;
     fn index(&self, i: I) -> &Self::Output {
@@ -301,7 +301,7 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<X, R> ToSeqString<isize> for ChainComplex<X, R>
+impl<X, R> ToSeqString<isize> for ChainComplex1<X, R>
 where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     delegate! {
         to self.summands { 

@@ -6,7 +6,7 @@ use yui_core::{MathType, Ring, RingOps};
 use yui_matrix::MatTrait;
 use yui_matrix::sparse::{SpMat, Trans};
 
-use crate::{isize2, isize3, AddInd, ChainComplexBase, GrMod, Summand};
+use crate::{isize2, isize3, AddInd, ChainComplex, GrMod, Summand};
 
 // --- GenericKey -------------------------------------------------------------
 
@@ -51,17 +51,17 @@ where I: AddInd, R: Ring, for<'x> &'x R: RingOps<R> {
 
 // --- GenericChainComplex / GenericGrMod aliases -----------------------------
 
-pub type GenericChainComplexBase<I, R> = ChainComplexBase<I, GenericKey<I>, R>;
-pub type GenericChainComplex<R>  = GenericChainComplexBase<isize,  R>;
-pub type GenericChainComplex2<R> = GenericChainComplexBase<isize2, R>;
-pub type GenericChainComplex3<R> = GenericChainComplexBase<isize3, R>;
+pub type GenericChainComplex<I, R> = ChainComplex<I, GenericKey<I>, R>;
+pub type GenericChainComplex1<R> = GenericChainComplex<isize,  R>;
+pub type GenericChainComplex2<R> = GenericChainComplex<isize2, R>;
+pub type GenericChainComplex3<R> = GenericChainComplex<isize3, R>;
 
 pub type GenericGrMod<I, R> = GrMod<I, GenericKey<I>, R>;
 pub type GenericGrMod1<R> = GenericGrMod<isize,  R>;
 pub type GenericGrMod2<R> = GenericGrMod<isize2, R>;
 pub type GenericGrMod3<R> = GenericGrMod<isize3, R>;
 
-impl<I, R> GenericChainComplexBase<I, R>
+impl<I, R> GenericChainComplex<I, R>
 where I: AddInd, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn from_d_matrices(d_deg: I, matrices: impl IntoIterator<Item = (I, SpMat<R>)>) -> Self {
         let d_matrices: HashMap<I, SpMat<R>> = matrices.into_iter().collect();

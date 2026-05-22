@@ -80,7 +80,6 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 mod tests {
     use yui_core::poly::Poly;
     use yui_core::num::FF2;
-    use yui_link::Link;
 
     use super::*;
 
@@ -88,11 +87,8 @@ mod tests {
     type P = Poly<'H', R>;
 
     #[test]
-    fn test_unknot_pos_twist() { 
-        let l = InvLink::new(
-            Link::test_data("unknot_r_twist"),
-            [(1, 1), (2, 2)],
-        ).with_base_pt(1);
+    fn test_unknot_pos_twist() {
+        let l = InvLink::test_data("unknot_r_twist");
         let c = P::variable();
 
         let ssi = ssi_invariants(&l, &c, false);
@@ -101,11 +97,8 @@ mod tests {
     }
 
     #[test]
-    fn test_unknot_neg_twist() { 
-        let l = InvLink::new(
-            Link::test_data("unknot_l_twist"),
-            [(1, 1), (2, 2)],
-        ).with_base_pt(1);
+    fn test_unknot_neg_twist() {
+        let l = InvLink::test_data("unknot_l_twist");
         let c = P::variable();
 
         let ssi = ssi_invariants(&l, &c, false);
@@ -114,11 +107,8 @@ mod tests {
     }
 
     #[test]
-    fn test_unknot_neg_twist2() { 
-        let l = InvLink::new(
-            Link::test_data("unknot_l_twist2"),
-            [(1, 1), (2, 4), (3, 3), (4, 2)],
-        ).with_base_pt(1);
+    fn test_unknot_neg_twist2() {
+        let l = InvLink::test_data("unknot_l_twist2");
         let c = P::variable();
 
         let ssi = ssi_invariants(&l, &c, false);

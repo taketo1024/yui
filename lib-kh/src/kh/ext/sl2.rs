@@ -52,9 +52,8 @@ impl<'a, R> KhSl2Map<'a, R> where
     }
 
     fn make_path(l: &Link) -> Vec<(usize, Sign)> {
-        let base_pt = l.base_pt().unwrap();
         let mut res = vec![];
-        let color = l.colored_seifert_circles(base_pt);
+        let color = l.colored_seifert_circles();
 
         l.traverse_from((0, 0), |i, j| {
             if l.node(i).is_resolved() { return }

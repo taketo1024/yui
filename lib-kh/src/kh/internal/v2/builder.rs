@@ -412,8 +412,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(l.base_pt().is_some());
 
         let reduced = base_pt.is_some();
-        let start_p = base_pt.or(l.base_pt()).unwrap();
-        let circles = l.colored_seifert_circles(start_p);
+        let circles = l.colored_seifert_circles();
 
         let crossings = l.nodes().filter(|x| x.is_crossing()).cloned();
         let state = l.seifert_state();

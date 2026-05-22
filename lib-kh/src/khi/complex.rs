@@ -60,8 +60,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         let inner = cube.into_complex();
 
         let canon_cycles = if l.base_pt().is_some() && l.is_knot() {
-            let p = l.base_pt().unwrap();
-            let zs = KhComplex::make_canon_cycles(l.inner(), p, &R::zero(), h, reduced, deg_shift);
+            let zs = KhComplex::make_canon_cycles(l.inner(), &R::zero(), h, reduced, deg_shift);
             Iterator::chain(
                 zs.iter().map(|z| z.clone().map_keys(KhIState::B)),
                 zs.iter().map(|z| z.clone().map_keys(KhIState::Q))

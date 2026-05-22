@@ -20,14 +20,16 @@ impl Color {
 }
 
 pub trait LinkExt { 
-    fn colored_seifert_circles(&self, base: Edge) -> Vec<(Path, Color)>;
+    fn colored_seifert_circles(&self) -> Vec<(Path, Color)>;
 }
 
 impl LinkExt for Link { 
-    fn colored_seifert_circles(&self, base: Edge) -> Vec<(Path, Color)> {
+    fn colored_seifert_circles(&self) -> Vec<(Path, Color)> {
         assert!(self.is_knot(), "Only knots are supported.");
+        assert!(self.base_pt().is_some());
 
         let circles = self.seifert_circles();
+        let base_pt = self.base_pt().unwrap();
         let n = circles.len();
     
         let mut colors = vec![Color::A; n];
@@ -35,7 +37,7 @@ impl LinkExt for Link {
         let mut remain: HashSet<_> = (0..n).collect();
     
         let i = circles.iter().find_position(|c| 
-            c.edges().contains(&base)
+            c.edges().contains(&base_pt)
         ).unwrap().0;
     
         queue.push(i);

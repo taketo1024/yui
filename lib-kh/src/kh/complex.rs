@@ -52,8 +52,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let complex = cube.clone().into_complex();
 
         let canon_cycles = if t.is_zero() && l.is_knot() {
-            let p = l.base_pt().unwrap();
-            Self::make_canon_cycles(l, p, &R::zero(), h, reduced, deg_shift)
+            Self::make_canon_cycles(l, &R::zero(), h, reduced, deg_shift)
         } else { 
             vec![]
         };

@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::iter::zip;
 use itertools::Itertools;
-use yui_link::{Edge, Link, Path};
+use yui_link::{Link, Path};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Color { A, B }

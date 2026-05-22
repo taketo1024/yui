@@ -17,6 +17,7 @@ pub type XCode = [Edge; 4];
 pub struct Link {
     nodes: Vec<Node>,
     loops: Vec<Edge>,
+    base_pt: Option<Edge>,
 }
 
 impl Link {
@@ -40,7 +41,7 @@ impl Link {
             assert!(loop_set.insert(e), "duplicate loop edge: {e}");
         }
 
-        Self { nodes, loops }
+        Self { nodes, loops, base_pt: None }
     }
 
     pub fn from_nodes(nodes: impl IntoIterator<Item = Node>) -> Self {
@@ -108,6 +109,18 @@ impl Link {
         Ok(Link::from_pd_code(data))
     }
 
+    pub fn with_base_pt(mut self, e: Edge) -> Self {
+        let exists = self.nodes.iter().any(|x| x.edges().contains(&e))
+            || self.loops.contains(&e);
+        assert!(exists, "base_pt {e} is not an edge of this link");
+        self.base_pt = Some(e);
+        self
+    }
+
+    pub fn base_pt(&self) -> Option<Edge> {
+        self.base_pt
+    }
+
     pub fn empty() -> Link {
         Self::new([], [])
     }
@@ -148,10 +161,12 @@ impl Link {
     }
 
     pub fn mirror(&self) -> Self {
-        Self::new(
+        let mut l = Self::new(
             self.nodes().map(|x| x.mirror()),
             self.loops.iter().copied(),
-        )
+        );
+        l.base_pt = self.base_pt;
+        l
     }
 
     pub fn n_nodes(&self) -> usize { 
@@ -662,6 +677,37 @@ mod tests {
 
         assert_eq!(l.node(1),  &Node::new(XL, NodeOri::Up, [3,6,4,1]));
         assert_eq!(l2.node(1), &Node::new(XR, NodeOri::Up, [3,6,4,1]));
+    }
+
+    #[test]
+    fn base_pt_default_none() {
+        let l = Link::test_data("3_1");
+        assert_eq!(l.base_pt(), None);
+    }
+
+    #[test]
+    fn with_base_pt_sets_base_pt() {
+        let l = Link::test_data("3_1").with_base_pt(1);
+        assert_eq!(l.base_pt(), Some(1));
+    }
+
+    #[test]
+    fn with_base_pt_on_loop() {
+        let l = Link::unlink(3).with_base_pt(2);
+        assert_eq!(l.base_pt(), Some(2));
+    }
+
+    #[test]
+    fn mirror_preserves_base_pt() {
+        let l = Link::test_data("3_1").with_base_pt(3).mirror();
+        assert_eq!(l.base_pt(), Some(3));
+    }
+
+    #[test]
+    #[should_panic]
+    fn with_base_pt_invalid_panics() {
+        // Edge 99 is not in the trefoil's edge set.
+        let _ = Link::test_data("3_1").with_base_pt(99);
     }
 
     #[test]

@@ -92,8 +92,7 @@ mod tests {
         let l = InvLink::new(
             Link::test_data("unknot_r_twist"),
             |e| e,
-            Some(1)
-        );
+        ).with_base_pt(1);
         let c = P::variable();
 
         let ssi = ssi_invariants(&l, &c, false);
@@ -106,8 +105,7 @@ mod tests {
         let l = InvLink::new(
             Link::test_data("unknot_l_twist"),
             |e| e,
-            Some(1)
-        );
+        ).with_base_pt(1);
         let c = P::variable();
 
         let ssi = ssi_invariants(&l, &c, false);
@@ -120,8 +118,7 @@ mod tests {
         let l = InvLink::new(
             Link::test_data("unknot_l_twist2"),
             |e| (5 - e) % 4 + 1,
-            Some(1)
-        );
+        ).with_base_pt(1);
         let c = P::variable();
 
         let ssi = ssi_invariants(&l, &c, false);

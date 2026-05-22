@@ -57,7 +57,7 @@ The `for<'x>` HRTB on the reference impl is required throughout; the [`auto_impl
 - `IntType` impls for `i32 / i64 / i128 / BigInt`.
 - `Ratio<T>` — fractions over a Euclidean ring; `Ratio<i64>` and `Ratio<BigInt>` are the rationals.
 - `FF<p>` — finite field 𝔽ₚ for prime `p`. For 𝔽₂, prefer the specialized `FF2` (uses XOR/AND directly on a `bool`).
-- `QuadInt<I, D>` — quadratic integers in ℤ[ω] for `ω = (1+√D)/2` or `√D`; aliases `GaussInt`, `EisenInt`.
+- `QuadInt<I, D>` — quadratic integers in ℤ\[ω\] for `ω = (1+√D)/2` or `√D`; aliases `GaussInt`, `EisenInt`.
 
 `conc/poly/`:
 - `Poly<X, R>` — univariate polynomial. 

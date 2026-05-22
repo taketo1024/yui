@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use delegate::delegate;
 use itertools::Itertools;
 use num_integer::Integer;
-use crate::{Node, Edge, Link, Path, State, XCode};
+use crate::{Node, Edge, Link, Path, State, PDCodeX};
 
 // Involutive link
 #[derive(Debug, Clone)]
@@ -44,7 +44,7 @@ impl InvLink {
             let j = find.unwrap().0;
             let y = inner.node(j);
 
-            assert_eq!(x.ntype(), y.ntype()); 
+            assert_eq!(x.node_type(), y.node_type()); 
 
             x_map.insert(x.clone(), y.clone());
             if x != y {
@@ -58,7 +58,7 @@ impl InvLink {
     }
 
     pub fn from_symmetric_pd_code<I1>(pd_code: I1) -> Self
-    where I1: IntoIterator<Item = XCode> { 
+    where I1: IntoIterator<Item = PDCodeX> { 
         let code = pd_code.into_iter().collect_vec();
         let l = Link::from_pd_code(code);
 
@@ -132,7 +132,7 @@ impl InvLink {
 impl InvLink {
     pub fn load(name: &str) -> Result<InvLink, Box<dyn std::error::Error>> {
         let json = yui_core::util::data_dir::load_json("inv_link", name)?;
-        let data: Vec<XCode> = serde_json::from_str(&json)?;
+        let data: Vec<PDCodeX> = serde_json::from_str(&json)?;
         Ok(InvLink::from_symmetric_pd_code(data))
     }
 }

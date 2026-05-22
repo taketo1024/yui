@@ -11,7 +11,7 @@ use super::{Node, Path};
 
 pub type Edge = usize;
 pub type State = yui_core::bitseq::BitSeq;
-pub type XCode = [Edge; 4];
+pub type PDCodeX = [Edge; 4];
 
 #[derive(Debug, Clone)]
 pub struct Link {
@@ -63,7 +63,7 @@ impl Link {
     // see: http://katlas.math.toronto.edu/wiki/Planar_Diagrams
 
     pub fn from_pd_code<I>(pd_code: I) -> Self
-    where I: IntoIterator<Item = XCode> { 
+    where I: IntoIterator<Item = PDCodeX> { 
         use crate::NodeOri::{Up, Right, None};
         
         let nodes = pd_code.into_iter().map(Node::from_pd_code).collect_vec();
@@ -108,7 +108,7 @@ impl Link {
 
     pub fn load(name: &str) -> Result<Link, Box<dyn std::error::Error>> {
         let json = yui_core::util::data_dir::load_json("links", name)?;
-        let data: Vec<XCode> = serde_json::from_str(&json)?;
+        let data: Vec<PDCodeX> = serde_json::from_str(&json)?;
         Ok(Link::from_pd_code(data))
     }
 
@@ -353,7 +353,7 @@ impl Link {
         // Edges = one per original crossing (now resolved into a V/H smoothing).
         // Free loops have no nodes, so they remain isolated vertices.
         for (i, x) in l0.nodes().enumerate() {
-            let (e1, e2) = if x.ntype() == NodeType::V {
+            let (e1, e2) = if x.node_type() == NodeType::V {
                 (x.edge(0), x.edge(1))
             } else {
                 (x.edge(0), x.edge(2))
@@ -434,7 +434,7 @@ mod tests {
     fn link_from_pd_code() { 
         let l = Link::test_data("unknot_l_twist");
         assert_eq!(l.nodes.len(), 1);
-        assert_eq!(l.node(0).ntype(), XL);
+        assert_eq!(l.node(0).node_type(), XL);
     }
 
     #[test]
@@ -516,10 +516,10 @@ mod tests {
     #[test]
     fn link_mirror() { 
         let l = Link::test_data("unknot_l_twist");
-        assert_eq!(l.node(0).ntype(), XL);
+        assert_eq!(l.node(0).node_type(), XL);
 
         let l = l.mirror();
-        assert_eq!(l.node(0).ntype(), XR);
+        assert_eq!(l.node(0).node_type(), XR);
     }
 
     #[test]

@@ -128,7 +128,7 @@ mod tests {
 
     #[test]
     fn test_3_1() { 
-        let l = InvLink::load("3_1").unwrap();
+        let l = InvLink::test_data("3_1");
         let c = P::variable();
 
         let ssi = ssi_invariants(&l, &c, false);
@@ -138,7 +138,7 @@ mod tests {
 
     #[test]
     fn test_3_1_m() { 
-        let l = InvLink::load("3_1").unwrap().mirror();
+        let l = InvLink::test_data("3_1").mirror();
         let c = P::variable();
 
         let ssi = ssi_invariants(&l, &c, false);
@@ -148,7 +148,7 @@ mod tests {
 
     #[test]
     fn test_3_1_red() { 
-        let l = InvLink::load("3_1").unwrap();
+        let l = InvLink::test_data("3_1");
         let c = P::variable();
 
         let ssi = ssi_invariants(&l, &c, true);

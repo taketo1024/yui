@@ -669,7 +669,7 @@ mod tests {
 
     #[test]
     fn test_kh_3_1() { 
-        let l = InvLink::load("3_1").unwrap();
+        let l = InvLink::test_data("3_1");
         let (h, t) = (FF2::zero(), FF2::zero());
 
         let c = SymTngBuilder::build_kh_complex(&l, &h, &t, false);
@@ -685,7 +685,7 @@ mod tests {
 
     #[test]
     fn test_khi_3_1() { 
-        let l = InvLink::load("3_1").unwrap();
+        let l = InvLink::test_data("3_1");
         let (h, t) = (FF2::zero(), FF2::zero());
 
         let c = SymTngBuilder::build_khi_complex(&l, &h, &t, false);
@@ -702,7 +702,7 @@ mod tests {
 
     #[test]
     fn no_preprocess() { 
-        let l = InvLink::load("3_1").unwrap();
+        let l = InvLink::test_data("3_1");
         let (h, t) = (FF2::zero(), FF2::zero());
 
         let mut b = SymTngBuilder::new(&l, &h, &t, false);
@@ -755,7 +755,7 @@ mod tests {
 
     #[test]
     fn no_auto_deloop() { 
-        let l = InvLink::load("3_1").unwrap();
+        let l = InvLink::test_data("3_1");
         let (h, t) = (FF2::zero(), FF2::zero());
 
         let mut b = SymTngBuilder::new(&l, &h, &t, false);
@@ -784,7 +784,7 @@ mod tests {
 
     #[test]
     fn no_auto_elim() { 
-        let l = InvLink::load("3_1").unwrap();
+        let l = InvLink::test_data("3_1");
         let (h, t) = (FF2::zero(), FF2::zero());
 
         let mut b = SymTngBuilder::new(&l, &h, &t, false);
@@ -809,7 +809,7 @@ mod tests {
 
     #[test]
     fn h_range() { 
-        let l = InvLink::load("6_3").unwrap();
+        let l = InvLink::test_data("6_3");
         let (h, t) = (FF2::zero(), FF2::zero());
         let h_range = -2..=2;
 

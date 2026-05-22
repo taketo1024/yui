@@ -144,19 +144,19 @@ mod tests {
 
     #[test]
     fn load_3_1() { 
-        let l = InvLink::load("3_1").unwrap();
+        let l = InvLink::test_data("3_1");
         assert_eq!(l.n_crossings(), 3);
     }
 
     #[test]
     fn load_4_1() { 
-        let l = InvLink::load("4_1").unwrap();
+        let l = InvLink::test_data("4_1");
         assert_eq!(l.n_crossings(), 4);
     }
     
     #[test]
     fn inv_edge() { 
-        let l = InvLink::load("3_1").unwrap();
+        let l = InvLink::test_data("3_1");
 
         assert_eq!(l.inv_edge(1), 1);
         assert_eq!(l.inv_edge(2), 6);
@@ -168,7 +168,7 @@ mod tests {
     
     #[test]
     fn inv_node() { 
-        let l = InvLink::load("3_1").unwrap();
+        let l = InvLink::test_data("3_1");
         let nodes = l.inner.nodes().collect_vec();
 
         assert_eq!(l.inv_node(&nodes[0]), nodes[1]);
@@ -178,7 +178,7 @@ mod tests {
 
     #[test]
     fn from_sinv() { 
-        let l = InvLink::load("3_1").unwrap();
+        let l = InvLink::test_data("3_1");
 
         assert_eq!(l.inv_edge(1), 1);
         assert_eq!(l.inv_edge(2), 6);

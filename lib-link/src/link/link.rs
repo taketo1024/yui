@@ -14,7 +14,6 @@ pub type XCode = [Edge; 4];
 #[derive(Debug, Clone)]
 pub struct Link {
     nodes: Vec<Node>,
-    edges: HashSet<Edge>,
     loops: Vec<Edge>,
 }
 
@@ -32,15 +31,14 @@ impl Link {
             "Invalid data: each edge in the diagram must appear exactly twice."
         );
 
-        let edges: HashSet<_> = edge_counts.into_keys().collect();
-
+        let node_edges: HashSet<Edge> = edge_counts.into_keys().collect();
         let mut loop_set: HashSet<Edge> = HashSet::new();
         for &e in &loops {
-            assert!(!edges.contains(&e), "loop edge {e} is already used in a node");
+            assert!(!node_edges.contains(&e), "loop edge {e} is already used in a node");
             assert!(loop_set.insert(e), "duplicate loop edge: {e}");
         }
 
-        Self { nodes, edges, loops }
+        Self { nodes, loops }
     }
 
     pub fn from_nodes(nodes: impl IntoIterator<Item = Node>) -> Self {
@@ -66,7 +64,7 @@ impl Link {
         let mut l = Self::from_nodes(nodes); // unoriented
         
         let mut ori = vec![None; l.n_nodes()];
-        let mut remain = l.edges.clone();
+        let mut remain: HashSet<Edge> = l.nodes.iter().flat_map(|x| x.edges().iter().copied()).collect();
 
         while !remain.is_empty() {
             // Take minimal edge-id. 
@@ -181,11 +179,17 @@ impl Link {
     }
 
     pub fn n_edges(&self) -> usize {
-        self.edges.len() + self.loops.len()
+        self.nodes.len() * 2 + self.loops.len()
     }
 
-    pub fn edges(&self) -> impl Iterator<Item = &Edge> {
-        self.edges.iter().chain(self.loops.iter())
+    pub fn edges(&self) -> Vec<Edge> {
+        let mut edges: Vec<Edge> = self.nodes.iter()
+            .flat_map(|x| x.edges().iter().copied())
+            .chain(self.loops.iter().copied())
+            .collect();
+        edges.sort();
+        edges.dedup();
+        edges
     }
 
     pub fn loops(&self) -> &[Edge] {
@@ -196,8 +200,11 @@ impl Link {
         self.loops.len()
     }
 
-    pub fn min_edge(&self) -> Option<Edge> { 
-        self.nodes.first().map(|x| x.min_edge())
+    pub fn min_edge(&self) -> Option<Edge> {
+        self.nodes.iter()
+            .flat_map(|x| x.edges().iter().copied())
+            .chain(self.loops.iter().copied())
+            .min()
     }
 
     pub fn n_comps(&self) -> usize {
@@ -230,7 +237,7 @@ impl Link {
     fn traverse_comps<F>(&self, mut f: F) where 
     F: FnMut(usize, usize, usize) { 
         let mut c = 0; // component counter
-        let mut remain = self.edges.clone();
+        let mut remain: HashSet<Edge> = self.nodes.iter().flat_map(|x| x.edges().iter().copied()).collect();
 
         while !remain.is_empty() {
             // Take minimal edge-id. 

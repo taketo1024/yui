@@ -17,7 +17,7 @@ pub struct InvLink {
 impl InvLink { 
     pub fn new<F>(inner: Link, e_map: F, base_pt: Option<Edge>) -> InvLink
     where F: Fn(Edge) -> Edge { 
-        let e_map = inner.edges().map(|&e| (e, e_map(e))).collect::<HashMap<_, _>>();
+        let e_map = inner.edges().into_iter().map(|e| (e, e_map(e))).collect::<HashMap<_, _>>();
         let mut x_map = HashMap::new();
 
         // TODO? check resolution
@@ -58,8 +58,8 @@ impl InvLink {
         let n = l.n_edges();
 
         assert!(n.is_even(), "number of edges must be even.");
-        assert_eq!(l.edges().min(), Some(&1), "edge must start from index 1.");
-        assert_eq!(l.edges().max(), Some(&n), "edges must have sequential indexing.");
+        assert_eq!(l.edges().first(), Some(&1), "edge must start from index 1.");
+        assert_eq!(l.edges().last(), Some(&n), "edges must have sequential indexing.");
 
         Self::new(l, |e| (n + 1 - e) % n + 1, Some(1))
     }
@@ -83,7 +83,7 @@ impl InvLink {
             pub fn n_crossings(&self) -> usize;
             pub fn n_signed_crossings(&self) -> (usize, usize);
             pub fn n_edges(&self) -> usize;
-            pub fn edges(&self) -> impl Iterator<Item = &Edge>;
+            pub fn edges(&self) -> Vec<Edge>;
             pub fn min_edge(&self) -> Option<Edge>;
             pub fn n_comps(&self) -> usize;
             pub fn comps(&self) -> Vec<Path>;

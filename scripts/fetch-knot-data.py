@@ -4,7 +4,7 @@ Download KnotInfo's database dump and convert it into per-knot JSON files
 for yui's runtime data dir.
 
 Usage:
-    python3 scripts/fetch-knotdata.py [--out DIR] [--in FILE] [--force] [--keep-xls]
+    python3 scripts/fetch-knot-data.py [--out DIR] [--in FILE] [--force] [--keep-xls]
 
     --out DIR      output directory (default: $YUI_DATA_DIR, else the platform
                    user-data dir for yui).
@@ -13,11 +13,14 @@ Usage:
     --keep-xls     keep the downloaded .xls file (printed at the end).
 
 Output layout:
-    <out>/links/<name>.json   PD code  : JSON array of [a,b,c,d] crossing quads
-    <out>/braid/<name>.json   braid    : JSON array of signed generator indices
+    <out>/links/<name>.json     PD code  : JSON array of [a,b,c,d] crossing quads
+    <out>/braid/<name>.json     braid    : JSON array of signed generator indices
+    <out>/inv_link/<name>.json  involutive-link PD codes bundled in lib-link/resources/
 
 The PD / braid columns are looked up by header name (row 0 of the sheet),
-so column reordering upstream does not break the script.
+so column reordering upstream does not break the script. The inv_link/
+directory is always copied from the repo's `lib-link/resources/inv_link/`,
+regardless of whether the .xls download happens.
 
 Requires: Python 3.8+ and xlrd<2.0  (`pip install 'xlrd<2.0'`).
 """
@@ -25,6 +28,7 @@ Requires: Python 3.8+ and xlrd<2.0  (`pip install 'xlrd<2.0'`).
 import argparse
 import json
 import os
+import shutil
 import sys
 import tempfile
 import urllib.request
@@ -41,7 +45,7 @@ except ImportError:
         "use a venv. From the workspace root:\n"
         "    python3 -m venv .venv\n"
         "    .venv/bin/pip install 'xlrd<2.0'\n"
-        "    .venv/bin/python scripts/fetch-knotinfo-data.py"
+        "    .venv/bin/python scripts/fetch-knot-data.py"
     )
 
 
@@ -91,15 +95,36 @@ def parse_array(s: str, kind: str, name: str):
         return None
 
 
+def copy_bundled_resources(out_dir: Path, force: bool) -> None:
+    """Copy bundled JSON resources (inv_link/*.json) from the repo into out_dir."""
+    repo_root = Path(__file__).resolve().parent.parent
+    src_root = repo_root / "lib-link" / "resources"
+    if not src_root.exists():
+        print(f"  skip resource copy: {src_root} not found", file=sys.stderr)
+        return
+
+    copied = skipped = 0
+    for src in src_root.rglob("*.json"):
+        rel = src.relative_to(src_root)
+        dst = out_dir / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if dst.exists() and not force:
+            skipped += 1
+            continue
+        shutil.copyfile(src, dst)
+        copied += 1
+    print(f"==> bundled resources: copied {copied}, skipped {skipped} (under {src_root})")
+
+
 def download_xls(dest: Path) -> None:
-    print(f"==> downloading {URL}")
+    print(f"==> fetch knot data from KnotInfo ({URL})")
     with urllib.request.urlopen(URL) as r, open(dest, "wb") as f:
         while chunk := r.read(1 << 16):
             f.write(chunk)
 
 
 def convert(xls_path: Path, out_dir: Path, force: bool) -> None:
-    print(f"==> reading {xls_path}")
+    print(f"==> extract and save data to {out_dir}")
     wb = xlrd.open_workbook(xls_path)
     sh = wb.sheet_by_index(0)
     header = sh.row_values(0)
@@ -161,6 +186,7 @@ def main():
         if not args.src.exists():
             sys.exit(f"error: input file not found: {args.src}")
         convert(args.src, out_dir, args.force)
+        copy_bundled_resources(out_dir, args.force)
         return
 
     # Download to a temp file
@@ -169,6 +195,7 @@ def main():
     try:
         download_xls(xls)
         convert(xls, out_dir, args.force)
+        copy_bundled_resources(out_dir, args.force)
     finally:
         if args.keep_xls:
             print(f"    kept .xls at: {xls}")

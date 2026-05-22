@@ -14,12 +14,25 @@ pub struct InvLink {
 }
 
 impl InvLink {
-    pub fn new<F>(inner: Link, e_map: F) -> InvLink
-    where F: Fn(Edge) -> Edge {
-        let e_map = inner.edges().into_iter().map(|e| (e, e_map(e))).collect::<HashMap<_, _>>();
+    pub fn new<I>(inner: Link, e_map: I) -> InvLink
+    where I: IntoIterator<Item = (Edge, Edge)> {
+        let e_map: HashMap<Edge, Edge> = e_map.into_iter().collect();
+
+        // Validate: domain = link edges, image ⊆ link edges, e_map is involutive.
+        let link_edges = inner.edges();
+        assert_eq!(
+            e_map.len(), link_edges.len(),
+            "e_map must have one entry per link edge (got {}, expected {})",
+            e_map.len(), link_edges.len()
+        );
+        for &e in &link_edges {
+            let f = *e_map.get(&e).unwrap_or_else(|| panic!("e_map missing edge {e}"));
+            let g = *e_map.get(&f).unwrap_or_else(|| panic!("e_map({e}) = {f} is not a link edge"));
+            assert_eq!(g, e, "e_map is not an involution: {e} ↦ {f} ↦ {g}");
+        }
+
         let mut x_map = HashMap::new();
 
-        // TODO? check resolution
         for x in inner.nodes() {
             let edges = x.edges().map(|e| e_map.get(&e).unwrap());
             let find = inner.nodes().find_position(|y|
@@ -31,8 +44,9 @@ impl InvLink {
             let j = find.unwrap().0;
             let y = inner.node(j);
 
-            x_map.insert(x.clone(), y.clone());
+            assert_eq!(x.ntype(), y.ntype()); 
 
+            x_map.insert(x.clone(), y.clone());
             if x != y {
                 x_map.insert(y.clone(), x.clone());
             }
@@ -56,7 +70,10 @@ impl InvLink {
         assert_eq!(l.edges().first(), Some(&1), "edge must start from index 1.");
         assert_eq!(l.edges().last(), Some(&n), "edges must have sequential indexing.");
 
-        Self::new(l, |e| (n + 1 - e) % n + 1).with_base_pt(1)
+        let e_map = l.edges().into_iter()
+            .map(|e| (e, (n + 1 - e) % n + 1));
+        
+        Self::new(l, e_map).with_base_pt(1)
     }
 
     pub fn inner(&self) -> &Link { 

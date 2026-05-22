@@ -136,6 +136,10 @@ impl Link {
         self.n_comps() == 1
     }
 
+    pub fn is_oriented(&self) -> bool { 
+        self.nodes().all(|n| n.is_oriented())
+    }
+
     pub fn writhe(&self) -> i32 { 
         let (p, n) = self.n_signed_crossings();
         (p as i32) - (n as i32)
@@ -184,8 +188,12 @@ impl Link {
         (pos, neg)
     }
 
-    pub fn is_oriented(&self) -> bool { 
-        self.nodes().all(|n| n.is_oriented())
+    pub fn loops(&self) -> &[Edge] {
+        &self.loops
+    }
+
+    pub fn n_loops(&self) -> usize {
+        self.loops.len()
     }
 
     pub fn n_edges(&self) -> usize {
@@ -200,14 +208,6 @@ impl Link {
         edges.sort();
         edges.dedup();
         edges
-    }
-
-    pub fn loops(&self) -> &[Edge] {
-        &self.loops
-    }
-
-    pub fn n_loops(&self) -> usize {
-        self.loops.len()
     }
 
     pub fn min_edge(&self) -> Option<Edge> {

@@ -41,7 +41,10 @@ impl Link {
             assert!(loop_set.insert(e), "duplicate loop edge: {e}");
         }
 
-        Self { nodes, loops, base_pt: None }
+        // Default base_pt to the minimal edge (if any).
+        let base_pt = node_edges.iter().chain(loops.iter()).copied().min();
+
+        Self { nodes, loops, base_pt }
     }
 
     pub fn from_nodes(nodes: impl IntoIterator<Item = Node>) -> Self {
@@ -680,9 +683,13 @@ mod tests {
     }
 
     #[test]
-    fn base_pt_default_none() {
+    fn base_pt_default_min_edge() {
+        // Defaults to the minimal edge of the link.
         let l = Link::test_data("3_1");
-        assert_eq!(l.base_pt(), None);
+        assert_eq!(l.base_pt(), Some(1));
+
+        // Empty link has no edge, so base_pt is None.
+        assert_eq!(Link::empty().base_pt(), None);
     }
 
     #[test]

@@ -72,8 +72,8 @@ impl InvLink {
 
         let e_map = l.edges().into_iter()
             .map(|e| (e, (n + 1 - e) % n + 1));
-        
-        Self::new(l, e_map).with_base_pt(1)
+
+        Self::new(l, e_map)
     }
 
     pub fn inner(&self) -> &Link { 

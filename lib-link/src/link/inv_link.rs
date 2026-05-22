@@ -106,16 +106,16 @@ impl InvLink {
     }
 
     pub fn with_base_pt(mut self, e: Edge) -> Self {
-        assert_eq!(self.inv_e(e), e, "base_pt {e} must be on-axis (fixed by involution)");
+        assert_eq!(self.inv_edge(e), e, "base_pt {e} must be on-axis (fixed by involution)");
         self.inner = self.inner.with_base_pt(e);
         self
     }
 
-    pub fn inv_e(&self, e: Edge) -> Edge { 
+    pub fn inv_edge(&self, e: Edge) -> Edge { 
         self.e_map.get(&e).cloned().unwrap()
     }
 
-    pub fn inv_x(&self, x: &Node) -> &Node { 
+    pub fn inv_node(&self, x: &Node) -> &Node { 
         self.x_map.get(x).unwrap()
     }
 
@@ -224,36 +224,36 @@ mod tests {
     }
     
     #[test]
-    fn inv_e() { 
+    fn inv_edge() { 
         let l = InvLink::load("3_1").unwrap();
 
-        assert_eq!(l.inv_e(1), 1);
-        assert_eq!(l.inv_e(2), 6);
-        assert_eq!(l.inv_e(3), 5);
-        assert_eq!(l.inv_e(4), 4);
-        assert_eq!(l.inv_e(5), 3);
-        assert_eq!(l.inv_e(6), 2);
+        assert_eq!(l.inv_edge(1), 1);
+        assert_eq!(l.inv_edge(2), 6);
+        assert_eq!(l.inv_edge(3), 5);
+        assert_eq!(l.inv_edge(4), 4);
+        assert_eq!(l.inv_edge(5), 3);
+        assert_eq!(l.inv_edge(6), 2);
     }
     
     #[test]
-    fn inv_x() { 
+    fn inv_node() { 
         let l = InvLink::load("3_1").unwrap();
         let nodes = l.inner.nodes().collect_vec();
 
-        assert_eq!(l.inv_x(&nodes[0]), nodes[1]);
-        assert_eq!(l.inv_x(&nodes[1]), nodes[0]);
-        assert_eq!(l.inv_x(&nodes[2]), nodes[2]);
+        assert_eq!(l.inv_node(&nodes[0]), nodes[1]);
+        assert_eq!(l.inv_node(&nodes[1]), nodes[0]);
+        assert_eq!(l.inv_node(&nodes[2]), nodes[2]);
     }
 
     #[test]
     fn from_sinv() { 
         let l = InvLink::load("3_1").unwrap();
 
-        assert_eq!(l.inv_e(1), 1);
-        assert_eq!(l.inv_e(2), 6);
-        assert_eq!(l.inv_e(3), 5);
-        assert_eq!(l.inv_e(4), 4);
-        assert_eq!(l.inv_e(5), 3);
-        assert_eq!(l.inv_e(6), 2);
+        assert_eq!(l.inv_edge(1), 1);
+        assert_eq!(l.inv_edge(2), 6);
+        assert_eq!(l.inv_edge(3), 5);
+        assert_eq!(l.inv_edge(4), 4);
+        assert_eq!(l.inv_edge(5), 3);
+        assert_eq!(l.inv_edge(6), 2);
     }
 }

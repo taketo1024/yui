@@ -54,9 +54,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let base_pt = if reduced { l.base_pt() } else { None };
         let inner = TngComplexBuilder::new(l.inner(), h, t, base_pt);
         let x_map = l.nodes().map(|x| 
-            (x.clone(), l.inv_x(x).clone())
+            (x.clone(), l.inv_node(x).clone())
         ).collect();
-        let e_map = l.edges().into_iter().map(|e| (e, l.inv_e(e))).collect();
+        let e_map = l.edges().into_iter().map(|e| (e, l.inv_edge(e))).collect();
 
         Self::new_impl(inner, x_map, e_map)
     }
@@ -97,7 +97,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.inner.remove_crossings(off_axis.iter());
         self.inner.connect(c);
 
-        let off_axis = off_axis.iter().map(|x| self.inv_x(x).clone()).collect_vec();
+        let off_axis = off_axis.iter().map(|x| self.inv_node(x).clone()).collect_vec();
         self.inner.remove_crossings(off_axis.iter());
         self.inner.connect(tc);
         
@@ -109,7 +109,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn off_axis_crossings(&self, take_half: bool) -> Vec<&Node> { 
         let off_axis = self.crossings().filter(|&x|
-            self.inv_x(x) != x
+            self.inv_node(x) != x
         ).collect_vec();
 
         if !take_half { 
@@ -118,7 +118,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let is_adj = |x: &Node, y: &Node| {
             x.edges().iter().filter(|&&e| 
-                self.inv_e(e) != e // no axis-crossing edge
+                self.inv_edge(e) != e // no axis-crossing edge
             ).any(|e| 
                 y.edges().contains(e)
             )
@@ -137,7 +137,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         u.into_disjoint().into_iter().fold(vec![], |mut res, next| {
             if let Some(x) = next.first() {
-                let tx = self.inv_x(x);
+                let tx = self.inv_node(x);
                 if !res.contains(&tx) {
                     res.extend(next);
                 }
@@ -159,7 +159,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let keys = b.complex().keys().cloned().collect_vec();
         let elements = b.take_elements();
         let c = b.into_tng_complex();
-        let tc = c.convert_edges(|e| self.inv_e(e));
+        let tc = c.convert_edges(|e| self.inv_edge(e));
 
         // build keys
         let keys = cartesian!(keys.iter(), keys.iter()).collect_vec();
@@ -175,7 +175,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 let kk = k + k;
                 let cc = c.map(|mut c, r| {
                     let r = &r * &r;
-                    let tc = c.convert_edges(|e| self.inv_e(e));
+                    let tc = c.convert_edges(|e| self.inv_edge(e));
                     c.connect(tc);
                     (c, r)
                 });
@@ -191,7 +191,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         info!("({}) process {} crossings", self.stat(), self.crossings().count());
         
         while let Some(x) = self.inner.choose_next() { 
-            let tx = self.inv_x(&x);
+            let tx = self.inv_node(&x);
             if &x == tx { 
                 self.append_on_axis(&x);
             } else { 
@@ -220,7 +220,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn append_off_axis(&mut self, x: &Node, tx: &Node) { 
-        assert_eq!(self.inv_x(x), tx);
+        assert_eq!(self.inv_node(x), tx);
 
         info!("({}) append off-axis: {x}, {tx}", self.stat());
 
@@ -330,7 +330,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         //  ⚪︎1 | ⚪︎X  <-->  ⚪︎X | ⚪︎1
         //          ⚪︎X | ⚪︎X
 
-        let tc = c.convert_edges(|e| self.inv_e(e));
+        let tc = c.convert_edges(|e| self.inv_edge(e));
 
         let ks = self.inner.deloop(k, r);
 
@@ -365,7 +365,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         //  ⚪︎X | ..  <-->  .. | ⚪︎X
 
         let tk = *self.inv_key(k);
-        let tc = c.convert_edges(|e| self.inv_e(e));
+        let tc = c.convert_edges(|e| self.inv_edge(e));
         let tr = self.complex().vertex(&tk).tng().index_of(&tc).unwrap();
 
         let mut ks = self.inner.deloop(k, r);
@@ -581,11 +581,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         c
     }
 
-    fn inv_x(&self, x: &Node) -> &Node { 
+    fn inv_node(&self, x: &Node) -> &Node { 
         &self.x_map[x]
     }
 
-    fn inv_e(&self, e: Edge) -> Edge { 
+    fn inv_edge(&self, e: Edge) -> Edge { 
         self.e_map[&e]
     }
 
@@ -612,7 +612,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn is_sym_comp(&self, c: &TngComp) -> bool { 
-        &c.convert_edges(|e| self.inv_e(e)) == c
+        &c.convert_edges(|e| self.inv_edge(e)) == c
     }
 
     #[allow(unused)]
@@ -649,7 +649,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 let f = self.complex().edge(k, l);
                 let tf = self.complex().edge(tk, tl);
 
-                assert_eq!(&f.convert_edges(|e| self.inv_e(e)), tf);
+                assert_eq!(&f.convert_edges(|e| self.inv_edge(e)), tf);
             }
         }
     }

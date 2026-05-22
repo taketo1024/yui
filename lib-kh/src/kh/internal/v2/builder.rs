@@ -46,7 +46,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> TngComplexBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn build_kh_complex(l: &Link, h: &R, t: &R, reduced: bool) -> KhComplex<R> { 
-        let base_pt = if reduced { l.min_edge() } else { None };
+        assert!(!reduced || l.base_pt().is_some());
+
+        let base_pt = if reduced { l.base_pt() } else { None };
         let mut b = Self::new(l, h, t, base_pt);
         b.process_all();
         b.finalize();
@@ -407,9 +409,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub(crate) fn make_canon_cycles(l: &Link, base_pt: Option<Edge>) -> Vec<BuildElem<R>> { 
         assert!(l.is_knot());
+        assert!(l.base_pt().is_some());
 
         let reduced = base_pt.is_some();
-        let start_p = base_pt.or(l.min_edge()).unwrap();
+        let start_p = base_pt.or(l.base_pt()).unwrap();
         let circles = l.colored_seifert_circles(start_p);
 
         let crossings = l.nodes().filter(|x| x.is_crossing()).cloned();

@@ -230,13 +230,6 @@ impl Link {
         edges
     }
 
-    pub fn min_edge(&self) -> Option<Edge> {
-        self.nodes.iter()
-            .flat_map(|x| x.edges().iter().copied())
-            .chain(self.loops.iter().copied())
-            .min()
-    }
-
     pub fn n_comps(&self) -> usize {
         let mut count = 0;
         self.traverse_comps(|c, _, _|

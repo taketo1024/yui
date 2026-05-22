@@ -41,6 +41,7 @@ impl<'a, R> KhSl2Map<'a, R> where
 {
     pub fn new(complex: &'a KhComplex<R>, l: &Link) -> Self {
         assert!(l.is_knot());
+        assert!(l.base_pt().is_some());
 
         let path = Self::make_path(l);
         Self { complex, path }
@@ -51,8 +52,9 @@ impl<'a, R> KhSl2Map<'a, R> where
     }
 
     fn make_path(l: &Link) -> Vec<(usize, Sign)> {
+        let base_pt = l.base_pt().unwrap();
         let mut res = vec![];
-        let color = l.colored_seifert_circles(l.min_edge().unwrap());
+        let color = l.colored_seifert_circles(base_pt);
 
         l.traverse_from((0, 0), |i, j| {
             if l.node(i).is_resolved() { return }

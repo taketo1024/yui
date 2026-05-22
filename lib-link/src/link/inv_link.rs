@@ -96,7 +96,6 @@ impl InvLink {
             pub fn n_signed_crossings(&self) -> (usize, usize);
             pub fn n_edges(&self) -> usize;
             pub fn edges(&self) -> Vec<Edge>;
-            pub fn min_edge(&self) -> Option<Edge>;
             pub fn n_comps(&self) -> usize;
             pub fn comps(&self) -> Vec<Path>;
             pub fn seifert_state(&self) -> State;

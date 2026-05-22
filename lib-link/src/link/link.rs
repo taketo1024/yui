@@ -5,6 +5,8 @@ use itertools::Itertools;
 use yui_core::{CloneAnd, Sign};
 use yui_core::bitseq::Bit;
 
+use petgraph::Graph;
+
 use super::{Node, Path};
 
 pub type Edge = usize;
@@ -312,8 +314,45 @@ impl Link {
         State::from_iter(seq)
     }
 
-    pub fn seifert_circles(&self) -> Vec<Path> { 
+    pub fn seifert_circles(&self) -> Vec<Path> {
         self.resolve_by(&self.seifert_state()).comps()
+    }
+
+    pub fn seifert_graph(&self) -> Graph<Path, usize> {
+        assert!(self.is_oriented());
+
+        use crate::NodeType;
+        type G = Graph<Path, usize>;
+
+        let s0 = self.seifert_state();
+        let l0 = self.resolve_by(&s0);
+        let mut graph = Graph::new();
+
+        // Vertices = Seifert circles (and free loops contribute their own circles).
+        for c in l0.comps() {
+            graph.add_node(c);
+        }
+
+        let find_node = |graph: &G, e| {
+            graph.node_indices().find(|&i|
+                graph[i].contains(e)
+            )
+        };
+
+        // Edges = one per original crossing (now resolved into a V/H smoothing).
+        // Free loops have no nodes, so they remain isolated vertices.
+        for (i, x) in l0.nodes().enumerate() {
+            let (e1, e2) = if x.ntype() == NodeType::V {
+                (x.edge(0), x.edge(1))
+            } else {
+                (x.edge(0), x.edge(2))
+            };
+            let n1 = find_node(&graph, e1).unwrap();
+            let n2 = find_node(&graph, e2).unwrap();
+            graph.add_edge(n1, n2, i);
+        }
+
+        graph
     }
 
     pub fn traverse_from<F>(&self, start: (usize, usize), mut f:F) where
@@ -623,5 +662,22 @@ mod tests {
 
         assert_eq!(l.node(1),  &Node::new(XL, NodeOri::Up, [3,6,4,1]));
         assert_eq!(l2.node(1), &Node::new(XR, NodeOri::Up, [3,6,4,1]));
+    }
+
+    #[test]
+    fn seifert_graph_trefoil() {
+        let l = Link::test_data("3_1");
+        let g = l.seifert_graph();
+        assert_eq!(g.node_count(), 2);
+        assert_eq!(g.edge_count(), 3);
+    }
+
+    #[test]
+    fn seifert_graph_unlink() {
+        // Free loops contribute isolated vertices and no edges.
+        let l = Link::unlink(3);
+        let g = l.seifert_graph();
+        assert_eq!(g.node_count(), 3);
+        assert_eq!(g.edge_count(), 0);
     }
 }

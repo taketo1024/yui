@@ -82,7 +82,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
             let bz = z.clone().map_keys(KhIState::B);
             let qz = z.clone().map_keys(KhIState::Q);
             [bz, qz]
-        }).sorted_by_key(|z| z.h_deg()).collect_vec();
+        }).sorted_by_key(|z| z.keys().map(|x| x.rel_h_deg()).min().unwrap_or(0)).collect_vec();
 
         // TODO use mapping cone
 
@@ -163,7 +163,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
         self.support().flat_map(|&i|
-            self[i].raw_generators().iter().map(|x| x.q_deg())
+            self[i].raw_generators().iter().map(|x| self.q_deg_of(x))
         ).range().unwrap_or(0..=-1)
     }
 

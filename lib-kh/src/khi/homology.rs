@@ -4,7 +4,6 @@ use delegate::delegate;
 use yui_core::{EucRing, EucRingOps, IteratorExt};
 use yui_homology::{ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_link::InvLink;
-use crate::kh::KhChainExt;
 use crate::khi::{KhIComplex, KhIState};
 use crate::misc::decomp_by_q_deg;
 
@@ -74,7 +73,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
         self.support().flat_map(|&i|
-            self[i].generators().map(|z| z.q_deg())
+            self[i].generators().map(|z| self.q_deg_of_chain(&z))
         ).range().unwrap_or(0..=-1)
     }
 

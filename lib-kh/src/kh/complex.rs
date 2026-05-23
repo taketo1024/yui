@@ -2,17 +2,18 @@ use std::ops::{RangeInclusive, Index};
 use std::sync::OnceLock;
 
 use delegate::delegate;
+use yui_core::lc::Lc;
 use yui_core::{IteratorExt, Ring, RingOps, EucRing, EucRingOps};
 use yui_link::Link;
 use yui_homology::{ChainComplex1, ToSeqString, ToTableString, GrMod2, Summand};
 
-use crate::kh::chain::KhChain;
 use crate::kh::internal::v1::cube::KhCube;
 use crate::kh::{KhGen, KhHomology};
 use crate::misc::decomp_by_q_deg;
 
 use super::KhAlg;
 
+pub type KhChain<R> = Lc<KhGen, R>;
 pub type KhComplexSummand<R> = Summand<KhGen, R>;
 
 // TODO: Make KhComplexTrait, and split impl into KhComplexV1 and V2. 

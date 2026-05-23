@@ -1,12 +1,12 @@
 mod alg;
-mod chain;
+mod kh_gen;
 mod complex;
 mod homology;
 mod ss;
 
 pub use alg::{KhAlg, KhAlgGen, KhTensor};
-pub use chain::{KhGen, KhChain};
-pub use complex::KhComplex;
+pub use kh_gen::KhGen;
+pub use complex::{KhComplex, KhChain};
 pub use homology::KhHomology;
 pub use ss::ss_invariant;
 

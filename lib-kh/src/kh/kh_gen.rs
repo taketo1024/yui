@@ -41,14 +41,14 @@ impl KhGen {
         d + r + s
     }
 
-    pub fn apply_at<F, R>(&self, i: usize, f: F) -> KhChain<R>
+    pub fn apply_at<F, R>(&self, i: usize, f: F) -> Lc<KhGen, R>
     where F: Fn(&KhAlgGen) -> Lc<KhAlgGen, R>, R: Ring, for<'x> &'x R: RingOps<R> {
         self.tensor.apply_at(i, f).map_keys(|t| {
             Self::new(self.state, t)
         })
     }
 
-    pub fn apply_each<F, R>(&self, f: F) -> KhChain<R>
+    pub fn apply_each<F, R>(&self, f: F) -> Lc<KhGen, R>
     where F: Fn(&KhAlgGen) -> Lc<KhAlgGen, R>, R: Ring, for<'x> &'x R: RingOps<R> {
         self.tensor.apply_each(f).map_keys(|t| {
             Self::new(self.state, t)
@@ -69,5 +69,3 @@ impl MathType for KhGen {
 }
 
 impl LcKey for KhGen {}
-
-pub type KhChain<R> = Lc<KhGen, R>;

@@ -38,8 +38,8 @@ impl TngKey {
         self.label.append(other.label);
     }
 
-    pub fn as_gen(&self, deg_shift: (isize, isize)) -> KhGen {
-        KhGen::new(self.state, self.label, deg_shift)
+    pub fn as_gen(&self) -> KhGen {
+        KhGen::new(self.state, self.label)
     }
 }
 
@@ -71,7 +71,7 @@ impl From<&KhGen> for TngKey {
 
 impl Display for TngKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.as_gen((0, 0)).fmt(f)
+        self.as_gen().fmt(f)
     }
 }
 
@@ -591,21 +591,21 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn into_raw_complex(self) -> ChainComplex1<KhGen, R> {
         assert!(self.is_completely_delooped());
 
-        let summands = GrMod1::generate(self.h_range(), |i| { 
+        let summands = GrMod1::generate(self.h_range(), |i| {
             let gens = self.keys_of(i).map(|k|
-                k.as_gen(self.deg_shift)
+                k.as_gen()
             ).sorted_by_key(|x|
                 -x.rel_q_deg()
             );
             Summand::from_raw_generators(gens)
         });
 
-        let d = move |x: &KhGen| { 
+        let d = move |x: &KhGen| {
             let (h, t) = self.ht();
             let k = TngKey::from(x);
             let v = self.vertex(&k);
             v.out_edges.iter().map(|(l, f)|
-                (l.as_gen(x.deg_shift()), f.eval(h, t))
+                (l.as_gen(), f.eval(h, t))
             ).collect()
         };
 

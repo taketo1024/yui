@@ -447,7 +447,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn eval_elements(&self) -> Vec<KhChain<R>> {
         let (h, t) = self.complex.ht();
         self.elements.iter().map(|z|
-            z.eval(h, t, self.complex.deg_shift())
+            z.eval(h, t)
         ).collect()
     }
 
@@ -572,12 +572,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.retr_cob.values().all(|c| c.iter().all(|(c, _)| c.tgt().is_empty()))
     }
 
-    pub fn eval(&self, h: &R, t: &R, deg_shift: (isize, isize)) -> KhChain<R> {
+    pub fn eval(&self, h: &R, t: &R) -> KhChain<R> {
         assert!(self.is_evalable());
 
         let init = LcCob::from(self.init_cob.clone());
         let eval = self.retr_cob.iter().map(|(k, retr)| {
-            let x = k.as_gen(deg_shift);
+            let x = k.as_gen();
             let f = retr * &init;
             let r = f.eval(h, t);
             (x, r)

@@ -24,7 +24,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn cc_map0<'a>(c1: &'a KhComplex<R>, c2: &'a KhComplex<R>, i: usize) -> KhChainMap<'a, 'static, R> {
         let deg = c2.deg_shift().0 - c1.deg_shift().0 + 1;
-        let c2_deg_shift = c2.deg_shift();
 
         ChainMap::new(c1.inner(), c2.inner(), deg, move |_, z| {
             z.apply(|x: &KhGen| {
@@ -34,7 +33,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
                 let e = Sign::from_parity( count_1s(x.state(), i) );
                 let t = x.state().edit(|s| s.set_1(i));
-                let y = KhGen::new(t, *x.tensor(), c2_deg_shift);
+                let y = KhGen::new(t, *x.tensor());
 
                 KhChain::from(y) * R::from_sign(e)
             })
@@ -46,7 +45,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(!c1.is_reduced() || l.base_pt().is_some());
 
         let deg = c2.deg_shift().0 - c1.deg_shift().0 - 1;
-        let c2_deg_shift = c2.deg_shift();
 
         let alg = c1.str().clone();
         let (a0, a1) = l.node(i).resolve(Bit::Bit0).arcs();
@@ -75,7 +73,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 let t = apply_f1(&alg, x.tensor(), k0, k1) * R::from_sign(e);
 
                 t.map_keys(|y| {
-                    KhGen::new(s, y, c2_deg_shift)
+                    KhGen::new(s, y)
                 })
             })
         })

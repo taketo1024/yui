@@ -94,7 +94,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         let s = *x.state();
         let t = self.t_state(s);
         let l = self.t_label(s, *x.tensor());
-        KhGen::new(t, l, x.deg_shift())
+        KhGen::new(t, l)
     }
 
     // f = 1 + τ
@@ -276,8 +276,7 @@ mod tests {
         let x = KhIState::B(
             KhGen::new(
                 State::from([0,0,0]),
-                KhTensor::from([X, I]),
-                (0, 0)
+                KhTensor::from([X, I])
             )
         );
         let dx = c.d(&x);
@@ -286,24 +285,21 @@ mod tests {
             (KhIState::B(
                 KhGen::new(
                     State::from([1,0,0]),
-                    KhTensor::from([X]),
-                    (0, 0)
+                    KhTensor::from([X])
                 )
             ), R::one()),
 
             (KhIState::B(
                 KhGen::new(
                     State::from([0,1,0]),
-                    KhTensor::from([X]),
-                    (0, 0)
+                    KhTensor::from([X])
                 )
             ), R::one()),
             
             (KhIState::B(
                 KhGen::new(
                     State::from([0,0,1]),
-                    KhTensor::from([X]),
-                    (0, 0)
+                    KhTensor::from([X])
                 )
             ), R::one())
         ]));
@@ -320,8 +316,7 @@ mod tests {
         let x = KhIState::B(
             KhGen::new(
                 State::from([0,1,0]),
-                KhTensor::from([X]),
-                (0, 0)
+                KhTensor::from([X])
             )
         );
         let dx = c.d(&x);
@@ -330,24 +325,21 @@ mod tests {
             (KhIState::B(
                 KhGen::new(
                     State::from([1,1,0]),
-                    KhTensor::from([X,X]),
-                    (0, 0)
+                    KhTensor::from([X,X])
                 )
             ), R::one()),
 
             (KhIState::B(
                 KhGen::new(
                     State::from([0,1,1]),
-                    KhTensor::from([X,X]),
-                    (0, 0)
+                    KhTensor::from([X,X])
                 )
             ), R::one()),
             
             (KhIState::Q(
                 KhGen::new(
                     State::from([0,1,0]),
-                    KhTensor::from([X]),
-                    (0, 0)
+                    KhTensor::from([X])
                 )
             ), R::one()),
 
@@ -355,8 +347,7 @@ mod tests {
             (KhIState::Q(
                 KhGen::new(
                     State::from([0,0,1]),
-                    KhTensor::from([X]),
-                    (0, 0)
+                    KhTensor::from([X])
                 )
             ), R::one())
         ]));
@@ -374,8 +365,7 @@ mod tests {
         let x = KhIState::Q(
             KhGen::new(
                 State::from([0,1,0]),
-                KhTensor::from([X]),
-                (0, 0)
+                KhTensor::from([X])
             )
         );
         let dx = c.d(&x);
@@ -384,16 +374,14 @@ mod tests {
             (KhIState::Q(
                 KhGen::new(
                     State::from([1,1,0]),
-                    KhTensor::from([X,X]),
-                    (0, 0)
+                    KhTensor::from([X,X])
                 )
             ), R::one()),
 
             (KhIState::Q(
                 KhGen::new(
                     State::from([0,1,1]),
-                    KhTensor::from([X,X]),
-                    (0, 0)
+                    KhTensor::from([X,X])
                 )
             ), R::one()),
         ]));

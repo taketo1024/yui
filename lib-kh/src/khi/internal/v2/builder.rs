@@ -561,15 +561,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn into_khi_complex(mut self) -> KhIComplex<R> {
         assert!(self.complex().is_completely_delooped());
-        
-        let deg_shift = self.complex().deg_shift();
+
         let key_map = std::mem::take(&mut self.key_map);
 
-        let map = move |x: &KhGen| -> KhGen { 
+        let map = move |x: &KhGen| -> KhGen {
             let k = TngKey::from(x);
             let tk = key_map[&k];
-            
-            tk.as_gen(deg_shift)
+
+            tk.as_gen()
         };
 
         let c = self.into_kh_complex();

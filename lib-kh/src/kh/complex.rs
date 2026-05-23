@@ -20,9 +20,9 @@ pub type KhComplexSummand<R> = Summand<KhGen, R>;
 
 #[derive(Clone)]
 pub struct KhComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> { 
+where R: Ring, for<'x> &'x R: RingOps<R> {
     inner: ChainComplex1<KhGen, R>,
-    str: KhAlg<R>,
+    alg: KhAlg<R>,
     cube: KhCube<R>,
     deg_shift: (isize, isize),
     reduced: bool,
@@ -49,24 +49,24 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let deg_shift = Self::deg_shift_for(l, reduced);
         
         let cube = KhCube::new(l, h, t, base_pt, deg_shift);
-        let str = cube.str().clone();
+        let alg = cube.alg().clone();
         let complex = cube.clone().into_complex();
 
         let canon_cycles = if t.is_zero() && l.is_knot() {
             Self::make_canon_cycles(l, &R::zero(), h, reduced)
-        } else { 
+        } else {
             vec![]
         };
 
-        KhComplex::new_impl(complex, str, cube, deg_shift, reduced, canon_cycles)
+        KhComplex::new_impl(complex, alg, cube, deg_shift, reduced, canon_cycles)
     }
 
-    pub(crate) fn new_impl(inner: ChainComplex1<KhGen, R>, str: KhAlg<R>, cube: KhCube<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
-        KhComplex { inner, str, cube, deg_shift, reduced, canon_cycles, gen_grid: OnceLock::new() }
+    pub(crate) fn new_impl(inner: ChainComplex1<KhGen, R>, alg: KhAlg<R>, cube: KhCube<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
+        KhComplex { inner, alg, cube, deg_shift, reduced, canon_cycles, gen_grid: OnceLock::new() }
     }
 
-    pub fn str(&self) -> &KhAlg<R> { 
-        &self.str
+    pub fn alg(&self) -> &KhAlg<R> {
+        &self.alg
     }
 
     pub fn cube(&self) -> &KhCube<R> {

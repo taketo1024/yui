@@ -15,7 +15,7 @@ use super::{KhAlg, KhChain, KhComplex};
 pub struct KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     inner: GrMod1<KhGen, R>,
-    str: KhAlg<R>,
+    alg: KhAlg<R>,
     deg_shift: (isize, isize),
     reduced: bool,
     canon_cycles: Vec<KhChain<R>>,
@@ -34,8 +34,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         Self::from(&c)
     }
     
-    pub(crate) fn new_impl(inner: GrMod1<KhGen, R>, str: KhAlg<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
-        Self { inner, str, deg_shift, reduced, canon_cycles, gen_grid: OnceLock::new() }
+    pub(crate) fn new_impl(inner: GrMod1<KhGen, R>, alg: KhAlg<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
+        Self { inner, alg, deg_shift, reduced, canon_cycles, gen_grid: OnceLock::new() }
     }
 
     pub fn inner(&self) -> &GrMod1<KhGen, R> { 
@@ -49,8 +49,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         }
     }
 
-    pub fn str(&self) -> &KhAlg<R> { 
-        &self.str
+    pub fn alg(&self) -> &KhAlg<R> {
+        &self.alg
     }
 
     pub fn deg_shift(&self) -> (isize, isize) { 
@@ -101,10 +101,10 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     pub fn truncated(&self, range: RangeInclusive<isize>) -> Self {
         Self::new_impl(
-            self.inner.truncated(range), 
-            self.str.clone(), 
-            self.deg_shift, 
-            self.reduced, 
+            self.inner.truncated(range),
+            self.alg.clone(),
+            self.deg_shift,
+            self.reduced,
             self.canon_cycles.clone()
         )
     }
@@ -120,9 +120,9 @@ impl<R> From<&KhComplex<R>> for KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     fn from(c: &KhComplex<R>) -> Self {
         KhHomology::new_impl(
-            c.inner().reduced().homology(), 
-            c.str().clone(), 
-            c.deg_shift(), 
+            c.inner().reduced().homology(),
+            c.alg().clone(),
+            c.deg_shift(),
             c.is_reduced(),
             c.canon_cycles().clone()
         )

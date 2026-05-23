@@ -110,8 +110,8 @@ impl KhCubeEdge {
 
 #[derive(Clone)]
 pub struct KhCube<R>
-where R: Ring, for<'x> &'x R: RingOps<R> { 
-    str: KhAlg<R>,
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    alg: KhAlg<R>,
     dim: usize,
     vertices: HashMap<State, KhCubeVertex>,
     edges: HashMap<State, Vec<(State, KhCubeEdge)>>,
@@ -119,20 +119,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 impl<R> KhCube<R>
-where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn new(l: &Link, h: &R, t: &R, reduce_e: Option<Edge>, deg_shift: (isize, isize)) -> Self { 
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    pub fn new(l: &Link, h: &R, t: &R, reduce_e: Option<Edge>, deg_shift: (isize, isize)) -> Self {
         assert!(reduce_e.is_none() || t.is_zero());
 
         let n = l.n_crossings();
-        let str = KhAlg::new(h, t);
+        let alg = KhAlg::new(h, t);
 
-        let vertices: HashMap<_, _> = State::generate(n).map(|s| { 
+        let vertices: HashMap<_, _> = State::generate(n).map(|s| {
             let v = KhCubeVertex::new(l, s, reduce_e);
             (s, v)
         }).collect();
 
-        let edges: HashMap<_, _> = vertices.keys().map(|s| { 
-            let edges = Self::generate_targets(s).map(|t| { 
+        let edges: HashMap<_, _> = vertices.keys().map(|s| {
+            let edges = Self::generate_targets(s).map(|t| {
                 let v = &vertices[s];
                 let w = &vertices[&t];
                 (t, KhCubeEdge::edge_between(v, w))
@@ -140,7 +140,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             (*s, edges)
         }).collect();
 
-        KhCube { str, dim: n, vertices, edges, deg_shift }
+        KhCube { alg, dim: n, vertices, edges, deg_shift }
     }
 
     fn generate_targets(from: &State) -> impl Iterator<Item = State> + '_ { 
@@ -150,8 +150,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         })
     }
 
-    pub fn str(&self) -> &KhAlg<R> {
-        &self.str
+    pub fn alg(&self) -> &KhAlg<R> {
+        &self.alg
     }
 
     pub fn dim(&self) -> usize { 
@@ -232,13 +232,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn merge(&self, x: &KhGen, in_indices: (usize, usize), out_index: usize, target: State) -> KhChain<R> {
-        self.str.mul_tensor(x.tensor(), in_indices, out_index).map_keys(|y| {
+        self.alg.mul_tensor(x.tensor(), in_indices, out_index).map_keys(|y| {
             KhGen::new(target, y)
         })
     }
 
     fn split(&self, x: &KhGen, in_index: usize, out_indices: (usize, usize), target: State) -> KhChain<R> {
-        self.str.comul_tensor(x.tensor(), in_index, out_indices).map_keys(|y| {
+        self.alg.comul_tensor(x.tensor(), in_index, out_indices).map_keys(|y| {
             KhGen::new(target, y)
         })
     }

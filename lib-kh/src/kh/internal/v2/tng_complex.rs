@@ -618,14 +618,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(self.is_completely_delooped());
 
         let (h, t) = self.ht();
-        let str = KhAlg::new(h, t);
+        let alg = KhAlg::new(h, t);
         let deg_shift = self.deg_shift;
         let reduced = self.base_pt.is_some();
         let cube = KhCube::new(&Link::empty(), h, t, None, deg_shift); // dummy
 
         let inner = self.into_raw_complex();
 
-        KhComplex::new_impl(inner, str, cube, deg_shift, reduced, canon_cycles)
+        KhComplex::new_impl(inner, alg, cube, deg_shift, reduced, canon_cycles)
     }
 
     pub fn is_completely_delooped(&self) -> bool { 

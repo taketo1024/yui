@@ -46,11 +46,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let deg = c2.deg_shift().0 - c1.deg_shift().0 - 1;
 
-        let alg = c1.str().clone();
+        let alg = c1.alg().clone();
         let (a0, a1) = l.node(i).resolve(Bit::Bit0).arcs();
 
         // TODO We don't want to reproduce the cube.
-        let (h, t) = c1.str().ht();
+        let (h, t) = c1.alg().ht();
         let base_pt = if c1.is_reduced() { l.base_pt() } else { None };
         let cube = KhCube::new(l, h, t, base_pt, c1.deg_shift());
 

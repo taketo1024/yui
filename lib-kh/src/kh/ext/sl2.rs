@@ -122,8 +122,8 @@ impl<'a, R> KhSl2Map<'a, R> where
     where R: Field, for<'x> &'x R: FieldOps<R> {
         use yui_matrix::sparse::SpMat;
         
-        assert!(self.cube().str().h().is_zero());
-        assert!(self.cube().str().t().is_zero());
+        assert!(self.cube().alg().h().is_zero());
+        assert!(self.cube().alg().t().is_zero());
 
         let h_range = kh.h_range().mv(0, -self.h_deg());
 

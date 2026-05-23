@@ -9,7 +9,6 @@ use log::info;
 use yui_core::{EucRing, EucRingOps};
 use yui_link::InvLink;
 
-use crate::kh::KhChainExt;
 use crate::misc::div_vec;
 use crate::khi::KhIHomology;
 
@@ -52,10 +51,10 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     
     assert_eq!(zs.len(), 2 * r);
     assert!(zs.iter().all(|z| !z.is_zero()));
-    assert!(zs.iter().enumerate().all(|(i, z)| z.h_deg() == if i < r { 0 } else { 1 } ));
+    assert!(zs.iter().enumerate().all(|(i, z)| kh.h_deg_of_chain(z) == if i < r { 0 } else { 1 } ));
 
     let ds = zs.iter().enumerate().map(|(i, z)| {
-        let h = z.h_deg();
+        let h = kh.h_deg_of_chain(z);
         let v = kh[h].vectorize_euc(z);
         info!("a[{i}] in Kh[{h}]: ({})", v.clone().into_dense().iter().join(","));
         v

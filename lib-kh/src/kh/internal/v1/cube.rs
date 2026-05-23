@@ -253,10 +253,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let i0 = self.deg_shift.0;
         if self.h_range().contains(&i) { 
             let i = (i - i0) as usize;
-            self.states_of_weight(i).flat_map(|s| 
-                self.vertex(s).generators() 
-            ).sorted_by_key(|x| 
-                -x.q_deg()
+            self.states_of_weight(i).flat_map(|s|
+                self.vertex(s).generators()
+            ).sorted_by_key(|x|
+                -x.rel_q_deg()
             ).collect()
         } else {
             vec![]

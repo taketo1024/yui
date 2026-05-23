@@ -79,7 +79,7 @@ mod tests {
         assert_ne!(zs[0], zs[1]);
 
         for z in zs { 
-            assert!(z.keys().all(|x| x.h_deg() == 0));
+            assert!(z.keys().all(|x| c.h_deg_of(x) == 0));
             assert!(!z.is_zero());
             
             let dz = c.d(0, &z);
@@ -98,7 +98,7 @@ mod tests {
         assert_ne!(zs[0], zs[1]);
 
         for z in zs { 
-            assert!(z.keys().all(|x| x.h_deg() == 0));
+            assert!(z.keys().all(|x| c.h_deg_of(x) == 0));
             assert!(!z.is_zero());
 
             let dz = c.d(0, &z);
@@ -116,7 +116,7 @@ mod tests {
         assert_eq!(zs.len(), 1);
 
         for z in zs { 
-            assert!(z.keys().all(|x| x.h_deg() == 0));
+            assert!(z.keys().all(|x| c.h_deg_of(x) == 0));
             assert!(!z.is_zero());
             
             let dz = c.d(0, &z);
@@ -134,7 +134,7 @@ mod tests {
         assert_eq!(zs.len(), 1);
 
         for z in zs { 
-            assert!(z.keys().all(|x| x.h_deg() == 0));
+            assert!(z.keys().all(|x| c.h_deg_of(x) == 0));
             assert!(!z.is_zero());
 
             let dz = c.d(0, &z);

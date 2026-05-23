@@ -9,7 +9,7 @@ use yui_link::Link;
 use yui_core::{EucRing, EucRingOps};
 
 use crate::misc::div_vec;
-use crate::kh::{KhChainExt, KhHomology};
+use crate::kh::KhHomology;
 
 pub fn ss_invariant<R>(l: &Link, c: &R, reduced: bool) -> i32
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
@@ -44,7 +44,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     assert_eq!(zs.len(), r);
     assert!(zs.iter().all(|z| !z.is_zero()));
-    assert!(zs.iter().all(|z| z.h_deg() == 0));    
+    assert!(zs.iter().all(|z| kh.h_deg_of_chain(z) == 0));
 
     let ds = zs.iter().enumerate().map(|(i, z)| {
         let v = kh[0].vectorize_euc(z);

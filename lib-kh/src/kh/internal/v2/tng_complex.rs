@@ -595,7 +595,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let gens = self.keys_of(i).map(|k|
                 k.as_gen(self.deg_shift)
             ).sorted_by_key(|x|
-                -x.q_deg()
+                -x.rel_q_deg()
             );
             Summand::from_raw_generators(gens)
         });

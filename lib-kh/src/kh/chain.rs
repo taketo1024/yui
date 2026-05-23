@@ -48,14 +48,6 @@ impl KhGen {
         d + r + s
     }
 
-    pub fn h_deg(&self) -> isize {
-        self.deg_shift.0 + self.rel_h_deg()
-    }
-
-    pub fn q_deg(&self) -> isize {
-        self.deg_shift.1 + self.rel_q_deg()
-    }
-
     pub fn apply_at<F, R>(&self, i: usize, f: F) -> KhChain<R>
     where F: Fn(&KhAlgGen) -> Lc<KhAlgGen, R>, R: Ring, for<'x> &'x R: RingOps<R> {
         self.tensor.apply_at(i, f).map_keys(|t| {

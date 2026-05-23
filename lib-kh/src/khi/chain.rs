@@ -23,20 +23,6 @@ impl KhIState {
             KhIState::Q(x) => x.rel_q_deg()
         }
     }
-
-    pub fn h_deg(&self) -> isize {
-        match self {
-            KhIState::B(x) => x.h_deg(),
-            KhIState::Q(x) => x.h_deg() + 1,
-        }
-    }
-
-    pub fn q_deg(&self) -> isize {
-        match self {
-            KhIState::B(x) |
-            KhIState::Q(x) => x.q_deg()
-        }
-    }
 }
 
 impl Display for KhIState {

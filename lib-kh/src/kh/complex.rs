@@ -7,7 +7,6 @@ use yui_core::{IteratorExt, Ring, RingOps, EucRing, EucRingOps};
 use yui_link::Link;
 use yui_homology::{ChainComplex1, ToSeqString, ToTableString, GrMod2, Summand};
 
-use crate::kh::internal::v1::cube::KhCube;
 use crate::kh::{KhGen, KhHomology};
 use crate::misc::decomp_by_q_deg;
 
@@ -16,14 +15,11 @@ use super::KhAlg;
 pub type KhChain<R> = Lc<KhGen, R>;
 pub type KhComplexSummand<R> = Summand<KhGen, R>;
 
-// TODO: Make KhComplexTrait, and split impl into KhComplexV1 and V2. 
-
 #[derive(Clone)]
 pub struct KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     inner: ChainComplex1<KhGen, R>,
     alg: KhAlg<R>,
-    cube: KhCube<R>,
     deg_shift: (isize, isize),
     reduced: bool,
     canon_cycles: Vec<KhChain<R>>,
@@ -31,7 +27,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 impl<R> KhComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> { 
+where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
         use crate::kh::internal::v2::builder::TngComplexBuilder;
 
@@ -40,17 +36,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         TngComplexBuilder::build_kh_complex(l, h, t, reduced)
     }
 
-    pub fn new_no_simplify(l: &Link, h: &R, t: &R, reduced: bool) -> Self { 
+    pub fn new_no_simplify(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
         use crate::kh::internal::v1::cube::KhCube;
 
         assert!(!reduced || (!l.is_empty() && t.is_zero()));
 
         let base_pt = if reduced { l.base_pt() } else { None };
         let deg_shift = Self::deg_shift_for(l, reduced);
-        
+
+        let alg = KhAlg::new(h, t);
         let cube = KhCube::new(l, h, t, base_pt, deg_shift);
-        let alg = cube.alg().clone();
-        let complex = cube.clone().into_complex();
+        let complex = cube.into_complex();
 
         let canon_cycles = if t.is_zero() && l.is_knot() {
             Self::make_canon_cycles(l, &R::zero(), h, reduced)
@@ -58,19 +54,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             vec![]
         };
 
-        KhComplex::new_impl(complex, alg, cube, deg_shift, reduced, canon_cycles)
+        KhComplex::new_impl(complex, alg, deg_shift, reduced, canon_cycles)
     }
 
-    pub(crate) fn new_impl(inner: ChainComplex1<KhGen, R>, alg: KhAlg<R>, cube: KhCube<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
-        KhComplex { inner, alg, cube, deg_shift, reduced, canon_cycles, gen_grid: OnceLock::new() }
+    pub(crate) fn new_impl(inner: ChainComplex1<KhGen, R>, alg: KhAlg<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
+        KhComplex { inner, alg, deg_shift, reduced, canon_cycles, gen_grid: OnceLock::new() }
     }
 
     pub fn alg(&self) -> &KhAlg<R> {
         &self.alg
-    }
-
-    pub fn cube(&self) -> &KhCube<R> {
-        &self.cube
     }
 
     pub fn deg_shift(&self) -> (isize, isize) { 

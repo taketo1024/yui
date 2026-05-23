@@ -32,6 +32,7 @@ pub struct KhSl2Map<'a, R> where
     for<'x> &'x R: RingOps<R>
 {
     complex: &'a KhComplex<R>,
+    cube: KhCube<R>,
     path: Vec<(usize, Sign)>,
 }
 
@@ -43,12 +44,16 @@ impl<'a, R> KhSl2Map<'a, R> where
         assert!(l.is_knot());
         assert!(l.base_pt().is_some());
 
+        let (h, t) = complex.alg().ht();
+        let base_pt = if complex.is_reduced() { l.base_pt() } else { None };
+        let cube = KhCube::new(l, h, t, base_pt, complex.deg_shift());
+
         let path = Self::make_path(l);
-        Self { complex, path }
+        Self { complex, cube, path }
     }
 
-    fn cube(&self) -> &KhCube<R> {
-        self.complex.cube()
+    pub fn cube(&self) -> &KhCube<R> {
+        &self.cube
     }
 
     fn make_path(l: &Link) -> Vec<(usize, Sign)> {
@@ -302,7 +307,7 @@ mod tests {
         let map = c.sl2_map(&l);
 
         let v = State::empty();
-        let x = c.cube().vertex(&v).generators()[0];
+        let x = map.cube().vertex(&v).generators()[0];
         assert_eq!(map.apply_u(x), KhChain::zero());
     }
 
@@ -313,11 +318,11 @@ mod tests {
         let map = c.sl2_map(&l);
 
         let v = State::from([0,0]);
-        let x = c.cube().vertex(&v).generators()[0]; // 111
+        let x = map.cube().vertex(&v).generators()[0]; // 111
         assert_eq!(map.apply_u(x), KhChain::zero());
 
         let v = State::from([1,1]);
-        let x = c.cube().vertex(&v).generators()[0]; // 1
+        let x = map.cube().vertex(&v).generators()[0]; // 1
         assert_eq!(map.apply_u(x), KhChain::zero());
     }
 
@@ -328,7 +333,7 @@ mod tests {
         let map = c.sl2_map(&l);
 
         let v = State::from([1,1,1]);
-        let z = c.cube().vertex(&v).generators()[0]; // (11)₁₁₁
+        let z = map.cube().vertex(&v).generators()[0]; // (11)₁₁₁
         let w = map.apply_u(z);
 
         assert_ne!(w, KhChain::zero());

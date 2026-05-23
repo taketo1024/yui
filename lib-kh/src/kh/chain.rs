@@ -113,19 +113,3 @@ impl MathType for KhGen {
 impl LcKey for KhGen {}
 
 pub type KhChain<R> = Lc<KhGen, R>;
-
-pub trait KhChainExt {
-    fn h_deg(&self) -> isize;
-    fn q_deg(&self) -> isize;
-}
-
-impl<R> KhChainExt for KhChain<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn h_deg(&self) -> isize {
-        self.keys().map(|x| x.h_deg()).min().unwrap_or(0)
-    }
-
-    fn q_deg(&self) -> isize {
-        self.keys().map(|x| x.q_deg()).min().unwrap_or(0)
-    }
-}

@@ -3,7 +3,6 @@ use std::str::FromStr;
 use yui_core::TeX;
 use yui_core::{EucRing, EucRingOps};
 use yui_homology::{ToSeqString, ToTableString};
-use yui_kh::kh::KhChainExt;
 use yui_kh::khi::{KhIChain, KhIComplex, KhIHomology};
 use yui_link::InvLink;
 use crate::app::args::*;
@@ -148,10 +147,11 @@ where
         }
     }
 
-    fn show_alpha(&mut self, khi: &KhIHomology<R>, zs: &[KhIChain<R>]) { 
-        for (i, z) in zs.iter().enumerate() { 
-            let v = khi[z.h_deg()].vectorize_euc(z);
-            self.out(&format!("a[{i}] in KhI[{}]: {}", z.h_deg(), vec2str(&v)));
+    fn show_alpha(&mut self, khi: &KhIHomology<R>, zs: &[KhIChain<R>]) {
+        for (i, z) in zs.iter().enumerate() {
+            let h = khi.h_deg_of_chain(z);
+            let v = khi[h].vectorize_euc(z);
+            self.out(&format!("a[{i}] in KhI[{h}]: {}", vec2str(&v)));
             self.out(&format!("  {z}\n"));
         }
     }
@@ -165,8 +165,8 @@ where
         let w = l.writhe();
         let r = l.seifert_circles().len() as i32;
 
-        for (i, z) in zs.iter().enumerate() { 
-            let h = &khi[z.h_deg()];
+        for (i, z) in zs.iter().enumerate() {
+            let h = &khi[khi.h_deg_of_chain(z)];
             let v = h.vectorize(z).subvec(0..h.rank());
             let d = div_vec(&v, c);
 

@@ -8,23 +8,12 @@ use yui_core::{EucRing, EucRingOps, IteratorExt, Ring, RingOps};
 use yui_homology::{ChainComplex1, ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_link::InvLink;
 
-use crate::kh::{KhChain, KhChainExt, KhComplex, KhGen};
+use crate::kh::{KhChain, KhComplex, KhGen};
 use crate::khi::KhIHomology;
 use crate::khi::KhIState;
 use crate::misc::decomp_by_q_deg;
 
 pub type KhIChain<R> = Lc<KhIState, R>;
-
-impl<R> KhChainExt for KhIChain<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn h_deg(&self) -> isize {
-        self.keys().map(|x| x.h_deg()).min().unwrap_or(0)
-    }
-    
-    fn q_deg(&self) -> isize {
-        self.keys().map(|x| x.q_deg()).min().unwrap_or(0)
-    }
-}
 
 pub type KhIComplexSummand<R> = Summand<KhIState, R>;
 

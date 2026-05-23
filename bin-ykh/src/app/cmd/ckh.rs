@@ -6,7 +6,6 @@ use std::str::FromStr;
 use yui_core::TeX;
 use yui_core::{Ring, RingOps};
 use yui_homology::ToTableString;
-use yui_kh::kh::KhChainExt;
 use yui_kh::kh::KhComplex;
 
 pub fn dispatch(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
@@ -137,9 +136,9 @@ where
         self.out(&ckh.describe_d());
     }
 
-    fn show_alpha(&mut self, ckh: &KhComplex<R>) { 
-        for (i, z) in ckh.canon_cycles().iter().enumerate() { 
-            let h = z.h_deg();
+    fn show_alpha(&mut self, ckh: &KhComplex<R>) {
+        for (i, z) in ckh.canon_cycles().iter().enumerate() {
+            let h = ckh.h_deg_of_chain(z);
             let v = ckh[h].vectorize(z);
             self.out(&format!("a[{i}] in CKh[{h}]: {}", vec2str(&v)));
             self.out(&format!("  {z}\n"));

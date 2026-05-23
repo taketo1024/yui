@@ -613,7 +613,7 @@ mod tests {
 
     #[test]
     fn test_unknot() {
-        let l = Link::unknot();
+        let l = Link::unknot_old();
         let c = TngComplexBuilder::build_kh_complex(&l, &2, &0, false);
 
         assert_eq!(c[0].rank(), 2);

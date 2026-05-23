@@ -186,7 +186,7 @@ mod tests {
 
     #[test]
     fn kh_unknot() {
-        let l = Link::unknot();
+        let l = Link::unknot_old();
         let h = KhHomology::new(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), 0..=0);
@@ -275,7 +275,7 @@ mod tests {
 
     #[test]
     fn kh_unknot_bigr() {
-        let l = Link::unknot();
+        let l = Link::unknot_old();
         let h = KhHomology::new(&l, &0, &0, false);
 
         assert_eq!(h.h_range(), 0..=0);
@@ -290,7 +290,7 @@ mod tests {
 
     #[test]
     fn kh_unknot_bigr_red() {
-        let l = Link::unknot();
+        let l = Link::unknot_old();
         let h = KhHomology::new(&l, &0, &0, true);
 
         let h = h.gen_grid();

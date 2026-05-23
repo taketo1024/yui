@@ -132,18 +132,15 @@ impl Link {
         self.nodes.is_empty() && self.loops.is_empty()
     }
 
-    pub fn unknot() -> Link {
-        // The unknot is currently represented via a legacy H-node trick.
-        // We would prefer `Self::unlink(1)` (a Link with zero nodes and one
-        // free loop), but lib-kh's v2 TngComplexBuilder doesn't yet seed its
-        // initial vertex with the Link's loops, so the loop-based unknot
-        // produces an empty Khovanov complex. Switch back to the line below
-        // once lib-kh is updated:
-        //
-        //     Self::unlink(1)
+    #[deprecated]
+    pub fn unknot_old() -> Link {
         use crate::{NodeType, NodeOri};
         let n = Node::new(NodeType::H, NodeOri::None, [1, 2, 2, 1]);
         Self::from_nodes([n])
+    }
+
+    pub fn unknot() -> Link {
+        Self::unlink(1)
     }
 
     pub fn unlink(n: usize) -> Link {
@@ -310,9 +307,9 @@ impl Link {
     }
 
     pub fn seifert_state(&self) -> State {
-        // NOTE: the legacy `unknot()` is built from a single unoriented H-node,
-        // so we can't assert `is_oriented()` here. Re-enable once `unknot()`
-        // switches to the loop-based representation.
+        // NOTE: `Link::unknot_old()` (the deprecated H-node form) is unoriented,
+        // so we cannot assert `is_oriented()` here while it's still callable.
+        // Re-enable once `unknot_old` is removed.
         // assert!(self.is_oriented());
 
         let seq = self.crossings().map(|x|
@@ -548,10 +545,11 @@ mod tests {
     }
 
     #[test]
-    fn unknot_legacy() {
-        // NOTE: covers the current H-node-based `Link::unknot()`. Remove once
-        // `Link::unknot()` is switched to the loop-based representation.
-        let l = Link::unknot();
+    #[allow(deprecated)]
+    fn unknot_old() {
+        // Covers the deprecated H-node representation. Drop once `unknot_old`
+        // itself is removed.
+        let l = Link::unknot_old();
         assert_eq!(l.n_crossings(), 0);
         assert_eq!(l.writhe(), 0);
         assert_eq!(l.n_comps(), 1);
@@ -559,9 +557,7 @@ mod tests {
 
     #[test]
     fn unknot() {
-        // NOTE: testing via `Link::unlink(1)` until `Link::unknot()` is switched
-        // to the loop-based representation. Replace with `Link::unknot()` then.
-        let l = Link::unlink(1);
+        let l = Link::unknot();
 
         assert!(!l.is_empty());
         assert!(l.is_oriented());

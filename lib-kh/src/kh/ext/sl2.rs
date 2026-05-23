@@ -15,7 +15,7 @@ use yui_matrix::dense::snf::fnf;
 use crate::ext::{Color, LinkExt};
 use crate::kh::ext::cc::KhChainMap;
 use crate::kh::internal::v1::cube::KhCube;
-use crate::kh::{KhChain, KhChainExt, KhGen, KhComplex, KhHomology};
+use crate::kh::{KhChain, KhGen, KhComplex, KhHomology};
 
 impl<R> KhComplex<R>
 where
@@ -160,12 +160,12 @@ impl<'a, R> KhSl2Map<'a, R> where
             ).collect_vec();
 
             assert!(!indices.is_empty());
-            assert!(indices.iter().map(|&j| gens[j].q_deg()).all_equal());
+            assert!(indices.iter().map(|&j| kh.q_deg_of_chain(&gens[j])).all_equal());
 
             let j = *indices.first().unwrap();
             let z = &gens[j];
-            let t = z.h_deg();
-            let q = -z.q_deg(); // TODO: must modify q_deg later.
+            let t = kh.h_deg_of_chain(z);
+            let q = -kh.q_deg_of_chain(z); // TODO: must modify q_deg later.
             let d = 2 * t + q;
 
             Some(isize3(d, q, ord as isize))
@@ -264,8 +264,6 @@ mod tests {
     #[allow(unused)]
     use yui_homology::ToTableString;
 
-    use crate::kh::KhChainExt;
-
     use super::*;
 
     #[test]
@@ -335,10 +333,10 @@ mod tests {
 
         assert_ne!(w, KhChain::zero());
 
-        assert_eq!(z.h_deg(), 0);
-        assert_eq!(z.q_deg(), -1);
-        assert_eq!(w.h_deg(), -2);
-        assert_eq!(w.q_deg(), -5);
+        assert_eq!(c.h_deg_of(z), 0);
+        assert_eq!(c.q_deg_of(z), -1);
+        assert_eq!(c.h_deg_of_chain(&w), -2);
+        assert_eq!(c.q_deg_of_chain(&w), -5);
     }
 
     #[test]
@@ -374,11 +372,11 @@ mod tests {
         let w = e.apply(0, &z);
 
         assert_ne!(w, KhChain::zero());
-        
-        assert_eq!(z.h_deg(), 0);
-        assert_eq!(z.q_deg(), -1);
-        assert_eq!(w.h_deg(), -2);
-        assert_eq!(w.q_deg(), -5);
+
+        assert_eq!(c.h_deg_of_chain(&z), 0);
+        assert_eq!(c.q_deg_of_chain(&z), -1);
+        assert_eq!(c.h_deg_of_chain(&w), -2);
+        assert_eq!(c.q_deg_of_chain(&w), -5);
     }
 
     #[test]

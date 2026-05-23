@@ -50,8 +50,11 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     let zs = kh.canon_cycles();
     
     assert_eq!(zs.len(), 2 * r);
-    assert!(zs.iter().all(|z| !z.is_zero()));
-    assert!(zs.iter().enumerate().all(|(i, z)| kh.h_deg_of_chain(z) == if i < r { 0 } else { 1 } ));
+    for (i, z) in zs.iter().enumerate() {
+        let expected = if i < r { 0 } else { 1 };
+        assert!(!z.is_zero());
+        assert_eq!(z.homogeneous_value(|x| kh.h_deg_of(x)), Some(expected));
+    }
 
     let ds = zs.iter().enumerate().map(|(i, z)| {
         let h = kh.h_deg_of_chain(z);

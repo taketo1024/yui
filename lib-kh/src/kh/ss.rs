@@ -43,8 +43,10 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     let zs = kh.canon_cycles();
 
     assert_eq!(zs.len(), r);
-    assert!(zs.iter().all(|z| !z.is_zero()));
-    assert!(zs.iter().all(|z| kh.h_deg_of_chain(z) == 0));
+    for z in zs.iter() {
+        assert!(!z.is_zero());
+        assert_eq!(z.homogeneous_value(|x| kh.h_deg_of(x)), Some(0));
+    }
 
     let ds = zs.iter().enumerate().map(|(i, z)| {
         let v = kh[0].vectorize_euc(z);

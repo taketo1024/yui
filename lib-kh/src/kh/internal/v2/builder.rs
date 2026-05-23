@@ -725,7 +725,7 @@ mod tests {
         assert_ne!(zs[0], zs[1]);
         
         for z in zs {
-            assert!(z.keys().all(|x| c.h_deg_of(x) == 0));
+            assert!(z.homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
             assert!(c.d(0, &z).is_zero());
         }
     }

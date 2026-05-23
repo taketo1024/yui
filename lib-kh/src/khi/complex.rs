@@ -368,10 +368,10 @@ mod tests {
         let zs = c.canon_cycles.clone();
 
         assert_eq!(zs.len(), 4);
-        assert!(zs[0].keys().all(|x| c.h_deg_of(x) == 0));
-        assert!(zs[1].keys().all(|x| c.h_deg_of(x) == 0));
-        assert!(zs[2].keys().all(|x| c.h_deg_of(x) == 1));
-        assert!(zs[3].keys().all(|x| c.h_deg_of(x) == 1));
+        assert!(zs[0].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
+        assert!(zs[1].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
+        assert!(zs[2].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
+        assert!(zs[3].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
 
         for (i, z) in zs.iter().enumerate() { 
             let i = (i / 2) as isize;
@@ -390,8 +390,8 @@ mod tests {
         let zs = c.canon_cycles.clone();
 
         assert_eq!(zs.len(), 2);
-        assert!(zs[0].keys().all(|x| c.h_deg_of(x) == 0));
-        assert!(zs[1].keys().all(|x| c.h_deg_of(x) == 1));
+        assert!(zs[0].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
+        assert!(zs[1].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
 
         for (i, z) in zs.iter().enumerate() { 
             let i = i as isize;
@@ -411,10 +411,10 @@ mod tests {
         let zs = c.canon_cycles.clone();
 
         assert_eq!(zs.len(), 4);
-        assert!(zs[0].keys().all(|x| c.h_deg_of(x) == 0));
-        assert!(zs[1].keys().all(|x| c.h_deg_of(x) == 0));
-        assert!(zs[2].keys().all(|x| c.h_deg_of(x) == 1));
-        assert!(zs[3].keys().all(|x| c.h_deg_of(x) == 1));
+        assert!(zs[0].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
+        assert!(zs[1].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
+        assert!(zs[2].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
+        assert!(zs[3].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
 
         for (i, z) in zs.iter().enumerate() { 
             let i = (i / 2) as isize;
@@ -434,8 +434,8 @@ mod tests {
         let zs = c.canon_cycles.clone();
 
         assert_eq!(zs.len(), 2);
-        assert!(zs[0].keys().all(|x| c.h_deg_of(x) == 0));
-        assert!(zs[1].keys().all(|x| c.h_deg_of(x) == 1));
+        assert!(zs[0].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
+        assert!(zs[1].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
 
         for (i, z) in zs.iter().enumerate() { 
             let i = i as isize;
@@ -532,10 +532,10 @@ mod tests_v1 {
         let zs = c.canon_cycles.clone();
 
         assert_eq!(zs.len(), 4);
-        assert!(zs[0].keys().all(|x| c.h_deg_of(x) == 0));
-        assert!(zs[1].keys().all(|x| c.h_deg_of(x) == 0));
-        assert!(zs[2].keys().all(|x| c.h_deg_of(x) == 1));
-        assert!(zs[3].keys().all(|x| c.h_deg_of(x) == 1));
+        assert!(zs[0].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
+        assert!(zs[1].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
+        assert!(zs[2].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
+        assert!(zs[3].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
 
         for (i, z) in zs.iter().enumerate() { 
             let i = (i / 2) as isize;
@@ -554,8 +554,8 @@ mod tests_v1 {
         let zs = c.canon_cycles.clone();
 
         assert_eq!(zs.len(), 2);
-        assert!(zs[0].keys().all(|x| c.h_deg_of(x) == 0));
-        assert!(zs[1].keys().all(|x| c.h_deg_of(x) == 1));
+        assert!(zs[0].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
+        assert!(zs[1].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
 
         for (i, z) in zs.iter().enumerate() { 
             let i = i as isize;
@@ -575,10 +575,10 @@ mod tests_v1 {
         let zs = c.canon_cycles.clone();
 
         assert_eq!(zs.len(), 4);
-        assert!(zs[0].keys().all(|x| c.h_deg_of(x) == 0));
-        assert!(zs[1].keys().all(|x| c.h_deg_of(x) == 0));
-        assert!(zs[2].keys().all(|x| c.h_deg_of(x) == 1));
-        assert!(zs[3].keys().all(|x| c.h_deg_of(x) == 1));
+        assert!(zs[0].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
+        assert!(zs[1].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
+        assert!(zs[2].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
+        assert!(zs[3].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
 
         for (i, z) in zs.iter().enumerate() { 
             let i = (i / 2) as isize;
@@ -598,8 +598,8 @@ mod tests_v1 {
         let zs = c.canon_cycles.clone();
 
         assert_eq!(zs.len(), 2);
-        assert!(zs[0].keys().all(|x| c.h_deg_of(x) == 0));
-        assert!(zs[1].keys().all(|x| c.h_deg_of(x) == 1));
+        assert!(zs[0].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
+        assert!(zs[1].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
 
         for (i, z) in zs.iter().enumerate() { 
             let i = i as isize;

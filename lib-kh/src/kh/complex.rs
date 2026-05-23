@@ -9,7 +9,7 @@ use yui_homology::{ChainComplex1, ToSeqString, ToTableString, GrMod2, Summand};
 use crate::kh::chain::KhChain;
 use crate::kh::internal::v1::cube::KhCube;
 use crate::kh::{KhGen, KhHomology};
-use crate::misc::make_gen_grid;
+use crate::misc::decomp_by_q_deg;
 
 use super::KhAlg;
 
@@ -102,7 +102,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
         self.support().flat_map(|&i|
-            self[i].raw_generators().iter().map(|x| x.q_deg())
+            self[i].raw_generators().iter().map(|x| self.q_deg_of(x))
         ).range().unwrap_or(0..=-1)
     }
 
@@ -115,7 +115,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn gen_grid(&self) -> &GrMod2<KhGen, R> {
-        self.gen_grid.get_or_init(|| make_gen_grid(self.inner.summands()))
+        self.gen_grid.get_or_init(|| 
+            decomp_by_q_deg(self.inner.summands(), |z| self.q_deg_of_chain(z))
+        )
     }
 
     pub fn deg_shift_for(l: &Link, reduced: bool) -> (isize, isize) {

@@ -6,8 +6,8 @@ use yui_homology::{ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_core::{EucRing, EucRingOps, IteratorExt};
 use yui_link::Link;
 
-use crate::kh::{KhChainExt, KhGen};
-use crate::misc::make_gen_grid;
+use crate::kh::KhGen;
+use crate::misc::decomp_by_q_deg;
 
 use super::{KhAlg, KhChain, KhComplex};
 
@@ -85,13 +85,13 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
         self.support().flat_map(|&i|
-            self[i].generators().map(|z| z.q_deg())
+            self[i].generators().map(|z| self.q_deg_of_chain(&z))
         ).range().unwrap_or(0..=-1)
     }
 
     pub fn delta_range(&self) -> RangeInclusive<isize> {
         self.support().flat_map(|&i|
-            self[i].generators().map(|z| 2 * z.h_deg() - z.q_deg())
+            self[i].generators().map(|z| 2 * self.h_deg_of_chain(&z) - self.q_deg_of_chain(&z))
         ).range().unwrap_or(0..=-1)
     }
 
@@ -110,7 +110,9 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     fn gen_grid(&self) -> &GrMod2<KhGen, R> {
-        self.gen_grid.get_or_init(|| make_gen_grid(self.inner()))
+        self.gen_grid.get_or_init(|| 
+            decomp_by_q_deg(self.inner(), |z| self.q_deg_of_chain(z))
+        )
     }
 }
 

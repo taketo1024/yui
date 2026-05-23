@@ -11,7 +11,7 @@ use yui_link::InvLink;
 use crate::kh::{KhChain, KhChainExt, KhComplex, KhGen};
 use crate::khi::KhIHomology;
 use crate::khi::KhIState;
-use crate::misc::make_gen_grid;
+use crate::misc::decomp_by_q_deg;
 
 pub type KhIChain<R> = Lc<KhIState, R>;
 
@@ -180,7 +180,9 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     }
 
     fn gen_grid(&self) -> &GrMod2<KhIState, R> {
-        self.gen_grid.get_or_init(|| make_gen_grid(self.inner.summands()))
+        self.gen_grid.get_or_init(|| 
+            decomp_by_q_deg(self.inner.summands(), |z| self.q_deg_of_chain(z))
+        )
     }
 
     pub fn homology(&self) -> KhIHomology<R>

@@ -5,7 +5,6 @@ use yui_core::{EucRing, EucRingOps, IteratorExt, Ring, RingOps};
 use yui_homology::{isize2, GrMod1, GrMod2, Summand};
 use yui_matrix::sparse::SpVec;
 
-use crate::kh::KhChainExt;
 use cartesian::cartesian;
 
 pub fn div_vec<R>(v: &SpVec<R>, c: &R) -> Option<i32>
@@ -30,8 +29,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     Some(k)
 }
 
-pub(crate) fn collect_gen_info<X, R>(grid: &GrMod1<X, R>) -> HashMap<isize2, (usize, Vec<R>, Vec<usize>)>
-where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R>, Lc<X, R>: KhChainExt { 
+pub(crate) fn collect_gen_info<X, R, F>(grid: &GrMod1<X, R>, q_deg_of_chain: F) -> HashMap<isize2, (usize, Vec<R>, Vec<usize>)>
+where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R>, F: Fn(&Lc<X, R>) -> isize {
     let mut table = HashMap::new();
     let init_entry = (0, vec![], vec![]);
 
@@ -41,11 +40,11 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R>, Lc<X, R>: KhChainExt {
 
         for k in 0..r + t {
             let z = h.generator(k);
-            let q = z.q_deg();
+            let q = q_deg_of_chain(&z);
             let e = table.entry(isize2(i, q)).or_insert_with(|| init_entry.clone());
-            if k < r { 
+            if k < r {
                 e.0 += 1;
-            } else { 
+            } else {
                 e.1.push(h.tors()[k - r].clone());
             }
             e.2.push(k);
@@ -55,9 +54,9 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R>, Lc<X, R>: KhChainExt {
     table
 }
 
-pub(crate) fn make_gen_grid<X, R>(grid: &GrMod1<X, R>) -> GrMod2<X, R> 
-where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R>, Lc<X, R>: KhChainExt { 
-    let info = collect_gen_info(grid);
+pub(crate) fn decomp_by_q_deg<X, R, F>(grid: &GrMod1<X, R>, q_deg_of_chain: F) -> GrMod2<X, R>
+where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R>, F: Fn(&Lc<X, R>) -> isize {
+    let info = collect_gen_info(grid, q_deg_of_chain);
 
     let h_range = info.keys().map(|i| i.0).range().unwrap_or(0..=-1);
     let q_range = info.keys().map(|i| i.1).range().unwrap_or(0..=-1).step_by(2);

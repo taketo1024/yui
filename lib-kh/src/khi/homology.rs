@@ -6,7 +6,7 @@ use yui_homology::{ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_link::InvLink;
 use crate::kh::KhChainExt;
 use crate::khi::{KhIComplex, KhIState};
-use crate::misc::make_gen_grid;
+use crate::misc::decomp_by_q_deg;
 
 use super::KhIChain;
 
@@ -91,7 +91,9 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     fn gen_grid(&self) -> &GrMod2<KhIState, R> {
-        self.gen_grid.get_or_init(|| make_gen_grid(self.inner()))
+        self.gen_grid.get_or_init(|| 
+            decomp_by_q_deg(self.inner(), |z| self.q_deg_of_chain(z))
+        )
     }
 }
 

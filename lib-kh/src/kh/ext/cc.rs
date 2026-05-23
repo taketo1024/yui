@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use yui_core::bitseq::Bit;
 use yui_core::lc::Lc;
-use yui_core::{CloneAnd, Ring, RingOps, Sign};
+use yui_core::{Ring, RingOps, Sign};
 use yui_homology::ChainMap;
 use yui_link::{Link, Path, State};
 use num_traits::Zero;
@@ -28,15 +28,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         ChainMap::new(c1.inner(), c2.inner(), deg, move |_, z| {
             z.apply(|x: &KhGen| {
-                if !x.state[i].is_zero() {
+                if !x.state()[i].is_zero() {
                     return KhChain::zero();
                 }
 
-                let e = Sign::from_parity( count_1s(&x.state, i) );
-                let y = x.clone_and(|y| {
-                    y.state.set_1(i);
-                    y.deg_shift = c2_deg_shift;
-                });
+                let e = Sign::from_parity( count_1s(x.state(), i) );
+                let t = x.state().edit(|s| s.set_1(i));
+                let y = KhGen::new(t, *x.tensor(), c2_deg_shift);
 
                 KhChain::from(y) * R::from_sign(e)
             })
@@ -60,23 +58,22 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         ChainMap::new(c1.inner(), c2.inner(), deg, move |_, z| {
             z.apply(|x: &KhGen| {
-                if !x.state[i].is_one() { 
+                if !x.state()[i].is_one() {
                     return KhChain::zero();
                 }
 
-                let circles = cube.vertex(&x.state).circles();
+                let circles = cube.vertex(x.state()).circles();
                 let (k0, k1) = (circle_index(circles, &a0), circle_index(circles, &a1));
 
-                if k0 == k1 { 
+                if k0 == k1 {
                     return Lc::zero();
                 }
 
-                let mut s = x.state;
-                s.set_0(i);
+                let s = x.state().edit(|s| s.set_0(i));
 
-                let e = Sign::from_parity( count_1s(&x.state, i) );
-                let t = apply_f1(&alg, &x.tensor, k0, k1) * R::from_sign(e);
-                
+                let e = Sign::from_parity( count_1s(x.state(), i) );
+                let t = apply_f1(&alg, x.tensor(), k0, k1) * R::from_sign(e);
+
                 t.map_keys(|y| {
                     KhGen::new(s, y, c2_deg_shift)
                 })

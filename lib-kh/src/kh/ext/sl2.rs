@@ -79,11 +79,11 @@ impl<'a, R> KhSl2Map<'a, R> where
     pub fn q_deg(&self) -> isize{ -4 }
 
     fn apply_chi(&self, x: &KhGen, i: usize) -> KhChain<R> {
-        if x.state[i].is_zero() {
+        if x.state()[i].is_zero() {
             return KhChain::zero();
         }
 
-        let t = x.state.edit(|s| s.set_0(i));
+        let t = x.state().edit(|s| s.set_0(i));
         self.cube().rev_d_to(x, &t, true)
     }
 

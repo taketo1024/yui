@@ -193,58 +193,58 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn d_to(&self, x: &KhGen, target: &State, signed: bool) -> KhChain<R> {
         use KhCubeEdgeTrans::*;
-        
-        let Some(e) = self.edge(&x.state, target) else { 
+
+        let Some(e) = self.edge(x.state(), target) else {
             return KhChain::zero();
         };
 
-        let res = match e.trans { 
+        let res = match e.trans {
             Merge(ij, k) => self.merge(x, ij, k, *target),
             Split(i, jk) => self.split(x, i, jk, *target)
         };
 
-        if signed { 
+        if signed {
             let sign = R::from_sign(e.sign());
             res * sign
-        } else { 
+        } else {
             res
         }
     }
 
     pub fn rev_d_to(&self, x: &KhGen, target: &State, signed: bool) -> KhChain<R> {
         use KhCubeEdgeTrans::*;
-        
-        let Some(e) = self.edge(target, &x.state) else { 
+
+        let Some(e) = self.edge(target, x.state()) else {
             return KhChain::zero();
         };
 
-        let res = match e.trans { 
+        let res = match e.trans {
             Merge(ij, k) => self.split(x, k, ij, *target),
             Split(i, jk) => self.merge(x, jk, i, *target)
         };
 
-        if signed { 
+        if signed {
             let sign = R::from_sign(e.sign());
             res * sign
-        } else { 
+        } else {
             res
         }
     }
 
-    fn merge(&self, x: &KhGen, in_indices: (usize, usize), out_index: usize, target: State) -> KhChain<R> { 
-        self.str.mul_tensor(&x.tensor, in_indices, out_index).map_keys(|y| { 
-            KhGen::new(target, y, x.deg_shift)
+    fn merge(&self, x: &KhGen, in_indices: (usize, usize), out_index: usize, target: State) -> KhChain<R> {
+        self.str.mul_tensor(x.tensor(), in_indices, out_index).map_keys(|y| {
+            KhGen::new(target, y, x.deg_shift())
         })
     }
 
-    fn split(&self, x: &KhGen, in_index: usize, out_indices: (usize, usize), target: State) -> KhChain<R> { 
-        self.str.comul_tensor(&x.tensor, in_index, out_indices).map_keys(|y| { 
-            KhGen::new(target, y, x.deg_shift)
+    fn split(&self, x: &KhGen, in_index: usize, out_indices: (usize, usize), target: State) -> KhChain<R> {
+        self.str.comul_tensor(x.tensor(), in_index, out_indices).map_keys(|y| {
+            KhGen::new(target, y, x.deg_shift())
         })
     }
 
     pub fn d(&self, x: &KhGen) -> KhChain<R> {
-        self.targets_from(&x.state).flat_map(|t| { 
+        self.targets_from(x.state()).flat_map(|t| {
             self.d_to(x, t, true)
         }).collect()
     }

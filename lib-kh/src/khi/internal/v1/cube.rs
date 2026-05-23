@@ -91,10 +91,10 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     }
 
     fn t(&self, x: &KhGen) -> KhGen {
-        let s = x.state;
+        let s = *x.state();
         let t = self.t_state(s);
-        let l = self.t_label(s, x.tensor);
-        KhGen::new(t, l, x.deg_shift)
+        let l = self.t_label(s, *x.tensor());
+        KhGen::new(t, l, x.deg_shift())
     }
 
     // f = 1 + τ

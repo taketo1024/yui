@@ -65,7 +65,7 @@ impl Add<KhAlgGen> for &TngKey {
 
 impl From<&KhGen> for TngKey {
     fn from(x: &KhGen) -> Self {
-        TngKey { state: x.state, label: x.tensor }
+        TngKey { state: *x.state(), label: *x.tensor() }
     }
 }
 
@@ -605,7 +605,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let k = TngKey::from(x);
             let v = self.vertex(&k);
             v.out_edges.iter().map(|(l, f)|
-                (l.as_gen(x.deg_shift), f.eval(h, t))
+                (l.as_gen(x.deg_shift()), f.eval(h, t))
             ).collect()
         };
 

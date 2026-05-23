@@ -137,6 +137,26 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         }
     }
 
+    pub fn deg_shift(&self) -> (isize, isize) {
+        self.deg_shift
+    }
+
+    pub fn h_deg_of(&self, x: &KhIState) -> isize {
+        self.deg_shift.0 + x.rel_h_deg()
+    }
+
+    pub fn q_deg_of(&self, x: &KhIState) -> isize {
+        self.deg_shift.1 + x.rel_q_deg()
+    }
+
+    pub fn h_deg_of_chain(&self, z: &KhIChain<R>) -> isize {
+        z.keys().map(|x| self.h_deg_of(x)).min().unwrap_or(0)
+    }
+
+    pub fn q_deg_of_chain(&self, z: &KhIChain<R>) -> isize {
+        z.keys().map(|x| self.q_deg_of(x)).min().unwrap_or(0)
+    }
+
     pub fn h_range(&self) -> RangeInclusive<isize> {
         self.support().copied().range().unwrap_or(0..=-1)
     }

@@ -15,10 +15,11 @@ pub struct KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     inner: GrMod1<KhIState, R>,
     canon_cycles: Vec<KhIChain<R>>,
+    deg_shift: (isize, isize),
     gen_grid: OnceLock<GrMod2<KhIState, R>>,
 }
 
-impl<R> KhIHomology<R> 
+impl<R> KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn new(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self {
         let c = KhIComplex::new(l, h, t, reduced);
@@ -30,12 +31,32 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         Self::from(&c)
     }
 
-    pub(crate) fn new_impl(inner: GrMod1<KhIState, R>, canon_cycles: Vec<KhIChain<R>>) -> Self {
-        Self { inner, canon_cycles, gen_grid: OnceLock::new() }
+    pub(crate) fn new_impl(inner: GrMod1<KhIState, R>, canon_cycles: Vec<KhIChain<R>>, deg_shift: (isize, isize)) -> Self {
+        Self { inner, canon_cycles, deg_shift, gen_grid: OnceLock::new() }
     }
 
-    pub fn inner(&self) -> &GrMod1<KhIState, R> { 
+    pub fn inner(&self) -> &GrMod1<KhIState, R> {
         &self.inner
+    }
+
+    pub fn deg_shift(&self) -> (isize, isize) {
+        self.deg_shift
+    }
+
+    pub fn h_deg_of(&self, x: &KhIState) -> isize {
+        self.deg_shift.0 + x.rel_h_deg()
+    }
+
+    pub fn q_deg_of(&self, x: &KhIState) -> isize {
+        self.deg_shift.1 + x.rel_q_deg()
+    }
+
+    pub fn h_deg_of_chain(&self, z: &KhIChain<R>) -> isize {
+        z.keys().map(|x| self.h_deg_of(x)).min().unwrap_or(0)
+    }
+
+    pub fn q_deg_of_chain(&self, z: &KhIChain<R>) -> isize {
+        z.keys().map(|x| self.q_deg_of(x)).min().unwrap_or(0)
     }
 
     delegate! {
@@ -44,7 +65,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
             pub fn is_supported(&self, i: isize) -> bool;
         }
     }
-    
+
     pub fn h_range(&self) -> RangeInclusive<isize> {
         self.support().filter(|&&i|
             !self[i].is_zero()
@@ -56,15 +77,16 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
             self[i].generators().map(|z| z.q_deg())
         ).range().unwrap_or(0..=-1)
     }
-    
-    pub fn canon_cycles(&self) -> &[KhIChain<R>] { 
+
+    pub fn canon_cycles(&self) -> &[KhIChain<R>] {
         &self.canon_cycles
     }
 
     pub fn truncated(&self, range: RangeInclusive<isize>) -> Self {
         Self::new_impl(
             self.inner.truncated(range),
-            self.canon_cycles.clone()
+            self.canon_cycles.clone(),
+            self.deg_shift,
         )
     }
 
@@ -77,8 +99,9 @@ impl<R> From<&KhIComplex<R>> for KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     fn from(c: &KhIComplex<R>) -> Self {
         KhIHomology::new_impl(
-            c.inner().reduced().homology(), 
-            c.canon_cycles().to_vec()
+            c.inner().reduced().homology(),
+            c.canon_cycles().to_vec(),
+            c.deg_shift(),
         )
     }
 }

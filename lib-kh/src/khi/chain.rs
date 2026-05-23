@@ -9,17 +9,31 @@ pub enum KhIState {
     B(KhGen), Q(KhGen)
 }
 
-impl KhIState { 
-    pub fn h_deg(&self) -> isize { 
+impl KhIState {
+    pub fn rel_h_deg(&self) -> isize {
+        match self {
+            KhIState::B(x) => x.rel_h_deg(),
+            KhIState::Q(x) => x.rel_h_deg() + 1,
+        }
+    }
+
+    pub fn rel_q_deg(&self) -> isize {
+        match self {
+            KhIState::B(x) |
+            KhIState::Q(x) => x.rel_q_deg()
+        }
+    }
+
+    pub fn h_deg(&self) -> isize {
         match self {
             KhIState::B(x) => x.h_deg(),
             KhIState::Q(x) => x.h_deg() + 1,
         }
     }
 
-    pub fn q_deg(&self) -> isize { 
+    pub fn q_deg(&self) -> isize {
         match self {
-            KhIState::B(x) | 
+            KhIState::B(x) |
             KhIState::Q(x) => x.q_deg()
         }
     }

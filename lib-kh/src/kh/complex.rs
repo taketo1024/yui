@@ -76,8 +76,24 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.deg_shift
     }
 
-    pub fn is_reduced(&self) -> bool { 
+    pub fn is_reduced(&self) -> bool {
         self.reduced
+    }
+
+    pub fn h_deg_of(&self, x: &KhGen) -> isize {
+        self.deg_shift.0 + x.rel_h_deg()
+    }
+
+    pub fn q_deg_of(&self, x: &KhGen) -> isize {
+        self.deg_shift.1 + x.rel_q_deg()
+    }
+
+    pub fn h_deg_of_chain(&self, z: &KhChain<R>) -> isize {
+        z.keys().map(|x| self.h_deg_of(x)).min().unwrap_or(0)
+    }
+
+    pub fn q_deg_of_chain(&self, z: &KhChain<R>) -> isize {
+        z.keys().map(|x| self.q_deg_of(x)).min().unwrap_or(0)
     }
 
     pub fn h_range(&self) -> RangeInclusive<isize> {

@@ -37,26 +37,23 @@ impl KhGen {
         self.deg_shift
     }
 
+    pub fn rel_h_deg(&self) -> isize {
+        self.state.weight() as isize
+    }
+
+    pub fn rel_q_deg(&self) -> isize {
+        let d = self.tensor.iter().map(|x| x.deg()).sum::<isize>();
+        let r = self.tensor.len() as isize;
+        let s = self.state.weight() as isize;
+        d + r + s
+    }
+
     pub fn h_deg(&self) -> isize {
-        Self::h_deg_of(&self.state, self.deg_shift)
+        self.deg_shift.0 + self.rel_h_deg()
     }
 
     pub fn q_deg(&self) -> isize {
-        Self::q_deg_of(&self.state, &self.tensor, self.deg_shift)
-    }
-
-    pub fn h_deg_of(state: &State, deg_shift: (isize, isize)) -> isize {
-        let h0 = deg_shift.0;
-        let s = state.weight() as isize;
-        h0 + s
-    }
-
-    pub fn q_deg_of(state: &State, tensor: &KhTensor, deg_shift: (isize, isize)) -> isize {
-        let q0 = deg_shift.1;
-        let d = tensor.iter().map(|x| x.deg()).sum::<isize>();
-        let r = tensor.len() as isize;
-        let s = state.weight() as isize;
-        q0 + d + r + s
+        self.deg_shift.1 + self.rel_q_deg()
     }
 
     pub fn apply_at<F, R>(&self, i: usize, f: F) -> KhChain<R>

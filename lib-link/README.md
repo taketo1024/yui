@@ -11,12 +11,12 @@ Knots and links for the [`yui`](https://github.com/taketo1024/yui) workspace: pl
 ```text
 src/
 ├── link/
-│   ├── link.rs       — `Link`, `Edge`, `State`, `XCode`, `seifert_graph`
-│   ├── node.rs       — `Node`, `NodeType` {XL, XR, V, H}, `NodeOri`
+│   ├── link.rs       — `Link`: knot or link diagram
+│   ├── node.rs       — `Node`: vertex of a diagram (crossing or smoothing)
 │   ├── path.rs       — `Path`: an arc or a circle of edges
 │   └── inv_link.rs   — `InvLink`: involutive link
 ├── braid/
-│   ├── braid.rs      — `Braid`
+│   ├── braid.rs      — `Braid`: word in the Artin generators
 │   └── braid_gen.rs  — `BraidGen`: signed Artin generator
 ├── misc/
 │   └── jones.rs      — `jones_polynomial`
@@ -34,7 +34,7 @@ A knot or link given by a planar diagram. Internally a `Vec<Node>` plus a `Vec<E
 
 - a PD code: `Link::from_pd_code([[1,4,2,5], ...])`,
 - explicit nodes and loops: `Link::new(nodes, loops)`, or the wrapper `Link::from_nodes(nodes)` for no loops,
-- a JSON file under `~/.yui/data/links/`: `Link::load("3_1")`,
+- a JSON file under `<DATA_DIR>/links/`: `Link::load("3_1")`,
 - predefined shapes: `Link::empty()`, `Link::unknot()`, `Link::unlink(n)`.
 
 Free loops are closed components without crossings. They participate in `comps()`, `n_comps()`, `n_edges()`, and `edges()` as expected — each loop shows up as a one-element closed `Path` in `comps()`.
@@ -81,7 +81,6 @@ An *involutive link*: a `Link` together with an involution on it — an edge bij
 
 ### Derived invariants
 
-- `Link::seifert_graph(&self) -> petgraph::Graph<Path, usize>` — vertices are Seifert circles, edges are crossings. Free loops contribute isolated vertices.
 - `jones_polynomial(&Link) -> LPoly<'q', i32>` — Kauffman-bracket computation summing over all `2^n` resolutions.
 
 ## Conventions
@@ -91,6 +90,17 @@ An *involutive link*: a `Link` together with an involution on it — an edge bij
   - KnotInfo — [knotinfo.org/descriptions/pd_notation.html](https://knotinfo.org/descriptions/pd_notation.html)
 - **Edge ids.** `Edge = usize`. Only used to identify endpoint coincidence; ids don't have to be contiguous or start at 0. `InvLink::from_symmetric_pd_code` expects `1..=n_edges` so the involution formula is well-defined.
 - **Base point.** Defaults to the minimum edge of the diagram. For `InvLink`, the base point must be fixed by the involution (use `with_base_pt(e)` to set a specific on-axis edge).
+
+## Data directory
+
+The `*::load(name)` constructors read JSON files from a user-data directory — `$YUI_DATA_DIR` if set, otherwise the platform default (`~/Library/Application Support/yui/` on macOS, `${XDG_DATA_HOME:-~/.local/share}/yui/` on Linux, `%APPDATA%\yui\` on Windows). To populate it from the [KnotInfo](https://knotinfo.org/) database:
+
+```bash
+python3 scripts/fetch-knot-data.py            # default data dir
+python3 scripts/fetch-knot-data.py --out DIR  # or a custom directory
+```
+
+The script writes per-knot PD codes to `<DATA_DIR>/links/`, braid words to `<DATA_DIR>/braid/`, and copies this crate's bundled symmetric PD codes (`resources/inv_link/*.json`) to `<DATA_DIR>/inv_link/`.
 
 ## Quick example
 

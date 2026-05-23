@@ -12,7 +12,7 @@ use yui_core::{Ring, RingOps};
 use yui_homology::ToSeqString;
 use yui_link::{Node, Edge, InvLink};
 
-use crate::kh::{KhComplex, KhState, KhTensor};
+use crate::kh::{KhComplex, KhGen, KhTensor};
 use crate::khi::KhIComplex;
 use crate::kh::internal::v2::builder::{BuildElem, TngComplexBuilder};
 use crate::kh::internal::v2::cob::LcCobTrait;
@@ -565,7 +565,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let deg_shift = self.complex().deg_shift();
         let key_map = std::mem::take(&mut self.key_map);
 
-        let map = move |x: &KhState| -> KhState { 
+        let map = move |x: &KhGen| -> KhGen { 
             let k = TngKey::from(x);
             let tk = key_map[&k];
             

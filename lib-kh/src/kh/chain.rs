@@ -8,19 +8,19 @@ use yui_link::State;
 use super::{KhAlgGen, KhTensor};
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
-pub struct KhState {
+pub struct KhGen {
     pub state: State,
     pub tensor: KhTensor,
     pub deg_shift: (isize, isize)
 }
 
-impl KhState {
-    pub fn new(state: State, tensor: KhTensor, deg_shift: (isize, isize)) -> KhState {
-        KhState { state, tensor, deg_shift }
+impl KhGen {
+    pub fn new(state: State, tensor: KhTensor, deg_shift: (isize, isize)) -> KhGen {
+        KhGen { state, tensor, deg_shift }
     }
 
     pub fn init() -> Self {
-        KhState::new(State::empty(), KhTensor::empty(), (0, 0))
+        KhGen::new(State::empty(), KhTensor::empty(), (0, 0))
     }
 
     pub fn h_deg(&self) -> isize {
@@ -52,21 +52,21 @@ impl KhState {
     }
 }
 
-impl MathType for KhState {
+impl MathType for KhGen {
     fn math_symbol() -> String {
         String::from("Kh")
     }
 }
 
-impl Display for KhState {
+impl Display for KhGen {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({}){}", self.tensor, self.state.iter().map(|i| subscript(i as u8)).join("") )
     }
 }
 
-impl LcKey for KhState {}
+impl LcKey for KhGen {}
 
-pub type KhChain<R> = Lc<KhState, R>;
+pub type KhChain<R> = Lc<KhGen, R>;
 
 pub trait KhChainExt {
     fn h_deg(&self) -> isize;

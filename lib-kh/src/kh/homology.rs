@@ -6,7 +6,7 @@ use yui_homology::{ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_core::{EucRing, EucRingOps, IteratorExt};
 use yui_link::Link;
 
-use crate::kh::{KhChainExt, KhState};
+use crate::kh::{KhChainExt, KhGen};
 use crate::misc::make_gen_grid;
 
 use super::{KhAlg, KhChain, KhComplex};
@@ -14,12 +14,12 @@ use super::{KhAlg, KhChain, KhComplex};
 #[derive(Clone)]
 pub struct KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    inner: GrMod1<KhState, R>,
+    inner: GrMod1<KhGen, R>,
     str: KhAlg<R>,
     deg_shift: (isize, isize),
     reduced: bool,
     canon_cycles: Vec<KhChain<R>>,
-    gen_grid: OnceLock<GrMod2<KhState, R>>,
+    gen_grid: OnceLock<GrMod2<KhGen, R>>,
 }
 
 impl<R> KhHomology<R> 
@@ -34,11 +34,11 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         Self::from(&c)
     }
     
-    pub(crate) fn new_impl(inner: GrMod1<KhState, R>, str: KhAlg<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
+    pub(crate) fn new_impl(inner: GrMod1<KhGen, R>, str: KhAlg<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
         Self { inner, str, deg_shift, reduced, canon_cycles, gen_grid: OnceLock::new() }
     }
 
-    pub fn inner(&self) -> &GrMod1<KhState, R> { 
+    pub fn inner(&self) -> &GrMod1<KhGen, R> { 
         &self.inner
     }
 
@@ -93,7 +93,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         )
     }
 
-    fn gen_grid(&self) -> &GrMod2<KhState, R> {
+    fn gen_grid(&self) -> &GrMod2<KhGen, R> {
         self.gen_grid.get_or_init(|| make_gen_grid(self.inner()))
     }
 }
@@ -113,7 +113,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 impl<R> Index<isize> for KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    type Output = Summand<KhState, R>;
+    type Output = Summand<KhGen, R>;
 
     delegate! {
         to self.inner {
@@ -124,7 +124,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 impl<R> Index<(isize, isize)> for KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    type Output = Summand<KhState, R>;
+    type Output = Summand<KhGen, R>;
 
     delegate! {
         to self.gen_grid() {

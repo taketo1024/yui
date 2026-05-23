@@ -8,7 +8,7 @@ use yui_core::{EucRing, EucRingOps, IteratorExt, Ring, RingOps};
 use yui_homology::{ChainComplex1, ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_link::InvLink;
 
-use crate::kh::{KhChain, KhChainExt, KhComplex, KhState};
+use crate::kh::{KhChain, KhChainExt, KhComplex, KhGen};
 use crate::khi::KhIHomology;
 use crate::khi::KhIState;
 use crate::misc::make_gen_grid;
@@ -73,7 +73,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     }
 
     pub fn from_kh_complex<'a, F>(c: KhComplex<R>, map: F) -> Self
-    where F: Fn(&KhState) -> KhState + Send + Sync + 'static {
+    where F: Fn(&KhGen) -> KhGen + Send + Sync + 'static {
         let deg_shift = c.deg_shift();
         let h_range = c.h_range();
         let h_range = *h_range.start() ..= (h_range.end() + 1);

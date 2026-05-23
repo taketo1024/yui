@@ -8,25 +8,25 @@ use yui_homology::{ChainComplex1, ToSeqString, ToTableString, GrMod2, Summand};
 
 use crate::kh::chain::KhChain;
 use crate::kh::internal::v1::cube::KhCube;
-use crate::kh::{KhState, KhHomology};
+use crate::kh::{KhGen, KhHomology};
 use crate::misc::make_gen_grid;
 
 use super::KhAlg;
 
-pub type KhComplexSummand<R> = Summand<KhState, R>;
+pub type KhComplexSummand<R> = Summand<KhGen, R>;
 
 // TODO: Make KhComplexTrait, and split impl into KhComplexV1 and V2. 
 
 #[derive(Clone)]
 pub struct KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    inner: ChainComplex1<KhState, R>,
+    inner: ChainComplex1<KhGen, R>,
     str: KhAlg<R>,
     cube: KhCube<R>,
     deg_shift: (isize, isize),
     reduced: bool,
     canon_cycles: Vec<KhChain<R>>,
-    gen_grid: OnceLock<GrMod2<KhState, R>>,
+    gen_grid: OnceLock<GrMod2<KhGen, R>>,
 }
 
 impl<R> KhComplex<R>
@@ -60,7 +60,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         KhComplex::new_impl(complex, str, cube, deg_shift, reduced, canon_cycles)
     }
 
-    pub(crate) fn new_impl(inner: ChainComplex1<KhState, R>, str: KhAlg<R>, cube: KhCube<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
+    pub(crate) fn new_impl(inner: ChainComplex1<KhGen, R>, str: KhAlg<R>, cube: KhCube<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
         KhComplex { inner, str, cube, deg_shift, reduced, canon_cycles, gen_grid: OnceLock::new() }
     }
 
@@ -94,11 +94,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.canon_cycles
     }
 
-    pub fn inner(&self) -> &ChainComplex1<KhState, R> {
+    pub fn inner(&self) -> &ChainComplex1<KhGen, R> {
         &self.inner
     }
 
-    fn gen_grid(&self) -> &GrMod2<KhState, R> {
+    fn gen_grid(&self) -> &GrMod2<KhGen, R> {
         self.gen_grid.get_or_init(|| make_gen_grid(self.inner.summands()))
     }
 

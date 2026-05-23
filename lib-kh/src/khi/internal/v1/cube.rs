@@ -7,7 +7,7 @@ use yui_core::{Ring, RingOps};
 use yui_homology::{GrMod, ChainComplex1, Summand};
 use yui_link::{InvLink, State};
 
-use crate::kh::{KhState, KhAlgGen, KhTensor};
+use crate::kh::{KhGen, KhAlgGen, KhTensor};
 use crate::kh::internal::v1::cube::KhCube;
 use crate::khi::KhIState;
 
@@ -90,15 +90,15 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         KhTensor::from_iter(seq)
     }
 
-    fn t(&self, x: &KhState) -> KhState {
+    fn t(&self, x: &KhGen) -> KhGen {
         let s = x.state;
         let t = self.t_state(s);
         let l = self.t_label(s, x.tensor);
-        KhState::new(t, l, x.deg_shift)
+        KhGen::new(t, l, x.deg_shift)
     }
 
     // f = 1 + τ
-    fn f(&self, x: &KhState) -> Lc<KhState, R> { 
+    fn f(&self, x: &KhGen) -> Lc<KhGen, R> { 
         let x = *x;
         let tx = self.t(&x);
         Lc::from_iter([
@@ -274,7 +274,7 @@ mod tests {
         let c = KhICube::new(&l, &h, &t, false, (0, 0));
 
         let x = KhIState::B(
-            KhState::new(
+            KhGen::new(
                 State::from([0,0,0]),
                 KhTensor::from([X, I]),
                 (0, 0)
@@ -284,7 +284,7 @@ mod tests {
 
         assert_eq!(dx, Lc::from_iter([
             (KhIState::B(
-                KhState::new(
+                KhGen::new(
                     State::from([1,0,0]),
                     KhTensor::from([X]),
                     (0, 0)
@@ -292,7 +292,7 @@ mod tests {
             ), R::one()),
 
             (KhIState::B(
-                KhState::new(
+                KhGen::new(
                     State::from([0,1,0]),
                     KhTensor::from([X]),
                     (0, 0)
@@ -300,7 +300,7 @@ mod tests {
             ), R::one()),
             
             (KhIState::B(
-                KhState::new(
+                KhGen::new(
                     State::from([0,0,1]),
                     KhTensor::from([X]),
                     (0, 0)
@@ -318,7 +318,7 @@ mod tests {
         let c = KhICube::new(&l, &h, &t, false, (0, 0));
 
         let x = KhIState::B(
-            KhState::new(
+            KhGen::new(
                 State::from([0,1,0]),
                 KhTensor::from([X]),
                 (0, 0)
@@ -328,7 +328,7 @@ mod tests {
 
         assert_eq!(dx, Lc::from_iter([
             (KhIState::B(
-                KhState::new(
+                KhGen::new(
                     State::from([1,1,0]),
                     KhTensor::from([X,X]),
                     (0, 0)
@@ -336,7 +336,7 @@ mod tests {
             ), R::one()),
 
             (KhIState::B(
-                KhState::new(
+                KhGen::new(
                     State::from([0,1,1]),
                     KhTensor::from([X,X]),
                     (0, 0)
@@ -344,7 +344,7 @@ mod tests {
             ), R::one()),
             
             (KhIState::Q(
-                KhState::new(
+                KhGen::new(
                     State::from([0,1,0]),
                     KhTensor::from([X]),
                     (0, 0)
@@ -353,7 +353,7 @@ mod tests {
 
                         
             (KhIState::Q(
-                KhState::new(
+                KhGen::new(
                     State::from([0,0,1]),
                     KhTensor::from([X]),
                     (0, 0)
@@ -372,7 +372,7 @@ mod tests {
         let c = KhICube::new(&l, &h, &t, false, (0, 0));
 
         let x = KhIState::Q(
-            KhState::new(
+            KhGen::new(
                 State::from([0,1,0]),
                 KhTensor::from([X]),
                 (0, 0)
@@ -382,7 +382,7 @@ mod tests {
 
         assert_eq!(dx, Lc::from_iter([
             (KhIState::Q(
-                KhState::new(
+                KhGen::new(
                     State::from([1,1,0]),
                     KhTensor::from([X,X]),
                     (0, 0)
@@ -390,7 +390,7 @@ mod tests {
             ), R::one()),
 
             (KhIState::Q(
-                KhState::new(
+                KhGen::new(
                     State::from([0,1,1]),
                     KhTensor::from([X,X]),
                     (0, 0)

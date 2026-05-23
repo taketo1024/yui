@@ -14,7 +14,7 @@ use yui_link::{Edge, Link, Node, State};
 use yui_core::bitseq::Bit;
 
 use crate::kh::internal::v1::cube::KhCube;
-use crate::kh::{KhAlgGen, KhAlg, KhChain, KhComplex, KhState, KhTensor};
+use crate::kh::{KhAlgGen, KhAlg, KhChain, KhComplex, KhGen, KhTensor};
 use super::cob::{Cob, Dot, Bottom, CobComp, LcCob, LcCobTrait};
 use super::tng::{Tng, TngComp};
 
@@ -38,8 +38,8 @@ impl TngKey {
         self.label.append(other.label);
     }
 
-    pub fn as_gen(&self, deg_shift: (isize, isize)) -> KhState {
-        KhState::new(self.state, self.label, deg_shift)
+    pub fn as_gen(&self, deg_shift: (isize, isize)) -> KhGen {
+        KhGen::new(self.state, self.label, deg_shift)
     }
 }
 
@@ -63,8 +63,8 @@ impl Add<KhAlgGen> for &TngKey {
     }
 }
 
-impl From<&KhState> for TngKey {
-    fn from(x: &KhState) -> Self {
+impl From<&KhGen> for TngKey {
+    fn from(x: &KhGen) -> Self {
         TngKey { state: x.state, label: x.tensor }
     }
 }
@@ -588,7 +588,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.remove_vertex(k1);
     }
 
-    pub fn into_raw_complex(self) -> ChainComplex1<KhState, R> {
+    pub fn into_raw_complex(self) -> ChainComplex1<KhGen, R> {
         assert!(self.is_completely_delooped());
 
         let summands = GrMod1::generate(self.h_range(), |i| { 
@@ -600,7 +600,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             Summand::from_raw_generators(gens)
         });
 
-        let d = move |x: &KhState| { 
+        let d = move |x: &KhGen| { 
             let (h, t) = self.ht();
             let k = TngKey::from(x);
             let v = self.vertex(&k);

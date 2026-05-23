@@ -7,9 +7,9 @@ use yui_link::{Link, Path, State};
 use num_traits::Zero;
 
 use crate::kh::internal::v1::cube::KhCube;
-use crate::kh::{KhAlg, KhChain, KhState, KhComplex, KhAlgGen, KhTensor};
+use crate::kh::{KhAlg, KhChain, KhGen, KhComplex, KhAlgGen, KhTensor};
 
-pub type KhChainMap<'a, 'c, R> = ChainMap<'a, 'c, isize, KhState, KhState, R>;
+pub type KhChainMap<'a, 'c, R> = ChainMap<'a, 'c, isize, KhGen, KhGen, R>;
 
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
@@ -27,7 +27,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let c2_deg_shift = c2.deg_shift();
 
         ChainMap::new(c1.inner(), c2.inner(), deg, move |_, z| {
-            z.apply(|x: &KhState| {
+            z.apply(|x: &KhGen| {
                 if !x.state[i].is_zero() {
                     return KhChain::zero();
                 }
@@ -59,7 +59,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let cube = KhCube::new(l, h, t, base_pt, c1.deg_shift());
 
         ChainMap::new(c1.inner(), c2.inner(), deg, move |_, z| {
-            z.apply(|x: &KhState| {
+            z.apply(|x: &KhGen| {
                 if !x.state[i].is_one() { 
                     return KhChain::zero();
                 }
@@ -78,7 +78,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 let t = apply_f1(&alg, &x.tensor, k0, k1) * R::from_sign(e);
                 
                 t.map_keys(|y| {
-                    KhState::new(s, y, c2_deg_shift)
+                    KhGen::new(s, y, c2_deg_shift)
                 })
             })
         })

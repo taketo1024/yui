@@ -62,7 +62,7 @@ where
         self.data.keys()
     }
 
-    pub fn is_singleton(&self) -> bool { 
+    pub fn is_singleton(&self) -> bool {
         self.nterms() == 1 && 
         self.iter().next().unwrap().1.is_one()
     }
@@ -171,6 +171,18 @@ where
         } else { 
             lc( self.sort_terms_by(cmp) )
         }
+    }
+
+    pub fn is_homogeneous<T, F>(&self, f: F) -> bool
+    where T: PartialEq, F: Fn(&X) -> T {
+        self.keys().map(f).all_equal()
+    }
+
+    pub fn homogeneous_value<T, F>(&self, f: F) -> Option<T>
+    where T: PartialEq, F: Fn(&X) -> T {
+        let mut iter = self.keys();
+        let first = f(iter.next()?);
+        if iter.all(|k| f(k) == first) { Some(first) } else { None }
     }
 }
 

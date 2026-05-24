@@ -33,10 +33,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         assert!(!reduced || (!l.is_empty() && t.is_zero()));
 
-        let mut b = TngComplexBuilder::new(l, h, t, reduced);
-        b.process_all();
-        b.finalize();
-
+        let b = TngComplexBuilder::new(l, h, t, reduced).run();
         let canon_cycles = b.eval_elements();
         let inner = b.into_tng_complex().into_raw_complex();
 

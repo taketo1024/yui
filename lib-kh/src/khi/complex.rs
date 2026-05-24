@@ -10,20 +10,20 @@ use yui_link::InvLink;
 
 use crate::kh::{KhChain, KhComplex, KhGen};
 use crate::khi::KhIHomology;
-use crate::khi::KhIState;
+use crate::khi::KhIGen;
 use crate::util::Bigraded;
 
-pub type KhIChain<R> = Lc<KhIState, R>;
+pub type KhIChain<R> = Lc<KhIGen, R>;
 
-pub type KhIComplexSummand<R> = Summand<KhIState, R>;
+pub type KhIComplexSummand<R> = Summand<KhIGen, R>;
 
 #[derive(Clone)]
 pub struct KhIComplex<R>
 where R: Ring, for<'a> &'a R: RingOps<R> {
-    inner: ChainComplex1<KhIState, R>,
+    inner: ChainComplex1<KhIGen, R>,
     canon_cycles: Vec<KhIChain<R>>,
     deg_shift: (isize, isize),
-    cache_bigr: OnceLock<GrMod2<KhIState, R>>,
+    cache_bigr: OnceLock<GrMod2<KhIGen, R>>,
 }
 
 impl<R> KhIComplex<R>
@@ -51,8 +51,8 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         let canon_cycles = if l.base_pt().is_some() && l.is_knot() {
             let zs = KhComplex::make_canon_cycles(l.inner(), &R::zero(), h, reduced);
             Iterator::chain(
-                zs.iter().map(|z| z.clone().map_keys(KhIState::B)),
-                zs.iter().map(|z| z.clone().map_keys(KhIState::Q))
+                zs.iter().map(|z| z.clone().map_keys(KhIGen::B)),
+                zs.iter().map(|z| z.clone().map_keys(KhIGen::Q))
             ).collect()
         } else { 
             vec![]
@@ -68,34 +68,34 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         let h_range = *h_range.start() ..= (h_range.end() + 1);
 
         let canon_cycles = c.canon_cycles().iter().flat_map(|z| { 
-            let bz = z.clone().map_keys(KhIState::B);
-            let qz = z.clone().map_keys(KhIState::Q);
+            let bz = z.clone().map_keys(KhIGen::B);
+            let qz = z.clone().map_keys(KhIGen::Q);
             [bz, qz]
         }).sorted_by_key(|z| z.keys().map(|x| x.rel_h_deg()).min().unwrap_or(0)).collect_vec();
 
         // TODO use mapping cone
 
         let summands = GrMod1::generate(h_range, |i| { 
-            let b_gens = c[i].raw_generators().iter().map(|x| KhIState::B(*x));
-            let q_gens = c[i - 1].raw_generators().iter().map(|x| KhIState::Q(*x));
+            let b_gens = c[i].raw_generators().iter().map(|x| KhIGen::B(*x));
+            let q_gens = c[i - 1].raw_generators().iter().map(|x| KhIGen::Q(*x));
             Summand::from_raw_generators(Iterator::chain(b_gens, q_gens))
         });
 
-        let d = move |i: isize, x: &KhIState| -> KhIChain<R> { 
+        let d = move |i: isize, x: &KhIGen| -> KhIChain<R> { 
             match x { 
-                KhIState::B(x) => {
+                KhIGen::B(x) => {
                     let z = KhChain::from(*x);
-                    let dx = c.d(i, &z).map_keys(KhIState::B);
-                    let qx = KhIChain::from(KhIState::Q(*x));
+                    let dx = c.d(i, &z).map_keys(KhIGen::B);
+                    let qx = KhIChain::from(KhIGen::Q(*x));
                     let qtx = {
                         let tx = map(x);
-                        KhIChain::from(KhIState::Q(tx))
+                        KhIChain::from(KhIGen::Q(tx))
                     };
                     dx + qx + qtx
                 },
-                KhIState::Q(x) => {
+                KhIGen::Q(x) => {
                     let z = KhChain::from(*x);
-                    c.d(i, &z).map_keys(KhIState::Q)
+                    c.d(i, &z).map_keys(KhIGen::Q)
                 }
             }
         };
@@ -107,11 +107,11 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         KhIComplex::new_impl(inner, canon_cycles, deg_shift)
     }
 
-    pub(crate) fn new_impl(inner: ChainComplex1<KhIState, R>, canon_cycles: Vec<KhIChain<R>>, deg_shift: (isize, isize)) -> Self {
+    pub(crate) fn new_impl(inner: ChainComplex1<KhIGen, R>, canon_cycles: Vec<KhIChain<R>>, deg_shift: (isize, isize)) -> Self {
         Self { inner, canon_cycles, deg_shift, cache_bigr: OnceLock::new() }
     }
 
-    pub fn inner(&self) -> &ChainComplex1<KhIState, R> {
+    pub fn inner(&self) -> &ChainComplex1<KhIGen, R> {
         &self.inner
     }
 
@@ -130,11 +130,11 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         self.deg_shift
     }
 
-    pub fn h_deg_of(&self, x: &KhIState) -> isize {
+    pub fn h_deg_of(&self, x: &KhIGen) -> isize {
         self.deg_shift.0 + x.rel_h_deg()
     }
 
-    pub fn q_deg_of(&self, x: &KhIState) -> isize {
+    pub fn q_deg_of(&self, x: &KhIGen) -> isize {
         self.deg_shift.1 + x.rel_q_deg()
     }
 
@@ -173,14 +173,14 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         KhIHomology::from(self)
     }
 
-    fn cached_bigraded(&self) -> &GrMod2<KhIState, R> {
+    fn cached_bigraded(&self) -> &GrMod2<KhIGen, R> {
         self.cache_bigr.get_or_init(|| self.bigraded())
     }
 }
 
-impl<R> Bigraded<KhIState, R> for KhIComplex<R>
+impl<R> Bigraded<KhIGen, R> for KhIComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn base(&self) -> &GrMod1<KhIState, R> { self.inner.summands() }
+    fn base(&self) -> &GrMod1<KhIGen, R> { self.inner.summands() }
     fn decomp_key(&self, z: &KhIChain<R>) -> isize { self.q_deg_of_chain(z) }
 }
 

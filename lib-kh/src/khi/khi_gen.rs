@@ -5,46 +5,46 @@ use yui_core::MathType;
 use crate::kh::KhGen;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum KhIState { 
+pub enum KhIGen { 
     B(KhGen), Q(KhGen)
 }
 
-impl KhIState {
+impl KhIGen {
     pub fn rel_h_deg(&self) -> isize {
         match self {
-            KhIState::B(x) => x.rel_h_deg(),
-            KhIState::Q(x) => x.rel_h_deg() + 1,
+            KhIGen::B(x) => x.rel_h_deg(),
+            KhIGen::Q(x) => x.rel_h_deg() + 1,
         }
     }
 
     pub fn rel_q_deg(&self) -> isize {
         match self {
-            KhIState::B(x) |
-            KhIState::Q(x) => x.rel_q_deg()
+            KhIGen::B(x) |
+            KhIGen::Q(x) => x.rel_q_deg()
         }
     }
 }
 
-impl Display for KhIState {
+impl Display for KhIGen {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self { 
-            KhIState::B(x) => x.fmt(f),
-            KhIState::Q(x) => write!(f, "Q{}", x)
+            KhIGen::B(x) => x.fmt(f),
+            KhIGen::Q(x) => write!(f, "Q{}", x)
         }
     }
 }
 
-impl Default for KhIState {
+impl Default for KhIGen {
     fn default() -> Self {
-        KhIState::B(KhGen::default())
+        KhIGen::B(KhGen::default())
     }
 }
 
-impl MathType for KhIState {
+impl MathType for KhIGen {
     fn math_symbol() -> String {
         String::new()
     }
 }
 
-impl LcKey for KhIState {}
+impl LcKey for KhIGen {}
 

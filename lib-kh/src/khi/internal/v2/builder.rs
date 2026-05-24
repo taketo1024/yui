@@ -51,8 +51,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(l.nodes().all(|x| x.is_crossing()));
         assert!(!reduced || l.base_pt().is_some());
 
-        let base_pt = if reduced { l.base_pt() } else { None };
-        let inner = TngComplexBuilder::new(l.inner(), h, t, base_pt);
+        let inner = TngComplexBuilder::new(l.inner(), h, t, reduced);
         let x_map = l.nodes().map(|x| 
             (x.clone(), l.inv_node(x).clone())
         ).collect();

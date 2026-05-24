@@ -48,15 +48,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn build_kh_complex(l: &Link, h: &R, t: &R, reduced: bool) -> KhComplex<R> { 
         assert!(!reduced || l.base_pt().is_some());
 
-        let base_pt = if reduced { l.base_pt() } else { None };
-        let mut b = Self::new(l, h, t, base_pt);
+        let mut b = Self::new(l, h, t, reduced);
         b.process_all();
         b.finalize();
         b.into_kh_complex()
     }
 
-    pub fn new(l: &Link, h: &R, t: &R, base_pt: Option<Edge>) -> Self { 
-        let reduced = base_pt.is_some();
+    pub fn new(l: &Link, h: &R, t: &R, reduced: bool) -> Self { 
+        let base_pt = if reduced { l.base_pt() } else { None };
         let deg_shift = KhComplex::deg_shift_for(l, reduced);
 
         let mut b = Self::init(h, t, deg_shift, base_pt);
@@ -735,7 +734,7 @@ mod tests {
         let l = Link::test_data("6_3");
         let h_range = -1..=1;
 
-        let mut b = TngComplexBuilder::new(&l, &0, &0, None);
+        let mut b = TngComplexBuilder::new(&l, &0, &0, false);
         b.set_h_range(h_range);
         b.process_all();
         b.finalize();

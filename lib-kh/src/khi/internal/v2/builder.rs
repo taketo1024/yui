@@ -31,22 +31,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> SymTngBuilder<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn build_kh_complex(l: &InvLink, h: &R, t: &R, reduced: bool) -> KhComplex<R> { 
-        let mut b = Self::new(l, h, t, reduced);
-        b.preprocess();
-        b.process_all();
-        b.finalize();
-        b.into_kh_complex()
-    }
-
-    pub fn build_khi_complex(l: &InvLink, h: &R, t: &R, reduced: bool) -> KhIComplex<R> { 
-        let mut b = Self::new(l, h, t, reduced);
-        b.preprocess();
-        b.process_all();
-        b.finalize();
-        b.into_khi_complex()
-    }
-
     pub fn new(l: &InvLink, h: &R, t: &R, reduced: bool) -> SymTngBuilder<R> { 
         assert!(l.nodes().all(|x| x.is_crossing()));
         assert!(!reduced || l.base_pt().is_some());
@@ -81,6 +65,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn set_h_range(&mut self, h_range: RangeInclusive<isize>);
             pub(crate) fn stat(&self) -> String;
         }
+    }
+
+    pub fn run(mut self) -> Self { 
+        self.preprocess();
+        self.process_all();
+        self.finalize();
+        self
     }
 
     pub fn preprocess(&mut self) { 
@@ -670,10 +661,11 @@ mod tests {
         let l = InvLink::test_data("3_1");
         let (h, t) = (FF2::zero(), FF2::zero());
 
-        let c = SymTngBuilder::build_kh_complex(&l, &h, &t, false);
-        c.inner().check_d_all();
+        let b = SymTngBuilder::new(&l, &h, &t, false).run();
+        let c = b.into_tng_complex().into_raw_complex();
+        c.check_d_all();
 
-        let h = c.inner().homology();
+        let h = c.homology();
 
         assert_eq!(h[0].rank(), 2);
         assert_eq!(h[1].rank(), 0);
@@ -686,8 +678,9 @@ mod tests {
         let l = InvLink::test_data("3_1");
         let (h, t) = (FF2::zero(), FF2::zero());
 
-        let c = SymTngBuilder::build_khi_complex(&l, &h, &t, false);
-        c.inner().check_d_all();;
+        let b = SymTngBuilder::new(&l, &h, &t, false).run();
+        let c = b.into_khi_complex();
+        c.inner().check_d_all();
 
         let h = c.homology();
 
@@ -767,7 +760,7 @@ mod tests {
 
         assert!(b.complex().is_completely_delooped());
 
-        let c = b.into_kh_complex();
+        let c = b.into_tng_complex().into_raw_complex();
         assert_eq!(c[0].rank(), 2);
         assert_eq!(c[1].rank(), 0);
         assert_eq!(c[2].rank(), 2);
@@ -792,7 +785,7 @@ mod tests {
 
         assert!(b.complex().is_completely_delooped());
 
-        let c = b.into_kh_complex();
+        let c = b.into_tng_complex().into_raw_complex();
         assert_eq!(c[0].rank(), 4);
         assert_eq!(c[1].rank(), 6);
         assert_eq!(c[2].rank(), 12);

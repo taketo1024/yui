@@ -31,7 +31,8 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     pub fn new(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self { 
         use crate::khi::internal::v2::builder::SymTngBuilder;
 
-        SymTngBuilder::build_khi_complex(l, h, t, reduced)
+        let b = SymTngBuilder::new(&l, &h, &t, reduced).run();
+        b.into_khi_complex()
     }
 
     pub fn new_no_simplify(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self {

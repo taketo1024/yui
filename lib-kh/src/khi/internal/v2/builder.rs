@@ -11,8 +11,7 @@ use yui_core::algo::KeyedUnionFind;
 use yui_core::{Ring, RingOps};
 use yui_link::{Node, Edge, InvLink};
 
-use crate::kh::{KhComplex, KhGen, KhTensor};
-use crate::khi::KhIComplex;
+use crate::kh::{KhGen, KhTensor};
 use crate::kh::internal::v2::builder::{BuildElem, TngComplexBuilder};
 use crate::kh::internal::v2::cob::LcCobTrait;
 use crate::kh::internal::v2::tng::TngComp;
@@ -556,27 +555,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn into_tng_complex(self) -> TngComplex<R> { 
         self.inner.into_tng_complex()
-    }
-
-    pub fn into_kh_complex(self) -> KhComplex<R> {
-        self.inner.into_kh_complex()
-    }
-
-    pub fn into_khi_complex(mut self) -> KhIComplex<R> {
-        assert!(self.complex().is_completely_delooped());
-
-        let key_map = std::mem::take(&mut self.key_map);
-
-        let map = move |x: &KhGen| -> KhGen {
-            let k = TngKey::from(x);
-            let tk = key_map[&k];
-
-            tk.as_gen()
-        };
-
-        let c = self.into_kh_complex();
-        let c = KhIComplex::from_kh_complex(c, map);
-        c
     }
 
     fn inv_node(&self, x: &Node) -> &Node { 

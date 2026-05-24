@@ -69,11 +69,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         KhComplex { inner, alg, deg_shift, reduced, canon_cycles, cache_bigr: OnceLock::new() }
     }
 
-    #[deprecated]
-    pub(crate) fn new_impl(inner: ChainComplex1<KhGen, R>, alg: KhAlg<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
-        KhComplex { inner, alg, deg_shift, reduced, canon_cycles, cache_bigr: OnceLock::new() }
-    }
-
     pub fn deg_shift_for(l: &Link, reduced: bool) -> (isize, isize) {
         let (n_pos, n_neg) = l.n_signed_crossings();
         let (n_pos, n_neg) = (n_pos as isize, n_neg as isize);

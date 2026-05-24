@@ -13,7 +13,7 @@ use yui_homology::{ChainComplex1, Summand, GrMod1};
 use yui_link::{Edge, Node, State};
 use yui_core::bitseq::Bit;
 
-use crate::kh::{KhAlgGen, KhAlg, KhChain, KhComplex, KhGen, KhTensor};
+use crate::kh::{KhAlgGen, KhGen, KhTensor};
 use super::cob::{Cob, Dot, Bottom, CobComp, LcCob, LcCobTrait};
 use super::tng::{Tng, TngComp};
 
@@ -611,19 +611,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         ChainComplex1::new(summands, 1, move |_, z| { 
             z.apply(&d)
         })
-    }
-
-    pub fn into_kh_complex(self, canon_cycles: Vec<KhChain<R>>) -> KhComplex<R> { 
-        assert!(self.is_completely_delooped());
-
-        let (h, t) = self.ht();
-        let alg = KhAlg::new(h, t);
-        let deg_shift = self.deg_shift;
-        let reduced = self.base_pt.is_some();
-
-        let inner = self.into_raw_complex();
-
-        KhComplex::new_impl(inner, alg, deg_shift, reduced, canon_cycles)
     }
 
     pub fn is_completely_delooped(&self) -> bool { 

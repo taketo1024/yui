@@ -34,31 +34,12 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         SymTngBuilder::build_khi_complex(l, h, t, reduced)
     }
 
-    pub fn new_no_simplify(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self { 
-        use crate::khi::internal::v1::cube::KhICube;
-        use crate::kh::KhComplex;
-
+    pub fn new_no_simplify(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self {
         assert_eq!(R::one() + R::one(), R::zero(), "char(R) != 2");
         assert!(!reduced || (l.base_pt().is_some() && t.is_zero()));
 
-        let deg_shift = KhComplex::deg_shift_for(l.inner(), reduced);
-
-        // TODO use mapping cone
-
-        let cube = KhICube::new(l, h, t, reduced, deg_shift);
-        let inner = cube.into_complex();
-
-        let canon_cycles = if l.base_pt().is_some() && l.is_knot() {
-            let zs = KhComplex::make_canon_cycles(l.inner(), &R::zero(), h, reduced);
-            Iterator::chain(
-                zs.iter().map(|z| z.clone().map_keys(KhIGen::from_left)),
-                zs.iter().map(|z| z.clone().map_keys(KhIGen::from_right))
-            ).collect()
-        } else { 
-            vec![]
-        };
-
-        Self::new_impl(inner, canon_cycles, deg_shift)
+        let c = KhComplex::new_no_simplify(l.inner(), h, t, reduced);
+        Self::from_kh_complex(c, crate::khi::tau::tau_map(l))
     }
 
     pub fn from_kh_complex<'a, F>(c: KhComplex<R>, map: F) -> Self

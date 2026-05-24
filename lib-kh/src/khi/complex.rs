@@ -2,13 +2,13 @@ use std::ops::{Index, RangeInclusive};
 use std::sync::OnceLock;
 use delegate::delegate;
 
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use yui_core::lc::Lc;
 use yui_core::{EucRing, EucRingOps, IteratorExt, Ring, RingOps};
-use yui_homology::{ChainComplex1, ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
+use yui_homology::{ChainComplex1, ChainMap, ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_link::InvLink;
 
-use crate::kh::{KhChain, KhComplex, KhGen};
+use crate::kh::{KhComplex, KhGen};
 use crate::khi::KhIHomology;
 use crate::khi::{KhIGen, KhIGenExt};
 use crate::util::Bigraded;
@@ -42,48 +42,23 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         Self::from_kh_complex(c, crate::khi::tau::tau_map(l))
     }
 
-    pub fn from_kh_complex<'a, F>(c: KhComplex<R>, map: F) -> Self
+    pub(crate) fn from_kh_complex<F>(c: KhComplex<R>, map: F) -> Self
     where F: Fn(&KhGen) -> KhGen + Send + Sync + 'static {
         let deg_shift = c.deg_shift();
         let h_range = c.h_range();
         let h_range = *h_range.start() ..= (h_range.end() + 1);
 
-        let canon_cycles = c.canon_cycles().iter().flat_map(|z| { 
+        let canon_cycles = c.canon_cycles().iter().flat_map(|z| {
             let bz = z.clone().map_keys(KhIGen::from_left);
             let qz = z.clone().map_keys(KhIGen::from_right);
             [bz, qz]
         }).sorted_by_key(|z| z.keys().map(|x| x.rel_h_deg()).min().unwrap_or(0)).collect_vec();
 
-        // TODO use mapping cone
-
-        let summands = GrMod1::generate(h_range, |i| { 
-            let b_gens = c[i].raw_generators().iter().map(|x| KhIGen::from_left(*x));
-            let q_gens = c[i - 1].raw_generators().iter().map(|x| KhIGen::from_right(*x));
-            Summand::from_raw_generators(Iterator::chain(b_gens, q_gens))
+        // KhI is the mapping cone of (1 + τ) : KhComplex → KhComplex.
+        let one_plus_tau = ChainMap::new(c.inner(), c.inner(), 0, move |_, z| {
+            z.clone() + z.apply(|x| Lc::from(map(x)))
         });
-
-        let d = move |i: isize, x: &KhIGen| -> KhIChain<R> {
-            match x.inner() {
-                Either::Left(x) => {
-                    let z = KhChain::from(*x);
-                    let dx = c.d(i, &z).map_keys(KhIGen::from_left);
-                    let qx = KhIChain::from(KhIGen::from_right(*x));
-                    let qtx = {
-                        let tx = map(x);
-                        KhIChain::from(KhIGen::from_right(tx))
-                    };
-                    dx + qx + qtx
-                },
-                Either::Right(x) => {
-                    let z = KhChain::from(*x);
-                    c.d(i, &z).map_keys(KhIGen::from_right)
-                }
-            }
-        };
-
-        let inner = ChainComplex1::new(summands, 1, move |i, z| { 
-            z.apply(|x| d(i, x))
-        });
+        let inner = one_plus_tau.cone(h_range, false);
 
         KhIComplex::new_impl(inner, canon_cycles, deg_shift)
     }

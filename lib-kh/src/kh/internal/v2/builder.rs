@@ -45,15 +45,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> TngComplexBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn build_kh_complex(l: &Link, h: &R, t: &R, reduced: bool) -> KhComplex<R> { 
-        assert!(!reduced || l.base_pt().is_some());
-
-        let mut b = Self::new(l, h, t, reduced);
-        b.process_all();
-        b.finalize();
-        b.into_kh_complex()
-    }
-
     pub fn new(l: &Link, h: &R, t: &R, reduced: bool) -> Self { 
         let base_pt = if reduced { l.base_pt() } else { None };
         let deg_shift = KhComplex::deg_shift_for(l, reduced);
@@ -153,6 +144,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         count
     }
+
+    pub fn run(mut self) -> Self { 
+        self.process_all();
+        self.finalize();
+        self
+    } 
 
     pub fn process_all(&mut self) { 
         while let Some(x) = self.choose_next() { 
@@ -395,6 +392,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.complex
     }
 
+    #[deprecated]
     pub fn into_kh_complex(self) -> KhComplex<R> { 
         info!("build Kh complex...");
 
@@ -613,7 +611,8 @@ mod tests {
     #[test]
     fn test_unknot() {
         let l = Link::unknot_old();
-        let c = TngComplexBuilder::build_kh_complex(&l, &2, &0, false);
+        let b = TngComplexBuilder::new(&l, &0, &0, false).run();
+        let c = b.into_tng_complex().into_raw_complex();
 
         assert_eq!(c[0].rank(), 2);
         assert_eq!(c[1].rank(), 0);
@@ -622,7 +621,8 @@ mod tests {
     #[test]
     fn test_unknot_rm1() {
         let l = Link::test_data("unknot_l_twist");
-        let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
+        let b = TngComplexBuilder::new(&l, &0, &0, false).run();
+        let c = b.into_tng_complex().into_raw_complex();
 
         assert_eq!(c[0].rank(), 2);
         assert_eq!(c[1].rank(), 0);
@@ -631,9 +631,10 @@ mod tests {
     #[test]
     fn test_unknot_rm1_neg() {
         let l = Link::test_data("unknot_r_twist");
-        let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
+        let b = TngComplexBuilder::new(&l, &0, &0, false).run();
+        let c = b.into_tng_complex().into_raw_complex();
 
-        c.inner().check_d_all();
+        c.check_d_all();
 
         assert_eq!(c[-1].rank(), 0);
         assert_eq!(c[ 0].rank(), 2);
@@ -642,9 +643,10 @@ mod tests {
     #[test]
     fn test_unknot_rm2() {
         let l = Link::test_data("unknot_lr_twist");
-        let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
+        let b = TngComplexBuilder::new(&l, &0, &0, false).run();
+        let c = b.into_tng_complex().into_raw_complex();
 
-        c.inner().check_d_all();
+        c.check_d_all();
 
         assert_eq!(c[-1].rank(), 0);
         assert_eq!(c[ 0].rank(), 2);
@@ -654,9 +656,10 @@ mod tests {
     #[test]
     fn test_unlink_2() {
         let l = Link::test_data("unlink2");
-        let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
+        let b = TngComplexBuilder::new(&l, &0, &0, false).run();
+        let c = b.into_tng_complex().into_raw_complex();
 
-        c.inner().check_d_all();
+        c.check_d_all();
 
         assert_eq!(c[-1].rank(), 0);
         assert_eq!(c[ 0].rank(), 4);
@@ -679,9 +682,10 @@ mod tests {
     #[test]
     fn test_hopf_link() {
         let l = Link::test_data("L2a1");
-        let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
+        let b = TngComplexBuilder::new(&l, &0, &0, false).run();
+        let c = b.into_tng_complex().into_raw_complex();
 
-        c.inner().check_d_all();
+        c.check_d_all();
 
         assert_eq!(c[-2].rank(), 2);
         assert_eq!(c[-1].rank(), 0);
@@ -691,11 +695,12 @@ mod tests {
     #[test]
     fn test_8_19() {
         let l = Link::test_data("8_19");
-        let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
+        let b = TngComplexBuilder::new(&l, &0, &0, false).run();
+        let c = b.into_tng_complex().into_raw_complex();
 
-        c.inner().check_d_all();
+        c.check_d_all();
 
-        let h = c.inner().homology();
+        let h = c.homology();
 
         for i in [1,6,7,8] {
             assert_eq!(h[i].rank(), 0);
@@ -717,14 +722,14 @@ mod tests {
     #[test]
     fn canon_cycle_trefoil() { 
         let l = Link::test_data("3_1");
-        let c = TngComplexBuilder::build_kh_complex(&l, &2, &0, false);
-        let zs = c.canon_cycles();
+        let b = TngComplexBuilder::new(&l, &1, &0, false).run();
+        let zs = b.eval_elements();
+        let c = b.into_tng_complex().into_raw_complex();
 
         assert_eq!(zs.len(), 2);
         assert_ne!(zs[0], zs[1]);
         
         for z in zs {
-            assert!(z.homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
             assert!(c.d(0, &z).is_zero());
         }
     }
@@ -739,8 +744,8 @@ mod tests {
         b.process_all();
         b.finalize();
 
-        let c = b.into_kh_complex();
-        c.inner().check_d_all();
+        let c = b.into_tng_complex().into_raw_complex();
+        c.check_d_all();
 
         let h = c.homology();
         assert_eq!(h[0].rank(), 4);

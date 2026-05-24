@@ -33,7 +33,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         assert!(!reduced || (!l.is_empty() && t.is_zero()));
 
-        TngComplexBuilder::build_kh_complex(l, h, t, reduced)
+        let alg = KhAlg::new(h, t);
+        let deg_shift = Self::deg_shift_for(l, reduced);
+
+        let mut b = TngComplexBuilder::new(l, h, t, reduced);
+        b.process_all();
+        b.finalize();
+
+        let canon_cycles = b.eval_elements();
+        let inner = b.into_tng_complex().into_raw_complex();
+
+        KhComplex { inner, alg, deg_shift, reduced, canon_cycles, cache_bigr: OnceLock::new() }
     }
 
     pub fn new_no_simplify(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
@@ -46,7 +56,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let alg = KhAlg::new(h, t);
         let cube = KhCube::new(l, h, t, base_pt, deg_shift);
-        let complex = cube.into_complex();
+        let inner = cube.into_complex();
 
         let canon_cycles = if t.is_zero() && l.is_knot() {
             Self::make_canon_cycles(l, &R::zero(), h, reduced)
@@ -54,7 +64,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             vec![]
         };
 
-        KhComplex::new_impl(complex, alg, deg_shift, reduced, canon_cycles)
+        KhComplex { inner, alg, deg_shift, reduced, canon_cycles, cache_bigr: OnceLock::new() }
     }
 
     pub(crate) fn new_impl(inner: ChainComplex1<KhGen, R>, alg: KhAlg<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {

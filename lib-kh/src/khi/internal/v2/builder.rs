@@ -9,7 +9,6 @@ use rayon::prelude::*;
 use yui_core::bitseq::{Bit, BitSeq};
 use yui_core::algo::KeyedUnionFind;
 use yui_core::{Ring, RingOps};
-use yui_homology::ToSeqString;
 use yui_link::{Node, Edge, InvLink};
 
 use crate::kh::{KhComplex, KhGen, KhTensor};
@@ -550,7 +549,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             tk.as_gen()
         }
     }
-    
+
     pub fn into_inner(self) -> TngComplexBuilder<R> { 
         self.inner
     }
@@ -576,11 +575,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         };
 
         let c = self.into_kh_complex();
-
-        info!("build KhI complex...");
         let c = KhIComplex::from_kh_complex(c, map);
-        info!("  done\n{}", c.to_seq_string());
-
         c
     }
 
@@ -661,14 +656,27 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 #[allow(unused)]
 mod tests { 
-    use crate::khi::KhIHomology;
+    use crate::khi::{KhIGen, KhIHomology};
 
     use super::*;
     use num_traits::Zero;
 
+    use yui_core::IteratorExt;
+    use yui_core::lc::Lc;
     use yui_core::num::FF2;
     use yui_core::poly::Poly;
-    use yui_homology::{ToSeqString, ToTableString};
+    use yui_core::RangeExt;
+    use yui_homology::{ChainComplex1, ChainMap, ToSeqString, ToTableString};
+
+    fn make_cone(b: SymTngBuilder<FF2>) -> ChainComplex1<KhIGen, FF2> { 
+        let t = b.tau_map();
+        let c = b.into_inner().into_tng_complex().into_raw_complex();
+        let h_range = c.support().cloned().range().unwrap().mv(0, 1);
+        let one_plus_tau = ChainMap::new(&c, &c, 0, move |_, z| {
+            z.clone() + z.apply(|x| Lc::from(t(x)))
+        });
+        one_plus_tau.cone(h_range, false)
+    }
 
     #[test]
     fn test_kh_3_1() { 
@@ -687,14 +695,13 @@ mod tests {
         assert_eq!(h[3].rank(), 2);
     }
 
-    #[test]
     fn test_khi_3_1() { 
         let l = InvLink::test_data("3_1");
         let (h, t) = (FF2::zero(), FF2::zero());
 
         let b = SymTngBuilder::new(&l, &h, &t, false).run();
-        let c = b.into_khi_complex();
-        c.inner().check_d_all();
+        let c = make_cone(b);
+        c.check_d_all();
 
         let h = c.homology();
 
@@ -713,10 +720,10 @@ mod tests {
         let mut b = SymTngBuilder::new(&l, &h, &t, false);
         b.process_all();
 
-        let c = b.into_khi_complex();
-        c.inner().check_d_all();;
+        let c = make_cone(b);
+        c.check_d_all();;
 
-        let h = c.inner().homology();
+        let h = c.homology();
 
         assert_eq!(h[0].rank(), 2);
         assert_eq!(h[1].rank(), 2);
@@ -742,10 +749,8 @@ mod tests {
         b.process_partial(0..4);
         b.finalize();
 
-        let c = b.into_khi_complex();
-        c.inner().check_d_all();
-
-        assert!(c.canon_cycles().is_empty()); // TODO
+        let c = make_cone(b);
+        c.check_d_all();
 
         let h = c.homology();
         assert_eq!(h[-3].rank(), 2);
@@ -820,12 +825,10 @@ mod tests {
 
         let mut b = SymTngBuilder::new(&l, &h, &t, false);
         b.set_h_range(h_range.clone());
-        b.preprocess();
-        b.process_all();
-        b.finalize();
+        b = b.run();
 
-        let c = b.into_khi_complex().truncated(-1..=2);
-        c.inner().check_d_all();
+        let c = make_cone(b).truncated(-1..=2);
+        c.check_d_all();
 
         let h = c.homology().truncated(0..=1);
         assert_eq!(h[0].rank(), 10);

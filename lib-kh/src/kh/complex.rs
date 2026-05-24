@@ -5,10 +5,10 @@ use delegate::delegate;
 use yui_core::lc::Lc;
 use yui_core::{IteratorExt, Ring, RingOps, EucRing, EucRingOps};
 use yui_link::Link;
-use yui_homology::{ChainComplex1, ToSeqString, ToTableString, GrMod2, Summand};
+use yui_homology::{ChainComplex1, ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 
 use crate::kh::{KhGen, KhHomology};
-use crate::misc::decomp_by_q_deg;
+use crate::misc::Bigraded;
 
 use super::KhAlg;
 
@@ -23,7 +23,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     deg_shift: (isize, isize),
     reduced: bool,
     canon_cycles: Vec<KhChain<R>>,
-    gen_grid: OnceLock<GrMod2<KhGen, R>>,
+    cache: OnceLock<GrMod2<KhGen, R>>,
 }
 
 impl<R> KhComplex<R>
@@ -58,7 +58,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub(crate) fn new_impl(inner: ChainComplex1<KhGen, R>, alg: KhAlg<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
-        KhComplex { inner, alg, deg_shift, reduced, canon_cycles, gen_grid: OnceLock::new() }
+        KhComplex { inner, alg, deg_shift, reduced, canon_cycles, cache: OnceLock::new() }
     }
 
     pub fn alg(&self) -> &KhAlg<R> {
@@ -107,12 +107,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.inner
     }
 
-    fn gen_grid(&self) -> &GrMod2<KhGen, R> {
-        self.gen_grid.get_or_init(|| 
-            decomp_by_q_deg(self.inner.summands(), |z| self.q_deg_of_chain(z))
-        )
-    }
-
     pub fn deg_shift_for(l: &Link, reduced: bool) -> (isize, isize) {
         let (n_pos, n_neg) = l.n_signed_crossings();
         let (n_pos, n_neg) = (n_pos as isize, n_neg as isize);
@@ -141,11 +135,24 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 }
 
+impl<R> Bigraded<KhGen, R> for KhComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn base(&self) -> &GrMod1<KhGen, R> { self.inner.summands() }
+    fn decomp_key(&self, z: &KhChain<R>) -> isize { self.q_deg_of_chain(z) }
+}
+
+impl<R> KhComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn cached_bigraded(&self) -> &GrMod2<KhGen, R> {
+        self.cache.get_or_init(|| self.bigraded())
+    }
+}
+
 impl<R> Index<isize> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = KhComplexSummand<R>;
 
-    delegate! { 
+    delegate! {
         to self.inner {
             fn index(&self, index: isize) -> &Self::Output;
         }
@@ -156,10 +163,8 @@ impl<R> Index<(isize, isize)> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = KhComplexSummand<R>;
 
-    delegate! { 
-        to self.gen_grid() {
-            fn index(&self, index: (isize, isize)) -> &Self::Output;
-        }
+    fn index(&self, index: (isize, isize)) -> &Self::Output {
+        &self.cached_bigraded()[index]
     }
 }
 

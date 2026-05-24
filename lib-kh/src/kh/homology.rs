@@ -7,7 +7,7 @@ use yui_core::{EucRing, EucRingOps, IteratorExt};
 use yui_link::Link;
 
 use crate::kh::KhGen;
-use crate::misc::decomp_by_q_deg;
+use crate::misc::Bigraded;
 
 use super::{KhAlg, KhChain, KhComplex};
 
@@ -19,7 +19,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     deg_shift: (isize, isize),
     reduced: bool,
     canon_cycles: Vec<KhChain<R>>,
-    gen_grid: OnceLock<GrMod2<KhGen, R>>,
+    cache: OnceLock<GrMod2<KhGen, R>>,
 }
 
 impl<R> KhHomology<R> 
@@ -35,7 +35,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
     
     pub(crate) fn new_impl(inner: GrMod1<KhGen, R>, alg: KhAlg<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
-        Self { inner, alg, deg_shift, reduced, canon_cycles, gen_grid: OnceLock::new() }
+        Self { inner, alg, deg_shift, reduced, canon_cycles, cache: OnceLock::new() }
     }
 
     pub fn inner(&self) -> &GrMod1<KhGen, R> { 
@@ -109,10 +109,18 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         )
     }
 
-    fn gen_grid(&self) -> &GrMod2<KhGen, R> {
-        self.gen_grid.get_or_init(|| 
-            decomp_by_q_deg(self.inner(), |z| self.q_deg_of_chain(z))
-        )
+}
+
+impl<R> Bigraded<KhGen, R> for KhHomology<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    fn base(&self) -> &GrMod1<KhGen, R> { self.inner() }
+    fn decomp_key(&self, z: &KhChain<R>) -> isize { self.q_deg_of_chain(z) }
+}
+
+impl<R> KhHomology<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    fn cached_bigraded(&self) -> &GrMod2<KhGen, R> {
+        self.cache.get_or_init(|| self.bigraded())
     }
 }
 
@@ -144,10 +152,8 @@ impl<R> Index<(isize, isize)> for KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     type Output = Summand<KhGen, R>;
 
-    delegate! {
-        to self.gen_grid() {
-            fn index(&self, index: (isize, isize)) -> &Self::Output;
-        }
+    fn index(&self, index: (isize, isize)) -> &Self::Output {
+        &self.cached_bigraded()[index]
     }
 }
 
@@ -286,7 +292,7 @@ mod tests {
         assert_eq!(h.h_range(), 0..=0);
         assert_eq!(h.q_range(), 0..=0);
 
-        let h = h.gen_grid();
+        let h = h.bigraded();
         assert_eq!(h[(0,0)].rank(), 1);
         assert!(h[(0,0)].is_free());
     }
@@ -299,7 +305,7 @@ mod tests {
         assert_eq!(h.h_range(), 0..=0);
         assert_eq!(h.q_range(), -1..=1);
 
-        let h = h.gen_grid();
+        let h = h.bigraded();
         assert_eq!(h[(0,-1)].rank(), 1);
         assert!(h[(0,-1)].is_free());
         assert_eq!(h[(0, 1)].rank(), 1);
@@ -311,7 +317,7 @@ mod tests {
         let l = Link::unknot_old();
         let h = KhHomology::new(&l, &0, &0, true);
 
-        let h = h.gen_grid();
+        let h = h.bigraded();
         assert_eq!(h[(0, 0)].rank(), 1);
         assert!(h[(0, 0)].is_free());
     }
@@ -324,7 +330,7 @@ mod tests {
         assert_eq!(h.h_range(), -3..=0);
         assert_eq!(h.q_range(), -9..=-1);
 
-        let h = h.gen_grid();
+        let h = h.bigraded();
         assert_eq!(h[(-3,-9)].rank(), 1);
         assert!(h[(-3,-9)].is_free());
         assert_eq!(h[(-2,-7)].rank(), 0);
@@ -345,7 +351,7 @@ mod tests {
         assert_eq!(h.h_range(), 0..=3);
         assert_eq!(h.q_range(), 1..=9);
 
-        let h = h.gen_grid();
+        let h = h.bigraded();
         assert_eq!(h[(0, 1)].rank(), 1);
         assert!(h[(0, 1)].is_free());
         assert_eq!(h[(0, 3)].rank(), 1);
@@ -366,7 +372,7 @@ mod tests {
         assert_eq!(h.h_range(), -3..=0);
         assert_eq!(h.q_range(), -8..=-2);
 
-        let h = h.gen_grid();
+        let h = h.bigraded();
         assert_eq!(h[(-3,-8)].rank(), 1);
         assert!(h[(-3,-8)].is_free());
         assert_eq!(h[(-2,-6)].rank(), 1);
@@ -383,7 +389,7 @@ mod tests {
         assert_eq!(h.h_range(), -2..=2);
         assert_eq!(h.q_range(), -5..=5);
 
-        let h = h.gen_grid();
+        let h = h.bigraded();
         assert_eq!(h[(-2,-5)].rank(), 1);
         assert!(h[(-2,-5)].is_free());
         assert_eq!(h[(-1,-3)].rank(), 0);
@@ -410,7 +416,7 @@ mod tests {
         assert_eq!(h.h_range(), -2..=2);
         assert_eq!(h.q_range(), -4..=4);
 
-        let h = h.gen_grid();
+        let h = h.bigraded();
         assert_eq!(h[(-2,-4)].rank(), 1);
         assert!(h[(-2,-4)].is_free());
         assert_eq!(h[(-1,-2)].rank(), 1);
@@ -435,7 +441,7 @@ mod tests {
         assert_eq!(kh.h_range(), -2..=0);
         assert_eq!(kh.q_range(), -7..=-1);
 
-        let kh = kh.gen_grid();
+        let kh = kh.bigraded();
         assert_eq!(kh[(-2,-7)].rank(), 0);
         assert_eq!(kh[(-2,-7)].tors(), &vec![h.clone()]);
         assert_eq!(kh[(-2,-5)].rank(), 0);

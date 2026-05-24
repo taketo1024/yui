@@ -5,7 +5,7 @@ use yui_core::{EucRing, EucRingOps, IteratorExt};
 use yui_homology::{ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_link::InvLink;
 use crate::khi::{KhIComplex, KhIState};
-use crate::misc::decomp_by_q_deg;
+use crate::misc::Bigraded;
 
 use super::KhIChain;
 
@@ -15,7 +15,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     inner: GrMod1<KhIState, R>,
     canon_cycles: Vec<KhIChain<R>>,
     deg_shift: (isize, isize),
-    gen_grid: OnceLock<GrMod2<KhIState, R>>,
+    cache: OnceLock<GrMod2<KhIState, R>>,
 }
 
 impl<R> KhIHomology<R>
@@ -31,7 +31,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     pub(crate) fn new_impl(inner: GrMod1<KhIState, R>, canon_cycles: Vec<KhIChain<R>>, deg_shift: (isize, isize)) -> Self {
-        Self { inner, canon_cycles, deg_shift, gen_grid: OnceLock::new() }
+        Self { inner, canon_cycles, deg_shift, cache: OnceLock::new() }
     }
 
     pub fn inner(&self) -> &GrMod1<KhIState, R> {
@@ -89,10 +89,18 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         )
     }
 
-    fn gen_grid(&self) -> &GrMod2<KhIState, R> {
-        self.gen_grid.get_or_init(|| 
-            decomp_by_q_deg(self.inner(), |z| self.q_deg_of_chain(z))
-        )
+}
+
+impl<R> Bigraded<KhIState, R> for KhIHomology<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    fn base(&self) -> &GrMod1<KhIState, R> { self.inner() }
+    fn decomp_key(&self, z: &KhIChain<R>) -> isize { self.q_deg_of_chain(z) }
+}
+
+impl<R> KhIHomology<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    fn cached_bigraded(&self) -> &GrMod2<KhIState, R> {
+        self.cache.get_or_init(|| self.bigraded())
     }
 }
 
@@ -122,10 +130,8 @@ impl<R> Index<(isize, isize)> for KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     type Output = Summand<KhIState, R>;
 
-    delegate! {
-        to self.gen_grid() {
-            fn index(&self, index: (isize, isize)) -> &Self::Output;
-        }
+    fn index(&self, index: (isize, isize)) -> &Self::Output {
+        &self.cached_bigraded()[index]
     }
 }
 

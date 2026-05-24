@@ -29,6 +29,22 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     Some(k)
 }
 
+/// q-graded decomposition of a `GrMod1` into a `GrMod2`.
+///
+/// Implementors describe the underlying `GrMod1` (`base`) and how to extract
+/// a chain's q-degree (`decomp_key`); the default `bigraded()` computes a
+/// fresh `GrMod2`. Each type typically also provides an inherent
+/// `cached_bigraded()` that caches the result in a `OnceLock` field.
+pub(crate) trait Bigraded<X, R>
+where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
+    fn base(&self) -> &GrMod1<X, R>;
+    fn decomp_key(&self, z: &Lc<X, R>) -> isize;
+
+    fn bigraded(&self) -> GrMod2<X, R> {
+        decomp_by_q_deg(self.base(), |z| self.decomp_key(z))
+    }
+}
+
 pub(crate) fn collect_gen_info<X, R, F>(grid: &GrMod1<X, R>, q_deg_of_chain: F) -> HashMap<isize2, (usize, Vec<R>, Vec<usize>)>
 where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R>, F: Fn(&Lc<X, R>) -> isize {
     let mut table = HashMap::new();

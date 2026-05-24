@@ -11,7 +11,7 @@ use yui_link::InvLink;
 use crate::kh::{KhChain, KhComplex, KhGen};
 use crate::khi::KhIHomology;
 use crate::khi::KhIState;
-use crate::misc::decomp_by_q_deg;
+use crate::misc::Bigraded;
 
 pub type KhIChain<R> = Lc<KhIState, R>;
 
@@ -23,7 +23,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     inner: ChainComplex1<KhIState, R>,
     canon_cycles: Vec<KhIChain<R>>,
     deg_shift: (isize, isize),
-    gen_grid: OnceLock<GrMod2<KhIState, R>>,
+    cache: OnceLock<GrMod2<KhIState, R>>,
 }
 
 impl<R> KhIComplex<R>
@@ -108,7 +108,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     }
 
     pub(crate) fn new_impl(inner: ChainComplex1<KhIState, R>, canon_cycles: Vec<KhIChain<R>>, deg_shift: (isize, isize)) -> Self {
-        Self { inner, canon_cycles, deg_shift, gen_grid: OnceLock::new() }
+        Self { inner, canon_cycles, deg_shift, cache: OnceLock::new() }
     }
 
     pub fn inner(&self) -> &ChainComplex1<KhIState, R> {
@@ -168,15 +168,22 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         )
     }
 
-    fn gen_grid(&self) -> &GrMod2<KhIState, R> {
-        self.gen_grid.get_or_init(|| 
-            decomp_by_q_deg(self.inner.summands(), |z| self.q_deg_of_chain(z))
-        )
-    }
-
     pub fn homology(&self) -> KhIHomology<R>
-    where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
+    where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         KhIHomology::from(self)
+    }
+}
+
+impl<R> Bigraded<KhIState, R> for KhIComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn base(&self) -> &GrMod1<KhIState, R> { self.inner.summands() }
+    fn decomp_key(&self, z: &KhIChain<R>) -> isize { self.q_deg_of_chain(z) }
+}
+
+impl<R> KhIComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn cached_bigraded(&self) -> &GrMod2<KhIState, R> {
+        self.cache.get_or_init(|| self.bigraded())
     }
 }
 
@@ -195,10 +202,8 @@ impl<R> Index<(isize, isize)> for KhIComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = KhIComplexSummand<R>;
 
-    delegate! {
-        to self.gen_grid() {
-            fn index(&self, index: (isize, isize)) -> &Self::Output;
-        }
+    fn index(&self, index: (isize, isize)) -> &Self::Output {
+        &self.cached_bigraded()[index]
     }
 }
 

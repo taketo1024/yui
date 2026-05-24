@@ -8,7 +8,7 @@ use yui_link::Link;
 use yui_homology::{ChainComplex1, ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 
 use crate::kh::{KhGen, KhHomology};
-use crate::misc::Bigraded;
+use crate::util::Bigraded;
 
 use super::KhAlg;
 
@@ -23,7 +23,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     deg_shift: (isize, isize),
     reduced: bool,
     canon_cycles: Vec<KhChain<R>>,
-    cache: OnceLock<GrMod2<KhGen, R>>,
+    cache_bigr: OnceLock<GrMod2<KhGen, R>>,
 }
 
 impl<R> KhComplex<R>
@@ -58,7 +58,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub(crate) fn new_impl(inner: ChainComplex1<KhGen, R>, alg: KhAlg<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
-        KhComplex { inner, alg, deg_shift, reduced, canon_cycles, cache: OnceLock::new() }
+        KhComplex { inner, alg, deg_shift, reduced, canon_cycles, cache_bigr: OnceLock::new() }
     }
 
     pub fn alg(&self) -> &KhAlg<R> {
@@ -126,6 +126,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn describe_d_at(&self, i: isize) -> String;
         }
     }
+
+    fn cached_bigraded(&self) -> &GrMod2<KhGen, R> {
+        self.cache_bigr.get_or_init(|| self.bigraded())
+    }
 }
 
 impl<R> KhComplex<R>
@@ -139,13 +143,6 @@ impl<R> Bigraded<KhGen, R> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn base(&self) -> &GrMod1<KhGen, R> { self.inner.summands() }
     fn decomp_key(&self, z: &KhChain<R>) -> isize { self.q_deg_of_chain(z) }
-}
-
-impl<R> KhComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn cached_bigraded(&self) -> &GrMod2<KhGen, R> {
-        self.cache.get_or_init(|| self.bigraded())
-    }
 }
 
 impl<R> Index<isize> for KhComplex<R>

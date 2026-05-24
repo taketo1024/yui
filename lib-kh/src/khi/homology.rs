@@ -5,7 +5,7 @@ use yui_core::{EucRing, EucRingOps, IteratorExt};
 use yui_homology::{ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_link::InvLink;
 use crate::khi::{KhIComplex, KhIState};
-use crate::misc::Bigraded;
+use crate::util::Bigraded;
 
 use super::KhIChain;
 
@@ -15,7 +15,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     inner: GrMod1<KhIState, R>,
     canon_cycles: Vec<KhIChain<R>>,
     deg_shift: (isize, isize),
-    cache: OnceLock<GrMod2<KhIState, R>>,
+    cache_bigr: OnceLock<GrMod2<KhIState, R>>,
 }
 
 impl<R> KhIHomology<R>
@@ -31,7 +31,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     pub(crate) fn new_impl(inner: GrMod1<KhIState, R>, canon_cycles: Vec<KhIChain<R>>, deg_shift: (isize, isize)) -> Self {
-        Self { inner, canon_cycles, deg_shift, cache: OnceLock::new() }
+        Self { inner, canon_cycles, deg_shift, cache_bigr: OnceLock::new() }
     }
 
     pub fn inner(&self) -> &GrMod1<KhIState, R> {
@@ -89,19 +89,15 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         )
     }
 
+    fn cached_bigraded(&self) -> &GrMod2<KhIState, R> {
+        self.cache_bigr.get_or_init(|| self.bigraded())
+    }
 }
 
 impl<R> Bigraded<KhIState, R> for KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     fn base(&self) -> &GrMod1<KhIState, R> { self.inner() }
     fn decomp_key(&self, z: &KhIChain<R>) -> isize { self.q_deg_of_chain(z) }
-}
-
-impl<R> KhIHomology<R>
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    fn cached_bigraded(&self) -> &GrMod2<KhIState, R> {
-        self.cache.get_or_init(|| self.bigraded())
-    }
 }
 
 impl<R> From<&KhIComplex<R>> for KhIHomology<R>

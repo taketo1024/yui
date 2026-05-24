@@ -11,7 +11,7 @@ use yui_link::InvLink;
 use crate::kh::{KhChain, KhComplex, KhGen};
 use crate::khi::KhIHomology;
 use crate::khi::KhIState;
-use crate::misc::Bigraded;
+use crate::util::Bigraded;
 
 pub type KhIChain<R> = Lc<KhIState, R>;
 
@@ -23,7 +23,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     inner: ChainComplex1<KhIState, R>,
     canon_cycles: Vec<KhIChain<R>>,
     deg_shift: (isize, isize),
-    cache: OnceLock<GrMod2<KhIState, R>>,
+    cache_bigr: OnceLock<GrMod2<KhIState, R>>,
 }
 
 impl<R> KhIComplex<R>
@@ -108,7 +108,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     }
 
     pub(crate) fn new_impl(inner: ChainComplex1<KhIState, R>, canon_cycles: Vec<KhIChain<R>>, deg_shift: (isize, isize)) -> Self {
-        Self { inner, canon_cycles, deg_shift, cache: OnceLock::new() }
+        Self { inner, canon_cycles, deg_shift, cache_bigr: OnceLock::new() }
     }
 
     pub fn inner(&self) -> &ChainComplex1<KhIState, R> {
@@ -162,9 +162,9 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
     pub fn truncated(&self, range: RangeInclusive<isize>) -> Self {
         Self::new_impl(
-            self.inner.truncated(range), 
+            self.inner.truncated(range),
             self.canon_cycles.clone(),
-            self.deg_shift, 
+            self.deg_shift,
         )
     }
 
@@ -172,19 +172,16 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         KhIHomology::from(self)
     }
+
+    fn cached_bigraded(&self) -> &GrMod2<KhIState, R> {
+        self.cache_bigr.get_or_init(|| self.bigraded())
+    }
 }
 
 impl<R> Bigraded<KhIState, R> for KhIComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn base(&self) -> &GrMod1<KhIState, R> { self.inner.summands() }
     fn decomp_key(&self, z: &KhIChain<R>) -> isize { self.q_deg_of_chain(z) }
-}
-
-impl<R> KhIComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn cached_bigraded(&self) -> &GrMod2<KhIState, R> {
-        self.cache.get_or_init(|| self.bigraded())
-    }
 }
 
 impl<R> Index<isize> for KhIComplex<R>

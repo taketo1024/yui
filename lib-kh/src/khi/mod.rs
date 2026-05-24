@@ -2,6 +2,7 @@ mod khi_gen;
 mod complex;
 mod homology;
 mod ssi;
+mod tau;
 
 pub use khi_gen::*;
 pub use complex::*;

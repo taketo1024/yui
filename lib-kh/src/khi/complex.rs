@@ -2,7 +2,7 @@ use std::ops::{Index, RangeInclusive};
 use std::sync::OnceLock;
 use delegate::delegate;
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use yui_core::lc::Lc;
 use yui_core::{EucRing, EucRingOps, IteratorExt, Ring, RingOps};
 use yui_homology::{ChainComplex1, ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
@@ -10,7 +10,7 @@ use yui_link::InvLink;
 
 use crate::kh::{KhChain, KhComplex, KhGen};
 use crate::khi::KhIHomology;
-use crate::khi::KhIGen;
+use crate::khi::{KhIGen, KhIGenExt};
 use crate::util::Bigraded;
 
 pub type KhIChain<R> = Lc<KhIGen, R>;
@@ -51,8 +51,8 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         let canon_cycles = if l.base_pt().is_some() && l.is_knot() {
             let zs = KhComplex::make_canon_cycles(l.inner(), &R::zero(), h, reduced);
             Iterator::chain(
-                zs.iter().map(|z| z.clone().map_keys(KhIGen::B)),
-                zs.iter().map(|z| z.clone().map_keys(KhIGen::Q))
+                zs.iter().map(|z| z.clone().map_keys(KhIGen::from_left)),
+                zs.iter().map(|z| z.clone().map_keys(KhIGen::from_right))
             ).collect()
         } else { 
             vec![]
@@ -68,34 +68,34 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         let h_range = *h_range.start() ..= (h_range.end() + 1);
 
         let canon_cycles = c.canon_cycles().iter().flat_map(|z| { 
-            let bz = z.clone().map_keys(KhIGen::B);
-            let qz = z.clone().map_keys(KhIGen::Q);
+            let bz = z.clone().map_keys(KhIGen::from_left);
+            let qz = z.clone().map_keys(KhIGen::from_right);
             [bz, qz]
         }).sorted_by_key(|z| z.keys().map(|x| x.rel_h_deg()).min().unwrap_or(0)).collect_vec();
 
         // TODO use mapping cone
 
         let summands = GrMod1::generate(h_range, |i| { 
-            let b_gens = c[i].raw_generators().iter().map(|x| KhIGen::B(*x));
-            let q_gens = c[i - 1].raw_generators().iter().map(|x| KhIGen::Q(*x));
+            let b_gens = c[i].raw_generators().iter().map(|x| KhIGen::from_left(*x));
+            let q_gens = c[i - 1].raw_generators().iter().map(|x| KhIGen::from_right(*x));
             Summand::from_raw_generators(Iterator::chain(b_gens, q_gens))
         });
 
-        let d = move |i: isize, x: &KhIGen| -> KhIChain<R> { 
-            match x { 
-                KhIGen::B(x) => {
+        let d = move |i: isize, x: &KhIGen| -> KhIChain<R> {
+            match x.inner() {
+                Either::Left(x) => {
                     let z = KhChain::from(*x);
-                    let dx = c.d(i, &z).map_keys(KhIGen::B);
-                    let qx = KhIChain::from(KhIGen::Q(*x));
+                    let dx = c.d(i, &z).map_keys(KhIGen::from_left);
+                    let qx = KhIChain::from(KhIGen::from_right(*x));
                     let qtx = {
                         let tx = map(x);
-                        KhIChain::from(KhIGen::Q(tx))
+                        KhIChain::from(KhIGen::from_right(tx))
                     };
                     dx + qx + qtx
                 },
-                KhIGen::Q(x) => {
+                Either::Right(x) => {
                     let z = KhChain::from(*x);
-                    c.d(i, &z).map_keys(KhIGen::Q)
+                    c.d(i, &z).map_keys(KhIGen::from_right)
                 }
             }
         };

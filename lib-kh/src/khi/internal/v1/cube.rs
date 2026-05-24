@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::ops::RangeInclusive;
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use yui_core::lc::Lc;
 use yui_core::{Ring, RingOps};
 use yui_homology::{GrMod, ChainComplex1, Summand};
@@ -118,10 +118,10 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     pub fn generators(&self, i: isize) -> Vec<KhIGen> { 
         Iterator::chain(
             self.cube.generators(i).iter().map(|&&x| 
-                KhIGen::B(x)
+                KhIGen::from_left(x)
             ),
             self.cube.generators(i - 1).iter().map(|&&x|
-                KhIGen::Q(x)
+                KhIGen::from_right(x)
             )
         ).collect()
     }
@@ -134,18 +134,15 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         z.apply(|x| self.d(x))
     }
 
-    fn d(&self, x: &KhIGen) -> Lc<KhIGen, R> { 
-        match x {
-            KhIGen::B(x) => {
-                let dx = self.cube.d(x).map_keys(KhIGen::B
-                );
-                let fx = self.f(x).map_keys(KhIGen::Q
-                );
+    fn d(&self, x: &KhIGen) -> Lc<KhIGen, R> {
+        match x.inner() {
+            Either::Left(x) => {
+                let dx = self.cube.d(x).map_keys(KhIGen::from_left);
+                let fx = self.f(x).map_keys(KhIGen::from_right);
                 dx + fx
             },
-            KhIGen::Q(x) => {
-                self.cube.d(x).map_keys(KhIGen::Q
-                )
+            Either::Right(x) => {
+                self.cube.d(x).map_keys(KhIGen::from_right)
             },
         }
     }
@@ -273,7 +270,7 @@ mod tests {
         let (h, t) = (R::zero(), R::zero());
         let c = KhICube::new(&l, &h, &t, false, (0, 0));
 
-        let x = KhIGen::B(
+        let x = KhIGen::from_left(
             KhGen::new(
                 State::from([0,0,0]),
                 KhTensor::from([X, I])
@@ -282,21 +279,21 @@ mod tests {
         let dx = c.d(&x);
 
         assert_eq!(dx, Lc::from_iter([
-            (KhIGen::B(
+            (KhIGen::from_left(
                 KhGen::new(
                     State::from([1,0,0]),
                     KhTensor::from([X])
                 )
             ), R::one()),
 
-            (KhIGen::B(
+            (KhIGen::from_left(
                 KhGen::new(
                     State::from([0,1,0]),
                     KhTensor::from([X])
                 )
             ), R::one()),
             
-            (KhIGen::B(
+            (KhIGen::from_left(
                 KhGen::new(
                     State::from([0,0,1]),
                     KhTensor::from([X])
@@ -313,7 +310,7 @@ mod tests {
         let (h, t) = (R::zero(), R::zero());
         let c = KhICube::new(&l, &h, &t, false, (0, 0));
 
-        let x = KhIGen::B(
+        let x = KhIGen::from_left(
             KhGen::new(
                 State::from([0,1,0]),
                 KhTensor::from([X])
@@ -322,21 +319,21 @@ mod tests {
         let dx = c.d(&x);
 
         assert_eq!(dx, Lc::from_iter([
-            (KhIGen::B(
+            (KhIGen::from_left(
                 KhGen::new(
                     State::from([1,1,0]),
                     KhTensor::from([X,X])
                 )
             ), R::one()),
 
-            (KhIGen::B(
+            (KhIGen::from_left(
                 KhGen::new(
                     State::from([0,1,1]),
                     KhTensor::from([X,X])
                 )
             ), R::one()),
             
-            (KhIGen::Q(
+            (KhIGen::from_right(
                 KhGen::new(
                     State::from([0,1,0]),
                     KhTensor::from([X])
@@ -344,7 +341,7 @@ mod tests {
             ), R::one()),
 
                         
-            (KhIGen::Q(
+            (KhIGen::from_right(
                 KhGen::new(
                     State::from([0,0,1]),
                     KhTensor::from([X])
@@ -362,7 +359,7 @@ mod tests {
         let (h, t) = (R::zero(), R::zero());
         let c = KhICube::new(&l, &h, &t, false, (0, 0));
 
-        let x = KhIGen::Q(
+        let x = KhIGen::from_right(
             KhGen::new(
                 State::from([0,1,0]),
                 KhTensor::from([X])
@@ -371,14 +368,14 @@ mod tests {
         let dx = c.d(&x);
 
         assert_eq!(dx, Lc::from_iter([
-            (KhIGen::Q(
+            (KhIGen::from_right(
                 KhGen::new(
                     State::from([1,1,0]),
                     KhTensor::from([X,X])
                 )
             ), R::one()),
 
-            (KhIGen::Q(
+            (KhIGen::from_right(
                 KhGen::new(
                     State::from([0,1,1]),
                     KhTensor::from([X,X])

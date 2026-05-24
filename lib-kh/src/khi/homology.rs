@@ -4,7 +4,7 @@ use delegate::delegate;
 use yui_core::{EucRing, EucRingOps, IteratorExt};
 use yui_homology::{ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_link::InvLink;
-use crate::khi::{KhIComplex, KhIGen};
+use crate::khi::{KhIComplex, KhIGen, KhIGenExt};
 use crate::util::Bigraded;
 
 use super::KhIChain;

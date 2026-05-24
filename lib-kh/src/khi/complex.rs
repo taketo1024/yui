@@ -32,7 +32,14 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         use crate::khi::internal::v2::builder::SymTngBuilder;
 
         let b = SymTngBuilder::new(&l, &h, &t, reduced).run();
-        b.into_khi_complex()
+        let tau_map = b.tau_map();
+
+        let b = b.into_inner();
+        let canon_cycles = b.eval_elements();
+        let complex = b.into_tng_complex().into_raw_complex();
+        let c = KhComplex::from_raw_complex(l.inner(), h, t, reduced, complex, canon_cycles);
+
+        Self::from_kh_complex(c, tau_map)
     }
 
     pub fn new_no_simplify(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self {

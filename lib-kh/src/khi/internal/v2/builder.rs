@@ -541,6 +541,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         // TODO merge elements
     }
 
+    pub fn tau_map(&self) -> impl Fn(&KhGen) -> KhGen + Send + Sync + 'static {
+        let key_map = self.key_map.clone();
+
+        move |x: &KhGen| -> KhGen {
+            let k = TngKey::from(x);
+            let tk = key_map[&k];
+            tk.as_gen()
+        }
+    }
+    
+    pub fn into_inner(self) -> TngComplexBuilder<R> { 
+        self.inner
+    }
+
     pub fn into_tng_complex(self) -> TngComplex<R> { 
         self.inner.into_tng_complex()
     }

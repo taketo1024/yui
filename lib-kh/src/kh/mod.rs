@@ -2,6 +2,7 @@ mod alg;
 mod kh_gen;
 mod complex;
 mod homology;
+mod canon_cycle;
 mod ss;
 
 pub use alg::{KhAlg, KhAlgGen, KhTensor};

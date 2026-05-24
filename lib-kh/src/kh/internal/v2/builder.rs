@@ -1,7 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::mem::swap;
-use std::ops::RangeInclusive;
 
 use itertools::Itertools;
 use log::{debug, info};
@@ -23,7 +22,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     crossings: Vec<Node>,
     complex: TngComplex<R>,
     elements: Vec<BuildElem<R>>,
-    h_range: Option<RangeInclusive<isize>>,
     pub auto_deloop: bool,
     pub auto_elim: bool
 }
@@ -35,7 +33,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             crossings: vec![], 
             complex, 
             elements: vec![], 
-            h_range: None,
             auto_deloop: true, 
             auto_elim: true 
         }
@@ -59,12 +56,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         b
     }
 
-    pub fn init(h: &R, t: &R, deg_shift: (isize, isize), base_pt: Option<Edge>) -> Self { 
+    pub(crate) fn init(h: &R, t: &R, deg_shift: (isize, isize), base_pt: Option<Edge>) -> Self { 
         let complex = TngComplex::init(h, t, deg_shift, base_pt);
         Self::from(complex)
     }
 
-    pub fn complex(&self) -> &TngComplex<R> { 
+    pub(crate) fn complex(&self) -> &TngComplex<R> { 
         &self.complex
     }
 
@@ -72,11 +69,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &mut self.complex
     }
 
-    pub fn crossings(&self) -> impl Iterator<Item = &Node> { 
+    pub(crate) fn crossings(&self) -> impl Iterator<Item = &Node> { 
         self.crossings.iter()
     }
 
-    pub fn set_crossings<I>(&mut self, crossings: I)
+    pub(crate) fn set_crossings<I>(&mut self, crossings: I)
     where I: IntoIterator<Item = Node> {
         self.crossings = crossings.into_iter().collect_vec();
     }
@@ -87,11 +84,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.crossings.retain(|x| !drop.contains(x));
     }
 
-    pub fn elements(&self) -> impl Iterator<Item = &BuildElem<R>> { 
-        self.elements.iter()
-    }
-
-    pub fn set_elements<I>(&mut self, elements: I)
+    pub(crate) fn set_elements<I>(&mut self, elements: I)
     where I: IntoIterator<Item = BuildElem<R>> { 
         self.elements = elements.into_iter().collect_vec();
     }
@@ -100,13 +93,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         std::mem::take(&mut self.elements)
     }
 
-    pub fn set_h_range(&mut self, h_range: RangeInclusive<isize>) { 
-        info!("({}) set h_range: {:?}", self.stat(), h_range);
-        self.h_range = Some(h_range);
-        self.retain_supported();
+    pub fn run(mut self) -> Self { 
+        self.process_all();
+        self.finalize();
+        self
+    } 
+
+    pub(crate) fn process_all(&mut self) { 
+        while let Some(x) = self.choose_next() { 
+            self.append(&x)
+        }
     }
 
-    pub fn choose_next(&mut self) -> Option<Node> { 
+    pub(crate) fn choose_next(&mut self) -> Option<Node> { 
         let Some((i, _)) = self.crossings.iter().enumerate().max_by_key(|(_, x)|
             self.count_connections(x)
         ) else { 
@@ -144,18 +143,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         count
     }
 
-    pub fn run(mut self) -> Self { 
-        self.process_all();
-        self.finalize();
-        self
-    } 
-
-    pub fn process_all(&mut self) { 
-        while let Some(x) = self.choose_next() { 
-            self.append(&x)
-        }
-    }
-
     pub(crate) fn append(&mut self, x: &Node) { 
         assert!(!self.complex.crossings().contains(x));
         
@@ -178,7 +165,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    #[allow(unused)]
     pub(crate) fn connect(&mut self, other: TngComplex<R>) { 
         info!("({}) connect <- ({})", self.stat(), other.stat());
         let (left, right) = self.connect_init(other);
@@ -192,7 +178,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub(crate) fn connect_incr(&mut self, left: &TngComplex<R>, right: &TngComplex<R>) {
-        let h_range = self.current_h_range();
+        let h_range = self.complex.h_range();
 
         for i in h_range.clone() { 
             self.complex.connect_vertices(left, right, i);
@@ -206,7 +192,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn deloop_all(&mut self, allow_based: bool) { 
+    pub(crate) fn deloop_all(&mut self, allow_based: bool) { 
         for i in self.complex.h_range() { 
             self.deloop_in(i, allow_based);
         }
@@ -239,7 +225,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn deloop(&mut self, k: &TngKey, r: usize) -> Vec<TngKey> {
+    pub(crate) fn deloop(&mut self, k: &TngKey, r: usize) -> Vec<TngKey> {
         let c = self.complex.vertex(k).tng().comp(r);
 
         debug!("({}) deloop {c} in {}", self.stat(), self.complex.vertex(k));
@@ -268,13 +254,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         ).sum()
     }
 
-    pub fn eliminate_all(&mut self) { 
+    #[allow(unused)]
+    pub(crate) fn eliminate_all(&mut self) { 
         for i in self.complex.h_range() { 
             self.eliminate_in(i);
         }
     }
 
-    pub fn eliminate_in(&mut self, i: isize) { 
+    pub(crate) fn eliminate_in(&mut self, i: isize) { 
         let mut keys = self.complex.keys_of(i).filter(|k| 
             self.complex.keys_out_from(k).find(|l|
                 self.complex.edge(k, l).is_invertible()
@@ -296,7 +283,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         info!("({}) -> C[{i}]: {} (-{}).", self.stat(), after, before - after);
     }
 
-    pub fn eliminate(&mut self, i: &TngKey, j: &TngKey) {
+    pub(crate) fn eliminate(&mut self, i: &TngKey, j: &TngKey) {
         debug!("({}) eliminate {}: {} -> {}", self.stat(), self.complex.edge(i, j), self.complex.vertex(i), self.complex.vertex(j));
         
         self.eliminate_elements(i, j);
@@ -309,7 +296,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn choose_pivot<'a, I>(&self, keys: I) -> Option<(&'a TngKey, &TngKey, usize)> 
+    fn choose_pivot<'a, I>(&self, keys: I) -> Option<(&'a TngKey, &TngKey, usize)> 
     where I: IntoIterator<Item = &'a TngKey> { 
         keys.into_iter().filter_map(move |k|
             self.choose_pivot_col(k).map(move |(l, s)| (k, l, s))
@@ -334,7 +321,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         (nk - 1) * (nl - 1)
     }
 
-    pub fn finalize(&mut self) { 
+    fn finalize(&mut self) { 
         if self.complex.is_completely_delooped() { 
             return;
         }
@@ -347,51 +334,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(self.complex.is_completely_delooped());
     }
 
-    pub(crate) fn current_h_range(&self) -> RangeInclusive<isize> { 
-        if let Some(h_range) = &self.h_range { 
-            let (h0, h1) = h_range.clone().into_inner();
-            let (c0, c1) = self.complex.h_range().into_inner();
-            let remain = self.crossings.len() as isize;
-            let i0 = isize::max(c0, h0 - remain);
-            let i1 = isize::min(c1, h1);
-            i0 ..= i1
-        } else { 
-            self.complex.h_range()
-        }
-    }
-
-    pub(crate) fn should_retain(&self, i: isize) -> bool { 
-        let Some(h_range) = &self.h_range else { return true };
-        let (h0, h1) = h_range.clone().into_inner();
-        let remain = self.crossings.len() as isize;
-        h0 <= (i + remain) && i <= h1
-    }
-
-    pub fn retain_supported(&mut self) { 
-        if self.h_range.is_none() { return }
-
-        let i0 = self.complex.deg_shift().0;
-        let drop = self.complex.keys().filter(|k| {
-            let i = i0 + (k.weight() as isize);
-            !self.should_retain(i)
-        }).cloned().collect_vec();
-
-        if drop.is_empty() { return }
-
-        info!("({}) drop {} vertices.", self.stat(), drop.len());
-
-        for k in drop.iter() { 
-            self.complex.remove_vertex(k);
-        }
-
-        // TODO must drop elements.
-    }
-
     pub fn into_tng_complex(self) -> TngComplex<R> { 
         self.complex
     }
 
-    pub(crate) fn make_canon_cycles(l: &Link, base_pt: Option<Edge>) -> Vec<BuildElem<R>> { 
+    fn make_canon_cycles(l: &Link, base_pt: Option<Edge>) -> Vec<BuildElem<R>> { 
         assert!(l.is_knot());
         assert!(l.base_pt().is_some());
 
@@ -441,7 +388,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 #[derive(Clone)]
-pub struct BuildElem<R>
+pub(crate) struct BuildElem<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     init_cob: Cob,                       // initial cob, precomposed at the final step.
     retr_cob: HashMap<TngKey, LcCob<R>>, // building cob, src must always match init_cob. 
@@ -719,23 +666,5 @@ mod tests {
         for z in zs {
             assert!(c.d(0, &z).is_zero());
         }
-    }
-
-    #[test]
-    fn h_range() { 
-        let l = Link::test_data("6_3");
-        let h_range = -1..=1;
-
-        let mut b = TngComplexBuilder::new(&l, &0, &0, false);
-        b.set_h_range(h_range);
-        b.process_all();
-        b.finalize();
-
-        let c = b.into_tng_complex().into_raw_complex();
-        c.check_d_all();
-
-        let h = c.homology();
-        assert_eq!(h[0].rank(), 4);
-        assert_eq!(h[0].tors(), &[2]);
     }
 }

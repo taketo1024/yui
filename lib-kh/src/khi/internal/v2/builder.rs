@@ -1,8 +1,6 @@
 use std::collections::HashSet;
-use std::ops::RangeInclusive;
 use ahash::AHashMap;
 use cartesian::cartesian;
-use delegate::delegate;
 use itertools::Itertools;
 use log::info;
 use rayon::prelude::*;
@@ -53,18 +51,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         SymTngBuilder { inner, x_map, e_map, key_map, auto_deloop, auto_elim }
     }
 
-    delegate! { 
-        to self.inner { 
-            pub fn complex(&self) -> &TngComplex<R>;
-            pub fn crossings(&self) -> impl Iterator<Item = &Node>;
-            pub fn set_crossings<I>(&mut self, crossings: I) where I: IntoIterator<Item = Node>;
-            pub fn elements(&self) -> impl Iterator<Item = &BuildElem<R>>;
-            pub fn set_elements<I>(&mut self, elements: I) where I: IntoIterator<Item = BuildElem<R>>;
-            pub fn set_h_range(&mut self, h_range: RangeInclusive<isize>);
-            pub(crate) fn stat(&self) -> String;
-        }
-    }
-
     pub fn run(mut self) -> Self { 
         self.preprocess();
         self.process_all();
@@ -72,13 +58,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self
     }
 
-    pub fn preprocess(&mut self) { 
-        assert_eq!(self.complex().dim(), 0, "must start from init state.");
+    fn preprocess(&mut self) { 
+        assert_eq!(self.inner.complex().dim(), 0, "must start from init state.");
 
         let elements = self.inner.take_elements();
         let off_axis = self.off_axis_crossings(true).into_iter().cloned().collect_vec();
 
-        info!("({}) preprocess off-axis: {}", self.stat(), off_axis.len());
+        info!("({}) preprocess off-axis: {}", self.inner.stat(), off_axis.len());
 
         let (c, tc, key_map, elements) = self.build_from_half(off_axis.iter(), elements);
 
@@ -90,13 +76,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.inner.connect(tc);
         
         self.key_map = key_map;
-        self.set_elements(elements);
+        self.inner.set_elements(elements);
 
-        info!("({}) preprocess done.", self.stat());
+        info!("({}) preprocess done.", self.inner.stat());
     }
 
     fn off_axis_crossings(&self, take_half: bool) -> Vec<&Node> { 
-        let off_axis = self.crossings().filter(|&x|
+        let off_axis = self.inner.crossings().filter(|&x|
             self.inv_node(x) != x
         ).collect_vec();
 
@@ -136,7 +122,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn build_from_half<'a, I>(&self, crossings: I, elements: Vec<BuildElem<R>>) -> (TngComplex<R>, TngComplex<R>, AHashMap<TngKey, TngKey>, Vec<BuildElem<R>>) 
     where I: IntoIterator<Item = &'a Node> { 
-        let (h, t) = self.complex().ht();
+        let (h, t) = self.inner.complex().ht();
         let mut b = TngComplexBuilder::init(h, t, (0, 0), None);
 
         b.set_crossings(crossings.into_iter().cloned());
@@ -175,8 +161,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         (c, tc, key_map, elements)
     }
 
-    pub fn process_all(&mut self) { 
-        info!("({}) process {} crossings", self.stat(), self.crossings().count());
+    fn process_all(&mut self) { 
+        info!("({}) process {} crossings", self.inner.stat(), self.inner.crossings().count());
         
         while let Some(x) = self.inner.choose_next() { 
             let tx = self.inv_node(&x);
@@ -189,11 +175,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn append_on_axis(&mut self, x: &Node) { 
-        info!("({}) append on-axis: {x}", self.stat());
+        info!("({}) append on-axis: {x}", self.inner.stat());
 
         self.inner.append_prepare(x);
 
-        let c = self.complex().make_x(x);
+        let c = self.inner.complex().make_x(x);
         let key_map = if x.is_crossing() { 
             [Bit::Bit0, Bit::Bit1].map(|b| { 
                 let k = TngKey { state: BitSeq::from(b), label: KhTensor::empty() };
@@ -210,13 +196,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn append_off_axis(&mut self, x: &Node, tx: &Node) { 
         assert_eq!(self.inv_node(x), tx);
 
-        info!("({}) append off-axis: {x}, {tx}", self.stat());
+        info!("({}) append off-axis: {x}, {tx}", self.inner.stat());
 
         self.inner.append_prepare(x);
         self.inner.append_prepare(tx);
 
         let c = { 
-            let mut c = self.complex().make_x(x);
+            let mut c = self.inner.complex().make_x(x);
             c.append(tx);
             c
         };
@@ -239,21 +225,21 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.connect(c, key_map);
     }
 
-    pub fn deloop_all(&mut self, allow_based: bool) { 
-        for i in self.complex().h_range() { 
+    fn deloop_all(&mut self, allow_based: bool) { 
+        for i in self.inner.complex().h_range() { 
             self.deloop_in(i, allow_based);
         }
     }
 
     fn deloop_in(&mut self, i: isize, allow_based: bool) {
-        let mut keys = self.complex().keys_of(i).filter(|k| 
-            self.complex().vertex(k).tng().contains_circle()
+        let mut keys = self.inner.complex().keys_of(i).filter(|k| 
+            self.inner.complex().vertex(k).tng().contains_circle()
         ).cloned().collect::<HashSet<_>>();
 
         if keys.is_empty() { return }
 
-        info!("({}) C[{i}]: {}, deloop: {}.", self.stat(), self.complex().rank(i), self.inner.count_loops_in(i, allow_based));
-        let before = self.complex().rank(i);
+        info!("({}) C[{i}]: {}, deloop: {}.", self.inner.stat(), self.inner.complex().rank(i), self.inner.count_loops_in(i, allow_based));
+        let before = self.inner.complex().rank(i);
 
         while let Some((k, r)) = self.inner.find_loop(keys.iter(), allow_based) { 
             keys.remove(&k);
@@ -261,11 +247,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             let updated = self.deloop_equiv(&k, r);
             
-            keys.extend(updated.into_iter().filter(|k| self.complex().contains_key(k)));
+            keys.extend(updated.into_iter().filter(|k| self.inner.complex().contains_key(k)));
         }
 
-        let after = self.complex().rank(i);
-        info!("({}) -> C[{i}]: {} (+{}).", self.stat(), after, after - before);
+        let after = self.inner.complex().rank(i);
+        info!("({}) -> C[{i}]: {} (+{}).", self.inner.stat(), after, after - before);
 
         if self.auto_elim { 
             self.eliminate_in(i - 1);
@@ -273,9 +259,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn deloop_equiv(&mut self, k: &TngKey, r: usize) -> Vec<TngKey> { 
+    fn deloop_equiv(&mut self, k: &TngKey, r: usize) -> Vec<TngKey> { 
         if self.is_sym_key(k) { 
-            let c = self.complex().vertex(k).tng().comp(r);
+            let c = self.inner.complex().vertex(k).tng().comp(r);
             if self.is_sym_comp(c) {
                 // symmetric loop on symmetric key
                 self.deloop_on_axis_sym(k, r)
@@ -290,7 +276,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn deloop_on_axis_sym(&mut self, k: &TngKey, r: usize) -> Vec<TngKey> {
-        let c = self.complex().vertex(k).tng().comp(r);
+        let c = self.inner.complex().vertex(k).tng().comp(r);
 
         assert!(self.is_sym_key(k));
         assert!(self.is_sym_comp(c));
@@ -308,11 +294,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     #[allow(non_snake_case)]
     fn deloop_on_axis_asym(&mut self, k: &TngKey, r: usize) -> Vec<TngKey> {
-        let c = self.complex().vertex(k).tng().comp(r);
+        let c = self.inner.complex().vertex(k).tng().comp(r);
 
         assert!(self.is_sym_key(k));
         assert!(!self.is_sym_comp(c));
-        assert!(!self.complex().contains_base_pt(c));
+        assert!(!self.inner.complex().contains_base_pt(c));
 
         //          ⚪︎1 | ⚪︎1
         //  ⚪︎1 | ⚪︎X  <-->  ⚪︎X | ⚪︎1
@@ -324,12 +310,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let (k_X, k_1) = (ks[0], ks[1]);
         let (k_XX, k_X1) = { 
-            let tr = self.complex().vertex(&k_X).tng().index_of(&tc).unwrap();
+            let tr = self.inner.complex().vertex(&k_X).tng().index_of(&tc).unwrap();
             let tks = self.inner.deloop(&k_X, tr);
             (tks[0], tks[1])
         };
         let (k_1X, k_11) = { 
-            let tr = self.complex().vertex(&k_1).tng().index_of(&tc).unwrap();
+            let tr = self.inner.complex().vertex(&k_1).tng().index_of(&tc).unwrap();
             let tks = self.inner.deloop(&k_1, tr);
             (tks[0], tks[1])
         };
@@ -345,7 +331,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     #[allow(non_snake_case)]
     fn deloop_off_axis(&mut self, k: &TngKey, r: usize) -> Vec<TngKey> {
-        let c = self.complex().vertex(k).tng().comp(r);
+        let c = self.inner.complex().vertex(k).tng().comp(r);
 
         assert!(!self.is_sym_key(k));
 
@@ -354,7 +340,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let tk = *self.inv_key(k);
         let tc = c.convert_edges(|e| self.inv_edge(e));
-        let tr = self.complex().vertex(&tk).tng().index_of(&tc).unwrap();
+        let tr = self.inner.complex().vertex(&tk).tng().index_of(&tc).unwrap();
 
         let mut ks = self.inner.deloop(k, r);
         let mut tks = self.inner.deloop(&tk, tr);
@@ -369,23 +355,24 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         ks
     }
 
-    pub fn eliminate_all(&mut self) { 
-        for i in self.complex().h_range() { 
+    #[allow(unused)]
+    fn eliminate_all(&mut self) { 
+        for i in self.inner.complex().h_range() { 
             self.eliminate_in(i)
         }
     }
 
     fn eliminate_in(&mut self, i: isize) { 
-        let mut keys = self.complex().keys_of(i).filter(|k| 
-            self.complex().keys_out_from(k).find(|l|
+        let mut keys = self.inner.complex().keys_of(i).filter(|k| 
+            self.inner.complex().keys_out_from(k).find(|l|
                 self.is_equiv_inv_edge(k, l)
             ).is_some()
         ).cloned().collect::<HashSet<_>>();
 
         if keys.is_empty() { return }
 
-        info!("({}) C[{i}]: {}, elim targets: {}.", self.stat(), self.complex().rank(i), keys.len());
-        let before = self.complex().rank(i);
+        info!("({}) C[{i}]: {}, elim targets: {}.", self.inner.stat(), self.inner.complex().rank(i), keys.len());
+        let before = self.inner.complex().rank(i);
 
         while let Some((k, l, _)) = self.choose_pivot(keys.iter()) { 
             let (k, l) = (*k, *l);
@@ -397,13 +384,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             keys.remove(&tk);
         }            
 
-        let after = self.complex().rank(i);
-        info!("({}) -> C[{i}]: {} (-{}).", self.stat(), after, before - after);
+        let after = self.inner.complex().rank(i);
+        info!("({}) -> C[{i}]: {} (-{}).", self.inner.stat(), after, before - after);
     }
 
-    pub fn eliminate_equiv(&mut self, i: &TngKey, j: &TngKey) {
+    fn eliminate_equiv(&mut self, i: &TngKey, j: &TngKey) {
         assert_eq!(self.is_sym_key(i), self.is_sym_key(j));
-        assert!(self.complex().has_edge(i, j));
+        assert!(self.inner.complex().has_edge(i, j));
 
         if self.is_sym_key(i) { 
             self.inner.eliminate(i, j);
@@ -411,7 +398,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let ti = *self.inv_key(i);
             let tj = *self.inv_key(j);
 
-            assert!(self.complex().has_edge(&ti, &tj));
+            assert!(self.inner.complex().has_edge(&ti, &tj));
 
             self.inner.eliminate(i, j);
             self.inner.eliminate(&ti, &tj);
@@ -429,7 +416,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn choose_pivot_col(&self, k: &TngKey) -> Option<(&TngKey, usize)> { 
-        self.complex().keys_out_from(k).filter(|&l| self.is_equiv_inv_edge(k, l)).map(|l| {
+        self.inner.complex().keys_out_from(k).filter(|&l| self.is_equiv_inv_edge(k, l)).map(|l| {
                 let s = self.inner.edge_weight(k, l);
                 (l, s)
             })
@@ -437,7 +424,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn is_equiv_inv_edge(&self, i: &TngKey, j: &TngKey) -> bool { 
-        let f = self.complex().edge(i, j);
+        let f = self.inner.complex().edge(i, j);
         f.is_invertible() && self.is_equiv_edge(i, j)
     }
 
@@ -453,67 +440,32 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let ti = self.inv_key(i);
             let tj = self.inv_key(j);
 
-            !self.complex().keys_into(j).contains(ti) && 
-            !self.complex().keys_into(tj).contains(i)
+            !self.inner.complex().keys_into(j).contains(ti) && 
+            !self.inner.complex().keys_into(tj).contains(i)
         } else { 
             false
         }
     }
 
-    pub fn finalize(&mut self) {
-        if self.complex().is_completely_delooped() { 
+    fn finalize(&mut self) {
+        if self.inner.complex().is_completely_delooped() { 
             return
         }
 
-        info!("({}) finalize", self.stat());
+        info!("({}) finalize", self.inner.stat());
 
         self.deloop_all(false);
         self.deloop_all(true);
 
-        assert!(self.complex().is_completely_delooped());
+        assert!(self.inner.complex().is_completely_delooped());
     }
-
-    pub fn process_partial<I>(&mut self, indices: I)
-    where I: IntoIterator<Item = usize> { 
-        self.set_elements([]); // TODO
-
-        // extract target crossings
-        let indices = indices.into_iter().collect::<HashSet<_>>();
-        let target = self.crossings().enumerate().filter(|(i, _)|
-            indices.contains(i)
-        ).map(|(_, x)| 
-            x.clone()
-        ).collect_vec();
-        
-        self.inner.remove_crossings(target.iter());
-
-        let (h, t) = self.complex().ht();
-        let mut b = Self::new_impl(
-            TngComplexBuilder::init(h, t, (0, 0), None),
-            self.x_map.clone(),
-            self.e_map.clone()
-        );
-
-        b.set_crossings(target);
-        b.preprocess();
-        b.process_all();
-
-        let key_map = std::mem::take(&mut b.key_map);
-        let c = b.into_tng_complex();
-
-        info!("connect ({}) <- ({})", self.stat(), c.stat());
-
-        self.connect(c, key_map);
-
-        info!("connected ({})", self.stat());
-    } 
 
     fn connect(&mut self, c: TngComplex<R>, key_map: AHashMap<TngKey, TngKey>) { 
         let (left, right) = self.inner.connect_init(c);
         let l_key_map = std::mem::take(&mut self.key_map);
         let r_key_map = key_map;
 
-        let h_range = self.inner.current_h_range();
+        let h_range = self.inner.complex().h_range();
 
         for i in h_range.clone() { 
             self.inner.complex_mut().connect_vertices(&left, &right, i);
@@ -525,8 +477,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         ).map(|((k1, l1), (k2, l2))|
             (k1 + k2, l1 + l2)
         ).filter(|(k, l)|
-            self.complex().contains_key(k) && 
-            self.complex().contains_key(l)
+            self.inner.complex().contains_key(k) && 
+            self.inner.complex().contains_key(l)
         ).collect();
 
         for i in h_range { 
@@ -599,9 +551,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             let tk = self.inv_key(k);
             if k == tk {
-                println!("{}", self.complex().vertex(k));
+                println!("{}", self.inner.complex().vertex(k));
             } else { 
-                println!("{} ↔ {}", self.complex().vertex(k), self.complex().vertex(tk));
+                println!("{} ↔ {}", self.inner.complex().vertex(k), self.inner.complex().vertex(tk));
             }
 
             done.insert(k);
@@ -612,18 +564,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     #[allow(unused)]
     fn validate_equiv(&self) {
-        for k in self.complex().keys().sorted() { 
+        for k in self.inner.complex().keys().sorted() { 
             assert!(self.key_map.contains_key(k), "no inv-key for {k}");
             let tk = self.inv_key(k);
 
-            for l in self.complex().keys_out_from(k) { 
+            for l in self.inner.complex().keys_out_from(k) { 
                 assert!(self.key_map.contains_key(l), "no inv-key for {l}");
                 let tl = self.inv_key(l);
 
-                assert!(self.complex().has_edge(tk, tl));
+                assert!(self.inner.complex().has_edge(tk, tl));
 
-                let f = self.complex().edge(k, l);
-                let tf = self.complex().edge(tk, tl);
+                let f = self.inner.complex().edge(k, l);
+                let tf = self.inner.complex().edge(tk, tl);
 
                 assert_eq!(&f.convert_edges(|e| self.inv_edge(e)), tf);
             }
@@ -711,37 +663,6 @@ mod tests {
     }
 
     #[test]
-    fn process_partial() { 
-        let l = InvLink::from_symmetric_pd_code([
-            [6,9,7,10],[8,1,9,2],[14,7,1,8], // upper
-            [3,13,4,12],[10,5,11,6],[11,3,12,2],[13,5,14,4], // lower
-        ]); // 6_3
-
-        let (h, t) = (FF2::zero(), FF2::zero());
-        let mut b = SymTngBuilder::new(&l, &h, &t, false);
-
-        b.auto_elim = false;
-        b.auto_deloop = false;
-
-        b.process_partial(0..3);
-        b.process_partial(0..4);
-        b.finalize();
-
-        let c = make_cone(b);
-        c.check_d_all();
-
-        let h = c.homology();
-        assert_eq!(h[-3].rank(), 2);
-        assert_eq!(h[-2].rank(), 6);
-        assert_eq!(h[-1].rank(), 8);
-        assert_eq!(h[ 0].rank(), 10);
-        assert_eq!(h[ 1].rank(), 10);
-        assert_eq!(h[ 2].rank(), 8);
-        assert_eq!(h[ 3].rank(), 6);
-        assert_eq!(h[ 4].rank(), 2);
-    }
-
-    #[test]
     fn no_auto_deloop() { 
         let l = InvLink::test_data("3_1");
         let (h, t) = (FF2::zero(), FF2::zero());
@@ -751,11 +672,11 @@ mod tests {
         b.preprocess();
         b.process_all();
 
-        assert!(!b.complex().is_completely_delooped());
+        assert!(!b.inner.complex().is_completely_delooped());
 
         b.finalize();
 
-        assert!(b.complex().is_completely_delooped());
+        assert!(b.inner.complex().is_completely_delooped());
 
         let c = b.into_tng_complex().into_raw_complex();
         assert_eq!(c[0].rank(), 2);
@@ -780,7 +701,7 @@ mod tests {
         b.preprocess();
         b.process_all();
 
-        assert!(b.complex().is_completely_delooped());
+        assert!(b.inner.complex().is_completely_delooped());
 
         let c = b.into_tng_complex().into_raw_complex();
         assert_eq!(c[0].rank(), 4);
@@ -793,23 +714,5 @@ mod tests {
         assert_eq!(h[1].rank(), 0);
         assert_eq!(h[2].rank(), 2);
         assert_eq!(h[3].rank(), 2);
-    }
-
-    #[test]
-    fn h_range() { 
-        let l = InvLink::test_data("6_3");
-        let (h, t) = (FF2::zero(), FF2::zero());
-        let h_range = -2..=2;
-
-        let mut b = SymTngBuilder::new(&l, &h, &t, false);
-        b.set_h_range(h_range.clone());
-        b = b.run();
-
-        let c = make_cone(b).truncated(-1..=2);
-        c.check_d_all();
-
-        let h = c.homology().truncated(0..=1);
-        assert_eq!(h[0].rank(), 10);
-        assert_eq!(h[1].rank(), 10);
     }
 }

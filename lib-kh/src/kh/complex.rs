@@ -61,6 +61,30 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         KhComplex { inner, alg, deg_shift, reduced, canon_cycles, cache_bigr: OnceLock::new() }
     }
 
+    pub fn deg_shift_for(l: &Link, reduced: bool) -> (isize, isize) {
+        let (n_pos, n_neg) = l.n_signed_crossings();
+        let (n_pos, n_neg) = (n_pos as isize, n_neg as isize);
+        let h = -n_neg;
+        let q = n_pos - 2 * n_neg;
+        let e = if reduced { 1 } else { 0 };
+        (h, q + e)
+    }
+
+    pub fn inner(&self) -> &ChainComplex1<KhGen, R> {
+        &self.inner
+    }
+
+    delegate! {
+        to self.inner {
+            pub fn support(&self) -> impl Iterator<Item = &isize> + '_;
+            pub fn is_supported(&self, i: isize) -> bool;
+            pub fn d_deg(&self) -> isize;
+            pub fn d(&self, i: isize, z: &KhChain<R>) -> KhChain<R>;
+            pub fn describe_d(&self) -> String;
+            pub fn describe_d_at(&self, i: isize) -> String;
+        }
+    }
+
     pub fn alg(&self) -> &KhAlg<R> {
         &self.alg
     }
@@ -101,30 +125,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn canon_cycles(&self) -> &Vec<KhChain<R>> { 
         &self.canon_cycles
-    }
-
-    pub fn inner(&self) -> &ChainComplex1<KhGen, R> {
-        &self.inner
-    }
-
-    pub fn deg_shift_for(l: &Link, reduced: bool) -> (isize, isize) {
-        let (n_pos, n_neg) = l.n_signed_crossings();
-        let (n_pos, n_neg) = (n_pos as isize, n_neg as isize);
-        let h = -n_neg;
-        let q = n_pos - 2 * n_neg;
-        let e = if reduced { 1 } else { 0 };
-        (h, q + e)
-    }
-
-    delegate! {
-        to self.inner {
-            pub fn support(&self) -> impl Iterator<Item = &isize> + '_;
-            pub fn is_supported(&self, i: isize) -> bool;
-            pub fn d_deg(&self) -> isize;
-            pub fn d(&self, i: isize, z: &KhChain<R>) -> KhChain<R>;
-            pub fn describe_d(&self) -> String;
-            pub fn describe_d_at(&self, i: isize) -> String;
-        }
     }
 
     fn cached_bigraded(&self) -> &GrMod2<KhGen, R> {

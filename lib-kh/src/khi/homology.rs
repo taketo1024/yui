@@ -38,6 +38,13 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         &self.inner
     }
 
+    delegate! {
+        to self.inner {
+            pub fn support(&self) -> impl Iterator<Item = &isize> + '_;
+            pub fn is_supported(&self, i: isize) -> bool;
+        }
+    }
+
     pub fn deg_shift(&self) -> (isize, isize) {
         self.deg_shift
     }
@@ -56,13 +63,6 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     pub fn q_deg_of_chain(&self, z: &KhIChain<R>) -> isize {
         z.keys().map(|x| self.q_deg_of(x)).min().unwrap_or(0)
-    }
-
-    delegate! {
-        to self.inner {
-            pub fn support(&self) -> impl Iterator<Item = &isize> + '_;
-            pub fn is_supported(&self, i: isize) -> bool;
-        }
     }
 
     pub fn h_range(&self) -> RangeInclusive<isize> {

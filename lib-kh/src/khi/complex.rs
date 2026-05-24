@@ -239,362 +239,283 @@ mod tests {
     use yui_core::poly::Poly;
     use yui_core::num::FF2;
     use num_traits::{Zero, One};
+    use super::*;
+
+    // canon-cycle tests are invariant under v1/v2 algorithm choice
+    macro_rules! canon_tests {
+        ($build:expr) => {
+            #[test]
+            fn canon_fbn() {
+                let l = InvLink::test_data("3_1");
+
+                type R = FF2;
+                let (h, t) = (R::one(), R::zero());
+                let c = $build(&l, &h, &t, false);
+
+                let zs = c.canon_cycles.clone();
+
+                assert_eq!(zs.len(), 4);
+                assert!(zs[0].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
+                assert!(zs[1].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
+                assert!(zs[2].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
+                assert!(zs[3].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
+
+                for (i, z) in zs.iter().enumerate() {
+                    let i = (i / 2) as isize;
+                    assert!(c.d(i, z).is_zero());
+                }
+            }
+
+            #[test]
+            fn canon_fbn_red() {
+                let l = InvLink::test_data("3_1");
+
+                type R = FF2;
+                let (h, t) = (R::one(), R::zero());
+                let c = $build(&l, &h, &t, true);
+
+                let zs = c.canon_cycles.clone();
+
+                assert_eq!(zs.len(), 2);
+                assert!(zs[0].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
+                assert!(zs[1].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
+
+                for (i, z) in zs.iter().enumerate() {
+                    let i = i as isize;
+                    assert!(c.d(i, z).is_zero());
+                }
+            }
+
+            #[test]
+            fn canon_bn() {
+                let l = InvLink::test_data("3_1");
+
+                type R = FF2;
+                type P = Poly<'H', R>;
+                let (h, t) = (P::variable(), P::zero());
+                let c = $build(&l, &h, &t, false);
+
+                let zs = c.canon_cycles.clone();
+
+                assert_eq!(zs.len(), 4);
+                assert!(zs[0].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
+                assert!(zs[1].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
+                assert!(zs[2].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
+                assert!(zs[3].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
+
+                for (i, z) in zs.iter().enumerate() {
+                    let i = (i / 2) as isize;
+                    assert!(c.d(i, z).is_zero());
+                }
+            }
+
+            #[test]
+            fn canon_bn_red() {
+                let l = InvLink::test_data("3_1");
+
+                type R = FF2;
+                type P = Poly<'H', R>;
+                let (h, t) = (P::variable(), P::zero());
+                let c = $build(&l, &h, &t, true);
+
+                let zs = c.canon_cycles.clone();
+
+                assert_eq!(zs.len(), 2);
+                assert!(zs[0].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
+                assert!(zs[1].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
+
+                for (i, z) in zs.iter().enumerate() {
+                    let i = i as isize;
+                    assert!(c.d(i, z).is_zero());
+                }
+            }
+        };
+    }
+
+    mod v2 {
         use super::*;
+        canon_tests!(KhIComplex::new);
 
-    #[test]
-    fn complex_kh() { 
-        let l = InvLink::test_data("3_1");
+        #[test]
+        fn complex_kh() {
+            let l = InvLink::test_data("3_1");
 
-        type R = FF2;
-        let (h, t) = (R::zero(), R::zero());
-        let c = KhIComplex::new(&l, &h, &t, false);
+            type R = FF2;
+            let (h, t) = (R::zero(), R::zero());
+            let c = KhIComplex::new(&l, &h, &t, false);
 
-        assert_eq!(c[0].rank(), 2);
-        assert_eq!(c[1].rank(), 2);
-        assert_eq!(c[2].rank(), 2);
-        assert_eq!(c[3].rank(), 4);
-        assert_eq!(c[4].rank(), 2);
-            
-        c.inner().check_d_all();
-    }
+            assert_eq!(c[0].rank(), 2);
+            assert_eq!(c[1].rank(), 2);
+            assert_eq!(c[2].rank(), 2);
+            assert_eq!(c[3].rank(), 4);
+            assert_eq!(c[4].rank(), 2);
 
-    #[test]
-    fn complex_fbn() { 
-        let l = InvLink::test_data("3_1");
+            c.inner().check_d_all();
+        }
 
-        type R = FF2;
-        let (h, t) = (R::one(), R::zero());
-        let c = KhIComplex::new(&l, &h, &t, false);
+        #[test]
+        fn complex_fbn() {
+            let l = InvLink::test_data("3_1");
 
-        assert_eq!(c[0].rank(), 2);
-        assert_eq!(c[1].rank(), 2);
-        assert_eq!(c[2].rank(), 0);
-        assert_eq!(c[3].rank(), 0);
-        assert_eq!(c[4].rank(), 0);
-        
-        c.inner().check_d_all();
-    }
+            type R = FF2;
+            let (h, t) = (R::one(), R::zero());
+            let c = KhIComplex::new(&l, &h, &t, false);
 
-    #[test]
-    fn complex_bn() { 
-        let l = InvLink::test_data("3_1");
+            assert_eq!(c[0].rank(), 2);
+            assert_eq!(c[1].rank(), 2);
+            assert_eq!(c[2].rank(), 0);
+            assert_eq!(c[3].rank(), 0);
+            assert_eq!(c[4].rank(), 0);
 
-        type R = FF2;
-        type P = Poly<'H', R>;
-        let (h, t) = (P::variable(), P::zero());
+            c.inner().check_d_all();
+        }
 
-        let c = KhIComplex::new(&l, &h, &t, false);
+        #[test]
+        fn complex_bn() {
+            let l = InvLink::test_data("3_1");
 
-        assert_eq!(c[0].rank(), 2);
-        assert_eq!(c[1].rank(), 2);
-        assert_eq!(c[2].rank(), 2);
-        assert_eq!(c[3].rank(), 4);
-        assert_eq!(c[4].rank(), 2);
-        
-        c.inner().check_d_all();
-    }
+            type R = FF2;
+            type P = Poly<'H', R>;
+            let (h, t) = (P::variable(), P::zero());
 
-    #[test]
-    fn complex_red() { 
-        let l = InvLink::test_data("3_1");
+            let c = KhIComplex::new(&l, &h, &t, false);
 
-        type R = FF2;
-        let (h, t) = (R::zero(), R::zero());
-        let c = KhIComplex::new(&l, &h, &t, true);
+            assert_eq!(c[0].rank(), 2);
+            assert_eq!(c[1].rank(), 2);
+            assert_eq!(c[2].rank(), 2);
+            assert_eq!(c[3].rank(), 4);
+            assert_eq!(c[4].rank(), 2);
 
-        assert_eq!(c[0].rank(), 1);
-        assert_eq!(c[1].rank(), 1);
-        assert_eq!(c[2].rank(), 1);
-        assert_eq!(c[3].rank(), 2);
-        assert_eq!(c[4].rank(), 1);
-        
-        c.inner().check_d_all();
-    }
+            c.inner().check_d_all();
+        }
 
-    #[test]
-    fn complex_kh_bigr() { 
-        let l = InvLink::test_data("3_1");
+        #[test]
+        fn complex_red() {
+            let l = InvLink::test_data("3_1");
 
-        type R = FF2;
-        let (h, t) = (R::zero(), R::zero());
-        let c = KhIComplex::new(&l, &h, &t, false);
+            type R = FF2;
+            let (h, t) = (R::zero(), R::zero());
+            let c = KhIComplex::new(&l, &h, &t, true);
 
-        assert_eq!(c[(0, 1)].rank(), 1);
-        assert_eq!(c[(0, 3)].rank(), 1);
-        assert_eq!(c[(1, 1)].rank(), 1);
-        assert_eq!(c[(1, 3)].rank(), 1);
-        assert_eq!(c[(2, 5)].rank(), 1);
-        assert_eq!(c[(2, 7)].rank(), 1);
-        assert_eq!(c[(3, 5)].rank(), 1);
-        assert_eq!(c[(3, 7)].rank(), 2);
-        assert_eq!(c[(3, 9)].rank(), 1);
-        assert_eq!(c[(4, 7)].rank(), 1);
-        assert_eq!(c[(4, 9)].rank(), 1);        
-    }
+            assert_eq!(c[0].rank(), 1);
+            assert_eq!(c[1].rank(), 1);
+            assert_eq!(c[2].rank(), 1);
+            assert_eq!(c[3].rank(), 2);
+            assert_eq!(c[4].rank(), 1);
 
-    #[test]
-    fn complex_kh_red_bigr() {
-        let l = InvLink::test_data("3_1");
+            c.inner().check_d_all();
+        }
 
-        type R = FF2;
-        let (h, t) = (R::zero(), R::zero());
-        let c = KhIComplex::new(&l, &h, &t, true);
+        #[test]
+        fn complex_kh_bigr() {
+            let l = InvLink::test_data("3_1");
 
-        assert_eq!(c[(0, 2)].rank(), 1);
-        assert_eq!(c[(1, 2)].rank(), 1);
-        assert_eq!(c[(2, 6)].rank(), 1);
-        assert_eq!(c[(3, 6)].rank(), 1);
-        assert_eq!(c[(3, 8)].rank(), 1);
-        assert_eq!(c[(4, 8)].rank(), 1);
-    }
+            type R = FF2;
+            let (h, t) = (R::zero(), R::zero());
+            let c = KhIComplex::new(&l, &h, &t, false);
 
-    #[test]
-    fn canon_fbn() { 
-        let l = InvLink::test_data("3_1");
+            assert_eq!(c[(0, 1)].rank(), 1);
+            assert_eq!(c[(0, 3)].rank(), 1);
+            assert_eq!(c[(1, 1)].rank(), 1);
+            assert_eq!(c[(1, 3)].rank(), 1);
+            assert_eq!(c[(2, 5)].rank(), 1);
+            assert_eq!(c[(2, 7)].rank(), 1);
+            assert_eq!(c[(3, 5)].rank(), 1);
+            assert_eq!(c[(3, 7)].rank(), 2);
+            assert_eq!(c[(3, 9)].rank(), 1);
+            assert_eq!(c[(4, 7)].rank(), 1);
+            assert_eq!(c[(4, 9)].rank(), 1);
+        }
 
-        type R = FF2;
-        let (h, t) = (R::one(), R::zero());
-        let c = KhIComplex::new(&l, &h, &t, false);
+        #[test]
+        fn complex_kh_red_bigr() {
+            let l = InvLink::test_data("3_1");
 
-        let zs = c.canon_cycles.clone();
+            type R = FF2;
+            let (h, t) = (R::zero(), R::zero());
+            let c = KhIComplex::new(&l, &h, &t, true);
 
-        assert_eq!(zs.len(), 4);
-        assert!(zs[0].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
-        assert!(zs[1].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
-        assert!(zs[2].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
-        assert!(zs[3].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
-
-        for (i, z) in zs.iter().enumerate() { 
-            let i = (i / 2) as isize;
-            assert!(c.d(i, z).is_zero());
+            assert_eq!(c[(0, 2)].rank(), 1);
+            assert_eq!(c[(1, 2)].rank(), 1);
+            assert_eq!(c[(2, 6)].rank(), 1);
+            assert_eq!(c[(3, 6)].rank(), 1);
+            assert_eq!(c[(3, 8)].rank(), 1);
+            assert_eq!(c[(4, 8)].rank(), 1);
         }
     }
 
-    #[test]
-    fn canon_fbn_red() { 
-        let l = InvLink::test_data("3_1");
-
-        type R = FF2;
-        let (h, t) = (R::one(), R::zero());
-        let c = KhIComplex::new(&l, &h, &t, true);
-
-        let zs = c.canon_cycles.clone();
-
-        assert_eq!(zs.len(), 2);
-        assert!(zs[0].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
-        assert!(zs[1].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
-
-        for (i, z) in zs.iter().enumerate() { 
-            let i = i as isize;
-            assert!(c.d(i, z).is_zero());
-        }
-    }
-
-    #[test]
-    fn canon_bn() { 
-        let l = InvLink::test_data("3_1");
-
-        type R = FF2;
-        type P = Poly<'H', R>;
-        let (h, t) = (P::variable(), P::zero());
-        let c = KhIComplex::new(&l, &h, &t, false);
-
-        let zs = c.canon_cycles.clone();
-
-        assert_eq!(zs.len(), 4);
-        assert!(zs[0].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
-        assert!(zs[1].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
-        assert!(zs[2].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
-        assert!(zs[3].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
-
-        for (i, z) in zs.iter().enumerate() { 
-            let i = (i / 2) as isize;
-            assert!(c.d(i, z).is_zero());
-        }
-    }
-
-    #[test]
-    fn canon_bn_red() { 
-        let l = InvLink::test_data("3_1");
-
-        type R = FF2;
-        type P = Poly<'H', R>;
-        let (h, t) = (P::variable(), P::zero());
-        let c = KhIComplex::new(&l, &h, &t, true);
-        
-        let zs = c.canon_cycles.clone();
-
-        assert_eq!(zs.len(), 2);
-        assert!(zs[0].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
-        assert!(zs[1].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
-
-        for (i, z) in zs.iter().enumerate() { 
-            let i = i as isize;
-            assert!(c.d(i, z).is_zero());
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests_v1 {
-    use yui_core::poly::Poly;
-    use yui_core::num::FF2;
-    use num_traits::{Zero, One};
+    mod v1 {
         use super::*;
+        canon_tests!(KhIComplex::new_no_simplify);
 
-    #[test]
-    fn complex_kh() { 
-        let l = InvLink::test_data("3_1");
+        #[test]
+        fn complex_kh() {
+            let l = InvLink::test_data("3_1");
 
-        type R = FF2;
-        let (h, t) = (R::zero(), R::zero());
-        let c = KhIComplex::new_no_simplify(&l, &h, &t, false);
+            type R = FF2;
+            let (h, t) = (R::zero(), R::zero());
+            let c = KhIComplex::new_no_simplify(&l, &h, &t, false);
 
-        assert_eq!(c[0].rank(), 4);
-        assert_eq!(c[1].rank(), 10);
-        assert_eq!(c[2].rank(), 18);
-        assert_eq!(c[3].rank(), 20);
-        assert_eq!(c[4].rank(), 8);
-            
-        c.inner().check_d_all();
-    }
+            assert_eq!(c[0].rank(), 4);
+            assert_eq!(c[1].rank(), 10);
+            assert_eq!(c[2].rank(), 18);
+            assert_eq!(c[3].rank(), 20);
+            assert_eq!(c[4].rank(), 8);
 
-    #[test]
-    fn complex_fbn() { 
-        let l = InvLink::test_data("3_1");
-
-        type R = FF2;
-        let (h, t) = (R::one(), R::zero());
-        let c = KhIComplex::new_no_simplify(&l, &h, &t, false);
-
-        assert_eq!(c[0].rank(), 4);
-        assert_eq!(c[1].rank(), 10);
-        assert_eq!(c[2].rank(), 18);
-        assert_eq!(c[3].rank(), 20);
-        assert_eq!(c[4].rank(), 8);
-        
-        c.inner().check_d_all();
-    }
-
-    #[test]
-    fn complex_bn() { 
-        let l = InvLink::test_data("3_1");
-
-        type R = FF2;
-        type P = Poly<'H', R>;
-        let (h, t) = (P::variable(), P::zero());
-
-        let c = KhIComplex::new_no_simplify(&l, &h, &t, false);
-
-        assert_eq!(c[0].rank(), 4);
-        assert_eq!(c[1].rank(), 10);
-        assert_eq!(c[2].rank(), 18);
-        assert_eq!(c[3].rank(), 20);
-        assert_eq!(c[4].rank(), 8);
-        
-        c.inner().check_d_all();
-    }
-
-    #[test]
-    fn complex_red() { 
-        let l = InvLink::test_data("3_1");
-
-        type R = FF2;
-        let (h, t) = (R::zero(), R::zero());
-        let c = KhIComplex::new_no_simplify(&l, &h, &t, true);
-
-        assert_eq!(c[0].rank(), 2);
-        assert_eq!(c[1].rank(), 5);
-        assert_eq!(c[2].rank(), 9);
-        assert_eq!(c[3].rank(), 10);
-        assert_eq!(c[4].rank(), 4);
-        
-        c.inner().check_d_all();
-    }
-
-    #[test]
-    fn canon_fbn() { 
-        let l = InvLink::test_data("3_1");
-
-        type R = FF2;
-        let (h, t) = (R::one(), R::zero());
-        let c = KhIComplex::new_no_simplify(&l, &h, &t, false);
-
-        let zs = c.canon_cycles.clone();
-
-        assert_eq!(zs.len(), 4);
-        assert!(zs[0].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
-        assert!(zs[1].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
-        assert!(zs[2].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
-        assert!(zs[3].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
-
-        for (i, z) in zs.iter().enumerate() { 
-            let i = (i / 2) as isize;
-            assert!(c.d(i, z).is_zero());
+            c.inner().check_d_all();
         }
-    }
 
-    #[test]
-    fn canon_fbn_red() { 
-        let l = InvLink::test_data("3_1");
+        #[test]
+        fn complex_fbn() {
+            let l = InvLink::test_data("3_1");
 
-        type R = FF2;
-        let (h, t) = (R::one(), R::zero());
-        let c = KhIComplex::new_no_simplify(&l, &h, &t, true);
+            type R = FF2;
+            let (h, t) = (R::one(), R::zero());
+            let c = KhIComplex::new_no_simplify(&l, &h, &t, false);
 
-        let zs = c.canon_cycles.clone();
+            assert_eq!(c[0].rank(), 4);
+            assert_eq!(c[1].rank(), 10);
+            assert_eq!(c[2].rank(), 18);
+            assert_eq!(c[3].rank(), 20);
+            assert_eq!(c[4].rank(), 8);
 
-        assert_eq!(zs.len(), 2);
-        assert!(zs[0].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
-        assert!(zs[1].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
-
-        for (i, z) in zs.iter().enumerate() { 
-            let i = i as isize;
-            assert!(c.d(i, z).is_zero());
+            c.inner().check_d_all();
         }
-    }
 
-    #[test]
-    fn canon_bn() { 
-        let l = InvLink::test_data("3_1");
+        #[test]
+        fn complex_bn() {
+            let l = InvLink::test_data("3_1");
 
-        type R = FF2;
-        type P = Poly<'H', R>;
-        let (h, t) = (P::variable(), P::zero());
-        let c = KhIComplex::new_no_simplify(&l, &h, &t, false);
+            type R = FF2;
+            type P = Poly<'H', R>;
+            let (h, t) = (P::variable(), P::zero());
 
-        let zs = c.canon_cycles.clone();
+            let c = KhIComplex::new_no_simplify(&l, &h, &t, false);
 
-        assert_eq!(zs.len(), 4);
-        assert!(zs[0].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
-        assert!(zs[1].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
-        assert!(zs[2].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
-        assert!(zs[3].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
+            assert_eq!(c[0].rank(), 4);
+            assert_eq!(c[1].rank(), 10);
+            assert_eq!(c[2].rank(), 18);
+            assert_eq!(c[3].rank(), 20);
+            assert_eq!(c[4].rank(), 8);
 
-        for (i, z) in zs.iter().enumerate() { 
-            let i = (i / 2) as isize;
-            assert!(c.d(i, z).is_zero());
+            c.inner().check_d_all();
         }
-    }
 
-    #[test]
-    fn canon_bn_red() { 
-        let l = InvLink::test_data("3_1");
+        #[test]
+        fn complex_red() {
+            let l = InvLink::test_data("3_1");
 
-        type R = FF2;
-        type P = Poly<'H', R>;
-        let (h, t) = (P::variable(), P::zero());
-        let c = KhIComplex::new_no_simplify(&l, &h, &t, true);
-        
-        let zs = c.canon_cycles.clone();
+            type R = FF2;
+            let (h, t) = (R::zero(), R::zero());
+            let c = KhIComplex::new_no_simplify(&l, &h, &t, true);
 
-        assert_eq!(zs.len(), 2);
-        assert!(zs[0].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
-        assert!(zs[1].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
+            assert_eq!(c[0].rank(), 2);
+            assert_eq!(c[1].rank(), 5);
+            assert_eq!(c[2].rank(), 9);
+            assert_eq!(c[3].rank(), 10);
+            assert_eq!(c[4].rank(), 4);
 
-        for (i, z) in zs.iter().enumerate() { 
-            let i = i as isize;
-            assert!(c.d(i, z).is_zero());
+            c.inner().check_d_all();
         }
     }
 }

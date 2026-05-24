@@ -150,7 +150,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         self.append_prepare(x);
 
-        let cx = self.complex.make_x(x);
+        let (h, t) = self.complex.ht();
+        let cx = TngComplex::from_node(h, t, x);
         let (left, right) = self.connect_init(cx);
         self.connect_incr(&left, &right);
     }

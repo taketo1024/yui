@@ -179,7 +179,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         self.inner.append_prepare(x);
 
-        let c = self.inner.complex().make_x(x);
+        let (h, t) = self.inner.complex().ht();
+        let c = TngComplex::from_node(h, t, x);
         let key_map = if x.is_crossing() { 
             [Bit::Bit0, Bit::Bit1].map(|b| { 
                 let k = TngKey { state: BitSeq::from(b), label: KhTensor::empty() };
@@ -202,7 +203,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.inner.append_prepare(tx);
 
         let c = { 
-            let mut c = self.inner.complex().make_x(x);
+            let (h, t) = self.inner.complex().ht();
+            let mut c = TngComplex::from_node(h, t, x);
             c.append(tx);
             c
         };

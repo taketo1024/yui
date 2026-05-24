@@ -150,6 +150,36 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         TngComplex::new(h, t, deg_shift, base_pt, vertices, vec![])
     }
 
+    pub fn from_node(h: &R, t: &R, x: &Node) -> Self { 
+        let mut c = Self::new(h, t, (0, 0), None, AHashMap::new(), vec![]);
+
+        if x.is_resolved() { 
+            let mut v = TngVertex::init();
+            v.tng = Tng::from_resolved(x);
+            c.add_vertex(v);
+        } else { 
+            let mut v0 = TngVertex::init();
+            v0.key.state.push_0();
+            v0.tng = Tng::from_resolved(&x.resolve(Bit::Bit0));
+            let k0 = v0.key;
+
+            let mut v1 = TngVertex::init();
+            v1.key.state.push_1();
+            v1.tng = Tng::from_resolved(&x.resolve(Bit::Bit1));
+            let k1 = v1.key;
+
+            c.add_vertex(v0);
+            c.add_vertex(v1);
+
+            let sdl = LcCob::from(Cob::from(CobComp::sdl_from(x)));
+            c.add_edge(&k0, &k1, sdl);
+
+            c.crossings.push(x.clone());
+        }
+
+        c
+    }
+
     pub fn ht(&self) -> &(R, R) { 
         &self.ht
     }
@@ -349,39 +379,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn append(&mut self, x: &Node) {
-        let c = self.make_x(x);
-        self.connect(c);
-    }
-
-    pub(crate) fn make_x(&self, x: &Node) -> Self { 
         let (h, t) = self.ht();
-        let mut c = Self::new(h, t, (0, 0), None, AHashMap::new(), vec![]);
-
-        if x.is_resolved() { 
-            let mut v = TngVertex::init();
-            v.tng = Tng::from_resolved(x);
-            c.add_vertex(v);
-        } else { 
-            let mut v0 = TngVertex::init();
-            v0.key.state.push_0();
-            v0.tng = Tng::from_resolved(&x.resolve(Bit::Bit0));
-            let k0 = v0.key;
-
-            let mut v1 = TngVertex::init();
-            v1.key.state.push_1();
-            v1.tng = Tng::from_resolved(&x.resolve(Bit::Bit1));
-            let k1 = v1.key;
-
-            c.add_vertex(v0);
-            c.add_vertex(v1);
-
-            let sdl = LcCob::from(Cob::from(CobComp::sdl_from(x)));
-            c.add_edge(&k0, &k1, sdl);
-
-            c.crossings.push(x.clone());
-        }
-
-        c
+        let c = Self::from_node(h, t, x);
+        self.connect(c);
     }
 
     // See [Bar-Natan '05] Section 5.

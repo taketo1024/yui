@@ -17,7 +17,7 @@ use crate::ext::LinkExt;
 use super::complex::{TngComplex, TngKey};
 
 #[derive(Clone)]
-pub(crate) struct TngComplexElem<R>
+pub struct TngComplexElem<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     init_cob: Cob,                       // initial cob, precomposed at the final step.
     retr_cob: HashMap<TngKey, LcCob<R>>, // building cob, src must always match init_cob. 
@@ -47,25 +47,31 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let r = self.state[x];
         let a = x.resolve(r);
-        let tng = Tng::from_resolved(&a);
-        let id = Cob::id(&tng);
+        let t = Tng::from_resolved(&a);
 
-        let mors = std::mem::take(&mut self.retr_cob);
-        self.retr_cob = mors.into_iter().map(|(mut k, f)| {
-            k.state.push(r);
-            let f = f.connect(&id);
-            (k, f)
-        }).collect();
+        self.connect_id_cob(&t, Some(r));
     }
 
     fn append_arcs(&mut self, x: &Node) {
         assert!(x.is_resolved());
 
-        let tng = Tng::from_resolved(x);
-        let id = Cob::id(&tng);
+        let t = Tng::from_resolved(x);
+        self.connect_id_cob(&t, None);
+    }
+
+    pub fn insert_loop(&mut self, c: Edge) { 
+        let t = Tng::from(TngComp::circ([c]));
+        self.connect_id_cob(&t, None);
+    }
+
+    fn connect_id_cob(&mut self, t: &Tng, r: Option<Bit>) { 
+        let id = Cob::id(&t);
 
         let mors = std::mem::take(&mut self.retr_cob);
-        self.retr_cob = mors.into_iter().map(|(k, f)| {
+        self.retr_cob = mors.into_iter().map(|(mut k, f)| {
+            if let Some(r) = r { 
+                k.state.push(r);
+            }
             let f = f.connect(&id);
             (k, f)
         }).collect();

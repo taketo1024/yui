@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use itertools::Itertools;
 use log::{debug, info};
@@ -14,8 +14,9 @@ use super::complex::{TngComplex, TngKey};
 
 pub struct TngComplexBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    nodes: Vec<Node>,
     complex: TngComplex<R>,
+    nodes: Vec<Node>,
+    loops: Vec<Edge>, 
     elements: Vec<TngComplexElem<R>>,
     pub auto_deloop: bool,
     pub auto_elim: bool
@@ -29,6 +30,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let mut b = Self::init(h, t, deg_shift, base_pt);
         b.set_nodes(l.nodes().cloned());
+        b.set_loops(l.loops().iter().cloned());
 
         if t.is_zero() && l.is_knot() {
             let canon = TngComplexElem::canon_cycles(l, base_pt);
@@ -38,18 +40,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         b
     }
 
-    pub(crate) fn init(h: &R, t: &R, deg_shift: (isize, isize), base_pt: Option<Edge>) -> Self { 
+    pub fn init(h: &R, t: &R, deg_shift: (isize, isize), base_pt: Option<Edge>) -> Self { 
         let complex = TngComplex::init(h, t, deg_shift, base_pt);
         Self { 
-            nodes: vec![], 
             complex, 
+            nodes: vec![], 
+            loops: vec![],
             elements: vec![], 
             auto_deloop: true, 
             auto_elim: true 
         }
     }
 
-    pub(crate) fn complex(&self) -> &TngComplex<R> { 
+    pub fn complex(&self) -> &TngComplex<R> { 
         &self.complex
     }
 
@@ -57,11 +60,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &mut self.complex
     }
 
-    pub(crate) fn nodes(&self) -> impl Iterator<Item = &Node> { 
+    pub fn nodes(&self) -> impl Iterator<Item = &Node> { 
         self.nodes.iter()
     }
 
-    pub(crate) fn set_nodes<I>(&mut self, nodes: I)
+    pub fn set_nodes<I>(&mut self, nodes: I)
     where I: IntoIterator<Item = Node> {
         self.nodes = nodes.into_iter().collect_vec();
     }
@@ -72,7 +75,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.nodes.retain(|x| !drop.contains(x));
     }
 
-    pub(crate) fn set_elements<I>(&mut self, elements: I)
+    pub fn loops(&self) -> impl Iterator<Item = &Edge> { 
+        self.loops.iter()
+    }
+
+    pub fn set_loops<I>(&mut self, loops: I)
+    where I: IntoIterator<Item = Edge> {
+        self.loops = loops.into_iter().collect_vec();
+    }
+
+    pub fn set_elements<I>(&mut self, elements: I)
     where I: IntoIterator<Item = TngComplexElem<R>> { 
         self.elements = elements.into_iter().collect_vec();
     }
@@ -83,6 +95,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn run(mut self) -> Self { 
         self.process_nodes();
+        self.process_loops();
         self.finalize();
         self
     } 
@@ -165,6 +178,24 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.complex.merge_edges(&left, &right, i);
             if self.auto_deloop {
                 self.deloop_in(i, false);
+            }
+        }
+    }
+
+    pub(crate) fn process_loops(&mut self) { 
+        while !self.loops.is_empty() { 
+            let c = self.loops.remove(0);
+
+            for e in self.elements.iter_mut() { 
+               e.insert_loop(c);
+            }
+
+            let (h, t) = self.complex.ht();
+            let c = TngComplex::from_loop(h, t, c);
+            self.merge(c);
+
+            if self.auto_deloop { 
+                self.deloop_all(false);
             }
         }
     }
@@ -335,7 +366,7 @@ mod tests {
 
     #[test]
     fn test_unknot() {
-        let l = Link::unknot_old();
+        let l = Link::unknot();
         let b = TngComplexBuilder::new(&l, &0, &0, false).run();
         let c = b.into_tng_complex().into_raw_complex();
 

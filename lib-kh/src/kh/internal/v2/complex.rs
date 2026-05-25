@@ -180,6 +180,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
+    pub fn from_loop(h: &R, t: &R, e: Edge) -> Self { 
+        let mut c = Self::new(h, t, (0, 0), None, 0, AHashMap::new());
+
+        let comp = TngComp::circ([e]);
+        let mut v = TngVertex::init();
+        v.tng = Tng::from(comp);
+        c.add_vertex(v);
+        c
+    }
+
     pub fn ht(&self) -> &(R, R) { 
         &self.ht
     }

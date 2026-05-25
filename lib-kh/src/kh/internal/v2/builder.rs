@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
-use std::mem::swap;
 
 use itertools::Itertools;
 use log::{debug, info};
@@ -150,8 +149,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let (h, t) = self.complex.ht();
         let cx = TngComplex::from_node(h, t, x);
-        let (left, right) = self.connect_init(cx);
-        self.connect_incr(&left, &right);
+        self.connect(cx);
     }
 
     pub(crate) fn append_prepare(&mut self, x: &Node) { 
@@ -166,25 +164,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub(crate) fn connect(&mut self, other: TngComplex<R>) { 
         info!("({}) connect <- ({})", self.stat(), other.stat());
-        let (left, right) = self.connect_init(other);
-        self.connect_incr(&left, &right);
-    }
 
-    pub(crate) fn connect_init(&mut self, other: TngComplex<R>) -> (TngComplex<R>, TngComplex<R>) { 
-        let mut complex = TngComplex::connect_init(&self.complex, &other);
-        swap(&mut self.complex, &mut complex);
-        (complex, other)
-    }
-
-    pub(crate) fn connect_incr(&mut self, left: &TngComplex<R>, right: &TngComplex<R>) {
+        let (left, right) = self.complex.prepare_connect(other); 
         let h_range = self.complex.h_range();
 
         for i in h_range.clone() { 
-            self.complex.connect_vertices(left, right, i);
+            self.complex.connect_vertices(&left, &right, i);
         }
 
         for i in h_range { 
-            self.complex.connect_edges(left, right, i);
+            self.complex.connect_edges(&left, &right, i);
             if self.auto_deloop {
                 self.deloop_in(i, false);
             }

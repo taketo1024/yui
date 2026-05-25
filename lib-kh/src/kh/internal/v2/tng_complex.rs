@@ -379,15 +379,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // See [Bar-Natan '05] Section 5.
     // https://arxiv.org/abs/math/0410495
     pub fn connect(&mut self, other: TngComplex<R>) { 
-        let mut new = Self::connect_init(self, &other);
-        for i in new.h_range() { 
-            new.connect_vertices(self, &other, i);
-            new.connect_edges(self, &other, i - 1);
+        let (left, right) = self.prepare_connect(other);
+        let h_range = self.h_range();
+
+        for i in h_range.clone() { 
+            self.connect_vertices(&left, &right, i);
         }
-        *self = new
+
+        for i in h_range { 
+            self.connect_edges(&left, &right, i);
+        }
     }
 
-    pub(crate) fn connect_init(&self, other: &TngComplex<R>) -> Self { 
+    pub(crate) fn prepare_connect(&mut self, other: TngComplex<R>) -> (Self, Self) { 
         assert_eq!(self.ht(), other.ht());
         assert!(self.base_pt.is_none() || other.base_pt.is_none() || self.base_pt == other.base_pt);
 
@@ -397,11 +401,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.deg_shift.0 + other.deg_shift.0,
             self.deg_shift.1 + other.deg_shift.1
         );
+        let dim = self.dim + other.dim;
 
         let mut new = TngComplex::init(h, t, deg_shift, base_pt);
         new.vertices.clear();
-        new.dim = self.dim + other.dim;
-        new
+        new.dim = dim;
+
+        let left = std::mem::replace(self, new);
+        (left, other)
     }
 
     pub(crate) fn connect_vertices(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize) {

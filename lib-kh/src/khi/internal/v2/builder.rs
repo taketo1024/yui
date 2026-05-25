@@ -463,25 +463,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn connect(&mut self, c: TngComplex<R>, key_map: AHashMap<TngKey, TngKey>) { 
-        let (left, right) = self.inner.connect_init(c);
-        let l_key_map = std::mem::take(&mut self.key_map);
-        let r_key_map = key_map;
+        self.key_map = cartesian!(
+            self.key_map.iter(),
+            key_map.iter()
+        ).map(|((k1, l1), (k2, l2))|
+            (k1 + k2, l1 + l2)
+        ).collect();
 
+        let (left, right) = self.inner.complex_mut().prepare_connect(c);
         let h_range = self.inner.complex().h_range();
 
         for i in h_range.clone() { 
             self.inner.complex_mut().connect_vertices(&left, &right, i);
         }
-
-        self.key_map = cartesian!(
-            l_key_map.iter(),
-            r_key_map.iter()
-        ).map(|((k1, l1), (k2, l2))|
-            (k1 + k2, l1 + l2)
-        ).filter(|(k, l)|
-            self.inner.complex().contains_key(k) && 
-            self.inner.complex().contains_key(l)
-        ).collect();
 
         for i in h_range { 
             self.inner.complex_mut().connect_edges(&left, &right, i);

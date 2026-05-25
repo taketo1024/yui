@@ -1,26 +1,22 @@
 use std::collections::{HashMap, HashSet};
-use std::fmt::Display;
 
 use itertools::Itertools;
 use log::{debug, info};
-use num_traits::Zero;
 use yui_core::bitseq::Bit;
-use maplit::hashmap;
 use yui_core::{Ring, RingOps};
 use yui_link::{Node, Edge, Link};
 
-use crate::ext::LinkExt;
-use crate::kh::{KhAlgGen, KhChain, KhComplex};
+use crate::kh::internal::v2::elem::TngComplexElem;
+use crate::kh::{KhChain, KhComplex};
 
-use super::cob::{Bottom, Dot, Cob, CobComp, LcCobTrait, LcCob};
-use super::tng::{Tng, TngComp};
-use super::tng_complex::{TngComplex, TngKey};
+use super::cob::LcCobTrait;
+use super::complex::{TngComplex, TngKey};
 
 pub struct TngComplexBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     nodes: Vec<Node>,
     complex: TngComplex<R>,
-    elements: Vec<BuildElem<R>>,
+    elements: Vec<TngComplexElem<R>>,
     pub auto_deloop: bool,
     pub auto_elim: bool
 }
@@ -35,7 +31,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         b.set_nodes(l.nodes().cloned());
 
         if t.is_zero() && l.is_knot() {
-            let canon = Self::make_canon_cycles(l, base_pt);
+            let canon = TngComplexElem::canon_cycles(l, base_pt);
             b.set_elements(canon);
         }
 
@@ -77,11 +73,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub(crate) fn set_elements<I>(&mut self, elements: I)
-    where I: IntoIterator<Item = BuildElem<R>> { 
+    where I: IntoIterator<Item = TngComplexElem<R>> { 
         self.elements = elements.into_iter().collect_vec();
     }
 
-    pub(crate) fn take_elements(&mut self) -> Vec<BuildElem<R>> {
+    pub(crate) fn take_elements(&mut self) -> Vec<TngComplexElem<R>> {
         std::mem::take(&mut self.elements)
     }
 
@@ -151,7 +147,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
 
         for e in self.elements.iter_mut() { 
-            e.append(x);
+            e.append_node(x);
         }
     }
 
@@ -319,43 +315,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.complex
     }
 
-    fn make_canon_cycles(l: &Link, base_pt: Option<Edge>) -> Vec<BuildElem<R>> { 
-        assert!(l.is_knot());
-        assert!(l.base_pt().is_some());
-
-        let reduced = base_pt.is_some();
-        let circles = l.colored_seifert_circles();
-
-        let crossings = l.nodes().filter(|x| x.is_crossing()).cloned();
-        let state = l.seifert_state();
-        let state_map = Iterator::zip(crossings.into_iter(), state.iter()).collect::<HashMap<_, _>>();
-
-        let ori = if reduced { 
-            vec![true]
-        } else { 
-            vec![true, false]
-        };
-
-        let cycles = ori.into_iter().map(|o| { 
-            let cob = Cob::new(
-                circles.iter().map(|(circ, col)| { 
-                    let t = TngComp::from(circ.clone());
-                    let mut cup = CobComp::cup(t);
-                    let dot = if col.is_a() == o { 
-                        Dot::X 
-                    } else { 
-                        Dot::Y 
-                    };
-                    cup.add_dot(dot);
-                    cup
-                })
-            );
-            BuildElem::new(cob, state_map.clone(), base_pt)
-        }).collect();
-
-        cycles
-    }
-
     pub fn eval_elements(&self) -> Vec<KhChain<R>> {
         let (h, t) = self.complex.ht();
         self.elements.iter().map(|z|
@@ -365,155 +324,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub(crate) fn stat(&self) -> String { 
         self.complex.stat()
-    }
-}
-
-#[derive(Clone)]
-pub(crate) struct BuildElem<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    init_cob: Cob,                       // initial cob, precomposed at the final step.
-    retr_cob: HashMap<TngKey, LcCob<R>>, // building cob, src must always match init_cob. 
-    state: HashMap<Node, Bit>,
-    base_pt: Option<Edge>
-}
-
-impl<R> BuildElem<R> 
-where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn new(init_cob: Cob, state: HashMap<Node, Bit>, base_pt: Option<Edge>) -> Self { 
-        let k0 = TngKey::init();
-        let f0 = LcCob::from(Cob::empty());
-        let retr_cob = hashmap! { k0 => f0 };
-        Self{ init_cob, retr_cob, state, base_pt }
-    }
-
-    pub fn append(&mut self, x: &Node) { 
-        if x.is_crossing() { 
-            self.append_crossing(x)
-        } else { 
-            self.append_arcs(x)
-        }
-    }
-
-    fn append_crossing(&mut self, x: &Node) {
-        assert!(x.is_crossing());
-
-        let r = self.state[x];
-        let a = x.resolve(r);
-        let tng = Tng::from_resolved(&a);
-        let id = Cob::id(&tng);
-
-        let mors = std::mem::take(&mut self.retr_cob);
-        self.retr_cob = mors.into_iter().map(|(mut k, f)| {
-            k.state.push(r);
-            let f = f.connect(&id);
-            (k, f)
-        }).collect();
-    }
-
-    fn append_arcs(&mut self, x: &Node) {
-        assert!(x.is_resolved());
-
-        let tng = Tng::from_resolved(x);
-        let id = Cob::id(&tng);
-
-        let mors = std::mem::take(&mut self.retr_cob);
-        self.retr_cob = mors.into_iter().map(|(k, f)| {
-            let f = f.connect(&id);
-            (k, f)
-        }).collect();
-    }
-
-    pub fn deloop(&mut self, k: &TngKey, c: &TngComp) {
-        let Some(f) = self.retr_cob.remove(k) else { return };
-        let marked = self.base_pt.map(|e| c.contains(e)).unwrap_or(false);
-
-        let k0 = k + KhAlgGen::X;
-        let f0 = f.clone().cap_off(Bottom::Tgt, c, Dot::None);
-        self.retr_cob.insert(k0, f0);
-
-        if !marked { 
-            let k1 = k + KhAlgGen::I;
-            let f1 = f.cap_off(Bottom::Tgt, c, Dot::Y);
-            self.retr_cob.insert(k1, f1);    
-        }
-    }
-
-    //  Gaussian Elimination
-    //
-    //       a
-    //  v0 - - -> v1         .             .
-    //     \   / b
-    //       /         ==>  
-    //     /   \ c              d - ca⁻¹b
-    //  w0 -----> w1         w0 ---------> w1
-    //       d                
-    
-    pub fn eliminate(&mut self, complex: &TngComplex<R>, i: &TngKey, j: &TngKey) {
-        assert!(complex.has_edge(i, j));
-
-        // mors into i can be simply dropped.
-        self.retr_cob.remove(i);
-
-        // mors into j must be redirected by -ca^{-1}
-        let Some(b) = self.retr_cob.remove(j) else { return };
-
-        let a = complex.edge(i, j);
-        let ainv = a.inv().unwrap();
-        let (h, t) = complex.ht();
-
-        for k in complex.keys_out_from(i) { 
-            if k == j { continue }
-
-            let c = complex.edge(i, k);
-            let cab = c * &ainv * &b;
-            let s = if let Some(d) = self.retr_cob.remove(k) {
-                d - cab
-            } else {
-                -cab
-            }.part_eval(h, t);
-
-            if !s.is_zero() { 
-                self.retr_cob.insert(*k, s);
-            }
-        }
-    }
-
-    pub fn is_evalable(&self) -> bool { 
-        let init = LcCob::from(self.init_cob.clone());
-        self.retr_cob.values().all(|c| init.is_stackable(c)) && 
-        self.retr_cob.values().all(|c| c.iter().all(|(c, _)| c.tgt().is_empty()))
-    }
-
-    pub fn eval(&self, h: &R, t: &R) -> KhChain<R> {
-        assert!(self.is_evalable());
-
-        let init = LcCob::from(self.init_cob.clone());
-        let eval = self.retr_cob.iter().map(|(k, retr)| {
-            let x = k.as_gen();
-            let f = retr * &init;
-            let r = f.eval(h, t);
-            (x, r)
-        }).collect::<KhChain<R>>();
-
-        eval
-    }
-
-    pub fn modify<F>(&mut self, f: F)
-    where F: Fn(TngKey, LcCob<R>) -> (TngKey, LcCob<R>) { 
-        let retr_cob = std::mem::take(&mut self.retr_cob);
-        self.retr_cob = retr_cob.into_iter().map(|(k, cob)|
-            f(k, cob)
-        ).collect();
-    }
-}
-
-impl<R> Display for BuildElem<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mors = self.retr_cob.iter().sorted_by_key(|&(&k, _)| k).map(|(k, f)| { 
-            format!("{}: {}", k, f)
-        }).join(", ");
-        write!(f, "[{}]", mors)
     }
 }
 

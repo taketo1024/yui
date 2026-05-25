@@ -9,11 +9,12 @@ use yui_core::algo::KeyedUnionFind;
 use yui_core::{Ring, RingOps};
 use yui_link::{Node, Edge, InvLink};
 
+use crate::kh::internal::v2::elem::TngComplexElem;
 use crate::kh::{KhGen, KhTensor};
-use crate::kh::internal::v2::builder::{BuildElem, TngComplexBuilder};
+use crate::kh::internal::v2::builder::TngComplexBuilder;
 use crate::kh::internal::v2::cob::LcCobTrait;
 use crate::kh::internal::v2::tng::TngComp;
-use crate::kh::internal::v2::tng_complex::{TngComplex, TngKey};
+use crate::kh::internal::v2::complex::{TngComplex, TngKey};
 
 pub struct SymTngBuilder<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> {
@@ -120,7 +121,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         })
     }
 
-    fn build_from_half<'a, I>(&self, crossings: I, elements: Vec<BuildElem<R>>) -> (TngComplex<R>, TngComplex<R>, AHashMap<TngKey, TngKey>, Vec<BuildElem<R>>) 
+    fn build_from_half<'a, I>(&self, crossings: I, elements: Vec<TngComplexElem<R>>) -> (TngComplex<R>, TngComplex<R>, AHashMap<TngKey, TngKey>, Vec<TngComplexElem<R>>) 
     where I: IntoIterator<Item = &'a Node> { 
         let (h, t) = self.inner.complex().ht();
         let mut b = TngComplexBuilder::init(h, t, (0, 0), None);

@@ -643,12 +643,6 @@ impl Cob {
         self.comps.push(c);
     }
 
-    pub fn connected(&self, other: &Cob) -> Self {
-        self.clone_and(|c|
-            c.connect(other.clone())
-        )
-    }
-
     pub fn is_stackable(&self, other: &Self) -> bool { 
         self.comps.iter().fold(0, |n, c| n + c.tgt.ncomps()) == 
         other.comps.iter().fold(0, |n, c| n + c.src.ncomps()) && 
@@ -791,7 +785,9 @@ impl Cob {
         let init = LcCob::from(Cob::empty());
         self.comps.iter().fold(init, |res, c| {
             let e = c.part_eval(h, t);
-            res.apply_bilin(&e, |c1, c2| c1.connected(c2))
+            res.apply_bilin(&e, |c1, c2| c1.clone_and(|c1|
+                c1.connect(c2.clone())
+            ))
         })
     }
 

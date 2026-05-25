@@ -430,7 +430,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             let mut vw = TngVertex::init();
             vw.key = kl;
-            vw.tng = v.tng.connected(&w.tng); // D(v, w)
+            vw.tng = v.tng.clone_and(|t|
+                t.connect(w.tng.clone())
+            );
 
             self.add_vertex(vw);
         });

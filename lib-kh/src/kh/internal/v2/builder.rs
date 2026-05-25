@@ -321,10 +321,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(self.complex.has_edge(i, j));
 
         // mors into i can be simply dropped.
-        e.remove_key(i);
+        e.remove_cob(i);
 
         // mors into j must be redirected by -ca^{-1}
-        let Some(b) = e.remove_key(j) else { return };
+        let Some(b) = e.remove_cob(j) else { return };
 
         let a = self.complex.edge(i, j);
         let ainv = a.inv().unwrap();
@@ -335,7 +335,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             let c = self.complex.edge(i, k);
             let cab = c * &ainv * &b;
-            let s = if let Some(d) = e.remove_key(k) {
+            let s = if let Some(d) = e.remove_cob(k) {
                 d - cab
             } else {
                 -cab

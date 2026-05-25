@@ -864,7 +864,7 @@ pub trait LcCobTrait: Sized {
     fn is_stackable(&self, other: &Self) -> bool;
     fn inv(&self) -> Option<Self>;
     fn convert_edges<F>(&self, f: F) -> Self where F: Fn(Edge) -> Edge;
-    fn modify<F>(self, f: F) -> Self where F: Fn(&mut Cob);
+    fn modify_cob<F>(self, f: F) -> Self where F: Fn(&mut Cob);
     fn connect(self, c: &Cob) -> Self;
     fn cap_off(self, b: Bottom, c: &TngComp, dot: Dot) -> Self;
     fn should_part_eval(&self) -> bool;
@@ -923,24 +923,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.map_ref(|c, r| (c.convert_edges(&f), r.clone()))
     }
 
-    fn modify<F>(self, f: F) -> Self 
+    fn modify_cob<F>(self, f: F) -> Self 
     where F: Fn(&mut Cob) {
-        self.map(|mut cob, r| {
+        self.into_iter().filter_map(|(mut cob, r)| {
             f(&mut cob);
-            if cob.is_zero_cob() { 
-                (cob, R::zero())
-            } else { 
-                (cob, r)
-            }
-        })
+            (!cob.is_zero_cob()).then_some((cob, r))
+        }).collect()
     }
 
     fn connect(self, c: &Cob) -> Self {
-        self.modify(|cob| cob.connect(c.clone()))
+        self.modify_cob(|cob| cob.connect(c.clone()))
     }
 
     fn cap_off(self, b: Bottom, c: &TngComp, dot: Dot) -> Self {
-        self.modify(|cob| cob.cap_off(b, c, dot) )
+        self.modify_cob(|cob| cob.cap_off(b, c, dot) )
     }
 
     fn should_part_eval(&self) -> bool {

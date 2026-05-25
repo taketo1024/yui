@@ -19,7 +19,7 @@ use super::complex::TngKey;
 pub struct TngComplexElem<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     state: HashMap<Node, Bit>,
-    in_cob: Cob,                       // initial cob, precomposed at the final step.
+    in_cob: Cob,                        // initial cob, precomposed at the final step.
     out_cob: HashMap<TngKey, LcCob<R>>, // building cob, src must always match init_cob. 
     base_pt: Option<Edge>
 }
@@ -95,8 +95,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.out_cob.insert(k, v);
     }
 
-    pub fn remove_key(&mut self, k: &TngKey) -> Option<LcCob<R>> { 
+    pub fn remove_cob(&mut self, k: &TngKey) -> Option<LcCob<R>> { 
         self.out_cob.remove(k)
+    }
+
+    pub fn modify<F>(&mut self, f: F)
+    where F: Fn(TngKey, LcCob<R>) -> (TngKey, LcCob<R>) { 
+        let retr_cob = std::mem::take(&mut self.out_cob);
+        self.out_cob = retr_cob.into_iter().map(|(k, cob)|
+            f(k, cob)
+        ).collect();
     }
 
     pub fn is_evalable(&self) -> bool { 
@@ -117,14 +125,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }).collect::<KhChain<R>>();
 
         eval
-    }
-
-    pub fn modify<F>(&mut self, f: F)
-    where F: Fn(TngKey, LcCob<R>) -> (TngKey, LcCob<R>) { 
-        let retr_cob = std::mem::take(&mut self.out_cob);
-        self.out_cob = retr_cob.into_iter().map(|(k, cob)|
-            f(k, cob)
-        ).collect();
     }
 
     pub fn canon_cycles(l: &Link, base_pt: Option<Edge>) -> Vec<Self> { 

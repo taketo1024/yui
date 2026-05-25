@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use itertools::Itertools;
 use log::{debug, info};
+use num_traits::Zero;
 use yui_core::bitseq::Bit;
 use yui_core::{Ring, RingOps};
 use yui_link::{Node, Edge, Link};
@@ -298,9 +299,51 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.complex.eliminate(i, j);
     }
 
-    fn eliminate_elements(&mut self, i: &TngKey, j: &TngKey) {
-        for e in self.elements.iter_mut() { 
-            e.eliminate(&self.complex, i, j);
+    pub(crate) fn eliminate_elements(&mut self, i: &TngKey, j: &TngKey) {
+        let mut elements = self.take_elements();
+        for e in elements.iter_mut() { 
+            self.eliminate_element(e, i, j);
+        }
+        self.elements = elements;
+    }
+
+    //  Gaussian Elimination
+    //
+    //       a
+    //  v0 - - -> v1         .             .
+    //     \   / b
+    //       /         ==>  
+    //     /   \ c              d - ca⁻¹b
+    //  w0 -----> w1         w0 ---------> w1
+    //       d                
+    
+    fn eliminate_element(&self, e: &mut TngComplexElem<R>, i: &TngKey, j: &TngKey) {
+        assert!(self.complex.has_edge(i, j));
+
+        // mors into i can be simply dropped.
+        e.remove_key(i);
+
+        // mors into j must be redirected by -ca^{-1}
+        let Some(b) = e.remove_key(j) else { return };
+
+        let a = self.complex.edge(i, j);
+        let ainv = a.inv().unwrap();
+        let (h, t) = self.complex.ht();
+
+        for k in self.complex.keys_out_from(i) { 
+            if k == j { continue }
+
+            let c = self.complex.edge(i, k);
+            let cab = c * &ainv * &b;
+            let s = if let Some(d) = e.remove_key(k) {
+                d - cab
+            } else {
+                -cab
+            }.part_eval(h, t);
+
+            if !s.is_zero() { 
+                e.insert_cob(*k, s);
+            }
         }
     }
 

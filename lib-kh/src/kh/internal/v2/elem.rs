@@ -3,7 +3,6 @@ use std::fmt::Display;
 
 use itertools::Itertools;
 use maplit::hashmap;
-use num_traits::Zero;
 use yui_core::bitseq::Bit;
 use yui_core::{Ring, RingOps};
 use yui_link::{Edge, Link, Node};
@@ -14,24 +13,24 @@ use crate::kh::{KhAlgGen, KhChain};
 use super::cob::{Bottom, Dot, Cob, LcCobTrait, LcCob};
 use super::tng::{Tng, TngComp};
 use crate::ext::LinkExt;
-use super::complex::{TngComplex, TngKey};
+use super::complex::TngKey;
 
 #[derive(Clone)]
 pub struct TngComplexElem<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    init_cob: Cob,                       // initial cob, precomposed at the final step.
-    retr_cob: HashMap<TngKey, LcCob<R>>, // building cob, src must always match init_cob. 
     state: HashMap<Node, Bit>,
+    in_cob: Cob,                       // initial cob, precomposed at the final step.
+    out_cob: HashMap<TngKey, LcCob<R>>, // building cob, src must always match init_cob. 
     base_pt: Option<Edge>
 }
 
 impl<R> TngComplexElem<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn new(init_cob: Cob, state: HashMap<Node, Bit>, base_pt: Option<Edge>) -> Self { 
+    pub fn new(state: HashMap<Node, Bit>, in_cob: Cob, base_pt: Option<Edge>) -> Self { 
         let k0 = TngKey::init();
         let f0 = LcCob::from(Cob::empty());
-        let retr_cob = hashmap! { k0 => f0 };
-        Self{ init_cob, retr_cob, state, base_pt }
+        let out_cob = hashmap! { k0 => f0 };
+        Self{ state, in_cob, out_cob, base_pt }
     }
 
     pub fn append_node(&mut self, x: &Node) { 
@@ -67,8 +66,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn connect_id_cob(&mut self, t: &Tng, r: Option<Bit>) { 
         let id = Cob::id(&t);
 
-        let mors = std::mem::take(&mut self.retr_cob);
-        self.retr_cob = mors.into_iter().map(|(mut k, f)| {
+        let mors = std::mem::take(&mut self.out_cob);
+        self.out_cob = mors.into_iter().map(|(mut k, f)| {
             if let Some(r) = r { 
                 k.state.push(r);
             }
@@ -78,71 +77,39 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn deloop(&mut self, k: &TngKey, c: &TngComp) {
-        let Some(f) = self.retr_cob.remove(k) else { return };
+        let Some(f) = self.out_cob.remove(k) else { return };
         let marked = self.base_pt.map(|e| c.contains(e)).unwrap_or(false);
 
         let k0 = k + KhAlgGen::X;
         let f0 = f.clone().cap_off(Bottom::Tgt, c, Dot::None);
-        self.retr_cob.insert(k0, f0);
+        self.out_cob.insert(k0, f0);
 
         if !marked { 
             let k1 = k + KhAlgGen::I;
             let f1 = f.cap_off(Bottom::Tgt, c, Dot::Y);
-            self.retr_cob.insert(k1, f1);    
+            self.out_cob.insert(k1, f1);    
         }
     }
 
-    //  Gaussian Elimination
-    //
-    //       a
-    //  v0 - - -> v1         .             .
-    //     \   / b
-    //       /         ==>  
-    //     /   \ c              d - ca⁻¹b
-    //  w0 -----> w1         w0 ---------> w1
-    //       d                
-    
-    pub fn eliminate(&mut self, complex: &TngComplex<R>, i: &TngKey, j: &TngKey) {
-        assert!(complex.has_edge(i, j));
+    pub fn insert_cob(&mut self, k: TngKey, v: LcCob<R>) {
+        self.out_cob.insert(k, v);
+    }
 
-        // mors into i can be simply dropped.
-        self.retr_cob.remove(i);
-
-        // mors into j must be redirected by -ca^{-1}
-        let Some(b) = self.retr_cob.remove(j) else { return };
-
-        let a = complex.edge(i, j);
-        let ainv = a.inv().unwrap();
-        let (h, t) = complex.ht();
-
-        for k in complex.keys_out_from(i) { 
-            if k == j { continue }
-
-            let c = complex.edge(i, k);
-            let cab = c * &ainv * &b;
-            let s = if let Some(d) = self.retr_cob.remove(k) {
-                d - cab
-            } else {
-                -cab
-            }.part_eval(h, t);
-
-            if !s.is_zero() { 
-                self.retr_cob.insert(*k, s);
-            }
-        }
+    pub fn remove_key(&mut self, k: &TngKey) -> Option<LcCob<R>> { 
+        self.out_cob.remove(k)
     }
 
     pub fn is_evalable(&self) -> bool { 
-        let init = LcCob::from(self.init_cob.clone());
-        self.retr_cob.values().all(|c| init.is_stackable(c)) && 
-        self.retr_cob.values().all(|c| c.iter().all(|(c, _)| c.tgt().is_empty()))
+        let init = LcCob::from(self.in_cob.clone());
+        self.out_cob.values().all(|c| init.is_stackable(c)) && 
+        self.out_cob.values().all(|c| c.iter().all(|(c, _)| c.tgt().is_empty()))
     }
 
     pub fn eval(&self, h: &R, t: &R) -> KhChain<R> {
         assert!(self.is_evalable());
 
-        let init = LcCob::from(self.init_cob.clone());
-        let eval = self.retr_cob.iter().map(|(k, retr)| {
+        let init = LcCob::from(self.in_cob.clone());
+        let eval = self.out_cob.iter().map(|(k, retr)| {
             let x = k.as_gen();
             let f = retr * &init;
             let r = f.eval(h, t);
@@ -154,8 +121,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn modify<F>(&mut self, f: F)
     where F: Fn(TngKey, LcCob<R>) -> (TngKey, LcCob<R>) { 
-        let retr_cob = std::mem::take(&mut self.retr_cob);
-        self.retr_cob = retr_cob.into_iter().map(|(k, cob)|
+        let retr_cob = std::mem::take(&mut self.out_cob);
+        self.out_cob = retr_cob.into_iter().map(|(k, cob)|
             f(k, cob)
         ).collect();
     }
@@ -191,7 +158,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                     cup
                 })
             );
-            TngComplexElem::new(cob, state_map.clone(), base_pt)
+            TngComplexElem::new(state_map.clone(), cob, base_pt)
         }).collect();
 
         cycles
@@ -201,7 +168,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> Display for TngComplexElem<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mors = self.retr_cob.iter().sorted_by_key(|&(&k, _)| k).map(|(k, f)| { 
+        let mors = self.out_cob.iter().sorted_by_key(|&(&k, _)| k).map(|(k, f)| { 
             format!("{}: {}", k, f)
         }).join(", ");
         write!(f, "[{}]", mors)

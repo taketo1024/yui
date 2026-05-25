@@ -18,24 +18,11 @@ use super::tng_complex::{TngComplex, TngKey};
 
 pub struct TngComplexBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    crossings: Vec<Node>,
+    nodes: Vec<Node>,
     complex: TngComplex<R>,
     elements: Vec<BuildElem<R>>,
     pub auto_deloop: bool,
     pub auto_elim: bool
-}
-
-impl<R> From<TngComplex<R>> for TngComplexBuilder<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn from(complex: TngComplex<R>) -> Self {
-        Self { 
-            crossings: vec![], 
-            complex, 
-            elements: vec![], 
-            auto_deloop: true, 
-            auto_elim: true 
-        }
-    }
 }
 
 impl<R> TngComplexBuilder<R>
@@ -45,7 +32,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let deg_shift = KhComplex::deg_shift_for(l, reduced);
 
         let mut b = Self::init(h, t, deg_shift, base_pt);
-        b.set_crossings(l.nodes().cloned());
+        b.set_nodes(l.nodes().cloned());
 
         if t.is_zero() && l.is_knot() {
             let canon = Self::make_canon_cycles(l, base_pt);
@@ -57,7 +44,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub(crate) fn init(h: &R, t: &R, deg_shift: (isize, isize), base_pt: Option<Edge>) -> Self { 
         let complex = TngComplex::init(h, t, deg_shift, base_pt);
-        Self::from(complex)
+        Self { 
+            nodes: vec![], 
+            complex, 
+            elements: vec![], 
+            auto_deloop: true, 
+            auto_elim: true 
+        }
     }
 
     pub(crate) fn complex(&self) -> &TngComplex<R> { 
@@ -68,19 +61,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &mut self.complex
     }
 
-    pub(crate) fn crossings(&self) -> impl Iterator<Item = &Node> { 
-        self.crossings.iter()
+    pub(crate) fn nodes(&self) -> impl Iterator<Item = &Node> { 
+        self.nodes.iter()
     }
 
-    pub(crate) fn set_crossings<I>(&mut self, crossings: I)
+    pub(crate) fn set_nodes<I>(&mut self, nodes: I)
     where I: IntoIterator<Item = Node> {
-        self.crossings = crossings.into_iter().collect_vec();
+        self.nodes = nodes.into_iter().collect_vec();
     }
 
-    pub(crate) fn remove_crossings<'a, I>(&mut self, crossings: I) 
+    pub(crate) fn remove_nodes<'a, I>(&mut self, nodes: I) 
     where I: IntoIterator<Item = &'a Node> { 
-        let drop = crossings.into_iter().collect::<HashSet<_>>();
-        self.crossings.retain(|x| !drop.contains(x));
+        let drop = nodes.into_iter().collect::<HashSet<_>>();
+        self.nodes.retain(|x| !drop.contains(x));
     }
 
     pub(crate) fn set_elements<I>(&mut self, elements: I)
@@ -93,25 +86,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn run(mut self) -> Self { 
-        self.process_all();
+        self.process_nodes();
         self.finalize();
         self
     } 
 
-    pub(crate) fn process_all(&mut self) { 
-        while let Some(x) = self.choose_next() { 
-            self.append(&x)
+    pub(crate) fn process_nodes(&mut self) { 
+        while let Some(x) = self.choose_next_node() { 
+            self.append_node(&x)
         }
     }
 
-    pub(crate) fn choose_next(&mut self) -> Option<Node> { 
-        let Some((i, _)) = self.crossings.iter().enumerate().max_by_key(|(_, x)|
+    pub(crate) fn choose_next_node(&mut self) -> Option<Node> { 
+        let Some((i, _)) = self.nodes.iter().enumerate().max_by_key(|(_, x)|
             self.count_connections(x)
         ) else { 
             return None
         };
 
-        let x = self.crossings.remove(i);
+        let x = self.nodes.remove(i);
         Some(x)
     }
 
@@ -142,19 +135,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         count
     }
 
-    pub(crate) fn append(&mut self, x: &Node) { 
+    pub(crate) fn append_node(&mut self, x: &Node) { 
         info!("({}) append: {x}", self.stat());
 
-        self.append_prepare(x);
+        self.prepare_append(x);
 
         let (h, t) = self.complex.ht();
         let cx = TngComplex::from_node(h, t, x);
-        self.connect(cx);
+        self.merge(cx);
     }
 
-    pub(crate) fn append_prepare(&mut self, x: &Node) { 
-        if let Some(i) = self.crossings.iter().find_position(|&e| e == x) { 
-            self.crossings.remove(i.0);
+    pub(crate) fn prepare_append(&mut self, x: &Node) { 
+        if let Some(i) = self.nodes.iter().find_position(|&e| e == x) { 
+            self.nodes.remove(i.0);
         }
 
         for e in self.elements.iter_mut() { 
@@ -162,18 +155,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub(crate) fn connect(&mut self, other: TngComplex<R>) { 
-        info!("({}) connect <- ({})", self.stat(), other.stat());
+    pub(crate) fn merge(&mut self, other: TngComplex<R>) { 
+        info!("({}) merge <- ({})", self.stat(), other.stat());
 
-        let (left, right) = self.complex.prepare_connect(other); 
+        let (left, right) = self.complex.prepare_merge(other); 
         let h_range = self.complex.h_range();
 
         for i in h_range.clone() { 
-            self.complex.connect_vertices(&left, &right, i);
+            self.complex.merge_vertices(&left, &right, i);
         }
 
         for i in h_range { 
-            self.complex.connect_edges(&left, &right, i);
+            self.complex.merge_edges(&left, &right, i);
             if self.auto_deloop {
                 self.deloop_in(i, false);
             }
@@ -395,13 +388,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn append(&mut self, x: &Node) { 
         if x.is_crossing() { 
-            self.append_x(x)
+            self.append_crossing(x)
         } else { 
-            self.append_a(x)
+            self.append_arcs(x)
         }
     }
 
-    fn append_x(&mut self, x: &Node) {
+    fn append_crossing(&mut self, x: &Node) {
         assert!(x.is_crossing());
 
         let r = self.state[x];
@@ -417,7 +410,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }).collect();
     }
 
-    fn append_a(&mut self, x: &Node) {
+    fn append_arcs(&mut self, x: &Node) {
         assert!(x.is_resolved());
 
         let tng = Tng::from_resolved(x);
@@ -591,12 +584,12 @@ mod tests {
     #[test]
     fn test_tangle() { 
         let mut c = TngComplexBuilder::init(&0, &0, (0, 0), None);
-        c.set_crossings([
+        c.set_nodes([
             Node::from_pd_code([4,2,5,1]),
             Node::from_pd_code([3,6,4,1])
         ]);
 
-        c.process_all();
+        c.process_nodes();
         
         assert!(!c.complex.is_completely_delooped());
     }

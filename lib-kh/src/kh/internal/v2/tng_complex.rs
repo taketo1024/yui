@@ -370,28 +370,28 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn append(&mut self, x: &Node) {
+    pub fn append_node(&mut self, x: &Node) {
         let (h, t) = self.ht();
         let c = Self::from_node(h, t, x);
-        self.connect(c);
+        self.merge(c);
     }
 
     // See [Bar-Natan '05] Section 5.
     // https://arxiv.org/abs/math/0410495
-    pub fn connect(&mut self, other: TngComplex<R>) { 
-        let (left, right) = self.prepare_connect(other);
+    pub fn merge(&mut self, other: TngComplex<R>) { 
+        let (left, right) = self.prepare_merge(other);
         let h_range = self.h_range();
 
         for i in h_range.clone() { 
-            self.connect_vertices(&left, &right, i);
+            self.merge_vertices(&left, &right, i);
         }
 
         for i in h_range { 
-            self.connect_edges(&left, &right, i);
+            self.merge_edges(&left, &right, i);
         }
     }
 
-    pub(crate) fn prepare_connect(&mut self, other: TngComplex<R>) -> (Self, Self) { 
+    pub(crate) fn prepare_merge(&mut self, other: TngComplex<R>) -> (Self, Self) { 
         assert_eq!(self.ht(), other.ht());
         assert!(self.base_pt.is_none() || other.base_pt.is_none() || self.base_pt == other.base_pt);
 
@@ -411,7 +411,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         (left, other)
     }
 
-    pub(crate) fn connect_vertices(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize) {
+    pub(crate) fn merge_vertices(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize) {
         let keys = self.collect_keys(left, right, i, false);
         keys.into_iter().for_each(|(k, l)| { 
             let v = left.vertex(k);
@@ -426,7 +426,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         });
     }
 
-    pub(crate) fn connect_edges(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize) {
+    pub(crate) fn merge_edges(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize) {
         let (h, t) = self.ht().clone();
         let keys = self.collect_keys(left, right, i, true);
 
@@ -723,7 +723,7 @@ mod tests {
     fn single_x() { 
         let mut c = TngComplex::init(&0, &0, (0, 0), None);
         let x = Node::from_pd_code([1,4,2,5]);
-        c.append(&x);
+        c.append_node(&x);
 
         assert_eq!(c.dim(), 1);
         assert_eq!(c.rank(0), 1);
@@ -734,7 +734,7 @@ mod tests {
     fn single_x_resolved() { 
         let mut c = TngComplex::init(&0, &0, (0, 0), None);
         let x = Node::from_pd_code([1,4,2,5]).resolve(Bit::Bit0);
-        c.append(&x);
+        c.append_node(&x);
 
         assert_eq!(c.dim(), 0);
         assert_eq!(c.rank(0), 1);
@@ -746,8 +746,8 @@ mod tests {
         let x0 = Node::from_pd_code([1,4,2,5]);
         let x1 = Node::from_pd_code([11,14,12,15]);
 
-        c.append(&x0);
-        c.append(&x1);
+        c.append_node(&x0);
+        c.append_node(&x1);
 
         assert_eq!(c.dim(), 2);
         assert_eq!(c.rank(0), 1);
@@ -761,8 +761,8 @@ mod tests {
         let x0 = Node::from_pd_code([4,2,5,1]);
         let x1 = Node::from_pd_code([3,6,4,1]);
 
-        c.append(&x0);
-        c.append(&x1);
+        c.append_node(&x0);
+        c.append_node(&x1);
 
         assert_eq!(c.dim(), 2);
         assert_eq!(c.rank(0), 1);
@@ -774,7 +774,7 @@ mod tests {
     fn deloop() { 
         let mut c = TngComplex::init(&0, &0, (0, 0), None);
         let x0 = Node::from_pd_code([1,2,2,1]).resolve(Bit::Bit0); // unknot
-        c.append(&x0);
+        c.append_node(&x0);
 
         assert_eq!(c.dim(), 0);
         assert_eq!(c.rank(0), 1);
@@ -803,8 +803,8 @@ mod tests {
         let x0 = Node::from_pd_code([4,2,5,1]);
         let x1 = Node::from_pd_code([3,6,4,1]);
 
-        c.append(&x0);
-        c.append(&x1);
+        c.append_node(&x0);
+        c.append_node(&x1);
 
         assert_eq!(c.dim(), 2);
         assert_eq!(c.rank(0), 1);
@@ -842,7 +842,7 @@ mod tests {
     fn deloop_based() { 
         let mut c = TngComplex::init(&0, &0, (0, 0), Some(1)); // base point = 1
         let x0 = Node::from_pd_code([1,2,2,1]).resolve(Bit::Bit0); // unknot
-        c.append(&x0);
+        c.append_node(&x0);
 
         assert_eq!(c.dim(), 0);
         assert_eq!(c.rank(0), 1);
@@ -862,16 +862,16 @@ mod tests {
     }
 
     #[test]
-    fn connect() {
+    fn merge() {
         let mut c0 = TngComplex::init(&0, &0, (0, 0), None);
         let mut c1 = TngComplex::init(&0, &0, (0, 0), None);
         let x0 = Node::from_pd_code([4,2,5,1]);
         let x1 = Node::from_pd_code([3,6,4,1]);
 
-        c0.append(&x0);
-        c1.append(&x1);
+        c0.append_node(&x0);
+        c1.append_node(&x1);
 
-        c0.connect(c1);
+        c0.merge(c1);
 
         assert_eq!(c0.dim(), 2);
         assert_eq!(c0.rank(0), 1);
@@ -882,18 +882,18 @@ mod tests {
     }
 
     #[test]
-    fn connect_trefoil() {
+    fn merge_trefoil() {
         let mut c0 = TngComplex::init(&0, &0, (0, 0), None);
         let mut c1 = TngComplex::init(&0, &0, (0, 0), None);
         let x0 = Node::from_pd_code([1,4,2,5]);
         let x1 = Node::from_pd_code([3,6,4,1]);
         let x2 = Node::from_pd_code([5,2,6,3]);
 
-        c0.append(&x0);
-        c0.append(&x1);
-        c1.append(&x2);
+        c0.append_node(&x0);
+        c0.append_node(&x1);
+        c1.append_node(&x2);
 
-        c0.connect(c1);
+        c0.merge(c1);
 
         assert_eq!(c0.dim(), 3);
         assert_eq!(c0.rank(0), 1);

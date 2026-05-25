@@ -206,6 +206,18 @@ mod tests {
             }
 
             #[test]
+            fn kh_unknot() {
+                let l = Link::unknot();
+                let h = $build(&l, &0, &0, false);
+
+                assert_eq!(h.h_range(), 0..=0);
+                assert_eq!(h.q_range(), -1..=1);
+
+                assert_eq!(h[0].rank(), 2);
+                assert!(h[0].is_free());
+            }
+
+            #[test]
             fn kh_trefoil() {
                 let l = Link::test_data("3_1");
                 let h = $build(&l, &0, &0, false);
@@ -269,6 +281,17 @@ mod tests {
             }
 
             #[test]
+            fn kh_unknot_bigr() {
+                let l = Link::unknot();
+                let h = $build(&l, &0, &0, false);
+
+                assert_eq!(h[(0,-1)].rank(), 1);
+                assert!(h[(0,-1)].is_free());
+                assert_eq!(h[(0, 1)].rank(), 1);
+                assert!(h[(0, 1)].is_free());
+            }
+
+            #[test]
             fn kh_trefoil_bigr() {
                 let l = Link::test_data("3_1");
                 let h = $build(&l, &0, &0, false);
@@ -300,6 +323,15 @@ mod tests {
                 assert_eq!(h[(3, 7)].tors(), &vec![2]);
                 assert_eq!(h[(3, 9)].rank(), 1);
                 assert!(h[(3, 9)].is_free());
+            }
+
+            #[test]
+            fn kh_unknot_bigr_red() {
+                let l = Link::unknot();
+                let h = $build(&l, &0, &0, true);
+
+                assert_eq!(h[(0, 0)].rank(), 1);
+                assert!(h[(0, 0)].is_free());
             }
 
             #[test]
@@ -378,82 +410,13 @@ mod tests {
             }
         };
     }
-
     mod v2 {
         use super::*;
         kh_homology_tests!(KhHomology::new);
-
-        // unknot tests are kept out of the macro for now: v2 requires
-        // `Link::unknot_old()` because `TngComplexBuilder` doesn't yet seed
-        // free loops. once that's fixed, fold these back into the macro.
-
-        #[test]
-        fn kh_unknot() {
-            let l = Link::unknot_old();
-            let h = KhHomology::new(&l, &0, &0, false);
-
-            assert_eq!(h.h_range(), 0..=0);
-            assert_eq!(h.q_range(), -1..=1);
-
-            assert_eq!(h[0].rank(), 2);
-            assert!(h[0].is_free());
-        }
-
-        #[test]
-        fn kh_unknot_bigr() {
-            let l = Link::unknot_old();
-            let h = KhHomology::new(&l, &0, &0, false);
-
-            assert_eq!(h[(0,-1)].rank(), 1);
-            assert!(h[(0,-1)].is_free());
-            assert_eq!(h[(0, 1)].rank(), 1);
-            assert!(h[(0, 1)].is_free());
-        }
-
-        #[test]
-        fn kh_unknot_bigr_red() {
-            let l = Link::unknot_old();
-            let h = KhHomology::new(&l, &0, &0, true);
-
-            assert_eq!(h[(0, 0)].rank(), 1);
-            assert!(h[(0, 0)].is_free());
-        }
     }
 
     mod v1 {
         use super::*;
         kh_homology_tests!(KhHomology::new_no_simplify);
-
-        #[test]
-        fn kh_unknot() {
-            let l = Link::unknot();
-            let h = KhHomology::new_no_simplify(&l, &0, &0, false);
-
-            assert_eq!(h.h_range(), 0..=0);
-            assert_eq!(h.q_range(), -1..=1);
-
-            assert_eq!(h[0].rank(), 2);
-            assert!(h[0].is_free());
-        }
-
-        #[test]
-        fn kh_unknot_bigr() {
-            let l = Link::unknot();
-            let h = KhHomology::new_no_simplify(&l, &0, &0, false);
-
-            assert_eq!(h[(0,-1)].rank(), 1);
-            assert!(h[(0,-1)].is_free());
-            assert_eq!(h[(0, 1)].rank(), 1);
-            assert!(h[(0, 1)].is_free());
-        }
-
-        #[test]
-        fn kh_unknot_bigr_red() {
-            let l = Link::unknot();
-            let h = KhHomology::new_no_simplify(&l, &0, &0, true);
-
-            assert_eq!(h[(0, 0)].rank(), 1);
-            assert!(h[(0, 0)].is_free());
-        }
     }
 }

@@ -9,7 +9,7 @@ use log::info;
 use yui_core::{EucRing, EucRingOps};
 use yui_link::InvLink;
 
-use crate::misc::div_vec;
+use crate::util::calc::div_vec;
 use crate::khi::KhIHomology;
 
 pub fn ssi_invariants<R>(l: &InvLink, c: &R, reduced: bool) -> (i32, i32)

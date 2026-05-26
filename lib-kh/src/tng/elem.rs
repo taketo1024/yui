@@ -7,13 +7,11 @@ use yui_core::bitseq::Bit;
 use yui_core::{Ring, RingOps};
 use yui_link::{Edge, Link, Node};
 
-use crate::kh::internal::v2::cob::CobComp;
-use crate::kh::{KhAlgGen, KhChain};
-
-use super::cob::{Bottom, Dot, Cob, LcCobTrait, LcCob};
 use super::tng::{Tng, TngComp};
-use crate::ext::LinkExt;
+use super::cob::{Bottom, Dot, Cob, CobComp, LcCobTrait, LcCob};
 use super::complex::TngComplexKey;
+use crate::kh::{KhAlgGen, KhChain};
+use crate::ext::LinkExt;
 
 #[derive(Clone)]
 pub struct TngComplexElem<R>

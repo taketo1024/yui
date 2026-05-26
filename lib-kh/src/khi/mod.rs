@@ -8,5 +8,3 @@ pub use khi_gen::{KhIGen, KhIGenExt};
 pub use complex::*;
 pub use homology::*;
 pub use ssi::ssi_invariants;
-
-pub mod internal;

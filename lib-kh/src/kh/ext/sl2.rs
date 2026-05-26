@@ -14,8 +14,7 @@ use yui_matrix::dense::snf::fnf;
 
 use crate::ext::{Color, LinkExt};
 use crate::kh::ext::cc::KhChainMap;
-use crate::kh::internal::v1::cube::KhCube;
-use crate::kh::{KhChain, KhGen, KhComplex, KhHomology};
+use crate::kh::{KhChain, KhCube, KhGen, KhComplex, KhHomology};
 
 impl<R> KhComplex<R>
 where

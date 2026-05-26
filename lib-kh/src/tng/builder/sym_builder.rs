@@ -9,12 +9,9 @@ use yui_core::algo::KeyedUnionFind;
 use yui_core::{Ring, RingOps};
 use yui_link::{Node, Edge, InvLink};
 
-use crate::kh::internal::v2::elem::TngComplexElem;
 use crate::kh::{KhGen, KhTensor};
-use crate::kh::internal::v2::builder::TngComplexBuilder;
-use crate::kh::internal::v2::cob::LcCobTrait;
-use crate::kh::internal::v2::tng::TngComp;
-use crate::kh::internal::v2::complex::{TngComplex, TngComplexKey};
+use crate::tng::{TngComplexElem, LcCobTrait, TngComp, TngComplex, TngComplexKey};
+use crate::tng::builder::TngComplexBuilder;
 
 pub struct SymTngBuilder<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> {

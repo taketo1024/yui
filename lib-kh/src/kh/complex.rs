@@ -29,7 +29,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
-        use crate::kh::internal::v2::builder::TngComplexBuilder;
+        use crate::tng::builder::TngComplexBuilder;
 
         assert!(!reduced || (!l.is_empty() && t.is_zero()));
 
@@ -41,7 +41,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn new_no_simplify(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
-        use crate::kh::internal::v1::cube::KhCube;
+        use super::cube::KhCube;
 
         assert!(!reduced || (!l.is_empty() && t.is_zero()));
 

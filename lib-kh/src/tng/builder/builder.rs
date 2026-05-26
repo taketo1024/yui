@@ -7,11 +7,8 @@ use yui_core::bitseq::Bit;
 use yui_core::{Ring, RingOps};
 use yui_link::{Node, Edge, Link};
 
-use crate::kh::internal::v2::elem::TngComplexElem;
 use crate::kh::{KhChain, KhComplex};
-
-use super::cob::LcCobTrait;
-use super::complex::{TngComplex, TngComplexKey};
+use crate::tng::{TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
 
 pub struct TngComplexBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {

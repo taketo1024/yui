@@ -29,7 +29,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 impl<R> KhIComplex<R>
 where R: Ring, for<'a> &'a R: RingOps<R> { 
     pub fn new(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self { 
-        use crate::khi::internal::v2::builder::SymTngBuilder;
+        use crate::tng::builder::SymTngBuilder;
 
         let b = SymTngBuilder::from_inv_link(&l, &h, &t, reduced).run();
         let tau_map = b.tau_map();

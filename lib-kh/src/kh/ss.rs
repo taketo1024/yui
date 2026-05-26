@@ -8,7 +8,7 @@ use num_traits::Zero;
 use yui_link::Link;
 use yui_core::{EucRing, EucRingOps};
 
-use crate::misc::div_vec;
+use crate::util::calc::div_vec;
 use crate::kh::KhHomology;
 
 pub fn ss_invariant<R>(l: &Link, c: &R, reduced: bool) -> i32

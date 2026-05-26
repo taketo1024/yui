@@ -159,7 +159,7 @@ where
     fn show_ssi(&mut self, l: &InvLink, c: &R, khi: &KhIHomology<R>, zs: &[KhIChain<R>]) -> Result<(), Box<dyn std::error::Error>> { 
         assert!(!c.is_unit() && !c.is_unit());
 
-        use yui_kh::misc::div_vec;
+        use yui_kh::util::calc::div_vec;
 
         let l = l.inner();
         let w = l.writhe();

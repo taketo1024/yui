@@ -6,8 +6,7 @@ use yui_homology::ChainMap;
 use yui_link::{Link, Path, State};
 use num_traits::Zero;
 
-use crate::kh::internal::v1::cube::KhCube;
-use crate::kh::{KhAlg, KhChain, KhGen, KhComplex, KhAlgGen, KhTensor};
+use crate::kh::{KhAlg, KhCube, KhChain, KhGen, KhComplex, KhAlgGen, KhTensor};
 
 pub type KhChainMap<'a, 'c, R> = ChainMap<'a, 'c, isize, KhGen, KhGen, R>;
 

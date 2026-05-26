@@ -103,6 +103,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.out_edges.keys()
     }
 
+    pub(crate) fn c_weight(&self) -> usize { 
+        self.in_edges.len() * self.out_edges.len()
+    }
+
     fn convert_edges<F>(&self, f: F) -> Self
     where F: Fn(Edge) -> Edge { 
         let tng = self.tng.convert_edges(&f);

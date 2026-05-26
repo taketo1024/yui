@@ -203,29 +203,46 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn deloop_in(&mut self, i: isize, allow_based: bool) { 
         let mut keys = self.complex.keys_of_deg(i).filter(|k| 
-            self.complex.vertex(k).tng().contains_circle()
-        ).cloned().collect::<HashSet<_>>();
+            self.is_deloopable(k, allow_based)
+        ).sorted_by_key(|&k| self.complex.vertex(k).c_weight()).cloned().collect_vec();
 
         if keys.is_empty() { return }
 
         info!("({}) C[{i}]: {}, deloop: {}.", self.stat(), self.complex.rank(i), self.count_loops_in(i, allow_based));
-        let before = self.complex.rank(i);
 
-        while let Some((k, r)) = self.find_loop(keys.iter(), allow_based) { 
-            keys.remove(&k);
+        let before = self.complex.rank(i) as isize;
 
-            let updated = self.deloop(&k, r);
+        while !keys.is_empty() { 
+            let k = keys.remove(0);
+            let mut list = vec![k];
 
-            keys.extend(updated);
+            while !list.is_empty() { 
+                let k = list.remove(0);
+                if !self.complex.contains_key(&k) { continue; }
+
+                let Some(r) = self.complex.vertex(&k).tng().find_comp(|c|
+                    c.is_circle() && (allow_based || !self.complex.contains_base_pt(c))
+                ) else { continue };
+
+                let updated = self.deloop(&k, r);
+
+                if self.auto_elim { 
+                    for k in updated.iter() { 
+                        if let Some(&j) = self.choose_inv_edge_into(&k) { 
+                            self.eliminate(&j, &k);
+                        } else if let Some(&l) = self.choose_inv_edge_from(&k) { 
+                            self.eliminate(&k, &l);
+                        } else if self.is_deloopable(k, allow_based) { 
+                            list.push(*k);
+                        }
+                    }
+                }
+            }
         }
 
-        let after = self.complex.rank(i);
-        info!("({}) -> C[{i}]: {} (+{}).", self.stat(), after, after - before);
+        let after = self.complex.rank(i) as isize;
 
-        if self.auto_elim { 
-            self.eliminate_in(i - 1);
-            self.eliminate_in(i);
-        }
+        info!("({}) -> C[{i}]: {} (diff: {}).", self.stat(), after, after - before);
     }
 
     pub(crate) fn deloop(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
@@ -238,6 +255,26 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
 
         self.complex.deloop(k, r)
+    }
+
+    fn choose_inv_edge_into(&self, k: &TngComplexKey) -> Option<&TngComplexKey> { 
+        self.complex.vertex(k).in_edges().filter_map(|j|
+            self.complex.edge(j, k).is_invertible().then_some(j)
+        )
+        .min_by_key(|j| self.edge_weight(j, k))
+    }
+
+    fn choose_inv_edge_from(&self, k: &TngComplexKey) -> Option<&TngComplexKey> { 
+        self.complex.vertex(k).out_edges().filter_map(|l|
+            self.complex.edge(k, l).is_invertible().then_some(l)
+        )
+        .min_by_key(|l| self.edge_weight(k, l))
+    }
+
+    pub(crate) fn is_deloopable(&self, k: &TngComplexKey, allow_based: bool) -> bool { 
+        self.complex.vertex(k).tng().find_comp(|c|
+            c.is_circle() && (allow_based || !self.complex.contains_base_pt(c))
+        ).is_some()
     }
 
     pub(crate) fn find_loop<'a, I>(&self, keys: I, allow_based: bool) -> Option<(TngComplexKey, usize)>

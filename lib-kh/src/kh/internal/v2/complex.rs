@@ -77,7 +77,6 @@ impl Display for TngKey {
 #[derive(Clone, Debug)]
 pub struct TngVertex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    key: TngKey,
     tng: Tng,
     in_edges: AHashSet<TngKey>,
     out_edges: AHashMap<TngKey, LcCob<R>>
@@ -86,11 +85,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> TngVertex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn init() -> Self { 
-        let key = TngKey::init();
         let tng = Tng::empty();
         let in_edges = AHashSet::new();
         let out_edges = AHashMap::new();
-        Self { key, tng, in_edges, out_edges }
+        Self { tng, in_edges, out_edges }
     }
 
     pub fn tng(&self) -> &Tng { 
@@ -107,20 +105,28 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn convert_edges<F>(&self, f: F) -> Self
     where F: Fn(Edge) -> Edge { 
-        let key = self.key;
         let tng = self.tng.convert_edges(&f);
         let in_edges = self.in_edges.clone();
         let out_edges = self.out_edges.iter().map(|(k, cob)|
             (*k, cob.convert_edges(&f))
         ).collect();
-        TngVertex { key, tng, in_edges, out_edges }
+        TngVertex { tng, in_edges, out_edges }
+    }
+}
+
+impl<R> From<Tng> for TngVertex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn from(tng: Tng) -> Self {
+        let in_edges = AHashSet::new();
+        let out_edges = AHashMap::new();
+        Self { tng, in_edges, out_edges }
     }
 }
 
 impl<R> Display for TngVertex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}; {})", self.key, self.tng)
+        write!(f, "{}", self.tng)
     }
 }
 
@@ -152,27 +158,29 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn from_node(h: &R, t: &R, x: &Node) -> Self { 
         if x.is_resolved() { 
-            let mut c = Self::new(h, t, (0, 0), None, 0, AHashMap::new());
+            let k = TngKey::init();
+            let tng = Tng::from_resolved(x);
+            let v = TngVertex::from(tng);
 
-            let mut v = TngVertex::init();
-            v.tng = Tng::from_resolved(x);
-            c.add_vertex(v);
+            let mut c = Self::new(h, t, (0, 0), None, 0, AHashMap::new());
+            c.add_vertex(k, v);
             c
         } else { 
+            let k0 = TngKey::init().clone_and(|k|
+                k.state.push_0()
+            );
+            let t0 = Tng::from_resolved(&x.resolve(Bit::Bit0));
+            let v0 = TngVertex::from(t0);
+
+            let k1 = TngKey::init().clone_and(|k|
+                k.state.push_1()
+            );
+            let t1 = Tng::from_resolved(&x.resolve(Bit::Bit1));
+            let v1 = TngVertex::from(t1);
+            
             let mut c = Self::new(h, t, (0, 0), None, 1, AHashMap::new());
-
-            let mut v0 = TngVertex::init();
-            v0.key.state.push_0();
-            v0.tng = Tng::from_resolved(&x.resolve(Bit::Bit0));
-            let k0 = v0.key;
-
-            let mut v1 = TngVertex::init();
-            v1.key.state.push_1();
-            v1.tng = Tng::from_resolved(&x.resolve(Bit::Bit1));
-            let k1 = v1.key;
-
-            c.add_vertex(v0);
-            c.add_vertex(v1);
+            c.add_vertex(k0, v0);
+            c.add_vertex(k1, v1);
 
             let sdl = LcCob::from(Cob::from(CobComp::sdl_from(x)));
             c.add_edge(&k0, &k1, sdl);
@@ -181,12 +189,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn from_loop(h: &R, t: &R, e: Edge) -> Self { 
-        let mut c = Self::new(h, t, (0, 0), None, 0, AHashMap::new());
+        let k = TngKey::init();
+        let tng = Tng::from(TngComp::circ([e]));
+        let v = TngVertex::from(tng);
 
-        let comp = TngComp::circ([e]);
-        let mut v = TngVertex::init();
-        v.tng = Tng::from(comp);
-        c.add_vertex(v);
+        let mut c = Self::new(h, t, (0, 0), None, 0, AHashMap::new());
+        c.add_vertex(k, v);
         c
     }
 
@@ -259,9 +267,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.vertex(k).out_edges()
     }
 
-    pub fn add_vertex(&mut self, v: TngVertex<R>) { 
-        assert!(!self.contains_key(&v.key));
-        self.vertices.insert(v.key, v);
+    pub fn add_vertex(&mut self, k: TngKey, v: TngVertex<R>) { 
+        assert!(!self.contains_key(&k));
+        self.vertices.insert(k, v);
     }
 
     pub fn remove_vertex(&mut self, k: &TngKey) -> TngVertex<R> { 
@@ -298,9 +306,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             (l, f)
         }).collect_vec();
 
-        let mut v = self.remove_vertex(k_old);
-        v.key = k_new;
-        self.add_vertex(v);
+        let v = self.remove_vertex(k_old);
+        self.add_vertex(k_new, v);
 
         for (j, f) in in_removed { 
             self.add_edge(&j, &k_new, f);
@@ -318,12 +325,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let out_edges = self.vertex(k).out_edges.keys().cloned().collect_vec();
 
         let v_new = self.vertex(k).clone_and(|v| { 
-            v.key = k_new;
             v.in_edges.clear();
             v.out_edges.clear();
         });
 
-        self.add_vertex(v_new);
+        self.add_vertex(k_new, v_new);
 
         for j in in_edges { 
             let f = self.edge(&j, k).clone();
@@ -429,12 +435,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let kl = k + l;
 
             let mut vw = TngVertex::init();
-            vw.key = kl;
             vw.tng = v.tng.clone_and(|t|
                 t.connect(w.tng.clone())
             );
 
-            self.add_vertex(vw);
+            self.add_vertex(kl, vw);
         });
     }
 

@@ -247,14 +247,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         )
     }
 
-    pub fn keys_into(&self, k: &TngComplexKey) -> impl Iterator<Item = &TngComplexKey> + use<'_, R> { 
-        self.vertex(k).in_edges()
-    }
-
-    pub fn keys_out_from(&self, k: &TngComplexKey) -> impl Iterator<Item = &TngComplexKey> + use<'_, R> { 
-        self.vertex(k).out_edges()
-    }
-
     pub fn vertex(&self, v: &TngComplexKey) -> &TngComplexVertex<R> { 
         &self.vertices[v]
     }
@@ -275,8 +267,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn remove_vertex(&mut self, k: &TngComplexKey) -> TngComplexVertex<R> { 
         assert!(self.contains_key(k));
 
-        let in_edges = self.keys_into(k).cloned().collect_vec();
-        let out_edges = self.keys_out_from(k).cloned().collect_vec();
+        let in_edges = self.vertex(k).in_edges().cloned().collect_vec();
+        let out_edges = self.vertex(k).out_edges().cloned().collect_vec();
 
         let v = self.vertices.remove(k).unwrap();
 
@@ -294,13 +286,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn rename_vertex_key(&mut self, k_old: &TngComplexKey, k_new: TngComplexKey) { 
         assert_ne!(k_old, &k_new);
 
-        let in_edges = self.keys_into(k_old).cloned().collect_vec(); 
+        let in_edges = self.vertex(k_old).in_edges().cloned().collect_vec(); 
         let in_removed = in_edges.into_iter().map(|j| {
             let f = self.remove_edge(&j, k_old);
             (j, f)
         }).collect_vec();
 
-        let out_edges = self.keys_out_from(k_old).cloned().collect_vec();
+        let out_edges = self.vertex(k_old).out_edges().cloned().collect_vec();
         let out_removed = out_edges.into_iter().map(|l| {
             let f = self.remove_edge(k_old, &l);
             (l, f)
@@ -455,14 +447,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let w0 = right.vertex(l0);
             let i0 = (k0.state.weight() as isize) - left.deg_shift.0;
 
-            let e1 = left.keys_out_from(k0).map(|k1| { 
+            let e1 = left.vertex(k0).out_edges().map(|k1| { 
                 let k1_l0 = k1 + l0;
                 let f = left.edge(k0, k1).clone();
                 let f_id = f.connect(&Cob::id(w0.tng())); // D(f, 1) 
                 (k0_l0, k1_l0, f_id.part_eval(&h, &t))
             });
 
-            let e2 = right.keys_out_from(l0).map(|l1| { 
+            let e2 = right.vertex(l0).out_edges().map(|l1| { 
                 let k0_l1 = k0 + l1;
                 let f = right.edge(l0, l1).clone();
                 let e = R::from_sign(Sign::from_parity(i0 as i64));
@@ -533,8 +525,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         // remove circle
         let circ = self.vertices.get_mut(k).unwrap().tng.remove_at(r);
 
-        let v_in = self.keys_into(k).cloned().collect_vec();
-        let v_out = self.keys_out_from(k).cloned().collect_vec();
+        let v_in = self.vertex(k).in_edges().cloned().collect_vec();
+        let v_out = self.vertex(k).out_edges().cloned().collect_vec();
 
         // cap incoming cobs
         let (h, t) = self.ht.clone();
@@ -571,8 +563,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let (h, t) = self.ht();
 
         let keys = cartesian!(
-            self.keys_into(k1).filter(|&l0| l0 != k0),
-            self.keys_out_from(k0).filter(|&l1| l1 != k1)
+            self.vertex(k1).in_edges().filter(|&l0| l0 != k0),
+            self.vertex(k0).out_edges().filter(|&l1| l1 != k1)
         ).collect_vec();
 
         let values = keys.into_par_iter().map(|(l0, l1)|{
@@ -643,7 +635,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 let v = &self.vertices[k];
                 str += &format!(" ({j}) {k}: {}", v.tng);
     
-                for l in self.keys_out_from(k).sorted() { 
+                for l in self.vertex(k).out_edges().sorted() { 
                     let f = self.edge(k, l);
                     str += &format!("\n  -> {l}: {f}");
                 }
@@ -660,7 +652,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn validate(&self) {
         for (k, v) in self.vertices.iter() { 
             // validate in_edges 
-            for j in self.keys_into(k) {
+            for j in self.vertex(k).in_edges() {
                 assert!(
                     self.vertices.contains_key(j),
                     "no vertex for in-edge {j} -> {k}"
@@ -675,7 +667,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
             
             // validate out_edges 
-            for l in self.keys_out_from(k) {
+            for l in self.vertex(k).out_edges() {
                 assert!(
                     self.vertices.contains_key(l),
                     "no vertex for out-edge {k} -> {l}"
@@ -690,7 +682,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
 
             // validate cobordism
-            for l in self.keys_out_from(k) {
+            for l in self.vertex(k).out_edges() {
                 let w = self.vertex(l);
                 let f = self.edge(k, l);
 

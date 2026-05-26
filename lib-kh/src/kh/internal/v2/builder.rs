@@ -272,7 +272,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub(crate) fn eliminate_in(&mut self, i: isize) { 
         let mut keys = self.complex.keys_of_deg(i).filter(|k| 
-            self.complex.keys_out_from(k).find(|l|
+            self.complex.vertex(k).out_edges().find(|l|
                 self.complex.edge(k, l).is_invertible()
             ).is_some()
         ).cloned().collect::<HashSet<_>>();
@@ -330,7 +330,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let ainv = a.inv().unwrap();
         let (h, t) = self.complex.ht();
 
-        for k in self.complex.keys_out_from(i) { 
+        for k in self.complex.vertex(i).out_edges() { 
             if k == j { continue }
 
             let c = self.complex.edge(i, k);
@@ -356,7 +356,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn choose_pivot_col(&self, k: &TngComplexKey) -> Option<(&TngComplexKey, usize)> { 
         // Choose best pivot in "column k".
-        self.complex.keys_out_from(k).filter_map(|l| { 
+        self.complex.vertex(k).out_edges().filter_map(|l| { 
             let f = self.complex.edge(k, l);
             f.is_invertible().then(|| {
                 let s = self.edge_weight(k, l);
@@ -367,8 +367,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub(crate) fn edge_weight(&self, k: &TngComplexKey, l: &TngComplexKey) -> usize { 
-        let nk = self.complex.keys_out_from(k).count(); // nnz in column k
-        let nl = self.complex.keys_into(l).count();     // nnz in row l
+        let nk = self.complex.vertex(k).out_edges().count(); // nnz in column k
+        let nl = self.complex.vertex(l).in_edges().count();     // nnz in row l
         (nk - 1) * (nl - 1)
     }
 

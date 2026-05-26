@@ -392,7 +392,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn eliminate_in(&mut self, i: isize) { 
         let mut keys = self.inner.complex().keys_of_deg(i).filter(|k| 
-            self.inner.complex().keys_out_from(k).find(|l|
+            self.inner.complex().vertex(k).out_edges().find(|l|
                 self.is_equiv_inv_edge(k, l)
             ).is_some()
         ).cloned().collect::<HashSet<_>>();
@@ -444,7 +444,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn choose_pivot_col(&self, k: &TngComplexKey) -> Option<(&TngComplexKey, usize)> { 
-        self.inner.complex().keys_out_from(k).filter(|&l| self.is_equiv_inv_edge(k, l)).map(|l| {
+        self.inner.complex().vertex(k).out_edges().filter(|&l| self.is_equiv_inv_edge(k, l)).map(|l| {
                 let s = self.inner.edge_weight(k, l);
                 (l, s)
             })
@@ -468,8 +468,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let ti = self.inv_key(i);
             let tj = self.inv_key(j);
 
-            !self.inner.complex().keys_into(j).contains(ti) && 
-            !self.inner.complex().keys_into(tj).contains(i)
+            !self.inner.complex().vertex(j).in_edges().contains(ti) && 
+            !self.inner.complex().vertex(tj).in_edges().contains(i)
         } else { 
             false
         }
@@ -565,7 +565,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             assert!(self.key_map.contains_key(k), "no inv-key for {k}");
             let tk = self.inv_key(k);
 
-            for l in self.inner.complex().keys_out_from(k) { 
+            for l in self.inner.complex().vertex(k).out_edges() { 
                 assert!(self.key_map.contains_key(l), "no inv-key for {l}");
                 let tl = self.inv_key(l);
 

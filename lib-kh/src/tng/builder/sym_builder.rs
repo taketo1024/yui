@@ -262,34 +262,44 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn deloop_in(&mut self, i: isize, allow_based: bool) {
         let mut keys = self.inner.complex().keys_of_deg(i).filter(|k| 
-            self.inner.complex().vertex(k).tng().contains_circle()
-        ).cloned().collect::<HashSet<_>>();
+            self.inner.is_deloopable(k, allow_based)
+        ).sorted_by_key(|&k| self.inner.complex().vertex(k).c_weight()).cloned().collect_vec();
 
         if keys.is_empty() { return }
 
         info!("({}) C[{i}]: {}, deloop: {}.", self.inner.stat(), self.inner.complex().rank(i), self.inner.count_loops_in(i, allow_based));
-        let before = self.inner.complex().rank(i);
 
-        while let Some((k, r)) = self.inner.find_loop(keys.iter(), allow_based) { 
-            keys.remove(&k);
-            keys.remove(self.inv_key(&k));
+        let before = self.inner.complex().rank(i) as isize;
 
-            let updated = self.deloop_equiv(&k, r);
-            
-            keys.extend(updated);
+        while !keys.is_empty() { 
+            let k = keys.remove(0);
+            if !self.inner.complex().contains_key(&k) { continue; } // already delooped or eliminated
+
+            let mut list = vec![k];
+
+            while !list.is_empty() { 
+                let k = list.remove(0);
+                if !self.inner.complex().contains_key(&k) { continue; }
+
+                let Some(r) = self.inner.complex().vertex(&k).tng().find_comp(|c|
+                    c.is_circle() && (allow_based || !self.inner.complex().contains_base_pt(c))
+                ) else { continue };
+
+                let added = self.deloop_equiv(&k, r);
+
+                list.extend(added.into_iter().filter(|k|
+                    self.inner.is_deloopable(k, allow_based)
+                ));
+            }
         }
 
-        let after = self.inner.complex().rank(i);
-        info!("({}) -> C[{i}]: {} (+{}).", self.inner.stat(), after, after - before);
+        let after = self.inner.complex().rank(i) as isize;
 
-        if self.auto_elim { 
-            self.eliminate_in(i - 1);
-            self.eliminate_in(i);
-        }
+        info!("({}) -> C[{i}]: {} (diff: {}).", self.inner.stat(), after, after - before);
     }
 
     fn deloop_equiv(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> { 
-        if self.is_sym_key(k) { 
+        let added = if self.is_sym_key(k) { 
             let c = self.inner.complex().vertex(k).tng().comp(r);
             if self.is_sym_comp(c) {
                 // symmetric loop on symmetric key
@@ -301,6 +311,24 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         } else { 
             // (symmetric or asymmetric) loop on asymmetric key
             self.deloop_off_axis(k, r)
+        };
+
+        if self.auto_elim { 
+            let mut res = vec![];
+            for k in added.iter() { 
+                if !self.inner.complex().contains_key(&k) { continue; } // already eliminated
+                
+                if let Some(&j) = self.choose_equiv_inv_edge_into(&k) { 
+                    self.eliminate_equiv(&j, &k);
+                } else if let Some(&l) = self.choose_equiv_inv_edge_from(&k) { 
+                    self.eliminate_equiv(&k, &l);
+                } else { 
+                    res.push(*k);
+                }
+            }
+            res
+        } else { 
+            added
         }
     }
 
@@ -382,6 +410,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         ks.append(&mut tks);
         ks
+    }
+
+    fn choose_equiv_inv_edge_into(&self, k: &TngComplexKey) -> Option<&TngComplexKey> { 
+        self.inner.complex().vertex(k).in_edges().filter_map(|j|
+            self.is_equiv_inv_edge(j, k).then_some(j)
+        )
+        .min_by_key(|j| self.inner.edge_weight(j, k))
+    }
+
+    fn choose_equiv_inv_edge_from(&self, k: &TngComplexKey) -> Option<&TngComplexKey> { 
+        self.inner.complex().vertex(k).out_edges().filter_map(|l|
+            self.is_equiv_inv_edge(k, l).then_some(l)
+        )
+        .min_by_key(|l| self.inner.edge_weight(k, l))
     }
 
     #[allow(unused)]

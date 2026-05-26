@@ -166,11 +166,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         info!("({}) merge <- ({})", self.stat(), other.stat());
 
         let (left, right) = self.complex.prepare_merge(other); 
-        let h_range = self.complex.h_range();
 
         self.complex.merge_vertices(&left, &right);
 
-        for i in h_range { 
+        for i in self.complex.h_range() { 
             self.complex.merge_edges(&left, &right, i);
             if self.auto_deloop {
                 self.deloop_in(i, false);
@@ -217,7 +216,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             let updated = self.deloop(&k, r);
 
-            keys.extend(updated.into_iter().filter(|k| self.complex.contains_key(k)));
+            keys.extend(updated);
         }
 
         let after = self.complex.rank(i);

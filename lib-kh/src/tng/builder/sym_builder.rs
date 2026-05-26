@@ -3,7 +3,6 @@ use ahash::AHashMap;
 use cartesian::cartesian;
 use itertools::Itertools;
 use log::info;
-use rayon::prelude::*;
 use yui_core::bitseq::{Bit, BitSeq};
 use yui_core::algo::KeyedUnionFind;
 use yui_core::{Ring, RingOps};
@@ -64,14 +63,22 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         info!("({}) preprocess off-axis: {}", self.inner.stat(), off_axis.len());
 
+        // process half
+
         let (c, tc, key_map, elements) = self.build_from_half(off_axis.iter(), elements);
+
+        // merge left
 
         self.inner.remove_nodes(off_axis.iter());
         self.inner.merge(c);
 
+        // merge right 
+
         let off_axis = off_axis.iter().map(|x| self.inv_node(x).clone()).collect_vec();
         self.inner.remove_nodes(off_axis.iter());
         self.inner.merge(tc);
+
+        // update key_map & elements
         
         self.key_map = key_map;
         self.inner.set_elements(elements);
@@ -134,15 +141,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let tc = c.convert_edges(|e| self.inv_edge(e));
 
         // build keys
-        let keys = cartesian!(keys.iter(), keys.iter()).collect_vec();
-        let key_map = keys.into_par_iter().map(|(k1, k2)| { 
+        let keys = cartesian!(keys.iter(), keys.iter());
+        let key_map = keys.map(|(k1, k2)| { 
             let k  = k1 + k2;
             let tk = k2 + k1;
             (k, tk)
-        }).collect::<ahash::HashMap<_, _>>().into();
+        }).collect();
 
         // build elements
-        let elements = elements.into_par_iter().map(|mut e| { 
+        let elements = elements.into_iter().map(|mut e| { 
             e.modify(|k, c| {
                 let kk = k + k;
                 let cc = c.map(|mut c, r| {
@@ -154,7 +161,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 (kk, cc)
             });
             e
-        }).collect::<Vec<_>>();
+        }).collect();
 
         (c, tc, key_map, elements)
     }
@@ -234,11 +241,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         ).collect();
 
         let (left, right) = self.inner.complex_mut().prepare_merge(c);
-        let h_range = self.inner.complex().h_range();
 
         self.inner.complex_mut().merge_vertices(&left, &right);
 
-        for i in h_range { 
+        for i in self.inner.complex().h_range() { 
             self.inner.complex_mut().merge_edges(&left, &right, i);
             if self.auto_deloop { 
                 self.deloop_in(i, false);
@@ -270,7 +276,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             let updated = self.deloop_equiv(&k, r);
             
-            keys.extend(updated.into_iter().filter(|k| self.inner.complex().contains_key(k)));
+            keys.extend(updated);
         }
 
         let after = self.inner.complex().rank(i);

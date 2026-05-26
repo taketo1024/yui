@@ -251,7 +251,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.vertices[v]
     }
 
-    pub fn nverts(&self) -> usize { 
+    pub fn n_verts(&self) -> usize { 
         self.vertices.len()
     }
 
@@ -697,7 +697,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub(crate) fn stat(&self) -> String { 
-        format!("n: {}, v: {}", self.dim(), self.nverts())
+        format!("n: {}, v: {}", self.dim(), self.n_verts())
     }
 
     pub fn convert_edges<F>(&self, f: F) -> Self

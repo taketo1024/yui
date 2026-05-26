@@ -182,8 +182,8 @@ impl CobComp {
     }
 
     pub fn is_cyl(&self) -> bool { // possibly with genus
-        self.src.ncomps() == 1 && 
-        self.tgt.ncomps() == 1
+        self.src.n_comps() == 1 && 
+        self.tgt.n_comps() == 1
     }
 
     pub fn is_id(&self) -> bool { 
@@ -193,27 +193,27 @@ impl CobComp {
     }
 
     pub fn is_sdl(&self) -> bool { // possibly with genus
-        self.src.ncomps() == 2 && 
-        self.tgt.ncomps() == 2 && 
+        self.src.n_comps() == 2 && 
+        self.tgt.n_comps() == 2 && 
         self.src.comps().all(|c| c.is_arc()) && 
         self.tgt.comps().all(|c| c.is_arc()) && 
         self.src != self.tgt
     }
 
     pub fn is_cup(&self) -> bool { 
-        self.src.ncomps() == 0 && self.tgt.ncomps() == 1
+        self.src.n_comps() == 0 && self.tgt.n_comps() == 1
     }
 
     pub fn is_cap(&self) -> bool { 
-        self.src.ncomps() == 1 && self.tgt.ncomps() == 0
+        self.src.n_comps() == 1 && self.tgt.n_comps() == 0
     }
 
     pub fn is_merge(&self) -> bool { 
-        self.src.ncomps() == 2 && self.tgt.ncomps() == 1
+        self.src.n_comps() == 2 && self.tgt.n_comps() == 1
     }
 
     pub fn is_split(&self) -> bool { 
-        self.src.ncomps() == 1 && self.tgt.ncomps() == 2
+        self.src.n_comps() == 1 && self.tgt.n_comps() == 2
     }
 
     pub fn is_zero_cob(&self) -> bool { 
@@ -262,18 +262,18 @@ impl CobComp {
     }
 
     pub fn nbdr_comps(&self) -> usize { 
-        let mut src_arcs: HashSet<_> = (0..self.src.ncomps()).filter(|&i| 
+        let mut src_arcs: HashSet<_> = (0..self.src.n_comps()).filter(|&i| 
             self.src.comp(i).is_arc()
         ).collect();
 
-        let mut tgt_arcs: HashSet<_> = (0..self.tgt.ncomps()).filter(|&i| 
+        let mut tgt_arcs: HashSet<_> = (0..self.tgt.n_comps()).filter(|&i| 
             self.tgt.comp(i).is_arc()
         ).collect();
 
         assert_eq!(src_arcs.len(), tgt_arcs.len());
 
-        let src_circs = self.src.ncomps() - src_arcs.len();
-        let tgt_circs = self.tgt.ncomps() - tgt_arcs.len();
+        let src_circs = self.src.n_comps() - src_arcs.len();
+        let tgt_circs = self.tgt.n_comps() - tgt_arcs.len();
 
         let mut side_circs = 0;
 
@@ -454,7 +454,7 @@ impl CobComp {
 
 impl Display for CobComp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match (self.src.ncomps(), self.tgt.ncomps()) { 
+        let s = match (self.src.n_comps(), self.tgt.n_comps()) { 
             (0, 0) => "S",
             (0, 1) => "ι",
             (1, 0) => "ε",
@@ -523,14 +523,14 @@ impl Cob {
     }
     
     pub fn id(v: &Tng) -> Self { 
-        let comps = (0..v.ncomps()).map(|i| {
+        let comps = (0..v.n_comps()).map(|i| {
             let c = v.comp(i).clone();
             CobComp::id(c)
         });
         Self::new(comps)
     }
 
-    pub fn ncomps(&self) -> usize { 
+    pub fn n_comps(&self) -> usize { 
         self.comps.len()
     }
 
@@ -644,8 +644,8 @@ impl Cob {
     }
 
     pub fn is_stackable(&self, other: &Self) -> bool { 
-        self.comps.iter().fold(0, |n, c| n + c.tgt.ncomps()) == 
-        other.comps.iter().fold(0, |n, c| n + c.src.ncomps()) && 
+        self.comps.iter().fold(0, |n, c| n + c.tgt.n_comps()) == 
+        other.comps.iter().fold(0, |n, c| n + c.src.n_comps()) && 
         self.comps.iter().all(|c| c.tgt.comps().all(|a|
             other.comps.iter().any(|c| c.contains(Bottom::Src, a))
         ))
@@ -1337,27 +1337,27 @@ mod tests {
         let mut c =  Cob::empty();
         c.stack(c0);
 
-        assert_eq!(c.ncomps(), 1);
-        assert_eq!(c.comp(0).src.ncomps(), 0);
-        assert_eq!(c.comp(0).tgt.ncomps(), 1);
+        assert_eq!(c.n_comps(), 1);
+        assert_eq!(c.comp(0).src.n_comps(), 0);
+        assert_eq!(c.comp(0).tgt.n_comps(), 1);
         assert_eq!(c.comp(0).genus, 0);
 
         c.stack(c1);
-        assert_eq!(c.ncomps(), 1);
-        assert_eq!(c.comp(0).src.ncomps(), 0);
-        assert_eq!(c.comp(0).tgt.ncomps(), 2);
+        assert_eq!(c.n_comps(), 1);
+        assert_eq!(c.comp(0).src.n_comps(), 0);
+        assert_eq!(c.comp(0).tgt.n_comps(), 2);
         assert_eq!(c.comp(0).genus, 0);
 
         c.stack(c2);
-        assert_eq!(c.ncomps(), 1);
-        assert_eq!(c.comp(0).src.ncomps(), 0);
-        assert_eq!(c.comp(0).tgt.ncomps(), 1);
+        assert_eq!(c.n_comps(), 1);
+        assert_eq!(c.comp(0).src.n_comps(), 0);
+        assert_eq!(c.comp(0).tgt.n_comps(), 1);
         assert_eq!(c.comp(0).genus, 1);
 
         c.stack(c3);
-        assert_eq!(c.ncomps(), 1);
-        assert_eq!(c.comp(0).src.ncomps(), 0);
-        assert_eq!(c.comp(0).tgt.ncomps(), 0);
+        assert_eq!(c.n_comps(), 1);
+        assert_eq!(c.comp(0).src.n_comps(), 0);
+        assert_eq!(c.comp(0).tgt.n_comps(), 0);
         assert_eq!(c.comp(0).genus, 1);
     }
 

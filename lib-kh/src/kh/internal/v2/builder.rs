@@ -25,7 +25,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> TngComplexBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new(l: &Link, h: &R, t: &R, reduced: bool) -> Self { 
+    pub fn from_link(l: &Link, h: &R, t: &R, reduced: bool) -> Self { 
         let base_pt = if reduced { l.base_pt() } else { None };
         let deg_shift = KhComplex::deg_shift_for(l, reduced);
 
@@ -410,7 +410,7 @@ mod tests {
     #[test]
     fn test_unknot() {
         let l = Link::unknot();
-        let b = TngComplexBuilder::new(&l, &0, &0, false).run();
+        let b = TngComplexBuilder::from_link(&l, &0, &0, false).run();
         let c = b.into_tng_complex().into_raw_complex();
 
         assert_eq!(c[0].rank(), 2);
@@ -420,7 +420,7 @@ mod tests {
     #[test]
     fn test_unknot_rm1() {
         let l = Link::test_data("unknot_l_twist");
-        let b = TngComplexBuilder::new(&l, &0, &0, false).run();
+        let b = TngComplexBuilder::from_link(&l, &0, &0, false).run();
         let c = b.into_tng_complex().into_raw_complex();
 
         assert_eq!(c[0].rank(), 2);
@@ -430,7 +430,7 @@ mod tests {
     #[test]
     fn test_unknot_rm1_neg() {
         let l = Link::test_data("unknot_r_twist");
-        let b = TngComplexBuilder::new(&l, &0, &0, false).run();
+        let b = TngComplexBuilder::from_link(&l, &0, &0, false).run();
         let c = b.into_tng_complex().into_raw_complex();
 
         c.check_d_all();
@@ -442,7 +442,7 @@ mod tests {
     #[test]
     fn test_unknot_rm2() {
         let l = Link::test_data("unknot_lr_twist");
-        let b = TngComplexBuilder::new(&l, &0, &0, false).run();
+        let b = TngComplexBuilder::from_link(&l, &0, &0, false).run();
         let c = b.into_tng_complex().into_raw_complex();
 
         c.check_d_all();
@@ -455,7 +455,7 @@ mod tests {
     #[test]
     fn test_unlink_2() {
         let l = Link::test_data("unlink2");
-        let b = TngComplexBuilder::new(&l, &0, &0, false).run();
+        let b = TngComplexBuilder::from_link(&l, &0, &0, false).run();
         let c = b.into_tng_complex().into_raw_complex();
 
         c.check_d_all();
@@ -481,7 +481,7 @@ mod tests {
     #[test]
     fn test_hopf_link() {
         let l = Link::test_data("L2a1");
-        let b = TngComplexBuilder::new(&l, &0, &0, false).run();
+        let b = TngComplexBuilder::from_link(&l, &0, &0, false).run();
         let c = b.into_tng_complex().into_raw_complex();
 
         c.check_d_all();
@@ -494,7 +494,7 @@ mod tests {
     #[test]
     fn test_8_19() {
         let l = Link::test_data("8_19");
-        let b = TngComplexBuilder::new(&l, &0, &0, false).run();
+        let b = TngComplexBuilder::from_link(&l, &0, &0, false).run();
         let c = b.into_tng_complex().into_raw_complex();
 
         c.check_d_all();
@@ -521,7 +521,7 @@ mod tests {
     #[test]
     fn canon_cycle_trefoil() { 
         let l = Link::test_data("3_1");
-        let b = TngComplexBuilder::new(&l, &1, &0, false).run();
+        let b = TngComplexBuilder::from_link(&l, &1, &0, false).run();
         let zs = b.eval_elements();
         let c = b.into_tng_complex().into_raw_complex();
 

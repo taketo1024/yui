@@ -28,11 +28,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> SymTngBuilder<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn new(l: &InvLink, h: &R, t: &R, reduced: bool) -> SymTngBuilder<R> { 
+    pub fn from_inv_link(l: &InvLink, h: &R, t: &R, reduced: bool) -> SymTngBuilder<R> { 
         assert!(l.nodes().all(|x| x.is_crossing()));
         assert!(!reduced || l.base_pt().is_some());
 
-        let inner = TngComplexBuilder::new(l.inner(), h, t, reduced);
+        let inner = TngComplexBuilder::from_link(l.inner(), h, t, reduced);
         let x_map = l.nodes().map(|x| 
             (x.clone(), l.inv_node(x).clone())
         ).collect();
@@ -610,7 +610,7 @@ mod tests {
         let l = InvLink::test_data("3_1");
         let (h, t) = (FF2::zero(), FF2::zero());
 
-        let b = SymTngBuilder::new(&l, &h, &t, false).run();
+        let b = SymTngBuilder::from_inv_link(&l, &h, &t, false).run();
         let c = b.into_tng_complex().into_raw_complex();
         c.check_d_all();
 
@@ -626,7 +626,7 @@ mod tests {
         let l = InvLink::test_data("3_1");
         let (h, t) = (FF2::zero(), FF2::zero());
 
-        let b = SymTngBuilder::new(&l, &h, &t, false).run();
+        let b = SymTngBuilder::from_inv_link(&l, &h, &t, false).run();
         let c = make_cone(b);
         c.check_d_all();
 
@@ -644,7 +644,7 @@ mod tests {
         let l = InvLink::test_data("3_1");
         let (h, t) = (FF2::zero(), FF2::zero());
 
-        let mut b = SymTngBuilder::new(&l, &h, &t, false);
+        let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
         b.process_nodes();
 
         let c = make_cone(b);
@@ -664,7 +664,7 @@ mod tests {
         let l = InvLink::test_data("3_1");
         let (h, t) = (FF2::zero(), FF2::zero());
 
-        let mut b = SymTngBuilder::new(&l, &h, &t, false);
+        let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
         b.auto_deloop = false;
         b.preprocess();
         b.process_nodes();
@@ -693,7 +693,7 @@ mod tests {
         let l = InvLink::test_data("3_1");
         let (h, t) = (FF2::zero(), FF2::zero());
 
-        let mut b = SymTngBuilder::new(&l, &h, &t, false);
+        let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
         b.auto_elim = false;
         b.preprocess();
         b.process_nodes();

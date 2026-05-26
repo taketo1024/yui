@@ -31,7 +31,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     pub fn new(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self { 
         use crate::khi::internal::v2::builder::SymTngBuilder;
 
-        let b = SymTngBuilder::new(&l, &h, &t, reduced).run();
+        let b = SymTngBuilder::from_inv_link(&l, &h, &t, reduced).run();
         let tau_map = b.tau_map();
 
         let b = b.into_inner();

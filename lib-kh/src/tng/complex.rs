@@ -390,9 +390,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let (left, right) = self.prepare_merge(other);
         let h_range = self.h_range();
 
-        for i in h_range.clone() { 
-            self.merge_vertices(&left, &right, i);
-        }
+        self.merge_vertices(&left, &right);
 
         for i in h_range { 
             self.merge_edges(&left, &right, i);
@@ -419,9 +417,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         (left, other)
     }
 
-    pub(crate) fn merge_vertices(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize) {
-        let keys = self.collect_keys(left, right, i, false);
-        keys.into_iter().for_each(|(k, l)| { 
+    pub(crate) fn merge_vertices(&mut self, left: &TngComplex<R>, right: &TngComplex<R>) {
+        let keys = cartesian!(left.keys(), right.keys());
+        keys.for_each(|(k, l)| { 
             let v = left.vertex(k);
             let w = right.vertex(l);
             let kl = k + l;

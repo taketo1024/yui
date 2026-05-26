@@ -236,9 +236,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let (left, right) = self.inner.complex_mut().prepare_merge(c);
         let h_range = self.inner.complex().h_range();
 
-        for i in h_range.clone() { 
-            self.inner.complex_mut().merge_vertices(&left, &right, i);
-        }
+        self.inner.complex_mut().merge_vertices(&left, &right);
 
         for i in h_range { 
             self.inner.complex_mut().merge_edges(&left, &right, i);

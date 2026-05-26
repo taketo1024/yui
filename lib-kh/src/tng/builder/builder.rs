@@ -168,9 +168,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let (left, right) = self.complex.prepare_merge(other); 
         let h_range = self.complex.h_range();
 
-        for i in h_range.clone() { 
-            self.complex.merge_vertices(&left, &right, i);
-        }
+        self.complex.merge_vertices(&left, &right);
 
         for i in h_range { 
             self.complex.merge_edges(&left, &right, i);

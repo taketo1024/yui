@@ -18,12 +18,12 @@ use super::cob::{Cob, Dot, Bottom, CobComp, LcCob, LcCobTrait};
 use super::tng::{Tng, TngComp};
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
-pub struct TngKey { 
+pub struct TngComplexKey { 
     pub state: State,
     pub label: KhTensor
 }
 
-impl TngKey { 
+impl TngComplexKey { 
     pub(crate) fn init() -> Self { 
         Self { state: State::empty(), label: KhTensor::empty() }
     }
@@ -32,7 +32,7 @@ impl TngKey {
         self.state.weight()
     }
 
-    fn append(&mut self, other: TngKey) { 
+    fn append(&mut self, other: TngComplexKey) { 
         self.state.append(other.state);
         self.label.append(other.label);
     }
@@ -43,8 +43,8 @@ impl TngKey {
 }
 
 #[auto_ops]
-impl Add for &TngKey {
-    type Output = TngKey;
+impl Add for &TngComplexKey {
+    type Output = TngComplexKey;
     fn add(self, rhs: Self) -> Self::Output {
         let mut res = *self;
         res.append(*rhs);
@@ -53,8 +53,8 @@ impl Add for &TngKey {
 }
 
 #[auto_ops]
-impl Add<KhAlgGen> for &TngKey {
-    type Output = TngKey;
+impl Add<KhAlgGen> for &TngComplexKey {
+    type Output = TngComplexKey;
     fn add(self, rhs: KhAlgGen) -> Self::Output {
         let mut res = *self;
         res.label.push(rhs);
@@ -62,27 +62,27 @@ impl Add<KhAlgGen> for &TngKey {
     }
 }
 
-impl From<&KhGen> for TngKey {
+impl From<&KhGen> for TngComplexKey {
     fn from(x: &KhGen) -> Self {
-        TngKey { state: *x.state(), label: *x.tensor() }
+        TngComplexKey { state: *x.state(), label: *x.tensor() }
     }
 }
 
-impl Display for TngKey {
+impl Display for TngComplexKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.as_gen().fmt(f)
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct TngVertex<R>
+pub struct TngComplexVertex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     tng: Tng,
-    in_edges: AHashSet<TngKey>,
-    out_edges: AHashMap<TngKey, LcCob<R>>
+    in_edges: AHashSet<TngComplexKey>,
+    out_edges: AHashMap<TngComplexKey, LcCob<R>>
 }
 
-impl<R> TngVertex<R>
+impl<R> TngComplexVertex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn init() -> Self { 
         let tng = Tng::empty();
@@ -95,11 +95,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.tng
     }
 
-    pub fn in_edges(&self) -> impl Iterator<Item = &TngKey> {
+    pub fn in_edges(&self) -> impl Iterator<Item = &TngComplexKey> {
         self.in_edges.iter()
     }
 
-    pub fn out_edges(&self) -> impl Iterator<Item = &TngKey> {
+    pub fn out_edges(&self) -> impl Iterator<Item = &TngComplexKey> {
         self.out_edges.keys()
     }
 
@@ -110,11 +110,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let out_edges = self.out_edges.iter().map(|(k, cob)|
             (*k, cob.convert_edges(&f))
         ).collect();
-        TngVertex { tng, in_edges, out_edges }
+        TngComplexVertex { tng, in_edges, out_edges }
     }
 }
 
-impl<R> From<Tng> for TngVertex<R>
+impl<R> From<Tng> for TngComplexVertex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn from(tng: Tng) -> Self {
         let in_edges = AHashSet::new();
@@ -123,7 +123,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<R> Display for TngVertex<R>
+impl<R> Display for TngComplexVertex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.tng)
@@ -137,20 +137,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     deg_shift: (isize, isize),
     base_pt: Option<Edge>,
     dim: usize, 
-    vertices: AHashMap<TngKey, TngVertex<R>>,
+    vertices: AHashMap<TngComplexKey, TngComplexVertex<R>>,
 }
 
 impl<R> TngComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn new(h: &R, t: &R, deg_shift: (isize, isize), base_pt: Option<Edge>, dim: usize, vertices: AHashMap<TngKey, TngVertex<R>>) -> Self { 
+    fn new(h: &R, t: &R, deg_shift: (isize, isize), base_pt: Option<Edge>, dim: usize, vertices: AHashMap<TngComplexKey, TngComplexVertex<R>>) -> Self { 
         let ht = (h.clone(), t.clone());
         TngComplex{ ht, deg_shift, base_pt, dim, vertices }
     }
 
     pub fn init(h: &R, t: &R, deg_shift: (isize, isize), base_pt: Option<Edge>) -> Self { 
         let mut vertices = AHashMap::new();
-        let k0 = TngKey::init();
-        let v0 = TngVertex::init();
+        let k0 = TngComplexKey::init();
+        let v0 = TngComplexVertex::init();
         vertices.insert(k0, v0);
 
         TngComplex::new(h, t, deg_shift, base_pt, 0, vertices)
@@ -158,25 +158,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn from_node(h: &R, t: &R, x: &Node) -> Self { 
         if x.is_resolved() { 
-            let k = TngKey::init();
+            let k = TngComplexKey::init();
             let tng = Tng::from_resolved(x);
-            let v = TngVertex::from(tng);
+            let v = TngComplexVertex::from(tng);
 
             let mut c = Self::new(h, t, (0, 0), None, 0, AHashMap::new());
             c.add_vertex(k, v);
             c
         } else { 
-            let k0 = TngKey::init().clone_and(|k|
+            let k0 = TngComplexKey::init().clone_and(|k|
                 k.state.push_0()
             );
             let t0 = Tng::from_resolved(&x.resolve(Bit::Bit0));
-            let v0 = TngVertex::from(t0);
+            let v0 = TngComplexVertex::from(t0);
 
-            let k1 = TngKey::init().clone_and(|k|
+            let k1 = TngComplexKey::init().clone_and(|k|
                 k.state.push_1()
             );
             let t1 = Tng::from_resolved(&x.resolve(Bit::Bit1));
-            let v1 = TngVertex::from(t1);
+            let v1 = TngComplexVertex::from(t1);
             
             let mut c = Self::new(h, t, (0, 0), None, 1, AHashMap::new());
             c.add_vertex(k0, v0);
@@ -189,9 +189,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn from_loop(h: &R, t: &R, e: Edge) -> Self { 
-        let k = TngKey::init();
+        let k = TngComplexKey::init();
         let tng = Tng::from(TngComp::circ([e]));
-        let v = TngVertex::from(tng);
+        let v = TngComplexVertex::from(tng);
 
         let mut c = Self::new(h, t, (0, 0), None, 0, AHashMap::new());
         c.add_vertex(k, v);
@@ -229,10 +229,33 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn rank(&self, i: isize) -> usize { 
-        self.keys_of(i).count()
+        self.keys_of_deg(i).count()
     }
 
-    pub fn vertex(&self, v: &TngKey) -> &TngVertex<R> { 
+    pub fn contains_key(&self, key: &TngComplexKey) -> bool { 
+        self.vertices.contains_key(key)
+    }
+
+    pub fn keys(&self) -> impl Iterator<Item = &TngComplexKey> { 
+        self.vertices.keys()
+    }
+
+    pub fn keys_of_deg(&self, i: isize) -> impl Iterator<Item = &TngComplexKey> { 
+        let i0 = self.deg_shift.0;
+        self.vertices.keys().filter(move |k| 
+            (k.weight() as isize) + i0 == i
+        )
+    }
+
+    pub fn keys_into(&self, k: &TngComplexKey) -> impl Iterator<Item = &TngComplexKey> + use<'_, R> { 
+        self.vertex(k).in_edges()
+    }
+
+    pub fn keys_out_from(&self, k: &TngComplexKey) -> impl Iterator<Item = &TngComplexKey> + use<'_, R> { 
+        self.vertex(k).out_edges()
+    }
+
+    pub fn vertex(&self, v: &TngComplexKey) -> &TngComplexVertex<R> { 
         &self.vertices[v]
     }
 
@@ -240,39 +263,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.vertices.len()
     }
 
-    pub fn iter_verts(&self) -> impl Iterator<Item = (&TngKey, &TngVertex<R>)> {
+    pub fn iter_verts(&self) -> impl Iterator<Item = (&TngComplexKey, &TngComplexVertex<R>)> {
         self.vertices.iter()
     }
 
-    pub fn contains_key(&self, key: &TngKey) -> bool { 
-        self.vertices.contains_key(key)
-    }
-
-    pub fn keys(&self) -> impl Iterator<Item = &TngKey> { 
-        self.vertices.keys()
-    }
-
-    pub fn keys_of(&self, i: isize) -> impl Iterator<Item = &TngKey> { 
-        let i0 = self.deg_shift.0;
-        self.vertices.keys().filter(move |k| 
-            (k.weight() as isize) + i0 == i
-        )
-    }
-
-    pub fn keys_into(&self, k: &TngKey) -> impl Iterator<Item = &TngKey> + use<'_, R> { 
-        self.vertex(k).in_edges()
-    }
-
-    pub fn keys_out_from(&self, k: &TngKey) -> impl Iterator<Item = &TngKey> + use<'_, R> { 
-        self.vertex(k).out_edges()
-    }
-
-    pub fn add_vertex(&mut self, k: TngKey, v: TngVertex<R>) { 
+    pub fn add_vertex(&mut self, k: TngComplexKey, v: TngComplexVertex<R>) { 
         assert!(!self.contains_key(&k));
         self.vertices.insert(k, v);
     }
 
-    pub fn remove_vertex(&mut self, k: &TngKey) -> TngVertex<R> { 
+    pub fn remove_vertex(&mut self, k: &TngComplexKey) -> TngComplexVertex<R> { 
         assert!(self.contains_key(k));
 
         let in_edges = self.keys_into(k).cloned().collect_vec();
@@ -291,7 +291,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         v
     }
     
-    fn rename_vertex_key(&mut self, k_old: &TngKey, k_new: TngKey) { 
+    fn rename_vertex_key(&mut self, k_old: &TngComplexKey, k_new: TngComplexKey) { 
         assert_ne!(k_old, &k_new);
 
         let in_edges = self.keys_into(k_old).cloned().collect_vec(); 
@@ -318,7 +318,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    fn duplicate_vertex(&mut self, k: &TngKey, k_new: TngKey) { 
+    fn duplicate_vertex(&mut self, k: &TngComplexKey, k_new: TngComplexKey) { 
         assert_ne!(k, &k_new);
 
         let in_edges = self.vertex(k).in_edges.clone(); 
@@ -342,11 +342,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
     
-    pub fn edge(&self, k: &TngKey, l: &TngKey) -> &LcCob<R> {
+    pub fn edge(&self, k: &TngComplexKey, l: &TngComplexKey) -> &LcCob<R> {
         &self.vertices[k].out_edges[l]
     }
     
-    pub fn has_edge(&self, k: &TngKey, l: &TngKey) -> bool { 
+    pub fn has_edge(&self, k: &TngComplexKey, l: &TngComplexKey) -> bool { 
         debug_assert_eq!(
             self.vertices[k].out_edges.contains_key(l), 
             self.vertices[l].in_edges.contains(k)
@@ -354,7 +354,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.vertices[k].out_edges.contains_key(l)
     }
 
-    fn add_edge(&mut self, k: &TngKey, l: &TngKey, f: LcCob<R>) { 
+    fn add_edge(&mut self, k: &TngComplexKey, l: &TngComplexKey, f: LcCob<R>) { 
         assert!(!self.has_edge(k, l));
         assert!(!f.is_zero());
 
@@ -365,7 +365,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         w.in_edges.insert(*k);
     }
 
-    fn remove_edge(&mut self, k: &TngKey, l: &TngKey) -> LcCob<R> { 
+    fn remove_edge(&mut self, k: &TngComplexKey, l: &TngComplexKey) -> LcCob<R> { 
         assert!(self.has_edge(k, l));
         let w = self.vertices.get_mut(l).unwrap();
         w.in_edges.remove(k);
@@ -374,7 +374,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         v.out_edges.remove(l).unwrap()
     }
 
-    fn modify_edge<F>(&mut self, k: &TngKey, l: &TngKey, map: F)
+    fn modify_edge<F>(&mut self, k: &TngComplexKey, l: &TngComplexKey, map: F)
     where F: Fn(LcCob<R>) -> LcCob<R> {
         assert!(self.has_edge(k, l));
 
@@ -434,7 +434,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let w = right.vertex(l);
             let kl = k + l;
 
-            let mut vw = TngVertex::init();
+            let mut vw = TngComplexVertex::init();
             vw.tng = v.tng.clone_and(|t|
                 t.connect(w.tng.clone())
             );
@@ -480,11 +480,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         });
     }
 
-    fn collect_keys<'a, 'b>(&mut self, left: &'a TngComplex<R>, right: &'b TngComplex<R>, i: isize, filter: bool) -> Vec<(&'a TngKey, &'b TngKey)> {
+    fn collect_keys<'a, 'b>(&mut self, left: &'a TngComplex<R>, right: &'b TngComplex<R>, i: isize, filter: bool) -> Vec<(&'a TngComplexKey, &'b TngComplexKey)> {
         let keys = left.h_range().flat_map(|i1| {
             let i2 = i - i1;
-            left.keys_of(i1).flat_map(move |k| { 
-                right.keys_of(i2).map(move |l|
+            left.keys_of_deg(i1).flat_map(move |k| { 
+                right.keys_of_deg(i2).map(move |l|
                     (k, l)
                 )
             })
@@ -499,7 +499,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn deloop(&mut self, k: &TngKey, r: usize) -> Vec<TngKey> { 
+    pub fn deloop(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> { 
         let c = self.vertex(k).tng.comp(r);
         assert!(c.is_circle());
         
@@ -529,7 +529,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         updated_keys
     }
 
-    fn deloop_with(&mut self, k: &TngKey, r: usize, birth_dot: Dot, death_dot: Dot) { 
+    fn deloop_with(&mut self, k: &TngComplexKey, r: usize, birth_dot: Dot, death_dot: Dot) { 
         // remove circle
         let circ = self.vertices.get_mut(k).unwrap().tng.remove_at(r);
 
@@ -562,7 +562,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     //  w0 -----> w1         w0 ---------> w1
     //       d                
 
-    pub fn eliminate(&mut self, k0: &TngKey, k1: &TngKey) {
+    pub fn eliminate(&mut self, k0: &TngComplexKey, k1: &TngComplexKey) {
         let a = self.edge(k0, k1);
         let Some(ainv) = a.inv() else { 
             panic!("{a} is not invertible.")
@@ -607,7 +607,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(self.is_completely_delooped());
 
         let summands = GrMod1::generate(self.h_range(), |i| {
-            let gens = self.keys_of(i).map(|k|
+            let gens = self.keys_of_deg(i).map(|k|
                 k.as_gen()
             ).sorted_by_key(|x|
                 -x.rel_q_deg()
@@ -617,7 +617,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let d = move |x: &KhGen| {
             let (h, t) = self.ht();
-            let k = TngKey::from(x);
+            let k = TngComplexKey::from(x);
             let v = self.vertex(&k);
             v.out_edges.iter().map(|(l, f)|
                 (l.as_gen(), f.eval(h, t))
@@ -639,7 +639,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let mut str = "".to_string();
         for i in self.h_range() { 
             str += &format!("C[{i}]: {}\n", self.rank(i));
-            for (j, k) in self.keys_of(i).sorted().enumerate() { 
+            for (j, k) in self.keys_of_deg(i).sorted().enumerate() { 
                 let v = &self.vertices[k];
                 str += &format!(" ({j}) {k}: {}", v.tng);
     
@@ -796,18 +796,18 @@ mod tests {
         assert_eq!(c.dim(), 0);
         assert_eq!(c.rank(0), 1);
 
-        let k = TngKey::init();
+        let k = TngComplexKey::init();
         let updated = c.deloop(&k, 0);
 
         assert_eq!(c.dim(), 0);
         assert_eq!(c.rank(0), 2);
 
         assert_eq!(updated, vec![
-            TngKey {
+            TngComplexKey {
                 state: State::empty(), 
                 label: KhTensor::from_iter([KhAlgGen::X])
             },
-            TngKey {
+            TngComplexKey {
                 state: State::empty(), 
                 label: KhTensor::from_iter([KhAlgGen::I])
             }
@@ -828,7 +828,7 @@ mod tests {
         assert_eq!(c.rank(1), 2);
         assert_eq!(c.rank(2), 1);
 
-        let k = TngKey {
+        let k = TngComplexKey {
             state: State::from([1,0]), 
             label: KhTensor::from_iter([])
         };
@@ -844,11 +844,11 @@ mod tests {
         assert_eq!(c.rank(2), 1);
 
         assert_eq!(updated, vec![
-            TngKey {
+            TngComplexKey {
                 state: State::from([1,0]), 
                 label: KhTensor::from_iter([KhAlgGen::X])
             },
-            TngKey {
+            TngComplexKey {
                 state: State::from([1,0]), 
                 label: KhTensor::from_iter([KhAlgGen::I])
             }
@@ -864,14 +864,14 @@ mod tests {
         assert_eq!(c.dim(), 0);
         assert_eq!(c.rank(0), 1);
 
-        let k = TngKey::init();
+        let k = TngComplexKey::init();
         let updated = c.deloop(&k, 0);
 
         assert_eq!(c.dim(), 0);
         assert_eq!(c.rank(0), 1);
 
         assert_eq!(updated, vec![
-            TngKey {
+            TngComplexKey {
                 state: State::empty(), 
                 label: KhTensor::from_iter([KhAlgGen::X])
             },

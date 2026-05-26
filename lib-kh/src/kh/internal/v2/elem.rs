@@ -13,21 +13,21 @@ use crate::kh::{KhAlgGen, KhChain};
 use super::cob::{Bottom, Dot, Cob, LcCobTrait, LcCob};
 use super::tng::{Tng, TngComp};
 use crate::ext::LinkExt;
-use super::complex::TngKey;
+use super::complex::TngComplexKey;
 
 #[derive(Clone)]
 pub struct TngComplexElem<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     state: HashMap<Node, Bit>,
     in_cob: Cob,                        // initial cob, precomposed at the final step.
-    out_cob: HashMap<TngKey, LcCob<R>>, // building cob, src must always match init_cob. 
+    out_cob: HashMap<TngComplexKey, LcCob<R>>, // building cob, src must always match init_cob. 
     base_pt: Option<Edge>
 }
 
 impl<R> TngComplexElem<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn new(state: HashMap<Node, Bit>, in_cob: Cob, base_pt: Option<Edge>) -> Self { 
-        let k0 = TngKey::init();
+        let k0 = TngComplexKey::init();
         let f0 = LcCob::from(Cob::empty());
         let out_cob = hashmap! { k0 => f0 };
         Self{ state, in_cob, out_cob, base_pt }
@@ -76,7 +76,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }).collect();
     }
 
-    pub fn deloop(&mut self, k: &TngKey, c: &TngComp) {
+    pub fn deloop(&mut self, k: &TngComplexKey, c: &TngComp) {
         let Some(f) = self.out_cob.remove(k) else { return };
         let marked = self.base_pt.map(|e| c.contains(e)).unwrap_or(false);
 
@@ -91,16 +91,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn insert_cob(&mut self, k: TngKey, v: LcCob<R>) {
+    pub fn insert_cob(&mut self, k: TngComplexKey, v: LcCob<R>) {
         self.out_cob.insert(k, v);
     }
 
-    pub fn remove_cob(&mut self, k: &TngKey) -> Option<LcCob<R>> { 
+    pub fn remove_cob(&mut self, k: &TngComplexKey) -> Option<LcCob<R>> { 
         self.out_cob.remove(k)
     }
 
     pub fn modify<F>(&mut self, f: F)
-    where F: Fn(TngKey, LcCob<R>) -> (TngKey, LcCob<R>) { 
+    where F: Fn(TngComplexKey, LcCob<R>) -> (TngComplexKey, LcCob<R>) { 
         let retr_cob = std::mem::take(&mut self.out_cob);
         self.out_cob = retr_cob.into_iter().map(|(k, cob)|
             f(k, cob)

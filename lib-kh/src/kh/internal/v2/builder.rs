@@ -11,7 +11,7 @@ use crate::kh::internal::v2::elem::TngComplexElem;
 use crate::kh::{KhChain, KhComplex};
 
 use super::cob::LcCobTrait;
-use super::complex::{TngComplex, TngKey};
+use super::complex::{TngComplex, TngComplexKey};
 
 pub struct TngComplexBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
@@ -208,7 +208,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn deloop_in(&mut self, i: isize, allow_based: bool) { 
-        let mut keys = self.complex.keys_of(i).filter(|k| 
+        let mut keys = self.complex.keys_of_deg(i).filter(|k| 
             self.complex.vertex(k).tng().contains_circle()
         ).cloned().collect::<HashSet<_>>();
 
@@ -234,7 +234,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub(crate) fn deloop(&mut self, k: &TngKey, r: usize) -> Vec<TngKey> {
+    pub(crate) fn deloop(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
         let c = self.complex.vertex(k).tng().comp(r);
 
         debug!("({}) deloop {c} in {}", self.stat(), self.complex.vertex(k));
@@ -246,8 +246,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.complex.deloop(k, r)
     }
 
-    pub(crate) fn find_loop<'a, I>(&self, keys: I, allow_based: bool) -> Option<(TngKey, usize)>
-    where I: IntoIterator<Item = &'a TngKey> { 
+    pub(crate) fn find_loop<'a, I>(&self, keys: I, allow_based: bool) -> Option<(TngComplexKey, usize)>
+    where I: IntoIterator<Item = &'a TngComplexKey> { 
         keys.into_iter().find_map(|k|
             self.complex.vertex(k).tng().find_comp(|c|
                 c.is_circle() && (allow_based || !self.complex.contains_base_pt(c))
@@ -256,7 +256,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub(crate) fn count_loops_in(&self, i: isize, allow_based: bool) -> usize { 
-        self.complex.keys_of(i).map(|k| 
+        self.complex.keys_of_deg(i).map(|k| 
             self.complex.vertex(k).tng().comps().filter(|c| 
                 c.is_circle() && (allow_based || !self.complex.contains_base_pt(c))
             ).count()
@@ -271,7 +271,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub(crate) fn eliminate_in(&mut self, i: isize) { 
-        let mut keys = self.complex.keys_of(i).filter(|k| 
+        let mut keys = self.complex.keys_of_deg(i).filter(|k| 
             self.complex.keys_out_from(k).find(|l|
                 self.complex.edge(k, l).is_invertible()
             ).is_some()
@@ -292,14 +292,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         info!("({}) -> C[{i}]: {} (-{}).", self.stat(), after, before - after);
     }
 
-    pub(crate) fn eliminate(&mut self, i: &TngKey, j: &TngKey) {
+    pub(crate) fn eliminate(&mut self, i: &TngComplexKey, j: &TngComplexKey) {
         debug!("({}) eliminate {}: {} -> {}", self.stat(), self.complex.edge(i, j), self.complex.vertex(i), self.complex.vertex(j));
         
         self.eliminate_elements(i, j);
         self.complex.eliminate(i, j);
     }
 
-    pub(crate) fn eliminate_elements(&mut self, i: &TngKey, j: &TngKey) {
+    pub(crate) fn eliminate_elements(&mut self, i: &TngComplexKey, j: &TngComplexKey) {
         let mut elements = self.take_elements();
         for e in elements.iter_mut() { 
             self.eliminate_element(e, i, j);
@@ -317,7 +317,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     //  w0 -----> w1         w0 ---------> w1
     //       d                
     
-    fn eliminate_element(&self, e: &mut TngComplexElem<R>, i: &TngKey, j: &TngKey) {
+    fn eliminate_element(&self, e: &mut TngComplexElem<R>, i: &TngComplexKey, j: &TngComplexKey) {
         assert!(self.complex.has_edge(i, j));
 
         // mors into i can be simply dropped.
@@ -347,14 +347,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    fn choose_pivot<'a, I>(&self, keys: I) -> Option<(&'a TngKey, &TngKey, usize)> 
-    where I: IntoIterator<Item = &'a TngKey> { 
+    fn choose_pivot<'a, I>(&self, keys: I) -> Option<(&'a TngComplexKey, &TngComplexKey, usize)> 
+    where I: IntoIterator<Item = &'a TngComplexKey> { 
         keys.into_iter().filter_map(move |k|
             self.choose_pivot_col(k).map(move |(l, s)| (k, l, s))
         ).min_by_key(|(_, _, s)| *s)
     }
 
-    fn choose_pivot_col(&self, k: &TngKey) -> Option<(&TngKey, usize)> { 
+    fn choose_pivot_col(&self, k: &TngComplexKey) -> Option<(&TngComplexKey, usize)> { 
         // Choose best pivot in "column k".
         self.complex.keys_out_from(k).filter_map(|l| { 
             let f = self.complex.edge(k, l);
@@ -366,7 +366,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         .min_by_key(|(_, s)| *s)
     }
 
-    pub(crate) fn edge_weight(&self, k: &TngKey, l: &TngKey) -> usize { 
+    pub(crate) fn edge_weight(&self, k: &TngComplexKey, l: &TngComplexKey) -> usize { 
         let nk = self.complex.keys_out_from(k).count(); // nnz in column k
         let nl = self.complex.keys_into(l).count();     // nnz in row l
         (nk - 1) * (nl - 1)

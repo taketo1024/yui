@@ -14,14 +14,14 @@ use crate::kh::{KhGen, KhTensor};
 use crate::kh::internal::v2::builder::TngComplexBuilder;
 use crate::kh::internal::v2::cob::LcCobTrait;
 use crate::kh::internal::v2::tng::TngComp;
-use crate::kh::internal::v2::complex::{TngComplex, TngKey};
+use crate::kh::internal::v2::complex::{TngComplex, TngComplexKey};
 
 pub struct SymTngBuilder<R> 
 where R: Ring, for<'x> &'x R: RingOps<R> {
     inner: TngComplexBuilder<R>,
     x_map: AHashMap<Node, Node>,
     e_map: AHashMap<Edge, Edge>,
-    key_map: AHashMap<TngKey, TngKey>,
+    key_map: AHashMap<TngComplexKey, TngComplexKey>,
     pub auto_deloop: bool,
     pub auto_elim: bool
 }
@@ -45,7 +45,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         inner.auto_deloop = false;
         inner.auto_elim = false;
 
-        let key_map = AHashMap::from_iter([(TngKey::init(), TngKey::init())]);
+        let key_map = AHashMap::from_iter([(TngComplexKey::init(), TngComplexKey::init())]);
         let auto_deloop = true;
         let auto_elim = true;
         
@@ -121,7 +121,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         })
     }
 
-    fn build_from_half<'a, I>(&self, crossings: I, elements: Vec<TngComplexElem<R>>) -> (TngComplex<R>, TngComplex<R>, AHashMap<TngKey, TngKey>, Vec<TngComplexElem<R>>) 
+    fn build_from_half<'a, I>(&self, crossings: I, elements: Vec<TngComplexElem<R>>) -> (TngComplex<R>, TngComplex<R>, AHashMap<TngComplexKey, TngComplexKey>, Vec<TngComplexElem<R>>) 
     where I: IntoIterator<Item = &'a Node> { 
         let (h, t) = self.inner.complex().ht();
         let mut b = TngComplexBuilder::init(h, t, (0, 0), None);
@@ -184,11 +184,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let c = TngComplex::from_node(h, t, x);
         let key_map = if x.is_crossing() { 
             [Bit::Bit0, Bit::Bit1].map(|b| { 
-                let k = TngKey { state: BitSeq::from(b), label: KhTensor::empty() };
+                let k = TngComplexKey { state: BitSeq::from(b), label: KhTensor::empty() };
                 (k, k)
             }).into_iter().collect()
         } else { 
-            let k = TngKey::init();
+            let k = TngComplexKey::init();
             [(k, k)].into_iter().collect()
         };
 
@@ -216,19 +216,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 ([0, 1], [1, 0]),
                 ([1, 1], [1, 1])
             ].map(|(b0, b1)| { 
-                let k = TngKey { state: BitSeq::from_iter(b0), label: KhTensor::empty() };
-                let l = TngKey { state: BitSeq::from_iter(b1), label: KhTensor::empty() };
+                let k = TngComplexKey { state: BitSeq::from_iter(b0), label: KhTensor::empty() };
+                let l = TngComplexKey { state: BitSeq::from_iter(b1), label: KhTensor::empty() };
                 (k, l)
             }).into_iter().collect()
         } else {
-            let k = TngKey::init();
+            let k = TngComplexKey::init();
             [(k, k)].into_iter().collect()
         };
 
         self.merge(c, key_map);
     }
 
-    fn merge(&mut self, c: TngComplex<R>, key_map: AHashMap<TngKey, TngKey>) { 
+    fn merge(&mut self, c: TngComplex<R>, key_map: AHashMap<TngComplexKey, TngComplexKey>) { 
         self.key_map = cartesian!(
             self.key_map.iter(),
             key_map.iter()
@@ -260,7 +260,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn deloop_in(&mut self, i: isize, allow_based: bool) {
-        let mut keys = self.inner.complex().keys_of(i).filter(|k| 
+        let mut keys = self.inner.complex().keys_of_deg(i).filter(|k| 
             self.inner.complex().vertex(k).tng().contains_circle()
         ).cloned().collect::<HashSet<_>>();
 
@@ -287,7 +287,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    fn deloop_equiv(&mut self, k: &TngKey, r: usize) -> Vec<TngKey> { 
+    fn deloop_equiv(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> { 
         if self.is_sym_key(k) { 
             let c = self.inner.complex().vertex(k).tng().comp(r);
             if self.is_sym_comp(c) {
@@ -303,7 +303,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    fn deloop_on_axis_sym(&mut self, k: &TngKey, r: usize) -> Vec<TngKey> {
+    fn deloop_on_axis_sym(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
         let c = self.inner.complex().vertex(k).tng().comp(r);
 
         assert!(self.is_sym_key(k));
@@ -321,7 +321,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     #[allow(non_snake_case)]
-    fn deloop_on_axis_asym(&mut self, k: &TngKey, r: usize) -> Vec<TngKey> {
+    fn deloop_on_axis_asym(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
         let c = self.inner.complex().vertex(k).tng().comp(r);
 
         assert!(self.is_sym_key(k));
@@ -358,7 +358,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     #[allow(non_snake_case)]
-    fn deloop_off_axis(&mut self, k: &TngKey, r: usize) -> Vec<TngKey> {
+    fn deloop_off_axis(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
         let c = self.inner.complex().vertex(k).tng().comp(r);
 
         assert!(!self.is_sym_key(k));
@@ -391,7 +391,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn eliminate_in(&mut self, i: isize) { 
-        let mut keys = self.inner.complex().keys_of(i).filter(|k| 
+        let mut keys = self.inner.complex().keys_of_deg(i).filter(|k| 
             self.inner.complex().keys_out_from(k).find(|l|
                 self.is_equiv_inv_edge(k, l)
             ).is_some()
@@ -416,7 +416,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         info!("({}) -> C[{i}]: {} (-{}).", self.inner.stat(), after, before - after);
     }
 
-    fn eliminate_equiv(&mut self, i: &TngKey, j: &TngKey) {
+    fn eliminate_equiv(&mut self, i: &TngComplexKey, j: &TngComplexKey) {
         assert_eq!(self.is_sym_key(i), self.is_sym_key(j));
         assert!(self.inner.complex().has_edge(i, j));
 
@@ -436,14 +436,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.remove_key_pair(j);
     }
 
-    fn choose_pivot<'a, I>(&self, keys: I) -> Option<(&'a TngKey, &TngKey, usize)> 
-    where I: IntoIterator<Item = &'a TngKey> { 
+    fn choose_pivot<'a, I>(&self, keys: I) -> Option<(&'a TngComplexKey, &TngComplexKey, usize)> 
+    where I: IntoIterator<Item = &'a TngComplexKey> { 
         keys.into_iter().filter_map(move |k|
             self.choose_pivot_col(k).map(move |(l, s)| (k, l, s))
         ).min_by_key(|(_, _, s)| *s)
     }
 
-    fn choose_pivot_col(&self, k: &TngKey) -> Option<(&TngKey, usize)> { 
+    fn choose_pivot_col(&self, k: &TngComplexKey) -> Option<(&TngComplexKey, usize)> { 
         self.inner.complex().keys_out_from(k).filter(|&l| self.is_equiv_inv_edge(k, l)).map(|l| {
                 let s = self.inner.edge_weight(k, l);
                 (l, s)
@@ -451,12 +451,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         .min_by_key(|(_, s)| *s)
     }
 
-    fn is_equiv_inv_edge(&self, i: &TngKey, j: &TngKey) -> bool { 
+    fn is_equiv_inv_edge(&self, i: &TngComplexKey, j: &TngComplexKey) -> bool { 
         let f = self.inner.complex().edge(i, j);
         f.is_invertible() && self.is_equiv_edge(i, j)
     }
 
-    fn is_equiv_edge(&self, i: &TngKey, j: &TngKey) -> bool { 
+    fn is_equiv_edge(&self, i: &TngComplexKey, j: &TngComplexKey) -> bool { 
         if self.is_sym_key(i) && self.is_sym_key(j) { 
             true
         } else if !self.is_sym_key(i) && !self.is_sym_key(j) { 
@@ -492,7 +492,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let key_map = self.key_map.clone();
 
         move |x: &KhGen| -> KhGen {
-            let k = TngKey::from(x);
+            let k = TngComplexKey::from(x);
             let tk = key_map[&k];
             tk.as_gen()
         }
@@ -514,25 +514,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.e_map[&e]
     }
 
-    fn inv_key(&self, k: &TngKey) -> &TngKey { 
+    fn inv_key(&self, k: &TngComplexKey) -> &TngComplexKey { 
         &self.key_map[k]
     }
 
-    fn add_key_pair(&mut self, k: TngKey, tk: TngKey) { 
+    fn add_key_pair(&mut self, k: TngComplexKey, tk: TngComplexKey) { 
         self.key_map.insert(k, tk);
         if k != tk { 
             self.key_map.insert(tk, k);
         }
     }
 
-    fn remove_key_pair(&mut self, k: &TngKey) { 
+    fn remove_key_pair(&mut self, k: &TngComplexKey) { 
         let tk = self.key_map.remove(k).unwrap();
         if k != &tk { 
             self.key_map.remove(&tk);
         }
     }
 
-    fn is_sym_key(&self, k: &TngKey) -> bool { 
+    fn is_sym_key(&self, k: &TngComplexKey) -> bool { 
         self.inv_key(k) == k
     }
 

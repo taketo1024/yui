@@ -5,7 +5,7 @@ use itertools::Itertools;
 use log::info;
 use yui_core::bitseq::{Bit, BitSeq};
 use yui_core::algo::KeyedUnionFind;
-use yui_core::{Ring, RingOps};
+use yui_core::{RangeExt, Ring, RingOps};
 use yui_link::{Node, Edge, InvLink};
 
 use crate::kh::{KhGen, KhTensor};
@@ -246,12 +246,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let (left, right) = self.inner.complex_mut().prepare_merge(c);
 
-        self.inner.complex_mut().merge_vertices(&left, &right);
-
-        for i in self.inner.complex().h_range() { 
-            self.inner.complex_mut().merge_edges(&left, &right, i);
+        for i in self.inner.complex().h_range().mv(0, 1) { 
+            self.inner.complex_mut().merge_vertices(&left, &right, i);
+            self.inner.complex_mut().merge_edges(&left, &right, i - 1);
+            
             if self.auto_deloop { 
-                self.deloop_in(i, false);
+                self.deloop_in(i - 1, false);
             }
         }
 

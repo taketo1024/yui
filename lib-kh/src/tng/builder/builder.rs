@@ -4,7 +4,7 @@ use itertools::Itertools;
 use log::{debug, info};
 use num_traits::Zero;
 use yui_core::bitseq::Bit;
-use yui_core::{Ring, RingOps};
+use yui_core::{RangeExt, Ring, RingOps};
 use yui_link::{Node, Edge, Link};
 
 use crate::kh::{KhChain, KhComplex};
@@ -167,12 +167,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let (left, right) = self.complex.prepare_merge(other); 
 
-        self.complex.merge_vertices(&left, &right);
-
-        for i in self.complex.h_range() { 
-            self.complex.merge_edges(&left, &right, i);
+        for i in self.complex.h_range().mv(0, 1) { 
+            self.complex.merge_vertices(&left, &right, i);
+            self.complex.merge_edges(&left, &right, i - 1);
+            
             if self.auto_deloop {
-                self.deloop_in(i, false);
+                self.deloop_in(i - 1, false);
             }
         }
     }

@@ -391,10 +391,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn merge(&mut self, other: TngComplex<R>) { 
         let (left, right) = self.prepare_merge(other);
 
-        self.merge_vertices(&left, &right);
-
         for i in self.h_range() { 
-            self.merge_edges(&left, &right, i);
+            self.merge_vertices(&left, &right, i);
+            self.merge_edges(&left, &right, i - 1);
         }
     }
 
@@ -418,9 +417,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         (left, other)
     }
 
-    pub(crate) fn merge_vertices(&mut self, left: &TngComplex<R>, right: &TngComplex<R>) {
-        let keys = cartesian!(left.keys(), right.keys());
-        keys.for_each(|(k, l)| { 
+    pub(crate) fn merge_vertices(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize) {
+        let keys = self.collect_keys(left, right, i).collect_vec();
+        for (k, l) in keys { 
             let v = left.vertex(k);
             let w = right.vertex(l);
             let kl = k + l;
@@ -431,12 +430,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let vw = TngComplexVertex::from(t);
 
             self.add_vertex(kl, vw);
-        });
+        }
     }
 
     pub(crate) fn merge_edges(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize) {
         let (h, t) = self.ht().clone();
-        let keys = self.collect_keys(left, right, i);
+        let keys = self.collect_keys(left, right, i). filter(|(k, l)|
+            self.contains_key(&(*k + *l))
+        ).collect_vec();
 
         let lock = RwLock::new(self);
         
@@ -471,17 +472,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         });
     }
 
-    fn collect_keys<'a, 'b>(&mut self, left: &'a TngComplex<R>, right: &'b TngComplex<R>, i: isize) -> Vec<(&'a TngComplexKey, &'b TngComplexKey)> {
-        left.h_range().flat_map(|i1| {
+    fn collect_keys<'a, 'b>(&self, left: &'a TngComplex<R>, right: &'b TngComplex<R>, i: isize) -> impl Iterator<Item = (&'a TngComplexKey, &'b TngComplexKey)> {
+        left.h_range().flat_map(move |i1| {
             let i2 = i - i1;
             left.keys_of_deg(i1).flat_map(move |k| { 
                 right.keys_of_deg(i2).map(move |l|
                     (k, l)
                 )
             })
-        }).filter(|(k, l)|
-            self.contains_key(&(*k + *l))
-        ).collect_vec()
+        })
     }
 
     pub fn deloop(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> { 

@@ -19,7 +19,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     e_map: AHashMap<Edge, Edge>,
     key_map: AHashMap<TngComplexKey, TngComplexKey>,
     pub auto_deloop: bool,
-    pub auto_elim: bool
+    pub auto_elim: bool,
+    pub no_preprocess: bool
 }
 
 impl<R> SymTngBuilder<R> 
@@ -44,12 +45,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let key_map = AHashMap::from_iter([(TngComplexKey::init(), TngComplexKey::init())]);
         let auto_deloop = true;
         let auto_elim = true;
+        let no_preprocess = false;
         
-        SymTngBuilder { inner, x_map, e_map, key_map, auto_deloop, auto_elim }
+        SymTngBuilder { inner, x_map, e_map, key_map, auto_deloop, auto_elim, no_preprocess }
     }
 
     pub fn run(mut self) -> Self { 
-        self.preprocess();
+        if !self.no_preprocess {
+            self.preprocess();
+        }
         self.process_nodes();
         self.finalize();
         self
@@ -267,7 +271,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         if keys.is_empty() { return }
 
-        info!("({}) C[{i}]: {}, deloop: {}.", self.inner.stat(), self.inner.complex().rank(i), self.inner.count_loops_in(i, allow_based));
+        info!("({}) C[{i}]: {}, deloop targets: {}.", self.inner.stat(), self.inner.complex().rank(i), keys.len());
 
         let before = self.inner.complex().rank(i) as isize;
 
@@ -280,10 +284,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             while !list.is_empty() { 
                 let k = list.remove(0);
                 if !self.inner.complex().contains_key(&k) { continue; }
-
-                let Some(r) = self.inner.complex().vertex(&k).tng().find_comp(|c|
-                    c.is_circle() && (allow_based || !self.inner.complex().contains_base_pt(c))
-                ) else { continue };
+                let Some(r) = self.inner.find_loop(&k, allow_based) else { continue };
 
                 let added = self.deloop_equiv(&k, r);
 
@@ -426,39 +427,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         .min_by_key(|l| self.inner.edge_weight(k, l))
     }
 
-    #[allow(unused)]
-    fn eliminate_all(&mut self) { 
-        for i in self.inner.complex().h_range() { 
-            self.eliminate_in(i)
-        }
-    }
-
-    fn eliminate_in(&mut self, i: isize) { 
-        let mut keys = self.inner.complex().keys_of_deg(i).filter(|k| 
-            self.inner.complex().vertex(k).out_edges().find(|l|
-                self.is_equiv_inv_edge(k, l)
-            ).is_some()
-        ).cloned().collect::<HashSet<_>>();
-
-        if keys.is_empty() { return }
-
-        info!("({}) C[{i}]: {}, elim targets: {}.", self.inner.stat(), self.inner.complex().rank(i), keys.len());
-        let before = self.inner.complex().rank(i);
-
-        while let Some((k, l, _)) = self.choose_pivot(keys.iter()) { 
-            let (k, l) = (*k, *l);
-            let tk = *self.inv_key(&k);
-
-            self.eliminate_equiv(&k, &l);
-            
-            keys.remove(&k);
-            keys.remove(&tk);
-        }            
-
-        let after = self.inner.complex().rank(i);
-        info!("({}) -> C[{i}]: {} (-{}).", self.inner.stat(), after, before - after);
-    }
-
     fn eliminate_equiv(&mut self, i: &TngComplexKey, j: &TngComplexKey) {
         assert_eq!(self.is_sym_key(i), self.is_sym_key(j));
         assert!(self.inner.complex().has_edge(i, j));
@@ -477,21 +445,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         self.remove_key_pair(i);
         self.remove_key_pair(j);
-    }
-
-    fn choose_pivot<'a, I>(&self, keys: I) -> Option<(&'a TngComplexKey, &TngComplexKey, usize)> 
-    where I: IntoIterator<Item = &'a TngComplexKey> { 
-        keys.into_iter().filter_map(move |k|
-            self.choose_pivot_col(k).map(move |(l, s)| (k, l, s))
-        ).min_by_key(|(_, _, s)| *s)
-    }
-
-    fn choose_pivot_col(&self, k: &TngComplexKey) -> Option<(&TngComplexKey, usize)> { 
-        self.inner.complex().vertex(k).out_edges().filter(|&l| self.is_equiv_inv_edge(k, l)).map(|l| {
-                let s = self.inner.edge_weight(k, l);
-                (l, s)
-            })
-        .min_by_key(|(_, s)| *s)
     }
 
     fn is_equiv_inv_edge(&self, i: &TngComplexKey, j: &TngComplexKey) -> bool { 
@@ -688,7 +641,8 @@ mod tests {
         let (h, t) = (FF2::zero(), FF2::zero());
 
         let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
-        b.process_nodes();
+        b.no_preprocess = true;
+        let b = b.run();
 
         let c = make_cone(b);
         c.check_d_all();;

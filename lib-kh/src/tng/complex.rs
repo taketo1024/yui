@@ -86,9 +86,7 @@ impl<R> TngComplexVertex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     pub fn init() -> Self { 
         let tng = Tng::empty();
-        let in_edges = AHashSet::new();
-        let out_edges = AHashMap::new();
-        Self { tng, in_edges, out_edges }
+        Self::from(tng)
     }
 
     pub fn tng(&self) -> &Tng { 
@@ -427,10 +425,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let w = right.vertex(l);
             let kl = k + l;
 
-            let mut vw = TngComplexVertex::init();
-            vw.tng = v.tng.clone_and(|t|
+            let t = v.tng.clone_and(|t|
                 t.connect(w.tng.clone())
             );
+            let vw = TngComplexVertex::from(t);
 
             self.add_vertex(kl, vw);
         });

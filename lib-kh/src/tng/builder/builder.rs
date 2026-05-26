@@ -208,7 +208,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         if keys.is_empty() { return }
 
-        info!("({}) C[{i}]: {}, deloop: {}.", self.stat(), self.complex.rank(i), self.count_loops_in(i, allow_based));
+        info!("({}) C[{i}]: {}, deloop targets: {}.", self.stat(), self.complex.rank(i), keys.len());
 
         let before = self.complex.rank(i) as isize;
 
@@ -219,10 +219,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             while !list.is_empty() { 
                 let k = list.remove(0);
                 if !self.complex.contains_key(&k) { continue; }
-
-                let Some(r) = self.complex.vertex(&k).tng().find_comp(|c|
-                    c.is_circle() && (allow_based || !self.complex.contains_base_pt(c))
-                ) else { continue };
+                let Some(r) = self.find_loop(&k, allow_based) else { continue };
 
                 let added = self.deloop(&k, r);
 
@@ -265,6 +262,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
+    pub(crate) fn is_deloopable(&self, k: &TngComplexKey, allow_based: bool) -> bool { 
+        self.find_loop(k, allow_based).is_some()
+    }
+
+    pub(crate) fn find_loop(&self, k: &TngComplexKey, allow_based: bool) -> Option<usize> { 
+        self.complex.vertex(k).tng().find_comp(|c|
+            c.is_circle() && (allow_based || !self.complex.contains_base_pt(c))
+        )
+    }
+
     fn choose_inv_edge_into(&self, k: &TngComplexKey) -> Option<&TngComplexKey> { 
         self.complex.vertex(k).in_edges().filter_map(|j|
             self.complex.edge(j, k).is_invertible().then_some(j)
@@ -279,56 +286,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         .min_by_key(|l| self.edge_weight(k, l))
     }
 
-    pub(crate) fn is_deloopable(&self, k: &TngComplexKey, allow_based: bool) -> bool { 
-        self.complex.vertex(k).tng().find_comp(|c|
-            c.is_circle() && (allow_based || !self.complex.contains_base_pt(c))
-        ).is_some()
-    }
-
-    pub(crate) fn find_loop<'a, I>(&self, keys: I, allow_based: bool) -> Option<(TngComplexKey, usize)>
-    where I: IntoIterator<Item = &'a TngComplexKey> { 
-        keys.into_iter().find_map(|k|
-            self.complex.vertex(k).tng().find_comp(|c|
-                c.is_circle() && (allow_based || !self.complex.contains_base_pt(c))
-            ).map(|r| (*k, r))
-        )
-    }
-
-    pub(crate) fn count_loops_in(&self, i: isize, allow_based: bool) -> usize { 
-        self.complex.keys_of_deg(i).map(|k| 
-            self.complex.vertex(k).tng().comps().filter(|c| 
-                c.is_circle() && (allow_based || !self.complex.contains_base_pt(c))
-            ).count()
-        ).sum()
-    }
-
-    #[allow(unused)]
-    pub(crate) fn eliminate_all(&mut self) { 
-        for i in self.complex.h_range() { 
-            self.eliminate_in(i);
-        }
-    }
-
-    pub(crate) fn eliminate_in(&mut self, i: isize) { 
-        let mut keys = self.complex.keys_of_deg(i).filter(|k| 
-            self.complex.vertex(k).out_edges().find(|l|
-                self.complex.edge(k, l).is_invertible()
-            ).is_some()
-        ).cloned().collect::<HashSet<_>>();
-
-        if keys.is_empty() { return }
-
-        info!("({}) C[{i}]: {}, elim targets: {}.", self.stat(), self.complex.rank(i), keys.len());
-        let before = self.complex.rank(i);
-
-        while let Some((k, l, _)) = self.choose_pivot(keys.iter()) { 
-            let (k, l) = (*k, *l);
-            self.eliminate(&k, &l);
-            keys.remove(&k);
-        }            
-
-        let after = self.complex.rank(i);
-        info!("({}) -> C[{i}]: {} (-{}).", self.stat(), after, before - after);
+    pub(crate) fn edge_weight(&self, k: &TngComplexKey, l: &TngComplexKey) -> usize { 
+        let nk = self.complex.vertex(k).out_edges().count(); // nnz in column k
+        let nl = self.complex.vertex(l).in_edges().count();     // nnz in row l
+        (nk - 1) * (nl - 1)
     }
 
     pub(crate) fn eliminate(&mut self, i: &TngComplexKey, j: &TngComplexKey) {
@@ -384,31 +345,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 e.insert_cob(*k, s);
             }
         }
-    }
-
-    fn choose_pivot<'a, I>(&self, keys: I) -> Option<(&'a TngComplexKey, &TngComplexKey, usize)> 
-    where I: IntoIterator<Item = &'a TngComplexKey> { 
-        keys.into_iter().filter_map(move |k|
-            self.choose_pivot_col(k).map(move |(l, s)| (k, l, s))
-        ).min_by_key(|(_, _, s)| *s)
-    }
-
-    fn choose_pivot_col(&self, k: &TngComplexKey) -> Option<(&TngComplexKey, usize)> { 
-        // Choose best pivot in "column k".
-        self.complex.vertex(k).out_edges().filter_map(|l| { 
-            let f = self.complex.edge(k, l);
-            f.is_invertible().then(|| {
-                let s = self.edge_weight(k, l);
-                (l, s)
-            })
-        })
-        .min_by_key(|(_, s)| *s)
-    }
-
-    pub(crate) fn edge_weight(&self, k: &TngComplexKey, l: &TngComplexKey) -> usize { 
-        let nk = self.complex.vertex(k).out_edges().count(); // nnz in column k
-        let nl = self.complex.vertex(l).in_edges().count();     // nnz in row l
-        (nk - 1) * (nl - 1)
     }
 
     fn finalize(&mut self) { 

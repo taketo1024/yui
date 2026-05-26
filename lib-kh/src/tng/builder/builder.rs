@@ -224,19 +224,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                     c.is_circle() && (allow_based || !self.complex.contains_base_pt(c))
                 ) else { continue };
 
-                let updated = self.deloop(&k, r);
+                let added = self.deloop(&k, r);
 
-                if self.auto_elim { 
-                    for k in updated.iter() { 
-                        if let Some(&j) = self.choose_inv_edge_into(&k) { 
-                            self.eliminate(&j, &k);
-                        } else if let Some(&l) = self.choose_inv_edge_from(&k) { 
-                            self.eliminate(&k, &l);
-                        } else if self.is_deloopable(k, allow_based) { 
-                            list.push(*k);
-                        }
-                    }
-                }
+                list.extend(added.into_iter().filter(|k|
+                    self.is_deloopable(k, allow_based)
+                ));
             }
         }
 
@@ -254,7 +246,23 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             e.deloop(k, c);
         }
 
-        self.complex.deloop(k, r)
+        let added = self.complex.deloop(k, r);
+
+        if self.auto_elim { 
+            let mut res = vec![];
+            for k in added.iter() { 
+                if let Some(&j) = self.choose_inv_edge_into(&k) { 
+                    self.eliminate(&j, &k);
+                } else if let Some(&l) = self.choose_inv_edge_from(&k) { 
+                    self.eliminate(&k, &l);
+                } else { 
+                    res.push(*k);
+                }
+            }
+            res
+        } else { 
+            added
+        }
     }
 
     fn choose_inv_edge_into(&self, k: &TngComplexKey) -> Option<&TngComplexKey> { 

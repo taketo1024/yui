@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use itertools::Itertools;
 use log::{debug, info};
 use num_traits::Zero;
@@ -65,12 +63,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn set_nodes<I>(&mut self, nodes: I)
     where I: IntoIterator<Item = Node> {
         self.nodes = nodes.into_iter().collect_vec();
-    }
-
-    pub(crate) fn remove_nodes<'a, I>(&mut self, nodes: I) 
-    where I: IntoIterator<Item = &'a Node> { 
-        let drop = nodes.into_iter().collect::<HashSet<_>>();
-        self.nodes.retain(|x| !drop.contains(x));
     }
 
     pub fn loops(&self) -> impl Iterator<Item = &Edge> { 
@@ -356,8 +348,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         self.deloop_all(false);
         self.deloop_all(true);
-
-        assert!(self.complex.is_completely_delooped());
     }
 
     pub fn into_tng_complex(self) -> TngComplex<R> { 

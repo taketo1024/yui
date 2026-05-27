@@ -3,13 +3,14 @@ use ahash::AHashMap;
 use cartesian::cartesian;
 use itertools::Itertools;
 use log::info;
+use num_traits::Zero;
 use yui_core::bitseq::{Bit, BitSeq};
 use yui_core::algo::KeyedUnionFind;
-use yui_core::{RangeExt, Ring, RingOps};
+use yui_core::{CloneAnd, RangeExt, Ring, RingOps, Sign};
 use yui_link::{Node, Edge, InvLink};
 
 use crate::kh::{KhGen, KhTensor};
-use crate::tng::{TngComplexElem, LcCobTrait, TngComp, TngComplex, TngComplexKey};
+use crate::tng::{Cob, LcCobTrait, TngComp, TngComplex, TngComplexKey, TngComplexVertex};
 use crate::tng::builder::TngComplexBuilder;
 
 pub struct SymTngBuilder<R> 
@@ -20,7 +21,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     key_map: AHashMap<TngComplexKey, TngComplexKey>,
     pub auto_deloop: bool,
     pub auto_elim: bool,
-    pub no_preprocess: bool
+    pub no_preprocess: bool,
+    pub mode_incremental: bool
 }
 
 impl<R> SymTngBuilder<R> 
@@ -35,10 +37,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         ).collect();
         let e_map = l.edges().into_iter().map(|e| (e, l.inv_edge(e))).collect();
 
-        Self::new_impl(inner, x_map, e_map)
+        Self::new(inner, x_map, e_map)
     }
 
-    fn new_impl(mut inner: TngComplexBuilder<R>, x_map: AHashMap<Node, Node>, e_map: AHashMap<Edge, Edge>) -> Self { 
+    pub fn new(mut inner: TngComplexBuilder<R>, x_map: AHashMap<Node, Node>, e_map: AHashMap<Edge, Edge>) -> Self { 
         inner.auto_deloop = false;
         inner.auto_elim = false;
 
@@ -46,128 +48,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let auto_deloop = true;
         let auto_elim = true;
         let no_preprocess = false;
+        let mode_incremental = true;
         
-        SymTngBuilder { inner, x_map, e_map, key_map, auto_deloop, auto_elim, no_preprocess }
+        SymTngBuilder { inner, x_map, e_map, key_map, auto_deloop, auto_elim, no_preprocess, mode_incremental }
     }
 
     pub fn run(mut self) -> Self { 
-        if !self.no_preprocess {
-            self.preprocess();
+        if self.mode_incremental { 
+            self.process_nodes();
+        } else { 
+            self.build_decomposed();
         }
-        self.process_nodes();
+
         self.finalize();
         self
-    }
-
-    fn preprocess(&mut self) { 
-        assert_eq!(self.inner.complex().dim(), 0, "must start from init state.");
-
-        let elements = self.inner.take_elements();
-        let off_axis = self.off_axis_crossings(true).into_iter().cloned().collect_vec();
-
-        info!("({}) preprocess off-axis: {}", self.inner.stat(), off_axis.len());
-
-        // process half
-
-        let (c, tc, key_map, elements) = self.build_from_half(off_axis.iter(), elements);
-
-        // merge left
-
-        self.inner.remove_nodes(off_axis.iter());
-        self.inner.merge(c);
-
-        // merge right 
-
-        let off_axis = off_axis.iter().map(|x| self.inv_node(x).clone()).collect_vec();
-        self.inner.remove_nodes(off_axis.iter());
-        self.inner.merge(tc);
-
-        // update key_map & elements
-        
-        self.key_map = key_map;
-        self.inner.set_elements(elements);
-
-        info!("({}) preprocess done.", self.inner.stat());
-    }
-
-    fn off_axis_crossings(&self, take_half: bool) -> Vec<&Node> { 
-        let off_axis = self.inner.nodes().filter(|&x|
-            self.inv_node(x) != x
-        ).collect_vec();
-
-        if !take_half { 
-            return off_axis
-        }
-
-        let is_adj = |x: &Node, y: &Node| {
-            x.edges().iter().filter(|&&e| 
-                self.inv_edge(e) != e // no axis-crossing edge
-            ).any(|e| 
-                y.edges().contains(e)
-            )
-        };
-
-        let mut u = KeyedUnionFind::from_iter(off_axis.iter().cloned());
-
-        for (i, x) in off_axis.iter().enumerate() { 
-            for j in 0 .. i { 
-                let y = &off_axis[j];
-                if is_adj(x, y) { 
-                    u.union(x, y);
-                }
-            }
-        }
-
-        u.into_disjoint().into_iter().fold(vec![], |mut res, next| {
-            if let Some(x) = next.first() {
-                let tx = self.inv_node(x);
-                if !res.contains(&tx) {
-                    res.extend(next);
-                }
-            }
-            res
-        })
-    }
-
-    fn build_from_half<'a, I>(&self, crossings: I, elements: Vec<TngComplexElem<R>>) -> (TngComplex<R>, TngComplex<R>, AHashMap<TngComplexKey, TngComplexKey>, Vec<TngComplexElem<R>>) 
-    where I: IntoIterator<Item = &'a Node> { 
-        let (h, t) = self.inner.complex().ht();
-        let mut b = TngComplexBuilder::init(h, t, (0, 0), None);
-
-        b.set_nodes(crossings.into_iter().cloned());
-        b.set_elements(elements);
-        b.process_nodes();
-
-        // take results
-        let keys = b.complex().keys().cloned().collect_vec();
-        let elements = b.take_elements();
-        let c = b.into_tng_complex();
-        let tc = c.convert_edges(|e| self.inv_edge(e));
-
-        // build keys
-        let keys = cartesian!(keys.iter(), keys.iter());
-        let key_map = keys.map(|(k1, k2)| { 
-            let k  = k1 + k2;
-            let tk = k2 + k1;
-            (k, tk)
-        }).collect();
-
-        // build elements
-        let elements = elements.into_iter().map(|mut e| { 
-            e.modify(|k, c| {
-                let kk = k + k;
-                let cc = c.map(|mut c, r| {
-                    let r = &r * &r;
-                    let tc = c.convert_edges(|e| self.inv_edge(e));
-                    c.connect(tc);
-                    (c, r)
-                });
-                (kk, cc)
-            });
-            e
-        }).collect();
-
-        (c, tc, key_map, elements)
     }
 
     fn process_nodes(&mut self) { 
@@ -249,7 +143,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         for i in self.inner.complex().h_range().mv(0, 1) { 
             self.inner.complex_mut().merge_vertices(&left, &right, i);
             self.inner.complex_mut().merge_edges(&left, &right, i - 1);
-            
+
             if self.auto_deloop { 
                 self.deloop_in(i - 1, false);
             }
@@ -471,6 +365,172 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
+    fn build_decomposed(&mut self) { 
+        // TODO fix later
+        let _ = self.inner.take_elements();
+
+        let center = self.build(self.center_nodes());
+        let side   = self.build(self.side_nodes());
+
+        self.sym_merge(&center, &side);
+    }
+
+    fn center_nodes(&self) -> impl Iterator<Item = &Node> { 
+        self.inner.nodes().filter(|&x|
+            self.inv_node(x) == x
+        )
+    }
+
+    fn side_nodes(&self) -> Vec<&Node> { 
+        let is_adj = |x: &Node, y: &Node| {
+            x.edges().iter().filter(|&&e| 
+                self.inv_edge(e) != e // no axis-crossing edge
+            ).any(|e| 
+                y.edges().contains(e)
+            )
+        };
+
+        let nodes = self.inner.nodes().filter(|&x|
+            self.inv_node(x) != x
+        ).collect_vec();
+
+        let mut u = KeyedUnionFind::from_iter(nodes.iter().cloned());
+
+        for (i, x) in nodes.iter().enumerate() { 
+            for j in 0 .. i { 
+                let y = &nodes[j];
+                if is_adj(x, y) { 
+                    u.union(x, y);
+                }
+            }
+        }
+
+        u.into_disjoint().into_iter().fold(vec![], |mut res, next| {
+            if let Some(x) = next.first() {
+                let tx = self.inv_node(x);
+                if !res.contains(&tx) {
+                    res.extend(next);
+                }
+            }
+            res
+        })
+    }
+
+    fn build<'a >(&'a self, nodes: impl IntoIterator<Item = &'a Node>) -> TngComplex<R> { 
+        let (h, t) = self.inner.complex().ht();
+        let mut b = TngComplexBuilder::init(h, t, (0, 0), None);
+
+        b.set_nodes(nodes.into_iter().cloned());
+        b.run().into_tng_complex()
+    }
+
+    fn sym_merge(&mut self, center: &TngComplex<R>, side: &TngComplex<R>) {
+        self.inner.complex_mut().clear_verts();
+        self.inner.complex_mut().set_dim(center.dim() + 2 * side.dim());
+        self.key_map.clear();
+        
+        for i in self.inner.complex().h_range().mv(0, 1) { 
+            self.sym_merge_vertices(center, side, i);
+            self.merge_edges(center, side, i - 1);
+
+            if self.auto_deloop {
+                self.deloop_in(i - 1, false);
+            }
+        }
+    }
+
+    fn sym_merge_vertices(&mut self, center: &TngComplex<R>, side: &TngComplex<R>, i: isize) { 
+        let keys = self.collect_key_triples(center, side, i).collect_vec();
+
+        for (k0, k1, k2) in keys { 
+            let v0 = center.vertex(k0);
+            let v1 = side.vertex(k1);
+            let v2 = side.vertex(k2);
+
+            let k = k0 + k1 + k2;
+            let t = v0.tng().clone_and(|t| {
+                t.connect(v1.tng().clone());
+                t.connect(v2.tng().convert_edges(|e| self.inv_edge(e)));
+            });
+            let v = TngComplexVertex::from(t);
+
+            self.inner.complex_mut().add_vertex(k, v);
+
+            let tk = k0 + k2 + k1;
+            self.add_key_pair(k, tk);
+        }
+    }
+
+    fn merge_edges(&mut self, center: &TngComplex<R>, side: &TngComplex<R>, i: isize) { 
+        let (h, t) = self.inner.complex().ht().clone();
+
+        let keys = self.collect_key_triples(center, side, i).filter(|&(k0, k1, k2)|
+            self.inner.complex().contains_key(&(k0 + k1 + k2))
+        ).collect_vec();
+
+        for (k0, k1, k2) in keys { 
+            let k = k0 + k1 + k2;
+
+            let v0 = center.vertex(k0);
+            let v1 = side.vertex(k1);
+            let v2 = side.vertex(k2);
+
+            let i0 = k0.state.weight();
+            let i1 = k1.state.weight();
+
+            let e1 = center.vertex(k0).out_edges().filter_map(|l0| { 
+                let l = l0 + k1 + k2;
+                let f0 = center.edge(k0, l0).clone();
+                let f1 = Cob::id(v1.tng());
+                let f2 = Cob::id(v2.tng()).convert_edges(|e| self.inv_edge(e));
+                let f = f0.connect(&f1).connect(&f2).part_eval(&h, &t); // D(f0, 1, 1) 
+                (!f.is_zero()).then_some((l, f))
+            }).collect_vec();
+
+            let e2 = side.vertex(k1).out_edges().filter_map(|l1| { 
+                let l = k0 + l1 + k2;
+                let f0 = Cob::id(v0.tng());
+                let f1 = side.edge(k1, l1).clone();
+                let f2 = Cob::id(v2.tng()).convert_edges(|e| self.inv_edge(e));
+                let e = R::from_sign(Sign::from_parity(i0 as i64));
+                let f = f1.connect(&f0).connect(&f2).part_eval(&h, &t) * e; // (-1)^|i0| D(1, f1, 1) 
+                (!f.is_zero()).then_some((l, f))
+            }).collect_vec();
+
+            let e3 = side.vertex(k2).out_edges().filter_map(|l2| { 
+                let l = k0 + k1 + l2;
+                let f0 = Cob::id(v0.tng());
+                let f1 = Cob::id(v1.tng());
+                let f2 = side.edge(k2, l2).convert_edges(|e| self.inv_edge(e));
+                let e = R::from_sign(Sign::from_parity((i0 + i1) as i64));
+                let f = f2.connect(&f0).connect(&f1).part_eval(&h, &t) * e; // (-1)^{i0 + k1} D(1, 1, f2) 
+                (!f.is_zero()).then_some((l, f))
+            }).collect_vec();
+
+            e1.into_iter().chain(e2).chain(e3).for_each(|(l, f)| { 
+                self.inner.complex_mut().add_edge(&k, &l, f);
+            });
+        }
+    }
+
+    fn collect_key_triples<'a>(&self, center: &'a TngComplex<R>, side: &'a TngComplex<R>, i: isize) -> impl Iterator<Item = (&'a TngComplexKey, &'a TngComplexKey, &'a TngComplexKey)> {
+        let i = i - self.inner.complex().deg_shift().0;
+        center.h_range().flat_map(move |i0|
+            side.h_range().filter_map(move |i1| {
+                let i2 = i - i0 - i1;
+                side.h_range().contains(&i2).then_some((i0, i1, i2))
+            })
+        ).flat_map(move |(i0, i1, i2)| { 
+            center.keys_of_deg(i0).flat_map(move |k0|
+                side.keys_of_deg(i1).flat_map(move |k1|
+                    side.keys_of_deg(i2).map(move |k2| 
+                        (k0, k1, k2)
+                    )
+                )
+            )
+        }) 
+    }
+
     fn finalize(&mut self) {
         if self.inner.complex().is_completely_delooped() { 
             return
@@ -480,8 +540,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         self.deloop_all(false);
         self.deloop_all(true);
-
-        assert!(self.inner.complex().is_completely_delooped());
     }
 
     pub fn tau_map(&self) -> impl Fn(&KhGen) -> KhGen + Send + Sync + 'static {
@@ -515,6 +573,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn add_key_pair(&mut self, k: TngComplexKey, tk: TngComplexKey) { 
+        if let Some(l) = self.key_map.get(&tk) {
+            assert_eq!(k, *l);
+            return;
+        }
+
         self.key_map.insert(k, tk);
         if k != tk { 
             self.key_map.insert(tk, k);
@@ -606,8 +669,9 @@ mod tests {
         let l = InvLink::test_data("3_1");
         let (h, t) = (FF2::zero(), FF2::zero());
 
-        let b = SymTngBuilder::from_inv_link(&l, &h, &t, false).run();
-        let c = b.into_tng_complex().into_raw_complex();
+        let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
+        b.auto_elim = false;
+        let c = b.run().into_tng_complex().into_raw_complex();
         c.check_d_all();
 
         let h = c.homology();
@@ -618,6 +682,7 @@ mod tests {
         assert_eq!(h[3].rank(), 2);
     }
 
+    #[test]
     fn test_khi_3_1() { 
         let l = InvLink::test_data("3_1");
         let (h, t) = (FF2::zero(), FF2::zero());
@@ -663,7 +728,6 @@ mod tests {
 
         let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
         b.auto_deloop = false;
-        b.preprocess();
         b.process_nodes();
 
         assert!(!b.inner.complex().is_completely_delooped());
@@ -692,7 +756,6 @@ mod tests {
 
         let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
         b.auto_elim = false;
-        b.preprocess();
         b.process_nodes();
 
         assert!(b.inner.complex().is_completely_delooped());

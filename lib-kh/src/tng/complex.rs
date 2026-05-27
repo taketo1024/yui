@@ -224,6 +224,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.dim
     }
     
+    pub(crate) fn set_dim(&mut self, d: usize) { 
+        self.dim = d
+    }
+    
     pub fn h_range(&self) -> RangeInclusive<isize> { 
         let i0 = self.deg_shift.0;
         let n = self.dim() as isize;
@@ -283,6 +287,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
 
         v
+    }
+
+    pub(crate) fn clear_verts(&mut self) { 
+        self.vertices.clear();
     }
     
     fn rename_vertex_key(&mut self, k_old: &TngComplexKey, k_new: TngComplexKey) { 
@@ -348,7 +356,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.vertices[k].out_edges.contains_key(l)
     }
 
-    fn add_edge(&mut self, k: &TngComplexKey, l: &TngComplexKey, f: LcCob<R>) { 
+    pub fn add_edge(&mut self, k: &TngComplexKey, l: &TngComplexKey, f: LcCob<R>) { 
         assert!(!self.has_edge(k, l));
         assert!(!f.is_zero());
 
@@ -359,7 +367,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         w.in_edges.insert(*k);
     }
 
-    fn remove_edge(&mut self, k: &TngComplexKey, l: &TngComplexKey) -> LcCob<R> { 
+    pub fn remove_edge(&mut self, k: &TngComplexKey, l: &TngComplexKey) -> LcCob<R> { 
         assert!(self.has_edge(k, l));
         let w = self.vertices.get_mut(l).unwrap();
         w.in_edges.remove(k);
@@ -410,7 +418,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let dim = self.dim + other.dim;
 
         let mut new = TngComplex::init(h, t, deg_shift, base_pt);
-        new.vertices.clear();
+        new.clear_verts();
         new.dim = dim;
 
         let left = std::mem::replace(self, new);
@@ -435,7 +443,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub(crate) fn merge_edges(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize) {
         let (h, t) = self.ht().clone();
-        let keys = self.collect_keys(left, right, i). filter(|(k, l)|
+        let keys = self.collect_keys(left, right, i).filter(|(k, l)|
             self.contains_key(&(*k + *l))
         ).collect_vec();
 
@@ -473,14 +481,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn collect_keys<'a, 'b>(&self, left: &'a TngComplex<R>, right: &'b TngComplex<R>, i: isize) -> impl Iterator<Item = (&'a TngComplexKey, &'b TngComplexKey)> {
-        left.h_range().flat_map(move |i1| {
+        left.h_range().filter_map(move |i1| {
             let i2 = i - i1;
-            left.keys_of_deg(i1).flat_map(move |k| { 
-                right.keys_of_deg(i2).map(move |l|
-                    (k, l)
-                )
-            })
-        })
+            right.h_range().contains(&i2).then_some((i1, i2))
+        }).flat_map(move |(i1, i2)|
+            left.keys_of_deg(i1).flat_map(move |k1| 
+                right.keys_of_deg(i2).map(move |k2|
+                    (k1, k2)
+            ))
+        )
     }
 
     pub fn deloop(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> { 

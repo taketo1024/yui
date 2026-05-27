@@ -698,7 +698,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub(crate) fn stat(&self) -> String { 
-        format!("n: {}, v: {}", self.dim(), self.n_verts())
+        format!("(n: {}, v: {})", self.dim(), self.n_verts())
     }
 
     pub fn convert_edges<F>(&self, f: F) -> Self

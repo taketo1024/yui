@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use log::{debug, info};
+use log::{debug, info, trace};
 use num_traits::Zero;
 use yui_core::bitseq::Bit;
 use yui_core::{RangeExt, Ring, RingOps};
@@ -91,6 +91,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     } 
 
     pub(crate) fn process_nodes(&mut self) { 
+        info!("process {} nodes", self.nodes.len());
+
         while let Some(x) = self.choose_next_node() { 
             self.append_node(&x)
         }
@@ -135,7 +137,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub(crate) fn append_node(&mut self, x: &Node) { 
-        info!("({}) append: {x}", self.stat());
+        info!("({}/{}) append: {x}", 
+            self.complex.dim() + 1, 
+            self.complex.dim() + self.nodes.len() + 1, 
+        );
 
         self.prepare_append(x);
 
@@ -155,7 +160,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub(crate) fn merge(&mut self, other: TngComplex<R>) { 
-        info!("({}) merge <- ({})", self.stat(), other.stat());
+        debug!("merge {} + {}", self.stat(), other.stat());
 
         let (left, right) = self.complex.prepare_merge(other); 
 
@@ -167,6 +172,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 self.deloop_in(i - 1, false);
             }
         }
+
+        debug!("  merged: {}", self.stat());
     }
 
     pub(crate) fn process_loops(&mut self) { 
@@ -200,7 +207,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         if keys.is_empty() { return }
 
-        info!("({}) C[{i}]: {}, deloop targets: {}.", self.stat(), self.complex.rank(i), keys.len());
+        debug!("deloop in C[{i}], targets: {}.", keys.len());
 
         let before = self.complex.rank(i) as isize;
 
@@ -223,13 +230,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let after = self.complex.rank(i) as isize;
 
-        info!("({}) -> C[{i}]: {} (diff: {}).", self.stat(), after, after - before);
+       debug!("  delooped C[{i}]: {} (diff: {}).", after, after - before);
     }
 
     pub(crate) fn deloop(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
         let c = self.complex.vertex(k).tng().comp(r);
 
-        debug!("({}) deloop {c} in {}", self.stat(), self.complex.vertex(k));
+        trace!("{} deloop {c} in {}", self.stat(), self.complex.vertex(k));
 
         for e in self.elements.iter_mut() { 
             e.deloop(k, c);
@@ -238,17 +245,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let added = self.complex.deloop(k, r);
 
         if self.auto_elim { 
-            let mut res = vec![];
-            for k in added.iter() { 
-                if let Some(&j) = self.choose_inv_edge_into(&k) { 
-                    self.eliminate(&j, &k);
-                } else if let Some(&l) = self.choose_inv_edge_from(&k) { 
-                    self.eliminate(&k, &l);
-                } else { 
-                    res.push(*k);
-                }
-            }
-            res
+            // only retain keys are not eliminated
+            added.into_iter().filter(|k|
+                !self.try_eliminate_at(k)
+            ).collect_vec()
         } else { 
             added
         }
@@ -262,6 +262,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.complex.vertex(k).tng().find_comp(|c|
             c.is_circle() && (allow_based || !self.complex.contains_base_pt(c))
         )
+    }
+
+    pub(crate) fn try_eliminate_at(&mut self, k: &TngComplexKey) -> bool {
+        if let Some(&j) = self.choose_inv_edge_into(&k) { 
+            self.eliminate(&j, &k);
+            true
+        } else if let Some(&l) = self.choose_inv_edge_from(&k) { 
+            self.eliminate(&k, &l);
+            true
+        } else { 
+            false
+        }
     }
 
     fn choose_inv_edge_into(&self, k: &TngComplexKey) -> Option<&TngComplexKey> { 
@@ -285,7 +297,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub(crate) fn eliminate(&mut self, i: &TngComplexKey, j: &TngComplexKey) {
-        debug!("({}) eliminate {}: {} -> {}", self.stat(), self.complex.edge(i, j), self.complex.vertex(i), self.complex.vertex(j));
+        trace!("{} eliminate {}: {} -> {}", self.stat(), self.complex.edge(i, j), self.complex.vertex(i), self.complex.vertex(j));
         
         self.eliminate_elements(i, j);
         self.complex.eliminate(i, j);

@@ -14,7 +14,6 @@
 
 use std::fmt::Display;
 use std::ops::{Add, AddAssign, RangeInclusive};
-use std::sync::RwLock;
 
 use ahash::{AHashMap, AHashSet};
 use auto_impl_ops::auto_ops;
@@ -461,37 +460,34 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.contains_key(&(*k + *l))
         ).collect_vec();
 
-        let lock = RwLock::new(self);
-        
-        keys.into_par_iter().for_each(|(k0, l0)| { 
+        for (k0, l0) in keys {
             let k0_l0 = k0 + l0;
             let v0 = left.vertex(k0);
             let w0 = right.vertex(l0);
             let i0 = (k0.state.weight() as isize) - left.deg_shift.0;
 
-            let e1 = left.vertex(k0).out_edges().map(|k1| { 
+            let e1 = left.vertex(k0).out_edges().map(|k1| {
                 let k1_l0 = k1 + l0;
                 let f = left.edge(k0, k1).clone();
-                let f_id = f.connect(&Cob::id(w0.tng())); // D(f, 1) 
+                let f_id = f.connect(&Cob::id(w0.tng())); // D(f, 1)
                 (k0_l0, k1_l0, f_id.part_eval(&h, &t))
             });
 
-            let e2 = right.vertex(l0).out_edges().map(|l1| { 
+            let e2 = right.vertex(l0).out_edges().map(|l1| {
                 let k0_l1 = k0 + l1;
                 let f = right.edge(l0, l1).clone();
                 let e = R::from_sign(Sign::from_parity(i0 as i64));
-                let id_f = f.connect(&Cob::id(v0.tng())) * e; // (-1)^{deg(k0)} D(1, f) 
+                let id_f = f.connect(&Cob::id(v0.tng())) * e; // (-1)^{deg(k0)} D(1, f)
                 (k0_l0, k0_l1, id_f.part_eval(&h, &t))
             });
 
-            let mut this = lock.write().unwrap();
-
-            Iterator::chain(e1, e2).for_each(|(k, l, f)| { 
-                if this.contains_key(&l) && !f.is_zero() { 
-                    this.add_edge(&k, &l, f);
+            let new_edges = Iterator::chain(e1, e2).collect_vec();
+            for (k, l, f) in new_edges {
+                if self.contains_key(&l) && !f.is_zero() {
+                    self.add_edge(&k, &l, f);
                 }
-            });
-        });
+            }
+        }
     }
 
     fn collect_keys<'a, 'b>(&self, left: &'a TngComplex<R>, right: &'b TngComplex<R>, i: isize) -> impl Iterator<Item = (&'a TngComplexKey, &'b TngComplexKey)> {
@@ -599,20 +595,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.vertex(k0).out_edges().filter(|&l1| l1 != k1)
         ).collect_vec();
 
-        let values = keys.into_par_iter().map(|(l0, l1)|{
+        let values: Vec<_> = keys.into_par_iter().map(|(l0, l1)| {
             let b = self.edge(l0, k1);
             let c = self.edge(k0, l1);
             let cab = (c * &ainv * b).part_eval(h, t);
 
-            let s = if self.has_edge(l0, l1) { 
+            let s = if self.has_edge(l0, l1) {
                 let d = self.edge(l0, l1);
                 d - cab
-            } else { 
+            } else {
                 -cab
             };
 
             (*l0, *l1, s)
-        }).collect::<Vec<_>>();
+        }).collect();
 
         for (l0, l1, s) in values { 
             if self.has_edge(&l0, &l1) { 

@@ -181,6 +181,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.complex.merge_vertices(&left, &right, i);
             self.complex.merge_edges(&left, &right, i - 1);
             
+            if self.auto_elim { 
+                self.eliminate_in(i - 1);
+            }
             if self.auto_deloop {
                 self.deloop_in(i - 1, false);
             }
@@ -275,6 +278,29 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.complex.vertex(k).tng().find_comp(|c|
             c.is_circle() && (allow_based || !self.complex.contains_base_pt(c))
         )
+    }
+
+    pub(crate) fn eliminate_in(&mut self, i: isize) { 
+        let mut keys = self.complex.keys_of_deg(i).filter(|k| 
+            self.complex.vertex(k).out_edges().find(|l|
+                self.complex.edge(k, l).is_invertible()
+            ).is_some()
+        ).sorted_by_key(|k| self.complex.vertex(k).c_weight()).cloned().collect_vec();
+
+        if keys.is_empty() { return }
+
+        debug!("eliminate in C[{i}], targets: {}", keys.len());
+
+        let before = self.complex.rank(i);
+
+        while !keys.is_empty() { 
+            let k = keys.remove(0);
+            self.try_eliminate_at(&k);
+        }
+
+        let after = self.complex.rank(i);
+
+        debug!("  eliminated C[{i}]: {} (diff: {}).", after, after - before);
     }
 
     pub(crate) fn try_eliminate_at(&mut self, k: &TngComplexKey) -> bool {

@@ -13,7 +13,7 @@ use std::collections::HashSet;
 use ahash::AHashMap;
 use cartesian::cartesian;
 use itertools::Itertools;
-use log::{debug, info};
+use log::{debug, info, trace};
 use num_traits::Zero;
 use yui_core::bitseq::{Bit, BitSeq};
 use yui_core::algo::KeyedUnionFind;
@@ -163,6 +163,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.inner.complex_mut().merge_vertices(&left, &right, i);
             self.inner.complex_mut().merge_edges(&left, &right, i - 1);
 
+            if self.auto_elim { 
+                self.eliminate_in(i - 1);
+            }
             if self.auto_deloop { 
                 self.deloop_in(i - 1, false);
             }
@@ -315,6 +318,30 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         ks.append(&mut tks);
         ks
+    }
+
+    fn eliminate_in(&mut self, i: isize) { 
+        let mut keys = self.inner.complex().keys_of_deg(i).filter(|k| 
+            self.inner.complex().vertex(k).out_edges().find(|l|
+                self.is_equiv_inv_edge(k, l)
+            ).is_some()
+        ).sorted_by_key(|k| self.inner.complex().vertex(k).c_weight()).cloned().collect_vec();
+
+        if keys.is_empty() { return }
+
+        debug!("eliminate in C[{i}], targets: {}", keys.len());
+        
+        let before = self.inner.complex().rank(i) as isize;
+
+        while !keys.is_empty() { 
+            let k = keys.remove(0);
+            if !self.inner.complex().contains_key(&k) { continue; } // removed by other side
+            self.try_eliminate_equiv_at(&k);
+        }
+
+        let after = self.inner.complex().rank(i) as isize;
+
+        debug!("  eliminated C[{i}]: {} (diff: {}).", after, after - before);
     }
 
     fn choose_equiv_inv_edge_into(&self, k: &TngComplexKey) -> Option<&TngComplexKey> { 
@@ -470,6 +497,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.sym_merge_vertices(center, side, i);
             self.merge_edges(center, side, i - 1);
 
+            if self.auto_elim { 
+                self.eliminate_in(i - 1);
+            }
             if self.auto_deloop {
                 self.deloop_in(i - 1, false);
             }

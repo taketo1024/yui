@@ -1,3 +1,15 @@
+//! Incremental builder for [`TngComplex`]: scan crossings one at a time,
+//! tensor-merge with the new crossing's small complex, then deloop newborn
+//! circles and gauss-eliminate invertible edges to keep the complex small.
+//!
+//! References:
+//! - BN05 — D. Bar-Natan, "Khovanov's homology for tangles and cobordisms",
+//!   Geom. Topol. 9 (2005), 1443–1499.
+//!   <https://doi.org/10.2140/gt.2005.9.1443>, <https://arxiv.org/abs/math/0410495>
+//! - BN07 — D. Bar-Natan, "Fast Khovanov homology computations",
+//!   J. Knot Theory Ramif. 16 (2007), 243–255.
+//!   <https://doi.org/10.1142/S0218216507005294>, <https://arxiv.org/abs/math/0606318>
+
 use itertools::Itertools;
 use log::{debug, info, trace};
 use num_traits::Zero;
@@ -90,10 +102,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self
     } 
 
-    pub(crate) fn process_nodes(&mut self) { 
+    // See [BN07, §7] (scan-and-cancel algorithm).
+    pub(crate) fn process_nodes(&mut self) {
         info!("process {} nodes", self.nodes.len());
 
-        while let Some(x) = self.choose_next_node() { 
+        while let Some(x) = self.choose_next_node() {
             self.append_node(&x)
         }
     }

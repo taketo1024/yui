@@ -1,3 +1,15 @@
+//! Cobordism morphisms in Bar-Natan's category `Cob³_{/l}`: dotted surfaces
+//! between Temperley–Lieb diagrams, modulo the local relations `S`, `T`, `4Tu`
+//! plus the dotted skein `X² = h·X + t`. The second dot `Y = X − h` satisfies
+//! `Y² = −h·Y + t` and `X·Y = t`. [`Cob`] is a connected-component
+//! decomposition of a cobordism, and [`LcCob`] is its `R`-linear closure used
+//! as the differential of [`super::TngComplex`].
+//!
+//! Reference:
+//! - D. Bar-Natan, "Khovanov's homology for tangles and cobordisms",
+//!   Geom. Topol. 9 (2005), 1443–1499.
+//!   <https://doi.org/10.2140/gt.2005.9.1443>, <https://arxiv.org/abs/math/0410495>
+
 use core::panic;
 use std::fmt::Display;
 use std::hash::Hash;

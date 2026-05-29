@@ -1,3 +1,13 @@
+//! The Frobenius algebra `A = R[X]/(X² − hX − t)` over the ground ring `R`,
+//! parametrizing all rank-two Frobenius extensions used by Khovanov homology.
+//! Specializations include the original Khovanov (`h = t = 0`), Lee (`h = 0`,
+//! `t = 1`) and Bar-Natan (`t = 0`, `h ≠ 0`) deformations.
+//!
+//! Reference:
+//! - M. Khovanov, "Link homology and Frobenius extensions",
+//!   Fund. Math. 190 (2006), 179–190.
+//!   <https://doi.org/10.4064/fm190-0-6>, <https://arxiv.org/abs/math/0411447>
+
 use std::fmt::Display;
 use std::ops::{Add, AddAssign, Index};
 use itertools::join;

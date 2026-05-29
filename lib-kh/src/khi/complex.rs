@@ -1,3 +1,12 @@
+//! The involutive Khovanov chain complex `CKhI(D, τ) = Cone(CKh(D) -^{Q(1+τ)}-> Q·CKh(D))`
+//! for a strongly invertible link, where `Q² = 0` (Definition 2.2 of the reference).
+//! Built here as the [`ChainMap::cone`] of `1 + τ`.
+//!
+//! Reference:
+//! - T. Sano, "Involutive Khovanov homology and equivariant knots",
+//!   Algebr. Geom. Topol. 25 (2025), 5059–5111.
+//!   <https://doi.org/10.2140/agt.2025.25.5059>, <https://arxiv.org/abs/2404.08568>
+
 use std::ops::{Index, RangeInclusive};
 use std::sync::OnceLock;
 use delegate::delegate;

@@ -1,6 +1,11 @@
-// "A family of slice-torus invariants from the divisibility of reduced Lee classes"
-// T. Sano, K. Sato
-// https://arxiv.org/abs/2211.02494
+//! The equivariant Rasmussen invariant `(s̲, s̄)` for a strongly invertible knot,
+//! obtained from the `c`-divisibilities of the two equivariant Lee classes in
+//! `KhI` (§3 of the reference).
+//!
+//! Reference:
+//! - T. Sano, "Involutive Khovanov homology and equivariant knots",
+//!   Algebr. Geom. Topol. 25 (2025), 5059–5111.
+//!   <https://doi.org/10.2140/agt.2025.25.5059>, <https://arxiv.org/abs/2404.08568>
 
 use itertools::Itertools;
 use num_traits::Zero;

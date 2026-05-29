@@ -1,3 +1,14 @@
+//! Equivariant variant of [`TngComplexBuilder`] for strongly invertible links:
+//! processes axis-symmetric crossings singly and off-axis crossings in pairs
+//! `(x, τx)`, then maintains a `key_map` matching each [`TngComplexKey`] with
+//! its τ-image so that [`SymTngBuilder::tau_map`] can be used to assemble the
+//! involutive Khovanov complex `CKhI = Cone(1 + τ)`.
+//!
+//! Reference:
+//! - T. Sano, "Involutive Khovanov homology and equivariant knots",
+//!   Algebr. Geom. Topol. 25 (2025), 5059–5111.
+//!   <https://doi.org/10.2140/agt.2025.25.5059>, <https://arxiv.org/abs/2404.08568>
+
 use std::collections::HashSet;
 use ahash::AHashMap;
 use cartesian::cartesian;

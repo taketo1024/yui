@@ -1,6 +1,11 @@
-// "A family of slice-torus invariants from the divisibility of reduced Lee classes"
-// T. Sano, K. Sato
-// https://arxiv.org/abs/2211.02494
+//! The Rasmussen-type slice-torus invariants `ss̃_c(K) = 2·d_c(D) + w(D) − r(D) + 1`,
+//! where `d_c` is the `c`-divisibility of the (unreduced or reduced) Lee class —
+//! selected by the `reduced` argument to [`ss_invariant`].
+//!
+//! Reference:
+//! - T. Sano and K. Sato, "A family of slice-torus invariants from the divisibility of Lee classes",
+//!   Topol. Appl. 357 (2024), 109059.
+//!   <https://doi.org/10.1016/j.topol.2024.109059>, <https://arxiv.org/abs/2211.02494>
 
 use itertools::Itertools;
 use log::info;

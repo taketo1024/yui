@@ -1,3 +1,17 @@
+//! The tangle chain complex `[T]` over [`super::Cob`]: each vertex carries the
+//! resolved tangle [`Tng`], each edge is a cobordism morphism, and the
+//! differential squares to zero. Composing two complexes is the Bar-Natan
+//! "tensor product" `D(Ω₁, Ω₂)` of BN05, §5, eq. (3). Local simplifications —
+//! delooping and Gaussian elimination — come from BN07.
+//!
+//! References:
+//! - BN05 — D. Bar-Natan, "Khovanov's homology for tangles and cobordisms",
+//!   Geom. Topol. 9 (2005), 1443–1499.
+//!   <https://doi.org/10.2140/gt.2005.9.1443>, <https://arxiv.org/abs/math/0410495>
+//! - BN07 — D. Bar-Natan, "Fast Khovanov homology computations",
+//!   J. Knot Theory Ramif. 16 (2007), 243–255.
+//!   <https://doi.org/10.1142/S0218216507005294>, <https://arxiv.org/abs/math/0606318>
+
 use std::fmt::Display;
 use std::ops::{Add, AddAssign, RangeInclusive};
 use std::sync::RwLock;
@@ -492,7 +506,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         )
     }
 
-    pub fn deloop(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> { 
+    // Delooping (generalized to any `(h, t)` — [BN07, Lemma 4.1] handles only `h = 0`).
+    //
+    // A loop component `⚫` is isomorphic in `Cob_{/l}` to two empty objects,
+    // one labeled with dot `X` and one with dot `1` (the dual of `Y = X − h`):
+    //
+    //     ⚫  ≅  ∅_X  ⊕  ∅_1     (with appropriate grading shifts)
+    //
+    // The two summands are inserted/projected by:
+    //   - `∅_X`: include = cup with dot `X`, project = cap with no dot
+    //   - `∅_1`: include = cup with no dot, project = cap with dot `Y`
+    //
+    // Orthogonality follows from `ε(X) = ε(Y) = 1`, `ε(1) = 0`, `XY = t·1`.
+    // For the base-pointed (reduced) variant only the `X` summand is kept.
+    pub fn deloop(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
         let c = self.vertex(k).tng.comp(r);
         assert!(c.is_circle());
         
@@ -545,12 +572,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    //  Gaussian Elimination
+    // Gaussian elimination — [BN07, Lemma 4.2].
+    //
+    // When `a: v0 → v1` is invertible (i.e. an iso in `Cob_{/l}`), the four-term
+    // segment on the left is homotopy-equivalent to the simpler segment on the
+    // right with `v0`, `v1` removed and the parallel edge `d` corrected by `−c·a⁻¹·b`:
     //
     //       a
     //  v0 - - -> v1         .             .
     //     \   / b
-    //       /         ==>  
+    //       /         ==>
     //     /   \ c              d - ca⁻¹b
     //  w0 -----> w1         w0 ---------> w1
     //       d                

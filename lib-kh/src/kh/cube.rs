@@ -1,3 +1,16 @@
+//! The cube of resolutions for Khovanov homology: each vertex carries the
+//! tensor product of one copy of `A` per circle of the resolved diagram,
+//! and each edge is a merge or split cobordism with a sign coming from the
+//! exterior-algebra parity of the bit flipped along that edge.
+//!
+//! References:
+//! - M. Khovanov, "A categorification of the Jones polynomial",
+//!   Duke Math. J. 101 (2000), no. 3, 359–426.
+//!   <https://doi.org/10.1215/S0012-7094-00-10131-7>, <https://arxiv.org/abs/math/9908171>
+//! - D. Bar-Natan, "On Khovanov's categorification of the Jones polynomial",
+//!   Algebr. Geom. Topol. 2 (2002), 337–370.
+//!   <https://doi.org/10.2140/agt.2002.2.337>, <https://arxiv.org/abs/math/0201043>
+
 use std::collections::HashMap;
 use std::ops::RangeInclusive;
 use itertools::Itertools;

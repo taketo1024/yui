@@ -1,3 +1,12 @@
+//! Generator type for the involutive Khovanov chain complex `CKhI = Cone(1 + τ)`
+//! — the disjoint union of two copies of `KhGen` (`B`-side and `Q`-side in the
+//! cone), realized as [`EitherKey<KhGen, KhGen>`].
+//!
+//! Reference:
+//! - T. Sano, "Involutive Khovanov homology and equivariant knots",
+//!   Algebr. Geom. Topol. 25 (2025), 5059–5111.
+//!   <https://doi.org/10.2140/agt.2025.25.5059>, <https://arxiv.org/abs/2404.08568>
+
 use itertools::Either;
 use yui_core::lc::EitherKey;
 

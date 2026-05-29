@@ -13,7 +13,7 @@ use std::collections::HashSet;
 use ahash::AHashMap;
 use cartesian::cartesian;
 use itertools::Itertools;
-use log::{debug, info, trace};
+use log::{debug, info};
 use num_traits::Zero;
 use yui_core::bitseq::{Bit, BitSeq};
 use yui_core::algo::KeyedUnionFind;

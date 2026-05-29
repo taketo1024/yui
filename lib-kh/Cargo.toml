@@ -37,3 +37,8 @@ yui-homology.workspace = true
 
 [dev-dependencies]
 yui-link = { workspace = true, features = ["test-utils"] }
+criterion = "0.5"
+
+[[bench]]
+name = "kh"
+harness = false

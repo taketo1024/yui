@@ -274,7 +274,7 @@ where X: Mono + FromStr, R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
 impl<X, R> IntoIterator for PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     type Item = (X, R);
-    type IntoIter = std::collections::hash_map::IntoIter<X, R>;
+    type IntoIter = <Lc<X, R> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
         self.data.into_iter()

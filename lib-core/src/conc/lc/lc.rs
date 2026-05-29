@@ -4,23 +4,29 @@
 //! Implements the [free `R`-module](crate::RMod) over the key set, i.e. the
 //! polynomial ring viewpoint without any multiplicative structure on keys.
 //!
+//! Internally stored via [`super::lc_data::LcData`], which specializes the
+//! empty and single-term cases (the common shape in the cobordism algebra
+//! hot path of `yui-kh`) so that those paths avoid the per-entry hashmap
+//! allocation. The struct [`Lc`] additionally caches an `R::zero()` so that
+//! [`Lc::coeff`] can return a stable `&R` for missing keys.
+//!
 //! See: <https://en.wikipedia.org/wiki/Linear_combination>,
 //! <https://en.wikipedia.org/wiki/Free_module>
 
 use std::collections::HashMap;
 use std::fmt::{Display, Debug};
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, MulAssign};
-use ahash::AHashMap;
 use itertools::Itertools;
 use num_traits::Zero;
 use auto_impl_ops::auto_ops;
 use crate::{MathType, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
 
 use super::lc_key::*;
+use super::lc_data::{LcData, LcDataIter, LcDataIntoIter};
 
 /// A linear combination `Σ rᵢ · xᵢ` with keys `X: LcKey` and coefficients in a
-/// ring `R`. Stored sparsely as a hashmap from key to coefficient; zero entries
-/// are pruned automatically.
+/// ring `R`. Stored via [`LcData`], which specializes the empty and single-term
+/// cases to avoid hashmap allocation.
 #[derive(PartialEq, Eq, Clone, Default, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
@@ -29,7 +35,7 @@ where
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    data: AHashMap<X, R>,
+    data: LcData<X, R>,
     #[cfg_attr(feature = "serde", serde(skip))]
     r_zero: R
 }
@@ -38,47 +44,44 @@ impl<X, R> Lc<X, R>
 where
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
-{ 
+{
     pub fn new() -> Self {
-        let hasher = ahash::RandomState::with_seeds(0, 0, 0, 0);
-        let data = AHashMap::with_hasher(hasher);
-        let r_zero = R::zero();
-        Self { data, r_zero }
+        Self { data: LcData::Zero, r_zero: R::zero() }
     }
 
-    pub fn clean(&mut self) { 
-        self.data.retain(|_, r| !r.is_zero());
+    pub fn clean(&mut self) {
+        self.data.clean()
     }
 
     pub fn nterms(&self) -> usize {
         self.data.len()
     }
 
-    pub fn any_term(&self) -> Option<(&X, &R)> { 
+    pub fn any_term(&self) -> Option<(&X, &R)> {
         self.iter().next()
     }
 
     pub fn keys(&self) -> impl Iterator<Item = &X> {
-        self.data.keys()
+        self.iter().map(|(k, _)| k)
     }
 
     pub fn is_singleton(&self) -> bool {
-        self.nterms() == 1 && 
+        self.nterms() == 1 &&
         self.iter().next().unwrap().1.is_one()
     }
 
-    pub fn as_singleton(&self) -> Option<X> { 
-        if !self.is_singleton() { 
+    pub fn as_singleton(&self) -> Option<X> {
+        if !self.is_singleton() {
             None?
         }
         self.iter().next().map(|(x, _)| x.clone())
     }
 
-    pub fn coeff(&self, x: &X) -> &R { 
+    pub fn coeff(&self, x: &X) -> &R {
         self.data.get(x).unwrap_or(&self.r_zero)
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&X, &R)> {
+    pub fn iter(&self) -> LcDataIter<'_, X, R> {
         self.data.iter()
     }
 
@@ -142,18 +145,17 @@ where
     }
 
     pub fn apply_bilin<Y, Z, F>(&self, other: &Lc<Y, R>, x_map: F) -> Lc<Z, R>
-    where Y: LcKey, Z: LcKey, F: Fn(&X, &Y) -> Z { 
+    where Y: LcKey, Z: LcKey, F: Fn(&X, &Y) -> Z {
         let mut res = Lc::zero();
-        res.data.reserve(self.nterms() * other.nterms());
 
-        for (x, r) in self.iter() { 
-            for (y, s) in other.iter() { 
+        for (x, r) in self.iter() {
+            for (y, s) in other.iter() {
                 let xy = x_map(x, y);
                 let rs = r * s;
                 res.add_pair((xy, rs));
             }
         }
-        
+
         res.clean();
         res
     }
@@ -237,7 +239,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     type Item = (X, R);
-    type IntoIter = std::collections::hash_map::IntoIter<X, R>;
+    type IntoIter = LcDataIntoIter<X, R>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.data.into_iter()
@@ -298,29 +300,15 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     // must clean after call
-    pub fn add_pair(&mut self, rhs: (X, R)) { 
+    pub fn add_pair(&mut self, rhs: (X, R)) {
         let (x, r) = rhs;
-        if r.is_zero() { return }
-
-        if self.data.contains_key(&x) { 
-            let v = self.data.get_mut(&x).unwrap();
-            v.add_assign(r);
-        } else { 
-            self.data.insert(x, r);
-        }
-    } 
+        self.data.add_pair(x, r);
+    }
 
     // must clean after call
-    pub fn add_pair_ref(&mut self, rhs: (&X, &R)) { 
+    pub fn add_pair_ref(&mut self, rhs: (&X, &R)) {
         let (x, r) = rhs;
-        if r.is_zero() { return }
-
-        if self.data.contains_key(x) { 
-            let v = self.data.get_mut(x).unwrap();
-            v.add_assign(r);
-        } else { 
-            self.data.insert(x.clone(), r.clone());
-        }
+        self.data.add_pair_ref(x, r);
     }
 }
 
@@ -359,12 +347,11 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn mul_assign(&mut self, rhs: &R) {
-        if rhs.is_one() { 
+        if rhs.is_one() {
             return
         }
 
-        self.data.iter_mut().for_each(|(_, r)| *r *= rhs);
-        self.clean()
+        self.data.map_coeffs_in_place(|r| r * rhs);
     }
 }
 

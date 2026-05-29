@@ -19,7 +19,6 @@ use ahash::{AHashMap, AHashSet};
 use auto_impl_ops::auto_ops;
 use itertools::Itertools;
 use num_traits::Zero;
-use rayon::prelude::*;
 use cartesian::cartesian;
 use yui_core::{CloneAnd, Ring, RingOps, Sign};
 use yui_homology::{ChainComplex1, Summand, GrMod1};
@@ -595,7 +594,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.vertex(k0).out_edges().filter(|&l1| l1 != k1)
         ).collect_vec();
 
-        let values: Vec<_> = keys.into_par_iter().map(|(l0, l1)| {
+        let values: Vec<_> = keys.into_iter().map(|(l0, l1)| {
             let b = self.edge(l0, k1);
             let c = self.edge(k0, l1);
             let cab = (c * &ainv * b).part_eval(h, t);

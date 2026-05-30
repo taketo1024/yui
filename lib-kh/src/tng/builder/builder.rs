@@ -220,17 +220,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub(crate) fn deloop_all(&mut self, allow_based: bool) { 
+    pub(crate) fn deloop_all(&mut self, allow_based: bool) {
         for i in self.complex.h_range() { 
             self.deloop_in(i, allow_based);
         }
     }
 
-    fn deloop_in(&mut self, i: isize, allow_based: bool) { 
-        let mut keys = self.complex.keys_of_deg(i).filter(|k| 
+    fn deloop_in(&mut self, i: isize, allow_based: bool) {
+        let mut keys = self.pick_keys_in(i, |k|
             self.is_deloopable(k, allow_based)
-        ).sorted_by_key(|&k| self.complex.vertex(k).c_weight()).cloned().collect_vec();
-
+        );
         if keys.is_empty() { return }
 
         debug!("deloop in C[{i}], targets: {}.", keys.len());
@@ -290,13 +289,23 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         )
     }
 
-    pub(crate) fn eliminate_in(&mut self, i: isize) { 
-        let mut keys = self.complex.keys_of_deg(i).filter(|k| 
-            self.complex.vertex(k).out_edges().find(|l|
-                self.complex.edge(k, l).is_invertible()
-            ).is_some()
-        ).sorted_by_key(|k| self.complex.vertex(k).c_weight()).cloned().collect_vec();
+    /// Keys at degree `i` matching `pred`, sorted ascending by the vertex's
+    /// `c_weight` (so the cheapest vertices come first).
+    pub(crate) fn pick_keys_in<F>(&self, i: isize, pred: F) -> Vec<TngComplexKey>
+    where F: Fn(&TngComplexKey) -> bool {
+        self.complex.keys_of_deg(i)
+            .filter(|k| pred(k))
+            .sorted_by_key(|k| self.complex.vertex(k).c_weight())
+            .copied()
+            .collect_vec()
+    }
 
+    pub(crate) fn eliminate_in(&mut self, i: isize) {
+        let mut keys = self.pick_keys_in(i, |k|
+            self.complex.vertex(k).out_edges().any(|l|
+                self.complex.edge(k, l).is_invertible()
+            )
+        );
         if keys.is_empty() { return }
 
         debug!("eliminate in C[{i}], targets: {}", keys.len());

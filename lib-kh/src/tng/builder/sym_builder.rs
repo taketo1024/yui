@@ -187,10 +187,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn deloop_in(&mut self, i: isize, allow_based: bool) {
-        let mut keys = self.inner.complex().keys_of_deg(i).filter(|k| 
+        let mut keys = self.inner.pick_keys_in(i, |k|
             self.inner.is_deloopable(k, allow_based)
-        ).sorted_by_key(|&k| self.inner.complex().vertex(k).c_weight()).cloned().collect_vec();
-
+        );
         if keys.is_empty() { return }
 
         debug!("deloop in C[{i}], targets: {}.", keys.len());
@@ -326,13 +325,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         ks
     }
 
-    fn eliminate_in(&mut self, i: isize) { 
-        let mut keys = self.inner.complex().keys_of_deg(i).filter(|k| 
-            self.inner.complex().vertex(k).out_edges().find(|l|
-                self.is_equiv_inv_edge(k, l)
-            ).is_some()
-        ).sorted_by_key(|k| self.inner.complex().vertex(k).c_weight()).cloned().collect_vec();
-
+    fn eliminate_in(&mut self, i: isize) {
+        let mut keys = self.inner.pick_keys_in(i, |k|
+            self.inner.complex().vertex(k).out_edges()
+                .any(|l| self.is_equiv_inv_edge(k, l))
+        );
         if keys.is_empty() { return }
 
         debug!("eliminate in C[{i}], targets: {}", keys.len());

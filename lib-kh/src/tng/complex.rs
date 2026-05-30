@@ -466,30 +466,32 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.contains_key(&(*k + *l))
         ).collect_vec();
 
-        for (k0, l0) in keys {
-            let k0_l0 = k0 + l0;
-            let v0 = left.vertex(k0);
-            let w0 = right.vertex(l0);
-            let i0 = (k0.state.weight() as isize) - left.deg_shift.0;
+        for (k_l, k_r) in keys {
+            let k = k_l + k_r;
+            
+            let v_l = left.vertex(k_l);
+            let v_r = right.vertex(k_r);
 
-            let id_w0 = Cob::id(w0.tng());
-            let e1 = left.vertex(k0).out_edges().map(|k1| {
-                let k1_l0 = k1 + l0;
-                let f_id = left.edge(k0, k1).connect_ref(&id_w0); // D(f, 1)
-                (k0_l0, k1_l0, f_id.part_eval(&h, &t))
+            let id_l = Cob::id(v_l.tng());
+            let id_r = Cob::id(v_r.tng());
+
+            let e1 = left.vertex(k_l).out_edges().map(|l_l| {
+                let l = l_l + k_r;
+                let f = left.edge(k_l, l_l).connect_ref(&id_r); // D(f, 1)
+                (l, f.part_eval(&h, &t))
             });
-
-            let id_v0 = Cob::id(v0.tng());
+            
+            let i0 = (k_l.state.weight() as isize) - left.deg_shift.0;
             let sign = R::from_sign(Sign::from_parity(i0 as i64));
-            let e2 = right.vertex(l0).out_edges().map(|l1| {
-                let k0_l1 = k0 + l1;
-                let id_f = right.edge(l0, l1).connect_ref(&id_v0) * &sign; // (-1)^{deg(k0)} D(1, f)
-                (k0_l0, k0_l1, id_f.part_eval(&h, &t))
+
+            let e2 = right.vertex(k_r).out_edges().map(|l_r| {
+                let l = k_l + l_r;
+                let id_f = right.edge(k_r, l_r).connect_ref(&id_l) * &sign; // (-1)^{deg(k0)} D(1, f)
+                (l, id_f.part_eval(&h, &t))
             });
 
-            let new_edges = Iterator::chain(e1, e2).collect_vec();
-            for (k, l, f) in new_edges {
-                if self.contains_key(&l) && !f.is_zero() {
+            for (l, f) in e1.chain(e2) {
+                if !f.is_zero() {
                     self.add_edge(&k, &l, f);
                 }
             }

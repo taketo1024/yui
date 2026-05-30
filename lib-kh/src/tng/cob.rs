@@ -376,16 +376,6 @@ impl CobComp {
         self.dots.1 += dots.1;
     }
 
-    pub fn convert_edges<F>(&self, f: F) -> Self 
-    where F: Fn(Edge) -> Edge {
-        Self { 
-            src: self.src.convert_edges(&f), 
-            tgt: self.tgt.convert_edges(&f), 
-            genus: self.genus, 
-            dots: self.dots
-        }
-    }
-
     pub fn should_part_eval(&self) -> bool {
         self.is_zero_cob() ||
         self.is_unit_cob() ||
@@ -775,12 +765,6 @@ impl Cob {
         c
     }
 
-    pub fn convert_edges<F>(&self, f: F) -> Self 
-    where F: Fn(Edge) -> Edge {
-        let comps = self.comps.iter().map(|c| c.convert_edges(&f));
-        Self::new(comps)
-    }
-
     pub fn should_part_eval(&self) -> bool {
         self.comps.iter().any(|c| c.should_part_eval())
     }
@@ -875,7 +859,6 @@ pub trait LcCobTrait: Sized {
     fn is_invertible(&self) -> bool;
     fn is_stackable(&self, other: &Self) -> bool;
     fn inv(&self) -> Option<Self>;
-    fn convert_edges<F>(&self, f: F) -> Self where F: Fn(Edge) -> Edge;
     fn connect(self, c: &Cob) -> Self;
     fn connect_ref(&self, c: &Cob) -> Self;
     fn cap_off(self, b: Bottom, c: &TngComp, dot: Dot) -> Self;
@@ -928,11 +911,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         } else { 
             None
         }
-    }
-
-    fn convert_edges<F>(&self, f: F) -> Self 
-    where F: Fn(Edge) -> Edge { 
-        self.map_ref(|c, r| (c.convert_edges(&f), r.clone()))
     }
 
     fn connect(self, c: &Cob) -> Self {

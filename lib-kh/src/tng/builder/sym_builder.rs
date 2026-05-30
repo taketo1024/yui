@@ -506,25 +506,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         println!();
     }
 
-    #[allow(unused)]
-    fn validate_equiv(&self) {
-        for k in self.inner.complex().keys().sorted() { 
-            assert!(self.key_map.contains_key(k), "no inv-key for {k}");
-            let tk = self.inv_key(k);
-
-            for l in self.inner.complex().vertex(k).out_edges() { 
-                assert!(self.key_map.contains_key(l), "no inv-key for {l}");
-                let tl = self.inv_key(l);
-
-                assert!(self.inner.complex().has_edge(tk, tl));
-
-                let f = self.inner.complex().edge(k, l);
-                let tf = self.inner.complex().edge(tk, tl);
-
-                assert_eq!(&f.convert_edges(|e| self.inv_edge(e)), tf);
-            }
-        }
-    }
 }
 
 #[cfg(test)]

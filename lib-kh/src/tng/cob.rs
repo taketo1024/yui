@@ -56,7 +56,7 @@ impl CobComp {
     }
 
     pub fn new(src: Tng, tgt: Tng, genus: usize, dots: (usize, usize)) -> Self { 
-        debug_assert_eq!(src.endpts(), tgt.endpts());
+        debug_assert_eq!(src.end_pts(), tgt.end_pts());
         Self { src, tgt, genus, dots }
     }
 
@@ -149,8 +149,8 @@ impl CobComp {
         self.genus
     }
 
-    pub fn endpts(&self) -> HashSet<Edge> { 
-        self.src.endpts() // == self.tgt.endpts()
+    pub fn end_pts(&self) -> HashSet<Edge> { 
+        self.src.end_pts() // == self.tgt.end_pts()
     }
 
     pub fn ndots(&self) -> usize { 
@@ -268,7 +268,7 @@ impl CobComp {
 
     pub fn deg(&self) -> i32 { 
         let x = self.euler_num();
-        let b = self.src.endpts().len() as i32;
+        let b = self.src.end_pts().len() as i32;
         let d = self.ndots() as i32;
         x - (b / 2) - 2 * d
     }
@@ -353,8 +353,8 @@ impl CobComp {
         let x1 = self.euler_num();
         let x2 = other.euler_num();
 
-        let a = self.endpts().intersection(
-            &other.endpts()
+        let a = self.end_pts().intersection(
+            &other.end_pts()
         ).count() as i32;
 
         assert!(a > 0);

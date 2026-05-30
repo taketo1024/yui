@@ -280,7 +280,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             .next()
             .into_iter()
             .flat_map(|(_, v)| v.tng().comps())
-            .filter_map(|c| c.path().ends())
+            .filter_map(|c| c.end_pts())
             .flat_map(|(e0, e1)| [e0, e1])
     }
 

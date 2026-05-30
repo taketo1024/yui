@@ -49,7 +49,7 @@ impl LinkExt for Link {
     
             let adjs = remain.iter().filter_map(|&i2| {
                 let c2 = &circles[i2];
-                if c1.is_adj(c2, self) { Some(i2) } else { None }
+                if is_adj(c1, c2, self) { Some(i2) } else { None }
             }).collect_vec();
             
             for i2 in adjs {
@@ -63,4 +63,24 @@ impl LinkExt for Link {
     
         zip(circles, colors).collect()
     }
+}
+
+/// Two paths are adjacent if some crossing of `link` touches an edge on
+/// `self` and a *different* edge on `other`.
+fn is_adj(p1: &Path, p2: &Path, link: &Link) -> bool {
+    for x in link.nodes() {
+        if !x.edges().iter().any(|e| p1.contains(*e)) {
+            continue
+        }
+
+        let Some(&e) = x.edges().iter().find(|e| !p1.contains(**e)) else {
+            continue
+        };
+
+        if p2.contains(e) {
+            return true
+        }
+    }
+
+    false
 }

@@ -16,10 +16,10 @@ use log::{debug, info, trace};
 use num_traits::Zero;
 use yui_core::bitseq::Bit;
 use yui_core::{RangeExt, Ring, RingOps};
-use yui_link::{Node, Edge, Link, Path};
+use yui_link::{Node, Edge, Link};
 
 use crate::kh::{KhChain, KhComplex};
-use crate::tng::{TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
+use crate::tng::{TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
 
 pub struct TngComplexBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
@@ -127,12 +127,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let loops: usize = self.complex.iter_verts().map(|(_, v)| {
             v.tng().comps().map(|c|
-                arcs.iter().filter(|a| c.path().is_connectable_bothends(a)).count()
+                arcs.iter().filter(|a| c.is_connectable_bothends(a)).count()
             ).sum::<usize>()
         }).sum();
 
         let width_score: isize = arcs.iter().map(|a| {
-            let Some((e0, e1)) = a.ends() else { return 0 };
+            let Some((e0, e1)) = a.end_pts() else { return 0 };
             let m = boundary_ends.contains(&e0) as isize
                   + boundary_ends.contains(&e1) as isize;
             2 * m - 2 // matched − unmatched, range −2..2 per arc
@@ -143,7 +143,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     /// Arcs that will be added when appending `x` to the partial diagram,
     /// with the base-point edge filtered out.
-    fn node_arcs(&self, x: &Node) -> Vec<Path> {
+    fn node_arcs(&self, x: &Node) -> Vec<TngComp> {
         let arcs = if x.is_resolved() {
             let (a0, a1) = x.arcs();
             vec![a0, a1]
@@ -155,6 +155,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let base_pt = self.complex.base_pt();
         arcs.into_iter()
             .filter(|a| base_pt.map(|e| !a.contains(e)).unwrap_or(true))
+            .map(TngComp::from)
             .collect()
     }
 

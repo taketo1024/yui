@@ -3,58 +3,138 @@ use std::fmt::Display;
 use std::hash::Hash;
 use delegate::delegate;
 use itertools::Itertools;
+use smallvec::SmallVec;
 use yui_link::{Edge, Node, Path};
 
-#[derive(Debug, Clone, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct TngComp(Path);
 
 impl From<Path> for TngComp {
+    /// Wraps a [`Path`] and normalizes it, so that two `TngComp`s compare
+    /// equal iff their backing paths are unoriented-equivalent.
     fn from(path: Path) -> Self {
-        Self(path)
+        let mut c = Self(path);
+        c.normalize();
+        c
     }
 }
 
-impl TngComp { 
+impl TngComp {
     pub fn arc<I>(edges: I) -> Self
-    where I: IntoIterator<Item = Edge> { 
+    where I: IntoIterator<Item = Edge> {
         Self::from(Path::arc(edges))
     }
 
     pub fn circ<I>(edges: I) -> Self
-    where I: IntoIterator<Item = Edge> { 
+    where I: IntoIterator<Item = Edge> {
         Self::from(Path::circ(edges))
     }
 
-    delegate! { 
-        to self.0 { 
+    delegate! {
+        to self.0 {
             pub fn len(&self) -> usize;
             pub fn is_arc(&self) -> bool;
             pub fn is_circle(&self) -> bool;
-            #[call(ends)]
-            pub fn endpts(&self) -> Option<(Edge, Edge)>;
+            pub fn end_pts(&self) -> Option<(Edge, Edge)>;
             pub fn contains(&self, e: Edge) -> bool;
             pub fn min_edge(&self) -> Edge;
         }
     }
 
-    pub fn path(&self) -> &Path { 
-        &self.0
+    /// Rewrite the backing [`Path`] in canonical form so two `TngComp`s
+    /// compare equal iff their oriented paths agree as *unoriented* sequences.
+    /// - `Arc(es)`:  reverse if `es[0] > es[last]`.
+    /// - `Circ(es)`: rotate so `es[0] == min(es)`, then reflect the suffix so
+    ///               `es[1] ≤ es[last]`.
+    fn normalize(&mut self) {
+        match &mut self.0 {
+            Path::Arc(es) => {
+                if es.len() >= 2 && *es.last().unwrap() < es[0] {
+                    es.reverse();
+                }
+            }
+            Path::Circ(es) => {
+                let n = es.len();
+                if n > 1 {
+                    let min_idx = (0..n).min_by_key(|&i| es[i]).unwrap();
+                    es.rotate_left(min_idx);
+                    if n > 2 && es[n - 1] < es[1] {
+                        es[1..].reverse();
+                    }
+                }
+            }
+        }
     }
 
-    pub fn is_connectable(&self, other: &Self) -> bool { 
-        self.0.is_connectable(&other.0)
+    pub fn is_connectable(&self, other: &Self) -> bool {
+        let Some((e0, e1)) = self.end_pts() else { return false };
+        let Some((f0, f1)) = other.end_pts() else { return false };
+        e0 == f0 || e0 == f1 || e1 == f0 || e1 == f1
     }
 
-    pub fn connect(&mut self, other: Self) { 
-        self.0.connect(other.0)
+    /// Endpoint-set match between two arcs. Both `TngComp`s are normalized,
+    /// so endpoint pairs are sorted — direct equality suffices.
+    pub fn is_connectable_bothends(&self, other: &Self) -> bool {
+        let Some(s) = self.end_pts() else { return false };
+        let Some(o) = other.end_pts() else { return false };
+        s == o
+    }
+
+    pub fn connect(&mut self, other: Self) {
+        assert!(self.is_connectable(&other), "{self} and {other} are not connectable.");
+
+        let placeholder = Path::Arc(SmallVec::new());
+        let this = std::mem::replace(&mut self.0, placeholder);
+        let (mut left, right) = (this.into_seq(), other.0.into_seq());
+
+        let (e0, e1) = (left[0], *left.last().unwrap());
+        let (f0, f1) = (right[0], *right.last().unwrap());
+
+        let mut combined = if e1 == f0 {
+            // self ++ other[1..]
+            left.extend_from_slice(&right[1..]);
+            left
+        } else if e1 == f1 {
+            // self ++ reverse(other[..-1])
+            let mut r = right;
+            r.pop();
+            r.reverse();
+            left.extend(r);
+            left
+        } else if e0 == f0 {
+            // reverse(other[1..]) ++ self
+            let mut r = right;
+            r.remove(0);
+            r.reverse();
+            r.append(&mut left);
+            r
+        } else {
+            // e0 == f1: other[..-1] ++ self
+            let mut r = right;
+            r.pop();
+            r.append(&mut left);
+            r
+        };
+
+        // If the new endpoints coincide, the result closes into a circle.
+        let closes = combined.len() > 1 && combined[0] == *combined.last().unwrap();
+        self.0 = if closes {
+            combined.pop();
+            Path::Circ(combined)
+        } else {
+            Path::Arc(combined)
+        };
+        self.normalize();
     }
 
     pub fn convert_edges<F>(&self, f: F) -> Self
-    where F: Fn(Edge) -> Edge { 
-        let path = Path::new(
-            self.0.edges().iter().map(|e| f(*e)),
-            self.0.is_circle()
-        );
+    where F: Fn(Edge) -> Edge {
+        let mapped = self.0.edges().iter().map(|e| f(*e));
+        let path = if self.0.is_circle() {
+            Path::circ(mapped)
+        } else {
+            Path::arc(mapped)
+        };
         Self::from(path)
     }
 }
@@ -65,32 +145,6 @@ impl Display for TngComp {
     }
 }
 
-impl PartialEq for TngComp {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.unori_eq(&other.0)
-    }
-}
-
-impl PartialOrd for TngComp {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for TngComp {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.is_circle().cmp(&other.is_circle())
-        .then_with(|| self.min_edge().cmp(&other.min_edge()))
-    }
-}
-
-impl Hash for TngComp {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.is_circle().hash(state);
-        self.min_edge().hash(state);
-        self.len().hash(state);
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Tng {
@@ -149,9 +203,9 @@ impl Tng {
         &self.comps[i]
     }
 
-    pub fn endpts(&self) -> HashSet<Edge> { 
+    pub fn end_pts(&self) -> HashSet<Edge> { 
         self.comps.iter().flat_map(|c| 
-            c.endpts().map(|(e0, e1)| vec![e0, e1]).unwrap_or_default()
+            c.end_pts().map(|(e0, e1)| vec![e0, e1]).unwrap_or_default()
         ).collect()
     }
 

@@ -30,6 +30,7 @@ cfg-if = "1.0.4"
 itertools = "0.14.0"
 ahash = "0.8.12"
 rayon = "1.12.0"
+smallvec = "1.13"
 yui-core.workspace = true
 yui-link.workspace = true
 yui-matrix.workspace = true
@@ -38,6 +39,7 @@ yui-homology.workspace = true
 [dev-dependencies]
 yui-link = { workspace = true, features = ["test-utils"] }
 criterion = "0.5"
+env_logger = "0.11"
 
 [[bench]]
 name = "kh"

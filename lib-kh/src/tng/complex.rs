@@ -465,18 +465,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let w0 = right.vertex(l0);
             let i0 = (k0.state.weight() as isize) - left.deg_shift.0;
 
+            let id_w0 = Cob::id(w0.tng());
             let e1 = left.vertex(k0).out_edges().map(|k1| {
                 let k1_l0 = k1 + l0;
-                let f = left.edge(k0, k1).clone();
-                let f_id = f.connect(&Cob::id(w0.tng())); // D(f, 1)
+                let f_id = left.edge(k0, k1).connect_ref(&id_w0); // D(f, 1)
                 (k0_l0, k1_l0, f_id.part_eval(&h, &t))
             });
 
+            let id_v0 = Cob::id(v0.tng());
+            let sign = R::from_sign(Sign::from_parity(i0 as i64));
             let e2 = right.vertex(l0).out_edges().map(|l1| {
                 let k0_l1 = k0 + l1;
-                let f = right.edge(l0, l1).clone();
-                let e = R::from_sign(Sign::from_parity(i0 as i64));
-                let id_f = f.connect(&Cob::id(v0.tng())) * e; // (-1)^{deg(k0)} D(1, f)
+                let id_f = right.edge(l0, l1).connect_ref(&id_v0) * &sign; // (-1)^{deg(k0)} D(1, f)
                 (k0_l0, k0_l1, id_f.part_eval(&h, &t))
             });
 

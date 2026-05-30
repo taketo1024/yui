@@ -876,8 +876,8 @@ pub trait LcCobTrait: Sized {
     fn is_stackable(&self, other: &Self) -> bool;
     fn inv(&self) -> Option<Self>;
     fn convert_edges<F>(&self, f: F) -> Self where F: Fn(Edge) -> Edge;
-    fn modify_cob<F>(self, f: F) -> Self where F: Fn(&mut Cob);
     fn connect(self, c: &Cob) -> Self;
+    fn connect_ref(&self, c: &Cob) -> Self;
     fn cap_off(self, b: Bottom, c: &TngComp, dot: Dot) -> Self;
     fn should_part_eval(&self) -> bool;
     fn part_eval(self, h: &Self::R, t: &Self::R) -> Self;
@@ -935,20 +935,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.map_ref(|c, r| (c.convert_edges(&f), r.clone()))
     }
 
-    fn modify_cob<F>(self, f: F) -> Self 
-    where F: Fn(&mut Cob) {
-        self.into_iter().filter_map(|(mut cob, r)| {
-            f(&mut cob);
-            (!cob.is_zero_cob()).then_some((cob, r))
-        }).collect()
+    fn connect(self, c: &Cob) -> Self {
+        mut_cob(self, |cob| cob.connect(c.clone()))
     }
 
-    fn connect(self, c: &Cob) -> Self {
-        self.modify_cob(|cob| cob.connect(c.clone()))
+    fn connect_ref(&self, c: &Cob) -> Self {
+        mut_cob_ref(self, |cob| cob.connect(c.clone()))
     }
 
     fn cap_off(self, b: Bottom, c: &TngComp, dot: Dot) -> Self {
-        self.modify_cob(|cob| cob.cap_off(b, c, dot) )
+        mut_cob(self, |cob| cob.cap_off(b, c, dot) )
     }
 
     fn should_part_eval(&self) -> bool {
@@ -971,6 +967,32 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         );
         R::sum(coeffs)
     }
+}
+
+/// Apply `f` to each `Cob` in `this`, dropping any terms that become zero.
+fn mut_cob<R, F>(this: LcCob<R>, f: F) -> LcCob<R>
+where
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    F: Fn(&mut Cob),
+{
+    this.into_iter().filter_map(|(mut cob, r)| {
+        f(&mut cob);
+        (!cob.is_zero_cob()).then_some((cob, r))
+    }).collect()
+}
+
+/// Non-consuming variant of [`modify_cob`]: clones each `Cob` individually
+/// rather than the whole `LcCob`.
+fn mut_cob_ref<R, F>(this: &LcCob<R>, f: F) -> LcCob<R>
+where
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    F: Fn(&mut Cob),
+{
+    this.iter().filter_map(|(cob, r)| {
+        let mut new_cob = cob.clone();
+        f(&mut new_cob);
+        (!new_cob.is_zero_cob()).then_some((new_cob, r.clone()))
+    }).collect()
 }
 
 #[cfg(test)]

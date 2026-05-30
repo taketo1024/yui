@@ -146,18 +146,25 @@ where
 
     pub fn apply_bilin<Y, Z, F>(&self, other: &Lc<Y, R>, x_map: F) -> Lc<Z, R>
     where Y: LcKey, Z: LcKey, F: Fn(&X, &Y) -> Z {
-        let mut res = Lc::zero();
-
-        for (x, r) in self.iter() {
-            for (y, s) in other.iter() {
-                let xy = x_map(x, y);
-                let rs = r * s;
-                res.add_pair((xy, rs));
+        match (&self.data, &other.data) {
+            (LcData::Zero, _) | (_, LcData::Zero) => Lc::zero(),
+            (LcData::Single(x, r), _) =>
+                other.map_ref(|y, s| (x_map(x, y), r * s)),
+            (_, LcData::Single(y, s)) =>
+                self.map_ref(|x, r| (x_map(x, y), r * s)),
+            (LcData::Many(_), LcData::Many(_)) => {
+                let mut res = Lc::zero();
+                for (x, r) in self.iter() {
+                    for (y, s) in other.iter() {
+                        let xy = x_map(x, y);
+                        let rs = r * s;
+                        res.add_pair((xy, rs));
+                    }
+                }
+                res.clean();
+                res
             }
         }
-
-        res.clean();
-        res
     }
 
     pub fn sort_terms_by<F>(&self, cmp: F) -> impl Iterator<Item = (&X, &R)>

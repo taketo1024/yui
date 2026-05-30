@@ -10,7 +10,7 @@
 //!   <https://doi.org/10.2140/agt.2025.25.5059>, <https://arxiv.org/abs/2404.08568>
 
 use std::collections::HashSet;
-use ahash::AHashMap;
+use ahash::{AHashMap, AHashSet};
 use cartesian::cartesian;
 use itertools::Itertools;
 use log::{debug, info};
@@ -82,7 +82,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     /// Pair-aware chooser: an off-axis node is scored as the pair `(x, τx)`
     /// it'll be appended as; on-axis is doubled to compare at the same scale.
     fn choose_next_node_sym(&self) -> Option<&Node> {
-        let boundary_ends = self.inner.complex().boundary_ends();
+        let boundary_ends: AHashSet<Edge> = self.inner.complex().boundary_ends().collect();
         self.inner.nodes()
             .max_by_key(|x| {
                 let tx = self.inv_node(x);

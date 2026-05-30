@@ -10,6 +10,7 @@
 //!   J. Knot Theory Ramif. 16 (2007), 243–255.
 //!   <https://doi.org/10.1142/S0218216507005294>, <https://arxiv.org/abs/math/0606318>
 
+use ahash::AHashSet;
 use itertools::Itertools;
 use log::{debug, info, trace};
 use num_traits::Zero;
@@ -114,14 +115,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     /// Pick the next node to append by maximizing [`Self::score_node`].
     /// Removal happens in [`Self::prepare_append`] inside `append_*`.
     pub(crate) fn choose_next_node(&self) -> Option<&Node> {
-        let boundary_ends = self.complex.boundary_ends();
+        let boundary_ends: AHashSet<Edge> = self.complex.boundary_ends().collect();
         self.nodes.iter().max_by_key(|x| self.score_node(x, &boundary_ends))
     }
 
     /// Score `x` for the chooser. Higher is better.
     /// `(loop_bonus, width_score)` — loop closures first (they unlock
     /// delooping + elimination), width as tiebreaker.
-    pub(crate) fn score_node(&self, x: &Node, boundary_ends: &ahash::AHashSet<Edge>) -> (usize, isize) {
+    pub(crate) fn score_node(&self, x: &Node, boundary_ends: &AHashSet<Edge>) -> (usize, isize) {
         let arcs = self.node_arcs(x);
 
         let loops: usize = self.complex.iter_verts().map(|(_, v)| {

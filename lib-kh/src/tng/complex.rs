@@ -275,14 +275,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     /// Endpoints of the current tangle boundary. Same across all vertices
     /// (they share the partial diagram), so we read it off any one vertex.
-    pub fn boundary_ends(&self) -> ahash::AHashSet<Edge> {
+    pub fn boundary_ends(&self) -> impl Iterator<Item = Edge> + '_ {
         self.iter_verts()
             .next()
-            .map(|(_, v)| v.tng().comps()
-                .filter_map(|c| c.path().ends())
-                .flat_map(|(e0, e1)| [e0, e1])
-                .collect())
-            .unwrap_or_default()
+            .into_iter()
+            .flat_map(|(_, v)| v.tng().comps())
+            .filter_map(|c| c.path().ends())
+            .flat_map(|(e0, e1)| [e0, e1])
     }
 
     pub fn add_vertex(&mut self, k: TngComplexKey, v: TngComplexVertex<R>) {

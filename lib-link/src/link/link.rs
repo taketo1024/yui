@@ -9,7 +9,7 @@ use petgraph::Graph;
 
 use super::{Node, Path};
 
-pub type Edge = usize;
+pub type Edge = u8;
 pub type State = yui_core::bitseq::BitSeq;
 pub type PDCodeX = [Edge; 4];
 
@@ -137,7 +137,7 @@ impl Link {
     }
 
     pub fn unlink(n: usize) -> Link {
-        Self::new([], 1..=n)
+        Self::new([], (1..=n).map(|e| e as Edge))
     }
 
     pub fn is_knot(&self) -> bool { 

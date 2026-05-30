@@ -64,19 +64,36 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self
     }
 
-    fn process_nodes(&mut self) { 
+    fn process_nodes(&mut self) {
         info!("process {} nodes", self.inner.nodes().count());
-        
-        while let Some(x) = self.inner.choose_next_node() { 
-            let tx = self.inv_node(&x);
-            if &x == tx { 
+
+        while let Some(x) = self.choose_next_node_sym().cloned() {
+            let tx = self.inv_node(&x).clone();
+            if x == tx {
                 self.append_on_axis(&x);
-            } else { 
-                self.append_off_axis(&x, &tx.clone());
+            } else {
+                self.append_off_axis(&x, &tx);
             }
 
             info!("  appended: {x}, current size: {}", self.inner.stat());
         }
+    }
+
+    /// Pair-aware chooser: an off-axis node is scored as the pair `(x, τx)`
+    /// it'll be appended as; on-axis is doubled to compare at the same scale.
+    fn choose_next_node_sym(&self) -> Option<&Node> {
+        let boundary_ends = self.inner.complex().boundary_ends();
+        self.inner.nodes()
+            .max_by_key(|x| {
+                let tx = self.inv_node(x);
+                let (l_x, w_x) = self.inner.score_node(x, &boundary_ends);
+                if tx == *x {
+                    (2 * l_x, 2 * w_x)
+                } else {
+                    let (l_tx, w_tx) = self.inner.score_node(tx, &boundary_ends);
+                    (l_x + l_tx, w_x + w_tx)
+                }
+            })
     }
 
     fn append_on_axis(&mut self, x: &Node) { 

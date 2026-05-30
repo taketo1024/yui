@@ -15,7 +15,7 @@ use log::{debug, info, trace};
 use num_traits::Zero;
 use yui_core::bitseq::Bit;
 use yui_core::{RangeExt, Ring, RingOps};
-use yui_link::{Node, Edge, Link};
+use yui_link::{Node, Edge, Link, Path};
 
 use crate::kh::{KhChain, KhComplex};
 use crate::tng::{TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
@@ -106,47 +106,55 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub(crate) fn process_nodes(&mut self) {
         info!("process {} nodes", self.nodes.len());
 
-        while let Some(x) = self.choose_next_node() {
+        while let Some(x) = self.choose_next_node().cloned() {
             self.append_node(&x)
         }
     }
 
-    pub(crate) fn choose_next_node(&mut self) -> Option<Node> { 
-        let Some((i, _)) = self.nodes.iter().enumerate().max_by_key(|(_, x)|
-            self.count_connections(x)
-        ) else { 
-            return None
-        };
-
-        let x = self.nodes.remove(i);
-        Some(x)
+    /// Pick the next node to append by maximizing [`Self::score_node`].
+    /// Removal happens in [`Self::prepare_append`] inside `append_*`.
+    pub(crate) fn choose_next_node(&self) -> Option<&Node> {
+        let boundary_ends = self.complex.boundary_ends();
+        self.nodes.iter().max_by_key(|x| self.score_node(x, &boundary_ends))
     }
 
-    fn count_connections(&self, x: &Node) -> usize { 
-        let arcs = if x.is_resolved() { 
-            let a = x.arcs();
-            vec![a.0, a.1]
-        } else { 
-            let a0 = x.resolve(Bit::Bit0).arcs();
-            let a1 = x.resolve(Bit::Bit1).arcs();
-            vec![a0.0, a0.1, a1.0, a1.1]
-        }.into_iter().filter(|a|
-            self.complex.base_pt().map(|e| !a.contains(e)).unwrap_or(true)
-        ).collect_vec();
+    /// Score `x` for the chooser. Higher is better.
+    /// `(loop_bonus, width_score)` — loop closures first (they unlock
+    /// delooping + elimination), width as tiebreaker.
+    pub(crate) fn score_node(&self, x: &Node, boundary_ends: &ahash::AHashSet<Edge>) -> (usize, isize) {
+        let arcs = self.node_arcs(x);
 
-        let count = self.complex.iter_verts().map(|(_, v)| {
-            v.tng().comps().map(|c| 
-                arcs.iter().map(|a| 
-                    match c.path() {
-                        p if p.is_connectable_bothends(a) => 2,
-                        p if p.is_connectable(a)          => 1,
-                        _                                 => 0
-                    }
-                ).sum::<usize>()
+        let loops: usize = self.complex.iter_verts().map(|(_, v)| {
+            v.tng().comps().map(|c|
+                arcs.iter().filter(|a| c.path().is_connectable_bothends(a)).count()
             ).sum::<usize>()
-        }).sum::<usize>();
+        }).sum();
 
-        count
+        let width_score: isize = arcs.iter().map(|a| {
+            let Some((e0, e1)) = a.ends() else { return 0 };
+            let m = boundary_ends.contains(&e0) as isize
+                  + boundary_ends.contains(&e1) as isize;
+            2 * m - 2 // matched − unmatched, range −2..2 per arc
+        }).sum();
+
+        (loops, width_score)
+    }
+
+    /// Arcs that will be added when appending `x` to the partial diagram,
+    /// with the base-point edge filtered out.
+    fn node_arcs(&self, x: &Node) -> Vec<Path> {
+        let arcs = if x.is_resolved() {
+            let (a0, a1) = x.arcs();
+            vec![a0, a1]
+        } else {
+            let (a00, a01) = x.resolve(Bit::Bit0).arcs();
+            let (a10, a11) = x.resolve(Bit::Bit1).arcs();
+            vec![a00, a01, a10, a11]
+        };
+        let base_pt = self.complex.base_pt();
+        arcs.into_iter()
+            .filter(|a| base_pt.map(|e| !a.contains(e)).unwrap_or(true))
+            .collect()
     }
 
     pub(crate) fn append_node(&mut self, x: &Node) { 
@@ -412,13 +420,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         ).collect()
     }
 
-    pub(crate) fn stat(&self) -> String { 
+    pub(crate) fn stat(&self) -> String {
         self.complex.stat()
     }
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     use num_traits::Zero;
     
     use super::*;

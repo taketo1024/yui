@@ -273,7 +273,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.vertices.iter()
     }
 
-    pub fn add_vertex(&mut self, k: TngComplexKey, v: TngComplexVertex<R>) { 
+    /// Endpoints of the current tangle boundary. Same across all vertices
+    /// (they share the partial diagram), so we read it off any one vertex.
+    pub fn boundary_ends(&self) -> ahash::AHashSet<Edge> {
+        self.iter_verts()
+            .next()
+            .map(|(_, v)| v.tng().comps()
+                .filter_map(|c| c.path().ends())
+                .flat_map(|(e0, e1)| [e0, e1])
+                .collect())
+            .unwrap_or_default()
+    }
+
+    pub fn add_vertex(&mut self, k: TngComplexKey, v: TngComplexVertex<R>) {
         assert!(!self.contains_key(&k));
         self.vertices.insert(k, v);
     }

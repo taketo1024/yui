@@ -236,10 +236,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.dim
     }
     
-    pub(crate) fn set_dim(&mut self, d: usize) { 
-        self.dim = d
-    }
-    
     pub fn h_range(&self) -> RangeInclusive<isize> { 
         let i0 = self.deg_shift.0;
         let n = self.dim() as isize;

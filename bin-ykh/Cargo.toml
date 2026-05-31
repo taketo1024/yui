@@ -27,6 +27,7 @@ serde_json = "1.0.149"
 serde = { version = "1.0.228", features = ["derive"] }
 cfg-if = "1.0.4"
 itertools = "0.14.0"
+mimalloc = "0.1"
 yui-core     = { workspace = true, features = ["tex"] }
 yui-link.workspace = true
 yui-matrix.workspace = true

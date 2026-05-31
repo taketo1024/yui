@@ -1,6 +1,9 @@
 mod app;
 use app::App;
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 fn main() {
     let app = App::new();
     let res = app.run();

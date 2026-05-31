@@ -1,21 +1,28 @@
 //! Microbenchmarks for `lib-kh`.
 //!
-//! These are *signal* benchmarks — they confirm regression on small/medium
-//! knots, they do not predict behavior on the 60+ crossing targets. Use
-//! `samply` (or similar) on a single representative run for true profiling.
+//! Use `samply` (or similar) on a single representative run for true
+//! profiling; these are *signal* benchmarks for regression detection.
 //!
 //! Run with:
 //! ```
-//! cargo bench -p yui-kh                              # all
-//! cargo bench -p yui-kh -- kh_complex_new            # filter by group
-//! cargo bench -p yui-kh -- kh_complex_new/v2/8_19    # one case
+//! cargo bench -p yui-kh -- kh                        # kh-side group
+//! cargo bench -p yui-kh -- khi                       # khi-side group
+//! cargo bench -p yui-kh -- khi_complex_k18           # one group
+//! cargo bench -p yui-kh -- 14n_19265                 # one case
 //! ```
+//!
+//! Heavy cases (44-crossing kh, 60-crossing khi) live as `examples/profile_*`
+//! and are intentionally outside the bench harness — too slow for criterion's
+//! statistical model.
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use yui_core::num::FF2;
 use yui_link::{InvLink, Link};
-use yui_kh::kh::{KhComplex, KhHomology};
+use yui_kh::kh::KhComplex;
 use yui_kh::khi::KhIComplex;
+
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 /// `KhComplex::new` via `TngComplexBuilder` (v2).
 fn bench_kh_complex_new(c: &mut Criterion) {
@@ -28,18 +35,12 @@ fn bench_kh_complex_new(c: &mut Criterion) {
         });
     }
 
-    group.finish();
-}
-
-/// Full Khovanov homology (complex + reduction + SNF).
-fn bench_kh_homology(c: &mut Criterion) {
-    let mut group = c.benchmark_group("kh_homology");
-    group.sample_size(20);
-
-    for name in ["3_1", "5_1", "6_3", "8_19"] {
-        let l = Link::test_data(name);
-        group.bench_function(name, |b| {
-            b.iter(|| KhHomology::<i32>::new(&l, &0, &0, false))
+    // 14-crossing knot — bigger enough that node-ordering choices matter.
+    {
+        let l = Link::test_data("14n_19265");
+        group.sample_size(10);
+        group.bench_function("14n_19265", |b| {
+            b.iter(|| KhComplex::<i32>::new(&l, &0, &0, false))
         });
     }
 
@@ -71,7 +72,7 @@ fn bench_khi_complex_k18(c: &mut Criterion) {
     group.sample_size(10);
     group.measurement_time(std::time::Duration::from_secs(60));
 
-    let pd: &[[usize; 4]] = &[
+    let pd: &[[u8; 4]] = &[
         [1,27,2,26],[5,16,6,17],[6,32,7,31],[10,27,11,28],[11,1,12,36],
         [13,8,14,9],[14,20,15,19],[17,4,18,5],[18,24,19,23],[21,32,22,33],
         [22,16,23,15],[25,3,26,2],[28,9,29,10],[29,24,30,25],[30,4,31,3],
@@ -92,11 +93,6 @@ fn bench_khi_complex_k18(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(
-    benches,
-    bench_kh_complex_new,
-    bench_kh_homology,
-    bench_khi_complex_new,
-    bench_khi_complex_k18,
-);
-criterion_main!(benches);
+criterion_group!(kh,  bench_kh_complex_new);
+criterion_group!(khi, bench_khi_complex_new, bench_khi_complex_k18);
+criterion_main!(kh, khi);

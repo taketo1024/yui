@@ -669,31 +669,30 @@ impl Cob {
         let mut bot = std::mem::take(&mut self.comps);
         let mut top = other.comps;
 
-        while !(bot.is_empty() && top.is_empty()) { 
-            let (mut b, mut t) = self.take_stackable_comps(&mut bot, &mut top);
+        let mut q_bot = VecDeque::new();
+        let mut q_top = VecDeque::new();
+        q_bot.reserve(bot.len());
+        q_top.reserve(top.len());
 
-            if t.is_empty() { 
-                assert_eq!(b.len(), 1);
-                self.comps.push(b.remove(0))
-            } else if b.is_empty() {
-                assert_eq!(t.len(), 1);
-                self.comps.push(t.remove(0))
-            } else { 
-                let c = self.stack_comps(b, t);
-                self.comps.push(c)
-            }
+        while let Some(c) = Self::stack_next(&mut bot, &mut top, &mut q_bot, &mut q_top) { 
+            self.comps.push(c)
         }
 
         self.normalize()
     }
 
     // collect `bot` & `top` comps that will form a connected component.
-    fn take_stackable_comps(&self, bot: &mut Vec<CobComp>, top: &mut Vec<CobComp>) -> (Vec<CobComp>, Vec<CobComp>) {
-        let mut res_bot = vec![];
-        let mut res_top = vec![];
+    fn stack_next(bot: &mut Vec<CobComp>, top: &mut Vec<CobComp>, q_bot: &mut VecDeque<CobComp>, q_top: &mut VecDeque<CobComp>) -> Option<CobComp> {
+        debug_assert!(q_bot.is_empty());
+        debug_assert!(q_top.is_empty());
 
-        let mut q_bot = VecDeque::new();
-        let mut q_top = VecDeque::new();
+        if bot.is_empty() && top.is_empty() { return None }
+
+        let mut src = Tng::empty();
+        let mut tgt = Tng::empty();
+        let mut dots = (0, 0);  
+        let mut x = 0 as i32;
+        let mut a = 0 as i32;
 
         if !bot.is_empty() { 
             q_bot.push_back(bot.remove(0))
@@ -702,67 +701,45 @@ impl Cob {
         }
 
         while !(q_bot.is_empty() && q_top.is_empty()) {
-            while let Some(b) = q_bot.pop_front() {
-                for c in b.tgt.comps() { 
+            if let Some(cob) = q_bot.pop_front() {
+                for c in cob.tgt.comps() { 
                     if let Some(i) = top.iter().position(|t| t.src.contains(c)) {
                         let t = top.remove(i);
                         q_top.push_back(t);
                     }
+
+                    if c.is_arc() { 
+                        a += 1;
+                    }
                 }
-                res_bot.push(b)
-            }
-            while let Some(t) = q_top.pop_front() {
-                for c in t.src.comps() { 
+                dots.0 += cob.dots.0;
+                dots.1 += cob.dots.1;
+                x += cob.euler_num();
+                src.connect(cob.src);
+            } else if let Some(cob) = q_top.pop_front() {
+                for c in cob.src.comps() { 
                     if let Some(i) = bot.iter().position(|b| b.tgt.contains(c)) {
                         let b = bot.remove(i);
                         q_bot.push_back(b);
                     }
                 }
-                res_top.push(t)
+                dots.0 += cob.dots.0;
+                dots.1 += cob.dots.1;
+                x += cob.euler_num();
+                tgt.connect(cob.tgt);
             }
         }
 
-        (res_bot, res_top)
-    }
-
-    fn stack_comps(&self, bot: Vec<CobComp>, top: Vec<CobComp>) -> CobComp { 
-        // `bot`, `top` must be non-empty for genus calculation. 
-        assert!(!bot.is_empty());
-        assert!(!top.is_empty());
-
-        let x0: i32 = bot.iter().map(|c| c.euler_num()).sum();
-        let x1: i32 = top.iter().map(|c| c.euler_num()).sum();
-        
-        let a : i32 = bot.iter().map(|c| 
-            c.tgt.comps().filter(|a| a.is_arc()).count() as i32
-        ).sum();
-
-        let dots = bot.iter().chain(top.iter()).fold((0, 0), |mut res, c| { 
-            res.0 += c.dots.0;
-            res.1 += c.dots.1;
-            res
-        });
-
-        let src = bot.into_iter().fold(Tng::empty(), |mut res, c| {
-            res.connect(c.src);
-            res
-        });
-
-        let tgt = top.into_iter().fold(Tng::empty(), |mut res, c| {
-            res.connect(c.tgt);
-            res
-        });
-
-        let mut c = CobComp::new(src, tgt, 0, dots);
-        let b = c.nbdr_comps() as i32;
-        let g = 2 - (x0 + x1 + b) + a;
+        let mut cob = CobComp::new(src, tgt, 0, dots);
+        let b = cob.nbdr_comps() as i32;
+        let g = 2 - (x + b) + a;
 
         assert!(g >= 0);
         assert!(g % 2 == 0);
         
-        c.genus = (g / 2) as usize;
+        cob.genus = (g / 2) as usize;
 
-        c
+        Some(cob)
     }
 
     pub fn should_part_eval(&self) -> bool {

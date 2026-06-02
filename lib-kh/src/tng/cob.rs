@@ -274,45 +274,56 @@ impl CobComp {
         x - (b / 2) - 2 * d
     }
 
-    pub fn nbdr_comps(&self) -> usize { 
-        let mut src_arcs: HashSet<_> = (0..self.src.n_comps()).filter(|&i| 
-            self.src.comp(i).is_arc()
-        ).collect();
+    pub fn nbdr_comps(&self) -> usize {
+        // Build a bitmask of arc-component indices in `t`, plus the count of
+        // closed circles. Asserts `t.n_comps() <= 64`.
+        let make = |t: &Tng| -> (u64, usize) {
+            let n = t.n_comps();
+            assert!(n <= 64, "nbdr_comps: n_comps {n} exceeds u64 mask width");
+            (0..n).fold((0u64, 0usize), |(arcs, circs), i| {
+                if t.comp(i).is_arc() {
+                    (arcs | (1u64 << i), circs)
+                } else {
+                    (arcs, circs + 1)
+                }
+            })
+        };
 
-        let mut tgt_arcs: HashSet<_> = (0..self.tgt.n_comps()).filter(|&i| 
-            self.tgt.comp(i).is_arc()
-        ).collect();
+        // First index `i` set in `mask` whose component in `t` is connectable to `c`.
+        let next = |t: &Tng, mask: u64, c: &TngComp| -> Option<usize> {
+            let mut m = mask;
+            while m != 0 {
+                let i = m.trailing_zeros() as usize;
+                if t.comp(i).is_connectable(c) { return Some(i) }
+                m &= m - 1;
+            }
+            None
+        };
 
-        assert_eq!(src_arcs.len(), tgt_arcs.len());
+        let (mut src_arcs, src_circs) = make(&self.src);
+        let (mut tgt_arcs, tgt_circs) = make(&self.tgt);
 
-        let src_circs = self.src.n_comps() - src_arcs.len();
-        let tgt_circs = self.tgt.n_comps() - tgt_arcs.len();
+        debug_assert_eq!(src_arcs.count_ones(), tgt_arcs.count_ones());
 
         let mut side_circs = 0;
-
-        while !src_arcs.is_empty() { 
-            let mut i0 = src_arcs.iter().next().cloned().unwrap();
-            loop { 
-                src_arcs.remove(&i0);
-
+        while src_arcs != 0 {
+            let mut i0 = src_arcs.trailing_zeros() as usize;
+            loop {
+                src_arcs &= !(1u64 << i0);
                 let c0 = self.src.comp(i0);
-                let Some(j) = tgt_arcs.iter().find(|&&j| { 
-                    self.tgt.comp(j).is_connectable(c0)
-                }).cloned() else { panic!() };
 
-                tgt_arcs.remove(&j);
-
+                let j = next(&self.tgt, tgt_arcs, c0).expect("no connectable tgt arc");
+                tgt_arcs &= !(1u64 << j);
                 let c1 = self.tgt.comp(j);
-                if let Some(i1) = src_arcs.iter().find(|&&i| { 
-                    i != i0 && self.src.comp(i).is_connectable(c1)
-                }).cloned() { 
-                    i0 = i1;
-                } else { 
-                    side_circs += 1;
-                    break
+
+                match next(&self.src, src_arcs, c1) {
+                    Some(i1) => i0 = i1,
+                    None => { side_circs += 1; break }
                 }
             }
         }
+
+        debug_assert_eq!(tgt_arcs, 0);
 
         src_circs + tgt_circs + side_circs
     }

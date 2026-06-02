@@ -809,7 +809,7 @@ impl Cob {
         self.comps.iter().any(|c| c.should_reduce())
     }
 
-    pub fn reduce<R>(self, h: &R, t: &R) -> Lc<Cob, R>
+    pub fn reduce<R>(mut self, h: &R, t: &R) -> Lc<Cob, R>
     where R: Ring, for<'x> &'x R: RingOps<R> {
         if self.is_zero_cob() {
             return Lc::zero()
@@ -821,15 +821,10 @@ impl Cob {
             return self.comps.into_iter().next().unwrap().reduce(h, t);
         }
 
-        let init = LcCob::from(Cob::empty());
-        self.comps.iter().fold(init, |res, c| {
-            if !c.should_reduce() {
-                return res.into_iter().map(|(mut cob, r)| {
-                    cob.comps.push(c.clone());
-                    (cob, r)
-                }).collect();
-            }
-
+        let need_reduce: Vec<_> = self.comps.extract_if(.., |c| c.should_reduce()).collect();
+        let init = LcCob::from(self);
+        
+        need_reduce.into_iter().fold(init, |res, c| {
             let e = c.reduce(h, t);
             debug_assert!(e.keys().all(|c| c.n_comps() <= 1));
 
@@ -840,9 +835,9 @@ impl Cob {
                 }
                 c
             })
-        }).map_keys(|mut c| { 
-            c.normalize(); 
-            c 
+        }).map_keys(|mut c| {
+            c.normalize();
+            c
         })
     }
 

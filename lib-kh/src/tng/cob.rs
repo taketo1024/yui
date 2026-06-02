@@ -399,44 +399,44 @@ impl CobComp {
 
     pub fn part_eval<R>(&self, h: &R, t: &R) -> LcCob<R>
     where R: Ring, for<'x> &'x R: RingOps<R> {
-        fn eval<R>(c: &CobComp, g: usize, x: usize, y: usize, h: &R, t: &R) -> LcCob<R>
-        where R: Ring, for<'x> &'x R: RingOps<R> { 
-            match (g, x, y) { 
-                // neck-cut
-                (g, _, _) if g > 0 => { 
-                    eval(c, g-1, x+1, y, h, t) + 
-                    eval(c, g-1, x, y+1, h, t)
-                },
+        fn eval<R>(c: &CobComp, nc: bool, g: usize, x: usize, y: usize, h: &R, t: &R) -> LcCob<R>
+        where R: Ring, for<'x> &'x R: RingOps<R> {
+            match (g, x, y) {
+                // neck-cut (only valid when boundary has at most one component)
+                (g, _, _) if g > 0 && nc => {
+                    eval(c, nc, g-1, x+1, y, h, t) +
+                    eval(c, nc, g-1, x, y+1, h, t)
+                }
 
                 // XY = t
-                (0, x, y) if x >= 1 && y >= 1 => 
-                    eval(c, 0, x-1, y-1, h, t) * t,
+                (0, x, y) if x >= 1 && y >= 1 =>
+                    eval(c, nc, 0, x-1, y-1, h, t) * t,
 
                 // X^2 = hX + t
-                (0, x, 0) if x >= 2 => 
-                    eval(c, 0, x-1, 0, h, t) * h + 
-                    eval(c, 0, x-2, 0, h, t) * t,
+                (0, x, 0) if x >= 2 =>
+                    eval(c, nc, 0, x-1, 0, h, t) * h +
+                    eval(c, nc, 0, x-2, 0, h, t) * t,
 
                 // Y^2 = -hY + t
-                (0, 0, y) if y >= 2 => 
-                    eval(c, 0, 0, y-1, h, t) * -h + 
-                    eval(c, 0, 0, y-2, h, t) *  t,
+                (0, 0, y) if y >= 2 =>
+                    eval(c, nc, 0, 0, y-1, h, t) * -h +
+                    eval(c, nc, 0, 0, y-2, h, t) *  t,
 
                 // XS = YS = 1
-                (0, 1, 0) | (0, 0, 1) if c.is_closed() => 
+                (0, 1, 0) | (0, 0, 1) if c.is_closed() =>
                     Lc::from(Cob::empty()),
-                
+
                 // S = 0
-                (0, 0, 0) if c.is_closed() => 
+                (0, 0, 0) if c.is_closed() =>
                     Lc::zero(),
-                
+
                 // default
                 _ => {
-                    let c = CobComp { 
-                        src: c.src.clone(), 
-                        tgt: c.tgt.clone(), 
-                        genus: 0, 
-                        dots: (x, y) 
+                    let c = CobComp {
+                        src: c.src.clone(),
+                        tgt: c.tgt.clone(),
+                        genus: g,
+                        dots: (x, y)
                     };
                     Lc::from(Cob::from(c))
                 }
@@ -445,8 +445,9 @@ impl CobComp {
 
         let g = self.genus;
         let (x, y) = self.dots;
+        let can_neck_cut = self.nbdr_comps() <= 1;
 
-        eval(self, g, x, y, h, t)
+        eval(self, can_neck_cut, g, x, y, h, t)
     }
 
     pub fn eval<R>(&self, h: &R, t: &R) -> R

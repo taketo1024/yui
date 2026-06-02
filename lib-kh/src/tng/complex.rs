@@ -358,10 +358,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
     
     pub fn has_edge(&self, k: &TngComplexKey, l: &TngComplexKey) -> bool { 
-        debug_assert_eq!(
-            self.vertices[k].out_edges.contains_key(l), 
-            self.vertices[l].in_edges.contains(k)
-        );
+        self.vertices[k].out_edges.contains_key(l) && 
+        self.vertices[l].in_edges.contains(k) && 
         self.vertices[k].out_edges.contains_key(l)
     }
 
@@ -378,6 +376,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn remove_edge(&mut self, k: &TngComplexKey, l: &TngComplexKey) -> LcCob<R> { 
         assert!(self.has_edge(k, l));
+        
         let w = self.vertices.get_mut(l).unwrap();
         w.in_edges.remove(k);
 
@@ -385,15 +384,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         v.out_edges.remove(l).unwrap()
     }
 
+    pub fn replace_edge(&mut self, k: &TngComplexKey, l: &TngComplexKey, f: LcCob<R>) -> LcCob<R> { 
+        assert!(self.has_edge(k, l));
+
+        let v = self.vertices.get_mut(k).unwrap();
+        v.out_edges.insert(*l, f).unwrap()
+    }
+
     fn modify_edge<F>(&mut self, k: &TngComplexKey, l: &TngComplexKey, map: F)
     where F: Fn(LcCob<R>) -> LcCob<R> {
         assert!(self.has_edge(k, l));
 
-        let f = self.remove_edge(k, l);
+        let v = self.vertices.get_mut(k).unwrap();
+        let f = std::mem::take(v.out_edges.get_mut(l).unwrap());
         let map_f = map(f);
 
         if !map_f.is_zero() { 
-            self.add_edge(k, l, map_f);
+            v.out_edges.insert(*l, map_f);
+        } else { 
+            self.remove_edge(k, l);
         }
     }
 
@@ -608,11 +617,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                     -c_ainv_b
                 };
 
-                if self.has_edge(l0, l1) {
-                    self.remove_edge(l0, l1);
-                }
-                if !s.is_zero() {
-                    self.add_edge(l0, l1, s);
+                match (self.has_edge(l0, l1), s.is_zero()) { 
+                    (false, false) => self.add_edge(l0, l1, s),
+                    (true,  false) => { self.replace_edge(l0, l1, s); },
+                    (true,  true)  => { self.remove_edge(l0, l1); },
+                    _              => ()
                 }
             }
         }

@@ -5,7 +5,7 @@ use itertools::Itertools;
 use maplit::hashmap;
 use yui_core::bitseq::Bit;
 use yui_core::{Ring, RingOps};
-use yui_link::{Edge, Link, Node};
+use yui_link::{Edge, Link, Node, Path};
 
 use super::tng::{Tng, TngComp};
 use super::cob::{Bottom, Dot, Cob, CobComp, LcCobTrait, LcCob};
@@ -44,7 +44,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let r = self.state[x];
         let a = x.resolve(r);
-        let t = Tng::from_resolved(&a);
+        let t = Tng::from_resolved(&a, self.base_pt);
 
         self.connect_id_cob(&t, Some(r));
     }
@@ -52,12 +52,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn append_arcs(&mut self, x: &Node) {
         assert!(x.is_resolved());
 
-        let t = Tng::from_resolved(x);
+        let t = Tng::from_resolved(x, self.base_pt);
         self.connect_id_cob(&t, None);
     }
 
-    pub fn insert_loop(&mut self, c: Edge) { 
-        let t = Tng::from(TngComp::circ([c]));
+    pub fn insert_loop(&mut self, c: Edge) {
+        let marked = self.base_pt == Some(c);
+        let t = Tng::from(
+            TngComp::from_path(Path::circ([c]), marked)
+        );
         self.connect_id_cob(&t, None);
     }
 
@@ -142,10 +145,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             vec![true, false]
         };
 
-        let cycles = ori.into_iter().map(|o| { 
+        let cycles = ori.into_iter().map(|o| {
             let cob = Cob::new(
-                circles.iter().map(|(circ, col)| { 
-                    let t = TngComp::from(circ.clone());
+                circles.iter().map(|(circ, col)| {
+                    let marked = base_pt.map(|b| circ.contains(b)).unwrap_or(false);
+                    let t = TngComp::from_path(circ.clone(), marked);
                     let mut cup = CobComp::cup(t);
                     let dot = if col.is_a() == o { 
                         Dot::X 

@@ -22,8 +22,7 @@ use cartesian::cartesian;
 use yui_core::{AddMon, MathType, Ring, RingOps};
 use yui_core::lc::{LcKey, Lc};
 use yui_core::poly::Var2;
-use yui_link::{Edge, Node};
-use yui_core::bitseq::Bit;
+use yui_link::Edge;
 use super::tng::{Tng, TngComp};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, derive_more::Display)]
@@ -45,51 +44,24 @@ pub struct CobComp {
 }
 
 impl CobComp { 
-    pub fn sdl_from(x: &Node) -> Self {
-        assert!(x.is_crossing());
-
-        use Bit::{Bit0, Bit1};
-        let src = Tng::from_resolved(&x.resolve(Bit0));
-        let tgt = Tng::from_resolved(&x.resolve(Bit1));
-
-        Self::plain(src, tgt, 0)
-    }
-
-    pub fn new(src: Tng, tgt: Tng, genus: usize, dots: (usize, usize)) -> Self { 
+    pub fn new(src: Tng, tgt: Tng, genus: usize, dots: (usize, usize)) -> Self {
         debug_assert_eq!(src.end_pts().collect::<HashSet<_>>(), tgt.end_pts().collect());
         Self { src, tgt, genus, dots }
     }
 
-    pub fn plain(src: Tng, tgt: Tng, genus: usize) -> Self { 
+    pub fn plain(src: Tng, tgt: Tng, genus: usize) -> Self {
         Self::new(src, tgt, genus, (0, 0))
     }
 
-    pub fn id(c: TngComp) -> Self { 
+    pub fn id(c: TngComp) -> Self {
         Self::plain(
-            Tng::from(c.clone()), 
+            Tng::from(c.clone()),
             Tng::from(c),
             0
         )
     }
 
-    pub fn sdl(r0: (TngComp, TngComp), r1: (TngComp, TngComp)) -> Self { 
-        assert!(r0.0.is_arc());
-        assert!(r0.1.is_arc());
-        assert!(r1.0.is_arc());
-        assert!(r1.1.is_arc());
-        assert!(r0.0 != r1.0);
-        assert!(r0.0 != r1.1);
-        assert!(r0.1 != r1.0);
-        assert!(r0.1 != r1.1);
-
-        Self::plain(
-            Tng::new(vec![r0.0, r0.1]), 
-            Tng::new(vec![r1.0, r1.1]),
-            0
-        )
-    }
-
-    pub fn merge(from: (TngComp, TngComp), to: TngComp) -> Self { 
+    pub fn merge(from: (TngComp, TngComp), to: TngComp) -> Self {
         assert!(from.0.is_circle() || from.1.is_circle());
         Self::plain(
             Tng::new(vec![from.0, from.1]), 
@@ -1034,10 +1006,20 @@ mod tests {
     use maplit::hashmap;
     use yui_core::CloneAnd;
     use yui_core::poly::Poly2;
+    use yui_core::bitseq::Bit;
+    use yui_link::Node;
 
     use super::CobComp;
     use super::*;
- 
+
+    fn sdl(r0: (TngComp, TngComp), r1: (TngComp, TngComp)) -> CobComp {
+        CobComp::plain(
+            Tng::new(vec![r0.0, r0.1]),
+            Tng::new(vec![r1.0, r1.1]),
+            0,
+        )
+    }
+
     #[test]
     fn cob_contains() { 
         let src = Tng::new(vec![
@@ -1078,7 +1060,7 @@ mod tests {
         let c1 = CobComp::id(
             TngComp::arc([0, 1])
         );
-        let c2 = CobComp::sdl(
+        let c2 = sdl(
             (TngComp::arc([0, 1]), TngComp::arc([90, 91])),
             (TngComp::arc([0, 90]), TngComp::arc([1, 91])),
         );
@@ -1159,7 +1141,7 @@ mod tests {
         let c0 = CobComp::id(
             TngComp::arc([1, 2])
         );
-        let c1 = CobComp::sdl(
+        let c1 = sdl(
             (TngComp::arc([3, 4]), TngComp::arc([5, 6])),
             (TngComp::arc([4, 5]), TngComp::arc([6, 3])),
         );
@@ -1266,9 +1248,9 @@ mod tests {
         ])));
 
         let c1 = Cob::from(
-            CobComp::sdl(
+            sdl(
                 (TngComp::arc([1, 2]), TngComp::arc([3, 4])),
-                (TngComp::arc([1, 3]), TngComp::arc([2, 4]))
+                (TngComp::arc([1, 3]), TngComp::arc([2, 4])),
             )
         );
 
@@ -1365,8 +1347,13 @@ mod tests {
 
     #[test]
     fn stack_id() {
+        let node = Node::from_pd_code([1,4,2,5]);
         let c1 = Cob::new(vec![
-            CobComp::sdl_from(&Node::from_pd_code([1,4,2,5])),
+            CobComp::plain(
+                Tng::from_resolved(&node.resolve(Bit::Bit0), None),
+                Tng::from_resolved(&node.resolve(Bit::Bit1), None),
+                0,
+            ),
             CobComp::cup(TngComp::circ([10])),
             CobComp::cap(TngComp::circ([11])),
         ]);

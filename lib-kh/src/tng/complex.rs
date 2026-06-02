@@ -21,7 +21,7 @@ use itertools::Itertools;
 use num_traits::Zero;
 use yui_core::{CloneAnd, Ring, RingOps, Sign};
 use yui_homology::{ChainComplex1, Summand, GrMod1};
-use yui_link::{Edge, Node, State};
+use yui_link::{Edge, Node, Path, State};
 use yui_core::bitseq::Bit;
 
 use crate::kh::{KhAlgGen, KhGen, KhTensor};
@@ -160,41 +160,43 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         TngComplex::new(h, t, deg_shift, base_pt, 0, vertices)
     }
 
-    pub fn from_node(h: &R, t: &R, x: &Node) -> Self { 
-        if x.is_resolved() { 
+    pub fn from_node(h: &R, t: &R, x: &Node, base_pt: Option<Edge>) -> Self {
+        if x.is_resolved() {
             let k = TngComplexKey::init();
-            let tng = Tng::from_resolved(x);
+            let tng = Tng::from_resolved(x, base_pt);
             let v = TngComplexVertex::from(tng);
 
-            let mut c = Self::new(h, t, (0, 0), None, 0, AHashMap::new());
+            let mut c = Self::new(h, t, (0, 0), base_pt, 0, AHashMap::new());
             c.add_vertex(k, v);
             c
-        } else { 
+        } else {
             let k0 = TngComplexKey::init().clone_and(|k|
                 k.state.push_0()
             );
-            let t0 = Tng::from_resolved(&x.resolve(Bit::Bit0));
-            let v0 = TngComplexVertex::from(t0);
+            let t0 = Tng::from_resolved(&x.resolve(Bit::Bit0), base_pt);
 
             let k1 = TngComplexKey::init().clone_and(|k|
                 k.state.push_1()
             );
-            let t1 = Tng::from_resolved(&x.resolve(Bit::Bit1));
-            let v1 = TngComplexVertex::from(t1);
-            
-            let mut c = Self::new(h, t, (0, 0), None, 1, AHashMap::new());
-            c.add_vertex(k0, v0);
-            c.add_vertex(k1, v1);
+            let t1 = Tng::from_resolved(&x.resolve(Bit::Bit1), base_pt);
 
-            let sdl = LcCob::from(Cob::from(CobComp::sdl_from(x)));
+            let sdl = LcCob::from(
+                Cob::from(CobComp::plain(t0.clone(), t1.clone(), 0))
+            );
+
+            let mut c = Self::new(h, t, (0, 0), base_pt, 1, AHashMap::new());
+            c.add_vertex(k0, TngComplexVertex::from(t0));
+            c.add_vertex(k1, TngComplexVertex::from(t1));
             c.add_edge(&k0, &k1, sdl);
             c
         }
     }
 
-    pub fn from_loop(h: &R, t: &R, e: Edge) -> Self { 
+    pub fn from_loop(h: &R, t: &R, e: Edge, marked: bool) -> Self {
         let k = TngComplexKey::init();
-        let tng = Tng::from(TngComp::circ([e]));
+        let tng = Tng::from(
+            TngComp::from_path(Path::circ([e]), marked)
+        );
         let v = TngComplexVertex::from(tng);
 
         let mut c = Self::new(h, t, (0, 0), None, 0, AHashMap::new());
@@ -218,11 +220,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.base_pt
     }
 
-    pub fn contains_base_pt(&self, c: &TngComp) -> bool { 
-        self.base_pt.map(|e| c.contains(e)).unwrap_or(false)
-    }
-
-    pub fn dim(&self) -> usize { 
+    pub fn dim(&self) -> usize {
         self.dim
     }
     
@@ -408,7 +406,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn append_node(&mut self, x: &Node) {
         let (h, t) = self.ht();
-        let c = Self::from_node(h, t, x);
+        let c = Self::from_node(h, t, x, self.base_pt);
         self.merge(c);
     }
 
@@ -526,10 +524,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let c = self.vertex(k).tng.comp(r);
         assert!(c.is_circle());
         
-        let based = self.contains_base_pt(c);
-
         #[allow(non_snake_case)]
-        let updated_keys = if based { 
+        let updated_keys = if c.is_marked() { 
             let k_X = k + KhAlgGen::X;
 
             self.rename_vertex_key(k, k_X);

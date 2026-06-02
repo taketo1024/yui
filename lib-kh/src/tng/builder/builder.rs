@@ -168,7 +168,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.prepare_append(x);
 
         let (h, t) = self.complex.ht();
-        let cx = TngComplex::from_node(h, t, x);
+        let cx = TngComplex::from_node(h, t, x, self.complex.base_pt());
         self.merge(cx);
     }
 
@@ -211,7 +211,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
 
             let (h, t) = self.complex.ht();
-            let c = TngComplex::from_loop(h, t, c);
+            let marked = self.complex.base_pt() == Some(c);
+            let c = TngComplex::from_loop(h, t, c, marked);
             self.merge(c);
 
             if self.auto_deloop { 
@@ -285,7 +286,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub(crate) fn find_loop(&self, k: &TngComplexKey, allow_based: bool) -> Option<usize> { 
         self.complex.vertex(k).tng().find_comp(|c|
-            c.is_circle() && (allow_based || !self.complex.contains_base_pt(c))
+            c.is_circle() && (allow_based || !c.is_marked())
         )
     }
 

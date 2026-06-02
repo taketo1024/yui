@@ -6,15 +6,15 @@ use smallvec::SmallVec;
 use yui_link::{Edge, Node, Path};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct TngComp(Path);
+pub struct TngComp {
+    path: Path,
+    // True iff `path` contains the link's base_pt. OR'd through `connect`.
+    marked: bool,
+}
 
 impl From<Path> for TngComp {
-    /// Wraps a [`Path`] and normalizes it, so that two `TngComp`s compare
-    /// equal iff their backing paths are unoriented-equivalent.
     fn from(path: Path) -> Self {
-        let mut c = Self(path);
-        c.normalize();
-        c
+        Self::from_path(path, false)
     }
 }
 
@@ -29,8 +29,18 @@ impl TngComp {
         Self::from(Path::circ(edges))
     }
 
+    pub fn from_path(path: Path, marked: bool) -> Self {
+        let mut c = Self { path, marked };
+        c.normalize();
+        c
+    }
+
+    pub fn is_marked(&self) -> bool {
+        self.marked
+    }
+
     delegate! {
-        to self.0 {
+        to self.path {
             pub fn len(&self) -> usize;
             pub fn is_arc(&self) -> bool;
             pub fn is_circle(&self) -> bool;
@@ -46,7 +56,7 @@ impl TngComp {
     /// - `Circ(es)`: rotate so `es[0] == min(es)`, then reflect the suffix so
     ///               `es[1] ≤ es[last]`.
     fn normalize(&mut self) {
-        match &mut self.0 {
+        match &mut self.path {
             Path::Arc(es) => {
                 if es.len() >= 2 && *es.last().unwrap() < es[0] {
                     es.reverse();
@@ -83,8 +93,8 @@ impl TngComp {
         assert!(self.is_connectable(&other), "{self} and {other} are not connectable.");
 
         let placeholder = Path::Arc(SmallVec::new());
-        let this = std::mem::replace(&mut self.0, placeholder);
-        let (mut left, right) = (this.into_seq(), other.0.into_seq());
+        let this = std::mem::replace(&mut self.path, placeholder);
+        let (mut left, right) = (this.into_seq(), other.path.into_seq());
 
         let (e0, e1) = (left[0], *left.last().unwrap());
         let (f0, f1) = (right[0], *right.last().unwrap());
@@ -117,30 +127,35 @@ impl TngComp {
 
         // If the new endpoints coincide, the result closes into a circle.
         let closes = combined.len() > 1 && combined[0] == *combined.last().unwrap();
-        self.0 = if closes {
+        self.path = if closes {
             combined.pop();
             Path::Circ(combined)
         } else {
             Path::Arc(combined)
         };
+        self.marked |= other.marked;
         self.normalize();
     }
 
     pub fn convert_edges<F>(&self, f: F) -> Self
     where F: Fn(Edge) -> Edge {
-        let mapped = self.0.edges().iter().map(|e| f(*e));
-        let path = if self.0.is_circle() {
+        let mapped = self.path.edges().iter().map(|e| f(*e));
+        let path = if self.path.is_circle() {
             Path::circ(mapped)
         } else {
             Path::arc(mapped)
         };
-        Self::from(path)
+        // `marked` preserved: InvLink's base_pt is on-axis (`inv(b) == b`).
+        Self::from_path(path, self.marked)
     }
 }
 
 impl Display for TngComp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
+        if self.marked {
+            write!(f, "*")?;
+        }
+        self.path.fmt(f)
     }
 }
 
@@ -157,19 +172,20 @@ impl Tng {
         Self { comps }
     }
 
-    pub fn from_resolved(x: &Node) -> Self { 
+    pub fn from_resolved(x: &Node, base_pt: Option<Edge>) -> Self {
         assert!(x.is_resolved());
 
+        let mk = |r: Path| -> TngComp {
+            let marked = base_pt.map(|b| r.contains(b)).unwrap_or(false);
+            TngComp::from_path(r, marked)
+        };
         let (r0, r1) = x.arcs();
-        let (mut c0, c1) = (
-            TngComp::from(r0), 
-            TngComp::from(r1)
-        );
+        let (mut c0, c1) = (mk(r0), mk(r1));
 
-        if c0.is_connectable(&c1) { 
+        if c0.is_connectable(&c1) {
             c0.connect(c1);
             Self::from(c0)
-        } else { 
+        } else {
             Self::new([c0, c1])
         }
     }

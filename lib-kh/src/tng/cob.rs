@@ -56,7 +56,7 @@ impl CobComp {
     }
 
     pub fn new(src: Tng, tgt: Tng, genus: usize, dots: (usize, usize)) -> Self { 
-        debug_assert_eq!(src.end_pts(), tgt.end_pts());
+        debug_assert_eq!(src.end_pts().collect::<HashSet<_>>(), tgt.end_pts().collect());
         Self { src, tgt, genus, dots }
     }
 
@@ -149,13 +149,9 @@ impl CobComp {
         self.genus
     }
 
-    pub fn end_pts(&self) -> HashSet<Edge> {
-        self.src.end_pts() // == self.tgt.end_pts()
-    }
-
     /// Alloc-free version of [`Self::end_pts`].
     pub fn end_pts_iter(&self) -> impl Iterator<Item = Edge> + '_ {
-        self.src.end_pts_iter() // == tgt
+        self.src.end_pts() // == tgt
     }
 
     pub fn ndots(&self) -> usize { 
@@ -273,7 +269,7 @@ impl CobComp {
 
     pub fn deg(&self) -> i32 { 
         let x = self.euler_num();
-        let b = self.src.end_pts().len() as i32;
+        let b = self.src.end_pts().count() as i32;
         let d = self.ndots() as i32;
         x - (b / 2) - 2 * d
     }
@@ -358,8 +354,8 @@ impl CobComp {
         let x1 = self.euler_num();
         let x2 = other.euler_num();
 
-        let a = self.end_pts().intersection(
-            &other.end_pts()
+        let a = self.src.end_pts().filter(|e|
+            other.src.end_pts().contains(&e)
         ).count() as i32;
 
         assert!(a > 0);
@@ -545,6 +541,10 @@ impl Cob {
         &self.comps[i]
     }
 
+    pub fn comp_mut(&mut self, i: usize) -> &mut CobComp { 
+        &mut self.comps[i]
+    }
+
     pub fn comps(&self) -> impl Iterator<Item = &CobComp> { 
         self.comps.iter()
     }
@@ -601,12 +601,19 @@ impl Cob {
         self.comps.iter().map(|c| c.nbdr_comps()).sum()
     }
 
+    pub fn find_comp(&mut self, b: Bottom, c: &TngComp) -> Option<(usize, usize)> { 
+        self.comps.iter().enumerate().filter_map(|(i, comp)| 
+            comp.index_of(b, c).map(|p| (i, p))
+        ).next()
+    }
+
     pub fn cap_off(&mut self, b: Bottom, c: &TngComp, x: Dot) {
         assert!(c.is_circle());
-        let Some((i, comp, p)) = self.find_comp(b, c) else { 
+        let Some((i, p)) = self.find_comp(b, c) else { 
             panic!("{c} not found in {} ({b})", self)
         };
 
+        let comp = self.comp_mut(i);
         comp.cap_off(b, p);
         comp.add_dot(x);
 
@@ -615,12 +622,6 @@ impl Cob {
         }
 
         self.normalize();
-    }
-
-    fn find_comp(&mut self, b: Bottom, c: &TngComp) -> Option<(usize, &mut CobComp, usize)> { 
-        self.comps.iter_mut().enumerate().filter_map(|(i, comp)| 
-            comp.index_of(b, c).map(|p| (i, comp, p))
-        ).next()
     }
 
     pub fn connect(&mut self, other: Cob) { // horizontal composition
@@ -688,14 +689,14 @@ impl Cob {
             dots.1 += cob.dots.1;
             x += cob.euler_num();
             a += cob.end_pts_iter().filter(|&e| 
-                src.contains_endpoint(e)
+                src.end_pts().contains(&e)
             ).count();
             src.connect(cob.src);
             tgt.connect(cob.tgt);
         }
 
         let mut cob = CobComp::new(src, tgt, 0, dots);
-        
+
         let a = a as i32;
         let b = cob.nbdr_comps() as i32;
         let g = 2 - (x + b) + a;

@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::fmt::Display;
 use std::hash::Hash;
 use delegate::delegate;
@@ -203,23 +202,10 @@ impl Tng {
         &self.comps[i]
     }
 
-    pub fn end_pts(&self) -> HashSet<Edge> {
-        self.end_pts_iter().collect()
-    }
-
-    /// Alloc-free iteration over boundary 0-cells. Walks each arc and yields
-    /// its two endpoints; circles contribute nothing.
-    pub fn end_pts_iter(&self) -> impl Iterator<Item = Edge> + '_ {
+    pub fn end_pts(&self) -> impl Iterator<Item = Edge> + '_ {
         self.comps.iter()
             .filter_map(|c| c.end_pts())
             .flat_map(|(e0, e1)| [e0, e1])
-    }
-
-    /// True iff `e` is an endpoint of some arc in `self`.
-    pub fn contains_endpoint(&self, e: Edge) -> bool {
-        self.comps.iter().any(|c|
-            matches!(c.end_pts(), Some((a, b)) if a == e || b == e)
-        )
     }
 
     pub fn contains(&self, c: &TngComp) -> bool { 

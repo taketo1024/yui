@@ -235,7 +235,7 @@ impl CobComp {
         self.dots.0 == self.dots.1 // XY = T
     }
 
-    pub fn is_unit_cob(&self) -> bool {
+    pub fn is_removable(&self) -> bool {
         self.is_sph() && 
         (self.dots == (1, 0) || // ε.X.ι = 1,
          self.dots == (0, 1))   // ε.Y.ι = 1.
@@ -390,7 +390,7 @@ impl CobComp {
 
     pub fn should_reduce(&self) -> bool {
         self.is_zero_cob() ||
-        self.is_unit_cob() ||
+        self.is_removable() ||
         self.genus > 0 || 
         self.dots.0 >= 1 && self.dots.1 >= 1 ||
         self.dots.0 >= 2 ||
@@ -615,7 +615,7 @@ impl Cob {
         comp.cap_off(b, p);
         comp.add_dot(x);
 
-        if comp.is_unit_cob() { 
+        if comp.is_removable() { 
             self.comps.remove(i);
         }
 

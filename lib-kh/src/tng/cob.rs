@@ -388,7 +388,7 @@ impl CobComp {
         self.dots.1 += dots.1;
     }
 
-    pub fn should_part_eval(&self) -> bool {
+    pub fn should_reduce(&self) -> bool {
         self.is_zero_cob() ||
         self.is_unit_cob() ||
         self.genus > 0 || 
@@ -397,7 +397,7 @@ impl CobComp {
         self.dots.1 >= 2
     }
 
-    pub fn part_eval<R>(&self, h: &R, t: &R) -> LcCob<R>
+    pub fn reduce<R>(&self, h: &R, t: &R) -> LcCob<R>
     where R: Ring, for<'x> &'x R: RingOps<R> {
         fn eval<R>(c: &CobComp, nc: bool, g: usize, x: usize, y: usize, h: &R, t: &R) -> LcCob<R>
         where R: Ring, for<'x> &'x R: RingOps<R> {
@@ -454,7 +454,7 @@ impl CobComp {
     where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(self.is_closed(), "cannot eval: {}", self);
 
-        let eval = self.part_eval(h, t);
+        let eval = self.reduce(h, t);
 
         assert!(eval.nterms() <= 1);
 
@@ -805,29 +805,29 @@ impl Cob {
         Some(cob)
     }
 
-    pub fn should_part_eval(&self) -> bool {
-        self.comps.iter().any(|c| c.should_part_eval())
+    pub fn should_reduce(&self) -> bool {
+        self.comps.iter().any(|c| c.should_reduce())
     }
 
-    pub fn part_eval<R>(self, h: &R, t: &R) -> Lc<Cob, R>
+    pub fn reduce<R>(self, h: &R, t: &R) -> Lc<Cob, R>
     where R: Ring, for<'x> &'x R: RingOps<R> {
         if self.is_zero_cob() {
             return Lc::zero()
         }
-        if !self.should_part_eval() {
+        if !self.should_reduce() {
             return Lc::from(self)
         }
 
         let init = LcCob::from(Cob::empty());
         self.comps.iter().fold(init, |res, c| {
-            if !c.should_part_eval() {
+            if !c.should_reduce() {
                 return res.into_iter().map(|(mut cob, r)| {
                     cob.comps.push(c.clone());
                     (cob, r)
                 }).collect();
             }
 
-            let e = c.part_eval(h, t);
+            let e = c.reduce(h, t);
             debug_assert!(e.keys().all(|c| c.n_comps() <= 1));
 
             res.apply_bilin(&e, |c1, c2| {
@@ -932,8 +932,8 @@ pub trait LcCobTrait: Sized {
     fn connect(self, c: &Cob) -> Self;
     fn connect_ref(&self, c: &Cob) -> Self;
     fn cap_off(self, b: Bottom, c: &TngComp, dot: Dot) -> Self;
-    fn should_part_eval(&self) -> bool;
-    fn part_eval(self, h: &Self::R, t: &Self::R) -> Self;
+    fn should_reduce(&self) -> bool;
+    fn reduce(self, h: &Self::R, t: &Self::R) -> Self;
     fn eval(&self, h: &Self::R, t: &Self::R) -> Self::R;
 }
 
@@ -981,14 +981,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         mut_cob(self, |cob| cob.cap_off(b, c, dot) )
     }
 
-    fn should_part_eval(&self) -> bool {
-        self.keys().any(|c| c.should_part_eval())
+    fn should_reduce(&self) -> bool {
+        self.keys().any(|c| c.should_reduce())
     }
 
-    fn part_eval(self, h: &Self::R, t: &Self::R) -> Self {
-        if self.should_part_eval() { 
+    fn reduce(self, h: &Self::R, t: &Self::R) -> Self {
+        if self.should_reduce() { 
             LcCob::sum(self.into_iter().map(|(cob, r)|
-                cob.part_eval(h, t) * r
+                cob.reduce(h, t) * r
             ))
         } else { 
             self
@@ -1452,7 +1452,7 @@ mod tests {
     }
 
     #[test]
-    fn part_eval() { 
+    fn reduce() { 
         let mut c0 = CobComp::id(TngComp::circ([1]));
         c0.add_dot(Dot::X);
 
@@ -1466,6 +1466,6 @@ mod tests {
         });
 
         assert!(!c.is_zero());
-        assert!(c.part_eval(&2, &0).is_zero()); // X^2 = 2X
+        assert!(c.reduce(&2, &0).is_zero()); // X^2 = 2X
     }
 }

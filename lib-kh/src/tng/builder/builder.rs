@@ -397,7 +397,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             if k == j { continue }
 
             let c = self.complex.edge(i, k);
-            let c_ainv_b = (c * &ainv_b).part_eval(h, t);
+            let c_ainv_b = (c * &ainv_b).reduce(h, t);
             let s = if let Some(d) = e.remove_cob(k) {
                 d - c_ainv_b
             } else {

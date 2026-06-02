@@ -477,7 +477,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let e1 = left.vertex(k_l).out_edges().map(|l_l| {
                 let l = l_l + k_r;
                 let f = left.edge(k_l, l_l).connect_ref(&id_r); // D(f, 1)
-                (l, f.part_eval(&h, &t))
+                (l, f.reduce(&h, &t))
             });
             
             let i0 = (k_l.state.weight() as isize) - left.deg_shift.0;
@@ -486,7 +486,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let e2 = right.vertex(k_r).out_edges().map(|l_r| {
                 let l = k_l + l_r;
                 let id_f = right.edge(k_r, l_r).connect_ref(&id_l) * &sign; // (-1)^{deg(k0)} D(1, f)
-                (l, id_f.part_eval(&h, &t))
+                (l, id_f.reduce(&h, &t))
             });
 
             for (l, f) in e1.chain(e2) {
@@ -563,14 +563,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let (h, t) = self.ht.clone();
         for j in v_in.iter() { 
             self.modify_edge(j, k, |f|
-                f.cap_off(Bottom::Tgt, &circ, death_dot).part_eval(&h, &t)
+                f.cap_off(Bottom::Tgt, &circ, death_dot).reduce(&h, &t)
             );
         }
         
         // cup outgoing cobs
         for l in v_out.iter() { 
             self.modify_edge(k, l, |f|
-                f.cap_off(Bottom::Src, &circ, birth_dot).part_eval(&h, &t)
+                f.cap_off(Bottom::Src, &circ, birth_dot).reduce(&h, &t)
             );
         }
     }
@@ -608,7 +608,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             for l1 in &out_keys {
                 let c = self.edge(k0, l1);
-                let c_ainv_b = (c * &ainv_b).part_eval(&h, &t);
+                let c_ainv_b = (c * &ainv_b).reduce(&h, &t);
 
                 let s = if self.has_edge(l0, l1) {
                     let d = self.edge(l0, l1);

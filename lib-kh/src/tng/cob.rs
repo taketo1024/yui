@@ -560,18 +560,14 @@ impl Cob {
         self.comps.iter()
     }
 
-    pub fn src(&self) -> Tng { 
-        self.comps.iter().fold(Tng::empty(), |mut t, c| {
-            t.connect(c.src.clone());
-            t
-        })
+    pub fn find_comp(&mut self, b: Bottom, c: &TngComp) -> Option<(usize, usize)> { 
+        self.comps.iter().enumerate().filter_map(|(i, comp)| 
+            comp.index_of(b, c).map(|p| (i, p))
+        ).next()
     }
 
-    pub fn tgt(&self) -> Tng { 
-        self.comps.iter().fold(Tng::empty(), |mut t, c| {
-            t.connect(c.tgt.clone());
-            t
-        })
+    pub fn nbdr_comps(&self) -> usize { 
+        self.comps.iter().map(|c| c.nbdr_comps()).sum()
     }
 
     pub fn is_empty(&self) -> bool { 
@@ -606,16 +602,6 @@ impl Cob {
 
     pub fn deg(&self) -> i32 { 
         self.comps.iter().map(|c| c.deg()).sum()
-    }
-
-    pub fn nbdr_comps(&self) -> usize { 
-        self.comps.iter().map(|c| c.nbdr_comps()).sum()
-    }
-
-    pub fn find_comp(&mut self, b: Bottom, c: &TngComp) -> Option<(usize, usize)> { 
-        self.comps.iter().enumerate().filter_map(|(i, comp)| 
-            comp.index_of(b, c).map(|p| (i, p))
-        ).next()
     }
 
     pub fn cap_off(&mut self, b: Bottom, c: &TngComp, x: Dot) {
@@ -731,7 +717,7 @@ impl Cob {
     pub fn stack(&mut self, other: Cob) { // vertical composition
         debug_assert!(
             self.is_stackable(&other),
-            "{} cannot be stacked on {}", other.src(), self.tgt()
+            "{} cannot be stacked on {}", other, self
         );
 
         if self.is_empty() { 
@@ -851,6 +837,22 @@ impl Cob {
     fn normalize(&mut self) {
         self.comps.sort()
     }
+
+    #[cfg(debug_assertions)]
+    pub fn reconst_src(&self) -> Tng { 
+        self.comps.iter().fold(Tng::empty(), |mut t, c| {
+            t.connect(c.src.clone());
+            t
+        })
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn reconst_tgt(&self) -> Tng { 
+        self.comps.iter().fold(Tng::empty(), |mut t, c| {
+            t.connect(c.tgt.clone());
+            t
+        })
+    }
 }
 
 impl From<CobComp> for Cob {
@@ -906,8 +908,6 @@ pub type LcCob<R> = Lc<Cob, R>; // R-linear combination of cobordisms.
 
 pub trait LcCobTrait: Sized {
     type R;
-    fn src(&self) -> Tng;
-    fn tgt(&self) -> Tng;
     fn is_closed(&self) -> bool;
     fn is_invertible(&self) -> bool;
     fn is_stackable(&self, other: &Self) -> bool;
@@ -923,20 +923,6 @@ pub trait LcCobTrait: Sized {
 impl<R> LcCobTrait for LcCob<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type R = R;
-
-    fn src(&self) -> Tng {
-        let Some((c, _)) = self.iter().next() else { 
-            return Tng::empty()
-        };
-        c.src()
-    }
-
-    fn tgt(&self) -> Tng { 
-        let Some((c, _)) = self.iter().next() else { 
-            return Tng::empty()
-        };
-        c.tgt()
-    }
 
     fn is_closed(&self) -> bool { 
         self.iter().all(|(f, _)| f.is_closed())
@@ -1367,8 +1353,8 @@ mod tests {
             CobComp::cup(TngComp::circ([10])),
             CobComp::cap(TngComp::circ([11])),
         ]);
-        let c0 = Cob::id(&c1.src());
-        let c2 = Cob::id(&c1.tgt());
+        let c0 = Cob::id(&c1.reconst_src());
+        let c2 = Cob::id(&c1.reconst_tgt());
 
         let e = c1.clone_and(|e|
             e.stack(c2)

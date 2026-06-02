@@ -684,6 +684,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         println!("{}", self.desc_d());
     }
 
+    #[cfg(debug_assertions)]
     pub fn validate(&self) {
         for (k, v) in self.vertices.iter() { 
             // validate in_edges 
@@ -724,8 +725,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 assert!(!f.is_zero());
 
                 f.iter().for_each(|(cob, _)| { 
-                    assert_eq!(&cob.src(), v.tng(), "invalid source: {} for {cob}", v.tng());
-                    assert_eq!(&cob.tgt(), w.tng(), "invalid target: {} for {cob}", w.tng());
+                    assert_eq!(&cob.reconst_src(), v.tng(), "invalid source: {} for {cob}", v.tng());
+                    assert_eq!(&cob.reconst_tgt(), w.tng(), "invalid target: {} for {cob}", w.tng());
                 })
             }
         }

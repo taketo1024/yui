@@ -108,7 +108,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn is_evalable(&self) -> bool { 
         let init = LcCob::from(self.in_cob.clone());
         self.out_cob.values().all(|c| init.is_stackable(c)) && 
-        self.out_cob.values().all(|c| c.iter().all(|(c, _)| c.tgt().is_empty()))
+        self.out_cob.values().all(|c| c.iter().all(|(c, _)| c.comps().all(|c| c.tgt().is_empty())))
     }
 
     pub fn eval(&self, h: &R, t: &R) -> KhChain<R> {

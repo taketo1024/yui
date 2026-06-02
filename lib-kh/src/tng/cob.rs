@@ -13,7 +13,7 @@
 use core::panic;
 use std::fmt::Display;
 use std::hash::Hash;
-use std::collections::{HashSet, VecDeque};
+use std::collections::HashSet;
 use std::ops::{Mul, MulAssign};
 use auto_impl_ops::auto_ops;
 use itertools::Itertools;
@@ -669,46 +669,46 @@ impl Cob {
         let mut bot = std::mem::take(&mut self.comps);
         let mut top = other.comps;
 
-        let mut q_bot = VecDeque::new();
-        let mut q_top = VecDeque::new();
-        q_bot.reserve(bot.len());
-        q_top.reserve(top.len());
-
-        while let Some(c) = Self::stack_next(&mut bot, &mut top, &mut q_bot, &mut q_top) { 
+        while let Some(c) = Self::stack_next(&mut bot, &mut top) {
             self.comps.push(c)
         }
 
         self.normalize()
     }
 
-    // collect `bot` & `top` comps that will form a connected component.
-    fn stack_next(bot: &mut Vec<CobComp>, top: &mut Vec<CobComp>, q_bot: &mut VecDeque<CobComp>, q_top: &mut VecDeque<CobComp>) -> Option<CobComp> {
-        debug_assert!(q_bot.is_empty());
-        debug_assert!(q_top.is_empty());
-
+    // Take the next connected group from `bot` & `top` and return its merged
+    // CobComp. Uses an in-place frontier index instead of an explicit queue:
+    //   bot[..bot_unproc] = unprocessed (available for later groups)
+    //   bot[bot_unproc..] = pending (in current group, awaiting absorption)
+    // Same for top. Both pending regions are empty again on return.
+    fn stack_next(bot: &mut Vec<CobComp>, top: &mut Vec<CobComp>) -> Option<CobComp> {
         if bot.is_empty() && top.is_empty() { return None }
 
         let mut src = Tng::empty();
         let mut tgt = Tng::empty();
-        let mut dots = (0, 0);  
+        let mut dots = (0, 0);
         let mut x = 0 as i32;
         let mut a = 0 as i32;
 
-        if !bot.is_empty() { 
-            q_bot.push_back(bot.remove(0))
-        } else if !top.is_empty() { 
-            q_top.push_back(top.remove(0))
+        let mut bot_unproc = bot.len();
+        let mut top_unproc = top.len();
+
+        // Seed: trailing comp becomes the first pending member of the group.
+        if bot_unproc > 0 {
+            bot_unproc -= 1;
+        } else {
+            top_unproc -= 1;
         }
 
-        while !(q_bot.is_empty() && q_top.is_empty()) {
-            if let Some(cob) = q_bot.pop_front() {
-                for c in cob.tgt.comps() { 
-                    if let Some(i) = top.iter().position(|t| t.src.contains(c)) {
-                        let t = top.remove(i);
-                        q_top.push_back(t);
+        while bot.len() > bot_unproc || top.len() > top_unproc {
+            if bot.len() > bot_unproc {
+                let cob = bot.pop().unwrap();
+                for c in cob.tgt.comps() {
+                    if let Some(i) = top[..top_unproc].iter().position(|t| t.src.contains(c)) {
+                        top.swap(i, top_unproc - 1);
+                        top_unproc -= 1;
                     }
-
-                    if c.is_arc() { 
+                    if c.is_arc() {
                         a += 1;
                     }
                 }
@@ -716,11 +716,12 @@ impl Cob {
                 dots.1 += cob.dots.1;
                 x += cob.euler_num();
                 src.connect(cob.src);
-            } else if let Some(cob) = q_top.pop_front() {
-                for c in cob.src.comps() { 
-                    if let Some(i) = bot.iter().position(|b| b.tgt.contains(c)) {
-                        let b = bot.remove(i);
-                        q_bot.push_back(b);
+            } else {
+                let cob = top.pop().unwrap();
+                for c in cob.src.comps() {
+                    if let Some(i) = bot[..bot_unproc].iter().position(|b| b.tgt.contains(c)) {
+                        bot.swap(i, bot_unproc - 1);
+                        bot_unproc -= 1;
                     }
                 }
                 dots.0 += cob.dots.0;
@@ -736,7 +737,7 @@ impl Cob {
 
         assert!(g >= 0);
         assert!(g % 2 == 0);
-        
+
         cob.genus = (g / 2) as usize;
 
         Some(cob)

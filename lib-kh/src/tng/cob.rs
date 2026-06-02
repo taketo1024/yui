@@ -149,8 +149,13 @@ impl CobComp {
         self.genus
     }
 
-    pub fn end_pts(&self) -> HashSet<Edge> { 
+    pub fn end_pts(&self) -> HashSet<Edge> {
         self.src.end_pts() // == self.tgt.end_pts()
+    }
+
+    /// Alloc-free version of [`Self::end_pts`].
+    pub fn end_pts_iter(&self) -> impl Iterator<Item = Edge> + '_ {
+        self.src.end_pts_iter() // == tgt
     }
 
     pub fn ndots(&self) -> usize { 
@@ -619,30 +624,88 @@ impl Cob {
     }
 
     pub fn connect(&mut self, other: Cob) { // horizontal composition
-        for c in other.comps.into_iter() { 
-            self._connect_comp(c);
+        if other.is_empty() { return; }
+        if self.is_empty() { *self = other; return; }
+
+        let mut comps = std::mem::take(&mut self.comps);
+        comps.reserve(other.comps.len());
+        comps.extend(other.comps);
+
+        while let Some(c) = Self::connect_next(&mut comps) {
+            self.comps.push(c)
         }
-        self.normalize();
+
+        self.normalize()
     }
 
-    pub fn connect_comp(&mut self, c: CobComp) {
-        self._connect_comp(c);
-        self.normalize();
-    }
+    // Take the next connected group from `comps` (transitively via shared
+    // boundary endpoints) and return its merged CobComp. In-place frontier
+    // index on `comps` — no auxiliary queue/Vec:
+    //   comps[..unproc] = unprocessed
+    //   comps[unproc..] = pending (in current group)
+    // The pending region is drained back to empty before return.
+    fn connect_next(comps: &mut Vec<CobComp>) -> Option<CobComp> {
+        // Pop the seed and look for direct connectables. If none, the seed
+        // is a singleton group and we can short-circuit (no genus rebuild).
+        let seed = comps.pop()?;
+        let mut unproc = comps.len();
 
-    fn _connect_comp(&mut self, mut c: CobComp) {
         let mut i = 0;
-
-        while i < self.comps.len() { 
-            if c.is_connectable(&self.comps[i]) { 
-                let c2 = self.comps.remove(i);
-                c.connect(c2);
-            } else { 
+        while i < unproc {
+            if seed.is_connectable(&comps[i]) {
+                comps.swap(i, unproc - 1);
+                unproc -= 1;
+            } else {
                 i += 1;
             }
         }
+
+        if comps.len() == unproc {
+            return Some(seed);
+        }
+
+        // Real group: initialize accumulators from the seed.
+        let mut dots = seed.dots;
+        let mut x = seed.euler_num();
+        let mut a = 0;
+        let mut src = seed.src;
+        let mut tgt = seed.tgt;
+
+        while comps.len() > unproc {
+            let cob = comps.pop().unwrap();
+
+            let mut i = 0;
+            while i < unproc {
+                if cob.is_connectable(&comps[i]) {
+                    comps.swap(i, unproc - 1);
+                    unproc -= 1;
+                } else {
+                    i += 1;
+                }
+            }
+
+            dots.0 += cob.dots.0;
+            dots.1 += cob.dots.1;
+            x += cob.euler_num();
+            a += cob.end_pts_iter().filter(|&e| 
+                src.contains_endpoint(e)
+            ).count();
+            src.connect(cob.src);
+            tgt.connect(cob.tgt);
+        }
+
+        let mut cob = CobComp::new(src, tgt, 0, dots);
         
-        self.comps.push(c);
+        let a = a as i32;
+        let b = cob.nbdr_comps() as i32;
+        let g = 2 - (x + b) + a;
+
+        assert!(g >= 0);
+        assert!(g % 2 == 0);
+
+        cob.genus = (g / 2) as usize;
+
+        Some(cob)
     }
 
     pub fn is_stackable(&self, other: &Self) -> bool { 

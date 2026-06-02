@@ -388,20 +388,21 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         // mors into j must be redirected by -ca^{-1}
         let Some(b) = e.remove_cob(j) else { return };
 
+        let (h, t) = self.complex.ht();
         let a = self.complex.edge(i, j);
         let ainv = a.inv().unwrap();
-        let (h, t) = self.complex.ht();
+        let ainv_b = ainv * b;
 
         for k in self.complex.vertex(i).out_edges() { 
             if k == j { continue }
 
             let c = self.complex.edge(i, k);
-            let cab = c * &ainv * &b;
+            let c_ainv_b = (c * &ainv_b).part_eval(h, t);
             let s = if let Some(d) = e.remove_cob(k) {
-                d - cab
+                d - c_ainv_b
             } else {
-                -cab
-            }.part_eval(h, t);
+                -c_ainv_b
+            };
 
             if !s.is_zero() { 
                 e.insert_cob(*k, s);

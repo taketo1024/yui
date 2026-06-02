@@ -19,7 +19,6 @@ use ahash::{AHashMap, AHashSet};
 use auto_impl_ops::auto_ops;
 use itertools::Itertools;
 use num_traits::Zero;
-use cartesian::cartesian;
 use yui_core::{CloneAnd, Ring, RingOps, Sign};
 use yui_homology::{ChainComplex1, Summand, GrMod1};
 use yui_link::{Edge, Node, State};
@@ -587,34 +586,34 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             panic!("{a} is not invertible.")
         };
 
-        let (h, t) = self.ht();
+        let (h, t) = self.ht().clone();
 
-        let keys = cartesian!(
-            self.vertex(k1).in_edges().filter(|&l0| l0 != k0),
-            self.vertex(k0).out_edges().filter(|&l1| l1 != k1)
-        ).collect_vec();
+        let in_keys: Vec<_> = self.vertex(k1).in_edges()
+            .filter(|&l0| l0 != k0).copied().collect();
+        let out_keys: Vec<_> = self.vertex(k0).out_edges()
+            .filter(|&l1| l1 != k1).copied().collect();
 
-        let values: Vec<_> = keys.into_iter().map(|(l0, l1)| {
+        for l0 in &in_keys {
             let b = self.edge(l0, k1);
-            let c = self.edge(k0, l1);
-            let cab = (c * &ainv * b).part_eval(h, t);
+            let ainv_b = &ainv * b;
 
-            let s = if self.has_edge(l0, l1) {
-                let d = self.edge(l0, l1);
-                d - cab
-            } else {
-                -cab
-            };
+            for l1 in &out_keys {
+                let c = self.edge(k0, l1);
+                let c_ainv_b = (c * &ainv_b).part_eval(&h, &t);
 
-            (*l0, *l1, s)
-        }).collect();
+                let s = if self.has_edge(l0, l1) {
+                    let d = self.edge(l0, l1);
+                    d - c_ainv_b
+                } else {
+                    -c_ainv_b
+                };
 
-        for (l0, l1, s) in values { 
-            if self.has_edge(&l0, &l1) { 
-                self.remove_edge(&l0, &l1);
-            }
-            if !s.is_zero() { 
-                self.add_edge(&l0, &l1, s);
+                if self.has_edge(l0, l1) {
+                    self.remove_edge(l0, l1);
+                }
+                if !s.is_zero() {
+                    self.add_edge(l0, l1, s);
+                }
             }
         }
 

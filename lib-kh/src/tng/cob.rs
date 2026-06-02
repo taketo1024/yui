@@ -817,6 +817,9 @@ impl Cob {
         if !self.should_reduce() {
             return Lc::from(self)
         }
+        if self.comps.len() == 1 {
+            return self.comps.into_iter().next().unwrap().reduce(h, t);
+        }
 
         let init = LcCob::from(Cob::empty());
         self.comps.iter().fold(init, |res, c| {
@@ -852,6 +855,7 @@ impl Cob {
     }
 
     fn normalize(&mut self) {
+        self.comps.retain(|c| !c.is_removable());
         self.comps.sort()
     }
 

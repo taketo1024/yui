@@ -19,7 +19,7 @@ use auto_impl_ops::auto_ops;
 use itertools::Itertools;
 use num_traits::Zero;
 use cartesian::cartesian;
-use yui_core::{AddMon, CloneAnd, MathType, Ring, RingOps};
+use yui_core::{AddMon, MathType, Ring, RingOps};
 use yui_core::lc::{LcKey, Lc};
 use yui_core::poly::Var2;
 use yui_link::{Edge, Node};
@@ -811,19 +811,35 @@ impl Cob {
 
     pub fn part_eval<R>(self, h: &R, t: &R) -> Lc<Cob, R>
     where R: Ring, for<'x> &'x R: RingOps<R> {
-        if self.is_zero_cob() { 
+        if self.is_zero_cob() {
             return Lc::zero()
         }
-        if !self.should_part_eval() { 
+        if !self.should_part_eval() {
             return Lc::from(self)
         }
 
         let init = LcCob::from(Cob::empty());
         self.comps.iter().fold(init, |res, c| {
+            if !c.should_part_eval() {
+                return res.into_iter().map(|(mut cob, r)| {
+                    cob.comps.push(c.clone());
+                    (cob, r)
+                }).collect();
+            }
+
             let e = c.part_eval(h, t);
-            res.apply_bilin(&e, |c1, c2| c1.clone_and(|c1|
-                c1.connect(c2.clone())
-            ))
+            debug_assert!(e.keys().all(|c| c.n_comps() <= 1));
+
+            res.apply_bilin(&e, |c1, c2| {
+                let mut c = c1.clone();
+                if let Some(c2) = c2.comps.first() {
+                    c.comps.push(c2.clone());
+                }
+                c
+            })
+        }).map_keys(|mut c| { 
+            c.normalize(); 
+            c 
         })
     }
 
@@ -1017,6 +1033,7 @@ where
 mod tests {
     use num_traits::Zero;
     use maplit::hashmap;
+    use yui_core::CloneAnd;
     use yui_core::poly::Poly2;
 
     use super::CobComp;

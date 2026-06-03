@@ -25,7 +25,7 @@ use yui_link::{Edge, Node, Path, State};
 use yui_core::bitseq::Bit;
 
 use crate::kh::{KhAlgGen, KhGen, KhTensor};
-use super::cob::{Cob, Dot, Bottom, CobComp, LcCob, LcCobTrait};
+use super::cob::{Cob, Dot, End, CobComp, LcCob, LcCobTrait};
 use super::tng::{Tng, TngComp};
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
@@ -181,7 +181,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let t1 = Tng::from_resolved(&x.resolve(Bit::Bit1), base_pt);
 
             let sdl = LcCob::from(
-                Cob::from(CobComp::plain(t0.clone(), t1.clone(), 0))
+                Cob::from(CobComp::plain(t0.clone(), t1.clone()))
             );
 
             let mut c = Self::new(h, t, (0, 0), base_pt, 1, AHashMap::new());
@@ -559,14 +559,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let (h, t) = self.ht.clone();
         for j in v_in.iter() { 
             self.modify_edge(j, k, |f|
-                f.cap_off(Bottom::Tgt, &circ, death_dot).reduce(&h, &t)
+                f.cap_off(End::Tgt, &circ, death_dot).reduce(&h, &t)
             );
         }
         
         // cup outgoing cobs
         for l in v_out.iter() { 
             self.modify_edge(k, l, |f|
-                f.cap_off(Bottom::Src, &circ, birth_dot).reduce(&h, &t)
+                f.cap_off(End::Src, &circ, birth_dot).reduce(&h, &t)
             );
         }
     }

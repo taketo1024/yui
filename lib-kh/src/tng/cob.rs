@@ -19,6 +19,7 @@ use auto_impl_ops::auto_ops;
 use itertools::Itertools;
 use num_traits::Zero;
 use cartesian::cartesian;
+use yui_core::util::format::subscript;
 use yui_core::{AddMon, MathType, Ring, RingOps};
 use yui_core::lc::{LcKey, Lc};
 use yui_core::poly::Var2;
@@ -31,7 +32,7 @@ pub enum Dot {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, derive_more::Display)]
-pub enum Bottom { 
+pub enum End { 
     Src, Tgt
 }
 
@@ -44,72 +45,44 @@ pub struct CobComp {
 }
 
 impl CobComp { 
-    pub fn new(src: Tng, tgt: Tng, genus: usize, dots: (usize, usize)) -> Self {
+    fn new(src: Tng, tgt: Tng, genus: usize, dots: (usize, usize)) -> Self {
         debug_assert_eq!(src.end_pts().collect::<HashSet<_>>(), tgt.end_pts().collect());
         Self { src, tgt, genus, dots }
     }
 
-    pub fn plain(src: Tng, tgt: Tng, genus: usize) -> Self {
-        Self::new(src, tgt, genus, (0, 0))
+    pub fn plain(src: Tng, tgt: Tng) -> Self {
+        Self::new(src, tgt, 0, (0, 0))
     }
 
     pub fn id(c: TngComp) -> Self {
         Self::plain(
             Tng::from(c.clone()),
             Tng::from(c),
-            0
         )
     }
 
-    pub fn merge(from: (TngComp, TngComp), to: TngComp) -> Self {
-        assert!(from.0.is_circle() || from.1.is_circle());
-        Self::plain(
-            Tng::new(vec![from.0, from.1]), 
-            Tng::new(vec![to]),
-            0
-        )
-    }
-
-    pub fn split(from: TngComp, to: (TngComp, TngComp)) -> Self { 
-        assert!(to.0.is_circle() || to.1.is_circle());
-        Self::plain(
-            Tng::new(vec![from]), 
-            Tng::new(vec![to.0, to.1]),
-            0
-        )
-    }
-
-    pub fn cup(c: TngComp) -> Self { 
+    pub fn cup(c: TngComp) -> Self {
         assert!(c.is_circle());
         Self::plain(
             Tng::empty(),
             Tng::from(c),
-            0
         )
     }
 
-    pub fn cap(c: TngComp) -> Self { 
+    pub fn cap(c: TngComp) -> Self {
+        assert!(c.is_circle());
         Self::plain(
             Tng::from(c),
             Tng::empty(),
-            0
         )
     }
 
-    pub fn closed(g: usize) -> Self { 
-        Self::new(
-            Tng::empty(),
-            Tng::empty(),
-            g,
-            (0, 0)
-        )
+    pub fn with_dots(mut self, x: usize, y: usize) -> Self {
+        self.dots = (x, y);
+        self
     }
 
-    pub fn sphere() -> Self { 
-        Self::closed(0)
-    }
-
-    pub fn src(&self) -> &Tng { 
+    pub fn src(&self) -> &Tng {
         &self.src
     }
 
@@ -121,102 +94,63 @@ impl CobComp {
         self.genus
     }
 
-    /// Alloc-free version of [`Self::end_pts`].
-    pub fn end_pts_iter(&self) -> impl Iterator<Item = Edge> + '_ {
+    pub fn end_pts(&self) -> impl Iterator<Item = Edge> + '_ {
         self.src.end_pts() // == tgt
     }
 
-    pub fn ndots(&self) -> usize { 
+    pub fn total_dots(&self) -> usize { 
         self.dots.0 + self.dots.1
     }
 
-    pub fn bottom(&self, b: Bottom) -> &Tng { 
-        match b { 
-            Bottom::Src => &self.src,
-            Bottom::Tgt => &self.tgt
+    pub fn end(&self, b: End) -> &Tng {
+        match b {
+            End::Src => &self.src,
+            End::Tgt => &self.tgt
         }
     }
 
-    pub fn bottom_mut(&mut self, b: Bottom) -> &mut Tng { 
-        match b { 
-            Bottom::Src => &mut self.src,
-            Bottom::Tgt => &mut self.tgt
+    pub fn end_mut(&mut self, b: End) -> &mut Tng {
+        match b {
+            End::Src => &mut self.src,
+            End::Tgt => &mut self.tgt
         }
     }
 
-    pub fn contains(&self, b: Bottom, c: &TngComp) -> bool { 
-        self.bottom(b).contains(c)
-    }
-
-    pub fn index_of(&self, b: Bottom, c: &TngComp) -> Option<usize> { 
-        self.bottom(b).index_of(c)
-    }
-
-    pub fn is_plain(&self) -> bool { 
-        self.dots == (0, 0)
+    pub fn is_plain(&self) -> bool {
+        self.dots == (0, 0) && self.genus == 0
     }
 
     pub fn is_closed(&self) -> bool {
-        self.src.is_empty() && 
+        self.src.is_empty() &&
         self.tgt.is_empty()
     }
 
-    pub fn is_sph(&self) -> bool {
-        self.is_closed() && 
-        self.genus == 0
-    }
-
-    pub fn is_cyl(&self) -> bool { // possibly with genus
-        self.src.n_comps() == 1 && 
-        self.tgt.n_comps() == 1
-    }
-
-    pub fn is_id(&self) -> bool { 
-        self.is_cyl() && 
-        self.src.comp(0) == self.tgt.comp(0) && 
-        self.genus == 0
-    }
-
-    pub fn is_sdl(&self) -> bool { // possibly with genus
-        self.src.n_comps() == 2 && 
-        self.tgt.n_comps() == 2 && 
-        self.src.comps().all(|c| c.is_arc()) && 
-        self.tgt.comps().all(|c| c.is_arc()) && 
-        self.src != self.tgt
-    }
-
-    pub fn is_cup(&self) -> bool { 
-        self.src.n_comps() == 0 && self.tgt.n_comps() == 1
-    }
-
-    pub fn is_cap(&self) -> bool { 
-        self.src.n_comps() == 1 && self.tgt.n_comps() == 0
-    }
-
-    pub fn is_merge(&self) -> bool { 
-        self.src.n_comps() == 2 && self.tgt.n_comps() == 1
-    }
-
-    pub fn is_split(&self) -> bool { 
-        self.src.n_comps() == 1 && self.tgt.n_comps() == 2
-    }
-
-    pub fn is_zero_cob(&self) -> bool { 
+    pub fn is_zero_cob(&self) -> bool {
         self.is_closed() && 
         self.genus % 2 == 0 &&
         self.dots.0 == self.dots.1 // XY = T
     }
 
     pub fn is_removable(&self) -> bool {
-        self.is_sph() && 
+        self.is_closed() &&
+        self.genus == 0 &&
         (self.dots == (1, 0) || // ε.X.ι = 1,
          self.dots == (0, 1))   // ε.Y.ι = 1.
     }
 
-    pub fn is_invertible(&self) -> bool { 
-        self.is_cyl() && 
-        self.genus == 0 &&
-        self.dots == (0, 0)
+    pub fn is_invertible(&self) -> bool {
+        self.src.n_comps() == 1 &&
+        self.tgt.n_comps() == 1 &&
+        self.is_plain()
+    }
+
+    pub fn is_sdl(&self) -> bool {
+        self.src.n_comps() == 2 && 
+        self.tgt.n_comps() == 2 && 
+        self.src.comps().all(|c| c.is_arc()) && 
+        self.tgt.comps().all(|c| c.is_arc()) && 
+        self.src != self.tgt && 
+        self.genus == 0
     }
 
     pub fn inv(&self) -> Option<Self> { 
@@ -224,7 +158,6 @@ impl CobComp {
             let inv = Self::plain(
                 self.tgt.clone(),
                 self.src.clone(),
-                0
             );
             Some(inv)
         } else {
@@ -242,7 +175,7 @@ impl CobComp {
     pub fn deg(&self) -> i32 { 
         let x = self.euler_num();
         let b = self.src.end_pts().count() as i32;
-        let d = self.ndots() as i32;
+        let d = self.total_dots() as i32;
         x - (b / 2) - 2 * d
     }
 
@@ -308,9 +241,9 @@ impl CobComp {
         }
     }
 
-    pub fn cap_off(&mut self, b: Bottom, i: usize) {
-        assert!(self.bottom(b).comp(i).is_circle());
-        self.bottom_mut(b).remove_at(i);
+    pub fn cap_off(&mut self, b: End, i: usize) {
+        assert!(self.end(b).comp(i).is_circle());
+        self.end_mut(b).remove_at(i);
     }
 
     // connect = horizontal composition
@@ -441,57 +374,41 @@ impl CobComp {
 
 impl Display for CobComp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match (self.src.n_comps(), self.tgt.n_comps()) { 
-            (0, 0) => "S",
-            (0, 1) => "ι",
-            (1, 0) => "ε",
-            (1, 1) if self.is_id() => "id",
-            (1, 1) => "cyl",
-            (2, 1) => "m",
-            (1, 2) => "Δ",
-            (2, 2) if self.is_sdl() => "sdl",
-            _      => "cob"
-        };
-
-        let g = if self.genus > 0 { 
-            yui_core::util::format::subscript(self.genus as isize)
-        } else { 
-            "".to_string()
-        };
-
-        let dots = if !self.is_plain() { 
-            let (p, q) = self.dots;
-            let m = Var2::<'X','Y', _>::from((p, q));
-            format!("{}", m)
-        } else { 
+        let dots = if self.total_dots() == 0 {
             String::new()
+        } else {
+            let (p, q) = self.dots;
+            format!("{}・", Var2::<'X','Y', _>::from((p, q)))
         };
-        
-        let cob = format!("{dots}({s}{g})");
 
-        if self.src.is_empty() && self.tgt.is_empty() { 
-            write!(f, "{cob}")
-        } else if self.is_id() { 
-            write!(f, "{cob}({})", &self.src.comp(0))
-        } else { 
-            write!(f, "{cob}({} -> {})", &self.src, &self.tgt)
+
+        if self.is_closed() { 
+            return if self.genus == 0 { 
+                write!(f, "{dots}S")
+            } else { 
+                write!(f, "{dots}Σ{}", subscript(self.genus as isize))                
+            }
         }
+        
+        let base = match (self.src.n_comps(), self.tgt.n_comps()) {
+            (0, 1) => "∪",
+            (1, 0) => "∩",
+            (1, 1) if self.is_invertible() => "I",
+            (2, 1) => "∇",
+            (1, 2) => "Δ",
+            (2, 2) if self.is_sdl() => "X",
+            _ => "Cob"
+        }.to_string();
+        
+        let g = if self.genus == 0 { 
+            "".to_string()
+        } else { 
+            format!(", g: {}", self.genus)
+        };
+
+        write!(f, "{dots}{base}({} -> {}{g})", self.src, self.tgt)
     }
 }
-
-impl Default for CobComp {
-    fn default() -> Self {
-        Self::sphere() // == zero
-    }
-}
-
-impl MathType for CobComp {
-    fn math_symbol() -> String {
-        "CobComp".to_string()
-    }
-}
-
-impl LcKey for CobComp {}
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Default)]
 pub struct Cob { 
@@ -533,9 +450,9 @@ impl Cob {
         self.comps.iter()
     }
 
-    pub fn find_comp(&mut self, b: Bottom, c: &TngComp) -> Option<(usize, usize)> { 
-        self.comps.iter().enumerate().filter_map(|(i, comp)| 
-            comp.index_of(b, c).map(|p| (i, p))
+    pub fn find_comp(&mut self, b: End, c: &TngComp) -> Option<(usize, usize)> {
+        self.comps.iter().enumerate().filter_map(|(i, comp)|
+            comp.end(b).index_of(c).map(|p| (i, p))
         ).next()
     }
 
@@ -577,7 +494,7 @@ impl Cob {
         self.comps.iter().map(|c| c.deg()).sum()
     }
 
-    pub fn cap_off(&mut self, b: Bottom, c: &TngComp, x: Dot) {
+    pub fn cap_off(&mut self, b: End, c: &TngComp, x: Dot) {
         assert!(c.is_circle());
         let Some((i, p)) = self.find_comp(b, c) else { 
             panic!("{c} not found in {} ({b})", self)
@@ -658,7 +575,7 @@ impl Cob {
             dots.0 += cob.dots.0;
             dots.1 += cob.dots.1;
             x += cob.euler_num();
-            a += cob.end_pts_iter().filter(|&e| 
+            a += cob.end_pts().filter(|&e|
                 src.end_pts().contains(&e)
             ).count();
             src.connect(cob.src);
@@ -679,11 +596,11 @@ impl Cob {
         Some(cob)
     }
 
-    pub fn is_stackable(&self, other: &Self) -> bool { 
-        self.comps.iter().fold(0, |n, c| n + c.tgt.n_comps()) == 
-        other.comps.iter().fold(0, |n, c| n + c.src.n_comps()) && 
+    pub fn is_stackable(&self, other: &Self) -> bool {
+        self.comps.iter().fold(0, |n, c| n + c.tgt.n_comps()) ==
+        other.comps.iter().fold(0, |n, c| n + c.src.n_comps()) &&
         self.comps.iter().all(|c| c.tgt.comps().all(|a|
-            other.comps.iter().any(|c| c.contains(Bottom::Src, a))
+            other.comps.iter().any(|c| c.src.contains(a))
         ))
     }
 
@@ -902,7 +819,7 @@ pub trait LcCobTrait: Sized {
     fn inv(&self) -> Option<Self>;
     fn connect(self, c: &Cob) -> Self;
     fn connect_ref(&self, c: &Cob) -> Self;
-    fn cap_off(self, b: Bottom, c: &TngComp, dot: Dot) -> Self;
+    fn cap_off(self, b: End, c: &TngComp, dot: Dot) -> Self;
     fn should_reduce(&self) -> bool;
     fn reduce(self, h: &Self::R, t: &Self::R) -> Self;
     fn eval(&self, h: &Self::R, t: &Self::R) -> Self::R;
@@ -948,7 +865,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         mut_cob_ref(self, |cob| cob.connect(c.clone()))
     }
 
-    fn cap_off(self, b: Bottom, c: &TngComp, dot: Dot) -> Self {
+    fn cap_off(self, b: End, c: &TngComp, dot: Dot) -> Self {
         mut_cob(self, |cob| cob.cap_off(b, c, dot) )
     }
 
@@ -1016,35 +933,31 @@ mod tests {
         CobComp::plain(
             Tng::new(vec![r0.0, r0.1]),
             Tng::new(vec![r1.0, r1.1]),
-            0,
         )
     }
 
-    #[test]
-    fn cob_contains() { 
-        let src = Tng::new(vec![
-            TngComp::arc([1, 2]),
-            TngComp::arc([3, 4]),
-            TngComp::circ([5]),
-        ]);
-        let tgt = Tng::new(vec![
-            TngComp::arc([1, 3]),
-            TngComp::arc([2, 4]),
-            TngComp::circ([6]),
-        ]);
-        let c = CobComp::plain(src, tgt, 0);
-        
-        let c0 = TngComp::arc([1, 2]);
-        let c1 = TngComp::circ([6]);
+    fn pants(from: (TngComp, TngComp), to: TngComp) -> CobComp {
+        assert!(from.0.is_circle() || from.1.is_circle());
+        CobComp::plain(
+            Tng::new(vec![from.0, from.1]),
+            Tng::new(vec![to]),
+        )
+    }
 
-        assert!( c.contains(Bottom::Src, &c0));
-        assert!(!c.contains(Bottom::Src, &c1));
-        assert!(!c.contains(Bottom::Tgt, &c0));
-        assert!( c.contains(Bottom::Tgt, &c1));
+    fn copants(from: TngComp, to: (TngComp, TngComp)) -> CobComp {
+        assert!(to.0.is_circle() || to.1.is_circle());
+        CobComp::plain(
+            Tng::new(vec![from]),
+            Tng::new(vec![to.0, to.1]),
+        )
+    }
+
+    fn closed(g: usize) -> CobComp {
+        CobComp::new(Tng::empty(), Tng::empty(), g, (0, 0))
     }
 
     #[test]
-    fn is_connectable() { 
+    fn is_connectable() {
         let src = Tng::new(vec![
             TngComp::arc([1, 2]),
             TngComp::arc([3, 4]),
@@ -1055,7 +968,7 @@ mod tests {
             TngComp::arc([2, 4]),
             TngComp::circ([11]),
         ]);
-        let c = CobComp::plain(src, tgt, 0);
+        let c = CobComp::plain(src, tgt);
 
         let c1 = CobComp::id(
             TngComp::arc([0, 1])
@@ -1084,7 +997,7 @@ mod tests {
             TngComp::circ([11]),
         ]);
 
-        let mut c = CobComp::plain(src, tgt, 0);
+        let mut c = CobComp::plain(src, tgt);
         c.connect(CobComp::id(
             TngComp::arc([0, 1])
         ));
@@ -1100,7 +1013,6 @@ mod tests {
                 TngComp::arc([2, 4]),
                 TngComp::circ([11]),
             ]),
-            0
         ));
     }
 
@@ -1117,7 +1029,7 @@ mod tests {
             TngComp::circ([11]),
         ]);
 
-        let mut c = CobComp::plain(src, tgt, 0);
+        let mut c = CobComp::plain(src, tgt);
         c.connect(CobComp::id(
             TngComp::arc([1, 3])
         ));
@@ -1132,7 +1044,6 @@ mod tests {
                 TngComp::circ([1, 3]),
                 TngComp::circ([11]),
             ]),
-            0
         ));
     }
 
@@ -1148,7 +1059,6 @@ mod tests {
         let c2 = CobComp::plain(
             Tng::from(TngComp::circ([10])),
             Tng::new(vec![TngComp::circ([10]), TngComp::circ([11])]),
-            0
         );
         let c3 = CobComp::cup(
             TngComp::circ([20])
@@ -1185,7 +1095,6 @@ mod tests {
                 TngComp::arc([1, 2]),
                 TngComp::arc([3, 4])
             ]),
-            0
         );
         let c1 = CobComp::id(
             TngComp::arc([1, 3])
@@ -1208,12 +1117,12 @@ mod tests {
         assert_eq!(c0.genus, 1);
         assert_eq!(c0.euler_num(), -2);
 
-        c0.cap_off(Bottom::Src, 0);
+        c0.cap_off(End::Src, 0);
 
         assert_eq!(c0.genus, 1);
         assert_eq!(c0.euler_num(), -1);
 
-        c0.cap_off(Bottom::Tgt, 0);
+        c0.cap_off(End::Tgt, 0);
 
         assert_eq!(c0.genus, 1);
         assert_eq!(c0.euler_num(), 0);
@@ -1224,9 +1133,8 @@ mod tests {
     fn inv() { 
         let cc0 = CobComp::id(TngComp::arc([0, 1]));
         let cc1 = CobComp::plain(
-            Tng::from(TngComp::circ([2])), 
+            Tng::from(TngComp::circ([2])),
             Tng::from(TngComp::circ([3])),
-            0
         );
 
         assert!(cc0.is_invertible());
@@ -1234,9 +1142,8 @@ mod tests {
 
         assert!(cc1.is_invertible());
         assert_eq!(cc1.inv(), Some(CobComp::plain(
-            Tng::from(TngComp::circ([3])), 
+            Tng::from(TngComp::circ([3])),
             Tng::from(TngComp::circ([2])),
-            0
         )));
 
         let c0 = Cob::new(vec![cc0, cc1]);
@@ -1290,14 +1197,14 @@ mod tests {
 
     #[test]
     fn stack_closed() {
-        let mut c0 = Cob::from(CobComp::closed(0));
-        let c1 = Cob::from(CobComp::closed(1));
+        let mut c0 = Cob::from(closed(0));
+        let c1 = Cob::from(closed(1));
         
         c0.stack(c1);
 
         assert_eq!(c0, Cob::new(vec![
-            CobComp::closed(0),
-            CobComp::closed(1)
+            closed(0),
+            closed(1)
         ]));
     }
     
@@ -1309,7 +1216,7 @@ mod tests {
         c0.stack(c1);
 
         assert_eq!(c0, Cob::new(vec![
-            CobComp::sphere()
+            closed(0)
         ]));
     }
    
@@ -1340,7 +1247,7 @@ mod tests {
         c0.stack(c1);
 
         assert_eq!(c0, Cob::new(vec![
-            CobComp::sphere(),
+            closed(0),
             CobComp::id(TngComp::arc([0, 1])),
         ]));
     }
@@ -1352,7 +1259,6 @@ mod tests {
             CobComp::plain(
                 Tng::from_resolved(&node.resolve(Bit::Bit0), None),
                 Tng::from_resolved(&node.resolve(Bit::Bit1), None),
-                0,
             ),
             CobComp::cup(TngComp::circ([10])),
             CobComp::cap(TngComp::circ([11])),
@@ -1376,14 +1282,14 @@ mod tests {
     fn stack_torus() {
         let c0 = Cob::from(CobComp::cup(TngComp::circ([0])));
         let c1 = Cob::new(vec![
-            CobComp::split(
+            copants(
                 TngComp::circ([0]),
                 (TngComp::circ([1]), TngComp::circ([2]))
             )
         ]);
         let c2 = Cob::new(vec![
-            CobComp::merge(
-                (TngComp::circ([1]), TngComp::circ([2])), 
+            pants(
+                (TngComp::circ([1]), TngComp::circ([2])),
                 TngComp::circ([3])
             )
         ]);
@@ -1424,16 +1330,16 @@ mod tests {
         let h = R::variable(0);
         let t = R::variable(1);
 
-        let c = CobComp::closed(0);
+        let c = closed(0);
         assert_eq!(c.eval(&h, &t), R::zero());
 
-        let c = CobComp::closed(1);
+        let c = closed(1);
         assert_eq!(c.eval(&h, &t), R::from_const(2));
 
-        let c = CobComp::closed(2);
+        let c = closed(2);
         assert_eq!(c.eval(&h, &t), R::zero());
 
-        let c = CobComp::closed(3);
+        let c = closed(3);
         assert_eq!(c.eval(&h, &t), R::from_iter([(ht(2, 0), 2), (ht(0, 1), 8)])); // 2(H^2 + 4T)
     }
 
@@ -1453,5 +1359,35 @@ mod tests {
 
         assert!(!c.is_zero());
         assert!(c.reduce(&2, &0).is_zero()); // X^2 = 2X
+    }
+
+    #[test]
+    fn cobcomp_display() {
+        // Closed shapes: "S" for genus-0, "Σ_n" for higher genus.
+        assert_eq!(closed(0).to_string(),                "S");
+        assert_eq!(closed(0).with_dots(1, 0).to_string(), "X・S");
+        assert_eq!(closed(0).with_dots(0, 1).to_string(), "Y・S");
+        assert_eq!(closed(0).with_dots(1, 1).to_string(), "XY・S");
+        assert_eq!(closed(0).with_dots(2, 0).to_string(), "X²・S");
+        assert_eq!(closed(1).to_string(),                "Σ₁");
+        assert_eq!(closed(2).with_dots(1, 0).to_string(), "X・Σ₂");
+
+        // Open shapes: base symbol + (src -> tgt) + optional ", g: N".
+        let c = TngComp::circ([0]);
+        assert_eq!(CobComp::cup(c.clone()).to_string(), "∪(∅ -> ⚪︎(0))");
+        assert_eq!(CobComp::cap(c.clone()).to_string(), "∩(⚪︎(0) -> ∅)");
+        assert_eq!(CobComp::id(c.clone()).to_string(),  "I(⚪︎(0) -> ⚪︎(0))");
+
+        // Saddle.
+        let sdl = CobComp::plain(
+            Tng::new(vec![TngComp::arc([0, 1]), TngComp::arc([2, 3])]),
+            Tng::new(vec![TngComp::arc([0, 2]), TngComp::arc([1, 3])]),
+        );
+        assert_eq!(sdl.to_string(), "X({[0-1], [2-3]} -> {[0-2], [1-3]})");
+
+        // Genus on open cob: drops to the default `Cob` label; trailing ", g: N".
+        let mut handle = CobComp::id(c);
+        handle.genus = 1;
+        assert_eq!(handle.to_string(), "Cob(⚪︎(0) -> ⚪︎(0), g: 1)");
     }
 }

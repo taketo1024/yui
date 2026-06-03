@@ -8,7 +8,7 @@ use yui_core::{Ring, RingOps};
 use yui_link::{Edge, Link, Node, Path};
 
 use super::tng::{Tng, TngComp};
-use super::cob::{Bottom, Dot, Cob, CobComp, LcCobTrait, LcCob};
+use super::cob::{End, Dot, Cob, CobComp, LcCobTrait, LcCob};
 use super::complex::TngComplexKey;
 use crate::kh::{KhAlgGen, KhChain};
 use crate::ext::LinkExt;
@@ -82,12 +82,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let marked = self.base_pt.map(|e| c.contains(e)).unwrap_or(false);
 
         let k0 = k + KhAlgGen::X;
-        let f0 = f.clone().cap_off(Bottom::Tgt, c, Dot::None);
+        let f0 = f.clone().cap_off(End::Tgt, c, Dot::None);
         self.out_cob.insert(k0, f0);
 
         if !marked { 
             let k1 = k + KhAlgGen::I;
-            let f1 = f.cap_off(Bottom::Tgt, c, Dot::Y);
+            let f1 = f.cap_off(End::Tgt, c, Dot::Y);
             self.out_cob.insert(k1, f1);    
         }
     }

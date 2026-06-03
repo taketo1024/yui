@@ -606,6 +606,86 @@ impl Cob {
         Some(CobComp::new_with_nb(src, tgt, genus, dots, b as usize))
     }
 
+    /// Ref-taking horizontal composition: same as `connect` but borrows both
+    /// sides and returns a new `Cob`. Avoids the deep-clone the owned API
+    /// pays at the call site.
+    pub fn connect_ref(&self, other: &Cob) -> Cob {
+        if other.is_empty() { return self.clone(); }
+        if self.is_empty()  { return other.clone(); }
+
+        let mut refs: Vec<&CobComp> =
+            self.comps.iter().chain(other.comps.iter()).collect();
+        let mut comps = Vec::new();
+
+        while let Some(c) = Self::connect_next_ref(&mut refs) {
+            comps.push(c);
+        }
+
+        Self::new(comps)  // Self::new sorts comps for canonical form.
+    }
+
+    // Ref-taking sibling of `connect_next`: same algorithm, but the working
+    // set holds `&CobComp` so merges go through `connect_ref` on the running
+    // src/tgt accumulators instead of moving Tngs out.
+    fn connect_next_ref<'a>(comps: &mut Vec<&'a CobComp>) -> Option<CobComp> {
+        let seed = comps.pop()?;
+        let mut unproc = comps.len();
+
+        let mut i = 0;
+        while i < unproc {
+            if seed.is_connectable(comps[i]) {
+                comps.swap(i, unproc - 1);
+                unproc -= 1;
+            } else {
+                i += 1;
+            }
+        }
+
+        // Singleton group: clone the seed unchanged.
+        if comps.len() == unproc {
+            return Some(seed.clone());
+        }
+
+        let mut dots = seed.dots;
+        let mut x = seed.euler_num();
+        let mut a = 0;
+        let mut src = seed.src.clone();
+        let mut tgt = seed.tgt.clone();
+
+        while comps.len() > unproc {
+            let cob = comps.pop().unwrap();
+
+            let mut i = 0;
+            while i < unproc {
+                if cob.is_connectable(comps[i]) {
+                    comps.swap(i, unproc - 1);
+                    unproc -= 1;
+                } else {
+                    i += 1;
+                }
+            }
+
+            dots.0 += cob.dots.0;
+            dots.1 += cob.dots.1;
+            x += cob.euler_num();
+            a += cob.src.end_pts().filter(|&e|
+                src.end_pts().contains(&e)
+            ).count();
+            src.connect_ref(&cob.src);
+            tgt.connect_ref(&cob.tgt);
+        }
+
+        let a = a as i32;
+        let b = CobComp::count_boundaries(&src, &tgt) as i32;
+        let g = 2 - (x + b) + a;
+
+        assert!(g >= 0);
+        assert!(g % 2 == 0);
+
+        let genus = (g / 2) as usize;
+        Some(CobComp::new_with_nb(src, tgt, genus, dots, b as usize))
+    }
+
     pub fn is_stackable(&self, other: &Self) -> bool {
         self.comps.iter().fold(0, |n, c| n + c.tgt.n_comps()) ==
         other.comps.iter().fold(0, |n, c| n + c.src.n_comps()) &&
@@ -870,7 +950,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn connect_ref(&self, c: &Cob) -> Self {
-        mut_cob_ref(self, |cob| cob.connect(c.clone()))
+        self.map_ref(|c1, r| (c1.connect_ref(c), r.clone()))
     }
 
     fn cap_off(self, b: End, c: &TngComp, dot: Dot) -> Self {
@@ -908,20 +988,6 @@ where
     this.into_iter().filter_map(|(mut cob, r)| {
         f(&mut cob);
         (!cob.is_zero_cob()).then_some((cob, r))
-    }).collect()
-}
-
-/// Non-consuming variant of [`modify_cob`]: clones each `Cob` individually
-/// rather than the whole `LcCob`.
-fn mut_cob_ref<R, F>(this: &LcCob<R>, f: F) -> LcCob<R>
-where
-    R: Ring, for<'x> &'x R: RingOps<R>,
-    F: Fn(&mut Cob),
-{
-    this.iter().filter_map(|(cob, r)| {
-        let mut new_cob = cob.clone();
-        f(&mut new_cob);
-        (!new_cob.is_zero_cob()).then_some((new_cob, r.clone()))
     }).collect()
 }
 

@@ -104,7 +104,11 @@ impl TngComp {
     }
 
     pub fn connect(&mut self, other: Self) {
-        assert!(self.is_connectable(&other), "{self} and {other} are not connectable.");
+        *self = self.connect_ref(&other);
+    }
+
+    pub fn connect_ref(&self, other: &Self) -> Self {
+        assert!(self.is_connectable(other), "{self} and {other} are not connectable.");
 
         let (TngCompKind::Arc { e0: a, e1: b }, TngCompKind::Arc { e0: c, e1: d }) =
             (self.kind, other.kind)
@@ -129,9 +133,11 @@ impl TngComp {
             _ => unreachable!("is_connectable guarantees meets ∈ {{1, 2}}"),
         };
 
-        self.kind = new_kind;
-        self.edges |= other.edges;
-        self.marked |= other.marked;
+        Self {
+            kind: new_kind,
+            edges: self.edges | other.edges,
+            marked: self.marked || other.marked,
+        }
     }
 
     pub fn convert_edges<F>(&self, f: F) -> Self
@@ -241,10 +247,21 @@ impl Tng {
 
     pub fn connect(&mut self, other: Self) {
         for c in other.comps.into_iter() {
-            if c.is_circle() { 
+            if c.is_circle() {
                 self.comps.push(c);
-            } else { 
+            } else {
                 self.append_arc(c);
+            }
+        }
+        self.normalize();
+    }
+
+    pub fn connect_ref(&mut self, other: &Self) {
+        for c in other.comps.iter() {
+            if c.is_circle() {
+                self.comps.push(*c);
+            } else {
+                self.append_arc(*c);
             }
         }
         self.normalize();

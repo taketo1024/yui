@@ -23,7 +23,6 @@ use yui_core::util::format::subscript;
 use yui_core::{AddMon, MathType, Ring, RingOps};
 use yui_core::lc::{LcKey, Lc};
 use yui_core::poly::Var2;
-use yui_link::Edge;
 use super::tng::{Tng, TngComp};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, derive_more::Display)]
@@ -37,17 +36,78 @@ pub enum End {
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
-pub struct CobComp { 
+pub struct CobComp {
     src: Tng,
     tgt: Tng,
     genus: usize,
-    dots: (usize, usize) // nums of X and Y dots resp. 
+    dots: (usize, usize), // nums of X and Y dots resp.
+    nb: usize,            // #∂-components — derived from (src, tgt)
 }
 
 impl CobComp { 
     fn new(src: Tng, tgt: Tng, genus: usize, dots: (usize, usize)) -> Self {
+        let nb = Self::count_boundaries(&src, &tgt);
+        Self::new_with_nb(src, tgt, genus, dots, nb)
+    }
+
+    fn new_with_nb(src: Tng, tgt: Tng, genus: usize, dots: (usize, usize), nb: usize) -> Self {
         debug_assert_eq!(src.end_pts().collect::<HashSet<_>>(), tgt.end_pts().collect());
-        Self { src, tgt, genus, dots }
+        debug_assert_eq!(nb, Self::count_boundaries(&src, &tgt));
+        Self { src, tgt, genus, dots, nb }
+    }
+
+    fn count_boundaries(src: &Tng, tgt: &Tng) -> usize {
+        // Build a bitmask of arc-component indices in `t`, plus the count of
+        // closed circles. Asserts `t.n_comps() <= 64`.
+        let make = |t: &Tng| -> (u64, usize) {
+            let n = t.n_comps();
+            assert!(n <= 64, "count_boundaries: n_comps {n} exceeds u64 mask width");
+            (0..n).fold((0u64, 0usize), |(arcs, circs), i| {
+                if t.comp(i).is_arc() {
+                    (arcs | (1u64 << i), circs)
+                } else {
+                    (arcs, circs + 1)
+                }
+            })
+        };
+
+        // First index `i` set in `mask` whose component in `t` is connectable to `c`.
+        let next = |t: &Tng, mask: u64, c: &TngComp| -> Option<usize> {
+            let mut m = mask;
+            while m != 0 {
+                let i = m.trailing_zeros() as usize;
+                if t.comp(i).is_connectable(c) { return Some(i) }
+                m &= m - 1;
+            }
+            None
+        };
+
+        let (mut src_arcs, src_circs) = make(src);
+        let (mut tgt_arcs, tgt_circs) = make(tgt);
+
+        debug_assert_eq!(src_arcs.count_ones(), tgt_arcs.count_ones());
+
+        let mut side_circs = 0;
+        while src_arcs != 0 {
+            let mut i0 = src_arcs.trailing_zeros() as usize;
+            loop {
+                src_arcs &= !(1u64 << i0);
+                let c0 = src.comp(i0);
+
+                let j = next(tgt, tgt_arcs, c0).expect("no connectable tgt arc");
+                tgt_arcs &= !(1u64 << j);
+                let c1 = tgt.comp(j);
+
+                match next(src, src_arcs, c1) {
+                    Some(i1) => i0 = i1,
+                    None => { side_circs += 1; break }
+                }
+            }
+        }
+
+        debug_assert_eq!(tgt_arcs, 0);
+
+        src_circs + tgt_circs + side_circs
     }
 
     pub fn plain(src: Tng, tgt: Tng) -> Self {
@@ -94,12 +154,16 @@ impl CobComp {
         self.genus
     }
 
-    pub fn end_pts(&self) -> impl Iterator<Item = Edge> + '_ {
-        self.src.end_pts() // == tgt
+    pub fn dots(&self) -> (usize, usize) { 
+        self.dots
     }
 
     pub fn total_dots(&self) -> usize { 
         self.dots.0 + self.dots.1
+    }
+
+    pub fn n_boundaries(&self) -> usize {
+        self.nb
     }
 
     pub fn end(&self, b: End) -> &Tng {
@@ -166,8 +230,8 @@ impl CobComp {
     }
 
     // χ(S) = 2 - 2g(S) - #(∂S)
-    pub fn euler_num(&self) -> i32 { 
-        let b = self.nbdr_comps() as i32;
+    pub fn euler_num(&self) -> i32 {
+        let b = self.nb as i32;
         let g = self.genus as i32;
         2 - 2 * g - b
     }
@@ -177,60 +241,6 @@ impl CobComp {
         let b = self.src.end_pts().count() as i32;
         let d = self.total_dots() as i32;
         x - (b / 2) - 2 * d
-    }
-
-    pub fn nbdr_comps(&self) -> usize {
-        // Build a bitmask of arc-component indices in `t`, plus the count of
-        // closed circles. Asserts `t.n_comps() <= 64`.
-        let make = |t: &Tng| -> (u64, usize) {
-            let n = t.n_comps();
-            assert!(n <= 64, "nbdr_comps: n_comps {n} exceeds u64 mask width");
-            (0..n).fold((0u64, 0usize), |(arcs, circs), i| {
-                if t.comp(i).is_arc() {
-                    (arcs | (1u64 << i), circs)
-                } else {
-                    (arcs, circs + 1)
-                }
-            })
-        };
-
-        // First index `i` set in `mask` whose component in `t` is connectable to `c`.
-        let next = |t: &Tng, mask: u64, c: &TngComp| -> Option<usize> {
-            let mut m = mask;
-            while m != 0 {
-                let i = m.trailing_zeros() as usize;
-                if t.comp(i).is_connectable(c) { return Some(i) }
-                m &= m - 1;
-            }
-            None
-        };
-
-        let (mut src_arcs, src_circs) = make(&self.src);
-        let (mut tgt_arcs, tgt_circs) = make(&self.tgt);
-
-        debug_assert_eq!(src_arcs.count_ones(), tgt_arcs.count_ones());
-
-        let mut side_circs = 0;
-        while src_arcs != 0 {
-            let mut i0 = src_arcs.trailing_zeros() as usize;
-            loop {
-                src_arcs &= !(1u64 << i0);
-                let c0 = self.src.comp(i0);
-
-                let j = next(&self.tgt, tgt_arcs, c0).expect("no connectable tgt arc");
-                tgt_arcs &= !(1u64 << j);
-                let c1 = self.tgt.comp(j);
-
-                match next(&self.src, src_arcs, c1) {
-                    Some(i1) => i0 = i1,
-                    None => { side_circs += 1; break }
-                }
-            }
-        }
-
-        debug_assert_eq!(tgt_arcs, 0);
-
-        src_circs + tgt_circs + side_circs
     }
 
     pub fn add_dot(&mut self, dot: Dot) { 
@@ -244,6 +254,7 @@ impl CobComp {
     pub fn cap_off(&mut self, b: End, i: usize) {
         assert!(self.end(b).comp(i).is_circle());
         self.end_mut(b).remove_at(i);
+        self.nb -= 1;
     }
 
     // connect = horizontal composition
@@ -276,17 +287,18 @@ impl CobComp {
 
         assert!(a > 0);
 
-        let CobComp{ src, tgt, genus: _, dots } = other;
+        let CobComp{ src, tgt, dots, .. } = other;
 
         self.src.connect(src);
         self.tgt.connect(tgt);
+        self.nb = Self::count_boundaries(&self.src, &self.tgt);
 
-        let b = self.nbdr_comps() as i32;
+        let b = self.nb as i32;
         let g = 2 - (x1 + x2 + b) + a;
 
         assert!(g >= 0);
         assert!(g % 2 == 0);
-        
+
         self.genus = (g / 2) as usize;
 
         self.dots.0 += dots.0;
@@ -337,20 +349,21 @@ impl CobComp {
 
                 // default
                 _ => {
-                    let c = CobComp {
-                        src: c.src.clone(),
-                        tgt: c.tgt.clone(),
-                        genus: g,
-                        dots: (x, y)
-                    };
-                    Lc::from(Cob::from(c))
+                    let new = CobComp::new_with_nb(
+                        c.src.clone(),
+                        c.tgt.clone(),
+                        g,
+                        (x, y),
+                        c.nb,
+                    );
+                    Lc::from(Cob::from(new))
                 }
             }
         }
 
         let g = self.genus;
         let (x, y) = self.dots;
-        let can_neck_cut = self.nbdr_comps() <= 1;
+        let can_neck_cut = self.n_boundaries() <= 1;
 
         eval(self, can_neck_cut, g, x, y, h, t)
     }
@@ -456,8 +469,8 @@ impl Cob {
         ).next()
     }
 
-    pub fn nbdr_comps(&self) -> usize { 
-        self.comps.iter().map(|c| c.nbdr_comps()).sum()
+    pub fn n_boundaries(&self) -> usize { 
+        self.comps.iter().map(|c| c.n_boundaries()).sum()
     }
 
     pub fn is_empty(&self) -> bool { 
@@ -575,25 +588,22 @@ impl Cob {
             dots.0 += cob.dots.0;
             dots.1 += cob.dots.1;
             x += cob.euler_num();
-            a += cob.end_pts().filter(|&e|
+            a += cob.src.end_pts().filter(|&e|
                 src.end_pts().contains(&e)
             ).count();
             src.connect(cob.src);
             tgt.connect(cob.tgt);
         }
 
-        let mut cob = CobComp::new(src, tgt, 0, dots);
-
         let a = a as i32;
-        let b = cob.nbdr_comps() as i32;
+        let b = CobComp::count_boundaries(&src, &tgt) as i32;
         let g = 2 - (x + b) + a;
 
         assert!(g >= 0);
         assert!(g % 2 == 0);
 
-        cob.genus = (g / 2) as usize;
-
-        Some(cob)
+        let genus = (g / 2) as usize;
+        Some(CobComp::new_with_nb(src, tgt, genus, dots, b as usize))
     }
 
     pub fn is_stackable(&self, other: &Self) -> bool {
@@ -682,16 +692,14 @@ impl Cob {
             }
         }
 
-        let mut cob = CobComp::new(src, tgt, 0, dots);
-        let b = cob.nbdr_comps() as i32;
+        let b = CobComp::count_boundaries(&src, &tgt) as i32;
         let g = 2 - (x + b) + a;
 
         assert!(g >= 0);
         assert!(g % 2 == 0);
 
-        cob.genus = (g / 2) as usize;
-
-        Some(cob)
+        let genus = (g / 2) as usize;
+        Some(CobComp::new_with_nb(src, tgt, genus, dots, b as usize))
     }
 
     pub fn should_reduce(&self) -> bool {
@@ -1067,11 +1075,11 @@ mod tests {
             TngComp::circ([30])
         );
 
-        assert_eq!(c0.nbdr_comps(), 1);
-        assert_eq!(c1.nbdr_comps(), 1);
-        assert_eq!(c2.nbdr_comps(), 3);
-        assert_eq!(c3.nbdr_comps(), 1);
-        assert_eq!(c4.nbdr_comps(), 1);
+        assert_eq!(c0.n_boundaries(), 1);
+        assert_eq!(c1.n_boundaries(), 1);
+        assert_eq!(c2.n_boundaries(), 3);
+        assert_eq!(c3.n_boundaries(), 1);
+        assert_eq!(c4.n_boundaries(), 1);
 
         assert_eq!(c0.euler_num(), 1);
         assert_eq!(c1.euler_num(), 1);
@@ -1081,7 +1089,7 @@ mod tests {
 
         let cob = Cob::new(vec![c0,c1,c2,c3,c4]);
         assert_eq!(cob.euler_num(), 3);
-        assert_eq!(cob.nbdr_comps(), 7);
+        assert_eq!(cob.n_boundaries(), 7);
     }
 
     #[test]

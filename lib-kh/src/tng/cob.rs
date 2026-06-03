@@ -619,12 +619,16 @@ impl Cob {
         if self.is_empty()  { return other.clone(); }
         if other.is_empty() { return self.clone();  }
 
-        // Fast path: 1×1 with non-empty glue boundary. Most Cobs have a
-        // single CobComp, and non-empty boundary guarantees the result is
-        // connected (one output CobComp).
-        if self.comps.len() == 1 && other.comps.len() == 1
-            && self.comps[0].is_stackable(&other.comps[0])
-        {
+        // Fast path: empty glue. No CobComp merges across the boundary,
+        // so the result is just `self.comps + other.comps`.
+        if self.comps.iter().all(|c| c.tgt.is_empty()) {
+            let comps = self.comps.iter().chain(other.comps.iter()).cloned();
+            return Self::new(comps);
+        }
+
+        // Fast path: 1×1 with non-empty glue (guaranteed by the empty-glue
+        // check above). 
+        if self.comps.len() == 1 && other.comps.len() == 1 {
             return Self::from(
                 self.comps[0].stack(&other.comps[0])
             );

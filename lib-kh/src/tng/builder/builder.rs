@@ -392,13 +392,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let (h, t) = self.complex.ht();
         let a = self.complex.edge(i, j);
         let ainv = a.inv().unwrap();
-        let ainv_b = ainv * b;
+        let ainv_b = b.stack_ref(&ainv);
 
-        for k in self.complex.vertex(i).out_edges() { 
+        for k in self.complex.vertex(i).out_edges() {
             if k == j { continue }
 
             let c = self.complex.edge(i, k);
-            let c_ainv_b = (c * &ainv_b).reduce(h, t);
+            let c_ainv_b = ainv_b.stack_ref(c).reduce(h, t);
             let s = if let Some(d) = e.remove_cob(k) {
                 d - c_ainv_b
             } else {

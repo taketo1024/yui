@@ -830,6 +830,7 @@ pub trait LcCobTrait: Sized {
     fn is_closed(&self) -> bool;
     fn is_invertible(&self) -> bool;
     fn is_stackable(&self, other: &Self) -> bool;
+    fn as_scalar(&self) -> Option<&Self::R>;
     fn inv(&self) -> Option<Self>;
     fn connect(&self, c: &Cob) -> Self;
     fn stack(&self, other: &Self) -> Self;
@@ -854,13 +855,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         ).unwrap_or(false)
     }
 
-    fn is_stackable(&self, other: &Self) -> bool { 
-        cartesian!(self.keys(), other.keys()).all(|(a, b)| 
+    fn is_stackable(&self, other: &Self) -> bool {
+        cartesian!(self.keys(), other.keys()).all(|(a, b)|
             a.is_stackable(b)
         )
     }
 
-    fn inv(&self) -> Option<Self> { 
+    fn as_scalar(&self) -> Option<&R> {
+        if self.nterms() != 1 { return None }
+        let (cob, r) = self.iter().next().unwrap();
+        cob.is_empty().then_some(r)
+    }
+
+    fn inv(&self) -> Option<Self> {
         if let Some((Some(cinv), Some(ainv))) = self.iter().next().map(|(c, a)| 
             (c.inv(), a.inv())
         ) { 
@@ -876,7 +883,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn stack(&self, other: &Self) -> Self {
-        self.apply_bilin(other, |c1, c2| c1.stack(c2))
+        if let Some(a) = self.as_scalar() { 
+            other * a
+        } else if let Some(b) = other.as_scalar() { 
+            self * b
+        } else { 
+            self.apply_bilin(other, |c1, c2| c1.stack(c2))
+        }
     }
 
     fn cap_off(self, b: End, c: &TngComp, dot: Dot) -> Self {

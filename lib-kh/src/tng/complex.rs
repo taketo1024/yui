@@ -602,11 +602,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             for l1 in &out_keys {
                 let c = self.edge(k0, l1);
                 let c_ainv_b = ainv_b.stack(c).reduce(&h, &t);
+                if c_ainv_b.is_zero() {
+                    continue
+                }
 
                 let s = if self.has_edge(l0, l1) {
                     let d = self.edge(l0, l1);
                     d - c_ainv_b
-                } else {
+                } else { 
                     -c_ainv_b
                 };
 

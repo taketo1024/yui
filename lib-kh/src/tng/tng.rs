@@ -1,14 +1,25 @@
 use std::fmt::Display;
 use std::hash::Hash;
-use delegate::delegate;
 use itertools::Itertools;
-use smallvec::SmallVec;
 use yui_link::{Edge, Node, Path};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+/// Bitmap over edges; bit `e` set iff edge `e` belongs to this component.
+/// `u128` covers Edge ∈ 0..128, i.e. links with ≤ 64 crossings (2 edges per
+/// crossing). Bump to `[u128; 2]` to extend.
+type EdgeSet = u128;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+enum TngCompKind {
+    /// Arc with endpoint edges `e0 ≤ e1` (canonical).
+    Arc { e0: Edge, e1: Edge },
+    Circ,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct TngComp {
-    path: Path,
-    // True iff `path` contains the link's base_pt. OR'd through `connect`.
+    kind: TngCompKind,
+    edges: EdgeSet,
+    /// True iff this component contains the link's base_pt. OR'd through `connect`.
     marked: bool,
 }
 
@@ -30,59 +41,66 @@ impl TngComp {
     }
 
     pub fn from_path(path: Path, marked: bool) -> Self {
-        let mut c = Self { path, marked };
-        c.normalize();
-        c
+        let edges = path.edges().iter().fold(0u128, |acc, &e| {
+            debug_assert!((e as usize) < 128, "edge {e} exceeds u128 bitmap width");
+            acc | edge_bit(e)
+        });
+        let kind = match &path {
+            Path::Arc(es) => {
+                let first = es[0];
+                let last = *es.last().unwrap();
+                TngCompKind::Arc { e0: first.min(last), e1: first.max(last) }
+            }
+            Path::Circ(_) => TngCompKind::Circ,
+        };
+        Self { kind, edges, marked }
     }
 
     pub fn is_marked(&self) -> bool {
         self.marked
     }
 
-    delegate! {
-        to self.path {
-            pub fn len(&self) -> usize;
-            pub fn is_arc(&self) -> bool;
-            pub fn is_circle(&self) -> bool;
-            pub fn end_pts(&self) -> Option<(Edge, Edge)>;
-            pub fn contains(&self, e: Edge) -> bool;
-            pub fn min_edge(&self) -> Edge;
+    pub fn is_arc(&self) -> bool {
+        matches!(self.kind, TngCompKind::Arc { .. })
+    }
+
+    pub fn is_circle(&self) -> bool {
+        matches!(self.kind, TngCompKind::Circ)
+    }
+
+    pub fn end_pts(&self) -> Option<(Edge, Edge)> {
+        match self.kind {
+            TngCompKind::Arc { e0, e1 } => Some((e0, e1)),
+            TngCompKind::Circ => None,
         }
     }
 
-    /// Rewrite the backing [`Path`] in canonical form so two `TngComp`s
-    /// compare equal iff their oriented paths agree as *unoriented* sequences.
-    /// - `Arc(es)`:  reverse if `es[0] > es[last]`.
-    /// - `Circ(es)`: rotate so `es[0] == min(es)`, then reflect the suffix so
-    ///               `es[1] ≤ es[last]`.
-    fn normalize(&mut self) {
-        match &mut self.path {
-            Path::Arc(es) => {
-                if es.len() >= 2 && *es.last().unwrap() < es[0] {
-                    es.reverse();
-                }
-            }
-            Path::Circ(es) => {
-                let n = es.len();
-                if n > 1 {
-                    let min_idx = (0..n).min_by_key(|&i| es[i]).unwrap();
-                    es.rotate_left(min_idx);
-                    if n > 2 && es[n - 1] < es[1] {
-                        es[1..].reverse();
-                    }
-                }
-            }
-        }
+    pub fn len(&self) -> usize {
+        self.edges.count_ones() as usize
+    }
+
+    pub fn contains(&self, e: Edge) -> bool {
+        self.edges & edge_bit(e) != 0
+    }
+
+    pub fn min_edge(&self) -> Edge {
+        debug_assert!(self.edges != 0);
+        self.edges.trailing_zeros() as Edge
+    }
+
+    /// Iterate the edges this comp contains, in ascending order.
+    pub fn edges(&self) -> impl ExactSizeIterator<Item = Edge> {
+        EdgeBits(self.edges)
     }
 
     pub fn is_connectable(&self, other: &Self) -> bool {
-        let Some((e0, e1)) = self.end_pts() else { return false };
-        let Some((f0, f1)) = other.end_pts() else { return false };
-        e0 == f0 || e0 == f1 || e1 == f0 || e1 == f1
+        let Some((a, b)) = self.end_pts() else { return false };
+        let Some((c, d)) = other.end_pts() else { return false };
+        a == c || a == d || b == c || b == d
     }
 
-    /// Endpoint-set match between two arcs. Both `TngComp`s are normalized,
-    /// so endpoint pairs are sorted — direct equality suffices.
+    /// True iff both arcs have the same unordered endpoint pair (would close
+    /// into a circle on `connect`).
     pub fn is_connectable_bothends(&self, other: &Self) -> bool {
         let Some(s) = self.end_pts() else { return false };
         let Some(o) = other.end_pts() else { return false };
@@ -92,61 +110,50 @@ impl TngComp {
     pub fn connect(&mut self, other: Self) {
         assert!(self.is_connectable(&other), "{self} and {other} are not connectable.");
 
-        let placeholder = Path::Arc(SmallVec::new());
-        let this = std::mem::replace(&mut self.path, placeholder);
-        let (mut left, right) = (this.into_seq(), other.path.into_seq());
+        let (TngCompKind::Arc { e0: a, e1: b }, TngCompKind::Arc { e0: c, e1: d }) =
+            (self.kind, other.kind)
+            else { panic!("connect requires two arcs") };
 
-        let (e0, e1) = (left[0], *left.last().unwrap());
-        let (f0, f1) = (right[0], *right.last().unwrap());
-
-        let mut combined = if e1 == f0 {
-            // self ++ other[1..]
-            left.extend_from_slice(&right[1..]);
-            left
-        } else if e1 == f1 {
-            // self ++ reverse(other[..-1])
-            let mut r = right;
-            r.pop();
-            r.reverse();
-            left.extend(r);
-            left
-        } else if e0 == f0 {
-            // reverse(other[1..]) ++ self
-            let mut r = right;
-            r.remove(0);
-            r.reverse();
-            r.append(&mut left);
-            r
-        } else {
-            // e0 == f1: other[..-1] ++ self
-            let mut r = right;
-            r.pop();
-            r.append(&mut left);
-            r
+        let meets = (a == c) as u8 + (a == d) as u8 + (b == c) as u8 + (b == d) as u8;
+        let new_kind = match meets {
+            // Both endpoints match → closes into a circle.
+            2 => TngCompKind::Circ,
+            // One endpoint matches → arc with the two unmatched endpoints.
+            1 => {
+                let (free_self, free_other) =
+                    if a == c { (b, d) }
+                    else if a == d { (b, c) }
+                    else if b == c { (a, d) }
+                    else { /* b == d */ (a, c) };
+                TngCompKind::Arc {
+                    e0: free_self.min(free_other),
+                    e1: free_self.max(free_other),
+                }
+            }
+            _ => unreachable!("is_connectable guarantees meets ∈ {{1, 2}}"),
         };
 
-        // If the new endpoints coincide, the result closes into a circle.
-        let closes = combined.len() > 1 && combined[0] == *combined.last().unwrap();
-        self.path = if closes {
-            combined.pop();
-            Path::Circ(combined)
-        } else {
-            Path::Arc(combined)
-        };
+        self.kind = new_kind;
+        self.edges |= other.edges;
         self.marked |= other.marked;
-        self.normalize();
     }
 
     pub fn convert_edges<F>(&self, f: F) -> Self
     where F: Fn(Edge) -> Edge {
-        let mapped = self.path.edges().iter().map(|e| f(*e));
-        let path = if self.path.is_circle() {
-            Path::circ(mapped)
-        } else {
-            Path::arc(mapped)
+        let edges = self.edges().fold(0u128, |acc, e| {
+            let fe = f(e);
+            debug_assert!((fe as usize) < 128, "image edge {fe} exceeds u128 bitmap width");
+            acc | edge_bit(fe)
+        });
+        let kind = match self.kind {
+            TngCompKind::Arc { e0, e1 } => {
+                let (a, b) = (f(e0), f(e1));
+                TngCompKind::Arc { e0: a.min(b), e1: a.max(b) }
+            }
+            TngCompKind::Circ => TngCompKind::Circ,
         };
-        // `marked` preserved: InvLink's base_pt is on-axis (`inv(b) == b`).
-        Self::from_path(path, self.marked)
+        // `marked` preserved: InvLink's base_pt is on-axis (`f(b) == b`).
+        Self { kind, edges, marked: self.marked }
     }
 }
 
@@ -155,7 +162,11 @@ impl Display for TngComp {
         if self.marked {
             write!(f, "*")?;
         }
-        self.path.fmt(f)
+        let body = EdgeBits(self.edges).map(|e| e.to_string()).join("-");
+        match self.kind {
+            TngCompKind::Arc { .. } => write!(f, "[{body}]"),
+            TngCompKind::Circ       => write!(f, "⚪︎({body})"),
+        }
     }
 }
 
@@ -274,14 +285,14 @@ impl Tng {
         ).map(|(i, _)| i)
     }
 
-    pub fn euler_num(&self) -> isize { 
-        // NOTE: χ(arc) = 1, χ(circle) = 0. 
-        self.comps.iter().filter(|c| 
+    pub fn euler_num(&self) -> isize {
+        // NOTE: χ(arc) = 1, χ(circle) = 0.
+        self.comps.iter().filter(|c|
             c.is_arc()
         ).count() as isize
     }
 
-    fn normalize(&mut self) { 
+    fn normalize(&mut self) {
         self.comps.sort()
     }
 
@@ -303,6 +314,27 @@ impl From<TngComp> for Tng {
     fn from(c: TngComp) -> Self {
         Self::new(vec![c])
     }
+}
+
+const fn edge_bit(e: Edge) -> EdgeSet {
+    1u128 << e
+}
+
+/// Iterate the set bits of an `EdgeSet` as `Edge`s, in ascending order.
+struct EdgeBits(EdgeSet);
+
+impl Iterator for EdgeBits {
+    type Item = Edge;
+    fn next(&mut self) -> Option<Edge> {
+        if self.0 == 0 { return None }
+        let e = self.0.trailing_zeros() as Edge;
+        self.0 &= self.0 - 1;
+        Some(e)
+    }
+}
+
+impl ExactSizeIterator for EdgeBits {
+    fn len(&self) -> usize { self.0.count_ones() as usize }
 }
 
 #[cfg(test)]

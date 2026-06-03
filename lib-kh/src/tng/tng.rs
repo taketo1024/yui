@@ -1,12 +1,13 @@
 use std::fmt::Display;
 use std::hash::Hash;
 use itertools::Itertools;
+use yui_core::bitmap::BitMap;
 use yui_link::{Edge, Node, Path};
 
-/// Bitmap over edges; bit `e` set iff edge `e` belongs to this component.
-/// `u128` covers Edge ∈ 0..128, i.e. links with ≤ 64 crossings (2 edges per
-/// crossing). Bump to `[u128; 2]` to extend.
-type EdgeSet = u128;
+/// Edge presence as a packed bitmap. `u128` storage covers Edge ∈ 0..128,
+/// i.e. links with ≤ 64 crossings (2 edges per crossing). Bump the storage
+/// param to `[u128; 2]` (and impl `BitStorage` for it) to extend.
+type EdgeSet = BitMap<Edge, u128>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 enum TngCompKind {
@@ -19,7 +20,6 @@ enum TngCompKind {
 pub struct TngComp {
     kind: TngCompKind,
     edges: EdgeSet,
-    /// True iff this component contains the link's base_pt. OR'd through `connect`.
     marked: bool,
 }
 
@@ -41,10 +41,7 @@ impl TngComp {
     }
 
     pub fn from_path(path: Path, marked: bool) -> Self {
-        let edges = path.edges().iter().fold(0u128, |acc, &e| {
-            debug_assert!((e as usize) < 128, "edge {e} exceeds u128 bitmap width");
-            acc | edge_bit(e)
-        });
+        let edges: EdgeSet = path.edges().iter().copied().collect();
         let kind = match &path {
             Path::Arc(es) => {
                 let first = es[0];
@@ -76,21 +73,20 @@ impl TngComp {
     }
 
     pub fn len(&self) -> usize {
-        self.edges.count_ones() as usize
+        self.edges.len()
     }
 
     pub fn contains(&self, e: Edge) -> bool {
-        self.edges & edge_bit(e) != 0
+        self.edges.contains(e)
     }
 
     pub fn min_edge(&self) -> Edge {
-        debug_assert!(self.edges != 0);
-        self.edges.trailing_zeros() as Edge
+        self.edges.iter().next().expect("empty TngComp has no min edge")
     }
 
     /// Iterate the edges this comp contains, in ascending order.
     pub fn edges(&self) -> impl ExactSizeIterator<Item = Edge> {
-        EdgeBits(self.edges)
+        self.edges.iter()
     }
 
     pub fn is_connectable(&self, other: &Self) -> bool {
@@ -140,11 +136,7 @@ impl TngComp {
 
     pub fn convert_edges<F>(&self, f: F) -> Self
     where F: Fn(Edge) -> Edge {
-        let edges = self.edges().fold(0u128, |acc, e| {
-            let fe = f(e);
-            debug_assert!((fe as usize) < 128, "image edge {fe} exceeds u128 bitmap width");
-            acc | edge_bit(fe)
-        });
+        let edges: EdgeSet = self.edges().map(&f).collect();
         let kind = match self.kind {
             TngCompKind::Arc { e0, e1 } => {
                 let (a, b) = (f(e0), f(e1));
@@ -162,7 +154,7 @@ impl Display for TngComp {
         if self.marked {
             write!(f, "*")?;
         }
-        let body = EdgeBits(self.edges).map(|e| e.to_string()).join("-");
+        let body = self.edges.iter().map(|e| e.to_string()).join("-");
         match self.kind {
             TngCompKind::Arc { .. } => write!(f, "[{body}]"),
             TngCompKind::Circ       => write!(f, "⚪︎({body})"),
@@ -314,27 +306,6 @@ impl From<TngComp> for Tng {
     fn from(c: TngComp) -> Self {
         Self::new(vec![c])
     }
-}
-
-const fn edge_bit(e: Edge) -> EdgeSet {
-    1u128 << e
-}
-
-/// Iterate the set bits of an `EdgeSet` as `Edge`s, in ascending order.
-struct EdgeBits(EdgeSet);
-
-impl Iterator for EdgeBits {
-    type Item = Edge;
-    fn next(&mut self) -> Option<Edge> {
-        if self.0 == 0 { return None }
-        let e = self.0.trailing_zeros() as Edge;
-        self.0 &= self.0 - 1;
-        Some(e)
-    }
-}
-
-impl ExactSizeIterator for EdgeBits {
-    fn len(&self) -> usize { self.0.count_ones() as usize }
 }
 
 #[cfg(test)]

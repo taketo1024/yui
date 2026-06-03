@@ -2,6 +2,7 @@ use std::fmt::Display;
 use std::hash::Hash;
 use itertools::Itertools;
 use yui_core::bitmap::BitMap;
+use yui_core::CloneAnd;
 use yui_link::{Edge, Node, Path};
 
 /// Edge presence as a packed bitmap. `u128` storage covers Edge ∈ 0..128,
@@ -103,11 +104,7 @@ impl TngComp {
         s == o
     }
 
-    pub fn connect(&mut self, other: Self) {
-        *self = self.connect_ref(&other);
-    }
-
-    pub fn connect_ref(&self, other: &Self) -> Self {
+    pub fn connect(&self, other: &Self) -> Self {
         assert!(self.is_connectable(other), "{self} and {other} are not connectable.");
 
         let (TngCompKind::Arc { e0: a, e1: b }, TngCompKind::Arc { e0: c, e1: d }) =
@@ -189,11 +186,10 @@ impl Tng {
             TngComp::from_path(r, marked)
         };
         let (r0, r1) = x.arcs();
-        let (mut c0, c1) = (mk(r0), mk(r1));
+        let (c0, c1) = (mk(r0), mk(r1));
 
         if c0.is_connectable(&c1) {
-            c0.connect(c1);
-            Self::from(c0)
+            Self::from(c0.connect(&c1))
         } else {
             Self::new([c0, c1])
         }
@@ -245,18 +241,11 @@ impl Tng {
         self.comps.remove(i)
     }
 
-    pub fn connect(&mut self, other: Self) {
-        for c in other.comps.into_iter() {
-            if c.is_circle() {
-                self.comps.push(c);
-            } else {
-                self.append_arc(c);
-            }
-        }
-        self.normalize();
+    pub fn connect(&self, other: &Self) -> Self {
+        self.clone_and(|t| t.connect_mut(other))
     }
 
-    pub fn connect_ref(&mut self, other: &Self) {
+    pub fn connect_mut(&mut self, other: &Self) {
         for c in other.comps.iter() {
             if c.is_circle() {
                 self.comps.push(*c);
@@ -267,20 +256,20 @@ impl Tng {
         self.normalize();
     }
 
-    pub fn append_arc(&mut self, arc: TngComp) { 
+    pub fn append_arc(&mut self, arc: TngComp) {
         assert!(arc.is_arc());
 
         // If one end of `arc` is connectable:
-        if let Some(i) = self.find_comp(|c| c.is_connectable(&arc)) { 
-            self.comps[i].connect(arc);
+        if let Some(i) = self.find_comp(|c| c.is_connectable(&arc)) {
+            self.comps[i] = self.comps[i].connect(&arc);
 
             // If the other end is also connectable to a different component:
-            let ci = &self.comps[i];
-            if let Some(j) = self.find_comp(|c| c != ci && c.is_connectable(ci)) { 
+            let ci = self.comps[i];
+            if let Some(j) = self.find_comp(|c| *c != ci && c.is_connectable(&ci)) {
                 let cj = self.comps.remove(j);
-                self.comps[i].connect(cj);
+                self.comps[i] = self.comps[i].connect(&cj);
             }
-        } else { 
+        } else {
             self.comps.push(arc);
         }
 
@@ -360,14 +349,14 @@ mod tests {
 
     #[test]
     fn connect_comp() { 
-        let mut c0 = TngComp::arc([0, 1]);
+        let c0 = TngComp::arc([0, 1]);
         let c1 = TngComp::arc([1, 2]);
         let c2 = TngComp::arc([0, 2]);
 
-        c0.connect(c1);
+        let c0 = c0.connect(&c1);
         assert_eq!(c0, TngComp::arc([0, 1, 2]));
 
-        c0.connect(c2);
+        let c0 = c0.connect(&c2);
         assert_eq!(c0, TngComp::circ([0, 1, 2]));
     }
 
@@ -408,7 +397,7 @@ mod tests {
             TngComp::circ([11]),
         ]);
 
-        t0.connect(t1);
+        t0.connect_mut(&t1);
 
         assert_eq!(t0, Tng::new(vec![
             TngComp::arc([0, 1, 2, 3, 4]),

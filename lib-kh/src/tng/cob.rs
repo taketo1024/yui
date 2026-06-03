@@ -269,41 +269,6 @@ impl CobComp {
         )
     }
     
-    pub fn connect(&mut self, other: Self) { 
-        debug_assert!(self.is_connectable(&other));
-
-        // χ(S∪S') = χ(S) + χ(S') - χ(S∩S')
-        //         = 2 - 2g(S∪S') - #∂(S∪S'),
-        // χ(S∩S') = #{ arcs in S∩S' }.
-        // 2g(S∪S') = 2 - (χ(S) + χ(S') + #∂(S∪S')) + #∂(S∩S').
-
-        let x1 = self.euler_num();
-        let x2 = other.euler_num();
-
-        let a = self.src.end_pts().filter(|e|
-            other.src.end_pts().contains(&e)
-        ).count() as i32;
-
-        assert!(a > 0);
-
-        let CobComp{ src, tgt, dots, .. } = other;
-
-        self.src.connect(src);
-        self.tgt.connect(tgt);
-        self.nb = Self::count_boundaries(&self.src, &self.tgt);
-
-        let b = self.nb as i32;
-        let g = 2 - (x1 + x2 + b) + a;
-
-        assert!(g >= 0);
-        assert!(g % 2 == 0);
-
-        self.genus = (g / 2) as usize;
-
-        self.dots.0 += dots.0;
-        self.dots.1 += dots.1;
-    }
-
     pub fn should_reduce(&self) -> bool {
         self.is_zero_cob() ||
         self.is_removable() ||
@@ -523,92 +488,8 @@ impl Cob {
         self.normalize();
     }
 
-    pub fn connect(&mut self, other: Cob) { // horizontal composition
-        if other.is_empty() { return; }
-        if self.is_empty() { *self = other; return; }
-
-        let mut comps = std::mem::take(&mut self.comps);
-        comps.reserve(other.comps.len());
-        comps.extend(other.comps);
-
-        while let Some(c) = Self::connect_next(&mut comps) {
-            self.comps.push(c)
-        }
-
-        self.normalize()
-    }
-
-    // Take the next connected group from `comps` (transitively via shared
-    // boundary endpoints) and return its merged CobComp. In-place frontier
-    // index on `comps` — no auxiliary queue/Vec:
-    //   comps[..unproc] = unprocessed
-    //   comps[unproc..] = pending (in current group)
-    // The pending region is drained back to empty before return.
-    fn connect_next(comps: &mut Vec<CobComp>) -> Option<CobComp> {
-        // Pop the seed and look for direct connectables. If none, the seed
-        // is a singleton group and we can short-circuit (no genus rebuild).
-        let seed = comps.pop()?;
-        let mut unproc = comps.len();
-
-        let mut i = 0;
-        while i < unproc {
-            if seed.is_connectable(&comps[i]) {
-                comps.swap(i, unproc - 1);
-                unproc -= 1;
-            } else {
-                i += 1;
-            }
-        }
-
-        if comps.len() == unproc {
-            return Some(seed);
-        }
-
-        // Real group: initialize accumulators from the seed.
-        let mut dots = seed.dots;
-        let mut x = seed.euler_num();
-        let mut a = 0;
-        let mut src = seed.src;
-        let mut tgt = seed.tgt;
-
-        while comps.len() > unproc {
-            let cob = comps.pop().unwrap();
-
-            let mut i = 0;
-            while i < unproc {
-                if cob.is_connectable(&comps[i]) {
-                    comps.swap(i, unproc - 1);
-                    unproc -= 1;
-                } else {
-                    i += 1;
-                }
-            }
-
-            dots.0 += cob.dots.0;
-            dots.1 += cob.dots.1;
-            x += cob.euler_num();
-            a += cob.src.end_pts().filter(|&e|
-                src.end_pts().contains(&e)
-            ).count();
-            src.connect(cob.src);
-            tgt.connect(cob.tgt);
-        }
-
-        let a = a as i32;
-        let b = CobComp::count_boundaries(&src, &tgt) as i32;
-        let g = 2 - (x + b) + a;
-
-        assert!(g >= 0);
-        assert!(g % 2 == 0);
-
-        let genus = (g / 2) as usize;
-        Some(CobComp::new_with_nb(src, tgt, genus, dots, b as usize))
-    }
-
-    /// Ref-taking horizontal composition: same as `connect` but borrows both
-    /// sides and returns a new `Cob`. Avoids the deep-clone the owned API
-    /// pays at the call site.
-    pub fn connect_ref(&self, other: &Cob) -> Cob {
+    /// Horizontal composition. Borrows both sides and returns a new `Cob`.
+    pub fn connect(&self, other: &Cob) -> Cob {
         if other.is_empty() { return self.clone(); }
         if self.is_empty()  { return other.clone(); }
 
@@ -616,7 +497,7 @@ impl Cob {
             self.comps.iter().chain(other.comps.iter()).collect();
         let mut comps = Vec::new();
 
-        while let Some(c) = Self::connect_next_ref(&mut refs) {
+        while let Some(c) = Self::connect_next(&mut refs) {
             comps.push(c);
         }
 
@@ -624,9 +505,9 @@ impl Cob {
     }
 
     // Ref-taking sibling of `connect_next`: same algorithm, but the working
-    // set holds `&CobComp` so merges go through `connect_ref` on the running
+    // set holds `&CobComp` so merges go through `connect` on the running
     // src/tgt accumulators instead of moving Tngs out.
-    fn connect_next_ref<'a>(comps: &mut Vec<&'a CobComp>) -> Option<CobComp> {
+    fn connect_next<'a>(comps: &mut Vec<&'a CobComp>) -> Option<CobComp> {
         let seed = comps.pop()?;
         let mut unproc = comps.len();
 
@@ -670,8 +551,8 @@ impl Cob {
             a += cob.src.end_pts().filter(|&e|
                 src.end_pts().contains(&e)
             ).count();
-            src.connect_ref(&cob.src);
-            tgt.connect_ref(&cob.tgt);
+            src.connect_mut(&cob.src);
+            tgt.connect_mut(&cob.tgt);
         }
 
         let a = a as i32;
@@ -693,98 +574,8 @@ impl Cob {
         ))
     }
 
-    pub fn stack(&mut self, other: Cob) { // vertical composition
-        debug_assert!(
-            self.is_stackable(&other),
-            "{} cannot be stacked on {}", other, self
-        );
-
-        if self.is_empty() { 
-            *self = other;
-            return;
-        } else if other.is_empty() { 
-            return;
-        }
-
-        let mut bot = std::mem::take(&mut self.comps);
-        let mut top = other.comps;
-
-        while let Some(c) = Self::stack_next(&mut bot, &mut top) {
-            self.comps.push(c)
-        }
-
-        self.normalize()
-    }
-
-    // Take the next connected group from `bot` & `top` and return its merged
-    // CobComp. Uses an in-place frontier index instead of an explicit queue:
-    //   bot[..bot_unproc] = unprocessed (available for later groups)
-    //   bot[bot_unproc..] = pending (in current group, awaiting absorption)
-    // Same for top. Both pending regions are empty again on return.
-    fn stack_next(bot: &mut Vec<CobComp>, top: &mut Vec<CobComp>) -> Option<CobComp> {
-        if bot.is_empty() && top.is_empty() { return None }
-
-        let mut src = Tng::empty();
-        let mut tgt = Tng::empty();
-        let mut dots = (0, 0);
-        let mut x = 0 as i32;
-        let mut a = 0 as i32;
-
-        let mut bot_unproc = bot.len();
-        let mut top_unproc = top.len();
-
-        // Seed: trailing comp becomes the first pending member of the group.
-        if bot_unproc > 0 {
-            bot_unproc -= 1;
-        } else {
-            top_unproc -= 1;
-        }
-
-        while bot.len() > bot_unproc || top.len() > top_unproc {
-            if bot.len() > bot_unproc {
-                let cob = bot.pop().unwrap();
-                for c in cob.tgt.comps() {
-                    if let Some(i) = top[..top_unproc].iter().position(|t| t.src.contains(c)) {
-                        top.swap(i, top_unproc - 1);
-                        top_unproc -= 1;
-                    }
-                    if c.is_arc() {
-                        a += 1;
-                    }
-                }
-                dots.0 += cob.dots.0;
-                dots.1 += cob.dots.1;
-                x += cob.euler_num();
-                src.connect(cob.src);
-            } else {
-                let cob = top.pop().unwrap();
-                for c in cob.src.comps() {
-                    if let Some(i) = bot[..bot_unproc].iter().position(|b| b.tgt.contains(c)) {
-                        bot.swap(i, bot_unproc - 1);
-                        bot_unproc -= 1;
-                    }
-                }
-                dots.0 += cob.dots.0;
-                dots.1 += cob.dots.1;
-                x += cob.euler_num();
-                tgt.connect(cob.tgt);
-            }
-        }
-
-        let b = CobComp::count_boundaries(&src, &tgt) as i32;
-        let g = 2 - (x + b) + a;
-
-        assert!(g >= 0);
-        assert!(g % 2 == 0);
-
-        let genus = (g / 2) as usize;
-        Some(CobComp::new_with_nb(src, tgt, genus, dots, b as usize))
-    }
-
-    /// By-ref vertical composition: same as [`Self::stack`] but borrows both
-    /// sides and returns a new `Cob`. Avoids the deep-clone of inputs that
-    /// `&Cob * &Cob` incurs through auto_ops.
-    pub fn stack_ref(&self, other: &Cob) -> Cob {
+    /// Vertical composition. Borrows both sides and returns a new `Cob`.
+    pub fn stack(&self, other: &Cob) -> Cob {
         debug_assert!(
             self.is_stackable(other),
             "{} cannot be stacked on {}", other, self
@@ -806,7 +597,7 @@ impl Cob {
         let mut top: Vec<&CobComp> = other.comps.iter().collect();
         let mut comps = Vec::new();
 
-        while let Some(c) = Self::stack_next_ref(&mut bot, &mut top) {
+        while let Some(c) = Self::stack_next(&mut bot, &mut top) {
             comps.push(c)
         }
 
@@ -815,7 +606,7 @@ impl Cob {
 
     // Direct merge of two CobComps that share non-empty glue boundary —
     // result is guaranteed connected (one output CobComp). Only valid as
-    // the 1×1 fast path inside `stack_ref`; for cap-bot + cup-top (empty
+    // the 1×1 fast path inside `stack`; for cap-bot + cup-top (empty
     // glue) the result is disjoint, and the general path must be used.
     fn stack_pair(bot: &CobComp, top: &CobComp) -> CobComp {
         debug_assert_eq!(bot.tgt, top.src, "stack_pair: boundary mismatch");
@@ -840,9 +631,9 @@ impl Cob {
     }
 
     // By-ref sibling of [`Self::stack_next`]: bot/top hold `&CobComp`, so the
-    // merge code can't move Tngs out — uses `connect_ref` on the running
+    // merge code can't move Tngs out — uses `connect` on the running
     // src/tgt accumulators instead.
-    fn stack_next_ref<'a>(
+    fn stack_next<'a>(
         bot: &mut Vec<&'a CobComp>,
         top: &mut Vec<&'a CobComp>,
     ) -> Option<CobComp> {
@@ -878,7 +669,7 @@ impl Cob {
                 dots.0 += cob.dots.0;
                 dots.1 += cob.dots.1;
                 x += cob.euler_num();
-                src.connect_ref(&cob.src);
+                src.connect_mut(&cob.src);
             } else {
                 let cob = top.pop().unwrap();
                 for c in cob.src.comps() {
@@ -890,7 +681,7 @@ impl Cob {
                 dots.0 += cob.dots.0;
                 dots.1 += cob.dots.1;
                 x += cob.euler_num();
-                tgt.connect_ref(&cob.tgt);
+                tgt.connect_mut(&cob.tgt);
             }
         }
 
@@ -954,17 +745,17 @@ impl Cob {
     }
 
     #[cfg(debug_assertions)]
-    pub fn reconst_src(&self) -> Tng { 
+    pub fn reconst_src(&self) -> Tng {
         self.comps.iter().fold(Tng::empty(), |mut t, c| {
-            t.connect(c.src.clone());
+            t.connect_mut(&c.src);
             t
         })
     }
 
     #[cfg(debug_assertions)]
-    pub fn reconst_tgt(&self) -> Tng { 
+    pub fn reconst_tgt(&self) -> Tng {
         self.comps.iter().fold(Tng::empty(), |mut t, c| {
-            t.connect(c.tgt.clone());
+            t.connect_mut(&c.tgt);
             t
         })
     }
@@ -1012,9 +803,8 @@ impl LcKey for Cob {}
 
 impl Mul for Cob {
     type Output = Cob;
-    fn mul(self, mut rhs: Self) -> Self::Output {
-        rhs.stack(self);
-        rhs
+    fn mul(self, rhs: Self) -> Self::Output {
+        rhs.stack(&self)
     }
 }
 
@@ -1026,9 +816,8 @@ pub trait LcCobTrait: Sized {
     fn is_invertible(&self) -> bool;
     fn is_stackable(&self, other: &Self) -> bool;
     fn inv(&self) -> Option<Self>;
-    fn connect(self, c: &Cob) -> Self;
-    fn connect_ref(&self, c: &Cob) -> Self;
-    fn stack_ref(&self, other: &Self) -> Self;
+    fn connect(&self, c: &Cob) -> Self;
+    fn stack(&self, other: &Self) -> Self;
     fn cap_off(self, b: End, c: &TngComp, dot: Dot) -> Self;
     fn should_reduce(&self) -> bool;
     fn reduce(self, h: &Self::R, t: &Self::R) -> Self;
@@ -1067,16 +856,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    fn connect(self, c: &Cob) -> Self {
-        mut_cob(self, |cob| cob.connect(c.clone()))
+    fn connect(&self, c: &Cob) -> Self {
+        self.map_ref(|c1, r| (c1.connect(c), r.clone()))
     }
 
-    fn connect_ref(&self, c: &Cob) -> Self {
-        self.map_ref(|c1, r| (c1.connect_ref(c), r.clone()))
-    }
-
-    fn stack_ref(&self, other: &Self) -> Self {
-        self.apply_bilin(other, |c1, c2| c1.stack_ref(c2))
+    fn stack(&self, other: &Self) -> Self {
+        self.apply_bilin(other, |c1, c2| c1.stack(c2))
     }
 
     fn cap_off(self, b: End, c: &TngComp, dot: Dot) -> Self {
@@ -1185,70 +970,7 @@ mod tests {
     }
 
     #[test]
-    fn connect1() { 
-        let src = Tng::new(vec![
-            TngComp::arc([1, 2]),
-            TngComp::arc([3, 4]),
-            TngComp::circ([10]),
-        ]);
-        let tgt = Tng::new(vec![
-            TngComp::arc([1, 3]),
-            TngComp::arc([2, 4]),
-            TngComp::circ([11]),
-        ]);
-
-        let mut c = CobComp::plain(src, tgt);
-        c.connect(CobComp::id(
-            TngComp::arc([0, 1])
-        ));
-
-        assert_eq!(c, CobComp::plain(
-            Tng::new(vec![
-                TngComp::arc([0, 1, 2]),
-                TngComp::arc([3, 4]),
-                TngComp::circ([10]),
-            ]),
-            Tng::new(vec![
-                TngComp::arc([0, 1, 3]),
-                TngComp::arc([2, 4]),
-                TngComp::circ([11]),
-            ]),
-        ));
-    }
-
-    #[test]
-    fn connect2() { 
-        let src = Tng::new(vec![
-            TngComp::arc([1, 2]),
-            TngComp::arc([3, 4]),
-            TngComp::circ([10]),
-        ]);
-        let tgt = Tng::new(vec![
-            TngComp::arc([1, 3]),
-            TngComp::arc([2, 4]),
-            TngComp::circ([11]),
-        ]);
-
-        let mut c = CobComp::plain(src, tgt);
-        c.connect(CobComp::id(
-            TngComp::arc([1, 3])
-        ));
-
-        assert_eq!(c, CobComp::plain(
-            Tng::new(vec![
-                TngComp::arc([2, 1, 3, 4]),
-                TngComp::circ([10]),
-            ]),
-            Tng::new(vec![
-                TngComp::arc([2, 4]),
-                TngComp::circ([1, 3]),
-                TngComp::circ([11]),
-            ]),
-        ));
-    }
-
-    #[test]
-    fn euler_num() { 
+    fn euler_num() {
         let c0 = CobComp::id(
             TngComp::arc([1, 2])
         );
@@ -1285,52 +1007,7 @@ mod tests {
     }
 
     #[test]
-    fn connect_incr_genus() { 
-        let mut c0 = CobComp::plain(
-            Tng::new(vec![
-                TngComp::arc([1, 2]),
-                TngComp::arc([3, 4])
-            ]),
-            Tng::new(vec![
-                TngComp::arc([1, 2]),
-                TngComp::arc([3, 4])
-            ]),
-        );
-        let c1 = CobComp::id(
-            TngComp::arc([1, 3])
-        );
-        let c2 = CobComp::id(
-            TngComp::arc([2, 4])
-        );
-
-        assert_eq!(c0.genus, 0);
-        assert_eq!(c1.genus, 0);
-        assert_eq!(c2.genus, 0);
-
-        c0.connect(c1);
-
-        assert_eq!(c0.genus, 1);
-        assert_eq!(c0.euler_num(), -1);
-
-        c0.connect(c2);
-
-        assert_eq!(c0.genus, 1);
-        assert_eq!(c0.euler_num(), -2);
-
-        c0.cap_off(End::Src, 0);
-
-        assert_eq!(c0.genus, 1);
-        assert_eq!(c0.euler_num(), -1);
-
-        c0.cap_off(End::Tgt, 0);
-
-        assert_eq!(c0.genus, 1);
-        assert_eq!(c0.euler_num(), 0);
-        assert!(c0.is_closed()); // torus
-    }
-
-    #[test]
-    fn inv() { 
+    fn inv() {
         let cc0 = CobComp::id(TngComp::arc([0, 1]));
         let cc1 = CobComp::plain(
             Tng::from(TngComp::circ([2])),
@@ -1397,45 +1074,45 @@ mod tests {
 
     #[test]
     fn stack_closed() {
-        let mut c0 = Cob::from(closed(0));
+        let c0 = Cob::from(closed(0));
         let c1 = Cob::from(closed(1));
-        
-        c0.stack(c1);
 
-        assert_eq!(c0, Cob::new(vec![
+        let c = c0.stack(&c1);
+
+        assert_eq!(c, Cob::new(vec![
             closed(0),
             closed(1)
         ]));
     }
-    
+
     #[test]
     fn stack_cup_cap() {
-        let mut c0 = Cob::from(CobComp::cup(TngComp::circ([0])));
+        let c0 = Cob::from(CobComp::cup(TngComp::circ([0])));
         let c1 = Cob::from(CobComp::cap(TngComp::circ([0])));
-        
-        c0.stack(c1);
 
-        assert_eq!(c0, Cob::new(vec![
+        let c = c0.stack(&c1);
+
+        assert_eq!(c, Cob::new(vec![
             closed(0)
         ]));
     }
-   
+
     #[test]
     fn stack_cap_cup() {
-        let mut c0 = Cob::from(CobComp::cap(TngComp::circ([0])));
+        let c0 = Cob::from(CobComp::cap(TngComp::circ([0])));
         let c1 = Cob::from(CobComp::cup(TngComp::circ([0])));
-        
-        c0.stack(c1);
 
-        assert_eq!(c0, Cob::new(vec![
+        let c = c0.stack(&c1);
+
+        assert_eq!(c, Cob::new(vec![
             CobComp::cup(TngComp::circ([0])),
             CobComp::cap(TngComp::circ([0]))
         ]));
     }
-   
+
     #[test]
     fn stack_comps() {
-        let mut c0 = Cob::new(vec![
+        let c0 = Cob::new(vec![
             CobComp::id(TngComp::arc([0, 1])),
             CobComp::cup(TngComp::circ([2]))
         ]);
@@ -1443,10 +1120,10 @@ mod tests {
             CobComp::cap(TngComp::circ([2])),
             CobComp::id(TngComp::arc([0, 1]))
         ]);
-        
-        c0.stack(c1);
 
-        assert_eq!(c0, Cob::new(vec![
+        let c = c0.stack(&c1);
+
+        assert_eq!(c, Cob::new(vec![
             closed(0),
             CobComp::id(TngComp::arc([0, 1])),
         ]));
@@ -1466,18 +1143,10 @@ mod tests {
         let c0 = Cob::id(&c1.reconst_src());
         let c2 = Cob::id(&c1.reconst_tgt());
 
-        let e = c1.clone_and(|e|
-            e.stack(c2)
-        );
-
-        assert_eq!(e, c1);
-
-        let e = c0.clone_and(|e|
-            e.stack(c1.clone())
-        );
-        assert_eq!(e, c1);
+        assert_eq!(c1.stack(&c2), c1);
+        assert_eq!(c0.stack(&c1), c1);
     }
-   
+
     #[test]
     fn stack_torus() {
         let c0 = Cob::from(CobComp::cup(TngComp::circ([0])));
@@ -1495,80 +1164,79 @@ mod tests {
         ]);
         let c3 = Cob::from(CobComp::cap(TngComp::circ([3])));
 
-        let mut c =  Cob::empty();
-        c.stack(c0);
+        let c = Cob::empty().stack(&c0);
 
         assert_eq!(c.n_comps(), 1);
         assert_eq!(c.comp(0).src.n_comps(), 0);
         assert_eq!(c.comp(0).tgt.n_comps(), 1);
         assert_eq!(c.comp(0).genus, 0);
 
-        c.stack(c1);
+        let c = c.stack(&c1);
         assert_eq!(c.n_comps(), 1);
         assert_eq!(c.comp(0).src.n_comps(), 0);
         assert_eq!(c.comp(0).tgt.n_comps(), 2);
         assert_eq!(c.comp(0).genus, 0);
 
-        c.stack(c2);
+        let c = c.stack(&c2);
         assert_eq!(c.n_comps(), 1);
         assert_eq!(c.comp(0).src.n_comps(), 0);
         assert_eq!(c.comp(0).tgt.n_comps(), 1);
         assert_eq!(c.comp(0).genus, 1);
 
-        c.stack(c3);
+        let c = c.stack(&c3);
         assert_eq!(c.n_comps(), 1);
         assert_eq!(c.comp(0).src.n_comps(), 0);
         assert_eq!(c.comp(0).tgt.n_comps(), 0);
         assert_eq!(c.comp(0).genus, 1);
     }
 
-    // ─── stack_ref ───
+    // ─── stack ───
     // Mirrors the by-value `stack` cases. 1×1 with non-empty glue takes the
     // fast path; empty inputs and disjoint pairs (cap below + cup above) and
     // multi-comp Cobs fall through to the general merge loop.
 
     #[test]
-    fn stack_ref_empty() {
+    fn stack_empty() {
         let cup = Cob::from(CobComp::cup(TngComp::circ([0])));  // src empty
         let cap = Cob::from(CobComp::cap(TngComp::circ([0])));  // tgt empty
 
         // Empty on the left: only valid for cobs with empty src.
-        assert_eq!(Cob::empty().stack_ref(&cup), cup);
+        assert_eq!(Cob::empty().stack(&cup), cup);
         // Empty on the right: only valid for cobs with empty tgt.
-        assert_eq!(cap.stack_ref(&Cob::empty()), cap);
+        assert_eq!(cap.stack(&Cob::empty()), cap);
         // Both empty.
-        assert_eq!(Cob::empty().stack_ref(&Cob::empty()), Cob::empty());
+        assert_eq!(Cob::empty().stack(&Cob::empty()), Cob::empty());
     }
 
     #[test]
-    fn stack_ref_pair_connected() {
+    fn stack_pair_connected() {
         // 1×1 with non-empty glue → fast path returns one CobComp.
 
         // cup-cap closes a circle into a sphere.
         let cup = Cob::from(CobComp::cup(TngComp::circ([0])));
         let cap = Cob::from(CobComp::cap(TngComp::circ([0])));
-        assert_eq!(cup.stack_ref(&cap), Cob::from(closed(0)));
+        assert_eq!(cup.stack(&cap), Cob::from(closed(0)));
 
         // id ∘ id = id.
         let id = Cob::from(CobComp::id(TngComp::arc([0, 1])));
-        assert_eq!(id.stack_ref(&id), id);
+        assert_eq!(id.stack(&id), id);
     }
 
     #[test]
-    fn stack_ref_pair_disjoint() {
+    fn stack_pair_disjoint() {
         // 1×1 with empty glue (cap below, cup above) → 2 disjoint CobComps.
         // Fast path rejects this; general path preserves both components.
         let cap = Cob::from(CobComp::cap(TngComp::circ([0])));
         let cup = Cob::from(CobComp::cup(TngComp::circ([0])));
 
-        assert_eq!(cap.stack_ref(&cup), Cob::new(vec![
+        assert_eq!(cap.stack(&cup), Cob::new(vec![
             CobComp::cup(TngComp::circ([0])),
             CobComp::cap(TngComp::circ([0])),
         ]));
     }
 
     #[test]
-    fn stack_ref_arbitrary_comps() {
+    fn stack_arbitrary_comps() {
         // Multi-comp on both sides: cup-cap pair becomes a sphere, the
         // remaining id-id pair passes through.
         let bot = Cob::new(vec![
@@ -1580,15 +1248,11 @@ mod tests {
             CobComp::id(TngComp::arc([0, 1])),
         ]);
 
-        assert_eq!(bot.stack_ref(&top), Cob::new(vec![
+        assert_eq!(bot.stack(&top), Cob::new(vec![
             closed(0),
             CobComp::id(TngComp::arc([0, 1])),
         ]));
 
-        // Cross-check: stack_ref must agree with the by-value `stack`.
-        let mut expected = bot.clone();
-        expected.stack(top.clone());
-        assert_eq!(bot.stack_ref(&top), expected);
     }
 
     #[test]

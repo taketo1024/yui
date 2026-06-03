@@ -448,10 +448,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let w = right.vertex(l);
             let kl = k + l;
 
-            let t = v.tng.clone_and(|t|
-                t.connect(w.tng.clone())
-            );
-            let vw = TngComplexVertex::from(t);
+            let vw = TngComplexVertex::from(v.tng.connect(&w.tng));
 
             self.add_vertex(kl, vw);
         }
@@ -474,7 +471,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             let e1 = left.vertex(k_l).out_edges().map(|l_l| {
                 let l = l_l + k_r;
-                let f = left.edge(k_l, l_l).connect_ref(&id_r); // D(f, 1)
+                let f = left.edge(k_l, l_l).connect(&id_r); // D(f, 1)
                 (l, f.reduce(&h, &t))
             });
             
@@ -483,7 +480,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             let e2 = right.vertex(k_r).out_edges().map(|l_r| {
                 let l = k_l + l_r;
-                let id_f = right.edge(k_r, l_r).connect_ref(&id_l) * &sign; // (-1)^{deg(k0)} D(1, f)
+                let id_f = right.edge(k_r, l_r).connect(&id_l) * &sign; // (-1)^{deg(k0)} D(1, f)
                 (l, id_f.reduce(&h, &t))
             });
 
@@ -600,11 +597,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         for l0 in &in_keys {
             let b = self.edge(l0, k1);
-            let ainv_b = b.stack_ref(&ainv);
+            let ainv_b = b.stack(&ainv);
 
             for l1 in &out_keys {
                 let c = self.edge(k0, l1);
-                let c_ainv_b = ainv_b.stack_ref(c).reduce(&h, &t);
+                let c_ainv_b = ainv_b.stack(c).reduce(&h, &t);
 
                 let s = if self.has_edge(l0, l1) {
                     let d = self.edge(l0, l1);

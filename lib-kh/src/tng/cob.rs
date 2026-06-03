@@ -269,6 +269,60 @@ impl CobComp {
         )
     }
     
+    /// In-place horizontal composition: merge `other` into `self` along the
+    /// shared arc boundary. Genus recomputed via the Euler formula.
+    pub fn connect_mut(&mut self, other: &Self) {
+        debug_assert!(self.is_connectable(other));
+
+        let x1 = self.euler_num();
+        let x2 = other.euler_num();
+        let a = self.src.end_pts().filter(|e|
+            other.src.end_pts().contains(&e)
+        ).count() as i32;
+        assert!(a > 0);
+
+        self.src.connect_mut(&other.src);
+        self.tgt.connect_mut(&other.tgt);
+        self.nb = Self::count_boundaries(&self.src, &self.tgt);
+
+        let b = self.nb as i32;
+        let g = 2 - (x1 + x2 + b) + a;
+        assert!(g >= 0);
+        assert!(g % 2 == 0);
+
+        self.genus = (g / 2) as usize;
+        self.dots.0 += other.dots.0;
+        self.dots.1 += other.dots.1;
+    }
+
+    // stack = vertical composition
+    // Stackable iff the glue boundary matches AND is non-empty.
+    pub fn is_stackable(&self, other: &Self) -> bool {
+        !self.tgt.is_empty() && self.tgt == other.src
+    }
+
+    /// Vertical composition `other ∘ self` of two CobComps that share a
+    /// non-empty glue boundary — result is guaranteed connected.
+    pub fn stack(&self, other: &Self) -> Self {
+        debug_assert!(self.is_stackable(other), "stack: not stackable");
+
+        let a = self.tgt.comps()
+            .filter(|c| c.is_arc())
+            .count() as i32;
+        let src = self.src.clone();
+        let tgt = other.tgt.clone();
+        let dots = (self.dots.0 + other.dots.0, self.dots.1 + other.dots.1);
+        let x = self.euler_num() + other.euler_num();
+        let b = Self::count_boundaries(&src, &tgt) as i32;
+        let g = 2 - (x + b) + a;
+
+        assert!(g >= 0);
+        assert!(g % 2 == 0);
+
+        let genus = (g / 2) as usize;
+        Self::new_with_nb(src, tgt, genus, dots, b as usize)
+    }
+
     pub fn should_reduce(&self) -> bool {
         self.is_zero_cob() ||
         self.is_removable() ||
@@ -526,11 +580,7 @@ impl Cob {
             return Some(seed.clone());
         }
 
-        let mut dots = seed.dots;
-        let mut x = seed.euler_num();
-        let mut a = 0;
-        let mut src = seed.src.clone();
-        let mut tgt = seed.tgt.clone();
+        let mut acc = seed.clone();
 
         while comps.len() > unproc {
             let cob = comps.pop().unwrap();
@@ -545,25 +595,10 @@ impl Cob {
                 }
             }
 
-            dots.0 += cob.dots.0;
-            dots.1 += cob.dots.1;
-            x += cob.euler_num();
-            a += cob.src.end_pts().filter(|&e|
-                src.end_pts().contains(&e)
-            ).count();
-            src.connect_mut(&cob.src);
-            tgt.connect_mut(&cob.tgt);
+            acc.connect_mut(cob);
         }
 
-        let a = a as i32;
-        let b = CobComp::count_boundaries(&src, &tgt) as i32;
-        let g = 2 - (x + b) + a;
-
-        assert!(g >= 0);
-        assert!(g % 2 == 0);
-
-        let genus = (g / 2) as usize;
-        Some(CobComp::new_with_nb(src, tgt, genus, dots, b as usize))
+        Some(acc)
     }
 
     pub fn is_stackable(&self, other: &Self) -> bool {
@@ -588,9 +623,11 @@ impl Cob {
         // single CobComp, and non-empty boundary guarantees the result is
         // connected (one output CobComp).
         if self.comps.len() == 1 && other.comps.len() == 1
-            && !self.comps[0].tgt.is_empty()
+            && self.comps[0].is_stackable(&other.comps[0])
         {
-            return Self::from(Self::stack_pair(&self.comps[0], &other.comps[0]));
+            return Self::from(
+                self.comps[0].stack(&other.comps[0])
+            );
         }
 
         let mut bot: Vec<&CobComp> = self.comps.iter().collect();
@@ -602,32 +639,6 @@ impl Cob {
         }
 
         Self::new(comps)  // Self::new sorts comps for canonical form.
-    }
-
-    // Direct merge of two CobComps that share non-empty glue boundary —
-    // result is guaranteed connected (one output CobComp). Only valid as
-    // the 1×1 fast path inside `stack`; for cap-bot + cup-top (empty
-    // glue) the result is disjoint, and the general path must be used.
-    fn stack_pair(bot: &CobComp, top: &CobComp) -> CobComp {
-        debug_assert_eq!(bot.tgt, top.src, "stack_pair: boundary mismatch");
-        debug_assert!(!bot.tgt.is_empty(),
-            "stack_pair: empty glue would yield a disjoint union");
-
-        let a = bot.tgt.comps()
-            .filter(|c| c.is_arc() && top.src.contains(c))
-            .count() as i32;
-        let src = bot.src.clone();
-        let tgt = top.tgt.clone();
-        let dots = (bot.dots.0 + top.dots.0, bot.dots.1 + top.dots.1);
-        let x = bot.euler_num() + top.euler_num();
-        let b = CobComp::count_boundaries(&src, &tgt) as i32;
-        let g = 2 - (x + b) + a;
-
-        assert!(g >= 0);
-        assert!(g % 2 == 0);
-
-        let genus = (g / 2) as usize;
-        CobComp::new_with_nb(src, tgt, genus, dots, b as usize)
     }
 
     // By-ref sibling of [`Self::stack_next`]: bot/top hold `&CobComp`, so the

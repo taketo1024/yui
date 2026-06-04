@@ -626,14 +626,6 @@ impl Cob {
             return Self::new(comps);
         }
 
-        // Fast path: 1×1 with non-empty glue (guaranteed by the empty-glue
-        // check above). 
-        if self.comps.len() == 1 && other.comps.len() == 1 {
-            return Self::from(
-                self.comps[0].stack(&other.comps[0])
-            );
-        }
-
         let mut bot: Vec<&CobComp> = self.comps.iter().collect();
         let mut top: Vec<&CobComp> = other.comps.iter().collect();
         let mut comps = Vec::new();

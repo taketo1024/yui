@@ -137,6 +137,10 @@ impl TngComp {
         }
     }
 
+    pub fn connect_mut(&mut self, other: &Self) {
+        *self = self.connect(other)
+    }
+
     pub fn convert_edges<F>(&self, f: F) -> Self
     where F: Fn(Edge) -> Edge {
         let edges: EdgeSet = self.edges().map(&f).collect();
@@ -261,13 +265,13 @@ impl Tng {
 
         // If one end of `arc` is connectable:
         if let Some(i) = self.find_comp(|c| c.is_connectable(&arc)) {
-            self.comps[i] = self.comps[i].connect(&arc);
+            self.comps[i].connect_mut(&arc);
 
             // If the other end is also connectable to a different component:
             let ci = self.comps[i];
             if let Some(j) = self.find_comp(|c| *c != ci && c.is_connectable(&ci)) {
                 let cj = self.comps.remove(j);
-                self.comps[i] = self.comps[i].connect(&cj);
+                self.comps[i].connect_mut(&cj);
             }
         } else {
             self.comps.push(arc);

@@ -296,7 +296,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     where F: Fn(&TngComplexKey) -> bool {
         self.complex.keys_of_deg(i)
             .filter(|k| pred(k))
-            .sorted_by_key(|k| self.complex.vertex(k).c_weight())
+            .sorted_by_key(|k| (self.complex.vertex(k).c_weight(), **k))
             .copied()
             .collect_vec()
     }
@@ -339,14 +339,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.complex.vertex(k).in_edges().filter_map(|j|
             self.complex.edge(j, k).is_invertible().then_some(j)
         )
-        .min_by_key(|j| self.edge_weight(j, k))
+        .min_by_key(|j| (self.edge_weight(j, k), **j))
     }
 
     fn choose_inv_edge_from(&self, k: &TngComplexKey) -> Option<&TngComplexKey> { 
         self.complex.vertex(k).out_edges().filter_map(|l|
             self.complex.edge(k, l).is_invertible().then_some(l)
         )
-        .min_by_key(|l| self.edge_weight(k, l))
+        .min_by_key(|l| (self.edge_weight(k, l), **l))
     }
 
     pub(crate) fn edge_weight(&self, k: &TngComplexKey, l: &TngComplexKey) -> usize { 

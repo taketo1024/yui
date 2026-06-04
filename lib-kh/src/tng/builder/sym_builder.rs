@@ -351,14 +351,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.inner.complex().vertex(k).in_edges().filter_map(|j|
             self.is_equiv_inv_edge(j, k).then_some(j)
         )
-        .min_by_key(|j| self.inner.edge_weight(j, k))
+        .min_by_key(|j| (self.inner.edge_weight(j, k), **j))
     }
 
     fn choose_equiv_inv_edge_from(&self, k: &TngComplexKey) -> Option<&TngComplexKey> { 
         self.inner.complex().vertex(k).out_edges().filter_map(|l|
             self.is_equiv_inv_edge(k, l).then_some(l)
         )
-        .min_by_key(|l| self.inner.edge_weight(k, l))
+        .min_by_key(|l| (self.inner.edge_weight(k, l), **l))
     }
 
     fn try_eliminate_equiv_at(&mut self, k: &TngComplexKey) -> bool {

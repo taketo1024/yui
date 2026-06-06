@@ -339,28 +339,28 @@ impl CobComp {
 
     pub fn reduce<R>(&self, h: &R, t: &R) -> LcCob<R>
     where R: Ring, for<'x> &'x R: RingOps<R> {
-        fn eval<R>(c: &CobComp, nc: bool, g: usize, x: usize, y: usize, h: &R, t: &R) -> LcCob<R>
+        fn eval<R>(c: &CobComp, g: usize, x: usize, y: usize, h: &R, t: &R) -> LcCob<R>
         where R: Ring, for<'x> &'x R: RingOps<R> {
             match (g, x, y) {
-                // neck-cut (only valid when boundary has at most one component)
-                (g, _, _) if g > 0 && nc => {
-                    eval(c, nc, g-1, x+1, y, h, t) +
-                    eval(c, nc, g-1, x, y+1, h, t)
+                // genus reduction = multiply by X + Y.
+                (g, _, _) if g > 0 => {
+                    eval(c, g-1, x+1, y, h, t) +
+                    eval(c, g-1, x, y+1, h, t)
                 }
 
                 // XY = t
                 (0, x, y) if x >= 1 && y >= 1 =>
-                    eval(c, nc, 0, x-1, y-1, h, t) * t,
+                    eval(c, 0, x-1, y-1, h, t) * t,
 
                 // X^2 = hX + t
                 (0, x, 0) if x >= 2 =>
-                    eval(c, nc, 0, x-1, 0, h, t) * h +
-                    eval(c, nc, 0, x-2, 0, h, t) * t,
+                    eval(c, 0, x-1, 0, h, t) * h +
+                    eval(c, 0, x-2, 0, h, t) * t,
 
                 // Y^2 = -hY + t
                 (0, 0, y) if y >= 2 =>
-                    eval(c, nc, 0, 0, y-1, h, t) * -h +
-                    eval(c, nc, 0, 0, y-2, h, t) *  t,
+                    eval(c, 0, 0, y-1, h, t) * -h +
+                    eval(c, 0, 0, y-2, h, t) *  t,
 
                 // XS = YS = 1
                 (0, 1, 0) | (0, 0, 1) if c.is_closed() =>
@@ -386,9 +386,7 @@ impl CobComp {
 
         let g = self.genus;
         let (x, y) = self.dots;
-        let can_neck_cut = self.n_boundaries() <= 1;
-
-        eval(self, can_neck_cut, g, x, y, h, t)
+        eval(self, g, x, y, h, t)
     }
 
     pub fn eval<R>(&self, h: &R, t: &R) -> R

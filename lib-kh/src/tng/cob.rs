@@ -180,7 +180,13 @@ impl CobComp {
     }
 
     pub fn is_plain(&self) -> bool {
-        self.dots == (0, 0) && self.genus == 0
+        self.dots == (0, 0)
+    }
+
+    pub fn is_cylinder(&self) -> bool { 
+        self.src.n_comps() == 1 &&
+        self.tgt.n_comps() == 1 &&
+        self.genus == 0
     }
 
     pub fn is_closed(&self) -> bool {
@@ -202,8 +208,7 @@ impl CobComp {
     }
 
     pub fn is_invertible(&self) -> bool {
-        self.src.n_comps() == 1 &&
-        self.tgt.n_comps() == 1 &&
+        self.is_cylinder() && 
         self.is_plain()
     }
 
@@ -421,13 +426,13 @@ impl Display for CobComp {
             }
         }
         
-        let base = match (self.src.n_comps(), self.tgt.n_comps()) {
-            (0, 1) => "∪",
-            (1, 0) => "∩",
-            (1, 1) if self.is_invertible() => "I",
-            (2, 1) => "∇",
-            (1, 2) => "Δ",
-            (2, 2) if self.is_sdl() => "X",
+        let base = match (self.src.n_comps(), self.tgt.n_comps(), self.genus) {
+            (0, 1, 0) => "∪",
+            (1, 0, 0) => "∩",
+            (1, 1, 0) => "I",
+            (2, 1, 0) => "∇",
+            (1, 2, 0) => "Δ",
+            (2, 2, 0) if self.is_sdl() => "X",
             _ => "Cob"
         }.to_string();
         
@@ -1331,6 +1336,12 @@ mod tests {
         assert_eq!(CobComp::cap(c.clone()).to_string(), "∩(⚪︎(0) -> ∅)");
         assert_eq!(CobComp::id(c.clone()).to_string(),  "I(⚪︎(0) -> ⚪︎(0))");
 
+        // Dotted identity: a (1,1) genus-0 cob (cylinder) still labels `I`, with
+        // the dot shown by the prefix.
+        assert_eq!(CobComp::id(c.clone()).with_dots(1, 0).to_string(), "X・I(⚪︎(0) -> ⚪︎(0))");
+        assert_eq!(CobComp::id(c.clone()).with_dots(0, 1).to_string(), "Y・I(⚪︎(0) -> ⚪︎(0))");
+        assert_eq!(CobComp::id(c.clone()).with_dots(1, 1).to_string(), "XY・I(⚪︎(0) -> ⚪︎(0))");
+
         // Saddle.
         let sdl = CobComp::plain(
             Tng::new(vec![TngComp::arc([0, 1]), TngComp::arc([2, 3])]),
@@ -1338,9 +1349,14 @@ mod tests {
         );
         assert_eq!(sdl.to_string(), "X({[0-1], [2-3]} -> {[0-2], [1-3]})");
 
-        // Genus on open cob: drops to the default `Cob` label; trailing ", g: N".
-        let mut handle = CobComp::id(c);
+        // Genus > 0: the special symbols (∪/∩/I/∇/Δ/X) are only used at genus 0,
+        // so any genus drops to the default `Cob` label with a trailing ", g: N".
+        let mut handle = CobComp::id(c.clone());
         handle.genus = 1;
         assert_eq!(handle.to_string(), "Cob(⚪︎(0) -> ⚪︎(0), g: 1)");
+
+        let mut cup_g = CobComp::cup(c);
+        cup_g.genus = 1;
+        assert_eq!(cup_g.to_string(), "Cob(∅ -> ⚪︎(0), g: 1)");
     }
 }

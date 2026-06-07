@@ -1,4 +1,5 @@
 /target
 /profiles
+/tmp*
 **/.DS_STORE
 **/Cargo.lock

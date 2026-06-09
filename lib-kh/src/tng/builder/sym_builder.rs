@@ -53,7 +53,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         // the inner builder is driven by `self` — disable its own auto-simplify.
         let inner = TngComplexBuilder::from_link(l.inner(), h, t, reduced)
-            .with_config(BuildConfig { auto_deloop: false, auto_elim: false });
+            .with_config(BuildConfig { auto_deloop: false, auto_elim: false, h_range: None });
 
         let x_map = l.nodes().map(|x|
             (x.clone(), l.inv_node(x).clone())

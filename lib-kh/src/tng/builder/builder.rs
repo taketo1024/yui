@@ -10,6 +10,8 @@
 //!   J. Knot Theory Ramif. 16 (2007), 243–255.
 //!   <https://doi.org/10.1142/S0218216507005294>, <https://arxiv.org/abs/math/0606318>
 
+use std::ops::RangeInclusive;
+
 use ahash::AHashSet;
 use itertools::Itertools;
 use log::{debug, info, trace};
@@ -22,15 +24,16 @@ use crate::kh::{KhChain, KhComplex};
 use crate::tng::{TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
 
 /// Toggles for the automatic simplification done while building.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct BuildConfig {
     pub auto_deloop: bool,
     pub auto_elim: bool,
+    pub h_range: Option<RangeInclusive<isize>>,
 }
 
 impl Default for BuildConfig {
     fn default() -> Self {
-        Self { auto_deloop: true, auto_elim: true }
+        Self { auto_deloop: true, auto_elim: true, h_range: None }
     }
 }
 
@@ -201,13 +204,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub(crate) fn merge(&mut self, other: TngComplex<R>) { 
         debug!("merge {} + {}", self.stat(), other.stat());
 
-        let (left, right) = self.complex.prepare_merge(other); 
+        let (left, right) = self.complex.prepare_merge(other);
 
-        for i in self.complex.h_range().mv(0, 1) { 
+        // cap at the top of `h_range`: weight only grows, so higher is unreachable.
+        let range = self.complex.h_range().mv(0, 1);
+        let top = match &self.config.h_range {
+            Some(h_range) => *range.end().min(h_range.end()),
+            None => *range.end(),
+        };
+
+        for i in *range.start() ..= top {
             self.complex.merge_vertices(&left, &right, i);
             self.complex.merge_edges(&left, &right, i - 1);
-            
-            if self.config.auto_elim { 
+
+            if self.config.auto_elim {
                 self.eliminate_in(i - 1);
             }
             if self.config.auto_deloop {
@@ -215,7 +225,32 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
         }
 
+        self.prune_h_range();
+
         debug!("  merged: {}", self.stat());
+    }
+
+    /// Drop vertices that can't end up in `config.h_range`: degree `d` ends in
+    /// `[d, d + r]` (`r` = pending crossings), so doomed iff `d > b` or `d + r < a`.
+    fn prune_h_range(&mut self) {
+        let Some(h_range) = self.config.h_range.clone() else { return };
+        let (a, b) = (*h_range.start(), *h_range.end());
+        let s = self.complex.deg_shift().0;
+        let r = self.nodes.len() as isize;
+
+        let doomed = self.complex.keys().filter(|k| {
+            let d = k.weight() as isize + s;
+            d > b || d + r < a
+        }).copied().collect_vec();
+
+        if doomed.is_empty() { return }
+
+        for k in &doomed {
+            for e in self.elements.iter_mut() {
+                e.remove_cob(k);
+            }
+            self.complex.remove_vertex(k);
+        }
     }
 
     pub(crate) fn process_loops(&mut self) { 
@@ -572,7 +607,72 @@ mod tests {
     }
 
     #[test]
-    fn canon_cycle_trefoil() { 
+    fn test_8_19_h_range() {
+        let l = Link::test_data("8_19");
+        let config = BuildConfig { h_range: Some(2..=6), ..Default::default() };
+        let b = TngComplexBuilder::from_link(&l, &0, &0, false).with_config(config).run();
+        let c = b.into_tng_complex().into_raw_complex();
+
+        // literal truncation: chain groups vanish outside [2, 6].
+        for i in [0, 1, 7, 8] {
+            assert_eq!(c[i].rank(), 0);
+        }
+
+        c.check_d_all();
+
+        let h = c.homology();
+
+        // interior degrees are correct (the endpoints 2 and 6 are not).
+        assert_eq!(h[3].rank(), 1);
+        assert_eq!(h[3].tors(), &vec![2]);
+
+        assert_eq!(h[4].rank(), 2);
+        assert!(h[4].is_free());
+
+        assert_eq!(h[5].rank(), 2);
+        assert!(h[5].is_free());
+    }
+
+    #[test]
+    fn test_8_19_h_range_full() {
+        // A range covering the whole complex must reproduce the full homology.
+        let l = Link::test_data("8_19");
+        let config = BuildConfig { h_range: Some(0..=8), ..Default::default() };
+        let b = TngComplexBuilder::from_link(&l, &0, &0, false).with_config(config).run();
+        let c = b.into_tng_complex().into_raw_complex();
+
+        c.check_d_all();
+
+        let h = c.homology();
+
+        for i in [1, 6, 7, 8] {
+            assert_eq!(h[i].rank(), 0);
+        }
+        for i in [0, 4, 5] {
+            assert_eq!(h[i].rank(), 2);
+            assert!(h[i].is_free());
+        }
+        assert_eq!(h[2].rank(), 1);
+        assert!(h[2].is_free());
+        assert_eq!(h[3].rank(), 1);
+        assert_eq!(h[3].tors(), &vec![2]);
+    }
+
+    #[test]
+    fn test_8_19_h_range_empty() {
+        // A range disjoint from the complex's degrees yields an empty complex.
+        let l = Link::test_data("8_19");
+        let config = BuildConfig { h_range: Some(20..=20), ..Default::default() };
+        let b = TngComplexBuilder::from_link(&l, &0, &0, false).with_config(config).run();
+        let c = b.into_tng_complex().into_raw_complex();
+
+        for i in 0..=8 {
+            assert_eq!(c[i].rank(), 0);
+        }
+    }
+
+    #[test]
+    fn canon_cycle_trefoil() {
         let l = Link::test_data("3_1");
         let b = TngComplexBuilder::from_link(&l, &1, &0, false).run();
         let zs = b.eval_elements();

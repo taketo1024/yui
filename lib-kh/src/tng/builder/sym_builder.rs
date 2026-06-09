@@ -33,13 +33,15 @@ pub struct SymBuildConfig {
     pub auto_elim: bool,
     // build half the off-axis crossings and mirror via τ (see `preprocess`).
     pub preprocess: bool,
+    // cap the off-axis crossings handled by `preprocess`; the rest go incremental.
+    pub preprocess_bound: Option<usize>,
     // literal truncation: homology at the endpoints is wrong (build `(a-1)..=(b+1)` for correct `[a, b]`).
     pub h_range: Option<RangeInclusive<isize>>,
 }
 
 impl Default for SymBuildConfig {
     fn default() -> Self {
-        Self { auto_deloop: true, auto_elim: true, preprocess: true, h_range: None }
+        Self { auto_deloop: true, auto_elim: true, preprocess: true, preprocess_bound: None, h_range: None }
     }
 }
 
@@ -95,7 +97,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert_eq!(self.inner.complex().dim(), 0, "must start from init state.");
 
         let elements = self.inner.take_elements();
-        let (half, t_half) = self.partition_off_axis();
+        let (mut half, mut t_half) = self.partition_off_axis();
+
+        // cap the symmetric chunk; the remaining off-axis pairs go through `process_nodes`.
+        if let Some(bound) = self.config.preprocess_bound {
+            half.truncate(bound / 2);
+            t_half = half.iter().map(|x| self.inv_node(x).clone()).collect();
+        }
 
         info!("({}) preprocess off-axis: {} + {}", self.inner.stat(), half.len(), t_half.len());
 
@@ -768,6 +776,30 @@ mod tests {
         let (h_on, h_off) = (c_on.homology(), c_off.homology());
         for i in (a + 1)..=(b - 1) {
             assert_eq!(h_on[i].rank(), h_off[i].rank(), "windowed rank at {i}");
+        }
+    }
+
+    #[test]
+    fn preprocess_bound_matches() {
+        let l = InvLink::test_data("6_3");
+        let (h, t) = (FF2::zero(), FF2::zero());
+
+        let build = |bound: Option<usize>| {
+            let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
+            b.config.preprocess_bound = bound;
+            b.run().into_tng_complex().into_raw_complex()
+        };
+
+        let full = build(None);
+        let range = full.support().cloned().range().unwrap();
+        let h_full = full.homology();
+
+        // Some(0) = empty chunk → pure incremental; Some(2) = chunk + incremental rest.
+        for bound in [Some(0), Some(2)] {
+            let h_b = build(bound).homology();
+            for i in range.clone() {
+                assert_eq!(h_b[i].rank(), h_full[i].rank(), "rank at {i} (bound {bound:?})");
+            }
         }
     }
 

@@ -16,7 +16,7 @@ use std::time::Instant;
 
 use yui_core::num::FF2;
 use yui_link::InvLink;
-use yui_kh::khi::KhIComplex;
+use yui_kh::tng::builder::{SymTngBuilder, SymBuildConfig};
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -44,19 +44,22 @@ fn main() {
 
     let zero = FF2::default();
 
-    // optional `H_RANGE=a..=b` restricts the build to that homological window.
+    // `H_RANGE=a..=b` restricts the build; `PREPROCESS_BOUND=n` caps the symmetric chunk.
     let h_range = std::env::var("H_RANGE").ok().map(|s| {
         let (a, b) = s.split_once("..=").expect("H_RANGE must be `a..=b`");
         a.trim().parse::<isize>().unwrap() ..= b.trim().parse::<isize>().unwrap()
     });
+    let preprocess_bound = std::env::var("PREPROCESS_BOUND").ok().map(|s| s.parse::<usize>().unwrap());
+
+    let cfg = SymBuildConfig { preprocess_bound, h_range: h_range.clone(), ..Default::default() };
 
     let t0 = Instant::now();
-    let c = KhIComplex::<FF2>::new_partial(&l, &zero, &zero, false, h_range.clone());
+    let b = SymTngBuilder::<FF2>::from_inv_link(&l, &zero, &zero, false).with_config(cfg).run();
     let elapsed = t0.elapsed();
+    let c = b.into_tng_complex();
 
     println!("\n=== summary ===");
     println!("knot: 60 crossings (strongly invertible target)");
-    println!("h_range arg: {:?}", h_range);
-    println!("KhIComplex total: {:?}", elapsed);
-    println!("h-range: {:?}", c.h_range());
+    println!("h_range: {:?}, preprocess_bound: {:?}", h_range, preprocess_bound);
+    println!("build total: {:?}, verts: {}", elapsed, c.n_verts());
 }

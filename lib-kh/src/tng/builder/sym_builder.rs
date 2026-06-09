@@ -68,6 +68,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn with_config(mut self, config: SymBuildConfig) -> Self {
+        // canon cycles live in h-degree 0; drop them if the range excludes it.
+        if let Some(range) = &config.h_range {
+            if !range.contains(&0) {
+                self.inner.set_elements(vec![]);
+            }
+        }
         self.config = config;
         self
     }
@@ -219,6 +225,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             !live.contains(&(k.weight() as isize + i0));
 
         let doomed_verts = self.inner.complex().keys_of(&doomed).copied().collect_vec();
+        if !doomed_verts.is_empty() {
+            debug!("prune {} verts outside h_range.", doomed_verts.len());
+        }
         self.inner.prune_keys(&doomed_verts);
 
         let doomed_keys = self.key_map.keys().filter(|k| doomed(k)).copied().collect_vec();

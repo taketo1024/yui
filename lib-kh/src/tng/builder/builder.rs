@@ -76,6 +76,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn with_config(mut self, config: BuildConfig) -> Self {
+        // canon cycles live in h-degree 0; drop them if the range excludes it.
+        if let Some(range) = &config.h_range {
+            if !range.contains(&0) {
+                self.elements.clear();
+            }
+        }
         self.config = config;
         self
     }
@@ -245,14 +251,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             !live.contains(&(k.weight() as isize + i0))
         ).copied().collect_vec();
 
+        if !doomed.is_empty() {
+            debug!("prune {} verts outside h_range.", doomed.len());
+        }
+
         self.prune_keys(&doomed);
     }
 
     pub(crate) fn prune_keys(&mut self, doomed: &[TngComplexKey]) {
         for k in doomed {
-            for e in self.elements.iter_mut() {
-                e.remove_cob(k);
-            }
             self.complex.remove_vertex(k);
         }
     }

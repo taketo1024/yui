@@ -454,8 +454,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub(crate) fn merge_vertices(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize) {
-        let keys = self.collect_keys(left, right, i).collect_vec();
-        for (k, l) in keys { 
+        for (k, l) in Self::collect_keys(left, right, i) {
             let v = left.vertex(k);
             let w = right.vertex(l);
             let kl = k + l;
@@ -468,13 +467,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub(crate) fn merge_edges(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize) {
         let (h, t) = self.ht().clone();
-        let keys = self.collect_keys(left, right, i).filter(|(k, l)|
-            self.contains_key(&(*k + *l))
-        ).collect_vec();
 
-        for (k_l, k_r) in keys {
+        for (k_l, k_r) in Self::collect_keys(left, right, i) {
             let k = k_l + k_r;
-            
+            if !self.contains_key(&k) { continue }
+
             let v_l = left.vertex(k_l);
             let v_r = right.vertex(k_r);
 
@@ -504,7 +501,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    fn collect_keys<'a, 'b>(&self, left: &'a TngComplex<R>, right: &'b TngComplex<R>, i: isize) -> impl Iterator<Item = (&'a TngComplexKey, &'b TngComplexKey)> {
+    fn collect_keys<'a, 'b>(left: &'a TngComplex<R>, right: &'b TngComplex<R>, i: isize) -> impl Iterator<Item = (&'a TngComplexKey, &'b TngComplexKey)> {
         left.h_range().filter_map(move |i1| {
             let i2 = i - i1;
             right.h_range().contains(&i2).then_some((i1, i2))

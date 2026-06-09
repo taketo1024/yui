@@ -121,7 +121,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     // Pick one τ-mirror half of the off-axis crossings (`τx != x`), capped to
-    // `preprocess_bound` whole adjacency groups; `t_half = τ(half)` is the rest.
+    // `preprocess_bound` crossings; `t_half = τ(half)`, the rest go incremental.
     fn partition_off_axis(&self) -> (Vec<Node>, Vec<Node>) {
         let off_axis = self.inner.nodes().filter(|&x| self.inv_node(x) != x).collect_vec();
         let groups = self.group_by_adjacency(&off_axis);
@@ -131,9 +131,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         for group in groups {
             let Some(&rep) = group.first() else { continue };
             if half.contains(&self.inv_node(rep)) { continue } // τ-side: regenerated below
-            if half.len() >= cap { break }
             half.extend(group);
+            if half.len() >= cap { break }
         }
+        half.truncate(cap); // exact bound (may cut the last group)
 
         let half: Vec<Node> = half.into_iter().cloned().collect();
         let t_half: Vec<Node> = half.iter().map(|x| self.inv_node(x).clone()).collect();

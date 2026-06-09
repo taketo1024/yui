@@ -141,7 +141,7 @@ impl TngComp {
         *self = self.connect(other)
     }
 
-    pub fn convert_edges<F>(&self, f: F) -> Self
+    pub(crate) fn convert_edges<F>(&self, f: F) -> Self
     where F: Fn(Edge) -> Edge {
         let edges: EdgeSet = self.edges().map(&f).collect();
         let kind = match self.kind {
@@ -298,6 +298,10 @@ impl Tng {
         self.comps.sort()
     }
 
+    pub(crate) fn convert_edges<F>(&self, f: F) -> Self
+    where F: Fn(Edge) -> Edge {
+        Self::new(self.comps.iter().map(|c| c.convert_edges(&f)))
+    }
 }
 
 impl Display for Tng {

@@ -112,10 +112,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.out_edges.keys()
     }
 
-    pub(crate) fn c_weight(&self) -> usize { 
+    pub(crate) fn c_weight(&self) -> usize {
         self.in_edges.len() * self.out_edges.len()
     }
 
+    pub(crate) fn convert_edges<F>(&self, f: F) -> Self
+    where F: Fn(Edge) -> Edge {
+        let tng = self.tng.convert_edges(&f);
+        let in_edges = self.in_edges.clone();
+        let out_edges = self.out_edges.iter().map(|(k, cob)|
+            (*k, cob.map_ref(|c, r| (c.convert_edges(&f), r.clone())))
+        ).collect();
+        Self { tng, in_edges, out_edges }
+    }
 }
 
 impl<R> From<Tng> for TngComplexVertex<R>
@@ -731,10 +740,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub(crate) fn stat(&self) -> String { 
+    pub(crate) fn stat(&self) -> String {
         format!("(n: {}, v: {})", self.dim(), self.n_verts())
     }
 
+    pub(crate) fn convert_edges<F>(&self, f: F) -> Self
+    where F: Fn(Edge) -> Edge {
+        let (h, t) = self.ht();
+        let base_pt = self.base_pt.map(&f);
+        let vertices = self.iter_verts().map(|(k, v)|
+            (*k, v.convert_edges(&f))
+        ).collect();
+        Self::new(h, t, self.deg_shift, base_pt, self.dim, vertices)
+    }
 }
 
 #[cfg(test)]

@@ -22,6 +22,7 @@ use yui_core::util::format::subscript;
 use yui_core::{AddMon, MathType, Ring, RingOps};
 use yui_core::lc::{LcKey, Lc};
 use yui_core::poly::Var2;
+use yui_link::Edge;
 use super::tng::{Tng, TngComp};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, derive_more::Display)]
@@ -404,6 +405,12 @@ impl CobComp {
             R::zero()
         }
     }
+
+    pub(crate) fn convert_edges<F>(&self, f: F) -> Self
+    where F: Fn(Edge) -> Edge {
+        // edge-relabel preserves boundary count, so `new` recomputes the same `nb`.
+        Self::new(self.src.convert_edges(&f), self.tgt.convert_edges(&f), self.genus, self.dots)
+    }
 }
 
 impl Display for CobComp {
@@ -768,6 +775,11 @@ impl Cob {
             t.connect_mut(&c.tgt);
             t
         })
+    }
+
+    pub(crate) fn convert_edges<F>(&self, f: F) -> Self
+    where F: Fn(Edge) -> Edge {
+        Self::new(self.comps.iter().map(|c| c.convert_edges(&f)))
     }
 }
 

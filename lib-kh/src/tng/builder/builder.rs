@@ -121,6 +121,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         std::mem::take(&mut self.elements)
     }
 
+    pub(crate) fn drop_nodes<F>(&mut self, pred: F)
+    where F: Fn(&Node) -> bool {
+        self.nodes.retain(|x| !pred(x));
+    }
+
     pub fn run(mut self) -> Self { 
         self.process_nodes();
         self.process_loops();

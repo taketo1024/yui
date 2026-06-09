@@ -15,12 +15,13 @@ use ahash::{AHashMap, AHashSet};
 use cartesian::cartesian;
 use itertools::Itertools;
 use log::{debug, info};
+use yui_core::algo::KeyedUnionFind;
 use yui_core::bitseq::{Bit, BitSeq};
 use yui_core::{RangeExt, Ring, RingOps};
 use yui_link::{Node, Edge, InvLink};
 
 use crate::kh::{KhGen, KhTensor};
-use crate::tng::{LcCobTrait, TngComp, TngComplex, TngComplexKey};
+use crate::tng::{LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
 use crate::tng::builder::{TngComplexBuilder, BuildConfig};
 
 /// Toggles for the automatic simplification done while building (kept separate
@@ -29,13 +30,15 @@ use crate::tng::builder::{TngComplexBuilder, BuildConfig};
 pub struct SymBuildConfig {
     pub auto_deloop: bool,
     pub auto_elim: bool,
+    // build half the off-axis crossings and mirror via τ (see `preprocess`).
+    pub preprocess: bool,
     // literal truncation: homology at the endpoints is wrong (build `(a-1)..=(b+1)` for correct `[a, b]`).
     pub h_range: Option<RangeInclusive<isize>>,
 }
 
 impl Default for SymBuildConfig {
     fn default() -> Self {
-        Self { auto_deloop: true, auto_elim: true, h_range: None }
+        Self { auto_deloop: true, auto_elim: true, preprocess: true, h_range: None }
     }
 }
 
@@ -68,20 +71,136 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn with_config(mut self, config: SymBuildConfig) -> Self {
-        // canon cycles live in h-degree 0; drop them if the range excludes it.
-        if let Some(range) = &config.h_range {
-            if !range.contains(&0) {
-                self.inner.set_elements(vec![]);
-            }
-        }
+        // propagate the window to the inner builder so the preprocess merges cap
+        // to it; this also drops canon cycles when the window excludes h-degree 0.
+        let inner_config = BuildConfig { auto_deloop: false, auto_elim: false, h_range: config.h_range.clone() };
+        self.inner = self.inner.with_config(inner_config);
         self.config = config;
         self
     }
 
     pub fn run(mut self) -> Self {
+        if self.config.preprocess {
+            self.preprocess();
+        }
         self.process_nodes();
         self.finalize();
         self
+    }
+
+    // Build one representative half of the off-axis crossings, mirror it via τ,
+    // merge both, then leave the on-axis crossings for `process_nodes`.
+    fn preprocess(&mut self) {
+        assert_eq!(self.inner.complex().dim(), 0, "must start from init state.");
+
+        let elements = self.inner.take_elements();
+        let off_axis = self.off_axis_crossings(true).into_iter().cloned().collect_vec();
+
+        info!("({}) preprocess off-axis: {}", self.inner.stat(), off_axis.len());
+
+        let (c, tc, key_map, elements) = self.build_from_half(off_axis.iter(), elements);
+
+        // merge left
+        self.inner.drop_nodes(|x| off_axis.contains(x));
+        self.inner.merge(c);
+
+        // merge right
+        let off_axis = off_axis.iter().map(|x| self.inv_node(x).clone()).collect_vec();
+        self.inner.drop_nodes(|x| off_axis.contains(x));
+        self.inner.merge(tc);
+
+        self.key_map = key_map;
+        self.inner.set_elements(elements);
+
+        info!("({}) preprocess done.", self.inner.stat());
+    }
+
+    // Off-axis crossings; when `take_half`, one representative per τ-pair,
+    // grouped by adjacency so a connected side is taken whole.
+    fn off_axis_crossings(&self, take_half: bool) -> Vec<&Node> {
+        let off_axis = self.inner.nodes().filter(|&x|
+            self.inv_node(x) != x
+        ).collect_vec();
+
+        if !take_half {
+            return off_axis
+        }
+
+        let is_adj = |x: &Node, y: &Node| {
+            x.edges().iter().filter(|&&e|
+                self.inv_edge(e) != e // no axis-crossing edge
+            ).any(|e|
+                y.edges().contains(e)
+            )
+        };
+
+        let mut u = KeyedUnionFind::from_iter(off_axis.iter().cloned());
+
+        for (i, x) in off_axis.iter().enumerate() {
+            for j in 0 .. i {
+                let y = &off_axis[j];
+                if is_adj(x, y) {
+                    u.union(x, y);
+                }
+            }
+        }
+
+        u.into_disjoint().into_iter().fold(vec![], |mut res, next| {
+            if let Some(x) = next.first() {
+                let tx = self.inv_node(x);
+                if !res.contains(&tx) {
+                    res.extend(next);
+                }
+            }
+            res
+        })
+    }
+
+    fn build_from_half<'a, I>(&self, crossings: I, elements: Vec<TngComplexElem<R>>) -> (TngComplex<R>, TngComplex<R>, AHashMap<TngComplexKey, TngComplexKey>, Vec<TngComplexElem<R>>)
+    where I: IntoIterator<Item = &'a Node> {
+        let (h, t) = self.inner.complex().ht();
+        let base_pt = self.inner.complex().base_pt();
+        let mut b = TngComplexBuilder::init(h, t, (0, 0), base_pt);
+
+        // a half-vertex of weight > b - deg_shift.0 can never land in the window.
+        if let Some(h_range) = &self.config.h_range {
+            let s = self.inner.complex().deg_shift().0;
+            b = b.with_config(BuildConfig { h_range: Some(0 ..= (*h_range.end() - s)), ..Default::default() });
+        }
+
+        b.set_nodes(crossings.into_iter().cloned());
+        b.set_elements(elements);
+        b.process_nodes();
+
+        // take results
+        let keys = b.complex().keys().cloned().collect_vec();
+        let elements = b.take_elements();
+        let c = b.into_tng_complex();
+        let tc = c.convert_edges(|e| self.inv_edge(e));
+
+        // build keys: k1 (from c) + k2 (from tc) ↦ τ(k) = k2 + k1
+        let keys = cartesian!(keys.iter(), keys.iter());
+        let key_map = keys.map(|(k1, k2)| {
+            let k  = k1 + k2;
+            let tk = k2 + k1;
+            (k, tk)
+        }).collect();
+
+        // duplicate each element by connecting its τ-image
+        let elements = elements.into_iter().map(|mut e| {
+            e.modify(|k, c| {
+                let kk = k + k;
+                let cc = c.map(|c, r| {
+                    let r = &r * &r;
+                    let tc = c.convert_edges(|e| self.inv_edge(e));
+                    (c.connect(&tc), r)
+                });
+                (kk, cc)
+            });
+            e
+        }).collect();
+
+        (c, tc, key_map, elements)
     }
 
     fn process_nodes(&mut self) {
@@ -590,7 +709,36 @@ mod tests {
     }
 
     #[test]
-    fn test_kh_3_1() { 
+    fn preprocess_matches() {
+        let l = InvLink::test_data("6_3");
+        let (h, t) = (FF2::zero(), FF2::zero());
+
+        let build = |preprocess: bool, window: Option<(isize, isize)>| {
+            let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
+            b.config.preprocess = preprocess;
+            b.config.h_range = window.map(|(a, b)| a..=b);
+            b.run().into_tng_complex().into_raw_complex()
+        };
+
+        // full build: preprocess on/off agree on every degree.
+        let (c_on, c_off) = (build(true, None), build(false, None));
+        let range = c_off.support().cloned().range().unwrap();
+        let (h_on, h_off) = (c_on.homology(), c_off.homology());
+        for i in range.clone() {
+            assert_eq!(h_on[i].rank(), h_off[i].rank(), "full rank at {i}");
+        }
+
+        // windowed build: agree on the interior of the window.
+        let (a, b) = (*range.start() + 1, *range.end() - 1);
+        let (c_on, c_off) = (build(true, Some((a, b))), build(false, Some((a, b))));
+        let (h_on, h_off) = (c_on.homology(), c_off.homology());
+        for i in (a + 1)..=(b - 1) {
+            assert_eq!(h_on[i].rank(), h_off[i].rank(), "windowed rank at {i}");
+        }
+    }
+
+    #[test]
+    fn test_kh_3_1() {
         let l = InvLink::test_data("3_1");
         let (h, t) = (FF2::zero(), FF2::zero());
 

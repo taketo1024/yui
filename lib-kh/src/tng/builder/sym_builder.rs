@@ -15,6 +15,7 @@ use ahash::{AHashMap, AHashSet};
 use cartesian::cartesian;
 use itertools::Itertools;
 use log::{debug, info};
+use rayon::prelude::*;
 use yui_core::algo::KeyedUnionFind;
 use yui_core::bitseq::{Bit, BitSeq};
 use yui_core::{RangeExt, Ring, RingOps};
@@ -111,8 +112,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn merge_half(&mut self, nodes: &[Node], c: TngComplex<R>) {
+        info!("merge half {} into {}", c.stat(), self.inner.stat());
         self.inner.drop_nodes(|x| nodes.contains(x));
         self.inner.merge(c);
+        info!("  merged: {}", self.inner.stat());
     }
 
     // Partition the off-axis crossings (`τx != x`) into two τ-mirror halves:
@@ -157,18 +160,24 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         b.set_nodes(crossings.into_iter().cloned());
         b.set_elements(elements);
         b.process_nodes();
+        info!("half complex built: {}", b.stat());
 
         let keys = b.complex().keys().cloned().collect_vec();
         let mut elements = b.take_elements();
-        
+
         let c = b.into_tng_complex();
+        info!("mirror half via τ...");
         let tc = c.convert_edges(|e| self.inv_edge(e));
 
-        let key_map = Self::pair_key_map(&keys);
-        elements.iter_mut().for_each(|e| 
+        info!("pair key_map ({}² entries)...", keys.len());
+        let key_map = self.pair_key_map(&keys);
+
+        info!("complete {} elements...", elements.len());
+        elements.iter_mut().for_each(|e|
             self.complete_element(e)
         );
 
+        info!("build_from_half done: {} key-pairs.", key_map.len());
         (c, tc, key_map, elements)
     }
 
@@ -189,10 +198,31 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     // off-axis key `k1 + k2` (k1 from `c`, k2 from `tc`); τ swaps the halves.
-    fn pair_key_map(keys: &[TngComplexKey]) -> AHashMap<TngComplexKey, TngComplexKey> {
-        cartesian!(keys.iter(), keys.iter()).map(|(k1, k2)|
-            (k1 + k2, k2 + k1)
-        ).collect()
+    // Only pairs whose combined weight can still land in the window survive the
+    // merge, so we filter to that band — otherwise this is the K² blow-up.
+    fn pair_key_map(&self, keys: &[TngComplexKey]) -> AHashMap<TngComplexKey, TngComplexKey> {
+        let (lo, hi) = self.off_axis_weight_band();
+        let pairs: Vec<(TngComplexKey, TngComplexKey)> = keys.par_iter().flat_map_iter(|k1| {
+            let w1 = k1.weight();
+            keys.iter().filter_map(move |k2| {
+                let w = w1 + k2.weight();
+                (lo <= w && w <= hi).then(|| (k1 + k2, k2 + k1))
+            })
+        }).collect();
+        pairs.into_iter().collect()
+    }
+
+    // Combined off-axis weight `w(k1) + w(k2)` that can still reach the window
+    // once the on-axis crossings are added. Full range when no window is set.
+    fn off_axis_weight_band(&self) -> (usize, usize) {
+        let Some(h_range) = &self.config.h_range else {
+            return (0, usize::MAX);
+        };
+        let s = self.inner.complex().deg_shift().0;
+        let n_on = self.inner.nodes().filter(|&x| self.inv_node(x) == x).count() as isize;
+        let lo = (*h_range.start() - s - n_on).max(0) as usize;
+        let hi = (*h_range.end() - s).max(0) as usize;
+        (lo, hi)
     }
 
     // Complete a half-element into the full off-axis element.

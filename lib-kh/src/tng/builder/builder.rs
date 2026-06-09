@@ -217,14 +217,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let (left, right) = self.complex.prepare_merge(other);
 
-        // cap at the top of `h_range`: weight only grows, so higher is unreachable.
-        let range = self.complex.h_range().mv(0, 1);
-        let top = match &self.config.h_range {
-            Some(h_range) => *range.end().min(h_range.end()),
-            None => *range.end(),
-        };
-
-        for i in *range.start() ..= top {
+        for i in self.merge_range() {
+            debug!("  merge deg {i}...");
             self.complex.merge_vertices(&left, &right, i);
             self.complex.merge_edges(&left, &right, i - 1);
 
@@ -239,6 +233,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.prune_h_range();
 
         debug!("  merged: {}", self.stat());
+    }
+
+    // Degree range to build in a merge, capped to `h_range`: a vertex of degree
+    // `i` ends in `[i, i + r]` (`r` = pending crossings), so degrees outside
+    // `[a - r, b]` can't reach the window.
+    fn merge_range(&self) -> RangeInclusive<isize> {
+        let range = self.complex.h_range().mv(0, 1);
+        let (mut bottom, mut top) = (*range.start(), *range.end());
+        if let Some(h_range) = &self.config.h_range {
+            let r = self.nodes.len() as isize;
+            bottom = bottom.max(*h_range.start() - r);
+            top = top.min(*h_range.end());
+        }
+        bottom ..= top
     }
 
     /// Drop vertices that can't end up in `config.h_range`: degree `d` ends in

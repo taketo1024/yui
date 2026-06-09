@@ -234,18 +234,22 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     /// `[d, d + r]` (`r` = pending crossings), so doomed iff `d > b` or `d + r < a`.
     fn prune_h_range(&mut self) {
         let Some(h_range) = self.config.h_range.clone() else { return };
-        let (a, b) = (*h_range.start(), *h_range.end());
-        let s = self.complex.deg_shift().0;
+        let i0 = self.complex.deg_shift().0;
         let r = self.nodes.len() as isize;
 
-        let doomed = self.complex.keys().filter(|k| {
-            let d = k.weight() as isize + s;
-            d > b || d + r < a
-        }).copied().collect_vec();
+        // a vertex of degree `d` reaches `[d, d + r]`, so it stays relevant iff
+        // `d ∈ [a - r, b]` — current degrees that can still land in `h_range`.
+        let live = (*h_range.start() - r) ..= *h_range.end();
 
-        if doomed.is_empty() { return }
+        let doomed = self.complex.keys_of(|k|
+            !live.contains(&(k.weight() as isize + i0))
+        ).copied().collect_vec();
 
-        for k in &doomed {
+        self.prune_keys(&doomed);
+    }
+
+    pub(crate) fn prune_keys(&mut self, doomed: &[TngComplexKey]) {
+        for k in doomed {
             for e in self.elements.iter_mut() {
                 e.remove_cob(k);
             }

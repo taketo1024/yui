@@ -242,11 +242,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.vertices.keys()
     }
 
-    pub fn keys_of_deg(&self, i: isize) -> impl Iterator<Item = &TngComplexKey> { 
+    pub fn keys_of<F>(&self, pred: F) -> impl Iterator<Item = &TngComplexKey>
+    where F: Fn(&TngComplexKey) -> bool {
+        self.vertices.keys().filter(move |k| pred(k))
+    }
+
+    pub fn keys_of_deg(&self, i: isize) -> impl Iterator<Item = &TngComplexKey> {
         let i0 = self.deg_shift.0;
-        self.vertices.keys().filter(move |k| 
-            (k.weight() as isize) + i0 == i
-        )
+        self.keys_of(move |k| (k.weight() as isize) + i0 == i)
     }
 
     pub fn vertex(&self, v: &TngComplexKey) -> &TngComplexVertex<R> { 

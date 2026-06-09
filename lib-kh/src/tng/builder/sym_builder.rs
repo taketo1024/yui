@@ -10,6 +10,7 @@
 //!   <https://doi.org/10.2140/agt.2025.25.5059>, <https://arxiv.org/abs/2404.08568>
 
 use std::collections::HashSet;
+use std::ops::RangeInclusive;
 use ahash::{AHashMap, AHashSet};
 use cartesian::cartesian;
 use itertools::Itertools;
@@ -24,15 +25,17 @@ use crate::tng::builder::{TngComplexBuilder, BuildConfig};
 
 /// Toggles for the automatic simplification done while building (kept separate
 /// from [`BuildConfig`] so the equivariant builder can gain its own flags).
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct SymBuildConfig {
     pub auto_deloop: bool,
     pub auto_elim: bool,
+    // literal truncation: homology at the endpoints is wrong (build `(a-1)..=(b+1)` for correct `[a, b]`).
+    pub h_range: Option<RangeInclusive<isize>>,
 }
 
 impl Default for SymBuildConfig {
     fn default() -> Self {
-        Self { auto_deloop: true, auto_elim: true }
+        Self { auto_deloop: true, auto_elim: true, h_range: None }
     }
 }
 
@@ -176,23 +179,56 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let (left, right) = self.inner.complex_mut().prepare_merge(c);
 
-        for i in self.inner.complex().h_range().mv(0, 1) { 
+        // cap at the top of `h_range`: weight only grows, so higher is unreachable.
+        let range = self.inner.complex().h_range().mv(0, 1);
+        let top = match &self.config.h_range {
+            Some(h_range) => *range.end().min(h_range.end()),
+            None => *range.end(),
+        };
+
+        for i in *range.start() ..= top {
             self.inner.complex_mut().merge_vertices(&left, &right, i);
             self.inner.complex_mut().merge_edges(&left, &right, i - 1);
 
-            if self.config.auto_elim { 
+            if self.config.auto_elim {
                 self.eliminate_in(i - 1);
             }
-            if self.config.auto_deloop { 
+            if self.config.auto_deloop {
                 self.deloop_in(i - 1, false);
             }
         }
 
+        self.prune_h_range();
+
         // TODO merge elements
     }
 
-    fn deloop_all(&mut self, allow_based: bool) { 
-        for i in self.inner.complex().h_range() { 
+    /// Prune doomed vertices *and* their `key_map` entries. τ preserves weight,
+    /// so `deg(k) == deg(τk)` — pruning is symmetric and `key_map` stays a valid
+    /// involution. The `key_map` is pruned independently of the complex because
+    /// the cartesian merge over-generates it past the vertex cap.
+    fn prune_h_range(&mut self) {
+        let Some(h_range) = self.config.h_range.clone() else { return };
+        let r = self.inner.nodes().count() as isize;
+        let i0 = self.inner.complex().deg_shift().0;
+
+        // a vertex of degree `d` reaches `[d, d + r]`, so it stays relevant iff
+        // `d ∈ [a - r, b]` — current degrees that can still land in `h_range`.
+        let live = (*h_range.start() - r) ..= *h_range.end();
+        let doomed = |k: &TngComplexKey|
+            !live.contains(&(k.weight() as isize + i0));
+
+        let doomed_verts = self.inner.complex().keys_of(&doomed).copied().collect_vec();
+        self.inner.prune_keys(&doomed_verts);
+
+        let doomed_keys = self.key_map.keys().filter(|k| doomed(k)).copied().collect_vec();
+        for k in &doomed_keys {
+            self.key_map.remove(k);
+        }
+    }
+
+    fn deloop_all(&mut self, allow_based: bool) {
+        for i in self.inner.complex().h_range() {
             self.deloop_in(i, allow_based);
         }
     }
@@ -563,7 +599,64 @@ mod tests {
     }
 
     #[test]
-    fn test_khi_3_1() { 
+    fn test_kh_3_1_h_range_full() {
+        // A range covering the whole complex must reproduce the full homology.
+        let l = InvLink::test_data("3_1");
+        let (h, t) = (FF2::zero(), FF2::zero());
+
+        let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
+        b.config.auto_elim = false;
+        b.config.h_range = Some(0..=3);
+        let c = b.run().into_tng_complex().into_raw_complex();
+        c.check_d_all();
+
+        let h = c.homology();
+
+        assert_eq!(h[0].rank(), 2);
+        assert_eq!(h[1].rank(), 0);
+        assert_eq!(h[2].rank(), 2);
+        assert_eq!(h[3].rank(), 2);
+    }
+
+    #[test]
+    fn test_kh_6_3_h_range() {
+        let l = InvLink::test_data("6_3");
+        let (h, t) = (FF2::zero(), FF2::zero());
+
+        // full build for reference.
+        let full = SymTngBuilder::from_inv_link(&l, &h, &t, false).run()
+            .into_tng_complex().into_raw_complex();
+        let range = full.support().cloned().range().unwrap();
+        let (lo, hi) = (*range.start(), *range.end());
+        let full_h = full.homology();
+
+        // restrict to a strict sub-window.
+        let (a, b) = (lo + 1, hi - 1);
+        let mut bld = SymTngBuilder::from_inv_link(&l, &h, &t, false);
+        bld.config.h_range = Some(a..=b);
+        let bld = bld.run();
+
+        // key_map stays in sync with the truncated complex.
+        let verts: HashSet<_> = bld.inner.complex().keys().copied().collect();
+        let kmap: HashSet<_> = bld.key_map.keys().copied().collect();
+        assert_eq!(verts, kmap);
+
+        let c = bld.into_tng_complex().into_raw_complex();
+        c.check_d_all();
+        let trunc_h = c.homology();
+
+        // chain groups vanish outside [a, b].
+        assert_eq!(c[a - 1].rank(), 0);
+        assert_eq!(c[b + 1].rank(), 0);
+
+        // strict interior degrees of the window are correct.
+        for i in (a + 1)..=(b - 1) {
+            assert_eq!(trunc_h[i].rank(), full_h[i].rank(), "rank mismatch at h-deg {i}");
+        }
+    }
+
+    #[test]
+    fn test_khi_3_1() {
         let l = InvLink::test_data("3_1");
         let (h, t) = (FF2::zero(), FF2::zero());
 

@@ -97,13 +97,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert_eq!(self.inner.complex().dim(), 0, "must start from init state.");
 
         let elements = self.inner.take_elements();
-        let (mut half, mut t_half) = self.partition_off_axis();
-
-        // cap the symmetric chunk; the remaining off-axis pairs go through `process_nodes`.
-        if let Some(bound) = self.config.preprocess_bound {
-            half.truncate(bound / 2);
-            t_half = half.iter().map(|x| self.inv_node(x).clone()).collect();
-        }
+        let (half, t_half) = self.partition_off_axis();
 
         info!("({}) preprocess off-axis: {} + {}", self.inner.stat(), half.len(), t_half.len());
 
@@ -126,22 +120,24 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         info!("  merged: {}", self.inner.stat());
     }
 
-    // Partition the off-axis crossings (`τx != x`) into two τ-mirror halves:
-    // each adjacency group goes opposite the side already holding its τ-image.
+    // Pick one τ-mirror half of the off-axis crossings (`τx != x`), capped to
+    // `preprocess_bound` whole adjacency groups; `t_half = τ(half)` is the rest.
     fn partition_off_axis(&self) -> (Vec<Node>, Vec<Node>) {
         let off_axis = self.inner.nodes().filter(|&x| self.inv_node(x) != x).collect_vec();
         let groups = self.group_by_adjacency(&off_axis);
+        let cap = self.config.preprocess_bound.map_or(usize::MAX, |b| b / 2);
 
-        let (mut half, mut t_half): (Vec<&Node>, Vec<&Node>) = (vec![], vec![]);
+        let mut half: Vec<&Node> = vec![];
         for group in groups {
             let Some(&rep) = group.first() else { continue };
-            if half.contains(&self.inv_node(rep)) {
-                t_half.extend(group);
-            } else {
-                half.extend(group);
-            }
+            if half.contains(&self.inv_node(rep)) { continue } // τ-side: regenerated below
+            if half.len() >= cap { break }
+            half.extend(group);
         }
-        (half.into_iter().cloned().collect(), t_half.into_iter().cloned().collect())
+
+        let half: Vec<Node> = half.into_iter().cloned().collect();
+        let t_half: Vec<Node> = half.iter().map(|x| self.inv_node(x).clone()).collect();
+        (half, t_half)
     }
 
     // Union-find grouping: two nodes are adjacent iff they share a non-axis edge.

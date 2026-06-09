@@ -107,7 +107,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         info!("({}) preprocess off-axis: {} + {}", self.inner.stat(), half.len(), t_half.len());
 
-        let (c, tc, key_map, elements) = self.build_from_half(half.iter(), elements);
+        let (c, tc, key_map, elements) = self.build_from_half(&half, elements);
 
         // merge the half, then its τ-image.
         self.merge_half(&half, c);
@@ -162,10 +162,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         uf.into_disjoint()
     }
 
-    fn build_from_half<'a, I>(&self, crossings: I, elements: Vec<TngComplexElem<R>>) -> (TngComplex<R>, TngComplex<R>, AHashMap<TngComplexKey, TngComplexKey>, Vec<TngComplexElem<R>>)
-    where I: IntoIterator<Item = &'a Node> {
+    fn build_from_half(&self, crossings: &[Node], elements: Vec<TngComplexElem<R>>) -> (TngComplex<R>, TngComplex<R>, AHashMap<TngComplexKey, TngComplexKey>, Vec<TngComplexElem<R>>) {
+        // crossings appended after this chunk: all remaining nodes minus the chunk (half + τ-half).
+        let r_rest = self.inner.nodes().count() - 2 * crossings.len();
+
         let mut b = self.half_builder();
-        b.set_nodes(crossings.into_iter().cloned());
+        b.set_nodes(crossings.iter().cloned());
         b.set_elements(elements);
         b.process_nodes();
         info!("half complex built: {}", b.stat());
@@ -178,7 +180,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let tc = c.convert_edges(|e| self.inv_edge(e));
 
         info!("pair key_map ({}² entries)...", keys.len());
-        let key_map = self.pair_key_map(&keys);
+        let key_map = self.pair_key_map(&keys, r_rest);
 
         info!("complete {} elements...", elements.len());
         elements.iter_mut().for_each(|e|
@@ -208,8 +210,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // off-axis key `k1 + k2` (k1 from `c`, k2 from `tc`); τ swaps the halves.
     // Only pairs whose combined weight can still land in the window survive the
     // merge, so we filter to that band — otherwise this is the K² blow-up.
-    fn pair_key_map(&self, keys: &[TngComplexKey]) -> AHashMap<TngComplexKey, TngComplexKey> {
-        let (lo, hi) = self.off_axis_weight_band();
+    fn pair_key_map(&self, keys: &[TngComplexKey], r_rest: usize) -> AHashMap<TngComplexKey, TngComplexKey> {
+        let (lo, hi) = self.off_axis_weight_band(r_rest);
         let pairs: Vec<(TngComplexKey, TngComplexKey)> = keys.par_iter().flat_map_iter(|k1| {
             let w1 = k1.weight();
             keys.iter().filter_map(move |k2| {
@@ -220,15 +222,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         pairs.into_iter().collect()
     }
 
-    // Combined off-axis weight `w(k1) + w(k2)` that can still reach the window
-    // once the on-axis crossings are added. Full range when no window is set.
-    fn off_axis_weight_band(&self) -> (usize, usize) {
+    // Combined off-axis weight that can still reach the window; `r_rest` = crossings
+    // appended after this chunk (on-axis + off-axis not preprocessed).
+    fn off_axis_weight_band(&self, r_rest: usize) -> (usize, usize) {
         let Some(h_range) = &self.config.h_range else {
             return (0, usize::MAX);
         };
         let s = self.inner.complex().deg_shift().0;
-        let n_on = self.inner.nodes().filter(|&x| self.inv_node(x) == x).count() as isize;
-        let lo = (*h_range.start() - s - n_on).max(0) as usize;
+        let lo = (*h_range.start() - s - r_rest as isize).max(0) as usize;
         let hi = (*h_range.end() - s).max(0) as usize;
         (lo, hi)
     }
@@ -781,25 +782,36 @@ mod tests {
 
     #[test]
     fn preprocess_bound_matches() {
-        let l = InvLink::test_data("6_3");
+        // k9_46 has enough off-axis pairs that a small bound leaves a real remainder.
+        let l = InvLink::from_symmetric_pd_code(
+            [[18,8,1,7],[13,6,14,7],[12,2,13,1],[8,18,9,17],[5,14,6,15],[2,12,3,11],[16,10,17,9],[15,4,16,5],[10,4,11,3]]
+        );
         let (h, t) = (FF2::zero(), FF2::zero());
 
-        let build = |bound: Option<usize>| {
+        let build = |bound: Option<usize>, window: Option<(isize, isize)>| {
             let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
             b.config.preprocess_bound = bound;
+            b.config.h_range = window.map(|(a, b)| a..=b);
             b.run().into_tng_complex().into_raw_complex()
         };
 
-        let full = build(None);
+        let full = build(None, None);
         let range = full.support().cloned().range().unwrap();
         let h_full = full.homology();
 
-        // Some(0) = empty chunk → pure incremental; Some(2) = chunk + incremental rest.
-        for bound in [Some(0), Some(2)] {
-            let h_b = build(bound).homology();
+        // partial chunk + incremental rest agrees with the full build on every degree.
+        for bound in [Some(0), Some(2), Some(4)] {
+            let h_b = build(bound, None).homology();
             for i in range.clone() {
                 assert_eq!(h_b[i].rank(), h_full[i].rank(), "rank at {i} (bound {bound:?})");
             }
+        }
+
+        // partial chunk + window agrees on the window interior (exercises the weight band).
+        let (a, b) = (*range.start() + 1, *range.end() - 1);
+        let h_w = build(Some(2), Some((a, b))).homology();
+        for i in (a + 1)..=(b - 1) {
+            assert_eq!(h_w[i].rank(), h_full[i].rank(), "windowed rank at {i}");
         }
     }
 

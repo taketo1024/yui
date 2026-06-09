@@ -17,7 +17,7 @@ use std::time::Instant;
 
 use yui_core::num::FF2;
 use yui_link::InvLink;
-use yui_kh::khi::KhIComplex;
+use yui_kh::tng::builder::{SymTngBuilder, SymBuildConfig};
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -37,12 +37,21 @@ fn main() {
 
     let zero = FF2::default();
 
-    let t0 = Instant::now();
-    let c = KhIComplex::<FF2>::new(&l, &zero, &zero, false);
-    let elapsed = t0.elapsed();
+    // isolate the variable that changed: the SymTngBuilder run with preprocess
+    // on vs off (cone assembly afterwards is identical either way).
+    let build = |preprocess: bool| {
+        let cfg = SymBuildConfig { preprocess, ..Default::default() };
+        let t0 = Instant::now();
+        let b = SymTngBuilder::<FF2>::from_inv_link(&l, &zero, &zero, false).with_config(cfg).run();
+        let dt = t0.elapsed();
+        let c = b.into_tng_complex();
+        (dt, c.n_verts())
+    };
 
-    println!("\n=== summary ===");
-    println!("knot: 18 crossings (user-supplied)");
-    println!("KhIComplex::new total: {:?}", elapsed);
-    println!("h-range: {:?}", c.h_range());
+    let (t_off, v_off) = build(false);
+    let (t_on, v_on) = build(true);
+
+    println!("\n=== summary (18 crossings) ===");
+    println!("preprocess off: {:?}  (verts {})", t_off, v_off);
+    println!("preprocess on : {:?}  (verts {})", t_on, v_on);
 }

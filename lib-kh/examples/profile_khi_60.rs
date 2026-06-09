@@ -44,12 +44,19 @@ fn main() {
 
     let zero = FF2::default();
 
+    // optional `H_RANGE=a..=b` restricts the build to that homological window.
+    let h_range = std::env::var("H_RANGE").ok().map(|s| {
+        let (a, b) = s.split_once("..=").expect("H_RANGE must be `a..=b`");
+        a.trim().parse::<isize>().unwrap() ..= b.trim().parse::<isize>().unwrap()
+    });
+
     let t0 = Instant::now();
-    let c = KhIComplex::<FF2>::new(&l, &zero, &zero, false);
+    let c = KhIComplex::<FF2>::new_partial(&l, &zero, &zero, false, h_range.clone());
     let elapsed = t0.elapsed();
 
     println!("\n=== summary ===");
     println!("knot: 60 crossings (strongly invertible target)");
-    println!("KhIComplex::new total: {:?}", elapsed);
+    println!("h_range arg: {:?}", h_range);
+    println!("KhIComplex total: {:?}", elapsed);
     println!("h-range: {:?}", c.h_range());
 }

@@ -37,10 +37,19 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
 impl<R> KhIComplex<R>
 where R: Ring, for<'a> &'a R: RingOps<R> { 
-    pub fn new(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self { 
-        use crate::tng::builder::SymTngBuilder;
+    pub fn new(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self {
+        Self::new_partial(l, h, t, reduced, None)
+    }
 
-        let b = SymTngBuilder::from_inv_link(&l, &h, &t, reduced).run();
+    // restricts the build to `h_range`; since `KhI_i = C_i ⊕ C_{i-1}`, the cone needs `C` over `[a-1, b]`.
+    pub fn new_partial(l: &InvLink, h: &R, t: &R, reduced: bool, h_range: Option<RangeInclusive<isize>>) -> Self {
+        use crate::tng::builder::{SymTngBuilder, SymBuildConfig};
+
+        let config = SymBuildConfig {
+            h_range: h_range.as_ref().map(|r| (*r.start() - 1) ..= *r.end()),
+            ..Default::default()
+        };
+        let b = SymTngBuilder::from_inv_link(l, h, t, reduced).with_config(config).run();
         let tau_map = b.tau_map();
 
         let b = b.into_inner();
@@ -48,7 +57,10 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         let complex = b.into_tng_complex().into_raw_complex();
         let c = KhComplex::from_raw_complex(l.inner(), h, t, reduced, complex, canon_cycles);
 
-        Self::from_kh_complex(c, tau_map)
+        match h_range {
+            Some(range) => Self::cone_of(c, tau_map, range),
+            None => Self::from_kh_complex(c, tau_map),
+        }
     }
 
     pub fn new_no_simplify(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self {
@@ -61,9 +73,15 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
     pub(crate) fn from_kh_complex<F>(c: KhComplex<R>, map: F) -> Self
     where F: Fn(&KhGen) -> KhGen + Send + Sync + 'static {
-        let deg_shift = c.deg_shift();
+        // the cone extends one degree above the complex.
         let h_range = c.h_range();
         let h_range = *h_range.start() ..= (h_range.end() + 1);
+        Self::cone_of(c, map, h_range)
+    }
+
+    pub(crate) fn cone_of<F>(c: KhComplex<R>, map: F, h_range: RangeInclusive<isize>) -> Self
+    where F: Fn(&KhGen) -> KhGen + Send + Sync + 'static {
+        let deg_shift = c.deg_shift();
 
         let canon_cycles = c.canon_cycles().iter().flat_map(|z| {
             let bz = z.clone().map_keys(KhIGen::from_left);

@@ -29,11 +29,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
-        use crate::tng::builder::TngComplexBuilder;
+        Self::new_partial(l, h, t, reduced, None)
+    }
+
+    // restricts the build to `h_range` (literal truncation; `None` = full).
+    pub fn new_partial(l: &Link, h: &R, t: &R, reduced: bool, h_range: Option<RangeInclusive<isize>>) -> Self {
+        use crate::tng::builder::{TngComplexBuilder, BuildConfig};
 
         assert!(!reduced || (!l.is_empty() && t.is_zero()));
 
-        let b = TngComplexBuilder::from_link(l, h, t, reduced).run();
+        let config = BuildConfig { h_range, ..Default::default() };
+        let b = TngComplexBuilder::from_link(l, h, t, reduced).with_config(config).run();
         let canon_cycles = b.eval_elements();
         let inner = b.into_tng_complex().into_raw_complex();
 

@@ -25,6 +25,16 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         Self::from(&c)
     }
 
+    // builds one degree wider (for boundary maps), then truncates to `h_range`.
+    pub fn new_partial(l: &InvLink, h: &R, t: &R, reduced: bool, h_range: Option<RangeInclusive<isize>>) -> Self {
+        let Some(range) = h_range else {
+            return Self::new(l, h, t, reduced);
+        };
+        let (a, b) = (*range.start(), *range.end());
+        let c = KhIComplex::new_partial(l, h, t, reduced, Some((a - 1)..=(b + 1)));
+        Self::from(&c).truncated(a..=b)
+    }
+
     pub fn new_no_simplify(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self {
         let c = KhIComplex::new_no_simplify(l, h, t, reduced);
         Self::from(&c)
@@ -189,7 +199,25 @@ mod tests {
     }
 
     #[test]
-    fn khi_fbn() { 
+    fn khi_partial() {
+        // partial KhI homology matches the full result across the whole window.
+        let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
+
+        type R = FF2;
+        let (h, t) = (R::zero(), R::zero());
+        let full = KhIHomology::new(&l, &h, &t, false);
+        let part = KhIHomology::new_partial(&l, &h, &t, false, Some(1..=3));
+
+        for i in 1..=3 {
+            assert_eq!(part[i].rank(), full[i].rank(), "rank at {i}");
+        }
+
+        assert!(part[0].is_zero());
+        assert!(part[4].is_zero());
+    }
+
+    #[test]
+    fn khi_fbn() {
         let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 
         type R = FF2;

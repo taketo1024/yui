@@ -39,8 +39,7 @@ fn compute_div<R>(l: &Link, c: &R, reduced: bool) -> i32
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
     let r = if reduced { 1 } else { 2 };
 
-    let kh = KhHomology::new(l, c, &R::zero(), reduced).truncated(0..=0);
-    // let kh = KhHomology::new_partial(l, c, &R::zero(), reduced, Some(0..=0));
+    let kh = KhHomology::new_partial(l, c, &R::zero(), reduced, Some(0..=0));
 
     assert_eq!(kh[0].rank(), r);
     info!("Kh[0]: {}", kh[0]);

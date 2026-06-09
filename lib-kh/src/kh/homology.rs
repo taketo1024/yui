@@ -25,10 +25,20 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 impl<R> KhHomology<R> 
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn new(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
-        let c = KhComplex::new(l, h, t, reduced); 
+        let c = KhComplex::new(l, h, t, reduced);
         Self::from(&c)
     }
-    
+
+    // builds one degree wider (for boundary maps), then truncates to `h_range`.
+    pub fn new_partial(l: &Link, h: &R, t: &R, reduced: bool, h_range: Option<RangeInclusive<isize>>) -> Self {
+        let Some(range) = h_range else {
+            return Self::new(l, h, t, reduced);
+        };
+        let (a, b) = (*range.start(), *range.end());
+        let c = KhComplex::new_partial(l, h, t, reduced, Some((a - 1)..=(b + 1)));
+        Self::from(&c).truncated(a..=b)
+    }
+
     pub fn new_no_simplify(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
         let c = KhComplex::new_no_simplify(l, h, t, reduced); 
         Self::from(&c)
@@ -410,6 +420,23 @@ mod tests {
             }
         };
     }
+
+    #[test]
+    fn kh_partial() {
+        // partial homology matches the full result across the whole window.
+        let l = Link::test_data("4_1");
+        let full = KhHomology::new(&l, &0, &0, false);
+        let part = KhHomology::new_partial(&l, &0, &0, false, Some(-1..=1));
+
+        for i in -1..=1 {
+            assert_eq!(part[i].rank(), full[i].rank(), "rank at {i}");
+            assert_eq!(part[i].tors(), full[i].tors(), "tors at {i}");
+        }
+
+        assert!(part[-2].is_zero());
+        assert!(part[2].is_zero());
+    }
+
     mod v2 {
         use super::*;
         kh_homology_tests!(KhHomology::new);

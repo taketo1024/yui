@@ -43,8 +43,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     let r = if reduced { 1 } else { 2 };
     let t = R::zero(); 
 
-    let kh = KhIHomology::new(l, c, &t, reduced).truncated(0..=1);
-    // let kh = KhIHomology::new_partial(l, c, &t, reduced, Some(0..=1));
+    let kh = KhIHomology::new_partial(l, c, &t, reduced, Some(0..=1));
 
     assert_eq!(kh[0].rank(), r);
     assert_eq!(kh[1].rank(), r);    

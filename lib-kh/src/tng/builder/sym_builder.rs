@@ -20,7 +20,21 @@ use yui_link::{Node, Edge, InvLink};
 
 use crate::kh::{KhGen, KhTensor};
 use crate::tng::{LcCobTrait, TngComp, TngComplex, TngComplexKey};
-use crate::tng::builder::TngComplexBuilder;
+use crate::tng::builder::{TngComplexBuilder, BuildConfig};
+
+/// Toggles for the automatic simplification done while building (kept separate
+/// from [`BuildConfig`] so the equivariant builder can gain its own flags).
+#[derive(Clone, Copy, Debug)]
+pub struct SymBuildConfig {
+    pub auto_deloop: bool,
+    pub auto_elim: bool,
+}
+
+impl Default for SymBuildConfig {
+    fn default() -> Self {
+        Self { auto_deloop: true, auto_elim: true }
+    }
+}
 
 pub struct SymTngBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
@@ -28,8 +42,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     x_map: AHashMap<Node, Node>,
     e_map: AHashMap<Edge, Edge>,
     key_map: AHashMap<TngComplexKey, TngComplexKey>,
-    pub auto_deloop: bool,
-    pub auto_elim: bool,
+    config: SymBuildConfig,
 }
 
 impl<R> SymTngBuilder<R>
@@ -38,24 +51,22 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(l.nodes().all(|x| x.is_crossing()));
         assert!(!reduced || l.base_pt().is_some());
 
-        let inner = TngComplexBuilder::from_link(l.inner(), h, t, reduced);
+        // the inner builder is driven by `self` — disable its own auto-simplify.
+        let inner = TngComplexBuilder::from_link(l.inner(), h, t, reduced)
+            .with_config(BuildConfig { auto_deloop: false, auto_elim: false });
+
         let x_map = l.nodes().map(|x|
             (x.clone(), l.inv_node(x).clone())
         ).collect();
         let e_map = l.edges().into_iter().map(|e| (e, l.inv_edge(e))).collect();
+        let key_map = AHashMap::from_iter([(TngComplexKey::init(), TngComplexKey::init())]);
 
-        Self::new(inner, x_map, e_map)
+        SymTngBuilder { inner, x_map, e_map, key_map, config: SymBuildConfig::default() }
     }
 
-    pub fn new(mut inner: TngComplexBuilder<R>, x_map: AHashMap<Node, Node>, e_map: AHashMap<Edge, Edge>) -> Self {
-        inner.auto_deloop = false;
-        inner.auto_elim = false;
-
-        let key_map = AHashMap::from_iter([(TngComplexKey::init(), TngComplexKey::init())]);
-        let auto_deloop = true;
-        let auto_elim = true;
-
-        SymTngBuilder { inner, x_map, e_map, key_map, auto_deloop, auto_elim }
+    pub fn with_config(mut self, config: SymBuildConfig) -> Self {
+        self.config = config;
+        self
     }
 
     pub fn run(mut self) -> Self {
@@ -169,10 +180,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.inner.complex_mut().merge_vertices(&left, &right, i);
             self.inner.complex_mut().merge_edges(&left, &right, i - 1);
 
-            if self.auto_elim { 
+            if self.config.auto_elim { 
                 self.eliminate_in(i - 1);
             }
-            if self.auto_deloop { 
+            if self.config.auto_deloop { 
                 self.deloop_in(i - 1, false);
             }
         }
@@ -235,7 +246,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.deloop_off_axis(k, r)
         };
 
-        if self.auto_elim { 
+        if self.config.auto_elim { 
             added.into_iter().filter(|k| 
                 self.inner.complex().contains_key(&k) && 
                 !self.try_eliminate_equiv_at(&k)
@@ -539,7 +550,7 @@ mod tests {
         let (h, t) = (FF2::zero(), FF2::zero());
 
         let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
-        b.auto_elim = false;
+        b.config.auto_elim = false;
         let c = b.run().into_tng_complex().into_raw_complex();
         c.check_d_all();
 
@@ -575,7 +586,7 @@ mod tests {
         let (h, t) = (FF2::zero(), FF2::zero());
 
         let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
-        b.auto_deloop = false;
+        b.config.auto_deloop = false;
         b.process_nodes();
 
         assert!(!b.inner.complex().is_completely_delooped());
@@ -603,7 +614,7 @@ mod tests {
         let (h, t) = (FF2::zero(), FF2::zero());
 
         let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
-        b.auto_elim = false;
+        b.config.auto_elim = false;
         b.process_nodes();
 
         assert!(b.inner.complex().is_completely_delooped());

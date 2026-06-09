@@ -21,14 +21,26 @@ use yui_link::{Node, Edge, Link};
 use crate::kh::{KhChain, KhComplex};
 use crate::tng::{TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
 
+/// Toggles for the automatic simplification done while building.
+#[derive(Clone, Copy, Debug)]
+pub struct BuildConfig {
+    pub auto_deloop: bool,
+    pub auto_elim: bool,
+}
+
+impl Default for BuildConfig {
+    fn default() -> Self {
+        Self { auto_deloop: true, auto_elim: true }
+    }
+}
+
 pub struct TngComplexBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     complex: TngComplex<R>,
     nodes: Vec<Node>,
-    loops: Vec<Edge>, 
+    loops: Vec<Edge>,
     elements: Vec<TngComplexElem<R>>,
-    pub auto_deloop: bool,
-    pub auto_elim: bool
+    config: BuildConfig,
 }
 
 impl<R> TngComplexBuilder<R>
@@ -51,17 +63,21 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn init(h: &R, t: &R, deg_shift: (isize, isize), base_pt: Option<Edge>) -> Self { 
         let complex = TngComplex::init(h, t, deg_shift, base_pt);
-        Self { 
-            complex, 
-            nodes: vec![], 
+        Self {
+            complex,
+            nodes: vec![],
             loops: vec![],
-            elements: vec![], 
-            auto_deloop: true, 
-            auto_elim: true 
+            elements: vec![],
+            config: BuildConfig::default(),
         }
     }
 
-    pub fn complex(&self) -> &TngComplex<R> { 
+    pub fn with_config(mut self, config: BuildConfig) -> Self {
+        self.config = config;
+        self
+    }
+
+    pub fn complex(&self) -> &TngComplex<R> {
         &self.complex
     }
 
@@ -191,10 +207,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.complex.merge_vertices(&left, &right, i);
             self.complex.merge_edges(&left, &right, i - 1);
             
-            if self.auto_elim { 
+            if self.config.auto_elim { 
                 self.eliminate_in(i - 1);
             }
-            if self.auto_deloop {
+            if self.config.auto_deloop {
                 self.deloop_in(i - 1, false);
             }
         }
@@ -215,7 +231,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let c = TngComplex::from_loop(h, t, c, marked);
             self.merge(c);
 
-            if self.auto_deloop { 
+            if self.config.auto_deloop { 
                 self.deloop_all(false);
             }
         }
@@ -270,7 +286,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let added = self.complex.deloop(k, r);
 
-        if self.auto_elim { 
+        if self.config.auto_elim { 
             // only retain keys are not eliminated
             added.into_iter().filter(|k|
                 !self.try_eliminate_at(k)

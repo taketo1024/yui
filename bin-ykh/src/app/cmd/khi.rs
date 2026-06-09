@@ -1,9 +1,10 @@
 use std::marker::PhantomData;
+use std::ops::RangeInclusive;
 use std::str::FromStr;
 use yui_core::TeX;
 use yui_core::{EucRing, EucRingOps};
 use yui_homology::{ToSeqString, ToTableString};
-use yui_kh::khi::{KhIChain, KhIComplex, KhIHomology};
+use yui_kh::khi::{KhIChain, KhIHomology};
 use yui_link::InvLink;
 use crate::app::args::*;
 use crate::app::utils::*;
@@ -40,6 +41,9 @@ pub struct Args {
 
     #[arg(short = 'n', long)]
     pub no_simplify: bool,
+
+    #[arg(long, value_parser = parse_h_range)]
+    pub h_range: Option<RangeInclusive<isize>>,
 
     #[arg(short, long, default_value = "unicode")]
     pub format: Format,
@@ -97,12 +101,11 @@ where
     
         let l = load_sinv_knot(&self.args.link, self.args.mirror)?;
 
-        let ckhi = if self.args.no_simplify {
-            KhIComplex::new_no_simplify(&l, &h, &t, self.args.reduced)
-        } else { 
-            KhIComplex::new(&l, &h, &t, self.args.reduced)
+        let khi = if self.args.no_simplify {
+            KhIHomology::new_no_simplify(&l, &h, &t, self.args.reduced)
+        } else {
+            KhIHomology::new_partial(&l, &h, &t, self.args.reduced, self.args.h_range.clone())
         };
-        let khi = ckhi.homology();
 
         let bigraded = h.is_zero() && t.is_zero() || 
             ["H", "0,T"].contains(&self.args.c_value.as_str());
@@ -119,12 +122,12 @@ where
         }
 
         if self.args.show_alpha { 
-            let zs = ckhi.canon_cycles();
+            let zs = khi.canon_cycles();
             self.show_alpha(&khi, zs);
         }
 
         if self.args.show_ssi { 
-            let zs = ckhi.canon_cycles();
+            let zs = khi.canon_cycles();
             self.show_ssi(&l, &h, &khi, zs)?;
         }
 

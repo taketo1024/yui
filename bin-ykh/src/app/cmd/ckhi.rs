@@ -2,6 +2,7 @@ use crate::app::args::*;
 use crate::app::utils::*;
 use crate::app::err::*;
 use std::marker::PhantomData;
+use std::ops::RangeInclusive;
 use std::str::FromStr;
 use yui_core::TeX;
 use yui_core::{Ring, RingOps};
@@ -39,6 +40,9 @@ pub struct Args {
 
     #[arg(short = 'n', long)]
     pub no_simplify: bool,
+
+    #[arg(long, value_parser = parse_h_range)]
+    pub h_range: Option<RangeInclusive<isize>>,
 
     #[arg(long, default_value = "0")]
     pub log: u8,
@@ -91,8 +95,8 @@ where
 
         let ckhi = if self.args.no_simplify {
             KhIComplex::new_no_simplify(&l, &h, &t, self.args.reduced)
-        } else { 
-            KhIComplex::new(&l, &h, &t, self.args.reduced)
+        } else {
+            KhIComplex::new_partial(&l, &h, &t, self.args.reduced, self.args.h_range.clone())
         };
         
         // CKh generators

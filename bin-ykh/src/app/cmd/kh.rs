@@ -1,4 +1,5 @@
 use std::marker::PhantomData;
+use std::ops::RangeInclusive;
 use std::str::FromStr;
 use yui_core::TeX;
 use yui_core::{EucRing, EucRingOps};
@@ -40,6 +41,9 @@ pub struct Args {
 
     #[arg(short = 'n', long)]
     pub no_simplify: bool,
+
+    #[arg(long, value_parser = parse_h_range)]
+    pub h_range: Option<RangeInclusive<isize>>,
 
     #[arg(long, default_value = "0")]
     pub log: u8,
@@ -97,9 +101,9 @@ where
         
         let kh = if self.args.no_simplify {
             KhHomology::new_no_simplify(&l, &h, &t, self.args.reduced)
-        } else { 
-            KhHomology::new(&l, &h, &t, self.args.reduced)
-        } ;
+        } else {
+            KhHomology::new_partial(&l, &h, &t, self.args.reduced, self.args.h_range.clone())
+        };
 
         // print Kh
         let table = if bigraded { 

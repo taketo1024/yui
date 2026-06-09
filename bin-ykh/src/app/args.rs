@@ -1,3 +1,4 @@
+use std::ops::RangeInclusive;
 use clap::ValueEnum;
 use derive_more::Display;
 
@@ -80,7 +81,16 @@ pub(crate) fn parse_poly_vars(c_value: &String) -> PolyVars {
 
 #[derive(Clone, Copy, PartialEq, Eq, ValueEnum, Display, Debug, Default)]
 #[clap(rename_all="lower")]
-pub enum Format { 
-    #[default] Unicode, 
+pub enum Format {
+    #[default] Unicode,
     TeX
+}
+
+// parse an inclusive degree range like `-1..=2` (also accepts `-1..2`).
+pub fn parse_h_range(s: &str) -> Result<RangeInclusive<isize>, String> {
+    let (lo, hi) = s.split_once("..=")
+        .or_else(|| s.split_once(".."))
+        .ok_or_else(|| format!("invalid range `{s}`, expected e.g. `-1..=2`"))?;
+    let parse = |x: &str| x.trim().parse::<isize>().map_err(|e| format!("`{x}`: {e}"));
+    Ok(parse(lo)? ..= parse(hi)?)
 }

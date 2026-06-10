@@ -143,7 +143,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             .with_config(BuildConfig { auto_deloop: false, auto_elim: false, h_range: None });
         inner.set_nodes(chunk.iter().cloned());
 
-        let config = SymBuildConfig { chunk_bound: None, preprocess: false, h_range: None, ..self.config.clone() };
+        // cap the child to the chunk's reachable band: a chunk vertex of weight
+        // > b - deg_shift.0 can never reach the window (weight only grows).
+        let h_range = self.config.h_range.as_ref().map(|r| {
+            let s = self.inner.complex().deg_shift().0;
+            0 ..= (*r.end() - s).max(0)
+        });
+        let config = SymBuildConfig { chunk_bound: None, preprocess: false, h_range, ..self.config.clone() };
         let key_map = AHashMap::from_iter([(TngComplexKey::init(), TngComplexKey::init())]);
         SymTngBuilder { inner, x_map: self.x_map.clone(), e_map: self.e_map.clone(), key_map, config }
     }
@@ -858,20 +864,30 @@ mod tests {
         );
         let (h, t) = (FF2::zero(), FF2::zero());
 
-        let build = |chunk_bound: Option<usize>| {
+        let build = |chunk_bound: Option<usize>, window: Option<(isize, isize)>| {
             let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
             b.config.chunk_bound = chunk_bound;
+            b.config.h_range = window.map(|(a, b)| a..=b);
             b.run().into_tng_complex().into_raw_complex()
         };
 
-        let normal = build(None);
+        let normal = build(None, None);
         let range = normal.support().cloned().range().unwrap();
         let hn = normal.homology();
+
+        // full chunked builds match on every degree.
         for bound in [Some(2), Some(4), Some(100)] {
-            let hc = build(bound).homology();
+            let hc = build(bound, None).homology();
             for i in range.clone() {
                 assert_eq!(hc[i].rank(), hn[i].rank(), "rank at {i} (bound {bound:?})");
             }
+        }
+
+        // windowed chunked build matches on the interior (exercises the band-cap).
+        let (a, b) = (*range.start() + 1, *range.end() - 1);
+        let hw = build(Some(4), Some((a, b))).homology();
+        for i in (a + 1)..=(b - 1) {
+            assert_eq!(hw[i].rank(), hn[i].rank(), "windowed rank at {i}");
         }
     }
 

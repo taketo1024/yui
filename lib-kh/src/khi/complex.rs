@@ -18,6 +18,7 @@ use yui_homology::{ChainComplex1, ChainMap, ToSeqString, ToTableString, GrMod1, 
 use yui_link::InvLink;
 
 use crate::kh::{KhComplex, KhGen};
+use crate::tng::builder::SymBuildConfig;
 use crate::khi::KhIHomology;
 use crate::khi::{KhIGen, KhIGenExt};
 use crate::util::Bigraded;
@@ -43,14 +44,13 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
     // restricts the build to `h_range`; since `KhI_i = C_i ⊕ C_{i-1}`, the cone needs `C` over `[a-1, b]`.
     pub fn new_partial(l: &InvLink, h: &R, t: &R, reduced: bool, h_range: Option<RangeInclusive<isize>>) -> Self {
-        use crate::tng::builder::SymBuildConfig;
         Self::new_with_config(l, h, t, reduced, SymBuildConfig { h_range, ..Default::default() })
     }
 
     // `config.h_range` is the desired cone range `[a, b]`; the cone needs `C` over `[a-1, b]`,
     // so the build range is shifted down by one while the rest of `config` is kept.
-    pub fn new_with_config(l: &InvLink, h: &R, t: &R, reduced: bool, config: crate::tng::builder::SymBuildConfig) -> Self {
-        use crate::tng::builder::{SymTngBuilder, SymBuildConfig};
+    pub fn new_with_config(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig) -> Self {
+        use crate::tng::builder::SymTngBuilder;
 
         let h_range = config.h_range.clone();
         let build_config = SymBuildConfig {

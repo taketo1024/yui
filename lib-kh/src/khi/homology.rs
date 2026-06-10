@@ -5,6 +5,7 @@ use yui_core::{EucRing, EucRingOps, IteratorExt};
 use yui_homology::{ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_link::InvLink;
 use crate::khi::{KhIComplex, KhIGen, KhIGenExt};
+use crate::tng::builder::SymBuildConfig;
 use crate::util::Bigraded;
 
 use super::KhIChain;
@@ -27,11 +28,18 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     // builds one degree wider (for boundary maps), then truncates to `h_range`.
     pub fn new_partial(l: &InvLink, h: &R, t: &R, reduced: bool, h_range: Option<RangeInclusive<isize>>) -> Self {
-        let Some(range) = h_range else {
-            return Self::new(l, h, t, reduced);
+        Self::new_with_config(l, h, t, reduced, SymBuildConfig { h_range, ..Default::default() })
+    }
+
+    // builds one degree wider (for boundary maps), then truncates to `config.h_range`;
+    // the rest of `config` (e.g. `chunk_bound`) flows down to the complex build.
+    pub fn new_with_config(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig) -> Self {
+        let Some(range) = config.h_range.clone() else {
+            return Self::from(&KhIComplex::new_with_config(l, h, t, reduced, config));
         };
         let (a, b) = (*range.start(), *range.end());
-        let c = KhIComplex::new_partial(l, h, t, reduced, Some((a - 1)..=(b + 1)));
+        let cone_config = SymBuildConfig { h_range: Some((a - 1)..=(b + 1)), ..config };
+        let c = KhIComplex::new_with_config(l, h, t, reduced, cone_config);
         Self::from(&c).truncated(a..=b)
     }
 

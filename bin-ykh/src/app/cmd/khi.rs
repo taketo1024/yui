@@ -5,6 +5,7 @@ use yui_core::TeX;
 use yui_core::{EucRing, EucRingOps};
 use yui_homology::{ToSeqString, ToTableString};
 use yui_kh::khi::{KhIChain, KhIHomology};
+use yui_kh::tng::builder::SymBuildConfig;
 use yui_link::InvLink;
 use crate::app::args::*;
 use crate::app::utils::*;
@@ -44,6 +45,9 @@ pub struct Args {
 
     #[arg(long, value_parser = parse_h_range)]
     pub h_range: Option<RangeInclusive<isize>>,
+
+    #[arg(long)]
+    pub chunk_bound: Option<usize>,
 
     #[arg(short, long, default_value = "unicode")]
     pub format: Format,
@@ -104,7 +108,12 @@ where
         let khi = if self.args.no_simplify {
             KhIHomology::new_no_simplify(&l, &h, &t, self.args.reduced)
         } else {
-            KhIHomology::new_partial(&l, &h, &t, self.args.reduced, self.args.h_range.clone())
+            let config = SymBuildConfig {
+                h_range: self.args.h_range.clone(),
+                chunk_bound: self.args.chunk_bound,
+                ..Default::default()
+            };
+            KhIHomology::new_with_config(&l, &h, &t, self.args.reduced, config)
         };
 
         let bigraded = h.is_zero() && t.is_zero() || 

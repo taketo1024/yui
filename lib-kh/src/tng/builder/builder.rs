@@ -17,7 +17,7 @@ use itertools::Itertools;
 use log::{debug, info, trace};
 use num_traits::Zero;
 use yui_core::bitseq::Bit;
-use yui_core::{RangeExt, Ring, RingOps};
+use yui_core::{Ring, RingOps};
 use yui_link::{Node, Edge, Link};
 
 use crate::kh::{KhChain, KhComplex};
@@ -217,8 +217,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("merge {} + {}", self.stat(), other.stat());
 
         let (left, right) = self.complex.prepare_merge(other);
-        // `mv(0, 1)` after the window clamp: deloop C[i] eliminates C[i-1].
-        let range = reachable_range(self.complex.h_range(), &self.config.h_range, self.nodes.len()).mv(0, 1);
+        let range = reachable_range(self.complex.h_range(), &self.config.h_range, self.nodes.len());
+        let top = *range.end();
+
         debug!("  merge range: {:?}", range);
 
         for i in range {
@@ -234,6 +235,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             if self.config.auto_deloop {
                 self.deloop_in(i - 1, false);
             }
+        }
+
+        if self.config.auto_deloop {
+            self.deloop_in(top, false);
         }
 
         self.prune_h_range();

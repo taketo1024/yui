@@ -16,7 +16,7 @@ use itertools::{iproduct, Itertools};
 use log::{debug, info};
 use yui_core::algo::KeyedUnionFind;
 use yui_core::bitseq::{Bit, BitSeq};
-use yui_core::{RangeExt, Ring, RingOps};
+use yui_core::{Ring, RingOps};
 use yui_link::{Node, Edge, InvLink};
 
 use crate::kh::{KhGen, KhTensor};
@@ -389,13 +389,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn merge(&mut self, c: TngComplex<R>, key_map: TauKeyMap) {
         debug!("merge {} + {}", self.inner.stat(), c.stat());
         debug!("  key_map: {} × {}", self.key_map.len(), key_map.len());
-        let band = self.config.h_range.is_some().then(|| self.weight_band(self.inner.nodes().count()));
+
+        let band = self.config.h_range.is_some().then(|| 
+            self.weight_band(self.inner.nodes().count())
+        );
         self.key_map = self.key_map.merge(&key_map, band);
+
         debug!("  key_map built: {}", self.key_map.len());
 
         let (left, right) = self.inner.complex_mut().prepare_merge(c);
 
-        let range = reachable_range(self.inner.complex().h_range().mv(0, 1), &self.config.h_range, self.inner.nodes().count());
+        let range = reachable_range(self.inner.complex().h_range(), &self.config.h_range, self.inner.nodes().count());
+        let top = *range.end();
+
         debug!("  merge range: {:?}", range);
 
         for i in range {
@@ -411,6 +417,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             if self.config.auto_deloop {
                 self.deloop_in(i - 1, false);
             }
+        }
+
+        if self.config.auto_deloop {
+            self.deloop_in(top, false);
         }
 
         self.prune_h_range();

@@ -14,7 +14,6 @@ use std::ops::RangeInclusive;
 use ahash::{AHashMap, AHashSet};
 use itertools::{iproduct, Itertools};
 use log::{debug, info};
-use rayon::prelude::*;
 use yui_core::algo::KeyedUnionFind;
 use yui_core::bitseq::{Bit, BitSeq};
 use yui_core::{RangeExt, Ring, RingOps};
@@ -144,6 +143,20 @@ impl TauKeyMap {
             .filter(|&((&w1, _), (&w2, _))| band.contains(&(w1 + w2)))
             .flat_map(|((_, ps), (_, qs))| iproduct!(ps, qs).map(|(&(k1, tk1), &(k2, tk2))| (k1 + k2, tk1 + tk2)))
             .collect()
+    }
+
+    // Key map of a half-complex (`keys`) tensored with its τ-mirror: `k1+k2 ↦ k2+k1`
+    // (τ swaps the halves), within `band`. Folded directly to avoid a large pair Vec.
+    fn from_half(keys: &[TngComplexKey], band: RangeInclusive<usize>) -> Self {
+        let mut m = Self::default();
+        for k1 in keys {
+            for k2 in keys {
+                if band.contains(&(k1.weight() + k2.weight())) {
+                    m.add_pair(k1 + k2, k2 + k1);
+                }
+            }
+        }
+        m
     }
 }
 
@@ -834,7 +847,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let tc = c.convert_edges(|e| self.builder.inv_edge(e));
 
         info!("pair key_map ({}² entries)...", keys.len());
-        let key_map = self.pair_key_map(&keys, r_rest);
+        let key_map = TauKeyMap::from_half(&keys, self.builder.weight_band(r_rest));
 
         info!("complete {} elements...", elements.len());
         elements.iter_mut().for_each(|e|
@@ -859,20 +872,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             },
             None => b,
         }
-    }
-
-    // off-axis key `k1 + k2` (k1 from `c`, k2 from `tc`); τ swaps the halves.
-    // Filter to the reachable weight band, else this is the K² blow-up.
-    fn pair_key_map(&self, keys: &[TngComplexKey], r_rest: usize) -> TauKeyMap {
-        let band = self.builder.weight_band(r_rest);
-        let pairs: Vec<(TngComplexKey, TngComplexKey)> = keys.par_iter().flat_map_iter(|k1| {
-            let (w1, band) = (k1.weight(), band.clone());
-            keys.iter().filter_map(move |k2| {
-                let w = w1 + k2.weight();
-                band.contains(&w).then(|| (k1 + k2, k2 + k1))
-            })
-        }).collect();
-        pairs.into_iter().collect()
     }
 
 

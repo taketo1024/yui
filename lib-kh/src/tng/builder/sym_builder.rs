@@ -90,12 +90,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.process_chunks();
         } else {
             if self.config.preprocess {
-                SymTngPreprocessor::run(&mut self);
+                self.preprocess();
             }
             self.process_nodes();
         }
         self.finalize();
         self
+    }
+
+    fn preprocess(&mut self) {
+        SymTngPreprocessor::run(self);
     }
 
     // Divide-and-conquer: build each bounded chunk via a child builder, then merge the

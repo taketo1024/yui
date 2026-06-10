@@ -148,15 +148,10 @@ impl TauKeyMap {
     // Key map of a half-complex (`keys`) tensored with its τ-mirror: `k1+k2 ↦ k2+k1`
     // (τ swaps the halves), within `band`. Folded directly to avoid a large pair Vec.
     fn from_half(keys: &[TngComplexKey], band: RangeInclusive<usize>) -> Self {
-        let mut m = Self::default();
-        for k1 in keys {
-            for k2 in keys {
-                if band.contains(&(k1.weight() + k2.weight())) {
-                    m.add_pair(k1 + k2, k2 + k1);
-                }
-            }
-        }
-        m
+        iproduct!(keys, keys)
+            .filter(|&(k1, k2)| band.contains(&(k1.weight() + k2.weight())))
+            .map(|(k1, k2)| (k1 + k2, k2 + k1))
+            .collect()
     }
 }
 

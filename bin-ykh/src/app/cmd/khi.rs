@@ -47,7 +47,7 @@ pub struct Args {
     pub h_range: Option<RangeInclusive<isize>>,
 
     #[arg(long)]
-    pub chunk_bound: Option<usize>,
+    pub chunk: Option<usize>,
 
     #[arg(short, long, default_value = "unicode")]
     pub format: Format,
@@ -110,7 +110,7 @@ where
         } else {
             let config = SymBuildConfig {
                 h_range: self.args.h_range.clone(),
-                chunk_bound: self.args.chunk_bound,
+                chunk_bound: self.args.chunk,
                 ..Default::default()
             };
             KhIHomology::new_with_config(&l, &h, &t, self.args.reduced, config)

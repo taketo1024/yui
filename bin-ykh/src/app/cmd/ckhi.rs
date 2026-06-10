@@ -46,7 +46,7 @@ pub struct Args {
     pub h_range: Option<RangeInclusive<isize>>,
 
     #[arg(long)]
-    pub chunk_bound: Option<usize>,
+    pub chunk: Option<usize>,
 
     #[arg(long, default_value = "0")]
     pub log: u8,
@@ -102,7 +102,7 @@ where
         } else {
             let config = SymBuildConfig {
                 h_range: self.args.h_range.clone(),
-                chunk_bound: self.args.chunk_bound,
+                chunk_bound: self.args.chunk,
                 ..Default::default()
             };
             KhIComplex::new_with_config(&l, &h, &t, self.args.reduced, config)

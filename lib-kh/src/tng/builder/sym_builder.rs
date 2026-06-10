@@ -33,8 +33,6 @@ pub struct SymBuildConfig {
     pub auto_elim: bool,
     // build half the off-axis crossings and mirror via τ (see `preprocess`).
     pub preprocess: bool,
-    // cap the off-axis crossings handled by `preprocess`; the rest go incremental.
-    pub preprocess_bound: Option<usize>,
     // chooser handicap on an off-axis pair = coeff · current size (its extra growth).
     pub pair_penalty_coeff: f64,
     // divide-and-conquer: build the link in chunks of ≤ this many crossings (each via a
@@ -46,7 +44,7 @@ pub struct SymBuildConfig {
 
 impl Default for SymBuildConfig {
     fn default() -> Self {
-        Self { auto_deloop: true, auto_elim: true, preprocess: true, preprocess_bound: None, pair_penalty_coeff: 1.0, chunk_bound: None, h_range: None }
+        Self { auto_deloop: true, auto_elim: true, preprocess: true, pair_penalty_coeff: 1.0, chunk_bound: None, h_range: None }
     }
 }
 
@@ -694,21 +692,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         info!("  merged: {}", self.builder.inner.stat());
     }
 
-    // Pick one τ-mirror half of the off-axis crossings (`τx != x`), capped to
-    // `preprocess_bound` crossings; `t_half = τ(half)`, the rest go incremental.
+    // Pick one τ-mirror half of the off-axis crossings (`τx != x`); `t_half = τ(half)`.
     fn partition_off_axis(&self) -> (Vec<Node>, Vec<Node>) {
         let off_axis = self.builder.inner.nodes().filter(|&x| self.builder.inv_node(x) != x).collect_vec();
         let groups = self.group_by_adjacency(&off_axis);
-        let cap = self.builder.config.preprocess_bound.map_or(usize::MAX, |b| b / 2);
 
         let mut half: Vec<&Node> = vec![];
         for group in groups {
             let Some(&rep) = group.first() else { continue };
             if half.contains(&self.builder.inv_node(rep)) { continue } // τ-side: regenerated below
             half.extend(group);
-            if half.len() >= cap { break }
         }
-        half.truncate(cap); // exact bound (may cut the last group)
 
         let half: Vec<Node> = half.into_iter().cloned().collect();
         let t_half: Vec<Node> = half.iter().map(|x| self.builder.inv_node(x).clone()).collect();
@@ -903,41 +897,6 @@ mod tests {
         let hw = build(Some(4), Some(a..=b)).homology();
         for i in (a + 1)..=(b - 1) {
             assert_eq!(hw[i].rank(), hn[i].rank(), "windowed rank at {i}");
-        }
-    }
-
-    #[test]
-    fn preprocess_bound_matches() {
-        // k9_46 has enough off-axis pairs that a small bound leaves a real remainder.
-        let l = InvLink::from_symmetric_pd_code(
-            [[18,8,1,7],[13,6,14,7],[12,2,13,1],[8,18,9,17],[5,14,6,15],[2,12,3,11],[16,10,17,9],[15,4,16,5],[10,4,11,3]]
-        );
-        let (h, t) = (FF2::zero(), FF2::zero());
-
-        let build = |bound: Option<usize>, window: Option<RangeInclusive<isize>>| {
-            let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
-            b.config.preprocess_bound = bound;
-            b.config.h_range = window;
-            b.run().into_tng_complex().into_raw_complex()
-        };
-
-        let full = build(None, None);
-        let range = full.support().cloned().range().unwrap();
-        let h_full = full.homology();
-
-        // partial chunk + incremental rest agrees with the full build on every degree.
-        for bound in [Some(0), Some(2), Some(4)] {
-            let h_b = build(bound, None).homology();
-            for i in range.clone() {
-                assert_eq!(h_b[i].rank(), h_full[i].rank(), "rank at {i} (bound {bound:?})");
-            }
-        }
-
-        // partial chunk + window agrees on the window interior (exercises the weight band).
-        let (a, b) = (*range.start() + 1, *range.end() - 1);
-        let h_w = build(Some(2), Some(a..=b)).homology();
-        for i in (a + 1)..=(b - 1) {
-            assert_eq!(h_w[i].rank(), h_full[i].rank(), "windowed rank at {i}");
         }
     }
 

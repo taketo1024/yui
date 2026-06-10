@@ -44,16 +44,15 @@ fn main() {
 
     let zero = FF2::default();
 
-    // `H_RANGE=a..=b` restricts the build; `PREPROCESS_BOUND=n` caps the symmetric chunk.
+    // `H_RANGE=a..=b` restricts the build; `CHUNK_BOUND=n` builds in ≤n-crossing chunks.
     let h_range = std::env::var("H_RANGE").ok().map(|s| {
         let (a, b) = s.split_once("..=").expect("H_RANGE must be `a..=b`");
         a.trim().parse::<isize>().unwrap() ..= b.trim().parse::<isize>().unwrap()
     });
-    let preprocess_bound = std::env::var("PREPROCESS_BOUND").ok().map(|s| s.parse::<usize>().unwrap());
     let pair_penalty_coeff = std::env::var("PAIR_PENALTY").ok().map_or(1.0, |s| s.parse::<f64>().unwrap());
     let chunk_bound = std::env::var("CHUNK_BOUND").ok().map(|s| s.parse::<usize>().unwrap());
 
-    let cfg = SymBuildConfig { preprocess_bound, pair_penalty_coeff, chunk_bound, h_range: h_range.clone(), ..Default::default() };
+    let cfg = SymBuildConfig { pair_penalty_coeff, chunk_bound, h_range: h_range.clone(), ..Default::default() };
 
     let t0 = Instant::now();
     let b = SymTngBuilder::<FF2>::from_inv_link(&l, &zero, &zero, false).with_config(cfg).run();
@@ -62,6 +61,6 @@ fn main() {
 
     println!("\n=== summary ===");
     println!("knot: 60 crossings (strongly invertible target)");
-    println!("h_range: {:?}, preprocess_bound: {:?}, chunk_bound: {:?}", h_range, preprocess_bound, chunk_bound);
+    println!("h_range: {:?}, chunk_bound: {:?}", h_range, chunk_bound);
     println!("build total: {:?}, verts: {}", elapsed, c.n_verts());
 }

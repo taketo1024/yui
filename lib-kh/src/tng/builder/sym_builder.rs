@@ -37,13 +37,16 @@ pub struct SymBuildConfig {
     pub preprocess_bound: Option<usize>,
     // chooser handicap on an off-axis pair = coeff · current size (its extra growth).
     pub pair_penalty_coeff: f64,
+    // divide-and-conquer: build the link in chunks of ≤ this many crossings (each via a
+    // child builder), merging each reduced chunk into the parent. None = single pass.
+    pub chunk_bound: Option<usize>,
     // literal truncation: homology at the endpoints is wrong (build `(a-1)..=(b+1)` for correct `[a, b]`).
     pub h_range: Option<RangeInclusive<isize>>,
 }
 
 impl Default for SymBuildConfig {
     fn default() -> Self {
-        Self { auto_deloop: true, auto_elim: true, preprocess: true, preprocess_bound: None, pair_penalty_coeff: 1.0, h_range: None }
+        Self { auto_deloop: true, auto_elim: true, preprocess: true, preprocess_bound: None, pair_penalty_coeff: 1.0, chunk_bound: None, h_range: None }
     }
 }
 
@@ -85,10 +88,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn run(mut self) -> Self {
-        if self.config.preprocess {
-            SymTngPreprocessor::run(&mut self);
+        if self.config.chunk_bound.is_some() {
+            self.process_chunks();
+        } else {
+            if self.config.preprocess {
+                SymTngPreprocessor::run(&mut self);
+            }
+            self.process_nodes();
         }
-        self.process_nodes();
         self.finalize();
         self
     }
@@ -106,6 +113,30 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             info!("  appended: {x}, current size: {}", self.inner.stat());
         }
+    }
+
+    // Divide-and-conquer: build each bounded chunk via a child builder, then merge the
+    // reduced chunk into the parent (so the parent never materializes the full dense slice).
+    fn process_chunks(&mut self) {
+        while let Some(chunk) = self.next_chunk() {
+            let (c, key_map) = self.build_chunk(&chunk);
+            self.inner.drop_nodes(|x| chunk.contains(x));
+            self.merge(c, key_map);
+            info!("  chunk merged ({}): {}", chunk.len(), self.inner.stat());
+        }
+    }
+
+    // Next batch of ≤ `chunk_bound` crossings to build: τ-closed and boundary-connected
+    // to the accumulated parent, so the merge can deloop.
+    fn next_chunk(&self) -> Option<Vec<Node>> {
+        todo!("select a bounded, τ-closed, boundary-connected chunk")
+    }
+
+    // Build `chunk` into a reduced sub-complex via a child SymTngBuilder (sharing the
+    // parent's τ-maps), capped to the reachable weight band; return its key_map too.
+    fn build_chunk(&self, chunk: &[Node]) -> (TngComplex<R>, AHashMap<TngComplexKey, TngComplexKey>) {
+        let _ = chunk;
+        todo!("dispatch a child SymTngBuilder over the chunk")
     }
 
     /// Cost-aware pair chooser: maximize delooping unlocked, but handicap an off-axis

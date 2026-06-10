@@ -104,6 +104,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         while let Some(chunk) = self.next_chunk() {
             info!("process chunk ({}): {}", chunk.len(), chunk.iter().join(", "));
             let (c, key_map) = self.build_chunk(&chunk);
+            debug!("  chunk built: {}", c.stat());
             self.inner.drop_nodes(|x| chunk.contains(x));
             self.merge(c, key_map);
             info!("  chunk merged: {}", self.inner.stat());
@@ -263,7 +264,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.merge(c, key_map);
     }
 
-    fn merge(&mut self, c: TngComplex<R>, key_map: AHashMap<TngComplexKey, TngComplexKey>) { 
+    fn merge(&mut self, c: TngComplex<R>, key_map: AHashMap<TngComplexKey, TngComplexKey>) {
+        debug!("merge {} + {}", self.inner.stat(), c.stat());
         self.key_map = cartesian!(
             self.key_map.iter(),
             key_map.iter()

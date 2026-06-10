@@ -111,17 +111,31 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    // Next ≤ `chunk_bound` crossings, τ-closed (whole `(x, τx)` pairs) so the child can
-    // build symmetrically. TODO: make it boundary-connected to the parent for cutwidth.
+    // Next ≤ `chunk_bound` crossings, grown from the parent's boundary by shared edges
+    // (so the merge can deloop), τ-closed (whole `(x, τx)` pairs).
     fn next_chunk(&self) -> Option<Vec<Node>> {
         let bound = self.config.chunk_bound.unwrap_or(usize::MAX);
+        let remaining = self.inner.nodes().cloned().collect_vec();
+        if remaining.is_empty() { return None }
+
+        let mut frontier: AHashSet<Edge> = self.inner.complex().boundary_ends().collect();
         let mut chunk: Vec<Node> = vec![];
-        for x in self.inner.nodes() {
-            if chunk.len() >= bound { break }
-            if chunk.contains(x) { continue } // already taken as a τ-pair
-            chunk.push(x.clone());
-            let tx = self.inv_node(x);
-            if tx != x { chunk.push(tx.clone()); }
+
+        while chunk.len() < bound {
+            // a remaining node touching the frontier, else seed a fresh component.
+            let pick = remaining.iter()
+                .find(|&x| !chunk.contains(x) && x.edges().iter().any(|e| frontier.contains(e)))
+                .or_else(|| remaining.iter().find(|&x| !chunk.contains(x)))
+                .cloned();
+            let Some(x) = pick else { break };
+
+            let tx = self.inv_node(&x).clone();
+            for n in [&x, &tx] {
+                if !chunk.contains(n) {
+                    frontier.extend(n.edges().iter().copied());
+                    chunk.push(n.clone());
+                }
+            }
         }
         (!chunk.is_empty()).then_some(chunk)
     }

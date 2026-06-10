@@ -208,6 +208,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // Divide-and-conquer: build each bounded chunk via a child builder, then merge the
     // reduced chunk into the parent (so the parent never materializes the full dense slice).
     fn process_chunks(&mut self) {
+        // canon cycles aren't yet tracked through chunk merges (see `merge`'s TODO), so
+        // drop them — a chunked build yields the complex/homology but not α / ssi.
+        self.inner.set_elements(vec![]);
         while let Some(chunk) = self.next_chunk() {
             info!("process chunk ({}): {}", chunk.len(), chunk.iter().join(", "));
             let (c, key_map) = self.build_chunk(&chunk);

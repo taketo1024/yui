@@ -190,9 +190,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub(crate) fn append_node(&mut self, x: &Node) { 
-        info!("({}/{}) append: {x}", 
-            self.complex.dim() + 1, 
-            self.complex.dim() + self.nodes.len() + 1, 
+        info!("({}/{}) append: {x}",
+            self.complex.dim() + 1,
+            self.complex.dim() + self.nodes.len(),
         );
 
         self.prepare_append(x);

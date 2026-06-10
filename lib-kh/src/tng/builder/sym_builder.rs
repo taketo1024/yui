@@ -204,7 +204,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn append_on_axis(&mut self, x: &Node) { 
         info!("({}/{}) append on-axis: {x}", 
             self.inner.complex().dim() + 1, 
-            self.inner.complex().dim() + self.inner.nodes().count() + 1, 
+            self.inner.complex().dim() + self.inner.nodes().count(), 
         );
 
         self.inner.prepare_append(x);
@@ -229,7 +229,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         info!("({}/{}) append off-axis: {x}, {tx}", 
             self.inner.complex().dim() + 1, 
-            self.inner.complex().dim() + self.inner.nodes().count() + 1, 
+            self.inner.complex().dim() + self.inner.nodes().count(), 
         );
 
         self.inner.prepare_append(x);

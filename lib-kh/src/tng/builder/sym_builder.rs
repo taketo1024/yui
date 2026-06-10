@@ -100,6 +100,54 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self
     }
 
+    // Divide-and-conquer: build each bounded chunk via a child builder, then merge the
+    // reduced chunk into the parent (so the parent never materializes the full dense slice).
+    fn process_chunks(&mut self) {
+        while let Some(chunk) = self.next_chunk() {
+            let (c, key_map) = self.build_chunk(&chunk);
+            self.inner.drop_nodes(|x| chunk.contains(x));
+            self.merge(c, key_map);
+            info!("  chunk merged ({}): {}", chunk.len(), self.inner.stat());
+        }
+    }
+
+    // Next ≤ `chunk_bound` crossings, τ-closed (whole `(x, τx)` pairs) so the child can
+    // build symmetrically. TODO: make it boundary-connected to the parent for cutwidth.
+    fn next_chunk(&self) -> Option<Vec<Node>> {
+        let bound = self.config.chunk_bound.unwrap_or(usize::MAX);
+        let mut chunk: Vec<Node> = vec![];
+        for x in self.inner.nodes() {
+            if chunk.len() >= bound { break }
+            if chunk.contains(x) { continue } // already taken as a τ-pair
+            chunk.push(x.clone());
+            let tx = self.inv_node(x);
+            if tx != x { chunk.push(tx.clone()); }
+        }
+        (!chunk.is_empty()).then_some(chunk)
+    }
+
+    // Build `chunk` into a reduced sub-complex via a child builder sharing the parent's
+    // τ-maps; return the complex and its τ key_map for the parent merge.
+    fn build_chunk(&self, chunk: &[Node]) -> (TngComplex<R>, AHashMap<TngComplexKey, TngComplexKey>) {
+        let child = self.child_builder(chunk).run();
+        let key_map = child.key_map.clone();
+        (child.into_tng_complex(), key_map)
+    }
+
+    // A child builder over `chunk` (a sub-tangle), sharing the parent's τ-maps; built
+    // non-recursively (no inner preprocess/chunking) for now.
+    fn child_builder(&self, chunk: &[Node]) -> Self {
+        let (h, t) = self.inner.complex().ht();
+        let base_pt = self.inner.complex().base_pt();
+        let mut inner = TngComplexBuilder::init(h, t, (0, 0), base_pt)
+            .with_config(BuildConfig { auto_deloop: false, auto_elim: false, h_range: None });
+        inner.set_nodes(chunk.iter().cloned());
+
+        let config = SymBuildConfig { chunk_bound: None, preprocess: false, h_range: None, ..self.config.clone() };
+        let key_map = AHashMap::from_iter([(TngComplexKey::init(), TngComplexKey::init())]);
+        SymTngBuilder { inner, x_map: self.x_map.clone(), e_map: self.e_map.clone(), key_map, config }
+    }
+
     fn process_nodes(&mut self) {
         info!("process {} nodes", self.inner.nodes().count());
 
@@ -113,30 +161,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             info!("  appended: {x}, current size: {}", self.inner.stat());
         }
-    }
-
-    // Divide-and-conquer: build each bounded chunk via a child builder, then merge the
-    // reduced chunk into the parent (so the parent never materializes the full dense slice).
-    fn process_chunks(&mut self) {
-        while let Some(chunk) = self.next_chunk() {
-            let (c, key_map) = self.build_chunk(&chunk);
-            self.inner.drop_nodes(|x| chunk.contains(x));
-            self.merge(c, key_map);
-            info!("  chunk merged ({}): {}", chunk.len(), self.inner.stat());
-        }
-    }
-
-    // Next batch of ≤ `chunk_bound` crossings to build: τ-closed and boundary-connected
-    // to the accumulated parent, so the merge can deloop.
-    fn next_chunk(&self) -> Option<Vec<Node>> {
-        todo!("select a bounded, τ-closed, boundary-connected chunk")
-    }
-
-    // Build `chunk` into a reduced sub-complex via a child SymTngBuilder (sharing the
-    // parent's τ-maps), capped to the reachable weight band; return its key_map too.
-    fn build_chunk(&self, chunk: &[Node]) -> (TngComplex<R>, AHashMap<TngComplexKey, TngComplexKey>) {
-        let _ = chunk;
-        todo!("dispatch a child SymTngBuilder over the chunk")
     }
 
     /// Cost-aware pair chooser: maximize delooping unlocked, but handicap an off-axis
@@ -823,6 +847,31 @@ mod tests {
         let (h_on, h_off) = (c_on.homology(), c_off.homology());
         for i in (a + 1)..=(b - 1) {
             assert_eq!(h_on[i].rank(), h_off[i].rank(), "windowed rank at {i}");
+        }
+    }
+
+    #[test]
+    fn chunk_build_matches() {
+        // k9_46 has enough crossings for several chunks at small bounds.
+        let l = InvLink::from_symmetric_pd_code(
+            [[18,8,1,7],[13,6,14,7],[12,2,13,1],[8,18,9,17],[5,14,6,15],[2,12,3,11],[16,10,17,9],[15,4,16,5],[10,4,11,3]]
+        );
+        let (h, t) = (FF2::zero(), FF2::zero());
+
+        let build = |chunk_bound: Option<usize>| {
+            let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
+            b.config.chunk_bound = chunk_bound;
+            b.run().into_tng_complex().into_raw_complex()
+        };
+
+        let normal = build(None);
+        let range = normal.support().cloned().range().unwrap();
+        let hn = normal.homology();
+        for bound in [Some(2), Some(4), Some(100)] {
+            let hc = build(bound).homology();
+            for i in range.clone() {
+                assert_eq!(hc[i].rank(), hn[i].rank(), "rank at {i} (bound {bound:?})");
+            }
         }
     }
 

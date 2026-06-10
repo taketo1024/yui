@@ -34,11 +34,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     // restricts the build to `h_range` (literal truncation; `None` = full).
     pub fn new_partial(l: &Link, h: &R, t: &R, reduced: bool, h_range: Option<RangeInclusive<isize>>) -> Self {
-        use crate::tng::builder::{TngComplexBuilder, BuildConfig};
+        use crate::tng::builder::BuildConfig;
+        Self::new_with_config(l, h, t, reduced, BuildConfig { h_range, ..Default::default() })
+    }
+
+    pub fn new_with_config(l: &Link, h: &R, t: &R, reduced: bool, config: crate::tng::builder::BuildConfig) -> Self {
+        use crate::tng::builder::TngComplexBuilder;
 
         assert!(!reduced || (!l.is_empty() && t.is_zero()));
 
-        let config = BuildConfig { h_range, ..Default::default() };
         let b = TngComplexBuilder::from_link(l, h, t, reduced).with_config(config).run();
         let canon_cycles = b.eval_elements();
         let inner = b.into_tng_complex().into_raw_complex();

@@ -43,13 +43,21 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
     // restricts the build to `h_range`; since `KhI_i = C_i ⊕ C_{i-1}`, the cone needs `C` over `[a-1, b]`.
     pub fn new_partial(l: &InvLink, h: &R, t: &R, reduced: bool, h_range: Option<RangeInclusive<isize>>) -> Self {
+        use crate::tng::builder::SymBuildConfig;
+        Self::new_with_config(l, h, t, reduced, SymBuildConfig { h_range, ..Default::default() })
+    }
+
+    // `config.h_range` is the desired cone range `[a, b]`; the cone needs `C` over `[a-1, b]`,
+    // so the build range is shifted down by one while the rest of `config` is kept.
+    pub fn new_with_config(l: &InvLink, h: &R, t: &R, reduced: bool, config: crate::tng::builder::SymBuildConfig) -> Self {
         use crate::tng::builder::{SymTngBuilder, SymBuildConfig};
 
-        let config = SymBuildConfig {
+        let h_range = config.h_range.clone();
+        let build_config = SymBuildConfig {
             h_range: h_range.as_ref().map(|r| (*r.start() - 1) ..= *r.end()),
-            ..Default::default()
+            ..config
         };
-        let b = SymTngBuilder::from_inv_link(l, h, t, reduced).with_config(config).run();
+        let b = SymTngBuilder::from_inv_link(l, h, t, reduced).with_config(build_config).run();
         let tau_map = b.tau_map();
 
         let b = b.into_inner();

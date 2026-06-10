@@ -51,8 +51,9 @@ fn main() {
     });
     let preprocess_bound = std::env::var("PREPROCESS_BOUND").ok().map(|s| s.parse::<usize>().unwrap());
     let pair_penalty_coeff = std::env::var("PAIR_PENALTY").ok().map_or(1.0, |s| s.parse::<f64>().unwrap());
+    let chunk_bound = std::env::var("CHUNK_BOUND").ok().map(|s| s.parse::<usize>().unwrap());
 
-    let cfg = SymBuildConfig { preprocess_bound, pair_penalty_coeff, h_range: h_range.clone(), ..Default::default() };
+    let cfg = SymBuildConfig { preprocess_bound, pair_penalty_coeff, chunk_bound, h_range: h_range.clone(), ..Default::default() };
 
     let t0 = Instant::now();
     let b = SymTngBuilder::<FF2>::from_inv_link(&l, &zero, &zero, false).with_config(cfg).run();
@@ -61,6 +62,6 @@ fn main() {
 
     println!("\n=== summary ===");
     println!("knot: 60 crossings (strongly invertible target)");
-    println!("h_range: {:?}, preprocess_bound: {:?}", h_range, preprocess_bound);
+    println!("h_range: {:?}, preprocess_bound: {:?}, chunk_bound: {:?}", h_range, preprocess_bound, chunk_bound);
     println!("build total: {:?}, verts: {}", elapsed, c.n_verts());
 }

@@ -7,6 +7,7 @@ use yui_core::{EucRing, EucRingOps, IteratorExt};
 use yui_link::Link;
 
 use crate::kh::KhGen;
+use crate::tng::builder::BuildConfig;
 use crate::util::Bigraded;
 
 use super::{KhAlg, KhChain, KhComplex};
@@ -31,11 +32,17 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     // builds one degree wider (for boundary maps), then truncates to `h_range`.
     pub fn new_partial(l: &Link, h: &R, t: &R, reduced: bool, h_range: Option<RangeInclusive<isize>>) -> Self {
-        let Some(range) = h_range else {
-            return Self::new(l, h, t, reduced);
+        Self::new_with_config(l, h, t, reduced, BuildConfig { h_range, ..Default::default() })
+    }
+
+    // builds one degree wider (for boundary maps), then truncates to `config.h_range`.
+    pub fn new_with_config(l: &Link, h: &R, t: &R, reduced: bool, config: BuildConfig) -> Self {
+        let Some(range) = config.h_range.clone() else {
+            return Self::from(&KhComplex::new_with_config(l, h, t, reduced, config));
         };
         let (a, b) = (*range.start(), *range.end());
-        let c = KhComplex::new_partial(l, h, t, reduced, Some((a - 1)..=(b + 1)));
+        let build_config = BuildConfig { h_range: Some((a - 1)..=(b + 1)), ..config };
+        let c = KhComplex::new_with_config(l, h, t, reduced, build_config);
         Self::from(&c).truncated(a..=b)
     }
 

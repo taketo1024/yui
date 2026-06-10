@@ -104,10 +104,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // reduced chunk into the parent (so the parent never materializes the full dense slice).
     fn process_chunks(&mut self) {
         while let Some(chunk) = self.next_chunk() {
+            info!("process chunk ({}): {}", chunk.len(), chunk.iter().join(", "));
             let (c, key_map) = self.build_chunk(&chunk);
             self.inner.drop_nodes(|x| chunk.contains(x));
             self.merge(c, key_map);
-            info!("  chunk merged ({}): {}", chunk.len(), self.inner.stat());
+            info!("  chunk merged: {}", self.inner.stat());
         }
     }
 

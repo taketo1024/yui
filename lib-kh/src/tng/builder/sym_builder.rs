@@ -147,8 +147,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         (child.into_tng_complex(), key_map)
     }
 
-    // A child builder over `chunk` (a sub-tangle), sharing the parent's τ-maps; built
-    // non-recursively (no inner preprocess/chunking) for now.
+    // A child builder over `chunk` (a sub-tangle), inheriting the parent's τ-maps and
+    // `preprocess`/simplify settings; `chunk_bound = None` so it doesn't recurse.
     fn child_builder(&self, chunk: &[Node]) -> Self {
         let (h, t) = self.inner.complex().ht();
         let base_pt = self.inner.complex().base_pt();
@@ -162,7 +162,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let s = self.inner.complex().deg_shift().0;
             0 ..= (*r.end() - s).max(0)
         });
-        let config = SymBuildConfig { chunk_bound: None, preprocess: false, h_range, ..self.config.clone() };
+        let config = SymBuildConfig { chunk_bound: None, h_range, ..self.config.clone() };
         let key_map = AHashMap::from_iter([(TngComplexKey::init(), TngComplexKey::init())]);
         SymTngBuilder { inner, x_map: self.x_map.clone(), e_map: self.e_map.clone(), key_map, config }
     }

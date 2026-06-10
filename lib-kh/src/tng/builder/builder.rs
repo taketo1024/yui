@@ -22,6 +22,7 @@ use yui_link::{Node, Edge, Link};
 
 use crate::kh::{KhChain, KhComplex};
 use crate::tng::{TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
+use super::reachable_range;
 
 /// Toggles for the automatic simplification done while building.
 #[derive(Clone, Debug)]
@@ -216,9 +217,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("merge {} + {}", self.stat(), other.stat());
 
         let (left, right) = self.complex.prepare_merge(other);
-        debug!("  merge range: {:?}", self.merge_range());
+        let range = reachable_range(self.complex.h_range().mv(0, 1), &self.config.h_range, self.nodes.len());
+        debug!("  merge range: {:?}", range);
 
-        for i in self.merge_range() {
+        for i in range {
             debug!("  merge deg {i}...");
             let nv = self.complex.merge_vertices(&left, &right, i);
             debug!("    +{nv} verts");
@@ -236,20 +238,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.prune_h_range();
 
         debug!("  merged: {}", self.stat());
-    }
-
-    // Degree range to build in a merge, capped to `h_range`: a vertex of degree
-    // `i` ends in `[i, i + r]` (`r` = pending crossings), so degrees outside
-    // `[a - r, b]` can't reach the window.
-    fn merge_range(&self) -> RangeInclusive<isize> {
-        let range = self.complex.h_range().mv(0, 1);
-        let (mut bottom, mut top) = (*range.start(), *range.end());
-        if let Some(h_range) = &self.config.h_range {
-            let r = self.nodes.len() as isize;
-            bottom = bottom.max(*h_range.start() - r);
-            top = top.min(*h_range.end());
-        }
-        bottom ..= top
     }
 
     /// Drop vertices that can't end up in `config.h_range`: degree `d` ends in

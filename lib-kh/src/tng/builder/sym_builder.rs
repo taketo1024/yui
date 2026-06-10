@@ -12,8 +12,7 @@
 use std::collections::HashSet;
 use std::ops::RangeInclusive;
 use ahash::{AHashMap, AHashSet};
-use cartesian::cartesian;
-use itertools::Itertools;
+use itertools::{iproduct, Itertools};
 use log::{debug, info};
 use rayon::prelude::*;
 use yui_core::algo::KeyedUnionFind;
@@ -24,6 +23,7 @@ use yui_link::{Node, Edge, InvLink};
 use crate::kh::{KhGen, KhTensor};
 use crate::tng::{LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
 use crate::tng::builder::{TngComplexBuilder, BuildConfig};
+use super::reachable_range;
 
 /// Toggles for the automatic simplification done while building (kept separate
 /// from [`BuildConfig`] so the equivariant builder can gain its own flags).
@@ -267,22 +267,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn merge(&mut self, c: TngComplex<R>, key_map: AHashMap<TngComplexKey, TngComplexKey>) {
         debug!("merge {} + {}", self.inner.stat(), c.stat());
         debug!("  key_map: {} × {}", self.key_map.len(), key_map.len());
-        self.key_map = self.windowed_key_map(&key_map);
+        self.key_map = self.merge_key_map(&key_map);
         debug!("  key_map built: {}", self.key_map.len());
 
         let (left, right) = self.inner.complex_mut().prepare_merge(c);
 
-        // build only the reachable band `[a-r, b]` (r = remaining crossings).
-        let range = self.inner.complex().h_range().mv(0, 1);
-        let (mut bottom, mut top) = (*range.start(), *range.end());
-        if let Some(h_range) = &self.config.h_range {
-            let r = self.inner.nodes().count() as isize;
-            bottom = bottom.max(*h_range.start() - r);
-            top = top.min(*h_range.end());
-        }
-        debug!("  merge range: {:?}", bottom ..= top);
+        let range = reachable_range(self.inner.complex().h_range().mv(0, 1), &self.config.h_range, self.inner.nodes().count());
+        debug!("  merge range: {:?}", range);
 
-        for i in bottom ..= top {
+        for i in range {
             debug!("  merge deg {i}...");
             let nv = self.inner.complex_mut().merge_vertices(&left, &right, i);
             debug!("    +{nv} verts");
@@ -302,40 +295,37 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         // TODO merge elements
     }
 
-    // The merged `key_map`, restricted to the reachable weight band so we never build
-    // the full `parent × chunk` cartesian (which explodes for large chunks).
-    fn windowed_key_map(&self, chunk_km: &AHashMap<TngComplexKey, TngComplexKey>) -> AHashMap<TngComplexKey, TngComplexKey> {
-        let Some(h_range) = &self.config.h_range else {
-            return cartesian!(self.key_map.iter(), chunk_km.iter())
+    // The merged `key_map`, restricted to the reachable weight band so we never build the
+    // full `parent × chunk` cartesian (which explodes for large chunks).
+    fn merge_key_map(&self, key_map: &AHashMap<TngComplexKey, TngComplexKey>) -> AHashMap<TngComplexKey, TngComplexKey> {
+        // no window → no band to exploit, so skip grouping and take the full product.
+        if self.config.h_range.is_none() {
+            return iproduct!(&self.key_map, key_map)
                 .map(|((k1, l1), (k2, l2))| (k1 + k2, l1 + l2)).collect();
-        };
-        let i0 = self.inner.complex().deg_shift().0;
-        let r = self.inner.nodes().count() as isize;
-        let lo = (*h_range.start() - r - i0).max(0) as usize;
-        let hi = (*h_range.end() - i0).max(0) as usize;
-
-        // group entries by key weight; combine only weight-pairs whose sum lands in [lo, hi].
-        let by_weight = |km: &AHashMap<TngComplexKey, TngComplexKey>| {
-            let mut m: AHashMap<usize, Vec<(TngComplexKey, TngComplexKey)>> = AHashMap::new();
-            for (k, l) in km {
-                m.entry(k.weight()).or_default().push((*k, *l));
-            }
-            m
-        };
-        let (pg, cg) = (by_weight(&self.key_map), by_weight(chunk_km));
-
-        let mut out = AHashMap::new();
-        for (&w1, ps) in &pg {
-            for (&w2, qs) in &cg {
-                if w1 + w2 < lo || w1 + w2 > hi { continue }
-                for (k1, l1) in ps {
-                    for (k2, l2) in qs {
-                        out.insert(k1 + k2, l1 + l2);
-                    }
-                }
-            }
         }
-        out
+        let band = self.weight_band(self.inner.nodes().count());
+
+        // group entries by key weight; combine only weight-pairs whose sum is in `band`.
+        let by_weight = |km: &AHashMap<TngComplexKey, TngComplexKey>| -> AHashMap<usize, Vec<(TngComplexKey, TngComplexKey)>> {
+            km.iter().fold(AHashMap::new(), |mut m, (k, l)| {
+                m.entry(k.weight()).or_default().push((*k, *l));
+                m
+            })
+        };
+        let (parent, chunk) = (by_weight(&self.key_map), by_weight(key_map));
+
+        iproduct!(&parent, &chunk)
+            .filter(|&((w1, _), (w2, _))| band.contains(&(*w1 + *w2)))
+            .flat_map(|((_, ps), (_, qs))| iproduct!(ps, qs).map(|(&(k1, l1), &(k2, l2))| (k1 + k2, l1 + l2)))
+            .collect()
+    }
+
+    // Combined off-axis weight that can still reach the window, given `r` pending crossings.
+    fn weight_band(&self, r: usize) -> RangeInclusive<usize> {
+        let s = self.inner.complex().deg_shift().0;
+        let window = self.config.h_range.as_ref().map(|w| (*w.start() - s) ..= (*w.end() - s));
+        let band = reachable_range(0 ..= isize::MAX, &window, r);
+        (*band.start()).max(0) as usize ..= (*band.end()).max(0) as usize
     }
 
     /// Prune doomed vertices *and* their `key_map` entries. τ preserves weight,
@@ -817,7 +807,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // off-axis key `k1 + k2` (k1 from `c`, k2 from `tc`); τ swaps the halves.
     // Filter to the reachable weight band, else this is the K² blow-up.
     fn pair_key_map(&self, keys: &[TngComplexKey], r_rest: usize) -> AHashMap<TngComplexKey, TngComplexKey> {
-        let band = self.off_axis_weight_band(r_rest);
+        let band = self.builder.weight_band(r_rest);
         let pairs: Vec<(TngComplexKey, TngComplexKey)> = keys.par_iter().flat_map_iter(|k1| {
             let (w1, band) = (k1.weight(), band.clone());
             keys.iter().filter_map(move |k2| {
@@ -828,17 +818,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         pairs.into_iter().collect()
     }
 
-    // Combined off-axis weight that can still reach the window; `r_rest` = crossings
-    // appended after this chunk (on-axis + off-axis not preprocessed).
-    fn off_axis_weight_band(&self, r_rest: usize) -> RangeInclusive<usize> {
-        let Some(h_range) = &self.builder.config.h_range else {
-            return 0 ..= usize::MAX;
-        };
-        let s = self.builder.inner.complex().deg_shift().0;
-        let lo = (*h_range.start() - s - r_rest as isize).max(0) as usize;
-        let hi = (*h_range.end() - s).max(0) as usize;
-        lo ..= hi
-    }
 
     // Complete a half-element into the full off-axis element.
     fn complete_element(&self, e: &mut TngComplexElem<R>) {

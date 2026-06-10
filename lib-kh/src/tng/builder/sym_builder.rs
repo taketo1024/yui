@@ -111,25 +111,37 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    // Next ≤ `chunk_bound` crossings, grown from the parent's boundary by shared edges
-    // (so the merge can deloop), τ-closed (whole `(x, τx)` pairs).
+    // Next ≤ `chunk_bound` crossings, grown from the parent's boundary by shared edges,
+    // τ-closed (whole `(x, τx)` pairs), with each chunk's proportional share of on-axis
+    // crossings — an off-axis-heavy chunk's `half ⊗ τ-half` preprocess product explodes.
     fn next_chunk(&self) -> Option<Vec<Node>> {
         let bound = self.config.chunk_bound.unwrap_or(usize::MAX);
         let remaining = self.inner.nodes().cloned().collect_vec();
         if remaining.is_empty() { return None }
 
+        let n_on_axis = remaining.iter().filter(|&x| self.inv_node(x) == x).count();
+        let target_on = if bound >= remaining.len() {
+            n_on_axis
+        } else {
+            (bound * n_on_axis).div_ceil(remaining.len())
+        };
+
         let mut frontier: AHashSet<Edge> = self.inner.complex().boundary_ends().collect();
         let mut chunk: Vec<Node> = vec![];
+        let mut on_taken = 0;
 
         while chunk.len() < bound {
-            // a remaining node touching the frontier, else seed a fresh component.
-            let pick = remaining.iter()
-                .find(|&x| !chunk.contains(x) && x.edges().iter().any(|e| frontier.contains(e)))
+            let prefer_on = on_taken < target_on;
+            let at_frontier = |x: &Node| !chunk.contains(x) && x.edges().iter().any(|e| frontier.contains(e));
+            // prefer on/off-axis at the frontier to hit `target_on`, then any frontier node, then seed.
+            let pick = remaining.iter().find(|&x| at_frontier(x) && (self.inv_node(x) == x) == prefer_on)
+                .or_else(|| remaining.iter().find(|&x| at_frontier(x)))
                 .or_else(|| remaining.iter().find(|&x| !chunk.contains(x)))
                 .cloned();
             let Some(x) = pick else { break };
 
             let tx = self.inv_node(&x).clone();
+            if tx == x { on_taken += 1; }
             for n in [&x, &tx] {
                 if !chunk.contains(n) {
                     frontier.extend(n.edges().iter().copied());

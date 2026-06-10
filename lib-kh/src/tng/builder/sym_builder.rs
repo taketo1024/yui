@@ -266,24 +266,23 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn merge(&mut self, c: TngComplex<R>, key_map: AHashMap<TngComplexKey, TngComplexKey>) {
         debug!("merge {} + {}", self.inner.stat(), c.stat());
-        self.key_map = cartesian!(
-            self.key_map.iter(),
-            key_map.iter()
-        ).map(|((k1, l1), (k2, l2))|
-            (k1 + k2, l1 + l2)
-        ).collect();
+        debug!("  key_map: {} × {}", self.key_map.len(), key_map.len());
+        self.key_map = self.windowed_key_map(&key_map);
+        debug!("  key_map built: {}", self.key_map.len());
 
         let (left, right) = self.inner.complex_mut().prepare_merge(c);
 
-        // cap at the top of `h_range`: weight only grows, so higher is unreachable.
+        // build only the reachable band `[a-r, b]` (r = remaining crossings).
         let range = self.inner.complex().h_range().mv(0, 1);
-        let top = match &self.config.h_range {
-            Some(h_range) => *range.end().min(h_range.end()),
-            None => *range.end(),
-        };
-        debug!("  merge range: {:?}", *range.start() ..= top);
+        let (mut bottom, mut top) = (*range.start(), *range.end());
+        if let Some(h_range) = &self.config.h_range {
+            let r = self.inner.nodes().count() as isize;
+            bottom = bottom.max(*h_range.start() - r);
+            top = top.min(*h_range.end());
+        }
+        debug!("  merge range: {:?}", bottom ..= top);
 
-        for i in *range.start() ..= top {
+        for i in bottom ..= top {
             debug!("  merge deg {i}...");
             let nv = self.inner.complex_mut().merge_vertices(&left, &right, i);
             debug!("    +{nv} verts");
@@ -301,6 +300,42 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.prune_h_range();
 
         // TODO merge elements
+    }
+
+    // The merged `key_map`, restricted to the reachable weight band so we never build
+    // the full `parent × chunk` cartesian (which explodes for large chunks).
+    fn windowed_key_map(&self, chunk_km: &AHashMap<TngComplexKey, TngComplexKey>) -> AHashMap<TngComplexKey, TngComplexKey> {
+        let Some(h_range) = &self.config.h_range else {
+            return cartesian!(self.key_map.iter(), chunk_km.iter())
+                .map(|((k1, l1), (k2, l2))| (k1 + k2, l1 + l2)).collect();
+        };
+        let i0 = self.inner.complex().deg_shift().0;
+        let r = self.inner.nodes().count() as isize;
+        let lo = (*h_range.start() - r - i0).max(0) as usize;
+        let hi = (*h_range.end() - i0).max(0) as usize;
+
+        // group entries by key weight; combine only weight-pairs whose sum lands in [lo, hi].
+        let by_weight = |km: &AHashMap<TngComplexKey, TngComplexKey>| {
+            let mut m: AHashMap<usize, Vec<(TngComplexKey, TngComplexKey)>> = AHashMap::new();
+            for (k, l) in km {
+                m.entry(k.weight()).or_default().push((*k, *l));
+            }
+            m
+        };
+        let (pg, cg) = (by_weight(&self.key_map), by_weight(chunk_km));
+
+        let mut out = AHashMap::new();
+        for (&w1, ps) in &pg {
+            for (&w2, qs) in &cg {
+                if w1 + w2 < lo || w1 + w2 > hi { continue }
+                for (k1, l1) in ps {
+                    for (k2, l2) in qs {
+                        out.insert(k1 + k2, l1 + l2);
+                    }
+                }
+            }
+        }
+        out
     }
 
     /// Prune doomed vertices *and* their `key_map` entries. τ preserves weight,

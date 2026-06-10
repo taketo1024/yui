@@ -245,8 +245,13 @@ where
     }
 
     pub fn homology(&self) -> GrMod<I, X, R> {
+        self.homology_in(self.support().copied())
+    }
+
+    /// Homology at the given indices only, using the full differentials.
+    pub fn homology_in(&self, support: impl IntoIterator<Item = I>) -> GrMod<I, X, R> {
         GrMod::generate_filtered(
-            self.support().copied(),
+            support.into_iter(),
             |i| {
                 let hi = self.homology_at(i);
                 (!hi.is_zero()).then_some(hi)

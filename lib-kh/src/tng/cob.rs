@@ -17,7 +17,7 @@ use std::collections::HashSet;
 use std::ops::Mul;
 use itertools::Itertools;
 use num_traits::Zero;
-use cartesian::cartesian;
+use cartesian::cartesian; // TODO: replace with itertools::iproduct! and drop the cartesian dep
 use yui_core::util::format::subscript;
 use yui_core::{AddMon, MathType, Ring, RingOps};
 use yui_core::lc::{LcKey, Lc};

@@ -43,7 +43,22 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         let (a, b) = (*range.start(), *range.end());
         let build_config = BuildConfig { h_range: Some((a - 1)..=(b + 1)), ..config };
         let c = KhComplex::new_with_config(l, h, t, reduced, build_config);
-        Self::from(&c).truncated(a..=b)
+        Self::from_complex(&c, Some(a..=b))
+    }
+
+    fn from_complex(c: &KhComplex<R>, range: Option<RangeInclusive<isize>>) -> Self {
+        let reduced = c.inner().reduced();
+        let homology = match range {
+            Some(r) => reduced.homology_in(r),
+            None    => reduced.homology(),
+        };
+        KhHomology::new_impl(
+            homology,
+            c.alg().clone(),
+            c.deg_shift(),
+            c.is_reduced(),
+            c.canon_cycles().clone()
+        )
     }
 
     pub fn new_no_simplify(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
@@ -140,13 +155,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 impl<R> From<&KhComplex<R>> for KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     fn from(c: &KhComplex<R>) -> Self {
-        KhHomology::new_impl(
-            c.inner().reduced().homology(),
-            c.alg().clone(),
-            c.deg_shift(),
-            c.is_reduced(),
-            c.canon_cycles().clone()
-        )
+        KhHomology::from_complex(c, None)
     }
 }
 

@@ -40,7 +40,20 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         let (a, b) = (*range.start(), *range.end());
         let cone_config = SymBuildConfig { h_range: Some((a - 1)..=(b + 1)), ..config };
         let c = KhIComplex::new_with_config(l, h, t, reduced, cone_config);
-        Self::from(&c).truncated(a..=b)
+        Self::from_complex(&c, Some(a..=b))
+    }
+
+    fn from_complex(c: &KhIComplex<R>, range: Option<RangeInclusive<isize>>) -> Self {
+        let reduced = c.inner().reduced();
+        let homology = match range {
+            Some(r) => reduced.homology_in(r),
+            None    => reduced.homology(),
+        };
+        KhIHomology::new_impl(
+            homology,
+            c.canon_cycles().to_vec(),
+            c.deg_shift(),
+        )
     }
 
     pub fn new_no_simplify(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self {
@@ -121,11 +134,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 impl<R> From<&KhIComplex<R>> for KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     fn from(c: &KhIComplex<R>) -> Self {
-        KhIHomology::new_impl(
-            c.inner().reduced().homology(),
-            c.canon_cycles().to_vec(),
-            c.deg_shift(),
-        )
+        KhIHomology::from_complex(c, None)
     }
 }
 

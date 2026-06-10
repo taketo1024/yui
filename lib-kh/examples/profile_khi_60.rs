@@ -50,8 +50,9 @@ fn main() {
         a.trim().parse::<isize>().unwrap() ..= b.trim().parse::<isize>().unwrap()
     });
     let preprocess_bound = std::env::var("PREPROCESS_BOUND").ok().map(|s| s.parse::<usize>().unwrap());
+    let pair_penalty_coeff = std::env::var("PAIR_PENALTY").ok().map_or(1.0, |s| s.parse::<f64>().unwrap());
 
-    let cfg = SymBuildConfig { preprocess_bound, h_range: h_range.clone(), ..Default::default() };
+    let cfg = SymBuildConfig { preprocess_bound, pair_penalty_coeff, h_range: h_range.clone(), ..Default::default() };
 
     let t0 = Instant::now();
     let b = SymTngBuilder::<FF2>::from_inv_link(&l, &zero, &zero, false).with_config(cfg).run();

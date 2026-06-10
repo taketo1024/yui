@@ -35,13 +35,15 @@ pub struct SymBuildConfig {
     pub preprocess: bool,
     // cap the off-axis crossings handled by `preprocess`; the rest go incremental.
     pub preprocess_bound: Option<usize>,
+    // chooser handicap on an off-axis pair = coeff · current size (its extra growth).
+    pub pair_penalty_coeff: f64,
     // literal truncation: homology at the endpoints is wrong (build `(a-1)..=(b+1)` for correct `[a, b]`).
     pub h_range: Option<RangeInclusive<isize>>,
 }
 
 impl Default for SymBuildConfig {
     fn default() -> Self {
-        Self { auto_deloop: true, auto_elim: true, preprocess: true, preprocess_bound: None, h_range: None }
+        Self { auto_deloop: true, auto_elim: true, preprocess: true, preprocess_bound: None, pair_penalty_coeff: 1.0, h_range: None }
     }
 }
 
@@ -258,19 +260,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    /// Pair-aware chooser: an off-axis node is scored as the pair `(x, τx)`
-    /// it'll be appended as; on-axis is doubled to compare at the same scale.
+    /// Cost-aware pair chooser: maximize delooping unlocked, but handicap an off-axis
+    /// pair by its extra intermediate growth (≈ coeff·size), `width` breaks ties.
     fn choose_next_node_sym(&self) -> Option<&Node> {
         let boundary_ends: AHashSet<Edge> = self.inner.complex().boundary_ends().collect();
+        let pair_penalty = (self.config.pair_penalty_coeff * self.inner.complex().n_verts() as f64) as isize;
         self.inner.nodes()
             .max_by_key(|x| {
                 let tx = self.inv_node(x);
                 let (l_x, w_x) = self.inner.score_node(x, &boundary_ends);
                 if tx == *x {
-                    (2 * l_x, 2 * w_x)
+                    (l_x, w_x)
                 } else {
                     let (l_tx, w_tx) = self.inner.score_node(tx, &boundary_ends);
-                    (l_x + l_tx, w_x + w_tx)
+                    (l_x + l_tx - pair_penalty, w_x + w_tx)
                 }
             })
     }

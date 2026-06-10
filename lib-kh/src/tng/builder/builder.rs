@@ -152,13 +152,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     /// Score `x` for the chooser. Higher is better.
     /// `(loop_bonus, width_score)` — loop closures first (they unlock
     /// delooping + elimination), width as tiebreaker.
-    pub(crate) fn score_node(&self, x: &Node, boundary_ends: &AHashSet<Edge>) -> (usize, isize) {
+    pub(crate) fn score_node(&self, x: &Node, boundary_ends: &AHashSet<Edge>) -> (isize, isize) {
         let arcs = self.node_arcs(x);
 
-        let loops: usize = self.complex.iter_verts().map(|(_, v)| {
+        let loops: isize = self.complex.iter_verts().map(|(_, v)| {
             v.tng().comps().map(|c|
-                arcs.iter().filter(|a| c.is_connectable_bothends(a)).count()
-            ).sum::<usize>()
+                arcs.iter().filter(|a| c.is_connectable_bothends(a)).count() as isize
+            ).sum::<isize>()
         }).sum();
 
         let width_score: isize = arcs.iter().map(|a| {

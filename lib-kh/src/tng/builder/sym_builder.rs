@@ -86,163 +86,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn run(mut self) -> Self {
         if self.config.preprocess {
-            self.preprocess();
+            SymTngPreprocessor::run(&mut self);
         }
         self.process_nodes();
         self.finalize();
         self
-    }
-
-    // Build one representative half of the off-axis crossings, mirror it via τ,
-    // merge both, then leave the on-axis crossings for `process_nodes`.
-    fn preprocess(&mut self) {
-        assert_eq!(self.inner.complex().dim(), 0, "must start from init state.");
-
-        let elements = self.inner.take_elements();
-        let (half, t_half) = self.partition_off_axis();
-
-        info!("({}) preprocess off-axis: {} + {}", self.inner.stat(), half.len(), t_half.len());
-
-        let (c, tc, key_map, elements) = self.build_from_half(&half, elements);
-
-        // merge the half, then its τ-image.
-        self.merge_half(&half, c);
-        self.merge_half(&t_half, tc);
-
-        self.key_map = key_map;
-        self.inner.set_elements(elements);
-
-        info!("({}) preprocess done.", self.inner.stat());
-    }
-
-    fn merge_half(&mut self, nodes: &[Node], c: TngComplex<R>) {
-        info!("merge half {} into {}", c.stat(), self.inner.stat());
-        self.inner.drop_nodes(|x| nodes.contains(x));
-        self.inner.merge(c);
-        info!("  merged: {}", self.inner.stat());
-    }
-
-    // Pick one τ-mirror half of the off-axis crossings (`τx != x`), capped to
-    // `preprocess_bound` crossings; `t_half = τ(half)`, the rest go incremental.
-    fn partition_off_axis(&self) -> (Vec<Node>, Vec<Node>) {
-        let off_axis = self.inner.nodes().filter(|&x| self.inv_node(x) != x).collect_vec();
-        let groups = self.group_by_adjacency(&off_axis);
-        let cap = self.config.preprocess_bound.map_or(usize::MAX, |b| b / 2);
-
-        let mut half: Vec<&Node> = vec![];
-        for group in groups {
-            let Some(&rep) = group.first() else { continue };
-            if half.contains(&self.inv_node(rep)) { continue } // τ-side: regenerated below
-            half.extend(group);
-            if half.len() >= cap { break }
-        }
-        half.truncate(cap); // exact bound (may cut the last group)
-
-        let half: Vec<Node> = half.into_iter().cloned().collect();
-        let t_half: Vec<Node> = half.iter().map(|x| self.inv_node(x).clone()).collect();
-        (half, t_half)
-    }
-
-    // Union-find grouping: two nodes are adjacent iff they share a non-axis edge.
-    fn group_by_adjacency<'a>(&self, nodes: &[&'a Node]) -> Vec<Vec<&'a Node>> {
-        let shares_edge = |x: &Node, y: &Node|
-            x.edges().iter()
-                .filter(|&&e| self.inv_edge(e) != e)
-                .any(|e| y.edges().contains(e));
-
-        let mut uf = KeyedUnionFind::from_iter(nodes.iter().copied());
-        for (i, &x) in nodes.iter().enumerate() {
-            for &y in &nodes[..i] {
-                if shares_edge(x, y) {
-                    uf.union(&x, &y);
-                }
-            }
-        }
-        uf.into_disjoint()
-    }
-
-    fn build_from_half(&self, crossings: &[Node], elements: Vec<TngComplexElem<R>>) -> (TngComplex<R>, TngComplex<R>, AHashMap<TngComplexKey, TngComplexKey>, Vec<TngComplexElem<R>>) {
-        // crossings appended after this chunk: all remaining nodes minus the chunk (half + τ-half).
-        let r_rest = self.inner.nodes().count() - 2 * crossings.len();
-
-        let mut b = self.half_builder();
-        b.set_nodes(crossings.iter().cloned());
-        b.set_elements(elements);
-        b.process_nodes();
-        info!("half complex built: {}", b.stat());
-
-        let keys = b.complex().keys().cloned().collect_vec();
-        let mut elements = b.take_elements();
-
-        let c = b.into_tng_complex();
-        info!("mirror half via τ...");
-        let tc = c.convert_edges(|e| self.inv_edge(e));
-
-        info!("pair key_map ({}² entries)...", keys.len());
-        let key_map = self.pair_key_map(&keys, r_rest);
-
-        info!("complete {} elements...", elements.len());
-        elements.iter_mut().for_each(|e|
-            self.complete_element(e)
-        );
-
-        info!("build_from_half done: {} key-pairs.", key_map.len());
-        (c, tc, key_map, elements)
-    }
-
-    // Inner builder for the half-complex; caps to `b - deg_shift.0`, since a
-    // half-vertex of larger weight can never land in the window.
-    fn half_builder(&self) -> TngComplexBuilder<R> {
-        let (h, t) = self.inner.complex().ht();
-        let base_pt = self.inner.complex().base_pt();
-        let b = TngComplexBuilder::init(h, t, (0, 0), base_pt);
-
-        match &self.config.h_range {
-            Some(h_range) => {
-                let cap = *h_range.end() - self.inner.complex().deg_shift().0;
-                b.with_config(BuildConfig { h_range: Some(0 ..= cap), ..Default::default() })
-            },
-            None => b,
-        }
-    }
-
-    // off-axis key `k1 + k2` (k1 from `c`, k2 from `tc`); τ swaps the halves.
-    // Only pairs whose combined weight can still land in the window survive the
-    // merge, so we filter to that band — otherwise this is the K² blow-up.
-    fn pair_key_map(&self, keys: &[TngComplexKey], r_rest: usize) -> AHashMap<TngComplexKey, TngComplexKey> {
-        let (lo, hi) = self.off_axis_weight_band(r_rest);
-        let pairs: Vec<(TngComplexKey, TngComplexKey)> = keys.par_iter().flat_map_iter(|k1| {
-            let w1 = k1.weight();
-            keys.iter().filter_map(move |k2| {
-                let w = w1 + k2.weight();
-                (lo <= w && w <= hi).then(|| (k1 + k2, k2 + k1))
-            })
-        }).collect();
-        pairs.into_iter().collect()
-    }
-
-    // Combined off-axis weight that can still reach the window; `r_rest` = crossings
-    // appended after this chunk (on-axis + off-axis not preprocessed).
-    fn off_axis_weight_band(&self, r_rest: usize) -> (usize, usize) {
-        let Some(h_range) = &self.config.h_range else {
-            return (0, usize::MAX);
-        };
-        let s = self.inner.complex().deg_shift().0;
-        let lo = (*h_range.start() - s - r_rest as isize).max(0) as usize;
-        let hi = (*h_range.end() - s).max(0) as usize;
-        (lo, hi)
-    }
-
-    // Complete a half-element into the full off-axis element.
-    fn complete_element(&self, e: &mut TngComplexElem<R>) {
-        e.modify(|k, cob| {
-            let kk = k + k;
-            let cc = cob.map(|c, r| {
-                let tc = c.convert_edges(|e| self.inv_edge(e));
-                (c.connect(&tc), &r * &r)
-            });
-            (kk, cc)
-        });
     }
 
     fn process_nodes(&mut self) {
@@ -726,9 +574,172 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 }
 
+/// Builds the off-axis part of a [`SymTngBuilder`] by τ-symmetry: build one
+/// representative half, mirror via τ, and merge both into the builder.
+struct SymTngPreprocessor<'a, R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    builder: &'a mut SymTngBuilder<R>,
+}
+
+impl<'a, R> SymTngPreprocessor<'a, R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn run(builder: &'a mut SymTngBuilder<R>) {
+        Self { builder }.build();
+    }
+
+    fn build(&mut self) {
+        assert_eq!(self.builder.inner.complex().dim(), 0, "must start from init state.");
+
+        let elements = self.builder.inner.take_elements();
+        let (half, t_half) = self.partition_off_axis();
+
+        info!("({}) preprocess off-axis: {} + {}", self.builder.inner.stat(), half.len(), t_half.len());
+
+        let (c, tc, key_map, elements) = self.build_from_half(&half, elements);
+
+        // merge the half, then its τ-image.
+        self.merge_half(&half, c);
+        self.merge_half(&t_half, tc);
+
+        self.builder.key_map = key_map;
+        self.builder.inner.set_elements(elements);
+
+        info!("({}) preprocess done.", self.builder.inner.stat());
+    }
+
+    fn merge_half(&mut self, nodes: &[Node], c: TngComplex<R>) {
+        info!("merge half {} into {}", c.stat(), self.builder.inner.stat());
+        self.builder.inner.drop_nodes(|x| nodes.contains(x));
+        self.builder.inner.merge(c);
+        info!("  merged: {}", self.builder.inner.stat());
+    }
+
+    // Pick one τ-mirror half of the off-axis crossings (`τx != x`), capped to
+    // `preprocess_bound` crossings; `t_half = τ(half)`, the rest go incremental.
+    fn partition_off_axis(&self) -> (Vec<Node>, Vec<Node>) {
+        let off_axis = self.builder.inner.nodes().filter(|&x| self.builder.inv_node(x) != x).collect_vec();
+        let groups = self.group_by_adjacency(&off_axis);
+        let cap = self.builder.config.preprocess_bound.map_or(usize::MAX, |b| b / 2);
+
+        let mut half: Vec<&Node> = vec![];
+        for group in groups {
+            let Some(&rep) = group.first() else { continue };
+            if half.contains(&self.builder.inv_node(rep)) { continue } // τ-side: regenerated below
+            half.extend(group);
+            if half.len() >= cap { break }
+        }
+        half.truncate(cap); // exact bound (may cut the last group)
+
+        let half: Vec<Node> = half.into_iter().cloned().collect();
+        let t_half: Vec<Node> = half.iter().map(|x| self.builder.inv_node(x).clone()).collect();
+        (half, t_half)
+    }
+
+    // Union-find grouping: two nodes are adjacent iff they share a non-axis edge.
+    fn group_by_adjacency<'b>(&self, nodes: &[&'b Node]) -> Vec<Vec<&'b Node>> {
+        let shares_edge = |x: &Node, y: &Node|
+            x.edges().iter()
+                .filter(|&&e| self.builder.inv_edge(e) != e)
+                .any(|e| y.edges().contains(e));
+
+        let mut uf = KeyedUnionFind::from_iter(nodes.iter().copied());
+        for (i, &x) in nodes.iter().enumerate() {
+            for &y in &nodes[..i] {
+                if shares_edge(x, y) {
+                    uf.union(&x, &y);
+                }
+            }
+        }
+        uf.into_disjoint()
+    }
+
+    fn build_from_half(&self, crossings: &[Node], elements: Vec<TngComplexElem<R>>) -> (TngComplex<R>, TngComplex<R>, AHashMap<TngComplexKey, TngComplexKey>, Vec<TngComplexElem<R>>) {
+        // crossings appended after this chunk: all remaining nodes minus the chunk (half + τ-half).
+        let r_rest = self.builder.inner.nodes().count() - 2 * crossings.len();
+
+        let mut b = self.half_builder();
+        b.set_nodes(crossings.iter().cloned());
+        b.set_elements(elements);
+        b.process_nodes();
+        info!("half complex built: {}", b.stat());
+
+        let keys = b.complex().keys().cloned().collect_vec();
+        let mut elements = b.take_elements();
+
+        let c = b.into_tng_complex();
+        info!("mirror half via τ...");
+        let tc = c.convert_edges(|e| self.builder.inv_edge(e));
+
+        info!("pair key_map ({}² entries)...", keys.len());
+        let key_map = self.pair_key_map(&keys, r_rest);
+
+        info!("complete {} elements...", elements.len());
+        elements.iter_mut().for_each(|e|
+            self.complete_element(e)
+        );
+
+        info!("build_from_half done: {} key-pairs.", key_map.len());
+        (c, tc, key_map, elements)
+    }
+
+    // Inner builder for the half-complex; caps to `b - deg_shift.0`, since a
+    // half-vertex of larger weight can never land in the window.
+    fn half_builder(&self) -> TngComplexBuilder<R> {
+        let (h, t) = self.builder.inner.complex().ht();
+        let base_pt = self.builder.inner.complex().base_pt();
+        let b = TngComplexBuilder::init(h, t, (0, 0), base_pt);
+
+        match &self.builder.config.h_range {
+            Some(h_range) => {
+                let cap = *h_range.end() - self.builder.inner.complex().deg_shift().0;
+                b.with_config(BuildConfig { h_range: Some(0 ..= cap), ..Default::default() })
+            },
+            None => b,
+        }
+    }
+
+    // off-axis key `k1 + k2` (k1 from `c`, k2 from `tc`); τ swaps the halves.
+    // Filter to the reachable weight band, else this is the K² blow-up.
+    fn pair_key_map(&self, keys: &[TngComplexKey], r_rest: usize) -> AHashMap<TngComplexKey, TngComplexKey> {
+        let (lo, hi) = self.off_axis_weight_band(r_rest);
+        let pairs: Vec<(TngComplexKey, TngComplexKey)> = keys.par_iter().flat_map_iter(|k1| {
+            let w1 = k1.weight();
+            keys.iter().filter_map(move |k2| {
+                let w = w1 + k2.weight();
+                (lo <= w && w <= hi).then(|| (k1 + k2, k2 + k1))
+            })
+        }).collect();
+        pairs.into_iter().collect()
+    }
+
+    // Combined off-axis weight that can still reach the window; `r_rest` = crossings
+    // appended after this chunk (on-axis + off-axis not preprocessed).
+    fn off_axis_weight_band(&self, r_rest: usize) -> (usize, usize) {
+        let Some(h_range) = &self.builder.config.h_range else {
+            return (0, usize::MAX);
+        };
+        let s = self.builder.inner.complex().deg_shift().0;
+        let lo = (*h_range.start() - s - r_rest as isize).max(0) as usize;
+        let hi = (*h_range.end() - s).max(0) as usize;
+        (lo, hi)
+    }
+
+    // Complete a half-element into the full off-axis element.
+    fn complete_element(&self, e: &mut TngComplexElem<R>) {
+        e.modify(|k, cob| {
+            let kk = k + k;
+            let cc = cob.map(|c, r| {
+                let tc = c.convert_edges(|e| self.builder.inv_edge(e));
+                (c.connect(&tc), &r * &r)
+            });
+            (kk, cc)
+        });
+    }
+}
+
 #[cfg(test)]
 #[allow(unused)]
-mod tests { 
+mod tests {
     use crate::khi::{KhIGen, KhIHomology};
 
     use super::*;

@@ -238,6 +238,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
 
         if self.config.auto_deloop {
+            if self.config.h_range.as_ref().is_some_and(|w| top == *w.end()) {
+                self.prune_isolated_in(top);
+            }
             self.deloop_in(top, false);
         }
 
@@ -274,7 +277,21 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub(crate) fn process_loops(&mut self) { 
+    // At the window-top degree, vertices with no incoming edge are isolated
+    // (no outgoing either) and only feed the discarded boundary homology — drop
+    // them before delooping their (ignored) loops.
+    fn prune_isolated_in(&mut self, i: isize) {
+        let doomed = self.complex.keys_of_deg(i)
+            .filter(|k| self.complex.vertex(k).in_edges().next().is_none())
+            .copied()
+            .collect_vec();
+        if !doomed.is_empty() {
+            debug!("prune {} isolated verts in C[{i}].", doomed.len());
+        }
+        self.prune_keys(&doomed);
+    }
+
+    pub(crate) fn process_loops(&mut self) {
         while !self.loops.is_empty() { 
             let c = self.loops.remove(0);
 

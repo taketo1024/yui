@@ -846,10 +846,10 @@ mod tests {
         let l = InvLink::test_data("6_3");
         let (h, t) = (FF2::zero(), FF2::zero());
 
-        let build = |preprocess: bool, window: Option<(isize, isize)>| {
+        let build = |preprocess: bool, window: Option<RangeInclusive<isize>>| {
             let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
             b.config.preprocess = preprocess;
-            b.config.h_range = window.map(|(a, b)| a..=b);
+            b.config.h_range = window;
             b.run().into_tng_complex().into_raw_complex()
         };
 
@@ -863,7 +863,7 @@ mod tests {
 
         // windowed build: agree on the interior of the window.
         let (a, b) = (*range.start() + 1, *range.end() - 1);
-        let (c_on, c_off) = (build(true, Some((a, b))), build(false, Some((a, b))));
+        let (c_on, c_off) = (build(true, Some(a..=b)), build(false, Some(a..=b)));
         let (h_on, h_off) = (c_on.homology(), c_off.homology());
         for i in (a + 1)..=(b - 1) {
             assert_eq!(h_on[i].rank(), h_off[i].rank(), "windowed rank at {i}");
@@ -878,10 +878,10 @@ mod tests {
         );
         let (h, t) = (FF2::zero(), FF2::zero());
 
-        let build = |chunk_bound: Option<usize>, window: Option<(isize, isize)>| {
+        let build = |chunk_bound: Option<usize>, window: Option<RangeInclusive<isize>>| {
             let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
             b.config.chunk_bound = chunk_bound;
-            b.config.h_range = window.map(|(a, b)| a..=b);
+            b.config.h_range = window;
             b.run().into_tng_complex().into_raw_complex()
         };
 
@@ -899,7 +899,7 @@ mod tests {
 
         // windowed chunked build matches on the interior (exercises the band-cap).
         let (a, b) = (*range.start() + 1, *range.end() - 1);
-        let hw = build(Some(4), Some((a, b))).homology();
+        let hw = build(Some(4), Some(a..=b)).homology();
         for i in (a + 1)..=(b - 1) {
             assert_eq!(hw[i].rank(), hn[i].rank(), "windowed rank at {i}");
         }
@@ -913,10 +913,10 @@ mod tests {
         );
         let (h, t) = (FF2::zero(), FF2::zero());
 
-        let build = |bound: Option<usize>, window: Option<(isize, isize)>| {
+        let build = |bound: Option<usize>, window: Option<RangeInclusive<isize>>| {
             let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
             b.config.preprocess_bound = bound;
-            b.config.h_range = window.map(|(a, b)| a..=b);
+            b.config.h_range = window;
             b.run().into_tng_complex().into_raw_complex()
         };
 
@@ -934,7 +934,7 @@ mod tests {
 
         // partial chunk + window agrees on the window interior (exercises the weight band).
         let (a, b) = (*range.start() + 1, *range.end() - 1);
-        let h_w = build(Some(2), Some((a, b))).homology();
+        let h_w = build(Some(2), Some(a..=b)).homology();
         for i in (a + 1)..=(b - 1) {
             assert_eq!(h_w[i].rank(), h_full[i].rank(), "windowed rank at {i}");
         }

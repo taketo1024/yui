@@ -216,11 +216,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("merge {} + {}", self.stat(), other.stat());
 
         let (left, right) = self.complex.prepare_merge(other);
+        debug!("  merge range: {:?}", self.merge_range());
 
         for i in self.merge_range() {
             debug!("  merge deg {i}...");
-            self.complex.merge_vertices(&left, &right, i);
-            self.complex.merge_edges(&left, &right, i - 1);
+            let nv = self.complex.merge_vertices(&left, &right, i);
+            debug!("    +{nv} verts");
+            let ne = self.complex.merge_edges(&left, &right, i - 1);
+            debug!("    +{ne} edges");
 
             if self.config.auto_elim {
                 self.eliminate_in(i - 1);

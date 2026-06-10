@@ -201,10 +201,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             Some(h_range) => *range.end().min(h_range.end()),
             None => *range.end(),
         };
+        debug!("  merge range: {:?}", *range.start() ..= top);
 
         for i in *range.start() ..= top {
-            self.inner.complex_mut().merge_vertices(&left, &right, i);
-            self.inner.complex_mut().merge_edges(&left, &right, i - 1);
+            debug!("  merge deg {i}...");
+            let nv = self.inner.complex_mut().merge_vertices(&left, &right, i);
+            debug!("    +{nv} verts");
+            let ne = self.inner.complex_mut().merge_edges(&left, &right, i - 1);
+            debug!("    +{ne} edges");
 
             if self.config.auto_elim {
                 self.eliminate_in(i - 1);

@@ -453,7 +453,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         (left, other)
     }
 
-    pub(crate) fn merge_vertices(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize) {
+    pub(crate) fn merge_vertices(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize) -> usize {
+        let mut n = 0;
         for (k, l) in Self::collect_keys(left, right, i) {
             let v = left.vertex(k);
             let w = right.vertex(l);
@@ -462,11 +463,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let vw = TngComplexVertex::from(v.tng.connect(&w.tng));
 
             self.add_vertex(kl, vw);
+            n += 1;
         }
+        n
     }
 
-    pub(crate) fn merge_edges(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize) {
+    pub(crate) fn merge_edges(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize) -> usize {
         let (h, t) = self.ht().clone();
+        let mut n = 0;
 
         for (k_l, k_r) in Self::collect_keys(left, right, i) {
             let k = k_l + k_r;
@@ -496,9 +500,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             for (l, f) in e1.chain(e2) {
                 if !f.is_zero() {
                     self.add_edge(&k, &l, f);
+                    n += 1;
                 }
             }
         }
+        n
     }
 
     fn collect_keys<'a, 'b>(left: &'a TngComplex<R>, right: &'b TngComplex<R>, i: isize) -> impl Iterator<Item = (&'a TngComplexKey, &'b TngComplexKey)> {

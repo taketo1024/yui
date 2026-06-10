@@ -48,12 +48,111 @@ impl Default for SymBuildConfig {
     }
 }
 
+// τ-symmetric key map: each `TngComplexKey`'s τ-image. On-axis keys (`τk = k`) are a set;
+// off-axis keys form an involution stored both ways for O(1) `inv_key`. The merge iterates
+// only one representative per off-axis pair (the map is symmetric), then symmetrizes.
+#[derive(Clone, Default)]
+struct TauKeyMap {
+    on_axis: AHashSet<TngComplexKey>,
+    off_axis: AHashMap<TngComplexKey, TngComplexKey>,
+}
+
+impl FromIterator<(TngComplexKey, TngComplexKey)> for TauKeyMap {
+    fn from_iter<I: IntoIterator<Item = (TngComplexKey, TngComplexKey)>>(iter: I) -> Self {
+        let mut m = Self::default();
+        for (k, tk) in iter {
+            m.add_pair(k, tk);
+        }
+        m
+    }
+}
+
+impl TauKeyMap {
+    fn init() -> Self {
+        Self::from_iter([(TngComplexKey::init(), TngComplexKey::init())])
+    }
+
+    fn len(&self) -> usize {
+        self.on_axis.len() + self.off_axis.len()
+    }
+
+    fn inv_key(&self, k: &TngComplexKey) -> &TngComplexKey {
+        self.on_axis.get(k).unwrap_or_else(|| &self.off_axis[k])
+    }
+
+    fn is_sym(&self, k: &TngComplexKey) -> bool {
+        self.on_axis.contains(k)
+    }
+
+    fn add_pair(&mut self, k: TngComplexKey, tk: TngComplexKey) {
+        if k == tk {
+            self.on_axis.insert(k);
+        } else if !self.off_axis.contains_key(&k) {
+            self.off_axis.insert(k, tk);
+            self.off_axis.insert(tk, k);
+        }
+    }
+
+    fn remove(&mut self, k: &TngComplexKey) {
+        if self.on_axis.remove(k) {
+            return;
+        }
+        let tk = self.off_axis.remove(k).unwrap();
+        self.off_axis.remove(&tk);
+    }
+
+    fn keys(&self) -> impl Iterator<Item = &TngComplexKey> + '_ {
+        self.on_axis.iter().chain(self.off_axis.keys())
+    }
+
+    // τ preserves weight, so if `pred` drops a key it drops its mirror too — symmetric.
+    fn drop(&mut self, pred: impl Fn(&TngComplexKey) -> bool) {
+        self.on_axis.retain(|k| !pred(k));
+        self.off_axis.retain(|k, _| !pred(k));
+    }
+
+    // (k, τk) for one rep of each off-axis pair, plus every on-axis key.
+    fn reps(&self) -> impl Iterator<Item = (TngComplexKey, TngComplexKey)> + '_ {
+        let on = self.on_axis.iter().map(|&k| (k, k));
+        let off = self.off_axis.iter().filter(|(k, tk)| k <= tk).map(|(&k, &tk)| (k, tk));
+        on.chain(off)
+    }
+
+    // (k, τk) for every key.
+    fn entries(&self) -> impl Iterator<Item = (TngComplexKey, TngComplexKey)> + '_ {
+        let on = self.on_axis.iter().map(|&k| (k, k));
+        let off = self.off_axis.iter().map(|(&k, &tk)| (k, tk));
+        on.chain(off)
+    }
+
+    // Merged map `(k1+k2) ↦ (τk1+τk2)`, restricted to the reachable weight band. Iterating
+    // one rep per `self` pair (× all of `other`) halves the work; `add_pair` symmetrizes.
+    fn merge(&self, other: &Self, band: Option<RangeInclusive<usize>>) -> Self {
+        let Some(band) = band else {
+            return self.reps()
+                .flat_map(move |(k1, tk1)| other.entries().map(move |(k2, tk2)| (k1 + k2, tk1 + tk2)))
+                .collect();
+        };
+        fn group(it: impl Iterator<Item = (TngComplexKey, TngComplexKey)>) -> AHashMap<usize, Vec<(TngComplexKey, TngComplexKey)>> {
+            it.fold(AHashMap::new(), |mut m, (k, tk)| {
+                m.entry(k.weight()).or_default().push((k, tk));
+                m
+            })
+        }
+        let (rg, ag) = (group(self.reps()), group(other.entries()));
+        iproduct!(&rg, &ag)
+            .filter(|&((&w1, _), (&w2, _))| band.contains(&(w1 + w2)))
+            .flat_map(|((_, ps), (_, qs))| iproduct!(ps, qs).map(|(&(k1, tk1), &(k2, tk2))| (k1 + k2, tk1 + tk2)))
+            .collect()
+    }
+}
+
 pub struct SymTngBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     inner: TngComplexBuilder<R>,
     x_map: AHashMap<Node, Node>,
     e_map: AHashMap<Edge, Edge>,
-    key_map: AHashMap<TngComplexKey, TngComplexKey>,
+    key_map: TauKeyMap,
     config: SymBuildConfig,
 }
 
@@ -71,7 +170,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             (x.clone(), l.inv_node(x).clone())
         ).collect();
         let e_map = l.edges().into_iter().map(|e| (e, l.inv_edge(e))).collect();
-        let key_map = AHashMap::from_iter([(TngComplexKey::init(), TngComplexKey::init())]);
+        let key_map = TauKeyMap::init();
 
         SymTngBuilder { inner, x_map, e_map, key_map, config: SymBuildConfig::default() }
     }
@@ -154,10 +253,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     // Build `chunk` into a reduced sub-complex via a child builder sharing the parent's
     // τ-maps; return the complex and its τ key_map for the parent merge.
-    fn build_chunk(&self, chunk: &[Node]) -> (TngComplex<R>, AHashMap<TngComplexKey, TngComplexKey>) {
+    fn build_chunk(&self, chunk: &[Node]) -> (TngComplex<R>, TauKeyMap) {
         let child = self.child_builder(chunk).run();
-        let key_map = child.key_map.clone();
-        (child.into_tng_complex(), key_map)
+        let SymTngBuilder { key_map, inner, .. } = child;
+        (inner.into_tng_complex(), key_map)
     }
 
     // A child builder over `chunk` (a sub-tangle), inheriting the parent's τ-maps and
@@ -176,7 +275,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             0 ..= (*r.end() - s).max(0)
         });
         let config = SymBuildConfig { chunk_bound: None, h_range, ..self.config.clone() };
-        let key_map = AHashMap::from_iter([(TngComplexKey::init(), TngComplexKey::init())]);
+        let key_map = TauKeyMap::init();
         SymTngBuilder { inner, x_map: self.x_map.clone(), e_map: self.e_map.clone(), key_map, config }
     }
 
@@ -276,10 +375,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.merge(c, key_map);
     }
 
-    fn merge(&mut self, c: TngComplex<R>, key_map: AHashMap<TngComplexKey, TngComplexKey>) {
+    fn merge(&mut self, c: TngComplex<R>, key_map: TauKeyMap) {
         debug!("merge {} + {}", self.inner.stat(), c.stat());
         debug!("  key_map: {} × {}", self.key_map.len(), key_map.len());
-        self.key_map = self.merge_key_map(&key_map);
+        let band = self.config.h_range.is_some().then(|| self.weight_band(self.inner.nodes().count()));
+        self.key_map = self.key_map.merge(&key_map, band);
         debug!("  key_map built: {}", self.key_map.len());
 
         let (left, right) = self.inner.complex_mut().prepare_merge(c);
@@ -305,31 +405,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.prune_h_range();
 
         // TODO merge elements
-    }
-
-    // The merged `key_map`, restricted to the reachable weight band so we never build the
-    // full `parent × chunk` cartesian (which explodes for large chunks).
-    fn merge_key_map(&self, key_map: &AHashMap<TngComplexKey, TngComplexKey>) -> AHashMap<TngComplexKey, TngComplexKey> {
-        // no window → no band to exploit, so skip grouping and take the full product.
-        if self.config.h_range.is_none() {
-            return iproduct!(&self.key_map, key_map)
-                .map(|((k1, l1), (k2, l2))| (k1 + k2, l1 + l2)).collect();
-        }
-        let band = self.weight_band(self.inner.nodes().count());
-
-        // group entries by key weight; combine only weight-pairs whose sum is in `band`.
-        let by_weight = |km: &AHashMap<TngComplexKey, TngComplexKey>| -> AHashMap<usize, Vec<(TngComplexKey, TngComplexKey)>> {
-            km.iter().fold(AHashMap::new(), |mut m, (k, l)| {
-                m.entry(k.weight()).or_default().push((*k, *l));
-                m
-            })
-        };
-        let (parent, chunk) = (by_weight(&self.key_map), by_weight(key_map));
-
-        iproduct!(&parent, &chunk)
-            .filter(|&((w1, _), (w2, _))| band.contains(&(*w1 + *w2)))
-            .flat_map(|((_, ps), (_, qs))| iproduct!(ps, qs).map(|(&(k1, l1), &(k2, l2))| (k1 + k2, l1 + l2)))
-            .collect()
     }
 
     // Combined off-axis weight that can still reach the window, given `r` pending crossings.
@@ -361,10 +436,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
         self.inner.prune_keys(&doomed_verts);
 
-        let doomed_keys = self.key_map.keys().filter(|k| doomed(k)).copied().collect_vec();
-        for k in &doomed_keys {
-            self.key_map.remove(k);
-        }
+        self.key_map.drop(doomed);
     }
 
     fn deloop_all(&mut self, allow_based: bool) {
@@ -408,7 +480,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn deloop_equiv(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> { 
-        let added = if self.is_sym_key(k) { 
+        let added = if self.key_map.is_sym(k) { 
             let c = self.inner.complex().vertex(k).tng().comp(r);
             if self.is_sym_comp(c) {
                 // symmetric loop on symmetric key
@@ -435,15 +507,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn deloop_on_axis_sym(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
         let c = self.inner.complex().vertex(k).tng().comp(r);
 
-        assert!(self.is_sym_key(k));
+        assert!(self.key_map.is_sym(k));
         assert!(self.is_sym_comp(c));
 
         let updated = self.inner.deloop(k, r);
 
-        self.remove_key_pair(k);
+        self.key_map.remove(k);
 
         for &k_new in updated.iter() { 
-            self.add_key_pair(k_new, k_new);
+            self.key_map.add_pair(k_new, k_new);
         }
 
         updated
@@ -453,7 +525,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn deloop_on_axis_asym(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
         let c = self.inner.complex().vertex(k).tng().comp(r);
 
-        assert!(self.is_sym_key(k));
+        assert!(self.key_map.is_sym(k));
         assert!(!self.is_sym_comp(c));
         assert!(!c.is_marked());
 
@@ -477,11 +549,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             (tks[0], tks[1])
         };
 
-        self.remove_key_pair(k);
+        self.key_map.remove(k);
 
-        self.add_key_pair(k_XX, k_XX);
-        self.add_key_pair(k_X1, k_1X);
-        self.add_key_pair(k_11, k_11);
+        self.key_map.add_pair(k_XX, k_XX);
+        self.key_map.add_pair(k_X1, k_1X);
+        self.key_map.add_pair(k_11, k_11);
 
         vec![k_XX, k_X1, k_1X, k_11]
     }
@@ -490,22 +562,22 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn deloop_off_axis(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
         let c = self.inner.complex().vertex(k).tng().comp(r);
 
-        assert!(!self.is_sym_key(k));
+        assert!(!self.key_map.is_sym(k));
 
         //  ⚪︎1 | ..  <-->  .. | ⚪︎1
         //  ⚪︎X | ..  <-->  .. | ⚪︎X
 
-        let tk = *self.inv_key(k);
+        let tk = *self.key_map.inv_key(k);
         let tc = c.convert_edges(|e| self.inv_edge(e));
         let tr = self.inner.complex().vertex(&tk).tng().index_of(&tc).unwrap();
 
         let mut ks = self.inner.deloop(k, r);
         let mut tks = self.inner.deloop(&tk, tr);
 
-        self.remove_key_pair(k);
+        self.key_map.remove(k);
 
         for (&k_new, &tk_new) in Iterator::zip(ks.iter(), tks.iter()) { 
-            self.add_key_pair(k_new, tk_new);
+            self.key_map.add_pair(k_new, tk_new);
         }
 
         ks.append(&mut tks);
@@ -561,14 +633,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn eliminate_equiv(&mut self, i: &TngComplexKey, j: &TngComplexKey) {
-        assert_eq!(self.is_sym_key(i), self.is_sym_key(j));
+        assert_eq!(self.key_map.is_sym(i), self.key_map.is_sym(j));
         assert!(self.inner.complex().has_edge(i, j));
 
-        if self.is_sym_key(i) { 
+        if self.key_map.is_sym(i) { 
             self.inner.eliminate(i, j);
         } else { 
-            let ti = *self.inv_key(i);
-            let tj = *self.inv_key(j);
+            let ti = *self.key_map.inv_key(i);
+            let tj = *self.key_map.inv_key(j);
 
             assert!(self.inner.complex().has_edge(&ti, &tj));
 
@@ -576,8 +648,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.inner.eliminate(&ti, &tj);
         }
 
-        self.remove_key_pair(i);
-        self.remove_key_pair(j);
+        self.key_map.remove(i);
+        self.key_map.remove(j);
     }
 
     fn is_equiv_inv_edge(&self, i: &TngComplexKey, j: &TngComplexKey) -> bool { 
@@ -586,16 +658,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn is_equiv_edge(&self, i: &TngComplexKey, j: &TngComplexKey) -> bool { 
-        if self.is_sym_key(i) && self.is_sym_key(j) { 
+        if self.key_map.is_sym(i) && self.key_map.is_sym(j) { 
             true
-        } else if !self.is_sym_key(i) && !self.is_sym_key(j) { 
+        } else if !self.key_map.is_sym(i) && !self.key_map.is_sym(j) { 
             //  i - - -> j 
             //    \   /   
             //      /     : not allowed
             //    /   \   
             // ti - - -> tj
-            let ti = self.inv_key(i);
-            let tj = self.inv_key(j);
+            let ti = self.key_map.inv_key(i);
+            let tj = self.key_map.inv_key(j);
 
             !self.inner.complex().vertex(j).in_edges().contains(ti) && 
             !self.inner.complex().vertex(tj).in_edges().contains(i)
@@ -622,7 +694,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         move |x: &KhGen| -> KhGen {
             let k = TngComplexKey::from(x);
-            let tk = key_map[&k];
+            let tk = *key_map.inv_key(&k);
             tk.as_gen()
         }
     }
@@ -643,34 +715,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.e_map[&e]
     }
 
-    fn inv_key(&self, k: &TngComplexKey) -> &TngComplexKey { 
-        &self.key_map[k]
-    }
-
-    fn add_key_pair(&mut self, k: TngComplexKey, tk: TngComplexKey) { 
-        if let Some(l) = self.key_map.get(&tk) {
-            assert_eq!(k, *l);
-            return;
-        }
-
-        self.key_map.insert(k, tk);
-        if k != tk { 
-            self.key_map.insert(tk, k);
-        }
-    }
-
-    fn remove_key_pair(&mut self, k: &TngComplexKey) { 
-        let tk = self.key_map.remove(k).unwrap();
-        if k != &tk { 
-            self.key_map.remove(&tk);
-        }
-    }
-
-    fn is_sym_key(&self, k: &TngComplexKey) -> bool { 
-        self.inv_key(k) == k
-    }
-
-    fn is_sym_comp(&self, c: &TngComp) -> bool { 
+    fn is_sym_comp(&self, c: &TngComp) -> bool {
         &c.convert_edges(|e| self.inv_edge(e)) == c
     }
 
@@ -680,7 +725,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         for k in self.key_map.keys().sorted() { 
             if done.contains(&k) { continue }
 
-            let tk = self.inv_key(k);
+            let tk = self.key_map.inv_key(k);
             if k == tk {
                 println!("{}", self.inner.complex().vertex(k));
             } else { 
@@ -771,7 +816,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         uf.into_disjoint()
     }
 
-    fn build_from_half(&self, crossings: &[Node], elements: Vec<TngComplexElem<R>>) -> (TngComplex<R>, TngComplex<R>, AHashMap<TngComplexKey, TngComplexKey>, Vec<TngComplexElem<R>>) {
+    fn build_from_half(&self, crossings: &[Node], elements: Vec<TngComplexElem<R>>) -> (TngComplex<R>, TngComplex<R>, TauKeyMap, Vec<TngComplexElem<R>>) {
         // crossings appended after this chunk: all remaining nodes minus the chunk (half + τ-half).
         let r_rest = self.builder.inner.nodes().count() - 2 * crossings.len();
 
@@ -818,7 +863,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     // off-axis key `k1 + k2` (k1 from `c`, k2 from `tc`); τ swaps the halves.
     // Filter to the reachable weight band, else this is the K² blow-up.
-    fn pair_key_map(&self, keys: &[TngComplexKey], r_rest: usize) -> AHashMap<TngComplexKey, TngComplexKey> {
+    fn pair_key_map(&self, keys: &[TngComplexKey], r_rest: usize) -> TauKeyMap {
         let band = self.builder.weight_band(r_rest);
         let pairs: Vec<(TngComplexKey, TngComplexKey)> = keys.par_iter().flat_map_iter(|k1| {
             let (w1, band) = (k1.weight(), band.clone());

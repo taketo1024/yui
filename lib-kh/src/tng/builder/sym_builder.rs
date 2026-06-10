@@ -98,10 +98,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self
     }
 
-    fn preprocess(&mut self) {
-        SymTngPreprocessor::run(self);
-    }
-
     // Divide-and-conquer: build each bounded chunk via a child builder, then merge the
     // reduced chunk into the parent (so the parent never materializes the full dense slice).
     fn process_chunks(&mut self) {
@@ -169,6 +165,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let config = SymBuildConfig { chunk_bound: None, preprocess: false, h_range, ..self.config.clone() };
         let key_map = AHashMap::from_iter([(TngComplexKey::init(), TngComplexKey::init())]);
         SymTngBuilder { inner, x_map: self.x_map.clone(), e_map: self.e_map.clone(), key_map, config }
+    }
+
+    fn preprocess(&mut self) {
+        SymTngPreprocessor::run(self);
     }
 
     fn process_nodes(&mut self) {
@@ -696,21 +696,22 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         info!("  merged: {}", self.builder.inner.stat());
     }
 
-    // Pick one τ-mirror half of the off-axis crossings (`τx != x`); `t_half = τ(half)`.
+    // Split the off-axis crossings (`τx != x`) into two τ-mirror halves: each adjacency
+    // group goes opposite the side already holding its τ-image.
     fn partition_off_axis(&self) -> (Vec<Node>, Vec<Node>) {
         let off_axis = self.builder.inner.nodes().filter(|&x| self.builder.inv_node(x) != x).collect_vec();
         let groups = self.group_by_adjacency(&off_axis);
 
-        let mut half: Vec<&Node> = vec![];
+        let (mut half, mut t_half): (Vec<&Node>, Vec<&Node>) = (vec![], vec![]);
         for group in groups {
             let Some(&rep) = group.first() else { continue };
-            if half.contains(&self.builder.inv_node(rep)) { continue } // τ-side: regenerated below
-            half.extend(group);
+            if half.contains(&self.builder.inv_node(rep)) {
+                t_half.extend(group);
+            } else {
+                half.extend(group);
+            }
         }
-
-        let half: Vec<Node> = half.into_iter().cloned().collect();
-        let t_half: Vec<Node> = half.iter().map(|x| self.builder.inv_node(x).clone()).collect();
-        (half, t_half)
+        (half.into_iter().cloned().collect(), t_half.into_iter().cloned().collect())
     }
 
     // Union-find grouping: two nodes are adjacent iff they share a non-axis edge.
@@ -779,12 +780,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // off-axis key `k1 + k2` (k1 from `c`, k2 from `tc`); τ swaps the halves.
     // Filter to the reachable weight band, else this is the K² blow-up.
     fn pair_key_map(&self, keys: &[TngComplexKey], r_rest: usize) -> AHashMap<TngComplexKey, TngComplexKey> {
-        let (lo, hi) = self.off_axis_weight_band(r_rest);
+        let band = self.off_axis_weight_band(r_rest);
         let pairs: Vec<(TngComplexKey, TngComplexKey)> = keys.par_iter().flat_map_iter(|k1| {
-            let w1 = k1.weight();
+            let (w1, band) = (k1.weight(), band.clone());
             keys.iter().filter_map(move |k2| {
                 let w = w1 + k2.weight();
-                (lo <= w && w <= hi).then(|| (k1 + k2, k2 + k1))
+                band.contains(&w).then(|| (k1 + k2, k2 + k1))
             })
         }).collect();
         pairs.into_iter().collect()
@@ -792,14 +793,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     // Combined off-axis weight that can still reach the window; `r_rest` = crossings
     // appended after this chunk (on-axis + off-axis not preprocessed).
-    fn off_axis_weight_band(&self, r_rest: usize) -> (usize, usize) {
+    fn off_axis_weight_band(&self, r_rest: usize) -> RangeInclusive<usize> {
         let Some(h_range) = &self.builder.config.h_range else {
-            return (0, usize::MAX);
+            return 0 ..= usize::MAX;
         };
         let s = self.builder.inner.complex().deg_shift().0;
         let lo = (*h_range.start() - s - r_rest as isize).max(0) as usize;
         let hi = (*h_range.end() - s).max(0) as usize;
-        (lo, hi)
+        lo ..= hi
     }
 
     // Complete a half-element into the full off-axis element.

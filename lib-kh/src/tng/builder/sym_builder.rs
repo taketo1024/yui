@@ -20,7 +20,7 @@ use yui_core::{Ring, RingOps};
 use yui_link::{Node, Edge, InvLink};
 
 use crate::kh::{KhGen, KhTensor};
-use crate::tng::{LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
+use crate::tng::{End, LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
 use crate::tng::builder::{TngComplexBuilder, BuildConfig};
 use super::reachable_range;
 
@@ -415,7 +415,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 self.eliminate_in(i - 1);
             }
             if self.config.auto_deloop {
-                self.deloop_in(i - 1, false);
+                self.deloop_in(i - 1, false, self.config.auto_elim); // selective during the build
             }
         }
 
@@ -423,7 +423,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             if self.config.h_range.as_ref().is_some_and(|w| top == *w.end()) {
                 self.prune_isolated_in(top);
             }
-            self.deloop_in(top, false);
+            self.deloop_in(top, false, self.config.auto_elim);
+
+            // full deloop the non-productive leftover now the complex is settled.
+            self.deloop_all(false, false);
+            self.deloop_all(true, false);
         }
 
         self.prune_h_range();
@@ -479,37 +483,61 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.key_map.drop(doomed);
     }
 
-    fn deloop_all(&mut self, allow_based: bool) {
+    fn deloop_all(&mut self, allow_based: bool, selective: bool) {
         for i in self.inner.complex().h_range() {
-            self.deloop_in(i, allow_based);
+            self.deloop_in(i, allow_based, selective);
         }
     }
 
-    fn deloop_in(&mut self, i: isize, allow_based: bool) {
+    // A circle whose no-dot cap yields an equiv-invertible edge (deloop+elim fires, no doubling).
+    fn find_productive_loop(&self, k: &TngComplexKey, allow_based: bool) -> Option<usize> {
+        let c = self.inner.complex();
+        let v = c.vertex(k);
+        v.tng().comps().enumerate()
+            .filter(|(_, comp)| comp.is_circle() && (allow_based || !comp.is_marked()))
+            .find(|(_, comp)|
+                v.out_edges().any(|l|
+                    c.edge(k, l).is_invertible_after_cap(End::Src, comp) && self.is_equiv_edge(k, l))
+                || v.in_edges().any(|j|
+                    c.edge(j, k).is_invertible_after_cap(End::Tgt, comp) && self.is_equiv_edge(j, k)))
+            .map(|(r, _)| r)
+    }
+
+    // Selective mode deloops only productive circles; otherwise any circle.
+    fn choose_loop(&self, k: &TngComplexKey, allow_based: bool, selective: bool) -> Option<usize> {
+        if selective {
+            self.find_productive_loop(k, allow_based)
+        } else {
+            self.find_productive_loop(k, allow_based)
+                .or_else(|| self.inner.find_loop(k, allow_based))
+        }
+    }
+
+    fn deloop_in(&mut self, i: isize, allow_based: bool, selective: bool) {
         let mut keys = self.inner.pick_keys_in(i, |k|
-            self.inner.is_deloopable(k, allow_based)
+            self.choose_loop(k, allow_based, selective).is_some()
         );
         if keys.is_empty() { return }
 
-        debug!("deloop in C[{i}], targets: {}.", keys.len());
+        debug!("deloop in C[{i}], targets: {} (selective: {selective}).", keys.len());
 
         let before = self.inner.complex().rank(i) as isize;
 
-        while !keys.is_empty() { 
+        while !keys.is_empty() {
             let k = keys.remove(0);
             if !self.inner.complex().contains_key(&k) { continue; } // already delooped or eliminated
 
             let mut list = vec![k];
 
-            while !list.is_empty() { 
+            while !list.is_empty() {
                 let k = list.remove(0);
                 if !self.inner.complex().contains_key(&k) { continue; }
-                let Some(r) = self.inner.find_loop(&k, allow_based) else { continue };
+                let Some(r) = self.choose_loop(&k, allow_based, selective) else { continue };
 
                 let added = self.deloop_equiv(&k, r);
 
                 list.extend(added.into_iter().filter(|k|
-                    self.inner.is_deloopable(k, allow_based)
+                    self.choose_loop(k, allow_based, selective).is_some()
                 ));
             }
         }
@@ -723,8 +751,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         info!("finalize: {}", self.inner.stat());
 
-        self.deloop_all(false);
-        self.deloop_all(true);
+        self.deloop_all(false, false); // full deloop — kill all remaining loops
+        self.deloop_all(true, false);
 
         info!("  finalized: {}", self.inner.stat());
     }

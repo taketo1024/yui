@@ -737,8 +737,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let ti = self.key_map.inv_key(i);
             let tj = self.key_map.inv_key(j);
 
-            !self.inner.complex().vertex(j).in_edges().contains(ti) && 
-            !self.inner.complex().vertex(tj).in_edges().contains(i)
+            !self.inner.complex().has_edge(ti, j) &&
+            !self.inner.complex().has_edge(i, tj)
         } else { 
             false
         }

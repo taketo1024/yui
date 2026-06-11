@@ -233,12 +233,12 @@ impl Tng {
             .flat_map(|(e0, e1)| [e0, e1])
     }
 
-    pub fn contains(&self, c: &TngComp) -> bool { 
-        self.comps.contains(c)
+    pub fn contains(&self, c: &TngComp) -> bool {
+        self.comps.binary_search(c).is_ok() // comps kept sorted (see normalize)
     }
 
     pub fn index_of(&self, c: &TngComp) -> Option<usize> {
-        self.comps.iter().position(|c1| c1 == c)
+        self.comps.binary_search(c).ok() // comps kept sorted (see normalize)
     }
 
     pub fn remove_at(&mut self, i: usize) -> TngComp {

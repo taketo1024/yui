@@ -213,10 +213,8 @@ impl CobComp {
         self.is_plain()
     }
 
-    // True if capping a circle on side `b` (no dot) turns this into a plain
-    // cylinder: a plain genus-0 saddle whose `b`-side has 2 comps and the
-    // opposite side 1, so dropping the circle leaves a 1→1 cylinder.
-    pub(crate) fn is_cylinder_after_cap(&self, b: End) -> bool {
+    // True if capping a circle on side `b` (no dot) leaves an invertible cobordism.
+    pub(crate) fn is_invertible_after_cap(&self, b: End) -> bool {
         let (near, far) = match b {
             End::Src => (&self.src, &self.tgt),
             End::Tgt => (&self.tgt, &self.src),
@@ -535,18 +533,13 @@ impl Cob {
     // Would capping circle `c` on side `b` (no dot) leave an invertible
     // cobordism? Structural check — no new cobordism is built, nothing reduced.
     pub fn is_invertible_after_cap(&self, b: End, c: &TngComp) -> bool {
-        let Some(i) = self.comps.iter().position(|comp|
-            comp.end(b).index_of(c).is_some()
-        ) else {
-            return false
-        };
-        self.comps.iter().enumerate().all(|(j, comp)|
-            if j == i {
-                comp.is_cylinder_after_cap(b)
+        self.comps.iter().try_fold(false, |capped, comp|
+            if !capped && comp.end(b).contains(c) {
+                comp.is_invertible_after_cap(b).then_some(true)
             } else {
-                comp.is_invertible()
+                comp.is_invertible().then_some(capped)
             }
-        )
+        ).unwrap_or(false)
     }
 
     pub fn inv(&self) -> Option<Self> {

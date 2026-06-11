@@ -258,11 +258,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let selective = self.config.deloop_mode.is_selective();
 
         for i in range {
-            debug!("  merge deg {i}...");
+            debug!("build C[{i}]...");
+
             let nv = self.complex.merge_vertices(&left, &right, i);
-            debug!("    +{nv} verts");
+            debug!("  +{nv} verts");
+            
             let ne = self.complex.merge_edges(&left, &right, i - 1);
-            debug!("    +{ne} edges");
+            debug!("  +{ne} edges");
 
             if self.config.elim_mode.is_enabled() {
                 self.eliminate_in(i - 1);
@@ -270,6 +272,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             if self.config.deloop_mode.is_enabled() {
                 self.deloop_in(i - 1, false, selective);
             }
+            
+            debug!("  built C[{i}]: {}", self.complex.rank(i));
         }
 
         if self.config.deloop_mode.is_enabled() {
@@ -559,14 +563,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn finalize(&mut self) { 
+        info!("finalize: {}", self.stat());
+
         if self.complex.is_completely_delooped() { 
             return;
         }
 
-        info!("finalize");
-
         self.deloop_all(false, false);
-        self.deloop_all(true, false);
+        self.deloop_all(true,  false); // deloop marked loops
+
+        info!("  finalized: {}", self.stat());
     }
 
     pub fn into_tng_complex(self) -> TngComplex<R> { 

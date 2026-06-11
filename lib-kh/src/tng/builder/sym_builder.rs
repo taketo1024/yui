@@ -408,11 +408,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let selective = self.config.deloop_mode.is_selective();
 
         for i in range {
-            debug!("  merge deg {i}...");
+            debug!("build C[{i}]...");
+
             let nv = self.inner.complex_mut().merge_vertices(&left, &right, i);
-            debug!("    +{nv} verts");
+            debug!("  +{nv} verts");
+
             let ne = self.inner.complex_mut().merge_edges(&left, &right, i - 1);
-            debug!("    +{ne} edges");
+            debug!("  +{ne} edges");
 
             if self.config.elim_mode.is_enabled() {
                 self.eliminate_in(i - 1);
@@ -420,6 +422,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             if self.config.deloop_mode.is_enabled() {
                 self.deloop_in(i - 1, false, selective);
             }
+
+            debug!("  built C[{i}]: {}", self.inner.complex().rank(i));
         }
 
         if self.config.deloop_mode.is_enabled() {
@@ -437,6 +441,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.prune_h_range();
 
         // TODO merge elements
+
+        debug!("  merged: {} + {} -> {}", left.stat(), right.stat(), self.inner.stat());
     }
 
     // At the window-top degree, vertices with no incoming edge are isolated and
@@ -749,14 +755,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn finalize(&mut self) {
+        info!("finalize: {}", self.inner.stat());
+
         if self.inner.complex().is_completely_delooped() { 
             return
         }
 
-        info!("finalize: {}", self.inner.stat());
-
-        self.deloop_all(false, false); // full deloop — kill all remaining loops
-        self.deloop_all(true, false);
+        self.deloop_all(false, false);
+        self.deloop_all(true,  false); // deloop marked loops
 
         info!("  finalized: {}", self.inner.stat());
     }

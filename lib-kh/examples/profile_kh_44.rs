@@ -19,6 +19,7 @@ use std::time::Instant;
 use num_bigint::BigInt;
 use yui_link::Braid;
 use yui_kh::kh::KhComplex;
+use yui_kh::tng::builder::{BuildConfig, DeloopMode};
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -38,10 +39,14 @@ fn main() {
     let braid = Braid::new(8, Braid::from_iter(word.iter().copied()).elements().to_vec());
     let l = braid.closure();
 
+    // SELECTIVE=1 → deloop only productive circles during build.
+    let deloop_mode = if std::env::var("SELECTIVE").is_ok() { DeloopMode::Selective } else { DeloopMode::Greedy };
+    let cfg = BuildConfig { deloop_mode, ..Default::default() };
+
     // `BigInt` because even `i128` overflows mid-run on this knot (the
     // earlier i128 attempt panicked at step 42/45 in apply_bilin's `r * s`).
     let t0 = Instant::now();
-    let c = KhComplex::<BigInt>::new(&l, &BigInt::from(0), &BigInt::from(0), false);
+    let c = KhComplex::<BigInt>::new_with_config(&l, &BigInt::from(0), &BigInt::from(0), false, cfg);
     let elapsed = t0.elapsed();
 
     println!("\n=== summary ===");

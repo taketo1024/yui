@@ -16,7 +16,7 @@ use std::time::Instant;
 
 use yui_core::num::FF2;
 use yui_link::InvLink;
-use yui_kh::tng::builder::{SymTngBuilder, SymBuildConfig};
+use yui_kh::tng::builder::{SymTngBuilder, SymBuildConfig, DeloopMode};
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -52,7 +52,9 @@ fn main() {
     let pair_penalty_coeff = std::env::var("PAIR_PENALTY").ok().map_or(1.0, |s| s.parse::<f64>().unwrap());
     let chunk_bound = std::env::var("CHUNK_BOUND").ok().map(|s| s.parse::<usize>().unwrap());
 
-    let cfg = SymBuildConfig { pair_penalty_coeff, chunk_bound, h_range: h_range.clone(), ..Default::default() };
+    let deloop_mode = if std::env::var("SELECTIVE").is_ok() { DeloopMode::Selective } else { DeloopMode::Greedy };
+
+    let cfg = SymBuildConfig { pair_penalty_coeff, chunk_bound, h_range: h_range.clone(), deloop_mode, ..Default::default() };
 
     let t0 = Instant::now();
     let b = SymTngBuilder::<FF2>::from_inv_link(&l, &zero, &zero, false).with_config(cfg).run();

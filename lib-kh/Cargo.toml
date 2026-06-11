@@ -9,6 +9,12 @@ edition.workspace = true
 rust-version.workspace = true
 repository.workspace  = true
 
+# benchmarks live in the [[bench]] target below, not the lib's unit tests.
+# without this, `cargo bench` compiles the lib's tests in release, where the
+# debug-only `check_d_all` helper is absent — a spurious compile error.
+[lib]
+bench = false
+
 [features]
 default = []
 

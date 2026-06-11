@@ -176,7 +176,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         // the inner builder is driven by `self` — disable its own auto-simplify.
         let inner = TngComplexBuilder::from_link(l.inner(), h, t, reduced)
-            .with_config(BuildConfig { auto_deloop: false, auto_elim: false, h_range: None });
+            .with_config(BuildConfig { auto_deloop: false, auto_elim: false, h_range: None, selective_deloop: false });
 
         let x_map = l.nodes().map(|x|
             (x.clone(), l.inv_node(x).clone())
@@ -190,7 +190,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn with_config(mut self, config: SymBuildConfig) -> Self {
         // propagate the window to the inner builder so the preprocess merges cap
         // to it; this also drops canon cycles when the window excludes h-degree 0.
-        let inner_config = BuildConfig { auto_deloop: false, auto_elim: false, h_range: config.h_range.clone() };
+        let inner_config = BuildConfig { auto_deloop: false, auto_elim: false, h_range: config.h_range.clone(), selective_deloop: false };
         self.inner = self.inner.with_config(inner_config);
         self.config = config;
         self
@@ -280,7 +280,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let (h, t) = self.inner.complex().ht();
         let base_pt = self.inner.complex().base_pt();
         let mut inner = TngComplexBuilder::init(h, t, (0, 0), base_pt)
-            .with_config(BuildConfig { auto_deloop: false, auto_elim: false, h_range: None });
+            .with_config(BuildConfig { auto_deloop: false, auto_elim: false, h_range: None, selective_deloop: false });
         inner.set_nodes(chunk.iter().cloned());
 
         // cap the child to the chunk's reachable band: a chunk vertex of weight

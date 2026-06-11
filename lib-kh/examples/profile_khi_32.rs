@@ -42,8 +42,10 @@ fn main() {
     });
     let pair_penalty_coeff = std::env::var("PAIR_PENALTY").ok().map_or(1.0, |s| s.parse::<f64>().unwrap());
     let chunk_bound = std::env::var("CHUNK_BOUND").ok().map(|s| s.parse::<usize>().unwrap());
+    // SELECTIVE=1 → deloop only productive circles during build (bounds the memory balloon).
+    let selective_deloop = std::env::var("SELECTIVE").is_ok();
 
-    let cfg = SymBuildConfig { pair_penalty_coeff, chunk_bound, h_range: h_range.clone(), ..Default::default() };
+    let cfg = SymBuildConfig { pair_penalty_coeff, chunk_bound, h_range: h_range.clone(), selective_deloop, ..Default::default() };
 
     let t0 = Instant::now();
     let b = SymTngBuilder::<FF2>::from_inv_link(&l, &zero, &zero, false).with_config(cfg).run();

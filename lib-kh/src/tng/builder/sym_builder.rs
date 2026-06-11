@@ -39,11 +39,15 @@ pub struct SymBuildConfig {
     pub chunk_bound: Option<usize>,
     // literal truncation: homology at the endpoints is wrong (build `(a-1)..=(b+1)` for correct `[a, b]`).
     pub h_range: Option<RangeInclusive<isize>>,
+    // during the build, deloop only productive circles (cap yields an eliminable edge),
+    // deferring the rest to a full deloop at merge end. Bounds the multi-circle memory
+    // balloon on large knots, at the cost of speed. Off = deloop everything as before.
+    pub selective_deloop: bool,
 }
 
 impl Default for SymBuildConfig {
     fn default() -> Self {
-        Self { auto_deloop: true, auto_elim: true, preprocess: true, pair_penalty_coeff: 1.0, chunk_bound: None, h_range: None }
+        Self { auto_deloop: true, auto_elim: true, preprocess: true, pair_penalty_coeff: 1.0, chunk_bound: None, h_range: None, selective_deloop: false }
     }
 }
 
@@ -404,6 +408,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         debug!("  merge range: {:?}", range);
 
+        // selective only makes sense with elimination (productive = "lets an elim fire").
+        let selective = self.config.selective_deloop && self.config.auto_elim;
+
         for i in range {
             debug!("  merge deg {i}...");
             let nv = self.inner.complex_mut().merge_vertices(&left, &right, i);
@@ -415,7 +422,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 self.eliminate_in(i - 1);
             }
             if self.config.auto_deloop {
-                self.deloop_in(i - 1, false, self.config.auto_elim); // selective during the build
+                self.deloop_in(i - 1, false, selective);
             }
         }
 
@@ -423,10 +430,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             if self.config.h_range.as_ref().is_some_and(|w| top == *w.end()) {
                 self.prune_isolated_in(top);
             }
-            self.deloop_in(top, false, self.config.auto_elim);
+            self.deloop_in(top, false, selective);
 
-            // full deloop the non-productive leftover now the complex is settled.
-            self.deloop_all(false, false);
+            // selective leaves non-productive circles undelooped — full deloop them now.
+            if selective {
+                self.deloop_all(false, false);
+            }
         }
 
         self.prune_h_range();
@@ -508,8 +517,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         if selective {
             self.find_productive_loop(k)
         } else {
-            self.find_productive_loop(k)
-                .or_else(|| self.inner.find_loop(k, allow_based))
+            self.inner.find_loop(k, allow_based)
         }
     }
 

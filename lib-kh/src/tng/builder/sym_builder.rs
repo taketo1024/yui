@@ -427,7 +427,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             // full deloop the non-productive leftover now the complex is settled.
             self.deloop_all(false, false);
-            self.deloop_all(true, false);
         }
 
         self.prune_h_range();
@@ -490,11 +489,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     // A circle whose no-dot cap yields an equiv-invertible edge (deloop+elim fires, no doubling).
-    fn find_productive_loop(&self, k: &TngComplexKey, allow_based: bool) -> Option<usize> {
+    // Marked circles are skipped — they're delooped in the final full sweep.
+    fn find_productive_loop(&self, k: &TngComplexKey) -> Option<usize> {
         let c = self.inner.complex();
         let v = c.vertex(k);
         v.tng().comps().enumerate()
-            .filter(|(_, comp)| comp.is_circle() && (allow_based || !comp.is_marked()))
+            .filter(|(_, comp)| comp.is_circle() && !comp.is_marked())
             .find(|(_, comp)|
                 v.out_edges().any(|l|
                     c.edge(k, l).is_invertible_after_cap(End::Src, comp) && self.is_equiv_edge(k, l))
@@ -506,9 +506,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // Selective mode deloops only productive circles; otherwise any circle.
     fn choose_loop(&self, k: &TngComplexKey, allow_based: bool, selective: bool) -> Option<usize> {
         if selective {
-            self.find_productive_loop(k, allow_based)
+            self.find_productive_loop(k)
         } else {
-            self.find_productive_loop(k, allow_based)
+            self.find_productive_loop(k)
                 .or_else(|| self.inner.find_loop(k, allow_based))
         }
     }

@@ -24,19 +24,48 @@ use crate::kh::{KhChain, KhComplex};
 use crate::tng::{End, TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
 use super::reachable_range;
 
+/// How circles are delooped during the build.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DeloopMode {
+    Greedy,    // deloop every circle
+    Selective, // deloop only productive circles during build, full deloop at merge end
+    None,      // don't deloop
+}
+
+impl DeloopMode {
+    pub fn is_enabled(&self) -> bool {
+        *self != DeloopMode::None
+    }
+
+    pub fn is_selective(&self) -> bool {
+        *self == DeloopMode::Selective
+    }
+}
+
+/// Whether invertible edges are gauss-eliminated during the build.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ElimMode {
+    Auto, // eliminate invertible edges
+    None, // don't eliminate
+}
+
+impl ElimMode {
+    pub fn is_enabled(&self) -> bool {
+        *self == ElimMode::Auto
+    }
+}
+
 /// Toggles for the automatic simplification done while building.
 #[derive(Clone, Debug)]
 pub struct BuildConfig {
-    pub auto_deloop: bool,
-    pub auto_elim: bool,
+    pub deloop_mode: DeloopMode,
+    pub elim_mode: ElimMode,
     pub h_range: Option<RangeInclusive<isize>>,
-    // deloop only productive circles during build, full deloop at merge end (off = deloop all).
-    pub selective_deloop: bool,
 }
 
 impl Default for BuildConfig {
     fn default() -> Self {
-        Self { auto_deloop: true, auto_elim: true, h_range: None, selective_deloop: false }
+        Self { deloop_mode: DeloopMode::Greedy, elim_mode: ElimMode::Auto, h_range: None }
     }
 }
 
@@ -225,7 +254,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("  merge range: {:?}", range);
 
         // selective only makes sense with elimination (productive = "lets an elim fire").
-        let selective = self.config.selective_deloop && self.config.auto_elim;
+        let selective = self.config.deloop_mode.is_selective();
 
         for i in range {
             debug!("  merge deg {i}...");
@@ -234,15 +263,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let ne = self.complex.merge_edges(&left, &right, i - 1);
             debug!("    +{ne} edges");
 
-            if self.config.auto_elim {
+            if self.config.elim_mode.is_enabled() {
                 self.eliminate_in(i - 1);
             }
-            if self.config.auto_deloop {
+            if self.config.deloop_mode.is_enabled() {
                 self.deloop_in(i - 1, false, selective);
             }
         }
 
-        if self.config.auto_deloop {
+        if self.config.deloop_mode.is_enabled() {
             if self.config.h_range.as_ref().is_some_and(|w| top == *w.end()) {
                 self.prune_isolated_in(top);
             }
@@ -314,7 +343,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let c = TngComplex::from_loop(h, t, c, marked);
             self.merge(c);
 
-            if self.config.auto_deloop { 
+            if self.config.deloop_mode.is_enabled() { 
                 self.deloop_all(false, false);
             }
         }
@@ -369,7 +398,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let added = self.complex.deloop(k, r);
 
-        if self.config.auto_elim { 
+        if self.config.elim_mode.is_enabled() { 
             // only retain keys are not eliminated
             added.into_iter().filter(|k|
                 !self.try_eliminate_at(k)

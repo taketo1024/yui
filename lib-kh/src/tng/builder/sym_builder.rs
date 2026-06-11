@@ -21,15 +21,15 @@ use yui_link::{Node, Edge, InvLink};
 
 use crate::kh::{KhGen, KhTensor};
 use crate::tng::{End, LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
-use crate::tng::builder::{TngComplexBuilder, BuildConfig};
+use crate::tng::builder::{TngComplexBuilder, BuildConfig, DeloopMode, ElimMode};
 use super::reachable_range;
 
 /// Toggles for the automatic simplification done while building (kept separate
 /// from [`BuildConfig`] so the equivariant builder can gain its own flags).
 #[derive(Clone, Debug)]
 pub struct SymBuildConfig {
-    pub auto_deloop: bool,
-    pub auto_elim: bool,
+    pub deloop_mode: DeloopMode,
+    pub elim_mode: ElimMode,
     // build half the off-axis crossings and mirror via τ (see `preprocess`).
     pub preprocess: bool,
     // chooser handicap on an off-axis pair = coeff · current size (its extra growth).
@@ -39,15 +39,11 @@ pub struct SymBuildConfig {
     pub chunk_bound: Option<usize>,
     // literal truncation: homology at the endpoints is wrong (build `(a-1)..=(b+1)` for correct `[a, b]`).
     pub h_range: Option<RangeInclusive<isize>>,
-    // during the build, deloop only productive circles (cap yields an eliminable edge),
-    // deferring the rest to a full deloop at merge end. Bounds the multi-circle memory
-    // balloon on large knots, at the cost of speed. Off = deloop everything as before.
-    pub selective_deloop: bool,
 }
 
 impl Default for SymBuildConfig {
     fn default() -> Self {
-        Self { auto_deloop: true, auto_elim: true, preprocess: true, pair_penalty_coeff: 1.0, chunk_bound: None, h_range: None, selective_deloop: false }
+        Self { deloop_mode: DeloopMode::Greedy, elim_mode: ElimMode::Auto, preprocess: true, pair_penalty_coeff: 1.0, chunk_bound: None, h_range: None }
     }
 }
 
@@ -176,7 +172,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         // the inner builder is driven by `self` — disable its own auto-simplify.
         let inner = TngComplexBuilder::from_link(l.inner(), h, t, reduced)
-            .with_config(BuildConfig { auto_deloop: false, auto_elim: false, h_range: None, selective_deloop: false });
+            .with_config(BuildConfig { deloop_mode: DeloopMode::None, elim_mode: ElimMode::None, h_range: None });
 
         let x_map = l.nodes().map(|x|
             (x.clone(), l.inv_node(x).clone())
@@ -190,7 +186,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn with_config(mut self, config: SymBuildConfig) -> Self {
         // propagate the window to the inner builder so the preprocess merges cap
         // to it; this also drops canon cycles when the window excludes h-degree 0.
-        let inner_config = BuildConfig { auto_deloop: false, auto_elim: false, h_range: config.h_range.clone(), selective_deloop: false };
+        let inner_config = BuildConfig { deloop_mode: DeloopMode::None, elim_mode: ElimMode::None, h_range: config.h_range.clone() };
         self.inner = self.inner.with_config(inner_config);
         self.config = config;
         self
@@ -280,7 +276,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let (h, t) = self.inner.complex().ht();
         let base_pt = self.inner.complex().base_pt();
         let mut inner = TngComplexBuilder::init(h, t, (0, 0), base_pt)
-            .with_config(BuildConfig { auto_deloop: false, auto_elim: false, h_range: None, selective_deloop: false });
+            .with_config(BuildConfig { deloop_mode: DeloopMode::None, elim_mode: ElimMode::None, h_range: None });
         inner.set_nodes(chunk.iter().cloned());
 
         // cap the child to the chunk's reachable band: a chunk vertex of weight
@@ -409,7 +405,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("  merge range: {:?}", range);
 
         // selective only makes sense with elimination (productive = "lets an elim fire").
-        let selective = self.config.selective_deloop && self.config.auto_elim;
+        let selective = self.config.deloop_mode.is_selective();
 
         for i in range {
             debug!("  merge deg {i}...");
@@ -418,15 +414,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let ne = self.inner.complex_mut().merge_edges(&left, &right, i - 1);
             debug!("    +{ne} edges");
 
-            if self.config.auto_elim {
+            if self.config.elim_mode.is_enabled() {
                 self.eliminate_in(i - 1);
             }
-            if self.config.auto_deloop {
+            if self.config.deloop_mode.is_enabled() {
                 self.deloop_in(i - 1, false, selective);
             }
         }
 
-        if self.config.auto_deloop {
+        if self.config.deloop_mode.is_enabled() {
             if self.config.h_range.as_ref().is_some_and(|w| top == *w.end()) {
                 self.prune_isolated_in(top);
             }
@@ -570,7 +566,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.deloop_off_axis(k, r)
         };
 
-        if self.config.auto_elim { 
+        if self.config.elim_mode.is_enabled() { 
             added.into_iter().filter(|k| 
                 self.inner.complex().contains_key(&k) && 
                 !self.try_eliminate_equiv_at(&k)
@@ -1046,7 +1042,7 @@ mod tests {
         let (h, t) = (FF2::zero(), FF2::zero());
 
         let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
-        b.config.auto_elim = false;
+        b.config.elim_mode = ElimMode::None;
         let c = b.run().into_tng_complex().into_raw_complex();
         c.check_d_all();
 
@@ -1065,7 +1061,7 @@ mod tests {
         let (h, t) = (FF2::zero(), FF2::zero());
 
         let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
-        b.config.auto_elim = false;
+        b.config.elim_mode = ElimMode::None;
         b.config.h_range = Some(0..=3);
         let c = b.run().into_tng_complex().into_raw_complex();
         c.check_d_all();
@@ -1139,7 +1135,7 @@ mod tests {
         let (h, t) = (FF2::zero(), FF2::zero());
 
         let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
-        b.config.auto_deloop = false;
+        b.config.deloop_mode = DeloopMode::None;
         b.process_nodes();
 
         assert!(!b.inner.complex().is_completely_delooped());
@@ -1167,7 +1163,7 @@ mod tests {
         let (h, t) = (FF2::zero(), FF2::zero());
 
         let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
-        b.config.auto_elim = false;
+        b.config.elim_mode = ElimMode::None;
         b.process_nodes();
 
         assert!(b.inner.complex().is_completely_delooped());

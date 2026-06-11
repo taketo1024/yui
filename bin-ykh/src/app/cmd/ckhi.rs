@@ -8,7 +8,7 @@ use yui_core::TeX;
 use yui_core::{Ring, RingOps};
 use yui_homology::ToTableString;
 use yui_kh::khi::KhIComplex;
-use yui_kh::tng::builder::SymBuildConfig;
+use yui_kh::tng::builder::{SymBuildConfig, DeloopMode};
 
 pub fn dispatch(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
     dispatch_ring!(App, boot, args)
@@ -47,6 +47,9 @@ pub struct Args {
 
     #[arg(long)]
     pub chunk: Option<usize>,
+
+    #[arg(long, value_parser = parse_deloop_mode, default_value = "greedy")]
+    pub deloop_mode: DeloopMode,
 
     #[arg(long, default_value = "0")]
     pub log: u8,
@@ -103,6 +106,7 @@ where
             let config = SymBuildConfig {
                 h_range: self.args.h_range.clone(),
                 chunk_bound: self.args.chunk,
+                deloop_mode: self.args.deloop_mode,
                 ..Default::default()
             };
             KhIComplex::new_with_config(&l, &h, &t, self.args.reduced, config)

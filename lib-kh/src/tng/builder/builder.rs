@@ -25,8 +25,9 @@ use crate::tng::{End, TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComple
 use super::reachable_range;
 
 /// How circles are delooped during the build.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum DeloopMode {
+    #[default]
     Greedy,    // deloop every circle
     Selective, // deloop only productive circles during build, full deloop at merge end
     None,      // don't deloop

@@ -1,6 +1,7 @@
 use std::ops::RangeInclusive;
 use clap::ValueEnum;
 use derive_more::Display;
+use yui_kh::tng::builder::DeloopMode;
 
 pub trait AppArgs { 
     fn c_type(&self) -> CType; 
@@ -93,4 +94,14 @@ pub fn parse_h_range(s: &str) -> Result<RangeInclusive<isize>, String> {
         .ok_or_else(|| format!("invalid range `{s}`, expected e.g. `-1..=2`"))?;
     let parse = |x: &str| x.trim().parse::<isize>().map_err(|e| format!("`{x}`: {e}"));
     Ok(parse(lo)? ..= parse(hi)?)
+}
+
+// parse a deloop mode: greedy | selective | none.
+pub fn parse_deloop_mode(s: &str) -> Result<DeloopMode, String> {
+    match s.to_lowercase().as_str() {
+        "greedy"    => Ok(DeloopMode::Greedy),
+        "selective" => Ok(DeloopMode::Selective),
+        "none"      => Ok(DeloopMode::None),
+        _ => Err(format!("invalid deloop-mode `{s}`, expected greedy|selective|none")),
+    }
 }

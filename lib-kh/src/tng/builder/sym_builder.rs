@@ -400,59 +400,75 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let (left, right) = self.inner.complex_mut().prepare_merge(c);
 
         let range = reachable_range(self.inner.complex().h_range(), &self.config.h_range, self.inner.nodes().count());
-        let top = *range.end();
-
         debug!("  merge range: {:?}", range);
 
-        // selective only makes sense with elimination (productive = "lets an elim fire").
-        let selective = self.config.deloop_mode.is_selective();
-
-        for i in range {
-            debug!("build C[{i}]...");
-
-            let nv = self.inner.complex_mut().merge_vertices(&left, &right, i);
-            debug!("  +{nv} verts");
-
-            let ne = self.inner.complex_mut().merge_edges(&left, &right, i - 1);
-            debug!("  +{ne} edges");
-
-            if self.config.elim_mode.is_enabled() {
-                self.eliminate_in(i - 1);
-            }
-            if self.config.deloop_mode.is_enabled() {
-                self.deloop_in(i - 1, false, selective);
-            }
-
-            debug!("  built C[{i}]: {}", self.inner.complex().rank(i));
+        if self.config.deloop_mode.is_selective() {
+            self.merge_selective(&left, &right, range);
+        } else {
+            self.merge_greedy(&left, &right, range);
         }
-
-        if self.config.deloop_mode.is_enabled() {
-            if self.config.h_range.as_ref().is_some_and(|w| top == *w.end()) {
-                self.prune_isolated_in(top);
-            }
-            self.deloop_in(top, false, selective);
-
-            // re-run selective to a fixpoint (catch loops turned productive by later equiv elims), then full-deloop the rest.
-            if selective {
-                let mut step = 0;
-                loop {
-                    let before = self.inner.complex().n_verts();
-                    self.deloop_all(false, true);
-                    let after = self.inner.complex().n_verts();
-                    debug!("  selective re-pass {step}: {before} -> {after} verts (diff {})",
-                        after as isize - before as isize);
-                    if after == before { break }
-                    step += 1;
-                }
-                self.deloop_all(false, false);
-            }
-        }
-
-        self.prune_h_range();
 
         // TODO merge elements
 
         debug!("  merged: {} + {} -> {}", left.stat(), right.stat(), self.inner.stat());
+    }
+
+    fn merge_greedy(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, range: RangeInclusive<isize>) {
+        let deloop = self.config.deloop_mode.is_enabled();
+        let top = *range.end();
+        for i in range {
+            self.merge_at(left, right, i);
+            if deloop {
+                self.deloop_in(i - 1, false, false); // not selective
+            }
+            debug!("  built C[{i}]: {}", self.inner.complex().rank(i));
+        }
+        if deloop {
+            if self.config.h_range.as_ref().is_some_and(|w| top == *w.end()) {
+                self.prune_isolated_in(top);
+            }
+            self.deloop_in(top, false, false); // not selective
+        }
+        self.prune_h_range();
+    }
+
+    fn merge_selective(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, range: RangeInclusive<isize>) {
+        let top = *range.end();
+        for i in range {
+            self.merge_at(left, right, i);
+            self.deloop_in(i - 1, false, true); // selective
+            debug!("  built C[{i}]: {}", self.inner.complex().rank(i));
+        }
+        if self.config.h_range.as_ref().is_some_and(|w| top == *w.end()) {
+            self.prune_isolated_in(top);
+        }
+        self.deloop_in(top, false, true); // selective
+
+        // re-run selective to a fixpoint (catch loops turned productive by later equiv elims), then full-deloop the rest.
+        let mut step = 0;
+        loop {
+            let before = self.inner.complex().n_verts();
+            self.deloop_all(false, true); // selective
+            let after = self.inner.complex().n_verts();
+            debug!("  selective re-pass {step}: {before} -> {after} verts (diff {})",
+                after as isize - before as isize);
+            if after == before { break }
+            step += 1;
+        }
+        self.deloop_all(false, false); // not selective
+        self.prune_h_range();
+    }
+
+    // Per-degree core shared by both merge modes: assemble C[i], then eliminate C[i-1].
+    fn merge_at(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize) {
+        debug!("build C[{i}]...");
+        let nv = self.inner.complex_mut().merge_vertices(left, right, i);
+        debug!("  +{nv} verts");
+        let ne = self.inner.complex_mut().merge_edges(left, right, i - 1);
+        debug!("  +{ne} edges");
+        if self.config.elim_mode.is_enabled() {
+            self.eliminate_in(i - 1);
+        }
     }
 
     // At the window-top degree, vertices with no incoming edge are isolated and

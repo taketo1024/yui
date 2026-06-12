@@ -19,6 +19,7 @@ use ahash::{AHashMap, AHashSet};
 use auto_impl_ops::auto_ops;
 use itertools::Itertools;
 use num_traits::Zero;
+use rayon::prelude::*;
 use yui_core::{CloneAnd, Ring, RingOps, Sign};
 use yui_homology::{ChainComplex1, Summand, GrMod1};
 use yui_link::{Edge, Node, Path, State};
@@ -603,42 +604,66 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             panic!("{a} is not invertible.")
         };
 
-        let (h, t) = self.ht().clone();
+        // both endpoints are removed below, so strip their edges out (no clone) for the Schur.
+        let in_data = self.take_in_edges(k1, k0);
+        let out_data = self.take_out_edges(k0, k1);
 
-        let in_keys: Vec<_> = self.vertex(k1).in_edges()
-            .filter(|&l0| l0 != k0).copied().collect();
-        let out_keys: Vec<_> = self.vertex(k0).out_edges()
-            .filter(|&l1| l1 != k1).copied().collect();
-
-        for l0 in &in_keys {
-            let b = self.edge(l0, k1);
-            let ainv_b = b.stack(&ainv);
-
-            for l1 in &out_keys {
-                let c = self.edge(k0, l1);
-                let c_ainv_b = ainv_b.stack(c).reduce(&h, &t);
-                if c_ainv_b.is_zero() {
-                    continue
-                }
-
-                let s = if self.has_edge(l0, l1) {
-                    let d = self.edge(l0, l1);
-                    d - c_ainv_b
-                } else { 
-                    -c_ainv_b
-                };
-
-                match (self.has_edge(l0, l1), s.is_zero()) { 
-                    (false, false) => self.add_edge(l0, l1, s),
-                    (true,  false) => { self.replace_edge(l0, l1, s); },
-                    (true,  true)  => { self.remove_edge(l0, l1); },
-                    _              => ()
-                }
-            }
-        }
+        self.compute_schur(&ainv, &in_data, &out_data);
 
         self.remove_vertex(k0);
         self.remove_vertex(k1);
+    }
+
+    // Strip (remove + return) k's in/out-edges except the pivot. The endpoint is about to be
+    // removed, so the cobs are moved out — no clone — and fed straight to `compute_schur`.
+    fn take_in_edges(&mut self, k: &TngComplexKey, except: &TngComplexKey) -> Vec<(TngComplexKey, LcCob<R>)> {
+        self.vertex(k).in_edges().filter(|&j| j != except).copied().collect_vec()
+            .into_iter().map(|j| { let b = self.remove_edge(&j, k); (j, b) }).collect()
+    }
+
+    fn take_out_edges(&mut self, k: &TngComplexKey, except: &TngComplexKey) -> Vec<(TngComplexKey, LcCob<R>)> {
+        self.vertex(k).out_edges().filter(|&l| l != except).copied().collect_vec()
+            .into_iter().map(|l| { let c = self.remove_edge(k, &l); (l, c) }).collect()
+    }
+
+    // The Schur-complement core, for an invertible pivot `a: k0 → k1`:
+    // correct each edge `l0 → l1` by `−c·a⁻¹·b` where `b: l0 → k1`, `c: k0 → l1`.
+    // The corrections `c·a⁻¹·b` (the compute-heavy `stack`/`reduce`) are fanned out across
+    // cores; the resulting edge updates are applied serially.
+    pub(crate) fn compute_schur(&mut self, ainv: &LcCob<R>, in_data: &[(TngComplexKey, LcCob<R>)], out_data: &[(TngComplexKey, LcCob<R>)]) {
+        let (h, t) = self.ht().clone();
+        let corrections = Self::schur_corrections(ainv, in_data, out_data, &h, &t);
+        for (l0, l1, c_ainv_b) in corrections {
+            let s = if self.has_edge(&l0, &l1) {
+                self.edge(&l0, &l1) - c_ainv_b
+            } else {
+                -c_ainv_b
+            };
+            match (self.has_edge(&l0, &l1), s.is_zero()) {
+                (false, false) => self.add_edge(&l0, &l1, s),
+                (true,  false) => { self.replace_edge(&l0, &l1, s); },
+                (true,  true)  => { self.remove_edge(&l0, &l1); },
+                _              => ()
+            }
+        }
+    }
+
+    // Pure: the non-zero corrections `(l0, l1, c·a⁻¹·b)`. Each in-row is independent, so fan
+    // them out across cores once `in×out` is large enough to amortize the rayon overhead.
+    fn schur_corrections(ainv: &LcCob<R>, in_data: &[(TngComplexKey, LcCob<R>)], out_data: &[(TngComplexKey, LcCob<R>)], h: &R, t: &R) -> Vec<(TngComplexKey, TngComplexKey, LcCob<R>)> {
+        const PARALLEL_THRESHOLD: usize = 16;
+        let row = |(l0, b): &(TngComplexKey, LcCob<R>)| -> Vec<(TngComplexKey, TngComplexKey, LcCob<R>)> {
+            let ainv_b = b.stack(ainv);
+            out_data.iter().filter_map(|(l1, c)| {
+                let c_ainv_b = ainv_b.stack(c).reduce(h, t);
+                (!c_ainv_b.is_zero()).then(|| (*l0, *l1, c_ainv_b))
+            }).collect()
+        };
+        if in_data.len() * out_data.len() >= PARALLEL_THRESHOLD {
+            in_data.par_iter().flat_map_iter(row).collect()
+        } else {
+            in_data.iter().flat_map(row).collect()
+        }
     }
 
     pub fn into_raw_complex(self) -> ChainComplex1<KhGen, R> {

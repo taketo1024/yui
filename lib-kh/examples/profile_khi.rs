@@ -17,7 +17,7 @@ use std::time::Instant;
 
 use yui_core::num::FF2;
 use yui_link::InvLink;
-use yui_kh::tng::builder::{SymTngBuilder, SymBuildConfig};
+use yui_kh::tng::builder::{SymTngBuilder, SymBuildConfig, DeloopMode};
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -37,10 +37,12 @@ fn main() {
 
     let zero = FF2::default();
 
+    let deloop_mode = if std::env::var("SELECTIVE").is_ok() { DeloopMode::Selective } else { DeloopMode::Greedy };
+
     // isolate the variable that changed: the SymTngBuilder run with preprocess
     // on vs off (cone assembly afterwards is identical either way).
     let build = |preprocess: bool| {
-        let cfg = SymBuildConfig { preprocess, ..Default::default() };
+        let cfg = SymBuildConfig { preprocess, deloop_mode, ..Default::default() };
         let t0 = Instant::now();
         let b = SymTngBuilder::<FF2>::from_inv_link(&l, &zero, &zero, false).with_config(cfg).run();
         let dt = t0.elapsed();

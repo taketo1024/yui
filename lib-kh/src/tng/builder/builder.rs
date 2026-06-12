@@ -282,8 +282,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
             self.deloop_in(top, false, selective);
 
-            // selective leaves non-productive circles undelooped — full deloop them now.
+            // re-run selective to a fixpoint (catch loops turned productive by later elims), then full-deloop the rest.
             if selective {
+                let mut step = 0;
+                loop {
+                    let before = self.complex.n_verts();
+                    self.deloop_all(false, true);
+                    let after = self.complex.n_verts();
+                    debug!("  selective re-pass {step}: {before} -> {after} verts (diff {})",
+                        after as isize - before as isize);
+                    if after == before { break }
+                    step += 1;
+                }
                 self.deloop_all(false, false);
             }
         }
@@ -562,10 +572,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    fn finalize(&mut self) { 
+    fn finalize(&mut self) {
         info!("finalize: {}", self.stat());
 
-        if self.complex.is_completely_delooped() { 
+        if self.complex.is_completely_delooped() {
             return;
         }
 
@@ -575,7 +585,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         info!("  finalized: {}", self.stat());
     }
 
-    pub fn into_tng_complex(self) -> TngComplex<R> { 
+    pub fn into_tng_complex(self) -> TngComplex<R> {
         self.complex
     }
 

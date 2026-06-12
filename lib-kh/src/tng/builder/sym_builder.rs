@@ -432,8 +432,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
             self.deloop_in(top, false, selective);
 
-            // selective leaves non-productive circles undelooped — full deloop them now.
+            // re-run selective to a fixpoint (catch loops turned productive by later equiv elims), then full-deloop the rest.
             if selective {
+                let mut step = 0;
+                loop {
+                    let before = self.inner.complex().n_verts();
+                    self.deloop_all(false, true);
+                    let after = self.inner.complex().n_verts();
+                    debug!("  selective re-pass {step}: {before} -> {after} verts (diff {})",
+                        after as isize - before as isize);
+                    if after == before { break }
+                    step += 1;
+                }
                 self.deloop_all(false, false);
             }
         }

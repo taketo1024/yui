@@ -515,14 +515,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         debug!("eliminate in C[{i}], targets: {}", keys.len());
 
-        let before = self.complex.rank(i);
+        let before = self.complex.rank(i) as isize;
 
-        while !keys.is_empty() { 
+        while !keys.is_empty() {
             let k = keys.remove(0);
             self.try_eliminate_at(&k);
         }
 
-        let after = self.complex.rank(i);
+        let after = self.complex.rank(i) as isize;
 
         debug!("  eliminated C[{i}]: {} (diff: {}).", after, after - before);
     }

@@ -445,18 +445,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
         self.deloop_block_in(top);
 
-        // re-run to a fixpoint (catch loops turned productive by later equiv elims), then full-deloop the rest.
-        let mut step = 0;
-        loop {
-            let before = self.inner.complex().n_verts();
-            self.deloop_block_all();
-            let after = self.inner.complex().n_verts();
-            debug!("  block re-pass {step}: {before} -> {after} verts (diff {})",
-                after as isize - before as isize);
-            if after == before { break }
-            step += 1;
-        }
-        self.deloop_all(false); // non-productive sweep
+        // BFS peel: alternate a selective block-eliminate pass with delooping one circle
+        // from the highest-circle-count keys — bounds memory vs the old full DFS sweep.
+        self.deloop_by_circle_count();
         self.prune_h_range();
     }
 
@@ -774,6 +765,50 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
+    // Final deloop: alternate a selective block-eliminate pass with a BFS peel (one circle
+    // per highest-circle-count key), bounding memory vs the old full DFS sweep.
+    fn deloop_by_circle_count(&mut self) {
+        loop {
+            let before = self.inner.complex().n_verts();
+            self.deloop_block_all();
+            debug!("  block pass: {before} -> {} verts", self.inner.complex().n_verts());
+
+            let Some(max) = self.max_circle_count() else { break };
+            let keys = self.keys_with_circle_count(max);
+            debug!("  peel circle-count {max}: {} keys ({} verts)", keys.len(), self.inner.complex().n_verts());
+
+            // deloop one circle from each, collecting the batch.
+            let mut batch = vec![];
+            for k in keys {
+                if !self.inner.complex().contains_key(&k) { continue }
+                if let Some(r) = self.inner.find_loop(&k, false) {
+                    batch.extend(self.deloop_equiv_only(&k, r));
+                }
+            }
+            // block-eliminate the peeled batch's invertible edges (the cap-structure cases).
+            loop {
+                let reps = self.find_tau_block(&batch);
+                if reps.is_empty() { break }
+                self.eliminate_block_equiv(&reps);
+            }
+            debug!("  peeled+elim -> {} verts", self.inner.complex().n_verts());
+        }
+    }
+
+    fn max_circle_count(&self) -> Option<usize> {
+        self.inner.complex().iter_verts()
+            .map(|(_, v)| v.tng().comps().filter(|c| c.is_circle() && !c.is_marked()).count())
+            .filter(|&n| n > 0)
+            .max()
+    }
+
+    fn keys_with_circle_count(&self, n: usize) -> Vec<TngComplexKey> {
+        self.inner.complex().iter_verts()
+            .filter(|(_, v)| v.tng().comps().filter(|c| c.is_circle() && !c.is_marked()).count() == n)
+            .map(|(k, _)| *k)
+            .collect()
+    }
+
     // Selective deloop with τ-block elimination (no-balloon): each round deloops one
     // productive circle per key (and its τ-image), then block-eliminates the batch.
     fn deloop_block_all(&mut self) {
@@ -787,6 +822,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let keys = self.inner.pick_keys_in(i, |k| self.find_productive_loop(k).is_some());
             if keys.is_empty() { break }
 
+            let n_keys = keys.len();
+            let t_deloop = std::time::Instant::now();
             let mut batch = vec![];
             for k in keys {
                 if !self.inner.complex().contains_key(&k) { continue } // delooped via its τ-pair
@@ -794,11 +831,21 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                     batch.extend(self.deloop_equiv_only(&k, r));
                 }
             }
+            let big = batch.len() > 1000;
+            if big {
+                debug!("    [C{i}] deloop {n_keys} keys: {:.1}s -> {} batch", t_deloop.elapsed().as_secs_f64(), batch.len());
+            }
 
             loop {
+                if big { debug!("    [C{i}] find_tau_block {} cand...", batch.len()); }
+                let t0 = std::time::Instant::now();
                 let reps = self.find_tau_block(&batch);
+                if big { debug!("    [C{i}] find_tau_block: {:.1}s -> {} reps", t0.elapsed().as_secs_f64(), reps.len()); }
                 if reps.is_empty() { break }
+                if big { debug!("    [C{i}] eliminate {} reps...", reps.len()); }
+                let t1 = std::time::Instant::now();
                 self.eliminate_block_equiv(&reps);
+                if big { debug!("    [C{i}] eliminate: {:.1}s", t1.elapsed().as_secs_f64()); }
             }
         }
     }

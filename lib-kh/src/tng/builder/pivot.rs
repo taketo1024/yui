@@ -12,6 +12,9 @@ use crate::tng::{LcCobTrait, TngComplex, TngComplexKey};
 /// `(source, target)` pairs whose eliminations are mutually independent.
 pub(crate) fn find_block<R>(complex: &TngComplex<R>, candidates: &[TngComplexKey]) -> Vec<(TngComplexKey, TngComplexKey)>
 where R: Ring, for<'x> &'x R: RingOps<R> {
+    // cap the block so eliminate_block's contribution buffer can't blow up memory.
+    const MAX_PIVOT: usize = 4096;
+
     let ordered = candidates.iter()
         .filter(|k| complex.contains_key(k)) // skip keys removed by a prior block this round.
         .sorted_by_key(|k| (complex.vertex(k).c_weight(), **k));
@@ -20,6 +23,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let mut block = vec![];
 
     for &k in ordered {
+        if block.len() >= MAX_PIVOT { break }
         if used.contains(&k) { continue }
         let Some((s, t)) = pick_pivot(complex, &k, &used) else { continue };
 

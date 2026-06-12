@@ -395,11 +395,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         v.out_edges.remove(l).unwrap()
     }
 
-    pub fn replace_edge(&mut self, k: &TngComplexKey, l: &TngComplexKey, f: LcCob<R>) -> LcCob<R> { 
-        assert!(self.has_edge(k, l));
-
-        let v = self.vertices.get_mut(k).unwrap();
-        v.out_edges.insert(*l, f).unwrap()
+    // Set edge(k, l) = f: create if absent, replace if present, remove if `f` is zero.
+    pub fn replace_edge(&mut self, k: &TngComplexKey, l: &TngComplexKey, f: LcCob<R>) {
+        match (self.has_edge(k, l), f.is_zero()) {
+            (false, false) => self.add_edge(k, l, f),
+            (true,  false) => { self.vertices.get_mut(k).unwrap().out_edges.insert(*l, f); },
+            (true,  true)  => { self.remove_edge(k, l); },
+            (false, true)  => {},
+        }
     }
 
     fn modify_edge<F>(&mut self, k: &TngComplexKey, l: &TngComplexKey, map: F)
@@ -612,7 +615,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let (h, t) = self.ht().clone();
         let corrections = Self::schur_corrections(&ainv, &in_data, &out_data, &h, &t);
         for (l0, l1, c_ainv_b) in corrections {
-            self.sub_edge(&l0, &l1, c_ainv_b);
+            let s = if self.has_edge(&l0, &l1) { self.edge(&l0, &l1) - c_ainv_b } else { -c_ainv_b };
+            self.replace_edge(&l0, &l1, s);
         }
 
         self.remove_vertex(k0);
@@ -657,18 +661,34 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             (*k0, *k1, ainv)
         }).collect();
 
+        // compute each pivot's corrections and sum them per surviving edge across cores:
+        // each worker folds into a local map, then `reduce` merges the per-thread maps.
         let this = &*self;
-        let contribs: Vec<((TngComplexKey, TngComplexKey), LcCob<R>)> =
+        let merged: AHashMap<(TngComplexKey, TngComplexKey), LcCob<R>> =
             pivots.par_iter()
-                .flat_map_iter(|(k0, k1, ainv)| this.block_schur_corrections(k0, k1, ainv))
-                .collect();
+                .fold(AHashMap::new, |mut m, (k0, k1, ainv)| {
+                    for (ab, v) in this.block_schur_corrections(k0, k1, ainv) {
+                        *m.entry(ab).or_default() += v;
+                    }
+                    m
+                })
+                .reduce(AHashMap::new, |mut a, b| {
+                    for (ab, v) in b {
+                        *a.entry(ab).or_default() += v;
+                    }
+                    a
+                });
 
-        let mut merged: AHashMap<(TngComplexKey, TngComplexKey), LcCob<R>> = AHashMap::new();
-        for (ab, v) in contribs {
-            *merged.entry(ab).or_default() += v;
-        }
-        for ((l0, l1), delta) in merged {
-            self.sub_edge(&l0, &l1, delta);
+        // compute the new edge value `d − delta` in parallel (read-only), then set serially.
+        let updates: Vec<((TngComplexKey, TngComplexKey), LcCob<R>)> =
+            merged.into_iter().collect::<Vec<_>>().into_par_iter()
+                .map(|((l0, l1), delta)| {
+                    let s = if this.has_edge(&l0, &l1) { this.edge(&l0, &l1) - delta } else { -delta };
+                    ((l0, l1), s)
+                })
+                .collect();
+        for ((l0, l1), s) in updates {
+            self.replace_edge(&l0, &l1, s);
         }
         for (k0, k1) in block {
             self.remove_vertex(k0);
@@ -694,17 +714,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     // `edge(k, l) -= delta`, creating or removing the edge as needed.
-    fn sub_edge(&mut self, k: &TngComplexKey, l: &TngComplexKey, delta: LcCob<R>) {
-        if delta.is_zero() { return }
-        let has = self.has_edge(k, l);
-        let s = if has { self.edge(k, l) - delta } else { -delta };
-        match (has, s.is_zero()) {
-            (false, false) => self.add_edge(k, l, s),
-            (true,  false) => { self.replace_edge(k, l, s); },
-            (true,  true)  => { self.remove_edge(k, l); },
-            _              => ()
-        }
-    }
 
     pub fn into_raw_complex(self) -> ChainComplex1<KhGen, R> {
         assert!(self.is_completely_delooped());

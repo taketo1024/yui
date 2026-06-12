@@ -22,6 +22,7 @@ use yui_link::{Node, Edge, InvLink};
 use crate::kh::{KhGen, KhTensor};
 use crate::tng::{End, LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
 use crate::tng::builder::{TngComplexBuilder, BuildConfig, DeloopMode, ElimMode};
+use super::pivot::find_block;
 use super::reachable_range;
 
 /// Toggles for the automatic simplification done while building (kept separate
@@ -419,7 +420,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         for i in range {
             self.merge_at(left, right, i);
             if deloop {
-                self.deloop_in(i - 1, false, false); // not selective
+                self.deloop_in(i - 1, false);
             }
             debug!("  built C[{i}]: {}", self.inner.complex().rank(i));
         }
@@ -427,7 +428,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             if self.config.h_range.as_ref().is_some_and(|w| top == *w.end()) {
                 self.prune_isolated_in(top);
             }
-            self.deloop_in(top, false, false); // not selective
+            self.deloop_in(top, false);
         }
         self.prune_h_range();
     }
@@ -436,26 +437,26 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let top = *range.end();
         for i in range {
             self.merge_at(left, right, i);
-            self.deloop_in(i - 1, false, true); // selective
+            self.deloop_block_in(i - 1);
             debug!("  built C[{i}]: {}", self.inner.complex().rank(i));
         }
         if self.config.h_range.as_ref().is_some_and(|w| top == *w.end()) {
             self.prune_isolated_in(top);
         }
-        self.deloop_in(top, false, true); // selective
+        self.deloop_block_in(top);
 
-        // re-run selective to a fixpoint (catch loops turned productive by later equiv elims), then full-deloop the rest.
+        // re-run to a fixpoint (catch loops turned productive by later equiv elims), then full-deloop the rest.
         let mut step = 0;
         loop {
             let before = self.inner.complex().n_verts();
-            self.deloop_all(false, true); // selective
+            self.deloop_block_all();
             let after = self.inner.complex().n_verts();
-            debug!("  selective re-pass {step}: {before} -> {after} verts (diff {})",
+            debug!("  block re-pass {step}: {before} -> {after} verts (diff {})",
                 after as isize - before as isize);
             if after == before { break }
             step += 1;
         }
-        self.deloop_all(false, false); // not selective
+        self.deloop_all(false); // non-productive sweep
         self.prune_h_range();
     }
 
@@ -519,9 +520,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.key_map.drop(doomed);
     }
 
-    fn deloop_all(&mut self, allow_based: bool, selective: bool) {
+    fn deloop_all(&mut self, allow_based: bool) {
         for i in self.inner.complex().h_range() {
-            self.deloop_in(i, allow_based, selective);
+            self.deloop_in(i, allow_based);
         }
     }
 
@@ -540,22 +541,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             .map(|(r, _)| r)
     }
 
-    // Selective mode deloops only productive circles; otherwise any circle.
-    fn choose_loop(&self, k: &TngComplexKey, allow_based: bool, selective: bool) -> Option<usize> {
-        if selective {
-            self.find_productive_loop(k)
-        } else {
-            self.inner.find_loop(k, allow_based)
-        }
-    }
-
-    fn deloop_in(&mut self, i: isize, allow_based: bool, selective: bool) {
+    fn deloop_in(&mut self, i: isize, allow_based: bool) {
         let mut keys = self.inner.pick_keys_in(i, |k|
-            self.choose_loop(k, allow_based, selective).is_some()
+            self.inner.find_loop(k, allow_based).is_some()
         );
         if keys.is_empty() { return }
 
-        debug!("deloop in C[{i}], targets: {} (selective: {selective}).", keys.len());
+        debug!("deloop in C[{i}], targets: {}.", keys.len());
 
         let before = self.inner.complex().rank(i) as isize;
 
@@ -568,12 +560,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             while !list.is_empty() {
                 let k = list.remove(0);
                 if !self.inner.complex().contains_key(&k) { continue; }
-                let Some(r) = self.choose_loop(&k, allow_based, selective) else { continue };
+                let Some(r) = self.inner.find_loop(&k, allow_based) else { continue };
 
                 let added = self.deloop_equiv(&k, r);
 
                 list.extend(added.into_iter().filter(|k|
-                    self.choose_loop(k, allow_based, selective).is_some()
+                    self.inner.find_loop(k, allow_based).is_some()
                 ));
             }
         }
@@ -583,28 +575,30 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("  delooped C[{i}]: {} (diff: {}).", after, after - before);
     }
 
-    fn deloop_equiv(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> { 
-        let added = if self.key_map.is_sym(k) { 
-            let c = self.inner.complex().vertex(k).tng().comp(r);
-            if self.is_sym_comp(c) {
-                // symmetric loop on symmetric key
-                self.deloop_on_axis_sym(k, r)
-            } else {
-                // asymmetric loop on symmetric key
-                self.deloop_on_axis_asym(k, r)
-            }
-        } else { 
-            // (symmetric or asymmetric) loop on asymmetric key
-            self.deloop_off_axis(k, r)
-        };
+    fn deloop_equiv(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
+        let added = self.deloop_equiv_only(k, r);
 
-        if self.config.elim_mode.is_enabled() { 
-            added.into_iter().filter(|k| 
-                self.inner.complex().contains_key(&k) && 
+        if self.config.elim_mode.is_enabled() {
+            added.into_iter().filter(|k|
+                self.inner.complex().contains_key(&k) &&
                 !self.try_eliminate_equiv_at(&k)
             ).collect()
-        } else { 
+        } else {
             added
+        }
+    }
+
+    // Pure equivariant deloop: split circle `r` in `k` (and its τ-image); no inline elim.
+    fn deloop_equiv_only(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
+        if self.key_map.is_sym(k) {
+            let c = self.inner.complex().vertex(k).tng().comp(r);
+            if self.is_sym_comp(c) {
+                self.deloop_on_axis_sym(k, r) // symmetric loop on symmetric key
+            } else {
+                self.deloop_on_axis_asym(k, r) // asymmetric loop on symmetric key
+            }
+        } else {
+            self.deloop_off_axis(k, r) // loop on asymmetric key
         }
     }
 
@@ -775,8 +769,83 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             !self.inner.complex().has_edge(ti, j) &&
             !self.inner.complex().has_edge(i, tj)
-        } else { 
+        } else {
             false
+        }
+    }
+
+    // Selective deloop with τ-block elimination (no-balloon): each round deloops one
+    // productive circle per key (and its τ-image), then block-eliminates the batch.
+    fn deloop_block_all(&mut self) {
+        for i in self.inner.complex().h_range() {
+            self.deloop_block_in(i);
+        }
+    }
+
+    fn deloop_block_in(&mut self, i: isize) {
+        loop {
+            let keys = self.inner.pick_keys_in(i, |k| self.find_productive_loop(k).is_some());
+            if keys.is_empty() { break }
+
+            let mut batch = vec![];
+            for k in keys {
+                if !self.inner.complex().contains_key(&k) { continue } // delooped via its τ-pair
+                if let Some(r) = self.find_productive_loop(&k) {
+                    batch.extend(self.deloop_equiv_only(&k, r));
+                }
+            }
+
+            loop {
+                let reps = self.find_tau_block(&batch);
+                if reps.is_empty() { break }
+                self.eliminate_block_equiv(&reps);
+            }
+        }
+    }
+
+    // Filter `find_block`'s diagonal block to τ-closed pivots: on-axis pivots, plus one
+    // rep per off-axis τ-pair whose mirror is also in the block (mixed pivots drop out).
+    fn find_tau_block(&self, candidates: &[TngComplexKey]) -> Vec<(TngComplexKey, TngComplexKey, bool)> {
+        let block = find_block(self.inner.complex(), candidates);
+        let in_block: AHashSet<(TngComplexKey, TngComplexKey)> = block.iter().copied().collect();
+
+        let mut reps = vec![];
+        let mut seen: AHashSet<(TngComplexKey, TngComplexKey)> = AHashSet::new();
+
+        for &(s, t) in &block {
+            if !seen.insert((s, t)) { continue }
+
+            let (s_sym, t_sym) = (self.key_map.is_sym(&s), self.key_map.is_sym(&t));
+            if s_sym && t_sym {
+                reps.push((s, t, false)); // on-axis
+            } else if !s_sym && !t_sym {
+                let (ts, tt) = (*self.key_map.inv_key(&s), *self.key_map.inv_key(&t));
+                if in_block.contains(&(ts, tt)) {
+                    reps.push((s, t, true)); // off-axis rep
+                    seen.insert((ts, tt));
+                }
+            }
+        }
+        reps
+    }
+
+    // Eliminate a τ-closed diagonal block (reps + their τ-mirrors) via the inner's
+    // parallel Schur; diagonality makes every pivot an equiv-edge automatically.
+    fn eliminate_block_equiv(&mut self, reps: &[(TngComplexKey, TngComplexKey, bool)]) {
+        let mut block = vec![];
+        for &(s, t, off_axis) in reps {
+            block.push((s, t));
+            if off_axis {
+                let (ts, tt) = (*self.key_map.inv_key(&s), *self.key_map.inv_key(&t));
+                block.push((ts, tt));
+            }
+        }
+
+        self.inner.eliminate_block(&block);
+
+        for &(s, t, _) in reps {
+            self.key_map.remove(&s);
+            self.key_map.remove(&t);
         }
     }
 
@@ -787,8 +856,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             return
         }
 
-        self.deloop_all(false, false);
-        self.deloop_all(true,  false); // deloop marked loops
+        self.deloop_all(false);
+        self.deloop_all(true); // deloop marked loops
 
         info!("  finalized: {}", self.inner.stat());
     }

@@ -234,6 +234,27 @@ mod tests {
     }
 
     #[test]
+    fn khi_selective_matches_greedy() {
+        use crate::tng::builder::{SymBuildConfig, DeloopMode};
+
+        type R = FF2;
+        let (h, t) = (R::zero(), R::zero());
+
+        for name in ["3_1", "4_1", "5_1", "6_2a", "7_1", "7_3a"] {
+            let l = InvLink::load(name).unwrap();
+            let greedy = KhIHomology::new(&l, &h, &t, false);
+
+            let cfg = SymBuildConfig { deloop_mode: DeloopMode::Selective, ..Default::default() };
+            let selective = KhIHomology::new_with_config(&l, &h, &t, false, cfg);
+
+            assert_eq!(selective.h_range(), greedy.h_range(), "{name} h_range");
+            for i in greedy.h_range() {
+                assert_eq!(selective[i].rank(), greedy[i].rank(), "{name} rank at {i}");
+            }
+        }
+    }
+
+    #[test]
     fn khi_fbn() {
         let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 

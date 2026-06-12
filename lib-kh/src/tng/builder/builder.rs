@@ -16,12 +16,14 @@ use ahash::AHashSet;
 use itertools::Itertools;
 use log::{debug, info, trace};
 use num_traits::Zero;
+use rayon::current_num_threads;
 use yui_core::bitseq::Bit;
 use yui_core::{Ring, RingOps};
 use yui_link::{Node, Edge, Link};
 
 use crate::kh::{KhChain, KhComplex};
 use crate::tng::{End, TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
+use super::pivot::find_block;
 use super::reachable_range;
 
 /// How circles are delooped during the build.
@@ -267,7 +269,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         for i in range {
             self.merge_at(left, right, i);
             if deloop {
-                self.deloop_in(i - 1, false, false); // not selective
+                self.deloop_in(i - 1, false);
             }
             debug!("  built C[{i}]: {}", self.complex.rank(i));
         }
@@ -275,7 +277,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             if self.config.h_range.as_ref().is_some_and(|w| top == *w.end()) {
                 self.prune_isolated_in(top);
             }
-            self.deloop_in(top, false, false); // not selective
+            self.deloop_in(top, false);
         }
         self.prune_h_range();
     }
@@ -284,26 +286,26 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let top = *range.end();
         for i in range {
             self.merge_at(left, right, i);
-            self.deloop_in(i - 1, false, true); // selective
+            self.deloop_block_in(i - 1);
             debug!("  built C[{i}]: {}", self.complex.rank(i));
         }
         if self.config.h_range.as_ref().is_some_and(|w| top == *w.end()) {
             self.prune_isolated_in(top);
         }
-        self.deloop_in(top, false, true); // selective
+        self.deloop_block_in(top);
 
-        // re-run selective to a fixpoint (catch loops turned productive by later elims), then full-deloop the rest.
+        // re-run to a fixpoint (catch loops turned productive by later elims), then full-deloop the rest.
         let mut step = 0;
         loop {
             let before = self.complex.n_verts();
-            self.deloop_all(false, true); // selective
+            self.deloop_block_all();
             let after = self.complex.n_verts();
-            debug!("  selective re-pass {step}: {before} -> {after} verts (diff {})",
+            debug!("  block re-pass {step}: {before} -> {after} verts (diff {})",
                 after as isize - before as isize);
             if after == before { break }
             step += 1;
         }
-        self.deloop_all(false, false); // not selective
+        self.deloop_all(false); // non-productive sweep
         self.prune_h_range();
     }
 
@@ -374,21 +376,50 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let c = TngComplex::from_loop(h, t, c, marked);
             self.merge(c);
 
-            if self.config.deloop_mode.is_enabled() { 
-                self.deloop_all(false, false);
+            if self.config.deloop_mode.is_enabled() {
+                self.deloop_all(false);
             }
         }
     }
 
-    pub(crate) fn deloop_all(&mut self, allow_based: bool, selective: bool) {
+    pub(crate) fn deloop_all(&mut self, allow_based: bool) {
         for i in self.complex.h_range() {
-            self.deloop_in(i, allow_based, selective);
+            self.deloop_in(i, allow_based);
         }
     }
 
-    fn deloop_in(&mut self, i: isize, allow_based: bool, selective: bool) {
+    // Selective deloop with block elimination (the no-balloon path): each round
+    // deloops one productive circle per key (1→2), then block-eliminates the batch (2→1).
+    fn deloop_block_all(&mut self) {
+        for i in self.complex.h_range() {
+            self.deloop_block_in(i);
+        }
+    }
+
+    fn deloop_block_in(&mut self, i: isize) {
+        loop {
+            let keys = self.pick_keys_in(i, |k| self.find_productive_loop(k).is_some());
+            if keys.is_empty() { break }
+
+            let mut batch = vec![];
+            for k in keys {
+                if let Some(r) = self.find_productive_loop(&k) {
+                    batch.extend(self.deloop_only(&k, r));
+                }
+            }
+
+            // block-eliminate the freshly delooped batch to a fixpoint.
+            loop {
+                let block = find_block(&self.complex, &batch);
+                if block.is_empty() { break }
+                self.eliminate_block(&block);
+            }
+        }
+    }
+
+    fn deloop_in(&mut self, i: isize, allow_based: bool) {
         let mut keys = self.pick_keys_in(i, |k|
-            self.choose_loop(k, allow_based, selective).is_some()
+            self.find_loop(k, allow_based).is_some()
         );
         if keys.is_empty() { return }
 
@@ -403,12 +434,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             while !list.is_empty() {
                 let k = list.remove(0);
                 if !self.complex.contains_key(&k) { continue; }
-                let Some(r) = self.choose_loop(&k, allow_based, selective) else { continue };
+                let Some(r) = self.find_loop(&k, allow_based) else { continue };
 
                 let added = self.deloop(&k, r);
 
                 list.extend(added.into_iter().filter(|k|
-                    self.choose_loop(k, allow_based, selective).is_some()
+                    self.find_loop(k, allow_based).is_some()
                 ));
             }
         }
@@ -419,24 +450,28 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub(crate) fn deloop(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
-        let c = self.complex.vertex(k).tng().comp(r);
+        let added = self.deloop_only(k, r);
 
-        trace!("{} deloop {c} in {}", self.stat(), self.complex.vertex(k));
-
-        for e in self.elements.iter_mut() { 
-            e.deloop(k, c);
-        }
-
-        let added = self.complex.deloop(k, r);
-
-        if self.config.elim_mode.is_enabled() { 
-            // only retain keys are not eliminated
+        if self.config.elim_mode.is_enabled() {
+            // keep only the keys not eliminated inline.
             added.into_iter().filter(|k|
                 !self.try_eliminate_at(k)
             ).collect_vec()
-        } else { 
+        } else {
             added
         }
+    }
+
+    // Pure deloop: split circle `r` in vertex `k`; no inline elimination.
+    pub(crate) fn deloop_only(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
+        let c = self.complex.vertex(k).tng().comp(r);
+        trace!("{} deloop {c} in {}", self.stat(), self.complex.vertex(k));
+
+        for e in self.elements.iter_mut() {
+            e.deloop(k, c);
+        }
+
+        self.complex.deloop(k, r)
     }
 
 
@@ -458,14 +493,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             .map(|(r, _)| r)
     }
 
-    // Selective mode deloops only productive circles; otherwise any circle.
-    fn choose_loop(&self, k: &TngComplexKey, allow_based: bool, selective: bool) -> Option<usize> {
-        if selective {
-            self.find_productive_loop(k)
-        } else {
-            self.find_loop(k, allow_based)
-        }
-    }
 
     /// Keys at degree `i` matching `pred`, sorted ascending by the vertex's
     /// `c_weight` (so the cheapest vertices come first).
@@ -539,6 +566,22 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.complex.eliminate(i, j);
     }
 
+    // Eliminate an independent block: small blocks serially (avoids rayon overhead),
+    // large blocks via the parallel across-pivot Schur.
+    pub(crate) fn eliminate_block(&mut self, block: &[(TngComplexKey, TngComplexKey)]) {
+        if block.len() < current_num_threads() {
+            for (k0, k1) in block {
+                self.eliminate(k0, k1);
+            }
+            return;
+        }
+        // elements read the intact complex — update them first (few, order-independent).
+        for (k0, k1) in block {
+            self.eliminate_elements(k0, k1);
+        }
+        self.complex.eliminate_block(block);
+    }
+
     pub(crate) fn eliminate_elements(&mut self, i: &TngComplexKey, j: &TngComplexKey) {
         let mut elements = self.take_elements();
         for e in elements.iter_mut() { 
@@ -595,8 +638,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             return;
         }
 
-        self.deloop_all(false, false);
-        self.deloop_all(true,  false); // deloop marked loops
+        self.deloop_all(false);
+        self.deloop_all(true); // deloop marked loops
 
         info!("  finalized: {}", self.stat());
     }

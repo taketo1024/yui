@@ -462,4 +462,17 @@ mod tests {
         use super::*;
         kh_homology_tests!(KhHomology::new_no_simplify);
     }
+
+    mod selective {
+        use super::*;
+        use crate::tng::builder::{BuildConfig, DeloopMode};
+
+        fn build<R>(l: &Link, h: &R, t: &R, reduced: bool) -> KhHomology<R>
+        where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+            let config = BuildConfig { deloop_mode: DeloopMode::Selective, ..Default::default() };
+            KhHomology::new_with_config(l, h, t, reduced, config)
+        }
+
+        kh_homology_tests!(build);
+    }
 }

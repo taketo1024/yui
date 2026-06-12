@@ -1,5 +1,6 @@
 pub mod builder;
 pub mod sym_builder;
+mod pivot;
 mod util;
 
 pub use builder::*;

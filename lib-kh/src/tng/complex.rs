@@ -608,14 +608,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let in_data = self.take_in_edges(k1, k0);
         let out_data = self.take_out_edges(k0, k1);
 
-        self.compute_schur(&ainv, &in_data, &out_data);
+        // compute `c·a⁻¹·b` and subtract from each surviving edge.
+        let (h, t) = self.ht().clone();
+        let corrections = Self::schur_corrections(&ainv, &in_data, &out_data, &h, &t);
+        for (l0, l1, c_ainv_b) in corrections {
+            self.sub_edge(&l0, &l1, c_ainv_b);
+        }
 
         self.remove_vertex(k0);
         self.remove_vertex(k1);
     }
 
     // Strip (remove + return) k's in/out-edges except the pivot. The endpoint is about to be
-    // removed, so the cobs are moved out — no clone — and fed straight to `compute_schur`.
+    // removed, so the cobs are moved out — no clone — and fed straight to `schur_corrections`.
     fn take_in_edges(&mut self, k: &TngComplexKey, except: &TngComplexKey) -> Vec<(TngComplexKey, LcCob<R>)> {
         self.vertex(k).in_edges().filter(|&j| j != except).copied().collect_vec()
             .into_iter().map(|j| { let b = self.remove_edge(&j, k); (j, b) }).collect()
@@ -624,28 +629,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn take_out_edges(&mut self, k: &TngComplexKey, except: &TngComplexKey) -> Vec<(TngComplexKey, LcCob<R>)> {
         self.vertex(k).out_edges().filter(|&l| l != except).copied().collect_vec()
             .into_iter().map(|l| { let c = self.remove_edge(k, &l); (l, c) }).collect()
-    }
-
-    // The Schur-complement core, for an invertible pivot `a: k0 → k1`:
-    // correct each edge `l0 → l1` by `−c·a⁻¹·b` where `b: l0 → k1`, `c: k0 → l1`.
-    // The corrections `c·a⁻¹·b` (the compute-heavy `stack`/`reduce`) are fanned out across
-    // cores; the resulting edge updates are applied serially.
-    pub(crate) fn compute_schur(&mut self, ainv: &LcCob<R>, in_data: &[(TngComplexKey, LcCob<R>)], out_data: &[(TngComplexKey, LcCob<R>)]) {
-        let (h, t) = self.ht().clone();
-        let corrections = Self::schur_corrections(ainv, in_data, out_data, &h, &t);
-        for (l0, l1, c_ainv_b) in corrections {
-            let s = if self.has_edge(&l0, &l1) {
-                self.edge(&l0, &l1) - c_ainv_b
-            } else {
-                -c_ainv_b
-            };
-            match (self.has_edge(&l0, &l1), s.is_zero()) {
-                (false, false) => self.add_edge(&l0, &l1, s),
-                (true,  false) => { self.replace_edge(&l0, &l1, s); },
-                (true,  true)  => { self.remove_edge(&l0, &l1); },
-                _              => ()
-            }
-        }
     }
 
     // Pure: the non-zero corrections `(l0, l1, c·a⁻¹·b)`. Each in-row is independent, so fan
@@ -663,6 +646,63 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             in_data.par_iter().flat_map_iter(row).collect()
         } else {
             in_data.iter().flat_map(row).collect()
+        }
+    }
+
+    // Parallel Schur for an independent (diagonal) block `{(s_p, t_p)}` (no edge
+    // `s_p → t_q`, p≠q): corrections computed read-only across pivots, then applied serially.
+    pub fn eliminate_block(&mut self, block: &[(TngComplexKey, TngComplexKey)]) {
+        let pivots: Vec<(TngComplexKey, TngComplexKey, LcCob<R>)> = block.iter().map(|(k0, k1)| {
+            let ainv = self.edge(k0, k1).inv().expect("block edge not invertible");
+            (*k0, *k1, ainv)
+        }).collect();
+
+        let this = &*self;
+        let contribs: Vec<((TngComplexKey, TngComplexKey), LcCob<R>)> =
+            pivots.par_iter()
+                .flat_map_iter(|(k0, k1, ainv)| this.block_schur_corrections(k0, k1, ainv))
+                .collect();
+
+        let mut merged: AHashMap<(TngComplexKey, TngComplexKey), LcCob<R>> = AHashMap::new();
+        for (ab, v) in contribs {
+            *merged.entry(ab).or_default() += v;
+        }
+        for ((l0, l1), delta) in merged {
+            self.sub_edge(&l0, &l1, delta);
+        }
+        for (k0, k1) in block {
+            self.remove_vertex(k0);
+            self.remove_vertex(k1);
+        }
+    }
+    
+    // Schur contributions of eliminating `(k0, k1)`: `((l0,l1), c·a⁻¹·b)` to subtract
+    // from `edge(l0,l1)`. Read-only → runs across an independent block's pivots in parallel.
+    fn block_schur_corrections(&self, k0: &TngComplexKey, k1: &TngComplexKey, ainv: &LcCob<R>) -> Vec<((TngComplexKey, TngComplexKey), LcCob<R>)> {
+        let (h, t) = self.ht();
+        let mut out = vec![];
+        for l0 in self.vertex(k1).in_edges().filter(|&l0| l0 != k0) {
+            let ainv_b = self.edge(l0, k1).stack(ainv);
+            for l1 in self.vertex(k0).out_edges().filter(|&l1| l1 != k1) {
+                let c_ainv_b = ainv_b.stack(self.edge(k0, l1)).reduce(h, t);
+                if !c_ainv_b.is_zero() {
+                    out.push(((*l0, *l1), c_ainv_b));
+                }
+            }
+        }
+        out
+    }
+
+    // `edge(k, l) -= delta`, creating or removing the edge as needed.
+    fn sub_edge(&mut self, k: &TngComplexKey, l: &TngComplexKey, delta: LcCob<R>) {
+        if delta.is_zero() { return }
+        let has = self.has_edge(k, l);
+        let s = if has { self.edge(k, l) - delta } else { -delta };
+        match (has, s.is_zero()) {
+            (false, false) => self.add_edge(k, l, s),
+            (true,  false) => { self.replace_edge(k, l, s); },
+            (true,  true)  => { self.remove_edge(k, l); },
+            _              => ()
         }
     }
 

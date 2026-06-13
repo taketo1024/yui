@@ -105,7 +105,7 @@ macro_rules! try_euc_poly {
     ($app:ident, $method:ident, $args:expr) => {{
         use yui_core::num::Ratio;
         use yui_core::num::FF;
-        use yui_core::poly::Poly;
+        use crate::app::utils::FastPoly;
 
         type Q = Ratio<Int>;
         type F2 = FF<2>;
@@ -114,12 +114,12 @@ macro_rules! try_euc_poly {
         let vars = $args.poly_vars();
 
         match ($args.c_type(), vars) {
-            (CType::Q,  PolyVars::H) => invoke!(Poly<'H', Q>,  $app, $method, $args),
-            (CType::Q,  PolyVars::T) => invoke!(Poly<'T', Q>,  $app, $method, $args),
-            (CType::F2, PolyVars::H) => invoke!(Poly<'H', F2>, $app, $method, $args),
-            (CType::F2, PolyVars::T) => invoke!(Poly<'T', F2>, $app, $method, $args),
-            (CType::F3, PolyVars::H) => invoke!(Poly<'H', F3>, $app, $method, $args),
-            (CType::F3, PolyVars::T) => invoke!(Poly<'T', F3>, $app, $method, $args),
+            (CType::Q,  PolyVars::H) => invoke!(FastPoly<'H', Q>,  $app, $method, $args),
+            (CType::Q,  PolyVars::T) => invoke!(FastPoly<'T', Q>,  $app, $method, $args),
+            (CType::F2, PolyVars::H) => invoke!(FastPoly<'H', F2>, $app, $method, $args),
+            (CType::F2, PolyVars::T) => invoke!(FastPoly<'T', F2>, $app, $method, $args),
+            (CType::F3, PolyVars::H) => invoke!(FastPoly<'H', F3>, $app, $method, $args),
+            (CType::F3, PolyVars::T) => invoke!(FastPoly<'T', F3>, $app, $method, $args),
             _ => None
         }
     }}

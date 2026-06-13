@@ -12,9 +12,11 @@
 
 use core::panic;
 use std::fmt::Display;
-use std::hash::Hash;
+use std::hash::{Hash, Hasher};
 use std::collections::HashSet;
 use std::ops::Mul;
+use std::sync::atomic::{AtomicU64, Ordering};
+use rustc_hash::FxHasher;
 use itertools::Itertools;
 use num_traits::Zero;
 use cartesian::cartesian; // TODO: replace with itertools::iproduct! and drop the cartesian dep
@@ -464,16 +466,66 @@ impl Display for CobComp {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug, Default)]
-pub struct Cob { 
-    comps: Vec<CobComp>
+// `hash`: lazy cache of the structural hash (0 = uncomputed), reset whenever `comps` is taken
+// via `comps_mut`/`comp_mut`; lets `eq` short-circuit on hash-mismatch and skips re-hashing.
+// `Clone` copies it (comps identical → valid); a mutated clone goes through `comps_mut`.
+#[derive(Debug, Default)]
+pub struct Cob {
+    comps: Vec<CobComp>,
+    hash: AtomicU64,
+}
+
+impl Clone for Cob {
+    fn clone(&self) -> Self {
+        Self { comps: self.comps.clone(), hash: AtomicU64::new(self.hash.load(Ordering::Relaxed)) }
+    }
+}
+
+impl PartialEq for Cob {
+    fn eq(&self, other: &Self) -> bool {
+        self.cached_hash() == other.cached_hash() && self.comps == other.comps
+    }
+}
+
+impl Eq for Cob {}
+
+impl Hash for Cob {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write_u64(self.cached_hash());
+    }
 }
 
 impl Cob {
     pub fn new<I>(comps: I) -> Self
-    where I: IntoIterator<Item = CobComp> { 
+    where I: IntoIterator<Item = CobComp> {
         let comps = comps.into_iter().sorted().collect_vec();
-        Self { comps }
+        Self { comps, hash: AtomicU64::new(0) }
+    }
+
+    // Lazy structural hash of `comps` (deterministic FxHasher); cached. 0 means uncomputed,
+    // so a real hash of 0 is bumped to 1 (negligible collision cost).
+    fn cached_hash(&self) -> u64 {
+        let h = self.hash.load(Ordering::Relaxed);
+        if h != 0 {
+            return h;
+        }
+        let mut hasher = FxHasher::default();
+        self.comps.hash(&mut hasher);
+        let h = hasher.finish().max(1);
+        self.hash.store(h, Ordering::Relaxed);
+        h
+    }
+
+    // Reset the lazy hash cache; call after any `comps` mutation.
+    fn invalidate(&mut self) {
+        *self.hash.get_mut() = 0;
+    }
+
+    // Mutable access to `comps`, invalidating the cache. Route all `comps` mutation
+    // through this (or `comp_mut`) so the cached hash can't go stale.
+    fn comps_mut(&mut self) -> &mut Vec<CobComp> {
+        self.invalidate();
+        &mut self.comps
     }
 
     pub fn empty() -> Self { 
@@ -496,8 +548,8 @@ impl Cob {
         &self.comps[i]
     }
 
-    pub fn comp_mut(&mut self, i: usize) -> &mut CobComp { 
-        &mut self.comps[i]
+    pub fn comp_mut(&mut self, i: usize) -> &mut CobComp {
+        &mut self.comps_mut()[i]
     }
 
     pub fn comps(&self) -> impl Iterator<Item = &CobComp> { 
@@ -571,8 +623,8 @@ impl Cob {
         comp.cap_off(b, p);
         comp.add_dot(x);
 
-        if comp.is_removable() { 
-            self.comps.remove(i);
+        if comp.is_removable() {
+            self.comps_mut().remove(i);
         }
 
         self.normalize();
@@ -754,7 +806,7 @@ impl Cob {
             return self.comps.into_iter().next().unwrap().reduce(h, t);
         }
 
-        let need_reduce: Vec<_> = self.comps.extract_if(.., |c| c.should_reduce()).collect();
+        let need_reduce: Vec<_> = self.comps_mut().extract_if(.., |c| c.should_reduce()).collect();
         let init = LcCob::from(self);
         
         need_reduce.into_iter().fold(init, |res, c| {
@@ -764,7 +816,7 @@ impl Cob {
             res.apply_bilin(&e, |c1, c2| {
                 let mut c = c1.clone();
                 if let Some(c2) = c2.comps.first() {
-                    c.comps.push(c2.clone());
+                    c.comps_mut().push(c2.clone()); // invalidates the hash copied from c1
                 }
                 c
             })
@@ -783,8 +835,9 @@ impl Cob {
     }
 
     fn normalize(&mut self) {
-        self.comps.retain(|c| !c.is_removable());
-        self.comps.sort()
+        let comps = self.comps_mut();
+        comps.retain(|c| !c.is_removable());
+        comps.sort();
     }
 
     #[cfg(debug_assertions)]
@@ -1111,14 +1164,14 @@ mod tests {
         assert_eq!(c1.inv(), None);
 
         let c2 = c0.clone_and(|c2|
-            c2.comps[0].add_dot(Dot::X)
+            c2.comp_mut(0).add_dot(Dot::X)
         );
 
         assert!(!c2.is_invertible());
         assert_eq!(c2.inv(), None);
 
         let c3 = c0.clone_and(|c3|
-            c3.comps[0].genus += 1
+            c3.comp_mut(0).genus += 1
         );
 
         assert!(!c3.is_invertible());

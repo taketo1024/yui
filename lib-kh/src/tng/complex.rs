@@ -286,12 +286,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn add_vertex(&mut self, k: TngComplexKey, v: TngComplexVertex<R>) {
-        assert!(!self.contains_key(&k));
+        debug_assert!(!self.contains_key(&k));
         self.vertices.insert(k, v);
     }
 
-    pub fn remove_vertex(&mut self, k: &TngComplexKey) -> TngComplexVertex<R> { 
-        assert!(self.contains_key(k));
+    pub fn remove_vertex(&mut self, k: &TngComplexKey) -> TngComplexVertex<R> {
+        debug_assert!(self.contains_key(k));
 
         let in_edges = self.vertex(k).in_edges().cloned().collect_vec();
         let out_edges = self.vertex(k).out_edges().cloned().collect_vec();
@@ -375,8 +375,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn add_edge(&mut self, k: &TngComplexKey, l: &TngComplexKey, f: LcCob<R>) { 
-        assert!(!self.has_edge(k, l));
-        assert!(!f.is_zero());
+        debug_assert!(!self.has_edge(k, l));
+        debug_assert!(!f.is_zero());
 
         let v = self.vertices.get_mut(k).unwrap();
         v.out_edges.insert(*l, f);
@@ -386,7 +386,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn remove_edge(&mut self, k: &TngComplexKey, l: &TngComplexKey) -> LcCob<R> { 
-        assert!(self.has_edge(k, l));
+        debug_assert!(self.has_edge(k, l));
         
         let w = self.vertices.get_mut(l).unwrap();
         w.in_edges.remove(k);
@@ -396,7 +396,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn replace_edge(&mut self, k: &TngComplexKey, l: &TngComplexKey, f: LcCob<R>) -> LcCob<R> { 
-        assert!(self.has_edge(k, l));
+        debug_assert!(self.has_edge(k, l));
 
         let v = self.vertices.get_mut(k).unwrap();
         v.out_edges.insert(*l, f).unwrap()
@@ -404,7 +404,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn modify_edge<F>(&mut self, k: &TngComplexKey, l: &TngComplexKey, map: F)
     where F: Fn(LcCob<R>) -> LcCob<R> {
-        assert!(self.has_edge(k, l));
+        debug_assert!(self.has_edge(k, l));
 
         let v = self.vertices.get_mut(k).unwrap();
         let f = std::mem::take(v.out_edges.get_mut(l).unwrap());
@@ -535,7 +535,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // For the base-pointed (reduced) variant only the `X` summand is kept.
     pub fn deloop(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
         let c = self.vertex(k).tng.comp(r);
-        assert!(c.is_circle());
+        debug_assert!(c.is_circle());
         
         #[allow(non_snake_case)]
         let updated_keys = if c.is_marked() { 

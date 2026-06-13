@@ -542,7 +542,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     //       d                
     
     fn eliminate_element(&self, e: &mut TngComplexElem<R>, i: &TngComplexKey, j: &TngComplexKey) {
-        assert!(self.complex.has_edge(i, j));
+        debug_assert!(self.complex.has_edge(i, j));
 
         // mors into i can be simply dropped.
         e.remove_cob(i);

@@ -595,8 +595,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn deloop_on_axis_sym(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
         let c = self.inner.complex().vertex(k).tng().comp(r);
 
-        assert!(self.key_map.is_sym(k));
-        assert!(self.is_sym_comp(c));
+        debug_assert!(self.key_map.is_sym(k));
+        debug_assert!(self.is_sym_comp(c));
 
         let updated = self.inner.deloop(k, r);
 
@@ -613,9 +613,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn deloop_on_axis_asym(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
         let c = self.inner.complex().vertex(k).tng().comp(r);
 
-        assert!(self.key_map.is_sym(k));
-        assert!(!self.is_sym_comp(c));
-        assert!(!c.is_marked());
+        debug_assert!(self.key_map.is_sym(k));
+        debug_assert!(!self.is_sym_comp(c));
+        debug_assert!(!c.is_marked());
 
         //          ⚪︎1 | ⚪︎1
         //  ⚪︎1 | ⚪︎X  <-->  ⚪︎X | ⚪︎1
@@ -650,7 +650,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn deloop_off_axis(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
         let c = self.inner.complex().vertex(k).tng().comp(r);
 
-        assert!(!self.key_map.is_sym(k));
+        debug_assert!(!self.key_map.is_sym(k));
 
         //  ⚪︎1 | ..  <-->  .. | ⚪︎1
         //  ⚪︎X | ..  <-->  .. | ⚪︎X
@@ -721,8 +721,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn eliminate_equiv(&mut self, i: &TngComplexKey, j: &TngComplexKey) {
-        assert_eq!(self.key_map.is_sym(i), self.key_map.is_sym(j));
-        assert!(self.inner.complex().has_edge(i, j));
+        debug_assert_eq!(self.key_map.is_sym(i), self.key_map.is_sym(j));
+        debug_assert!(self.inner.complex().has_edge(i, j));
 
         if self.key_map.is_sym(i) { 
             self.inner.eliminate(i, j);
@@ -730,7 +730,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let ti = *self.key_map.inv_key(i);
             let tj = *self.key_map.inv_key(j);
 
-            assert!(self.inner.complex().has_edge(&ti, &tj));
+            debug_assert!(self.inner.complex().has_edge(&ti, &tj));
 
             self.inner.eliminate(i, j);
             self.inner.eliminate(&ti, &tj);

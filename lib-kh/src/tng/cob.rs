@@ -270,7 +270,7 @@ impl CobComp {
     }
 
     pub fn cap_off(&mut self, b: End, i: usize) {
-        assert!(self.end(b).comp(i).is_circle());
+        debug_assert!(self.end(b).comp(i).is_circle());
         self.end_mut(b).remove_at(i);
         self.nb -= 1;
     }
@@ -561,7 +561,8 @@ impl Cob {
     }
 
     pub fn cap_off(&mut self, b: End, c: &TngComp, x: Dot) {
-        assert!(c.is_circle());
+        debug_assert!(c.is_circle());
+        
         let Some((i, p)) = self.find_comp(b, c) else { 
             panic!("{c} not found in {} ({b})", self)
         };

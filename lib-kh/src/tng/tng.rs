@@ -105,7 +105,7 @@ impl TngComp {
     }
 
     pub fn connect(&self, other: &Self) -> Self {
-        assert!(self.is_connectable(other), "{self} and {other} are not connectable.");
+        debug_assert!(self.is_connectable(other), "{self} and {other} are not connectable.");
 
         let (TngCompKind::Arc { e0: a, e1: b }, TngCompKind::Arc { e0: c, e1: d }) =
             (self.kind, other.kind)
@@ -261,7 +261,7 @@ impl Tng {
     }
 
     pub fn append_arc(&mut self, arc: TngComp) {
-        assert!(arc.is_arc());
+        debug_assert!(arc.is_arc());
 
         // If one end of `arc` is connectable:
         if let Some(i) = self.find_comp(|c| c.is_connectable(&arc)) {

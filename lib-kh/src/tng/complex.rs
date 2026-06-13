@@ -391,21 +391,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         v.out_edges.insert(*l, f).unwrap()
     }
 
-    fn modify_edge<F>(&mut self, k: &TngComplexKey, l: &TngComplexKey, map: F)
-    where F: Fn(LcCob<R>) -> LcCob<R> {
-        debug_assert!(self.has_edge(k, l));
-
-        let v = self.vertices.get_mut(k).unwrap();
-        let f = std::mem::take(v.out_edges.get_mut(l).unwrap());
-        let map_f = map(f);
-
-        if !map_f.is_zero() { 
-            v.out_edges.insert(*l, map_f);
-        } else { 
-            self.remove_edge(k, l);
-        }
-    }
-
     pub fn append_node(&mut self, x: &Node) {
         let (h, t) = self.ht();
         let c = Self::from_node(h, t, x, self.base_pt);
@@ -550,27 +535,33 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         updated_keys
     }
 
-    fn deloop_with(&mut self, k: &TngComplexKey, r: usize, birth_dot: Dot, death_dot: Dot) { 
-        // remove circle
-        let circ = self.vertices.get_mut(k).unwrap().tng.remove_at(r);
-
-        let v_in = self.vertex(k).in_edges().cloned().collect_vec();
-        let v_out = self.vertex(k).out_edges().cloned().collect_vec();
-
-        // cap incoming cobs
+    fn deloop_with(&mut self, k: &TngComplexKey, r: usize, birth_dot: Dot, death_dot: Dot) {
         let (h, t) = self.ht.clone();
-        for j in v_in.iter() { 
-            self.modify_edge(j, k, |f|
-                f.cap_off(End::Tgt, &circ, death_dot).reduce(&h, &t)
-            );
-        }
-        
-        // cup outgoing cobs
-        for l in v_out.iter() { 
-            self.modify_edge(k, l, |f|
-                f.cap_off(End::Src, &circ, birth_dot).reduce(&h, &t)
-            );
-        }
+
+        // own the vertex so its in/out edge lists are walked without cloning, and the outgoing
+        // cobs (which live in v) are capped in place; a cob that reduces to 0 drops its edge.
+        let mut v = self.vertices.remove(k).unwrap();
+        let circ = v.tng.remove_at(r);
+
+        // cap incoming cobs (j → k); cobs live in the sources.
+        v.in_edges.retain(|j| {
+            let u = self.vertices.get_mut(j).unwrap();
+            let f = std::mem::take(u.out_edges.get_mut(k).unwrap())
+                .cap_off(End::Tgt, &circ, death_dot).reduce(&h, &t);
+            let keep = !f.is_zero();
+            if keep { u.out_edges.insert(*k, f); } else { u.out_edges.remove(k); }
+            keep
+        });
+
+        // cup outgoing cobs (k → l); cobs owned in v, so cap in place and drop l's back-ref on 0.
+        v.out_edges.retain(|l, f| {
+            let g = std::mem::take(f).cap_off(End::Src, &circ, birth_dot).reduce(&h, &t);
+            let keep = !g.is_zero();
+            if keep { *f = g; } else { self.vertices.get_mut(l).unwrap().in_edges.remove(k); }
+            keep
+        });
+
+        self.vertices.insert(*k, v);
     }
 
     // Gaussian elimination — [BN07, Lemma 4.2].
@@ -587,32 +578,38 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     //  w0 -----> w1         w0 ---------> w1
     //       d                
 
+    // Gaussian-eliminate the invertible pivot `a: k0 → k1`: remove both endpoints, pull the Schur
+    // data from the owned vertices and strip neighbors' dangling refs in one pass (no key-vecs).
     pub fn eliminate(&mut self, k0: &TngComplexKey, k1: &TngComplexKey) {
-        let a = self.edge(k0, k1);
-        let Some(ainv) = a.inv() else { 
+        let v0 = self.vertices.remove(k0).unwrap();
+        let v1 = self.vertices.remove(k1).unwrap();
+
+        let a = &v0.out_edges[k1];
+        let Some(ainv) = a.inv() else {
             panic!("{a} is not invertible.")
         };
 
-        // both endpoints are removed below, so strip their edges out (no clone) for the Schur.
-        let in_data = self.take_in_edges(k1, k0);
-        let out_data = self.take_out_edges(k0, k1);
+        // out-edges k0 → l (cobs owned in v0) except the pivot; strip k0 from each target's in_edges.
+        let out_data: Vec<_> = v0.out_edges.into_iter().filter(|(l, _)| l != k1).map(|(l, c)| {
+            self.vertices.get_mut(&l).unwrap().in_edges.remove(k0);
+            (l, c)
+        }).collect();
+
+        // in-edges j → k1 (cobs live in the sources) except the pivot; the remove doubles as cleanup.
+        let in_data: Vec<_> = v1.in_edges.iter().filter(|&j| j != k0).map(|&j| {
+            let b = self.vertices.get_mut(&j).unwrap().out_edges.remove(k1).unwrap();
+            (j, b)
+        }).collect();
+
+        // remaining dangling refs to the removed pair (not part of the Schur).
+        for j in v0.in_edges.iter() {
+            self.vertices.get_mut(j).unwrap().out_edges.remove(k0);
+        }
+        for l in v1.out_edges.keys() {
+            self.vertices.get_mut(l).unwrap().in_edges.remove(k1);
+        }
 
         self.compute_schur(&ainv, &in_data, &out_data);
-
-        self.remove_vertex(k0);
-        self.remove_vertex(k1);
-    }
-
-    // Strip (remove + return) k's in/out-edges except the pivot. The endpoint is about to be
-    // removed, so the cobs are moved out — no clone — and fed straight to `compute_schur`.
-    fn take_in_edges(&mut self, k: &TngComplexKey, except: &TngComplexKey) -> Vec<(TngComplexKey, LcCob<R>)> {
-        self.vertex(k).in_edges().filter(|&j| j != except).copied().collect_vec()
-            .into_iter().map(|j| { let b = self.remove_edge(&j, k); (j, b) }).collect()
-    }
-
-    fn take_out_edges(&mut self, k: &TngComplexKey, except: &TngComplexKey) -> Vec<(TngComplexKey, LcCob<R>)> {
-        self.vertex(k).out_edges().filter(|&l| l != except).copied().collect_vec()
-            .into_iter().map(|l| { let c = self.remove_edge(k, &l); (l, c) }).collect()
     }
 
     // The Schur-complement core, for an invertible pivot `a: k0 → k1`:

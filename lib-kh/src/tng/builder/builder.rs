@@ -12,7 +12,7 @@
 
 use std::ops::RangeInclusive;
 
-use ahash::AHashSet;
+use rustc_hash::FxHashSet;
 use itertools::Itertools;
 use log::{debug, info, trace};
 use num_traits::Zero;
@@ -178,14 +178,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     /// Pick the next node to append by maximizing [`Self::score_node`].
     /// Removal happens in [`Self::prepare_append`] inside `append_*`.
     pub(crate) fn choose_next_node(&self) -> Option<&Node> {
-        let boundary_ends: AHashSet<Edge> = self.complex.boundary_ends().collect();
+        let boundary_ends: FxHashSet<Edge> = self.complex.boundary_ends().collect();
         self.nodes.iter().max_by_key(|x| self.score_node(x, &boundary_ends))
     }
 
     /// Score `x` for the chooser. Higher is better.
     /// `(loop_bonus, width_score)` — loop closures first (they unlock
     /// delooping + elimination), width as tiebreaker.
-    pub(crate) fn score_node(&self, x: &Node, boundary_ends: &AHashSet<Edge>) -> (isize, isize) {
+    pub(crate) fn score_node(&self, x: &Node, boundary_ends: &FxHashSet<Edge>) -> (isize, isize) {
         let arcs = self.node_arcs(x);
 
         let loops: isize = self.complex.iter_verts().map(|(_, v)| {

@@ -11,7 +11,7 @@
 
 use std::collections::HashSet;
 use std::ops::RangeInclusive;
-use ahash::{AHashMap, AHashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 use itertools::{iproduct, Itertools};
 use log::{debug, info};
 use yui_core::algo::KeyedUnionFind;
@@ -52,8 +52,8 @@ impl Default for SymBuildConfig {
 // only one representative per off-axis pair (the map is symmetric), then symmetrizes.
 #[derive(Clone, Default)]
 struct TauKeyMap {
-    on_axis: AHashSet<TngComplexKey>,
-    off_axis: AHashMap<TngComplexKey, TngComplexKey>,
+    on_axis: FxHashSet<TngComplexKey>,
+    off_axis: FxHashMap<TngComplexKey, TngComplexKey>,
 }
 
 impl FromIterator<(TngComplexKey, TngComplexKey)> for TauKeyMap {
@@ -132,8 +132,8 @@ impl TauKeyMap {
                 .flat_map(move |(k1, tk1)| other.entries().map(move |(k2, tk2)| (k1 + k2, tk1 + tk2)))
                 .collect();
         };
-        fn group(it: impl Iterator<Item = (TngComplexKey, TngComplexKey)>) -> AHashMap<usize, Vec<(TngComplexKey, TngComplexKey)>> {
-            it.fold(AHashMap::new(), |mut m, (k, tk)| {
+        fn group(it: impl Iterator<Item = (TngComplexKey, TngComplexKey)>) -> FxHashMap<usize, Vec<(TngComplexKey, TngComplexKey)>> {
+            it.fold(FxHashMap::default(), |mut m, (k, tk)| {
                 m.entry(k.weight()).or_default().push((k, tk));
                 m
             })
@@ -158,8 +158,8 @@ impl TauKeyMap {
 pub struct SymTngBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     inner: TngComplexBuilder<R>,
-    x_map: AHashMap<Node, Node>,
-    e_map: AHashMap<Edge, Edge>,
+    x_map: FxHashMap<Node, Node>,
+    e_map: FxHashMap<Edge, Edge>,
     key_map: TauKeyMap,
     config: SymBuildConfig,
 }
@@ -236,7 +236,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             (bound * n_on_axis).div_ceil(remaining.len())
         };
 
-        let mut frontier: AHashSet<Edge> = self.inner.complex().boundary_ends().collect();
+        let mut frontier: FxHashSet<Edge> = self.inner.complex().boundary_ends().collect();
         let mut chunk: Vec<Node> = vec![];
         let mut on_taken = 0;
 
@@ -312,7 +312,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     /// Cost-aware pair chooser: maximize delooping unlocked, but handicap an off-axis
     /// pair by its extra intermediate growth (≈ coeff·size), `width` breaks ties.
     fn choose_next_node_sym(&self) -> Option<&Node> {
-        let boundary_ends: AHashSet<Edge> = self.inner.complex().boundary_ends().collect();
+        let boundary_ends: FxHashSet<Edge> = self.inner.complex().boundary_ends().collect();
         let pair_penalty = (self.config.pair_penalty_coeff * self.inner.complex().n_verts() as f64) as isize;
         self.inner.nodes()
             .max_by_key(|x| {
@@ -466,7 +466,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         if !doomed_verts.is_empty() {
             debug!("prune {} isolated verts in C[{i}].", doomed_verts.len());
         }
-        let doomed: AHashSet<_> = doomed_verts.iter().copied().collect();
+        let doomed: FxHashSet<_> = doomed_verts.iter().copied().collect();
         self.inner.prune_keys(&doomed_verts);
         self.key_map.drop(|k| doomed.contains(k));
     }

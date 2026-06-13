@@ -293,16 +293,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn remove_vertex(&mut self, k: &TngComplexKey) -> TngComplexVertex<R> {
         debug_assert!(self.contains_key(k));
 
-        let in_edges = self.vertex(k).in_edges().cloned().collect_vec();
-        let out_edges = self.vertex(k).out_edges().cloned().collect_vec();
-
         let v = self.vertices.remove(k).unwrap();
 
-        for j in in_edges { 
+        for j in v.in_edges.iter() {
             self.vertices.get_mut(&j).unwrap().out_edges.remove(k);
         }
         
-        for l in out_edges { 
+        for l in v.out_edges.keys() { 
             self.vertices.get_mut(&l).unwrap().in_edges.remove(k);
         }
 
@@ -314,54 +311,46 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
     
     fn rename_vertex_key(&mut self, k_old: &TngComplexKey, k_new: TngComplexKey) { 
-        assert_ne!(k_old, &k_new);
+        debug_assert_ne!(k_old, &k_new);
+        debug_assert!(self.contains_key(k_old));
+        debug_assert!(!self.contains_key(&k_new));
 
-        let in_edges = self.vertex(k_old).in_edges().cloned().collect_vec(); 
-        let in_removed = in_edges.into_iter().map(|j| {
-            let f = self.remove_edge(&j, k_old);
-            (j, f)
-        }).collect_vec();
+        let v = self.vertices.remove(k_old).unwrap();
 
-        let out_edges = self.vertex(k_old).out_edges().cloned().collect_vec();
-        let out_removed = out_edges.into_iter().map(|l| {
-            let f = self.remove_edge(k_old, &l);
-            (l, f)
-        }).collect_vec();
+        for j in v.in_edges.iter() {
+            let u = self.vertices.get_mut(j).unwrap();
+            let f = u.out_edges.remove(k_old).unwrap();
+            u.out_edges.insert(k_new, f);
+        }
 
-        let v = self.remove_vertex(k_old);
+        for l in v.out_edges.keys() {
+            let w = self.vertices.get_mut(l).unwrap();
+            w.in_edges.remove(k_old);
+            w.in_edges.insert(k_new);
+        }
+
         self.add_vertex(k_new, v);
-
-        for (j, f) in in_removed { 
-            self.add_edge(&j, &k_new, f);
-        }
-
-        for (l, f) in out_removed { 
-            self.add_edge(&k_new, &l, f);
-        }
     }
 
     fn duplicate_vertex(&mut self, k: &TngComplexKey, k_new: TngComplexKey) { 
-        assert_ne!(k, &k_new);
+        debug_assert_ne!(k, &k_new);
+        debug_assert!(self.contains_key(k));
+        debug_assert!(!self.contains_key(&k_new));
 
-        let in_edges = self.vertex(k).in_edges.clone(); 
-        let out_edges = self.vertex(k).out_edges.keys().cloned().collect_vec();
+        let v_new = self.vertex(k).clone();
 
-        let v_new = self.vertex(k).clone_and(|v| { 
-            v.in_edges.clear();
-            v.out_edges.clear();
-        });
+        for j in v_new.in_edges.iter() { 
+            let u = self.vertices.get_mut(j).unwrap();
+            let f = u.out_edges[k].clone();
+            u.out_edges.insert(k_new, f);
+        }
+
+        for l in v_new.out_edges.keys() {
+            let w = self.vertices.get_mut(l).unwrap();
+            w.in_edges.insert(k_new);
+        }
 
         self.add_vertex(k_new, v_new);
-
-        for j in in_edges { 
-            let f = self.edge(&j, k).clone();
-            self.add_edge(&j, &k_new, f);
-        }
-
-        for l in out_edges { 
-            let f = self.edge(k, &l).clone();
-            self.add_edge(&k_new, &l, f);
-        }
     }
     
     pub fn edge(&self, k: &TngComplexKey, l: &TngComplexKey) -> &LcCob<R> {

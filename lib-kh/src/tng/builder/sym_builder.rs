@@ -11,6 +11,8 @@
 
 use std::collections::HashSet;
 use std::ops::RangeInclusive;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::OnceLock;
 use ahash::{AHashMap, AHashSet};
 use itertools::{iproduct, Itertools};
 use log::{debug, info};
@@ -20,9 +22,46 @@ use yui_core::{Ring, RingOps};
 use yui_link::{Node, Edge, InvLink};
 
 use crate::kh::{KhGen, KhTensor};
-use crate::tng::{End, LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
+use crate::tng::{End, LcCob, LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
 use crate::tng::builder::{TngComplexBuilder, BuildConfig, DeloopMode, ElimMode};
 use super::reachable_range;
+
+// --- temporary probe (PROBE=1): single-term incident edges of non-productive deloops that fire elim ---
+static PROBE_COUNT: AtomicUsize = AtomicUsize::new(0);
+const PROBE_LIMIT: usize = 60;
+
+fn probe_on() -> bool {
+    static ON: OnceLock<bool> = OnceLock::new();
+    *ON.get_or_init(|| std::env::var("PROBE").is_ok())
+}
+
+fn fmt_single_term<R>(f: &LcCob<R>) -> Option<String>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    if f.nterms() != 1 { return None }
+    let (cob, _) = f.iter().next()?;
+    let comps = cob.comps().map(|c|
+        format!("(d{:?} g{} s{} t{})", c.dots(), c.genus(), c.end(End::Src).n_comps(), c.end(End::Tgt).n_comps())
+    ).collect::<Vec<_>>().join(" ");
+    Some(format!("{cob}  |{comps}|"))
+}
+
+fn probe_report(class: &str, snapshot: Vec<String>) {
+    let n = PROBE_COUNT.fetch_add(1, Ordering::Relaxed);
+    if n >= PROBE_LIMIT { return }
+    if snapshot.is_empty() {
+        debug!("PROBE #{n}: {class}");
+    } else {
+        debug!("PROBE #{n}: {class}; edges:");
+        for s in &snapshot {
+            debug!("{s}");
+        }
+    }
+}
+
+fn edge_multicap<R>(f: &LcCob<R>, b: End, c: &TngComp) -> bool
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    f.nterms() == 1 && f.iter().next().is_some_and(|(cob, a)| a.is_unit() && cob.is_invertible_after_multicap(b, c))
+}
 
 /// Toggles for the automatic simplification done while building (kept separate
 /// from [`BuildConfig`] so the equivariant builder can gain its own flags).
@@ -432,19 +471,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
             self.deloop_in(top, false, selective);
 
-            // re-run selective to a fixpoint (catch loops turned productive by later equiv elims), then full-deloop the rest.
+            // BFS peel (replaces the re-pass + full sweep): alternate the selective
+            // fixpoint with delooping one circle from the highest-circle-count keys.
             if selective {
-                let mut step = 0;
-                loop {
-                    let before = self.inner.complex().n_verts();
-                    self.deloop_all(false, true);
-                    let after = self.inner.complex().n_verts();
-                    debug!("  selective re-pass {step}: {before} -> {after} verts (diff {})",
-                        after as isize - before as isize);
-                    if after == before { break }
-                    step += 1;
-                }
-                self.deloop_all(false, false);
+                self.deloop_by_circle_count();
             }
         }
 
@@ -509,6 +539,42 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
+    // BFS peel: alternate the selective fixpoint with delooping one circle from each
+    // highest-circle-count key, so productivity exposed by a peel is eliminated before
+    // delooping more (avoids the deep DFS doubling of a full sweep).
+    fn deloop_by_circle_count(&mut self) {
+        loop {
+            loop {
+                let before = self.inner.complex().n_verts();
+                self.deloop_all(false, true);
+                if self.inner.complex().n_verts() == before { break }
+            }
+            let Some(max) = self.max_circle_count() else { break };
+            let keys = self.keys_with_circle_count(max);
+            debug!("peel circle-count {max}: {} keys", keys.len());
+            for k in keys {
+                if !self.inner.complex().contains_key(&k) { continue }
+                if let Some(r) = self.inner.find_loop(&k, false) {
+                    self.deloop_equiv(&k, r);
+                }
+            }
+        }
+    }
+
+    fn max_circle_count(&self) -> Option<usize> {
+        self.inner.complex().iter_verts()
+            .map(|(_, v)| v.tng().comps().filter(|c| c.is_circle() && !c.is_marked()).count())
+            .filter(|&n| n > 0)
+            .max()
+    }
+
+    fn keys_with_circle_count(&self, n: usize) -> Vec<TngComplexKey> {
+        self.inner.complex().iter_verts()
+            .filter(|(_, v)| v.tng().comps().filter(|c| c.is_circle() && !c.is_marked()).count() == n)
+            .map(|(k, _)| *k)
+            .collect()
+    }
+
     // A circle whose no-dot cap yields an equiv-invertible edge (deloop+elim fires, no doubling).
     // Marked circles are skipped — they're delooped in the final full sweep.
     fn find_productive_loop(&self, k: &TngComplexKey) -> Option<usize> {
@@ -567,8 +633,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("  delooped C[{i}]: {} (diff: {}).", after, after - before);
     }
 
-    fn deloop_equiv(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> { 
-        let added = if self.key_map.is_sym(k) { 
+    fn deloop_equiv(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
+        let probe = self.probe_class(k);
+
+        let added = if self.key_map.is_sym(k) {
             let c = self.inner.complex().vertex(k).tng().comp(r);
             if self.is_sym_comp(c) {
                 // symmetric loop on symmetric key
@@ -577,19 +645,75 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 // asymmetric loop on symmetric key
                 self.deloop_on_axis_asym(k, r)
             }
-        } else { 
+        } else {
             // (symmetric or asymmetric) loop on asymmetric key
             self.deloop_off_axis(k, r)
         };
 
-        if self.config.elim_mode.is_enabled() { 
-            added.into_iter().filter(|k| 
-                self.inner.complex().contains_key(&k) && 
+        if self.config.elim_mode.is_enabled() {
+            let n = added.len();
+            let kept: Vec<_> = added.into_iter().filter(|k|
+                self.inner.complex().contains_key(&k) &&
                 !self.try_eliminate_equiv_at(&k)
-            ).collect()
-        } else { 
+            ).collect();
+            if let Some((class, snap)) = probe {
+                if kept.len() < n { probe_report(class, snap); }
+            }
+            kept
+        } else {
             added
         }
+    }
+
+    // PROBE: classify a missed loop. EQUIV = is_invertible_after_cap holds (blocked by
+    // is_equiv_edge); MULTICAP = catchable by the multi-cap relaxation; OTHER = neither.
+    fn probe_class(&self, k: &TngComplexKey) -> Option<(&'static str, Vec<String>)> {
+        if !probe_on() || PROBE_COUNT.load(Ordering::Relaxed) >= PROBE_LIMIT {
+            return None;
+        }
+        if self.find_productive_loop(k).is_some() {
+            return None;
+        }
+        let class = if self.relaxed_productive(k) {
+            "EQUIV"
+        } else if self.multicap_productive(k) {
+            "MULTICAP"
+        } else {
+            "OTHER"
+        };
+        let snapshot = if class == "OTHER" { self.snapshot_edges(k) } else { vec![] };
+        Some((class, snapshot))
+    }
+
+    // is_invertible_after_cap on any incident edge, IGNORING is_equiv_edge: for a
+    // non-productive vertex, true ⇒ equivariance-blocked, false ⇒ cap-structure.
+    fn relaxed_productive(&self, k: &TngComplexKey) -> bool {
+        let c = self.inner.complex();
+        let v = c.vertex(k);
+        v.tng().comps()
+            .filter(|comp| comp.is_circle() && !comp.is_marked())
+            .any(|comp|
+                v.out_edges().any(|l| c.edge(k, l).is_invertible_after_cap(End::Src, comp))
+                || v.in_edges().any(|j| c.edge(j, k).is_invertible_after_cap(End::Tgt, comp)))
+    }
+
+    // same, with the multi-cap relaxation (single-term edges only).
+    fn multicap_productive(&self, k: &TngComplexKey) -> bool {
+        let c = self.inner.complex();
+        let v = c.vertex(k);
+        v.tng().comps()
+            .filter(|comp| comp.is_circle() && !comp.is_marked())
+            .any(|comp|
+                v.out_edges().any(|l| edge_multicap(c.edge(k, l), End::Src, comp))
+                || v.in_edges().any(|j| edge_multicap(c.edge(j, k), End::Tgt, comp)))
+    }
+
+    fn snapshot_edges(&self, k: &TngComplexKey) -> Vec<String> {
+        let c = self.inner.complex();
+        let v = c.vertex(k);
+        let outs = v.out_edges().filter_map(|l| fmt_single_term(c.edge(k, l)).map(|s| format!("    out->{l}: {s}")));
+        let ins = v.in_edges().filter_map(|j| fmt_single_term(c.edge(j, k)).map(|s| format!("    in <-{j}: {s}")));
+        outs.chain(ins).collect()
     }
 
     fn deloop_on_axis_sym(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {

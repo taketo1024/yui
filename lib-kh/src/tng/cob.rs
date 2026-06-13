@@ -226,6 +226,20 @@ impl CobComp {
         near.comps().any(|c| c.is_circle()) // a circle on the capped side to remove
     }
 
+    // True if capping circles on side `b` (and matching circles on the far end) can
+    // reduce this to a cylinder: genus 0, plain, ≤1 arc per end, with a circle to cap.
+    pub(crate) fn is_invertible_after_multicap(&self, b: End) -> bool {
+        let (near, far) = match b {
+            End::Src => (&self.src, &self.tgt),
+            End::Tgt => (&self.tgt, &self.src),
+        };
+        self.is_plain() &&
+        self.genus == 0 &&
+        near.comps().filter(|c| c.is_arc()).count() <= 1 &&
+        far.comps().filter(|c| c.is_arc()).count() <= 1 &&
+        near.comps().any(|c| c.is_circle())
+    }
+
     pub fn is_sdl(&self) -> bool {
         self.src.n_comps() == 2 && 
         self.tgt.n_comps() == 2 && 
@@ -536,6 +550,17 @@ impl Cob {
         self.comps.iter().try_fold(false, |capped, comp|
             if !capped && comp.end(b).contains(c) {
                 comp.is_invertible_after_cap(b).then_some(true)
+            } else {
+                comp.is_invertible().then_some(capped)
+            }
+        ).unwrap_or(false)
+    }
+
+    // Multi-cap relaxation of `is_invertible_after_cap` (probe measurement only).
+    pub(crate) fn is_invertible_after_multicap(&self, b: End, c: &TngComp) -> bool {
+        self.comps.iter().try_fold(false, |capped, comp|
+            if !capped && comp.end(b).contains(c) {
+                comp.is_invertible_after_multicap(b).then_some(true)
             } else {
                 comp.is_invertible().then_some(capped)
             }

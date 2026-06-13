@@ -3,7 +3,7 @@
 //! empty and single-term cases.
 
 use std::collections::hash_map;
-use ahash::AHashMap;
+use rustc_hash::FxHashMap;
 use crate::{Ring, RingOps};
 
 use super::lc_key::LcKey;
@@ -23,7 +23,7 @@ where
 {
     Zero,
     Single(X, R),
-    Many(AHashMap<X, R>),
+    Many(FxHashMap<X, R>),
 }
 
 impl<X, R> Default for LcData<X, R>
@@ -39,9 +39,8 @@ where
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    fn new_many() -> AHashMap<X, R> {
-        let hasher = ahash::RandomState::with_seeds(0, 0, 0, 0);
-        AHashMap::with_hasher(hasher)
+    fn new_many() -> FxHashMap<X, R> {
+        FxHashMap::default()
     }
 
     pub(super) fn len(&self) -> usize {

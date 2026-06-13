@@ -568,7 +568,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn deloop_equiv(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> { 
-        let added = if self.key_map.is_sym(k) { 
+        let mut added = if self.key_map.is_sym(k) {
             let c = self.inner.complex().vertex(k).tng().comp(r);
             if self.is_sym_comp(c) {
                 // symmetric loop on symmetric key
@@ -577,19 +577,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 // asymmetric loop on symmetric key
                 self.deloop_on_axis_asym(k, r)
             }
-        } else { 
+        } else {
             // (symmetric or asymmetric) loop on asymmetric key
             self.deloop_off_axis(k, r)
         };
 
-        if self.config.elim_mode.is_enabled() { 
-            added.into_iter().filter(|k| 
-                self.inner.complex().contains_key(&k) && 
-                !self.try_eliminate_equiv_at(&k)
-            ).collect()
-        } else { 
-            added
+        if self.config.elim_mode.is_enabled() {
+            added.retain(|k|
+                self.inner.complex().contains_key(k) &&
+                !self.try_eliminate_equiv_at(k)
+            );
         }
+        added
     }
 
     fn deloop_on_axis_sym(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {

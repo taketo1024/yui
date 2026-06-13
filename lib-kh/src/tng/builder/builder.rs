@@ -411,16 +411,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             e.deloop(k, c);
         }
 
-        let added = self.complex.deloop(k, r);
+        let mut added = self.complex.deloop(k, r);
 
-        if self.config.elim_mode.is_enabled() { 
-            // only retain keys are not eliminated
-            added.into_iter().filter(|k|
-                !self.try_eliminate_at(k)
-            ).collect_vec()
-        } else { 
-            added
+        if self.config.elim_mode.is_enabled() {
+            // retain only the keys that weren't eliminated
+            added.retain(|k| !self.try_eliminate_at(k));
         }
+        added
     }
 
 
@@ -463,7 +460,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub(crate) fn eliminate_in(&mut self, i: isize) {
-        let mut keys = self.pick_keys_in(i, |k|
+        let keys = self.pick_keys_in(i, |k|
             self.complex.vertex(k).out_edges().any(|l|
                 self.complex.edge(k, l).is_invertible()
             )
@@ -474,8 +471,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let before = self.complex.rank(i) as isize;
 
-        while !keys.is_empty() {
-            let k = keys.remove(0);
+        for k in keys {
             self.try_eliminate_at(&k);
         }
 

@@ -15,7 +15,7 @@
 use std::fmt::Display;
 use std::ops::{Add, AddAssign, RangeInclusive};
 
-use ahash::{AHashMap, AHashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 use auto_impl_ops::auto_ops;
 use itertools::Itertools;
 use num_traits::Zero;
@@ -90,8 +90,8 @@ impl Display for TngComplexKey {
 pub struct TngComplexVertex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
     tng: Tng,
-    in_edges: AHashSet<TngComplexKey>,
-    out_edges: AHashMap<TngComplexKey, LcCob<R>>
+    in_edges: FxHashSet<TngComplexKey>,
+    out_edges: FxHashMap<TngComplexKey, LcCob<R>>
 }
 
 impl<R> TngComplexVertex<R>
@@ -131,8 +131,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> From<Tng> for TngComplexVertex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn from(tng: Tng) -> Self {
-        let in_edges = AHashSet::new();
-        let out_edges = AHashMap::new();
+        let in_edges = FxHashSet::default();
+        let out_edges = FxHashMap::default();
         Self { tng, in_edges, out_edges }
     }
 }
@@ -151,18 +151,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     deg_shift: (isize, isize),
     base_pt: Option<Edge>,
     dim: usize, 
-    vertices: AHashMap<TngComplexKey, TngComplexVertex<R>>,
+    vertices: FxHashMap<TngComplexKey, TngComplexVertex<R>>,
 }
 
 impl<R> TngComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn new(h: &R, t: &R, deg_shift: (isize, isize), base_pt: Option<Edge>, dim: usize, vertices: AHashMap<TngComplexKey, TngComplexVertex<R>>) -> Self { 
+    fn new(h: &R, t: &R, deg_shift: (isize, isize), base_pt: Option<Edge>, dim: usize, vertices: FxHashMap<TngComplexKey, TngComplexVertex<R>>) -> Self { 
         let ht = (h.clone(), t.clone());
         TngComplex{ ht, deg_shift, base_pt, dim, vertices }
     }
 
     pub fn init(h: &R, t: &R, deg_shift: (isize, isize), base_pt: Option<Edge>) -> Self { 
-        let mut vertices = AHashMap::new();
+        let mut vertices = FxHashMap::default();
         let k0 = TngComplexKey::init();
         let v0 = TngComplexVertex::init();
         vertices.insert(k0, v0);
@@ -176,7 +176,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let tng = Tng::from_resolved(x, base_pt);
             let v = TngComplexVertex::from(tng);
 
-            let mut c = Self::new(h, t, (0, 0), base_pt, 0, AHashMap::new());
+            let mut c = Self::new(h, t, (0, 0), base_pt, 0, FxHashMap::default());
             c.add_vertex(k, v);
             c
         } else {
@@ -194,7 +194,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 Cob::from(CobComp::plain(t0.clone(), t1.clone()))
             );
 
-            let mut c = Self::new(h, t, (0, 0), base_pt, 1, AHashMap::new());
+            let mut c = Self::new(h, t, (0, 0), base_pt, 1, FxHashMap::default());
             c.add_vertex(k0, TngComplexVertex::from(t0));
             c.add_vertex(k1, TngComplexVertex::from(t1));
             c.add_edge(&k0, &k1, sdl);
@@ -209,7 +209,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         );
         let v = TngComplexVertex::from(tng);
 
-        let mut c = Self::new(h, t, (0, 0), None, 0, AHashMap::new());
+        let mut c = Self::new(h, t, (0, 0), None, 0, FxHashMap::default());
         c.add_vertex(k, v);
         c
     }

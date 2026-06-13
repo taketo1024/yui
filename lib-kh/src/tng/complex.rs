@@ -354,7 +354,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
     
     pub fn edge(&self, k: &TngComplexKey, l: &TngComplexKey) -> &LcCob<R> {
-        &self.vertices[k].out_edges[l]
+        self.edge_opt(k, l).unwrap()
+    }
+
+    pub fn edge_opt(&self, k: &TngComplexKey, l: &TngComplexKey) -> Option<&LcCob<R>> {
+        self.vertices.get(k)?.out_edges.get(l)
+    }
+
+    // private: raw `&mut` to a cob would let callers break the edge-set consistency.
+    fn edge_mut(&mut self, k: &TngComplexKey, l: &TngComplexKey) -> Option<&mut LcCob<R>> {
+        self.vertices.get_mut(k)?.out_edges.get_mut(l)
     }
     
     pub fn has_edge(&self, k: &TngComplexKey, l: &TngComplexKey) -> bool { 
@@ -382,13 +391,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let v = self.vertices.get_mut(k).unwrap();
         v.out_edges.remove(l).unwrap()
-    }
-
-    pub fn replace_edge(&mut self, k: &TngComplexKey, l: &TngComplexKey, f: LcCob<R>) -> LcCob<R> { 
-        debug_assert!(self.has_edge(k, l));
-
-        let v = self.vertices.get_mut(k).unwrap();
-        v.out_edges.insert(*l, f).unwrap()
     }
 
     pub fn append_node(&mut self, x: &Node) {
@@ -588,6 +590,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let Some(ainv) = a.inv() else {
             panic!("{a} is not invertible.")
         };
+        // fold the Schur minus sign into a⁻¹ so corrections are added, not subtracted.
+        let neg_ainv = -ainv;
 
         // out-edges k0 → l (cobs owned in v0) except the pivot; strip k0 from each target's in_edges.
         let out_data: Vec<_> = v0.out_edges.into_iter().filter(|(l, _)| l != k1).map(|(l, c)| {
@@ -609,46 +613,67 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.vertices.get_mut(l).unwrap().in_edges.remove(k1);
         }
 
-        self.compute_schur(&ainv, &in_data, &out_data);
+        self.compute_schur(&neg_ainv, &in_data, &out_data);
     }
 
-    // The Schur-complement core, for an invertible pivot `a: k0 → k1`:
-    // correct each edge `l0 → l1` by `−c·a⁻¹·b` where `b: l0 → k1`, `c: k0 → l1`.
-    // The corrections `c·a⁻¹·b` (the compute-heavy `stack`/`reduce`) are fanned out across
-    // cores; the resulting edge updates are applied serially.
-    pub(crate) fn compute_schur(&mut self, ainv: &LcCob<R>, in_data: &[(TngComplexKey, LcCob<R>)], out_data: &[(TngComplexKey, LcCob<R>)]) {
+    // Schur-complement core for invertible pivot `a: k0 → k1`: correct edge `l0 → l1` by
+    // `−c·a⁻¹·b` (`b: l0→k1`, `c: k0→l1`; the `−` is folded into `neg_ainv`). Each `(l0, l1)`
+    // is unique, so corrections apply in any order — heavy `stack`/`reduce` runs in parallel.
+    pub(crate) fn compute_schur(&mut self, neg_ainv: &LcCob<R>, in_data: &[(TngComplexKey, LcCob<R>)], out_data: &[(TngComplexKey, LcCob<R>)]) {
+        const PARALLEL_THRESHOLD: usize = 16;
+        const ROW_CHUNK: usize = 64;
         let (h, t) = self.ht().clone();
-        let corrections = Self::schur_corrections(ainv, in_data, out_data, &h, &t);
-        for (l0, l1, c_ainv_b) in corrections {
-            let s = if self.has_edge(&l0, &l1) {
-                self.edge(&l0, &l1) - c_ainv_b
-            } else {
-                -c_ainv_b
-            };
-            match (self.has_edge(&l0, &l1), s.is_zero()) {
-                (false, false) => self.add_edge(&l0, &l1, s),
-                (true,  false) => { self.replace_edge(&l0, &l1, s); },
-                (true,  true)  => { self.remove_edge(&l0, &l1); },
-                _              => ()
+
+        // one in-row's non-zero corrections `(l0, l1, −c·a⁻¹·b)`, each handed to `emit`.
+        let schur_row = |l0: &TngComplexKey, b: &LcCob<R>, emit: &mut dyn FnMut(TngComplexKey, TngComplexKey, LcCob<R>)| {
+            let nainv_b = b.stack(neg_ainv);
+            for (l1, c) in out_data {
+                let corr = nainv_b.stack(c).reduce(&h, &t);
+                if !corr.is_zero() {
+                    emit(*l0, *l1, corr);
+                }
+            }
+        };
+
+        // small problems: apply inline, no parallel overhead.
+        if in_data.len() * out_data.len() < PARALLEL_THRESHOLD {
+            for (l0, b) in in_data {
+                schur_row(l0, b, &mut |l0, l1, corr| self.add_to_edge(&l0, &l1, corr));
+            }
+            return;
+        }
+
+        // Chunk the in-rows: compute each chunk's corrections with rayon's lock-free collect,
+        // then apply serially. Caps materialized corrections at `ROW_CHUNK × |out|` (no full Vec).
+        for chunk in in_data.chunks(ROW_CHUNK) {
+            let corrections: Vec<_> = chunk.par_iter().flat_map_iter(|(l0, b)| {
+                let mut row = Vec::with_capacity(out_data.len());
+                schur_row(l0, b, &mut |l0, l1, corr| row.push((l0, l1, corr)));
+                row
+            }).collect();
+
+            for (l0, l1, corr) in corrections {
+                self.add_to_edge(&l0, &l1, corr);
             }
         }
     }
 
-    // Pure: the non-zero corrections `(l0, l1, c·a⁻¹·b)`. Each in-row is independent, so fan
-    // them out across cores once `in×out` is large enough to amortize the rayon overhead.
-    fn schur_corrections(ainv: &LcCob<R>, in_data: &[(TngComplexKey, LcCob<R>)], out_data: &[(TngComplexKey, LcCob<R>)], h: &R, t: &R) -> Vec<(TngComplexKey, TngComplexKey, LcCob<R>)> {
-        const PARALLEL_THRESHOLD: usize = 16;
-        let row = |(l0, b): &(TngComplexKey, LcCob<R>)| -> Vec<(TngComplexKey, TngComplexKey, LcCob<R>)> {
-            let ainv_b = b.stack(ainv);
-            out_data.iter().filter_map(|(l1, c)| {
-                let c_ainv_b = ainv_b.stack(c).reduce(h, t);
-                (!c_ainv_b.is_zero()).then(|| (*l0, *l1, c_ainv_b))
-            }).collect()
+    // Add `val` to edge `k → l` (absent = 0), in place; drop the edge if the sum is 0.
+    fn add_to_edge(&mut self, k: &TngComplexKey, l: &TngComplexKey, val: LcCob<R>) {
+        let became_zero = match self.edge_mut(k, l) {
+            Some(e) => {
+                *e += val;
+                e.is_zero()
+            }
+            None => {
+                if !val.is_zero() {
+                    self.add_edge(k, l, val);
+                }
+                return;
+            }
         };
-        if in_data.len() * out_data.len() >= PARALLEL_THRESHOLD {
-            in_data.par_iter().flat_map_iter(row).collect()
-        } else {
-            in_data.iter().flat_map(row).collect()
+        if became_zero {
+            self.remove_edge(k, l);
         }
     }
 

@@ -96,12 +96,13 @@ pub fn parse_h_range(s: &str) -> Result<RangeInclusive<isize>, String> {
     Ok(parse(lo)? ..= parse(hi)?)
 }
 
-// parse a deloop mode: greedy | selective | none.
+// parse a deloop mode: greedy | selective | strongly-selective | none.
 pub fn parse_deloop_mode(s: &str) -> Result<DeloopMode, String> {
     match s.to_lowercase().as_str() {
-        "greedy"    => Ok(DeloopMode::Greedy),
-        "selective" => Ok(DeloopMode::Selective),
-        "none"      => Ok(DeloopMode::None),
-        _ => Err(format!("invalid deloop-mode `{s}`, expected greedy|selective|none")),
+        "greedy"             => Ok(DeloopMode::Greedy),
+        "selective"          => Ok(DeloopMode::Selective),
+        "strongly-selective" => Ok(DeloopMode::StronglySelective),
+        "none"               => Ok(DeloopMode::None),
+        _ => Err(format!("invalid deloop-mode `{s}`, expected greedy|selective|strongly-selective|none")),
     }
 }

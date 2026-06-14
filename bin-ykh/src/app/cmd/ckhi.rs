@@ -51,6 +51,10 @@ pub struct Args {
     #[arg(long, value_parser = parse_deloop_mode, default_value = "greedy")]
     pub deloop_mode: DeloopMode,
 
+    // skip the half-build/τ-mirror preprocess (which materializes the unbridged off-axis product).
+    #[arg(long)]
+    pub no_preprocess: bool,
+
     #[arg(long, default_value = "0")]
     pub log: u8,
 }
@@ -107,6 +111,7 @@ where
                 h_range: self.args.h_range.clone(),
                 chunk_bound: self.args.chunk,
                 deloop_mode: self.args.deloop_mode,
+                preprocess: !self.args.no_preprocess,
                 ..Default::default()
             };
             KhIComplex::new_with_config(&l, &h, &t, self.args.reduced, config)

@@ -411,7 +411,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                     if after == before { break }
                     step += 1;
                 }
-                self.deloop_all(false, false);
+                // strongly-selective defers the non-productive sweep to finalize (leaner merges).
+                if !self.config.deloop_mode.is_strongly_selective() {
+                    self.deloop_all(false, false);
+                }
             }
         }
 

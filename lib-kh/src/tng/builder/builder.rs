@@ -28,9 +28,10 @@ use super::reachable_range;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum DeloopMode {
     #[default]
-    Greedy,    // deloop every circle
-    Selective, // deloop only productive circles during build, full deloop at merge end
-    None,      // don't deloop
+    Greedy,            // deloop every circle
+    Selective,         // deloop only productive circles during build, full deloop at merge end
+    StronglySelective, // productive-only during build, full deloop deferred to finalize
+    None,              // don't deloop
 }
 
 impl DeloopMode {
@@ -39,7 +40,11 @@ impl DeloopMode {
     }
 
     pub fn is_selective(&self) -> bool {
-        *self == DeloopMode::Selective
+        matches!(self, DeloopMode::Selective | DeloopMode::StronglySelective)
+    }
+
+    pub fn is_strongly_selective(&self) -> bool {
+        *self == DeloopMode::StronglySelective
     }
 }
 
@@ -292,7 +297,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                     if after == before { break }
                     step += 1;
                 }
-                self.deloop_all(false, false);
+                // strongly-selective defers the non-productive sweep to finalize (leaner merges).
+                if !self.config.deloop_mode.is_strongly_selective() {
+                    self.deloop_all(false, false);
+                }
             }
         }
 
@@ -364,7 +372,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let c = TngComplex::from_loop(h, t, c, marked);
             self.merge(c);
 
-            if self.config.deloop_mode.is_enabled() { 
+            if self.config.deloop_mode.is_enabled() && !self.config.deloop_mode.is_strongly_selective() {
                 self.deloop_all(false, false);
             }
         }

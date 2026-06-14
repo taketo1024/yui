@@ -52,7 +52,12 @@ fn main() {
     let pair_penalty_coeff = std::env::var("PAIR_PENALTY").ok().map_or(1.0, |s| s.parse::<f64>().unwrap());
     let chunk_bound = std::env::var("CHUNK_BOUND").ok().map(|s| s.parse::<usize>().unwrap());
 
-    let deloop_mode = if std::env::var("SELECTIVE").is_ok() { DeloopMode::Selective } else { DeloopMode::Greedy };
+    // SELECTIVE=1 → selective, =2 → strongly selective (defer full deloop to finalize), unset → greedy.
+    let deloop_mode = match std::env::var("SELECTIVE").ok().as_deref() {
+        Some("2") => DeloopMode::StronglySelective,
+        Some(_)   => DeloopMode::Selective,
+        None      => DeloopMode::Greedy,
+    };
     // PREPROCESS=0 → skip the half-build/τ-mirror (which materializes the unbridged off-axis product); process incrementally.
     let preprocess = std::env::var("PREPROCESS").map_or(true, |s| s != "0");
 

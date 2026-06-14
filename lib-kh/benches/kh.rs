@@ -93,6 +93,40 @@ fn bench_khi_complex_k18(c: &mut Criterion) {
     group.finish();
 }
 
+/// Selective-deloop variant — the path that exercises `is_dotted_cup`.
+fn bench_khi_selective(c: &mut Criterion) {
+    use yui_kh::tng::builder::{SymBuildConfig, DeloopMode};
+
+    let mut group = c.benchmark_group("khi_selective");
+    group.sample_size(10);
+
+    let zero = FF2::default();
+    let sel = || SymBuildConfig { deloop_mode: DeloopMode::Selective, ..Default::default() };
+
+    for name in ["3_1", "4_1", "6_3"] {
+        let l = InvLink::test_data(name);
+        group.bench_function(name, |b| {
+            b.iter(|| KhIComplex::<FF2>::new_with_config(&l, &zero, &zero, false, sel()))
+        });
+    }
+
+    // K18 — realistic scale where dotted caps actually arise during selective deloop.
+    let pd: &[[u8; 4]] = &[
+        [1,27,2,26],[5,16,6,17],[6,32,7,31],[10,27,11,28],[11,1,12,36],
+        [13,8,14,9],[14,20,15,19],[17,4,18,5],[18,24,19,23],[21,32,22,33],
+        [22,16,23,15],[25,3,26,2],[28,9,29,10],[29,24,30,25],[30,4,31,3],
+        [33,20,34,21],[34,8,35,7],[35,13,36,12],
+    ];
+    let l = InvLink::from_symmetric_pd_code(pd.iter().copied());
+    group.measurement_time(std::time::Duration::from_secs(60));
+    group.bench_function("k18", |b| {
+        b.iter(|| KhIComplex::<FF2>::new_with_config(&l, &zero, &zero, false, sel()))
+    });
+
+    group.finish();
+}
+
 criterion_group!(kh,  bench_kh_complex_new);
 criterion_group!(khi, bench_khi_complex_new, bench_khi_complex_k18);
-criterion_main!(kh, khi);
+criterion_group!(sel, bench_khi_selective);
+criterion_main!(kh, khi, sel);

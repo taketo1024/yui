@@ -44,7 +44,7 @@ fn main() {
     let build = |preprocess: bool| {
         let cfg = SymBuildConfig { preprocess, deloop_mode, ..Default::default() };
         let t0 = Instant::now();
-        let b = SymTngBuilder::<FF2>::from_inv_link(&l, &zero, &zero, false).with_config(cfg).run();
+        let b = SymTngBuilder::<FF2>::from_inv_link(&l, &zero, &zero, false).with_config(cfg).run(true);
         let dt = t0.elapsed();
         let c = b.into_tng_complex();
         (dt, c.n_verts())

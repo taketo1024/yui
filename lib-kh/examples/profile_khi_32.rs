@@ -52,7 +52,7 @@ fn main() {
     let cfg = SymBuildConfig { pair_penalty_coeff, chunk_bound, h_range: h_range.clone(), deloop_mode, ..Default::default() };
 
     let t0 = Instant::now();
-    let b = SymTngBuilder::<FF2>::from_inv_link(&l, &zero, &zero, false).with_config(cfg).run();
+    let b = SymTngBuilder::<FF2>::from_inv_link(&l, &zero, &zero, false).with_config(cfg).run(true);
     let elapsed = t0.elapsed();
     let c = b.into_tng_complex();
 

@@ -57,7 +57,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
             h_range: h_range.as_ref().map(|r| (*r.start() - 1) ..= *r.end()),
             ..config
         };
-        let b = SymTngBuilder::from_inv_link(l, h, t, reduced).with_config(build_config).run();
+        let b = SymTngBuilder::from_inv_link(l, h, t, reduced).with_config(build_config).run(true);
         let tau_map = b.tau_map();
 
         let b = b.into_inner();

@@ -161,7 +161,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self
     }
 
-    pub fn run(mut self) -> Self {
+    // `finalize = false` returns the complex lean (non-productive loops left undelooped) — used
+    // for strongly-selective sub-builds, whose full deloop is deferred to the top-level run.
+    pub fn run(mut self, finalize: bool) -> Self {
         if self.config.chunk_bound.is_some() {
             self.process_chunks();
         } else {
@@ -170,7 +172,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
             self.process_nodes();
         }
-        self.finalize();
+        if finalize {
+            self.finalize();
+        }
         self
     }
 
@@ -234,7 +238,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // Build `chunk` into a reduced sub-complex via a child builder sharing the parent's
     // τ-maps; return the complex and its τ key_map for the parent merge.
     fn build_chunk(&self, chunk: &[Node]) -> (TngComplex<R>, TauKeyMap) {
-        let child = self.child_builder(chunk).run();
+        // strongly-selective: return the chunk lean (defer its full deloop to the parent's finalize).
+        let finalize = !self.config.deloop_mode.is_strongly_selective();
+        let child = self.child_builder(chunk).run(finalize);
         let SymTngBuilder { key_map, inner, .. } = child;
         (inner.into_tng_complex(), key_map)
     }
@@ -981,7 +987,7 @@ mod tests {
             let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
             b.config.preprocess = preprocess;
             b.config.h_range = window;
-            b.run().into_tng_complex().into_raw_complex()
+            b.run(true).into_tng_complex().into_raw_complex()
         };
 
         // full build: preprocess on/off agree on every degree.
@@ -1013,7 +1019,7 @@ mod tests {
             let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
             b.config.chunk_bound = chunk_bound;
             b.config.h_range = window;
-            b.run().into_tng_complex().into_raw_complex()
+            b.run(true).into_tng_complex().into_raw_complex()
         };
 
         let normal = build(None, None);
@@ -1043,7 +1049,7 @@ mod tests {
 
         let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
         b.config.elim_mode = ElimMode::None;
-        let c = b.run().into_tng_complex().into_raw_complex();
+        let c = b.run(true).into_tng_complex().into_raw_complex();
         c.check_d_all();
 
         let h = c.homology();
@@ -1063,7 +1069,7 @@ mod tests {
         let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
         b.config.elim_mode = ElimMode::None;
         b.config.h_range = Some(0..=3);
-        let c = b.run().into_tng_complex().into_raw_complex();
+        let c = b.run(true).into_tng_complex().into_raw_complex();
         c.check_d_all();
 
         let h = c.homology();
@@ -1080,7 +1086,7 @@ mod tests {
         let (h, t) = (FF2::zero(), FF2::zero());
 
         // full build for reference.
-        let full = SymTngBuilder::from_inv_link(&l, &h, &t, false).run()
+        let full = SymTngBuilder::from_inv_link(&l, &h, &t, false).run(true)
             .into_tng_complex().into_raw_complex();
         let range = full.support().cloned().range().unwrap();
         let (lo, hi) = (*range.start(), *range.end());
@@ -1090,7 +1096,7 @@ mod tests {
         let (a, b) = (lo + 1, hi - 1);
         let mut bld = SymTngBuilder::from_inv_link(&l, &h, &t, false);
         bld.config.h_range = Some(a..=b);
-        let bld = bld.run();
+        let bld = bld.run(true);
 
         // key_map stays in sync with the truncated complex.
         let verts: HashSet<_> = bld.inner.complex().keys().copied().collect();
@@ -1116,7 +1122,7 @@ mod tests {
         let l = InvLink::test_data("3_1");
         let (h, t) = (FF2::zero(), FF2::zero());
 
-        let b = SymTngBuilder::from_inv_link(&l, &h, &t, false).run();
+        let b = SymTngBuilder::from_inv_link(&l, &h, &t, false).run(true);
         let c = make_cone(b);
         c.check_d_all();
 

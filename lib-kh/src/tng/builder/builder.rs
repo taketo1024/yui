@@ -277,9 +277,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
 
         if self.config.deloop_mode.is_enabled() {
-            if self.config.h_range.as_ref().is_some_and(|w| top == *w.end()) {
-                self.prune_isolated_in(top);
-            }
+            self.prune_isolated_top(top);
             self.deloop_in(top, false, selective);
 
             // re-run selective to a fixpoint (catch loops turned productive by later elims), then full-deloop the rest.
@@ -334,13 +332,21 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // At the window-top degree, vertices with no incoming edge are isolated
     // (no outgoing either) and only feed the discarded boundary homology — drop
     // them before delooping their (ignored) loops.
-    fn prune_isolated_in(&mut self, i: isize) {
-        let doomed = self.complex.keys_of_deg(i)
+    // No-in-edge vertices at the window-top feed only the discarded `top+1` homology —
+    // but only when `top` is a TRUNCATED top (`top < real_top`). At the real top they're
+    // genuine generators, so skip (else we'd silently drop real homology).
+    fn prune_isolated_top(&mut self, top: isize) {
+        // real top = deg_shift + total crossings (dim + remaining nodes).
+        let real_top = self.complex.deg_shift().0 + (self.complex.dim() + self.nodes.len()) as isize;
+        let truncated = self.config.h_range.as_ref().is_some_and(|w| top == *w.end()) && top < real_top;
+        if !truncated { return; }
+
+        let doomed = self.complex.keys_of_deg(top)
             .filter(|k| self.complex.vertex(k).in_edges().next().is_none())
             .copied()
             .collect_vec();
         if !doomed.is_empty() {
-            debug!("prune {} isolated verts in C[{i}].", doomed.len());
+            debug!("prune {} isolated verts in C[{top}].", doomed.len());
         }
         self.prune_keys(&doomed);
     }

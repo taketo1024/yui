@@ -162,6 +162,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     e_map: FxHashMap<Edge, Edge>,
     key_map: TauKeyMap,
     config: SymBuildConfig,
+    real_top: isize, // n₊ = the complex's max h-degree (deg_shift.0 + #crossings)
 }
 
 impl<R> SymTngBuilder<R>
@@ -179,8 +180,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         ).collect();
         let e_map = l.edges().into_iter().map(|e| (e, l.inv_edge(e))).collect();
         let key_map = TauKeyMap::init();
+        let real_top = inner.complex().deg_shift().0 + l.inner().n_crossings() as isize;
 
-        SymTngBuilder { inner, x_map, e_map, key_map, config: SymBuildConfig::default() }
+        SymTngBuilder { inner, x_map, e_map, key_map, config: SymBuildConfig::default(), real_top }
     }
 
     pub fn with_config(mut self, config: SymBuildConfig) -> Self {
@@ -287,7 +289,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         });
         let config = SymBuildConfig { chunk_bound: None, h_range, ..self.config.clone() };
         let key_map = TauKeyMap::init();
-        SymTngBuilder { inner, x_map: self.x_map.clone(), e_map: self.e_map.clone(), key_map, config }
+        let real_top = inner.complex().deg_shift().0 + chunk.len() as isize; // child deg_shift = 0
+        SymTngBuilder { inner, x_map: self.x_map.clone(), e_map: self.e_map.clone(), key_map, config, real_top }
     }
 
     fn preprocess(&mut self) {
@@ -427,9 +430,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
 
         if self.config.deloop_mode.is_enabled() {
-            if self.config.h_range.as_ref().is_some_and(|w| top == *w.end()) {
-                self.prune_isolated_in(top);
-            }
+            self.prune_isolated_top(top);
             self.deloop_in(top, false, selective);
 
             // re-run selective to a fixpoint (catch loops turned productive by later equiv elims), then full-deloop the rest.
@@ -455,16 +456,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("  merged: {} + {} -> {}", left.stat(), right.stat(), self.inner.stat());
     }
 
-    // At the window-top degree, vertices with no incoming edge are isolated and
-    // only feed the discarded boundary; drop them (and their τ-pairs) before
-    // delooping. The no-in-edge set is τ-closed, so `key_map` stays an involution.
-    fn prune_isolated_in(&mut self, i: isize) {
-        let doomed_verts = self.inner.complex().keys_of_deg(i)
+    // No-in-edge vertices at a TRUNCATED window-top (`top < real_top`) feed only the discarded
+    // boundary — drop them and their τ-pairs (at the real top they're genuine generators).
+    // The no-in-edge set is τ-closed, so `key_map` stays an involution.
+    fn prune_isolated_top(&mut self, top: isize) {
+        let truncated = self.config.h_range.as_ref().is_some_and(|w| top == *w.end()) && top < self.real_top;
+        if !truncated { return; }
+
+        let doomed_verts = self.inner.complex().keys_of_deg(top)
             .filter(|k| self.inner.complex().vertex(k).in_edges().next().is_none())
             .copied()
             .collect_vec();
         if !doomed_verts.is_empty() {
-            debug!("prune {} isolated verts in C[{i}].", doomed_verts.len());
+            debug!("prune {} isolated verts in C[{top}].", doomed_verts.len());
         }
         let doomed: FxHashSet<_> = doomed_verts.iter().copied().collect();
         self.inner.prune_keys(&doomed_verts);

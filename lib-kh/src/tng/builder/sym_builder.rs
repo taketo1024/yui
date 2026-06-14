@@ -12,7 +12,7 @@
 use std::collections::HashSet;
 use std::ops::RangeInclusive;
 use rustc_hash::{FxHashMap, FxHashSet};
-use itertools::{iproduct, Itertools};
+use itertools::Itertools;
 use log::{debug, info};
 use yui_core::algo::KeyedUnionFind;
 use yui_core::bitseq::{Bit, BitSeq};
@@ -124,34 +124,27 @@ impl TauKeyMap {
         on.chain(off)
     }
 
-    // Merged map `(k1+k2) ↦ (τk1+τk2)`, restricted to the reachable weight band. Iterating
-    // one rep per `self` pair (× all of `other`) halves the work; `add_pair` symmetrizes.
+    // Merged map `(k1+k2) ↦ (τk1+τk2)` over `reps(self) × entries(other)` (one rep per off-axis
+    // pair; `add_pair` symmetrizes), restricted to the reachable weight band.
     fn merge(&self, other: &Self, band: Option<RangeInclusive<usize>>) -> Self {
-        let Some(band) = band else {
-            return self.reps()
-                .flat_map(move |(k1, tk1)| other.entries().map(move |(k2, tk2)| (k1 + k2, tk1 + tk2)))
-                .collect();
-        };
-        fn group(it: impl Iterator<Item = (TngComplexKey, TngComplexKey)>) -> FxHashMap<usize, Vec<(TngComplexKey, TngComplexKey)>> {
-            it.fold(FxHashMap::default(), |mut m, (k, tk)| {
-                m.entry(k.weight()).or_default().push((k, tk));
-                m
+        self.reps().flat_map(|(k1, tk1)| {
+            let band = band.clone();
+            other.entries().filter_map(move |(k2, tk2)| {
+                band.as_ref().map_or(true, |b| b.contains(&(k1.weight() + k2.weight())))
+                    .then(|| (k1 + k2, tk1 + tk2))
             })
-        }
-        let (rg, ag) = (group(self.reps()), group(other.entries()));
-        iproduct!(&rg, &ag)
-            .filter(|&((&w1, _), (&w2, _))| band.contains(&(w1 + w2)))
-            .flat_map(|((_, ps), (_, qs))| iproduct!(ps, qs).map(|(&(k1, tk1), &(k2, tk2))| (k1 + k2, tk1 + tk2)))
-            .collect()
+        }).collect()
     }
 
     // Key map of a half-complex (`keys`) tensored with its τ-mirror: `k1+k2 ↦ k2+k1`
-    // (τ swaps the halves), within `band`. Folded directly to avoid a large pair Vec.
+    // (τ swaps the halves), within `band`.
     fn from_half(keys: &[TngComplexKey], band: RangeInclusive<usize>) -> Self {
-        iproduct!(keys, keys)
-            .filter(|&(k1, k2)| band.contains(&(k1.weight() + k2.weight())))
-            .map(|(k1, k2)| (k1 + k2, k2 + k1))
-            .collect()
+        keys.iter().flat_map(|&k1| {
+            let band = band.clone();
+            keys.iter().filter_map(move |&k2| {
+                band.contains(&(k1.weight() + k2.weight())).then(|| (k1 + k2, k2 + k1))
+            })
+        }).collect()
     }
 }
 

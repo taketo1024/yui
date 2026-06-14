@@ -587,6 +587,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 self.inner.complex().contains_key(k) &&
                 !self.try_eliminate_equiv_at(k)
             );
+            // an equivariant elim removes the whole τ-pair, so a key kept above may since have
+            // been eliminated as another's τ-partner — re-retain so only live keys are returned.
+            added.retain(|k| self.inner.complex().contains_key(k));
         }
         added
     }

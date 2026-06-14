@@ -484,7 +484,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         n
     }
 
-    fn collect_keys<'a, 'b>(left: &'a TngComplex<R>, right: &'b TngComplex<R>, i: isize) -> impl Iterator<Item = (&'a TngComplexKey, &'b TngComplexKey)> {
+    pub(crate) fn collect_keys<'a, 'b>(left: &'a TngComplex<R>, right: &'b TngComplex<R>, i: isize) -> impl Iterator<Item = (&'a TngComplexKey, &'b TngComplexKey)> {
         left.h_range().filter_map(move |i1| {
             let i2 = i - i1;
             right.h_range().contains(&i2).then_some((i1, i2))

@@ -110,32 +110,6 @@ impl TauKeyMap {
         self.off_axis.retain(|k, _| !pred(k));
     }
 
-    // (k, τk) for one rep of each off-axis pair, plus every on-axis key.
-    fn reps(&self) -> impl Iterator<Item = (TngComplexKey, TngComplexKey)> + '_ {
-        let on = self.on_axis.iter().map(|&k| (k, k));
-        let off = self.off_axis.iter().filter(|(k, tk)| k <= tk).map(|(&k, &tk)| (k, tk));
-        on.chain(off)
-    }
-
-    // (k, τk) for every key.
-    fn entries(&self) -> impl Iterator<Item = (TngComplexKey, TngComplexKey)> + '_ {
-        let on = self.on_axis.iter().map(|&k| (k, k));
-        let off = self.off_axis.iter().map(|(&k, &tk)| (k, tk));
-        on.chain(off)
-    }
-
-    // Merged map `(k1+k2) ↦ (τk1+τk2)` over `reps(self) × entries(other)` (one rep per off-axis
-    // pair; `add_pair` symmetrizes), restricted to the reachable weight band.
-    fn merge(&self, other: &Self, band: Option<RangeInclusive<usize>>) -> Self {
-        self.reps().flat_map(|(k1, tk1)| {
-            let band = band.clone();
-            other.entries().filter_map(move |(k2, tk2)| {
-                band.as_ref().map_or(true, |b| b.contains(&(k1.weight() + k2.weight())))
-                    .then(|| (k1 + k2, tk1 + tk2))
-            })
-        }).collect()
-    }
-
     // Key map of a half-complex (`keys`) tensored with its τ-mirror: `k1+k2 ↦ k2+k1`
     // (τ swaps the halves), within `band`.
     fn from_half(keys: &[TngComplexKey], band: RangeInclusive<usize>) -> Self {
@@ -382,16 +356,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.merge(c, key_map);
     }
 
-    fn merge(&mut self, c: TngComplex<R>, key_map: TauKeyMap) {
+    fn merge(&mut self, c: TngComplex<R>, right_map: TauKeyMap) {
         debug!("merge {} + {}", self.inner.stat(), c.stat());
-        debug!("  key_map: {} × {}", self.key_map.len(), key_map.len());
+        debug!("  key_map: {} × {}", self.key_map.len(), right_map.len());
 
-        let band = self.config.h_range.is_some().then(|| 
-            self.weight_band(self.inner.nodes().count())
-        );
-        self.key_map = self.key_map.merge(&key_map, band);
-
-        debug!("  key_map built: {}", self.key_map.len());
+        // build the merged τ key-map per degree (next to merge_vertices) rather than as one
+        // up-front cartesian — for large knots that product never fits in memory.
+        let left_map = std::mem::take(&mut self.key_map);
 
         let (left, right) = self.inner.complex_mut().prepare_merge(c);
 
@@ -405,6 +376,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         for i in range {
             debug!("build C[{i}]...");
+
+            self.merge_key_slice(&left, &right, i, &left_map, &right_map);
 
             let nv = self.inner.complex_mut().merge_vertices(&left, &right, i);
             debug!("  +{nv} verts");
@@ -446,7 +419,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         // TODO merge elements
 
+        debug!("  key_map built: {}", self.key_map.len());
         debug!("  merged: {} + {} -> {}", left.stat(), right.stat(), self.inner.stat());
+    }
+
+    // Degree-i slice of the merged τ key-map: k1+k2 ↦ τk1+τk2 (τ preserves degree,
+    // so the slice is self-contained — see `merge`).
+    fn merge_key_slice(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize, left_map: &TauKeyMap, right_map: &TauKeyMap) {
+        for (k1, k2) in TngComplex::collect_keys(left, right, i) {
+            self.key_map.add_pair(k1 + k2, left_map.inv_key(k1) + right_map.inv_key(k2));
+        }
     }
 
     // No-in-edge vertices at a TRUNCATED window-top (`top < real_top`) feed only the discarded

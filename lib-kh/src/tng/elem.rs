@@ -5,12 +5,12 @@ use itertools::Itertools;
 use maplit::hashmap;
 use yui_core::bitseq::Bit;
 use yui_core::{Ring, RingOps};
-use yui_link::{Edge, Link, Node, Path};
+use yui_link::{Edge, Link, Node};
 
-use super::tng::{Tng, TngComp};
-use super::cob::{End, Dot, Cob, CobComp, LcCobTrait, LcCob};
+use super::tng::TngComp;
+use super::cob::{Dot, Cob, CobComp, LcCobTrait, LcCob};
 use super::complex::TngComplexKey;
-use crate::kh::{KhAlgGen, KhChain};
+use crate::kh::KhChain;
 use crate::ext::LinkExt;
 
 #[derive(Clone)]
@@ -31,84 +31,23 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         Self{ state, in_cob, out_cob, base_pt }
     }
 
-    pub fn append_node(&mut self, x: &Node) { 
-        if x.is_crossing() { 
-            self.append_crossing(x)
-        } else { 
-            self.append_arcs(x)
-        }
+    pub fn state(&self) -> &HashMap<Node, Bit> {
+        &self.state
     }
 
-    fn append_crossing(&mut self, x: &Node) {
-        assert!(x.is_crossing());
-
-        let r = self.state[x];
-        let a = x.resolve(r);
-        let t = Tng::from_resolved(&a, self.base_pt);
-
-        self.connect_id_cob(&t, Some(r));
+    pub fn base_pt(&self) -> Option<Edge> {
+        self.base_pt
     }
 
-    fn append_arcs(&mut self, x: &Node) {
-        assert!(x.is_resolved());
-
-        let t = Tng::from_resolved(x, self.base_pt);
-        self.connect_id_cob(&t, None);
+    pub fn out_cob(&self) -> &HashMap<TngComplexKey, LcCob<R>> {
+        &self.out_cob
     }
 
-    pub fn insert_loop(&mut self, c: Edge) {
-        let marked = self.base_pt == Some(c);
-        let t = Tng::from(
-            TngComp::from_path(Path::circ([c]), marked)
-        );
-        self.connect_id_cob(&t, None);
+    pub fn out_cob_mut(&mut self) -> &mut HashMap<TngComplexKey, LcCob<R>> {
+        &mut self.out_cob
     }
 
-    fn connect_id_cob(&mut self, t: &Tng, r: Option<Bit>) { 
-        let id = Cob::id(&t);
-
-        let mors = std::mem::take(&mut self.out_cob);
-        self.out_cob = mors.into_iter().map(|(mut k, f)| {
-            if let Some(r) = r { 
-                k.state.push(r);
-            }
-            let f = f.connect(&id);
-            (k, f)
-        }).collect();
-    }
-
-    pub fn deloop(&mut self, k: &TngComplexKey, c: &TngComp) {
-        let Some(f) = self.out_cob.remove(k) else { return };
-        let marked = self.base_pt.map(|e| c.contains(e)).unwrap_or(false);
-
-        let k0 = k + KhAlgGen::X;
-        let f0 = f.clone().cap_off(End::Tgt, c, Dot::None);
-        self.out_cob.insert(k0, f0);
-
-        if !marked { 
-            let k1 = k + KhAlgGen::I;
-            let f1 = f.cap_off(End::Tgt, c, Dot::Y);
-            self.out_cob.insert(k1, f1);    
-        }
-    }
-
-    pub fn insert_cob(&mut self, k: TngComplexKey, v: LcCob<R>) {
-        self.out_cob.insert(k, v);
-    }
-
-    pub fn remove_cob(&mut self, k: &TngComplexKey) -> Option<LcCob<R>> { 
-        self.out_cob.remove(k)
-    }
-
-    pub fn modify<F>(&mut self, f: F)
-    where F: Fn(TngComplexKey, LcCob<R>) -> (TngComplexKey, LcCob<R>) { 
-        let retr_cob = std::mem::take(&mut self.out_cob);
-        self.out_cob = retr_cob.into_iter().map(|(k, cob)|
-            f(k, cob)
-        ).collect();
-    }
-
-    pub fn is_evalable(&self) -> bool { 
+    pub fn is_evalable(&self) -> bool {
         let init = LcCob::from(self.in_cob.clone());
         self.out_cob.values().all(|c| init.is_stackable(c)) && 
         self.out_cob.values().all(|c| c.iter().all(|(c, _)| c.comps().all(|c| c.tgt().is_empty())))

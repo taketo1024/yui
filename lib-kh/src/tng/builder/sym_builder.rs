@@ -995,14 +995,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     // Complete a half-element into the full off-axis element.
     fn complete_element(&self, e: &mut TngComplexElem<R>) {
-        e.modify(|k, cob| {
+        let out = std::mem::take(e.out_cob_mut());
+        *e.out_cob_mut() = out.into_iter().map(|(k, cob)| {
             let kk = k + k;
             let cc = cob.map(|c, r| {
                 let tc = c.convert_edges(|e| self.builder.inv_edge(e));
                 (c.connect(&tc), &r * &r)
             });
             (kk, cc)
-        });
+        }).collect();
     }
 }
 

@@ -15,13 +15,12 @@ use std::ops::RangeInclusive;
 use rustc_hash::{FxHashSet, FxHashMap};
 use itertools::Itertools;
 use log::{debug, info, trace};
-use num_traits::Zero;
 use yui_core::{Ring, RingOps};
 use yui_link::{Node, Edge, Link};
 
 use crate::kh::{KhChain, KhComplex};
 use crate::tng::{End, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
-use super::{reachable_range, node_arcs};
+use super::{reachable_range, node_arcs, TngElemBuilder};
 
 /// How circles are delooped during the build.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -84,7 +83,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     complex: TngComplex<R>,
     nodes: Vec<Node>,
     loops: Vec<Edge>,
-    elements: Vec<TngComplexElem<R>>,
+    elements: TngElemBuilder<R>,
     config: BuildConfig,
 }
 
@@ -112,7 +111,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             complex,
             nodes: vec![],
             loops: vec![],
-            elements: vec![],
+            elements: TngElemBuilder::new(),
             config: BuildConfig::default(),
         }
     }
@@ -155,12 +154,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn set_elements<I>(&mut self, elements: I)
-    where I: IntoIterator<Item = TngComplexElem<R>> { 
-        self.elements = elements.into_iter().collect_vec();
+    where I: IntoIterator<Item = TngComplexElem<R>> {
+        self.elements.set(elements);
     }
 
     pub(crate) fn take_elements(&mut self) -> Vec<TngComplexElem<R>> {
-        std::mem::take(&mut self.elements)
+        self.elements.take()
     }
 
     pub(crate) fn drop_nodes<F>(&mut self, pred: F)
@@ -249,9 +248,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.nodes.remove(i.0);
         }
 
-        for e in self.elements.iter_mut() { 
-            e.append_node(x);
-        }
+        self.elements.append_node(x);
     }
 
     pub(crate) fn merge(&mut self, other: TngComplex<R>) { 
@@ -354,9 +351,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         while !self.loops.is_empty() { 
             let c = self.loops.remove(0);
 
-            for e in self.elements.iter_mut() { 
-               e.insert_loop(c);
-            }
+            self.elements.insert_loop(c);
 
             let (h, t) = self.complex.ht();
             let marked = self.complex.base_pt() == Some(c);
@@ -435,9 +430,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         trace!("{} deloop {c} in {}", self.stat(), self.complex.vertex(k));
 
-        for e in self.elements.iter_mut() { 
-            e.deloop(k, c);
-        }
+        self.elements.deloop(k, c);
 
         let mut added = self.complex.deloop(k, r);
 
@@ -504,57 +497,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub(crate) fn eliminate(&mut self, i: &TngComplexKey, j: &TngComplexKey) {
         trace!("{} eliminate {}: {} -> {}", self.stat(), self.complex.edge(i, j), self.complex.vertex(i), self.complex.vertex(j));
         
-        self.eliminate_elements(i, j);
+        self.elements.eliminate(&self.complex, i, j);
         self.complex.eliminate(i, j);
-    }
-
-    pub(crate) fn eliminate_elements(&mut self, i: &TngComplexKey, j: &TngComplexKey) {
-        let mut elements = self.take_elements();
-        for e in elements.iter_mut() { 
-            self.eliminate_element(e, i, j);
-        }
-        self.elements = elements;
-    }
-
-    //  Gaussian Elimination
-    //
-    //       a
-    //  v0 - - -> v1         .             .
-    //     \   / b
-    //       /         ==>  
-    //     /   \ c              d - ca⁻¹b
-    //  w0 -----> w1         w0 ---------> w1
-    //       d                
-    
-    fn eliminate_element(&self, e: &mut TngComplexElem<R>, i: &TngComplexKey, j: &TngComplexKey) {
-        debug_assert!(self.complex.has_edge(i, j));
-
-        // mors into i can be simply dropped.
-        e.remove_cob(i);
-
-        // mors into j must be redirected by -ca^{-1}
-        let Some(b) = e.remove_cob(j) else { return };
-
-        let (h, t) = self.complex.ht();
-        let a = self.complex.edge(i, j);
-        let ainv = a.inv().unwrap();
-        let ainv_b = b.stack(&ainv);
-
-        for k in self.complex.vertex(i).out_edges() {
-            if k == j { continue }
-
-            let c = self.complex.edge(i, k);
-            let c_ainv_b = ainv_b.stack(c).reduce(h, t);
-            let s = if let Some(d) = e.remove_cob(k) {
-                d - c_ainv_b
-            } else {
-                -c_ainv_b
-            };
-
-            if !s.is_zero() { 
-                e.insert_cob(*k, s);
-            }
-        }
     }
 
     fn finalize(&mut self) {
@@ -576,9 +520,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn eval_elements(&self) -> Vec<KhChain<R>> {
         let (h, t) = self.complex.ht();
-        self.elements.iter().map(|z|
-            z.eval(h, t)
-        ).collect()
+        self.elements.eval(h, t)
     }
 
     pub(crate) fn stat(&self) -> String {

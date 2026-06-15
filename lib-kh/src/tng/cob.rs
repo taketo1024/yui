@@ -15,9 +15,10 @@ use std::fmt::Display;
 use std::hash::{Hash, Hasher};
 use std::collections::HashSet;
 use std::ops::Mul;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
 use std::sync::atomic::{AtomicU64, Ordering};
-use rustc_hash::{FxHasher, FxHashSet};
+use rustc_hash::{FxHasher, FxBuildHasher};
+use dashmap::DashSet;
 use itertools::Itertools;
 use num_traits::Zero;
 use cartesian::cartesian; // TODO: replace with itertools::iproduct! and drop the cartesian dep
@@ -31,19 +32,23 @@ use super::tng::{Tng, TngComp};
 // Global hash-cons for `Tng`: boundary tangles are heavily duplicated across cobs, so one shared
 // `Arc` per value collapses them (interned at each `CobComp` ctor). 
 // Global for now; could become a per-`TngComplex` store later.
-fn tng_interner() -> &'static Mutex<FxHashSet<Arc<Tng>>> {
-    static TABLE: OnceLock<Mutex<FxHashSet<Arc<Tng>>>> = OnceLock::new();
-    TABLE.get_or_init(|| Mutex::new(FxHashSet::default()))
+fn tng_interner() -> &'static DashSet<Arc<Tng>, FxBuildHasher> {
+    static TABLE: OnceLock<DashSet<Arc<Tng>, FxBuildHasher>> = OnceLock::new();
+    TABLE.get_or_init(DashSet::default)
 }
 
 fn intern_tng(t: Tng) -> Arc<Tng> {
-    let mut table = tng_interner().lock().unwrap();
+    let table = tng_interner();
     if let Some(a) = table.get(&t) {
-        return Arc::clone(a);
+        return Arc::clone(&a);
     }
-    let a = Arc::new(t);
-    table.insert(Arc::clone(&a));
-    a
+    let arc = Arc::new(t);
+    // `insert` returns false if an equal `Tng` was interned by another thread first;
+    // fetch that canonical `Arc` so dedup stays exact.
+    if !table.insert(Arc::clone(&arc)) {
+        return Arc::clone(&table.get(&*arc).unwrap());
+    }
+    arc
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, derive_more::Display)]

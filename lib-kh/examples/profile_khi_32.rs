@@ -13,7 +13,7 @@ use std::time::Instant;
 
 use yui_core::num::FF2;
 use yui_link::InvLink;
-use yui_kh::tng::builder::{SymTngBuilder, SymBuildConfig, DeloopMode};
+use yui_kh::tng::builder::{SymTngBuilder, SymBuildConfig, DeloopMode, NodeStrategy};
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -45,7 +45,13 @@ fn main() {
     // SELECTIVE=1 → deloop only productive circles during build (bounds the memory balloon).
     let deloop_mode = if std::env::var("SELECTIVE").is_ok() { DeloopMode::Selective } else { DeloopMode::Greedy };
 
-    let cfg = SymBuildConfig { pair_penalty_coeff, chunk_bound, h_range: h_range.clone(), deloop_mode, ..Default::default() };
+    // STRATEGY=mincut → min-cutwidth crossing order (bounds the dense-slice memory).
+    let strategy = match std::env::var("STRATEGY").ok().as_deref() {
+        Some("mincut") | Some("min-cut") => NodeStrategy::MinCut,
+        _ => NodeStrategy::LoopGreedy,
+    };
+    let preprocess = std::env::var("PREPROCESS").map_or(true, |s| s != "0");
+    let cfg = SymBuildConfig { pair_penalty_coeff, chunk_bound, h_range: h_range.clone(), deloop_mode, strategy, preprocess, ..Default::default() };
 
     let t0 = Instant::now();
     let b = SymTngBuilder::<FF2>::from_inv_link(&l, &zero, &zero, false).with_config(cfg).run();

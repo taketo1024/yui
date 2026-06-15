@@ -1,7 +1,7 @@
 use std::ops::RangeInclusive;
 use clap::ValueEnum;
 use derive_more::Display;
-use yui_kh::tng::builder::DeloopMode;
+use yui_kh::tng::builder::{DeloopMode, NodeStrategy};
 
 pub trait AppArgs { 
     fn c_type(&self) -> CType; 
@@ -103,5 +103,14 @@ pub fn parse_deloop_mode(s: &str) -> Result<DeloopMode, String> {
         "selective" => Ok(DeloopMode::Selective),
         "none"      => Ok(DeloopMode::None),
         _ => Err(format!("invalid deloop-mode `{s}`, expected greedy|selective|none")),
+    }
+}
+
+// parse a node-order strategy: loop-greedy | min-cut.
+pub fn parse_strategy(s: &str) -> Result<NodeStrategy, String> {
+    match s.to_lowercase().as_str() {
+        "loop-greedy" | "loopgreedy" | "loop" => Ok(NodeStrategy::LoopGreedy),
+        "min-cut" | "mincut" | "min"          => Ok(NodeStrategy::MinCut),
+        _ => Err(format!("invalid strategy `{s}`, expected loop-greedy|min-cut")),
     }
 }

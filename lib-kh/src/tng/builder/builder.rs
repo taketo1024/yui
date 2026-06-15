@@ -12,7 +12,7 @@
 
 use std::ops::RangeInclusive;
 
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashSet, FxHashMap};
 use itertools::Itertools;
 use log::{debug, info, trace};
 use num_traits::Zero;
@@ -43,6 +43,14 @@ impl DeloopMode {
     }
 }
 
+/// How the next crossing to append is chosen.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum NodeStrategy {
+    #[default]
+    LoopGreedy, // maximize loop closures unlocked (good when reduction is the bottleneck)
+    MinCut,     // minimize the boundary cutwidth (bounds the dense-slice memory; needed for wide knots)
+}
+
 /// Whether invertible edges are gauss-eliminated during the build.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ElimMode {
@@ -59,6 +67,7 @@ impl ElimMode {
 /// Toggles for the automatic simplification done while building.
 #[derive(Clone, Debug)]
 pub struct BuildConfig {
+    pub strategy: NodeStrategy,
     pub deloop_mode: DeloopMode,
     pub elim_mode: ElimMode,
     pub h_range: Option<RangeInclusive<isize>>,
@@ -66,9 +75,10 @@ pub struct BuildConfig {
 
 impl Default for BuildConfig {
     fn default() -> Self {
-        Self { deloop_mode: DeloopMode::Greedy, elim_mode: ElimMode::Auto, h_range: None }
+        Self { strategy: NodeStrategy::default(), deloop_mode: DeloopMode::Greedy, elim_mode: ElimMode::Auto, h_range: None }
     }
 }
+
 
 pub struct TngComplexBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
@@ -175,33 +185,51 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    /// Pick the next node to append by maximizing [`Self::score_node`].
-    /// Removal happens in [`Self::prepare_append`] inside `append_*`.
+    /// Pick the next node: maximize `score_node`, ties broken by earliest crossing order
+    /// (`self.nodes` keeps PD order — `prepare_append` removes via order-preserving `Vec::remove`).
     pub(crate) fn choose_next_node(&self) -> Option<&Node> {
-        let boundary_ends: FxHashSet<Edge> = self.complex.boundary_ends().collect();
-        self.nodes.iter().max_by_key(|x| self.score_node(x, &boundary_ends))
+        self.nodes.iter().enumerate()
+            .min_by_key(|(i, x)| (-self.score_node(x), *i))
+            .map(|(_, x)| x)
     }
 
-    /// Score `x` for the chooser. Higher is better.
-    /// `(loop_bonus, width_score)` — loop closures first (they unlock
-    /// delooping + elimination), width as tiebreaker.
-    pub(crate) fn score_node(&self, x: &Node, boundary_ends: &FxHashSet<Edge>) -> (isize, isize) {
-        let arcs = self.node_arcs(x);
+    /// Strategy score for appending `x` (higher is better).
+    pub(crate) fn score_node(&self, x: &Node) -> isize {
+        match self.config.strategy {
+            NodeStrategy::LoopGreedy => self.loop_count(x),
+            NodeStrategy::MinCut => -self.cutwidth(x),
+        }
+    }
 
-        let loops: isize = self.complex.iter_verts().map(|(_, v)| {
+    /// Circles `x` would close across the current vertices — the deloop/elim unlock.
+    pub(crate) fn loop_count(&self, x: &Node) -> isize {
+        let arcs = self.node_arcs(x);
+        self.complex.iter_verts().map(|(_, v)| {
             v.tng().comps().map(|c|
                 arcs.iter().filter(|a| c.is_connectable_bothends(a)).count() as isize
             ).sum::<isize>()
-        }).sum();
+        }).sum()
+    }
 
-        let width_score: isize = arcs.iter().map(|a| {
-            let Some((e0, e1)) = a.end_pts() else { return 0 };
-            let m = boundary_ends.contains(&e0) as isize
-                  + boundary_ends.contains(&e1) as isize;
-            2 * m - 2 // matched − unmatched, range −2..2 per arc
-        }).sum();
+    /// Boundary cutwidth (open-edge count) after appending `x`. `boundary_ends` is cheap, so
+    /// recomputing it per call is fine.
+    pub(crate) fn cutwidth(&self, x: &Node) -> isize {
+        self.cutwidth_of(x.edges().iter().copied())
+    }
 
-        (loops, width_score)
+    /// Cutwidth after toggling an arbitrary edge multiset — for τ-pairs, where `x` and `τx`
+    /// must be scored together (a shared axis edge toggles twice and cancels).
+    pub(crate) fn cutwidth_of(&self, edges: impl IntoIterator<Item = Edge>) -> isize {
+        let boundary: FxHashSet<Edge> = self.complex.boundary_ends().collect();
+        let mut cnt: FxHashMap<Edge, u32> = FxHashMap::default();
+        for e in edges {
+            *cnt.entry(e).or_default() += 1;
+        }
+        let delta: isize = cnt.iter()
+            .filter(|(_, c)| *c % 2 == 1)
+            .map(|(e, _)| if boundary.contains(e) { -1 } else { 1 })
+            .sum();
+        boundary.len() as isize + delta
     }
 
     /// Arcs that will be added when appending `x` to the partial diagram,

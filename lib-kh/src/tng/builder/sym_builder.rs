@@ -21,13 +21,15 @@ use yui_link::{Node, Edge, InvLink};
 
 use crate::kh::{KhGen, KhTensor};
 use crate::tng::{End, LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
-use crate::tng::builder::{TngComplexBuilder, BuildConfig, DeloopMode, ElimMode};
+use crate::tng::builder::{TngComplexBuilder, BuildConfig, DeloopMode, ElimMode, NodeStrategy};
 use super::reachable_range;
 
 /// Toggles for the automatic simplification done while building (kept separate
 /// from [`BuildConfig`] so the equivariant builder can gain its own flags).
 #[derive(Clone, Debug)]
 pub struct SymBuildConfig {
+    // crossing-order strategy: LoopGreedy (default) or MinCut (bounds cutwidth for wide knots).
+    pub strategy: NodeStrategy,
     pub deloop_mode: DeloopMode,
     pub elim_mode: ElimMode,
     // build half the off-axis crossings and mirror via τ (see `preprocess`).
@@ -43,7 +45,7 @@ pub struct SymBuildConfig {
 
 impl Default for SymBuildConfig {
     fn default() -> Self {
-        Self { deloop_mode: DeloopMode::Greedy, elim_mode: ElimMode::Auto, preprocess: true, pair_penalty_coeff: 1.0, chunk_bound: None, h_range: None }
+        Self { strategy: NodeStrategy::default(), deloop_mode: DeloopMode::Greedy, elim_mode: ElimMode::Auto, preprocess: true, pair_penalty_coeff: 1.0, chunk_bound: None, h_range: None }
     }
 }
 
@@ -140,7 +142,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         // the inner builder is driven by `self` — disable its own auto-simplify.
         let inner = TngComplexBuilder::from_link(l.inner(), h, t, reduced)
-            .with_config(BuildConfig { deloop_mode: DeloopMode::None, elim_mode: ElimMode::None, h_range: None });
+            .with_config(BuildConfig { deloop_mode: DeloopMode::None, elim_mode: ElimMode::None, strategy: NodeStrategy::default(), h_range: None });
 
         let x_map = l.nodes().map(|x|
             (x.clone(), l.inv_node(x).clone())
@@ -155,7 +157,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn with_config(mut self, config: SymBuildConfig) -> Self {
         // propagate the window to the inner builder so the preprocess merges cap
         // to it; this also drops canon cycles when the window excludes h-degree 0.
-        let inner_config = BuildConfig { deloop_mode: DeloopMode::None, elim_mode: ElimMode::None, h_range: config.h_range.clone() };
+        let inner_config = BuildConfig { deloop_mode: DeloopMode::None, elim_mode: ElimMode::None, strategy: config.strategy, h_range: config.h_range.clone() };
         self.inner = self.inner.with_config(inner_config);
         self.config = config;
         self
@@ -245,7 +247,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let (h, t) = self.inner.complex().ht();
         let base_pt = self.inner.complex().base_pt();
         let mut inner = TngComplexBuilder::init(h, t, (0, 0), base_pt)
-            .with_config(BuildConfig { deloop_mode: DeloopMode::None, elim_mode: ElimMode::None, h_range: None });
+            .with_config(BuildConfig { deloop_mode: DeloopMode::None, elim_mode: ElimMode::None, strategy: self.config.strategy, h_range: None });
         inner.set_nodes(chunk.iter().cloned());
 
         // cap the child to the chunk's reachable band: a chunk vertex of weight
@@ -279,22 +281,27 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    /// Cost-aware pair chooser: maximize delooping unlocked, but handicap an off-axis
-    /// pair by its extra intermediate growth (≈ coeff·size), `width` breaks ties.
+    /// Pick the next τ-unit by strategy, ties broken by earliest crossing order. MinCut scores the
+    /// *combined* x+τx toggle (a shared axis edge cancels — can't be summed); LoopGreedy sums loops.
     fn choose_next_node_sym(&self) -> Option<&Node> {
-        let boundary_ends: FxHashSet<Edge> = self.inner.complex().boundary_ends().collect();
         let pair_penalty = (self.config.pair_penalty_coeff * self.inner.complex().n_verts() as f64) as isize;
-        self.inner.nodes()
-            .max_by_key(|x| {
+        self.inner.nodes().enumerate()
+            .min_by_key(|(i, x)| {
                 let tx = self.inv_node(x);
-                let (l_x, w_x) = self.inner.score_node(x, &boundary_ends);
-                if tx == *x {
-                    (l_x, w_x)
-                } else {
-                    let (l_tx, w_tx) = self.inner.score_node(tx, &boundary_ends);
-                    (l_x + l_tx - pair_penalty, w_x + w_tx)
-                }
+                let score = match self.config.strategy {
+                    NodeStrategy::LoopGreedy => {
+                        if tx == *x { self.inner.loop_count(x) }
+                        else { self.inner.loop_count(x) + self.inner.loop_count(tx) - pair_penalty }
+                    },
+                    NodeStrategy::MinCut => {
+                        let mut edges = x.edges().to_vec();
+                        if tx != *x { edges.extend_from_slice(tx.edges()); }
+                        -self.inner.cutwidth_of(edges)
+                    },
+                };
+                (-score, *i)
             })
+            .map(|(_, x)| x)
     }
 
     fn append_on_axis(&mut self, x: &Node) { 
@@ -919,15 +926,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn half_builder(&self) -> TngComplexBuilder<R> {
         let (h, t) = self.builder.inner.complex().ht();
         let base_pt = self.builder.inner.complex().base_pt();
-        let b = TngComplexBuilder::init(h, t, (0, 0), base_pt);
-
-        match &self.builder.config.h_range {
-            Some(h_range) => {
-                let cap = *h_range.end() - self.builder.inner.complex().deg_shift().0;
-                b.with_config(BuildConfig { h_range: Some(0 ..= cap), ..Default::default() })
-            },
-            None => b,
-        }
+        let strategy = self.builder.config.strategy;
+        let h_range = self.builder.config.h_range.as_ref().map(|w|
+            0 ..= (*w.end() - self.builder.inner.complex().deg_shift().0)
+        );
+        TngComplexBuilder::init(h, t, (0, 0), base_pt)
+            .with_config(BuildConfig { strategy, h_range, ..Default::default() })
     }
 
 

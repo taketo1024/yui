@@ -377,7 +377,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn deloop_in(&mut self, i: isize, allow_based: bool, selective: bool) {
         let mut keys = self.pick_keys_in(i, |k|
-            self.choose_loop(k, allow_based, selective).is_some()
+            self.find_loop(k, allow_based, selective).is_some()
         );
         if keys.is_empty() { return }
 
@@ -392,12 +392,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             while !list.is_empty() {
                 let k = list.remove(0);
                 if !self.complex.contains_key(&k) { continue; }
-                let Some(r) = self.choose_loop(&k, allow_based, selective) else { continue };
+                let Some(r) = self.find_loop(&k, allow_based, selective) else { continue };
 
                 let added = self.deloop(&k, r);
 
                 list.extend(added.into_iter().filter(|k|
-                    self.choose_loop(k, allow_based, selective).is_some()
+                    self.find_loop(k, allow_based, selective).is_some()
                 ));
             }
         }
@@ -425,32 +425,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         added
     }
 
-
-    pub(crate) fn find_loop(&self, k: &TngComplexKey, allow_based: bool) -> Option<usize> {
-        self.complex.vertex(k).tng().find_comp(|c|
-            c.is_circle() && (allow_based || !c.is_marked())
-        )
-    }
-
-    // A circle whose no-dot cap yields an invertible edge (deloop+elim fires, no doubling).
-    // Marked circles are skipped — they're delooped in the final full sweep.
-    fn find_productive_loop(&self, k: &TngComplexKey) -> Option<usize> {
+    // Selective mode deloops only "productive" circles — those whose no-dot cap yields an
+    // invertible edge (deloop+elim fires, no doubling); otherwise any circle.
+    pub(crate) fn find_loop(&self, k: &TngComplexKey, allow_based: bool, selective: bool) -> Option<usize> {
         let v = self.complex.vertex(k);
         v.tng().comps().enumerate()
-            .filter(|(_, c)| c.is_circle() && !c.is_marked())
-            .find(|(_, c)|
-                v.out_edges().any(|l| self.complex.edge(k, l).is_invertible_after_cap(End::Src, c))
+            .filter(|(_, c)| c.is_circle() && (allow_based || !c.is_marked()))
+            .find(|(_, c)| !selective
+             || v.out_edges().any(|l| self.complex.edge(k, l).is_invertible_after_cap(End::Src, c))
              || v.in_edges().any(|j| self.complex.edge(j, k).is_invertible_after_cap(End::Tgt, c)))
             .map(|(r, _)| r)
-    }
-
-    // Selective mode deloops only productive circles; otherwise any circle.
-    fn choose_loop(&self, k: &TngComplexKey, allow_based: bool, selective: bool) -> Option<usize> {
-        if selective {
-            self.find_productive_loop(k)
-        } else {
-            self.find_loop(k, allow_based)
-        }
     }
 
     /// Keys at degree `i` matching `pred`, sorted ascending by the vertex's

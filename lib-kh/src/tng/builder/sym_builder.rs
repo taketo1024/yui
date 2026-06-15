@@ -466,7 +466,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         if selective {
             self.find_productive_loop(k)
         } else {
-            self.inner.find_loop(k, allow_based)
+            self.inner.find_loop(k, allow_based, false)
         }
     }
 

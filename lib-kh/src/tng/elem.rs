@@ -89,14 +89,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 circles.iter().map(|(circ, col)| {
                     let marked = base_pt.map(|b| circ.contains(b)).unwrap_or(false);
                     let t = TngComp::from_path(circ.clone(), marked);
-                    let mut cup = CobComp::cup(t);
-                    let dot = if col.is_a() == o { 
-                        Dot::X 
-                    } else { 
-                        Dot::Y 
-                    };
-                    cup.add_dot(dot);
-                    cup
+                    let dot = if col.is_a() == o { Dot::X } else { Dot::Y };
+                    CobComp::cup(t).add_dot(dot)
                 })
             );
             TngComplexElem::new(state_map.clone(), cob, base_pt)

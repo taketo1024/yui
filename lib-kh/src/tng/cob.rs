@@ -176,17 +176,6 @@ impl CobComp {
         }
     }
 
-    // COW: the boundary tangle is interned/shared, so clone it out, apply `f`, then re-intern.
-    fn modify_end(&mut self, b: End, f: impl FnOnce(&mut Tng)) {
-        let slot = match b {
-            End::Src => &mut self.src,
-            End::Tgt => &mut self.tgt
-        };
-        let mut t = (**slot).clone();
-        f(&mut t);
-        *slot = intern_tng(t);
-    }
-
     pub fn is_plain(&self) -> bool {
         self.dots == (0, 0)
     }
@@ -282,18 +271,29 @@ impl CobComp {
         x - (b / 2) - 2 * d
     }
 
-    pub fn add_dot(&mut self, dot: Dot) { 
-        match dot { 
-            Dot::X => self.dots.0 += 1,
-            Dot::Y => self.dots.1 += 1,
-            _      => ()
+    // Shortcut for adding a single dot.
+    pub fn add_dot(self, dot: Dot) -> Self {
+        let (x, y) = self.dots;
+        match dot {
+            Dot::X => self.with_dots(x + 1, y),
+            Dot::Y => self.with_dots(x, y + 1),
+            Dot::None => self,
         }
     }
 
-    pub fn cap_off(&mut self, b: End, i: usize) {
+    pub fn cap_off(&self, b: End, i: usize) -> Self {
         debug_assert!(self.end(b).comp(i).is_circle());
-        self.modify_end(b, |t| { t.remove_at(i); });
-        self.nb -= 1;
+        // interned tangles are shared — build the capped end as a fresh interned `Tng`.
+        let capped = |t: &Arc<Tng>| {
+            let mut t = (**t).clone();
+            t.remove_at(i);
+            intern_tng(t)
+        };
+        let (src, tgt) = match b {
+            End::Src => (capped(&self.src), self.tgt.clone()),
+            End::Tgt => (self.src.clone(), capped(&self.tgt)),
+        };
+        Self { src, tgt, genus: self.genus, dots: self.dots, nb: self.nb - 1 }
     }
 
     // connect = horizontal composition
@@ -309,9 +309,9 @@ impl CobComp {
         )
     }
     
-    /// In-place horizontal composition: merge `other` into `self` along the
-    /// shared arc boundary. Genus recomputed via the Euler formula.
-    pub fn connect_mut(&mut self, other: &Self) {
+    /// Horizontal composition: merge `other` into `self` along the shared arc
+    /// boundary, returning a new component. Genus recomputed via the Euler formula.
+    pub fn connect(&self, other: &Self) -> Self {
         debug_assert!(self.is_connectable(other));
 
         let x1 = self.euler_num();
@@ -321,18 +321,22 @@ impl CobComp {
         ).count() as i32;
         assert!(a > 0);
 
-        self.modify_end(End::Src, |t| t.connect_mut(&other.src));
-        self.modify_end(End::Tgt, |t| t.connect_mut(&other.tgt));
-        self.nb = Self::count_boundaries(&self.src, &self.tgt);
+        let join = |t: &Arc<Tng>, u: &Arc<Tng>| {
+            let mut t = (**t).clone();
+            t.connect_mut(u);
+            intern_tng(t)
+        };
+        let src = join(&self.src, &other.src);
+        let tgt = join(&self.tgt, &other.tgt);
+        let nb = Self::count_boundaries(&src, &tgt);
+        let dots = (self.dots.0 + other.dots.0, self.dots.1 + other.dots.1);
 
-        let b = self.nb as i32;
+        let b = nb as i32;
         let g = 2 - (x1 + x2 + b) + a;
         assert!(g >= 0);
         assert!(g % 2 == 0);
 
-        self.genus = (g / 2) as usize;
-        self.dots.0 += other.dots.0;
-        self.dots.1 += other.dots.1;
+        Self { src, tgt, nb, dots, genus: (g / 2) as usize }
     }
 
     // stack = vertical composition
@@ -638,12 +642,11 @@ impl Cob {
             panic!("{c} not found in {} ({b})", self)
         };
 
-        let comp = self.comp_mut(i);
-        comp.cap_off(b, p);
-        comp.add_dot(x);
-
-        if comp.is_removable() {
+        let new = self.comp(i).cap_off(b, p).add_dot(x);
+        if new.is_removable() {
             self.comps_mut().remove(i);
+        } else {
+            *self.comp_mut(i) = new;
         }
 
         self.normalize();
@@ -702,7 +705,7 @@ impl Cob {
                 }
             }
 
-            acc.connect_mut(cob);
+            acc = acc.connect(cob);
         }
 
         Some(acc)
@@ -1182,9 +1185,10 @@ mod tests {
         assert!(!c1.is_invertible());
         assert_eq!(c1.inv(), None);
 
-        let c2 = c0.clone_and(|c2|
-            c2.comp_mut(0).add_dot(Dot::X)
-        );
+        let c2 = c0.clone_and(|c2| {
+            let dotted = c2.comp(0).clone().add_dot(Dot::X);
+            *c2.comp_mut(0) = dotted;
+        });
 
         assert!(!c2.is_invertible());
         assert_eq!(c2.inv(), None);
@@ -1445,12 +1449,8 @@ mod tests {
 
     #[test]
     fn reduce() { 
-        let mut c0 = CobComp::id(TngComp::circ([1]));
-        c0.add_dot(Dot::X);
-
-        let mut c1 = CobComp::id(TngComp::circ([1]));
-        c1.add_dot(Dot::X);
-        c1.add_dot(Dot::X);
+        let c0 = CobComp::id(TngComp::circ([1])).add_dot(Dot::X);
+        let c1 = CobComp::id(TngComp::circ([1])).add_dot(Dot::X).add_dot(Dot::X);
 
         let c = LcCob::from_iter(hashmap! { 
             Cob::from(c0) => -2,

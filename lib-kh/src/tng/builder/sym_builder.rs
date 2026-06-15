@@ -124,23 +124,6 @@ impl TauKeyMap {
     }
 }
 
-// Flip `edges` in the open-boundary set: each edge appears twice across crossings, so toggling
-// closes an already-open edge and opens a fresh one.
-fn toggle(open: &mut FxHashSet<Edge>, edges: &[Edge]) {
-    for &e in edges {
-        if !open.insert(e) { open.remove(&e); }
-    }
-}
-
-// First cutwidth valley past the peak in a `(chunk_len, width)` profile → the chunk length to cut
-// at. None for a monotone-decreasing profile (a closing / last chunk) — caller takes it whole.
-fn cut_at_valley(cuts: &[(usize, usize)]) -> Option<usize> {
-    let peak = cuts.iter().enumerate().max_by_key(|(_, (_, w))| *w)?.0;
-    cuts[peak..].iter().tuple_windows()
-        .find(|((_, w0), (_, w1))| w0 <= w1)
-        .map(|((len, _), _)| *len)
-}
-
 pub struct SymTngBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     inner: TngComplexBuilder<R>,
@@ -791,7 +774,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         if self.builder.inner.nodes().next().is_none() { return None }
         let bound = self.builder.config.chunk_bound.unwrap_or(usize::MAX);
         let (chunk, cuts) = self.grow_chunk(bound);
-        let cut = cut_at_valley(&cuts).unwrap_or(chunk.len());
+        let cut = Self::cut_at_valley(&cuts).unwrap_or(chunk.len());
         Some(chunk[..cut].to_vec())
     }
 
@@ -813,7 +796,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             if tx == x { on_taken += 1; }
             for n in [&x, &tx] {
                 if !chunk.contains(n) {
-                    toggle(&mut open, n.edges());
+                    Self::toggle(&mut open, n.edges());
                     chunk.push(n.clone());
                 }
             }
@@ -839,8 +822,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn unit_cutwidth(&self, x: &Node, open: &FxHashSet<Edge>) -> usize {
         let tx = self.builder.inv_node(x);
         let mut s = open.clone();
-        toggle(&mut s, x.edges());
-        if tx != x { toggle(&mut s, tx.edges()); }
+        Self::toggle(&mut s, x.edges());
+        if tx != x { Self::toggle(&mut s, tx.edges()); }
         s.len()
     }
 
@@ -871,6 +854,23 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let key_map = TauKeyMap::init();
         let real_top = inner.complex().deg_shift().0 + chunk.len() as isize; // child deg_shift = 0
         SymTngBuilder { inner, x_map: self.builder.x_map.clone(), e_map: self.builder.e_map.clone(), key_map, config, real_top }
+    }
+
+    // Flip `edges` in the open-boundary set: each edge appears twice across crossings, so toggling
+    // closes an already-open edge and opens a fresh one.
+    fn toggle(open: &mut FxHashSet<Edge>, edges: &[Edge]) {
+        for &e in edges {
+            if !open.insert(e) { open.remove(&e); }
+        }
+    }
+
+    // First cutwidth valley past the peak in a `(chunk_len, width)` profile → the chunk length to cut
+    // at. None for a monotone-decreasing profile (a closing / last chunk) — caller takes it whole.
+    fn cut_at_valley(cuts: &[(usize, usize)]) -> Option<usize> {
+        let peak = cuts.iter().enumerate().max_by_key(|(_, (_, w))| *w)?.0;
+        cuts[peak..].iter().tuple_windows()
+            .find(|((_, w0), (_, w1))| w0 <= w1)
+            .map(|((len, _), _)| *len)
     }
 }
 

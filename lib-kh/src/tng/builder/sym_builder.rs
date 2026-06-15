@@ -124,6 +124,23 @@ impl TauKeyMap {
     }
 }
 
+// Flip `edges` in the open-boundary set: each edge appears twice across crossings, so toggling
+// closes an already-open edge and opens a fresh one.
+fn toggle(open: &mut FxHashSet<Edge>, edges: &[Edge]) {
+    for &e in edges {
+        if !open.insert(e) { open.remove(&e); }
+    }
+}
+
+// First cutwidth valley past the peak in a `(chunk_len, width)` profile → the chunk length to cut
+// at. None for a monotone-decreasing profile (a closing / last chunk) — caller takes it whole.
+fn cut_at_valley(cuts: &[(usize, usize)]) -> Option<usize> {
+    let peak = cuts.iter().enumerate().max_by_key(|(_, (_, w))| *w)?.0;
+    cuts[peak..].iter().tuple_windows()
+        .find(|((_, w0), (_, w1))| w0 <= w1)
+        .map(|((len, _), _)| *len)
+}
+
 pub struct SymTngBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     inner: TngComplexBuilder<R>,
@@ -192,45 +209,67 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    // Next ≤ `chunk_bound` crossings, grown from the parent's boundary by shared edges,
-    // τ-closed (whole `(x, τx)` pairs), with each chunk's proportional share of on-axis
-    // crossings — an off-axis-heavy chunk's `half ⊗ τ-half` preprocess product explodes.
+    fn is_on_axis(&self, x: &Node) -> bool {
+        self.inv_node(x) == x
+    }
+
+    // Next chunk: grow a τ-closed, boundary-connected piece (≤ `chunk_bound`), then cut it at the
+    // first cutwidth valley past the peak — isolating the heavy region for a thin merge interface.
     fn next_chunk(&self) -> Option<Vec<Node>> {
+        if self.inner.nodes().next().is_none() { return None }
         let bound = self.config.chunk_bound.unwrap_or(usize::MAX);
+        let (chunk, cuts) = self.grow_chunk(bound);
+        let cut = cut_at_valley(&cuts).unwrap_or(chunk.len());
+        Some(chunk[..cut].to_vec())
+    }
+
+    // Grow a τ-closed chunk ≤ `bound` with its proportional on-axis share (off-axis-heavy chunks
+    // explode in preprocess). `open` is the connectivity frontier *and* the merge-cutwidth tracker.
+    fn grow_chunk(&self, bound: usize) -> (Vec<Node>, Vec<(usize, usize)>) {
         let remaining = self.inner.nodes().cloned().collect_vec();
-        if remaining.is_empty() { return None }
+        let n_on = remaining.iter().filter(|x| self.is_on_axis(x)).count();
+        let target_on = if bound >= remaining.len() { n_on } else { (bound * n_on).div_ceil(remaining.len()) };
 
-        let n_on_axis = remaining.iter().filter(|&x| self.inv_node(x) == x).count();
-        let target_on = if bound >= remaining.len() {
-            n_on_axis
-        } else {
-            (bound * n_on_axis).div_ceil(remaining.len())
-        };
-
-        let mut frontier: FxHashSet<Edge> = self.inner.complex().boundary_ends().collect();
+        let mut open: FxHashSet<Edge> = self.inner.complex().boundary_ends().collect();
         let mut chunk: Vec<Node> = vec![];
+        let mut cuts: Vec<(usize, usize)> = vec![];
         let mut on_taken = 0;
 
         while chunk.len() < bound {
-            let prefer_on = on_taken < target_on;
-            let at_frontier = |x: &Node| !chunk.contains(x) && x.edges().iter().any(|e| frontier.contains(e));
-            // prefer on/off-axis at the frontier to hit `target_on`, then any frontier node, then seed.
-            let pick = remaining.iter().find(|&x| at_frontier(x) && (self.inv_node(x) == x) == prefer_on)
-                .or_else(|| remaining.iter().find(|&x| at_frontier(x)))
-                .or_else(|| remaining.iter().find(|&x| !chunk.contains(x)))
-                .cloned();
-            let Some(x) = pick else { break };
-
+            let Some(x) = self.pick_next(&remaining, &chunk, &open, on_taken < target_on) else { break };
             let tx = self.inv_node(&x).clone();
             if tx == x { on_taken += 1; }
             for n in [&x, &tx] {
                 if !chunk.contains(n) {
-                    frontier.extend(n.edges().iter().copied());
+                    toggle(&mut open, n.edges());
                     chunk.push(n.clone());
                 }
             }
+            cuts.push((chunk.len(), open.len()));
         }
-        (!chunk.is_empty()).then_some(chunk)
+        (chunk, cuts)
+    }
+
+    // The next crossing to absorb: boundary-connected and honoring the on-axis target, chosen by
+    // strategy (MinCut → smallest resulting cutwidth; LoopGreedy → first in crossing order).
+    fn pick_next(&self, remaining: &[Node], chunk: &[Node], open: &FxHashSet<Edge>, prefer_on: bool) -> Option<Node> {
+        let connected = |x: &&Node| !chunk.contains(*x) && x.edges().iter().any(|e| open.contains(e));
+        let pick = |pool: Vec<&Node>| match self.config.strategy {
+            NodeStrategy::MinCut => pool.into_iter().min_by_key(|x| self.unit_cutwidth(x, open)).cloned(),
+            NodeStrategy::LoopGreedy => pool.into_iter().next().cloned(),
+        };
+        pick(remaining.iter().filter(|x| connected(x) && self.is_on_axis(x) == prefer_on).collect())
+            .or_else(|| pick(remaining.iter().filter(connected).collect()))
+            .or_else(|| remaining.iter().find(|x| !chunk.contains(x)).cloned()) // seed when disconnected
+    }
+
+    // Merge cutwidth after absorbing the τ-unit of `x` (x and τx) into the simulated `open` set.
+    fn unit_cutwidth(&self, x: &Node, open: &FxHashSet<Edge>) -> usize {
+        let tx = self.inv_node(x);
+        let mut s = open.clone();
+        toggle(&mut s, x.edges());
+        if tx != x { toggle(&mut s, tx.edges()); }
+        s.len()
     }
 
     // Build `chunk` into a reduced sub-complex via a child builder sharing the parent's

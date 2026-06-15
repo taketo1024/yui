@@ -15,6 +15,7 @@ use std::fmt::Display;
 use std::hash::{Hash, Hasher};
 use std::collections::HashSet;
 use std::ops::Mul;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use rustc_hash::FxHasher;
 use itertools::Itertools;
@@ -25,7 +26,7 @@ use yui_core::{AddMon, MathType, Ring, RingOps};
 use yui_core::lc::{LcKey, Lc};
 use yui_core::poly::Var2;
 use yui_link::Edge;
-use super::tng::{Tng, TngComp};
+use super::tng::{Tng, TngComp, intern_tng};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, derive_more::Display)]
 pub enum Dot { 
@@ -39,8 +40,8 @@ pub enum End {
 
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub struct CobComp {
-    src: Tng,
-    tgt: Tng,
+    src: Arc<Tng>, // interned — the same boundary tangle is shared across many cobs
+    tgt: Arc<Tng>,
     genus: usize,
     dots: (usize, usize), // nums of X and Y dots resp.
     nb: usize,            // #∂-components — derived from (src, tgt)
@@ -55,7 +56,7 @@ impl CobComp {
     fn new_with_nb(src: Tng, tgt: Tng, genus: usize, dots: (usize, usize), nb: usize) -> Self {
         debug_assert_eq!(src.end_pts().collect::<HashSet<_>>(), tgt.end_pts().collect());
         debug_assert_eq!(nb, Self::count_boundaries(&src, &tgt));
-        Self { src, tgt, genus, dots, nb }
+        Self { src: intern_tng(src), tgt: intern_tng(tgt), genus, dots, nb }
     }
 
     fn count_boundaries(src: &Tng, tgt: &Tng) -> usize {
@@ -175,11 +176,15 @@ impl CobComp {
         }
     }
 
-    pub fn end_mut(&mut self, b: End) -> &mut Tng {
-        match b {
+    // COW: the boundary tangle is interned/shared, so clone it out, apply `f`, then re-intern.
+    fn modify_end(&mut self, b: End, f: impl FnOnce(&mut Tng)) {
+        let slot = match b {
             End::Src => &mut self.src,
             End::Tgt => &mut self.tgt
-        }
+        };
+        let mut t = (**slot).clone();
+        f(&mut t);
+        *slot = intern_tng(t);
     }
 
     pub fn is_plain(&self) -> bool {
@@ -254,8 +259,8 @@ impl CobComp {
     pub fn inv(&self) -> Option<Self> { 
         if self.is_invertible() { 
             let inv = Self::plain(
-                self.tgt.clone(),
-                self.src.clone(),
+                (*self.tgt).clone(),
+                (*self.src).clone(),
             );
             Some(inv)
         } else {
@@ -287,7 +292,7 @@ impl CobComp {
 
     pub fn cap_off(&mut self, b: End, i: usize) {
         debug_assert!(self.end(b).comp(i).is_circle());
-        self.end_mut(b).remove_at(i);
+        self.modify_end(b, |t| { t.remove_at(i); });
         self.nb -= 1;
     }
 
@@ -316,8 +321,8 @@ impl CobComp {
         ).count() as i32;
         assert!(a > 0);
 
-        self.src.connect_mut(&other.src);
-        self.tgt.connect_mut(&other.tgt);
+        self.modify_end(End::Src, |t| t.connect_mut(&other.src));
+        self.modify_end(End::Tgt, |t| t.connect_mut(&other.tgt));
         self.nb = Self::count_boundaries(&self.src, &self.tgt);
 
         let b = self.nb as i32;
@@ -344,8 +349,8 @@ impl CobComp {
         let a = self.tgt.comps()
             .filter(|c| c.is_arc())
             .count() as i32;
-        let src = self.src.clone();
-        let tgt = other.tgt.clone();
+        let src = (*self.src).clone();
+        let tgt = (*other.tgt).clone();
         let dots = (self.dots.0 + other.dots.0, self.dots.1 + other.dots.1);
         let x = self.euler_num() + other.euler_num();
         let b = Self::count_boundaries(&src, &tgt) as i32;
@@ -403,8 +408,8 @@ impl CobComp {
                 // default
                 _ => {
                     let new = CobComp::new_with_nb(
-                        c.src.clone(),
-                        c.tgt.clone(),
+                        (*c.src).clone(),
+                        (*c.tgt).clone(),
                         g,
                         (x, y),
                         c.nb,

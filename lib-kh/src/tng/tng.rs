@@ -1,6 +1,8 @@
 use std::fmt::Display;
 use std::hash::Hash;
+use std::sync::{Arc, Mutex, OnceLock};
 use itertools::Itertools;
+use rustc_hash::FxHashSet;
 use yui_core::bitmap::BitMap;
 use yui_core::CloneAnd;
 use yui_link::{Edge, Node, Path};
@@ -320,6 +322,23 @@ impl From<TngComp> for Tng {
     fn from(c: TngComp) -> Self {
         Self::new(vec![c])
     }
+}
+
+// Global hash-cons for `Tng`: the same boundary tangle repeats ~180× across a dense slice (profiled),
+// so one shared `Arc` per distinct value collapses it. Strong refs, no GC — a build's distinct set is small.
+fn tng_interner() -> &'static Mutex<FxHashSet<Arc<Tng>>> {
+    static TABLE: OnceLock<Mutex<FxHashSet<Arc<Tng>>>> = OnceLock::new();
+    TABLE.get_or_init(|| Mutex::new(FxHashSet::default()))
+}
+
+pub(crate) fn intern_tng(t: Tng) -> Arc<Tng> {
+    let mut table = tng_interner().lock().unwrap();
+    if let Some(a) = table.get(&t) {
+        return Arc::clone(a);
+    }
+    let a = Arc::new(t);
+    table.insert(Arc::clone(&a));
+    a
 }
 
 #[cfg(test)]

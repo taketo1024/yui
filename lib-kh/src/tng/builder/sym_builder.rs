@@ -362,6 +362,61 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         debug!("  key_map built: {}", self.key_map.len());
         debug!("  merged: {} + {} -> {}", left.stat(), right.stat(), self.inner.stat());
+
+        if std::env::var("COB_STATS").is_ok() && self.inner.complex().n_verts() > 20000 {
+            self.log_cob_stats();
+        }
+    }
+
+    // One-off memory probe: walk all edge cobs, tabulate single-component fraction (→ SmallVec win)
+    // and Tng/Cob duplication (→ interning win), plus a rough live-bytes estimate.
+    fn log_cob_stats(&self) {
+        use std::collections::HashSet;
+        use std::mem::size_of;
+        use crate::tng::{Cob, Tng, TngComp, cob::CobComp};
+
+        let c = self.inner.complex();
+        let (mut n_cob, mut cob_single, mut n_cobcomp) = (0usize, 0usize, 0usize);
+        let (mut n_tng, mut tng_single, mut tng_comp_sum) = (0usize, 0usize, 0usize);
+        let mut distinct_tng: HashSet<&Tng> = HashSet::new();
+        let mut distinct_cob: HashSet<&Cob> = HashSet::new();
+
+        for (k, v) in c.iter_verts() {
+            for l in v.out_edges() {
+                for (cob, _) in c.edge(k, l).iter() {
+                    n_cob += 1;
+                    distinct_cob.insert(cob);
+                    let nc = cob.comps().count();
+                    if nc == 1 { cob_single += 1; }
+                    n_cobcomp += nc;
+                    for cc in cob.comps() {
+                        for tng in [cc.src(), cc.tgt()] {
+                            n_tng += 1;
+                            distinct_tng.insert(tng);
+                            let tl = tng.comps().count();
+                            tng_comp_sum += tl;
+                            if tl == 1 { tng_single += 1; }
+                        }
+                    }
+                }
+            }
+        }
+
+        let pct = |a: usize, b: usize| 100.0 * a as f64 / b.max(1) as f64;
+        let ratio = |a: usize, b: usize| a as f64 / b.max(1) as f64;
+        // live bytes of the Tng data alone (the dedup target): each instance = Vec header + comps.
+        let tng_bytes = n_tng * size_of::<Vec<TngComp>>() + tng_comp_sum * size_of::<TngComp>();
+        let tng_dedup_bytes = distinct_tng.len() * size_of::<Vec<TngComp>>()
+            + (tng_comp_sum / n_tng.max(1)) * distinct_tng.len() * size_of::<TngComp>();
+
+        info!("cob stats @ {} verts (sizeof Cob={}, CobComp={}, Tng={}, TngComp={}):",
+            c.n_verts(), size_of::<Cob>(), size_of::<CobComp>(), size_of::<Tng>(), size_of::<TngComp>());
+        info!("  Cob terms={n_cob}, single-comp={:.1}%, avg comps={:.2}", pct(cob_single, n_cob), ratio(n_cobcomp, n_cob));
+        info!("  Tng instances={n_tng}, single-comp={:.1}%, avg comps={:.2}", pct(tng_single, n_tng), ratio(tng_comp_sum, n_tng));
+        info!("  DEDUP: distinct Tng={}/{} ({:.1}x), distinct Cob={}/{} ({:.1}x)",
+            distinct_tng.len(), n_tng, ratio(n_tng, distinct_tng.len()), distinct_cob.len(), n_cob, ratio(n_cob, distinct_cob.len()));
+        info!("  Tng live≈{:.0}MB → interned≈{:.0}MB (save {:.0}MB)",
+            tng_bytes as f64/1e6, tng_dedup_bytes as f64/1e6, (tng_bytes - tng_dedup_bytes) as f64/1e6);
     }
 
     // Degree-i slice of the merged τ key-map: k1+k2 ↦ τk1+τk2 (τ preserves degree,

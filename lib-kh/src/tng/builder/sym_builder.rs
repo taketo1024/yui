@@ -193,15 +193,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self
     }
 
-    // Divide-and-conquer: build each bounded chunk via a child builder, then merge the
-    // reduced chunk into the parent (so the parent never materializes the full dense slice).
+    // Divide-and-conquer: `ChunkBuilder` selects + builds each reduced chunk, then merge it into
+    // the parent (so the parent never materializes the full dense slice).
     fn process_chunks(&mut self) {
         // canon cycles aren't yet tracked through chunk merges (see `merge`'s TODO), so
         // drop them — a chunked build yields the complex/homology but not α / ssi.
         self.inner.set_elements(vec![]);
-        while let Some(chunk) = self.next_chunk() {
+        while let Some(chunk) = ChunkBuilder::new(self).next_chunk() {
             info!("process chunk ({}): {}", chunk.len(), chunk.iter().join(", "));
-            let (c, key_map) = self.build_chunk(&chunk);
+            let (c, key_map) = ChunkBuilder::new(self).build_chunk(&chunk);
             debug!("  chunk built: {}", c.stat());
             self.inner.drop_nodes(|x| chunk.contains(x));
             self.merge(c, key_map);
@@ -209,97 +209,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    fn is_on_axis(&self, x: &Node) -> bool {
-        self.inv_node(x) == x
-    }
-
-    // Next chunk: grow a τ-closed, boundary-connected piece (≤ `chunk_bound`), then cut it at the
-    // first cutwidth valley past the peak — isolating the heavy region for a thin merge interface.
-    fn next_chunk(&self) -> Option<Vec<Node>> {
-        if self.inner.nodes().next().is_none() { return None }
-        let bound = self.config.chunk_bound.unwrap_or(usize::MAX);
-        let (chunk, cuts) = self.grow_chunk(bound);
-        let cut = cut_at_valley(&cuts).unwrap_or(chunk.len());
-        Some(chunk[..cut].to_vec())
-    }
-
-    // Grow a τ-closed chunk ≤ `bound` with its proportional on-axis share (off-axis-heavy chunks
-    // explode in preprocess). `open` is the connectivity frontier *and* the merge-cutwidth tracker.
-    fn grow_chunk(&self, bound: usize) -> (Vec<Node>, Vec<(usize, usize)>) {
-        let remaining = self.inner.nodes().cloned().collect_vec();
-        let n_on = remaining.iter().filter(|x| self.is_on_axis(x)).count();
-        let target_on = if bound >= remaining.len() { n_on } else { (bound * n_on).div_ceil(remaining.len()) };
-
-        let mut open: FxHashSet<Edge> = self.inner.complex().boundary_ends().collect();
-        let mut chunk: Vec<Node> = vec![];
-        let mut cuts: Vec<(usize, usize)> = vec![];
-        let mut on_taken = 0;
-
-        while chunk.len() < bound {
-            let Some(x) = self.pick_next(&remaining, &chunk, &open, on_taken < target_on) else { break };
-            let tx = self.inv_node(&x).clone();
-            if tx == x { on_taken += 1; }
-            for n in [&x, &tx] {
-                if !chunk.contains(n) {
-                    toggle(&mut open, n.edges());
-                    chunk.push(n.clone());
-                }
-            }
-            cuts.push((chunk.len(), open.len()));
-        }
-        (chunk, cuts)
-    }
-
-    // The next crossing to absorb: boundary-connected and honoring the on-axis target, chosen by
-    // strategy (MinCut → smallest resulting cutwidth; LoopGreedy → first in crossing order).
-    fn pick_next(&self, remaining: &[Node], chunk: &[Node], open: &FxHashSet<Edge>, prefer_on: bool) -> Option<Node> {
-        let connected = |x: &&Node| !chunk.contains(*x) && x.edges().iter().any(|e| open.contains(e));
-        let pick = |pool: Vec<&Node>| match self.config.strategy {
-            NodeStrategy::MinCut => pool.into_iter().min_by_key(|x| self.unit_cutwidth(x, open)).cloned(),
-            NodeStrategy::LoopGreedy => pool.into_iter().next().cloned(),
-        };
-        pick(remaining.iter().filter(|x| connected(x) && self.is_on_axis(x) == prefer_on).collect())
-            .or_else(|| pick(remaining.iter().filter(connected).collect()))
-            .or_else(|| remaining.iter().find(|x| !chunk.contains(x)).cloned()) // seed when disconnected
-    }
-
-    // Merge cutwidth after absorbing the τ-unit of `x` (x and τx) into the simulated `open` set.
-    fn unit_cutwidth(&self, x: &Node, open: &FxHashSet<Edge>) -> usize {
-        let tx = self.inv_node(x);
-        let mut s = open.clone();
-        toggle(&mut s, x.edges());
-        if tx != x { toggle(&mut s, tx.edges()); }
-        s.len()
-    }
-
-    // Build `chunk` into a reduced sub-complex via a child builder sharing the parent's
-    // τ-maps; return the complex and its τ key_map for the parent merge.
-    fn build_chunk(&self, chunk: &[Node]) -> (TngComplex<R>, TauKeyMap) {
-        let child = self.child_builder(chunk).run();
-        let SymTngBuilder { key_map, inner, .. } = child;
-        (inner.into_tng_complex(), key_map)
-    }
-
-    // A child builder over `chunk` (a sub-tangle), inheriting the parent's τ-maps and
-    // `preprocess`/simplify settings; `chunk_bound = None` so it doesn't recurse.
-    fn child_builder(&self, chunk: &[Node]) -> Self {
-        let (h, t) = self.inner.complex().ht();
-        let base_pt = self.inner.complex().base_pt();
-        let mut inner = TngComplexBuilder::init(h, t, (0, 0), base_pt)
-            .with_config(BuildConfig { deloop_mode: DeloopMode::None, elim_mode: ElimMode::None, strategy: self.config.strategy, h_range: None });
-        inner.set_nodes(chunk.iter().cloned());
-
-        // cap the child to the chunk's reachable band: a chunk vertex of weight
-        // > b - deg_shift.0 can never reach the window (weight only grows).
-        let h_range = self.config.h_range.as_ref().map(|r| {
-            let s = self.inner.complex().deg_shift().0;
-            0 ..= (*r.end() - s).max(0)
-        });
-        let config = SymBuildConfig { chunk_bound: None, h_range, ..self.config.clone() };
-        let key_map = TauKeyMap::init();
-        let real_top = inner.complex().deg_shift().0 + chunk.len() as isize; // child deg_shift = 0
-        SymTngBuilder { inner, x_map: self.x_map.clone(), e_map: self.e_map.clone(), key_map, config, real_top }
-    }
 
     fn preprocess(&mut self) {
         SymTngPreprocessor::run(self);
@@ -853,6 +762,113 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         println!();
     }
 
+}
+
+/// Divide-and-conquer chunked build for a [`SymTngBuilder`]: select τ-closed chunks at thin
+/// cutwidth boundaries, build each via a child builder, and merge the reduced chunk into the
+/// parent — so the parent never materializes the full dense slice.
+struct ChunkBuilder<'a, R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    builder: &'a SymTngBuilder<R>,
+}
+
+impl<'a, R> ChunkBuilder<'a, R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn new(builder: &'a SymTngBuilder<R>) -> Self {
+        Self { builder }
+    }
+
+    fn is_on_axis(&self, x: &Node) -> bool {
+        self.builder.inv_node(x) == x
+    }
+
+    // Next chunk: grow a τ-closed, boundary-connected piece (≤ `chunk_bound`), then cut it at the
+    // first cutwidth valley past the peak — isolating the heavy region for a thin merge interface.
+    fn next_chunk(&self) -> Option<Vec<Node>> {
+        if self.builder.inner.nodes().next().is_none() { return None }
+        let bound = self.builder.config.chunk_bound.unwrap_or(usize::MAX);
+        let (chunk, cuts) = self.grow_chunk(bound);
+        let cut = cut_at_valley(&cuts).unwrap_or(chunk.len());
+        Some(chunk[..cut].to_vec())
+    }
+
+    // Grow a τ-closed chunk ≤ `bound` with its proportional on-axis share (off-axis-heavy chunks
+    // explode in preprocess). `open` is the connectivity frontier *and* the merge-cutwidth tracker.
+    fn grow_chunk(&self, bound: usize) -> (Vec<Node>, Vec<(usize, usize)>) {
+        let remaining = self.builder.inner.nodes().cloned().collect_vec();
+        let n_on = remaining.iter().filter(|x| self.is_on_axis(x)).count();
+        let target_on = if bound >= remaining.len() { n_on } else { (bound * n_on).div_ceil(remaining.len()) };
+
+        let mut open: FxHashSet<Edge> = self.builder.inner.complex().boundary_ends().collect();
+        let mut chunk: Vec<Node> = vec![];
+        let mut cuts: Vec<(usize, usize)> = vec![];
+        let mut on_taken = 0;
+
+        while chunk.len() < bound {
+            let Some(x) = self.pick_next(&remaining, &chunk, &open, on_taken < target_on) else { break };
+            let tx = self.builder.inv_node(&x).clone();
+            if tx == x { on_taken += 1; }
+            for n in [&x, &tx] {
+                if !chunk.contains(n) {
+                    toggle(&mut open, n.edges());
+                    chunk.push(n.clone());
+                }
+            }
+            cuts.push((chunk.len(), open.len()));
+        }
+        (chunk, cuts)
+    }
+
+    // The next crossing to absorb: boundary-connected and honoring the on-axis target, chosen by
+    // strategy (MinCut → smallest resulting cutwidth; LoopGreedy → first in crossing order).
+    fn pick_next(&self, remaining: &[Node], chunk: &[Node], open: &FxHashSet<Edge>, prefer_on: bool) -> Option<Node> {
+        let connected = |x: &&Node| !chunk.contains(*x) && x.edges().iter().any(|e| open.contains(e));
+        let pick = |pool: Vec<&Node>| match self.builder.config.strategy {
+            NodeStrategy::MinCut => pool.into_iter().min_by_key(|x| self.unit_cutwidth(x, open)).cloned(),
+            NodeStrategy::LoopGreedy => pool.into_iter().next().cloned(),
+        };
+        pick(remaining.iter().filter(|x| connected(x) && self.is_on_axis(x) == prefer_on).collect())
+            .or_else(|| pick(remaining.iter().filter(connected).collect()))
+            .or_else(|| remaining.iter().find(|x| !chunk.contains(x)).cloned()) // seed when disconnected
+    }
+
+    // Merge cutwidth after absorbing the τ-unit of `x` (x and τx) into the simulated `open` set.
+    fn unit_cutwidth(&self, x: &Node, open: &FxHashSet<Edge>) -> usize {
+        let tx = self.builder.inv_node(x);
+        let mut s = open.clone();
+        toggle(&mut s, x.edges());
+        if tx != x { toggle(&mut s, tx.edges()); }
+        s.len()
+    }
+
+    // Build `chunk` into a reduced sub-complex via a child builder sharing the parent's
+    // τ-maps; return the complex and its τ key_map for the parent merge.
+    fn build_chunk(&self, chunk: &[Node]) -> (TngComplex<R>, TauKeyMap) {
+        let child = self.child_builder(chunk).run();
+        let SymTngBuilder { key_map, inner, .. } = child;
+        (inner.into_tng_complex(), key_map)
+    }
+
+    // A child builder over `chunk` (a sub-tangle), inheriting the parent's τ-maps and
+    // `preprocess`/simplify settings; `chunk_bound = None` so it doesn't recurse.
+    fn child_builder(&self, chunk: &[Node]) -> SymTngBuilder<R> {
+        let (h, t) = self.builder.inner.complex().ht();
+        let base_pt = self.builder.inner.complex().base_pt();
+        let mut inner = TngComplexBuilder::init(h, t, (0, 0), base_pt)
+            .with_config(BuildConfig { deloop_mode: DeloopMode::None, elim_mode: ElimMode::None, strategy: self.builder.config.strategy, h_range: None });
+        inner.set_nodes(chunk.iter().cloned());
+
+        // cap the child to the chunk's reachable band: a chunk vertex of weight
+        // > b - deg_shift.0 can never reach the window (weight only grows).
+        let h_range = self.builder.config.h_range.as_ref().map(|r| {
+            let s = self.builder.inner.complex().deg_shift().0;
+            0 ..= (*r.end() - s).max(0)
+        });
+        let config = SymBuildConfig { chunk_bound: None, h_range, ..self.builder.config.clone() };
+        let key_map = TauKeyMap::init();
+        let real_top = inner.complex().deg_shift().0 + chunk.len() as isize; // child deg_shift = 0
+        SymTngBuilder { inner, x_map: self.builder.x_map.clone(), e_map: self.builder.e_map.clone(), key_map, config, real_top }
+    }
 }
 
 /// Builds the off-axis part of a [`SymTngBuilder`] by τ-symmetry: build one

@@ -20,6 +20,10 @@ use yui_core::num::FF2;
 use yui_link::{InvLink, Link};
 use yui_kh::kh::KhComplex;
 use yui_kh::khi::KhIComplex;
+use yui_kh::tng::builder::{BuildConfig, SymBuildConfig, NodeStrategy};
+
+const STRATEGIES: [(&str, NodeStrategy); 2] =
+    [("loop", NodeStrategy::LoopGreedy), ("mincut", NodeStrategy::MinCut)];
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -30,18 +34,22 @@ fn bench_kh_complex_new(c: &mut Criterion) {
 
     for name in ["3_1", "5_1", "6_3", "8_19"] {
         let l = Link::test_data(name);
-        group.bench_function(name, |b| {
-            b.iter(|| KhComplex::<i32>::new(&l, &0, &0, false))
-        });
+        for (sn, strategy) in STRATEGIES {
+            group.bench_function(format!("{name}/{sn}"), |b| {
+                b.iter(|| KhComplex::<i32>::new_with_config(&l, &0, &0, false, BuildConfig { strategy, ..Default::default() }))
+            });
+        }
     }
 
     // 14-crossing knot — bigger enough that node-ordering choices matter.
     {
         let l = Link::test_data("14n_19265");
         group.sample_size(10);
-        group.bench_function("14n_19265", |b| {
-            b.iter(|| KhComplex::<i32>::new(&l, &0, &0, false))
-        });
+        for (sn, strategy) in STRATEGIES {
+            group.bench_function(format!("14n_19265/{sn}"), |b| {
+                b.iter(|| KhComplex::<i32>::new_with_config(&l, &0, &0, false, BuildConfig { strategy, ..Default::default() }))
+            });
+        }
     }
 
     group.finish();
@@ -57,9 +65,11 @@ fn bench_khi_complex_new(c: &mut Criterion) {
 
     for name in ["3_1", "4_1", "6_3"] {
         let l = InvLink::test_data(name);
-        group.bench_function(name, |b| {
-            b.iter(|| KhIComplex::<FF2>::new(&l, &zero, &zero, false))
-        });
+        for (sn, strategy) in STRATEGIES {
+            group.bench_function(format!("{name}/{sn}"), |b| {
+                b.iter(|| KhIComplex::<FF2>::new_with_config(&l, &zero, &zero, false, SymBuildConfig { strategy, ..Default::default() }))
+            });
+        }
     }
 
     group.finish();

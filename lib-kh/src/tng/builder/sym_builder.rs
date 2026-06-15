@@ -466,12 +466,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         if selective {
             self.find_productive_loop(k)
         } else {
-            self.inner.find_loop(k, allow_based, false)
+            self.inner.find_loop_in(k, allow_based, false)
         }
     }
 
     fn deloop_in(&mut self, i: isize, allow_based: bool, selective: bool) {
-        let mut keys = self.inner.pick_keys_in(i, |k|
+        let mut keys = self.inner.collect_keys(i, |k|
             self.choose_loop(k, allow_based, selective).is_some()
         );
         if keys.is_empty() { return }
@@ -612,7 +612,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn eliminate_in(&mut self, i: isize) {
-        let mut keys = self.inner.pick_keys_in(i, |k|
+        let mut keys = self.inner.collect_keys(i, |k|
             self.inner.complex().vertex(k).out_edges()
                 .any(|l| self.is_equiv_inv_edge(k, l))
         );

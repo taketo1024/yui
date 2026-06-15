@@ -170,7 +170,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn run(mut self) -> Self { 
         self.process_nodes();
-        self.process_loops();
+        self.process_free_loops();
         self.finalize();
         self
     } 
@@ -350,7 +350,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.complex.remove_vertices(&doomed);
     }
 
-    pub(crate) fn process_loops(&mut self) {
+    pub(crate) fn process_free_loops(&mut self) {
         while !self.loops.is_empty() { 
             let c = self.loops.remove(0);
 
@@ -369,6 +369,29 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
+    /// Keys at degree `i` matching `pred`, sorted ascending by the vertex's
+    /// `c_weight` (so the cheapest vertices come first).
+    pub(crate) fn collect_keys<F>(&self, i: isize, pred: F) -> Vec<TngComplexKey>
+    where F: Fn(&TngComplexKey) -> bool {
+        self.complex.keys_of_deg(i)
+            .filter(|k| pred(k))
+            .sorted_by_key(|k| (self.complex.vertex(k).c_weight(), **k))
+            .copied()
+            .collect_vec()
+    }
+
+    // Selective mode deloops only "productive" circles — those whose no-dot cap yields an
+    // invertible edge (deloop+elim fires, no doubling); otherwise any circle.
+    pub(crate) fn find_loop_in(&self, k: &TngComplexKey, allow_based: bool, selective: bool) -> Option<usize> {
+        let v = self.complex.vertex(k);
+        v.tng().comps().enumerate()
+            .filter(|(_, c)| c.is_circle() && (allow_based || !c.is_marked()))
+            .find(|(_, c)| !selective
+             || v.out_edges().any(|l| self.complex.edge(k, l).is_invertible_after_cap(End::Src, c))
+             || v.in_edges().any(|j| self.complex.edge(j, k).is_invertible_after_cap(End::Tgt, c)))
+            .map(|(r, _)| r)
+    }
+
     pub(crate) fn deloop_all(&mut self, allow_based: bool, selective: bool) {
         for i in self.complex.h_range() {
             self.deloop_in(i, allow_based, selective);
@@ -376,8 +399,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn deloop_in(&mut self, i: isize, allow_based: bool, selective: bool) {
-        let mut keys = self.pick_keys_in(i, |k|
-            self.find_loop(k, allow_based, selective).is_some()
+        let mut keys = self.collect_keys(i, |k|
+            self.find_loop_in(k, allow_based, selective).is_some()
         );
         if keys.is_empty() { return }
 
@@ -392,12 +415,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             while !list.is_empty() {
                 let k = list.remove(0);
                 if !self.complex.contains_key(&k) { continue; }
-                let Some(r) = self.find_loop(&k, allow_based, selective) else { continue };
+                let Some(r) = self.find_loop_in(&k, allow_based, selective) else { continue };
 
                 let added = self.deloop(&k, r);
 
                 list.extend(added.into_iter().filter(|k|
-                    self.find_loop(k, allow_based, selective).is_some()
+                    self.find_loop_in(k, allow_based, selective).is_some()
                 ));
             }
         }
@@ -425,31 +448,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         added
     }
 
-    // Selective mode deloops only "productive" circles — those whose no-dot cap yields an
-    // invertible edge (deloop+elim fires, no doubling); otherwise any circle.
-    pub(crate) fn find_loop(&self, k: &TngComplexKey, allow_based: bool, selective: bool) -> Option<usize> {
-        let v = self.complex.vertex(k);
-        v.tng().comps().enumerate()
-            .filter(|(_, c)| c.is_circle() && (allow_based || !c.is_marked()))
-            .find(|(_, c)| !selective
-             || v.out_edges().any(|l| self.complex.edge(k, l).is_invertible_after_cap(End::Src, c))
-             || v.in_edges().any(|j| self.complex.edge(j, k).is_invertible_after_cap(End::Tgt, c)))
-            .map(|(r, _)| r)
-    }
-
-    /// Keys at degree `i` matching `pred`, sorted ascending by the vertex's
-    /// `c_weight` (so the cheapest vertices come first).
-    pub(crate) fn pick_keys_in<F>(&self, i: isize, pred: F) -> Vec<TngComplexKey>
-    where F: Fn(&TngComplexKey) -> bool {
-        self.complex.keys_of_deg(i)
-            .filter(|k| pred(k))
-            .sorted_by_key(|k| (self.complex.vertex(k).c_weight(), **k))
-            .copied()
-            .collect_vec()
-    }
-
     pub(crate) fn eliminate_in(&mut self, i: isize) {
-        let keys = self.pick_keys_in(i, |k|
+        let keys = self.collect_keys(i, |k|
             self.complex.vertex(k).out_edges().any(|l|
                 self.complex.edge(k, l).is_invertible()
             )

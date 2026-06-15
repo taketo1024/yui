@@ -299,14 +299,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.vertices.get_mut(&j).unwrap().out_edges.remove(k);
         }
         
-        for l in v.out_edges.keys() { 
+        for l in v.out_edges.keys() {
             self.vertices.get_mut(&l).unwrap().in_edges.remove(k);
         }
 
         v
     }
 
-    pub(crate) fn clear_verts(&mut self) { 
+    pub fn remove_vertices(&mut self, ks: &[TngComplexKey]) {
+        for k in ks {
+            self.remove_vertex(k);
+        }
+    }
+
+    pub(crate) fn clear_verts(&mut self) {
         self.vertices.clear();
     }
     

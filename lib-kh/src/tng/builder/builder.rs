@@ -16,13 +16,12 @@ use rustc_hash::{FxHashSet, FxHashMap};
 use itertools::Itertools;
 use log::{debug, info, trace};
 use num_traits::Zero;
-use yui_core::bitseq::Bit;
 use yui_core::{Ring, RingOps};
 use yui_link::{Node, Edge, Link};
 
 use crate::kh::{KhChain, KhComplex};
-use crate::tng::{End, TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
-use super::reachable_range;
+use crate::tng::{End, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
+use super::{reachable_range, node_arcs};
 
 /// How circles are delooped during the build.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -203,7 +202,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     /// Circles `x` would close across the current vertices — the deloop/elim unlock.
     pub(crate) fn loop_count(&self, x: &Node) -> isize {
-        let arcs = self.node_arcs(x);
+        let arcs = node_arcs(x, self.complex.base_pt());
         self.complex.iter_verts().map(|(_, v)| {
             v.tng().comps().map(|c|
                 arcs.iter().filter(|a| c.is_connectable_bothends(a)).count() as isize
@@ -230,24 +229,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             .map(|(e, _)| if boundary.contains(e) { -1 } else { 1 })
             .sum();
         boundary.len() as isize + delta
-    }
-
-    /// Arcs that will be added when appending `x` to the partial diagram,
-    /// with the base-point edge filtered out.
-    fn node_arcs(&self, x: &Node) -> Vec<TngComp> {
-        let arcs = if x.is_resolved() {
-            let (a0, a1) = x.arcs();
-            vec![a0, a1]
-        } else {
-            let (a00, a01) = x.resolve(Bit::Bit0).arcs();
-            let (a10, a11) = x.resolve(Bit::Bit1).arcs();
-            vec![a00, a01, a10, a11]
-        };
-        let base_pt = self.complex.base_pt();
-        arcs.into_iter()
-            .filter(|a| base_pt.map(|e| !a.contains(e)).unwrap_or(true))
-            .map(TngComp::from)
-            .collect()
     }
 
     pub(crate) fn append_node(&mut self, x: &Node) { 
@@ -348,21 +329,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             debug!("prune {} verts outside h_range.", doomed.len());
         }
 
-        self.prune_keys(&doomed);
+        self.complex.remove_vertices(&doomed);
     }
 
-    pub(crate) fn prune_keys(&mut self, doomed: &[TngComplexKey]) {
-        for k in doomed {
-            self.complex.remove_vertex(k);
-        }
-    }
-
-    // At the window-top degree, vertices with no incoming edge are isolated
-    // (no outgoing either) and only feed the discarded boundary homology — drop
-    // them before delooping their (ignored) loops.
-    // No-in-edge vertices at the window-top feed only the discarded `top+1` homology —
-    // but only when `top` is a TRUNCATED top (`top < real_top`). At the real top they're
-    // genuine generators, so skip (else we'd silently drop real homology).
+    // Drop no-in-edge vertices at a TRUNCATED window-top (`top < real_top`): they feed only the
+    // discarded `top+1` homology. At the real top they're genuine generators, so skip.
     fn prune_isolated_top(&mut self, top: isize) {
         // real top = deg_shift + total crossings (dim + remaining nodes).
         let real_top = self.complex.deg_shift().0 + (self.complex.dim() + self.nodes.len()) as isize;
@@ -376,7 +347,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         if !doomed.is_empty() {
             debug!("prune {} isolated verts in C[{top}].", doomed.len());
         }
-        self.prune_keys(&doomed);
+        self.complex.remove_vertices(&doomed);
     }
 
     pub(crate) fn process_loops(&mut self) {

@@ -4,4 +4,4 @@ mod util;
 
 pub use builder::*;
 pub use sym_builder::*;
-pub(crate) use util::reachable_range;
+pub(crate) use util::{reachable_range, node_arcs};

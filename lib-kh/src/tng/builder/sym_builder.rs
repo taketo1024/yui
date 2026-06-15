@@ -201,14 +201,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.inner.set_elements(vec![]);
         while let Some(chunk) = ChunkBuilder::new(self).next_chunk() {
             info!("process chunk ({}): {}", chunk.len(), chunk.iter().join(", "));
+
             let (c, key_map) = ChunkBuilder::new(self).build_chunk(&chunk);
+
             debug!("  chunk built: {}", c.stat());
+
             self.inner.drop_nodes(|x| chunk.contains(x));
             self.merge(c, key_map);
+
             info!("  chunk merged: {}", self.inner.stat());
         }
     }
-
 
     fn preprocess(&mut self) {
         SymTngPreprocessor::run(self);
@@ -401,7 +404,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             debug!("prune {} isolated verts in C[{top}].", doomed_verts.len());
         }
         let doomed: FxHashSet<_> = doomed_verts.iter().copied().collect();
-        self.inner.prune_keys(&doomed_verts);
+        self.inner.complex_mut().remove_vertices(&doomed_verts);
         self.key_map.drop(|k| doomed.contains(k));
     }
 
@@ -432,7 +435,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         if !doomed_verts.is_empty() {
             debug!("prune {} verts outside h_range.", doomed_verts.len());
         }
-        self.inner.prune_keys(&doomed_verts);
+        self.inner.complex_mut().remove_vertices(&doomed_verts);
 
         self.key_map.drop(doomed);
     }

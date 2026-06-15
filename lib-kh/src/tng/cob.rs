@@ -15,9 +15,9 @@ use std::fmt::Display;
 use std::hash::{Hash, Hasher};
 use std::collections::HashSet;
 use std::ops::Mul;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, OnceLock};
 use std::sync::atomic::{AtomicU64, Ordering};
-use rustc_hash::FxHasher;
+use rustc_hash::{FxHasher, FxHashSet};
 use itertools::Itertools;
 use num_traits::Zero;
 use cartesian::cartesian; // TODO: replace with itertools::iproduct! and drop the cartesian dep
@@ -26,10 +26,28 @@ use yui_core::{AddMon, MathType, Ring, RingOps};
 use yui_core::lc::{LcKey, Lc};
 use yui_core::poly::Var2;
 use yui_link::Edge;
-use super::tng::{Tng, TngComp, intern_tng};
+use super::tng::{Tng, TngComp};
+
+// Global hash-cons for `Tng`: boundary tangles are heavily duplicated across cobs, so one shared
+// `Arc` per value collapses them (interned at each `CobComp` ctor). 
+// Global for now; could become a per-`TngComplex` store later.
+fn tng_interner() -> &'static Mutex<FxHashSet<Arc<Tng>>> {
+    static TABLE: OnceLock<Mutex<FxHashSet<Arc<Tng>>>> = OnceLock::new();
+    TABLE.get_or_init(|| Mutex::new(FxHashSet::default()))
+}
+
+fn intern_tng(t: Tng) -> Arc<Tng> {
+    let mut table = tng_interner().lock().unwrap();
+    if let Some(a) = table.get(&t) {
+        return Arc::clone(a);
+    }
+    let a = Arc::new(t);
+    table.insert(Arc::clone(&a));
+    a
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, derive_more::Display)]
-pub enum Dot { 
+pub enum Dot {
     None, X, Y
 }
 

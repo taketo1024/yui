@@ -30,7 +30,7 @@ use super::cob::{Cob, Dot, End, CobComp, LcCob, LcCobTrait};
 use super::tng::{Tng, TngComp};
 
 // Raw pointer made shareable across rayon tasks. SAFETY is the caller's: used only in
-// `compute_schur`'s parallel value-write, where each task holds a pointer to a *distinct* vertex.
+// `eliminate_par`'s parallel value-write, where each task holds a pointer to a *distinct* vertex.
 struct SendPtr<T>(*mut T);
 unsafe impl<T> Send for SendPtr<T> {}
 
@@ -591,9 +591,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     //  w0 -----> w1         w0 ---------> w1
     //       d                
 
-    // Gaussian-eliminate the invertible pivot `a: k0 → k1`: remove both endpoints, pull the Schur
-    // data from the owned vertices and strip neighbors' dangling refs in one pass (no key-vecs).
+    // Gaussian-eliminate the invertible pivot `a: k0 → k1`: remove both endpoints, then correct each
+    // parallel edge by `−c·a⁻¹·b`. Dispatches by Schur-block size: small → serial, large → parallel.
     pub fn eliminate(&mut self, k0: &TngComplexKey, k1: &TngComplexKey) {
+        // the parallel path only pays off on large Schur blocks; below this its fixed overhead
+        // (pre-fill + drop-zeros scans + dispatch) loses to the straightforward serial apply.
+        const PARALLEL_THRESHOLD: usize = 1024;
+
         let v0 = self.vertices.remove(k0).unwrap();
         let v1 = self.vertices.remove(k1).unwrap();
 
@@ -604,60 +608,76 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         // fold the Schur minus sign into a⁻¹ so corrections are added, not subtracted.
         let neg_ainv = -ainv;
 
-        // out-edges k0 → l (cobs owned in v0) except the pivot; strip k0 from each target's in_edges.
-        let out_data: Vec<_> = v0.out_edges.into_iter().filter(|(l, _)| l != k1).map(|(l, c)| {
-            self.vertices.get_mut(&l).unwrap().in_edges.remove(k0);
-            (l, c)
-        }).collect();
-
-        // in-edges j → k1 (cobs live in the sources) except the pivot; the remove doubles as cleanup.
-        let in_data: Vec<_> = v1.in_edges.iter().filter(|&j| j != k0).map(|&j| {
-            let b = self.vertices.get_mut(&j).unwrap().out_edges.remove(k1).unwrap();
-            (j, b)
-        }).collect();
-
-        // remaining dangling refs to the removed pair (not part of the Schur).
-        for j in v0.in_edges.iter() {
-            self.vertices.get_mut(j).unwrap().out_edges.remove(k0);
+        // clear only the *non-Schur* dangling refs to the removed pair (k0's in-sources, k1's
+        // out-targets); the Schur-side refs are deliberately left for ser/par — see the invariant below.
+        for l0 in v0.in_edges.iter() {
+            self.vertices.get_mut(l0).unwrap().out_edges.remove(k0);
         }
-        for l in v1.out_edges.keys() {
-            self.vertices.get_mut(l).unwrap().in_edges.remove(k1);
+        for l1 in v1.out_edges.keys() {
+            self.vertices.get_mut(l1).unwrap().in_edges.remove(k1);
         }
 
-        self.compute_schur(&neg_ainv, &in_data, &out_data);
+        // INVARIANT (fragile): the dispatched paths still depend on the Schur-side refs left dangling
+        // here. Every in-source keeps its `b` edge (`out_edges[k1]`), which ser/par read as the
+        // correction input; every out-target keeps `k0` in its `in_edges` (its `c` edge already left
+        // with v0). ser/par consume and clear both — do NOT strip them here, it would drop the `b` cobs.
+
+        // block size = #in-sources × #out-targets (both minus the pivot edge).
+        if (v1.in_edges.len() - 1) * (v0.out_edges.len() - 1) < PARALLEL_THRESHOLD {
+            self.eliminate_ser(k0, k1, v0, v1, &neg_ainv);
+        } else {
+            self.eliminate_par(k0, k1, v0, v1, &neg_ainv);
+        }
     }
 
-    // Schur-complement core for invertible pivot `a: k0 → k1`: correct edge `l0 → l1` by
-    // `−c·a⁻¹·b` (`b: l0→k1`, `c: k0→l1`; the `−` is folded into `neg_ainv`). Each `(l0, l1)`
-    // is unique, so corrections apply in any order — heavy `stack`/`reduce` runs in parallel.
-    pub(crate) fn compute_schur(&mut self, neg_ainv: &LcCob<R>, in_data: &[(TngComplexKey, LcCob<R>)], out_data: &[(TngComplexKey, LcCob<R>)]) {
-        // the parallel/fused path only pays off on large Schur blocks; below this, its fixed
-        // overhead (pre-fill + drop-zeros scans + dispatch) loses to the inline serial apply.
-        const PARALLEL_THRESHOLD: usize = 1024;
+    // Serial elimination (small blocks): iterate the owned `v0`/`v1` directly and apply each
+    // correction inline via `add_to_edge` — no `in_data`/`out_data` key-vecs.
+    fn eliminate_ser(&mut self, k0: &TngComplexKey, k1: &TngComplexKey, v0: TngComplexVertex<R>, v1: TngComplexVertex<R>, neg_ainv: &LcCob<R>) {
         let (h, t) = self.ht().clone();
 
-        // small problems: apply inline, no parallel overhead.
-        if in_data.len() * out_data.len() < PARALLEL_THRESHOLD {
-            for (l0, b) in in_data {
-                let nainv_b = b.stack(neg_ainv);
-                for (l1, c) in out_data {
-                    let corr = nainv_b.stack(c).reduce(&h, &t);
-                    if !corr.is_zero() {
-                        self.add_to_edge(l0, l1, corr);
-                    }
+        // correct each parallel edge `l0 → l1` by `b·a⁻¹·c` (b: l0→k1, c: k0→l1), removing each `b`.
+        for l0 in v1.in_edges.iter().filter(|&l0| l0 != k0) {
+            let b = self.vertices.get_mut(l0).unwrap().out_edges.remove(k1).unwrap();
+            let nainv_b = b.stack(neg_ainv);
+            for (l1, c) in v0.out_edges.iter().filter(|(l1, _)| *l1 != k1) {
+                let corr = nainv_b.stack(c).reduce(&h, &t);
+                if !corr.is_zero() {
+                    self.add_to_edge(l0, l1, corr);
                 }
             }
-            return;
         }
 
-        // Large block: pre-fill a zero slot for every (l0, l1) target, so the parallel phase writes
-        // only values (no structural mutation → no `in_edges` race). Per `l0`: back-refs, then `*mut`.
+        // strip k0 from the Schur out-targets' back-refs (the dangling refs are cleared in `eliminate`).
+        for l1 in v0.out_edges.keys().filter(|&l1| l1 != k1) {
+            self.vertices.get_mut(l1).unwrap().in_edges.remove(k0);
+        }
+    }
+
+    // Parallel elimination (large blocks): pull the Schur data into key-vecs, pre-fill a zero slot
+    // for every target, then write corrections in parallel via one `*mut` per source vertex.
+    fn eliminate_par(&mut self, k0: &TngComplexKey, k1: &TngComplexKey, v0: TngComplexVertex<R>, v1: TngComplexVertex<R>, neg_ainv: &LcCob<R>) {
+        // out-edges k0 → l1 (cobs moved out of v0) except the pivot; strip k0 from each target's in_edges.
+        let out_data: Vec<_> = v0.out_edges.into_iter().filter(|(l1, _)| l1 != k1).map(|(l1, c)| {
+            self.vertices.get_mut(&l1).unwrap().in_edges.remove(k0);
+            (l1, c)
+        }).collect();
+
+        // in-edges l0 → k1 (cobs pulled from the sources) except the pivot; the remove doubles as cleanup.
+        let in_data: Vec<_> = v1.in_edges.iter().filter(|&l0| l0 != k0).map(|&l0| {
+            let b = self.vertices.get_mut(&l0).unwrap().out_edges.remove(k1).unwrap();
+            (l0, b)
+        }).collect();
+
+        let (h, t) = self.ht().clone();
+
+        // Pre-fill a zero slot for every (l0, l1) target, so the parallel phase writes only values
+        // (no structural mutation → no `in_edges` race). Per `l0`: back-refs, then `*mut`.
         let vert_ptrs: Vec<SendPtr<TngComplexVertex<R>>> = in_data.iter().map(|(l0, _)| {
-            for (l1, _) in out_data {
+            for (l1, _) in &out_data {
                 self.vertices.get_mut(l1).unwrap().in_edges.insert(*l0);
             }
             let v = self.vertices.get_mut(l0).unwrap();
-            for (l1, _) in out_data {
+            for (l1, _) in &out_data {
                 v.out_edges.entry(*l1).or_insert_with(LcCob::zero);
             }
             SendPtr(v as *mut _)
@@ -669,7 +689,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             // the pre-fill created every target slot, so no map is structurally mutated here (values
             // only) and the pointers stay valid for the whole phase.
             let vert = unsafe { &mut *vptr.0 };
-            for (l1, c) in out_data {
+            for (l1, c) in &out_data {
                 let corr = nainv_b.stack(c).reduce(&h, &t);
                 if !corr.is_zero() {
                     *vert.out_edges.get_mut(l1).unwrap() += corr;
@@ -678,7 +698,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         });
 
         // Drop the slots that stayed/became zero (pre-filled-but-unwritten + cancellations).
-        for ((l0, _), (l1, _)) in iproduct!(in_data, out_data) {
+        for ((l0, _), (l1, _)) in iproduct!(&in_data, &out_data) {
             if self.edge_opt(l0, l1).is_some_and(|e| e.is_zero()) {
                 self.remove_edge(l0, l1);
             }

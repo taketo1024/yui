@@ -11,12 +11,13 @@
 //!   <https://doi.org/10.2140/gt.2005.9.1443>, <https://arxiv.org/abs/math/0410495>
 
 use core::panic;
+use std::cell::RefCell;
 use std::fmt::Display;
 use std::hash::Hash;
 use std::collections::HashSet;
 use std::ops::Mul;
 use std::sync::{Arc, OnceLock};
-use rustc_hash::FxBuildHasher;
+use rustc_hash::{FxBuildHasher, FxHashSet};
 use dashmap::DashSet;
 use itertools::Itertools;
 use num_traits::Zero;
@@ -37,7 +38,24 @@ fn tng_interner() -> &'static DashSet<Arc<Tng>, FxBuildHasher> {
     TABLE.get_or_init(DashSet::default)
 }
 
+thread_local! {
+    // Per-thread read cache over the global interner. A few tangles are looked up thousands of
+    // times; serving those locally skips the contended DashSet shard lock + probe. We only ever
+    // cache the canonical `Arc` the global interner blessed, so dedup stays exact.
+    static TNG_CACHE: RefCell<FxHashSet<Arc<Tng>>> = RefCell::new(FxHashSet::default());
+}
+
 fn intern_tng(t: Tng) -> Arc<Tng> {
+    // `Arc<Tng>: Borrow<Tng>` lets us probe by `&t` using the cached hash, no lock.
+    if let Some(arc) = TNG_CACHE.with(|c| c.borrow().get(&t).map(Arc::clone)) {
+        return arc;
+    }
+    let arc = intern_tng_global(t);
+    TNG_CACHE.with(|c| { c.borrow_mut().insert(Arc::clone(&arc)); });
+    arc
+}
+
+fn intern_tng_global(t: Tng) -> Arc<Tng> {
     let table = tng_interner();
     if let Some(a) = table.get(&t) {
         return Arc::clone(&a);

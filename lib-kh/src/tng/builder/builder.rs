@@ -20,7 +20,7 @@ use yui_link::{Node, Edge, Link};
 
 use crate::kh::{KhChain, KhComplex};
 use crate::tng::{End, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
-use super::{reachable_range, node_arcs, TngElemBuilder};
+use super::{reachable_range, node_arcs, pop_min_pivot, TngElemBuilder};
 
 /// How circles are delooped during the build.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -364,14 +364,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    /// Keys at degree `i` matching `pred`, sorted ascending by the vertex's
-    /// `c_weight` (so the cheapest vertices come first).
-    pub(crate) fn collect_keys<F>(&self, i: isize, pred: F) -> Vec<TngComplexKey>
-    where F: Fn(&TngComplexKey) -> bool {
+    /// Keys at degree `i` matching `pred`, each paired with `weight(k)`; callers pivot by least
+    /// weight via [`pop_min_pivot`].
+    pub(crate) fn collect_keys<F, W>(&self, i: isize, pred: F, weight: W) -> Vec<(TngComplexKey, usize)>
+    where F: Fn(&TngComplexKey) -> bool, W: Fn(&TngComplexKey) -> usize {
         self.complex.keys_of_deg(i)
             .filter(|k| pred(k))
-            .sorted_by_key(|k| (self.complex.vertex(k).c_weight(), **k))
-            .copied()
+            .map(|k| (*k, weight(k)))
             .collect_vec()
     }
 
@@ -394,8 +393,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn deloop_in(&mut self, i: isize, allow_based: bool, selective: bool) {
-        let mut keys = self.collect_keys(i, |k|
-            self.find_loop_in(k, allow_based, selective).is_some()
+        let mut keys = self.collect_keys(i,
+            |k| self.find_loop_in(k, allow_based, selective).is_some(),
+            |k| self.complex.vertex(k).c_weight(),
         );
         if keys.is_empty() { return }
 
@@ -403,26 +403,22 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let before = self.complex.rank(i) as isize;
 
-        while !keys.is_empty() {
-            let k = keys.remove(0);
-            let mut list = vec![k];
+        while let Some(k) = pop_min_pivot(&mut keys, |k|
+            self.complex.contains_key(k).then(|| self.complex.vertex(k).c_weight())
+        ) {
+            let Some(r) = self.find_loop_in(&k, allow_based, selective) else { continue };
 
-            while !list.is_empty() {
-                let k = list.remove(0);
-                if !self.complex.contains_key(&k) { continue; }
-                let Some(r) = self.find_loop_in(&k, allow_based, selective) else { continue };
-
-                let added = self.deloop(&k, r);
-
-                list.extend(added.into_iter().filter(|k|
-                    self.find_loop_in(k, allow_based, selective).is_some()
-                ));
+            for new_key in self.deloop(&k, r) {
+                if self.find_loop_in(&new_key, allow_based, selective).is_some() {
+                    let w = self.complex.vertex(&new_key).c_weight();
+                    keys.push((new_key, w));
+                }
             }
         }
 
         let after = self.complex.rank(i) as isize;
 
-       debug!("  delooped C[{i}]: {} (diff: {}).", after, after - before);
+        debug!("  delooped C[{i}]: {} (diff: {}).", after, after - before);
     }
 
     pub(crate) fn deloop(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
@@ -442,10 +438,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub(crate) fn eliminate_in(&mut self, i: isize) {
-        let keys = self.collect_keys(i, |k|
-            self.complex.vertex(k).out_edges().any(|l|
+        let mut keys = self.collect_keys(i,
+            |k| self.complex.vertex(k).out_edges().any(|l|
                 self.complex.edge(k, l).is_invertible()
-            )
+            ),
+            |k| self.complex.vertex(k).c_weight(),
         );
         if keys.is_empty() { return }
 
@@ -453,7 +450,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let before = self.complex.rank(i) as isize;
 
-        for k in keys {
+        while let Some(k) = pop_min_pivot(&mut keys, |k|
+            self.complex.contains_key(k).then(|| self.complex.vertex(k).c_weight())
+        ) {
             self.try_eliminate_at(&k);
         }
 

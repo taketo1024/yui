@@ -22,7 +22,7 @@ use yui_link::{Node, Edge, InvLink};
 use crate::kh::{KhGen, KhTensor};
 use crate::tng::{End, LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
 use crate::tng::builder::{TngComplexBuilder, BuildConfig, DeloopMode, ElimMode, NodeStrategy};
-use super::reachable_range;
+use super::{reachable_range, pop_min_pivot};
 
 /// Toggles for the automatic simplification done while building (kept separate
 /// from [`BuildConfig`] so the equivariant builder can gain its own flags).
@@ -508,9 +508,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
+    // Pivot cost for selection: off-axis pivots are eliminated in τ-pairs, so count ~2× the fill.
+    fn pivot_weight(&self, k: &TngComplexKey) -> usize {
+        let w = self.inner.complex().vertex(k).c_weight();
+        if self.key_map.is_sym(k) { w } else { 2 * w }
+    }
+
     fn deloop_in(&mut self, i: isize, allow_based: bool, selective: bool) {
-        let mut keys = self.inner.collect_keys(i, |k|
-            self.choose_loop(k, allow_based, selective).is_some()
+        let mut keys = self.inner.collect_keys(i,
+            |k| self.choose_loop(k, allow_based, selective).is_some(),
+            |k| self.pivot_weight(k),
         );
         if keys.is_empty() { return }
 
@@ -518,22 +525,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let before = self.inner.complex().rank(i) as isize;
 
-        while !keys.is_empty() {
-            let k = keys.remove(0);
-            if !self.inner.complex().contains_key(&k) { continue; } // already delooped or eliminated
+        while let Some(k) = pop_min_pivot(&mut keys, |k|
+            self.inner.complex().contains_key(k).then(|| self.pivot_weight(k))
+        ) {
+            let Some(r) = self.choose_loop(&k, allow_based, selective) else { continue };
 
-            let mut list = vec![k];
-
-            while !list.is_empty() {
-                let k = list.remove(0);
-                if !self.inner.complex().contains_key(&k) { continue; }
-                let Some(r) = self.choose_loop(&k, allow_based, selective) else { continue };
-
-                let added = self.deloop_equiv(&k, r);
-
-                list.extend(added.into_iter().filter(|k|
-                    self.choose_loop(k, allow_based, selective).is_some()
-                ));
+            for new_key in self.deloop_equiv(&k, r) {
+                if self.choose_loop(&new_key, allow_based, selective).is_some() {
+                    let w = self.pivot_weight(&new_key);
+                    keys.push((new_key, w));
+                }
             }
         }
 
@@ -650,19 +651,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn eliminate_in(&mut self, i: isize) {
-        let mut keys = self.inner.collect_keys(i, |k|
-            self.inner.complex().vertex(k).out_edges()
-                .any(|l| self.is_equiv_inv_edge(k, l))
+        let mut keys = self.inner.collect_keys(i,
+            |k| self.inner.complex().vertex(k).out_edges()
+                .any(|l| self.is_equiv_inv_edge(k, l)),
+            |k| self.pivot_weight(k),
         );
         if keys.is_empty() { return }
 
         debug!("eliminate in C[{i}], targets: {}", keys.len());
-        
+
         let before = self.inner.complex().rank(i) as isize;
 
-        while !keys.is_empty() { 
-            let k = keys.remove(0);
-            if !self.inner.complex().contains_key(&k) { continue; } // removed by other side
+        while let Some(k) = pop_min_pivot(&mut keys, |k|
+            self.inner.complex().contains_key(k).then(|| self.pivot_weight(k))
+        ) {
             self.try_eliminate_equiv_at(&k);
         }
 

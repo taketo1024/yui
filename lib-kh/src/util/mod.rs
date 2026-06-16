@@ -4,4 +4,6 @@ pub(crate) use bigraded::Bigraded;
 pub(crate) mod cached_hash;
 pub(crate) use cached_hash::CachedHash;
 
+pub(crate) mod hash_cons;
+
 pub mod calc;

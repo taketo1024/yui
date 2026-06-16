@@ -17,8 +17,6 @@ use std::hash::Hash;
 use std::collections::HashSet;
 use std::ops::Mul;
 use std::sync::{Arc, OnceLock};
-use rustc_hash::{FxBuildHasher, FxHashSet};
-use dashmap::DashSet;
 use itertools::Itertools;
 use num_traits::Zero;
 use cartesian::cartesian; // TODO: replace with itertools::iproduct! and drop the cartesian dep
@@ -28,45 +26,27 @@ use yui_core::lc::{LcKey, Lc};
 use yui_core::poly::Var2;
 use yui_link::Edge;
 use crate::util::CachedHash;
+use crate::util::hash_cons::{HashCons, Cache};
 use super::tng::{Tng, TngComp};
 
 // Global hash-cons for `Tng`: boundary tangles are heavily duplicated across cobs, so one shared
-// `Arc` per value collapses them (interned at each `CobComp` ctor). 
-// Global for now; could become a per-`TngComplex` store later.
-fn tng_interner() -> &'static DashSet<Arc<Tng>, FxBuildHasher> {
-    static TABLE: OnceLock<DashSet<Arc<Tng>, FxBuildHasher>> = OnceLock::new();
-    TABLE.get_or_init(DashSet::default)
+// `Arc` per value collapses them (interned at each `CobComp` ctor). A per-thread read cache fronts
+// it — a few tangles are looked up thousands of times. Global for now; could become a
+// per-`TngComplex` store later.
+fn tng_cons() -> &'static HashCons<Tng> {
+    static CONS: OnceLock<HashCons<Tng>> = OnceLock::new();
+    CONS.get_or_init(HashCons::new)
 }
 
 thread_local! {
-    // Per-thread read cache over the global interner. A few tangles are looked up thousands of
-    // times; serving those locally skips the contended DashSet shard lock + probe. We only ever
-    // cache the canonical `Arc` the global interner blessed, so dedup stays exact.
-    static TNG_CACHE: RefCell<FxHashSet<Arc<Tng>>> = RefCell::new(FxHashSet::default());
+    static TNG_CACHE: RefCell<Cache<Tng>> = RefCell::new(Cache::default());
 }
 
 fn intern_tng(t: Tng) -> Arc<Tng> {
-    // `Arc<Tng>: Borrow<Tng>` lets us probe by `&t` using the cached hash, no lock.
-    if let Some(arc) = TNG_CACHE.with(|c| c.borrow().get(&t).map(Arc::clone)) {
-        return arc;
-    }
-    let arc = intern_tng_global(t);
-    TNG_CACHE.with(|c| { c.borrow_mut().insert(Arc::clone(&arc)); });
-    arc
-}
-
-fn intern_tng_global(t: Tng) -> Arc<Tng> {
-    let table = tng_interner();
-    if let Some(a) = table.get(&t) {
-        return Arc::clone(&a);
-    }
-    let arc = Arc::new(t);
-    // `insert` returns false if an equal `Tng` was interned by another thread first;
-    // fetch that canonical `Arc` so dedup stays exact.
-    if !table.insert(Arc::clone(&arc)) {
-        return Arc::clone(&table.get(&*arc).unwrap());
-    }
-    arc
+    TNG_CACHE.with(|c| {
+        let mut cache = c.borrow_mut();
+        tng_cons().intern_cached(t, &mut cache)
+    })
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, derive_more::Display)]

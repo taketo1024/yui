@@ -1,9 +1,9 @@
 use std::fmt::Display;
-use std::hash::Hash;
 use itertools::Itertools;
 use yui_core::bitmap::BitMap;
 use yui_core::CloneAnd;
 use yui_link::{Edge, Node, Path};
+use crate::util::CachedHash;
 
 /// Edge presence as a packed bitmap. `u128` storage covers Edge ∈ 0..128,
 /// i.e. links with ≤ 64 crossings (2 edges per crossing). Bump the storage
@@ -170,16 +170,19 @@ impl Display for TngComp {
 }
 
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+// `CachedHash` caches the structural hash — `Tng` is hashed constantly via interning and `Arc<Tng>`
+// in `CobComp`. Mutate only via `inner_mut`. `comps` stays sorted (`normalize`) so the derived `Ord`
+// (required since `CobComp` derives `Ord` over `Arc<Tng>`) is canonical.
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug, Default)]
 pub struct Tng {
-    comps: Vec<TngComp> // arc or circle
+    comps: CachedHash<Vec<TngComp>>, // arc or circle
 }
 
-impl Tng { 
-    pub fn new<I>(comps: I) -> Self 
-    where I: IntoIterator<Item = TngComp> { 
+impl Tng {
+    pub fn new<I>(comps: I) -> Self
+    where I: IntoIterator<Item = TngComp> {
         let comps = comps.into_iter().sorted().collect_vec();
-        Self { comps }
+        Self { comps: CachedHash::new(comps) }
     }
 
     pub fn from_resolved(x: &Node, base_pt: Option<Edge>) -> Self {
@@ -242,7 +245,7 @@ impl Tng {
     }
 
     pub fn remove_at(&mut self, i: usize) -> TngComp {
-        self.comps.remove(i)
+        self.comps.inner_mut().remove(i)
     }
 
     pub fn connect(&self, other: &Self) -> Self {
@@ -252,7 +255,7 @@ impl Tng {
     pub fn connect_mut(&mut self, other: &Self) {
         for c in other.comps.iter() {
             if c.is_circle() {
-                self.comps.push(*c);
+                self.comps.inner_mut().push(*c);
             } else {
                 self.append_arc(*c);
             }
@@ -265,16 +268,16 @@ impl Tng {
 
         // If one end of `arc` is connectable:
         if let Some(i) = self.find_comp(|c| c.is_connectable(&arc)) {
-            self.comps[i].connect_mut(&arc);
+            self.comps.inner_mut()[i].connect_mut(&arc);
 
             // If the other end is also connectable to a different component:
             let ci = self.comps[i];
             if let Some(j) = self.find_comp(|c| *c != ci && c.is_connectable(&ci)) {
-                let cj = self.comps.remove(j);
-                self.comps[i].connect_mut(&cj);
+                let cj = self.comps.inner_mut().remove(j);
+                self.comps.inner_mut()[i].connect_mut(&cj);
             }
         } else {
-            self.comps.push(arc);
+            self.comps.inner_mut().push(arc);
         }
 
         self.normalize();
@@ -295,7 +298,7 @@ impl Tng {
     }
 
     fn normalize(&mut self) {
-        self.comps.sort()
+        self.comps.inner_mut().sort()
     }
 
     pub(crate) fn convert_edges<F>(&self, f: F) -> Self
@@ -324,6 +327,8 @@ impl From<TngComp> for Tng {
 
 #[cfg(test)]
 mod tests {
+    use std::hash::{Hash, Hasher};
+    use rustc_hash::FxHasher;
     use super::*;
 
     #[test]
@@ -427,6 +432,32 @@ mod tests {
         ]);
 
         assert_eq!(t0, t1);
+    }
+
+    #[test]
+    fn tng_hash_cache_invalidates() {
+        fn hash_of(t: &Tng) -> u64 {
+            let mut h = FxHasher::default();
+            t.hash(&mut h);
+            h.finish()
+        }
+
+        // remove_at: force the cache, mutate, then the hash must match a freshly-built Tng.
+        let mut t = Tng::new([TngComp::arc([0, 1]), TngComp::arc([2, 3])]);
+        let _ = hash_of(&t); // populate cache
+        let i = t.index_of(&TngComp::arc([0, 1])).unwrap();
+        t.remove_at(i);
+        let fresh = Tng::new([TngComp::arc([2, 3])]);
+        assert_eq!(hash_of(&t), hash_of(&fresh), "stale hash after remove_at");
+        assert_eq!(t, fresh);
+
+        // connect_mut: ends in normalize → invalidate.
+        let mut a = Tng::new([TngComp::arc([0, 1])]);
+        let _ = hash_of(&a);
+        a.connect_mut(&Tng::new([TngComp::arc([2, 3])]));
+        let fresh2 = Tng::new([TngComp::arc([0, 1]), TngComp::arc([2, 3])]);
+        assert_eq!(hash_of(&a), hash_of(&fresh2), "stale hash after connect_mut");
+        assert_eq!(a, fresh2);
     }
 
     #[test]

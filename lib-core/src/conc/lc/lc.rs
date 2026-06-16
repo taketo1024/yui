@@ -716,6 +716,64 @@ mod tests {
         assert_eq!(z1, L::from(hashmap!{ e(1) => 1, e(2) => -18, e(3) => -30 }));
     }
 
+    // The owned/borrowed `+=`/`-=` split is wired through undocumented `auto_ops` args, so
+    // cross-check every generated operator form (val/ref × val/ref) and both assign forms against
+    // a HashMap ground truth over Zero/Single/Many cases incl. full cancellation.
+    #[test]
+    fn op_forms_consistent() {
+        use std::collections::HashMap;
+        type L = Lc<X, i32>;
+
+        let lc = |pairs: &[(i32, i32)]| -> L {
+            L::from_iter(pairs.iter().map(|&(k, c)| (e(k), c)))
+        };
+        let reference = |a: &[(i32, i32)], b: &[(i32, i32)], sign: i32| -> L {
+            let mut m: HashMap<i32, i32> = HashMap::new();
+            for &(k, c) in a { *m.entry(k).or_default() += c; }
+            for &(k, c) in b { *m.entry(k).or_default() += sign * c; }
+            L::from_iter(m.into_iter().filter(|&(_, c)| c != 0).map(|(k, c)| (e(k), c)))
+        };
+
+        let cases: &[&[(i32, i32)]] = &[
+            &[],
+            &[(1, 5)],
+            &[(1, -5)],
+            &[(1, 1), (2, 2)],
+            &[(2, 20), (3, 30)],
+            &[(1, 3), (2, -2), (3, 7)],
+            &[(1, -3), (2, 2), (3, -7)],   // negation of the previous → cancels to zero on add
+            &[(1, 1), (2, 1), (3, 1), (4, 1), (5, 1)],
+        ];
+
+        for a in cases {
+            for b in cases {
+                let (la, lb) = (lc(a), lc(b));
+                let exp_add = reference(a, b, 1);
+                let exp_sub = reference(a, b, -1);
+
+                assert_eq!(la.clone() + lb.clone(), exp_add, "Add val_val {a:?} {b:?}");
+                assert_eq!(la.clone() + &lb,        exp_add, "Add val_ref {a:?} {b:?}");
+                assert_eq!(&la + lb.clone(),        exp_add, "Add ref_val {a:?} {b:?}");
+                assert_eq!(&la + &lb,               exp_add, "Add ref_ref {a:?} {b:?}");
+                { let mut t = la.clone(); t += lb.clone(); assert_eq!(t, exp_add, "+= val {a:?} {b:?}"); }
+                { let mut t = la.clone(); t += &lb;        assert_eq!(t, exp_add, "+= ref {a:?} {b:?}"); }
+
+                assert_eq!(la.clone() - lb.clone(), exp_sub, "Sub val_val {a:?} {b:?}");
+                assert_eq!(la.clone() - &lb,        exp_sub, "Sub val_ref {a:?} {b:?}");
+                assert_eq!(&la - lb.clone(),        exp_sub, "Sub ref_val {a:?} {b:?}");
+                assert_eq!(&la - &lb,               exp_sub, "Sub ref_ref {a:?} {b:?}");
+                { let mut t = la.clone(); t -= lb.clone(); assert_eq!(t, exp_sub, "-= val {a:?} {b:?}"); }
+                { let mut t = la.clone(); t -= &lb;        assert_eq!(t, exp_sub, "-= ref {a:?} {b:?}"); }
+
+                // Borrowed operands must be untouched by the ref-rhs / ref-lhs forms.
+                let _ = &la + &lb;
+                let _ = &la - &lb;
+                assert_eq!(la, lc(a), "lhs mutated {a:?}");
+                assert_eq!(lb, lc(b), "rhs mutated {b:?}");
+            }
+        }
+    }
+
     #[test]
     fn mul() {
         type L = Lc<X, i32>;

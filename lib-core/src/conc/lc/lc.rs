@@ -319,28 +319,59 @@ where
     }
 }
 
-#[auto_ops]
+// Owned rhs moves its pairs in (no key clones); borrowed rhs must clone. The split `auto_ops`
+// arg-sets generate the four `Add` variants by rhs-ownership so the two impls don't collide.
+#[auto_ops(val_val, ref_val)]
+impl<X, R> AddAssign<Lc<X, R>> for Lc<X, R>
+where
+    X: LcKey,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{
+    fn add_assign(&mut self, rhs: Self) {
+        for e in rhs.data {
+            self.add_pair(e);
+        }
+        self.clean()
+    }
+}
+
+#[auto_ops(val_ref, ref_ref)]
 impl<X, R> AddAssign<&Lc<X, R>> for Lc<X, R>
 where
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn add_assign(&mut self, rhs: &Self) {
-        for e in rhs.data.iter() { 
+        for e in rhs.data.iter() {
             self.add_pair_ref(e);
         }
         self.clean()
     }
 }
 
-#[auto_ops]
+// Owned rhs moves its keys in (negating coeffs, no key clones); borrowed rhs must clone.
+#[auto_ops(val_val, ref_val)]
+impl<X, R> SubAssign<Lc<X, R>> for Lc<X, R>
+where
+    X: LcKey,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{
+    fn sub_assign(&mut self, rhs: Self) {
+        for (x, r) in rhs.data {
+            self.add_pair((x, -r));
+        }
+        self.clean()
+    }
+}
+
+#[auto_ops(val_ref, ref_ref)]
 impl<X, R> SubAssign<&Lc<X, R>> for Lc<X, R>
 where
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn sub_assign(&mut self, rhs: &Self) {
-        for e in rhs.data.iter() { 
+        for e in rhs.data.iter() {
             self.add_pair_ref((e.0, &-e.1));
         }
         self.clean()

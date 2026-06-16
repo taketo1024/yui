@@ -17,7 +17,7 @@ use std::ops::{Add, AddAssign, RangeInclusive};
 
 use rustc_hash::{FxHashMap, FxHashSet};
 use auto_impl_ops::auto_ops;
-use itertools::Itertools;
+use itertools::{Itertools, iproduct};
 use num_traits::Zero;
 use rayon::prelude::*;
 use yui_core::{CloneAnd, Ring, RingOps, Sign};
@@ -28,6 +28,11 @@ use yui_core::bitseq::Bit;
 use crate::kh::{KhAlgGen, KhGen, KhTensor};
 use super::cob::{Cob, Dot, End, CobComp, LcCob, LcCobTrait};
 use super::tng::{Tng, TngComp};
+
+// Raw pointer made shareable across rayon tasks. SAFETY is the caller's: used only in
+// `compute_schur`'s parallel value-write, where each task holds a pointer to a *distinct* vertex.
+struct SendPtr<T>(*mut T);
+unsafe impl<T> Send for SendPtr<T> {}
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub struct TngComplexKey { 
@@ -626,40 +631,56 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // `−c·a⁻¹·b` (`b: l0→k1`, `c: k0→l1`; the `−` is folded into `neg_ainv`). Each `(l0, l1)`
     // is unique, so corrections apply in any order — heavy `stack`/`reduce` runs in parallel.
     pub(crate) fn compute_schur(&mut self, neg_ainv: &LcCob<R>, in_data: &[(TngComplexKey, LcCob<R>)], out_data: &[(TngComplexKey, LcCob<R>)]) {
-        const PARALLEL_THRESHOLD: usize = 16;
-        const ROW_CHUNK: usize = 64;
+        // the parallel/fused path only pays off on large Schur blocks; below this, its fixed
+        // overhead (pre-fill + drop-zeros scans + dispatch) loses to the inline serial apply.
+        const PARALLEL_THRESHOLD: usize = 1024;
         let (h, t) = self.ht().clone();
-
-        // one in-row's non-zero corrections `(l0, l1, −c·a⁻¹·b)`, each handed to `emit`.
-        let schur_row = |l0: &TngComplexKey, b: &LcCob<R>, emit: &mut dyn FnMut(TngComplexKey, TngComplexKey, LcCob<R>)| {
-            let nainv_b = b.stack(neg_ainv);
-            for (l1, c) in out_data {
-                let corr = nainv_b.stack(c).reduce(&h, &t);
-                if !corr.is_zero() {
-                    emit(*l0, *l1, corr);
-                }
-            }
-        };
 
         // small problems: apply inline, no parallel overhead.
         if in_data.len() * out_data.len() < PARALLEL_THRESHOLD {
             for (l0, b) in in_data {
-                schur_row(l0, b, &mut |l0, l1, corr| self.add_to_edge(&l0, &l1, corr));
+                let nainv_b = b.stack(neg_ainv);
+                for (l1, c) in out_data {
+                    let corr = nainv_b.stack(c).reduce(&h, &t);
+                    if !corr.is_zero() {
+                        self.add_to_edge(l0, l1, corr);
+                    }
+                }
             }
             return;
         }
 
-        // Chunk the in-rows: compute each chunk's corrections with rayon's lock-free collect,
-        // then apply serially. Caps materialized corrections at `ROW_CHUNK × |out|` (no full Vec).
-        for chunk in in_data.chunks(ROW_CHUNK) {
-            let corrections: Vec<_> = chunk.par_iter().flat_map_iter(|(l0, b)| {
-                let mut row = Vec::with_capacity(out_data.len());
-                schur_row(l0, b, &mut |l0, l1, corr| row.push((l0, l1, corr)));
-                row
-            }).collect();
+        // Large block: pre-fill a zero slot for every (l0, l1) target, so the parallel phase writes
+        // only values (no structural mutation → no `in_edges` race). Per `l0`: back-refs, then `*mut`.
+        let vert_ptrs: Vec<SendPtr<TngComplexVertex<R>>> = in_data.iter().map(|(l0, _)| {
+            for (l1, _) in out_data {
+                self.vertices.get_mut(l1).unwrap().in_edges.insert(*l0);
+            }
+            let v = self.vertices.get_mut(l0).unwrap();
+            for (l1, _) in out_data {
+                v.out_edges.entry(*l1).or_insert_with(LcCob::zero);
+            }
+            SendPtr(v as *mut _)
+        }).collect();
 
-            for (l0, l1, corr) in corrections {
-                self.add_to_edge(&l0, &l1, corr);
+        in_data.par_iter().zip(vert_ptrs).for_each(|((_, b), vptr)| {
+            let nainv_b = b.stack(neg_ainv);
+            // SAFETY: `in_data` keys are distinct, so each task holds a `*mut` to a different vertex;
+            // the pre-fill created every target slot, so no map is structurally mutated here (values
+            // only) and the pointers stay valid for the whole phase.
+            let vert = unsafe { &mut *vptr.0 };
+            for (l1, c) in out_data {
+                let corr = nainv_b.stack(c).reduce(&h, &t);
+                if !corr.is_zero() {
+                    *vert.out_edges.get_mut(l1).unwrap() += corr;
+                }
+            }
+        });
+
+        // Drop the slots that stayed/became zero (pre-filled-but-unwritten + cancellations).
+        for ((l0, _), (l1, _)) in iproduct!(in_data, out_data) {
+            if self.edge_opt(l0, l1).is_some_and(|e| e.is_zero()) {
+                self.remove_edge(l0, l1);
             }
         }
     }

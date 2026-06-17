@@ -442,7 +442,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             |k| self.complex.vertex(k).out_edges().any(|l|
                 self.complex.edge(k, l).is_invertible()
             ),
-            |k| self.complex.vertex(k).c_weight(),
+            |k| self.complex.elim_cost(k),
         );
         if keys.is_empty() { return }
 
@@ -451,7 +451,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let before = self.complex.rank(i) as isize;
 
         while let Some(k) = pop_min_pivot(&mut keys, |k|
-            self.complex.contains_key(k).then(|| self.complex.vertex(k).c_weight())
+            self.complex.contains_key(k).then(|| self.complex.elim_cost(k))
         ) {
             self.try_eliminate_at(&k);
         }
@@ -477,20 +477,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.complex.vertex(k).in_edges().filter_map(|j|
             self.complex.edge(j, k).is_invertible().then_some(j)
         )
-        .min_by_key(|j| (self.edge_weight(j, k), **j))
+        .min_by_key(|j| (self.complex.edge_weight(j, k), **j))
     }
 
-    fn choose_inv_edge_from(&self, k: &TngComplexKey) -> Option<&TngComplexKey> { 
+    fn choose_inv_edge_from(&self, k: &TngComplexKey) -> Option<&TngComplexKey> {
         self.complex.vertex(k).out_edges().filter_map(|l|
             self.complex.edge(k, l).is_invertible().then_some(l)
         )
-        .min_by_key(|l| (self.edge_weight(k, l), **l))
-    }
-
-    pub(crate) fn edge_weight(&self, k: &TngComplexKey, l: &TngComplexKey) -> usize { 
-        let nk = self.complex.vertex(k).out_edges().count(); // nnz in column k
-        let nl = self.complex.vertex(l).in_edges().count();     // nnz in row l
-        (nk - 1) * (nl - 1)
+        .min_by_key(|l| (self.complex.edge_weight(k, l), **l))
     }
 
     pub(crate) fn eliminate(&mut self, i: &TngComplexKey, j: &TngComplexKey) {

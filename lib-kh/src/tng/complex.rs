@@ -377,10 +377,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.vertices.get_mut(k)?.out_edges.get_mut(l)
     }
     
-    pub fn has_edge(&self, k: &TngComplexKey, l: &TngComplexKey) -> bool { 
-        self.vertices[k].out_edges.contains_key(l) && 
-        self.vertices[l].in_edges.contains(k) && 
+    pub fn has_edge(&self, k: &TngComplexKey, l: &TngComplexKey) -> bool {
+        self.vertices[k].out_edges.contains_key(l) &&
+        self.vertices[l].in_edges.contains(k) &&
         self.vertices[k].out_edges.contains_key(l)
+    }
+
+    // Markowitz cost of eliminating edge `k → l`: the fill `(out(k)-1)·(in(l)-1)` it creates.
+    pub fn edge_weight(&self, k: &TngComplexKey, l: &TngComplexKey) -> usize {
+        let nk = self.vertices[k].out_edges.len();
+        let nl = self.vertices[l].in_edges.len();
+        (nk - 1) * (nl - 1)
     }
 
     pub fn add_edge(&mut self, k: &TngComplexKey, l: &TngComplexKey, f: LcCob<R>) { 
@@ -575,6 +582,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         });
 
         self.vertices.insert(*k, v);
+    }
+
+    // Least edge-weight (Markowitz cost) to eliminate `k`, over its invertible incident edges —
+    // the pivot priority.
+    pub fn elim_cost(&self, k: &TngComplexKey) -> usize {
+        let v = &self.vertices[k];
+        let outs = v.out_edges.keys().filter(|l| self.edge(k, l).is_invertible()).map(|l| self.edge_weight(k, l));
+        let ins = v.in_edges.iter().filter(|j| self.edge(j, k).is_invertible()).map(|j| self.edge_weight(j, k));
+        outs.chain(ins).min().unwrap_or(0)
     }
 
     // Gaussian elimination — [BN07, Lemma 4.2].

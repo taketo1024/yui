@@ -52,3 +52,7 @@ mimalloc = "0.1"
 [[bench]]
 name = "kh"
 harness = false
+
+[[bench]]
+name = "khi"
+harness = false

@@ -16,7 +16,7 @@ use std::time::Instant;
 
 use yui_core::num::FF2;
 use yui_link::InvLink;
-use yui_kh::tng::builder::{SymTngBuilder, SymBuildConfig, BuildMode};
+use yui_kh::tng::builder::{SymTngBuilder, SymBuildConfig, BuildMode, NodeOrder};
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -58,10 +58,15 @@ fn main() {
         _ if std::env::var("SELECTIVE").is_ok() => BuildMode::Selective,
         _ => BuildMode::Greedy,
     };
+    // NODE=mincut → min-cutwidth crossing order (needed for K60 to avoid the cutwidth balloon).
+    let node = match std::env::var("NODE").ok().as_deref() {
+        Some("mincut") | Some("min-cut") => NodeOrder::MinCut,
+        _ => NodeOrder::LoopGreedy,
+    };
     // PREPROCESS=0 → skip the half-build/τ-mirror (which materializes the unbridged off-axis product); process incrementally.
     let preprocess = std::env::var("PREPROCESS").map_or(true, |s| s != "0");
 
-    let cfg = SymBuildConfig { pair_penalty_coeff, chunk_bound, h_range: h_range.clone(), mode, preprocess, ..Default::default() };
+    let cfg = SymBuildConfig { pair_penalty_coeff, chunk_bound, h_range: h_range.clone(), mode, node, preprocess, ..Default::default() };
 
     let t0 = Instant::now();
     let b = SymTngBuilder::<FF2>::from_inv_link(&l, &zero, &zero, false).with_config(cfg).run();

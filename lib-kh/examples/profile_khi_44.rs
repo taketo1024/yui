@@ -10,6 +10,7 @@ use std::time::Instant;
 
 use yui_core::num::FF2;
 use yui_link::InvLink;
+use yui_kh::kh::KhComplex;
 use yui_kh::tng::builder::{SymTngBuilder, SymBuildConfig, BuildMode, NodeOrder};
 
 #[global_allocator]
@@ -35,9 +36,11 @@ fn main() {
 
     let zero = FF2::default();
 
+    // H_RANGE=a..=b restricts the build; an open bottom `..=b` resolves to deg_shift.0.
     let h_range = std::env::var("H_RANGE").ok().map(|s| {
-        let (a, b) = s.split_once("..=").expect("H_RANGE must be `a..=b`");
-        a.trim().parse::<isize>().unwrap() ..= b.trim().parse::<isize>().unwrap()
+        let (a, b) = s.split_once("..=").or_else(|| s.split_once("..")).expect("H_RANGE must be `a..=b` or `..=b`");
+        let lo = if a.trim().is_empty() { KhComplex::<FF2>::deg_shift_for(l.inner(), false).0 } else { a.trim().parse().unwrap() };
+        lo ..= b.trim().parse::<isize>().unwrap()
     });
     let pair_penalty_coeff = std::env::var("PAIR_PENALTY").ok().map_or(1.0, |s| s.parse::<f64>().unwrap());
     let chunk_bound = std::env::var("CHUNK_BOUND").ok().map(|s| s.parse::<usize>().unwrap());

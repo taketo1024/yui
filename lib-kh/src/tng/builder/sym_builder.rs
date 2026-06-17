@@ -379,7 +379,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.prune_isolated_top(top);
         self.deloop_in(top, false, false);
         self.eliminate_in(top - 1);
-        self.eliminate_in(top);
+        // no eliminate_in(top): top has no outgoing edges, so it would be a no-op.
     }
 
     // Build degree `i`: the τ key-map slice, then its vertices and the edges into it.

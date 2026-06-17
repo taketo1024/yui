@@ -275,6 +275,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.vertices.len()
     }
 
+    pub fn n_edges(&self) -> usize {
+        self.vertices.values().map(|v| v.out_edges.len()).sum()
+    }
+
     // Total stored cobordism weight: number of cob monomials summed over all edges.
     pub fn cob_weight(&self) -> usize {
         self.vertices.values()
@@ -849,7 +853,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub(crate) fn stat(&self) -> String {
-        format!("(n: {}, v: {})", self.dim(), self.n_verts())
+        format!("(n: {}, v: {}, e: {}, w: {})", self.dim(), self.n_verts(), self.n_edges(), self.cob_weight())
     }
 
     pub(crate) fn convert_edges<F>(&self, f: F) -> Self

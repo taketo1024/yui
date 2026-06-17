@@ -87,13 +87,24 @@ pub enum Format {
     TeX
 }
 
-// parse an inclusive degree range like `-1..=2` (also accepts `-1..2`).
+// Parse an inclusive degree range like `-1..=2` (also accepts `-1..2`). An open bottom `..=2`
+// parses with a near-min sentinel start, an open top `-1..=` with a near-max end; the command
+// clamps these to the complex's degree span (so the bottom resolves to deg_shift.0). The `±1`
+// margin keeps a stray `start-1` / `end+1` widening from overflowing before the clamp.
 pub fn parse_h_range(s: &str) -> Result<RangeInclusive<isize>, String> {
     let (lo, hi) = s.split_once("..=")
         .or_else(|| s.split_once(".."))
-        .ok_or_else(|| format!("invalid range `{s}`, expected e.g. `-1..=2`"))?;
-    let parse = |x: &str| x.trim().parse::<isize>().map_err(|e| format!("`{x}`: {e}"));
-    Ok(parse(lo)? ..= parse(hi)?)
+        .ok_or_else(|| format!("invalid range `{s}`, expected e.g. `-1..=2` or `..=2`"))?;
+    let parse = |x: &str, open: isize| {
+        let x = x.trim();
+        if x.is_empty() { Ok(open) } else { x.parse::<isize>().map_err(|e| format!("`{x}`: {e}")) }
+    };
+    Ok(parse(lo, isize::MIN + 1)? ..= parse(hi, isize::MAX - 1)?)
+}
+
+// Clamp an h_range to `[lo, hi]`; open ends (the near-min/max sentinels) thus resolve to the span.
+pub fn clamp_h_range(r: RangeInclusive<isize>, lo: isize, hi: isize) -> RangeInclusive<isize> {
+    (*r.start()).max(lo) ..= (*r.end()).min(hi)
 }
 
 // parse a build mode: greedy | selective | min-fill | none.

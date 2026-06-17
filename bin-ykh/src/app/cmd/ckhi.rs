@@ -7,6 +7,7 @@ use std::str::FromStr;
 use yui_core::TeX;
 use yui_core::{Ring, RingOps};
 use yui_homology::ToTableString;
+use yui_kh::kh::KhComplex;
 use yui_kh::khi::KhIComplex;
 use yui_kh::tng::builder::{SymBuildConfig, BuildMode, NodeOrder};
 
@@ -111,8 +112,12 @@ where
         let ckhi = if self.args.no_simplify {
             KhIComplex::new_no_simplify(&l, &h, &t, self.args.reduced)
         } else {
+            let h_range = self.args.h_range.clone().map(|r| {
+                let lo = KhComplex::<R>::deg_shift_for(l.inner(), self.args.reduced).0;
+                clamp_h_range(r, lo, lo + l.inner().n_crossings() as isize + 1)
+            });
             let config = SymBuildConfig {
-                h_range: self.args.h_range.clone(),
+                h_range,
                 chunk_bound: self.args.chunk,
                 mode: self.args.mode,
                 node: self.args.node,

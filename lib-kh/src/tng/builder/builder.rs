@@ -22,58 +22,55 @@ use crate::kh::{KhChain, KhComplex};
 use crate::tng::{End, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
 use super::{reachable_range, node_arcs, pop_min_pivot, TngElemBuilder};
 
-/// How circles are delooped during the build.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub enum DeloopMode {
-    #[default]
-    Greedy,    // deloop every circle
-    Selective, // deloop only productive circles during build, full deloop at merge end
-    None,      // don't deloop
-}
-
-impl DeloopMode {
-    pub fn is_enabled(&self) -> bool {
-        *self != DeloopMode::None
-    }
-
-    pub fn is_selective(&self) -> bool {
-        *self == DeloopMode::Selective
-    }
-}
-
 /// How the next crossing to append is chosen.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub enum NodeStrategy {
+pub enum NodeOrder {
     #[default]
     LoopGreedy, // maximize loop closures unlocked (good when reduction is the bottleneck)
     MinCut,     // minimize the boundary cutwidth (bounds the dense-slice memory; needed for wide knots)
 }
 
-/// Whether invertible edges are gauss-eliminated during the build.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ElimMode {
-    Auto, // eliminate invertible edges
-    None, // don't eliminate
+/// How the complex is simplified while building.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum BuildMode {
+    #[default]
+    Greedy,    // deloop every circle, eliminate immediately
+    Selective, // deloop only productive circles, eliminate immediately (full deloop at merge end)
+    MinFill,   // deloop a whole degree, then eliminate by global min-fill (Markowitz)
+    None,      // don't deloop, don't eliminate (raw merge; finalize still deloops to a valid complex)
 }
 
-impl ElimMode {
-    pub fn is_enabled(&self) -> bool {
-        *self == ElimMode::Auto
+impl BuildMode {
+    // whether any simplification happens during the build (None = raw merge only).
+    pub fn is_active(&self) -> bool {
+        *self != BuildMode::None
+    }
+
+    pub fn is_selective(&self) -> bool {
+        *self == BuildMode::Selective
+    }
+
+    pub fn is_min_fill(&self) -> bool {
+        *self == BuildMode::MinFill
+    }
+
+    // whether each newly-delooped vertex is eliminated inline (vs deferred / not at all).
+    pub fn immediate_elim(&self) -> bool {
+        matches!(self, BuildMode::Greedy | BuildMode::Selective)
     }
 }
 
 /// Toggles for the automatic simplification done while building.
 #[derive(Clone, Debug)]
 pub struct BuildConfig {
-    pub strategy: NodeStrategy,
-    pub deloop_mode: DeloopMode,
-    pub elim_mode: ElimMode,
+    pub node: NodeOrder,
+    pub mode: BuildMode,
     pub h_range: Option<RangeInclusive<isize>>,
 }
 
 impl Default for BuildConfig {
     fn default() -> Self {
-        Self { strategy: NodeStrategy::default(), deloop_mode: DeloopMode::Greedy, elim_mode: ElimMode::Auto, h_range: None }
+        Self { node: NodeOrder::default(), mode: BuildMode::default(), h_range: None }
     }
 }
 
@@ -193,9 +190,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     /// Strategy score for appending `x` (higher is better).
     pub(crate) fn score_node(&self, x: &Node) -> isize {
-        match self.config.strategy {
-            NodeStrategy::LoopGreedy => self.loop_count(x),
-            NodeStrategy::MinCut => -self.cutwidth(x),
+        match self.config.node {
+            NodeOrder::LoopGreedy => self.loop_count(x),
+            NodeOrder::MinCut => -self.cutwidth(x),
         }
     }
 
@@ -251,60 +248,89 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.elements.append_node(x);
     }
 
-    pub(crate) fn merge(&mut self, other: TngComplex<R>) { 
+    pub(crate) fn merge(&mut self, other: TngComplex<R>) {
         debug!("merge {} + {}", self.stat(), other.stat());
 
         let (left, right) = self.complex.prepare_merge(other);
         let range = reachable_range(self.complex.h_range(), &self.config.h_range, self.nodes.len());
-        let top = *range.end();
-
         debug!("  merge range: {:?}", range);
 
-        // selective only makes sense with elimination (productive = "lets an elim fire").
-        let selective = self.config.deloop_mode.is_selective();
-
-        for i in range {
-            debug!("build C[{i}]...");
-
-            let nv = self.complex.merge_vertices(&left, &right, i);
-            debug!("  +{nv} verts");
-            
-            let ne = self.complex.merge_edges(&left, &right, i - 1);
-            debug!("  +{ne} edges");
-
-            if self.config.elim_mode.is_enabled() {
-                self.eliminate_in(i - 1);
-            }
-            if self.config.deloop_mode.is_enabled() {
-                self.deloop_in(i - 1, false, selective);
-            }
-            
-            debug!("  built C[{i}]: {}", self.complex.rank(i));
-        }
-
-        if self.config.deloop_mode.is_enabled() {
-            self.prune_isolated_top(top);
-            self.deloop_in(top, false, selective);
-
-            // re-run selective to a fixpoint (catch loops turned productive by later elims), then full-deloop the rest.
-            if selective {
-                let mut step = 0;
-                loop {
-                    let before = self.complex.n_verts();
-                    self.deloop_all(false, true);
-                    let after = self.complex.n_verts();
-                    debug!("  selective re-pass {step}: {before} -> {after} verts (diff {})",
-                        after as isize - before as isize);
-                    if after == before { break }
-                    step += 1;
-                }
-                self.deloop_all(false, false);
-            }
+        match self.config.mode {
+            BuildMode::None    => self.complex.merge_with(&left, &right),
+            BuildMode::MinFill => self.merge_deferred(&left, &right, range),
+            _                  => self.merge_immediate(&left, &right, range),
         }
 
         self.prune_h_range();
-
         debug!("  merged: {}", self.stat());
+    }
+
+    // Immediate: per degree, eliminate then deloop (deloop inline-eliminates each new vertex). Deloop
+    // may be selective (defer non-productive circles, then full-deloop + re-pass to a fixpoint at the end).
+    fn merge_immediate(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, range: RangeInclusive<isize>) {
+        let top = *range.end();
+        let selective = self.config.mode.is_selective();
+
+        for i in range {
+            debug!("build C[{i}]...");
+            self.merge_slice(left, right, i);
+            self.eliminate_in(i - 1);
+            self.deloop_in(i - 1, false, selective);
+            debug!("  built C[{i}]: {}", self.complex.rank(i));
+        }
+
+        self.prune_isolated_top(top);
+        self.deloop_in(top, false, selective);
+
+        // re-run selective to a fixpoint (catch loops turned productive by later elims), then full-deloop the rest.
+        if selective {
+            self.deloop_selective();
+            self.deloop_all(false, false);
+        }
+    }
+
+    // Repeatedly deloop productive circles until none remain — each elimination can turn a
+    // previously-deferred loop productive.
+    fn deloop_selective(&mut self) {
+        let mut step = 0;
+        loop {
+            let before = self.complex.n_verts();
+            debug!("selective re-pass {step}: start ({before} verts)");
+            self.deloop_all(false, true);
+            let after = self.complex.n_verts();
+            debug!("  selective re-pass {step}: {before} -> {after} verts (diff {})",
+                after as isize - before as isize);
+            if after == before { break }
+            step += 1;
+        }
+    }
+
+    // MinFill: per degree, deloop then eliminate i-1, i by global min-fill (incremental Markowitz).
+    // Always full-deloops — combining it with selective delooping only balloons the transient complex.
+    fn merge_deferred(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, range: RangeInclusive<isize>) {
+        let top = *range.end();
+
+        for i in range {
+            debug!("build C[{i}]...");
+            self.merge_slice(left, right, i);
+            self.deloop_in(i - 1, false, false);
+            self.eliminate_in(i - 2);
+            self.eliminate_in(i - 1);
+            debug!("  built C[{i}]: {}", self.complex.rank(i));
+        }
+
+        self.prune_isolated_top(top);
+        self.deloop_in(top, false, false);
+        self.eliminate_in(top - 1);
+        self.eliminate_in(top);
+    }
+
+    // Build degree `i`: merge in its vertices and the edges into it.
+    pub(super) fn merge_slice(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize) {
+        let nv = self.complex.merge_vertices(left, right, i);
+        debug!("  +{nv} verts");
+        let ne = self.complex.merge_edges(left, right, i - 1);
+        debug!("  +{ne} edges");
     }
 
     /// Drop vertices that can't end up in `config.h_range`: degree `d` ends in
@@ -358,7 +384,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let c = TngComplex::from_loop(h, t, c, marked);
             self.merge(c);
 
-            if self.config.deloop_mode.is_enabled() { 
+            if self.config.mode.is_active() {
                 self.deloop_all(false, false);
             }
         }
@@ -430,7 +456,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let mut added = self.complex.deloop(k, r);
 
-        if self.config.elim_mode.is_enabled() {
+        // immediate elim eliminates each new vertex now; min-fill leaves them for the post-deloop
+        // global pass, None leaves them entirely.
+        if self.config.mode.immediate_elim() {
             // retain only the keys that weren't eliminated
             added.retain(|k| !self.try_eliminate_at(k));
         }
@@ -609,6 +637,28 @@ mod tests {
         assert_eq!(c[-2].rank(), 2);
         assert_eq!(c[-1].rank(), 0);
         assert_eq!(c[ 0].rank(), 2);
+    }
+
+    #[test]
+    fn test_build_modes_agree() {
+        // all build modes must produce identical homology (incl. torsion).
+        let l = Link::test_data("8_19");
+        let build = |mode| {
+            let config = BuildConfig { mode, ..Default::default() };
+            TngComplexBuilder::from_link(&l, &0, &0, false).with_config(config).run()
+                .into_tng_complex().into_raw_complex()
+        };
+
+        let ref_h = build(BuildMode::Greedy).homology();
+        for mode in [BuildMode::Selective, BuildMode::MinFill, BuildMode::None] {
+            let c = build(mode);
+            c.check_d_all();
+            let h = c.homology();
+            for i in 0..=8 {
+                assert_eq!(h[i].rank(), ref_h[i].rank(), "rank at {i}, {mode:?}");
+                assert_eq!(h[i].tors(), ref_h[i].tors(), "tors at {i}, {mode:?}");
+            }
+        }
     }
 
     #[test]

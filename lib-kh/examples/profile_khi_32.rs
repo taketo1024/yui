@@ -13,7 +13,7 @@ use std::time::Instant;
 
 use yui_core::num::FF2;
 use yui_link::InvLink;
-use yui_kh::tng::builder::{SymTngBuilder, SymBuildConfig, DeloopMode, NodeStrategy};
+use yui_kh::tng::builder::{SymTngBuilder, SymBuildConfig, BuildMode, NodeOrder};
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -42,16 +42,21 @@ fn main() {
     });
     let pair_penalty_coeff = std::env::var("PAIR_PENALTY").ok().map_or(1.0, |s| s.parse::<f64>().unwrap());
     let chunk_bound = std::env::var("CHUNK_BOUND").ok().map(|s| s.parse::<usize>().unwrap());
-    // SELECTIVE=1 → deloop only productive circles during build (bounds the memory balloon).
-    let deloop_mode = if std::env::var("SELECTIVE").is_ok() { DeloopMode::Selective } else { DeloopMode::Greedy };
+    // ELIM=deferred → MinFill (deloop a whole degree, then global min-fill eliminate);
+    // else SELECTIVE=1 → Selective (deloop only productive circles); else Greedy.
+    let mode = match std::env::var("ELIM").ok().as_deref() {
+        Some("deferred") | Some("d") => BuildMode::MinFill,
+        _ if std::env::var("SELECTIVE").is_ok() => BuildMode::Selective,
+        _ => BuildMode::Greedy,
+    };
 
-    // STRATEGY=mincut → min-cutwidth crossing order (bounds the dense-slice memory).
-    let strategy = match std::env::var("STRATEGY").ok().as_deref() {
-        Some("mincut") | Some("min-cut") => NodeStrategy::MinCut,
-        _ => NodeStrategy::LoopGreedy,
+    // NODE=mincut → min-cutwidth crossing order (bounds the dense-slice memory).
+    let node = match std::env::var("NODE").ok().as_deref() {
+        Some("mincut") | Some("min-cut") => NodeOrder::MinCut,
+        _ => NodeOrder::LoopGreedy,
     };
     let preprocess = std::env::var("PREPROCESS").map_or(true, |s| s != "0");
-    let cfg = SymBuildConfig { pair_penalty_coeff, chunk_bound, h_range: h_range.clone(), deloop_mode, strategy, preprocess, ..Default::default() };
+    let cfg = SymBuildConfig { pair_penalty_coeff, chunk_bound, h_range: h_range.clone(), mode, node, preprocess, ..Default::default() };
 
     let t0 = Instant::now();
     let b = SymTngBuilder::<FF2>::from_inv_link(&l, &zero, &zero, false).with_config(cfg).run();

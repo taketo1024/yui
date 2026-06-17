@@ -19,7 +19,7 @@ use std::time::Instant;
 use num_bigint::BigInt;
 use yui_link::Braid;
 use yui_kh::kh::KhComplex;
-use yui_kh::tng::builder::{BuildConfig, DeloopMode};
+use yui_kh::tng::builder::{BuildConfig, BuildMode};
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -40,8 +40,8 @@ fn main() {
     let l = braid.closure();
 
     // SELECTIVE=1 → deloop only productive circles during build.
-    let deloop_mode = if std::env::var("SELECTIVE").is_ok() { DeloopMode::Selective } else { DeloopMode::Greedy };
-    let cfg = BuildConfig { deloop_mode, ..Default::default() };
+    let mode = if std::env::var("SELECTIVE").is_ok() { BuildMode::Selective } else { BuildMode::Greedy };
+    let cfg = BuildConfig { mode, ..Default::default() };
 
     // `BigInt` because even `i128` overflows mid-run on this knot (the
     // earlier i128 attempt panicked at step 42/45 in apply_bilin's `r * s`).

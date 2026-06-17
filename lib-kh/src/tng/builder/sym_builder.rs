@@ -21,17 +21,16 @@ use yui_link::{Node, Edge, InvLink};
 
 use crate::kh::{KhGen, KhTensor};
 use crate::tng::{End, LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
-use crate::tng::builder::{TngComplexBuilder, BuildConfig, DeloopMode, ElimMode, NodeStrategy};
+use crate::tng::builder::{TngComplexBuilder, BuildConfig, BuildMode, NodeOrder};
 use super::{reachable_range, pop_min_pivot};
 
 /// Toggles for the automatic simplification done while building (kept separate
 /// from [`BuildConfig`] so the equivariant builder can gain its own flags).
 #[derive(Clone, Debug)]
 pub struct SymBuildConfig {
-    // crossing-order strategy: LoopGreedy (default) or MinCut (bounds cutwidth for wide knots).
-    pub strategy: NodeStrategy,
-    pub deloop_mode: DeloopMode,
-    pub elim_mode: ElimMode,
+    // crossing order: LoopGreedy (default) or MinCut (bounds cutwidth for wide knots).
+    pub node: NodeOrder,
+    pub mode: BuildMode,
     // build half the off-axis crossings and mirror via τ (see `preprocess`).
     pub preprocess: bool,
     // chooser handicap on an off-axis pair = coeff · current size (its extra growth).
@@ -45,7 +44,7 @@ pub struct SymBuildConfig {
 
 impl Default for SymBuildConfig {
     fn default() -> Self {
-        Self { strategy: NodeStrategy::default(), deloop_mode: DeloopMode::Greedy, elim_mode: ElimMode::Auto, preprocess: true, pair_penalty_coeff: 1.0, chunk_bound: None, h_range: None }
+        Self { node: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, pair_penalty_coeff: 1.0, chunk_bound: None, h_range: None }
     }
 }
 
@@ -142,7 +141,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         // the inner builder is driven by `self` — disable its own auto-simplify.
         let inner = TngComplexBuilder::from_link(l.inner(), h, t, reduced)
-            .with_config(BuildConfig { deloop_mode: DeloopMode::None, elim_mode: ElimMode::None, strategy: NodeStrategy::default(), h_range: None });
+            .with_config(BuildConfig { mode: BuildMode::None, node: NodeOrder::default(), h_range: None });
 
         let x_map = l.nodes().map(|x|
             (x.clone(), l.inv_node(x).clone())
@@ -157,7 +156,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn with_config(mut self, config: SymBuildConfig) -> Self {
         // propagate the window to the inner builder so the preprocess merges cap
         // to it; this also drops canon cycles when the window excludes h-degree 0.
-        let inner_config = BuildConfig { deloop_mode: DeloopMode::None, elim_mode: ElimMode::None, strategy: config.strategy, h_range: config.h_range.clone() };
+        let inner_config = BuildConfig { mode: BuildMode::None, node: config.node, h_range: config.h_range.clone() };
         self.inner = self.inner.with_config(inner_config);
         self.config = config;
         self
@@ -215,19 +214,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    /// Pick the next τ-unit by strategy, ties broken by earliest crossing order. MinCut scores the
+    /// Pick the next τ-unit by node order, ties broken by earliest crossing order. MinCut scores the
     /// *combined* x+τx toggle (a shared axis edge cancels — can't be summed); LoopGreedy sums loops.
     fn choose_next_node_sym(&self) -> Option<&Node> {
         let pair_penalty = (self.config.pair_penalty_coeff * self.inner.complex().n_verts() as f64) as isize;
         self.inner.nodes().enumerate()
             .min_by_key(|(i, x)| {
                 let tx = self.inv_node(x);
-                let score = match self.config.strategy {
-                    NodeStrategy::LoopGreedy => {
+                let score = match self.config.node {
+                    NodeOrder::LoopGreedy => {
                         if tx == *x { self.inner.loop_count(x) }
                         else { self.inner.loop_count(x) + self.inner.loop_count(tx) - pair_penalty }
                     },
-                    NodeStrategy::MinCut => {
+                    NodeOrder::MinCut => {
                         let mut edges = x.edges().to_vec();
                         if tx != *x { edges.extend_from_slice(tx.edges()); }
                         -self.inner.cutwidth_of(edges)
@@ -306,54 +305,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let left_map = std::mem::take(&mut self.key_map);
 
         let (left, right) = self.inner.complex_mut().prepare_merge(c);
-
         let range = reachable_range(self.inner.complex().h_range(), &self.config.h_range, self.inner.nodes().count());
-        let top = *range.end();
-
         debug!("  merge range: {:?}", range);
 
-        // selective only makes sense with elimination (productive = "lets an elim fire").
-        let selective = self.config.deloop_mode.is_selective();
-
-        for i in range {
-            debug!("build C[{i}]...");
-
-            self.merge_key_slice(&left, &right, i, &left_map, &right_map);
-
-            let nv = self.inner.complex_mut().merge_vertices(&left, &right, i);
-            debug!("  +{nv} verts");
-
-            let ne = self.inner.complex_mut().merge_edges(&left, &right, i - 1);
-            debug!("  +{ne} edges");
-
-            if self.config.elim_mode.is_enabled() {
-                self.eliminate_in(i - 1);
-            }
-            if self.config.deloop_mode.is_enabled() {
-                self.deloop_in(i - 1, false, selective);
-            }
-
-            debug!("  built C[{i}]: {}", self.inner.complex().rank(i));
-        }
-
-        if self.config.deloop_mode.is_enabled() {
-            self.prune_isolated_top(top);
-            self.deloop_in(top, false, selective);
-
-            // re-run selective to a fixpoint (catch loops turned productive by later equiv elims), then full-deloop the rest.
-            if selective {
-                let mut step = 0;
-                loop {
-                    let before = self.inner.complex().n_verts();
-                    self.deloop_all(false, true);
-                    let after = self.inner.complex().n_verts();
-                    debug!("  selective re-pass {step}: {before} -> {after} verts (diff {})",
-                        after as isize - before as isize);
-                    if after == before { break }
-                    step += 1;
-                }
-                self.deloop_all(false, false);
-            }
+        match self.config.mode {
+            BuildMode::None    => for i in range { self.merge_slice(&left, &right, i, &left_map, &right_map); },
+            BuildMode::MinFill => self.merge_deferred(&left, &right, range, &left_map, &right_map),
+            _                  => self.merge_immediate(&left, &right, range, &left_map, &right_map),
         }
 
         self.prune_h_range();
@@ -362,61 +320,72 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         debug!("  key_map built: {}", self.key_map.len());
         debug!("  merged: {} + {} -> {}", left.stat(), right.stat(), self.inner.stat());
+    }
 
-        if std::env::var("COB_STATS").is_ok() && self.inner.complex().n_verts() > 20000 {
-            self.log_cob_stats();
+    // Immediate: per degree, eliminate then deloop (deloop inline-eliminates each new vertex). Deloop
+    // may be selective (defer non-productive circles, then full-deloop + re-pass to a fixpoint at the end).
+    fn merge_immediate(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, range: RangeInclusive<isize>, left_map: &TauKeyMap, right_map: &TauKeyMap) {
+        let top = *range.end();
+        let selective = self.config.mode.is_selective();
+
+        for i in range {
+            debug!("build C[{i}]...");
+            self.merge_slice(left, right, i, left_map, right_map);
+            self.eliminate_in(i - 1);
+            self.deloop_in(i - 1, false, selective);
+            debug!("  built C[{i}]: {}", self.inner.complex().rank(i));
+        }
+
+        self.prune_isolated_top(top);
+        self.deloop_in(top, false, selective);
+
+        // re-run selective to a fixpoint (catch loops turned productive by later equiv elims), then full-deloop the rest.
+        if selective {
+            self.deloop_selective();
+            self.deloop_all(false, false);
         }
     }
 
-    // One-off memory probe: walk all edge cobs, tabulate single-component fraction (→ SmallVec win)
-    // and Tng/Cob duplication (→ interning win), plus a rough live-bytes estimate.
-    fn log_cob_stats(&self) {
-        use std::collections::HashSet;
-        use std::mem::size_of;
-        use crate::tng::{Cob, Tng, TngComp, cob::CobComp};
+    // Repeatedly deloop productive circles until none remain — each equiv elimination can turn a
+    // previously-deferred loop productive.
+    fn deloop_selective(&mut self) {
+        let mut step = 0;
+        loop {
+            let before = self.inner.complex().n_verts();
+            debug!("selective re-pass {step}: start ({before} verts)");
+            self.deloop_all(false, true);
+            let after = self.inner.complex().n_verts();
+            debug!("  selective re-pass {step}: {before} -> {after} verts (diff {})",
+                after as isize - before as isize);
+            if after == before { break }
+            step += 1;
+        }
+    }
 
-        let c = self.inner.complex();
-        let (mut n_cob, mut cob_single, mut n_cobcomp) = (0usize, 0usize, 0usize);
-        let (mut n_tng, mut tng_single, mut tng_comp_sum) = (0usize, 0usize, 0usize);
-        let mut distinct_tng: HashSet<&Tng> = HashSet::new();
-        let mut distinct_cob: HashSet<&Cob> = HashSet::new();
+    // MinFill: per degree, deloop then eliminate i-1, i by global equivariant min-fill (incremental
+    // Markowitz). Always full-deloops — combining it with selective delooping only balloons the transient.
+    fn merge_deferred(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, range: RangeInclusive<isize>, left_map: &TauKeyMap, right_map: &TauKeyMap) {
+        let top = *range.end();
 
-        for (k, v) in c.iter_verts() {
-            for l in v.out_edges() {
-                for (cob, _) in c.edge(k, l).iter() {
-                    n_cob += 1;
-                    distinct_cob.insert(cob);
-                    let nc = cob.comps().count();
-                    if nc == 1 { cob_single += 1; }
-                    n_cobcomp += nc;
-                    for cc in cob.comps() {
-                        for tng in [cc.src(), cc.tgt()] {
-                            n_tng += 1;
-                            distinct_tng.insert(tng);
-                            let tl = tng.comps().count();
-                            tng_comp_sum += tl;
-                            if tl == 1 { tng_single += 1; }
-                        }
-                    }
-                }
-            }
+        for i in range {
+            debug!("build C[{i}]...");
+            self.merge_slice(left, right, i, left_map, right_map);
+            self.deloop_in(i - 1, false, false);
+            self.eliminate_in(i - 2);
+            self.eliminate_in(i - 1);
+            debug!("  built C[{i}]: {}", self.inner.complex().rank(i));
         }
 
-        let pct = |a: usize, b: usize| 100.0 * a as f64 / b.max(1) as f64;
-        let ratio = |a: usize, b: usize| a as f64 / b.max(1) as f64;
-        // live bytes of the Tng data alone (the dedup target): each instance = Vec header + comps.
-        let tng_bytes = n_tng * size_of::<Vec<TngComp>>() + tng_comp_sum * size_of::<TngComp>();
-        let tng_dedup_bytes = distinct_tng.len() * size_of::<Vec<TngComp>>()
-            + (tng_comp_sum / n_tng.max(1)) * distinct_tng.len() * size_of::<TngComp>();
+        self.prune_isolated_top(top);
+        self.deloop_in(top, false, false);
+        self.eliminate_in(top - 1);
+        self.eliminate_in(top);
+    }
 
-        info!("cob stats @ {} verts (sizeof Cob={}, CobComp={}, Tng={}, TngComp={}):",
-            c.n_verts(), size_of::<Cob>(), size_of::<CobComp>(), size_of::<Tng>(), size_of::<TngComp>());
-        info!("  Cob terms={n_cob}, single-comp={:.1}%, avg comps={:.2}", pct(cob_single, n_cob), ratio(n_cobcomp, n_cob));
-        info!("  Tng instances={n_tng}, single-comp={:.1}%, avg comps={:.2}", pct(tng_single, n_tng), ratio(tng_comp_sum, n_tng));
-        info!("  DEDUP: distinct Tng={}/{} ({:.1}x), distinct Cob={}/{} ({:.1}x)",
-            distinct_tng.len(), n_tng, ratio(n_tng, distinct_tng.len()), distinct_cob.len(), n_cob, ratio(n_cob, distinct_cob.len()));
-        info!("  Tng live≈{:.0}MB → interned≈{:.0}MB (save {:.0}MB)",
-            tng_bytes as f64/1e6, tng_dedup_bytes as f64/1e6, (tng_bytes - tng_dedup_bytes) as f64/1e6);
+    // Build degree `i`: the τ key-map slice, then its vertices and the edges into it.
+    fn merge_slice(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize, left_map: &TauKeyMap, right_map: &TauKeyMap) {
+        self.merge_key_slice(left, right, i, left_map, right_map);
+        self.inner.merge_slice(left, right, i);
     }
 
     // Degree-i slice of the merged τ key-map: k1+k2 ↦ τk1+τk2 (τ preserves degree,
@@ -573,7 +542,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.deloop_off_axis(k, r)
         };
 
-        if self.config.elim_mode.is_enabled() {
+        // immediate elim eliminates each new vertex now; min-fill leaves them for the post-deloop
+        // global pass, None leaves them entirely.
+        if self.config.mode.immediate_elim() {
             added.retain(|k|
                 self.inner.complex().contains_key(k) &&
                 !self.try_eliminate_equiv_at(k)
@@ -878,12 +849,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     // The next crossing to absorb: boundary-connected and honoring the on-axis target, chosen by
-    // strategy (MinCut → smallest resulting cutwidth; LoopGreedy → first in crossing order).
+    // node order (MinCut → smallest resulting cutwidth; LoopGreedy → first in crossing order).
     fn pick_next(&self, remaining: &[Node], chunk: &[Node], open: &FxHashSet<Edge>, prefer_on: bool) -> Option<Node> {
         let connected = |x: &&Node| !chunk.contains(*x) && x.edges().iter().any(|e| open.contains(e));
-        let pick = |pool: Vec<&Node>| match self.builder.config.strategy {
-            NodeStrategy::MinCut => pool.into_iter().min_by_key(|x| self.unit_cutwidth(x, open)).cloned(),
-            NodeStrategy::LoopGreedy => pool.into_iter().next().cloned(),
+        let pick = |pool: Vec<&Node>| match self.builder.config.node {
+            NodeOrder::MinCut => pool.into_iter().min_by_key(|x| self.unit_cutwidth(x, open)).cloned(),
+            NodeOrder::LoopGreedy => pool.into_iter().next().cloned(),
         };
         pick(remaining.iter().filter(|x| connected(x) && self.is_on_axis(x) == prefer_on).collect())
             .or_else(|| pick(remaining.iter().filter(connected).collect()))
@@ -913,7 +884,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let (h, t) = self.builder.inner.complex().ht();
         let base_pt = self.builder.inner.complex().base_pt();
         let mut inner = TngComplexBuilder::init(h, t, (0, 0), base_pt)
-            .with_config(BuildConfig { deloop_mode: DeloopMode::None, elim_mode: ElimMode::None, strategy: self.builder.config.strategy, h_range: None });
+            .with_config(BuildConfig { mode: BuildMode::None, node: self.builder.config.node, h_range: None });
         inner.set_nodes(chunk.iter().cloned());
 
         // cap the child to the chunk's reachable band: a chunk vertex of weight
@@ -1056,12 +1027,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn half_builder(&self) -> TngComplexBuilder<R> {
         let (h, t) = self.builder.inner.complex().ht();
         let base_pt = self.builder.inner.complex().base_pt();
-        let strategy = self.builder.config.strategy;
+        let node = self.builder.config.node;
         let h_range = self.builder.config.h_range.as_ref().map(|w|
             0 ..= (*w.end() - self.builder.inner.complex().deg_shift().0)
         );
         TngComplexBuilder::init(h, t, (0, 0), base_pt)
-            .with_config(BuildConfig { strategy, h_range, ..Default::default() })
+            .with_config(BuildConfig { node, h_range, ..Default::default() })
     }
 
 
@@ -1102,6 +1073,32 @@ mod tests {
             z.clone() + z.apply(|x| Lc::from(t(x)))
         });
         one_plus_tau.cone(h_range, false)
+    }
+
+    #[test]
+    fn build_modes_agree() {
+        // all build modes on the sym builder must agree on homology.
+        let l = InvLink::from_symmetric_pd_code(
+            [[18,8,1,7],[13,6,14,7],[12,2,13,1],[8,18,9,17],[5,14,6,15],[2,12,3,11],[16,10,17,9],[15,4,16,5],[10,4,11,3]]
+        );
+        let (h, t) = (FF2::zero(), FF2::zero());
+        let build = |mode| {
+            let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
+            b.config.mode = mode;
+            b.run().into_tng_complex().into_raw_complex()
+        };
+
+        let ref_c = build(BuildMode::Greedy);
+        let range = ref_c.support().cloned().range().unwrap();
+        let ref_h = ref_c.homology();
+        for mode in [BuildMode::Selective, BuildMode::MinFill, BuildMode::None] {
+            let c = build(mode);
+            c.check_d_all();
+            let h = c.homology();
+            for i in range.clone() {
+                assert_eq!(h[i].rank(), ref_h[i].rank(), "rank at {i}, {mode:?}");
+            }
+        }
     }
 
     #[test]
@@ -1174,7 +1171,7 @@ mod tests {
         let (h, t) = (FF2::zero(), FF2::zero());
 
         let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
-        b.config.elim_mode = ElimMode::None;
+        b.config.mode = BuildMode::None;
         let c = b.run().into_tng_complex().into_raw_complex();
         c.check_d_all();
 
@@ -1193,7 +1190,7 @@ mod tests {
         let (h, t) = (FF2::zero(), FF2::zero());
 
         let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
-        b.config.elim_mode = ElimMode::None;
+        b.config.mode = BuildMode::None;
         b.config.h_range = Some(0..=3);
         let c = b.run().into_tng_complex().into_raw_complex();
         c.check_d_all();
@@ -1263,11 +1260,13 @@ mod tests {
 
     #[test]
     fn no_auto_deloop() {
+        // BuildMode::None defers all deloop to finalize and never eliminates, so the
+        // finalized complex is delooped but unreduced.
         let l = InvLink::test_data("3_1");
         let (h, t) = (FF2::zero(), FF2::zero());
 
         let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
-        b.config.deloop_mode = DeloopMode::None;
+        b.config.mode = BuildMode::None;
         b.process_nodes();
 
         assert!(!b.inner.complex().is_completely_delooped());
@@ -1277,35 +1276,11 @@ mod tests {
         assert!(b.inner.complex().is_completely_delooped());
 
         let c = b.into_tng_complex().into_raw_complex();
-        assert_eq!(c[0].rank(), 2);
-        assert_eq!(c[1].rank(), 0);
-        assert_eq!(c[2].rank(), 2);
-        assert_eq!(c[3].rank(), 2);
-        
-        let h = c.homology();
-        assert_eq!(h[0].rank(), 2);
-        assert_eq!(h[1].rank(), 0);
-        assert_eq!(h[2].rank(), 2);
-        assert_eq!(h[3].rank(), 2);
-    }
-
-    #[test]
-    fn no_auto_elim() { 
-        let l = InvLink::test_data("3_1");
-        let (h, t) = (FF2::zero(), FF2::zero());
-
-        let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
-        b.config.elim_mode = ElimMode::None;
-        b.process_nodes();
-
-        assert!(b.inner.complex().is_completely_delooped());
-
-        let c = b.into_tng_complex().into_raw_complex();
         assert_eq!(c[0].rank(), 4);
         assert_eq!(c[1].rank(), 6);
         assert_eq!(c[2].rank(), 12);
         assert_eq!(c[3].rank(), 8);
-        
+
         let h = c.homology();
         assert_eq!(h[0].rank(), 2);
         assert_eq!(h[1].rank(), 0);

@@ -20,10 +20,10 @@ use yui_core::num::FF2;
 use yui_link::{InvLink, Link};
 use yui_kh::kh::KhComplex;
 use yui_kh::khi::KhIComplex;
-use yui_kh::tng::builder::{BuildConfig, SymBuildConfig, NodeStrategy};
+use yui_kh::tng::builder::{BuildConfig, SymBuildConfig, NodeOrder};
 
-const STRATEGIES: [(&str, NodeStrategy); 2] =
-    [("loop", NodeStrategy::LoopGreedy), ("mincut", NodeStrategy::MinCut)];
+const NODE_ORDERS: [(&str, NodeOrder); 2] =
+    [("loop", NodeOrder::LoopGreedy), ("mincut", NodeOrder::MinCut)];
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -34,9 +34,9 @@ fn bench_kh_complex_new(c: &mut Criterion) {
 
     for name in ["3_1", "5_1", "6_3", "8_19"] {
         let l = Link::test_data(name);
-        for (sn, strategy) in STRATEGIES {
+        for (sn, node) in NODE_ORDERS {
             group.bench_function(format!("{name}/{sn}"), |b| {
-                b.iter(|| KhComplex::<i32>::new_with_config(&l, &0, &0, false, BuildConfig { strategy, ..Default::default() }))
+                b.iter(|| KhComplex::<i32>::new_with_config(&l, &0, &0, false, BuildConfig { node, ..Default::default() }))
             });
         }
     }
@@ -45,9 +45,9 @@ fn bench_kh_complex_new(c: &mut Criterion) {
     {
         let l = Link::test_data("14n_19265");
         group.sample_size(10);
-        for (sn, strategy) in STRATEGIES {
+        for (sn, node) in NODE_ORDERS {
             group.bench_function(format!("14n_19265/{sn}"), |b| {
-                b.iter(|| KhComplex::<i32>::new_with_config(&l, &0, &0, false, BuildConfig { strategy, ..Default::default() }))
+                b.iter(|| KhComplex::<i32>::new_with_config(&l, &0, &0, false, BuildConfig { node, ..Default::default() }))
             });
         }
     }
@@ -65,9 +65,9 @@ fn bench_khi_complex_new(c: &mut Criterion) {
 
     for name in ["3_1", "4_1", "6_3"] {
         let l = InvLink::test_data(name);
-        for (sn, strategy) in STRATEGIES {
+        for (sn, node) in NODE_ORDERS {
             group.bench_function(format!("{name}/{sn}"), |b| {
-                b.iter(|| KhIComplex::<FF2>::new_with_config(&l, &zero, &zero, false, SymBuildConfig { strategy, ..Default::default() }))
+                b.iter(|| KhIComplex::<FF2>::new_with_config(&l, &zero, &zero, false, SymBuildConfig { node, ..Default::default() }))
             });
         }
     }
@@ -105,13 +105,13 @@ fn bench_khi_complex_k18(c: &mut Criterion) {
 
 /// Selective-deloop variant — the path that exercises `is_dotted_cup`.
 fn bench_khi_selective(c: &mut Criterion) {
-    use yui_kh::tng::builder::{SymBuildConfig, DeloopMode};
+    use yui_kh::tng::builder::{SymBuildConfig, BuildMode};
 
     let mut group = c.benchmark_group("khi_selective");
     group.sample_size(10);
 
     let zero = FF2::default();
-    let sel = || SymBuildConfig { deloop_mode: DeloopMode::Selective, ..Default::default() };
+    let sel = || SymBuildConfig { mode: BuildMode::Selective, ..Default::default() };
 
     for name in ["3_1", "4_1", "6_3"] {
         let l = InvLink::test_data(name);

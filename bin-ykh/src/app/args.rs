@@ -1,7 +1,7 @@
 use std::ops::RangeInclusive;
 use clap::ValueEnum;
 use derive_more::Display;
-use yui_kh::tng::builder::{DeloopMode, NodeStrategy};
+use yui_kh::tng::builder::{BuildMode, NodeOrder};
 
 pub trait AppArgs { 
     fn c_type(&self) -> CType; 
@@ -96,21 +96,22 @@ pub fn parse_h_range(s: &str) -> Result<RangeInclusive<isize>, String> {
     Ok(parse(lo)? ..= parse(hi)?)
 }
 
-// parse a deloop mode: greedy | selective | none.
-pub fn parse_deloop_mode(s: &str) -> Result<DeloopMode, String> {
+// parse a build mode: greedy | selective | min-fill | none.
+pub fn parse_build_mode(s: &str) -> Result<BuildMode, String> {
     match s.to_lowercase().as_str() {
-        "greedy"    => Ok(DeloopMode::Greedy),
-        "selective" => Ok(DeloopMode::Selective),
-        "none"      => Ok(DeloopMode::None),
-        _ => Err(format!("invalid deloop-mode `{s}`, expected greedy|selective|none")),
+        "greedy"               => Ok(BuildMode::Greedy),
+        "selective"            => Ok(BuildMode::Selective),
+        "min-fill" | "minfill" => Ok(BuildMode::MinFill),
+        "none"                 => Ok(BuildMode::None),
+        _ => Err(format!("invalid mode `{s}`, expected greedy|selective|min-fill|none")),
     }
 }
 
-// parse a node-order strategy: loop-greedy | min-cut.
-pub fn parse_strategy(s: &str) -> Result<NodeStrategy, String> {
+// parse a node order: loop-greedy | min-cut.
+pub fn parse_node_order(s: &str) -> Result<NodeOrder, String> {
     match s.to_lowercase().as_str() {
-        "loop-greedy" | "loopgreedy" | "loop" => Ok(NodeStrategy::LoopGreedy),
-        "min-cut" | "mincut" | "min"          => Ok(NodeStrategy::MinCut),
-        _ => Err(format!("invalid strategy `{s}`, expected loop-greedy|min-cut")),
+        "loop-greedy" | "loopgreedy" | "loop" => Ok(NodeOrder::LoopGreedy),
+        "min-cut" | "mincut" | "min"          => Ok(NodeOrder::MinCut),
+        _ => Err(format!("invalid node order `{s}`, expected loop-greedy|min-cut")),
     }
 }

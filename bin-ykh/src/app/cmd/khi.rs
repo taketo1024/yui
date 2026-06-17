@@ -5,7 +5,7 @@ use yui_core::TeX;
 use yui_core::{EucRing, EucRingOps};
 use yui_homology::{ToSeqString, ToTableString};
 use yui_kh::khi::{KhIChain, KhIHomology};
-use yui_kh::tng::builder::{SymBuildConfig, DeloopMode, NodeStrategy};
+use yui_kh::tng::builder::{SymBuildConfig, BuildMode, NodeOrder};
 use yui_link::InvLink;
 use crate::app::args::*;
 use crate::app::utils::*;
@@ -49,12 +49,12 @@ pub struct Args {
     #[arg(long)]
     pub chunk: Option<usize>,
 
-    #[arg(long, value_parser = parse_deloop_mode, default_value = "greedy")]
-    pub deloop_mode: DeloopMode,
+    #[arg(long, value_parser = parse_build_mode, default_value = "greedy")]
+    pub mode: BuildMode,
 
-    // crossing-order strategy: loop-greedy (default) or min-cut (bounds cutwidth for wide knots).
-    #[arg(long, value_parser = parse_strategy, default_value = "loop-greedy")]
-    pub strategy: NodeStrategy,
+    // crossing order: loop-greedy (default) or min-cut (bounds cutwidth for wide knots).
+    #[arg(long, value_parser = parse_node_order, default_value = "loop-greedy")]
+    pub node: NodeOrder,
 
     // skip the half-build/τ-mirror preprocess (which materializes the unbridged off-axis product).
     #[arg(long)]
@@ -122,8 +122,8 @@ where
             let config = SymBuildConfig {
                 h_range: self.args.h_range.clone(),
                 chunk_bound: self.args.chunk,
-                deloop_mode: self.args.deloop_mode,
-                strategy: self.args.strategy,
+                mode: self.args.mode,
+                node: self.args.node,
                 preprocess: !self.args.no_preprocess,
                 ..Default::default()
             };

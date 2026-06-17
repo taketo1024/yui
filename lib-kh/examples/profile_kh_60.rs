@@ -14,7 +14,7 @@ use std::time::Instant;
 use yui_core::num::FF2;
 use yui_link::InvLink;
 use yui_kh::kh::KhComplex;
-use yui_kh::tng::builder::{BuildConfig, DeloopMode};
+use yui_kh::tng::builder::{BuildConfig, BuildMode};
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -49,16 +49,16 @@ fn main() {
     });
     let h_range: Option<RangeInclusive<isize>> = h_range;
     // SELECTIVE=1 → deloop only productive circles during build.
-    let deloop_mode = if std::env::var("SELECTIVE").is_ok() { DeloopMode::Selective } else { DeloopMode::Greedy };
+    let mode = if std::env::var("SELECTIVE").is_ok() { BuildMode::Selective } else { BuildMode::Greedy };
 
-    let cfg = BuildConfig { deloop_mode, h_range: h_range.clone(), ..Default::default() };
+    let cfg = BuildConfig { mode, h_range: h_range.clone(), ..Default::default() };
 
     let t0 = Instant::now();
     let c = KhComplex::<FF2>::new_with_config(l, &zero, &zero, false, cfg);
     let elapsed = t0.elapsed();
 
     println!("\n=== summary ===");
-    println!("knot: 60-crossing (non-sym, FF2), deloop_mode: {deloop_mode:?}");
+    println!("knot: 60-crossing (non-sym, FF2), mode: {mode:?}");
     println!("KhComplex::new total: {elapsed:?}");
     println!("h-range: {:?}, h_range arg: {:?}", c.h_range(), h_range);
 }

@@ -271,8 +271,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.vertices[v]
     }
 
-    pub fn n_verts(&self) -> usize { 
+    pub fn n_verts(&self) -> usize {
         self.vertices.len()
+    }
+
+    // Total stored cobordism weight: number of cob monomials summed over all edges.
+    pub fn cob_weight(&self) -> usize {
+        self.vertices.values()
+            .flat_map(|v| v.out_edges.values())
+            .map(|f| f.nterms())
+            .sum()
     }
 
     pub fn iter_verts(&self) -> impl Iterator<Item = (&TngComplexKey, &TngComplexVertex<R>)> {
@@ -419,12 +427,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     // See [Bar-Natan '05] Section 5.
     // https://arxiv.org/abs/math/0410495
-    pub fn merge(&mut self, other: TngComplex<R>) { 
+    pub fn merge(&mut self, other: TngComplex<R>) {
         let (left, right) = self.prepare_merge(other);
+        self.merge_with(&left, &right);
+    }
 
-        for i in self.h_range() { 
-            self.merge_vertices(&left, &right, i);
-            self.merge_edges(&left, &right, i - 1);
+    // Merge already-prepared halves into `self` (no deloop / eliminate) — `self` must be the empty
+    // shell left by `prepare_merge`.
+    pub(crate) fn merge_with(&mut self, left: &Self, right: &Self) {
+        for i in self.h_range() {
+            self.merge_vertices(left, right, i);
+            self.merge_edges(left, right, i - 1);
         }
     }
 

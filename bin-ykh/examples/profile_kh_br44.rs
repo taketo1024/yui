@@ -5,13 +5,13 @@
 //!
 //! Usage:
 //! ```
-//! RUST_LOG=info cargo run --release --example profile_kh_44
+//! RUST_LOG=info cargo run --release --example profile_kh_br44
 //! ```
 //!
 //! Profile with samply:
 //! ```
-//! cargo build --profile=profiling --example profile_kh_44
-//! samply record target/profiling/examples/profile_kh_44
+//! cargo build --profile=profiling --example profile_kh_br44
+//! samply record target/profiling/examples/profile_kh_br44
 //! ```
 
 use std::time::Instant;

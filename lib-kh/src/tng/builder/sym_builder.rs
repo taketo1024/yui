@@ -169,6 +169,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             fn complex_mut(&mut self) -> &mut TngComplex<R>;
             pub fn set_elements<I>(&mut self, elements: I) where I: IntoIterator<Item = TngComplexElem<R>>;
             pub fn nodes(&self) -> impl Iterator<Item = &Node>;
+            pub fn n_nodes(&self) -> usize;
             fn drop_nodes<F>(&mut self, pred: F) where F: Fn(&Node) -> bool;
             fn prepare_append(&mut self, x: &Node);
             fn loop_count(&self, x: &Node) -> isize;
@@ -178,6 +179,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             fn eliminate(&mut self, i: &TngComplexKey, j: &TngComplexKey);
             fn collect_keys<F, W>(&self, i: isize, pred: F, weight: W) -> Vec<(TngComplexKey, usize)>
                 where F: Fn(&TngComplexKey) -> bool, W: Fn(&TngComplexKey) -> usize;
+            fn current_step(&self) -> String;
             pub(crate) fn stat(&self) -> String;
         }
     }
@@ -220,7 +222,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn process_nodes(&mut self) {
-        info!("process {} nodes", self.nodes().count());
+        info!("process {} nodes", self.n_nodes());
 
         while let Some(x) = self.choose_next_node().cloned() {
             let tx = self.inv_node(&x).clone();
@@ -259,10 +261,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn append_on_axis(&mut self, x: &Node) { 
-        info!("({}/{}) append on-axis: {x}", 
-            self.complex().dim() + 1, 
-            self.complex().dim() + self.nodes().count(), 
-        );
+        info!("{} append on-axis: {x}", self.current_step());
 
         self.prepare_append(x);
 
@@ -284,10 +283,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn append_off_axis(&mut self, x: &Node, tx: &Node) { 
         assert_eq!(self.inv_node(x), tx);
 
-        info!("({}/{}) append off-axis: {x}, {tx}", 
-            self.complex().dim() + 1, 
-            self.complex().dim() + self.nodes().count(), 
-        );
+        info!("{} append off-axis: {x}, {tx}", self.current_step());
 
         self.prepare_append(x);
         self.prepare_append(tx);
@@ -318,7 +314,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn merge(&mut self, c: TngComplex<R>, right_map: TauKeyMap) {
-        debug!("merge {} + {}", self.stat(), c.stat());
+        debug!("{} merge {} + {}", self.current_step(), self.stat(), c.stat());
         debug!("  key_map: {} × {}", self.key_map.len(), right_map.len());
 
         // build the merged τ key-map per degree (next to merge_vertices) rather than as one
@@ -326,7 +322,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let left_map = std::mem::take(&mut self.key_map);
 
         let (left, right) = self.complex_mut().prepare_merge(c);
-        let range = reachable_range(self.complex().h_range(), &self.config.h_range, self.nodes().count());
+        let range = reachable_range(self.complex().h_range(), &self.config.h_range, self.n_nodes());
         debug!("  merge range: {:?}", range);
 
         match self.config.mode {
@@ -348,13 +344,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let selective = self.config.mode.is_selective();
 
         for i in range {
-            debug!("build C[{i}]...");
+            debug!("{} build C[{i}]...", self.current_step());
             self.merge_slice(left, right, i, left_map, right_map);
             if self.config.mode.immediate_elim() {
                 self.eliminate_in(i - 1);
             }
             self.deloop_in(i - 1);
-            debug!("  built C[{i}]: {}", self.complex().rank(i));
+            debug!("{}   built C[{i}]: {}", self.current_step(), self.complex().rank(i));
         }
 
         self.prune_isolated_top(top);
@@ -387,12 +383,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let top = *range.end();
 
         for i in range {
-            debug!("build C[{i}]...");
+            debug!("{} build C[{i}]...", self.current_step());
             self.merge_slice(left, right, i, left_map, right_map);
             self.deloop_in(i - 1);
             self.eliminate_in(i - 2);
             self.eliminate_in(i - 1);
-            debug!("  built C[{i}]: {}", self.complex().rank(i));
+            debug!("{}   built C[{i}]: {}", self.current_step(), self.complex().rank(i));
         }
 
         self.prune_isolated_top(top);
@@ -434,7 +430,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     /// the cartesian merge over-generates it past the vertex cap.
     fn prune_h_range(&mut self) {
         let Some(h_range) = self.config.h_range.clone() else { return };
-        let r = self.nodes().count() as isize;
+        let r = self.n_nodes() as isize;
         let i0 = self.complex().deg_shift().0;
 
         // a vertex of degree `d` reaches `[d, d + r]`, so it stays relevant iff
@@ -535,7 +531,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         );
         if keys.is_empty() { return }
 
-        debug!("deloop in C[{i}], targets: {} (selective: {selective}).", keys.len());
+        debug!("{} deloop in C[{i}], targets: {} (selective: {selective}).", self.current_step(), keys.len());
 
         let before = self.complex().rank(i) as isize;
 
@@ -554,7 +550,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let after = self.complex().rank(i) as isize;
 
-        debug!("  delooped C[{i}]: {} (diff: {}).", after, after - before);
+        debug!("{}   delooped C[{i}]: {} (diff: {}).", self.current_step(), after, after - before);
     }
 
     fn deloop_equiv(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> { 
@@ -674,7 +670,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         );
         if keys.is_empty() { return }
 
-        debug!("eliminate in C[{i}], targets: {}", keys.len());
+        debug!("{} eliminate in C[{i}], targets: {}", self.current_step(), keys.len());
 
         let before = self.complex().rank(i) as isize;
 
@@ -686,7 +682,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let after = self.complex().rank(i) as isize;
 
-        debug!("  eliminated C[{i}]: {} (diff: {}).", after, after - before);
+        debug!("{}   eliminated C[{i}]: {} (diff: {}).", self.current_step(), after, after - before);
     }
 
     fn choose_equiv_inv_edge_into(&self, k: &TngComplexKey) -> Option<&TngComplexKey> { 
@@ -1025,7 +1021,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn build_from_half(&self, crossings: &[Node], elements: Vec<TngComplexElem<R>>) -> (TngComplex<R>, TngComplex<R>, TauKeyMap, Vec<TngComplexElem<R>>) {
         // crossings appended after this chunk: all remaining nodes minus the chunk (half + τ-half).
-        let r_rest = self.builder.inner.nodes().count() - 2 * crossings.len();
+        let r_rest = self.builder.n_nodes() - 2 * crossings.len();
 
         let mut b = self.half_builder();
         b.set_nodes(crossings.iter().cloned());

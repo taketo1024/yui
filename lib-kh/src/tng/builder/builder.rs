@@ -134,8 +134,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &mut self.complex
     }
 
-    pub fn nodes(&self) -> impl Iterator<Item = &Node> { 
+    pub fn nodes(&self) -> impl Iterator<Item = &Node> {
         self.nodes.iter()
+    }
+
+    pub fn n_nodes(&self) -> usize {
+        self.nodes.len()
     }
 
     pub fn set_nodes<I>(&mut self, nodes: I)
@@ -175,7 +179,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     // See [BN07, §7] (scan-and-cancel algorithm).
     pub(crate) fn process_nodes(&mut self) {
-        info!("process {} nodes", self.nodes.len());
+        info!("process {} nodes", self.n_nodes());
 
         while let Some(x) = self.choose_next_node().cloned() {
             self.append_node(&x)
@@ -230,11 +234,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         boundary.len() as isize + delta
     }
 
-    pub(crate) fn append_node(&mut self, x: &Node) { 
-        info!("({}/{}) append: {x}",
-            self.complex.dim() + 1,
-            self.complex.dim() + self.nodes.len(),
-        );
+    // "(committed/total)" crossing progress, for log prefixes.
+    pub(crate) fn current_step(&self) -> String {
+        format!("({}/{})", self.complex.dim(), self.complex.dim() + self.n_nodes())
+    }
+
+    pub(crate) fn append_node(&mut self, x: &Node) {
+        info!("{} append: {x}", self.current_step());
 
         self.prepare_append(x);
 
@@ -252,10 +258,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub(crate) fn merge(&mut self, other: TngComplex<R>) {
-        debug!("merge {} + {}", self.stat(), other.stat());
+        debug!("{} merge {} + {}", self.current_step(), self.stat(), other.stat());
 
         let (left, right) = self.complex.prepare_merge(other);
-        let range = reachable_range(self.complex.h_range(), &self.config.h_range, self.nodes.len());
+        let range = reachable_range(self.complex.h_range(), &self.config.h_range, self.n_nodes());
         debug!("  merge range: {:?}", range);
 
         match self.config.mode {
@@ -265,7 +271,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
 
         self.prune_h_range();
-        debug!("  merged: {}", self.stat());
+        debug!("{}   merged: {}", self.current_step(), self.stat());
     }
 
     // Default path (Greedy / Selective / NoElim): per degree, eliminate (if the mode does) then deloop.
@@ -275,13 +281,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let selective = self.config.mode.is_selective();
 
         for i in range {
-            debug!("build C[{i}]...");
+            debug!("{} build C[{i}]...", self.current_step());
             self.merge_slice(left, right, i);
             if self.config.mode.immediate_elim() {
                 self.eliminate_in(i - 1);
             }
             self.deloop_in(i - 1);
-            debug!("  built C[{i}]: {}", self.complex.rank(i));
+            debug!("{}   built C[{i}]: {}", self.current_step(), self.complex.rank(i));
         }
 
         self.prune_isolated_top(top);
@@ -314,12 +320,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let top = *range.end();
 
         for i in range {
-            debug!("build C[{i}]...");
+            debug!("{} build C[{i}]...", self.current_step());
             self.merge_slice(left, right, i);
             self.deloop_in(i - 1);
             self.eliminate_in(i - 2);
             self.eliminate_in(i - 1);
-            debug!("  built C[{i}]: {}", self.complex.rank(i));
+            debug!("{}   built C[{i}]: {}", self.current_step(), self.complex.rank(i));
         }
 
         self.prune_isolated_top(top);
@@ -341,7 +347,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn prune_h_range(&mut self) {
         let Some(h_range) = self.config.h_range.clone() else { return };
         let i0 = self.complex.deg_shift().0;
-        let r = self.nodes.len() as isize;
+        let r = self.n_nodes() as isize;
 
         // a vertex of degree `d` reaches `[d, d + r]`, so it stays relevant iff
         // `d ∈ [a - r, b]` — current degrees that can still land in `h_range`.
@@ -362,7 +368,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // discarded `top+1` homology. At the real top they're genuine generators, so skip.
     fn prune_isolated_top(&mut self, top: isize) {
         // real top = deg_shift + total crossings (dim + remaining nodes).
-        let real_top = self.complex.deg_shift().0 + (self.complex.dim() + self.nodes.len()) as isize;
+        let real_top = self.complex.deg_shift().0 + (self.complex.dim() + self.n_nodes()) as isize;
         let truncated = self.config.h_range.as_ref().is_some_and(|w| top == *w.end()) && top < real_top;
         if !truncated { return; }
 
@@ -436,7 +442,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         );
         if keys.is_empty() { return }
 
-        debug!("deloop in C[{i}], targets: {}.", keys.len());
+        debug!("{} deloop in C[{i}], targets: {}.", self.current_step(), keys.len());
 
         let before = self.complex.rank(i) as isize;
 
@@ -455,7 +461,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let after = self.complex.rank(i) as isize;
 
-        debug!("  delooped C[{i}]: {} (diff: {}).", after, after - before);
+        debug!("{}   delooped C[{i}]: {} (diff: {}).", self.current_step(), after, after - before);
     }
 
     pub(crate) fn deloop(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
@@ -485,7 +491,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         );
         if keys.is_empty() { return }
 
-        debug!("eliminate in C[{i}], targets: {}", keys.len());
+        debug!("{} eliminate in C[{i}], targets: {}", self.current_step(), keys.len());
 
         let before = self.complex.rank(i) as isize;
 
@@ -497,7 +503,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let after = self.complex.rank(i) as isize;
 
-        debug!("  eliminated C[{i}]: {} (diff: {}).", after, after - before);
+        debug!("{}   eliminated C[{i}]: {} (diff: {}).", self.current_step(), after, after - before);
     }
 
     pub(crate) fn try_eliminate_at(&mut self, k: &TngComplexKey) -> bool {

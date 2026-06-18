@@ -170,12 +170,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.elements.take()
     }
 
-    pub fn run(mut self) -> Self { 
+    pub fn run(mut self) -> Self {
+        info!("build config:\n{:#?}", self.config);
         self.process_nodes();
         self.process_free_loops();
         self.finalize();
         self
-    } 
+    }
 
     // See [BN07, §7] (scan-and-cancel algorithm).
     pub(crate) fn process_nodes(&mut self) {

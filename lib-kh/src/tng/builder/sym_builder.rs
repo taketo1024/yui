@@ -183,6 +183,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn run(mut self) -> Self {
+        info!("build config:\n{:#?}", self.config);
         if self.config.chunk_bound.is_some() {
             self.process_chunks();
         } else {

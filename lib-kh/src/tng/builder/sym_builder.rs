@@ -34,8 +34,6 @@ pub struct SymBuildConfig {
     pub mode: BuildMode,
     // build half the off-axis crossings and mirror via τ (see `preprocess`).
     pub preprocess: bool,
-    // chooser handicap on an off-axis pair = coeff · current size (its extra growth).
-    pub pair_penalty_coeff: f64,
     // divide-and-conquer: build the link in chunks of ≤ this many crossings (each via a
     // child builder), merging each reduced chunk into the parent. None = single pass.
     pub chunk_bound: Option<usize>,
@@ -45,7 +43,7 @@ pub struct SymBuildConfig {
 
 impl Default for SymBuildConfig {
     fn default() -> Self {
-        Self { node: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, pair_penalty_coeff: 1.0, chunk_bound: None, h_range: None }
+        Self { node: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, chunk_bound: None, h_range: None }
     }
 }
 
@@ -237,12 +235,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     /// Pick the next τ-unit by node order, ties broken by earliest crossing order. MinCut scores the
     /// *combined* x+τx toggle (a shared axis edge cancels — can't be summed); LoopGreedy sums loops.
     fn choose_next_node(&self) -> Option<&Node> {
-        let pair_penalty = (self.config.pair_penalty_coeff * self.complex().n_verts() as f64) as isize;
         self.nodes().iter().enumerate()
             .min_by_key(|(i, x)| {
                 let tx = self.inv_node(x);
                 let score = match self.config.node {
                     NodeOrder::LoopGreedy => {
+                        let pair_penalty = self.complex().n_verts() as isize; // off-axis-pair handicap = current size
                         if tx == *x { self.loop_count(x) }
                         else { self.loop_count(x) + self.loop_count(tx) - pair_penalty }
                     },

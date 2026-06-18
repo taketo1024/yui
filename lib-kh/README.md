@@ -62,7 +62,7 @@ src/
 - **`Tng`**, **`TngComp`** — Temperley–Lieb diagrams; the "objects" of Bar-Natan's category.
 - **`Cob`**, **`CobComp`**, **`LcCob<R>`** — dotted cobordism morphisms, modulo `S`, `T`, `4Tu`, and the dotted skein `X² = h·X + t`.
 - **`TngComplex<R>`** — chain complex over `Cob_{/l}`; the differential is `LcCob<R>`. Supports `merge` (Bar-Natan tensor product), `deloop` (loop ≅ ∅_X ⊕ ∅_1 in the `(h, t)`-generalised form), and `eliminate` (Gauss-eliminate an invertible edge).
-- **`TngComplexBuilder<R>`** — assembles the complex incrementally, choosing crossings by a connection heuristic and deloop+eliminating after each step.
+- **`TngComplexBuilder<R>`** — assembles the complex incrementally, choosing crossings by a connection heuristic and deloop+eliminating after each step. The crossing order (`NodeOrder`) and the simplification strategy (`BuildMode`) are tunable via `BuildConfig`.
 - **`SymTngBuilder<R>`** — the equivariant variant for `InvLink`: processes axis-symmetric crossings singly, off-axis crossings in `(x, τ·x)` pairs, and maintains a `key_map` so `tau_map()` can return the chain-level `τ` used to build `KhIComplex`.
 
 ### Extras (`kh::ext`)

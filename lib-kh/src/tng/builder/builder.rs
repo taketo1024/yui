@@ -10,6 +10,7 @@
 //!   J. Knot Theory Ramif. 16 (2007), 243–255.
 //!   <https://doi.org/10.1142/S0218216507005294>, <https://arxiv.org/abs/math/0606318>
 
+use std::fmt;
 use std::ops::RangeInclusive;
 
 use rustc_hash::{FxHashSet, FxHashMap};
@@ -20,7 +21,7 @@ use yui_link::{Node, Edge, Link};
 
 use crate::kh::{KhChain, KhComplex};
 use crate::tng::{End, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
-use super::{reachable_range, node_arcs, pop_min_pivot, TngElemBuilder};
+use super::{reachable_range, node_arcs, pop_min_pivot, sparkline, cutwidth_after, toggle_boundary, TngElemBuilder};
 
 /// How the next crossing to append is chosen.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -172,6 +173,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn run(mut self) -> Self {
         info!("build config:\n{:#?}", self.config);
+        info!("cutwidth profile:\n{}", self.profile());
         self.process_nodes();
         self.process_free_loops();
         self.finalize();
@@ -583,6 +585,43 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub(crate) fn stat(&self) -> String {
         self.complex.stat()
     }
+
+    /// Boundary-cutwidth profile of this builder's MinCut crossing order — a Cob-free pre-build
+    /// dry-run (ties broken by index). The peak width predicts the dense-slice cost (~`2^peak`).
+    pub(crate) fn profile(&self) -> BuildProfile {
+        let nodes = self.nodes();
+        let n = nodes.len();
+        let mut remaining: Vec<usize> = (0..n).collect();
+        let mut open: FxHashSet<Edge> = FxHashSet::default();
+
+        let (order, widths): (Vec<usize>, Vec<usize>) = std::iter::from_fn(|| {
+            let pos = remaining.iter()
+                .position_min_by_key(|&&i| (cutwidth_after(&open, &[&nodes[i]]), i))?;
+            let idx = remaining.swap_remove(pos);
+            toggle_boundary(&mut open, &[&nodes[idx]]);
+            Some((idx, open.len()))
+        }).unzip();
+
+        let peak = widths.iter().copied().max().unwrap_or(0);
+        BuildProfile { n, order, widths, peak }
+    }
+}
+
+/// Boundary-cutwidth profile of a crossing order: dense-slice cost peaks at ~`2^peak`.
+pub(crate) struct BuildProfile {
+    pub n: usize,
+    #[allow(dead_code)] // replayed only by the faithfulness test
+    pub order: Vec<usize>,  // node indices, in MinCut order
+    pub widths: Vec<usize>, // boundary cutwidth after each step
+    pub peak: usize,
+}
+
+impl fmt::Display for BuildProfile {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "n:    {}", self.n)?;
+        writeln!(f, "peak: {}", self.peak)?;
+        write!(f, "{}", sparkline(&self.widths, self.peak))
+    }
 }
 
 #[cfg(test)]
@@ -590,6 +629,30 @@ mod tests {
     use num_traits::Zero;
     
     use super::*;
+
+    // `profile`'s dry-run open-edge set must equal the real complex's `boundary_ends` at every step.
+    #[test]
+    fn dry_run_matches_real_boundary() {
+        for name in ["6_2", "7_3", "8_19"] {
+            let l = Link::test_data(name);
+            let prof = TngComplexBuilder::<i32>::from_link(&l, &0, &0, false).profile();
+            let nodes: Vec<Node> = l.nodes().cloned().collect();
+
+            // raw merge (no deloop / eliminate) so we read the pure tangle boundary
+            let mut b = TngComplexBuilder::<i32>::init(&0, &0, (0, 0), None)
+                .with_config(BuildConfig { mode: BuildMode::None, ..Default::default() });
+
+            let mut open: FxHashSet<Edge> = FxHashSet::default();
+            for (step, &idx) in prof.order.iter().enumerate() {
+                b.append_node(&nodes[idx]);
+                toggle_boundary(&mut open, &[&nodes[idx]]);
+                let real: FxHashSet<Edge> = b.complex().boundary_ends().collect();
+                assert_eq!(open, real, "{name} step {step}: open-set vs boundary_ends");
+                assert_eq!(prof.widths[step], open.len(), "{name} step {step}: width");
+            }
+            assert_eq!(*prof.widths.last().unwrap(), 0, "{name} should close up");
+        }
+    }
 
     #[test]
     fn test_unknot() {

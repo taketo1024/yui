@@ -23,7 +23,8 @@ use yui_link::{Node, Edge, InvLink};
 use crate::kh::{KhGen, KhTensor};
 use crate::tng::{End, LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
 use crate::tng::builder::{TngComplexBuilder, BuildConfig, BuildMode, NodeOrder};
-use super::{reachable_range, pop_min_pivot};
+use std::fmt;
+use super::{reachable_range, pop_min_pivot, sparkline, cutwidth_after, toggle_boundary};
 
 /// Toggles for the automatic simplification done while building (kept separate
 /// from [`BuildConfig`] so the equivariant builder can gain its own flags).
@@ -184,6 +185,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn run(mut self) -> Self {
         info!("build config:\n{:#?}", self.config);
+        info!("cutwidth profile:\n{}", self.profile_sym());
         if self.config.chunk_bound.is_some() {
             self.process_chunks();
         } else {
@@ -817,6 +819,64 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         println!();
     }
 
+    /// Boundary-cutwidth profile of the symmetric (τ-equivariant) MinCut order: on-axis crossings
+    /// singly, off-axis in `(x, τx)` pairs scored by combined cutwidth (shared axis edges cancel).
+    pub(crate) fn profile_sym(&self) -> SymBuildProfile {
+        let nodes = self.nodes();
+        let tau = &self.x_map;
+        let idx_of: FxHashMap<Node, usize> = nodes.iter().enumerate()
+            .map(|(i, x)| (x.clone(), i))
+            .collect();
+
+        // each pair is kept once, at its lower index; on-axis crossings stay singletons
+        let units: Vec<Vec<usize>> = (0..nodes.len()).filter_map(|i| {
+            let j = idx_of[&tau[&nodes[i]]];
+            match j {
+                _ if j == i => Some(vec![i]),
+                _ if i < j  => Some(vec![i, j]),
+                _           => None,
+            }
+        }).collect();
+
+        let on_axis = units.iter().filter(|u| u.len() == 1).count();
+        let off_axis = nodes.len() - on_axis;
+
+        let unit_nodes = |u: &[usize]| -> Vec<&Node> { u.iter().map(|&i| &nodes[i]).collect() };
+
+        let mut remaining: Vec<usize> = (0..units.len()).collect();
+        let mut open: FxHashSet<Edge> = FxHashSet::default();
+
+        let (order, widths): (Vec<Vec<usize>>, Vec<usize>) = std::iter::from_fn(|| {
+            let pos = remaining.iter()
+                .position_min_by_key(|&&u| (cutwidth_after(&open, &unit_nodes(&units[u])), units[u][0]))?;
+            let u = remaining.swap_remove(pos);
+            toggle_boundary(&mut open, &unit_nodes(&units[u]));
+            Some((units[u].clone(), open.len()))
+        }).unzip();
+
+        let peak = widths.iter().copied().max().unwrap_or(0);
+        SymBuildProfile { on_axis, off_axis, order, widths, peak }
+    }
+
+}
+
+/// Boundary-cutwidth profile of the symmetric (τ-equivariant) MinCut order.
+pub(crate) struct SymBuildProfile {
+    pub on_axis: usize,
+    pub off_axis: usize,        // node count; pairs = off_axis / 2
+    #[allow(dead_code)] // replayed only by the faithfulness test
+    pub order: Vec<Vec<usize>>, // each unit = 1 (on-axis) or 2 (τ-pair) node indices
+    pub widths: Vec<usize>,
+    pub peak: usize,
+}
+
+impl fmt::Display for SymBuildProfile {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "on-axis:  {}", self.on_axis)?;
+        writeln!(f, "off-axis: {} ({} pairs)", self.off_axis, self.off_axis / 2)?;
+        writeln!(f, "peak:     {}", self.peak)?;
+        write!(f, "{}", sparkline(&self.widths, self.peak))
+    }
 }
 
 /// Divide-and-conquer chunked build for a [`SymTngBuilder`]: select τ-closed chunks at thin
@@ -1097,7 +1157,34 @@ mod tests {
     use yui_core::RangeExt;
     use yui_homology::{ChainComplex1, ChainMap, ToSeqString, ToTableString};
 
-    fn make_cone(b: SymTngBuilder<FF2>) -> ChainComplex1<KhIGen, FF2> { 
+    // `profile_sym`'s dry-run widths must match the real complex's `boundary_ends`. Boundary depends
+    // only on the processed *set*, not the pairing, so a plain builder is a valid oracle.
+    #[test]
+    fn sym_dry_run_matches_boundary() {
+        for name in ["3_1", "6_3"] {
+            let l = InvLink::test_data(name);
+            let prof = SymTngBuilder::<i32>::from_inv_link(&l, &0, &0, false).profile_sym();
+            let nodes: Vec<Node> = l.nodes().cloned().collect();
+
+            assert_eq!(prof.on_axis + prof.off_axis, nodes.len(), "{name}: unit counts");
+
+            let mut b = TngComplexBuilder::<i32>::init(&0, &0, (0, 0), None)
+                .with_config(BuildConfig { mode: BuildMode::None, ..Default::default() });
+
+            let mut open: FxHashSet<Edge> = FxHashSet::default();
+            for (step, unit) in prof.order.iter().enumerate() {
+                unit.iter().for_each(|&i| b.append_node(&nodes[i]));
+                let u: Vec<&Node> = unit.iter().map(|&i| &nodes[i]).collect();
+                toggle_boundary(&mut open, &u);
+                let real: FxHashSet<Edge> = b.complex().boundary_ends().collect();
+                assert_eq!(open, real, "{name} step {step}: open-set vs boundary_ends");
+                assert_eq!(prof.widths[step], open.len(), "{name} step {step}: width");
+            }
+            assert_eq!(*prof.widths.last().unwrap(), 0, "{name} should close up");
+        }
+    }
+
+    fn make_cone(b: SymTngBuilder<FF2>) -> ChainComplex1<KhIGen, FF2> {
         let t = b.tau_map();
         let c = b.into_inner().into_tng_complex().into_raw_complex();
         let h_range = c.support().cloned().range().unwrap().mv(0, 1);

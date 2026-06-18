@@ -1,4 +1,6 @@
 use std::ops::RangeInclusive;
+use itertools::Itertools;
+use rustc_hash::FxHashSet;
 use yui_core::bitseq::Bit;
 use yui_link::{Node, Edge};
 use crate::tng::{TngComp, TngComplexKey};
@@ -42,4 +44,40 @@ pub(crate) fn node_arcs(x: &Node, base_pt: Option<Edge>) -> Vec<TngComp> {
         .filter(|a| base_pt.map(|e| !a.contains(e)).unwrap_or(true))
         .map(TngComp::from)
         .collect()
+}
+
+// ---- Cutwidth-profile helpers (for TngComplexBuilder::profile / SymTngBuilder::profile_sym) ----
+// A `node_unit` is one crossing (on-axis) or a τ-pair; `open` is the set of boundary (open) arc-ends.
+
+// Unicode bar chart of a width sequence, scaled to `peak`.
+pub(crate) fn sparkline(widths: &[usize], peak: usize) -> String {
+    const BARS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+    widths.iter().map(|&w| {
+        let i = if peak == 0 { 0 } else { w * 7 / peak };
+        BARS[i.min(7)]
+    }).collect()
+}
+
+// Distinct edges of a node-unit (one or two crossings) with odd incidence — those whose open/closed flips.
+fn flip_edges(node_unit: &[&Node]) -> Vec<Edge> {
+    node_unit.iter().flat_map(|x| x.edges().iter().copied()).counts().into_iter()
+        .filter_map(|(e, c)| (c % 2 == 1).then_some(e))
+        .collect()
+}
+
+// Boundary cutwidth that appending `node_unit` would yield, without mutating `open`.
+pub(crate) fn cutwidth_after(open: &FxHashSet<Edge>, node_unit: &[&Node]) -> usize {
+    let delta: isize = flip_edges(node_unit).iter()
+        .map(|e| if open.contains(e) { -1 } else { 1 })
+        .sum();
+    (open.len() as isize + delta) as usize
+}
+
+// Toggle `node_unit`'s flip-edges into/out of the open-edge set (open ↦ open △ flip_edges).
+pub(crate) fn toggle_boundary(open: &mut FxHashSet<Edge>, node_unit: &[&Node]) {
+    flip_edges(node_unit).into_iter().for_each(|e| {
+        if !open.remove(&e) {
+            open.insert(e);
+        }
+    });
 }

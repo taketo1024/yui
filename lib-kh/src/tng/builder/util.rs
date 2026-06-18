@@ -58,8 +58,8 @@ pub(crate) fn sparkline(widths: &[usize], peak: usize) -> String {
     }).collect()
 }
 
-// Distinct edges of a node-unit (one or two crossings) with odd incidence — those whose open/closed flips.
-fn flip_edges(node_unit: &[&Node]) -> Vec<Edge> {
+// The node-unit's boundary arc-ends: its edges with odd incidence (one endpoint inside the unit).
+pub(crate) fn boundary_edges(node_unit: &[&Node]) -> Vec<Edge> {
     node_unit.iter().flat_map(|x| x.edges().iter().copied()).counts().into_iter()
         .filter_map(|(e, c)| (c % 2 == 1).then_some(e))
         .collect()
@@ -67,15 +67,15 @@ fn flip_edges(node_unit: &[&Node]) -> Vec<Edge> {
 
 // Boundary cutwidth that appending `node_unit` would yield, without mutating `open`.
 pub(crate) fn cutwidth_after(open: &FxHashSet<Edge>, node_unit: &[&Node]) -> usize {
-    let delta: isize = flip_edges(node_unit).iter()
+    let delta: isize = boundary_edges(node_unit).iter()
         .map(|e| if open.contains(e) { -1 } else { 1 })
         .sum();
     (open.len() as isize + delta) as usize
 }
 
-// Toggle `node_unit`'s flip-edges into/out of the open-edge set (open ↦ open △ flip_edges).
+// Toggle `node_unit`'s flip-edges into/out of the open-edge set (open ↦ open △ boundary_edges).
 pub(crate) fn toggle_boundary(open: &mut FxHashSet<Edge>, node_unit: &[&Node]) {
-    flip_edges(node_unit).into_iter().for_each(|e| {
+    boundary_edges(node_unit).into_iter().for_each(|e| {
         if !open.remove(&e) {
             open.insert(e);
         }

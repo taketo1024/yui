@@ -24,7 +24,7 @@ use crate::kh::{KhGen, KhTensor};
 use crate::tng::{End, LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
 use crate::tng::builder::{TngComplexBuilder, BuildConfig, BuildMode, NodeOrder};
 use std::fmt;
-use super::{reachable_range, pop_min_pivot, sparkline, cutwidth_after, toggle_boundary};
+use super::{reachable_range, pop_min_pivot, sparkline, cutwidth_after, toggle_boundary, boundary_edges};
 
 /// Toggles for the automatic simplification done while building (kept separate
 /// from [`BuildConfig`] so the equivariant builder can gain its own flags).
@@ -204,16 +204,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         // canon cycles aren't yet tracked through chunk merges (see `merge`'s TODO), so
         // drop them — a chunked build yields the complex/homology but not α / ssi.
         self.set_elements(vec![]);
-        while let Some(chunk) = ChunkBuilder::new(self).next_chunk() {
-            info!("{} build chunk ({}): {}", self.current_step(), chunk.len(), chunk.iter().join(", "));
-
-            let (c, key_map) = ChunkBuilder::new(self).build_chunk(&chunk);
-
-            info!("{} chunk built: {}", self.current_step(), c.stat());
-
+        while let Some((chunk, c, key_map)) = ChunkBuilder::new(self).next_chunk() {
             self.drop_nodes(|x| chunk.contains(x));
             self.merge(c, key_map);
-
             info!("{} chunk merged: {}", self.current_step(), self.stat());
         }
     }
@@ -897,14 +890,29 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.builder.inv_node(x) == x
     }
 
-    // Next chunk: grow a τ-closed, boundary-connected piece (≤ `chunk_bound`), then cut it at the
-    // first cutwidth valley past the peak — isolating the heavy region for a thin merge interface.
-    fn next_chunk(&self) -> Option<Vec<Node>> {
+    // Nodes of the next τ-closed chunk: grow ≤ `chunk_bound`, cut at the first cutwidth valley past
+    // the peak — isolating the heavy region for a thin merge interface. None when no crossings remain.
+    fn next_chunk_nodes(&self) -> Option<Vec<Node>> {
         if self.builder.inner.nodes().is_empty() { return None }
         let bound = self.builder.config.chunk_bound.unwrap_or(usize::MAX);
-        let (chunk, cuts) = self.grow_chunk(bound);
-        let cut = Self::cut_at_valley(&cuts).unwrap_or(chunk.len());
-        Some(chunk[..cut].to_vec())
+        let (grown, cuts) = self.grow_chunk(bound);
+        let cut = Self::cut_at_valley(&cuts).unwrap_or(grown.len());
+        Some(grown[..cut].to_vec())
+    }
+
+    // Select + build the next chunk into a reduced sub-complex, tagged with its nodes for the parent merge.
+    fn next_chunk(&self) -> Option<(Vec<Node>, TngComplex<R>, TauKeyMap)> {
+        let chunk = self.next_chunk_nodes()?;
+        let step = self.builder.current_step();
+        let ends = boundary_edges(&chunk.iter().collect::<Vec<_>>()).into_iter().sorted().collect_vec();
+        info!("{step} build chunk (n: {}, nb: {} {:?}): {}", chunk.len(), ends.len(), ends, chunk.iter().join(", "));
+
+        let child = self.child_builder(&chunk).run();
+        let SymTngBuilder { key_map, inner, .. } = child;
+        let c = inner.into_tng_complex();
+        info!("{step} chunk built: {}", c.stat());
+
+        Some((chunk, c, key_map))
     }
 
     // Grow a τ-closed chunk ≤ `bound` with its proportional on-axis share (off-axis-heavy chunks
@@ -925,7 +933,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             if tx == x { on_taken += 1; }
             for n in [&x, &tx] {
                 if !chunk.contains(n) {
-                    Self::toggle(&mut open, n.edges());
+                    toggle_boundary(&mut open, &[n]);
                     chunk.push(n.clone());
                 }
             }
@@ -947,21 +955,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             .or_else(|| remaining.iter().find(|x| !chunk.contains(x)).cloned()) // seed when disconnected
     }
 
-    // Merge cutwidth after absorbing the τ-unit of `x` (x and τx) into the simulated `open` set.
+    // Merge cutwidth after absorbing the τ-unit of `x` (x and τx) into the `open` boundary set.
     fn unit_cutwidth(&self, x: &Node, open: &FxHashSet<Edge>) -> usize {
         let tx = self.builder.inv_node(x);
-        let mut s = open.clone();
-        Self::toggle(&mut s, x.edges());
-        if tx != x { Self::toggle(&mut s, tx.edges()); }
-        s.len()
-    }
-
-    // Build `chunk` into a reduced sub-complex via a child builder sharing the parent's
-    // τ-maps; return the complex and its τ key_map for the parent merge.
-    fn build_chunk(&self, chunk: &[Node]) -> (TngComplex<R>, TauKeyMap) {
-        let child = self.child_builder(chunk).run();
-        let SymTngBuilder { key_map, inner, .. } = child;
-        (inner.into_tng_complex(), key_map)
+        let unit: Vec<&Node> = if tx == x { vec![x] } else { vec![x, tx] };
+        cutwidth_after(open, &unit)
     }
 
     // A child builder over `chunk` (a sub-tangle), inheriting the parent's τ-maps and
@@ -983,14 +981,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let key_map = TauKeyMap::init();
         let real_top = inner.complex().deg_shift().0 + chunk.len() as isize; // child deg_shift = 0
         SymTngBuilder { inner, x_map: self.builder.x_map.clone(), e_map: self.builder.e_map.clone(), key_map, config, real_top }
-    }
-
-    // Flip `edges` in the open-boundary set: each edge appears twice across crossings, so toggling
-    // closes an already-open edge and opens a fresh one.
-    fn toggle(open: &mut FxHashSet<Edge>, edges: &[Edge]) {
-        for &e in edges {
-            if !open.insert(e) { open.remove(&e); }
-        }
     }
 
     // First cutwidth valley past the peak in a `(chunk_len, width)` profile → the chunk length to cut

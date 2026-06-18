@@ -350,17 +350,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             debug!("build C[{i}]...");
             self.merge_slice(left, right, i, left_map, right_map);
             self.eliminate_in(i - 1);
-            self.deloop_in(i - 1, false, selective);
+            self.deloop_in(i - 1);
             debug!("  built C[{i}]: {}", self.complex().rank(i));
         }
 
         self.prune_isolated_top(top);
-        self.deloop_in(top, false, selective);
+        self.deloop_in(top);
 
         // re-run selective to a fixpoint (catch loops turned productive by later equiv elims), then full-deloop the rest.
         if selective {
             self.deloop_all_selective();
-            self.deloop_all(false, false);
+            self.deloop_all_forced();
         }
     }
 
@@ -370,7 +370,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         for step in 1.. {
             let before = self.complex().n_verts();
             debug!("selective re-pass {step}: start ({before} verts)");
-            self.deloop_all(false, true);
+            self.deloop_all();
             let after = self.complex().n_verts();
             debug!("  selective re-pass {step}: {before} -> {after} verts (diff {})",
                 after as isize - before as isize);
@@ -386,14 +386,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         for i in range {
             debug!("build C[{i}]...");
             self.merge_slice(left, right, i, left_map, right_map);
-            self.deloop_in(i - 1, false, false);
+            self.deloop_in(i - 1);
             self.eliminate_in(i - 2);
             self.eliminate_in(i - 1);
             debug!("  built C[{i}]: {}", self.complex().rank(i));
         }
 
         self.prune_isolated_top(top);
-        self.deloop_in(top, false, false);
+        self.deloop_in(top);
         self.eliminate_in(top - 1);
         // no eliminate_in(top): top has no outgoing edges, so it would be a no-op.
     }
@@ -449,10 +449,35 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.key_map.drop(doomed);
     }
 
-    fn deloop_all(&mut self, allow_based: bool, selective: bool) {
+    // Deloop unmarked loops over all degrees, selective per `config.mode`.
+    fn deloop_all(&mut self) {
         for i in self.complex().h_range() {
-            self.deloop_in(i, allow_based, selective);
+            self.deloop_in(i);
         }
+    }
+
+    // Deloop all unmarked loops, ignoring the `selective` config — for the final cleanup.
+    fn deloop_all_forced(&mut self) {
+        for i in self.complex().h_range() {
+            self.deloop_in_with(i, false, false);
+        }
+    }
+
+    // Deloop the marked (based) loops into a single summand. All unmarked loops must already
+    // be gone — else delooping only the marked ones would break the complex.
+    fn deloop_all_marked(&mut self) {
+        debug_assert!(
+            self.complex().keys().all(|k| self.find_loop_in(k, false, false).is_none()),
+            "deloop_all_marked: unmarked loops remain"
+        );
+        for i in self.complex().h_range() {
+            self.deloop_in_with(i, true, false);
+        }
+    }
+
+    fn deloop_in(&mut self, i: isize) {
+        let selective = self.config.mode.is_selective();
+        self.deloop_in_with(i, false, selective);
     }
 
     // A circle whose no-dot cap yields an equiv-invertible edge (deloop+elim fires, no doubling).
@@ -500,7 +525,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         outs.chain(ins).min().unwrap_or(0)
     }
 
-    fn deloop_in(&mut self, i: isize, allow_based: bool, selective: bool) {
+    fn deloop_in_with(&mut self, i: isize, allow_based: bool, selective: bool) {
         let mut keys = self.collect_keys(i,
             |k| self.choose_loop(k, allow_based, selective).is_some(),
             |k| self.pivot_weight(k),
@@ -738,8 +763,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             return
         }
 
-        self.deloop_all(false, false);
-        self.deloop_all(true,  false); // deloop marked loops
+        self.deloop_all_forced();
+        self.deloop_all_marked(); // deloop marked loops
 
         info!("  finalized: {}", self.stat());
     }

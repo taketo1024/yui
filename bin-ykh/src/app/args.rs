@@ -102,11 +102,6 @@ pub fn parse_h_range(s: &str) -> Result<RangeInclusive<isize>, String> {
     Ok(parse(lo, isize::MIN + 1)? ..= parse(hi, isize::MAX - 1)?)
 }
 
-// Clamp an h_range to `[lo, hi]`; open ends (the near-min/max sentinels) thus resolve to the span.
-pub fn clamp_h_range(r: RangeInclusive<isize>, lo: isize, hi: isize) -> RangeInclusive<isize> {
-    (*r.start()).max(lo) ..= (*r.end()).min(hi)
-}
-
 // parse a build mode: greedy | selective | min-fill | none.
 pub fn parse_build_mode(s: &str) -> Result<BuildMode, String> {
     match s.to_lowercase().as_str() {

@@ -40,6 +40,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         let Some(range) = config.h_range.clone() else {
             return Self::from(&KhComplex::new_with_config(l, h, t, reduced, config));
         };
+        let range = KhComplex::<R>::clamp_h_range(l, reduced, range); // resolve open ends before truncating
         let (a, b) = (*range.start(), *range.end());
         let build_config = BuildConfig { h_range: Some((a - 1)..=(b + 1)), ..config };
         let c = KhComplex::new_with_config(l, h, t, reduced, build_config);

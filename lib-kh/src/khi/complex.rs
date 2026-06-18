@@ -52,6 +52,10 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     pub fn new_with_config(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig) -> Self {
         use crate::tng::builder::SymTngBuilder;
 
+        let config = SymBuildConfig {
+            h_range: config.h_range.map(|r| KhComplex::<R>::clamp_h_range(l.inner(), reduced, r)),
+            ..config
+        };
         let h_range = config.h_range.clone();
         let build_config = SymBuildConfig {
             h_range: h_range.as_ref().map(|r| (*r.start() - 1) ..= *r.end()),

@@ -43,7 +43,9 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     let r = if reduced { 1 } else { 2 };
     let t = R::zero(); 
 
-    let kh = KhIHomology::new_partial(l, c, &t, reduced, Some(0..=1));
+    // bottom..=1: building the cheap low degrees and truncating only at the top is faster than
+    // the doubly-truncated `0..=1` slice (which widens to the dense `-1..=2`). Builder clamps the start.
+    let kh = KhIHomology::new_partial(l, c, &t, reduced, Some(isize::MIN + 1 ..= 1));
 
     assert_eq!(kh[0].rank(), r);
     assert_eq!(kh[1].rank(), r);    

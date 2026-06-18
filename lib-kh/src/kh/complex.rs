@@ -43,6 +43,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         assert!(!reduced || (!l.is_empty() && t.is_zero()));
 
+        let config = BuildConfig {
+            h_range: config.h_range.map(|r| Self::clamp_h_range(l, reduced, r)),
+            ..config
+        };
         let b = TngComplexBuilder::from_link(l, h, t, reduced).with_config(config).run();
         let canon_cycles = b.eval_elements();
         let inner = b.into_tng_complex().into_raw_complex();
@@ -83,6 +87,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let q = n_pos - 2 * n_neg;
         let e = if reduced { 1 } else { 0 };
         (h, q + e)
+    }
+
+    /// Clamp an h_range to the degree span, so open-ended ranges (`..=b` / `a..=`) don't overflow
+    /// the build's `(a-1)..=(b+1)` widening. Span = `[deg_shift.0, deg_shift.0 + n_crossings + 1]`.
+    pub fn clamp_h_range(l: &Link, reduced: bool, range: RangeInclusive<isize>) -> RangeInclusive<isize> {
+        let lo = Self::deg_shift_for(l, reduced).0;
+        let hi = lo + l.n_crossings() as isize + 1;
+        (*range.start()).max(lo) ..= (*range.end()).min(hi)
     }
 
     pub fn inner(&self) -> &ChainComplex1<KhGen, R> {

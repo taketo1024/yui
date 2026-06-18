@@ -4,6 +4,7 @@ use delegate::delegate;
 use yui_core::{EucRing, EucRingOps, IteratorExt};
 use yui_homology::{ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_link::InvLink;
+use crate::kh::KhComplex;
 use crate::khi::{KhIComplex, KhIGen, KhIGenExt};
 use crate::tng::builder::SymBuildConfig;
 use crate::util::Bigraded;
@@ -37,6 +38,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         let Some(range) = config.h_range.clone() else {
             return Self::from(&KhIComplex::new_with_config(l, h, t, reduced, config));
         };
+        let range = KhComplex::<R>::clamp_h_range(l.inner(), reduced, range); // resolve open ends before truncating
         let (a, b) = (*range.start(), *range.end());
         let cone_config = SymBuildConfig { h_range: Some((a - 1)..=(b + 1)), ..config };
         let c = KhIComplex::new_with_config(l, h, t, reduced, cone_config);

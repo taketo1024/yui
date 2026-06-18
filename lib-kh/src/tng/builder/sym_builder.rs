@@ -890,8 +890,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.builder.inv_node(x) == x
     }
 
-    // Nodes of the next τ-closed chunk: grow ≤ `chunk_bound`, cut at the first cutwidth valley past
-    // the peak — isolating the heavy region for a thin merge interface. None when no crossings remain.
+    // Nodes of the next τ-closed chunk: grow ≤ `chunk_bound`, cut at the first cutwidth valley —
+    // isolating a heavy region behind a thin merge interface. None when no crossings remain.
     fn next_chunk_nodes(&self) -> Option<Vec<Node>> {
         if self.builder.inner.nodes().is_empty() { return None }
         let bound = self.builder.config.chunk_bound.unwrap_or(usize::MAX);
@@ -983,13 +983,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         SymTngBuilder { inner, x_map: self.builder.x_map.clone(), e_map: self.builder.e_map.clone(), key_map, config, real_top }
     }
 
-    // First cutwidth valley past the peak in a `(chunk_len, width)` profile → the chunk length to cut
-    // at. None for a monotone-decreasing profile (a closing / last chunk) — caller takes it whole.
+    // First cutwidth valley — where a descent turns back up — giving the chunk length to cut at. Flats
+    // are ignored, so a plateau mid-descent isn't taken as the bottom. None for a monotone (closing) profile.
     fn cut_at_valley(cuts: &[(usize, usize)]) -> Option<usize> {
-        let peak = cuts.iter().enumerate().max_by_key(|(_, (_, w))| *w)?.0;
-        cuts[peak..].iter().tuple_windows()
-            .find(|((_, w0), (_, w1))| w0 <= w1)
-            .map(|((len, _), _)| *len)
+        let mut descended = false;
+        for i in 1..cuts.len() {
+            let (prev, cur) = (cuts[i - 1].1, cuts[i].1);
+            if cur < prev {
+                descended = true;
+            } else if cur > prev && descended {
+                return Some(cuts[i - 1].0);
+            }
+        }
+        None
     }
 }
 

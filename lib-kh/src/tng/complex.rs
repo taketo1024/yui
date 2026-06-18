@@ -279,8 +279,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.vertices.values().map(|v| v.out_edges.len()).sum()
     }
 
-    // Total stored cobordism weight: number of cob monomials summed over all edges.
-    pub fn cob_weight(&self) -> usize {
+    /// Total stored cobordism weight: number of cob monomials summed over all edges.
+    pub(crate) fn cob_weight(&self) -> usize {
         self.vertices.values()
             .flat_map(|v| v.out_edges.values())
             .map(|f| f.nterms())
@@ -395,8 +395,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.vertices[k].out_edges.contains_key(l)
     }
 
-    // Markowitz cost of eliminating edge `k → l`: the fill `(out(k)-1)·(in(l)-1)` it creates.
-    pub fn edge_weight(&self, k: &TngComplexKey, l: &TngComplexKey) -> usize {
+    /// Markowitz cost of eliminating edge `k → l`: the fill `(out(k)-1)·(in(l)-1)` it creates.
+    pub(crate) fn edge_weight(&self, k: &TngComplexKey, l: &TngComplexKey) -> usize {
         let nk = self.vertices[k].out_edges.len();
         let nl = self.vertices[l].in_edges.len();
         (nk - 1) * (nl - 1)
@@ -429,8 +429,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.merge(c);
     }
 
-    // See [Bar-Natan '05] Section 5.
-    // https://arxiv.org/abs/math/0410495
+    /// Bar-Natan tensor product with `other` — see [BN05, §5](https://arxiv.org/abs/math/0410495).
     pub fn merge(&mut self, other: TngComplex<R>) {
         let (left, right) = self.prepare_merge(other);
         self.merge_with(&left, &right);
@@ -531,19 +530,22 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         )
     }
 
-    // Delooping (generalized to any `(h, t)` — [BN07, Lemma 4.1] handles only `h = 0`).
-    //
-    // A loop component `⚫` is isomorphic in `Cob_{/l}` to two empty objects,
-    // one labeled with dot `X` and one with dot `1` (the dual of `Y = X − h`):
-    //
-    //     ⚫  ≅  ∅_X  ⊕  ∅_1     (with appropriate grading shifts)
-    //
-    // The two summands are inserted/projected by:
-    //   - `∅_X`: include = cup with dot `X`, project = cap with no dot
-    //   - `∅_1`: include = cup with no dot, project = cap with dot `Y`
-    //
-    // Orthogonality follows from `ε(X) = ε(Y) = 1`, `ε(1) = 0`, `XY = t·1`.
-    // For the base-pointed (reduced) variant only the `X` summand is kept.
+    /// Deloop the `r`-th circle of vertex `k` (generalized to any `(h, t)` —
+    /// [BN07, Lemma 4.1] handles only `h = 0`).
+    ///
+    /// A loop component `◯` is isomorphic in `Cob_{/l}` to two empty objects,
+    /// one labeled with dot `X` and one with dot `1` (the dual of `Y = X − h`):
+    ///
+    /// ```text
+    ///     ◯  ≅  ∅_X  ⊕  ∅_1     (with appropriate grading shifts)
+    /// ```
+    ///
+    /// The two summands are inserted/projected by:
+    ///   - `∅_X`: include = cup with dot `X`, project = cap with no dot
+    ///   - `∅_1`: include = cup with no dot, project = cap with dot `Y`
+    ///
+    /// Orthogonality follows from `ε(X) = ε(Y) = 1`, `ε(1) = 0`, `XY = t·1`.
+    /// For the base-pointed (reduced) variant only the `X` summand is kept.
     pub fn deloop(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
         let c = self.vertex(k).tng.comp(r);
         debug_assert!(c.is_circle());
@@ -603,29 +605,27 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     // Least edge-weight (Markowitz cost) to eliminate `k`, over its invertible incident edges —
     // the pivot priority.
-    pub fn elim_cost(&self, k: &TngComplexKey) -> usize {
+    pub(crate) fn elim_cost(&self, k: &TngComplexKey) -> usize {
         let v = &self.vertices[k];
         let outs = v.out_edges.keys().filter(|l| self.edge(k, l).is_invertible()).map(|l| self.edge_weight(k, l));
         let ins = v.in_edges.iter().filter(|j| self.edge(j, k).is_invertible()).map(|j| self.edge_weight(j, k));
         outs.chain(ins).min().unwrap_or(0)
     }
 
-    // Gaussian elimination — [BN07, Lemma 4.2].
-    //
-    // When `a: v0 → v1` is invertible (i.e. an iso in `Cob_{/l}`), the four-term
-    // segment on the left is homotopy-equivalent to the simpler segment on the
-    // right with `v0`, `v1` removed and the parallel edge `d` corrected by `−c·a⁻¹·b`:
-    //
-    //       a
-    //  v0 - - -> v1         .             .
-    //     \   / b
-    //       /         ==>
-    //     /   \ c              d - ca⁻¹b
-    //  w0 -----> w1         w0 ---------> w1
-    //       d                
-
-    // Gaussian-eliminate the invertible pivot `a: k0 → k1`: remove both endpoints, then correct each
-    // parallel edge by `−c·a⁻¹·b`. Dispatches by Schur-block size: small → serial, large → parallel.
+    /// Gaussian-eliminate the invertible pivot `a: k0 → k1` (an iso in `Cob_{/l}`) — [BN07, Lemma 4.2].
+    /// Removes both endpoints and corrects each parallel edge `d` by `d − c·a⁻¹·b`, turning the
+    /// four-term segment on the left into the right. Dispatches by Schur-block size: small → serial,
+    /// large → parallel.
+    ///
+    /// ```text
+    ///       a
+    ///  v0 - - -> v1         .             .
+    ///     \   / b
+    ///       /         ==>
+    ///     /   \ c              d - ca⁻¹b
+    ///  w0 -----> w1         w0 ---------> w1
+    ///       d
+    /// ```
     pub fn eliminate(&mut self, k0: &TngComplexKey, k1: &TngComplexKey) {
         // the parallel path only pays off on large Schur blocks; below this its fixed overhead
         // (pre-fill + drop-zeros scans + dispatch) loses to the straightforward serial apply.

@@ -124,6 +124,7 @@ pub fn parse_node_order(s: &str) -> Result<NodeOrder, String> {
     match s.to_lowercase().as_str() {
         "loop-greedy" | "loopgreedy" | "loop" => Ok(NodeOrder::LoopGreedy),
         "min-cut" | "mincut" | "min"          => Ok(NodeOrder::MinCut),
-        _ => Err(format!("invalid node order `{s}`, expected loop-greedy|min-cut")),
+        "given"                               => Ok(NodeOrder::Given),
+        _ => Err(format!("invalid node order `{s}`, expected loop-greedy|min-cut|given")),
     }
 }

@@ -251,6 +251,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                         if tx != *x { edges.extend_from_slice(tx.edges()); }
                         -self.cutwidth_of(edges)
                     },
+                    NodeOrder::Given => 0, // constant → ties broken by earliest index = given order
                 };
                 (-score, *i)
             })
@@ -883,7 +884,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let connected = |x: &&Node| !chunk.contains(*x) && x.edges().iter().any(|e| open.contains(e));
         let pick = |pool: Vec<&Node>| match self.builder.config.node {
             NodeOrder::MinCut => pool.into_iter().min_by_key(|x| self.unit_cutwidth(x, open)).cloned(),
-            NodeOrder::LoopGreedy => pool.into_iter().next().cloned(),
+            NodeOrder::LoopGreedy | NodeOrder::Given => pool.into_iter().next().cloned(),
         };
         pick(remaining.iter().filter(|x| connected(x) && self.is_on_axis(x) == prefer_on).collect())
             .or_else(|| pick(remaining.iter().filter(connected).collect()))

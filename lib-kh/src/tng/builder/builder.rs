@@ -28,6 +28,7 @@ pub enum NodeOrder {
     #[default]
     LoopGreedy, // maximize loop closures unlocked (good when reduction is the bottleneck)
     MinCut,     // minimize the boundary cutwidth (bounds the dense-slice memory; needed for wide knots)
+    Given,      // process crossings in the given (PD) order — no reordering
 }
 
 /// How the complex is simplified while building.
@@ -194,6 +195,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         match self.config.node {
             NodeOrder::LoopGreedy => self.loop_count(x),
             NodeOrder::MinCut => -self.cutwidth(x),
+            NodeOrder::Given => 0, // constant → ties broken by earliest index = given order
         }
     }
 

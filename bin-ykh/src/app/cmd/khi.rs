@@ -5,7 +5,7 @@ use yui_core::TeX;
 use yui_core::{EucRing, EucRingOps};
 use yui_homology::{ToSeqString, ToTableString};
 use yui_kh::khi::{KhIChain, KhIHomology};
-use yui_kh::tng::builder::{SymBuildConfig, BuildMode, NodeOrder};
+use yui_kh::tng::builder::{SymBuildConfig, BuildMode, NodeOrder, ChunkStrategy};
 use yui_link::InvLink;
 use crate::app::args::*;
 use crate::app::utils::*;
@@ -121,7 +121,8 @@ where
         } else {
             let config = SymBuildConfig {
                 h_range: self.args.h_range.clone(), // open ends are clamped inside the build
-                chunk_bound: self.args.chunk,
+                chunks: self.args.chunk,
+                chunk_strategy: ChunkStrategy::default(),
                 mode: self.args.mode,
                 node: self.args.node,
                 preprocess: !self.args.no_preprocess,

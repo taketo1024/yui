@@ -1,9 +1,12 @@
 pub mod builder;
 pub mod sym_builder;
+pub mod chunk;
 mod elem_builder;
 mod util;
 
 pub use builder::*;
 pub use sym_builder::*;
+pub use chunk::ChunkStrategy;
+pub(crate) use chunk::ChunkBuilder;
 pub(crate) use util::{reachable_range, node_arcs, pop_min_pivot, sparkline, cutwidth_after, toggle_boundary, boundary_edges};
 pub(crate) use elem_builder::TngElemBuilder;

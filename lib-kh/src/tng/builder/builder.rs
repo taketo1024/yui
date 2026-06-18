@@ -26,8 +26,8 @@ use super::{reachable_range, node_arcs, pop_min_pivot, TngElemBuilder};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum NodeOrder {
     #[default]
+    MinCut,     // minimize the boundary cutwidth (default; bounds dense-slice memory, wins on wide knots)
     LoopGreedy, // maximize loop closures unlocked (good when reduction is the bottleneck)
-    MinCut,     // minimize the boundary cutwidth (bounds the dense-slice memory; needed for wide knots)
     Given,      // process crossings in the given (PD) order — no reordering
 }
 

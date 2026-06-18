@@ -53,8 +53,8 @@ pub struct Args {
     #[arg(long, value_parser = parse_build_mode, default_value = "greedy")]
     pub mode: BuildMode,
 
-    // crossing order: loop-greedy (default) or min-cut (bounds cutwidth for wide knots).
-    #[arg(long, value_parser = parse_node_order, default_value = "loop-greedy")]
+    // crossing order: min-cut (default; bounds cutwidth, wins on wide knots) or loop-greedy.
+    #[arg(long, value_parser = parse_node_order, default_value = "min-cut")]
     pub node: NodeOrder,
 
     // skip the half-build/τ-mirror preprocess (which materializes the unbridged off-axis product).

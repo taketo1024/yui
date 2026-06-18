@@ -168,7 +168,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn complex(&self) -> &TngComplex<R>;
             fn complex_mut(&mut self) -> &mut TngComplex<R>;
             pub fn set_elements<I>(&mut self, elements: I) where I: IntoIterator<Item = TngComplexElem<R>>;
-            pub fn nodes(&self) -> impl Iterator<Item = &Node>;
+            pub fn nodes(&self) -> &[Node];
             pub fn n_nodes(&self) -> usize;
             fn drop_nodes<F>(&mut self, pred: F) where F: Fn(&Node) -> bool;
             fn prepare_append(&mut self, x: &Node);
@@ -240,7 +240,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     /// *combined* x+τx toggle (a shared axis edge cancels — can't be summed); LoopGreedy sums loops.
     fn choose_next_node(&self) -> Option<&Node> {
         let pair_penalty = (self.config.pair_penalty_coeff * self.complex().n_verts() as f64) as isize;
-        self.nodes().enumerate()
+        self.nodes().iter().enumerate()
             .min_by_key(|(i, x)| {
                 let tx = self.inv_node(x);
                 let score = match self.config.node {
@@ -840,7 +840,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // Next chunk: grow a τ-closed, boundary-connected piece (≤ `chunk_bound`), then cut it at the
     // first cutwidth valley past the peak — isolating the heavy region for a thin merge interface.
     fn next_chunk(&self) -> Option<Vec<Node>> {
-        if self.builder.inner.nodes().next().is_none() { return None }
+        if self.builder.inner.nodes().is_empty() { return None }
         let bound = self.builder.config.chunk_bound.unwrap_or(usize::MAX);
         let (chunk, cuts) = self.grow_chunk(bound);
         let cut = Self::cut_at_valley(&cuts).unwrap_or(chunk.len());
@@ -850,7 +850,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // Grow a τ-closed chunk ≤ `bound` with its proportional on-axis share (off-axis-heavy chunks
     // explode in preprocess). `open` is the connectivity frontier *and* the merge-cutwidth tracker.
     fn grow_chunk(&self, bound: usize) -> (Vec<Node>, Vec<(usize, usize)>) {
-        let remaining = self.builder.inner.nodes().cloned().collect_vec();
+        let remaining = self.builder.inner.nodes().to_vec();
         let n_on = remaining.iter().filter(|x| self.is_on_axis(x)).count();
         let target_on = if bound >= remaining.len() { n_on } else { (bound * n_on).div_ceil(remaining.len()) };
 
@@ -986,7 +986,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // Split the off-axis crossings (`τx != x`) into two τ-mirror halves: each adjacency
     // group goes opposite the side already holding its τ-image.
     fn partition_off_axis(&self) -> (Vec<Node>, Vec<Node>) {
-        let off_axis = self.builder.inner.nodes().filter(|&x| self.builder.inv_node(x) != x).collect_vec();
+        let off_axis = self.builder.inner.nodes().iter().filter(|&x| self.builder.inv_node(x) != x).collect_vec();
         let groups = self.group_by_adjacency(&off_axis);
 
         let (mut half, mut t_half): (Vec<&Node>, Vec<&Node>) = (vec![], vec![]);

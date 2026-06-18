@@ -134,8 +134,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &mut self.complex
     }
 
-    pub fn nodes(&self) -> impl Iterator<Item = &Node> {
-        self.nodes.iter()
+    pub fn nodes(&self) -> &[Node] {
+        &self.nodes
     }
 
     pub fn n_nodes(&self) -> usize {
@@ -147,8 +147,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.nodes = nodes.into_iter().collect_vec();
     }
 
-    pub fn loops(&self) -> impl Iterator<Item = &Edge> { 
-        self.loops.iter()
+    pub(crate) fn drop_nodes<F>(&mut self, pred: F)
+    where F: Fn(&Node) -> bool {
+        self.nodes.retain(|x| !pred(x));
+    }
+
+    pub fn loops(&self) -> &[Edge] {
+        &self.loops
     }
 
     pub fn set_loops<I>(&mut self, loops: I)
@@ -163,11 +168,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub(crate) fn take_elements(&mut self) -> Vec<TngComplexElem<R>> {
         self.elements.take()
-    }
-
-    pub(crate) fn drop_nodes<F>(&mut self, pred: F)
-    where F: Fn(&Node) -> bool {
-        self.nodes.retain(|x| !pred(x));
     }
 
     pub fn run(mut self) -> Self { 

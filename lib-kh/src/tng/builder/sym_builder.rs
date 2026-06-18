@@ -359,16 +359,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         // re-run selective to a fixpoint (catch loops turned productive by later equiv elims), then full-deloop the rest.
         if selective {
-            self.deloop_selective();
+            self.deloop_all_selective();
             self.deloop_all(false, false);
         }
     }
 
     // Repeatedly deloop productive circles until none remain — each equiv elimination can turn a
     // previously-deferred loop productive.
-    fn deloop_selective(&mut self) {
-        let mut step = 0;
-        loop {
+    fn deloop_all_selective(&mut self) {
+        for step in 1.. {
             let before = self.complex().n_verts();
             debug!("selective re-pass {step}: start ({before} verts)");
             self.deloop_all(false, true);
@@ -376,7 +375,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             debug!("  selective re-pass {step}: {before} -> {after} verts (diff {})",
                 after as isize - before as isize);
             if after == before { break }
-            step += 1;
         }
     }
 

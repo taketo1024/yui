@@ -284,16 +284,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         // re-run selective to a fixpoint (catch loops turned productive by later elims), then full-deloop the rest.
         if selective {
-            self.deloop_selective();
+            self.deloop_all_selective();
             self.deloop_all(false, false);
         }
     }
 
     // Repeatedly deloop productive circles until none remain — each elimination can turn a
     // previously-deferred loop productive.
-    fn deloop_selective(&mut self) {
-        let mut step = 0;
-        loop {
+    fn deloop_all_selective(&mut self) {
+        for step in 1.. {
             let before = self.complex.n_verts();
             debug!("selective re-pass {step}: start ({before} verts)");
             self.deloop_all(false, true);
@@ -301,7 +300,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             debug!("  selective re-pass {step}: {before} -> {after} verts (diff {})",
                 after as isize - before as isize);
             if after == before { break }
-            step += 1;
         }
     }
 
@@ -371,23 +369,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             debug!("prune {} isolated verts in C[{top}].", doomed.len());
         }
         self.complex.remove_vertices(&doomed);
-    }
-
-    pub(crate) fn process_free_loops(&mut self) {
-        while !self.loops.is_empty() { 
-            let c = self.loops.remove(0);
-
-            self.elements.insert_loop(c);
-
-            let (h, t) = self.complex.ht();
-            let marked = self.complex.base_pt() == Some(c);
-            let c = TngComplex::from_loop(h, t, c, marked);
-            self.merge(c);
-
-            if self.config.mode.is_active() {
-                self.deloop_all(false, false);
-            }
-        }
     }
 
     /// Keys at degree `i` matching `pred`, each paired with `weight(k)`; callers pivot by least
@@ -520,6 +501,23 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         
         self.elements.eliminate(&self.complex, i, j);
         self.complex.eliminate(i, j);
+    }
+
+    pub(crate) fn process_free_loops(&mut self) {
+        while !self.loops.is_empty() { 
+            let c = self.loops.remove(0);
+
+            self.elements.insert_loop(c);
+
+            let (h, t) = self.complex.ht();
+            let marked = self.complex.base_pt() == Some(c);
+            let c = TngComplex::from_loop(h, t, c, marked);
+            self.merge(c);
+
+            if self.config.mode.is_active() {
+                self.deloop_all(false, false);
+            }
+        }
     }
 
     fn finalize(&mut self) {

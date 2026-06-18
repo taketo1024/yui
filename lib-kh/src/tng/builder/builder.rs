@@ -179,7 +179,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     // See [BN07, §7] (scan-and-cancel algorithm).
     pub(crate) fn process_nodes(&mut self) {
-        info!("process {} nodes", self.n_nodes());
+        info!("{} process {} nodes", self.current_step(), self.n_nodes());
 
         while let Some(x) = self.choose_next_node().cloned() {
             self.append_node(&x)
@@ -243,7 +243,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         info!("{} append: {x}", self.current_step());
 
         self.prepare_append(x);
-
+        
         let (h, t) = self.complex.ht();
         let cx = TngComplex::from_node(h, t, x, self.complex.base_pt());
         self.merge(cx);
@@ -258,10 +258,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub(crate) fn merge(&mut self, other: TngComplex<R>) {
-        debug!("{} merge {} + {}", self.current_step(), self.stat(), other.stat());
-
         let (left, right) = self.complex.prepare_merge(other);
         let range = reachable_range(self.complex.h_range(), &self.config.h_range, self.n_nodes());
+
+        debug!("{} merge {} <- {}", self.current_step(), left.stat(), right.stat());
         debug!("  merge range: {:?}", range);
 
         match self.config.mode {
@@ -271,7 +271,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
 
         self.prune_h_range();
-        debug!("{}   merged: {}", self.current_step(), self.stat());
+        debug!("{} merged: {}", self.current_step(), self.stat());
     }
 
     // Default path (Greedy / Selective / NoElim): per degree, eliminate (if the mode does) then deloop.
@@ -287,7 +287,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 self.eliminate_in(i - 1);
             }
             self.deloop_in(i - 1);
-            debug!("{}   built C[{i}]: {}", self.current_step(), self.complex.rank(i));
+            debug!("{} built C[{i}]: {}", self.current_step(), self.complex.rank(i));
         }
 
         self.prune_isolated_top(top);
@@ -325,7 +325,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.deloop_in(i - 1);
             self.eliminate_in(i - 2);
             self.eliminate_in(i - 1);
-            debug!("{}   built C[{i}]: {}", self.current_step(), self.complex.rank(i));
+            debug!("{} built C[{i}]: {}", self.current_step(), self.complex.rank(i));
         }
 
         self.prune_isolated_top(top);
@@ -442,7 +442,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         );
         if keys.is_empty() { return }
 
-        debug!("{} deloop in C[{i}], targets: {}.", self.current_step(), keys.len());
+        debug!("{} deloop in C[{i}], targets: {}{}.", self.current_step(), keys.len(), if selective { " (selective)" } else { "" });
 
         let before = self.complex.rank(i) as isize;
 
@@ -557,16 +557,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn finalize(&mut self) {
-        info!("finalize: {}", self.stat());
-
         if self.complex.is_completely_delooped() {
+            info!("{} completely delooped: {}", self.current_step(), self.stat());
             return;
         }
+
+        info!("{} finalize: {}", self.current_step(), self.stat());
 
         self.deloop_all_forced();
         self.deloop_all_marked(); // deloop marked loops
 
-        info!("  finalized: {}", self.stat());
+        info!("{} finalized: {}", self.current_step(), self.stat());
     }
 
     pub fn into_tng_complex(self) -> TngComplex<R> {

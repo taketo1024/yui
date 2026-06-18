@@ -204,16 +204,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         // drop them — a chunked build yields the complex/homology but not α / ssi.
         self.set_elements(vec![]);
         while let Some(chunk) = ChunkBuilder::new(self).next_chunk() {
-            info!("process chunk ({}): {}", chunk.len(), chunk.iter().join(", "));
+            info!("{} build chunk ({}): {}", self.current_step(), chunk.len(), chunk.iter().join(", "));
 
             let (c, key_map) = ChunkBuilder::new(self).build_chunk(&chunk);
 
-            debug!("  chunk built: {}", c.stat());
+            info!("{} chunk built: {}", self.current_step(), c.stat());
 
             self.drop_nodes(|x| chunk.contains(x));
             self.merge(c, key_map);
 
-            info!("  chunk merged: {}", self.stat());
+            info!("{} chunk merged: {}", self.current_step(), self.stat());
         }
     }
 
@@ -222,7 +222,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn process_nodes(&mut self) {
-        info!("process {} nodes", self.n_nodes());
+        info!("{} process {} nodes", self.current_step(), self.n_nodes());
 
         while let Some(x) = self.choose_next_node().cloned() {
             let tx = self.inv_node(&x).clone();
@@ -231,8 +231,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             } else {
                 self.append_off_axis(&x, &tx);
             }
-
-            info!("  appended: {x}, current size: {}", self.stat());
         }
     }
 
@@ -282,7 +280,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn append_off_axis(&mut self, x: &Node, tx: &Node) { 
         assert_eq!(self.inv_node(x), tx);
-
         info!("{} append off-axis: {x}, {tx}", self.current_step());
 
         self.prepare_append(x);
@@ -314,15 +311,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn merge(&mut self, c: TngComplex<R>, right_map: TauKeyMap) {
-        debug!("{} merge {} + {}", self.current_step(), self.stat(), c.stat());
-        debug!("  key_map: {} × {}", self.key_map.len(), right_map.len());
-
         // build the merged τ key-map per degree (next to merge_vertices) rather than as one
         // up-front cartesian — for large knots that product never fits in memory.
         let left_map = std::mem::take(&mut self.key_map);
-
         let (left, right) = self.complex_mut().prepare_merge(c);
         let range = reachable_range(self.complex().h_range(), &self.config.h_range, self.n_nodes());
+        
+        debug!("{} merge {} <- {}", self.current_step(), left.stat(), right.stat());
+        debug!("  key_map: {} × {}", left_map.len(), right_map.len());
         debug!("  merge range: {:?}", range);
 
         match self.config.mode {
@@ -333,8 +329,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         self.prune_h_range();
 
-        debug!("  key_map built: {}", self.key_map.len());
-        debug!("  merged: {} + {} -> {}", left.stat(), right.stat(), self.stat());
+        debug!("{} merged: {}", self.current_step(), self.stat());
     }
 
     // Default path (Greedy / Selective / NoElim): per degree, eliminate (if the mode does) then deloop.
@@ -350,7 +345,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 self.eliminate_in(i - 1);
             }
             self.deloop_in(i - 1);
-            debug!("{}   built C[{i}]: {}", self.current_step(), self.complex().rank(i));
+            debug!("{} built C[{i}]: {}", self.current_step(), self.complex().rank(i));
         }
 
         self.prune_isolated_top(top);
@@ -367,13 +362,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // previously-deferred loop productive.
     fn deloop_all_selective(&mut self) {
         for step in 1.. {
-            let before = self.complex().n_verts();
-            debug!("selective re-pass {step}: start ({before} verts)");
+            let before = self.complex().n_verts() as isize;
+            debug!("{} selective re-pass {step}: start ({before} verts)", self.current_step());
+
             self.deloop_all();
-            let after = self.complex().n_verts();
-            debug!("  selective re-pass {step}: {before} -> {after} verts (diff {})",
-                after as isize - before as isize);
-            if after == before { break }
+            
+            let after = self.complex().n_verts() as isize;
+            if after == before { 
+                debug!("  no more selective edges.");
+                break 
+            }
+
+            debug!("{} done selective re-pass {step}: {before} -> {after} verts (diff {})", self.current_step(), after - before);
         }
     }
 
@@ -388,7 +388,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.deloop_in(i - 1);
             self.eliminate_in(i - 2);
             self.eliminate_in(i - 1);
-            debug!("{}   built C[{i}]: {}", self.current_step(), self.complex().rank(i));
+            debug!("{} built C[{i}]: {}", self.current_step(), self.complex().rank(i));
         }
 
         self.prune_isolated_top(top);
@@ -531,7 +531,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         );
         if keys.is_empty() { return }
 
-        debug!("{} deloop in C[{i}], targets: {} (selective: {selective}).", self.current_step(), keys.len());
+        debug!("{} deloop in C[{i}], targets: {}{}.", self.current_step(), keys.len(), if selective { " (selective)" } else { "" });
 
         let before = self.complex().rank(i) as isize;
 
@@ -756,16 +756,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn finalize(&mut self) {
-        info!("finalize: {}", self.stat());
-
         if self.complex().is_completely_delooped() { 
+            info!("{} completely delooped: {}", self.current_step(), self.stat());
             return
         }
+
+        info!("{} finalize: {}", self.current_step(), self.stat());
 
         self.deloop_all_forced();
         self.deloop_all_marked(); // deloop marked loops
 
-        info!("  finalized: {}", self.stat());
+        info!("{} finalized: {}", self.current_step(), self.stat());
     }
 
     pub fn tau_map(&self) -> impl Fn(&KhGen) -> KhGen + Send + Sync + 'static {
@@ -962,7 +963,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let elements = self.builder.inner.take_elements();
         let (half, t_half) = self.partition_off_axis();
 
-        info!("({}) preprocess off-axis: {} + {}", self.builder.inner.stat(), half.len(), t_half.len());
+        info!("{} preprocess off-axis: {} + {}", self.builder.current_step(), half.len(), t_half.len());
 
         let (c, tc, key_map, elements) = self.build_from_half(&half, elements);
 
@@ -973,14 +974,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.builder.key_map = key_map;
         self.builder.inner.set_elements(elements);
 
-        info!("({}) preprocess done.", self.builder.inner.stat());
+        info!("{} preprocess done: {}", self.builder.current_step(), self.builder.stat());
     }
 
     fn merge_half(&mut self, nodes: &[Node], c: TngComplex<R>) {
-        info!("merge half {} into {}", c.stat(), self.builder.inner.stat());
         self.builder.inner.drop_nodes(|x| nodes.contains(x));
         self.builder.inner.merge(c);
-        info!("  merged: {}", self.builder.inner.stat());
     }
 
     // Split the off-axis crossings (`τx != x`) into two τ-mirror halves: each adjacency
@@ -1027,24 +1026,24 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         b.set_nodes(crossings.iter().cloned());
         b.set_elements(elements);
         b.process_nodes();
-        info!("half complex built: {}", b.stat());
+
+        info!("{} half complex built: {}", self.builder.current_step(), b.stat());
 
         let keys = b.complex().keys().cloned().collect_vec();
         let mut elements = b.take_elements();
 
         let c = b.into_tng_complex();
-        info!("mirror half via τ...");
+        debug!("  mirror half via τ...");
         let tc = c.convert_edges(|e| self.builder.inv_edge(e));
 
-        info!("pair key_map ({}² entries)...", keys.len());
+        debug!("  pair key_map ({}² entries)...", keys.len());
         let key_map = TauKeyMap::from_half(&keys, self.weight_band(r_rest));
 
-        info!("complete {} elements...", elements.len());
+        debug!("  complete {} elements...", elements.len());
         elements.iter_mut().for_each(|e|
             self.complete_element(e)
         );
 
-        info!("build_from_half done: {} key-pairs.", key_map.len());
         (c, tc, key_map, elements)
     }
 

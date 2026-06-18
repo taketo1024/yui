@@ -113,8 +113,9 @@ pub fn parse_build_mode(s: &str) -> Result<BuildMode, String> {
         "greedy"               => Ok(BuildMode::Greedy),
         "selective"            => Ok(BuildMode::Selective),
         "min-fill" | "minfill" => Ok(BuildMode::MinFill),
+        "no-elim" | "noelim"   => Ok(BuildMode::NoElim),
         "none"                 => Ok(BuildMode::None),
-        _ => Err(format!("invalid mode `{s}`, expected greedy|selective|min-fill|none")),
+        _ => Err(format!("invalid mode `{s}`, expected greedy|selective|min-fill|no-elim|none")),
     }
 }
 

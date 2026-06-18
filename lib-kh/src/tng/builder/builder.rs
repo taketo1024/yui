@@ -37,6 +37,7 @@ pub enum BuildMode {
     Greedy,    // deloop every circle, eliminate immediately
     Selective, // deloop only productive circles, eliminate immediately (full deloop at merge end)
     MinFill,   // deloop a whole degree, then eliminate by global min-fill (Markowitz)
+    NoElim,    // deloop every circle but don't eliminate (delooped, unreduced complex)
     None,      // don't deloop, don't eliminate (raw merge; finalize still deloops to a valid complex)
 }
 
@@ -258,23 +259,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         match self.config.mode {
             BuildMode::None    => self.complex.merge_with(&left, &right),
             BuildMode::MinFill => self.merge_deferred(&left, &right, range),
-            _                  => self.merge_immediate(&left, &right, range),
+            _                  => self.merge_default(&left, &right, range),
         }
 
         self.prune_h_range();
         debug!("  merged: {}", self.stat());
     }
 
-    // Immediate: per degree, eliminate then deloop (deloop inline-eliminates each new vertex). Deloop
-    // may be selective (defer non-productive circles, then full-deloop + re-pass to a fixpoint at the end).
-    fn merge_immediate(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, range: RangeInclusive<isize>) {
+    // Default path (Greedy / Selective / NoElim): per degree, eliminate (if the mode does) then deloop.
+    // Deloop reads `selective` from the mode (defer non-productive circles, then full-deloop + re-pass at the end).
+    fn merge_default(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, range: RangeInclusive<isize>) {
         let top = *range.end();
         let selective = self.config.mode.is_selective();
 
         for i in range {
             debug!("build C[{i}]...");
             self.merge_slice(left, right, i);
-            self.eliminate_in(i - 1);
+            if self.config.mode.immediate_elim() {
+                self.eliminate_in(i - 1);
+            }
             self.deloop_in(i - 1);
             debug!("  built C[{i}]: {}", self.complex.rank(i));
         }
@@ -673,7 +676,7 @@ mod tests {
         };
 
         let ref_h = build(BuildMode::Greedy).homology();
-        for mode in [BuildMode::Selective, BuildMode::MinFill, BuildMode::None] {
+        for mode in [BuildMode::Selective, BuildMode::MinFill, BuildMode::NoElim, BuildMode::None] {
             let c = build(mode);
             c.check_d_all();
             let h = c.homology();

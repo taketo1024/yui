@@ -331,7 +331,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         match self.config.mode {
             BuildMode::None    => for i in range { self.merge_slice(&left, &right, i, &left_map, &right_map); },
             BuildMode::MinFill => self.merge_deferred(&left, &right, range, &left_map, &right_map),
-            _                  => self.merge_immediate(&left, &right, range, &left_map, &right_map),
+            _                  => self.merge_default(&left, &right, range, &left_map, &right_map),
         }
 
         self.prune_h_range();
@@ -340,16 +340,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("  merged: {} + {} -> {}", left.stat(), right.stat(), self.stat());
     }
 
-    // Immediate: per degree, eliminate then deloop (deloop inline-eliminates each new vertex). Deloop
-    // may be selective (defer non-productive circles, then full-deloop + re-pass to a fixpoint at the end).
-    fn merge_immediate(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, range: RangeInclusive<isize>, left_map: &TauKeyMap, right_map: &TauKeyMap) {
+    // Default path (Greedy / Selective / NoElim): per degree, eliminate (if the mode does) then deloop.
+    // Deloop reads `selective` from the mode (defer non-productive circles, then full-deloop + re-pass at the end).
+    fn merge_default(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, range: RangeInclusive<isize>, left_map: &TauKeyMap, right_map: &TauKeyMap) {
         let top = *range.end();
         let selective = self.config.mode.is_selective();
 
         for i in range {
             debug!("build C[{i}]...");
             self.merge_slice(left, right, i, left_map, right_map);
-            self.eliminate_in(i - 1);
+            if self.config.mode.immediate_elim() {
+                self.eliminate_in(i - 1);
+            }
             self.deloop_in(i - 1);
             debug!("  built C[{i}]: {}", self.complex().rank(i));
         }
@@ -1126,7 +1128,7 @@ mod tests {
         let ref_c = build(BuildMode::Greedy);
         let range = ref_c.support().cloned().range().unwrap();
         let ref_h = ref_c.homology();
-        for mode in [BuildMode::Selective, BuildMode::MinFill, BuildMode::None] {
+        for mode in [BuildMode::Selective, BuildMode::MinFill, BuildMode::NoElim, BuildMode::None] {
             let c = build(mode);
             c.check_d_all();
             let h = c.homology();
@@ -1307,6 +1309,31 @@ mod tests {
         assert!(!b.inner.complex().is_completely_delooped());
 
         b.finalize();
+
+        assert!(b.inner.complex().is_completely_delooped());
+
+        let c = b.into_tng_complex().into_raw_complex();
+        assert_eq!(c[0].rank(), 4);
+        assert_eq!(c[1].rank(), 6);
+        assert_eq!(c[2].rank(), 12);
+        assert_eq!(c[3].rank(), 8);
+
+        let h = c.homology();
+        assert_eq!(h[0].rank(), 2);
+        assert_eq!(h[1].rank(), 0);
+        assert_eq!(h[2].rank(), 2);
+        assert_eq!(h[3].rank(), 2);
+    }
+
+    #[test]
+    fn no_auto_elim() {
+        // NoElim deloops every circle during the build but never eliminates → delooped, unreduced.
+        let l = InvLink::test_data("3_1");
+        let (h, t) = (FF2::zero(), FF2::zero());
+
+        let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
+        b.config.mode = BuildMode::NoElim;
+        b.process_nodes();
 
         assert!(b.inner.complex().is_completely_delooped());
 

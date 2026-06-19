@@ -920,7 +920,6 @@ impl fmt::Display for SymBuildProfile {
     }
 }
 
-
 /// Builds the off-axis part of a [`SymTngBuilder`] by τ-symmetry: build one
 /// representative half, mirror via τ, and merge both into the builder.
 struct SymTngPreprocessor<'a, R>
@@ -1044,7 +1043,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         TngComplexBuilder::init(h, t, (0, 0), base_pt)
             .with_config(BuildConfig { node, h_range, ..Default::default() })
     }
-
 
     // Complete a half-element into the full off-axis element.
     fn complete_element(&self, e: &mut TngComplexElem<R>) {

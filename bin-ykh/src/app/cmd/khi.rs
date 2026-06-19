@@ -6,7 +6,7 @@ use yui_core::{EucRing, EucRingOps};
 use yui_homology::{ToSeqString, ToTableString};
 use yui_kh::khi::{KhIChain, KhIHomology};
 use yui_kh::tng::builder::{SymBuildConfig, BuildMode, NodeOrder, ChunkStrategy};
-use yui_link::InvLink;
+use yui_link::{InvLink, Edge};
 use crate::app::args::*;
 use crate::app::utils::*;
 use crate::app::err::*;
@@ -46,8 +46,16 @@ pub struct Args {
     #[arg(long, value_parser = parse_h_range)]
     pub h_range: Option<RangeInclusive<isize>>,
 
+    // split the build into this many τ-closed chunks.
     #[arg(long)]
-    pub chunk: Option<usize>,
+    pub chunks: Option<usize>,
+
+    #[arg(long, value_parser = parse_chunk_strategy, default_value = "frontier")]
+    pub chunk_strategy: ChunkStrategy,
+
+    // manual cut `e,e,e` (repeatable; overrides --chunk-strategy with Manual).
+    #[arg(long, value_parser = parse_cut)]
+    pub cut: Vec<Vec<Edge>>,
 
     #[arg(long, value_parser = parse_build_mode, default_value = "greedy")]
     pub mode: BuildMode,
@@ -121,8 +129,9 @@ where
         } else {
             let config = SymBuildConfig {
                 h_range: self.args.h_range.clone(), // open ends are clamped inside the build
-                chunks: self.args.chunk,
-                chunk_strategy: ChunkStrategy::default(),
+                chunks: self.args.chunks,
+                chunk_strategy: if self.args.cut.is_empty() { self.args.chunk_strategy.clone() }
+                                else { ChunkStrategy::Manual(self.args.cut.clone()) },
                 mode: self.args.mode,
                 node: self.args.node,
                 preprocess: !self.args.no_preprocess,

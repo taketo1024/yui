@@ -1,7 +1,8 @@
 use std::ops::RangeInclusive;
 use clap::ValueEnum;
 use derive_more::Display;
-use yui_kh::tng::builder::{BuildMode, NodeOrder};
+use yui_kh::tng::builder::{BuildMode, NodeOrder, ChunkStrategy};
+use yui_link::Edge;
 
 pub trait AppArgs { 
     fn c_type(&self) -> CType; 
@@ -122,4 +123,18 @@ pub fn parse_node_order(s: &str) -> Result<NodeOrder, String> {
         "given"                               => Ok(NodeOrder::Given),
         _ => Err(format!("invalid node order `{s}`, expected loop-greedy|min-cut|given")),
     }
+}
+
+// parse a chunk strategy: frontier | boundary. (Manual is selected via `--cut`.)
+pub fn parse_chunk_strategy(s: &str) -> Result<ChunkStrategy, String> {
+    match s.to_lowercase().as_str() {
+        "frontier" => Ok(ChunkStrategy::Frontier),
+        "boundary" => Ok(ChunkStrategy::Boundary),
+        _ => Err(format!("invalid chunk strategy `{s}`, expected frontier|boundary")),
+    }
+}
+
+// parse one manual cut `e,e,e` — a comma list of edge labels (the flag is repeatable for more cuts).
+pub fn parse_cut(s: &str) -> Result<Vec<Edge>, String> {
+    s.split(',').map(|e| e.trim().parse::<Edge>().map_err(|err| format!("`{e}`: {err}"))).collect()
 }

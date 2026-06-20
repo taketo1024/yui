@@ -47,7 +47,7 @@ pub struct Args {
     pub h_range: Option<RangeInclusive<isize>>,
 
     #[arg(long)]
-    pub chunk: Option<usize>,
+    pub chunks: Option<usize>,
 
     #[arg(long, value_parser = parse_build_mode, default_value = "greedy")]
     pub mode: BuildMode,
@@ -121,7 +121,7 @@ where
         } else {
             let config = SymBuildConfig {
                 h_range: self.args.h_range.clone(), // open ends are clamped inside the build
-                chunk_bound: self.args.chunk,
+                chunks: self.args.chunks,
                 mode: self.args.mode,
                 node_order: self.args.node_order,
                 preprocess: !self.args.no_preprocess,

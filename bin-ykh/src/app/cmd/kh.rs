@@ -5,6 +5,7 @@ use yui_core::TeX;
 use yui_core::{EucRing, EucRingOps};
 use yui_homology::{ToSeqString, ToTableString};
 use yui_kh::kh::KhHomology;
+use yui_kh::tng::builder::BuildConfig;
 use yui_link::Link;
 use crate::app::args::*;
 use crate::app::utils::*;
@@ -44,6 +45,9 @@ pub struct Args {
 
     #[arg(long, value_parser = parse_h_range)]
     pub h_range: Option<RangeInclusive<isize>>,
+
+    #[arg(long)]
+    pub chunks: Option<usize>,
 
     #[arg(long, default_value = "0")]
     pub log: u8,
@@ -102,7 +106,8 @@ where
         let kh = if self.args.no_simplify {
             KhHomology::new_no_simplify(&l, &h, &t, self.args.reduced)
         } else {
-            KhHomology::new_partial(&l, &h, &t, self.args.reduced, self.args.h_range.clone())
+            let config = BuildConfig { h_range: self.args.h_range.clone(), chunks: self.args.chunks, ..Default::default() };
+            KhHomology::new_with_config(&l, &h, &t, self.args.reduced, config)
         };
 
         // print Kh

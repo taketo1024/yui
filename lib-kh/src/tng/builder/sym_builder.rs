@@ -24,7 +24,7 @@ use crate::kh::{KhGen, KhTensor};
 use crate::tng::{LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
 use crate::tng::builder::{TngComplexBuilder, BuildConfig, BuildMode, NodeOrder};
 use std::fmt;
-use super::{reachable_range, pop_min_pivot, sparkline, cutwidth_after, toggle_boundary, boundary_edges};
+use super::{reachable_range, pop_min_pivot, sparkline, cutwidth_after, toggle_boundary, boundary_edges, select_cuts};
 
 /// Toggles for the automatic simplification done while building (kept separate
 /// from [`BuildConfig`] so the equivariant builder can gain its own flags).
@@ -141,7 +141,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         // the inner builder is driven by `self` — disable its own auto-simplify.
         let inner = TngComplexBuilder::from_link(l.inner(), h, t, reduced)
-            .with_config(BuildConfig { mode: BuildMode::None, node_order: NodeOrder::default(), h_range: None });
+            .with_config(BuildConfig { mode: BuildMode::None, chunks: None, node_order: NodeOrder::default(), h_range: None });
 
         let x_map = l.nodes().map(|x|
             (x.clone(), l.inv_node(x).clone())
@@ -156,7 +156,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn with_config(mut self, config: SymBuildConfig) -> Self {
         // propagate the window to the inner builder so the preprocess merges cap
         // to it; this also drops canon cycles when the window excludes h-degree 0.
-        let inner_config = BuildConfig { mode: BuildMode::None, node_order: config.node_order, h_range: config.h_range.clone() };
+        let inner_config = BuildConfig { mode: BuildMode::None, chunks: None, node_order: config.node_order, h_range: config.h_range.clone() };
         self.inner = self.inner.with_config(inner_config);
         self.config = config;
         self
@@ -805,8 +805,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let plan = self.plan();
         info!("{} chunk plan: {} pieces {:?}", self.builder.current_step(), plan.len(),
             plan.iter().map(|c| c.len()).collect_vec());
-        for chunk in plan {
-            let (c, key_map) = self.build_chunk(&chunk);
+
+        // build every chunk first (each is independent of the parent state), then merge them in.
+        let built: Vec<(TngComplex<R>, TauKeyMap)> = plan.iter().map(|chunk| self.build_chunk(chunk)).collect();
+        for (chunk, (c, key_map)) in plan.into_iter().zip(built) {
             self.builder.drop_nodes(|x| chunk.contains(x));
             self.builder.merge(c, key_map);
             info!("{} chunk merged: {}", self.builder.current_step(), self.builder.stat());
@@ -820,7 +822,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let prof = self.builder.profile_sym();
         let k = self.builder.config.chunks.unwrap_or(1).max(1);
         let nodes = self.builder.inner.nodes();
-        let cuts = Self::select_cuts(&prof.widths, k - 1);
+        let cuts = select_cuts(&prof.widths, k - 1);
 
         // segment `prof.order` after each cut position; expand each unit to its nodes.
         let starts = std::iter::once(0).chain(cuts.iter().map(|&v| v + 1));
@@ -829,66 +831,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             .map(|(s, e)| prof.order[s..e].iter().flatten().map(|&i| nodes[i].clone()).collect())
             .filter(|c: &Vec<Node>| !c.is_empty())
             .collect()
-    }
-
-    // Valley positions (a descent that turns back up) in `widths`, ascending. The `scan` carries
-    // a `descended` flag so flats are ignored — a mid-descent plateau isn't mistaken for the bottom.
-    fn valleys(widths: &[usize]) -> Vec<usize> {
-        widths.windows(2).enumerate()
-            .scan(false, |descended, (i, w)| Some(
-                if w[1] < w[0] {
-                    *descended = true;
-                    None
-                } else if w[1] > w[0] && *descended {
-                    *descended = false;
-                    Some(i)
-                } else {
-                    None
-                }
-            ))
-            .flatten()
-            .collect()
-    }
-
-    // `n_cuts` cut positions in `widths`: take the deepest valleys first; if more cuts than
-    // valleys are needed, keep every valley and split the widest pieces evenly (greedy, which
-    // minimizes the largest piece).
-    fn select_cuts(widths: &[usize], n_cuts: usize) -> Vec<usize> {
-        let n = widths.len();
-        let n_cuts = n_cuts.min(n.saturating_sub(1));
-        if n_cuts == 0 {
-            return vec![];
-        }
-
-        let vs = Self::valleys(widths); // ascending positions
-        if vs.len() >= n_cuts {
-            // enough valleys: keep the `n_cuts` deepest, back in position order.
-            return vs.into_iter()
-                .sorted_by_key(|&p| widths[p])
-                .take(n_cuts)
-                .sorted()
-                .collect();
-        }
-
-        // too few valleys: every valley is a cut; spend the rest splitting the widest pieces
-        // evenly. `alloc[i]` is the number of pieces segment `i` is divided into.
-        let segs: Vec<(usize, usize)> = std::iter::once(0)
-            .chain(vs.iter().map(|&v| v + 1))
-            .chain(std::iter::once(n))
-            .tuple_windows()
-            .collect();
-
-        let alloc = (vs.len()..n_cuts).fold(vec![1usize; segs.len()], |mut alloc, _| {
-            let widest = (0..segs.len())
-                .max_by(|&a, &b| ((segs[a].1 - segs[a].0) * alloc[b]).cmp(&((segs[b].1 - segs[b].0) * alloc[a])))
-                .unwrap();
-            alloc[widest] += 1;
-            alloc
-        });
-
-        let even = segs.iter().zip(&alloc)
-            .flat_map(|(&(lo, hi), &a)| (1..a).map(move |j| lo + j * (hi - lo) / a - 1));
-        vs.into_iter().chain(even).sorted().collect()
     }
 
     // Build `chunk` into a reduced sub-complex via a child builder, returning it with its τ key-map.
@@ -910,7 +852,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let (h, t) = self.builder.inner.complex().ht();
         let base_pt = self.builder.inner.complex().base_pt();
         let mut inner = TngComplexBuilder::init(h, t, (0, 0), base_pt)
-            .with_config(BuildConfig { mode: BuildMode::None, node_order: NodeOrder::MinCut, h_range: None });
+            .with_config(BuildConfig { mode: BuildMode::None, chunks: None, node_order: NodeOrder::MinCut, h_range: None });
         inner.set_nodes(chunk.iter().cloned());
 
         // cap the child to the chunk's reachable band: a chunk vertex of weight
@@ -1092,7 +1034,7 @@ mod tests {
             assert_eq!(prof.on_axis + prof.off_axis, nodes.len(), "{name}: unit counts");
 
             let mut b = TngComplexBuilder::<i32>::init(&0, &0, (0, 0), None)
-                .with_config(BuildConfig { mode: BuildMode::None, ..Default::default() });
+                .with_config(BuildConfig { mode: BuildMode::None, chunks: None, ..Default::default() });
 
             let mut open: FxHashSet<Edge> = FxHashSet::default();
             for (step, unit) in prof.order.iter().enumerate() {

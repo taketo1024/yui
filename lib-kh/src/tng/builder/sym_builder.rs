@@ -660,9 +660,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         self.deloop_all();
 
-        // Deloop the marked loops into a single summand.
-        for i in self.complex().h_range() {
-            self.deloop_in_with(i, true);
+        // Deloop marked circles only when there are no other unmarked components left. 
+        if self.complex().is_closed() {
+            for i in self.complex().h_range() {
+                self.deloop_in_with(i, true);
+            }
         }
 
         info!("{} finalized: {}", self.current_step(), self.stat());
@@ -1140,6 +1142,33 @@ mod tests {
         let hw = build(Some(3), Some(a..=b)).homology();
         for i in (a + 1)..=(b - 1) {
             assert_eq!(hw[i].rank(), hn[i].rank(), "windowed rank at {i}");
+        }
+    }
+
+    #[test]
+    fn chunk_build_reduced_matches() {
+        // reduced (based) chunked build must reproduce the non-chunked reduced homology — the
+        // based component is capped once, by the top-level finalize, not per chunk.
+        let l = InvLink::from_symmetric_pd_code(
+            [[18,8,1,7],[13,6,14,7],[12,2,13,1],[8,18,9,17],[5,14,6,15],[2,12,3,11],[16,10,17,9],[15,4,16,5],[10,4,11,3]]
+        ).with_base_pt(1); // edge 1 is on-axis (inv(1) = 1)
+        let (h, t) = (FF2::zero(), FF2::zero());
+
+        let build = |chunks: Option<usize>| {
+            let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, true);
+            b.config.chunks = chunks;
+            b.run().into_tng_complex().into_raw_complex()
+        };
+
+        let normal = build(None);
+        let range = normal.support().cloned().range().unwrap();
+        let hn = normal.homology();
+
+        for k in [Some(2), Some(3)] {
+            let hc = build(k).homology();
+            for i in range.clone() {
+                assert_eq!(hc[i].rank(), hn[i].rank(), "reduced rank at {i} (chunks {k:?})");
+            }
         }
     }
 

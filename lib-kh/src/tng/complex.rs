@@ -249,6 +249,21 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.keys_of_deg(i).count()
     }
 
+    /// Whether the diagram is closed — every component is a circle (no open arc-ends).
+    pub fn is_closed(&self) -> bool {
+        self.iter_verts().next().is_none_or(|(_, v)| v.tng().is_closed())
+    }
+
+    /// Endpoints of the current tangle boundary.
+    pub fn boundary_ends(&self) -> impl Iterator<Item = Edge> + '_ {
+        self.iter_verts()
+            .next()
+            .into_iter()
+            .flat_map(|(_, v)| v.tng().comps())
+            .filter_map(|c| c.end_pts())
+            .flat_map(|(e0, e1)| [e0, e1])
+    }
+
     pub fn contains_key(&self, key: &TngComplexKey) -> bool { 
         self.vertices.contains_key(key)
     }
@@ -267,10 +282,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.keys_of(move |k| (k.weight() as isize) + i0 == i)
     }
 
-    pub fn vertex(&self, v: &TngComplexKey) -> &TngComplexVertex<R> { 
-        &self.vertices[v]
-    }
-
     pub fn n_verts(&self) -> usize {
         self.vertices.len()
     }
@@ -279,27 +290,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.vertices.values().map(|v| v.out_edges.len()).sum()
     }
 
-    /// Total stored cobordism weight: number of cob monomials summed over all edges.
-    pub(crate) fn cob_weight(&self) -> usize {
-        self.vertices.values()
-            .flat_map(|v| v.out_edges.values())
-            .map(|f| f.nterms())
-            .sum()
+    pub fn vertex(&self, v: &TngComplexKey) -> &TngComplexVertex<R> { 
+        &self.vertices[v]
     }
 
     pub fn iter_verts(&self) -> impl Iterator<Item = (&TngComplexKey, &TngComplexVertex<R>)> {
         self.vertices.iter()
-    }
-
-    /// Endpoints of the current tangle boundary. Same across all vertices
-    /// (they share the partial diagram), so we read it off any one vertex.
-    pub fn boundary_ends(&self) -> impl Iterator<Item = Edge> + '_ {
-        self.iter_verts()
-            .next()
-            .into_iter()
-            .flat_map(|(_, v)| v.tng().comps())
-            .filter_map(|c| c.end_pts())
-            .flat_map(|(e0, e1)| [e0, e1])
     }
 
     pub fn add_vertex(&mut self, k: TngComplexKey, v: TngComplexVertex<R>) {
@@ -854,6 +850,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub(crate) fn stat(&self) -> String {
         format!("(n: {}, v: {}, e: {}, w: {})", self.dim(), self.n_verts(), self.n_edges(), self.cob_weight())
+    }
+
+    /// Total stored cobordism weight: number of cob monomials summed over all edges.
+    fn cob_weight(&self) -> usize {
+        self.vertices.values()
+            .flat_map(|v| v.out_edges.values())
+            .map(|f| f.nterms())
+            .sum()
     }
 
     pub(crate) fn convert_edges<F>(&self, f: F) -> Self

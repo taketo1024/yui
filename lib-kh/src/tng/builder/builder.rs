@@ -482,9 +482,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         self.deloop_all();
 
-        // Deloop the marked loops into a single summand.
-        for i in self.complex.h_range() {
-            self.deloop_in_with(i, true);
+        // Deloop marked circles only when there are no other unmarked components left. 
+        if self.complex.is_closed() {
+            for i in self.complex.h_range() {
+                self.deloop_in_with(i, true);
+            }
         }
 
         info!("{} finalized: {}", self.current_step(), self.stat());

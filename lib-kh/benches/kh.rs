@@ -15,8 +15,8 @@ use yui_link::Link;
 use yui_kh::kh::KhComplex;
 use yui_kh::tng::builder::{BuildConfig, BuildMode, NodeOrder};
 
-const NODE_ORDERS: [(&str, NodeOrder); 2] =
-    [("loop", NodeOrder::LoopGreedy), ("mincut", NodeOrder::MinCut)];
+const NODE_ORDERS: [(&str, NodeOrder); 1] =
+    [("mincut", NodeOrder::MinCut)];
 
 const MODES: [(&str, BuildMode); 3] =
     [("greedy", BuildMode::Greedy), ("selective", BuildMode::Selective), ("minfill", BuildMode::MinFill)];
@@ -54,7 +54,7 @@ fn bench_kh_node(c: &mut Criterion) {
     group.finish();
 }
 
-/// Mode comparison (greedy / selective / min-fill), loop-greedy node order.
+/// Mode comparison (greedy / selective / min-fill), min-cut node order.
 fn bench_kh_modes(c: &mut Criterion) {
     let mut group = c.benchmark_group("kh_modes");
 

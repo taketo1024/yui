@@ -21,15 +21,14 @@ use yui_link::{Node, Edge, Link};
 
 use crate::kh::{KhChain, KhComplex};
 use crate::tng::{End, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
-use super::{reachable_range, node_arcs, pop_min_pivot, sparkline, cutwidth_after, toggle_boundary, TngElemBuilder};
+use super::{reachable_range, pop_min_pivot, sparkline, cutwidth_after, toggle_boundary, TngElemBuilder};
 
 /// How the next crossing to append is chosen.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum NodeOrder {
     #[default]
-    MinCut,     // minimize the boundary cutwidth (default; bounds dense-slice memory, wins on wide knots)
-    LoopGreedy, // maximize loop closures unlocked (good when reduction is the bottleneck)
-    Given,      // process crossings in the given (PD) order — no reordering
+    MinCut, // minimize the boundary cutwidth (default; bounds dense-slice memory, wins on wide knots)
+    Given,  // process crossings in the given (PD) order — no reordering
 }
 
 /// How the complex is simplified while building.
@@ -200,20 +199,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     /// Strategy score for appending `x` (higher is better).
     pub(crate) fn score_node(&self, x: &Node) -> isize {
         match self.config.node {
-            NodeOrder::LoopGreedy => self.loop_count(x),
             NodeOrder::MinCut => -self.cutwidth(x),
             NodeOrder::Given => 0, // constant → ties broken by earliest index = given order
         }
-    }
-
-    /// Circles `x` would close across the current vertices — the deloop/elim unlock.
-    pub(crate) fn loop_count(&self, x: &Node) -> isize {
-        let arcs = node_arcs(x, self.complex.base_pt());
-        self.complex.iter_verts().map(|(_, v)| {
-            v.tng().comps().map(|c|
-                arcs.iter().filter(|a| c.is_connectable_bothends(a)).count() as isize
-            ).sum::<isize>()
-        }).sum()
     }
 
     /// Boundary cutwidth (open-edge count) after appending `x`. `boundary_ends` is cheap, so

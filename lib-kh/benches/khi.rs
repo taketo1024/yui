@@ -17,8 +17,8 @@ use yui_kh::kh::KhComplex;
 use yui_kh::khi::KhIComplex;
 use yui_kh::tng::builder::{SymBuildConfig, BuildMode, NodeOrder};
 
-const NODE_ORDERS: [(&str, NodeOrder); 2] =
-    [("loop", NodeOrder::LoopGreedy), ("mincut", NodeOrder::MinCut)];
+const NODE_ORDERS: [(&str, NodeOrder); 1] =
+    [("mincut", NodeOrder::MinCut)];
 
 const MODES: [(&str, BuildMode); 3] =
     [("greedy", BuildMode::Greedy), ("selective", BuildMode::Selective), ("minfill", BuildMode::MinFill)];

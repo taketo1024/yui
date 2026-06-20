@@ -30,7 +30,7 @@ use super::{reachable_range, pop_min_pivot, sparkline, cutwidth_after, toggle_bo
 /// from [`BuildConfig`] so the equivariant builder can gain its own flags).
 #[derive(Clone, Debug)]
 pub struct SymBuildConfig {
-    // crossing order: LoopGreedy (default) or MinCut (bounds cutwidth for wide knots).
+    // crossing order: MinCut (default; bounds cutwidth for wide knots) or Given (PD order, debug).
     pub node: NodeOrder,
     pub mode: BuildMode,
     // build half the off-axis crossings and mirror via τ (see `preprocess`).
@@ -171,7 +171,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn n_nodes(&self) -> usize;
             fn drop_nodes<F>(&mut self, pred: F) where F: Fn(&Node) -> bool;
             fn prepare_append(&mut self, x: &Node);
-            fn loop_count(&self, x: &Node) -> isize;
             fn cutwidth_of(&self, edges: impl IntoIterator<Item = Edge>) -> isize;
             fn find_loop_in(&self, k: &TngComplexKey, allow_based: bool, selective: bool) -> Option<usize>;
             fn deloop(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey>;
@@ -229,17 +228,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     /// Pick the next τ-unit by node order, ties broken by earliest crossing order. MinCut scores the
-    /// *combined* x+τx toggle (a shared axis edge cancels — can't be summed); LoopGreedy sums loops.
+    /// *combined* x+τx toggle (a shared axis edge cancels — can't be summed).
     fn choose_next_node(&self) -> Option<&Node> {
         self.nodes().iter().enumerate()
             .min_by_key(|(i, x)| {
                 let tx = self.inv_node(x);
                 let score = match self.config.node {
-                    NodeOrder::LoopGreedy => {
-                        let pair_penalty = self.complex().n_verts() as isize; // off-axis-pair handicap = current size
-                        if tx == *x { self.loop_count(x) }
-                        else { self.loop_count(x) + self.loop_count(tx) - pair_penalty }
-                    },
                     NodeOrder::MinCut => {
                         let mut edges = x.edges().to_vec();
                         if tx != *x { edges.extend_from_slice(tx.edges()); }
@@ -943,12 +937,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     // The next crossing to absorb: boundary-connected and honoring the on-axis target, chosen by
-    // node order (MinCut → smallest resulting cutwidth; LoopGreedy → first in crossing order).
+    // node order (MinCut → smallest resulting cutwidth; Given → first in crossing order).
     fn pick_next(&self, remaining: &[Node], chunk: &[Node], open: &FxHashSet<Edge>, prefer_on: bool) -> Option<Node> {
         let connected = |x: &&Node| !chunk.contains(*x) && x.edges().iter().any(|e| open.contains(e));
         let pick = |pool: Vec<&Node>| match self.builder.config.node {
             NodeOrder::MinCut => pool.into_iter().min_by_key(|x| self.unit_cutwidth(x, open)).cloned(),
-            NodeOrder::LoopGreedy | NodeOrder::Given => pool.into_iter().next().cloned(),
+            NodeOrder::Given => pool.into_iter().next().cloned(),
         };
         pick(remaining.iter().filter(|x| connected(x) && self.is_on_axis(x) == prefer_on).collect())
             .or_else(|| pick(remaining.iter().filter(connected).collect()))

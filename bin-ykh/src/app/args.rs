@@ -114,12 +114,11 @@ pub fn parse_build_mode(s: &str) -> Result<BuildMode, String> {
     }
 }
 
-// parse a node order: loop-greedy | min-cut.
+// parse a node order: min-cut | given.
 pub fn parse_node_order(s: &str) -> Result<NodeOrder, String> {
     match s.to_lowercase().as_str() {
-        "loop-greedy" | "loopgreedy" | "loop" => Ok(NodeOrder::LoopGreedy),
-        "min-cut" | "mincut" | "min"          => Ok(NodeOrder::MinCut),
-        "given"                               => Ok(NodeOrder::Given),
-        _ => Err(format!("invalid node order `{s}`, expected loop-greedy|min-cut|given")),
+        "min-cut" | "mincut" | "min" => Ok(NodeOrder::MinCut),
+        "given"                      => Ok(NodeOrder::Given),
+        _ => Err(format!("invalid node order `{s}`, expected min-cut|given")),
     }
 }

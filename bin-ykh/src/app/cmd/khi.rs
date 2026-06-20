@@ -52,7 +52,7 @@ pub struct Args {
     #[arg(long, value_parser = parse_build_mode, default_value = "greedy")]
     pub mode: BuildMode,
 
-    // crossing order: min-cut (default; bounds cutwidth, wins on wide knots) or loop-greedy.
+    // crossing order: min-cut (default; bounds cutwidth) or given (PD order, debug).
     #[arg(long, value_parser = parse_node_order, default_value = "min-cut")]
     pub node: NodeOrder,
 

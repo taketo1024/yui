@@ -39,9 +39,7 @@ fn main() {
     let braid = Braid::new(8, Braid::from_iter(word.iter().copied()).elements().to_vec());
     let l = braid.closure();
 
-    // SELECTIVE=1 → deloop only productive circles during build.
-    let mode = if std::env::var("SELECTIVE").is_ok() { BuildMode::Selective } else { BuildMode::Greedy };
-    let cfg = BuildConfig { mode, ..Default::default() };
+    let cfg = BuildConfig { mode: BuildMode::Greedy, ..Default::default() };
 
     // `BigInt` because even `i128` overflows mid-run on this knot (the
     // earlier i128 attempt panicked at step 42/45 in apply_bilin's `r * s`).

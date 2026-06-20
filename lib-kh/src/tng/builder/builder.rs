@@ -20,7 +20,7 @@ use yui_core::{Ring, RingOps};
 use yui_link::{Node, Edge, Link};
 
 use crate::kh::{KhChain, KhComplex};
-use crate::tng::{End, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
+use crate::tng::{TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
 use super::{reachable_range, pop_min_pivot, sparkline, cutwidth_after, toggle_boundary, TngElemBuilder};
 
 /// How the next crossing to append is chosen.
@@ -36,7 +36,6 @@ pub enum NodeOrder {
 pub enum BuildMode {
     #[default]
     Greedy,    // deloop every circle, eliminate immediately
-    Selective, // deloop only productive circles, eliminate immediately (full deloop at merge end)
     MinFill,   // deloop a whole degree, then eliminate by global min-fill (Markowitz)
     NoElim,    // deloop every circle but don't eliminate (delooped, unreduced complex)
     None,      // don't deloop, don't eliminate (raw merge; finalize still deloops to a valid complex)
@@ -48,17 +47,13 @@ impl BuildMode {
         *self != BuildMode::None
     }
 
-    pub fn is_selective(&self) -> bool {
-        *self == BuildMode::Selective
-    }
-
     pub fn is_min_fill(&self) -> bool {
         *self == BuildMode::MinFill
     }
 
     // whether each newly-delooped vertex is eliminated inline (vs deferred / not at all).
     pub fn immediate_elim(&self) -> bool {
-        matches!(self, BuildMode::Greedy | BuildMode::Selective)
+        *self == BuildMode::Greedy
     }
 }
 
@@ -265,11 +260,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("{} merged: {}", self.current_step(), self.stat());
     }
 
-    // Default path (Greedy / Selective / NoElim): per degree, eliminate (if the mode does) then deloop.
-    // Deloop reads `selective` from the mode (defer non-productive circles, then full-deloop + re-pass at the end).
+    // Default path (Greedy / NoElim): per degree, eliminate (if the mode does) then deloop.
     fn merge_default(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, range: RangeInclusive<isize>) {
         let top = *range.end();
-        let selective = self.config.mode.is_selective();
 
         for i in range {
             debug!("{} build C[{i}]...", self.current_step());
@@ -283,30 +276,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         self.prune_isolated_top(top);
         self.deloop_in(top);
-
-        // re-run selective to a fixpoint (catch loops turned productive by later elims), then full-deloop the rest.
-        if selective {
-            self.deloop_all_selective();
-            self.deloop_all_forced();
-        }
-    }
-
-    // Repeatedly deloop productive circles until none remain — each elimination can turn a
-    // previously-deferred loop productive.
-    fn deloop_all_selective(&mut self) {
-        for step in 1.. {
-            let before = self.complex.n_verts();
-            debug!("selective re-pass {step}: start ({before} verts)");
-            self.deloop_all();
-            let after = self.complex.n_verts();
-            debug!("  selective re-pass {step}: {before} -> {after} verts (diff {})",
-                after as isize - before as isize);
-            if after == before { break }
-        }
     }
 
     // MinFill: per degree, deloop then eliminate i-1, i by global min-fill (incremental Markowitz).
-    // Always full-deloops — combining it with selective delooping only balloons the transient complex.
     fn merge_deferred(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, range: RangeInclusive<isize>) {
         let top = *range.end();
 
@@ -383,29 +355,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             .collect_vec()
     }
 
-    // Selective mode deloops only "productive" circles — those whose no-dot cap yields an
-    // invertible edge (deloop+elim fires, no doubling); otherwise any circle.
-    pub(crate) fn find_loop_in(&self, k: &TngComplexKey, allow_based: bool, selective: bool) -> Option<usize> {
+    // The first unmarked (or based, if `allow_based`) circle in `k`'s tangle.
+    pub(crate) fn find_loop_in(&self, k: &TngComplexKey, allow_based: bool) -> Option<usize> {
         let v = self.complex.vertex(k);
         v.tng().comps().enumerate()
-            .filter(|(_, c)| c.is_circle() && (allow_based || !c.is_marked()))
-            .find(|(_, c)| !selective
-             || v.out_edges().any(|l| self.complex.edge(k, l).is_invertible_after_cap(End::Src, c))
-             || v.in_edges().any(|j| self.complex.edge(j, k).is_invertible_after_cap(End::Tgt, c)))
+            .find(|(_, c)| c.is_circle() && (allow_based || !c.is_marked()))
             .map(|(r, _)| r)
     }
 
-    // Deloop unmarked loops over all degrees, selective per `config.mode`.
+    // Deloop unmarked loops over all degrees.
     pub(crate) fn deloop_all(&mut self) {
         for i in self.complex.h_range() {
             self.deloop_in(i);
-        }
-    }
-
-    // Deloop all unmarked loops, ignoring the `selective` config — for the final cleanup.
-    fn deloop_all_forced(&mut self) {
-        for i in self.complex.h_range() {
-            self.deloop_in_with(i, false, false);
         }
     }
 
@@ -413,37 +374,36 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // be gone — else delooping only the marked ones would break the complex.
     fn deloop_all_marked(&mut self) {
         debug_assert!(
-            self.complex.keys().all(|k| self.find_loop_in(k, false, false).is_none()),
+            self.complex.keys().all(|k| self.find_loop_in(k, false).is_none()),
             "deloop_all_marked: unmarked loops remain"
         );
         for i in self.complex.h_range() {
-            self.deloop_in_with(i, true, false);
+            self.deloop_in_with(i, true);
         }
     }
 
     fn deloop_in(&mut self, i: isize) {
-        let selective = self.config.mode.is_selective();
-        self.deloop_in_with(i, false, selective);
+        self.deloop_in_with(i, false);
     }
 
-    fn deloop_in_with(&mut self, i: isize, allow_based: bool, selective: bool) {
+    fn deloop_in_with(&mut self, i: isize, allow_based: bool) {
         let mut keys = self.collect_keys(i,
-            |k| self.find_loop_in(k, allow_based, selective).is_some(),
+            |k| self.find_loop_in(k, allow_based).is_some(),
             |k| self.complex.vertex(k).c_weight(),
         );
         if keys.is_empty() { return }
 
-        debug!("{} deloop in C[{i}], targets: {}{}.", self.current_step(), keys.len(), if selective { " (selective)" } else { "" });
+        debug!("{} deloop in C[{i}], targets: {}.", self.current_step(), keys.len());
 
         let before = self.complex.rank(i) as isize;
 
         while let Some(k) = pop_min_pivot(&mut keys, |k|
             self.complex.contains_key(k).then(|| self.complex.vertex(k).c_weight())
         ) {
-            let Some(r) = self.find_loop_in(&k, allow_based, selective) else { continue };
+            let Some(r) = self.find_loop_in(&k, allow_based) else { continue };
 
             for new_key in self.deloop(&k, r) {
-                if self.find_loop_in(&new_key, allow_based, selective).is_some() {
+                if self.find_loop_in(&new_key, allow_based).is_some() {
                     let w = self.complex.vertex(&new_key).c_weight();
                     keys.push((new_key, w));
                 }
@@ -542,7 +502,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.merge(c);
 
             if self.config.mode.is_active() {
-                self.deloop_all_forced();
+                self.deloop_all();
             }
         }
     }
@@ -555,7 +515,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         info!("{} finalize: {}", self.current_step(), self.stat());
 
-        self.deloop_all_forced();
+        self.deloop_all();
         self.deloop_all_marked(); // deloop marked loops
 
         info!("{} finalized: {}", self.current_step(), self.stat());
@@ -737,7 +697,7 @@ mod tests {
         };
 
         let ref_h = build(BuildMode::Greedy).homology();
-        for mode in [BuildMode::Selective, BuildMode::MinFill, BuildMode::NoElim, BuildMode::None] {
+        for mode in [BuildMode::MinFill, BuildMode::NoElim, BuildMode::None] {
             let c = build(mode);
             c.check_d_all();
             let h = c.homology();

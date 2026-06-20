@@ -102,15 +102,14 @@ pub fn parse_h_range(s: &str) -> Result<RangeInclusive<isize>, String> {
     Ok(parse(lo, isize::MIN + 1)? ..= parse(hi, isize::MAX - 1)?)
 }
 
-// parse a build mode: greedy | selective | min-fill | none.
+// parse a build mode: greedy | min-fill | no-elim | none.
 pub fn parse_build_mode(s: &str) -> Result<BuildMode, String> {
     match s.to_lowercase().as_str() {
         "greedy"               => Ok(BuildMode::Greedy),
-        "selective"            => Ok(BuildMode::Selective),
         "min-fill" | "minfill" => Ok(BuildMode::MinFill),
         "no-elim" | "noelim"   => Ok(BuildMode::NoElim),
         "none"                 => Ok(BuildMode::None),
-        _ => Err(format!("invalid mode `{s}`, expected greedy|selective|min-fill|no-elim|none")),
+        _ => Err(format!("invalid mode `{s}`, expected greedy|min-fill|no-elim|none")),
     }
 }
 

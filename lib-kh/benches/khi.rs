@@ -20,8 +20,8 @@ use yui_kh::tng::builder::{SymBuildConfig, BuildMode, NodeOrder};
 const NODE_ORDERS: [(&str, NodeOrder); 1] =
     [("mincut", NodeOrder::MinCut)];
 
-const MODES: [(&str, BuildMode); 3] =
-    [("greedy", BuildMode::Greedy), ("selective", BuildMode::Selective), ("minfill", BuildMode::MinFill)];
+const MODES: [(&str, BuildMode); 2] =
+    [("greedy", BuildMode::Greedy), ("minfill", BuildMode::MinFill)];
 
 // 18-crossing strongly invertible knot — realistic scale-up.
 const K18_PD: &[[u8; 4]] = &[

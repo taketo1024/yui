@@ -18,8 +18,8 @@ use yui_kh::tng::builder::{BuildConfig, BuildMode, NodeOrder};
 const NODE_ORDERS: [(&str, NodeOrder); 1] =
     [("mincut", NodeOrder::MinCut)];
 
-const MODES: [(&str, BuildMode); 3] =
-    [("greedy", BuildMode::Greedy), ("selective", BuildMode::Selective), ("minfill", BuildMode::MinFill)];
+const MODES: [(&str, BuildMode); 2] =
+    [("greedy", BuildMode::Greedy), ("minfill", BuildMode::MinFill)];
 
 const KNOTS: [&str; 8] = ["3_1", "4_1", "5_1", "5_2", "6_2", "6_3", "7_3", "8_19"];
 

@@ -53,7 +53,7 @@ pub struct Args {
 
     // crossing order: min-cut (default; bounds cutwidth) or given (PD order, debug).
     #[arg(long, value_parser = parse_node_order, default_value = "min-cut")]
-    pub node: NodeOrder,
+    pub node_order: NodeOrder,
 
     // skip the half-build/τ-mirror preprocess (which materializes the unbridged off-axis product).
     #[arg(long)]
@@ -115,7 +115,7 @@ where
                 h_range: self.args.h_range.clone(), // open ends are clamped inside the build
                 chunk_bound: self.args.chunk,
                 mode: self.args.mode,
-                node: self.args.node,
+                node_order: self.args.node_order,
                 preprocess: !self.args.no_preprocess,
                 ..Default::default()
             };

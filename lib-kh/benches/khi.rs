@@ -44,7 +44,7 @@ fn bench_khi_node(c: &mut Criterion) {
         let l = InvLink::test_data(name);
         for (sn, node) in NODE_ORDERS {
             group.bench_function(format!("{name}/{sn}"), |b| {
-                b.iter(|| KhIComplex::<FF2>::new_with_config(&l, &zero, &zero, false, SymBuildConfig { node, ..Default::default() }))
+                b.iter(|| KhIComplex::<FF2>::new_with_config(&l, &zero, &zero, false, SymBuildConfig { node_order: node, ..Default::default() }))
             });
         }
     }

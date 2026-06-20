@@ -38,7 +38,7 @@ fn bench_kh_node(c: &mut Criterion) {
         let l = Link::test_data(name);
         for (sn, node) in NODE_ORDERS {
             group.bench_function(format!("{name}/{sn}"), |b| {
-                b.iter(|| build(&l, BuildConfig { node, ..Default::default() }))
+                b.iter(|| build(&l, BuildConfig { node_order: node, ..Default::default() }))
             });
         }
     }
@@ -48,7 +48,7 @@ fn bench_kh_node(c: &mut Criterion) {
     group.sample_size(10);
     for (sn, node) in NODE_ORDERS {
         group.bench_function(format!("14n_19265/{sn}"), |b| {
-            b.iter(|| build(&l, BuildConfig { node, ..Default::default() }))
+            b.iter(|| build(&l, BuildConfig { node_order: node, ..Default::default() }))
         });
     }
     group.finish();

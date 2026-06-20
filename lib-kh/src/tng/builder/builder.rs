@@ -65,14 +65,14 @@ impl BuildMode {
 /// Toggles for the automatic simplification done while building.
 #[derive(Clone, Debug)]
 pub struct BuildConfig {
-    pub node: NodeOrder,
+    pub node_order: NodeOrder,
     pub mode: BuildMode,
     pub h_range: Option<RangeInclusive<isize>>,
 }
 
 impl Default for BuildConfig {
     fn default() -> Self {
-        Self { node: NodeOrder::default(), mode: BuildMode::default(), h_range: None }
+        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), h_range: None }
     }
 }
 
@@ -188,7 +188,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    /// Pick the next node: maximize `score_node`, ties broken by earliest crossing order
+    /// Pick the next node_order: maximize `score_node`, ties broken by earliest crossing order
     /// (`self.nodes` keeps PD order — `prepare_append` removes via order-preserving `Vec::remove`).
     pub(crate) fn choose_next_node(&self) -> Option<&Node> {
         self.nodes.iter().enumerate()
@@ -198,7 +198,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     /// Strategy score for appending `x` (higher is better).
     pub(crate) fn score_node(&self, x: &Node) -> isize {
-        match self.config.node {
+        match self.config.node_order {
             NodeOrder::MinCut => -self.cutwidth(x),
             NodeOrder::Given => 0, // constant → ties broken by earliest index = given order
         }

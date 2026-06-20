@@ -31,7 +31,7 @@ use super::{reachable_range, pop_min_pivot, sparkline, cutwidth_after, toggle_bo
 #[derive(Clone, Debug)]
 pub struct SymBuildConfig {
     // crossing order: MinCut (default; bounds cutwidth for wide knots) or Given (PD order, debug).
-    pub node: NodeOrder,
+    pub node_order: NodeOrder,
     pub mode: BuildMode,
     // build half the off-axis crossings and mirror via τ (see `preprocess`).
     pub preprocess: bool,
@@ -44,7 +44,7 @@ pub struct SymBuildConfig {
 
 impl Default for SymBuildConfig {
     fn default() -> Self {
-        Self { node: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, chunk_bound: None, h_range: None }
+        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, chunk_bound: None, h_range: None }
     }
 }
 
@@ -141,7 +141,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         // the inner builder is driven by `self` — disable its own auto-simplify.
         let inner = TngComplexBuilder::from_link(l.inner(), h, t, reduced)
-            .with_config(BuildConfig { mode: BuildMode::None, node: NodeOrder::default(), h_range: None });
+            .with_config(BuildConfig { mode: BuildMode::None, node_order: NodeOrder::default(), h_range: None });
 
         let x_map = l.nodes().map(|x|
             (x.clone(), l.inv_node(x).clone())
@@ -156,7 +156,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn with_config(mut self, config: SymBuildConfig) -> Self {
         // propagate the window to the inner builder so the preprocess merges cap
         // to it; this also drops canon cycles when the window excludes h-degree 0.
-        let inner_config = BuildConfig { mode: BuildMode::None, node: config.node, h_range: config.h_range.clone() };
+        let inner_config = BuildConfig { mode: BuildMode::None, node_order: config.node_order, h_range: config.h_range.clone() };
         self.inner = self.inner.with_config(inner_config);
         self.config = config;
         self
@@ -233,7 +233,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.nodes().iter().enumerate()
             .min_by_key(|(i, x)| {
                 let tx = self.inv_node(x);
-                let score = match self.config.node {
+                let score = match self.config.node_order {
                     NodeOrder::MinCut => {
                         let mut edges = x.edges().to_vec();
                         if tx != *x { edges.extend_from_slice(tx.edges()); }
@@ -940,7 +940,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // node order (MinCut → smallest resulting cutwidth; Given → first in crossing order).
     fn pick_next(&self, remaining: &[Node], chunk: &[Node], open: &FxHashSet<Edge>, prefer_on: bool) -> Option<Node> {
         let connected = |x: &&Node| !chunk.contains(*x) && x.edges().iter().any(|e| open.contains(e));
-        let pick = |pool: Vec<&Node>| match self.builder.config.node {
+        let pick = |pool: Vec<&Node>| match self.builder.config.node_order {
             NodeOrder::MinCut => pool.into_iter().min_by_key(|x| self.unit_cutwidth(x, open)).cloned(),
             NodeOrder::Given => pool.into_iter().next().cloned(),
         };
@@ -962,7 +962,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let (h, t) = self.builder.inner.complex().ht();
         let base_pt = self.builder.inner.complex().base_pt();
         let mut inner = TngComplexBuilder::init(h, t, (0, 0), base_pt)
-            .with_config(BuildConfig { mode: BuildMode::None, node: self.builder.config.node, h_range: None });
+            .with_config(BuildConfig { mode: BuildMode::None, node_order: self.builder.config.node_order, h_range: None });
         inner.set_nodes(chunk.iter().cloned());
 
         // cap the child to the chunk's reachable band: a chunk vertex of weight
@@ -1103,12 +1103,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn half_builder(&self) -> TngComplexBuilder<R> {
         let (h, t) = self.builder.inner.complex().ht();
         let base_pt = self.builder.inner.complex().base_pt();
-        let node = self.builder.config.node;
+        let node_order = self.builder.config.node_order;
         let h_range = self.builder.config.h_range.as_ref().map(|w|
             0 ..= (*w.end() - self.builder.inner.complex().deg_shift().0)
         );
         TngComplexBuilder::init(h, t, (0, 0), base_pt)
-            .with_config(BuildConfig { node, h_range, ..Default::default() })
+            .with_config(BuildConfig { node_order, h_range, ..Default::default() })
     }
 
 

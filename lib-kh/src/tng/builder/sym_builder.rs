@@ -310,9 +310,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("  merge range: {:?}", range);
 
         match self.config.mode {
-            BuildMode::None    => for i in range { self.merge_slice(&left, &right, i, &left_map, &right_map); },
-            BuildMode::MinFill => self.merge_deferred(&left, &right, range, &left_map, &right_map),
-            _                  => self.merge_default(&left, &right, range, &left_map, &right_map),
+            BuildMode::None => for i in range { self.merge_slice(&left, &right, i, &left_map, &right_map); },
+            _               => self.merge_incremental(&left, &right, range, &left_map, &right_map),
         }
 
         self.prune_h_range();
@@ -320,42 +319,28 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("{} merged: {}", self.current_step(), self.stat());
     }
 
-    // Default path (Greedy / NoElim): per degree, eliminate (if the mode does) then deloop.
-    fn merge_default(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, range: RangeInclusive<isize>, left_map: &TauKeyMap, right_map: &TauKeyMap) {
+    // Per degree: deloop, then (if the mode eliminates) sweep i-2,i-1 by equivariant Markowitz cost.
+    // Greedy also inline-eliminates during deloop; the sweep just catches what it missed.
+    fn merge_incremental(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, range: RangeInclusive<isize>, left_map: &TauKeyMap, right_map: &TauKeyMap) {
+        debug_assert!(self.config.mode.auto_deloop()); // None is dispatched to merge_slice
         let top = *range.end();
 
         for i in range {
             debug!("{} build C[{i}]...", self.current_step());
             self.merge_slice(left, right, i, left_map, right_map);
-            if self.config.mode.immediate_elim() {
+            self.deloop_in(i - 1);
+            if self.config.mode.auto_elim() {
+                self.eliminate_in(i - 2);
                 self.eliminate_in(i - 1);
             }
-            self.deloop_in(i - 1);
             debug!("{} built C[{i}]: {}", self.current_step(), self.complex().rank(i));
         }
 
         self.prune_isolated_top(top);
         self.deloop_in(top);
-    }
-
-    // MinFill: per degree, deloop then eliminate i-1, i by global equivariant min-fill
-    // (incremental Markowitz).
-    fn merge_deferred(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, range: RangeInclusive<isize>, left_map: &TauKeyMap, right_map: &TauKeyMap) {
-        let top = *range.end();
-
-        for i in range {
-            debug!("{} build C[{i}]...", self.current_step());
-            self.merge_slice(left, right, i, left_map, right_map);
-            self.deloop_in(i - 1);
-            self.eliminate_in(i - 2);
-            self.eliminate_in(i - 1);
-            debug!("{} built C[{i}]: {}", self.current_step(), self.complex().rank(i));
+        if self.config.mode.auto_elim() {
+            self.eliminate_in(top - 1);
         }
-
-        self.prune_isolated_top(top);
-        self.deloop_in(top);
-        self.eliminate_in(top - 1);
-        // no eliminate_in(top): top has no outgoing edges, so it would be a no-op.
     }
 
     // Build degree `i`: the τ key-map slice, then its vertices and the edges into it.

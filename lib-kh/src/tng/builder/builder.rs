@@ -42,16 +42,17 @@ pub enum BuildMode {
 }
 
 impl BuildMode {
-    // whether any simplification happens during the build (None = raw merge only).
-    pub fn is_active(&self) -> bool {
+    // whether the build deloops at all (None = raw merge, deloop deferred to finalize).
+    pub fn auto_deloop(&self) -> bool {
         *self != BuildMode::None
     }
 
-    pub fn is_min_fill(&self) -> bool {
-        *self == BuildMode::MinFill
+    // whether the build eliminates at all (Greedy inline, MinFill swept; NoElim/None don't).
+    pub fn auto_elim(&self) -> bool {
+        matches!(self, BuildMode::Greedy | BuildMode::MinFill)
     }
 
-    // whether each newly-delooped vertex is eliminated inline (vs deferred / not at all).
+    // whether each newly-delooped vertex is eliminated inline (vs swept after).
     pub fn immediate_elim(&self) -> bool {
         *self == BuildMode::Greedy
     }
@@ -251,50 +252,36 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("  merge range: {:?}", range);
 
         match self.config.mode {
-            BuildMode::None    => self.complex.merge_with(&left, &right),
-            BuildMode::MinFill => self.merge_deferred(&left, &right, range),
-            _                  => self.merge_default(&left, &right, range),
+            BuildMode::None => self.complex.merge_with(&left, &right),
+            _               => self.merge_incremental(&left, &right, range),
         }
 
         self.prune_h_range();
         debug!("{} merged: {}", self.current_step(), self.stat());
     }
 
-    // Default path (Greedy / NoElim): per degree, eliminate (if the mode does) then deloop.
-    fn merge_default(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, range: RangeInclusive<isize>) {
+    // Per degree: deloop, then (if the mode eliminates) sweep i-2,i-1 by Markowitz cost.
+    // Greedy also inline-eliminates during deloop; the sweep just catches what it missed.
+    fn merge_incremental(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, range: RangeInclusive<isize>) {
+        debug_assert!(self.config.mode.auto_deloop()); // None is dispatched to merge_with
         let top = *range.end();
 
         for i in range {
             debug!("{} build C[{i}]...", self.current_step());
             self.merge_slice(left, right, i);
-            if self.config.mode.immediate_elim() {
+            self.deloop_in(i - 1);
+            if self.config.mode.auto_elim() {
+                self.eliminate_in(i - 2);
                 self.eliminate_in(i - 1);
             }
-            self.deloop_in(i - 1);
             debug!("{} built C[{i}]: {}", self.current_step(), self.complex.rank(i));
         }
 
         self.prune_isolated_top(top);
         self.deloop_in(top);
-    }
-
-    // MinFill: per degree, deloop then eliminate i-1, i by global min-fill (incremental Markowitz).
-    fn merge_deferred(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, range: RangeInclusive<isize>) {
-        let top = *range.end();
-
-        for i in range {
-            debug!("{} build C[{i}]...", self.current_step());
-            self.merge_slice(left, right, i);
-            self.deloop_in(i - 1);
-            self.eliminate_in(i - 2);
-            self.eliminate_in(i - 1);
-            debug!("{} built C[{i}]: {}", self.current_step(), self.complex.rank(i));
+        if self.config.mode.auto_elim() {
+            self.eliminate_in(top - 1);
         }
-
-        self.prune_isolated_top(top);
-        self.deloop_in(top);
-        self.eliminate_in(top - 1);
-        // no eliminate_in(top): top has no outgoing edges, so it would be a no-op.
     }
 
     // Build degree `i`: merge in its vertices and the edges into it.
@@ -501,7 +488,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let c = TngComplex::from_loop(h, t, c, marked);
             self.merge(c);
 
-            if self.config.mode.is_active() {
+            if self.config.mode.auto_deloop() {
                 self.deloop_all();
             }
         }

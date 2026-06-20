@@ -13,7 +13,7 @@
 use std::fmt;
 use std::ops::RangeInclusive;
 
-use rustc_hash::{FxHashSet, FxHashMap};
+use rustc_hash::FxHashSet;
 use itertools::Itertools;
 use log::{debug, info, trace};
 use yui_core::{Ring, RingOps};
@@ -191,41 +191,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    /// Pick the next node_order: maximize `score_node`, ties broken by earliest crossing order
+    /// Pick the next node by node order, ties broken by earliest crossing order
     /// (`self.nodes` keeps PD order — `prepare_append` removes via order-preserving `Vec::remove`).
     pub(crate) fn choose_next_node(&self) -> Option<&Node> {
         self.nodes.iter().enumerate()
-            .min_by_key(|(i, x)| (-self.score_node(x), *i))
+            .min_by_key(|(i, x)| {
+                let score = match self.config.node_order {
+                    NodeOrder::MinCut => self.cutwidth(x),
+                    NodeOrder::Given => 0, // constant → ties broken by earliest index = given order
+                };
+                (score, *i)
+            })
             .map(|(_, x)| x)
-    }
-
-    /// Strategy score for appending `x` (higher is better).
-    pub(crate) fn score_node(&self, x: &Node) -> isize {
-        match self.config.node_order {
-            NodeOrder::MinCut => -self.cutwidth(x),
-            NodeOrder::Given => 0, // constant → ties broken by earliest index = given order
-        }
     }
 
     /// Boundary cutwidth (open-edge count) after appending `x`. `boundary_ends` is cheap, so
     /// recomputing it per call is fine.
     pub(crate) fn cutwidth(&self, x: &Node) -> isize {
-        self.cutwidth_of(x.edges().iter().copied())
-    }
-
-    /// Cutwidth after toggling an arbitrary edge multiset — for τ-pairs, where `x` and `τx`
-    /// must be scored together (a shared axis edge toggles twice and cancels).
-    pub(crate) fn cutwidth_of(&self, edges: impl IntoIterator<Item = Edge>) -> isize {
-        let boundary: FxHashSet<Edge> = self.complex.boundary_ends().collect();
-        let mut cnt: FxHashMap<Edge, u32> = FxHashMap::default();
-        for e in edges {
-            *cnt.entry(e).or_default() += 1;
-        }
-        let delta: isize = cnt.iter()
-            .filter(|(_, c)| *c % 2 == 1)
-            .map(|(e, _)| if boundary.contains(e) { -1 } else { 1 })
-            .sum();
-        boundary.len() as isize + delta
+        let open: FxHashSet<Edge> = self.complex.boundary_ends().collect();
+        cutwidth_after(&open, &[x]) as isize
     }
 
     // "(committed/total)" crossing progress, for log prefixes.

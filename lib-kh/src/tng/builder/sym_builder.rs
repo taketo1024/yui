@@ -171,7 +171,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn n_nodes(&self) -> usize;
             fn drop_nodes<F>(&mut self, pred: F) where F: Fn(&Node) -> bool;
             fn prepare_append(&mut self, x: &Node);
-            fn cutwidth_of(&self, edges: impl IntoIterator<Item = Edge>) -> isize;
             fn find_loop_in(&self, k: &TngComplexKey, allow_based: bool) -> Option<usize>;
             fn deloop(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey>;
             fn eliminate(&mut self, i: &TngComplexKey, j: &TngComplexKey);
@@ -218,23 +217,26 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    /// Pick the next τ-unit by node order, ties broken by earliest crossing order. MinCut scores the
-    /// *combined* x+τx toggle (a shared axis edge cancels — can't be summed).
+    /// Pick the next τ-unit by node order, ties broken by earliest crossing order.
     fn choose_next_node(&self) -> Option<&Node> {
         self.nodes().iter().enumerate()
             .min_by_key(|(i, x)| {
-                let tx = self.inv_node(x);
                 let score = match self.config.node_order {
-                    NodeOrder::MinCut => {
-                        let mut edges = x.edges().to_vec();
-                        if tx != *x { edges.extend_from_slice(tx.edges()); }
-                        -self.cutwidth_of(edges)
-                    },
+                    NodeOrder::MinCut => self.unit_cutwidth(x) as isize,
                     NodeOrder::Given => 0, // constant → ties broken by earliest index = given order
                 };
-                (-score, *i)
+                (score, *i)
             })
             .map(|(_, x)| x)
+    }
+
+    /// Boundary cutwidth after appending the τ-unit of `x` (x and τx scored together; a shared
+    /// axis edge toggles twice and cancels).
+    fn unit_cutwidth(&self, x: &Node) -> usize {
+        let tx = self.inv_node(x);
+        let unit: Vec<&Node> = if tx != x { vec![x, tx] } else { vec![x] };
+        let open: FxHashSet<Edge> = self.complex().boundary_ends().collect();
+        cutwidth_after(&open, &unit)
     }
 
     fn append_on_axis(&mut self, x: &Node) { 

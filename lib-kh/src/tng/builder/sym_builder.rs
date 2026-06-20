@@ -181,6 +181,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
+    // Pivot cost for selection: off-axis pivots are eliminated in τ-pairs, so count ~2× the fill.
+    fn pivot_weight(&self, k: &TngComplexKey) -> usize {
+        let w = self.complex().vertex(k).c_weight();
+        if self.key_map.is_sym(k) { w } else { 2 * w }
+    }
+
     pub fn run(mut self) -> Self {
         info!("build config:\n{:#?}", self.config);
         info!("cutwidth profile:\n{}", self.profile_sym());
@@ -394,41 +400,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    // Deloop the marked (based) loops into a single summand. All unmarked loops must already
-    // be gone — else delooping only the marked ones would break the complex.
-    fn deloop_all_marked(&mut self) {
-        debug_assert!(
-            self.complex().keys().all(|k| self.find_loop_in(k, false).is_none()),
-            "deloop_all_marked: unmarked loops remain"
-        );
-        for i in self.complex().h_range() {
-            self.deloop_in_with(i, true);
-        }
-    }
-
     fn deloop_in(&mut self, i: isize) {
         self.deloop_in_with(i, false);
-    }
-
-    // Pivot cost for selection: off-axis pivots are eliminated in τ-pairs, so count ~2× the fill.
-    fn pivot_weight(&self, k: &TngComplexKey) -> usize {
-        let w = self.complex().vertex(k).c_weight();
-        if self.key_map.is_sym(k) { w } else { 2 * w }
-    }
-
-    // Markowitz cost of eliminating `k → l`; off-axis pivots eliminate in τ-pairs (~2× the fill).
-    fn equiv_edge_weight(&self, k: &TngComplexKey, l: &TngComplexKey) -> usize {
-        let w = self.complex().edge_weight(k, l);
-        if self.key_map.is_sym(k) { w } else { 2 * w }
-    }
-
-    // Least Markowitz cost to eliminate `k`, over its equiv-invertible incident edges — the
-    // equivariant pivot priority (vs the cruder `pivot_weight`).
-    fn equiv_elim_cost(&self, k: &TngComplexKey) -> usize {
-        let v = self.complex().vertex(k);
-        let outs = v.out_edges().filter(|l| self.is_equiv_inv_edge(k, l)).map(|l| self.equiv_edge_weight(k, l));
-        let ins = v.in_edges().filter(|j| self.is_equiv_inv_edge(j, k)).map(|j| self.equiv_edge_weight(j, k));
-        outs.chain(ins).min().unwrap_or(0)
     }
 
     fn deloop_in_with(&mut self, i: isize, allow_based: bool) {
@@ -592,20 +565,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("{}   eliminated C[{i}]: {} (diff: {}).", self.current_step(), after, after - before);
     }
 
-    fn choose_equiv_inv_edge_into(&self, k: &TngComplexKey) -> Option<&TngComplexKey> { 
-        self.complex().vertex(k).in_edges().filter_map(|j|
-            self.is_equiv_inv_edge(j, k).then_some(j)
-        )
-        .min_by_key(|j| (self.complex().edge_weight(j, k), **j))
-    }
-
-    fn choose_equiv_inv_edge_from(&self, k: &TngComplexKey) -> Option<&TngComplexKey> {
-        self.complex().vertex(k).out_edges().filter_map(|l|
-            self.is_equiv_inv_edge(k, l).then_some(l)
-        )
-        .min_by_key(|l| (self.complex().edge_weight(k, l), **l))
-    }
-
     fn try_eliminate_equiv_at(&mut self, k: &TngComplexKey) -> bool {
         if let Some(&j) = self.choose_equiv_inv_edge_into(&k) { 
             self.eliminate_equiv(&j, &k);
@@ -636,6 +595,35 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         self.key_map.remove(i);
         self.key_map.remove(j);
+    }
+
+    // Markowitz cost of eliminating `k → l`; off-axis pivots eliminate in τ-pairs (~2× the fill).
+    fn equiv_edge_weight(&self, k: &TngComplexKey, l: &TngComplexKey) -> usize {
+        let w = self.complex().edge_weight(k, l);
+        if self.key_map.is_sym(k) { w } else { 2 * w }
+    }
+
+    // Least Markowitz cost to eliminate `k`, over its equiv-invertible incident edges — the
+    // equivariant pivot priority (vs the cruder `pivot_weight`).
+    fn equiv_elim_cost(&self, k: &TngComplexKey) -> usize {
+        let v = self.complex().vertex(k);
+        let outs = v.out_edges().filter(|l| self.is_equiv_inv_edge(k, l)).map(|l| self.equiv_edge_weight(k, l));
+        let ins = v.in_edges().filter(|j| self.is_equiv_inv_edge(j, k)).map(|j| self.equiv_edge_weight(j, k));
+        outs.chain(ins).min().unwrap_or(0)
+    }
+
+    fn choose_equiv_inv_edge_into(&self, k: &TngComplexKey) -> Option<&TngComplexKey> { 
+        self.complex().vertex(k).in_edges().filter_map(|j|
+            self.is_equiv_inv_edge(j, k).then_some(j)
+        )
+        .min_by_key(|j| (self.complex().edge_weight(j, k), **j))
+    }
+
+    fn choose_equiv_inv_edge_from(&self, k: &TngComplexKey) -> Option<&TngComplexKey> {
+        self.complex().vertex(k).out_edges().filter_map(|l|
+            self.is_equiv_inv_edge(k, l).then_some(l)
+        )
+        .min_by_key(|l| (self.complex().edge_weight(k, l), **l))
     }
 
     fn is_equiv_inv_edge(&self, i: &TngComplexKey, j: &TngComplexKey) -> bool { 
@@ -671,7 +659,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         info!("{} finalize: {}", self.current_step(), self.stat());
 
         self.deloop_all();
-        self.deloop_all_marked(); // deloop marked loops
+
+        // Deloop the marked loops into a single summand.
+        for i in self.complex().h_range() {
+            self.deloop_in_with(i, true);
+        }
 
         info!("{} finalized: {}", self.current_step(), self.stat());
     }

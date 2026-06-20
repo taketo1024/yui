@@ -169,6 +169,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.elements.take()
     }
 
+    /// Keys at degree `i` matching `pred`, each paired with `weight(k)`
+    pub(crate) fn collect_keys<F, W>(&self, i: isize, pred: F, weight: W) -> Vec<(TngComplexKey, usize)>
+    where F: Fn(&TngComplexKey) -> bool, W: Fn(&TngComplexKey) -> usize {
+        self.complex.keys_of_deg(i)
+            .filter(|k| pred(k))
+            .map(|k| (*k, weight(k)))
+            .collect_vec()
+    }
+
+    // "(committed/total)" crossing progress, for log prefixes.
+    pub(crate) fn current_step(&self) -> String {
+        format!("({}/{})", self.complex.dim(), self.complex.dim() + self.n_nodes())
+    }
+
     pub fn run(mut self) -> Self {
         info!("build config:\n{:#?}", self.config);
         info!("cutwidth profile:\n{}", self.profile());
@@ -210,11 +224,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub(crate) fn cutwidth(&self, x: &Node) -> isize {
         let open: FxHashSet<Edge> = self.complex.boundary_ends().collect();
         cutwidth_after(&open, &[x]) as isize
-    }
-
-    // "(committed/total)" crossing progress, for log prefixes.
-    pub(crate) fn current_step(&self) -> String {
-        format!("({}/{})", self.complex.dim(), self.complex.dim() + self.n_nodes())
     }
 
     pub(crate) fn append_node(&mut self, x: &Node) {
@@ -323,16 +332,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.complex.remove_vertices(&doomed);
     }
 
-    /// Keys at degree `i` matching `pred`, each paired with `weight(k)`; callers pivot by least
-    /// weight via [`pop_min_pivot`].
-    pub(crate) fn collect_keys<F, W>(&self, i: isize, pred: F, weight: W) -> Vec<(TngComplexKey, usize)>
-    where F: Fn(&TngComplexKey) -> bool, W: Fn(&TngComplexKey) -> usize {
-        self.complex.keys_of_deg(i)
-            .filter(|k| pred(k))
-            .map(|k| (*k, weight(k)))
-            .collect_vec()
-    }
-
     // The first unmarked (or based, if `allow_based`) circle in `k`'s tangle.
     pub(crate) fn find_loop_in(&self, k: &TngComplexKey, allow_based: bool) -> Option<usize> {
         let v = self.complex.vertex(k);
@@ -345,18 +344,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub(crate) fn deloop_all(&mut self) {
         for i in self.complex.h_range() {
             self.deloop_in(i);
-        }
-    }
-
-    // Deloop the marked (based) loops into a single summand. All unmarked loops must already
-    // be gone — else delooping only the marked ones would break the complex.
-    fn deloop_all_marked(&mut self) {
-        debug_assert!(
-            self.complex.keys().all(|k| self.find_loop_in(k, false).is_none()),
-            "deloop_all_marked: unmarked loops remain"
-        );
-        for i in self.complex.h_range() {
-            self.deloop_in_with(i, true);
         }
     }
 
@@ -447,6 +434,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
+    pub(crate) fn eliminate(&mut self, i: &TngComplexKey, j: &TngComplexKey) {
+        trace!("{} eliminate {}: {} -> {}", self.stat(), self.complex.edge(i, j), self.complex.vertex(i), self.complex.vertex(j));
+        
+        self.elements.eliminate(&self.complex, i, j);
+        self.complex.eliminate(i, j);
+    }
+
     fn choose_inv_edge_into(&self, k: &TngComplexKey) -> Option<&TngComplexKey> { 
         self.complex.vertex(k).in_edges().filter_map(|j|
             self.complex.edge(j, k).is_invertible().then_some(j)
@@ -459,13 +453,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.complex.edge(k, l).is_invertible().then_some(l)
         )
         .min_by_key(|l| (self.complex.edge_weight(k, l), **l))
-    }
-
-    pub(crate) fn eliminate(&mut self, i: &TngComplexKey, j: &TngComplexKey) {
-        trace!("{} eliminate {}: {} -> {}", self.stat(), self.complex.edge(i, j), self.complex.vertex(i), self.complex.vertex(j));
-        
-        self.elements.eliminate(&self.complex, i, j);
-        self.complex.eliminate(i, j);
     }
 
     pub(crate) fn process_free_loops(&mut self) {
@@ -494,7 +481,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         info!("{} finalize: {}", self.current_step(), self.stat());
 
         self.deloop_all();
-        self.deloop_all_marked(); // deloop marked loops
+
+        // Deloop the marked loops into a single summand.
+        for i in self.complex.h_range() {
+            self.deloop_in_with(i, true);
+        }
 
         info!("{} finalized: {}", self.current_step(), self.stat());
     }

@@ -171,8 +171,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn n_nodes(&self) -> usize;
             fn drop_nodes<F>(&mut self, pred: F) where F: Fn(&Node) -> bool;
             fn prepare_append(&mut self, x: &Node);
-            fn find_loop_in(&self, k: &TngComplexKey, allow_based: bool) -> Option<usize>;
-            fn deloop(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey>;
+            fn find_loop_in(&self, k: &TngComplexKey, allow_based: bool) -> Option<&TngComp>;
+            fn deloop(&mut self, k: &TngComplexKey, c: &TngComp) -> Vec<TngComplexKey>;
             fn eliminate(&mut self, i: &TngComplexKey, j: &TngComplexKey);
             fn collect_keys<F, W>(&self, i: isize, pred: F, weight: W) -> Vec<(TngComplexKey, usize)>
                 where F: Fn(&TngComplexKey) -> bool, W: Fn(&TngComplexKey) -> usize;
@@ -418,9 +418,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         while let Some(k) = pop_min_pivot(&mut keys, |k|
             self.complex().contains_key(k).then(|| self.pivot_weight(k))
         ) {
-            let Some(r) = self.find_loop_in(&k, allow_based) else { continue };
+            let Some(&c) = self.find_loop_in(&k, allow_based) else { continue };
 
-            for new_key in self.deloop_equiv(&k, r) {
+            for new_key in self.deloop_equiv(&k, &c) {
                 if self.find_loop_in(&new_key, allow_based).is_some() {
                     let w = self.pivot_weight(&new_key);
                     keys.push((new_key, w));
@@ -433,19 +433,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("{}   delooped C[{i}]: {} (diff: {}).", self.current_step(), after, after - before);
     }
 
-    fn deloop_equiv(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> { 
+    fn deloop_equiv(&mut self, k: &TngComplexKey, c: &TngComp) -> Vec<TngComplexKey> {
         let mut added = if self.key_map.is_sym(k) {
-            let c = self.complex().vertex(k).tng().comp(r);
             if self.is_sym_comp(c) {
                 // symmetric loop on symmetric key
-                self.deloop_on_axis_sym(k, r)
+                self.deloop_on_axis_sym(k, c)
             } else {
                 // asymmetric loop on symmetric key
-                self.deloop_on_axis_asym(k, r)
+                self.deloop_on_axis_asym(k, c)
             }
         } else {
             // (symmetric or asymmetric) loop on asymmetric key
-            self.deloop_off_axis(k, r)
+            self.deloop_off_axis(k, c)
         };
 
         // immediate elim eliminates each new vertex now; min-fill leaves them for the post-deloop
@@ -462,13 +461,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         added
     }
 
-    fn deloop_on_axis_sym(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
-        let c = self.complex().vertex(k).tng().comp(r);
-
+    fn deloop_on_axis_sym(&mut self, k: &TngComplexKey, c: &TngComp) -> Vec<TngComplexKey> {
         debug_assert!(self.key_map.is_sym(k));
         debug_assert!(self.is_sym_comp(c));
 
-        let updated = self.deloop(k, r);
+        let updated = self.deloop(k, c);
 
         self.key_map.remove(k);
 
@@ -480,9 +477,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     #[allow(non_snake_case)]
-    fn deloop_on_axis_asym(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
-        let c = self.complex().vertex(k).tng().comp(r);
-
+    fn deloop_on_axis_asym(&mut self, k: &TngComplexKey, c: &TngComp) -> Vec<TngComplexKey> {
         debug_assert!(self.key_map.is_sym(k));
         debug_assert!(!self.is_sym_comp(c));
         debug_assert!(!c.is_marked());
@@ -493,17 +488,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let tc = c.convert_edges(|e| self.inv_edge(e));
 
-        let ks = self.deloop(k, r);
+        let ks = self.deloop(k, c);
 
         let (k_X, k_1) = (ks[0], ks[1]);
-        let (k_XX, k_X1) = { 
-            let tr = self.complex().vertex(&k_X).tng().index_of(&tc).unwrap();
-            let tks = self.deloop(&k_X, tr);
+        let (k_XX, k_X1) = {
+            let tks = self.deloop(&k_X, &tc);
             (tks[0], tks[1])
         };
-        let (k_1X, k_11) = { 
-            let tr = self.complex().vertex(&k_1).tng().index_of(&tc).unwrap();
-            let tks = self.deloop(&k_1, tr);
+        let (k_1X, k_11) = {
+            let tks = self.deloop(&k_1, &tc);
             (tks[0], tks[1])
         };
 
@@ -517,9 +510,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     #[allow(non_snake_case)]
-    fn deloop_off_axis(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
-        let c = self.complex().vertex(k).tng().comp(r);
-
+    fn deloop_off_axis(&mut self, k: &TngComplexKey, c: &TngComp) -> Vec<TngComplexKey> {
         debug_assert!(!self.key_map.is_sym(k));
 
         //  ⚪︎1 | ..  <-->  .. | ⚪︎1
@@ -527,10 +518,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let tk = *self.key_map.inv_key(k);
         let tc = c.convert_edges(|e| self.inv_edge(e));
-        let tr = self.complex().vertex(&tk).tng().index_of(&tc).unwrap();
 
-        let mut ks = self.deloop(k, r);
-        let mut tks = self.deloop(&tk, tr);
+        let mut ks = self.deloop(k, c);
+        let mut tks = self.deloop(&tk, &tc);
 
         self.key_map.remove(k);
 

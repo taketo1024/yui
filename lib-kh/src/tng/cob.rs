@@ -275,12 +275,12 @@ impl CobComp {
         }
     }
 
-    pub fn cap_off(&self, b: End, i: usize) -> Self {
-        debug_assert!(self.end(b).comp(i).is_circle());
+    pub fn cap_off(&self, b: End, c: &TngComp) -> Self {
+        debug_assert!(c.is_circle());
         // interned tangles are shared — build the capped end as a fresh interned `Tng`.
         let capped = |t: &Arc<Tng>| {
             let mut t = (**t).clone();
-            t.remove_at(i);
+            t.remove(c);
             intern_tng(t)
         };
         let (src, tgt) = match b {
@@ -531,13 +531,7 @@ impl Cob {
         self.comps.iter()
     }
 
-    pub fn find_comp(&mut self, b: End, c: &TngComp) -> Option<(usize, usize)> {
-        self.comps.iter().enumerate().filter_map(|(i, comp)|
-            comp.end(b).index_of(c).map(|p| (i, p))
-        ).next()
-    }
-
-    pub fn n_boundaries(&self) -> usize { 
+    pub fn n_boundaries(&self) -> usize {
         self.comps.iter().map(|c| c.n_boundaries()).sum()
     }
 
@@ -578,11 +572,11 @@ impl Cob {
     pub fn cap_off(&mut self, b: End, c: &TngComp, x: Dot) {
         debug_assert!(c.is_circle());
         
-        let Some((i, p)) = self.find_comp(b, c) else { 
+        let Some(i) = self.comps.iter().position(|comp| comp.end(b).contains(c)) else {
             panic!("{c} not found in {} ({b})", self)
         };
 
-        let new = self.comp(i).cap_off(b, p).add_dot(x);
+        let new = self.comp(i).cap_off(b, c).add_dot(x);
         if new.is_removable() {
             self.comps_mut().remove(i);
         } else {

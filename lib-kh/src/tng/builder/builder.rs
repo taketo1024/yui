@@ -20,7 +20,7 @@ use yui_core::{Ring, RingOps};
 use yui_link::{Node, Edge, Link};
 
 use crate::kh::{KhChain, KhComplex};
-use crate::tng::{TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
+use crate::tng::{TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
 use super::{reachable_range, pop_min_pivot, sparkline, cutwidth_after, toggle_boundary, boundary_edges, select_cuts, TngElemBuilder};
 
 /// How the next crossing to append is chosen.
@@ -333,11 +333,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     // The first unmarked (or based, if `allow_based`) circle in `k`'s tangle.
-    pub(crate) fn find_loop_in(&self, k: &TngComplexKey, allow_based: bool) -> Option<usize> {
+    pub(crate) fn find_loop_in(&self, k: &TngComplexKey, allow_based: bool) -> Option<&TngComp> {
         let v = self.complex.vertex(k);
-        v.tng().comps().enumerate()
-            .find(|(_, c)| c.is_circle() && (allow_based || !c.is_marked()))
-            .map(|(r, _)| r)
+        v.tng().comps()
+            .find(|c| c.is_circle() && (allow_based || !c.is_marked()))
     }
 
     // Deloop unmarked loops over all degrees.
@@ -365,9 +364,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         while let Some(k) = pop_min_pivot(&mut keys, |k|
             self.complex.contains_key(k).then(|| self.complex.vertex(k).c_weight())
         ) {
-            let Some(r) = self.find_loop_in(&k, allow_based) else { continue };
+            let Some(&c) = self.find_loop_in(&k, allow_based) else { continue };
 
-            for new_key in self.deloop(&k, r) {
+            for new_key in self.deloop(&k, &c) {
                 if self.find_loop_in(&new_key, allow_based).is_some() {
                     let w = self.complex.vertex(&new_key).c_weight();
                     keys.push((new_key, w));
@@ -380,14 +379,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("{}   delooped C[{i}]: {} (diff: {}).", self.current_step(), after, after - before);
     }
 
-    pub(crate) fn deloop(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
-        let c = self.complex.vertex(k).tng().comp(r);
-
+    pub(crate) fn deloop(&mut self, k: &TngComplexKey, c: &TngComp) -> Vec<TngComplexKey> {
         trace!("{} deloop {c} in {}", self.stat(), self.complex.vertex(k));
 
         self.elements.deloop(k, c);
 
-        let mut added = self.complex.deloop(k, r);
+        let mut added = self.complex.deloop(k, c);
 
         // immediate elim eliminates each new vertex now; min-fill leaves them for the post-deloop
         // global pass, None leaves them entirely.

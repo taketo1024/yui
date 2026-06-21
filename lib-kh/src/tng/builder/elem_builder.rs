@@ -28,8 +28,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         std::mem::take(&mut self.elements)
     }
 
-    pub(crate) fn clone_elements(&self) -> Vec<TngComplexElem<R>> {
-        self.elements.clone()
+    pub(crate) fn content(&self) -> &[TngComplexElem<R>] {
+        &self.elements
     }
 
     // Bilinearly merge `other` (a parallel chunk's elements) into self: each pair shares `state`

@@ -841,7 +841,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let mut inner = TngComplexBuilder::init(h, t, (0, 0), base_pt)
             .with_config(BuildConfig { mode: BuildMode::None, chunks: None, node_order: NodeOrder::MinCut, h_range: None });
         inner.set_nodes(chunk.iter().cloned());
-        inner.elements_mut().set(self.builder.inner.elements().clone_elements());
+        inner.elements_mut().set(self.builder.inner.elements().content().to_vec());
 
         // cap the child to the chunk's reachable band: a chunk vertex of weight
         // > b - deg_shift.0 can never reach the window (weight only grows).

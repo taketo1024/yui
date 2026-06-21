@@ -19,16 +19,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         Self { elements: vec![] }
     }
 
-    pub(crate) fn set<I>(&mut self, elements: I)
+    pub fn set<I>(&mut self, elements: I)
     where I: IntoIterator<Item = TngComplexElem<R>> {
         self.elements = elements.into_iter().collect();
     }
 
-    pub(crate) fn take(&mut self) -> Vec<TngComplexElem<R>> {
+    pub fn take(&mut self) -> Vec<TngComplexElem<R>> {
         std::mem::take(&mut self.elements)
     }
 
-    pub(crate) fn content(&self) -> &[TngComplexElem<R>] {
+    pub fn content(&self) -> &[TngComplexElem<R>] {
         &self.elements
     }
 
@@ -56,7 +56,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }).collect();
     }
 
-    pub(crate) fn clear(&mut self) {
+    pub fn clear(&mut self) {
         self.elements.clear();
     }
 

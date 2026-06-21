@@ -550,7 +550,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let k_X = k + KhAlgGen::X;
 
             self.rename_vertex_key(k, k_X);
-            self.deloop_with(&k_X, c, Dot::X, Dot::None);
+            self.deloop_with(&k_X, c, Some(Dot::X), None);
 
             vec![k_X]
         } else {
@@ -560,8 +560,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.rename_vertex_key(k, k_X);
             self.duplicate_vertex(&k_X, k_1);
 
-            self.deloop_with(&k_X, c, Dot::X, Dot::None);
-            self.deloop_with(&k_1, c, Dot::None, Dot::Y);
+            self.deloop_with(&k_X, c, Some(Dot::X), None);
+            self.deloop_with(&k_1, c, None, Some(Dot::Y));
 
             vec![k_X, k_1]
         };
@@ -569,7 +569,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         updated_keys
     }
 
-    fn deloop_with(&mut self, k: &TngComplexKey, c: &TngComp, birth_dot: Dot, death_dot: Dot) {
+    fn deloop_with(&mut self, k: &TngComplexKey, c: &TngComp, birth_dot: Option<Dot>, death_dot: Option<Dot>) {
         let (h, t) = self.ht.clone();
 
         // own the vertex so its in/out edge lists are walked without cloning, and the outgoing

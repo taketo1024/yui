@@ -51,7 +51,7 @@ fn intern_tng(t: Tng) -> Arc<Tng> {
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, derive_more::Display)]
 pub enum Dot {
-    None, X, Y
+    X, Y
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, derive_more::Display)]
@@ -271,7 +271,6 @@ impl CobComp {
         match dot {
             Dot::X => self.with_dots(x + 1, y),
             Dot::Y => self.with_dots(x, y + 1),
-            Dot::None => self,
         }
     }
 
@@ -569,14 +568,17 @@ impl Cob {
         self.comps.iter().map(|c| c.deg()).sum()
     }
 
-    pub fn cap_off(&mut self, b: End, c: &TngComp, x: Dot) {
+    pub fn cap_off(&mut self, b: End, c: &TngComp, dot: Option<Dot>) {
         debug_assert!(c.is_circle());
-        
+
         let Some(i) = self.comps.iter().position(|comp| comp.end(b).contains(c)) else {
             panic!("{c} not found in {} ({b})", self)
         };
 
-        let new = self.comp(i).cap_off(b, c).add_dot(x);
+        let mut new = self.comp(i).cap_off(b, c);
+        if let Some(d) = dot {
+            new = new.add_dot(d);
+        }
         if new.is_removable() {
             self.comps_mut().remove(i);
         } else {
@@ -876,7 +878,7 @@ pub trait LcCobTrait: Sized {
     fn inv(&self) -> Option<Self>;
     fn connect(&self, c: &Cob) -> Self;
     fn stack(&self, other: &Self) -> Self;
-    fn cap_off(self, b: End, c: &TngComp, dot: Dot) -> Self;
+    fn cap_off(self, b: End, c: &TngComp, dot: Option<Dot>) -> Self;
     fn should_reduce(&self) -> bool;
     fn reduce(self, h: &Self::R, t: &Self::R) -> Self;
     fn eval(&self, h: &Self::R, t: &Self::R) -> Self::R;
@@ -934,7 +936,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    fn cap_off(self, b: End, c: &TngComp, dot: Dot) -> Self {
+    fn cap_off(self, b: End, c: &TngComp, dot: Option<Dot>) -> Self {
         mut_cob(self, |cob| cob.cap_off(b, c, dot) )
     }
 

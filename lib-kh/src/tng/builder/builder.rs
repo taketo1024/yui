@@ -169,6 +169,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.elements.take()
     }
 
+    pub(crate) fn elements(&self) -> &TngElemBuilder<R> {
+        &self.elements
+    }
+
+    pub(crate) fn elements_mut(&mut self) -> &mut TngElemBuilder<R> {
+        &mut self.elements
+    }
+
     /// Keys at degree `i` matching `pred`, each paired with `weight(k)`
     pub(crate) fn collect_keys<F, W>(&self, i: isize, pred: F, weight: W) -> Vec<(TngComplexKey, usize)>
     where F: Fn(&TngComplexKey) -> bool, W: Fn(&TngComplexKey) -> usize {
@@ -249,9 +257,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let range = reachable_range(self.complex.h_range(), &self.config.h_range, self.n_nodes());
 
         // merge elements before delooping/eliminating, so the per-degree hooks transform them too.
-        if !other_elements.is_empty() {
-            self.elements.merge(other_elements);
-        }
+        self.elements.merge(other_elements);
 
         debug!("{} merge {} <- {}", self.current_step(), left.stat(), right.stat());
         debug!("  merge range: {:?}", range);
@@ -611,7 +617,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let base_pt = self.builder.complex.base_pt();
         let mut child = TngComplexBuilder::init(h, t, (0, 0), base_pt);
         child.set_nodes(chunk.iter().cloned());
-        child.set_elements(self.builder.elements.clone_elements());
+        child.set_elements(self.builder.elements().clone_elements());
 
         // cap the child to the chunk's reachable band: a chunk vertex of weight
         // > b - deg_shift.0 can never reach the window (weight only grows).

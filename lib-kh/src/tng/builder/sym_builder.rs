@@ -262,10 +262,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             [(k, k)].into_iter().collect()
         };
 
-        self.merge(c, key_map);
+        self.merge(c, key_map, vec![]);
     }
 
-    fn append_off_axis(&mut self, x: &Node, tx: &Node) { 
+    fn append_off_axis(&mut self, x: &Node, tx: &Node) {
         assert_eq!(self.inv_node(x), tx);
         info!("{} append off-axis: {x}, {tx}", self.current_step());
 
@@ -294,15 +294,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             [(k, k)].into_iter().collect()
         };
 
-        self.merge(c, key_map);
+        self.merge(c, key_map, vec![]);
     }
 
-    fn merge(&mut self, c: TngComplex<R>, right_map: TauKeyMap) {
+    fn merge(&mut self, c: TngComplex<R>, right_map: TauKeyMap, right_elements: Vec<TngComplexElem<R>>) {
         // build the merged τ key-map per degree (next to merge_vertices) rather than as one
         // up-front cartesian — for large knots that product never fits in memory.
         let left_map = std::mem::take(&mut self.key_map);
         let (left, right) = self.complex_mut().prepare_merge(c);
         let range = reachable_range(self.complex().h_range(), &self.config.h_range, self.n_nodes());
+
+        // merge elements before delooping/eliminating, so the per-degree hooks transform them too.
+        self.inner.elements_mut().merge(right_elements);
         
         debug!("{} merge {} <- {}", self.current_step(), left.stat(), right.stat());
         debug!("  key_map: {} × {}", left_map.len(), right_map.len());
@@ -785,18 +788,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     // Plan k chunks up front, then build each reduced chunk and merge it into the parent.
     fn build(&mut self) {
-        // canon cycles aren't yet tracked through chunk merges (see `merge`'s TODO), so
-        // drop them — a chunked build yields the complex/homology but not α / ssi.
-        self.builder.set_elements(vec![]);
         let plan = self.plan();
         info!("{} chunk plan: {} pieces {:?}", self.builder.current_step(), plan.len(),
             plan.iter().map(|c| c.len()).collect_vec());
 
         // build every chunk first (each is independent of the parent state), then merge them in.
-        let built: Vec<(TngComplex<R>, TauKeyMap)> = plan.iter().map(|chunk| self.build_chunk(chunk)).collect();
-        for (chunk, (c, key_map)) in plan.into_iter().zip(built) {
+        let built: Vec<(TngComplex<R>, TauKeyMap, Vec<TngComplexElem<R>>)> = plan.iter().map(|chunk| self.build_chunk(chunk)).collect();
+        for (chunk, (c, key_map, elems)) in plan.into_iter().zip(built) {
             self.builder.drop_nodes(|x| chunk.contains(x));
-            self.builder.merge(c, key_map);
+            self.builder.merge(c, key_map, elems);
             info!("{} chunk merged: {}", self.builder.current_step(), self.builder.stat());
         }
     }
@@ -819,17 +819,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             .collect()
     }
 
-    // Build `chunk` into a reduced sub-complex via a child builder, returning it with its τ key-map.
-    fn build_chunk(&self, chunk: &[Node]) -> (TngComplex<R>, TauKeyMap) {
+    // Build `chunk` into a reduced sub-complex via a child builder, returning it with its τ
+    // key-map and transformed elements.
+    fn build_chunk(&self, chunk: &[Node]) -> (TngComplex<R>, TauKeyMap, Vec<TngComplexElem<R>>) {
         let step = self.builder.current_step();
         let ends = boundary_edges(&chunk.iter().collect::<Vec<_>>()).into_iter().sorted().collect_vec();
         info!("{step} build chunk (n: {}, nb: {} {:?}): {}", chunk.len(), ends.len(), ends, chunk.iter().join(", "));
 
         let child = self.child_builder(chunk).run();
-        let SymTngBuilder { key_map, inner, .. } = child;
+        let SymTngBuilder { key_map, mut inner, .. } = child;
+        let elems = inner.take_elements();
         let c = inner.into_tng_complex();
         info!("{step} chunk built: {}", c.stat());
-        (c, key_map)
+        (c, key_map, elems)
     }
 
     // A child builder over `chunk` (a sub-tangle), inheriting the parent's τ-maps and
@@ -840,6 +842,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let mut inner = TngComplexBuilder::init(h, t, (0, 0), base_pt)
             .with_config(BuildConfig { mode: BuildMode::None, chunks: None, node_order: NodeOrder::MinCut, h_range: None });
         inner.set_nodes(chunk.iter().cloned());
+        inner.set_elements(self.builder.inner.elements().clone_elements());
 
         // cap the child to the chunk's reachable band: a chunk vertex of weight
         // > b - deg_shift.0 can never reach the window (weight only grows).
@@ -889,7 +892,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn merge_half(&mut self, nodes: &[Node], c: TngComplex<R>) {
         self.builder.inner.drop_nodes(|x| nodes.contains(x));
-        self.builder.inner.merge(c, vec![]); // sym element-merge not yet supported
+        self.builder.inner.merge(c, vec![]); // elements are tracked through build_from_half, not here
     }
 
     // Split the off-axis crossings (`τx != x`) into two τ-mirror halves: each adjacency
@@ -1159,6 +1162,34 @@ mod tests {
             for i in range.clone() {
                 assert_eq!(hc[i].rank(), hn[i].rank(), "reduced rank at {i} (chunks {k:?})");
             }
+        }
+    }
+
+    // chunked builds must track the canon cycles too: the Lee-class divisibility (the ssi
+    // ingredient) computed from each chunked KhI homology must match the non-chunked one.
+    #[test]
+    fn chunk_elements_match() {
+        use crate::util::calc::div_vec;
+        type P = Poly<'H', FF2>;
+
+        let l = InvLink::from_symmetric_pd_code(
+            [[18,8,1,7],[13,6,14,7],[12,2,13,1],[8,18,9,17],[5,14,6,15],[2,12,3,11],[16,10,17,9],[15,4,16,5],[10,4,11,3]]
+        );
+        let c = P::variable();
+        let (h, t) = (c.clone(), P::zero());
+
+        let div = |chunks| {
+            let config = SymBuildConfig { chunks, ..Default::default() };
+            let kh = KhIHomology::new_with_config(&l, &h, &t, false, config);
+            kh.canon_cycles().iter().map(|z| {
+                let v = kh[kh.h_deg_of_chain(z)].vectorize_euc(z);
+                div_vec(&v.subvec(0..2), &c).unwrap()
+            }).collect_vec()
+        };
+
+        let ref_d = div(None);
+        for k in [Some(2), Some(3)] {
+            assert_eq!(div(k), ref_d, "divisibility, chunks {k:?}");
         }
     }
 

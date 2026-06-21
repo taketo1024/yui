@@ -35,6 +35,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // Bilinearly merge `other` (a parallel chunk's elements) into self: each pair shares `state`
     // and `in_cob`, and their `out_cob`s combine over the product of keys via horizontal composition.
     pub(crate) fn merge(&mut self, other: Vec<TngComplexElem<R>>) {
+        if other.is_empty() {
+            return; // nothing to merge (e.g. single-crossing append, or no canon cycles)
+        }
         assert_eq!(self.elements.len(), other.len());
         for (e, o) in self.elements.iter_mut().zip(other) {
             Self::merge_into(e, &o);

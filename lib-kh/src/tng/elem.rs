@@ -39,6 +39,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.base_pt
     }
 
+    pub fn in_cob(&self) -> &Cob {
+        &self.in_cob
+    }
+
     pub fn out_cob(&self) -> &HashMap<TngComplexKey, LcCob<R>> {
         &self.out_cob
     }

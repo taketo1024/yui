@@ -28,6 +28,31 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         std::mem::take(&mut self.elements)
     }
 
+    pub(crate) fn clone_elements(&self) -> Vec<TngComplexElem<R>> {
+        self.elements.clone()
+    }
+
+    // Bilinearly merge `other` (a parallel chunk's elements) into self: each pair shares `state`
+    // and `in_cob`, and their `out_cob`s combine over the product of keys via horizontal composition.
+    pub(crate) fn merge(&mut self, other: Vec<TngComplexElem<R>>) {
+        assert_eq!(self.elements.len(), other.len());
+        for (e, o) in self.elements.iter_mut().zip(other) {
+            Self::merge_into(e, &o);
+        }
+    }
+
+    fn merge_into(e: &mut TngComplexElem<R>, o: &TngComplexElem<R>) {
+        assert_eq!(e.state(), o.state());
+        assert_eq!(e.in_cob(), o.in_cob());
+
+        let lhs = std::mem::take(e.out_cob_mut());
+        *e.out_cob_mut() = lhs.iter().flat_map(|(k, f)| {
+            o.out_cob().iter().map(move |(l, g)| {
+                (k + l, f.apply_bilin(g, |c1, c2| c1.connect(c2)))
+            })
+        }).collect();
+    }
+
     pub(crate) fn clear(&mut self) {
         self.elements.clear();
     }

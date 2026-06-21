@@ -233,7 +233,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         
         let (h, t) = self.complex.ht();
         let cx = TngComplex::from_node(h, t, x, self.complex.base_pt());
-        self.merge(cx);
+        self.merge(cx, vec![]);
     }
 
     pub(crate) fn prepare_append(&mut self, x: &Node) { 
@@ -244,9 +244,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.elements.append_node(x);
     }
 
-    pub(crate) fn merge(&mut self, other: TngComplex<R>) {
+    pub(crate) fn merge(&mut self, other: TngComplex<R>, other_elements: Vec<TngComplexElem<R>>) {
         let (left, right) = self.complex.prepare_merge(other);
         let range = reachable_range(self.complex.h_range(), &self.config.h_range, self.n_nodes());
+
+        // merge elements before delooping/eliminating, so the per-degree hooks transform them too.
+        if !other_elements.is_empty() {
+            self.elements.merge(other_elements);
+        }
 
         debug!("{} merge {} <- {}", self.current_step(), left.stat(), right.stat());
         debug!("  merge range: {:?}", range);
@@ -461,7 +466,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let (h, t) = self.complex.ht();
             let marked = self.complex.base_pt() == Some(c);
             let c = TngComplex::from_loop(h, t, c, marked);
-            self.merge(c);
+            self.merge(c, vec![]);
 
             if self.config.mode.auto_deloop() {
                 self.deloop_all();
@@ -556,18 +561,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     // Plan k chunks up front, then build each reduced chunk and merge it into the parent.
     fn build(&mut self) {
-        // canon cycles aren't yet tracked through chunk merges, so drop them — a chunked build
-        // yields the complex/homology but not the ss invariant.
-        self.builder.take_elements();
         let plan = self.plan();
         info!("{} chunk plan: {} pieces {:?}", self.builder.current_step(), plan.len(),
             plan.iter().map(|c| c.len()).collect_vec());
 
         // build every chunk first (each is independent of the parent state), then merge them in.
-        let built: Vec<TngComplex<R>> = plan.iter().map(|chunk| self.build_chunk(chunk)).collect();
-        for (chunk, c) in plan.into_iter().zip(built) {
+        let built: Vec<(TngComplex<R>, Vec<TngComplexElem<R>>)> = plan.iter().map(|chunk| self.build_chunk(chunk)).collect();
+        for (chunk, (c, elems)) in plan.into_iter().zip(built) {
             self.builder.drop_nodes(|x| chunk.contains(x));
-            self.builder.merge(c);
+            self.builder.merge(c, elems);
             info!("{} chunk merged: {}", self.builder.current_step(), self.builder.stat());
         }
     }
@@ -589,15 +591,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             .collect()
     }
 
-    // Build `chunk` into a reduced sub-complex via a child builder.
-    fn build_chunk(&self, chunk: &[Node]) -> TngComplex<R> {
+    // Build `chunk` into a reduced sub-complex via a child builder, carrying its elements out too.
+    fn build_chunk(&self, chunk: &[Node]) -> (TngComplex<R>, Vec<TngComplexElem<R>>) {
         let step = self.builder.current_step();
         let ends = boundary_edges(&chunk.iter().collect::<Vec<_>>()).into_iter().sorted().collect_vec();
         info!("{step} build chunk (n: {}, nb: {} {:?}): {}", chunk.len(), ends.len(), ends, chunk.iter().join(", "));
 
-        let c = self.child_builder(chunk).run().into_tng_complex();
+        let mut child = self.child_builder(chunk).run();
+        let elems = child.take_elements();
+        let c = child.into_tng_complex();
         info!("{step} chunk built: {}", c.stat());
-        c
+        (c, elems)
     }
 
     // A child builder over `chunk` (a sub-tangle), inheriting the parent's simplify mode;
@@ -607,6 +611,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let base_pt = self.builder.complex.base_pt();
         let mut child = TngComplexBuilder::init(h, t, (0, 0), base_pt);
         child.set_nodes(chunk.iter().cloned());
+        child.set_elements(self.builder.elements.clone_elements());
 
         // cap the child to the chunk's reachable band: a chunk vertex of weight
         // > b - deg_shift.0 can never reach the window (weight only grows).
@@ -773,6 +778,29 @@ mod tests {
                 assert_eq!(h[i].rank(), ref_h[i].rank(), "rank at {i}, chunks {k:?}");
                 assert_eq!(h[i].tors(), ref_h[i].tors(), "tors at {i}, chunks {k:?}");
             }
+        }
+    }
+
+    // chunked builds must track the canon cycles too: the Lee-class divisibility (the ss
+    // ingredient) is computed from each chunked homology and must match the non-chunked one.
+    #[test]
+    fn test_chunk_elements_match() {
+        use crate::kh::KhHomology;
+        use crate::util::calc::div_vec;
+
+        let l = Link::test_data("8_19");
+        let c = 2;
+        let div = |chunks| {
+            let config = BuildConfig { chunks, ..Default::default() };
+            let kh = KhHomology::new_with_config(&l, &c, &0, false, config);
+            kh.canon_cycles().iter()
+                .map(|z| div_vec(&kh[0].vectorize_euc(z).subvec(0..2), &c).unwrap())
+                .collect_vec()
+        };
+
+        let ref_d = div(None);
+        for k in [Some(2), Some(3), Some(4)] {
+            assert_eq!(div(k), ref_d, "divisibility, chunks {k:?}");
         }
     }
 

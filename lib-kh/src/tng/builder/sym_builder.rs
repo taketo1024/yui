@@ -889,7 +889,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn merge_half(&mut self, nodes: &[Node], c: TngComplex<R>) {
         self.builder.inner.drop_nodes(|x| nodes.contains(x));
-        self.builder.inner.merge(c);
+        self.builder.inner.merge(c, vec![]); // sym element-merge not yet supported
     }
 
     // Split the off-axis crossings (`τx != x`) into two τ-mirror halves: each adjacency

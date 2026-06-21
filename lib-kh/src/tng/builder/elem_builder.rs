@@ -32,6 +32,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.elements
     }
 
+    pub fn clear(&mut self) {
+        self.elements.clear();
+    }
+
     // Bilinearly merge `other` (a parallel chunk's elements) into self: each pair shares `state`
     // and `in_cob`, and their `out_cob`s combine over the product of keys via horizontal composition.
     pub(crate) fn merge(&mut self, other: Vec<TngComplexElem<R>>) {
@@ -54,10 +58,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 (k + l, f.apply_bilin(g, |c1, c2| c1.connect(c2)))
             })
         }).collect();
-    }
-
-    pub fn clear(&mut self) {
-        self.elements.clear();
     }
 
     pub(crate) fn append_node(&mut self, x: &Node) {

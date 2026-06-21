@@ -51,7 +51,7 @@ fn intern_tng(t: Tng) -> Arc<Tng> {
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, derive_more::Display)]
 pub enum Dot {
-    None, X, Y
+    X, Y
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, derive_more::Display)]
@@ -230,33 +230,6 @@ impl CobComp {
         self.is_plain()
     }
 
-    // True if capping a circle on side `b` (no dot) leaves an invertible cobordism.
-    pub(crate) fn is_invertible_after_cap(&self, b: End) -> bool {
-        let (near, far) = match b {
-            End::Src => (&self.src, &self.tgt),
-            End::Tgt => (&self.tgt, &self.src),
-        };
-        self.is_plain() &&
-        self.genus == 0 &&
-        near.n_comps() == 2 &&
-        far.n_comps() == 1 &&
-        near.comps().any(|c| c.is_circle()) // a circle on the capped side to remove
-    }
-
-    // True if `self` is a dotted cup/cap (disk, one dot) whose only boundary is the
-    // circle on side `b`: capping it (plain) closes it to a dotted sphere = ε(X)=ε(Y)=1.
-    pub(crate) fn is_dotted_cup(&self, b: End) -> bool {
-        let (near, far) = match b {
-            End::Src => (&self.src, &self.tgt),
-            End::Tgt => (&self.tgt, &self.src),
-        };
-        self.genus == 0 &&
-        (self.dots == (1, 0) || self.dots == (0, 1)) &&
-        far.is_empty() &&
-        near.n_comps() == 1 &&
-        near.comps().next().is_some_and(|c| c.is_circle())
-    }
-
     pub fn is_sdl(&self) -> bool {
         self.src.n_comps() == 2 && 
         self.tgt.n_comps() == 2 && 
@@ -298,16 +271,15 @@ impl CobComp {
         match dot {
             Dot::X => self.with_dots(x + 1, y),
             Dot::Y => self.with_dots(x, y + 1),
-            Dot::None => self,
         }
     }
 
-    pub fn cap_off(&self, b: End, i: usize) -> Self {
-        debug_assert!(self.end(b).comp(i).is_circle());
+    pub fn cap_off(&self, b: End, c: &TngComp) -> Self {
+        debug_assert!(c.is_circle());
         // interned tangles are shared — build the capped end as a fresh interned `Tng`.
         let capped = |t: &Arc<Tng>| {
             let mut t = (**t).clone();
-            t.remove_at(i);
+            t.remove(c);
             intern_tng(t)
         };
         let (src, tgt) = match b {
@@ -558,13 +530,7 @@ impl Cob {
         self.comps.iter()
     }
 
-    pub fn find_comp(&mut self, b: End, c: &TngComp) -> Option<(usize, usize)> {
-        self.comps.iter().enumerate().filter_map(|(i, comp)|
-            comp.end(b).index_of(c).map(|p| (i, p))
-        ).next()
-    }
-
-    pub fn n_boundaries(&self) -> usize { 
+    pub fn n_boundaries(&self) -> usize {
         self.comps.iter().map(|c| c.n_boundaries()).sum()
     }
 
@@ -582,18 +548,6 @@ impl Cob {
 
     pub fn is_invertible(&self) -> bool {
         self.comps.iter().all(|c| c.is_invertible())
-    }
-
-    // Would capping circle `c` on side `b` (no dot) leave an invertible
-    // cobordism? Structural check — no new cobordism is built, nothing reduced.
-    pub fn is_invertible_after_cap(&self, b: End, c: &TngComp) -> bool {
-        self.comps.iter().try_fold(false, |capped, comp|
-            if !capped && comp.end(b).contains(c) {
-                (comp.is_invertible_after_cap(b) || comp.is_dotted_cup(b)).then_some(true)
-            } else {
-                comp.is_invertible().then_some(capped)
-            }
-        ).unwrap_or(false)
     }
 
     pub fn inv(&self) -> Option<Self> {
@@ -614,14 +568,17 @@ impl Cob {
         self.comps.iter().map(|c| c.deg()).sum()
     }
 
-    pub fn cap_off(&mut self, b: End, c: &TngComp, x: Dot) {
+    pub fn cap_off(&mut self, b: End, c: &TngComp, dot: Option<Dot>) {
         debug_assert!(c.is_circle());
-        
-        let Some((i, p)) = self.find_comp(b, c) else { 
+
+        let Some(i) = self.comps.iter().position(|comp| comp.end(b).contains(c)) else {
             panic!("{c} not found in {} ({b})", self)
         };
 
-        let new = self.comp(i).cap_off(b, p).add_dot(x);
+        let mut new = self.comp(i).cap_off(b, c);
+        if let Some(d) = dot {
+            new = new.add_dot(d);
+        }
         if new.is_removable() {
             self.comps_mut().remove(i);
         } else {
@@ -916,13 +873,12 @@ pub trait LcCobTrait: Sized {
     type R;
     fn is_closed(&self) -> bool;
     fn is_invertible(&self) -> bool;
-    fn is_invertible_after_cap(&self, b: End, c: &TngComp) -> bool;
     fn is_stackable(&self, other: &Self) -> bool;
     fn as_scalar(&self) -> Option<&Self::R>;
     fn inv(&self) -> Option<Self>;
     fn connect(&self, c: &Cob) -> Self;
     fn stack(&self, other: &Self) -> Self;
-    fn cap_off(self, b: End, c: &TngComp, dot: Dot) -> Self;
+    fn cap_off(self, b: End, c: &TngComp, dot: Option<Dot>) -> Self;
     fn should_reduce(&self) -> bool;
     fn reduce(self, h: &Self::R, t: &Self::R) -> Self;
     fn eval(&self, h: &Self::R, t: &Self::R) -> Self::R;
@@ -940,13 +896,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.nterms() == 1 &&
         self.iter().next().map(|(c, a)|
             c.is_invertible() && a.is_unit()
-        ).unwrap_or(false)
-    }
-
-    fn is_invertible_after_cap(&self, b: End, c: &TngComp) -> bool {
-        self.nterms() == 1 &&
-        self.iter().next().map(|(cob, a)|
-            a.is_unit() && cob.is_invertible_after_cap(b, c)
         ).unwrap_or(false)
     }
 
@@ -987,7 +936,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    fn cap_off(self, b: End, c: &TngComp, dot: Dot) -> Self {
+    fn cap_off(self, b: End, c: &TngComp, dot: Option<Dot>) -> Self {
         mut_cob(self, |cob| cob.cap_off(b, c, dot) )
     }
 
@@ -1232,32 +1181,6 @@ mod tests {
             CobComp::cup(TngComp::circ([0])),
             CobComp::cap(TngComp::circ([0]))
         ]));
-    }
-
-    #[test]
-    fn dotted_cup_after_cap() {
-        // dotted cup (∅ → ◯, one X dot): capping its Tgt circle closes it to a dotted sphere = ε(X) = 1.
-        let cup = CobComp::cup(TngComp::circ([0])).with_dots(1, 0);
-        assert!(cup.is_dotted_cup(End::Tgt));
-        assert!(!cup.is_dotted_cup(End::Src)); // the circle is on Tgt, not Src
-        // a Y dot also gives ε(Y) = 1; on a cap the circle is on Src.
-        assert!(CobComp::cap(TngComp::circ([0])).with_dots(0, 1).is_dotted_cup(End::Src));
-        // not a unit: plain (ε(1) = 0) and two dots (ε(X²) = h).
-        assert!(!CobComp::cup(TngComp::circ([0])).is_dotted_cup(End::Tgt));
-        assert!(!CobComp::cup(TngComp::circ([0])).with_dots(2, 0).is_dotted_cup(End::Tgt));
-
-        // Cob = dotted cup ⊔ cylinder: capping the cup's circle leaves an invertible cob.
-        let cob = Cob::new(vec![
-            CobComp::cup(TngComp::circ([0])).with_dots(1, 0),
-            CobComp::id(TngComp::arc([1, 2])),
-        ]);
-        assert!(cob.is_invertible_after_cap(End::Tgt, &TngComp::circ([0])));
-        // undotted cup is not a unit after cap.
-        let cob_plain = Cob::new(vec![
-            CobComp::cup(TngComp::circ([0])),
-            CobComp::id(TngComp::arc([1, 2])),
-        ]);
-        assert!(!cob_plain.is_invertible_after_cap(End::Tgt, &TngComp::circ([0])));
     }
 
     #[test]

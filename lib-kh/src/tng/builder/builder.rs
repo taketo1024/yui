@@ -13,15 +13,15 @@
 use std::fmt;
 use std::ops::RangeInclusive;
 
-use rustc_hash::{FxHashSet, FxHashMap};
+use rustc_hash::FxHashSet;
 use itertools::Itertools;
 use log::{debug, info, trace};
 use yui_core::{Ring, RingOps};
 use yui_link::{Node, Edge, Link};
 
 use crate::kh::{KhChain, KhComplex};
-use crate::tng::{TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
-use super::{reachable_range, pop_min_pivot, sparkline, cutwidth_after, toggle_boundary, TngElemBuilder};
+use crate::tng::{TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
+use super::{reachable_range, pop_min_pivot, sparkline, cutwidth_after, toggle_boundary, boundary_edges, select_cuts, TngElemBuilder};
 
 /// How the next crossing to append is chosen.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -63,12 +63,15 @@ impl BuildMode {
 pub struct BuildConfig {
     pub node_order: NodeOrder,
     pub mode: BuildMode,
+    // divide-and-conquer: partition the link into this many chunks at the deepest cutwidth
+    // valleys, build each via a child builder, and merge into the parent. None = single pass.
+    pub chunks: Option<usize>,
     pub h_range: Option<RangeInclusive<isize>>,
 }
 
 impl Default for BuildConfig {
     fn default() -> Self {
-        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), h_range: None }
+        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), chunks: None, h_range: None }
     }
 }
 
@@ -166,10 +169,28 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.elements.take()
     }
 
+    /// Keys at degree `i` matching `pred`, each paired with `weight(k)`
+    pub(crate) fn collect_keys<F, W>(&self, i: isize, pred: F, weight: W) -> Vec<(TngComplexKey, usize)>
+    where F: Fn(&TngComplexKey) -> bool, W: Fn(&TngComplexKey) -> usize {
+        self.complex.keys_of_deg(i)
+            .filter(|k| pred(k))
+            .map(|k| (*k, weight(k)))
+            .collect_vec()
+    }
+
+    // "(committed/total)" crossing progress, for log prefixes.
+    pub(crate) fn current_step(&self) -> String {
+        format!("({}/{})", self.complex.dim(), self.complex.dim() + self.n_nodes())
+    }
+
     pub fn run(mut self) -> Self {
         info!("build config:\n{:#?}", self.config);
         info!("cutwidth profile:\n{}", self.profile());
-        self.process_nodes();
+        if self.config.chunks.is_some() {
+            ChunkBuilder::run(&mut self);
+        } else {
+            self.process_nodes();
+        }
         self.process_free_loops();
         self.finalize();
         self
@@ -184,46 +205,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    /// Pick the next node_order: maximize `score_node`, ties broken by earliest crossing order
+    /// Pick the next node by node order, ties broken by earliest crossing order
     /// (`self.nodes` keeps PD order — `prepare_append` removes via order-preserving `Vec::remove`).
     pub(crate) fn choose_next_node(&self) -> Option<&Node> {
         self.nodes.iter().enumerate()
-            .min_by_key(|(i, x)| (-self.score_node(x), *i))
+            .min_by_key(|(i, x)| {
+                let score = match self.config.node_order {
+                    NodeOrder::MinCut => self.cutwidth(x),
+                    NodeOrder::Given => 0, // constant → ties broken by earliest index = given order
+                };
+                (score, *i)
+            })
             .map(|(_, x)| x)
-    }
-
-    /// Strategy score for appending `x` (higher is better).
-    pub(crate) fn score_node(&self, x: &Node) -> isize {
-        match self.config.node_order {
-            NodeOrder::MinCut => -self.cutwidth(x),
-            NodeOrder::Given => 0, // constant → ties broken by earliest index = given order
-        }
     }
 
     /// Boundary cutwidth (open-edge count) after appending `x`. `boundary_ends` is cheap, so
     /// recomputing it per call is fine.
     pub(crate) fn cutwidth(&self, x: &Node) -> isize {
-        self.cutwidth_of(x.edges().iter().copied())
-    }
-
-    /// Cutwidth after toggling an arbitrary edge multiset — for τ-pairs, where `x` and `τx`
-    /// must be scored together (a shared axis edge toggles twice and cancels).
-    pub(crate) fn cutwidth_of(&self, edges: impl IntoIterator<Item = Edge>) -> isize {
-        let boundary: FxHashSet<Edge> = self.complex.boundary_ends().collect();
-        let mut cnt: FxHashMap<Edge, u32> = FxHashMap::default();
-        for e in edges {
-            *cnt.entry(e).or_default() += 1;
-        }
-        let delta: isize = cnt.iter()
-            .filter(|(_, c)| *c % 2 == 1)
-            .map(|(e, _)| if boundary.contains(e) { -1 } else { 1 })
-            .sum();
-        boundary.len() as isize + delta
-    }
-
-    // "(committed/total)" crossing progress, for log prefixes.
-    pub(crate) fn current_step(&self) -> String {
-        format!("({}/{})", self.complex.dim(), self.complex.dim() + self.n_nodes())
+        let open: FxHashSet<Edge> = self.complex.boundary_ends().collect();
+        cutwidth_after(&open, &[x]) as isize
     }
 
     pub(crate) fn append_node(&mut self, x: &Node) {
@@ -332,40 +332,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.complex.remove_vertices(&doomed);
     }
 
-    /// Keys at degree `i` matching `pred`, each paired with `weight(k)`; callers pivot by least
-    /// weight via [`pop_min_pivot`].
-    pub(crate) fn collect_keys<F, W>(&self, i: isize, pred: F, weight: W) -> Vec<(TngComplexKey, usize)>
-    where F: Fn(&TngComplexKey) -> bool, W: Fn(&TngComplexKey) -> usize {
-        self.complex.keys_of_deg(i)
-            .filter(|k| pred(k))
-            .map(|k| (*k, weight(k)))
-            .collect_vec()
-    }
-
     // The first unmarked (or based, if `allow_based`) circle in `k`'s tangle.
-    pub(crate) fn find_loop_in(&self, k: &TngComplexKey, allow_based: bool) -> Option<usize> {
+    pub(crate) fn find_loop_in(&self, k: &TngComplexKey, allow_based: bool) -> Option<&TngComp> {
         let v = self.complex.vertex(k);
-        v.tng().comps().enumerate()
-            .find(|(_, c)| c.is_circle() && (allow_based || !c.is_marked()))
-            .map(|(r, _)| r)
+        v.tng().comps()
+            .find(|c| c.is_circle() && (allow_based || !c.is_marked()))
     }
 
     // Deloop unmarked loops over all degrees.
     pub(crate) fn deloop_all(&mut self) {
         for i in self.complex.h_range() {
             self.deloop_in(i);
-        }
-    }
-
-    // Deloop the marked (based) loops into a single summand. All unmarked loops must already
-    // be gone — else delooping only the marked ones would break the complex.
-    fn deloop_all_marked(&mut self) {
-        debug_assert!(
-            self.complex.keys().all(|k| self.find_loop_in(k, false).is_none()),
-            "deloop_all_marked: unmarked loops remain"
-        );
-        for i in self.complex.h_range() {
-            self.deloop_in_with(i, true);
         }
     }
 
@@ -387,9 +364,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         while let Some(k) = pop_min_pivot(&mut keys, |k|
             self.complex.contains_key(k).then(|| self.complex.vertex(k).c_weight())
         ) {
-            let Some(r) = self.find_loop_in(&k, allow_based) else { continue };
+            let Some(&c) = self.find_loop_in(&k, allow_based) else { continue };
 
-            for new_key in self.deloop(&k, r) {
+            for new_key in self.deloop(&k, &c) {
                 if self.find_loop_in(&new_key, allow_based).is_some() {
                     let w = self.complex.vertex(&new_key).c_weight();
                     keys.push((new_key, w));
@@ -402,14 +379,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("{}   delooped C[{i}]: {} (diff: {}).", self.current_step(), after, after - before);
     }
 
-    pub(crate) fn deloop(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
-        let c = self.complex.vertex(k).tng().comp(r);
-
+    pub(crate) fn deloop(&mut self, k: &TngComplexKey, c: &TngComp) -> Vec<TngComplexKey> {
         trace!("{} deloop {c} in {}", self.stat(), self.complex.vertex(k));
 
         self.elements.deloop(k, c);
 
-        let mut added = self.complex.deloop(k, r);
+        let mut added = self.complex.deloop(k, c);
 
         // immediate elim eliminates each new vertex now; min-fill leaves them for the post-deloop
         // global pass, None leaves them entirely.
@@ -456,6 +431,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
+    pub(crate) fn eliminate(&mut self, i: &TngComplexKey, j: &TngComplexKey) {
+        trace!("{} eliminate {}: {} -> {}", self.stat(), self.complex.edge(i, j), self.complex.vertex(i), self.complex.vertex(j));
+        
+        self.elements.eliminate(&self.complex, i, j);
+        self.complex.eliminate(i, j);
+    }
+
     fn choose_inv_edge_into(&self, k: &TngComplexKey) -> Option<&TngComplexKey> { 
         self.complex.vertex(k).in_edges().filter_map(|j|
             self.complex.edge(j, k).is_invertible().then_some(j)
@@ -468,13 +450,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.complex.edge(k, l).is_invertible().then_some(l)
         )
         .min_by_key(|l| (self.complex.edge_weight(k, l), **l))
-    }
-
-    pub(crate) fn eliminate(&mut self, i: &TngComplexKey, j: &TngComplexKey) {
-        trace!("{} eliminate {}: {} -> {}", self.stat(), self.complex.edge(i, j), self.complex.vertex(i), self.complex.vertex(j));
-        
-        self.elements.eliminate(&self.complex, i, j);
-        self.complex.eliminate(i, j);
     }
 
     pub(crate) fn process_free_loops(&mut self) {
@@ -503,7 +478,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         info!("{} finalize: {}", self.current_step(), self.stat());
 
         self.deloop_all();
-        self.deloop_all_marked(); // deloop marked loops
+
+        // Deloop marked circles only when there are no other unmarked components left. 
+        if self.complex.is_closed() {
+            for i in self.complex.h_range() {
+                self.deloop_in_with(i, true);
+            }
+        }
 
         info!("{} finalized: {}", self.current_step(), self.stat());
     }
@@ -556,6 +537,84 @@ impl fmt::Display for BuildProfile {
         writeln!(f, "n:    {}", self.n)?;
         writeln!(f, "peak: {}", self.peak)?;
         write!(f, "{}", sparkline(&self.widths, self.peak))
+    }
+}
+
+/// Divide-and-conquer chunked build for a [`TngComplexBuilder`]: plan k chunks up front at the
+/// deepest cutwidth valleys, build each via a child builder, and merge the reduced chunk into the
+/// parent — so the parent never materializes the full dense slice.
+struct ChunkBuilder<'a, R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    builder: &'a mut TngComplexBuilder<R>,
+}
+
+impl<'a, R> ChunkBuilder<'a, R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn run(builder: &'a mut TngComplexBuilder<R>) {
+        Self { builder }.build();
+    }
+
+    // Plan k chunks up front, then build each reduced chunk and merge it into the parent.
+    fn build(&mut self) {
+        // canon cycles aren't yet tracked through chunk merges, so drop them — a chunked build
+        // yields the complex/homology but not the ss invariant.
+        self.builder.take_elements();
+        let plan = self.plan();
+        info!("{} chunk plan: {} pieces {:?}", self.builder.current_step(), plan.len(),
+            plan.iter().map(|c| c.len()).collect_vec());
+
+        // build every chunk first (each is independent of the parent state), then merge them in.
+        let built: Vec<TngComplex<R>> = plan.iter().map(|chunk| self.build_chunk(chunk)).collect();
+        for (chunk, c) in plan.into_iter().zip(built) {
+            self.builder.drop_nodes(|x| chunk.contains(x));
+            self.builder.merge(c);
+            info!("{} chunk merged: {}", self.builder.current_step(), self.builder.stat());
+        }
+    }
+
+    // Partition the crossings into `chunks` pieces at the deepest cutwidth valleys of the MinCut
+    // order. Each piece is contiguous in that order, so merging in sequence keeps a thin interface.
+    fn plan(&self) -> Vec<Vec<Node>> {
+        let prof = self.builder.profile();
+        let k = self.builder.config.chunks.unwrap_or(1).max(1);
+        let nodes = self.builder.nodes();
+        let cuts = select_cuts(&prof.widths, k - 1);
+
+        // segment `prof.order` after each cut position; map each index to its node.
+        let starts = std::iter::once(0).chain(cuts.iter().map(|&v| v + 1));
+        let ends = cuts.iter().map(|&v| v + 1).chain(std::iter::once(prof.order.len()));
+        starts.zip(ends)
+            .map(|(s, e)| prof.order[s..e].iter().map(|&i| nodes[i].clone()).collect())
+            .filter(|c: &Vec<Node>| !c.is_empty())
+            .collect()
+    }
+
+    // Build `chunk` into a reduced sub-complex via a child builder.
+    fn build_chunk(&self, chunk: &[Node]) -> TngComplex<R> {
+        let step = self.builder.current_step();
+        let ends = boundary_edges(&chunk.iter().collect::<Vec<_>>()).into_iter().sorted().collect_vec();
+        info!("{step} build chunk (n: {}, nb: {} {:?}): {}", chunk.len(), ends.len(), ends, chunk.iter().join(", "));
+
+        let c = self.child_builder(chunk).run().into_tng_complex();
+        info!("{step} chunk built: {}", c.stat());
+        c
+    }
+
+    // A child builder over `chunk` (a sub-tangle), inheriting the parent's simplify mode;
+    // chunking always uses the MinCut order, never recursing.
+    fn child_builder(&self, chunk: &[Node]) -> TngComplexBuilder<R> {
+        let (h, t) = self.builder.complex.ht();
+        let base_pt = self.builder.complex.base_pt();
+        let mut child = TngComplexBuilder::init(h, t, (0, 0), base_pt);
+        child.set_nodes(chunk.iter().cloned());
+
+        // cap the child to the chunk's reachable band: a chunk vertex of weight
+        // > b - deg_shift.0 can never reach the window (weight only grows).
+        let h_range = self.builder.config.h_range.as_ref().map(|r| {
+            let s = self.builder.complex.deg_shift().0;
+            0 ..= (*r.end() - s).max(0)
+        });
+        child.with_config(BuildConfig { mode: self.builder.config.mode, node_order: NodeOrder::MinCut, chunks: None, h_range })
     }
 }
 
@@ -691,6 +750,28 @@ mod tests {
             for i in 0..=8 {
                 assert_eq!(h[i].rank(), ref_h[i].rank(), "rank at {i}, {mode:?}");
                 assert_eq!(h[i].tors(), ref_h[i].tors(), "tors at {i}, {mode:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn test_chunk_build_matches() {
+        // chunked builds must reproduce the non-chunked homology (incl. torsion).
+        let l = Link::test_data("8_19");
+        let build = |chunks| {
+            let config = BuildConfig { chunks, ..Default::default() };
+            TngComplexBuilder::from_link(&l, &0, &0, false).with_config(config).run()
+                .into_tng_complex().into_raw_complex()
+        };
+
+        let ref_h = build(None).homology();
+        for k in [Some(2), Some(3), Some(4)] {
+            let c = build(k);
+            c.check_d_all();
+            let h = c.homology();
+            for i in 0..=8 {
+                assert_eq!(h[i].rank(), ref_h[i].rank(), "rank at {i}, chunks {k:?}");
+                assert_eq!(h[i].tors(), ref_h[i].tors(), "tors at {i}, chunks {k:?}");
             }
         }
     }

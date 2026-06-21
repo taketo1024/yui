@@ -84,12 +84,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let marked = e.base_pt().map(|b| c.contains(b)).unwrap_or(false);
 
         let k0 = k + KhAlgGen::X;
-        let f0 = f.clone().cap_off(End::Tgt, c, Dot::None);
+        let f0 = f.clone().cap_off(End::Tgt, c, None);
         e.out_cob_mut().insert(k0, f0);
 
         if !marked {
             let k1 = k + KhAlgGen::I;
-            let f1 = f.cap_off(End::Tgt, c, Dot::Y);
+            let f1 = f.cap_off(End::Tgt, c, Some(Dot::Y));
             e.out_cob_mut().insert(k1, f1);
         }
     }

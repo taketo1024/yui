@@ -244,7 +244,8 @@ impl Tng {
         self.comps.binary_search(c).ok() // comps kept sorted (see normalize)
     }
 
-    pub fn remove_at(&mut self, i: usize) -> TngComp {
+    pub fn remove(&mut self, c: &TngComp) -> TngComp {
+        let i = self.index_of(c).expect("component not found");
         self.comps.inner_mut().remove(i)
     }
 
@@ -442,13 +443,12 @@ mod tests {
             h.finish()
         }
 
-        // remove_at: force the cache, mutate, then the hash must match a freshly-built Tng.
+        // remove: force the cache, mutate, then the hash must match a freshly-built Tng.
         let mut t = Tng::new([TngComp::arc([0, 1]), TngComp::arc([2, 3])]);
         let _ = hash_of(&t); // populate cache
-        let i = t.index_of(&TngComp::arc([0, 1])).unwrap();
-        t.remove_at(i);
+        t.remove(&TngComp::arc([0, 1]));
         let fresh = Tng::new([TngComp::arc([2, 3])]);
-        assert_eq!(hash_of(&t), hash_of(&fresh), "stale hash after remove_at");
+        assert_eq!(hash_of(&t), hash_of(&fresh), "stale hash after remove");
         assert_eq!(t, fresh);
 
         // connect_mut: ends in normalize → invalidate.
@@ -478,7 +478,8 @@ mod tests {
         assert_eq!(t.n_comps(), 2);
         assert_eq!(t.find_comp(|c| c.is_circle()), Some(1));
 
-        t.remove_at(1);
+        let c = *t.comp(1);
+        t.remove(&c);
 
         assert_eq!(t.n_comps(), 1);
         assert_eq!(t.find_comp(|c| c.is_circle()), None);

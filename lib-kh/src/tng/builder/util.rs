@@ -64,3 +64,65 @@ pub(crate) fn toggle_boundary(open: &mut FxHashSet<Edge>, node_unit: &[&Node]) {
         }
     });
 }
+
+// ---- Chunk planning: pick the cut positions in a cutwidth profile (shared by both builders) ----
+
+// Valley positions (a descent that turns back up) in `widths`, ascending. The `scan` carries a
+// `descended` flag so flats are ignored — a mid-descent plateau isn't mistaken for the bottom.
+fn valleys(widths: &[usize]) -> Vec<usize> {
+    widths.windows(2).enumerate()
+        .scan(false, |descended, (i, w)| Some(
+            if w[1] < w[0] {
+                *descended = true;
+                None
+            } else if w[1] > w[0] && *descended {
+                *descended = false;
+                Some(i)
+            } else {
+                None
+            }
+        ))
+        .flatten()
+        .collect()
+}
+
+// `n_cuts` cut positions in `widths`: take the deepest valleys first; if more cuts than valleys
+// are needed, keep every valley and split the widest pieces evenly (greedy, which minimizes the
+// largest piece).
+pub(crate) fn select_cuts(widths: &[usize], n_cuts: usize) -> Vec<usize> {
+    let n = widths.len();
+    let n_cuts = n_cuts.min(n.saturating_sub(1));
+    if n_cuts == 0 {
+        return vec![];
+    }
+
+    let vs = valleys(widths); // ascending positions
+    if vs.len() >= n_cuts {
+        // enough valleys: keep the `n_cuts` deepest, back in position order.
+        return vs.into_iter()
+            .sorted_by_key(|&p| widths[p])
+            .take(n_cuts)
+            .sorted()
+            .collect();
+    }
+
+    // too few valleys: every valley is a cut; spend the rest splitting the widest pieces evenly.
+    // `alloc[i]` is the number of pieces segment `i` is divided into.
+    let segs: Vec<(usize, usize)> = std::iter::once(0)
+        .chain(vs.iter().map(|&v| v + 1))
+        .chain(std::iter::once(n))
+        .tuple_windows()
+        .collect();
+
+    let alloc = (vs.len()..n_cuts).fold(vec![1usize; segs.len()], |mut alloc, _| {
+        let widest = (0..segs.len())
+            .max_by(|&a, &b| ((segs[a].1 - segs[a].0) * alloc[b]).cmp(&((segs[b].1 - segs[b].0) * alloc[a])))
+            .unwrap();
+        alloc[widest] += 1;
+        alloc
+    });
+
+    let even = segs.iter().zip(&alloc)
+        .flat_map(|(&(lo, hi), &a)| (1..a).map(move |j| lo + j * (hi - lo) / a - 1));
+    vs.into_iter().chain(even).sorted().collect()
+}

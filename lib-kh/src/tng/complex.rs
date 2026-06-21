@@ -249,6 +249,21 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.keys_of_deg(i).count()
     }
 
+    /// Whether the diagram is closed — every component is a circle (no open arc-ends).
+    pub fn is_closed(&self) -> bool {
+        self.iter_verts().next().is_none_or(|(_, v)| v.tng().is_closed())
+    }
+
+    /// Endpoints of the current tangle boundary.
+    pub fn boundary_ends(&self) -> impl Iterator<Item = Edge> + '_ {
+        self.iter_verts()
+            .next()
+            .into_iter()
+            .flat_map(|(_, v)| v.tng().comps())
+            .filter_map(|c| c.end_pts())
+            .flat_map(|(e0, e1)| [e0, e1])
+    }
+
     pub fn contains_key(&self, key: &TngComplexKey) -> bool { 
         self.vertices.contains_key(key)
     }
@@ -267,10 +282,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.keys_of(move |k| (k.weight() as isize) + i0 == i)
     }
 
-    pub fn vertex(&self, v: &TngComplexKey) -> &TngComplexVertex<R> { 
-        &self.vertices[v]
-    }
-
     pub fn n_verts(&self) -> usize {
         self.vertices.len()
     }
@@ -279,27 +290,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.vertices.values().map(|v| v.out_edges.len()).sum()
     }
 
-    /// Total stored cobordism weight: number of cob monomials summed over all edges.
-    pub(crate) fn cob_weight(&self) -> usize {
-        self.vertices.values()
-            .flat_map(|v| v.out_edges.values())
-            .map(|f| f.nterms())
-            .sum()
+    pub fn vertex(&self, v: &TngComplexKey) -> &TngComplexVertex<R> { 
+        &self.vertices[v]
     }
 
     pub fn iter_verts(&self) -> impl Iterator<Item = (&TngComplexKey, &TngComplexVertex<R>)> {
         self.vertices.iter()
-    }
-
-    /// Endpoints of the current tangle boundary. Same across all vertices
-    /// (they share the partial diagram), so we read it off any one vertex.
-    pub fn boundary_ends(&self) -> impl Iterator<Item = Edge> + '_ {
-        self.iter_verts()
-            .next()
-            .into_iter()
-            .flat_map(|(_, v)| v.tng().comps())
-            .filter_map(|c| c.end_pts())
-            .flat_map(|(e0, e1)| [e0, e1])
     }
 
     pub fn add_vertex(&mut self, k: TngComplexKey, v: TngComplexVertex<R>) {
@@ -546,27 +542,26 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     ///
     /// Orthogonality follows from `ε(X) = ε(Y) = 1`, `ε(1) = 0`, `XY = t·1`.
     /// For the base-pointed (reduced) variant only the `X` summand is kept.
-    pub fn deloop(&mut self, k: &TngComplexKey, r: usize) -> Vec<TngComplexKey> {
-        let c = self.vertex(k).tng.comp(r);
+    pub fn deloop(&mut self, k: &TngComplexKey, c: &TngComp) -> Vec<TngComplexKey> {
         debug_assert!(c.is_circle());
-        
+
         #[allow(non_snake_case)]
-        let updated_keys = if c.is_marked() { 
+        let updated_keys = if c.is_marked() {
             let k_X = k + KhAlgGen::X;
 
             self.rename_vertex_key(k, k_X);
-            self.deloop_with(&k_X, r, Dot::X, Dot::None);
+            self.deloop_with(&k_X, c, Some(Dot::X), None);
 
             vec![k_X]
-        } else { 
+        } else {
             let k_X = k + KhAlgGen::X;
             let k_1 = k + KhAlgGen::I;
 
             self.rename_vertex_key(k, k_X);
             self.duplicate_vertex(&k_X, k_1);
 
-            self.deloop_with(&k_X, r, Dot::X, Dot::None);
-            self.deloop_with(&k_1, r, Dot::None, Dot::Y);
+            self.deloop_with(&k_X, c, Some(Dot::X), None);
+            self.deloop_with(&k_1, c, None, Some(Dot::Y));
 
             vec![k_X, k_1]
         };
@@ -574,19 +569,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         updated_keys
     }
 
-    fn deloop_with(&mut self, k: &TngComplexKey, r: usize, birth_dot: Dot, death_dot: Dot) {
+    fn deloop_with(&mut self, k: &TngComplexKey, c: &TngComp, birth_dot: Option<Dot>, death_dot: Option<Dot>) {
         let (h, t) = self.ht.clone();
 
         // own the vertex so its in/out edge lists are walked without cloning, and the outgoing
         // cobs (which live in v) are capped in place; a cob that reduces to 0 drops its edge.
         let mut v = self.vertices.remove(k).unwrap();
-        let circ = v.tng.remove_at(r);
+        v.tng.remove(c);
 
         // cap incoming cobs (j → k); cobs live in the sources.
         v.in_edges.retain(|j| {
             let u = self.vertices.get_mut(j).unwrap();
             let f = std::mem::take(u.out_edges.get_mut(k).unwrap())
-                .cap_off(End::Tgt, &circ, death_dot).reduce(&h, &t);
+                .cap_off(End::Tgt, c, death_dot).reduce(&h, &t);
             let keep = !f.is_zero();
             if keep { u.out_edges.insert(*k, f); } else { u.out_edges.remove(k); }
             keep
@@ -594,7 +589,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         // cup outgoing cobs (k → l); cobs owned in v, so cap in place and drop l's back-ref on 0.
         v.out_edges.retain(|l, f| {
-            let g = std::mem::take(f).cap_off(End::Src, &circ, birth_dot).reduce(&h, &t);
+            let g = std::mem::take(f).cap_off(End::Src, c, birth_dot).reduce(&h, &t);
             let keep = !g.is_zero();
             if keep { *f = g; } else { self.vertices.get_mut(l).unwrap().in_edges.remove(k); }
             keep
@@ -856,6 +851,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         format!("(n: {}, v: {}, e: {}, w: {})", self.dim(), self.n_verts(), self.n_edges(), self.cob_weight())
     }
 
+    /// Total stored cobordism weight: number of cob monomials summed over all edges.
+    fn cob_weight(&self) -> usize {
+        self.vertices.values()
+            .flat_map(|v| v.out_edges.values())
+            .map(|f| f.nterms())
+            .sum()
+    }
+
     pub(crate) fn convert_edges<F>(&self, f: F) -> Self
     where F: Fn(Edge) -> Edge {
         let (h, t) = self.ht();
@@ -941,7 +944,8 @@ mod tests {
         assert_eq!(c.rank(0), 1);
 
         let k = TngComplexKey::init();
-        let updated = c.deloop(&k, 0);
+        let circ = *c.vertex(&k).tng().comp(0);
+        let updated = c.deloop(&k, &circ);
 
         assert_eq!(c.dim(), 0);
         assert_eq!(c.rank(0), 2);
@@ -976,11 +980,10 @@ mod tests {
             state: State::from([1,0]), 
             label: KhTensor::from_iter([])
         };
-        let r = 2;
+        let circ = *c.vertex(&k).tng().comp(2);
+        assert!(circ.is_circle());
 
-        assert!(c.vertex(&k).tng().comp(r).is_circle());
-
-        let updated = c.deloop(&k, r);
+        let updated = c.deloop(&k, &circ);
 
         assert_eq!(c.dim(), 2);
         assert_eq!(c.rank(0), 1);
@@ -1009,7 +1012,8 @@ mod tests {
         assert_eq!(c.rank(0), 1);
 
         let k = TngComplexKey::init();
-        let updated = c.deloop(&k, 0);
+        let circ = *c.vertex(&k).tng().comp(0);
+        let updated = c.deloop(&k, &circ);
 
         assert_eq!(c.dim(), 0);
         assert_eq!(c.rank(0), 1);

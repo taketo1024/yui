@@ -8,6 +8,7 @@ use yui_core::TeX;
 use yui_core::{Ring, RingOps};
 use yui_homology::ToTableString;
 use yui_kh::kh::KhComplex;
+use yui_kh::tng::builder::BuildConfig;
 
 pub fn dispatch(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
     dispatch_ring!(App, boot, args)
@@ -43,6 +44,9 @@ pub struct Args {
 
     #[arg(long, value_parser = parse_h_range)]
     pub h_range: Option<RangeInclusive<isize>>,
+
+    #[arg(long)]
+    pub chunks: Option<usize>,
 
     #[arg(long, default_value = "0")]
     pub log: u8,
@@ -94,7 +98,8 @@ where
         let ckh = if self.args.no_simplify {
             KhComplex::new_no_simplify(&l, &h, &t, self.args.reduced)
         } else {
-            KhComplex::new_partial(&l, &h, &t, self.args.reduced, self.args.h_range.clone())
+            let config = BuildConfig { h_range: self.args.h_range.clone(), chunks: self.args.chunks, ..Default::default() };
+            KhComplex::new_with_config(&l, &h, &t, self.args.reduced, config)
         };
         
         // CKh generators

@@ -97,7 +97,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         if t.is_zero() && l.is_knot() {
             let canon = TngComplexElem::canon_cycles(l, base_pt);
-            b.set_elements(canon);
+            b.elements_mut().set(canon);
         }
 
         b
@@ -158,15 +158,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn set_loops<I>(&mut self, loops: I)
     where I: IntoIterator<Item = Edge> {
         self.loops = loops.into_iter().collect_vec();
-    }
-
-    pub fn set_elements<I>(&mut self, elements: I)
-    where I: IntoIterator<Item = TngComplexElem<R>> {
-        self.elements.set(elements);
-    }
-
-    pub(crate) fn take_elements(&mut self) -> Vec<TngComplexElem<R>> {
-        self.elements.take()
     }
 
     pub(crate) fn elements(&self) -> &TngElemBuilder<R> {
@@ -604,7 +595,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         info!("{step} build chunk (n: {}, nb: {} {:?}): {}", chunk.len(), ends.len(), ends, chunk.iter().join(", "));
 
         let mut child = self.child_builder(chunk).run();
-        let elems = child.take_elements();
+        let elems = child.elements_mut().take();
         let c = child.into_tng_complex();
         info!("{step} chunk built: {}", c.stat());
         (c, elems)
@@ -617,7 +608,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let base_pt = self.builder.complex.base_pt();
         let mut child = TngComplexBuilder::init(h, t, (0, 0), base_pt);
         child.set_nodes(chunk.iter().cloned());
-        child.set_elements(self.builder.elements().clone_elements());
+        child.elements_mut().set(self.builder.elements().clone_elements());
 
         // cap the child to the chunk's reachable band: a chunk vertex of weight
         // > b - deg_shift.0 can never reach the window (weight only grows).

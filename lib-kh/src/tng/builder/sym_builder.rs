@@ -166,7 +166,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         to self.inner {
             pub fn complex(&self) -> &TngComplex<R>;
             fn complex_mut(&mut self) -> &mut TngComplex<R>;
-            pub fn set_elements<I>(&mut self, elements: I) where I: IntoIterator<Item = TngComplexElem<R>>;
             pub fn nodes(&self) -> &[Node];
             pub fn n_nodes(&self) -> usize;
             fn drop_nodes<F>(&mut self, pred: F) where F: Fn(&Node) -> bool;
@@ -828,7 +827,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let child = self.child_builder(chunk).run();
         let SymTngBuilder { key_map, mut inner, .. } = child;
-        let elems = inner.take_elements();
+        let elems = inner.elements_mut().take();
         let c = inner.into_tng_complex();
         info!("{step} chunk built: {}", c.stat());
         (c, key_map, elems)
@@ -842,7 +841,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let mut inner = TngComplexBuilder::init(h, t, (0, 0), base_pt)
             .with_config(BuildConfig { mode: BuildMode::None, chunks: None, node_order: NodeOrder::MinCut, h_range: None });
         inner.set_nodes(chunk.iter().cloned());
-        inner.set_elements(self.builder.inner.elements().clone_elements());
+        inner.elements_mut().set(self.builder.inner.elements().clone_elements());
 
         // cap the child to the chunk's reachable band: a chunk vertex of weight
         // > b - deg_shift.0 can never reach the window (weight only grows).
@@ -873,7 +872,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn build(&mut self) {
         assert_eq!(self.builder.inner.complex().dim(), 0, "must start from init state.");
 
-        let elements = self.builder.inner.take_elements();
+        let elements = self.builder.inner.elements_mut().take();
         let (half, t_half) = self.partition_off_axis();
 
         info!("{} preprocess off-axis: {} + {}", self.builder.current_step(), half.len(), t_half.len());
@@ -885,7 +884,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.merge_half(&t_half, tc);
 
         self.builder.key_map = key_map;
-        self.builder.inner.set_elements(elements);
+        self.builder.inner.elements_mut().set(elements);
 
         info!("{} preprocess done: {}", self.builder.current_step(), self.builder.stat());
     }
@@ -937,13 +936,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let mut b = self.half_builder();
         b.set_nodes(crossings.iter().cloned());
-        b.set_elements(elements);
+        b.elements_mut().set(elements);
         b.process_nodes();
 
         info!("{} half complex built: {}", self.builder.current_step(), b.stat());
 
         let keys = b.complex().keys().cloned().collect_vec();
-        let mut elements = b.take_elements();
+        let mut elements = b.elements_mut().take();
 
         let c = b.into_tng_complex();
         debug!("  mirror half via τ...");

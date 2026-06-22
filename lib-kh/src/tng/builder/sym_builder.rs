@@ -202,7 +202,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn process_chunks(&mut self) {
-        ChunkBuilder::run(self);
+        let chunks = ChunkBuilder { builder: self }.build_chunks();
+        for (chunk, (c, key_map, elems)) in chunks {
+            self.drop_nodes(|x| chunk.contains(x));
+            self.merge(c, key_map, elems);
+            info!("{} chunk merged: {}", self.current_step(), self.stat());
+        }
     }
 
     fn preprocess(&mut self) {
@@ -776,28 +781,22 @@ impl fmt::Display for SymBuildProfile {
 /// parent — so the parent never materializes the full dense slice.
 struct ChunkBuilder<'a, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    builder: &'a mut SymTngBuilder<R>,
+    builder: &'a SymTngBuilder<R>,
 }
 
 impl<'a, R> ChunkBuilder<'a, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn run(builder: &'a mut SymTngBuilder<R>) {
-        Self { builder }.build();
-    }
-
-    // Plan k chunks up front, then build each reduced chunk and merge it into the parent.
-    fn build(&mut self) {
+    // Plan k chunks up front and build each into a reduced sub-complex, paired with the crossings
+    // it covers. Building is independent of the parent, so the caller merges them afterwards.
+    fn build_chunks(&self) -> Vec<(Vec<Node>, (TngComplex<R>, TauKeyMap, Vec<TngComplexElem<R>>))> {
         let plan = self.plan();
         info!("{} chunk plan: {} pieces {:?}", self.builder.current_step(), plan.len(),
             plan.iter().map(|c| c.len()).collect_vec());
 
-        // build every chunk first (each is independent of the parent state), then merge them in.
-        let built: Vec<(TngComplex<R>, TauKeyMap, Vec<TngComplexElem<R>>)> = plan.iter().map(|chunk| self.build_chunk(chunk)).collect();
-        for (chunk, (c, key_map, elems)) in plan.into_iter().zip(built) {
-            self.builder.drop_nodes(|x| chunk.contains(x));
-            self.builder.merge(c, key_map, elems);
-            info!("{} chunk merged: {}", self.builder.current_step(), self.builder.stat());
-        }
+        plan.into_iter().map(|chunk| {
+            let built = self.build_chunk(&chunk);
+            (chunk, built)
+        }).collect()
     }
 
     // Partition the crossings into `chunks` pieces at the deepest cutwidth valleys of the MinCut

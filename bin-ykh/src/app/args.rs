@@ -123,7 +123,7 @@ pub fn parse_node_order(s: &str) -> Result<NodeOrder, String> {
     }
 }
 
-// parse a manual cut as a comma-separated edge list `e,e,e`.
+// parse manual cuts as `;`-separated edge lists (each `e,e,e`); severed together as one edge set.
 pub fn parse_cut(s: &str) -> Result<Vec<Edge>, String> {
-    s.split(',').map(|e| e.trim().parse::<Edge>().map_err(|err| format!("`{e}`: {err}"))).collect()
+    s.split([';', ',']).map(|e| e.trim().parse::<Edge>().map_err(|err| format!("`{e}`: {err}"))).collect()
 }

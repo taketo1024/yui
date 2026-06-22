@@ -64,7 +64,7 @@ pub struct Args {
     #[arg(long)]
     pub cone_cob: bool,
 
-    // manual τ-symmetric edge-cut `e,e,e` to chunk at (repeatable; overrides cutwidth chunking).
+    // manual τ-symmetric edge-cut(s) `e,e,e;e,e,e` to chunk at (repeatable; overrides cutwidth chunking).
     #[arg(long, value_parser = parse_cut)]
     pub cut: Vec<Vec<Edge>>,
 

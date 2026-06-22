@@ -838,15 +838,36 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             .collect()
     }
 
-    // Manual cut: validate, sever the cut edges, return the resulting node-pieces (no reordering — a
-    // single cut yields ≤2 pieces, for which `merge_order` would be a no-op).
+    // Manual cut: validate, sever the cut edges, order the resulting pieces for thin-interface merging.
     fn manual_plan(&self, cut: &[Edge]) -> Vec<Vec<Node>> {
         let cut: FxHashSet<Edge> = cut.iter().copied().collect();
         self.validate_cut(&cut);
         let nodes = self.builder.nodes();
-        self.cut_components(&cut).into_iter()
+        self.merge_order(self.cut_components(&cut)).into_iter()
             .map(|piece| piece.into_iter().map(|i| nodes[i].clone()).collect())
             .collect()
+    }
+
+    // Order pieces so each merges behind a thin interface (exhaustive ≤8 pieces, greedy beyond).
+    fn merge_order(&self, pieces: Vec<Vec<usize>>) -> Vec<Vec<usize>> {
+        let k = pieces.len();
+        if k <= 2 {
+            return pieces;
+        }
+        let ends: Vec<FxHashSet<Edge>> = pieces.iter().map(|c| self.chunk_ends(c).into_iter().collect()).collect();
+        let order = if k <= 8 {
+            (0..k).permutations(k).min_by_key(|o| interface_profile(o, &ends)).unwrap()
+        } else {
+            greedy_merge_order(&ends)
+        };
+        order.into_iter().map(|i| pieces[i].clone()).collect()
+    }
+
+    // Boundary edges of a node-index piece — its merge interface (edges with one endpoint inside).
+    fn chunk_ends(&self, piece: &[usize]) -> Vec<Edge> {
+        let nodes = self.builder.nodes();
+        let subset: Vec<&Node> = piece.iter().map(|&i| &nodes[i]).collect();
+        boundary_edges(&subset).into_iter().sorted().collect()
     }
 
     // A cut must be τ-symmetric (closed under `inv_edge`), separate the link into ≥2 pieces,
@@ -933,6 +954,37 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let real_top = inner.complex().deg_shift().0 + chunk.len() as isize; // child deg_shift = 0
         SymTngBuilder { inner, x_map: self.builder.x_map.clone(), e_map: self.builder.e_map.clone(), key_map, config, real_top }
     }
+}
+
+// Sorted-descending shared-edge counts as each piece merges in `order` (0 = disjoint → worst).
+// Compared lexicographically to pick the order whose merges share the most boundary throughout.
+fn interface_profile(order: &[usize], ends: &[FxHashSet<Edge>]) -> Vec<usize> {
+    let mut acc = ends[order[0]].clone();
+    let mut ifs: Vec<usize> = order[1..].iter().map(|&i| {
+        let shared = ends[i].iter().filter(|e| acc.contains(e)).count();
+        ends[i].iter().for_each(|&e| if !acc.remove(&e) { acc.insert(e); });
+        if shared == 0 { usize::MAX } else { shared }
+    }).collect();
+    ifs.sort_unstable_by(|a, b| b.cmp(a));
+    ifs
+}
+
+// Greedy merge order for >8 pieces: seed at the thinnest boundary, then always append the piece
+// sharing the most edges with the accumulated frontier.
+fn greedy_merge_order(ends: &[FxHashSet<Edge>]) -> Vec<usize> {
+    let seed = (0..ends.len()).min_by_key(|&i| ends[i].len()).unwrap();
+    let mut remaining: Vec<usize> = (0..ends.len()).filter(|&i| i != seed).collect();
+    let mut acc = ends[seed].clone();
+    let mut order = vec![seed];
+    while !remaining.is_empty() {
+        let pick = remaining.iter().copied()
+            .min_by_key(|&i| match ends[i].iter().filter(|e| acc.contains(e)).count() { 0 => usize::MAX, s => s })
+            .unwrap();
+        remaining.retain(|&i| i != pick);
+        ends[pick].iter().for_each(|&e| if !acc.remove(&e) { acc.insert(e); });
+        order.push(pick);
+    }
+    order
 }
 
 /// Builds the off-axis part of a [`SymTngBuilder`] by τ-symmetry: build one

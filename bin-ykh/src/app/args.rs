@@ -1,6 +1,7 @@
 use std::ops::RangeInclusive;
 use clap::ValueEnum;
 use derive_more::Display;
+use yui_link::Edge;
 use yui_kh::tng::builder::{BuildMode, NodeOrder};
 
 pub trait AppArgs { 
@@ -120,4 +121,9 @@ pub fn parse_node_order(s: &str) -> Result<NodeOrder, String> {
         "given"                      => Ok(NodeOrder::Given),
         _ => Err(format!("invalid node order `{s}`, expected min-cut|given")),
     }
+}
+
+// parse a manual cut as a comma-separated edge list `e,e,e`.
+pub fn parse_cut(s: &str) -> Result<Vec<Edge>, String> {
+    s.split(',').map(|e| e.trim().parse::<Edge>().map_err(|err| format!("`{e}`: {err}"))).collect()
 }

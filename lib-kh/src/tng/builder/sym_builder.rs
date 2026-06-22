@@ -42,11 +42,13 @@ pub struct SymBuildConfig {
     pub h_range: Option<RangeInclusive<isize>>,
     // temporary A/B switch: build KhI as the cobordism-level cone (ConeBuilder) instead of the matrix cone.
     pub cone_cob: bool,
+    // manual τ-symmetric edge-cut: sever these edges and chunk at the resulting pieces (overrides cutwidth).
+    pub cut: Option<Vec<Edge>>,
 }
 
 impl Default for SymBuildConfig {
     fn default() -> Self {
-        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, chunks: None, h_range: None, cone_cob: false }
+        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, chunks: None, h_range: None, cone_cob: false, cut: None }
     }
 }
 
@@ -195,7 +197,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn run(mut self) -> Self {
         info!("build config:\n{:#?}", self.config);
         info!("cutwidth profile:\n{}", self.profile_sym());
-        if self.config.chunks.is_some() {
+        if self.config.chunks.is_some() || self.config.cut.is_some() {
             self.process_chunks();
         } else {
             if self.config.preprocess {
@@ -819,6 +821,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // order. Each piece is τ-closed (τ-units stay whole) and contiguous in that order, so merging
     // them in sequence keeps a thin interface at every step.
     pub(crate) fn plan(&self) -> Vec<Vec<Node>> {
+        if let Some(cut) = &self.builder.config.cut {
+            return self.manual_plan(cut);
+        }
         let prof = self.builder.profile_sym();
         let k = self.builder.config.chunks.unwrap_or(1).max(1);
         let nodes = self.builder.inner.nodes();
@@ -831,6 +836,65 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             .map(|(s, e)| prof.order[s..e].iter().flatten().map(|&i| nodes[i].clone()).collect())
             .filter(|c: &Vec<Node>| !c.is_empty())
             .collect()
+    }
+
+    // Manual cut: validate, sever the cut edges, return the resulting node-pieces (no reordering — a
+    // single cut yields ≤2 pieces, for which `merge_order` would be a no-op).
+    fn manual_plan(&self, cut: &[Edge]) -> Vec<Vec<Node>> {
+        let cut: FxHashSet<Edge> = cut.iter().copied().collect();
+        self.validate_cut(&cut);
+        let nodes = self.builder.nodes();
+        self.cut_components(&cut).into_iter()
+            .map(|piece| piece.into_iter().map(|i| nodes[i].clone()).collect())
+            .collect()
+    }
+
+    // A cut must be τ-symmetric (closed under `inv_edge`), separate the link into ≥2 pieces,
+    // and leave each piece τ-invariant (so the sym build can pair `x` with `τx` inside it).
+    fn validate_cut(&self, cut: &FxHashSet<Edge>) {
+        for &e in cut {
+            assert!(cut.contains(&self.builder.inv_edge(e)), "cut not τ-symmetric: τ-image of edge {e} missing");
+        }
+        let comps = self.cut_components(cut);
+        assert!(comps.len() >= 2, "cut does not separate the link into ≥2 pieces");
+
+        let nodes = self.builder.nodes();
+        let idx_of: FxHashMap<Node, usize> = nodes.iter().enumerate().map(|(i, x)| (x.clone(), i)).collect();
+        for comp in &comps {
+            let set: FxHashSet<usize> = comp.iter().copied().collect();
+            let tau_in = comp.iter().all(|&i| set.contains(&idx_of[self.builder.inv_node(&nodes[i])]));
+            assert!(tau_in, "a cut piece is not τ-invariant (τ maps it outside)");
+        }
+    }
+
+    // Crossing components after severing the `cut` edges (BFS over non-cut shared edges).
+    fn cut_components(&self, cut: &FxHashSet<Edge>) -> Vec<Vec<usize>> {
+        let nodes = self.builder.nodes();
+        let mut by_edge: FxHashMap<Edge, Vec<usize>> = FxHashMap::default();
+        for (i, x) in nodes.iter().enumerate() {
+            for &e in x.edges() {
+                if !cut.contains(&e) { by_edge.entry(e).or_default().push(i); }
+            }
+        }
+        let mut seen = vec![false; nodes.len()];
+        let mut comps = vec![];
+        for start in 0..nodes.len() {
+            if seen[start] { continue }
+            seen[start] = true;
+            let mut stack = vec![start];
+            let mut comp = vec![];
+            while let Some(i) = stack.pop() {
+                comp.push(i);
+                for &e in nodes[i].edges() {
+                    if cut.contains(&e) { continue }
+                    for &j in by_edge.get(&e).into_iter().flatten() {
+                        if !seen[j] { seen[j] = true; stack.push(j); }
+                    }
+                }
+            }
+            comps.push(comp);
+        }
+        comps
     }
 
     // Build `chunk` into a reduced sub-complex via a child builder, returning it with its τ

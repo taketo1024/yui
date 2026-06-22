@@ -67,7 +67,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // The cutwidth partition when `chunks` is set, else a degenerate split of the first τ-unit off
     // the rest — so even the non-chunked knot is closed by one incremental `cone_merge`.
     fn plan(&self) -> Vec<Vec<Node>> {
-        if self.inner.config().chunks.is_some() {
+        if self.inner.config().chunks.is_some() || self.inner.config().cut.is_some() {
             return ChunkBuilder { builder: &self.inner }.plan();
         }
         let x = self.inner.choose_next_node().expect("a crossing to split off").clone();

@@ -6,7 +6,7 @@ use yui_core::{EucRing, EucRingOps};
 use yui_homology::{ToSeqString, ToTableString};
 use yui_kh::khi::{KhIChain, KhIHomology};
 use yui_kh::tng::builder::{SymBuildConfig, BuildMode, NodeOrder};
-use yui_link::InvLink;
+use yui_link::{InvLink, Edge};
 use crate::app::args::*;
 use crate::app::utils::*;
 use crate::app::err::*;
@@ -63,6 +63,10 @@ pub struct Args {
     // temporary A/B: build KhI as the cobordism-level cone (no canon cycles → no ssi/alpha).
     #[arg(long)]
     pub cone_cob: bool,
+
+    // manual τ-symmetric edge-cut `e,e,e` to chunk at (repeatable; overrides cutwidth chunking).
+    #[arg(long, value_parser = parse_cut)]
+    pub cut: Vec<Vec<Edge>>,
 
     #[arg(short, long, default_value = "unicode")]
     pub format: Format,
@@ -133,6 +137,7 @@ where
                 node_order: self.args.node_order,
                 preprocess: !self.args.no_preprocess,
                 cone_cob: self.args.cone_cob,
+                cut: (!self.args.cut.is_empty()).then(|| self.args.cut.concat()),
                 ..Default::default()
             };
             KhIHomology::new_with_config(&l, &h, &t, self.args.reduced, config)

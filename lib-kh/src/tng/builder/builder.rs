@@ -125,11 +125,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self
     }
 
+    pub(crate) fn from_tng_complex(complex: TngComplex<R>, config: BuildConfig) -> Self {
+        Self { complex, nodes: vec![], loops: vec![], elements: TngElemBuilder::new(), config }
+    }
+
+    pub fn config(&self) -> &BuildConfig {
+        &self.config
+    }
+
     pub fn complex(&self) -> &TngComplex<R> {
         &self.complex
     }
 
-    pub(crate) fn complex_mut(&mut self) -> &mut TngComplex<R> { 
+    pub(crate) fn complex_mut(&mut self) -> &mut TngComplex<R> {
         &mut self.complex
     }
 
@@ -357,11 +365,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    fn deloop_in(&mut self, i: isize) {
+    pub(crate) fn deloop_in(&mut self, i: isize) {
         self.deloop_in_with(i, false);
     }
 
-    fn deloop_in_with(&mut self, i: isize, allow_based: bool) {
+    pub(crate) fn deloop_in_with(&mut self, i: isize, allow_based: bool) {
         let mut keys = self.collect_keys(i,
             |k| self.find_loop_in(k, allow_based).is_some(),
             |k| self.complex.vertex(k).c_weight(),
@@ -404,6 +412,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             added.retain(|k| !self.try_eliminate_at(k));
         }
         added
+    }
+
+    pub(crate) fn eliminate_all(&mut self) {
+        for i in self.complex.h_range() {
+            self.eliminate_in(i);
+        }
     }
 
     pub(crate) fn eliminate_in(&mut self, i: isize) {

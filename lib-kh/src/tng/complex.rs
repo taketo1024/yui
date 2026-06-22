@@ -161,7 +161,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> TngComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn new(h: &R, t: &R, deg_shift: (isize, isize), base_pt: Option<Edge>, dim: usize, vertices: FxHashMap<TngComplexKey, TngComplexVertex<R>>) -> Self { 
+    pub(crate) fn new(h: &R, t: &R, deg_shift: (isize, isize), base_pt: Option<Edge>, dim: usize, vertices: FxHashMap<TngComplexKey, TngComplexVertex<R>>) -> Self {
         let ht = (h.clone(), t.clone());
         TngComplex{ ht, deg_shift, base_pt, dim, vertices }
     }

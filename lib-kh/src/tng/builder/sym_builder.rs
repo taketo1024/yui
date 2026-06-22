@@ -928,7 +928,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let s = self.builder.inner.complex().deg_shift().0;
             0 ..= (*r.end() - s).max(0)
         });
-        let config = SymBuildConfig { chunks: None, node_order: NodeOrder::MinCut, h_range, ..self.builder.config.clone() };
+        let config = SymBuildConfig { chunks: None, cut: None, node_order: NodeOrder::MinCut, h_range, ..self.builder.config.clone() };
         let key_map = TauKeyMap::init();
         let real_top = inner.complex().deg_shift().0 + chunk.len() as isize; // child deg_shift = 0
         SymTngBuilder { inner, x_map: self.builder.x_map.clone(), e_map: self.builder.e_map.clone(), key_map, config, real_top }

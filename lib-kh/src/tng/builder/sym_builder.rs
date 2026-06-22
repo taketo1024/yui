@@ -40,11 +40,13 @@ pub struct SymBuildConfig {
     pub chunks: Option<usize>,
     // literal truncation: homology at the endpoints is wrong (build `(a-1)..=(b+1)` for correct `[a, b]`).
     pub h_range: Option<RangeInclusive<isize>>,
+    // temporary A/B switch: build KhI as the cobordism-level cone (ConeBuilder) instead of the matrix cone.
+    pub cone_cob: bool,
 }
 
 impl Default for SymBuildConfig {
     fn default() -> Self {
-        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, chunks: None, h_range: None }
+        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, chunks: None, h_range: None, cone_cob: false }
     }
 }
 

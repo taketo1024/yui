@@ -414,12 +414,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         added
     }
 
-    pub(crate) fn eliminate_all(&mut self) {
-        for i in self.complex.h_range() {
-            self.eliminate_in(i);
-        }
-    }
-
     pub(crate) fn eliminate_in(&mut self, i: isize) {
         let mut keys = self.collect_keys(i,
             |k| self.complex.vertex(k).out_edges().any(|l|

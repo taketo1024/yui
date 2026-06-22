@@ -206,7 +206,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn process_chunks(&mut self) {
-        let chunks = ChunkBuilder { builder: self }.build_chunks();
+        let cb = ChunkBuilder { builder: self };
+        let chunks = cb.build_chunks(cb.plan());
         for (chunk, (c, key_map, elems)) in chunks {
             self.drop_nodes(|x| chunk.contains(x));
             self.merge(c, key_map, elems);
@@ -232,7 +233,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     /// Pick the next τ-unit by node order, ties broken by earliest crossing order.
-    fn choose_next_node(&self) -> Option<&Node> {
+    pub(crate) fn choose_next_node(&self) -> Option<&Node> {
         self.nodes().iter().enumerate()
             .min_by_key(|(i, x)| {
                 let score = match self.config.node_order {
@@ -699,15 +700,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &mut self.key_map
     }
 
-    pub(crate) fn e_map(&self) -> &FxHashMap<Edge, Edge> {
-        &self.e_map
-    }
-
-    fn inv_node(&self, x: &Node) -> &Node {
+    pub(crate) fn inv_node(&self, x: &Node) -> &Node {
         &self.x_map[x]
     }
 
-    fn inv_edge(&self, e: Edge) -> Edge { 
+    pub(crate) fn inv_edge(&self, e: Edge) -> Edge {
         self.e_map[&e]
     }
 
@@ -804,10 +801,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<'a, R> ChunkBuilder<'a, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    // Plan k chunks up front and build each into a reduced sub-complex, paired with the crossings
-    // it covers. Building is independent of the parent, so the caller merges them afterwards.
-    pub(crate) fn build_chunks(&self) -> Vec<(Vec<Node>, (TngComplex<R>, TauKeyMap, Vec<TngComplexElem<R>>))> {
-        let plan = self.plan();
+    // Build each piece of `plan` into a reduced sub-complex, paired with the crossings it covers.
+    // Building is independent of the parent, so the caller merges them afterwards.
+    pub(crate) fn build_chunks(&self, plan: Vec<Vec<Node>>) -> Vec<(Vec<Node>, (TngComplex<R>, TauKeyMap, Vec<TngComplexElem<R>>))> {
         info!("{} chunk plan: {} pieces {:?}", self.builder.current_step(), plan.len(),
             plan.iter().map(|c| c.len()).collect_vec());
 
@@ -820,7 +816,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // Partition the crossings into `chunks` pieces at the deepest cutwidth valleys of the MinCut
     // order. Each piece is τ-closed (τ-units stay whole) and contiguous in that order, so merging
     // them in sequence keeps a thin interface at every step.
-    fn plan(&self) -> Vec<Vec<Node>> {
+    pub(crate) fn plan(&self) -> Vec<Vec<Node>> {
         let prof = self.builder.profile_sym();
         let k = self.builder.config.chunks.unwrap_or(1).max(1);
         let nodes = self.builder.inner.nodes();

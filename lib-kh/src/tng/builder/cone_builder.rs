@@ -17,7 +17,7 @@ use itertools::Itertools;
 use num_traits::Zero;
 use yui_core::bitseq::Bit;
 use yui_core::{Ring, RingOps};
-use yui_link::{Edge, InvLink};
+use yui_link::{Edge, Node, InvLink};
 
 use crate::tng::{Cob, CobComp, LcCob, Tng, TngComplex, TngComplexKey, TngComplexVertex};
 use super::{reachable_range, ChunkBuilder, SymTngBuilder, SymBuildConfig, TngComplexBuilder, BuildConfig, BuildMode, TauKeyMap};
@@ -25,13 +25,15 @@ use super::{reachable_range, ChunkBuilder, SymTngBuilder, SymBuildConfig, TngCom
 pub struct ConeBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     inner: SymTngBuilder<R>,
-    cone: Option<TngComplex<R>>,
+    cone: TngComplexBuilder<R>, // the reduced cone, filled in by the final `cone_merge`
 }
 
 impl<R> ConeBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn from_inv_link(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self {
-        Self { inner: SymTngBuilder::from_inv_link(l, h, t, reduced), cone: None }
+        let inner = SymTngBuilder::from_inv_link(l, h, t, reduced);
+        let cone = TngComplexBuilder::init(h, t, (0, 0), None); // replaced by `cone_merge`
+        Self { inner, cone }
     }
 
     pub fn with_config(mut self, config: SymBuildConfig) -> Self {
@@ -39,88 +41,126 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self
     }
 
+    // Build the reduced chunks, merge all but the last normally, and close with the incremental
+    // cone merge. The non-chunked case is just a degenerate plan (see `plan`).
     pub fn run(mut self) -> Self {
-        let cone = if self.inner.config().chunks.is_some() {
-            self.run_chunked()
-        } else {
-            self.run_whole()
-        };
-        self.cone = Some(cone);
-        self
-    }
-
-    pub fn into_tng_complex(self) -> TngComplex<R> {
-        self.cone.expect("`run` must be called before `into_tng_complex`")
-    }
-
-    // Non-chunked: build the symmetric complex, double it whole, then reduce.
-    fn run_whole(&mut self) -> TngComplex<R> {
-        if self.inner.config().preprocess {
-            self.inner.preprocess();
-        }
-        self.inner.process_nodes();
-
+        let plan = self.plan();
         let mode = self.inner.config().mode;
-        let cone = {
-            let key_map = self.inner.key_map().clone();
-            let e_map = self.inner.e_map().clone();
-            make_cone(self.inner.complex(), &|k| *key_map.inv_key(k), &|e| e_map[&e])
-        };
-        reduce(cone, mode)
-    }
-
-    // Chunked: build the reduced chunks, merge all but the last normally, and close with the
-    // incremental cone merge.
-    fn run_chunked(&mut self) -> TngComplex<R> {
-        let mode = self.inner.config().mode;
-        let e_map = self.inner.e_map().clone();
-        let inv_edge = |e: Edge| e_map[&e];
-        let chunks = ChunkBuilder { builder: &self.inner }.build_chunks();
+        let chunks = ChunkBuilder { builder: &self.inner }.build_chunks(plan);
         let last = chunks.len().saturating_sub(1);
 
-        let mut cone = None;
         for (i, (chunk, (c, key_map, elems))) in chunks.into_iter().enumerate() {
             self.inner.drop_nodes(|x| chunk.contains(x));
             if i == last {
-                cone = Some(self.cone_merge(c, key_map, &inv_edge, mode));
+                self.cone_merge(c, key_map, mode);
             } else {
                 self.inner.merge(c, key_map, elems);
             }
         }
-        cone.expect("at least one chunk")
+        self
+    }
+
+    pub fn into_tng_complex(self) -> TngComplex<R> {
+        self.cone.into_tng_complex()
+    }
+
+    // The cutwidth partition when `chunks` is set, else a degenerate split of the first τ-unit off
+    // the rest — so even the non-chunked knot is closed by one incremental `cone_merge`.
+    fn plan(&self) -> Vec<Vec<Node>> {
+        if self.inner.config().chunks.is_some() {
+            return ChunkBuilder { builder: &self.inner }.plan();
+        }
+        let x = self.inner.choose_next_node().expect("a crossing to split off").clone();
+        let tx = self.inner.inv_node(&x).clone();
+        let unit = if tx == x { vec![x] } else { vec![x, tx] };
+        let rest: Vec<Node> = self.inner.nodes().iter().filter(|n| !unit.contains(n)).cloned().collect();
+        if rest.is_empty() { vec![unit] } else { vec![unit, rest] }
     }
 
     // Fuse the final merge with cone construction + reduction. Per symmetric degree: merge the slice,
     // cone-ify it, then collapse the invertible `1`-edges two degrees behind (so `cone_extend` has
     // moved past the degree being removed). Delooping is deferred to the end, on the small survivors.
-    fn cone_merge<G>(&mut self, other: TngComplex<R>, other_map: TauKeyMap, inv_edge: &G, mode: BuildMode) -> TngComplex<R>
-    where G: Fn(Edge) -> Edge {
+    fn cone_merge(&mut self, other: TngComplex<R>, other_map: TauKeyMap, mode: BuildMode) {
         let left_map = std::mem::take(self.inner.key_map_mut());
         let (left, right) = self.inner.complex_mut().prepare_merge(other);
         let range = reachable_range(self.inner.complex().h_range(), &self.inner.config().h_range, self.inner.n_nodes());
-        let mut cone = TngComplexBuilder::from_tng_complex(cone_shell(self.inner.complex()), BuildConfig { mode, ..Default::default() });
+        self.cone = TngComplexBuilder::from_tng_complex(cone_shell(self.inner.complex()), BuildConfig { mode, ..Default::default() });
 
         let (start, top) = (*range.start(), *range.end());
         for d in range {
             self.inner.merge_slice(&left, &right, d, &left_map, &other_map);
-            {
-                let key_map = self.inner.key_map();
-                let tau = |k: &TngComplexKey| *key_map.inv_key(k);
-                cone_extend(self.inner.complex(), cone.complex_mut(), d, &tau, inv_edge);
-            }
+            self.cone_extend(d);
             if d - 2 >= start {
-                cone.eliminate_in(d - 2);
+                self.cone.eliminate_in(d - 2);
             }
             if d > start {
                 self.prune(d - 1);
             }
         }
         for d in (top - 1) ..= (top + 1) {
-            cone.eliminate_in(d);
+            self.cone.eliminate_in(d);
         }
-        deloop_all(&mut cone, mode, false);
-        deloop_all(&mut cone, mode, true);
-        cone.into_tng_complex()
+        self.deloop_all(false);
+        self.deloop_all(true);
+    }
+
+    // Add the symmetric complex's degree-`d` slice to the cone: the two copies `k·0`, `k·1` of each
+    // vertex, the within-layer edges *into* degree `d`, and the `1+τ` edges out of `k·0`. Processed
+    // ascending, every edge lands exactly once (its target's degree).
+    fn cone_extend(&mut self, d: isize) {
+        let with_bit = |k: &TngComplexKey, b: Bit| {
+            let mut key = *k;
+            key.state.push(b);
+            key
+        };
+        let keys = self.inner.complex().keys_of_deg(d).copied().collect_vec();
+
+        for k in keys.iter() {
+            let tng = self.inner.complex().vertex(k).tng().clone();
+            self.cone.complex_mut().add_vertex(with_bit(k, Bit::Bit0), TngComplexVertex::from(tng.clone()));
+            self.cone.complex_mut().add_vertex(with_bit(k, Bit::Bit1), TngComplexVertex::from(tng));
+        }
+
+        // within-layer edges into degree d (each layer copies the symmetric differential).
+        for k in keys.iter() {
+            for j in self.inner.complex().vertex(k).in_edges().copied().collect_vec() {
+                let f = self.inner.complex().edge(&j, k).clone();
+                self.cone.complex_mut().add_edge(&with_bit(&j, Bit::Bit0), &with_bit(k, Bit::Bit0), f.clone());
+                self.cone.complex_mut().add_edge(&with_bit(&j, Bit::Bit1), &with_bit(k, Bit::Bit1), f);
+            }
+        }
+
+        // connecting differential (1 + τ): k·0 → k·1 (id) and k·0 → τk·1 (τ-cyl).
+        for k in keys.iter() {
+            let tng = self.inner.complex().vertex(k).tng().clone();
+            let id = LcCob::from(Cob::id(&tng));
+            let tau = LcCob::from(tau_cob(&tng, |e| self.inner.inv_edge(e)));
+            let tk = *self.inner.key_map().inv_key(k);
+            let k0 = with_bit(k, Bit::Bit0);
+
+            if &tk == k {
+                let f = id + tau; // same target: sum over char 2
+                if !f.is_zero() {
+                    self.cone.complex_mut().add_edge(&k0, &with_bit(k, Bit::Bit1), f);
+                }
+            } else {
+                self.cone.complex_mut().add_edge(&k0, &with_bit(k, Bit::Bit1), id);
+                self.cone.complex_mut().add_edge(&k0, &with_bit(&tk, Bit::Bit1), tau);
+            }
+        }
+    }
+
+    // Deloop every degree (marked circles only when `based`), eliminating to finish the reduction.
+    fn deloop_all(&mut self, based: bool) {
+        let auto_elim = self.cone.config().mode.auto_elim();
+        for d in self.cone.complex().h_range() {
+            self.cone.deloop_in_with(d, based);
+        }
+        if auto_elim {
+            for d in self.cone.complex().h_range() {
+                self.cone.eliminate_in(d);
+            }
+        }
     }
 
     // Drop a consumed symmetric degree and its τ key-map entries — never needed again.
@@ -132,98 +172,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-// Whole-complex reduction: collapse invertible `1`-edges first, then deloop (MinFill re-eliminates).
-fn reduce<R>(cone: TngComplex<R>, mode: BuildMode) -> TngComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    let mut b = TngComplexBuilder::from_tng_complex(cone, BuildConfig { mode, ..Default::default() });
-    b.eliminate_all();
-    let mut b = b.run();
-    if mode.auto_elim() && !mode.immediate_elim() {
-        b.eliminate_all();
-    }
-    b.into_tng_complex()
-}
-
-// Deloop every degree (marked circles only when `based`), eliminating to finish the reduction.
-fn deloop_all<R>(cone: &mut TngComplexBuilder<R>, mode: BuildMode, based: bool)
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    for d in cone.complex().h_range() {
-        cone.deloop_in_with(d, based);
-    }
-    if mode.auto_elim() {
-        for d in cone.complex().h_range() {
-            cone.eliminate_in(d);
-        }
-    }
-}
-
-// ---- cobordism-level cone construction ----
-
-// Cobordism-level mapping cone of `1 + τ` for a closed complex (the involutive complex). Doubles
-// every vertex — a cone bit appended to its key — and connects the two layers by `1` (identity) and
-// `τ` (per-circle relabel cylinder). Char-2, so no cone signs.
-fn make_cone<R, F, G>(c: &TngComplex<R>, tau_key: &F, inv_edge: &G) -> TngComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R>, F: Fn(&TngComplexKey) -> TngComplexKey, G: Fn(Edge) -> Edge {
-    debug_assert!(c.is_closed());
-    let mut cone = cone_shell(c);
-    for d in c.h_range() {
-        cone_extend(c, &mut cone, d, tau_key, inv_edge);
-    }
-    cone
-}
+// ---- cobordism-level cone construction (`1 + τ`, char-2) ----
 
 // An empty cone shell: same `deg_shift`/base point, one extra h-degree for the cone bit.
 fn cone_shell<R>(c: &TngComplex<R>) -> TngComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let (h, t) = c.ht();
     TngComplex::new(h, t, c.deg_shift(), c.base_pt(), c.dim() + 1, Default::default())
-}
-
-// Add `c`'s degree-`d` contribution to `cone`: the two copies `k·0`, `k·1` of each degree-`d`
-// vertex, the within-layer edges *into* degree `d`, and the `1+τ` edges out of `k·0`. Processed
-// ascending, every edge lands exactly once (its target's degree).
-fn cone_extend<R, F, G>(c: &TngComplex<R>, cone: &mut TngComplex<R>, d: isize, tau_key: &F, inv_edge: &G)
-where R: Ring, for<'x> &'x R: RingOps<R>, F: Fn(&TngComplexKey) -> TngComplexKey, G: Fn(Edge) -> Edge {
-    let with_bit = |k: &TngComplexKey, b: Bit| {
-        let mut key = *k;
-        key.state.push(b);
-        key
-    };
-    let keys = c.keys_of_deg(d).copied().collect_vec();
-
-    for k in keys.iter() {
-        let tng = c.vertex(k).tng().clone();
-        cone.add_vertex(with_bit(k, Bit::Bit0), TngComplexVertex::from(tng.clone()));
-        cone.add_vertex(with_bit(k, Bit::Bit1), TngComplexVertex::from(tng));
-    }
-
-    // within-layer edges into degree d (each layer copies the symmetric differential).
-    for k in keys.iter() {
-        for j in c.vertex(k).in_edges().copied().collect_vec() {
-            let f = c.edge(&j, k).clone();
-            cone.add_edge(&with_bit(&j, Bit::Bit0), &with_bit(k, Bit::Bit0), f.clone());
-            cone.add_edge(&with_bit(&j, Bit::Bit1), &with_bit(k, Bit::Bit1), f);
-        }
-    }
-
-    // connecting differential (1 + τ): k·0 → k·1 (id) and k·0 → τk·1 (τ-cyl).
-    for k in keys.iter() {
-        let v = c.vertex(k);
-        let k0 = with_bit(k, Bit::Bit0);
-        let id = LcCob::from(Cob::id(v.tng()));
-        let tau = LcCob::from(tau_cob(v.tng(), inv_edge));
-        let tk = tau_key(k);
-
-        if &tk == k {
-            let f = id + tau; // same target: sum over char 2
-            if !f.is_zero() {
-                cone.add_edge(&k0, &with_bit(k, Bit::Bit1), f);
-            }
-        } else {
-            cone.add_edge(&k0, &with_bit(k, Bit::Bit1), id);
-            cone.add_edge(&k0, &with_bit(&tk, Bit::Bit1), tau);
-        }
-    }
 }
 
 // The τ morphism on a closed tangle: one relabel cylinder `c → τc` per circle.

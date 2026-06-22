@@ -196,24 +196,48 @@ mod tests {
     use yui_link::InvLink;
     use super::*;
 
-    // The reduced cone must be a valid complex (d² = 0) — full homology vs. the reference is checked
-    // in `khi`, once the `KhGen → KhIGen` extraction is in place.
-    fn check_valid(l: &InvLink, chunks: Option<usize>) {
+    // Build the reduced cone, assert d² = 0, and return its nonzero homology ranks per degree.
+    // (Full homology vs. the KhI reference is checked in `khi` via the `KhGen → KhIGen` extraction.)
+    fn cone_homology(l: &InvLink, reduced: bool, config: SymBuildConfig) -> Vec<(isize, usize)> {
+        let c = ConeBuilder::from_inv_link(l, &FF2::zero(), &FF2::zero(), reduced)
+            .with_config(config).run().into_tng_complex().into_raw_complex();
+        c.check_d_all();
+        let h = c.homology();
+        h.support().map(|&i| (i, h[i].rank())).filter(|(_, r)| *r > 0).sorted().collect()
+    }
+
+    // The cone homology must not depend on the chunking: whole == chunked, reduced and unreduced.
+    fn check_chunk_independent(l: &InvLink, chunks: usize) {
         for reduced in [false, true] {
-            let config = SymBuildConfig { chunks, ..Default::default() };
-            let cone = ConeBuilder::from_inv_link(l, &FF2::zero(), &FF2::zero(), reduced)
-                .with_config(config).run().into_tng_complex();
-            cone.into_raw_complex().check_d_all();
+            let whole = cone_homology(l, reduced, SymBuildConfig::default());
+            let chunked = cone_homology(l, reduced, SymBuildConfig { chunks: Some(chunks), ..Default::default() });
+            assert_eq!(whole, chunked, "reduced={reduced}");
         }
     }
 
     #[test]
-    fn cone_3_1_whole() {
-        check_valid(&InvLink::test_data("3_1"), None);
+    fn cone_chunk_independent_3_1() {
+        check_chunk_independent(&InvLink::test_data("3_1"), 2);
     }
 
     #[test]
-    fn cone_3_1_chunked() {
-        check_valid(&InvLink::test_data("3_1"), Some(2));
+    fn cone_chunk_independent_4_1() {
+        check_chunk_independent(&InvLink::test_data("4_1"), 2);
+    }
+
+    #[test]
+    fn cone_chunk_independent_6_3() {
+        check_chunk_independent(&InvLink::test_data("6_3"), 3);
+    }
+
+    // The cone homology must not depend on the simplification mode.
+    #[test]
+    fn cone_mode_independent() {
+        let l = InvLink::test_data("6_3");
+        let reference = cone_homology(&l, false, SymBuildConfig::default());
+        for mode in [BuildMode::MinFill, BuildMode::NoElim, BuildMode::None] {
+            let h = cone_homology(&l, false, SymBuildConfig { mode, ..Default::default() });
+            assert_eq!(h, reference, "mode {mode:?}");
+        }
     }
 }

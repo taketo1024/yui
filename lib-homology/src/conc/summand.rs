@@ -88,6 +88,13 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
         self.devectorize(&v)
     }
 
+    // Relabel generators by an injective `f` (rank/torsion/basis-change untouched).
+    pub fn map_keys<Y, F>(&self, f: F) -> Summand<Y, R>
+    where Y: LcKey, F: Fn(&X) -> Y {
+        let gens = self.raw_gens.iter().map(f).collect::<IndexSet<Y>>();
+        Summand::new(gens, self.rank, self.tors.clone(), self.trans.clone())
+    }
+
     pub fn generators(&self) -> impl Iterator<Item = Lc<X, R>> + use<'_, X, R> {
         (0 .. self.rank + self.tors.len()).map(|i| self.generator(i))
     }

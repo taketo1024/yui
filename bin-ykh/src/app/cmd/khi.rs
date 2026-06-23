@@ -60,7 +60,7 @@ pub struct Args {
     #[arg(long)]
     pub no_preprocess: bool,
 
-    // temporary A/B: build KhI as the cobordism-level cone (no canon cycles → no ssi/alpha).
+    // temporary A/B: build KhI as the cobordism-level cone (ConeBuilder) instead of the matrix cone.
     #[arg(long)]
     pub cone_cob: bool,
 
@@ -117,10 +117,7 @@ where
             ensure!(!h.is_zero() && !h.is_unit(), "`h` must be non-zero, non-invertible to compute ssi.");
             ensure!(t.is_zero(), "`t` must be zero to compute ss.");
         }
-        if self.args.cone_cob {
-            ensure!(!self.args.show_ssi && !self.args.show_alpha, "`--cone-cob` has no canon cycles yet (no ssi/alpha).");
-        }
-    
+
         let l = load_sinv_knot(&self.args.link, self.args.mirror)?;
 
         let khi = if self.args.no_simplify {

@@ -79,8 +79,8 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         }
     }
 
-    // Cobordism-level cone: ConeBuilder yields the coned TngComplex directly; extract KhIGen by
-    // stripping the cone bit. Canon cycles are left empty (Milestone 1) — invalid for ssi/alpha.
+    // Cobordism-level cone: ConeBuilder yields the coned TngComplex + canon classes directly; extract
+    // KhIGen by stripping the cone bit (both for the complex and the canon cycles).
     fn cone_cob_complex(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig) -> Self {
         use crate::tng::builder::ConeBuilder;
 
@@ -94,11 +94,12 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
             ..config
         };
 
-        let raw = ConeBuilder::from_inv_link(l, h, t, reduced)
-            .with_config(build_config)
-            .run()
-            .into_tng_complex()
-            .into_raw_complex();
+        let cone = ConeBuilder::from_inv_link(l, h, t, reduced).with_config(build_config).run();
+        let canon_cycles = cone.eval_elements().into_iter()
+            .map(|z| z.map_keys(|x| from_cone_gen(&x)))
+            .collect_vec();
+
+        let raw = cone.into_tng_complex().into_raw_complex();
         let inner = raw.map_keys(from_cone_gen, to_cone_gen);
         let inner = match h_range {
             Some(range) => inner.truncated(range),
@@ -106,7 +107,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         };
 
         let deg_shift = KhComplex::<R>::deg_shift_for(l.inner(), reduced);
-        Self::new_impl(inner, vec![], deg_shift)
+        Self::new_impl(inner, canon_cycles, deg_shift)
     }
 
     pub fn new_no_simplify(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self {

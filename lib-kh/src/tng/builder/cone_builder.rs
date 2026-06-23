@@ -13,13 +13,15 @@
 //! - T. Sano, "Involutive Khovanov homology and equivariant knots",
 //!   Algebr. Geom. Topol. 25 (2025), 5059–5111.
 
+use delegate::delegate;
 use itertools::Itertools;
 use num_traits::Zero;
 use yui_core::bitseq::Bit;
 use yui_core::{Ring, RingOps};
 use yui_link::{Edge, Node, InvLink};
 
-use crate::tng::{Cob, CobComp, LcCob, Tng, TngComplex, TngComplexKey, TngComplexVertex};
+use crate::kh::KhChain;
+use crate::tng::{Cob, CobComp, LcCob, Tng, TngComplex, TngComplexElem, TngComplexKey, TngComplexVertex};
 use super::{reachable_range, ChunkBuilder, SymTngBuilder, SymBuildConfig, TngComplexBuilder, BuildConfig, BuildMode, TauKeyMap};
 
 pub struct ConeBuilder<R>
@@ -52,7 +54,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         for (i, (chunk, (c, key_map, elems))) in chunks.into_iter().enumerate() {
             self.inner.drop_nodes(|x| chunk.contains(x));
             if i == last {
-                self.cone_merge(c, key_map, mode);
+                self.cone_merge(c, key_map, elems, mode);
             } else {
                 self.inner.merge(c, key_map, elems);
             }
@@ -60,8 +62,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self
     }
 
-    pub fn into_tng_complex(self) -> TngComplex<R> {
-        self.cone.into_tng_complex()
+    delegate! {
+        to self.cone {
+            pub fn into_tng_complex(self) -> TngComplex<R>;
+            pub fn eval_elements(&self) -> Vec<KhChain<R>>;
+        }
     }
 
     // The cutwidth partition when `chunks` is set, else a degenerate split of the first τ-unit off
@@ -80,11 +85,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // Fuse the final merge with cone construction + reduction. Per symmetric degree: merge the slice,
     // cone-ify it, then collapse the invertible `1`-edges two degrees behind (so `cone_extend` has
     // moved past the degree being removed). Delooping is deferred to the end, on the small survivors.
-    fn cone_merge(&mut self, other: TngComplex<R>, other_map: TauKeyMap, mode: BuildMode) {
+    fn cone_merge(&mut self, other: TngComplex<R>, other_map: TauKeyMap, other_elems: Vec<TngComplexElem<R>>, mode: BuildMode) {
         let left_map = std::mem::take(self.inner.key_map_mut());
         let (left, right) = self.inner.complex_mut().prepare_merge(other);
         let range = reachable_range(self.inner.complex().h_range(), &self.inner.config().h_range, self.inner.n_nodes());
         self.cone = TngComplexBuilder::from_tng_complex(cone_shell(self.inner.complex()), BuildConfig { mode, ..Default::default() });
+
+        // complete the symmetric canon cycles, then seed their `B`/`Q` (bit-0/bit-1) copies into the
+        // cone so its deloop/eliminate carry them. `cone_extend` will create the referenced vertices.
+        self.inner.elements_mut().merge(other_elems);
+        self.seed_cone_elements();
 
         let (start, top) = (*range.start(), *range.end());
         for d in range {
@@ -150,6 +160,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
+    // Lift each completed symmetric canon cycle to its `B` (bit-0) and `Q` (bit-1) cone copies.
+    fn seed_cone_elements(&mut self) {
+        let lifted = self.inner.elements().content().iter().flat_map(|e|
+            [lift_elem(e, Bit::Bit0), lift_elem(e, Bit::Bit1)]
+        ).collect_vec();
+        self.cone.elements_mut().set(lifted);
+    }
+
     // Deloop every degree (marked circles only when `based`), eliminating to finish the reduction.
     fn deloop_all(&mut self, based: bool) {
         let auto_elim = self.cone.config().mode.auto_elim();
@@ -187,6 +205,19 @@ where G: Fn(Edge) -> Edge {
     Cob::new(tng.comps().map(|c|
         CobComp::plain(Tng::from(c.clone()), Tng::from(c.convert_edges(&inv_edge)))
     ))
+}
+
+// Lift a symmetric canon cycle to the cone layer `bit`: push the cone bit onto each `out_cob` key's
+// state (`Bit0` = `B`, `Bit1` = `Q`); `in_cob`/`state` are unchanged.
+fn lift_elem<R>(e: &TngComplexElem<R>, bit: Bit) -> TngComplexElem<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    let mut e = e.clone();
+    let out = std::mem::take(e.out_cob_mut());
+    *e.out_cob_mut() = out.into_iter().map(|(mut k, f)| {
+        k.state.push(bit);
+        (k, f)
+    }).collect();
+    e
 }
 
 #[cfg(test)]
@@ -238,6 +269,35 @@ mod tests {
         for mode in [BuildMode::MinFill, BuildMode::NoElim, BuildMode::None] {
             let h = cone_homology(&l, false, SymBuildConfig { mode, ..Default::default() });
             assert_eq!(h, reference, "mode {mode:?}");
+        }
+    }
+
+    // The cone's canon classes must give the same ssi as the matrix cone.
+    #[test]
+    fn cone_canon_ssi_matches_matrix() {
+        use yui_core::poly::Poly;
+        use crate::khi::{KhIHomology, ssi_invariants};
+        use crate::util::calc::div_vec;
+
+        type P = Poly<'H', FF2>;
+        let (c, t) = (P::variable(), P::zero());
+        for name in ["3_1", "4_1", "6_3"] {
+            let l = InvLink::test_data(name);
+            let matrix = ssi_invariants(&l, &c, false);
+
+            let config = SymBuildConfig { cone_cob: true, h_range: Some(isize::MIN + 1 ..= 1), ..Default::default() };
+            let kh = KhIHomology::new_with_config(&l, &c, &t, false, config);
+            let zs = kh.canon_cycles();
+            assert_eq!(zs.len(), 4);
+
+            let ds = zs.iter().map(|z| {
+                let h = kh.h_deg_of_chain(z);
+                div_vec(&kh[h].vectorize_euc(z).subvec(0..2), &c).expect("invalid divisibility")
+            }).collect_vec();
+
+            let (w, r) = (l.writhe(), l.seifert_circles().len() as i32);
+            let cone = (2 * ds[0] + w - r + 1, 2 * ds[2] + w - r + 1);
+            assert_eq!(cone, matrix, "{name}");
         }
     }
 }

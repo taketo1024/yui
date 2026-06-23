@@ -22,7 +22,7 @@ use yui_link::{Node, Edge, InvLink};
 
 use crate::kh::{KhGen, KhTensor};
 use crate::tng::{LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
-use crate::tng::builder::{TngComplexBuilder, BuildConfig, BuildMode, NodeOrder};
+use crate::tng::builder::{TngComplexBuilder, TngElemBuilder, BuildConfig, BuildMode, NodeOrder};
 use std::fmt;
 use super::{reachable_range, pop_min_pivot, sparkline, cutwidth_after, toggle_boundary, boundary_edges, select_cuts};
 
@@ -172,6 +172,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         to self.inner {
             pub fn complex(&self) -> &TngComplex<R>;
             pub(crate) fn complex_mut(&mut self) -> &mut TngComplex<R>;
+            pub(crate) fn elements(&self) -> &TngElemBuilder<R>;
+            pub(crate) fn elements_mut(&mut self) -> &mut TngElemBuilder<R>;
             pub fn nodes(&self) -> &[Node];
             pub fn n_nodes(&self) -> usize;
             pub(crate) fn drop_nodes<F>(&mut self, pred: F) where F: Fn(&Node) -> bool;

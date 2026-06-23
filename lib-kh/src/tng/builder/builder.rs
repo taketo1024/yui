@@ -115,21 +115,28 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn with_config(mut self, config: BuildConfig) -> Self {
-        // canon cycles live in h-degree 0; drop them if the range excludes it.
+        // drop canon cycles whose h-degree falls outside the range (computed, not assumed h0).
         if let Some(range) = &config.h_range {
-            if !range.contains(&0) {
-                self.elements.clear();
-            }
+            let shift = self.complex.deg_shift().0;
+            self.elements.retain(|e| range.contains(&(shift + e.rel_h_deg())));
         }
         self.config = config;
         self
+    }
+
+    pub(crate) fn from_tng_complex(complex: TngComplex<R>, config: BuildConfig) -> Self {
+        Self { complex, nodes: vec![], loops: vec![], elements: TngElemBuilder::new(), config }
+    }
+
+    pub fn config(&self) -> &BuildConfig {
+        &self.config
     }
 
     pub fn complex(&self) -> &TngComplex<R> {
         &self.complex
     }
 
-    pub(crate) fn complex_mut(&mut self) -> &mut TngComplex<R> { 
+    pub(crate) fn complex_mut(&mut self) -> &mut TngComplex<R> {
         &mut self.complex
     }
 
@@ -186,13 +193,22 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         info!("build config:\n{:#?}", self.config);
         info!("cutwidth profile:\n{}", self.profile());
         if self.config.chunks.is_some() {
-            ChunkBuilder::run(&mut self);
+            self.process_chunks();
         } else {
             self.process_nodes();
         }
         self.process_free_loops();
         self.finalize();
         self
+    }
+
+    fn process_chunks(&mut self) {
+        let chunks = ChunkBuilder { builder: self }.build_chunks();
+        for (chunk, (c, elems)) in chunks {
+            self.drop_nodes(|x| chunk.contains(x));
+            self.merge(c, elems);
+            info!("{} chunk merged: {}", self.current_step(), self.stat());
+        }
     }
 
     // See [BN07, §7] (scan-and-cancel algorithm).
@@ -348,11 +364,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    fn deloop_in(&mut self, i: isize) {
+    pub(crate) fn deloop_in(&mut self, i: isize) {
         self.deloop_in_with(i, false);
     }
 
-    fn deloop_in_with(&mut self, i: isize, allow_based: bool) {
+    pub(crate) fn deloop_in_with(&mut self, i: isize, allow_based: bool) {
         let mut keys = self.collect_keys(i,
             |k| self.find_loop_in(k, allow_based).is_some(),
             |k| self.complex.vertex(k).c_weight(),
@@ -547,28 +563,22 @@ impl fmt::Display for BuildProfile {
 /// parent — so the parent never materializes the full dense slice.
 struct ChunkBuilder<'a, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    builder: &'a mut TngComplexBuilder<R>,
+    builder: &'a TngComplexBuilder<R>,
 }
 
 impl<'a, R> ChunkBuilder<'a, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn run(builder: &'a mut TngComplexBuilder<R>) {
-        Self { builder }.build();
-    }
-
-    // Plan k chunks up front, then build each reduced chunk and merge it into the parent.
-    fn build(&mut self) {
+    // Plan k chunks up front and build each into a reduced sub-complex, paired with the crossings
+    // it covers. Building is independent of the parent, so the caller merges them afterwards.
+    fn build_chunks(&self) -> Vec<(Vec<Node>, (TngComplex<R>, Vec<TngComplexElem<R>>))> {
         let plan = self.plan();
         info!("{} chunk plan: {} pieces {:?}", self.builder.current_step(), plan.len(),
             plan.iter().map(|c| c.len()).collect_vec());
 
-        // build every chunk first (each is independent of the parent state), then merge them in.
-        let built: Vec<(TngComplex<R>, Vec<TngComplexElem<R>>)> = plan.iter().map(|chunk| self.build_chunk(chunk)).collect();
-        for (chunk, (c, elems)) in plan.into_iter().zip(built) {
-            self.builder.drop_nodes(|x| chunk.contains(x));
-            self.builder.merge(c, elems);
-            info!("{} chunk merged: {}", self.builder.current_step(), self.builder.stat());
-        }
+        plan.into_iter().map(|chunk| {
+            let built = self.build_chunk(&chunk);
+            (chunk, built)
+        }).collect()
     }
 
     // Partition the crossings into `chunks` pieces at the deepest cutwidth valleys of the MinCut

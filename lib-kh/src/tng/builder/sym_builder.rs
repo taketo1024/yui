@@ -22,7 +22,7 @@ use yui_link::{Node, Edge, InvLink};
 
 use crate::kh::{KhGen, KhTensor};
 use crate::tng::{LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
-use crate::tng::builder::{TngComplexBuilder, BuildConfig, BuildMode, NodeOrder};
+use crate::tng::builder::{TngComplexBuilder, TngElemBuilder, BuildConfig, BuildMode, NodeOrder};
 use std::fmt;
 use super::{reachable_range, pop_min_pivot, sparkline, cutwidth_after, toggle_boundary, boundary_edges, select_cuts};
 
@@ -40,11 +40,13 @@ pub struct SymBuildConfig {
     pub chunks: Option<usize>,
     // literal truncation: homology at the endpoints is wrong (build `(a-1)..=(b+1)` for correct `[a, b]`).
     pub h_range: Option<RangeInclusive<isize>>,
+    // temporary A/B switch: build KhI as the cobordism-level cone (ConeBuilder) instead of the matrix cone.
+    pub cob_cone: bool,
 }
 
 impl Default for SymBuildConfig {
     fn default() -> Self {
-        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, chunks: None, h_range: None }
+        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, chunks: None, h_range: None, cob_cone: false }
     }
 }
 
@@ -52,7 +54,7 @@ impl Default for SymBuildConfig {
 // off-axis keys form an involution stored both ways for O(1) `inv_key`. The merge iterates
 // only one representative per off-axis pair (the map is symmetric), then symmetrizes.
 #[derive(Clone, Default)]
-struct TauKeyMap {
+pub(crate) struct TauKeyMap {
     on_axis: FxHashSet<TngComplexKey>,
     off_axis: FxHashMap<TngComplexKey, TngComplexKey>,
 }
@@ -76,7 +78,7 @@ impl TauKeyMap {
         self.on_axis.len() + self.off_axis.len()
     }
 
-    fn inv_key(&self, k: &TngComplexKey) -> &TngComplexKey {
+    pub(crate) fn inv_key(&self, k: &TngComplexKey) -> &TngComplexKey {
         self.on_axis.get(k).unwrap_or_else(|| &self.off_axis[k])
     }
 
@@ -106,7 +108,7 @@ impl TauKeyMap {
     }
 
     // τ preserves weight, so if `pred` drops a key it drops its mirror too — symmetric.
-    fn drop(&mut self, pred: impl Fn(&TngComplexKey) -> bool) {
+    pub(crate) fn drop(&mut self, pred: impl Fn(&TngComplexKey) -> bool) {
         self.on_axis.retain(|k| !pred(k));
         self.off_axis.retain(|k, _| !pred(k));
     }
@@ -162,13 +164,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self
     }
 
+    pub fn config(&self) -> &SymBuildConfig {
+        &self.config
+    }
+
     delegate! {
         to self.inner {
             pub fn complex(&self) -> &TngComplex<R>;
-            fn complex_mut(&mut self) -> &mut TngComplex<R>;
+            pub(crate) fn complex_mut(&mut self) -> &mut TngComplex<R>;
+            pub(crate) fn elements(&self) -> &TngElemBuilder<R>;
+            pub(crate) fn elements_mut(&mut self) -> &mut TngElemBuilder<R>;
             pub fn nodes(&self) -> &[Node];
             pub fn n_nodes(&self) -> usize;
-            fn drop_nodes<F>(&mut self, pred: F) where F: Fn(&Node) -> bool;
+            pub(crate) fn drop_nodes<F>(&mut self, pred: F) where F: Fn(&Node) -> bool;
             fn prepare_append(&mut self, x: &Node);
             fn find_loop_in(&self, k: &TngComplexKey, allow_based: bool) -> Option<&TngComp>;
             fn deloop(&mut self, k: &TngComplexKey, c: &TngComp) -> Vec<TngComplexKey>;
@@ -202,14 +210,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn process_chunks(&mut self) {
-        ChunkBuilder::run(self);
+        let cb = ChunkBuilder { builder: self };
+        let chunks = cb.build_chunks(cb.plan());
+        for (chunk, (c, key_map, elems)) in chunks {
+            self.drop_nodes(|x| chunk.contains(x));
+            self.merge(c, key_map, elems);
+            info!("{} chunk merged: {}", self.current_step(), self.stat());
+        }
     }
 
-    fn preprocess(&mut self) {
+    pub(crate) fn preprocess(&mut self) {
         SymTngPreprocessor::run(self);
     }
 
-    fn process_nodes(&mut self) {
+    pub(crate) fn process_nodes(&mut self) {
         info!("{} process {} nodes", self.current_step(), self.n_nodes());
 
         while let Some(x) = self.choose_next_node().cloned() {
@@ -223,7 +237,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     /// Pick the next τ-unit by node order, ties broken by earliest crossing order.
-    fn choose_next_node(&self) -> Option<&Node> {
+    pub(crate) fn choose_next_node(&self) -> Option<&Node> {
         self.nodes().iter().enumerate()
             .min_by_key(|(i, x)| {
                 let score = match self.config.node_order {
@@ -296,7 +310,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.merge(c, key_map, vec![]);
     }
 
-    fn merge(&mut self, c: TngComplex<R>, right_map: TauKeyMap, right_elements: Vec<TngComplexElem<R>>) {
+    pub(crate) fn merge(&mut self, c: TngComplex<R>, right_map: TauKeyMap, right_elements: Vec<TngComplexElem<R>>) {
         // build the merged τ key-map per degree (next to merge_vertices) rather than as one
         // up-front cartesian — for large knots that product never fits in memory.
         let left_map = std::mem::take(&mut self.key_map);
@@ -345,7 +359,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     // Build degree `i`: the τ key-map slice, then its vertices and the edges into it.
-    fn merge_slice(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize, left_map: &TauKeyMap, right_map: &TauKeyMap) {
+    pub(crate) fn merge_slice(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize, left_map: &TauKeyMap, right_map: &TauKeyMap) {
         for (k1, k2) in TngComplex::collect_keys(left, right, i) {
             self.key_map.add_pair(k1 + k2, left_map.inv_key(k1) + right_map.inv_key(k2));
         }
@@ -672,19 +686,29 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn into_inner(self) -> TngComplexBuilder<R> { 
+    pub fn into_inner(self) -> TngComplexBuilder<R> {
         self.inner
     }
 
-    pub fn into_tng_complex(self) -> TngComplex<R> { 
+    pub fn into_tng_complex(self) -> TngComplex<R> {
         self.inner.into_tng_complex()
     }
 
-    fn inv_node(&self, x: &Node) -> &Node { 
+    // --- accessors for the cobordism-cone builder ---
+
+    pub(crate) fn key_map(&self) -> &TauKeyMap {
+        &self.key_map
+    }
+
+    pub(crate) fn key_map_mut(&mut self) -> &mut TauKeyMap {
+        &mut self.key_map
+    }
+
+    pub(crate) fn inv_node(&self, x: &Node) -> &Node {
         &self.x_map[x]
     }
 
-    fn inv_edge(&self, e: Edge) -> Edge { 
+    pub(crate) fn inv_edge(&self, e: Edge) -> Edge {
         self.e_map[&e]
     }
 
@@ -774,36 +798,29 @@ impl fmt::Display for SymBuildProfile {
 /// Divide-and-conquer chunked build for a [`SymTngBuilder`]: plan k τ-closed chunks up front at
 /// thin cutwidth interfaces, build each via a child builder, and merge the reduced chunk into the
 /// parent — so the parent never materializes the full dense slice.
-struct ChunkBuilder<'a, R>
+pub(crate) struct ChunkBuilder<'a, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    builder: &'a mut SymTngBuilder<R>,
+    pub(crate) builder: &'a SymTngBuilder<R>,
 }
 
 impl<'a, R> ChunkBuilder<'a, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn run(builder: &'a mut SymTngBuilder<R>) {
-        Self { builder }.build();
-    }
-
-    // Plan k chunks up front, then build each reduced chunk and merge it into the parent.
-    fn build(&mut self) {
-        let plan = self.plan();
+    // Build each piece of `plan` into a reduced sub-complex, paired with the crossings it covers.
+    // Building is independent of the parent, so the caller merges them afterwards.
+    pub(crate) fn build_chunks(&self, plan: Vec<Vec<Node>>) -> Vec<(Vec<Node>, (TngComplex<R>, TauKeyMap, Vec<TngComplexElem<R>>))> {
         info!("{} chunk plan: {} pieces {:?}", self.builder.current_step(), plan.len(),
             plan.iter().map(|c| c.len()).collect_vec());
 
-        // build every chunk first (each is independent of the parent state), then merge them in.
-        let built: Vec<(TngComplex<R>, TauKeyMap, Vec<TngComplexElem<R>>)> = plan.iter().map(|chunk| self.build_chunk(chunk)).collect();
-        for (chunk, (c, key_map, elems)) in plan.into_iter().zip(built) {
-            self.builder.drop_nodes(|x| chunk.contains(x));
-            self.builder.merge(c, key_map, elems);
-            info!("{} chunk merged: {}", self.builder.current_step(), self.builder.stat());
-        }
+        plan.into_iter().map(|chunk| {
+            let built = self.build_chunk(&chunk);
+            (chunk, built)
+        }).collect()
     }
 
     // Partition the crossings into `chunks` pieces at the deepest cutwidth valleys of the MinCut
     // order. Each piece is τ-closed (τ-units stay whole) and contiguous in that order, so merging
     // them in sequence keeps a thin interface at every step.
-    fn plan(&self) -> Vec<Vec<Node>> {
+    pub(crate) fn plan(&self) -> Vec<Vec<Node>> {
         let prof = self.builder.profile_sym();
         let k = self.builder.config.chunks.unwrap_or(1).max(1);
         let nodes = self.builder.inner.nodes();

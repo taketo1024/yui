@@ -60,6 +60,10 @@ pub struct Args {
     #[arg(long)]
     pub no_preprocess: bool,
 
+    // temporary A/B: build KhI as the cobordism-level cone (ConeBuilder) instead of the matrix cone.
+    #[arg(long)]
+    pub cob_cone: bool,
+
     #[arg(short, long, default_value = "unicode")]
     pub format: Format,
 
@@ -109,11 +113,11 @@ where
         if self.args.show_alpha { 
             ensure!(t.is_zero(), "`t` must be zero to have alpha.");
         }
-        if self.args.show_ssi { 
+        if self.args.show_ssi {
             ensure!(!h.is_zero() && !h.is_unit(), "`h` must be non-zero, non-invertible to compute ssi.");
             ensure!(t.is_zero(), "`t` must be zero to compute ss.");
         }
-    
+
         let l = load_sinv_knot(&self.args.link, self.args.mirror)?;
 
         let khi = if self.args.no_simplify {
@@ -125,6 +129,7 @@ where
                 mode: self.args.mode,
                 node_order: self.args.node_order,
                 preprocess: !self.args.no_preprocess,
+                cob_cone: self.args.cob_cone,
                 ..Default::default()
             };
             KhIHomology::new_with_config(&l, &h, &t, self.args.reduced, config)

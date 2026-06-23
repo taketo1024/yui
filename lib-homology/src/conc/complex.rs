@@ -101,6 +101,21 @@ where
         (self.d_map)(i, z)
     }
 
+    // Relabel generators by an injective `f` with inverse `g`; the differential is conjugated by them.
+    pub fn map_keys<Y, F, G>(&self, f: F, g: G) -> ChainComplex<I, Y, R>
+    where
+        Y: LcKey,
+        F: Fn(&X) -> Y + Send + Sync + 'static,
+        G: Fn(&Y) -> X + Send + Sync + 'static,
+    {
+        let summands = self.summands.map_keys(&f);
+        let d = self.d_map.clone();
+        ChainComplex::new(summands, self.d_deg, move |i, z: &Lc<Y, R>| {
+            let zx = z.clone().map_keys(|y| g(&y));
+            d(i, &zx).map_keys(|x| f(&x))
+        })
+    }
+
     /// Returns the differential matrix `d_i: C_i → C_{i + d_deg}` in the
     /// stored basis. Hits the precomputed cache if populated; otherwise builds
     /// the matrix by applying `d_map` to each basis element.

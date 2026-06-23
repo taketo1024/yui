@@ -35,6 +35,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.state
     }
 
+    // h-degree relative to `deg_shift`: the weight (number of 1-resolutions) of the state.
+    pub fn rel_h_deg(&self) -> isize {
+        self.state.values().filter(|b| b.is_one()).count() as isize
+    }
+
     pub fn base_pt(&self) -> Option<Edge> {
         self.base_pt
     }

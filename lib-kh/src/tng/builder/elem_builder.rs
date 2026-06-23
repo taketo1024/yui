@@ -32,8 +32,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.elements
     }
 
-    pub fn clear(&mut self) {
-        self.elements.clear();
+    pub(crate) fn retain<F>(&mut self, f: F)
+    where F: FnMut(&TngComplexElem<R>) -> bool {
+        self.elements.retain(f);
     }
 
     // Bilinearly merge `other` (a parallel chunk's elements) into self: each pair shares `state`

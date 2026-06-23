@@ -69,6 +69,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 #[cfg(test)]
 mod tests {
+    use yui_core::num::{FF, FF2, Ratio};
+    use yui_core::poly::Poly;
     use yui_link::Link;
     use super::*;
 
@@ -227,7 +229,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_k14_c2() { 
         let l = Link::test_data("14n_19265");
         let c = 2_i64;
@@ -239,10 +240,49 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_k14_c3() { 
         let l = Link::test_data("14n_19265");
         let c = 3_i64;
+        
+        assert_eq!(ss_invariant(&l, &c, false), 0);
+        assert_eq!(ss_invariant(&l, &c, true ), 0);
+        assert_eq!(ss_invariant(&l.mirror(), &c, false), 0);
+        assert_eq!(ss_invariant(&l.mirror(), &c, true ), 0);
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_k14_QH() { 
+        type Q = Ratio<i64>;
+        type R = Poly<'H', Q>;
+        let l = Link::test_data("14n_19265");
+        let c = R::variable();
+        
+        assert_eq!(ss_invariant(&l, &c, false), 0);
+        assert_eq!(ss_invariant(&l, &c, true ), 0);
+        assert_eq!(ss_invariant(&l.mirror(), &c, false), 0);
+        assert_eq!(ss_invariant(&l.mirror(), &c, true ), 0);
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_k14_F2H() { 
+        type R = Poly<'H', FF2>;
+        let l = Link::test_data("14n_19265");
+        let c = R::variable();
+        
+        assert_eq!(ss_invariant(&l, &c, false), -2);
+        assert_eq!(ss_invariant(&l, &c, true ), -2);
+        assert_eq!(ss_invariant(&l.mirror(), &c, false), 2);
+        assert_eq!(ss_invariant(&l.mirror(), &c, true ), 2);
+    }
+    
+   #[test]
+    #[allow(non_snake_case)]
+    fn test_k14_F3H() { 
+        type R = Poly<'H', FF<3>>;
+        let l = Link::test_data("14n_19265");
+        let c = R::variable();
         
         assert_eq!(ss_invariant(&l, &c, false), 0);
         assert_eq!(ss_invariant(&l, &c, true ), 0);

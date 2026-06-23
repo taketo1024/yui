@@ -291,7 +291,7 @@ mod tests {
         for (name, l) in knots {
             let matrix = ssi_invariants(&l, &c, false);
 
-            let config = SymBuildConfig { cone_cob: true, h_range: Some(isize::MIN + 1 ..= 1), ..Default::default() };
+            let config = SymBuildConfig { cob_cone: true, h_range: Some(isize::MIN + 1 ..= 1), ..Default::default() };
             let kh = KhIHomology::new_with_config(&l, &c, &t, false, config);
             let zs = kh.canon_cycles();
             assert_eq!(zs.len(), 4);

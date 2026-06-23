@@ -62,7 +62,7 @@ pub struct Args {
 
     // temporary A/B: build KhI as the cobordism-level cone (ConeBuilder) instead of the matrix cone.
     #[arg(long)]
-    pub cone_cob: bool,
+    pub cob_cone: bool,
 
     #[arg(short, long, default_value = "unicode")]
     pub format: Format,
@@ -129,7 +129,7 @@ where
                 mode: self.args.mode,
                 node_order: self.args.node_order,
                 preprocess: !self.args.no_preprocess,
-                cone_cob: self.args.cone_cob,
+                cob_cone: self.args.cob_cone,
                 ..Default::default()
             };
             KhIHomology::new_with_config(&l, &h, &t, self.args.reduced, config)

@@ -52,8 +52,8 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     pub fn new_with_config(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig) -> Self {
         use crate::tng::builder::SymTngBuilder;
 
-        if config.cone_cob {
-            return Self::cone_cob_complex(l, h, t, reduced, config);
+        if config.cob_cone {
+            return Self::cob_cone_complex(l, h, t, reduced, config);
         }
 
         let config = SymBuildConfig {
@@ -81,7 +81,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
     // Cobordism-level cone: ConeBuilder yields the coned TngComplex + canon classes directly; extract
     // KhIGen by stripping the cone bit (both for the complex and the canon cycles).
-    fn cone_cob_complex(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig) -> Self {
+    fn cob_cone_complex(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig) -> Self {
         use crate::tng::builder::ConeBuilder;
 
         let config = SymBuildConfig {
@@ -485,7 +485,7 @@ mod tests {
 
         // the cobordism-level cone must give the same bigraded homology as the matrix cone.
         #[test]
-        fn cone_cob_matches_matrix() {
+        fn cob_cone_matches_matrix() {
             use yui_homology::isize2;
 
             type R = FF2;
@@ -499,7 +499,7 @@ mod tests {
                 for reduced in [false, true] {
                     let l = InvLink::test_data(name);
                     let matrix = KhIComplex::new(&l, &h, &t, reduced).homology().bigraded();
-                    let config = SymBuildConfig { cone_cob: true, ..Default::default() };
+                    let config = SymBuildConfig { cob_cone: true, ..Default::default() };
                     let cone = KhIComplex::new_with_config(&l, &h, &t, reduced, config).homology().bigraded();
                     assert_eq!(nonzero(&matrix), nonzero(&cone), "{name} reduced={reduced}");
                 }

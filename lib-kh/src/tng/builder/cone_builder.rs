@@ -281,8 +281,14 @@ mod tests {
 
         type P = Poly<'H', FF2>;
         let (c, t) = (P::variable(), P::zero());
-        for name in ["3_1", "4_1", "6_3"] {
-            let l = InvLink::test_data(name);
+        let knots = [
+            ("3_1", InvLink::test_data("3_1")),
+            ("4_1", InvLink::test_data("4_1")),
+            ("6_3", InvLink::test_data("6_3")),
+            // 9_46 has s̲ ≠ s̄ (ssi = (0, 2)) — exercises the canon-cycle ordering.
+            ("9_46", InvLink::from_symmetric_pd_code([[18,8,1,7],[13,6,14,7],[12,2,13,1],[8,18,9,17],[5,14,6,15],[2,12,3,11],[16,10,17,9],[15,4,16,5],[10,4,11,3]])),
+        ];
+        for (name, l) in knots {
             let matrix = ssi_invariants(&l, &c, false);
 
             let config = SymBuildConfig { cone_cob: true, h_range: Some(isize::MIN + 1 ..= 1), ..Default::default() };

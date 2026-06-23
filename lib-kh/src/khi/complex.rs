@@ -95,8 +95,10 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         };
 
         let cone = ConeBuilder::from_inv_link(l, h, t, reduced).with_config(build_config).run();
+        // sort by h-degree (all `B` then all `Q`) to match the matrix cone's canon-cycle order.
         let canon_cycles = cone.eval_elements().into_iter()
             .map(|z| z.map_keys(|x| from_cone_gen(&x)))
+            .sorted_by_key(|z| z.keys().map(|x| x.rel_h_deg()).min().unwrap_or(0))
             .collect_vec();
 
         let raw = cone.into_tng_complex().into_raw_complex();

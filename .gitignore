@@ -4,3 +4,5 @@
 **/.DS_STORE
 **/Cargo.lock
 /lib-kh/profile
+/log/
+/.venv/

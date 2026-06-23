@@ -5,7 +5,7 @@ use yui_core::TeX;
 use yui_core::{EucRing, EucRingOps};
 use yui_homology::{ToSeqString, ToTableString};
 use yui_kh::khi::{KhIChain, KhIHomology};
-use yui_kh::tng::builder::{SymBuildConfig, BuildMode, NodeOrder};
+use yui_kh::tng::builder::{SymBuildConfig, BuildMode, NodeOrder, CutOption};
 use yui_link::InvLink;
 use crate::app::args::*;
 use crate::app::utils::*;
@@ -46,9 +46,6 @@ pub struct Args {
     #[arg(long, value_parser = parse_h_range)]
     pub h_range: Option<RangeInclusive<isize>>,
 
-    #[arg(long)]
-    pub chunks: Option<usize>,
-
     #[arg(long, value_parser = parse_build_mode, default_value = "greedy")]
     pub mode: BuildMode,
 
@@ -63,6 +60,10 @@ pub struct Args {
     // temporary A/B: build KhI as the cobordism-level cone (ConeBuilder) instead of the matrix cone.
     #[arg(long)]
     pub cob_cone: bool,
+
+    // chunking: `auto(k)` (cutwidth) or manual τ-symmetric edge-cut(s) `e,e,e;e,e,e`.
+    #[arg(long, value_parser = parse_cut)]
+    pub cut: Option<CutOption>,
 
     #[arg(short, long, default_value = "unicode")]
     pub format: Format,
@@ -125,11 +126,11 @@ where
         } else {
             let config = SymBuildConfig {
                 h_range: self.args.h_range.clone(), // open ends are clamped inside the build
-                chunks: self.args.chunks,
                 mode: self.args.mode,
                 node_order: self.args.node_order,
                 preprocess: !self.args.no_preprocess,
                 cob_cone: self.args.cob_cone,
+                cut: self.args.cut.clone().unwrap_or_default(),
                 ..Default::default()
             };
             KhIHomology::new_with_config(&l, &h, &t, self.args.reduced, config)

@@ -8,7 +8,7 @@ use yui_core::TeX;
 use yui_core::{Ring, RingOps};
 use yui_homology::ToTableString;
 use yui_kh::khi::KhIComplex;
-use yui_kh::tng::builder::{SymBuildConfig, BuildMode, NodeOrder};
+use yui_kh::tng::builder::{SymBuildConfig, BuildMode, NodeOrder, CutOption};
 
 pub fn dispatch(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
     dispatch_ring!(App, boot, args)
@@ -45,8 +45,9 @@ pub struct Args {
     #[arg(long, value_parser = parse_h_range)]
     pub h_range: Option<RangeInclusive<isize>>,
 
-    #[arg(long)]
-    pub chunks: Option<usize>,
+    // chunking: `auto(k)` (cutwidth) or manual τ-symmetric edge-cut(s) `e,e,e;e,e,e`.
+    #[arg(long, value_parser = parse_cut)]
+    pub cut: Option<CutOption>,
 
     #[arg(long, value_parser = parse_build_mode, default_value = "greedy")]
     pub mode: BuildMode,
@@ -113,7 +114,7 @@ where
         } else {
             let config = SymBuildConfig {
                 h_range: self.args.h_range.clone(), // open ends are clamped inside the build
-                chunks: self.args.chunks,
+                cut: self.args.cut.clone().unwrap_or_default(),
                 mode: self.args.mode,
                 node_order: self.args.node_order,
                 preprocess: !self.args.no_preprocess,

@@ -82,7 +82,7 @@ fn bench_khi_modes(c: &mut Criterion) {
     group.finish();
 }
 
-/// Matrix cone vs. cobordism-level cone (`--cone-cob`), greedy mode, on small/medium knots.
+/// Matrix cone vs. cobordism-level cone (`--cob-cone`), greedy mode, on small/medium knots.
 fn bench_khi_cone(c: &mut Criterion) {
     let mut group = c.benchmark_group("khi_cone");
     group.sample_size(20);
@@ -97,9 +97,9 @@ fn bench_khi_cone(c: &mut Criterion) {
     ];
 
     for (name, l) in &knots {
-        for (cn, cone_cob) in CONES {
+        for (cn, cob_cone) in CONES {
             group.bench_function(format!("{name}/{cn}"), |b| {
-                b.iter(|| KhIComplex::<FF2>::new_with_config(l, &zero, &zero, false, SymBuildConfig { cone_cob, ..Default::default() }))
+                b.iter(|| KhIComplex::<FF2>::new_with_config(l, &zero, &zero, false, SymBuildConfig { cob_cone, ..Default::default() }))
             });
         }
     }

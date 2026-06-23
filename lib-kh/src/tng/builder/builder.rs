@@ -115,11 +115,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn with_config(mut self, config: BuildConfig) -> Self {
-        // canon cycles live in h-degree 0; drop them if the range excludes it.
+        // drop canon cycles whose h-degree falls outside the range (computed, not assumed h0).
         if let Some(range) = &config.h_range {
-            if !range.contains(&0) {
-                self.elements.clear();
-            }
+            let shift = self.complex.deg_shift().0;
+            self.elements.retain(|e| range.contains(&(shift + e.rel_h_deg())));
         }
         self.config = config;
         self

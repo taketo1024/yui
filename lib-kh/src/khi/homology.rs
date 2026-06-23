@@ -47,15 +47,16 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     fn from_complex(c: &KhIComplex<R>, range: Option<RangeInclusive<isize>>) -> Self {
         let reduced = c.inner().reduced();
-        let homology = match range {
-            Some(r) => reduced.homology_in(r),
+        let homology = match &range {
+            Some(r) => reduced.homology_in(r.clone()),
             None    => reduced.homology(),
         };
-        KhIHomology::new_impl(
-            homology,
-            c.canon_cycles().to_vec(),
-            c.deg_shift(),
-        )
+        // drop canon cycles whose h-degree falls outside the requested range (e.g. the Q-side at h+1).
+        let canon_cycles = c.canon_cycles().iter()
+            .filter(|z| range.as_ref().map_or(true, |r| r.contains(&c.h_deg_of_chain(z))))
+            .cloned()
+            .collect();
+        KhIHomology::new_impl(homology, canon_cycles, c.deg_shift())
     }
 
     pub fn new_no_simplify(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self {
@@ -215,6 +216,19 @@ mod tests {
         assert_eq!(khi[2].rank(), 2);
         assert_eq!(khi[3].rank(), 4);
         assert_eq!(khi[4].rank(), 2);
+    }
+
+    // canon cycles outside the h-range are dropped: 3_1 has B-cycles at h0 and Q-cycles at h1,
+    // so `..=0` keeps only the 2 B-cycles (was a crash when the Q-cycles indexed an unbuilt degree).
+    #[test]
+    fn canon_cycles_clipped_to_h_range() {
+        let l = InvLink::test_data("3_1");
+        type P = Poly<'H', FF2>;
+        let (h, t) = (P::variable(), P::zero());
+
+        assert_eq!(KhIHomology::new(&l, &h, &t, false).canon_cycles().len(), 4);
+        let clipped = KhIHomology::new_partial(&l, &h, &t, false, Some(isize::MIN + 1 ..= 0));
+        assert_eq!(clipped.canon_cycles().len(), 2);
     }
 
     #[test]

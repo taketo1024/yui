@@ -21,7 +21,7 @@ use yui_link::{Node, Edge, Link};
 
 use crate::kh::{KhChain, KhComplex};
 use crate::tng::{TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
-use super::{reachable_range, pop_min_pivot, sparkline, cutwidth_after, toggle_boundary, boundary_edges, select_cuts, TngElemBuilder};
+use super::{reachable_range, pop_min_pivot, sparkline, cutwidth_after, toggle_boundary, boundary_edges, select_cuts, cut_components, merge_order, TngElemBuilder};
 
 /// How the next crossing to append is chosen.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -58,20 +58,35 @@ impl BuildMode {
     }
 }
 
+/// Divide-and-conquer chunking: `None` = single pass; `Auto(k)` cuts the MinCut order at its `k-1`
+/// deepest cutwidth valleys; `Manual` severs the given edge-cut(s) (a union) into pieces.
+#[derive(Clone, Debug, Default)]
+pub enum CutOption {
+    #[default]
+    None,
+    Auto(usize),
+    Manual(Vec<Vec<Edge>>),
+}
+
+impl CutOption {
+    pub fn enabled(&self) -> bool {
+        !matches!(self, CutOption::None)
+    }
+}
+
 /// Toggles for the automatic simplification done while building.
 #[derive(Clone, Debug)]
 pub struct BuildConfig {
     pub node_order: NodeOrder,
     pub mode: BuildMode,
-    // divide-and-conquer: partition the link into this many chunks at the deepest cutwidth
-    // valleys, build each via a child builder, and merge into the parent. None = single pass.
-    pub chunks: Option<usize>,
+    // divide-and-conquer chunking (auto cutwidth or manual edge-cuts); None = single pass.
+    pub cut: CutOption,
     pub h_range: Option<RangeInclusive<isize>>,
 }
 
 impl Default for BuildConfig {
     fn default() -> Self {
-        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), chunks: None, h_range: None }
+        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), cut: CutOption::None, h_range: None }
     }
 }
 
@@ -192,7 +207,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn run(mut self) -> Self {
         info!("build config:\n{:#?}", self.config);
         info!("cutwidth profile:\n{}", self.profile());
-        if self.config.chunks.is_some() {
+        if self.config.cut.enabled() {
             self.process_chunks();
         } else {
             self.process_nodes();
@@ -581,11 +596,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }).collect()
     }
 
-    // Partition the crossings into `chunks` pieces at the deepest cutwidth valleys of the MinCut
-    // order. Each piece is contiguous in that order, so merging in sequence keeps a thin interface.
+    // Partition the crossings into pieces: `Auto(k)` at the deepest cutwidth valleys of the MinCut
+    // order (contiguous, thin interface), or `Manual` by severing the given edge-cut(s).
     fn plan(&self) -> Vec<Vec<Node>> {
+        let k = match &self.builder.config.cut {
+            CutOption::Manual(cuts) => return self.manual_plan(cuts),
+            CutOption::Auto(k) => (*k).max(1),
+            CutOption::None => 1,
+        };
         let prof = self.builder.profile();
-        let k = self.builder.config.chunks.unwrap_or(1).max(1);
         let nodes = self.builder.nodes();
         let cuts = select_cuts(&prof.widths, k - 1);
 
@@ -595,6 +614,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         starts.zip(ends)
             .map(|(s, e)| prof.order[s..e].iter().map(|&i| nodes[i].clone()).collect())
             .filter(|c: &Vec<Node>| !c.is_empty())
+            .collect()
+    }
+
+    // Manual cut (no symmetry constraint): sever the cut edges (union), order the resulting pieces.
+    fn manual_plan(&self, cuts: &[Vec<Edge>]) -> Vec<Vec<Node>> {
+        let cut: FxHashSet<Edge> = cuts.iter().flatten().copied().collect();
+        let nodes = self.builder.nodes();
+        let pieces = cut_components(nodes, &cut);
+        assert!(pieces.len() >= 2, "cut does not separate the link into ≥2 pieces");
+        merge_order(nodes, pieces).into_iter()
+            .map(|piece| piece.into_iter().map(|i| nodes[i].clone()).collect())
             .collect()
     }
 
@@ -626,7 +656,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let s = self.builder.complex.deg_shift().0;
             0 ..= (*r.end() - s).max(0)
         });
-        child.with_config(BuildConfig { mode: self.builder.config.mode, node_order: NodeOrder::MinCut, chunks: None, h_range })
+        child.with_config(BuildConfig { mode: self.builder.config.mode, node_order: NodeOrder::MinCut, cut: CutOption::None, h_range })
     }
 }
 
@@ -770,8 +800,8 @@ mod tests {
     fn test_chunk_build_matches() {
         // chunked builds must reproduce the non-chunked homology (incl. torsion).
         let l = Link::test_data("8_19");
-        let build = |chunks| {
-            let config = BuildConfig { chunks, ..Default::default() };
+        let build = |chunks: Option<usize>| {
+            let config = BuildConfig { cut: chunks.map_or(CutOption::None, CutOption::Auto), ..Default::default() };
             TngComplexBuilder::from_link(&l, &0, &0, false).with_config(config).run()
                 .into_tng_complex().into_raw_complex()
         };
@@ -797,8 +827,8 @@ mod tests {
 
         let l = Link::test_data("8_19");
         let c = 2;
-        let div = |chunks| {
-            let config = BuildConfig { chunks, ..Default::default() };
+        let div = |chunks: Option<usize>| {
+            let config = BuildConfig { cut: chunks.map_or(CutOption::None, CutOption::Auto), ..Default::default() };
             let kh = KhHomology::new_with_config(&l, &c, &0, false, config);
             kh.canon_cycles().iter()
                 .map(|z| div_vec(&kh[0].vectorize_euc(z).subvec(0..2), &c).unwrap())

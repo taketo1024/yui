@@ -72,7 +72,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // The cutwidth partition when `chunks` is set, else a degenerate split of the first τ-unit off
     // the rest — so even the non-chunked knot is closed by one incremental `cone_merge`.
     fn plan(&self) -> Vec<Vec<Node>> {
-        if self.inner.config().chunks.is_some() {
+        if self.inner.config().cut.enabled() {
             return ChunkBuilder { builder: &self.inner }.plan();
         }
         let x = self.inner.choose_next_node().expect("a crossing to split off").clone();
@@ -226,6 +226,7 @@ mod tests {
     use yui_core::num::FF2;
     use yui_link::InvLink;
     use super::*;
+    use super::super::CutOption;
 
     // Build the reduced cone, assert d² = 0, and return its nonzero homology ranks per degree.
     // (Full homology vs. the KhI reference is checked in `khi` via the `KhGen → KhIGen` extraction.)
@@ -241,7 +242,7 @@ mod tests {
     fn check_chunk_independent(l: &InvLink, chunks: usize) {
         for reduced in [false, true] {
             let whole = cone_homology(l, reduced, SymBuildConfig::default());
-            let chunked = cone_homology(l, reduced, SymBuildConfig { chunks: Some(chunks), ..Default::default() });
+            let chunked = cone_homology(l, reduced, SymBuildConfig { cut: CutOption::Auto(chunks), ..Default::default() });
             assert_eq!(whole, chunked, "reduced={reduced}");
         }
     }

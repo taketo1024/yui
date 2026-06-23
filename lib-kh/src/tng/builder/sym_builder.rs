@@ -24,7 +24,7 @@ use crate::kh::{KhGen, KhTensor};
 use crate::tng::{LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
 use crate::tng::builder::{TngComplexBuilder, TngElemBuilder, BuildConfig, BuildMode, NodeOrder};
 use std::fmt;
-use super::{reachable_range, pop_min_pivot, sparkline, cutwidth_after, toggle_boundary, boundary_edges, select_cuts};
+use super::{reachable_range, pop_min_pivot, sparkline, cutwidth_after, toggle_boundary, boundary_edges, select_cuts, cut_components, merge_order, CutOption};
 
 /// Toggles for the automatic simplification done while building (kept separate
 /// from [`BuildConfig`] so the equivariant builder can gain its own flags).
@@ -35,18 +35,17 @@ pub struct SymBuildConfig {
     pub mode: BuildMode,
     // build half the off-axis crossings and mirror via τ (see `preprocess`).
     pub preprocess: bool,
-    // divide-and-conquer: partition the link into this many chunks at the deepest cutwidth
-    // valleys, build each via a child builder, and merge into the parent. None = single pass.
-    pub chunks: Option<usize>,
     // literal truncation: homology at the endpoints is wrong (build `(a-1)..=(b+1)` for correct `[a, b]`).
     pub h_range: Option<RangeInclusive<isize>>,
+    // divide-and-conquer chunking (auto cutwidth or manual edge-cuts); None = single pass.
+    pub cut: CutOption,
     // temporary A/B switch: build KhI as the cobordism-level cone (ConeBuilder) instead of the matrix cone.
     pub cob_cone: bool,
 }
 
 impl Default for SymBuildConfig {
     fn default() -> Self {
-        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, chunks: None, h_range: None, cob_cone: false }
+        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, h_range: None, cut: CutOption::None, cob_cone: false }
     }
 }
 
@@ -143,7 +142,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         // the inner builder is driven by `self` — disable its own auto-simplify.
         let inner = TngComplexBuilder::from_link(l.inner(), h, t, reduced)
-            .with_config(BuildConfig { mode: BuildMode::None, chunks: None, node_order: NodeOrder::default(), h_range: None });
+            .with_config(BuildConfig { mode: BuildMode::None, cut: CutOption::None, node_order: NodeOrder::default(), h_range: None });
 
         let x_map = l.nodes().map(|x|
             (x.clone(), l.inv_node(x).clone())
@@ -158,7 +157,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn with_config(mut self, config: SymBuildConfig) -> Self {
         // propagate the window to the inner builder so the preprocess merges cap
         // to it; this also drops canon cycles when the window excludes h-degree 0.
-        let inner_config = BuildConfig { mode: BuildMode::None, chunks: None, node_order: config.node_order, h_range: config.h_range.clone() };
+        let inner_config = BuildConfig { mode: BuildMode::None, cut: CutOption::None, node_order: config.node_order, h_range: config.h_range.clone() };
         self.inner = self.inner.with_config(inner_config);
         self.config = config;
         self
@@ -197,7 +196,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn run(mut self) -> Self {
         info!("build config:\n{:#?}", self.config);
         info!("cutwidth profile:\n{}", self.profile_sym());
-        if self.config.chunks.is_some() {
+        if self.config.cut.enabled() {
             self.process_chunks();
         } else {
             if self.config.preprocess {
@@ -821,8 +820,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // order. Each piece is τ-closed (τ-units stay whole) and contiguous in that order, so merging
     // them in sequence keeps a thin interface at every step.
     pub(crate) fn plan(&self) -> Vec<Vec<Node>> {
+        let k = match &self.builder.config.cut {
+            CutOption::Manual(cuts) => return self.manual_plan(cuts),
+            CutOption::Auto(k) => (*k).max(1),
+            CutOption::None => 1,
+        };
         let prof = self.builder.profile_sym();
-        let k = self.builder.config.chunks.unwrap_or(1).max(1);
         let nodes = self.builder.inner.nodes();
         let cuts = select_cuts(&prof.widths, k - 1);
 
@@ -833,6 +836,34 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             .map(|(s, e)| prof.order[s..e].iter().flatten().map(|&i| nodes[i].clone()).collect())
             .filter(|c: &Vec<Node>| !c.is_empty())
             .collect()
+    }
+
+    // Manual cut: sever the cut edges (union of all cut-lines), validate τ-symmetry, order the pieces.
+    fn manual_plan(&self, cuts: &[Vec<Edge>]) -> Vec<Vec<Node>> {
+        let cut: FxHashSet<Edge> = cuts.iter().flatten().copied().collect();
+        let nodes = self.builder.nodes();
+        let pieces = cut_components(nodes, &cut);
+        self.validate_cut(&cut, &pieces);
+        merge_order(nodes, pieces).into_iter()
+            .map(|piece| piece.into_iter().map(|i| nodes[i].clone()).collect())
+            .collect()
+    }
+
+    // A cut must be τ-symmetric (closed under `inv_edge`), separate into ≥2 pieces, each τ-invariant
+    // (so the sym build can pair `x` with `τx` inside it).
+    fn validate_cut(&self, cut: &FxHashSet<Edge>, pieces: &[Vec<usize>]) {
+        for &e in cut {
+            assert!(cut.contains(&self.builder.inv_edge(e)), "cut not τ-symmetric: τ-image of edge {e} missing");
+        }
+        assert!(pieces.len() >= 2, "cut does not separate the link into ≥2 pieces");
+
+        let nodes = self.builder.nodes();
+        let idx_of: FxHashMap<Node, usize> = nodes.iter().enumerate().map(|(i, x)| (x.clone(), i)).collect();
+        for comp in pieces {
+            let set: FxHashSet<usize> = comp.iter().copied().collect();
+            let tau_in = comp.iter().all(|&i| set.contains(&idx_of[self.builder.inv_node(&nodes[i])]));
+            assert!(tau_in, "a cut piece is not τ-invariant (τ maps it outside)");
+        }
     }
 
     // Build `chunk` into a reduced sub-complex via a child builder, returning it with its τ
@@ -856,7 +887,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let (h, t) = self.builder.inner.complex().ht();
         let base_pt = self.builder.inner.complex().base_pt();
         let mut inner = TngComplexBuilder::init(h, t, (0, 0), base_pt)
-            .with_config(BuildConfig { mode: BuildMode::None, chunks: None, node_order: NodeOrder::MinCut, h_range: None });
+            .with_config(BuildConfig { mode: BuildMode::None, cut: CutOption::None, node_order: NodeOrder::MinCut, h_range: None });
         inner.set_nodes(chunk.iter().cloned());
         inner.elements_mut().set(self.builder.inner.elements().content().to_vec());
 
@@ -866,7 +897,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let s = self.builder.inner.complex().deg_shift().0;
             0 ..= (*r.end() - s).max(0)
         });
-        let config = SymBuildConfig { chunks: None, node_order: NodeOrder::MinCut, h_range, ..self.builder.config.clone() };
+        let config = SymBuildConfig { cut: CutOption::None, node_order: NodeOrder::MinCut, h_range, ..self.builder.config.clone() };
         let key_map = TauKeyMap::init();
         let real_top = inner.complex().deg_shift().0 + chunk.len() as isize; // child deg_shift = 0
         SymTngBuilder { inner, x_map: self.builder.x_map.clone(), e_map: self.builder.e_map.clone(), key_map, config, real_top }
@@ -1039,7 +1070,7 @@ mod tests {
             assert_eq!(prof.on_axis + prof.off_axis, nodes.len(), "{name}: unit counts");
 
             let mut b = TngComplexBuilder::<i32>::init(&0, &0, (0, 0), None)
-                .with_config(BuildConfig { mode: BuildMode::None, chunks: None, ..Default::default() });
+                .with_config(BuildConfig { mode: BuildMode::None, cut: CutOption::None, ..Default::default() });
 
             let mut open: FxHashSet<Edge> = FxHashSet::default();
             for (step, unit) in prof.order.iter().enumerate() {
@@ -1129,7 +1160,7 @@ mod tests {
 
         let build = |chunks: Option<usize>, window: Option<RangeInclusive<isize>>| {
             let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
-            b.config.chunks = chunks;
+            b.config.cut = chunks.map_or(CutOption::None, CutOption::Auto);
             b.config.h_range = window;
             b.run().into_tng_complex().into_raw_complex()
         };
@@ -1165,7 +1196,7 @@ mod tests {
 
         let build = |chunks: Option<usize>| {
             let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, true);
-            b.config.chunks = chunks;
+            b.config.cut = chunks.map_or(CutOption::None, CutOption::Auto);
             b.run().into_tng_complex().into_raw_complex()
         };
 
@@ -1194,8 +1225,8 @@ mod tests {
         let c = P::variable();
         let (h, t) = (c.clone(), P::zero());
 
-        let div = |chunks| {
-            let config = SymBuildConfig { chunks, ..Default::default() };
+        let div = |chunks: Option<usize>| {
+            let config = SymBuildConfig { cut: chunks.map_or(CutOption::None, CutOption::Auto), ..Default::default() };
             let kh = KhIHomology::new_with_config(&l, &h, &t, false, config);
             kh.canon_cycles().iter().map(|z| {
                 let v = kh[kh.h_deg_of_chain(z)].vectorize_euc(z);

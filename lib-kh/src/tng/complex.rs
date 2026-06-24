@@ -799,7 +799,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         println!("{}", self.desc_d());
     }
 
-    #[cfg(debug_assertions)]
+    #[cfg(any(test, debug_assertions))]
     pub fn validate(&self) {
         for (k, v) in self.vertices.iter() { 
             // validate in_edges 

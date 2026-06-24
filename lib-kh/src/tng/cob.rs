@@ -798,7 +798,6 @@ impl Cob {
         comps.sort();
     }
 
-    #[cfg(debug_assertions)]
     pub fn reconst_src(&self) -> Tng {
         self.comps.iter().fold(Tng::empty(), |mut t, c| {
             t.connect_mut(&c.src);
@@ -806,7 +805,6 @@ impl Cob {
         })
     }
 
-    #[cfg(debug_assertions)]
     pub fn reconst_tgt(&self) -> Tng {
         self.comps.iter().fold(Tng::empty(), |mut t, c| {
             t.connect_mut(&c.tgt);

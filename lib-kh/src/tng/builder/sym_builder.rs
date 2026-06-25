@@ -891,13 +891,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         inner.set_nodes(chunk.iter().cloned());
         inner.elements_mut().set(self.builder.inner.elements().content().to_vec());
 
-        // cap the child to the chunk's reachable band: a chunk vertex of weight
-        // > b - deg_shift.0 can never reach the window (weight only grows).
-        let h_range = self.builder.config.h_range.as_ref().map(|r| {
-            let s = self.builder.inner.complex().deg_shift().0;
-            0 ..= (*r.end() - s).max(0)
-        });
-        let config = SymBuildConfig { cut: CutOption::None, node_order: NodeOrder::MinCut, h_range, ..self.builder.config.clone() };
+        // No per-chunk h_range: it would under-cover preprocess's off-axis key_map. Applied at the merge.
+        let config = SymBuildConfig { cut: CutOption::None, node_order: NodeOrder::MinCut, h_range: None, ..self.builder.config.clone() };
         let key_map = TauKeyMap::init();
         let real_top = inner.complex().deg_shift().0 + chunk.len() as isize; // child deg_shift = 0
         SymTngBuilder { inner, x_map: self.builder.x_map.clone(), e_map: self.builder.e_map.clone(), key_map, config, real_top }

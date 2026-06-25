@@ -262,6 +262,17 @@ mod tests {
         check_chunk_independent(&InvLink::test_data("6_3"), 3);
     }
 
+    #[test]
+    fn cone_chunk_windowed_9_46() {
+        let l = InvLink::from_symmetric_pd_code([[18,8,1,7],[13,6,14,7],[12,2,13,1],[8,18,9,17],[5,14,6,15],[2,12,3,11],[16,10,17,9],[15,4,16,5],[10,4,11,3]]);
+        let narrow = |h: Vec<(isize, usize)>| h.into_iter().filter(|&(d, _)| d <= 0).collect_vec();
+        for reduced in [false, true] {
+            let full = narrow(cone_homology(&l, reduced, SymBuildConfig::default()));
+            let chunked = narrow(cone_homology(&l, reduced, SymBuildConfig { cut: CutOption::Auto(2), mode: BuildMode::MinFill, h_range: Some(-64 ..= 1), ..Default::default() }));
+            assert_eq!(full, chunked, "reduced={reduced}");
+        }
+    }
+
     // The cone homology must not depend on the simplification mode.
     #[test]
     fn cone_mode_independent() {

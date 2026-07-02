@@ -227,7 +227,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     // See [BN07, §7] (scan-and-cancel algorithm).
-    pub(crate) fn process_nodes(&mut self) {
+    pub fn process_nodes(&mut self) {
         info!("{} process {} nodes", self.current_step(), self.n_nodes());
 
         while let Some(x) = self.choose_next_node().cloned() {
@@ -256,7 +256,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         cutwidth_after(&open, &[x]) as isize
     }
 
-    pub(crate) fn append_node(&mut self, x: &Node) {
+    pub fn append_node(&mut self, x: &Node) {
         info!("{} append: {x}", self.current_step());
 
         self.prepare_append(x);
@@ -274,7 +274,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.elements.append_node(x);
     }
 
-    pub(crate) fn merge(&mut self, other: TngComplex<R>, other_elements: Vec<TngComplexElem<R>>) {
+    pub fn merge(&mut self, other: TngComplex<R>, other_elements: Vec<TngComplexElem<R>>) {
         let (left, right) = self.complex.prepare_merge(other);
         let range = reachable_range(self.complex.h_range(), &self.config.h_range, self.n_nodes());
 
@@ -373,17 +373,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     // Deloop unmarked loops over all degrees.
-    pub(crate) fn deloop_all(&mut self) {
+    pub fn deloop_all(&mut self) {
         for i in self.complex.h_range() {
             self.deloop_in(i);
         }
     }
 
-    pub(crate) fn deloop_in(&mut self, i: isize) {
+    pub fn deloop_in(&mut self, i: isize) {
         self.deloop_in_with(i, false);
     }
 
-    pub(crate) fn deloop_in_with(&mut self, i: isize, allow_based: bool) {
+    pub fn deloop_in_with(&mut self, i: isize, allow_based: bool) {
         let mut keys = self.collect_keys(i,
             |k| self.find_loop_in(k, allow_based).is_some(),
             |k| self.complex.vertex(k).c_weight(),
@@ -412,7 +412,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("{}   delooped C[{i}]: {} (diff: {}).", self.current_step(), after, after - before);
     }
 
-    pub(crate) fn deloop(&mut self, k: &TngComplexKey, c: &TngComp) -> Vec<TngComplexKey> {
+    pub fn deloop(&mut self, k: &TngComplexKey, c: &TngComp) -> Vec<TngComplexKey> {
         trace!("{} deloop {c} in {}", self.stat(), self.complex.vertex(k));
 
         self.elements.deloop(k, c);
@@ -428,7 +428,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         added
     }
 
-    pub(crate) fn eliminate_in(&mut self, i: isize) {
+    pub fn eliminate_in(&mut self, i: isize) {
         let mut keys = self.collect_keys(i,
             |k| self.complex.vertex(k).out_edges().any(|l|
                 self.complex.edge(k, l).is_invertible()
@@ -452,7 +452,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("{}   eliminated C[{i}]: {} (diff: {}).", self.current_step(), after, after - before);
     }
 
-    pub(crate) fn try_eliminate_at(&mut self, k: &TngComplexKey) -> bool {
+    pub fn try_eliminate_at(&mut self, k: &TngComplexKey) -> bool {
         if let Some(&j) = self.choose_inv_edge_into(&k) { 
             self.eliminate(&j, &k);
             true
@@ -464,7 +464,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub(crate) fn eliminate(&mut self, i: &TngComplexKey, j: &TngComplexKey) {
+    pub fn eliminate(&mut self, i: &TngComplexKey, j: &TngComplexKey) {
         trace!("{} eliminate {}: {} -> {}", self.stat(), self.complex.edge(i, j), self.complex.vertex(i), self.complex.vertex(j));
         
         self.elements.eliminate(&self.complex, i, j);
@@ -485,7 +485,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         .min_by_key(|l| (self.complex.edge_weight(k, l), **l))
     }
 
-    pub(crate) fn process_free_loops(&mut self) {
+    pub fn process_free_loops(&mut self) {
         while !self.loops.is_empty() { 
             let c = self.loops.remove(0);
 

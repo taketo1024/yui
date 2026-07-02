@@ -218,11 +218,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub(crate) fn preprocess(&mut self) {
+    pub fn preprocess(&mut self) {
         SymTngPreprocessor::run(self);
     }
 
-    pub(crate) fn process_nodes(&mut self) {
+    pub fn process_nodes(&mut self) {
         info!("{} process {} nodes", self.current_step(), self.n_nodes());
 
         while let Some(x) = self.choose_next_node().cloned() {

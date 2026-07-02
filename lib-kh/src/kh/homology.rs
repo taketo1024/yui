@@ -94,6 +94,11 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         self.reduced
     }
 
+    // same bigraded Khovanov homology (free ranks + torsion at every (i, j)) as `other`.
+    pub fn is_identical(&self, other: &KhHomology<R>) -> bool {
+        Bigraded::is_identical(self, other)
+    }
+
     pub fn h_deg_of(&self, x: &KhGen) -> isize {
         self.deg_shift.0 + x.rel_h_deg()
     }
@@ -436,6 +441,18 @@ mod tests {
                 assert!(kh[( 0,-1)].is_free());
             }
         };
+    }
+
+    #[test]
+    fn kh_is_identical() {
+        let kh = |l: &Link| KhHomology::new(l, &0, &0, false);
+        let h31 = kh(&Link::test_data("3_1"));
+        let h41 = kh(&Link::test_data("4_1"));
+
+        assert!(h31.is_identical(&h31));
+        assert!(!h31.is_identical(&h41));
+        assert!(h41.is_identical(&kh(&Link::test_data("4_1").mirror())), "4_1 is amphichiral");
+        assert!(!h31.is_identical(&kh(&Link::test_data("3_1").mirror())), "3_1 is chiral");
     }
 
     #[test]

@@ -19,6 +19,15 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     fn bigraded(&self) -> GrMod2<X, R> {
         decomp_by(self.base(), |z| self.decomp_key(z))
     }
+
+    // structurally equal as bigraded modules: same (free rank, torsion) at every bidegree.
+    fn is_identical<B>(&self, other: &B) -> bool
+    where B: Bigraded<X, R> {
+        let strip = |base: &GrMod1<X, R>, g: &dyn Fn(&Lc<X, R>) -> isize| -> HashMap<isize2, (usize, Vec<R>)> {
+            decomp_info(base, g).into_iter().map(|(k, (r, t, _))| (k, (r, t))).collect()
+        };
+        strip(self.base(), &|z| self.decomp_key(z)) == strip(other.base(), &|z| other.decomp_key(z))
+    }
 }
 
 pub(crate) fn decomp_info<X, R, F>(grid: &GrMod1<X, R>, decomp_key: F) -> HashMap<isize2, (usize, Vec<R>, Vec<usize>)>

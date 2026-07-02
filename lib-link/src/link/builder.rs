@@ -51,6 +51,30 @@ impl LinkBuilder {
         self.loops += 1;
     }
 
+    // A column of `k ≥ 1` crossings of type `tt`, chained bottom→top; returns the column's four
+    // corner ports in CCW slot order (SW, SE, NE, NW) — for k = 1 the crossing's own ports.
+    pub fn add_v_twist(&mut self, tt: NodeType, k: usize) -> (Port, Port, Port, Port) {
+        assert!(k >= 1, "a twist needs at least one crossing");
+        let v: Vec<_> = (0..k).map(|_| self.add_crossing(tt)).collect();
+        for w in v.windows(2) {
+            self.connect((w[0], 3), (w[1], 0));
+            self.connect((w[0], 2), (w[1], 1));
+        }
+        ((v[0], 0), (v[0], 1), (v[k - 1], 2), (v[k - 1], 3))
+    }
+
+    // A row of `k ≥ 1` crossings of type `tt`, chained left→right; returns the row's four
+    // corner ports in CCW slot order (SW, SE, NE, NW) — for k = 1 the crossing's own ports.
+    pub fn add_h_twist(&mut self, tt: NodeType, k: usize) -> (Port, Port, Port, Port) {
+        assert!(k >= 1, "a twist needs at least one crossing");
+        let h: Vec<_> = (0..k).map(|_| self.add_crossing(tt)).collect();
+        for w in h.windows(2) {
+            self.connect((w[0], 1), (w[1], 0));
+            self.connect((w[0], 2), (w[1], 3));
+        }
+        ((h[0], 0), (h[k - 1], 1), (h[k - 1], 2), (h[0], 3))
+    }
+
     // Absorb all nodes, edges and free loops of `l`; returns its node-index → builder-vertex map (so
     // port `(verts[i], s)` is node i's slot s), for later rewiring.
     pub fn add_link(&mut self, l: &Link) -> Vec<NodeIndex> {

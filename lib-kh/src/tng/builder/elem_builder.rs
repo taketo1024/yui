@@ -108,18 +108,24 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
+    // note: capping can annihilate the cobordism (e.g. a Y-dotted cap over 𝔽₂); a zero entry must
+    // not survive in `out_cob` — its phantom key made `d_sym` non-deterministic.
     fn deloop_from(e: &mut TngComplexElem<R>, k: &TngComplexKey, c: &TngComp) {
         let Some(f) = e.out_cob_mut().remove(k) else { return };
         let marked = e.base_pt().map(|b| c.contains(b)).unwrap_or(false);
 
         let k0 = k + KhAlgGen::X;
         let f0 = f.clone().cap_off(End::Tgt, c, None);
-        e.out_cob_mut().insert(k0, f0);
+        if !f0.is_zero() {
+            e.out_cob_mut().insert(k0, f0);
+        }
 
         if !marked {
             let k1 = k + KhAlgGen::I;
             let f1 = f.cap_off(End::Tgt, c, Some(Dot::Y));
-            e.out_cob_mut().insert(k1, f1);
+            if !f1.is_zero() {
+                e.out_cob_mut().insert(k1, f1);
+            }
         }
     }
 

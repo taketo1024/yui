@@ -373,11 +373,10 @@ fn into_khi_gen(x: &KhGen) -> KhIGen {
 fn lift_elem<R>(e: &TngComplexElem<R>, bit: Bit) -> TngComplexElem<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let mut e = e.clone();
-    let out = std::mem::take(e.out_cob_mut());
-    *e.out_cob_mut() = out.into_iter().map(|(mut k, f)| {
+    e.modify_out_cob(|out| out.into_iter().map(|(mut k, f)| {
         k.state.push(bit);
         (k, f)
-    }).collect();
+    }).collect());
     e
 }
 

@@ -53,12 +53,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert_eq!(e.state(), o.state());
         assert_eq!(e.in_cob(), o.in_cob());
 
-        let lhs = std::mem::take(e.out_cob_mut());
-        *e.out_cob_mut() = lhs.iter().flat_map(|(k, f)| {
+        e.modify_out_cob(|lhs| lhs.iter().flat_map(|(k, f)| {
             o.out_cob().iter().map(move |(l, g)| {
                 (k + l, f.apply_bilin(g, |c1, c2| c1.connect(c2)))
             })
-        }).collect();
+        }).collect());
     }
 
     pub(crate) fn append_node(&mut self, x: &Node) {
@@ -93,13 +92,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // Append the identity cobordism on `t` to the out_cob, pushing the resolution bit `r` onto each key.
     fn connect_id(e: &mut TngComplexElem<R>, t: &Tng, r: Option<Bit>) {
         let id = Cob::id(t);
-        let out = std::mem::take(e.out_cob_mut());
-        *e.out_cob_mut() = out.into_iter().map(|(mut k, f)| {
+        e.modify_out_cob(|out| out.into_iter().map(|(mut k, f)| {
             if let Some(r) = r {
                 k.state.push(r);
             }
             (k, f.connect(&id))
-        }).collect();
+        }).collect());
     }
 
     pub(crate) fn deloop(&mut self, k: &TngComplexKey, c: &TngComp) {
@@ -111,22 +109,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // note: capping can annihilate the cobordism (e.g. a Y-dotted cap over 𝔽₂); a zero entry must
     // not survive in `out_cob` — its phantom key made `d_sym` non-deterministic.
     fn deloop_from(e: &mut TngComplexElem<R>, k: &TngComplexKey, c: &TngComp) {
-        let Some(f) = e.out_cob_mut().remove(k) else { return };
         let marked = e.base_pt().map(|b| c.contains(b)).unwrap_or(false);
+        e.modify_out_cob(|mut cob| {
+            let Some(f) = cob.remove(k) else { return cob };
 
-        let k0 = k + KhAlgGen::X;
-        let f0 = f.clone().cap_off(End::Tgt, c, None);
-        if !f0.is_zero() {
-            e.out_cob_mut().insert(k0, f0);
-        }
-
-        if !marked {
-            let k1 = k + KhAlgGen::I;
-            let f1 = f.cap_off(End::Tgt, c, Some(Dot::Y));
-            if !f1.is_zero() {
-                e.out_cob_mut().insert(k1, f1);
+            let k0 = k + KhAlgGen::X;
+            let f0 = f.clone().cap_off(End::Tgt, c, None);
+            if !f0.is_zero() {
+                cob.insert(k0, f0);
             }
-        }
+
+            if !marked {
+                let k1 = k + KhAlgGen::I;
+                let f1 = f.cap_off(End::Tgt, c, Some(Dot::Y));
+                if !f1.is_zero() {
+                    cob.insert(k1, f1);
+                }
+            }
+            cob
+        });
     }
 
     pub(crate) fn eliminate(&mut self, complex: &TngComplex<R>, i: &TngComplexKey, j: &TngComplexKey) {
@@ -147,31 +148,34 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn eliminate_from(e: &mut TngComplexElem<R>, complex: &TngComplex<R>, i: &TngComplexKey, j: &TngComplexKey) {
         debug_assert!(complex.has_edge(i, j));
 
-        // mors into i can be simply dropped.
-        e.out_cob_mut().remove(i);
+        e.modify_out_cob(|mut cob| {
+            // mors into i can be simply dropped.
+            cob.remove(i);
 
-        // mors into j must be redirected by -ca⁻¹.
-        let Some(b) = e.out_cob_mut().remove(j) else { return };
+            // mors into j must be redirected by -ca⁻¹.
+            let Some(b) = cob.remove(j) else { return cob };
 
-        let (h, t) = complex.ht();
-        let ainv = complex.edge(i, j).inv().unwrap();
-        let ainv_b = b.stack(&ainv);
+            let (h, t) = complex.ht();
+            let ainv = complex.edge(i, j).inv().unwrap();
+            let ainv_b = b.stack(&ainv);
 
-        for k in complex.vertex(i).out_edges() {
-            if k == j { continue }
+            for k in complex.vertex(i).out_edges() {
+                if k == j { continue }
 
-            let c = complex.edge(i, k);
-            let c_ainv_b = ainv_b.stack(c).reduce(h, t);
-            let s = if let Some(d) = e.out_cob_mut().remove(k) {
-                d - c_ainv_b
-            } else {
-                -c_ainv_b
-            };
+                let c = complex.edge(i, k);
+                let c_ainv_b = ainv_b.stack(c).reduce(h, t);
+                let s = if let Some(d) = cob.remove(k) {
+                    d - c_ainv_b
+                } else {
+                    -c_ainv_b
+                };
 
-            if !s.is_zero() {
-                e.out_cob_mut().insert(*k, s);
+                if !s.is_zero() {
+                    cob.insert(*k, s);
+                }
             }
-        }
+            cob
+        });
     }
 
     pub(crate) fn eval(&self, h: &R, t: &R) -> Vec<KhChain<R>> {

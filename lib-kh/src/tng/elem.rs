@@ -17,18 +17,20 @@ use crate::ext::LinkExt;
 pub struct TngComplexElem<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     state: HashMap<Node, Bit>,
-    in_cob: Cob,                        // initial cob, precomposed at the final step.
-    out_cob: HashMap<TngComplexKey, LcCob<R>>, // building cob, src must always match init_cob. 
+    in_cob: Cob,                        // initial cup-cob, precomposed at the final step.
+    out_cob: HashMap<TngComplexKey, LcCob<R>>, // building cob, src must always match in_cob.
     base_pt: Option<Edge>
 }
 
-impl<R> TngComplexElem<R> 
-where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn new(state: HashMap<Node, Bit>, in_cob: Cob, base_pt: Option<Edge>) -> Self { 
+impl<R> TngComplexElem<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    pub fn new(state: HashMap<Node, Bit>, in_cob: Cob, base_pt: Option<Edge>) -> Self {
         let k0 = TngComplexKey::init();
         let f0 = LcCob::from(Cob::empty());
         let out_cob = hashmap! { k0 => f0 };
-        Self{ state, in_cob, out_cob, base_pt }
+        let elem = Self { state, in_cob, out_cob, base_pt };
+        elem.verify();
+        elem
     }
 
     pub fn state(&self) -> &HashMap<Node, Bit> {
@@ -52,13 +54,23 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.out_cob
     }
 
-    pub fn out_cob_mut(&mut self) -> &mut HashMap<TngComplexKey, LcCob<R>> {
-        &mut self.out_cob
+    pub(crate) fn set_out_cob<I>(&mut self, out_cob: I)
+    where I: IntoIterator<Item = (TngComplexKey, LcCob<R>)> {
+        self.out_cob = out_cob.into_iter().collect();
+        self.verify();
+    }
+
+    // Take the `out_cob`, let `f` rebuild or edit it, store the result and re-check the invariant.
+    pub(crate) fn modify_out_cob<F>(&mut self, f: F)
+    where F: FnOnce(HashMap<TngComplexKey, LcCob<R>>) -> HashMap<TngComplexKey, LcCob<R>> {
+        let out = std::mem::take(&mut self.out_cob);
+        self.out_cob = f(out);
+        self.verify();
     }
 
     pub fn is_evalable(&self) -> bool {
         let init = LcCob::from(self.in_cob.clone());
-        self.out_cob.values().all(|c| init.is_stackable(c)) && 
+        self.out_cob.values().all(|c| init.is_stackable(c)) &&
         self.out_cob.values().all(|c| c.iter().all(|(c, _)| c.comps().all(|c| c.tgt().is_empty())))
     }
 
@@ -74,6 +86,27 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }).collect::<KhChain<R>>();
 
         eval
+    }
+
+    // Invariant (debug-only): no zero `out_cob` value; all `out_cob` terms share one source; every
+    // closed circle of that source is one of in_cob's target circles.
+    fn verify(&self) {
+        if !cfg!(debug_assertions) {
+            return;
+        }
+
+        // 0. no out_cob value is zero (a zero entry has no source — invisible to (1)).
+        debug_assert!(self.out_cob.values().all(|f| f.any_term().is_some()), "verify: zero out_cob entry");
+
+        // 1. all out_cob terms reconstruct the same source.
+        let mut out_srcs = self.out_cob.values().flat_map(|f| f.iter().map(|(c, _)| c.reconst_src()));
+        let Some(out_src) = out_srcs.next() else { return };
+        debug_assert!(out_srcs.all(|s| s == out_src), "verify: out_cob terms have differing sources");
+
+        // 2. every closed circle in out_cob's source is one of in_cob's target circles (open arcs,
+        // which may later close up, are not checked).
+        let in_tgt = self.in_cob.reconst_tgt();
+        debug_assert!(out_src.comps().filter(|c| c.is_circle()).all(|c| in_tgt.contains(c)), "verify: out_cob source circle not in in_cob target");
     }
 
     pub fn canon_cycles(l: &Link, base_pt: Option<Edge>) -> Vec<Self> { 

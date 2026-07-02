@@ -147,33 +147,32 @@ impl Link {
         //          [ row_a ]    [ clasp ]    [ row_b ]
         //   a0 ────[       ]────[       ]────[       ]──── b1   (lower strand)
         //
-        // The clasp turns each side's pair back on itself and the turn-backs hook (winding 0);
-        // row_a is the π-rotation of row_b, so tw_a = tw_b gives a π-rotation-symmetric diagram.
+        // The clasp turns each side's pair back on itself and the turn-backs hook (winding 0).
+        // Twist rows are π-rotation invariant, so tw_a = tw_b gives a π-rotation-symmetric diagram.
+        // Corners are destructured by picture position (ul/ur/ll/lr = upper/lower × left/right);
+        // the wiring is identical for every piece: enter at (ul, ll), continue from (ur, lr).
         let twist_type = |tw: i32| if tw >= 0 { XR } else { XL };
         let (mut upper, mut lower) = (a1, a0);
 
-        // row_a, π-rotated: its left face is (SE upper, NE lower), its right face (SW upper, NW lower).
         if tw_a != 0 {
-            let (h0, h1, h2, h3) = b.add_h_twist(twist_type(tw_a), tw_a.unsigned_abs() as usize);
-            b.connect(upper, h1);
-            b.connect(lower, h2);
-            (upper, lower) = (h0, h3);
+            let (ll, lr, ur, ul) = b.add_h_twist(twist_type(tw_a), tw_a.unsigned_abs() as usize);
+            b.connect(upper, ul);
+            b.connect(lower, ll);
+            (upper, lower) = (ur, lr);
         }
 
-        // the clasp column: left ports (NW upper, SW lower), right ports (NE upper, SE lower).
         // positive = a positive clasp = D⁺ (pinned by the clasp-sign determinant test).
         let ct = if positive { XL } else { XR };
-        let (c0, c1, c2, c3) = b.add_v_twist(ct, 2);
-        b.connect(upper, c3);
-        b.connect(lower, c0);
-        (upper, lower) = (c2, c1);
+        let (ll, lr, ur, ul) = b.add_v_twist(ct, 2);
+        b.connect(upper, ul);
+        b.connect(lower, ll);
+        (upper, lower) = (ur, lr);
 
-        // row_b, upright: left face (NW upper, SW lower), right face (NE upper, SE lower).
         if tw_b != 0 {
-            let (h0, h1, h2, h3) = b.add_h_twist(twist_type(tw_b), tw_b.unsigned_abs() as usize);
-            b.connect(upper, h3);
-            b.connect(lower, h0);
-            (upper, lower) = (h2, h1);
+            let (ll, lr, ur, ul) = b.add_h_twist(twist_type(tw_b), tw_b.unsigned_abs() as usize);
+            b.connect(upper, ul);
+            b.connect(lower, ll);
+            (upper, lower) = (ur, lr);
         }
 
         b.connect(upper, b0);

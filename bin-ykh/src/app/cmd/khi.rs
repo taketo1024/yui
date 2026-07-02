@@ -130,17 +130,26 @@ where
             l
         };
 
+        let config = SymBuildConfig {
+            h_range: self.args.h_range.clone(), // open ends are clamped inside the build
+            mode: self.args.mode,
+            node_order: self.args.node_order,
+            preprocess: !self.args.no_preprocess,
+            cut: self.args.cut.clone().unwrap_or_default(),
+            ..Default::default()
+        };
+
+        // nothing downstream needs generators — compute rank/torsion only (trans-free, much lighter).
+        let generic = !(self.args.show_gens || self.args.show_alpha || self.args.show_ssi);
+        if generic && self.args.cob_cone && !self.args.no_simplify {
+            let khi = KhIHomology::generic_from_cone(&l, &h, &t, self.args.reduced, config);
+            self.out(&khi.to_seq_string());
+            return Ok(self.flush());
+        }
+
         let khi = if self.args.no_simplify {
             KhIHomology::new_no_simplify(&l, &h, &t, self.args.reduced)
         } else {
-            let config = SymBuildConfig {
-                h_range: self.args.h_range.clone(), // open ends are clamped inside the build
-                mode: self.args.mode,
-                node_order: self.args.node_order,
-                preprocess: !self.args.no_preprocess,
-                cut: self.args.cut.clone().unwrap_or_default(),
-                ..Default::default()
-            };
             if self.args.cob_cone {
                 KhIHomology::from_cone(&l, &h, &t, self.args.reduced, config)
             } else {

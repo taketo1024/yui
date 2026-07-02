@@ -72,87 +72,6 @@ impl Link {
         b.build().unwrap()
     }
 
-    // The `tw`-twisted Whitehead double D±(K), `tw` from the Seifert (0) framing (tw = 0 = untwisted,
-    // trivial Alexander); `positive` = clasp sign. Seifert sits at 2·writhe blackboard half-twists.
-    pub fn whitehead_double(&self, positive: bool, tw: i32) -> Link {
-        self.whitehead_double_bbf(positive, 2 * self.writhe() + tw)
-    }
-
-    // Whitehead double with the framing counted from the blackboard framing (tw = 0 = the diagram's
-    // blackboard 2-cable): cut the cable to a 4-end tangle, add `tw` half-twists, close with the clasp.
-    pub fn whitehead_double_bbf(&self, positive: bool, tw: i32) -> Link {
-        // cut a clean edge (joining two distinct crossings): frees the 4 cable ends
-        let e0 = self.edges().into_iter()
-            .find(|&e| {
-                let ((i, _), (j, _)) = self.edge_ends(e, false);
-                i != j
-            })
-            .expect("the companion needs an edge joining two distinct crossings");
-        self.whitehead_double_impl(positive, 0, tw, e0, None).0
-    }
-
-    // Whitehead double cutting the cable at edge `e0` (must join two distinct crossings), placing
-    // `tw_a` framing half-twists on the i-side of the cut and `tw_b` on the j-side. Cutting at an
-    // on-axis edge with `tw_a == tw_b` keeps a strongly-invertible companion's double τ-symmetric.
-    // Also returns the result-edges of `base`'s two doubled strands (empty if `base` is `None`) so the
-    // caller can place a base point there.
-    pub(crate) fn whitehead_double_impl(&self, positive: bool, tw_a: i32, tw_b: i32, e0: Edge, base: Option<Edge>) -> (Link, Vec<Edge>) {
-        use crate::NodeType::{XL, XR};
-        assert!(self.is_knot(), "the Whitehead double requires a knot companion");
-
-        let (mut b, cab) = self.cable2_builder();
-        let ((i0, s0), (j0, t0)) = self.edge_ends(e0, false);
-        let ((a0, a1), (b0, b1)) = (cab[i0][s0], cab[j0][t0]);   // i-side / j-side, CCW order
-        b.disconnect(a0);   // the swapped join means a0–b1, a1–b0 are removed
-        b.disconnect(a1);
-
-        let twist_type = |tw: i32| if tw >= 0 { XR } else { XL };
-        // |tw| half-twists growing right off the j-side ends (b1, b0) = (top, bottom): attach the
-        // row's left corners (NW, SW), continue from its right corners (NE, SE).
-        let twist_r = |b: &mut LinkBuilder, (p0, p1): (Port, Port), tw: i32| {
-            if tw == 0 {
-                return (p0, p1);
-            }
-            let (h0, h1, h2, h3) = b.add_h_twist(twist_type(tw), tw.unsigned_abs() as usize);
-            b.connect(p0, h3);
-            b.connect(p1, h0);
-            (h2, h1)
-        };
-        // the 180°-rotation image: grows left off the i-side ends (a1, a0), attaching the row's
-        // right corners (SE, NE) and continuing from its left corners (SW, NW).
-        let twist_l = |b: &mut LinkBuilder, (p0, p1): (Port, Port), tw: i32| {
-            if tw == 0 {
-                return (p0, p1);
-            }
-            let (h0, h1, h2, h3) = b.add_h_twist(twist_type(tw), tw.unsigned_abs() as usize);
-            b.connect(p0, h1);
-            b.connect(p1, h2);
-            (h0, h3)
-        };
-        let (pa0, pa1) = twist_l(&mut b, (a1, a0), tw_a);
-        let (rb0, rb1) = twist_r(&mut b, (b1, b0), tw_b);
-
-        // vertical clasp glued as in twist_knot. The a-side wiring is the 180° image of the b-side,
-        // so equal twists give a τ-symmetric diagram. positive = a positive clasp = D⁺ (verified
-        // Kh-identical to the reference Wh⁺(4_1)).
-        let ct = if positive { XL } else { XR };
-        let (c0, c1, c2, c3) = b.add_v_twist(ct, 2);
-        b.connect(c3, pa0);
-        b.connect(c0, pa1);
-        b.connect(c2, rb1);
-        b.connect(c1, rb0);
-
-        // `base` is not at the cut, so its cable join survives: the two ports cab[bi][bs] each carry
-        // one of base's doubled strands; read off their result-edge ids before consuming the builder.
-        let base_edges: Vec<Edge> = base.into_iter().flat_map(|base| {
-            let ((bi, bs), _) = self.edge_ends(base, false);
-            let (c0, c1) = cab[bi][bs];
-            [b.edge_at(c0).unwrap(), b.edge_at(c1).unwrap()]
-        }).collect();
-
-        (b.build().unwrap(), base_edges)
-    }
-
     // The 2-cable in an open builder, plus `cab[i][slot] = (copy-0 port, copy-1 port)` so callers can
     // re-splice the cable (e.g. the Whitehead clasp) before building.
     fn cable2_builder(&self) -> (LinkBuilder, Vec<[(Port, Port); 4]>) {
@@ -183,6 +102,88 @@ impl Link {
             b.add_loop();
         }
         (b, cab)
+    }
+
+    // The `tw`-twisted Whitehead double D±(K), `tw` from the Seifert (0) framing (tw = 0 = untwisted,
+    // trivial Alexander); `positive` = clasp sign. Seifert sits at 2·writhe blackboard half-twists.
+    pub fn whitehead_double(&self, positive: bool, tw: i32) -> Link {
+        self.whitehead_double_bbf(positive, 2 * self.writhe() + tw)
+    }
+
+    // Whitehead double with the framing counted from the blackboard framing (tw = 0 = the diagram's
+    // blackboard 2-cable): cut the cable to a 4-end tangle, add `tw` half-twists, close with the clasp.
+    pub fn whitehead_double_bbf(&self, positive: bool, tw: i32) -> Link {
+        // cut a clean edge (joining two distinct crossings): frees the 4 cable ends
+        let e0 = self.edges().into_iter()
+            .find(|&e| {
+                let ((i, _), (j, _)) = self.edge_ends(e, false);
+                i != j
+            })
+            .expect("the companion needs an edge joining two distinct crossings");
+        self.whitehead_double_impl(positive, 0, tw, e0, None).0
+    }
+
+    // Whitehead double cutting the cable at edge `e0` (must join two distinct crossings), placing
+    // `tw_a` framing half-twists on one side of the cut and `tw_b` on the other. Also returns the
+    // result-edges of `base`'s two doubled strands (empty if `base` is `None`) so the caller can
+    // place a base point there.
+    pub(crate) fn whitehead_double_impl(&self, positive: bool, tw_a: i32, tw_b: i32, e0: Edge, base: Option<Edge>) -> (Link, Vec<Edge>) {
+        use crate::NodeType::{XL, XR};
+        assert!(self.is_knot(), "the Whitehead double requires a knot companion");
+
+        let (mut b, cab) = self.cable2_builder();
+
+        // the cut edge's two ends: the a-side (node ia, slot sa) and b-side (ib, sb), with their
+        // cable ports (a0, a1) / (b0, b1) in CCW order.
+        let ((ia, sa), (ib, sb)) = self.edge_ends(e0, false);
+        let ((a0, a1), (b0, b1)) = (cab[ia][sa], cab[ib][sb]);
+        b.disconnect(a0);   // the swapped join means a0–b1, a1–b0 are removed
+        b.disconnect(a1);
+
+        let twist_type = |tw: i32| if tw >= 0 { XR } else { XL };
+
+        // |tw_a| half-twists growing left off the a-side ends (a1, a0): attach the row's right
+        // corners (SE, NE), continue from its left corners (SW, NW) — the 180°-rotation image of
+        // the b-side below.
+        let (ta0, ta1) = if tw_a == 0 {
+            (a1, a0)
+        } else {
+            let (h0, h1, h2, h3) = b.add_h_twist(twist_type(tw_a), tw_a.unsigned_abs() as usize);
+            b.connect(a1, h1);
+            b.connect(a0, h2);
+            (h0, h3)
+        };
+
+        // |tw_b| half-twists growing right off the b-side ends (b1, b0): attach the row's left
+        // corners (NW, SW), continue from its right corners (NE, SE).
+        let (tb0, tb1) = if tw_b == 0 {
+            (b1, b0)
+        } else {
+            let (h0, h1, h2, h3) = b.add_h_twist(twist_type(tw_b), tw_b.unsigned_abs() as usize);
+            b.connect(b1, h3);
+            b.connect(b0, h0);
+            (h2, h1)
+        };
+
+        // vertical clasp glued as in twist_knot: the twisted a-side ends on its left, the twisted
+        // b-side ends on its right. positive = a positive clasp = D⁺ (verified Kh-identical to the
+        // reference Wh⁺(4_1)).
+        let ct = if positive { XL } else { XR };
+        let (c0, c1, c2, c3) = b.add_v_twist(ct, 2);
+        b.connect(c3, ta0);
+        b.connect(c0, ta1);
+        b.connect(c2, tb1);
+        b.connect(c1, tb0);
+
+        // `base` is not at the cut, so its cable join survives: the two ports of cab at `base` each
+        // carry one of its doubled strands; read off their result-edge ids before consuming the builder.
+        let base_edges: Vec<Edge> = base.into_iter().flat_map(|base| {
+            let ((i, s), _) = self.edge_ends(base, false);
+            let (p0, p1) = cab[i][s];
+            [b.edge_at(p0).unwrap(), b.edge_at(p1).unwrap()]
+        }).collect();
+
+        (b.build().unwrap(), base_edges)
     }
 
     // The two (node, slot) ends of edge `e`. When `directed`, they are ordered as (tail, head)

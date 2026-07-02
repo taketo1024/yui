@@ -1,5 +1,5 @@
 use core::panic;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use itertools::Itertools;
 use yui_core::{CloneAnd, Sign};
@@ -430,6 +430,31 @@ impl Link {
         }
 
         panic!("Broken data")
+    }
+
+    // Renumber the edges base..base+n in the order they are met traversing from `start_edge`
+    // (a knot's one traversal covers every edge), keeping the diagram. base_pt becomes `base`
+    // (base = 1 gives the usual 1-based numbering of knot theory).
+    pub(crate) fn reindexed(&self, start_edge: Edge, base: Edge) -> Link {
+        assert!(self.is_knot() && self.loops.is_empty(), "reindexed expects a knot");
+        let start = self.find_port(|i, j|
+            self.node(i).edge(j) == start_edge
+        ).expect("start_edge must be an edge of the link");
+
+        let mut map: HashMap<Edge, Edge> = HashMap::new();
+        let mut next = base;
+        self.traverse_from(start, |i, j| {
+            map.entry(self.node(i).edge(j)).or_insert_with(|| {
+                let id = next;
+                next += 1;
+                id
+            });
+        });
+
+        let nodes = self.nodes.iter().map(|x|
+            x.convert_edges(|e| map[&e])
+        );
+        Link::new(nodes, []).with_base_pt(base)
     }
 }
 

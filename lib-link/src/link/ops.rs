@@ -2,7 +2,7 @@
 
 use itertools::Itertools;
 
-use crate::{Link, Edge, LinkBuilder};
+use crate::{Link, Edge, LinkBuilder, Port};
 
 impl Link {
     // Connected sum at the two base points (a PD-built link defaults to its minimal edge).
@@ -24,8 +24,8 @@ impl Link {
 
         // the (tail, head) ends of each spliced edge, as builder ports.
         let port = |verts: &[_], (i, s): (usize, usize)| (verts[i], s);
-        let (t1, h1) = self.edge_ports(self_e);
-        let (t2, h2) = other.edge_ports(other_e);
+        let (t1, h1) = self.edge_ends(self_e, true);
+        let (t2, h2) = other.edge_ends(other_e, true);
         let (t1, h1) = (port(&v1, t1), port(&v1, h1));
         let (t2, h2) = (port(&v2, t2), port(&v2, h2));
 
@@ -61,24 +61,70 @@ impl Link {
         };
         let (h0, h1, h2, h3) = b.add_h_twist(tt, n.unsigned_abs() as usize);
 
-        b.connect(v3, h0);
         b.connect(v0, h3);
-        b.connect(v2, h1);
+        b.connect(v3, h0);
         b.connect(v1, h2);
+        b.connect(v2, h1);
         b.build().unwrap()
     }
 
-    // The (tail, head) ports of an oriented edge: the tail is where the strand exits its node,
-    // the head where it enters the next (cf. `NodeOri::in_ports`).
-    fn edge_ports(&self, e: Edge) -> ((usize, usize), (usize, usize)) {
+    // Blackboard-framed 2-cable: each crossing → a 2×2 block of 4 sub-crossings of the same type,
+    // each edge → 2 parallel edges. Every component doubles into its two parallel copies
+    // (n components → 2n; framing = the diagram's writhe per component).
+    pub fn cable2(&self) -> Link {
+        let (b, _) = self.cable2_builder();
+        b.build().unwrap()
+    }
+
+    // The 2-cable in an open builder, plus `cab[i][slot] = (copy-0 port, copy-1 port)` so callers can
+    // re-splice the cable (e.g. the Whitehead clasp) before building.
+    fn cable2_builder(&self) -> (LinkBuilder, Vec<[(Port, Port); 4]>) {
+        let mut b = LinkBuilder::new();
+
+        // per crossing: 4 sub-crossings + the 4 internal edges; record the two cable ports at each slot
+        let cab: Vec<[(Port, Port); 4]> = self.nodes().map(|x| {
+            let t = x.node_type();
+            let [s0, s1, s2, s3] = [b.add_node(t), b.add_node(t), b.add_node(t), b.add_node(t)];
+            b.connect((s0, 2), (s1, 0));
+            b.connect((s0, 3), (s2, 1));
+            b.connect((s1, 3), (s3, 1));
+            b.connect((s2, 2), (s3, 0));
+            // cab[slot] = the slot's two cable ports in a consistent (CCW) order, so edge-joins line up.
+            [((s2, 0), (s0, 0)), ((s0, 1), (s1, 1)), ((s1, 2), (s3, 2)), ((s3, 3), (s2, 3))]
+        }).collect();
+
+        // join the two cables of each original edge across its two endpoints. the two ends list their
+        // ports in CCW order, which reverses along the edge, so copy 0 pairs with the other's copy 1.
+        for e in self.edges() {
+            let ((i, s), (j, t)) = self.edge_ends(e, false);
+            let ((a0, a1), (b0, b1)) = (cab[i][s], cab[j][t]);
+            b.connect(a0, b1);
+            b.connect(a1, b0);
+        }
+        for _ in self.loops() {   // each free loop doubles
+            b.add_loop();
+            b.add_loop();
+        }
+        (b, cab)
+    }
+
+    // The two (node, slot) ends of edge `e`. When `directed`, they are ordered as (tail, head)
+    // along the orientation — the strand exits at the tail and enters at the head (cf.
+    // `NodeOri::in_ports`); otherwise the order carries no meaning.
+    fn edge_ends(&self, e: Edge, directed: bool) -> ((usize, usize), (usize, usize)) {
+        assert!(!directed || self.is_oriented(), "directed edge_ends requires an oriented link");
+
         let (x, y) = self.nodes().enumerate().flat_map(|(i, n)|
             (0..4).filter(move |&s| n.edge(s) == e).map(move |s| (i, s))
         ).collect_tuple().unwrap_or_else(||
             panic!("edge {e} must appear exactly twice")
         );
+        if !directed {
+            return (x, y);
+        }
 
         let is_in = |(i, s): (usize, usize)| {
-            let ports = self.node(i).ori().in_ports().expect("edge_ports requires an oriented link");
+            let ports = self.node(i).ori().in_ports().expect("directed edge_ends requires an oriented link");
             ports.contains(&s)
         };
         debug_assert!(is_in(x) != is_in(y), "edge {e} must have one head and one tail");
@@ -129,9 +175,28 @@ mod tests {
     }
 
     #[test]
+    fn cable2_trefoil() {
+        let k = Link::test_data("3_1");
+        let c = k.cable2();
+        assert_eq!(c.n_crossings(), 4 * k.n_crossings());
+        assert_eq!(c.n_comps(), 2, "2-cable of a knot is a 2-component link");
+        assert!(c.is_oriented());
+        let _ = c.seifert_circles(); // exercises orientation consistency
+    }
+
+    #[test]
+    fn cable2_is_hopf() {
+        // 2-cable of a ±1-framed unknot is the Hopf link (linking ±1), not the 2-component unlink.
+        let c = Link::test_data("unknot_l_twist").cable2();
+        assert_eq!(c.n_comps(), 2);
+        assert_ne!(jones_polynomial(&c), jones_polynomial(&Link::unlink(2)),
+            "2-cable of a framed unknot must be linked (Hopf), not the unlink");
+    }
+
+    #[test]
     fn conn_sum_of_braid_closures() {
         // braid closures orient downward (`ori = Down`), exercising the non-PD arms of
-        // `NodeOri::in_ports` in edge_ports.
+        // `NodeOri::in_ports` in edge_dir.
         let k1 = Braid::from([1, 1, 1]).closure();      // 3_1
         let k2 = Braid::from([1, -2, 1, -2]).closure(); // 4_1
         let cs = k1.conn_sum(&k2);

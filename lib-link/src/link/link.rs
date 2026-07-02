@@ -7,7 +7,7 @@ use yui_core::bitseq::Bit;
 
 use petgraph::Graph;
 
-use super::{Node, Path};
+use super::{Node, NodeOri, Path};
 
 pub type Edge = u8;
 pub type State = yui_core::bitseq::BitSeq;
@@ -77,7 +77,7 @@ impl Link {
     // contradicting `is_incoming` (an odd PD code) panics. Returns whether the link is now oriented.
     pub(crate) fn reorient<F>(&mut self, is_incoming: F) -> bool
     where F: Fn(usize, usize) -> bool {
-        use crate::NodeOri::{Up, Down, Left, Right, None};
+        use crate::NodeOri::None;
 
         let mut incoming: Vec<Vec<usize>> = vec![vec![]; self.n_nodes()];
         let mut remain: HashSet<Edge> = self.nodes.iter().flat_map(|x| x.edges().iter().copied()).collect();
@@ -103,17 +103,14 @@ impl Link {
             });
         }
 
-        // a crossing's two incoming ports are an adjacent pair, which fixes the orientation;
+        // a crossing's two incoming ports fix the orientation (see `NodeOri::from_in_ports`);
         // if any node is incoherent, or some component is undetermined, the whole link is unoriented.
         let oris = incoming.iter().map(|ports| match ports[..] {
-            [0, 1] | [1, 0] => Up,
-            [1, 2] | [2, 1] => Left,
-            [2, 3] | [3, 2] => Down,
-            [3, 0] | [0, 3] => Right,
+            [p, q] => NodeOri::from_in_ports(p, q),
             _ => None,
         }).collect_vec();
-
         let coherent = !undetermined && !oris.contains(&None);
+        
         self.nodes.iter_mut().zip(oris).for_each(|(n, o)| 
             n.ori = if coherent { o } else { None }
         );
@@ -404,9 +401,9 @@ impl Link {
     fn traverse_outer(&self, n_index: usize, e_index: usize) -> (usize, usize) {
         let e = self.nodes[n_index].edge(e_index);
 
-        for (i, c) in self.nodes.iter().enumerate() { 
-            for (j, &f) in c.edges().iter().enumerate() { 
-                if e == f && (n_index != i || (n_index == i && e_index != j)) { 
+        for (i, c) in self.nodes.iter().enumerate() {
+            for (j, &f) in c.edges().iter().enumerate() {
+                if e == f && (n_index != i || (n_index == i && e_index != j)) {
                     return (i, j)
                 }
             }

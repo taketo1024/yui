@@ -37,6 +37,37 @@ impl Link {
         b.build().unwrap()
     }
 
+    // Twist knot = numerator closure of the rational tangle [n, 2]: a horizontal |n|-twist region
+    // summed with a vertical 2-twist clasp. twist_knot(0) = unknot, (1,2,3,4) = 3_1, 4_1, 5_2, 6_1;
+    // n < 0 mirrors.
+    pub fn twist_knot(n: i32) -> Link {
+        use crate::NodeType::{XL, XR};
+        let mut b = LinkBuilder::new();
+
+        // the vertical 2-twist clasp; corners (v0, v1, v2, v3) = (SW, SE, NE, NW).
+        let (v0, v1, v2, v3) = b.add_v_twist(XR, 2);
+
+        if n == 0 {
+            b.connect(v3, v2);
+            b.connect(v0, v1);   // N([2] clasp) = unknot
+            return b.build().unwrap();
+        }
+
+        // the horizontal |n|-twist region.
+        let tt = if n >= 0 {
+            XR
+        } else {
+            XL
+        };
+        let (h0, h1, h2, h3) = b.add_h_twist(tt, n.unsigned_abs() as usize);
+
+        b.connect(v3, h0);
+        b.connect(v0, h3);
+        b.connect(v2, h1);
+        b.connect(v1, h2);
+        b.build().unwrap()
+    }
+
     // The (tail, head) ports of an oriented edge: the tail is where the strand exits its node,
     // the head where it enters the next (cf. `NodeOri::in_ports`).
     fn edge_ports(&self, e: Edge) -> ((usize, usize), (usize, usize)) {
@@ -63,7 +94,7 @@ impl Link {
 mod tests {
     use super::*;
     use crate::Braid;
-    use crate::misc::jones_polynomial;
+    use crate::misc::{jones_polynomial, det};
 
     #[test]
     fn conn_sum_is_jones_multiplicative() {
@@ -82,6 +113,19 @@ mod tests {
         // the connected sum does not depend on the chosen edges.
         let cs2 = k1.conn_sum_at(&k2, 4, 6);
         assert_eq!(jones_polynomial(&cs2), jones_polynomial(&cs));
+    }
+
+    #[test]
+    fn twist_knot_determinants() {
+        // twist knot K_n is a knot of determinant 2n+1 (3_1, 4_1, 5_2, … → 3, 5, 7, …); K_0 = unknot.
+        // negative n is the mirror (twist_knot(-1-n) = mirror K_n), with the same determinant.
+        for n in 0..=6 {
+            let k = Link::twist_knot(n);
+            assert_eq!(k.n_comps(), 1);
+            assert!(k.is_oriented());
+            assert_eq!(det(&k), 2 * n + 1, "det twist_knot({n})");
+            assert_eq!(det(&Link::twist_knot(-1 - n)), 2 * n + 1, "det twist_knot({})", -1 - n);
+        }
     }
 
     #[test]

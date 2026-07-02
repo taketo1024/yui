@@ -254,6 +254,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let c = self.cone.into_tng_complex();
         let (h, t) = c.ht().clone();
 
+        info!("build raw complex: {}", c.stat());
+
         // expanded generators (vertex, labels) per degree, sorted by their KhIGen q-degree
         // (descending) — fixing both the summand generator order and the matrix row/column order.
         let keys: FxHashMap<isize, Vec<(TngComplexKey, KhTensor)>> = c.h_range().map(|i| {
@@ -292,9 +294,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 }
             }
 
+            debug!("  raw d[{i}]: {} -> {}, nnz: {}", cols.len(), rows.len(), entries.len());
             let m = SpMat::from_entries((rows.len(), cols.len()), entries);
             (i, m)
         }).collect_vec();
+
+        info!("raw complex done: {} gens", keys.values().map(|ks| ks.len()).sum::<usize>());
 
         drop(c);
         ChainComplex1::new_with_d_matrices(summands, 1, matrices)

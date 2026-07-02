@@ -3,6 +3,7 @@ mod node;
 mod path;
 mod inv_link;
 mod builder;
+mod ops;
 
 pub use link::{Link, Edge, State, PDCodeX};
 pub use node::{Node, NodeType, NodeOri};

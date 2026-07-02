@@ -76,6 +76,97 @@ impl Link {
         b.build().unwrap()
     }
 
+    // The `tw`-twisted Whitehead double D±(K), `tw` from the Seifert (0) framing (tw = 0 = untwisted,
+    // trivial Alexander); `positive` = clasp sign. Seifert sits at 2·writhe blackboard half-twists.
+    pub fn whitehead_double(&self, positive: bool, tw: i32) -> Link {
+        self.whitehead_double_bbf(positive, 2 * self.writhe() + tw)
+    }
+
+    // Whitehead double with the framing counted from the blackboard framing (tw = 0 = the diagram's
+    // blackboard 2-cable): cut the cable to a 4-end tangle, add `tw` half-twists, close with the clasp.
+    pub fn whitehead_double_bbf(&self, positive: bool, tw: i32) -> Link {
+        // cut a clean edge (joining two distinct crossings): frees the 4 cable ends
+        let e0 = self.edges().into_iter()
+            .find(|&e| {
+                let ((i, _), (j, _)) = self.edge_ends(e, false);
+                i != j
+            })
+            .expect("the companion needs an edge joining two distinct crossings");
+        self.whitehead_double_impl(positive, 0, tw, e0, None).0
+    }
+
+    // Whitehead double cutting the cable at edge `e0` (must join two distinct crossings), placing
+    // `tw_a` framing half-twists on the i-side of the cut and `tw_b` on the j-side. Cutting at an
+    // on-axis edge with `tw_a == tw_b` keeps a strongly-invertible companion's double τ-symmetric.
+    // Also returns the result-edges of `base`'s two doubled strands (empty if `base` is `None`) so the
+    // caller can place a base point there.
+    pub(crate) fn whitehead_double_impl(&self, positive: bool, tw_a: i32, tw_b: i32, e0: Edge, base: Option<Edge>) -> (Link, Vec<Edge>) {
+        use crate::NodeType::{XL, XR};
+        assert!(self.is_knot(), "the Whitehead double requires a knot companion");
+
+        let (mut b, cab) = self.cable2_builder();
+        let ((i0, s0), (j0, t0)) = self.edge_ends(e0, false);
+        let ((a0, a1), (b0, b1)) = (cab[i0][s0], cab[j0][t0]);   // i-side / j-side, CCW order
+        b.disconnect(a0);   // the swapped join means a0–b1, a1–b0 are removed
+        b.disconnect(a1);
+
+        let twist_type = |tw: i32| {
+            if tw >= 0 {
+                XR
+            } else {
+                XL
+            }
+        };
+        // |tw| half-twists growing right off the j-side ends (b1, b0) = (top, bottom): attach the
+        // row's left corners (NW, SW), continue from its right corners (NE, SE).
+        let twist_r = |b: &mut LinkBuilder, (p0, p1): (Port, Port), tw: i32| {
+            if tw == 0 {
+                return (p0, p1);
+            }
+            let (h0, h1, h2, h3) = b.add_h_twist(twist_type(tw), tw.unsigned_abs() as usize);
+            b.connect(p0, h3);
+            b.connect(p1, h0);
+            (h2, h1)
+        };
+        // the 180°-rotation image: grows left off the i-side ends (a1, a0), attaching the row's
+        // right corners (SE, NE) and continuing from its left corners (SW, NW).
+        let twist_l = |b: &mut LinkBuilder, (p0, p1): (Port, Port), tw: i32| {
+            if tw == 0 {
+                return (p0, p1);
+            }
+            let (h0, h1, h2, h3) = b.add_h_twist(twist_type(tw), tw.unsigned_abs() as usize);
+            b.connect(p0, h1);
+            b.connect(p1, h2);
+            (h0, h3)
+        };
+        let (pa0, pa1) = twist_l(&mut b, (a1, a0), tw_a);
+        let (rb0, rb1) = twist_r(&mut b, (b1, b0), tw_b);
+
+        // vertical clasp glued as in twist_knot. The a-side wiring is the 180° image of the b-side,
+        // so equal twists give a τ-symmetric diagram. positive = a positive clasp = D⁺ (verified
+        // Kh-identical to the reference Wh⁺(4_1)).
+        let ct = if positive {
+            XL
+        } else {
+            XR
+        };
+        let (c0, c1, c2, c3) = b.add_v_twist(ct, 2);
+        b.connect(c3, pa0);
+        b.connect(c0, pa1);
+        b.connect(c2, rb1);
+        b.connect(c1, rb0);
+
+        // `base` is not at the cut, so its cable join survives: the two ports cab[bi][bs] each carry
+        // one of base's doubled strands; read off their result-edge ids before consuming the builder.
+        let base_edges: Vec<Edge> = base.into_iter().flat_map(|base| {
+            let ((bi, bs), _) = self.edge_ends(base, false);
+            let (c0, c1) = cab[bi][bs];
+            [b.edge_at(c0).unwrap(), b.edge_at(c1).unwrap()]
+        }).collect();
+
+        (b.build().unwrap(), base_edges)
+    }
+
     // The 2-cable in an open builder, plus `cab[i][slot] = (copy-0 port, copy-1 port)` so callers can
     // re-splice the cable (e.g. the Whitehead clasp) before building.
     fn cable2_builder(&self) -> (LinkBuilder, Vec<[(Port, Port); 4]>) {
@@ -171,6 +262,36 @@ mod tests {
             assert!(k.is_oriented());
             assert_eq!(det(&k), 2 * n + 1, "det twist_knot({n})");
             assert_eq!(det(&Link::twist_knot(-1 - n)), 2 * n + 1, "det twist_knot({})", -1 - n);
+        }
+    }
+
+    #[test]
+    fn whitehead_double_of_unknot() {
+        // the untwisted double of the unknot is the unknot, from any companion diagram (framing 2·writhe).
+        for word in [vec![1, -2], vec![1, 2], vec![-1, -2]] {
+            let u = Braid::from_iter(word).closure();
+            for positive in [true, false] {
+                let d = u.whitehead_double(positive, 0);
+                assert_eq!(d.n_comps(), 1);
+                assert_eq!(det(&d), 1, "D±(unknot) must be the unknot (trivial Alexander)");
+            }
+        }
+    }
+
+    #[test]
+    fn whitehead_double_is_a_knot() {
+        // D±(K) of a nontrivial companion builds (exercising the planarity check) and is a knot with
+        // 4·(crossings) + 2·|writhe| (framing) + 2 (clasp) crossings. det would confirm untwisted but
+        // is exponential here — see _of_unknot.
+        for name in ["3_1", "4_1", "5_2", "6_1"] {
+            let k = Link::test_data(name);
+            let expected = 4 * k.n_crossings() + 2 * k.writhe().unsigned_abs() as usize + 2;
+            for positive in [true, false] {
+                let d = k.whitehead_double(positive, 0);
+                assert_eq!(d.n_comps(), 1, "D±({name}) is a knot");
+                assert_eq!(d.n_crossings(), expected, "D±({name}) crossing count");
+                assert!(d.is_oriented());
+            }
         }
     }
 

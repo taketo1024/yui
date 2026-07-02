@@ -468,7 +468,7 @@ impl Display for CobComp {
             (1, 1, 0) => "I",
             (2, 1, 0) => "∇",
             (1, 2, 0) => "Δ",
-            (2, 2, 0) if self.is_sdl() => "X",
+            (2, 2, 0) if self.is_sdl() => "sdl",
             _ => "Cob"
         }.to_string();
         
@@ -1389,9 +1389,9 @@ mod tests {
             Tng::new(vec![TngComp::arc([0, 1]), TngComp::arc([2, 3])]),
             Tng::new(vec![TngComp::arc([0, 2]), TngComp::arc([1, 3])]),
         );
-        assert_eq!(sdl.to_string(), "X({[0-1], [2-3]} -> {[0-2], [1-3]})");
+        assert_eq!(sdl.to_string(), "sdl({[0-1], [2-3]} -> {[0-2], [1-3]})");
 
-        // Genus > 0: the special symbols (∪/∩/I/∇/Δ/X) are only used at genus 0,
+        // Genus > 0: the special symbols (∪/∩/I/∇/Δ/sdl) are only used at genus 0,
         // so any genus drops to the default `Cob` label with a trailing ", g: N".
         let mut handle = CobComp::id(c.clone());
         handle.genus = 1;

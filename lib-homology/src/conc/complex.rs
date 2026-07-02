@@ -313,8 +313,13 @@ where
     }
 
     pub fn generic_homology(&self) -> GenericGrMod<I, R> {
+        self.generic_homology_in(self.support().copied())
+    }
+
+    /// Trans-free homology at the given indices only, using the full differentials.
+    pub fn generic_homology_in(&self, support: impl IntoIterator<Item = I>) -> GenericGrMod<I, R> {
         GrMod::generate_filtered(
-            self.support().copied(),
+            support.into_iter(),
             |i| {
                 let hi = self.generic_homology_at(i);
                 (!hi.is_zero()).then_some(hi)

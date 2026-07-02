@@ -54,11 +54,7 @@ impl Link {
         }
 
         // the horizontal |n|-twist region.
-        let tt = if n >= 0 {
-            XR
-        } else {
-            XL
-        };
+        let tt = if n >= 0 { XR } else { XL };
         let (h0, h1, h2, h3) = b.add_h_twist(tt, n.unsigned_abs() as usize);
 
         b.connect(v0, h3);
@@ -110,13 +106,7 @@ impl Link {
         b.disconnect(a0);   // the swapped join means a0–b1, a1–b0 are removed
         b.disconnect(a1);
 
-        let twist_type = |tw: i32| {
-            if tw >= 0 {
-                XR
-            } else {
-                XL
-            }
-        };
+        let twist_type = |tw: i32| if tw >= 0 { XR } else { XL };
         // |tw| half-twists growing right off the j-side ends (b1, b0) = (top, bottom): attach the
         // row's left corners (NW, SW), continue from its right corners (NE, SE).
         let twist_r = |b: &mut LinkBuilder, (p0, p1): (Port, Port), tw: i32| {
@@ -145,11 +135,7 @@ impl Link {
         // vertical clasp glued as in twist_knot. The a-side wiring is the 180° image of the b-side,
         // so equal twists give a τ-symmetric diagram. positive = a positive clasp = D⁺ (verified
         // Kh-identical to the reference Wh⁺(4_1)).
-        let ct = if positive {
-            XL
-        } else {
-            XR
-        };
+        let ct = if positive { XL } else { XR };
         let (c0, c1, c2, c3) = b.add_v_twist(ct, 2);
         b.connect(c3, pa0);
         b.connect(c0, pa1);
@@ -219,11 +205,7 @@ impl Link {
             ports.contains(&s)
         };
         debug_assert!(is_in(x) != is_in(y), "edge {e} must have one head and one tail");
-        if is_in(x) {
-            (y, x)
-        } else {
-            (x, y)
-        }
+        if is_in(x) { (y, x) } else { (x, y) }
     }
 }
 

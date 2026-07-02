@@ -1,7 +1,7 @@
 //! Builds the involutive cone `Cone(1 + τ)` at the *cobordism* level — before delooping — for a
 //! strongly invertible link. [`ConeBuilder`] owns a [`SymTngBuilder`], drives the symmetric build,
-//! and returns the reduced cone as a [`TngComplex`] (the `KhGen → KhIGen` conversion is done by the
-//! caller in `khi`). Char-2 only.
+//! and converts the reduced cone at the boundary: `into_raw_complex` yields the matrix-backed
+//! `KhIGen`-keyed chain complex, `eval_khi_elements` the canon classes. Char-2 only.
 //!
 //! The build always closes with the incremental `cone_merge`: the final chunk merge is fused with
 //! cone construction + reduction per symmetric degree, so the full un-delooped product is never
@@ -19,8 +19,13 @@ use yui_core::bitseq::Bit;
 use yui_core::{Ring, RingOps};
 use yui_link::{Edge, Node, InvLink};
 
-use crate::kh::KhChain;
-use crate::tng::{Cob, CobComp, LcCob, Tng, TngComplex, TngComplexElem, TngComplexKey, TngComplexVertex};
+use rustc_hash::FxHashMap;
+use yui_homology::{ChainComplex1, GrMod1, Summand};
+use yui_matrix::sparse::SpMat;
+
+use crate::kh::{KhChain, KhGen};
+use crate::khi::{KhIChain, KhIGen, KhIGenExt};
+use crate::tng::{Cob, CobComp, LcCob, LcCobTrait, Tng, TngComplex, TngComplexElem, TngComplexKey, TngComplexVertex};
 use super::{reachable_range, ChunkBuilder, SymTngBuilder, SymBuildConfig, TngComplexBuilder, BuildConfig, BuildMode, TauKeyMap};
 
 pub struct ConeBuilder<R>
@@ -239,6 +244,56 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("cone: window top C[{top}] {}/{total} no-in-edge verts pruned", doomed.len());
         self.cone.complex_mut().remove_vertices(&doomed);
     }
+
+    /// The canon classes as KhI chains (cone bit → `B`/`Q`).
+    pub fn eval_khi_elements(&self) -> Vec<KhIChain<R>> {
+        self.eval_elements().into_iter()
+            .map(|z| z.map_keys(|x| into_khi_gen(&x)))
+            .collect()
+    }
+
+    /// Convert the reduced cone directly into the KhI chain complex: generators become `KhIGen`s
+    /// (cone bit → `B`/`Q`), the scalar edges are materialized as cached differential matrices, and
+    /// the cobordism-level complex is dropped — downstream reduction is pure linear algebra.
+    pub fn into_raw_complex(self) -> ChainComplex1<KhIGen, R> {
+        let c = self.cone.into_tng_complex();
+        assert!(c.is_completely_delooped());
+
+        let (h, t) = c.ht().clone();
+
+        // per degree: keys sorted by their KhIGen q-degree (descending), fixing both the summand
+        // generator order and the matrix row/column order.
+        let keys: FxHashMap<isize, Vec<TngComplexKey>> = c.h_range().map(|i| {
+            let sorted = c.keys_of_deg(i).copied()
+                .sorted_by_key(|k| -into_khi_gen(&k.as_gen()).rel_q_deg())
+                .collect_vec();
+            (i, sorted)
+        }).collect();
+
+        let summands = GrMod1::generate(c.h_range(), |i| {
+            Summand::from_raw_generators(keys[&i].iter().map(|k| into_khi_gen(&k.as_gen())))
+        });
+
+        let matrices = c.h_range().map(|i| {
+            let cols = &keys[&i];
+            let rows: FxHashMap<&TngComplexKey, usize> = keys.get(&(i + 1))
+                .map(|ks| ks.iter().enumerate().map(|(r, k)| (k, r)).collect())
+                .unwrap_or_default();
+
+            let entries = cols.iter().enumerate().flat_map(|(j, k)| {
+                let (c, rows, h, t) = (&c, &rows, &h, &t);
+                c.vertex(k).out_edges().map(move |l|
+                    (rows[l], j, c.edge(k, l).eval(h, t))
+                )
+            });
+
+            let m = SpMat::from_entries((rows.len(), cols.len()), entries);
+            (i, m)
+        }).collect_vec();
+
+        drop(c);
+        ChainComplex1::new_with_d_matrices(summands, 1, matrices)
+    }
 }
 
 // ---- cobordism-level cone construction (`1 + τ`, char-2) ----
@@ -256,6 +311,19 @@ where G: Fn(Edge) -> Edge {
     Cob::new(tng.comps().map(|c|
         CobComp::plain(Tng::from(c.clone()), Tng::from(c.convert_edges(&inv_edge)))
     ))
+}
+
+// Cone key → KhIGen: the cone bit is the last `state` bit (`0` → `B`/`Left`, `1` → `Q`/`Right`);
+// stripping it gives the underlying `KhGen` (with the true q-grading).
+fn into_khi_gen(x: &KhGen) -> KhIGen {
+    let mut state = *x.state();
+    let bit = state.iter().last().unwrap();
+    state.remove(state.len() - 1);
+    let under = KhGen::new(state, *x.tensor());
+    match bit {
+        Bit::Bit0 => KhIGen::from_left(under),
+        Bit::Bit1 => KhIGen::from_right(under),
+    }
 }
 
 // Lift a symmetric canon cycle to the cone layer `bit`: push the cone bit onto each `out_cob` key's
@@ -354,8 +422,8 @@ mod tests {
         for (name, l) in knots {
             let matrix = ssi_invariants(&l, &c, false);
 
-            let config = SymBuildConfig { cob_cone: true, h_range: Some(isize::MIN + 1 ..= 1), ..Default::default() };
-            let kh = KhIHomology::new_with_config(&l, &c, &t, false, config);
+            let config = SymBuildConfig { h_range: Some(isize::MIN + 1 ..= 1), ..Default::default() };
+            let kh = KhIHomology::from_cone(&l, &c, &t, false, config);
             let zs = kh.canon_cycles();
             assert_eq!(zs.len(), 4);
 

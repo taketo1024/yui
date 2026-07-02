@@ -15,6 +15,7 @@
 
 use delegate::delegate;
 use itertools::Itertools;
+use log::{debug, info};
 use num_traits::Zero;
 use yui_core::bitseq::Bit;
 use yui_core::{Ring, RingOps};
@@ -46,12 +47,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // Build the reduced chunks, merge all but the last normally, and close with the incremental
     // cone merge. The non-chunked case is just a degenerate plan (see `plan`).
     pub fn run(mut self) -> Self {
+        info!("build config:\n{:#?}", self.inner.config());
+        info!("cutwidth profile:\n{}", self.inner.profile_sym());
+
         let plan = self.plan();
         let mode = self.inner.config().mode;
+
+        info!("cone build: {} chunks, mode: {mode:?}", plan.len());
+
         let chunks = ChunkBuilder { builder: &self.inner }.build_chunks(plan);
         let last = chunks.len().saturating_sub(1);
 
         for (i, (chunk, (c, key_map, elems))) in chunks.into_iter().enumerate() {
+            info!("cone chunk {}/{}: {} nodes{}", i + 1, last + 1, chunk.len(), if i == last { " (cone merge)" } else { "" });
             self.inner.drop_nodes(|x| chunk.contains(x));
             if i == last {
                 self.cone_merge(c, key_map, elems, mode);
@@ -91,6 +99,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let range = reachable_range(self.inner.complex().h_range(), &self.inner.config().h_range, self.inner.n_nodes());
         self.cone = TngComplexBuilder::from_tng_complex(cone_shell(self.inner.complex()), BuildConfig { mode, ..Default::default() });
 
+        info!("cone merge {} <- {}, range: {range:?}", left.stat(), right.stat());
+
         // complete the symmetric canon cycles, then seed their `B`/`Q` (bit-0/bit-1) copies into the
         // cone so its deloop/eliminate carry them. `cone_extend` will create the referenced vertices.
         self.inner.elements_mut().merge(other_elems);
@@ -98,6 +108,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let (start, top) = (*range.start(), *range.end());
         for d in range {
+            debug!("cone merge C[{d}]...");
             self.inner.merge_slice(&left, &right, d, &left_map, &other_map);
             self.cone_extend(d);
             if d - 2 >= start {
@@ -106,12 +117,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             if d > start {
                 self.prune(d - 1);
             }
+            debug!("  cone C[{d}] done: {}", self.cone.stat());
         }
+
+        info!("cone eliminate top C[{}..={}]: {}", top - 1, top + 1, self.cone.stat());
         for d in (top - 1) ..= (top + 1) {
             self.cone.eliminate_in(d);
         }
+
+        info!("cone deloop: {}", self.cone.stat());
         self.deloop_all(false);
         self.deloop_all(true);
+
+        info!("cone done: {}", self.cone.stat());
     }
 
     // Add the symmetric complex's degree-`d` slice to the cone: the two copies `k·0`, `k·1` of each
@@ -124,6 +142,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             key
         };
         let keys = self.inner.complex().keys_of_deg(d).copied().collect_vec();
+
+        debug!("  cone-extend C[{d}]: +{} verts", 2 * keys.len());
 
         for k in keys.iter() {
             let tng = self.inner.complex().vertex(k).tng().clone();
@@ -165,11 +185,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let lifted = self.inner.elements().content().iter().flat_map(|e|
             [lift_elem(e, Bit::Bit0), lift_elem(e, Bit::Bit1)]
         ).collect_vec();
+
+        debug!("  seed {} cone elements", lifted.len());
+
         self.cone.elements_mut().set(lifted);
     }
 
     // Deloop every degree (marked circles only when `based`), eliminating to finish the reduction.
     fn deloop_all(&mut self, based: bool) {
+        debug!("cone deloop-all (based: {based})...");
+
         let auto_elim = self.cone.config().mode.auto_elim();
         for d in self.cone.complex().h_range() {
             self.cone.deloop_in_with(d, based);
@@ -184,6 +209,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // Drop a consumed symmetric degree and its τ key-map entries — never needed again.
     fn prune(&mut self, d: isize) {
         let doomed = self.inner.complex().keys_of_deg(d).copied().collect_vec();
+
+        debug!("  prune sym C[{d}]: -{} verts", doomed.len());
+
         self.inner.complex_mut().remove_vertices(&doomed);
         let i0 = self.inner.complex().deg_shift().0;
         self.inner.key_map_mut().drop(|k| k.weight() as isize + i0 == d);

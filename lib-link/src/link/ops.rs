@@ -140,40 +140,49 @@ impl Link {
         b.disconnect(a0);   // the swapped join means a0–b1, a1–b0 are removed
         b.disconnect(a1);
 
+        // The insert replaces the two parallel cable strands. At the cut, CCW order runs upward
+        // around the right-facing a-stump and downward around the left-facing b-stump, so
+        // (a0, a1) = (lower, upper) and (b0, b1) = (upper, lower) — consistent with the removed
+        // parallel joins a0–b1 (lower) and a1–b0 (upper):
+        //
+        //   a1 ────[       ]────[       ]────[       ]──── b0   (upper strand)
+        //          [ row_a ]    [ clasp ]    [ row_b ]
+        //   a0 ────[       ]────[       ]────[       ]──── b1   (lower strand)
+        //
+        // row_a / row_b carry tw_a / tw_b half-twists. The clasp's left strand (SW↔NW) turns the
+        // a-side pair back on itself, its right strand (SE↔NE) the b-side pair, and the two
+        // turn-backs hook — the Whitehead pattern (winding number 0). row_a is embedded as the
+        // π-rotation of row_b, so tw_a = tw_b gives a diagram symmetric under the π-rotation
+        // about the horizontal axis (the strong inversion used by InvLink).
         let twist_type = |tw: i32| if tw >= 0 { XR } else { XL };
+        let (mut upper, mut lower) = (a1, a0);
 
-        // |tw_a| half-twists growing left off the a-side ends (a1, a0): attach the row's right
-        // corners (SE, NE), continue from its left corners (SW, NW) — the 180°-rotation image of
-        // the b-side below.
-        let (ta0, ta1) = if tw_a == 0 {
-            (a1, a0)   // a zero-length row is a straight pass-through: SW takes SE's strand, NW takes NE's
-        } else {
+        // row_a, π-rotated: its left face is (SE upper, NE lower), its right face (SW upper, NW lower).
+        if tw_a != 0 {
             let (h0, h1, h2, h3) = b.add_h_twist(twist_type(tw_a), tw_a.unsigned_abs() as usize);
-            b.connect(a1, h1);
-            b.connect(a0, h2);
-            (h0, h3)
-        };
+            b.connect(upper, h1);
+            b.connect(lower, h2);
+            (upper, lower) = (h0, h3);
+        }
 
-        // |tw_b| half-twists growing right off the b-side ends (b1, b0): attach the row's left
-        // corners (NW, SW), continue from its right corners (NE, SE).
-        let (tb0, tb1) = if tw_b == 0 {
-            (b1, b0)   // likewise: NE takes NW's strand, SE takes SW's
-        } else {
-            let (h0, h1, h2, h3) = b.add_h_twist(twist_type(tw_b), tw_b.unsigned_abs() as usize);
-            b.connect(b1, h3);
-            b.connect(b0, h0);
-            (h2, h1)
-        };
-
-        // vertical clasp glued as in twist_knot: the twisted a-side ends on its left, the twisted
-        // b-side ends on its right. positive = a positive clasp = D⁺ (verified Kh-identical to the
-        // reference Wh⁺(4_1)).
+        // the clasp column: left ports (NW upper, SW lower), right ports (NE upper, SE lower).
+        // positive = a positive clasp = D⁺ (pinned by the clasp-sign determinant test).
         let ct = if positive { XL } else { XR };
         let (c0, c1, c2, c3) = b.add_v_twist(ct, 2);
-        b.connect(c3, ta0);
-        b.connect(c0, ta1);
-        b.connect(c2, tb1);
-        b.connect(c1, tb0);
+        b.connect(upper, c3);
+        b.connect(lower, c0);
+        (upper, lower) = (c2, c1);
+
+        // row_b, upright: left face (NW upper, SW lower), right face (NE upper, SE lower).
+        if tw_b != 0 {
+            let (h0, h1, h2, h3) = b.add_h_twist(twist_type(tw_b), tw_b.unsigned_abs() as usize);
+            b.connect(upper, h3);
+            b.connect(lower, h0);
+            (upper, lower) = (h2, h1);
+        }
+
+        b.connect(upper, b0);
+        b.connect(lower, b1);
 
         // `base` is not at the cut, so its cable join survives: the two ports of cab at `base` each
         // carry one of its doubled strands; read off their result-edge ids before consuming the builder.
@@ -275,6 +284,17 @@ mod tests {
                 assert_eq!(d.n_crossings(), expected, "D±({name}) crossing count");
                 assert!(d.is_oriented());
             }
+        }
+    }
+
+    #[test]
+    fn whitehead_double_clasp_sign() {
+        // twisted doubles of the unknot are twist knots, whose determinants separate the clasp
+        // signs; values pinned against the Kh-verified reference implementation.
+        let u = Braid::from([1, -2]).closure(); // writhe-0 unknot diagram
+        for (tw, pos_det, neg_det) in [(2, 3, 5), (4, 7, 9)] {
+            assert_eq!(det(&u.whitehead_double(true, tw)), pos_det, "D+(U, tw={tw})");
+            assert_eq!(det(&u.whitehead_double(false, tw)), neg_det, "D-(U, tw={tw})");
         }
     }
 

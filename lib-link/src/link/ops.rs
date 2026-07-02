@@ -146,7 +146,7 @@ impl Link {
         // corners (SE, NE), continue from its left corners (SW, NW) — the 180°-rotation image of
         // the b-side below.
         let (ta0, ta1) = if tw_a == 0 {
-            (a1, a0)
+            (a1, a0)   // a zero-length row is a straight pass-through: SW takes SE's strand, NW takes NE's
         } else {
             let (h0, h1, h2, h3) = b.add_h_twist(twist_type(tw_a), tw_a.unsigned_abs() as usize);
             b.connect(a1, h1);
@@ -157,7 +157,7 @@ impl Link {
         // |tw_b| half-twists growing right off the b-side ends (b1, b0): attach the row's left
         // corners (NW, SW), continue from its right corners (NE, SE).
         let (tb0, tb1) = if tw_b == 0 {
-            (b1, b0)
+            (b1, b0)   // likewise: NE takes NW's strand, SE takes SW's
         } else {
             let (h0, h1, h2, h3) = b.add_h_twist(twist_type(tw_b), tw_b.unsigned_abs() as usize);
             b.connect(b1, h3);

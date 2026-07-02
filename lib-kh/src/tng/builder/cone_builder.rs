@@ -3,11 +3,9 @@
 //! and returns the reduced cone as a [`TngComplex`] (the `KhGen → KhIGen` conversion is done by the
 //! caller in `khi`). Char-2 only.
 //!
-//! Two paths, by `chunks`:
-//! - **whole-complex**: build the symmetric complex, double it (`make_cone`), then eliminate the
-//!   invertible `1`-edges and deloop.
-//! - **incremental** (`cone_merge`): fuse the final chunk merge with cone construction + reduction,
-//!   so the full un-delooped product is never materialized.
+//! The build always closes with the incremental `cone_merge`: the final chunk merge is fused with
+//! cone construction + reduction per symmetric degree, so the full un-delooped product is never
+//! materialized (a non-chunked build uses the degenerate two-piece plan — see `plan`).
 //!
 //! Reference:
 //! - T. Sano, "Involutive Khovanov homology and equivariant knots",
@@ -115,15 +113,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 self.cone.eliminate_in(d - 2);
             }
             if d > start {
-                self.prune(d - 1);
+                self.prune_consumed(d - 1);
             }
             debug!("  cone C[{d}] done: {}", self.cone.stat());
         }
 
-        info!("cone eliminate top C[{}..={}]: {}", top - 1, top + 1, self.cone.stat());
-        for d in (top - 1) ..= (top + 1) {
+        // eliminate_in(top) collapses the id-pairing C[top] (Bit0) → C[top+1] (Bit1), shrinking the
+        // top before deloop; C[top+1]'s remainder is dropped by `prune_isolated_top` below.
+        // (top+1 itself needs no eliminate_in: its vertices have no out-edges.)
+        info!("cone eliminate top C[{}..={}]: {}", top - 1, top, self.cone.stat());
+        for d in (top - 1) ..= top {
             self.cone.eliminate_in(d);
         }
+
+        self.prune_isolated_top(top);
 
         info!("cone deloop: {}", self.cone.stat());
         self.deloop_all(false);
@@ -207,7 +210,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     // Drop a consumed symmetric degree and its τ key-map entries — never needed again.
-    fn prune(&mut self, d: isize) {
+    fn prune_consumed(&mut self, d: isize) {
         let doomed = self.inner.complex().keys_of_deg(d).copied().collect_vec();
 
         debug!("  prune sym C[{d}]: -{} verts", doomed.len());
@@ -215,6 +218,26 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.inner.complex_mut().remove_vertices(&doomed);
         let i0 = self.inner.complex().deg_shift().0;
         self.inner.key_map_mut().drop(|k| k.weight() as isize + i0 == d);
+    }
+
+    // Restrict a truncated cone to what KhI within the window needs: drop the out-of-window layer
+    // C[top+1] (the `Bit1` shift of C[top]), then prune no-in-edge vertices at C[top] — they fed
+    // only the dropped layer. No-op for a full-range build (its C[top+1] is genuine).
+    fn prune_isolated_top(&mut self, top: isize) {
+        if self.inner.config().h_range.is_none() {
+            return;
+        }
+        let doomed = self.cone.complex().keys_of_deg(top + 1).copied().collect_vec();
+        debug!("cone: drop out-of-window C[{}] ({} verts)", top + 1, doomed.len());
+        self.cone.complex_mut().remove_vertices(&doomed);
+
+        let total = self.cone.complex().keys_of_deg(top).count();
+        let doomed = self.cone.complex().keys_of_deg(top)
+            .filter(|k| self.cone.complex().vertex(k).in_edges().next().is_none())
+            .copied()
+            .collect_vec();
+        debug!("cone: window top C[{top}] {}/{total} no-in-edge verts pruned", doomed.len());
+        self.cone.complex_mut().remove_vertices(&doomed);
     }
 }
 

@@ -148,7 +148,6 @@ impl Link {
         //   a0 ────[       ]────[       ]────[       ]──── b1   (lower strand)
         //
         // The clasp turns each side's pair back on itself and the turn-backs hook (winding 0).
-        // Twist rows are π-rotation invariant, so tw_a = tw_b gives a π-rotation-symmetric diagram.
         // Corners are destructured by picture position (ul/ur/ll/lr = upper/lower × left/right);
         // the wiring is identical for every piece: enter at (ul, ll), continue from (ur, lr).
         let twist_type = |tw: i32| if tw >= 0 { XR } else { XL };

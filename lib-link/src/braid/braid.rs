@@ -1,11 +1,10 @@
-use std::collections::HashMap;
 use std::ops::{MulAssign, Mul};
 use auto_impl_ops::auto_ops;
 use delegate::delegate;
 use derive_more::{Display, Debug};
 use itertools::Itertools;
 
-use crate::{Edge, Link, Node};
+use crate::{Link, LinkBuilder, NodeType};
 
 use super::braid_gen::{BraidGen, from_raw};
 
@@ -73,51 +72,46 @@ impl Braid {
         Self::new(self.strands, stack)
     }
 
+    // Plat-free braid closure: one crossing per generator; each strand position is closed by wiring
+    // its visits cyclically (the wrap-around edge is the closure arc, so a single visit wires to
+    // itself), and an unvisited position becomes a free loop. Crossing ports are SW=0, SE=1, NE=2, NW=3.
     pub fn closure(&self) -> Link {
-        use crate::{NodeType, NodeOri};
+        let mut b = LinkBuilder::new();
 
-        let mut count: Edge = self.strands as Edge;
-        let mut front_edges: Vec<Edge> = (0..self.strands as Edge).collect();
-        let mut nodes: Vec<Node> = Vec::new();
-
-        for s in &self.elements {
-            /*        +       -
-             *  ↓   a   b   a   b
-             *       \ /     \ /
-             *  ↓     /       \
-             *       / \     / \
-             *  ↓   c   d   c   d
-             */
-            let i = s.index() - 1;
-            let (a, b) = (front_edges[i], front_edges[i + 1]);
-            let (c, d) = (count, count + 1);
-
-            let nt = if s.sign().is_positive() { NodeType::XR } else { NodeType::XL };
-            let n = Node::new(nt, NodeOri::Up, [b,a,c,d]);
-            nodes.push(n);
-
-            front_edges[i] = c;
-            front_edges[i + 1] = d;
-            count += 2;
-        }
-
-        let mut conn: HashMap<Edge, Edge> = HashMap::new();
-        let mut loops: Vec<Edge> = Vec::new();
-
-        for (k, front) in front_edges.into_iter().enumerate() {
-            let k = k as Edge;
-            if front == k {
-                loops.push(k);
+        let xs: Vec<_> = self.elements.iter().map(|g| {
+            let nt = if g.sign().is_positive() {
+                NodeType::XR
             } else {
-                conn.insert(front, k);
+                NodeType::XL
+            };
+            b.add_crossing(nt)
+        }).collect();
+
+        // the (top, bottom) ports each crossing presents to its two strand positions:
+        // (NW = 3, SW = 0) at position i, (NE = 2, SE = 1) at position i + 1.
+        let strands = self.elements.iter().zip(&xs).fold(
+            vec![vec![]; self.strands],
+            |mut strands, (g, &x)| {
+                let i = g.index() - 1;
+                strands[i]    .push(((x, 3), (x, 0)));
+                strands[i + 1].push(((x, 2), (x, 1)));
+                strands
+            }
+        );
+
+        for visits in strands {
+            if visits.is_empty() {
+                b.add_loop();
+            } else {
+                for (&(_, bot), &(top, _)) in visits.iter().circular_tuple_windows() {
+                    b.connect(bot, top);
+                }
             }
         }
 
-        nodes.iter_mut().for_each(|n|
-            *n = n.convert_edges(|e| conn.get(&e).cloned().unwrap_or(e))
-        );
-
-        Link::new(nodes, loops)
+        // canonical braid orientation: strands run downward, entering every crossing from the
+        // top ports (NW = 3, NE = 2).
+        b.build_with(|_, j| j >= 2).unwrap()
     }
 
     pub fn display(&self) -> String {
@@ -189,6 +183,24 @@ impl MulAssign<&Braid> for Braid {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use yui_core::poly::LPoly;
+    use crate::misc::jones_polynomial;
+
+    type P = LPoly<'q', i32>;
+
+    #[test]
+    fn closure_orientation() {
+        // σ₁⁻⁴ closes to the (2,4) torus link with parallel downward strands. jones detects the
+        // component orientations, so this locks the closure's convention (verified identical to the
+        // pre-LinkBuilder closure; L4a1's PD orientation is the anti-parallel variant, NOT this one).
+        let l = Braid::from([-1, -1, -1, -1]).closure();
+        assert_eq!(l.n_comps(), 2);
+        assert!(l.is_oriented());
+        assert_eq!(l.writhe(), -4);
+
+        let q = P::mono;
+        assert_eq!(jones_polynomial(&l), P::from_iter([(q(-2), 1), (q(-4), 1), (q(-6), 1), (q(-12), 1)]));
+    }
 
     #[test]
     fn init_by_code() {

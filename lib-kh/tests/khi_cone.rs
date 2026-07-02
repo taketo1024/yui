@@ -15,11 +15,15 @@ use common::*;
 
 type P = Poly<'H', FF2>;
 
-// ssi (s̲, s̄) from the cone's canon classes via H-divisibility — cf. `cone_canon_ssi_matches_matrix`.
-fn ssi_via_cone(l: &InvLink, config: SymBuildConfig) -> (i32, i32) {
+// ssi (s̲, s̄) from the canon classes via H-divisibility — cf. `cone_canon_ssi_matches_matrix`.
+fn ssi_with(l: &InvLink, config: SymBuildConfig, cone: bool) -> (i32, i32) {
     let (c, t) = (P::variable(), P::zero());
     let config = SymBuildConfig { h_range: Some(isize::MIN + 1 ..= 1), ..config };
-    let kh = KhIHomology::from_cone(l, &c, &t, false, config);
+    let kh = if cone {
+        KhIHomology::from_cone(l, &c, &t, false, config)
+    } else {
+        KhIHomology::new_with_config(l, &c, &t, false, config)
+    };
 
     let zs = kh.canon_cycles();
     assert_eq!(zs.len(), 4);
@@ -31,6 +35,10 @@ fn ssi_via_cone(l: &InvLink, config: SymBuildConfig) -> (i32, i32) {
 
     let (w, r) = (l.writhe(), l.seifert_circles().len() as i32);
     (2 * ds[0] + w - r + 1, 2 * ds[2] + w - r + 1)
+}
+
+fn ssi_via_cone(l: &InvLink, config: SymBuildConfig) -> (i32, i32) {
+    ssi_with(l, config, true)
 }
 
 #[test]
@@ -47,5 +55,14 @@ fn ssi_interlock_9_46_cone() {
     let (pd, cut) = interlock_9_46();
     let l = inv(pd);
     let config = SymBuildConfig { cut: CutOption::Manual(cut), ..Default::default() };
-    assert_eq!(ssi_via_cone(&l, config), (0, 4), "oracle from the ssi-corks experiments");
+    assert_eq!(ssi_with(&l, config, true), (0, 4), "oracle from the ssi-corks experiments");
+}
+
+#[test]
+#[ignore = "slow: 30-crossing interlock"]
+fn ssi_interlock_9_46_matrix() {
+    let (pd, cut) = interlock_9_46();
+    let l = inv(pd);
+    let config = SymBuildConfig { cut: CutOption::Manual(cut), ..Default::default() };
+    assert_eq!(ssi_with(&l, config, false), (0, 4), "oracle from the ssi-corks experiments");
 }

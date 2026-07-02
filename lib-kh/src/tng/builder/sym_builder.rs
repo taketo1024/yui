@@ -21,7 +21,7 @@ use yui_core::{Ring, RingOps};
 use yui_link::{Node, Edge, InvLink};
 
 use crate::kh::{KhGen, KhTensor};
-use crate::tng::{LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
+use crate::tng::{LcCob, LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
 use crate::tng::builder::{TngComplexBuilder, TngElemBuilder, BuildConfig, BuildMode, NodeOrder};
 use std::fmt;
 use super::{reachable_range, pop_min_pivot, sparkline, cutwidth_after, toggle_boundary, boundary_edges, select_cuts, cut_components, merge_order, CutOption};
@@ -836,14 +836,36 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             .collect()
     }
 
-    // Manual cut: sever the cut edges (union of all cut-lines), validate τ-symmetry, order the pieces.
+    // Manual cut: sever the cut edges (union of all cut-lines), fuse τ-swapped components into
+    // single τ-invariant chunks, validate, then order the pieces.
     fn manual_plan(&self, cuts: &[Vec<Edge>]) -> Vec<Vec<Node>> {
         let cut: FxHashSet<Edge> = cuts.iter().flatten().copied().collect();
         let nodes = self.builder.nodes();
-        let pieces = cut_components(nodes, &cut);
+        let comps = cut_components(nodes, &cut);
+        let pieces = self.fuse_tau_orbits(nodes, comps);
         self.validate_cut(&cut, &pieces);
         merge_order(nodes, pieces).into_iter()
             .map(|piece| piece.into_iter().map(|i| nodes[i].clone()).collect())
+            .collect()
+    }
+
+    // Fuse each τ-orbit of components into one chunk: a τ-symmetric cut maps a component to another
+    // component, so off-axis τ-swapped pieces merge into a single τ-invariant chunk.
+    fn fuse_tau_orbits(&self, nodes: &[Node], comps: Vec<Vec<usize>>) -> Vec<Vec<usize>> {
+        let idx_of: FxHashMap<Node, usize> = nodes.iter().enumerate().map(|(i, x)| (x.clone(), i)).collect();
+        let comp_of: FxHashMap<usize, usize> = comps.iter().enumerate()
+            .flat_map(|(c, comp)| comp.iter().map(move |&i| (i, c)))
+            .collect();
+        let tau = |c: usize| comp_of[&idx_of[self.builder.inv_node(&nodes[comps[c][0]])]];
+
+        // one chunk per τ-orbit (τ is an involution on components), keyed by its smaller index.
+        (0..comps.len())
+            .filter(|&c| c <= tau(c))
+            .map(|c| if tau(c) == c {
+                comps[c].clone()
+            } else {
+                comps[c].iter().chain(&comps[tau(c)]).copied().collect()
+            })
             .collect()
     }
 
@@ -913,26 +935,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn build(&mut self) {
         assert_eq!(self.builder.inner.complex().dim(), 0, "must start from init state.");
 
-        let elements = self.builder.inner.elements_mut().take();
+        let elements = self.builder.inner.elements().content().to_vec();
         let (half, t_half) = self.partition_off_axis();
 
         info!("{} preprocess off-axis: {} + {}", self.builder.current_step(), half.len(), t_half.len());
 
-        let (c, tc, key_map, elements) = self.build_from_half(&half, elements);
+        let (c, tc, key_map, e_half, e_t_half) = self.build_from_half(&half, elements);
 
-        // merge the half, then its τ-image.
-        self.merge_half(&half, c);
-        self.merge_half(&t_half, tc);
+        // merge the half (combines with the resident seeds = e_half), then its τ-image (completes them).
+        self.merge_half(&half, c, e_half);
+        self.merge_half(&t_half, tc, e_t_half);
 
         self.builder.key_map = key_map;
-        self.builder.inner.elements_mut().set(elements);
 
         info!("{} preprocess done: {}", self.builder.current_step(), self.builder.stat());
     }
 
-    fn merge_half(&mut self, nodes: &[Node], c: TngComplex<R>) {
+    fn merge_half(&mut self, nodes: &[Node], c: TngComplex<R>, elements: Vec<TngComplexElem<R>>) {
         self.builder.inner.drop_nodes(|x| nodes.contains(x));
-        self.builder.inner.merge(c, vec![]); // elements are tracked through build_from_half, not here
+        self.builder.inner.merge(c, elements);
     }
 
     // Split the off-axis crossings (`τx != x`) into two τ-mirror halves: each adjacency
@@ -971,33 +992,36 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         uf.into_disjoint()
     }
 
-    fn build_from_half(&self, crossings: &[Node], elements: Vec<TngComplexElem<R>>) -> (TngComplex<R>, TngComplex<R>, TauKeyMap, Vec<TngComplexElem<R>>) {
+    fn build_from_half(&self, crossings: &[Node], elements: Vec<TngComplexElem<R>>) -> (TngComplex<R>, TngComplex<R>, TauKeyMap, Vec<TngComplexElem<R>>, Vec<TngComplexElem<R>>) {
         // crossings appended after this chunk: all remaining nodes minus the chunk (half + τ-half).
         let r_rest = self.builder.n_nodes() - 2 * crossings.len();
 
+        let n = elements.len();
+
+        // Transport each element with its τ-image; applying τ again to (τe)_h gives the τ-half element
+        // (e_h's state/in_cob via τ² = id, τ-converted out_cob), which the bilinear merge then completes.
+        let t_elements = elements.iter().map(|e| self.tau_element(e)).collect_vec();
+
         let mut b = self.half_builder();
         b.set_nodes(crossings.iter().cloned());
-        b.elements_mut().set(elements);
+        b.elements_mut().set(elements.into_iter().chain(t_elements));
         b.process_nodes();
 
         info!("{} half complex built: {}", self.builder.current_step(), b.stat());
 
         let keys = b.complex().keys().cloned().collect_vec();
-        let mut elements = b.elements_mut().take();
+        let mut e_half = b.elements_mut().take();
+        let tau_half = e_half.split_off(n);
+        let e_t_half = tau_half.iter().map(|e| self.tau_element(e)).collect_vec();
 
+        debug!("  build complexes...");
         let c = b.into_tng_complex();
-        debug!("  mirror half via τ...");
         let tc = c.convert_edges(|e| self.builder.inv_edge(e));
 
         debug!("  pair key_map ({}² entries)...", keys.len());
         let key_map = TauKeyMap::from_half(&keys, self.weight_band(r_rest));
 
-        debug!("  complete {} elements...", elements.len());
-        elements.iter_mut().for_each(|e|
-            self.complete_element(e)
-        );
-
-        (c, tc, key_map, elements)
+        (c, tc, key_map, e_half, e_t_half)
     }
 
     // Combined off-axis weight that can still reach the window, given `r` pending crossings.
@@ -1021,18 +1045,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             .with_config(BuildConfig { node_order, h_range, ..Default::default() })
     }
 
+    // The τ-image of an element: mirror the state (inv_node), in_cob/out_cob/base_pt (inv_edge).
+    fn tau_element(&self, e: &TngComplexElem<R>) -> TngComplexElem<R> {
+        let tau_cob = |f: &LcCob<R>| f.map_ref(|c, r|
+            (c.convert_edges(|e| self.builder.inv_edge(e)), r.clone())
+        );
+        let state = e.state().iter().map(|(x, b)|
+            (self.builder.inv_node(x).clone(), *b)
+        ).collect();
+        let base_pt = e.base_pt().map(|b| self.builder.inv_edge(b));
+        let in_cob = e.in_cob().convert_edges(&|e| self.builder.inv_edge(e));
 
-    // Complete a half-element into the full off-axis element.
-    fn complete_element(&self, e: &mut TngComplexElem<R>) {
-        let out = std::mem::take(e.out_cob_mut());
-        *e.out_cob_mut() = out.into_iter().map(|(k, cob)| {
-            let kk = k + k;
-            let cc = cob.map(|c, r| {
-                let tc = c.convert_edges(|e| self.builder.inv_edge(e));
-                (c.connect(&tc), &r * &r)
-            });
-            (kk, cc)
-        }).collect();
+        let mut te = TngComplexElem::new(state, in_cob, base_pt);
+        te.set_out_cob(e.out_cob().iter().map(|(k, f)| (*k, tau_cob(f))));
+        te
     }
 }
 

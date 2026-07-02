@@ -140,20 +140,15 @@ impl Link {
         b.disconnect(a0);   // the swapped join means a0–b1, a1–b0 are removed
         b.disconnect(a1);
 
-        // The insert replaces the two parallel cable strands. At the cut, CCW order runs upward
-        // around the right-facing a-stump and downward around the left-facing b-stump, so
-        // (a0, a1) = (lower, upper) and (b0, b1) = (upper, lower) — consistent with the removed
-        // parallel joins a0–b1 (lower) and a1–b0 (upper):
+        // The insert replaces the parallel cable strands (CCW at the cut ⇒ (a0, a1) = (lower, upper),
+        // (b0, b1) = (upper, lower)):
         //
         //   a1 ────[       ]────[       ]────[       ]──── b0   (upper strand)
         //          [ row_a ]    [ clasp ]    [ row_b ]
         //   a0 ────[       ]────[       ]────[       ]──── b1   (lower strand)
         //
-        // row_a / row_b carry tw_a / tw_b half-twists. The clasp's left strand (SW↔NW) turns the
-        // a-side pair back on itself, its right strand (SE↔NE) the b-side pair, and the two
-        // turn-backs hook — the Whitehead pattern (winding number 0). row_a is embedded as the
-        // π-rotation of row_b, so tw_a = tw_b gives a diagram symmetric under the π-rotation
-        // about the horizontal axis (the strong inversion used by InvLink).
+        // The clasp turns each side's pair back on itself and the turn-backs hook (winding 0);
+        // row_a is the π-rotation of row_b, so tw_a = tw_b gives a π-rotation-symmetric diagram.
         let twist_type = |tw: i32| if tw >= 0 { XR } else { XL };
         let (mut upper, mut lower) = (a1, a0);
 

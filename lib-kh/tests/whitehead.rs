@@ -2,8 +2,11 @@
 // doubles): the bigraded Kh is diagram-independent, so two diagrams of the same knot give identical
 // homology (the mirror is tried where chirality is not the point).
 
-use yui_link::{Link, InvLink, Braid, PDCodeX};
+use yui_link::{Link, InvLink, Braid};
 use yui_kh::kh::KhHomology;
+
+mod common;
+use common::{wh_4_1, wh_3_1};
 
 fn kh(l: &Link) -> KhHomology<i32> {
     KhHomology::new(l, &0, &0, false)
@@ -14,25 +17,6 @@ fn same_knot(a: &Link, b: &Link) -> bool {
     ka.is_identical(&kh(b)) || ka.is_identical(&kh(&b.mirror()))
 }
 
-// Authoritative symmetric PD of Wh⁺(4_1), 18 crossings.
-fn wh_4_1() -> Vec<PDCodeX> {
-    vec![
-        [1, 9, 2, 8], [2, 11, 3, 12], [5, 25, 6, 24], [6, 31, 7, 32], [9, 29, 10, 28],
-        [13, 33, 14, 32], [14, 23, 15, 24], [17, 13, 18, 12], [18, 7, 19, 8], [21, 5, 22, 4],
-        [22, 15, 23, 16], [25, 21, 26, 20], [26, 35, 27, 36], [27, 11, 28, 10], [29, 1, 30, 36],
-        [30, 19, 31, 20], [33, 17, 34, 16], [34, 3, 35, 4],
-    ]
-}
-
-// Authoritative symmetric PD of Wh⁺(negative trefoil) — positive clasp, −6 twists, 20 crossings.
-fn wh_3_1() -> Vec<PDCodeX> {
-    vec![
-        [3, 25, 4, 24], [4, 37, 5, 38], [7, 14, 8, 15], [9, 12, 10, 13], [11, 31, 12, 30],
-        [13, 8, 14, 9], [17, 39, 18, 38], [18, 23, 19, 24], [21, 7, 22, 6], [22, 15, 23, 16],
-        [25, 3, 26, 2], [26, 19, 27, 20], [27, 34, 28, 35], [29, 32, 30, 33], [31, 11, 32, 10],
-        [33, 28, 34, 29], [35, 21, 36, 20], [36, 1, 37, 2], [39, 17, 40, 16], [40, 5, 1, 6],
-    ]
-}
 
 #[test]
 fn braid_closures_are_kh_faithful() {

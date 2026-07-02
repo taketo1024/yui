@@ -123,6 +123,15 @@ pub fn parse_node_order(s: &str) -> Result<NodeOrder, String> {
     }
 }
 
+// parse a clasp sign for `--whitehead`: pos | neg.
+pub fn parse_clasp(s: &str) -> Result<bool, String> {
+    match s.to_lowercase().as_str() {
+        "pos" | "+" => Ok(true),
+        "neg" | "-" => Ok(false),
+        _ => Err(format!("invalid clasp `{s}`, expected pos|neg")),
+    }
+}
+
 // parse `--cut`: `auto(k)` for cutwidth chunking, else `;`-separated manual edge-cuts (each `e,e,e`).
 pub fn parse_cut(s: &str) -> Result<CutOption, String> {
     if let Some(inner) = s.trim().strip_prefix("auto(").and_then(|x| x.strip_suffix(')')) {

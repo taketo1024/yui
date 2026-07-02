@@ -61,6 +61,10 @@ pub struct Args {
     #[arg(long)]
     pub cob_cone: bool,
 
+    // take the strongly-invertible Whitehead double of the (mirrored) knot: clasp sign pos|neg.
+    #[arg(long, value_parser = parse_clasp)]
+    pub whitehead: Option<bool>,
+
     // chunking: `auto(k)` (cutwidth) or manual τ-symmetric edge-cut(s) `e,e,e;e,e,e`.
     #[arg(long, value_parser = parse_cut)]
     pub cut: Option<CutOption>,
@@ -120,6 +124,11 @@ where
         }
 
         let l = load_sinv_knot(&self.args.link, self.args.mirror)?;
+        let l = if let Some(positive) = self.args.whitehead {
+            l.whitehead_double(positive, 0)
+        } else {
+            l
+        };
 
         let khi = if self.args.no_simplify {
             KhIHomology::new_no_simplify(&l, &h, &t, self.args.reduced)

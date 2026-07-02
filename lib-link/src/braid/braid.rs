@@ -79,11 +79,7 @@ impl Braid {
         let mut b = LinkBuilder::new();
 
         let xs: Vec<_> = self.elements.iter().map(|g| {
-            let nt = if g.sign().is_positive() {
-                NodeType::XR
-            } else {
-                NodeType::XL
-            };
+            let nt = if g.sign().is_positive() { NodeType::XR } else { NodeType::XL };
             b.add_crossing(nt)
         }).collect();
 

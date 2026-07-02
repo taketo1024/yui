@@ -1,3 +1,3 @@
 mod jones;
 
-pub use jones::jones_polynomial;
+pub use jones::{jones_polynomial, det};

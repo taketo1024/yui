@@ -47,20 +47,21 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         Self::new_with_config(l, h, t, reduced, SymBuildConfig { h_range, ..Default::default() })
     }
 
-    // `config.h_range` is the desired cone range `[a, b]`; the cone needs `C` over `[a-1, b]`,
-    // so the build range is shifted down by one while the rest of `config` is kept.
-    pub fn new_with_config(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig) -> Self {
-        use crate::tng::builder::SymTngBuilder;
-
-        let config = SymBuildConfig {
-            h_range: config.h_range.map(|r| KhComplex::<R>::clamp_h_range(l.inner(), reduced, r)),
-            ..config
-        };
-        let h_range = config.h_range.clone();
+    // `config.h_range` is the desired cone range `[a, b]`, clamped; since `KhI_i = C_i ⊕ C_{i-1}`,
+    // the build gets `[a-1, b]` while the rest of `config` is kept.
+    fn cone_build_config(l: &InvLink, reduced: bool, config: SymBuildConfig) -> (Option<RangeInclusive<isize>>, SymBuildConfig) {
+        let h_range = config.h_range.clone().map(|r| KhComplex::<R>::clamp_h_range(l.inner(), reduced, r));
         let build_config = SymBuildConfig {
             h_range: h_range.as_ref().map(|r| (*r.start() - 1) ..= *r.end()),
             ..config
         };
+        (h_range, build_config)
+    }
+
+    pub fn new_with_config(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig) -> Self {
+        use crate::tng::builder::SymTngBuilder;
+
+        let (h_range, build_config) = Self::cone_build_config(l, reduced, config);
         let b = SymTngBuilder::from_inv_link(l, h, t, reduced).with_config(build_config).run();
         let tau_map = b.tau_map();
 
@@ -80,16 +81,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     pub fn from_cone(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig) -> Self {
         use crate::tng::builder::ConeBuilder;
 
-        let config = SymBuildConfig {
-            h_range: config.h_range.map(|r| KhComplex::<R>::clamp_h_range(l.inner(), reduced, r)),
-            ..config
-        };
-        let h_range = config.h_range.clone();
-        let build_config = SymBuildConfig {
-            h_range: h_range.as_ref().map(|r| (*r.start() - 1) ..= *r.end()),
-            ..config
-        };
-
+        let (h_range, build_config) = Self::cone_build_config(l, reduced, config);
         let cone = ConeBuilder::from_inv_link(l, h, t, reduced).with_config(build_config).run();
 
         // sort by h-degree (all `B` then all `Q`) to match the matrix cone's canon-cycle order.

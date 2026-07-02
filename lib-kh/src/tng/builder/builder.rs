@@ -737,7 +737,9 @@ mod tests {
 
     #[test]
     fn test_unlink_2() {
-        let l = Link::test_data("unlink2");
+        // the R2 diagram: "unlink2" itself loads unoriented (its over-component has no under-anchor)
+        // and Kh needs the orientation for its grading.
+        let l = Link::test_data("unlink2_r2");
         let b = TngComplexBuilder::from_link(&l, &0, &0, false).run();
         let c = b.into_tng_complex().into_raw_complex();
 

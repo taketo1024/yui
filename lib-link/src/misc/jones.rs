@@ -6,6 +6,9 @@ use crate::{Link, State};
 pub fn jones_polynomial(l: &Link) -> LPoly<'q', i32> {
     type P = LPoly<'q', i32>;
 
+    // the writhe normalization needs the orientation; unoriented signs would silently read as 0.
+    assert!(l.is_oriented(), "jones_polynomial requires an oriented link");
+
     let n = l.n_crossings();
     let n_signed = l.n_signed_crossings();
     let (n_pos, n_neg) = (n_signed.0 as i32, n_signed.1 as i32);

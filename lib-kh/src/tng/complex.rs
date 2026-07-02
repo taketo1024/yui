@@ -155,7 +155,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     ht: (R, R),
     deg_shift: (isize, isize),
     base_pt: Option<Edge>,
-    dim: usize, 
+    dim: usize,
+    nodes: Vec<Node>,
     vertices: FxHashMap<TngComplexKey, TngComplexVertex<R>>,
 }
 
@@ -163,7 +164,7 @@ impl<R> TngComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     pub(crate) fn new(h: &R, t: &R, deg_shift: (isize, isize), base_pt: Option<Edge>, dim: usize, vertices: FxHashMap<TngComplexKey, TngComplexVertex<R>>) -> Self {
         let ht = (h.clone(), t.clone());
-        TngComplex{ ht, deg_shift, base_pt, dim, vertices }
+        TngComplex{ ht, deg_shift, base_pt, dim, nodes: vec![], vertices }
     }
 
     pub fn init(h: &R, t: &R, deg_shift: (isize, isize), base_pt: Option<Edge>) -> Self { 
@@ -183,6 +184,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             let mut c = Self::new(h, t, (0, 0), base_pt, 0, FxHashMap::default());
             c.add_vertex(k, v);
+            c.nodes = vec![x.clone()];
             c
         } else {
             let k0 = TngComplexKey::init().clone_and(|k|
@@ -203,6 +205,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             c.add_vertex(k0, TngComplexVertex::from(t0));
             c.add_vertex(k1, TngComplexVertex::from(t1));
             c.add_edge(&k0, &k1, sdl);
+            c.nodes = vec![x.clone()];
             c
         }
     }
@@ -238,8 +241,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn dim(&self) -> usize {
         self.dim
     }
-    
-    pub fn h_range(&self) -> RangeInclusive<isize> { 
+
+    pub fn nodes(&self) -> &[Node] {
+        &self.nodes
+    }
+
+    pub fn h_range(&self) -> RangeInclusive<isize> {
         let i0 = self.deg_shift.0;
         let n = self.dim() as isize;
         i0 ..= i0 + n
@@ -455,6 +462,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let mut new = TngComplex::init(h, t, deg_shift, base_pt);
         new.clear_verts();
         new.dim = dim;
+        new.nodes = self.nodes.iter().chain(other.nodes.iter()).cloned().collect();
 
         let left = std::mem::replace(self, new);
         (left, other)
@@ -866,14 +874,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let vertices = self.iter_verts().map(|(k, v)|
             (*k, v.convert_edges(&f))
         ).collect();
-        Self::new(h, t, self.deg_shift, base_pt, self.dim, vertices)
+        let mut c = Self::new(h, t, self.deg_shift, base_pt, self.dim, vertices);
+        c.nodes = self.nodes.iter().map(|n| n.convert_edges(&f)).collect();
+        c
     }
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     use super::*;
     use crate::kh::KhTensor;
+    use yui_link::Link;
 
     #[test]
     fn empty() { 
@@ -884,7 +895,7 @@ mod tests {
     }
 
     #[test]
-    fn single_x() { 
+    fn single_x() {
         let mut c = TngComplex::init(&0, &0, (0, 0), None);
         let x = Node::from_pd_code([1,4,2,5]);
         c.append_node(&x);
@@ -892,6 +903,17 @@ mod tests {
         assert_eq!(c.dim(), 1);
         assert_eq!(c.rank(0), 1);
         assert_eq!(c.rank(1), 1);
+    }
+
+    #[test]
+    fn nodes_track_append_order() {
+        let l = Link::test_data("3_1");
+        let mut c = TngComplex::init(&0, &0, (0, 0), None);
+        for x in l.nodes() {
+            c.append_node(x);
+        }
+
+        assert_eq!(c.nodes(), l.nodes().cloned().collect_vec());
     }
 
     #[test]

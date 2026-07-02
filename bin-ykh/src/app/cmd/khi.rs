@@ -129,11 +129,14 @@ where
                 mode: self.args.mode,
                 node_order: self.args.node_order,
                 preprocess: !self.args.no_preprocess,
-                cob_cone: self.args.cob_cone,
                 cut: self.args.cut.clone().unwrap_or_default(),
                 ..Default::default()
             };
-            KhIHomology::new_with_config(&l, &h, &t, self.args.reduced, config)
+            if self.args.cob_cone {
+                KhIHomology::from_cone(&l, &h, &t, self.args.reduced, config)
+            } else {
+                KhIHomology::new_with_config(&l, &h, &t, self.args.reduced, config)
+            }
         };
 
         let bigraded = h.is_zero() && t.is_zero() || 

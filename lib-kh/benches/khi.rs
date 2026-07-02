@@ -99,7 +99,11 @@ fn bench_khi_cone(c: &mut Criterion) {
     for (name, l) in &knots {
         for (cn, cob_cone) in CONES {
             group.bench_function(format!("{name}/{cn}"), |b| {
-                b.iter(|| KhIComplex::<FF2>::new_with_config(l, &zero, &zero, false, SymBuildConfig { cob_cone, ..Default::default() }))
+                if cob_cone {
+                    b.iter(|| KhIComplex::<FF2>::from_cone(l, &zero, &zero, false, SymBuildConfig::default()))
+                } else {
+                    b.iter(|| KhIComplex::<FF2>::new_with_config(l, &zero, &zero, false, SymBuildConfig::default()))
+                }
             });
         }
     }

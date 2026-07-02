@@ -39,13 +39,11 @@ pub struct SymBuildConfig {
     pub h_range: Option<RangeInclusive<isize>>,
     // divide-and-conquer chunking (auto cutwidth or manual edge-cuts); None = single pass.
     pub cut: CutOption,
-    // temporary A/B switch: build KhI as the cobordism-level cone (ConeBuilder) instead of the matrix cone.
-    pub cob_cone: bool,
 }
 
 impl Default for SymBuildConfig {
     fn default() -> Self {
-        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, h_range: None, cut: CutOption::None, cob_cone: false }
+        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, h_range: None, cut: CutOption::None }
     }
 }
 

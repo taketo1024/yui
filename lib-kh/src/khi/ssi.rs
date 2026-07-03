@@ -75,8 +75,12 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     let r = if reduced { 1 } else { 2 };
     let t = R::zero();
 
-    // same window as `div`: bottom..=1, built one degree wider on both ends for the boundary maps.
-    let range = KhComplex::<R>::clamp_h_range(l.inner(), reduced, -(Link::MAX_CROSSING as isize) ..= 1);
+    // default window: bottom..=1, built one degree wider on both ends for the boundary maps.
+    // a caller-supplied `h_range` (must contain 0..=1) overrides it — the doubly-truncated `0..=1`
+    // trades cheap low degrees for a dense bottom edge, which can win on huge diagrams.
+    let range = config.h_range.clone().unwrap_or(-(Link::MAX_CROSSING as isize) ..= 1);
+    let range = KhComplex::<R>::clamp_h_range(l.inner(), reduced, range);
+    assert!(*range.start() <= 0 && 1 <= *range.end(), "h_range must contain 0..=1 for the canon classes");
     let (a, b) = (*range.start(), *range.end());
     let config = SymBuildConfig { h_range: Some((a - 1)..=(b + 1)), ..config };
     let kc = KhIComplex::from_cone(l, c, &t, reduced, config);

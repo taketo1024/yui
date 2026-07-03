@@ -131,7 +131,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.cone.eliminate_in(d);
         }
 
-        self.prune_isolated_top(top);
+        // prune only when the window truncates the KhI complex: if the requested top exceeds the
+        // reachable Kh top, C[top+1] is the genuine KhI top degree (Bit1 of C[top]) and must stay.
+        let window_top = self.inner.config().h_range.as_ref().map(|r| *r.end());
+        if window_top.is_some_and(|t| t <= top) {
+            self.prune_isolated_top(top);
+        }
 
         info!("cone done: {}", self.cone.stat());
     }

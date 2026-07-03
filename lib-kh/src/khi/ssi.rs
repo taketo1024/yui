@@ -316,6 +316,17 @@ mod tests {
         }
     }
 
+    // all-negative diagram: the Kh h-range tops at 0, so the KhI top degree 1 must survive the
+    // cone's window pruning (regression: prune_isolated_top dropped it, killing the Q classes).
+    #[test]
+    fn k3_1_m_cone() {
+        let l = InvLink::test_data("3_1").mirror();
+        let c = P::variable();
+
+        let ssi = ssi_invariants_via_cone(&l, &c, false, SymBuildConfig::default());
+        assert_eq!(ssi, (-2, -2));
+    }
+
     test_cone!(k3_1_cone, "3_1", (2, 2));
     test_cone!(k4_1_cone, "4_1", (0, 0));
     test_cone!(k5_1_cone, "5_1", (4, 4));

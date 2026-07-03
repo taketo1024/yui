@@ -288,7 +288,7 @@ where
 
                 let (x, y) = v.permute(p).split(r);
                 let ainvx = solve_triangular_vec(t, &a, &x);
-                let w = y - &c * ainvx;
+                let w = (y - &c * ainvx).drop_zeros();
 
                 *v = w;
             }

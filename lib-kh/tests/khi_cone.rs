@@ -59,6 +59,24 @@ fn ssi_interlock_9_46_cone() {
 }
 
 #[test]
+#[ignore = "heavy: 48-crossing interlock"]
+fn ssi_interlock_17nh_cone() {
+    let (pd, cut) = interlock_17nh();
+    let l = inv(pd);
+    let config = SymBuildConfig { cut: CutOption::Manual(cut), ..Default::default() };
+    assert_eq!(ssi_with(&l, config, true), (0, 4), "oracle from the ssi-corks experiments");
+}
+
+#[test]
+#[ignore = "heavy: 48-crossing interlock"]
+fn ssi_interlock_17nh_vec_pipeline() {
+    let (pd, cut) = interlock_17nh();
+    let l = inv(pd);
+    let config = SymBuildConfig { cut: CutOption::Manual(cut), ..Default::default() };
+    assert_eq!(ssi_invariants_via_cone(&l, &P::variable(), false, config), (0, 4), "oracle from the ssi-corks experiments");
+}
+
+#[test]
 #[ignore = "slow: 30-crossing interlock"]
 fn ssi_interlock_9_46_vec_pipeline() {
     let (pd, cut) = interlock_9_46();

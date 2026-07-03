@@ -176,7 +176,8 @@ impl PivotFinder {
             .filter(|&i| !self.pivots.is_piv_row(i))
     }
 
-    // occupancy bitmap over columns: faster than a hash set at this density.
+    // occupancy bitmap over columns: the finder already holds O(n_cols) state (col_wght, RowWorker),
+    // so the bitmap is free, and lookups are one per matrix entry — they must be cheaper than hashing.
     fn occupied_cols(&self) -> Vec<bool> {
         let mut occ = vec![false; self.cols()];
         for (i, _) in self.pivots.iter() {

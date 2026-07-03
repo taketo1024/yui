@@ -147,7 +147,7 @@ where
     let tl_b = Arc::new(ThreadLocal::new());
 
     let report = should_report(y);
-    let counter = SyncCounter::new();
+    let counter = SyncCounter::new(0);
 
     (0..k).into_par_iter().map(|j| {
         let mut b = tl_b.get_or(||

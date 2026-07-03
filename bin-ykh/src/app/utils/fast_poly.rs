@@ -39,8 +39,12 @@ impl<const X: char, R> FastPoly<X, R> {
 }
 
 impl<const X: char, R> Display for FastPoly<X, R>
-where R: Display {
+where R: Display + Zero {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.coeff.is_zero() {
+            return write!(f, "0");
+        }
+
         let x = if self.deg == 0 {
             "1".to_string()
         } else if self.deg == 1 {
@@ -293,6 +297,10 @@ mod tex {
         }
 
         fn tex_string(&self) -> String {
+            if self.coeff.is_zero() {
+                return "0".to_string();
+            }
+
             let x = if self.deg == 0 {
                 "1".to_string()
             } else if self.deg == 1 {

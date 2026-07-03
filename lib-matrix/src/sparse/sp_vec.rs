@@ -142,10 +142,22 @@ where R: Scalar + Zero + ClosedAddAssign {
     }
 
     pub fn extract<F>(&self, dim: usize, f: F) -> SpVec<R>
-    where F: Fn(usize) -> Option<usize> { 
+    where F: Fn(usize) -> Option<usize> {
         SpVec::from_entries(dim, self.iter().filter_map(|(i, a)|
             f(i).map(|i| (i, a.clone()))
         ))
+    }
+
+    // drops explicitly-stored zeros (CSC arithmetic keeps cancellation zeros).
+    pub fn drop_zeros(self) -> Self {
+        if self.iter().all(|(_, a)| !a.is_zero()) {
+            return self;
+        }
+
+        let n = self.dim();
+        let (_, rows, vals) = self.inner.disassemble();
+        let (rows, vals) = rows.into_iter().zip(vals).filter(|(_, a)| !a.is_zero()).unzip();
+        Self::try_from_csc_data(n, rows, vals).unwrap()
     }
 
     pub fn permute(&self, p: &Perm) -> SpVec<R> {

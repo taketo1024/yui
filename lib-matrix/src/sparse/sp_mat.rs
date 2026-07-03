@@ -195,15 +195,16 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         Self::from(csc)
     }
 
-    pub fn from_col_vecs<I>(nrows: usize, vecs: I) -> Self 
-    where I: IntoIterator<Item = SpVec<R>> { 
+    // note: explicitly-stored zeros are dropped (CSC arithmetic keeps cancellation zeros).
+    pub fn from_col_vecs<I>(nrows: usize, vecs: I) -> Self
+    where I: IntoIterator<Item = SpVec<R>> {
         let mut col_offsets = vec![0];
         let mut row_indices = vec![];
         let mut values = vec![];
 
-        for v in vecs.into_iter() { 
+        for v in vecs.into_iter() {
             assert_eq!(nrows, v.dim());
-            let (_, mut v_rows, mut v_values) = v.into_inner().disassemble();
+            let (_, mut v_rows, mut v_values) = v.drop_zeros().into_inner().disassemble();
 
             row_indices.append(&mut v_rows);
             values.append(&mut v_values);

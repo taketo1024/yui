@@ -4,7 +4,7 @@ use std::str::FromStr;
 use yui_core::TeX;
 use yui_core::{EucRing, EucRingOps};
 use yui_homology::{ToSeqString, ToTableString};
-use yui_kh::khi::{KhIChain, KhIHomology};
+use yui_kh::khi::{KhIChain, KhIHomology, ssi_invariants_via_cone};
 use yui_kh::tng::builder::{SymBuildConfig, BuildMode, NodeOrder, CutOption};
 use yui_link::InvLink;
 use crate::app::args::*;
@@ -139,11 +139,11 @@ where
             ..Default::default()
         };
 
-        // nothing downstream needs generators — compute rank/torsion only (trans-free, much lighter).
-        let generic = !(self.args.show_gens || self.args.show_alpha || self.args.show_ssi);
-        if generic && self.args.cob_cone && !self.args.no_simplify {
-            let khi = KhIHomology::generic_from_cone(&l, &h, &t, self.args.reduced, config);
-            self.out(&khi.to_seq_string());
+        // ssi-only: canon classes ride the trans-free reduction as vectors (no table output).
+        let ssi_only = self.args.show_ssi && !(self.args.show_gens || self.args.show_alpha);
+        if ssi_only && self.args.cob_cone && !self.args.no_simplify {
+            let ssi = ssi_invariants_via_cone(&l, &h, self.args.reduced, config);
+            self.out(&format!("ssi = ({}, {})", ssi.0, ssi.1));
             return Ok(self.flush());
         }
 

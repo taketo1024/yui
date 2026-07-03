@@ -9,8 +9,18 @@ use petgraph::Graph;
 
 use super::{Node, NodeOri, Path};
 
+#[cfg(not(feature = "big-link"))]
 pub type Edge = u8;
-pub type State = yui_core::bitseq::BitSeq;
+#[cfg(not(feature = "big-link"))]
+pub type StateRepr = u64;
+
+// `big-link`: diagrams with up to 128 crossings (256 edge labels).
+#[cfg(feature = "big-link")]
+pub type Edge = u16;
+#[cfg(feature = "big-link")]
+pub type StateRepr = u128;
+
+pub type State = yui_core::bitseq::BitSeq<StateRepr>;
 pub type PDCodeX = [Edge; 4];
 
 #[derive(Debug, Clone)]
@@ -21,12 +31,22 @@ pub struct Link {
 }
 
 impl Link {
+    /// The maximum number of crossings a `Link` can carry, bounded by the `State` width
+    /// (64 by default, 128 under the `big-link` feature).
+    pub const MAX_CROSSING: usize = State::MAX_LEN;
+
     pub fn new(
         nodes: impl IntoIterator<Item = Node>,
         loops: impl IntoIterator<Item = Edge>,
     ) -> Self {
         let nodes = nodes.into_iter().collect_vec();
         let loops = loops.into_iter().collect_vec();
+
+        assert!(
+            nodes.len() <= Self::MAX_CROSSING,
+            "too many crossings: {} > MAX_CROSSING = {} (enable the `big-link` feature for up to 128)",
+            nodes.len(), Self::MAX_CROSSING
+        );
 
         let edge_counts = nodes.iter().flat_map(|x| x.edges()).cloned().counts();
         assert!(

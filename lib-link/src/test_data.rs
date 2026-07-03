@@ -4,11 +4,11 @@
 //! Database / KnotInfo — its only use is to drive tests, so the
 //! choice of chirality convention is self-contained.
 
-use crate::{Braid, InvLink, Link};
+use crate::{Braid, InvLink, Link, PDCodeX};
 
 impl Link {
     pub fn test_data(name: &str) -> Link {
-        let pd: &[[u8; 4]] = match name {
+        let pd: &[PDCodeX] = match name {
             "3_1"  => &[[1,4,2,5],[3,6,4,1],[5,2,6,3]],
             "4_1"  => &[[4,2,5,1],[8,6,1,5],[6,3,7,4],[2,7,3,8]],
             "5_1"  => &[[1,6,2,7],[3,8,4,9],[5,10,6,1],[7,2,8,3],[9,4,10,5]],
@@ -57,7 +57,7 @@ impl Braid {
 
 impl InvLink {
     pub fn test_data(name: &str) -> InvLink {
-        let pd: &[[u8; 4]] = match name {
+        let pd: &[PDCodeX] = match name {
             "3_1" => &[[1,5,2,4],[3,1,4,6],[5,3,6,2]],
             "4_1" => &[[2,7,3,8],[4,2,5,1],[6,3,7,4],[8,6,1,5]],
             "6_3" => &[[3,13,4,12],[6,9,7,10],[8,1,9,2],[10,5,11,6],[11,3,12,2],[13,5,14,4],[14,7,1,8]],

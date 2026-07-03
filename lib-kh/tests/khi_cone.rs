@@ -6,7 +6,7 @@ use num_traits::Zero;
 use yui_core::poly::Poly;
 use yui_core::num::FF2;
 use yui_link::InvLink;
-use yui_kh::khi::{KhIHomology, ssi_invariants};
+use yui_kh::khi::{KhIHomology, ssi_invariants, ssi_invariants_via_cone};
 use yui_kh::tng::builder::{CutOption, SymBuildConfig};
 use yui_kh::util::calc::div_vec;
 
@@ -56,6 +56,15 @@ fn ssi_interlock_9_46_cone() {
     let l = inv(pd);
     let config = SymBuildConfig { cut: CutOption::Manual(cut), ..Default::default() };
     assert_eq!(ssi_with(&l, config, true), (0, 4), "oracle from the ssi-corks experiments");
+}
+
+#[test]
+#[ignore = "slow: 30-crossing interlock"]
+fn ssi_interlock_9_46_vec_pipeline() {
+    let (pd, cut) = interlock_9_46();
+    let l = inv(pd);
+    let config = SymBuildConfig { cut: CutOption::Manual(cut), ..Default::default() };
+    assert_eq!(ssi_invariants_via_cone(&l, &P::variable(), false, config), (0, 4), "oracle from the ssi-corks experiments");
 }
 
 #[test]

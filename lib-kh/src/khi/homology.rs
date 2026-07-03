@@ -2,7 +2,7 @@ use std::ops::{Index, RangeInclusive};
 use std::sync::OnceLock;
 use delegate::delegate;
 use yui_core::{EucRing, EucRingOps, IteratorExt};
-use yui_homology::{ToSeqString, ToTableString, GenericGrMod1, GrMod1, GrMod2, Summand};
+use yui_homology::{ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_link::InvLink;
 use crate::kh::KhComplex;
 use crate::khi::{KhIComplex, KhIGen, KhIGenExt};
@@ -55,21 +55,6 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         let cone_config = SymBuildConfig { h_range: Some((a - 1)..=(b + 1)), ..config };
         let c = KhIComplex::from_cone(l, h, t, reduced, cone_config);
         Self::from_complex(&c, Some(a..=b))
-    }
-
-    /// Rank/torsion-only KhI homology via the cobordism-level cone, skipping all basis-change
-    /// tracking (reduction and SNF both trans-free). Vastly lighter than `from_cone`, but the
-    /// result has no generators — table output only, no `vectorize`/canon-class reads.
-    pub fn generic_from_cone(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig) -> GenericGrMod1<R> {
-        let Some(range) = config.h_range.clone() else {
-            let c = KhIComplex::from_cone(l, h, t, reduced, config);
-            return c.inner().reduced_generic().generic_homology();
-        };
-        let range = KhComplex::<R>::clamp_h_range(l.inner(), reduced, range); // resolve open ends before truncating
-        let (a, b) = (*range.start(), *range.end());
-        let cone_config = SymBuildConfig { h_range: Some((a - 1)..=(b + 1)), ..config };
-        let c = KhIComplex::from_cone(l, h, t, reduced, cone_config);
-        c.inner().reduced_generic().generic_homology_in(a..=b)
     }
 
     fn from_complex(c: &KhIComplex<R>, range: Option<RangeInclusive<isize>>) -> Self {

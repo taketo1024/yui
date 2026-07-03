@@ -12,10 +12,18 @@ use num_traits::Zero;
 use log::info;
 
 use yui_core::{EucRing, EucRingOps};
+use yui_homology::algo::{ChainReducer, HomologyCalc};
+use yui_matrix::MatTrait;
+use yui_matrix::sparse::SpMat;
 use yui_link::InvLink;
 
+use crate::kh::KhComplex;
+use crate::tng::builder::SymBuildConfig;
 use crate::util::calc::div_vec;
-use crate::khi::KhIHomology;
+use crate::khi::{KhIComplex, KhIHomology};
+
+// injected into the reducer on the heavy cone path: bounds each Schur round's `a⁻¹b` transient.
+pub(crate) const MAX_PIVOTS_PER_ROUND: usize = 32_768;
 
 pub fn ssi_invariants<R>(l: &InvLink, c: &R, reduced: bool) -> (i32, i32)
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
@@ -36,6 +44,91 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     info!("ssi = ({ss0}, {ss1}).");
 
     (ss0, ss1)
+}
+
+/// `ssi` via the cobordism-level cone (`ConeBuilder`), without any bigraded structure: the canon
+/// classes are transported as coordinate vectors through a trans-free capped reduction, and the
+/// basis-change is computed only at the reduced scale (two small SNFs). Memory-safe on huge diagrams.
+pub fn ssi_invariants_via_cone<R>(l: &InvLink, c: &R, reduced: bool, config: SymBuildConfig) -> (i32, i32)
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    assert!(!c.is_zero());
+    assert!(!c.is_unit());
+    assert!(l.is_knot());
+
+    info!("compute ssi via cone, c = {c} over {}.", R::math_symbol());
+
+    let w = l.writhe();
+    let r = l.seifert_circles().len() as i32;
+    let (d0, d1) = div_via_cone(l, c, reduced, config);
+
+    let ss0 = 2 * d0 + w - r + 1;
+    let ss1 = 2 * d1 + w - r + 1;
+
+    info!("w = {w}, r = {r}, d0 = {d0}, d1 = {d1}.");
+    info!("ssi = ({ss0}, {ss1}).");
+
+    (ss0, ss1)
+}
+
+fn div_via_cone<R>(l: &InvLink, c: &R, reduced: bool, config: SymBuildConfig) -> (i32, i32)
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    let r = if reduced { 1 } else { 2 };
+    let t = R::zero();
+
+    // same window as `div`: bottom..=1, built one degree wider on both ends for the boundary maps.
+    let range = KhComplex::<R>::clamp_h_range(l.inner(), reduced, isize::MIN + 1 ..= 1);
+    let (a, b) = (*range.start(), *range.end());
+    let config = SymBuildConfig { h_range: Some((a - 1)..=(b + 1)), ..config };
+    let kc = KhIComplex::from_cone(l, c, &t, reduced, config);
+
+    let zs = kc.canon_cycles(); // sorted by h-degree: B classes at 0, then Q classes at 1
+    assert_eq!(zs.len(), 2 * r);
+    for (i, z) in zs.iter().enumerate() {
+        let expected = if i < r { 0 } else { 1 };
+        assert!(!z.is_zero());
+        assert_eq!(z.homogeneous_value(|x| kc.h_deg_of(x)), Some(expected));
+    }
+
+    let mut red = ChainReducer::from_complex(kc.inner(), false);
+    red.set_max_pivots(MAX_PIVOTS_PER_ROUND);
+
+    for z in zs.iter() {
+        let h = kc.h_deg_of_chain(z);
+        red.add_vec(h, kc.inner()[h].vectorize(z));
+    }
+
+    red.reduce_all(false);
+    red.reduce_all(true);
+
+    // basis change only at the reduced scale: homology with trans at the two canon degrees.
+    let ds = [0, 1].map(|h| {
+        let d1 = red.matrix(h).expect("d[h] must be set").clone();
+        // below the clamped window bottom there is no incoming differential.
+        let d0 = red.matrix(h - 1).cloned().unwrap_or_else(|| SpMat::zero((d1.n_cols(), 0)));
+        let (rank, _, tr) = HomologyCalc::calculate(d0, d1, true);
+        let tr = tr.unwrap();
+
+        assert_eq!(rank, r);
+        info!("KhI[{h}]: rank {rank}");
+
+        red.vecs(h).expect("transported vecs at canon degree").iter().map(|v| {
+            let w = tr.forward(v);
+            info!("a in KhI[{h}]: ({})", w.clone().into_dense().iter().join(","));
+            div_vec(&w.subvec(0..r), c).expect("invalid divisibility.")
+        }).collect_vec()
+    });
+
+    let (d0, d1) = if reduced {
+        (ds[0][0], ds[1][0])
+    } else {
+        assert_eq!(ds[0][0], ds[0][1]);
+        assert_eq!(ds[1][0], ds[1][1]);
+        (ds[0][0], ds[1][0])
+    };
+
+    assert!(d0 <= d1);
+
+    (d0, d1)
 }
 
 fn div<R>(l: &InvLink, c: &R, reduced: bool) -> (i32, i32)
@@ -197,13 +290,69 @@ mod tests {
     test!(k7_7b, "7_7b", (0, 0));
 
     #[test]
-    fn k9_46() { 
+    fn k9_46() {
         let l = InvLink::from_symmetric_pd_code(
             [[18,8,1,7],[13,6,14,7],[12,2,13,1],[8,18,9,17],[5,14,6,15],[2,12,3,11],[16,10,17,9],[15,4,16,5],[10,4,11,3]]
         );
 
         let c = P::variable();
         let ssi = ssi_invariants(&l, &c, false);
+
+        assert_eq!(ssi, (0, 2));
+    }
+
+    macro_rules! test_cone {
+        ($(#[$m:meta])* $test:ident, $name:literal, $expected:expr) => {
+            $(#[$m])*
+            #[test]
+            fn $test() -> Result<(), Box<dyn std::error::Error>> {
+                let c = P::variable();
+                let l = InvLink::load($name)?;
+                let ssi = ssi_invariants_via_cone(&l, &c, false, SymBuildConfig::default());
+                assert_eq!(ssi, $expected);
+
+                Ok(())
+            }
+        }
+    }
+
+    test_cone!(k3_1_cone, "3_1", (2, 2));
+    test_cone!(k4_1_cone, "4_1", (0, 0));
+    test_cone!(k5_1_cone, "5_1", (4, 4));
+    test_cone!(k6_2a_cone, "6_2a", (2, 2));
+    test_cone!(k6_3_cone, "6_3", (0, 0));
+    test_cone!(k7_6a_cone, "7_6a", (-2, -2));
+    test_cone!(k7_7a_cone, "7_7a", (0, 0));
+
+    #[test]
+    fn k3_1_cone_red() {
+        let l = InvLink::test_data("3_1");
+        let c = P::variable();
+
+        let ssi = ssi_invariants_via_cone(&l, &c, true, SymBuildConfig::default());
+        assert_eq!(ssi, (2, 2));
+    }
+
+    #[test]
+    fn k9_46_cone() {
+        let l = InvLink::from_symmetric_pd_code(
+            [[18,8,1,7],[13,6,14,7],[12,2,13,1],[8,18,9,17],[5,14,6,15],[2,12,3,11],[16,10,17,9],[15,4,16,5],[10,4,11,3]]
+        );
+
+        let c = P::variable();
+        let ssi = ssi_invariants_via_cone(&l, &c, false, SymBuildConfig::default());
+
+        assert_eq!(ssi, (0, 2));
+    }
+
+    #[test]
+    fn k15n_103488_cone() {
+        let l = InvLink::from_symmetric_pd_code(
+            [[1,11,2,10],[2,20,3,19],[5,17,6,16],[6,25,7,26],[9,22,10,23],[12,30,13,29],[14,8,15,7],[15,27,16,26],[18,4,19,3],[20,11,21,12],[21,1,22,30],[23,4,24,5],[24,18,25,17],[27,8,28,9],[28,14,29,13]]
+        );
+
+        let c = P::variable();
+        let ssi = ssi_invariants_via_cone(&l, &c, false, SymBuildConfig::default());
 
         assert_eq!(ssi, (0, 2));
     }

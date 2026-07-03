@@ -15,7 +15,7 @@ use yui_core::{EucRing, EucRingOps};
 use yui_homology::algo::{ChainReducer, HomologyCalc};
 use yui_matrix::MatTrait;
 use yui_matrix::sparse::SpMat;
-use yui_link::InvLink;
+use yui_link::{InvLink, Link};
 
 use crate::kh::KhComplex;
 use crate::tng::builder::SymBuildConfig;
@@ -76,7 +76,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     let t = R::zero();
 
     // same window as `div`: bottom..=1, built one degree wider on both ends for the boundary maps.
-    let range = KhComplex::<R>::clamp_h_range(l.inner(), reduced, isize::MIN + 1 ..= 1);
+    let range = KhComplex::<R>::clamp_h_range(l.inner(), reduced, -(Link::MAX_CROSSING as isize) ..= 1);
     let (a, b) = (*range.start(), *range.end());
     let config = SymBuildConfig { h_range: Some((a - 1)..=(b + 1)), ..config };
     let kc = KhIComplex::from_cone(l, c, &t, reduced, config);
@@ -138,7 +138,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     // bottom..=1: building the cheap low degrees and truncating only at the top is faster than
     // the doubly-truncated `0..=1` slice (which widens to the dense `-1..=2`). Builder clamps the start.
-    let kh = KhIHomology::new_partial(l, c, &t, reduced, Some(isize::MIN + 1 ..= 1));
+    let kh = KhIHomology::new_partial(l, c, &t, reduced, Some(-(Link::MAX_CROSSING as isize) ..= 1));
 
     assert_eq!(kh[0].rank(), r);
     assert_eq!(kh[1].rank(), r);    

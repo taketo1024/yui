@@ -17,6 +17,7 @@ bench = false
 
 [features]
 default = []
+big-link = ["yui-link/big-link"]
 
 [dependencies]
 auto-impl-ops = "0.2.1"

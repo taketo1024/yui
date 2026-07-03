@@ -8,7 +8,12 @@ use crate::util::CachedHash;
 /// Edge presence as a packed bitmap. `u128` storage covers Edge ∈ 0..128,
 /// i.e. links with ≤ 64 crossings (2 edges per crossing). Bump the storage
 /// param to `[u128; 2]` (and impl `BitStorage` for it) to extend.
+#[cfg(not(feature = "big-link"))]
 type EdgeSet = BitMap<Edge, u128>;
+#[cfg(feature = "big-link")]
+use yui_core::u256::U256;
+#[cfg(feature = "big-link")]
+type EdgeSet = BitMap<Edge, U256>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 enum TngCompKind {

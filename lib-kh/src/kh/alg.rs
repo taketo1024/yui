@@ -15,6 +15,7 @@ use auto_impl_ops::auto_ops;
 use num_traits::Zero;
 use yui_core::{AddMon, CloneAnd, MathType, Ring, RingOps};
 use yui_core::bitseq::{Bit, BitSeq};
+use yui_link::StateRepr;
 use yui_core::lc::{LcKey, Lc};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
@@ -75,7 +76,7 @@ impl LcKey for KhAlgGen {}
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub struct KhTensor(
-    BitSeq
+    BitSeq<StateRepr>
 );
 
 impl KhTensor {

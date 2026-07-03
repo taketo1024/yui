@@ -41,7 +41,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     // bottom..=0: building the cheap low degrees and truncating only at the top is faster than
     // the doubly-truncated `0..=0` slice (which widens to the dense `-1..=1`). Builder clamps the start.
-    let kh = KhHomology::new_partial(l, c, &R::zero(), reduced, Some(isize::MIN + 1 ..= 0));
+    let kh = KhHomology::new_partial(l, c, &R::zero(), reduced, Some(-(Link::MAX_CROSSING as isize) ..= 0));
 
     assert_eq!(kh[0].rank(), r);
     info!("Kh[0]: {}", kh[0]);

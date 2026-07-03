@@ -22,8 +22,11 @@ cfg_if::cfg_if! {
     if #[cfg(feature = "multithread")] {
         use std::cell::RefCell;
         use std::sync::RwLock;
+        use std::sync::atomic::AtomicUsize;
+        use std::sync::atomic::Ordering::Relaxed;
         use thread_local::ThreadLocal;
         use rayon::prelude::*;
+        use yui_core::util::sync::SyncCounter;
     }
 }
 
@@ -280,9 +283,6 @@ impl PivotFinder {
 
      #[cfg(feature = "multithread")]
      fn find_cycle_free_pivots_m(&mut self) {
-        use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
-        use yui_core::util::sync::SyncCounter;
-
         let remain_rows = self.remain_rows().collect_vec();
         let total_rows = remain_rows.len();
 
@@ -328,9 +328,7 @@ impl PivotFinder {
      }
 
      #[cfg(feature = "multithread")]
-     fn find_cycle_free_pivots_in(&self, pivots: &RwLock<PivotData>, count: &std::sync::atomic::AtomicUsize, loc_pivots: &mut PivotData, w: &mut RowWorker) {
-        use std::sync::atomic::Ordering::Relaxed;
-
+     fn find_cycle_free_pivots_in(&self, pivots: &RwLock<PivotData>, count: &AtomicUsize, loc_pivots: &mut PivotData, w: &mut RowWorker) {
         loop {
             w.traverse(&self.str, loc_pivots);
 

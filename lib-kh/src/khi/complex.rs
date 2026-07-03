@@ -47,17 +47,6 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         Self::new_with_config(l, h, t, reduced, SymBuildConfig { h_range, ..Default::default() })
     }
 
-    // `config.h_range` is the desired cone range `[a, b]`, clamped; since `KhI_i = C_i ⊕ C_{i-1}`,
-    // the build gets `[a-1, b]` while the rest of `config` is kept.
-    fn cone_build_config(l: &InvLink, reduced: bool, config: SymBuildConfig) -> (Option<RangeInclusive<isize>>, SymBuildConfig) {
-        let h_range = config.h_range.clone().map(|r| KhComplex::<R>::clamp_h_range(l.inner(), reduced, r));
-        let build_config = SymBuildConfig {
-            h_range: h_range.as_ref().map(|r| (*r.start() - 1) ..= *r.end()),
-            ..config
-        };
-        (h_range, build_config)
-    }
-
     pub fn new_with_config(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig) -> Self {
         use crate::tng::builder::SymTngBuilder;
 
@@ -202,6 +191,17 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
     fn cached_bigraded(&self) -> &GrMod2<KhIGen, R> {
         self.cache_bigr.get_or_init(|| self.bigraded())
+    }
+
+    // `config.h_range` is the desired cone range `[a, b]`, clamped; since `KhI_i = C_i ⊕ C_{i-1}`,
+    // the build gets `[a-1, b]` while the rest of `config` is kept.
+    fn cone_build_config(l: &InvLink, reduced: bool, config: SymBuildConfig) -> (Option<RangeInclusive<isize>>, SymBuildConfig) {
+        let h_range = config.h_range.clone().map(|r| KhComplex::<R>::clamp_h_range(l.inner(), reduced, r));
+        let build_config = SymBuildConfig {
+            h_range: h_range.as_ref().map(|r| (*r.start() - 1) ..= *r.end()),
+            ..config
+        };
+        (h_range, build_config)
     }
 }
 

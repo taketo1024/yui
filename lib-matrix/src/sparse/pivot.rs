@@ -10,7 +10,6 @@
 
 use std::cmp::Ordering;
 use std::collections::VecDeque;
-use ahash::AHashSet;
 use itertools::Itertools;
 use log::*;
 
@@ -174,13 +173,15 @@ impl PivotFinder {
             .filter(|&i| !self.pivots.is_piv_row(i))
     }
 
-    fn occupied_cols(&self) -> AHashSet<Col> {
-        self.pivots.iter().fold(AHashSet::new(), |mut res, (i, _)| {
+    // occupancy bitmap over columns: faster than a hash set at this density.
+    fn occupied_cols(&self) -> Vec<bool> {
+        let mut occ = vec![false; self.cols()];
+        for (i, _) in self.pivots.iter() {
             for j in self.str.cols_in(i) {
-                res.insert(j);
+                occ[j] = true;
             }
-            res
-        })
+        }
+        occ
     }
 
     fn find_fl_pivots(&mut self) {
@@ -210,7 +211,7 @@ impl PivotFinder {
             let mut cands = vec![];
 
             for (j, is_cand) in self.str.entries_in(i) {
-                if is_cand && !occ_cols.contains(&j) {
+                if is_cand && !occ_cols[j] {
                     cands.push(j);
                 }
             }
@@ -222,7 +223,7 @@ impl PivotFinder {
             self.pivots.set(i, j);
 
             for j in self.str.cols_in(i) {
-                occ_cols.insert(j);
+                occ_cols[j] = true;
             }
 
             if self.pivots.count() >= self.max_pivots { break; }
@@ -279,14 +280,16 @@ impl PivotFinder {
 
      #[cfg(feature = "multithread")]
      fn find_cycle_free_pivots_m(&mut self) {
+        use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
         use yui_core::util::sync::SyncCounter;
 
         let remain_rows = self.remain_rows().collect_vec();
         let total_rows = remain_rows.len();
 
         trace!("  start find-cycle-free-pivots: {total_rows} rows");
-        
+
         let n = self.cols();
+        let count = AtomicUsize::new(self.pivots.count()); // lock-free mirror of `pivots.count()`
         let pivots = RwLock::new(
             std::mem::take(&mut self.pivots)
         );
@@ -297,7 +300,7 @@ impl PivotFinder {
         let row_counter = SyncCounter::new();
 
         remain_rows.par_iter().for_each(|&i| {
-            if pivots.read().unwrap().count() >= self.max_pivots { return; }
+            if count.load(Relaxed) >= self.max_pivots { return; }
 
             let mut loc_pivots = init_tls(&loc_pivots_tls, ||
                 pivots.read().unwrap().clone()
@@ -310,11 +313,11 @@ impl PivotFinder {
             loc_pivots.update_from(&pivots.read().unwrap());
             w.init(i, &self.str, &loc_pivots);
 
-            self.find_cycle_free_pivots_in(&pivots, &mut loc_pivots, &mut w);
+            self.find_cycle_free_pivots_in(&pivots, &count, &mut loc_pivots, &mut w);
 
-            if report { 
-                let row_count = row_counter.incr();            
-                if row_count % LOG_THRESHOLD == 0 { 
+            if report {
+                let row_count = row_counter.incr();
+                if row_count % LOG_THRESHOLD == 0 {
                     let c = loc_pivots.count();
                     trace!("    [{row_count}/{total_rows}], {c} pivots.");
                 }
@@ -325,7 +328,9 @@ impl PivotFinder {
      }
 
      #[cfg(feature = "multithread")]
-     fn find_cycle_free_pivots_in(&self, pivots: &RwLock<PivotData>, loc_pivots: &mut PivotData, w: &mut RowWorker) {
+     fn find_cycle_free_pivots_in(&self, pivots: &RwLock<PivotData>, count: &std::sync::atomic::AtomicUsize, loc_pivots: &mut PivotData, w: &mut RowWorker) {
+        use std::sync::atomic::Ordering::Relaxed;
+
         loop {
             w.traverse(&self.str, loc_pivots);
 
@@ -345,6 +350,7 @@ impl PivotFinder {
             } else {
                 if pivots.count() < self.max_pivots {
                     pivots.set(w.row, j);
+                    count.store(pivots.count(), Relaxed);
                 }
                 break
             }
@@ -511,6 +517,7 @@ struct RowWorker {
     candidates: Vec<Col>,    // columns ever marked Candidate (may include stale entries reclassified to Occupied)
     queue: VecDeque<Col>,
     queued: Vec<bool>,       // queued[j] = true iff j has ever been pushed to `queue`
+    touched: Vec<Col>,       // columns whose status/queued changed — `clear` resets only these, O(touched) not O(n)
 }
 
 impl RowWorker {
@@ -519,16 +526,20 @@ impl RowWorker {
         let candidates = Vec::new();
         let queue = VecDeque::new();
         let queued = vec![false; size];
-        RowWorker { row: 0, status, ncand: 0, candidates, queue, queued }
+        let touched = Vec::new();
+        RowWorker { row: 0, status, ncand: 0, candidates, queue, queued, touched }
     }
 
     fn clear(&mut self) {
         self.row = 0;
-        self.status.fill(EntryStatus::None);
         self.ncand = 0;
+        for &j in self.touched.iter() {
+            self.status[j] = EntryStatus::None;
+            self.queued[j] = false;
+        }
+        self.touched.clear();
         self.candidates.clear();
         self.queue.clear();
-        self.queued.fill(false);
     }
 
     //  i [  o       #     # ]     [  o   x   x      # ]     [  o   x   x   x  # ]
@@ -620,23 +631,35 @@ impl RowWorker {
         assert_eq!(self.status[i], EntryStatus::None);
         self.status[i] = EntryStatus::Candidate;
         self.candidates.push(i);
+        self.touched.push(i);
         self.ncand += 1;
     }
 
-    fn is_occupied(&self, i: usize) -> bool { 
+    fn is_occupied(&self, i: usize) -> bool {
         self.status[i] == EntryStatus::Occupied
     }
 
-    fn set_occupied(&mut self, i: usize) { 
-        if self.is_candidate(i) { 
-            self.ncand -= 1;
+    fn set_occupied(&mut self, i: usize) {
+        match self.status[i] {
+            EntryStatus::Candidate => {
+                self.ncand -= 1; // already in `touched` via set_candidate
+            }
+            EntryStatus::None => {
+                self.touched.push(i);
+            }
+            EntryStatus::Occupied => {
+                return;
+            }
         }
         self.status[i] = EntryStatus::Occupied;
     }
 
     fn enqueue(&mut self, i: Col) {
         self.queue.push_back(i);
-        self.queued[i] = true;
+        if !self.queued[i] {
+            self.queued[i] = true;
+            self.touched.push(i);
+        }
     }
 
     fn dequeue(&mut self) -> Option<Col> {
@@ -751,15 +774,17 @@ mod tests {
         ]);
         let mut pf = PivotFinder::new(&a, &Default::default());
 
-        assert_eq!(pf.occupied_cols(), AHashSet::new());
+        let occ = |pf: &PivotFinder| pf.occupied_cols().iter().positions(|&b| b).collect_vec();
+
+        assert_eq!(occ(&pf), vec![]);
 
         pf.pivots.set(0, 0);
 
-        assert_eq!(pf.occupied_cols(), AHashSet::from_iter([0,2]));
+        assert_eq!(occ(&pf), vec![0, 2]);
 
         pf.pivots.set(1, 1);
 
-        assert_eq!(pf.occupied_cols(), AHashSet::from_iter([0,1,2,3]));
+        assert_eq!(occ(&pf), vec![0, 1, 2, 3]);
     }
 
     #[test]

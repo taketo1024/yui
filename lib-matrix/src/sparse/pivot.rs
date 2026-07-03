@@ -22,8 +22,6 @@ cfg_if::cfg_if! {
     if #[cfg(feature = "multithread")] {
         use std::cell::RefCell;
         use std::sync::RwLock;
-        use std::sync::atomic::AtomicUsize;
-        use std::sync::atomic::Ordering::Relaxed;
         use thread_local::ThreadLocal;
         use rayon::prelude::*;
         use yui_core::util::sync::SyncCounter;
@@ -290,7 +288,7 @@ impl PivotFinder {
         trace!("  start find-cycle-free-pivots: {total_rows} rows");
 
         let n = self.cols();
-        let count = AtomicUsize::new(self.pivots.count()); // lock-free mirror of `pivots.count()`
+        let count = SyncCounter::new(self.pivots.count()); // lock-free mirror of `pivots.count()`
         let pivots = RwLock::new(
             std::mem::take(&mut self.pivots)
         );
@@ -298,10 +296,10 @@ impl PivotFinder {
         let loc_worker_tls = ThreadLocal::new();
 
         let report = self.should_report();
-        let row_counter = SyncCounter::new();
+        let row_counter = SyncCounter::new(0);
 
         remain_rows.par_iter().for_each(|&i| {
-            if count.load(Relaxed) >= self.max_pivots { return; }
+            if count.count() >= self.max_pivots { return; }
 
             let mut loc_pivots = init_tls(&loc_pivots_tls, ||
                 pivots.read().unwrap().clone()
@@ -329,7 +327,7 @@ impl PivotFinder {
      }
 
      #[cfg(feature = "multithread")]
-     fn find_cycle_free_pivots_in(&self, pivots: &RwLock<PivotData>, count: &AtomicUsize, loc_pivots: &mut PivotData, w: &mut RowWorker) {
+     fn find_cycle_free_pivots_in(&self, pivots: &RwLock<PivotData>, count: &SyncCounter, loc_pivots: &mut PivotData, w: &mut RowWorker) {
         loop {
             w.traverse(&self.str, loc_pivots);
 
@@ -349,7 +347,7 @@ impl PivotFinder {
             } else {
                 if pivots.count() < self.max_pivots {
                     pivots.set(w.row, j);
-                    count.store(pivots.count(), Relaxed);
+                    count.set(pivots.count());
                 }
                 break
             }

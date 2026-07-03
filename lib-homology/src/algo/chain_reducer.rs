@@ -9,6 +9,7 @@ use yui_matrix::sparse::*;
 use yui_matrix::Perm;
 use yui_matrix::sparse::pivot::{PivotCondition, PivotFinderConfig, PivotType, find_pivots};
 use yui_matrix::sparse::schur::Schur;
+use yui_matrix::sparse::triang::{solve_triangular_vec, TriangularType};
 use yui_core::{Ring, RingOps};
 
 use yui_core::lc::LcKey;
@@ -44,6 +45,8 @@ where
     d_deg: I,
     mats: HashMap<I, SpMat<R>>,
     trans: HashMap<I, Trans<R>>,
+    vecs: HashMap<I, Vec<SpVec<R>>>,
+    max_pivots: usize,
 }
 
 impl<I, R> ChainReducer<I, R>
@@ -83,7 +86,8 @@ where
         let support = Self::sort_support(support, d_deg);
         let mats = HashMap::new();
         let trans = HashMap::new();
-        Self { support, d_deg, mats, trans }
+        let vecs = HashMap::new();
+        Self { support, d_deg, mats, trans, vecs, max_pivots: usize::MAX }
     }
 
     // MEMO: not efficient, but usually the support set is small. 
@@ -119,6 +123,26 @@ where
 
     pub fn trans_mut(&mut self, i: I) -> Option<&mut Trans<R>> {
         self.trans.get_mut(&i)
+    }
+
+    pub fn vecs(&self, i: I) -> Option<&Vec<SpVec<R>>> {
+        self.vecs.get(&i)
+    }
+
+    pub fn take_vecs(&mut self, i: I) -> Vec<SpVec<R>> {
+        self.vecs.remove(&i).unwrap_or_default()
+    }
+
+    // Attach a coordinate vector at index `i`; it is transported through every reduction round
+    // (col side: pivot-coordinate projection; row side: Schur correction `y - c·a⁻¹x`).
+    pub fn add_vec(&mut self, i: I, v: SpVec<R>) {
+        self.vecs.entry(i).or_default().push(v)
+    }
+
+    // Bound the pivots taken per reduction round: the Schur transient `a⁻¹b` is `r × (n - r)`,
+    // so one unbounded round can exceed memory on very large complexes.
+    pub fn set_max_pivots(&mut self, max_pivots: usize) {
+        self.max_pivots = max_pivots;
     }
 
     pub fn rank(&self, i: I) -> Option<usize> { 
@@ -190,17 +214,26 @@ where
         trace!("  density: {}", a.density());
         trace!("  mean-weight: {}", a.mean_weight());
 
-        let config = PivotFinderConfig { piv_type, piv_cond, ..Default::default() };
+        let config = PivotFinderConfig { piv_type, piv_cond, max_pivots: self.max_pivots, ..Default::default() };
         let (p, q, r) = find_pivots(a, config);
 
-        if r == 0 { 
+        if r == 0 {
             debug!("  done.");
             return false;
         }
 
-        let with_trans = 
-            self.trans.contains_key(&i) || 
+        let with_trans =
+            self.trans.contains_key(&i) ||
             self.trans.contains_key(&(i + self.d_deg));
+
+        // the row-side vec update needs the pivot/lower blocks of the permuted matrix — extract
+        // them while `a` is still borrowed.
+        let shape = a.shape();
+        let has_row_vecs = self.vecs.get(&(i + self.d_deg)).is_some_and(|vs| !vs.is_empty());
+        let vec_blocks = has_row_vecs.then(|| {
+            let [a11, _, c, _] = a.permute_and_split(&p, &q, r);
+            (a11, c)
+        });
 
         let sch = Schur::from_pivots(a, piv_type, &p, &q, r, with_trans, with_trans);
         let t_src = sch.trans_src();
@@ -215,11 +248,51 @@ where
             self.update_trans(i, &p, &q, t_src.unwrap(), t_tgt.unwrap());
         }
 
+        self.update_vecs(i, piv_type, vec_blocks, &p, &q, r, shape);
+
         true
     }
 
     pub fn preferred_strategy(&self, _i: I) -> (PivotType, PivotCondition) { 
         (PivotType::Cols, PivotCondition::One)
+    }
+
+    // Transport attached vectors through this round's basis change. Col side (index `i`): a cycle's
+    // pivot components lie in the cancelled summand, so the non-pivot projection is the homology-
+    // correct coordinate. Row side (`i + d_deg`): the honest Schur correction `y - c·a⁻¹x`.
+    fn update_vecs(&mut self, i: I, piv_type: PivotType, blocks: Option<(SpMat<R>, SpMat<R>)>, p: &Perm, q: &Perm, r: usize, shape: (usize, usize)) {
+        let (m, n) = shape;
+        let (_, i1, i2) = self.deg_trip(i);
+
+        if let Some(vs) = self.vecs.get_mut(&i1) {
+            for v in vs.iter_mut() {
+                assert_eq!(v.dim(), n);
+
+                let w = v.extract(n - r, |i| {
+                    let i = q.at(i);
+                    (r..n).contains(&i).then(|| i - r)
+                });
+
+                *v = w;
+            }
+        }
+
+        if let Some(vs) = self.vecs.get_mut(&i2) {
+            trace!("update {} vecs in C[{i2}] ..", vs.len());
+
+            let (a, c) = blocks.expect("row-side blocks must be extracted when vecs exist");
+            let t = if piv_type == PivotType::Rows { TriangularType::Upper } else { TriangularType::Lower };
+
+            for v in vs.iter_mut() {
+                assert_eq!(v.dim(), m);
+
+                let (x, y) = v.permute(p).split(r);
+                let ainvx = solve_triangular_vec(t, &a, &x);
+                let w = y - &c * ainvx;
+
+                *v = w;
+            }
+        }
     }
 
     fn update_trans(&mut self, i: I, p: &Perm, q: &Perm, t_src: Trans<R>, t_tgt: Trans<R>) {
@@ -309,8 +382,42 @@ mod tests {
         assert_eq!(sort, (0..10).rev().collect_vec());
     }
 
+    // transported vectors must agree with the trans-ful forward map (same pivot sequence).
+    fn check_vec_transport(max_pivots: usize) {
+        let c = GenericChainComplex1::<i32>::t2();
+
+        let mut r1 = ChainReducer::from_complex(&c, true);
+        r1.set_max_pivots(max_pivots);
+        r1.reduce_all(false);
+        r1.reduce_all(true);
+
+        // homology cycles at index 0 and 1, in original coordinates.
+        let z0 = r1.trans(0).unwrap().backward_mat().col_vec(0);
+        let z1 = r1.trans(1).unwrap().backward_mat().col_vec(0);
+
+        let mut r2 = ChainReducer::from_complex(&c, false);
+        r2.set_max_pivots(max_pivots);
+        r2.add_vec(0, z0.clone());
+        r2.add_vec(1, z1.clone());
+        r2.reduce_all(false);
+        r2.reduce_all(true);
+
+        assert_eq!(r2.vecs(0).unwrap()[0], r1.trans(0).unwrap().forward(&z0));
+        assert_eq!(r2.vecs(1).unwrap()[0], r1.trans(1).unwrap().forward(&z1));
+    }
+
     #[test]
-    fn zero() { 
+    fn vec_transport() {
+        check_vec_transport(usize::MAX);
+    }
+
+    #[test]
+    fn vec_transport_capped() {
+        check_vec_transport(2); // force many small rounds
+    }
+
+    #[test]
+    fn zero() {
         let c = GenericChainComplex1::<i32>::zero();
         let r = ChainReducer::reduce(&c, false).into_generic_complex();
 

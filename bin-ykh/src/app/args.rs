@@ -1,7 +1,7 @@
 use std::ops::RangeInclusive;
 use clap::ValueEnum;
 use derive_more::Display;
-use yui_link::Edge;
+use yui_link::{Edge, Link};
 use yui_kh::tng::builder::{BuildMode, NodeOrder, CutOption};
 
 pub trait AppArgs { 
@@ -100,7 +100,7 @@ pub fn parse_h_range(s: &str) -> Result<RangeInclusive<isize>, String> {
         let x = x.trim();
         if x.is_empty() { Ok(open) } else { x.parse::<isize>().map_err(|e| format!("`{x}`: {e}")) }
     };
-    Ok(parse(lo, isize::MIN + 1)? ..= parse(hi, isize::MAX - 1)?)
+    Ok(parse(lo, -(Link::MAX_CROSSING as isize))? ..= parse(hi, Link::MAX_CROSSING as isize + 2)?)
 }
 
 // parse a build mode: greedy | min-fill | no-elim | none.

@@ -327,6 +327,50 @@ mod tests {
         assert_eq!(ssi, (-2, -2));
     }
 
+    // direct symmetry-broken emission (Sano2026 Prop 4.6) with the SDR canon transport.
+    macro_rules! test_cone_direct {
+        ($test:ident, $name:literal, $expected:expr) => {
+            #[test]
+            fn $test() -> Result<(), Box<dyn std::error::Error>> {
+                let c = P::variable();
+                let l = InvLink::load($name)?;
+                let config = SymBuildConfig { cone_direct: true, ..Default::default() };
+                let ssi = ssi_invariants_via_cone(&l, &c, false, config);
+                assert_eq!(ssi, $expected);
+
+                Ok(())
+            }
+        }
+    }
+
+    test_cone_direct!(k3_1_cone_direct, "3_1", (2, 2));
+    test_cone_direct!(k4_1_cone_direct, "4_1", (0, 0));
+    test_cone_direct!(k6_2a_cone_direct, "6_2a", (2, 2));
+    test_cone_direct!(k7_6a_cone_direct, "7_6a", (-2, -2));
+
+    #[test]
+    fn k3_1_m_cone_direct() {
+        let l = InvLink::test_data("3_1").mirror();
+        let c = P::variable();
+
+        let config = SymBuildConfig { cone_direct: true, ..Default::default() };
+        let ssi = ssi_invariants_via_cone(&l, &c, false, config);
+        assert_eq!(ssi, (-2, -2));
+    }
+
+    #[test]
+    fn k9_46_cone_direct() {
+        let l = InvLink::from_symmetric_pd_code(
+            [[18,8,1,7],[13,6,14,7],[12,2,13,1],[8,18,9,17],[5,14,6,15],[2,12,3,11],[16,10,17,9],[15,4,16,5],[10,4,11,3]]
+        );
+
+        let c = P::variable();
+        let config = SymBuildConfig { cone_direct: true, ..Default::default() };
+        let ssi = ssi_invariants_via_cone(&l, &c, false, config);
+
+        assert_eq!(ssi, (0, 2));
+    }
+
     test_cone!(k3_1_cone, "3_1", (2, 2));
     test_cone!(k4_1_cone, "4_1", (0, 0));
     test_cone!(k5_1_cone, "5_1", (4, 4));

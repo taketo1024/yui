@@ -742,7 +742,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     // Add `val` to edge `k → l` (absent = 0), in place; drop the edge if the sum is 0.
-    fn add_to_edge(&mut self, k: &TngComplexKey, l: &TngComplexKey, val: LcCob<R>) {
+    pub(crate) fn add_to_edge(&mut self, k: &TngComplexKey, l: &TngComplexKey, val: LcCob<R>) {
         if let Some(e) = self.edge_mut(k, l) {
             *e += val;
             if e.is_zero() {

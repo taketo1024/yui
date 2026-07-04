@@ -39,11 +39,14 @@ pub struct SymBuildConfig {
     pub h_range: Option<RangeInclusive<isize>>,
     // divide-and-conquer chunking (auto cutwidth or manual edge-cuts); None = single pass.
     pub cut: CutOption,
+    // cone only: emit the symmetry-broken complex directly (Sano2026 Prop 4.6) instead of
+    // doubling every vertex and eliminating the vertical identities afterwards.
+    pub cone_direct: bool,
 }
 
 impl Default for SymBuildConfig {
     fn default() -> Self {
-        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, h_range: None, cut: CutOption::None }
+        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, h_range: None, cut: CutOption::None, cone_direct: false }
     }
 }
 

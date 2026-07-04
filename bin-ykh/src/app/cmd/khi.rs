@@ -61,6 +61,10 @@ pub struct Args {
     #[arg(long)]
     pub cob_cone: bool,
 
+    // cone only: direct symmetry-broken emission (Sano2026 Prop 4.6).
+    #[arg(long)]
+    pub cone_direct: bool,
+
     // take the strongly-invertible Whitehead double of the (mirrored) knot: clasp sign pos|neg.
     #[arg(long, value_parser = parse_clasp)]
     pub whitehead: Option<bool>,
@@ -136,6 +140,7 @@ where
             node_order: self.args.node_order,
             preprocess: !self.args.no_preprocess,
             cut: self.args.cut.clone().unwrap_or_default(),
+            cone_direct: self.args.cone_direct,
             ..Default::default()
         };
 

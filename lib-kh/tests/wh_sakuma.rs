@@ -35,6 +35,8 @@ fn k8_21b() -> InvLink {
 #[test]
 #[ignore = "heavy: 72 crossings, needs a large-memory machine"]
 fn ssi_wh_8_21_pos() {
+    let _ = env_logger::try_init(); // RUST_LOG controls the level; logs go to stderr (use 2>&1 for stdout)
+
     let j = k8_21a().conn_sum(&k8_21b().mirror());
     let wh = j.whitehead_double(true, 0);
 

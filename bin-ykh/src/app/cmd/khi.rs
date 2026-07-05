@@ -65,6 +65,10 @@ pub struct Args {
     #[arg(long)]
     pub cone_direct: bool,
 
+    // cone only: cap the per-elimination fill cost; survivors defer to the matrix reduction.
+    #[arg(long)]
+    pub elim_max_cost: Option<usize>,
+
     // take the strongly-invertible Whitehead double of the (mirrored) knot: clasp sign pos|neg.
     #[arg(long, value_parser = parse_clasp)]
     pub whitehead: Option<bool>,
@@ -141,6 +145,7 @@ where
             preprocess: !self.args.no_preprocess,
             cut: self.args.cut.clone().unwrap_or_default(),
             cone_direct: self.args.cone_direct,
+            elim_max_cost: self.args.elim_max_cost,
             ..Default::default()
         };
 

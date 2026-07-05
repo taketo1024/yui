@@ -28,6 +28,7 @@ use crate::kh::{KhChain, KhGen, KhTensor};
 use crate::khi::{KhIChain, KhIGen, KhIGenExt};
 use crate::tng::{Cob, CobComp, Dot, End, LcCob, LcCobTrait, Tng, TngComp, TngComplex, TngComplexElem, TngComplexKey, TngComplexVertex};
 use super::{reachable_range, ChunkBuilder, SymTngBuilder, SymBuildConfig, TngComplexBuilder, BuildConfig, BuildMode, TauKeyMap};
+use super::builder::{PROGRESS_LOG_STEP, PROGRESS_LOG_MIN};
 
 // τ-orbit class of a symmetric-complex vertex: the representative (smaller key) and the τ-fixed
 // survive into the direct cone; the non-representative column is never materialized.
@@ -186,7 +187,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     //   surv → surv : verbatim on both layers,
     //   surv → drop : (ii)  j¹ → (τk)¹ += Iτ(k)∘f,
     //   drop → surv : (iii) (τj)⁰ → k⁰ += f∘Iτ(τj),
-    //   cross via dropped N at d−1 : (i) X¹ → k⁰ += (X→N)∘(N→k),
+    //   asymmetric elimination through dropped N at d−1 : (i) X¹ → k⁰ += (X→N)∘(N→k),
     // and only τ-fixed vertices keep a vertical `1 + τ` (a representative's identity cancels via τ²).
     fn cone_extend_direct(&mut self, d: isize) {
         let with_bit = |k: &TngComplexKey, b: Bit| {
@@ -238,15 +239,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
         }
 
-        // (i) cross corrections through each dropped N at degree d−1: X¹ → k⁰ += (X→N)∘(N→k),
-        // one full cobordism composition per (N, in-edge, out-edge) triple — O(dropped × in × out),
-        // the dominant cost. The composition is independent per triple, so compute in parallel
-        // (chunked over N to bound the transient), then apply the accumulating add_to_edge serially.
+        // (i) asymmetric elimination: eliminating each dropped N's diagonal `1+τ` edge reconnects its
+        // in-edges to its out-edges, X¹ → k⁰ += (X→N)∘(N→k) — one full cobordism composition per
+        // (N, in-edge, out-edge) triple, O(dropped × in × out), the dominant cost. Independent per
+        // triple, so compute in parallel (chunked over N to bound the transient), then apply the
+        // accumulating add_to_edge serially.
         let dropped_prev = self.inner.complex().keys_of_deg(d - 1)
             .filter(|n| self.orbit_class(n).1 == OrbitClass::Drop)
             .copied().collect_vec();
 
-        debug!("    C[{d}] cross-corr: {} dropped-prev...", dropped_prev.len());
+        debug!("    C[{d}] asymmetric elimination: {} dropped...", dropped_prev.len());
 
         const CHUNK: usize = 4096;
         let inner = self.inner.complex();
@@ -275,8 +277,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
             let prev = done;
             done += ns.len();
-            if dropped_prev.len() > 20_000 && done / 20_000 > prev / 20_000 {
-                debug!("    cross-corr C[{d}]: {done}/{} dropped", dropped_prev.len());
+            if dropped_prev.len() > PROGRESS_LOG_MIN && done / PROGRESS_LOG_STEP > prev / PROGRESS_LOG_STEP {
+                debug!("      ... corrected {done}/{} in C[{d}]", dropped_prev.len());
             }
         }
 
@@ -458,9 +460,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // Drop a consumed symmetric degree and its τ key-map entries — never needed again.
     fn prune_consumed(&mut self, d: isize) {
         let doomed = self.inner.complex().keys_of_deg(d).copied().collect_vec();
-
-        debug!("  prune sym C[{d}]: -{} verts", doomed.len());
-
         self.inner.complex_mut().remove_vertices(&doomed);
         let i0 = self.inner.complex().deg_shift().0;
         self.inner.key_map_mut().drop(|k| k.weight() as isize + i0 == d);

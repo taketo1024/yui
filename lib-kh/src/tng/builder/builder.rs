@@ -23,6 +23,11 @@ use crate::kh::{KhChain, KhComplex};
 use crate::tng::{TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
 use super::{reachable_range, pop_min_pivot, sparkline, cutwidth_after, toggle_boundary, boundary_edges, select_cuts, cut_components, merge_order, TngElemBuilder};
 
+// Progress logging for the long per-op build loops (eliminate / deloop / asymmetric elimination):
+// emit a line every `PROGRESS_LOG_STEP` ops, but only for rounds larger than `PROGRESS_LOG_MIN`.
+pub(super) const PROGRESS_LOG_STEP: usize = 20_000;
+pub(super) const PROGRESS_LOG_MIN: usize = 50_000;
+
 /// How the next crossing to append is chosen.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum NodeOrder {
@@ -390,10 +395,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         );
         if keys.is_empty() { return }
 
-        debug!("{} deloop in C[{i}], targets: {}.", self.current_step(), keys.len());
+        let total = keys.len();
+        debug!("{} deloop in C[{i}], targets: {}.", self.current_step(), total);
 
         let before = self.complex.rank(i) as isize;
 
+        let mut done = 0;
         while let Some(k) = pop_min_pivot(&mut keys, |k|
             self.complex.contains_key(k).then(|| self.complex.vertex(k).c_weight())
         ) {
@@ -404,6 +411,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                     let w = self.complex.vertex(&new_key).c_weight();
                     keys.push((new_key, w));
                 }
+            }
+            done += 1;
+            if total > PROGRESS_LOG_MIN && done % PROGRESS_LOG_STEP == 0 {
+                debug!("{}   ... delooped {done} in C[{i}] (rank: {})", self.current_step(), self.complex.rank(i));
             }
         }
 
@@ -448,7 +459,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         ) {
             self.try_eliminate_at(&k);
             done += 1;
-            if total > 50_000 && done % 20_000 == 0 {
+            if total > PROGRESS_LOG_MIN && done % PROGRESS_LOG_STEP == 0 {
                 debug!("{}   ... eliminated {done}/{total} in C[{i}] (rank: {})", self.current_step(), self.complex.rank(i));
             }
         }

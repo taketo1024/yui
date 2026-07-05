@@ -273,8 +273,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             for (src, dst, corr) in corrs {
                 self.cone.complex_mut().add_to_edge(&src, &dst, corr);
             }
+            let prev = done;
             done += ns.len();
-            if dropped_prev.len() > CHUNK {
+            if dropped_prev.len() > 20_000 && done / 20_000 > prev / 20_000 {
                 debug!("    cross-corr C[{d}]: {done}/{} dropped", dropped_prev.len());
             }
         }

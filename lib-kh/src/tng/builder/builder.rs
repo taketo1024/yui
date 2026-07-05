@@ -452,7 +452,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         if keys.is_empty() { return }
 
         let total = keys.len();
-        debug!("{} eliminate in C[{i}], targets: {}", self.current_step(), total);
+        debug!("{} eliminate in C[{i}], targets: {} / rank {}", self.current_step(), total, self.complex.rank(i));
 
         let before = self.complex.rank(i) as isize;
 
@@ -479,7 +479,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let after = self.complex.rank(i) as isize;
 
-        debug!("{}   eliminated C[{i}]: {} (diff: {}).", self.current_step(), after, after - before);
+        // neighbor ranks: an elimination at C[i] also shrinks the adjacent degrees it bridges.
+        debug!("{}   eliminated C[{i}]: {} (diff: {}). neighbors: C[{}] {} / C[{}] {}",
+            self.current_step(), after, after - before,
+            i - 1, self.complex.rank(i - 1), i + 1, self.complex.rank(i + 1));
         if total > PROGRESS_LOG_MIN {
             let buckets = cost_hist.iter().enumerate()
                 .filter(|(_, c)| **c > 0)

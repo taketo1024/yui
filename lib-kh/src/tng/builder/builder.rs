@@ -453,12 +453,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         );
         if keys.is_empty() { return }
 
-        let total = keys.len();
-
-        // fill-cost distribution of the targets, as a sparkline (the histogram is built only inside
-        // `debug!`, so it costs nothing unless debug logging is on).
-        debug!("{} eliminate in C[{i}], targets: {} / rank {} | fill {}",
-            self.current_step(), total, self.complex.rank(i), fill_cost_sparkline(&keys));
+        // `targets` counts only the pivots the cap will actually eliminate (cost ≤ cap); the rest
+        // defer to the matrix. The sparkline shows the *whole* eliminatable distribution for context.
+        let targets = self.config.elim_max_cost
+            .map_or(keys.len(), |max| keys.iter().filter(|(_, c)| *c <= max).count());
+        debug!("{} eliminate in C[{i}]: {}, targets: {}", self.current_step(), self.complex.rank(i), targets);
+        debug!("{}   fill: {}", self.current_step(), fill_cost_sparkline(&keys));
 
         let before = self.complex.rank(i) as isize;
 
@@ -473,17 +473,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
             self.try_eliminate_at(&k);
             done += 1;
-            if total > PROGRESS_LOG_MIN && done % PROGRESS_LOG_STEP == 0 {
-                debug!("{}   ... eliminated {done}/{total} in C[{i}] (rank: {})", self.current_step(), self.complex.rank(i));
+            if targets > PROGRESS_LOG_MIN && done % PROGRESS_LOG_STEP == 0 {
+                debug!("{}   ... eliminated {done}/{targets} in C[{i}] (rank: {})", self.current_step(), self.complex.rank(i));
             }
         }
 
         let after = self.complex.rank(i) as isize;
 
+        debug!("{}   eliminated C[{i}]: {} (diff: {})", self.current_step(), after, after - before);
         // neighbor ranks: an elimination at C[i] also shrinks the adjacent degrees it bridges.
-        debug!("{}   eliminated C[{i}]: {} (diff: {}). neighbors: C[{}] {} / C[{}] {}",
-            self.current_step(), after, after - before,
-            i - 1, self.complex.rank(i - 1), i + 1, self.complex.rank(i + 1));
+        debug!("{}   neighbors: C[{}] {} / C[{}] {}",
+            self.current_step(), i - 1, self.complex.rank(i - 1), i + 1, self.complex.rank(i + 1));
     }
 
     // Eliminate at `k` via an invertible in- or out-edge; returns the fill cost paid

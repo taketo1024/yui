@@ -19,6 +19,7 @@ use yui_core::bitseq::Bit;
 use yui_core::{Ring, RingOps};
 use yui_link::{Edge, Node, InvLink};
 
+use rayon::prelude::*;
 use rustc_hash::FxHashMap;
 use yui_homology::{ChainComplex1, GrMod1, Summand};
 use yui_matrix::sparse::SpMat;
@@ -235,23 +236,42 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
         }
 
-        // (i) cross corrections through each dropped N at degree d−1.
+        // (i) cross corrections through each dropped N at degree d−1: X¹ → k⁰ += (X→N)∘(N→k),
+        // one full cobordism composition per (N, in-edge, out-edge) triple — O(dropped × in × out),
+        // the dominant cost. The composition is independent per triple, so compute in parallel
+        // (chunked over N to bound the transient), then apply the accumulating add_to_edge serially.
         let dropped_prev = self.inner.complex().keys_of_deg(d - 1)
             .filter(|n| self.orbit_class(n).1 == OrbitClass::Drop)
             .copied().collect_vec();
 
-        for n in dropped_prev {
-            let ins = self.inner.complex().vertex(&n).in_edges().copied()
-                .filter(|x| self.orbit_class(x).1 != OrbitClass::Drop).collect_vec();
-            let outs = self.inner.complex().vertex(&n).out_edges().copied()
-                .filter(|k| self.orbit_class(k).1 != OrbitClass::Drop).collect_vec();
-
-            for x in ins.iter() {
-                let b = self.inner.complex().edge(x, &n).clone();
-                for k in outs.iter() {
-                    let corr = b.stack(self.inner.complex().edge(&n, k)).reduce(&h, &t);
-                    self.cone.complex_mut().add_to_edge(&with_bit(x, Bit::Bit1), &with_bit(k, Bit::Bit0), corr);
+        const CHUNK: usize = 4096;
+        let inner = self.inner.complex();
+        let mut done = 0;
+        for ns in dropped_prev.chunks(CHUNK) {
+            let corrs: Vec<(TngComplexKey, TngComplexKey, LcCob<R>)> = ns.par_iter().flat_map_iter(|n| {
+                let ins = inner.vertex(n).in_edges().copied()
+                    .filter(|x| self.orbit_class(x).1 != OrbitClass::Drop).collect_vec();
+                let outs = inner.vertex(n).out_edges().copied()
+                    .filter(|k| self.orbit_class(k).1 != OrbitClass::Drop).collect_vec();
+                let mut local = vec![];
+                for x in ins.iter() {
+                    let b = inner.edge(x, n).clone();
+                    for k in outs.iter() {
+                        let corr = b.stack(inner.edge(n, k)).reduce(&h, &t);
+                        if !corr.is_zero() {
+                            local.push((with_bit(x, Bit::Bit1), with_bit(k, Bit::Bit0), corr));
+                        }
+                    }
                 }
+                local
+            }).collect();
+
+            for (src, dst, corr) in corrs {
+                self.cone.complex_mut().add_to_edge(&src, &dst, corr);
+            }
+            done += ns.len();
+            if dropped_prev.len() > CHUNK {
+                debug!("    cross-corr C[{d}]: {done}/{} dropped", dropped_prev.len());
             }
         }
 
@@ -282,8 +302,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             key
         };
 
+        // only keys the elements actually reference need a push table (the canon elements touch a
+        // tiny fraction of the ~10⁵ dropped keys per degree).
+        let referenced: rustc_hash::FxHashSet<TngComplexKey> = self.cone.elements().content().iter()
+            .flat_map(|e| e.out_cob().keys().copied())
+            .map(|mut k| { k.state.remove(k.state.len() - 1); k })
+            .collect();
+
         let dropped = self.inner.complex().keys_of_deg(d)
-            .filter(|n| self.orbit_class(n).1 == OrbitClass::Drop)
+            .filter(|n| referenced.contains(n) && self.orbit_class(n).1 == OrbitClass::Drop)
             .copied().collect_vec();
 
         if dropped.is_empty() {

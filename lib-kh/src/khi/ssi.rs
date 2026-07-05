@@ -75,9 +75,12 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     let r = if reduced { 1 } else { 2 };
     let t = R::zero();
 
-    // same window as `div`: bottom..=1, built one degree wider on both ends for the boundary maps.
-    let range = KhComplex::<R>::clamp_h_range(l.inner(), reduced, -(Link::MAX_CROSSING as isize) ..= 1);
+    // Respect a requested `h_range` (must cover 0 and 1, the ssi degrees); else the full support up to 1.
+    // Built one degree wider on both ends for the boundary maps.
+    let requested = config.h_range.clone().unwrap_or(-(Link::MAX_CROSSING as isize) ..= 1);
+    let range = KhComplex::<R>::clamp_h_range(l.inner(), reduced, requested);
     let (a, b) = (*range.start(), *range.end());
+    assert!(a <= 0 && b >= 1, "ssi h-range must include 0 and 1, got {a}..={b}");
     let config = SymBuildConfig { h_range: Some((a - 1)..=(b + 1)), ..config };
     let kc = KhIComplex::from_cone(l, c, &t, reduced, config);
 

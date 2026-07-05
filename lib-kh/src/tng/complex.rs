@@ -398,11 +398,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.vertices[k].out_edges.contains_key(l)
     }
 
-    /// Markowitz cost of eliminating edge `k → l`: the fill `(out(k)-1)·(in(l)-1)` it creates.
+    /// Fill cost of eliminating edge `k → l`: each Schur correction `d − c·a⁻¹·b` stacks the
+    /// surrounding cobordisms, so the term-count grows ~`nterms(c)·nterms(b)`. Summing over the
+    /// parallel edges factorizes into a product of the actual edge weights (excluding the pivot).
+    /// Reduces to the Markowitz count `(out(k)-1)·(in(l)-1)` when every edge has `nterms = 1`.
     pub(crate) fn edge_weight(&self, k: &TngComplexKey, l: &TngComplexKey) -> usize {
-        let nk = self.vertices[k].out_edges.len();
-        let nl = self.vertices[l].in_edges.len();
-        (nk - 1) * (nl - 1)
+        let out_w: usize = self.vertices[k].out_edges.iter()
+            .filter(|(l2, _)| *l2 != l)
+            .map(|(_, f)| f.nterms())
+            .sum();
+        let in_w: usize = self.vertices[l].in_edges.iter()
+            .filter(|k2| *k2 != k)
+            .map(|k2| self.edge(k2, l).nterms())
+            .sum();
+        out_w * in_w
     }
 
     pub fn add_edge(&mut self, k: &TngComplexKey, l: &TngComplexKey, f: LcCob<R>) { 

@@ -112,7 +112,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let left_map = std::mem::take(self.inner.key_map_mut());
         let (left, right) = self.inner.complex_mut().prepare_merge(other);
         let range = reachable_range(self.inner.complex().h_range(), &self.inner.config().h_range, self.inner.n_nodes());
-        self.cone = TngComplexBuilder::from_tng_complex(cone_shell(self.inner.complex()), BuildConfig { mode, ..Default::default() });
+        let elim_max_cost = self.inner.config().elim_max_cost;
+        self.cone = TngComplexBuilder::from_tng_complex(cone_shell(self.inner.complex()), BuildConfig { mode, elim_max_cost, ..Default::default() });
 
         info!("cone merge {} <- {}, range: {range:?}", left.stat(), right.stat());
 
@@ -699,6 +700,33 @@ mod tests {
     #[test]
     fn cone_direct_6_3_chunked() {
         check_direct_matches(&InvLink::test_data("6_3"), SymBuildConfig { cut: CutOption::Auto(3), ..Default::default() });
+    }
+
+    // Capping the elimination fill cost must not change the homology — the survivors just defer to
+    // the matrix reduction. Test at threshold 0 (only free eliminations) and a small positive cap.
+    fn check_elim_cap(l: &InvLink) {
+        for reduced in [false, true] {
+            let full = cone_homology(l, reduced, SymBuildConfig { cone_direct: true, ..Default::default() });
+            for cap in [Some(0), Some(4)] {
+                let capped = cone_homology(l, reduced, SymBuildConfig { cone_direct: true, elim_max_cost: cap, ..Default::default() });
+                assert_eq!(full, capped, "reduced={reduced}, cap={cap:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn cone_elim_cap_3_1() {
+        check_elim_cap(&InvLink::test_data("3_1"));
+    }
+
+    #[test]
+    fn cone_elim_cap_6_3_chunked() {
+        let l = InvLink::test_data("6_3");
+        for reduced in [false, true] {
+            let full = cone_homology(&l, reduced, SymBuildConfig { cone_direct: true, cut: CutOption::Auto(3), ..Default::default() });
+            let capped = cone_homology(&l, reduced, SymBuildConfig { cone_direct: true, cut: CutOption::Auto(3), elim_max_cost: Some(0), ..Default::default() });
+            assert_eq!(full, capped, "reduced={reduced}");
+        }
     }
 
     #[test]

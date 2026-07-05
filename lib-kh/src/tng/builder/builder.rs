@@ -87,11 +87,14 @@ pub struct BuildConfig {
     // divide-and-conquer chunking (auto cutwidth or manual edge-cuts); None = single pass.
     pub cut: CutOption,
     pub h_range: Option<RangeInclusive<isize>>,
+    // skip eliminations whose fill cost (`edge_weight` = Schur block size) exceeds this; the
+    // survivors defer to the matrix reduction. `None` = eliminate everything (current behavior).
+    pub elim_max_cost: Option<usize>,
 }
 
 impl Default for BuildConfig {
     fn default() -> Self {
-        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), cut: CutOption::None, h_range: None }
+        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), cut: CutOption::None, h_range: None, elim_max_cost: None }
     }
 }
 
@@ -459,6 +462,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         while let Some(k) = pop_min_pivot(&mut keys, |k|
             self.complex.contains_key(k).then(|| self.complex.elim_cost(k))
         ) {
+            // `pop_min_pivot` returns the cheapest pivot; once it exceeds the cap, so do all the
+            // rest — stop and defer them (with the whole remaining frontier) to the matrix reduction.
+            if self.config.elim_max_cost.is_some_and(|max| self.complex.elim_cost(&k) > max) {
+                break;
+            }
             if let Some(cost) = self.try_eliminate_at(&k) {
                 let bucket = (usize::BITS - cost.leading_zeros()) as usize; // ⌈log2⌉+1; 0 for cost 0
                 cost_hist[bucket.min(39)] += 1;
@@ -689,7 +697,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let s = self.builder.complex.deg_shift().0;
             0 ..= (*r.end() - s).max(0)
         });
-        child.with_config(BuildConfig { mode: self.builder.config.mode, node_order: NodeOrder::MinCut, cut: CutOption::None, h_range })
+        child.with_config(BuildConfig { mode: self.builder.config.mode, node_order: NodeOrder::MinCut, cut: CutOption::None, h_range, elim_max_cost: None })
     }
 }
 

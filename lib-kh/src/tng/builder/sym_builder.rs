@@ -42,11 +42,14 @@ pub struct SymBuildConfig {
     // cone only: emit the symmetry-broken complex directly (Sano2026 Prop 4.6) instead of
     // doubling every vertex and eliminating the vertical identities afterwards.
     pub cone_direct: bool,
+    // cone only: cap the per-elimination fill cost during cone_merge; survivors defer to the
+    // matrix reduction (two-pass: cheap cobordism elim, then scalar F2[H] reduction). None = no cap.
+    pub elim_max_cost: Option<usize>,
 }
 
 impl Default for SymBuildConfig {
     fn default() -> Self {
-        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, h_range: None, cut: CutOption::None, cone_direct: false }
+        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, h_range: None, cut: CutOption::None, cone_direct: false, elim_max_cost: None }
     }
 }
 
@@ -143,7 +146,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         // the inner builder is driven by `self` — disable its own auto-simplify.
         let inner = TngComplexBuilder::from_link(l.inner(), h, t, reduced)
-            .with_config(BuildConfig { mode: BuildMode::None, cut: CutOption::None, node_order: NodeOrder::default(), h_range: None });
+            .with_config(BuildConfig { mode: BuildMode::None, cut: CutOption::None, node_order: NodeOrder::default(), h_range: None, elim_max_cost: None });
 
         let x_map = l.nodes().map(|x|
             (x.clone(), l.inv_node(x).clone())
@@ -158,7 +161,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn with_config(mut self, config: SymBuildConfig) -> Self {
         // propagate the window to the inner builder so the preprocess merges cap
         // to it; this also drops canon cycles when the window excludes h-degree 0.
-        let inner_config = BuildConfig { mode: BuildMode::None, cut: CutOption::None, node_order: config.node_order, h_range: config.h_range.clone() };
+        let inner_config = BuildConfig { mode: BuildMode::None, cut: CutOption::None, node_order: config.node_order, h_range: config.h_range.clone(), elim_max_cost: None };
         self.inner = self.inner.with_config(inner_config);
         self.config = config;
         self
@@ -910,7 +913,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let (h, t) = self.builder.inner.complex().ht();
         let base_pt = self.builder.inner.complex().base_pt();
         let mut inner = TngComplexBuilder::init(h, t, (0, 0), base_pt)
-            .with_config(BuildConfig { mode: BuildMode::None, cut: CutOption::None, node_order: NodeOrder::MinCut, h_range: None });
+            .with_config(BuildConfig { mode: BuildMode::None, cut: CutOption::None, node_order: NodeOrder::MinCut, h_range: None, elim_max_cost: None });
         inner.set_nodes(chunk.iter().cloned());
         inner.elements_mut().set(self.builder.inner.elements().content().to_vec());
 

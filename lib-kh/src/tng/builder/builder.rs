@@ -437,14 +437,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         );
         if keys.is_empty() { return }
 
-        debug!("{} eliminate in C[{i}], targets: {}", self.current_step(), keys.len());
+        let total = keys.len();
+        debug!("{} eliminate in C[{i}], targets: {}", self.current_step(), total);
 
         let before = self.complex.rank(i) as isize;
 
+        let mut done = 0;
         while let Some(k) = pop_min_pivot(&mut keys, |k|
             self.complex.contains_key(k).then(|| self.complex.elim_cost(k))
         ) {
             self.try_eliminate_at(&k);
+            done += 1;
+            if total > 50_000 && done % 20_000 == 0 {
+                debug!("{}   ... eliminated {done}/{total} in C[{i}] (rank: {})", self.current_step(), self.complex.rank(i));
+            }
         }
 
         let after = self.complex.rank(i) as isize;

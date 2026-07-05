@@ -13,7 +13,7 @@
 
 use delegate::delegate;
 use itertools::Itertools;
-use log::{debug, info};
+use log::{debug, info, trace};
 use num_traits::Zero;
 use yui_core::bitseq::Bit;
 use yui_core::{Ring, RingOps};
@@ -209,8 +209,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.cone.complex_mut().add_vertex(with_bit(k, Bit::Bit0), TngComplexVertex::from(tng.clone()));
             self.cone.complex_mut().add_vertex(with_bit(k, Bit::Bit1), TngComplexVertex::from(tng));
         }
+        trace!("    C[{d}] vertices done");
 
         // within-layer edges into degree d, rewritten per the tables above.
+        debug!("    C[{d}] within-layer edges ({} keys)...", keys.len());
         for k in keys.iter() {
             let (tk, ck) = self.orbit_class(k);
             for j in self.inner.complex().vertex(k).in_edges().copied().collect_vec() {
@@ -243,6 +245,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let dropped_prev = self.inner.complex().keys_of_deg(d - 1)
             .filter(|n| self.orbit_class(n).1 == OrbitClass::Drop)
             .copied().collect_vec();
+
+        debug!("    C[{d}] cross-corr: {} dropped-prev...", dropped_prev.len());
 
         const CHUNK: usize = 4096;
         let inner = self.inner.complex();
@@ -316,6 +320,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         if dropped.is_empty() {
             return;
         }
+
+        debug!("    rewrite-elements C[{d}]: {} referenced-dropped", dropped.len());
 
         let (h, t) = self.cone.complex().ht().clone();
 

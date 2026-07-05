@@ -434,7 +434,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         // global pass, None leaves them entirely.
         if self.config.mode.immediate_elim() {
             // retain only the keys that weren't eliminated
-            added.retain(|k| !self.try_eliminate_at(k));
+            added.retain(|k| self.try_eliminate_at(k).is_none());
         }
         added
     }
@@ -453,11 +453,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let before = self.complex.rank(i) as isize;
 
+        // profiling: histogram of fill cost (edge_weight) at elimination time, log-scale buckets.
+        let mut cost_hist = [0usize; 40];
         let mut done = 0;
         while let Some(k) = pop_min_pivot(&mut keys, |k|
             self.complex.contains_key(k).then(|| self.complex.elim_cost(k))
         ) {
-            self.try_eliminate_at(&k);
+            if let Some(cost) = self.try_eliminate_at(&k) {
+                let bucket = (usize::BITS - cost.leading_zeros()) as usize; // ⌈log2⌉+1; 0 for cost 0
+                cost_hist[bucket.min(39)] += 1;
+            }
             done += 1;
             if total > PROGRESS_LOG_MIN && done % PROGRESS_LOG_STEP == 0 {
                 debug!("{}   ... eliminated {done}/{total} in C[{i}] (rank: {})", self.current_step(), self.complex.rank(i));
@@ -467,17 +472,28 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let after = self.complex.rank(i) as isize;
 
         debug!("{}   eliminated C[{i}]: {} (diff: {}).", self.current_step(), after, after - before);
+        if total > PROGRESS_LOG_MIN {
+            let buckets = cost_hist.iter().enumerate()
+                .filter(|(_, c)| **c > 0)
+                .map(|(b, c)| format!("<2^{b}:{c}"))
+                .collect_vec();
+            debug!("{}   fill-cost C[{i}]: {}", self.current_step(), buckets.join(" "));
+        }
     }
 
-    pub fn try_eliminate_at(&mut self, k: &TngComplexKey) -> bool {
-        if let Some(&j) = self.choose_inv_edge_into(&k) { 
+    // Eliminate at `k` via an invertible in- or out-edge; returns the fill cost paid
+    // (`edge_weight` of the chosen pivot = Schur block size), or `None` if nothing to eliminate.
+    pub fn try_eliminate_at(&mut self, k: &TngComplexKey) -> Option<usize> {
+        if let Some(&j) = self.choose_inv_edge_into(&k) {
+            let cost = self.complex.edge_weight(&j, k);
             self.eliminate(&j, &k);
-            true
-        } else if let Some(&l) = self.choose_inv_edge_from(&k) { 
+            Some(cost)
+        } else if let Some(&l) = self.choose_inv_edge_from(&k) {
+            let cost = self.complex.edge_weight(k, &l);
             self.eliminate(&k, &l);
-            true
-        } else { 
-            false
+            Some(cost)
+        } else {
+            None
         }
     }
 

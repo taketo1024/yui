@@ -21,7 +21,7 @@ use yui_link::{Node, Edge, Link};
 
 use crate::kh::{KhChain, KhComplex};
 use crate::tng::{TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
-use super::{reachable_range, pop_min_pivot, sparkline, cutwidth_after, toggle_boundary, boundary_edges, select_cuts, cut_components, merge_order, TngElemBuilder};
+use super::{reachable_range, pop_min_pivot, sparkline, fill_cost_histogram, cutwidth_after, toggle_boundary, boundary_edges, select_cuts, cut_components, merge_order, TngElemBuilder};
 
 // Progress logging for the long per-op build loops (eliminate / deloop / asymmetric elimination):
 // emit a line every `PROGRESS_LOG_STEP` ops, but only for rounds larger than `PROGRESS_LOG_MIN`.
@@ -423,7 +423,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let after = self.complex.rank(i) as isize;
 
-        debug!("{}   delooped C[{i}]: {} (diff: {}).", self.current_step(), after, after - before);
+        debug!("{}   delooped C[{i}]: {} (diff: {}). neighbors: C[{}] {} / C[{}] {}",
+            self.current_step(), after, after - before,
+            i - 1, self.complex.rank(i - 1), i + 1, self.complex.rank(i + 1));
     }
 
     pub fn deloop(&mut self, k: &TngComplexKey, c: &TngComp) -> Vec<TngComplexKey> {
@@ -452,12 +454,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         if keys.is_empty() { return }
 
         let total = keys.len();
-        debug!("{} eliminate in C[{i}], targets: {} / rank {}", self.current_step(), total, self.complex.rank(i));
+
+        // fill-cost distribution of the targets, as a sparkline (the histogram is built only inside
+        // `debug!`, so it costs nothing unless debug logging is on).
+        debug!("{} eliminate in C[{i}], targets: {} / rank {} | fill {}",
+            self.current_step(), total, self.complex.rank(i), fill_cost_sparkline(&keys));
 
         let before = self.complex.rank(i) as isize;
 
-        // profiling: histogram of fill cost (edge_weight) at elimination time, log-scale buckets.
-        let mut cost_hist = [0usize; 40];
         let mut done = 0;
         while let Some(k) = pop_min_pivot(&mut keys, |k|
             self.complex.contains_key(k).then(|| self.complex.elim_cost(k))
@@ -467,10 +471,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             if self.config.elim_max_cost.is_some_and(|max| self.complex.elim_cost(&k) > max) {
                 break;
             }
-            if let Some(cost) = self.try_eliminate_at(&k) {
-                let bucket = (usize::BITS - cost.leading_zeros()) as usize; // ⌈log2⌉+1; 0 for cost 0
-                cost_hist[bucket.min(39)] += 1;
-            }
+            self.try_eliminate_at(&k);
             done += 1;
             if total > PROGRESS_LOG_MIN && done % PROGRESS_LOG_STEP == 0 {
                 debug!("{}   ... eliminated {done}/{total} in C[{i}] (rank: {})", self.current_step(), self.complex.rank(i));
@@ -483,13 +484,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("{}   eliminated C[{i}]: {} (diff: {}). neighbors: C[{}] {} / C[{}] {}",
             self.current_step(), after, after - before,
             i - 1, self.complex.rank(i - 1), i + 1, self.complex.rank(i + 1));
-        if total > PROGRESS_LOG_MIN {
-            let buckets = cost_hist.iter().enumerate()
-                .filter(|(_, c)| **c > 0)
-                .map(|(b, c)| format!("<2^{b}:{c}"))
-                .collect_vec();
-            debug!("{}   fill-cost C[{i}]: {}", self.current_step(), buckets.join(" "));
-        }
     }
 
     // Eliminate at `k` via an invertible in- or out-edge; returns the fill cost paid
@@ -702,6 +696,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         });
         child.with_config(BuildConfig { mode: self.builder.config.mode, node_order: NodeOrder::MinCut, cut: CutOption::None, h_range, elim_max_cost: None })
     }
+}
+
+// Sparkline of a target set's fill-cost distribution (log2 buckets). Kept separate so the
+// histogram is built only inside a `debug!` argument — i.e. only when debug logging is on.
+fn fill_cost_sparkline(keys: &[(TngComplexKey, usize)]) -> String {
+    let hist = fill_cost_histogram(keys.iter().map(|(_, c)| *c));
+    let hi = hist.iter().rposition(|&c| c > 0).unwrap_or(0);
+    let peak = hist.iter().copied().max().unwrap_or(0);
+    sparkline(&hist[..=hi], peak)
 }
 
 #[cfg(test)]

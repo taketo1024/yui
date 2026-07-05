@@ -42,6 +42,17 @@ pub(crate) fn sparkline(widths: &[usize], peak: usize) -> String {
     }).collect()
 }
 
+// Bucket `costs` into 32 log2 bins: bin 0 = cost 0 (free), bin b = cost in [2^(b-1), 2^b);
+// costs ≥ 2^31 saturate into the top bin.
+pub(crate) fn fill_cost_histogram(costs: impl Iterator<Item = usize>) -> [usize; 32] {
+    let mut hist = [0usize; 32];
+    for c in costs {
+        let b = if c == 0 { 0 } else { (usize::BITS - c.leading_zeros()) as usize };
+        hist[b.min(31)] += 1;
+    }
+    hist
+}
+
 // The node-unit's boundary arc-ends: its edges with odd incidence (one endpoint inside the unit).
 pub(crate) fn boundary_edges(node_unit: &[&Node]) -> Vec<Edge> {
     node_unit.iter().flat_map(|x| x.edges().iter().copied()).counts().into_iter()

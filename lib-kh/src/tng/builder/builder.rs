@@ -458,7 +458,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let targets = self.config.elim_max_cost
             .map_or(keys.len(), |max| keys.iter().filter(|(_, c)| *c <= max).count());
         debug!("{} eliminate in C[{i}]: {}, targets: {}", self.current_step(), self.complex.rank(i), targets);
-        debug!("{}   fill: {}", self.current_step(), fill_cost_sparkline(&keys));
+        debug!("{}   fill: {}", self.current_step(), fill_cost_sparkline(&keys, self.config.elim_max_cost));
 
         let before = self.complex.rank(i) as isize;
 
@@ -700,11 +700,22 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 // Sparkline of a target set's fill-cost distribution (log2 buckets). Kept separate so the
 // histogram is built only inside a `debug!` argument — i.e. only when debug logging is on.
-fn fill_cost_sparkline(keys: &[(TngComplexKey, usize)]) -> String {
+// A `|` marks the cap: buckets left of it are fully eliminated, buckets right defer to the matrix.
+fn fill_cost_sparkline(keys: &[(TngComplexKey, usize)], max: Option<usize>) -> String {
     let hist = fill_cost_histogram(keys.iter().map(|(_, c)| *c));
     let hi = hist.iter().rposition(|&c| c > 0).unwrap_or(0);
     let peak = hist.iter().copied().max().unwrap_or(0);
-    sparkline(&hist[..=hi], peak)
+    let bars = sparkline(&hist[..=hi], peak);
+    match max {
+        // last fully-kept bucket = ⌊log2(cap+1)⌋ (bucket b covers [2^(b-1), 2^b), kept iff 2^b-1 ≤ cap).
+        Some(m) => {
+            let cut = ((m + 1).ilog2() as usize).min(hi);
+            bars.chars().enumerate()
+                .flat_map(|(b, ch)| if b == cut { vec![ch, '|'] } else { vec![ch] })
+                .collect()
+        }
+        None => bars,
+    }
 }
 
 #[cfg(test)]

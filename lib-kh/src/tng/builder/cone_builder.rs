@@ -82,6 +82,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 self.inner.merge(c, key_map, elems);
             }
         }
+        self.finalize();
         self
     }
 
@@ -481,11 +482,39 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }).collect()
     }
 
-    /// Convert the reduced cone directly into the KhI chain complex, without delooping: each
-    /// closed vertex expands into its label assignments (one `KhAlgGen` per circle; a marked
-    /// circle is fixed to `X`), and each edge contributes the scalars `⟨b|f|a⟩` — `f` with source
-    /// circles cupped by `a` and target circles capped by `b` (the deloop pairing), evaluated as
-    /// a closed cobordism. Downstream reduction is pure linear algebra.
+    // Fully deloop the reduced cone so `eval_khi_elements` and `into_raw_complex` share the delooped
+    // basis. Called from `run` after the last merge, matching the other builders.
+    fn finalize(&mut self) {
+        info!("cone finalize: {}", self.cone.stat());
+        self.deloop_all(false);
+        self.deloop_all(true);
+        info!("cone finalized: {}", self.cone.stat());
+    }
+
+    // Deloop the whole cone one degree at a time, eliminating inline: a degree is eliminated once
+    // its upper neighbor is delooped, so the delooped transient never spans more than the current
+    // frontier. `eliminate_in` is capped by `elim_max_cost` — cheap pivots cascade here, heavy ones
+    // survive to the matrix reduction. Called twice: non-based circles, then the based one.
+    fn deloop_all(&mut self, based: bool) {
+        debug!("cone deloop-all (based: {based})...");
+        let auto_elim = self.cone.config().mode.auto_elim();
+        let range = self.cone.complex().h_range();
+        let (start, end) = (*range.start(), *range.end());
+        for d in start ..= end {
+            self.cone.deloop_in_with(d, based);
+            if auto_elim && d > start {
+                self.cone.eliminate_in(d - 1);
+            }
+        }
+        if auto_elim {
+            self.cone.eliminate_in(end);
+        }
+    }
+
+    /// Convert the fully-delooped cone (delooped at the end of `cone_merge`) to the KhI chain
+    /// complex: each vertex has no circles, so it expands into exactly one generator, and each edge
+    /// contributes the scalar `⟨b|f|a⟩` (the deloop pairing) evaluated as a closed cobordism.
+    /// `eval_khi_elements` reads the canon classes on this same delooped basis.
     pub fn into_raw_complex(self) -> ChainComplex1<KhIGen, R> {
         let c = self.cone.into_tng_complex();
         let (h, t) = c.ht().clone();

@@ -24,7 +24,8 @@ use crate::kh::{KhGen, KhTensor};
 use crate::tng::{LcCob, LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
 use crate::tng::builder::{TngComplexBuilder, TngElemBuilder, BuildConfig, BuildMode, NodeOrder};
 use std::fmt;
-use super::{reachable_range, pop_min_pivot, sparkline, cutwidth_after, toggle_boundary, boundary_edges, select_cuts, cut_components, merge_order, CutOption};
+use super::{reachable_range, pop_min_pivot, sparkline, fill_cost_sparkline, cutwidth_after, toggle_boundary, boundary_edges, select_cuts, cut_components, merge_order, CutOption};
+use super::builder::{PROGRESS_LOG_STEP, PROGRESS_LOG_MIN};
 
 /// Toggles for the automatic simplification done while building (kept separate
 /// from [`BuildConfig`] so the equivariant builder can gain its own flags).
@@ -430,10 +431,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         );
         if keys.is_empty() { return }
 
-        debug!("{} deloop in C[{i}], targets: {}.", self.current_step(), keys.len());
+        let total = keys.len();
+        debug!("{} deloop in C[{i}]: {}, targets: {}", self.current_step(), self.complex().rank(i), total);
 
         let before = self.complex().rank(i) as isize;
 
+        let mut done = 0;
         while let Some(k) = pop_min_pivot(&mut keys, |k|
             self.complex().contains_key(k).then(|| self.pivot_weight(k))
         ) {
@@ -445,11 +448,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                     keys.push((new_key, w));
                 }
             }
+            done += 1;
+            if total > PROGRESS_LOG_MIN && done % PROGRESS_LOG_STEP == 0 {
+                debug!("{}   ... delooped {done} in C[{i}] (rank: {})", self.current_step(), self.complex().rank(i));
+            }
         }
 
         let after = self.complex().rank(i) as isize;
 
-        debug!("{}   delooped C[{i}]: {} (diff: {}).", self.current_step(), after, after - before);
+        debug!("{}   delooped C[{i}]: {} (diff: {})", self.current_step(), after, after - before);
+        debug!("{}   neighbors: C[{}] {} / C[{}] {}",
+            self.current_step(), i - 1, self.complex().rank(i - 1), i + 1, self.complex().rank(i + 1));
     }
 
     fn deloop_equiv(&mut self, k: &TngComplexKey, c: &TngComp) -> Vec<TngComplexKey> {
@@ -559,19 +568,36 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         );
         if keys.is_empty() { return }
 
-        debug!("{} eliminate in C[{i}], targets: {}", self.current_step(), keys.len());
+        // `targets` counts only the pivots the cap will actually eliminate (equiv cost ≤ cap); the
+        // rest defer to the matrix. The sparkline shows the whole eliminatable distribution.
+        let targets = self.config.elim_max_cost
+            .map_or(keys.len(), |max| keys.iter().filter(|(_, c)| *c <= max).count());
+        debug!("{} eliminate in C[{i}]: {}, targets: {}", self.current_step(), self.complex().rank(i), targets);
+        debug!("{}   fill: {}", self.current_step(), fill_cost_sparkline(&keys, self.config.elim_max_cost));
 
         let before = self.complex().rank(i) as isize;
 
+        let mut done = 0;
         while let Some(k) = pop_min_pivot(&mut keys, |k|
             self.complex().contains_key(k).then(|| self.equiv_elim_cost(k))
         ) {
+            // `pop_min_pivot` returns the cheapest pivot; once it exceeds the cap, so do all the
+            // rest — stop and defer them (with the whole remaining frontier) to the matrix reduction.
+            if self.config.elim_max_cost.is_some_and(|max| self.equiv_elim_cost(&k) > max) {
+                break;
+            }
             self.try_eliminate_equiv_at(&k);
+            done += 1;
+            if targets > PROGRESS_LOG_MIN && done % PROGRESS_LOG_STEP == 0 {
+                debug!("{}   ... eliminated {done}/{targets} in C[{i}] (rank: {})", self.current_step(), self.complex().rank(i));
+            }
         }
 
         let after = self.complex().rank(i) as isize;
 
-        debug!("{}   eliminated C[{i}]: {} (diff: {}).", self.current_step(), after, after - before);
+        debug!("{}   eliminated C[{i}]: {} (diff: {})", self.current_step(), after, after - before);
+        debug!("{}   neighbors: C[{}] {} / C[{}] {}",
+            self.current_step(), i - 1, self.complex().rank(i - 1), i + 1, self.complex().rank(i + 1));
     }
 
     fn try_eliminate_equiv_at(&mut self, k: &TngComplexKey) -> bool {

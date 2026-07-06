@@ -142,7 +142,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             } else if d > start {
                 self.prune_consumed(d - 1);
             }
-            debug!("  cone C[{d}] done: {}", self.cone.stat());
+            debug!("  built cone C[{d}]: {}.", self.cone.complex().rank(d));
         }
 
         // eliminate_in(top) collapses the id-pairing C[top] (Bit0) → C[top+1] (Bit1), shrinking the
@@ -152,7 +152,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.rewrite_elements(top); // the top degree has no further out-edges — Iτ pushes only
         }
 
-        info!("cone eliminate top C[{}..={}]: {}", top - 1, top, self.cone.stat());
+        info!("cone eliminate top C[{}..={}]", top - 1, top);
         for d in (top - 1) ..= top {
             self.vertical_reduce(d);
             self.cone.eliminate_in(d);
@@ -165,7 +165,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.prune_isolated_top(top);
         }
 
-        info!("cone done: {}", self.cone.stat());
+        info!("merged: {}", self.cone.stat());
     }
 
     fn direct(&self) -> bool {

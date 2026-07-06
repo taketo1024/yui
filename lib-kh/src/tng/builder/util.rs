@@ -53,6 +53,27 @@ pub(crate) fn fill_cost_histogram(costs: impl Iterator<Item = usize>) -> [usize;
     hist
 }
 
+// Sparkline of a target set's fill-cost distribution (log2 buckets). Kept out of the `debug!` call
+// site so the histogram is built only when debug logging is on. A `|` marks the cap — but only when
+// it actually splits the distribution (some edges above it defer to the matrix); if the cap sits at
+// or above the top non-empty bucket, everything is kept and no marker is drawn.
+pub(crate) fn fill_cost_sparkline(keys: &[(TngComplexKey, usize)], max: Option<usize>) -> String {
+    let hist = fill_cost_histogram(keys.iter().map(|(_, c)| *c));
+    let hi = hist.iter().rposition(|&c| c > 0).unwrap_or(0);
+    let peak = hist.iter().copied().max().unwrap_or(0);
+    let bars = sparkline(&hist[..=hi], peak);
+    match max {
+        // last fully-kept bucket = ⌊log2(cap+1)⌋ (bucket b covers [2^(b-1), 2^b), kept iff 2^b-1 ≤ cap).
+        Some(m) if (m + 1).ilog2() < hi as u32 => {
+            let cut = (m + 1).ilog2() as usize;
+            bars.chars().enumerate()
+                .flat_map(|(b, ch)| if b == cut { vec![ch, '|'] } else { vec![ch] })
+                .collect()
+        }
+        _ => bars,
+    }
+}
+
 // The node-unit's boundary arc-ends: its edges with odd incidence (one endpoint inside the unit).
 pub(crate) fn boundary_edges(node_unit: &[&Node]) -> Vec<Edge> {
     node_unit.iter().flat_map(|x| x.edges().iter().copied()).counts().into_iter()

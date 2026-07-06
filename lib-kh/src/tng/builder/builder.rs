@@ -21,7 +21,7 @@ use yui_link::{Node, Edge, Link};
 
 use crate::kh::{KhChain, KhComplex};
 use crate::tng::{TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
-use super::{reachable_range, pop_min_pivot, sparkline, fill_cost_histogram, cutwidth_after, toggle_boundary, boundary_edges, select_cuts, cut_components, merge_order, TngElemBuilder};
+use super::{reachable_range, pop_min_pivot, sparkline, fill_cost_sparkline, cutwidth_after, toggle_boundary, boundary_edges, select_cuts, cut_components, merge_order, TngElemBuilder};
 
 // Progress logging for the long per-op build loops (eliminate / deloop / asymmetric elimination):
 // emit a line every `PROGRESS_LOG_STEP` ops, but only for rounds larger than `PROGRESS_LOG_MIN`.
@@ -399,7 +399,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         if keys.is_empty() { return }
 
         let total = keys.len();
-        debug!("{} deloop in C[{i}], targets: {}.", self.current_step(), total);
+        debug!("{} deloop in C[{i}]: {}, targets: {}", self.current_step(), self.complex.rank(i), total);
 
         let before = self.complex.rank(i) as isize;
 
@@ -423,9 +423,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let after = self.complex.rank(i) as isize;
 
-        debug!("{}   delooped C[{i}]: {} (diff: {}). neighbors: C[{}] {} / C[{}] {}",
-            self.current_step(), after, after - before,
-            i - 1, self.complex.rank(i - 1), i + 1, self.complex.rank(i + 1));
+        debug!("{}   delooped C[{i}]: {} (diff: {})", self.current_step(), after, after - before);
+        debug!("{}   neighbors: C[{}] {} / C[{}] {}",
+            self.current_step(), i - 1, self.complex.rank(i - 1), i + 1, self.complex.rank(i + 1));
     }
 
     pub fn deloop(&mut self, k: &TngComplexKey, c: &TngComp) -> Vec<TngComplexKey> {
@@ -481,7 +481,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let after = self.complex.rank(i) as isize;
 
         debug!("{}   eliminated C[{i}]: {} (diff: {})", self.current_step(), after, after - before);
-        // neighbor ranks: an elimination at C[i] also shrinks the adjacent degrees it bridges.
         debug!("{}   neighbors: C[{}] {} / C[{}] {}",
             self.current_step(), i - 1, self.complex.rank(i - 1), i + 1, self.complex.rank(i + 1));
     }
@@ -695,26 +694,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             0 ..= (*r.end() - s).max(0)
         });
         child.with_config(BuildConfig { mode: self.builder.config.mode, node_order: NodeOrder::MinCut, cut: CutOption::None, h_range, elim_max_cost: None })
-    }
-}
-
-// Sparkline of a target set's fill-cost distribution (log2 buckets). Kept separate so the
-// histogram is built only inside a `debug!` argument — i.e. only when debug logging is on.
-// A `|` marks the cap: buckets left of it are fully eliminated, buckets right defer to the matrix.
-fn fill_cost_sparkline(keys: &[(TngComplexKey, usize)], max: Option<usize>) -> String {
-    let hist = fill_cost_histogram(keys.iter().map(|(_, c)| *c));
-    let hi = hist.iter().rposition(|&c| c > 0).unwrap_or(0);
-    let peak = hist.iter().copied().max().unwrap_or(0);
-    let bars = sparkline(&hist[..=hi], peak);
-    match max {
-        // last fully-kept bucket = ⌊log2(cap+1)⌋ (bucket b covers [2^(b-1), 2^b), kept iff 2^b-1 ≤ cap).
-        Some(m) => {
-            let cut = ((m + 1).ilog2() as usize).min(hi);
-            bars.chars().enumerate()
-                .flat_map(|(b, ch)| if b == cut { vec![ch, '|'] } else { vec![ch] })
-                .collect()
-        }
-        None => bars,
     }
 }
 

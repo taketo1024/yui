@@ -122,35 +122,22 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.inner.elements_mut().merge(other_elems);
         self.seed_cone_elements();
 
-        let (start, top) = (*range.start(), *range.end());
+        let top = *range.end();
         for d in range {
             debug!("cone merge C[{d}]...");
             self.inner.merge_slice(&left, &right, d, &left_map, &other_map);
-            self.cone_extend(d);
-            if self.direct() {
-                self.rewrite_elements(d - 1); // degree d-1's out-edges are now complete
-            }
-            if d - 2 >= start {
-                self.vertical_reduce(d - 2);
-                self.cone.eliminate_in(d - 2); // stragglers: τ-fixed `1+τ` units, correction-created units
-            }
-            // direct emission reads the dropped column's in-edges one degree deeper, so its prune lags one more.
-            if self.direct() {
-                if d - 1 > start {
-                    self.prune_consumed(d - 2);
-                }
-            } else if d > start {
-                self.prune_consumed(d - 1);
-            }
+            self.cone_extend_reduced(d);
+            self.rewrite_elements(d - 1); // degree d-1's out-edges are now complete
+            self.vertical_reduce(d - 2); // no-op below the range start (empty pending_vertical)
+            self.prune_consumed(d - 2); // free the consumed symmetric degree before the heavy eliminate
+            self.cone.eliminate_in(d - 2); // stragglers: τ-fixed `1+τ` units, correction-created units
             debug!("  built cone C[{d}]: {}.", self.cone.complex().rank(d));
         }
 
         // eliminate_in(top) collapses the id-pairing C[top] (Bit0) → C[top+1] (Bit1), shrinking the
         // top before deloop; C[top+1]'s remainder is dropped by `prune_isolated_top` below.
         // (top+1 itself needs no eliminate_in: its vertices have no out-edges.)
-        if self.direct() {
-            self.rewrite_elements(top); // the top degree has no further out-edges — Iτ pushes only
-        }
+        self.rewrite_elements(top); // the top degree has no further out-edges — Iτ pushes only
 
         info!("cone eliminate top C[{}..={}]", top - 1, top);
         for d in (top - 1) ..= top {
@@ -158,26 +145,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.cone.eliminate_in(d);
         }
 
-        // prune only when the window truncates the KhI complex: if the requested top exceeds the
-        // reachable Kh top, C[top+1] is the genuine KhI top degree (Bit1 of C[top]) and must stay.
-        let window_top = self.inner.config().h_range.as_ref().map(|r| *r.end());
-        if window_top.is_some_and(|t| t <= top) {
-            self.prune_isolated_top(top);
-        }
+        self.prune_isolated_top(top);
 
         info!("merged: {}", self.cone.stat());
-    }
-
-    fn direct(&self) -> bool {
-        self.inner.config().cone_direct
-    }
-
-    fn cone_extend(&mut self, d: isize) {
-        if self.direct() {
-            self.cone_extend_direct(d);
-        } else {
-            self.cone_extend_full(d);
-        }
     }
 
     // Symmetry-breaking direct emission (Sano2026, Prop 4.6): per free τ-orbit only the
@@ -190,7 +160,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     //   drop → surv : (iii) (τj)⁰ → k⁰ += f∘Iτ(τj),
     //   asymmetric elimination through dropped N at d−1 : (i) X¹ → k⁰ += (X→N)∘(N→k),
     // and only τ-fixed vertices keep a vertical `1 + τ` (a representative's identity cancels via τ²).
-    fn cone_extend_direct(&mut self, d: isize) {
+    fn cone_extend_reduced(&mut self, d: isize) {
         let with_bit = |k: &TngComplexKey, b: Bit| {
             let mut key = *k;
             key.state.push(b);
@@ -200,7 +170,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let keys = self.inner.complex().keys_of_deg(d).copied().collect_vec();
         let dropped = keys.iter().filter(|k| self.orbit_class(k).1 == OrbitClass::Drop).count();
 
-        debug!("  cone-extend-direct C[{d}]: +{} verts ({dropped} dropped)", 2 * (keys.len() - dropped));
+        debug!("  cone-extend-reduced C[{d}]: +{} verts ({dropped} dropped)", 2 * (keys.len() - dropped));
 
         // vertices: representatives and τ-fixed only.
         for k in keys.iter() {
@@ -298,7 +268,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    // Direct mode: retract canon-element components off the dropped column of degree `d`
+    // Retract canon-element components off the dropped column of degree `d`
     // (Sano2026, Prop 4.6 SDR): an entry at `N·0` is the pivot's dependent coordinate and drops;
     // an entry at `N·1` redirects to `(τN)·1` via Iτ and to `l·0` via each out-edge `N → l`
     // (mirroring `eliminate_from` with the identity pivot). Corrections landing on a dropped
@@ -373,9 +343,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         (tk, class)
     }
 
-    // Add the symmetric complex's degree-`d` slice to the cone: the two copies `k·0`, `k·1` of each
+    // The full (non-reduced) cone extension — kept for debugging against `cone_extend_reduced`.
+    // Adds the symmetric complex's degree-`d` slice to the cone: the two copies `k·0`, `k·1` of each
     // vertex, the within-layer edges *into* degree `d`, and the `1+τ` edges out of `k·0`. Processed
-    // ascending, every edge lands exactly once (its target's degree).
+    // ascending, every edge lands exactly once (its target's degree). `vertical_reduce` (via
+    // `pending_vertical`) collapses its free-orbit `1+τ` pivots two degrees behind.
+    #[allow(dead_code)]
     fn cone_extend_full(&mut self, d: isize) {
         let with_bit = |k: &TngComplexKey, b: Bit| {
             let mut key = *k;
@@ -470,7 +443,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // C[top+1] (the `Bit1` shift of C[top]), then prune no-in-edge vertices at C[top] — they fed
     // only the dropped layer. No-op for a full-range build (its C[top+1] is genuine).
     fn prune_isolated_top(&mut self, top: isize) {
-        if self.inner.config().h_range.is_none() {
+        // prune only when the window truncates the KhI complex: if the requested top exceeds the
+        // reachable Kh top, C[top+1] is the genuine KhI top degree (Bit1 of C[top]) and must stay.
+        let Some(window_top) = self.inner.config().h_range.as_ref().map(|r| *r.end()) else { return };
+        if window_top > top {
             return;
         }
         let doomed = self.cone.complex().keys_of_deg(top + 1).copied().collect_vec();
@@ -677,7 +653,7 @@ mod tests {
     fn check_direct_matches(l: &InvLink, config: SymBuildConfig) {
         for reduced in [false, true] {
             let full = cone_homology(l, reduced, config.clone());
-            let direct = cone_homology(l, reduced, SymBuildConfig { cone_direct: true, ..config.clone() });
+            let direct = cone_homology(l, reduced, SymBuildConfig { ..config.clone() });
             assert_eq!(full, direct, "reduced={reduced}");
         }
     }
@@ -706,9 +682,9 @@ mod tests {
     // the matrix reduction. Test at threshold 0 (only free eliminations) and a small positive cap.
     fn check_elim_cap(l: &InvLink) {
         for reduced in [false, true] {
-            let full = cone_homology(l, reduced, SymBuildConfig { cone_direct: true, ..Default::default() });
+            let full = cone_homology(l, reduced, SymBuildConfig { ..Default::default() });
             for cap in [Some(0), Some(4)] {
-                let capped = cone_homology(l, reduced, SymBuildConfig { cone_direct: true, elim_max_cost: cap, ..Default::default() });
+                let capped = cone_homology(l, reduced, SymBuildConfig { elim_max_cost: cap, ..Default::default() });
                 assert_eq!(full, capped, "reduced={reduced}, cap={cap:?}");
             }
         }
@@ -723,8 +699,8 @@ mod tests {
     fn cone_elim_cap_6_3_chunked() {
         let l = InvLink::test_data("6_3");
         for reduced in [false, true] {
-            let full = cone_homology(&l, reduced, SymBuildConfig { cone_direct: true, cut: CutOption::Auto(3), ..Default::default() });
-            let capped = cone_homology(&l, reduced, SymBuildConfig { cone_direct: true, cut: CutOption::Auto(3), elim_max_cost: Some(0), ..Default::default() });
+            let full = cone_homology(&l, reduced, SymBuildConfig { cut: CutOption::Auto(3), ..Default::default() });
+            let capped = cone_homology(&l, reduced, SymBuildConfig { cut: CutOption::Auto(3), elim_max_cost: Some(0), ..Default::default() });
             assert_eq!(full, capped, "reduced={reduced}");
         }
     }
@@ -735,7 +711,7 @@ mod tests {
         let config = SymBuildConfig { cut: CutOption::Auto(2), mode: BuildMode::MinFill, h_range: Some(-64 ..= 1), ..Default::default() };
         for reduced in [false, true] {
             let full = cone_homology(&l, reduced, SymBuildConfig { h_range: Some(-64 ..= 1), ..Default::default() });
-            let direct = cone_homology(&l, reduced, SymBuildConfig { cone_direct: true, ..config.clone() });
+            let direct = cone_homology(&l, reduced, SymBuildConfig { ..config.clone() });
             let narrow = |h: Vec<(isize, usize)>| h.into_iter().filter(|&(d, _)| d <= 0).collect_vec();
             assert_eq!(narrow(full), narrow(direct), "reduced={reduced}");
         }

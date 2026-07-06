@@ -40,9 +40,6 @@ pub struct SymBuildConfig {
     pub h_range: Option<RangeInclusive<isize>>,
     // divide-and-conquer chunking (auto cutwidth or manual edge-cuts); None = single pass.
     pub cut: CutOption,
-    // cone only: emit the symmetry-broken complex directly (Sano2026 Prop 4.6) instead of
-    // doubling every vertex and eliminating the vertical identities afterwards.
-    pub cone_direct: bool,
     // cone only: cap the per-elimination fill cost during cone_merge; survivors defer to the
     // matrix reduction (two-pass: cheap cobordism elim, then scalar F2[H] reduction). None = no cap.
     pub elim_max_cost: Option<usize>,
@@ -50,7 +47,7 @@ pub struct SymBuildConfig {
 
 impl Default for SymBuildConfig {
     fn default() -> Self {
-        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, h_range: None, cut: CutOption::None, cone_direct: false, elim_max_cost: None }
+        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, h_range: None, cut: CutOption::None, elim_max_cost: None }
     }
 }
 

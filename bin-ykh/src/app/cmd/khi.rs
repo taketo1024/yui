@@ -61,10 +61,6 @@ pub struct Args {
     #[arg(long)]
     pub cob_cone: bool,
 
-    // cone only: direct symmetry-broken emission (Sano2026 Prop 4.6).
-    #[arg(long)]
-    pub cone_direct: bool,
-
     // cap the per-elimination fill cost; survivors defer to the matrix reduction.
     #[arg(long)]
     pub elim_max_cost: Option<usize>,
@@ -144,7 +140,6 @@ where
             node_order: self.args.node_order,
             preprocess: !self.args.no_preprocess,
             cut: self.args.cut.clone().unwrap_or_default(),
-            cone_direct: self.args.cone_direct,
             elim_max_cost: self.args.elim_max_cost,
             ..Default::default()
         };

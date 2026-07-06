@@ -337,7 +337,7 @@ mod tests {
             fn $test() -> Result<(), Box<dyn std::error::Error>> {
                 let c = P::variable();
                 let l = InvLink::load($name)?;
-                let config = SymBuildConfig { cone_direct: true, ..Default::default() };
+                let config = SymBuildConfig { ..Default::default() };
                 let ssi = ssi_invariants_via_cone(&l, &c, false, config);
                 assert_eq!(ssi, $expected);
 
@@ -356,7 +356,7 @@ mod tests {
         let l = InvLink::test_data("3_1").mirror();
         let c = P::variable();
 
-        let config = SymBuildConfig { cone_direct: true, ..Default::default() };
+        let config = SymBuildConfig { ..Default::default() };
         let ssi = ssi_invariants_via_cone(&l, &c, false, config);
         assert_eq!(ssi, (-2, -2));
     }
@@ -368,7 +368,7 @@ mod tests {
         );
 
         let c = P::variable();
-        let config = SymBuildConfig { cone_direct: true, ..Default::default() };
+        let config = SymBuildConfig { ..Default::default() };
         let ssi = ssi_invariants_via_cone(&l, &c, false, config);
 
         assert_eq!(ssi, (0, 2));

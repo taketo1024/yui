@@ -403,20 +403,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.vertices[k].out_edges.contains_key(l)
     }
 
-    /// Fill cost of eliminating edge `k → l`: each Schur correction `d − c·a⁻¹·b` stacks the
-    /// surrounding cobordisms, so the term-count grows ~`nterms(c)·nterms(b)`. Summing over the
-    /// parallel edges factorizes into a product of the actual edge weights (excluding the pivot).
-    /// Reduces to the Markowitz count `(out(k)-1)·(in(l)-1)` when every edge has `nterms = 1`.
+    /// Fill cost of eliminating edge `k → l`: the Markowitz count `(out(k)-1)·(in(l)-1)` — the number
+    /// of parallel edges the Schur complement corrects. O(1); the nterm-weighted variant priced the
+    /// true fill more accurately but was too costly to compute over dense degrees (`collect_keys` wall).
     pub(crate) fn edge_weight(&self, k: &TngComplexKey, l: &TngComplexKey) -> usize {
-        let out_w: usize = self.vertices[k].out_edges.iter()
-            .filter(|(l2, _)| *l2 != l)
-            .map(|(_, f)| f.nterms())
-            .sum();
-        let in_w: usize = self.vertices[l].in_edges.iter()
-            .filter(|k2| *k2 != k)
-            .map(|k2| self.edge(k2, l).nterms())
-            .sum();
-        out_w * in_w
+        (self.vertices[k].out_edges.len() - 1) * (self.vertices[l].in_edges.len() - 1)
     }
 
     pub fn add_edge(&mut self, k: &TngComplexKey, l: &TngComplexKey, f: LcCob<R>) { 

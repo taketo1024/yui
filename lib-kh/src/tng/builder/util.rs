@@ -1,21 +1,33 @@
+use std::cmp::Reverse;
+use std::collections::BinaryHeap;
 use std::ops::RangeInclusive;
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
 use yui_link::{Node, Edge};
 use crate::tng::TngComplexKey;
 
-// Pop the least-weight live key from a `(key, weight)` pool. Cached weights go stale as fill grows
-// degrees, so re-check the popped key via `live_weight` and re-store it if it got pricier (drop if gone).
-// Ties break by key (not Vec/hash-table order) so the elimination order is identical across platforms.
-pub(crate) fn pop_min_pivot<F>(keys: &mut Vec<(TngComplexKey, usize)>, mut live_weight: F) -> Option<TngComplexKey>
+// A lazy min-priority pool of pivot candidates, ordered by (cached weight, key). The key joins the
+// ordering so the pop sequence is deterministic across platforms (no true ties — keys are unique).
+pub(crate) type PivotPool = BinaryHeap<Reverse<(usize, TngComplexKey)>>;
+
+pub(crate) fn pivot_pool(keys: impl IntoIterator<Item = (TngComplexKey, usize)>) -> PivotPool {
+    keys.into_iter().map(|(k, w)| Reverse((w, k))).collect()
+}
+
+pub(crate) fn push_pivot(pool: &mut PivotPool, key: TngComplexKey, weight: usize) {
+    pool.push(Reverse((weight, key)));
+}
+
+// Pop the least-weight live key. Cached weights go stale as fill grows degrees, so re-check the
+// popped key via `live_weight`: if it got pricier, re-push at the new weight and reselect; drop it
+// if gone. O(log n) per pop, vs a linear scan of the whole frontier.
+pub(crate) fn pop_min_pivot<F>(pool: &mut PivotPool, mut live_weight: F) -> Option<TngComplexKey>
 where F: FnMut(&TngComplexKey) -> Option<usize> {
-    while !keys.is_empty() {
-        let idx = keys.iter().enumerate().min_by_key(|(_, (k, w))| (*w, *k)).map(|(i, _)| i).unwrap();
-        let (key, w) = keys[idx];
+    while let Some(Reverse((w, key))) = pool.pop() {
         match live_weight(&key) {
-            None => { keys.swap_remove(idx); }
-            Some(w_now) if w_now > w => keys[idx].1 = w_now, // pricier than cached → re-store, reselect
-            Some(_) => { keys.swap_remove(idx); return Some(key); } // ≤ cached → already the best, take it
+            None => {}                                                    // gone → drop
+            Some(w_now) if w_now > w => pool.push(Reverse((w_now, key))), // pricier than cached → re-push, reselect
+            Some(_) => return Some(key),                                  // ≤ cached → already the best, take it
         }
     }
     None
@@ -60,9 +72,9 @@ pub(crate) fn fill_cost_histogram(costs: impl Iterator<Item = usize>) -> [usize;
 pub(crate) fn fill_cost_sparkline(keys: &[(TngComplexKey, usize)], max: Option<usize>) -> String {
     let hist = fill_cost_histogram(keys.iter().map(|(_, c)| *c));
     let hi = hist.iter().rposition(|&c| c > 0).unwrap_or(0);
-    let peak = hist.iter().copied().max().unwrap_or(0);
-    let bars = sparkline(&hist[..=hi], peak);
-    match max {
+    let peak_h = hist.iter().copied().max().unwrap_or(0);
+    let bars = sparkline(&hist[..=hi], peak_h);
+    let bars: String = match max {
         // last fully-kept bucket = ⌊log2(cap+1)⌋ (bucket b covers [2^(b-1), 2^b), kept iff 2^b-1 ≤ cap).
         Some(m) if (m + 1).ilog2() < hi as u32 => {
             let cut = (m + 1).ilog2() as usize;
@@ -71,7 +83,15 @@ pub(crate) fn fill_cost_sparkline(keys: &[(TngComplexKey, usize)], max: Option<u
                 .collect()
         }
         _ => bars,
-    }
+    };
+
+    // total eliminatable edges, modal cost (tallest bucket b holds costs 2^(b-1)..2^b), and max cost.
+    let total = keys.len();
+    let max_cost = keys.iter().map(|(_, c)| *c).max().unwrap_or(0);
+    let peak_bucket = hist.iter().enumerate().max_by_key(|&(_, &c)| c).map_or(0, |(b, _)| b);
+    let peak = if peak_bucket == 0 { "0".to_string() } else { format!("2^{}", peak_bucket - 1) };
+    let max_s = if max_cost == 0 { "0".to_string() } else { format!("2^{}", max_cost.ilog2()) };
+    format!("{bars} (total: {total}, peak: {peak}, max: {max_s})")
 }
 
 // The node-unit's boundary arc-ends: its edges with odd incidence (one endpoint inside the unit).

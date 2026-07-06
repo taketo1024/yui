@@ -21,7 +21,7 @@ use yui_link::{Node, Edge, Link};
 
 use crate::kh::{KhChain, KhComplex};
 use crate::tng::{TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
-use super::{reachable_range, pop_min_pivot, sparkline, fill_cost_sparkline, cutwidth_after, toggle_boundary, boundary_edges, select_cuts, cut_components, merge_order, TngElemBuilder};
+use super::{reachable_range, pop_min_pivot, pivot_pool, push_pivot, sparkline, fill_cost_sparkline, cutwidth_after, toggle_boundary, boundary_edges, select_cuts, cut_components, merge_order, TngElemBuilder};
 
 // Progress logging for the long per-op build loops (eliminate / deloop / asymmetric elimination):
 // emit a line every `PROGRESS_LOG_STEP` ops, but only for rounds larger than `PROGRESS_LOG_MIN`.
@@ -392,7 +392,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn deloop_in_with(&mut self, i: isize, allow_based: bool) {
-        let mut keys = self.collect_keys(i,
+        let keys = self.collect_keys(i,
             |k| self.find_loop_in(k, allow_based).is_some(),
             |k| self.complex.vertex(k).c_weight(),
         );
@@ -403,27 +403,33 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let before = self.complex.rank(i) as isize;
 
-        let mut done = 0;
-        while let Some(k) = pop_min_pivot(&mut keys, |k|
+        let mut pool = pivot_pool(keys);
+        let (mut done, mut elim) = (0, 0);
+        while let Some(k) = pop_min_pivot(&mut pool, |k|
             self.complex.contains_key(k).then(|| self.complex.vertex(k).c_weight())
         ) {
             let Some(&c) = self.find_loop_in(&k, allow_based) else { continue };
 
-            for new_key in self.deloop(&k, &c) {
+            let new_keys = self.deloop(&k, &c);
+            // a normal circle yields 2 branches; a based circle yields 1, and in greedy mode each
+            // branch may be eliminated on the spot. Count branches short of 2 as eliminated, so
+            // `delooped - eliminated = diff` holds in both greedy and min-fill.
+            elim += 2usize.saturating_sub(new_keys.len());
+            for new_key in new_keys {
                 if self.find_loop_in(&new_key, allow_based).is_some() {
                     let w = self.complex.vertex(&new_key).c_weight();
-                    keys.push((new_key, w));
+                    push_pivot(&mut pool, new_key, w);
                 }
             }
             done += 1;
-            if total > PROGRESS_LOG_MIN && done % PROGRESS_LOG_STEP == 0 {
-                debug!("{}   ... delooped {done} in C[{i}] (rank: {})", self.current_step(), self.complex.rank(i));
+            if done % PROGRESS_LOG_STEP == 0 {
+                debug!("{}   ... delooped {done} ({}% eliminated, remain: {})", self.current_step(), elim * 100 / done, pool.len());
             }
         }
 
         let after = self.complex.rank(i) as isize;
 
-        debug!("{}   delooped C[{i}]: {} (diff: {})", self.current_step(), after, after - before);
+        debug!("{}   delooped C[{i}]: {} (delooped: {done}, eliminated: {elim}, diff: {})", self.current_step(), after, after - before);
         debug!("{}   neighbors: C[{}] {} / C[{}] {}",
             self.current_step(), i - 1, self.complex.rank(i - 1), i + 1, self.complex.rank(i + 1));
     }
@@ -436,7 +442,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let mut added = self.complex.deloop(k, c);
 
         // immediate elim eliminates each new vertex now; min-fill leaves them for the post-deloop
-        // global pass, None leaves them entirely.
+        // global pass, None leaves them entirely. `try_eliminate_at` skips over-cap pivots.
         if self.config.mode.immediate_elim() {
             // retain only the keys that weren't eliminated
             added.retain(|k| self.try_eliminate_at(k).is_none());
@@ -445,7 +451,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn eliminate_in(&mut self, i: isize) {
-        let mut keys = self.collect_keys(i,
+        let keys = self.collect_keys(i,
             |k| self.complex.vertex(k).out_edges().any(|l|
                 self.complex.edge(k, l).is_invertible()
             ),
@@ -462,19 +468,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let before = self.complex.rank(i) as isize;
 
+        let mut pool = pivot_pool(keys);
         let mut done = 0;
-        while let Some(k) = pop_min_pivot(&mut keys, |k|
+        while let Some(k) = pop_min_pivot(&mut pool, |k|
             self.complex.contains_key(k).then(|| self.complex.elim_cost(k))
         ) {
             // `pop_min_pivot` returns the cheapest pivot; once it exceeds the cap, so do all the
             // rest — stop and defer them (with the whole remaining frontier) to the matrix reduction.
-            if self.config.elim_max_cost.is_some_and(|max| self.complex.elim_cost(&k) > max) {
-                break;
+            if let Some(max) = self.config.elim_max_cost {
+                let cost = self.complex.elim_cost(&k);
+                if cost > max {
+                    debug!("{}   deferred {} pivots to matrix (min cost 2^{} > cap {max})", self.current_step(), pool.len() + 1, cost.ilog2());
+                    break;
+                }
             }
-            self.try_eliminate_at(&k);
-            done += 1;
-            if targets > PROGRESS_LOG_MIN && done % PROGRESS_LOG_STEP == 0 {
-                debug!("{}   ... eliminated {done}/{targets} in C[{i}] (rank: {})", self.current_step(), self.complex.rank(i));
+            if self.try_eliminate_at(&k).is_some() {
+                done += 1;
+                if targets > PROGRESS_LOG_MIN && done % PROGRESS_LOG_STEP == 0 {
+                    debug!("{}   ... eliminated {done}/{targets} in C[{i}] (rank: {})", self.current_step(), self.complex.rank(i));
+                }
             }
         }
 
@@ -508,17 +520,23 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.complex.eliminate(i, j);
     }
 
-    fn choose_inv_edge_into(&self, k: &TngComplexKey) -> Option<&TngComplexKey> { 
+    // Cheapest invertible in-/out-edge within the cost cap (over-cap pivots are left for the matrix
+    // pass — this is what gates greedy's inline elim as well as the `eliminate_in` sweep).
+    fn choose_inv_edge_into(&self, k: &TngComplexKey) -> Option<&TngComplexKey> {
+        let cap = self.config.elim_max_cost;
         self.complex.vertex(k).in_edges().filter_map(|j|
             self.complex.edge(j, k).is_invertible().then_some(j)
         )
+        .filter(|j| cap.map_or(true, |max| self.complex.edge_weight(j, k) <= max))
         .min_by_key(|j| (self.complex.edge_weight(j, k), **j))
     }
 
     fn choose_inv_edge_from(&self, k: &TngComplexKey) -> Option<&TngComplexKey> {
+        let cap = self.config.elim_max_cost;
         self.complex.vertex(k).out_edges().filter_map(|l|
             self.complex.edge(k, l).is_invertible().then_some(l)
         )
+        .filter(|l| cap.map_or(true, |max| self.complex.edge_weight(k, l) <= max))
         .min_by_key(|l| (self.complex.edge_weight(k, l), **l))
     }
 

@@ -6,3 +6,5 @@
 /lib-kh/profile
 /log/
 /.venv/
+/references/
+/.claude/settings.local.json

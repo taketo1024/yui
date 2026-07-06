@@ -50,6 +50,10 @@ pub struct Args {
     #[arg(long, value_parser = parse_cut)]
     pub cut: Option<CutOption>,
 
+    // cap the per-elimination fill cost; survivors defer to the matrix reduction.
+    #[arg(long)]
+    pub elim_max_cost: Option<usize>,
+
     #[arg(long, default_value = "0")]
     pub log: u8,
 }
@@ -107,7 +111,7 @@ where
         let kh = if self.args.no_simplify {
             KhHomology::new_no_simplify(&l, &h, &t, self.args.reduced)
         } else {
-            let config = BuildConfig { h_range: self.args.h_range.clone(), cut: self.args.cut.clone().unwrap_or_default(), ..Default::default() };
+            let config = BuildConfig { h_range: self.args.h_range.clone(), cut: self.args.cut.clone().unwrap_or_default(), elim_max_cost: self.args.elim_max_cost, ..Default::default() };
             KhHomology::new_with_config(&l, &h, &t, self.args.reduced, config)
         };
 

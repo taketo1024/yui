@@ -65,7 +65,7 @@ pub struct Args {
     #[arg(long)]
     pub cone_direct: bool,
 
-    // cone only: cap the per-elimination fill cost; survivors defer to the matrix reduction.
+    // cap the per-elimination fill cost; survivors defer to the matrix reduction.
     #[arg(long)]
     pub elim_max_cost: Option<usize>,
 

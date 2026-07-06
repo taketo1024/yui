@@ -15,6 +15,7 @@
 use std::fmt::Display;
 use std::ops::{Add, AddAssign, RangeInclusive};
 
+use log::debug;
 use rustc_hash::{FxHashMap, FxHashSet};
 use auto_impl_ops::auto_ops;
 use itertools::{Itertools, iproduct};
@@ -28,6 +29,10 @@ use yui_core::bitseq::Bit;
 use crate::kh::{KhAlgGen, KhGen, KhTensor};
 use super::cob::{Cob, Dot, End, CobComp, LcCob, LcCobTrait};
 use super::tng::{Tng, TngComp};
+
+// Progress-log every this many verts/edges created during a merge — only bites on the huge
+// central-degree slices (small merges stay silent), so it costs nothing on normal builds.
+const MERGE_LOG_STEP: usize = 1_000_000;
 
 // Raw pointer made shareable across rayon tasks. SAFETY is the caller's: used only in
 // `eliminate_par`'s parallel value-write, where each task holds a pointer to a *distinct* vertex.
@@ -488,6 +493,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             self.add_vertex(kl, vw);
             n += 1;
+            if n % MERGE_LOG_STEP == 0 {
+                debug!("  ... created {n} verts");
+            }
         }
         n
     }
@@ -525,6 +533,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 if !f.is_zero() {
                     self.add_edge(&k, &l, f);
                     n += 1;
+                    if n % MERGE_LOG_STEP == 0 {
+                        debug!("  ... created {n} edges");
+                    }
                 }
             }
         }

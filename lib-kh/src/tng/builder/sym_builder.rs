@@ -43,11 +43,14 @@ pub struct SymBuildConfig {
     // cone only: cap the per-elimination fill cost during cone_merge; survivors defer to the
     // matrix reduction (two-pass: cheap cobordism elim, then scalar F2[H] reduction). None = no cap.
     pub elim_max_cost: Option<usize>,
+    // skip the final deloop (the last merge and `finalize`): remaining circles defer to
+    // `into_raw_complex`'s matrix-level expansion + the `ChainReducer`. See `should_deloop`.
+    pub skip_final_process: bool,
 }
 
 impl Default for SymBuildConfig {
     fn default() -> Self {
-        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, h_range: None, cut: CutOption::None, elim_max_cost: None }
+        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, h_range: None, cut: CutOption::None, elim_max_cost: None, skip_final_process: false }
     }
 }
 
@@ -319,6 +322,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.merge(c, key_map, vec![]);
     }
 
+    // Whether the automatic deloop runs. `false` for `BuildMode::None` and, under
+    // `skip_final_process`, once all nodes are merged — remaining circles then defer to `into_raw_complex`.
+    pub(crate) fn should_deloop(&self) -> bool {
+        self.config.mode.auto_deloop()
+            && !(self.config.skip_final_process && self.n_nodes() == 0)
+    }
+
     pub(crate) fn merge(&mut self, c: TngComplex<R>, right_map: TauKeyMap, right_elements: Vec<TngComplexElem<R>>) {
         // build the merged τ key-map per degree (next to merge_vertices) rather than as one
         // up-front cartesian — for large knots that product never fits in memory.
@@ -333,9 +343,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("  key_map: {} × {}", left_map.len(), right_map.len());
         debug!("  merge range: {:?}", range);
 
-        match self.config.mode {
-            BuildMode::None => for i in range { self.merge_slice(&left, &right, i, &left_map, &right_map); },
-            _               => self.merge_incremental(&left, &right, range, &left_map, &right_map),
+        if self.should_deloop() {
+            self.merge_incremental(&left, &right, range, &left_map, &right_map);
+        } else {
+            for i in range {
+                self.merge_slice(&left, &right, i, &left_map, &right_map);
+            }
         }
 
         self.prune_h_range();
@@ -707,7 +720,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn finalize(&mut self) {
-        if self.complex().is_completely_delooped() { 
+        if !self.should_deloop() {
+            info!("{} skip finalize (deloop deferred): {}", self.current_step(), self.stat());
+            return
+        }
+
+        if self.complex().is_completely_delooped() {
             info!("{} completely delooped: {}", self.current_step(), self.stat());
             return
         }
@@ -1196,6 +1214,28 @@ mod tests {
     }
 
     #[test]
+    fn skip_final_process_agrees() {
+        // skip_final_process must not change homology: into_raw_complex redoes the deferred deloop.
+        let l = InvLink::test_data("6_3");
+        let (h, t) = (FF2::zero(), FF2::zero());
+        let build = |skip| {
+            let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
+            b.config.skip_final_process = skip;
+            b.run().into_tng_complex().into_raw_complex()
+        };
+
+        let ref_c = build(false);
+        let range = ref_c.support().cloned().range().unwrap();
+        let ref_h = ref_c.homology();
+        let c = build(true);
+        c.check_d_all();
+        let h = c.homology();
+        for i in range {
+            assert_eq!(h[i].rank(), ref_h[i].rank(), "rank at {i}");
+        }
+    }
+
+    #[test]
     fn preprocess_matches() {
         let l = InvLink::test_data("6_3");
         let (h, t) = (FF2::zero(), FF2::zero());
@@ -1409,8 +1449,8 @@ mod tests {
 
     #[test]
     fn no_auto_deloop() {
-        // BuildMode::None defers all deloop to finalize and never eliminates, so the
-        // finalized complex is delooped but unreduced.
+        // BuildMode::None never deloops (not even in finalize); into_raw_complex expands the
+        // remaining circles at the matrix level, giving the same generators.
         let l = InvLink::test_data("3_1");
         let (h, t) = (FF2::zero(), FF2::zero());
 
@@ -1422,7 +1462,7 @@ mod tests {
 
         b.finalize();
 
-        assert!(b.inner.complex().is_completely_delooped());
+        assert!(!b.inner.complex().is_completely_delooped());
 
         let c = b.into_tng_complex().into_raw_complex();
         assert_eq!(c[0].rank(), 4);

@@ -808,6 +808,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     /// evaluated as a closed cobordism. A fully-delooped complex gives exactly one generator/vertex.
     pub fn into_raw_complex(self) -> ChainComplex1<KhGen, R> {
         let c = self;
+        assert!(c.is_closed(), "into_raw_complex requires a closed complex (only circles expand into generators)");
         let (h, t) = c.ht().clone();
 
         info!("build raw complex: {}", c.stat());

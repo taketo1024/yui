@@ -90,11 +90,14 @@ pub struct BuildConfig {
     // skip eliminations whose fill cost (`edge_weight` = Schur block size) exceeds this; the
     // survivors defer to the matrix reduction. `None` = eliminate everything (current behavior).
     pub elim_max_cost: Option<usize>,
+    // skip the final deloop (the last merge and `finalize`): remaining circles are deferred to
+    // `into_raw_complex`'s matrix-level expansion + the `ChainReducer`. See `should_deloop`.
+    pub skip_final_process: bool,
 }
 
 impl Default for BuildConfig {
     fn default() -> Self {
-        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), cut: CutOption::None, h_range: None, elim_max_cost: None }
+        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), cut: CutOption::None, h_range: None, elim_max_cost: None, skip_final_process: false }
     }
 }
 
@@ -282,6 +285,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.elements.append_node(x);
     }
 
+    // Whether the automatic deloop runs. `false` for `BuildMode::None` and, under
+    // `skip_final_process`, once all nodes are merged — remaining circles then defer to `into_raw_complex`.
+    pub(crate) fn should_deloop(&self) -> bool {
+        self.config.mode.auto_deloop()
+            && !(self.config.skip_final_process && self.n_nodes() == 0)
+    }
+
     pub fn merge(&mut self, other: TngComplex<R>, other_elements: Vec<TngComplexElem<R>>) {
         let (left, right) = self.complex.prepare_merge(other);
         let range = reachable_range(self.complex.h_range(), &self.config.h_range, self.n_nodes());
@@ -292,9 +302,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("{} merge {} <- {}", self.current_step(), left.stat(), right.stat());
         debug!("  merge range: {:?}", range);
 
-        match self.config.mode {
-            BuildMode::None => self.complex.merge_with(&left, &right),
-            _               => self.merge_incremental(&left, &right, range),
+        if self.should_deloop() {
+            self.merge_incremental(&left, &right, range);
+        } else {
+            self.complex.merge_with(&left, &right);
         }
 
         self.prune_h_range();
@@ -558,6 +569,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn finalize(&mut self) {
+        if !self.should_deloop() {
+            info!("{} skip finalize (deloop deferred): {}", self.current_step(), self.stat());
+            return;
+        }
+
         if self.complex.is_completely_delooped() {
             info!("{} completely delooped: {}", self.current_step(), self.stat());
             return;
@@ -851,6 +867,26 @@ mod tests {
                 assert_eq!(h[i].rank(), ref_h[i].rank(), "rank at {i}, {mode:?}");
                 assert_eq!(h[i].tors(), ref_h[i].tors(), "tors at {i}, {mode:?}");
             }
+        }
+    }
+
+    #[test]
+    fn test_skip_final_process_agrees() {
+        // skip_final_process must not change homology: the deferred deloop is redone by into_raw_complex.
+        let l = Link::test_data("8_19");
+        let build = |skip| {
+            let config = BuildConfig { skip_final_process: skip, ..Default::default() };
+            TngComplexBuilder::from_link(&l, &0, &0, false).with_config(config).run()
+                .into_tng_complex().into_raw_complex()
+        };
+
+        let ref_h = build(false).homology();
+        let c = build(true);
+        c.check_d_all();
+        let h = c.homology();
+        for i in 0..=8 {
+            assert_eq!(h[i].rank(), ref_h[i].rank(), "rank at {i}");
+            assert_eq!(h[i].tors(), ref_h[i].tors(), "tors at {i}");
         }
     }
 

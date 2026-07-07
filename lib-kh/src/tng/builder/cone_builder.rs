@@ -26,7 +26,7 @@ use yui_matrix::sparse::SpMat;
 
 use crate::kh::{KhChain, KhGen, KhTensor};
 use crate::khi::{KhIChain, KhIGen, KhIGenExt};
-use crate::tng::{Cob, CobComp, Dot, End, LcCob, LcCobTrait, Tng, TngComp, TngComplex, TngComplexElem, TngComplexKey, TngComplexVertex};
+use crate::tng::{Cob, CobComp, End, LcCob, LcCobTrait, Tng, TngComplex, TngComplexElem, TngComplexKey, TngComplexVertex, circles_of, label_assignments, expanded_key, cap_circles};
 use super::{reachable_range, ChunkBuilder, SymTngBuilder, SymBuildConfig, TngComplexBuilder, BuildConfig, BuildMode, TauKeyMap};
 use super::builder::{PROGRESS_LOG_STEP, PROGRESS_LOG_MIN};
 
@@ -586,43 +586,6 @@ where G: Fn(Edge) -> Edge {
     Cob::new(tng.comps().map(|c|
         CobComp::plain(Tng::from(c.clone()), Tng::from(c.convert_edges(&inv_edge)))
     ))
-}
-
-// The circles of a closed vertex in expansion order: unmarked first (matching the deloop order),
-// the marked circle last.
-fn circles_of(tng: &Tng) -> Vec<TngComp> {
-    debug_assert!(tng.comps().all(|c| c.is_circle()));
-    let (marked, unmarked): (Vec<_>, Vec<_>) = tng.comps().cloned().partition(|c| c.is_marked());
-    unmarked.into_iter().chain(marked).collect()
-}
-
-// All label assignments for the circles (a marked circle is fixed to `X`).
-fn label_assignments(circles: &[TngComp]) -> Vec<KhTensor> {
-    KhTensor::generate(circles.len()).filter(|a|
-        circles.iter().enumerate().all(|(i, c)| !c.is_marked() || a[i].is_X())
-    ).collect()
-}
-
-// The expanded key: the vertex key with the assignment appended to its label.
-fn expanded_key(k: &TngComplexKey, a: &KhTensor) -> TngComplexKey {
-    let mut kk = *k;
-    kk.label.append(*a);
-    kk
-}
-
-// Cap the given circles by the deloop pairing: a source circle labeled `X` is cupped with `Dot::X`
-// (`1` plain); a target circle labeled `X` is capped plain (`1` with `Dot::Y`).
-fn cap_circles<R>(f: LcCob<R>, e: End, circles: &[TngComp], labels: &KhTensor, h: &R, t: &R) -> LcCob<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    circles.iter().enumerate().fold(f, |f, (i, c)| {
-        let dot = match (e, labels[i].is_X()) {
-            (End::Src, true)  => Some(Dot::X),
-            (End::Src, false) => None,
-            (End::Tgt, true)  => None,
-            (End::Tgt, false) => Some(Dot::Y),
-        };
-        f.cap_off(e, c, dot).reduce(h, t)
-    })
 }
 
 // Cone key → KhIGen: the cone bit is the last `state` bit (`0` → `B`/`Left`, `1` → `Q`/`Right`);

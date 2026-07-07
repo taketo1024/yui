@@ -15,7 +15,7 @@
 use std::fmt::Display;
 use std::ops::{Add, AddAssign, RangeInclusive};
 
-use log::debug;
+use log::{debug, info};
 use rustc_hash::{FxHashMap, FxHashSet};
 use auto_impl_ops::auto_ops;
 use itertools::{Itertools, iproduct};
@@ -23,6 +23,7 @@ use num_traits::Zero;
 use rayon::prelude::*;
 use yui_core::{CloneAnd, Ring, RingOps, Sign};
 use yui_homology::{ChainComplex1, Summand, GrMod1};
+use yui_matrix::sparse::SpMat;
 use yui_link::{Edge, Node, Path, State};
 use yui_core::bitseq::Bit;
 
@@ -38,6 +39,43 @@ const MERGE_LOG_STEP: usize = 1_000_000;
 // `eliminate_par`'s parallel value-write, where each task holds a pointer to a *distinct* vertex.
 struct SendPtr<T>(*mut T);
 unsafe impl<T> Send for SendPtr<T> {}
+
+// ---- deloop-via-labels: shared by TngComplex::into_raw_complex and ConeBuilder::into_raw_complex ----
+// A vertex's remaining circles expand into 2^circles generators at conversion time (delooping at the
+// matrix level, never on the cobordisms). A marked (based) circle is fixed to the `X` label.
+
+pub(crate) fn circles_of(tng: &Tng) -> Vec<TngComp> {
+    debug_assert!(tng.comps().all(|c| c.is_circle()));
+    let (marked, unmarked): (Vec<_>, Vec<_>) = tng.comps().cloned().partition(|c| c.is_marked());
+    unmarked.into_iter().chain(marked).collect()
+}
+
+pub(crate) fn label_assignments(circles: &[TngComp]) -> Vec<KhTensor> {
+    KhTensor::generate(circles.len()).filter(|a|
+        circles.iter().enumerate().all(|(i, c)| !c.is_marked() || a[i].is_X())
+    ).collect()
+}
+
+pub(crate) fn expanded_key(k: &TngComplexKey, a: &KhTensor) -> TngComplexKey {
+    let mut kk = *k;
+    kk.label.append(*a);
+    kk
+}
+
+// Cap the circles by the deloop pairing: a source circle labeled `X` is cupped with `Dot::X`
+// (`1` plain); a target circle labeled `X` is capped plain (`1` with `Dot::Y`).
+pub(crate) fn cap_circles<R>(f: LcCob<R>, e: End, circles: &[TngComp], labels: &KhTensor, h: &R, t: &R) -> LcCob<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    circles.iter().enumerate().fold(f, |f, (i, c)| {
+        let dot = match (e, labels[i].is_X()) {
+            (End::Src, true)  => Some(Dot::X),
+            (End::Src, false) => None,
+            (End::Tgt, true)  => None,
+            (End::Tgt, false) => Some(Dot::Y),
+        };
+        f.cap_off(e, c, dot).reduce(h, t)
+    })
+}
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub struct TngComplexKey { 
@@ -764,30 +802,61 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
+    /// Convert to the raw Khovanov chain complex, matrix-backed for `ChainReducer`. Any circles left
+    /// on a vertex are delooped here, at the matrix level: the vertex expands into one generator per
+    /// circle-label assignment, and each edge contributes the scalar `⟨b|f|a⟩` (the deloop pairing)
+    /// evaluated as a closed cobordism. A fully-delooped complex gives exactly one generator/vertex.
     pub fn into_raw_complex(self) -> ChainComplex1<KhGen, R> {
-        assert!(self.is_completely_delooped());
+        let c = self;
+        let (h, t) = c.ht().clone();
 
-        let summands = GrMod1::generate(self.h_range(), |i| {
-            let gens = self.keys_of_deg(i).map(|k|
-                k.as_gen()
-            ).sorted_by_key(|x|
-                -x.rel_q_deg()
-            );
-            Summand::from_raw_generators(gens)
-        });
+        info!("build raw complex: {}", c.stat());
 
-        let d = move |x: &KhGen| {
-            let (h, t) = self.ht();
-            let k = TngComplexKey::from(x);
-            let v = self.vertex(&k);
-            v.out_edges.iter().map(|(l, f)|
-                (l.as_gen(), f.eval(h, t))
-            ).collect()
-        };
+        // expanded generators (vertex, circle-labels) per degree, sorted by q-degree (descending) —
+        // fixes both the summand generator order and the matrix row/column order.
+        let keys: FxHashMap<isize, Vec<(TngComplexKey, KhTensor)>> = c.h_range().map(|i| {
+            let expanded = c.keys_of_deg(i).flat_map(|k| {
+                let circles = circles_of(c.vertex(k).tng());
+                label_assignments(&circles).into_iter().map(|a| (*k, a)).collect_vec()
+            }).sorted_by_key(|(k, a)|
+                -expanded_key(k, a).as_gen().rel_q_deg()
+            ).collect_vec();
+            (i, expanded)
+        }).collect();
 
-        ChainComplex1::new(summands, 1, move |_, z| { 
-            z.apply(&d)
-        })
+        let summands = GrMod1::generate(c.h_range(), |i|
+            Summand::from_raw_generators(keys[&i].iter().map(|(k, a)| expanded_key(k, a).as_gen()))
+        );
+
+        let matrices = c.h_range().map(|i| {
+            let cols = &keys[&i];
+            let rows: FxHashMap<TngComplexKey, usize> = keys.get(&(i + 1))
+                .map(|ks| ks.iter().enumerate().map(|(r, (k, a))| (expanded_key(k, a), r)).collect())
+                .unwrap_or_default();
+
+            let mut entries = vec![];
+            for (j, (k, a)) in cols.iter().enumerate() {
+                let src_circles = circles_of(c.vertex(k).tng());
+                for l in c.vertex(k).out_edges() {
+                    let fa = cap_circles(c.edge(k, l).clone(), End::Src, &src_circles, a, &h, &t);
+                    if fa.is_zero() {
+                        continue;
+                    }
+                    let tgt_circles = circles_of(c.vertex(l).tng());
+                    for b in label_assignments(&tgt_circles) {
+                        let g = cap_circles(fa.clone(), End::Tgt, &tgt_circles, &b, &h, &t);
+                        entries.push((rows[&expanded_key(l, &b)], j, g.eval(&h, &t)));
+                    }
+                }
+            }
+
+            debug!("  raw d[{i}]: {} -> {}, nnz: {}", cols.len(), rows.len(), entries.len());
+            let m = SpMat::from_entries((rows.len(), cols.len()), entries);
+            (i, m)
+        }).collect_vec();
+
+        info!("raw complex done: {} gens", keys.values().map(|ks| ks.len()).sum::<usize>());
+        ChainComplex1::new_with_d_matrices(summands, 1, matrices)
     }
 
     pub fn is_completely_delooped(&self) -> bool { 

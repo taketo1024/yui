@@ -457,7 +457,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let after = self.complex().rank(i) as isize;
 
-        debug!("{}   delooped C[{i}]: {} (diff: {})", self.current_step(), after, after - before);
+        debug!("{}   delooped C[{i}]: {} (delooped: {done}, eliminated: {elim}, diff: {})", self.current_step(), after, after - before);
         debug!("{}   neighbors: C[{}] {} / C[{}] {}",
             self.current_step(), i - 1, self.complex().rank(i - 1), i + 1, self.complex().rank(i + 1));
     }

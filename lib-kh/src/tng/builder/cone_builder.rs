@@ -485,10 +485,22 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // Fully deloop the reduced cone so `eval_khi_elements` and `into_raw_complex` share the delooped
     // basis. Called from `run` after the last merge, matching the other builders.
     fn finalize(&mut self) {
+        if self.skip_finalize() {
+            info!("cone skip finalize (deloop deferred): {}", self.cone.stat());
+            return;
+        }
         info!("cone finalize: {}", self.cone.stat());
         self.deloop_all(false);
         self.deloop_all(true);
         info!("cone finalized: {}", self.cone.stat());
+    }
+
+    // Skip the finalize deloop when the build is complete and closed under `skip_final_process`:
+    // `into_raw_complex`/`eval_khi_elements` then expand the remaining circles at the matrix level.
+    fn skip_finalize(&self) -> bool {
+        self.inner.config().skip_final_process
+            && self.inner.n_nodes() == 0
+            && self.cone.complex().is_closed()
     }
 
     // Deloop the whole cone one degree at a time, eliminating inline: a degree is eliminated once
@@ -517,6 +529,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     /// `eval_khi_elements` reads the canon classes on this same delooped basis.
     pub fn into_raw_complex(self) -> ChainComplex1<KhIGen, R> {
         let c = self.cone.into_tng_complex();
+        assert!(c.is_closed(), "into_raw_complex requires a closed complex (only circles expand into generators)");
         let (h, t) = c.ht().clone();
 
         info!("build raw complex: {}", c.stat());
@@ -635,6 +648,28 @@ mod tests {
         c.check_d_all();
         let h = c.homology();
         h.support().map(|&i| (i, h[i].rank())).filter(|(_, r)| *r > 0).sorted().collect()
+    }
+
+    // skip_final_process defers the finalize deloop to into_raw_complex — the cone homology must
+    // not change (whole and chunked).
+    fn check_skip_final_process(l: &InvLink) {
+        for reduced in [false, true] {
+            for cut in [CutOption::None, CutOption::Auto(2)] {
+                let full = cone_homology(l, reduced, SymBuildConfig { cut: cut.clone(), ..Default::default() });
+                let skipped = cone_homology(l, reduced, SymBuildConfig { cut: cut.clone(), skip_final_process: true, ..Default::default() });
+                assert_eq!(full, skipped, "reduced={reduced}, cut={cut:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn cone_skip_final_process_3_1() {
+        check_skip_final_process(&InvLink::test_data("3_1"));
+    }
+
+    #[test]
+    fn cone_skip_final_process_6_3() {
+        check_skip_final_process(&InvLink::test_data("6_3"));
     }
 
     // The cone homology must not depend on the chunking: whole == chunked, reduced and unreduced.

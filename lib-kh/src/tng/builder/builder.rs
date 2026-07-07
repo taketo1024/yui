@@ -599,7 +599,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn eval_elements(&self) -> Vec<KhChain<R>> {
         let (h, t) = self.complex.ht();
-        self.elements.eval(h, t)
+        // an un-delooped complex (`skip_final_process`) needs the circle-expanding eval.
+        if self.complex.is_completely_delooped() {
+            self.elements.eval(h, t)
+        } else {
+            self.elements.eval_with(&self.complex, h, t)
+        }
     }
 
     pub(crate) fn stat(&self) -> String {

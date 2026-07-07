@@ -3,8 +3,10 @@ use yui_core::bitseq::Bit;
 use yui_core::{Ring, RingOps};
 use yui_link::{Edge, Node, Path};
 
+use itertools::Itertools;
+
 use crate::kh::{KhAlgGen, KhChain};
-use crate::tng::{Tng, TngComp, Cob, End, Dot, LcCobTrait, TngComplex, TngComplexElem, TngComplexKey};
+use crate::tng::{Tng, TngComp, Cob, End, Dot, LcCob, LcCobTrait, TngComplex, TngComplexElem, TngComplexKey, circles_of, label_assignments, cap_circles, expanded_key};
 
 // Owns the canonical-cycle elements and transforms them in lockstep with the `TngComplex`: each
 // element's `out_cob` (cap cobordism) tracks the complex via the same append/deloop/eliminate.
@@ -180,5 +182,21 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub(crate) fn eval(&self, h: &R, t: &R) -> Vec<KhChain<R>> {
         self.elements.iter().map(|e| e.eval(h, t)).collect()
+    }
+
+    // Like `eval`, but expands each vertex's remaining circles over their label assignments (the same
+    // pairing as `into_raw_complex`) — so it also works on an un-delooped complex (`skip_final_process`).
+    pub(crate) fn eval_with(&self, c: &TngComplex<R>, h: &R, t: &R) -> Vec<KhChain<R>> {
+        self.elements.iter().map(|e| {
+            let init = LcCob::from(e.in_cob().clone());
+            e.out_cob().iter().flat_map(|(k, retr)| {
+                let circles = circles_of(c.vertex(k).tng());
+                label_assignments(&circles).into_iter().map(|b| {
+                    let g = cap_circles(retr.clone(), End::Tgt, &circles, &b, h, t);
+                    let x = (g * &init).eval(h, t);
+                    (expanded_key(k, &b).as_gen(), x)
+                }).collect_vec()
+            }).collect()
+        }).collect()
     }
 }

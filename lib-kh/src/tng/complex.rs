@@ -22,6 +22,7 @@ use itertools::{Itertools, iproduct};
 use num_traits::Zero;
 use rayon::prelude::*;
 use yui_core::{CloneAnd, Ring, RingOps, Sign};
+use yui_core::lc::LcKey;
 use yui_homology::{ChainComplex1, Summand, GrMod1};
 use yui_matrix::sparse::SpMat;
 use yui_link::{Edge, Node, Path, State};
@@ -40,45 +41,8 @@ const MERGE_LOG_STEP: usize = 1_000_000;
 struct SendPtr<T>(*mut T);
 unsafe impl<T> Send for SendPtr<T> {}
 
-// ---- deloop-via-labels: shared by TngComplex::into_raw_complex and ConeBuilder::into_raw_complex ----
-// A vertex's remaining circles expand into 2^circles generators at conversion time (delooping at the
-// matrix level, never on the cobordisms). A marked (based) circle is fixed to the `X` label.
-
-pub(crate) fn circles_of(tng: &Tng) -> Vec<TngComp> {
-    debug_assert!(tng.comps().all(|c| c.is_circle()));
-    let (marked, unmarked): (Vec<_>, Vec<_>) = tng.comps().cloned().partition(|c| c.is_marked());
-    unmarked.into_iter().chain(marked).collect()
-}
-
-pub(crate) fn label_assignments(circles: &[TngComp]) -> Vec<KhTensor> {
-    KhTensor::generate(circles.len()).filter(|a|
-        circles.iter().enumerate().all(|(i, c)| !c.is_marked() || a[i].is_X())
-    ).collect()
-}
-
-pub(crate) fn expanded_key(k: &TngComplexKey, a: &KhTensor) -> TngComplexKey {
-    let mut kk = *k;
-    kk.label.append(*a);
-    kk
-}
-
-// Cap the circles by the deloop pairing: a source circle labeled `X` is cupped with `Dot::X`
-// (`1` plain); a target circle labeled `X` is capped plain (`1` with `Dot::Y`).
-pub(crate) fn cap_circles<R>(f: LcCob<R>, e: End, circles: &[TngComp], labels: &KhTensor, h: &R, t: &R) -> LcCob<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    circles.iter().enumerate().fold(f, |f, (i, c)| {
-        let dot = match (e, labels[i].is_X()) {
-            (End::Src, true)  => Some(Dot::X),
-            (End::Src, false) => None,
-            (End::Tgt, true)  => None,
-            (End::Tgt, false) => Some(Dot::Y),
-        };
-        f.cap_off(e, c, dot).reduce(h, t)
-    })
-}
-
 #[derive(Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
-pub struct TngComplexKey { 
+pub struct TngComplexKey {
     pub state: State,
     pub label: KhTensor
 }
@@ -802,11 +766,21 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    /// Convert to the raw Khovanov chain complex, matrix-backed for `ChainReducer`. Any circles left
-    /// on a vertex are delooped here, at the matrix level: the vertex expands into one generator per
-    /// circle-label assignment, and each edge contributes the scalar `⟨b|f|a⟩` (the deloop pairing)
-    /// evaluated as a closed cobordism. A fully-delooped complex gives exactly one generator/vertex.
+    /// Convert to the raw Khovanov chain complex (`KhGen`-keyed). See `into_raw_complex_with`.
     pub fn into_raw_complex(self) -> ChainComplex1<KhGen, R> {
+        self.into_raw_complex_with(|k, a| expanded_key(k, a).as_gen(), KhGen::rel_q_deg)
+    }
+
+    /// Convert to a raw chain complex, matrix-backed for `ChainReducer`. Any circles left on a vertex
+    /// are delooped here, at the matrix level: the vertex expands into one generator per circle-label
+    /// assignment (mapped to `X` by `into_gen`, ordered by `q_deg`), and each edge contributes the scalar
+    /// `⟨b|f|a⟩` (the deloop pairing) as a closed cobordism. A delooped vertex gives one generator.
+    pub(crate) fn into_raw_complex_with<X>(
+        self,
+        into_gen: impl Fn(&TngComplexKey, &KhTensor) -> X,
+        q_deg: impl Fn(&X) -> isize,
+    ) -> ChainComplex1<X, R>
+    where X: LcKey {
         let c = self;
         assert!(c.is_closed(), "into_raw_complex requires a closed complex (only circles expand into generators)");
         let (h, t) = c.ht().clone();
@@ -820,13 +794,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 let circles = circles_of(c.vertex(k).tng());
                 label_assignments(&circles).into_iter().map(|a| (*k, a)).collect_vec()
             }).sorted_by_key(|(k, a)|
-                -expanded_key(k, a).as_gen().rel_q_deg()
+                -q_deg(&into_gen(k, a))
             ).collect_vec();
             (i, expanded)
         }).collect();
 
         let summands = GrMod1::generate(c.h_range(), |i|
-            Summand::from_raw_generators(keys[&i].iter().map(|(k, a)| expanded_key(k, a).as_gen()))
+            Summand::from_raw_generators(keys[&i].iter().map(|(k, a)| into_gen(k, a)))
         );
 
         let matrices = c.h_range().map(|i| {
@@ -959,6 +933,43 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         c.nodes = self.nodes.iter().map(|n| n.convert_edges(&f)).collect();
         c
     }
+}
+
+// ---- deloop-via-labels: shared by TngComplex::into_raw_complex and ConeBuilder::into_raw_complex ----
+// A vertex's remaining circles expand into 2^circles generators at conversion time (delooping at the
+// matrix level, never on the cobordisms). A marked (based) circle is fixed to the `X` label.
+
+pub(crate) fn circles_of(tng: &Tng) -> Vec<TngComp> {
+    debug_assert!(tng.comps().all(|c| c.is_circle()));
+    let (marked, unmarked): (Vec<_>, Vec<_>) = tng.comps().cloned().partition(|c| c.is_marked());
+    unmarked.into_iter().chain(marked).collect()
+}
+
+pub(crate) fn label_assignments(circles: &[TngComp]) -> Vec<KhTensor> {
+    KhTensor::generate(circles.len()).filter(|a|
+        circles.iter().enumerate().all(|(i, c)| !c.is_marked() || a[i].is_X())
+    ).collect()
+}
+
+pub(crate) fn expanded_key(k: &TngComplexKey, a: &KhTensor) -> TngComplexKey {
+    let mut kk = *k;
+    kk.label.append(*a);
+    kk
+}
+
+// Cap the circles by the deloop pairing: a source circle labeled `X` is cupped with `Dot::X`
+// (`1` plain); a target circle labeled `X` is capped plain (`1` with `Dot::Y`).
+pub(crate) fn cap_circles<R>(f: LcCob<R>, e: End, circles: &[TngComp], labels: &KhTensor, h: &R, t: &R) -> LcCob<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    circles.iter().enumerate().fold(f, |f, (i, c)| {
+        let dot = match (e, labels[i].is_X()) {
+            (End::Src, true)  => Some(Dot::X),
+            (End::Src, false) => None,
+            (End::Tgt, true)  => None,
+            (End::Tgt, false) => Some(Dot::Y),
+        };
+        f.cap_off(e, c, dot).reduce(h, t)
+    })
 }
 
 #[cfg(test)]

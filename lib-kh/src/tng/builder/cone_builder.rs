@@ -21,10 +21,9 @@ use yui_link::{Edge, Node, InvLink};
 
 use rayon::prelude::*;
 use rustc_hash::FxHashMap;
-use yui_homology::{ChainComplex1, GrMod1, Summand};
-use yui_matrix::sparse::SpMat;
+use yui_homology::ChainComplex1;
 
-use crate::kh::{KhChain, KhGen, KhTensor};
+use crate::kh::{KhChain, KhGen};
 use crate::khi::{KhIChain, KhIGen, KhIGenExt};
 use crate::tng::{Cob, CobComp, End, LcCob, LcCobTrait, Tng, TngComplex, TngComplexElem, TngComplexKey, TngComplexVertex, circles_of, label_assignments, expanded_key, cap_circles};
 use super::{reachable_range, ChunkBuilder, SymTngBuilder, SymBuildConfig, TngComplexBuilder, BuildConfig, TauKeyMap};
@@ -523,64 +522,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    /// Convert the fully-delooped cone (delooped at the end of `cone_merge`) to the KhI chain
-    /// complex: each vertex has no circles, so it expands into exactly one generator, and each edge
-    /// contributes the scalar `⟨b|f|a⟩` (the deloop pairing) evaluated as a closed cobordism.
-    /// `eval_khi_elements` reads the canon classes on this same delooped basis.
+    /// Convert the cone to the KhI chain complex: each vertex expands into one generator per
+    /// circle-label assignment, mapped to `KhIGen` via the cone bit (`into_khi_gen`) and ordered by
+    /// `KhIGen` q-degree. `eval_khi_elements` reads the canon classes on this same basis.
     pub fn into_raw_complex(self) -> ChainComplex1<KhIGen, R> {
-        let c = self.cone.into_tng_complex();
-        assert!(c.is_closed(), "into_raw_complex requires a closed complex (only circles expand into generators)");
-        let (h, t) = c.ht().clone();
-
-        info!("build raw complex: {}", c.stat());
-
-        // expanded generators (vertex, labels) per degree, sorted by their KhIGen q-degree
-        // (descending) — fixing both the summand generator order and the matrix row/column order.
-        let keys: FxHashMap<isize, Vec<(TngComplexKey, KhTensor)>> = c.h_range().map(|i| {
-            let expanded = c.keys_of_deg(i).flat_map(|k| {
-                let circles = circles_of(c.vertex(k).tng());
-                label_assignments(&circles).into_iter().map(|a| (*k, a)).collect_vec()
-            }).sorted_by_key(|(k, a)|
-                -into_khi_gen(&expanded_key(k, a).as_gen()).rel_q_deg()
-            ).collect_vec();
-            (i, expanded)
-        }).collect();
-
-        let summands = GrMod1::generate(c.h_range(), |i| {
-            Summand::from_raw_generators(keys[&i].iter().map(|(k, a)| into_khi_gen(&expanded_key(k, a).as_gen())))
-        });
-
-        let matrices = c.h_range().map(|i| {
-            let cols = &keys[&i];
-            let rows: FxHashMap<TngComplexKey, usize> = keys.get(&(i + 1))
-                .map(|ks| ks.iter().enumerate().map(|(r, (k, a))| (expanded_key(k, a), r)).collect())
-                .unwrap_or_default();
-
-            let mut entries = vec![];
-            for (j, (k, a)) in cols.iter().enumerate() {
-                let src_circles = circles_of(c.vertex(k).tng());
-                for l in c.vertex(k).out_edges() {
-                    let fa = cap_circles(c.edge(k, l).clone(), End::Src, &src_circles, a, &h, &t);
-                    if fa.is_zero() {
-                        continue;
-                    }
-                    let tgt_circles = circles_of(c.vertex(l).tng());
-                    for b in label_assignments(&tgt_circles) {
-                        let g = cap_circles(fa.clone(), End::Tgt, &tgt_circles, &b, &h, &t);
-                        entries.push((rows[&expanded_key(l, &b)], j, g.eval(&h, &t)));
-                    }
-                }
-            }
-
-            debug!("  raw d[{i}]: {} -> {}, nnz: {}", cols.len(), rows.len(), entries.len());
-            let m = SpMat::from_entries((rows.len(), cols.len()), entries);
-            (i, m)
-        }).collect_vec();
-
-        info!("raw complex done: {} gens", keys.values().map(|ks| ks.len()).sum::<usize>());
-
-        drop(c);
-        ChainComplex1::new_with_d_matrices(summands, 1, matrices)
+        self.cone.into_tng_complex().into_raw_complex_with(
+            |k, a| into_khi_gen(&expanded_key(k, a).as_gen()),
+            |g| g.rel_q_deg(),
+        )
     }
 }
 

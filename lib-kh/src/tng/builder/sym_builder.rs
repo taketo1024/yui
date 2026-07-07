@@ -51,6 +51,14 @@ impl Default for SymBuildConfig {
     }
 }
 
+impl SymBuildConfig {
+    // Config for the inner merge builder: `mode: None` (the sym builder drives deloop/elim, the inner
+    // never orders nodes), so only `h_range` carries over — to drop out-of-window canon cycles.
+    pub(crate) fn inner_build_config(&self) -> BuildConfig {
+        BuildConfig { mode: BuildMode::None, h_range: self.h_range.clone(), ..Default::default() }
+    }
+}
+
 // τ-symmetric key map: each `TngComplexKey`'s τ-image. On-axis keys (`τk = k`) are a set;
 // off-axis keys form an involution stored both ways for O(1) `inv_key`. The merge iterates
 // only one representative per off-axis pair (the map is symmetric), then symmetrizes.
@@ -143,8 +151,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(!reduced || l.base_pt().is_some());
 
         // the inner builder is driven by `self` — disable its own auto-simplify.
+        let config = SymBuildConfig::default();
         let inner = TngComplexBuilder::from_link(l.inner(), h, t, reduced)
-            .with_config(BuildConfig { mode: BuildMode::None, cut: CutOption::None, node_order: NodeOrder::default(), h_range: None, elim_max_cost: None });
+            .with_config(config.inner_build_config());
 
         let x_map = l.nodes().map(|x|
             (x.clone(), l.inv_node(x).clone())
@@ -153,14 +162,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let key_map = TauKeyMap::init();
         let real_top = inner.complex().deg_shift().0 + l.inner().n_crossings() as isize;
 
-        SymTngBuilder { inner, x_map, e_map, key_map, config: SymBuildConfig::default(), real_top }
+        SymTngBuilder { inner, x_map, e_map, key_map, config, real_top }
     }
 
     pub fn with_config(mut self, config: SymBuildConfig) -> Self {
         // propagate the window to the inner builder so the preprocess merges cap
         // to it; this also drops canon cycles when the window excludes h-degree 0.
-        let inner_config = BuildConfig { mode: BuildMode::None, cut: CutOption::None, node_order: config.node_order, h_range: config.h_range.clone(), elim_max_cost: None };
-        self.inner = self.inner.with_config(inner_config);
+        self.inner = self.inner.with_config(config.inner_build_config());
         self.config = config;
         self
     }
@@ -951,13 +959,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn child_builder(&self, chunk: &[Node]) -> SymTngBuilder<R> {
         let (h, t) = self.builder.inner.complex().ht();
         let base_pt = self.builder.inner.complex().base_pt();
-        let mut inner = TngComplexBuilder::init(h, t, (0, 0), base_pt)
-            .with_config(BuildConfig { mode: BuildMode::None, cut: CutOption::None, node_order: NodeOrder::MinCut, h_range: None, elim_max_cost: None });
-        inner.set_nodes(chunk.iter().cloned());
-        inner.elements_mut().set(self.builder.inner.elements().content().to_vec());
 
         // No per-chunk h_range: it would under-cover preprocess's off-axis key_map. Applied at the merge.
         let config = SymBuildConfig { cut: CutOption::None, node_order: NodeOrder::MinCut, h_range: None, ..self.builder.config.clone() };
+
+        let mut inner = TngComplexBuilder::init(h, t, (0, 0), base_pt)
+            .with_config(config.inner_build_config());
+        inner.set_nodes(chunk.iter().cloned());
+        inner.elements_mut().set(self.builder.inner.elements().content().to_vec());
+
         let key_map = TauKeyMap::init();
         let real_top = inner.complex().deg_shift().0 + chunk.len() as isize; // child deg_shift = 0
         SymTngBuilder { inner, x_map: self.builder.x_map.clone(), e_map: self.builder.e_map.clone(), key_map, config, real_top }

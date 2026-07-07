@@ -711,7 +711,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let s = self.builder.complex.deg_shift().0;
             0 ..= (*r.end() - s).max(0)
         });
-        child.with_config(BuildConfig { mode: self.builder.config.mode, node_order: NodeOrder::MinCut, cut: CutOption::None, h_range, elim_max_cost: None })
+        let config = BuildConfig { mode: self.builder.config.mode, node_order: NodeOrder::MinCut, h_range, ..Default::default() };
+        child.with_config(config)
     }
 }
 

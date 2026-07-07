@@ -449,13 +449,21 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         if window_top > top {
             return;
         }
-        let doomed = self.cone.complex().keys_of_deg(top + 1).copied().collect_vec();
+        // keep vertices a canon cycle lands on: its `Q` copy lives at the boundary degree `top`, and
+        // `eval_khi_elements` needs the vertex present (the homology window trims the class afterwards).
+        let referenced: rustc_hash::FxHashSet<TngComplexKey> = self.cone.elements().content().iter()
+            .flat_map(|e| e.out_cob().keys().copied())
+            .collect();
+
+        let doomed = self.cone.complex().keys_of_deg(top + 1)
+            .filter(|k| !referenced.contains(k))
+            .copied().collect_vec();
         debug!("cone: drop out-of-window C[{}] ({} verts)", top + 1, doomed.len());
         self.cone.complex_mut().remove_vertices(&doomed);
 
         let total = self.cone.complex().keys_of_deg(top).count();
         let doomed = self.cone.complex().keys_of_deg(top)
-            .filter(|k| self.cone.complex().vertex(k).in_edges().next().is_none())
+            .filter(|k| self.cone.complex().vertex(k).in_edges().next().is_none() && !referenced.contains(k))
             .copied()
             .collect_vec();
         debug!("cone: window top C[{top}] {}/{total} no-in-edge verts pruned", doomed.len());

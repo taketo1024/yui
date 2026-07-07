@@ -243,6 +243,17 @@ mod tests {
         assert_eq!(clipped.canon_cycles().len(), 2);
     }
 
+    // same clip, via the cobordism cone: the Q-cycles land on the truncation-boundary degree, whose
+    // vertices `prune_isolated_top` used to delete — panicking `eval_khi_elements` (now canon-aware).
+    #[test]
+    fn canon_cycles_clipped_via_cone() {
+        let l = InvLink::test_data("3_1");
+        type P = Poly<'H', FF2>;
+        let (h, t) = (P::variable(), P::zero());
+        let clipped = KhIHomology::from_cone(&l, &h, &t, false, SymBuildConfig { h_range: Some(isize::MIN + 1 ..= 0), ..Default::default() });
+        assert_eq!(clipped.canon_cycles().len(), 2);
+    }
+
     #[test]
     fn khi_partial() {
         // partial KhI homology matches the full result across the whole window.

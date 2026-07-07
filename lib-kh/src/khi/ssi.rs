@@ -25,31 +25,10 @@ use crate::khi::{KhIComplex, KhIHomology};
 // injected into the reducer on the heavy cone path: bounds each Schur round's `a⁻¹b` transient.
 pub(crate) const MAX_PIVOTS_PER_ROUND: usize = 32_768;
 
-pub fn ssi_invariants<R>(l: &InvLink, c: &R, reduced: bool) -> (i32, i32)
-where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
-    assert!(!c.is_zero());
-    assert!(!c.is_unit());
-    assert!(l.is_knot());
-
-    info!("compute ssi, c = {c} over {}.", R::math_symbol());
-
-    let w = l.writhe();
-    let r = l.seifert_circles().len() as i32;
-    let (d0, d1) = div(l, c, reduced);
-
-    let ss0 = 2 * d0 + w - r + 1;
-    let ss1 = 2 * d1 + w - r + 1;
-
-    info!("w = {w}, r = {r}, d0 = {d0}, d1 = {d1}.");
-    info!("ssi = ({ss0}, {ss1}).");
-
-    (ss0, ss1)
-}
-
 /// `ssi` via the cobordism-level cone (`ConeBuilder`), without any bigraded structure: the canon
 /// classes are transported as coordinate vectors through a trans-free capped reduction, and the
 /// basis-change is computed only at the reduced scale (two small SNFs). Memory-safe on huge diagrams.
-pub fn ssi_invariants_via_cone<R>(l: &InvLink, c: &R, reduced: bool, config: SymBuildConfig) -> (i32, i32)
+pub fn ssi_invariant<R>(l: &InvLink, c: &R, reduced: bool, config: SymBuildConfig) -> (i32, i32)
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     assert!(!c.is_zero());
     assert!(!c.is_unit());
@@ -59,7 +38,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     let w = l.writhe();
     let r = l.seifert_circles().len() as i32;
-    let (d0, d1) = div_via_cone(l, c, reduced, config);
+    let (d0, d1) = ssi_divisibility(l, c, reduced, config);
 
     let ss0 = 2 * d0 + w - r + 1;
     let ss1 = 2 * d1 + w - r + 1;
@@ -70,7 +49,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     (ss0, ss1)
 }
 
-fn div_via_cone<R>(l: &InvLink, c: &R, reduced: bool, config: SymBuildConfig) -> (i32, i32)
+fn ssi_divisibility<R>(l: &InvLink, c: &R, reduced: bool, config: SymBuildConfig) -> (i32, i32)
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     let r = if reduced { 1 } else { 2 };
     let t = R::zero();
@@ -82,7 +61,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     let (a, b) = (*range.start(), *range.end());
     assert!(a <= 0 && b >= 1, "ssi h-range must include 0 and 1, got {a}..={b}");
     let config = SymBuildConfig { h_range: Some((a - 1)..=(b + 1)), ..config };
-    let kc = KhIComplex::from_cone(l, c, &t, reduced, config);
+    let kc = KhIComplex::new_with_config(l, c, &t, reduced, config);
 
     let zs = kc.canon_cycles(); // sorted by h-degree: B classes at 0, then Q classes at 1
     assert_eq!(zs.len(), 2 * r);
@@ -134,7 +113,28 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     (d0, d1)
 }
 
-fn div<R>(l: &InvLink, c: &R, reduced: bool) -> (i32, i32)
+pub fn ssi_invariant_v1<R>(l: &InvLink, c: &R, reduced: bool) -> (i32, i32)
+where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
+    assert!(!c.is_zero());
+    assert!(!c.is_unit());
+    assert!(l.is_knot());
+
+    info!("compute ssi, c = {c} over {}.", R::math_symbol());
+
+    let w = l.writhe();
+    let r = l.seifert_circles().len() as i32;
+    let (d0, d1) = ssi_divisibility_v1(l, c, reduced);
+
+    let ss0 = 2 * d0 + w - r + 1;
+    let ss1 = 2 * d1 + w - r + 1;
+
+    info!("w = {w}, r = {r}, d0 = {d0}, d1 = {d1}.");
+    info!("ssi = ({ss0}, {ss1}).");
+
+    (ss0, ss1)
+}
+
+fn ssi_divisibility_v1<R>(l: &InvLink, c: &R, reduced: bool) -> (i32, i32)
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     let r = if reduced { 1 } else { 2 };
     let t = R::zero(); 
@@ -195,7 +195,7 @@ mod tests {
         let l = InvLink::test_data("unknot_r_twist");
         let c = P::variable();
 
-        let ssi = ssi_invariants(&l, &c, false);
+        let ssi = ssi_invariant_v1(&l, &c, false);
         assert_eq!(ssi.0, 0);
         assert_eq!(ssi.1, 0);
     }
@@ -205,7 +205,7 @@ mod tests {
         let l = InvLink::test_data("unknot_l_twist");
         let c = P::variable();
 
-        let ssi = ssi_invariants(&l, &c, false);
+        let ssi = ssi_invariant_v1(&l, &c, false);
         assert_eq!(ssi.0, 0);
         assert_eq!(ssi.1, 0);
     }
@@ -215,7 +215,7 @@ mod tests {
         let l = InvLink::test_data("unknot_l_twist2");
         let c = P::variable();
 
-        let ssi = ssi_invariants(&l, &c, false);
+        let ssi = ssi_invariant_v1(&l, &c, false);
         assert_eq!(ssi.0, 0);
         assert_eq!(ssi.1, 0);
     }
@@ -225,7 +225,7 @@ mod tests {
         let l = InvLink::test_data("3_1");
         let c = P::variable();
 
-        let ssi = ssi_invariants(&l, &c, false);
+        let ssi = ssi_invariant_v1(&l, &c, false);
         assert_eq!(ssi.0, 2);
         assert_eq!(ssi.1, 2);
     }
@@ -235,7 +235,7 @@ mod tests {
         let l = InvLink::test_data("3_1").mirror();
         let c = P::variable();
 
-        let ssi = ssi_invariants(&l, &c, false);
+        let ssi = ssi_invariant_v1(&l, &c, false);
         assert_eq!(ssi.0, -2);
         assert_eq!(ssi.1, -2);
     }
@@ -245,7 +245,7 @@ mod tests {
         let l = InvLink::test_data("3_1");
         let c = P::variable();
 
-        let ssi = ssi_invariants(&l, &c, true);
+        let ssi = ssi_invariant_v1(&l, &c, true);
         assert_eq!(ssi.0, 2);
         assert_eq!(ssi.1, 2);
     }
@@ -260,7 +260,7 @@ mod tests {
                 let c = P::variable();
     
                 let l = InvLink::load($name)?;
-                let ssi = ssi_invariants(&l, &c, false);
+                let ssi = ssi_invariant_v1(&l, &c, false);
                 assert_eq!(ssi, $expected);
     
                 Ok(())
@@ -299,7 +299,7 @@ mod tests {
         );
 
         let c = P::variable();
-        let ssi = ssi_invariants(&l, &c, false);
+        let ssi = ssi_invariant_v1(&l, &c, false);
 
         assert_eq!(ssi, (0, 2));
     }
@@ -311,7 +311,7 @@ mod tests {
             fn $test() -> Result<(), Box<dyn std::error::Error>> {
                 let c = P::variable();
                 let l = InvLink::load($name)?;
-                let ssi = ssi_invariants_via_cone(&l, &c, false, SymBuildConfig::default());
+                let ssi = ssi_invariant(&l, &c, false, SymBuildConfig::default());
                 assert_eq!(ssi, $expected);
 
                 Ok(())
@@ -326,7 +326,7 @@ mod tests {
         let l = InvLink::test_data("3_1").mirror();
         let c = P::variable();
 
-        let ssi = ssi_invariants_via_cone(&l, &c, false, SymBuildConfig::default());
+        let ssi = ssi_invariant(&l, &c, false, SymBuildConfig::default());
         assert_eq!(ssi, (-2, -2));
     }
 
@@ -338,7 +338,7 @@ mod tests {
                 let c = P::variable();
                 let l = InvLink::load($name)?;
                 let config = SymBuildConfig { ..Default::default() };
-                let ssi = ssi_invariants_via_cone(&l, &c, false, config);
+                let ssi = ssi_invariant(&l, &c, false, config);
                 assert_eq!(ssi, $expected);
 
                 Ok(())
@@ -357,7 +357,7 @@ mod tests {
         let c = P::variable();
 
         let config = SymBuildConfig { ..Default::default() };
-        let ssi = ssi_invariants_via_cone(&l, &c, false, config);
+        let ssi = ssi_invariant(&l, &c, false, config);
         assert_eq!(ssi, (-2, -2));
     }
 
@@ -369,7 +369,7 @@ mod tests {
 
         let c = P::variable();
         let config = SymBuildConfig { ..Default::default() };
-        let ssi = ssi_invariants_via_cone(&l, &c, false, config);
+        let ssi = ssi_invariant(&l, &c, false, config);
 
         assert_eq!(ssi, (0, 2));
     }
@@ -387,7 +387,7 @@ mod tests {
         let l = InvLink::test_data("3_1");
         let c = P::variable();
 
-        let ssi = ssi_invariants_via_cone(&l, &c, true, SymBuildConfig::default());
+        let ssi = ssi_invariant(&l, &c, true, SymBuildConfig::default());
         assert_eq!(ssi, (2, 2));
     }
 
@@ -398,7 +398,7 @@ mod tests {
         );
 
         let c = P::variable();
-        let ssi = ssi_invariants_via_cone(&l, &c, false, SymBuildConfig::default());
+        let ssi = ssi_invariant(&l, &c, false, SymBuildConfig::default());
 
         assert_eq!(ssi, (0, 2));
     }
@@ -410,7 +410,7 @@ mod tests {
         );
 
         let c = P::variable();
-        let ssi = ssi_invariants_via_cone(&l, &c, false, SymBuildConfig::default());
+        let ssi = ssi_invariant(&l, &c, false, SymBuildConfig::default());
 
         assert_eq!(ssi, (0, 2));
     }
@@ -422,7 +422,7 @@ mod tests {
         );
 
         let c = P::variable();
-        let ssi = ssi_invariants(&l, &c, false);
+        let ssi = ssi_invariant_v1(&l, &c, false);
 
         assert_eq!(ssi, (0, 2));
     }
@@ -435,7 +435,7 @@ mod tests {
         );
 
         let c = P::variable();
-        let ssi = ssi_invariants(&l, &c, false);
+        let ssi = ssi_invariant_v1(&l, &c, false);
 
         assert_eq!(ssi, (0, 2));
     }

@@ -47,28 +47,12 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         Self::new_with_config(l, h, t, reduced, SymBuildConfig { h_range, ..Default::default() })
     }
 
+    /// The default KhI construction: the cobordism-level cone (`ConeBuilder`) yields the coned complex
+    /// + canon classes directly, and `into_raw_complex` converts once at the boundary (matrix-backed).
+    /// The equivalent matrix-level cone is kept for reference as `new_with_config_matrix`.
     pub fn new_with_config(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig) -> Self {
-        use crate::tng::builder::SymTngBuilder;
-
-        let (h_range, build_config) = Self::cone_build_config(l, reduced, config);
-        let b = SymTngBuilder::from_inv_link(l, h, t, reduced).with_config(build_config).run();
-        let tau_map = b.tau_map();
-
-        let b = b.into_inner();
-        let canon_cycles = b.eval_elements();
-        let complex = b.into_tng_complex().into_raw_complex();
-        let c = KhComplex::from_raw_complex(l.inner(), h, t, reduced, complex, canon_cycles);
-
-        match h_range {
-            Some(range) => Self::cone_of(c, tau_map, range),
-            None => Self::from_kh_complex(c, tau_map),
-        }
-    }
-
-    /// Cobordism-level cone: `ConeBuilder` yields the coned complex + canon classes directly, and
-    /// `into_raw_complex` converts once at the boundary (matrix-backed, no key round-trips).
-    pub fn from_cone(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig) -> Self {
         use crate::tng::builder::ConeBuilder;
+        assert_eq!(R::one() + R::one(), R::zero(), "char(R) != 2"); // the cobordism cone is char-2 only
 
         let (h_range, build_config) = Self::cone_build_config(l, reduced, config);
         let cone = ConeBuilder::from_inv_link(l, h, t, reduced).with_config(build_config).run();
@@ -202,6 +186,31 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
             ..config
         };
         (h_range, build_config)
+    }
+}
+
+// Reference: the "honest" matrix-level cone — build the sym `KhComplex`, then cone `(1+τ)` at the
+// matrix level (`cone_of`). Superseded by the cobordism cone in `new_with_config`; kept for
+// cross-checks (see the `cone_canon_ssi_matches_matrix` test).
+#[allow(dead_code)]
+impl<R> KhIComplex<R>
+where R: Ring, for<'a> &'a R: RingOps<R> {
+    fn new_with_config_v1(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig) -> Self {
+        use crate::tng::builder::SymTngBuilder;
+
+        let (h_range, build_config) = Self::cone_build_config(l, reduced, config);
+        let b = SymTngBuilder::from_inv_link(l, h, t, reduced).with_config(build_config).run();
+        let tau_map = b.tau_map();
+
+        let b = b.into_inner();
+        let canon_cycles = b.eval_elements();
+        let complex = b.into_tng_complex().into_raw_complex();
+        let c = KhComplex::from_raw_complex(l.inner(), h, t, reduced, complex, canon_cycles);
+
+        match h_range {
+            Some(range) => Self::cone_of(c, tau_map, range),
+            None => Self::from_kh_complex(c, tau_map),
+        }
     }
 }
 
@@ -470,9 +479,10 @@ mod tests {
             assert_eq!(c[(4, 8)].rank(), 1);
         }
 
-        // the cobordism-level cone must give the same bigraded homology as the matrix cone.
+        // the default cobordism cone (`new`) must give the same bigraded homology as the honest
+        // matrix cone (`new_with_config_v1`).
         #[test]
-        fn cob_cone_matches_matrix() {
+        fn cone_matches_v1() {
             use yui_homology::isize2;
 
             type R = FF2;
@@ -485,9 +495,9 @@ mod tests {
             for name in ["3_1", "4_1", "6_3"] {
                 for reduced in [false, true] {
                     let l = InvLink::test_data(name);
-                    let matrix = KhIComplex::new(&l, &h, &t, reduced).homology().bigraded();
-                    let cone = KhIComplex::from_cone(&l, &h, &t, reduced, SymBuildConfig::default()).homology().bigraded();
-                    assert_eq!(nonzero(&matrix), nonzero(&cone), "{name} reduced={reduced}");
+                    let v1 = KhIComplex::new_with_config_v1(&l, &h, &t, reduced, SymBuildConfig::default()).homology().bigraded();
+                    let v2 = KhIComplex::new(&l, &h, &t, reduced).homology().bigraded();
+                    assert_eq!(nonzero(&v1), nonzero(&v2), "{name} reduced={reduced}");
                 }
             }
         }

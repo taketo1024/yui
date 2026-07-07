@@ -748,7 +748,7 @@ mod tests {
     #[test]
     fn cone_canon_ssi_matches_matrix() {
         use yui_core::poly::Poly;
-        use crate::khi::{KhIHomology, ssi_invariants};
+        use crate::khi::{KhIHomology, ssi_invariant_v1};
         use crate::util::calc::div_vec;
 
         type P = Poly<'H', FF2>;
@@ -761,10 +761,10 @@ mod tests {
             ("9_46", InvLink::from_symmetric_pd_code([[18,8,1,7],[13,6,14,7],[12,2,13,1],[8,18,9,17],[5,14,6,15],[2,12,3,11],[16,10,17,9],[15,4,16,5],[10,4,11,3]])),
         ];
         for (name, l) in knots {
-            let matrix = ssi_invariants(&l, &c, false);
+            let matrix = ssi_invariant_v1(&l, &c, false);
 
             let config = SymBuildConfig { h_range: Some(isize::MIN + 1 ..= 1), ..Default::default() };
-            let kh = KhIHomology::from_cone(&l, &c, &t, false, config);
+            let kh = KhIHomology::new_with_config(&l, &c, &t, false, config);
             let zs = kh.canon_cycles();
             assert_eq!(zs.len(), 4);
 

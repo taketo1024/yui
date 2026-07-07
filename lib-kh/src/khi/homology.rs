@@ -45,18 +45,6 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         Self::from_complex(&c, Some(a..=b))
     }
 
-    // Cobordism-level cone (`ConeBuilder`), with the same windowing as `new_with_config`.
-    pub fn from_cone(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig) -> Self {
-        let Some(range) = config.h_range.clone() else {
-            return Self::from(&KhIComplex::from_cone(l, h, t, reduced, config));
-        };
-        let range = KhComplex::<R>::clamp_h_range(l.inner(), reduced, range); // resolve open ends before truncating
-        let (a, b) = (*range.start(), *range.end());
-        let cone_config = SymBuildConfig { h_range: Some((a - 1)..=(b + 1)), ..config };
-        let c = KhIComplex::from_cone(l, h, t, reduced, cone_config);
-        Self::from_complex(&c, Some(a..=b))
-    }
-
     fn from_complex(c: &KhIComplex<R>, range: Option<RangeInclusive<isize>>) -> Self {
         let reduced = c.inner().reduced();
         let homology = match &range {
@@ -240,17 +228,6 @@ mod tests {
 
         assert_eq!(KhIHomology::new(&l, &h, &t, false).canon_cycles().len(), 4);
         let clipped = KhIHomology::new_partial(&l, &h, &t, false, Some(isize::MIN + 1 ..= 0));
-        assert_eq!(clipped.canon_cycles().len(), 2);
-    }
-
-    // same clip, via the cobordism cone: the Q-cycles land on the truncation-boundary degree, whose
-    // vertices `prune_isolated_top` used to delete — panicking `eval_khi_elements` (now canon-aware).
-    #[test]
-    fn canon_cycles_clipped_via_cone() {
-        let l = InvLink::test_data("3_1");
-        type P = Poly<'H', FF2>;
-        let (h, t) = (P::variable(), P::zero());
-        let clipped = KhIHomology::from_cone(&l, &h, &t, false, SymBuildConfig { h_range: Some(isize::MIN + 1 ..= 0), ..Default::default() });
         assert_eq!(clipped.canon_cycles().len(), 2);
     }
 

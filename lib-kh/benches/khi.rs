@@ -23,9 +23,6 @@ const NODE_ORDERS: [(&str, NodeOrder); 1] =
 const MODES: [(&str, BuildMode); 2] =
     [("greedy", BuildMode::Greedy), ("minfill", BuildMode::MinFill)];
 
-const CONES: [(&str, bool); 2] =
-    [("matrix", false), ("conecob", true)];
-
 // 18-crossing strongly invertible knot — realistic scale-up.
 const K18_PD: &[[u8; 4]] = &[
     [1,27,2,26],[5,16,6,17],[6,32,7,31],[10,27,11,28],[11,1,12,36],
@@ -97,15 +94,9 @@ fn bench_khi_cone(c: &mut Criterion) {
     ];
 
     for (name, l) in &knots {
-        for (cn, cob_cone) in CONES {
-            group.bench_function(format!("{name}/{cn}"), |b| {
-                if cob_cone {
-                    b.iter(|| KhIComplex::<FF2>::from_cone(l, &zero, &zero, false, SymBuildConfig::default()))
-                } else {
-                    b.iter(|| KhIComplex::<FF2>::new_with_config(l, &zero, &zero, false, SymBuildConfig::default()))
-                }
-            });
-        }
+        group.bench_function(*name, |b| {
+            b.iter(|| KhIComplex::<FF2>::new_with_config(l, &zero, &zero, false, SymBuildConfig::default()))
+        });
     }
     group.finish();
 }

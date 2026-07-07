@@ -4,7 +4,7 @@ use std::str::FromStr;
 use yui_core::TeX;
 use yui_core::{EucRing, EucRingOps};
 use yui_homology::{ToSeqString, ToTableString};
-use yui_kh::khi::{KhIChain, KhIHomology, ssi_invariants_via_cone};
+use yui_kh::khi::{KhIChain, KhIHomology, ssi_invariant};
 use yui_kh::tng::builder::{SymBuildConfig, BuildMode, NodeOrder, CutOption};
 use yui_link::InvLink;
 use crate::app::args::*;
@@ -56,10 +56,6 @@ pub struct Args {
     // skip the half-build/τ-mirror preprocess (which materializes the unbridged off-axis product).
     #[arg(long)]
     pub no_preprocess: bool,
-
-    // temporary A/B: build KhI as the cobordism-level cone (ConeBuilder) instead of the matrix cone.
-    #[arg(long)]
-    pub cob_cone: bool,
 
     // cap the per-elimination fill cost; survivors defer to the matrix reduction.
     #[arg(long)]
@@ -146,8 +142,8 @@ where
 
         // ssi-only: canon classes ride the trans-free reduction as vectors (no table output).
         let ssi_only = self.args.show_ssi && !(self.args.show_gens || self.args.show_alpha);
-        if ssi_only && self.args.cob_cone && !self.args.no_simplify {
-            let ssi = ssi_invariants_via_cone(&l, &h, self.args.reduced, config);
+        if ssi_only && !self.args.no_simplify {
+            let ssi = ssi_invariant(&l, &h, self.args.reduced, config);
             self.out(&format!("ssi = ({}, {})", ssi.0, ssi.1));
             return Ok(self.flush());
         }
@@ -155,11 +151,7 @@ where
         let khi = if self.args.no_simplify {
             KhIHomology::new_no_simplify(&l, &h, &t, self.args.reduced)
         } else {
-            if self.args.cob_cone {
-                KhIHomology::from_cone(&l, &h, &t, self.args.reduced, config)
-            } else {
-                KhIHomology::new_with_config(&l, &h, &t, self.args.reduced, config)
-            }
+            KhIHomology::new_with_config(&l, &h, &t, self.args.reduced, config)
         };
 
         let bigraded = h.is_zero() && t.is_zero() || 

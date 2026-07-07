@@ -27,7 +27,7 @@ use yui_matrix::sparse::SpMat;
 use crate::kh::{KhChain, KhGen, KhTensor};
 use crate::khi::{KhIChain, KhIGen, KhIGenExt};
 use crate::tng::{Cob, CobComp, End, LcCob, LcCobTrait, Tng, TngComplex, TngComplexElem, TngComplexKey, TngComplexVertex, circles_of, label_assignments, expanded_key, cap_circles};
-use super::{reachable_range, ChunkBuilder, SymTngBuilder, SymBuildConfig, TngComplexBuilder, BuildConfig, BuildMode, TauKeyMap};
+use super::{reachable_range, ChunkBuilder, SymTngBuilder, SymBuildConfig, TngComplexBuilder, BuildConfig, TauKeyMap};
 use super::builder::{PROGRESS_LOG_STEP, PROGRESS_LOG_MIN};
 
 // τ-orbit class of a symmetric-complex vertex: the representative (smaller key) and the τ-fixed
@@ -77,7 +77,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             info!("cone chunk {}/{}: {} nodes{}", i + 1, last + 1, chunk.len(), if i == last { " (cone merge)" } else { "" });
             self.inner.drop_nodes(|x| chunk.contains(x));
             if i == last {
-                self.cone_merge(c, key_map, elems, mode);
+                self.cone_merge(c, key_map, elems);
             } else {
                 self.inner.merge(c, key_map, elems);
             }
@@ -109,12 +109,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // Fuse the final merge with cone construction + reduction. Per symmetric degree: merge the slice,
     // cone-ify it, then collapse the invertible `1`-edges two degrees behind (so `cone_extend` has
     // moved past the degree being removed). Delooping is deferred to the end, on the small survivors.
-    fn cone_merge(&mut self, other: TngComplex<R>, other_map: TauKeyMap, other_elems: Vec<TngComplexElem<R>>, mode: BuildMode) {
+    fn cone_merge(&mut self, other: TngComplex<R>, other_map: TauKeyMap, other_elems: Vec<TngComplexElem<R>>) {
         let left_map = std::mem::take(self.inner.key_map_mut());
         let (left, right) = self.inner.complex_mut().prepare_merge(other);
         let range = reachable_range(self.inner.complex().h_range(), &self.inner.config().h_range, self.inner.n_nodes());
-        let elim_max_cost = self.inner.config().elim_max_cost;
-        self.cone = TngComplexBuilder::from_tng_complex(cone_shell(self.inner.complex()), BuildConfig { mode, elim_max_cost, ..Default::default() });
+        let cone_config = cone_build_config(self.inner.config());
+        self.cone = TngComplexBuilder::from_tng_complex(cone_shell(self.inner.complex()), cone_config);
 
         info!("cone merge {} <- {}, range: {range:?}", left.stat(), right.stat());
 
@@ -573,6 +573,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 // ---- cobordism-level cone construction (`1 + τ`, char-2) ----
 
+// Config for the cone's own `TngComplexBuilder`, which drives deloop/eliminate on the coned complex:
+// the simplify `mode` and the elimination fill-cost cap carry over from the sym config.
+fn cone_build_config(config: &SymBuildConfig) -> BuildConfig {
+    BuildConfig { mode: config.mode, elim_max_cost: config.elim_max_cost, ..Default::default() }
+}
+
 // An empty cone shell: same `deg_shift`/base point, one extra h-degree for the cone bit.
 fn cone_shell<R>(c: &TngComplex<R>) -> TngComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
@@ -619,7 +625,7 @@ mod tests {
     use yui_core::num::FF2;
     use yui_link::InvLink;
     use super::*;
-    use super::super::CutOption;
+    use super::super::{BuildMode, CutOption};
 
     // Build the reduced cone, assert d² = 0, and return its nonzero homology ranks per degree.
     // (Full homology vs. the KhI reference is checked in `khi`.)

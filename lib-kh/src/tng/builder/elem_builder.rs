@@ -185,7 +185,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     // Like `eval`, but expands each vertex's remaining circles over their label assignments (the same
-    // pairing as `into_raw_complex`) — so it also works on an un-delooped complex (`skip_final_process`).
+    // pairing as `into_raw_complex`) — so it also works on an un-delooped complex (`skip_final_elim`).
     pub(crate) fn eval_with(&self, c: &TngComplex<R>, h: &R, t: &R) -> Vec<KhChain<R>> {
         self.elements.iter().map(|e| {
             let init = LcCob::from(e.in_cob().clone());

@@ -59,11 +59,12 @@ pub struct Args {
 
     // cap the per-elimination fill cost; survivors defer to the matrix reduction.
     #[arg(long)]
-    pub elim_max_cost: Option<usize>,
+    pub max_elim_cost: Option<usize>,
 
-    // take the strongly-invertible Whitehead double of the (mirrored) knot: clasp sign pos|neg.
-    #[arg(long, value_parser = parse_clasp)]
-    pub whitehead: Option<bool>,
+    // skip the final deloop/eliminate; remaining circles defer to into_raw_complex + the matrix
+    // reducer. For huge knots where the final cobordism deloop is the memory/time wall.
+    #[arg(long)]
+    pub skip_final_elim: bool,
 
     // chunking: `auto(k)` (cutwidth) or manual τ-symmetric edge-cut(s) `e,e,e;e,e,e`.
     #[arg(long, value_parser = parse_cut)]
@@ -124,11 +125,6 @@ where
         }
 
         let l = load_sinv_knot(&self.args.link, self.args.mirror)?;
-        let l = if let Some(positive) = self.args.whitehead {
-            l.whitehead_double(positive, 0)
-        } else {
-            l
-        };
 
         let config = SymBuildConfig {
             h_range: self.args.h_range.clone(), // open ends are clamped inside the build
@@ -136,7 +132,8 @@ where
             node_order: self.args.node_order,
             preprocess: !self.args.no_preprocess,
             cut: self.args.cut.clone().unwrap_or_default(),
-            elim_max_cost: self.args.elim_max_cost,
+            max_elim_cost: self.args.max_elim_cost,
+            skip_final_elim: self.args.skip_final_elim,
             ..Default::default()
         };
 

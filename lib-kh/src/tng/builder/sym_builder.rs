@@ -42,15 +42,15 @@ pub struct SymBuildConfig {
     pub cut: CutOption,
     // cone only: cap the per-elimination fill cost during cone_merge; survivors defer to the
     // matrix reduction (two-pass: cheap cobordism elim, then scalar F2[H] reduction). None = no cap.
-    pub elim_max_cost: Option<usize>,
+    pub max_elim_cost: Option<usize>,
     // skip the final deloop (the last merge and `finalize`): remaining circles defer to
     // `into_raw_complex`'s matrix-level expansion + the `ChainReducer`. See `should_deloop`.
-    pub skip_final_process: bool,
+    pub skip_final_elim: bool,
 }
 
 impl Default for SymBuildConfig {
     fn default() -> Self {
-        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, h_range: None, cut: CutOption::None, elim_max_cost: None, skip_final_process: false }
+        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, h_range: None, cut: CutOption::None, max_elim_cost: None, skip_final_elim: false }
     }
 }
 
@@ -323,10 +323,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     // Whether the automatic deloop runs. `false` for `BuildMode::None` and, under
-    // `skip_final_process`, once all nodes are merged — remaining circles then defer to `into_raw_complex`.
+    // `skip_final_elim`, once all nodes are merged — remaining circles then defer to `into_raw_complex`.
     pub(crate) fn should_deloop(&self) -> bool {
         self.config.mode.auto_deloop()
-            && !(self.config.skip_final_process && self.n_nodes() == 0)
+            && !(self.config.skip_final_elim && self.n_nodes() == 0)
     }
 
     pub(crate) fn merge(&mut self, c: TngComplex<R>, right_map: TauKeyMap, right_elements: Vec<TngComplexElem<R>>) {
@@ -592,10 +592,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         // `targets` counts only the pivots the cap will actually eliminate (equiv cost ≤ cap); the
         // rest defer to the matrix. The sparkline shows the whole eliminatable distribution.
-        let targets = self.config.elim_max_cost
+        let targets = self.config.max_elim_cost
             .map_or(keys.len(), |max| keys.iter().filter(|(_, c)| *c <= max).count());
         debug!("{} eliminate in C[{i}]: {}, targets: {}", self.current_step(), self.complex().rank(i), targets);
-        debug!("{}   fill: {}", self.current_step(), fill_cost_sparkline(&keys, self.config.elim_max_cost));
+        debug!("{}   fill: {}", self.current_step(), fill_cost_sparkline(&keys, self.config.max_elim_cost));
 
         let before = self.complex().rank(i) as isize;
 
@@ -606,7 +606,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         ) {
             // `pop_min_pivot` returns the cheapest pivot; once it exceeds the cap, so do all the
             // rest — stop and defer them (with the whole remaining frontier) to the matrix reduction.
-            if let Some(max) = self.config.elim_max_cost {
+            if let Some(max) = self.config.max_elim_cost {
                 let cost = self.equiv_elim_cost(&k);
                 if cost > max {
                     debug!("{}   deferred {} pivots to matrix (min cost 2^{} > cap {max})", self.current_step(), pool.len() + 1, cost.ilog2());
@@ -678,7 +678,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // Cheapest invertible in-/out-edge within the cost cap (over-cap pivots are left for the matrix
     // pass — gates greedy's inline elim too). The cap is compared against the equiv fill cost.
     fn choose_equiv_inv_edge_into(&self, k: &TngComplexKey) -> Option<&TngComplexKey> {
-        let cap = self.config.elim_max_cost;
+        let cap = self.config.max_elim_cost;
         self.complex().vertex(k).in_edges().filter_map(|j|
             self.is_equiv_inv_edge(j, k).then_some(j)
         )
@@ -687,7 +687,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn choose_equiv_inv_edge_from(&self, k: &TngComplexKey) -> Option<&TngComplexKey> {
-        let cap = self.config.elim_max_cost;
+        let cap = self.config.max_elim_cost;
         self.complex().vertex(k).out_edges().filter_map(|l|
             self.is_equiv_inv_edge(k, l).then_some(l)
         )
@@ -1214,13 +1214,13 @@ mod tests {
     }
 
     #[test]
-    fn skip_final_process_agrees() {
-        // skip_final_process must not change homology: into_raw_complex redoes the deferred deloop.
+    fn skip_final_elim_agrees() {
+        // skip_final_elim must not change homology: into_raw_complex redoes the deferred deloop.
         let l = InvLink::test_data("6_3");
         let (h, t) = (FF2::zero(), FF2::zero());
         let build = |skip| {
             let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
-            b.config.skip_final_process = skip;
+            b.config.skip_final_elim = skip;
             b.run().into_tng_complex().into_raw_complex()
         };
 

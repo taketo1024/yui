@@ -502,17 +502,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         info!("cone finalized: {}", self.cone.stat());
     }
 
-    // Skip the finalize deloop when the build is complete and closed under `skip_final_process`:
+    // Skip the finalize deloop when the build is complete and closed under `skip_final_elim`:
     // `into_raw_complex`/`eval_khi_elements` then expand the remaining circles at the matrix level.
     fn skip_finalize(&self) -> bool {
-        self.inner.config().skip_final_process
+        self.inner.config().skip_final_elim
             && self.inner.n_nodes() == 0
             && self.cone.complex().is_closed()
     }
 
     // Deloop the whole cone one degree at a time, eliminating inline: a degree is eliminated once
     // its upper neighbor is delooped, so the delooped transient never spans more than the current
-    // frontier. `eliminate_in` is capped by `elim_max_cost` — cheap pivots cascade here, heavy ones
+    // frontier. `eliminate_in` is capped by `max_elim_cost` — cheap pivots cascade here, heavy ones
     // survive to the matrix reduction. Called twice: non-based circles, then the based one.
     fn deloop_all(&mut self, based: bool) {
         debug!("cone deloop-all (based: {based})...");
@@ -546,7 +546,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 // Config for the cone's own `TngComplexBuilder`, which drives deloop/eliminate on the coned complex:
 // the simplify `mode` and the elimination fill-cost cap carry over from the sym config.
 fn cone_build_config(config: &SymBuildConfig) -> BuildConfig {
-    BuildConfig { mode: config.mode, elim_max_cost: config.elim_max_cost, ..Default::default() }
+    BuildConfig { mode: config.mode, max_elim_cost: config.max_elim_cost, ..Default::default() }
 }
 
 // An empty cone shell: same `deg_shift`/base point, one extra h-degree for the cone bit.
@@ -607,26 +607,26 @@ mod tests {
         h.support().map(|&i| (i, h[i].rank())).filter(|(_, r)| *r > 0).sorted().collect()
     }
 
-    // skip_final_process defers the finalize deloop to into_raw_complex — the cone homology must
+    // skip_final_elim defers the finalize deloop to into_raw_complex — the cone homology must
     // not change (whole and chunked).
-    fn check_skip_final_process(l: &InvLink) {
+    fn check_skip_final_elim(l: &InvLink) {
         for reduced in [false, true] {
             for cut in [CutOption::None, CutOption::Auto(2)] {
                 let full = cone_homology(l, reduced, SymBuildConfig { cut: cut.clone(), ..Default::default() });
-                let skipped = cone_homology(l, reduced, SymBuildConfig { cut: cut.clone(), skip_final_process: true, ..Default::default() });
+                let skipped = cone_homology(l, reduced, SymBuildConfig { cut: cut.clone(), skip_final_elim: true, ..Default::default() });
                 assert_eq!(full, skipped, "reduced={reduced}, cut={cut:?}");
             }
         }
     }
 
     #[test]
-    fn cone_skip_final_process_3_1() {
-        check_skip_final_process(&InvLink::test_data("3_1"));
+    fn cone_skip_final_elim_3_1() {
+        check_skip_final_elim(&InvLink::test_data("3_1"));
     }
 
     #[test]
-    fn cone_skip_final_process_6_3() {
-        check_skip_final_process(&InvLink::test_data("6_3"));
+    fn cone_skip_final_elim_6_3() {
+        check_skip_final_elim(&InvLink::test_data("6_3"));
     }
 
     // The cone homology must not depend on the chunking: whole == chunked, reduced and unreduced.
@@ -674,7 +674,7 @@ mod tests {
         for reduced in [false, true] {
             let full = cone_homology(l, reduced, SymBuildConfig { ..Default::default() });
             for cap in [Some(0), Some(4)] {
-                let capped = cone_homology(l, reduced, SymBuildConfig { elim_max_cost: cap, ..Default::default() });
+                let capped = cone_homology(l, reduced, SymBuildConfig { max_elim_cost: cap, ..Default::default() });
                 assert_eq!(full, capped, "reduced={reduced}, cap={cap:?}");
             }
         }
@@ -690,7 +690,7 @@ mod tests {
         let l = InvLink::test_data("6_3");
         for reduced in [false, true] {
             let full = cone_homology(&l, reduced, SymBuildConfig { cut: CutOption::Auto(3), ..Default::default() });
-            let capped = cone_homology(&l, reduced, SymBuildConfig { cut: CutOption::Auto(3), elim_max_cost: Some(0), ..Default::default() });
+            let capped = cone_homology(&l, reduced, SymBuildConfig { cut: CutOption::Auto(3), max_elim_cost: Some(0), ..Default::default() });
             assert_eq!(full, capped, "reduced={reduced}");
         }
     }

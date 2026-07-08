@@ -89,15 +89,15 @@ pub struct BuildConfig {
     pub h_range: Option<RangeInclusive<isize>>,
     // skip eliminations whose fill cost (`edge_weight` = Schur block size) exceeds this; the
     // survivors defer to the matrix reduction. `None` = eliminate everything (current behavior).
-    pub elim_max_cost: Option<usize>,
+    pub max_elim_cost: Option<usize>,
     // skip the final deloop (the last merge and `finalize`): remaining circles are deferred to
     // `into_raw_complex`'s matrix-level expansion + the `ChainReducer`. See `should_deloop`.
-    pub skip_final_process: bool,
+    pub skip_final_elim: bool,
 }
 
 impl Default for BuildConfig {
     fn default() -> Self {
-        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), cut: CutOption::None, h_range: None, elim_max_cost: None, skip_final_process: false }
+        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), cut: CutOption::None, h_range: None, max_elim_cost: None, skip_final_elim: false }
     }
 }
 
@@ -286,10 +286,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     // Whether the automatic deloop runs. `false` for `BuildMode::None` and, under
-    // `skip_final_process`, once all nodes are merged — remaining circles then defer to `into_raw_complex`.
+    // `skip_final_elim`, once all nodes are merged — remaining circles then defer to `into_raw_complex`.
     pub(crate) fn should_deloop(&self) -> bool {
         self.config.mode.auto_deloop()
-            && !(self.config.skip_final_process && self.n_nodes() == 0)
+            && !(self.config.skip_final_elim && self.n_nodes() == 0)
     }
 
     pub fn merge(&mut self, other: TngComplex<R>, other_elements: Vec<TngComplexElem<R>>) {
@@ -472,10 +472,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         // `targets` counts only the pivots the cap will actually eliminate (cost ≤ cap); the rest
         // defer to the matrix. The sparkline shows the *whole* eliminatable distribution for context.
-        let targets = self.config.elim_max_cost
+        let targets = self.config.max_elim_cost
             .map_or(keys.len(), |max| keys.iter().filter(|(_, c)| *c <= max).count());
         debug!("{} eliminate in C[{i}]: {}, targets: {}", self.current_step(), self.complex.rank(i), targets);
-        debug!("{}   fill: {}", self.current_step(), fill_cost_sparkline(&keys, self.config.elim_max_cost));
+        debug!("{}   fill: {}", self.current_step(), fill_cost_sparkline(&keys, self.config.max_elim_cost));
 
         let before = self.complex.rank(i) as isize;
 
@@ -486,7 +486,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         ) {
             // `pop_min_pivot` returns the cheapest pivot; once it exceeds the cap, so do all the
             // rest — stop and defer them (with the whole remaining frontier) to the matrix reduction.
-            if let Some(max) = self.config.elim_max_cost {
+            if let Some(max) = self.config.max_elim_cost {
                 let cost = self.complex.elim_cost(&k);
                 if cost > max {
                     debug!("{}   deferred {} pivots to matrix (min cost 2^{} > cap {max})", self.current_step(), pool.len() + 1, cost.ilog2());
@@ -534,7 +534,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // Cheapest invertible in-/out-edge within the cost cap (over-cap pivots are left for the matrix
     // pass — this is what gates greedy's inline elim as well as the `eliminate_in` sweep).
     fn choose_inv_edge_into(&self, k: &TngComplexKey) -> Option<&TngComplexKey> {
-        let cap = self.config.elim_max_cost;
+        let cap = self.config.max_elim_cost;
         self.complex.vertex(k).in_edges().filter_map(|j|
             self.complex.edge(j, k).is_invertible().then_some(j)
         )
@@ -543,7 +543,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn choose_inv_edge_from(&self, k: &TngComplexKey) -> Option<&TngComplexKey> {
-        let cap = self.config.elim_max_cost;
+        let cap = self.config.max_elim_cost;
         self.complex.vertex(k).out_edges().filter_map(|l|
             self.complex.edge(k, l).is_invertible().then_some(l)
         )
@@ -599,7 +599,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn eval_elements(&self) -> Vec<KhChain<R>> {
         let (h, t) = self.complex.ht();
-        // an un-delooped complex (`skip_final_process`) needs the circle-expanding eval.
+        // an un-delooped complex (`skip_final_elim`) needs the circle-expanding eval.
         if self.complex.is_completely_delooped() {
             self.elements.eval(h, t)
         } else {
@@ -876,11 +876,11 @@ mod tests {
     }
 
     #[test]
-    fn test_skip_final_process_agrees() {
-        // skip_final_process must not change homology: the deferred deloop is redone by into_raw_complex.
+    fn test_skip_final_elim_agrees() {
+        // skip_final_elim must not change homology: the deferred deloop is redone by into_raw_complex.
         let l = Link::test_data("8_19");
         let build = |skip| {
-            let config = BuildConfig { skip_final_process: skip, ..Default::default() };
+            let config = BuildConfig { skip_final_elim: skip, ..Default::default() };
             TngComplexBuilder::from_link(&l, &0, &0, false).with_config(config).run()
                 .into_tng_complex().into_raw_complex()
         };

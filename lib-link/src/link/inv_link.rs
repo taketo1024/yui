@@ -135,6 +135,19 @@ impl InvLink {
         &self.inner
     }
 
+    /// The symmetric PD code — the inner diagram's PD, with edges numbered so the strong inversion is
+    /// the standard `e ↦ (n+1-e)%n+1`. Feeding this to `from_symmetric_pd_code` (or the `ykh` CLI)
+    /// reconstructs the same `InvLink`. The builders (`from_symmetric_pd_code`, `conn_sum`,
+    /// `whitehead_double`) already reindex to this involution, so an arbitrary `e_map` is rejected.
+    pub fn pd_code(&self) -> Vec<PDCodeX> {
+        let n = self.inner.n_edges() as Edge;
+        assert!(
+            self.inner.edges().into_iter().all(|e| self.inv_edge(e) == (n + 1 - e) % n + 1),
+            "pd_code requires the standard involution `e ↦ (n+1-e)%n+1`; reindex the InvLink first"
+        );
+        self.inner.pd_code()
+    }
+
     // delegate methods from Link
 
     delegate! {
@@ -207,6 +220,18 @@ mod tests {
         let n = r.n_edges() as Edge;
         let e_map: Vec<_> = r.edges().into_iter().map(|e| (e, (n + 1 - e) % n + 1)).collect();
         InvLink::new(r, e_map);  // panics if the involution is invalid
+    }
+
+    #[test]
+    fn pd_code_roundtrip() {
+        // 5_1 as a symmetric PD (standard involution by construction); emit + reparse must recover
+        // the same diagram and the same strong inversion.
+        let l = InvLink::from_symmetric_pd_code([[1,7,2,6],[3,9,4,8],[5,1,6,10],[7,3,8,2],[9,5,10,4]]);
+        let l2 = InvLink::from_symmetric_pd_code(l.pd_code());
+        assert_eq!(l.pd_code(), l2.pd_code());
+        for e in l.inner().edges() {
+            assert_eq!(l.inv_edge(e), l2.inv_edge(e), "involution differs at edge {e}");
+        }
     }
 
     #[test]

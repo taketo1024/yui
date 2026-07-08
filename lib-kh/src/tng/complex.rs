@@ -781,7 +781,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         q_deg: impl Fn(&X) -> isize,
     ) -> ChainComplex1<X, R>
     where X: LcKey {
-        let c = self;
+        let mut c = self;
         assert!(c.is_closed(), "into_raw_complex requires a closed complex (only circles expand into generators)");
         let (h, t) = c.ht().clone();
 
@@ -827,6 +827,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             debug!("  raw d[{i}]: {} -> {}, nnz: {}", cols.len(), rows.len(), entries.len());
             let m = SpMat::from_entries((rows.len(), cols.len()), entries);
+
+            // degree i is now fully consumed (target of d[i-1], source of d[i]); raw-drop its
+            // vertices + their cobordism edges so peak memory holds at most two adjacent degrees.
+            for (k, _) in cols {
+                c.vertices.remove(k);
+            }
+
             (i, m)
         }).collect_vec();
 

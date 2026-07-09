@@ -311,3 +311,48 @@ Observations:
 | `10_144` | `(-2, 0)` **nonzero** | 24 | 0.5 s |
 | `10_145` | `(0, 0)` | 24 | 0.5 s |
 | `10_146` | `(0, 0)` | 28 | 4.0 s |
+
+## Experiment 3: the Dai–Mallick–Taniguchi fractions (`q² ≡ 1`)
+
+For 2-bridge knots `b(p,q)` with `q² ≡ 1 (mod p)` the two strong-inversion
+classes come from *different* constructions: the horizontal Fig-5 four-plat
+(`τ_h`, the `a`-files) and the vertical Fig-6 four-plat of the palindromic
+odd-length positive continued fraction (`τ_v`, the `b`-files; axis through the
+odd middle box, whose central crossing lies ON the axis).
+
+Dai–Mallick–Taniguchi (arXiv:2606.05819, §8.3) single out the `(p,q)` with
+`p, q < 200` whose instanton `τ₁`-action swaps two irreducible generators
+carrying `δ₁`-arrows to the reducible:
+`45/26, 55/34, 91/64, 95/56, 105/64, 105/76, 153/118, 171/134`
+(found via Daemi–Scaduto's congruence count). For `K(45,26) = 9_23` they prove
+the two inversions are distinct up to local equivalence, whence
+`(9_23 # −9_23, τ₀ # −τ₁)` bounds a new family of corks; the other seven are
+open even for them.
+
+Here `ssi((K, τ_h) # (−K, −τ_v))` was computed for all eight (plus the four
+smaller `q² ≡ 1` knots), with the same fast configuration as Experiment 2.
+Both constituent diagrams are Kh-verified (named knots against KnotInfo;
+the larger fractions by horizontal-vs-vertical agreement) and
+chirality-aligned before summing.
+
+Result: **all zero.**
+
+| knot | fraction | palindromic CF | `ssi(h # -v)` | crossings | time |
+|---|---|---|---|---|---|
+| `7_4` | `15/4` | `C[3,1,3]` | `(0, 0)` | 15 | 0.0 s |
+| `7_7` | `21/8` | `C[2,1,1,1,2]` | `(0, 0)` | 15 | 0.0 s |
+| `9_10` | `33/10` | `C[3,3,3]` | `(0, 0)` | 21 | 0.3 s |
+| `9_17` | `39/14` | `C[2,1,3,1,2]` | `(0, 0)` | 21 | 0.4 s |
+| `9_23` | `45/26` | `C[2,2,1,2,2]` | `(0, 0)` | 21 | 0.4 s |
+| `9_31` | `55/34` | `C[2,1,1,1,1,1,2]` | `(0, 0)` | 21 | 1.0 s |
+| `91/64` | `91/64` | `C[3,2,1,2,3]` | `(0, 0)` | 27 | 15.0 s |
+| `95/56` | `95/56` | `C[2,2,3,2,2]` | `(0, 0)` | 27 | 15.5 s |
+| `105/64` | `105/64` | `C[2,1,1,3,1,1,2]` | `(0, 0)` | 27 | 17.2 s |
+| `105/76` | `105/76` | `C[3,1,1,1,1,1,3]` | `(0, 0)` | 27 | 17.6 s |
+| `153/118` | `153/118` | `C[4,2,1,2,4]` | `(0, 0)` | 33 | 259.8 s |
+| `171/134` | `171/134` | `C[4,1,1,1,1,1,4]` | `(0, 0)` | 33 | 215.5 s |
+
+Interpretation: `ssi` does not obstruct equivariant sliceness for any of the
+DMT pairs — in particular the instanton-detected `9_23`-cork is invisible to
+`ssi`, in contrast to Hayden's `9_46`-corks where `ssi ≠ 0` is the detector.
+The two cork-detection mechanisms are independent.

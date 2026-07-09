@@ -117,12 +117,14 @@ the same caveat.
     representative among `{q, q⁻¹ mod p}`, `b` = the other. For amphichiral
     2-bridge knots (`q² ≡ -1`), `b` is the mirror image of `a`'s diagram
     (mirroring swaps the two classes). For the six knots with `q² ≡ 1`
-    (`7_4, 7_7, 9_10, 9_17, 9_23, 9_31`) only `a` exists here — the second
-    class needs Lamm's vertical (Fig. 6) construction, not yet implemented.
+    (`7_4, 7_7, 9_10, 9_17, 9_23, 9_31`) the single fraction gives only one
+    class; `b` comes from Lamm's vertical (Fig. 6) construction — the 4-plat
+    of the palindromic odd-length positive continued fraction, drawn
+    vertically with the axis through the middle box.
 
 These `a`/`b` labels follow the conventions above; they are **not** aligned
 with the labels of Lobb–Watson §6.5 (used in `resources/inv_link/`).
 
 Not yet included: `10_22` and `10_35` (2-bridge, both `b(49,·)`) — the pair is
 Kh-identical, so assigning the right name to each fraction needs KnotInfo's
-2-bridge notation; and the `b`-classes of the six `q² ≡ 1` knots (Fig. 6).
+2-bridge notation.

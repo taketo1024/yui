@@ -13,6 +13,7 @@ use log::info;
 
 use yui_core::{EucRing, EucRingOps};
 use yui_homology::algo::{ChainReducer, HomologyCalc};
+use yui_homology::utils::rmod_str;
 use yui_matrix::MatTrait;
 use yui_matrix::sparse::SpMat;
 use yui_link::{InvLink, Link};
@@ -87,16 +88,16 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         let d1 = red.matrix(h).expect("d[h] must be set").clone();
         // below the clamped window bottom there is no incoming differential.
         let d0 = red.matrix(h - 1).cloned().unwrap_or_else(|| SpMat::zero((d1.n_cols(), 0)));
-        let (rank, _, tr) = HomologyCalc::calculate(d0, d1, true);
+        let (rank, tors, tr) = HomologyCalc::calculate(d0, d1, true);
         let tr = tr.unwrap();
 
         assert_eq!(rank, r);
-        info!("KhI[{h}]: rank {rank}");
+        info!("KhI[{h}] ≅ {}", rmod_str(rank, &tors));
 
-        red.vecs(h).expect("transported vecs at canon degree").iter().map(|v| {
-            let w = tr.forward(v);
-            info!("a in KhI[{h}]: ({})", w.clone().into_dense().iter().join(","));
-            div_vec(&w.subvec(0..r), c).expect("invalid divisibility.")
+        red.vecs(h).expect("transported vecs at canon degree").iter().enumerate().map(|(i, v)| {
+            let w = tr.forward(v).subvec(0..r);
+            info!("a[{i}] in KhI[{h}]: ({})", w.clone().into_dense().iter().join(", "));
+            div_vec(&w, c).expect("invalid divisibility.")
         }).collect_vec()
     });
 

@@ -168,25 +168,17 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }))
 }
 
-// Recorded elementary operations, replayed to build the trans matrices.
-// `Left([a,b,c,d], i, j)`: rows (i, j) ← (a·rᵢ + b·rⱼ, c·rᵢ + d·rⱼ), det = 1.
-// `Right([a,b,c,d], i, j)`: cols (i, j) ← (a·cᵢ + b·cⱼ, c·cᵢ + d·cⱼ), det = 1.
-enum Op<R> {
-    SwapRows(usize, usize),
-    SwapCols(usize, usize),
-    MulRow(usize, R),
-    MulCol(usize, R),
-    Left([R; 4], usize, usize),
-    Right([R; 4], usize, usize),
-}
-
 struct SpSnfCalc<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     shape: (usize, usize),
     rows: Vec<FxHashMap<usize, R>>,  // row -> (col -> value)
     cols: Vec<FxHashSet<usize>>,     // col -> rows with a non-zero entry
-    ops: Vec<Op<R>>,
-    flags: SnfFlags,
+    // trans matrices, updated in realtime like the dense SnfCalc:
+    // p / qinv accumulate row-wise, pinv / q column-wise.
+    p:    Option<VecStore<R>>,
+    pinv: Option<VecStore<R>>,
+    q:    Option<VecStore<R>>,
+    qinv: Option<VecStore<R>>,
     rank: usize,
 }
 
@@ -202,12 +194,18 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
             cols[j].insert(i);
         }
 
-        Self { shape: (m, n), rows, cols, ops: Vec::new(), flags, rank: 0 }
+        let [fp, fpinv, fq, fqinv] = flags;
+        let p    = fp.then(|| VecStore::id(m));
+        let pinv = fpinv.then(|| VecStore::id(m));
+        let q    = fq.then(|| VecStore::id(n));
+        let qinv = fqinv.then(|| VecStore::id(n));
+
+        Self { shape: (m, n), rows, cols, p, pinv, q, qinv, rank: 0 }
     }
 
     fn process(&mut self) {
         self.eliminate_all();
-        debug!("  snf eliminate done: rank {}, ops {}; normalize..", self.rank, self.ops.len());
+        debug!("  snf eliminate done: rank {}; normalize..", self.rank);
         self.diag_normalize();
     }
 
@@ -216,7 +214,11 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         let result = SpMat::from_entries(self.shape, self.rows.iter().enumerate().flat_map(|(i, row)|
             row.iter().map(move |(&j, v)| (i, j, v.clone()))
         ));
-        let [p, pinv, q, qinv] = self.make_trans();
+        let (m, n) = self.shape;
+        let p    = self.p.map(|s| s.into_spmat_rows(m));
+        let pinv = self.pinv.map(|s| s.into_spmat_cols(m));
+        let q    = self.q.map(|s| s.into_spmat_cols(n));
+        let qinv = self.qinv.map(|s| s.into_spmat_rows(n));
         SpSnf { result, diag, p, pinv, q, qinv }
     }
 
@@ -232,7 +234,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
                 i += 1;
                 if i % 100_000 == 0 {
                     let nnz: usize = self.rows.iter().map(|r| r.len()).sum();
-                    debug!("  snf progress: {i} pivots ({j}/{n} cols), nnz {nnz}, ops {}", self.ops.len());
+                    debug!("  snf progress: {i} pivots ({j}/{n} cols), nnz {nnz}");
                 }
             }
         }
@@ -421,14 +423,10 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         false
     }
 
-    // ---- primitive operations (matrix + op log) ----
+    // ---- primitive operations (matrix + realtime trans) ----
 
     fn entry(&self, i: usize, j: usize) -> Option<&R> {
         self.rows[i].get(&j)
-    }
-
-    fn record(&self) -> bool {
-        self.flags.iter().any(|&b| b)
     }
 
     fn swap_rows(&mut self, i: usize, j: usize) {
@@ -445,9 +443,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
                 col.insert(i);
             }
         }
-        if self.record() {
-            self.ops.push(Op::SwapRows(i, j));
-        }
+        if let Some(p) = &mut self.p { p.swap(i, j); }
+        if let Some(pinv) = &mut self.pinv { pinv.swap(i, j); }
     }
 
     fn swap_cols(&mut self, i: usize, j: usize) {
@@ -459,9 +456,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
             if let Some(v) = vi { self.rows[r].insert(j, v); }
         }
         self.cols.swap(i, j);
-        if self.record() {
-            self.ops.push(Op::SwapCols(i, j));
-        }
+        if let Some(q) = &mut self.q { q.swap(i, j); }
+        if let Some(qinv) = &mut self.qinv { qinv.swap(i, j); }
     }
 
     fn mul_row(&mut self, i: usize, u: &R) {
@@ -469,9 +465,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         for (_, v) in self.rows[i].iter_mut() {
             *v = &*v * u;
         }
-        if self.record() {
-            self.ops.push(Op::MulRow(i, u.clone()));
-        }
+        if let Some(p) = &mut self.p { p.scale(i, u); }
+        if let Some(pinv) = &mut self.pinv { pinv.scale(i, &u.inv().unwrap()); }
     }
 
     fn mul_col(&mut self, j: usize, u: &R) {
@@ -481,9 +476,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
             let v = self.rows[r].get_mut(&j).unwrap();
             *v = &*v * u;
         }
-        if self.record() {
-            self.ops.push(Op::MulCol(j, u.clone()));
-        }
+        if let Some(q) = &mut self.q { q.scale(j, u); }
+        if let Some(qinv) = &mut self.qinv { qinv.scale(j, &u.inv().unwrap()); }
     }
 
     // rows (i, j) ← (a·rᵢ + b·rⱼ, c·rᵢ + d·rⱼ), det = 1.
@@ -509,9 +503,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         self.rows[i] = ni;
         self.rows[j] = nj;
 
-        if self.record() {
-            self.ops.push(Op::Left(comps, i, j));
-        }
+        if let Some(p) = &mut self.p { p.combine(&comps, i, j); }
+        if let Some(pinv) = &mut self.pinv { pinv.combine(&inv_comps(&comps), i, j); }
     }
 
     // cols (i, j) ← (a·cᵢ + b·cⱼ, c·cᵢ + d·cⱼ), det = 1.
@@ -530,66 +523,17 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
             if vj.is_zero() { self.cols[j].remove(&r); } else { self.cols[j].insert(r); self.rows[r].insert(j, vj); }
         }
 
-        if self.record() {
-            self.ops.push(Op::Right(comps, i, j));
-        }
+        if let Some(q) = &mut self.q { q.combine(&comps, i, j); }
+        if let Some(qinv) = &mut self.qinv { qinv.combine(&inv_comps(&comps), i, j); }
     }
 
-    // ---- trans materialization ----
+}
 
-    // Replays the op log over sparse identities:
-    //   p, qinv accumulate row-wise; pinv, q accumulate column-wise.
-    // Inverse of an elementary [a,b;c,d] (det 1) is [d,-b;-c,a], which as a
-    // combine on the opposite side takes comps [d, -c, -b, a].
-    fn make_trans(&self) -> [Option<SpMat<R>>; 4] {
-        let (m, n) = self.shape;
-        let [fp, fpinv, fq, fqinv] = self.flags;
-
-        let mut p    = fp.then(|| VecStore::id(m));
-        let mut pinv = fpinv.then(|| VecStore::id(m));
-        let mut q    = fq.then(|| VecStore::id(n));
-        let mut qinv = fqinv.then(|| VecStore::id(n));
-
-        let inv = |[a, b, c, d]: &[R; 4]| -> [R; 4] {
-            [d.clone(), -c, -b, a.clone()]
-        };
-
-        for op in &self.ops {
-            match op {
-                Op::SwapRows(i, j) => {
-                    if let Some(p) = &mut p { p.swap(*i, *j); }
-                    if let Some(pinv) = &mut pinv { pinv.swap(*i, *j); }
-                }
-                Op::SwapCols(i, j) => {
-                    if let Some(q) = &mut q { q.swap(*i, *j); }
-                    if let Some(qinv) = &mut qinv { qinv.swap(*i, *j); }
-                }
-                Op::MulRow(i, u) => {
-                    if let Some(p) = &mut p { p.scale(*i, u); }
-                    if let Some(pinv) = &mut pinv { pinv.scale(*i, &u.inv().unwrap()); }
-                }
-                Op::MulCol(j, u) => {
-                    if let Some(q) = &mut q { q.scale(*j, u); }
-                    if let Some(qinv) = &mut qinv { qinv.scale(*j, &u.inv().unwrap()); }
-                }
-                Op::Left(comps, i, j) => {
-                    if let Some(p) = &mut p { p.combine(comps, *i, *j); }
-                    if let Some(pinv) = &mut pinv { pinv.combine(&inv(comps), *i, *j); }
-                }
-                Op::Right(comps, i, j) => {
-                    if let Some(q) = &mut q { q.combine(comps, *i, *j); }
-                    if let Some(qinv) = &mut qinv { qinv.combine(&inv(comps), *i, *j); }
-                }
-            }
-        }
-
-        [
-            p.map(|s| s.into_spmat_rows(m)),
-            pinv.map(|s| s.into_spmat_cols(m)),
-            q.map(|s| s.into_spmat_cols(n)),
-            qinv.map(|s| s.into_spmat_rows(n)),
-        ]
-    }
+// Inverse of an elementary [a,b;c,d] (det 1) is [d,-b;-c,a], which as a
+// combine on the opposite side takes comps [d, -c, -b, a].
+fn inv_comps<R>([a, b, c, d]: &[R; 4]) -> [R; 4]
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    [d.clone(), -c, -b, a.clone()]
 }
 
 // x/d is kept as the Bezout coefficient shortcut when it is a unit:

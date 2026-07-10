@@ -56,11 +56,30 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 }
 
+/// Below this core area (non-zero rows × non-zero cols), the matrix is
+/// compacted by permutation and passed to the dense SNF instead.
+const DENSE_SNF_MAX_AREA: usize = 65536; // 256 × 256
+
 /// Computes the sparse SNF of `a`, producing the transformation matrices
 /// selected by `flags = [p, pinv, q, qinv]`.
+///
+/// Small inputs take a fast pass: permute the non-zero core to the front and
+/// run [`crate::dense::snf`] on it; large ones are eliminated sparsely.
 pub fn sp_snf<R>(a: &SpMat<R>, flags: SnfFlags) -> SpSnf<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    debug!("start sparse snf: {:?}, nnz: {}, flags: {:?}", a.shape(), a.iter_nz().count(), flags);
+    sp_snf_with(a, flags, DENSE_SNF_MAX_AREA)
+}
+
+fn sp_snf_with<R>(a: &SpMat<R>, flags: SnfFlags, dense_max_area: usize) -> SpSnf<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    let (row_idx, col_idx) = nz_indices(a);
+    let (m0, n0) = (row_idx.len(), col_idx.len());
+
+    debug!("start sparse snf: {:?}, nnz: {}, core: {m0}x{n0}, flags: {:?}", a.shape(), a.iter_nz().count(), flags);
+
+    if m0 * n0 <= dense_max_area {
+        return dense_snf_in(a, flags, row_idx, col_idx);
+    }
 
     let mut calc = SpSnfCalc::new(a, flags);
     calc.process();
@@ -68,6 +87,85 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     debug!("sparse snf done, rank: {}", calc.rank);
 
     calc.into_result()
+}
+
+// Sorted non-zero row / col indices of `a`.
+fn nz_indices<R>(a: &SpMat<R>) -> (Vec<usize>, Vec<usize>)
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    let mut rows = vec![false; a.n_rows()];
+    let mut cols = vec![false; a.n_cols()];
+    for (i, j, _) in a.iter_nz() {
+        rows[i] = true;
+        cols[j] = true;
+    }
+    let row_idx = rows.iter().enumerate().filter_map(|(i, &b)| b.then_some(i)).collect();
+    let col_idx = cols.iter().enumerate().filter_map(|(j, &b)| b.then_some(j)).collect();
+    (row_idx, col_idx)
+}
+
+// Fast pass: gather the non-zero core `a[row_idx, col_idx]` to the front,
+// run the dense SNF on it, and lift. With `R`/`C` the gathering permutations,
+// `R·a·C = [[core, 0], [0, 0]]`, so
+// `p = diag(p_d, I)·R`, `q = C·diag(q_d, I)`, and inverses transposed-fashion.
+fn dense_snf_in<R>(a: &SpMat<R>, flags: SnfFlags, row_idx: Vec<usize>, col_idx: Vec<usize>) -> SpSnf<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    use crate::dense::Mat;
+    use crate::dense::snf::snf_in_place;
+
+    let (m, n) = a.shape();
+    let (m0, n0) = (row_idx.len(), col_idx.len());
+
+    debug!("  snf fast-pass: dense on {m0}x{n0} core");
+
+    let row_pos: FxHashMap<usize, usize> = row_idx.iter().enumerate().map(|(k, &i)| (i, k)).collect();
+    let col_pos: FxHashMap<usize, usize> = col_idx.iter().enumerate().map(|(k, &j)| (j, k)).collect();
+
+    let mut core = Mat::zero((m0, n0));
+    for (i, j, v) in a.iter_nz() {
+        core[(row_pos[&i], col_pos[&j])] = v.clone();
+    }
+
+    let s = snf_in_place(core, flags);
+    let rank = s.rank();
+    let (res_d, [p_d, pinv_d, q_d, qinv_d]) = s.destruct();
+
+    let diag: Vec<R> = (0..rank).map(|i| res_d[(i, i)].clone()).collect();
+    let result = SpMat::from_entries((m, n), diag.iter().enumerate().map(|(i, v)| (i, i, v.clone())));
+
+    let rest_rows = || (0..m).filter(|i| !row_pos.contains_key(i));
+    let rest_cols = || (0..n).filter(|j| !col_pos.contains_key(j));
+
+    // p[k, row_idx[l]] = p_d[k, l];  p[m0+t, rest_row_t] = 1
+    let p = p_d.map(|p_d| SpMat::from_entries((m, m),
+        dense_nz(&p_d).map(|(k, l, v)| (k, row_idx[l], v))
+            .chain(rest_rows().enumerate().map(|(t, i)| (m0 + t, i, R::one())))
+    ));
+    // pinv[row_idx[k], l] = pinv_d[k, l];  pinv[rest_row_t, m0+t] = 1
+    let pinv = pinv_d.map(|pinv_d| SpMat::from_entries((m, m),
+        dense_nz(&pinv_d).map(|(k, l, v)| (row_idx[k], l, v))
+            .chain(rest_rows().enumerate().map(|(t, i)| (i, m0 + t, R::one())))
+    ));
+    // q[col_idx[k], l] = q_d[k, l];  q[rest_col_t, n0+t] = 1
+    let q = q_d.map(|q_d| SpMat::from_entries((n, n),
+        dense_nz(&q_d).map(|(k, l, v)| (col_idx[k], l, v))
+            .chain(rest_cols().enumerate().map(|(t, j)| (j, n0 + t, R::one())))
+    ));
+    // qinv[k, col_idx[l]] = qinv_d[k, l];  qinv[n0+t, rest_col_t] = 1
+    let qinv = qinv_d.map(|qinv_d| SpMat::from_entries((n, n),
+        dense_nz(&qinv_d).map(|(k, l, v)| (k, col_idx[l], v))
+            .chain(rest_cols().enumerate().map(|(t, j)| (n0 + t, j, R::one())))
+    ));
+
+    SpSnf { result, diag, p, pinv, q, qinv }
+}
+
+fn dense_nz<R>(a: &crate::dense::Mat<R>) -> impl Iterator<Item = (usize, usize, R)> + '_
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    let (m, n) = a.shape();
+    (0..m).flat_map(move |i| (0..n).filter_map(move |j| {
+        let v = &a[(i, j)];
+        (!v.is_zero()).then(|| (i, j, v.clone()))
+    }))
 }
 
 // Recorded elementary operations, replayed to build the trans matrices.
@@ -535,37 +633,42 @@ mod tests {
     use yui_core::poly::Poly;
     use crate::dense::snf::snf;
 
+    // exercises both routes: 0 forces the sparse elimination, MAX the dense fast-pass.
     fn check_snf<R>(a: &SpMat<R>)
     where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-        let s = sp_snf(a, [true; 4]);
-        let res = s.result();
+        for max in [0, usize::MAX] {
+            let s = sp_snf_with(a, [true; 4], max);
+            let res = s.result();
 
-        // diagonal shape
-        for (i, j, v) in res.iter_nz() {
-            assert!(i == j || v.is_zero(), "non-diagonal entry at ({i}, {j})");
+            // diagonal shape
+            for (i, j, v) in res.iter_nz() {
+                assert!(i == j || v.is_zero(), "non-diagonal entry at ({i}, {j}) (max: {max})");
+            }
+
+            // divisor chain
+            let fs = s.factors();
+            for w in fs.windows(2) {
+                assert!(w[0].divides(w[1]), "{} does not divide {} (max: {max})", w[0], w[1]);
+            }
+
+            // p * a * q = result, pinv * result * qinv = a
+            let (p, pinv, q, qinv) = (s.p().unwrap(), s.pinv().unwrap(), s.q().unwrap(), s.qinv().unwrap());
+            assert_eq!(&(&(p * a) * q), res, "p*a*q != result (max: {max})");
+            assert_eq!(&(&(pinv * res) * qinv), a, "pinv*result*qinv != a (max: {max})");
         }
-
-        // divisor chain
-        let fs = s.factors();
-        for w in fs.windows(2) {
-            assert!(w[0].divides(w[1]), "{} does not divide {}", w[0], w[1]);
-        }
-
-        // p * a * q = result, pinv * result * qinv = a
-        let (p, pinv, q, qinv) = (s.p().unwrap(), s.pinv().unwrap(), s.q().unwrap(), s.qinv().unwrap());
-        assert_eq!(&(&(p * a) * q), res, "p*a*q != result");
-        assert_eq!(&(&(pinv * res) * qinv), a, "pinv*result*qinv != a");
     }
 
     fn check_against_dense<R>(a: &SpMat<R>)
     where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         check_snf(a);
 
-        let s = sp_snf(a, [false; 4]);
         let d = snf(&a.clone().into_dense(), [false; 4]);
-        let sf: Vec<&R> = s.factors();
         let df: Vec<&R> = d.factors();
-        assert_eq!(sf, df, "factors differ from dense snf");
+        for max in [0, usize::MAX] {
+            let s = sp_snf_with(a, [false; 4], max);
+            let sf: Vec<&R> = s.factors();
+            assert_eq!(sf, df, "factors differ from dense snf (max: {max})");
+        }
     }
 
     #[test]

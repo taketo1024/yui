@@ -979,7 +979,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let base_pt = self.builder.inner.complex().base_pt();
 
         // No per-chunk h_range: it would under-cover preprocess's off-axis key_map. Applied at the merge.
-        let config = SymBuildConfig { cut: CutOption::None, node_order: NodeOrder::MinCut, h_range: None, ..self.builder.config.clone() };
+        // No skip_final_elim either: "final" means root-final — a chunk must deloop before the cross-chunk merge.
+        let config = SymBuildConfig { cut: CutOption::None, node_order: NodeOrder::MinCut, h_range: None, skip_final_elim: false, ..self.builder.config.clone() };
 
         let mut inner = TngComplexBuilder::init(h, t, (0, 0), base_pt)
             .with_config(config.inner_build_config());

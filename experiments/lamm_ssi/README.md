@@ -356,3 +356,60 @@ Interpretation: `ssi` does not obstruct equivariant sliceness for any of the
 DMT pairs — in particular the instanton-detected `9_23`-cork is invisible to
 `ssi`, in contrast to Hayden's `9_46`-corks where `ssi ≠ 0` is the detector.
 The two cork-detection mechanisms are independent.
+
+## Experiment 4: the flip construction `(2J # −2J, τ_f # −2τ₀)`
+
+For a bundle diagram `(J, τ₀)` let `2J = J # Jʳ` (`Jʳ` = reverse) carry the
+**flip involution** `τ_f`, the π-rotation exchanging the two copies — the
+central construction of Dai–Mallick–Taniguchi (their `(2T_{2,3} # −2T_{2,3},
+τ_f # −2τ₀)`, Fig. 3). We compute
+
+```
+ssi(K, τ),   K = 2J # −J # −J,   τ = τ_f # −τ₀ # −τ₀
+```
+
+over `𝔽₂[H]` (unreduced) for the `s̲ ≠ s̄` knots of Experiment 1 plus `7_4`
+and `10_75`. Since `K = L # −L` with `L = 2J`, every `K` is **slice**; a
+nonzero value exhibits a slice strongly invertible knot none of whose slice
+disks is equivariantly isotopic to its τ-image (Lemma A of the ssi paper).
+
+Config: `MinFill`, `CutOption::Auto(3)`, `skip_final_elim`, `h_range = 0..=1`;
+sparse-SNF homology pipeline (`lib-matrix/sparse/snf.rs`, added for this
+experiment — the `H01` window residuals are ~40k–300k-dimensional with no
+unit pivots, far beyond the dense SNF).
+
+| `J` | `ssi(K, τ)` | crossings | time |
+|---|---|---|---|
+| `9_46a`  | **`(−2, 0)`** | 40 | 5.6 s |
+| `9_46b`  | **`(−2, 0)`** | 40 | 1.5 s |
+| `8_21a`  | `(0, 0)`      | 40 | 12.1 s |
+| `8_21b`  | **`(0, 2)`**  | 40 | 2.1 s |
+| `7_4a`   | `(0, 0)`      | 32 | 2.7 s |
+| `7_4b`   | `(0, 0)`      | 28 | 0.7 s |
+| `10_160` | **`(−2, 0)`** | 40 | 8.8 s |
+| `10_162` | **`(−2, 0)`** | 40 | 66.9 s |
+| `10_165` | **`(−2, 0)`** | 40 | 843.3 s |
+| `10_141a`| `(0, 0)`      | 56 | 682.3 s |
+| `10_141b`| **`(0, 2)`**  | 56 | 151.3 s |
+| `10_144a`| `(0, 0)`      | 48 | 792.0 s |
+| `10_144b`| **`(0, 2)`**  | 48 | 106.8 s |
+| `10_75a/b` | — (skipped) | 64 | — |
+
+`10_75a/b` (16-crossing diagrams → 64-crossing `K`) are memory-infeasible on
+128 GB: the final raw merge exceeds 466M edges before the matrix stage.
+
+Observations:
+
+- Every C₁-family knot (`9_46`, `10_160`, `10_162`, `10_165`; single known
+  inversion class) gives `(−2, 0)` — **eight slice SI knots with `ssi ≠ 0`**
+  in total, each a DMT-type example visible to Khovanov-level invariants
+  (DMT's own trefoil example gives `(0, 0)` here).
+- For all three two-class knots (`8_21`, `10_141`, `10_144`): the `a`-class
+  vanishes, the `b`-class gives `(0, 2)`. The class separation of
+  Experiments 1–2 persists through the flip construction.
+- `7_4` (2-bridge, `q² ≡ 1`): zero for both classes, consistent with
+  Experiment 3.
+
+Runner: scratchpad `lamm-gen` crate, mode `EXP4`; canonical logs
+`exp4full.out.log` / `exp4full.debug.log` (+ per-knot splits in
+`exp4_results/`).

@@ -23,4 +23,5 @@ pub use trans::*;
 pub mod pivot;
 pub mod pluq;
 pub mod schur;
+pub mod snf;
 pub mod triang;

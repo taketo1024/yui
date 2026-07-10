@@ -5,8 +5,9 @@ use std::marker::PhantomData;
 use log::*;
 
 use yui_core::{EucRing, EucRingOps};
-use yui_matrix::dense::{*, snf::*};
+use yui_matrix::MatTrait;
 use yui_matrix::sparse::*;
+use yui_matrix::sparse::snf::{sp_snf, SpSnf};
 
 /// `(rank, torsion_coefficients, optional_basis_change)` returned by
 /// [`HomologyCalc::calculate`].
@@ -50,6 +51,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         }
 
         debug!("calculate homology: {} -> {} -> {}", d1.n_cols(), d1.n_rows(), d2.n_rows());
+        Self::log_sparsity("d1", &d1);
+        Self::log_sparsity("d2", &d2);
         
         let (s1, s2) = Self::process_snf(d1, d2, with_trans);
         let (rank, tors) = Self::result(&s1, &s2);
@@ -68,28 +71,41 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         (rank, vec![], t)
     }
 
-    fn process_snf(d1: SpMat<R>, d2: SpMat<R>, with_trans: bool) -> (SnfResult<R>, SnfResult<R>) {
+    // sparsity structure of the reducer residual (core = non-zero rows × cols).
+    fn log_sparsity(name: &str, d: &SpMat<R>) {
+        use std::collections::HashSet;
+        let (m, n) = d.shape();
+        let nnz = d.iter_nz().count();
+        let nz_rows = d.iter_nz().map(|(i, _, _)| i).collect::<HashSet<_>>().len();
+        let nz_cols = d.iter_nz().map(|(_, j, _)| j).collect::<HashSet<_>>().len();
+        let core_density = if nz_rows * nz_cols > 0 {
+            nnz as f64 / (nz_rows * nz_cols) as f64
+        } else {
+            0.0
+        };
+        debug!("  {name}: shape ({m}, {n}), nnz {nnz}, nz-rows {nz_rows}, nz-cols {nz_cols}, core {nz_rows}x{nz_cols} (density {core_density:.4})");
+    }
+
+    fn process_snf(d1: SpMat<R>, d2: SpMat<R>, with_trans: bool) -> (SpSnf<R>, SpSnf<R>) {
         let n = d1.n_rows();
 
-        let d1_dns = d1.into_dense();
-        let s1 = snf_in_place(d1_dns, [with_trans, true, false, false]);
+        let s1 = sp_snf(&d1, [with_trans, true, false, false]);
         let r1 = s1.rank();
 
-        let d2_dns = if r1 > 0 { 
+        let d2 = if r1 > 0 {
             let p1_inv = s1.pinv().unwrap();
-            let t2 = p1_inv.submat_cols(r1..n).into_sparse();
-            let d2 = d2 * &t2; // d2': C21' -> C3
-            d2.into_dense()
+            let t2 = p1_inv.submat_cols(r1..n);
+            d2 * &t2 // d2': C21' -> C3
         } else {
-            d2.into_dense()
+            d2
         };
 
-        let s2 = snf_in_place(d2_dns, [false, false, with_trans, with_trans]);
+        let s2 = sp_snf(&d2, [false, false, with_trans, with_trans]);
 
         (s1, s2)
     }
 
-    fn result(s1: &SnfResult<R>, s2: &SnfResult<R>) -> (usize, Vec<R>) {
+    fn result(s1: &SpSnf<R>, s2: &SpSnf<R>) -> (usize, Vec<R>) {
         let n = s1.result().n_rows();
         let (r1, r2) = (s1.rank(), s2.rank());
 
@@ -108,40 +124,34 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         (rank, tors)
     }
 
-    fn trans(s1: &SnfResult<R>, s2: &SnfResult<R>) -> Trans<R> {
+    fn trans(s1: &SpSnf<R>, s2: &SpSnf<R>) -> Trans<R> {
         let n = s1.result().n_rows();
         let (r1, r2) = (s1.rank(), s2.rank());
         let r = n - r1 - r2;
         let t = s1.factors().iter().filter(|a| !a.is_unit()).count();
 
         let p1 = s1.p().unwrap();                 // size = (n, n)
-        let p11 = p1.submat_rows(r1..n)           // size = (n - r1, n)
-                    .into_sparse();
+        let p11 = p1.submat_rows(r1..n);          // size = (n - r1, n)
                 
         let p2 = s2.qinv().unwrap();              // size = (n - r1, n - r1)
-        let p22 = p2.submat_rows(r2..n-r1)        // size = (n - (r1 + r2), n - r1)
-                    .into_sparse();
+        let p22 = p2.submat_rows(r2..n-r1);       // size = (n - (r1 + r2), n - r1)
 
         let p_free = p22 * p11;                   // size = (n - (r1 + r2), n)
-        let p_tor = p1.submat_rows(r1-t..r1)      // size = (t, n)
-                      .into_sparse();
+        let p_tor = p1.submat_rows(r1-t..r1);     // size = (t, n)
 
         let p = SpMat::v_stack(p_free, p_tor);      // size = (r + t, n)
 
         assert_eq!(p.shape(), (r + t, n));
 
         let q1 = s1.pinv().unwrap();              // size = (n, n)
-        let q12 = q1.submat_cols(r1..n)           // size = (n, n - r1)
-                    .into_sparse();
+        let q12 = q1.submat_cols(r1..n);          // size = (n, n - r1)
 
         let q2 = s2.q().unwrap();                 // size = (n - r1, n - r1)
-        let q22 = q2.submat_cols(r2..n-r1)        // size = (n - r1, n - (r1 + r2))
-                    .into_sparse();
+        let q22 = q2.submat_cols(r2..n-r1);       // size = (n - r1, n - (r1 + r2))
 
 
         let q_free = q12 * q22;                   // size = (n, n - (r1 + r2))
-        let q_tor = q1.submat_cols(r1-t..r1)      // size = (n, t)
-                      .into_sparse();
+        let q_tor = q1.submat_cols(r1-t..r1);     // size = (n, t)
 
         let q = SpMat::h_stack(q_free, q_tor);     // size = (n, r + t)
 

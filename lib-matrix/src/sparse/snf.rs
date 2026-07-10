@@ -322,19 +322,72 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
             return
         }
 
-        'outer: loop {
-            for i in 0..r-1 {
-                if !self.diag_normalize_step(i) {
-                    continue 'outer
-                }
-            }
-            break
-        }
-
+        // canonical unit representatives, so associates compare equal below.
         for i in 0..r {
             let u = self.rows[i][&i].normalizing_unit();
             if !u.is_one() {
                 self.mul_row(i, &u);
+            }
+        }
+
+        // pre-order by divisibility: when the diagonal values are pairwise
+        // comparable (e.g. powers of H) the bubble pass below finds nothing.
+        self.sort_diag();
+
+        // bubble the divisor chain: full O(r) passes, no restart-from-zero
+        // (the dense algorithm's restart is quadratic on huge diagonals).
+        loop {
+            let mut clean = true;
+            for i in 0..r-1 {
+                if !self.diag_normalize_step(i) {
+                    clean = false;
+                }
+            }
+            if clean {
+                break
+            }
+        }
+
+        // gcd fixes may denormalize units.
+        for i in 0..r {
+            let u = self.rows[i][&i].normalizing_unit();
+            if !u.is_one() {
+                self.mul_row(i, &u);
+            }
+        }
+    }
+
+    // Sorts the diagonal (by row+col swaps) so equal values are contiguous and
+    // strictly-dividing values come first; incomparable pairs keep insertion
+    // order and are resolved by the gcd steps of the bubble pass.
+    fn sort_diag(&mut self) {
+        let r = self.rank;
+
+        let mut chain: Vec<(R, Vec<usize>)> = Vec::new();
+        for i in 0..r {
+            let v = self.rows[i][&i].clone();
+            if let Some((_, grp)) = chain.iter_mut().find(|(w, _)| w == &v) {
+                grp.push(i);
+                continue
+            }
+            let pos = chain.iter().position(|(w, _)| v.divides(w) && !w.divides(&v)).unwrap_or(chain.len());
+            chain.insert(pos, (v, vec![i]));
+        }
+
+        // target[t] = original position whose value should land at t.
+        let target: Vec<usize> = chain.into_iter().flat_map(|(_, grp)| grp).collect();
+
+        let mut pos_of: Vec<usize> = (0..r).collect(); // original -> current
+        let mut at: Vec<usize> = (0..r).collect();     // current -> original
+        for t in 0..r {
+            let cur = pos_of[target[t]];
+            if cur != t {
+                self.swap_rows(t, cur);
+                self.swap_cols(t, cur);
+                let other = at[t];
+                at.swap(t, cur);
+                pos_of[target[t]] = t;
+                pos_of[other] = cur;
             }
         }
     }
@@ -628,7 +681,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use num_traits::Zero;
+    use num_traits::{Pow, Zero};
     use yui_core::num::FF2;
     use yui_core::poly::Poly;
     use crate::dense::snf::snf;
@@ -728,6 +781,24 @@ mod tests {
             h2.clone(), o.clone(), h.clone(),
         ]);
         check_snf(&a);
+    }
+
+    #[test]
+    fn snf_large_monomial_diag() {
+        // 20k-entry shuffled H-power diagonal: normalization must be linear-ish,
+        // not the dense algorithm's restart-quadratic (regression for the
+        // 143k-diagonal stall on 10_162).
+        type P = Poly<'H', FF2>;
+        let n = 20_000;
+        let a: SpMat<P> = SpMat::from_entries((n, n), (0..n).map(|i|
+            (i, i, P::variable().pow((i * 7919) % 23))
+        ));
+        let s = sp_snf_with(&a, [false; 4], 0);
+        assert_eq!(s.rank(), n);
+        let fs = s.factors();
+        for w in fs.windows(2) {
+            assert!(w[0].divides(w[1]));
+        }
     }
 
     #[test]

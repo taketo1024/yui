@@ -20,7 +20,7 @@ use yui_core::{Ring, RingOps};
 use yui_link::{Node, Edge, Link};
 
 use crate::kh::{KhChain, KhComplex};
-use crate::tng::{TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
+use crate::tng::{MAX_EDGE, TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
 use super::{reachable_range, pop_min_pivot, pivot_pool, push_pivot, sparkline, fill_cost_sparkline, cutwidth_after, toggle_boundary, boundary_edges, select_cuts, cut_components, merge_order, TngElemBuilder};
 
 // Progress logging for the long per-op build loops (eliminate / deloop / asymmetric elimination):
@@ -113,7 +113,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> TngComplexBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn from_link(l: &Link, h: &R, t: &R, reduced: bool) -> Self { 
+    pub fn from_link(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
+        Self::assert_max_edge(l);
         let base_pt = if reduced { l.base_pt() } else { None };
         let deg_shift = KhComplex::deg_shift_for(l, reduced);
 
@@ -127,6 +128,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
 
         b
+    }
+
+    // note: the `EdgeSet` bitmap wraps silently on overflow in release builds — fail loudly up front.
+    fn assert_max_edge(l: &Link) {
+        if let Some(e) = l.edges().into_iter().max() {
+            assert!(e <= MAX_EDGE, "edge label {e} exceeds the EdgeSet capacity ({MAX_EDGE}); enable the `big-link` feature");
+        }
     }
 
     pub fn init(h: &R, t: &R, deg_shift: (isize, isize), base_pt: Option<Edge>) -> Self { 

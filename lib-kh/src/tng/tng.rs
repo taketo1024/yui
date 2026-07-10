@@ -5,15 +5,19 @@ use yui_core::CloneAnd;
 use yui_link::{Edge, Node, Path};
 use crate::util::CachedHash;
 
-/// Edge presence as a packed bitmap. `u128` storage covers Edge ∈ 0..128,
-/// i.e. links with ≤ 64 crossings (2 edges per crossing). Bump the storage
-/// param to `[u128; 2]` (and impl `BitStorage` for it) to extend.
-#[cfg(not(feature = "big-link"))]
-type EdgeSet = BitMap<Edge, u128>;
-#[cfg(feature = "big-link")]
-use yui_core::u256::U256;
-#[cfg(feature = "big-link")]
-type EdgeSet = BitMap<Edge, U256>;
+// Edge presence as a packed bitmap, `MAX_EDGE` the largest label it can hold.
+// With the conventional 1-indexed consecutive numbering, u128 covers ≤ 63
+// crossings (a 64-crossing link has edge 128, which does not fit).
+cfg_if::cfg_if! {
+    if #[cfg(feature = "big-link")] {
+        use yui_core::u256::U256;
+        type EdgeSet = BitMap<Edge, U256>;
+        pub(crate) const MAX_EDGE: Edge = 255;
+    } else {
+        type EdgeSet = BitMap<Edge, u128>;
+        pub(crate) const MAX_EDGE: Edge = 127;
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 enum TngCompKind {
@@ -47,6 +51,7 @@ impl TngComp {
     }
 
     pub fn from_path(path: Path, marked: bool) -> Self {
+        debug_assert!(path.edges().iter().all(|&e| e <= MAX_EDGE), "edge label exceeds the EdgeSet capacity ({MAX_EDGE})");
         let edges: EdgeSet = path.edges().iter().copied().collect();
         let kind = match &path {
             Path::Arc(es) => {

@@ -109,6 +109,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     fn process(&mut self) {
         self.eliminate_all();
+        debug!("  snf eliminate done: rank {}, ops {}; normalize..", self.rank, self.ops.len());
         self.diag_normalize();
     }
 
@@ -131,6 +132,10 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
             if i >= m { break }
             if self.eliminate_step(i, j) {
                 i += 1;
+                if i % 10_000 == 0 {
+                    let nnz: usize = self.rows.iter().map(|r| r.len()).sum();
+                    debug!("  snf progress: {i} pivots ({j}/{n} cols), nnz {nnz}, ops {}", self.ops.len());
+                }
             }
         }
     }

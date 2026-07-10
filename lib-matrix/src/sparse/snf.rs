@@ -230,7 +230,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
             if i >= m { break }
             if self.eliminate_step(i, j) {
                 i += 1;
-                if i % 1000 == 0 {
+                if i % 100_000 == 0 {
                     let nnz: usize = self.rows.iter().map(|r| r.len()).sum();
                     debug!("  snf progress: {i} pivots ({j}/{n} cols), nnz {nnz}, ops {}", self.ops.len());
                 }

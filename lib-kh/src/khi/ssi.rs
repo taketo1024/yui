@@ -114,6 +114,80 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     (d0, d1)
 }
 
+/// One component of `ssi` from a single-degree window: `h = 0` gives `s̲` (the `B`-classes),
+/// `h = 1` gives `s̄` (the `Q`-classes). Builds `C` only over `(h-1)..=(h+1)`, so the two
+/// components can be computed in separate, cheaper runs.
+pub fn ssi_invariant_at<R>(l: &InvLink, c: &R, reduced: bool, config: SymBuildConfig, h: isize) -> i32
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    assert!(!c.is_zero());
+    assert!(!c.is_unit());
+    assert!(l.is_knot());
+    assert!(h == 0 || h == 1, "ssi components live in h-degrees 0 and 1, got {h}");
+
+    info!("compute ssi[{h}] via cone, c = {c} over {}.", R::math_symbol());
+
+    let w = l.writhe();
+    let r = l.seifert_circles().len() as i32;
+    let d = ssi_divisibility_at(l, c, reduced, config, h);
+
+    let ss = 2 * d + w - r + 1;
+
+    info!("w = {w}, r = {r}, d = {d}.");
+    info!("ssi[{h}] = {ss}.");
+
+    ss
+}
+
+// `ssi_divisibility` restricted to one canon degree `h`: the window is `h..=h` (built one degree
+// wider on both ends), and only the `r` canon classes at degree `h` are read — the other
+// component's classes are clipped by the window and ignored.
+fn ssi_divisibility_at<R>(l: &InvLink, c: &R, reduced: bool, config: SymBuildConfig, h: isize) -> i32
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    let r = if reduced { 1 } else { 2 };
+    let t = R::zero();
+
+    let requested = config.h_range.clone().unwrap_or(h ..= h);
+    let range = KhComplex::<R>::clamp_h_range(l.inner(), reduced, requested);
+    let (a, b) = (*range.start(), *range.end());
+    assert!(a <= h && h <= b, "window must include the canon degree {h}, got {a}..={b}");
+    let config = SymBuildConfig { h_range: Some((a - 1)..=(b + 1)), ..config };
+    let kc = KhIComplex::new_with_config(l, c, &t, reduced, config);
+
+    let zs = kc.canon_cycles().iter()
+        .filter(|z| z.homogeneous_value(|x| kc.h_deg_of(x)) == Some(h))
+        .collect_vec();
+    assert_eq!(zs.len(), r);
+
+    let mut red = ChainReducer::from_complex(kc.inner(), false);
+    red.set_max_pivots(MAX_PIVOTS_PER_ROUND);
+
+    for z in zs.iter() {
+        red.add_vec(h, kc.inner()[h].vectorize(z));
+    }
+
+    red.reduce_all(false);
+    red.reduce_all(true);
+
+    let d1 = red.matrix(h).expect("d[h] must be set").clone();
+    let d0 = red.matrix(h - 1).cloned().unwrap_or_else(|| SpMat::zero((d1.n_cols(), 0)));
+    let (rank, tors, tr) = HomologyCalc::calculate(d0, d1, true);
+    let tr = tr.unwrap();
+
+    assert_eq!(rank, r);
+    info!("KhI[{h}] ≅ {}", rmod_str(rank, &tors));
+
+    let ds = red.vecs(h).expect("transported vecs at canon degree").iter().enumerate().map(|(i, v)| {
+        let w = tr.forward(v).subvec(0..r);
+        info!("a[{i}] in KhI[{h}]: ({})", w.clone().into_dense().iter().join(", "));
+        div_vec(&w, c).expect("invalid divisibility.")
+    }).collect_vec();
+
+    if !reduced {
+        assert_eq!(ds[0], ds[1]);
+    }
+    ds[0]
+}
+
 pub fn ssi_invariant_v1<R>(l: &InvLink, c: &R, reduced: bool) -> (i32, i32)
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
     assert!(!c.is_zero());
@@ -190,6 +264,25 @@ mod tests {
 
     type R = FF2;
     type P = Poly<'H', R>;
+
+    // the single-degree components must reproduce the pair, including for chunked builds.
+    #[test]
+    fn ssi_at_matches_pair() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::tng::builder::CutOption;
+        let c = P::variable();
+
+        for name in ["3_1", "4_1", "6_1a"] {
+            let l = InvLink::load(name)?;
+            for cut in [CutOption::None, CutOption::Auto(3)] {
+                let config = SymBuildConfig { cut, ..Default::default() };
+                let ssi = ssi_invariant(&l, &c, false, config.clone());
+                let s0 = ssi_invariant_at(&l, &c, false, config.clone(), 0);
+                let s1 = ssi_invariant_at(&l, &c, false, config.clone(), 1);
+                assert_eq!((s0, s1), ssi, "{name} {:?}", config.cut);
+            }
+        }
+        Ok(())
+    }
 
     #[test]
     fn test_unknot_pos_twist() {

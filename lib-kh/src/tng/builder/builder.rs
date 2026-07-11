@@ -70,6 +70,9 @@ pub enum CutOption {
     #[default]
     None,
     Auto(usize),
+    // cut after the unit positions closest to the given cumulative crossing counts —
+    // direct control over chunk balance (Auto cuts only at cutwidth valleys).
+    AtCrossings(Vec<usize>),
     Manual(Vec<Vec<Edge>>),
 }
 
@@ -683,16 +686,26 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // Partition the crossings into pieces: `Auto(k)` at the deepest cutwidth valleys of the MinCut
     // order (contiguous, thin interface), or `Manual` by severing the given edge-cut(s).
     fn plan(&self) -> Vec<Vec<Node>> {
+        let prof = self.builder.profile();
         let k = match &self.builder.config.cut {
             CutOption::Manual(cuts) => return self.manual_plan(cuts),
+            // one node per unit here, so "cut after `c` crossings" = position `c - 1`.
+            CutOption::AtCrossings(counts) => {
+                let cuts = counts.iter()
+                    .map(|&c| c.saturating_sub(1).min(prof.order.len().saturating_sub(2)))
+                    .sorted().dedup().collect_vec();
+                return self.segment_plan(&prof, &cuts);
+            }
             CutOption::Auto(k) => (*k).max(1),
             CutOption::None => 1,
         };
-        let prof = self.builder.profile();
-        let nodes = self.builder.nodes();
         let cuts = select_cuts(&prof.widths, k - 1);
+        self.segment_plan(&prof, &cuts)
+    }
 
-        // segment `prof.order` after each cut position; map each index to its node.
+    // Segment `prof.order` after each cut position; map each index to its node.
+    fn segment_plan(&self, prof: &BuildProfile, cuts: &[usize]) -> Vec<Vec<Node>> {
+        let nodes = self.builder.nodes();
         let starts = std::iter::once(0).chain(cuts.iter().map(|&v| v + 1));
         let ends = cuts.iter().map(|&v| v + 1).chain(std::iter::once(prof.order.len()));
         starts.zip(ends)

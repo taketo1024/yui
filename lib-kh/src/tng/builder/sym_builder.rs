@@ -891,14 +891,39 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub(crate) fn plan(&self) -> Vec<Vec<Node>> {
         let k = match &self.builder.config.cut {
             CutOption::Manual(cuts) => return self.manual_plan(cuts),
+            CutOption::AtCrossings(counts) => return self.at_crossings_plan(counts),
             CutOption::Auto(k) => (*k).max(1),
             CutOption::None => 1,
         };
         let prof = self.builder.profile_sym();
-        let nodes = self.builder.inner.nodes();
         let cuts = select_cuts(&prof.widths, k - 1);
+        self.segment_plan(&prof, &cuts)
+    }
 
-        // segment `prof.order` after each cut position; expand each unit to its nodes.
+    // Cut after the unit positions whose cumulative crossing count is closest to each requested
+    // count — direct control over chunk balance (τ-units stay whole, so counts land within ±1).
+    fn at_crossings_plan(&self, counts: &[usize]) -> Vec<Vec<Node>> {
+        let prof = self.builder.profile_sym();
+        let cum: Vec<usize> = prof.order.iter()
+            .scan(0, |acc, unit| {
+                *acc += unit.len();
+                Some(*acc)
+            })
+            .collect();
+        let cuts = counts.iter()
+            .map(|&c| (0..cum.len()).min_by_key(|&p| cum[p].abs_diff(c)).unwrap())
+            .sorted()
+            .dedup()
+            .collect_vec();
+        for (&c, &p) in counts.iter().sorted().zip(cuts.iter()) {
+            info!("cut requested at {c} crossings -> position {p} ({} crossings, width {})", cum[p], prof.widths[p]);
+        }
+        self.segment_plan(&prof, &cuts)
+    }
+
+    // Segment `prof.order` after each cut position; expand each unit to its nodes.
+    fn segment_plan(&self, prof: &SymBuildProfile, cuts: &[usize]) -> Vec<Vec<Node>> {
+        let nodes = self.builder.inner.nodes();
         let starts = std::iter::once(0).chain(cuts.iter().map(|&v| v + 1));
         let ends = cuts.iter().map(|&v| v + 1).chain(std::iter::once(prof.order.len()));
         starts.zip(ends)

@@ -15,7 +15,7 @@ use std::ops::RangeInclusive;
 
 use rustc_hash::FxHashSet;
 use itertools::Itertools;
-use log::{debug, info, trace};
+use log::{debug, info, trace, log_enabled, Level};
 use yui_core::{Ring, RingOps};
 use yui_link::{Node, Edge, Link};
 
@@ -349,6 +349,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     // Build degree `i`: merge in its vertices and the edges into it.
     pub(super) fn merge_slice(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize) {
+        if log_enabled!(Level::Debug) {
+            let (nv, ne) = slice_estimate(left, right, i);
+            // no sources below the already-built bottom — the raw estimate would overcount there.
+            let ne = if self.complex.rank(i - 1) == 0 { 0 } else { ne };
+            debug!("  merge C[{i}]: ({nv} verts, ~{ne} edges)");
+        }
         let nv = self.complex.merge_vertices(left, right, i);
         debug!("  +{nv} verts");
         let ne = self.complex.merge_edges(left, right, i - 1);
@@ -756,6 +762,24 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let config = BuildConfig { mode: self.builder.config.mode, node_order: NodeOrder::MinCut, h_range, ..Default::default() };
         child.with_config(config)
     }
+}
+
+// Predicted raw size of the degree-`d` product slice, computable before building it:
+// vertices `Σ_{d₁+d₂=d} |L[d₁]|·|R[d₂]|`, edges from the degree-`d-1` sources weighted by their
+// out-edge counts (an upper bound: zero-reduced cobordisms and out-of-window targets drop out).
+fn slice_estimate<R>(left: &TngComplex<R>, right: &TngComplex<R>, d: isize) -> (usize, usize)
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    let out_edges = |c: &TngComplex<R>, i: isize| -> usize {
+        c.keys_of_deg(i).map(|k| c.vertex(k).out_edges().count()).sum()
+    };
+    let verts = left.h_range().map(|d1| {
+        left.rank(d1) * right.rank(d - d1)
+    }).sum();
+    let edges = left.h_range().map(|d1| {
+        let d2 = d - 1 - d1;
+        out_edges(left, d1) * right.rank(d2) + left.rank(d1) * out_edges(right, d2)
+    }).sum();
+    (verts, edges)
 }
 
 #[cfg(test)]

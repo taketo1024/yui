@@ -123,11 +123,18 @@ pub fn parse_node_order(s: &str) -> Result<NodeOrder, String> {
     }
 }
 
-// parse `--cut`: `auto(k)` for cutwidth chunking, else `;`-separated manual edge-cuts (each `e,e,e`).
+// parse `--cut`: `auto(k)` for cutwidth chunking, `at(c,..)` to cut after the given cumulative
+// crossing counts, else `;`-separated manual edge-cuts (each `e,e,e`).
 pub fn parse_cut(s: &str) -> Result<CutOption, String> {
     if let Some(inner) = s.trim().strip_prefix("auto(").and_then(|x| x.strip_suffix(')')) {
         let k = inner.trim().parse::<usize>().map_err(|e| format!("auto(k): `{inner}`: {e}"))?;
         return Ok(CutOption::Auto(k));
+    }
+    if let Some(inner) = s.trim().strip_prefix("at(").and_then(|x| x.strip_suffix(')')) {
+        let counts = inner.split(',')
+            .map(|c| c.trim().parse::<usize>().map_err(|e| format!("at(c,..): `{c}`: {e}")))
+            .collect::<Result<Vec<usize>, _>>()?;
+        return Ok(CutOption::AtCrossings(counts));
     }
     let cuts = s.split(';')
         .map(|grp| grp.split(',').map(|e| e.trim().parse::<Edge>().map_err(|err| format!("`{e}`: {err}"))).collect())

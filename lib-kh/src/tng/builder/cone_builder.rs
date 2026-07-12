@@ -17,7 +17,7 @@ use log::{debug, info, trace};
 use num_traits::Zero;
 use yui_core::bitseq::Bit;
 use yui_core::{Ring, RingOps};
-use yui_link::{Edge, Node, InvLink};
+use yui_link::{Edge, InvLink};
 
 use rayon::prelude::*;
 use rustc_hash::FxHashMap;
@@ -26,7 +26,7 @@ use yui_homology::ChainComplex1;
 use crate::kh::{KhChain, KhGen};
 use crate::khi::{KhIChain, KhIGen, KhIGenExt};
 use crate::tng::{Cob, CobComp, End, LcCob, LcCobTrait, Tng, TngComplex, TngComplexElem, TngComplexKey, TngComplexVertex, circles_of, label_assignments, expanded_key, cap_circles};
-use super::{reachable_range, ChunkBuilder, SymTngBuilder, SymBuildConfig, TngComplexBuilder, BuildConfig, TauKeyMap};
+use super::{reachable_range, SymTngBuilder, SymBuildConfig, TngComplexBuilder, BuildConfig};
 use super::builder::{PROGRESS_LOG_STEP, PROGRESS_LOG_MIN};
 
 // τ-orbit class of a symmetric-complex vertex: the representative (smaller key) and the τ-fixed
@@ -58,29 +58,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self
     }
 
-    // Build the reduced chunks, merge all but the last normally, and close with the incremental
-    // cone merge. The non-chunked case is just a degenerate plan (see `plan`).
+    // Build the symmetric complex via `SymTngBuilder::run` (chunked or incremental; its finalize
+    // ends with the free-eliminate fixpoint), then build the cone over the finished complex.
     pub fn run(mut self) -> Self {
-        info!("build config:\n{:#?}", self.inner.config());
-        info!("cutwidth profile:\n{}", self.inner.profile_sym());
-
-        let plan = self.plan();
-        let mode = self.inner.config().mode;
-
-        info!("cone build: {} chunks, mode: {mode:?}", plan.len());
-
-        let chunks = ChunkBuilder { builder: &self.inner }.build_chunks(plan);
-        let last = chunks.len().saturating_sub(1);
-
-        for (i, (chunk, (c, key_map, elems))) in chunks.into_iter().enumerate() {
-            info!("cone chunk {}/{}: {} nodes{}", i + 1, last + 1, chunk.len(), if i == last { " (cone merge)" } else { "" });
-            self.inner.drop_nodes(|x| chunk.contains(x));
-            if i == last {
-                self.cone_merge(c, key_map, elems);
-            } else {
-                self.inner.merge(c, key_map, elems);
-            }
-        }
+        self.inner = self.inner.run();
+        self.build_cone();
         self.finalize();
         self
     }
@@ -92,40 +74,23 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    // The cutwidth partition when `chunks` is set, else a degenerate split of the first τ-unit off
-    // the rest — so even the non-chunked knot is closed by one incremental `cone_merge`.
-    fn plan(&self) -> Vec<Vec<Node>> {
-        if self.inner.config().cut.enabled() {
-            return ChunkBuilder { builder: &self.inner }.plan();
-        }
-        let x = self.inner.choose_next_node().expect("a crossing to split off").clone();
-        let tx = self.inner.inv_node(&x).clone();
-        let unit = if tx == x { vec![x] } else { vec![x, tx] };
-        let rest: Vec<Node> = self.inner.nodes().iter().filter(|n| !unit.contains(n)).cloned().collect();
-        if rest.is_empty() { vec![unit] } else { vec![unit, rest] }
-    }
-
-    // Fuse the final merge with cone construction + reduction. Per symmetric degree: merge the slice,
-    // cone-ify it, then collapse the invertible `1`-edges two degrees behind (so `cone_extend` has
-    // moved past the degree being removed). Delooping is deferred to the end, on the small survivors.
-    fn cone_merge(&mut self, other: TngComplex<R>, other_map: TauKeyMap, other_elems: Vec<TngComplexElem<R>>) {
-        let left_map = std::mem::take(self.inner.key_map_mut());
-        let (left, right) = self.inner.complex_mut().prepare_merge(other);
+    // Build the reduced cone over the FINISHED symmetric complex (Sano2026, Prop 4.6): per degree,
+    // emit the symmetry-broken cone extension and collapse the invertible `1`-edges two degrees
+    // behind. Nothing is merged here — the complex and its τ key map are already complete.
+    fn build_cone(&mut self) {
         let range = reachable_range(self.inner.complex().h_range(), &self.inner.config().h_range, self.inner.n_nodes());
         let cone_config = cone_build_config(self.inner.config());
         self.cone = TngComplexBuilder::from_tng_complex(cone_shell(self.inner.complex()), cone_config);
 
-        info!("cone merge {} <- {}, range: {range:?}", left.stat(), right.stat());
+        info!("build cone over {}, range: {range:?}", self.inner.complex().stat());
 
-        // complete the symmetric canon cycles, then seed their `B`/`Q` (bit-0/bit-1) copies into the
-        // cone so its deloop/eliminate carry them. `cone_extend` will create the referenced vertices.
-        self.inner.elements_mut().merge(other_elems);
+        // seed the canon cycles' `B`/`Q` (bit-0/bit-1) copies into the cone so its
+        // deloop/eliminate carry them. `cone_extend` will create the referenced vertices.
         self.seed_cone_elements();
 
         let top = *range.end();
         for d in range {
-            debug!("cone merge C[{d}]...");
-            self.inner.merge_slice(&left, &right, d, &left_map, &other_map);
+            debug!("cone C[{d}]...");
             self.cone_extend_reduced(d);
             self.rewrite_elements(d - 1); // degree d-1's out-edges are now complete
             self.vertical_reduce(d - 2); // no-op below the range start (empty pending_vertical)
@@ -502,10 +467,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         info!("cone finalized: {}", self.cone.stat());
     }
 
-    // Skip the finalize deloop when the build is complete and closed under `skip_final_elim`:
+    // Skip the finalize deloop when the build is complete and closed under `no_full_deloop`:
     // `into_raw_complex`/`eval_khi_elements` then expand the remaining circles at the matrix level.
     fn skip_finalize(&self) -> bool {
-        self.inner.config().skip_final_elim
+        self.inner.config().no_full_deloop
             && self.inner.n_nodes() == 0
             && self.cone.complex().is_closed()
     }
@@ -607,26 +572,26 @@ mod tests {
         h.support().map(|&i| (i, h[i].rank())).filter(|(_, r)| *r > 0).sorted().collect()
     }
 
-    // skip_final_elim defers the finalize deloop to into_raw_complex — the cone homology must
+    // no_full_deloop defers the finalize deloop to into_raw_complex — the cone homology must
     // not change (whole and chunked).
-    fn check_skip_final_elim(l: &InvLink) {
+    fn check_no_full_deloop(l: &InvLink) {
         for reduced in [false, true] {
             for cut in [CutOption::None, CutOption::Auto(2)] {
                 let full = cone_homology(l, reduced, SymBuildConfig { cut: cut.clone(), ..Default::default() });
-                let skipped = cone_homology(l, reduced, SymBuildConfig { cut: cut.clone(), skip_final_elim: true, ..Default::default() });
+                let skipped = cone_homology(l, reduced, SymBuildConfig { cut: cut.clone(), no_full_deloop: true, ..Default::default() });
                 assert_eq!(full, skipped, "reduced={reduced}, cut={cut:?}");
             }
         }
     }
 
     #[test]
-    fn cone_skip_final_elim_3_1() {
-        check_skip_final_elim(&InvLink::test_data("3_1"));
+    fn cone_no_full_deloop_3_1() {
+        check_no_full_deloop(&InvLink::test_data("3_1"));
     }
 
     #[test]
-    fn cone_skip_final_elim_6_3() {
-        check_skip_final_elim(&InvLink::test_data("6_3"));
+    fn cone_no_full_deloop_6_3() {
+        check_no_full_deloop(&InvLink::test_data("6_3"));
     }
 
     // The cone homology must not depend on the chunking: whole == chunked, reduced and unreduced.

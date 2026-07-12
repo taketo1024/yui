@@ -95,12 +95,12 @@ pub struct BuildConfig {
     pub max_elim_cost: Option<usize>,
     // skip the final deloop (the last merge and `finalize`): remaining circles are deferred to
     // `into_raw_complex`'s matrix-level expansion + the `ChainReducer`. See `should_deloop`.
-    pub skip_final_elim: bool,
+    pub no_full_deloop: bool,
 }
 
 impl Default for BuildConfig {
     fn default() -> Self {
-        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), cut: CutOption::None, h_range: None, max_elim_cost: None, skip_final_elim: false }
+        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), cut: CutOption::None, h_range: None, max_elim_cost: None, no_full_deloop: false }
     }
 }
 
@@ -297,10 +297,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     // Whether the automatic deloop runs. `false` for `BuildMode::None` and, under
-    // `skip_final_elim`, once all nodes are merged — remaining circles then defer to `into_raw_complex`.
+    // `no_full_deloop`, once all nodes are merged — remaining circles then defer to `into_raw_complex`.
     pub(crate) fn should_deloop(&self) -> bool {
         self.config.mode.auto_deloop()
-            && !(self.config.skip_final_elim && self.n_nodes() == 0)
+            && !(self.config.no_full_deloop && self.n_nodes() == 0)
     }
 
     pub fn merge(&mut self, other: TngComplex<R>, other_elements: Vec<TngComplexElem<R>>) {
@@ -616,7 +616,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn eval_elements(&self) -> Vec<KhChain<R>> {
         let (h, t) = self.complex.ht();
-        // an un-delooped complex (`skip_final_elim`) needs the circle-expanding eval.
+        // an un-delooped complex (`no_full_deloop`) needs the circle-expanding eval.
         if self.complex.is_completely_delooped() {
             self.elements.eval(h, t)
         } else {
@@ -921,11 +921,11 @@ mod tests {
     }
 
     #[test]
-    fn test_skip_final_elim_agrees() {
-        // skip_final_elim must not change homology: the deferred deloop is redone by into_raw_complex.
+    fn test_no_full_deloop_agrees() {
+        // no_full_deloop must not change homology: the deferred deloop is redone by into_raw_complex.
         let l = Link::test_data("8_19");
         let build = |skip| {
-            let config = BuildConfig { skip_final_elim: skip, ..Default::default() };
+            let config = BuildConfig { no_full_deloop: skip, ..Default::default() };
             TngComplexBuilder::from_link(&l, &0, &0, false).with_config(config).run()
                 .into_tng_complex().into_raw_complex()
         };

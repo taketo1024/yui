@@ -64,7 +64,7 @@ pub struct Args {
     // skip the final deloop/eliminate; remaining circles defer to into_raw_complex + the matrix
     // reducer. For huge knots where the final cobordism deloop is the memory/time wall.
     #[arg(long)]
-    pub skip_final_elim: bool,
+    pub no_full_deloop: bool,
 
     // chunking: `auto(k)` (cutwidth) or manual τ-symmetric edge-cut(s) `e,e,e;e,e,e`.
     #[arg(long, value_parser = parse_cut)]
@@ -133,7 +133,7 @@ where
             preprocess: !self.args.no_preprocess,
             cut: self.args.cut.clone().unwrap_or_default(),
             max_elim_cost: self.args.max_elim_cost,
-            skip_final_elim: self.args.skip_final_elim,
+            no_full_deloop: self.args.no_full_deloop,
             ..Default::default()
         };
 

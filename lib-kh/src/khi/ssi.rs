@@ -386,6 +386,47 @@ mod tests {
     test!(k7_7a, "7_7a", (0, 0));
     test!(k7_7b, "7_7b", (0, 0));
 
+    // RUST_LOG-controlled logging to stdout (tests initialize no logger by default).
+    fn init_logger() {
+        use env_logger::{Builder, Target};
+        let _ = Builder::from_default_env().target(Target::Stdout).try_init();
+    }
+
+    // The production Wh⁺-pretzel runs, reproducible on any machine (the in-memory construction
+    // fixes the crossing order; a PD re-import would reorder under MinCut).
+    fn wh_pretzel_config(cut_at: usize) -> SymBuildConfig {
+        use crate::tng::builder::{BuildMode, CutOption};
+        SymBuildConfig {
+            mode: BuildMode::MinFill,
+            cut: CutOption::AtCrossings(vec![cut_at]),
+            max_elim_cost: Some(1 << 16),
+            no_full_deloop: true,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    #[ignore = "heavy: 44-crossing Whitehead double (~30 min)"]
+    fn ssi_wh_pretzel_3() {
+        init_logger();
+        let k = InvLink::sym_pretzel(-3, 3, -3);
+        let w = k.whitehead_double(true, 0);
+        let c = P::variable();
+        let ssi = ssi_invariant(&w, &c, false, wh_pretzel_config(17));
+        assert_eq!(ssi, (0, 2));
+    }
+
+    #[test]
+    #[ignore = "heavy: 72-crossing Whitehead double"]
+    fn ssi_wh_pretzel_5() {
+        init_logger();
+        let k = InvLink::sym_pretzel(-5, 5, -5);
+        let w = k.whitehead_double(true, 0);
+        let c = P::variable();
+        let ssi = ssi_invariant(&w, &c, false, wh_pretzel_config(20));
+        println!("ssi(Wh+(P(-5,5,-5))) = {ssi:?}");
+    }
+
     #[test]
     fn k9_46() {
         let l = InvLink::from_symmetric_pd_code(

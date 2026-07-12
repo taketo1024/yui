@@ -45,12 +45,12 @@ pub struct SymBuildConfig {
     pub max_elim_cost: Option<usize>,
     // skip the final deloop (the last merge and `finalize`): remaining circles defer to
     // `into_raw_complex`'s matrix-level expansion + the `ChainReducer`. See `should_deloop`.
-    pub skip_final_elim: bool,
+    pub no_full_deloop: bool,
 }
 
 impl Default for SymBuildConfig {
     fn default() -> Self {
-        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, h_range: None, cut: CutOption::None, max_elim_cost: None, skip_final_elim: false }
+        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, h_range: None, cut: CutOption::None, max_elim_cost: None, no_full_deloop: false }
     }
 }
 
@@ -82,7 +82,7 @@ impl FromIterator<(TngComplexKey, TngComplexKey)> for TauKeyMap {
 }
 
 impl TauKeyMap {
-    fn init() -> Self {
+    pub(crate) fn init() -> Self {
         Self::from_iter([(TngComplexKey::init(), TngComplexKey::init())])
     }
 
@@ -185,7 +185,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn complex(&self) -> &TngComplex<R>;
             pub(crate) fn complex_mut(&mut self) -> &mut TngComplex<R>;
             pub(crate) fn elements(&self) -> &TngElemBuilder<R>;
-            pub(crate) fn elements_mut(&mut self) -> &mut TngElemBuilder<R>;
             pub fn nodes(&self) -> &[Node];
             pub fn n_nodes(&self) -> usize;
             pub(crate) fn drop_nodes<F>(&mut self, pred: F) where F: Fn(&Node) -> bool;
@@ -323,10 +322,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     // Whether the automatic deloop runs. `false` for `BuildMode::None` and, under
-    // `skip_final_elim`, once all nodes are merged — remaining circles then defer to `into_raw_complex`.
+    // `no_full_deloop`, once all nodes are merged — remaining circles then defer to `into_raw_complex`.
     pub(crate) fn should_deloop(&self) -> bool {
         self.config.mode.auto_deloop()
-            && !(self.config.skip_final_elim && self.n_nodes() == 0)
+            && !(self.config.no_full_deloop && self.n_nodes() == 0)
     }
 
     pub(crate) fn merge(&mut self, c: TngComplex<R>, right_map: TauKeyMap, right_elements: Vec<TngComplexElem<R>>) {
@@ -346,8 +345,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         if self.should_deloop() {
             self.merge_incremental(&left, &right, range, &left_map, &right_map);
         } else {
+            // no-deloop merge: still free-eliminate per degree (invertible pivots need no
+            // delooping — shared circles pass through as cylinders), bounding the slice growth.
+            let elim = self.config.mode.auto_elim();
             for i in range {
+                debug!("{} build C[{i}]...", self.current_step());
                 self.merge_slice(&left, &right, i, &left_map, &right_map);
+                if elim {
+                    self.eliminate_in(i - 1);
+                }
+                debug!("{} built C[{i}]: {}", self.current_step(), self.complex().rank(i));
             }
         }
 
@@ -582,7 +589,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         ks
     }
 
-    fn eliminate_in(&mut self, i: isize) {
+    pub(crate) fn eliminate_in(&mut self, i: isize) {
         let keys = self.collect_keys(i,
             |k| self.complex().vertex(k).out_edges()
                 .any(|l| self.is_equiv_inv_edge(k, l)),
@@ -1004,8 +1011,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let base_pt = self.builder.inner.complex().base_pt();
 
         // No per-chunk h_range: it would under-cover preprocess's off-axis key_map. Applied at the merge.
-        // No skip_final_elim either: "final" means root-final — a chunk must deloop before the cross-chunk merge.
-        let config = SymBuildConfig { cut: CutOption::None, node_order: NodeOrder::MinCut, h_range: None, skip_final_elim: false, ..self.builder.config.clone() };
+        // No no_full_deloop either: "final" means root-final — a chunk must deloop before the cross-chunk merge.
+        let config = SymBuildConfig { cut: CutOption::None, node_order: NodeOrder::MinCut, h_range: None, no_full_deloop: false, ..self.builder.config.clone() };
 
         let mut inner = TngComplexBuilder::init(h, t, (0, 0), base_pt)
             .with_config(config.inner_build_config());
@@ -1240,13 +1247,13 @@ mod tests {
     }
 
     #[test]
-    fn skip_final_elim_agrees() {
-        // skip_final_elim must not change homology: into_raw_complex redoes the deferred deloop.
+    fn no_full_deloop_agrees() {
+        // no_full_deloop must not change homology: into_raw_complex redoes the deferred deloop.
         let l = InvLink::test_data("6_3");
         let (h, t) = (FF2::zero(), FF2::zero());
         let build = |skip| {
             let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
-            b.config.skip_final_elim = skip;
+            b.config.no_full_deloop = skip;
             b.run().into_tng_complex().into_raw_complex()
         };
 

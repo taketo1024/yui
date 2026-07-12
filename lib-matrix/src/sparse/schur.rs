@@ -54,6 +54,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(r <= n);
 
         let t = if t == PivotType::Rows { TriangularType::Upper } else { TriangularType::Lower };
+        if m * n > 10_000_000 {
+            debug!("split blocks: {:?}, r: {r}", a.shape());
+        }
         let [a0, a1, a2, a3] = a.permute_and_split(p, q, r);
         Self::from_blocks(t, [&a0, &a1, &a2, &a3], with_trans_src, with_trans_tgt)
     }

@@ -18,6 +18,10 @@ use crate::conc::ChainComplex;
 use crate::GenericChainComplex;
 use crate::AddInd;
 
+// skip a reduction round when the pivot yield is below `1 / MIN_PIVOT_RATE` of the smaller
+// dimension — the round's full-matrix reshuffle wouldn't pay off.
+const MIN_PIVOT_RATE: usize = 1000;
+
 /// Reduces a chain complex by repeatedly cancelling pivot pairs `(a, d)` —
 /// applying a Schur-complement style change of basis at each step — and
 /// accumulates the resulting basis change as a [`Trans<R>`] per index.
@@ -217,8 +221,13 @@ where
         let config = PivotFinderConfig { piv_type, piv_cond, max_pivots: self.max_pivots, ..Default::default() };
         let (p, q, r) = find_pivots(a, config);
 
-        if r == 0 {
-            debug!("  done.");
+        let (m, n) = a.shape();
+        if r * MIN_PIVOT_RATE < m.min(n) {
+            if r == 0 { 
+                debug!("  done.");
+            } else { 
+                debug!("  skip r: {r}.");
+            }
             return false;
         }
 

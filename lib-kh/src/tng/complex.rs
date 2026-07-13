@@ -449,6 +449,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // shell left by `prepare_merge`.
     pub(crate) fn merge_with(&mut self, left: &Self, right: &Self) {
         for i in self.h_range() {
+            debug!("build C[{i}]...");
             self.merge_vertices(left, right, i);
             self.merge_edges(left, right, i - 1);
         }

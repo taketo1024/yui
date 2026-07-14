@@ -20,7 +20,7 @@ use yui_core::bitseq::{Bit, BitSeq};
 use yui_core::{Ring, RingOps};
 use yui_link::{Node, Edge, InvLink};
 
-use crate::kh::{KhGen, KhTensor};
+use crate::kh::{KhAlgGen, KhGen, KhTensor};
 use crate::tng::{LcCob, LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
 use crate::tng::builder::{TngComplexBuilder, TngElemBuilder, BuildConfig, BuildMode, NodeOrder};
 use std::fmt;
@@ -472,12 +472,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let Some(&c) = self.find_loop_in(&k, allow_based) else { continue };
 
             let new_keys = self.deloop_equiv(&k, &c);
-            // branches short of the usual 2 = inline-eliminated (based collapse or greedy elim)
+            // branches short of the usual 2 = inline-eliminated (based collapse or greedy elim),
+            // or dropped by the q-filter in `deloop`.
             elim += 2usize.saturating_sub(new_keys.len());
-
-            // drop out-of-window branches before they re-enter the pool (τ preserves q, so a branch
-            // and its τ-partner drop together — `key_map` stays a valid involution).
-            let new_keys = self.filter_q_range(new_keys);
 
             for new_key in new_keys {
                 if self.find_loop_in(&new_key, allow_based).is_some() {
@@ -496,21 +493,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("{}   delooped C[{i}]: {} (delooped: {done}, eliminated: {elim}, diff: {})", self.current_step(), after, after - before);
         debug!("{}   neighbors: C[{}] {} / C[{}] {}",
             self.current_step(), i - 1, self.complex().rank(i - 1), i + 1, self.complex().rank(i + 1));
-    }
-
-    // Drop delooped branches outside `config.q_range` (and their `key_map` entries), returning the
-    // kept keys. Exact once closed (see `TngComplexBuilder::should_drop`); a no-op otherwise.
-    fn filter_q_range(&mut self, keys: Vec<TngComplexKey>) -> Vec<TngComplexKey> {
-        if self.config.q_range.is_none() {
-            return keys;
-        }
-        let (keep, doomed): (Vec<_>, Vec<_>) = keys.into_iter().partition(|k| !self.inner.should_drop(k));
-        if !doomed.is_empty() {
-            let doomed_set: FxHashSet<_> = doomed.iter().copied().collect();
-            self.complex_mut().remove_vertices(&doomed);
-            self.key_map.drop(|k| doomed_set.contains(k));
-        }
-        keep
     }
 
     fn deloop_equiv(&mut self, k: &TngComplexKey, c: &TngComp) -> Vec<TngComplexKey> {
@@ -568,25 +550,35 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let tc = c.convert_edges(|e| self.inv_edge(e));
 
-        let ks = self.deloop(k, c);
-
-        let (k_X, k_1) = (ks[0], ks[1]);
-        let (k_XX, k_X1) = {
-            let tks = self.deloop(&k_X, &tc);
-            (tks[0], tks[1])
-        };
-        let (k_1X, k_11) = {
-            let tks = self.deloop(&k_1, &tc);
-            (tks[0], tks[1])
-        };
+        // deloop c then tc. Branch keys are deterministic (`+X`/`+I`), so the q-filter in `deloop`
+        // may drop any of them without us relying on the return: deloop only surviving branches,
+        // and pair up only the survivors (τ preserves q ⇒ a τ-pair drops together, so `k_X1`/`k_1X`
+        // are both present or both gone — the involution stays valid).
+        let (k_X, k_1) = (k + KhAlgGen::X, k + KhAlgGen::I);
+        self.deloop(k, c);
+        if self.complex().contains_key(&k_X) {
+            self.deloop(&k_X, &tc);
+        }
+        if self.complex().contains_key(&k_1) {
+            self.deloop(&k_1, &tc);
+        }
 
         self.key_map.remove(k);
 
-        self.key_map.add_pair(k_XX, k_XX);
-        self.key_map.add_pair(k_X1, k_1X);
-        self.key_map.add_pair(k_11, k_11);
+        let (k_XX, k_X1) = (&k_X + KhAlgGen::X, &k_X + KhAlgGen::I);
+        let (k_1X, k_11) = (&k_1 + KhAlgGen::X, &k_1 + KhAlgGen::I);
 
-        vec![k_XX, k_X1, k_1X, k_11]
+        if self.complex().contains_key(&k_XX) {
+            self.key_map.add_pair(k_XX, k_XX);
+        }
+        if self.complex().contains_key(&k_X1) && self.complex().contains_key(&k_1X) {
+            self.key_map.add_pair(k_X1, k_1X);
+        }
+        if self.complex().contains_key(&k_11) {
+            self.key_map.add_pair(k_11, k_11);
+        }
+
+        [k_XX, k_X1, k_1X, k_11].into_iter().filter(|x| self.complex().contains_key(x)).collect()
     }
 
     #[allow(non_snake_case)]

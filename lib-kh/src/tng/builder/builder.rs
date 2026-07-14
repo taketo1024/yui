@@ -458,16 +458,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         ) {
             let Some(&c) = self.find_loop_in(&k, allow_based) else { continue };
 
-            let mut new_keys = self.deloop(&k, &c);
-
-            // drop delooped branches outside `config.q_range` (exact once closed, see `should_drop`).
-            // Kept out of `deloop` itself so the sym builder's paired deloop still sees both branches.
-            if self.config.q_range.is_some() {
-                let (keep, doomed): (Vec<_>, Vec<_>) = new_keys.into_iter().partition(|nk| !self.should_drop(nk));
-                self.complex.remove_vertices(&doomed);
-                new_keys = keep;
-            }
-
+            let new_keys = self.deloop(&k, &c);
             // a normal circle yields 2 branches; a based circle yields 1, and in greedy mode each
             // branch may be eliminated on the spot. Count branches short of 2 as eliminated, so
             // `delooped - eliminated = diff` holds in both greedy and min-fill.
@@ -497,6 +488,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.elements.deloop(k, c);
 
         let mut added = self.complex.deloop(k, c);
+
+        // drop delooped branches outside `config.q_range` (exact once closed, see `should_drop`).
+        // The sym builder's paired deloop tolerates this — it guards its nested deloops on existence.
+        if self.config.q_range.is_some() {
+            let (keep, doomed): (Vec<_>, Vec<_>) = added.into_iter().partition(|k| !self.should_drop(k));
+            self.complex.remove_vertices(&doomed);
+            added = keep;
+        }
 
         // immediate elim eliminates each new vertex now; min-fill leaves them for the post-deloop
         // global pass, None leaves them entirely. `try_eliminate_at` skips over-cap pivots.

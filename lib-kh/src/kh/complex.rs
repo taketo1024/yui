@@ -49,7 +49,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         };
         let b = TngComplexBuilder::from_link(l, h, t, reduced).with_config(config).run();
         let canon_cycles = b.eval_elements();
-        let inner = b.into_tng_complex().into_raw_complex();
+        let inner = b.into_raw_complex(); // applies config.q_range on the no_full_deloop path
 
         KhComplex::from_raw_complex(l, h, t, reduced, inner, canon_cycles)
     }

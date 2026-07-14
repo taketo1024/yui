@@ -19,7 +19,9 @@ use log::{debug, info, trace, log_enabled, Level};
 use yui_core::{Ring, RingOps};
 use yui_link::{Node, Edge, Link};
 
-use crate::kh::{KhChain, KhComplex};
+use yui_homology::ChainComplex1;
+
+use crate::kh::{KhChain, KhComplex, KhGen};
 use crate::tng::{MAX_EDGE, TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
 use super::{reachable_range, pop_min_pivot, pivot_pool, push_pivot, sparkline, fill_cost_sparkline, cutwidth_after, toggle_boundary, boundary_edges, select_cuts, cut_components, merge_order, TngElemBuilder};
 
@@ -90,6 +92,9 @@ pub struct BuildConfig {
     // divide-and-conquer chunking (auto cutwidth or manual edge-cuts); None = single pass.
     pub cut: CutOption,
     pub h_range: Option<RangeInclusive<isize>>,
+    // drop generators outside this q-range. Only applied once the diagram is closed (see
+    // `should_drop`), where q-degrees are exact. `None` = no q-truncation.
+    pub q_range: Option<RangeInclusive<isize>>,
     // skip eliminations whose fill cost (`edge_weight` = Schur block size) exceeds this; the
     // survivors defer to the matrix reduction. `None` = eliminate everything (current behavior).
     pub max_elim_cost: Option<usize>,
@@ -100,7 +105,7 @@ pub struct BuildConfig {
 
 impl Default for BuildConfig {
     fn default() -> Self {
-        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), cut: CutOption::None, h_range: None, max_elim_cost: None, no_full_deloop: false }
+        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), cut: CutOption::None, h_range: None, q_range: None, max_elim_cost: None, no_full_deloop: false }
     }
 }
 
@@ -359,6 +364,21 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("  +{nv} verts");
         let ne = self.complex.merge_edges(left, right, i - 1);
         debug!("  +{ne} edges");
+
+        // drop merged vertices already outside q_range (before we deloop/eliminate them).
+        self.prune_q_range(i);
+    }
+
+    // Drop vertices in degree `i` whose q-degree can't reach `config.q_range`.
+    fn prune_q_range(&mut self, i: isize) {
+        if self.config.q_range.is_none() {
+            return;
+        }
+        let doomed = self.complex.keys_of_deg(i).filter(|k| self.should_drop(k)).copied().collect_vec();
+        if !doomed.is_empty() {
+            debug!("  -{} verts (q_range)", doomed.len());
+        }
+        self.complex.remove_vertices(&doomed);
     }
 
     /// Drop vertices that can't end up in `config.h_range`: degree `d` ends in
@@ -469,6 +489,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let mut added = self.complex.deloop(k, c);
 
+        // drop delooped branches that fall outside `config.q_range` (exact once closed, see `should_drop`).
+        if self.config.q_range.is_some() {
+            let (keep, doomed): (Vec<_>, Vec<_>) = added.into_iter().partition(|k| !self.should_drop(k));
+            self.complex.remove_vertices(&doomed);
+            added = keep;
+        }
+
         // immediate elim eliminates each new vertex now; min-fill leaves them for the post-deloop
         // global pass, None leaves them entirely. `try_eliminate_at` skips over-cap pivots.
         if self.config.mode.immediate_elim() {
@@ -476,6 +503,22 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             added.retain(|k| self.try_eliminate_at(k).is_none());
         }
         added
+    }
+
+    // A delooped branch is doomed if its q-degree can't land in `config.q_range`. q is exact only
+    // once the diagram is closed (`n_nodes() == 0`); then each remaining circle shifts q by ±1.
+    fn should_drop(&self, k: &TngComplexKey) -> bool {
+        let Some(q_range) = self.config.q_range.as_ref() else {
+            return false;
+        };
+        if self.n_nodes() != 0 {
+            return false;
+        }
+
+        let q0 = self.complex.deg_shift().1 + k.as_gen().rel_q_deg();
+        let nc = self.complex.vertex(k).tng().comps().filter(|c| c.is_circle()).count() as isize;
+
+        q0 + nc < *q_range.start() || q0 - nc > *q_range.end()
     }
 
     pub fn eliminate_in(&mut self, i: isize) {
@@ -612,6 +655,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn into_tng_complex(self) -> TngComplex<R> {
         self.complex
+    }
+
+    /// Convert to the raw complex, applying `config.q_range` (matrix-level deloop filter). This is the
+    /// only q-filter on the `no_full_deloop` path, where circles expand into generators here.
+    pub fn into_raw_complex(self) -> ChainComplex1<KhGen, R> {
+        match self.config.q_range.clone() {
+            Some(range) => self.complex.into_raw_complex_filtered(range),
+            None => self.complex.into_raw_complex(),
+        }
     }
 
     pub fn eval_elements(&self) -> Vec<KhChain<R>> {
@@ -960,6 +1012,96 @@ mod tests {
                 assert_eq!(h[i].tors(), ref_h[i].tors(), "tors at {i}, chunks {k:?}");
             }
         }
+    }
+
+    // Over Khovanov (d preserves q), a q-window keeps exactly the in-window generators, and the
+    // bigraded homology at each kept (i, q) is unchanged. Runs both filter paths (greedy deloop and
+    // no_full_deloop / matrix-level).
+    #[test]
+    fn q_filter_matches_full() {
+        let l = Link::test_data("8_19");
+        let full = KhComplex::new(&l, &0, &0, false);
+        let (h_range, q_range) = (full.h_range(), full.q_range());
+        let full_h = full.homology();
+
+        // an interior window: drop the outermost occupied q on each side.
+        let lo = *q_range.start() + 2;
+        let hi = *q_range.end() - 2;
+
+        for no_full_deloop in [false, true] {
+            let config = BuildConfig { q_range: Some(lo..=hi), no_full_deloop, ..Default::default() };
+            let win = KhComplex::new_with_config(&l, &0, &0, false, config);
+
+            for i in win.h_range() {
+                for x in win[i].raw_generators() {
+                    let q = win.q_deg_of(x);
+                    assert!((lo..=hi).contains(&q), "gen out of window: ({i}, {q}), no_full_deloop={no_full_deloop}");
+                }
+            }
+
+            let win_h = win.homology();
+            for i in h_range.clone() {
+                for q in q_range.clone().step_by(2) {
+                    let expected = if (lo..=hi).contains(&q) { full_h[(i, q)].rank() } else { 0 };
+                    assert_eq!(win_h[(i, q)].rank(), expected, "rank ({i}, {q}), no_full_deloop={no_full_deloop}");
+                    if (lo..=hi).contains(&q) {
+                        assert_eq!(win_h[(i, q)].tors(), full_h[(i, q)].tors(), "tors ({i}, {q}), no_full_deloop={no_full_deloop}");
+                    }
+                }
+            }
+        }
+    }
+
+    // Over 𝔽₂[H] (cross-q edges via H), a window covering the whole complex reproduces the
+    // unfiltered homology exactly — checks the edge-skipping path is a faithful no-op. Compared
+    // singly-graded (per h), since `deg H = −2` makes the bigraded split ill-defined here.
+    #[test]
+    fn q_filter_full_window_identity() {
+        use yui_core::poly::Poly;
+        use yui_core::num::FF2;
+        type P = Poly<'H', FF2>;
+
+        let l = Link::test_data("6_2");
+        let (h, t) = (P::variable(), P::zero());
+        let full = KhComplex::new(&l, &h, &t, false);
+        let q = full.q_range();
+        let wide = (*q.start() - 4) ..= (*q.end() + 4);
+
+        let config = BuildConfig { q_range: Some(wide), ..Default::default() };
+        let win = KhComplex::new_with_config(&l, &h, &t, false, config);
+
+        let (fh, wh) = (full.homology(), win.homology());
+        for i in full.h_range() {
+            assert_eq!(wh[i].rank(), fh[i].rank(), "rank at {i}");
+            assert_eq!(wh[i].tors(), fh[i].tors(), "tors at {i}");
+        }
+    }
+
+    // Over 𝔽₂[H], `d` raises generator-q (via H), so an upper-unbounded window `{q ≥ lo}` is a
+    // genuine subcomplex: a proper truncation that must still satisfy `d² = 0`.
+    #[test]
+    fn q_filter_subcomplex_valid() {
+        use yui_core::poly::Poly;
+        use yui_core::num::FF2;
+        type P = Poly<'H', FF2>;
+
+        let l = Link::test_data("6_2");
+        let (h, t) = (P::variable(), P::zero());
+        let full = KhComplex::new(&l, &h, &t, false);
+        let lo = *full.q_range().start() + 2; // drop the bottom q-degree(s)
+
+        let config = BuildConfig { q_range: Some(lo ..= isize::MAX), ..Default::default() };
+        let win = KhComplex::new_with_config(&l, &h, &t, false, config);
+
+        win.inner().check_d_all(); // `{q ≥ lo}` is a subcomplex: valid d² = 0
+        for i in win.h_range() {
+            for x in win[i].raw_generators() {
+                assert!(win.q_deg_of(x) >= lo, "gen below window at ({i}, {})", win.q_deg_of(x));
+            }
+        }
+
+        let gens = |c: &KhComplex<P>| c.h_range().map(|i| c[i].rank()).sum::<usize>();
+        assert!(gens(&win) < gens(&full), "window dropped no generator");
     }
 
     // chunked builds must track the canon cycles too: the Lee-class divisibility (the ss

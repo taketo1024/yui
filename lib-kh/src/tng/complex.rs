@@ -769,22 +769,35 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     /// Convert to the raw Khovanov chain complex (`KhGen`-keyed). See `into_raw_complex_with`.
     pub fn into_raw_complex(self) -> ChainComplex1<KhGen, R> {
-        self.into_raw_complex_with(|k, a| expanded_key(k, a).as_gen(), KhGen::rel_q_deg)
+        self.into_raw_complex_with(|k, a| expanded_key(k, a).as_gen(), KhGen::rel_q_deg, None)
+    }
+
+    /// `into_raw_complex` keeping only generators of absolute q-degree in `q_range`. Since the
+    /// differential is q-preserving over `𝔽[H]`, the window is a genuine subquotient. Note: for the
+    /// `d_H` (mod torsion) computation the low end must not exceed the complex's minimum q — only the
+    /// high end shrinks the complex without changing `d_H`.
+    pub(crate) fn into_raw_complex_filtered(self, q_range: RangeInclusive<isize>) -> ChainComplex1<KhGen, R> {
+        self.into_raw_complex_with(|k, a| expanded_key(k, a).as_gen(), KhGen::rel_q_deg, Some(q_range))
     }
 
     /// Convert to a raw chain complex, matrix-backed for `ChainReducer`. Any circles left on a vertex
     /// are delooped here, at the matrix level: the vertex expands into one generator per circle-label
     /// assignment (mapped to `X` by `into_gen`, ordered by `q_deg`), and each edge contributes the scalar
     /// `⟨b|f|a⟩` (the deloop pairing) as a closed cobordism. A delooped vertex gives one generator.
+    /// `q_range` (absolute q) drops out-of-window generators and their incident edges.
     pub(crate) fn into_raw_complex_with<X>(
         self,
         into_gen: impl Fn(&TngComplexKey, &KhTensor) -> X,
         q_deg: impl Fn(&X) -> isize,
+        q_range: Option<RangeInclusive<isize>>,
     ) -> ChainComplex1<X, R>
     where X: LcKey {
         let mut c = self;
         assert!(c.is_closed(), "into_raw_complex requires a closed complex (only circles expand into generators)");
         let (h, t) = c.ht().clone();
+        let q_shift = c.deg_shift().1;
+        let in_window = |k: &TngComplexKey, a: &KhTensor|
+            q_range.as_ref().is_none_or(|r| r.contains(&(q_shift + q_deg(&into_gen(k, a)))));
 
         info!("build raw complex: {}", c.stat());
 
@@ -794,7 +807,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let expanded = c.keys_of_deg(i).flat_map(|k| {
                 let circles = circles_of(c.vertex(k).tng());
                 label_assignments(&circles).into_iter().map(|a| (*k, a)).collect_vec()
-            }).sorted_by_key(|(k, a)|
+            }).filter(|(k, a)| in_window(k, a)).sorted_by_key(|(k, a)|
                 -q_deg(&into_gen(k, a))
             ).collect_vec();
             (i, expanded)
@@ -820,8 +833,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                     }
                     let tgt_circles = circles_of(c.vertex(l).tng());
                     for b in label_assignments(&tgt_circles) {
+                        // skip edges into a dropped (out-of-window) target; realizes the subquotient.
+                        let Some(&ri) = rows.get(&expanded_key(l, &b)) else { continue };
                         let g = cap_circles(fa.clone(), End::Tgt, &tgt_circles, &b, &h, &t);
-                        entries.push((rows[&expanded_key(l, &b)], j, g.eval(&h, &t)));
+                        entries.push((ri, j, g.eval(&h, &t)));
                     }
                 }
             }

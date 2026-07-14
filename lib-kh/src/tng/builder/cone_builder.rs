@@ -498,6 +498,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.cone.into_tng_complex().into_raw_complex_with(
             |k, a| into_khi_gen(&expanded_key(k, a).as_gen()),
             |g| g.rel_q_deg(),
+            None,
         )
     }
 }

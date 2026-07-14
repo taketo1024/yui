@@ -495,10 +495,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     /// circle-label assignment, mapped to `KhIGen` via the cone bit (`into_khi_gen`) and ordered by
     /// `KhIGen` q-degree. `eval_khi_elements` reads the canon classes on this same basis.
     pub fn into_raw_complex(self) -> ChainComplex1<KhIGen, R> {
+        let q_range = self.cone.config().q_range.clone();
         self.cone.into_tng_complex().into_raw_complex_with(
             |k, a| into_khi_gen(&expanded_key(k, a).as_gen()),
             |g| g.rel_q_deg(),
-            None,
+            q_range,
         )
     }
 }
@@ -508,7 +509,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 // Config for the cone's own `TngComplexBuilder`, which drives deloop/eliminate on the coned complex:
 // the simplify `mode` and the elimination fill-cost cap carry over from the sym config.
 fn cone_build_config(config: &SymBuildConfig) -> BuildConfig {
-    BuildConfig { mode: config.mode, max_elim_cost: config.max_elim_cost, ..Default::default() }
+    BuildConfig { mode: config.mode, max_elim_cost: config.max_elim_cost, q_range: config.q_range.clone(), ..Default::default() }
 }
 
 // An empty cone shell: same `deg_shift`/base point, one extra h-degree for the cone bit.

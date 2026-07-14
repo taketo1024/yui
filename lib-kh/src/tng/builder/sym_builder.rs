@@ -38,6 +38,9 @@ pub struct SymBuildConfig {
     pub preprocess: bool,
     // literal truncation: homology at the endpoints is wrong (build `(a-1)..=(b+1)` for correct `[a, b]`).
     pub h_range: Option<RangeInclusive<isize>>,
+    // drop generators outside this q-range. Applied once the diagram is closed (exact q); τ is
+    // q-homogeneous, so this stays consistent through the cone. `None` = no q-truncation.
+    pub q_range: Option<RangeInclusive<isize>>,
     // divide-and-conquer chunking (auto cutwidth or manual edge-cuts); None = single pass.
     pub cut: CutOption,
     // cone only: cap the per-elimination fill cost during cone_merge; survivors defer to the
@@ -50,7 +53,7 @@ pub struct SymBuildConfig {
 
 impl Default for SymBuildConfig {
     fn default() -> Self {
-        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, h_range: None, cut: CutOption::None, max_elim_cost: None, no_full_deloop: false }
+        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, h_range: None, q_range: None, cut: CutOption::None, max_elim_cost: None, no_full_deloop: false }
     }
 }
 
@@ -58,7 +61,7 @@ impl SymBuildConfig {
     // Config for the inner merge builder: `mode: None` (the sym builder drives deloop/elim, the inner
     // never orders nodes), so only `h_range` carries over — to drop out-of-window canon cycles.
     pub(crate) fn inner_build_config(&self) -> BuildConfig {
-        BuildConfig { mode: BuildMode::None, h_range: self.h_range.clone(), ..Default::default() }
+        BuildConfig { mode: BuildMode::None, h_range: self.h_range.clone(), q_range: self.q_range.clone(), ..Default::default() }
     }
 }
 

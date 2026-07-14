@@ -501,6 +501,37 @@ mod tests {
                 }
             }
         }
+
+        // The sym+cone q-filter: over Khovanov (d preserves q), a q-window keeps exactly the
+        // in-window generators, and bigraded KhI homology at each kept (i, q) is unchanged.
+        #[test]
+        fn q_filter_matches_full() {
+            type R = FF2;
+            let l = InvLink::test_data("6_3");
+            let (h, t) = (R::zero(), R::zero());
+
+            let full = KhIComplex::new(&l, &h, &t, false);
+            let (h_range, q_range) = (full.h_range(), full.q_range());
+            let full_h = full.homology();
+
+            let (lo, hi) = (*q_range.start() + 2, *q_range.end() - 2);
+            let config = SymBuildConfig { q_range: Some(lo ..= hi), ..Default::default() };
+            let win = KhIComplex::new_with_config(&l, &h, &t, false, config);
+
+            for i in win.h_range() {
+                for x in win[i].raw_generators() {
+                    assert!((lo ..= hi).contains(&win.q_deg_of(x)), "gen out of window: ({i}, {})", win.q_deg_of(x));
+                }
+            }
+
+            let win_h = win.homology();
+            for i in h_range.clone() {
+                for q in q_range.clone().step_by(2) {
+                    let expected = if (lo ..= hi).contains(&q) { full_h[(i, q)].rank() } else { 0 };
+                    assert_eq!(win_h[(i, q)].rank(), expected, "rank ({i}, {q})");
+                }
+            }
+        }
     }
 
     mod v1 {

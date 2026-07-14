@@ -44,6 +44,35 @@ where F: Field, for<'x> &'x F: FieldOps<F> {
     (ss0, ss1)
 }
 
+/// `ssi_invariant_h1` with the build's high-q cut set from a target divisibility `max_div`: only
+/// generators of q-degree `≤ q₀ + 2·(max_div + 2)` are built (`q₀` = the canon cycle's q-degree).
+/// Since only the high end is cut, `d_H` (mod torsion) is unchanged, so the result is exact provided
+/// the true divisibility is `≤ max_div + 1` (otherwise the solve reaches the built ceiling — raise
+/// `max_div`). This is the memory lever for large diagrams (Wh-doubles).
+pub fn ssi_invariant_h1_windowed<F>(l: &InvLink, reduced: bool, config: SymBuildConfig, max_div: i32) -> (i32, i32)
+where F: Field, for<'x> &'x F: FieldOps<F> {
+    let q0 = canon_q_deg::<F>(l, reduced);
+    let q_hi = q0 + 2 * (max_div as isize + 2);
+    info!("q-window: q0 = {q0}, cut above {q_hi} (max_div = {max_div}).");
+
+    // only the high-q cut; keep everything below (the full quotient needs the low generators for
+    // the torsion corrections that make this `d_H` mod torsion, not honest divisibility).
+    let config = SymBuildConfig { q_range: Some((isize::MIN + 1) ..= q_hi), ..config };
+    ssi_invariant_h1::<F>(l, reduced, config)
+}
+
+// The canon cycle's homogeneous q-degree `q₀`, from the Seifert-state cycle alone (no complex build).
+fn canon_q_deg<F>(l: &InvLink, reduced: bool) -> isize
+where F: Field, for<'x> &'x F: FieldOps<F> {
+    let deg_shift = KhComplex::<PolyH<F>>::deg_shift_for(l.inner(), reduced);
+    let (a, b) = (PolyH::<F>::zero(), PolyH::<F>::variable());
+    let zs = KhComplex::<PolyH<F>>::make_canon_cycles(l.inner(), &a, &b, reduced);
+
+    zs.iter().flat_map(|z|
+        z.iter().map(|(x, c)| deg_shift.1 + x.rel_q_deg() - 2 * (c.lead_deg() as isize))
+    ).min().expect("empty canon cycle")
+}
+
 fn ssi_divisibility_h1<F>(l: &InvLink, reduced: bool, config: SymBuildConfig) -> (i32, i32)
 where F: Field, for<'x> &'x F: FieldOps<F> {
     let r = if reduced { 1 } else { 2 };
@@ -217,6 +246,23 @@ mod tests {
     test!(k6_2a, "6_2a", (2, 2));
     test!(k6_3, "6_3", (0, 0));
     test!(k7_6a, "7_6a", (-2, -2));
+
+    // the q-windowed build (high-q cut at the true divisibility) reproduces the full ssi.
+    #[test]
+    fn windowed_matches_full() -> Result<(), Box<dyn std::error::Error>> {
+        for name in ["3_1", "4_1", "5_1", "5_2a", "6_2a", "6_3", "7_6a"] {
+            let l = InvLink::load(name)?;
+            let full = ssi_invariant_h1::<F>(&l, false, SymBuildConfig::default());
+
+            // tight window at the true divisibility d = (ss − w + r − 1) / 2 (max over the two classes).
+            let (w, r) = (l.writhe(), l.seifert_circles().len() as i32);
+            let d_max = [(full.0 - w + r - 1) / 2, (full.1 - w + r - 1) / 2].into_iter().max().unwrap();
+            let win = ssi_invariant_h1_windowed::<F>(&l, false, SymBuildConfig::default(), d_max);
+
+            assert_eq!(win, full, "{name} (d_max = {d_max})");
+        }
+        Ok(())
+    }
 
     #[test]
     fn k3_1_m() {

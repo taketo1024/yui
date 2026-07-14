@@ -13,14 +13,14 @@
 
 use delegate::delegate;
 use itertools::Itertools;
-use log::{debug, info, trace};
+use log::{debug, info};
 use num_traits::Zero;
 use yui_core::bitseq::Bit;
 use yui_core::{Ring, RingOps};
 use yui_link::{Edge, InvLink};
 
 use rayon::prelude::*;
-use rustc_hash::FxHashMap;
+use rustc_hash::FxHashSet;
 use yui_homology::ChainComplex1;
 
 use crate::kh::{KhChain, KhGen};
@@ -28,6 +28,8 @@ use crate::khi::{KhIChain, KhIGen, KhIGenExt};
 use crate::tng::{Cob, CobComp, End, LcCob, LcCobTrait, Tng, TngComplex, TngComplexElem, TngComplexKey, TngComplexVertex, circles_of, label_assignments, expanded_key, cap_circles};
 use super::{reachable_range, SymTngBuilder, SymBuildConfig, TngComplexBuilder, BuildConfig};
 use super::builder::{PROGRESS_LOG_STEP, PROGRESS_LOG_MIN};
+
+const CHUNK: usize = 4096;
 
 // τ-orbit class of a symmetric-complex vertex: the representative (smaller key) and the τ-fixed
 // survive into the direct cone; the non-representative column is never materialized.
@@ -40,9 +42,6 @@ pub struct ConeBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     inner: SymTngBuilder<R>,
     cone: TngComplexBuilder<R>, // the reduced cone, filled in by the final `cone_merge`
-    // vertical identity pivots `k·0 → k·1` per free τ-orbit, recorded at `cone_extend` (while the
-    // τ-pairing is still alive) and consumed by `vertical_reduce` two degrees behind.
-    pending_vertical: FxHashMap<isize, Vec<(TngComplexKey, TngComplexKey)>>,
 }
 
 impl<R> ConeBuilder<R>
@@ -50,7 +49,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn from_inv_link(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self {
         let inner = SymTngBuilder::from_inv_link(l, h, t, reduced);
         let cone = TngComplexBuilder::init(h, t, (0, 0), None); // replaced by `cone_merge`
-        Self { inner, cone, pending_vertical: FxHashMap::default() }
+        Self { inner, cone }
     }
 
     pub fn with_config(mut self, config: SymBuildConfig) -> Self {
@@ -84,38 +83,40 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         info!("build cone over {}, range: {range:?}", self.inner.complex().stat());
 
-        // seed the canon cycles' `B`/`Q` (bit-0/bit-1) copies into the cone so its
-        // deloop/eliminate carry them. `cone_extend` will create the referenced vertices.
-        self.seed_cone_elements();
+        self.seed_elements();
 
         let top = *range.end();
         for d in range {
-            debug!("cone C[{d}]...");
+            debug!("build cone C[{d}]...");
             self.cone_extend_reduced(d);
             self.rewrite_elements(d - 1); // degree d-1's out-edges are now complete
-            self.vertical_reduce(d - 2); // no-op below the range start (empty pending_vertical)
             self.prune_consumed(d - 2); // free the consumed symmetric degree before the heavy eliminate
             self.cone.eliminate_in(d - 2); // stragglers: τ-fixed `1+τ` units, correction-created units
             debug!("  built cone C[{d}]: {}.", self.cone.complex().rank(d));
         }
 
-        // eliminate_in(top) collapses the id-pairing C[top] (Bit0) → C[top+1] (Bit1), shrinking the
-        // top before deloop; C[top+1]'s remainder is dropped by `prune_isolated_top` below.
-        // (top+1 itself needs no eliminate_in: its vertices have no out-edges.)
         self.rewrite_elements(top); // the top degree has no further out-edges — Iτ pushes only
 
         info!("cone eliminate top C[{}..={}]", top - 1, top);
         for d in (top - 1) ..= top {
-            self.vertical_reduce(d);
+            self.prune_consumed(d);
             self.cone.eliminate_in(d);
         }
 
         self.prune_isolated_top(top);
 
-        info!("merged: {}", self.cone.stat());
+        info!("built cone: {}", self.cone.stat());
     }
 
-    // Symmetry-breaking direct emission (Sano2026, Prop 4.6): per free τ-orbit only the
+    // Lift each completed symmetric canon cycle to its `B` (bit-0) and `Q` (bit-1) cone copies.
+    fn seed_elements(&mut self) {
+        let lifted = self.inner.elements().content().iter().flat_map(|e|
+            [lift_elem(e, Bit::Bit0), lift_elem(e, Bit::Bit1)]
+        ).collect_vec();
+        self.cone.elements_mut().set(lifted);
+    }
+
+    // Symmetry-breaking reduction (Sano2026, Prop 4.6): per free τ-orbit only the
     // representative's two copies are created; the dropped column's contributions enter as
     // closed-form corrections. Corrections through two dropped corners vanish (an edge into a
     // dropped `l⁰` is an in-edge of a removed pivot source; one out of a dropped `j¹` is an
@@ -126,109 +127,147 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     //   asymmetric elimination through dropped N at d−1 : (i) X¹ → k⁰ += (X→N)∘(N→k),
     // and only τ-fixed vertices keep a vertical `1 + τ` (a representative's identity cancels via τ²).
     fn cone_extend_reduced(&mut self, d: isize) {
-        let with_bit = |k: &TngComplexKey, b: Bit| {
-            let mut key = *k;
-            key.state.push(b);
-            key
-        };
-        let (h, t) = self.cone.complex().ht().clone();
         let keys = self.inner.complex().keys_of_deg(d).copied().collect_vec();
-        let dropped = keys.iter().filter(|k| self.orbit_class(k).1 == OrbitClass::Drop).count();
+        self.add_cone_vertices(d, &keys);
+        self.add_horizontal_edges(d, &keys);
+        self.add_vertical_edges(d, &keys);
+        self.add_diag_edges(d - 1);
+    }
 
-        debug!("  cone-extend-reduced C[{d}]: +{} verts ({dropped} dropped)", 2 * (keys.len() - dropped));
+    // vertices: representatives and τ-fixed only.
+    fn add_cone_vertices(&mut self, d: isize, keys: &[TngComplexKey]) {
+        let dropped = keys.iter().filter(|k| self.tau_key(k).1 == OrbitClass::Drop).count();
+        debug!("  C[{d}]: build {} verts ({dropped} dropped)", 2 * (keys.len() - dropped));
 
-        // vertices: representatives and τ-fixed only.
         for k in keys.iter() {
-            if self.orbit_class(k).1 == OrbitClass::Drop {
+            if self.tau_key(k).1 == OrbitClass::Drop {
                 continue;
             }
             let tng = self.inner.complex().vertex(k).tng().clone();
             self.cone.complex_mut().add_vertex(with_bit(k, Bit::Bit0), TngComplexVertex::from(tng.clone()));
             self.cone.complex_mut().add_vertex(with_bit(k, Bit::Bit1), TngComplexVertex::from(tng));
         }
-        trace!("    C[{d}] vertices done");
+    }
 
-        // within-layer edges into degree d, rewritten per the tables above.
-        debug!("    C[{d}] within-layer edges ({} keys)...", keys.len());
-        for k in keys.iter() {
-            let (tk, ck) = self.orbit_class(k);
-            for j in self.inner.complex().vertex(k).in_edges().copied().collect_vec() {
-                let f = self.inner.complex().edge(&j, k).clone();
-                let (tj, cj) = self.orbit_class(&j);
-                match (cj, ck) {
-                    (OrbitClass::Drop, OrbitClass::Drop) => {}
-                    (OrbitClass::Drop, _) => {
-                        let itau = LcCob::from(tau_cob(self.inner.complex().vertex(&tj).tng(), |e| self.inner.inv_edge(e)));
-                        let corr = itau.stack(&f).reduce(&h, &t);
-                        self.cone.complex_mut().add_to_edge(&with_bit(&tj, Bit::Bit0), &with_bit(k, Bit::Bit0), corr);
-                    }
-                    (_, OrbitClass::Drop) => {
-                        let itau = LcCob::from(tau_cob(self.inner.complex().vertex(k).tng(), |e| self.inner.inv_edge(e)));
-                        let corr = f.stack(&itau).reduce(&h, &t);
-                        self.cone.complex_mut().add_to_edge(&with_bit(&j, Bit::Bit1), &with_bit(&tk, Bit::Bit1), corr);
-                    }
-                    _ => {
-                        self.cone.complex_mut().add_to_edge(&with_bit(&j, Bit::Bit0), &with_bit(k, Bit::Bit0), f.clone());
-                        self.cone.complex_mut().add_to_edge(&with_bit(&j, Bit::Bit1), &with_bit(k, Bit::Bit1), f);
-                    }
-                }
-            }
-        }
+    // horizontal edges into degree d, rewritten per the tables in `cone_extend_reduced`. The Drop
+    // arms each cost a cobordism composition (`Iτ∘f` / `f∘Iτ`), independent per edge — compute in
+    // parallel (chunked over k to bound the transient), then apply the accumulating add_to_edge
+    // serially (entries can collide: a Drop-arm correction may land on a genuine surviving edge).
+    fn add_horizontal_edges(&mut self, d: isize, keys: &[TngComplexKey]) {
+        debug!("  C[{d}]: add horizontal edges ({} keys)...", keys.len());
 
-        // (i) asymmetric elimination: eliminating each dropped N's diagonal `1+τ` edge reconnects its
-        // in-edges to its out-edges, X¹ → k⁰ += (X→N)∘(N→k) — one full cobordism composition per
-        // (N, in-edge, out-edge) triple, O(dropped × in × out), the dominant cost. Independent per
-        // triple, so compute in parallel (chunked over N to bound the transient), then apply the
-        // accumulating add_to_edge serially.
-        let dropped_prev = self.inner.complex().keys_of_deg(d - 1)
-            .filter(|n| self.orbit_class(n).1 == OrbitClass::Drop)
-            .copied().collect_vec();
-
-        debug!("    C[{d}] asymmetric elimination: {} dropped...", dropped_prev.len());
-
-        const CHUNK: usize = 4096;
+        let (h, t) = self.cone.complex().ht().clone();
         let inner = self.inner.complex();
         let mut done = 0;
-        for ns in dropped_prev.chunks(CHUNK) {
-            let corrs: Vec<(TngComplexKey, TngComplexKey, LcCob<R>)> = ns.par_iter().flat_map_iter(|n| {
-                let ins = inner.vertex(n).in_edges().copied()
-                    .filter(|x| self.orbit_class(x).1 != OrbitClass::Drop).collect_vec();
-                let outs = inner.vertex(n).out_edges().copied()
-                    .filter(|k| self.orbit_class(k).1 != OrbitClass::Drop).collect_vec();
-                let mut local = vec![];
-                for x in ins.iter() {
-                    let b = inner.edge(x, n).clone();
-                    for k in outs.iter() {
-                        let corr = b.stack(inner.edge(n, k)).reduce(&h, &t);
-                        if !corr.is_zero() {
-                            local.push((with_bit(x, Bit::Bit1), with_bit(k, Bit::Bit0), corr));
+        
+        for keys_chunk in keys.chunks(CHUNK) {
+            // reference shadows: the nested `move` closures can only capture `Copy` refs.
+            let this = &*self;
+            let (h, t) = (&h, &t);
+            let entries: Vec<(TngComplexKey, TngComplexKey, LcCob<R>)> = keys_chunk.par_iter().flat_map_iter(|k| {
+                let (tk, ck) = this.tau_key(k);
+                inner.vertex(k).in_edges().flat_map(move |j| {
+                    let f = inner.edge(j, k);
+                    let (tj, cj) = this.tau_key(j);
+                    // per the rewrite tables: at most one cone edge per layer (e0: bit-0, e1: bit-1).
+                    let (e0, e1) = match (cj, ck) {
+                        (OrbitClass::Drop, OrbitClass::Drop) => (None, None),
+                        (OrbitClass::Drop, _) => {
+                            let itau = LcCob::from(tau_cob(inner.vertex(&tj).tng(), |e| this.inner.inv_edge(e)));
+                            let corr = itau.stack(f).reduce(h, t);
+                            let e0 = (!corr.is_zero()).then(|| (with_bit(&tj, Bit::Bit0), with_bit(k, Bit::Bit0), corr));
+                            (e0, None)
                         }
-                    }
-                }
-                local
+                        (_, OrbitClass::Drop) => {
+                            let itau = LcCob::from(tau_cob(inner.vertex(k).tng(), |e| this.inner.inv_edge(e)));
+                            let corr = f.stack(&itau).reduce(h, t);
+                            let e1 = (!corr.is_zero()).then(|| (with_bit(j, Bit::Bit1), with_bit(&tk, Bit::Bit1), corr));
+                            (None, e1)
+                        }
+                        _ => (
+                            Some((with_bit(j, Bit::Bit0), with_bit(k, Bit::Bit0), f.clone())),
+                            Some((with_bit(j, Bit::Bit1), with_bit(k, Bit::Bit1), f.clone())),
+                        ),
+                    };
+                    [e0, e1].into_iter().flatten()
+                })
             }).collect();
 
-            for (src, dst, corr) in corrs {
-                self.cone.complex_mut().add_to_edge(&src, &dst, corr);
+            for (src, dst, f) in entries {
+                self.cone.complex_mut().add_to_edge(&src, &dst, f);
             }
+
             let prev = done;
-            done += ns.len();
-            if dropped_prev.len() > PROGRESS_LOG_MIN && done / PROGRESS_LOG_STEP > prev / PROGRESS_LOG_STEP {
-                debug!("      ... corrected {done}/{} in C[{d}]", dropped_prev.len());
+            done += keys_chunk.len();
+            if keys.len() > PROGRESS_LOG_MIN && done / PROGRESS_LOG_STEP > prev / PROGRESS_LOG_STEP {
+                debug!("    ... {done}/{}", keys.len());
             }
         }
+    }
 
-        // verticals: τ-fixed only.
-        for k in keys.iter() {
-            if self.orbit_class(k).1 != OrbitClass::Fixed {
-                continue;
-            }
+    // verticals: τ-fixed only.
+    fn add_vertical_edges(&mut self, d: isize, keys: &[TngComplexKey]) {
+        let target = keys.iter().filter(|k| self.tau_key(k).1 == OrbitClass::Fixed).collect_vec();
+
+        debug!("  C[{d}]: add vertical edges ({} keys)...", target.len());
+        let mut done = 0;
+
+        for k in target.iter() {
             let tng = self.inner.complex().vertex(k).tng().clone();
             let id = LcCob::from(Cob::id(&tng));
             let tau = LcCob::from(tau_cob(&tng, |e| self.inner.inv_edge(e)));
             let f = id + tau; // same target: sum over char 2
             if !f.is_zero() {
                 self.cone.complex_mut().add_edge(&with_bit(k, Bit::Bit0), &with_bit(k, Bit::Bit1), f);
+            }
+
+            let prev = done;
+            done += 1;
+            if target.len() > PROGRESS_LOG_MIN && done / PROGRESS_LOG_STEP > prev / PROGRESS_LOG_STEP {
+                debug!("    ... {done}/{}", target.len());
+            }
+        }
+    }
+
+    // (i) asymmetric elimination: eliminating each dropped N's diagonal `1+τ` edge reconnects its
+    // in-edges to its out-edges, X¹ → k⁰ += (X→N)∘(N→k) — one full cobordism composition per
+    // (N, in-edge, out-edge) triple, O(dropped × in × out), the dominant cost. Independent per
+    // triple, so compute in parallel (chunked over N to bound the transient), then apply the
+    // accumulating add_to_edge serially (corrections collide with horizontal edges and each other).
+    fn add_diag_edges(&mut self, d: isize) {
+        let dropped = self.inner.complex().keys_of_deg(d)
+            .filter(|n| self.tau_key(n).1 == OrbitClass::Drop)
+            .copied().collect_vec();
+
+        debug!("  C[{}]: add diagonal edges (dropped: {})", d, dropped.len());
+
+        let (h, t) = self.cone.complex().ht().clone();
+        let inner = self.inner.complex();
+        let mut done = 0;
+
+        for dropped_chunk in dropped.chunks(CHUNK) {
+            let (h, t) = (&h, &t);
+            let corrs: Vec<(TngComplexKey, TngComplexKey, LcCob<R>)> = dropped_chunk.par_iter().flat_map_iter(|n| {
+                let ins = inner.vertex(n).in_edges().copied()
+                    .filter(|x| self.tau_key(x).1 != OrbitClass::Drop).collect_vec();
+                let outs = inner.vertex(n).out_edges().copied()
+                    .filter(|k| self.tau_key(k).1 != OrbitClass::Drop).collect_vec();
+                ins.into_iter().cartesian_product(outs).filter_map(move |(x, k)| {
+                    let corr = inner.edge(&x, n).stack(inner.edge(n, &k)).reduce(h, t);
+                    (!corr.is_zero()).then(|| 
+                        (with_bit(&x, Bit::Bit1), with_bit(&k, Bit::Bit0), corr)
+                    )
+                })
+            }).collect();
+
+            for (src, dst, corr) in corrs {
+                self.cone.complex_mut().add_to_edge(&src, &dst, corr);
+            }
+
+            let prev = done;
+            done += dropped_chunk.len();
+            if dropped.len() > PROGRESS_LOG_MIN && done / PROGRESS_LOG_STEP > prev / PROGRESS_LOG_STEP {
+                debug!("    ... {done}/{}", dropped.len());
             }
         }
     }
@@ -239,33 +278,32 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // (mirroring `eliminate_from` with the identity pivot). Corrections landing on a dropped
     // `l·0` are removed by the next degree's rewrite, matching the sequential SDR composition.
     fn rewrite_elements(&mut self, d: isize) {
-        let with_bit = |k: &TngComplexKey, b: Bit| {
-            let mut key = *k;
-            key.state.push(b);
-            key
-        };
+        let n_elems = self.cone.elements().content().len();
+        if n_elems == 0 { 
+            return;
+        }
 
         // only keys the elements actually reference need a push table (the canon elements touch a
         // tiny fraction of the ~10⁵ dropped keys per degree).
-        let referenced: rustc_hash::FxHashSet<TngComplexKey> = self.cone.elements().content().iter()
+        let referenced: FxHashSet<TngComplexKey> = self.cone.elements().content().iter()
             .flat_map(|e| e.out_cob().keys().copied())
             .map(|mut k| { k.state.remove(k.state.len() - 1); k })
             .collect();
 
         let dropped = self.inner.complex().keys_of_deg(d)
-            .filter(|n| referenced.contains(n) && self.orbit_class(n).1 == OrbitClass::Drop)
+            .filter(|n| referenced.contains(n) && self.tau_key(n).1 == OrbitClass::Drop)
             .copied().collect_vec();
 
         if dropped.is_empty() {
             return;
         }
 
-        debug!("    rewrite-elements C[{d}]: {} referenced-dropped", dropped.len());
+        debug!("    rewrite-elements {n_elems} in C[{d}]: {} referenced-dropped", dropped.len());
 
         let (h, t) = self.cone.complex().ht().clone();
 
         let pushes = dropped.iter().map(|n| {
-            let tn = self.orbit_class(n).0;
+            let tn = self.tau_key(n).0;
             let itau = LcCob::from(tau_cob(self.inner.complex().vertex(n).tng(), |e| self.inner.inv_edge(e)));
             let mut outs = vec![(with_bit(&tn, Bit::Bit1), itau)];
             for l in self.inner.complex().vertex(n).out_edges() {
@@ -296,7 +334,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     // τ-orbit classification via the inner key map; the representative is the smaller key.
-    fn orbit_class(&self, k: &TngComplexKey) -> (TngComplexKey, OrbitClass) {
+    fn tau_key(&self, k: &TngComplexKey) -> (TngComplexKey, OrbitClass) {
         let tk = *self.inner.key_map().inv_key(k);
         let class = if tk == *k {
             OrbitClass::Fixed
@@ -310,16 +348,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     // The full (non-reduced) cone extension — kept for debugging against `cone_extend_reduced`.
     // Adds the symmetric complex's degree-`d` slice to the cone: the two copies `k·0`, `k·1` of each
-    // vertex, the within-layer edges *into* degree `d`, and the `1+τ` edges out of `k·0`. Processed
+    // vertex, the horizontal edges *into* degree `d`, and the `1+τ` edges out of `k·0`. Processed
     // ascending, every edge lands exactly once (its target's degree). `vertical_reduce` (via
     // `pending_vertical`) collapses its free-orbit `1+τ` pivots two degrees behind.
     #[allow(dead_code)]
     fn cone_extend_full(&mut self, d: isize) {
-        let with_bit = |k: &TngComplexKey, b: Bit| {
-            let mut key = *k;
-            key.state.push(b);
-            key
-        };
         let keys = self.inner.complex().keys_of_deg(d).copied().collect_vec();
 
         debug!("  cone-extend C[{d}]: +{} verts", 2 * keys.len());
@@ -330,7 +363,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.cone.complex_mut().add_vertex(with_bit(k, Bit::Bit1), TngComplexVertex::from(tng));
         }
 
-        // within-layer edges into degree d (each layer copies the symmetric differential).
+        // horizontal edges into degree d (each layer copies the symmetric differential).
         for k in keys.iter() {
             for j in self.inner.complex().vertex(k).in_edges().copied().collect_vec() {
                 let f = self.inner.complex().edge(&j, k).clone();
@@ -355,45 +388,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             } else {
                 self.cone.complex_mut().add_edge(&k0, &with_bit(k, Bit::Bit1), id);
                 self.cone.complex_mut().add_edge(&k0, &with_bit(&tk, Bit::Bit1), tau);
-
-                // record the vertical pivot at the orbit's non-representative (Sano2026, Prop 4.6);
-                // the representative's identity cancels via the τ² correction when this eliminates.
-                if *k > tk {
-                    self.pending_vertical.entry(d).or_default().push((k0, with_bit(k, Bit::Bit1)));
-                }
             }
         }
-    }
-
-    // Symmetry-breaking reduction (Sano2026, Prop 4.6): eliminate the recorded vertical identity
-    // pivots of degree `d` directly, skipping the pivot search. The recorded pairs are hints, not
-    // guarantees — the straggler `eliminate_in` passes may have consumed a vertex or spoiled the
-    // edge's invertibility, and such leftovers fall back to the generic pass.
-    fn vertical_reduce(&mut self, d: isize) {
-        let Some(pairs) = self.pending_vertical.remove(&d) else { return };
-
-        debug!("  vertical-reduce C[{d}]: {} orbit pairs", pairs.len());
-
-        for (v, w) in pairs {
-            let c = self.cone.complex();
-            let valid = c.contains_key(&v) && c.contains_key(&w)
-                && c.has_edge(&v, &w)
-                && c.edge(&v, &w).is_invertible();
-            if valid {
-                self.cone.eliminate(&v, &w);
-            }
-        }
-    }
-
-    // Lift each completed symmetric canon cycle to its `B` (bit-0) and `Q` (bit-1) cone copies.
-    fn seed_cone_elements(&mut self) {
-        let lifted = self.inner.elements().content().iter().flat_map(|e|
-            [lift_elem(e, Bit::Bit0), lift_elem(e, Bit::Bit1)]
-        ).collect_vec();
-
-        debug!("  seed {} cone elements", lifted.len());
-
-        self.cone.elements_mut().set(lifted);
     }
 
     // Drop a consumed symmetric degree and its τ key-map entries — never needed again.
@@ -416,7 +412,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
         // keep vertices a canon cycle lands on: its `Q` copy lives at the boundary degree `top`, and
         // `eval_khi_elements` needs the vertex present (the homology window trims the class afterwards).
-        let referenced: rustc_hash::FxHashSet<TngComplexKey> = self.cone.elements().content().iter()
+        let referenced: FxHashSet<TngComplexKey> = self.cone.elements().content().iter()
             .flat_map(|e| e.out_cob().keys().copied())
             .collect();
 
@@ -519,6 +515,13 @@ fn cone_shell<R>(c: &TngComplex<R>) -> TngComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let (h, t) = c.ht();
     TngComplex::new(h, t, c.deg_shift(), c.base_pt(), c.dim() + 1, Default::default())
+}
+
+// The cone copy of a symmetric-complex key: push the cone bit onto the state.
+fn with_bit(k: &TngComplexKey, b: Bit) -> TngComplexKey {
+    let mut key = *k;
+    key.state.push(b);
+    key
 }
 
 // The τ morphism on a closed tangle: one relabel cylinder `c → τc` per circle.

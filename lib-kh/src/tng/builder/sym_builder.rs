@@ -474,6 +474,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let new_keys = self.deloop_equiv(&k, &c);
             // branches short of the usual 2 = inline-eliminated (based collapse or greedy elim)
             elim += 2usize.saturating_sub(new_keys.len());
+
+            // drop out-of-window branches before they re-enter the pool (τ preserves q, so a branch
+            // and its τ-partner drop together — `key_map` stays a valid involution).
+            let new_keys = self.filter_q_range(new_keys);
+
             for new_key in new_keys {
                 if self.find_loop_in(&new_key, allow_based).is_some() {
                     let w = self.pivot_weight(&new_key);
@@ -491,6 +496,21 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("{}   delooped C[{i}]: {} (delooped: {done}, eliminated: {elim}, diff: {})", self.current_step(), after, after - before);
         debug!("{}   neighbors: C[{}] {} / C[{}] {}",
             self.current_step(), i - 1, self.complex().rank(i - 1), i + 1, self.complex().rank(i + 1));
+    }
+
+    // Drop delooped branches outside `config.q_range` (and their `key_map` entries), returning the
+    // kept keys. Exact once closed (see `TngComplexBuilder::should_drop`); a no-op otherwise.
+    fn filter_q_range(&mut self, keys: Vec<TngComplexKey>) -> Vec<TngComplexKey> {
+        if self.config.q_range.is_none() {
+            return keys;
+        }
+        let (keep, doomed): (Vec<_>, Vec<_>) = keys.into_iter().partition(|k| !self.inner.should_drop(k));
+        if !doomed.is_empty() {
+            let doomed_set: FxHashSet<_> = doomed.iter().copied().collect();
+            self.complex_mut().remove_vertices(&doomed);
+            self.key_map.drop(|k| doomed_set.contains(k));
+        }
+        keep
     }
 
     fn deloop_equiv(&mut self, k: &TngComplexKey, c: &TngComp) -> Vec<TngComplexKey> {

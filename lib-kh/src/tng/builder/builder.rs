@@ -509,7 +509,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     // A delooped branch is doomed if its q-degree can't land in `config.q_range`. q is exact only
     // once the diagram is closed (no open arcs); then each remaining circle shifts q by ±1.
-    fn should_drop(&self, k: &TngComplexKey) -> bool {
+    pub(crate) fn should_drop(&self, k: &TngComplexKey) -> bool {
         let Some(q_range) = self.config.q_range.as_ref() else {
             return false;
         };

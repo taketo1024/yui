@@ -28,52 +28,59 @@ type PolyH<F> = Poly<'H', F>;
 pub fn ssi_invariant_h1<F>(l: &InvLink, reduced: bool, config: SymBuildConfig) -> (i32, i32)
 where F: Field, for<'x> &'x F: FieldOps<F> {
     assert!(l.is_knot());
-
     info!("compute ssi via H=1 solves over {}.", PolyH::<F>::math_symbol());
 
-    let w = l.writhe();
-    let r = l.seifert_circles().len() as i32;
-    let (d0, d1) = ssi_divisibility_h1::<F>(l, reduced, config);
-
-    let ss0 = 2 * d0 + w - r + 1;
-    let ss1 = 2 * d1 + w - r + 1;
-
-    info!("w = {w}, r = {r}, d0 = {d0}, d1 = {d1}.");
-    info!("ssi = ({ss0}, {ss1}).");
-
-    (ss0, ss1)
+    let q0 = canon_q_deg(l, reduced);
+    let (d0, d1) = ssi_divisibility_h1::<F>(l, reduced, config, q0)
+        .expect("full (un-windowed) build must not truncate the canon cycle");
+    finish_ssi(l, d0, d1)
 }
 
 /// `ssi_invariant_h1` with the build's high-q cut set from a target divisibility `max_div`: only
-/// generators of q-degree `≤ q₀ + 2·(max_div + 2)` are built (`q₀` = the canon cycle's q-degree).
-/// Since only the high end is cut, `d_H` (mod torsion) is unchanged, so the result is exact provided
-/// the true divisibility is `≤ max_div + 1` (otherwise the solve reaches the built ceiling — raise
-/// `max_div`). This is the memory lever for large diagrams (Wh-doubles).
+/// generators of q-degree `≤ q₀ + 2·(max_div + 2)` are built (`q₀ = w − r`). Only the high end is
+/// cut, so `d_H` (mod torsion) is unchanged. If the window is too tight — the reduction pushes the
+/// canon representative above it, truncating it to zero — the build is retried with a wider window.
+/// This is the memory lever for large diagrams (Wh-doubles).
 pub fn ssi_invariant_h1_windowed<F>(l: &InvLink, reduced: bool, config: SymBuildConfig, max_div: i32) -> (i32, i32)
 where F: Field, for<'x> &'x F: FieldOps<F> {
-    let q0 = canon_q_deg::<F>(l, reduced);
-    let q_hi = q0 + 2 * (max_div as isize + 2);
-    info!("q-window: q0 = {q0}, cut above {q_hi} (max_div = {max_div}).");
+    assert!(l.is_knot());
+    info!("compute ssi via windowed H=1 solves over {}.", PolyH::<F>::math_symbol());
 
-    // only the high-q cut; keep everything below (the full quotient needs the low generators for
-    // the torsion corrections that make this `d_H` mod torsion, not honest divisibility).
-    let config = SymBuildConfig { q_range: Some((isize::MIN + 1) ..= q_hi), ..config };
-    ssi_invariant_h1::<F>(l, reduced, config)
+    let q0 = canon_q_deg(l, reduced);
+    let mut md = max_div;
+    loop {
+        let q_hi = q0 + 2 * (md as isize + 2);
+        info!("q-window: q0 = {q0}, cut above {q_hi} (max_div = {md}).");
+        let cfg = SymBuildConfig { q_range: Some((isize::MIN + 1) ..= q_hi), ..config.clone() };
+
+        if let Some((d0, d1)) = ssi_divisibility_h1::<F>(l, reduced, cfg, q0) {
+            return finish_ssi(l, d0, d1);
+        }
+        md += 2;
+        info!("canon cycle above window; widening to max_div = {md}.");
+        assert!(md <= max_div + 64, "q-window widening runaway");
+    }
 }
 
-// The canon cycle's homogeneous q-degree `q₀`, from the Seifert-state cycle alone (no complex build).
-fn canon_q_deg<F>(l: &InvLink, reduced: bool) -> isize
-where F: Field, for<'x> &'x F: FieldOps<F> {
-    let deg_shift = KhComplex::<PolyH<F>>::deg_shift_for(l.inner(), reduced);
-    let (a, b) = (PolyH::<F>::zero(), PolyH::<F>::variable());
-    let zs = KhComplex::<PolyH<F>>::make_canon_cycles(l.inner(), &a, &b, reduced);
-
-    zs.iter().flat_map(|z|
-        z.iter().map(|(x, c)| deg_shift.1 + x.rel_q_deg() - 2 * (c.lead_deg() as isize))
-    ).min().expect("empty canon cycle")
+fn finish_ssi(l: &InvLink, d0: i32, d1: i32) -> (i32, i32) {
+    let w = l.writhe();
+    let r = l.seifert_circles().len() as i32;
+    let (ss0, ss1) = (2 * d0 + w - r + 1, 2 * d1 + w - r + 1);
+    info!("w = {w}, r = {r}, d0 = {d0}, d1 = {d1}; ssi = ({ss0}, {ss1}).");
+    (ss0, ss1)
 }
 
-fn ssi_divisibility_h1<F>(l: &InvLink, reduced: bool, config: SymBuildConfig) -> (i32, i32)
+// The canon cycle's homogeneous q-degree `q₀`, computed from the diagram: `w − r` (`+1` reduced),
+// where `w` = writhe and `r` = number of Seifert circles.
+fn canon_q_deg(l: &InvLink, reduced: bool) -> isize {
+    let w = l.writhe() as isize;
+    let r = l.seifert_circles().len() as isize;
+    w - r + if reduced { 1 } else { 0 }
+}
+
+// `None` signals the q-window was too tight (a canon cycle's low-q representative was truncated) —
+// the caller should widen and retry. `q0 = w − r` is the diagram-computed homogeneous degree.
+fn ssi_divisibility_h1<F>(l: &InvLink, reduced: bool, config: SymBuildConfig, q0: isize) -> Option<(i32, i32)>
 where F: Field, for<'x> &'x F: FieldOps<F> {
     let r = if reduced { 1 } else { 2 };
     let h = PolyH::<F>::variable();
@@ -89,18 +96,13 @@ where F: Field, for<'x> &'x F: FieldOps<F> {
 
     let zs = kc.canon_cycles(); // sorted by h-degree: B classes at 0, then Q classes at 1
     assert_eq!(zs.len(), 2 * r);
-    for (i, z) in zs.iter().enumerate() {
-        let expected = if i < r { 0 } else { 1 };
-        assert!(!z.is_zero());
-        assert_eq!(z.homogeneous_value(|x| kc.h_deg_of(x)), Some(expected));
-    }
 
-    let ds = [0, 1].map(|i0|
-        zs.iter()
-            .filter(|z| kc.h_deg_of_chain(z) == i0)
-            .map(|z| max_solvable_level::<F>(&kc, z, i0))
-            .collect_vec()
-    );
+    // index gives the h-degree (0 for the first `r`, else 1) — robust to a cycle truncated to zero.
+    let mut ds = [vec![], vec![]];
+    for (i, z) in zs.iter().enumerate() {
+        let i0 = if i < r { 0 } else { 1 };
+        ds[i0 as usize].push(max_solvable_level::<F>(&kc, z, i0, q0)?);
+    }
 
     let (d0, d1) = if reduced {
         (ds[0][0], ds[1][0])
@@ -112,17 +114,20 @@ where F: Field, for<'x> &'x F: FieldOps<F> {
 
     assert!(d0 <= d1); // s̲ ≤ s̄.
 
-    (d0, d1)
+    Some((d0, d1))
 }
 
-// Climb `m` while the level-`m` system `d(w) = z` in `C̄ / F_{q₀+2m}` solves; the first failure
-// gives `d_H = m − 1`. Level 0 is trivially solvable (`z̄` truncated to zero), so the climb starts at 1.
-fn max_solvable_level<F>(kc: &KhIComplex<PolyH<F>>, z: &KhIChain<PolyH<F>>, i0: isize) -> i32
+// Climb `m` while the level-`m` system `d(w) = z` in `C̄ / F_{q₀+2m}` solves; the first failure gives
+// `d_H = m`. Returns `None` when the built window is too tight to trust: the canon representative's
+// lowest generator sits above `q₀` (truncated), or the climb reaches the built ceiling still solvable.
+fn max_solvable_level<F>(kc: &KhIComplex<PolyH<F>>, z: &KhIChain<PolyH<F>>, i0: isize, q0: isize) -> Option<i32>
 where F: Field, for<'x> &'x F: FieldOps<F> {
-    // the homogeneous degree of `z`: coefficient `H^k` shifts a term's degree by `−2k`.
-    // (`q_deg_of_chain` ignores coefficients — wrong here when the transported `z` is `H`-divisible.)
-    let q0 = z.iter().map(|(x, a)| kc.q_deg_of(x) - 2 * (a.lead_deg() as isize)).min()
-        .expect("canon cycle is zero");
+    // an empty cycle means the window cut the whole representative (it sits entirely above `q_hi`) —
+    // signal widen. A nonempty cycle is homogeneous at `q₀` (every term has `q(x) − 2·deg_H = q₀`),
+    // so the truncated low part is enough to run the solve.
+    if z.is_zero() {
+        return None;
+    }
     assert_homogeneous(kc, z, q0);
 
     let src_q = q_degs(kc, i0 - 1);
@@ -130,13 +135,15 @@ where F: Field, for<'x> &'x F: FieldOps<F> {
     let d = kc.inner().d_matrix(i0 - 1);
     let v = kc.inner()[i0].vectorize(z);
 
-    // beyond this the window contains everything and the system stops changing.
+    // beyond this the window contains everything the build kept.
     let q_top = Iterator::chain(src_q.iter(), tgt_q.iter()).max().copied().unwrap_or(q0);
 
     let mut m = 0;
     loop {
         let q_hi = q0 + 2 * (m + 1);
-        assert!(q_hi <= q_top + 2, "untruncated z̄ solved as a boundary — the Lee class cannot vanish");
+        if q_hi > q_top + 2 {
+            return None; // reached the built ceiling still solvable — widen for the true failure
+        }
 
         let (a, y) = truncated_system(&d, &v, &src_q, &tgt_q, q_hi);
         info!("h = {i0}, level {}: solve system of size {:?}.", m + 1, a.shape());
@@ -145,7 +152,7 @@ where F: Field, for<'x> &'x F: FieldOps<F> {
             m += 1;
         } else {
             info!("h = {i0}: d = {m}.");
-            return m as i32;
+            return Some(m as i32);
         }
     }
 }
@@ -262,6 +269,45 @@ mod tests {
             assert_eq!(win, full, "{name} (d_max = {d_max})");
         }
         Ok(())
+    }
+
+    // Gate for the windowed path: the 44-crossing Whitehead double of P(−3,3,−3), with the sym
+    // finalize deloop ENABLED (no_full_deloop = false) — kept feasible by the q-filter.
+    #[test]
+    #[ignore = "heavy: 44-crossing Whitehead double via windowed H=1"]
+    fn ssi_wh_pretzel_3_windowed() {
+        use crate::tng::builder::{BuildMode, CutOption};
+        let _ = env_logger::Builder::from_default_env().target(env_logger::Target::Stdout).try_init();
+
+        let k = InvLink::sym_pretzel(-3, 3, -3);
+        let w = k.whitehead_double(true, 0);
+        let config = SymBuildConfig {
+            mode: BuildMode::MinFill,
+            cut: CutOption::AtCrossings(vec![17]),
+            max_elim_cost: Some(1 << 16),
+            no_full_deloop: false,
+            ..Default::default()
+        };
+        let ssi = ssi_invariant_h1_windowed::<F>(&w, false, config, 3);
+        println!("ssi(Wh+(P(-3,3,-3))) [windowed] = {ssi:?}");
+        assert_eq!(ssi, (0, 2));
+    }
+
+    // Minimal reproducer for the windowed canon-transport bug: Wh(6_2a) (30 crossings) truncates a
+    // canon cycle to zero, while Wh(6_1a) (also 30) works. Root cause: the build-time q-filter moves
+    // the canon cycle's representative onto high-q vertices that the window then drops. See notes.
+    // Wh(6_2a) (30 crossings) needs the adaptive window widening: at max_div=3 the reduction pushes
+    // the canon representative above the window (truncated to zero), so the driver widens until it
+    // reappears. Should converge to ssi = (2, 2).
+    #[test]
+    #[ignore = "heavy-ish (~1 min): windowed Wh(6_2a) with adaptive widening"]
+    fn wh_6_2a_windowed_adaptive() {
+        use crate::tng::builder::{BuildMode, CutOption};
+        let l = InvLink::load("6_2a").unwrap().whitehead_double(true, 0);
+        let nx = l.inner().n_crossings();
+        let cfg = SymBuildConfig { mode: BuildMode::MinFill, cut: CutOption::AtCrossings(vec![nx / 2]), max_elim_cost: Some(1 << 16), no_full_deloop: false, ..Default::default() };
+        let ssi = ssi_invariant_h1_windowed::<F>(&l, false, cfg, 3);
+        assert_eq!(ssi, (2, 2));
     }
 
     #[test]

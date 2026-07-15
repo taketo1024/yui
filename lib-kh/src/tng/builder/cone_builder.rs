@@ -437,14 +437,26 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let c = self.cone.complex();
         let (h, t) = c.ht().clone();
 
+        // match `into_raw_complex_filtered`: skip out-of-window generators (the H-tower terms of the
+        // canon cycle above `q_hi`). Those are dropped from the complex, so vectorizing against it
+        // would miss them; they are the terms the full quotient mods out anyway.
+        let q_range = self.cone.config().q_range.clone();
+        let q_shift = c.deg_shift().1;
+        let in_window = |g: &KhIGen|
+            q_range.as_ref().is_none_or(|r| r.contains(&(q_shift + g.rel_q_deg())));
+
         self.cone.elements().content().iter().map(|e| {
             let init = LcCob::from(e.in_cob().clone());
-            e.out_cob().iter().flat_map(|(k, retr)| {
+            e.out_cob().iter().filter(|(k, _)| c.contains_key(k)).flat_map(|(k, retr)| {
                 let circles = circles_of(c.vertex(k).tng());
-                label_assignments(&circles).into_iter().map(|b| {
+                label_assignments(&circles).into_iter().filter_map(|b| {
+                    let kg = into_khi_gen(&expanded_key(k, &b).as_gen());
+                    if !in_window(&kg) {
+                        return None;
+                    }
                     let g = cap_circles(retr.clone(), End::Tgt, &circles, &b, &h, &t);
                     let x = (g * &init).eval(&h, &t);
-                    (into_khi_gen(&expanded_key(k, &b).as_gen()), x)
+                    Some((kg, x))
                 }).collect_vec()
             }).collect()
         }).collect()

@@ -36,29 +36,35 @@ where F: Field, for<'x> &'x F: FieldOps<F> {
     finish_ssi(l, d0, d1)
 }
 
-/// `ssi_invariant_h1` with the build's high-q cut set from a target divisibility `max_div`: only
-/// generators of q-degree `≤ q₀ + 2·(max_div + 2)` are built (`q₀ = w − r`). Only the high end is
-/// cut, so `d_H` (mod torsion) is unchanged. If the window is too tight — the reduction pushes the
-/// canon representative above it, truncating it to zero — the build is retried with a wider window.
-/// This is the memory lever for large diagrams (Wh-doubles).
-pub fn ssi_invariant_h1_windowed<F>(l: &InvLink, reduced: bool, config: SymBuildConfig, max_div: i32) -> (i32, i32)
+/// `ssi_invariant_h1` with the build's high-q cut set from a target divisibility level: only
+/// generators of q-degree `≤ q₀ + 2·(level + 2)` are built (`q₀ = w − r`). Only the high end is cut,
+/// so `d_H` (mod torsion) is unchanged, and the solve still checks every level from `q₀`. If the
+/// window is too tight — the reduction lifts the canon representative above it (truncated to zero) —
+/// the build is retried one level wider.
+///
+/// `start_from` is the initial level. `None` uses the `ssi ≈ 0` heuristic `−(q₀+1)/2 − 1`: slice
+/// knots have `ssi` near 0, hence `d_H ≈ −(q₀+1)/2` (large, since `q₀` is very negative), so this
+/// starts near the answer and skips the doomed small windows. This is the memory/time lever for
+/// large diagrams (Wh-doubles).
+pub fn ssi_invariant_h1_windowed<F>(l: &InvLink, reduced: bool, config: SymBuildConfig, start_from: Option<i32>) -> (i32, i32)
 where F: Field, for<'x> &'x F: FieldOps<F> {
     assert!(l.is_knot());
     info!("compute ssi via windowed H=1 solves over {}.", PolyH::<F>::math_symbol());
 
     let q0 = canon_q_deg(l, reduced);
-    let mut md = max_div;
+    let md0 = start_from.unwrap_or(((-(q0 + 1) / 2) as i32 - 1).max(0));
+    let mut md = md0;
     loop {
         let q_hi = q0 + 2 * (md as isize + 2);
-        info!("q-window: q0 = {q0}, cut above {q_hi} (max_div = {md}).");
+        info!("q-window: q0 = {q0}, cut above {q_hi} (level = {md}).");
         let cfg = SymBuildConfig { q_range: Some((isize::MIN + 1) ..= q_hi), ..config.clone() };
 
         if let Some((d0, d1)) = ssi_divisibility_h1::<F>(l, reduced, cfg, q0) {
             return finish_ssi(l, d0, d1);
         }
         md += 1; // one divisibility level = q-degree 2 (deg H = −2); widen by the minimal step.
-        info!("canon cycle above window; widening to max_div = {md}.");
-        assert!(md <= max_div + 64, "q-window widening runaway");
+        info!("canon cycle above window; widening to level = {md}.");
+        assert!(md <= md0 + 64, "q-window widening runaway");
     }
 }
 
@@ -264,7 +270,7 @@ mod tests {
             // tight window at the true divisibility d = (ss − w + r − 1) / 2 (max over the two classes).
             let (w, r) = (l.writhe(), l.seifert_circles().len() as i32);
             let d_max = [(full.0 - w + r - 1) / 2, (full.1 - w + r - 1) / 2].into_iter().max().unwrap();
-            let win = ssi_invariant_h1_windowed::<F>(&l, false, SymBuildConfig::default(), d_max);
+            let win = ssi_invariant_h1_windowed::<F>(&l, false, SymBuildConfig::default(), Some(d_max));
 
             assert_eq!(win, full, "{name} (d_max = {d_max})");
         }
@@ -288,7 +294,7 @@ mod tests {
             no_full_deloop,
             ..Default::default()
         };
-        let ssi = ssi_invariant_h1_windowed::<F>(&w, false, config, 3);
+        let ssi = ssi_invariant_h1_windowed::<F>(&w, false, config, None);
         println!("ssi(Wh+(P(-3,3,-3))) [windowed, no_full_deloop={no_full_deloop}] = {ssi:?}");
         assert_eq!(ssi, (0, 2));
     }
@@ -318,7 +324,7 @@ mod tests {
         let l = InvLink::load("6_2a").unwrap().whitehead_double(true, 0);
         let nx = l.inner().n_crossings();
         let cfg = SymBuildConfig { mode: BuildMode::MinFill, cut: CutOption::AtCrossings(vec![nx / 2]), max_elim_cost: Some(1 << 16), no_full_deloop: false, ..Default::default() };
-        let ssi = ssi_invariant_h1_windowed::<F>(&l, false, cfg, 3);
+        let ssi = ssi_invariant_h1_windowed::<F>(&l, false, cfg, None);
         assert_eq!(ssi, (2, 2));
     }
 

@@ -298,6 +298,28 @@ mod tests {
         assert_eq!(ssi, (0, 2));
     }
 
+    // The campaign target: the 72-crossing Whitehead double of P(−5,5,−5), infeasible on 128 GB with
+    // the old homology pipeline. Windowed H=1, `expected = 2` (the Wh⁺(9_46) precedent), no_full_deloop.
+    #[test]
+    #[ignore = "very heavy: 72-crossing Wh double of P(-5,5,-5) via windowed H=1"]
+    fn ssi_wh_pretzel_5_windowed() {
+        use crate::tng::builder::{BuildMode, CutOption};
+        let _ = env_logger::Builder::from_default_env().target(env_logger::Target::Stdout).try_init();
+
+        let k = InvLink::sym_pretzel(-5, 5, -5);
+        let w = k.whitehead_double(true, 0);
+        let config = SymBuildConfig {
+            mode: BuildMode::MinFill,
+            cut: CutOption::AtCrossings(vec![20]),
+            max_elim_cost: Some(1 << 16),
+            h_range: Some(0 ..= 1), // only the canon-cycle degrees (built one wider); the full h-range balloons
+            no_full_deloop: true,
+            ..Default::default()
+        };
+        let ssi = ssi_invariant_h1_windowed::<F>(&w, false, config, Some(2));
+        println!("ssi(Wh+(P(-5,5,-5))) [windowed] = {ssi:?}");
+    }
+
     #[test]
     #[ignore = "heavy: 44-crossing Whitehead double via windowed H=1"]
     fn ssi_wh_pretzel_3_windowed() {

@@ -36,21 +36,23 @@ where F: Field, for<'x> &'x F: FieldOps<F> {
     finish_ssi(l, d0, d1)
 }
 
-/// `ssi_invariant_h1` with the build's high-q cut at q-degree `start_from`: only generators of
-/// q-degree `≤ start_from` are built. Only the high end is cut, so `d_H` (mod torsion) is unchanged,
-/// and the solve still climbs every level from `q₀ = w − r`. If the window is too tight — the
-/// reduction lifts the canon representative above it (truncated to zero) — the cut is raised by 2.
+/// `ssi_invariant_h1` with the build's high-q cut set from the `expected` `s`-value: only generators
+/// of q-degree `≤ expected − 1` are built initially. Only the high end is cut, so `d_H` (mod torsion)
+/// is unchanged, and the solve still climbs every level from `q₀ = w − r`. If the window is too tight
+/// — the reduction lifts the canon representative above it (truncated to zero) — the cut is raised
+/// by 2.
 ///
-/// `start_from` is the initial q-degree cutoff. `None` defaults to `−1`: a slice knot has `ssi ≈ 0`,
-/// whose top divisibility sits at `q = ss − 1 = −1`, so this starts near the answer and skips the
-/// doomed small windows (where `q₀ = w − r` is very negative). The memory/time lever for Wh-doubles.
-pub fn ssi_invariant_h1_windowed<F>(l: &InvLink, reduced: bool, config: SymBuildConfig, start_from: Option<isize>) -> (i32, i32)
+/// `expected` is the guessed `s`-value; the cut starts at `q = expected − 1` (the top divisibility
+/// for that `s`). `None` defaults to `0`, i.e. `q = −1`: slice knots have `ssi ≈ 0`, so this starts
+/// near the answer and skips the doomed small windows (where `q₀ = w − r` is very negative). The
+/// memory/time lever for Wh-doubles.
+pub fn ssi_invariant_h1_windowed<F>(l: &InvLink, reduced: bool, config: SymBuildConfig, expected: Option<i32>) -> (i32, i32)
 where F: Field, for<'x> &'x F: FieldOps<F> {
     assert!(l.is_knot());
     info!("compute ssi via windowed H=1 solves over {}.", PolyH::<F>::math_symbol());
 
     let q0 = canon_q_deg(l, reduced);
-    let q_hi0 = start_from.unwrap_or(-1);
+    let q_hi0 = expected.unwrap_or(0) as isize - 1;
     let mut q_hi = q_hi0;
     loop {
         info!("q-window: q0 = {q0}, cut above {q_hi}.");
@@ -264,14 +266,12 @@ mod tests {
             let l = InvLink::load(name)?;
             let full = ssi_invariant_h1::<F>(&l, false, SymBuildConfig::default());
 
-            // tight q-cut at the true divisibility d = (ss − w + r − 1) / 2 (max over the two classes):
-            // q_hi = q₀ + 2·(d + 2), one level of margin above the answer.
-            let (w, r) = (l.writhe(), l.seifert_circles().len() as i32);
-            let d_max = [(full.0 - w + r - 1) / 2, (full.1 - w + r - 1) / 2].into_iter().max().unwrap();
-            let q_hi = (w - r) as isize + 2 * (d_max as isize + 2);
-            let win = ssi_invariant_h1_windowed::<F>(&l, false, SymBuildConfig::default(), Some(q_hi));
+            // start the window at the true answer's `s`; the cut = s − 1 is tight and widens if the
+            // representative needs one more level.
+            let expected = full.0.max(full.1);
+            let win = ssi_invariant_h1_windowed::<F>(&l, false, SymBuildConfig::default(), Some(expected));
 
-            assert_eq!(win, full, "{name} (d_max = {d_max})");
+            assert_eq!(win, full, "{name} (expected = {expected})");
         }
         Ok(())
     }

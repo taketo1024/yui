@@ -22,7 +22,7 @@ use yui_link::{Node, Edge, Link};
 use yui_homology::ChainComplex1;
 
 use crate::kh::{KhChain, KhComplex, KhGen};
-use crate::tng::{MAX_EDGE, TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
+use crate::tng::{MAX_EDGE, Tng, TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
 use super::{reachable_range, pop_min_pivot, pivot_pool, push_pivot, sparkline, fill_cost_sparkline, cutwidth_after, toggle_boundary, boundary_edges, select_cuts, cut_components, merge_order, TngElemBuilder};
 
 // Progress logging for the long per-op build loops (eliminate / deloop / asymmetric elimination):
@@ -360,25 +360,27 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let ne = if self.complex.rank(i - 1) == 0 { 0 } else { ne };
             debug!("  merge C[{i}]: ({nv} verts, ~{ne} edges)");
         }
-        let nv = self.complex.merge_vertices(left, right, i);
+        // filter out-of-window merged vertices as they're created — never build them or their edges.
+        // The predicate captures owned values (not `self`), so it can be passed into the `&mut` merge.
+        let keep = {
+            let q_range = self.config.q_range.clone();
+            let q_shift = self.complex.deg_shift().1;
+            move |k: &TngComplexKey, tng: &Tng| {
+                let Some(qr) = q_range.as_ref() else {
+                    return true;
+                };
+                if !tng.is_closed() {
+                    return true; // q not yet exact
+                }
+                let q0 = q_shift + k.as_gen().rel_q_deg();
+                let nc = tng.comps().filter(|c| c.is_circle()).count() as isize;
+                q0 + nc >= *qr.start() && q0 - nc <= *qr.end()
+            }
+        };
+        let nv = self.complex.merge_vertices(left, right, i, keep);
         debug!("  +{nv} verts");
         let ne = self.complex.merge_edges(left, right, i - 1);
         debug!("  +{ne} edges");
-
-        // drop merged vertices already outside q_range (before we deloop/eliminate them).
-        self.prune_q_range(i);
-    }
-
-    // Drop vertices in degree `i` whose q-degree can't reach `config.q_range`.
-    fn prune_q_range(&mut self, i: isize) {
-        if self.config.q_range.is_none() {
-            return;
-        }
-        let doomed = self.complex.keys_of_deg(i).filter(|k| self.should_drop(k)).copied().collect_vec();
-        if !doomed.is_empty() {
-            debug!("  -{} verts (q_range)", doomed.len());
-        }
-        self.complex.remove_vertices(&doomed);
     }
 
     /// Drop vertices that can't end up in `config.h_range`: degree `d` ends in

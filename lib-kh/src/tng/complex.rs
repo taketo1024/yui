@@ -450,7 +450,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub(crate) fn merge_with(&mut self, left: &Self, right: &Self) {
         for i in self.h_range() {
             debug!("build C[{i}]...");
-            self.merge_vertices(left, right, i);
+            self.merge_vertices(left, right, i, |_, _| true);
             self.merge_edges(left, right, i - 1);
         }
     }
@@ -476,16 +476,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         (left, other)
     }
 
-    pub(crate) fn merge_vertices(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize) -> usize {
+    // `keep(k, tng)` filters the merged vertices: `false` drops one before it (or any of its edges)
+    // is built — the memory lever on wide merges.
+    pub(crate) fn merge_vertices(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize, keep: impl Fn(&TngComplexKey, &Tng) -> bool) -> usize {
         let mut n = 0;
         for (k, l) in Self::collect_keys(left, right, i) {
-            let v = left.vertex(k);
-            let w = right.vertex(l);
             let kl = k + l;
-
-            let vw = TngComplexVertex::from(v.tng.connect(&w.tng));
-
-            self.add_vertex(kl, vw);
+            let tng = left.vertex(k).tng.connect(&right.vertex(l).tng);
+            if !keep(&kl, &tng) {
+                continue;
+            }
+            self.add_vertex(kl, TngComplexVertex::from(tng));
             n += 1;
             if n % MERGE_LOG_STEP == 0 {
                 debug!("  ... created {n} verts");
@@ -494,6 +495,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         n
     }
 
+    // Edges into a dropped target (not in the complex — filtered by `merge_vertices`) are skipped
+    // before the cobordism `reduce`, so they are never built.
     pub(crate) fn merge_edges(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize) -> usize {
         let (h, t) = self.ht().clone();
         let mut n = 0;
@@ -502,28 +505,22 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let k = k_l + k_r;
             if !self.contains_key(&k) { continue }
 
-            let v_l = left.vertex(k_l);
-            let v_r = right.vertex(k_r);
-
-            let id_l = Cob::id(v_l.tng());
-            let id_r = Cob::id(v_r.tng());
-
-            let e1 = left.vertex(k_l).out_edges().map(|l_l| {
-                let l = l_l + k_r;
-                let f = left.edge(k_l, l_l).connect(&id_r); // D(f, 1)
-                (l, f.reduce(&h, &t))
-            });
-            
+            let id_l = Cob::id(left.vertex(k_l).tng());
+            let id_r = Cob::id(right.vertex(k_r).tng());
             let i0 = (k_l.state.weight() as isize) - left.deg_shift.0;
             let sign = R::from_sign(Sign::from_parity(i0 as i64));
 
-            let e2 = right.vertex(k_r).out_edges().map(|l_r| {
-                let l = k_l + l_r;
-                let id_f = right.edge(k_r, l_r).connect(&id_l) * &sign; // (-1)^{deg(k0)} D(1, f)
-                (l, id_f.reduce(&h, &t))
-            });
+            let targets = left.vertex(k_l).out_edges().map(|l_l| (l_l + k_r, l_l, true))
+                .chain(right.vertex(k_r).out_edges().map(|l_r| (k_l + l_r, l_r, false)))
+                .collect_vec();
 
-            for (l, f) in e1.chain(e2) {
+            for (l, m, from_left) in targets {
+                if !self.contains_key(&l) { continue } // skip edges into dropped targets, before reduce
+                let f = if from_left {
+                    left.edge(k_l, m).connect(&id_r).reduce(&h, &t) // D(f, 1)
+                } else {
+                    (right.edge(k_r, m).connect(&id_l) * &sign).reduce(&h, &t) // (-1)^{deg(k0)} D(1, f)
+                };
                 if !f.is_zero() {
                     self.add_edge(&k, &l, f);
                     n += 1;

@@ -56,7 +56,7 @@ where F: Field, for<'x> &'x F: FieldOps<F> {
         if let Some((d0, d1)) = ssi_divisibility_h1::<F>(l, reduced, cfg, q0) {
             return finish_ssi(l, d0, d1);
         }
-        md += 2;
+        md += 1; // one divisibility level = q-degree 2 (deg H = −2); widen by the minimal step.
         info!("canon cycle above window; widening to max_div = {md}.");
         assert!(md <= max_div + 64, "q-window widening runaway");
     }
@@ -271,11 +271,11 @@ mod tests {
         Ok(())
     }
 
-    // Gate for the windowed path: the 44-crossing Whitehead double of P(−3,3,−3), with the sym
-    // finalize deloop ENABLED (no_full_deloop = false) — kept feasible by the q-filter.
-    #[test]
-    #[ignore = "heavy: 44-crossing Whitehead double via windowed H=1"]
-    fn ssi_wh_pretzel_3_windowed() {
+    // Gate for the windowed path: the 44-crossing Whitehead double of P(−3,3,−3). Two variants for
+    // a runtime comparison: `no_full_deloop = false` deloops+eliminates at the final step (heavier
+    // build, lighter solve); `true` defers that to the matrix-level expansion (lighter build, heavier
+    // solve). Both must give (0, 2).
+    fn run_wh_pretzel_3_windowed(no_full_deloop: bool) {
         use crate::tng::builder::{BuildMode, CutOption};
         let _ = env_logger::Builder::from_default_env().target(env_logger::Target::Stdout).try_init();
 
@@ -283,14 +283,26 @@ mod tests {
         let w = k.whitehead_double(true, 0);
         let config = SymBuildConfig {
             mode: BuildMode::MinFill,
-            cut: CutOption::AtCrossings(vec![17]),
+            cut: CutOption::Auto(2),
             max_elim_cost: Some(1 << 16),
-            no_full_deloop: false,
+            no_full_deloop,
             ..Default::default()
         };
         let ssi = ssi_invariant_h1_windowed::<F>(&w, false, config, 3);
-        println!("ssi(Wh+(P(-3,3,-3))) [windowed] = {ssi:?}");
+        println!("ssi(Wh+(P(-3,3,-3))) [windowed, no_full_deloop={no_full_deloop}] = {ssi:?}");
         assert_eq!(ssi, (0, 2));
+    }
+
+    #[test]
+    #[ignore = "heavy: 44-crossing Whitehead double via windowed H=1"]
+    fn ssi_wh_pretzel_3_windowed() {
+        run_wh_pretzel_3_windowed(false);
+    }
+
+    #[test]
+    #[ignore = "heavy: 44-crossing Whitehead double via windowed H=1 (no_full_deloop)"]
+    fn ssi_wh_pretzel_3_windowed_nodeloop() {
+        run_wh_pretzel_3_windowed(true);
     }
 
     // Minimal reproducer for the windowed canon-transport bug: Wh(6_2a) (30 crossings) truncates a

@@ -361,23 +361,21 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             debug!("  merge C[{i}]: ({nv} verts, ~{ne} edges)");
         }
         // filter out-of-window merged vertices as they're created — never build them or their edges.
-        // The predicate captures owned values (not `self`), so it can be passed into the `&mut` merge.
-        let keep = {
-            let q_range = self.config.q_range.clone();
-            let q_shift = self.complex.deg_shift().1;
-            move |k: &TngComplexKey, tng: &Tng| {
-                let Some(qr) = q_range.as_ref() else {
-                    return true;
-                };
-                if !tng.is_closed() {
-                    return true; // q not yet exact
+        // The `q_range` branch is resolved once here, out of the per-vertex predicate.
+        let q_shift = self.complex.deg_shift().1;
+        let keep = self.config.q_range.clone().map(|qr| move |k: &TngComplexKey, tng: &Tng| {
+            !tng.is_closed() // q not yet exact — keep
+                || {
+                    let q0 = q_shift + k.as_gen().rel_q_deg();
+                    let nc = tng.comps().filter(|c| c.is_circle()).count() as isize;
+                    q0 + nc >= *qr.start() && q0 - nc <= *qr.end()
                 }
-                let q0 = q_shift + k.as_gen().rel_q_deg();
-                let nc = tng.comps().filter(|c| c.is_circle()).count() as isize;
-                q0 + nc >= *qr.start() && q0 - nc <= *qr.end()
-            }
+        });
+        let nv = if let Some(keep) = keep {
+            self.complex.merge_vertices(left, right, i, keep)
+        } else {
+            self.complex.merge_vertices(left, right, i, |_, _| true)
         };
-        let nv = self.complex.merge_vertices(left, right, i, keep);
         debug!("  +{nv} verts");
         let ne = self.complex.merge_edges(left, right, i - 1);
         debug!("  +{ne} edges");

@@ -452,17 +452,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let before = self.complex.rank(i) as isize;
 
         let mut pool = pivot_pool(keys);
-        let (mut done, mut elim) = (0, 0);
+        let (mut done, mut removed) = (0, 0);
         while let Some(k) = pop_min_pivot(&mut pool, |k|
             self.complex.contains_key(k).then(|| self.complex.vertex(k).c_weight())
         ) {
             let Some(&c) = self.find_loop_in(&k, allow_based) else { continue };
 
             let new_keys = self.deloop(&k, &c);
-            // a normal circle yields 2 branches; a based circle yields 1, and in greedy mode each
-            // branch may be eliminated on the spot. Count branches short of 2 as eliminated, so
-            // `delooped - eliminated = diff` holds in both greedy and min-fill.
-            elim += 2usize.saturating_sub(new_keys.len());
+            // branches short of the usual 2 were removed: based collapse (1 branch), greedy inline
+            // elim, or a q-filter drop in `deloop`. Not necessarily eliminated — hence "removed".
+            removed += 2usize.saturating_sub(new_keys.len());
             for new_key in new_keys {
                 if self.find_loop_in(&new_key, allow_based).is_some() {
                     let w = self.complex.vertex(&new_key).c_weight();
@@ -471,13 +470,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
             done += 1;
             if done % PROGRESS_LOG_STEP == 0 {
-                debug!("{}   ... delooped {done} ({}% eliminated, remain: {})", self.current_step(), elim * 100 / done, pool.len());
+                debug!("{}   ... delooped {done} ({}% removed, remain: {})", self.current_step(), removed * 100 / done, pool.len());
             }
         }
 
         let after = self.complex.rank(i) as isize;
 
-        debug!("{}   delooped C[{i}]: {} (delooped: {done}, eliminated: {elim}, diff: {})", self.current_step(), after, after - before);
+        debug!("{}   delooped C[{i}]: {} (delooped: {done}, removed: {removed}, diff: {})", self.current_step(), after, after - before);
         debug!("{}   neighbors: C[{}] {} / C[{}] {}",
             self.current_step(), i - 1, self.complex.rank(i - 1), i + 1, self.complex.rank(i + 1));
     }

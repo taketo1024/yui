@@ -70,6 +70,11 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
     debug!("dense solve: {:?}", a.shape());
 
     assert_eq!(y.len(), a.n_rows());
+
+    if y.iter().all(|yi| yi.is_zero()) {
+        return Some(vec![R::zero(); a.n_cols()]); // y = 0 ⇒ x = 0 solves it — skip the factorization.
+    }
+
     let Pluq { p, q, l, u, .. } = pluq(a);
     let yp = p.apply_to(y.to_vec());
 

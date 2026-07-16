@@ -416,6 +416,20 @@ mod tests {
         assert_eq!(ssi, (0, 2));
     }
 
+    // A/B vs `ssi_wh_pretzel_3`: same config but with the finalize deloop ENABLED (no_full_deloop =
+    // false), delooping at the last step instead of deferring to the matrix reduction.
+    #[test]
+    #[ignore = "heavy: original ssi with full deloop enabled"]
+    fn ssi_wh_pretzel_3_deloop() {
+        init_logger();
+        let k = InvLink::sym_pretzel(-3, 3, -3);
+        let w = k.whitehead_double(true, 0);
+        let c = P::variable();
+        let config = SymBuildConfig { no_full_deloop: false, ..wh_pretzel_config(17) };
+        let ssi = ssi_invariant(&w, &c, false, config);
+        assert_eq!(ssi, (0, 2));
+    }
+
     #[test]
     #[ignore = "heavy: 72-crossing Whitehead double"]
     fn ssi_wh_pretzel_5() {

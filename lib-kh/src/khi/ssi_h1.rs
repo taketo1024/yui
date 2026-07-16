@@ -311,7 +311,7 @@ mod tests {
         let config = SymBuildConfig {
             mode: BuildMode::MinFill,
             cut: CutOption::AtCrossings(vec![20]),
-            max_elim_cost: Some(1 << 16),
+            max_elim_cost: Some(0), // eliminate only cost-0 (free) pivots at the final merge; children still eliminate fully
             h_range: Some(0 ..= 1), // only the canon-cycle degrees (built one wider); the full h-range balloons
             no_full_deloop: true,
             ..Default::default()

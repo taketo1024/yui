@@ -1027,7 +1027,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         // No per-chunk h_range: it would under-cover preprocess's off-axis key_map. Applied at the merge.
         // No no_full_deloop either: "final" means root-final — a chunk must deloop before the cross-chunk merge.
-        let config = SymBuildConfig { cut: CutOption::None, node_order: NodeOrder::MinCut, h_range: None, no_full_deloop: false, ..self.builder.config.clone() };
+        // max_elim_cost: None so the root's "eliminate only free pivots at final" (max_elim_cost = 0) does NOT cascade — chunks eliminate fully.
+        let config = SymBuildConfig { cut: CutOption::None, node_order: NodeOrder::MinCut, h_range: None, no_full_deloop: false, max_elim_cost: None, ..self.builder.config.clone() };
 
         let mut inner = TngComplexBuilder::init(h, t, (0, 0), base_pt)
             .with_config(config.inner_build_config());

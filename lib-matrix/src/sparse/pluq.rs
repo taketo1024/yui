@@ -242,6 +242,10 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
 
     assert_eq!(y.dim(), a.n_rows());
 
+    if y.is_zero() {
+        return Some(SpVec::zero(a.n_cols())); // y = 0 ⇒ x = 0 solves it — skip the factorization.
+    }
+
     let pp = pluq(a, PivotFinderConfig {
         piv_type: PivotType::Rows,
         ..Default::default()
@@ -360,6 +364,10 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
     debug!("solve pluq (incremental), a: {:?}", a.shape());
 
     assert_eq!(y.dim(), a.n_rows());
+
+    if y.is_zero() {
+        return Some(SpVec::zero(a.n_cols())); // y = 0 ⇒ x = 0 solves it — skip the factorization.
+    }
 
     let mut pp = pre_pluq(a, PivotFinderConfig {
         piv_type: PivotType::Rows,

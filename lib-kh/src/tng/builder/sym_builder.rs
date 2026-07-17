@@ -24,7 +24,7 @@ use crate::kh::{KhGen, KhTensor};
 use crate::tng::{ElimDir, LcCob, LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
 use crate::tng::builder::{TngComplexBuilder, TngElemBuilder, BuildConfig, BuildMode, NodeOrder};
 use std::fmt;
-use super::{reachable_range, pop_min_pivot, pivot_pool, push_pivot, sparkline, fill_cost_sparkline, cutwidth_after, toggle_boundary, Chunkable, ChunkBuilder, CutOption, PlanProfile};
+use super::{reachable_range, pop_min_pivot, pivot_pool, push_pivot, sparkline, fill_cost_sparkline, cutwidth_after, toggle_boundary, BuildPlanner, CutOption};
 use super::builder::PROGRESS_LOG_STEP;
 use crate::util::log_progress;
 
@@ -209,6 +209,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn run(mut self) -> Self {
         info!("build config:\n{:#?}", self.config);
         info!("cutwidth profile:\n{}", self.profile_sym());
+
         if self.config.cut.enabled() {
             self.process_chunks();
         } else {
@@ -222,13 +223,37 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn process_chunks(&mut self) {
-        let chunks = ChunkBuilder::new(self).build_chunks();
-        for (chunk, child, elems) in chunks {
+        let planner = BuildPlanner::new(
+            self.nodes(), self.tau_units(), &self.config.cut,
+            self.config.node_order, self.complex().boundary_ends()
+        );
+        let plan = planner.plan();
+
+        info!("chunk plan: {} pieces", plan.len());
+        debug!("chunks: {:?}", plan.iter().map(|c| c.len()).collect_vec());
+
+        let chunks = plan.into_iter().map(|chunk| {
+            let built = Self::build_chunk(self.init_child(&chunk));
+            (chunk, built)
+        }).collect_vec();
+
+        for (chunk, (c, key_map, elems)) in chunks {
             self.drop_nodes(|x| chunk.contains(x));
-            let SymTngBuilder { key_map, inner, .. } = child;
-            self.merge(inner.into_tng_complex(), key_map, elems);
+            self.merge(c, key_map, elems);
             info!("{} chunk merged: {}", self.current_step(), self.stat());
         }
+    }
+
+    // Run a child builder over its chunk and extract the reduced complex with its τ key-map
+    // and transformed elements.
+    fn build_chunk(child: Self) -> (TngComplex<R>, TauKeyMap, Vec<TngComplexElem<R>>) {
+        info!("build chunk (n: {}): {}", child.nodes().len(), child.nodes().iter().join(", "));
+        let child = child.run();
+        info!("chunk built: {}", child.stat());
+        
+        let SymTngBuilder { key_map, mut inner, .. } = child;
+        let elems = inner.elements_mut().take();
+        (inner.into_tng_complex(), key_map, elems)
     }
 
     pub fn preprocess(&mut self) {
@@ -238,7 +263,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn process_nodes(&mut self) {
         info!("{} process {} nodes", self.current_step(), self.n_nodes());
 
-        while let Some(x) = self.choose_next_node().cloned() {
+        let planner = BuildPlanner::new(
+            self.nodes(), self.tau_units(), &CutOption::None,
+            self.config.node_order, self.complex().boundary_ends()
+        );
+        let Some(order) = planner.plan().pop() else {
+            return;
+        };
+        debug!("node order: {}", order.iter().join(", "));
+
+        for x in order {
+            if !self.nodes().contains(&x) {
+                continue; // already consumed as a τ-partner
+            }
             let tx = self.inv_node(&x).clone();
             if x == tx {
                 self.append_on_axis(&x);
@@ -246,28 +283,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 self.append_off_axis(&x, &tx);
             }
         }
-    }
-
-    /// Pick the next τ-unit by node order, ties broken by earliest crossing order.
-    pub(crate) fn choose_next_node(&self) -> Option<&Node> {
-        self.nodes().iter().enumerate()
-            .min_by_key(|(i, x)| {
-                let score = match self.config.node_order {
-                    NodeOrder::MinCut => self.unit_cutwidth(x) as isize,
-                    NodeOrder::Given => 0, // constant → ties broken by earliest index = given order
-                };
-                (score, *i)
-            })
-            .map(|(_, x)| x)
-    }
-
-    /// Boundary cutwidth after appending the τ-unit of `x` (x and τx scored together; a shared
-    /// axis edge toggles twice and cancels).
-    fn unit_cutwidth(&self, x: &Node) -> usize {
-        let tx = self.inv_node(x);
-        let unit: Vec<&Node> = if tx != x { vec![x, tx] } else { vec![x] };
-        let open: FxHashSet<Edge> = self.complex().boundary_ends().collect();
-        cutwidth_after(&open, &unit)
     }
 
     fn append_on_axis(&mut self, x: &Node) { 
@@ -813,24 +828,30 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         println!();
     }
 
-    /// Boundary-cutwidth profile of the symmetric (τ-equivariant) MinCut order: on-axis crossings
-    /// singly, off-axis in `(x, τx)` pairs scored by combined cutwidth (shared axis edges cancel).
-    pub(crate) fn profile_sym(&self) -> SymBuildProfile {
+    // The τ-units of the crossings: on-axis singly, off-axis as `(x, τx)` pairs kept once at
+    // the lower index.
+    fn tau_units(&self) -> Vec<Vec<usize>> {
         let nodes = self.nodes();
         let tau = &self.x_map;
         let idx_of: FxHashMap<Node, usize> = nodes.iter().enumerate()
             .map(|(i, x)| (x.clone(), i))
             .collect();
 
-        // each pair is kept once, at its lower index; on-axis crossings stay singletons
-        let units: Vec<Vec<usize>> = (0..nodes.len()).filter_map(|i| {
+        (0..nodes.len()).filter_map(|i| {
             let j = idx_of[&tau[&nodes[i]]];
             match j {
                 _ if j == i => Some(vec![i]),
                 _ if i < j  => Some(vec![i, j]),
                 _           => None,
             }
-        }).collect();
+        }).collect()
+    }
+
+    /// Boundary-cutwidth profile of the symmetric (τ-equivariant) MinCut order: on-axis crossings
+    /// singly, off-axis in `(x, τx)` pairs scored by combined cutwidth (shared axis edges cancel).
+    pub(crate) fn profile_sym(&self) -> SymBuildProfile {
+        let nodes = self.nodes();
+        let units = self.tau_units();
 
         let on_axis = units.iter().filter(|u| u.len() == 1).count();
         let off_axis = nodes.len() - on_axis;
@@ -850,47 +871,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let peak = widths.iter().copied().max().unwrap_or(0);
         SymBuildProfile { on_axis, off_axis, order, widths, peak }
-    }
-
-}
-
-/// Boundary-cutwidth profile of the symmetric (τ-equivariant) MinCut order.
-pub(crate) struct SymBuildProfile {
-    pub on_axis: usize,
-    pub off_axis: usize,        // node count; pairs = off_axis / 2
-    pub order: Vec<Vec<usize>>, // each unit = 1 (on-axis) or 2 (τ-pair) node indices
-    pub widths: Vec<usize>,
-    pub peak: usize,
-}
-
-impl fmt::Display for SymBuildProfile {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "on-axis:  {}", self.on_axis)?;
-        writeln!(f, "off-axis: {} ({} pairs)", self.off_axis, self.off_axis / 2)?;
-        writeln!(f, "peak:     {}", self.peak)?;
-        write!(f, "{}", sparkline(&self.widths, self.peak))
-    }
-}
-
-impl<R> Chunkable for SymTngBuilder<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Elem = TngComplexElem<R>;
-
-    fn nodes(&self) -> &[Node] {
-        SymTngBuilder::nodes(self)
-    }
-
-    fn cut_option(&self) -> &CutOption {
-        &self.config.cut
-    }
-
-    fn profile(&self) -> PlanProfile {
-        let prof = self.profile_sym();
-        PlanProfile { units: prof.order, widths: prof.widths }
-    }
-
-    fn stat(&self) -> String {
-        SymTngBuilder::stat(self)
     }
 
     // A child builder over `chunk` (a sub-tangle), inheriting the parent's τ-maps and
@@ -913,15 +893,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let real_top = inner.complex().deg_shift().0 + chunk.len() as isize; // child deg_shift = 0
         SymTngBuilder { inner, x_map: self.x_map.clone(), e_map: self.e_map.clone(), key_map, config, real_top }
     }
+}
 
-    fn run(self) -> Self {
-        SymTngBuilder::run(self)
+/// Boundary-cutwidth profile of the symmetric (τ-equivariant) MinCut order.
+pub(crate) struct SymBuildProfile {
+    pub on_axis: usize,
+    pub off_axis: usize,        // node count; pairs = off_axis / 2
+    #[allow(dead_code)] // replayed only by the faithfulness test
+    pub order: Vec<Vec<usize>>, // each unit = 1 (on-axis) or 2 (τ-pair) node indices
+    pub widths: Vec<usize>,
+    pub peak: usize,
+}
+
+impl fmt::Display for SymBuildProfile {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "on-axis:  {}", self.on_axis)?;
+        writeln!(f, "off-axis: {} ({} pairs)", self.off_axis, self.off_axis / 2)?;
+        writeln!(f, "peak:     {}", self.peak)?;
+        write!(f, "{}", sparkline(&self.widths, self.peak))
     }
-
-    fn take_elements(&mut self) -> Vec<TngComplexElem<R>> {
-        self.inner.elements_mut().take()
-    }
-
 }
 
 /// Builds the off-axis part of a [`SymTngBuilder`] by τ-symmetry: build one

@@ -21,7 +21,7 @@ use yui_link::{Node, Edge, Link};
 
 use crate::kh::{KhChain, KhComplex};
 use crate::util::log_progress;
-use crate::tng::{MAX_EDGE, ElimDir, TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
+use crate::tng::{MAX_EDGE, ElimDir, Tng, TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
 use super::{reachable_range, pop_min_pivot, pivot_pool, push_pivot, sparkline, fill_cost_sparkline, cutwidth_after, toggle_boundary, BuildPlanner, TngElemBuilder};
 
 // Pacing of the progress lines in the per-op build loops (eliminate / deloop / asym elimination).
@@ -88,6 +88,9 @@ pub struct BuildConfig {
     // divide-and-conquer chunking (auto cutwidth or manual edge-cuts); None = single pass.
     pub cut: CutOption,
     pub h_range: Option<RangeInclusive<isize>>,
+    // drop generators outside this q-range. Only applied once the diagram is closed (see
+    // `should_drop`), where q-degrees are exact. `None` = no q-truncation.
+    pub q_range: Option<RangeInclusive<isize>>,
     // skip eliminations whose fill cost (`edge_weight` = Schur block size) exceeds this; the
     // survivors defer to the matrix reduction. `None` = eliminate everything (current behavior).
     pub max_elim_cost: Option<usize>,
@@ -98,7 +101,7 @@ pub struct BuildConfig {
 
 impl Default for BuildConfig {
     fn default() -> Self {
-        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), cut: CutOption::None, h_range: None, max_elim_cost: None, no_full_deloop: false }
+        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), cut: CutOption::None, h_range: None, q_range: None, max_elim_cost: None, no_full_deloop: false }
     }
 }
 
@@ -358,9 +361,27 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    // Build degree `i`: merge in its vertices and the edges into it.
+    // All crossings and free loops merged — only then are q-degrees exact
+    // (a split-union component can close early).
+    fn is_final_step(&self) -> bool {
+        self.n_nodes() == 0 && self.loops.is_empty()
+    }
+
+    // Build degree `i`. Under `q_range` (final step only), out-of-window vertices are never built.
     pub(super) fn merge_slice(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize) {
-        self.complex.merge_vertices(left, right, i);
+        if let Some(q_range) = self.config.q_range.as_ref() && self.is_final_step() {
+            let q_shift = self.complex.deg_shift().1;
+            let keep = |k: &TngComplexKey, tng: &Tng| {
+                if !tng.is_closed() { return true; }
+
+                let q0 = q_shift + k.as_gen().rel_q_deg();
+                let nc = tng.comps().filter(|c| c.is_circle()).count() as isize;
+                q_reachable(q0, nc, q_range)
+            };
+            self.complex.merge_vertices_filtered(left, right, i, keep);
+        } else {
+            self.complex.merge_vertices(left, right, i);
+        }
         self.complex.merge_edges(left, right, i - 1);
     }
 
@@ -467,6 +488,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let mut added = self.complex.deloop(k, c);
 
+        // drop branches outside `config.q_range`; the sym paired deloop tolerates missing branches.
+        if self.config.q_range.is_some() {
+            let (keep, doomed): (Vec<_>, Vec<_>) = added.into_iter().partition(|k| !self.should_drop(k));
+            self.complex.remove_vertices(&doomed);
+            added = keep;
+        }
+
         // immediate elim eliminates each new vertex now; min-fill leaves them for the post-deloop
         // global pass, None leaves them entirely. `try_eliminate_at` skips over-cap pivots.
         if self.config.mode.immediate_elim() {
@@ -474,6 +502,21 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             added.retain(|k| !self.try_eliminate_at(k, ElimDir::Both));
         }
         added
+    }
+
+    // Doomed iff q can't land in `config.q_range` — checked only at the final step, closed.
+    pub(crate) fn should_drop(&self, k: &TngComplexKey) -> bool {
+        let Some(q_range) = self.config.q_range.as_ref() else {
+            return false;
+        };
+        if !self.is_final_step() || !self.complex.is_closed() {
+            return false;
+        }
+
+        let q0 = self.complex.deg_shift().1 + k.as_gen().rel_q_deg();
+        let nc = self.complex.vertex(k).tng().comps().filter(|c| c.is_circle()).count() as isize;
+
+        !q_reachable(q0, nc, q_range)
     }
 
     pub fn eliminate_in(&mut self, i: isize) {
@@ -689,6 +732,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         child.with_config(config)
     }
 
+}
+
+// q of a closed vertex can drift by ±1 per remaining circle: reachable iff [q0−nc, q0+nc] meets the window.
+fn q_reachable(q0: isize, nc: isize, qr: &RangeInclusive<isize>) -> bool {
+    q0 + nc >= *qr.start() && q0 - nc <= *qr.end()
 }
 
 #[cfg(test)]
@@ -1000,4 +1048,7 @@ mod tests {
             assert!(c.d(0, &z).is_zero());
         }
     }
+
+
+
 }

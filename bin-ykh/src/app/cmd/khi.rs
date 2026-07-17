@@ -43,6 +43,10 @@ pub struct Args {
     #[arg(short = 'n', long)]
     pub no_simplify: bool,
 
+    // ssi only: the guessed s-value seeding the high-q build cut (see `ssi_invariant`).
+    #[arg(long)]
+    pub expected: Option<isize>,
+
     #[arg(long, value_parser = parse_h_range)]
     pub h_range: Option<RangeInclusive<isize>>,
 
@@ -119,11 +123,6 @@ where
         if self.args.show_alpha { 
             ensure!(t.is_zero(), "`t` must be zero to have alpha.");
         }
-        if self.args.show_ssi {
-            ensure!(!h.is_zero() && !h.is_unit(), "`h` must be non-zero, non-invertible to compute ssi.");
-            ensure!(t.is_zero(), "`t` must be zero to compute ss.");
-        }
-
         let l = load_sinv_knot(&self.args.link, self.args.mirror)?;
 
         let config = SymBuildConfig {
@@ -137,12 +136,18 @@ where
             ..Default::default()
         };
 
-        // ssi-only: canon classes ride the trans-free reduction as vectors (no table output).
+        // ssi-only: computed over F2[H] internally — the selected ring is not involved.
         let ssi_only = self.args.show_ssi && !(self.args.show_gens || self.args.show_alpha);
         if ssi_only && !self.args.no_simplify {
-            let ssi = ssi_invariant(&l, &h, self.args.reduced, config);
+            let ssi = ssi_invariant(&l, self.args.reduced, config, self.args.expected);
             self.out(&format!("ssi = ({}, {})", ssi.0, ssi.1));
             return Ok(self.flush());
+        }
+
+        // the table path reads the divisibilities from KhI over the selected ring, with c = h.
+        if self.args.show_ssi {
+            ensure!(!h.is_zero() && !h.is_unit(), "`h` must be non-zero, non-invertible to compute ssi.");
+            ensure!(t.is_zero(), "`t` must be zero to compute ss.");
         }
 
         let khi = if self.args.no_simplify {

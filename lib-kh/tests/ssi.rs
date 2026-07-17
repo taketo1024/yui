@@ -3,7 +3,7 @@
 
 use yui_core::poly::Poly;
 use yui_core::num::FF2;
-use yui_kh::khi::{ssi_invariant, ssi_invariant_v1};
+use yui_kh::khi::{ssi_invariant, ssi_invariant_ver, SsiVersion};
 use yui_kh::tng::builder::{BuildMode, CutOption, SymBuildConfig};
 use yui_link::InvLink;
 
@@ -59,8 +59,10 @@ fn k15n_103488() {
 
     let c = P::variable();
 
-    assert_eq!(ssi_invariant_v1(&l, &c, false), (0, 2), "v1");
-    assert_eq!(ssi_invariant(&l, &c, false, SymBuildConfig::default()), (0, 2), "v2");
+    for ver in [SsiVersion::V1, SsiVersion::V2] {
+        let ssi = ssi_invariant_ver(&l, &c, false, SymBuildConfig::default(), ver);
+        assert_eq!(ssi, (0, 2), "{ver:?}");
+    }
 }
 
 #[test]
@@ -71,7 +73,7 @@ fn k17nh_73() {
     );
 
     let c = P::variable();
-    let ssi = ssi_invariant_v1(&l, &c, false);
+    let ssi = ssi_invariant_ver(&l, &c, false, SymBuildConfig::default(), SsiVersion::V1);
 
     assert_eq!(ssi, (0, 2));
 }

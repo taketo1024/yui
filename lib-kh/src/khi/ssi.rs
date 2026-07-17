@@ -26,20 +26,37 @@ use crate::khi::{KhIComplex, KhIHomology};
 // injected into the reducer on the heavy cone path: bounds each Schur round's `a⁻¹b` transient.
 pub(crate) const MAX_PIVOTS_PER_ROUND: usize = 32_768;
 
-/// `ssi` via the cobordism-level cone (`ConeBuilder`), without any bigraded structure: the canon
-/// classes are transported as coordinate vectors through a trans-free capped reduction, and the
-/// basis-change is computed only at the reduced scale (two small SNFs). Memory-safe on huge diagrams.
+/// The `ssi` computation pipeline.
+/// - `V1`: full bigraded `KhIHomology`; simple, memory-heavy (`config` is ignored).
+/// - `V2`: cobordism-level cone (`ConeBuilder`) without any bigraded structure — the canon
+///   classes are transported as coordinate vectors through a trans-free capped reduction, and
+///   the basis-change is computed only at the reduced scale. Memory-safe on huge diagrams.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SsiVersion {
+    V1,
+    V2
+}
+
+/// `ssi` via the current default pipeline ([`SsiVersion::V2`]).
 pub fn ssi_invariant<R>(l: &InvLink, c: &R, reduced: bool, config: SymBuildConfig) -> (i32, i32)
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    ssi_invariant_ver(l, c, reduced, config, SsiVersion::V2)
+}
+
+pub fn ssi_invariant_ver<R>(l: &InvLink, c: &R, reduced: bool, config: SymBuildConfig, ver: SsiVersion) -> (i32, i32)
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     assert!(!c.is_zero());
     assert!(!c.is_unit());
     assert!(l.is_knot());
 
-    info!("compute ssi via cone, c = {c} over {}.", R::math_symbol());
+    info!("compute ssi ({ver:?}), c = {c} over {}.", R::math_symbol());
 
     let w = l.writhe();
     let r = l.seifert_circles().len() as i32;
-    let (d0, d1) = ssi_divisibility(l, c, reduced, config);
+    let (d0, d1) = match ver {
+        SsiVersion::V1 => ssi_divisibility_v1(l, c, reduced),
+        SsiVersion::V2 => ssi_divisibility_v2(l, c, reduced, config),
+    };
 
     let ss0 = 2 * d0 + w - r + 1;
     let ss1 = 2 * d1 + w - r + 1;
@@ -50,7 +67,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     (ss0, ss1)
 }
 
-fn ssi_divisibility<R>(l: &InvLink, c: &R, reduced: bool, config: SymBuildConfig) -> (i32, i32)
+fn ssi_divisibility_v2<R>(l: &InvLink, c: &R, reduced: bool, config: SymBuildConfig) -> (i32, i32)
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     let r = if reduced { 1 } else { 2 };
     let t = R::zero();
@@ -114,101 +131,6 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     (d0, d1)
 }
 
-/// One component of `ssi` from a single-degree window: `h = 0` gives `s̲` (the `B`-classes),
-/// `h = 1` gives `s̄` (the `Q`-classes). Builds `C` only over `(h-1)..=(h+1)`, so the two
-/// components can be computed in separate, cheaper runs.
-pub fn ssi_invariant_at<R>(l: &InvLink, c: &R, reduced: bool, config: SymBuildConfig, h: isize) -> i32
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    assert!(!c.is_zero());
-    assert!(!c.is_unit());
-    assert!(l.is_knot());
-    assert!(h == 0 || h == 1, "ssi components live in h-degrees 0 and 1, got {h}");
-
-    info!("compute ssi[{h}] via cone, c = {c} over {}.", R::math_symbol());
-
-    let w = l.writhe();
-    let r = l.seifert_circles().len() as i32;
-    let d = ssi_divisibility_at(l, c, reduced, config, h);
-
-    let ss = 2 * d + w - r + 1;
-
-    info!("w = {w}, r = {r}, d = {d}.");
-    info!("ssi[{h}] = {ss}.");
-
-    ss
-}
-
-// `ssi_divisibility` restricted to one canon degree `h`: the window is `h..=h` (built one degree
-// wider on both ends), and only the `r` canon classes at degree `h` are read — the other
-// component's classes are clipped by the window and ignored.
-fn ssi_divisibility_at<R>(l: &InvLink, c: &R, reduced: bool, config: SymBuildConfig, h: isize) -> i32
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    let r = if reduced { 1 } else { 2 };
-    let t = R::zero();
-
-    let requested = config.h_range.clone().unwrap_or(h ..= h);
-    let range = KhComplex::<R>::clamp_h_range(l.inner(), reduced, requested);
-    let (a, b) = (*range.start(), *range.end());
-    assert!(a <= h && h <= b, "window must include the canon degree {h}, got {a}..={b}");
-    let config = SymBuildConfig { h_range: Some((a - 1)..=(b + 1)), ..config };
-    let kc = KhIComplex::new_with_config(l, c, &t, reduced, config);
-
-    let zs = kc.canon_cycles().iter()
-        .filter(|z| z.homogeneous_value(|x| kc.h_deg_of(x)) == Some(h))
-        .collect_vec();
-    assert_eq!(zs.len(), r);
-
-    let mut red = ChainReducer::from_complex(kc.inner(), false);
-    red.set_max_pivots(MAX_PIVOTS_PER_ROUND);
-
-    for z in zs.iter() {
-        red.add_vec(h, kc.inner()[h].vectorize(z));
-    }
-
-    red.reduce_all(false);
-    red.reduce_all(true);
-
-    let d1 = red.matrix(h).expect("d[h] must be set").clone();
-    let d0 = red.matrix(h - 1).cloned().unwrap_or_else(|| SpMat::zero((d1.n_cols(), 0)));
-    let (rank, tors, tr) = HomologyCalc::calculate(d0, d1, true);
-    let tr = tr.unwrap();
-
-    assert_eq!(rank, r);
-    info!("KhI[{h}] ≅ {}", rmod_str(rank, &tors));
-
-    let ds = red.vecs(h).expect("transported vecs at canon degree").iter().enumerate().map(|(i, v)| {
-        let w = tr.forward(v).subvec(0..r);
-        info!("a[{i}] in KhI[{h}]: ({})", w.clone().into_dense().iter().join(", "));
-        div_vec(&w, c).expect("invalid divisibility.")
-    }).collect_vec();
-
-    if !reduced {
-        assert_eq!(ds[0], ds[1]);
-    }
-    ds[0]
-}
-
-pub fn ssi_invariant_v1<R>(l: &InvLink, c: &R, reduced: bool) -> (i32, i32)
-where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
-    assert!(!c.is_zero());
-    assert!(!c.is_unit());
-    assert!(l.is_knot());
-
-    info!("compute ssi, c = {c} over {}.", R::math_symbol());
-
-    let w = l.writhe();
-    let r = l.seifert_circles().len() as i32;
-    let (d0, d1) = ssi_divisibility_v1(l, c, reduced);
-
-    let ss0 = 2 * d0 + w - r + 1;
-    let ss1 = 2 * d1 + w - r + 1;
-
-    info!("w = {w}, r = {r}, d0 = {d0}, d1 = {d1}.");
-    info!("ssi = ({ss0}, {ss1}).");
-
-    (ss0, ss1)
-}
-
 fn ssi_divisibility_v1<R>(l: &InvLink, c: &R, reduced: bool) -> (i32, i32)
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     let r = if reduced { 1 } else { 2 };
@@ -265,31 +187,12 @@ mod tests {
     type R = FF2;
     type P = Poly<'H', R>;
 
-    // the single-degree components must reproduce the pair, including for chunked builds.
-    #[test]
-    fn ssi_at_matches_pair() -> Result<(), Box<dyn std::error::Error>> {
-        use crate::tng::builder::CutOption;
-        let c = P::variable();
-
-        for name in ["3_1", "4_1", "6_1a"] {
-            let l = InvLink::load(name)?;
-            for cut in [CutOption::None, CutOption::Auto(3), CutOption::At(vec![4])] {
-                let config = SymBuildConfig { cut, ..Default::default() };
-                let ssi = ssi_invariant(&l, &c, false, config.clone());
-                let s0 = ssi_invariant_at(&l, &c, false, config.clone(), 0);
-                let s1 = ssi_invariant_at(&l, &c, false, config.clone(), 1);
-                assert_eq!((s0, s1), ssi, "{name} {:?}", config.cut);
-            }
-        }
-        Ok(())
-    }
-
     #[test]
     fn test_unknot_pos_twist() {
         let l = InvLink::test_data("unknot_r_twist");
         let c = P::variable();
 
-        let ssi = ssi_invariant_v1(&l, &c, false);
+        let ssi = ssi_invariant_ver(&l, &c, false, SymBuildConfig::default(), SsiVersion::V1);
         assert_eq!(ssi.0, 0);
         assert_eq!(ssi.1, 0);
     }
@@ -299,7 +202,7 @@ mod tests {
         let l = InvLink::test_data("unknot_l_twist");
         let c = P::variable();
 
-        let ssi = ssi_invariant_v1(&l, &c, false);
+        let ssi = ssi_invariant_ver(&l, &c, false, SymBuildConfig::default(), SsiVersion::V1);
         assert_eq!(ssi.0, 0);
         assert_eq!(ssi.1, 0);
     }
@@ -309,53 +212,45 @@ mod tests {
         let l = InvLink::test_data("unknot_l_twist2");
         let c = P::variable();
 
-        let ssi = ssi_invariant_v1(&l, &c, false);
+        let ssi = ssi_invariant_ver(&l, &c, false, SymBuildConfig::default(), SsiVersion::V1);
         assert_eq!(ssi.0, 0);
         assert_eq!(ssi.1, 0);
     }
 
-    #[test]
-    fn test_3_1() { 
-        let l = InvLink::test_data("3_1");
+    fn test(name: &str, ver: SsiVersion, reduced: bool, expected: (i32, i32)) -> Result<(), Box<dyn std::error::Error>> {
+        let l = InvLink::load(name)?;
         let c = P::variable();
 
-        let ssi = ssi_invariant_v1(&l, &c, false);
-        assert_eq!(ssi.0, 2);
-        assert_eq!(ssi.1, 2);
-    }
+        let ssi = ssi_invariant_ver(&l, &c, reduced, SymBuildConfig::default(), ver);
+        assert_eq!(ssi, expected);
 
-    #[test]
-    fn test_3_1_m() { 
-        let l = InvLink::test_data("3_1").mirror();
-        let c = P::variable();
-
-        let ssi = ssi_invariant_v1(&l, &c, false);
-        assert_eq!(ssi.0, -2);
-        assert_eq!(ssi.1, -2);
-    }
-
-    #[test]
-    fn test_3_1_red() { 
-        let l = InvLink::test_data("3_1");
-        let c = P::variable();
-
-        let ssi = ssi_invariant_v1(&l, &c, true);
-        assert_eq!(ssi.0, 2);
-        assert_eq!(ssi.1, 2);
+        Ok(())
     }
 
     macro_rules! test {
-        ($(#[$m:meta])* $test:ident, $name:literal, $expected:expr) => {
-            $(#[$m])*
-            #[test]
-            fn $test() -> Result<(), Box<dyn std::error::Error>> {
-                let c = P::variable();
-                let l = InvLink::load($name)?;
+        ($test:ident, $name:literal, $expected:expr) => {
+            mod $test {
+                use super::*;
 
-                assert_eq!(ssi_invariant_v1(&l, &c, false), $expected, "v1");
-                assert_eq!(ssi_invariant(&l, &c, false, SymBuildConfig::default()), $expected, "v2");
+                #[test]
+                fn v1() -> Result<(), Box<dyn std::error::Error>> {
+                    test($name, SsiVersion::V1, false, $expected)
+                }
 
-                Ok(())
+                #[test]
+                fn v2() -> Result<(), Box<dyn std::error::Error>> {
+                    test($name, SsiVersion::V2, false, $expected)
+                }
+
+                #[test]
+                fn v1_red() -> Result<(), Box<dyn std::error::Error>> {
+                    test($name, SsiVersion::V1, true, $expected)
+                }
+
+                #[test]
+                fn v2_red() -> Result<(), Box<dyn std::error::Error>> {
+                    test($name, SsiVersion::V2, true, $expected)
+                }
             }
         }
     }
@@ -383,25 +278,5 @@ mod tests {
     test!(k7_6b, "7_6b", (-2, -2));
     test!(k7_7a, "7_7a", (0, 0));
     test!(k7_7b, "7_7b", (0, 0));
-
-    // all-negative diagram: the Kh h-range tops at 0, so the KhI top degree 1 must survive the
-    // cone's window pruning (regression: prune_isolated_top dropped it, killing the Q classes).
-    #[test]
-    fn k3_1_m_cone() {
-        let l = InvLink::test_data("3_1").mirror();
-        let c = P::variable();
-
-        let ssi = ssi_invariant(&l, &c, false, SymBuildConfig::default());
-        assert_eq!(ssi, (-2, -2));
-    }
-
-    #[test]
-    fn k3_1_cone_red() {
-        let l = InvLink::test_data("3_1");
-        let c = P::variable();
-
-        let ssi = ssi_invariant(&l, &c, true, SymBuildConfig::default());
-        assert_eq!(ssi, (2, 2));
-    }
 
 }

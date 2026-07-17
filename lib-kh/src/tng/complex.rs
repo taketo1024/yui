@@ -29,12 +29,15 @@ use yui_link::{Edge, Node, Path, State};
 use yui_core::bitseq::Bit;
 
 use crate::kh::{KhAlgGen, KhGen, KhTensor};
+use crate::util::log_progress;
 use super::cob::{Cob, Dot, End, CobComp, LcCob, LcCobTrait};
 use super::tng::{Tng, TngComp};
 
-// Progress-log every this many verts/edges created during a merge — only bites on the huge
-// central-degree slices (small merges stay silent), so it costs nothing on normal builds.
+// Pacing of the merge-loop progress lines — only bites on the huge central-degree slices
+// (small merges stay silent), so it costs nothing on normal builds. Edge progress runs over
+// key pairs, each expanding to many attempted edges — hence the smaller step.
 const MERGE_LOG_STEP: usize = 1_000_000;
+const MERGE_PAIR_LOG_STEP: usize = 50_000;
 
 // Raw pointer made shareable across rayon tasks. SAFETY is the caller's: used only in
 // `eliminate_par`'s parallel value-write, where each task holds a pointer to a *distinct* vertex.
@@ -476,7 +479,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         (left, other)
     }
 
-    pub(crate) fn merge_vertices(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize) -> usize {
+    pub(crate) fn merge_vertices(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize) {
+        let total = Self::count_keys(left, right, i);
+        debug!("  C[{i}]: build {total} verts ...");
+
         let mut n = 0;
         for (k, l) in Self::collect_keys(left, right, i) {
             let v = left.vertex(k);
@@ -487,18 +493,26 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             self.add_vertex(kl, vw);
             n += 1;
-            if n % MERGE_LOG_STEP == 0 {
-                debug!("  ... created {n} verts");
-            }
+            log_progress(n, n - 1, total, MERGE_LOG_STEP);
         }
-        n
+
+        debug!("  C[{i}]: built {n} verts.");
     }
 
-    pub(crate) fn merge_edges(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize) -> usize {
+    pub(crate) fn merge_edges(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, i: isize) {
         let (h, t) = self.ht().clone();
+
+        // progress runs over the key pairs (created-edge counts alone have no meaningful total).
+        let total = Self::count_keys(left, right, i);
+        debug!("  C[{i}]: build edges over {total} pairs ...");
+
+        let mut seen = 0;
         let mut n = 0;
 
         for (k_l, k_r) in Self::collect_keys(left, right, i) {
+            seen += 1;
+            log_progress(seen, seen - 1, total, MERGE_PAIR_LOG_STEP);
+
             let k = k_l + k_r;
             if !self.contains_key(&k) { continue }
 
@@ -527,13 +541,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 if !f.is_zero() {
                     self.add_edge(&k, &l, f);
                     n += 1;
-                    if n % MERGE_LOG_STEP == 0 {
-                        debug!("  ... created {n} edges");
-                    }
                 }
             }
         }
-        n
+        
+        debug!("  C[{i}]: built {n} edges");
+    }
+
+    // `collect_keys` pair count at degree `i` — one flat pass per side for the degree histograms,
+    // then their convolution (no walk over the product).
+    fn count_keys(left: &TngComplex<R>, right: &TngComplex<R>, i: isize) -> usize {
+        let count_by_deg = |c: &TngComplex<R>| {
+            c.vertices.keys().fold(FxHashMap::<isize, usize>::default(), |mut m, k| {
+                *m.entry((k.weight() as isize) + c.deg_shift.0).or_insert(0) += 1;
+                m
+            })
+        };
+        let l = count_by_deg(left);
+        let r = count_by_deg(right);
+        l.iter().map(|(d, n)| n * r.get(&(i - d)).unwrap_or(&0)).sum()
     }
 
     pub(crate) fn collect_keys<'a, 'b>(left: &'a TngComplex<R>, right: &'b TngComplex<R>, i: isize) -> impl Iterator<Item = (&'a TngComplexKey, &'b TngComplexKey)> {
@@ -541,7 +567,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let i2 = i - i1;
             right.h_range().contains(&i2).then_some((i1, i2))
         }).flat_map(move |(i1, i2)|
-            left.keys_of_deg(i1).flat_map(move |k1| 
+            left.keys_of_deg(i1).flat_map(move |k1|
                 right.keys_of_deg(i2).map(move |k2|
                     (k1, k2)
             ))

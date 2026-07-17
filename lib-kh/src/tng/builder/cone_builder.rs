@@ -27,7 +27,8 @@ use crate::kh::{KhChain, KhGen};
 use crate::khi::{KhIChain, KhIGen, KhIGenExt};
 use crate::tng::{Cob, CobComp, End, LcCob, LcCobTrait, Tng, TngComplex, TngComplexElem, TngComplexKey, TngComplexVertex, circles_of, label_assignments, expanded_key, cap_circles};
 use super::{reachable_range, SymTngBuilder, SymBuildConfig, TngComplexBuilder, BuildConfig};
-use super::builder::log_progress;
+use super::builder::PROGRESS_LOG_STEP;
+use crate::util::log_progress;
 
 const CHUNK: usize = 4096;
 
@@ -199,7 +200,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             let prev = done;
             done += keys_chunk.len();
-            log_progress(done, prev, keys.len());
+            log_progress(done, prev, keys.len(), PROGRESS_LOG_STEP);
         }
     }
 
@@ -220,7 +221,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
 
             done += 1;
-            log_progress(done, done - 1, target.len());
+            log_progress(done, done - 1, target.len(), PROGRESS_LOG_STEP);
         }
     }
 
@@ -261,7 +262,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             let prev = done;
             done += dropped_chunk.len();
-            log_progress(done, prev, dropped.len());
+            log_progress(done, prev, dropped.len(), PROGRESS_LOG_STEP);
         }
     }
 

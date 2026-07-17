@@ -25,7 +25,8 @@ use crate::tng::{LcCob, LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComp
 use crate::tng::builder::{TngComplexBuilder, TngElemBuilder, BuildConfig, BuildMode, NodeOrder};
 use std::fmt;
 use super::{reachable_range, pop_min_pivot, pivot_pool, push_pivot, sparkline, fill_cost_sparkline, cutwidth_after, toggle_boundary, boundary_edges, select_cuts, cut_components, merge_order, CutOption};
-use super::builder::log_progress;
+use super::builder::PROGRESS_LOG_STEP;
+use crate::util::log_progress;
 
 /// Toggles for the automatic simplification done while building (kept separate
 /// from [`BuildConfig`] so the equivariant builder can gain its own flags).
@@ -478,7 +479,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 }
             }
             done += 1;
-            log_progress(done, done - 1, done + pool.len());
+            log_progress(done, done - 1, done + pool.len(), PROGRESS_LOG_STEP);
         }
 
         let after = self.complex().rank(i) as isize;
@@ -622,7 +623,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             if n > 0 {
                 let prev = done;
                 done += n; // off-axis events consume the pivot and its τ-mirror.
-                log_progress(done, prev, targets);
+                log_progress(done, prev, targets, PROGRESS_LOG_STEP);
             }
         }
 

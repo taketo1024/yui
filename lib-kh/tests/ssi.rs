@@ -56,7 +56,7 @@ fn interlock_17nh() {
 }
 
 #[test]
-#[ignore = "heavy: 44-crossing Whitehead double (~30 min)"]
+#[ignore = "heavy: 44-crossing Whitehead double (~1 min)"]
 fn wh_pretzel_3() {
     init_logger();
     let k = InvLink::sym_pretzel(-3, 3, -3);

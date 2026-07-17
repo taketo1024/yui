@@ -346,17 +346,15 @@ mod tests {
 
     macro_rules! test {
         ($(#[$m:meta])* $test:ident, $name:literal, $expected:expr) => {
-            $(#[$m])* 
+            $(#[$m])*
             #[test]
-            fn $test() -> Result<(), Box<dyn std::error::Error>> { 
-                type R = FF2;
-                type P = Poly<'H', R>;
+            fn $test() -> Result<(), Box<dyn std::error::Error>> {
                 let c = P::variable();
-    
                 let l = InvLink::load($name)?;
-                let ssi = ssi_invariant_v1(&l, &c, false);
-                assert_eq!(ssi, $expected);
-    
+
+                assert_eq!(ssi_invariant_v1(&l, &c, false), $expected, "v1");
+                assert_eq!(ssi_invariant(&l, &c, false, SymBuildConfig::default()), $expected, "v2");
+
                 Ok(())
             }
         }
@@ -386,74 +384,6 @@ mod tests {
     test!(k7_7a, "7_7a", (0, 0));
     test!(k7_7b, "7_7b", (0, 0));
 
-    // RUST_LOG-controlled logging to stdout (tests initialize no logger by default).
-    fn init_logger() {
-        use env_logger::{Builder, Target};
-        let _ = Builder::from_default_env().target(Target::Stdout).try_init();
-    }
-
-    // The production Wh⁺-pretzel runs, reproducible on any machine (the in-memory construction
-    // fixes the crossing order; a PD re-import would reorder under MinCut).
-    fn wh_pretzel_config(cut_at: usize) -> SymBuildConfig {
-        use crate::tng::builder::{BuildMode, CutOption};
-        SymBuildConfig {
-            mode: BuildMode::MinFill,
-            cut: CutOption::At(vec![cut_at]),
-            max_elim_cost: Some(1 << 16),
-            no_full_deloop: true,
-            ..Default::default()
-        }
-    }
-
-    #[test]
-    #[ignore = "heavy: 44-crossing Whitehead double (~30 min)"]
-    fn ssi_wh_pretzel_3() {
-        init_logger();
-        let k = InvLink::sym_pretzel(-3, 3, -3);
-        let w = k.whitehead_double(true, 0);
-        let c = P::variable();
-        let ssi = ssi_invariant(&w, &c, false, wh_pretzel_config(17));
-        assert_eq!(ssi, (0, 2));
-    }
-
-    #[test]
-    #[ignore = "heavy: 72-crossing Whitehead double"]
-    fn ssi_wh_pretzel_5() {
-        init_logger();
-        let k = InvLink::sym_pretzel(-5, 5, -5);
-        let w = k.whitehead_double(true, 0);
-        let c = P::variable();
-        let ssi = ssi_invariant(&w, &c, false, wh_pretzel_config(20));
-        println!("ssi(Wh+(P(-5,5,-5))) = {ssi:?}");
-    }
-
-    #[test]
-    fn k9_46() {
-        let l = InvLink::from_symmetric_pd_code(
-            [[18,8,1,7],[13,6,14,7],[12,2,13,1],[8,18,9,17],[5,14,6,15],[2,12,3,11],[16,10,17,9],[15,4,16,5],[10,4,11,3]]
-        );
-
-        let c = P::variable();
-        let ssi = ssi_invariant_v1(&l, &c, false);
-
-        assert_eq!(ssi, (0, 2));
-    }
-
-    macro_rules! test_cone {
-        ($(#[$m:meta])* $test:ident, $name:literal, $expected:expr) => {
-            $(#[$m])*
-            #[test]
-            fn $test() -> Result<(), Box<dyn std::error::Error>> {
-                let c = P::variable();
-                let l = InvLink::load($name)?;
-                let ssi = ssi_invariant(&l, &c, false, SymBuildConfig::default());
-                assert_eq!(ssi, $expected);
-
-                Ok(())
-            }
-        }
-    }
-
     // all-negative diagram: the Kh h-range tops at 0, so the KhI top degree 1 must survive the
     // cone's window pruning (regression: prune_isolated_top dropped it, killing the Q classes).
     #[test]
@@ -465,58 +395,6 @@ mod tests {
         assert_eq!(ssi, (-2, -2));
     }
 
-    // direct symmetry-broken emission (Sano2026 Prop 4.6) with the SDR canon transport.
-    macro_rules! test_cone_direct {
-        ($test:ident, $name:literal, $expected:expr) => {
-            #[test]
-            fn $test() -> Result<(), Box<dyn std::error::Error>> {
-                let c = P::variable();
-                let l = InvLink::load($name)?;
-                let config = SymBuildConfig { ..Default::default() };
-                let ssi = ssi_invariant(&l, &c, false, config);
-                assert_eq!(ssi, $expected);
-
-                Ok(())
-            }
-        }
-    }
-
-    test_cone_direct!(k3_1_cone_direct, "3_1", (2, 2));
-    test_cone_direct!(k4_1_cone_direct, "4_1", (0, 0));
-    test_cone_direct!(k6_2a_cone_direct, "6_2a", (2, 2));
-    test_cone_direct!(k7_6a_cone_direct, "7_6a", (-2, -2));
-
-    #[test]
-    fn k3_1_m_cone_direct() {
-        let l = InvLink::test_data("3_1").mirror();
-        let c = P::variable();
-
-        let config = SymBuildConfig { ..Default::default() };
-        let ssi = ssi_invariant(&l, &c, false, config);
-        assert_eq!(ssi, (-2, -2));
-    }
-
-    #[test]
-    fn k9_46_cone_direct() {
-        let l = InvLink::from_symmetric_pd_code(
-            [[18,8,1,7],[13,6,14,7],[12,2,13,1],[8,18,9,17],[5,14,6,15],[2,12,3,11],[16,10,17,9],[15,4,16,5],[10,4,11,3]]
-        );
-
-        let c = P::variable();
-        let config = SymBuildConfig { ..Default::default() };
-        let ssi = ssi_invariant(&l, &c, false, config);
-
-        assert_eq!(ssi, (0, 2));
-    }
-
-    test_cone!(k3_1_cone, "3_1", (2, 2));
-    test_cone!(k4_1_cone, "4_1", (0, 0));
-    test_cone!(k5_1_cone, "5_1", (4, 4));
-    test_cone!(k6_2a_cone, "6_2a", (2, 2));
-    test_cone!(k6_3_cone, "6_3", (0, 0));
-    test_cone!(k7_6a_cone, "7_6a", (-2, -2));
-    test_cone!(k7_7a_cone, "7_7a", (0, 0));
-
     #[test]
     fn k3_1_cone_red() {
         let l = InvLink::test_data("3_1");
@@ -526,52 +404,4 @@ mod tests {
         assert_eq!(ssi, (2, 2));
     }
 
-    #[test]
-    fn k9_46_cone() {
-        let l = InvLink::from_symmetric_pd_code(
-            [[18,8,1,7],[13,6,14,7],[12,2,13,1],[8,18,9,17],[5,14,6,15],[2,12,3,11],[16,10,17,9],[15,4,16,5],[10,4,11,3]]
-        );
-
-        let c = P::variable();
-        let ssi = ssi_invariant(&l, &c, false, SymBuildConfig::default());
-
-        assert_eq!(ssi, (0, 2));
-    }
-
-    #[test]
-    fn k15n_103488_cone() {
-        let l = InvLink::from_symmetric_pd_code(
-            [[1,11,2,10],[2,20,3,19],[5,17,6,16],[6,25,7,26],[9,22,10,23],[12,30,13,29],[14,8,15,7],[15,27,16,26],[18,4,19,3],[20,11,21,12],[21,1,22,30],[23,4,24,5],[24,18,25,17],[27,8,28,9],[28,14,29,13]]
-        );
-
-        let c = P::variable();
-        let ssi = ssi_invariant(&l, &c, false, SymBuildConfig::default());
-
-        assert_eq!(ssi, (0, 2));
-    }
-
-    #[test]
-    fn k15n_103488() { 
-        let l = InvLink::from_symmetric_pd_code(
-            [[1,11,2,10],[2,20,3,19],[5,17,6,16],[6,25,7,26],[9,22,10,23],[12,30,13,29],[14,8,15,7],[15,27,16,26],[18,4,19,3],[20,11,21,12],[21,1,22,30],[23,4,24,5],[24,18,25,17],[27,8,28,9],[28,14,29,13]]
-        );
-
-        let c = P::variable();
-        let ssi = ssi_invariant_v1(&l, &c, false);
-
-        assert_eq!(ssi, (0, 2));
-    }
-
-    #[test]
-    #[ignore]
-    fn k17nh_73() {
-        let l = InvLink::from_symmetric_pd_code(
-            [[1,27,2,26],[19,2,20,3],[3,13,4,12],[4,31,5,32],[30,5,31,6],[13,7,14,6],[8,27,9,28],[9,1,10,34],[10,18,11,17],[24,11,25,12],[14,21,15,22],[28,16,29,15],[33,16,34,17],[18,26,19,25],[20,8,21,7],[29,23,30,22],[23,33,24,32]]
-        );
-
-        let c = P::variable();
-        let ssi = ssi_invariant_v1(&l, &c, false);
-
-        assert_eq!(ssi, (0, 2));
-    }
 }

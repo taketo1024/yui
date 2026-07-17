@@ -21,7 +21,7 @@ use yui_core::{Ring, RingOps};
 use yui_link::{Node, Edge, InvLink};
 
 use crate::kh::{KhGen, KhTensor};
-use crate::tng::{LcCob, LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
+use crate::tng::{ElimDir, LcCob, LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
 use crate::tng::builder::{TngComplexBuilder, TngElemBuilder, BuildConfig, BuildMode, NodeOrder};
 use std::fmt;
 use super::{reachable_range, pop_min_pivot, pivot_pool, push_pivot, sparkline, fill_cost_sparkline, cutwidth_after, toggle_boundary, boundary_edges, select_cuts, cut_components, merge_order, CutOption};
@@ -458,14 +458,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.complex().contains_key(k).then(|| self.pivot_weight(k))
         ) {
             let Some(&c) = self.find_loop_in(&k, allow_based) else { continue };
+            let added = self.deloop_equiv(&k, &c);
 
-            let new_keys = self.deloop_equiv(&k, &c);
-            for new_key in new_keys {
-                if self.find_loop_in(&new_key, allow_based).is_some() {
-                    let w = self.pivot_weight(&new_key);
-                    push_pivot(&mut pool, new_key, w);
+            for nk in added {
+                if self.find_loop_in(&nk, allow_based).is_some() {
+                    let w = self.pivot_weight(&nk);
+                    push_pivot(&mut pool, nk, w);
                 }
             }
+            
             done += 1;
             log_progress(done, done - 1, done + pool.len(), PROGRESS_LOG_STEP);
         }
@@ -496,7 +497,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         if self.config.mode.immediate_elim() {
             added.retain(|k|
                 self.complex().contains_key(k) &&
-                self.try_eliminate_equiv_at(k) == 0
+                self.try_eliminate_equiv_at(k, ElimDir::Both) == 0
             );
             // an equivariant elim removes the whole τ-pair, so a key kept above may since have
             // been eliminated as another's τ-partner — re-retain so only live keys are returned.
@@ -577,37 +578,36 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub(crate) fn eliminate_in(&mut self, i: isize) {
+        // pivot = equiv-invertible outgoing edge at its source (see the non-sym `eliminate_in`).
         let keys = self.collect_keys(i,
             |k| self.complex().vertex(k).out_edges()
                 .any(|l| self.is_equiv_inv_edge(k, l)),
-            |k| self.equiv_elim_cost(k),
+            |k| self.equiv_elim_cost(k, ElimDir::Outgoing),
         );
         if keys.is_empty() { return }
 
         // `targets` counts only the pivots the cap will actually eliminate (equiv cost ≤ cap); the
         // rest defer to the matrix. The sparkline shows the whole eliminatable distribution.
-        let targets = self.config.max_elim_cost
-            .map_or(keys.len(), |max| keys.iter().filter(|(_, c)| *c <= max).count());
+        let targets = keys.iter().filter(|(_, c)| !self.exceeds_elim_cap(*c)).count();
+        
         debug!("{} eliminate in C[{i}]: {}, targets: {}", self.current_step(), self.complex().rank(i), targets);
         debug!("{}   fill: {}", self.current_step(), fill_cost_sparkline(&keys, self.config.max_elim_cost));
 
         let before = self.complex().rank(i) as isize;
-
         let mut pool = pivot_pool(keys);
         let mut done = 0;
+        
         while let Some(k) = pop_min_pivot(&mut pool, |k|
-            self.complex().contains_key(k).then(|| self.equiv_elim_cost(k))
+            self.complex().contains_key(k).then(|| self.equiv_elim_cost(k, ElimDir::Outgoing))
         ) {
             // `pop_min_pivot` returns the cheapest pivot; once it exceeds the cap, so do all the
             // rest — stop and defer them (with the whole remaining frontier) to the matrix reduction.
-            if let Some(max) = self.config.max_elim_cost {
-                let cost = self.equiv_elim_cost(&k);
-                if cost > max {
-                    debug!("{}   deferred {} pivots to matrix (min cost 2^{} > cap {max})", self.current_step(), pool.len() + 1, cost.ilog2());
-                    break;
-                }
+            let cost = self.equiv_elim_cost(&k, ElimDir::Outgoing);
+            if self.exceeds_elim_cap(cost) {
+                debug!("{}   deferred {} pivots", self.current_step(), pool.len() + 1);
+                break;
             }
-            let n = self.try_eliminate_equiv_at(&k);
+            let n = self.try_eliminate_equiv_at(&k, ElimDir::Outgoing);
             if n > 0 {
                 let prev = done;
                 done += n; // off-axis events consume the pivot and its τ-mirror.
@@ -622,15 +622,24 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.current_step(), i - 1, self.complex().rank(i - 1), i + 1, self.complex().rank(i + 1));
     }
 
+    fn exceeds_elim_cap(&self, cost: usize) -> bool {
+        self.config.max_elim_cost.is_some_and(|max| cost > max)
+    }
+
     // Returns the number of degree-`i` pivot targets consumed: 1 on-axis, 2 off-axis (`k` and `τk`).
-    fn try_eliminate_equiv_at(&mut self, k: &TngComplexKey) -> usize {
-        if let Some(&j) = self.choose_equiv_inv_edge_into(&k) {
-            self.eliminate_equiv(&j, &k)
-        } else if let Some(&l) = self.choose_equiv_inv_edge_from(&k) {
-            self.eliminate_equiv(&k, &l)
-        } else {
-            0
+    // `Both` prefers the incoming side, matching the non-sym `try_eliminate_at`.
+    fn try_eliminate_equiv_at(&mut self, k: &TngComplexKey, dir: ElimDir) -> usize {
+        if matches!(dir, ElimDir::Incoming | ElimDir::Both) {
+            if let Some(&j) = self.choose_equiv_inv_edge_into(k) {
+                return self.eliminate_equiv(&j, k);
+            }
         }
+        if matches!(dir, ElimDir::Outgoing | ElimDir::Both) {
+            if let Some(&l) = self.choose_equiv_inv_edge_from(k) {
+                return self.eliminate_equiv(k, &l);
+            }
+        }
+        0
     }
 
     fn eliminate_equiv(&mut self, i: &TngComplexKey, j: &TngComplexKey) -> usize {
@@ -662,13 +671,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         if self.key_map.is_sym(k) { w } else { 2 * w }
     }
 
-    // Least Markowitz cost to eliminate `k`, over its equiv-invertible incident edges — the
-    // equivariant pivot priority (vs the cruder `pivot_weight`).
-    fn equiv_elim_cost(&self, k: &TngComplexKey) -> usize {
+    // Least Markowitz cost to eliminate `k`, over its equiv-invertible edges in the given
+    // direction — the equivariant pivot priority (vs the cruder `pivot_weight`).
+    fn equiv_elim_cost(&self, k: &TngComplexKey, dir: ElimDir) -> usize {
         let v = self.complex().vertex(k);
-        let outs = v.out_edges().filter(|l| self.is_equiv_inv_edge(k, l)).map(|l| self.equiv_edge_weight(k, l));
-        let ins = v.in_edges().filter(|j| self.is_equiv_inv_edge(j, k)).map(|j| self.equiv_edge_weight(j, k));
-        outs.chain(ins).min().unwrap_or(0)
+        let outs = || v.out_edges().filter(|l| self.is_equiv_inv_edge(k, l)).map(|l| self.equiv_edge_weight(k, l)).min();
+        let ins = || v.in_edges().filter(|j| self.is_equiv_inv_edge(j, k)).map(|j| self.equiv_edge_weight(j, k)).min();
+        let min = match dir {
+            ElimDir::Outgoing => outs(),
+            ElimDir::Incoming => ins(),
+            ElimDir::Both => Iterator::chain(outs().into_iter(), ins()).min(),
+        };
+        min.unwrap_or(0)
     }
 
     // Cheapest invertible in-/out-edge within the cost cap (over-cap pivots are left for the matrix

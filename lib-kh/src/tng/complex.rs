@@ -44,6 +44,14 @@ const MERGE_PAIR_LOG_STEP: usize = 50_000;
 struct SendPtr<T>(*mut T);
 unsafe impl<T> Send for SendPtr<T> {}
 
+/// Which invertible edges of a vertex count as its pivot candidates (`elim_cost`, `try_eliminate_at`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ElimDir {
+    Incoming,
+    Outgoing,
+    Both,
+}
+
 #[derive(Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub struct TngComplexKey {
     pub state: State,
@@ -643,11 +651,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     // Least edge-weight (Markowitz cost) to eliminate `k`, over its invertible incident edges —
     // the pivot priority.
-    pub(crate) fn elim_cost(&self, k: &TngComplexKey) -> usize {
+    pub(crate) fn elim_cost(&self, k: &TngComplexKey, dir: ElimDir) -> usize {
         let v = &self.vertices[k];
-        let outs = v.out_edges.keys().filter(|l| self.edge(k, l).is_invertible()).map(|l| self.edge_weight(k, l));
-        let ins = v.in_edges.iter().filter(|j| self.edge(j, k).is_invertible()).map(|j| self.edge_weight(j, k));
-        outs.chain(ins).min().unwrap_or(0)
+        let outs = || v.out_edges.keys().filter(|l| self.edge(k, l).is_invertible()).map(|l| self.edge_weight(k, l)).min();
+        let ins = || v.in_edges.iter().filter(|j| self.edge(j, k).is_invertible()).map(|j| self.edge_weight(j, k)).min();
+        let min = match dir {
+            ElimDir::Outgoing => outs(),
+            ElimDir::Incoming => ins(),
+            ElimDir::Both => Iterator::chain(outs().into_iter(), ins()).min(),
+        };
+        min.unwrap_or(0)
     }
 
     /// Gaussian-eliminate the invertible pivot `a: k0 → k1` (an iso in `Cob_{/l}`) — [BN07, Lemma 4.2].

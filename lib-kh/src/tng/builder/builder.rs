@@ -21,7 +21,7 @@ use yui_link::{Node, Edge, Link};
 
 use crate::kh::{KhChain, KhComplex};
 use crate::util::log_progress;
-use crate::tng::{MAX_EDGE, TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
+use crate::tng::{MAX_EDGE, ElimDir, TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
 use super::{reachable_range, pop_min_pivot, pivot_pool, push_pivot, sparkline, fill_cost_sparkline, cutwidth_after, toggle_boundary, boundary_edges, select_cuts, cut_components, merge_order, TngElemBuilder};
 
 // Pacing of the progress lines in the per-op build loops (eliminate / deloop / asym elimination).
@@ -459,44 +459,45 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         // global pass, None leaves them entirely. `try_eliminate_at` skips over-cap pivots.
         if self.config.mode.immediate_elim() {
             // retain only the keys that weren't eliminated
-            added.retain(|k| self.try_eliminate_at(k).is_none());
+            added.retain(|k| !self.try_eliminate_at(k, ElimDir::Both));
         }
         added
     }
 
     pub fn eliminate_in(&mut self, i: isize) {
+        // pivot = invertible outgoing edge at its source: the filter, the pool order and the paid
+        // cost all use `ElimDir::Outgoing`, so the cost-sorted pool's over-cap break is exact.
+        // Edges into C[i] are covered when C[i-1] is swept.
         let keys = self.collect_keys(i,
             |k| self.complex.vertex(k).out_edges().any(|l|
                 self.complex.edge(k, l).is_invertible()
             ),
-            |k| self.complex.elim_cost(k),
+            |k| self.complex.elim_cost(k, ElimDir::Outgoing),
         );
         if keys.is_empty() { return }
 
         // `targets` counts only the pivots the cap will actually eliminate (cost ≤ cap); the rest
         // defer to the matrix. The sparkline shows the *whole* eliminatable distribution for context.
-        let targets = self.config.max_elim_cost
-            .map_or(keys.len(), |max| keys.iter().filter(|(_, c)| *c <= max).count());
+        let targets = keys.iter().filter(|(_, c)| !self.exceeds_elim_cap(*c)).count();
+
         debug!("{} eliminate in C[{i}]: {}, targets: {}", self.current_step(), self.complex.rank(i), targets);
-        debug!("{}   fill: {}", self.current_step(), fill_cost_sparkline(&keys, self.config.max_elim_cost));
+        debug!("{}   {}", self.current_step(), fill_cost_sparkline(&keys, self.config.max_elim_cost));
 
         let before = self.complex.rank(i) as isize;
-
         let mut pool = pivot_pool(keys);
         let mut done = 0;
+
         while let Some(k) = pop_min_pivot(&mut pool, |k|
-            self.complex.contains_key(k).then(|| self.complex.elim_cost(k))
+            self.complex.contains_key(k).then(|| self.complex.elim_cost(k, ElimDir::Outgoing))
         ) {
             // `pop_min_pivot` returns the cheapest pivot; once it exceeds the cap, so do all the
             // rest — stop and defer them (with the whole remaining frontier) to the matrix reduction.
-            if let Some(max) = self.config.max_elim_cost {
-                let cost = self.complex.elim_cost(&k);
-                if cost > max {
-                    debug!("{}   deferred {} pivots to matrix (min cost 2^{} > cap {max})", self.current_step(), pool.len() + 1, cost.ilog2());
-                    break;
-                }
+            let cost = self.complex.elim_cost(&k, ElimDir::Outgoing);
+            if self.exceeds_elim_cap(cost) {
+                debug!("{}   deferred {} pivots", self.current_step(), pool.len() + 1);
+                break;
             }
-            if self.try_eliminate_at(&k).is_some() {
+            if self.try_eliminate_at(&k, ElimDir::Outgoing) {
                 done += 1;
                 log_progress(done, done - 1, targets, PROGRESS_LOG_STEP);
             }
@@ -509,20 +510,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.current_step(), i - 1, self.complex.rank(i - 1), i + 1, self.complex.rank(i + 1));
     }
 
-    // Eliminate at `k` via an invertible in- or out-edge; returns the fill cost paid
-    // (`edge_weight` of the chosen pivot = Schur block size), or `None` if nothing to eliminate.
-    pub fn try_eliminate_at(&mut self, k: &TngComplexKey) -> Option<usize> {
-        if let Some(&j) = self.choose_inv_edge_into(&k) {
-            let cost = self.complex.edge_weight(&j, k);
-            self.eliminate(&j, &k);
-            Some(cost)
-        } else if let Some(&l) = self.choose_inv_edge_from(&k) {
-            let cost = self.complex.edge_weight(k, &l);
-            self.eliminate(&k, &l);
-            Some(cost)
-        } else {
-            None
+    fn exceeds_elim_cap(&self, cost: usize) -> bool {
+        self.config.max_elim_cost.is_some_and(|max| cost > max)
+    }
+
+    // Eliminate at `k` via an invertible edge in the given direction (`Both` prefers incoming).
+    pub fn try_eliminate_at(&mut self, k: &TngComplexKey, dir: ElimDir) -> bool {
+        if matches!(dir, ElimDir::Incoming | ElimDir::Both) {
+            if let Some(&j) = self.choose_inv_edge_into(k) {
+                self.eliminate(&j, k);
+                return true;
+            }
         }
+        if matches!(dir, ElimDir::Outgoing | ElimDir::Both) {
+            if let Some(&l) = self.choose_inv_edge_from(k) {
+                self.eliminate(k, &l);
+                return true;
+            }
+        }
+        false
     }
 
     pub fn eliminate(&mut self, i: &TngComplexKey, j: &TngComplexKey) {

@@ -218,6 +218,29 @@ mod tests {
     use crate::Braid;
     use crate::misc::{jones_polynomial, det};
 
+    fn same_knot(a: &Link, b: &Link) -> bool {
+        let ja = jones_polynomial(a);
+        ja == jones_polynomial(b) || ja == jones_polynomial(&b.mirror())
+    }
+
+    #[test]
+    fn braid_closures_are_jones_faithful() {
+        assert!(same_knot(&Braid::from([1, 1, 1]).closure(), &Link::test_data("3_1")));
+        assert!(same_knot(&Braid::from([1, -2, 1, -2]).closure(), &Link::test_data("4_1")));
+    }
+
+    #[test]
+    fn twist_knot_matches_references() {
+        // twist_knot(n) vs the independent PD-code reference, by Jones (mirror allowed);
+        // twist_knot(-1-n) is the mirror.
+        let table = ["3_1", "4_1", "5_2", "6_1", "7_2"];
+        for (i, name) in table.iter().enumerate() {
+            let n = i as i32 + 1;
+            assert!(same_knot(&Link::twist_knot(n), &Link::test_data(name)), "twist_knot({n}) ≠ {name}");
+            assert!(same_knot(&Link::twist_knot(-1 - n), &Link::test_data(name)), "twist_knot({}) ≠ mirror {name}", -1 - n);
+        }
+    }
+
     #[test]
     fn conn_sum_is_jones_multiplicative() {
         // unreduced Jones: Ṽ(K1 # K2) · Ṽ(unknot) = Ṽ(K1) · Ṽ(K2)

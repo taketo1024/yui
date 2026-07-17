@@ -451,17 +451,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("{} deloop in C[{i}]: {}, targets: {}", self.current_step(), self.complex().rank(i), total);
 
         let before = self.complex().rank(i) as isize;
+        let mut done = 0;
 
         let mut pool = pivot_pool(keys);
-        let (mut done, mut elim) = (0, 0);
         while let Some(k) = pop_min_pivot(&mut pool, |k|
             self.complex().contains_key(k).then(|| self.pivot_weight(k))
         ) {
             let Some(&c) = self.find_loop_in(&k, allow_based) else { continue };
 
             let new_keys = self.deloop_equiv(&k, &c);
-            // branches short of the usual 2 = inline-eliminated (based collapse or greedy elim)
-            elim += 2usize.saturating_sub(new_keys.len());
             for new_key in new_keys {
                 if self.find_loop_in(&new_key, allow_based).is_some() {
                     let w = self.pivot_weight(&new_key);
@@ -474,7 +472,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let after = self.complex().rank(i) as isize;
 
-        debug!("{}   delooped C[{i}]: {} (delooped: {done}, eliminated: {elim}, diff: {})", self.current_step(), after, after - before);
+        debug!("{}   delooped C[{i}]: {} (delooped: {done}, diff: {})", self.current_step(), after, after - before);
         debug!("{}   neighbors: C[{}] {} / C[{}] {}",
             self.current_step(), i - 1, self.complex().rank(i - 1), i + 1, self.complex().rank(i + 1));
     }

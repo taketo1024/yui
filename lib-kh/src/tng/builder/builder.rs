@@ -672,11 +672,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn eval_elements(&self) -> Vec<KhChain<R>> {
         let (h, t) = self.complex.ht();
-        // an un-delooped complex (`no_full_deloop`) needs the circle-expanding eval.
-        if self.complex.is_completely_delooped() {
+        // an un-delooped complex (`no_full_deloop`) or a q-filtered one (elements may hold refs to
+        // dropped vertices) needs the guarded circle-expanding eval.
+        if self.complex.is_completely_delooped() && self.config.q_range.is_none() {
             self.elements.eval(h, t)
         } else {
-            self.elements.eval_with(&self.complex, h, t)
+            self.elements.eval_with(&self.complex, h, t, self.config.q_range.clone())
         }
     }
 
@@ -1120,6 +1121,38 @@ mod tests {
         for i in full.h_range() {
             assert_eq!(wh[i].rank(), fh[i].rank(), "rank at {i}");
             assert_eq!(wh[i].tors(), fh[i].tors(), "tors at {i}");
+        }
+    }
+
+    // A window clipping the canon cycle's low-q terms: dropped keys/generators must be skipped in
+    // eval (regression: eval_with panicked on dangling refs), leaving the truncated representative.
+    #[test]
+    fn q_filter_truncates_canon() {
+        use yui_core::poly::Poly;
+        use yui_core::num::FF2;
+        type P = Poly<'H', FF2>;
+
+        let l = Link::test_data("6_2");
+        let (h, t) = (P::variable(), P::zero());
+        // canon cycles are homogeneous at q0 = w − r counting deg_H (q(x) − 2·deg_H = q0);
+        // cut above the lowest surviving generator q-degree so the truncation really clips.
+        let q0 = (l.writhe() as isize) - (l.seifert_circles().len() as isize);
+        let lo = q0 + 4;
+
+        let full = KhComplex::new(&l, &h, &t, false);
+        let clipped = full.canon_cycles().iter().any(|z| z.iter().any(|(x, _)| full.q_deg_of(x) < lo));
+        assert!(clipped, "the window must clip some canon term");
+
+        for no_full_deloop in [false, true] {
+            let config = BuildConfig { q_range: Some(lo ..= isize::MAX), no_full_deloop, ..Default::default() };
+            let win = KhComplex::new_with_config(&l, &h, &t, false, config);
+            // a cycle truncated to zero is legitimate (the H1 driver widens on it); no panic, no
+            // out-of-window terms.
+            for z in win.canon_cycles() {
+                for (x, _) in z.iter() {
+                    assert!(win.q_deg_of(x) >= lo, "term below the window: q = {}", win.q_deg_of(x));
+                }
+            }
         }
     }
 

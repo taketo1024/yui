@@ -1,3 +1,5 @@
+use std::ops::RangeInclusive;
+
 use num_traits::Zero;
 use yui_core::bitseq::Bit;
 use yui_core::{Ring, RingOps};
@@ -5,7 +7,7 @@ use yui_link::{Edge, Node, Path};
 
 use itertools::Itertools;
 
-use crate::kh::{KhAlgGen, KhChain};
+use crate::kh::{KhAlgGen, KhChain, KhGen};
 use crate::tng::{Tng, TngComp, Cob, End, Dot, LcCob, LcCobTrait, TngComplex, TngComplexElem, TngComplexKey, circles_of, label_assignments, cap_circles, expanded_key};
 
 // Owns the canonical-cycle elements and transforms them in lockstep with the `TngComplex`: each
@@ -186,15 +188,24 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     // Like `eval`, but expands each vertex's remaining circles over their label assignments (the same
     // pairing as `into_raw_complex`) — so it also works on an un-delooped complex (`no_full_deloop`).
-    pub(crate) fn eval_with(&self, c: &TngComplex<R>, h: &R, t: &R) -> Vec<KhChain<R>> {
+    // Keys/generators dropped by the q-filter are skipped, matching `into_raw_complex_filtered`.
+    pub(crate) fn eval_with(&self, c: &TngComplex<R>, h: &R, t: &R, q_range: Option<RangeInclusive<isize>>) -> Vec<KhChain<R>> {
+        let q_shift = c.deg_shift().1;
+        let in_window = |g: &KhGen|
+            q_range.as_ref().is_none_or(|r| r.contains(&(q_shift + g.rel_q_deg())));
+
         self.elements.iter().map(|e| {
             let init = LcCob::from(e.in_cob().clone());
-            e.out_cob().iter().flat_map(|(k, retr)| {
+            e.out_cob().iter().filter(|(k, _)| c.contains_key(k)).flat_map(|(k, retr)| {
                 let circles = circles_of(c.vertex(k).tng());
-                label_assignments(&circles).into_iter().map(|b| {
-                    let g = cap_circles(retr.clone(), End::Tgt, &circles, &b, h, t);
-                    let x = (g * &init).eval(h, t);
-                    (expanded_key(k, &b).as_gen(), x)
+                label_assignments(&circles).into_iter().filter_map(|b| {
+                    let g = expanded_key(k, &b).as_gen();
+                    if !in_window(&g) {
+                        return None;
+                    }
+                    let gc = cap_circles(retr.clone(), End::Tgt, &circles, &b, h, t);
+                    let x = (gc * &init).eval(h, t);
+                    Some((g, x))
                 }).collect_vec()
             }).collect()
         }).collect()

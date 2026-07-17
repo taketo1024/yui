@@ -33,4 +33,4 @@ yui-core     = { workspace = true, features = ["tex"] }
 yui-link.workspace = true
 yui-matrix.workspace = true
 yui-homology = { workspace = true, features = ["tex"] }
-yui-kh.workspace = true
+yui-kh = { workspace = true, features = ["tex"] }

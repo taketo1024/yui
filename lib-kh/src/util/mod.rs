@@ -10,3 +10,6 @@ pub(crate) mod log;
 pub(crate) use log::log_progress;
 
 pub mod calc;
+
+pub mod fast_poly;
+pub use fast_poly::FastPoly;

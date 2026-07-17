@@ -105,7 +105,7 @@ macro_rules! try_euc_poly {
     ($app:ident, $method:ident, $args:expr) => {{
         use yui_core::num::Ratio;
         use yui_core::num::FF;
-        use crate::app::utils::FastPoly;
+        use yui_kh::util::FastPoly;
 
         type Q = Ratio<Int>;
         type F2 = FF<2>;
@@ -130,7 +130,7 @@ macro_rules! try_noneuc_poly {
         use yui_core::num::Ratio;
         use yui_core::num::FF;
         use yui_core::poly::Poly2;
-        use crate::app::utils::FastPoly;
+        use yui_kh::util::FastPoly;
 
         type Z = Int;
         type Q = Ratio<Int>;

@@ -10,9 +10,7 @@ use itertools::Itertools;
 use num_traits::Zero;
 use log::info;
 
-use yui_core::AddMon;
 use yui_core::num::FF2;
-use yui_core::poly::Poly;
 use yui_matrix::MatTrait;
 use yui_matrix::sparse::{SpMat, SpVec};
 use yui_matrix::sparse::pluq::solve_pluq;
@@ -20,10 +18,11 @@ use yui_link::{InvLink, Link};
 
 use crate::kh::KhComplex;
 use crate::tng::builder::SymBuildConfig;
+use crate::util::FastPoly;
 use crate::khi::{KhIChain, KhIComplex};
 
 type F = FF2;
-type P = Poly<'H', F>;
+type P = FastPoly<'H', F>;
 
 // The `H`-divisibilities `(d0, d1)` via `H = 1` solves. `expected` (the guessed s-value) sets the
 // initial high-q build cut at `q = expected − 1` — only the high end is cut, so `d_H` (mod torsion)
@@ -151,7 +150,7 @@ fn truncated_system(
         let i1 = row_map[i]?;
         let j1 = col_map[j]?;
         debug_assert!(
-            p.nterms() == 1 && 2 * (p.lead_deg() as isize) == tgt_q[i] - src_q[j],
+            2 * (p.deg() as isize) == tgt_q[i] - src_q[j],
             "the differential is not q-homogeneous"
         );
         let e = eval_at_one(p);
@@ -184,15 +183,15 @@ fn window_index(qs: &[isize], in_win: impl Fn(isize) -> bool) -> (usize, Vec<Opt
 }
 
 fn eval_at_one(p: &P) -> F {
-    F::sum(p.iter().map(|(_, a)| *a))
+    *p.coeff()
 }
 
-// every coefficient of `z` must be a monomial `λ·H^k` with `q(x) − 2k = q₀`.
+// every coefficient of `z` is a monomial `λ·H^k` (by the `FastPoly` representation); check `q(x) − 2k = q₀`.
 fn assert_homogeneous(kc: &KhIComplex<P>, z: &KhIChain<P>, q0: isize) {
     let bad = z.iter().filter(|(x, a)|
-        a.nterms() != 1 || kc.q_deg_of(*x) - 2 * (a.lead_deg() as isize) != q0
+        kc.q_deg_of(*x) - 2 * (a.deg() as isize) != q0
     ).map(|(x, a)|
-        format!("  q(x) = {}, coeff = {} (nterms {}, lead_deg {})", kc.q_deg_of(x), a, a.nterms(), a.lead_deg())
+        format!("  q(x) = {}, coeff = {} (deg {})", kc.q_deg_of(x), a, a.deg())
     ).collect_vec();
 
     assert!(

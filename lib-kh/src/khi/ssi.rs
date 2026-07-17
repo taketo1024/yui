@@ -13,15 +13,15 @@ use log::info;
 
 use yui_core::MathType;
 use yui_core::num::FF2;
-use yui_core::poly::Poly;
 use yui_link::{InvLink, Link};
 
 use crate::tng::builder::SymBuildConfig;
+use crate::util::FastPoly;
 use crate::util::calc::div_vec;
 use crate::khi::KhIHomology;
 use super::ssi_h1::ssi_divisibility_v2;
 
-type P = Poly<'H', FF2>;
+type P = FastPoly<'H', FF2>;
 
 /// The `ssi` computation pipeline.
 /// - `V1`: full bigraded `KhIHomology`; simple, memory-heavy (`config`/`expected` are ignored).

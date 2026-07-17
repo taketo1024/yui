@@ -19,7 +19,9 @@ use log::{debug, info, trace};
 use yui_core::{Ring, RingOps};
 use yui_link::{Node, Edge, Link};
 
-use crate::kh::{KhChain, KhComplex};
+use yui_homology::ChainComplex1;
+
+use crate::kh::{KhChain, KhComplex, KhGen};
 use crate::util::log_progress;
 use crate::tng::{MAX_EDGE, ElimDir, Tng, TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
 use super::{reachable_range, pop_min_pivot, pivot_pool, push_pivot, sparkline, fill_cost_sparkline, cutwidth_after, toggle_boundary, BuildPlanner, TngElemBuilder};
@@ -659,6 +661,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.complex
     }
 
+    /// Convert to the raw complex, applying `config.q_range` (matrix-level deloop filter). This is the
+    /// only q-filter on the `no_full_deloop` path, where circles expand into generators here.
+    pub fn into_raw_complex(self) -> ChainComplex1<KhGen, R> {
+        match self.config.q_range.clone() {
+            Some(range) => self.complex.into_raw_complex_filtered(range),
+            None => self.complex.into_raw_complex(),
+        }
+    }
+
     pub fn eval_elements(&self) -> Vec<KhChain<R>> {
         let (h, t) = self.complex.ht();
         // an un-delooped complex (`no_full_deloop`) needs the circle-expanding eval.
@@ -1049,6 +1060,93 @@ mod tests {
         }
     }
 
+    // Over Khovanov (d preserves q), a q-window keeps exactly the in-window generators, and the
+    // bigraded homology at each kept (i, q) is unchanged. Runs both filter paths (greedy deloop and
+    // no_full_deloop / matrix-level).
+    #[test]
+    fn q_filter_matches_full() {
+        let l = Link::test_data("8_19");
+        let full = KhComplex::new(&l, &0, &0, false);
+        let (h_range, q_range) = (full.h_range(), full.q_range());
+        let full_h = full.homology();
 
+        // an interior window: drop the outermost occupied q on each side.
+        let lo = *q_range.start() + 2;
+        let hi = *q_range.end() - 2;
 
+        for no_full_deloop in [false, true] {
+            let config = BuildConfig { q_range: Some(lo..=hi), no_full_deloop, ..Default::default() };
+            let win = KhComplex::new_with_config(&l, &0, &0, false, config);
+
+            for i in win.h_range() {
+                for x in win[i].raw_generators() {
+                    let q = win.q_deg_of(x);
+                    assert!((lo..=hi).contains(&q), "gen out of window: ({i}, {q}), no_full_deloop={no_full_deloop}");
+                }
+            }
+
+            let win_h = win.homology();
+            for i in h_range.clone() {
+                for q in q_range.clone().step_by(2) {
+                    let expected = if (lo..=hi).contains(&q) { full_h[(i, q)].rank() } else { 0 };
+                    assert_eq!(win_h[(i, q)].rank(), expected, "rank ({i}, {q}), no_full_deloop={no_full_deloop}");
+                    if (lo..=hi).contains(&q) {
+                        assert_eq!(win_h[(i, q)].tors(), full_h[(i, q)].tors(), "tors ({i}, {q}), no_full_deloop={no_full_deloop}");
+                    }
+                }
+            }
+        }
+    }
+
+    // Over 𝔽₂[H] (cross-q edges via H), a window covering the whole complex reproduces the
+    // unfiltered homology exactly — checks the edge-skipping path is a faithful no-op. Compared
+    // singly-graded (per h), since `deg H = −2` makes the bigraded split ill-defined here.
+    #[test]
+    fn q_filter_full_window_identity() {
+        use yui_core::poly::Poly;
+        use yui_core::num::FF2;
+        type P = Poly<'H', FF2>;
+
+        let l = Link::test_data("6_2");
+        let (h, t) = (P::variable(), P::zero());
+        let full = KhComplex::new(&l, &h, &t, false);
+        let q = full.q_range();
+        let wide = (*q.start() - 4) ..= (*q.end() + 4);
+
+        let config = BuildConfig { q_range: Some(wide), ..Default::default() };
+        let win = KhComplex::new_with_config(&l, &h, &t, false, config);
+
+        let (fh, wh) = (full.homology(), win.homology());
+        for i in full.h_range() {
+            assert_eq!(wh[i].rank(), fh[i].rank(), "rank at {i}");
+            assert_eq!(wh[i].tors(), fh[i].tors(), "tors at {i}");
+        }
+    }
+
+    // Over 𝔽₂[H], `d` raises generator-q (via H), so an upper-unbounded window `{q ≥ lo}` is a
+    // genuine subcomplex: a proper truncation that must still satisfy `d² = 0`.
+    #[test]
+    fn q_filter_subcomplex_valid() {
+        use yui_core::poly::Poly;
+        use yui_core::num::FF2;
+        type P = Poly<'H', FF2>;
+
+        let l = Link::test_data("6_2");
+        let (h, t) = (P::variable(), P::zero());
+        let full = KhComplex::new(&l, &h, &t, false);
+        let lo = *full.q_range().start() + 2; // drop the bottom q-degree(s)
+
+        let config = BuildConfig { q_range: Some(lo ..= isize::MAX), ..Default::default() };
+        let win = KhComplex::new_with_config(&l, &h, &t, false, config);
+
+        win.inner().check_d_all(); // `{q ≥ lo}` is a subcomplex: valid d² = 0
+        for i in win.h_range() {
+            for x in win[i].raw_generators() {
+                assert!(win.q_deg_of(x) >= lo, "gen below window at ({i}, {})", win.q_deg_of(x));
+            }
+        }
+
+        let gens = |c: &KhComplex<P>| c.h_range().map(|i| c[i].rank()).sum::<usize>();
+        assert!(gens(&win) < gens(&full), "window dropped no generator");
+    }
 }

@@ -21,6 +21,7 @@ use yui_link::Braid;
 use yui_kh::kh::KhComplex;
 use yui_kh::tng::builder::{BuildConfig, BuildMode};
 
+#[cfg(feature = "mimalloc")]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 

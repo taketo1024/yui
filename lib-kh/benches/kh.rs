@@ -23,9 +23,6 @@ const MODES: [(&str, BuildMode); 2] =
 
 const KNOTS: [&str; 8] = ["3_1", "4_1", "5_1", "5_2", "6_2", "6_3", "7_3", "8_19"];
 
-#[global_allocator]
-static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
-
 fn build(l: &Link, cfg: BuildConfig) -> KhComplex<i32> {
     KhComplex::<i32>::new_with_config(l, &0, &0, false, cfg)
 }

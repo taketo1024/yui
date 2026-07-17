@@ -49,7 +49,6 @@ yui-link = { workspace = true, features = ["test-utils"] }
 yui-homology = { workspace = true, features = ["test-utils"] }
 criterion = "0.5"
 env_logger = "0.11"
-mimalloc = "0.1"
 
 [[bench]]
 name = "kh"

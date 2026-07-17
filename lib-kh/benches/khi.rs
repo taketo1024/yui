@@ -31,9 +31,6 @@ const K18_PD: &[[u8; 4]] = &[
     [33,20,34,21],[34,8,35,7],[35,13,36,12],
 ];
 
-#[global_allocator]
-static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
-
 /// `KhIComplex::new` across node orders (greedy mode), on small knots.
 fn bench_khi_node(c: &mut Criterion) {
     let mut group = c.benchmark_group("khi_node");

@@ -1,11 +1,16 @@
-// Heavy `ssi` computations (all `#[ignore]`d); the fast correctness tests live in
-// `src/khi/ssi.rs`. Run with `--ignored --nocapture` (and `--features big-link` for Wh(P5)).
+// `ssi` computations on larger diagrams, with the values established by the ssi-corks
+// experiments as oracles; the fast per-knot correctness tests live in `src/khi/ssi.rs`.
+// The heavy ones are `#[ignore]`d — run with `--ignored --nocapture` (and
+// `--features big-link` for Wh(P5)).
 
 use yui_core::poly::Poly;
 use yui_core::num::FF2;
 use yui_kh::khi::{ssi_invariant, ssi_invariant_ver, SsiVersion};
 use yui_kh::tng::builder::{BuildMode, CutOption, SymBuildConfig};
 use yui_link::InvLink;
+
+mod common;
+use common::*;
 
 type P = Poly<'H', FF2>;
 
@@ -28,8 +33,37 @@ fn wh_pretzel_config(cut_at: usize) -> SymBuildConfig {
 }
 
 #[test]
+fn k9_46() {
+    let l = inv(common::k9_46());
+    let c = P::variable();
+
+    for ver in [SsiVersion::V1, SsiVersion::V2] {
+        let ssi = ssi_invariant_ver(&l, &c, false, SymBuildConfig::default(), ver);
+        assert_eq!(ssi, (0, 2), "{ver:?}");
+    }
+}
+
+#[test]
+#[ignore = "slow: 30-crossing interlock"]
+fn interlock_9_46() {
+    let (pd, _) = common::interlock_9_46();
+    let l = inv(pd);
+    let config = SymBuildConfig { cut: CutOption::Auto(2), ..Default::default() };
+    assert_eq!(ssi_invariant(&l, &P::variable(), false, config), (0, 4));
+}
+
+#[test]
+#[ignore = "heavy: 48-crossing interlock"]
+fn interlock_17nh() {
+    let (pd, _) = common::interlock_17nh();
+    let l = inv(pd);
+    let config = SymBuildConfig { cut: CutOption::Auto(2), ..Default::default() };
+    assert_eq!(ssi_invariant(&l, &P::variable(), false, config), (0, 4));
+}
+
+#[test]
 #[ignore = "heavy: 44-crossing Whitehead double (~30 min)"]
-fn ssi_wh_pretzel_3() {
+fn wh_pretzel_3() {
     init_logger();
     let k = InvLink::sym_pretzel(-3, 3, -3);
     let w = k.whitehead_double(true, 0);
@@ -41,7 +75,7 @@ fn ssi_wh_pretzel_3() {
 #[cfg(feature = "big-link")]
 #[test]
 #[ignore = "heavy: 72-crossing Whitehead double"]
-fn ssi_wh_pretzel_5() {
+fn wh_pretzel_5() {
     init_logger();
     let k = InvLink::sym_pretzel(-5, 5, -5);
     let w = k.whitehead_double(true, 0);

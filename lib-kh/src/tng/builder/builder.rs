@@ -62,7 +62,7 @@ impl BuildMode {
     }
 }
 
-/// Divide-and-conquer chunking: `None` = single pass; `Auto(k)` cuts the MinCut order at its `k-1`
+/// Divide-and-conquer chunking: `None` = single pass; `Auto(k)` cuts the build order at its `k-1`
 /// deepest cutwidth valleys.
 #[derive(Clone, Debug, Default)]
 pub enum CutOption {
@@ -71,7 +71,7 @@ pub enum CutOption {
     Auto(usize),
     // cut after the unit positions closest to the given cumulative crossing counts —
     // direct control over chunk balance (Auto cuts only at cutwidth valleys).
-    AtCrossings(Vec<usize>),
+    At(Vec<usize>),
 }
 
 impl CutOption {

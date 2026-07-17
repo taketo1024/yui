@@ -29,7 +29,7 @@ impl<'a> BuildPlanner<'a> {
     /// The planned chunks, each a node list in build order.
     pub(crate) fn plan(&self) -> Vec<Vec<Node>> {
         let k = match self.cut {
-            CutOption::AtCrossings(counts) => return self.at_crossings_plan(counts),
+            CutOption::At(counts) => return self.at_plan(counts),
             CutOption::Auto(k) => (*k).max(1),
             CutOption::None => 1,
         };
@@ -40,7 +40,7 @@ impl<'a> BuildPlanner<'a> {
 
     // Cut after the unit positions whose cumulative crossing count is closest to each requested
     // count — direct control over chunk balance (units stay whole, so counts land within ±1).
-    fn at_crossings_plan(&self, counts: &[usize]) -> Vec<Vec<Node>> {
+    fn at_plan(&self, counts: &[usize]) -> Vec<Vec<Node>> {
         let (order, widths) = self.unit_order();
         let cum: Vec<usize> = order.iter()
             .scan(0, |acc, &u| {

@@ -273,7 +273,7 @@ mod tests {
 
         for name in ["3_1", "4_1", "6_1a"] {
             let l = InvLink::load(name)?;
-            for cut in [CutOption::None, CutOption::Auto(3), CutOption::AtCrossings(vec![4])] {
+            for cut in [CutOption::None, CutOption::Auto(3), CutOption::At(vec![4])] {
                 let config = SymBuildConfig { cut, ..Default::default() };
                 let ssi = ssi_invariant(&l, &c, false, config.clone());
                 let s0 = ssi_invariant_at(&l, &c, false, config.clone(), 0);
@@ -398,7 +398,7 @@ mod tests {
         use crate::tng::builder::{BuildMode, CutOption};
         SymBuildConfig {
             mode: BuildMode::MinFill,
-            cut: CutOption::AtCrossings(vec![cut_at]),
+            cut: CutOption::At(vec![cut_at]),
             max_elim_cost: Some(1 << 16),
             no_full_deloop: true,
             ..Default::default()

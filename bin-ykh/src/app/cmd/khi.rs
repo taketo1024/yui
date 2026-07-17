@@ -66,7 +66,7 @@ pub struct Args {
     #[arg(long)]
     pub no_full_deloop: bool,
 
-    // chunking: `auto(k)` (cutwidth) or manual τ-symmetric edge-cut(s) `e,e,e;e,e,e`.
+    // chunking: `N` (cutwidth, N pieces) or `at(c,..)` (cut after the given crossing counts).
     #[arg(long, value_parser = parse_cut)]
     pub cut: Option<CutOption>,
 

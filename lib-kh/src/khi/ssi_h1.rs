@@ -66,13 +66,15 @@ fn divisibility_in_window(l: &InvLink, reduced: bool, config: SymBuildConfig, q0
     let h = P::variable();
     let t = P::zero();
 
-    // window the h-degrees to cover the canon degrees 0, 1 — one wider on both ends.
+    // Build over `(a−1)..=1`: the solves only involve `C[−1] → C[0] → C[1]`, so nothing above 1
+    // is built; the cheap low degrees stay (truncating the bottom makes the build frontier dense).
+    // Only KhI degrees `−1..=1` are converted to the raw complex — the rest is never expanded.
     let requested = config.h_range.clone().unwrap_or(-(Link::MAX_CROSSING as isize) ..= 1);
     let range = KhComplex::<P>::clamp_h_range(l.inner(), reduced, requested);
     let (a, b) = (*range.start(), *range.end());
     assert!(a <= 0 && b >= 1, "ssi h-range must include 0 and 1, got {a}..={b}");
-    let config = SymBuildConfig { h_range: Some((a - 1)..=(b + 1)), ..config };
-    let kc = KhIComplex::<P>::new_with_config(l, &h, &t, reduced, config);
+    let config = SymBuildConfig { h_range: Some((a - 1)..=b), ..config };
+    let kc = KhIComplex::<P>::new_windowed(l, &h, &t, reduced, config, -1..=1);
 
     let zs = kc.canon_cycles(); // sorted by h-degree: B classes at 0, then Q classes at 1
     assert_eq!(zs.len(), 2 * r);

@@ -51,10 +51,20 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     /// + canon classes directly, and `into_raw_complex` converts once at the boundary (matrix-backed).
     /// The equivalent matrix-level cone is kept for reference as `new_with_config_matrix`.
     pub fn new_with_config(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig) -> Self {
+        let (h_range, build_config) = Self::cone_build_config(l, reduced, config);
+        Self::build_cone(l, h, t, reduced, build_config, h_range)
+    }
+
+    // The ssi (`V2`) entry: `config.h_range` is used literally for the build (the driver pre-widens
+    // it), and only `raw_range` is converted — the solves never touch the other degrees.
+    pub(crate) fn new_windowed(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig, raw_range: RangeInclusive<isize>) -> Self {
+        Self::build_cone(l, h, t, reduced, config, Some(raw_range))
+    }
+
+    fn build_cone(l: &InvLink, h: &R, t: &R, reduced: bool, build_config: SymBuildConfig, raw_range: Option<RangeInclusive<isize>>) -> Self {
         use crate::tng::builder::ConeBuilder;
         assert_eq!(R::one() + R::one(), R::zero(), "char(R) != 2"); // the cobordism cone is char-2 only
 
-        let (h_range, build_config) = Self::cone_build_config(l, reduced, config);
         let cone = ConeBuilder::from_inv_link(l, h, t, reduced).with_config(build_config).run();
 
         // sort by h-degree (all `B` then all `Q`) to match the matrix cone's canon-cycle order.
@@ -62,11 +72,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
             .sorted_by_key(|z| z.keys().map(|x| x.rel_h_deg()).min().unwrap_or(0))
             .collect_vec();
 
-        let inner = cone.into_raw_complex();
-        let inner = match h_range {
-            Some(range) => inner.truncated(range),
-            None => inner,
-        };
+        let inner = cone.into_raw_complex(raw_range);
 
         let deg_shift = KhComplex::<R>::deg_shift_for(l.inner(), reduced);
         Self::new_impl(inner, canon_cycles, deg_shift)

@@ -801,13 +801,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     /// Convert to the raw Khovanov chain complex (`KhGen`-keyed). See `into_raw_complex_with`.
     pub fn into_raw_complex(self) -> ChainComplex1<KhGen, R> {
-        self.into_raw_complex_with(|k, a| expanded_key(k, a).as_gen(), KhGen::rel_q_deg, None)
+        self.into_raw_complex_with(|k, a| expanded_key(k, a).as_gen(), KhGen::rel_q_deg, None, None)
     }
 
     /// `into_raw_complex` restricted to absolute q-degrees in `q_range` — a genuine subquotient,
     /// since `d` preserves q over `𝔽[H]`. For `d_H`, only the high end may shrink the complex.
     pub(crate) fn into_raw_complex_filtered(self, q_range: RangeInclusive<isize>) -> ChainComplex1<KhGen, R> {
-        self.into_raw_complex_with(|k, a| expanded_key(k, a).as_gen(), KhGen::rel_q_deg, Some(q_range))
+        self.into_raw_complex_with(|k, a| expanded_key(k, a).as_gen(), KhGen::rel_q_deg, Some(q_range), None)
     }
 
     /// Convert to a raw chain complex, matrix-backed for `ChainReducer`. Any circles left on a vertex
@@ -815,11 +815,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     /// assignment (mapped to `X` by `into_gen`, ordered by `q_deg`), and each edge contributes the scalar
     /// `⟨b|f|a⟩` (the deloop pairing) as a closed cobordism. A delooped vertex gives one generator.
     /// `q_range` (absolute q) drops out-of-window generators and their incident edges.
+    /// `h_range` restricts the conversion to the given h-degrees (the top boundary gets a zero
+    /// differential) — degrees outside are never expanded.
     pub(crate) fn into_raw_complex_with<X>(
         self,
         into_gen: impl Fn(&TngComplexKey, &KhTensor) -> X,
         q_deg: impl Fn(&X) -> isize,
         q_range: Option<RangeInclusive<isize>>,
+        h_range: Option<RangeInclusive<isize>>,
     ) -> ChainComplex1<X, R>
     where X: LcKey {
         let mut c = self;
@@ -831,9 +834,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         info!("build raw complex: {}", c.stat());
 
+        let degs = {
+            let full = c.h_range();
+            match &h_range {
+                Some(w) => (*full.start()).max(*w.start()) ..= (*full.end()).min(*w.end()),
+                None => full,
+            }
+        };
+
         // expanded generators (vertex, circle-labels) per degree, sorted by q-degree (descending) —
         // fixes both the summand generator order and the matrix row/column order.
-        let keys: FxHashMap<isize, Vec<(TngComplexKey, KhTensor)>> = c.h_range().map(|i| {
+        let keys: FxHashMap<isize, Vec<(TngComplexKey, KhTensor)>> = degs.clone().map(|i| {
             let expanded = c.keys_of_deg(i).flat_map(|k| {
                 let circles = circles_of(c.vertex(k).tng());
                 label_assignments(&circles).into_iter().map(|a| (*k, a)).collect_vec()
@@ -843,11 +854,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             (i, expanded)
         }).collect();
 
-        let summands = GrMod1::generate(c.h_range(), |i|
+        let summands = GrMod1::generate(degs.clone(), |i|
             Summand::from_raw_generators(keys[&i].iter().map(|(k, a)| into_gen(k, a)))
         );
 
-        let matrices = c.h_range().map(|i| {
+        let matrices = degs.clone().map(|i| {
             let cols = &keys[&i];
             let rows: FxHashMap<TngComplexKey, usize> = keys.get(&(i + 1))
                 .map(|ks| ks.iter().enumerate().map(|(r, (k, a))| (expanded_key(k, a), r)).collect())

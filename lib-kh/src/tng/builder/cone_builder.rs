@@ -11,6 +11,8 @@
 //! - T. Sano, "Involutive Khovanov homology and equivariant knots",
 //!   Algebr. Geom. Topol. 25 (2025), 5059–5111.
 
+use std::ops::RangeInclusive;
+
 use delegate::delegate;
 use itertools::Itertools;
 use log::{debug, info};
@@ -499,12 +501,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     /// Convert the cone to the KhI chain complex: each vertex expands into one generator per
     /// circle-label assignment, mapped to `KhIGen` via the cone bit (`into_khi_gen`) and ordered by
     /// `KhIGen` q-degree. `eval_khi_elements` reads the canon classes on this same basis.
-    pub fn into_raw_complex(self) -> ChainComplex1<KhIGen, R> {
+    /// `h_range` restricts the conversion window (KhI degrees) — degrees outside are never expanded.
+    pub fn into_raw_complex(self, h_range: Option<RangeInclusive<isize>>) -> ChainComplex1<KhIGen, R> {
         let q_range = self.cone.config().q_range.clone();
         self.cone.into_tng_complex().into_raw_complex_with(
             |k, a| into_khi_gen(&expanded_key(k, a).as_gen()),
             |g| g.rel_q_deg(),
             q_range,
+            h_range,
         )
     }
 }
@@ -576,7 +580,7 @@ mod tests {
     // (Full homology vs. the KhI reference is checked in `khi`.)
     fn cone_homology(l: &InvLink, reduced: bool, config: SymBuildConfig) -> Vec<(isize, usize)> {
         let c = ConeBuilder::from_inv_link(l, &FF2::zero(), &FF2::zero(), reduced)
-            .with_config(config).run().into_raw_complex();
+            .with_config(config).run().into_raw_complex(None);
         c.check_d_all();
         let h = c.homology();
         h.support().map(|&i| (i, h[i].rank())).filter(|(_, r)| *r > 0).sorted().collect()

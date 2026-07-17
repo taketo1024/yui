@@ -25,7 +25,7 @@ use crate::tng::{LcCob, LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComp
 use crate::tng::builder::{TngComplexBuilder, TngElemBuilder, BuildConfig, BuildMode, NodeOrder};
 use std::fmt;
 use super::{reachable_range, pop_min_pivot, pivot_pool, push_pivot, sparkline, fill_cost_sparkline, cutwidth_after, toggle_boundary, boundary_edges, select_cuts, cut_components, merge_order, CutOption};
-use super::builder::{PROGRESS_LOG_STEP, PROGRESS_LOG_MIN};
+use super::builder::log_progress;
 
 /// Toggles for the automatic simplification done while building (kept separate
 /// from [`BuildConfig`] so the equivariant builder can gain its own flags).
@@ -478,9 +478,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 }
             }
             done += 1;
-            if done % PROGRESS_LOG_STEP == 0 {
-                debug!("{}   ... delooped {done} ({}% eliminated, remain: {})", self.current_step(), elim * 100 / done, pool.len());
-            }
+            log_progress(done, done - 1, done + pool.len());
         }
 
         let after = self.complex().rank(i) as isize;
@@ -509,7 +507,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         if self.config.mode.immediate_elim() {
             added.retain(|k|
                 self.complex().contains_key(k) &&
-                !self.try_eliminate_equiv_at(k)
+                self.try_eliminate_equiv_at(k) == 0
             );
             // an equivariant elim removes the whole τ-pair, so a key kept above may since have
             // been eliminated as another's τ-partner — re-retain so only live keys are returned.
@@ -620,11 +618,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                     break;
                 }
             }
-            if self.try_eliminate_equiv_at(&k) {
-                done += 1;
-                if targets > PROGRESS_LOG_MIN && done % PROGRESS_LOG_STEP == 0 {
-                    debug!("{}   ... eliminated {done}/{targets} in C[{i}] (rank: {})", self.current_step(), self.complex().rank(i));
-                }
+            let n = self.try_eliminate_equiv_at(&k);
+            if n > 0 {
+                let prev = done;
+                done += n; // off-axis events consume the pivot and its τ-mirror.
+                log_progress(done, prev, targets);
             }
         }
 
@@ -635,25 +633,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             self.current_step(), i - 1, self.complex().rank(i - 1), i + 1, self.complex().rank(i + 1));
     }
 
-    fn try_eliminate_equiv_at(&mut self, k: &TngComplexKey) -> bool {
+    // Returns the number of degree-`i` pivot targets consumed: 1 on-axis, 2 off-axis (`k` and `τk`).
+    fn try_eliminate_equiv_at(&mut self, k: &TngComplexKey) -> usize {
         if let Some(&j) = self.choose_equiv_inv_edge_into(&k) {
-            self.eliminate_equiv(&j, &k);
-            true
+            self.eliminate_equiv(&j, &k)
         } else if let Some(&l) = self.choose_equiv_inv_edge_from(&k) {
-            self.eliminate_equiv(&k, &l);
-            true
+            self.eliminate_equiv(&k, &l)
         } else {
-            false
+            0
         }
     }
 
-    fn eliminate_equiv(&mut self, i: &TngComplexKey, j: &TngComplexKey) {
+    fn eliminate_equiv(&mut self, i: &TngComplexKey, j: &TngComplexKey) -> usize {
         debug_assert_eq!(self.key_map.is_sym(i), self.key_map.is_sym(j));
         debug_assert!(self.complex().has_edge(i, j));
 
-        if self.key_map.is_sym(i) { 
+        let n = if self.key_map.is_sym(i) {
             self.eliminate(i, j);
-        } else { 
+            1
+        } else {
             let ti = *self.key_map.inv_key(i);
             let tj = *self.key_map.inv_key(j);
 
@@ -661,10 +659,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             self.eliminate(i, j);
             self.eliminate(&ti, &tj);
-        }
+            2
+        };
 
         self.key_map.remove(i);
         self.key_map.remove(j);
+        n
     }
 
     // Markowitz cost of eliminating `k → l`; off-axis pivots eliminate in τ-pairs (~2× the fill).

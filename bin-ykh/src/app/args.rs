@@ -1,7 +1,7 @@
 use std::ops::RangeInclusive;
 use clap::ValueEnum;
 use derive_more::Display;
-use yui_link::{Edge, Link};
+use yui_link::Link;
 use yui_kh::tng::builder::{BuildMode, NodeOrder, CutOption};
 
 pub trait AppArgs { 
@@ -124,7 +124,7 @@ pub fn parse_node_order(s: &str) -> Result<NodeOrder, String> {
 }
 
 // parse `--cut`: `auto(k)` for cutwidth chunking, `at(c,..)` to cut after the given cumulative
-// crossing counts, else `;`-separated manual edge-cuts (each `e,e,e`).
+// crossing counts.
 pub fn parse_cut(s: &str) -> Result<CutOption, String> {
     if let Some(inner) = s.trim().strip_prefix("auto(").and_then(|x| x.strip_suffix(')')) {
         let k = inner.trim().parse::<usize>().map_err(|e| format!("auto(k): `{inner}`: {e}"))?;
@@ -136,8 +136,5 @@ pub fn parse_cut(s: &str) -> Result<CutOption, String> {
             .collect::<Result<Vec<usize>, _>>()?;
         return Ok(CutOption::AtCrossings(counts));
     }
-    let cuts = s.split(';')
-        .map(|grp| grp.split(',').map(|e| e.trim().parse::<Edge>().map_err(|err| format!("`{e}`: {err}"))).collect())
-        .collect::<Result<Vec<Vec<Edge>>, _>>()?;
-    Ok(CutOption::Manual(cuts))
+    Err(format!("invalid cut `{s}`, expected auto(k)|at(c,..)"))
 }

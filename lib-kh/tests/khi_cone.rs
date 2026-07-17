@@ -24,17 +24,17 @@ fn ssi_9_46() {
 #[test]
 #[ignore = "slow: 30-crossing interlock"]
 fn ssi_interlock_9_46() {
-    let (pd, cut) = interlock_9_46();
+    let (pd, _) = interlock_9_46();
     let l = inv(pd);
-    let config = SymBuildConfig { cut: CutOption::Manual(cut), ..Default::default() };
+    let config = SymBuildConfig { cut: CutOption::Auto(2), ..Default::default() };
     assert_eq!(ssi_invariant(&l, &P::variable(), false, config), (0, 4), "oracle from the ssi-corks experiments");
 }
 
 #[test]
 #[ignore = "heavy: 48-crossing interlock"]
 fn ssi_interlock_17nh() {
-    let (pd, cut) = interlock_17nh();
+    let (pd, _) = interlock_17nh();
     let l = inv(pd);
-    let config = SymBuildConfig { cut: CutOption::Manual(cut), ..Default::default() };
+    let config = SymBuildConfig { cut: CutOption::Auto(2), ..Default::default() };
     assert_eq!(ssi_invariant(&l, &P::variable(), false, config), (0, 4), "oracle from the ssi-corks experiments");
 }

@@ -922,42 +922,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.inner.elements_mut().take()
     }
 
-    // Fuse each τ-orbit of components into one chunk: a τ-symmetric cut maps a component to another
-    // component, so off-axis τ-swapped pieces merge into a single τ-invariant chunk.
-    fn process_pieces(&self, comps: Vec<Vec<usize>>) -> Vec<Vec<usize>> {
-        let nodes = self.nodes();
-        let idx_of: FxHashMap<Node, usize> = nodes.iter().enumerate().map(|(i, x)| (x.clone(), i)).collect();
-        let comp_of: FxHashMap<usize, usize> = comps.iter().enumerate()
-            .flat_map(|(c, comp)| comp.iter().map(move |&i| (i, c)))
-            .collect();
-        let tau = |c: usize| comp_of[&idx_of[self.inv_node(&nodes[comps[c][0]])]];
-
-        // one chunk per τ-orbit (τ is an involution on components), keyed by its smaller index.
-        (0..comps.len())
-            .filter(|&c| c <= tau(c))
-            .map(|c| if tau(c) == c {
-                comps[c].clone()
-            } else {
-                comps[c].iter().chain(&comps[tau(c)]).copied().collect()
-            })
-            .collect()
-    }
-
-    // A cut must be τ-symmetric (closed under `inv_edge`), each piece τ-invariant (so the sym
-    // build can pair `x` with `τx` inside it).
-    fn validate_cut(&self, cut: &FxHashSet<Edge>, pieces: &[Vec<usize>]) {
-        for &e in cut {
-            assert!(cut.contains(&self.inv_edge(e)), "cut not τ-symmetric: τ-image of edge {e} missing");
-        }
-
-        let nodes = self.nodes();
-        let idx_of: FxHashMap<Node, usize> = nodes.iter().enumerate().map(|(i, x)| (x.clone(), i)).collect();
-        for comp in pieces {
-            let set: FxHashSet<usize> = comp.iter().copied().collect();
-            let tau_in = comp.iter().all(|&i| set.contains(&idx_of[self.inv_node(&nodes[i])]));
-            assert!(tau_in, "a cut piece is not τ-invariant (τ maps it outside)");
-        }
-    }
 }
 
 /// Builds the off-axis part of a [`SymTngBuilder`] by τ-symmetry: build one

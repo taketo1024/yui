@@ -443,18 +443,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     /// Bar-Natan tensor product with `other` — see [BN05, §5](https://arxiv.org/abs/math/0410495).
+    /// Raw merge (no deloop / eliminate), degree by degree.
     pub fn merge(&mut self, other: TngComplex<R>) {
         let (left, right) = self.prepare_merge(other);
-        self.merge_with(&left, &right);
-    }
-
-    // Merge already-prepared halves into `self` (no deloop / eliminate) — `self` must be the empty
-    // shell left by `prepare_merge`.
-    pub(crate) fn merge_with(&mut self, left: &Self, right: &Self) {
         for i in self.h_range() {
             debug!("build C[{i}]...");
-            self.merge_vertices(left, right, i);
-            self.merge_edges(left, right, i - 1);
+            self.merge_vertices(&left, &right, i);
+            self.merge_edges(&left, &right, i - 1);
         }
     }
 

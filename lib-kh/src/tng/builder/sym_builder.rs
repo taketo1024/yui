@@ -343,37 +343,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("  key_map: {} × {}", left_map.len(), right_map.len());
         debug!("  merge range: {:?}", range);
 
-        if self.should_deloop() {
-            self.merge_incremental(&left, &right, range, &left_map, &right_map);
-        } else {
-            // no-deloop merge: still free-eliminate per degree (invertible pivots need no
-            // delooping — shared circles pass through as cylinders), bounding the slice growth.
-            let elim = self.config.mode.auto_elim();
-            for i in range {
-                debug!("{} build C[{i}]...", self.current_step());
-                self.merge_slice(&left, &right, i, &left_map, &right_map);
-                if elim {
-                    self.eliminate_in(i - 1);
-                }
-                debug!("{} built C[{i}]: {}", self.current_step(), self.complex().rank(i));
-            }
-        }
-
+        self.merge_incremental(&left, &right, range, &left_map, &right_map);
         self.prune_h_range();
 
         debug!("{} merged: {}", self.current_step(), self.stat());
     }
 
-    // Per degree: deloop, then (if the mode eliminates) sweep i-2,i-1 by equivariant Markowitz cost.
-    // Greedy also inline-eliminates during deloop; the sweep just catches what it missed.
+    // Per degree: deloop (when enabled), then (if the mode eliminates) sweep i-2,i-1 by equivariant
+    // Markowitz cost. Greedy also inline-eliminates during deloop; the sweep just catches what it
+    // missed. Without delooping the sweep still applies — invertible pivots need no delooping,
+    // shared circles pass through as cylinders.
     fn merge_incremental(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, range: RangeInclusive<isize>, left_map: &TauKeyMap, right_map: &TauKeyMap) {
-        debug_assert!(self.config.mode.auto_deloop()); // None is dispatched to merge_slice
         let top = *range.end();
 
         for i in range {
             debug!("{} build C[{i}]...", self.current_step());
             self.merge_slice(left, right, i, left_map, right_map);
-            self.deloop_in(i - 1);
+            if self.should_deloop() {
+                self.deloop_in(i - 1);
+            }
             if self.config.mode.auto_elim() {
                 self.eliminate_in(i - 2);
                 self.eliminate_in(i - 1);
@@ -382,7 +370,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
 
         self.prune_isolated_top(top);
-        self.deloop_in(top);
+        if self.should_deloop() {
+            self.deloop_in(top);
+        }
         if self.config.mode.auto_elim() {
             self.eliminate_in(top - 1);
         }

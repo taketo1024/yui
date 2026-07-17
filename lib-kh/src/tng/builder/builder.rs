@@ -312,26 +312,24 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("{} merge {} <- {}", self.current_step(), left.stat(), right.stat());
         debug!("  merge range: {:?}", range);
 
-        if self.should_deloop() {
-            self.merge_incremental(&left, &right, range);
-        } else {
-            self.complex.merge_with(&left, &right);
-        }
-
+        self.merge_incremental(&left, &right, range);
         self.prune_h_range();
+        
         debug!("{} merged: {}", self.current_step(), self.stat());
     }
 
-    // Per degree: deloop, then (if the mode eliminates) sweep i-2,i-1 by Markowitz cost.
-    // Greedy also inline-eliminates during deloop; the sweep just catches what it missed.
+    // Per degree: deloop (when enabled), then (if the mode eliminates) sweep i-2,i-1 by Markowitz
+    // cost. Greedy also inline-eliminates during deloop; the sweep just catches what it missed.
+    // Without delooping the sweep still applies — invertible pivots need no delooping.
     fn merge_incremental(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, range: RangeInclusive<isize>) {
-        debug_assert!(self.config.mode.auto_deloop()); // None is dispatched to merge_with
         let top = *range.end();
 
         for i in range {
             debug!("{} build C[{i}]...", self.current_step());
             self.merge_slice(left, right, i);
-            self.deloop_in(i - 1);
+            if self.should_deloop() {
+                self.deloop_in(i - 1);
+            }
             if self.config.mode.auto_elim() {
                 self.eliminate_in(i - 2);
                 self.eliminate_in(i - 1);
@@ -340,7 +338,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
 
         self.prune_isolated_top(top);
-        self.deloop_in(top);
+        if self.should_deloop() {
+            self.deloop_in(top);
+        }
         if self.config.mode.auto_elim() {
             self.eliminate_in(top - 1);
         }

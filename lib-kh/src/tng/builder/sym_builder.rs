@@ -24,7 +24,7 @@ use crate::kh::{KhGen, KhTensor};
 use crate::tng::{ElimDir, LcCob, LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
 use crate::tng::builder::{TngComplexBuilder, TngElemBuilder, BuildConfig, BuildMode, NodeOrder};
 use std::fmt;
-use super::{reachable_range, pop_min_pivot, pivot_pool, push_pivot, sparkline, fill_cost_sparkline, cutwidth_after, toggle_boundary, boundary_edges, select_cuts, cut_components, merge_order, CutOption};
+use super::{reachable_range, pop_min_pivot, pivot_pool, push_pivot, sparkline, fill_cost_sparkline, cutwidth_after, toggle_boundary, Chunkable, ChunkBuilder, CutOption, PlanProfile};
 use super::builder::PROGRESS_LOG_STEP;
 use crate::util::log_progress;
 
@@ -222,11 +222,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn process_chunks(&mut self) {
-        let cb = ChunkBuilder { builder: self };
-        let chunks = cb.build_chunks(cb.plan());
-        for (chunk, (c, key_map, elems)) in chunks {
+        let chunks = ChunkBuilder::new(self).build_chunks();
+        for (chunk, child, elems) in chunks {
             self.drop_nodes(|x| chunk.contains(x));
-            self.merge(c, key_map, elems);
+            let SymTngBuilder { key_map, inner, .. } = child;
+            self.merge(inner.into_tng_complex(), key_map, elems);
             info!("{} chunk merged: {}", self.current_step(), self.stat());
         }
     }
@@ -858,7 +858,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 pub(crate) struct SymBuildProfile {
     pub on_axis: usize,
     pub off_axis: usize,        // node count; pairs = off_axis / 2
-    #[allow(dead_code)] // replayed only by the faithfulness test
     pub order: Vec<Vec<usize>>, // each unit = 1 (on-axis) or 2 (τ-pair) node indices
     pub widths: Vec<usize>,
     pub peak: usize,
@@ -873,96 +872,65 @@ impl fmt::Display for SymBuildProfile {
     }
 }
 
-/// Divide-and-conquer chunked build for a [`SymTngBuilder`]: plan k τ-closed chunks up front at
-/// thin cutwidth interfaces, build each via a child builder, and merge the reduced chunk into the
-/// parent — so the parent never materializes the full dense slice.
-pub(crate) struct ChunkBuilder<'a, R>
+impl<R> Chunkable for SymTngBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub(crate) builder: &'a SymTngBuilder<R>,
-}
+    type Elem = TngComplexElem<R>;
 
-impl<'a, R> ChunkBuilder<'a, R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    // Build each piece of `plan` into a reduced sub-complex, paired with the crossings it covers.
-    // Building is independent of the parent, so the caller merges them afterwards.
-    pub(crate) fn build_chunks(&self, plan: Vec<Vec<Node>>) -> Vec<(Vec<Node>, (TngComplex<R>, TauKeyMap, Vec<TngComplexElem<R>>))> {
-        info!("{} chunk plan: {} pieces {:?}", self.builder.current_step(), plan.len(),
-            plan.iter().map(|c| c.len()).collect_vec());
-
-        plan.into_iter().map(|chunk| {
-            let built = self.build_chunk(&chunk);
-            (chunk, built)
-        }).collect()
+    fn nodes(&self) -> &[Node] {
+        SymTngBuilder::nodes(self)
     }
 
-    // Partition the crossings into `chunks` pieces at the deepest cutwidth valleys of the MinCut
-    // order. Each piece is τ-closed (τ-units stay whole) and contiguous in that order, so merging
-    // them in sequence keeps a thin interface at every step.
-    pub(crate) fn plan(&self) -> Vec<Vec<Node>> {
-        let k = match &self.builder.config.cut {
-            CutOption::Manual(cuts) => return self.manual_plan(cuts),
-            CutOption::AtCrossings(counts) => return self.at_crossings_plan(counts),
-            CutOption::Auto(k) => (*k).max(1),
-            CutOption::None => 1,
-        };
-        let prof = self.builder.profile_sym();
-        let cuts = select_cuts(&prof.widths, k - 1);
-        self.segment_plan(&prof, &cuts)
+    fn cut_option(&self) -> &CutOption {
+        &self.config.cut
     }
 
-    // Cut after the unit positions whose cumulative crossing count is closest to each requested
-    // count — direct control over chunk balance (τ-units stay whole, so counts land within ±1).
-    fn at_crossings_plan(&self, counts: &[usize]) -> Vec<Vec<Node>> {
-        let prof = self.builder.profile_sym();
-        let cum: Vec<usize> = prof.order.iter()
-            .scan(0, |acc, unit| {
-                *acc += unit.len();
-                Some(*acc)
-            })
-            .collect();
-        let cuts = counts.iter()
-            .map(|&c| (0..cum.len()).min_by_key(|&p| cum[p].abs_diff(c)).unwrap())
-            .sorted()
-            .dedup()
-            .collect_vec();
-        for (&c, &p) in counts.iter().sorted().zip(cuts.iter()) {
-            info!("cut requested at {c} crossings -> position {p} ({} crossings, width {})", cum[p], prof.widths[p]);
-        }
-        self.segment_plan(&prof, &cuts)
+    fn profile(&self) -> PlanProfile {
+        let prof = self.profile_sym();
+        PlanProfile { units: prof.order, widths: prof.widths }
     }
 
-    // Segment `prof.order` after each cut position; expand each unit to its nodes.
-    fn segment_plan(&self, prof: &SymBuildProfile, cuts: &[usize]) -> Vec<Vec<Node>> {
-        let nodes = self.builder.inner.nodes();
-        let starts = std::iter::once(0).chain(cuts.iter().map(|&v| v + 1));
-        let ends = cuts.iter().map(|&v| v + 1).chain(std::iter::once(prof.order.len()));
-        starts.zip(ends)
-            .map(|(s, e)| prof.order[s..e].iter().flatten().map(|&i| nodes[i].clone()).collect())
-            .filter(|c: &Vec<Node>| !c.is_empty())
-            .collect()
+    fn stat(&self) -> String {
+        SymTngBuilder::stat(self)
     }
 
-    // Manual cut: sever the cut edges (union of all cut-lines), fuse τ-swapped components into
-    // single τ-invariant chunks, validate, then order the pieces.
-    fn manual_plan(&self, cuts: &[Vec<Edge>]) -> Vec<Vec<Node>> {
-        let cut: FxHashSet<Edge> = cuts.iter().flatten().copied().collect();
-        let nodes = self.builder.nodes();
-        let comps = cut_components(nodes, &cut);
-        let pieces = self.fuse_tau_orbits(nodes, comps);
-        self.validate_cut(&cut, &pieces);
-        merge_order(nodes, pieces).into_iter()
-            .map(|piece| piece.into_iter().map(|i| nodes[i].clone()).collect())
-            .collect()
+    // A child builder over `chunk` (a sub-tangle), inheriting the parent's τ-maps and
+    // `preprocess`/simplify settings; chunking always uses the MinCut order, never recursing.
+    fn init_child(&self, chunk: &[Node]) -> Self {
+        let (h, t) = self.inner.complex().ht();
+        let base_pt = self.inner.complex().base_pt();
+
+        // No per-chunk h_range: it would under-cover preprocess's off-axis key_map. Applied at the merge.
+        // No no_full_deloop either: "final" means root-final — a chunk must deloop before the cross-chunk merge.
+        // max_elim_cost: None so the root's "eliminate only free pivots at final" (max_elim_cost = 0) does NOT cascade — chunks eliminate fully.
+        let config = SymBuildConfig { cut: CutOption::None, node_order: NodeOrder::MinCut, h_range: None, no_full_deloop: false, max_elim_cost: None, ..self.config.clone() };
+
+        let mut inner = TngComplexBuilder::init(h, t, (0, 0), base_pt)
+            .with_config(config.inner_build_config());
+        inner.set_nodes(chunk.iter().cloned());
+        inner.elements_mut().set(self.inner.elements().content().to_vec());
+
+        let key_map = TauKeyMap::init();
+        let real_top = inner.complex().deg_shift().0 + chunk.len() as isize; // child deg_shift = 0
+        SymTngBuilder { inner, x_map: self.x_map.clone(), e_map: self.e_map.clone(), key_map, config, real_top }
+    }
+
+    fn run(self) -> Self {
+        SymTngBuilder::run(self)
+    }
+
+    fn take_elements(&mut self) -> Vec<TngComplexElem<R>> {
+        self.inner.elements_mut().take()
     }
 
     // Fuse each τ-orbit of components into one chunk: a τ-symmetric cut maps a component to another
     // component, so off-axis τ-swapped pieces merge into a single τ-invariant chunk.
-    fn fuse_tau_orbits(&self, nodes: &[Node], comps: Vec<Vec<usize>>) -> Vec<Vec<usize>> {
+    fn process_pieces(&self, comps: Vec<Vec<usize>>) -> Vec<Vec<usize>> {
+        let nodes = self.nodes();
         let idx_of: FxHashMap<Node, usize> = nodes.iter().enumerate().map(|(i, x)| (x.clone(), i)).collect();
         let comp_of: FxHashMap<usize, usize> = comps.iter().enumerate()
             .flat_map(|(c, comp)| comp.iter().map(move |&i| (i, c)))
             .collect();
-        let tau = |c: usize| comp_of[&idx_of[self.builder.inv_node(&nodes[comps[c][0]])]];
+        let tau = |c: usize| comp_of[&idx_of[self.inv_node(&nodes[comps[c][0]])]];
 
         // one chunk per τ-orbit (τ is an involution on components), keyed by its smaller index.
         (0..comps.len())
@@ -975,56 +943,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             .collect()
     }
 
-    // A cut must be τ-symmetric (closed under `inv_edge`), separate into ≥2 pieces, each τ-invariant
-    // (so the sym build can pair `x` with `τx` inside it).
+    // A cut must be τ-symmetric (closed under `inv_edge`), each piece τ-invariant (so the sym
+    // build can pair `x` with `τx` inside it).
     fn validate_cut(&self, cut: &FxHashSet<Edge>, pieces: &[Vec<usize>]) {
         for &e in cut {
-            assert!(cut.contains(&self.builder.inv_edge(e)), "cut not τ-symmetric: τ-image of edge {e} missing");
+            assert!(cut.contains(&self.inv_edge(e)), "cut not τ-symmetric: τ-image of edge {e} missing");
         }
-        assert!(pieces.len() >= 2, "cut does not separate the link into ≥2 pieces");
 
-        let nodes = self.builder.nodes();
+        let nodes = self.nodes();
         let idx_of: FxHashMap<Node, usize> = nodes.iter().enumerate().map(|(i, x)| (x.clone(), i)).collect();
         for comp in pieces {
             let set: FxHashSet<usize> = comp.iter().copied().collect();
-            let tau_in = comp.iter().all(|&i| set.contains(&idx_of[self.builder.inv_node(&nodes[i])]));
+            let tau_in = comp.iter().all(|&i| set.contains(&idx_of[self.inv_node(&nodes[i])]));
             assert!(tau_in, "a cut piece is not τ-invariant (τ maps it outside)");
         }
-    }
-
-    // Build `chunk` into a reduced sub-complex via a child builder, returning it with its τ
-    // key-map and transformed elements.
-    fn build_chunk(&self, chunk: &[Node]) -> (TngComplex<R>, TauKeyMap, Vec<TngComplexElem<R>>) {
-        let step = self.builder.current_step();
-        let ends = boundary_edges(&chunk.iter().collect::<Vec<_>>()).into_iter().sorted().collect_vec();
-        info!("{step} build chunk (n: {}, nb: {} {:?}): {}", chunk.len(), ends.len(), ends, chunk.iter().join(", "));
-
-        let child = self.child_builder(chunk).run();
-        let SymTngBuilder { key_map, mut inner, .. } = child;
-        let elems = inner.elements_mut().take();
-        let c = inner.into_tng_complex();
-        info!("{step} chunk built: {}", c.stat());
-        (c, key_map, elems)
-    }
-
-    // A child builder over `chunk` (a sub-tangle), inheriting the parent's τ-maps and
-    // `preprocess`/simplify settings; chunking always uses the MinCut order, never recursing.
-    fn child_builder(&self, chunk: &[Node]) -> SymTngBuilder<R> {
-        let (h, t) = self.builder.inner.complex().ht();
-        let base_pt = self.builder.inner.complex().base_pt();
-
-        // No per-chunk h_range: it would under-cover preprocess's off-axis key_map. Applied at the merge.
-        // No no_full_deloop either: "final" means root-final — a chunk must deloop before the cross-chunk merge.
-        let config = SymBuildConfig { cut: CutOption::None, node_order: NodeOrder::MinCut, h_range: None, no_full_deloop: false, ..self.builder.config.clone() };
-
-        let mut inner = TngComplexBuilder::init(h, t, (0, 0), base_pt)
-            .with_config(config.inner_build_config());
-        inner.set_nodes(chunk.iter().cloned());
-        inner.elements_mut().set(self.builder.inner.elements().content().to_vec());
-
-        let key_map = TauKeyMap::init();
-        let real_top = inner.complex().deg_shift().0 + chunk.len() as isize; // child deg_shift = 0
-        SymTngBuilder { inner, x_map: self.builder.x_map.clone(), e_map: self.builder.e_map.clone(), key_map, config, real_top }
     }
 }
 

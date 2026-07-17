@@ -22,7 +22,7 @@ use yui_link::{Node, Edge, Link};
 use crate::kh::{KhChain, KhComplex};
 use crate::util::log_progress;
 use crate::tng::{MAX_EDGE, ElimDir, TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
-use super::{reachable_range, pop_min_pivot, pivot_pool, push_pivot, sparkline, fill_cost_sparkline, cutwidth_after, toggle_boundary, boundary_edges, select_cuts, cut_components, merge_order, TngElemBuilder};
+use super::{reachable_range, pop_min_pivot, pivot_pool, push_pivot, sparkline, fill_cost_sparkline, cutwidth_after, toggle_boundary, Chunkable, ChunkBuilder, PlanProfile, TngElemBuilder};
 
 // Pacing of the progress lines in the per-op build loops (eliminate / deloop / asym elimination).
 pub(super) const PROGRESS_LOG_STEP: usize = 20_000;
@@ -239,10 +239,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn process_chunks(&mut self) {
-        let chunks = ChunkBuilder { builder: self }.build_chunks();
-        for (chunk, (c, elems)) in chunks {
+        let chunks = ChunkBuilder::new(self).build_chunks();
+        for (chunk, child, elems) in chunks {
             self.drop_nodes(|x| chunk.contains(x));
-            self.merge(c, elems);
+            self.merge(child.into_tng_complex(), elems);
             info!("{} chunk merged: {}", self.current_step(), self.stat());
         }
     }
@@ -642,7 +642,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 /// Boundary-cutwidth profile of a crossing order: dense-slice cost peaks at ~`2^peak`.
 pub(crate) struct BuildProfile {
     pub n: usize,
-    #[allow(dead_code)] // replayed only by the faithfulness test
     pub order: Vec<usize>,  // node indices, in MinCut order
     pub widths: Vec<usize>, // boundary cutwidth after each step
     pub peak: usize,
@@ -656,101 +655,55 @@ impl fmt::Display for BuildProfile {
     }
 }
 
-/// Divide-and-conquer chunked build for a [`TngComplexBuilder`]: plan k chunks up front at the
-/// deepest cutwidth valleys, build each via a child builder, and merge the reduced chunk into the
-/// parent — so the parent never materializes the full dense slice.
-struct ChunkBuilder<'a, R>
+impl<R> Chunkable for TngComplexBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    builder: &'a TngComplexBuilder<R>,
-}
+    type Elem = TngComplexElem<R>;
 
-impl<'a, R> ChunkBuilder<'a, R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    // Plan k chunks up front and build each into a reduced sub-complex, paired with the crossings
-    // it covers. Building is independent of the parent, so the caller merges them afterwards.
-    fn build_chunks(&self) -> Vec<(Vec<Node>, (TngComplex<R>, Vec<TngComplexElem<R>>))> {
-        let plan = self.plan();
-        info!("{} chunk plan: {} pieces {:?}", self.builder.current_step(), plan.len(),
-            plan.iter().map(|c| c.len()).collect_vec());
-
-        plan.into_iter().map(|chunk| {
-            let built = self.build_chunk(&chunk);
-            (chunk, built)
-        }).collect()
+    fn nodes(&self) -> &[Node] {
+        TngComplexBuilder::nodes(self)
     }
 
-    // Partition the crossings into pieces: `Auto(k)` at the deepest cutwidth valleys of the MinCut
-    // order (contiguous, thin interface), or `Manual` by severing the given edge-cut(s).
-    fn plan(&self) -> Vec<Vec<Node>> {
-        let prof = self.builder.profile();
-        let k = match &self.builder.config.cut {
-            CutOption::Manual(cuts) => return self.manual_plan(cuts),
-            // one node per unit here, so "cut after `c` crossings" = position `c - 1`.
-            CutOption::AtCrossings(counts) => {
-                let cuts = counts.iter()
-                    .map(|&c| c.saturating_sub(1).min(prof.order.len().saturating_sub(2)))
-                    .sorted().dedup().collect_vec();
-                return self.segment_plan(&prof, &cuts);
-            }
-            CutOption::Auto(k) => (*k).max(1),
-            CutOption::None => 1,
-        };
-        let cuts = select_cuts(&prof.widths, k - 1);
-        self.segment_plan(&prof, &cuts)
+    fn cut_option(&self) -> &CutOption {
+        &self.config.cut
     }
 
-    // Segment `prof.order` after each cut position; map each index to its node.
-    fn segment_plan(&self, prof: &BuildProfile, cuts: &[usize]) -> Vec<Vec<Node>> {
-        let nodes = self.builder.nodes();
-        let starts = std::iter::once(0).chain(cuts.iter().map(|&v| v + 1));
-        let ends = cuts.iter().map(|&v| v + 1).chain(std::iter::once(prof.order.len()));
-        starts.zip(ends)
-            .map(|(s, e)| prof.order[s..e].iter().map(|&i| nodes[i].clone()).collect())
-            .filter(|c: &Vec<Node>| !c.is_empty())
-            .collect()
+    fn profile(&self) -> PlanProfile {
+        let prof = TngComplexBuilder::profile(self);
+        PlanProfile {
+            units: prof.order.iter().map(|&i| vec![i]).collect(),
+            widths: prof.widths,
+        }
     }
 
-    // Manual cut (no symmetry constraint): sever the cut edges (union), order the resulting pieces.
-    fn manual_plan(&self, cuts: &[Vec<Edge>]) -> Vec<Vec<Node>> {
-        let cut: FxHashSet<Edge> = cuts.iter().flatten().copied().collect();
-        let nodes = self.builder.nodes();
-        let pieces = cut_components(nodes, &cut);
-        assert!(pieces.len() >= 2, "cut does not separate the link into ≥2 pieces");
-        merge_order(nodes, pieces).into_iter()
-            .map(|piece| piece.into_iter().map(|i| nodes[i].clone()).collect())
-            .collect()
-    }
-
-    // Build `chunk` into a reduced sub-complex via a child builder, carrying its elements out too.
-    fn build_chunk(&self, chunk: &[Node]) -> (TngComplex<R>, Vec<TngComplexElem<R>>) {
-        let step = self.builder.current_step();
-        let ends = boundary_edges(&chunk.iter().collect::<Vec<_>>()).into_iter().sorted().collect_vec();
-        info!("{step} build chunk (n: {}, nb: {} {:?}): {}", chunk.len(), ends.len(), ends, chunk.iter().join(", "));
-
-        let mut child = self.child_builder(chunk).run();
-        let elems = child.elements_mut().take();
-        let c = child.into_tng_complex();
-        info!("{step} chunk built: {}", c.stat());
-        (c, elems)
+    fn stat(&self) -> String {
+        TngComplexBuilder::stat(self)
     }
 
     // A child builder over `chunk` (a sub-tangle), inheriting the parent's simplify mode;
     // chunking always uses the MinCut order, never recursing.
-    fn child_builder(&self, chunk: &[Node]) -> TngComplexBuilder<R> {
-        let (h, t) = self.builder.complex.ht();
-        let base_pt = self.builder.complex.base_pt();
+    fn init_child(&self, chunk: &[Node]) -> Self {
+        let (h, t) = self.complex.ht();
+        let base_pt = self.complex.base_pt();
         let mut child = TngComplexBuilder::init(h, t, (0, 0), base_pt);
         child.set_nodes(chunk.iter().cloned());
-        child.elements_mut().set(self.builder.elements().content().to_vec());
+        child.elements_mut().set(self.elements().content().to_vec());
 
         // cap the child to the chunk's reachable band: a chunk vertex of weight
         // > b - deg_shift.0 can never reach the window (weight only grows).
-        let h_range = self.builder.config.h_range.as_ref().map(|r| {
-            let s = self.builder.complex.deg_shift().0;
+        let h_range = self.config.h_range.as_ref().map(|r| {
+            let s = self.complex.deg_shift().0;
             0 ..= (*r.end() - s).max(0)
         });
-        let config = BuildConfig { mode: self.builder.config.mode, node_order: NodeOrder::MinCut, h_range, ..Default::default() };
+        let config = BuildConfig { mode: self.config.mode, node_order: NodeOrder::MinCut, h_range, ..Default::default() };
         child.with_config(config)
+    }
+
+    fn run(self) -> Self {
+        TngComplexBuilder::run(self)
+    }
+
+    fn take_elements(&mut self) -> Vec<TngComplexElem<R>> {
+        self.elements.take()
     }
 }
 

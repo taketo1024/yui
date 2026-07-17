@@ -27,7 +27,7 @@ use crate::kh::{KhChain, KhGen};
 use crate::khi::{KhIChain, KhIGen, KhIGenExt};
 use crate::tng::{Cob, CobComp, End, LcCob, LcCobTrait, Tng, TngComplex, TngComplexElem, TngComplexKey, TngComplexVertex, circles_of, label_assignments, expanded_key, cap_circles};
 use super::{reachable_range, SymTngBuilder, SymBuildConfig, TngComplexBuilder, BuildConfig};
-use super::builder::{PROGRESS_LOG_STEP, PROGRESS_LOG_MIN};
+use super::builder::log_progress;
 
 const CHUNK: usize = 4096;
 
@@ -199,9 +199,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             let prev = done;
             done += keys_chunk.len();
-            if keys.len() > PROGRESS_LOG_MIN && done / PROGRESS_LOG_STEP > prev / PROGRESS_LOG_STEP {
-                debug!("    ... {done}/{}", keys.len());
-            }
+            log_progress(done, prev, keys.len());
         }
     }
 
@@ -221,11 +219,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 self.cone.complex_mut().add_edge(&with_bit(k, Bit::Bit0), &with_bit(k, Bit::Bit1), f);
             }
 
-            let prev = done;
             done += 1;
-            if target.len() > PROGRESS_LOG_MIN && done / PROGRESS_LOG_STEP > prev / PROGRESS_LOG_STEP {
-                debug!("    ... {done}/{}", target.len());
-            }
+            log_progress(done, done - 1, target.len());
         }
     }
 
@@ -266,9 +261,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             let prev = done;
             done += dropped_chunk.len();
-            if dropped.len() > PROGRESS_LOG_MIN && done / PROGRESS_LOG_STEP > prev / PROGRESS_LOG_STEP {
-                debug!("    ... {done}/{}", dropped.len());
-            }
+            log_progress(done, prev, dropped.len());
         }
     }
 

@@ -28,6 +28,14 @@ use super::{reachable_range, pop_min_pivot, pivot_pool, push_pivot, sparkline, f
 pub(super) const PROGRESS_LOG_STEP: usize = 20_000;
 pub(super) const PROGRESS_LOG_MIN: usize = 50_000;
 
+// One progress line per `PROGRESS_LOG_STEP` boundary that `prev → done` crosses (increments may
+// exceed 1, e.g. equivariant eliminations consume τ-pairs), for rounds larger than `PROGRESS_LOG_MIN`.
+pub(super) fn log_progress(done: usize, prev: usize, total: usize) {
+    if total > PROGRESS_LOG_MIN && done / PROGRESS_LOG_STEP > prev / PROGRESS_LOG_STEP {
+        debug!("    ...{done}/{total} ({}%)", 100 * done / total);
+    }
+}
+
 /// How the next crossing to append is chosen.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum NodeOrder {
@@ -450,9 +458,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 }
             }
             done += 1;
-            if done % PROGRESS_LOG_STEP == 0 {
-                debug!("{}   ... delooped {done} ({}% eliminated, remain: {})", self.current_step(), elim * 100 / done, pool.len());
-            }
+            log_progress(done, done - 1, done + pool.len());
         }
 
         let after = self.complex.rank(i) as isize;
@@ -512,9 +518,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
             if self.try_eliminate_at(&k).is_some() {
                 done += 1;
-                if targets > PROGRESS_LOG_MIN && done % PROGRESS_LOG_STEP == 0 {
-                    debug!("{}   ... eliminated {done}/{targets} in C[{i}] (rank: {})", self.current_step(), self.complex.rank(i));
-                }
+                log_progress(done, done - 1, targets);
             }
         }
 

@@ -13,14 +13,14 @@ use std::collections::HashSet;
 use std::ops::RangeInclusive;
 use delegate::delegate;
 use rustc_hash::{FxHashMap, FxHashSet};
-use itertools::Itertools;
+use itertools::{iproduct, Itertools};
 use log::{debug, info};
 use yui_core::algo::KeyedUnionFind;
 use yui_core::bitseq::{Bit, BitSeq};
 use yui_core::{Ring, RingOps};
 use yui_link::{Node, Edge, InvLink};
 
-use crate::kh::{KhGen, KhTensor};
+use crate::kh::{KhAlgGen, KhGen, KhTensor};
 use crate::tng::{ElimDir, LcCob, LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
 use crate::tng::builder::{TngComplexBuilder, TngElemBuilder, BuildConfig, BuildMode, NodeOrder};
 use std::fmt;
@@ -39,6 +39,9 @@ pub struct SymBuildConfig {
     pub preprocess: bool,
     // literal truncation: homology at the endpoints is wrong (build `(a-1)..=(b+1)` for correct `[a, b]`).
     pub h_range: Option<RangeInclusive<isize>>,
+    // drop generators outside this q-range. Applied once the diagram is closed (exact q); τ is
+    // q-homogeneous, so this stays consistent through the cone. `None` = no q-truncation.
+    pub q_range: Option<RangeInclusive<isize>>,
     // divide-and-conquer chunking (auto cutwidth or manual edge-cuts); None = single pass.
     pub cut: CutOption,
     // cone only: cap the per-elimination fill cost during cone_merge; survivors defer to the
@@ -51,7 +54,7 @@ pub struct SymBuildConfig {
 
 impl Default for SymBuildConfig {
     fn default() -> Self {
-        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, h_range: None, cut: CutOption::None, max_elim_cost: None, no_full_deloop: false }
+        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, h_range: None, q_range: None, cut: CutOption::None, max_elim_cost: None, no_full_deloop: false }
     }
 }
 
@@ -59,7 +62,7 @@ impl SymBuildConfig {
     // Config for the inner merge builder: `mode: None` (the sym builder drives deloop/elim, the inner
     // never orders nodes), so only `h_range` carries over — to drop out-of-window canon cycles.
     pub(crate) fn inner_build_config(&self) -> BuildConfig {
-        BuildConfig { mode: BuildMode::None, h_range: self.h_range.clone(), ..Default::default() }
+        BuildConfig { mode: BuildMode::None, h_range: self.h_range.clone(), q_range: self.q_range.clone(), ..Default::default() }
     }
 }
 
@@ -548,25 +551,28 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         let tc = c.convert_edges(|e| self.inv_edge(e));
 
-        let ks = self.deloop(k, c);
-
-        let (k_X, k_1) = (ks[0], ks[1]);
-        let (k_XX, k_X1) = {
-            let tks = self.deloop(&k_X, &tc);
-            (tks[0], tks[1])
-        };
-        let (k_1X, k_11) = {
-            let tks = self.deloop(&k_1, &tc);
-            (tks[0], tks[1])
-        };
+        // deloop c, then tc on each surviving branch (the q-filter may have dropped some).
+        self.deloop(k, c);
+        for a in [KhAlgGen::X, KhAlgGen::I] {
+            let ka = k + a;
+            if self.complex().contains_key(&ka) {
+                self.deloop(&ka, &tc);
+            }
+        }
 
         self.key_map.remove(k);
 
-        self.key_map.add_pair(k_XX, k_XX);
-        self.key_map.add_pair(k_X1, k_1X);
-        self.key_map.add_pair(k_11, k_11);
+        // τ swaps the circles: τ(k+a+b) = k+b+a; τ preserves q ⇒ a pair survives or drops together.
+        let added = iproduct!([KhAlgGen::X, KhAlgGen::I], [KhAlgGen::X, KhAlgGen::I])
+            .map(|(a, b)| (k + a + b, k + b + a))
+            .filter(|(ka, _)| self.complex().contains_key(ka))
+            .collect_vec();
 
-        vec![k_XX, k_X1, k_1X, k_11]
+        added.into_iter().map(|(ka, kb)| {
+            debug_assert!(self.complex().contains_key(&kb));
+            self.key_map.add_pair(ka, kb);
+            ka
+        }).collect()
     }
 
     #[allow(non_snake_case)]
@@ -882,7 +888,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         // No per-chunk h_range: it would under-cover preprocess's off-axis key_map. Applied at the merge.
         // No no_full_deloop either: "final" means root-final — a chunk must deloop before the cross-chunk merge.
         // max_elim_cost: None so the root's "eliminate only free pivots at final" (max_elim_cost = 0) does NOT cascade — chunks eliminate fully.
-        let config = SymBuildConfig { cut: CutOption::None, node_order: NodeOrder::MinCut, h_range: None, no_full_deloop: false, max_elim_cost: None, ..self.config.clone() };
+        // No q_range either: q is exact only at the root's final merge (a chunk is an open sub-tangle).
+        let config = SymBuildConfig { cut: CutOption::None, node_order: NodeOrder::MinCut, h_range: None, no_full_deloop: false, max_elim_cost: None, q_range: None, ..self.config.clone() };
 
         let mut inner = TngComplexBuilder::init(h, t, (0, 0), base_pt)
             .with_config(config.inner_build_config());

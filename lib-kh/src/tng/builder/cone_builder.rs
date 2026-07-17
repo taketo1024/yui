@@ -514,7 +514,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 // Config for the cone's own `TngComplexBuilder`, which drives deloop/eliminate on the coned complex:
 // the simplify `mode` and the elimination fill-cost cap carry over from the sym config.
 fn cone_build_config(config: &SymBuildConfig) -> BuildConfig {
-    BuildConfig { mode: config.mode, max_elim_cost: config.max_elim_cost, ..Default::default() }
+    BuildConfig { mode: config.mode, max_elim_cost: config.max_elim_cost, q_range: config.q_range.clone(), ..Default::default() }
 }
 
 // An empty cone shell: same `deg_shift`/base point, one extra h-degree for the cone bit.

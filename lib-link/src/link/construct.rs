@@ -109,28 +109,28 @@ impl Link {
     // blackboard 2-cable): cut the cable to a 4-end tangle, add `tw` half-twists, close with the clasp.
     pub fn whitehead_double_bbf(l: &Link, positive: bool, tw: i32) -> Link {
         // cut a clean edge (joining two distinct crossings): frees the 4 cable ends
-        let e0 = l.edges().into_iter()
+        let cut = l.edges().into_iter()
             .find(|&e| {
                 let ((i, _), (j, _)) = l.edge_ends(e, false);
                 i != j
             })
             .expect("the companion needs an edge joining two distinct crossings");
-        Self::whitehead_double_impl(l, positive, 0, tw, e0, None).0
+        Self::whitehead_double_impl(l, positive, 0, tw, cut, None)
     }
 
-    // Whitehead double cutting the cable at edge `e0` (must join two distinct crossings), placing
-    // `tw_a` framing half-twists on one side of the cut and `tw_b` on the other. Also returns the
-    // result-edges of `base`'s two doubled strands (empty if `base` is `None`) so the caller can
-    // place a base point there.
-    pub(crate) fn whitehead_double_impl(l: &Link, positive: bool, tw_a: i32, tw_b: i32, e0: Edge, base: Option<Edge>) -> (Link, Vec<Edge>) {
+    // Whitehead double cutting the cable at edge `cut` (must join two distinct crossings), placing
+    // `tw_a` framing half-twists on one side of the cut and `tw_b` on the other. The result is based
+    // at one of `base`'s two doubled strands.
+    pub(crate) fn whitehead_double_impl(l: &Link, positive: bool, tw_a: i32, tw_b: i32, cut: Edge, base: Option<Edge>) -> Link {
         use crate::NodeType::{XL, XR};
         assert!(l.is_knot(), "the Whitehead double requires a knot companion");
+        assert!(base.is_none_or(|b| b != cut), "the base point must be away from the cut");
 
         let (mut b, cab) = Self::cable2_builder(l);
 
         // the cut edge's two ends: the a-side (node ia, slot sa) and b-side (ib, sb), with their
         // cable ports (a0, a1) / (b0, b1) in CCW order.
-        let ((ia, sa), (ib, sb)) = l.edge_ends(e0, false);
+        let ((ia, sa), (ib, sb)) = l.edge_ends(cut, false);
         let ((a0, a1), (b0, b1)) = (cab[ia][sa.index()], cab[ib][sb.index()]);
         b.disconnect(a0);   // the swapped join means a0–b1, a1–b0 are removed
         b.disconnect(a1);
@@ -172,15 +172,18 @@ impl Link {
         b.connect(upper, b0);
         b.connect(lower, b1);
 
-        // `base` is not at the cut, so its cable join survives: the two ports of cab at `base` each
-        // carry one of its doubled strands; read off their result-edge ids before consuming the builder.
-        let base_edges: Vec<Edge> = base.into_iter().flat_map(|base| {
-            let ((i, s), _) = l.edge_ends(base, false);
-            let (p0, p1) = cab[i][s.index()];
-            [b.edge_at(p0).unwrap(), b.edge_at(p1).unwrap()]
-        }).collect();
+        // `base` is away from the cut, so its cable join survives: `cab` holds the two ports its
+        // doubled strands run through. Read the id off before `build` consumes the builder.
+        let base_pt = base.map(|e| {
+            let ((i, s), _) = l.edge_ends(e, false);
+            b.edge_at(cab[i][s.index()].0).unwrap()
+        });
 
-        (b.build().unwrap(), base_edges)
+        let double = b.build().unwrap();
+        match base_pt {
+            Some(e) => double.with_base_pt(e),
+            None => double,
+        }
     }
 }
 

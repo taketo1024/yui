@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use delegate::delegate;
 use itertools::Itertools;
-use num_integer::Integer;
 use crate::{Node, Edge, Link, Path, Slot, State, PDCodeX};
 
 // Involutive link
@@ -16,79 +15,56 @@ pub struct InvLink {
 impl InvLink {
     pub fn new<I>(inner: Link, e_map: I) -> InvLink
     where I: IntoIterator<Item = (Edge, Edge)> {
-        Self::try_new(inner, e_map).expect("e_map is not a valid strong involution of the link")
-    }
-
-    // Like `new`, but returns `None` instead of panicking when `e_map` fails to be a symmetry — used
-    // to search for the reindex start that realizes the standard strong inversion.
-    pub fn try_new<I>(inner: Link, e_map: I) -> Option<InvLink>
-    where I: IntoIterator<Item = (Edge, Edge)> {
+        assert!(inner.loops().is_empty(), "free loops are not supported");
         let e_map: HashMap<Edge, Edge> = e_map.into_iter().collect();
 
-        // Validate: domain = link edges, image ⊆ link edges, e_map is involutive.
+        // `e_map` must be an involution of the whole edge set.
         let link_edges = inner.edges();
-        if e_map.len() != link_edges.len() {
-            return None;
-        }
+        assert_eq!(e_map.len(), link_edges.len(), "e_map must cover every edge exactly once");
         for &e in &link_edges {
-            let f = *e_map.get(&e)?;
-            let g = *e_map.get(&f)?;
-            if g != e {
-                return None;
-            }
+            let f = e_map[&e];
+            assert_eq!(e_map[&f], e, "e_map is not involutive at edge {e}");
         }
 
+        // ... and must carry each node to a node of the same type.
         let mut x_map = HashMap::new();
         for x in inner.nodes() {
             let edges = x.edges().map(|e| e_map[&e]);
-            let (j, _) = inner.nodes().find_position(|y|
-                edges.iter().all(|e| y.edges().contains(e))
-            )?;
-            let y = inner.node(j);
-            if x.node_type() != y.node_type() {
-                return None;
-            }
+            let y = inner.nodes()
+                .find(|y| edges.iter().all(|e| y.edges().contains(e)))
+                .unwrap_or_else(|| panic!("e_map sends node {x} to no node of the link"));
+            assert_eq!(x.node_type(), y.node_type(), "e_map changes the type of node {x}");
+
             x_map.insert(x.clone(), y.clone());
             if x != y {
                 x_map.insert(y.clone(), x.clone());
             }
         }
-        if x_map.len() != inner.n_nodes() {
-            return None;
-        }
+        assert_eq!(x_map.len(), inner.n_nodes(), "e_map is not a bijection on nodes");
 
-        Some(Self { inner, e_map, x_map })
+        Self { inner, e_map, x_map }
     }
 
     pub fn from_symmetric_pd_code<I1>(pd_code: I1) -> Self
     where I1: IntoIterator<Item = PDCodeX> { 
-        let code = pd_code.into_iter().collect_vec();
-        let l = Link::from_pd_code(code);
-
-        assert!(l.is_knot(), "currently only supports strongly invertible knots");
-
-        let n = l.n_edges();
-
-        assert!(n.is_even(), "number of edges must be even.");
-        assert_eq!(l.edges().first(), Some(&1), "edge must start from index 1.");
-        assert_eq!(l.edges().last(), Some(&(n as Edge)), "edges must have sequential indexing.");
-
-        let n = n as Edge;
-        let e_map = l.edges().into_iter()
-            .map(|e| (e, (n + 1 - e) % n + 1));
-
-        Self::new(l, e_map)
+        // the base point defaults to the least edge, which the symmetric convention puts on the axis.
+        Self::si_knot_from(Link::from_pd_code(pd_code))
     }
 
-    // Reindex `inner` from the first `start` for which the standard involution `e ↦ (n+1-e)%n+1` is
-    // valid (robust to the builder renumbering edges, unlike tracking ids through `Link::conn_sum`).
-    pub(super) fn from_standard_reindex(inner: Link, starts: impl IntoIterator<Item = Edge>) -> Option<InvLink> {
-        let n = inner.n_edges() as Edge;
-        starts.into_iter().find_map(|s| {
-            let r = inner.reindexed(s, 1);
-            let e_map = r.edges().into_iter().map(|e| (e, (n + 1 - e) % n + 1)).collect_vec();
-            Self::try_new(r, e_map)
-        })
+    // A strongly invertible knot, given a diagram based on its axis. τ reverses the traversal, so
+    // walking both ways from the base point pairs each edge with its image.
+    pub(super) fn si_knot_from(inner: Link) -> InvLink {
+        assert!(inner.is_knot(), "a strongly invertible knot must be a knot");
+        let base = inner.base_pt().expect("the diagram needs a base point on the axis");
+        let comps = inner.comps();
+        let seq = comps[0].edges();
+        let n = seq.len();
+        let k = seq.iter().position(|&e| e == base).expect("the base point is not on a strand");
+
+        let e_map = (0..n).map(|i| (seq[(k + i) % n], seq[(k + n - i) % n])).collect_vec();
+        let l = Self::new(inner.clone(), e_map);
+        assert!(l.is_strongly_invertible(), "the based diagram is not a strongly invertible knot");
+        l
     }
 
     pub fn inner(&self) -> &Link {
@@ -150,14 +126,13 @@ impl InvLink {
         self.edges().into_iter().filter(|&e| self.inv_edge(e) == e).collect()
     }
 
-    // A strong inversion reverses the orientation; its axis then necessarily meets the link.
+    // A strong inversion reverses the orientation.
     pub fn is_strongly_invertible(&self) -> bool {
         self.is_oriented()
             && self.inner.nodes().all(|x| self.preserves_dir_at(x) == Some(false))
     }
 
-    // A 2-periodic link carries an involution preserving the orientation; its axis then misses the
-    // link.
+    // A 2-periodic link carries an involution preserving the orientation.
     pub fn is_2periodic(&self) -> bool {
         self.is_oriented()
             && self.inner.nodes().all(|x| self.preserves_dir_at(x) == Some(true))
@@ -193,9 +168,13 @@ impl InvLink {
         }
     }
 
-    // Equivariant connected sum at the two (on-axis) base points.
+    // Equivariant connected sum: splice self's other on-axis edge to other's base point, so self's
+    // base point survives as the sum's.
     pub fn conn_sum(&self, other: &InvLink) -> InvLink {
-        let self_e = self.base_pt().expect("self needs a base point");
+        let base = self.base_pt().expect("self needs a base point");
+        let self_e = self.on_axis_edges().into_iter()
+            .find(|&e| e != base)
+            .expect("self needs a second on-axis edge");
         let other_e = other.base_pt().expect("other needs a base point");
         self.conn_sum_at(other, self_e, other_e)
     }
@@ -206,12 +185,13 @@ impl InvLink {
         assert!(self.is_knot() && other.is_knot(), "connected sum requires knots");
         assert!(self.is_strongly_invertible() && other.is_strongly_invertible(),
             "connected sum requires strongly invertible knots");
+        assert_ne!(Some(self_e), self.base_pt(), "the splice must not consume self's base point");
         assert_eq!(self.inv_edge(self_e), self_e, "self_e {self_e} must be on-axis");
         assert_eq!(other.inv_edge(other_e), other_e, "other_e {other_e} must be on-axis");
 
+        // `Link::conn_sum_at` carries self's base point through the splice, and it is on-axis.
         let inner = self.inner.conn_sum_at(other.inner(), self_e, other_e);
-        let starts = inner.edges();
-        Self::from_standard_reindex(inner, starts).expect("connected sum is not τ-symmetric")
+        Self::si_knot_from(inner)
     }
 }
 
@@ -306,12 +286,12 @@ mod tests {
         // inversion; swapping the two edges is a rotation missing the knot, so 2-periodic.
         let l = Link::from_pd_code([[0, 1, 1, 0]]);
 
-        let si = InvLink::try_new(l.clone(), [(0, 0), (1, 1)]).unwrap();
+        let si = InvLink::new(l.clone(), [(0, 0), (1, 1)]);
         assert_eq!(si.on_axis_edges(), vec![0, 1]);
         assert!(si.is_strongly_invertible());
         assert!(!si.is_2periodic());
 
-        let per = InvLink::try_new(l, [(0, 1), (1, 0)]).unwrap();
+        let per = InvLink::new(l, [(0, 1), (1, 0)]);
         assert!(per.on_axis_edges().is_empty());
         assert!(!per.is_strongly_invertible());
         assert!(per.is_2periodic());
@@ -355,6 +335,9 @@ mod tests {
         let k2 = InvLink::test_data("4_1");
         let cs = k1.conn_sum(&k2);
         assert!(cs.is_knot());
+        assert!(cs.is_strongly_invertible());
+        let base = cs.base_pt().expect("the sum keeps a base point");
+        assert_eq!(cs.inv_edge(base), base, "the sum's base point is on-axis");
         assert_eq!(det(cs.inner()), 3 * 5, "det is multiplicative under conn sum");
     }
 }

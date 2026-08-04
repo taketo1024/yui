@@ -46,12 +46,9 @@ impl InvLink {
         assert_ne!(cut, base, "the clasp cannot sit at the base point");
 
         let half = l.writhe() + tw / 2;   // (2·writhe + tw) / 2 = half the blackboard framing
-        let (inner, base_edges) = Link::whitehead_double_impl(l.inner(), positive, half, half, cut, Some(base));
-
-        // base point on the on-axis doubled base_pt strand: reindex from the copy that realizes the
-        // standard τ, so edge 1 lands there rather than at the clasp.
-        Self::from_standard_reindex(inner, base_edges)
-            .expect("whitehead double diagram is not τ-symmetric at the base point")
+        // the double is based at a doubled copy of `base`, which lies on the axis — that pins τ.
+        let inner = Link::whitehead_double_impl(l.inner(), positive, half, half, cut, Some(base));
+        Self::si_knot_from(inner)
     }
 }
 
@@ -98,13 +95,14 @@ mod tests {
 
     #[test]
     fn whitehead_double_is_symmetric() {
-        // building succeeding ⟺ try_new found an on-axis reindex start ⟺ the diagram is τ-symmetric.
+        // building succeeding ⟺ the pairing gave a valid strong inversion.
         for name in ["3_1", "4_1"] {
             let k = InvLink::test_data(name);
             let w = InvLink::whitehead_double(&k, true, 0);
             assert!(w.is_knot());
-            assert_eq!(w.base_pt(), Some(1), "base point on the doubled base_pt strand");
-            assert_eq!(w.inv_edge(1), 1, "base point is on-axis");
+            assert!(w.is_strongly_invertible());
+            let base = w.base_pt().expect("the double is based");
+            assert_eq!(w.inv_edge(base), base, "base point is on-axis");
             // 4·n_crossings (cable) + |blackboard framing| (split each side) + 2 (clasp)
             let bl = (2 * k.writhe()).unsigned_abs() as usize;
             assert_eq!(w.n_crossings(), 4 * k.n_crossings() + bl + 2);

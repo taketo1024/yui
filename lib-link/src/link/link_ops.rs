@@ -38,7 +38,17 @@ impl Link {
         b.connect(t1, h2);  // self tail → other head
         b.connect(t2, h1);  // other tail → self head
 
-        b.build().unwrap()
+        // the splice consumes `self_e`, but any other base point survives it — read off its new id
+        // before the builder renumbers on `build`.
+        let base = self.base_pt()
+            .filter(|&e| e != self_e)
+            .map(|e| b.edge_at(port(&v1, self.edge_ends(e, false).0)).unwrap());
+
+        let sum = b.build().unwrap();
+        match base {
+            Some(e) => sum.with_base_pt(e),
+            None => sum,
+        }
     }
 
     pub fn mirror(&self) -> Self {

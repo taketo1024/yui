@@ -239,6 +239,47 @@ mod tests {
     }
 
     #[test]
+    fn pretzel_band_symmetries() {
+        // the three bands sit in a cycle, so rotating them — or reversing their order — leaves the
+        // diagram itself unchanged, not merely the knot type.
+        // Canonical form of the *unoriented* diagram: least PD code over all start edges and both
+        // strand directions. Rotating or reversing the bands may reverse the direction (it does
+        // whenever a band is even), so the orientation must be quotiented out here.
+        let canon = |l: &Link| {
+            let least = |k: &Link| k.edges().into_iter()
+                .map(|e| k.reindexed(e, 1).pd_code())
+                .min().unwrap();
+            // reverse the strand: the under-strand enters at the far end, CCW order unchanged.
+            let rev = Link::from_pd_code(l.pd_code().into_iter().map(|[a, b, c, d]| [c, d, a, b]));
+            least(l).min(least(&rev))
+        };
+
+        for (a, b, c) in [(1, 3, 5), (3, 5, 7), (-3, 3, -3), (-2, 3, 7), (-5, 5, -5)] {
+            let p = canon(&Link::pretzel(a, b, c));
+            assert_eq!(canon(&Link::pretzel(b, c, a)), p, "cyclic P({a},{b},{c})");
+            assert_eq!(canon(&Link::pretzel(c, a, b)), p, "cyclic P({a},{b},{c})");
+            assert_eq!(canon(&Link::pretzel(c, b, a)), p, "reversal P({a},{b},{c})");
+        }
+    }
+
+    #[test]
+    fn mirror_identities() {
+        // mirroring flips every band, every cable crossing and the clasp.
+        for (a, b, c) in [(1, 3, 5), (3, 5, 7), (-2, 3, 7), (-5, 5, -5)] {
+            assert_eq!(Link::pretzel(a, b, c).mirror().pd_code(), Link::pretzel(-a, -b, -c).pd_code(),
+                "mirror P({a},{b},{c})");
+        }
+        for name in ["3_1", "4_1", "5_2"] {
+            let k = Link::test_data(name);
+            assert_eq!(Link::cable2(&k).mirror().pd_code(), Link::cable2(&k.mirror()).pd_code(),
+                "mirror cable2({name})");
+            assert_eq!(Link::whitehead_double(&k, true, 0).mirror().pd_code(),
+                       Link::whitehead_double(&k.mirror(), false, 0).pd_code(),
+                "mirror D+({name}) vs D-(mirror {name})");
+        }
+    }
+
+    #[test]
     fn pretzel_trefoil() {
         assert!(same_knot(&Link::pretzel(1, 1, 1), &Link::test_data("3_1")));
     }

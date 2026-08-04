@@ -1,7 +1,7 @@
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, MulAssign, Range};
 use std::fmt::{Display, Debug};
 use delegate::delegate;
-use itertools::Itertools;
+use itertools::{Itertools, repeat_n};
 use nalgebra_sparse::na::{Scalar, ClosedAddAssign, ClosedSubAssign, ClosedMulAssign};
 use nalgebra_sparse::{CscMatrix, CooMatrix};
 use num_traits::{Zero, One, ToPrimitive};
@@ -26,7 +26,7 @@ impl<R> SpMat<R> {
         values: Vec<R>,
     ) -> Option<Self> { 
         let csc = CscMatrix::try_from_csc_data(num_rows, num_cols, col_offsets, row_indices, values);
-        csc.ok().map(|csc| SpMat::from(csc))
+        csc.ok().map(SpMat::from)
     }
 
     pub(crate) fn inner(&self) -> &CscMatrix<R> { 
@@ -154,7 +154,7 @@ impl<R> SpMat<R> {
     where F: Fn(R) -> S {
         let (m, n) = self.shape();
         let (cols, rows, vals) = self.disassemble();
-        let vals = vals.into_iter().map(|r| f(r)).collect_vec();
+        let vals = vals.into_iter().map(f).collect_vec();
         SpMat::<S>::try_from_csc_data(m, n, cols, rows, vals).unwrap()
     }
 
@@ -407,10 +407,11 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
 
     pub fn extend_by_zero(&mut self, add_rows: usize, add_cols: usize) {
         let (m, n) = self.shape();
-        let l = std::mem::replace(&mut self.inner, CscMatrix::zeros(0, 0));
+        let l = std::mem::take(&mut self.inner);
         let (mut col_offsets, row_indices, values) = l.disassemble();
         let last = *col_offsets.last().unwrap();
-        col_offsets.extend(std::iter::repeat(last).take(add_cols));
+        col_offsets.extend(repeat_n(last, add_cols));
+        
         self.inner = CscMatrix::try_from_csc_data(
             m + add_rows, n + add_cols,
             col_offsets, row_indices, values

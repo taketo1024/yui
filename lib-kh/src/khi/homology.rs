@@ -5,7 +5,7 @@ use yui_core::{EucRing, EucRingOps};
 use yui_homology::{DisplaySeq, DisplayTable, Grid2, GridIter, GridTrait, Homology, Summand, SummandTrait};
 use yui_link::InvLink;
 use crate::kh::KhChainExt;
-use crate::khi::{KhIComplex, KhIGen};
+use crate::khi::{KhIComplex, KhIState};
 use crate::misc::{make_gen_grid, range_of};
 
 use super::KhIChain;
@@ -13,9 +13,9 @@ use super::KhIChain;
 #[derive(Clone)]
 pub struct KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    inner: Homology<KhIGen, R>,
+    inner: Homology<KhIState, R>,
     canon_cycles: Vec<KhIChain<R>>,
-    gen_grid: OnceLock<Grid2<Summand<KhIGen, R>>>,
+    gen_grid: OnceLock<Grid2<Summand<KhIState, R>>>,
 }
 
 impl<R> KhIHomology<R> 
@@ -30,7 +30,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         Self::from(&c)
     }
 
-    pub(crate) fn new_impl(inner: Homology<KhIGen, R>, canon_cycles: Vec<KhIChain<R>>) -> Self {
+    pub(crate) fn new_impl(inner: Homology<KhIState, R>, canon_cycles: Vec<KhIChain<R>>) -> Self {
         Self { inner, canon_cycles, gen_grid: OnceLock::new() }
     }
 
@@ -42,7 +42,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
         range_of(self.support().flat_map(|&i|
-            self[i].gens().map(|z| z.q_deg())
+            self[i].generators().map(|z| z.q_deg())
         ))
     }
     
@@ -50,7 +50,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         &self.canon_cycles
     }
 
-    pub fn inner(&self) -> &Homology<KhIGen, R> { 
+    pub fn inner(&self) -> &Homology<KhIState, R> { 
         &self.inner
     }
 
@@ -61,7 +61,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         )
     }
 
-    fn gen_grid(&self) -> &Grid2<Summand<KhIGen, R>> {
+    fn gen_grid(&self) -> &Grid2<Summand<KhIState, R>> {
         self.gen_grid.get_or_init(|| make_gen_grid(self.inner()))
     }
 }
@@ -71,14 +71,14 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     fn from(c: &KhIComplex<R>) -> Self {
         KhIHomology::new_impl(
             c.inner().reduced().homology(), 
-            c.canon_cycles().iter().cloned().collect()
+            c.canon_cycles().to_vec()
         )
     }
 }
 
 impl<R> GridTrait<isize> for KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    type Item = Summand<KhIGen, R>;
+    type Item = Summand<KhIState, R>;
     type Support<'a> = GridIter<'a, isize, Self::Item> where Self: 'a, R: 'a;
 
     delegate! {
@@ -93,7 +93,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 impl<R> Index<isize> for KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    type Output = Summand<KhIGen, R>;
+    type Output = Summand<KhIState, R>;
 
     delegate! {
         to self.inner {
@@ -104,7 +104,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 impl<R> Index<(isize, isize)> for KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    type Output = Summand<KhIGen, R>;
+    type Output = Summand<KhIState, R>;
 
     delegate! {
         to self.gen_grid() {
@@ -131,7 +131,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     fn display_indices(&self) -> (Vec<isize>, Vec<isize>) { 
-        (self.h_range().into_iter().collect(), self.q_range().step_by(2).collect())
+        (self.h_range().collect(), self.q_range().step_by(2).collect())
     }
 
     fn display_at(&self, i: &isize, j: &isize) -> String {
@@ -147,7 +147,7 @@ mod tests {
     #![allow(unused)]
 
     use itertools::Itertools;
-    use yui_core::poly::HPoly;
+    use yui_core::poly::Poly;
     use yui_core::num::FF2;
     use num_traits::{Zero, One};
     use yui_homology::{ChainComplexTrait, DisplaySeq, DisplayTable, SummandTrait};
@@ -191,7 +191,7 @@ mod tests {
         let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 
         type R = FF2;
-        type P = HPoly<'H', R>;
+        type P = Poly<'H', R>;
         let (h, t) = (P::variable(), P::zero());
 
         let khi = KhIHomology::new(&l, &h, &t, false);
@@ -243,7 +243,7 @@ mod tests {
         let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 
         type R = FF2;
-        type P = HPoly<'H', R>;
+        type P = Poly<'H', R>;
         let (h, t) = (P::variable(), P::zero());
 
         let khi = KhIHomology::new(&l, &h, &t, true);
@@ -300,7 +300,7 @@ mod tests_v1 {
     #![allow(unused)]
 
     use itertools::Itertools;
-    use yui_core::poly::HPoly;
+    use yui_core::poly::Poly;
     use yui_core::num::FF2;
     use num_traits::{Zero, One};
     use yui_homology::{ChainComplexTrait, DisplaySeq, DisplayTable, SummandTrait};
@@ -344,7 +344,7 @@ mod tests_v1 {
         let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 
         type R = FF2;
-        type P = HPoly<'H', R>;
+        type P = Poly<'H', R>;
         let (h, t) = (P::variable(), P::zero());
 
         let khi = KhIHomology::new_no_simplify(&l, &h, &t, false);
@@ -396,7 +396,7 @@ mod tests_v1 {
         let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 
         type R = FF2;
-        type P = HPoly<'H', R>;
+        type P = Poly<'H', R>;
         let (h, t) = (P::variable(), P::zero());
 
         let khi = KhIHomology::new_no_simplify(&l, &h, &t, true);

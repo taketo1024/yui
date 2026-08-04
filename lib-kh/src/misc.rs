@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::ops::RangeInclusive;
 
-use yui_core::lc::{Gen, Lc};
+use yui_core::lc::{LcKey, Lc};
 use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 use yui_homology::{isize2, Grid1, Grid2, Summand, SummandTrait};
 use yui_matrix::sparse::SpVec;
@@ -51,7 +51,7 @@ where Idx: Ord + Default + Copy, Itr: IntoIterator<Item = Idx> {
 }
 
 pub(crate) fn collect_gen_info<X, R>(grid: &Grid1<Summand<X, R>>) -> HashMap<isize2, (usize, Vec<R>, Vec<usize>)>
-where X: Gen, R: Ring, for<'x> &'x R: RingOps<R>, Lc<X, R>: KhChainExt { 
+where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R>, Lc<X, R>: KhChainExt { 
     let mut table = HashMap::new();
     let init_entry = (0, vec![], vec![]);
 
@@ -60,7 +60,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R>, Lc<X, R>: KhChainExt {
         let t = h.tors().len();
 
         for k in 0..r + t { 
-            let z = h.gen(k);
+            let z = h.generator(k);
             let q = z.q_deg();
             let e = table.entry(isize2(i, q)).or_insert_with(|| init_entry.clone());
             if k < r { 
@@ -76,7 +76,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R>, Lc<X, R>: KhChainExt {
 }
 
 pub(crate) fn make_gen_grid<X, R>(grid: &Grid1<Summand<X, R>>) -> Grid2<Summand<X, R>> 
-where X: Gen, R: Ring, for<'x> &'x R: RingOps<R>, Lc<X, R>: KhChainExt { 
+where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R>, Lc<X, R>: KhChainExt { 
     let info = collect_gen_info(grid);
 
     let h_range = range_of(info.keys().map(|i| i.0));
@@ -92,7 +92,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R>, Lc<X, R>: KhChainExt {
         };
         
         let (rank, tors, indices) = e;
-        let gens = grid[i].raw_gens().clone(); 
+        let gens = grid[i].raw_generators().clone();
         let trans = grid[i].trans().sub(indices);
         Summand::new(gens, *rank, tors.clone(), trans)
     })

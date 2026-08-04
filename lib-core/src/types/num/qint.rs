@@ -1,3 +1,28 @@
+//! Quadratic integers: the ring 𝒪 of algebraic integers of ℚ(√D) for a
+//! squarefree integer `D ≢ 0 (mod 4)`.
+//!
+//! 𝒪 is represented as `ℤ[ω]` where
+//!
+//! ```text
+//!   ω =  { (1 + √D)/2   if D ≡ 1    (mod 4)
+//!        { √D           if D ≡ 2, 3 (mod 4).
+//! ```
+//!
+//! A general `z ∈ ℤ[ω]` is stored as the pair `(a, b)` representing `a + b·ω`,
+//! i.e.
+//!
+//! ```text
+//!   z = a + bω = { (a + b/2) + (b/2)√D   if D ≡ 1
+//!                {        a  +    b √D   if D ≡ 2, 3.
+//! ```
+//!
+//! The cases `D = -1` and `D = -3` give the [Gaussian integers](GaussInt) `ℤ[i]`
+//! and the [Eisenstein integers](EisenInt) `ℤ[ω]`, respectively.
+//!
+//! See: <https://en.wikipedia.org/wiki/Quadratic_integer>,
+//! <https://en.wikipedia.org/wiki/Gaussian_integer>,
+//! <https://en.wikipedia.org/wiki/Eisenstein_integer>
+
 use std::str::FromStr;
 use std::fmt::{Display, Debug};
 use std::ops::{Add, Neg, Sub, Mul, AddAssign, SubAssign, MulAssign, Rem, Div, RemAssign, DivAssign};
@@ -5,23 +30,18 @@ use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
 use crate::{AddGrp, AddGrpOps, AddMon, AddMonOps, DivRound, Elem, EucRing, EucRingOps, Mon, MonOps, Ring, RingOps, Integer, IntOps};
 
+/// A quadratic integer in `ℤ[ω]`, represented by `(a, b)` for `a + b·ω`.
+///
+/// See the module-level docs for the meaning of `ω` and the const `D`.
 #[derive(Clone, Default, PartialEq, Eq)]
 pub struct QuadInt<I, const D: i32>(I, I)
 where I: Integer, for<'x> &'x I: IntOps<I>;
 
+/// Gaussian integers: `ℤ[i] = QuadInt<I, -1>`.
 pub type GaussInt<I> = QuadInt<I, -1>;
-pub type EisenInt<I> = QuadInt<I, -3>;
 
-// The algebraic integers of Q(√D), 
-// represented as Z[ω] where
-//
-//   ω =  { (1 + √D)/2 | D ≡ 1    (mod 4)
-//        { √D         | D ≡ 2, 3 (mod 4).
-//
-// A general z ∈ Z[ω] is represented as
-//
-//   z = a + bω = { (a + b/2) + (b/2)√D | D ≡ 1
-//                {        a  +    b √D | D ≡ 2, 3
+/// Eisenstein integers: `ℤ[ω]` with `ω = (-1 + √-3)/2`, i.e. `QuadInt<I, -3>`.
+pub type EisenInt<I> = QuadInt<I, -3>;
 
 impl<I, const D: i32> QuadInt<I, D>
 where I: Integer, for<'x> &'x I: IntOps<I> {
@@ -194,7 +214,7 @@ impl_add_op!(Add, add);
 impl_add_op!(Sub, sub);
 
 #[auto_ops]
-impl<'a, 'b, I, const D: i32> Mul<&'b QuadInt<I, D>> for &'a QuadInt<I, D>
+impl<'b, I, const D: i32> Mul<&'b QuadInt<I, D>> for &QuadInt<I, D>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     type Output = QuadInt<I, D>;
 
@@ -261,7 +281,7 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 }
 
 #[auto_ops]
-impl<'a, 'b, I> Div<&'b GaussInt<I>> for &'a GaussInt<I>
+impl<'b, I> Div<&'b GaussInt<I>> for &GaussInt<I>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     type Output = GaussInt<I>;
 
@@ -271,7 +291,7 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 }
 
 #[auto_ops]
-impl<'a, 'b, I> Rem<&'b GaussInt<I>> for &'a GaussInt<I>
+impl<'b, I> Rem<&'b GaussInt<I>> for &GaussInt<I>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     type Output = QuadInt<I, -1>;
 
@@ -305,7 +325,7 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 }
 
 #[auto_ops]
-impl<'a, 'b, I> Div<&'b EisenInt<I>> for &'a EisenInt<I>
+impl<'b, I> Div<&'b EisenInt<I>> for &EisenInt<I>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     type Output = EisenInt<I>;
 
@@ -315,7 +335,7 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 }
 
 #[auto_ops]
-impl<'a, 'b, I> Rem<&'b EisenInt<I>> for &'a EisenInt<I>
+impl<'b, I> Rem<&'b EisenInt<I>> for &EisenInt<I>
 where I: Integer, for<'x> &'x I: IntOps<I> {
     type Output = EisenInt<I>;
 

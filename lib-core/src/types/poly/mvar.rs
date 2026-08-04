@@ -1,3 +1,7 @@
+//! Multivariate monomial in indexed variables `X₀^{d₀} X₁^{d₁} ⋯ Xₙ^{dₙ}`,
+//! with the base symbol `X` as a const generic and a [`MultiDeg`] holding
+//! the exponents. With `I = isize` it is a Laurent monomial.
+
 use std::fmt::{Display, Debug};
 use std::ops::{AddAssign, MulAssign, Mul, Div, DivAssign, SubAssign, Add};
 use std::str::FromStr;
@@ -7,11 +11,14 @@ use itertools::Itertools;
 use auto_impl_ops::auto_ops;
 
 use crate::{Elem, ElemBase};
-use crate::lc::Gen;
+use crate::lc::LcKey;
 use crate::util::format::subscript;
 use super::{Mono, MultiDeg, MonoOrd};
 use super::var::{fmt_mono, parse_mono_deg};
 
+/// A multivariate monomial in indexed variables `Xᵢ`, with exponents stored
+/// in a [`MultiDeg`]. The base symbol `X` is a const generic; the actual
+/// variables are `X₀, X₁, …` (displayed with subscripts).
 #[derive(Clone, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde_with::DeserializeFromStr))]
 pub struct MultiVar<const X: char, I> (
@@ -95,14 +102,14 @@ where I: Zero + FromStr + FromPrimitive {
         let p = format!(r"({X}_([0-9]+))(\^\{{?-?[0-9]+\}}?)?");
         let p_all = format!(r"^({p}\s?)+$");
 
-        if !Regex::new(&p_all).unwrap().is_match(&s) { 
+        if !Regex::new(&p_all).unwrap().is_match(s) { 
             return Err(format!("Failed to parse: {s}"))
         }
 
         let r = Regex::new(&p).unwrap();
         let mut degs = vec![];
         
-        for c in r.captures_iter(&s) {
+        for c in r.captures_iter(s) {
             let x = &c[1];
             let i = usize::from_str(&c[2]).map_err(|e| e.to_string())?;
             if let Some(d) = parse_mono_deg(x, &c[0]) { 
@@ -195,7 +202,7 @@ where I: ElemBase + ToPrimitive {
     }
 }
 
-impl<const X: char, I> Gen for MultiVar<X, I>
+impl<const X: char, I> LcKey for MultiVar<X, I>
 where I: ElemBase + Zero + Ord + Hash + ToPrimitive + for<'x> Add<&'x I, Output = I> {}
 
 macro_rules! impl_multivar_unsigned {

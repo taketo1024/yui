@@ -11,7 +11,7 @@ use yui_core::{KeyedUnionFind, Ring, RingOps};
 use yui_homology::DisplaySeq;
 use yui_link::{Node, Edge, InvLink};
 
-use crate::kh::{KhComplex, KhChainGen, KhTensor};
+use crate::kh::{KhComplex, KhState, KhTensor};
 use crate::khi::KhIComplex;
 use crate::kh::internal::v2::builder::{BuildElem, TngComplexBuilder};
 use crate::kh::internal::v2::cob::LcCobTrait;
@@ -129,7 +129,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             for j in 0 .. i { 
                 let y = &off_axis[j];
                 if is_adj(x, y) { 
-                    u.union(&x, &y);
+                    u.union(x, y);
                 }
             }
         }
@@ -138,7 +138,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             if let Some(x) = next.iter().next() { 
                 let tx = self.inv_x(x);
                 if !res.contains(&tx) { 
-                    res.extend(next.into_iter());
+                    res.extend(next);
                 }
             }
             res
@@ -202,7 +202,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn append_on_axis(&mut self, x: &Node) { 
         info!("({}) append on-axis: {x}", self.stat());
 
-        self.inner.append_prepare(&x);
+        self.inner.append_prepare(x);
 
         let c = self.complex().make_x(x);
         let key_map = if x.is_crossing() { 
@@ -223,8 +223,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         info!("({}) append off-axis: {x}, {tx}", self.stat());
 
-        self.inner.append_prepare(&x);
-        self.inner.append_prepare(&tx);
+        self.inner.append_prepare(x);
+        self.inner.append_prepare(tx);
 
         let c = { 
             let mut c = self.complex().make_x(x);
@@ -268,7 +268,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         while let Some((k, r)) = self.inner.find_loop(keys.iter(), allow_based) { 
             keys.remove(&k);
-            keys.remove(&self.inv_key(&k));
+            keys.remove(self.inv_key(&k));
 
             let updated = self.deloop_equiv(&k, r);
             
@@ -285,18 +285,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn deloop_equiv(&mut self, k: &TngKey, r: usize) -> Vec<TngKey> { 
-        if self.is_sym_key(&k) { 
-            let c = self.complex().vertex(&k).tng().comp(r);
+        if self.is_sym_key(k) { 
+            let c = self.complex().vertex(k).tng().comp(r);
             if self.is_sym_comp(c) {
                 // symmetric loop on symmetric key
-                self.deloop_on_axis_sym(&k, r)
+                self.deloop_on_axis_sym(k, r)
             } else {
                 // asymmetric loop on symmetric key
-                self.deloop_on_axis_asym(&k, r)
+                self.deloop_on_axis_asym(k, r)
             }
         } else { 
             // (symmetric or asymmetric) loop on asymmetric key
-            self.deloop_off_axis(&k, r)
+            self.deloop_off_axis(k, r)
         }
     }
 
@@ -414,7 +414,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn eliminate_equiv(&mut self, i: &TngKey, j: &TngKey) {
         assert_eq!(self.is_sym_key(i), self.is_sym_key(j));
-        assert!(self.complex().has_edge(&i, &j));
+        assert!(self.complex().has_edge(i, j));
 
         if self.is_sym_key(i) { 
             self.inner.eliminate(i, j);
@@ -440,12 +440,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn choose_pivot_col(&self, k: &TngKey) -> Option<(&TngKey, usize)> { 
-        self.complex().keys_out_from(k).filter_map(|l|
-            self.is_equiv_inv_edge(k, l).then(|| {
+        self.complex().keys_out_from(k).filter(|&l| self.is_equiv_inv_edge(k, l)).map(|l| {
                 let s = self.inner.edge_weight(k, l);
                 (l, s)
             })
-        )
         .min_by_key(|(_, s)| *s)
     }
 
@@ -493,7 +491,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         // extract target crossings
         let indices = indices.into_iter().collect::<HashSet<_>>();
         let target = self.crossings().enumerate().filter(|(i, _)|
-            indices.contains(&i)
+            indices.contains(i)
         ).map(|(_, x)| 
             x.clone()
         ).collect_vec();
@@ -538,8 +536,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         ).map(|((k1, l1), (k2, l2))|
             (k1 + k2, l1 + l2)
         ).filter(|(k, l)|
-            self.complex().contains_key(&k) && 
-            self.complex().contains_key(&l)
+            self.complex().contains_key(k) && 
+            self.complex().contains_key(l)
         ).collect();
 
         for i in h_range { 
@@ -566,11 +564,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let deg_shift = self.complex().deg_shift();
         let key_map = std::mem::take(&mut self.key_map);
 
-        let map = move |x: &KhChainGen| -> KhChainGen { 
+        let map = move |x: &KhState| -> KhState { 
             let k = TngKey::from(x);
             let tk = key_map[&k];
-            let tx = tk.as_gen(deg_shift);
-            tx
+            
+            tk.as_gen(deg_shift)
         };
 
         let c = self.into_kh_complex();
@@ -591,7 +589,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn inv_key(&self, k: &TngKey) -> &TngKey { 
-        &self.key_map[&k]
+        &self.key_map[k]
     }
 
     fn add_key_pair(&mut self, k: TngKey, tk: TngKey) { 
@@ -665,7 +663,7 @@ mod tests {
     use num_traits::Zero;
 
     use yui_core::num::FF2;
-    use yui_core::poly::HPoly;
+    use yui_core::poly::Poly;
     use yui_homology::{ChainComplexTrait, DisplaySeq, DisplayTable, SummandTrait};
 
     #[test]

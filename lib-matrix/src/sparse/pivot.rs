@@ -356,7 +356,7 @@ impl PivotFinder {
             // Otherwise, modify `pivots` and exit.
 
             let mut pivots = pivots.write().unwrap();
-            w.update_diff(&loc_pivots, &pivots);
+            w.update_diff(loc_pivots, &pivots);
 
             if w.should_retry() {
                 loc_pivots.update_from(&pivots);

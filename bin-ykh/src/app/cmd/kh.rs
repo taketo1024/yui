@@ -134,7 +134,7 @@ where
 
             let r = h.rank() + h.tors().len();
             for i in 0..r { 
-                let z = h.gen(i);
+                let z = h.generator(i);
                 self.out(&format!("  {i}: {z}"));
             }
             self.out("");

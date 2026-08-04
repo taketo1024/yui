@@ -1,5 +1,5 @@
-mod gen;
+mod lc_key;
 mod lc;
 
-pub use gen::*;
+pub use lc_key::*;
 pub use lc::*;

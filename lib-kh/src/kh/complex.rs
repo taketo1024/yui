@@ -7,21 +7,21 @@ use yui_link::Link;
 use yui_homology::{ChainComplex, ChainComplexTrait, DisplaySeq, DisplayTable, Grid2, GridIter, GridTrait, Summand, SummandTrait};
 use yui_matrix::sparse::SpMat;
 
-use crate::kh::r#gen::KhChain;
+use crate::kh::chain::KhChain;
 use crate::kh::internal::v1::cube::KhCube;
-use crate::kh::{KhChainGen, KhHomology};
+use crate::kh::{KhState, KhHomology};
 use crate::misc::{make_gen_grid, range_of};
 
 use super::KhAlg;
 
-pub type KhComplexSummand<R> = Summand<KhChainGen, R>;
+pub type KhComplexSummand<R> = Summand<KhState, R>;
 
 // TODO: Make KhComplexTrait, and split impl into KhComplexV1 and V2. 
 
 #[derive(Clone)]
 pub struct KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    inner: ChainComplex<KhChainGen, R>,
+    inner: ChainComplex<KhState, R>,
     str: KhAlg<R>,
     cube: KhCube<R>,
     deg_shift: (isize, isize),
@@ -62,7 +62,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         KhComplex::new_impl(complex, str, cube, deg_shift, reduced, canon_cycles)
     }
 
-    pub(crate) fn new_impl(inner: ChainComplex<KhChainGen, R>, str: KhAlg<R>, cube: KhCube<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
+    pub(crate) fn new_impl(inner: ChainComplex<KhState, R>, str: KhAlg<R>, cube: KhCube<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
         KhComplex { inner, str, cube, deg_shift, reduced, canon_cycles, gen_grid: OnceLock::new() }
     }
 
@@ -88,7 +88,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
         range_of(self.support().flat_map(|&i|
-            self[i].raw_gens().iter().map(|x| x.q_deg())
+            self[i].raw_generators().iter().map(|x| x.q_deg())
         ))
     }
 
@@ -96,7 +96,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.canon_cycles
     }
 
-    pub fn inner(&self) -> &ChainComplex<KhChainGen, R> {
+    pub fn inner(&self) -> &ChainComplex<KhState, R> {
         &self.inner
     }
 

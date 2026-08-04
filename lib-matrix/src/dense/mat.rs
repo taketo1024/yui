@@ -219,7 +219,7 @@ where R: Scalar + ClosedSubAssign {
 }
 
 #[auto_ops]
-impl<'a, 'b, R> Mul<&'b Mat<R>> for &'a Mat<R>
+impl<'b, R> Mul<&'b Mat<R>> for &Mat<R>
 where R: Scalar + Zero + One + ClosedAddAssign + ClosedMulAssign {
     type Output = Mat<R>;
     fn mul(self, rhs: &'b Mat<R>) -> Self::Output {

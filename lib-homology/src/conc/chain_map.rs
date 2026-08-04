@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use num_traits::Zero;
-use yui_core::lc::{EitherGen, Gen, Lc};
+use yui_core::lc::{EitherKey, LcKey, Lc, split_lr};
 use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 use yui_matrix::sparse::SpMat;
 
@@ -16,7 +16,7 @@ use super::ChainComplexBase;
 pub struct ChainMap<I, X, Y, R>
 where 
     I: GridDeg,
-    X: Gen, Y: Gen,
+    X: LcKey, Y: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     deg: I,
@@ -26,8 +26,8 @@ where
 impl<I, X, Y, R> ChainMap<I, X, Y, R>
 where 
     I: GridDeg,
-    X: Gen,
-    Y: Gen,
+    X: LcKey,
+    Y: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     pub fn new<F>(
@@ -56,7 +56,7 @@ where
     }
 
     pub fn apply(&self, i: I, z: &Lc<X, R>) -> Lc<Y, R> {
-        (self.map)(i, &z)
+        (self.map)(i, z)
     }
 
     pub fn make_matrix(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I) -> SpMat<R> {
@@ -64,7 +64,7 @@ where
     }
 
     pub fn make_matrix_euc(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I) -> SpMat<R>
-    where Y: Gen, R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    where Y: LcKey, R: EucRing, for<'x> &'x R: EucRingOps<R> {
         source[i].make_matrix_euc(&target[i + self.deg], |z| self.apply(i, z))
     }
 
@@ -81,7 +81,7 @@ where
 
 
     pub fn check_at(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I) {
-        for x in source.get(i).raw_gens().iter() {
+        for x in source.get(i).raw_generators().iter() {
             self.check_for(source, target, i, x);
         }
     }
@@ -106,13 +106,13 @@ where
     pub fn print_map_at(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I) { 
         let j = i + self.deg();
         println!("({i}) {} -> ({j}) {}", source[i], target[j]);
-        for z in source[i].gens() { 
+        for z in source[i].generators() {
             let w = self.apply(i, &z);
             println!("\t{z} -> {w}");
         }
     }
 
-    pub fn cone<It>(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, support: It, target_based: bool) -> ChainComplexBase<I, EitherGen<X, Y>, R>
+    pub fn cone<It>(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, support: It, target_based: bool) -> ChainComplexBase<I, EitherKey<X, Y>, R>
     where It: IntoIterator<Item = I> {
         assert!(source.d_deg() == target.d_deg());
 
@@ -128,24 +128,23 @@ where
         let summands = Grid::generate(support, |i| {
             let (i, j) = degs(i);
             let gens = Iterator::chain(
-                source.get(i).raw_gens().iter().map(|x| EitherGen::from_left(x.clone())), 
-                target.get(j).raw_gens().iter().map(|y| EitherGen::from_right(y.clone()))
+                source.get(i).raw_generators().iter().map(|x| EitherKey::from_left(x.clone())), 
+                target.get(j).raw_generators().iter().map(|y| EitherKey::from_right(y.clone()))
             );
-            Summand::from_raw_gens(gens)
+            Summand::from_raw_generators(gens)
         });
 
         let d1 = source.raw_d();
         let d2 = target.raw_d();
         let f = self.map.clone();
 
-        let d_map = move |i: I, z: &Lc<EitherGen<X, Y>, R>| {
+        let d_map = move |i: I, z: &Lc<EitherKey<X, Y>, R>| {
             let (i, j) = degs(i);
-            let x = z.filter_gens(|x| x.is_left() ).map_gens(|x| x.into_left());
-            let y = z.filter_gens(|x| x.is_right()).map_gens(|x| x.into_right());
-
-            let dx = d1(i, &x).map_gens(|x2| EitherGen::from_left (x2));
-            let fx =  f(i, &x).map_gens(|y2| EitherGen::from_right(y2));
-            let dy = d2(j, &y).map_gens(|y2| EitherGen::from_right(y2));
+            let (x, y) = split_lr(z);
+            
+            let dx = d1(i, &x).map_keys(|x2| EitherKey::from_left (x2));
+            let fx =  f(i, &x).map_keys(|y2| EitherKey::from_right(y2));
+            let dy = d2(j, &y).map_keys(|y2| EitherKey::from_right(y2));
 
             dx + fx - dy
         };
@@ -156,7 +155,7 @@ where
 
 #[cfg(test)]
 mod tests { 
-    use crate::{EnumGen, GenericChainComplex};
+    use crate::{GenericKey, GenericChainComplex};
 
     use super::*;
 
@@ -175,7 +174,7 @@ mod tests {
 
     #[test]
     fn test_cone() { 
-        type T = EitherGen<EnumGen<isize>, EnumGen<isize>>;
+        type T = EitherKey<GenericKey<isize>, GenericKey<isize>>;
         let s2 = GenericChainComplex::<i32>::s2();
         let d3 = GenericChainComplex::<i32>::d3();
 
@@ -187,28 +186,28 @@ mod tests {
         let cone = f.cone(&s2, &d3, (0..=4).rev(), true);
         cone.check_d_all();
 
-        let x = T::from_left(s2[0].raw_gen(0).clone());
-        let y = T::from_left(s2[1].raw_gen(0).clone());
-        let z = T::from_right(d3[1].raw_gen(0).clone());
+        let x = T::from_left(s2[0].raw_generator(0).clone());
+        let y = T::from_left(s2[1].raw_generator(0).clone());
+        let z = T::from_right(d3[1].raw_generator(0).clone());
 
-        assert_eq!(cone[1].raw_gens().index_of(&x), Some(0));
-        assert_eq!(cone[2].raw_gens().index_of(&y), Some(0));
-        assert_eq!(cone[1].raw_gens().index_of(&z), Some(4));
+        assert_eq!(cone[1].raw_generators().index_of(&x), Some(0));
+        assert_eq!(cone[2].raw_generators().index_of(&y), Some(0));
+        assert_eq!(cone[1].raw_generators().index_of(&z), Some(4));
 
         let dx = cone.d(1, &Lc::from(x.clone()));
-        assert_eq!(dx, Lc::from(T::from_right(EnumGen(0, 0))));
+        assert_eq!(dx, Lc::from(T::from_right(GenericKey(0, 0))));
 
         let dy = cone.d(2, &Lc::from(y.clone()));
         assert_eq!(dy, Lc::from_iter([
-            (T::from_left(EnumGen(0, 0)), -1),
-            (T::from_left(EnumGen(0, 1)), 1),
-            (T::from_right(EnumGen(1, 0)), 1),
+            (T::from_left(GenericKey(0, 0)), -1),
+            (T::from_left(GenericKey(0, 1)), 1),
+            (T::from_right(GenericKey(1, 0)), 1),
         ]));
 
         let dz = cone.d(1, &Lc::from(z.clone()));
         assert_eq!(dz, Lc::from_iter([
-            (T::from_right(EnumGen(0, 0)), 1),
-            (T::from_right(EnumGen(0, 1)), -1),
+            (T::from_right(GenericKey(0, 0)), 1),
+            (T::from_right(GenericKey(0, 1)), -1),
         ]));
     }
 }

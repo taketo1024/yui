@@ -119,13 +119,13 @@ where
         let is_zero = h.is_zero() && t.is_zero();
         let bigraded = is_zero || ["H", "0,T"].contains(&self.args.c_value.as_str());
 
-        self.show_table(&kh, bigraded);
+        self.show_table(kh, bigraded);
 
         if self.args.show_matrix { 
             if is_zero {
                 self.show_matrix_bigr(kh, e, (-2, -4));
             } else { 
-                self.show_matrix(&kh, e, -2);
+                self.show_matrix(kh, e, -2);
             }
         }
     }
@@ -168,7 +168,7 @@ where
 
             self.out(&format!("({i}): {}", h[i]));
 
-            for (k, z) in h[i].gens().enumerate() { 
+            for (k, z) in h[i].generators().enumerate() { 
                 self.out(&format!("  {k}: {z}"));
             }
             self.out("");

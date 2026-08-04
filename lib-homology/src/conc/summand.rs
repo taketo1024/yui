@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use yui_core::{EucRing, EucRingOps, IndexList, Ring, RingOps};
-use yui_core::lc::{Gen, Lc};
+use yui_core::lc::{LcKey, Lc};
 use yui_matrix::sparse::{SpMat, SpVec, Trans};
 
 use crate::{Grid, GridDeg, GridTrait, SummandTrait};
@@ -12,7 +12,7 @@ use crate::{Grid, GridDeg, GridTrait, SummandTrait};
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Summand<X, R>
 where 
-    X: Gen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     raw_gens: IndexList<X>,
@@ -22,7 +22,7 @@ where
 }
 
 impl<X, R> Summand<X, R>
-where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(raw_gens: IndexList<X>, rank: usize, tors: Vec<R>, trans: Trans<R>) -> Self { 
         assert_eq!(trans.src_dim(), raw_gens.len());
         assert_eq!(trans.tgt_dim(), rank + tors.len());
@@ -30,11 +30,11 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         Self { raw_gens, rank, tors, trans }
     }
 
-    pub fn from_raw_gens<Itr>(raw_gens: Itr) -> Self 
+    pub fn from_raw_generators<Itr>(raw_gens: Itr) -> Self
     where Itr: IntoIterator<Item = X> {
         let gens = raw_gens.into_iter().collect::<IndexList<X>>();
         let r = gens.len();
-        Self::new(gens, r, vec![], Trans::id(r)) 
+        Self::new(gens, r, vec![], Trans::id(r))
     }
 
     pub fn zero() -> Self { 
@@ -45,22 +45,22 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         &self.trans
     }
 
-    pub fn raw_gen(&self, i: usize) -> &X { 
+    pub fn raw_generator(&self, i: usize) -> &X {
         &self.raw_gens[i]
     }
 
-    pub fn raw_gens(&self) -> &IndexList<X> { 
+    pub fn raw_generators(&self) -> &IndexList<X> {
         &self.raw_gens
     }
 
-    pub fn gen(&self, i: usize) -> Lc<X, R> { 
+    pub fn generator(&self, i: usize) -> Lc<X, R> {
         let n = self.dim();
         let v = SpVec::unit(n, i);
         self.devectorize(&v)
     }
-    
-    pub fn gens(&self) -> impl Iterator<Item = Lc<X, R>> + use<'_, X, R> { 
-        (0 .. self.rank + self.tors.len()).map(|i| self.gen(i))
+
+    pub fn generators(&self) -> impl Iterator<Item = Lc<X, R>> + use<'_, X, R> {
+        (0 .. self.rank + self.tors.len()).map(|i| self.generator(i))
     }
 
     pub fn vectorize(&self, z: &Lc<X, R>) -> SpVec<R> {
@@ -69,11 +69,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         // MEMO should add strict option. 
 
         let v = SpVec::from_entries(n, z.iter().flat_map(|(x, a)| { 
-            if let Some(i) = self.raw_gens.index_of(x) {
-                Some((i, a.clone()))
-            } else {
-                None
-            }
+            self.raw_gens.index_of(x).map(|i| (i, a.clone()))
         }));
 
         self.trans.forward(&v)
@@ -105,23 +101,23 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn make_matrix<Y, F>(&self, target: &Summand<Y, R>, map: F) -> SpMat<R>
-    where Y: Gen, F: Fn(&Lc<X, R>) -> Lc<Y, R> { 
-        SpMat::from_col_vecs(target.dim(), self.gens().map(|z| { 
+    where Y: LcKey, F: Fn(&Lc<X, R>) -> Lc<Y, R> { 
+        SpMat::from_col_vecs(target.dim(), self.generators().map(|z| { 
             let w = map(&z);
             target.vectorize(&w)
         }))
     }
 
     pub fn make_matrix_euc<Y, F>(&self, target: &Summand<Y, R>, map: F) -> SpMat<R>
-    where R: EucRing, for<'x> &'x R: EucRingOps<R>, Y: Gen, F: Fn(&Lc<X, R>) -> Lc<Y, R> { 
-        SpMat::from_col_vecs(target.dim(), self.gens().map(|z| { 
+    where R: EucRing, for<'x> &'x R: EucRingOps<R>, Y: LcKey, F: Fn(&Lc<X, R>) -> Lc<Y, R> { 
+        SpMat::from_col_vecs(target.dim(), self.generators().map(|z| { 
             let w = map(&z);
             target.vectorize_euc(&w)
         }))
     }
 
     pub fn merge<Y>(&mut self, other: Summand<Y, R>)
-    where Y: Gen { 
+    where Y: LcKey { 
         assert_eq!(self.trans.tgt_dim(), other.trans.src_dim());
 
         self.rank = other.rank;
@@ -130,23 +126,23 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         self.trans.reduce();
     }
 
-    pub fn map_raw_gens<Y>(&self, f: impl Fn(&X) -> Y) -> Summand<Y, R>
-    where Y: Gen {
+    pub fn map_raw_generators<Y>(&self, f: impl Fn(&X) -> Y) -> Summand<Y, R>
+    where Y: LcKey {
         Summand::new(
-            self.raw_gens.iter().map(|x| f(x)).collect(),
+            self.raw_gens.iter().map(f).collect(),
             self.rank,
             self.tors.clone(),
             self.trans.clone()
         )
     }
 
-    pub fn print_gens(&self) {
-        for (i, x) in self.gens().enumerate() {
+    pub fn print_generators(&self) {
+        for (i, x) in self.generators().enumerate() {
             println!("{i}: {x}")
         }
     }
 
-    pub fn print_raw_gens(&self) {
+    pub fn print_raw_generators(&self) {
         for (i, x) in self.raw_gens.iter().enumerate() { 
             println!("{i}: {x}");
         }
@@ -154,21 +150,21 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 impl<X, R> Default for Summand<X, R>
-where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     fn default() -> Self {
         Self::zero()
     }
 }
 
 impl<X, R> Display for Summand<X, R>
-where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.display().fmt(f)
     }
 }
 
 impl<X, R> SummandTrait for Summand<X, R>
-where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     type R = R;
 
     fn rank(&self) -> usize {
@@ -181,7 +177,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 impl<I, X, R> Grid<I, Summand<X, R>>
-where I: GridDeg, X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+where I: GridDeg, X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn total_rank(&self) -> usize { 
         self.support().map(|&i| self[i].rank()).sum()
     }
@@ -195,7 +191,7 @@ mod tex {
     use yui_core::tex::TeX;
 
     impl<X, R> TeX for Summand<X, R>
-    where X: Gen, R: Ring + TeX, for<'x> &'x R: RingOps<R> {
+    where X: LcKey, R: Ring + TeX, for<'x> &'x R: RingOps<R> {
         fn tex_math_symbol() -> String {
             "".to_string()
         }
@@ -208,18 +204,18 @@ mod tex {
 
 #[cfg(test)]
 mod tests { 
-    use yui_core::lc::FreeGen;
+    use yui_core::lc::AsKey;
 
     use super::*;
 
-    type X = FreeGen<i32>;
+    type X = AsKey<i32>;
     fn e(i: isize) -> X { 
         X::from(i as i32)
     }
     
     #[test]
     fn vectorize() { 
-        let s = Summand::from_raw_gens([e(0), e(1), e(2)]);
+        let s = Summand::from_raw_generators([e(0), e(1), e(2)]);
         
         let x = Lc::from(e(0));
         let y = Lc::from(e(1));
@@ -234,7 +230,7 @@ mod tests {
         
     #[test]
     fn as_chain() { 
-        let s = Summand::from_raw_gens([e(0), e(1), e(2)]);
+        let s = Summand::from_raw_generators([e(0), e(1), e(2)]);
 
         let x = Lc::from(e(0));
         let y = Lc::from(e(1));

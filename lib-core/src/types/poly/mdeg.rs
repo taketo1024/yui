@@ -1,3 +1,6 @@
+//! Multi-degree: a sparse map from variable index to exponent, used as the
+//! degree type of multivariate monomials.
+
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::ops::{Add, AddAssign, Neg, SubAssign, Sub, Index};
@@ -10,10 +13,14 @@ use num_traits::Zero;
 
 use super::MonoOrd;
 
+/// Multi-degree of a monomial, stored sparsely as `{ variable_index → exponent }`.
+/// Zero exponents are elided.
+///
+/// Used as [`MultiVar`](super::MultiVar)'s degree type.
 #[derive(Clone, Default, PartialEq, Eq, Hash, Display, Debug)]
 #[display("{:?}", data)]
 #[debug("{:?}", data)]
-pub struct MultiDeg<I> { 
+pub struct MultiDeg<I> {
     data: BTreeMap<usize, I>, // { index => degree }
     _zero: I
 }

@@ -12,7 +12,7 @@ use yui_homology::DisplaySeq;
 use yui_link::{Node, Edge, Link};
 
 use crate::ext::LinkExt;
-use crate::kh::{KhGen, KhChain, KhComplex};
+use crate::kh::{KhAlgGen, KhChain, KhComplex};
 
 use super::cob::{Bottom, Dot, Cob, CobComp, LcCobTrait, LcCob};
 use super::tng::{Tng, TngComp};
@@ -197,11 +197,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let h_range = self.current_h_range();
 
         for i in h_range.clone() { 
-            self.complex.connect_vertices(&left, &right, i);
+            self.complex.connect_vertices(left, right, i);
         }
 
         for i in h_range { 
-            self.complex.connect_edges(&left, &right, i);
+            self.complex.connect_edges(left, right, i);
             if self.auto_deloop {
                 self.deloop_in(i, false);
             }
@@ -512,12 +512,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let Some(f) = self.retr_cob.remove(k) else { return };
         let marked = self.base_pt.map(|e| c.contains(e)).unwrap_or(false);
 
-        let k0 = k + KhGen::X;
+        let k0 = k + KhAlgGen::X;
         let f0 = f.clone().cap_off(Bottom::Tgt, c, Dot::None);
         self.retr_cob.insert(k0, f0);
 
         if !marked { 
-            let k1 = k + KhGen::I;
+            let k1 = k + KhAlgGen::I;
             let f1 = f.cap_off(Bottom::Tgt, c, Dot::Y);
             self.retr_cob.insert(k1, f1);    
         }
@@ -551,9 +551,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             let c = complex.edge(i, k);
             let cab = c * &ainv * &b;
-            let s = if let Some(d) = self.retr_cob.remove(k) { 
+            let s = if let Some(d) = self.retr_cob.remove(k) {
                 d - cab
-            } else { 
+            } else {
                 -cab
             }.part_eval(h, t);
 
@@ -595,7 +595,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> Display for BuildElem<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mors = self.retr_cob.iter().sorted_by_key(|(&k, _)| k).map(|(k, f)| { 
+        let mors = self.retr_cob.iter().sorted_by_key(|&(&k, _)| k).map(|(k, f)| { 
             format!("{}: {}", k, f)
         }).join(", ");
         write!(f, "[{}]", mors)
@@ -723,7 +723,7 @@ mod tests {
         assert_ne!(zs[0], zs[1]);
         
         for z in zs { 
-            assert!(z.gens().all(|x| x.h_deg() == 0));
+            assert!(z.keys().all(|x| x.h_deg() == 0));
             assert!(c.d(0, &z).is_zero());
         }
     }

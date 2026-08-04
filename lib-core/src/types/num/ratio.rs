@@ -1,3 +1,11 @@
+//! Field of fractions over a Euclidean ring: `Ratio<T>` represents `numer / denom`.
+//!
+//! With `T = i64` or `BigInt` this gives the rationals ℚ. More generally,
+//! `Ratio<T>` is a [`Field`] whenever `T` is a [`EucRing`].
+//!
+//! See: <https://en.wikipedia.org/wiki/Field_of_fractions>,
+//! <https://en.wikipedia.org/wiki/Rational_number>
+
 use std::fmt::{Display, Debug};
 use std::str::FromStr;
 use std::cmp;
@@ -7,6 +15,7 @@ use auto_impl_ops::auto_ops;
 
 use crate::{EucRing, EucRingOps, Elem, Mon, AddMon, AddGrp, AddMonOps, AddGrpOps, MonOps, RingOps, Ring, FieldOps, Field, Integer, IntOps};
 
+/// A fraction `numer / denom` over a [`EucRing`] `T`, kept in reduced form.
 #[derive(Copy, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde_with::SerializeDisplay, serde_with::DeserializeFromStr))]
 pub struct Ratio<T> {
@@ -251,7 +260,7 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
 }
 
 #[auto_ops]
-impl<'a, 'b, T> Rem<&'b Ratio<T>> for &'a Ratio<T>
+impl<'b, T> Rem<&'b Ratio<T>> for &Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     type Output = Ratio<T>;
     fn rem(self, rhs: &'b Ratio<T>) -> Self::Output {

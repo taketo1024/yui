@@ -23,7 +23,7 @@ where
             if s.is_empty() { 
                 "$ $".to_string()
             } else {
-                format!("${}$", s.to_string())
+                format!("${}$", s)
             }
         } else { 
             s.to_string()

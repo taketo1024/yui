@@ -129,7 +129,8 @@ macro_rules! try_noneuc_poly {
     ($app:ident, $method:ident, $args:expr) => {{
         use yui_core::num::Ratio;
         use yui_core::num::FF;
-        use yui_core::poly::{Poly, Poly2};
+        use yui_core::poly::Poly2;
+        use crate::app::utils::FastPoly;
 
         type Z = Int;
         type Q = Ratio<Int>;
@@ -139,8 +140,8 @@ macro_rules! try_noneuc_poly {
         let vars = $args.poly_vars();
 
         match ($args.c_type(), vars) {
-            (CType::Z,  PolyVars::H ) => invoke!(Poly<'H', Z>, $app, $method, $args),
-            (CType::Z,  PolyVars::T ) => invoke!(Poly<'T', Z>, $app, $method, $args),
+            (CType::Z,  PolyVars::H ) => invoke!(FastPoly<'H', Z>, $app, $method, $args),
+            (CType::Z,  PolyVars::T ) => invoke!(FastPoly<'T', Z>, $app, $method, $args),
             (CType::Z,  PolyVars::HT) => invoke!(Poly2<'H', 'T', Z>, $app, $method, $args),
             (CType::Q,  PolyVars::HT) => invoke!(Poly2<'H', 'T', Q>, $app, $method, $args),
             (CType::F2, PolyVars::HT) => invoke!(Poly2<'H', 'T', F2>, $app, $method, $args),

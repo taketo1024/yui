@@ -1,3 +1,9 @@
+//! Univariate monomial `X^d`. With `I = isize` it is a Laurent monomial
+//! (allowing `d < 0`).
+//!
+//! See: <https://en.wikipedia.org/wiki/Monomial>,
+//! <https://en.wikipedia.org/wiki/Laurent_polynomial>
+
 use std::fmt::{Display, Debug};
 use std::hash::Hash;
 use std::ops::{AddAssign, Mul, MulAssign, DivAssign, SubAssign, Div};
@@ -6,13 +12,12 @@ use num_traits::{Zero, One, ToPrimitive, Pow, FromPrimitive};
 use auto_impl_ops::auto_ops;
 
 use crate::{Elem, ElemBase};
-use crate::lc::Gen;
+use crate::lc::LcKey;
 use crate::util::format::superscript;
 use super::{Mono, MonoOrd};
 
-// `Var<X, I>` : represents monomials X^d (univar).
-// `I` is either `usize` or `isize`.
-
+/// A univariate monomial `X^d`, where the variable symbol `X` is a const
+/// generic and `I` is the exponent type (`usize` or `isize`).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Default, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde_with::DeserializeFromStr))]
 pub struct Var<const X: char, I>(
@@ -120,7 +125,7 @@ where I: ElemBase + Hash + Ord + ToPrimitive {
     }
 }
 
-impl<const X: char, I> Gen for Var<X, I> 
+impl<const X: char, I> LcKey for Var<X, I> 
 where I: ElemBase + Hash + Ord + ToPrimitive {}
 
 macro_rules! impl_univar_unsigned {

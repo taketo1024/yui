@@ -4,7 +4,7 @@ use std::sync::Arc;
 use delegate::delegate;
 use num_traits::Zero;
 use yui_core::{Ring, RingOps};
-use yui_core::lc::{Gen, Lc};
+use yui_core::lc::{LcKey, Lc};
 use yui_matrix::sparse::{SpMat, SpVec};
 
 use crate::utils::ChainReducer;
@@ -22,7 +22,7 @@ pub type ChainComplex3<X, R> = ChainComplexBase<isize3, X, R>;
 pub struct ChainComplexBase<I, X, R>
 where 
     I: GridDeg,
-    X: Gen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     summands: Grid<I, Summand<X, R>>,
@@ -33,7 +33,7 @@ where
 impl<I, X, R> ChainComplexBase<I, X, R>
 where 
     I: GridDeg,
-    X: Gen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
     pub fn new<F>(summands: Grid<I, Summand<X, R>>, d_deg: I, d_map: F) -> Self
@@ -77,7 +77,7 @@ where
 
     #[inline(never)] // for profilability
     fn d_matrix_col(&self, i: I, j: usize) -> SpVec<R> { 
-        let z = self[i].gen(j);
+        let z = self[i].generator(j);
         let w = self.d(i, &z);
         self[i + self.d_deg].vectorize(&w)
     }
@@ -90,7 +90,7 @@ where
             |i| {
                 let c = &self[i];
                 Summand::new(
-                    c.raw_gens().clone(), 
+                    c.raw_generators().clone(), 
                     r.rank(i).unwrap(), 
                     vec![], 
                     c.trans().merged(r.trans(i).unwrap())
@@ -121,7 +121,7 @@ where
 
 impl<X, R> ChainComplex<X, R>
 where 
-    X: Gen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
     pub fn truncated(&self, range: RangeInclusive<isize>) -> Self { 
@@ -142,7 +142,7 @@ where
 impl<I, X, R> GridTrait<I> for ChainComplexBase<I, X, R>
 where
     I: GridDeg,
-    X: Gen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
     type Item = Summand<X, R>;
@@ -161,7 +161,7 @@ where
 impl<I, X, R> ChainComplexTrait<I> for ChainComplexBase<I, X, R>
 where 
     I: GridDeg,
-    X: Gen,
+    X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
     type R = R;
@@ -184,14 +184,14 @@ where
     }
 
     fn check_d_at(&self, i0: I) { 
-        for x in self.get(i0).raw_gens().iter() {
+        for x in self.get(i0).raw_generators().iter() {
             self.check_d_for(i0, x);
         }
     }
 }
 
 impl<I, X, R> Index<I> for ChainComplexBase<I, X, R>
-where I: GridDeg, X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+where I: GridDeg, X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = Summand<X, R>;
     fn index(&self, i: I) -> &Self::Output {
         self.get(i)
@@ -199,7 +199,7 @@ where I: GridDeg, X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 impl<X, R> Index<(isize, isize)> for ChainComplex2<X, R>
-where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = Summand<X, R>;
     fn index(&self, i: (isize, isize)) -> &Self::Output {
         self.get(i.into())
@@ -207,7 +207,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 impl<X, R> Index<(isize, isize, isize)> for ChainComplex3<X, R>
-where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = Summand<X, R>;
     fn index(&self, i: (isize, isize, isize)) -> &Self::Output {
         self.get(i.into())
@@ -215,7 +215,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 impl<X, R> DisplaySeq<isize> for ChainComplex<X, R>
-where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     delegate! {
         to self.summands { 
             fn display_label(&self) -> String;
@@ -226,7 +226,7 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 impl<X, R> DisplayTable<isize> for ChainComplex2<X, R>
-where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     delegate! {
         to self.summands { 
             fn display_labels(&self) -> (String, String);

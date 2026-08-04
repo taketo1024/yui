@@ -6,13 +6,13 @@ use yui_core::{Ring, RingOps, PowMod2, Sign, GetSign};
 use yui_homology::{ChainComplex, Grid, Summand};
 use yui_link::{Link, State, Path, Edge};
 
-use crate::kh::{KhAlg, KhChain, KhChainGen, KhTensor};
+use crate::kh::{KhAlg, KhChain, KhState, KhTensor};
 
 #[derive(Clone, Debug)]
 pub struct KhCubeVertex { 
     state: State,
     circles: Vec<Path>,
-    gens: Vec<KhChainGen>
+    gens: Vec<KhState>
 }
 
 impl KhCubeVertex { 
@@ -35,14 +35,14 @@ impl KhCubeVertex {
                 true
             };
             ok.then(|| 
-                KhChainGen::new(state, label, deg_shift)
+                KhState::new(state, label, deg_shift)
             )
         }).collect();
 
         KhCubeVertex { state, circles, gens }
     }
 
-    pub fn generators(&self) -> Vec<&KhChainGen> { 
+    pub fn generators(&self) -> Vec<&KhState> { 
         self.gens.iter().collect()
     }
 
@@ -187,11 +187,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.edges.get(from)?.iter().find(|(t, _)| t == to).map(|(_, e)| e)
     }
 
-    pub fn targets_from(&self, s: &State) -> impl Iterator<Item = &State> {
+    pub fn targets_from(&self, s: &State) -> impl Iterator<Item = &State> + use<'_, R> {
         self.edges[s].iter().map(|e| &e.0)
     }
 
-    pub fn d_to(&self, x: &KhChainGen, target: &State, signed: bool) -> KhChain<R> {
+    pub fn d_to(&self, x: &KhState, target: &State, signed: bool) -> KhChain<R> {
         use KhCubeEdgeTrans::*;
         
         let Some(e) = self.edge(&x.state, target) else { 
@@ -211,7 +211,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn rev_d_to(&self, x: &KhChainGen, target: &State, signed: bool) -> KhChain<R> {
+    pub fn rev_d_to(&self, x: &KhState, target: &State, signed: bool) -> KhChain<R> {
         use KhCubeEdgeTrans::*;
         
         let Some(e) = self.edge(target, &x.state) else { 
@@ -231,25 +231,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    fn merge(&self, x: &KhChainGen, in_indices: (usize, usize), out_index: usize, target: State) -> KhChain<R> { 
-        self.str.mul_tensor(&x.tensor, in_indices, out_index).map_gens(|y| { 
-            KhChainGen::new(target, y, x.deg_shift)
+    fn merge(&self, x: &KhState, in_indices: (usize, usize), out_index: usize, target: State) -> KhChain<R> { 
+        self.str.mul_tensor(&x.tensor, in_indices, out_index).map_keys(|y| { 
+            KhState::new(target, y, x.deg_shift)
         })
     }
 
-    fn split(&self, x: &KhChainGen, in_index: usize, out_indices: (usize, usize), target: State) -> KhChain<R> { 
-        self.str.comul_tensor(&x.tensor, in_index, out_indices).map_gens(|y| { 
-            KhChainGen::new(target, y, x.deg_shift)
+    fn split(&self, x: &KhState, in_index: usize, out_indices: (usize, usize), target: State) -> KhChain<R> { 
+        self.str.comul_tensor(&x.tensor, in_index, out_indices).map_keys(|y| { 
+            KhState::new(target, y, x.deg_shift)
         })
     }
 
-    pub fn d(&self, x: &KhChainGen) -> KhChain<R> {
+    pub fn d(&self, x: &KhState) -> KhChain<R> {
         self.targets_from(&x.state).flat_map(|t| { 
             self.d_to(x, t, true)
         }).collect()
     }
 
-    pub fn generators(&self, i: isize) -> Vec<&KhChainGen> { 
+    pub fn generators(&self, i: isize) -> Vec<&KhState> { 
         let i0 = self.deg_shift.0;
         if self.h_range().contains(&i) { 
             let i = (i - i0) as usize;
@@ -264,22 +264,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn states_of_weight(&self, k: usize) -> impl Iterator<Item = &State> { 
-        self.vertices
-            .iter()
-            .filter_map(|(s, _)| {
+        self.vertices.keys().filter_map(|s| {
                 if s.weight() == k { 
                     Some(s)
                 } else {
                     None
                 }
             })
-            .sorted_by(|s1, s2| Ord::cmp(s1, s2))
+            .sorted_by(Ord::cmp)
     }
 
-    pub fn into_complex(self) -> ChainComplex<KhChainGen, R> {
+    pub fn into_complex(self) -> ChainComplex<KhState, R> {
         let summands = Grid::generate(self.h_range(), |i| { 
             let gens = self.generators(i);
-            Summand::from_raw_gens(gens.into_iter().cloned())
+            Summand::from_raw_generators(gens.into_iter().cloned())
         });
 
         ChainComplex::new(summands, 1, move |_, z| { 

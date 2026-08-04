@@ -7,9 +7,9 @@ use yui_link::{Link, Path, State};
 use num_traits::Zero;
 
 use crate::kh::internal::v1::cube::KhCube;
-use crate::kh::{KhAlg, KhChain, KhChainGen, KhComplex, KhGen, KhTensor};
+use crate::kh::{KhAlg, KhChain, KhState, KhComplex, KhAlgGen, KhTensor};
 
-pub type KhChainMap<R> = ChainMap<isize, KhChainGen, KhChainGen, R>;
+pub type KhChainMap<R> = ChainMap<isize, KhState, KhState, R>;
 
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
@@ -27,7 +27,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let c2_deg_shift = c2.deg_shift();
 
         ChainMap::new(deg, move |_, z| { 
-            z.apply(|x: &KhChainGen| {
+            z.apply(|x: &KhState| {
                 if !x.state[i].is_zero() { 
                     return KhChain::zero();
                 }
@@ -58,7 +58,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let cube = KhCube::new(l, h, t, red_e, c1.deg_shift());
 
         ChainMap::new(deg, move |_, z| { 
-            z.apply(|x: &KhChainGen| {
+            z.apply(|x: &KhState| {
                 if !x.state[i].is_one() { 
                     return KhChain::zero();
                 }
@@ -76,8 +76,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 let e = Sign::from_parity( count_1s(&x.state, i) );
                 let t = apply_f1(&alg, &x.tensor, k0, k1) * R::from_sign(e);
                 
-                t.map_gens(|y| {
-                    KhChainGen::new(s, y, c2_deg_shift)
+                t.map_keys(|y| {
+                    KhState::new(s, y, c2_deg_shift)
                 })
             })
         })
@@ -94,7 +94,7 @@ fn circle_index(circles: &[Path], arc: &Path) -> usize {
 
 fn apply_f1<R>(alg: &KhAlg<R>, x: &KhTensor, i0: usize, i1: usize) -> Lc<KhTensor, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    use KhGen::X;
+    use KhAlgGen::X;
 
     let w0 = x.apply_at(i0, |x0| 
         alg.mul(*x0, X)  // multiply X at i0
@@ -277,7 +277,7 @@ mod tests {
         for i in h1.h_range() { 
             let j = i + f.deg();
             println!("({i}) {} -> ({j}) {}", h1[i], h2[j]);
-            for z in h1[i].gens() { 
+            for z in h1[i].generators() {
                 let w = f.apply(i, &z);
                 let x = h1[i].vectorize_euc(&z).into_dense();
                 let y = h2[j].vectorize_euc(&w).into_dense();

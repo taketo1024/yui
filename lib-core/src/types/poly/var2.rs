@@ -1,3 +1,5 @@
+//! Bivariate monomial `X^i Y^j`. With `I = isize` it is a Laurent monomial.
+
 use core::panic;
 use std::fmt::{Display, Debug};
 use std::hash::Hash;
@@ -7,15 +9,14 @@ use num_traits::{Zero, One, Pow, FromPrimitive, ToPrimitive};
 use auto_impl_ops::auto_ops;
 
 use crate::{Elem, ElemBase};
-use crate::lc::Gen;
+use crate::lc::LcKey;
 
 use super::{Mono, MonoOrd};
 use super::var::parse_mono_deg;
 use super::mvar::fmt_mono_n;
 
-// `Var2<X, Y, I>` : represents bivariant monomials X^i Y^j.
-// `I` is either `usize` or `isize`.
-
+/// A bivariate monomial `X^i Y^j`, with variable symbols `X`, `Y` as const
+/// generics and exponent type `I` (`usize` or `isize`).
 #[derive(Clone, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde_with::DeserializeFromStr))]
 pub struct Var2<const X: char, const Y: char, I> (
@@ -87,13 +88,13 @@ where I: Zero + AddAssign + FromStr + FromPrimitive {
         let r = Regex::new(&p).unwrap();
         let r_all = Regex::new(&p_all).unwrap();
 
-        if !r_all.is_match(&s) { 
+        if !r_all.is_match(s) { 
             return Err(format!("Failed to parse: {s}"))
         }
 
         let mut deg = (I::zero(), I::zero());
         
-        for c in r.captures_iter(&s) {
+        for c in r.captures_iter(s) {
             let x = &c[1];
             let i = parse_mono_deg(x, &c[0]).unwrap();
             if x.starts_with(X) { 
@@ -193,7 +194,7 @@ where I: ElemBase + ToPrimitive {
     }
 }
         
-impl<const X: char, const Y: char, I> Gen for Var2<X, Y, I>
+impl<const X: char, const Y: char, I> LcKey for Var2<X, Y, I>
 where I: ElemBase + Copy + Hash + Ord + for<'x> Add<&'x I, Output = I> + ToPrimitive {}
 
 macro_rules! impl_bivar_unsigned {

@@ -3,9 +3,9 @@ use yui_matrix::sparse::Trans;
 
 use crate::{GridDeg, Summand};
 
-use super::EnumGen;
+use super::GenericKey;
 
-pub type GenericSummand<I, R> = Summand<EnumGen<I>, R>;
+pub type GenericSummand<I, R> = Summand<GenericKey<I>, R>;
 
 impl<I, R> GenericSummand<I, R>
 where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> { 
@@ -17,7 +17,7 @@ where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {
             (n, Trans::id(n))
         };
         
-        let gens = (0..n).map(|j| EnumGen(i, j)).collect();
+        let gens = (0..n).map(|j| GenericKey(i, j)).collect();
         Self::new(gens, rank, tors, trans)
     }
 

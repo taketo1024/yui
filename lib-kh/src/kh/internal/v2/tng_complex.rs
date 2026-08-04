@@ -14,7 +14,7 @@ use yui_link::{Edge, Link, Node, State};
 use yui_core::bitseq::Bit;
 
 use crate::kh::internal::v1::cube::KhCube;
-use crate::kh::{KhGen, KhAlg, KhChain, KhComplex, KhChainGen, KhTensor};
+use crate::kh::{KhAlgGen, KhAlg, KhChain, KhComplex, KhState, KhTensor};
 use super::cob::{Cob, Dot, Bottom, CobComp, LcCob, LcCobTrait};
 use super::tng::{Tng, TngComp};
 
@@ -38,13 +38,13 @@ impl TngKey {
         self.label.append(other.label);
     }
 
-    pub fn as_gen(&self, deg_shift: (isize, isize)) -> KhChainGen { 
-        KhChainGen::new(self.state, self.label, deg_shift)
+    pub fn as_gen(&self, deg_shift: (isize, isize)) -> KhState {
+        KhState::new(self.state, self.label, deg_shift)
     }
 }
 
 #[auto_ops]
-impl<'a> Add for &'a TngKey {
+impl Add for &TngKey {
     type Output = TngKey;
     fn add(self, rhs: Self) -> Self::Output {
         let mut res = *self;
@@ -54,17 +54,17 @@ impl<'a> Add for &'a TngKey {
 }
 
 #[auto_ops]
-impl<'a> Add<KhGen> for &'a TngKey {
+impl Add<KhAlgGen> for &TngKey {
     type Output = TngKey;
-    fn add(self, rhs: KhGen) -> Self::Output {
+    fn add(self, rhs: KhAlgGen) -> Self::Output {
         let mut res = *self;
         res.label.push(rhs);
         res
     }
 }
 
-impl From<&KhChainGen> for TngKey {
-    fn from(x: &KhChainGen) -> Self {
+impl From<&KhState> for TngKey {
+    fn from(x: &KhState) -> Self {
         TngKey { state: x.state, label: x.tensor }
     }
 }
@@ -112,7 +112,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let tng = self.tng.convert_edges(&f);
         let in_edges = self.in_edges.clone();
         let out_edges = self.out_edges.iter().map(|(k, cob)|
-            (k.clone(), cob.convert_edges(&f))
+            (*k, cob.convert_edges(&f))
         ).collect();
         TngVertex { key, tng, in_edges, out_edges }
     }
@@ -220,11 +220,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         )
     }
 
-    pub fn keys_into(&self, k: &TngKey) -> impl Iterator<Item = &TngKey> { 
+    pub fn keys_into(&self, k: &TngKey) -> impl Iterator<Item = &TngKey> + use<'_, R> { 
         self.vertex(k).in_edges()
     }
 
-    pub fn keys_out_from(&self, k: &TngKey) -> impl Iterator<Item = &TngKey> { 
+    pub fn keys_out_from(&self, k: &TngKey) -> impl Iterator<Item = &TngKey> + use<'_, R> { 
         self.vertex(k).out_edges()
     }
 
@@ -376,7 +376,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             c.add_vertex(v0);
             c.add_vertex(v1);
 
-            let sdl = LcCob::from(Cob::from(CobComp::sdl_from(&x)));
+            let sdl = LcCob::from(Cob::from(CobComp::sdl_from(x)));
             c.add_edge(&k0, &k1, sdl);
 
             c.crossings.push(x.clone());
@@ -390,8 +390,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn connect(&mut self, other: TngComplex<R>) { 
         let mut new = Self::connect_init(self, &other);
         for i in new.h_range() { 
-            new.connect_vertices(&self, &other, i);
-            new.connect_edges(&self, &other, i - 1);
+            new.connect_vertices(self, &other, i);
+            new.connect_edges(self, &other, i - 1);
         }
         *self = new
     }
@@ -436,20 +436,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         
         keys.into_par_iter().for_each(|(k0, l0)| { 
             let k0_l0 = k0 + l0;
-            let v0 = left.vertex(&k0);
-            let w0 = right.vertex(&l0);
+            let v0 = left.vertex(k0);
+            let w0 = right.vertex(l0);
             let i0 = (k0.state.weight() as isize) - left.deg_shift.0;
 
-            let e1 = left.keys_out_from(&k0).map(|k1| { 
+            let e1 = left.keys_out_from(k0).map(|k1| { 
                 let k1_l0 = k1 + l0;
-                let f = left.edge(&k0, k1).clone();
+                let f = left.edge(k0, k1).clone();
                 let f_id = f.connect(&Cob::id(w0.tng())); // D(f, 1) 
                 (k0_l0, k1_l0, f_id.part_eval(&h, &t))
             });
 
-            let e2 = right.keys_out_from(&l0).map(|l1| { 
+            let e2 = right.keys_out_from(l0).map(|l1| { 
                 let k0_l1 = k0 + l1;
-                let f = right.edge(&l0, l1).clone();
+                let f = right.edge(l0, l1).clone();
                 let e = R::from_sign(Sign::from_parity(i0 as i64));
                 let id_f = f.connect(&Cob::id(v0.tng())) * e; // (-1)^{deg(k0)} D(1, f) 
                 (k0_l0, k0_l1, id_f.part_eval(&h, &t))
@@ -492,15 +492,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         #[allow(non_snake_case)]
         let updated_keys = if based { 
-            let k_X = k + KhGen::X;
+            let k_X = k + KhAlgGen::X;
 
             self.rename_vertex_key(k, k_X);
             self.deloop_with(&k_X, r, Dot::X, Dot::None);
 
             vec![k_X]
         } else { 
-            let k_X = k + KhGen::X;
-            let k_1 = k + KhGen::I;
+            let k_X = k + KhAlgGen::X;
+            let k_1 = k + KhAlgGen::I;
 
             self.rename_vertex_key(k, k_X);
             self.duplicate_vertex(&k_X, k_1);
@@ -588,7 +588,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.remove_vertex(k1);
     }
 
-    pub fn into_raw_complex(self) -> ChainComplex<KhChainGen, R> {
+    pub fn into_raw_complex(self) -> ChainComplex<KhState, R> {
         assert!(self.is_completely_delooped());
 
         let summands = Grid1::generate(self.h_range(), |i| { 
@@ -597,10 +597,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             ).sorted_by_key(|x|
                 -x.q_deg()
             );
-            Summand::from_raw_gens(gens)
+            Summand::from_raw_generators(gens)
         });
 
-        let d = move |x: &KhChainGen| { 
+        let d = move |x: &KhState| { 
             let (h, t) = self.ht();
             let k = TngKey::from(x);
             let v = self.vertex(&k);
@@ -710,11 +710,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn convert_edges<F>(&self, f: F) -> Self
     where F: Fn(Edge) -> Edge { 
         let (h, t) = self.ht();
-        let base_pt = self.base_pt.map(|e| f(e));
+        let base_pt = self.base_pt.map(&f);
         let crossings = self.crossings.iter().map(|x| x.convert_edges(&f)).collect();
 
         let vertices = self.iter_verts().map(|(k1, v1)| {
-            let k2 = k1.clone();
+            let k2 = *k1;
             let v2 = v1.convert_edges(&f);
             (k2, v2)
         }).collect();
@@ -805,11 +805,11 @@ mod tests {
         assert_eq!(updated, vec![
             TngKey {
                 state: State::empty(), 
-                label: KhTensor::from_iter([KhGen::X])
+                label: KhTensor::from_iter([KhAlgGen::X])
             },
             TngKey {
                 state: State::empty(), 
-                label: KhTensor::from_iter([KhGen::I])
+                label: KhTensor::from_iter([KhAlgGen::I])
             }
         ]);
     }
@@ -846,11 +846,11 @@ mod tests {
         assert_eq!(updated, vec![
             TngKey {
                 state: State::from([1,0]), 
-                label: KhTensor::from_iter([KhGen::X])
+                label: KhTensor::from_iter([KhAlgGen::X])
             },
             TngKey {
                 state: State::from([1,0]), 
-                label: KhTensor::from_iter([KhGen::I])
+                label: KhTensor::from_iter([KhAlgGen::I])
             }
         ]);
     }
@@ -873,7 +873,7 @@ mod tests {
         assert_eq!(updated, vec![
             TngKey {
                 state: State::empty(), 
-                label: KhTensor::from_iter([KhGen::X])
+                label: KhTensor::from_iter([KhAlgGen::X])
             },
         ]);
     }

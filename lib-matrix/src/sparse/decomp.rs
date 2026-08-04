@@ -4,12 +4,12 @@ use ahash::AHashSet;
 use itertools::Itertools;
 use nalgebra::{Scalar, ClosedAddAssign};
 use num_traits::Zero;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sprs::PermOwned;
 use yui_core::UnionFind;
 
-cfg_if::cfg_if! { if #[cfg(feature = "multithread")] { 
+cfg_if::cfg_if! { if #[cfg(feature = "multithread")] {
     use std::sync::Mutex;
+    use rayon::iter::{IntoParallelIterator, ParallelIterator};
 }}
 
 use crate::MatTrait;
@@ -81,8 +81,7 @@ where R: Zero + Send + Sync {
 
             (0 .. l - 1).for_each(|i|
                 (i + 1 .. l).for_each(|j| {
-                    println!("{}, {} -> {}", cols[i], cols[j], col_intersects(a, cols[i], cols[j]));
-                    if !u.is_same(i, j) && col_intersects(a, cols[i], cols[j]) { 
+                    if !u.is_same(i, j) && col_intersects(a, cols[i], cols[j]) {
                         u.union(i, j)
                     }
                 })
@@ -113,7 +112,7 @@ fn col_intersects<R>(a: &SpMat<R>, j1: usize, j2: usize) -> bool {
     };
 
     loop { 
-        match usize::cmp(&i1, &i2) {
+        match usize::cmp(i1, i2) {
             Less => {
                 if let Some(j1) = itr1.next() { 
                     i1 = j1
@@ -150,7 +149,7 @@ where R: Clone + Zero + Scalar + ClosedAddAssign {
     assert_eq!(rows.len(), cols.len());
 
     let l = rows.len();
-    let row_inds = rows.iter().map(|r| AHashSet::from_iter(r)).collect_vec();
+    let row_inds = rows.iter().map(AHashSet::from_iter).collect_vec();
     let row_offsets = rows.iter().fold(vec![0], |mut res, next| { 
         let offset = res.last().unwrap();
         res.push(offset + next.len());

@@ -2,7 +2,7 @@ use yui_core::{Ring, RingOps};
 use yui_link::{Edge, Link, State};
 
 use crate::ext::LinkExt;
-use crate::kh::{KhGen, KhChain, KhComplex, KhChainGen, KhTensor};
+use crate::kh::{KhAlgGen, KhChain, KhComplex, KhState, KhTensor};
 
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
@@ -32,22 +32,22 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         });
 
         let init = KhChain::from(
-            KhChainGen::new(s, KhTensor::empty(), deg_shift)
+            KhState::new(s, KhTensor::empty(), deg_shift)
         );
 
         xs.fold(init, |res, next| { 
-            res.combine(next, |a, b| 
-                KhChainGen::new(s, a.tensor + b.tensor, deg_shift)
+            res.apply_bilin(next, |a, b| 
+                KhState::new(s, a.tensor + b.tensor, deg_shift)
             )
         })
     }
 
     fn color_factor(a: &R) -> KhChain<R> // a -> X - a
     where R: Ring, for<'x> &'x R: RingOps<R> { 
-        use KhGen::{I, X};
+        use KhAlgGen::{I, X};
     
-        fn init(x: KhGen) -> KhChainGen { 
-            KhChainGen::new(
+        fn init(x: KhAlgGen) -> KhState { 
+            KhState::new(
                 State::empty(),
                 KhTensor::from(x),
                 (0, 0)
@@ -80,7 +80,7 @@ mod tests {
         assert_ne!(zs[0], zs[1]);
 
         for z in zs { 
-            assert!(z.gens().all(|x| x.h_deg() == 0));
+            assert!(z.keys().all(|x| x.h_deg() == 0));
             assert!(!z.is_zero());
             
             let dz = c.d(0, &z);
@@ -100,7 +100,7 @@ mod tests {
         assert_ne!(zs[0], zs[1]);
 
         for z in zs { 
-            assert!(z.gens().all(|x| x.h_deg() == 0));
+            assert!(z.keys().all(|x| x.h_deg() == 0));
             assert!(!z.is_zero());
 
             let dz = c.d(0, &z);
@@ -119,7 +119,7 @@ mod tests {
         assert_eq!(zs.len(), 1);
 
         for z in zs { 
-            assert!(z.gens().all(|x| x.h_deg() == 0));
+            assert!(z.keys().all(|x| x.h_deg() == 0));
             assert!(!z.is_zero());
             
             let dz = c.d(0, &z);
@@ -138,7 +138,7 @@ mod tests {
         assert_eq!(zs.len(), 1);
 
         for z in zs { 
-            assert!(z.gens().all(|x| x.h_deg() == 0));
+            assert!(z.keys().all(|x| x.h_deg() == 0));
             assert!(!z.is_zero());
 
             let dz = c.d(0, &z);

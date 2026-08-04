@@ -8,7 +8,7 @@ use itertools::Itertools;
 use num_traits::Zero;
 use cartesian::cartesian;
 use yui_core::{AddMon, CloneAnd, Elem, Ring, RingOps};
-use yui_core::lc::{Gen, Lc};
+use yui_core::lc::{LcKey, Lc};
 use yui_core::poly::Var2;
 use yui_link::{Edge, Node};
 use yui_core::bitseq::Bit;
@@ -504,7 +504,7 @@ impl Elem for CobComp {
     }
 }
 
-impl Gen for CobComp {}
+impl LcKey for CobComp {}
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Default)]
 pub struct Cob { 
@@ -791,7 +791,7 @@ impl Cob {
         let init = LcCob::from(Cob::empty());
         self.comps.iter().fold(init, |res, c| {
             let e = c.part_eval(h, t);
-            res.combine(&e, |c1, c2| c1.connected(c2))
+            res.apply_bilin(&e, |c1, c2| c1.connected(c2))
         })
     }
 
@@ -846,7 +846,7 @@ impl Elem for Cob {
     }
 }
 
-impl Gen for Cob {}
+impl LcKey for Cob {}
 
 #[auto_ops]
 impl Mul for Cob {
@@ -874,7 +874,6 @@ pub trait LcCobTrait: Sized {
     fn should_part_eval(&self) -> bool;
     fn part_eval(self, h: &Self::R, t: &Self::R) -> Self;
     fn eval(&self, h: &Self::R, t: &Self::R) -> Self::R;
-    fn is_homogeneous(&self) -> bool; // only for debug
 }
 
 impl<R> LcCobTrait for LcCob<R>
@@ -907,7 +906,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn is_stackable(&self, other: &Self) -> bool { 
-        cartesian!(self.gens(), other.gens()).all(|(a, b)| 
+        cartesian!(self.keys(), other.keys()).all(|(a, b)| 
             a.is_stackable(b)
         )
     }
@@ -949,7 +948,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn should_part_eval(&self) -> bool {
-        self.gens().any(|c| c.should_part_eval())
+        self.keys().any(|c| c.should_part_eval())
     }
 
     fn part_eval(self, h: &Self::R, t: &Self::R) -> Self {
@@ -967,17 +966,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             a * c.eval(h, t)
         );
         R::sum(coeffs)
-    }
-
-    fn is_homogeneous(&self) -> bool {
-        use std::any::Any;
-        use yui_core::{num::FF2, poly::HPoly};
-
-        if let Some(_self) = (self as &dyn Any).downcast_ref::<LcCob<HPoly<'H', FF2>>>() { 
-            _self.iter().map(|(cob, r)| cob.deg() - 2 * (r.deg() as i32)).all_equal()
-        } else { 
-            true
-        }
     }
 }
 

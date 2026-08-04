@@ -9,30 +9,30 @@ use yui_homology::{ChainComplex, ChainComplexTrait, DisplaySeq, DisplayTable, Gr
 use yui_link::InvLink;
 use yui_matrix::sparse::SpMat;
 
-use crate::kh::{KhChain, KhChainExt, KhComplex, KhChainGen};
+use crate::kh::{KhChain, KhChainExt, KhComplex, KhState};
 use crate::khi::KhIHomology;
-use crate::khi::KhIGen;
+use crate::khi::KhIState;
 use crate::misc::{make_gen_grid, range_of};
 
-pub type KhIChain<R> = Lc<KhIGen, R>;
+pub type KhIChain<R> = Lc<KhIState, R>;
 
 impl<R> KhChainExt for KhIChain<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn h_deg(&self) -> isize {
-        self.gens().map(|x| x.h_deg()).min().unwrap_or(0)
+        self.keys().map(|x| x.h_deg()).min().unwrap_or(0)
     }
     
     fn q_deg(&self) -> isize {
-        self.gens().map(|x| x.q_deg()).min().unwrap_or(0)
+        self.keys().map(|x| x.q_deg()).min().unwrap_or(0)
     }
 }
 
-pub type KhIComplexSummand<R> = Summand<KhIGen, R>;
+pub type KhIComplexSummand<R> = Summand<KhIState, R>;
 
 #[derive(Clone)]
 pub struct KhIComplex<R>
 where R: Ring, for<'a> &'a R: RingOps<R> {
-    inner: ChainComplex<KhIGen, R>,
+    inner: ChainComplex<KhIState, R>,
     canon_cycles: Vec<KhIChain<R>>,
     deg_shift: (isize, isize),
     gen_grid: OnceLock<Grid2<KhIComplexSummand<R>>>,
@@ -64,8 +64,8 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
             let p = l.base_pt().unwrap();
             let zs = KhComplex::make_canon_cycles(l.inner(), p, &R::zero(), h, reduced, deg_shift);
             Iterator::chain(
-                zs.iter().map(|z| z.clone().map_gens(|x| KhIGen::B(x))),
-                zs.iter().map(|z| z.clone().map_gens(|x| KhIGen::Q(x)))
+                zs.iter().map(|z| z.clone().map_keys(KhIState::B)),
+                zs.iter().map(|z| z.clone().map_keys(KhIState::Q))
             ).collect()
         } else { 
             vec![]
@@ -75,40 +75,40 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     }
 
     pub fn from_kh_complex<'a, F>(c: KhComplex<R>, map: F) -> Self
-    where F: Fn(&KhChainGen) -> KhChainGen + Send + Sync + 'static {
+    where F: Fn(&KhState) -> KhState + Send + Sync + 'static {
         let deg_shift = c.deg_shift();
         let h_range = c.h_range();
         let h_range = *h_range.start() ..= (h_range.end() + 1);
 
         let canon_cycles = c.canon_cycles().iter().flat_map(|z| { 
-            let bz = z.clone().map_gens(|x| KhIGen::B(x));
-            let qz = z.clone().map_gens(|x| KhIGen::Q(x));
+            let bz = z.clone().map_keys(KhIState::B);
+            let qz = z.clone().map_keys(KhIState::Q);
             [bz, qz]
         }).sorted_by_key(|z| z.h_deg()).collect_vec();
 
         // TODO use mapping cone
 
         let summands = Grid1::generate(h_range, |i| { 
-            let b_gens = c[i].raw_gens().iter().map(|x| KhIGen::B(*x));
-            let q_gens = c[i - 1].raw_gens().iter().map(|x| KhIGen::Q(*x));
-            Summand::from_raw_gens(Iterator::chain(b_gens, q_gens))
+            let b_gens = c[i].raw_generators().iter().map(|x| KhIState::B(*x));
+            let q_gens = c[i - 1].raw_generators().iter().map(|x| KhIState::Q(*x));
+            Summand::from_raw_generators(Iterator::chain(b_gens, q_gens))
         });
 
-        let d = move |i: isize, x: &KhIGen| -> KhIChain<R> { 
+        let d = move |i: isize, x: &KhIState| -> KhIChain<R> { 
             match x { 
-                KhIGen::B(x) => {
+                KhIState::B(x) => {
                     let z = KhChain::from(*x);
-                    let dx = c.d(i, &z).map_gens(|y| KhIGen::B(y));
-                    let qx = KhIChain::from(KhIGen::Q(*x));
+                    let dx = c.d(i, &z).map_keys(KhIState::B);
+                    let qx = KhIChain::from(KhIState::Q(*x));
                     let qtx = {
                         let tx = map(x);
-                        KhIChain::from(KhIGen::Q(tx))
+                        KhIChain::from(KhIState::Q(tx))
                     };
                     dx + qx + qtx
                 },
-                KhIGen::Q(x) => {
+                KhIState::Q(x) => {
                     let z = KhChain::from(*x);
-                    c.d(i, &z).map_gens(|y| KhIGen::Q(y))
+                    c.d(i, &z).map_keys(KhIState::Q)
                 }
             }
         };
@@ -120,11 +120,11 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         KhIComplex::new_impl(inner, canon_cycles, deg_shift)
     }
 
-    pub(crate) fn new_impl(inner: ChainComplex<KhIGen, R>, canon_cycles: Vec<KhIChain<R>>, deg_shift: (isize, isize)) -> Self {
+    pub(crate) fn new_impl(inner: ChainComplex<KhIState, R>, canon_cycles: Vec<KhIChain<R>>, deg_shift: (isize, isize)) -> Self {
         Self { inner, canon_cycles, deg_shift, gen_grid: OnceLock::new() }
     }
 
-    pub fn inner(&self) -> &ChainComplex<KhIGen, R> {
+    pub fn inner(&self) -> &ChainComplex<KhIState, R> {
         &self.inner
     }
 
@@ -134,7 +134,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
         range_of(self.support().flat_map(|&i|
-            self[i].raw_gens().iter().map(|x| x.q_deg())
+            self[i].raw_generators().iter().map(|x| x.q_deg())
         ))
     }
 
@@ -230,7 +230,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn display_indices(&self) -> (Vec<isize>, Vec<isize>) { 
-        (self.h_range().into_iter().collect(), self.q_range().step_by(2).collect())
+        (self.h_range().collect(), self.q_range().step_by(2).collect())
     }
 
     fn display_at(&self, i: &isize, j: &isize) -> String {
@@ -244,7 +244,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests {
-    use yui_core::poly::HPoly;
+    use yui_core::poly::Poly;
     use yui_core::num::FF2;
     use num_traits::{Zero, One};
     use yui_homology::{ChainComplexTrait, SummandTrait};
@@ -289,7 +289,7 @@ mod tests {
         let l = InvLink::load("3_1").unwrap();
 
         type R = FF2;
-        type P = HPoly<'H', R>;
+        type P = Poly<'H', R>;
         let (h, t) = (P::variable(), P::zero());
 
         let c = KhIComplex::new(&l, &h, &t, false);
@@ -368,10 +368,10 @@ mod tests {
         let zs = c.canon_cycles.clone();
 
         assert_eq!(zs.len(), 4);
-        assert!(zs[0].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[1].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[2].gens().all(|x| x.h_deg() == 1));
-        assert!(zs[3].gens().all(|x| x.h_deg() == 1));
+        assert!(zs[0].keys().all(|x| x.h_deg() == 0));
+        assert!(zs[1].keys().all(|x| x.h_deg() == 0));
+        assert!(zs[2].keys().all(|x| x.h_deg() == 1));
+        assert!(zs[3].keys().all(|x| x.h_deg() == 1));
 
         for (i, z) in zs.iter().enumerate() { 
             let i = (i / 2) as isize;
@@ -390,8 +390,8 @@ mod tests {
         let zs = c.canon_cycles.clone();
 
         assert_eq!(zs.len(), 2);
-        assert!(zs[0].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[1].gens().all(|x| x.h_deg() == 1));
+        assert!(zs[0].keys().all(|x| x.h_deg() == 0));
+        assert!(zs[1].keys().all(|x| x.h_deg() == 1));
 
         for (i, z) in zs.iter().enumerate() { 
             let i = i as isize;
@@ -404,17 +404,17 @@ mod tests {
         let l = InvLink::load("3_1").unwrap();
 
         type R = FF2;
-        type P = HPoly<'H', R>;
+        type P = Poly<'H', R>;
         let (h, t) = (P::variable(), P::zero());
         let c = KhIComplex::new(&l, &h, &t, false);
 
         let zs = c.canon_cycles.clone();
 
         assert_eq!(zs.len(), 4);
-        assert!(zs[0].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[1].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[2].gens().all(|x| x.h_deg() == 1));
-        assert!(zs[3].gens().all(|x| x.h_deg() == 1));
+        assert!(zs[0].keys().all(|x| x.h_deg() == 0));
+        assert!(zs[1].keys().all(|x| x.h_deg() == 0));
+        assert!(zs[2].keys().all(|x| x.h_deg() == 1));
+        assert!(zs[3].keys().all(|x| x.h_deg() == 1));
 
         for (i, z) in zs.iter().enumerate() { 
             let i = (i / 2) as isize;
@@ -427,15 +427,15 @@ mod tests {
         let l = InvLink::load("3_1").unwrap();
 
         type R = FF2;
-        type P = HPoly<'H', R>;
+        type P = Poly<'H', R>;
         let (h, t) = (P::variable(), P::zero());
         let c = KhIComplex::new(&l, &h, &t, true);
         
         let zs = c.canon_cycles.clone();
 
         assert_eq!(zs.len(), 2);
-        assert!(zs[0].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[1].gens().all(|x| x.h_deg() == 1));
+        assert!(zs[0].keys().all(|x| x.h_deg() == 0));
+        assert!(zs[1].keys().all(|x| x.h_deg() == 1));
 
         for (i, z) in zs.iter().enumerate() { 
             let i = i as isize;
@@ -446,7 +446,7 @@ mod tests {
 
 #[cfg(test)]
 mod tests_v1 {
-    use yui_core::poly::HPoly;
+    use yui_core::poly::Poly;
     use yui_core::num::FF2;
     use num_traits::{Zero, One};
     use yui_homology::{ChainComplexTrait, SummandTrait};
@@ -491,7 +491,7 @@ mod tests_v1 {
         let l = InvLink::load("3_1").unwrap();
 
         type R = FF2;
-        type P = HPoly<'H', R>;
+        type P = Poly<'H', R>;
         let (h, t) = (P::variable(), P::zero());
 
         let c = KhIComplex::new_no_simplify(&l, &h, &t, false);
@@ -533,10 +533,10 @@ mod tests_v1 {
         let zs = c.canon_cycles.clone();
 
         assert_eq!(zs.len(), 4);
-        assert!(zs[0].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[1].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[2].gens().all(|x| x.h_deg() == 1));
-        assert!(zs[3].gens().all(|x| x.h_deg() == 1));
+        assert!(zs[0].keys().all(|x| x.h_deg() == 0));
+        assert!(zs[1].keys().all(|x| x.h_deg() == 0));
+        assert!(zs[2].keys().all(|x| x.h_deg() == 1));
+        assert!(zs[3].keys().all(|x| x.h_deg() == 1));
 
         for (i, z) in zs.iter().enumerate() { 
             let i = (i / 2) as isize;
@@ -555,8 +555,8 @@ mod tests_v1 {
         let zs = c.canon_cycles.clone();
 
         assert_eq!(zs.len(), 2);
-        assert!(zs[0].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[1].gens().all(|x| x.h_deg() == 1));
+        assert!(zs[0].keys().all(|x| x.h_deg() == 0));
+        assert!(zs[1].keys().all(|x| x.h_deg() == 1));
 
         for (i, z) in zs.iter().enumerate() { 
             let i = i as isize;
@@ -569,17 +569,17 @@ mod tests_v1 {
         let l = InvLink::load("3_1").unwrap();
 
         type R = FF2;
-        type P = HPoly<'H', R>;
+        type P = Poly<'H', R>;
         let (h, t) = (P::variable(), P::zero());
         let c = KhIComplex::new_no_simplify(&l, &h, &t, false);
 
         let zs = c.canon_cycles.clone();
 
         assert_eq!(zs.len(), 4);
-        assert!(zs[0].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[1].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[2].gens().all(|x| x.h_deg() == 1));
-        assert!(zs[3].gens().all(|x| x.h_deg() == 1));
+        assert!(zs[0].keys().all(|x| x.h_deg() == 0));
+        assert!(zs[1].keys().all(|x| x.h_deg() == 0));
+        assert!(zs[2].keys().all(|x| x.h_deg() == 1));
+        assert!(zs[3].keys().all(|x| x.h_deg() == 1));
 
         for (i, z) in zs.iter().enumerate() { 
             let i = (i / 2) as isize;
@@ -592,15 +592,15 @@ mod tests_v1 {
         let l = InvLink::load("3_1").unwrap();
 
         type R = FF2;
-        type P = HPoly<'H', R>;
+        type P = Poly<'H', R>;
         let (h, t) = (P::variable(), P::zero());
         let c = KhIComplex::new_no_simplify(&l, &h, &t, true);
         
         let zs = c.canon_cycles.clone();
 
         assert_eq!(zs.len(), 2);
-        assert!(zs[0].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[1].gens().all(|x| x.h_deg() == 1));
+        assert!(zs[0].keys().all(|x| x.h_deg() == 0));
+        assert!(zs[1].keys().all(|x| x.h_deg() == 1));
 
         for (i, z) in zs.iter().enumerate() { 
             let i = i as isize;

@@ -126,8 +126,8 @@ impl<X> KeyedUnionFind<X> where X: Eq + Hash {
         group.iter().map(|l| 
             l.iter().map(|i| {
                 let x = map.remove(i).unwrap();
-                let x = Rc::into_inner(x).unwrap();
-                x
+                
+                Rc::into_inner(x).unwrap()
             }).collect()
         ).collect()
     }

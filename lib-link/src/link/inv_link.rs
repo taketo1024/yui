@@ -68,8 +68,9 @@ impl InvLink {
 
         assert!(n.is_even(), "number of edges must be even.");
         assert_eq!(l.edges().first(), Some(&1), "edge must start from index 1.");
-        assert_eq!(l.edges().last(), Some(&n), "edges must have sequential indexing.");
+        assert_eq!(l.edges().last(), Some(&(n as Edge)), "edges must have sequential indexing.");
 
+        let n = n as Edge;
         let e_map = l.edges().into_iter()
             .map(|e| (e, (n + 1 - e) % n + 1));
 

@@ -1,19 +1,25 @@
 use std::{fmt::Display, cmp::min};
 
 use itertools::Itertools;
+use smallvec::{SmallVec, smallvec};
 
 use crate::{Edge, Link};
 
+/// Inline capacity for `Path::edges`. Since `Edge = u8`, the 16-byte inline
+/// buffer (= heap repr's ptr+cap) fits 16 elements — same `Path` struct size
+/// as `Vec<Edge>` would give, but skips allocation for short paths.
+type PathEdges = SmallVec<[Edge; 16]>;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Path { 
-    edges:Vec<Edge>,
-    closed:bool
+pub struct Path {
+    edges: PathEdges,
+    closed: bool
 }
 
 impl Path { 
     pub fn new<I>(edges: I, closed: bool) -> Self
-    where I: IntoIterator<Item = Edge> { 
-        let edges = edges.into_iter().collect_vec();
+    where I: IntoIterator<Item = Edge> {
+        let edges: PathEdges = edges.into_iter().collect();
         assert!(!edges.is_empty());
         Self { edges, closed }
     }
@@ -36,7 +42,7 @@ impl Path {
         self.edges.len()
     }
     
-    pub fn edges(&self) -> &Vec<Edge> { 
+    pub fn edges(&self) -> &[Edge] {
         &self.edges
     }
 
@@ -69,13 +75,13 @@ impl Path {
             let min = self.edges().iter().filter(|&e| e < min(&e0, &e1)).min();
 
             self.edges = if let Some(&e2) = min {
-                vec![e0, e2, e1]
-            } else { 
-                vec![e0, e1]
+                smallvec![e0, e2, e1]
+            } else {
+                smallvec![e0, e1]
             };
-        } else if self.is_circle() && self.len() > 1 { 
+        } else if self.is_circle() && self.len() > 1 {
             let e0 = *self.edges.iter().min().unwrap();
-            self.edges = vec![e0];
+            self.edges = smallvec![e0];
         }
     }
 
@@ -154,8 +160,8 @@ impl Path {
         false
     }
 
-    fn edge_sum(&self) -> usize { 
-        self.edges.iter().sum()
+    fn edge_sum(&self) -> usize {
+        self.edges.iter().map(|&e| e as usize).sum()
     }
 
     pub fn unori_eq(&self, other: &Self) -> bool {

@@ -5,7 +5,7 @@ use delegate::delegate;
 use derive_more::{Display, Debug};
 use itertools::Itertools;
 
-use crate::{Link, Node};
+use crate::{Edge, Link, Node};
 
 use super::braid_gen::{BraidGen, from_raw};
 
@@ -76,8 +76,8 @@ impl Braid {
     pub fn closure(&self) -> Link {
         use crate::{NodeType, NodeOri};
 
-        let mut count = self.strands;
-        let mut front_edges: Vec<usize> = (0..self.strands).collect();
+        let mut count: Edge = self.strands as Edge;
+        let mut front_edges: Vec<Edge> = (0..self.strands as Edge).collect();
         let mut nodes: Vec<Node> = Vec::new();
 
         for s in &self.elements {
@@ -101,10 +101,11 @@ impl Braid {
             count += 2;
         }
 
-        let mut conn: HashMap<usize, usize> = HashMap::new();
-        let mut loops: Vec<usize> = Vec::new();
+        let mut conn: HashMap<Edge, Edge> = HashMap::new();
+        let mut loops: Vec<Edge> = Vec::new();
 
         for (k, front) in front_edges.into_iter().enumerate() {
+            let k = k as Edge;
             if front == k {
                 loops.push(k);
             } else {

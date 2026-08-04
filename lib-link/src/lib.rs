@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 
 mod link;
+mod inv_link;
 mod braid;
 pub mod misc;
 
@@ -8,4 +9,5 @@ pub mod misc;
 mod test_data;
 
 pub use link::*;
+pub use inv_link::*;
 pub use braid::*;

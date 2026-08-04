@@ -321,6 +321,7 @@ where
 
 // Owned rhs moves its pairs in (no key clones); borrowed rhs must clone. The split `auto_ops`
 // arg-sets generate the four `Add` variants by rhs-ownership so the two impls don't collide.
+// note: the arg-set form `auto_ops(val_val, ref_val)` is an undocumented API of `auto_impl_ops`.
 #[auto_ops(val_val, ref_val)]
 impl<X, R> AddAssign<Lc<X, R>> for Lc<X, R>
 where

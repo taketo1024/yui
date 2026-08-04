@@ -678,7 +678,7 @@ mod tests {
 
     #[test]
     fn test_hopf_link() {
-        let l = Link::hopf_link();
+        let l = Link::test_data("L2a1").unwrap();
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
         c.check_d_all();
@@ -716,7 +716,7 @@ mod tests {
 
     #[test]
     fn canon_cycle_trefoil() { 
-        let l = Link::trefoil();
+        let l = Link::test_data("3_1").unwrap();
         let c = TngComplexBuilder::build_kh_complex(&l, &2, &0, false);
         let zs = c.canon_cycles();
 
@@ -731,7 +731,7 @@ mod tests {
 
     #[test]
     fn h_range() { 
-        let l = Link::load("6_3").unwrap();
+        let l = Link::test_data("6_3").unwrap();
         let h_range = -1..=1;
 
         let mut b = TngComplexBuilder::new(&l, &0, &0, None);

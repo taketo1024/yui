@@ -7,7 +7,7 @@ pub fn seifert_graph(link: &Link) -> Graph<Path, usize> {
     let l0 = link.resolved_by(&s0);
     let mut graph = Graph::new();
 
-    for c in l0.collect_components() {
+    for c in l0.comps() {
         graph.add_node(c);
     }
 
@@ -37,7 +37,7 @@ mod tests {
 
     #[test]
     fn seif_graph() { 
-        let l = Link::trefoil();
+        let l = Link::test_data("3_1").unwrap();
         let g = seifert_graph(&l);
         assert_eq!(g.node_count(), 2);
         assert_eq!(g.edge_count(), 3);

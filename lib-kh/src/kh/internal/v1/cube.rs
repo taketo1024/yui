@@ -17,7 +17,7 @@ pub struct KhCubeVertex {
 
 impl KhCubeVertex { 
     pub fn new(l: &Link, state: State, red_e: Option<Edge>, deg_shift: (isize, isize)) -> Self {
-        let mut circles = l.resolved_by(&state).collect_components();
+        let mut circles = l.resolved_by(&state).comps();
         circles.sort_by_key(|c| c.min_edge());
         
         let r = circles.len();
@@ -123,7 +123,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(l: &Link, h: &R, t: &R, reduce_e: Option<Edge>, deg_shift: (isize, isize)) -> Self { 
         assert!(reduce_e.is_none() || t.is_zero());
 
-        let n = l.count_crossings();
+        let n = l.n_crossings();
         let str = KhAlg::new(h, t);
 
         let vertices: HashMap<_, _> = State::generate(n).map(|s| { 
@@ -459,7 +459,7 @@ mod tests {
 
     #[test]
     fn cube_hopf_link() { 
-        let l = Link::hopf_link();
+        let l = Link::test_data("L2a1").unwrap();
         let cube = KhCube::<i32>::new(&l, &0, &0, None, (0, 0));
 
         assert_eq!(cube.dim, 2);
@@ -468,7 +468,7 @@ mod tests {
 
    #[test]
    fn cube_trefoil() { 
-       let l = Link::trefoil();
+       let l = Link::test_data("3_1").unwrap();
        let cube = KhCube::<i32>::new(&l, &0, &0, None, (0, 0));
 
        assert_eq!(cube.dim, 3);

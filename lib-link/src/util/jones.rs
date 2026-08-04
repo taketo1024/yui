@@ -6,7 +6,7 @@ use crate::{Link, State};
 pub fn jones_polynomial(l: &Link) -> LPoly<'q', i32> {
     type P = LPoly<'q', i32>;
 
-    let n = l.count_crossings();
+    let n = l.n_crossings();
     let n_signed = l.count_signed_crossings();
     let (n_pos, n_neg) = (n_signed.0 as i32, n_signed.1 as i32);
 
@@ -18,7 +18,7 @@ pub fn jones_polynomial(l: &Link) -> LPoly<'q', i32> {
     let body = P::sum(State::generate(n).into_iter().map(|s| { 
         let w = s.weight();
         let l_s = l.resolved_by(&s);
-        let r = l_s.n_components();
+        let r = l_s.n_comps();
 
         (-&q).pow(w) * q0.pow(r) // (-q)^w (q + q^{-1})^r
     }));
@@ -59,7 +59,7 @@ mod tests {
 
     #[test]
     fn trefoil() {
-        let l = Link::trefoil();
+        let l = Link::test_data("3_1").unwrap();
         let p = jones_polynomial(&l);
         let q = P::mono;
         assert_eq!(p, P::from_iter([(q(-9), -1), (q(-5), 1), (q(-3), 1), (q(-1), 1)]));
@@ -67,7 +67,7 @@ mod tests {
 
     #[test]
     fn figure8() {
-        let l = Link::figure8();
+        let l = Link::test_data("4_1").unwrap();
         let p = jones_polynomial(&l);
         let q = P::mono;
         assert_eq!(p, P::from_iter([(q(-5), 1), (q(5), 1)]));
@@ -75,7 +75,7 @@ mod tests {
 
     #[test]
     fn hopf_link() { 
-        let l = Link::hopf_link();
+        let l = Link::test_data("L2a1").unwrap();
         let p = jones_polynomial(&l);
         let q = P::mono;
         assert_eq!(p, P::from_iter([(q(-6), 1), (q(-4), 1), (q(-2), 1), (q(0), 1)]));

@@ -96,7 +96,7 @@ where
         let i = self.args.cc_index;
 
         let l = if self.args.reverse { 
-            l.crossing_change(i)
+            l.cc_at(i)
         } else { 
             l
         };

@@ -32,7 +32,8 @@ pub struct KhCubeVertex {
 
 impl KhCubeVertex {
     pub fn new(l: &Link, state: State, red_e: Option<Edge>) -> Self {
-        let mut circles = l.resolve_by(&state).comps();
+        // Resolutions are unoriented
+        let mut circles = l.resolve_by(&state).unoriented().comps();
         circles.sort_by_key(|c| c.min_edge());
 
         let red_i = red_e.and_then(|e| {

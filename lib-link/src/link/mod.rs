@@ -1,12 +1,13 @@
 mod link;
+mod link_ops;
 mod node;
 mod path;
-mod inv_link;
+mod pd_code;
 mod builder;
-mod ops;
+mod construct;
 
-pub use link::{Link, Edge, State, StateRepr, PDCodeX};
-pub use node::{Node, NodeType, NodeOri};
+pub use link::{Link, Edge, State, StateRepr};
+pub use pd_code::PDCodeX;
+pub use node::{Node, NodeType, Slot};
 pub use path::Path;
-pub use inv_link::InvLink;
 pub use builder::{LinkBuilder, LinkError, Port};

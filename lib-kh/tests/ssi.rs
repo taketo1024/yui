@@ -60,7 +60,7 @@ fn interlock_17nh() {
 fn wh_pretzel_3() {
     init_logger();
     let k = InvLink::sym_pretzel(-3, 3, -3);
-    let w = k.whitehead_double(true, 0);
+    let w = InvLink::whitehead_double(&k, true, 0);
     let ssi = ssi_invariant(&w, false, wh_pretzel_config(17), Some(2));
     assert_eq!(ssi, (0, 2));
 }
@@ -71,7 +71,7 @@ fn wh_pretzel_3() {
 fn wh_pretzel_5() {
     init_logger();
     let k = InvLink::sym_pretzel(-5, 5, -5);
-    let w = k.whitehead_double(true, 0);
+    let w = InvLink::whitehead_double(&k, true, 0);
     let ssi = ssi_invariant(&w, false, wh_pretzel_config(20), Some(2));
     println!("ssi(Wh+(P(-5,5,-5))) = {ssi:?}");
 }

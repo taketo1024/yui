@@ -1,42 +1,9 @@
-// Constructions on `Link` kept out of the core type.
-
-use itertools::Itertools;
+//! Constructions producing new links from patterns — twist knots, cables and satellites.
+//! Contrast with [`crate::link::link_ops`], which operates on links you already have.
 
 use crate::{Link, Edge, LinkBuilder, Port};
 
 impl Link {
-    // Connected sum at the two base points (a PD-built link defaults to its minimal edge).
-    pub fn conn_sum(&self, other: &Link) -> Link {
-        let self_e = self.base_pt().expect("self needs a base point");
-        let other_e = other.base_pt().expect("other needs a base point");
-        self.conn_sum_at(other, self_e, other_e)
-    }
-
-    // Connected sum at edges `self_e`/`other_e`: import both links, then re-splice the two edges
-    // tail-to-head (self out → other in, other out → self in), so the orientations are compatible.
-    pub fn conn_sum_at(&self, other: &Link, self_e: Edge, other_e: Edge) -> Link {
-        assert!(self.is_oriented(),  "conn_sum requires an oriented link (self)");
-        assert!(other.is_oriented(), "conn_sum requires an oriented link (other)");
-
-        let mut b = LinkBuilder::new();
-        let v1 = b.add_link(self);
-        let v2 = b.add_link(other);
-
-        // the (tail, head) ends of each spliced edge, as builder ports.
-        let port = |verts: &[_], (i, s): (usize, usize)| (verts[i], s);
-        let (t1, h1) = self.edge_ends(self_e, true);
-        let (t2, h2) = other.edge_ends(other_e, true);
-        let (t1, h1) = (port(&v1, t1), port(&v1, h1));
-        let (t2, h2) = (port(&v2, t2), port(&v2, h2));
-
-        b.disconnect(h1);   // free self_e's two ports
-        b.disconnect(h2);   // free other_e's two ports
-        b.connect(t1, h2);  // self tail → other head
-        b.connect(t2, h1);  // other tail → self head
-
-        b.build().unwrap()
-    }
-
     // Twist knot = numerator closure of the rational tangle [n, 2]: a horizontal |n|-twist region
     // summed with a vertical 2-twist clasp. twist_knot(0) = unknot, (1,2,3,4) = 3_1, 4_1, 5_2, 6_1;
     // n < 0 mirrors.
@@ -64,21 +31,49 @@ impl Link {
         b.build().unwrap()
     }
 
+    // The 3-pretzel P(a, b, c): three vertical twist regions of |a|, |b|, |c| half-twists, chained by
+    // their inner arcs and closed by one spanning arc on the top and one on the bottom. A positive
+    // parameter is a right-handed (XR) region; all three must be nonzero. Edge 1 is the top spanning
+    // arc.
+    pub fn pretzel(a: i32, b: i32, c: i32) -> Link {
+        use crate::NodeType::{XL, XR};
+        assert!(a != 0 && b != 0 && c != 0, "pretzel parameters must be nonzero");
+
+        let mut bld = LinkBuilder::new();
+        let ends: Vec<_> = [a, b, c].iter().map(|&v| {
+            let ty = if v > 0 { XR } else { XL };
+            bld.add_v_twist(ty, v.unsigned_abs() as usize) // (sw, se, ne, nw)
+        }).collect();
+        let (sw1, se1, ne1, nw1) = ends[0];
+        let (sw2, se2, ne2, nw2) = ends[1];
+        let (sw3, se3, ne3, nw3) = ends[2];
+
+        bld.connect(ne1, nw2);
+        bld.connect(ne2, nw3);
+        bld.connect(se1, sw2);
+        bld.connect(se2, sw3);
+        bld.connect(nw1, ne3); // spanning top
+        bld.connect(sw1, se3); // spanning bottom
+
+        let start = bld.edge_at(nw1).unwrap();
+        bld.build().expect("pretzel must be planar").reindexed(start, 1)
+    }
+
     // Blackboard-framed 2-cable: each crossing → a 2×2 block of 4 sub-crossings of the same type,
     // each edge → 2 parallel edges. Every component doubles into its two parallel copies
     // (n components → 2n; framing = the diagram's writhe per component).
-    pub fn cable2(&self) -> Link {
-        let (b, _) = self.cable2_builder();
+    pub fn cable2(l: &Link) -> Link {
+        let (b, _) = Self::cable2_builder(l);
         b.build().unwrap()
     }
 
-    // The 2-cable in an open builder, plus `cab[i][slot] = (copy-0 port, copy-1 port)` so callers can
+    // The 2-cable in an open builder, plus `cab[i][slot.index()] = (copy-0 port, copy-1 port)` so callers can
     // re-splice the cable (e.g. the Whitehead clasp) before building.
-    fn cable2_builder(&self) -> (LinkBuilder, Vec<[(Port, Port); 4]>) {
+    fn cable2_builder(l: &Link) -> (LinkBuilder, Vec<[(Port, Port); 4]>) {
         let mut b = LinkBuilder::new();
 
         // per crossing: 4 sub-crossings + the 4 internal edges; record the two cable ports at each slot
-        let cab: Vec<[(Port, Port); 4]> = self.nodes().map(|x| {
+        let cab: Vec<[(Port, Port); 4]> = l.nodes().map(|x| {
             let t = x.node_type();
             let [s0, s1, s2, s3] = [b.add_node(t), b.add_node(t), b.add_node(t), b.add_node(t)];
             b.connect((s0, 2), (s1, 0));
@@ -91,13 +86,13 @@ impl Link {
 
         // join the two cables of each original edge across its two endpoints. the two ends list their
         // ports in CCW order, which reverses along the edge, so copy 0 pairs with the other's copy 1.
-        for e in self.edges() {
-            let ((i, s), (j, t)) = self.edge_ends(e, false);
-            let ((a0, a1), (b0, b1)) = (cab[i][s], cab[j][t]);
+        for e in l.edges() {
+            let ((i, s), (j, t)) = l.edge_ends(e, false);
+            let ((a0, a1), (b0, b1)) = (cab[i][s.index()], cab[j][t.index()]);
             b.connect(a0, b1);
             b.connect(a1, b0);
         }
-        for _ in self.loops() {   // each free loop doubles
+        for _ in l.loops() {   // each free loop doubles
             b.add_loop();
             b.add_loop();
         }
@@ -106,37 +101,37 @@ impl Link {
 
     // The `tw`-twisted Whitehead double D±(K), `tw` from the Seifert (0) framing (tw = 0 = untwisted,
     // trivial Alexander); `positive` = clasp sign. Seifert sits at 2·writhe blackboard half-twists.
-    pub fn whitehead_double(&self, positive: bool, tw: i32) -> Link {
-        self.whitehead_double_bbf(positive, 2 * self.writhe() + tw)
+    pub fn whitehead_double(l: &Link, positive: bool, tw: i32) -> Link {
+        Self::whitehead_double_bbf(l, positive, 2 * l.writhe() + tw)
     }
 
     // Whitehead double with the framing counted from the blackboard framing (tw = 0 = the diagram's
     // blackboard 2-cable): cut the cable to a 4-end tangle, add `tw` half-twists, close with the clasp.
-    pub fn whitehead_double_bbf(&self, positive: bool, tw: i32) -> Link {
+    pub fn whitehead_double_bbf(l: &Link, positive: bool, tw: i32) -> Link {
         // cut a clean edge (joining two distinct crossings): frees the 4 cable ends
-        let e0 = self.edges().into_iter()
+        let cut = l.edges().into_iter()
             .find(|&e| {
-                let ((i, _), (j, _)) = self.edge_ends(e, false);
+                let ((i, _), (j, _)) = l.edge_ends(e, false);
                 i != j
             })
             .expect("the companion needs an edge joining two distinct crossings");
-        self.whitehead_double_impl(positive, 0, tw, e0, None).0
+        Self::whitehead_double_impl(l, positive, 0, tw, cut, None)
     }
 
-    // Whitehead double cutting the cable at edge `e0` (must join two distinct crossings), placing
-    // `tw_a` framing half-twists on one side of the cut and `tw_b` on the other. Also returns the
-    // result-edges of `base`'s two doubled strands (empty if `base` is `None`) so the caller can
-    // place a base point there.
-    pub(crate) fn whitehead_double_impl(&self, positive: bool, tw_a: i32, tw_b: i32, e0: Edge, base: Option<Edge>) -> (Link, Vec<Edge>) {
+    // Whitehead double cutting the cable at edge `cut` (must join two distinct crossings), placing
+    // `tw_a` framing half-twists on one side of the cut and `tw_b` on the other. The result is based
+    // at one of `base`'s two doubled strands.
+    pub(crate) fn whitehead_double_impl(l: &Link, positive: bool, tw_a: i32, tw_b: i32, cut: Edge, base: Option<Edge>) -> Link {
         use crate::NodeType::{XL, XR};
-        assert!(self.is_knot(), "the Whitehead double requires a knot companion");
+        assert!(l.is_knot(), "the Whitehead double requires a knot companion");
+        assert!(base.is_none_or(|b| b != cut), "the base point must be away from the cut");
 
-        let (mut b, cab) = self.cable2_builder();
+        let (mut b, cab) = Self::cable2_builder(l);
 
         // the cut edge's two ends: the a-side (node ia, slot sa) and b-side (ib, sb), with their
         // cable ports (a0, a1) / (b0, b1) in CCW order.
-        let ((ia, sa), (ib, sb)) = self.edge_ends(e0, false);
-        let ((a0, a1), (b0, b1)) = (cab[ia][sa], cab[ib][sb]);
+        let ((ia, sa), (ib, sb)) = l.edge_ends(cut, false);
+        let ((a0, a1), (b0, b1)) = (cab[ia][sa.index()], cab[ib][sb.index()]);
         b.disconnect(a0);   // the swapped join means a0–b1, a1–b0 are removed
         b.disconnect(a1);
 
@@ -177,38 +172,18 @@ impl Link {
         b.connect(upper, b0);
         b.connect(lower, b1);
 
-        // `base` is not at the cut, so its cable join survives: the two ports of cab at `base` each
-        // carry one of its doubled strands; read off their result-edge ids before consuming the builder.
-        let base_edges: Vec<Edge> = base.into_iter().flat_map(|base| {
-            let ((i, s), _) = self.edge_ends(base, false);
-            let (p0, p1) = cab[i][s];
-            [b.edge_at(p0).unwrap(), b.edge_at(p1).unwrap()]
-        }).collect();
+        // `base` is away from the cut, so its cable join survives: `cab` holds the two ports its
+        // doubled strands run through. Read the id off before `build` consumes the builder.
+        let base_pt = base.map(|e| {
+            let ((i, s), _) = l.edge_ends(e, false);
+            b.edge_at(cab[i][s.index()].0).unwrap()
+        });
 
-        (b.build().unwrap(), base_edges)
-    }
-
-    // The two (node, slot) ends of edge `e`. When `directed`, they are ordered as (tail, head)
-    // along the orientation — the strand exits at the tail and enters at the head (cf.
-    // `NodeOri::in_ports`); otherwise the order carries no meaning.
-    fn edge_ends(&self, e: Edge, directed: bool) -> ((usize, usize), (usize, usize)) {
-        assert!(!directed || self.is_oriented(), "directed edge_ends requires an oriented link");
-
-        let (x, y) = self.nodes().enumerate().flat_map(|(i, n)|
-            (0..4).filter(move |&s| n.edge(s) == e).map(move |s| (i, s))
-        ).collect_tuple().unwrap_or_else(||
-            panic!("edge {e} must appear exactly twice")
-        );
-        if !directed {
-            return (x, y);
+        let double = b.build().unwrap();
+        match base_pt {
+            Some(e) => double.with_base_pt(e),
+            None => double,
         }
-
-        let is_in = |(i, s): (usize, usize)| {
-            let ports = self.node(i).ori().in_ports().expect("directed edge_ends requires an oriented link");
-            ports.contains(&s)
-        };
-        debug_assert!(is_in(x) != is_in(y), "edge {e} must have one head and one tail");
-        if is_in(x) { (y, x) } else { (x, y) }
     }
 }
 
@@ -241,24 +216,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn conn_sum_is_jones_multiplicative() {
-        // unreduced Jones: Ṽ(K1 # K2) · Ṽ(unknot) = Ṽ(K1) · Ṽ(K2)
-        let k1 = Link::test_data("3_1");
-        let k2 = Link::test_data("4_1");
-        let cs = k1.conn_sum(&k2); // at the default base points (edge 1 each)
-        assert_eq!(cs.n_comps(), 1);
-        assert_eq!(cs.n_crossings(), k1.n_crossings() + k2.n_crossings());
-        assert!(cs.is_oriented());
-
-        let (vcs, vu) = (jones_polynomial(&cs), jones_polynomial(&Link::unknot()));
-        let (v1, v2) = (jones_polynomial(&k1), jones_polynomial(&k2));
-        assert_eq!(&vcs * &vu, &v1 * &v2);
-
-        // the connected sum does not depend on the chosen edges.
-        let cs2 = k1.conn_sum_at(&k2, 4, 6);
-        assert_eq!(jones_polynomial(&cs2), jones_polynomial(&cs));
-    }
 
     #[test]
     fn twist_knot_determinants() {
@@ -274,12 +231,66 @@ mod tests {
     }
 
     #[test]
+    fn pretzel_determinants() {
+        // det P(a, b, c) = |ab + bc + ca| — includes the (-2, 3, 7)-pretzel (det 1).
+        for (a, b, c) in [(1, 1, 1), (-1, -1, -1), (3, 5, 7), (-2, 3, 7), (-5, 5, -5)] {
+            let l = Link::pretzel(a, b, c);
+            let n = (a.unsigned_abs() + b.unsigned_abs() + c.unsigned_abs()) as usize;
+            assert_eq!(l.n_crossings(), n, "P({a},{b},{c}) crossing count");
+            assert_eq!(det(&l), (a * b + b * c + c * a).abs(), "det P({a},{b},{c})");
+        }
+    }
+
+    #[test]
+    fn pretzel_band_symmetries() {
+        // the three bands sit in a cycle, so rotating them — or reversing their order — leaves the
+        // diagram itself unchanged, not merely the knot type.
+        // Canonical form of the *unoriented* diagram: least PD code over all start edges and both
+        // strand directions. Rotating or reversing the bands may reverse the direction (it does
+        // whenever a band is even), so the orientation must be quotiented out here.
+        let canon = |l: &Link| {
+            // reverse the strand: the under-strand enters at the far end, CCW order unchanged.
+            let rev = Link::from_pd_code(l.pd_code().into_iter().map(|[a, b, c, d]| [c, d, a, b]));
+            l.reindexed_canon().pd_code().min(rev.reindexed_canon().pd_code())
+        };
+
+        for (a, b, c) in [(1, 3, 5), (3, 5, 7), (-3, 3, -3), (-2, 3, 7), (-5, 5, -5)] {
+            let p = canon(&Link::pretzel(a, b, c));
+            assert_eq!(canon(&Link::pretzel(b, c, a)), p, "cyclic P({a},{b},{c})");
+            assert_eq!(canon(&Link::pretzel(c, a, b)), p, "cyclic P({a},{b},{c})");
+            assert_eq!(canon(&Link::pretzel(c, b, a)), p, "reversal P({a},{b},{c})");
+        }
+    }
+
+    #[test]
+    fn mirror_identities() {
+        // mirroring flips every band, every cable crossing and the clasp.
+        for (a, b, c) in [(1, 3, 5), (3, 5, 7), (-2, 3, 7), (-5, 5, -5)] {
+            assert_eq!(Link::pretzel(a, b, c).mirror().pd_code(), Link::pretzel(-a, -b, -c).pd_code(),
+                "mirror P({a},{b},{c})");
+        }
+        for name in ["3_1", "4_1", "5_2"] {
+            let k = Link::test_data(name);
+            assert_eq!(Link::cable2(&k).mirror().pd_code(), Link::cable2(&k.mirror()).pd_code(),
+                "mirror cable2({name})");
+            assert_eq!(Link::whitehead_double(&k, true, 0).mirror().pd_code(),
+                       Link::whitehead_double(&k.mirror(), false, 0).pd_code(),
+                "mirror D+({name}) vs D-(mirror {name})");
+        }
+    }
+
+    #[test]
+    fn pretzel_trefoil() {
+        assert!(same_knot(&Link::pretzel(1, 1, 1), &Link::test_data("3_1")));
+    }
+
+    #[test]
     fn whitehead_double_of_unknot() {
         // the untwisted double of the unknot is the unknot, from any companion diagram (framing 2·writhe).
         for word in [vec![1, -2], vec![1, 2], vec![-1, -2]] {
             let u = Braid::from_iter(word).closure();
             for positive in [true, false] {
-                let d = u.whitehead_double(positive, 0);
+                let d = Link::whitehead_double(&u, positive, 0);
                 assert_eq!(d.n_comps(), 1);
                 assert_eq!(det(&d), 1, "D±(unknot) must be the unknot (trivial Alexander)");
             }
@@ -295,7 +306,7 @@ mod tests {
             let k = Link::test_data(name);
             let expected = 4 * k.n_crossings() + 2 * k.writhe().unsigned_abs() as usize + 2;
             for positive in [true, false] {
-                let d = k.whitehead_double(positive, 0);
+                let d = Link::whitehead_double(&k, positive, 0);
                 assert_eq!(d.n_comps(), 1, "D±({name}) is a knot");
                 assert_eq!(d.n_crossings(), expected, "D±({name}) crossing count");
                 assert!(d.is_oriented());
@@ -309,15 +320,15 @@ mod tests {
         // signs; values pinned against the Kh-verified reference implementation.
         let u = Braid::from([1, -2]).closure(); // writhe-0 unknot diagram
         for (tw, pos_det, neg_det) in [(2, 3, 5), (4, 7, 9)] {
-            assert_eq!(det(&u.whitehead_double(true, tw)), pos_det, "D+(U, tw={tw})");
-            assert_eq!(det(&u.whitehead_double(false, tw)), neg_det, "D-(U, tw={tw})");
+            assert_eq!(det(&Link::whitehead_double(&u, true, tw)), pos_det, "D+(U, tw={tw})");
+            assert_eq!(det(&Link::whitehead_double(&u, false, tw)), neg_det, "D-(U, tw={tw})");
         }
     }
 
     #[test]
     fn cable2_trefoil() {
         let k = Link::test_data("3_1");
-        let c = k.cable2();
+        let c = Link::cable2(&k);
         assert_eq!(c.n_crossings(), 4 * k.n_crossings());
         assert_eq!(c.n_comps(), 2, "2-cable of a knot is a 2-component link");
         assert!(c.is_oriented());
@@ -327,24 +338,10 @@ mod tests {
     #[test]
     fn cable2_is_hopf() {
         // 2-cable of a ±1-framed unknot is the Hopf link (linking ±1), not the 2-component unlink.
-        let c = Link::test_data("unknot_l_twist").cable2();
+        let c = Link::cable2(&Link::test_data("unknot_l_twist"));
         assert_eq!(c.n_comps(), 2);
         assert_ne!(jones_polynomial(&c), jones_polynomial(&Link::unlink(2)),
             "2-cable of a framed unknot must be linked (Hopf), not the unlink");
     }
 
-    #[test]
-    fn conn_sum_of_braid_closures() {
-        // braid closures orient downward (`ori = Down`), exercising the non-PD arms of
-        // `NodeOri::in_ports` in edge_dir.
-        let k1 = Braid::from([1, 1, 1]).closure();      // 3_1
-        let k2 = Braid::from([1, -2, 1, -2]).closure(); // 4_1
-        let cs = k1.conn_sum(&k2);
-        assert_eq!(cs.n_comps(), 1);
-        assert!(cs.is_oriented());
-
-        let (vcs, vu) = (jones_polynomial(&cs), jones_polynomial(&Link::unknot()));
-        let (v1, v2) = (jones_polynomial(&k1), jones_polynomial(&k2));
-        assert_eq!(&vcs * &vu, &v1 * &v2);
-    }
 }

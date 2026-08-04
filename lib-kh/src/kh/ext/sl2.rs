@@ -15,7 +15,7 @@ use itertools::Itertools;
 use num_traits::Zero;
 use yui_core::{AddMon, Field, FieldOps, RangeExt, Ring, RingOps, Sign};
 use yui_homology::isize3;
-use yui_link::Link;
+use yui_link::{Link, Slot};
 use yui_matrix::MatTrait;
 use yui_matrix::dense::snf::fnf;
 
@@ -71,7 +71,7 @@ impl<'a, R> KhSl2Map<'a, R> where
         let mut res = vec![];
         let color = l.colored_seifert_circles();
 
-        l.traverse_from((0, 0), |i, j| {
+        l.traverse_from((0, Slot::SW), |i, j| {
             if l.node(i).is_resolved() { return }
 
             let edge = l.node(i).edge(j);

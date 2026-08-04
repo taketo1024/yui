@@ -44,10 +44,12 @@ impl Link {
         );
 
         let edge_counts = nodes.iter().flat_map(|x| x.edges()).cloned().counts();
-        assert!(
-            edge_counts.values().all(|&c| c == 2),
-            "Invalid data: each edge in the diagram must appear exactly twice."
-        );
+        let bad = edge_counts.iter()
+            .filter(|&(_, &c)| c != 2)
+            .map(|(&e, &c)| (e, c))
+            .sorted()
+            .collect_vec();
+        assert!(bad.is_empty(), "each edge must appear exactly twice; (edge, count) = {bad:?}");
 
         let node_edges: HashSet<Edge> = edge_counts.into_keys().collect();
         let mut loop_set: HashSet<Edge> = HashSet::new();
@@ -416,6 +418,13 @@ mod tests {
     use yui_core::bitseq::Bit;
 
     use super::*;
+
+    #[test]
+    #[should_panic(expected = "(edge, count) = [(4, 1), (5, 3)]")]
+    fn new_names_the_miscounted_edges() {
+        // the trefoil's symmetric PD with edge 4 mistyped as 5
+        let _ = Link::from_pd_code([[1, 5, 2, 4], [3, 1, 5, 6], [5, 3, 6, 2]]);
+    }
 
     #[test]
     #[should_panic(expected = "does not run from an outgoing slot")]

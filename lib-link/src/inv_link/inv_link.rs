@@ -20,10 +20,15 @@ impl InvLink {
 
         // `e_map` must be an involution of the whole edge set.
         let link_edges = inner.edges();
-        assert_eq!(e_map.len(), link_edges.len(), "e_map must cover every edge exactly once");
+        let missing = link_edges.iter().filter(|e| !e_map.contains_key(e)).collect_vec();
+        assert!(missing.is_empty(), "e_map does not cover edges {missing:?}");
+        let extra = e_map.keys().filter(|e| !link_edges.contains(e)).sorted().collect_vec();
+        assert!(extra.is_empty(), "e_map maps edges {extra:?}, which are not in the link");
+
         for &e in &link_edges {
             let f = e_map[&e];
-            assert_eq!(e_map[&f], e, "e_map is not involutive at edge {e}");
+            assert!(link_edges.contains(&f), "e_map sends edge {e} to {f}, not an edge of the link");
+            assert_eq!(e_map[&f], e, "e_map is not involutive: {e} ↦ {f} ↦ {}", e_map[&f]);
         }
 
         // ... and must carry each node to a node of the same type.
@@ -54,7 +59,7 @@ impl InvLink {
     // A strongly invertible knot, given a diagram based on its axis. τ reverses the traversal, so
     // walking both ways from the base point pairs each edge with its image.
     pub(super) fn si_knot_from(inner: Link) -> InvLink {
-        assert!(inner.is_knot(), "a strongly invertible knot must be a knot");
+        assert!(inner.is_knot(), "expected a knot, found {} components", inner.n_comps());
         let base = inner.base_pt().expect("the diagram needs a base point on the axis");
         let comps = inner.comps();
         let seq = comps[0].edges();
@@ -63,7 +68,10 @@ impl InvLink {
 
         let e_map = (0..n).map(|i| (seq[(k + i) % n], seq[(k + n - i) % n])).collect_vec();
         let l = Self::new(inner.clone(), e_map);
-        assert!(l.is_strongly_invertible(), "the based diagram is not a strongly invertible knot");
+        assert!(l.is_oriented(), "the diagram is not oriented");
+        if let Some(x) = l.inner.nodes().find(|x| l.preserves_dir_at(x) != Some(false)) {
+            panic!("τ does not reverse the orientation at node {x} — the diagram is not symmetric there");
+        }
         l
     }
 
@@ -278,6 +286,12 @@ mod tests {
         for (x, y) in k.inner().nodes().zip(m.inner().nodes()) {
             assert_eq!(m.inv_node(y), &k.inv_node(x).mirror(), "τ differs at node {x:?}");
         }
+    }
+
+    #[test]
+    #[should_panic(expected = "e_map does not cover edges [3, 4, 5, 6]")]
+    fn new_names_the_uncovered_edges() {
+        let _ = InvLink::new(Link::test_data("3_1"), [(1, 1), (2, 2)]);
     }
 
     #[test]

@@ -42,7 +42,7 @@ pub enum NodeOri {
     #[display("→")] Right,
 }
 
-impl NodeOri { 
+impl NodeOri {
     pub fn rev(&self) -> NodeOri {
         use NodeOri::*;
         match self {
@@ -51,6 +51,30 @@ impl NodeOri {
             Left  => Right,
             Right => Left,
             None  => None,
+        }
+    }
+
+    // The two ports of a crossing where the strands enter, in CCW order (slots 0..4 = SW, SE, NE, NW).
+    pub fn in_ports(&self) -> Option<[usize; 2]> {
+        use NodeOri::*;
+        match self {
+            Up    => Some([0, 1]),
+            Left  => Some([1, 2]),
+            Down  => Some([2, 3]),
+            Right => Some([3, 0]),
+            None  => Option::None,
+        }
+    }
+
+    // The orientation whose `in_ports` match the given (unordered) pair; `None` if incoherent.
+    pub fn from_in_ports(p: usize, q: usize) -> NodeOri {
+        use NodeOri::*;
+        match (p.min(q), p.max(q)) {
+            (0, 1) => Up,
+            (1, 2) => Left,
+            (2, 3) => Down,
+            (0, 3) => Right,
+            _ => None,
         }
     }
 

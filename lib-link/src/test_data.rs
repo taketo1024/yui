@@ -28,7 +28,11 @@ impl Link {
             "unknot_l_twist2" => &[[1,1,2,4],[3,3,4,2]],
             "unknot_r_twist" => &[[1,2,2,1]],
             "unknot_lr_twist" => &[[1,1,2,4],[2,3,3,4]],
+            // one circle lies entirely over the other: no under-anchor for it, so the PD code
+            // does not determine its orientation (the link loads unoriented).
             "unlink2" => &[[1,4,2,3],[2,4,1,3]],
+            // R2 pair with alternating over/under: both components are under-anchored (oriented).
+            "unlink2_r2" => &[[1,3,2,4],[3,2,4,1]],
             _ => panic!("no test data for `{name}`"),
         };
         Link::from_pd_code(pd.iter().copied())

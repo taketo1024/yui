@@ -16,45 +16,48 @@ pub struct InvLink {
 impl InvLink {
     pub fn new<I>(inner: Link, e_map: I) -> InvLink
     where I: IntoIterator<Item = (Edge, Edge)> {
+        Self::try_new(inner, e_map).expect("e_map is not a valid strong involution of the link")
+    }
+
+    // Like `new`, but returns `None` instead of panicking when `e_map` fails to be a symmetry — used
+    // to search for the reindex start that realizes the standard strong inversion.
+    pub fn try_new<I>(inner: Link, e_map: I) -> Option<InvLink>
+    where I: IntoIterator<Item = (Edge, Edge)> {
         let e_map: HashMap<Edge, Edge> = e_map.into_iter().collect();
 
         // Validate: domain = link edges, image ⊆ link edges, e_map is involutive.
         let link_edges = inner.edges();
-        assert_eq!(
-            e_map.len(), link_edges.len(),
-            "e_map must have one entry per link edge (got {}, expected {})",
-            e_map.len(), link_edges.len()
-        );
+        if e_map.len() != link_edges.len() {
+            return None;
+        }
         for &e in &link_edges {
-            let f = *e_map.get(&e).unwrap_or_else(|| panic!("e_map missing edge {e}"));
-            let g = *e_map.get(&f).unwrap_or_else(|| panic!("e_map({e}) = {f} is not a link edge"));
-            assert_eq!(g, e, "e_map is not an involution: {e} ↦ {f} ↦ {g}");
+            let f = *e_map.get(&e)?;
+            let g = *e_map.get(&f)?;
+            if g != e {
+                return None;
+            }
         }
 
         let mut x_map = HashMap::new();
-
         for x in inner.nodes() {
-            let edges = x.edges().map(|e| e_map.get(&e).unwrap());
-            let find = inner.nodes().find_position(|y|
+            let edges = x.edges().map(|e| e_map[&e]);
+            let (j, _) = inner.nodes().find_position(|y|
                 edges.iter().all(|e| y.edges().contains(e))
-            );
-
-            assert!(find.is_some(), "no match for x: {x} -> {edges:?}");
-
-            let j = find.unwrap().0;
+            )?;
             let y = inner.node(j);
-
-            assert_eq!(x.node_type(), y.node_type()); 
-
+            if x.node_type() != y.node_type() {
+                return None;
+            }
             x_map.insert(x.clone(), y.clone());
             if x != y {
                 x_map.insert(y.clone(), x.clone());
             }
         }
+        if x_map.len() != inner.n_nodes() {
+            return None;
+        }
 
-        assert_eq!(x_map.len(), inner.n_nodes());
-
-        Self { inner, e_map, x_map }
+        Some(Self { inner, e_map, x_map })
     }
 
     pub fn from_symmetric_pd_code<I1>(pd_code: I1) -> Self
@@ -77,8 +80,72 @@ impl InvLink {
         Self::new(l, e_map)
     }
 
-    pub fn inner(&self) -> &Link { 
+    // Reindex `inner` from the first `start` for which the standard involution `e ↦ (n+1-e)%n+1` is
+    // valid (robust to the builder renumbering edges, unlike tracking ids through `Link::conn_sum`).
+    fn from_standard_reindex(inner: Link, starts: impl IntoIterator<Item = Edge>) -> Option<InvLink> {
+        let n = inner.n_edges() as Edge;
+        starts.into_iter().find_map(|s| {
+            let r = inner.reindexed(s, 1);
+            let e_map = r.edges().into_iter().map(|e| (e, (n + 1 - e) % n + 1)).collect_vec();
+            Self::try_new(r, e_map)
+        })
+    }
+
+    // Equivariant connected sum at the two (on-axis) base points.
+    pub fn conn_sum(&self, other: &InvLink) -> InvLink {
+        let self_e = self.base_pt().expect("self needs a base point");
+        let other_e = other.base_pt().expect("other needs a base point");
+        self.conn_sum_at(other, self_e, other_e)
+    }
+
+    // Equivariant connected sum: splice along on-axis edges (`inv_edge(e) == e`) of each summand,
+    // then recover the combined strong inversion by reindexing to the standard involution.
+    pub fn conn_sum_at(&self, other: &InvLink, self_e: Edge, other_e: Edge) -> InvLink {
+        assert_eq!(self.inv_edge(self_e), self_e, "self_e {self_e} must be on-axis");
+        assert_eq!(other.inv_edge(other_e), other_e, "other_e {other_e} must be on-axis");
+
+        let inner = self.inner.conn_sum_at(&other.inner, self_e, other_e);
+        let starts = inner.edges();
+        Self::from_standard_reindex(inner, starts).expect("connected sum is not τ-symmetric")
+    }
+
+    // Strongly-invertible Whitehead double of a symmetric companion. The 2-cable inherits τ; the
+    // clasp and `tw` framing twists go in at the *other* on-axis edge (`inv_edge(e) == e`,
+    // e ≠ base_pt), split evenly across the axis so the diagram stays τ-invariant. `tw` counts from
+    // the Seifert framing and must be even. The base point lands on the doubled on-axis strand.
+    pub fn whitehead_double(&self, positive: bool, tw: i32) -> InvLink {
+        assert!(tw.is_even(), "tw must be even for a τ-symmetric diagram");
+
+        let base = self.base_pt().expect("companion needs a base point");
+        assert_eq!(self.inv_edge(base), base, "base point must be on-axis");
+        let cut = self.edges().into_iter()
+            .find(|&e| e != base && self.inv_edge(e) == e)
+            .expect("need a second on-axis edge for the clasp");
+
+        let half = self.writhe() + tw / 2;   // (2·writhe + tw) / 2 = half the blackboard framing
+        let (inner, base_edges) = self.inner.whitehead_double_impl(positive, half, half, cut, Some(base));
+
+        // base point on the on-axis doubled base_pt strand: reindex from the copy that realizes the
+        // standard τ, so edge 1 lands there rather than at the clasp.
+        Self::from_standard_reindex(inner, base_edges)
+            .expect("whitehead double diagram is not τ-symmetric at the base point")
+    }
+
+    pub fn inner(&self) -> &Link {
         &self.inner
+    }
+
+    /// The symmetric PD code — the inner diagram's PD, with edges numbered so the strong inversion is
+    /// the standard `e ↦ (n+1-e)%n+1`. Feeding this to `from_symmetric_pd_code` (or the `ykh` CLI)
+    /// reconstructs the same `InvLink`. The builders (`from_symmetric_pd_code`, `conn_sum`,
+    /// `whitehead_double`) already reindex to this involution, so an arbitrary `e_map` is rejected.
+    pub fn pd_code(&self) -> Vec<PDCodeX> {
+        let n = self.inner.n_edges() as Edge;
+        assert!(
+            self.inner.edges().into_iter().all(|e| self.inv_edge(e) == (n + 1 - e) % n + 1),
+            "pd_code requires the standard involution `e ↦ (n+1-e)%n+1`; reindex the InvLink first"
+        );
+        self.inner.pd_code()
     }
 
     // delegate methods from Link
@@ -139,11 +206,61 @@ impl InvLink {
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     use super::*;
+    use crate::misc::det;
 
     #[test]
-    fn load_3_1() { 
+    fn reindexed_keeps_strong_inversion() {
+        // reindex the symmetric trefoil from edge 1; the standard e↦(n+1-e)%n+1 must stay a valid τ.
+        let il = InvLink::test_data("3_1");
+        let r = il.inner().reindexed(1, 1);
+        assert_eq!(r.edges(), (1..=6).collect::<Vec<Edge>>());
+
+        let n = r.n_edges() as Edge;
+        let e_map: Vec<_> = r.edges().into_iter().map(|e| (e, (n + 1 - e) % n + 1)).collect();
+        InvLink::new(r, e_map);  // panics if the involution is invalid
+    }
+
+    #[test]
+    fn pd_code_roundtrip() {
+        // 5_1 as a symmetric PD (standard involution by construction); emit + reparse must recover
+        // the same diagram and the same strong inversion.
+        let l = InvLink::from_symmetric_pd_code([[1,7,2,6],[3,9,4,8],[5,1,6,10],[7,3,8,2],[9,5,10,4]]);
+        let l2 = InvLink::from_symmetric_pd_code(l.pd_code());
+        assert_eq!(l.pd_code(), l2.pd_code());
+        for e in l.inner().edges() {
+            assert_eq!(l.inv_edge(e), l2.inv_edge(e), "involution differs at edge {e}");
+        }
+    }
+
+    #[test]
+    fn conn_sum_is_equivariant() {
+        // construction succeeding ⟺ from_standard_reindex found a valid τ on the sum.
+        let k1 = InvLink::test_data("3_1");
+        let k2 = InvLink::test_data("4_1");
+        let cs = k1.conn_sum(&k2);
+        assert!(cs.is_knot());
+        assert_eq!(det(cs.inner()), 3 * 5, "det is multiplicative under conn sum");
+    }
+
+    #[test]
+    fn whitehead_double_is_symmetric() {
+        // building succeeding ⟺ try_new found an on-axis reindex start ⟺ the diagram is τ-symmetric.
+        for name in ["3_1", "4_1"] {
+            let k = InvLink::test_data(name);
+            let w = k.whitehead_double(true, 0);
+            assert!(w.is_knot());
+            assert_eq!(w.base_pt(), Some(1), "base point on the doubled base_pt strand");
+            assert_eq!(w.inv_edge(1), 1, "base point is on-axis");
+            // 4·n_crossings (cable) + |blackboard framing| (split each side) + 2 (clasp)
+            let bl = (2 * k.writhe()).unsigned_abs() as usize;
+            assert_eq!(w.n_crossings(), 4 * k.n_crossings() + bl + 2);
+        }
+    }
+
+    #[test]
+    fn load_3_1() {
         let l = InvLink::test_data("3_1");
         assert_eq!(l.n_crossings(), 3);
     }

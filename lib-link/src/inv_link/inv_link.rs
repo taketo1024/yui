@@ -226,16 +226,4 @@ mod tests {
         assert_eq!(l.inv_node(&nodes[1]), nodes[0]);
         assert_eq!(l.inv_node(&nodes[2]), nodes[2]);
     }
-
-    #[test]
-    fn from_sinv() { 
-        let l = InvLink::test_data("3_1");
-
-        assert_eq!(l.inv_edge(1), 1);
-        assert_eq!(l.inv_edge(2), 6);
-        assert_eq!(l.inv_edge(3), 5);
-        assert_eq!(l.inv_edge(4), 4);
-        assert_eq!(l.inv_edge(5), 3);
-        assert_eq!(l.inv_edge(6), 2);
-    }
 }

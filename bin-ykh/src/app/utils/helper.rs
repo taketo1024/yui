@@ -90,7 +90,7 @@ pub fn parse_pair<R: FromStr + Zero>(s: &String) -> Result<(R, R), Box<dyn std::
 
 pub fn vec2str<R>(v: &SpVec<R>) -> String 
 where R: Ring + ToString, for<'x> &'x R: RingOps<R> { 
-    format!("({})", v.to_dense().iter().join(", "))
+    format!("({})", v.clone().into_dense().iter().join(", "))
 }
 
 pub fn csv_writer(path: &String) -> Result<csv::Writer<std::fs::File>, Box<dyn std::error::Error>> { 

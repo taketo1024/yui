@@ -8,7 +8,7 @@ use yui_core::lc::{Gen, Lc};
 use yui_matrix::sparse::{SpMat, SpVec};
 
 use crate::utils::ChainReducer;
-use crate::{isize2, isize3, ChainComplexTrait, Grid, GridDeg, GridIter, GridTrait, SummandTrait};
+use crate::{ChainComplexTrait, DisplaySeq, DisplayTable, GenericChainComplexBase, Grid, GridDeg, GridIter, GridTrait, SummandTrait, isize2, isize3};
 use super::Summand;
 
 #[cfg(feature = "multithread")]
@@ -86,7 +86,7 @@ where
         let r = ChainReducer::reduce(self, true);
 
         let summands = Grid::generate(
-            self.summands.support(),
+            self.summands.support().copied(),
             |i| {
                 let c = &self[i];
                 Summand::new(
@@ -101,6 +101,11 @@ where
         let d_deg = self.d_deg;
         let d_map = self.d_map.clone();
         Self { summands, d_deg, d_map }
+    }
+
+    pub fn reduced_generic(&self) -> GenericChainComplexBase<I, R> { 
+        let r = ChainReducer::reduce(self, false);
+        r.into_complex()
     }
 
     fn check_d_for(&self, i0: I, x: &X) { 
@@ -135,17 +140,17 @@ where
 }
 
 impl<I, X, R> GridTrait<I> for ChainComplexBase<I, X, R>
-where 
+where
     I: GridDeg,
     X: Gen,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
-    type Support = GridIter<I>;
     type Item = Summand<X, R>;
-    
-    delegate! { 
-        to self.summands { 
-            fn support(&self) -> Self::Support;
+    type Support<'a> = GridIter<'a, I, Self::Item> where Self: 'a, I: 'a, X: 'a, R: 'a;
+
+    delegate! {
+        to self.summands {
+            fn support(&self) -> Self::Support<'_>;
             fn is_supported(&self, i: I) -> bool;
             fn get(&self, i: I) -> &Self::Item;
             fn get_default(&self) -> &Self::Item;
@@ -206,5 +211,27 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = Summand<X, R>;
     fn index(&self, i: (isize, isize, isize)) -> &Self::Output {
         self.get(i.into())
+    }
+}
+
+impl<X, R> DisplaySeq<isize> for ChainComplex<X, R>
+where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+    delegate! {
+        to self.summands { 
+            fn display_label(&self) -> String;
+            fn display_indices(&self) -> Vec<isize>;
+            fn display_at(&self, i: &isize) -> String;
+        }
+    }
+}
+
+impl<X, R> DisplayTable<isize> for ChainComplex2<X, R>
+where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
+    delegate! {
+        to self.summands { 
+            fn display_labels(&self) -> (String, String);
+            fn display_indices(&self) -> (Vec<isize>, Vec<isize>);
+            fn display_at(&self, i: &isize, j: &isize) -> String;
+        }
     }
 }

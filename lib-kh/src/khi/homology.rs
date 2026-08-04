@@ -1,7 +1,8 @@
 use std::ops::{Index, RangeInclusive};
+use std::sync::OnceLock;
 use delegate::delegate;
 use yui_core::{EucRing, EucRingOps};
-use yui_homology::{Grid2, GridTrait, Homology, Summand, SummandTrait};
+use yui_homology::{DisplaySeq, DisplayTable, Grid2, GridIter, GridTrait, Homology, Summand, SummandTrait};
 use yui_link::InvLink;
 use crate::kh::KhChainExt;
 use crate::khi::{KhIComplex, KhIGen};
@@ -10,10 +11,11 @@ use crate::misc::{make_gen_grid, range_of};
 use super::KhIChain;
 
 #[derive(Clone)]
-pub struct KhIHomology<R> 
+pub struct KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     inner: Homology<KhIGen, R>,
-    canon_cycles: Vec<KhIChain<R>>
+    canon_cycles: Vec<KhIChain<R>>,
+    gen_grid: OnceLock<Grid2<Summand<KhIGen, R>>>,
 }
 
 impl<R> KhIHomology<R> 
@@ -29,17 +31,17 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     pub(crate) fn new_impl(inner: Homology<KhIGen, R>, canon_cycles: Vec<KhIChain<R>>) -> Self {
-        Self { inner, canon_cycles }
+        Self { inner, canon_cycles, gen_grid: OnceLock::new() }
     }
 
-    pub fn h_range(&self) -> RangeInclusive<isize> { 
-        range_of(self.support().filter(|&i| 
+    pub fn h_range(&self) -> RangeInclusive<isize> {
+        range_of(self.support().filter(|&&i|
             !self[i].is_zero()
-        ))
+        ).copied())
     }
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
-        range_of(self.support().flat_map(|i| 
+        range_of(self.support().flat_map(|&i|
             self[i].gens().map(|z| z.q_deg())
         ))
     }
@@ -59,8 +61,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         )
     }
 
-    pub fn gen_grid(self) -> Grid2<Summand<KhIGen, R>> { 
-        make_gen_grid(self.inner())
+    fn gen_grid(&self) -> &Grid2<Summand<KhIGen, R>> {
+        self.gen_grid.get_or_init(|| make_gen_grid(self.inner()))
     }
 }
 
@@ -76,12 +78,12 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 impl<R> GridTrait<isize> for KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    type Support = std::vec::IntoIter<isize>;
     type Item = Summand<KhIGen, R>;
+    type Support<'a> = GridIter<'a, isize, Self::Item> where Self: 'a, R: 'a;
 
-    delegate! { 
-        to self.inner { 
-            fn support(&self) -> Self::Support;
+    delegate! {
+        to self.inner {
+            fn support(&self) -> Self::Support<'_>;
             fn is_supported(&self, i: isize) -> bool;
             fn get(&self, i: isize) -> &Self::Item;
             fn get_default(&self) -> &Self::Item;
@@ -89,13 +91,54 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 }
 
-impl<R> Index<isize> for KhIHomology<R> 
+impl<R> Index<isize> for KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     type Output = Summand<KhIGen, R>;
 
-    delegate! { 
-        to self.inner { 
+    delegate! {
+        to self.inner {
             fn index(&self, index: isize) -> &Self::Output;
+        }
+    }
+}
+
+impl<R> Index<(isize, isize)> for KhIHomology<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    type Output = Summand<KhIGen, R>;
+
+    delegate! {
+        to self.gen_grid() {
+            fn index(&self, index: (isize, isize)) -> &Self::Output;
+        }
+    }
+}
+
+impl<R> DisplaySeq<isize> for KhIHomology<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    delegate! {
+        to self.inner { 
+            fn display_label(&self) -> String;
+            fn display_indices(&self) -> Vec<isize>;
+            fn display_at(&self, i: &isize) -> String;
+        }
+    }
+}
+
+impl<R> DisplayTable<isize> for KhIHomology<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    fn display_labels(&self) -> (String, String) { 
+        ("i".to_string(), "j".to_string())
+    }
+
+    fn display_indices(&self) -> (Vec<isize>, Vec<isize>) { 
+        (self.h_range().into_iter().collect(), self.q_range().step_by(2).collect())
+    }
+
+    fn display_at(&self, i: &isize, j: &isize) -> String {
+        if self[(*i, *j)].is_zero() {
+            ".".to_string()
+        } else {
+            self[(*i, *j)].to_string()
         }
     }
 }
@@ -221,7 +264,7 @@ mod tests {
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
-        let khi = KhIHomology::new(&l, &h, &t, false).gen_grid();
+        let khi = KhIHomology::new(&l, &h, &t, false);
 
         assert_eq!(khi[(0, 1)].rank(), 1);
         assert_eq!(khi[(0, 3)].rank(), 1);
@@ -242,7 +285,7 @@ mod tests {
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
-        let khi = KhIHomology::new(&l, &h, &t, true).gen_grid();
+        let khi = KhIHomology::new(&l, &h, &t, true);
 
         assert_eq!(khi[(0, 2)].rank(), 1);
         assert_eq!(khi[(1, 2)].rank(), 1);
@@ -374,7 +417,7 @@ mod tests_v1 {
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
-        let khi = KhIHomology::new_no_simplify(&l, &h, &t, false).gen_grid();
+        let khi = KhIHomology::new_no_simplify(&l, &h, &t, false);
 
         assert_eq!(khi[(0, 1)].rank(), 1);
         assert_eq!(khi[(0, 3)].rank(), 1);
@@ -395,7 +438,7 @@ mod tests_v1 {
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
-        let khi = KhIHomology::new_no_simplify(&l, &h, &t, true).gen_grid();
+        let khi = KhIHomology::new_no_simplify(&l, &h, &t, true);
 
         assert_eq!(khi[(0, 2)].rank(), 1);
         assert_eq!(khi[(1, 2)].rank(), 1);

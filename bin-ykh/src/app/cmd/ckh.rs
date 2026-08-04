@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use yui_core::tex::TeX;
 use yui_core::{Ring, RingOps};
-use yui_homology::{ChainComplexTrait, DisplayTable, GridTrait, SummandTrait, tex::TeXTable};
+use yui_homology::{ChainComplexTrait, DisplayTable, GridTrait, SummandTrait};
 use yui_kh::kh::KhChainExt;
 use yui_kh::kh::KhComplex;
 
@@ -40,9 +40,6 @@ pub struct Args {
 
     #[arg(short = 'n', long)]
     pub no_simplify: bool,
-
-    #[arg(short, long, default_value = "unicode")]
-    pub format: Format,
 
     #[arg(long, default_value = "0")]
     pub log: u8,
@@ -98,11 +95,7 @@ where
         };
         
         // CKh generators
-        let grid = ckh.gen_grid();
-        let table = match self.args.format {
-            Format::Unicode => grid.display_table("i", "j"),
-            Format::TeX     => grid.tex_table("$\\mathit{CKh}$", " ")
-        };
+        let table = ckh.display_table();
         self.out(&table);
 
         // Generators
@@ -125,7 +118,7 @@ where
     }
 
     fn show_gens(&mut self, ckh: &KhComplex<R>) { 
-        for i in ckh.support() {
+        for &i in ckh.support() {
             let c = &ckh[i];
             if c.is_zero() { continue }
             

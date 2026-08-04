@@ -55,8 +55,8 @@ impl<const X: char, const Y: char, const Z: char, I> Var3<X, Y, Z, I> {
     }
 
     pub fn eval<R>(&self, x: &R, y: &R, z: &R) -> R
-    where R: Mul<Output = R>, for<'x, 'y> &'x R: Pow<&'y I, Output = R> {
-        x.pow(&self.0) * y.pow(&self.1) * z.pow(&self.2)
+    where R: Mul<Output = R>, I: Copy, for<'x> &'x R: Pow<I, Output = R> {
+        x.pow(self.0) * y.pow(self.1) * z.pow(self.2)
     }
 
     fn to_string_u(&self, unicode: bool) -> String

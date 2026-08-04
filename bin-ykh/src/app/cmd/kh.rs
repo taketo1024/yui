@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use yui_core::tex::TeX;
 use yui_core::{EucRing, EucRingOps};
-use yui_homology::{DisplaySeq, DisplayTable, GridTrait, SummandTrait, tex::TeXTable};
+use yui_homology::{DisplaySeq, DisplayTable, GridTrait, SummandTrait};
 use yui_kh::kh::KhHomology;
 use yui_kh::kh::KhChainExt;
 use yui_link::Link;
@@ -41,9 +41,6 @@ pub struct Args {
 
     #[arg(short = 'n', long)]
     pub no_simplify: bool,
-
-    #[arg(short, long, default_value = "unicode")]
-    pub format: Format,
 
     #[arg(long, default_value = "0")]
     pub log: u8,
@@ -107,13 +104,9 @@ where
 
         // print Kh
         let table = if bigraded { 
-            let grid = kh.gen_grid();
-            match self.args.format {
-                Format::Unicode => grid.display_table("i", "j"),
-                Format::TeX     => grid.tex_table("$\\mathit{Kh}$", " ")
-            }
+            kh.display_table()
         } else { 
-            kh.display_seq("i")
+            kh.display_seq()
         };
         self.out(&table);
 
@@ -133,7 +126,7 @@ where
     }
 
     fn show_gens(&mut self, kh: &KhHomology<R>) { 
-        for i in kh.support() {
+        for &i in kh.support() {
             let h = &kh[i];
             if h.is_zero() { continue }
 

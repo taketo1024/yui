@@ -2,7 +2,7 @@ use std::fmt::{Display, Debug};
 use std::ops::{AddAssign, MulAssign, Mul, Div, DivAssign, SubAssign, Add};
 use std::str::FromStr;
 use std::hash::Hash;
-use num_traits::{Zero, One, ToPrimitive, FromPrimitive};
+use num_traits::{Zero, One, Pow, ToPrimitive, FromPrimitive};
 use itertools::Itertools;
 use auto_impl_ops::auto_ops;
 
@@ -31,6 +31,12 @@ impl<const X: char, I> MultiVar<X, I> {
     pub fn total_deg(&self) -> I
     where I: Zero + for<'x> Add<&'x I, Output = I> {
         self.0.total()
+    }
+
+    pub fn eval<R>(&self, v: &[R]) -> R
+    where R: One + Mul<Output = R>, I: Copy, for<'x> &'x R: Pow<I, Output = R> {
+        assert!(v.len() >= self.0.ninds());
+        self.0.iter().fold(R::one(), |acc, (&i, &d)| acc * v[i].pow(d))
     }
 
     fn to_string_u(&self, unicode: bool) -> String
@@ -361,7 +367,33 @@ mod tests {
     }
 
     #[test]
-    fn is_divisible() { 
+    fn eval() {
+        type M = MultiVar<'X', usize>;
+        let v = [2, 3, 5];
+
+        assert_eq!(M::from([]).eval::<i32>(&v), 1);
+        assert_eq!(M::from([1]).eval::<i32>(&v), 2);
+        assert_eq!(M::from([0, 1]).eval::<i32>(&v), 3);
+        assert_eq!(M::from([2, 3]).eval::<i32>(&v), 4 * 27);
+        assert_eq!(M::from([1, 0, 3]).eval::<i32>(&v), 2 * 125);
+    }
+
+    #[test]
+    fn eval_f2() {
+        use crate::num::FF2;
+
+        type M = MultiVar<'X', usize>;
+        let v = [FF2::from(2), FF2::from(3), FF2::from(5)];
+
+        assert_eq!(M::from([]).eval::<FF2>(&v), FF2::from(1));
+        assert_eq!(M::from([1]).eval::<FF2>(&v), FF2::from(0));
+        assert_eq!(M::from([0, 1]).eval::<FF2>(&v), FF2::from(1));
+        assert_eq!(M::from([2, 3]).eval::<FF2>(&v), FF2::from(0));
+        assert_eq!(M::from([1, 0, 3]).eval::<FF2>(&v), FF2::from(0));
+    }
+
+    #[test]
+    fn is_divisible() {
         type M = MultiVar<'X', usize>;
 
         let one = M::from([]);

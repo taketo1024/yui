@@ -267,10 +267,10 @@ mod tests {
         let h2 = c2.homology();
 
         println!("L1");
-        h1.print_seq("i");
+        h1.print_seq();
 
         println!("L2");
-        h2.print_seq("i");
+        h2.print_seq();
 
         println!("f: deg {}\n", f.deg());
 
@@ -279,8 +279,8 @@ mod tests {
             println!("({i}) {} -> ({j}) {}", h1[i], h2[j]);
             for z in h1[i].gens() { 
                 let w = f.apply(i, &z);
-                let x = h1[i].vectorize_euc(&z).into_vec();
-                let y = h2[j].vectorize_euc(&w).into_vec();
+                let x = h1[i].vectorize_euc(&z).into_dense();
+                let y = h2[j].vectorize_euc(&w).into_dense();
                 println!("\t{:?} -> {:?}", x, y);
             }
             println!();

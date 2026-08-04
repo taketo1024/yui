@@ -123,8 +123,8 @@ macro_rules! impl_var_specific {
             }
 
             pub fn eval(&self, x: &R) -> R
-            where for<'x, 'y> &'x R: Pow<&'y $I, Output = R> { 
-                R::sum(self.iter().map(|(i, r)| { 
+            where for<'x> &'x R: Pow<$I, Output = R> {
+                R::sum(self.iter().map(|(i, r)| {
                     r * i.eval(x)
                 }))
             }
@@ -144,8 +144,8 @@ macro_rules! impl_var_specific {
             }
 
             pub fn eval(&self, x: &R, y: &R) -> R
-            where for<'x, 'y> &'x R: Pow<&'y $I, Output = R> { 
-                R::sum(self.iter().map(|(i, r)| { 
+            where for<'x> &'x R: Pow<$I, Output = R> {
+                R::sum(self.iter().map(|(i, r)| {
                     r * i.eval(x, y)
                 }))
             }
@@ -170,8 +170,8 @@ macro_rules! impl_var_specific {
             }
 
             pub fn eval(&self, x: &R, y: &R, z: &R) -> R
-            where for<'x, 'y> &'x R: Pow<&'y $I, Output = R> { 
-                R::sum(self.iter().map(|(i, r)| { 
+            where for<'x> &'x R: Pow<$I, Output = R> {
+                R::sum(self.iter().map(|(i, r)| {
                     r * i.eval(x, y, z)
                 }))
             }

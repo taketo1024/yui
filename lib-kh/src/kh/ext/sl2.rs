@@ -118,10 +118,11 @@ impl<R> KhSl2Map<R> where
         assert!(self.cube.str().h().is_zero());
         assert!(self.cube.str().t().is_zero());
 
-        let n = kh.support().map(|i| kh[i].rank()).sum();
-        let gens = kh.support().flat_map(|i| kh[i].gens()).collect_vec();
-
         let h_range = kh.h_range().mv(0, -self.h_deg());
+
+        let n = kh.support().map(|&i| kh[i].rank()).sum();
+        let gens = h_range.clone().flat_map(|i| kh[i].gens()).collect_vec();
+
         let blocks = h_range.map(|i|
             kh[i].make_matrix(&kh[i + self.h_deg()], |z| self.apply(z))
         );
@@ -141,7 +142,7 @@ impl<R> KhSl2Map<R> where
 
             let v = pinv.col_vec(i);
 
-            // println!("{i}) order: {ord}\n{:?}", v.to_dense());
+            // println!("{i}) order: {ord}\n{:?}", v.clone().into_dense());
 
             let indices = v.iter_nz().filter_map(|(j, r)| 
                 if r.is_const() { 
@@ -409,8 +410,6 @@ mod tests {
         let e = c.sl2_map(&l);
         let h = c.homology();
 
-        h.gen_grid().print_table("i", "j");
-
         let e_str = e.string_decomp(&h);
 
         assert_eq!(e_str.len(), 2);
@@ -427,11 +426,7 @@ mod tests {
         let e = c.sl2_map(&l);
         let h = c.homology();
 
-        h.gen_grid().print_table("i", "j");
-
         let e_str = e.string_decomp(&h);
-        println!("{e_str}");
-
         assert_eq!(e_str.len(), 3);
         assert_eq!(e_str[(1, 1, 2)], 1);
         assert_eq!(e_str[(3, 3, 1)], 1);

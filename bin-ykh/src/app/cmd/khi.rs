@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use yui_core::tex::TeX;
 use yui_core::{EucRing, EucRingOps};
-use yui_homology::{DisplaySeq, DisplayTable, GridTrait, SummandTrait, tex::TeXTable};
+use yui_homology::{DisplaySeq, DisplayTable, GridTrait, SummandTrait};
 use yui_kh::kh::KhChainExt;
 use yui_kh::khi::{KhIChain, KhIComplex, KhIHomology};
 use yui_link::InvLink;
@@ -109,13 +109,9 @@ where
             ["H", "0,T"].contains(&self.args.c_value.as_str());
 
         let table = if bigraded { 
-            let grid = khi.clone().gen_grid();
-            match self.args.format {
-                Format::Unicode => grid.display_table("i", "j"),
-                Format::TeX     => grid.tex_table("$\\mathit{KhI}$", " ")
-            }
+            khi.display_table()
         } else { 
-            khi.display_seq("i")
+            khi.display_seq()
         };
         self.out(&table);
 
@@ -137,7 +133,7 @@ where
     }
 
     fn show_gens(&mut self, khi: &KhIHomology<R>) { 
-        for i in khi.support() {
+        for &i in khi.support() {
             let h = &khi[i];
             if h.is_zero() { continue }
 

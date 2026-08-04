@@ -16,22 +16,17 @@ pub struct Mat<R> {
     inner: DMatrix<R>
 }
 
-impl<R> MatTrait for Mat<R> {
-    fn shape(&self) -> (usize, usize) {
-        (self.inner.nrows(), self.inner.ncols())
-    }
-}
-
 impl<R> Mat<R> {
-    pub fn inner(&self) -> &DMatrix<R> {
+    pub(crate) fn inner(&self) -> &DMatrix<R> {
         &self.inner
     }
 
-    pub fn inner_mut(&mut self) -> &mut DMatrix<R> {
+    pub(crate) fn inner_mut(&mut self) -> &mut DMatrix<R> {
         &mut self.inner
     }
 
-    pub fn into_inner(self) -> DMatrix<R> {
+    #[allow(unused)]
+    pub(crate) fn into_inner(self) -> DMatrix<R> {
         self.inner
     }
 
@@ -135,11 +130,21 @@ where R: Scalar {
         calc.result().rank()
     }
 
+    pub fn transpose(&self) -> Self {
+        Self::from(self.inner.transpose())
+    }
+
     pub fn map<S, F>(&self, f: F) -> Mat<S>
-    where S: Scalar, F: Fn(&R) -> S { 
+    where S: Scalar, F: Fn(&R) -> S {
         let data = self.inner.iter().map(f);
         let inner = DMatrix::from_iterator(self.nrows(), self.ncols(), data);
         Mat::from(inner)
+    }
+}
+
+impl<R> MatTrait for Mat<R> {
+    fn shape(&self) -> (usize, usize) {
+        (self.inner.nrows(), self.inner.ncols())
     }
 }
 
@@ -243,16 +248,20 @@ where R: Scalar {
         self.inner.column_mut(j).mul_assign(r.clone())
     }
 
-    pub fn add_row_to(&mut self, i: usize, j: usize, r: &R)
-    where R: ClosedAddAssign + ClosedMulAssign { 
-        let row = self.inner.row(i).mul(r.clone());
-        self.inner.row_mut(j).add_assign(row)
+    pub fn add_row_to(&mut self, i0: usize, i1: usize, r: &R)
+    where R: ClosedAddAssign, for<'x> &'x R: Mul<Output = R> {
+        for j in 0..self.ncols() {
+            let v = &self[(i0, j)] * r;
+            self[(i1, j)] += v;
+        }
     }
 
-    pub fn add_col_to(&mut self, i: usize, j: usize, r: &R)
-    where R: ClosedAddAssign + ClosedMulAssign {  
-        let col = self.inner.column(i).mul(r.clone());
-        self.inner.column_mut(j).add_assign(col)
+    pub fn add_col_to(&mut self, j0: usize, j1: usize, r: &R)
+    where R: ClosedAddAssign, for<'x> &'x R: Mul<Output = R> {
+        for i in 0..self.nrows() {
+            let v = &self[(i, j0)] * r;
+            self[(i, j1)] += v;
+        }
     }
 
     // Multiply [a, b; c, d] from left. 
@@ -310,6 +319,14 @@ mod tests {
         assert_eq!(a, a);
         assert_ne!(a, b);
         assert_ne!(a, c);
+    }
+
+    #[test]
+    fn transpose() {
+        let a = Mat::from_data((2, 3), [1,2,3,4,5,6]);
+        let t = a.transpose();
+        assert_eq!(t.shape(), (3, 2));
+        assert_eq!(t, Mat::from_data((3, 2), [1,4,2,5,3,6]));
     }
 
     #[test]

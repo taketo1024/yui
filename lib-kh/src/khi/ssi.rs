@@ -58,7 +58,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     let ds = zs.iter().enumerate().map(|(i, z)| {
         let h = z.h_deg();
         let v = kh[h].vectorize_euc(z);
-        info!("a[{i}] in Kh[{h}]: ({})", v.to_dense().iter().join(","));
+        info!("a[{i}] in Kh[{h}]: ({})", v.clone().into_dense().iter().join(","));
         v
     }).map(|v| 
         div_vec(&v.subvec(0..r), c).expect("invalid divisibility.")

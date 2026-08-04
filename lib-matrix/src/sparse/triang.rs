@@ -1,6 +1,5 @@
 use either::Either;
-use log::debug;
-use num_traits::Zero;
+use log::*;
 use yui_core::{Ring, RingOps};
 
 use super::*;
@@ -35,6 +34,13 @@ impl TriangularType {
             Self::Lower => Self::Upper
         }
     }
+
+    fn str(&self) -> &'static str { 
+        match self { 
+            Self::Upper => "upper",
+            Self::Lower => "lower"
+        }
+    }
 }
 
 pub fn inv_triangular<R>(t: TriangularType, a: &SpMat<R>) -> SpMat<R>
@@ -46,14 +52,30 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 // solve ax = y.
 pub fn solve_triangular<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
+    let n = a.nrows();
+    let cols = solve_triangular_with(t, a, y, |_, x| x);
+    SpMat::from_col_vecs(n, cols)
+}
+
+// Solve `ax = y` column by column, invoking `f(j, x_j)` on each solved
+// column. Hoists the diagonal collection and RHS buffer out of the per-column
+// loop, and (under `multithread`) reuses one buffer per thread.
+pub(crate) fn solve_triangular_with<R, F, T>(
+    t: TriangularType, a: &SpMat<R>, y: &SpMat<R>, f: F
+) -> Vec<T>
+where
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    F: Fn(usize, SpVec<R>) -> T + Sync,
+    T: Send,
+{
     assert_eq!(a.nrows(), y.nrows());
     debug_assert!(a.is_triang(t));
 
-    cfg_if::cfg_if! { 
-        if #[cfg(feature = "multithread")] { 
-            solve_triangular_m(t, a, y)
-        } else { 
-            solve_triangular_s(t, a, y)
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "multithread")] {
+            solve_triangular_m(t, a, y, f)
+        } else {
+            solve_triangular_s(t, a, y, f)
         }
     }
 }
@@ -69,62 +91,78 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     assert_eq!(a.nrows(), b.dim());
     debug_assert!(a.is_triang(t));
 
-    let diag = collect_diag(a);
-    let mut b = b.to_dense();
+    debug!("solve {} triangular-vec", t.str());
+    debug!("  a: {:?}", a.shape());
 
-    _solve_triangular(t, a, &diag, &mut b)
+    let n = a.nrows();
+    let diag = collect_diag(t, a);
+    let mut b_buf = vec![R::zero(); n];
+    scatter_into(b.data(), &mut b_buf);
+
+    _solve_triangular(t, a, &diag, &mut b_buf)
 }
 
 #[allow(unused)]
-fn solve_triangular_s<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    debug!("solve triangular, y: {:?}", y.shape());
+fn solve_triangular_s<R, F, T>(
+    t: TriangularType, a: &SpMat<R>, y: &SpMat<R>, f: F
+) -> Vec<T>
+where
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    F: Fn(usize, SpVec<R>) -> T,
+{
+    debug!("solve {} triangular", t.str());
+    debug!("  a: {:?}, y: {:?}", a.shape(), y.shape());
 
     let (n, k) = (a.nrows(), y.ncols());
-    let diag = collect_diag(a);
+    let diag = collect_diag(t, a);
     let mut b = vec![R::zero(); n];
 
-    let cols = (0..k).map(|j| { 
-        copy_into(y.col_vec(j), &mut b);
-        _solve_triangular(t, a, &diag, &mut b)
-    });
-
-    SpMat::from_col_vecs(n, cols)
+    (0..k).map(|j| {
+        scatter_into(y.col_data(j), &mut b);
+        let x = _solve_triangular(t, a, &diag, &mut b);
+        f(j, x)
+    }).collect()
 }
 
 #[cfg(feature = "multithread")]
-fn solve_triangular_m<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
+fn solve_triangular_m<R, F, T>(
+    t: TriangularType, a: &SpMat<R>, y: &SpMat<R>, f: F
+) -> Vec<T>
+where
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    F: Fn(usize, SpVec<R>) -> T + Sync,
+    T: Send,
+{
     use yui_core::util::sync::SyncCounter;
 
-    debug!("solve triangular, y: {:?}", y.shape());
+    debug!("solve {} triangular (threads: {})", t.str(), rayon::current_num_threads());
+    debug!("  a: {:?}, y: {:?}", a.shape(), y.shape());
 
     let (n, k) = (a.nrows(), y.ncols());
-    let diag = collect_diag(a);
+    let diag = collect_diag(t, a);
     let tl_b = Arc::new(ThreadLocal::new());
 
     let report = should_report(y);
     let counter = SyncCounter::new();
 
-    let cols = (0..k).into_par_iter().map(|j| { 
-        let mut b = tl_b.get_or(|| 
+    (0..k).into_par_iter().map(|j| {
+        let mut b = tl_b.get_or(||
             RefCell::new(vec![R::zero(); n])
         ).borrow_mut();
 
-        copy_into(y.col_vec(j), &mut b);
-        let col = _solve_triangular(t, a, &diag, &mut b);
+        scatter_into(y.col_data(j), &mut b);
+        let x = _solve_triangular(t, a, &diag, &mut b);
+        let result = f(j, x);
 
-        if report { 
+        if report {
             let c = counter.incr();
-            if (c > 0 && c % LOG_THRESHOLD == 0) || c == k { 
-                debug!("  solved {c}/{k}.");
+            if (c > 0 && c % LOG_THRESHOLD == 0) || c == k {
+                trace!("  solved {c}/{k}.");
             }
         }
 
-        col
-    }).collect::<Vec<_>>();
-
-    SpMat::from_col_vecs(n, cols)
+        result
+    }).collect()
 }
 
 #[inline(never)] // for profilability
@@ -133,9 +171,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let mut entries = vec![];
 
     let itr = diag.iter().enumerate();
-    let itr = if t.is_upper() { 
+    let itr = if t.is_upper() {
         Either::Left(itr.rev())
-    } else { 
+    } else {
         Either::Right(itr)
     };
 
@@ -145,7 +183,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let uinv = u.inv().unwrap();
         let x_j = &b[j] * &uinv; // non-zero
 
-        for (i, a_ij) in a.col_vec(j).iter() {
+        let (idx, val) = a.col_data(j);
+        for (&i, a_ij) in idx.iter().zip(val.iter()) {
             if a_ij.is_zero() { continue }
             b[i] -= a_ij * &x_j;
         }
@@ -153,27 +192,38 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         entries.push((j, x_j));
     }
 
-    debug_assert!(b.iter().all(|b_i| 
+    debug_assert!(b.iter().all(|b_i|
         b_i.is_zero())
     );
 
-    if t.is_upper() { 
-        entries.reverse()
+    let entries = if t.is_upper() {
+        Either::Left(entries.into_iter().rev())
+    } else {
+        Either::Right(entries.into_iter())
     };
 
     SpVec::from_sorted_entries(a.ncols(), entries)
 }
 
-fn collect_diag<'a, R>(a: &'a SpMat<R>) -> Vec<&'a R>
-where R: Ring, for<'x> &'x R: RingOps<R> { 
-    a.iter().filter_map(|(i, j, a)| 
-        if i == j { Some(a) } else { None }
-    ).collect()
+fn collect_diag<'a, R>(t: TriangularType, a: &'a SpMat<R>) -> Vec<&'a R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    let (col_offsets, row_indices, values) = a.csc_data();
+    (0..a.ncols()).map(|j| {
+        let p = if t.is_upper() {
+            col_offsets[j + 1] - 1
+        } else {
+            col_offsets[j]
+        };
+        assert_eq!(row_indices[p], j, "broken input: missing diagonal at column {j}");
+        &values[p]
+    }).collect()
 }
 
-fn copy_into<R>(vec: SpVec<R>, x: &mut [R])
-where R: Clone + Zero { 
-    vec.iter().for_each(|(i, r)| x[i] = r.clone())
+fn scatter_into<R: Clone>(data: (&[usize], &[R]), dst: &mut [R]) {
+    let (idx, val) = data;
+    for (&i, v) in idx.iter().zip(val.iter()) {
+        dst[i] = v.clone();
+    }
 }
 
 #[allow(unused)]

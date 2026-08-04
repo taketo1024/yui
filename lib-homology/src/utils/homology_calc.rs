@@ -39,7 +39,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
             return Self::trivial_result(d1.nrows(), with_trans);
         }
 
-        trace!("calculate homology: {} -> {} -> {}", d1.ncols(), d1.nrows(), d2.nrows());
+        debug!("calculate homology: {} -> {} -> {}", d1.ncols(), d1.nrows(), d2.nrows());
         
         let (s1, s2) = Self::process_snf(d1, d2, with_trans);
         let (rank, tors) = Self::result(&s1, &s2);
@@ -116,7 +116,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         let p_tor = p1.submat_rows(r1-t..r1)      // size = (t, n)
                       .into_sparse();
 
-        let p = p_free.stack(&p_tor);             // size = (r + t, n)
+        let p = SpMat::stack(p_free, p_tor);      // size = (r + t, n)
 
         assert_eq!(p.shape(), (r + t, n));
 
@@ -133,7 +133,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         let q_tor = q1.submat_cols(r1-t..r1)      // size = (n, t)
                       .into_sparse();
 
-        let q = q_free.concat(&q_tor);            // size = (n, r + t)
+        let q = SpMat::concat(q_free, q_tor);     // size = (n, r + t)
 
         assert_eq!(q.shape(), (n, r + t));
 

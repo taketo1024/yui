@@ -1,18 +1,18 @@
 use std::ops::{Index, RangeInclusive};
-use cartesian::cartesian;
+use std::sync::OnceLock;
 use delegate::delegate;
 
 use itertools::Itertools;
 use yui_core::lc::Lc;
 use yui_core::{EucRing, EucRingOps, Ring, RingOps};
-use yui_homology::{isize2, ChainComplexTrait, Grid1, Grid2, GridTrait, ChainComplex, Summand};
+use yui_homology::{ChainComplex, ChainComplexTrait, DisplaySeq, DisplayTable, Grid1, Grid2, GridIter, GridTrait, Summand, SummandTrait};
 use yui_link::InvLink;
 use yui_matrix::sparse::SpMat;
 
 use crate::kh::{KhChain, KhChainExt, KhComplex, KhChainGen};
 use crate::khi::KhIHomology;
 use crate::khi::KhIGen;
-use crate::misc::range_of;
+use crate::misc::{make_gen_grid, range_of};
 
 pub type KhIChain<R> = Lc<KhIGen, R>;
 
@@ -31,10 +31,11 @@ pub type KhIComplexSummand<R> = Summand<KhIGen, R>;
 
 #[derive(Clone)]
 pub struct KhIComplex<R>
-where R: Ring, for<'a> &'a R: RingOps<R> { 
+where R: Ring, for<'a> &'a R: RingOps<R> {
     inner: ChainComplex<KhIGen, R>,
     canon_cycles: Vec<KhIChain<R>>,
-    deg_shift: (isize, isize)
+    deg_shift: (isize, isize),
+    gen_grid: OnceLock<Grid2<KhIComplexSummand<R>>>,
 }
 
 impl<R> KhIComplex<R>
@@ -119,20 +120,20 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         KhIComplex::new_impl(inner, canon_cycles, deg_shift)
     }
 
-    pub(crate) fn new_impl(inner: ChainComplex<KhIGen, R>, canon_cycles: Vec<KhIChain<R>>, deg_shift: (isize, isize)) -> Self { 
-        Self { inner, canon_cycles, deg_shift }
+    pub(crate) fn new_impl(inner: ChainComplex<KhIGen, R>, canon_cycles: Vec<KhIChain<R>>, deg_shift: (isize, isize)) -> Self {
+        Self { inner, canon_cycles, deg_shift, gen_grid: OnceLock::new() }
     }
 
     pub fn inner(&self) -> &ChainComplex<KhIGen, R> {
         &self.inner
     }
 
-    pub fn h_range(&self) -> RangeInclusive<isize> { 
-        range_of(self.support())
+    pub fn h_range(&self) -> RangeInclusive<isize> {
+        range_of(self.support().copied())
     }
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
-        range_of(self.support().flat_map(|i| 
+        range_of(self.support().flat_map(|&i|
             self[i].raw_gens().iter().map(|x| x.q_deg())
         ))
     }
@@ -149,20 +150,8 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         )
     }
 
-    pub fn gen_grid(&self) -> Grid2<Summand<KhIGen, R>> {
-        let h_range = self.h_range();
-        let q_range = self.q_range().step_by(2);
-        let support = cartesian!(h_range, q_range.clone()).map(|(i, j)| 
-            isize2(i, j)
-        );
-
-        Grid2::generate(support, |idx| { 
-            let isize2(i, j) = idx;
-            let gens = self[i].raw_gens().iter().filter(|x| { 
-                x.q_deg() == j
-            }).cloned();
-            Summand::from_raw_gens(gens)
-        })
+    fn gen_grid(&self) -> &Grid2<KhIComplexSummand<R>> {
+        self.gen_grid.get_or_init(|| make_gen_grid(self.inner.summands()))
     }
 
     pub fn homology(&self) -> KhIHomology<R>
@@ -175,21 +164,32 @@ impl<R> Index<isize> for KhIComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = KhIComplexSummand<R>;
 
-    delegate! { 
+    delegate! {
         to self.inner {
             fn index(&self, index: isize) -> &Self::Output;
         }
     }
 }
 
+impl<R> Index<(isize, isize)> for KhIComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = KhIComplexSummand<R>;
+
+    delegate! {
+        to self.gen_grid() {
+            fn index(&self, index: (isize, isize)) -> &Self::Output;
+        }
+    }
+}
+
 impl<R> GridTrait<isize> for KhIComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Support = std::vec::IntoIter<isize>;
     type Item = KhIComplexSummand<R>;
+    type Support<'a> = GridIter<'a, isize, Self::Item> where Self: 'a, R: 'a;
 
-    delegate! { 
-        to self.inner { 
-            fn support(&self) -> Self::Support;
+    delegate! {
+        to self.inner {
+            fn support(&self) -> Self::Support<'_>;
             fn is_supported(&self, i: isize) -> bool;
             fn get(&self, i: isize) -> &Self::Item;
             fn get_default(&self) -> &Self::Item;
@@ -208,6 +208,36 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             fn d_deg(&self) -> isize;
             fn d(&self, i: isize, z: &Self::Element) -> Self::Element;
             fn d_matrix(&self, i: isize) -> SpMat<R>;
+        }
+    }
+}
+
+impl<R> DisplaySeq<isize> for KhIComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    delegate! {
+        to self.inner { 
+            fn display_label(&self) -> String;
+            fn display_indices(&self) -> Vec<isize>;
+            fn display_at(&self, i: &isize) -> String;
+        }
+    }
+}
+
+impl<R> DisplayTable<isize> for KhIComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn display_labels(&self) -> (String, String) { 
+        ("i".to_string(), "j".to_string())
+    }
+
+    fn display_indices(&self) -> (Vec<isize>, Vec<isize>) { 
+        (self.h_range().into_iter().collect(), self.q_range().step_by(2).collect())
+    }
+
+    fn display_at(&self, i: &isize, j: &isize) -> String {
+        if self[(*i, *j)].is_zero() {
+            ".".to_string()
+        } else {
+            self[(*i, *j)].to_string()
         }
     }
 }
@@ -296,7 +326,7 @@ mod tests {
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
-        let c = KhIComplex::new(&l, &h, &t, false).gen_grid();
+        let c = KhIComplex::new(&l, &h, &t, false);
 
         assert_eq!(c[(0, 1)].rank(), 1);
         assert_eq!(c[(0, 3)].rank(), 1);
@@ -317,7 +347,7 @@ mod tests {
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
-        let c = KhIComplex::new(&l, &h, &t, true).gen_grid();
+        let c = KhIComplex::new(&l, &h, &t, true);
 
         assert_eq!(c[(0, 2)].rank(), 1);
         assert_eq!(c[(1, 2)].rank(), 1);

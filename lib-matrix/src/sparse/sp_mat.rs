@@ -1,5 +1,4 @@
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, MulAssign, Range};
-use std::iter::zip;
 use std::fmt::{Display, Debug};
 use delegate::delegate;
 use itertools::Itertools;
@@ -13,18 +12,23 @@ use crate::dense::*;
 use super::sp_vec::SpVec;
 use super::triang::TriangularType;
 
-#[derive(Clone, PartialEq, Eq)]
-pub struct SpMat<R> { 
+#[derive(Clone)]
+pub struct SpMat<R> {
     inner: CscMatrix<R>
 }
 
-impl<R> MatTrait for SpMat<R> {
-    fn shape(&self) -> (usize, usize) {
-        (self.inner.nrows(), self.inner.ncols())
-    }
-}
-
 impl<R> SpMat<R> { 
+    pub fn try_from_csc_data(
+        num_rows: usize,
+        num_cols: usize,
+        col_offsets: Vec<usize>,
+        row_indices: Vec<usize>,
+        values: Vec<R>,
+    ) -> Option<Self> { 
+        let csc = CscMatrix::try_from_csc_data(num_rows, num_cols, col_offsets, row_indices, values);
+        csc.ok().map(|csc| SpMat::from(csc))
+    }
+
     pub(crate) fn inner(&self) -> &CscMatrix<R> { 
         &self.inner
     }
@@ -77,12 +81,12 @@ impl<R> SpMat<R> {
         }
     }
     
-    pub fn iter(&self) -> impl Iterator<Item = (usize, usize, &R)> { 
+    pub fn iter(&self) -> impl Iterator<Item = (usize, usize, &R)> {
         self.inner.triplet_iter()
     }
 
     pub fn iter_nz(&self) -> impl Iterator<Item = (usize, usize, &R)>
-    where R: Zero { 
+    where R: Zero {
         self.iter().filter(|e| !e.2.is_zero())
     }
 
@@ -143,10 +147,7 @@ impl<R> SpMat<R> {
         }
         col_offsets.push(values.len());
 
-        let csc = CscMatrix::try_from_csc_data(shape.0, shape.1, col_offsets, row_indices, values)
-            .expect("Broken CSC data");
-
-        SpMat::from(csc)
+        SpMat::try_from_csc_data(shape.0, shape.1, col_offsets, row_indices, values).unwrap()
     }
 
     pub fn map_values<F, S>(self, f: F) -> SpMat<S>
@@ -154,8 +155,15 @@ impl<R> SpMat<R> {
         let (m, n) = self.shape();
         let (cols, rows, vals) = self.disassemble();
         let vals = vals.into_iter().map(|r| f(r)).collect_vec();
-        let csc = CscMatrix::try_from_csc_data(m, n, cols, rows, vals).expect("Broken CSC data");
-        SpMat::<S>::from(csc)
+        SpMat::<S>::try_from_csc_data(m, n, cols, rows, vals).unwrap()
+    }
+
+    /// Returns the raw `(row_indices, values)` slices of column `j`.
+    /// Borrow-only — no allocation, no value clones.
+    pub fn col_data(&self, j: usize) -> (&[usize], &[R]) {
+        let (col_offsets, row_indices, values) = self.inner.csc_data();
+        let range = col_offsets[j]..col_offsets[j + 1];
+        (&row_indices[range.clone()], &values[range])
     }
 }
 
@@ -196,8 +204,7 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         }
 
         let ncols = col_offsets.len() - 1;
-        let csc = CscMatrix::try_from_csc_data(nrows, ncols, col_offsets, row_indices, values).unwrap();
-        Self::from(csc)
+        SpMat::try_from_csc_data(nrows, ncols, col_offsets, row_indices, values).unwrap()
     }
 
     pub fn from_dense_data<I>(shape: (usize, usize), data: I) -> Self
@@ -217,13 +224,11 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
     }
 
     pub fn col_vec(&self, j: usize) -> SpVec<R>
-    where R: Scalar + Zero + ClosedAddAssign { 
+    where R: Scalar + Zero + ClosedAddAssign {
         let col = self.inner.col(j);
-        let iter = Iterator::zip(
-            col.row_indices().iter().cloned(), 
-            col.values().iter().cloned()
-        );
-        SpVec::from_entries(self.nrows(), iter)
+        let row_indices = col.row_indices().to_vec();
+        let values = col.values().to_vec();
+        SpVec::try_from_csc_data(self.nrows(), row_indices, values).unwrap()
     }
 
     pub fn transpose(&self) -> Self { 
@@ -276,34 +281,67 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         self.submat(0 .. m, cols)
     }
 
-    pub fn divide4(&self, point: (usize, usize)) -> [SpMat<R>; 4] { 
+    pub fn divide_into_blocks(self, point: (usize, usize)) -> [SpMat<R>; 4] {
         let (m, n) = self.shape();
         let (k, l) = point;
         assert!(k <= m);
         assert!(l <= n);
 
-        let mut a = CooMatrix::new(k, l);
-        let mut b = CooMatrix::new(k, n - l);
-        let mut c = CooMatrix::new(m - k, l);
-        let mut d = CooMatrix::new(m - k, n - l);
-        
-        for (i, j, r) in self.iter() { 
-            if r.is_zero() { continue }
-            let r = r.clone();
-            match ((0..k).contains(&i), (0..l).contains(&j)) { 
-                (true , true ) => a.push(i, j, r),
-                (true , false) => b.push(i, j - l, r),
-                (false, true ) => c.push(i - k, j, r),
-                (false, false) => d.push(i - k, j - l, r),
-            }
+        let (offsets, rows, vals) = self.disassemble();
+
+        let (mut a_rows, mut a_vals, mut a_offs) = (vec![], vec![], vec![0]);
+        let (mut b_rows, mut b_vals, mut b_offs) = (vec![], vec![], vec![0]);
+        let (mut c_rows, mut c_vals, mut c_offs) = (vec![], vec![], vec![0]);
+        let (mut d_rows, mut d_vals, mut d_offs) = (vec![], vec![], vec![0]);
+
+        let mut vals_iter = vals.into_iter();
+
+        for j in 0..n {
+            let range = offsets[j]..offsets[j + 1];
+            let col_rows = &rows[range];
+            let split = col_rows.partition_point(|&i| i < k);
+            let (top_rows_src, bot_rows_src) = col_rows.split_at(split);
+
+            let (top_rows, top_vals, top_offs, bot_rows, bot_vals, bot_offs) = if j < l {
+                (&mut a_rows, &mut a_vals, &mut a_offs, &mut c_rows, &mut c_vals, &mut c_offs)
+            } else {
+                (&mut b_rows, &mut b_vals, &mut b_offs, &mut d_rows, &mut d_vals, &mut d_offs)
+            };
+
+            top_rows.extend_from_slice(top_rows_src);
+            top_vals.extend(vals_iter.by_ref().take(top_rows_src.len()));
+            top_offs.push(top_rows.len());
+
+            bot_rows.extend(bot_rows_src.iter().map(|&i| i - k));
+            bot_vals.extend(vals_iter.by_ref().take(bot_rows_src.len()));
+            bot_offs.push(bot_rows.len());
         }
-        
-        [a, b, c, d].map(|x| 
-            CscMatrix::from(&x).into()
-        )
+
+        [
+            SpMat::try_from_csc_data(k,     l,     a_offs, a_rows, a_vals).unwrap(),
+            SpMat::try_from_csc_data(k,     n - l, b_offs, b_rows, b_vals).unwrap(),
+            SpMat::try_from_csc_data(m - k, l,     c_offs, c_rows, c_vals).unwrap(),
+            SpMat::try_from_csc_data(m - k, n - l, d_offs, d_rows, d_vals).unwrap(),
+        ]
     }
 
-    pub fn combine_blocks(blocks: [&SpMat<R>; 4]) -> SpMat<R> {
+    pub fn divide_at_col(self, k: usize) -> [SpMat<R>; 2] {
+        let (m, n) = self.shape();
+        assert!(k <= n);
+
+        let [a, b, ..] = self.divide_into_blocks((m, k));
+        [a, b]
+    }
+
+    pub fn divide_at_row(self, k: usize) -> [SpMat<R>; 2] {
+        let (m, n) = self.shape();
+        assert!(k <= m);
+
+        let [a, _, b, _] = self.divide_into_blocks((k, n));
+        [a, b]
+    }
+
+    pub fn combine_blocks(blocks: [SpMat<R>; 4]) -> SpMat<R> {
         let [a, b, c, d] = blocks;
 
         assert_eq!(a.nrows(), b.nrows());
@@ -311,65 +349,71 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         assert_eq!(a.ncols(), c.ncols());
         assert_eq!(b.ncols(), d.ncols());
 
-        let (m, n) = (a.nrows() + c.nrows(), a.ncols() + b.ncols());
-        let (k, l) = a.shape();
+        let (m0, m1) = (a.nrows(), c.nrows());
+        let m = m0 + m1;
+        let (n0, n1) = (a.ncols(), b.ncols());
+        let n = n0 + n1;
+        let nnz = a.nnz() + b.nnz() + c.nnz() + d.nnz();
 
-        let entries = zip(
-            [a, b, c, d], 
-            [(0,0), (0,l), (k,0), (k,l)]
-        ).flat_map(|(x, (di, dj))| 
-            x.iter().map(move |(i, j, r)|
-                (i + di, j + dj, r.clone())
-            )
-        );
+        let mut a = ColSource::from(a);
+        let mut b = ColSource::from(b);
+        let mut c = ColSource::from(c);
+        let mut d = ColSource::from(d);
 
-        Self::from_entries((m, n), entries)
+        let mut col_offsets = Vec::with_capacity(n + 1);
+        let mut row_indices = Vec::with_capacity(nnz);
+        let mut values = Vec::with_capacity(nnz);
+        col_offsets.push(0);
+
+        let mut push_col = |top: &mut ColSource<R>, bot: &mut ColSource<R>, j: usize| {
+            let (top_rows, top_vals) = top.take_col(j);
+            row_indices.extend_from_slice(top_rows);
+            values.extend(top_vals);
+
+            let (bot_rows, bot_vals) = bot.take_col(j);
+            row_indices.extend(bot_rows.iter().map(|i| i + m0));
+            values.extend(bot_vals);
+
+            col_offsets.push(row_indices.len());
+        };
+
+        for j in 0..n0 { push_col(&mut a, &mut c, j); }
+        for j in 0..n1 { push_col(&mut b, &mut d, j); }
+
+        SpMat::try_from_csc_data(m, n, col_offsets, row_indices, values).unwrap()
     }
 
-    pub fn concat(&self, b: &Self) -> Self { 
-        let zero = |m, n| SpMat::<R>::zero((m, n));
+    pub fn concat(left: Self, right: Self) -> Self {
+        assert_eq!(left.nrows(), right.nrows());
+        let (l_cols, r_cols) = (left.ncols(), right.ncols());
         Self::combine_blocks([
-            self, 
-            b, 
-            &zero(0, self.ncols()), 
-            &zero(0, b.ncols())
+            left,
+            right,
+            SpMat::zero((0, l_cols)),
+            SpMat::zero((0, r_cols)),
         ])
     }
 
-    pub fn stack(&self, b: &Self) -> Self { 
-        let zero = |m, n| SpMat::<R>::zero((m, n));
+    pub fn stack(top: Self, bot: Self) -> Self {
+        assert_eq!(top.ncols(), bot.ncols());
+        let (t_rows, b_rows) = (top.nrows(), bot.nrows());
         Self::combine_blocks([
-            self, 
-            &zero(self.nrows(), 0), 
-            b, 
-            &zero(b.nrows(), 0)
+            top,
+            SpMat::zero((t_rows, 0)),
+            bot,
+            SpMat::zero((b_rows, 0)),
         ])
     }
 
-    pub fn extend_cols(&mut self, b: Self) { 
-        assert_eq!(self.nrows(), b.nrows());
-
-        if b.ncols() == 0 { 
-            return
-        }
-
-        let shape = (self.nrows(), self.ncols() + b.ncols());
+    pub fn extend_by_zero(&mut self, add_rows: usize, add_cols: usize) {
+        let (m, n) = self.shape();
         let l = std::mem::replace(&mut self.inner, CscMatrix::zeros(0, 0));
-        let r = b.inner;
-
-        let (mut col_offsets, mut row_indices, mut values) = l.disassemble();
-        let (c, mut r, mut v) = r.disassemble();
-        
-        let offset = col_offsets.pop().unwrap(); // pop last element.
-        col_offsets.extend(c.into_iter().map(|i| offset + i));
-        row_indices.append(&mut r);
-        values.append(&mut v);
-
+        let (mut col_offsets, row_indices, values) = l.disassemble();
+        let last = *col_offsets.last().unwrap();
+        col_offsets.extend(std::iter::repeat(last).take(add_cols));
         self.inner = CscMatrix::try_from_csc_data(
-            shape.0, shape.1, 
-            col_offsets, 
-            row_indices, 
-            values
+            m + add_rows, n + add_cols,
+            col_offsets, row_indices, values
         ).unwrap();
     }
 
@@ -392,6 +436,38 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
     }
 }
 
+// A column-major view of a disassembled matrix that yields one column at a
+// time, moving values out without cloning. Used by `combine_blocks`.
+struct ColSource<R> {
+    offsets: Vec<usize>,
+    rows: Vec<usize>,
+    vals: std::vec::IntoIter<R>,
+    pos: usize,
+}
+
+impl<R> ColSource<R> {
+    fn from(m: SpMat<R>) -> Self {
+        let (offsets, rows, vals) = m.disassemble();
+        Self { offsets, rows, vals: vals.into_iter(), pos: 0 }
+    }
+
+    // Returns `(row_indices, values)` for column `j`. Must be called with
+    // monotonically increasing `j` since values are moved out lazily.
+    fn take_col(&mut self, j: usize) -> (&[usize], impl Iterator<Item = R> + '_) {
+        debug_assert_eq!(self.pos, self.offsets[j]);
+        let range = self.offsets[j]..self.offsets[j + 1];
+        let count = range.len();
+        self.pos += count;
+        (&self.rows[range], self.vals.by_ref().take(count))
+    }
+}
+
+impl<R> MatTrait for SpMat<R> {
+    fn shape(&self) -> (usize, usize) {
+        (self.inner.nrows(), self.inner.ncols())
+    }
+}
+
 impl<R> From<CscMatrix<R>> for SpMat<R> {
     fn from(inner: CscMatrix<R>) -> Self {
         Self { inner }
@@ -411,6 +487,14 @@ impl<R> Default for SpMat<R> {
         Self::zero((0, 0))
     }
 }
+
+impl<R: PartialEq + Zero> PartialEq for SpMat<R> {
+    fn eq(&self, other: &Self) -> bool {
+        self.shape() == other.shape() && self.iter_nz().eq(other.iter_nz())
+    }
+}
+
+impl<R: Eq + Zero> Eq for SpMat<R> {}
 
 impl<R> Neg for SpMat<R>
 where R: Scalar + Neg<Output = R> {
@@ -599,17 +683,41 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn extend_cols() {
-        let mut a = SpMat::from_dense_data((4, 3), 0..12);
+    fn concat() {
+        let a = SpMat::from_dense_data((4, 3), 0..12);
         let b = SpMat::from_dense_data((4, 2), 12..20);
-        a.extend_cols(b);
+        let c = SpMat::concat(a, b);
 
-        assert_eq!(a, SpMat::from_dense_data((4,5), vec![
+        assert_eq!(c, SpMat::from_dense_data((4,5), vec![
             0,  1,  2, 12, 13,
             3,  4,  5, 14, 15,
             6,  7,  8, 16, 17,
             9, 10, 11, 18, 19,
         ]));
+    }
+
+    #[test]
+    fn stack() {
+        let a = SpMat::from_dense_data((2, 3), 0..6);
+        let b = SpMat::from_dense_data((3, 3), 6..15);
+        let c = SpMat::stack(a, b);
+
+        assert_eq!(c, SpMat::from_dense_data((5, 3), vec![
+            0,  1,  2,
+            3,  4,  5,
+            6,  7,  8,
+            9, 10, 11,
+           12, 13, 14,
+        ]));
+    }
+
+    #[test]
+    fn extend_by_zero() {
+        // [[1,2],[3,4]] extended by 1 row and 2 cols → [[1,2,0,0],[3,4,0,0],[0,0,0,0]]
+        let mut a = SpMat::from_dense_data((2, 2), [1,2,3,4]);
+        a.extend_by_zero(1, 2);
+        assert_eq!(a.shape(), (3, 4));
+        assert_eq!(a, SpMat::from_dense_data((3, 4), [1,2,0,0, 3,4,0,0, 0,0,0,0]));
     }
 
     #[test]

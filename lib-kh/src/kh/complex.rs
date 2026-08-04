@@ -1,16 +1,16 @@
 use std::ops::{RangeInclusive, Index};
-use cartesian::cartesian;
+use std::sync::OnceLock;
 
 use delegate::delegate;
 use yui_core::{Ring, RingOps, EucRing, EucRingOps};
 use yui_link::Link;
-use yui_homology::{isize2, ChainComplexTrait, Grid2, GridTrait, ChainComplex, Summand};
+use yui_homology::{ChainComplex, ChainComplexTrait, DisplaySeq, DisplayTable, Grid2, GridIter, GridTrait, Summand, SummandTrait};
 use yui_matrix::sparse::SpMat;
 
 use crate::kh::r#gen::KhChain;
 use crate::kh::internal::v1::cube::KhCube;
 use crate::kh::{KhChainGen, KhHomology};
-use crate::misc::range_of;
+use crate::misc::{make_gen_grid, range_of};
 
 use super::KhAlg;
 
@@ -27,6 +27,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     deg_shift: (isize, isize),
     reduced: bool,
     canon_cycles: Vec<KhChain<R>>,
+    gen_grid: OnceLock<Grid2<KhComplexSummand<R>>>,
 }
 
 impl<R> KhComplex<R>
@@ -61,8 +62,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         KhComplex::new_impl(complex, str, cube, deg_shift, reduced, canon_cycles)
     }
 
-    pub(crate) fn new_impl(inner: ChainComplex<KhChainGen, R>, str: KhAlg<R>, cube: KhCube<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self { 
-        KhComplex { inner, str, cube, deg_shift, reduced, canon_cycles }
+    pub(crate) fn new_impl(inner: ChainComplex<KhChainGen, R>, str: KhAlg<R>, cube: KhCube<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
+        KhComplex { inner, str, cube, deg_shift, reduced, canon_cycles, gen_grid: OnceLock::new() }
     }
 
     pub fn str(&self) -> &KhAlg<R> { 
@@ -81,12 +82,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.reduced
     }
 
-    pub fn h_range(&self) -> RangeInclusive<isize> { 
-        range_of(self.support())
+    pub fn h_range(&self) -> RangeInclusive<isize> {
+        range_of(self.support().copied())
     }
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
-        range_of(self.support().flat_map(|i| 
+        range_of(self.support().flat_map(|&i|
             self[i].raw_gens().iter().map(|x| x.q_deg())
         ))
     }
@@ -99,20 +100,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.inner
     }
 
-    pub fn gen_grid(&self) -> Grid2<Summand<KhChainGen, R>> { 
-        let h_range = self.h_range();
-        let q_range = self.q_range().step_by(2);
-        let support = cartesian!(h_range, q_range.clone()).map(|(i, j)| 
-            isize2(i, j)
-        );
-
-        Grid2::generate(support, |idx| { 
-            let isize2(i, j) = idx;
-            let gens = self[i].raw_gens().iter().filter(|x| { 
-                x.q_deg() == j
-            }).cloned();
-            Summand::from_raw_gens(gens)
-        })
+    fn gen_grid(&self) -> &Grid2<KhComplexSummand<R>> {
+        self.gen_grid.get_or_init(|| make_gen_grid(self.inner.summands()))
     }
 
     pub fn deg_shift_for(l: &Link, reduced: bool) -> (isize, isize) {
@@ -131,6 +120,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
+impl<R> KhComplex<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    pub fn homology(&self) -> KhHomology<R> {
+        self.into()
+    }
+}
+
 impl<R> Index<isize> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = KhComplexSummand<R>;
@@ -142,14 +138,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<R> GridTrait<isize> for KhComplex<R>
+impl<R> Index<(isize, isize)> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Support = std::vec::IntoIter<isize>;
-    type Item = KhComplexSummand<R>;
+    type Output = KhComplexSummand<R>;
 
     delegate! { 
-        to self.inner { 
-            fn support(&self) -> Self::Support;
+        to self.gen_grid() {
+            fn index(&self, index: (isize, isize)) -> &Self::Output;
+        }
+    }
+}
+
+impl<R> GridTrait<isize> for KhComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type Item = KhComplexSummand<R>;
+    type Support<'a> = GridIter<'a, isize, Self::Item> where Self: 'a, R: 'a;
+
+    delegate! {
+        to self.inner {
+            fn support(&self) -> Self::Support<'_>;
             fn is_supported(&self, i: isize) -> bool;
             fn get(&self, i: isize) -> &Self::Item;
             fn get_default(&self) -> &Self::Item;
@@ -172,10 +179,33 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<R> KhComplex<R>
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    pub fn homology(&self) -> KhHomology<R> {
-        self.into()
+impl<R> DisplaySeq<isize> for KhComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    delegate! {
+        to self.inner { 
+            fn display_label(&self) -> String;
+            fn display_indices(&self) -> Vec<isize>;
+            fn display_at(&self, i: &isize) -> String;
+        }
+    }
+}
+
+impl<R> DisplayTable<isize> for KhComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn display_labels(&self) -> (String, String) { 
+        ("i".to_string(), "j".to_string())
+    }
+
+    fn display_indices(&self) -> (Vec<isize>, Vec<isize>) { 
+        (self.h_range().collect(), self.q_range().step_by(2).collect())
+    }
+
+    fn display_at(&self, i: &isize, j: &isize) -> String { 
+        if self[(*i, *j)].is_zero() { 
+            ".".to_string()
+        } else { 
+            self[(*i, *j)].to_string()
+        }
     }
 }
 
@@ -219,9 +249,9 @@ mod tests {
     }
 
     #[test]
-    fn gen_grid() {
+    fn ckh_trefoil_bigr() {
         let l = Link::trefoil();
-        let c = KhComplex::new(&l, &0, &0, false).gen_grid();
+        let c = KhComplex::new(&l, &0, &0, false);
 
         assert_eq!(c[(-3, -9)].rank(), 1);
         assert_eq!(c[(-3, -7)].rank(), 1);
@@ -232,9 +262,9 @@ mod tests {
     }
 
     #[test]
-    fn gen_grid_red() {
+    fn ckh_trefoil_bigr_red() {
         let l = Link::trefoil();
-        let c = KhComplex::new(&l, &0, &0, true).gen_grid();
+        let c = KhComplex::new(&l, &0, &0, true);
 
         assert_eq!(c[(-3, -8)].rank(), 1);
         assert_eq!(c[(-2, -6)].rank(), 1);

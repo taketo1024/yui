@@ -399,7 +399,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let canon_cycles = self.eval_elements();
         let c = self.into_tng_complex().into_kh_complex(canon_cycles);
         
-        info!("  done\n{}", c.display_seq("i"));
+        info!("  done\n{}", c.display_seq());
 
         c
     }

@@ -150,9 +150,9 @@ where
 
     fn show_table(&mut self, h: &KhHomology<R>, bigraded: bool) { 
         let table = if bigraded { 
-            h.gen_grid().display_table("i", "j")
+            h.display_table()
         } else { 
-            h.display_seq("i")
+            h.display_seq()
         };
 
         self.out(&table);
@@ -163,7 +163,7 @@ where
     }
 
     fn show_gens(&mut self, h: &KhHomology<R>) { 
-        for i in h.support() {
+        for &i in h.support() {
             if h[i].is_zero() { continue }
 
             self.out(&format!("({i}): {}", h[i]));
@@ -176,7 +176,6 @@ where
     }
 
     fn show_matrix_bigr(&mut self, h: &KhHomology<R>, f: &KhChainMap<R>, deg: (isize, isize)) { 
-        let grid = h.gen_grid();
         for d in h.delta_range().step_by(2) { 
             self.out(&format!("delta: {d}\n"));
 
@@ -185,15 +184,15 @@ where
                 let i2 = i1 + deg.0;
                 let j2 = j1 + deg.1;
 
-                let h1 = &grid[(i1, j1)];
-                let h2 = &grid[(i2, j2)];
+                let h1 = &h[(i1, j1)];
+                let h2 = &h[(i2, j2)];
 
                 if h1.is_zero() || h2.is_zero() { continue; }
 
                 let mat = h1.make_matrix_euc(h2, |z| f.apply(i1, z)).into_dense();
                 let r = mat.rank();
                 
-                self.out(&format!("  ({i1}, {j1}): {} -> ({i2}, {j2}): {}; rank: {}", grid[(i1, j1)], grid[(i2, j2)], r));
+                self.out(&format!("  ({i1}, {j1}): {} -> ({i2}, {j2}): {}; rank: {}", h[(i1, j1)], h[(i2, j2)], r));
                 self.out(&format!("{}\n", mat.to_string().trim_end()));
             }
         }

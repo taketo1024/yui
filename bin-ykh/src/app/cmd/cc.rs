@@ -122,9 +122,9 @@ where
 
     fn show_table(&mut self, label: &str, h: &KhHomology<R>, bigraded: bool, with_gens: bool) { 
         let table = if bigraded { 
-            h.gen_grid().display_table("i", "j")
+            h.display_table()
         } else { 
-            h.display_seq("i")
+            h.display_seq()
         };
 
         self.out(label);
@@ -136,7 +136,7 @@ where
     }
 
     fn show_gens(&mut self, h: &KhHomology<R>) { 
-        for i in h.support() {
+        for &i in h.support() {
             if h[i].is_zero() { continue }
 
             self.out(&format!("({i}): {}", h[i]));
@@ -157,8 +157,8 @@ where
 
             for z in h1[i].gens() { 
                 let w = f.apply(i, &z);
-                let x = h1[i].vectorize_euc(&z).into_vec();
-                let y = h2[j].vectorize_euc(&w).into_vec();
+                let x = h1[i].vectorize_euc(&z).into_dense();
+                let y = h2[j].vectorize_euc(&w).into_dense();
                 self.out(&format!("\t{:?} -> {:?}", x, y));
             }
             self.out("");

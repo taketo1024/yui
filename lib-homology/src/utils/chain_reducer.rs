@@ -4,13 +4,12 @@ use log::*;
 use sprs::PermOwned;
 
 use yui_matrix::sparse::*;
-use yui_matrix::sparse::pivot::{PivotType, PivotCondition, perms_by_pivots, find_pivots};
+use yui_matrix::sparse::pivot::{PivotCondition, PivotFinderConfig, PivotType, find_pivots, perms_by_pivots};
 use yui_matrix::sparse::schur::Schur;
-use yui_matrix::sparse::triang::{solve_triangular_vec, TriangularType};
 use yui_core::{Ring, RingOps};
 
 use crate::generic::GenericChainComplexBase;
-use crate::{GridDeg, ChainComplexTrait, GridTrait};
+use crate::{ChainComplexTrait, GridDeg, GridTrait, SummandTrait};
 
 //       a0 = [x]      a1 = [a b]      a2 = [z w]
 //            [y]           [c d]     
@@ -34,7 +33,6 @@ where
     d_deg: I,
     mats: HashMap<I, SpMat<R>>,
     trans: HashMap<I, Trans<R>>,
-    vecs: HashMap<I, Vec<SpVec<R>>>
 }
 
 impl<I, R> ChainReducer<I, R>
@@ -43,7 +41,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
     pub fn reduce<C>(complex: &C, with_trans: bool) -> Self
-    where C: GridTrait<I> + ChainComplexTrait<I, R = R> {
+    where C: GridTrait<I> + ChainComplexTrait<I, R = R>, C::Item: SummandTrait<R = R> {
         let mut r = Self::from(complex, with_trans);
         r.reduce_all(false);
         r.reduce_all(true);
@@ -51,8 +49,8 @@ where
     }
 
     pub fn from<C>(complex: &C, with_trans: bool) -> Self 
-    where C: GridTrait<I> + ChainComplexTrait<I, R = R> {
-        let support = complex.support();
+    where C: GridTrait<I> + ChainComplexTrait<I, R = R>, C::Item: SummandTrait<R = R> {
+        let support = complex.support().copied();
         let d_deg = complex.d_deg();
 
         let mut reducer = Self::new(support, d_deg);
@@ -71,11 +69,29 @@ where
 
     pub fn new<Itr>(support: Itr, d_deg: I) -> Self
     where Itr: Iterator<Item = I> {
-        let support = support.collect_vec();
+        let support = Self::sort_support(support, d_deg);
         let mats = HashMap::new();
         let trans = HashMap::new();
-        let vecs = HashMap::new();
-        Self { support, d_deg, mats, trans, vecs }
+        Self { support, d_deg, mats, trans }
+    }
+
+    // MEMO: not efficient, but usually the support set is small. 
+    fn sort_support(support: impl Iterator<Item = I>, d_deg: I) -> Vec<I> { 
+        let mut res: Vec<I> = Vec::new();
+
+        for i0 in support.sorted() { 
+            let next = i0 + d_deg;
+            let prev = i0 - d_deg;
+            if let Some(p) = res.iter().find_position(|i| i == &&prev) { 
+                res.insert(p.0 + 1, i0);
+            } else if let Some(p) = res.iter().find_position(|i| i == &&next) {
+                res.insert(p.0, i0);
+            } else { 
+                res.push(i0);
+            }
+        }
+
+        res
     }
 
     pub fn support(&self) -> &[I] { 
@@ -88,10 +104,6 @@ where
 
     pub fn trans(&self, i: I) -> Option<&Trans<R>> {
         self.trans.get(&i)
-    }
-
-    pub fn vecs(&self, i: I) -> Option<&Vec<SpVec<R>>> { 
-        self.vecs.get(&i)
     }
 
     pub fn trans_mut(&mut self, i: I) -> Option<&mut Trans<R>> {
@@ -120,19 +132,15 @@ where
         self.mats.insert(i, d);
     }
 
-    pub fn add_vec(&mut self, i: I, v: SpVec<R>) { 
-        self.vecs.entry(i).or_default().push(v)
-    }
-
     pub fn reduce_all(&mut self, deep: bool) { 
         if self.is_done() { 
             return
         }
         
         if deep { 
-            info!("reduce all (deep)");
+            debug!("reduce all (deep)");
         } else {
-            info!("reduce all (shallow)");
+            debug!("reduce all (shallow)");
         }
 
         let support = self.support.clone();
@@ -153,7 +161,7 @@ where
             }
 
             c += 1;
-            debug!("next itr: {c}");
+            trace!("next itr: {c}");
         }
     }
 
@@ -166,64 +174,40 @@ where
             return false;
         }
 
-        info!("reduce C[{i}]: {:?} ..", a.shape());
-        debug!("  nnz: {}", a.nnz());
-        debug!("  density: {}", a.density());
-        debug!("  mean-weight: {}", a.mean_weight());
+        debug!("reduce C[{i}]: {:?} ..", a.shape());
+        trace!("  nnz: {}", a.nnz());
+        trace!("  density: {}", a.density());
+        trace!("  mean-weight: {}", a.mean_weight());
 
         let (p, q, r) = pivots(a, piv_type, piv_cond);
 
         if r == 0 { 
-            info!("  done.");
+            debug!("  done.");
             return false;
         }
-
-        info!("  found {r} pivots.");
-        
-        let a = a.permute(p.view(), q.view());
-
-        let t = match piv_type { 
-            PivotType::Rows => TriangularType::Upper,
-            PivotType::Cols => TriangularType::Lower
-        };
 
         let with_trans = 
             self.trans.contains_key(&i) || 
             self.trans.contains_key(&(i + self.d_deg));
 
-        let sch = Schur::from_partial_triangular(t, &a, r, with_trans);
-        let (s, t_src, t_tgt) = sch.disassemble();
+        let sch = Schur::from_pivots(&a, piv_type, &p, &q, r, with_trans, with_trans);
+        let t_src = sch.trans_src();
+        let t_tgt = sch.trans_tgt();
+        let s = sch.into_s();
 
-        info!("  reduced C[{i}]: {:?} -> {:?}", a.shape(), s.shape());
+        debug!("  reduced C[{i}]: {:?} -> {:?}", a.shape(), s.shape());
 
         self.update_mats(i, &p, &q, r, s);
 
-        if with_trans { 
-            let t_src = t_src.unwrap();
-            let t_tgt = t_tgt.unwrap();
-            self.update_trans(i, &p, &q, t_src, t_tgt);
+        if with_trans {
+            self.update_trans(i, &p, &q, t_src.unwrap(), t_tgt.unwrap());
         }
-
-        self.update_vecs(i, &a, &p, &q, r, t);
 
         true
     }
 
-    pub fn preferred_strategy(&self, i: I) -> (PivotType, PivotCondition) { 
-        let Some(a) = self.matrix(i) else { 
-            panic!("not initialized at {i}");
-        };
-
-        // TODO improve
-        let piv_type = PivotType::Cols;
-
-        let piv_cond = if a.iter().any(|(_, _, r)| r.is_pm_one()) { 
-            PivotCondition::One
-        } else { 
-            PivotCondition::AnyUnit
-        };
-
-        (piv_type, piv_cond)
+    pub fn preferred_strategy(&self, _i: I) -> (PivotType, PivotCondition) { 
+        (PivotType::Cols, PivotCondition::One)
     }
 
     fn update_trans(&mut self, i: I, p: &PermOwned, q: &PermOwned, t_src: Trans<R>, t_tgt: Trans<R>) {
@@ -259,40 +243,6 @@ where
         }
     }
 
-    fn update_vecs(&mut self, i: I, a: &SpMat<R>, p: &PermOwned, q: &PermOwned, r: usize, t: TriangularType) {
-        let (m, n) = a.shape();
-        let (_, i1, i2) = self.deg_trip(i);
-        
-        if let Some(vs) = self.vecs.get_mut(&i1) { 
-            for v in vs.iter_mut() { 
-                assert_eq!(v.dim(), n);
-
-                let w = v.extract(n - r, |i| {
-                    let i = q.at(i);
-                    (r..n).contains(&i).then(|| i - r)
-                });
-
-                *v = w;
-            }
-        }
-
-        if let Some(vs) = self.vecs.get_mut(&i2) { 
-            debug!("update {} vecs in C[{i2}] ..", vs.len());
-
-            let [a, _, c, _] = a.divide4((r, r));
-            
-            for v in vs.iter_mut() { 
-                assert_eq!(v.dim(), m);
-
-                let (x, y) = v.permute(p.view()).split(r);
-                let ainvx = solve_triangular_vec(t, &a, &x);
-                let w = y - &c * ainvx;
-
-                *v = w;
-            }
-        }
-    }
-
     fn deg_trip(&self, i: I) -> (I, I, I) { 
         let deg = self.d_deg;
         (i - deg, i, i + deg)
@@ -305,9 +255,10 @@ where
     }
 }
 
-fn pivots<R>(a: &SpMat<R>, piv_type: PivotType, pivot_cond: PivotCondition) -> (PermOwned, PermOwned, usize) 
+fn pivots<R>(a: &SpMat<R>, piv_type: PivotType, piv_cond: PivotCondition) -> (PermOwned, PermOwned, usize) 
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let pivs = find_pivots(a, piv_type, pivot_cond);
+    let config = PivotFinderConfig { piv_type, piv_cond, ..Default::default() };
+    let pivs = find_pivots(a, config);
     let (p, q) = perms_by_pivots(a, &pivs);
     let r = pivs.len();
     (p, q, r)
@@ -333,10 +284,26 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use num_traits::Zero;
     use crate::generic::GenericChainComplex;
     use crate::SummandTrait;
     use super::*;
+
+    #[test]
+    fn sort_asc() { 
+        let supp: HashSet<isize> = HashSet::from_iter(0isize..10);
+        let sort = ChainReducer::<_, i32>::sort_support(supp.into_iter(), 1);
+        assert_eq!(sort, (0..10).collect_vec());
+    }
+
+    #[test]
+    fn sort_desc() { 
+        let supp: HashSet<isize> = HashSet::from_iter(0isize..10);
+        let sort = ChainReducer::<_, i32>::sort_support(supp.into_iter(), -1);
+        assert_eq!(sort, (0..10).rev().collect_vec());
+    }
 
     #[test]
     fn zero() { 
@@ -534,7 +501,7 @@ mod tests {
         let dw = c[1].vectorize(&dx);
         let dv = t1.forward(&dw);
 
-        assert_eq!(dv.to_dense()[0].abs(), 2);
+        assert_eq!(dv.into_dense()[0].abs(), 2);
 
         let v = SpVec::unit(1, 0);
         let w = t1.backward(&v);

@@ -25,10 +25,13 @@ where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {
     {
         let d_matrices = Grid::generate(support, d_matrix_map);
 
-        let summands = Grid::generate(d_matrices.support(), |i| {
-            let r = d_matrices[i].ncols();
-            GenericSummand::generate_free(i, r)
-        });
+        let summands = Grid::generate(
+            d_matrices.support().copied(), 
+            |i| {
+                let r = d_matrices[i].ncols();
+                GenericSummand::generate_free(i, r)
+            }
+        );
 
         Self::new(
             summands.clone(), d_deg, 

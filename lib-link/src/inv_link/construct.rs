@@ -4,7 +4,7 @@
 
 use num_integer::Integer;
 
-use crate::{InvLink, Link};
+use crate::{Edge, InvLink, Link};
 
 impl InvLink {
     /// The 3-pretzel `P(a, b, a)` with its strong inversion (the π-rotation through the middle
@@ -26,13 +26,22 @@ impl InvLink {
     // e ≠ base_pt), split evenly across the axis so the diagram stays τ-invariant. `tw` counts from
     // the Seifert framing and must be even. The base point lands on the doubled on-axis strand.
     pub fn whitehead_double(l: &InvLink, positive: bool, tw: i32) -> InvLink {
-        assert!(tw.is_even(), "tw must be even for a τ-symmetric diagram");
-
         let base = l.base_pt().expect("companion needs a base point");
-        assert_eq!(l.inv_edge(base), base, "base point must be on-axis");
         let cut = l.edges().into_iter()
             .find(|&e| e != base && l.inv_edge(e) == e)
             .expect("need a second on-axis edge for the clasp");
+        Self::whitehead_double_at(l, positive, tw, cut)
+    }
+
+    // The same, with the clasp placed at a chosen on-axis edge. The axis meets the knot twice, so
+    // `cut` is the on-axis edge that does not carry the base point.
+    pub fn whitehead_double_at(l: &InvLink, positive: bool, tw: i32, cut: Edge) -> InvLink {
+        assert!(tw.is_even(), "tw must be even for a τ-symmetric diagram");
+        assert_eq!(l.inv_edge(cut), cut, "the clasp edge {cut} must be on-axis");
+
+        let base = l.base_pt().expect("companion needs a base point");
+        assert_eq!(l.inv_edge(base), base, "base point must be on-axis");
+        assert_ne!(cut, base, "the clasp cannot sit at the base point");
 
         let half = l.writhe() + tw / 2;   // (2·writhe + tw) / 2 = half the blackboard framing
         let (inner, base_edges) = Link::whitehead_double_impl(l.inner(), positive, half, half, cut, Some(base));
@@ -47,6 +56,7 @@ impl InvLink {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use itertools::Itertools;
     use crate::misc::det;
 
     #[test]
@@ -57,6 +67,34 @@ mod tests {
         assert_eq!(k.n_crossings(), 9);
         assert_eq!(det(k.inner()), 9);  // |ab + bc + ca|
         assert_eq!(k.writhe(), 3);      // = -(2a + b) for anti-parallel bands
+    }
+
+    #[test]
+    fn whitehead_double_clasp_placement() {
+        // The axis meets the knot twice, so the clasp has exactly two possible homes. They give
+        // different diagrams in general; for P(a, b, a) the pretzel's extra symmetry makes them
+        // agree, up to relabelling (also checked for P(-5,5,-5) in experiments/link_check).
+        let k = InvLink::sym_pretzel(-3, 3, -3);
+        let axis = k.edges().into_iter().filter(|&e| k.inv_edge(e) == e).collect_vec();
+        assert_eq!(axis.len(), 2, "a strong inversion fixes exactly two edges");
+
+        for positive in [true, false] {
+            // swapping the roles of the two on-axis edges: each takes a turn holding the base point,
+            // and the clasp goes to the other.
+            let ds = axis.iter().map(|&base| {
+                let kb = k.clone().with_base_pt(base);
+                InvLink::whitehead_double_at(&kb, positive, 0, other(&axis, base))
+            }).collect_vec();
+            // least PD code over all start edges — a canonical form for the diagram's labelling.
+            let canon = |k: &InvLink| k.inner().edges().into_iter()
+                .map(|e| k.inner().reindexed(e, 1).pd_code())
+                .min().unwrap();
+            assert_eq!(canon(&ds[0]), canon(&ds[1]), "the two clasp placements differ");
+        }
+    }
+
+    fn other(axis: &[Edge], e: Edge) -> Edge {
+        *axis.iter().find(|&&f| f != e).unwrap()
     }
 
     #[test]

@@ -4,8 +4,7 @@
 
 use num_integer::Integer;
 
-use crate::{Edge, InvLink, Link, LinkBuilder};
-use crate::NodeType::{XL, XR};
+use crate::{Edge, InvLink, Link};
 
 impl InvLink {
     // Equivariant connected sum at the two (on-axis) base points.
@@ -34,24 +33,9 @@ impl InvLink {
         assert_eq!(a, c, "the strong inversion needs P(a, b, a)");
         assert!(a % 2 != 0 && b % 2 != 0, "all-odd parameters required");
 
-        let mut bld = LinkBuilder::new();
-        let ends: Vec<_> = [a, b, c].iter().map(|&v| {
-            let ty = if v > 0 { XR } else { XL };
-            bld.add_v_twist(ty, v.unsigned_abs() as usize) // (sw, se, ne, nw)
-        }).collect();
-        let (sw1, se1, ne1, nw1) = ends[0];
-        let (sw2, se2, ne2, nw2) = ends[1];
-        let (sw3, se3, ne3, nw3) = ends[2];
-
-        bld.connect(ne1, nw2);
-        bld.connect(ne2, nw3);
-        bld.connect(se1, sw2);
-        bld.connect(se2, sw3);
-        bld.connect(nw1, ne3); // spanning top (τ-fixed)
-        bld.connect(sw1, se3); // spanning bottom (τ-fixed)
-
-        let start = bld.edge_at(nw1).unwrap();
-        let link = bld.build().expect("pretzel must be planar").reindexed(start, 1);
+        // the two spanning arcs are τ-fixed; `Link::pretzel` numbers from the top one, which is what
+        // the standard involution expects.
+        let link = Link::pretzel(a, b, c);
         InvLink::from_symmetric_pd_code(link.pd_code())
     }
 
@@ -91,6 +75,16 @@ mod tests {
         let cs = k1.conn_sum(&k2);
         assert!(cs.is_knot());
         assert_eq!(det(cs.inner()), 3 * 5, "det is multiplicative under conn sum");
+    }
+
+    #[test]
+    fn sym_pretzel_is_symmetric() {
+        // construction succeeding ⟺ the standard involution is realized by the pretzel numbering.
+        let k = InvLink::sym_pretzel(-3, 3, -3);
+        assert!(k.is_knot());
+        assert_eq!(k.n_crossings(), 9);
+        assert_eq!(det(k.inner()), 9);  // |ab + bc + ca|
+        assert_eq!(k.writhe(), 3);      // = -(2a + b) for anti-parallel bands
     }
 
     #[test]

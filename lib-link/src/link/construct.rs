@@ -31,6 +31,34 @@ impl Link {
         b.build().unwrap()
     }
 
+    // The 3-pretzel P(a, b, c): three vertical twist regions of |a|, |b|, |c| half-twists, chained by
+    // their inner arcs and closed by one spanning arc on the top and one on the bottom. A positive
+    // parameter is a right-handed (XR) region; all three must be nonzero. Edge 1 is the top spanning
+    // arc.
+    pub fn pretzel(a: i32, b: i32, c: i32) -> Link {
+        use crate::NodeType::{XL, XR};
+        assert!(a != 0 && b != 0 && c != 0, "pretzel parameters must be nonzero");
+
+        let mut bld = LinkBuilder::new();
+        let ends: Vec<_> = [a, b, c].iter().map(|&v| {
+            let ty = if v > 0 { XR } else { XL };
+            bld.add_v_twist(ty, v.unsigned_abs() as usize) // (sw, se, ne, nw)
+        }).collect();
+        let (sw1, se1, ne1, nw1) = ends[0];
+        let (sw2, se2, ne2, nw2) = ends[1];
+        let (sw3, se3, ne3, nw3) = ends[2];
+
+        bld.connect(ne1, nw2);
+        bld.connect(ne2, nw3);
+        bld.connect(se1, sw2);
+        bld.connect(se2, sw3);
+        bld.connect(nw1, ne3); // spanning top
+        bld.connect(sw1, se3); // spanning bottom
+
+        let start = bld.edge_at(nw1).unwrap();
+        bld.build().expect("pretzel must be planar").reindexed(start, 1)
+    }
+
     // Blackboard-framed 2-cable: each crossing → a 2×2 block of 4 sub-crossings of the same type,
     // each edge → 2 parallel edges. Every component doubles into its two parallel copies
     // (n components → 2n; framing = the diagram's writhe per component).
@@ -197,6 +225,22 @@ mod tests {
             assert_eq!(det(&k), 2 * n + 1, "det twist_knot({n})");
             assert_eq!(det(&Link::twist_knot(-1 - n)), 2 * n + 1, "det twist_knot({})", -1 - n);
         }
+    }
+
+    #[test]
+    fn pretzel_determinants() {
+        // det P(a, b, c) = |ab + bc + ca| — includes the (-2, 3, 7)-pretzel (det 1).
+        for (a, b, c) in [(1, 1, 1), (-1, -1, -1), (3, 5, 7), (-2, 3, 7), (-5, 5, -5)] {
+            let l = Link::pretzel(a, b, c);
+            let n = (a.unsigned_abs() + b.unsigned_abs() + c.unsigned_abs()) as usize;
+            assert_eq!(l.n_crossings(), n, "P({a},{b},{c}) crossing count");
+            assert_eq!(det(&l), (a * b + b * c + c * a).abs(), "det P({a},{b},{c})");
+        }
+    }
+
+    #[test]
+    fn pretzel_trefoil() {
+        assert!(same_knot(&Link::pretzel(1, 1, 1), &Link::test_data("3_1")));
     }
 
     #[test]

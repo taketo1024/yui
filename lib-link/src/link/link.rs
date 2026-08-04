@@ -104,6 +104,15 @@ impl Link {
         self.nodes().all(|n| n.is_oriented())
     }
 
+    // An orientation belongs to the whole diagram: once any node has lost it, drop it everywhere.
+    pub(crate) fn normalize_ori(&mut self) {
+        if !self.is_oriented() {
+            self.nodes.iter_mut().for_each(|n|
+                n.set_incoming(None)
+            );
+        }
+    }
+
     // Oriented throughout or not at all, every edge from an outgoing slot to an incoming one.
     pub fn verify_ori(&self) {
         let n_ori = self.nodes.iter().filter(|x| x.is_oriented()).count();

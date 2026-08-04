@@ -63,9 +63,10 @@ impl Link {
 
     pub fn resolve_at(&self, i: usize, r: Bit) -> Self {
         assert!(self.node(i).is_crossing());
-        self.clone_and(|l|
-            *l.node_mut(i) = l.node(i).resolve(r)
-        )
+        self.clone_and(|l| {
+            *l.node_mut(i) = l.node(i).resolve(r);
+            l.normalize_ori();
+        })
     }
 
     pub fn resolve_by(&self, s: &State) -> Self {
@@ -78,6 +79,7 @@ impl Link {
             for (i, r) in Iterator::zip(itr, s.iter()) {
                 *l.node_mut(i) = self.node(i).resolve(r);
             }
+            l.normalize_ori();
         })
     }
 
@@ -171,6 +173,21 @@ mod tests {
 
         assert_eq!(l.node(1),  &Node::new(XL, Some((Slot::SW, Slot::SE)), [3,6,4,1]));
         assert_eq!(l2.node(1), &Node::new(XR, Some((Slot::SW, Slot::SE)), [3,6,4,1]));
+    }
+
+    #[test]
+    fn resolve_drops_the_orientation_wholesale() {
+        // a smoothing that does not respect the orientation costs the whole diagram its own; only
+        // the Seifert state keeps it.
+        let l = Link::test_data("3_1");
+        assert_eq!(l.seifert_state(), State::from([1, 1, 1]));
+
+        assert!(l.resolve_by(&State::from([1, 1, 1])).is_oriented());
+        for st in [[0, 0, 0], [1, 0, 0], [1, 1, 0]] {
+            let r = l.resolve_by(&State::from(st));
+            assert!(!r.is_oriented(), "{st:?} left a partial orientation");
+            r.verify_ori();
+        }
     }
 
     #[test]

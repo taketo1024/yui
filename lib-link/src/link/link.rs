@@ -18,7 +18,7 @@ pub type StateRepr = u128;
 
 pub type State = yui_core::bitseq::BitSeq<StateRepr>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Link {
     nodes: Vec<Node>,
     loops: Vec<Edge>,
@@ -342,6 +342,16 @@ impl Link {
         Link::new(nodes, []).with_base_pt(base)
     }
 
+    // The canonical relabelling: the least `reindexed(e, 1)` over all start edges. Rebuilt from that
+    // PD code so the node order is canonical too, making `==` equality up to relabelling.
+    pub fn reindexed_canon(&self) -> Link {
+        let pd = self.edges().into_iter()
+            .map(|e| self.reindexed(e, 1).pd_code())
+            .min()
+            .expect("a knot has at least one edge");
+        Self::from_pd_code(pd)
+    }
+
     // The two (node, slot) ends of edge `e`. When `directed`, they are ordered as (tail, head)
     // along the orientation — the strand exits at the tail and enters at the head (cf.
     // `NodeOri::in_ports`); otherwise the order carries no meaning.
@@ -614,9 +624,7 @@ mod tests {
     #[test]
     fn reindexed_numbers_along_the_orientation() {
         // Renumbering depends only on (diagram, start edge), so the least code is a canonical form.
-        let canon = |k: &Link| k.edges().into_iter()
-            .map(|e| k.reindexed(e, 1).pd_code())
-            .min().unwrap();
+        let canon = |k: &Link| k.reindexed_canon();
 
         for l in [Link::test_data("3_1"), Link::test_data("6_1"), Link::pretzel(1, 3, 5)] {
             let c = canon(&l);

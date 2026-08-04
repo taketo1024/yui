@@ -246,12 +246,9 @@ mod tests {
         // strand directions. Rotating or reversing the bands may reverse the direction (it does
         // whenever a band is even), so the orientation must be quotiented out here.
         let canon = |l: &Link| {
-            let least = |k: &Link| k.edges().into_iter()
-                .map(|e| k.reindexed(e, 1).pd_code())
-                .min().unwrap();
             // reverse the strand: the under-strand enters at the far end, CCW order unchanged.
             let rev = Link::from_pd_code(l.pd_code().into_iter().map(|[a, b, c, d]| [c, d, a, b]));
-            least(l).min(least(&rev))
+            l.reindexed_canon().pd_code().min(rev.reindexed_canon().pd_code())
         };
 
         for (a, b, c) in [(1, 3, 5), (3, 5, 7), (-3, 3, -3), (-2, 3, 7), (-5, 5, -5)] {

@@ -85,10 +85,7 @@ mod tests {
                 let kb = k.clone().with_base_pt(base);
                 InvLink::whitehead_double_at(&kb, positive, 0, other(&axis, base))
             }).collect_vec();
-            // least PD code over all start edges — a canonical form for the diagram's labelling.
-            let canon = |k: &InvLink| k.inner().edges().into_iter()
-                .map(|e| k.inner().reindexed(e, 1).pd_code())
-                .min().unwrap();
+            let canon = |k: &InvLink| k.inner().reindexed_canon();
             assert_eq!(canon(&ds[0]), canon(&ds[1]), "the two clasp placements differ");
         }
     }

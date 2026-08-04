@@ -6,6 +6,8 @@ use delegate::delegate;
 use derive_more::Display;
 use auto_impl_ops::auto_ops;
 use num_traits::{Zero, One};
+use yui_core::{EucRing, EucRingOps};
+use crate::dense::snf::SnfCalc;
 use crate::MatTrait;
 use crate::sparse::SpMat;
 
@@ -48,6 +50,12 @@ where R: Scalar {
         DMatrix::from_row_iterator(shape.0, shape.1, data).into()
     }
 
+    pub fn from_generator<F>(shape: (usize, usize), generator: F) -> Self
+    where F: Fn(usize, usize) -> R { 
+        let f = &generator;
+        Self::from_data(shape, (0..shape.0).flat_map(|i| (0..shape.1).map(move |j| f(i, j))))
+    }
+
     pub fn zero(shape: (usize, usize)) -> Self
     where R: Zero { 
         let inner = DMatrix::zeros(shape.0, shape.1);
@@ -71,6 +79,11 @@ where R: Scalar {
             i == j && a.is_one() || 
             i != j && a.is_zero()
         )
+    }
+
+    pub fn scalar(size: usize, r: &R) -> Self
+    where R: Zero + Clone { 
+        Self::diag((size, size), vec![r; size].into_iter().cloned())
     }
 
     pub fn diag<I>(shape: (usize, usize), entries: I) -> Self
@@ -113,6 +126,20 @@ where R: Scalar {
     pub fn into_sparse(self) -> SpMat<R>
     where R: Zero + ClosedAddAssign { 
         self.into()
+    }
+
+    pub fn rank(&self) -> usize
+    where R: EucRing, for<'a> &'a R: EucRingOps<R> { 
+        let mut calc = SnfCalc::new(self.clone(), [false; 4]);
+        calc.process();
+        calc.result().rank()
+    }
+
+    pub fn map<S, F>(&self, f: F) -> Mat<S>
+    where S: Scalar, F: Fn(&R) -> S { 
+        let data = self.inner.iter().map(f);
+        let inner = DMatrix::from_iterator(self.nrows(), self.ncols(), data);
+        Mat::from(inner)
     }
 }
 
@@ -261,6 +288,8 @@ where R: Scalar {
 
 #[cfg(test)]
 mod tests { 
+    use itertools::Itertools;
+
     use super::*;
 
     #[test]
@@ -410,6 +439,39 @@ mod tests {
         assert_eq!(b, Mat::from_data((2, 2), [
              6, 8,
             11,12           
+        ]));
+    }
+
+    #[test]
+    fn from_generator() {
+        let a = Mat::from_generator((2, 3), |i, j| (i * 3 + j) as i32);
+        assert_eq!(a, Mat::from_data((2, 3), [0, 1, 2, 3, 4, 5]));
+    }
+
+    #[test]
+    fn iter() { 
+        let a = Mat::from_data((2, 3), [
+            1, 2, 3,
+            4, 5, 6,
+        ]);
+        let data = a.iter().collect_vec();
+        assert_eq!(data, vec![
+            (0, 0, &1), (1, 0, &4), 
+            (0, 1, &2), (1, 1, &5), 
+            (0, 2, &3), (1, 2, &6)
+        ]);
+    }
+
+    #[test]
+    fn map() { 
+        let a = Mat::from_data((2, 3), [
+            1, 2, 3,
+            4, 5, 6,
+        ]);
+        let b = a.map(|r| 2 * r);
+        assert_eq!(b, Mat::from_data((2, 3), [
+            2,  4,  6,
+            8, 10, 12,
         ]));
     }
 }

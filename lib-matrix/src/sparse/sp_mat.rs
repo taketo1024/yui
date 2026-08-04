@@ -2,6 +2,7 @@ use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, MulAssign, Range};
 use std::iter::zip;
 use std::fmt::{Display, Debug};
 use delegate::delegate;
+use itertools::Itertools;
 use nalgebra_sparse::na::{Scalar, ClosedAddAssign, ClosedSubAssign, ClosedMulAssign};
 use nalgebra_sparse::{CscMatrix, CooMatrix};
 use num_traits::{Zero, One, ToPrimitive};
@@ -32,7 +33,7 @@ impl<R> SpMat<R> {
         self.inner
     }
 
-    pub fn data(&self) -> (&[usize], &[usize], &[R]) { 
+    pub fn csc_data(&self) -> (&[usize], &[usize], &[R]) { 
         self.inner.csc_data()
     }
 
@@ -119,6 +120,43 @@ impl<R> SpMat<R> {
         let w = self.iter().map(|(_, _, a)| a.c_weight()).sum::<f64>(); 
         w / nnz
     }
+
+    pub fn block_diag<'a, I>(blocks: I) -> SpMat<R>
+    where I: IntoIterator<Item = SpMat<R>> { 
+        let mut shape = (0, 0);
+        let mut col_offsets: Vec<usize> = vec![];
+        let mut row_indices: Vec<usize> = vec![];
+        let mut values: Vec<R> = vec![];
+
+        for a in blocks { 
+            let a_shape = a.shape();
+            let (a_cols, a_rows, mut a_vals) = a.disassemble();
+
+            col_offsets.extend(a_cols.iter().map(|i| i + values.len()));
+            col_offsets.pop(); // remove last offset
+
+            row_indices.extend(a_rows.iter().map(|i| i + shape.0));
+            values.append(&mut a_vals);
+
+            shape.0 += a_shape.0;
+            shape.1 += a_shape.1;
+        }
+        col_offsets.push(values.len());
+
+        let csc = CscMatrix::try_from_csc_data(shape.0, shape.1, col_offsets, row_indices, values)
+            .expect("Broken CSC data");
+
+        SpMat::from(csc)
+    }
+
+    pub fn map_values<F, S>(self, f: F) -> SpMat<S>
+    where F: Fn(R) -> S {
+        let (m, n) = self.shape();
+        let (cols, rows, vals) = self.disassemble();
+        let vals = vals.into_iter().map(|r| f(r)).collect_vec();
+        let csc = CscMatrix::try_from_csc_data(m, n, cols, rows, vals).expect("Broken CSC data");
+        SpMat::<S>::from(csc)
+    }
 }
 
 impl<R> SpMat<R> 
@@ -134,6 +172,12 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         }
         let csc = CscMatrix::from(&coo);
         Self::from(csc)
+    }
+
+    pub fn from_generator<F>(shape: (usize, usize), generator: F) -> Self
+    where F: Fn(usize, usize) -> R { 
+        let f = &generator;
+        Self::from_entries(shape, (0..shape.0).flat_map(|i| (0..shape.1).map(move |j| (i, j, f(i, j)))))
     }
 
     pub fn from_col_vecs<I>(nrows: usize, vecs: I) -> Self 
@@ -166,6 +210,10 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
                 (i, j, a)
             })
         )
+    }
+
+    pub fn scalar(n: usize, a: &R) -> Self { 
+        Self::from_entries((n, n), (0..n).map(|i| (i, i, a.clone())))
     }
 
     pub fn col_vec(&self, j: usize) -> SpVec<R>
@@ -493,6 +541,16 @@ pub(super) mod tests {
     }
 
     #[test]
+    fn from_generator() {
+        let a = SpMat::from_generator((3, 4), |i, j| (i + j) as i32);
+        assert_eq!(a, SpMat::from_dense_data((3, 4), vec![
+            0, 1, 2, 3,
+            1, 2, 3, 4,
+            2, 3, 4, 5,
+        ]));
+    }
+
+    #[test]
     fn to_dense() { 
         let a = SpMat::from_entries((2, 2), [
             (0, 0, 1),
@@ -568,6 +626,21 @@ pub(super) mod tests {
         let p = PermOwned::new(vec![2,0,1,3]);
         let q = SpMat::from_col_perm(p.view());
         assert!(&a * q == a.permute_cols(p.view()))
+    }
+
+    #[test]
+    fn block_diag() { 
+        let a = SpMat::from_dense_data((2, 2), 1..=4);
+        let b = SpMat::from_dense_data((1, 3), 5..=7);
+        let c = SpMat::from_dense_data((2, 1), 8..=9);
+        let d = SpMat::block_diag([a, b, c]);
+        assert_eq!(d, SpMat::from_dense_data((5, 6), [
+            1,2,0,0,0,0,
+            3,4,0,0,0,0,
+            0,0,5,6,7,0,
+            0,0,0,0,0,8,
+            0,0,0,0,0,9
+        ]))
     }
 
     #[test]

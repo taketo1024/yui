@@ -1,3 +1,4 @@
+use crate::app::args::*;
 use crate::app::utils::*;
 use crate::app::err::*;
 use std::marker::PhantomData;
@@ -9,7 +10,7 @@ use yui_kh::kh::KhChainExt;
 use yui_kh::kh::KhComplex;
 
 pub fn dispatch(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
-    dispatch_ring!(App, args)
+    dispatch_ring!(App, boot, args)
 }
 
 #[derive(Clone, Default, Debug, clap::Args)]
@@ -47,6 +48,12 @@ pub struct Args {
     pub log: u8,
 }
 
+impl AppArgs for Args {
+    fn c_type(&self) -> CType { self.c_type }
+    fn c_value(&self) -> &String { &self.c_value }
+    fn log(&self) -> u8 { self.log }
+}
+
 pub struct App<R>
 where
     R: Ring + FromStr + TeX,
@@ -62,6 +69,11 @@ where
     R: Ring + FromStr + TeX,
     for<'x> &'x R: RingOps<R>,
 {
+    pub fn boot(args: &Args) -> Result<String, Box<dyn std::error::Error>> { 
+        let mut app = Self::new(args.clone());
+        app.run()
+    }
+
     pub fn new(args: Args) -> Self { 
         let buff = String::with_capacity(1024);
         App { args, buff, _ring: PhantomData }
@@ -181,7 +193,6 @@ mod tests {
         assert!(res.is_ok());
     }
 
-    #[cfg(feature = "poly")]
     mod poly_tests {
         use super::*;
 

@@ -1,3 +1,4 @@
+use crate::app::args::*;
 use crate::app::utils::*;
 use crate::app::err::*;
 use std::marker::PhantomData;
@@ -11,7 +12,7 @@ use yui_kh::kh::KhComplex;
 use yui_kh::kh::KhHomology;
 
 pub fn dispatch(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
-    dispatch_eucring!(App, args)
+    dispatch_eucring!(App, boot, args)
 }
 
 #[derive(Clone, Default, Debug, clap::Args)]
@@ -46,6 +47,12 @@ pub struct Args {
     pub log: u8,
 }
 
+impl AppArgs for Args {
+    fn c_type(&self) -> CType { self.c_type }
+    fn c_value(&self) -> &String { &self.c_value }
+    fn log(&self) -> u8 { self.log }
+}
+
 pub struct App<R>
 where
     R: EucRing + FromStr + TeX,
@@ -61,6 +68,11 @@ where
     R: EucRing + FromStr + TeX,
     for<'x> &'x R: EucRingOps<R>,
 {
+    pub fn boot(args: &Args) -> Result<String, Box<dyn std::error::Error>> { 
+        let mut app = Self::new(args.clone());
+        app.run()
+    }
+
     pub fn new(args: Args) -> Self { 
         let buff = String::with_capacity(1024);
         App { args, buff, _ring: PhantomData }

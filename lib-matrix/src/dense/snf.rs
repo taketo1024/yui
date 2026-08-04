@@ -1,7 +1,8 @@
 use core::panic;
 use std::cmp::min;
 use log::{debug, trace};
-use yui_core::{EucRing, EucRingOps};
+use yui_core::poly::Poly;
+use yui_core::{EucRing, EucRingOps, Field, FieldOps};
 use crate::dense::*;
 use super::lll::{LLLRing, LLLRingOps, lll_hnf_in_place};
 
@@ -26,6 +27,21 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     trace!("{}", calc.target);
 
     calc.result()
+}
+
+// Frobenius normal form
+// ref: https://en.wikipedia.org/wiki/Frobenius_normal_form
+pub fn fnf<R>(a: &Mat<R>, flags: SnfFlags) -> SnfResult<Poly<'x', R>>
+where R: Field, for<'x> &'x R: FieldOps<R> { 
+    assert!(a.is_square());
+
+    type P<R> = Poly<'x', R>;
+
+    let x = Mat::scalar(a.nrows(), &P::variable());
+    let a = a.map(|r| P::from_const(r.clone()) );
+    let target = x - a;
+    
+    snf_in_place::<P<R>>(target, flags)
 }
 
 #[derive(Debug)]
@@ -484,6 +500,8 @@ use {preprocess_lll_for, preprocess_lll_expand};
 
 #[cfg(test)]
 mod tests {
+    use yui_core::num::Ratio;
+
     use super::*;
 
     #[test]
@@ -902,5 +920,37 @@ mod tests {
 
         assert_eq!(p * a.clone(), res);
         assert_eq!(pinv * res, a.clone());
+    }
+
+    #[test]
+    fn test_snf() { 
+        let a = Mat::from_data((3, 3), [1,2,3,4,5,6,7,8,9]);
+        let (res, trans) = snf(&a, [true; 4]).destruct();
+        let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
+
+        assert_eq!(&p * &a * &q, res);
+        assert_eq!(&pinv * &res * &qinv, a);
+        assert!(res.is_diag());
+
+        assert!(res[(0, 0)].divides(&res[(1, 1)]));
+        assert!(res[(1, 1)].divides(&res[(2, 2)]));
+    }
+
+    #[test]
+    fn test_fnf() { 
+        type R = Ratio<i64>;
+        type P = Poly<'x', R>;
+
+        let a = Mat::from_data((3, 3), [1,2,3,4,5,6,7,8,9]).map(|r| R::from(*r));
+        let (res, trans) = fnf(&a, [true; 4]).destruct();
+        let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
+
+        let x = Mat::scalar(3, &P::variable()) - a.map(|r| P::from_const(r.clone()));
+
+        assert_eq!(&p * &x * &q, res);
+        assert_eq!(&pinv * &res * &qinv, x);
+
+        assert!(res[(0, 0)].divides(&res[(1, 1)]));
+        assert!(res[(1, 1)].divides(&res[(2, 2)]));
     }
 }

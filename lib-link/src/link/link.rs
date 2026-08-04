@@ -5,7 +5,7 @@ use itertools::Itertools;
 use yui_core::{hashmap, CloneAnd, Sign};
 use yui_core::bitseq::Bit;
 
-use super::{Node, NodeType, Path};
+use super::{Node, Path};
 
 pub type Edge = usize;
 pub type State = yui_core::bitseq::BitSeq;
@@ -87,17 +87,12 @@ impl Link {
     }
 
     pub fn collect_crossing_signs(&self) -> HashMap<usize, Sign> {
-        use NodeType::{X, Xm};
-
         let mut result = hashmap!{};
 
-        self.traverse(|_, i, j| { 
-            let c = self.node(i);
-            match (c.ntype(), j) { 
-                (Xm, 1) | (X, 3) => result.insert(i, Sign::Pos),
-                (Xm, 3) | (X, 1) => result.insert(i, Sign::Neg),
-                _ => None
-            };
+        self.traverse(|_, i, j| {
+            if let Some(e) = self.node(i).sign(j) {
+                result.insert(i, e);
+            } 
         });
 
         result
@@ -178,7 +173,7 @@ impl Link {
         self.resolved_by(&self.seifert_state()).collect_components()
     }
 
-    fn traverse<F>(&self, mut f: F) where 
+    pub fn traverse<F>(&self, mut f: F) where 
     F: FnMut(usize, usize, usize) { 
         let n = self.n_nodes();
 
@@ -213,7 +208,7 @@ impl Link {
         assert!(remain.is_empty())
     }
 
-    fn traverse_from<F>(&self, start: (usize, usize), mut f:F) where
+    pub fn traverse_from<F>(&self, start: (usize, usize), mut f:F) where
         F: FnMut(usize, usize)
     {
         let (mut i, mut j) = start;
@@ -321,9 +316,9 @@ impl Display for Link {
 #[cfg(test)]
 mod tests { 
     use yui_core::hashmap;
+    use crate::NodeType::{X, Xm};
 
     use super::*;
-    use super::NodeType::{X, Xm};
 
     #[test]
     fn link_init() { 
@@ -530,7 +525,7 @@ mod tests {
         let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]);
         let l2 = l.crossing_change(1);
 
-        assert_eq!(l.node(1),  &Node::new(NodeType::X, [3,6,4,1]));
-        assert_eq!(l2.node(1), &Node::new(NodeType::Xm, [3,6,4,1]));
+        assert_eq!(l.node(1),  &Node::new(X,  [3,6,4,1]));
+        assert_eq!(l2.node(1), &Node::new(Xm, [3,6,4,1]));
     }
 }

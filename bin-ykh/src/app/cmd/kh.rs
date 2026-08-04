@@ -6,11 +6,12 @@ use yui_homology::{DisplaySeq, DisplayTable, GridTrait, SummandTrait, tex::TeXTa
 use yui_kh::kh::KhHomology;
 use yui_kh::kh::KhChainExt;
 use yui_link::Link;
+use crate::app::args::*;
 use crate::app::utils::*;
 use crate::app::err::*;
 
 pub fn dispatch(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
-    dispatch_eucring!(App, args)
+    dispatch_eucring!(App, boot, args)
 }
 
 #[derive(Clone, Default, Debug, clap::Args)]
@@ -48,6 +49,12 @@ pub struct Args {
     pub log: u8,
 }
 
+impl AppArgs for Args {
+    fn c_type(&self) -> CType { self.c_type }
+    fn c_value(&self) -> &String { &self.c_value }
+    fn log(&self) -> u8 { self.log }
+}
+
 pub struct App<R>
 where
     R: EucRing + FromStr + TeX,
@@ -63,6 +70,11 @@ where
     R: EucRing + FromStr + TeX,
     for<'x> &'x R: EucRingOps<R>,
 {
+    pub fn boot(args: &Args) -> Result<String, Box<dyn std::error::Error>> { 
+        let mut app = Self::new(args.clone());
+        app.run()
+    }
+
     pub fn new(args: Args) -> Self { 
         let buff = String::with_capacity(1024);
         App { args, buff, _ring: PhantomData }
@@ -211,32 +223,27 @@ mod tests {
         assert!(res.is_ok());
     }
 
-    #[cfg(feature = "poly")]
-    mod poly_tests { 
-        use super::*;
-        
-        #[test]
-        fn test_qpoly_h() { 
-            let args = Args {
-                link: "3_1".to_string(),
-                c_value: "H".to_string(),
-                c_type: CType::Q,
-                ..Default::default()
-            };
-            let res = dispatch(&args);
-            assert!(res.is_ok());
-        }
+    #[test]
+    fn test_qpoly_h() { 
+        let args = Args {
+            link: "3_1".to_string(),
+            c_value: "H".to_string(),
+            c_type: CType::Q,
+            ..Default::default()
+        };
+        let res = dispatch(&args);
+        assert!(res.is_ok());
+    }
 
-        #[test]
-        fn test_qpoly_t() { 
-            let args = Args {
-                link: "3_1".to_string(),
-                c_value: "0,T".to_string(),
-                c_type: CType::Q,
-                ..Default::default()
-            };
-            let res = dispatch(&args);
-            assert!(res.is_ok());
-        }
+    #[test]
+    fn test_qpoly_t() { 
+        let args = Args {
+            link: "3_1".to_string(),
+            c_value: "0,T".to_string(),
+            c_type: CType::Q,
+            ..Default::default()
+        };
+        let res = dispatch(&args);
+        assert!(res.is_ok());
     }
 }

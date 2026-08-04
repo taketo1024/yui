@@ -1,7 +1,8 @@
 use log::info;
 use clap::{Parser, Subcommand};
 
-use super::cmd::{ckh, ckhi, kh, khi, cc};
+use super::cmd::{ckh, ckhi, kh, khi, cc, sl2};
+use super::args::*;
 use super::utils::*;
 
 #[derive(Parser, Debug)]
@@ -20,24 +21,23 @@ pub enum Cmd {
     CKhI(ckhi::Args),    
     KhI(khi::Args),
     CC(cc::Args),
+    SL2(sl2::Args),
 }
 
 impl CliArgs { 
-    fn log_level(&self) -> log::LevelFilter { 
-        use log::LevelFilter::*;
-        let level = match &self.command { 
-            Cmd::CKh(args)  => args.log,
-            Cmd::Kh(args)   => args.log,
-            Cmd::CKhI(args) => args.log,
-            Cmd::KhI(args)  => args.log,
-            Cmd::CC(args)   => args.log,
-        };
-        match level {
-            1 => Info,
-            2 => Debug,
-            3 => Trace,
-            _ => Off,
+    fn app_args(&self) -> &dyn AppArgs { 
+        match &self.command { 
+            Cmd::CKh(args)  => args,
+            Cmd::Kh(args)   => args,
+            Cmd::CKhI(args) => args,
+            Cmd::KhI(args)  => args,
+            Cmd::CC(args)   => args,
+            Cmd::SL2(args)  => args,
         }
+    }
+
+    fn log_level(&self) -> log::LevelFilter { 
+        self.app_args().log_level()
     }
 }
 
@@ -79,6 +79,7 @@ impl App {
                 Cmd::CKhI(args) => ckhi::dispatch(args),
                 Cmd::KhI(args)  => khi::dispatch(args),
                 Cmd::CC(args)   => cc::dispatch(args),
+                Cmd::SL2(args)  => sl2::dispatch(args),
             }
         )
     }

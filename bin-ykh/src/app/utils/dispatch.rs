@@ -8,72 +8,66 @@ cfg_if::cfg_if! {
     }
 }
 
-macro_rules! dispatch_ring {
-    ($app:ident, $args:expr) => {{
+macro_rules! dispatch {
+    ($mode:ident, $app:ident, $method:ident, $args:expr) => {{
         use crate::app::utils::dispatch::*;
 
-        try_ring!($app, $args)
+        $mode!($app, $method, $args)
         .unwrap_or_else(|| 
-            err!("`{}` is not supported for: -t {} -c {}", stringify!($app), $args.c_type, $args.c_value)
+            err!("`{}::{}` is not supported for: -t {} -c {}", stringify!($app), stringify!($method), $args.c_type(), $args.c_value)
         )
+    }};
+}
+
+macro_rules! dispatch_ring {
+    ($app:ident, $method:ident, $args:expr) => {{
+        use crate::app::utils::dispatch::*;
+        dispatch!(try_ring, $app, $method, $args)
     }};
 }
 
 macro_rules! dispatch_eucring {
-    ($app:ident, $args:expr) => {{
+    ($app:ident, $method:ident, $args:expr) => {{
         use crate::app::utils::dispatch::*;
-
-        try_eucring!($app, $args)
-        .unwrap_or( 
-            err!("`{}` is not supported for: -t {} -c {}", stringify!($app), $args.c_type, $args.c_value)
-        )
+        dispatch!(try_eucring, $app, $method, $args)
     }};
 }
 
-pub(crate) use {dispatch_ring, dispatch_eucring};
+macro_rules! dispatch_field {
+    ($app:ident, $method:ident, $args:expr) => {{
+        use crate::app::utils::dispatch::*;
+        dispatch!(try_field, $app, $method, $args)
+    }};
+}
+
+pub(crate) use {dispatch, dispatch_ring, dispatch_eucring, dispatch_field};
 
 // -- internal -- //
 
-#[derive(PartialEq, Eq)]
-pub(crate) enum PolyVars { 
-    H, T, HT, None
-}
-
-pub(crate) fn poly_vars(c_value: &String) -> PolyVars { 
-    use std::collections::HashSet;
-    
-    let s: HashSet<_> = c_value.split(',').collect();
-    match (s.contains("H"), s.contains("T")) { 
-        (true,  true)  => PolyVars::HT,
-        (true,  false) => PolyVars::H,
-        (false, true)  => PolyVars::T,
-        (false, false) => PolyVars::None
-    }
-}
-
 macro_rules! try_ring {
-    ($app:ident, $args:expr) => {{
-        if poly_vars(&$args.c_value) == PolyVars::None { 
-            try_std!($app, $args)
-        } else { 
-            try_euc_poly!($app, $args)
-            .or_else(|| try_noneuc_poly!($app, $args))
+    ($app:ident, $method:ident, $args:expr) => {{
+        if !$args.is_poly() { 
+            try_std!($app, $method, $args)
+        } else if $args.is_euc_ring() { 
+            try_euc_poly!($app, $method, $args)
+        } else {
+            try_noneuc_poly!($app, $method, $args)
         }
     }}
 }
 
 macro_rules! try_eucring {
-    ($app:ident, $args:expr) => {{
-        if poly_vars(&$args.c_value) == PolyVars::None { 
-            try_std!($app, $args)
+    ($app:ident, $method:ident, $args:expr) => {{
+        if !$args.is_poly() { 
+            try_std!($app, $method, $args)
         } else { 
-            try_euc_poly!($app, $args)
+            try_euc_poly!($app, $method, $args)
         }
     }}
 }
 
 macro_rules! try_std {
-    ($app:ident, $args:expr) => {{
+    ($app:ident, $method:ident, $args:expr) => {{
         use yui_core::num::{Ratio, FF};
 
         type Z = Int;
@@ -81,92 +75,86 @@ macro_rules! try_std {
         type F2 = FF<2>;
         type F3 = FF<3>;
 
-        match $args.c_type {
-            CType::Z     => run!(Z,  $app, $args),
-            CType::Q     => run!(Q,  $app, $args),
-            CType::F2    => run!(F2, $app, $args),
-            CType::F3    => run!(F3, $app, $args),
+        match $args.c_type() {
+            CType::Z     => invoke!(Z,  $app, $method, $args),
+            CType::Q     => invoke!(Q,  $app, $method, $args),
+            CType::F2    => invoke!(F2, $app, $method, $args),
+            CType::F3    => invoke!(F3, $app, $method, $args),
+        }
+    }}
+}
+
+macro_rules! try_field {
+    ($app:ident, $method:ident, $args:expr) => {{
+        use yui_core::num::{Ratio, FF};
+
+        type Q = Ratio<Int>;
+        type F2 = FF<2>;
+        type F3 = FF<3>;
+
+        match $args.c_type() {
+            CType::Q     => invoke!(Q,  $app, $method, $args),
+            CType::F2    => invoke!(F2, $app, $method, $args),
+            CType::F3    => invoke!(F3, $app, $method, $args),
+            _ => None
         }
     }}
 }
 
 macro_rules! try_euc_poly {
-    ($app:ident, $args:expr) => {{
-        cfg_if::cfg_if! {
-            if #[cfg(any(feature = "poly", feature = "all"))] {
-                use yui_core::num::Ratio;
-                use yui_core::num::FF;
-                use yui_core::poly::Poly;
+    ($app:ident, $method:ident, $args:expr) => {{
+        use yui_core::num::Ratio;
+        use yui_core::num::FF;
+        use yui_core::poly::Poly;
 
-                type Q = Ratio<Int>;
-                type F2 = FF<2>;
-                type F3 = FF<3>;
+        type Q = Ratio<Int>;
+        type F2 = FF<2>;
+        type F3 = FF<3>;
 
-                let vars = poly_vars(&$args.c_value);
+        let vars = $args.poly_vars();
 
-                match ($args.c_type, vars) {
-                    (CType::Q,  PolyVars::H) => run!(Poly<'H', Q>,  $app, $args),
-                    (CType::Q,  PolyVars::T) => run!(Poly<'T', Q>,  $app, $args),
-                    (CType::F2, PolyVars::H) => run!(Poly<'H', F2>, $app, $args),
-                    (CType::F2, PolyVars::T) => run!(Poly<'T', F2>, $app, $args),
-                    (CType::F3, PolyVars::H) => run!(Poly<'H', F3>, $app, $args),
-                    (CType::F3, PolyVars::T) => run!(Poly<'T', F3>, $app, $args),
-                    _ => None
-                }
-            } else {
-                match $c_type {
-                    CType::Q  |
-                    CType::F2 |
-                    CType::F3 => Some(err!("build with `--features poly` to enable polynomial types.")),
-                    _         => None
-                }
-            }
+        match ($args.c_type(), vars) {
+            (CType::Q,  PolyVars::H) => invoke!(Poly<'H', Q>,  $app, $method, $args),
+            (CType::Q,  PolyVars::T) => invoke!(Poly<'T', Q>,  $app, $method, $args),
+            (CType::F2, PolyVars::H) => invoke!(Poly<'H', F2>, $app, $method, $args),
+            (CType::F2, PolyVars::T) => invoke!(Poly<'T', F2>, $app, $method, $args),
+            (CType::F3, PolyVars::H) => invoke!(Poly<'H', F3>, $app, $method, $args),
+            (CType::F3, PolyVars::T) => invoke!(Poly<'T', F3>, $app, $method, $args),
+            _ => None
         }
     }}
 }
 
 macro_rules! try_noneuc_poly {
-    ($app:ident, $args:expr) => {{
-        cfg_if::cfg_if! {
-            if #[cfg(any(feature = "poly", feature = "all"))] {
-                use yui_core::num::Ratio;
-                use yui_core::num::FF;
-                use yui_core::poly::{Poly, Poly2};
+    ($app:ident, $method:ident, $args:expr) => {{
+        use yui_core::num::Ratio;
+        use yui_core::num::FF;
+        use yui_core::poly::{Poly, Poly2};
 
-                type Z = Int;
-                type Q = Ratio<Int>;
-                type F2 = FF<2>;
-                type F3 = FF<3>;
+        type Z = Int;
+        type Q = Ratio<Int>;
+        type F2 = FF<2>;
+        type F3 = FF<3>;
 
-                let vars = poly_vars(&$args.c_value);
+        let vars = $args.poly_vars();
 
-                match ($args.c_type, vars) {
-                    (CType::Z,  PolyVars::H ) => run!(Poly<'H', Z>, $app, $args),
-                    (CType::Z,  PolyVars::T ) => run!(Poly<'T', Z>, $app, $args),
-                    (CType::Z,  PolyVars::HT) => run!(Poly2<'H', 'T', Z>, $app, $args),
-                    (CType::Q,  PolyVars::HT) => run!(Poly2<'H', 'T', Q>, $app, $args),
-                    (CType::F2, PolyVars::HT) => run!(Poly2<'H', 'T', F2>, $app, $args),
-                    (CType::F3, PolyVars::HT) => run!(Poly2<'H', 'T', F3>, $app, $args),
-                    _ => None
-                }
-            } else {
-                match $c_type {
-                    CType::Z  |
-                    CType::Q  |
-                    CType::F2 |
-                    CType::F3 => Some(err!("build with `--features poly` to enable polynomial types.")),
-                    _         => None
-                }
-            }
+        match ($args.c_type(), vars) {
+            (CType::Z,  PolyVars::H ) => invoke!(Poly<'H', Z>, $app, $method, $args),
+            (CType::Z,  PolyVars::T ) => invoke!(Poly<'T', Z>, $app, $method, $args),
+            (CType::Z,  PolyVars::HT) => invoke!(Poly2<'H', 'T', Z>, $app, $method, $args),
+            (CType::Q,  PolyVars::HT) => invoke!(Poly2<'H', 'T', Q>, $app, $method, $args),
+            (CType::F2, PolyVars::HT) => invoke!(Poly2<'H', 'T', F2>, $app, $method, $args),
+            (CType::F3, PolyVars::HT) => invoke!(Poly2<'H', 'T', F3>, $app, $method, $args),
+            _ => None
         }
     }}
 }
 
-macro_rules! run {
-    ($c_type:ty, $app:ident, $args:expr) => {{
-        let mut app: $app<$c_type> = $app::new($args.clone());
-        Some(app.run())
+macro_rules! invoke {
+    ($c_type:ty, $app:ident, $method:ident, $args:expr) => {{
+        let res = $app::<$c_type>::$method($args);
+        Some(res)
     }}
 }
 
-pub(crate) use {run, try_ring, try_eucring, try_std, try_euc_poly, try_noneuc_poly};
+pub(crate) use {invoke, try_field, try_ring, try_eucring, try_std, try_euc_poly, try_noneuc_poly};

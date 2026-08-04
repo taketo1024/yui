@@ -60,6 +60,12 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         ))
     }
 
+    pub fn delta_range(&self) -> RangeInclusive<isize> {
+        range_of(self.support().flat_map(|i| 
+            self[i].gens().map(|z| 2 * z.h_deg() - z.q_deg())
+        ))
+    }
+
     pub fn canon_cycles(&self) -> &Vec<KhChain<R>> { 
         &self.canon_cycles
     }

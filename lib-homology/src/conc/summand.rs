@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use yui_core::{EucRing, EucRingOps, IndexList, Ring, RingOps};
 use yui_core::lc::{Gen, Lc};
-use yui_matrix::sparse::{SpVec, Trans};
+use yui_matrix::sparse::{SpMat, SpVec, Trans};
 
 use crate::SummandTrait;
 
@@ -65,11 +65,15 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn vectorize(&self, z: &Lc<X, R>) -> SpVec<R> {
         let n = self.raw_gens.len();
-        let v = SpVec::from_entries(n, z.iter().map(|(x, a)| { 
-            let Some(i) = self.raw_gens.index_of(x) else { 
-                panic!("{x} not found in generators ({}).", &self.raw_gens.len());
-            };
-            (i, a.clone())
+
+        // MEMO should add strict option. 
+
+        let v = SpVec::from_entries(n, z.iter().flat_map(|(x, a)| { 
+            if let Some(i) = self.raw_gens.index_of(x) {
+                Some((i, a.clone()))
+            } else {
+                None
+            }
         }));
 
         self.trans.forward(&v)
@@ -98,6 +102,22 @@ where X: Gen, R: Ring, for<'x> &'x R: RingOps<R> {
         Lc::from_iter( v.iter().map(|(i, a)| 
             (self.raw_gens[i].clone(), a.clone())
         ) )
+    }
+
+    pub fn make_matrix<Y, F>(&self, target: &Summand<Y, R>, map: F) -> SpMat<R>
+    where Y: Gen, F: Fn(&Lc<X, R>) -> Lc<Y, R> { 
+        SpMat::from_col_vecs(target.dim(), self.gens().map(|z| { 
+            let w = map(&z);
+            target.vectorize(&w)
+        }))
+    }
+
+    pub fn make_matrix_euc<Y, F>(&self, target: &Summand<Y, R>, map: F) -> SpMat<R>
+    where R: EucRing, for<'x> &'x R: EucRingOps<R>, Y: Gen, F: Fn(&Lc<X, R>) -> Lc<Y, R> { 
+        SpMat::from_col_vecs(target.dim(), self.gens().map(|z| { 
+            let w = map(&z);
+            target.vectorize_euc(&w)
+        }))
     }
 
     pub fn merge<Y>(&mut self, other: Summand<Y, R>)

@@ -32,6 +32,11 @@ impl<const X: char, const Y: char, I> Var2<X, Y, I> {
         }
     }
 
+    pub fn multi_deg(&self) -> (I, I) 
+    where I: Copy { 
+        (self.0, self.1)
+    }
+
     pub fn deg_for(&self, i: usize) -> I
     where I: Copy { 
         assert!(i < 2);

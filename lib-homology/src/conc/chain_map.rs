@@ -2,13 +2,17 @@ use std::sync::Arc;
 
 use num_traits::Zero;
 use yui_core::lc::{EitherGen, Gen, Lc};
-use yui_core::{Ring, RingOps};
+use yui_core::{EucRing, EucRingOps, Ring, RingOps};
+use yui_matrix::sparse::SpMat;
 
 use crate::{ChainComplexTrait, Grid, GridDeg, GridTrait, Summand};
 
 use super::ChainComplexBase;
 
 /// Represents a chain map between chain complexes.
+
+// TODO: possess source and target by reference. 
+
 pub struct ChainMap<I, X, Y, R>
 where 
     I: GridDeg,
@@ -27,15 +31,11 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     pub fn new<F>(
-        source: &ChainComplexBase<I, X, R>,
-        target: &ChainComplexBase<I, Y, R>,
         deg: I,
         map: F,
     ) -> Self
         where F: Fn(I, &Lc<X, R>) -> Lc<Y, R> + Send + Sync + 'static 
     {
-        assert!(source.d_deg() == target.d_deg());
-
         let map = Arc::new(map);
         Self {
             deg,
@@ -57,6 +57,15 @@ where
 
     pub fn apply(&self, i: I, z: &Lc<X, R>) -> Lc<Y, R> {
         (self.map)(i, &z)
+    }
+
+    pub fn make_matrix(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I) -> SpMat<R> {
+        source[i].make_matrix(&target[i + self.deg], |z| self.apply(i, z))
+    }
+
+    pub fn make_matrix_euc(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I) -> SpMat<R>
+    where Y: Gen, R: EucRing, for<'x> &'x R: EucRingOps<R> {
+        source[i].make_matrix_euc(&target[i + self.deg], |z| self.apply(i, z))
     }
 
     pub fn check_for(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I, x: &X) {
@@ -157,8 +166,6 @@ mod tests {
         let d3 = GenericChainComplex::<i32>::d3();
 
         let f = ChainMap::new(
-            &s2, 
-            &d3, 
             0, 
             |_, z| z.clone()
         );
@@ -173,8 +180,6 @@ mod tests {
         let d3 = GenericChainComplex::<i32>::d3();
 
         let f = ChainMap::new(
-            &s2, 
-            &d3, 
             0, 
             |_, z| z.clone()
         );

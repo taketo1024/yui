@@ -27,8 +27,8 @@ impl InvLink {
     // the Seifert framing and must be even. The base point lands on the doubled on-axis strand.
     pub fn whitehead_double(l: &InvLink, positive: bool, tw: i32) -> InvLink {
         let base = l.base_pt().expect("companion needs a base point");
-        let cut = l.edges().into_iter()
-            .find(|&e| e != base && l.inv_edge(e) == e)
+        let cut = l.on_axis_edges().into_iter()
+            .find(|&e| e != base)
             .expect("need a second on-axis edge for the clasp");
         Self::whitehead_double_at(l, positive, tw, cut)
     }
@@ -36,6 +36,8 @@ impl InvLink {
     // The same, with the clasp placed at a chosen on-axis edge. The axis meets the knot twice, so
     // `cut` is the on-axis edge that does not carry the base point.
     pub fn whitehead_double_at(l: &InvLink, positive: bool, tw: i32, cut: Edge) -> InvLink {
+        assert!(l.is_knot(), "the companion must be a knot");
+        assert!(l.is_strongly_invertible(), "the companion must be strongly invertible");
         assert!(tw.is_even(), "tw must be even for a τ-symmetric diagram");
         assert_eq!(l.inv_edge(cut), cut, "the clasp edge {cut} must be on-axis");
 
@@ -75,7 +77,7 @@ mod tests {
         // different diagrams in general; for P(a, b, a) the pretzel's extra symmetry makes them
         // agree, up to relabelling (also checked for P(-5,5,-5) in experiments/link_check).
         let k = InvLink::sym_pretzel(-3, 3, -3);
-        let axis = k.edges().into_iter().filter(|&e| k.inv_edge(e) == e).collect_vec();
+        let axis = k.on_axis_edges();
         assert_eq!(axis.len(), 2, "a strong inversion fixes exactly two edges");
 
         for positive in [true, false] {

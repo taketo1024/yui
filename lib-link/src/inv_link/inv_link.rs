@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use delegate::delegate;
 use itertools::Itertools;
 use num_integer::Integer;
-use crate::{Node, Edge, Link, Path, State, PDCodeX};
+use crate::{Node, Edge, Link, Path, Slot, State, PDCodeX};
 
 // Involutive link
 #[derive(Debug, Clone)]
@@ -146,8 +146,43 @@ impl InvLink {
         self.x_map.get(x).unwrap()
     }
 
-    // Mirroring flips every crossing but leaves the edge set untouched, so the involution carries
-    // over unchanged.
+    pub fn on_axis_edges(&self) -> Vec<Edge> {
+        self.edges().into_iter().filter(|&e| self.inv_edge(e) == e).collect()
+    }
+
+    // A strong inversion reverses the orientation; its axis then necessarily meets the link.
+    pub fn is_strongly_invertible(&self) -> bool {
+        self.is_oriented()
+            && self.inner.nodes().all(|x| self.preserves_dir_at(x) == Some(false))
+    }
+
+    // A 2-periodic link carries an involution preserving the orientation; its axis then misses the
+    // link.
+    pub fn is_2periodic(&self) -> bool {
+        self.is_oriented()
+            && self.inner.nodes().all(|x| self.preserves_dir_at(x) == Some(true))
+    }
+
+    // Whether τ keeps the strands running the same way at `x`. The rotation reverses the cyclic
+    // order of a node's slots, sending both incoming slots to incoming ones, or both to outgoing.
+    fn preserves_dir_at(&self, x: &Node) -> Option<bool> {
+        let y = self.inv_node(x);
+        let (p, q) = x.incoming()?;
+        let k = Slot::ALL.into_iter().find(|k|
+            Slot::ALL.into_iter().all(|s| y.edge(k.shift(4 - s.index())) == self.inv_edge(x.edge(s)))
+        )?;
+
+        let is_in = |s: Slot| {
+            let img = k.shift(4 - s.index());
+            y.incoming().is_some_and(|(a, b)| img == a || img == b)
+        };
+        match (is_in(p), is_in(q)) {
+            (true, true) => Some(true),
+            (false, false) => Some(false),
+            _ => None,
+        }
+    }
+
     pub fn mirror(&self) -> Self {
         Self {
             inner: self.inner.mirror(),
@@ -168,6 +203,9 @@ impl InvLink {
     // Equivariant connected sum: splice along on-axis edges (`inv_edge(e) == e`) of each summand,
     // then recover the combined strong inversion by reindexing to the standard involution.
     pub fn conn_sum_at(&self, other: &InvLink, self_e: Edge, other_e: Edge) -> InvLink {
+        assert!(self.is_knot() && other.is_knot(), "connected sum requires knots");
+        assert!(self.is_strongly_invertible() && other.is_strongly_invertible(),
+            "connected sum requires strongly invertible knots");
         assert_eq!(self.inv_edge(self_e), self_e, "self_e {self_e} must be on-axis");
         assert_eq!(other.inv_edge(other_e), other_e, "other_e {other_e} must be on-axis");
 
@@ -263,26 +301,43 @@ mod tests {
     }
 
     #[test]
+    fn twist_unknot() {
+        // the 1-crossing unknot: the identity is the π-rotation through the crossing, a strong
+        // inversion; swapping the two edges is a rotation missing the knot, so 2-periodic.
+        let l = Link::from_pd_code([[0, 1, 1, 0]]);
+
+        let si = InvLink::try_new(l.clone(), [(0, 0), (1, 1)]).unwrap();
+        assert_eq!(si.on_axis_edges(), vec![0, 1]);
+        assert!(si.is_strongly_invertible());
+        assert!(!si.is_2periodic());
+
+        let per = InvLink::try_new(l, [(0, 1), (1, 0)]).unwrap();
+        assert!(per.on_axis_edges().is_empty());
+        assert!(!per.is_strongly_invertible());
+        assert!(per.is_2periodic());
+    }
+
+    #[test]
     fn involution_is_a_strong_inversion() {
         // `new` only checks that the edge map is an involution; these are the conditions making it
         // a π-rotation about an axis in the plane.
         fn check(name: &str, l: &InvLink) {
             let inner = l.inner();
-            let fixed = inner.edges().into_iter().filter(|&e| l.inv_edge(e) == e).count();
-            assert_eq!(fixed, 2, "{name}: the axis must meet the knot twice");
+            assert_eq!(l.on_axis_edges().len(), 2, "{name}: the axis must meet the knot twice");
+            assert!(l.is_strongly_invertible(), "{name}: τ must reverse the orientation");
 
             for x in inner.nodes() {
                 let y = l.inv_node(x);
                 assert_eq!(y.node_type(), x.node_type(), "{name}: τ changed a crossing type");
                 assert_eq!(l.inv_node(y), x, "{name}: τ is not an involution on nodes");
 
-                // a π-rotation reflects each crossing's four slots: s ↦ (k - s) mod 4, k odd.
+                // the rotation reverses the cyclic order of a crossing's slots: s ↦ (k - s) mod 4, k odd.
                 let k = (0..4).find(|&k|
                     Slot::ALL.iter().all(|&s|
                         y.edge(Slot::from((k + 4 - s.index()) % 4)) == l.inv_edge(x.edge(s))
                     )
                 );
-                assert!(matches!(k, Some(1) | Some(3)), "{name}: τ does not reflect the slots at {x}");
+                assert!(matches!(k, Some(1) | Some(3)), "{name}: τ does not reverse the slot order at {x}");
             }
         }
 

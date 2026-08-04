@@ -4,23 +4,29 @@
 //! Implements the [free `R`-module](crate::RMod) over the key set, i.e. the
 //! polynomial ring viewpoint without any multiplicative structure on keys.
 //!
+//! Internally stored via [`super::lc_data::LcData`], which specializes the
+//! empty and single-term cases (the common shape in the cobordism algebra
+//! hot path of `yui-kh`) so that those paths avoid the per-entry hashmap
+//! allocation. The struct [`Lc`] additionally caches an `R::zero()` so that
+//! [`Lc::coeff`] can return a stable `&R` for missing keys.
+//!
 //! See: <https://en.wikipedia.org/wiki/Linear_combination>,
 //! <https://en.wikipedia.org/wiki/Free_module>
 
 use std::collections::HashMap;
 use std::fmt::{Display, Debug};
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, MulAssign};
-use ahash::AHashMap;
 use itertools::Itertools;
 use num_traits::Zero;
 use auto_impl_ops::auto_ops;
 use crate::{MathType, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
 
 use super::lc_key::*;
+use super::lc_data::{LcData, LcDataIter, LcDataIntoIter};
 
 /// A linear combination `Σ rᵢ · xᵢ` with keys `X: LcKey` and coefficients in a
-/// ring `R`. Stored sparsely as a hashmap from key to coefficient; zero entries
-/// are pruned automatically.
+/// ring `R`. Stored via [`LcData`], which specializes the empty and single-term
+/// cases to avoid hashmap allocation.
 #[derive(PartialEq, Eq, Clone, Default, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
@@ -29,7 +35,7 @@ where
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    data: AHashMap<X, R>,
+    data: LcData<X, R>,
     #[cfg_attr(feature = "serde", serde(skip))]
     r_zero: R
 }
@@ -38,47 +44,44 @@ impl<X, R> Lc<X, R>
 where
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
-{ 
+{
     pub fn new() -> Self {
-        let hasher = ahash::RandomState::with_seeds(0, 0, 0, 0);
-        let data = AHashMap::with_hasher(hasher);
-        let r_zero = R::zero();
-        Self { data, r_zero }
+        Self { data: LcData::Zero, r_zero: R::zero() }
     }
 
-    pub fn clean(&mut self) { 
-        self.data.retain(|_, r| !r.is_zero());
+    pub fn clean(&mut self) {
+        self.data.clean()
     }
 
     pub fn nterms(&self) -> usize {
         self.data.len()
     }
 
-    pub fn any_term(&self) -> Option<(&X, &R)> { 
+    pub fn any_term(&self) -> Option<(&X, &R)> {
         self.iter().next()
     }
 
     pub fn keys(&self) -> impl Iterator<Item = &X> {
-        self.data.keys()
+        self.iter().map(|(k, _)| k)
     }
 
     pub fn is_singleton(&self) -> bool {
-        self.nterms() == 1 && 
+        self.nterms() == 1 &&
         self.iter().next().unwrap().1.is_one()
     }
 
-    pub fn as_singleton(&self) -> Option<X> { 
-        if !self.is_singleton() { 
+    pub fn as_singleton(&self) -> Option<X> {
+        if !self.is_singleton() {
             None?
         }
         self.iter().next().map(|(x, _)| x.clone())
     }
 
-    pub fn coeff(&self, x: &X) -> &R { 
+    pub fn coeff(&self, x: &X) -> &R {
         self.data.get(x).unwrap_or(&self.r_zero)
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&X, &R)> {
+    pub fn iter(&self) -> LcDataIter<'_, X, R> {
         self.data.iter()
     }
 
@@ -142,20 +145,26 @@ where
     }
 
     pub fn apply_bilin<Y, Z, F>(&self, other: &Lc<Y, R>, x_map: F) -> Lc<Z, R>
-    where Y: LcKey, Z: LcKey, F: Fn(&X, &Y) -> Z { 
-        let mut res = Lc::zero();
-        res.data.reserve(self.nterms() * other.nterms());
-
-        for (x, r) in self.iter() { 
-            for (y, s) in other.iter() { 
-                let xy = x_map(x, y);
-                let rs = r * s;
-                res.add_pair((xy, rs));
+    where Y: LcKey, Z: LcKey, F: Fn(&X, &Y) -> Z {
+        match (&self.data, &other.data) {
+            (LcData::Zero, _) | (_, LcData::Zero) => Lc::zero(),
+            (LcData::Single(x, r), _) =>
+                other.map_ref(|y, s| (x_map(x, y), r * s)),
+            (_, LcData::Single(y, s)) =>
+                self.map_ref(|x, r| (x_map(x, y), r * s)),
+            (LcData::Many(_), LcData::Many(_)) => {
+                let mut res = Lc::zero();
+                for (x, r) in self.iter() {
+                    for (y, s) in other.iter() {
+                        let xy = x_map(x, y);
+                        let rs = r * s;
+                        res.add_pair((xy, rs));
+                    }
+                }
+                res.clean();
+                res
             }
         }
-        
-        res.clean();
-        res
     }
 
     pub fn sort_terms_by<F>(&self, cmp: F) -> impl Iterator<Item = (&X, &R)>
@@ -237,7 +246,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     type Item = (X, R);
-    type IntoIter = std::collections::hash_map::IntoIter<X, R>;
+    type IntoIter = LcDataIntoIter<X, R>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.data.into_iter()
@@ -298,54 +307,71 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     // must clean after call
-    pub fn add_pair(&mut self, rhs: (X, R)) { 
+    pub fn add_pair(&mut self, rhs: (X, R)) {
         let (x, r) = rhs;
-        if r.is_zero() { return }
-
-        if self.data.contains_key(&x) { 
-            let v = self.data.get_mut(&x).unwrap();
-            v.add_assign(r);
-        } else { 
-            self.data.insert(x, r);
-        }
-    } 
+        self.data.add_pair(x, r);
+    }
 
     // must clean after call
-    pub fn add_pair_ref(&mut self, rhs: (&X, &R)) { 
+    pub fn add_pair_ref(&mut self, rhs: (&X, &R)) {
         let (x, r) = rhs;
-        if r.is_zero() { return }
-
-        if self.data.contains_key(x) { 
-            let v = self.data.get_mut(x).unwrap();
-            v.add_assign(r);
-        } else { 
-            self.data.insert(x.clone(), r.clone());
-        }
+        self.data.add_pair_ref(x, r);
     }
 }
 
-#[auto_ops]
+// Owned rhs moves its pairs in (no key clones); borrowed rhs must clone. The split `auto_ops`
+// arg-sets generate the four `Add` variants by rhs-ownership so the two impls don't collide.
+#[auto_ops(val_val, ref_val)]
+impl<X, R> AddAssign<Lc<X, R>> for Lc<X, R>
+where
+    X: LcKey,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{
+    fn add_assign(&mut self, rhs: Self) {
+        for e in rhs.data {
+            self.add_pair(e);
+        }
+        self.clean()
+    }
+}
+
+#[auto_ops(val_ref, ref_ref)]
 impl<X, R> AddAssign<&Lc<X, R>> for Lc<X, R>
 where
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn add_assign(&mut self, rhs: &Self) {
-        for e in rhs.data.iter() { 
+        for e in rhs.data.iter() {
             self.add_pair_ref(e);
         }
         self.clean()
     }
 }
 
-#[auto_ops]
+// Owned rhs moves its keys in (negating coeffs, no key clones); borrowed rhs must clone.
+#[auto_ops(val_val, ref_val)]
+impl<X, R> SubAssign<Lc<X, R>> for Lc<X, R>
+where
+    X: LcKey,
+    R: Ring, for<'x> &'x R: RingOps<R>
+{
+    fn sub_assign(&mut self, rhs: Self) {
+        for (x, r) in rhs.data {
+            self.add_pair((x, -r));
+        }
+        self.clean()
+    }
+}
+
+#[auto_ops(val_ref, ref_ref)]
 impl<X, R> SubAssign<&Lc<X, R>> for Lc<X, R>
 where
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn sub_assign(&mut self, rhs: &Self) {
-        for e in rhs.data.iter() { 
+        for e in rhs.data.iter() {
             self.add_pair_ref((e.0, &-e.1));
         }
         self.clean()
@@ -359,12 +385,11 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn mul_assign(&mut self, rhs: &R) {
-        if rhs.is_one() { 
+        if rhs.is_one() {
             return
         }
 
-        self.data.iter_mut().for_each(|(_, r)| *r *= rhs);
-        self.clean()
+        self.data.map_coeffs_in_place(|r| r * rhs);
     }
 }
 
@@ -689,6 +714,64 @@ mod tests {
         z1 -= &z2;
 
         assert_eq!(z1, L::from(hashmap!{ e(1) => 1, e(2) => -18, e(3) => -30 }));
+    }
+
+    // The owned/borrowed `+=`/`-=` split is wired through undocumented `auto_ops` args, so
+    // cross-check every generated operator form (val/ref × val/ref) and both assign forms against
+    // a HashMap ground truth over Zero/Single/Many cases incl. full cancellation.
+    #[test]
+    fn op_forms_consistent() {
+        use std::collections::HashMap;
+        type L = Lc<X, i32>;
+
+        let lc = |pairs: &[(i32, i32)]| -> L {
+            L::from_iter(pairs.iter().map(|&(k, c)| (e(k), c)))
+        };
+        let reference = |a: &[(i32, i32)], b: &[(i32, i32)], sign: i32| -> L {
+            let mut m: HashMap<i32, i32> = HashMap::new();
+            for &(k, c) in a { *m.entry(k).or_default() += c; }
+            for &(k, c) in b { *m.entry(k).or_default() += sign * c; }
+            L::from_iter(m.into_iter().filter(|&(_, c)| c != 0).map(|(k, c)| (e(k), c)))
+        };
+
+        let cases: &[&[(i32, i32)]] = &[
+            &[],
+            &[(1, 5)],
+            &[(1, -5)],
+            &[(1, 1), (2, 2)],
+            &[(2, 20), (3, 30)],
+            &[(1, 3), (2, -2), (3, 7)],
+            &[(1, -3), (2, 2), (3, -7)],   // negation of the previous → cancels to zero on add
+            &[(1, 1), (2, 1), (3, 1), (4, 1), (5, 1)],
+        ];
+
+        for a in cases {
+            for b in cases {
+                let (la, lb) = (lc(a), lc(b));
+                let exp_add = reference(a, b, 1);
+                let exp_sub = reference(a, b, -1);
+
+                assert_eq!(la.clone() + lb.clone(), exp_add, "Add val_val {a:?} {b:?}");
+                assert_eq!(la.clone() + &lb,        exp_add, "Add val_ref {a:?} {b:?}");
+                assert_eq!(&la + lb.clone(),        exp_add, "Add ref_val {a:?} {b:?}");
+                assert_eq!(&la + &lb,               exp_add, "Add ref_ref {a:?} {b:?}");
+                { let mut t = la.clone(); t += lb.clone(); assert_eq!(t, exp_add, "+= val {a:?} {b:?}"); }
+                { let mut t = la.clone(); t += &lb;        assert_eq!(t, exp_add, "+= ref {a:?} {b:?}"); }
+
+                assert_eq!(la.clone() - lb.clone(), exp_sub, "Sub val_val {a:?} {b:?}");
+                assert_eq!(la.clone() - &lb,        exp_sub, "Sub val_ref {a:?} {b:?}");
+                assert_eq!(&la - lb.clone(),        exp_sub, "Sub ref_val {a:?} {b:?}");
+                assert_eq!(&la - &lb,               exp_sub, "Sub ref_ref {a:?} {b:?}");
+                { let mut t = la.clone(); t -= lb.clone(); assert_eq!(t, exp_sub, "-= val {a:?} {b:?}"); }
+                { let mut t = la.clone(); t -= &lb;        assert_eq!(t, exp_sub, "-= ref {a:?} {b:?}"); }
+
+                // Borrowed operands must be untouched by the ref-rhs / ref-lhs forms.
+                let _ = &la + &lb;
+                let _ = &la - &lb;
+                assert_eq!(la, lc(a), "lhs mutated {a:?}");
+                assert_eq!(lb, lc(b), "rhs mutated {b:?}");
+            }
+        }
     }
 
     #[test]

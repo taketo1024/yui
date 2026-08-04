@@ -262,6 +262,35 @@ mod tests {
     }
 
     #[test]
+    fn involution_is_a_strong_inversion() {
+        // `new` only checks that the edge map is an involution; these are the conditions making it
+        // a π-rotation about an axis in the plane.
+        fn check(name: &str, l: &InvLink) {
+            let inner = l.inner();
+            let fixed = inner.edges().into_iter().filter(|&e| l.inv_edge(e) == e).count();
+            assert_eq!(fixed, 2, "{name}: the axis must meet the knot twice");
+
+            for x in inner.nodes() {
+                let y = l.inv_node(x);
+                assert_eq!(y.node_type(), x.node_type(), "{name}: τ changed a crossing type");
+                assert_eq!(l.inv_node(y), x, "{name}: τ is not an involution on nodes");
+
+                // a π-rotation reflects each crossing's four slots: s ↦ (k - s) mod 4, k odd.
+                let k = (0..4).find(|&k|
+                    (0..4).all(|s| y.edge((k + 4 - s) % 4) == l.inv_edge(x.edge(s)))
+                );
+                assert!(matches!(k, Some(1) | Some(3)), "{name}: τ does not reflect the slots at {x}");
+            }
+        }
+
+        for name in ["3_1", "4_1", "6_3"] {
+            check(name, &InvLink::test_data(name));
+        }
+        check("sym_pretzel(-3,3,-3)", &InvLink::sym_pretzel(-3, 3, -3));
+        check("sym_wh+(3_1)", &InvLink::whitehead_double(&InvLink::test_data("3_1"), true, 0));
+    }
+
+    #[test]
     fn conn_sum_is_equivariant() {
         // construction succeeding ⟺ from_standard_reindex found a valid τ on the sum.
         let k1 = InvLink::test_data("3_1");

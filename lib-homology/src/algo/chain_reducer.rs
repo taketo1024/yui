@@ -266,9 +266,10 @@ where
         (PivotType::Cols, PivotCondition::One)
     }
 
-    // Transport attached vectors through this round's basis change. Col side (index `i`): a cycle's
-    // pivot components lie in the cancelled summand, so the non-pivot projection is the homology-
-    // correct coordinate. Row side (`i + d_deg`): the honest Schur correction `y - c·a⁻¹x`.
+    // Transport attached vectors through this round's basis change by the two SDR projections:
+    // col side (index `i`) is `(0  1)` — drop the pivot components; row side (`i + d_deg`) is
+    // `(-c·a⁻¹  1)` — the Schur correction.
+    // See for example [KS2025, Prop 2.28] (https://arxiv.org/abs/2503.05414)
     fn update_vecs(&mut self, i: I, piv_type: PivotType, blocks: Option<(SpMat<R>, SpMat<R>)>, p: &Perm, q: &Perm, r: usize, shape: (usize, usize)) {
         let (m, n) = shape;
         let (_, i1, i2) = self.deg_trip(i);

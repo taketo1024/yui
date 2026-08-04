@@ -18,7 +18,6 @@ pub type StateRepr = u128;
 
 pub type State = yui_core::bitseq::BitSeq<StateRepr>;
 
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Link {
     nodes: Vec<Node>,
@@ -65,63 +64,6 @@ impl Link {
 
     pub fn from_nodes(nodes: impl IntoIterator<Item = Node>) -> Self {
         Self::new(nodes, [])
-    }
-
-    // Re-derive each crossing's orientation by traversing components. `is_incoming(i, j)` tells
-    // whether port j of node i is known to receive an incoming strand (PD codes: j == 0). The first
-    // claimed port met by a tentative traversal fixes the component's direction; a component claiming
-    // no port is undetermined (cf. `unlink2`) and the whole link is left unoriented. A fixed direction
-    // contradicting `is_incoming` (an odd PD code) panics. Returns whether the link is now oriented.
-    pub(crate) fn reorient<F>(&mut self, is_incoming: F) -> bool
-    where F: Fn(usize, Slot) -> bool {
-        let mut incoming: Vec<Vec<Slot>> = vec![vec![]; self.n_nodes()];
-        let mut remain: HashSet<Edge> = self.nodes.iter().flat_map(|x| x.edges().iter().copied()).collect();
-        let mut undetermined = false;
-
-        while !remain.is_empty() {
-            // start at a claimed port of an untraversed component, so the direction is correct
-            // from the outset. Components claiming no port are undetermined (cf. `unlink2`).
-            let Some(start) = self.find_port(|i, s|
-                remain.contains(&self.node(i).edge(s)) && is_incoming(i, s)
-            ) else {
-                undetermined = true;
-                break;
-            };
-
-            self.traverse_from(start, |i, s| {
-                remain.remove(&self.node(i).edge(s));
-                let out = s.shift(2);
-                assert!(
-                    is_incoming(i, s) || !is_incoming(i, out),
-                    "inconsistent orientation: the strand through node {i} exits at slot {out}, which is claimed incoming"
-                );
-                incoming[i].push(s);
-            });
-        }
-
-        // a node is oriented by its two incoming slots, provided they lie on different strands;
-        // if any node fails that, or some component is undetermined, the whole link is unoriented.
-        let oris = Iterator::zip(self.nodes.iter(), incoming.iter()).map(|(n, slots)|
-            match slots[..] {
-                [p, q] => Node::orientable(n.node_type(), p, q).then_some((p, q)),
-                _ => None,
-            }
-        ).collect_vec();
-        let coherent = !undetermined && oris.iter().all(Option::is_some);
-
-        self.nodes.iter_mut().zip(oris).for_each(|(n, o)| 
-            n.set_incoming(if coherent { o } else { None })
-        );
-
-        coherent
-    }
-
-    // note: builder links may have an edge with both ends at port 2, so no port is excluded here;
-    // PD-specific constraints (never enter at 2) belong in the caller's predicate.
-    fn find_port(&self, f: impl Fn(usize, Slot) -> bool) -> Option<(usize, Slot)> {
-        (0..self.n_nodes()).flat_map(|i|
-            Slot::ALL.map(move |s| (i, s))
-        ).find(|&(i, s)| f(i, s))
     }
 
     pub fn with_base_pt(mut self, e: Edge) -> Self {
@@ -307,6 +249,66 @@ impl Link {
         ).expect("Broken data")
     }
 
+    // Re-derive each crossing's orientation by traversing components. `is_incoming(i, j)` tells
+    // whether port j of node i is known to receive an incoming strand (PD codes: j == 0). The first
+    // claimed port met by a tentative traversal fixes the component's direction; a component claiming
+    // no port is undetermined (cf. `unlink2`) and the whole link is left unoriented. A fixed direction
+    // contradicting `is_incoming` (an odd PD code) panics. Returns whether the link is now oriented.
+    pub(crate) fn reorient<F>(&mut self, is_incoming: F) -> bool
+    where F: Fn(usize, Slot) -> bool {
+        let mut incoming: Vec<Vec<Slot>> = vec![vec![]; self.n_nodes()];
+        let mut remain: HashSet<Edge> = self.nodes.iter().flat_map(|x| x.edges().iter().copied()).collect();
+        let mut undetermined = false;
+
+        while !remain.is_empty() {
+            // start at a claimed port of an untraversed component, so the direction is correct
+            // from the outset. Components claiming no port are undetermined (cf. `unlink2`).
+            let Some(start) = self.find_port(|i, s|
+                remain.contains(&self.node(i).edge(s)) && is_incoming(i, s)
+            ) else {
+                undetermined = true;
+                break;
+            };
+
+            self.traverse_from(start, |i, s| {
+                remain.remove(&self.node(i).edge(s));
+                let out = s.shift(2);
+                assert!(
+                    is_incoming(i, s) || !is_incoming(i, out),
+                    "inconsistent orientation: the strand through node {i} exits at slot {out}, which is claimed incoming"
+                );
+                incoming[i].push(s);
+            });
+        }
+
+        // a node is oriented by its two incoming slots, provided they lie on different strands;
+        // if any node fails that, or some component is undetermined, the whole link is unoriented.
+        let oris = Iterator::zip(self.nodes.iter(), incoming.iter()).map(|(n, slots)|
+            match slots[..] {
+                [p, q] => Node::orientable(n.node_type(), p, q).then_some((p, q)),
+                _ => None,
+            }
+        ).collect_vec();
+        let coherent = !undetermined && oris.iter().all(Option::is_some);
+
+        self.nodes.iter_mut().zip(oris).for_each(|(n, o)| 
+            n.set_incoming(if coherent { o } else { None })
+        );
+
+        coherent
+    }
+
+    pub fn unoriented(&self) -> Self {
+        if !self.is_oriented() {
+            return self.clone();
+        }
+        let mut l = self.clone();
+        l.nodes.iter_mut().for_each(|n|
+            n.set_incoming(None)
+        );
+        l
+    }
+
     // Renumber the edges base..base+n in the order they are met traversing from `start_edge`
     // (a knot's one traversal covers every edge), keeping the diagram. base_pt becomes `base`
     // (base = 1 gives the usual 1-based numbering of knot theory).
@@ -364,6 +366,12 @@ impl Link {
         };
         debug_assert!(is_in(x) != is_in(y), "edge {e} must have one head and one tail");
         if is_in(x) { (y, x) } else { (x, y) }
+    }
+
+    fn find_port(&self, f: impl Fn(usize, Slot) -> bool) -> Option<(usize, Slot)> {
+        (0..self.n_nodes()).flat_map(|i|
+            Slot::ALL.map(move |s| (i, s))
+        ).find(|&(i, s)| f(i, s))
     }
 }
 

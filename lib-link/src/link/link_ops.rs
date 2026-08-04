@@ -6,7 +6,7 @@ use petgraph::Graph;
 use yui_core::{CloneAnd, Sign};
 use yui_core::bitseq::Bit;
 
-use super::{Edge, Link, LinkBuilder, Node, NodeType, Path, Slot, State};
+use super::{Edge, Link, LinkBuilder, NodeType, Path, Slot, State};
 
 impl Link {
     // Connected sum at the two base points (a PD-built link defaults to its minimal edge).
@@ -48,20 +48,6 @@ impl Link {
         );
         // `new` defaults the base point to the minimal edge; mirroring preserves the edge set,
         // so re-imposing the original one is always valid.
-        match self.base_pt() {
-            Some(e) => l.with_base_pt(e),
-            None => l,
-        }
-    }
-
-    pub fn unoriented(&self) -> Self {
-        if !self.is_oriented() {
-            return self.clone();
-        }
-        let l = Self::new(
-            self.nodes().map(|x| Node::new(x.node_type(), None, *x.edges())),
-            self.loops().iter().copied(),
-        );
         match self.base_pt() {
             Some(e) => l.with_base_pt(e),
             None => l,

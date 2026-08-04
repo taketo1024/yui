@@ -260,10 +260,14 @@ impl Link {
             // Take minimal edge-id. 
             let e0 = remain.iter().min().cloned().unwrap();
 
-            // Find node & point having edge e0. 
-            let (i0, j0) = self.find_port(|i, j| 
-                self.node(i).edge(j) == e0
-            ).unwrap();
+            // Find node & point having edge e0, entering at its head so the walk runs forward.
+            let (i0, j0) = if self.is_oriented() {
+                self.edge_ends(e0, true).1
+            } else {
+                self.find_port(|i, j|
+                    self.node(i).edge(j) == e0
+                ).unwrap()
+            };
 
             self.traverse_from((i0, j0), |i, j| { 
                 let e = self.node(i).edge(j);
@@ -317,9 +321,10 @@ impl Link {
     // (base = 1 gives the usual 1-based numbering of knot theory).
     pub fn reindexed(&self, start_edge: Edge, base: Edge) -> Link {
         assert!(self.is_knot() && self.loops.is_empty(), "reindexed expects a knot");
-        let start = self.find_port(|i, j|
-            self.node(i).edge(j) == start_edge
-        ).expect("start_edge must be an edge of the link");
+        assert!(self.is_oriented(), "reindexed needs an orientation to traverse in");
+
+        // note: `traverse_from` runs forward from an in-port, backward from an out-port.
+        let (_, start) = self.edge_ends(start_edge, true);
 
         let mut map: HashMap<Edge, Edge> = HashMap::new();
         let mut next = base;
@@ -606,5 +611,18 @@ mod tests {
         let _ = Link::test_data("3_1").with_base_pt(99);
     }
 
+    #[test]
+    fn reindexed_numbers_along_the_orientation() {
+        // Renumbering depends only on (diagram, start edge), so the least code is a canonical form.
+        let canon = |k: &Link| k.edges().into_iter()
+            .map(|e| k.reindexed(e, 1).pd_code())
+            .min().unwrap();
 
+        for l in [Link::test_data("3_1"), Link::test_data("6_1"), Link::pretzel(1, 3, 5)] {
+            let c = canon(&l);
+            for e in l.edges() {
+                assert_eq!(canon(&l.reindexed(e, 1)), c, "relabelling from edge {e} changed the canonical form");
+            }
+        }
+    }
 }

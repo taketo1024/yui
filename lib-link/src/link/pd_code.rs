@@ -83,6 +83,17 @@ mod tests {
     }
 
     #[test]
+    fn pd_code_depends_only_on_the_diagram() {
+        // Rebuilding changes the node order, so this holds only if traversal follows the orientation.
+        for name in ["3_1", "4_1", "5_2", "6_1", "L2a1", "L4a1"] {
+            let l = Link::test_data(name);
+            assert_eq!(Link::from_pd_code(l.pd_code()).pd_code(), l.pd_code(), "{name}");
+        }
+        let l = Link::pretzel(1, 3, 5);
+        assert_eq!(Link::from_pd_code(l.pd_code()).pd_code(), l.pd_code(), "pretzel(1,3,5)");
+    }
+
+    #[test]
     fn link_from_pd_code() {
         let l = Link::test_data("unknot_l_twist");
         assert_eq!(l.n_nodes(), 1);

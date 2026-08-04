@@ -26,7 +26,7 @@ impl Link {
     where I: IntoIterator<Item = PDCodeX> {
         let nodes = pd_code.into_iter().map(Node::from_pd_code).collect_vec();
         let mut l = Self::from_nodes(nodes); // unoriented
-        l.reorient(|_, j| j == 0); // PD convention: the under-strand enters at pos 0.
+        l.reorient(|_, s| s.index() == 0); // PD convention: the under-strand enters at slot 0.
         l
     }
 
@@ -40,12 +40,12 @@ impl Link {
             // under-pass: `XL`'s under-strand enters at an even port (0/2), `XR`'s at an odd port (1/3);
             // the other pass is the over-strand and is skipped, so each crossing is emitted exactly once.
             let under = match x.node_type() {
-                NodeType::XL => j % 2 == 0,
-                NodeType::XR => j % 2 == 1,
+                NodeType::XL => j.index() % 2 == 0,
+                NodeType::XR => j.index() % 2 == 1,
                 _ => return,
             };
             if under {
-                pd.push([x.edge(j), x.edge((j + 1) % 4), x.edge((j + 2) % 4), x.edge((j + 3) % 4)]);
+                pd.push([x.edge(j), x.edge(j.shift(1)), x.edge(j.shift(2)), x.edge(j.shift(3))]);
             }
         });
         pd

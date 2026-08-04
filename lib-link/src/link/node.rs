@@ -17,6 +17,31 @@ use NodeType::{XL, XR, V, H};
 //     0   1         0   1         0   1         0   1        
 //
 
+// One of a node's four ends, counter-clockwise from the lower left (see the NodeType diagram).
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::Display, Debug)]
+pub enum Slot {
+    SW, SE, NE, NW
+}
+
+impl Slot {
+    pub const ALL: [Slot; 4] = [Slot::SW, Slot::SE, Slot::NE, Slot::NW];
+
+    pub fn index(&self) -> usize {
+        *self as usize
+    }
+
+    // the slot `k` steps counter-clockwise from this one.
+    pub fn shift(&self, k: usize) -> Self {
+        Self::from((self.index() + k) % 4)
+    }
+}
+
+impl From<usize> for Slot {
+    fn from(i: usize) -> Self {
+        Self::ALL.get(i).copied().unwrap_or_else(|| panic!("slot {i} out of range"))
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Hash, derive_more::Display, Debug)]
 pub enum NodeType { 
     XL, XR, V, H 
@@ -24,13 +49,13 @@ pub enum NodeType {
 
 impl NodeType { 
     // The slot at the other end of the strand passing through `slot` — the strand pairing.
-    pub fn counter_pos(&self, slot: u8) -> u8 {
-        assert!(slot < 4, "slot {slot} out of range");
-        match self {
-            XL | XR => (slot + 2) % 4,
-            V => 3 - slot,
-            H => (5 - slot) % 4,
-        }
+    pub fn counter_pos(&self, slot: Slot) -> Slot {
+        let i = slot.index();
+        Slot::from(match self {
+            XL | XR => (i + 2) % 4,   // SW<->NE, SE<->NW
+            V => 3 - i,               // SW<->NW, SE<->NE
+            H => i ^ 1,               // SW<->SE, NE<->NW
+        })
     }
 
     pub fn mirror(&self) -> Self {
@@ -47,12 +72,12 @@ pub struct Node {
     node_type: NodeType,
     // the two slots where the strands enter, sorted; `None` when the node is not coherently
     // oriented. The two must lie on different strands — see `Node::orientable`.
-    incoming: Option<(u8, u8)>,
+    incoming: Option<(Slot, Slot)>,
     edges: [Edge; 4],
 }
 
 impl Node {
-    pub fn new(node_type: NodeType, incoming: Option<(u8, u8)>, edges: [Edge; 4]) -> Self { 
+    pub fn new(node_type: NodeType, incoming: Option<(Slot, Slot)>, edges: [Edge; 4]) -> Self { 
         let incoming = incoming.map(|(p, q)| (p.min(q), p.max(q)));
         assert!(
             incoming.is_none_or(|(p, q)| Self::orientable(node_type, p, q)),
@@ -67,7 +92,7 @@ impl Node {
 
     // A node is coherently oriented only when its two incoming slots sit on different strands;
     // `counter_pos` is the strand pairing.
-    pub fn orientable(node_type: NodeType, p: u8, q: u8) -> bool {
+    pub fn orientable(node_type: NodeType, p: Slot, q: Slot) -> bool {
         p != q && node_type.counter_pos(p) != q
     }
 
@@ -75,14 +100,12 @@ impl Node {
         self.node_type
     }
 
-    pub fn edge(&self, i: usize) -> Edge { 
-        assert!(i < 4);
-        self.edges[i]
+    pub fn edge(&self, s: Slot) -> Edge { 
+        self.edges[s.index()]
     }
 
-    pub fn counter_edge(&self, i: usize) -> Edge { 
-        assert!(i < 4);
-        self.edge(self.counter_pos(i))
+    pub fn counter_edge(&self, s: Slot) -> Edge { 
+        self.edge(self.counter_pos(s))
     }
 
     pub fn edges(&self) -> &[Edge; 4] { 
@@ -124,12 +147,12 @@ impl Node {
     }
 
     // The two slots where the strands enter, sorted.
-    pub fn incoming(&self) -> Option<(u8, u8)> { 
+    pub fn incoming(&self) -> Option<(Slot, Slot)> { 
         self.incoming
     }
 
     // Goes through `new`, so the pair is sorted and validated however the caller passes it.
-    pub(crate) fn set_incoming(&mut self, incoming: Option<(u8, u8)>) {
+    pub(crate) fn set_incoming(&mut self, incoming: Option<(Slot, Slot)>) {
         *self = Self::new(self.node_type, incoming, self.edges);
     }
 
@@ -143,10 +166,10 @@ impl Node {
 
     // Only a crossing has a sign, read off the type and which pair of slots the strands enter by.
     pub fn sign(&self) -> Option<Sign> { 
-        let incoming = self.incoming?;
-        match (self.node_type, incoming) { 
-            (XL, (1, 2)) | (XL, (0, 3)) | (XR, (0, 1)) | (XR, (2, 3)) => Some(Sign::Pos),
-            (XL, (0, 1)) | (XL, (2, 3)) | (XR, (1, 2)) | (XR, (0, 3)) => Some(Sign::Neg),
+        use Slot::{SW, SE, NE, NW};
+        match (self.node_type, self.incoming?) { 
+            (XL, (SE, NE)) | (XL, (SW, NW)) | (XR, (SW, SE)) | (XR, (NE, NW)) => Some(Sign::Pos),
+            (XL, (SW, SE)) | (XL, (NE, NW)) | (XR, (SE, NE)) | (XR, (SW, NW)) => Some(Sign::Neg),
             _ => None,
         }
     }
@@ -187,8 +210,8 @@ impl Node {
         }
     }
 
-    pub(crate) fn counter_pos(&self, index: usize) -> usize { 
-        self.node_type.counter_pos(index as u8) as usize
+    pub(crate) fn counter_pos(&self, s: Slot) -> Slot { 
+        self.node_type.counter_pos(s)
     }
 }
 
@@ -203,12 +226,12 @@ mod tests {
     use super::*;
 
     // the four orientations a crossing can carry, by the direction the strands run.
-    const UP:    Option<(u8, u8)> = Some((0, 1));
-    const LEFT:  Option<(u8, u8)> = Some((1, 2));
-    const DOWN:  Option<(u8, u8)> = Some((2, 3));
-    const RIGHT: Option<(u8, u8)> = Some((0, 3));
+    const UP:    Option<(Slot, Slot)> = Some((Slot::SW, Slot::SE));
+    const LEFT:  Option<(Slot, Slot)> = Some((Slot::SE, Slot::NE));
+    const DOWN:  Option<(Slot, Slot)> = Some((Slot::NE, Slot::NW));
+    const RIGHT: Option<(Slot, Slot)> = Some((Slot::SW, Slot::NW));
 
-    fn node(ntype: NodeType, incoming: Option<(u8, u8)>) -> Node {
+    fn node(ntype: NodeType, incoming: Option<(Slot, Slot)>) -> Node {
         Node::new(ntype, incoming, [0, 1, 2, 3])
     }
 
@@ -260,14 +283,15 @@ mod tests {
         // which no crossing can carry. `resolve` never produces them, but a V/H diagram oriented in
         // its own right does (e.g. orienting the circles of a resolution).
         for ntype in [V, H] {
-            for pair in [(0, 2), (1, 3)] {
+            for (a, b) in [(Slot::SW, Slot::NE), (Slot::SE, Slot::NW)] {
+                let pair = (a, b);
                 assert!(Node::orientable(ntype, pair.0, pair.1));
                 assert_eq!(node(ntype, Some(pair)).incoming(), Some(pair));
             }
         }
         for ntype in [XL, XR] {
-            assert!(!Node::orientable(ntype, 0, 2), "a crossing's diagonal is one strand");
-            assert!(!Node::orientable(ntype, 1, 3));
+            assert!(!Node::orientable(ntype, Slot::SW, Slot::NE), "a crossing's diagonal is one strand");
+            assert!(!Node::orientable(ntype, Slot::SE, Slot::NW));
         }
     }
 
@@ -329,8 +353,8 @@ mod tests {
         ];
         for (ntype, expected) in cases {
             let c = node(ntype, None);
-            for i in 0..4 {
-                assert_eq!(c.counter_pos(i), expected[i]);
+            for s in Slot::ALL {
+                assert_eq!(c.counter_pos(s), Slot::from(expected[s.index()]));
             }
         }
     }

@@ -67,7 +67,7 @@ impl Link {
         b.build().unwrap()
     }
 
-    // The 2-cable in an open builder, plus `cab[i][slot] = (copy-0 port, copy-1 port)` so callers can
+    // The 2-cable in an open builder, plus `cab[i][slot.index()] = (copy-0 port, copy-1 port)` so callers can
     // re-splice the cable (e.g. the Whitehead clasp) before building.
     fn cable2_builder(l: &Link) -> (LinkBuilder, Vec<[(Port, Port); 4]>) {
         let mut b = LinkBuilder::new();
@@ -88,7 +88,7 @@ impl Link {
         // ports in CCW order, which reverses along the edge, so copy 0 pairs with the other's copy 1.
         for e in l.edges() {
             let ((i, s), (j, t)) = l.edge_ends(e, false);
-            let ((a0, a1), (b0, b1)) = (cab[i][s], cab[j][t]);
+            let ((a0, a1), (b0, b1)) = (cab[i][s.index()], cab[j][t.index()]);
             b.connect(a0, b1);
             b.connect(a1, b0);
         }
@@ -131,7 +131,7 @@ impl Link {
         // the cut edge's two ends: the a-side (node ia, slot sa) and b-side (ib, sb), with their
         // cable ports (a0, a1) / (b0, b1) in CCW order.
         let ((ia, sa), (ib, sb)) = l.edge_ends(e0, false);
-        let ((a0, a1), (b0, b1)) = (cab[ia][sa], cab[ib][sb]);
+        let ((a0, a1), (b0, b1)) = (cab[ia][sa.index()], cab[ib][sb.index()]);
         b.disconnect(a0);   // the swapped join means a0–b1, a1–b0 are removed
         b.disconnect(a1);
 
@@ -176,7 +176,7 @@ impl Link {
         // carry one of its doubled strands; read off their result-edge ids before consuming the builder.
         let base_edges: Vec<Edge> = base.into_iter().flat_map(|base| {
             let ((i, s), _) = l.edge_ends(base, false);
-            let (p0, p1) = cab[i][s];
+            let (p0, p1) = cab[i][s.index()];
             [b.edge_at(p0).unwrap(), b.edge_at(p1).unwrap()]
         }).collect();
 

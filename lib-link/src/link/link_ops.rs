@@ -6,7 +6,7 @@ use petgraph::Graph;
 use yui_core::{CloneAnd, Sign};
 use yui_core::bitseq::Bit;
 
-use super::{Edge, Link, LinkBuilder, Node, NodeType, Path, State};
+use super::{Edge, Link, LinkBuilder, Node, NodeType, Path, Slot, State};
 
 impl Link {
     // Connected sum at the two base points (a PD-built link defaults to its minimal edge).
@@ -27,7 +27,7 @@ impl Link {
         let v2 = b.add_link(other);
 
         // the (tail, head) ends of each spliced edge, as builder ports.
-        let port = |verts: &[_], (i, s): (usize, usize)| (verts[i], s);
+        let port = |verts: &[_], (i, s): (usize, Slot)| (verts[i], s.index());
         let (t1, h1) = self.edge_ends(self_e, true);
         let (t2, h2) = other.edge_ends(other_e, true);
         let (t1, h1) = (port(&v1, t1), port(&v1, h1));
@@ -136,9 +136,9 @@ impl Link {
         // Free loops have no nodes, so they remain isolated vertices.
         for (i, x) in l0.nodes().enumerate() {
             let (e1, e2) = if x.node_type() == NodeType::V {
-                (x.edge(0), x.edge(1))
+                (x.edge(Slot::SW), x.edge(Slot::SE))
             } else {
-                (x.edge(0), x.edge(2))
+                (x.edge(Slot::SW), x.edge(Slot::NE))
             };
             let n1 = find_node(&graph, e1).unwrap();
             let n2 = find_node(&graph, e2).unwrap();
@@ -183,8 +183,8 @@ mod tests {
         let l = Link::test_data("3_1");
         let l2 = l.cc_at(1);
 
-        assert_eq!(l.node(1),  &Node::new(XL, Some((0, 1)), [3,6,4,1]));
-        assert_eq!(l2.node(1), &Node::new(XR, Some((0, 1)), [3,6,4,1]));
+        assert_eq!(l.node(1),  &Node::new(XL, Some((Slot::SW, Slot::SE)), [3,6,4,1]));
+        assert_eq!(l2.node(1), &Node::new(XR, Some((Slot::SW, Slot::SE)), [3,6,4,1]));
     }
 
     #[test]

@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use itertools::Itertools;
 
-use super::{Node, Path};
+use super::{Node, Path, Slot};
 
 #[cfg(not(feature = "big-link"))]
 pub type Edge = u8;
@@ -17,6 +17,7 @@ pub type Edge = u16;
 pub type StateRepr = u128;
 
 pub type State = yui_core::bitseq::BitSeq<StateRepr>;
+
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Link {
@@ -72,28 +73,29 @@ impl Link {
     // no port is undetermined (cf. `unlink2`) and the whole link is left unoriented. A fixed direction
     // contradicting `is_incoming` (an odd PD code) panics. Returns whether the link is now oriented.
     pub(crate) fn reorient<F>(&mut self, is_incoming: F) -> bool
-    where F: Fn(usize, usize) -> bool {
-        let mut incoming: Vec<Vec<u8>> = vec![vec![]; self.n_nodes()];
+    where F: Fn(usize, Slot) -> bool {
+        let mut incoming: Vec<Vec<Slot>> = vec![vec![]; self.n_nodes()];
         let mut remain: HashSet<Edge> = self.nodes.iter().flat_map(|x| x.edges().iter().copied()).collect();
         let mut undetermined = false;
 
         while !remain.is_empty() {
             // start at a claimed port of an untraversed component, so the direction is correct
             // from the outset. Components claiming no port are undetermined (cf. `unlink2`).
-            let Some(start) = self.find_port(|i, j|
-                remain.contains(&self.node(i).edge(j)) && is_incoming(i, j)
+            let Some(start) = self.find_port(|i, s|
+                remain.contains(&self.node(i).edge(s)) && is_incoming(i, s)
             ) else {
                 undetermined = true;
                 break;
             };
 
-            self.traverse_from(start, |i, j| {
-                remain.remove(&self.node(i).edge(j));
+            self.traverse_from(start, |i, s| {
+                remain.remove(&self.node(i).edge(s));
+                let out = s.shift(2);
                 assert!(
-                    is_incoming(i, j) || !is_incoming(i, (j + 2) % 4),
-                    "inconsistent orientation: the strand through node {i} exits at port {}, which is claimed incoming", (j + 2) % 4
+                    is_incoming(i, s) || !is_incoming(i, out),
+                    "inconsistent orientation: the strand through node {i} exits at slot {out}, which is claimed incoming"
                 );
-                incoming[i].push(j as u8);
+                incoming[i].push(s);
             });
         }
 
@@ -116,13 +118,10 @@ impl Link {
 
     // note: builder links may have an edge with both ends at port 2, so no port is excluded here;
     // PD-specific constraints (never enter at 2) belong in the caller's predicate.
-    fn find_port(&self, f: impl Fn(usize, usize) -> bool) -> Option<(usize, usize)> {
-        let n = self.n_nodes();
-        (0..n).flat_map(|i|
-            (0..4).map(move |j| (i, j))
-        ).find(|&(i, j)|
-            f(i, j)
-        )
+    fn find_port(&self, f: impl Fn(usize, Slot) -> bool) -> Option<(usize, Slot)> {
+        (0..self.n_nodes()).flat_map(|i|
+            Slot::ALL.map(move |s| (i, s))
+        ).find(|&(i, s)| f(i, s))
     }
 
     pub fn with_base_pt(mut self, e: Edge) -> Self {
@@ -235,13 +234,11 @@ impl Link {
     pub fn comps(&self) -> Vec<Path> {
         let mut comps = vec![];
 
-        self.traverse_comps(|c, i, j| {
+        self.traverse_comps(|c, i, s| {
             if c == comps.len() {
                 comps.push(vec![]);
             }
-
-            let e = self.node(i).edge(j);
-            comps[c].push(e);
+            comps[c].push(self.node(i).edge(s));
         });
 
         let mut result: Vec<Path> = comps.into_iter().map(Path::circ).collect();
@@ -252,7 +249,7 @@ impl Link {
     }
 
     pub fn traverse_comps<F>(&self, mut f: F) where 
-    F: FnMut(usize, usize, usize) { 
+    F: FnMut(usize, usize, Slot) { 
         let mut c = 0; // component counter
         let mut remain: HashSet<Edge> = self.nodes.iter().flat_map(|x| x.edges().iter().copied()).collect();
 
@@ -264,15 +261,14 @@ impl Link {
             let (i0, j0) = if self.is_oriented() {
                 self.edge_ends(e0, true).1
             } else {
-                self.find_port(|i, j|
-                    self.node(i).edge(j) == e0
+                self.find_port(|i, s|
+                    self.node(i).edge(s) == e0
                 ).unwrap()
             };
 
-            self.traverse_from((i0, j0), |i, j| { 
-                let e = self.node(i).edge(j);
-                remain.remove(&e);
-                f(c, i, j);
+            self.traverse_from((i0, j0), |i, s| { 
+                remain.remove(&self.node(i).edge(s));
+                f(c, i, s);
             });
 
             // Onto next component.
@@ -280,8 +276,8 @@ impl Link {
         }
     }
 
-    pub fn traverse_from<F>(&self, start: (usize, usize), mut f:F) where
-        F: FnMut(usize, usize)
+    pub fn traverse_from<F>(&self, start: (usize, Slot), mut f: F) where
+        F: FnMut(usize, Slot)
     {
         let (mut i, mut j) = start;
 
@@ -302,18 +298,13 @@ impl Link {
         }
     }
 
-    fn traverse_outer(&self, n_index: usize, e_index: usize) -> (usize, usize) {
-        let e = self.nodes[n_index].edge(e_index);
-
-        for (i, c) in self.nodes.iter().enumerate() {
-            for (j, &f) in c.edges().iter().enumerate() {
-                if e == f && (n_index != i || (n_index == i && e_index != j)) {
-                    return (i, j)
-                }
-            }
-        }
-
-        panic!("Broken data")
+    fn traverse_outer(&self, n_index: usize, slot: Slot) -> (usize, Slot) {
+        let e = self.nodes[n_index].edge(slot);
+        self.nodes.iter().enumerate().flat_map(|(i, _)|
+            Slot::ALL.map(move |s| (i, s))
+        ).find(|&(i, s)|
+            self.nodes[i].edge(s) == e && (i, s) != (n_index, slot)
+        ).expect("Broken data")
     }
 
     // Renumber the edges base..base+n in the order they are met traversing from `start_edge`
@@ -328,8 +319,8 @@ impl Link {
 
         let mut map: HashMap<Edge, Edge> = HashMap::new();
         let mut next = base;
-        self.traverse_from(start, |i, j| {
-            map.entry(self.node(i).edge(j)).or_insert_with(|| {
+        self.traverse_from(start, |i, s| {
+            map.entry(self.node(i).edge(s)).or_insert_with(|| {
                 let id = next;
                 next += 1;
                 id
@@ -355,11 +346,11 @@ impl Link {
     // The two (node, slot) ends of edge `e`. When `directed`, they are ordered as (tail, head)
     // along the orientation — the strand exits at the tail and enters at the head (cf.
     // `Node::incoming`); otherwise the order carries no meaning.
-    pub(crate) fn edge_ends(&self, e: Edge, directed: bool) -> ((usize, usize), (usize, usize)) {
+    pub(crate) fn edge_ends(&self, e: Edge, directed: bool) -> ((usize, Slot), (usize, Slot)) {
         assert!(!directed || self.is_oriented(), "directed edge_ends requires an oriented link");
 
         let (x, y) = self.nodes().enumerate().flat_map(|(i, n)|
-            (0..4).filter(move |&s| n.edge(s) == e).map(move |s| (i, s))
+            Slot::ALL.into_iter().filter(move |&s| n.edge(s) == e).map(move |s| (i, s))
         ).collect_tuple().unwrap_or_else(||
             panic!("edge {e} must appear exactly twice")
         );
@@ -367,9 +358,9 @@ impl Link {
             return (x, y);
         }
 
-        let is_in = |(i, s): (usize, usize)| {
+        let is_in = |(i, s): (usize, Slot)| {
             let (p, q) = self.node(i).incoming().expect("directed edge_ends requires an oriented link");
-            s as u8 == p || s as u8 == q
+            s == p || s == q
         };
         debug_assert!(is_in(x) != is_in(y), "edge {e} must have one head and one tail");
         if is_in(x) { (y, x) } else { (x, y) }
@@ -419,22 +410,23 @@ mod tests {
     fn link_next() {
         let l = Link::test_data("unknot_l_twist");
 
-        assert_eq!(l.traverse_outer(0, 0), (0, 1));
-        assert_eq!(l.traverse_outer(0, 1), (0, 0));
-        assert_eq!(l.traverse_outer(0, 2), (0, 3));
-        assert_eq!(l.traverse_outer(0, 3), (0, 2));
+        let s = |i: usize| Slot::from(i);
+        assert_eq!(l.traverse_outer(0, s(0)), (0, s(1)));
+        assert_eq!(l.traverse_outer(0, s(1)), (0, s(0)));
+        assert_eq!(l.traverse_outer(0, s(2)), (0, s(3)));
+        assert_eq!(l.traverse_outer(0, s(3)), (0, s(2)));
     }
 
     #[test]
     fn link_traverse() {
-        let traverse = |l: &Link, (i0, j0)| { 
+        let traverse = |l: &Link, start: (usize, Slot)| { 
             let mut queue = vec![];
-            l.traverse_from((i0, j0), |i, j| queue.push((i, j)));
+            l.traverse_from(start, |i, s| queue.push((i, s.index())));
             queue
         };
 
         let l = Link::test_data("unknot_l_twist");
-        let path = traverse(&l, (0, 0));
+        let path = traverse(&l, (0, Slot::SW));
         
         assert_eq!(path, [(0, 0), (0, 3)]); // loop
     }

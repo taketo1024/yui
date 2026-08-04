@@ -188,6 +188,7 @@ impl InvLink {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Slot;
     use crate::misc::det;
 
     #[test]
@@ -277,7 +278,9 @@ mod tests {
 
                 // a π-rotation reflects each crossing's four slots: s ↦ (k - s) mod 4, k odd.
                 let k = (0..4).find(|&k|
-                    (0..4).all(|s| y.edge((k + 4 - s) % 4) == l.inv_edge(x.edge(s)))
+                    Slot::ALL.iter().all(|&s|
+                        y.edge(Slot::from((k + 4 - s.index()) % 4)) == l.inv_edge(x.edge(s))
+                    )
                 );
                 assert!(matches!(k, Some(1) | Some(3)), "{name}: τ does not reflect the slots at {x}");
             }

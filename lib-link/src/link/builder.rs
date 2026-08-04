@@ -4,7 +4,7 @@ use std::fmt::Display;
 use petgraph::stable_graph::{StableDiGraph, NodeIndex, EdgeIndex};
 use yui_core::algo::UnionFind;
 
-use crate::{Link, Node, NodeType, Edge};
+use crate::{Link, Node, NodeType, Edge, Slot};
 
 // A port is slot `s` (0..4, CCW) of vertex `v`. For a crossing the slots are
 //     3   2
@@ -83,7 +83,7 @@ impl LinkBuilder {
         // group the two occurrences of each edge, sorted by edge id for deterministic numbering.
         let occ = l.nodes().enumerate().flat_map(|(i, x)| {
             let v = verts[i];
-            (0..4).map(move |s| (x.edge(s), (v, s)))
+            Slot::ALL.map(move |s| (x.edge(s), (v, s.index())))
         }).fold(BTreeMap::<Edge, Vec<Port>>::new(), |mut occ, (e, p)| {
             occ.entry(e).or_default().push(p);
             occ
@@ -143,7 +143,7 @@ impl LinkBuilder {
         let loops = e0 .. e0 + self.loops as Edge;
 
         let mut l = Link::new(nodes.collect::<Vec<_>>(), loops);
-        l.reorient(is_incoming);
+        l.reorient(|i, s| is_incoming(i, s.index()));
         Ok(l)
     }
 

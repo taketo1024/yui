@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use itertools::Itertools;
 
-use super::{Node, NodeOri, Path};
+use super::{Node, Path};
 
 #[cfg(not(feature = "big-link"))]
 pub type Edge = u8;
@@ -73,9 +73,7 @@ impl Link {
     // contradicting `is_incoming` (an odd PD code) panics. Returns whether the link is now oriented.
     pub(crate) fn reorient<F>(&mut self, is_incoming: F) -> bool
     where F: Fn(usize, usize) -> bool {
-        use crate::NodeOri::None;
-
-        let mut incoming: Vec<Vec<usize>> = vec![vec![]; self.n_nodes()];
+        let mut incoming: Vec<Vec<u8>> = vec![vec![]; self.n_nodes()];
         let mut remain: HashSet<Edge> = self.nodes.iter().flat_map(|x| x.edges().iter().copied()).collect();
         let mut undetermined = false;
 
@@ -95,20 +93,22 @@ impl Link {
                     is_incoming(i, j) || !is_incoming(i, (j + 2) % 4),
                     "inconsistent orientation: the strand through node {i} exits at port {}, which is claimed incoming", (j + 2) % 4
                 );
-                incoming[i].push(j);
+                incoming[i].push(j as u8);
             });
         }
 
-        // a crossing's two incoming ports fix the orientation (see `NodeOri::from_in_ports`);
-        // if any node is incoherent, or some component is undetermined, the whole link is unoriented.
-        let oris = incoming.iter().map(|ports| match ports[..] {
-            [p, q] => NodeOri::from_in_ports(p, q),
-            _ => None,
-        }).collect_vec();
-        let coherent = !undetermined && !oris.contains(&None);
-        
+        // a node is oriented by its two incoming slots, provided they lie on different strands;
+        // if any node fails that, or some component is undetermined, the whole link is unoriented.
+        let oris = Iterator::zip(self.nodes.iter(), incoming.iter()).map(|(n, slots)|
+            match slots[..] {
+                [p, q] => Node::orientable(n.node_type(), p, q).then_some((p, q)),
+                _ => None,
+            }
+        ).collect_vec();
+        let coherent = !undetermined && oris.iter().all(Option::is_some);
+
         self.nodes.iter_mut().zip(oris).for_each(|(n, o)| 
-            n.ori = if coherent { o } else { None }
+            n.set_incoming(if coherent { o } else { None })
         );
 
         coherent
@@ -354,7 +354,7 @@ impl Link {
 
     // The two (node, slot) ends of edge `e`. When `directed`, they are ordered as (tail, head)
     // along the orientation — the strand exits at the tail and enters at the head (cf.
-    // `NodeOri::in_ports`); otherwise the order carries no meaning.
+    // `Node::incoming`); otherwise the order carries no meaning.
     pub(crate) fn edge_ends(&self, e: Edge, directed: bool) -> ((usize, usize), (usize, usize)) {
         assert!(!directed || self.is_oriented(), "directed edge_ends requires an oriented link");
 
@@ -368,8 +368,8 @@ impl Link {
         }
 
         let is_in = |(i, s): (usize, usize)| {
-            let ports = self.node(i).ori().in_ports().expect("directed edge_ends requires an oriented link");
-            ports.contains(&s)
+            let (p, q) = self.node(i).incoming().expect("directed edge_ends requires an oriented link");
+            s as u8 == p || s as u8 == q
         };
         debug_assert!(is_in(x) != is_in(y), "edge {e} must have one head and one tail");
         if is_in(x) { (y, x) } else { (x, y) }

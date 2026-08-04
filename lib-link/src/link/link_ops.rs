@@ -6,7 +6,7 @@ use petgraph::Graph;
 use yui_core::{CloneAnd, Sign};
 use yui_core::bitseq::Bit;
 
-use super::{Edge, Link, LinkBuilder, Node, NodeOri, NodeType, Path, State};
+use super::{Edge, Link, LinkBuilder, Node, NodeType, Path, State};
 
 impl Link {
     // Connected sum at the two base points (a PD-built link defaults to its minimal edge).
@@ -59,7 +59,7 @@ impl Link {
             return self.clone();
         }
         let l = Self::new(
-            self.nodes().map(|x| Node::new(x.node_type(), NodeOri::None, *x.edges())),
+            self.nodes().map(|x| Node::new(x.node_type(), None, *x.edges())),
             self.loops().iter().copied(),
         );
         match self.base_pt() {
@@ -152,7 +152,7 @@ impl Link {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Braid, Node, NodeOri};
+    use crate::{Braid, Node};
     use crate::NodeType::{XL, XR};
     use crate::misc::jones_polynomial;
 
@@ -183,8 +183,8 @@ mod tests {
         let l = Link::test_data("3_1");
         let l2 = l.cc_at(1);
 
-        assert_eq!(l.node(1),  &Node::new(XL, NodeOri::Up, [3,6,4,1]));
-        assert_eq!(l2.node(1), &Node::new(XR, NodeOri::Up, [3,6,4,1]));
+        assert_eq!(l.node(1),  &Node::new(XL, Some((0, 1)), [3,6,4,1]));
+        assert_eq!(l2.node(1), &Node::new(XR, Some((0, 1)), [3,6,4,1]));
     }
 
     #[test]
@@ -242,8 +242,7 @@ mod tests {
 
     #[test]
     fn conn_sum_of_braid_closures() {
-        // braid closures orient downward (`ori = Down`), exercising the non-PD arms of
-        // `NodeOri::in_ports` in edge_dir.
+        // braid closures orient downward, exercising the non-PD arms of `edge_ends`.
         let k1 = Braid::from([1, 1, 1]).closure();      // 3_1
         let k2 = Braid::from([1, -2, 1, -2]).closure(); // 4_1
         let cs = k1.conn_sum(&k2);

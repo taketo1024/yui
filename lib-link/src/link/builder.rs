@@ -4,7 +4,7 @@ use std::fmt::Display;
 use petgraph::stable_graph::{StableDiGraph, NodeIndex, EdgeIndex};
 use yui_core::algo::UnionFind;
 
-use crate::{Link, Node, NodeType, NodeOri, Edge};
+use crate::{Link, Node, NodeType, Edge};
 
 // A port is slot `s` (0..4, CCW) of vertex `v`. For a crossing the slots are
 //     3   2
@@ -136,7 +136,7 @@ impl LinkBuilder {
         }).collect();
 
         let nodes = self.graph.node_indices().map(|v|
-            Node::new(self.graph[v], NodeOri::None, [0, 1, 2, 3].map(|s| edge_at[&(v, s)]))
+            Node::new(self.graph[v], None, [0, 1, 2, 3].map(|s| edge_at[&(v, s)]))
         );
 
         let e0 = self.graph.edge_count() as Edge + 1;

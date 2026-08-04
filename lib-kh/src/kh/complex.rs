@@ -105,7 +105,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn deg_shift_for(l: &Link, reduced: bool) -> (isize, isize) {
-        let (n_pos, n_neg) = l.count_signed_crossings();
+        let (n_pos, n_neg) = l.n_signed_crossings();
         let (n_pos, n_neg) = (n_pos as isize, n_neg as isize);
         let h = -n_neg;
         let q = n_pos - 2 * n_neg;
@@ -218,7 +218,7 @@ mod tests {
 
     #[test]
     fn ckh_trefoil() {
-        let l = Link::test_data("3_1").unwrap();
+        let l = Link::test_data("3_1");
         let c = KhComplex::new(&l, &0, &0, false);
 
         assert_eq!(c.h_range(), -3..=0);
@@ -234,7 +234,7 @@ mod tests {
 
     #[test]
     fn ckh_trefoil_red() {
-        let l = Link::test_data("3_1").unwrap();
+        let l = Link::test_data("3_1");
         let c = KhComplex::new(&l, &0, &0, true);
 
         assert_eq!(c.h_range(), -3..=0);
@@ -250,7 +250,7 @@ mod tests {
 
     #[test]
     fn ckh_trefoil_bigr() {
-        let l = Link::test_data("3_1").unwrap();
+        let l = Link::test_data("3_1");
         let c = KhComplex::new(&l, &0, &0, false);
 
         assert_eq!(c[(-3, -9)].rank(), 1);
@@ -263,7 +263,7 @@ mod tests {
 
     #[test]
     fn ckh_trefoil_bigr_red() {
-        let l = Link::test_data("3_1").unwrap();
+        let l = Link::test_data("3_1");
         let c = KhComplex::new(&l, &0, &0, true);
 
         assert_eq!(c[(-3, -8)].rank(), 1);
@@ -281,7 +281,7 @@ mod tests_v1 {
 
     #[test]
     fn ckh_trefoil() {
-        let l = Link::test_data("3_1").unwrap();
+        let l = Link::test_data("3_1");
         let c = KhComplex::new_no_simplify(&l, &0, &0, false);
 
         assert_eq!(c.h_range(), -3..=0);
@@ -295,7 +295,7 @@ mod tests_v1 {
 
     #[test]
     fn ckh_trefoil_red() {
-        let l = Link::test_data("3_1").unwrap();
+        let l = Link::test_data("3_1");
         let c = KhComplex::new_no_simplify(&l, &0, &0, true);
 
         assert_eq!(c.h_range(), -3..=0);

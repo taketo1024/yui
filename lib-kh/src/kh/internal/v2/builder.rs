@@ -130,8 +130,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let a = x.arcs();
             vec![a.0, a.1]
         } else { 
-            let a0 = x.resolved(Bit::Bit0).arcs();
-            let a1 = x.resolved(Bit::Bit1).arcs();
+            let a0 = x.resolve(Bit::Bit0).arcs();
+            let a1 = x.resolve(Bit::Bit1).arcs();
             vec![a0.0, a0.1, a1.0, a1.1]
         }.into_iter().filter(|a|
             self.complex.base_pt().map(|e| !a.contains(e)).unwrap_or(true)
@@ -483,7 +483,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(x.is_crossing());
 
         let r = self.state[x];
-        let a = x.resolved(r);
+        let a = x.resolve(r);
         let tng = Tng::from_resolved(&a);
         let id = Cob::id(&tng);
 
@@ -620,7 +620,7 @@ mod tests {
 
     #[test]
     fn test_unknot_rm1() {
-        let l = Link::from_pd_code([[0,0,1,1]]);
+        let l = Link::test_data("unknot_l_twist");
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
         assert_eq!(c[0].rank(), 2);
@@ -629,7 +629,7 @@ mod tests {
 
     #[test]
     fn test_unknot_rm1_neg() {
-        let l = Link::from_pd_code([[0,1,1,0]]);
+        let l = Link::test_data("unknot_r_twist");
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
         c.check_d_all();
@@ -640,7 +640,7 @@ mod tests {
 
     #[test]
     fn test_unknot_rm2() {
-        let l = Link::from_pd_code([[1,4,2,1],[2,4,3,3]]);
+        let l = Link::test_data("unknot_lr_twist");
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
         c.check_d_all();
@@ -652,8 +652,7 @@ mod tests {
 
     #[test]
     fn test_unlink_2() {
-        let pd_code = [[1,2,3,4], [3,2,1,4]];
-        let l = Link::from_pd_code(pd_code);
+        let l = Link::test_data("unlink2");
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
         c.check_d_all();
@@ -678,7 +677,7 @@ mod tests {
 
     #[test]
     fn test_hopf_link() {
-        let l = Link::test_data("L2a1").unwrap();
+        let l = Link::test_data("L2a1");
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
         c.check_d_all();
@@ -690,7 +689,7 @@ mod tests {
 
     #[test]
     fn test_8_19() {
-        let l = Link::from_pd_code([[4,2,5,1],[8,4,9,3],[9,15,10,14],[5,13,6,12],[13,7,14,6],[11,1,12,16],[15,11,16,10],[2,8,3,7]]);
+        let l = Link::test_data("8_19");
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
         c.check_d_all();
@@ -716,7 +715,7 @@ mod tests {
 
     #[test]
     fn canon_cycle_trefoil() { 
-        let l = Link::test_data("3_1").unwrap();
+        let l = Link::test_data("3_1");
         let c = TngComplexBuilder::build_kh_complex(&l, &2, &0, false);
         let zs = c.canon_cycles();
 
@@ -731,7 +730,7 @@ mod tests {
 
     #[test]
     fn h_range() { 
-        let l = Link::test_data("6_3").unwrap();
+        let l = Link::test_data("6_3");
         let h_range = -1..=1;
 
         let mut b = TngComplexBuilder::new(&l, &0, &0, None);

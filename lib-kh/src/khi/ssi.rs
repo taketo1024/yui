@@ -18,12 +18,12 @@ pub fn ssi_invariants<R>(l: &InvLink, c: &R, reduced: bool) -> (i32, i32)
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
     assert!(!c.is_zero());
     assert!(!c.is_unit());
-    assert!(l.link().is_knot());
+    assert!(l.is_knot());
 
     info!("compute ssi, c = {c} over {}.", R::math_symbol());
 
-    let w = l.link().writhe();
-    let r = l.link().seifert_circles().len() as i32;
+    let w = l.writhe();
+    let r = l.seifert_circles().len() as i32;
     let (d0, d1) = div(l, c, reduced);
 
     let ss0 = 2 * d0 + w - r + 1;
@@ -91,9 +91,9 @@ mod tests {
     #[test]
     fn test_unknot_pos_twist() { 
         let l = InvLink::new(
-            Link::from_pd_code([[0,0,1,1]]),
+            Link::test_data("unknot_r_twist"),
             |e| e,
-            Some(0)
+            Some(1)
         );
         let c = P::variable();
 
@@ -105,9 +105,9 @@ mod tests {
     #[test]
     fn test_unknot_neg_twist() { 
         let l = InvLink::new(
-            Link::from_pd_code([[0,1,1,0]]),
+            Link::test_data("unknot_l_twist"),
             |e| e,
-            Some(0)
+            Some(1)
         );
         let c = P::variable();
 
@@ -119,9 +119,9 @@ mod tests {
     #[test]
     fn test_unknot_neg_twist2() { 
         let l = InvLink::new(
-            Link::from_pd_code([[0,1,3,0],[2,3,1,2]]),
-            |e| (4 - e) % 4,
-            Some(0)
+            Link::test_data("unknot_l_twist2"),
+            |e| (5 - e) % 4 + 1,
+            Some(1)
         );
         let c = P::variable();
 
@@ -204,7 +204,7 @@ mod tests {
 
     #[test]
     fn k9_46() { 
-        let l = InvLink::sinv_knot_from_code(
+        let l = InvLink::from_symmetric_pd_code(
             [[18,8,1,7],[13,6,14,7],[12,2,13,1],[8,18,9,17],[5,14,6,15],[2,12,3,11],[16,10,17,9],[15,4,16,5],[10,4,11,3]]
         );
 

@@ -4,7 +4,7 @@ use crate::{Link, Path, NodeType};
 pub fn seifert_graph(link: &Link) -> Graph<Path, usize> { 
     type G = Graph<Path, usize>;
     let s0 = link.seifert_state();
-    let l0 = link.resolved_by(&s0);
+    let l0 = link.resolve_by(&s0);
     let mut graph = Graph::new();
 
     for c in l0.comps() {
@@ -37,7 +37,7 @@ mod tests {
 
     #[test]
     fn seif_graph() { 
-        let l = Link::test_data("3_1").unwrap();
+        let l = Link::test_data("3_1");
         let g = seifert_graph(&l);
         assert_eq!(g.node_count(), 2);
         assert_eq!(g.edge_count(), 3);

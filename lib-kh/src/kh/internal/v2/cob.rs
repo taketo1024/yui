@@ -37,8 +37,8 @@ impl CobComp {
         assert!(x.is_crossing());
 
         use Bit::{Bit0, Bit1};
-        let src = Tng::from_resolved(&x.resolved(Bit0));
-        let tgt = Tng::from_resolved(&x.resolved(Bit1));
+        let src = Tng::from_resolved(&x.resolve(Bit0));
+        let tgt = Tng::from_resolved(&x.resolve(Bit1));
 
         Self::plain(src, tgt, 0)
     }
@@ -870,7 +870,6 @@ pub trait LcCobTrait: Sized {
     fn convert_edges<F>(&self, f: F) -> Self where F: Fn(Edge) -> Edge;
     fn modify<F>(self, f: F) -> Self where F: Fn(&mut Cob);
     fn connect(self, c: &Cob) -> Self;
-    fn connected(&self, c: &Cob) -> Self;
     fn cap_off(self, b: Bottom, c: &TngComp, dot: Dot) -> Self;
     fn should_part_eval(&self) -> bool;
     fn part_eval(self, h: &Self::R, t: &Self::R) -> Self;
@@ -926,12 +925,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn convert_edges<F>(&self, f: F) -> Self 
     where F: Fn(Edge) -> Edge { 
-        self.map_gens(|c| c.convert_edges(&f))
+        self.map_ref(|c, r| (c.convert_edges(&f), r.clone()))
     }
 
     fn modify<F>(self, f: F) -> Self 
     where F: Fn(&mut Cob) {
-        self.into_map(|mut cob, r| { 
+        self.map(|mut cob, r| {
             f(&mut cob);
             if cob.is_zero_cob() { 
                 (cob, R::zero())
@@ -942,13 +941,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn connect(self, c: &Cob) -> Self {
-        self.modify(|cob| cob.connect(c.clone()) )
-    }
-
-    fn connected(&self, c: &Cob) -> Self { 
-        self.map(|cob, r| { 
-            (cob.connected(c), r.clone())
-        })
+        self.modify(|cob| cob.connect(c.clone()))
     }
 
     fn cap_off(self, b: Bottom, c: &TngComp, dot: Dot) -> Self {
@@ -1325,9 +1318,9 @@ mod tests {
     #[test]
     fn stack_id() {
         let c1 = Cob::new(vec![
-            CobComp::sdl_from(&Node::from_pd_code([0,1,2,3])),
-            CobComp::cup(TngComp::circ([4])),
-            CobComp::cap(TngComp::circ([5])),
+            CobComp::sdl_from(&Node::from_pd_code([1,4,2,5])),
+            CobComp::cup(TngComp::circ([10])),
+            CobComp::cap(TngComp::circ([11])),
         ]);
         let c0 = Cob::id(&c1.src());
         let c2 = Cob::id(&c1.tgt());

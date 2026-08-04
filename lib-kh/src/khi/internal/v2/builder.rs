@@ -47,15 +47,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn new(l: &InvLink, h: &R, t: &R, reduced: bool) -> SymTngBuilder<R> { 
-        assert!(l.link().nodes().all(|x| x.is_crossing()));
+        assert!(l.nodes().all(|x| x.is_crossing()));
         assert!(!reduced || l.base_pt().is_some());
 
         let base_pt = if reduced { l.base_pt() } else { None };
-        let inner = TngComplexBuilder::new(l.link(), h, t, base_pt);
-        let x_map = l.link().nodes().map(|x| 
+        let inner = TngComplexBuilder::new(l.inner(), h, t, base_pt);
+        let x_map = l.nodes().map(|x| 
             (x.clone(), l.inv_x(x).clone())
         ).collect();
-        let e_map = l.link().edges().map(|&e| (e, l.inv_e(e))).collect();
+        let e_map = l.edges().map(|&e| (e, l.inv_e(e))).collect();
 
         Self::new_impl(inner, x_map, e_map)
     }
@@ -172,7 +172,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let elements = elements.into_par_iter().map(|mut e| { 
             e.modify(|k, c| {
                 let kk = k + k;
-                let cc = c.into_map(|mut c, r| { 
+                let cc = c.map(|mut c, r| {
                     let r = &r * &r;
                     let tc = c.convert_edges(|e| self.inv_e(e));
                     c.connect(tc);
@@ -723,7 +723,7 @@ mod tests {
 
     #[test]
     fn process_partial() { 
-        let l = InvLink::sinv_knot_from_code([
+        let l = InvLink::from_symmetric_pd_code([
             [6,9,7,10],[8,1,9,2],[14,7,1,8], // upper
             [3,13,4,12],[10,5,11,6],[11,3,12,2],[13,5,14,4], // lower
         ]); // 6_3

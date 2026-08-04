@@ -50,7 +50,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let c2_deg_shift = c2.deg_shift();
 
         let alg = c1.str().clone();
-        let (a0, a1) = l.node(i).resolved(Bit::Bit0).arcs();
+        let (a0, a1) = l.node(i).resolve(Bit::Bit0).arcs();
 
         // TODO We don't want to reproduce the cube. 
         let (h, t) = c1.str().ht();
@@ -76,7 +76,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 let e = Sign::from_parity( count_1s(&x.state, i) );
                 let t = apply_f1(&alg, &x.tensor, k0, k1) * R::from_sign(e);
                 
-                t.into_map_gens(|y| { 
+                t.map_gens(|y| {
                     KhChainGen::new(s, y, c2_deg_shift)
                 })
             })
@@ -119,7 +119,7 @@ mod tests {
     #[test]
     fn test_cc0_pos_to_neg() { 
         let i = 0;
-        let l = Link::test_data("5_1").unwrap().cc_at(i);
+        let l = Link::test_data("5_1").cc_at(i);
         let (h, t) = (0, 0);
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, false, i);
@@ -133,7 +133,7 @@ mod tests {
     #[test]
     fn test_cc0_neg_to_pos() { 
         let i = 0;
-        let l = Link::test_data("5_1").unwrap().mirror().cc_at(i);
+        let l = Link::test_data("5_1").mirror().cc_at(i);
         let (h, t) = (0, 0);
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, false, i);
@@ -147,7 +147,7 @@ mod tests {
     #[test]
     fn test_cc1_pos_to_neg() { 
         let i = 0;
-        let l = Link::test_data("5_1").unwrap().cc_at(i);
+        let l = Link::test_data("5_1").cc_at(i);
         let (h, t) = (0, 0);
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, false, i);
@@ -161,7 +161,7 @@ mod tests {
     #[test]
     fn test_cc1_neg_to_pos() { 
         let i = 0;
-        let l = Link::test_data("5_1").unwrap().mirror().cc_at(i);
+        let l = Link::test_data("5_1").mirror().cc_at(i);
         let (h, t) = (0, 0);
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, false, i);
@@ -175,7 +175,7 @@ mod tests {
     #[test]
     fn test_red_cc0_pos_to_neg() { 
         let i = 0;
-        let l = Link::test_data("5_1").unwrap().cc_at(i);
+        let l = Link::test_data("5_1").cc_at(i);
         let (h, t) = (0, 0);
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, true, i);
@@ -189,7 +189,7 @@ mod tests {
     #[test]
     fn test_red_cc0_neg_to_pos() { 
         let i = 0;
-        let l = Link::test_data("5_1").unwrap().mirror().cc_at(i);
+        let l = Link::test_data("5_1").mirror().cc_at(i);
         let (h, t) = (0, 0);
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, true, i);
@@ -203,7 +203,7 @@ mod tests {
     #[test]
     fn test_red_cc1_pos_to_neg() { 
         let i = 0;
-        let l = Link::test_data("5_1").unwrap().cc_at(i);
+        let l = Link::test_data("5_1").cc_at(i);
         let (h, t) = (0, 0);
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, true, i);
@@ -217,7 +217,7 @@ mod tests {
     #[test]
     fn test_red_cc1_neg_to_pos() { 
         let i = 0;
-        let l = Link::test_data("5_1").unwrap().mirror().cc_at(i);
+        let l = Link::test_data("5_1").mirror().cc_at(i);
         let (h, t) = (0, 0);
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, true, i);
@@ -233,7 +233,7 @@ mod tests {
         type P = Poly2<'h', 't', i64>;
 
         let i = 0;
-        let l = Link::test_data("5_1").unwrap().cc_at(i);
+        let l = Link::test_data("5_1").cc_at(i);
         let (h, t) = (P::variable(0), P::variable(1));
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, false, i);
@@ -249,7 +249,7 @@ mod tests {
         type P = Poly2<'h', 't', i64>;
 
         let i = 0;
-        let l = Link::test_data("5_1").unwrap().mirror().cc_at(i);
+        let l = Link::test_data("5_1").mirror().cc_at(i);
         let (h, t) = (P::variable(0), P::variable(1));
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, false, i);

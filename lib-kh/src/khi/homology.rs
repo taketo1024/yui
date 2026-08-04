@@ -156,7 +156,7 @@ mod tests {
 
     #[test]
     fn khi() { 
-        let l = InvLink::sinv_knot_from_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
+        let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
@@ -172,7 +172,7 @@ mod tests {
 
     #[test]
     fn khi_fbn() { 
-        let l = InvLink::sinv_knot_from_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
+        let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 
         type R = FF2;
         let (h, t) = (R::one(), R::zero());
@@ -188,7 +188,7 @@ mod tests {
 
     #[test]
     fn khi_bn() { 
-        let l = InvLink::sinv_knot_from_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
+        let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 
         type R = FF2;
         type P = HPoly<'H', R>;
@@ -208,7 +208,7 @@ mod tests {
 
     #[test]
     fn khi_red() { 
-        let l = InvLink::sinv_knot_from_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
+        let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
@@ -224,7 +224,7 @@ mod tests {
 
     #[test]
     fn khi_fbn_red() { 
-        let l = InvLink::sinv_knot_from_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
+        let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 
         type R = FF2;
         let (h, t) = (R::one(), R::zero());
@@ -240,7 +240,7 @@ mod tests {
 
     #[test]
     fn khi_bn_red() { 
-        let l = InvLink::sinv_knot_from_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
+        let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 
         type R = FF2;
         type P = HPoly<'H', R>;
@@ -260,7 +260,7 @@ mod tests {
 
     #[test]
     fn khi_kh_bigr() { 
-        let l = InvLink::sinv_knot_from_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
+        let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
@@ -281,7 +281,7 @@ mod tests {
 
     #[test]
     fn khi_kh_red_bigr() { 
-        let l = InvLink::sinv_knot_from_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
+        let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
@@ -309,7 +309,7 @@ mod tests_v1 {
 
     #[test]
     fn khi() { 
-        let l = InvLink::sinv_knot_from_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
+        let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
@@ -325,7 +325,7 @@ mod tests_v1 {
 
     #[test]
     fn khi_fbn() { 
-        let l = InvLink::sinv_knot_from_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
+        let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 
         type R = FF2;
         let (h, t) = (R::one(), R::zero());
@@ -341,7 +341,7 @@ mod tests_v1 {
 
     #[test]
     fn khi_bn() { 
-        let l = InvLink::sinv_knot_from_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
+        let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 
         type R = FF2;
         type P = HPoly<'H', R>;
@@ -361,7 +361,7 @@ mod tests_v1 {
 
     #[test]
     fn khi_red() { 
-        let l = InvLink::sinv_knot_from_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
+        let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
@@ -377,7 +377,7 @@ mod tests_v1 {
 
     #[test]
     fn khi_fbn_red() { 
-        let l = InvLink::sinv_knot_from_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
+        let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 
         type R = FF2;
         let (h, t) = (R::one(), R::zero());
@@ -393,7 +393,7 @@ mod tests_v1 {
 
     #[test]
     fn khi_bn_red() { 
-        let l = InvLink::sinv_knot_from_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
+        let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 
         type R = FF2;
         type P = HPoly<'H', R>;
@@ -413,7 +413,7 @@ mod tests_v1 {
 
     #[test]
     fn khi_kh_bigr() { 
-        let l = InvLink::sinv_knot_from_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
+        let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());
@@ -434,7 +434,7 @@ mod tests_v1 {
 
     #[test]
     fn khi_kh_red_bigr() { 
-        let l = InvLink::sinv_knot_from_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
+        let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 
         type R = FF2;
         let (h, t) = (R::zero(), R::zero());

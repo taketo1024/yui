@@ -161,7 +161,7 @@ where
 
         use yui_kh::misc::div_vec;
 
-        let l = l.link();
+        let l = l.inner();
         let w = l.writhe();
         let r = l.seifert_circles().len() as i32;
 

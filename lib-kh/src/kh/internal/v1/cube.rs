@@ -17,7 +17,7 @@ pub struct KhCubeVertex {
 
 impl KhCubeVertex { 
     pub fn new(l: &Link, state: State, red_e: Option<Edge>, deg_shift: (isize, isize)) -> Self {
-        let mut circles = l.resolved_by(&state).comps();
+        let mut circles = l.resolve_by(&state).comps();
         circles.sort_by_key(|c| c.min_edge());
         
         let r = circles.len();
@@ -232,13 +232,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn merge(&self, x: &KhChainGen, in_indices: (usize, usize), out_index: usize, target: State) -> KhChain<R> { 
-        self.str.mul_tensor(&x.tensor, in_indices, out_index).into_map_gens(|y| { 
+        self.str.mul_tensor(&x.tensor, in_indices, out_index).map_gens(|y| { 
             KhChainGen::new(target, y, x.deg_shift)
         })
     }
 
     fn split(&self, x: &KhChainGen, in_index: usize, out_indices: (usize, usize), target: State) -> KhChain<R> { 
-        self.str.comul_tensor(&x.tensor, in_index, out_indices).into_map_gens(|y| { 
+        self.str.comul_tensor(&x.tensor, in_index, out_indices).map_gens(|y| { 
             KhChainGen::new(target, y, x.deg_shift)
         })
     }
@@ -319,7 +319,7 @@ mod tests {
     fn unknot_red() { 
         let l = Link::unknot();
         let s = State::empty();
-        let v = KhCubeVertex::new(&l, s, Some(0), (0, 0));
+        let v = KhCubeVertex::new(&l, s, Some(1), (0, 0));
 
         assert_eq!(v.state, s);
         assert_eq!(v.circles.len(), 1);
@@ -328,7 +328,7 @@ mod tests {
 
     #[test]
     fn unlink_2() {
-        let l = Link::from_pd_code([[0, 0, 1, 1]]).resolved_at(0, Bit::Bit0);
+        let l = Link::test_data("unknot_l_twist").resolve_at(0, Bit::Bit0);
         let s = State::empty();
         let v = KhCubeVertex::new(&l, s, None, (0, 0));
 
@@ -339,7 +339,7 @@ mod tests {
 
     #[test]
     fn edge_merge() { 
-        let l = Link::from_pd_code([[0, 0, 1, 1]]);
+        let l = Link::test_data("unknot_l_twist");
         let s = State::from([0]);
         let t = State::from([1]);
         let v = KhCubeVertex::new(&l, s, None, (0, 0));
@@ -357,7 +357,7 @@ mod tests {
 
     #[test]
     fn edge_split() { 
-        let l = Link::from_pd_code([[0, 1, 1, 0]]);
+        let l = Link::test_data("unknot_r_twist");
         let s = State::from([0]);
         let t = State::from([1]);
         let v = KhCubeVertex::new(&l, s, None, (0, 0));
@@ -433,7 +433,7 @@ mod tests {
 
     #[test]
     fn cube_twist_unknot() { 
-        let l = Link::from_pd_code([[0, 0, 1, 1]]);
+        let l = Link::test_data("unknot_l_twist");
         let cube = KhCube::<i32>::new(&l, &0, &0, None, (0, 0));
 
         assert_eq!(cube.dim, 1);
@@ -459,7 +459,7 @@ mod tests {
 
     #[test]
     fn cube_hopf_link() { 
-        let l = Link::test_data("L2a1").unwrap();
+        let l = Link::test_data("L2a1");
         let cube = KhCube::<i32>::new(&l, &0, &0, None, (0, 0));
 
         assert_eq!(cube.dim, 2);
@@ -468,7 +468,7 @@ mod tests {
 
    #[test]
    fn cube_trefoil() { 
-       let l = Link::test_data("3_1").unwrap();
+       let l = Link::test_data("3_1");
        let cube = KhCube::<i32>::new(&l, &0, &0, None, (0, 0));
 
        assert_eq!(cube.dim, 3);

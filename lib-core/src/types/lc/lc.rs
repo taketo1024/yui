@@ -70,54 +70,43 @@ where
         self.data.iter()
     }
 
-    pub fn map<Y, S, F>(&self, f: F) -> Lc<Y, S>
-    where 
-        Y: Gen, 
+    pub fn map<Y, S, F>(self, f: F) -> Lc<Y, S>
+    where
+        Y: Gen,
         S: Ring, for<'x> &'x S: RingOps<S>,
-        F: Fn(&X, &R) -> (Y, S) 
-    { 
-        self.iter().map(|(x, r)| f(x, r)).collect()
-    }
-
-    pub fn into_map<Y, S, F>(self, f: F) -> Lc<Y, S>
-    where 
-        Y: Gen, 
-        S: Ring, for<'x> &'x S: RingOps<S>,
-        F: Fn(X, R) -> (Y, S) 
-    { 
+        F: Fn(X, R) -> (Y, S)
+    {
         self.into_iter().map(|(x, r)| f(x, r)).collect()
     }
 
-    pub fn map_coeffs<S, F>(&self, f: F) -> Lc<X, S>
-    where 
-        S: Ring, for<'x> &'x S: RingOps<S>, 
-        F: Fn(&R) -> S 
-    { 
-        self.map(|x, r| (x.clone(), f(r)))
+    pub fn map_coeffs<S, F>(self, f: F) -> Lc<X, S>
+    where
+        S: Ring, for<'x> &'x S: RingOps<S>,
+        F: Fn(R) -> S
+    {
+        self.map(|x, r| (x, f(r)))
     }
 
-    pub fn into_map_coeffs<S, F>(self, f: F) -> Lc<X, S>
-    where 
-        S: Ring, for<'x> &'x S: RingOps<S>, 
-        F: Fn(R) -> S 
-    { 
-        self.into_map(|x, r| (x, f(r)))
+    pub fn map_gens<Y, F>(self, f: F) -> Lc<Y, R>
+    where
+        Y: Gen,
+        F: Fn(X) -> Y
+    {
+        self.map(|x, r| (f(x), r))
     }
 
-    pub fn map_gens<Y, F>(&self, f: F) -> Lc<Y, R>
-    where 
-        Y: Gen, 
-        F: Fn(&X) -> Y 
-    { 
-        self.map(|x, r| (f(x), r.clone()))
+    pub fn map_ref<Y, S, F>(&self, f: F) -> Lc<Y, S>
+    where
+        Y: Gen,
+        S: Ring, for<'x> &'x S: RingOps<S>,
+        F: Fn(&X, &R) -> (Y, S)
+    {
+        self.iter().map(|(x, r)| f(x, r)).collect()
     }
 
-    pub fn into_map_gens<Y, F>(self, f: F) -> Lc<Y, R>
-    where 
-        Y: Gen, 
-        F: Fn(X) -> Y 
-    { 
-        self.into_map(|x, r| (f(x), r))
+    pub fn into_filter_gens<F>(self, f: F) -> Self
+    where F: Fn(&X) -> bool { 
+        self.into_iter().filter(|(x, _)| f(&x)).collect()
     }
 
     pub fn filter_gens<F>(&self, f: F) -> Self
@@ -129,11 +118,6 @@ where
                 None
             }
         ).collect()
-    }
-
-    pub fn into_filter_gens<F>(self, f: F) -> Self
-    where F: Fn(&X) -> bool { 
-        self.into_iter().filter(|(x, _)| f(&x)).collect()
     }
 
     pub fn apply<F, Y: Gen>(&self, f: F) -> Lc<Y, R>
@@ -268,7 +252,7 @@ where
     type Output = Self;
 
     fn neg(self) -> Self::Output {
-        self.into_map_coeffs(|r| -r)
+        self.map_coeffs(|r| -r)
     }
 }
 
@@ -280,7 +264,7 @@ where
     type Output = Lc<X, R>;
 
     fn neg(self) -> Self::Output {
-        self.map_coeffs(|r| -r)
+        self.map_ref(|x, r| (x.clone(), -r))
     }
 }
 
@@ -733,28 +717,10 @@ mod tests {
     }
 
     #[test]
-    fn into_map_coeffs() {
-        type L = Lc<X, i32>;
-        let z = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
-        let w = z.into_map_coeffs(|a| a * 10);
-
-        assert_eq!(w, L::from(hashmap!{ e(1) => 10, e(2) => 20 }));
-    }
-
-    #[test]
     fn map_gens() {
         type L = Lc<X, i32>;
         let z = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
         let w = z.map_gens(|x| e(x.0 * 10));
-
-        assert_eq!(w, L::from(hashmap!{ e(10) => 1, e(20) => 2 }));
-    }
-
-    #[test]
-    fn into_map_gens() {
-        type L = Lc<X, i32>;
-        let z = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
-        let w = z.into_map_gens(|x| e(x.0 * 10));
 
         assert_eq!(w, L::from(hashmap!{ e(10) => 1, e(20) => 2 }));
     }

@@ -365,12 +365,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         } else { 
             let mut v0 = TngVertex::init();
             v0.key.state.push_0();
-            v0.tng = Tng::from_resolved(&x.resolved(Bit::Bit0));
+            v0.tng = Tng::from_resolved(&x.resolve(Bit::Bit0));
             let k0 = v0.key;
 
             let mut v1 = TngVertex::init();
             v1.key.state.push_1();
-            v1.tng = Tng::from_resolved(&x.resolved(Bit::Bit1));
+            v1.tng = Tng::from_resolved(&x.resolve(Bit::Bit1));
             let k1 = v1.key;
 
             c.add_vertex(v0);
@@ -442,16 +442,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             let e1 = left.keys_out_from(&k0).map(|k1| { 
                 let k1_l0 = k1 + l0;
-                let f = left.edge(&k0, k1);
-                let f_id = f.connected(&Cob::id(w0.tng())); // D(f, 1) 
+                let f = left.edge(&k0, k1).clone();
+                let f_id = f.connect(&Cob::id(w0.tng())); // D(f, 1) 
                 (k0_l0, k1_l0, f_id.part_eval(&h, &t))
             });
 
             let e2 = right.keys_out_from(&l0).map(|l1| { 
                 let k0_l1 = k0 + l1;
-                let f = right.edge(&l0, l1);
+                let f = right.edge(&l0, l1).clone();
                 let e = R::from_sign(Sign::from_parity(i0 as i64));
-                let id_f = f.connected(&Cob::id(v0.tng())) * e; // (-1)^{deg(k0)} D(1, f) 
+                let id_f = f.connect(&Cob::id(v0.tng())) * e; // (-1)^{deg(k0)} D(1, f) 
                 (k0_l0, k0_l1, id_f.part_eval(&h, &t))
             });
 
@@ -739,7 +739,7 @@ mod tests {
     #[test]
     fn single_x() { 
         let mut c = TngComplex::init(&0, &0, (0, 0), None);
-        let x = Node::from_pd_code([0,1,2,3]);
+        let x = Node::from_pd_code([1,4,2,5]);
         c.append(&x);
 
         assert_eq!(c.dim(), 1);
@@ -750,7 +750,7 @@ mod tests {
     #[test]
     fn single_x_resolved() { 
         let mut c = TngComplex::init(&0, &0, (0, 0), None);
-        let x = Node::from_pd_code([0,1,2,3]).resolved(Bit::Bit0);
+        let x = Node::from_pd_code([1,4,2,5]).resolve(Bit::Bit0);
         c.append(&x);
 
         assert_eq!(c.dim(), 0);
@@ -760,8 +760,8 @@ mod tests {
     #[test]
     fn two_x_disj() { 
         let mut c = TngComplex::init(&0, &0, (0, 0), None);
-        let x0 = Node::from_pd_code([0,1,2,3]);
-        let x1 = Node::from_pd_code([4,5,6,7]);
+        let x0 = Node::from_pd_code([1,4,2,5]);
+        let x1 = Node::from_pd_code([11,14,12,15]);
 
         c.append(&x0);
         c.append(&x1);
@@ -775,8 +775,8 @@ mod tests {
     #[test]
     fn two_x() { 
         let mut c = TngComplex::init(&0, &0, (0, 0), None);
-        let x0 = Node::from_pd_code([0,4,1,5]);
-        let x1 = Node::from_pd_code([3,1,4,2]);
+        let x0 = Node::from_pd_code([4,2,5,1]);
+        let x1 = Node::from_pd_code([3,6,4,1]);
 
         c.append(&x0);
         c.append(&x1);
@@ -790,7 +790,7 @@ mod tests {
     #[test]
     fn deloop() { 
         let mut c = TngComplex::init(&0, &0, (0, 0), None);
-        let x0 = Node::from_pd_code([0, 1, 1, 0]).resolved(Bit::Bit0); // unknot
+        let x0 = Node::from_pd_code([1,2,2,1]).resolve(Bit::Bit0); // unknot
         c.append(&x0);
 
         assert_eq!(c.dim(), 0);
@@ -857,8 +857,8 @@ mod tests {
 
     #[test]
     fn deloop_based() { 
-        let mut c = TngComplex::init(&0, &0, (0, 0), Some(0)); // base point = 0
-        let x0 = Node::from_pd_code([0, 1, 1, 0]).resolved(Bit::Bit0); // unknot
+        let mut c = TngComplex::init(&0, &0, (0, 0), Some(1)); // base point = 1
+        let x0 = Node::from_pd_code([1,2,2,1]).resolve(Bit::Bit0); // unknot
         c.append(&x0);
 
         assert_eq!(c.dim(), 0);

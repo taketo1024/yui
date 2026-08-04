@@ -125,7 +125,7 @@ impl KhTensor {
     where F: Fn(&KhGen) -> Lc<KhGen, R>, R: Ring, for<'x> &'x R: RingOps<R> { 
         assert!(i < self.len());
 
-        f(&self[i]).into_map_gens(|y| 
+        f(&self[i]).map_gens(|y| 
             self.clone_and(|t| t.set(i, y))
         )
     }
@@ -237,14 +237,14 @@ impl KhChainGen {
 
     pub fn apply_at<F, R>(&self, i: usize, f: F) -> KhChain<R> 
     where F: Fn(&KhGen) -> Lc<KhGen, R>, R: Ring, for<'x> &'x R: RingOps<R> { 
-        self.tensor.apply_at(i, f).into_map_gens(|t| { 
+        self.tensor.apply_at(i, f).map_gens(|t| { 
             Self::new(self.state, t, self.deg_shift)
         })
     }
 
     pub fn apply_each<F, R>(&self, f: F) -> KhChain<R>  
     where F: Fn(&KhGen) -> Lc<KhGen, R>, R: Ring, for<'x> &'x R: RingOps<R> { 
-        self.tensor.apply_each(f).into_map_gens(|t| { 
+        self.tensor.apply_each(f).map_gens(|t| { 
             Self::new(self.state, t, self.deg_shift)
         })
     }

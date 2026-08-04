@@ -54,7 +54,7 @@ pub fn load_sinv_knot(input: &String, mirror: bool) -> Result<InvLink, Box<dyn s
 
     let l = if input.trim_start().starts_with('[') {
         let pd_code: PDCode = serde_json::from_str(input)?;
-        InvLink::sinv_knot_from_code(pd_code)
+        InvLink::from_symmetric_pd_code(pd_code)
     } else {
         InvLink::load(input)?
     };

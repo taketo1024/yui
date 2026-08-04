@@ -1,5 +1,8 @@
+use std::ops::RangeInclusive;
 use clap::ValueEnum;
 use derive_more::Display;
+use yui_link::Link;
+use yui_kh::tng::builder::{BuildMode, NodeOrder, CutOption};
 
 pub trait AppArgs { 
     fn c_type(&self) -> CType; 
@@ -80,7 +83,57 @@ pub(crate) fn parse_poly_vars(c_value: &String) -> PolyVars {
 
 #[derive(Clone, Copy, PartialEq, Eq, ValueEnum, Display, Debug, Default)]
 #[clap(rename_all="lower")]
-pub enum Format { 
-    #[default] Unicode, 
+pub enum Format {
+    #[default] Unicode,
     TeX
+}
+
+// Parse an inclusive degree range like `-1..=2` (also accepts `-1..2`). An open bottom `..=2`
+// parses with a near-min sentinel start, an open top `-1..=` with a near-max end; the command
+// clamps these to the complex's degree span (so the bottom resolves to deg_shift.0). The `±1`
+// margin keeps a stray `start-1` / `end+1` widening from overflowing before the clamp.
+pub fn parse_h_range(s: &str) -> Result<RangeInclusive<isize>, String> {
+    let (lo, hi) = s.split_once("..=")
+        .or_else(|| s.split_once(".."))
+        .ok_or_else(|| format!("invalid range `{s}`, expected e.g. `-1..=2` or `..=2`"))?;
+    let parse = |x: &str, open: isize| {
+        let x = x.trim();
+        if x.is_empty() { Ok(open) } else { x.parse::<isize>().map_err(|e| format!("`{x}`: {e}")) }
+    };
+    Ok(parse(lo, -(Link::MAX_CROSSING as isize))? ..= parse(hi, Link::MAX_CROSSING as isize + 2)?)
+}
+
+// parse a build mode: greedy | min-fill | no-elim | none.
+pub fn parse_build_mode(s: &str) -> Result<BuildMode, String> {
+    match s.to_lowercase().as_str() {
+        "greedy"               => Ok(BuildMode::Greedy),
+        "min-fill" | "minfill" => Ok(BuildMode::MinFill),
+        "no-elim" | "noelim"   => Ok(BuildMode::NoElim),
+        "none"                 => Ok(BuildMode::None),
+        _ => Err(format!("invalid mode `{s}`, expected greedy|min-fill|no-elim|none")),
+    }
+}
+
+// parse a node order: min-cut | given.
+pub fn parse_node_order(s: &str) -> Result<NodeOrder, String> {
+    match s.to_lowercase().as_str() {
+        "min-cut" | "mincut" | "min" => Ok(NodeOrder::MinCut),
+        "given"                      => Ok(NodeOrder::Given),
+        _ => Err(format!("invalid node order `{s}`, expected min-cut|given")),
+    }
+}
+
+// parse `--cut`: `N` for cutwidth chunking into `N` pieces, `at(c,..)` to cut after the given
+// cumulative crossing counts.
+pub fn parse_cut(s: &str) -> Result<CutOption, String> {
+    if let Some(inner) = s.trim().strip_prefix("at(").and_then(|x| x.strip_suffix(')')) {
+        let counts = inner.split(',')
+            .map(|c| c.trim().parse::<usize>().map_err(|e| format!("at(c,..): `{c}`: {e}")))
+            .collect::<Result<Vec<usize>, _>>()?;
+        return Ok(CutOption::At(counts));
+    }
+    if let Ok(k) = s.trim().parse::<usize>() {
+        return Ok(CutOption::Auto(k));
+    }
+    Err(format!("invalid cut `{s}`, expected N|at(c,..)"))
 }

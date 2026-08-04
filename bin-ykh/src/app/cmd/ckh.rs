@@ -2,11 +2,13 @@ use crate::app::args::*;
 use crate::app::utils::*;
 use crate::app::err::*;
 use std::marker::PhantomData;
+use std::ops::RangeInclusive;
 use std::str::FromStr;
 use yui_core::TeX;
 use yui_core::{Ring, RingOps};
 use yui_homology::ToTableString;
 use yui_kh::kh::KhComplex;
+use yui_kh::tng::builder::{BuildConfig, CutOption};
 
 pub fn dispatch(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
     dispatch_ring!(App, boot, args)
@@ -39,6 +41,13 @@ pub struct Args {
 
     #[arg(short = 'n', long)]
     pub no_simplify: bool,
+
+    #[arg(long, value_parser = parse_h_range)]
+    pub h_range: Option<RangeInclusive<isize>>,
+
+    // chunking: `auto(k)` (cutwidth) or manual edge-cut(s) `e,e,e;e,e,e`.
+    #[arg(long, value_parser = parse_cut)]
+    pub cut: Option<CutOption>,
 
     #[arg(long, default_value = "0")]
     pub log: u8,
@@ -89,8 +98,9 @@ where
 
         let ckh = if self.args.no_simplify {
             KhComplex::new_no_simplify(&l, &h, &t, self.args.reduced)
-        } else { 
-            KhComplex::new(&l, &h, &t, self.args.reduced)
+        } else {
+            let config = BuildConfig { h_range: self.args.h_range.clone(), cut: self.args.cut.clone().unwrap_or_default(), ..Default::default() };
+            KhComplex::new_with_config(&l, &h, &t, self.args.reduced, config)
         };
         
         // CKh generators

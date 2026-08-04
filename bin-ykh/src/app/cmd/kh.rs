@@ -1,9 +1,11 @@
 use std::marker::PhantomData;
+use std::ops::RangeInclusive;
 use std::str::FromStr;
 use yui_core::TeX;
 use yui_core::{EucRing, EucRingOps};
 use yui_homology::{ToSeqString, ToTableString};
 use yui_kh::kh::KhHomology;
+use yui_kh::tng::builder::{BuildConfig, CutOption};
 use yui_link::Link;
 use crate::app::args::*;
 use crate::app::utils::*;
@@ -40,6 +42,17 @@ pub struct Args {
 
     #[arg(short = 'n', long)]
     pub no_simplify: bool,
+
+    #[arg(long, value_parser = parse_h_range)]
+    pub h_range: Option<RangeInclusive<isize>>,
+
+    // chunking: `N` (cutwidth, N pieces) or `at(c,..)` (cut after the given crossing counts).
+    #[arg(long, value_parser = parse_cut)]
+    pub cut: Option<CutOption>,
+
+    // cap the per-elimination fill cost; survivors defer to the matrix reduction.
+    #[arg(long)]
+    pub max_elim_cost: Option<usize>,
 
     #[arg(long, default_value = "0")]
     pub log: u8,
@@ -97,9 +110,10 @@ where
         
         let kh = if self.args.no_simplify {
             KhHomology::new_no_simplify(&l, &h, &t, self.args.reduced)
-        } else { 
-            KhHomology::new(&l, &h, &t, self.args.reduced)
-        } ;
+        } else {
+            let config = BuildConfig { h_range: self.args.h_range.clone(), cut: self.args.cut.clone().unwrap_or_default(), max_elim_cost: self.args.max_elim_cost, ..Default::default() };
+            KhHomology::new_with_config(&l, &h, &t, self.args.reduced, config)
+        };
 
         // print Kh
         let table = if bigraded { 

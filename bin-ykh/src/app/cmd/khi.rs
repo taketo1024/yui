@@ -1,9 +1,11 @@
 use std::marker::PhantomData;
+use std::ops::RangeInclusive;
 use std::str::FromStr;
 use yui_core::TeX;
 use yui_core::{EucRing, EucRingOps};
 use yui_homology::{ToSeqString, ToTableString};
-use yui_kh::khi::{KhIChain, KhIComplex, KhIHomology};
+use yui_kh::khi::{KhIChain, KhIHomology, ssi_invariant};
+use yui_kh::tng::builder::{SymBuildConfig, BuildMode, NodeOrder, CutOption};
 use yui_link::InvLink;
 use crate::app::args::*;
 use crate::app::utils::*;
@@ -40,6 +42,37 @@ pub struct Args {
 
     #[arg(short = 'n', long)]
     pub no_simplify: bool,
+
+    // ssi only: the guessed s-value seeding the high-q build cut (see `ssi_invariant`).
+    #[arg(long)]
+    pub expected: Option<isize>,
+
+    #[arg(long, value_parser = parse_h_range)]
+    pub h_range: Option<RangeInclusive<isize>>,
+
+    #[arg(long, value_parser = parse_build_mode, default_value = "greedy")]
+    pub mode: BuildMode,
+
+    // crossing order: min-cut (default; bounds cutwidth) or given (PD order, debug).
+    #[arg(long, value_parser = parse_node_order, default_value = "min-cut")]
+    pub node_order: NodeOrder,
+
+    // skip the half-build/τ-mirror preprocess (which materializes the unbridged off-axis product).
+    #[arg(long)]
+    pub no_preprocess: bool,
+
+    // cap the per-elimination fill cost; survivors defer to the matrix reduction.
+    #[arg(long)]
+    pub max_elim_cost: Option<usize>,
+
+    // skip the final deloop/eliminate; remaining circles defer to into_raw_complex + the matrix
+    // reducer. For huge knots where the final cobordism deloop is the memory/time wall.
+    #[arg(long)]
+    pub no_full_deloop: bool,
+
+    // chunking: `N` (cutwidth, N pieces) or `at(c,..)` (cut after the given crossing counts).
+    #[arg(long, value_parser = parse_cut)]
+    pub cut: Option<CutOption>,
 
     #[arg(short, long, default_value = "unicode")]
     pub format: Format,
@@ -90,19 +123,38 @@ where
         if self.args.show_alpha { 
             ensure!(t.is_zero(), "`t` must be zero to have alpha.");
         }
-        if self.args.show_ssi { 
+        let l = load_sinv_knot(&self.args.link, self.args.mirror)?;
+
+        let config = SymBuildConfig {
+            h_range: self.args.h_range.clone(), // open ends are clamped inside the build
+            mode: self.args.mode,
+            node_order: self.args.node_order,
+            preprocess: !self.args.no_preprocess,
+            cut: self.args.cut.clone().unwrap_or_default(),
+            max_elim_cost: self.args.max_elim_cost,
+            no_full_deloop: self.args.no_full_deloop,
+            ..Default::default()
+        };
+
+        // ssi-only: computed over F2[H] internally — the selected ring is not involved.
+        let ssi_only = self.args.show_ssi && !(self.args.show_gens || self.args.show_alpha);
+        if ssi_only && !self.args.no_simplify {
+            let ssi = ssi_invariant(&l, self.args.reduced, config, self.args.expected);
+            self.out(&format!("ssi = ({}, {})", ssi.0, ssi.1));
+            return Ok(self.flush());
+        }
+
+        // the table path reads the divisibilities from KhI over the selected ring, with c = h.
+        if self.args.show_ssi {
             ensure!(!h.is_zero() && !h.is_unit(), "`h` must be non-zero, non-invertible to compute ssi.");
             ensure!(t.is_zero(), "`t` must be zero to compute ss.");
         }
-    
-        let l = load_sinv_knot(&self.args.link, self.args.mirror)?;
 
-        let ckhi = if self.args.no_simplify {
-            KhIComplex::new_no_simplify(&l, &h, &t, self.args.reduced)
-        } else { 
-            KhIComplex::new(&l, &h, &t, self.args.reduced)
+        let khi = if self.args.no_simplify {
+            KhIHomology::new_no_simplify(&l, &h, &t, self.args.reduced)
+        } else {
+            KhIHomology::new_with_config(&l, &h, &t, self.args.reduced, config)
         };
-        let khi = ckhi.homology();
 
         let bigraded = h.is_zero() && t.is_zero() || 
             ["H", "0,T"].contains(&self.args.c_value.as_str());
@@ -119,12 +171,12 @@ where
         }
 
         if self.args.show_alpha { 
-            let zs = ckhi.canon_cycles();
+            let zs = khi.canon_cycles();
             self.show_alpha(&khi, zs);
         }
 
         if self.args.show_ssi { 
-            let zs = ckhi.canon_cycles();
+            let zs = khi.canon_cycles();
             self.show_ssi(&l, &h, &khi, zs)?;
         }
 

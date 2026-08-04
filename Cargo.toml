@@ -26,3 +26,10 @@ yui-kh       = { version = "0.5.0", path = "lib-kh" }
 [profile.release]
 overflow-checks = true
 # debug = true
+
+# Release-perf with full debuginfo, for `samply` / `cargo flamegraph`.
+# Build with: cargo build --profile=profiling --example profile_khi
+[profile.profiling]
+inherits = "release"
+debug = true
+split-debuginfo = "unpacked"

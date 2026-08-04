@@ -1,5 +1,5 @@
 mod app;
-pub use app::App;
+pub use app::{App, CliArgs};
 
 mod args;
 mod err;

@@ -2,11 +2,13 @@ use crate::app::args::*;
 use crate::app::utils::*;
 use crate::app::err::*;
 use std::marker::PhantomData;
+use std::ops::RangeInclusive;
 use std::str::FromStr;
 use yui_core::TeX;
 use yui_core::{Ring, RingOps};
 use yui_homology::ToTableString;
 use yui_kh::khi::KhIComplex;
+use yui_kh::tng::builder::{SymBuildConfig, BuildMode, NodeOrder, CutOption};
 
 pub fn dispatch(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
     dispatch_ring!(App, boot, args)
@@ -39,6 +41,24 @@ pub struct Args {
 
     #[arg(short = 'n', long)]
     pub no_simplify: bool,
+
+    #[arg(long, value_parser = parse_h_range)]
+    pub h_range: Option<RangeInclusive<isize>>,
+
+    // chunking: `N` (cutwidth, N pieces) or `at(c,..)` (cut after the given crossing counts).
+    #[arg(long, value_parser = parse_cut)]
+    pub cut: Option<CutOption>,
+
+    #[arg(long, value_parser = parse_build_mode, default_value = "greedy")]
+    pub mode: BuildMode,
+
+    // crossing order: min-cut (default; bounds cutwidth) or given (PD order, debug).
+    #[arg(long, value_parser = parse_node_order, default_value = "min-cut")]
+    pub node_order: NodeOrder,
+
+    // skip the half-build/τ-mirror preprocess (which materializes the unbridged off-axis product).
+    #[arg(long)]
+    pub no_preprocess: bool,
 
     #[arg(long, default_value = "0")]
     pub log: u8,
@@ -91,8 +111,16 @@ where
 
         let ckhi = if self.args.no_simplify {
             KhIComplex::new_no_simplify(&l, &h, &t, self.args.reduced)
-        } else { 
-            KhIComplex::new(&l, &h, &t, self.args.reduced)
+        } else {
+            let config = SymBuildConfig {
+                h_range: self.args.h_range.clone(), // open ends are clamped inside the build
+                cut: self.args.cut.clone().unwrap_or_default(),
+                mode: self.args.mode,
+                node_order: self.args.node_order,
+                preprocess: !self.args.no_preprocess,
+                ..Default::default()
+            };
+            KhIComplex::new_with_config(&l, &h, &t, self.args.reduced, config)
         };
         
         // CKh generators

@@ -54,7 +54,7 @@ impl App {
     pub fn run(&self) -> Result<String, Box<dyn std::error::Error>> { 
         self.init_logger();
 
-        info!("args: {:?}", self.args);
+        info!("args:\n{:#?}", self.args);
         info!("int-type: {}", std::any::type_name::<super::utils::dispatch::Int>());
 
         let (res, time) = measure(||

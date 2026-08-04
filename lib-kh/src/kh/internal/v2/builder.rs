@@ -9,7 +9,7 @@ use num_traits::Zero;
 use yui_core::bitseq::Bit;
 use maplit::hashmap;
 use yui_core::{Ring, RingOps};
-use yui_homology::DisplaySeq;
+use yui_homology::ToSeqString;
 use yui_link::{Node, Edge, Link};
 
 use crate::ext::LinkExt;
@@ -400,7 +400,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let canon_cycles = self.eval_elements();
         let c = self.into_tng_complex().into_kh_complex(canon_cycles);
         
-        info!("  done\n{}", c.display_seq());
+        info!("  done\n{}", c.to_seq_string());
 
         c
     }
@@ -606,8 +606,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 mod tests { 
     use num_traits::Zero;
-    use yui_homology::{ChainComplexTrait, SummandTrait};
-
+    
     use super::*;
 
     #[test]
@@ -633,7 +632,7 @@ mod tests {
         let l = Link::test_data("unknot_r_twist");
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
-        c.check_d_all();
+        c.inner().check_d_all();
 
         assert_eq!(c[-1].rank(), 0);
         assert_eq!(c[ 0].rank(), 2);
@@ -644,7 +643,7 @@ mod tests {
         let l = Link::test_data("unknot_lr_twist");
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
-        c.check_d_all();
+        c.inner().check_d_all();
 
         assert_eq!(c[-1].rank(), 0);
         assert_eq!(c[ 0].rank(), 2);
@@ -656,7 +655,7 @@ mod tests {
         let l = Link::test_data("unlink2");
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
-        c.check_d_all();
+        c.inner().check_d_all();
 
         assert_eq!(c[-1].rank(), 0);
         assert_eq!(c[ 0].rank(), 4);
@@ -681,7 +680,7 @@ mod tests {
         let l = Link::test_data("L2a1");
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
-        c.check_d_all();
+        c.inner().check_d_all();
 
         assert_eq!(c[-2].rank(), 2);
         assert_eq!(c[-1].rank(), 0);
@@ -693,7 +692,7 @@ mod tests {
         let l = Link::test_data("8_19");
         let c = TngComplexBuilder::build_kh_complex(&l, &0, &0, false);
 
-        c.check_d_all();
+        c.inner().check_d_all();
 
         let h = c.inner().homology();
 
@@ -740,7 +739,7 @@ mod tests {
         b.finalize();
 
         let c = b.into_kh_complex();
-        c.check_d_all();
+        c.inner().check_d_all();
 
         let h = c.homology();
         assert_eq!(h[0].rank(), 4);

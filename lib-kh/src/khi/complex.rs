@@ -5,9 +5,8 @@ use delegate::delegate;
 use itertools::Itertools;
 use yui_core::lc::Lc;
 use yui_core::{EucRing, EucRingOps, IteratorExt, Ring, RingOps};
-use yui_homology::{ChainComplex, ChainComplexTrait, DisplaySeq, DisplayTable, Grid1, Grid2, GridIter, GridTrait, Summand, SummandTrait};
+use yui_homology::{ChainComplex1, ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_link::InvLink;
-use yui_matrix::sparse::SpMat;
 
 use crate::kh::{KhChain, KhChainExt, KhComplex, KhState};
 use crate::khi::KhIHomology;
@@ -32,10 +31,10 @@ pub type KhIComplexSummand<R> = Summand<KhIState, R>;
 #[derive(Clone)]
 pub struct KhIComplex<R>
 where R: Ring, for<'a> &'a R: RingOps<R> {
-    inner: ChainComplex<KhIState, R>,
+    inner: ChainComplex1<KhIState, R>,
     canon_cycles: Vec<KhIChain<R>>,
     deg_shift: (isize, isize),
-    gen_grid: OnceLock<Grid2<KhIComplexSummand<R>>>,
+    gen_grid: OnceLock<GrMod2<KhIState, R>>,
 }
 
 impl<R> KhIComplex<R>
@@ -88,7 +87,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
         // TODO use mapping cone
 
-        let summands = Grid1::generate(h_range, |i| { 
+        let summands = GrMod1::generate(h_range, |i| { 
             let b_gens = c[i].raw_generators().iter().map(|x| KhIState::B(*x));
             let q_gens = c[i - 1].raw_generators().iter().map(|x| KhIState::Q(*x));
             Summand::from_raw_generators(Iterator::chain(b_gens, q_gens))
@@ -113,19 +112,30 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
             }
         };
 
-        let inner = ChainComplex::new(summands, 1, move |i, z| { 
+        let inner = ChainComplex1::new(summands, 1, move |i, z| { 
             z.apply(|x| d(i, x))
         });
 
         KhIComplex::new_impl(inner, canon_cycles, deg_shift)
     }
 
-    pub(crate) fn new_impl(inner: ChainComplex<KhIState, R>, canon_cycles: Vec<KhIChain<R>>, deg_shift: (isize, isize)) -> Self {
+    pub(crate) fn new_impl(inner: ChainComplex1<KhIState, R>, canon_cycles: Vec<KhIChain<R>>, deg_shift: (isize, isize)) -> Self {
         Self { inner, canon_cycles, deg_shift, gen_grid: OnceLock::new() }
     }
 
-    pub fn inner(&self) -> &ChainComplex<KhIState, R> {
+    pub fn inner(&self) -> &ChainComplex1<KhIState, R> {
         &self.inner
+    }
+
+    delegate! {
+        to self.inner {
+            pub fn support(&self) -> impl Iterator<Item = &isize> + '_;
+            pub fn is_supported(&self, i: isize) -> bool;
+            pub fn d_deg(&self) -> isize;
+            pub fn d(&self, i: isize, z: &KhIChain<R>) -> KhIChain<R>;
+            pub fn describe_d(&self) -> String;
+            pub fn describe_d_at(&self, i: isize) -> String;
+        }
     }
 
     pub fn h_range(&self) -> RangeInclusive<isize> {
@@ -150,7 +160,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         )
     }
 
-    fn gen_grid(&self) -> &Grid2<KhIComplexSummand<R>> {
+    fn gen_grid(&self) -> &GrMod2<KhIState, R> {
         self.gen_grid.get_or_init(|| make_gen_grid(self.inner.summands()))
     }
 
@@ -182,58 +192,28 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<R> GridTrait<isize> for KhIComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Item = KhIComplexSummand<R>;
-    type Support<'a> = GridIter<'a, isize, Self::Item> where Self: 'a, R: 'a;
-
-    delegate! {
-        to self.inner {
-            fn support(&self) -> Self::Support<'_>;
-            fn is_supported(&self, i: isize) -> bool;
-            fn get(&self, i: isize) -> &Self::Item;
-            fn get_default(&self) -> &Self::Item;
-        }
-    }
-}
-
-impl<R> ChainComplexTrait<isize> for KhIComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type R = R;
-    type Element = KhIChain<R>;
-
-    delegate! { 
-        to self.inner { 
-            fn rank(&self, i: isize) -> usize;
-            fn d_deg(&self) -> isize;
-            fn d(&self, i: isize, z: &Self::Element) -> Self::Element;
-            fn d_matrix(&self, i: isize) -> SpMat<R>;
-        }
-    }
-}
-
-impl<R> DisplaySeq<isize> for KhIComplex<R>
+impl<R> ToSeqString<isize> for KhIComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     delegate! {
         to self.inner { 
-            fn display_label(&self) -> String;
-            fn display_indices(&self) -> Vec<isize>;
-            fn display_at(&self, i: &isize) -> String;
+            fn label(&self) -> String;
+            fn indices(&self) -> Vec<isize>;
+            fn entry_at(&self, i: &isize) -> String;
         }
     }
 }
 
-impl<R> DisplayTable<isize> for KhIComplex<R>
+impl<R> ToTableString<isize> for KhIComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn display_labels(&self) -> (String, String) { 
+    fn labels(&self) -> (String, String) { 
         ("i".to_string(), "j".to_string())
     }
 
-    fn display_indices(&self) -> (Vec<isize>, Vec<isize>) { 
+    fn indices(&self) -> (Vec<isize>, Vec<isize>) { 
         (self.h_range().collect(), self.q_range().step_by(2).collect())
     }
 
-    fn display_at(&self, i: &isize, j: &isize) -> String {
+    fn entry_at(&self, i: &isize, j: &isize) -> String {
         if self[(*i, *j)].is_zero() {
             ".".to_string()
         } else {
@@ -247,8 +227,7 @@ mod tests {
     use yui_core::poly::Poly;
     use yui_core::num::FF2;
     use num_traits::{Zero, One};
-    use yui_homology::{ChainComplexTrait, SummandTrait};
-    use super::*;
+        use super::*;
 
     #[test]
     fn complex_kh() { 
@@ -264,7 +243,7 @@ mod tests {
         assert_eq!(c[3].rank(), 4);
         assert_eq!(c[4].rank(), 2);
             
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 
     #[test]
@@ -281,7 +260,7 @@ mod tests {
         assert_eq!(c[3].rank(), 0);
         assert_eq!(c[4].rank(), 0);
         
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 
     #[test]
@@ -300,7 +279,7 @@ mod tests {
         assert_eq!(c[3].rank(), 4);
         assert_eq!(c[4].rank(), 2);
         
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 
     #[test]
@@ -317,7 +296,7 @@ mod tests {
         assert_eq!(c[3].rank(), 2);
         assert_eq!(c[4].rank(), 1);
         
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 
     #[test]
@@ -449,8 +428,7 @@ mod tests_v1 {
     use yui_core::poly::Poly;
     use yui_core::num::FF2;
     use num_traits::{Zero, One};
-    use yui_homology::{ChainComplexTrait, SummandTrait};
-    use super::*;
+        use super::*;
 
     #[test]
     fn complex_kh() { 
@@ -466,7 +444,7 @@ mod tests_v1 {
         assert_eq!(c[3].rank(), 20);
         assert_eq!(c[4].rank(), 8);
             
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 
     #[test]
@@ -483,7 +461,7 @@ mod tests_v1 {
         assert_eq!(c[3].rank(), 20);
         assert_eq!(c[4].rank(), 8);
         
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 
     #[test]
@@ -502,7 +480,7 @@ mod tests_v1 {
         assert_eq!(c[3].rank(), 20);
         assert_eq!(c[4].rank(), 8);
         
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 
     #[test]
@@ -519,7 +497,7 @@ mod tests_v1 {
         assert_eq!(c[3].rank(), 10);
         assert_eq!(c[4].rank(), 4);
         
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 
     #[test]

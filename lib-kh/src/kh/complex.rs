@@ -4,8 +4,7 @@ use std::sync::OnceLock;
 use delegate::delegate;
 use yui_core::{IteratorExt, Ring, RingOps, EucRing, EucRingOps};
 use yui_link::Link;
-use yui_homology::{ChainComplex, ChainComplexTrait, DisplaySeq, DisplayTable, Grid2, GridIter, GridTrait, Summand, SummandTrait};
-use yui_matrix::sparse::SpMat;
+use yui_homology::{ChainComplex1, ToSeqString, ToTableString, GrMod2, Summand};
 
 use crate::kh::chain::KhChain;
 use crate::kh::internal::v1::cube::KhCube;
@@ -21,13 +20,13 @@ pub type KhComplexSummand<R> = Summand<KhState, R>;
 #[derive(Clone)]
 pub struct KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
-    inner: ChainComplex<KhState, R>,
+    inner: ChainComplex1<KhState, R>,
     str: KhAlg<R>,
     cube: KhCube<R>,
     deg_shift: (isize, isize),
     reduced: bool,
     canon_cycles: Vec<KhChain<R>>,
-    gen_grid: OnceLock<Grid2<KhComplexSummand<R>>>,
+    gen_grid: OnceLock<GrMod2<KhState, R>>,
 }
 
 impl<R> KhComplex<R>
@@ -62,7 +61,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         KhComplex::new_impl(complex, str, cube, deg_shift, reduced, canon_cycles)
     }
 
-    pub(crate) fn new_impl(inner: ChainComplex<KhState, R>, str: KhAlg<R>, cube: KhCube<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
+    pub(crate) fn new_impl(inner: ChainComplex1<KhState, R>, str: KhAlg<R>, cube: KhCube<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
         KhComplex { inner, str, cube, deg_shift, reduced, canon_cycles, gen_grid: OnceLock::new() }
     }
 
@@ -96,11 +95,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.canon_cycles
     }
 
-    pub fn inner(&self) -> &ChainComplex<KhState, R> {
+    pub fn inner(&self) -> &ChainComplex1<KhState, R> {
         &self.inner
     }
 
-    fn gen_grid(&self) -> &Grid2<KhComplexSummand<R>> {
+    fn gen_grid(&self) -> &GrMod2<KhState, R> {
         self.gen_grid.get_or_init(|| make_gen_grid(self.inner.summands()))
     }
 
@@ -113,9 +112,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         (h, q + e)
     }
 
-    delegate! { 
-        to self.inner { 
+    delegate! {
+        to self.inner {
+            pub fn support(&self) -> impl Iterator<Item = &isize> + '_;
+            pub fn is_supported(&self, i: isize) -> bool;
+            pub fn d_deg(&self) -> isize;
             pub fn d(&self, i: isize, z: &KhChain<R>) -> KhChain<R>;
+            pub fn describe_d(&self) -> String;
+            pub fn describe_d_at(&self, i: isize) -> String;
         }
     }
 }
@@ -149,58 +153,29 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-impl<R> GridTrait<isize> for KhComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Item = KhComplexSummand<R>;
-    type Support<'a> = GridIter<'a, isize, Self::Item> where Self: 'a, R: 'a;
 
-    delegate! {
-        to self.inner {
-            fn support(&self) -> Self::Support<'_>;
-            fn is_supported(&self, i: isize) -> bool;
-            fn get(&self, i: isize) -> &Self::Item;
-            fn get_default(&self) -> &Self::Item;
-        }
-    }
-}
-
-impl<R> ChainComplexTrait<isize> for KhComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type R = R;
-    type Element = KhChain<R>;
-
-    delegate! { 
-        to self.inner { 
-            fn rank(&self, i: isize) -> usize;
-            fn d_deg(&self) -> isize;
-            fn d(&self, i: isize, z: &Self::Element) -> Self::Element;
-            fn d_matrix(&self, i: isize) -> SpMat<R>;
-        }
-    }
-}
-
-impl<R> DisplaySeq<isize> for KhComplex<R>
+impl<R> ToSeqString<isize> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     delegate! {
         to self.inner { 
-            fn display_label(&self) -> String;
-            fn display_indices(&self) -> Vec<isize>;
-            fn display_at(&self, i: &isize) -> String;
+            fn label(&self) -> String;
+            fn indices(&self) -> Vec<isize>;
+            fn entry_at(&self, i: &isize) -> String;
         }
     }
 }
 
-impl<R> DisplayTable<isize> for KhComplex<R>
+impl<R> ToTableString<isize> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn display_labels(&self) -> (String, String) { 
+    fn labels(&self) -> (String, String) { 
         ("i".to_string(), "j".to_string())
     }
 
-    fn display_indices(&self) -> (Vec<isize>, Vec<isize>) { 
+    fn indices(&self) -> (Vec<isize>, Vec<isize>) { 
         (self.h_range().collect(), self.q_range().step_by(2).collect())
     }
 
-    fn display_at(&self, i: &isize, j: &isize) -> String { 
+    fn entry_at(&self, i: &isize, j: &isize) -> String { 
         if self[(*i, *j)].is_zero() { 
             ".".to_string()
         } else { 
@@ -211,8 +186,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests {
-    use yui_homology::{ChainComplexTrait, SummandTrait};
-    use yui_link::Link;
+        use yui_link::Link;
 
     use super::KhComplex;
 
@@ -229,7 +203,7 @@ mod tests {
         assert_eq!(c[-1].rank(), 0);
         assert_eq!(c[ 0].rank(), 2);
 
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 
     #[test]
@@ -245,7 +219,7 @@ mod tests {
         assert_eq!(c[-1].rank(), 0);
         assert_eq!(c[ 0].rank(), 1);
 
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 
     #[test]
@@ -274,8 +248,7 @@ mod tests {
 
 #[cfg(test)]
 mod tests_v1 {
-    use yui_homology::{ChainComplexTrait, SummandTrait};
-    use yui_link::Link;
+        use yui_link::Link;
 
     use super::KhComplex;
 
@@ -290,7 +263,7 @@ mod tests_v1 {
         assert_eq!(c[-1].rank(), 6);
         assert_eq!(c[ 0].rank(), 4);    
 
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 
     #[test]
@@ -304,6 +277,6 @@ mod tests_v1 {
         assert_eq!(c[-1].rank(), 3);
         assert_eq!(c[ 0].rank(), 2);
 
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 }

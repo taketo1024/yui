@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use yui_core::lc::{LcKey, Lc};
 use yui_core::{EucRing, EucRingOps, IteratorExt, Ring, RingOps};
-use yui_homology::{isize2, Grid1, Grid2, Summand, SummandTrait};
+use yui_homology::{isize2, GrMod1, GrMod2, Summand};
 use yui_matrix::sparse::SpVec;
 
 use crate::kh::KhChainExt;
@@ -30,16 +30,16 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     Some(k)
 }
 
-pub(crate) fn collect_gen_info<X, R>(grid: &Grid1<Summand<X, R>>) -> HashMap<isize2, (usize, Vec<R>, Vec<usize>)>
+pub(crate) fn collect_gen_info<X, R>(grid: &GrMod1<X, R>) -> HashMap<isize2, (usize, Vec<R>, Vec<usize>)>
 where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R>, Lc<X, R>: KhChainExt { 
     let mut table = HashMap::new();
     let init_entry = (0, vec![], vec![]);
 
-    for (i, h) in grid.iter() { 
+    for (&i, h) in grid.iter() {
         let r = h.rank();
         let t = h.tors().len();
 
-        for k in 0..r + t { 
+        for k in 0..r + t {
             let z = h.generator(k);
             let q = z.q_deg();
             let e = table.entry(isize2(i, q)).or_insert_with(|| init_entry.clone());
@@ -55,7 +55,7 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R>, Lc<X, R>: KhChainExt {
     table
 }
 
-pub(crate) fn make_gen_grid<X, R>(grid: &Grid1<Summand<X, R>>) -> Grid2<Summand<X, R>> 
+pub(crate) fn make_gen_grid<X, R>(grid: &GrMod1<X, R>) -> GrMod2<X, R> 
 where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R>, Lc<X, R>: KhChainExt { 
     let info = collect_gen_info(grid);
 
@@ -65,7 +65,7 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R>, Lc<X, R>: KhChainExt {
         isize2(i, j)
     );
 
-    Grid2::generate(support, move |idx| { 
+    GrMod2::generate(support, move |idx| { 
         let i = idx.0;
         let Some(e) = info.get(&idx) else { 
             return Summand::zero()

@@ -1,72 +1,124 @@
+//! [`ChainComplex<I, X, R>`]: the central chain-complex type, together with
+//! homology computation via SNF.
+
+use std::collections::HashMap;
 use std::ops::{Index, RangeInclusive};
 use std::sync::Arc;
 
 use delegate::delegate;
+use itertools::Itertools;
 use num_traits::Zero;
-use yui_core::{Ring, RingOps};
+use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 use yui_core::lc::{LcKey, Lc};
+
+#[cfg(debug_assertions)]
+use yui_matrix::MatTrait;
 use yui_matrix::sparse::{SpMat, SpVec};
 
-use crate::utils::ChainReducer;
-use crate::{ChainComplexTrait, DisplaySeq, DisplayTable, GenericChainComplexBase, Grid, GridDeg, GridIter, GridTrait, SummandTrait, isize2, isize3};
+use crate::algo::{ChainReducer, HomologyCalc};
+use crate::{ToSeqString, ToTableString, GenericChainComplex, GenericGrMod, GenericSummand, GrMod, AddInd, isize2, isize3};
 use super::Summand;
 
 #[cfg(feature = "multithread")]
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
-pub type ChainComplex <X, R> = ChainComplexBase<isize,  X, R>;
-pub type ChainComplex2<X, R> = ChainComplexBase<isize2, X, R>;
-pub type ChainComplex3<X, R> = ChainComplexBase<isize3, X, R>;
+pub type ChainComplex1<X, R> = ChainComplex<isize,  X, R>;
+pub type ChainComplex2<X, R> = ChainComplex<isize2, X, R>;
+pub type ChainComplex3<X, R> = ChainComplex<isize3, X, R>;
 
+/// An `I`-graded chain complex: a [`GrMod`] of [`Summand`]s, a degree shift
+/// `d_deg`, and a differential closure `Fn(I, &Lc<X, R>) -> Lc<X, R>`. Optionally
+/// caches per-index `SpMat<R>`s so [`Self::d_matrix`] becomes a clone.
 #[derive(Clone)]
-pub struct ChainComplexBase<I, X, R>
-where 
-    I: GridDeg,
+pub struct ChainComplex<I, X, R>
+where
+    I: AddInd,
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
-    summands: Grid<I, Summand<X, R>>,
+    summands: GrMod<I, X, R>,
     d_deg: I,
     d_map: Arc<dyn Fn(I, &Lc<X, R>) -> Lc<X, R> + Send + Sync>,
+    d_matrices: Arc<HashMap<I, SpMat<R>>>,
 }
 
-impl<I, X, R> ChainComplexBase<I, X, R>
-where 
-    I: GridDeg,
+impl<I, X, R> ChainComplex<I, X, R>
+where
+    I: AddInd,
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
-    pub fn new<F>(summands: Grid<I, Summand<X, R>>, d_deg: I, d_map: F) -> Self
+    pub fn new<F>(summands: GrMod<I, X, R>, d_deg: I, d_map: F) -> Self
     where F: Fn(I, &Lc<X, R>) -> Lc<X, R> + Send + Sync + 'static {
         assert!(summands.iter().all(|(_, s)| s.is_free()));
 
         let d_map = Arc::new(d_map);
-        Self { summands, d_deg, d_map }
+        let d_matrices = Arc::new(HashMap::new());
+        Self { summands, d_deg, d_map, d_matrices }
     }
 
-    pub fn zero() -> Self { 
-        Self::new(Grid::default(), I::zero(), |_, _| Lc::zero())
+    pub(crate) fn with_d_matrices(mut self, matrices: impl IntoIterator<Item = (I, SpMat<R>)>) -> Self {
+        let map: HashMap<I, SpMat<R>> = matrices.into_iter().collect();
+
+        #[cfg(debug_assertions)]
+        for (&i, m) in &map {
+            let (n_rows, n_cols) = m.shape();
+            assert_eq!(n_cols, self[i].rank(),
+                "d_matrix at {i}: n_cols {n_cols} != rank(C[{i}]) {}", self[i].rank());
+            let j = i + self.d_deg;
+            assert_eq!(n_rows, self[j].rank(),
+                "d_matrix at {i}: n_rows {n_rows} != rank(C[{j}]) {}", self[j].rank());
+        }
+
+        self.d_matrices = Arc::new(map);
+        self
     }
 
-    pub fn summands(&self) -> &Grid<I, Summand<X, R>> { 
+    pub fn zero() -> Self {
+        Self::new(GrMod::default(), I::zero(), |_, _| Lc::zero())
+    }
+
+    pub fn summands(&self) -> &GrMod<I, X, R> {
         &self.summands
     }
 
-    pub fn raw_d(&self) -> Arc<dyn Fn(I, &Lc<X, R>) -> Lc<X, R> + Send + Sync> { 
+    delegate! {
+        to self.summands {
+            pub fn support(&self) -> impl Iterator<Item = &I> + '_;
+            pub fn is_supported(&self, i: I) -> bool;
+        }
+    }
+
+    pub fn d_deg(&self) -> I {
+        self.d_deg
+    }
+
+    pub(crate) fn raw_d(&self) -> Arc<dyn Fn(I, &Lc<X, R>) -> Lc<X, R> + Send + Sync> {
         self.d_map.clone()
     }
 
-    fn d_matrix(&self, i: I) -> SpMat<R> { 
+    pub fn d(&self, i: I, z: &Lc<X, R>) -> Lc<X, R> {
+        (self.d_map)(i, z)
+    }
+
+    /// Returns the differential matrix `d_i: C_i → C_{i + d_deg}` in the
+    /// stored basis. Hits the precomputed cache if populated; otherwise builds
+    /// the matrix by applying `d_map` to each basis element.
+    pub fn d_matrix(&self, i: I) -> SpMat<R> {
+        if let Some(d) = self.d_matrices.get(&i) {
+            return d.clone();
+        }
+
         let m = self[i + self.d_deg].rank();
         let n = self[i].rank();
 
-        cfg_if::cfg_if! { 
+        cfg_if::cfg_if! {
             if #[cfg(feature = "multithread")] {
                 let cols = (0..n).into_par_iter().map(|j|
                     self.d_matrix_col(i, j)
                 ).collect::<Vec<_>>();
                 SpMat::from_col_vecs(m, cols)
-            } else { 
+            } else {
                 let cols = (0..n).map(|j|
                     self.d_matrix_col(i, j)
                 );
@@ -82,45 +134,148 @@ where
         self[i + self.d_deg].vectorize(&w)
     }
 
-    pub fn reduced(&self) -> ChainComplexBase<I, X, R> { 
+    pub fn describe_d_at(&self, i: I) -> String {
+        let c0 = &self[i];
+        let c1 = &self[i + self.d_deg];
+        let d = self.d_matrix(i).into_dense();
+        format!("d[{i}]: {c0} -> {c1}\n{d}")
+    }
+
+    pub fn describe_d(&self) -> String {
+        self.support().filter_map(|&i|
+            if self[i].rank() > 0 && self[i + self.d_deg].rank() > 0 && !self.d_matrix(i).is_zero() {
+                Some(self.describe_d_at(i))
+            } else {
+                None
+            }
+        ).join("")
+    }
+
+    /// Forget the symbolic generators and return an equivalent
+    /// [`GenericChainComplex`] built from the differential matrices.
+    pub fn as_generic(&self) -> GenericChainComplex<I, R> {
+        GenericChainComplex::from_d_matrices(
+            self.d_deg,
+            self.support().map(|&i| (i, self.d_matrix(i)))
+        )
+    }
+
+    /// Reduce the complex via pivot cancellation (Schur complement), preserving
+    /// symbolic generators. The returned complex has fewer raw generators but
+    /// the same homology; basis-change tracking lets cycles pull back to the
+    /// original generators.
+    pub fn reduced(&self) -> ChainComplex<I, X, R> {
         let r = ChainReducer::reduce(self, true);
 
-        let summands = Grid::generate(
+        let summands = GrMod::generate(
             self.summands.support().copied(),
             |i| {
                 let c = &self[i];
                 Summand::new(
-                    c.raw_generators().clone(), 
-                    r.rank(i).unwrap(), 
-                    vec![], 
+                    c.raw_generators().clone(),
+                    r.rank(i).unwrap(),
+                    vec![],
                     c.trans().merged(r.trans(i).unwrap())
                 )
-            } 
+            }
         );
+
+        let matrices = self.summands.support()
+            .filter_map(|&i| r.matrix(i).map(|m| (i, m.clone())))
+            .collect::<Vec<_>>();
 
         let d_deg = self.d_deg;
         let d_map = self.d_map.clone();
-        Self { summands, d_deg, d_map }
+        Self { summands, d_deg, d_map, d_matrices: Arc::new(HashMap::new()) }
+            .with_d_matrices(matrices)
     }
 
-    pub fn reduced_generic(&self) -> GenericChainComplexBase<I, R> { 
+    /// Like [`Self::reduced`] but skips the basis-change tracking and discards
+    /// symbolic generators, returning a [`GenericChainComplex`].
+    pub fn reduced_generic(&self) -> GenericChainComplex<I, R> {
         let r = ChainReducer::reduce(self, false);
-        r.into_complex()
+        r.into_generic_complex()
     }
 
-    fn check_d_for(&self, i0: I, x: &X) { 
+    #[cfg(debug_assertions)]
+    fn check_d_for(&self, i0: I, x: &X) {
         let i1 = i0 + self.d_deg();
         assert!(self.is_supported(i0), "Not supported: {i0}.");
 
         let dx = self.d(i0, &Lc::from(x.clone()));
         let ddx = self.d(i1, &dx);
-        
+
         assert!(ddx.is_zero(), "d² is non-zero for {x} at {i0}.\n  dx: {dx}\n  ddx: {ddx}.");
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn check_d_at(&self, i0: I) {
+        for x in self[i0].raw_generators().iter() {
+            self.check_d_for(i0, x);
+        }
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn check_d_all(&self) {
+        for &i in self.support() {
+            self.check_d_at(i);
+        }
     }
 }
 
-impl<X, R> ChainComplex<X, R>
-where 
+impl<I, X, R> ChainComplex<I, X, R>
+where
+    I: AddInd,
+    X: LcKey,
+    R: EucRing, for<'x> &'x R: EucRingOps<R>,
+{
+    pub fn homology_at(&self, i: I) -> Summand<X, R> {
+        let c = &self[i];
+        let d0 = self.d_matrix(i - self.d_deg());
+        let d1 = self.d_matrix(i);
+        let (rank, tors, trans) = HomologyCalc::calculate(d0, d1, true);
+        let trans = trans.unwrap();
+
+        Summand::new(
+            c.raw_generators().clone(),
+            rank,
+            tors,
+            c.trans().merged(&trans)
+        )
+    }
+
+    pub fn homology(&self) -> GrMod<I, X, R> {
+        GrMod::generate_filtered(
+            self.support().copied(),
+            |i| {
+                let hi = self.homology_at(i);
+                (!hi.is_zero()).then_some(hi)
+            }
+        )
+    }
+
+    /// Compute the homology at index `i` without tracking the basis change.
+    /// Faster than `homology_at` when only the rank/torsion are needed.
+    pub fn generic_homology_at(&self, i: I) -> GenericSummand<I, R> {
+        let d0 = self.d_matrix(i - self.d_deg());
+        let d1 = self.d_matrix(i);
+        let (rank, tors, _) = HomologyCalc::calculate(d0, d1, false);
+        GenericSummand::generate(i, rank, tors, None)
+    }
+
+    pub fn generic_homology(&self) -> GenericGrMod<I, R> {
+        GrMod::generate_filtered(
+            self.support().copied(),
+            |i| {
+                let hi = self.generic_homology_at(i);
+                (!hi.is_zero()).then_some(hi)
+            }
+        )
+    }
+}
+
+impl<X, R> ChainComplex1<X, R>
+where
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
@@ -139,62 +294,11 @@ where
     }
 }
 
-impl<I, X, R> GridTrait<I> for ChainComplexBase<I, X, R>
-where
-    I: GridDeg,
-    X: LcKey,
-    R: Ring, for<'x> &'x R: RingOps<R>,
-{
-    type Item = Summand<X, R>;
-    type Support<'a> = GridIter<'a, I, Self::Item> where Self: 'a, I: 'a, X: 'a, R: 'a;
-
-    delegate! {
-        to self.summands {
-            fn support(&self) -> Self::Support<'_>;
-            fn is_supported(&self, i: I) -> bool;
-            fn get(&self, i: I) -> &Self::Item;
-            fn get_default(&self) -> &Self::Item;
-        }
-    }
-}
-
-impl<I, X, R> ChainComplexTrait<I> for ChainComplexBase<I, X, R>
-where 
-    I: GridDeg,
-    X: LcKey,
-    R: Ring, for<'x> &'x R: RingOps<R>,
-{
-    type R = R;
-    type Element = Lc<X, R>;
-
-    fn rank(&self, i: I) -> usize {
-        self[i].rank()
-    }
-    
-    fn d_deg(&self) -> I {
-        self.d_deg
-    }
-
-    fn d(&self, i: I, z: &Lc<X, R>) -> Lc<X, R> { 
-        (self.d_map)(i, z)
-    }
-
-    fn d_matrix(&self, i: I) -> SpMat<Self::R> { 
-        self.d_matrix(i)
-    }
-
-    fn check_d_at(&self, i0: I) { 
-        for x in self.get(i0).raw_generators().iter() {
-            self.check_d_for(i0, x);
-        }
-    }
-}
-
-impl<I, X, R> Index<I> for ChainComplexBase<I, X, R>
-where I: GridDeg, X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
+impl<I, X, R> Index<I> for ChainComplex<I, X, R>
+where I: AddInd, X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = Summand<X, R>;
     fn index(&self, i: I) -> &Self::Output {
-        self.get(i)
+        &self.summands[i]
     }
 }
 
@@ -202,7 +306,7 @@ impl<X, R> Index<(isize, isize)> for ChainComplex2<X, R>
 where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = Summand<X, R>;
     fn index(&self, i: (isize, isize)) -> &Self::Output {
-        self.get(i.into())
+        &self[isize2::from(i)]
     }
 }
 
@@ -210,28 +314,44 @@ impl<X, R> Index<(isize, isize, isize)> for ChainComplex3<X, R>
 where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = Summand<X, R>;
     fn index(&self, i: (isize, isize, isize)) -> &Self::Output {
-        self.get(i.into())
+        &self[isize3::from(i)]
     }
 }
 
-impl<X, R> DisplaySeq<isize> for ChainComplex<X, R>
+impl<X, R> ToSeqString<isize> for ChainComplex1<X, R>
 where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     delegate! {
         to self.summands { 
-            fn display_label(&self) -> String;
-            fn display_indices(&self) -> Vec<isize>;
-            fn display_at(&self, i: &isize) -> String;
+            fn label(&self) -> String;
+            fn indices(&self) -> Vec<isize>;
+            fn entry_at(&self, i: &isize) -> String;
         }
     }
 }
 
-impl<X, R> DisplayTable<isize> for ChainComplex2<X, R>
+impl<X, R> ToTableString<isize> for ChainComplex2<X, R>
 where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     delegate! {
-        to self.summands { 
-            fn display_labels(&self) -> (String, String);
-            fn display_indices(&self) -> (Vec<isize>, Vec<isize>);
-            fn display_at(&self, i: &isize, j: &isize) -> String;
+        to self.summands {
+            fn labels(&self) -> (String, String);
+            fn indices(&self) -> (Vec<isize>, Vec<isize>);
+            fn entry_at(&self, i: &isize, j: &isize) -> String;
+        }
+    }
+}
+
+#[cfg(feature = "tex")]
+mod tex_impl {
+    use super::*;
+    use yui_core::TeX;
+    use crate::utils::tex::TeXTable;
+
+    impl<X, R> TeXTable<isize2> for ChainComplex2<X, R>
+    where X: LcKey, R: Ring + TeX, for<'x> &'x R: RingOps<R> {
+        delegate! {
+            to self.summands {
+                fn tex_table(&self, caption: &str, head: &str) -> String;
+            }
         }
     }
 }

@@ -2,7 +2,7 @@ use std::ops::{RangeInclusive, Index};
 use std::sync::OnceLock;
 use delegate::delegate;
 
-use yui_homology::{DisplaySeq, DisplayTable, Grid2, GridIter, GridTrait, Homology, Summand, SummandTrait};
+use yui_homology::{ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_core::{EucRing, EucRingOps, IteratorExt};
 use yui_link::Link;
 
@@ -14,12 +14,12 @@ use super::{KhAlg, KhChain, KhComplex};
 #[derive(Clone)]
 pub struct KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    inner: Homology<KhState, R>,
+    inner: GrMod1<KhState, R>,
     str: KhAlg<R>,
     deg_shift: (isize, isize),
     reduced: bool,
     canon_cycles: Vec<KhChain<R>>,
-    gen_grid: OnceLock<Grid2<Summand<KhState, R>>>,
+    gen_grid: OnceLock<GrMod2<KhState, R>>,
 }
 
 impl<R> KhHomology<R> 
@@ -34,8 +34,19 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         Self::from(&c)
     }
     
-    pub(crate) fn new_impl(inner: Homology<KhState, R>, str: KhAlg<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
+    pub(crate) fn new_impl(inner: GrMod1<KhState, R>, str: KhAlg<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
         Self { inner, str, deg_shift, reduced, canon_cycles, gen_grid: OnceLock::new() }
+    }
+
+    pub fn inner(&self) -> &GrMod1<KhState, R> { 
+        &self.inner
+    }
+
+    delegate! {
+        to self.inner {
+            pub fn support(&self) -> impl Iterator<Item = &isize> + '_;
+            pub fn is_supported(&self, i: isize) -> bool;
+        }
     }
 
     pub fn str(&self) -> &KhAlg<R> { 
@@ -72,10 +83,6 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         &self.canon_cycles
     }
 
-    pub fn inner(&self) -> &Homology<KhState, R> { 
-        &self.inner
-    }
-
     pub fn truncated(&self, range: RangeInclusive<isize>) -> Self {
         Self::new_impl(
             self.inner.truncated(range), 
@@ -86,7 +93,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         )
     }
 
-    fn gen_grid(&self) -> &Grid2<Summand<KhState, R>> {
+    fn gen_grid(&self) -> &GrMod2<KhState, R> {
         self.gen_grid.get_or_init(|| make_gen_grid(self.inner()))
     }
 }
@@ -101,21 +108,6 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
             c.is_reduced(),
             c.canon_cycles().clone()
         )
-    }
-}
-
-impl<R> GridTrait<isize> for KhHomology<R>
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    type Item = Summand<KhState, R>;
-    type Support<'a> = GridIter<'a, isize, Self::Item> where Self: 'a, R: 'a;
-
-    delegate! {
-        to self.inner {
-            fn support(&self) -> Self::Support<'_>;
-            fn is_supported(&self, i: isize) -> bool;
-            fn get(&self, i: isize) -> &Self::Item;
-            fn get_default(&self) -> &Self::Item;
-        }
     }
 }
 
@@ -141,28 +133,28 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 }
 
-impl<R> DisplaySeq<isize> for KhHomology<R>
+impl<R> ToSeqString<isize> for KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     delegate! {
         to self.inner { 
-            fn display_label(&self) -> String;
-            fn display_indices(&self) -> Vec<isize>;
-            fn display_at(&self, i: &isize) -> String;
+            fn label(&self) -> String;
+            fn indices(&self) -> Vec<isize>;
+            fn entry_at(&self, i: &isize) -> String;
         }
     }
 }
 
-impl<R> DisplayTable<isize> for KhHomology<R>
+impl<R> ToTableString<isize> for KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    fn display_labels(&self) -> (String, String) { 
+    fn labels(&self) -> (String, String) { 
         ("i".to_string(), "j".to_string())
     }
 
-    fn display_indices(&self) -> (Vec<isize>, Vec<isize>) { 
+    fn indices(&self) -> (Vec<isize>, Vec<isize>) { 
         (self.h_range().collect(), self.q_range().step_by(2).collect())
     }
 
-    fn display_at(&self, i: &isize, j: &isize) -> String {
+    fn entry_at(&self, i: &isize, j: &isize) -> String {
         if self[(*i, *j)].is_zero() {
             ".".to_string()
         } else {
@@ -177,7 +169,6 @@ mod tests {
     use yui_core::poly::Poly;
     use yui_core::num::FF2;
     
-    use yui_homology::SummandTrait;
     use yui_link::Link;
     use super::*;
     
@@ -443,7 +434,6 @@ mod tests_v1 {
     use num_traits::Zero;
     use yui_core::poly::Poly;
     use yui_core::num::FF2;
-    use yui_homology::SummandTrait;
     use yui_link::Link;
     use super::*;
     

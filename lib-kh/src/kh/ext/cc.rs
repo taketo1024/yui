@@ -9,7 +9,7 @@ use num_traits::Zero;
 use crate::kh::internal::v1::cube::KhCube;
 use crate::kh::{KhAlg, KhChain, KhState, KhComplex, KhAlgGen, KhTensor};
 
-pub type KhChainMap<R> = ChainMap<isize, KhState, KhState, R>;
+pub type KhChainMap<'a, 'c, R> = ChainMap<'a, 'c, isize, KhState, KhState, R>;
 
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
@@ -22,18 +22,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         (c1, c2)
     }
 
-    pub fn cc_map0(c1: &KhComplex<R>, c2: &KhComplex<R>, i: usize) -> KhChainMap<R> {
+    pub fn cc_map0<'a>(c1: &'a KhComplex<R>, c2: &'a KhComplex<R>, i: usize) -> KhChainMap<'a, 'static, R> {
         let deg = c2.deg_shift().0 - c1.deg_shift().0 + 1;
         let c2_deg_shift = c2.deg_shift();
 
-        ChainMap::new(deg, move |_, z| { 
+        ChainMap::new(c1.inner(), c2.inner(), deg, move |_, z| {
             z.apply(|x: &KhState| {
-                if !x.state[i].is_zero() { 
+                if !x.state[i].is_zero() {
                     return KhChain::zero();
                 }
 
                 let e = Sign::from_parity( count_1s(&x.state, i) );
-                let y = x.clone_and(|y| { 
+                let y = x.clone_and(|y| {
                     y.state.set_1(i);
                     y.deg_shift = c2_deg_shift;
                 });
@@ -43,7 +43,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         })
     }
 
-    pub fn cc_map1(c1: &KhComplex<R>, c2: &KhComplex<R>, l: &Link, i: usize) -> KhChainMap<R> {
+    pub fn cc_map1<'a>(c1: &'a KhComplex<R>, c2: &'a KhComplex<R>, l: &Link, i: usize) -> KhChainMap<'a, 'static, R> {
         assert!(l.node(i).is_crossing());
 
         let deg = c2.deg_shift().0 - c1.deg_shift().0 - 1;
@@ -52,12 +52,12 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let alg = c1.str().clone();
         let (a0, a1) = l.node(i).resolve(Bit::Bit0).arcs();
 
-        // TODO We don't want to reproduce the cube. 
+        // TODO We don't want to reproduce the cube.
         let (h, t) = c1.str().ht();
         let red_e = if c1.is_reduced() { l.min_edge() } else { None };
         let cube = KhCube::new(l, h, t, red_e, c1.deg_shift());
 
-        ChainMap::new(deg, move |_, z| { 
+        ChainMap::new(c1.inner(), c2.inner(), deg, move |_, z| {
             z.apply(|x: &KhState| {
                 if !x.state[i].is_one() { 
                     return KhChain::zero();
@@ -110,7 +110,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 mod tests {
     use yui_core::poly::Poly2;
     use yui_core::{EucRing, EucRingOps};
-    use yui_homology::DisplaySeq;
+    use yui_homology::ToSeqString;
     use yui_link::Link;
 
     use crate::kh::ext::cc::KhChainMap;
@@ -127,7 +127,7 @@ mod tests {
 
         assert_eq!(f.deg(), 0);
 
-        f.check_all(c1.inner(), c2.inner());
+        f.check_all();
     }
 
     #[test]
@@ -141,7 +141,7 @@ mod tests {
 
         assert_eq!(f.deg(), 2);
 
-        f.check_all(c1.inner(), c2.inner());
+        f.check_all();
     }
 
     #[test]
@@ -155,7 +155,7 @@ mod tests {
 
         assert_eq!(f.deg(), -2);
 
-        f.check_all(c1.inner(), c2.inner());
+        f.check_all();
     }
 
     #[test]
@@ -169,7 +169,7 @@ mod tests {
 
         assert_eq!(f.deg(), 0);
 
-        f.check_all(c1.inner(), c2.inner());
+        f.check_all();
     }
 
     #[test]
@@ -183,7 +183,7 @@ mod tests {
 
         assert_eq!(f.deg(), 0);
 
-        f.check_all(c1.inner(), c2.inner());
+        f.check_all();
     }
 
     #[test]
@@ -197,7 +197,7 @@ mod tests {
 
         assert_eq!(f.deg(), 2);
 
-        f.check_all(c1.inner(), c2.inner());
+        f.check_all();
     }
 
     #[test]
@@ -211,7 +211,7 @@ mod tests {
 
         assert_eq!(f.deg(), -2);
 
-        f.check_all(c1.inner(), c2.inner());
+        f.check_all();
     }
 
     #[test]
@@ -225,7 +225,7 @@ mod tests {
 
         assert_eq!(f.deg(), 0);
 
-        f.check_all(c1.inner(), c2.inner());
+        f.check_all();
     }
 
     #[test]
@@ -241,7 +241,7 @@ mod tests {
 
         assert_eq!(f.deg(), -2);
 
-        f.check_all(c1.inner(), c2.inner());
+        f.check_all();
     }
 
     #[test]
@@ -257,20 +257,20 @@ mod tests {
 
         assert_eq!(f.deg(), 0);
 
-        f.check_all(c1.inner(), c2.inner());
+        f.check_all();
     }
 
     #[allow(unused)]
-    fn print_h_map<R>(c1: &KhComplex<R>, c2: &KhComplex<R>, f: &KhChainMap<R>) 
+    fn print_h_map<R>(c1: &KhComplex<R>, c2: &KhComplex<R>, f: &KhChainMap<'_, '_, R>)
     where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
         let h1 = c1.homology();
         let h2 = c2.homology();
 
         println!("L1");
-        h1.print_seq();
+        println!("{}", h1.to_seq_string());
 
         println!("L2");
-        h2.print_seq();
+        println!("{}", h2.to_seq_string());
 
         println!("f: deg {}\n", f.deg());
 

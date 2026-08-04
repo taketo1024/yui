@@ -1,3 +1,6 @@
+//! [`ChainReducer`]: iterative reduction of a chain complex by pivot
+//! cancellation (Schur complement), with optional basis-change tracking.
+
 use std::collections::HashMap;
 use itertools::Itertools;
 use log::*;
@@ -8,25 +11,33 @@ use yui_matrix::sparse::pivot::{PivotCondition, PivotFinderConfig, PivotType, fi
 use yui_matrix::sparse::schur::Schur;
 use yui_core::{Ring, RingOps};
 
-use crate::generic::GenericChainComplexBase;
-use crate::{ChainComplexTrait, GridDeg, GridTrait, SummandTrait};
+use yui_core::lc::LcKey;
 
-//       a0 = [x]      a1 = [a b]      a2 = [z w]
-//            [y]           [c d]     
-//  C[0] --------> C[1] ---------> C[2] -------> C[3]
-//    |    [1 a⁻¹b] |             | [ 1     ]    |
-//    |    [    1 ] |             | [-ca⁻¹ 1]    |
-//    |             V             V              |    
-//  C[0] --------> C[1] ---------> C[2] -------> C[3]
-//    |     [0]     |    [a 0]    |    [0  w]    |
-//    |     [y]     |    [0 s]    |              |
-//    |             V             V              |
-//  C[0] --------> C[1]'---------> C[2]'-------> C[3]
-//          [y]           [s]           [w]
+use crate::conc::ChainComplex;
+use crate::GenericChainComplex;
+use crate::AddInd;
 
+/// Reduces a chain complex by repeatedly cancelling pivot pairs `(a, d)` —
+/// applying a Schur-complement style change of basis at each step — and
+/// accumulates the resulting basis change as a [`Trans<R>`] per index.
+///
+/// ```text
+///       a0 = [x]      a1 = [a b]      a2 = [z w]
+///            [y]           [c d]
+///  C[0] ────────→ C[1] ─────────→ C[2] ───────→ C[3]
+///    │    [1 a⁻¹b] │             │ [ 1     ]    │
+///    │    [    1 ] │             │ [-ca⁻¹ 1]    │
+///    │             ↓             ↓              │
+///  C[0] ────────→ C[1] ─────────→ C[2] ───────→ C[3]
+///    │     [0]     │    [a 0]    │    [0  w]    │
+///    │     [y]     │    [0 s]    │              │
+///    │             ↓             ↓              │
+///  C[0] ────────→ C[1]'─────────→ C[2]'───────→ C[3]
+///          [y]           [s]           [w]
+/// ```
 pub struct ChainReducer<I, R>
 where 
-    I: GridDeg,
+    I: AddInd,
     R: Ring, for<'x> &'x R: RingOps<R>,
 { 
     support: Vec<I>,
@@ -37,19 +48,19 @@ where
 
 impl<I, R> ChainReducer<I, R>
 where 
-    I: GridDeg,
+    I: AddInd,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
-    pub fn reduce<C>(complex: &C, with_trans: bool) -> Self
-    where C: GridTrait<I> + ChainComplexTrait<I, R = R>, C::Item: SummandTrait<R = R> {
-        let mut r = Self::from(complex, with_trans);
+    pub fn reduce<X>(complex: &ChainComplex<I, X, R>, with_trans: bool) -> Self
+    where X: LcKey {
+        let mut r = Self::from_complex(complex, with_trans);
         r.reduce_all(false);
         r.reduce_all(true);
         r
     }
 
-    pub fn from<C>(complex: &C, with_trans: bool) -> Self 
-    where C: GridTrait<I> + ChainComplexTrait<I, R = R>, C::Item: SummandTrait<R = R> {
+    pub fn from_complex<X>(complex: &ChainComplex<I, X, R>, with_trans: bool) -> Self
+    where X: LcKey {
         let support = complex.support().copied();
         let d_deg = complex.d_deg();
 
@@ -249,9 +260,11 @@ where
         (i - deg, i, i + deg)
     }
 
-    pub fn into_complex(self) -> GenericChainComplexBase<I, R> { 
-        GenericChainComplexBase::generate(
-            self.support.clone(), self.d_deg, |i| self.mats[&i].clone()
+    pub fn into_generic_complex(self) -> GenericChainComplex<I, R> {
+        let d_deg = self.d_deg;
+        GenericChainComplex::from_d_matrices(
+            d_deg,
+            self.support.iter().map(|&i| (i, self.mats[&i].clone()))
         )
     }
 }
@@ -279,8 +292,7 @@ mod tests {
     use std::collections::HashSet;
 
     use num_traits::Zero;
-    use crate::generic::GenericChainComplex;
-    use crate::SummandTrait;
+    use crate::GenericChainComplex1;
     use super::*;
 
     #[test]
@@ -299,8 +311,8 @@ mod tests {
 
     #[test]
     fn zero() { 
-        let c = GenericChainComplex::<i32>::zero();
-        let r = ChainReducer::reduce(&c, false).into_complex();
+        let c = GenericChainComplex1::<i32>::zero();
+        let r = ChainReducer::reduce(&c, false).into_generic_complex();
 
         r.check_d_all();
 
@@ -309,8 +321,8 @@ mod tests {
 
     #[test]
     fn acyclic() { 
-        let c = GenericChainComplex::<i32>::one_one(1);
-        let r = ChainReducer::reduce(&c, false).into_complex();
+        let c = GenericChainComplex1::<i32>::one_one(1);
+        let r = ChainReducer::reduce(&c, false).into_generic_complex();
 
         r.check_d_all();
 
@@ -320,8 +332,8 @@ mod tests {
 
     #[test]
     fn tor() { 
-        let c = GenericChainComplex::<i32>::one_one(2);
-        let r = ChainReducer::reduce(&c, false).into_complex();
+        let c = GenericChainComplex1::<i32>::one_one(2);
+        let r = ChainReducer::reduce(&c, false).into_generic_complex();
 
         r.check_d_all();
 
@@ -331,8 +343,8 @@ mod tests {
     
     #[test]
     fn d3() {
-        let c = GenericChainComplex::<i32>::d3();
-        let r = ChainReducer::reduce(&c, false).into_complex();
+        let c = GenericChainComplex1::<i32>::d3();
+        let r = ChainReducer::reduce(&c, false).into_generic_complex();
 
         r.check_d_all();
 
@@ -349,8 +361,8 @@ mod tests {
 
     #[test]
     fn s2() {
-        let c = GenericChainComplex::<i32>::s2();
-        let r = ChainReducer::reduce(&c, false).into_complex();
+        let c = GenericChainComplex1::<i32>::s2();
+        let r = ChainReducer::reduce(&c, false).into_generic_complex();
 
         r.check_d_all();
 
@@ -365,8 +377,8 @@ mod tests {
 
     #[test]
     fn t2() {
-        let c = GenericChainComplex::<i32>::t2();
-        let r = ChainReducer::reduce(&c, false).into_complex();
+        let c = GenericChainComplex1::<i32>::t2();
+        let r = ChainReducer::reduce(&c, false).into_generic_complex();
 
         r.check_d_all();
 
@@ -381,8 +393,8 @@ mod tests {
 
     #[test]
     fn rp2() {
-        let c = GenericChainComplex::<i32>::rp2();
-        let r = ChainReducer::reduce(&c, false).into_complex();
+        let c = GenericChainComplex1::<i32>::rp2();
+        let r = ChainReducer::reduce(&c, false).into_generic_complex();
 
         r.check_d_all();
 
@@ -400,7 +412,7 @@ mod tests {
 
     #[test]
     fn s2_trans() {
-        let c = GenericChainComplex::<i32>::s2();
+        let c = GenericChainComplex1::<i32>::s2();
         let r = ChainReducer::reduce(&c, true);
 
         let t0 = r.trans(0).unwrap();
@@ -428,7 +440,7 @@ mod tests {
 
     #[test]
     fn t2_trans() {
-        let c = GenericChainComplex::<i32>::t2();
+        let c = GenericChainComplex1::<i32>::t2();
         let r = ChainReducer::reduce(&c, true);
 
         let t0 = r.trans(0).unwrap();
@@ -467,7 +479,7 @@ mod tests {
 
     #[test]
     fn rp2_trans() {
-        let c = GenericChainComplex::<i32>::rp2();
+        let c = GenericChainComplex1::<i32>::rp2();
         let r = ChainReducer::reduce(&c, true);
 
         let t0 = r.trans(0).unwrap();

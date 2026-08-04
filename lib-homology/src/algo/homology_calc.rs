@@ -1,3 +1,6 @@
+//! [`HomologyCalc`]: computes the homology at one grading index from two
+//! consecutive differential matrices via Smith normal form.
+
 use std::marker::PhantomData;
 use log::*;
 
@@ -5,8 +8,11 @@ use yui_core::{EucRing, EucRingOps};
 use yui_matrix::dense::{*, snf::*};
 use yui_matrix::sparse::*;
 
+/// `(rank, torsion_coefficients, optional_basis_change)` returned by
+/// [`HomologyCalc::calculate`].
 pub type HomologyCalcResult<R> = (usize, Vec<R>, Option<Trans<R>>);
 
+/// Stateless namespace for SNF-based homology computation.
 pub struct HomologyCalc<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     _r: PhantomData<R>
@@ -14,24 +20,28 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 impl<R> HomologyCalc<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    //            d1             d2
-    //    C1 ----------> C2 -----------> C3
-    //     |              |               |
-    //     |           p1 |               |
-    //     V      d1'     V               |
-    //    C11 ---------> C21              |
-    //     ⊕              ⊕      d2'      |
-    //    C11'           C21'----------> C3
-    //                    |               |
-    //                q2⁻¹|               |
-    //                    V      d2''     V
-    //                   C22 ----------> C31
-    //                    ⊕               ⊕
-    //                   C22'            C31'
-    // 
-    //  H2 = Ker(d2) / Im(d1)
-    //     ≅ C22' (free) ⊕ (C21 / Im(d1')) (tor)
-
+    /// Computes the homology of `d1 → d2` (i.e. `H = ker(d2) / im(d1)`) via two
+    /// successive SNF reductions.
+    ///
+    /// ```text
+    ///            d1             d2
+    ///    C1 ──────────→ C2 ───────────→ C3
+    ///     │              │               │
+    ///     │           p1 │               │
+    ///     ↓      d1'     ↓               │
+    ///    C11 ─────────→ C21              │
+    ///     ⊕              ⊕      d2'      │
+    ///    C11'           C21'──────────→ C3
+    ///                    │               │
+    ///                q2⁻¹│               │
+    ///                    ↓      d2''     ↓
+    ///                   C22 ──────────→ C31
+    ///                    ⊕               ⊕
+    ///                   C22'            C31'
+    ///
+    ///  H2 = Ker(d2) / Im(d1)
+    ///     ≅ C22' (free) ⊕ (C21 / Im(d1')) (tor)
+    /// ```
     pub fn calculate(d1: SpMat<R>, d2: SpMat<R>, with_trans: bool) -> HomologyCalcResult<R> {
         assert_eq!(d1.n_rows(), d2.n_cols());
 
@@ -144,13 +154,12 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 #[cfg(test)]
 mod tests {
     use num_traits::Zero;
-    use crate::generic::GenericChainComplex;
-    use crate::ChainComplexTrait;
+    use crate::GenericChainComplex1;
     use super::*;
  
     #[test]
     fn s2_0th() {
-        let c = GenericChainComplex::<i32>::s2();
+        let c = GenericChainComplex1::<i32>::s2();
         let d1 = c.d_matrix(1);
         let d0 = c.d_matrix(0); // zero
 
@@ -170,7 +179,7 @@ mod tests {
 
     #[test]
     fn s2_1st() {
-        let c = GenericChainComplex::<i32>::s2();
+        let c = GenericChainComplex1::<i32>::s2();
         let d1 = c.d_matrix(2);
         let d0 = c.d_matrix(1);
 
@@ -182,7 +191,7 @@ mod tests {
 
     #[test]
     fn s2_2nd() {
-        let c = GenericChainComplex::<i32>::s2();
+        let c = GenericChainComplex1::<i32>::s2();
         let d3 = c.d_matrix(3); // zero
         let d2 = c.d_matrix(2);
 
@@ -202,7 +211,7 @@ mod tests {
 
     #[test]
     fn t2_0th() {
-        let c = GenericChainComplex::<i32>::t2();
+        let c = GenericChainComplex1::<i32>::t2();
         let d1 = c.d_matrix(1);
         let d0 = c.d_matrix(0); // zero
 
@@ -222,7 +231,7 @@ mod tests {
 
     #[test]
     fn t2_1st() {
-        let c = GenericChainComplex::<i32>::t2();
+        let c = GenericChainComplex1::<i32>::t2();
         let d2 = c.d_matrix(2);
         let d1 = c.d_matrix(1);
 
@@ -245,7 +254,7 @@ mod tests {
 
     #[test]
     fn t2_2nd() {
-        let c = GenericChainComplex::<i32>::t2();
+        let c = GenericChainComplex1::<i32>::t2();
         let d3 = c.d_matrix(3); // zero
         let d2 = c.d_matrix(2);
 
@@ -265,7 +274,7 @@ mod tests {
 
     #[test]
     fn rp2_0th() {
-        let c = GenericChainComplex::<i32>::rp2();
+        let c = GenericChainComplex1::<i32>::rp2();
         let d1 = c.d_matrix(1);
         let d0 = c.d_matrix(0); // zero
 
@@ -285,7 +294,7 @@ mod tests {
 
     #[test]
     fn rp2_1st() {
-        let c = GenericChainComplex::<i32>::rp2();
+        let c = GenericChainComplex1::<i32>::rp2();
         let d2 = c.d_matrix(2);
         let d1 = c.d_matrix(1);
 

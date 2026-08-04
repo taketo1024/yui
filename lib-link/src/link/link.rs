@@ -2,10 +2,6 @@ use core::panic;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use itertools::Itertools;
-use yui_core::{CloneAnd, Sign};
-use yui_core::bitseq::Bit;
-
-use petgraph::Graph;
 
 use super::{Node, NodeOri, Path};
 
@@ -170,15 +166,6 @@ impl Link {
         (p as i32) - (n as i32)
     }
 
-    pub fn mirror(&self) -> Self {
-        let mut l = Self::new(
-            self.nodes().map(|x| x.mirror()),
-            self.loops.iter().copied(),
-        );
-        l.base_pt = self.base_pt;
-        l
-    }
-
     pub fn n_nodes(&self) -> usize { 
         self.nodes.len()
     }
@@ -191,7 +178,7 @@ impl Link {
         &self.nodes[i]
     }
 
-    pub fn node_mut(&mut self, i: usize) -> &mut Node { 
+    pub(crate) fn node_mut(&mut self, i: usize) -> &mut Node { 
         &mut self.nodes[i]
     }
 
@@ -262,87 +249,6 @@ impl Link {
             result.push(Path::circ(vec![e]));
         }
         result
-    }
-
-    pub fn cc_at(&self, i: usize) -> Self {
-        assert!(self.node(i).is_crossing());
-        self.clone_and(|l| 
-            *l.node_mut(i) = l.node(i).mirror()
-        )
-    }
-
-    pub fn resolve_at(&self, i: usize, r: Bit) -> Self {
-        assert!(self.node(i).is_crossing());
-        self.clone_and(|l| 
-            *l.node_mut(i) = l.node(i).resolve(r)
-        )
-    }
-
-    pub fn resolve_by(&self, s: &State) -> Self {
-        assert!(s.len() == self.n_crossings());
-
-        let n = self.nodes.len();
-        let itr = (0..n).filter(|&i| self.node(i).is_crossing());
-
-        self.clone_and(|l| {
-            for (i, r) in Iterator::zip(itr, s.iter()) {
-                *l.node_mut(i) = self.node(i).resolve(r); 
-            }
-        })
-    }
-
-    pub fn seifert_state(&self) -> State {
-        assert!(self.is_oriented());
-
-        let seq = self.crossings().map(|x|
-            match x.sign() {
-                Some(Sign::Pos) => 0,
-                Some(Sign::Neg) => 1,
-                None => panic!("Impossible.")
-            }
-        ); 
-        State::from_iter(seq)
-    }
-
-    pub fn seifert_circles(&self) -> Vec<Path> {
-        self.resolve_by(&self.seifert_state()).comps()
-    }
-
-    pub fn seifert_graph(&self) -> Graph<Path, usize> {
-        assert!(self.is_oriented());
-
-        use crate::NodeType;
-        type G = Graph<Path, usize>;
-
-        let s0 = self.seifert_state();
-        let l0 = self.resolve_by(&s0);
-        let mut graph = Graph::new();
-
-        // Vertices = Seifert circles (and free loops contribute their own circles).
-        for c in l0.comps() {
-            graph.add_node(c);
-        }
-
-        let find_node = |graph: &G, e| {
-            graph.node_indices().find(|&i|
-                graph[i].contains(e)
-            )
-        };
-
-        // Edges = one per original crossing (now resolved into a V/H smoothing).
-        // Free loops have no nodes, so they remain isolated vertices.
-        for (i, x) in l0.nodes().enumerate() {
-            let (e1, e2) = if x.node_type() == NodeType::V {
-                (x.edge(0), x.edge(1))
-            } else {
-                (x.edge(0), x.edge(2))
-            };
-            let n1 = find_node(&graph, e1).unwrap();
-            let n2 = find_node(&graph, e2).unwrap();
-            graph.add_edge(n1, n2, i);
-        }
-
-        graph
     }
 
     pub fn traverse_comps<F>(&self, mut f: F) where 
@@ -430,6 +336,29 @@ impl Link {
         );
         Link::new(nodes, []).with_base_pt(base)
     }
+
+    // The two (node, slot) ends of edge `e`. When `directed`, they are ordered as (tail, head)
+    // along the orientation — the strand exits at the tail and enters at the head (cf.
+    // `NodeOri::in_ports`); otherwise the order carries no meaning.
+    pub(crate) fn edge_ends(&self, e: Edge, directed: bool) -> ((usize, usize), (usize, usize)) {
+        assert!(!directed || self.is_oriented(), "directed edge_ends requires an oriented link");
+
+        let (x, y) = self.nodes().enumerate().flat_map(|(i, n)|
+            (0..4).filter(move |&s| n.edge(s) == e).map(move |s| (i, s))
+        ).collect_tuple().unwrap_or_else(||
+            panic!("edge {e} must appear exactly twice")
+        );
+        if !directed {
+            return (x, y);
+        }
+
+        let is_in = |(i, s): (usize, usize)| {
+            let ports = self.node(i).ori().in_ports().expect("directed edge_ends requires an oriented link");
+            ports.contains(&s)
+        };
+        debug_assert!(is_in(x) != is_in(y), "edge {e} must have one head and one tail");
+        if is_in(x) { (y, x) } else { (x, y) }
+    }
 }
 
 impl Display for Link {
@@ -439,8 +368,8 @@ impl Display for Link {
 }
 
 #[cfg(test)]
-mod tests { 
-    use crate::NodeType::{XL, XR};
+mod tests {
+    use yui_core::bitseq::Bit;
 
     use super::*;
 
@@ -526,31 +455,7 @@ mod tests {
         assert_eq!(comps, vec![ Path::circ(vec![1, 2])]);
     }
 
-    #[test]
-    fn link_mirror() { 
-        let l = Link::test_data("unknot_l_twist");
-        assert_eq!(l.node(0).node_type(), XL);
 
-        let l = l.mirror();
-        assert_eq!(l.node(0).node_type(), XR);
-    }
-
-    #[test]
-    fn link_resolve() {
-        let s = State::from([0, 0, 0]);
-        let l = Link::test_data("3_1").resolve_by(&s);
-
-        let comps = l.comps();
-        assert_eq!(comps.len(), 3);
-        assert!(comps.iter().all(|c| c.is_circle()));
-
-        let s = State::from([1, 1, 1]);
-        let l = Link::test_data("3_1").resolve_by(&s);
-
-        let comps = l.comps();
-        assert_eq!(comps.len(), 2);
-        assert!(comps.iter().all(|c| c.is_circle()));
-    }
 
     #[test]
     fn empty_link() {
@@ -617,12 +522,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn mirror_preserves_loops() {
-        let l = Link::unlink(1).mirror();
-        assert_eq!(l.n_loops(), 1);
-        assert_eq!(l.loops(), &[1]);
-    }
 
     #[test]
     fn trefoil() {
@@ -676,16 +575,6 @@ mod tests {
         assert_eq!(l.n_comps(), 2);
     }
 
-    #[test]
-    fn crossing_change() {
-        use crate::link::node::NodeOri;
-
-        let l = Link::test_data("3_1");
-        let l2 = l.cc_at(1);
-
-        assert_eq!(l.node(1),  &Node::new(XL, NodeOri::Up, [3,6,4,1]));
-        assert_eq!(l2.node(1), &Node::new(XR, NodeOri::Up, [3,6,4,1]));
-    }
 
     #[test]
     fn base_pt_default_min_edge() {
@@ -709,11 +598,6 @@ mod tests {
         assert_eq!(l.base_pt(), Some(2));
     }
 
-    #[test]
-    fn mirror_preserves_base_pt() {
-        let l = Link::test_data("3_1").with_base_pt(3).mirror();
-        assert_eq!(l.base_pt(), Some(3));
-    }
 
     #[test]
     #[should_panic]
@@ -722,20 +606,5 @@ mod tests {
         let _ = Link::test_data("3_1").with_base_pt(99);
     }
 
-    #[test]
-    fn seifert_graph_trefoil() {
-        let l = Link::test_data("3_1");
-        let g = l.seifert_graph();
-        assert_eq!(g.node_count(), 2);
-        assert_eq!(g.edge_count(), 3);
-    }
 
-    #[test]
-    fn seifert_graph_unlink() {
-        // Free loops contribute isolated vertices and no edges.
-        let l = Link::unlink(3);
-        let g = l.seifert_graph();
-        assert_eq!(g.node_count(), 3);
-        assert_eq!(g.edge_count(), 0);
-    }
 }

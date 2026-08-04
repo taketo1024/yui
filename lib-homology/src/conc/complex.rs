@@ -57,11 +57,43 @@ where
         Self { summands, d_deg, d_map, d_matrices }
     }
 
-    pub(crate) fn with_d_matrices(mut self, matrices: impl IntoIterator<Item = (I, SpMat<R>)>) -> Self {
-        let map: HashMap<I, SpMat<R>> = matrices.into_iter().collect();
+    /// Build from summands and explicit differential matrices (in the summands' generator order);
+    /// the matrices are cached, and the differential closure is derived from them.
+    pub fn new_with_d_matrices(summands: GrMod<I, X, R>, d_deg: I, matrices: impl IntoIterator<Item = (I, SpMat<R>)>) -> Self {
+        let d_matrices: Arc<HashMap<I, SpMat<R>>> = Arc::new(matrices.into_iter().collect());
+
+        let s = summands.clone();
+        let ds = d_matrices.clone();
+        let mut new = Self::new(summands, d_deg, move |i, z| {
+            let Some(d) = ds.get(&i) else {
+                return Lc::zero();
+            };
+            let v = s[i].vectorize(z);
+            s[i + d_deg].devectorize(&(d * v))
+        });
+
+        new.d_matrices = d_matrices;
 
         #[cfg(debug_assertions)]
-        for (&i, m) in &map {
+        new.validate_d_matrices();
+
+        new
+    }
+
+    pub(crate) fn with_d_matrices(mut self, matrices: impl IntoIterator<Item = (I, SpMat<R>)>) -> Self {
+        let map: HashMap<I, SpMat<R>> = matrices.into_iter().collect();
+        self.d_matrices = Arc::new(map);
+
+        #[cfg(debug_assertions)]
+        self.validate_d_matrices();
+
+        self
+    }
+
+    // Each cached d-matrix's shape must match the summand ranks at its endpoints.
+    #[cfg(debug_assertions)]
+    fn validate_d_matrices(&self) {
+        for (&i, m) in self.d_matrices.iter() {
             let (n_rows, n_cols) = m.shape();
             assert_eq!(n_cols, self[i].rank(),
                 "d_matrix at {i}: n_cols {n_cols} != rank(C[{i}]) {}", self[i].rank());
@@ -69,9 +101,6 @@ where
             assert_eq!(n_rows, self[j].rank(),
                 "d_matrix at {i}: n_rows {n_rows} != rank(C[{j}]) {}", self[j].rank());
         }
-
-        self.d_matrices = Arc::new(map);
-        self
     }
 
     pub fn zero() -> Self {
@@ -99,6 +128,21 @@ where
 
     pub fn d(&self, i: I, z: &Lc<X, R>) -> Lc<X, R> {
         (self.d_map)(i, z)
+    }
+
+    // Relabel generators by an injective `f` with inverse `g`; the differential is conjugated by them.
+    pub fn map_keys<Y, F, G>(&self, f: F, g: G) -> ChainComplex<I, Y, R>
+    where
+        Y: LcKey,
+        F: Fn(&X) -> Y + Send + Sync + 'static,
+        G: Fn(&Y) -> X + Send + Sync + 'static,
+    {
+        let summands = self.summands.map_keys(&f);
+        let d = self.d_map.clone();
+        ChainComplex::new(summands, self.d_deg, move |i, z: &Lc<Y, R>| {
+            let zx = z.clone().map_keys(|y| g(&y));
+            d(i, &zx).map_keys(|x| f(&x))
+        })
     }
 
     /// Returns the differential matrix `d_i: C_i → C_{i + d_deg}` in the
@@ -245,8 +289,13 @@ where
     }
 
     pub fn homology(&self) -> GrMod<I, X, R> {
+        self.homology_in(self.support().copied())
+    }
+
+    /// Homology at the given indices only, using the full differentials.
+    pub fn homology_in(&self, support: impl IntoIterator<Item = I>) -> GrMod<I, X, R> {
         GrMod::generate_filtered(
-            self.support().copied(),
+            support.into_iter(),
             |i| {
                 let hi = self.homology_at(i);
                 (!hi.is_zero()).then_some(hi)
@@ -264,8 +313,13 @@ where
     }
 
     pub fn generic_homology(&self) -> GenericGrMod<I, R> {
+        self.generic_homology_in(self.support().copied())
+    }
+
+    /// Trans-free homology at the given indices only, using the full differentials.
+    pub fn generic_homology_in(&self, support: impl IntoIterator<Item = I>) -> GenericGrMod<I, R> {
         GrMod::generate_filtered(
-            self.support().copied(),
+            support.into_iter(),
             |i| {
                 let hi = self.generic_homology_at(i);
                 (!hi.is_zero()).then_some(hi)
@@ -279,18 +333,23 @@ where
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
-    pub fn truncated(&self, range: RangeInclusive<isize>) -> Self { 
+    pub fn truncated(&self, range: RangeInclusive<isize>) -> Self {
         let d_deg = self.d_deg;
         let d_map = self.d_map.clone();
         let summands = self.summands.truncated(range.clone());
 
-        Self::new(summands, d_deg, move |i, z| 
-            if range.contains(&(i + d_deg)) { 
+        // cached d-matrices with both endpoints inside the window stay valid.
+        let matrices = self.d_matrices.iter().filter_map(|(&i, m)|
+            (range.contains(&i) && range.contains(&(i + d_deg))).then(|| (i, m.clone()))
+        ).collect_vec();
+
+        Self::new(summands, d_deg, move |i, z|
+            if range.contains(&(i + d_deg)) {
                 d_map(i, z)
-            } else { 
+            } else {
                 Lc::zero()
             }
-        )
+        ).with_d_matrices(matrices)
     }
 }
 

@@ -59,7 +59,9 @@ impl Link {
         // Default base_pt to the minimal edge (if any).
         let base_pt = node_edges.iter().chain(loops.iter()).copied().min();
 
-        Self { nodes, loops, base_pt }
+        let l = Self { nodes, loops, base_pt };
+        l.verify_ori();
+        l
     }
 
     pub fn from_nodes(nodes: impl IntoIterator<Item = Node>) -> Self {
@@ -100,6 +102,25 @@ impl Link {
 
     pub fn is_oriented(&self) -> bool { 
         self.nodes().all(|n| n.is_oriented())
+    }
+
+    // Oriented throughout or not at all, every edge from an outgoing slot to an incoming one.
+    pub fn verify_ori(&self) {
+        let n_ori = self.nodes.iter().filter(|x| x.is_oriented()).count();
+        if n_ori == 0 {
+            return;
+        }
+        assert_eq!(n_ori, self.n_nodes(), "some nodes are oriented and some are not");
+
+        self.nodes.iter().flat_map(|x| {
+            let (p, q) = x.incoming().unwrap();
+            Slot::ALL.map(move |s| (x.edge(s), s == p || s == q))
+        }).into_group_map().into_iter().for_each(|(e, ins)|
+            assert!(
+                matches!(ins[..], [a, b] if a != b),
+                "edge {e} does not run from an outgoing slot to an incoming one"
+            )
+        );
     }
 
     pub fn writhe(&self) -> i32 { 
@@ -386,6 +407,25 @@ mod tests {
     use yui_core::bitseq::Bit;
 
     use super::*;
+
+    #[test]
+    #[should_panic(expected = "does not run from an outgoing slot")]
+    fn new_rejects_disagreeing_orientation() {
+        use crate::NodeType::XL;
+        // both nodes take edge 1 as incoming, so it would enter at both of its ends.
+        let a = Node::new(XL, Some((Slot::SW, Slot::SE)), [1, 2, 3, 4]);
+        let b = Node::new(XL, Some((Slot::NE, Slot::NW)), [3, 4, 1, 2]);
+        let _ = Link::from_nodes([a, b]);
+    }
+
+    #[test]
+    #[should_panic(expected = "some nodes are oriented and some are not")]
+    fn new_rejects_partial_orientation() {
+        use crate::NodeType::XL;
+        let a = Node::new(XL, Some((Slot::SW, Slot::SE)), [1, 2, 3, 4]);
+        let b = Node::new(XL, None, [3, 4, 1, 2]);
+        let _ = Link::from_nodes([a, b]);
+    }
 
     #[test]
     fn link_init() {

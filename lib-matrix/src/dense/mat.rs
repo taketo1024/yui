@@ -8,9 +8,26 @@ use auto_impl_ops::auto_ops;
 use num_traits::{Zero, One};
 use yui_core::{EucRing, EucRingOps};
 use crate::dense::snf::SnfCalc;
-use crate::MatTrait;
 use crate::sparse::SpMat;
 
+/// Minimal shape-based interface shared by [`Mat`] and [`crate::sparse::SpMat`].
+///
+/// Implementors only need to provide [`shape`](Self::shape); the rest are
+/// derived defaults.
+pub trait MatTrait {
+    fn shape(&self) -> (usize, usize);
+    fn n_rows(&self) -> usize { self.shape().0 }
+    fn n_cols(&self) -> usize { self.shape().1 }
+    fn is_square(&self) -> bool {
+        let (m, n) = self.shape();
+        m == n
+    }
+}
+
+/// Dense matrix, backed by `nalgebra::DMatrix` (column-major storage).
+///
+/// Generic over the element ring `R`; bounds are applied per-method (most
+/// constructors and basic algebra only need `R: Scalar`).
 #[derive(Clone, Debug, Display, PartialEq, Eq)]
 pub struct Mat<R> {
     inner: DMatrix<R>
@@ -31,7 +48,7 @@ impl<R> Mat<R> {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (usize, usize, &R)> { 
-        let m = self.nrows();
+        let m = self.n_rows();
         self.inner.iter().enumerate().map(move |(i, a)| 
             (i % m, i / m, a)
         )
@@ -40,15 +57,15 @@ impl<R> Mat<R> {
 
 impl<R> Mat<R>
 where R: Scalar {
-    pub fn from_data<I>(shape: (usize, usize), data: I) -> Self
+    pub fn from_row_major<I>(shape: (usize, usize), data: I) -> Self
     where I: IntoIterator<Item = R> { 
         DMatrix::from_row_iterator(shape.0, shape.1, data).into()
     }
 
-    pub fn from_generator<F>(shape: (usize, usize), generator: F) -> Self
+    pub fn generate<F>(shape: (usize, usize), generator: F) -> Self
     where F: Fn(usize, usize) -> R { 
         let f = &generator;
-        Self::from_data(shape, (0..shape.0).flat_map(|i| (0..shape.1).map(move |j| f(i, j))))
+        Self::from_row_major(shape, (0..shape.0).flat_map(|i| (0..shape.1).map(move |j| f(i, j))))
     }
 
     pub fn zero(shape: (usize, usize)) -> Self
@@ -101,20 +118,20 @@ where R: Scalar {
         let (i0, i1) = (rows.start, rows.end);
         let (j0, j1) = (cols.start, cols.end);
 
-        assert!(i0 <= i1 && i1 <= self.nrows());
-        assert!(j0 <= j1 && j1 <= self.ncols());
+        assert!(i0 <= i1 && i1 <= self.n_rows());
+        assert!(j0 <= j1 && j1 <= self.n_cols());
 
         let slice = self.inner.view((i0, j0), (i1 - i0, j1 - j0));
         Self::from(slice.clone_owned())
     }
 
     pub fn submat_rows(&self, rows: Range<usize>) -> Mat<R> { 
-        let n = self.ncols();
+        let n = self.n_cols();
         self.submat(rows, 0 .. n)
     }
 
     pub fn submat_cols(&self, cols: Range<usize>) -> Mat<R> { 
-        let m = self.nrows();
+        let m = self.n_rows();
         self.submat(0 .. m, cols)
     }
 
@@ -137,7 +154,7 @@ where R: Scalar {
     pub fn map<S, F>(&self, f: F) -> Mat<S>
     where S: Scalar, F: Fn(&R) -> S {
         let data = self.inner.iter().map(f);
-        let inner = DMatrix::from_iterator(self.nrows(), self.ncols(), data);
+        let inner = DMatrix::from_iterator(self.n_rows(), self.n_cols(), data);
         Mat::from(inner)
     }
 }
@@ -250,7 +267,7 @@ where R: Scalar {
 
     pub fn add_row_to(&mut self, i0: usize, i1: usize, r: &R)
     where R: ClosedAddAssign, for<'x> &'x R: Mul<Output = R> {
-        for j in 0..self.ncols() {
+        for j in 0..self.n_cols() {
             let v = &self[(i0, j)] * r;
             self[(i1, j)] += v;
         }
@@ -258,7 +275,7 @@ where R: Scalar {
 
     pub fn add_col_to(&mut self, j0: usize, j1: usize, r: &R)
     where R: ClosedAddAssign, for<'x> &'x R: Mul<Output = R> {
-        for i in 0..self.nrows() {
+        for i in 0..self.n_rows() {
             let v = &self[(i, j0)] * r;
             self[(i, j1)] += v;
         }
@@ -303,18 +320,18 @@ mod tests {
 
     #[test]
     fn init() { 
-        let a = Mat::from_data((2, 3), [1,2,3,4,5,6]);
+        let a = Mat::from_row_major((2, 3), [1,2,3,4,5,6]);
 
-        assert_eq!(a.nrows(), 2);
-        assert_eq!(a.ncols(), 3);
+        assert_eq!(a.n_rows(), 2);
+        assert_eq!(a.n_cols(), 3);
         assert_eq!(a.into_inner(), DMatrix::from_row_slice(2, 3, &[1,2,3,4,5,6]));
     }
 
     #[test]
     fn eq() {
-        let a = Mat::from_data((2, 3), [1,2,3,4,5,6]);
-        let b = Mat::from_data((2, 3), [1,2,0,4,5,6]);
-        let c = Mat::from_data((3, 2), [1,2,3,4,5,6]);
+        let a = Mat::from_row_major((2, 3), [1,2,3,4,5,6]);
+        let b = Mat::from_row_major((2, 3), [1,2,0,4,5,6]);
+        let c = Mat::from_row_major((3, 2), [1,2,3,4,5,6]);
 
         assert_eq!(a, a);
         assert_ne!(a, b);
@@ -323,10 +340,10 @@ mod tests {
 
     #[test]
     fn transpose() {
-        let a = Mat::from_data((2, 3), [1,2,3,4,5,6]);
+        let a = Mat::from_row_major((2, 3), [1,2,3,4,5,6]);
         let t = a.transpose();
         assert_eq!(t.shape(), (3, 2));
-        assert_eq!(t, Mat::from_data((3, 2), [1,4,2,5,3,6]));
+        assert_eq!(t, Mat::from_row_major((3, 2), [1,4,2,5,3,6]));
     }
 
     #[test]
@@ -343,7 +360,7 @@ mod tests {
         let a: Mat<i32> = Mat::zero((3, 2));
         assert!(a.is_zero());
 
-        let a = Mat::from_data((2, 3), [1,2,3,4,5,6]);
+        let a = Mat::from_row_major((2, 3), [1,2,3,4,5,6]);
         assert!(!a.is_zero());
     }
 
@@ -352,122 +369,122 @@ mod tests {
         let a: Mat<i32> = Mat::id(3);
         assert!(a.is_id());
 
-        let a = Mat::from_data((2, 2), [1,2,3,4]);
+        let a = Mat::from_row_major((2, 2), [1,2,3,4]);
         assert!(!a.is_id());
 
-        let a = Mat::from_data((2, 3), [1,0,0,0,1,0]);
+        let a = Mat::from_row_major((2, 3), [1,0,0,0,1,0]);
         assert!(!a.is_id());
     }
 
     #[test]
     fn swap_rows() { 
-        let mut a = Mat::from_data((3, 4), 1..=12);
+        let mut a = Mat::from_row_major((3, 4), 1..=12);
         a.swap_rows(0, 1);
-        assert_eq!(a, Mat::from_data((3, 4), [5,6,7,8,1,2,3,4,9,10,11,12]));
+        assert_eq!(a, Mat::from_row_major((3, 4), [5,6,7,8,1,2,3,4,9,10,11,12]));
     }
 
     #[test]
     fn swap_cols() { 
-        let mut a = Mat::from_data((3, 4), 1..=12);
+        let mut a = Mat::from_row_major((3, 4), 1..=12);
         a.swap_cols(0, 1);
-        assert_eq!(a, Mat::from_data((3, 4), [2,1,3,4,6,5,7,8,10,9,11,12]));
+        assert_eq!(a, Mat::from_row_major((3, 4), [2,1,3,4,6,5,7,8,10,9,11,12]));
     }
 
     #[test]
     fn mul_row() { 
-        let mut a = Mat::from_data((3, 3), 1..=9);
+        let mut a = Mat::from_row_major((3, 3), 1..=9);
         a.mul_row(1, &10);
-        assert_eq!(a, Mat::from_data((3, 3), [1,2,3,40,50,60,7,8,9]));
+        assert_eq!(a, Mat::from_row_major((3, 3), [1,2,3,40,50,60,7,8,9]));
     }
 
     #[test]
     fn mul_col() { 
-        let mut a = Mat::from_data((3, 3), 1..=9);
+        let mut a = Mat::from_row_major((3, 3), 1..=9);
         a.mul_col(1, &10);
-        assert_eq!(a, Mat::from_data((3, 3), [1,20,3,4,50,6,7,80,9]));
+        assert_eq!(a, Mat::from_row_major((3, 3), [1,20,3,4,50,6,7,80,9]));
     }
 
     #[test]
     fn add_row_to() { 
-        let mut a = Mat::from_data((3, 3), 1..=9);
+        let mut a = Mat::from_row_major((3, 3), 1..=9);
         a.add_row_to(0, 1, &10);
-        assert_eq!(a, Mat::from_data((3, 3), [1,2,3,14,25,36,7,8,9]));
+        assert_eq!(a, Mat::from_row_major((3, 3), [1,2,3,14,25,36,7,8,9]));
     }
 
     #[test]
     fn add_col_to() { 
-        let mut a = Mat::from_data((3, 3), 1..=9);
+        let mut a = Mat::from_row_major((3, 3), 1..=9);
         a.add_col_to(0, 1, &10);
-        assert_eq!(a, Mat::from_data((3, 3), [1,12,3,4,45,6,7,78,9]));
+        assert_eq!(a, Mat::from_row_major((3, 3), [1,12,3,4,45,6,7,78,9]));
     }
 
     #[test]
     fn add() { 
-        let a = Mat::from_data((3, 2), [1,2,3,4,5,6]);
-        let b = Mat::from_data((3, 2), [8,2,4,0,2,1]);
+        let a = Mat::from_row_major((3, 2), [1,2,3,4,5,6]);
+        let b = Mat::from_row_major((3, 2), [8,2,4,0,2,1]);
         let c = a + b;
-        assert_eq!(c, Mat::from_data((3, 2), [9,4,7,4,7,7]));
+        assert_eq!(c, Mat::from_row_major((3, 2), [9,4,7,4,7,7]));
     }
 
     #[test]
     fn sub() { 
-        let a = Mat::from_data((3, 2), [1,2,3,4,5,6]);
-        let b = Mat::from_data((3, 2), [8,2,4,0,2,1]);
+        let a = Mat::from_row_major((3, 2), [1,2,3,4,5,6]);
+        let b = Mat::from_row_major((3, 2), [8,2,4,0,2,1]);
         let c = a - b;
-        assert_eq!(c, Mat::from_data((3, 2), [-7,0,-1,4,3,5]));
+        assert_eq!(c, Mat::from_row_major((3, 2), [-7,0,-1,4,3,5]));
     }
 
     #[test]
     fn neg() { 
-        let a = Mat::from_data((3, 2), [1,2,3,4,5,6]);
-        assert_eq!(-a, Mat::from_data((3, 2), [-1,-2,-3,-4,-5,-6]));
+        let a = Mat::from_row_major((3, 2), [1,2,3,4,5,6]);
+        assert_eq!(-a, Mat::from_row_major((3, 2), [-1,-2,-3,-4,-5,-6]));
     }
 
     #[test]
     fn mul() { 
-        let a = Mat::from_data((2, 3), [1,2,3,4,5,6]);
-        let b = Mat::from_data((3, 2), [1,2,1,-1,0,2]);
+        let a = Mat::from_row_major((2, 3), [1,2,3,4,5,6]);
+        let b = Mat::from_row_major((3, 2), [1,2,1,-1,0,2]);
         let c = a * b;
-        assert_eq!(c, Mat::from_data((2, 2), [3,6,9,15]));
+        assert_eq!(c, Mat::from_row_major((2, 2), [3,6,9,15]));
     }
 
     #[test]
     fn to_sparse() { 
-        let dns = Mat::from_data((2, 3), [1,2,3,4,5,6]);
+        let dns = Mat::from_row_major((2, 3), [1,2,3,4,5,6]);
         let sps = dns.into_sparse();
-        assert_eq!(sps, SpMat::from_dense_data((2, 3), [1,2,3,4,5,6]));
+        assert_eq!(sps, SpMat::from_row_major((2, 3), [1,2,3,4,5,6]));
     }
 
     #[test]
     fn from_sparse() { 
-        let sps = SpMat::from_dense_data((2, 3), [1,2,3,4,5,6]);
+        let sps = SpMat::from_row_major((2, 3), [1,2,3,4,5,6]);
         let dns = Mat::from(sps);
-        assert_eq!(dns, Mat::from_data((2, 3), [1,2,3,4,5,6]));
+        assert_eq!(dns, Mat::from_row_major((2, 3), [1,2,3,4,5,6]));
     }
 
     #[test]
     fn submat() { 
-        let a = Mat::from_data((3, 4), [
+        let a = Mat::from_row_major((3, 4), [
             1, 2, 3, 7,
             4, 5, 6, 8,
             9,10,11,12           
         ]);
         let b = a.submat(1..3, 2..4);
-        assert_eq!(b, Mat::from_data((2, 2), [
+        assert_eq!(b, Mat::from_row_major((2, 2), [
              6, 8,
             11,12           
         ]));
     }
 
     #[test]
-    fn from_generator() {
-        let a = Mat::from_generator((2, 3), |i, j| (i * 3 + j) as i32);
-        assert_eq!(a, Mat::from_data((2, 3), [0, 1, 2, 3, 4, 5]));
+    fn generate() {
+        let a = Mat::generate((2, 3), |i, j| (i * 3 + j) as i32);
+        assert_eq!(a, Mat::from_row_major((2, 3), [0, 1, 2, 3, 4, 5]));
     }
 
     #[test]
     fn iter() { 
-        let a = Mat::from_data((2, 3), [
+        let a = Mat::from_row_major((2, 3), [
             1, 2, 3,
             4, 5, 6,
         ]);
@@ -481,12 +498,12 @@ mod tests {
 
     #[test]
     fn map() { 
-        let a = Mat::from_data((2, 3), [
+        let a = Mat::from_row_major((2, 3), [
             1, 2, 3,
             4, 5, 6,
         ]);
         let b = a.map(|r| 2 * r);
-        assert_eq!(b, Mat::from_data((2, 3), [
+        assert_eq!(b, Mat::from_row_major((2, 3), [
             2,  4,  6,
             8, 10, 12,
         ]));

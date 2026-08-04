@@ -1,12 +1,23 @@
-use sprs::PermView;
 use yui_core::{CloneAnd, Ring, RingOps};
+use crate::Perm;
 use crate::sparse::{SpMat, MatTrait, SpVec};
 
+/// A composable forward/backward sparse linear map, used to track basis
+/// changes through a chain of reductions.
+///
+/// Internally stores two parallel sequences `(f_0, ..., f_k)` and
+/// `(b_0, ..., b_k)` such that the forward map is `f_k * ... * f_0` and the
+/// backward map is `b_0 * ... * b_k` (so applying `forward` followed by
+/// `backward` recovers a vector in the source space).
+///
+/// New stages are appended with [`append`](Self::append) /
+/// [`append_perm`](Self::append_perm); two `Trans`es can be composed via
+/// [`merge`](Self::merge).
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Trans<R> 
+pub struct Trans<R>
 where R: Ring, for <'x> &'x R: RingOps<R> {
-    src_dim: usize, 
+    src_dim: usize,
     tgt_dim: usize,
     f_mats: Vec<SpMat<R>>,
     b_mats: Vec<SpMat<R>>,
@@ -27,8 +38,9 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         Self::id(0)
     }
 
+    /// Single-stage transform with forward map `f` and backward map `b`.
     pub fn new(f: SpMat<R>, b: SpMat<R>) -> Self {
-        let mut t = Self::id(f.ncols());
+        let mut t = Self::id(f.n_cols());
         t.append(f, b);
         t
     }
@@ -56,23 +68,24 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
     }
 
     pub fn append(&mut self, f: SpMat<R>, b: SpMat<R>) { 
-        assert_eq!(f.ncols(), b.nrows());
-        assert_eq!(f.nrows(), b.ncols());
-        assert_eq!(f.ncols(), self.tgt_dim);
+        assert_eq!(f.n_cols(), b.n_rows());
+        assert_eq!(f.n_rows(), b.n_cols());
+        assert_eq!(f.n_cols(), self.tgt_dim);
 
-        self.tgt_dim = f.nrows();
+        self.tgt_dim = f.n_rows();
         self.f_mats.push(f);
         self.b_mats.push(b);
     }
 
-    pub fn append_perm(&mut self, p: PermView) { 
-        assert_eq!(p.dim(), self.tgt_dim);
-        let f = SpMat::from_row_perm(p.clone());
-        let b = SpMat::from_col_perm(p);
+    pub fn append_perm(&mut self, p: &Perm) {
+        assert_eq!(p.len(), self.tgt_dim);
+        let f = SpMat::row_perm_mat(p);
+        let b = SpMat::col_perm_mat(p);
         self.append(f, b)
     }
 
-    pub fn merge(&mut self, mut other: Trans<R>) { 
+    /// Appends `other`'s stages onto `self`; requires `self.tgt_dim == other.src_dim`.
+    pub fn merge(&mut self, mut other: Trans<R>) {
         assert_eq!(self.tgt_dim, other.src_dim);
 
         self.tgt_dim = other.tgt_dim;
@@ -110,6 +123,7 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         }
     }
 
+    /// Collapses the stored stages into a single pair of forward/backward matrices.
     pub fn reduce(&mut self) {
         if self.f_mats.len() > 1 { 
             let f = self.forward_mat();
@@ -122,7 +136,9 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn sub(&self, indices: &[usize]) -> Self { 
+    /// Restricts the target to the given index subset, appending an extra
+    /// projection / inclusion stage.
+    pub fn sub(&self, indices: &[usize]) -> Self {
         let n = self.tgt_dim();
         let p = indices.len();
         let f = SpMat::from_entries(
@@ -152,8 +168,6 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
 
 #[cfg(test)]
 mod tests {
-    use sprs::PermOwned;
-
     use super::*;
     use crate::sparse::*;
 
@@ -190,9 +204,7 @@ mod tests {
             SpMat::id(5).submat_rows(0..3),
             SpMat::id(5).submat_cols(0..3),
         );
-        t.append_perm(
-            PermOwned::new(vec![1,2,0]).view()
-        );
+        t.append_perm(&Perm::from_indices([1,2,0]));
 
         let v = SpVec::from(vec![0,1,2,3,4]);
         let w = t.forward(&v);

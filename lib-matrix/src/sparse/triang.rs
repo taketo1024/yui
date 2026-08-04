@@ -15,8 +15,10 @@ cfg_if::cfg_if! {
 
 const LOG_THRESHOLD: usize = 10_000;
 
+/// Selector for whether a matrix is upper- or lower-triangular, used by
+/// the triangular solvers and Schur reduction.
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum TriangularType { 
+pub enum TriangularType {
     Upper, Lower
 }
 
@@ -28,7 +30,7 @@ impl TriangularType {
         }
     }
 
-    pub fn tranpose(&self) -> Self { 
+    pub fn transpose(&self) -> Self {
         match self { 
             Self::Upper => Self::Lower,
             Self::Lower => Self::Upper
@@ -43,16 +45,17 @@ impl TriangularType {
     }
 }
 
+/// Inverse of a triangular matrix `a`.
 pub fn inv_triangular<R>(t: TriangularType, a: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let e = SpMat::id(a.nrows());
+    let e = SpMat::id(a.n_rows());
     solve_triangular(t, a, &e)
 }
 
-// solve ax = y.
+/// Solves `a · x = y` for triangular `a`.
 pub fn solve_triangular<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let n = a.nrows();
+    let n = a.n_rows();
     let cols = solve_triangular_with(t, a, y, |_, x| x);
     SpMat::from_col_vecs(n, cols)
 }
@@ -68,7 +71,7 @@ where
     F: Fn(usize, SpVec<R>) -> T + Sync,
     T: Send,
 {
-    assert_eq!(a.nrows(), y.nrows());
+    assert_eq!(a.n_rows(), y.n_rows());
     debug_assert!(a.is_triang(t));
 
     cfg_if::cfg_if! {
@@ -80,21 +83,22 @@ where
     }
 }
 
-// solve xa = y.
+/// Solves `x · a = y` for triangular `a`.
 pub fn solve_triangular_left<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    solve_triangular(t.tranpose(), &a.transpose(), &y.transpose()).transpose()
+    solve_triangular(t.transpose(), &a.transpose(), &y.transpose()).transpose()
 }
 
+/// Vector form of [`solve_triangular`]: solves `a · x = b`.
 pub fn solve_triangular_vec<R>(t: TriangularType, a: &SpMat<R>, b: &SpVec<R>) -> SpVec<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    assert_eq!(a.nrows(), b.dim());
+    assert_eq!(a.n_rows(), b.dim());
     debug_assert!(a.is_triang(t));
 
     debug!("solve {} triangular-vec", t.str());
     debug!("  a: {:?}", a.shape());
 
-    let n = a.nrows();
+    let n = a.n_rows();
     let diag = collect_diag(t, a);
     let mut b_buf = vec![R::zero(); n];
     scatter_into(b.data(), &mut b_buf);
@@ -113,7 +117,7 @@ where
     debug!("solve {} triangular", t.str());
     debug!("  a: {:?}, y: {:?}", a.shape(), y.shape());
 
-    let (n, k) = (a.nrows(), y.ncols());
+    let (n, k) = (a.n_rows(), y.n_cols());
     let diag = collect_diag(t, a);
     let mut b = vec![R::zero(); n];
 
@@ -138,7 +142,7 @@ where
     debug!("solve {} triangular (threads: {})", t.str(), rayon::current_num_threads());
     debug!("  a: {:?}, y: {:?}", a.shape(), y.shape());
 
-    let (n, k) = (a.nrows(), y.ncols());
+    let (n, k) = (a.n_rows(), y.n_cols());
     let diag = collect_diag(t, a);
     let tl_b = Arc::new(ThreadLocal::new());
 
@@ -202,13 +206,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         Either::Right(entries.into_iter())
     };
 
-    SpVec::from_sorted_entries(a.ncols(), entries)
+    SpVec::from_sorted_entries(a.n_cols(), entries)
 }
 
 fn collect_diag<'a, R>(t: TriangularType, a: &'a SpMat<R>) -> Vec<&'a R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let (col_offsets, row_indices, values) = a.csc_data();
-    (0..a.ncols()).map(|j| {
+    (0..a.n_cols()).map(|j| {
         let p = if t.is_upper() {
             col_offsets[j + 1] - 1
         } else {
@@ -228,7 +232,7 @@ fn scatter_into<R: Clone>(data: (&[usize], &[R]), dst: &mut [R]) {
 
 #[allow(unused)]
 fn should_report<R>(a: &SpMat<R>) -> bool { 
-    usize::min(a.nrows(), a.ncols()) > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Debug
+    usize::min(a.n_rows(), a.n_cols()) > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Debug
 }
 
 #[cfg(test)]
@@ -238,7 +242,7 @@ mod tests {
 
     #[test]
     fn solve_upper() { 
-        let u = SpMat::from_dense_data((5, 5), vec![
+        let u = SpMat::from_row_major((5, 5), vec![
             1, -2, 1,  3, 5,
             0, -1, 4,  2, 1,
             0,  0, 1,  0, 3,
@@ -252,7 +256,7 @@ mod tests {
 
     #[test]
     fn inv_upper() { 
-        let u = SpMat::from_dense_data((5, 5), [
+        let u = SpMat::from_row_major((5, 5), [
             1, -2, 1,  3, 5,
             0, -1, 4,  2, 1,
             0,  0, 1,  0, 3,
@@ -266,7 +270,7 @@ mod tests {
 
     #[test]
     fn solve_lower() { 
-        let l = SpMat::from_dense_data((5, 5), [
+        let l = SpMat::from_row_major((5, 5), [
             1,  0, 0,  0, 0,
            -2, -1, 0,  0, 0,
             1,  4, 1,  0, 0,
@@ -280,7 +284,7 @@ mod tests {
 
     #[test]
     fn inv_lower() { 
-        let l = SpMat::from_dense_data((5, 5), [
+        let l = SpMat::from_row_major((5, 5), [
             1,  0, 0,  0, 0,
            -2, -1, 0,  0, 0,
             1,  4, 1,  0, 0,

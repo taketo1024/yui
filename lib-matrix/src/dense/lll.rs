@@ -1,13 +1,14 @@
-// "Extended GCD and Hermite Normal Form Algorithms via Lattice Basis Reduction",
-// George Havas, Bohdan S. Majewski, and Keith R. Matthews
-// https://projecteuclid.org/journals/experimental-mathematics/volume-7/issue-2/Extended-GCD-and-Hermite-normal-form-algorithms-via-lattice-basis/em/1048515660.full
-//
-// see also: "Keith Matthews' LLL page", 
-// http://www.numbertheory.org/lll.html
-//
-// "A generalization of the LLL-algorithm over euclidean rings or orders",
-// Huguette Napias
-// https://www.jstor.org/stable/43974220
+//! LLL lattice reduction and Hermite normal form.
+//!
+//! Based on:
+//!
+//! - "Extended GCD and Hermite Normal Form Algorithms via Lattice Basis Reduction",
+//!   George Havas, Bohdan S. Majewski, and Keith R. Matthews.
+//!   <https://projecteuclid.org/journals/experimental-mathematics/volume-7/issue-2/Extended-GCD-and-Hermite-normal-form-algorithms-via-lattice-basis/em/1048515660.full>
+//! - see also: "Keith Matthews' LLL page", <http://www.numbertheory.org/lll.html>.
+//! - "A generalization of the LLL-algorithm over euclidean rings or orders",
+//!   Huguette Napias.
+//!   <https://www.jstor.org/stable/43974220>
 
 use std::fmt::Debug;
 use std::iter::zip;
@@ -150,7 +151,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 
     pub fn process(&mut self) { 
         assert!(self.data.step == 1);
-        let m = self.data.nrows();
+        let m = self.data.n_rows();
 
         while self.data.step < m { 
             self.iterate()
@@ -196,7 +197,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 
     fn process(&mut self) { 
         assert!(self.data.step > 0);
-        let m = self.data.nrows();
+        let m = self.data.n_rows();
 
         while self.data.step < m { 
             self.iterate();
@@ -222,7 +223,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     }
 
     fn result(self) -> (Mat<R>, Option<Mat<R>>, Option<Mat<R>>) { 
-        let m = self.data.nrows();
+        let m = self.data.n_rows();
         let (mut target, mut p, mut pinv) = self.data.result();
 
         for i in 0..m/2 {
@@ -294,7 +295,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 impl<R> LLLData<R>
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     fn new(target: Mat<R>, flags: [bool; 2]) -> Self { 
-        let m = target.nrows();
+        let m = target.n_rows();
         let p =    if flags[0] { Some(Mat::id(m)) } else { None };
         let pinv = if flags[1] { Some(Mat::id(m)) } else { None };
         let det = vec![R::one(); m];
@@ -386,7 +387,7 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         let d1 = &d[k - 1];
         let d2 = &d[k];
 
-        let m = self.lambda.ncols();
+        let m = self.lambda.n_cols();
 
         // λ[.., k-1] <--> λ[.., k]
         for i in k+1..m { 
@@ -470,8 +471,8 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         }
     }
 
-    fn nrows(&self) -> usize { 
-        self.target.nrows()
+    fn n_rows(&self) -> usize {
+        self.target.n_rows()
     }
 
     fn dump(&self) -> String { 
@@ -532,14 +533,14 @@ pub(super) mod tests {
  
     #[test]
     fn test_large_orth_basis() {
-        let a = Mat::from_data((3, 3), [
+        let a = Mat::from_row_major((3, 3), [
             1,-1, 3,
             1, 0, 5,
             1, 2, 6
         ]);
         let (c, l, d) = orthogonalize(&a);
 
-        assert_eq!(c, Mat::from_data((3, 3), [
+        assert_eq!(c, Mat::from_row_major((3, 3), [
             1, -1,  3,
             -5, 16, 7,
             15, 6, -3
@@ -549,7 +550,7 @@ pub(super) mod tests {
         assert_eq!(d[1], 30);
         assert_eq!(d[2], 9);
 
-        assert_eq!(l, Mat::from_data((3, 3), [
+        assert_eq!(l, Mat::from_row_major((3, 3), [
             0,  0, 0,
             16, 0, 0,
             17,69, 0
@@ -558,7 +559,7 @@ pub(super) mod tests {
 
     #[test]
     fn data_init() { 
-        let a = Mat::from_data((3, 3), [
+        let a = Mat::from_row_major((3, 3), [
             1,-1, 3,
             1, 0, 5,
             1, 2, 6
@@ -582,7 +583,7 @@ pub(super) mod tests {
     
     #[test]
     fn setup() { 
-        let a = Mat::from_data((3, 3), [
+        let a = Mat::from_row_major((3, 3), [
             1,-1, 3,
             1, 0, 5,
             1, 2, 6
@@ -596,7 +597,7 @@ pub(super) mod tests {
         assert_eq!(data.det[1], 30);
         assert_eq!(data.det[2], 9);
 
-        assert_eq!(data.lambda, Mat::from_data((3, 3), [
+        assert_eq!(data.lambda, Mat::from_row_major((3, 3), [
             0,  0, 0,
             16, 0, 0,
             17,69, 0
@@ -605,7 +606,7 @@ pub(super) mod tests {
 
     #[test]
     fn swap() { 
-        let a0 = Mat::from_data((3, 3), [
+        let a0 = Mat::from_row_major((3, 3), [
             1,-1, 3,
             1, 0, 5,
             1, 2, 6
@@ -616,7 +617,7 @@ pub(super) mod tests {
         data0.swap(2);
         
         // compare data
-        let a1 = Mat::from_data((3, 3), [
+        let a1 = Mat::from_row_major((3, 3), [
             1, 0, 5,
             1, 2, 6,
             1,-1, 3
@@ -629,7 +630,7 @@ pub(super) mod tests {
 
     #[test]
     fn swap_trans() { 
-        let a0 = Mat::from_data((3, 3), [
+        let a0 = Mat::from_row_major((3, 3), [
             1,-1, 3,
             1, 0, 5,
             1, 2, 6
@@ -640,7 +641,7 @@ pub(super) mod tests {
         data0.swap(2);
 
         // compare data
-        let a1 = Mat::from_data((3, 3), [
+        let a1 = Mat::from_row_major((3, 3), [
             1, 0, 5,
             1, 2, 6,
             1,-1, 3
@@ -655,7 +656,7 @@ pub(super) mod tests {
 
     #[test]
     fn add_row_to() { 
-        let a0 = Mat::from_data((3, 3), [
+        let a0 = Mat::from_row_major((3, 3), [
             1,-1, 3,
             1, 0, 5,
             1, 2, 6
@@ -666,7 +667,7 @@ pub(super) mod tests {
         data0.add_row_to(1, 2, &-3);
         
         // compare data
-        let a1 = Mat::from_data((3, 3), [
+        let a1 = Mat::from_row_major((3, 3), [
              1,-1,  3,
              3,-2, 11,
             -8, 8,-27
@@ -679,7 +680,7 @@ pub(super) mod tests {
 
     #[test]
     fn add_row_to_trans() { 
-        let a0 = Mat::from_data((3, 3), [
+        let a0 = Mat::from_row_major((3, 3), [
             1,-1, 3,
             1, 0, 5,
             1, 2, 6
@@ -690,7 +691,7 @@ pub(super) mod tests {
         data0.add_row_to(1, 2, &-3);
         
         // compare data
-        let a1 = Mat::from_data((3, 3), [
+        let a1 = Mat::from_row_major((3, 3), [
             1,-1, 3,
             3,-2,11,
             -8,8,-27
@@ -705,7 +706,7 @@ pub(super) mod tests {
 
     #[test]
     fn mul_row() { 
-        let a0 = Mat::from_data((3, 3), [
+        let a0 = Mat::from_row_major((3, 3), [
             1,-1, 3,
             1, 0, 5,
             1, 2, 6
@@ -716,7 +717,7 @@ pub(super) mod tests {
         data0.mul_row(2, &-1);
         
         // compare data
-        let a1 = Mat::from_data((3, 3), [
+        let a1 = Mat::from_row_major((3, 3), [
             1,-1, 3,
             -1, 0, -5,
             -1, -2, -6
@@ -729,7 +730,7 @@ pub(super) mod tests {
 
     #[test]
     fn mul_row_trans() { 
-       let a0 = Mat::from_data((3, 3), [
+       let a0 = Mat::from_row_major((3, 3), [
            1,-1, 3,
            1, 0, 5,
            1, 2, 6
@@ -740,7 +741,7 @@ pub(super) mod tests {
        data0.mul_row(2, &-1);
        
        // compare data
-       let a1 = Mat::from_data((3, 3), [
+       let a1 = Mat::from_row_major((3, 3), [
            1,-1, 3,
            -1, 0, -5,
            -1, -2, -6
@@ -755,7 +756,7 @@ pub(super) mod tests {
 
     #[test]
     fn lll() { 
-        let a = Mat::from_data((3, 3), [
+        let a = Mat::from_row_major((3, 3), [
             1,-1, 3,
             1, 0, 5,
             1, 2, 6
@@ -765,7 +766,7 @@ pub(super) mod tests {
 
         let (res, Some(p)) = calc.result() else { panic!() };
 
-        assert_eq!(res, Mat::from_data((3, 3), [
+        assert_eq!(res, Mat::from_row_major((3, 3), [
             0, 1, -1,
             1, 0, -1,
             1, 1, 1
@@ -778,7 +779,7 @@ pub(super) mod tests {
      #[test]
      fn lll_gcdx() { 
         // MEMO: γ = 10
-        let a = Mat::from_data((3, 4), [
+        let a = Mat::from_row_major((3, 4), [
             1, 0, 0, 40,
             0, 1, 0, 60,
             0, 0, 1, 90
@@ -788,7 +789,7 @@ pub(super) mod tests {
 
         let (res, Some(p)) = calc.result() else { panic!() };
 
-        assert_eq!(res, Mat::from_data((3, 4), [
+        assert_eq!(res, Mat::from_row_major((3, 4), [
             3, -2, 0, 0,
             0, 3, -2, 0,
             -2, 0, 1, 10
@@ -801,7 +802,7 @@ pub(super) mod tests {
 
      #[test]
      fn hnf() { 
-        let a: Mat<i64> = Mat::from_data((4, 3), [
+        let a: Mat<i64> = Mat::from_row_major((4, 3), [
             8,    44,   43,
             4,    10,   43,
             56, -550, -328,
@@ -823,7 +824,7 @@ pub(super) mod tests {
         type A = GaussInt<i64>;
 
         let i = A::new;
-        let a = Mat::from_data((3, 3), [
+        let a = Mat::from_row_major((3, 3), [
             i(-2, 3), i(7, 3), i(7, 3),
             i(3, 3), i(-2, 4), i(6, 2),
             i(2, 2), i(-8, 0), i(-9, 1),
@@ -837,7 +838,7 @@ pub(super) mod tests {
         assert_eq!(data.det[1], i(7436, 0));
         assert_eq!(data.det[2], i(161408, 0));
 
-        assert_eq!(data.lambda, Mat::from_data((3, 3), [
+        assert_eq!(data.lambda, Mat::from_row_major((3, 3), [
             i(0, 0),     i(0, 0),      i(0, 0),
             i(49, 15),   i(0, 0),      i(0, 0),
             i(-114, 48), i(1770,3162), i(0, 0)
@@ -848,7 +849,7 @@ pub(super) mod tests {
     fn swap_gauss() { 
         type A = GaussInt<i64>;
         let i = A::new;
-        let a0 = Mat::from_data((3, 3), [
+        let a0 = Mat::from_row_major((3, 3), [
             i(-2, 3), i(7, 3), i(7, 3),
             i(3, 3), i(-2, 4), i(6, 2),
             i(2, 2), i(-8, 0), i(-9, 1),
@@ -859,7 +860,7 @@ pub(super) mod tests {
         data0.swap(2);
         
         // compare data
-        let a1 = Mat::from_data((3, 3), [
+        let a1 = Mat::from_row_major((3, 3), [
             i(3, 3), i(-2, 4), i(6, 2),
             i(2, 2), i(-8, 0), i(-9, 1),
             i(-2, 3), i(7, 3), i(7, 3),
@@ -874,7 +875,7 @@ pub(super) mod tests {
     fn add_row_to_gauss() { 
         type A = GaussInt<i64>;
         let i = A::new;
-        let a0 = Mat::from_data((3, 3), [
+        let a0 = Mat::from_row_major((3, 3), [
             i(-2, 3), i(7, 3), i(7, 3),
             i(3, 3), i(-2, 4), i(6, 2),
             i(2, 2), i(-8, 0), i(-9, 1),
@@ -885,7 +886,7 @@ pub(super) mod tests {
         data0.add_row_to(1, 2, &i(-3, 2));
         
         // compare data
-        let a1 = Mat::from_data((3, 3), [
+        let a1 = Mat::from_row_major((3, 3), [
             i(-2, 3), i(7, 3), i(7, 3),
             i(-2, 4), i(2, 14), i(10, 12),
             i(0, -14), i(-42, -38), i(-63, -15),
@@ -900,7 +901,7 @@ pub(super) mod tests {
     fn mul_row_gauss() { 
         type A = GaussInt<i64>;
         let i = A::new;
-        let a0 = Mat::from_data((3, 3), [
+        let a0 = Mat::from_row_major((3, 3), [
             i(-2, 3), i(7, 3), i(7, 3),
             i(3, 3), i(-2, 4), i(6, 2),
             i(2, 2), i(-8, 0), i(-9, 1),
@@ -912,7 +913,7 @@ pub(super) mod tests {
         data0.mul_row(2, &i(0, -1));
 
         // compare data
-        let a1 = Mat::from_data((3, 3), [
+        let a1 = Mat::from_row_major((3, 3), [
             i(-2, 3), i(7, 3), i(7, 3),
             i(-3, 3), i(-4, -2), i(-2, 6),
             i(2, -2), i(0, 8), i(1, 9),
@@ -928,7 +929,7 @@ pub(super) mod tests {
         type A = GaussInt<i64>;
         let i = A::new;
 
-        let a: Mat<A> = Mat::from_data((3, 3), [
+        let a: Mat<A> = Mat::from_row_major((3, 3), [
             i(-2, 3), i(7, 3), i(7, 3),
             i(3, 3), i(-2, 4), i(6, 2),
             i(2, 2), i(-8, 0), i(-9, 1),
@@ -950,7 +951,7 @@ pub(super) mod tests {
         type A = EisenInt<i64>;
         let i = A::new;
 
-        let a: Mat<A> = Mat::from_data((3, 3), [
+        let a: Mat<A> = Mat::from_row_major((3, 3), [
             i(-2, 3), i(7, 3), i(7, 3),
             i(3, 3), i(-2, 4), i(6, 2),
             i(2, 2), i(-8, 0), i(-9, 1),
@@ -1026,7 +1027,7 @@ pub(super) mod tests {
     
         pub fn assert_is_reduced<R>(b: &Mat<R>)
         where R: IntType + LLLRing, for<'x> &'x R: IntOps<R> + LLLRingOps<R> {
-            let m = b.nrows();    
+            let m = b.n_rows();    
             let (c, l) = gram_schmidt(b);
 
             let alpha = Ratio::from(R::alpha());

@@ -1,22 +1,23 @@
-// Implementation based on:
-// 
-// "Parallel Sparse PLUQ Factorization modulo p", Charles Bouillaguet, Claire Delaplace, Marie-Emilie Voge.
-// https://hal.inria.fr/hal-01646133/document
-// 
-// see also: SpaSM (Sparse direct Solver Modulo p)
-// https://github.com/cbouilla/spasm
+//! Heuristic pivot finder for sparse PLUQ.
+//!
+//! Implementation based on:
+//!
+//! - "Parallel Sparse PLUQ Factorization modulo p", Charles Bouillaguet,
+//!   Claire Delaplace, Marie-Emilie Voge.
+//!   <https://hal.inria.fr/hal-01646133/document>
+//! - see also: SpaSM (Sparse direct Solver Modulo p),
+//!   <https://github.com/cbouilla/spasm>.
 
 use std::cmp::Ordering;
 use std::collections::VecDeque;
 use ahash::AHashSet;
 use itertools::Itertools;
 use log::*;
-use sprs::PermOwned;
 
 use yui_core::{Ring, RingOps};
 use yui_core::algo::TopSort;
+use crate::Perm;
 use super::*;
-use super::util::perm_for_indices;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "multithread")] {
@@ -30,6 +31,9 @@ cfg_if::cfg_if! {
 const LOG_THRESHOLD: usize = 10_000;
 const DEFAULT_MAX_PIVOT: usize = usize::MAX;
 
+/// Whether pivots are picked along rows (each pivot eliminates a row's
+/// other entries) or along columns. Affects how the resulting `L`/`U`
+/// blocks are oriented after reduction.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum PivotType {
     Rows, Cols
@@ -44,11 +48,16 @@ impl PivotType {
     }
 }
 
+/// Which entries are eligible as pivots:
+/// - `One` — only `±1`.
+/// - `Weight(w)` — any unit whose `c_weight()` is at most `w`.
+/// - `AnyUnit` — any unit of the ring.
 #[derive(Clone, Copy, Debug)]
 pub enum PivotCondition {
     One, Weight(f64), AnyUnit
 }
 
+/// Knobs for [`find_pivots`].
 #[derive(Clone, Copy, Debug)]
 pub struct PivotFinderConfig {
     pub piv_type: PivotType,
@@ -77,58 +86,30 @@ impl PivotCondition {
     }
 }
 
-pub fn find_pivots<R>(a: &SpMat<R>, config: PivotFinderConfig) -> Vec<(usize, usize)>
+/// Searches for pivots in `a` and returns row/column permutations `(p, q)`
+/// that bring the chosen pivots to the leading r×r block of `p·a·q⁻¹`, along
+/// with the rank `r` (number of pivots found).
+pub fn find_pivots<R>(a: &SpMat<R>, config: PivotFinderConfig) -> (Perm, Perm, usize)
 where R: Ring, for<'x> &'x R: RingOps<R> {
+    let (m, n) = a.shape();
+
     if a.is_zero() {
-        return vec![];
+        return (Perm::id(m), Perm::id(n), 0);
     }
 
     debug!("find {} pivots: {:?}", config.piv_type.str(), a.shape());
 
     let mut pf = PivotFinder::new(a, &config);
     pf.find_pivots();
+    let pivs = pf.result();
 
-    debug!("  found {} {} pivots", pf.result().len(), config.piv_type.str());
+    debug!("  found {} {} pivots", pivs.len(), config.piv_type.str());
 
-    pf.result()
-}
-
-pub fn perms_by_pivots<R>(a: &SpMat<R>, pivs: &[(usize, usize)]) -> (PermOwned, PermOwned)
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    let (m, n) = a.shape();
-    (
-        perm_for_indices(m, pivs.iter().map(|(i, _)| i)), 
-        perm_for_indices(n, pivs.iter().map(|(_, j)| j))
-    )
-}
-
-// Applies permutations (p, q) to `a` and partitions the result into four blocks at row/col r:
-//
-//   paq = [[a0 | a1],   a0: r×r,     a1: r×(n-r)
-//          [a2 | a3]]   a2: (m-r)×r, a3: (m-r)×(n-r)
-pub fn split_by_pqr<R>(a: &SpMat<R>, p: &PermOwned, q: &PermOwned, r: usize) -> [SpMat<R>; 4]
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    use std::cmp::Ordering::Less;
-
-    let (m, n) = a.shape();
-    let [mut a0, mut a1, mut a2, mut a3] = [vec![], vec![], vec![], vec![]];
-
-    for (i, j, v) in a.iter() {
-        let (pi, qj) = (p.at(i), q.at(j));
-        let v = v.clone();
-        match (pi.cmp(&r), qj.cmp(&r)) {
-            (Less, Less) => a0.push((pi,     qj,     v)),
-            (Less, _   ) => a1.push((pi,     qj - r, v)),
-            (_   , Less) => a2.push((pi - r, qj,     v)),
-            (_   , _   ) => a3.push((pi - r, qj - r, v)),
-        }
-    }
-    [
-        SpMat::from_entries((r,     r    ), a0),
-        SpMat::from_entries((r,     n - r), a1),
-        SpMat::from_entries((m - r, r    ), a2),
-        SpMat::from_entries((m - r, n - r), a3),
-    ]
+    let p = Perm::forward_indices(m, pivs.iter().map(|(i, _)| *i));
+    let q = Perm::forward_indices(n, pivs.iter().map(|(_, j)| *j));
+    let r = pivs.len();
+    
+    (p, q, r)
 }
 
 type Row = usize;
@@ -393,7 +374,7 @@ impl MatrixStr {
     where R: Ring, for<'x> &'x R: RingOps<R> {
         let shape = match piv_type {
             PivotType::Rows => a.shape(),
-            PivotType::Cols => (a.ncols(), a.nrows())
+            PivotType::Cols => (a.n_cols(), a.n_rows())
         };
         let t = match piv_type {
             PivotType::Rows => |i: usize, j: usize| (i, j),
@@ -462,8 +443,8 @@ impl PivotData {
     fn new<R>(a: &SpMat<R>, piv_type: PivotType) -> Self
     where R: Ring, for<'x> &'x R: RingOps<R> {
         let (m, n) = match piv_type {
-            PivotType::Rows => (a.nrows(), a.ncols()),
-            PivotType::Cols => (a.ncols(), a.nrows()),
+            PivotType::Rows => (a.n_rows(), a.n_cols()),
+            PivotType::Cols => (a.n_cols(), a.n_rows()),
         };
         let data = vec![None; n];
         let indices = vec![];
@@ -674,7 +655,7 @@ mod tests {
  
     #[test]
     fn str_init() {
-        let a = SpMat::from_dense_data((6, 9), [
+        let a = SpMat::from_row_major((6, 9), [
             1, 0, 1, 0, 0, 1, 1, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 2, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -698,7 +679,7 @@ mod tests {
 
     #[test]
     fn str_row_head() {
-        let a = SpMat::from_dense_data((4, 4), [
+        let a = SpMat::from_row_major((4, 4), [
             1, 0, 1, 0,
             0, 1, 1, 1,
             0, 0, 0, 0,
@@ -714,7 +695,7 @@ mod tests {
 
     #[test]
     fn rows_cols() {
-        let a = SpMat::<i32>::from_dense_data((4, 3), []);
+        let a = SpMat::<i32>::from_row_major((4, 3), []);
         let pf = PivotFinder::new(&a, &Default::default());
         assert_eq!(pf.rows(), 4);
         assert_eq!(pf.cols(), 3);
@@ -722,7 +703,7 @@ mod tests {
 
     #[test]
     fn pivot_data() { 
-        let a = SpMat::from_dense_data((2, 4), [
+        let a = SpMat::from_row_major((2, 4), [
             1, 0, 1, 0,
             0, 0, 1, 1,
         ]);
@@ -741,7 +722,7 @@ mod tests {
 
     #[test]
     fn remain_rows() {
-        let a = SpMat::from_dense_data((4, 4), [
+        let a = SpMat::from_row_major((4, 4), [
             1, 0, 1, 0,
             0, 1, 1, 1,
             0, 0, 0, 0,
@@ -762,7 +743,7 @@ mod tests {
 
     #[test]
     fn pivots() {
-        let a = SpMat::from_dense_data((4, 4), [
+        let a = SpMat::from_row_major((4, 4), [
             1, 0, 1, 0,
             0, 1, 1, 1,
             0, 0, 0, 0,
@@ -783,7 +764,7 @@ mod tests {
 
     #[test]
     fn find_fl_pivots() {
-        let a = SpMat::from_dense_data((6, 9), [
+        let a = SpMat::from_row_major((6, 9), [
             1, 0, 1, 0, 0, 1, 1, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -800,7 +781,7 @@ mod tests {
 
     #[test]
     fn find_fl_col_pivots() { 
-        let a = SpMat::from_dense_data((6, 9), [
+        let a = SpMat::from_row_major((6, 9), [
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -817,7 +798,7 @@ mod tests {
 
     #[test]
     fn find_fl_row_col_pivots() { 
-        let a = SpMat::from_dense_data((6, 9), [
+        let a = SpMat::from_row_major((6, 9), [
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -838,7 +819,7 @@ mod tests {
 
     #[test]
     fn find_cycle_free_pivots_s() {
-        let a = SpMat::from_dense_data((6, 9), [
+        let a = SpMat::from_row_major((6, 9), [
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -856,7 +837,7 @@ mod tests {
     #[cfg(feature = "multithread")]
     #[test]
     fn find_cycle_free_pivots_m() {
-        let a = SpMat::from_dense_data((6, 9), [
+        let a = SpMat::from_row_major((6, 9), [
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -872,34 +853,41 @@ mod tests {
     }
 
     #[test]
-    fn zero() { 
-        let a = SpMat::from_dense_data((1, 1), [0]);
-        let pivs = find_pivots(&a, Default::default());
-        let r = pivs.len();
+    fn zero() {
+        let a = SpMat::from_row_major((1, 1), [0]);
+        let (p, q, r) = find_pivots(&a, Default::default());
         assert_eq!(r, 0);
+        assert_eq!(p.len(), 1);
+        assert_eq!(q.len(), 1);
+        assert!(p.is_id());
+        assert!(q.is_id());
     }
 
     #[test]
-    fn id_1() { 
-        let a = SpMat::from_dense_data((1, 1), [1]);
-        let pivs = find_pivots(&a, Default::default());
-        let r = pivs.len();
+    fn id_1() {
+        let a = SpMat::from_row_major((1, 1), [1]);
+        let (p, q, r) = find_pivots(&a, Default::default());
         assert_eq!(r, 1);
+        assert_eq!(p.len(), 1);
+        assert_eq!(q.len(), 1);
+        assert!(p.is_id());
+        assert!(q.is_id());
     }
 
     #[test]
-    fn id_2() { 
-        let a = SpMat::from_dense_data((2, 2), [
+    fn id_2() {
+        let a = SpMat::from_row_major((2, 2), [
             1, 0, 0, 1
         ]);
-        let pivs = find_pivots(&a, Default::default());
-        let r = pivs.len();
+        let (p, q, r) = find_pivots(&a, Default::default());
         assert_eq!(r, 2);
+        assert_eq!(p.len(), 2);
+        assert_eq!(q.len(), 2);
     }
 
     #[test]
-    fn result() { 
-        let a = SpMat::from_dense_data((6, 9), [
+    fn result() {
+        let a = SpMat::from_row_major((6, 9), [
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -907,12 +895,12 @@ mod tests {
             0, 0, 1, 0, 0, 0, 0, 0, 0,
             0, 1, 0, 0, 0, 1, 0, 1, 0
         ]);
-        let pivs = find_pivots(&a, Default::default());
-        let r = pivs.len();
+        let (p, q, r) = find_pivots(&a, Default::default());
         assert_eq!(r, 5);
-        
-        let (p, q) = perms_by_pivots(&a, &pivs);
-        let b = a.permute(p.view(), q.view()).into_dense();
+        assert_eq!(p.len(), 6);
+        assert_eq!(q.len(), 9);
+
+        let b = a.permute(&p, &q).into_dense();
 
         assert!((0..r).all(|i| b[(i, i)].is_one()));
         assert!((0..r).all(|j| {
@@ -921,8 +909,8 @@ mod tests {
     }
 
     #[test]
-    fn result_cols() { 
-        let a = SpMat::from_dense_data((6, 9), [
+    fn result_cols() {
+        let a = SpMat::from_row_major((6, 9), [
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -931,12 +919,12 @@ mod tests {
             0, 1, 0, 0, 0, 1, 0, 1, 0
         ]);
         let config = PivotFinderConfig { piv_type: PivotType::Cols, ..Default::default() };
-        let pivs = find_pivots(&a, config);
-        let r = pivs.len();
+        let (p, q, r) = find_pivots(&a, config);
         assert_eq!(r, 6);
-        
-        let (p, q) = perms_by_pivots(&a, &pivs);
-        let b = a.permute(p.view(), q.view()).into_dense();
+        assert_eq!(p.len(), 6);
+        assert_eq!(q.len(), 9);
+
+        let b = a.permute(&p, &q).into_dense();
 
         assert!((0..r).all(|i| b[(i, i)].is_one()));
         assert!((0..r).all(|i| {
@@ -950,12 +938,12 @@ mod tests {
         let shape = (60, 80);
         let a = SpMat::<i32>::rand(shape, d);
 
-        let pivs = find_pivots(&a, Default::default());
-        let r = pivs.len();
+        let (p, q, r) = find_pivots(&a, Default::default());
         assert!(r > 10);
-        
-        let (p, q) = perms_by_pivots(&a, &pivs);
-        let b = a.permute(p.view(), q.view()).into_dense();
+        assert_eq!(p.len(), shape.0);
+        assert_eq!(q.len(), shape.1);
+
+        let b = a.permute(&p, &q).into_dense();
 
         assert!((0..r).all(|i| b[(i, i)].is_one()));
         assert!((0..r).all(|j| {
@@ -966,7 +954,7 @@ mod tests {
     #[test]
     fn max_pivots() {
         // Full rank of this matrix is 5; limiting to 3 must return ≤ 3 pivots.
-        let a = SpMat::from_dense_data((6, 9), [
+        let a = SpMat::from_row_major((6, 9), [
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -975,30 +963,16 @@ mod tests {
             0, 1, 0, 0, 0, 1, 0, 1, 0
         ]);
         let config = PivotFinderConfig { max_pivots: 3, ..Default::default() };
-        let pivs = find_pivots(&a, config);
-        assert!(pivs.len() <= 3);
+        let (p, q, r) = find_pivots(&a, config);
+        assert!(r <= 3);
+        assert_eq!(p.len(), 6);
+        assert_eq!(q.len(), 9);
 
-        let (p, q) = perms_by_pivots(&a, &pivs);
-        let b = a.permute(p.view(), q.view()).into_dense();
-        let r = pivs.len();
+        let b = a.permute(&p, &q).into_dense();
         assert!((0..r).all(|i| b[(i, i)].is_one()));
         assert!((0..r).all(|j| {
             (j+1..r).all(|i| b[(i, j)].is_zero())
         }));
     }
 
-    #[test]
-    fn test_split_by_pqr() {
-        use sprs::PermOwned;
-        // a = [[1,2],[3,4]], r=1, identity perms → paq = a, partition at row/col 1:
-        // a0=[[1]], a1=[[2]], a2=[[3]], a3=[[4]]
-        let a = SpMat::from_dense_data((2, 2), [1, 2, 3, 4]);
-        let p = PermOwned::new(vec![0, 1]);
-        let q = PermOwned::new(vec![0, 1]);
-        let [a0, a1, a2, a3] = split_by_pqr(&a, &p, &q, 1);
-        assert_eq!(a0, SpMat::from_dense_data((1, 1), [1]));
-        assert_eq!(a1, SpMat::from_dense_data((1, 1), [2]));
-        assert_eq!(a2, SpMat::from_dense_data((1, 1), [3]));
-        assert_eq!(a3, SpMat::from_dense_data((1, 1), [4]));
-    }
 }

@@ -2,28 +2,24 @@
 // Implemented with the help of Claude Code.
 
 use log::debug;
-use sprs::PermOwned;
-use sprs::PermView;
 use yui_core::{Ring, RingOps, Field, FieldOps};
 
-use crate::MatTrait;
+use crate::{MatTrait, Perm};
 use crate::dense::Mat;
 use crate::dense::pluq::pluq as dense_pluq;
-use crate::sparse::pivot::split_by_pqr;
 use super::SpMat;
 use super::SpVec;
-use super::pivot::{PivotFinderConfig, PivotType, find_pivots, perms_by_pivots};
+use super::pivot::{PivotFinderConfig, PivotType, find_pivots};
 use super::schur::Schur;
 use super::triang::{TriangularType, solve_triangular_vec};
-use super::util::perm_for_indices;
 
 /// Result of a sparse PLUQ decomposition.
 ///
 /// Satisfies `p * A * q = l * u + s` where `s` is the
 /// `(m - rank) × (n - rank)` Schur complement (bottom-right block).
 pub struct SpPluq<R> {
-    pub p: PermOwned,
-    pub q: PermOwned,
+    pub p: Perm,
+    pub q: Perm,
     pub l: SpMat<R>,
     pub u: SpMat<R>,
     pub s: SpMat<R>,
@@ -31,20 +27,20 @@ pub struct SpPluq<R> {
 
 impl<R> SpPluq<R> {
     /// Constructs a `PartialPluq` after asserting the shapes are mutually
-    /// consistent: `l.ncols() == u.nrows() = r`, `l.nrows() == p.dim() = m`,
-    /// `u.ncols() == q.dim() = n`, and `s.shape() == (m - r, n - r)`.
-    pub fn new(p: PermOwned, q: PermOwned, l: SpMat<R>, u: SpMat<R>, s: SpMat<R>) -> Self {
-        let r = l.ncols();
-        let m = l.nrows();
-        let n = u.ncols();
-        assert_eq!(r, u.nrows(), "l.ncols() must match u.nrows()");
-        assert_eq!(m, p.dim(), "l.nrows() must match p.dim()");
-        assert_eq!(n, q.dim(), "u.ncols() must match q.dim()");
+    /// consistent: `l.n_cols() == u.n_rows() = r`, `l.n_rows() == p.dim() = m`,
+    /// `u.n_cols() == q.dim() = n`, and `s.shape() == (m - r, n - r)`.
+    pub fn new(p: Perm, q: Perm, l: SpMat<R>, u: SpMat<R>, s: SpMat<R>) -> Self {
+        let r = l.n_cols();
+        let m = l.n_rows();
+        let n = u.n_cols();
+        assert_eq!(r, u.n_rows(), "l.n_cols() must match u.n_rows()");
+        assert_eq!(m, p.len(), "l.n_rows() must match p.len()");
+        assert_eq!(n, q.len(), "u.n_cols() must match q.len()");
         assert_eq!(s.shape(), (m - r, n - r), "s shape must be (m - r, n - r)");
         Self { p, q, l, u, s }
     }
 
-    pub fn rank(&self) -> usize { self.l.ncols() }
+    pub fn rank(&self) -> usize { self.l.n_cols() }
 
     pub fn take_l(&mut self) -> SpMat<R> {
         std::mem::take(&mut self.l)
@@ -65,8 +61,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn from(a: SpMat<R>) -> Self {
         let (m, n) = a.shape();
         Self::new(
-            PermOwned::identity(m),
-            PermOwned::identity(n),
+            Perm::id(m),
+            Perm::id(n),
             SpMat::zero((m, 0)),
             SpMat::zero((0, n)),
             a,
@@ -80,9 +76,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 /// Splits the permuted matrix into four blocks `[[a0|a1],[a2|a3]]` at row/col
 /// `r`, then asks Schur to fuse the triangular solve with the Schur update.
 ///
-/// Rows: top half [a0|a1] is `u` (upper triangular on the left). Schur produces
+/// Rows: top half `[a0|a1]` is `u` (upper triangular on the left). Schur produces
 ///   `l1 = a2·a0⁻¹` and `s = a3 - l1·a1`; final `l = [I_r; l1]`.
-/// Cols: left half [a0;a2] is `l` (lower triangular on top). Schur produces
+/// Cols: left half `[a0;a2]` is `l` (lower triangular on top). Schur produces
 ///   `u1 = a0⁻¹·a1` and `s = a3 - a2·u1`; final `u = [I_r | u1]`.
 pub fn pre_pluq<R>(a: &SpMat<R>, config: PivotFinderConfig) -> SpPluq<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
@@ -90,31 +86,29 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     let (m, n) = a.shape();
     let piv_type = config.piv_type;
-    let pivots = find_pivots(a, config);
-    let r = pivots.len();
+    let (p, q, r) = find_pivots(a, config);
 
     if r == 0 {
-        return SpPluq::new(PermOwned::identity(m), PermOwned::identity(n), SpMat::zero((m, 0)), SpMat::zero((0, n)), a.clone());
+        return SpPluq::new(Perm::id(m), Perm::id(n), SpMat::zero((m, 0)), SpMat::zero((0, n)), a.clone());
     }
 
-    let (p, q) = perms_by_pivots(a, &pivots);
-    let [a0, a1, a2, a3] = split_by_pqr(a, &p, &q, r);
+    let [a0, a1, a2, a3] = a.permute_and_split(&p, &q, r);
 
     let (l, u, s) = match piv_type {
         PivotType::Rows => {
             let sch = Schur::from_blocks(TriangularType::Upper, [&a0, &a1, &a2, &a3], false, true);
             let (s, _, row_mult) = sch.disassemble();
             let l1 = row_mult.unwrap();
-            let u = SpMat::concat(a0, a1);          // u = [a0 | a1]
-            let l = SpMat::stack(SpMat::id(r), l1); // l = [I_r ; l1]
+            let u = SpMat::h_stack(a0, a1);          // u = [a0 | a1]
+            let l = SpMat::v_stack(SpMat::id(r), l1); // l = [I_r ; l1]
             (l, u, s)
         },
         PivotType::Cols => {
             let sch = Schur::from_blocks(TriangularType::Lower, [&a0, &a1, &a2, &a3], true, false);
             let (s, col_mult, _) = sch.disassemble();
             let u1 = col_mult.unwrap();
-            let l = SpMat::stack(a0, a2);            // l = [a0 ; a2]
-            let u = SpMat::concat(SpMat::id(r), u1); // u = [I_r | u1]
+            let l = SpMat::v_stack(a0, a2);            // l = [a0 ; a2]
+            let u = SpMat::h_stack(SpMat::id(r), u1); // u = [I_r | u1]
             (l, u, s)
         }
     };
@@ -158,8 +152,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let raw = dense_pluq(&mat);
     let dp = if transpose { raw.transpose() } else { raw };
 
-    let p2 = extend_perm(&dp.p, &row_idx, ms);
-    let q2 = extend_perm(&dp.q, &col_idx, ns);
+    let p2 = extend_perm(ms, &row_idx, dp.p);
+    let q2 = extend_perm(ns, &col_idx, dp.q);
 
     let mut l2 = SpMat::from(dp.l);
     l2.extend_by_zero(ms - m0, 0);
@@ -184,8 +178,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let col_idx: Vec<usize> = s.iter_nz().map(|(_, j, _)| j).collect::<BTreeSet<_>>().into_iter().collect();
     let (m0, n0) = (row_idx.len(), col_idx.len());
 
-    let row_perm = perm_for_indices(s.nrows(), row_idx.iter());
-    let col_perm = perm_for_indices(s.ncols(), col_idx.iter());
+    let row_perm = Perm::forward_indices(s.n_rows(), row_idx.iter().copied());
+    let col_perm = Perm::forward_indices(s.n_cols(), col_idx.iter().copied());
 
     let shape = if transpose { (n0, m0) } else { (m0, n0) };
     let mut mat = Mat::zero(shape);
@@ -210,34 +204,33 @@ fn merge_pluq<R>(pp1: &mut SpPluq<R>, pp2: SpPluq<R>)
 where R: Ring, for<'x> &'x R: RingOps<R> {
     debug!("merge pluq: {} + {}", pp1.rank(), pp2.rank());
 
-    let (m, n) = (pp1.l.nrows(), pp1.u.ncols());
+    let (m, n) = (pp1.l.n_rows(), pp1.u.n_cols());
     let r1 = pp1.rank();
     let r2 = pp2.rank();
 
-    assert_eq!(pp2.l.nrows(), m - r1);
-    assert_eq!(pp2.u.ncols(), n - r1);
+    assert_eq!(pp2.l.n_rows(), m - r1);
+    assert_eq!(pp2.u.n_cols(), n - r1);
 
-    // MEMO: Even if r2 == 0, there could be non-trivial permutations 
-    // when R is not a field. 
-
-    pp1.p = merge_perm(&pp1.p, &pp2.p);
-    pp1.q = merge_perm(&pp1.q, &pp2.q);
+    // MEMO: Even if r2 == 0, there could be non-trivial permutations
+    // when R is not a field.
 
     pp1.l = {
-        let [l0, l1] = pp1.take_l().divide_at_row(r1);
-        let l1 = l1.permute_rows(pp2.p.view());
+        let [l0, l1] = pp1.take_l().v_split(r1);
+        let l1 = l1.permute_rows(&pp2.p);
         let zero_tr = SpMat::zero((r1, r2));
-        SpMat::combine_blocks([l0, zero_tr, l1, pp2.l])
+        SpMat::block_combine([l0, zero_tr, l1, pp2.l])
     };
 
     pp1.u = {
-        let [u0, u1] = pp1.take_u().divide_at_col(r1);
-        let u1 = u1.permute_cols(pp2.q.view());
+        let [u0, u1] = pp1.take_u().h_split(r1);
+        let u1 = u1.permute_cols(&pp2.q);
         let zero_bl = SpMat::zero((r2, r1));
-        SpMat::combine_blocks([u0, u1, zero_bl, pp2.u])
+        SpMat::block_combine([u0, u1, zero_bl, pp2.u])
     };
 
     pp1.s = pp2.s;
+    pp1.p = merge_perm(&pp1.p, pp2.p);
+    pp1.q = merge_perm(&pp1.q, pp2.q);
 }
 
 /// Solves `a * x = y` over a field using sparse PLUQ.
@@ -247,7 +240,7 @@ pub fn solve_pluq<R>(a: &SpMat<R>, y: &SpVec<R>) -> Option<SpVec<R>>
 where R: Field, for<'x> &'x R: FieldOps<R> {
     debug!("solve pluq, a: {:?}", a.shape());
 
-    assert_eq!(y.dim(), a.nrows());
+    assert_eq!(y.dim(), a.n_rows());
 
     let pp = pluq(a, PivotFinderConfig {
         piv_type: PivotType::Rows,
@@ -255,26 +248,26 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
     });
 
     let y_dense = y.clone().into_dense();
-    let yp = perm_apply(pp.p.view(), &y_dense);
+    let yp = pp.p.apply_to(y_dense);
     let xq = solve_lu(&pp.l, &pp.u, &yp)?;
-    let x = perm_apply(pp.q.inv(), &xq);
+    let x = pp.q.apply_inv_to(xq);
 
     Some(SpVec::from(x))
 }
 
-// Solves `L * U * x = y` and returns `x` of length `n = u.ncols()` with
-// entries beyond `r = l.ncols()` set to zero (free variables = 0).
+// Solves `L * U * x = y` and returns `x` of length `n = u.n_cols()` with
+// entries beyond `r = l.n_cols()` set to zero (free variables = 0).
 //
 // Requires the top r × r block of L to be unit lower triangular and the top
 // r × r block of U to be invertible upper triangular.
 //
 // Returns `None` when `solve_l(l, y, true)` detects an inconsistent residual.
-// When `l` is square (`l.nrows() == r`) the residual is empty and the call
+// When `l` is square (`l.n_rows() == r`) the residual is empty and the call
 // always succeeds.
 fn solve_lu<R>(l: &SpMat<R>, u: &SpMat<R>, y: &[R]) -> Option<Vec<R>>
 where R: Field, for<'x> &'x R: FieldOps<R> {
-    assert_eq!(l.ncols(), u.nrows());
-    assert_eq!(y.len(), l.nrows());
+    assert_eq!(l.n_cols(), u.n_rows());
+    assert_eq!(y.len(), l.n_rows());
 
     let z = solve_l(l, y, true)?;
     let x = solve_u(u, &z);
@@ -283,7 +276,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
 }
 
 // Solves `l[0..r, 0..r] * z = y[0..r]` by forward substitution, where
-// `r = l.ncols()`. The top r × r block of L must be lower triangular with
+// `r = l.n_cols()`. The top r × r block of L must be lower triangular with
 // non-zero diagonal.
 //
 // If `check_consistency` is true and `r < y.len()`, also verifies the residual
@@ -291,8 +284,8 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
 // y.len()` the residual is trivially empty so the check is skipped.
 fn solve_l<R>(l: &SpMat<R>, y: &[R], check_consistency: bool) -> Option<Vec<R>>
 where R: Field, for<'x> &'x R: FieldOps<R> {
-    assert_eq!(l.nrows(), y.len());
-    let r = l.ncols();
+    assert_eq!(l.n_rows(), y.len());
+    let r = l.n_cols();
 
     let x = if r == y.len() {
         let y = SpVec::from(y.to_vec());
@@ -319,8 +312,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 fn is_consistent_upto<R>(l: &SpMat<R>, y: &[R], x: &[R], k: usize) -> bool
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    assert_eq!(l.nrows(), y.len());
-    assert_eq!(l.ncols(), x.len());
+    assert_eq!(l.n_rows(), y.len());
+    assert_eq!(l.n_cols(), x.len());
     assert!(x.len() <= k && k <= y.len());
 
     let r = x.len();
@@ -336,7 +329,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 // Solves `u[0..r, 0..r] * x[..r] = y` by back-substitution, where
-// `r = u.nrows()`, and returns `x` of length `n = u.ncols()` with entries
+// `r = u.n_rows()`, and returns `x` of length `n = u.n_cols()` with entries
 // beyond `r` set to zero. The top r × r block of U must be upper triangular
 // with non-zero diagonal.
 fn solve_u<R>(u: &SpMat<R>, y: &[R]) -> Vec<R>
@@ -366,7 +359,7 @@ pub fn solve_pluq_incr<R>(a: &SpMat<R>, y: &SpVec<R>, max_piv: usize, chunk: usi
 where R: Field, for<'x> &'x R: FieldOps<R> {
     debug!("solve pluq (incremental), a: {:?}", a.shape());
 
-    assert_eq!(y.dim(), a.nrows());
+    assert_eq!(y.dim(), a.n_rows());
 
     let mut pp = pre_pluq(a, PivotFinderConfig {
         piv_type: PivotType::Rows,
@@ -374,12 +367,12 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
         ..Default::default()
     });
     let y_dense = y.clone().into_dense();
-    let mut yp = perm_apply(pp.p.view(), &y_dense);
+    let mut yp = pp.p.apply_to(y_dense);
 
     let mut step = 1;
-    let total_step = (a.nrows() - pp.rank()) / chunk + 1;
+    let total_step = (a.n_rows() - pp.rank()) / chunk + 1;
 
-    while pp.s.nrows() > 0 {
+    while pp.s.n_rows() > 0 {
         debug!("(step {}/{})", step, total_step);
         debug!("  current rank: {}", pp.rank());
 
@@ -390,7 +383,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
         merge_pluq(&mut pp, pp_next);
 
         // Apply the chunk's row perm to the tail of yp so it stays in sync with pp.l.
-        let yp_tail = perm_apply(p_next.view(), &yp[r_old..]);
+        let yp_tail = p_next.apply_to(yp[r_old..].to_vec());
         yp[r_old..].clone_from_slice(&yp_tail);
 
         // The top `k` rows of pp.s are zero rows (chunk's PLUQ leftover);
@@ -412,18 +405,18 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
     debug!("solve pluq..");
 
     let xq = solve_lu(&pp.l, &pp.u, &yp)?;
-    let x = perm_apply(pp.q.inv(), &xq);
+    let x = pp.q.apply_inv_to(xq);
 
     Some(SpVec::from(x))
 }
 
-// Takes the top `min(chunk_size, s.nrows())` rows of `s`, runs `pluq` on them,
+// Takes the top `min(chunk_size, s.n_rows())` rows of `s`, runs `pluq` on them,
 // and lifts the result to act on all of `s` via `extend_chunk_to_full`.
 // Returns `(pp_chunk_full, r_chunk, c)`.
 fn chunk_pluq<R>(s: SpMat<R>, chunk_size: usize) -> (SpPluq<R>, usize, usize)
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let c = chunk_size.min(s.nrows());
-    let [s_chunk, s_rest] = s.divide_at_row(c);
+    let c = chunk_size.min(s.n_rows());
+    let [s_chunk, s_rest] = s.v_split(c);
     let pp_chunk = pluq(&s_chunk, PivotFinderConfig {
         piv_type: PivotType::Rows,
         ..Default::default()
@@ -441,17 +434,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 // Sparse analog of `dense_pluq_in`, applied to a single chunk.
 fn extend_chunk_to_full<R>(pp_chunk: SpPluq<R>, s_rest: SpMat<R>) -> SpPluq<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let (c, n_s) = (pp_chunk.l.nrows(), pp_chunk.u.ncols());
+    let (c, n_s) = (pp_chunk.l.n_rows(), pp_chunk.u.n_cols());
     let r_chunk = pp_chunk.rank();
-    let m_rest = s_rest.nrows();
+    let m_rest = s_rest.n_rows();
     let m_s = c + m_rest;
 
-    assert_eq!(s_rest.ncols(), n_s);
+    assert_eq!(s_rest.n_cols(), n_s);
     assert_eq!(pp_chunk.s.shape(), (c - r_chunk, n_s - r_chunk));
 
-    let s_rest_q = s_rest.permute_cols(pp_chunk.q.view());
-    let [s_rest_left, s_rest_right] = s_rest_q.divide_at_col(r_chunk);
-    let [u_top, u_right] = pp_chunk.u.clone().divide_at_col(r_chunk);
+    let s_rest_q = s_rest.permute_cols(&pp_chunk.q);
+    let [s_rest_left, s_rest_right] = s_rest_q.h_split(r_chunk);
+    let [u_top, u_right] = pp_chunk.u.clone().h_split(r_chunk);
 
     // Same Schur shape as pre_pluq's Rows branch: u_top (upper triangular) plays
     // the role of `a`, with `c = s_rest_left`, `b = u_right`, `d = s_rest_right`.
@@ -464,11 +457,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let l_ext = row_mult.unwrap();
 
     let chunk_idx: Vec<usize> = (0..c).collect();
-    let p = extend_perm(&pp_chunk.p, &chunk_idx, m_s);
+    let p = extend_perm(m_s, &chunk_idx, pp_chunk.p);
     let q = pp_chunk.q;
-    let l = SpMat::stack(pp_chunk.l, l_ext);
+    let l = SpMat::v_stack(pp_chunk.l, l_ext);
     let u = pp_chunk.u;
-    let s = SpMat::stack(pp_chunk.s, s_ext);
+    let s = SpMat::v_stack(pp_chunk.s, s_ext);
 
     SpPluq::new(p, q, l, u, s)
 }
@@ -483,10 +476,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     if k == 0 { return; }
 
     let r = pp.rank();
-    let m = pp.l.nrows();
+    let m = pp.l.n_rows();
     assert!(r + k <= m);
     assert_eq!(yp.len(), m);
-    assert_eq!(pp.p.dim(), m);
+    assert_eq!(pp.p.len(), m);
 
     // Drop rows [r..r+k] from pp.l: keep [0..r] and [r+k..m], shifted down.
     pp.l = pp.l.extract((m - k, r), |i, j| {
@@ -500,7 +493,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     });
 
     // Drop the top k rows of pp.s.
-    pp.s = pp.s.submat_rows(k..pp.s.nrows());
+    pp.s = pp.s.submat_rows(k..pp.s.n_rows());
 
     // Drop yp entries [r..r+k] to stay in sync with pp.l.
     yp.drain(r..r + k);
@@ -516,38 +509,28 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             Some(pos - k)
         }
     }).collect();
-    pp.p = PermOwned::new(new_p_at);
+    pp.p = Perm::new(new_p_at);
 }
 
 // Composes perm1 with perm2: the first `r` positions stay, the rest are
-// shifted by `r` and remapped by perm2 (where `r = perm1.dim() - perm2.dim()`).
-fn merge_perm(perm1: &PermOwned, perm2: &PermOwned) -> PermOwned {
-    assert!(perm1.dim() >= perm2.dim());
-    let n = perm1.dim();
-    let r = n - perm2.dim();
-    PermOwned::new((0..n).map(|i| {
-        let j = perm1.at(i);
-        if j < r { j } else { r + perm2.at(j - r) }
-    }).collect())
+// shifted by `r` and remapped by perm2 (where `r = perm1.len() - perm2.len()`).
+fn merge_perm(perm1: &Perm, perm2: Perm) -> Perm {
+    assert!(perm1.len() >= perm2.len());
+    let r = perm1.len() - perm2.len();
+    perm2.shift(r) * perm1
 }
 
-// Lifts a compact permutation (acting on compact_idx elements of [0..full_n]) to the
+// Lifts a compact permutation (acting on compact_idx elements of [0..n]) to the
 // full index space.  compact_idx[k] maps to compact_perm.at(k) (within [0..mr]);
 // all other indices map to consecutive positions starting at mr (in sorted order).
-fn extend_perm(compact_perm: &PermOwned, compact_idx: &[usize], full_n: usize) -> PermOwned {
-    let front = perm_for_indices(full_n, compact_idx.iter());
-    let mr = compact_idx.len();
-    PermOwned::new((0..full_n).map(|i| {
-        let k = front.at(i);
-        if k < mr { compact_perm.at(k) } else { k }
-    }).collect())
-}
+fn extend_perm(n: usize, compact_idx: &[usize], compact_perm: Perm) -> Perm {
+    let c = compact_idx.len();
 
-// Applies permutation p to y: yp[p(i)] = y[i].
-fn perm_apply<R>(p: PermView, y: &[R]) -> Vec<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    let pinv = p.inv();
-    (0..y.len()).map(|i| y[pinv.at(i)].clone()).collect()
+    assert!(n >= c);
+    assert_eq!(compact_perm.len(), c);
+
+    let front = Perm::forward_indices(n, compact_idx.iter().copied());
+    compact_perm.extend(n - c) * front
 }
 
 #[cfg(test)]
@@ -560,7 +543,7 @@ mod tests {
     }
 
     fn sample() -> SpMat<i32> {
-        SpMat::from_dense_data((6, 9), [
+        SpMat::from_row_major((6, 9), [
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
             0, 0, 1, 1, 0, 0, 0, 1, 1,
@@ -581,7 +564,7 @@ mod tests {
         assert_eq!(pp.u.shape(), (r, n));
         assert_eq!(pp.s.shape(), (m - r, n - r));
 
-        let paq = a.permute(pp.p.view(), pp.q.view());
+        let paq = a.permute(&pp.p, &pp.q);
         let rem_full = SpMat::from_entries((m, n),
             pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
         );
@@ -607,7 +590,7 @@ mod tests {
         assert_eq!(pp.u.shape(), (r, n));
         assert_eq!(pp.s.shape(), (m - r, n - r));
 
-        let paq = a.permute(pp.p.view(), pp.q.view());
+        let paq = a.permute(&pp.p, &pp.q);
         let rem_full = SpMat::from_entries((m, n),
             pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
         );
@@ -638,12 +621,12 @@ mod tests {
         assert_eq!(pp.l.shape(), (4, 0));
         assert_eq!(pp.u.shape(), (0, 5));
         assert_eq!(pp.s.shape(), (4, 5)); // (m-r, n-r) = (4, 5) when r=0
-        assert_eq!(pp.s, a.permute(pp.p.view(), pp.q.view()));
+        assert_eq!(pp.s, a.permute(&pp.p, &pp.q));
     }
 
     #[test]
     fn test_pre_pluq_square_full_rank() {
-        let a = SpMat::from_dense_data((3, 3), [1, 0, 0, 0, 1, 0, 0, 0, 1]);
+        let a = SpMat::from_row_major((3, 3), [1, 0, 0, 0, 1, 0, 0, 0, 1]);
         let pp = pre_pluq(&a, cfg(PivotType::Rows));
         assert_eq!(pp.rank(), 3);
         assert_eq!(pp.s.shape(), (0, 0)); // full rank: Schur complement is empty
@@ -676,7 +659,7 @@ mod tests {
         assert_eq!(pp.u.shape(), (r, n));
         assert_eq!(pp.s.shape(), (m - r, n - r));
 
-        let paq = a.permute(pp.p.view(), pp.q.view());
+        let paq = a.permute(&pp.p, &pp.q);
         let rem = SpMat::from_entries((m, n),
             pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
         );
@@ -699,7 +682,7 @@ mod tests {
         assert_eq!(pp.u.shape(), (r, n));
         assert_eq!(pp.s.shape(), (m - r, n - r));
 
-        let paq = a.permute(pp.p.view(), pp.q.view());
+        let paq = a.permute(&pp.p, &pp.q);
         let rem = SpMat::from_entries((m, n),
             pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
         );
@@ -721,21 +704,21 @@ mod tests {
         // Non-zero entries: (0,0)=1, (0,2)=2, (2,0)=3, (2,2)=4.
         // row_idx=[0,2], col_idx=[0,2].
         // S0 (2×2) = [[1,2],[3,4]].
-        let s = SpMat::from_dense_data((3, 3), [1i32, 0, 2, 0, 0, 0, 3, 0, 4]);
+        let s = SpMat::from_row_major((3, 3), [1i32, 0, 2, 0, 0, 0, 3, 0, 4]);
         let (row_idx, col_idx, mat) = extract_dense(&s, false);
         assert_eq!(row_idx, vec![0usize, 2]);
         assert_eq!(col_idx, vec![0usize, 2]);
-        assert_eq!(mat, crate::dense::Mat::from_data((2, 2), [1i32, 2, 3, 4]));
+        assert_eq!(mat, crate::dense::Mat::from_row_major((2, 2), [1i32, 2, 3, 4]));
     }
 
     #[test]
     fn test_extract_dense_transpose() {
         // Same S, but with transpose=true.  S0^T (2×2) = [[1,3],[2,4]].
-        let s = SpMat::from_dense_data((3, 3), [1i32, 0, 2, 0, 0, 0, 3, 0, 4]);
+        let s = SpMat::from_row_major((3, 3), [1i32, 0, 2, 0, 0, 0, 3, 0, 4]);
         let (row_idx, col_idx, mat) = extract_dense(&s, true);
         assert_eq!(row_idx, vec![0usize, 2]);
         assert_eq!(col_idx, vec![0usize, 2]);
-        assert_eq!(mat, crate::dense::Mat::from_data((2, 2), [1i32, 3, 2, 4]));
+        assert_eq!(mat, crate::dense::Mat::from_row_major((2, 2), [1i32, 3, 2, 4]));
     }
 
     // ---- dense_pluq_in ----
@@ -749,7 +732,7 @@ mod tests {
         assert_eq!(pp.u.shape(), (r, ns));
         assert_eq!(pp.s.shape(), (ms - r, ns - r));
 
-        let psq = s.permute(pp.p.view(), pp.q.view());
+        let psq = s.permute(&pp.p, &pp.q);
         let rem = SpMat::from_entries((ms, ns),
             pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
         );
@@ -759,13 +742,13 @@ mod tests {
     #[test]
     fn test_dense_pluq_in_cols_with_zero_row_and_col() {
         // S has a zero row (row 1) and a zero col (col 1).
-        let s = SpMat::from_dense_data((3, 3), [1i32, 0, 2, 0, 0, 0, 3, 0, 4]);
+        let s = SpMat::from_row_major((3, 3), [1i32, 0, 2, 0, 0, 0, 3, 0, 4]);
         check_dense_pluq_in(&s, PivotType::Cols);
     }
 
     #[test]
     fn test_dense_pluq_in_rows_with_zero_row_and_col() {
-        let s = SpMat::from_dense_data((3, 3), [1i32, 0, 2, 0, 0, 0, 3, 0, 4]);
+        let s = SpMat::from_row_major((3, 3), [1i32, 0, 2, 0, 0, 0, 3, 0, 4]);
         check_dense_pluq_in(&s, PivotType::Rows);
     }
 
@@ -779,7 +762,7 @@ mod tests {
     #[test]
     fn test_dense_pluq_in_no_zero_rows_or_cols() {
         // No zero rows/cols: compact_dense gives the full matrix.
-        let s = SpMat::from_dense_data((3, 3), [1i32,2,3,4,5,6,7,8,9]);
+        let s = SpMat::from_row_major((3, 3), [1i32,2,3,4,5,6,7,8,9]);
         check_dense_pluq_in(&s, PivotType::Cols);
         check_dense_pluq_in(&s, PivotType::Rows);
     }
@@ -810,7 +793,7 @@ mod tests {
     fn r(n: i64) -> R { R::from(n) }
     
     fn sp_mat(shape: (usize, usize), data: impl IntoIterator<Item = R>) -> SpMat<R> {
-        SpMat::from_dense_data(shape, data)
+        SpMat::from_row_major(shape, data)
     }
 
     fn sp_vec(data: impl IntoIterator<Item = R>) -> SpVec<R> {
@@ -981,7 +964,7 @@ mod tests {
     fn check_extend_chunk(s: &SpMat<i32>, c: usize) {
         let (m, n) = s.shape();
         assert!(c <= m);
-        let [s_top, s_rest] = s.clone().divide_at_row(c);
+        let [s_top, s_rest] = s.clone().v_split(c);
         let pp_chunk = pluq(&s_top, cfg(PivotType::Rows));
         let pp = extend_chunk_to_full(pp_chunk, s_rest);
         let r = pp.rank();
@@ -990,7 +973,7 @@ mod tests {
         assert_eq!(pp.u.shape(), (r, n));
         assert_eq!(pp.s.shape(), (m - r, n - r));
 
-        let psq = s.permute(pp.p.view(), pp.q.view());
+        let psq = s.permute(&pp.p, &pp.q);
         let rem = SpMat::from_entries((m, n),
             pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
         );
@@ -1024,7 +1007,7 @@ mod tests {
         assert_eq!(pp.u.shape(), (r, n));
         assert_eq!(pp.s.shape(), (m - r, n - r));
 
-        let psq = s.permute(pp.p.view(), pp.q.view());
+        let psq = s.permute(&pp.p, &pp.q);
         let rem = SpMat::from_entries((m, n),
             pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
         );
@@ -1034,7 +1017,7 @@ mod tests {
     #[test]
     fn test_chunk_pluq_oversize() {
         let s = sample();
-        let m = s.nrows();
+        let m = s.n_rows();
         let (_, _, c) = chunk_pluq(s, 100);
         assert_eq!(c, m);
     }
@@ -1146,7 +1129,6 @@ mod tests {
 
     #[test]
     fn test_merge_perm() {
-        use sprs::PermOwned;
         // perm1 (size 5) = [2, 0, 3, 1, 4]; r = 2; perm2 (size 3) = [1, 2, 0].
         // For each i in 0..5, let j = perm1.at(i):
         //   i=0: j=2 ≥ r → r + perm2.at(0) = 2 + 1 = 3
@@ -1154,9 +1136,9 @@ mod tests {
         //   i=2: j=3 ≥ r → r + perm2.at(1) = 2 + 2 = 4
         //   i=3: j=1 < r → 1
         //   i=4: j=4 ≥ r → r + perm2.at(2) = 2 + 0 = 2
-        let perm1 = PermOwned::new(vec![2, 0, 3, 1, 4]);
-        let perm2 = PermOwned::new(vec![1, 2, 0]);
-        let p = merge_perm(&perm1, &perm2);
+        let perm1 = Perm::from_indices([2, 0, 3, 1, 4]);
+        let perm2 = Perm::from_indices([1, 2, 0]);
+        let p = merge_perm(&perm1, perm2);
         for (i, expected) in [3, 0, 4, 1, 2].iter().enumerate() {
             assert_eq!(p.at(i), *expected, "mismatch at i={i}");
         }
@@ -1166,7 +1148,6 @@ mod tests {
 
     #[test]
     fn test_extend_perm() {
-        use sprs::PermOwned;
         // compact_idx = [1, 3] in full space of size 5.
         // compact_perm swaps the two: at(0)=1, at(1)=0.
         // Expected:
@@ -1174,9 +1155,9 @@ mod tests {
         //   i=3 (compact_idx[1]) -> compact_perm.at(1) = 0
         //   rest = [0,2,4] -> positions [2,3,4]
         //     i=0 -> 2,  i=2 -> 3,  i=4 -> 4
-        let cp = PermOwned::new(vec![1, 0]);
+        let cp = Perm::from_indices([1, 0]);
         let idx = vec![1usize, 3];
-        let p = extend_perm(&cp, &idx, 5);
+        let p = extend_perm(5, &idx, cp);
         assert_eq!(p.at(0), 2);
         assert_eq!(p.at(1), 1);
         assert_eq!(p.at(2), 3);
@@ -1186,27 +1167,15 @@ mod tests {
 
     #[test]
     fn test_extend_perm_identity() {
-        use sprs::PermOwned;
         // compact_idx = [0, 2, 5] with identity compact_perm.
-        // extend_perm should equal perm_for_indices(7, [0,2,5]).
-        let cp = PermOwned::identity(3);
+        // extend_perm should equal Perm::forward_indices(7, [0,2,5]).
+        let cp = Perm::id(3);
         let idx = vec![0usize, 2, 5];
-        let p = extend_perm(&cp, &idx, 7);
-        let expected = perm_for_indices(7, idx.iter());
+        let p = extend_perm(7, &idx, cp);
+        let expected = Perm::forward_indices(7, idx.iter().copied());
         for i in 0..7 {
             assert_eq!(p.at(i), expected.at(i), "mismatch at i={i}");
         }
     }
 
-    // ---- perm_apply ----
-
-    #[test]
-    fn test_perm_apply() {
-        use sprs::PermOwned;
-        let p = PermOwned::new(vec![1, 2, 0]); // 0→1, 1→2, 2→0
-        let y = vec![r(10), r(20), r(30)];
-        let yp = perm_apply(p.view(), &y);
-        // yp[p(0)=1]=10, yp[p(1)=2]=20, yp[p(2)=0]=30
-        assert_eq!(yp, vec![r(30), r(10), r(20)]);
-    }
 }

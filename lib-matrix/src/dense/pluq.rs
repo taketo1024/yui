@@ -2,9 +2,8 @@
 
 use log::debug;
 use nalgebra::Scalar;
-use sprs::PermOwned;
 use yui_core::{Ring, RingOps, Field, FieldOps};
-use crate::MatTrait;
+use crate::{MatTrait, Perm};
 use crate::dense::Mat;
 
 /// Result of a PLUQ decomposition satisfying `p_mat * A * q_mat = L * U + s`:
@@ -14,15 +13,15 @@ use crate::dense::Mat;
 ///   - `u`: `rank × n`, unit upper triangular — elimination multipliers
 ///   - `s`: `(m - rank) × (n - rank)`, Schur complement — zero when `R` is a field
 pub struct Pluq<R> {
-    pub p: PermOwned,
-    pub q: PermOwned,
+    pub p: Perm,
+    pub q: Perm,
     pub l: Mat<R>,
     pub u: Mat<R>,
     pub s: Mat<R>,
 }
 
 impl<R> Pluq<R> {
-    pub fn rank(&self) -> usize { self.l.ncols() }
+    pub fn rank(&self) -> usize { self.l.n_cols() }
 }
 
 impl<R: Scalar> Pluq<R> {
@@ -53,11 +52,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     let (pivot_rows, u) = reduce(&mut work, &mut col_of);
     let rank = pivot_rows.len();
-    let q = col_perm(&col_of, n);
-    let rows = row_order(&pivot_rows, m);
-    let p = row_perm(&rows, m);
-    let l = build_l(&work, &rows, rank);
-    let s = build_s(&work, &rows, rank);
+    let p = Perm::forward_indices(m, pivot_rows.iter().copied());
+    let q = Perm::from_indices(col_of).inv();
+    let p_inv = p.inv();
+    let l = build_l(&work, &p_inv, rank);
+    let s = build_s(&work, &p_inv, rank);
 
     Pluq { p, q, l, u, s }
 }
@@ -70,9 +69,9 @@ pub fn solve_pluq<R>(a: &Mat<R>, y: &[R]) -> Option<Vec<R>>
 where R: Field, for<'x> &'x R: FieldOps<R> {
     debug!("dense solve: {:?}", a.shape());
 
-    assert_eq!(y.len(), a.nrows());
+    assert_eq!(y.len(), a.n_rows());
     let Pluq { p, q, l, u, .. } = pluq(a);
-    let yp = apply_perm(&p, y);
+    let yp = p.apply_to(y.to_vec());
 
     debug!("forward sub: {:?}", l.shape());
 
@@ -85,16 +84,10 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
     Some((0..xp.len()).map(|j| xp[q.at(j)].clone()).collect())
 }
 
-// Applies permutation p to y: result[k] = y[p^{-1}(k)], i.e., result[p(i)] = y[i].
-fn apply_perm<R: Clone>(p: &PermOwned, y: &[R]) -> Vec<R> {
-    let pinv = p.inv();
-    (0..y.len()).map(|k| y[pinv.at(k)].clone()).collect()
-}
-
 // Solves L * z = yp[0..rank] by forward substitution (L is lower triangular, pivot values on diagonal).
 fn forward_sub<R>(l: &Mat<R>, yp: &[R]) -> Vec<R>
 where R: Field, for<'x> &'x R: FieldOps<R> {
-    (0..l.ncols()).fold(vec![], |mut z, k| {
+    (0..l.n_cols()).fold(vec![], |mut z, k| {
         let pivot_inv = l[(k, k)].inv().unwrap();
         let val = (0..k).fold(yp[k].clone(), |v, j| v - &l[(k, j)] * &z[j]) * pivot_inv;
         z.push(val);
@@ -114,7 +107,7 @@ where R: Ring + PartialEq, for<'x> &'x R: RingOps<R> {
 // Solves U * xp = z by back substitution (U is unit upper triangular); free variables xp[rank..n] stay zero.
 fn back_sub<R>(u: &Mat<R>, z: &[R]) -> Vec<R>
 where R: Field, for<'x> &'x R: FieldOps<R> {
-    let (rank, n) = (z.len(), u.ncols());
+    let (rank, n) = (z.len(), u.n_cols());
     (0..rank).rev().fold(vec![R::zero(); n], |mut xp, k| {
         xp[k] = (k + 1..rank).fold(z[k].clone(), |v, j| v - &u[(k, j)] * &xp[j]);
         xp
@@ -151,7 +144,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     let rank = pivot_rows.len();
-    let u = Mat::from_generator((rank, n), |k, j| u_rows[k][j].clone());
+    let u = Mat::generate((rank, n), |k, j| u_rows[k][j].clone());
     (pivot_rows, u)
 }
 
@@ -160,7 +153,7 @@ fn build_u_row<R>(work: &Mat<R>, i: usize, c: usize) -> Vec<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     use std::cmp::Ordering::*;
     let pivot_inv = work[(i, c)].inv().unwrap();
-    (0..work.ncols()).map(|j| match j.cmp(&c) {
+    (0..work.n_cols()).map(|j| match j.cmp(&c) {
         Less    => R::zero(),
         Equal   => R::one(),
         Greater => work[(i, j)].clone() * pivot_inv.clone(),
@@ -170,45 +163,24 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 // Subtracts `u_row[j] * col_c` from each column `j > c`, zeroing out the pivot row to the right.
 fn eliminate_right<R>(work: &mut Mat<R>, u_row: &[R], c: usize)
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    let n = work.ncols();
+    let n = work.n_cols();
     (c + 1..n)
         .filter(|&j| !u_row[j].is_zero())
         .for_each(|j| work.add_col_to(c, j, &-u_row[j].clone()));
 }
 
-// Builds the row permutation: p.at(orig) = current position of that row.
-fn row_perm(row_of: &[usize], m: usize) -> PermOwned {
-    PermOwned::new(row_of.iter().enumerate().fold(vec![0usize; m], |mut v, (pos, &orig)| {
-        v[orig] = pos; v
-    }))
-}
-
-// Returns the full row reordering: pivot rows first, non-pivot rows last.
-fn row_order(pivot_rows: &[usize], m: usize) -> Vec<usize> {
-    use std::collections::HashSet;
-    let pivot_set: HashSet<usize> = pivot_rows.iter().cloned().collect();
-    pivot_rows.iter().cloned().chain((0..m).filter(|i| !pivot_set.contains(i))).collect()
-}
-
-// Builds the column permutation from the full ordered column list.
-fn col_perm(cols: &[usize], n: usize) -> PermOwned {
-    PermOwned::new(cols.iter().enumerate().fold(vec![0usize; n], |mut v, (new_j, &old_j)| {
-        v[old_j] = new_j; v
-    }))
-}
-
-// Extracts L: the first `rank` columns of the reduced matrix with rows reordered by `rows`.
-fn build_l<R>(work: &Mat<R>, rows: &[usize], rank: usize) -> Mat<R>
+// Extracts L: the first `rank` columns of the reduced matrix with rows reordered by `p_inv`.
+fn build_l<R>(work: &Mat<R>, p_inv: &Perm, rank: usize) -> Mat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    Mat::from_generator((work.nrows(), rank), |i, k| work[(rows[i], k)].clone())
+    Mat::generate((work.n_rows(), rank), |i, k| work[(p_inv.at(i), k)].clone())
 }
 
 // Builds the Schur complement s: (m-rank)×(n-rank), the bottom-right non-pivot block.
 // Satisfies p*A*q = L*U + [[0,0],[0,s]].
-fn build_s<R>(work: &Mat<R>, rows: &[usize], rank: usize) -> Mat<R>
+fn build_s<R>(work: &Mat<R>, p_inv: &Perm, rank: usize) -> Mat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let (m, n) = work.shape();
-    Mat::from_generator((m - rank, n - rank), |i, j| work[(rows[i + rank], rank + j)].clone())
+    Mat::generate((m - rank, n - rank), |i, j| work[(p_inv.at(i + rank), rank + j)].clone())
 }
 
 #[cfg(test)]
@@ -227,7 +199,7 @@ mod tests {
         type R = Ratio<i64>;
         let r = |n: i64| R::from(n);
 
-        let a = Mat::from_data((2, 3), [r(1),r(2),r(3),r(4),r(5),r(6)]);
+        let a = Mat::from_row_major((2, 3), [r(1),r(2),r(3),r(4),r(5),r(6)]);
         let at = a.transpose(); // 3×2
 
         let dp = pluq(&a).transpose();
@@ -239,7 +211,7 @@ mod tests {
 
         // p * A^T * q = l * u + rest
         let paq = apply_perms(&at, &dp.p, &dp.q);
-        let rem_full = Mat::from_generator((m, n), |i, j| {
+        let rem_full = Mat::generate((m, n), |i, j| {
             if i >= rank && j >= rank { dp.s[(i - rank, j - rank)].clone() } else { R::zero() }
         });
         assert_eq!(paq, &dp.l * &dp.u + &rem_full);
@@ -251,7 +223,7 @@ mod tests {
     fn rf(n: i64, d: i64) -> R { R::new(n, d) }
 
     fn sample() -> Mat<R> {
-        Mat::from_data((3, 4), [
+        Mat::from_row_major((3, 4), [
             r(1), r(2), r(3), r(4),
             r(2), r(4), r(5), r(6),
             r(3), r(6), r(7), r(8),
@@ -259,7 +231,7 @@ mod tests {
     }
 
     // Applies permutations to compute p_mat * a * q_mat as a plain matrix.
-    fn apply_perms(a: &Mat<R>, p: &PermOwned, q: &PermOwned) -> Mat<R> {
+    fn apply_perms(a: &Mat<R>, p: &Perm, q: &Perm) -> Mat<R> {
         let (m, n) = a.shape();
         let mut out = Mat::zero((m, n));
         for i in 0..m {
@@ -298,7 +270,7 @@ mod tests {
 
         // Main invariant: p_mat * A * q_mat = L * U + [[0,0],[0,s]]
         let paq = apply_perms(a, &pp.p, &pp.q);
-        let rem_full = Mat::from_generator((m, n), |i, j| {
+        let rem_full = Mat::generate((m, n), |i, j| {
             if i >= rank && j >= rank { pp.s[(i - rank, j - rank)].clone() } else { R::zero() }
         });
         assert_eq!(paq, &pp.l * &pp.u + &rem_full, "p*A*q should equal L*U + s");
@@ -329,7 +301,7 @@ mod tests {
 
     #[test]
     fn test_full_row_rank() {
-        let a = Mat::from_data((2, 3), [
+        let a = Mat::from_row_major((2, 3), [
             r(1), r(0), r(2),
             r(0), r(1), r(3),
         ]);
@@ -340,7 +312,7 @@ mod tests {
 
     #[test]
     fn test_full_col_rank() {
-        let a = Mat::from_data((3, 2), [
+        let a = Mat::from_row_major((3, 2), [
             r(1), r(2),
             r(3), r(4),
             r(5), r(6),
@@ -353,7 +325,7 @@ mod tests {
     #[test]
     fn test_rank_deficient_cols() {
         // Column 2 = 2 * column 0
-        let a = Mat::from_data((3, 3), [
+        let a = Mat::from_row_major((3, 3), [
             r(1), r(0), r(2),
             r(2), r(1), r(4),
             r(3), r(2), r(6),
@@ -366,7 +338,7 @@ mod tests {
     #[test]
     fn test_pivot_not_in_first_col() {
         // First column is all zeros
-        let a = Mat::from_data((2, 3), [
+        let a = Mat::from_row_major((2, 3), [
             r(0), r(1), r(2),
             r(0), r(3), r(4),
         ]);
@@ -379,7 +351,7 @@ mod tests {
     #[test]
     fn test_col_swap() {
         // First column has no unit in row 0
-        let a = Mat::from_data((3, 3), [
+        let a = Mat::from_row_major((3, 3), [
             r(0), r(1), r(2),
             r(1), r(0), r(3),
             r(2), r(1), r(4),
@@ -392,7 +364,7 @@ mod tests {
 
     #[test]
     fn test_fractions() {
-        let a = Mat::from_data((2, 2), [
+        let a = Mat::from_row_major((2, 2), [
             rf(1, 2), rf(1, 3),
             rf(1, 4), rf(1, 5),
         ]);
@@ -403,7 +375,7 @@ mod tests {
 
     #[test]
     fn test_single_row() {
-        let a = Mat::from_data((1, 4), [r(0), r(2), r(0), r(3)]);
+        let a = Mat::from_row_major((1, 4), [r(0), r(2), r(0), r(3)]);
         let pp = check(&a);
         assert_eq!(pp.rank(), 1);
         assert!(pp.s.is_zero());
@@ -411,7 +383,7 @@ mod tests {
 
     #[test]
     fn test_single_col() {
-        let a = Mat::from_data((3, 1), [r(2), r(0), r(4)]);
+        let a = Mat::from_row_major((3, 1), [r(2), r(0), r(4)]);
         let pp = check(&a);
         assert_eq!(pp.rank(), 1);
         assert!(pp.s.is_zero());
@@ -422,7 +394,7 @@ mod tests {
     #[test]
     fn test_ring_nonzero_rem() {
         // Row 0 has no units; row 1 col 0 has unit 1 → rank 1.
-        let a = Mat::<i32>::from_data((2, 2), [2, 3, 1, 4]);
+        let a = Mat::<i32>::from_row_major((2, 2), [2, 3, 1, 4]);
         let pp = pluq(&a);
 
         assert_eq!(pp.rank(), 1);
@@ -437,7 +409,7 @@ mod tests {
             for i in 0..m { for j in 0..n { out[(pp.p.at(i), pp.q.at(j))] = a[(i, j)]; } }
             out
         };
-        let rem_full = Mat::from_generator((2, 2), |i, j| {
+        let rem_full = Mat::generate((2, 2), |i, j| {
             if i >= 1 && j >= 1 { pp.s[(i - 1, j - 1)] } else { 0 }
         });
         assert_eq!(paq, &pp.l * &pp.u + &rem_full);
@@ -463,7 +435,7 @@ mod tests {
     #[test]
     fn test_solve_square_full_rank() {
         // 2×2 invertible matrix
-        let a = Mat::from_data((2, 2), [r(1), r(2), r(3), r(4)]);
+        let a = Mat::from_row_major((2, 2), [r(1), r(2), r(3), r(4)]);
         let y = vec![r(5), r(6)];
         solve_check(&a, &y);
     }
@@ -471,14 +443,14 @@ mod tests {
     #[test]
     fn test_solve_overdetermined_consistent() {
         // 3×2 matrix, consistent y
-        let a = Mat::from_data((3, 2), [r(1), r(0), r(0), r(1), r(1), r(1)]);
+        let a = Mat::from_row_major((3, 2), [r(1), r(0), r(0), r(1), r(1), r(1)]);
         let y = vec![r(2), r(3), r(5)]; // y = a * [2, 3]
         solve_check(&a, &y);
     }
 
     #[test]
     fn test_solve_overdetermined_inconsistent() {
-        let a = Mat::from_data((3, 2), [r(1), r(0), r(0), r(1), r(1), r(1)]);
+        let a = Mat::from_row_major((3, 2), [r(1), r(0), r(0), r(1), r(1), r(1)]);
         let y = vec![r(1), r(1), r(0)]; // 1+1 != 0, inconsistent
         assert!(solve_pluq(&a, &y).is_none());
     }
@@ -486,14 +458,14 @@ mod tests {
     #[test]
     fn test_solve_underdetermined() {
         // 2×3 matrix, rank 2; infinitely many solutions — we just get one
-        let a = Mat::from_data((2, 3), [r(1), r(0), r(2), r(0), r(1), r(3)]);
+        let a = Mat::from_row_major((2, 3), [r(1), r(0), r(2), r(0), r(1), r(3)]);
         let y = vec![r(4), r(5)];
         solve_check(&a, &y);
     }
 
     #[test]
     fn test_solve_zero_rhs() {
-        let a = Mat::from_data((2, 2), [r(1), r(2), r(3), r(4)]);
+        let a = Mat::from_row_major((2, 2), [r(1), r(2), r(3), r(4)]);
         let y = vec![r(0), r(0)];
         let x = solve_check(&a, &y);
         assert_eq!(x, vec![r(0), r(0)]);
@@ -502,7 +474,7 @@ mod tests {
     #[test]
     fn test_solve_no_solution_rank_deficient() {
         // rank-1 matrix; y not in column space
-        let a = Mat::from_data((2, 2), [r(1), r(2), r(2), r(4)]);
+        let a = Mat::from_row_major((2, 2), [r(1), r(2), r(2), r(4)]);
         let y = vec![r(1), r(0)]; // not in column space
         assert!(solve_pluq(&a, &y).is_none());
     }

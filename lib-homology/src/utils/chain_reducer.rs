@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 use itertools::Itertools;
 use log::*;
-use sprs::PermOwned;
 
 use yui_matrix::sparse::*;
-use yui_matrix::sparse::pivot::{PivotCondition, PivotFinderConfig, PivotType, find_pivots, perms_by_pivots};
+use yui_matrix::Perm;
+use yui_matrix::sparse::pivot::{PivotCondition, PivotFinderConfig, PivotType, find_pivots};
 use yui_matrix::sparse::schur::Schur;
 use yui_core::{Ring, RingOps};
 
@@ -111,7 +111,7 @@ where
     }
 
     pub fn rank(&self, i: I) -> Option<usize> { 
-        self.matrix(i).map(|d| d.ncols())
+        self.matrix(i).map(|d| d.n_cols())
     }
 
     pub fn is_set(&self, i: I) -> bool { 
@@ -126,7 +126,7 @@ where
 
     pub fn set_matrix(&mut self, i: I, d: SpMat<R>, with_trans: bool) {
         if with_trans { 
-            let n = d.ncols();
+            let n = d.n_cols();
             self.trans.insert(i, Trans::id(n));
         }
         self.mats.insert(i, d);
@@ -179,7 +179,8 @@ where
         trace!("  density: {}", a.density());
         trace!("  mean-weight: {}", a.mean_weight());
 
-        let (p, q, r) = pivots(a, piv_type, piv_cond);
+        let config = PivotFinderConfig { piv_type, piv_cond, ..Default::default() };
+        let (p, q, r) = find_pivots(a, config);
 
         if r == 0 { 
             debug!("  done.");
@@ -210,26 +211,26 @@ where
         (PivotType::Cols, PivotCondition::One)
     }
 
-    fn update_trans(&mut self, i: I, p: &PermOwned, q: &PermOwned, t_src: Trans<R>, t_tgt: Trans<R>) {
+    fn update_trans(&mut self, i: I, p: &Perm, q: &Perm, t_src: Trans<R>, t_tgt: Trans<R>) {
         let (_, i1, i2) = self.deg_trip(i);
-        
-        if let Some(t1) = self.trans_mut(i1) { 
-            t1.append_perm(q.view());
+
+        if let Some(t1) = self.trans_mut(i1) {
+            t1.append_perm(q);
             t1.merge(t_src);
         }
 
         if let Some(t2) = self.trans_mut(i2) {
-            t2.append_perm(p.view());
+            t2.append_perm(p);
             t2.merge(t_tgt);
         }
     }
 
-    fn update_mats(&mut self, i: I, p: &PermOwned, q: &PermOwned, r: usize, s: SpMat<R>) {
-        let (m, n) = (p.dim(), q.dim());
+    fn update_mats(&mut self, i: I, p: &Perm, q: &Perm, r: usize, s: SpMat<R>) {
+        let (m, n) = (p.len(), q.len());
         let (i0, i1, i2) = self.deg_trip(i);
 
         if let Some(a0) = self.matrix(i0) {
-            assert_eq!(a0.nrows(), n);
+            assert_eq!(a0.n_rows(), n);
             let a0 = reduce_mat_rows(a0, q, r);
             self.mats.insert(i0, a0);
         }
@@ -237,7 +238,7 @@ where
         self.mats.insert(i1, s);
 
         if let Some(a2) = self.matrix(i2) { 
-            assert_eq!(a2.ncols(), m);
+            assert_eq!(a2.n_cols(), m);
             let a2 = reduce_mat_cols(a2, p, r);
             self.mats.insert(i2, a2);
         }
@@ -255,28 +256,19 @@ where
     }
 }
 
-fn pivots<R>(a: &SpMat<R>, piv_type: PivotType, piv_cond: PivotCondition) -> (PermOwned, PermOwned, usize) 
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    let config = PivotFinderConfig { piv_type, piv_cond, ..Default::default() };
-    let pivs = find_pivots(a, config);
-    let (p, q) = perms_by_pivots(a, &pivs);
-    let r = pivs.len();
-    (p, q, r)
-}
-
-fn reduce_mat_rows<R>(a: &SpMat<R>, p: &PermOwned, r: usize) -> SpMat<R> 
+fn reduce_mat_rows<R>(a: &SpMat<R>, p: &Perm, r: usize) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let (m, n) = a.shape();
-    a.extract((m - r, n), |i, j| { 
+    a.extract((m - r, n), |i, j| {
         let i = p.at(i);
         (r..m).contains(&i).then(|| (i - r, j))
     })
 }
 
-fn reduce_mat_cols<R>(a: &SpMat<R>, p: &PermOwned, r: usize) -> SpMat<R> 
+fn reduce_mat_cols<R>(a: &SpMat<R>, p: &Perm, r: usize) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let (m, n) = a.shape();
-    a.extract((m, n - r), |i, j| { 
+    a.extract((m, n - r), |i, j| {
         let j = p.at(j);
         (r..n).contains(&j).then(|| (i, j - r))
     })

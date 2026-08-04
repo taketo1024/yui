@@ -28,7 +28,7 @@ where I: GridDeg, R: Ring, for<'x> &'x R: RingOps<R> {
         let summands = Grid::generate(
             d_matrices.support().copied(), 
             |i| {
-                let r = d_matrices[i].ncols();
+                let r = d_matrices[i].n_cols();
                 GenericSummand::generate_free(i, r)
             }
         );
@@ -51,7 +51,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn one() -> GenericChainComplex<R> {
         GenericChainComplex::generate(0..=0, -1, |i|
             match i { 
-                0 => SpMat::from_dense_data((0, 1), []),
+                0 => SpMat::from_row_major((0, 1), []),
                 _ => SpMat::zero((0, 0))
             }
         )
@@ -60,8 +60,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn one_one(r: R) -> GenericChainComplex<R> {
         GenericChainComplex::generate(0..=1, -1, |i|
             match i { 
-                0 => SpMat::from_dense_data((0, 1), []),
-                1 => SpMat::from_dense_data((1, 1), [r.clone()]),
+                0 => SpMat::from_row_major((0, 1), []),
+                1 => SpMat::from_row_major((1, 1), [r.clone()]),
                 _ => SpMat::zero((0, 0))
             }
         )
@@ -70,8 +70,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn two_one(r1: R, r2: R) -> GenericChainComplex<R> {
         GenericChainComplex::generate(0..=1, -1, |i|
             match i { 
-                0 => SpMat::from_dense_data((0, 1), []),
-                1 => SpMat::from_dense_data((1, 2), [r1.clone(), r2.clone()]),
+                0 => SpMat::from_row_major((0, 1), []),
+                1 => SpMat::from_row_major((1, 2), [r1.clone(), r2.clone()]),
                 _ => SpMat::zero((0, 0))
             }
         )
@@ -80,8 +80,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn one_two(r1: R, r2: R) -> GenericChainComplex<R> {
         GenericChainComplex::generate(0..=1, -1, |i|
             match i { 
-                0 => SpMat::from_dense_data((0, 2), []),
-                1 => SpMat::from_dense_data((2, 1), [r1.clone(), r2.clone()]),
+                0 => SpMat::from_row_major((0, 2), []),
+                1 => SpMat::from_row_major((2, 1), [r1.clone(), r2.clone()]),
                 _ => SpMat::zero((0, 0))
             }
         )
@@ -137,7 +137,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     fn mat<I>(shape: (usize, usize), entries: I) -> SpMat<R>
     where I: IntoIterator<Item = i32> { 
-        SpMat::from_dense_data(shape, entries.into_iter().map(|a| 
+        SpMat::from_row_major(shape, entries.into_iter().map(|a| 
             match a { 
                 0 => R::zero(),
                 1 => R::one(),

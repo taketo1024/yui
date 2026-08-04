@@ -3,27 +3,31 @@ use std::ops::AddAssign;
 use log::debug;
 use nalgebra::Scalar;
 use num_traits::{One, Zero};
-use sprs::PermOwned;
 use yui_core::{Ring, RingOps};
-use crate::sparse::pivot::{PivotType, split_by_pqr};
+use crate::Perm;
+use crate::sparse::pivot::PivotType;
 
 use super::*;
 use super::triang::{TriangularType, solve_triangular_left, solve_triangular_with};
 
-//                [a  b]
-//                [c  d]
-//            X ----------> Y
-//  [1 -a⁻¹b] ^             | [1      ]
-//  [     1 ] |   [a   ]    | [-ca⁻¹ 1]
-//            |   [   s]    V
-//            X ----------> Y
-//       [0]  ^             | 
-//       [1]  |             | [0  1]
-//            |      s      V
-//            X'----------> Y'
-//
-// s = d - c a⁻¹ b
-
+/// Schur complement `s = d - c·a⁻¹·b` of a 2×2 block matrix
+/// `[[a, b], [c, d]]` whose top-left block `a` is triangular (and
+/// invertible). Optionally retains the source / target elimination
+/// multipliers `a⁻¹·b` and `c·a⁻¹` for use as basis-change transforms.
+///
+/// ```text
+///                [a  b]
+///                [c  d]
+///            X ──────────→ Y
+///  [1 -a⁻¹b] ↑             │ [1      ]
+///  [     1 ] │   [a   ]    │ [-ca⁻¹ 1]
+///            │   [   s]    ↓
+///            X ──────────→ Y
+///       [0]  ↑             │
+///       [1]  │             │ [0  1]
+///            │      s      ↓
+///            X'──────────→ Y'
+/// ```
 pub struct Schur<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     s: SpMat<R>,
@@ -33,11 +37,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<R> Schur<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
+    /// Reduces `a` by permuting `(p, q)` and treating the leading `r × r`
+    /// block (now triangular by `t`) as the pivot block `a` in the 2×2
+    /// decomposition.
     pub fn from_pivots(
         a: &SpMat<R>,
         t: PivotType,
-        p: &PermOwned,
-        q: &PermOwned,
+        p: &Perm,
+        q: &Perm,
         r: usize,
         with_trans_src: bool,
         with_trans_tgt: bool,
@@ -47,7 +54,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(r <= n);
 
         let t = if t == PivotType::Rows { TriangularType::Upper } else { TriangularType::Lower };
-        let [a0, a1, a2, a3] = split_by_pqr(a, p, q, r);
+        let [a0, a1, a2, a3] = a.permute_and_split(p, q, r);
         Self::from_blocks(t, [&a0, &a1, &a2, &a3], with_trans_src, with_trans_tgt)
     }
 
@@ -60,8 +67,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let [a, b, c, d] = blocks;
         assert!(a.is_square());
 
-        let r = a.nrows();
-        let (m_d, n_b) = (d.nrows(), b.ncols());
+        let r = a.n_rows();
+        let (m_d, n_b) = (d.n_rows(), b.n_cols());
 
         debug!("compute schur: a{:?}, r: {r}", (m_d + r, n_b + r));
 
@@ -106,17 +113,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn trans_src(&self) -> Option<Trans<R>> {
         self.col_mult.as_ref().map(|x| {
-            let (r, n_b) = (x.nrows(), x.ncols());
+            let (r, n_b) = (x.n_rows(), x.n_cols());
             let f = proj_mat(r + n_b, n_b);
-            let b = SpMat::stack(-x, id_mat(n_b)); // [-a⁻¹b ; I]
+            let b = SpMat::v_stack(-x, id_mat(n_b)); // [-a⁻¹b ; I]
             Trans::new(f, b)
         })
     }
 
     pub fn trans_tgt(&self) -> Option<Trans<R>> {
         self.row_mult.as_ref().map(|y| {
-            let (m_d, r) = (y.nrows(), y.ncols());
-            let f = SpMat::concat(-y, id_mat(m_d)); // [-c·a⁻¹, I]
+            let (m_d, r) = (y.n_rows(), y.n_cols());
+            let f = SpMat::h_stack(-y, id_mat(m_d)); // [-c·a⁻¹, I]
             let b = incl_mat(r + m_d, m_d);
             Trans::new(f, b)
         })
@@ -149,7 +156,7 @@ mod tests {
 
     #[test]
     fn schur_lower() {
-        let a = SpMat::from_dense_data((6, 5), [
+        let a = SpMat::from_row_major((6, 5), [
             1, 0, 0, 1, 3,
             2,-1, 0, 2, 2,
             3, 2, 1, 0, 3,
@@ -157,10 +164,10 @@ mod tests {
             5, 3, 5, 2, 2,
             6, 2,-3, 1, 8
         ]);
-        let sch = Schur::from_pivots(&a, PivotType::Cols, &PermOwned::identity(6), &PermOwned::identity(5), 3, false, false);
+        let sch = Schur::from_pivots(&a, PivotType::Cols, &Perm::id(6), &Perm::id(5), 3, false, false);
         let s = sch.complement();
 
-        assert_eq!(s, &SpMat::from_dense_data((3,2), [
+        assert_eq!(s, &SpMat::from_row_major((3,2), [
              5,  36,
              12, 45,
             -14,-60
@@ -171,7 +178,7 @@ mod tests {
 
     #[test]
     fn schur_lower_with_trans() {
-        let a = SpMat::from_dense_data((6, 5), [
+        let a = SpMat::from_row_major((6, 5), [
             1, 0, 0, 1, 3,
             2,-1, 0, 2, 2,
             3, 2, 1, 0, 3,
@@ -179,10 +186,10 @@ mod tests {
             5, 3, 5, 2, 2,
             6, 2,-3, 1, 8
         ]);
-        let sch = Schur::from_pivots(&a, PivotType::Cols, &PermOwned::identity(6), &PermOwned::identity(5), 3, true, true);
+        let sch = Schur::from_pivots(&a, PivotType::Cols, &Perm::id(6), &Perm::id(5), 3, true, true);
         let s = sch.complement();
 
-        assert_eq!(s, &SpMat::from_dense_data((3,2), [
+        assert_eq!(s, &SpMat::from_row_major((3,2), [
              5,  36, 
              12, 45,
             -14,-60
@@ -193,7 +200,7 @@ mod tests {
         let t_in  = sch.trans_src().unwrap().backward_mat();
         let t_out = sch.trans_tgt().unwrap().forward_mat();
 
-        assert_eq!(t_in, SpMat::from_dense_data((5,2), [
+        assert_eq!(t_in, SpMat::from_row_major((5,2), [
             -1, -3,
              0, -4,
              3, 14,
@@ -201,7 +208,7 @@ mod tests {
              0,  1
         ]));
         
-        assert_eq!(t_out, SpMat::from_dense_data((3,6), [
+        assert_eq!(t_out, SpMat::from_row_major((3,6), [
              20, -6, -4, 1, 0, 0,
              24, -7, -5, 0, 1, 0,
             -31,  8,  3, 0, 0, 1
@@ -212,17 +219,17 @@ mod tests {
 
     #[test]
     fn schur_upper() {
-        let a = SpMat::from_dense_data((5, 6), [
+        let a = SpMat::from_row_major((5, 6), [
             1, 2, 3, 4, 5, 6,
             0, -1, 2, 2, 3, 2,
             0, 0, 1, 4, 5, -3,
             1, 2, 0, -3, 2, 1,
             3, 2, 3, 0, 2, 8,
         ]);
-        let sch = Schur::from_pivots(&a, PivotType::Rows, &PermOwned::identity(5), &PermOwned::identity(6), 3, false, false);
+        let sch = Schur::from_pivots(&a, PivotType::Rows, &Perm::id(5), &Perm::id(6), 3, false, false);
         let s = sch.complement();
 
-        assert_eq!(s, &SpMat::from_dense_data((2, 3), [
+        assert_eq!(s, &SpMat::from_row_major((2, 3), [
             5, 12,-14,
             36,45,-60
         ]));
@@ -232,17 +239,17 @@ mod tests {
 
     #[test]
     fn schur_upper_with_trans() {
-        let a = SpMat::from_dense_data((5, 6), [
+        let a = SpMat::from_row_major((5, 6), [
             1, 2, 3, 4, 5, 6,
             0, -1, 2, 2, 3, 2,
             0, 0, 1, 4, 5, -3,
             1, 2, 0, -3, 2, 1,
             3, 2, 3, 0, 2, 8,
         ]);
-        let sch = Schur::from_pivots(&a, PivotType::Rows, &PermOwned::identity(5), &PermOwned::identity(6), 3, true, true);
+        let sch = Schur::from_pivots(&a, PivotType::Rows, &Perm::id(5), &Perm::id(6), 3, true, true);
         let s = sch.complement();
 
-        assert_eq!(s, &SpMat::from_dense_data((2, 3), [
+        assert_eq!(s, &SpMat::from_row_major((2, 3), [
             5, 12,-14,
             36,45,-60
         ]));
@@ -252,7 +259,7 @@ mod tests {
         let t_in  = sch.trans_src().unwrap().backward_mat();
         let t_out = sch.trans_tgt().unwrap().forward_mat();
 
-        assert_eq!(t_in,  SpMat::from_dense_data((6,3), [
+        assert_eq!(t_in,  SpMat::from_row_major((6,3), [
             20, 24, -31,
             -6, -7,   8,
             -4, -5,   3,
@@ -261,7 +268,7 @@ mod tests {
              0,  0,   1
         ]));
 
-        assert_eq!(t_out, SpMat::from_dense_data((2, 5), [
+        assert_eq!(t_out, SpMat::from_row_major((2, 5), [
             -1,  0,  3, 1, 0,
             -3, -4, 14, 0, 1
         ]));

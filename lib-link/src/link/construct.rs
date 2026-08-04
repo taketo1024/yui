@@ -34,18 +34,18 @@ impl Link {
     // Blackboard-framed 2-cable: each crossing → a 2×2 block of 4 sub-crossings of the same type,
     // each edge → 2 parallel edges. Every component doubles into its two parallel copies
     // (n components → 2n; framing = the diagram's writhe per component).
-    pub fn cable2(&self) -> Link {
-        let (b, _) = self.cable2_builder();
+    pub fn cable2(l: &Link) -> Link {
+        let (b, _) = Self::cable2_builder(l);
         b.build().unwrap()
     }
 
     // The 2-cable in an open builder, plus `cab[i][slot] = (copy-0 port, copy-1 port)` so callers can
     // re-splice the cable (e.g. the Whitehead clasp) before building.
-    fn cable2_builder(&self) -> (LinkBuilder, Vec<[(Port, Port); 4]>) {
+    fn cable2_builder(l: &Link) -> (LinkBuilder, Vec<[(Port, Port); 4]>) {
         let mut b = LinkBuilder::new();
 
         // per crossing: 4 sub-crossings + the 4 internal edges; record the two cable ports at each slot
-        let cab: Vec<[(Port, Port); 4]> = self.nodes().map(|x| {
+        let cab: Vec<[(Port, Port); 4]> = l.nodes().map(|x| {
             let t = x.node_type();
             let [s0, s1, s2, s3] = [b.add_node(t), b.add_node(t), b.add_node(t), b.add_node(t)];
             b.connect((s0, 2), (s1, 0));
@@ -58,13 +58,13 @@ impl Link {
 
         // join the two cables of each original edge across its two endpoints. the two ends list their
         // ports in CCW order, which reverses along the edge, so copy 0 pairs with the other's copy 1.
-        for e in self.edges() {
-            let ((i, s), (j, t)) = self.edge_ends(e, false);
+        for e in l.edges() {
+            let ((i, s), (j, t)) = l.edge_ends(e, false);
             let ((a0, a1), (b0, b1)) = (cab[i][s], cab[j][t]);
             b.connect(a0, b1);
             b.connect(a1, b0);
         }
-        for _ in self.loops() {   // each free loop doubles
+        for _ in l.loops() {   // each free loop doubles
             b.add_loop();
             b.add_loop();
         }
@@ -73,36 +73,36 @@ impl Link {
 
     // The `tw`-twisted Whitehead double D±(K), `tw` from the Seifert (0) framing (tw = 0 = untwisted,
     // trivial Alexander); `positive` = clasp sign. Seifert sits at 2·writhe blackboard half-twists.
-    pub fn whitehead_double(&self, positive: bool, tw: i32) -> Link {
-        self.whitehead_double_bbf(positive, 2 * self.writhe() + tw)
+    pub fn whitehead_double(l: &Link, positive: bool, tw: i32) -> Link {
+        Self::whitehead_double_bbf(l, positive, 2 * l.writhe() + tw)
     }
 
     // Whitehead double with the framing counted from the blackboard framing (tw = 0 = the diagram's
     // blackboard 2-cable): cut the cable to a 4-end tangle, add `tw` half-twists, close with the clasp.
-    pub fn whitehead_double_bbf(&self, positive: bool, tw: i32) -> Link {
+    pub fn whitehead_double_bbf(l: &Link, positive: bool, tw: i32) -> Link {
         // cut a clean edge (joining two distinct crossings): frees the 4 cable ends
-        let e0 = self.edges().into_iter()
+        let e0 = l.edges().into_iter()
             .find(|&e| {
-                let ((i, _), (j, _)) = self.edge_ends(e, false);
+                let ((i, _), (j, _)) = l.edge_ends(e, false);
                 i != j
             })
             .expect("the companion needs an edge joining two distinct crossings");
-        self.whitehead_double_impl(positive, 0, tw, e0, None).0
+        Self::whitehead_double_impl(l, positive, 0, tw, e0, None).0
     }
 
     // Whitehead double cutting the cable at edge `e0` (must join two distinct crossings), placing
     // `tw_a` framing half-twists on one side of the cut and `tw_b` on the other. Also returns the
     // result-edges of `base`'s two doubled strands (empty if `base` is `None`) so the caller can
     // place a base point there.
-    pub(crate) fn whitehead_double_impl(&self, positive: bool, tw_a: i32, tw_b: i32, e0: Edge, base: Option<Edge>) -> (Link, Vec<Edge>) {
+    pub(crate) fn whitehead_double_impl(l: &Link, positive: bool, tw_a: i32, tw_b: i32, e0: Edge, base: Option<Edge>) -> (Link, Vec<Edge>) {
         use crate::NodeType::{XL, XR};
-        assert!(self.is_knot(), "the Whitehead double requires a knot companion");
+        assert!(l.is_knot(), "the Whitehead double requires a knot companion");
 
-        let (mut b, cab) = self.cable2_builder();
+        let (mut b, cab) = Self::cable2_builder(l);
 
         // the cut edge's two ends: the a-side (node ia, slot sa) and b-side (ib, sb), with their
         // cable ports (a0, a1) / (b0, b1) in CCW order.
-        let ((ia, sa), (ib, sb)) = self.edge_ends(e0, false);
+        let ((ia, sa), (ib, sb)) = l.edge_ends(e0, false);
         let ((a0, a1), (b0, b1)) = (cab[ia][sa], cab[ib][sb]);
         b.disconnect(a0);   // the swapped join means a0–b1, a1–b0 are removed
         b.disconnect(a1);
@@ -147,7 +147,7 @@ impl Link {
         // `base` is not at the cut, so its cable join survives: the two ports of cab at `base` each
         // carry one of its doubled strands; read off their result-edge ids before consuming the builder.
         let base_edges: Vec<Edge> = base.into_iter().flat_map(|base| {
-            let ((i, s), _) = self.edge_ends(base, false);
+            let ((i, s), _) = l.edge_ends(base, false);
             let (p0, p1) = cab[i][s];
             [b.edge_at(p0).unwrap(), b.edge_at(p1).unwrap()]
         }).collect();
@@ -205,7 +205,7 @@ mod tests {
         for word in [vec![1, -2], vec![1, 2], vec![-1, -2]] {
             let u = Braid::from_iter(word).closure();
             for positive in [true, false] {
-                let d = u.whitehead_double(positive, 0);
+                let d = Link::whitehead_double(&u, positive, 0);
                 assert_eq!(d.n_comps(), 1);
                 assert_eq!(det(&d), 1, "D±(unknot) must be the unknot (trivial Alexander)");
             }
@@ -221,7 +221,7 @@ mod tests {
             let k = Link::test_data(name);
             let expected = 4 * k.n_crossings() + 2 * k.writhe().unsigned_abs() as usize + 2;
             for positive in [true, false] {
-                let d = k.whitehead_double(positive, 0);
+                let d = Link::whitehead_double(&k, positive, 0);
                 assert_eq!(d.n_comps(), 1, "D±({name}) is a knot");
                 assert_eq!(d.n_crossings(), expected, "D±({name}) crossing count");
                 assert!(d.is_oriented());
@@ -235,15 +235,15 @@ mod tests {
         // signs; values pinned against the Kh-verified reference implementation.
         let u = Braid::from([1, -2]).closure(); // writhe-0 unknot diagram
         for (tw, pos_det, neg_det) in [(2, 3, 5), (4, 7, 9)] {
-            assert_eq!(det(&u.whitehead_double(true, tw)), pos_det, "D+(U, tw={tw})");
-            assert_eq!(det(&u.whitehead_double(false, tw)), neg_det, "D-(U, tw={tw})");
+            assert_eq!(det(&Link::whitehead_double(&u, true, tw)), pos_det, "D+(U, tw={tw})");
+            assert_eq!(det(&Link::whitehead_double(&u, false, tw)), neg_det, "D-(U, tw={tw})");
         }
     }
 
     #[test]
     fn cable2_trefoil() {
         let k = Link::test_data("3_1");
-        let c = k.cable2();
+        let c = Link::cable2(&k);
         assert_eq!(c.n_crossings(), 4 * k.n_crossings());
         assert_eq!(c.n_comps(), 2, "2-cable of a knot is a 2-component link");
         assert!(c.is_oriented());
@@ -253,7 +253,7 @@ mod tests {
     #[test]
     fn cable2_is_hopf() {
         // 2-cable of a ±1-framed unknot is the Hopf link (linking ±1), not the 2-component unlink.
-        let c = Link::test_data("unknot_l_twist").cable2();
+        let c = Link::cable2(&Link::test_data("unknot_l_twist"));
         assert_eq!(c.n_comps(), 2);
         assert_ne!(jones_polynomial(&c), jones_polynomial(&Link::unlink(2)),
             "2-cable of a framed unknot must be linked (Hopf), not the unlink");

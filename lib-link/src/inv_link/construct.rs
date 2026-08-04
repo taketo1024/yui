@@ -4,7 +4,7 @@
 
 use num_integer::Integer;
 
-use crate::{Edge, InvLink, LinkBuilder};
+use crate::{Edge, InvLink, Link, LinkBuilder};
 use crate::NodeType::{XL, XR};
 
 impl InvLink {
@@ -69,7 +69,7 @@ impl InvLink {
             .expect("need a second on-axis edge for the clasp");
 
         let half = self.writhe() + tw / 2;   // (2·writhe + tw) / 2 = half the blackboard framing
-        let (inner, base_edges) = self.inner().whitehead_double_impl(positive, half, half, cut, Some(base));
+        let (inner, base_edges) = Link::whitehead_double_impl(self.inner(), positive, half, half, cut, Some(base));
 
         // base point on the on-axis doubled base_pt strand: reindex from the copy that realizes the
         // standard τ, so edge 1 lands there rather than at the clasp.

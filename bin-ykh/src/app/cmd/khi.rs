@@ -251,7 +251,7 @@ mod tests {
     #[test]
     fn test1() { 
         let args = Args { 
-            link: "3_1".to_string(), 
+            link: "[[1,5,2,4],[3,1,4,6],[5,3,6,2]]".to_string(), 
             c_type: CType::F2,
             c_value: "0".to_string(),
             ..Default::default()
@@ -277,7 +277,7 @@ mod tests {
     #[test]
     fn test_poly_h() { 
         let args = Args {
-            link: "3_1".to_string(),
+            link: "[[1,5,2,4],[3,1,4,6],[5,3,6,2]]".to_string(),
             c_type: CType::F2,
             c_value: "H".to_string(),
             ..Default::default()

@@ -13,6 +13,7 @@ repository.workspace  = true
 default = ["multithread"]
 multithread = ["rayon"]
 tex = ["yui-core/tex"]
+test-utils = []
 
 [dependencies]
 ahash = "0.8.12"

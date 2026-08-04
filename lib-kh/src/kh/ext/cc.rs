@@ -1,3 +1,12 @@
+//! Crossing-change chain maps `f₀, f₁ : CKh(D) → CKh(D')` for diagrams `D, D'`
+//! related by a crossing change at a single crossing — see the maps defined
+//! at the start of §2.1 of the reference.
+//!
+//! Reference:
+//! - H. Imori, T. Sano, K. Sato, M. Taniguchi,
+//!   "Cobordism maps in Khovanov homology and singular instanton homology II".
+//!   <https://arxiv.org/abs/2510.09399>
+
 use itertools::Itertools;
 use yui_core::bitseq::Bit;
 use yui_core::lc::Lc;

@@ -7,6 +7,7 @@ use yui_core::{EucRing, EucRingOps, IteratorExt};
 use yui_link::Link;
 
 use crate::kh::KhGen;
+use crate::tng::builder::BuildConfig;
 use crate::util::Bigraded;
 
 use super::{KhAlg, KhChain, KhComplex};
@@ -25,10 +26,42 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 impl<R> KhHomology<R> 
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn new(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
-        let c = KhComplex::new(l, h, t, reduced); 
+        let c = KhComplex::new(l, h, t, reduced);
         Self::from(&c)
     }
-    
+
+    // builds one degree wider (for boundary maps), then truncates to `h_range`.
+    pub fn new_partial(l: &Link, h: &R, t: &R, reduced: bool, h_range: Option<RangeInclusive<isize>>) -> Self {
+        Self::new_with_config(l, h, t, reduced, BuildConfig { h_range, ..Default::default() })
+    }
+
+    // builds one degree wider (for boundary maps), then truncates to `config.h_range`.
+    pub fn new_with_config(l: &Link, h: &R, t: &R, reduced: bool, config: BuildConfig) -> Self {
+        let Some(range) = config.h_range.clone() else {
+            return Self::from(&KhComplex::new_with_config(l, h, t, reduced, config));
+        };
+        let range = KhComplex::<R>::clamp_h_range(l, reduced, range); // resolve open ends before truncating
+        let (a, b) = (*range.start(), *range.end());
+        let build_config = BuildConfig { h_range: Some((a - 1)..=(b + 1)), ..config };
+        let c = KhComplex::new_with_config(l, h, t, reduced, build_config);
+        Self::from_complex(&c, Some(a..=b))
+    }
+
+    fn from_complex(c: &KhComplex<R>, range: Option<RangeInclusive<isize>>) -> Self {
+        let reduced = c.inner().reduced();
+        let homology = match range {
+            Some(r) => reduced.homology_in(r),
+            None    => reduced.homology(),
+        };
+        KhHomology::new_impl(
+            homology,
+            c.alg().clone(),
+            c.deg_shift(),
+            c.is_reduced(),
+            c.canon_cycles().clone()
+        )
+    }
+
     pub fn new_no_simplify(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
         let c = KhComplex::new_no_simplify(l, h, t, reduced); 
         Self::from(&c)
@@ -59,6 +92,11 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     pub fn is_reduced(&self) -> bool {
         self.reduced
+    }
+
+    // same bigraded Khovanov homology (free ranks + torsion at every (i, j)) as `other`.
+    pub fn is_identical(&self, other: &KhHomology<R>) -> bool {
+        Bigraded::is_identical(self, other)
     }
 
     pub fn h_deg_of(&self, x: &KhGen) -> isize {
@@ -123,13 +161,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 impl<R> From<&KhComplex<R>> for KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     fn from(c: &KhComplex<R>) -> Self {
-        KhHomology::new_impl(
-            c.inner().reduced().homology(),
-            c.alg().clone(),
-            c.deg_shift(),
-            c.is_reduced(),
-            c.canon_cycles().clone()
-        )
+        KhHomology::from_complex(c, None)
     }
 }
 
@@ -410,6 +442,35 @@ mod tests {
             }
         };
     }
+
+    #[test]
+    fn kh_is_identical() {
+        let kh = |l: &Link| KhHomology::new(l, &0, &0, false);
+        let h31 = kh(&Link::test_data("3_1"));
+        let h41 = kh(&Link::test_data("4_1"));
+
+        assert!(h31.is_identical(&h31));
+        assert!(!h31.is_identical(&h41));
+        assert!(h41.is_identical(&kh(&Link::test_data("4_1").mirror())), "4_1 is amphichiral");
+        assert!(!h31.is_identical(&kh(&Link::test_data("3_1").mirror())), "3_1 is chiral");
+    }
+
+    #[test]
+    fn kh_partial() {
+        // partial homology matches the full result across the whole window.
+        let l = Link::test_data("4_1");
+        let full = KhHomology::new(&l, &0, &0, false);
+        let part = KhHomology::new_partial(&l, &0, &0, false, Some(-1..=1));
+
+        for i in -1..=1 {
+            assert_eq!(part[i].rank(), full[i].rank(), "rank at {i}");
+            assert_eq!(part[i].tors(), full[i].tors(), "tors at {i}");
+        }
+
+        assert!(part[-2].is_zero());
+        assert!(part[2].is_zero());
+    }
+
     mod v2 {
         use super::*;
         kh_homology_tests!(KhHomology::new);

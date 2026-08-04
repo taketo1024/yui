@@ -1,5 +1,19 @@
+//! The cube of resolutions for Khovanov homology: each vertex carries the
+//! tensor product of one copy of `A` per circle of the resolved diagram,
+//! and each edge is a merge or split cobordism with a sign coming from the
+//! exterior-algebra parity of the bit flipped along that edge.
+//!
+//! References:
+//! - M. Khovanov, "A categorification of the Jones polynomial",
+//!   Duke Math. J. 101 (2000), no. 3, 359–426.
+//!   <https://doi.org/10.1215/S0012-7094-00-10131-7>, <https://arxiv.org/abs/math/9908171>
+//! - D. Bar-Natan, "On Khovanov's categorification of the Jones polynomial",
+//!   Algebr. Geom. Topol. 2 (2002), 337–370.
+//!   <https://doi.org/10.2140/agt.2002.2.337>, <https://arxiv.org/abs/math/0201043>
+
 use std::collections::HashMap;
 use std::ops::RangeInclusive;
+use std::sync::OnceLock;
 use itertools::Itertools;
 use num_traits::Zero;
 use yui_core::{Ring, RingOps, Sign};
@@ -9,10 +23,11 @@ use yui_link::{Link, State, Path, Edge};
 use crate::kh::{KhAlg, KhChain, KhGen, KhTensor};
 
 #[derive(Clone, Debug)]
-pub struct KhCubeVertex { 
+pub struct KhCubeVertex {
     state: State,
     circles: Vec<Path>,
-    gens: Vec<KhGen>
+    red_i: Option<usize>,
+    gens: OnceLock<Vec<KhGen>>
 }
 
 impl KhCubeVertex {
@@ -20,30 +35,23 @@ impl KhCubeVertex {
         let mut circles = l.resolve_by(&state).comps();
         circles.sort_by_key(|c| c.min_edge());
 
-        let r = circles.len();
-
         let red_i = red_e.and_then(|e| {
             circles.iter().position(|c|
                 c.edges().contains(&e)
             )
         });
 
-        let gens = KhTensor::generate(r).filter_map(|label| {
-            let ok = if let Some(red_i) = red_i {
-                label[red_i].is_X()
-            } else {
-                true
-            };
-            ok.then(||
-                KhGen::new(state, label)
-            )
-        }).collect();
-
-        KhCubeVertex { state, circles, gens }
+        KhCubeVertex { state, circles, red_i, gens: OnceLock::new() }
     }
 
-    pub fn generators(&self) -> Vec<&KhGen> { 
-        self.gens.iter().collect()
+    // Generators are built lazily: computing d(x) for a given x never needs them,
+    // so a full cube can be constructed without enumerating 2^(#circles) per vertex.
+    pub fn generators(&self) -> Vec<&KhGen> {
+        self.gens.get_or_init(|| {
+            KhTensor::generate(self.circles.len()).filter_map(|label|
+                self.red_i.map_or(true, |i| label[i].is_X()).then(|| KhGen::new(self.state, label))
+            ).collect()
+        }).iter().collect()
     }
 
     pub fn circles(&self) -> &[Path] { 

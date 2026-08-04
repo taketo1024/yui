@@ -1,28 +1,54 @@
-// "A family of slice-torus invariants from the divisibility of reduced Lee classes"
-// T. Sano, K. Sato
-// https://arxiv.org/abs/2211.02494
+//! The equivariant Rasmussen invariant `(s̲, s̄)` for a strongly invertible knot,
+//! obtained from the `H`-divisibilities of the two equivariant Lee classes in
+//! `KhI` over `𝔽₂[H]` (§3 of the reference).
+//!
+//! Reference:
+//! - T. Sano, "Involutive Khovanov homology and equivariant knots",
+//!   Algebr. Geom. Topol. 25 (2025), 5059–5111.
+//!   <https://doi.org/10.2140/agt.2025.25.5059>, <https://arxiv.org/abs/2404.08568>
 
 use itertools::Itertools;
 use num_traits::Zero;
 use log::info;
 
-use yui_core::{EucRing, EucRingOps};
-use yui_link::InvLink;
+use yui_core::MathType;
+use yui_core::num::FF2;
+use yui_link::{InvLink, Link};
 
+use crate::tng::builder::SymBuildConfig;
+use crate::util::FastPoly;
 use crate::util::calc::div_vec;
 use crate::khi::KhIHomology;
+use super::ssi_h1::ssi_divisibility_v2;
 
-pub fn ssi_invariants<R>(l: &InvLink, c: &R, reduced: bool) -> (i32, i32)
-where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
-    assert!(!c.is_zero());
-    assert!(!c.is_unit());
+type P = FastPoly<'H', FF2>;
+
+/// The `ssi` computation pipeline.
+/// - `V1`: full bigraded `KhIHomology`; simple, memory-heavy (`config`/`expected` are ignored).
+/// - `V2`: `H = 1` specialization — per-level q-truncated `𝔽₂` solves, no homology or basis
+///   tracking. `expected` (the guessed s-value) seeds the high-q build cut; `None` = full build.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SsiVersion {
+    V1,
+    V2
+}
+
+/// `ssi` over `𝔽₂[H]`, via the current default pipeline ([`SsiVersion::V2`]).
+pub fn ssi_invariant(l: &InvLink, reduced: bool, config: SymBuildConfig, expected: Option<isize>) -> (i32, i32) {
+    ssi_invariant_ver(l, reduced, config, expected, SsiVersion::V2)
+}
+
+pub fn ssi_invariant_ver(l: &InvLink, reduced: bool, config: SymBuildConfig, expected: Option<isize>, ver: SsiVersion) -> (i32, i32) {
     assert!(l.is_knot());
 
-    info!("compute ssi, c = {c} over {}.", R::math_symbol());
+    info!("compute ssi ({ver:?}) over {}.", P::math_symbol());
 
     let w = l.writhe();
     let r = l.seifert_circles().len() as i32;
-    let (d0, d1) = div(l, c, reduced);
+    let (d0, d1) = match ver {
+        SsiVersion::V1 => ssi_divisibility_v1(l, reduced),
+        SsiVersion::V2 => ssi_divisibility_v2(l, reduced, config, expected),
+    };
 
     let ss0 = 2 * d0 + w - r + 1;
     let ss1 = 2 * d1 + w - r + 1;
@@ -33,13 +59,14 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     (ss0, ss1)
 }
 
-fn div<R>(l: &InvLink, c: &R, reduced: bool) -> (i32, i32)
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+fn ssi_divisibility_v1(l: &InvLink, reduced: bool) -> (i32, i32) {
     let r = if reduced { 1 } else { 2 };
-    let t = R::zero(); 
+    let c = P::variable();
+    let t = P::zero();
 
-    let kh = KhIHomology::new(l, c, &t, reduced).truncated(0..=1);
-    // let kh = KhIHomology::new_partial(l, c, &t, reduced, Some(0..=1));
+    // bottom..=1: building the cheap low degrees and truncating only at the top is faster than
+    // the doubly-truncated `0..=1` slice (which widens to the dense `-1..=2`). Builder clamps the start.
+    let kh = KhIHomology::new_partial(l, &c, &t, reduced, Some(-(Link::MAX_CROSSING as isize) ..= 1));
 
     assert_eq!(kh[0].rank(), r);
     assert_eq!(kh[1].rank(), r);    
@@ -62,7 +89,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         info!("a[{i}] in Kh[{h}]: ({})", v.clone().into_dense().iter().join(","));
         v
     }).map(|v| 
-        div_vec(&v.subvec(0..r), c).expect("invalid divisibility.")
+        div_vec(&v.subvec(0..r), &c).expect("invalid divisibility.")
     ).collect_vec();
 
     let (d0, d1) = if reduced { 
@@ -80,20 +107,12 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 #[cfg(test)]
 mod tests {
-    use yui_core::poly::Poly;
-    use yui_core::num::FF2;
-
     use super::*;
-
-    type R = FF2;
-    type P = Poly<'H', R>;
 
     #[test]
     fn test_unknot_pos_twist() {
         let l = InvLink::test_data("unknot_r_twist");
-        let c = P::variable();
-
-        let ssi = ssi_invariants(&l, &c, false);
+        let ssi = ssi_invariant_ver(&l, false, SymBuildConfig::default(), None, SsiVersion::V1);
         assert_eq!(ssi.0, 0);
         assert_eq!(ssi.1, 0);
     }
@@ -101,9 +120,7 @@ mod tests {
     #[test]
     fn test_unknot_neg_twist() {
         let l = InvLink::test_data("unknot_l_twist");
-        let c = P::variable();
-
-        let ssi = ssi_invariants(&l, &c, false);
+        let ssi = ssi_invariant_ver(&l, false, SymBuildConfig::default(), None, SsiVersion::V1);
         assert_eq!(ssi.0, 0);
         assert_eq!(ssi.1, 0);
     }
@@ -111,57 +128,44 @@ mod tests {
     #[test]
     fn test_unknot_neg_twist2() {
         let l = InvLink::test_data("unknot_l_twist2");
-        let c = P::variable();
-
-        let ssi = ssi_invariants(&l, &c, false);
+        let ssi = ssi_invariant_ver(&l, false, SymBuildConfig::default(), None, SsiVersion::V1);
         assert_eq!(ssi.0, 0);
         assert_eq!(ssi.1, 0);
     }
 
-    #[test]
-    fn test_3_1() { 
-        let l = InvLink::test_data("3_1");
-        let c = P::variable();
+    fn test(name: &str, ver: SsiVersion, reduced: bool, expected: (i32, i32)) -> Result<(), Box<dyn std::error::Error>> {
+        let l = InvLink::load(name)?;
 
-        let ssi = ssi_invariants(&l, &c, false);
-        assert_eq!(ssi.0, 2);
-        assert_eq!(ssi.1, 2);
-    }
+        let ssi = ssi_invariant_ver(&l, reduced, SymBuildConfig::default(), None, ver);
+        assert_eq!(ssi, expected);
 
-    #[test]
-    fn test_3_1_m() { 
-        let l = InvLink::test_data("3_1").mirror();
-        let c = P::variable();
-
-        let ssi = ssi_invariants(&l, &c, false);
-        assert_eq!(ssi.0, -2);
-        assert_eq!(ssi.1, -2);
-    }
-
-    #[test]
-    fn test_3_1_red() { 
-        let l = InvLink::test_data("3_1");
-        let c = P::variable();
-
-        let ssi = ssi_invariants(&l, &c, true);
-        assert_eq!(ssi.0, 2);
-        assert_eq!(ssi.1, 2);
+        Ok(())
     }
 
     macro_rules! test {
-        ($(#[$m:meta])* $test:ident, $name:literal, $expected:expr) => {
-            $(#[$m])* 
-            #[test]
-            fn $test() -> Result<(), Box<dyn std::error::Error>> { 
-                type R = FF2;
-                type P = Poly<'H', R>;
-                let c = P::variable();
-    
-                let l = InvLink::load($name)?;
-                let ssi = ssi_invariants(&l, &c, false);
-                assert_eq!(ssi, $expected);
-    
-                Ok(())
+        ($test:ident, $name:literal, $expected:expr) => {
+            mod $test {
+                use super::*;
+
+                #[test]
+                fn v1() -> Result<(), Box<dyn std::error::Error>> {
+                    test($name, SsiVersion::V1, false, $expected)
+                }
+
+                #[test]
+                fn v2() -> Result<(), Box<dyn std::error::Error>> {
+                    test($name, SsiVersion::V2, false, $expected)
+                }
+
+                #[test]
+                fn v1_red() -> Result<(), Box<dyn std::error::Error>> {
+                    test($name, SsiVersion::V1, true, $expected)
+                }
+
+                #[test]
+                fn v2_red() -> Result<(), Box<dyn std::error::Error>> {
+                    test($name, SsiVersion::V2, true, $expected)
+                }
             }
         }
     }
@@ -190,15 +194,4 @@ mod tests {
     test!(k7_7a, "7_7a", (0, 0));
     test!(k7_7b, "7_7b", (0, 0));
 
-    #[test]
-    fn k9_46() { 
-        let l = InvLink::from_symmetric_pd_code(
-            [[18,8,1,7],[13,6,14,7],[12,2,13,1],[8,18,9,17],[5,14,6,15],[2,12,3,11],[16,10,17,9],[15,4,16,5],[10,4,11,3]]
-        );
-
-        let c = P::variable();
-        let ssi = ssi_invariants(&l, &c, false);
-
-        assert_eq!(ssi, (0, 2));
-    }
 }

@@ -4,7 +4,9 @@ use delegate::delegate;
 use yui_core::{EucRing, EucRingOps, IteratorExt};
 use yui_homology::{ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_link::InvLink;
+use crate::kh::KhComplex;
 use crate::khi::{KhIComplex, KhIGen, KhIGenExt};
+use crate::tng::builder::SymBuildConfig;
 use crate::util::Bigraded;
 
 use super::KhIChain;
@@ -23,6 +25,38 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn new(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self {
         let c = KhIComplex::new(l, h, t, reduced);
         Self::from(&c)
+    }
+
+    // builds one degree wider (for boundary maps), then truncates to `h_range`.
+    pub fn new_partial(l: &InvLink, h: &R, t: &R, reduced: bool, h_range: Option<RangeInclusive<isize>>) -> Self {
+        Self::new_with_config(l, h, t, reduced, SymBuildConfig { h_range, ..Default::default() })
+    }
+
+    // builds one degree wider (for boundary maps), then truncates to `config.h_range`;
+    // the rest of `config` (e.g. `chunk_bound`) flows down to the complex build.
+    pub fn new_with_config(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig) -> Self {
+        let Some(range) = config.h_range.clone() else {
+            return Self::from(&KhIComplex::new_with_config(l, h, t, reduced, config));
+        };
+        let range = KhComplex::<R>::clamp_h_range(l.inner(), reduced, range); // resolve open ends before truncating
+        let (a, b) = (*range.start(), *range.end());
+        let cone_config = SymBuildConfig { h_range: Some((a - 1)..=(b + 1)), ..config };
+        let c = KhIComplex::new_with_config(l, h, t, reduced, cone_config);
+        Self::from_complex(&c, Some(a..=b))
+    }
+
+    fn from_complex(c: &KhIComplex<R>, range: Option<RangeInclusive<isize>>) -> Self {
+        let reduced = c.inner().reduced();
+        let homology = match &range {
+            Some(r) => reduced.homology_in(r.clone()),
+            None    => reduced.homology(),
+        };
+        // drop canon cycles whose h-degree falls outside the requested range (e.g. the Q-side at h+1).
+        let canon_cycles = c.canon_cycles().iter()
+            .filter(|z| range.as_ref().map_or(true, |r| r.contains(&c.h_deg_of_chain(z))))
+            .cloned()
+            .collect();
+        KhIHomology::new_impl(homology, canon_cycles, c.deg_shift())
     }
 
     pub fn new_no_simplify(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self {
@@ -103,11 +137,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 impl<R> From<&KhIComplex<R>> for KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     fn from(c: &KhIComplex<R>) -> Self {
-        KhIHomology::new_impl(
-            c.inner().reduced().homology(),
-            c.canon_cycles().to_vec(),
-            c.deg_shift(),
-        )
+        KhIHomology::from_complex(c, None)
     }
 }
 
@@ -188,8 +218,39 @@ mod tests {
         assert_eq!(khi[4].rank(), 2);
     }
 
+    // canon cycles outside the h-range are dropped: 3_1 has B-cycles at h0 and Q-cycles at h1,
+    // so `..=0` keeps only the 2 B-cycles (was a crash when the Q-cycles indexed an unbuilt degree).
     #[test]
-    fn khi_fbn() { 
+    fn canon_cycles_clipped_to_h_range() {
+        let l = InvLink::test_data("3_1");
+        type P = Poly<'H', FF2>;
+        let (h, t) = (P::variable(), P::zero());
+
+        assert_eq!(KhIHomology::new(&l, &h, &t, false).canon_cycles().len(), 4);
+        let clipped = KhIHomology::new_partial(&l, &h, &t, false, Some(isize::MIN + 1 ..= 0));
+        assert_eq!(clipped.canon_cycles().len(), 2);
+    }
+
+    #[test]
+    fn khi_partial() {
+        // partial KhI homology matches the full result across the whole window.
+        let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
+
+        type R = FF2;
+        let (h, t) = (R::zero(), R::zero());
+        let full = KhIHomology::new(&l, &h, &t, false);
+        let part = KhIHomology::new_partial(&l, &h, &t, false, Some(1..=3));
+
+        for i in 1..=3 {
+            assert_eq!(part[i].rank(), full[i].rank(), "rank at {i}");
+        }
+
+        assert!(part[0].is_zero());
+        assert!(part[4].is_zero());
+    }
+
+    #[test]
+    fn khi_fbn() {
         let l = InvLink::from_symmetric_pd_code([[1,5,2,4],[3,1,4,6],[5,3,6,2]]);
 
         type R = FF2;

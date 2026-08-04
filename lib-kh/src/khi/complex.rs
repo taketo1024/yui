@@ -1,3 +1,12 @@
+//! The involutive Khovanov chain complex `CKhI(D, τ) = Cone(CKh(D) -^{Q(1+τ)}-> Q·CKh(D))`
+//! for a strongly invertible link, where `Q² = 0` (Definition 2.2 of the reference).
+//! Built here as the [`ChainMap::cone`] of `1 + τ`.
+//!
+//! Reference:
+//! - T. Sano, "Involutive Khovanov homology and equivariant knots",
+//!   Algebr. Geom. Topol. 25 (2025), 5059–5111.
+//!   <https://doi.org/10.2140/agt.2025.25.5059>, <https://arxiv.org/abs/2404.08568>
+
 use std::ops::{Index, RangeInclusive};
 use std::sync::OnceLock;
 use delegate::delegate;
@@ -9,6 +18,7 @@ use yui_homology::{ChainComplex1, ChainMap, ToSeqString, ToTableString, GrMod1, 
 use yui_link::InvLink;
 
 use crate::kh::{KhComplex, KhGen};
+use crate::tng::builder::SymBuildConfig;
 use crate::khi::KhIHomology;
 use crate::khi::{KhIGen, KhIGenExt};
 use crate::util::Bigraded;
@@ -28,18 +38,44 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
 impl<R> KhIComplex<R>
 where R: Ring, for<'a> &'a R: RingOps<R> { 
-    pub fn new(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self { 
-        use crate::tng::builder::SymTngBuilder;
+    pub fn new(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self {
+        Self::new_partial(l, h, t, reduced, None)
+    }
 
-        let b = SymTngBuilder::from_inv_link(&l, &h, &t, reduced).run();
-        let tau_map = b.tau_map();
+    // restricts the build to `h_range`; since `KhI_i = C_i ⊕ C_{i-1}`, the cone needs `C` over `[a-1, b]`.
+    pub fn new_partial(l: &InvLink, h: &R, t: &R, reduced: bool, h_range: Option<RangeInclusive<isize>>) -> Self {
+        Self::new_with_config(l, h, t, reduced, SymBuildConfig { h_range, ..Default::default() })
+    }
 
-        let b = b.into_inner();
-        let canon_cycles = b.eval_elements();
-        let complex = b.into_tng_complex().into_raw_complex();
-        let c = KhComplex::from_raw_complex(l.inner(), h, t, reduced, complex, canon_cycles);
+    /// The default KhI construction: the cobordism-level cone (`ConeBuilder`) yields the coned complex
+    /// + canon classes directly, and `into_raw_complex` converts once at the boundary (matrix-backed).
+    /// The equivalent matrix-level cone is kept for reference as `new_with_config_matrix`.
+    pub fn new_with_config(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig) -> Self {
+        let (h_range, build_config) = Self::cone_build_config(l, reduced, config);
+        Self::build_cone(l, h, t, reduced, build_config, h_range)
+    }
 
-        Self::from_kh_complex(c, tau_map)
+    // The ssi (`V2`) entry: `config.h_range` is used literally for the build (the driver pre-widens
+    // it), and only `raw_range` is converted — the solves never touch the other degrees.
+    pub(crate) fn new_windowed(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig, raw_range: RangeInclusive<isize>) -> Self {
+        Self::build_cone(l, h, t, reduced, config, Some(raw_range))
+    }
+
+    fn build_cone(l: &InvLink, h: &R, t: &R, reduced: bool, build_config: SymBuildConfig, raw_range: Option<RangeInclusive<isize>>) -> Self {
+        use crate::tng::builder::ConeBuilder;
+        assert_eq!(R::one() + R::one(), R::zero(), "char(R) != 2"); // the cobordism cone is char-2 only
+
+        let cone = ConeBuilder::from_inv_link(l, h, t, reduced).with_config(build_config).run();
+
+        // sort by h-degree (all `B` then all `Q`) to match the matrix cone's canon-cycle order.
+        let canon_cycles = cone.eval_khi_elements().into_iter()
+            .sorted_by_key(|z| z.keys().map(|x| x.rel_h_deg()).min().unwrap_or(0))
+            .collect_vec();
+
+        let inner = cone.into_raw_complex(raw_range);
+
+        let deg_shift = KhComplex::<R>::deg_shift_for(l.inner(), reduced);
+        Self::new_impl(inner, canon_cycles, deg_shift)
     }
 
     pub fn new_no_simplify(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self {
@@ -52,9 +88,15 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
     pub(crate) fn from_kh_complex<F>(c: KhComplex<R>, map: F) -> Self
     where F: Fn(&KhGen) -> KhGen + Send + Sync + 'static {
-        let deg_shift = c.deg_shift();
+        // the cone extends one degree above the complex.
         let h_range = c.h_range();
         let h_range = *h_range.start() ..= (h_range.end() + 1);
+        Self::cone_of(c, map, h_range)
+    }
+
+    pub(crate) fn cone_of<F>(c: KhComplex<R>, map: F, h_range: RangeInclusive<isize>) -> Self
+    where F: Fn(&KhGen) -> KhGen + Send + Sync + 'static {
+        let deg_shift = c.deg_shift();
 
         let canon_cycles = c.canon_cycles().iter().flat_map(|z| {
             let bz = z.clone().map_keys(KhIGen::from_left);
@@ -139,6 +181,42 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
     fn cached_bigraded(&self) -> &GrMod2<KhIGen, R> {
         self.cache_bigr.get_or_init(|| self.bigraded())
+    }
+
+    // `config.h_range` is the desired cone range `[a, b]`, clamped; since `KhI_i = C_i ⊕ C_{i-1}`,
+    // the build gets `[a-1, b]` while the rest of `config` is kept.
+    fn cone_build_config(l: &InvLink, reduced: bool, config: SymBuildConfig) -> (Option<RangeInclusive<isize>>, SymBuildConfig) {
+        let h_range = config.h_range.clone().map(|r| KhComplex::<R>::clamp_h_range(l.inner(), reduced, r));
+        let build_config = SymBuildConfig {
+            h_range: h_range.as_ref().map(|r| (*r.start() - 1) ..= *r.end()),
+            ..config
+        };
+        (h_range, build_config)
+    }
+}
+
+// Reference: the "honest" matrix-level cone — build the sym `KhComplex`, then cone `(1+τ)` at the
+// matrix level (`cone_of`). Superseded by the cobordism cone in `new_with_config`; kept for
+// cross-checks (see the `cone_canon_ssi_matches_matrix` test).
+#[allow(dead_code)]
+impl<R> KhIComplex<R>
+where R: Ring, for<'a> &'a R: RingOps<R> {
+    fn new_with_config_v1(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig) -> Self {
+        use crate::tng::builder::SymTngBuilder;
+
+        let (h_range, build_config) = Self::cone_build_config(l, reduced, config);
+        let b = SymTngBuilder::from_inv_link(l, h, t, reduced).with_config(build_config).run();
+        let tau_map = b.tau_map();
+
+        let b = b.into_inner();
+        let canon_cycles = b.eval_elements();
+        let complex = b.into_tng_complex().into_raw_complex();
+        let c = KhComplex::from_raw_complex(l.inner(), h, t, reduced, complex, canon_cycles);
+
+        match h_range {
+            Some(range) => Self::cone_of(c, tau_map, range),
+            None => Self::from_kh_complex(c, tau_map),
+        }
     }
 }
 
@@ -405,6 +483,66 @@ mod tests {
             assert_eq!(c[(3, 6)].rank(), 1);
             assert_eq!(c[(3, 8)].rank(), 1);
             assert_eq!(c[(4, 8)].rank(), 1);
+        }
+
+        // the default cobordism cone (`new`) must give the same bigraded homology as the honest
+        // matrix cone (`new_with_config_v1`).
+        #[test]
+        fn cone_matches_v1() {
+            use yui_homology::isize2;
+
+            type R = FF2;
+            let (h, t) = (R::zero(), R::zero());
+
+            let nonzero = |m: &GrMod2<KhIGen, R>| -> Vec<(isize2, usize)> {
+                m.support().map(|&k| (k, m[k].rank())).filter(|(_, r)| *r > 0).sorted().collect()
+            };
+
+            for name in ["3_1", "4_1", "6_3"] {
+                for reduced in [false, true] {
+                    let l = InvLink::test_data(name);
+                    let v1 = KhIComplex::new_with_config_v1(&l, &h, &t, reduced, SymBuildConfig::default()).homology().bigraded();
+                    let v2 = KhIComplex::new(&l, &h, &t, reduced).homology().bigraded();
+                    assert_eq!(nonzero(&v1), nonzero(&v2), "{name} reduced={reduced}");
+                }
+            }
+        }
+
+        // The sym+cone q-filter: over Khovanov (d preserves q), a q-window keeps exactly the
+        // in-window generators, and bigraded KhI homology at each kept (i, q) is unchanged.
+        // Runs the single-pass build (final-merge prune + finalize deloop filter) and a chunked
+        // build (sym chunk-merges too).
+        #[test]
+        fn q_filter_matches_full() {
+            use crate::tng::builder::CutOption;
+            type R = FF2;
+            let l = InvLink::test_data("6_3");
+            let (h, t) = (R::zero(), R::zero());
+
+            let full = KhIComplex::new(&l, &h, &t, false);
+            let (h_range, q_range) = (full.h_range(), full.q_range());
+            let full_h = full.homology();
+
+            let (lo, hi) = (*q_range.start() + 2, *q_range.end() - 2);
+
+            for cut in [CutOption::None, CutOption::Auto(3)] {
+                let config = SymBuildConfig { q_range: Some(lo ..= hi), cut: cut.clone(), ..Default::default() };
+                let win = KhIComplex::new_with_config(&l, &h, &t, false, config);
+
+                for i in win.h_range() {
+                    for x in win[i].raw_generators() {
+                        assert!((lo ..= hi).contains(&win.q_deg_of(x)), "gen out of window: ({i}, {}), cut={cut:?}", win.q_deg_of(x));
+                    }
+                }
+
+                let win_h = win.homology();
+                for i in h_range.clone() {
+                    for q in q_range.clone().step_by(2) {
+                        let expected = if (lo ..= hi).contains(&q) { full_h[(i, q)].rank() } else { 0 };
+                        assert_eq!(win_h[(i, q)].rank(), expected, "rank ({i}, {q}), cut={cut:?}");
+                    }
+                }
+            }
         }
     }
 

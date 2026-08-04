@@ -8,6 +8,7 @@ use yui_link::Link;
 use yui_homology::{ChainComplex1, ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 
 use crate::kh::{KhGen, KhHomology};
+use crate::tng::builder::BuildConfig;
 use crate::util::Bigraded;
 
 use super::KhAlg;
@@ -29,13 +30,26 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
+        Self::new_partial(l, h, t, reduced, None)
+    }
+
+    // restricts the build to `h_range` (literal truncation; `None` = full).
+    pub fn new_partial(l: &Link, h: &R, t: &R, reduced: bool, h_range: Option<RangeInclusive<isize>>) -> Self {
+        Self::new_with_config(l, h, t, reduced, BuildConfig { h_range, ..Default::default() })
+    }
+
+    pub fn new_with_config(l: &Link, h: &R, t: &R, reduced: bool, config: BuildConfig) -> Self {
         use crate::tng::builder::TngComplexBuilder;
 
         assert!(!reduced || (!l.is_empty() && t.is_zero()));
 
-        let b = TngComplexBuilder::from_link(l, h, t, reduced).run();
+        let config = BuildConfig {
+            h_range: config.h_range.map(|r| Self::clamp_h_range(l, reduced, r)),
+            ..config
+        };
+        let b = TngComplexBuilder::from_link(l, h, t, reduced).with_config(config).run();
         let canon_cycles = b.eval_elements();
-        let inner = b.into_tng_complex().into_raw_complex();
+        let inner = b.into_raw_complex(); // applies config.q_range on the no_full_deloop path
 
         KhComplex::from_raw_complex(l, h, t, reduced, inner, canon_cycles)
     }
@@ -73,6 +87,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let q = n_pos - 2 * n_neg;
         let e = if reduced { 1 } else { 0 };
         (h, q + e)
+    }
+
+    /// Clamp an h_range to the degree span, so open-ended ranges (`..=b` / `a..=`) don't overflow
+    /// the build's `(a-1)..=(b+1)` widening. Span = `[deg_shift.0, deg_shift.0 + n_crossings + 1]`.
+    pub fn clamp_h_range(l: &Link, reduced: bool, range: RangeInclusive<isize>) -> RangeInclusive<isize> {
+        let lo = Self::deg_shift_for(l, reduced).0;
+        let hi = lo + l.n_crossings() as isize + 1;
+        (*range.start()).max(lo) ..= (*range.end()).min(hi)
     }
 
     pub fn inner(&self) -> &ChainComplex1<KhGen, R> {

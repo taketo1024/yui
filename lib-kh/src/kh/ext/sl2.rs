@@ -1,3 +1,10 @@
+//! The `e`-operator of the sl₂-action on Khovanov homology, realized as
+//! a chain map of bidegree `(−2, −4)` built by summing colored compositions
+//! `χ_{i₁} · χ_{i₂}` over ordered pairs of crossings.
+//!
+//! Reference:
+//! - T. Sano, "A y-ification of Khovanov homology".
+//!   <https://arxiv.org/abs/2602.17435>
 
 use std::collections::HashMap;
 use std::fmt::Display;

@@ -596,7 +596,7 @@ mod tests {
     fn link_components() {
         let l = Link::test_data("unknot_l_twist");
         let comps = l.comps();
-        assert_eq!(comps, vec![ Path::new(vec![1, 2], true)]);
+        assert_eq!(comps, vec![ Path::circ(vec![1, 2])]);
     }
 
     #[test]

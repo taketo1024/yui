@@ -1,6 +1,11 @@
-// "A family of slice-torus invariants from the divisibility of reduced Lee classes"
-// T. Sano, K. Sato
-// https://arxiv.org/abs/2211.02494
+//! The Rasmussen-type slice-torus invariants `ss̃_c(K) = 2·d_c(D) + w(D) − r(D) + 1`,
+//! where `d_c` is the `c`-divisibility of the (unreduced or reduced) Lee class —
+//! selected by the `reduced` argument to [`ss_invariant`].
+//!
+//! Reference:
+//! - T. Sano and K. Sato, "A family of slice-torus invariants from the divisibility of Lee classes",
+//!   Topol. Appl. 357 (2024), 109059.
+//!   <https://doi.org/10.1016/j.topol.2024.109059>, <https://arxiv.org/abs/2211.02494>
 
 use itertools::Itertools;
 use log::info;
@@ -34,8 +39,9 @@ fn compute_div<R>(l: &Link, c: &R, reduced: bool) -> i32
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
     let r = if reduced { 1 } else { 2 };
 
-    let kh = KhHomology::new(l, c, &R::zero(), reduced).truncated(0..=0);
-    // let kh = KhHomology::new_partial(l, c, &R::zero(), reduced, Some(0..=0));
+    // bottom..=0: building the cheap low degrees and truncating only at the top is faster than
+    // the doubly-truncated `0..=0` slice (which widens to the dense `-1..=1`). Builder clamps the start.
+    let kh = KhHomology::new_partial(l, c, &R::zero(), reduced, Some(-(Link::MAX_CROSSING as isize) ..= 0));
 
     assert_eq!(kh[0].rank(), r);
     info!("Kh[0]: {}", kh[0]);
@@ -49,12 +55,10 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     let ds = zs.iter().enumerate().map(|(i, z)| {
-        let v = kh[0].vectorize_euc(z);
-        info!("a[{i}] in Kh[0]: ({})", v.clone().into_dense().iter().join(","));
-        v
-    }).map(|v| 
-        div_vec(&v.subvec(0..r), c).expect("invalid divisibility.")
-    ).collect_vec();
+        let v = kh[0].vectorize_euc(z).subvec(0..r);
+        info!("a[{i}] in Kh[0]: ({})", v.clone().into_dense().iter().join(", "));
+        div_vec(&v, c).expect("invalid divisibility.")
+    }).collect_vec();
 
     assert!(ds.iter().all_equal());
 
@@ -63,6 +67,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 #[cfg(test)]
 mod tests {
+    use yui_core::num::{FF, FF2, Ratio};
+    use yui_core::poly::Poly;
     use yui_link::Link;
     use super::*;
 
@@ -221,7 +227,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_k14_c2() { 
         let l = Link::test_data("14n_19265");
         let c = 2_i64;
@@ -233,10 +238,49 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_k14_c3() { 
         let l = Link::test_data("14n_19265");
         let c = 3_i64;
+        
+        assert_eq!(ss_invariant(&l, &c, false), 0);
+        assert_eq!(ss_invariant(&l, &c, true ), 0);
+        assert_eq!(ss_invariant(&l.mirror(), &c, false), 0);
+        assert_eq!(ss_invariant(&l.mirror(), &c, true ), 0);
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_k14_QH() { 
+        type Q = Ratio<i64>;
+        type R = Poly<'H', Q>;
+        let l = Link::test_data("14n_19265");
+        let c = R::variable();
+        
+        assert_eq!(ss_invariant(&l, &c, false), 0);
+        assert_eq!(ss_invariant(&l, &c, true ), 0);
+        assert_eq!(ss_invariant(&l.mirror(), &c, false), 0);
+        assert_eq!(ss_invariant(&l.mirror(), &c, true ), 0);
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_k14_F2H() { 
+        type R = Poly<'H', FF2>;
+        let l = Link::test_data("14n_19265");
+        let c = R::variable();
+        
+        assert_eq!(ss_invariant(&l, &c, false), -2);
+        assert_eq!(ss_invariant(&l, &c, true ), -2);
+        assert_eq!(ss_invariant(&l.mirror(), &c, false), 2);
+        assert_eq!(ss_invariant(&l.mirror(), &c, true ), 2);
+    }
+    
+   #[test]
+    #[allow(non_snake_case)]
+    fn test_k14_F3H() { 
+        type R = Poly<'H', FF<3>>;
+        let l = Link::test_data("14n_19265");
+        let c = R::variable();
         
         assert_eq!(ss_invariant(&l, &c, false), 0);
         assert_eq!(ss_invariant(&l, &c, true ), 0);

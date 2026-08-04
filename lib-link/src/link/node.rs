@@ -194,14 +194,14 @@ impl Node {
     pub fn arcs(&self) -> (Path, Path) {
         let comp = |i: usize, j: usize| {
             let (ei, ej) = (self.edges[i], self.edges[j]);
-            if ei == ej { 
-                Path::new(vec![ei], true)
-            } else { 
-                Path::new(vec![ei, ej], false)
+            if ei == ej {
+                Path::circ([ei])
+            } else {
+                Path::arc([ei, ej])
             }
         };
-        match self.node_type { 
-            XL | 
+        match self.node_type {
+            XL |
             XR => (comp(0, 2), comp(1, 3)),
             V  => (comp(0, 3), comp(1, 2)),
             H  => (comp(0, 1), comp(2, 3))

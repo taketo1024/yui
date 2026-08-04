@@ -1,3 +1,12 @@
+//! The chain-level involution `τ : CKh(D) → CKh(D)` induced by the symmetry
+//! of a strongly invertible link diagram (Section 2.1 of the reference).
+//! Used to build the involutive Khovanov complex `CKhI = Cone(1 + τ)`.
+//!
+//! Reference:
+//! - T. Sano, "Involutive Khovanov homology and equivariant knots",
+//!   Algebr. Geom. Topol. 25 (2025), 5059–5111.
+//!   <https://doi.org/10.2140/agt.2025.25.5059>, <https://arxiv.org/abs/2404.08568>
+
 use std::collections::HashMap;
 
 use yui_link::{InvLink, State};

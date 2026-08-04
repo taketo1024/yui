@@ -109,6 +109,36 @@ impl InvLink {
         Self::from_standard_reindex(inner, starts).expect("connected sum is not τ-symmetric")
     }
 
+    /// The 3-pretzel `P(a, b, a)` with its strong inversion (the π-rotation through the middle
+    /// band), reindexed to the standard involution. Standard convention: all-odd 3-pretzel bands
+    /// are anti-parallel, so a positive (right-handed) half-twist is a NEGATIVE crossing —
+    /// `writhe(P(a, b, a)) = -(2a + b)`.
+    pub fn sym_pretzel(a: i32, b: i32, c: i32) -> InvLink {
+        use crate::{LinkBuilder, NodeType::{XL, XR}};
+        assert_eq!(a, c, "the strong inversion needs P(a, b, a)");
+        assert!(a % 2 != 0 && b % 2 != 0, "all-odd parameters required");
+
+        let mut bld = LinkBuilder::new();
+        let ends: Vec<_> = [a, b, c].iter().map(|&v| {
+            let ty = if v > 0 { XR } else { XL };
+            bld.add_v_twist(ty, v.unsigned_abs() as usize) // (sw, se, ne, nw)
+        }).collect();
+        let (sw1, se1, ne1, nw1) = ends[0];
+        let (sw2, se2, ne2, nw2) = ends[1];
+        let (sw3, se3, ne3, nw3) = ends[2];
+
+        bld.connect(ne1, nw2);
+        bld.connect(ne2, nw3);
+        bld.connect(se1, sw2);
+        bld.connect(se2, sw3);
+        bld.connect(nw1, ne3); // spanning top (τ-fixed)
+        bld.connect(sw1, se3); // spanning bottom (τ-fixed)
+
+        let start = bld.edge_at(nw1).unwrap();
+        let link = bld.build().expect("pretzel must be planar").reindexed(start, 1);
+        InvLink::from_symmetric_pd_code(link.pd_code())
+    }
+
     // Strongly-invertible Whitehead double of a symmetric companion. The 2-cable inherits τ; the
     // clasp and `tw` framing twists go in at the *other* on-axis edge (`inv_edge(e) == e`,
     // e ≠ base_pt), split evenly across the axis so the diagram stays τ-invariant. `tw` counts from

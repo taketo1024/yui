@@ -229,12 +229,14 @@ mod tests {
     }
 
     #[test]
+    #[cfg(debug_assertions)] // `Perm::new` validates via `debug_assert!`
     #[should_panic]
     fn new_rejects_duplicate() {
         let _ = Perm::new(vec![0, 0, 1]);
     }
 
     #[test]
+    #[cfg(debug_assertions)] // `Perm::new` validates via `debug_assert!`
     #[should_panic]
     fn new_rejects_out_of_range() {
         let _ = Perm::new(vec![0, 1, 5]);

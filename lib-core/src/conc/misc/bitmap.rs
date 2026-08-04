@@ -188,6 +188,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(debug_assertions)] // the out-of-range guard is a `debug_assert!`
     #[should_panic(expected = "BitMap index")]
     fn small_storage_out_of_range_panics_in_debug() {
         let mut m: BitMap<u8, u8> = BitMap::new();

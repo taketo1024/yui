@@ -5,33 +5,50 @@ use itertools::Itertools;
 use yui_core::{CloneAnd, Sign};
 use yui_core::bitseq::Bit;
 
-use crate::NodeType;
-use crate::link::node::NodeOri;
+use petgraph::Graph;
 
 use super::{Node, Path};
 
 pub type Edge = usize;
 pub type State = yui_core::bitseq::BitSeq;
-pub type XCode = [Edge; 4];
+pub type PDCodeX = [Edge; 4];
 
 #[derive(Debug, Clone)]
-pub struct Link { 
+pub struct Link {
     nodes: Vec<Node>,
-    edges: HashSet<Edge>
+    loops: Vec<Edge>,
+    base_pt: Option<Edge>,
 }
 
 impl Link {
-    pub fn from_nodes(nodes: impl IntoIterator<Item = Node>) -> Self { 
+    pub fn new(
+        nodes: impl IntoIterator<Item = Node>,
+        loops: impl IntoIterator<Item = Edge>,
+    ) -> Self {
         let nodes = nodes.into_iter().collect_vec();
-        let edge_counts = nodes.iter().flat_map(|x| x.edges()).cloned().counts();
+        let loops = loops.into_iter().collect_vec();
 
+        let edge_counts = nodes.iter().flat_map(|x| x.edges()).cloned().counts();
         assert!(
             edge_counts.values().all(|&c| c == 2),
-            "Invalid data: each edge must appear exactly twice."
+            "Invalid data: each edge in the diagram must appear exactly twice."
         );
 
-        let edges: HashSet<_> = edge_counts.into_keys().collect();
-        Self { nodes, edges }
+        let node_edges: HashSet<Edge> = edge_counts.into_keys().collect();
+        let mut loop_set: HashSet<Edge> = HashSet::new();
+        for &e in &loops {
+            assert!(!node_edges.contains(&e), "loop edge {e} is already used in a node");
+            assert!(loop_set.insert(e), "duplicate loop edge: {e}");
+        }
+
+        // Default base_pt to the minimal edge (if any).
+        let base_pt = node_edges.iter().chain(loops.iter()).copied().min();
+
+        Self { nodes, loops, base_pt }
+    }
+
+    pub fn from_nodes(nodes: impl IntoIterator<Item = Node>) -> Self {
+        Self::new(nodes, [])
     }
 
     // Planer Diagram code, represented by sequence of crossings of the form:
@@ -46,14 +63,14 @@ impl Link {
     // see: http://katlas.math.toronto.edu/wiki/Planar_Diagrams
 
     pub fn from_pd_code<I>(pd_code: I) -> Self
-    where I: IntoIterator<Item = XCode> { 
+    where I: IntoIterator<Item = PDCodeX> { 
         use crate::NodeOri::{Up, Right, None};
         
         let nodes = pd_code.into_iter().map(Node::from_pd_code).collect_vec();
         let mut l = Self::from_nodes(nodes); // unoriented
         
         let mut ori = vec![None; l.n_nodes()];
-        let mut remain = l.edges.clone();
+        let mut remain: HashSet<Edge> = l.nodes.iter().flat_map(|x| x.edges().iter().copied()).collect();
 
         while !remain.is_empty() {
             // Take minimal edge-id. 
@@ -91,25 +108,51 @@ impl Link {
 
     pub fn load(name: &str) -> Result<Link, Box<dyn std::error::Error>> {
         let json = yui_core::util::data_dir::load_json("links", name)?;
-        let data: Vec<XCode> = serde_json::from_str(&json)?;
+        let data: Vec<PDCodeX> = serde_json::from_str(&json)?;
         Ok(Link::from_pd_code(data))
     }
 
+    pub fn with_base_pt(mut self, e: Edge) -> Self {
+        let exists = self.nodes.iter().any(|x| x.edges().contains(&e))
+            || self.loops.contains(&e);
+        assert!(exists, "base_pt {e} is not an edge of this link");
+        self.base_pt = Some(e);
+        self
+    }
+
+    pub fn base_pt(&self) -> Option<Edge> {
+        self.base_pt
+    }
+
     pub fn empty() -> Link {
-        Link { nodes: vec![], edges: HashSet::new() }
+        Self::new([], [])
     }
 
     pub fn is_empty(&self) -> bool {
-        self.nodes.is_empty()
+        self.nodes.is_empty() && self.loops.is_empty()
+    }
+
+    #[deprecated]
+    pub fn unknot_old() -> Link {
+        use crate::{NodeType, NodeOri};
+        let n = Node::new(NodeType::H, NodeOri::None, [1, 2, 2, 1]);
+        Self::from_nodes([n])
     }
 
     pub fn unknot() -> Link {
-        let n = Node::new(NodeType::H, NodeOri::None, [1, 2, 2, 1]);
-        Link::from_nodes([n])
+        Self::unlink(1)
+    }
+
+    pub fn unlink(n: usize) -> Link {
+        Self::new([], 1..=n)
     }
 
     pub fn is_knot(&self) -> bool { 
         self.n_comps() == 1
+    }
+
+    pub fn is_oriented(&self) -> bool { 
+        self.nodes().all(|n| n.is_oriented())
     }
 
     pub fn writhe(&self) -> i32 { 
@@ -118,7 +161,12 @@ impl Link {
     }
 
     pub fn mirror(&self) -> Self {
-        Self::from_nodes(self.nodes().map(|x| x.mirror()))
+        let mut l = Self::new(
+            self.nodes().map(|x| x.mirror()),
+            self.loops.iter().copied(),
+        );
+        l.base_pt = self.base_pt;
+        l
     }
 
     pub fn n_nodes(&self) -> usize { 
@@ -157,35 +205,41 @@ impl Link {
         (pos, neg)
     }
 
-    pub fn is_oriented(&self) -> bool { 
-        self.nodes().all(|n| n.is_oriented())
+    pub fn loops(&self) -> &[Edge] {
+        &self.loops
     }
 
-    pub fn n_edges(&self) -> usize { 
-        self.edges.len()
-    }
-    
-    pub fn edges(&self) -> impl Iterator<Item = &Edge> {
-        self.edges.iter()
+    pub fn n_loops(&self) -> usize {
+        self.loops.len()
     }
 
-    pub fn min_edge(&self) -> Option<Edge> { 
-        self.nodes.first().map(|x| x.min_edge())
+    pub fn n_edges(&self) -> usize {
+        self.nodes.len() * 2 + self.loops.len()
     }
 
-    pub fn n_comps(&self) -> usize { 
+    pub fn edges(&self) -> Vec<Edge> {
+        let mut edges: Vec<Edge> = self.nodes.iter()
+            .flat_map(|x| x.edges().iter().copied())
+            .chain(self.loops.iter().copied())
+            .collect();
+        edges.sort();
+        edges.dedup();
+        edges
+    }
+
+    pub fn n_comps(&self) -> usize {
         let mut count = 0;
-        self.traverse_comps(|c, _, _| 
-            if count <= c { count = c + 1 } 
+        self.traverse_comps(|c, _, _|
+            if count <= c { count = c + 1 }
         );
-        count
+        count + self.loops.len()
     }
 
     pub fn comps(&self) -> Vec<Path> {
         let mut comps = vec![];
 
-        self.traverse_comps(|c, i, j| { 
-            if c == comps.len() { 
+        self.traverse_comps(|c, i, j| {
+            if c == comps.len() {
                 comps.push(vec![]);
             }
 
@@ -193,14 +247,17 @@ impl Link {
             comps[c].push(e);
         });
 
-        comps.into_iter().map(Path::circ
-        ).collect()
+        let mut result: Vec<Path> = comps.into_iter().map(Path::circ).collect();
+        for &e in &self.loops {
+            result.push(Path::circ(vec![e]));
+        }
+        result
     }
 
     fn traverse_comps<F>(&self, mut f: F) where 
     F: FnMut(usize, usize, usize) { 
         let mut c = 0; // component counter
-        let mut remain = self.edges.clone();
+        let mut remain: HashSet<Edge> = self.nodes.iter().flat_map(|x| x.edges().iter().copied()).collect();
 
         while !remain.is_empty() {
             // Take minimal edge-id. 
@@ -249,11 +306,13 @@ impl Link {
         })
     }
 
-    pub fn seifert_state(&self) -> State { 
-        // MEMO: no assertion here since `unknot` is not oriented. 
+    pub fn seifert_state(&self) -> State {
+        // NOTE: `Link::unknot_old()` (the deprecated H-node form) is unoriented,
+        // so we cannot assert `is_oriented()` here while it's still callable.
+        // Re-enable once `unknot_old` is removed.
         // assert!(self.is_oriented());
 
-        let seq = self.crossings().map(|x| 
+        let seq = self.crossings().map(|x|
             match x.sign() {
                 Some(Sign::Pos) => 0,
                 Some(Sign::Neg) => 1,
@@ -263,8 +322,45 @@ impl Link {
         State::from_iter(seq)
     }
 
-    pub fn seifert_circles(&self) -> Vec<Path> { 
+    pub fn seifert_circles(&self) -> Vec<Path> {
         self.resolve_by(&self.seifert_state()).comps()
+    }
+
+    pub fn seifert_graph(&self) -> Graph<Path, usize> {
+        assert!(self.is_oriented());
+
+        use crate::NodeType;
+        type G = Graph<Path, usize>;
+
+        let s0 = self.seifert_state();
+        let l0 = self.resolve_by(&s0);
+        let mut graph = Graph::new();
+
+        // Vertices = Seifert circles (and free loops contribute their own circles).
+        for c in l0.comps() {
+            graph.add_node(c);
+        }
+
+        let find_node = |graph: &G, e| {
+            graph.node_indices().find(|&i|
+                graph[i].contains(e)
+            )
+        };
+
+        // Edges = one per original crossing (now resolved into a V/H smoothing).
+        // Free loops have no nodes, so they remain isolated vertices.
+        for (i, x) in l0.nodes().enumerate() {
+            let (e1, e2) = if x.node_type() == NodeType::V {
+                (x.edge(0), x.edge(1))
+            } else {
+                (x.edge(0), x.edge(2))
+            };
+            let n1 = find_node(&graph, e1).unwrap();
+            let n2 = find_node(&graph, e2).unwrap();
+            graph.add_edge(n1, n2, i);
+        }
+
+        graph
     }
 
     pub fn traverse_from<F>(&self, start: (usize, usize), mut f:F) where
@@ -335,7 +431,7 @@ mod tests {
     fn link_from_pd_code() { 
         let l = Link::test_data("unknot_l_twist");
         assert_eq!(l.nodes.len(), 1);
-        assert_eq!(l.node(0).ntype(), XL);
+        assert_eq!(l.node(0).node_type(), XL);
     }
 
     #[test]
@@ -417,10 +513,10 @@ mod tests {
     #[test]
     fn link_mirror() { 
         let l = Link::test_data("unknot_l_twist");
-        assert_eq!(l.node(0).ntype(), XL);
+        assert_eq!(l.node(0).node_type(), XL);
 
         let l = l.mirror();
-        assert_eq!(l.node(0).ntype(), XR);
+        assert_eq!(l.node(0).node_type(), XR);
     }
 
     #[test]
@@ -449,11 +545,78 @@ mod tests {
     }
 
     #[test]
-    fn unknot() { 
-        let l = Link::unknot();
+    #[allow(deprecated)]
+    fn unknot_old() {
+        // Covers the deprecated H-node representation. Drop once `unknot_old`
+        // itself is removed.
+        let l = Link::unknot_old();
         assert_eq!(l.n_crossings(), 0);
         assert_eq!(l.writhe(), 0);
         assert_eq!(l.n_comps(), 1);
+    }
+
+    #[test]
+    fn unknot() {
+        let l = Link::unknot();
+
+        assert!(!l.is_empty());
+        assert!(l.is_oriented());
+        assert!(l.is_knot());
+
+        assert_eq!(l.n_crossings(), 0);
+        assert_eq!(l.writhe(), 0);
+        assert_eq!(l.n_edges(), 1);
+        assert_eq!(l.n_comps(), 1);
+        assert_eq!(l.n_loops(), 1);
+
+        assert_eq!(l.loops(), &[1]);
+        assert_eq!(l.comps(), vec![Path::circ(vec![1])]);
+    }
+
+    #[test]
+    fn unlink_zero() {
+        let l = Link::unlink(0);
+
+        assert!(l.is_empty());
+        assert!(l.is_oriented());
+        assert!(!l.is_knot());
+
+        assert_eq!(l.n_crossings(), 0);
+        assert_eq!(l.writhe(), 0);
+        assert_eq!(l.n_edges(), 0);
+        assert_eq!(l.n_comps(), 0);
+        assert_eq!(l.n_loops(), 0);
+
+        assert_eq!(l.loops(), &[] as &[Edge]);
+        assert_eq!(l.comps(), vec![] as Vec<Path>);
+    }
+
+    #[test]
+    fn unlink_n() {
+        let l = Link::unlink(3);
+
+        assert!(!l.is_empty());
+        assert!(l.is_oriented());
+        assert!(!l.is_knot());
+
+        assert_eq!(l.n_crossings(), 0);
+        assert_eq!(l.writhe(), 0);
+        assert_eq!(l.n_edges(), 3);
+        assert_eq!(l.n_comps(), 3);
+        assert_eq!(l.n_loops(), 3);
+
+        assert_eq!(l.loops(), &[1, 2, 3]);
+        assert_eq!(
+            l.comps(),
+            vec![Path::circ(vec![1]), Path::circ(vec![2]), Path::circ(vec![3])]
+        );
+    }
+
+    #[test]
+    fn mirror_preserves_loops() {
+        let l = Link::unlink(1).mirror();
+        assert_eq!(l.n_loops(), 1);
+        assert_eq!(l.loops(), &[1]);
     }
 
     #[test]
@@ -506,5 +669,57 @@ mod tests {
 
         assert_eq!(l.node(1),  &Node::new(XL, NodeOri::Up, [3,6,4,1]));
         assert_eq!(l2.node(1), &Node::new(XR, NodeOri::Up, [3,6,4,1]));
+    }
+
+    #[test]
+    fn base_pt_default_min_edge() {
+        // Defaults to the minimal edge of the link.
+        let l = Link::test_data("3_1");
+        assert_eq!(l.base_pt(), Some(1));
+
+        // Empty link has no edge, so base_pt is None.
+        assert_eq!(Link::empty().base_pt(), None);
+    }
+
+    #[test]
+    fn with_base_pt_sets_base_pt() {
+        let l = Link::test_data("3_1").with_base_pt(1);
+        assert_eq!(l.base_pt(), Some(1));
+    }
+
+    #[test]
+    fn with_base_pt_on_loop() {
+        let l = Link::unlink(3).with_base_pt(2);
+        assert_eq!(l.base_pt(), Some(2));
+    }
+
+    #[test]
+    fn mirror_preserves_base_pt() {
+        let l = Link::test_data("3_1").with_base_pt(3).mirror();
+        assert_eq!(l.base_pt(), Some(3));
+    }
+
+    #[test]
+    #[should_panic]
+    fn with_base_pt_invalid_panics() {
+        // Edge 99 is not in the trefoil's edge set.
+        let _ = Link::test_data("3_1").with_base_pt(99);
+    }
+
+    #[test]
+    fn seifert_graph_trefoil() {
+        let l = Link::test_data("3_1");
+        let g = l.seifert_graph();
+        assert_eq!(g.node_count(), 2);
+        assert_eq!(g.edge_count(), 3);
+    }
+
+    #[test]
+    fn seifert_graph_unlink() {
+        // Free loops contribute isolated vertices and no edges.
+        let l = Link::unlink(3);
+        let g = l.seifert_graph();
+        assert_eq!(g.node_count(), 3);
+        assert_eq!(g.edge_count(), 0);
     }
 }

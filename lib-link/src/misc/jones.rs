@@ -74,10 +74,42 @@ mod tests {
     }
 
     #[test]
-    fn hopf_link() { 
+    fn hopf_link() {
         let l = Link::test_data("L2a1");
         let p = jones_polynomial(&l);
         let q = P::mono;
         assert_eq!(p, P::from_iter([(q(-6), 1), (q(-4), 1), (q(-2), 1), (q(0), 1)]));
+    }
+
+    #[test]
+    fn unlink_2_loops() {
+        // J(unlink(2)) = (q + q^{-1})^2 = q^{-2} + 2 + q^2.
+        let l = Link::unlink(2);
+        let p = jones_polynomial(&l);
+        let q = P::mono;
+        assert_eq!(p, P::from_iter([(q(-2), 1), (q(0), 2), (q(2), 1)]));
+    }
+
+    #[test]
+    fn unlink_3_loops() {
+        // J(unlink(3)) = (q + q^{-1})^3 = q^{-3} + 3 q^{-1} + 3 q + q^3.
+        let l = Link::unlink(3);
+        let p = jones_polynomial(&l);
+        let q = P::mono;
+        assert_eq!(p, P::from_iter([(q(-3), 1), (q(-1), 3), (q(1), 3), (q(3), 1)]));
+    }
+
+    #[test]
+    fn trefoil_with_free_loop() {
+        // J(L ⊔ unknot) = J(L) · (q + q^{-1}).
+        let trefoil = Link::test_data("3_1");
+        let p_trefoil = jones_polynomial(&trefoil);
+
+        let l = Link::new(trefoil.nodes().cloned(), [7]);
+        let p = jones_polynomial(&l);
+
+        let q = P::mono;
+        let q_factor = P::from_iter([(q(-1), 1), (q(1), 1)]);
+        assert_eq!(p, p_trefoil * q_factor);
     }
 }

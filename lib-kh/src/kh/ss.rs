@@ -66,7 +66,7 @@ mod tests {
 
     #[test]
     fn test_unknot() { 
-        let l = Link::unknot();
+        let l = Link::unknot_old();
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), 0);

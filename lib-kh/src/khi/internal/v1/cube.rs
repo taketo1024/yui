@@ -37,7 +37,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         let state_map = State::generate(n).map(|s| { 
             let t = State::from_iter((0..n).map(|i| {
                 let x = l.node(i);
-                let tx = l.inv_x(x);
+                let tx = l.inv_node(x);
                 let ti = x_index[tx];
                 s[ti]
             }));
@@ -54,7 +54,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
             let r = v.circles().len();
             let map = (0..r).map(|i| {
                 let c0 = &v.circles()[i];
-                let e = l.inv_e(c0.min_edge());
+                let e = l.inv_edge(c0.min_edge());
                 let Some((j, c1)) = w.circles().iter().find_position(|c| c.contains(e)) else { 
                     panic!()
                 };

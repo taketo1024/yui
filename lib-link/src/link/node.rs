@@ -68,23 +68,23 @@ impl NodeOri {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Node { 
-    ntype: NodeType,
+    node_type: NodeType,
     pub(crate) ori: NodeOri,
     edges: [Edge; 4],
 }
 
 impl Node {
-    pub fn new(ntype: NodeType, ori: NodeOri, edges: [Edge; 4]) -> Self { 
-        assert!(ori.is_compatible(ntype), "Invalid (node-type, ori) combination: ({ntype}, {ori})");
-        Node { ntype, edges, ori }
+    pub fn new(node_type: NodeType, ori: NodeOri, edges: [Edge; 4]) -> Self { 
+        assert!(ori.is_compatible(node_type), "Invalid (node-type, ori) combination: ({node_type}, {ori})");
+        Node { node_type, edges, ori }
     }
 
     pub fn from_pd_code(edges: [Edge; 4]) -> Self { 
         Node::new(NodeType::XL, NodeOri::None, edges)
     }
 
-    pub fn ntype(&self) -> NodeType { 
-        self.ntype
+    pub fn node_type(&self) -> NodeType { 
+        self.node_type
     }
 
     pub fn edge(&self, i: usize) -> Edge { 
@@ -106,24 +106,24 @@ impl Node {
     }
 
     pub fn is_crossing(&self) -> bool { 
-        matches!(self.ntype, XL | XR)
+        matches!(self.node_type, XL | XR)
     }
 
     pub fn is_resolved(&self) -> bool { 
-        matches!(self.ntype, V | H)
+        matches!(self.node_type, V | H)
     }
 
     pub fn resolve(&self, r: Bit) -> Self {
         use Bit::{Bit0, Bit1};
 
         self.clone_and(|x| {
-            x.ntype = match (x.ntype, r) {
+            x.node_type = match (x.node_type, r) {
                 (XL, Bit0) | (XR, Bit1) => H,
                 (XL, Bit1) | (XR, Bit0) => V,
-                _ => panic!("cannot resolve node-type: {}", x.ntype)
+                _ => panic!("cannot resolve node-type: {}", x.node_type)
             };
 
-            if !x.ori.is_compatible(x.ntype) {
+            if !x.ori.is_compatible(x.node_type) {
                 x.ori = NodeOri::None
             }
         })
@@ -149,17 +149,17 @@ impl Node {
         use NodeType::*;
         use NodeOri::*;
 
-        match (self.ntype, self.ori) { 
+        match (self.node_type, self.ori) { 
             (XL, Left) | (XL, Right) | (XR, Up) | (XR, Down)  => Some(Sign::Pos),
             (XL, Up) | (XL, Down) |(XR, Left) | (XR, Right)   => Some(Sign::Neg),
             (_, None) | (V, Up) | (V, Down) | (H, Left) | (H, Right) => Option::None, 
-            _ => panic!("Invalid (node-type, ori) combination: ({}, {})", self.ntype, self.ori)
+            _ => panic!("Invalid (node-type, ori) combination: ({}, {})", self.node_type, self.ori)
         }
     }
 
     pub fn mirror(&self) -> Self { 
         self.clone_and(|x| 
-            x.ntype = self.ntype.mirror()
+            x.node_type = self.node_type.mirror()
         )
     }
 
@@ -176,7 +176,7 @@ impl Node {
                 Path::new(vec![ei, ej], false)
             }
         };
-        match self.ntype { 
+        match self.node_type { 
             XL | 
             XR => (comp(0, 2), comp(1, 3)),
             V  => (comp(0, 3), comp(1, 2)),
@@ -187,7 +187,7 @@ impl Node {
     pub fn convert_edges<F>(&self, f: F) -> Self
     where F: Fn(Edge) -> Edge { 
         Self { 
-            ntype: self.ntype, 
+            node_type: self.node_type, 
             ori:   self.ori,
             edges: self.edges.map(f)
         }
@@ -196,7 +196,7 @@ impl Node {
     pub(crate) fn counter_pos(&self, index:usize) -> usize { 
         assert!((0..4).contains(&index));
 
-        match self.ntype {
+        match self.node_type {
             XL | XR => (index + 2) % 4,
             V => 3 - index,
             H => (5 - index) % 4
@@ -206,7 +206,7 @@ impl Node {
 
 impl Display for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{:?}", self.ntype, self.edges)
+        write!(f, "{}{:?}", self.node_type, self.edges)
     }
 }
 
@@ -261,7 +261,7 @@ mod tests {
         for (ntype, ori, bit, expected_ntype, expected_ori) in cases {
             let c = node(ntype, ori).resolve(bit);
             assert!(c.is_resolved());
-            assert_eq!(c.ntype(), expected_ntype);
+            assert_eq!(c.node_type(), expected_ntype);
             assert_eq!(c.ori(), expected_ori);
         }
     }
@@ -284,7 +284,7 @@ mod tests {
 
         for (ntype, ori, expected_ntype, expected_ori) in cases {
             let c = node(ntype, ori).mirror();
-            assert_eq!(c.ntype(), expected_ntype);
+            assert_eq!(c.node_type(), expected_ntype);
             assert_eq!(c.ori(), expected_ori);
         }
     }

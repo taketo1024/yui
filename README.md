@@ -28,8 +28,8 @@ Inside that dir, data is partitioned by kind, e.g. `<data_dir>/links/3_1.json`, 
 To populate it from the [KnotInfo](https://knotinfo.org/) database:
 
 ```bash
-python3 scripts/fetch-knotinfo-data.py            # writes to the default data dir
-python3 scripts/fetch-knotinfo-data.py --out DIR  # or to a custom directory
+python3 scripts/fetch-knot-data.py            # writes to the default data dir
+python3 scripts/fetch-knot-data.py --out DIR  # or to a custom directory
 ```
 
 ## License

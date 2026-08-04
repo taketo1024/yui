@@ -1,30 +1,30 @@
 use yui_core::{Ring, RingOps};
-use yui_link::{Edge, Link, State};
+use yui_link::{Link, State};
 
 use crate::ext::LinkExt;
 use crate::kh::{KhAlgGen, KhChain, KhComplex, KhState, KhTensor};
 
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    pub(crate) fn make_canon_cycles(l: &Link, base: Edge, a: &R, b: &R, reduced: bool, deg_shift: (isize, isize)) -> Vec<KhChain<R>> {
+    pub(crate) fn make_canon_cycles(l: &Link, a: &R, b: &R, reduced: bool, deg_shift: (isize, isize)) -> Vec<KhChain<R>> {
         if reduced { 
             vec![
-                Self::make_canon_cycle(l, base, a, b, deg_shift),
+                Self::make_canon_cycle(l, a, b, deg_shift),
             ]
         } else { 
             vec![
-                Self::make_canon_cycle(l, base, a, b, deg_shift),
-                Self::make_canon_cycle(l, base, b, a, deg_shift),
+                Self::make_canon_cycle(l, a, b, deg_shift),
+                Self::make_canon_cycle(l, b, a, deg_shift),
             ]
         }
     }
 
-    fn make_canon_cycle(l: &Link, base: Edge, a: &R, b: &R, deg_shift: (isize, isize)) -> KhChain<R> {
+    fn make_canon_cycle(l: &Link, a: &R, b: &R, deg_shift: (isize, isize)) -> KhChain<R> {
         let s = l.seifert_state();
         let x_a = Self::color_factor(a); // X - a
         let x_b = Self::color_factor(b); // X - b
 
-        let colors = l.colored_seifert_circles(base);
+        let colors = l.colored_seifert_circles();
         let xs = colors.into_iter().map(|(_, c)| if c.is_a() {
             &x_a
         } else { 
@@ -71,10 +71,9 @@ mod tests {
     #[test]
     fn trefoil() { 
         let l = Link::test_data("3_1").mirror();
-        let p = l.min_edge().unwrap();
         let r = false;
         let c = KhComplex::new_no_simplify(&l, &1, &0, r);
-        let zs = KhComplex::make_canon_cycles(&l, p, &0, &1, r, c.deg_shift());
+        let zs = KhComplex::make_canon_cycles(&l, &0, &1, r, c.deg_shift());
 
         assert_eq!(zs.len(), 2);
         assert_ne!(zs[0], zs[1]);
@@ -91,10 +90,9 @@ mod tests {
     #[test]
     fn figure8() { 
         let l = Link::test_data("4_1");
-        let p = l.min_edge().unwrap();
         let r = false;
         let c = KhComplex::new_no_simplify(&l, &1, &0, r);
-        let zs = KhComplex::make_canon_cycles(&l, p, &0, &1, r, c.deg_shift());
+        let zs = KhComplex::make_canon_cycles(&l, &0, &1, r, c.deg_shift());
         
         assert_eq!(zs.len(), 2);
         assert_ne!(zs[0], zs[1]);
@@ -111,10 +109,9 @@ mod tests {
     #[test]
     fn trefoil_red() { 
         let l = Link::test_data("3_1").mirror();
-        let p = l.min_edge().unwrap();
         let r = true;
         let c = KhComplex::new_no_simplify(&l, &1, &0, r);
-        let zs = KhComplex::make_canon_cycles(&l, p, &0, &1, r, c.deg_shift());
+        let zs = KhComplex::make_canon_cycles(&l, &0, &1, r, c.deg_shift());
 
         assert_eq!(zs.len(), 1);
 
@@ -130,10 +127,9 @@ mod tests {
     #[test]
     fn figure8_red() { 
         let l = Link::test_data("4_1");
-        let p = l.min_edge().unwrap();
         let r = true;
         let c = KhComplex::new_no_simplify(&l, &1, &0, r);
-        let zs = KhComplex::make_canon_cycles(&l, p, &0, &1, r, c.deg_shift());
+        let zs = KhComplex::make_canon_cycles(&l, &0, &1, r, c.deg_shift());
         
         assert_eq!(zs.len(), 1);
 

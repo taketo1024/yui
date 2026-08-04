@@ -45,6 +45,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn cc_map1<'a>(c1: &'a KhComplex<R>, c2: &'a KhComplex<R>, l: &Link, i: usize) -> KhChainMap<'a, 'static, R> {
         assert!(l.node(i).is_crossing());
+        assert!(!c1.is_reduced() || l.base_pt().is_some());
 
         let deg = c2.deg_shift().0 - c1.deg_shift().0 - 1;
         let c2_deg_shift = c2.deg_shift();
@@ -54,8 +55,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         // TODO We don't want to reproduce the cube.
         let (h, t) = c1.str().ht();
-        let red_e = if c1.is_reduced() { l.min_edge() } else { None };
-        let cube = KhCube::new(l, h, t, red_e, c1.deg_shift());
+        let base_pt = if c1.is_reduced() { l.base_pt() } else { None };
+        let cube = KhCube::new(l, h, t, base_pt, c1.deg_shift());
 
         ChainMap::new(c1.inner(), c2.inner(), deg, move |_, z| {
             z.apply(|x: &KhState| {

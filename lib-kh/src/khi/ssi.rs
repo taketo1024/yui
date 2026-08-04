@@ -80,7 +80,6 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 mod tests {
     use yui_core::poly::Poly;
     use yui_core::num::FF2;
-    use yui_link::Link;
 
     use super::*;
 
@@ -88,12 +87,8 @@ mod tests {
     type P = Poly<'H', R>;
 
     #[test]
-    fn test_unknot_pos_twist() { 
-        let l = InvLink::new(
-            Link::test_data("unknot_r_twist"),
-            |e| e,
-            Some(1)
-        );
+    fn test_unknot_pos_twist() {
+        let l = InvLink::test_data("unknot_r_twist");
         let c = P::variable();
 
         let ssi = ssi_invariants(&l, &c, false);
@@ -102,12 +97,8 @@ mod tests {
     }
 
     #[test]
-    fn test_unknot_neg_twist() { 
-        let l = InvLink::new(
-            Link::test_data("unknot_l_twist"),
-            |e| e,
-            Some(1)
-        );
+    fn test_unknot_neg_twist() {
+        let l = InvLink::test_data("unknot_l_twist");
         let c = P::variable();
 
         let ssi = ssi_invariants(&l, &c, false);
@@ -116,12 +107,8 @@ mod tests {
     }
 
     #[test]
-    fn test_unknot_neg_twist2() { 
-        let l = InvLink::new(
-            Link::test_data("unknot_l_twist2"),
-            |e| (5 - e) % 4 + 1,
-            Some(1)
-        );
+    fn test_unknot_neg_twist2() {
+        let l = InvLink::test_data("unknot_l_twist2");
         let c = P::variable();
 
         let ssi = ssi_invariants(&l, &c, false);
@@ -131,7 +118,7 @@ mod tests {
 
     #[test]
     fn test_3_1() { 
-        let l = InvLink::load("3_1").unwrap();
+        let l = InvLink::test_data("3_1");
         let c = P::variable();
 
         let ssi = ssi_invariants(&l, &c, false);
@@ -141,7 +128,7 @@ mod tests {
 
     #[test]
     fn test_3_1_m() { 
-        let l = InvLink::load("3_1").unwrap().mirror();
+        let l = InvLink::test_data("3_1").mirror();
         let c = P::variable();
 
         let ssi = ssi_invariants(&l, &c, false);
@@ -151,7 +138,7 @@ mod tests {
 
     #[test]
     fn test_3_1_red() { 
-        let l = InvLink::load("3_1").unwrap();
+        let l = InvLink::test_data("3_1");
         let c = P::variable();
 
         let ssi = ssi_invariants(&l, &c, true);

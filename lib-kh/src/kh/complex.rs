@@ -44,16 +44,15 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         assert!(!reduced || (!l.is_empty() && t.is_zero()));
 
-        let red_e = reduced.then(|| l.min_edge().unwrap());
+        let base_pt = if reduced { l.base_pt() } else { None };
         let deg_shift = Self::deg_shift_for(l, reduced);
         
-        let cube = KhCube::new(l, h, t, red_e, deg_shift);
+        let cube = KhCube::new(l, h, t, base_pt, deg_shift);
         let str = cube.str().clone();
         let complex = cube.clone().into_complex();
 
         let canon_cycles = if t.is_zero() && l.is_knot() {
-            let p = l.min_edge().unwrap();
-            Self::make_canon_cycles(l, p, &R::zero(), h, reduced, deg_shift)
+            Self::make_canon_cycles(l, &R::zero(), h, reduced, deg_shift)
         } else { 
             vec![]
         };

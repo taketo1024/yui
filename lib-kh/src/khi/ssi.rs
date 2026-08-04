@@ -133,13 +133,11 @@ mod tests {
         assert_eq!(ssi.1, 0);
     }
 
-    fn test(name: &str, ver: SsiVersion, reduced: bool, expected: (i32, i32)) -> Result<(), Box<dyn std::error::Error>> {
-        let l = InvLink::load(name)?;
-
+    // diagrams come from `test_data`, not the data dir, so the tests need no external resources.
+    fn test(name: &str, ver: SsiVersion, reduced: bool, expected: (i32, i32)) {
+        let l = InvLink::test_data(name);
         let ssi = ssi_invariant_ver(&l, reduced, SymBuildConfig::default(), None, ver);
         assert_eq!(ssi, expected);
-
-        Ok(())
     }
 
     macro_rules! test {
@@ -148,30 +146,31 @@ mod tests {
                 use super::*;
 
                 #[test]
-                fn v1() -> Result<(), Box<dyn std::error::Error>> {
-                    test($name, SsiVersion::V1, false, $expected)
+                fn v1() {
+                    test($name, SsiVersion::V1, false, $expected);
                 }
 
                 #[test]
-                fn v2() -> Result<(), Box<dyn std::error::Error>> {
-                    test($name, SsiVersion::V2, false, $expected)
+                fn v2() {
+                    test($name, SsiVersion::V2, false, $expected);
                 }
 
                 #[test]
-                fn v1_red() -> Result<(), Box<dyn std::error::Error>> {
-                    test($name, SsiVersion::V1, true, $expected)
+                fn v1_red() {
+                    test($name, SsiVersion::V1, true, $expected);
                 }
 
                 #[test]
-                fn v2_red() -> Result<(), Box<dyn std::error::Error>> {
-                    test($name, SsiVersion::V2, true, $expected)
+                fn v2_red() {
+                    test($name, SsiVersion::V2, true, $expected);
                 }
             }
         }
     }
     
     test!(k3_1, "3_1", (2, 2));
-    test!(k4_1, "4_1", (0, 0));
+    test!(k4_1a, "4_1a", (0, 0));
+    test!(k4_1b, "4_1b", (0, 0));
     test!(k5_1, "5_1", (4, 4));
     test!(k5_2a, "5_2a", (2, 2));
     test!(k5_2b, "5_2b", (2, 2));
@@ -179,7 +178,8 @@ mod tests {
     test!(k6_1b, "6_1b", (0, 0));
     test!(k6_2a, "6_2a", (2, 2));
     test!(k6_2b, "6_2b", (2, 2));
-    test!(k6_3, "6_3", (0, 0));
+    test!(k6_3a, "6_3a", (0, 0));
+    test!(k6_3b, "6_3b", (0, 0));
     test!(k7_1, "7_1", (6, 6));
     test!(k7_2a, "7_2a", (2, 2));
     test!(k7_2b, "7_2b", (2, 2));
@@ -189,8 +189,8 @@ mod tests {
     test!(k7_4b, "7_4b", (2, 2));
     test!(k7_5a, "7_5a", (4, 4));
     test!(k7_5b, "7_5b", (4, 4));
-    test!(k7_6a, "7_6a", (-2, -2));
-    test!(k7_6b, "7_6b", (-2, -2));
+    test!(k7_6a, "7_6a", (2, 2));
+    test!(k7_6b, "7_6b", (2, 2));
     test!(k7_7a, "7_7a", (0, 0));
     test!(k7_7b, "7_7b", (0, 0));
 

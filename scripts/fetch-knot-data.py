@@ -19,7 +19,8 @@ Output layout:
 
 The PD / braid columns are looked up by header name (row 0 of the sheet),
 so column reordering upstream does not break the script. The inv_link/
-directory is always copied from the repo's `lib-link/resources/inv_link/`,
+directory is always copied from the repo's `lib-link/resources/inv_link/`
+(the Lamm bundle's lamm/A, lamm/B, lamm/two_bridge are flattened into it),
 regardless of whether the .xls download happens.
 
 Requires: Python 3.8+ and xlrd<2.0  (`pip install 'xlrd<2.0'`).
@@ -95,17 +96,34 @@ def parse_array(s: str, kind: str, name: str):
         return None
 
 
-def copy_bundled_resources(out_dir: Path, force: bool) -> None:
-    """Copy bundled JSON resources (inv_link/*.json) from the repo into out_dir."""
+def copy_bundled_resources(out_dir: Path, force: bool, clean: bool = False) -> None:
+    """Copy bundled JSON resources (inv_link/*.json) from the repo into out_dir.
+
+    Copying only ever adds, so a resource deleted from the repo would linger in an
+    existing data dir and keep loading. `clean` first removes the directories this
+    function owns (the top-level names under resources/), leaving the downloaded
+    links/ and braid/ untouched.
+    """
     repo_root = Path(__file__).resolve().parent.parent
     src_root = repo_root / "lib-link" / "resources"
     if not src_root.exists():
         print(f"  skip resource copy: {src_root} not found", file=sys.stderr)
         return
 
+    if clean:
+        for owned in {p.parts[0] for p in (s.relative_to(src_root) for s in src_root.rglob("*.json"))}:
+            target = out_dir / owned
+            if target.is_dir():
+                shutil.rmtree(target)
+                print(f"  cleaned {target}")
+
     copied = skipped = 0
     for src in src_root.rglob("*.json"):
         rel = src.relative_to(src_root)
+        # the Lamm bundle is grouped by construction in the repo (lamm/A, lamm/B,
+        # lamm/two_bridge); flatten it into inv_link/ so names load directly.
+        if rel.parts[:2] == ("inv_link", "lamm"):
+            rel = Path("inv_link") / rel.name
         dst = out_dir / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         if dst.exists() and not force:
@@ -176,6 +194,9 @@ def main():
                     help="use this .xls file instead of downloading")
     ap.add_argument("--force", action="store_true",
                     help="overwrite existing JSON files")
+    ap.add_argument("--clean", action="store_true",
+                    help="remove bundled-resource dirs (inv_link/) before copying, so resources "
+                         "deleted from the repo do not linger")
     ap.add_argument("--keep-xls", action="store_true",
                     help="keep the downloaded .xls (only relevant without --in)")
     args = ap.parse_args()
@@ -186,7 +207,7 @@ def main():
         if not args.src.exists():
             sys.exit(f"error: input file not found: {args.src}")
         convert(args.src, out_dir, args.force)
-        copy_bundled_resources(out_dir, args.force)
+        copy_bundled_resources(out_dir, args.force, args.clean)
         return
 
     # Download to a temp file
@@ -195,7 +216,7 @@ def main():
     try:
         download_xls(xls)
         convert(xls, out_dir, args.force)
-        copy_bundled_resources(out_dir, args.force)
+        copy_bundled_resources(out_dir, args.force, args.clean)
     finally:
         if args.keep_xls:
             print(f"    kept .xls at: {xls}")

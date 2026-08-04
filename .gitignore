@@ -8,3 +8,6 @@
 /.venv/
 /references/
 /.claude/settings.local.json
+
+# Python bytecode from scripts/
+__pycache__/

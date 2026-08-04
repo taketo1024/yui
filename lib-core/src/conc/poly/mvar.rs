@@ -5,12 +5,11 @@
 use std::fmt::{Display, Debug};
 use std::ops::{AddAssign, MulAssign, Mul, Div, DivAssign, SubAssign, Add};
 use std::str::FromStr;
-use std::hash::Hash;
 use num_traits::{Zero, One, Pow, ToPrimitive, FromPrimitive};
 use itertools::Itertools;
 use auto_impl_ops::auto_ops;
 
-use crate::{Elem, ElemBase};
+use crate::{MathType, IndexType};
 use crate::lc::LcKey;
 use crate::util::format::subscript;
 use super::{Mono, MultiDeg, MonoOrd};
@@ -195,15 +194,15 @@ where I: ToPrimitive {
     }
 }
 
-impl<const X: char, I> Elem for MultiVar<X, I>
-where I: ElemBase + ToPrimitive { 
+impl<const X: char, I> MathType for MultiVar<X, I>
+where I: IndexType + ToPrimitive { 
     fn math_symbol() -> String {
         format!("{X}")
     }
 }
 
 impl<const X: char, I> LcKey for MultiVar<X, I>
-where I: ElemBase + Zero + Ord + Hash + ToPrimitive + for<'x> Add<&'x I, Output = I> {}
+where I: IndexType + Zero + ToPrimitive + for<'x> Add<&'x I, Output = I> {}
 
 macro_rules! impl_multivar_unsigned {
     ($I:ty) => {
@@ -298,7 +297,7 @@ where X: ToString, I: 'a + ToPrimitive, S: IntoIterator<Item = (X, &'a I)> {
 
 #[cfg(feature = "tex")]
 mod tex {
-    use crate::tex::TeX;
+    use crate::TeX;
     use super::*;
 
     impl<const X: char, I> TeX for MultiVar<X, I>

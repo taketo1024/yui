@@ -1,14 +1,21 @@
+//! Integer extension traits and concrete impls for `i32`, `i64`, `i128`, and `BigInt`.
+//!
+//! See: <https://en.wikipedia.org/wiki/Integer>
+
 use num_bigint::BigInt;
 use num_traits::{One, Signed, ToPrimitive, FromPrimitive};
 use crate::*;
 
+/// Helper trait bundling [`EucRingOps`] for [`IntType`].
 pub trait IntOps<T = Self>: EucRingOps<T> {}
 
-pub trait Integer: EucRing + IntOps + Signed + PartialOrd + Ord + FromPrimitive + ToPrimitive
+/// Integers: a signed, totally-ordered [`EucRing`] convertible to and from
+/// the native numeric types.
+pub trait IntType: EucRing + IntOps + Signed + PartialOrd + Ord + FromPrimitive + ToPrimitive
 where for<'a> &'a Self: EucRingOps<Self> {}
 
 impl<T> DivRound for T
-where T: Integer, for<'x> &'x T: IntOps<T> {
+where T: IntType, for<'x> &'x T: IntOps<T> {
     fn div_round(&self, q: &Self) -> Self {
         let a = self.to_f64().unwrap();
         let b = q.to_f64().unwrap();
@@ -33,7 +40,7 @@ macro_rules! impl_integer {
         impl_ops!(EucRingOps, $type);
         impl_ops!(IntOps, $type);
 
-        impl Elem for $type {
+        impl MathType for $type {
             fn math_symbol() -> String { 
                 String::from("Z")
             }
@@ -83,7 +90,7 @@ macro_rules! impl_integer {
             }
         }
 
-        impl Integer for $type {}
+        impl IntType for $type {}
     }
 }
 
@@ -92,15 +99,16 @@ impl_integer!(i64);
 impl_integer!(i128);
 impl_integer!(BigInt);
 
+
 #[cfg(feature = "tex")] 
 mod tex {
-    use crate::tex::TeX;
+    use crate::TeX;
     use num_bigint::BigInt;
-
-    macro_rules! impl_tex {
+    
+    macro_rules! impl_tex_int {
         ($type:ident) => {
             impl TeX for $type {
-                fn tex_math_symbol() -> String { 
+                fn tex_math_symbol() -> String {
                     String::from("\\mathbb{Z}")
                 }
                 fn tex_string(&self) -> String {
@@ -110,10 +118,10 @@ mod tex {
         }
     }
 
-    impl_tex!(i32);
-    impl_tex!(i64);
-    impl_tex!(i128);
-    impl_tex!(BigInt);        
+    impl_tex_int!(i32);
+    impl_tex_int!(i64);
+    impl_tex_int!(i128);
+    impl_tex_int!(BigInt);
 }
 
 #[cfg(test)]
@@ -122,7 +130,7 @@ mod tests {
 
     #[test]
     fn check_type() {
-        fn check<T>() where T: Integer, for<'a> &'a T: IntOps<T> {}
+        fn check<T>() where T: IntType, for<'a> &'a T: IntOps<T> {}
         check::<i32>();
         check::<i64>();
         check::<i128>();
@@ -205,7 +213,7 @@ mod tests {
     #[cfg(feature = "tex")]
     #[test]
     fn tex() { 
-        use crate::tex::*;
+        use crate::TeX;
         assert_eq!(i32::tex_math_symbol(), "\\mathbb{Z}");
         assert_eq!((-2).tex_string(), "-2");
     }

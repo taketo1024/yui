@@ -3,7 +3,7 @@ use crate::app::utils::*;
 use crate::app::err::*;
 use std::marker::PhantomData;
 use std::str::FromStr;
-use yui_core::tex::TeX;
+use yui_core::TeX;
 use yui_core::{Ring, RingOps};
 use yui_homology::DisplayTable;
 use yui_homology::{ChainComplexTrait, GridTrait, SummandTrait};
@@ -156,7 +156,7 @@ where
 
     fn flush(&mut self) -> String { 
         let res = std::mem::take(&mut self.buff);
-        res.trim().to_string()
+        res.trim_end().to_string()
     }
 }
 

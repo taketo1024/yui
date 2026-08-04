@@ -6,7 +6,7 @@
 
 use std::ops::{Mul, MulAssign};
 use num_traits::One;
-use crate::Elem;
+use crate::MathType;
 
 /// Helper trait bundling `Mul` impls so [`Mon`] can require all four
 /// reference variants (`T * T`, `T * &T`, `&T * T`, `&T * &T`) via one HRTB.
@@ -22,7 +22,7 @@ pub trait MonOps<T = Self>:
 ///
 /// See: <https://en.wikipedia.org/wiki/Monoid>
 pub trait Mon:
-    Elem +
+    MathType +
     One +
     MonOps +
     MulAssign +

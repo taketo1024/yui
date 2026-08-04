@@ -5,7 +5,7 @@
 
 use std::ops::{Add, AddAssign};
 use num_traits::Zero;
-use crate::Elem;
+use crate::MathType;
 
 /// Helper trait bundling `Add` impls so [`AddMon`] can require all four
 /// reference variants (`T + T`, `T + &T`, `&T + T`, `&T + &T`) via one HRTB.
@@ -20,7 +20,7 @@ pub trait AddMonOps<T = Self>:
 /// See: <https://en.wikipedia.org/wiki/Monoid>,
 /// <https://en.wikipedia.org/wiki/Commutative_monoid>
 pub trait AddMon:
-    Elem +
+    MathType +
     Zero +
     AddMonOps +                       // T + T -> T, T + &T -> T
     AddAssign +                       // T += T

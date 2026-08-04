@@ -13,7 +13,8 @@ use std::ops::{Mul, Add, Sub, Neg, AddAssign, SubAssign, MulAssign, Div, DivAssi
 use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
 
-use crate::{EucRing, EucRingOps, Elem, Mon, AddMon, AddGrp, AddMonOps, AddGrpOps, MonOps, RingOps, Ring, FieldOps, Field, Integer, IntOps};
+use crate::{EucRing, EucRingOps, MathType, Mon, AddMon, AddGrp, AddMonOps, AddGrpOps, MonOps, RingOps, Ring, FieldOps, Field};
+use super::int::{IntType, IntOps};
 
 /// A fraction `numer / denom` over a [`EucRing`] `T`, kept in reduced form.
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -286,7 +287,7 @@ decl_alg_ops!(RingOps);
 decl_alg_ops!(EucRingOps);
 decl_alg_ops!(FieldOps);
 
-impl<T> Elem for Ratio<T> 
+impl<T> MathType for Ratio<T> 
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     fn math_symbol() -> String {
         let t = T::math_symbol();
@@ -342,7 +343,7 @@ impl<T> Field for Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {}
 
 impl<T> Ratio<T>
-where T: Integer, for<'x> &'x T: IntOps<T> {
+where T: IntType, for<'x> &'x T: IntOps<T> {
     pub fn abs(&self) -> Self {
         if self.numer.is_negative() { 
             -self
@@ -359,7 +360,7 @@ where T: Integer, for<'x> &'x T: IntOps<T> {
 }
 
 impl<T> Ord for Ratio<T>
-where T: Integer, for<'x> &'x T: IntOps<T> {
+where T: IntType, for<'x> &'x T: IntOps<T> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let l = self.to_f64();
         let r = other.to_f64();
@@ -368,7 +369,7 @@ where T: Integer, for<'x> &'x T: IntOps<T> {
 }
 
 impl<T> PartialOrd for Ratio<T> 
-where T: Integer, for<'x> &'x T: IntOps<T> {
+where T: IntType, for<'x> &'x T: IntOps<T> {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         Some(self.cmp(other))
     }
@@ -376,11 +377,11 @@ where T: Integer, for<'x> &'x T: IntOps<T> {
 
 #[cfg(feature = "tex")] 
 mod tex {
-    use crate::tex::TeX;
+    use crate::TeX;
     use super::*;
 
     impl<T> TeX for Ratio<T> 
-    where T: TeX + Elem {
+    where T: TeX + MathType {
         fn tex_math_symbol() -> String { 
             let t = T::math_symbol();
             if &t == "Z" { 
@@ -620,7 +621,7 @@ mod tests {
     #[test]
     #[cfg(feature = "tex")]
     fn tex() { 
-        use crate::tex::TeX;
+        use crate::TeX;
         assert_eq!(Ratio::<i32>::tex_math_symbol(), "\\mathbb{Q}");
 
         let a = Ratio::new(43, 1);

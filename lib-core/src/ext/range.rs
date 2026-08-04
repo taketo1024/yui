@@ -1,6 +1,8 @@
 use std::ops::{Add, Neg, Range, RangeInclusive, Sub};
 
-pub trait RangeExt 
+/// Shift the endpoints of a [`Range`] or [`RangeInclusive`] by independent
+/// left/right offsets.
+pub trait RangeExt
 where Self::Idx: Copy, Self: Sized {
     type Idx; 
     fn mv(&self, l: Self::Idx, r: Self::Idx) -> Self;

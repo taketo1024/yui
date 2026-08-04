@@ -1,5 +1,8 @@
 //! The finite field 𝔽₂ = ℤ/2ℤ with two elements `0` and `1`.
 //!
+//! Specialized over [`FF<2>`](super::FF) — stores a single `bool` and
+//! implements addition/multiplication as direct `^` (XOR) / `&` (AND).
+//!
 //! See: <https://en.wikipedia.org/wiki/GF(2)>
 
 use std::fmt::{Debug, Display};
@@ -9,7 +12,7 @@ use num_integer::Integer;
 use num_traits::{One, Pow, ToPrimitive, Zero};
 use auto_impl_ops::auto_ops;
 
-use crate::{Elem, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, EucRingOps, AddMon, AddGrp, Mon, Ring, EucRing, Field};
+use crate::{MathType, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, EucRingOps, AddMon, AddGrp, Mon, Ring, EucRing, Field};
 
 /// An element of the finite field 𝔽₂.
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
@@ -144,7 +147,7 @@ impl_alg_ops!(RingOps);
 impl_alg_ops!(EucRingOps);
 impl_alg_ops!(FieldOps);
 
-impl Elem for FF2 {
+impl MathType for FF2 {
     fn math_symbol() -> String {
         String::from("F₂")
     }
@@ -181,7 +184,7 @@ impl Field for FF2 {}
 
 #[cfg(feature = "tex")] 
 mod tex {
-    use crate::tex::TeX;
+    use crate::TeX;
     use super::*;
 
     impl TeX for FF2 {
@@ -317,7 +320,7 @@ mod tests {
     #[cfg(feature = "tex")]
     #[test]
     fn tex() { 
-        use crate::tex::TeX;
+        use crate::TeX;
         assert_eq!(FF2::tex_math_symbol(), "\\mathbb{F}_2");
         assert_eq!(FF2::from(5).tex_string(), "1");
     }

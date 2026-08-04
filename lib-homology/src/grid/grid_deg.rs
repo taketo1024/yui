@@ -1,25 +1,13 @@
-use std::hash::Hash;
-use std::fmt::{Display, Debug};
 use std::ops::{Add, Sub};
 use num_traits::Zero;
+use yui_core::IndexType;
 
 pub trait GridDeg:
-    Sized
-    + Display
-    + Default
-    + Clone
+    IndexType
     + Copy
-    + PartialEq
-    + Eq
-    + PartialOrd
-    + Ord
-    + Hash
     + Zero
     + Add<Output = Self>
     + Sub<Output = Self>
-    + Send
-    + Sync
-    + 'static
 {}
 
 impl GridDeg for isize {}

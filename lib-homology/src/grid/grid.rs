@@ -242,7 +242,7 @@ impl<E: Display> DisplayTable<isize> for Grid<isize2, E> {
 #[cfg(feature = "tex")]
 pub mod tex { 
     use super::*;
-    use yui_core::tex::{TeX, tex_table};
+    use yui_core::{TeX, tex_table};
 
     pub trait TeXTable<I> {
         fn tex_table(&self, caption: &str, head: &str) -> String;

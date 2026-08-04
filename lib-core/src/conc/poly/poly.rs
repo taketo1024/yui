@@ -21,7 +21,7 @@ use delegate::delegate;
 use num_traits::{Zero, One, Pow};
 use auto_impl_ops::auto_ops;
 
-use crate::{Elem, AddMon, AddMonOps, AddGrp, AddGrpOps, Mon, MonOps, Ring, RingOps, EucRing, EucRingOps, Field, FieldOps};
+use crate::{MathType, AddMon, AddMonOps, AddGrp, AddGrpOps, Mon, MonOps, Ring, RingOps, EucRing, EucRingOps, Field, FieldOps};
 use crate::lc::Lc;
 use super::{MultiDeg, Var, Var2, Var3,MultiVar, Mono, MonoOrd};
 
@@ -428,7 +428,7 @@ impl_alg_op!(AddGrpOps);
 impl_alg_op!(MonOps);
 impl_alg_op!(RingOps);
 
-impl<X, R> Elem for PolyBase<X, R>
+impl<X, R> MathType for PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     fn math_symbol() -> String {
         format!("{}[{}]", R::math_symbol(), X::math_symbol())
@@ -541,7 +541,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {}
 
 #[cfg(feature = "tex")]
 mod tex {
-    use crate::tex::TeX;
+    use crate::TeX;
     use super::*;
 
     impl<X, R> TeX for PolyBase<X, R>
@@ -1022,7 +1022,7 @@ mod tests {
     #[test]
     #[cfg(feature = "tex")]
     fn tex() { 
-        use crate::tex::TeX;
+        use crate::TeX;
         type P = LPolyN::<'x', i32>; 
 
         assert_eq!(P::tex_math_symbol(), "\\mathbb{Z}[x_1,\\ldots]");

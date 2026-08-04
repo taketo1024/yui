@@ -7,7 +7,8 @@ use itertools::Itertools;
 use log::info;
 use rayon::prelude::*;
 use yui_core::bitseq::{Bit, BitSeq};
-use yui_core::{KeyedUnionFind, Ring, RingOps};
+use yui_core::algo::KeyedUnionFind;
+use yui_core::{Ring, RingOps};
 use yui_homology::DisplaySeq;
 use yui_link::{Node, Edge, InvLink};
 
@@ -134,10 +135,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
         }
 
-        u.group().into_iter().fold(vec![], |mut res, next| { 
-            if let Some(x) = next.iter().next() { 
+        u.into_disjoint().into_iter().fold(vec![], |mut res, next| {
+            if let Some(x) = next.first() {
                 let tx = self.inv_x(x);
-                if !res.contains(&tx) { 
+                if !res.contains(&tx) {
                     res.extend(next);
                 }
             }

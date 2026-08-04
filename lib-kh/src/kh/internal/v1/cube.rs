@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ops::RangeInclusive;
 use itertools::Itertools;
 use num_traits::Zero;
-use yui_core::{Ring, RingOps, PowMod2, Sign, GetSign};
+use yui_core::{Ring, RingOps, Sign};
 use yui_homology::{ChainComplex, Grid, Summand};
 use yui_link::{Link, State, Path, Edge};
 
@@ -104,7 +104,7 @@ impl KhCubeEdge {
         let i = (0..n).find(|&i| from[i] != to[i]).unwrap();
         let k = (0..i).filter(|&j| from[j].is_one()).count() as u32;
 
-        (-1).pow_mod2(k).sign()
+        Sign::from_parity(k)
     }
 }
 

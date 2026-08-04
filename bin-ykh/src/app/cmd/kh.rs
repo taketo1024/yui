@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 use std::str::FromStr;
-use yui_core::tex::TeX;
+use yui_core::TeX;
 use yui_core::{EucRing, EucRingOps};
 use yui_homology::{DisplaySeq, DisplayTable, GridTrait, SummandTrait};
 use yui_kh::kh::KhHomology;
@@ -183,7 +183,7 @@ where
 
     fn flush(&mut self) -> String { 
         let res = std::mem::take(&mut self.buff);
-        res.trim().to_string()
+        res.trim_end().to_string()
     }
 }
 

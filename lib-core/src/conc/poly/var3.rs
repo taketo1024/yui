@@ -2,13 +2,12 @@
 
 use core::panic;
 use std::fmt::{Display, Debug};
-use std::hash::Hash;
 use std::ops::{AddAssign, Mul, MulAssign, DivAssign, SubAssign, Div, Add};
 use std::str::FromStr;
 use num_traits::{Zero, One, Pow, FromPrimitive, ToPrimitive};
 use auto_impl_ops::auto_ops;
 
-use crate::{Elem, ElemBase};
+use crate::{MathType, IndexType};
 use crate::lc::LcKey;
 
 use super::{Mono, MonoOrd};
@@ -195,15 +194,15 @@ where I: ToPrimitive {
     }
 }
 
-impl<const X: char, const Y: char, const Z: char, I> Elem for Var3<X, Y, Z, I>
-where I: ElemBase + ToPrimitive { 
+impl<const X: char, const Y: char, const Z: char, I> MathType for Var3<X, Y, Z, I>
+where I: IndexType + ToPrimitive { 
     fn math_symbol() -> String {
         format!("{X}, {Y}, {Z}")
     }
 }
         
 impl<const X: char, const Y: char, const Z: char, I> LcKey for Var3<X, Y, Z, I>
-where I: ElemBase + Copy + Hash + Ord + for<'x> Add<&'x I, Output = I> + ToPrimitive {}
+where I: IndexType + Copy + for<'x> Add<&'x I, Output = I> + ToPrimitive {}
 
 macro_rules! impl_trivar_unsigned {
     ($I:ty) => {
@@ -262,7 +261,7 @@ impl_trivar_signed!  (isize);
 
 #[cfg(feature = "tex")] 
 mod tex {
-    use crate::tex::TeX;
+    use crate::TeX;
     use super::*;
 
     impl<const X: char, const Y: char, const Z: char, I> TeX for Var3<X, Y, Z, I>

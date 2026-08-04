@@ -1,8 +1,10 @@
+mod int;
 mod ratio;
 mod f2;
 mod ff;
 mod qint;
 
+pub use int::*;
 pub use ratio::*;
 pub use f2::*;
 pub use ff::*;

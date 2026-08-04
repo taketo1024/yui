@@ -28,14 +28,15 @@ use std::fmt::{Display, Debug};
 use std::ops::{Add, Neg, Sub, Mul, AddAssign, SubAssign, MulAssign, Rem, Div, RemAssign, DivAssign};
 use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
-use crate::{AddGrp, AddGrpOps, AddMon, AddMonOps, DivRound, Elem, EucRing, EucRingOps, Mon, MonOps, Ring, RingOps, Integer, IntOps};
+use crate::{AddGrp, AddGrpOps, AddMon, AddMonOps, DivRound, MathType, EucRing, EucRingOps, Mon, MonOps, Ring, RingOps};
+use super::int::{IntType, IntOps};
 
 /// A quadratic integer in `ℤ[ω]`, represented by `(a, b)` for `a + b·ω`.
 ///
 /// See the module-level docs for the meaning of `ω` and the const `D`.
 #[derive(Clone, Default, PartialEq, Eq)]
 pub struct QuadInt<I, const D: i32>(I, I)
-where I: Integer, for<'x> &'x I: IntOps<I>;
+where I: IntType, for<'x> &'x I: IntOps<I>;
 
 /// Gaussian integers: `ℤ[i] = QuadInt<I, -1>`.
 pub type GaussInt<I> = QuadInt<I, -1>;
@@ -44,7 +45,7 @@ pub type GaussInt<I> = QuadInt<I, -1>;
 pub type EisenInt<I> = QuadInt<I, -3>;
 
 impl<I, const D: i32> QuadInt<I, D>
-where I: Integer, for<'x> &'x I: IntOps<I> {
+where I: IntType, for<'x> &'x I: IntOps<I> {
     pub fn new(a: I, b: I) -> Self { 
         assert!(D % 4 != 0);
         Self(a, b)
@@ -121,14 +122,14 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 }
 
 impl<I, const D: i32> From<I> for QuadInt<I, D>
-where I: Integer, for<'x> &'x I: IntOps<I> {
+where I: IntType, for<'x> &'x I: IntOps<I> {
     fn from(i: I) -> Self {
         Self::new(i, I::zero())
     }
 }
 
 impl<I, const D: i32> FromStr for QuadInt<I, D>
-where I: Integer + FromStr, for<'x> &'x I: IntOps<I> {
+where I: IntType + FromStr, for<'x> &'x I: IntOps<I> {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -155,7 +156,7 @@ where I: FromStr, J: FromStr {
 }
 
 impl<I, const D: i32> Display for QuadInt<I, D>
-where I: Integer, for<'x> &'x I: IntOps<I> {
+where I: IntType, for<'x> &'x I: IntOps<I> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let (a, b) = self.pair();
         let x = if D == -1 { "i" } else { "ω" };
@@ -181,14 +182,14 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 }
 
 impl<I, const D: i32> Debug for QuadInt<I, D>
-where I: Integer, for<'x> &'x I: IntOps<I> {
+where I: IntType, for<'x> &'x I: IntOps<I> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Display::fmt(self, f)
     }
 }
 
 impl<I, const D: i32> Zero for QuadInt<I, D>
-where I: Integer, for<'x> &'x I: IntOps<I> {
+where I: IntType, for<'x> &'x I: IntOps<I> {
     fn zero() -> Self {
         Self::new(I::zero(), I::zero())
     }
@@ -199,7 +200,7 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 }
 
 impl<I, const D: i32> One for QuadInt<I, D>
-where I: Integer, for<'x> &'x I: IntOps<I> {
+where I: IntType, for<'x> &'x I: IntOps<I> {
     fn one() -> Self {
         Self::new(I::one(), I::zero())
     }
@@ -215,7 +216,7 @@ impl_add_op!(Sub, sub);
 
 #[auto_ops]
 impl<'b, I, const D: i32> Mul<&'b QuadInt<I, D>> for &QuadInt<I, D>
-where I: Integer, for<'x> &'x I: IntOps<I> {
+where I: IntType, for<'x> &'x I: IntOps<I> {
     type Output = QuadInt<I, D>;
 
     fn mul(self, rhs: &'b QuadInt<I, D>) -> Self::Output {
@@ -268,7 +269,7 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 // Div / Rem for GaussInt (D = -1).
 
 impl<I> DivRound for GaussInt<I>
-where I: Integer, for<'x> &'x I: IntOps<I> {
+where I: IntType, for<'x> &'x I: IntOps<I> {
     fn div_round(&self, rhs: &Self) -> Self {
         let norm = rhs.norm();
         let w = self * &rhs.conj();
@@ -282,7 +283,7 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 
 #[auto_ops]
 impl<'b, I> Div<&'b GaussInt<I>> for &GaussInt<I>
-where I: Integer, for<'x> &'x I: IntOps<I> {
+where I: IntType, for<'x> &'x I: IntOps<I> {
     type Output = GaussInt<I>;
 
     fn div(self, rhs: &'b GaussInt<I>) -> Self::Output {
@@ -292,8 +293,8 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 
 #[auto_ops]
 impl<'b, I> Rem<&'b GaussInt<I>> for &GaussInt<I>
-where I: Integer, for<'x> &'x I: IntOps<I> {
-    type Output = QuadInt<I, -1>;
+where I: IntType, for<'x> &'x I: IntOps<I> {
+    type Output = GaussInt<I>;
 
     fn rem(self, rhs: &'b GaussInt<I>) -> Self::Output {
         let q = self / rhs;
@@ -304,7 +305,7 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 // Div / Rem for EisenInt (D = -3).
 
 impl<I> DivRound for EisenInt<I>
-where I: Integer, for<'x> &'x I: IntOps<I> {
+where I: IntType, for<'x> &'x I: IntOps<I> {
     //  z / w = (x + y ω) / N(w) 
     //        = (x + y) / N(w) + y / N(w) (ω - 1).
     //
@@ -326,7 +327,7 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 
 #[auto_ops]
 impl<'b, I> Div<&'b EisenInt<I>> for &EisenInt<I>
-where I: Integer, for<'x> &'x I: IntOps<I> {
+where I: IntType, for<'x> &'x I: IntOps<I> {
     type Output = EisenInt<I>;
 
     fn div(self, rhs: &'b EisenInt<I>) -> Self::Output {
@@ -336,7 +337,7 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 
 #[auto_ops]
 impl<'b, I> Rem<&'b EisenInt<I>> for &EisenInt<I>
-where I: Integer, for<'x> &'x I: IntOps<I> {
+where I: IntType, for<'x> &'x I: IntOps<I> {
     type Output = EisenInt<I>;
 
     fn rem(self, rhs: &'b EisenInt<I>) -> Self::Output {
@@ -352,8 +353,8 @@ impl_alg_op!(RingOps);
 impl_alg_op_d!(EucRingOps, -1);
 impl_alg_op_d!(EucRingOps, -3);
 
-impl<I, const D: i32> Elem for QuadInt<I, D>
-where I: Integer, for<'x> &'x I: IntOps<I> {
+impl<I, const D: i32> MathType for QuadInt<I, D>
+where I: IntType, for<'x> &'x I: IntOps<I> {
     fn math_symbol() -> String {
         if D == -1 { 
             String::from("Z[i]")
@@ -364,16 +365,16 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 }
 
 impl<I, const D: i32> AddMon for QuadInt<I, D> 
-where I: Integer, for<'x> &'x I: IntOps<I> {}
+where I: IntType, for<'x> &'x I: IntOps<I> {}
 
 impl<I, const D: i32> AddGrp for QuadInt<I, D> 
-where I: Integer, for<'x> &'x I: IntOps<I> {}
+where I: IntType, for<'x> &'x I: IntOps<I> {}
 
 impl<I, const D: i32> Mon for QuadInt<I, D> 
-where I: Integer, for<'x> &'x I: IntOps<I> {}
+where I: IntType, for<'x> &'x I: IntOps<I> {}
 
 impl<I, const D: i32> Ring for QuadInt<I, D> 
-where I: Integer, for<'x> &'x I: IntOps<I> {
+where I: IntType, for<'x> &'x I: IntOps<I> {
     // see: https://en.wikipedia.org/wiki/Quadratic_integer#Units
     fn is_unit(&self) -> bool {
         self.norm().is_unit()
@@ -434,17 +435,17 @@ where I: Integer, for<'x> &'x I: IntOps<I> {
 }
 
 impl<I> EucRing for QuadInt<I, -1> 
-where I: Integer, for<'x> &'x I: IntOps<I> {}
+where I: IntType, for<'x> &'x I: IntOps<I> {}
 
 impl<I> EucRing for QuadInt<I, -3> 
-where I: Integer, for<'x> &'x I: IntOps<I> {}
+where I: IntType, for<'x> &'x I: IntOps<I> {}
 
 // -- macros -- //
 
 macro_rules! impl_unop {
     ($trait:ident, $method:ident) => {
         impl<I, const D: i32> $trait for QuadInt<I, D>
-        where I: Integer, for<'x> &'x I: IntOps<I> {
+        where I: IntType, for<'x> &'x I: IntOps<I> {
             type Output = Self;
 
             fn $method(self) -> Self::Output {
@@ -454,7 +455,7 @@ macro_rules! impl_unop {
         }
 
         impl<'a, I, const D: i32> $trait for &'a QuadInt<I, D>
-        where I: Integer, for<'x> &'x I: IntOps<I> {
+        where I: IntType, for<'x> &'x I: IntOps<I> {
             type Output = QuadInt<I, D>;
 
             fn $method(self) -> Self::Output {
@@ -469,7 +470,7 @@ macro_rules! impl_add_op {
     ($trait:ident, $method:ident) => {
         #[auto_ops]
         impl<'a, 'b, I, const D: i32> $trait<&'b QuadInt<I, D>> for &'a QuadInt<I, D>
-        where I: Integer, for<'x> &'x I: IntOps<I> {
+        where I: IntType, for<'x> &'x I: IntOps<I> {
             type Output = QuadInt<I, D>;
 
             fn $method(self, rhs: &'b QuadInt<I, D>) -> Self::Output {
@@ -484,20 +485,20 @@ macro_rules! impl_add_op {
 macro_rules! impl_alg_op {
     ($trait:ident) => {
         impl<I, const D: i32> $trait<Self> for QuadInt<I, D> 
-        where I: Integer, for<'x> &'x I: IntOps<I> {}
+        where I: IntType, for<'x> &'x I: IntOps<I> {}
 
         impl<'a, I, const D: i32> $trait<QuadInt<I, D>> for &'a QuadInt<I, D> 
-        where I: Integer, for<'x> &'x I: IntOps<I> {}
+        where I: IntType, for<'x> &'x I: IntOps<I> {}
     };
 }
 
 macro_rules! impl_alg_op_d {
     ($trait:ident, $d:literal) => {
         impl<I> $trait<Self> for QuadInt<I, $d> 
-        where I: Integer, for<'x> &'x I: IntOps<I> {}
+        where I: IntType, for<'x> &'x I: IntOps<I> {}
 
         impl<'a, I> $trait<QuadInt<I, $d>> for &'a QuadInt<I, $d> 
-        where I: Integer, for<'x> &'x I: IntOps<I> {}
+        where I: IntType, for<'x> &'x I: IntOps<I> {}
     };
 }
 

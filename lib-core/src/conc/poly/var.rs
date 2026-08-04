@@ -5,13 +5,12 @@
 //! <https://en.wikipedia.org/wiki/Laurent_polynomial>
 
 use std::fmt::{Display, Debug};
-use std::hash::Hash;
 use std::ops::{AddAssign, Mul, MulAssign, DivAssign, SubAssign, Div};
 use std::str::FromStr;
 use num_traits::{Zero, One, ToPrimitive, Pow, FromPrimitive};
 use auto_impl_ops::auto_ops;
 
-use crate::{Elem, ElemBase};
+use crate::{MathType, IndexType};
 use crate::lc::LcKey;
 use crate::util::format::superscript;
 use super::{Mono, MonoOrd};
@@ -107,15 +106,15 @@ where I: ToPrimitive {
     }
 }
 
-impl<const X: char, I> Elem for Var<X, I>
-where I: ElemBase + ToPrimitive { 
+impl<const X: char, I> MathType for Var<X, I>
+where I: IndexType + ToPrimitive { 
     fn math_symbol() -> String {
         format!("{X}")
     }
 }
 
 impl<const X: char, I> MonoOrd for Var<X, I> 
-where I: ElemBase + Hash + Ord + ToPrimitive {
+where I: IndexType + ToPrimitive {
     fn cmp_lex(&self, other: &Self) -> std::cmp::Ordering {
         I::cmp(&self.0, &other.0)
     }
@@ -126,7 +125,7 @@ where I: ElemBase + Hash + Ord + ToPrimitive {
 }
 
 impl<const X: char, I> LcKey for Var<X, I> 
-where I: ElemBase + Hash + Ord + ToPrimitive {}
+where I: IndexType + ToPrimitive {}
 
 macro_rules! impl_univar_unsigned {
     ($I:ty) => {
@@ -185,7 +184,7 @@ impl_univar_signed!  (isize);
 
 #[cfg(feature = "tex")] 
 mod tex {
-    use crate::tex::TeX;
+    use crate::TeX;
     use super::*;
 
     impl<const X: char, I> TeX for Var<X, I>

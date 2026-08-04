@@ -1,12 +1,12 @@
 use std::ops::{Index, RangeInclusive};
 use std::sync::OnceLock;
 use delegate::delegate;
-use yui_core::{EucRing, EucRingOps};
+use yui_core::{EucRing, EucRingOps, IteratorExt};
 use yui_homology::{DisplaySeq, DisplayTable, Grid2, GridIter, GridTrait, Homology, Summand, SummandTrait};
 use yui_link::InvLink;
 use crate::kh::KhChainExt;
 use crate::khi::{KhIComplex, KhIState};
-use crate::misc::{make_gen_grid, range_of};
+use crate::misc::make_gen_grid;
 
 use super::KhIChain;
 
@@ -35,15 +35,15 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     pub fn h_range(&self) -> RangeInclusive<isize> {
-        range_of(self.support().filter(|&&i|
+        self.support().filter(|&&i|
             !self[i].is_zero()
-        ).copied())
+        ).copied().range().unwrap_or(0..=-1)
     }
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
-        range_of(self.support().flat_map(|&i|
+        self.support().flat_map(|&i|
             self[i].generators().map(|z| z.q_deg())
-        ))
+        ).range().unwrap_or(0..=-1)
     }
     
     pub fn canon_cycles(&self) -> &[KhIChain<R>] { 

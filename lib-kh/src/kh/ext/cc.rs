@@ -1,15 +1,14 @@
 use itertools::Itertools;
 use yui_core::bitseq::Bit;
 use yui_core::lc::Lc;
-use yui_core::{CloneAnd, Ring, RingOps, Sign};
+use yui_core::{Ring, RingOps, Sign};
 use yui_homology::ChainMap;
 use yui_link::{Link, Path, State};
 use num_traits::Zero;
 
-use crate::kh::internal::v1::cube::KhCube;
-use crate::kh::{KhAlg, KhChain, KhState, KhComplex, KhAlgGen, KhTensor};
+use crate::kh::{KhAlg, KhCube, KhChain, KhGen, KhComplex, KhAlgGen, KhTensor};
 
-pub type KhChainMap<'a, 'c, R> = ChainMap<'a, 'c, isize, KhState, KhState, R>;
+pub type KhChainMap<'a, 'c, R> = ChainMap<'a, 'c, isize, KhGen, KhGen, R>;
 
 impl<R> KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> { 
@@ -24,19 +23,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn cc_map0<'a>(c1: &'a KhComplex<R>, c2: &'a KhComplex<R>, i: usize) -> KhChainMap<'a, 'static, R> {
         let deg = c2.deg_shift().0 - c1.deg_shift().0 + 1;
-        let c2_deg_shift = c2.deg_shift();
 
         ChainMap::new(c1.inner(), c2.inner(), deg, move |_, z| {
-            z.apply(|x: &KhState| {
-                if !x.state[i].is_zero() {
+            z.apply(|x: &KhGen| {
+                if !x.state()[i].is_zero() {
                     return KhChain::zero();
                 }
 
-                let e = Sign::from_parity( count_1s(&x.state, i) );
-                let y = x.clone_and(|y| {
-                    y.state.set_1(i);
-                    y.deg_shift = c2_deg_shift;
-                });
+                let e = Sign::from_parity( count_1s(x.state(), i) );
+                let t = x.state().edit(|s| s.set_1(i));
+                let y = KhGen::new(t, *x.tensor());
 
                 KhChain::from(y) * R::from_sign(e)
             })
@@ -48,37 +44,35 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(!c1.is_reduced() || l.base_pt().is_some());
 
         let deg = c2.deg_shift().0 - c1.deg_shift().0 - 1;
-        let c2_deg_shift = c2.deg_shift();
 
-        let alg = c1.str().clone();
+        let alg = c1.alg().clone();
         let (a0, a1) = l.node(i).resolve(Bit::Bit0).arcs();
 
         // TODO We don't want to reproduce the cube.
-        let (h, t) = c1.str().ht();
+        let (h, t) = c1.alg().ht();
         let base_pt = if c1.is_reduced() { l.base_pt() } else { None };
         let cube = KhCube::new(l, h, t, base_pt, c1.deg_shift());
 
         ChainMap::new(c1.inner(), c2.inner(), deg, move |_, z| {
-            z.apply(|x: &KhState| {
-                if !x.state[i].is_one() { 
+            z.apply(|x: &KhGen| {
+                if !x.state()[i].is_one() {
                     return KhChain::zero();
                 }
 
-                let circles = cube.vertex(&x.state).circles();
+                let circles = cube.vertex(x.state()).circles();
                 let (k0, k1) = (circle_index(circles, &a0), circle_index(circles, &a1));
 
-                if k0 == k1 { 
+                if k0 == k1 {
                     return Lc::zero();
                 }
 
-                let mut s = x.state;
-                s.set_0(i);
+                let s = x.state().edit(|s| s.set_0(i));
 
-                let e = Sign::from_parity( count_1s(&x.state, i) );
-                let t = apply_f1(&alg, &x.tensor, k0, k1) * R::from_sign(e);
-                
+                let e = Sign::from_parity( count_1s(x.state(), i) );
+                let t = apply_f1(&alg, x.tensor(), k0, k1) * R::from_sign(e);
+
                 t.map_keys(|y| {
-                    KhState::new(s, y, c2_deg_shift)
+                    KhGen::new(s, y)
                 })
             })
         })

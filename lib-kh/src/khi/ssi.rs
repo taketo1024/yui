@@ -9,8 +9,7 @@ use log::info;
 use yui_core::{EucRing, EucRingOps};
 use yui_link::InvLink;
 
-use crate::kh::KhChainExt;
-use crate::misc::div_vec;
+use crate::util::calc::div_vec;
 use crate::khi::KhIHomology;
 
 pub fn ssi_invariants<R>(l: &InvLink, c: &R, reduced: bool) -> (i32, i32)
@@ -51,11 +50,14 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     let zs = kh.canon_cycles();
     
     assert_eq!(zs.len(), 2 * r);
-    assert!(zs.iter().all(|z| !z.is_zero()));
-    assert!(zs.iter().enumerate().all(|(i, z)| z.h_deg() == if i < r { 0 } else { 1 } ));
+    for (i, z) in zs.iter().enumerate() {
+        let expected = if i < r { 0 } else { 1 };
+        assert!(!z.is_zero());
+        assert_eq!(z.homogeneous_value(|x| kh.h_deg_of(x)), Some(expected));
+    }
 
     let ds = zs.iter().enumerate().map(|(i, z)| {
-        let h = z.h_deg();
+        let h = kh.h_deg_of_chain(z);
         let v = kh[h].vectorize_euc(z);
         info!("a[{i}] in Kh[{h}]: ({})", v.clone().into_dense().iter().join(","));
         v

@@ -132,13 +132,6 @@ impl Link {
         self.nodes.is_empty() && self.loops.is_empty()
     }
 
-    #[deprecated]
-    pub fn unknot_old() -> Link {
-        use crate::{NodeType, NodeOri};
-        let n = Node::new(NodeType::H, NodeOri::None, [1, 2, 2, 1]);
-        Self::from_nodes([n])
-    }
-
     pub fn unknot() -> Link {
         Self::unlink(1)
     }
@@ -307,10 +300,7 @@ impl Link {
     }
 
     pub fn seifert_state(&self) -> State {
-        // NOTE: `Link::unknot_old()` (the deprecated H-node form) is unoriented,
-        // so we cannot assert `is_oriented()` here while it's still callable.
-        // Re-enable once `unknot_old` is removed.
-        // assert!(self.is_oriented());
+        assert!(self.is_oriented());
 
         let seq = self.crossings().map(|x|
             match x.sign() {
@@ -542,17 +532,6 @@ mod tests {
         assert_eq!(l.n_crossings(), 0);
         assert_eq!(l.writhe(), 0);
         assert_eq!(l.n_comps(), 0);
-    }
-
-    #[test]
-    #[allow(deprecated)]
-    fn unknot_old() {
-        // Covers the deprecated H-node representation. Drop once `unknot_old`
-        // itself is removed.
-        let l = Link::unknot_old();
-        assert_eq!(l.n_crossings(), 0);
-        assert_eq!(l.writhe(), 0);
-        assert_eq!(l.n_comps(), 1);
     }
 
     #[test]

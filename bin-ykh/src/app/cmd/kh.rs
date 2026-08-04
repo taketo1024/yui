@@ -4,7 +4,6 @@ use yui_core::TeX;
 use yui_core::{EucRing, EucRingOps};
 use yui_homology::{ToSeqString, ToTableString};
 use yui_kh::kh::KhHomology;
-use yui_kh::kh::KhChainExt;
 use yui_link::Link;
 use crate::app::args::*;
 use crate::app::utils::*;
@@ -141,10 +140,10 @@ where
         }
     }
 
-    fn show_alpha(&mut self, kh: &KhHomology<R>) { 
+    fn show_alpha(&mut self, kh: &KhHomology<R>) {
         let zs = kh.canon_cycles();
-        for (i, z) in zs.iter().enumerate() { 
-            let h = z.h_deg();
+        for (i, z) in zs.iter().enumerate() {
+            let h = kh.h_deg_of_chain(z);
             let v = kh[h].vectorize_euc(z);
             self.out(&format!("a[{i}] in Kh[{h}]: {}", vec2str(&v)));
             self.out(&format!("  {z}\n"));
@@ -154,14 +153,14 @@ where
     fn show_ss(&mut self, l: &Link, c: &R, kh: &KhHomology<R>) -> Result<(), Box<dyn std::error::Error>> { 
         assert!(!c.is_unit() && !c.is_unit());
 
-        use yui_kh::misc::div_vec;
+        use yui_kh::util::calc::div_vec;
 
         let w = l.writhe();
         let r = l.seifert_circles().len() as i32;
         let zs = kh.canon_cycles();
 
-        for (i, z) in zs.iter().enumerate() { 
-            let h = &kh[z.h_deg()];
+        for (i, z) in zs.iter().enumerate() {
+            let h = &kh[kh.h_deg_of_chain(z)];
             let v = h.vectorize(z).subvec(0..h.rank());
             let d = div_vec(&v, c);
 

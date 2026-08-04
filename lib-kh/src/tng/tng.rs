@@ -3,7 +3,6 @@ use std::fmt::Display;
 use std::hash::Hash;
 use delegate::delegate;
 use itertools::Itertools;
-use yui_core::CloneAnd;
 use yui_link::{Edge, Node, Path};
 
 #[derive(Debug, Clone, Eq)]
@@ -138,7 +137,7 @@ impl Tng {
         self.comps.iter().any(|a| a.is_circle())
     }
 
-    pub fn ncomps(&self) -> usize { 
+    pub fn n_comps(&self) -> usize { 
         self.comps.len()
     }
 
@@ -197,12 +196,6 @@ impl Tng {
         }
 
         self.normalize();
-    }
-
-    pub fn connected(&self, other: &Self) -> Self { 
-        self.clone_and(|tng| 
-            tng.connect(other.clone())
-        )
     }
 
     pub fn find_comp<F>(&self, pred: F) -> Option<usize>
@@ -298,23 +291,23 @@ mod tests {
     #[test]
     fn append_arc() { 
         let mut t = Tng::empty();
-        assert_eq!(t.ncomps(), 0);
+        assert_eq!(t.n_comps(), 0);
 
         t.append_arc(TngComp::arc([0, 1])); // [0-1]
-        assert_eq!(t.ncomps(), 1);
+        assert_eq!(t.n_comps(), 1);
         assert!(t.comp(0).is_arc());
 
         t.append_arc(TngComp::arc([2, 3])); // [0-1] [2-3]
-        assert_eq!(t.ncomps(), 2);
+        assert_eq!(t.n_comps(), 2);
         assert!(t.comp(0).is_arc());
         assert!(t.comp(1).is_arc());
 
         t.append_arc(TngComp::arc([1, 2])); // [0-1-2-3]
-        assert_eq!(t.ncomps(), 1);
+        assert_eq!(t.n_comps(), 1);
         assert!(t.comp(0).is_arc());
 
         t.append_arc(TngComp::arc([0, 3])); // [-0-1-2-3-]
-        assert_eq!(t.ncomps(), 1);
+        assert_eq!(t.n_comps(), 1);
         assert!(t.comp(0).is_circle());
     }
 
@@ -359,24 +352,24 @@ mod tests {
     #[test]
     fn find_loop() { 
         let mut t = Tng::empty();
-        assert_eq!(t.ncomps(), 0);
+        assert_eq!(t.n_comps(), 0);
         assert_eq!(t.find_comp(|c| c.is_circle()), None);
 
         t.append_arc(TngComp::arc([0, 1]));
-        assert_eq!(t.ncomps(), 1);
+        assert_eq!(t.n_comps(), 1);
         assert_eq!(t.find_comp(|c| c.is_circle()), None);
 
         t.append_arc(TngComp::arc([2, 3]));
-        assert_eq!(t.ncomps(), 2);
+        assert_eq!(t.n_comps(), 2);
         assert_eq!(t.find_comp(|c| c.is_circle()), None);
 
         t.append_arc(TngComp::arc([2, 3]));
-        assert_eq!(t.ncomps(), 2);
+        assert_eq!(t.n_comps(), 2);
         assert_eq!(t.find_comp(|c| c.is_circle()), Some(1));
 
         t.remove_at(1);
 
-        assert_eq!(t.ncomps(), 1);
+        assert_eq!(t.n_comps(), 1);
         assert_eq!(t.find_comp(|c| c.is_circle()), None);
     }
 

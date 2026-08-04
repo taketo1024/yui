@@ -8,8 +8,8 @@ use num_traits::Zero;
 use yui_link::Link;
 use yui_core::{EucRing, EucRingOps};
 
-use crate::misc::div_vec;
-use crate::kh::{KhChainExt, KhHomology};
+use crate::util::calc::div_vec;
+use crate::kh::KhHomology;
 
 pub fn ss_invariant<R>(l: &Link, c: &R, reduced: bool) -> i32
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
@@ -43,8 +43,10 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     let zs = kh.canon_cycles();
 
     assert_eq!(zs.len(), r);
-    assert!(zs.iter().all(|z| !z.is_zero()));
-    assert!(zs.iter().all(|z| z.h_deg() == 0));    
+    for z in zs.iter() {
+        assert!(!z.is_zero());
+        assert_eq!(z.homogeneous_value(|x| kh.h_deg_of(x)), Some(0));
+    }
 
     let ds = zs.iter().enumerate().map(|(i, z)| {
         let v = kh[0].vectorize_euc(z);
@@ -66,7 +68,7 @@ mod tests {
 
     #[test]
     fn test_unknot() { 
-        let l = Link::unknot_old();
+        let l = Link::unknot();
         let c = 2;
         
         assert_eq!(ss_invariant(&l, &c, false), 0);

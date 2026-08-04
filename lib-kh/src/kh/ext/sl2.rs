@@ -14,8 +14,7 @@ use yui_matrix::dense::snf::fnf;
 
 use crate::ext::{Color, LinkExt};
 use crate::kh::ext::cc::KhChainMap;
-use crate::kh::internal::v1::cube::KhCube;
-use crate::kh::{KhChain, KhChainExt, KhState, KhComplex, KhHomology};
+use crate::kh::{KhChain, KhCube, KhGen, KhComplex, KhHomology};
 
 impl<R> KhComplex<R>
 where
@@ -32,6 +31,7 @@ pub struct KhSl2Map<'a, R> where
     for<'x> &'x R: RingOps<R>
 {
     complex: &'a KhComplex<R>,
+    cube: KhCube<R>,
     path: Vec<(usize, Sign)>,
 }
 
@@ -43,12 +43,16 @@ impl<'a, R> KhSl2Map<'a, R> where
         assert!(l.is_knot());
         assert!(l.base_pt().is_some());
 
+        let (h, t) = complex.alg().ht();
+        let base_pt = if complex.is_reduced() { l.base_pt() } else { None };
+        let cube = KhCube::new(l, h, t, base_pt, complex.deg_shift());
+
         let path = Self::make_path(l);
-        Self { complex, path }
+        Self { complex, cube, path }
     }
 
-    fn cube(&self) -> &KhCube<R> {
-        self.complex.cube()
+    pub fn cube(&self) -> &KhCube<R> {
+        &self.cube
     }
 
     fn make_path(l: &Link) -> Vec<(usize, Sign)> {
@@ -78,16 +82,16 @@ impl<'a, R> KhSl2Map<'a, R> where
     pub fn h_deg(&self) -> isize{ -2 }
     pub fn q_deg(&self) -> isize{ -4 }
 
-    fn apply_chi(&self, x: &KhState, i: usize) -> KhChain<R> {
-        if x.state[i].is_zero() {
+    fn apply_chi(&self, x: &KhGen, i: usize) -> KhChain<R> {
+        if x.state()[i].is_zero() {
             return KhChain::zero();
         }
 
-        let t = x.state.edit(|s| s.set_0(i));
+        let t = x.state().edit(|s| s.set_0(i));
         self.cube().rev_d_to(x, &t, true)
     }
 
-    fn apply_u(&self, x: &KhState) -> KhChain<R> {
+    fn apply_u(&self, x: &KhGen) -> KhChain<R> {
         let n = self.path.len();
         if n < 2 {
             return KhChain::zero();
@@ -122,8 +126,8 @@ impl<'a, R> KhSl2Map<'a, R> where
     where R: Field, for<'x> &'x R: FieldOps<R> {
         use yui_matrix::sparse::SpMat;
         
-        assert!(self.cube().str().h().is_zero());
-        assert!(self.cube().str().t().is_zero());
+        assert!(self.cube().alg().h().is_zero());
+        assert!(self.cube().alg().t().is_zero());
 
         let h_range = kh.h_range().mv(0, -self.h_deg());
 
@@ -160,12 +164,12 @@ impl<'a, R> KhSl2Map<'a, R> where
             ).collect_vec();
 
             assert!(!indices.is_empty());
-            assert!(indices.iter().map(|&j| gens[j].q_deg()).all_equal());
+            assert!(indices.iter().map(|&j| kh.q_deg_of_chain(&gens[j])).all_equal());
 
             let j = *indices.first().unwrap();
             let z = &gens[j];
-            let t = z.h_deg();
-            let q = -z.q_deg(); // TODO: must modify q_deg later.
+            let t = kh.h_deg_of_chain(z);
+            let q = -kh.q_deg_of_chain(z); // TODO: must modify q_deg later.
             let d = 2 * t + q;
 
             Some(isize3(d, q, ord as isize))
@@ -264,8 +268,6 @@ mod tests {
     #[allow(unused)]
     use yui_homology::ToTableString;
 
-    use crate::kh::KhChainExt;
-
     use super::*;
 
     #[test]
@@ -304,7 +306,7 @@ mod tests {
         let map = c.sl2_map(&l);
 
         let v = State::empty();
-        let x = c.cube().vertex(&v).generators()[0];
+        let x = map.cube().vertex(&v).generators()[0];
         assert_eq!(map.apply_u(x), KhChain::zero());
     }
 
@@ -315,11 +317,11 @@ mod tests {
         let map = c.sl2_map(&l);
 
         let v = State::from([0,0]);
-        let x = c.cube().vertex(&v).generators()[0]; // 111
+        let x = map.cube().vertex(&v).generators()[0]; // 111
         assert_eq!(map.apply_u(x), KhChain::zero());
 
         let v = State::from([1,1]);
-        let x = c.cube().vertex(&v).generators()[0]; // 1
+        let x = map.cube().vertex(&v).generators()[0]; // 1
         assert_eq!(map.apply_u(x), KhChain::zero());
     }
 
@@ -330,15 +332,15 @@ mod tests {
         let map = c.sl2_map(&l);
 
         let v = State::from([1,1,1]);
-        let z = c.cube().vertex(&v).generators()[0]; // (11)₁₁₁
+        let z = map.cube().vertex(&v).generators()[0]; // (11)₁₁₁
         let w = map.apply_u(z);
 
         assert_ne!(w, KhChain::zero());
 
-        assert_eq!(z.h_deg(), 0);
-        assert_eq!(z.q_deg(), -1);
-        assert_eq!(w.h_deg(), -2);
-        assert_eq!(w.q_deg(), -5);
+        assert_eq!(c.h_deg_of(z), 0);
+        assert_eq!(c.q_deg_of(z), -1);
+        assert_eq!(c.h_deg_of_chain(&w), -2);
+        assert_eq!(c.q_deg_of_chain(&w), -5);
     }
 
     #[test]
@@ -374,11 +376,11 @@ mod tests {
         let w = e.apply(0, &z);
 
         assert_ne!(w, KhChain::zero());
-        
-        assert_eq!(z.h_deg(), 0);
-        assert_eq!(z.q_deg(), -1);
-        assert_eq!(w.h_deg(), -2);
-        assert_eq!(w.q_deg(), -5);
+
+        assert_eq!(c.h_deg_of_chain(&z), 0);
+        assert_eq!(c.q_deg_of_chain(&z), -1);
+        assert_eq!(c.h_deg_of_chain(&w), -2);
+        assert_eq!(c.q_deg_of_chain(&w), -5);
     }
 
     #[test]

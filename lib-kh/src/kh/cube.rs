@@ -6,43 +6,43 @@ use yui_core::{Ring, RingOps, Sign};
 use yui_homology::{ChainComplex1, GrMod, Summand};
 use yui_link::{Link, State, Path, Edge};
 
-use crate::kh::{KhAlg, KhChain, KhState, KhTensor};
+use crate::kh::{KhAlg, KhChain, KhGen, KhTensor};
 
 #[derive(Clone, Debug)]
 pub struct KhCubeVertex { 
     state: State,
     circles: Vec<Path>,
-    gens: Vec<KhState>
+    gens: Vec<KhGen>
 }
 
-impl KhCubeVertex { 
-    pub fn new(l: &Link, state: State, red_e: Option<Edge>, deg_shift: (isize, isize)) -> Self {
+impl KhCubeVertex {
+    pub fn new(l: &Link, state: State, red_e: Option<Edge>) -> Self {
         let mut circles = l.resolve_by(&state).comps();
         circles.sort_by_key(|c| c.min_edge());
-        
+
         let r = circles.len();
 
-        let red_i = red_e.and_then(|e| { 
-            circles.iter().position(|c| 
+        let red_i = red_e.and_then(|e| {
+            circles.iter().position(|c|
                 c.edges().contains(&e)
             )
         });
 
-        let gens = KhTensor::generate(r).filter_map(|label| { 
-            let ok = if let Some(red_i) = red_i { 
+        let gens = KhTensor::generate(r).filter_map(|label| {
+            let ok = if let Some(red_i) = red_i {
                 label[red_i].is_X()
-            } else { 
+            } else {
                 true
             };
-            ok.then(|| 
-                KhState::new(state, label, deg_shift)
+            ok.then(||
+                KhGen::new(state, label)
             )
         }).collect();
 
         KhCubeVertex { state, circles, gens }
     }
 
-    pub fn generators(&self) -> Vec<&KhState> { 
+    pub fn generators(&self) -> Vec<&KhGen> { 
         self.gens.iter().collect()
     }
 
@@ -110,8 +110,8 @@ impl KhCubeEdge {
 
 #[derive(Clone)]
 pub struct KhCube<R>
-where R: Ring, for<'x> &'x R: RingOps<R> { 
-    str: KhAlg<R>,
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    alg: KhAlg<R>,
     dim: usize,
     vertices: HashMap<State, KhCubeVertex>,
     edges: HashMap<State, Vec<(State, KhCubeEdge)>>,
@@ -119,20 +119,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 }
 
 impl<R> KhCube<R>
-where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn new(l: &Link, h: &R, t: &R, reduce_e: Option<Edge>, deg_shift: (isize, isize)) -> Self { 
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    pub fn new(l: &Link, h: &R, t: &R, reduce_e: Option<Edge>, deg_shift: (isize, isize)) -> Self {
         assert!(reduce_e.is_none() || t.is_zero());
 
         let n = l.n_crossings();
-        let str = KhAlg::new(h, t);
+        let alg = KhAlg::new(h, t);
 
-        let vertices: HashMap<_, _> = State::generate(n).map(|s| { 
-            let v = KhCubeVertex::new(l, s, reduce_e, deg_shift);
+        let vertices: HashMap<_, _> = State::generate(n).map(|s| {
+            let v = KhCubeVertex::new(l, s, reduce_e);
             (s, v)
         }).collect();
 
-        let edges: HashMap<_, _> = vertices.keys().map(|s| { 
-            let edges = Self::generate_targets(s).map(|t| { 
+        let edges: HashMap<_, _> = vertices.keys().map(|s| {
+            let edges = Self::generate_targets(s).map(|t| {
                 let v = &vertices[s];
                 let w = &vertices[&t];
                 (t, KhCubeEdge::edge_between(v, w))
@@ -140,7 +140,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             (*s, edges)
         }).collect();
 
-        KhCube { str, dim: n, vertices, edges, deg_shift }
+        KhCube { alg, dim: n, vertices, edges, deg_shift }
     }
 
     fn generate_targets(from: &State) -> impl Iterator<Item = State> + '_ { 
@@ -150,8 +150,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         })
     }
 
-    pub fn str(&self) -> &KhAlg<R> {
-        &self.str
+    pub fn alg(&self) -> &KhAlg<R> {
+        &self.alg
     }
 
     pub fn dim(&self) -> usize { 
@@ -191,72 +191,72 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.edges[s].iter().map(|e| &e.0)
     }
 
-    pub fn d_to(&self, x: &KhState, target: &State, signed: bool) -> KhChain<R> {
+    pub fn d_to(&self, x: &KhGen, target: &State, signed: bool) -> KhChain<R> {
         use KhCubeEdgeTrans::*;
-        
-        let Some(e) = self.edge(&x.state, target) else { 
+
+        let Some(e) = self.edge(x.state(), target) else {
             return KhChain::zero();
         };
 
-        let res = match e.trans { 
+        let res = match e.trans {
             Merge(ij, k) => self.merge(x, ij, k, *target),
             Split(i, jk) => self.split(x, i, jk, *target)
         };
 
-        if signed { 
+        if signed {
             let sign = R::from_sign(e.sign());
             res * sign
-        } else { 
+        } else {
             res
         }
     }
 
-    pub fn rev_d_to(&self, x: &KhState, target: &State, signed: bool) -> KhChain<R> {
+    pub fn rev_d_to(&self, x: &KhGen, target: &State, signed: bool) -> KhChain<R> {
         use KhCubeEdgeTrans::*;
-        
-        let Some(e) = self.edge(target, &x.state) else { 
+
+        let Some(e) = self.edge(target, x.state()) else {
             return KhChain::zero();
         };
 
-        let res = match e.trans { 
+        let res = match e.trans {
             Merge(ij, k) => self.split(x, k, ij, *target),
             Split(i, jk) => self.merge(x, jk, i, *target)
         };
 
-        if signed { 
+        if signed {
             let sign = R::from_sign(e.sign());
             res * sign
-        } else { 
+        } else {
             res
         }
     }
 
-    fn merge(&self, x: &KhState, in_indices: (usize, usize), out_index: usize, target: State) -> KhChain<R> { 
-        self.str.mul_tensor(&x.tensor, in_indices, out_index).map_keys(|y| { 
-            KhState::new(target, y, x.deg_shift)
+    fn merge(&self, x: &KhGen, in_indices: (usize, usize), out_index: usize, target: State) -> KhChain<R> {
+        self.alg.mul_tensor(x.tensor(), in_indices, out_index).map_keys(|y| {
+            KhGen::new(target, y)
         })
     }
 
-    fn split(&self, x: &KhState, in_index: usize, out_indices: (usize, usize), target: State) -> KhChain<R> { 
-        self.str.comul_tensor(&x.tensor, in_index, out_indices).map_keys(|y| { 
-            KhState::new(target, y, x.deg_shift)
+    fn split(&self, x: &KhGen, in_index: usize, out_indices: (usize, usize), target: State) -> KhChain<R> {
+        self.alg.comul_tensor(x.tensor(), in_index, out_indices).map_keys(|y| {
+            KhGen::new(target, y)
         })
     }
 
-    pub fn d(&self, x: &KhState) -> KhChain<R> {
-        self.targets_from(&x.state).flat_map(|t| { 
+    pub fn d(&self, x: &KhGen) -> KhChain<R> {
+        self.targets_from(x.state()).flat_map(|t| {
             self.d_to(x, t, true)
         }).collect()
     }
 
-    pub fn generators(&self, i: isize) -> Vec<&KhState> { 
+    pub fn generators(&self, i: isize) -> Vec<&KhGen> { 
         let i0 = self.deg_shift.0;
         if self.h_range().contains(&i) { 
             let i = (i - i0) as usize;
-            self.states_of_weight(i).flat_map(|s| 
-                self.vertex(s).generators() 
-            ).sorted_by_key(|x| 
-                -x.q_deg()
+            self.states_of_weight(i).flat_map(|s|
+                self.vertex(s).generators()
+            ).sorted_by_key(|x|
+                -x.rel_q_deg()
             ).collect()
         } else {
             vec![]
@@ -274,7 +274,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             .sorted_by(Ord::cmp)
     }
 
-    pub fn into_complex(self) -> ChainComplex1<KhState, R> {
+    pub fn into_complex(self) -> ChainComplex1<KhGen, R> {
         let summands = GrMod::generate(self.h_range(), |i| { 
             let gens = self.generators(i);
             Summand::from_raw_generators(gens.into_iter().cloned())
@@ -295,7 +295,7 @@ mod tests {
     fn empty() { 
         let l = Link::empty();
         let s = State::empty();
-        let v = KhCubeVertex::new(&l, s, None, (0, 0));
+        let v = KhCubeVertex::new(&l, s, None);
 
         assert_eq!(v.state, s);
         assert_eq!(v.circles.len(), 0);
@@ -306,7 +306,7 @@ mod tests {
     fn unknot() { 
         let l = Link::unknot();
         let s = State::empty();
-        let v = KhCubeVertex::new(&l, s, None, (0, 0));
+        let v = KhCubeVertex::new(&l, s, None);
 
         assert_eq!(v.state, s);
         assert_eq!(v.circles.len(), 1);
@@ -317,7 +317,7 @@ mod tests {
     fn unknot_red() { 
         let l = Link::unknot();
         let s = State::empty();
-        let v = KhCubeVertex::new(&l, s, Some(1), (0, 0));
+        let v = KhCubeVertex::new(&l, s, Some(1));
 
         assert_eq!(v.state, s);
         assert_eq!(v.circles.len(), 1);
@@ -328,7 +328,7 @@ mod tests {
     fn unlink_2() {
         let l = Link::test_data("unknot_l_twist").resolve_at(0, Bit::Bit0);
         let s = State::empty();
-        let v = KhCubeVertex::new(&l, s, None, (0, 0));
+        let v = KhCubeVertex::new(&l, s, None);
 
         assert_eq!(v.state, s);
         assert_eq!(v.circles.len(), 2);
@@ -340,8 +340,8 @@ mod tests {
         let l = Link::test_data("unknot_l_twist");
         let s = State::from([0]);
         let t = State::from([1]);
-        let v = KhCubeVertex::new(&l, s, None, (0, 0));
-        let w = KhCubeVertex::new(&l, t, None, (0, 0));
+        let v = KhCubeVertex::new(&l, s, None);
+        let w = KhCubeVertex::new(&l, t, None);
         let e = KhCubeEdge::edge_between(&v, &w);
 
         assert!(e.sign.is_positive());
@@ -358,8 +358,8 @@ mod tests {
         let l = Link::test_data("unknot_r_twist");
         let s = State::from([0]);
         let t = State::from([1]);
-        let v = KhCubeVertex::new(&l, s, None, (0, 0));
-        let w = KhCubeVertex::new(&l, t, None, (0, 0));
+        let v = KhCubeVertex::new(&l, s, None);
+        let w = KhCubeVertex::new(&l, t, None);
         let e = KhCubeEdge::edge_between(&v, &w);
 
         assert!(e.sign.is_positive());

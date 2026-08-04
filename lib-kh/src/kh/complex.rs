@@ -2,104 +2,68 @@ use std::ops::{RangeInclusive, Index};
 use std::sync::OnceLock;
 
 use delegate::delegate;
+use yui_core::lc::Lc;
 use yui_core::{IteratorExt, Ring, RingOps, EucRing, EucRingOps};
 use yui_link::Link;
-use yui_homology::{ChainComplex1, ToSeqString, ToTableString, GrMod2, Summand};
+use yui_homology::{ChainComplex1, ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 
-use crate::kh::chain::KhChain;
-use crate::kh::internal::v1::cube::KhCube;
-use crate::kh::{KhState, KhHomology};
-use crate::misc::make_gen_grid;
+use crate::kh::{KhGen, KhHomology};
+use crate::util::Bigraded;
 
 use super::KhAlg;
 
-pub type KhComplexSummand<R> = Summand<KhState, R>;
-
-// TODO: Make KhComplexTrait, and split impl into KhComplexV1 and V2. 
+pub type KhChain<R> = Lc<KhGen, R>;
+pub type KhComplexSummand<R> = Summand<KhGen, R>;
 
 #[derive(Clone)]
 pub struct KhComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> { 
-    inner: ChainComplex1<KhState, R>,
-    str: KhAlg<R>,
-    cube: KhCube<R>,
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    inner: ChainComplex1<KhGen, R>,
+    alg: KhAlg<R>,
     deg_shift: (isize, isize),
     reduced: bool,
     canon_cycles: Vec<KhChain<R>>,
-    gen_grid: OnceLock<GrMod2<KhState, R>>,
+    cache_bigr: OnceLock<GrMod2<KhGen, R>>,
 }
 
 impl<R> KhComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> { 
+where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
-        use crate::kh::internal::v2::builder::TngComplexBuilder;
+        use crate::tng::builder::TngComplexBuilder;
 
         assert!(!reduced || (!l.is_empty() && t.is_zero()));
 
-        TngComplexBuilder::build_kh_complex(l, h, t, reduced)
+        let b = TngComplexBuilder::from_link(l, h, t, reduced).run();
+        let canon_cycles = b.eval_elements();
+        let inner = b.into_tng_complex().into_raw_complex();
+
+        KhComplex::from_raw_complex(l, h, t, reduced, inner, canon_cycles)
     }
 
-    pub fn new_no_simplify(l: &Link, h: &R, t: &R, reduced: bool) -> Self { 
-        use crate::kh::internal::v1::cube::KhCube;
+    pub fn new_no_simplify(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
+        use super::cube::KhCube;
 
         assert!(!reduced || (!l.is_empty() && t.is_zero()));
 
         let base_pt = if reduced { l.base_pt() } else { None };
         let deg_shift = Self::deg_shift_for(l, reduced);
-        
         let cube = KhCube::new(l, h, t, base_pt, deg_shift);
-        let str = cube.str().clone();
-        let complex = cube.clone().into_complex();
+        let inner = cube.into_complex();
 
         let canon_cycles = if t.is_zero() && l.is_knot() {
-            Self::make_canon_cycles(l, &R::zero(), h, reduced, deg_shift)
-        } else { 
+            Self::make_canon_cycles(l, &R::zero(), h, reduced)
+        } else {
             vec![]
         };
 
-        KhComplex::new_impl(complex, str, cube, deg_shift, reduced, canon_cycles)
+        KhComplex::from_raw_complex(l, h, t, reduced, inner, canon_cycles)
     }
 
-    pub(crate) fn new_impl(inner: ChainComplex1<KhState, R>, str: KhAlg<R>, cube: KhCube<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
-        KhComplex { inner, str, cube, deg_shift, reduced, canon_cycles, gen_grid: OnceLock::new() }
-    }
+    pub(crate) fn from_raw_complex(l: &Link, h: &R, t: &R, reduced: bool, inner: ChainComplex1<KhGen, R>, canon_cycles: Vec<KhChain<R>>) -> Self {
+        let alg = KhAlg::new(h, t);
+        let deg_shift = Self::deg_shift_for(l, reduced);
 
-    pub fn str(&self) -> &KhAlg<R> { 
-        &self.str
-    }
-
-    pub fn cube(&self) -> &KhCube<R> {
-        &self.cube
-    }
-
-    pub fn deg_shift(&self) -> (isize, isize) { 
-        self.deg_shift
-    }
-
-    pub fn is_reduced(&self) -> bool { 
-        self.reduced
-    }
-
-    pub fn h_range(&self) -> RangeInclusive<isize> {
-        self.support().copied().range().unwrap_or(0..=-1)
-    }
-
-    pub fn q_range(&self) -> RangeInclusive<isize> {
-        self.support().flat_map(|&i|
-            self[i].raw_generators().iter().map(|x| x.q_deg())
-        ).range().unwrap_or(0..=-1)
-    }
-
-    pub fn canon_cycles(&self) -> &Vec<KhChain<R>> { 
-        &self.canon_cycles
-    }
-
-    pub fn inner(&self) -> &ChainComplex1<KhState, R> {
-        &self.inner
-    }
-
-    fn gen_grid(&self) -> &GrMod2<KhState, R> {
-        self.gen_grid.get_or_init(|| make_gen_grid(self.inner.summands()))
+        KhComplex { inner, alg, deg_shift, reduced, canon_cycles, cache_bigr: OnceLock::new() }
     }
 
     pub fn deg_shift_for(l: &Link, reduced: bool) -> (isize, isize) {
@@ -109,6 +73,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let q = n_pos - 2 * n_neg;
         let e = if reduced { 1 } else { 0 };
         (h, q + e)
+    }
+
+    pub fn inner(&self) -> &ChainComplex1<KhGen, R> {
+        &self.inner
     }
 
     delegate! {
@@ -121,6 +89,52 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             pub fn describe_d_at(&self, i: isize) -> String;
         }
     }
+
+    pub fn alg(&self) -> &KhAlg<R> {
+        &self.alg
+    }
+
+    pub fn deg_shift(&self) -> (isize, isize) { 
+        self.deg_shift
+    }
+
+    pub fn is_reduced(&self) -> bool {
+        self.reduced
+    }
+
+    pub fn h_deg_of(&self, x: &KhGen) -> isize {
+        self.deg_shift.0 + x.rel_h_deg()
+    }
+
+    pub fn q_deg_of(&self, x: &KhGen) -> isize {
+        self.deg_shift.1 + x.rel_q_deg()
+    }
+
+    pub fn h_deg_of_chain(&self, z: &KhChain<R>) -> isize {
+        z.keys().map(|x| self.h_deg_of(x)).min().unwrap_or(0)
+    }
+
+    pub fn q_deg_of_chain(&self, z: &KhChain<R>) -> isize {
+        z.keys().map(|x| self.q_deg_of(x)).min().unwrap_or(0)
+    }
+
+    pub fn h_range(&self) -> RangeInclusive<isize> {
+        self.support().copied().range().unwrap_or(0..=-1)
+    }
+
+    pub fn q_range(&self) -> RangeInclusive<isize> {
+        self.support().flat_map(|&i|
+            self[i].raw_generators().iter().map(|x| self.q_deg_of(x))
+        ).range().unwrap_or(0..=-1)
+    }
+
+    pub fn canon_cycles(&self) -> &Vec<KhChain<R>> { 
+        &self.canon_cycles
+    }
+
+    fn cached_bigraded(&self) -> &GrMod2<KhGen, R> {
+        self.cache_bigr.get_or_init(|| self.bigraded())
+    }
 }
 
 impl<R> KhComplex<R>
@@ -130,11 +144,17 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 }
 
+impl<R> Bigraded<KhGen, R> for KhComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn base(&self) -> &GrMod1<KhGen, R> { self.inner.summands() }
+    fn decomp_key(&self, z: &KhChain<R>) -> isize { self.q_deg_of_chain(z) }
+}
+
 impl<R> Index<isize> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = KhComplexSummand<R>;
 
-    delegate! { 
+    delegate! {
         to self.inner {
             fn index(&self, index: isize) -> &Self::Output;
         }
@@ -145,10 +165,8 @@ impl<R> Index<(isize, isize)> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = KhComplexSummand<R>;
 
-    delegate! { 
-        to self.gen_grid() {
-            fn index(&self, index: (isize, isize)) -> &Self::Output;
-        }
+    fn index(&self, index: (isize, isize)) -> &Self::Output {
+        &self.cached_bigraded()[index]
     }
 }
 

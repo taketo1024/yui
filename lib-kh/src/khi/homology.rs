@@ -4,21 +4,21 @@ use delegate::delegate;
 use yui_core::{EucRing, EucRingOps, IteratorExt};
 use yui_homology::{ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_link::InvLink;
-use crate::kh::KhChainExt;
-use crate::khi::{KhIComplex, KhIState};
-use crate::misc::make_gen_grid;
+use crate::khi::{KhIComplex, KhIGen, KhIGenExt};
+use crate::util::Bigraded;
 
 use super::KhIChain;
 
 #[derive(Clone)]
 pub struct KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    inner: GrMod1<KhIState, R>,
+    inner: GrMod1<KhIGen, R>,
     canon_cycles: Vec<KhIChain<R>>,
-    gen_grid: OnceLock<GrMod2<KhIState, R>>,
+    deg_shift: (isize, isize),
+    cache_bigr: OnceLock<GrMod2<KhIGen, R>>,
 }
 
-impl<R> KhIHomology<R> 
+impl<R> KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn new(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self {
         let c = KhIComplex::new(l, h, t, reduced);
@@ -30,11 +30,11 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         Self::from(&c)
     }
 
-    pub(crate) fn new_impl(inner: GrMod1<KhIState, R>, canon_cycles: Vec<KhIChain<R>>) -> Self {
-        Self { inner, canon_cycles, gen_grid: OnceLock::new() }
+    pub(crate) fn new_impl(inner: GrMod1<KhIGen, R>, canon_cycles: Vec<KhIChain<R>>, deg_shift: (isize, isize)) -> Self {
+        Self { inner, canon_cycles, deg_shift, cache_bigr: OnceLock::new() }
     }
 
-    pub fn inner(&self) -> &GrMod1<KhIState, R> { 
+    pub fn inner(&self) -> &GrMod1<KhIGen, R> {
         &self.inner
     }
 
@@ -44,7 +44,27 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
             pub fn is_supported(&self, i: isize) -> bool;
         }
     }
-    
+
+    pub fn deg_shift(&self) -> (isize, isize) {
+        self.deg_shift
+    }
+
+    pub fn h_deg_of(&self, x: &KhIGen) -> isize {
+        self.deg_shift.0 + x.rel_h_deg()
+    }
+
+    pub fn q_deg_of(&self, x: &KhIGen) -> isize {
+        self.deg_shift.1 + x.rel_q_deg()
+    }
+
+    pub fn h_deg_of_chain(&self, z: &KhIChain<R>) -> isize {
+        z.keys().map(|x| self.h_deg_of(x)).min().unwrap_or(0)
+    }
+
+    pub fn q_deg_of_chain(&self, z: &KhIChain<R>) -> isize {
+        z.keys().map(|x| self.q_deg_of(x)).min().unwrap_or(0)
+    }
+
     pub fn h_range(&self) -> RangeInclusive<isize> {
         self.support().filter(|&&i|
             !self[i].is_zero()
@@ -53,39 +73,47 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
         self.support().flat_map(|&i|
-            self[i].generators().map(|z| z.q_deg())
+            self[i].generators().map(|z| self.q_deg_of_chain(&z))
         ).range().unwrap_or(0..=-1)
     }
-    
-    pub fn canon_cycles(&self) -> &[KhIChain<R>] { 
+
+    pub fn canon_cycles(&self) -> &[KhIChain<R>] {
         &self.canon_cycles
     }
 
     pub fn truncated(&self, range: RangeInclusive<isize>) -> Self {
         Self::new_impl(
             self.inner.truncated(range),
-            self.canon_cycles.clone()
+            self.canon_cycles.clone(),
+            self.deg_shift,
         )
     }
 
-    fn gen_grid(&self) -> &GrMod2<KhIState, R> {
-        self.gen_grid.get_or_init(|| make_gen_grid(self.inner()))
+    fn cached_bigraded(&self) -> &GrMod2<KhIGen, R> {
+        self.cache_bigr.get_or_init(|| self.bigraded())
     }
+}
+
+impl<R> Bigraded<KhIGen, R> for KhIHomology<R>
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+    fn base(&self) -> &GrMod1<KhIGen, R> { self.inner() }
+    fn decomp_key(&self, z: &KhIChain<R>) -> isize { self.q_deg_of_chain(z) }
 }
 
 impl<R> From<&KhIComplex<R>> for KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     fn from(c: &KhIComplex<R>) -> Self {
         KhIHomology::new_impl(
-            c.inner().reduced().homology(), 
-            c.canon_cycles().to_vec()
+            c.inner().reduced().homology(),
+            c.canon_cycles().to_vec(),
+            c.deg_shift(),
         )
     }
 }
 
 impl<R> Index<isize> for KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    type Output = Summand<KhIState, R>;
+    type Output = Summand<KhIGen, R>;
 
     delegate! {
         to self.inner {
@@ -96,12 +124,10 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
 impl<R> Index<(isize, isize)> for KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    type Output = Summand<KhIState, R>;
+    type Output = Summand<KhIGen, R>;
 
-    delegate! {
-        to self.gen_grid() {
-            fn index(&self, index: (isize, isize)) -> &Self::Output;
-        }
+    fn index(&self, index: (isize, isize)) -> &Self::Output {
+        &self.cached_bigraded()[index]
     }
 }
 

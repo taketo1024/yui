@@ -1,5 +1,5 @@
 //! Operations *on* a link — deriving a new diagram or a combinatorial object from the one at hand:
-//! crossing changes, resolutions, and Seifert's algorithm. Contrast with [`crate::link::ops`],
+//! crossing changes, resolutions, and Seifert's algorithm. Contrast with [`crate::link::construct`],
 //! which builds links out of patterns.
 
 use petgraph::Graph;

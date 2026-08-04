@@ -1,4 +1,5 @@
-// Constructions on `Link` kept out of the core type.
+//! Constructions producing new links from patterns — twist knots, cables and satellites.
+//! Contrast with [`crate::link::link_ops`], which operates on links you already have.
 
 use crate::{Link, Edge, LinkBuilder, Port};
 

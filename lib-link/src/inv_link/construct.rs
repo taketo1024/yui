@@ -1,5 +1,5 @@
 //! Constructions specific to [`InvLink`] — the equivariant counterparts of the operations in
-//! [`crate::link::ops`]. Each one produces a diagram carrying a strong inversion, recovered by
+//! [`crate::link::construct`]. Each one produces a diagram carrying a strong inversion, recovered by
 //! reindexing to the standard involution `e ↦ (n+1-e)%n+1`.
 
 use num_integer::Integer;

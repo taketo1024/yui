@@ -4,7 +4,7 @@ mod node;
 mod path;
 mod pd_code;
 mod builder;
-mod ops;
+mod construct;
 
 pub use link::{Link, Edge, State, StateRepr};
 pub use pd_code::PDCodeX;

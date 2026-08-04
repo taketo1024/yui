@@ -11,15 +11,21 @@ Knots and links for the [`yui`](https://github.com/taketo1024/yui) workspace: pl
 ```text
 src/
 ├── link/
-│   ├── link.rs       — `Link`: knot or link diagram
+│   ├── link.rs       — `Link`: the type itself — accessors, components, traversal
+│   ├── link_ops.rs   — operations *on* a link: mirror, connected sum, resolutions, Seifert's algorithm
+│   ├── construct.rs  — links built *from patterns*: twist knots, pretzels, cables, Whitehead doubles
+│   ├── pd_code.rs    — PD-code conversion and `Link::load`
+│   ├── builder.rs    — `LinkBuilder`: assemble a diagram port by port
 │   ├── node.rs       — `Node`: vertex of a diagram (crossing or smoothing)
-│   ├── path.rs       — `Path`: an arc or a circle of edges
-│   └── inv_link.rs   — `InvLink`: involutive link
+│   └── path.rs       — `Path`: an arc or a circle of edges
+├── inv_link/
+│   ├── inv_link.rs   — `InvLink`: involutive link, with mirror and connected sum
+│   └── construct.rs  — the equivariant constructions
 ├── braid/
 │   ├── braid.rs      — `Braid`: word in the Artin generators
 │   └── braid_gen.rs  — `BraidGen`: signed Artin generator
 ├── misc/
-│   └── jones.rs      — `jones_polynomial`
+│   └── jones.rs      — `jones_polynomial`, `det`
 └── test_data.rs      — hard-coded PD codes / braid words (test-only)
 resources/
 └── inv_link/         — bundled symmetric PD codes for `InvLink::load`
@@ -41,7 +47,13 @@ Free loops are closed components without crossings. They participate in `comps()
 
 Each link carries a `base_pt: Option<Edge>`, defaulting to the minimum edge of the diagram (or `None` for the empty link). Set explicitly via `with_base_pt(e)` (consuming builder; asserts `e` is a real edge of the diagram).
 
-Methods: `n_crossings`, `n_comps`, `comps`, `writhe`, `mirror`, `resolve_at` / `resolve_by` (Khovanov-style 0/1-smoothings), `seifert_state`, `seifert_circles`, `seifert_graph`, `loops`, `n_loops`, `base_pt`, `with_base_pt`, traversal helpers.
+Accessors: `n_crossings`, `n_comps`, `comps`, `writhe`, `loops`, `n_loops`, `base_pt`, `with_base_pt`, `reindexed`, traversal helpers.
+
+Operations on a diagram: `mirror`, `conn_sum` / `conn_sum_at`, `cc_at` (crossing change), `resolve_at` / `resolve_by` (Khovanov-style 0/1-smoothings), `seifert_state`, `seifert_circles`, `seifert_graph`.
+
+Constructions are associated functions, taking the companion link (if any) as an argument: `Link::twist_knot(n)`, `Link::pretzel(a, b, c)`, `Link::cable2(&l)` (blackboard-framed 2-cable), `Link::whitehead_double(&l, positive, tw)` (`tw` from the Seifert framing) and `Link::whitehead_double_bbf(&l, positive, tw)` (from the blackboard framing).
+
+For anything else, `LinkBuilder` assembles a diagram port by port; `build()` rejects unconnected or duplicated ports and non-planar wirings.
 
 ### `Node`
 
@@ -78,6 +90,8 @@ An *involutive link*: a `Link` together with an involution on it — an edge bij
 - `InvLink::load(name)` — reads `<DATA_DIR>/inv_link/<name>.json`. Bundled entries (3_1, 4_1, 5_1, 5_2a/b, …, 7_7a/b) ship in `lib-link/resources/inv_link/` and are copied into the data dir by `scripts/fetch-knot-data.py`.
 
 `with_base_pt(e)` sets the base point; it asserts that `e` is on-axis (`inv_edge(e) == e`). `inv_edge(e)` and `inv_node(x)` look up the involution. Most read-only `Link` methods are delegated, including `base_pt()`.
+
+`mirror` and `conn_sum` / `conn_sum_at` are the equivariant counterparts of the `Link` operations — the connected sum splices along on-axis edges. `InvLink::sym_pretzel(a, b, a)` (all-odd) and `InvLink::whitehead_double(&k, positive, tw)` (even `tw`) are the equivariant constructions; each recovers the strong inversion by reindexing to the standard involution.
 
 ### Derived invariants
 

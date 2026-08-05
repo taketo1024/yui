@@ -47,7 +47,7 @@ pub struct Args {
     #[arg(short = 'n', long)]
     pub no_simplify: bool,
 
-    #[arg(long, value_parser = parse_h_range)]
+    #[arg(long, value_parser = parse_h_range, allow_hyphen_values = true)]
     pub h_range: Option<RangeInclusive<isize>>,
 
     #[arg(long, value_parser = parse_strategy, default_value = "greedy")]
@@ -204,7 +204,7 @@ where
     }
 
     fn show_ssi(&mut self, l: &InvLink, c: &R, khi: &KhIHomology<R>, zs: &[KhIChain<R>]) -> Result<(), Box<dyn std::error::Error>> { 
-        assert!(!c.is_unit() && !c.is_unit());
+        assert!(!c.is_zero() && !c.is_unit());
 
         use yui_kh::ss::div_vec;
 

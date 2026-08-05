@@ -46,7 +46,7 @@ pub struct Args {
     #[arg(short = 'n', long)]
     pub no_simplify: bool,
 
-    #[arg(long, value_parser = parse_h_range)]
+    #[arg(long, value_parser = parse_h_range, allow_hyphen_values = true)]
     pub h_range: Option<RangeInclusive<isize>>,
 
     // chunking: `N` (cutwidth, N pieces) or `at(c,..)` (cut after the given crossing counts).

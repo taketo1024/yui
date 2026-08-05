@@ -47,7 +47,7 @@ pub struct Args {
     #[arg(short = 'n', long)]
     pub no_simplify: bool,
 
-    #[arg(long, value_parser = parse_h_range)]
+    #[arg(long, value_parser = parse_h_range, allow_hyphen_values = true)]
     pub h_range: Option<RangeInclusive<isize>>,
 
     // chunking: `N` (cutwidth, N pieces) or `at(c,..)` (cut after the given crossing counts).
@@ -193,7 +193,7 @@ where
     }
 
     fn show_ss(&mut self, l: &Link, c: &R, kh: &KhHomology<R>) -> Result<(), Box<dyn std::error::Error>> { 
-        assert!(!c.is_unit() && !c.is_unit());
+        assert!(!c.is_zero() && !c.is_unit());
 
         use yui_kh::ss::div_vec;
 
@@ -242,6 +242,17 @@ mod tests {
             panic!("`kh` routed to the wrong subcommand")
         };
         assert_cli_default(&a, &Args { link, ..Default::default() });
+    }
+
+    #[test]
+    fn h_range_accepts_a_negative_bound() {
+        // a mirrored knot's support is entirely negative, so the space-separated form matters.
+        let link = pd("3_1");
+        let args = CliArgs::try_parse_from(["ykh", "kh", &link, "--h-range", "-3..=0"]).unwrap();
+        let Cmd::Kh(a) = args.command else {
+            panic!("`kh` routed to the wrong subcommand")
+        };
+        assert_eq!(a.h_range, Some(-3..=0));
     }
 
     #[test]

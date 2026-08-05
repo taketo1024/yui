@@ -9,12 +9,12 @@ cfg_if::cfg_if! {
 }
 
 macro_rules! dispatch {
-    ($mode:ident, $app:ident, $method:ident, $args:expr) => {{
+    ($mode:ident, $kind:expr, $app:ident, $method:ident, $args:expr) => {{
         use crate::app::utils::dispatch::*;
 
         $mode!($app, $method, $args)
-        .unwrap_or_else(|| 
-            err!("`{}::{}` is not supported for: -t {} -c {}", stringify!($app), stringify!($method), $args.c_type(), $args.c_value)
+        .unwrap_or_else(||
+            err!("`-t {} -c {}` does not give {}.", $args.c_type(), $args.c_value, $kind)
         )
     }};
 }
@@ -22,21 +22,21 @@ macro_rules! dispatch {
 macro_rules! dispatch_ring {
     ($app:ident, $method:ident, $args:expr) => {{
         use crate::app::utils::dispatch::*;
-        dispatch!(try_ring, $app, $method, $args)
+        dispatch!(try_ring, "a ring", $app, $method, $args)
     }};
 }
 
 macro_rules! dispatch_eucring {
     ($app:ident, $method:ident, $args:expr) => {{
         use crate::app::utils::dispatch::*;
-        dispatch!(try_eucring, $app, $method, $args)
+        dispatch!(try_eucring, "a Euclidean ring", $app, $method, $args)
     }};
 }
 
 macro_rules! dispatch_field {
     ($app:ident, $method:ident, $args:expr) => {{
         use crate::app::utils::dispatch::*;
-        dispatch!(try_field, $app, $method, $args)
+        dispatch!(try_field, "a field", $app, $method, $args)
     }};
 }
 

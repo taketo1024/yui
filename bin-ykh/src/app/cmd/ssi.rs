@@ -40,7 +40,7 @@ pub struct Args {
     #[default(SsVersion::V2)]
     pub ver: SsVersion,
 
-    #[arg(long, value_parser = parse_h_range)]
+    #[arg(long, value_parser = parse_h_range, allow_hyphen_values = true)]
     pub h_range: Option<RangeInclusive<isize>>,
 
     #[arg(long, value_parser = parse_strategy, default_value = "greedy")]

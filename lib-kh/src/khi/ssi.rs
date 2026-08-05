@@ -194,4 +194,11 @@ mod tests {
     test!(k7_7a, "7_7a", (0, 0));
     test!(k7_7b, "7_7b", (0, 0));
 
+    // The (s̲, s̄) ≠ (s, s) cases of [Sano, InvKh II, Prop. 1.3] — everything above has s̲ = s̄, so
+    // these are what keep a bug that collapses ssi to (s, s) from passing. 8_21's two inversion
+    // classes differ, which is ssi seeing the involution and not just the knot.
+    test!(k8_21a, "8_21a", (2, 2));
+    test!(k8_21b, "8_21b", (2, 4));
+    test!(k9_46a, "9_46a", (-2, 0));
+    test!(k9_46b, "9_46b", (-2, 0));
 }

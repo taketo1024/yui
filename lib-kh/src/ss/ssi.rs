@@ -32,13 +32,22 @@ pub fn ssi_invariant(l: &InvLink, reduced: bool) -> (i32, i32) {
 /// The same, with the build configuration, the guessed s-value and the pipeline given explicitly.
 pub fn ssi_invariant_with(l: &InvLink, reduced: bool, config: SymBuildConfig, expected: Option<isize>, ver: SsVersion) -> (i32, i32) {
     assert!(l.is_knot());
+    assert_h_range(&config);
+
+    // the two equivariant Lee classes sit at h = 0 (B) and h = 1 (Q). Default to bottom..=1:
+    // building the cheap low degrees and truncating only at the top beats the doubly-truncated
+    // `0..=1` slice, which widens to the dense `-1..=2`.
+    let config = SymBuildConfig {
+        h_range: Some(config.h_range.clone().unwrap_or(-(Link::MAX_CROSSING as isize) ..= 1)),
+        ..config
+    };
 
     info!("compute ssi ({ver:?}) over {}.", P::math_symbol());
 
     let w = l.writhe();
     let r = l.seifert_circles().len() as i32;
     let (d0, d1) = match ver {
-        SsVersion::V1 => ssi_divisibility_v1(l, reduced),
+        SsVersion::V1 => ssi_divisibility_v1(l, reduced, config),
         SsVersion::V2 => ssi_divisibility_v2(l, reduced, config, expected),
     };
 
@@ -51,14 +60,21 @@ pub fn ssi_invariant_with(l: &InvLink, reduced: bool, config: SymBuildConfig, ex
     (ss0, ss1)
 }
 
-fn ssi_divisibility_v1(l: &InvLink, reduced: bool) -> (i32, i32) {
+// The two equivariant Lee classes live at h = 0 and h = 1, so a window missing either computes
+// nothing. `None` = the default (bottom..=1).
+fn assert_h_range(config: &SymBuildConfig) {
+    assert!(
+        config.h_range.as_ref().is_none_or(|r| r.contains(&0) && r.contains(&1)),
+        "the build h-range must contain 0 and 1, got {:?}", config.h_range
+    );
+}
+
+fn ssi_divisibility_v1(l: &InvLink, reduced: bool, config: SymBuildConfig) -> (i32, i32) {
     let r = if reduced { 1 } else { 2 };
     let c = P::variable();
     let t = P::zero();
 
-    // bottom..=1: building the cheap low degrees and truncating only at the top is faster than
-    // the doubly-truncated `0..=1` slice (which widens to the dense `-1..=2`). Builder clamps the start.
-    let kh = KhIHomology::new_partial(l, &c, &t, reduced, Some(-(Link::MAX_CROSSING as isize) ..= 1));
+    let kh = KhIHomology::new_with_config(l, &c, &t, reduced, config);
 
     assert_eq!(kh[0].rank(), r);
     assert_eq!(kh[1].rank(), r);    
@@ -134,7 +150,6 @@ fn divisibility_in_window(l: &InvLink, reduced: bool, config: SymBuildConfig, q0
     let requested = config.h_range.clone().unwrap_or(-(Link::MAX_CROSSING as isize) ..= 1);
     let range = KhComplex::<P>::clamp_h_range(l.inner(), reduced, requested);
     let (a, b) = (*range.start(), *range.end());
-    assert!(a <= 0 && b >= 1, "ssi h-range must include 0 and 1, got {a}..={b}");
     let config = SymBuildConfig { h_range: Some((a - 1)..=b), ..config };
     let kc = KhIComplex::<P>::new_windowed(l, &h, &t, reduced, config, -1..=1);
 

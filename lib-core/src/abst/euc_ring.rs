@@ -46,8 +46,8 @@ where
     /// See: <https://en.wikipedia.org/wiki/Euclidean_algorithm>
     fn gcd(x: &Self, y: &Self) -> Self {
         if x.is_zero() && y.is_zero() { return Self::zero() }
-        if x.divides(y) { return x.clone() }
-        if y.divides(x) { return y.clone() }
+        if x.divides(y) { return x.normalized() }
+        if y.divides(x) { return y.normalized() }
 
         let (mut x, mut y) = (x.clone(), y.clone());
 
@@ -65,8 +65,16 @@ where
     /// See: <https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm>
     fn gcdx(x: &Self, y: &Self) -> (Self, Self, Self) {
         if x.is_zero() && y.is_zero() { return (Self::zero(), Self::zero(), Self::zero()) }
-        if x.divides(y) { return (x.clone(), Self::one(), Self::zero()) }
-        if y.divides(x) { return (y.clone(), Self::zero(), Self::one()) }
+
+        // `d` is normalized, so the cofactor is the normalizing unit rather than `1`.
+        if x.divides(y) {
+            let u = x.normalizing_unit();
+            return (x * &u, u, Self::zero())
+        }
+        if y.divides(x) {
+            let u = y.normalizing_unit();
+            return (y * &u, Self::zero(), u)
+        }
 
         let (mut x,  mut y)  = (x.clone(), y.clone());
         let (mut s0, mut s1) = (Self::one(),  Self::zero());

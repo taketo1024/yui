@@ -589,6 +589,20 @@ mod tests {
     }
 
     #[test]
+    fn gcd_normalized() {
+        // over a field every nonzero element divides every other, so the gcd normalizes to 1.
+        let (x, y) = (Ratio::new(-3, 2), Ratio::new(5, 4));
+
+        let d = EucRing::gcd(&x, &y);
+        assert_eq!(d, Ratio::one(), "gcd is not normalized");
+
+        let (d, s, t) = EucRing::gcdx(&x, &y);
+        assert_eq!(d, Ratio::one(), "gcdx's d is not normalized");
+        assert_eq!(&s * &x + &t * &y, d, "Bezout fails");
+        assert_eq!(EucRing::gcd(&x, &y), d, "gcd disagrees with gcdx");
+    }
+
+    #[test]
     fn cmp() { 
         let a = Ratio::new(3, 5);
         let b = Ratio::new(4, 7);

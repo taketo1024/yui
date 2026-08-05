@@ -663,7 +663,22 @@ mod tests {
     }
 
     #[test]
-    fn unit_eisen() { 
+    fn gcd_normalized() {
+        // `x` divides `y` here, the branch that used to return `x` unchanged.
+        type A = QuadInt<i32, -1>; // GaussInt
+        let (x, y) = (A::new(0, -3), A::new(0, -6));
+
+        let d = EucRing::gcd(&x, &y);
+        assert_eq!(d, d.normalized(), "gcd is not normalized");
+
+        let (d, s, t) = EucRing::gcdx(&x, &y);
+        assert_eq!(d, d.normalized(), "gcdx's d is not normalized");
+        assert_eq!(&s * &x + &t * &y, d, "Bezout fails");
+        assert_eq!(EucRing::gcd(&x, &y), d, "gcd disagrees with gcdx");
+    }
+
+    #[test]
+    fn unit_eisen() {
         type A = QuadInt<i32, -3>; // EisenInt
         assert!(A::new(1,  0).is_unit());
         assert!(A::new(0,  1).is_unit());

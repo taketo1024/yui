@@ -100,6 +100,8 @@ where
     pub fn cone<It>(&self, support: It, target_based: bool) -> ChainComplex<I, EitherKey<X, Y>, R>
     where It: IntoIterator<Item = I>, 'c: 'static {
         assert!(self.source.d_deg() == self.target.d_deg());
+        // the cone pairs `Cᵢ` with `Dᵢ`, so `f` must land in the summand `d` already maps into.
+        assert!(self.deg.is_zero(), "cone requires a degree-zero map");
 
         let source = self.source;
         let target = self.target;
@@ -200,6 +202,18 @@ mod tests {
         );
 
         f.check_at(1);
+    }
+
+    #[test]
+    #[should_panic(expected = "cone requires a degree-zero map")]
+    fn cone_rejects_nonzero_deg() {
+        // with `deg ≠ 0` the `f`-terms land outside the summand and `vectorize` drops them,
+        // leaving a complex whose differential is missing `f` entirely.
+        let s2 = GenericChainComplex1::<i32>::s2();
+        let d3 = GenericChainComplex1::<i32>::d3();
+
+        let f = ChainMap::new(&s2, &d3, 1, |_, z| z.clone());
+        let _ = f.cone((0..=4).rev(), true);
     }
 
     #[test]

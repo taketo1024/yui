@@ -2,6 +2,7 @@ use std::ops::RangeInclusive;
 use clap::ValueEnum;
 use derive_more::Display;
 use yui_link::Link;
+use yui_kh::khi::SsiVersion;
 use yui_kh::tng::builder::{Strategy, NodeOrder, CutOption};
 
 pub trait AppArgs { 
@@ -111,6 +112,15 @@ pub fn parse_strategy(s: &str) -> Result<Strategy, String> {
         "no-elim" | "noelim"   => Ok(Strategy::NoElim),
         "none"                 => Ok(Strategy::None),
         _ => Err(format!("invalid strategy `{s}`, expected greedy|min-fill|no-elim|none")),
+    }
+}
+
+// parse the ssi pipeline version: v1 | v2.
+pub fn parse_ssi_version(s: &str) -> Result<SsiVersion, String> {
+    match s.to_lowercase().as_str() {
+        "v1" | "1" => Ok(SsiVersion::V1),
+        "v2" | "2" => Ok(SsiVersion::V2),
+        _ => Err(format!("invalid ssi version `{s}`, expected v1|v2")),
     }
 }
 

@@ -6,4 +6,5 @@ pub mod kh;
 pub mod ckhi;
 pub mod khi;
 pub mod cc;
+pub mod ssi;
 pub mod sl2;

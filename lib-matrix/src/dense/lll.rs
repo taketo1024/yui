@@ -22,6 +22,8 @@ use yui_core::ext::DivRound;
 use yui_core::num::{QuadInt, GaussInt, EisenInt, IntType, IntOps};
 use crate::dense::*;
 
+/// LLL-reduces the rows of `b`, which must be linearly independent — the Gram-Schmidt
+/// denominators vanish otherwise. Use [`lll_hnf`] for a possibly dependent basis.
 pub fn lll<R>(b: &Mat<R>, with_trans: bool) -> (Mat<R>, Option<Mat<R>>)
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     lll_in_place(b.clone(), with_trans)
@@ -30,7 +32,12 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 pub fn lll_in_place<R>(b: Mat<R>, with_trans: bool) -> (Mat<R>, Option<Mat<R>>)
 where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
     trace!("lll: {:?}", b.shape());
-    
+
+    if b.n_rows() == 0 {
+        let t = with_trans.then(|| Mat::id(0));
+        return (b, t)
+    }
+
     let mut calc = LLLCalc::new(b, with_trans);
     calc.process();
     calc.result()
@@ -309,8 +316,12 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
         (self.target, self.p, self.pinv)
     }
 
-    fn setup(&mut self) { 
+    fn setup(&mut self) {
         let (_, l, d) = orthogonalize(&self.target);
+        // a vanishing Gram-Schmidt determinant means the rows are dependent, which `reduce`
+        // would only discover by dividing by it.
+        assert!(d.iter().all(|x| !x.is_zero()), "lll requires linearly independent rows");
+
         self.lambda = l;
         self.det = d;
     }
@@ -532,6 +543,22 @@ where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {
 pub(super) mod tests {
     use super::*;
  
+    #[test]
+    fn lll_empty_basis() {
+        let a: Mat<i64> = Mat::from_row_major((0, 3), []);
+        let (b, t) = super::lll(&a, true);
+        assert_eq!(b.shape(), (0, 3));
+        assert!(t.unwrap().is_id());
+    }
+
+    #[test]
+    #[should_panic(expected = "linearly independent")]
+    fn lll_rejects_dependent_rows() {
+        // `reduce` would otherwise divide by the vanishing Gram-Schmidt determinant.
+        let a = Mat::from_row_major((2, 2), [1i64, 2, 2, 4]);
+        let _ = super::lll(&a, false);
+    }
+
     #[test]
     fn test_large_orth_basis() {
         let a = Mat::from_row_major((3, 3), [

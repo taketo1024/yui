@@ -2,7 +2,7 @@ use std::ops::RangeInclusive;
 use clap::ValueEnum;
 use derive_more::Display;
 use yui_link::Link;
-use yui_kh::ssi::SsiVersion;
+use yui_kh::ss::SsVersion;
 use yui_kh::tng::builder::{Strategy, NodeOrder, CutOption};
 
 pub trait AppArgs { 
@@ -116,10 +116,10 @@ pub fn parse_strategy(s: &str) -> Result<Strategy, String> {
 }
 
 // parse the ssi pipeline version: v1 | v2.
-pub fn parse_ssi_version(s: &str) -> Result<SsiVersion, String> {
+pub fn parse_ssi_version(s: &str) -> Result<SsVersion, String> {
     match s.to_lowercase().as_str() {
-        "v1" | "1" => Ok(SsiVersion::V1),
-        "v2" | "2" => Ok(SsiVersion::V2),
+        "v1" | "1" => Ok(SsVersion::V1),
+        "v2" | "2" => Ok(SsVersion::V2),
         _ => Err(format!("invalid ssi version `{s}`, expected v1|v2")),
     }
 }

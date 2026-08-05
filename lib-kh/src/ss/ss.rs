@@ -7,14 +7,15 @@
 //!   Topol. Appl. 357 (2024), 109059.
 //!   <https://doi.org/10.1016/j.topol.2024.109059>, <https://arxiv.org/abs/2211.02494>
 
+
 use itertools::Itertools;
 use log::info;
 use num_traits::Zero;
 use yui_link::Link;
 use yui_core::{EucRing, EucRingOps};
 
-use crate::util::calc::div_vec;
 use crate::kh::KhHomology;
+use super::util::div_vec;
 
 pub fn ss_invariant<R>(l: &Link, c: &R, reduced: bool) -> i32
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 

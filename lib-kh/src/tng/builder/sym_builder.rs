@@ -1259,7 +1259,7 @@ mod tests {
     // ingredient) computed from each chunked KhI homology must match the non-chunked one.
     #[test]
     fn chunk_elements_match() {
-        use crate::util::calc::div_vec;
+        use crate::ss::div_vec;
         type P = Poly<'H', FF2>;
 
         let l = InvLink::from_symmetric_pd_code(

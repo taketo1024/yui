@@ -189,7 +189,7 @@ where
     fn show_ss(&mut self, l: &Link, c: &R, kh: &KhHomology<R>) -> Result<(), Box<dyn std::error::Error>> { 
         assert!(!c.is_unit() && !c.is_unit());
 
-        use yui_kh::util::calc::div_vec;
+        use yui_kh::ss::div_vec;
 
         let w = l.writhe();
         let r = l.seifert_circles().len() as i32;

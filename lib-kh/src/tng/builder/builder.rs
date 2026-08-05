@@ -936,7 +936,7 @@ mod tests {
     #[test]
     fn test_chunk_elements_match() {
         use crate::kh::KhHomology;
-        use crate::util::calc::div_vec;
+        use crate::ss::div_vec;
 
         let l = Link::test_data("8_19");
         let c = 2;

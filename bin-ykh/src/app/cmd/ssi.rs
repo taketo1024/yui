@@ -1,6 +1,6 @@
 use smart_default::SmartDefault;
 use std::ops::RangeInclusive;
-use yui_kh::ssi::{ssi_invariant_with, SsiVersion};
+use yui_kh::ss::{ssi_invariant_with, SsVersion};
 use yui_kh::tng::builder::{CutOption, NodeOrder, Strategy, SymBuildConfig};
 
 use crate::app::args::*;
@@ -37,8 +37,8 @@ pub struct Args {
 
     // pipeline: v2 (default, `H = 1` q-truncated solves) or v1 (homology of the cone).
     #[arg(long, value_parser = parse_ssi_version, default_value = "v2")]
-    #[default(SsiVersion::V2)]
-    pub ver: SsiVersion,
+    #[default(SsVersion::V2)]
+    pub ver: SsVersion,
 
     #[arg(long, value_parser = parse_h_range)]
     pub h_range: Option<RangeInclusive<isize>>,
@@ -147,7 +147,7 @@ mod tests {
     #[test]
     fn ssi_v1_agrees_with_v2() {
         let v2 = Args { link: inv_pd("8_21b"), ..Default::default() };
-        let v1 = Args { ver: SsiVersion::V1, ..v2.clone() };
+        let v1 = Args { ver: SsVersion::V1, ..v2.clone() };
         assert_eq!(dispatch(&v1).unwrap(), dispatch(&v2).unwrap());
     }
 }

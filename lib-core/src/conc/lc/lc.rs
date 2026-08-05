@@ -396,14 +396,14 @@ where
 
 #[auto_ops]
 impl<X, R> Mul for &Lc<X, R>
-where 
-    X: LcKey + Mul<Output = X>,
+where
+    X: LcMulKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     type Output = Lc<X, R>;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        self.apply_bilin(rhs, |x, y| x.clone() * y.clone())
+        self.apply_bilin(rhs, |x, y| x.mul_ref(y))
     }
 }
 

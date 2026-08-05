@@ -100,6 +100,8 @@ where
 
     /// Least common multiple, returned in normalized form.
     fn lcm(x: &Self, y: &Self) -> Self {
+        if x.is_zero() || y.is_zero() { return Self::zero() }
+
         let g = Self::gcd(x, y);
         let m = x * (y / g);
         m.into_normalized()

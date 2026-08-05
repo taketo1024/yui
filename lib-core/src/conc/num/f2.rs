@@ -9,7 +9,7 @@ use std::fmt::{Debug, Display};
 use std::ops::{Add, Neg, Sub, Mul, Div, Rem, AddAssign, SubAssign, MulAssign, DivAssign, RemAssign};
 use std::str::FromStr;
 use num_integer::Integer;
-use num_traits::{One, Pow, ToPrimitive, Zero};
+use num_traits::{One, Pow, Zero};
 use auto_impl_ops::auto_ops;
 
 use crate::abst::{MathType, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, EucRingOps, AddMon, AddGrp, Mon, Ring, EucRing, Field};
@@ -19,10 +19,9 @@ use crate::abst::{MathType, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, Euc
 pub struct FF2(bool);
 
 impl<I> From<I> for FF2
-where I: ToPrimitive {
+where I: Integer {
     fn from(a: I) -> Self {
-        let b = a.to_i64().unwrap().is_odd();
-        Self(b)
+        Self(a.is_odd())
     }
 }
 
@@ -222,6 +221,14 @@ mod tests {
 
         let a = FF2::from(2);
         assert_eq!(a.to_string(), "0");
+    }
+
+    #[test]
+    fn from_big() {
+        // parity is read directly, so a value past `i64` still converts.
+        use num_bigint::BigInt;
+        assert_eq!(FF2::from(BigInt::from(2).pow(100u32) + BigInt::from(1)), FF2::one());
+        assert_eq!(FF2::from(BigInt::from(2).pow(100u32)), FF2::zero());
     }
 
     #[test]

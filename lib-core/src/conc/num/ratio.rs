@@ -112,6 +112,9 @@ where T: EucRing + FromStr, for<'x> &'x T: EucRingOps<T> {
         if let Some(c) = r.captures(s) { 
             let (s1, s2) = (&c[1], &c[2]);
             if let (Ok(a), Ok(b)) = (s1.parse::<T>(), s2.parse::<T>()) {
+                if b.is_zero() {
+                    return Err(format!("zero denominator: '{s}'"))
+                }
                 return Ok(Self::new(a, b))
             }
         }
@@ -607,6 +610,14 @@ mod tests {
         let a = Ratio::new(3, 5);
         let b = Ratio::new(4, 7);
         assert!(a > b);
+    }
+
+    #[test]
+    fn from_str_zero_denom() {
+        // `Ratio` derives `DeserializeFromStr`, so this must not abort the process.
+        assert!(Ratio::<i64>::from_str("1/0").is_err());
+        assert!(Ratio::<i64>::from_str("0/0").is_err());
+        assert_eq!(Ratio::<i64>::from_str("1/2"), Ok(Ratio::new(1, 2)));
     }
 
     #[test]

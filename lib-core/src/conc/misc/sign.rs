@@ -99,10 +99,11 @@ pub trait GetSign {
 
 impl<T> GetSign for T where T: Signed {
     fn sign(&self) -> Sign {
-        if self.is_positive() { 
-            Sign::Pos 
-        } else { 
-            Sign::Neg 
+        assert!(!self.is_zero(), "zero has no sign");
+        if self.is_positive() {
+            Sign::Pos
+        } else {
+            Sign::Neg
         }
     }
 }
@@ -110,6 +111,12 @@ impl<T> GetSign for T where T: Signed {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[should_panic(expected = "zero has no sign")]
+    fn sign_of_zero() {
+        let _ = 0i64.sign();
+    }
 
     #[test]
     fn ord() {

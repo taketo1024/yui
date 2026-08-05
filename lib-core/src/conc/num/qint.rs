@@ -678,6 +678,16 @@ mod tests {
     }
 
     #[test]
+    fn lcm_zero() {
+        // lcm(0, y) = 0, and gcd(0, 0) = 0 must not reach the division.
+        type A = QuadInt<i32, -1>; // GaussInt
+        let (z, a) = (A::new(0, 0), A::new(2, 1));
+        assert_eq!(EucRing::lcm(&z, &z), z);
+        assert_eq!(EucRing::lcm(&z, &a), z);
+        assert_eq!(EucRing::lcm(&a, &z), z);
+    }
+
+    #[test]
     fn unit_eisen() {
         type A = QuadInt<i32, -3>; // EisenInt
         assert!(A::new(1,  0).is_unit());

@@ -450,6 +450,11 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     fn gcdx(x: &R, y: &R) -> (R, R, R) {
         let (d, s, t) = EucRing::gcdx(x, y);
 
+        // `gcd(0, 0) = 0`, and nothing divides it.
+        if d.is_zero() {
+            return (d, s, t)
+        }
+
         // If `a = x/d` is a unit, `s = a⁻¹` satisfies `s·x + 0·y = d` (avoids coefficient growth).
         let a = x / &d;
         if a.is_unit() {
@@ -682,10 +687,12 @@ mod tests {
         }
 
         type G = GaussInt<i64>;
-        check(&[G::new(1, 0), G::new(0, 1), G::new(2, 1), G::new(3, 0), G::new(-1, 2)]);
+        check(&[G::new(0, 0), G::new(1, 0), G::new(0, 1), G::new(2, 1), G::new(3, 0), G::new(-1, 2)]);
 
         type Q = Ratio<i64>;
-        check(&[Q::new(1, 2), Q::new(-3, 4), Q::new(5, 1), Q::new(2, 3)]);
+        check(&[Q::new(0, 1), Q::new(1, 2), Q::new(-3, 4), Q::new(5, 1), Q::new(2, 3)]);
+
+        check(&[0i64, 1, -2, 6, 15]);
     }
 
     #[test]

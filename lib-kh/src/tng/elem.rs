@@ -80,7 +80,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let init = LcCob::from(self.in_cob.clone());
         let eval = self.out_cob.iter().map(|(k, retr)| {
             let x = k.as_gen();
-            let f = retr * &init;
+            let f = init.stack(retr);
             let r = f.eval(h, t);
             (x, r)
         }).collect::<KhChain<R>>();

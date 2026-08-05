@@ -15,7 +15,6 @@ use std::cell::RefCell;
 use std::fmt::Display;
 use std::hash::Hash;
 use std::collections::HashSet;
-use std::ops::Mul;
 use std::sync::{Arc, OnceLock};
 use itertools::Itertools;
 use num_traits::Zero;
@@ -857,13 +856,6 @@ impl MathType for Cob {
 }
 
 impl LcKey for Cob {}
-
-impl Mul for Cob {
-    type Output = Cob;
-    fn mul(self, rhs: Self) -> Self::Output {
-        rhs.stack(&self)
-    }
-}
 
 pub type LcCob<R> = Lc<Cob, R>; // R-linear combination of cobordisms.
 

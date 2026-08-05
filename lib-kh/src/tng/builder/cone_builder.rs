@@ -450,7 +450,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                         return None;
                     }
                     let g = cap_circles(retr.clone(), End::Tgt, &circles, &b, &h, &t);
-                    let x = (g * &init).eval(&h, &t);
+                    let x = init.stack(&g).eval(&h, &t);
                     Some((kg, x))
                 }).collect_vec()
             }).collect()

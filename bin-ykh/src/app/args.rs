@@ -37,11 +37,11 @@ pub trait AppArgs {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, ValueEnum, Display, Debug, Default)]
+// no `Default`: each command's `Args` states its own, matching its clap `default_value`.
+#[derive(Clone, Copy, PartialEq, Eq, ValueEnum, Display, Debug)]
 #[clap(rename_all="verbatim")]
 pub enum CType { 
-    #[default] Z, 
-    Q, F2, F3
+    Z, Q, F2, F3
 }
 
 impl CType { 

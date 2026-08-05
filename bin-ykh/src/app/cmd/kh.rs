@@ -1,3 +1,4 @@
+use smart_default::SmartDefault;
 use std::marker::PhantomData;
 use std::ops::RangeInclusive;
 use std::str::FromStr;
@@ -15,14 +16,16 @@ pub fn dispatch(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
     dispatch_eucring!(App, boot, args)
 }
 
-#[derive(Clone, Default, Debug, clap::Args)]
+#[derive(Clone, SmartDefault, PartialEq, Debug, clap::Args)]
 pub struct Args { 
     pub link: String,
 
     #[arg(short = 't', long, default_value = "Z")]
+    #[default(CType::Z)]
     pub c_type: CType,
 
     #[arg(short, long, default_value = "0")]
+    #[default("0".to_string())]
     pub c_value: String,
 
     #[arg(short, long)]
@@ -203,13 +206,23 @@ where
 #[cfg(test)]
 mod tests { 
     use super::*;
-    use crate::app::cmd::test_utils::{pd, assert_out};
+    use clap::Parser;
+    use crate::app::app::{CliArgs, Cmd};
+    use crate::app::cmd::test_utils::{pd, assert_out, assert_cli_default};
+
+    #[test]
+    fn cli_defaults() {
+        let link = pd("3_1");
+        let Cmd::Kh(a) = CliArgs::parse_from(["ykh", "kh", &link]).command else {
+            panic!("`kh` routed to the wrong subcommand")
+        };
+        assert_cli_default(&a, &Args { link, ..Default::default() });
+    }
 
     #[test]
     fn kh_trefoil_z() { 
         let args = Args { 
             link: pd("3_1"), 
-            c_value: "0".to_string(), 
             ..Default::default()
         };
         assert_out(dispatch(&args), r"
@@ -226,8 +239,6 @@ mod tests {
     fn kh_trefoil_mirror_reduced() { 
         let args = Args { 
             link: pd("3_1"),
-            c_value: "0".to_string(),
-            c_type: CType::Z,
             mirror: true,
             reduced: true,
             ..Default::default()

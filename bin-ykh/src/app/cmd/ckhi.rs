@@ -1,3 +1,4 @@
+use smart_default::SmartDefault;
 use crate::app::args::*;
 use crate::app::utils::*;
 use crate::app::err::*;
@@ -14,14 +15,16 @@ pub fn dispatch(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
     dispatch_ring!(App, boot, args)
 }
 
-#[derive(Clone, Default, Debug, clap::Args)]
+#[derive(Clone, SmartDefault, PartialEq, Debug, clap::Args)]
 pub struct Args {
     pub link: String,
 
     #[arg(short = 't', long, default_value = "F2")]
+    #[default(CType::F2)]
     pub c_type: CType,
 
     #[arg(short, long, default_value = "0")]
+    #[default("0".to_string())]
     pub c_value: String,
 
     #[arg(short, long)]
@@ -189,14 +192,23 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::cmd::test_utils::{pd, assert_out};
+    use clap::Parser;
+    use crate::app::app::{CliArgs, Cmd};
+    use crate::app::cmd::test_utils::{pd, assert_out, assert_cli_default};
+
+    #[test]
+    fn cli_defaults() {
+        let link = pd("3_1");
+        let Cmd::CKhI(a) = CliArgs::parse_from(["ykh", "ckhi", &link]).command else {
+            panic!("`ckhi` routed to the wrong subcommand")
+        };
+        assert_cli_default(&a, &Args { link, ..Default::default() });
+    }
 
     #[test]
     fn ckhi_trefoil_f2() {
         let args = Args {
             link: pd("3_1"),
-            c_value: "0".to_string(),
-            c_type: CType::F2,
             ..Default::default()
         };
         assert_out(dispatch(&args), r"
@@ -214,7 +226,6 @@ mod tests {
         let args = Args {
             link: pd("3_1"),
             c_value: "1".to_string(),
-            c_type: CType::F2,
             mirror: true,
             reduced: true,
             show_alpha: true,
@@ -237,7 +248,6 @@ mod tests {
         let args = Args {
             link: pd("3_1"),
             c_value: "H".to_string(),
-            c_type: CType::F2,
             ..Default::default()
         };
         assert_out(dispatch(&args), r"
@@ -255,7 +265,6 @@ mod tests {
         let args = Args {
             link: pd("3_1"),
             c_value: "0,T".to_string(),
-            c_type: CType::F2,
             ..Default::default()
         };
         assert_out(dispatch(&args), r"
@@ -273,7 +282,6 @@ mod tests {
         let args = Args {
             link: pd("3_1"),
             c_value: "H,T".to_string(),
-            c_type: CType::F2,
             ..Default::default()
         };
         assert_out(dispatch(&args), r"

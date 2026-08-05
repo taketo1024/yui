@@ -1,3 +1,4 @@
+use smart_default::SmartDefault;
 use crate::app::args::*;
 use crate::app::utils::dispatch::dispatch_field;
 use crate::app::utils::*;
@@ -22,14 +23,16 @@ pub fn dispatch(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
     }
 }
 
-#[derive(Clone, Default, Debug, clap::Args)]
+#[derive(Clone, SmartDefault, PartialEq, Debug, clap::Args)]
 pub struct Args {
     pub link: String,
 
     #[arg(short = 't', long, default_value = "Q")]
+    #[default(CType::Q)]
     pub c_type: CType,
 
     #[arg(short, long, default_value = "0")]
+    #[default("0".to_string())]
     pub c_value: String,
 
     #[arg(short, long)]
@@ -231,15 +234,24 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::cmd::test_utils::{pd, assert_out};
+    use clap::Parser;
+    use crate::app::app::{CliArgs, Cmd};
+    use crate::app::cmd::test_utils::{pd, assert_out, assert_cli_default};
+
+    #[test]
+    fn cli_defaults() {
+        let link = pd("3_1");
+        let Cmd::SL2(a) = CliArgs::parse_from(["ykh", "sl2", &link]).command else {
+            panic!("`sl2` routed to the wrong subcommand")
+        };
+        assert_cli_default(&a, &Args { link, ..Default::default() });
+    }
 
     // Kh over Q, then its decomposition into sl(2) strings δ^a q^b e(n).
     #[test]
     fn sl2_trefoil() {
         let args = Args {
             link: pd("3_1"),
-            c_type: CType::Q,
-            c_value: "0".to_string(),
             ..Default::default()
         };
         assert_out(dispatch(&args), r"
@@ -258,8 +270,6 @@ mod tests {
     fn sl2_trefoil_reduced() {
         let args = Args {
             link: pd("3_1"),
-            c_type: CType::Q,
-            c_value: "0".to_string(),
             reduced: true,
             ..Default::default()
         };
@@ -279,8 +289,6 @@ mod tests {
     fn sl2_figure8() {
         let args = Args {
             link: pd("4_1"),
-            c_type: CType::Q,
-            c_value: "0".to_string(),
             ..Default::default()
         };
         assert_out(dispatch(&args), r"

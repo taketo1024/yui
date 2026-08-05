@@ -1,6 +1,7 @@
 //! Shared helpers for the per-command tests.
 
 use std::error::Error;
+use std::fmt::Debug;
 use yui_link::Link;
 
 // PD code of a `lib-link` test knot, in the JSON form the `link` argument takes.
@@ -17,4 +18,11 @@ pub fn assert_out(res: Result<String, Box<dyn Error>>, expected: &str) {
         .collect::<Vec<_>>();
 
     assert_eq!(cells(&res.expect("dispatch failed")), cells(expected));
+}
+
+// `Args::default()` must agree with clap's `default_value`s — the command tests build `Args` by
+// struct literal, so a mismatch would have them testing something the CLI never runs.
+pub fn assert_cli_default<T>(parsed: &T, default: &T)
+where T: PartialEq + Debug {
+    assert_eq!(parsed, default);
 }

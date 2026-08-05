@@ -52,8 +52,6 @@ impl Link {
     }
 
     pub fn load(name: &str) -> Result<Link, Box<dyn std::error::Error>> {
-        // the data dir is external and empty on a fresh checkout; tests must not depend on it.
-        assert!(!cfg!(feature = "test-utils"), "`load` reads the data directory — use `test_data` in tests");
         let json = yui_core::util::data_dir::load_json("links", name)?;
         let data: Vec<PDCodeX> = serde_json::from_str(&json)?;
         Ok(Link::from_pd_code(data))

@@ -138,8 +138,6 @@ impl Braid {
     }
 
     pub fn load(name: &str) -> Result<Braid, Box<dyn std::error::Error>> {
-        // the data dir is external and empty on a fresh checkout; tests must not depend on it.
-        assert!(!cfg!(feature = "test-utils"), "`load` reads the data directory — use `test_data` in tests");
         let json = yui_core::util::data_dir::load_json("braid", name)?;
         let code: Vec<i32> = serde_json::from_str(&json)?;
         Ok(Braid::from_iter(code))

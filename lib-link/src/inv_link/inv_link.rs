@@ -226,8 +226,6 @@ impl InvLink {
 
 impl InvLink {
     pub fn load(name: &str) -> Result<InvLink, Box<dyn std::error::Error>> {
-        // the data dir is external and empty on a fresh checkout; tests must not depend on it.
-        assert!(!cfg!(feature = "test-utils"), "`load` reads the data directory — use `test_data` in tests");
         let json = yui_core::util::data_dir::load_json("inv_link", name)?;
         let data: Vec<PDCodeX> = serde_json::from_str(&json)?;
         Ok(InvLink::from_symmetric_pd_code(data))

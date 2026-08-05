@@ -1,6 +1,8 @@
 use either::Either;
 use log::*;
 use yui_core::{Ring, RingOps};
+use log::Level;
+use yui_core::util::log::log_progress;
 
 use super::*;
 
@@ -146,7 +148,6 @@ where
     let diag = collect_diag(t, a);
     let tl_b = Arc::new(ThreadLocal::new());
 
-    let report = should_report(y);
     let counter = SyncCounter::new(0);
 
     (0..k).into_par_iter().map(|j| {
@@ -158,12 +159,8 @@ where
         let x = _solve_triangular(t, a, &diag, &mut b);
         let result = f(j, x);
 
-        if report {
-            let c = counter.incr();
-            if (c > 0 && c % LOG_THRESHOLD == 0) || c == k {
-                trace!("  solved {c}/{k}.");
-            }
-        }
+        let c = counter.incr();
+        log_progress(Level::Trace, c, c - 1, k, LOG_THRESHOLD, 1);
 
         result
     }).collect()
@@ -228,11 +225,6 @@ fn scatter_into<R: Clone>(data: (&[usize], &[R]), dst: &mut [R]) {
     for (&i, v) in idx.iter().zip(val.iter()) {
         dst[i] = v.clone();
     }
-}
-
-#[allow(unused)]
-fn should_report<R>(a: &SpMat<R>) -> bool { 
-    usize::min(a.n_rows(), a.n_cols()) > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Debug
 }
 
 #[cfg(test)]

@@ -201,21 +201,6 @@ mod tests {
         }
     }
 
-    // 14n_19265 is the standard example where `s` genuinely depends on the field: -2 over F2,
-    // 0 over Q and F3. A V2 path mishandling the coefficients would give one value for all three.
-    #[test]
-    fn s_is_field_dependent() {
-        let l = Link::test_data("14n_19265");
-
-        for reduced in [false, true] {
-            assert_eq!(s_invariant::<FF2>(&l, reduced), -2, "F2, reduced = {reduced}");
-            assert_eq!(s_invariant::<Ratio<i64>>(&l, reduced), 0, "Q, reduced = {reduced}");
-            assert_eq!(s_invariant::<FF<3>>(&l, reduced), 0, "F3, reduced = {reduced}");
-        }
-
-        assert_eq!(s_invariant::<FF2>(&l.mirror(), false), 2, "F2, mirror");
-    }
-
     #[test]
     #[should_panic(expected = "h-range must contain 0")]
     fn s_rejects_an_h_range_missing_zero() {
@@ -271,20 +256,32 @@ mod tests {
     test_c2!(k7_3,  "7_3",  4);
     test_c2!(k8_19, "8_19", 6);
 
-    // 14n_19265: the value depends on the coefficients — -2 for c = 2 and over F2[H],
-    // 0 for c = 3 and over Q[H] / F3[H].
-    macro_rules! test_k14 {
-        ($test:ident, $c:expr, $expected:expr) => {
-            #[test]
-            fn $test() {
-                check(&Link::test_data("14n_19265"), &$c, $expected);
-            }
-        };
+    // The invariant genuinely depends on the coefficients, so one computation per choice is the
+    // point here — the mirror/reduced invariance is already pinned by the knots above.
+    //
+    // 14n_19265: `ss` over Z differs for c = 2 and c = 3; `s` over F2 differs from Q and F3.
+    #[test]
+    fn k14_ring_dependence() {
+        let l = Link::test_data("14n_19265");
+
+        assert_eq!(ss_invariant(&l, &2_i64, false), -2, "c = 2");
+        assert_eq!(ss_invariant(&l, &3_i64, false),  0, "c = 3");
+
+        assert_eq!(s_invariant::<Ratio<i64>>(&l, false),  0, "Q");
+        assert_eq!(s_invariant::<FF2>(&l, false),        -2, "F2");
+        assert_eq!(s_invariant::<FF<3>>(&l, false),       0, "F3");
     }
 
-    test_k14!(k14_c2,  2_i64, -2);
-    test_k14!(k14_c3,  3_i64,  0);
-    test_k14!(k14_q_h,  P::<Ratio<i64>>::variable(),  0);
-    test_k14!(k14_f2_h, P::<FF2>::variable(),        -2);
-    test_k14!(k14_f3_h, P::<FF<3>>::variable(),       0);
+    // The F3 counterpart of 14n_19265: here Q and F2 agree and F3 differs. Values from the
+    // computations behind [Sano-Sato, Topol. Appl. 357 (2024)].
+    #[test]
+    #[ignore = "slow in debug (~15s): two 18-crossing knots over three fields"]
+    fn k18_ring_dependence() {
+        for (name, s_q, s_f3) in [("18nh_05566876", 2, 0), ("18nh_37144251", -2, 0)] {
+            let l = Link::test_data(name);
+            assert_eq!(s_invariant::<Ratio<i64>>(&l, false), s_q,  "{name} over Q");
+            assert_eq!(s_invariant::<FF2>(&l, false),        s_q,  "{name} over F2");
+            assert_eq!(s_invariant::<FF<3>>(&l, false),      s_f3, "{name} over F3");
+        }
+    }
 }

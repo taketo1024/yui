@@ -22,7 +22,6 @@ itertools = "0.14.0"
 num-integer = "0.1.46"
 num-traits = "0.2.19"
 petgraph = "0.8.3"
-serde = "1.0.228"
 smallvec = "1.13"
 serde_json = "1.0.149"
 yui-core.workspace = true

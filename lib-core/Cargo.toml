@@ -13,7 +13,6 @@ repository.workspace  = true
 serde = ["dep:serde", "dep:serde_json", "dep:serde_repr", "dep:serde_with"]
 
 [dependencies]
-ahash = { version = "0.8.12", features = ["serde"] }
 auto-impl-ops = "0.2.1"
 delegate = "0.13.5"
 derive_more = { version = "2.1.1", features = ["display", "debug"] }

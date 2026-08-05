@@ -192,11 +192,12 @@ impl PivotFinder {
         let remain_rows: Vec<_> = self.remain_rows().collect();
 
         for i in remain_rows {
+            if self.pivots.count() >= self.max_pivots { break; }
+
             let Some((j, is_cand)) = self.str.head(i) else { continue };
 
             if is_cand && !self.pivots.has_col(j) {
                 self.pivots.set(i, j);
-                if self.pivots.count() >= self.max_pivots { break; }
             }
         }
 
@@ -212,6 +213,8 @@ impl PivotFinder {
         let mut occ_cols = self.occupied_cols();
 
         for i in remain_rows {
+            if self.pivots.count() >= self.max_pivots { break; }
+
             let mut cands = vec![];
 
             for (j, is_cand) in self.str.entries_in(i) {
@@ -229,8 +232,6 @@ impl PivotFinder {
             for j in self.str.cols_in(i) {
                 occ_cols[j] = true;
             }
-
-            if self.pivots.count() >= self.max_pivots { break; }
         }
 
         let piv_count = self.pivots.count();
@@ -965,6 +966,15 @@ mod tests {
         assert!((0..r).all(|j| {
             (j+1..r).all(|i| b[(i, j)].is_zero())
         }))
+    }
+
+    #[test]
+    fn max_pivots_zero() {
+        // the cap is tested before a pivot is taken, so zero really means zero.
+        let a: SpMat<i64> = SpMat::id(3);
+        let config = PivotFinderConfig { max_pivots: 0, ..Default::default() };
+        let (_, _, r) = find_pivots(&a, config);
+        assert_eq!(r, 0);
     }
 
     #[test]

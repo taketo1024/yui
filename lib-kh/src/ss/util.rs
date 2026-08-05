@@ -8,7 +8,7 @@
 //! Reference: `research/h1-divisibility.tex`.
 
 use itertools::Itertools;
-use log::info;
+use log::debug;
 
 use yui_core::lc::Lc;
 use yui_core::abst::{EucRing, EucRingOps, Field, FieldOps};
@@ -55,12 +55,12 @@ where F: Field, for<'x> &'x F: FieldOps<F> {
         }
 
         let (a, y) = truncated_system(d, v, src_q, tgt_q, q_hi);
-        info!("h = {at}, level {}: solve system of size {:?}.", m + 1, a.shape());
+        debug!("h = {at}, level {}: solve system of size {:?}.", m + 1, a.shape());
 
         if solve_pluq(&a, &y).is_some() {
             m += 1;
         } else {
-            info!("h = {at}: d = {m}.");
+            debug!("h = {at}: d = {m}.");
             return Some(m as i32);
         }
     }

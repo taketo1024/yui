@@ -6,13 +6,14 @@
 //! - T. Sano, "Involutive Khovanov homology and equivariant knots",
 //!   Algebr. Geom. Topol. 25 (2025), 5059–5111.
 //!   <https://doi.org/10.2140/agt.2025.25.5059>, <https://arxiv.org/abs/2404.08568>
+use std::ops::RangeInclusive;
 use itertools::Itertools;
 use num_traits::Zero;
-use log::info;
+use log::{info, debug};
 
 use yui_core::abst::MathType;
 use yui_core::num::FF2;
-use yui_link::{InvLink, Link};
+use yui_link::InvLink;
 
 use crate::kh::KhComplex;
 use crate::khi::{KhIChain, KhIComplex, KhIHomology};
@@ -26,19 +27,14 @@ type P = FastPoly<'H', F>;
 
 /// `ssi` over `𝔽₂[H]`, via the current default pipeline ([`SsVersion::V2`]).
 pub fn ssi_invariant(l: &InvLink, reduced: bool) -> (i32, i32) {
-    ssi_invariant_with(l, reduced, SymBuildConfig::default(), None, SsVersion::V2)
+    let config = SymBuildConfig { h_range: Some(default_h_range(l)), ..Default::default() };
+    ssi_invariant_with(l, reduced, config, None, SsVersion::V2)
 }
 
 /// The same, with the build configuration, the guessed s-value and the pipeline given explicitly.
 pub fn ssi_invariant_with(l: &InvLink, reduced: bool, config: SymBuildConfig, expected: Option<isize>, ver: SsVersion) -> (i32, i32) {
     assert!(l.is_knot());
     assert_h_range(&config);
-
-    let bot = -(l.n_signed_crossings().1 as isize);
-    let config = SymBuildConfig {
-        h_range: Some(config.h_range.clone().unwrap_or(bot ..= 1)),
-        ..config
-    };
 
     info!("compute ssi ({ver:?}) over {}.", P::math_symbol());
 
@@ -58,8 +54,12 @@ pub fn ssi_invariant_with(l: &InvLink, reduced: bool, config: SymBuildConfig, ex
     (ss0, ss1)
 }
 
-// The two equivariant Lee classes live at h = 0 and h = 1, so a window missing either computes
-// nothing. `None` = the default (bottom..=1).
+// The complex starts at `-n_neg`; the two equivariant Lee classes sit at h = 0 and h = 1.
+fn default_h_range(l: &InvLink) -> RangeInclusive<isize> {
+    -(l.n_signed_crossings().1 as isize) ..= 1
+}
+
+// A window missing either Lee class computes nothing.
 fn assert_h_range(config: &SymBuildConfig) {
     assert!(
         config.h_range.as_ref().is_none_or(|r| r.contains(&0) && r.contains(&1)),
@@ -77,8 +77,8 @@ fn ssi_divisibility_v1(l: &InvLink, reduced: bool, config: SymBuildConfig) -> (i
     assert_eq!(kh[0].rank(), r);
     assert_eq!(kh[1].rank(), r);    
 
-    info!("KhI[0]: {}", kh[0]);    
-    info!("KhI[1]: {}", kh[1]);    
+    debug!("KhI[0]: {}", kh[0]);    
+    debug!("KhI[1]: {}", kh[1]);    
 
     let zs = kh.canon_cycles();
     
@@ -92,7 +92,7 @@ fn ssi_divisibility_v1(l: &InvLink, reduced: bool, config: SymBuildConfig) -> (i
     let ds = zs.iter().enumerate().map(|(i, z)| {
         let h = kh.h_deg_of_chain(z);
         let v = kh[h].vectorize_euc(z);
-        info!("a[{i}] in Kh[{h}]: ({})", v.clone().into_dense().iter().join(","));
+        debug!("a[{i}] in Kh[{h}]: ({})", v.clone().into_dense().iter().join(","));
         v
     }).map(|v| 
         div_vec(&v.subvec(0..r), &c).expect("invalid divisibility.")
@@ -119,20 +119,20 @@ fn ssi_divisibility_v2(l: &InvLink, reduced: bool, config: SymBuildConfig, expec
 
     let Some(s) = expected else {
         return divisibility_in_window(l, reduced, config, q0)
-            .expect("the full (un-windowed) build must not truncate the canon cycle");
+            .expect("invalid divisibility.");
     };
 
     let q_hi0 = s - 1; // the top divisibility generator for the guessed s sits at q = s − 1.
     let mut q_hi = q_hi0;
     loop {
-        info!("q-window: q0 = {q0}, cut above {q_hi}.");
+        debug!("q-window: q0 = {q0}, cut above {q_hi}.");
         let cfg = SymBuildConfig { q_range: Some((isize::MIN + 1) ..= q_hi), ..config.clone() };
 
         if let Some(ds) = divisibility_in_window(l, reduced, cfg, q0) {
             return ds;
         }
         q_hi += 2; // one divisibility level = q-degree 2 (deg H = −2); raise the cut minimally.
-        info!("canon cycle above window; raising cut to {q_hi}.");
+        debug!("canon cycle above window; raising cut to {q_hi}.");
         assert!(q_hi <= q_hi0 + 128, "q-window widening runaway");
     }
 }
@@ -142,10 +142,9 @@ fn divisibility_in_window(l: &InvLink, reduced: bool, config: SymBuildConfig, q0
     let h = P::variable();
     let t = P::zero();
 
-    // Build over `(a−1)..=1`: the solves only involve `C[−1] → C[0] → C[1]`, so nothing above 1
-    // is built; the cheap low degrees stay (truncating the bottom makes the build frontier dense).
-    // Only KhI degrees `−1..=1` are converted to the raw complex — the rest is never expanded.
-    let requested = config.h_range.clone().unwrap_or(-(Link::MAX_CROSSING as isize) ..= 1);
+    // one degree lower feeds the differential; only KhI degrees `−1..=1` are converted to the
+    // raw complex, so nothing above 1 is ever expanded.
+    let requested = config.h_range.clone().unwrap_or(default_h_range(l));
     let range = KhComplex::<P>::clamp_h_range(l.inner(), reduced, requested);
     let (a, b) = (*range.start(), *range.end());
     let config = SymBuildConfig { h_range: Some((a - 1)..=b), ..config };
@@ -157,8 +156,9 @@ fn divisibility_in_window(l: &InvLink, reduced: bool, config: SymBuildConfig, q0
     // index gives the h-degree (0 for the first `r`, else 1) — robust to a cycle truncated to zero.
     let mut ds = [vec![], vec![]];
     for (i, z) in zs.iter().enumerate() {
-        let i0 = if i < r { 0 } else { 1 };
-        ds[i0 as usize].push(solvable_level(&kc, z, i0, q0)?);
+        let i0: usize = if i < r { 0 } else { 1 };
+        let d = solvable_level(&kc, z, i0 as isize, q0)?;
+        ds[i0].push(d);
     }
 
     let (d0, d1) = if reduced {

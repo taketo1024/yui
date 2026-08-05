@@ -11,8 +11,9 @@
 //! field `F` — the specialization [`s_invariant`] computes.
 
 
+use std::ops::RangeInclusive;
 use itertools::Itertools;
-use log::info;
+use log::{info, debug};
 use num_traits::Zero;
 use yui_link::Link;
 use yui_core::abst::{EucRing, EucRingOps};
@@ -28,7 +29,8 @@ type P<F> = FastPoly<'H', F>;
 
 pub fn ss_invariant<R>(l: &Link, c: &R, reduced: bool) -> i32
 where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
-    ss_invariant_with(l, c, reduced, BuildConfig::default())
+    let config = BuildConfig { h_range: Some(default_h_range(l)), ..Default::default() };
+    ss_invariant_with(l, c, reduced, config)
 }
 
 /// The same, with the build configuration given explicitly.
@@ -38,12 +40,6 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     assert!(!c.is_unit());
     assert!(l.is_knot());
     assert_h_range(&config);
-
-    let bot = -(l.n_signed_crossings().1 as isize);
-    let config = BuildConfig {
-        h_range: Some(config.h_range.clone().unwrap_or(bot ..= 0)),
-        ..config
-    };
 
     info!("compute ss, c = {c} ({}).", std::any::type_name::<R>());
 
@@ -58,7 +54,12 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     ss
 }
 
-// The Lee class lives at h = 0, so a build window that excludes it computes nothing.
+// The complex starts at `-n_neg`; the Lee class sits at h = 0.
+fn default_h_range(l: &Link) -> RangeInclusive<isize> {
+    -(l.n_signed_crossings().1 as isize) ..= 0
+}
+
+// A window missing the Lee class computes nothing.
 fn assert_h_range(config: &BuildConfig) {
     assert!(
         config.h_range.as_ref().is_none_or(|r| r.contains(&0)),
@@ -73,7 +74,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     let kh = KhHomology::new_with_config(l, c, &R::zero(), reduced, config);
 
     assert_eq!(kh[0].rank(), r);
-    info!("Kh[0]: {}", kh[0]);
+    debug!("Kh[0]: {}", kh[0]);
     
     let zs = kh.canon_cycles();
 
@@ -85,8 +86,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     let ds = zs.iter().enumerate().map(|(i, z)| {
         let v = kh[0].vectorize_euc(z).subvec(0..r);
-        info!("a[{i}] in Kh[0]: ({})", v.clone().into_dense().iter().join(", "));
-        div_vec(&v, c).expect("invalid divisibility.")
+        debug!("a[{i}] in Kh[0]: ({})", v.clone().into_dense().iter().join(", "));
+        div_vec(&v, c).expect("invalid divisibility")
     }).collect_vec();
 
     assert!(ds.iter().all_equal());
@@ -98,7 +99,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 /// `c = H` (Theorem 2 of the reference), via the `H = 1` pipeline.
 pub fn s_invariant<F>(l: &Link, reduced: bool) -> i32
 where F: Field, for<'x> &'x F: FieldOps<F> {
-    s_invariant_with::<F>(l, reduced, BuildConfig::default(), SsVersion::default())
+    let config = BuildConfig { h_range: Some(default_h_range(l)), ..Default::default() };
+    s_invariant_with::<F>(l, reduced, config, SsVersion::default())
 }
 
 /// The same, with the build configuration and the pipeline given explicitly.
@@ -133,10 +135,9 @@ where F: Field, for<'x> &'x F: FieldOps<F> {
     let q0 = canon_q_deg(l.writhe(), l.seifert_circles().len(), reduced);
     let (h, t) = (P::<F>::variable(), P::<F>::zero());
 
-    // the solve involves `C[-1] -> C[0]` only. Build one degree wider on each side: the extra
-    // degree below feeds the differential, and the one above is needed to close the circles at 0
-    // (the canon cycle is not evaluable if the build is cut there).
-    let requested = config.h_range.clone().unwrap_or(-(Link::MAX_CROSSING as isize) ..= 0);
+    // one degree wider on each side: the lower feeds the differential, the upper closes the
+    // circles at 0 (cut there, the canon cycle is not evaluable).
+    let requested = config.h_range.clone().unwrap_or(default_h_range(l));
     let range = KhComplex::<P<F>>::clamp_h_range(l, reduced, requested);
     let (a, b) = (*range.start(), *range.end());
     let config = BuildConfig { h_range: Some((a - 1)..=(b + 1)), ..config };
@@ -146,7 +147,7 @@ where F: Field, for<'x> &'x F: FieldOps<F> {
     assert_eq!(zs.len(), n);
 
     let ds = zs.iter().map(|z|
-        solvable_level(&kc, z, 0, q0).expect("the full build must not truncate the canon cycle")
+        solvable_level(&kc, z, 0, q0).expect("invalid divisibility")
     ).collect_vec();
 
     assert!(ds.iter().all_equal());
@@ -256,10 +257,7 @@ mod tests {
     test_c2!(k7_3,  "7_3",  4);
     test_c2!(k8_19, "8_19", 6);
 
-    // The invariant genuinely depends on the coefficients, so one computation per choice is the
-    // point here — the mirror/reduced invariance is already pinned by the knots above.
-    //
-    // 14n_19265: `ss` over Z differs for c = 2 and c = 3; `s` over F2 differs from Q and F3.
+    // 14n_19265: `ss` over Z differs for c = 2 and c = 3, `s` over F2 differs from Q and F3.
     #[test]
     fn k14_ring_dependence() {
         let l = Link::test_data("14n_19265");

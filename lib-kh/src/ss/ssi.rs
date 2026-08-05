@@ -34,11 +34,9 @@ pub fn ssi_invariant_with(l: &InvLink, reduced: bool, config: SymBuildConfig, ex
     assert!(l.is_knot());
     assert_h_range(&config);
 
-    // the two equivariant Lee classes sit at h = 0 (B) and h = 1 (Q). Default to bottom..=1:
-    // building the cheap low degrees and truncating only at the top beats the doubly-truncated
-    // `0..=1` slice, which widens to the dense `-1..=2`.
+    let bot = -(l.n_signed_crossings().1 as isize);
     let config = SymBuildConfig {
-        h_range: Some(config.h_range.clone().unwrap_or(-(Link::MAX_CROSSING as isize) ..= 1)),
+        h_range: Some(config.h_range.clone().unwrap_or(bot ..= 1)),
         ..config
     };
 

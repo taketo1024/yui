@@ -39,10 +39,9 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     assert!(l.is_knot());
     assert_h_range(&config);
 
-    // the Lee class sits at h = 0; building the cheap low degrees and truncating only at the top
-    // is faster than the doubly-truncated `0..=0` slice (which widens to the dense `-1..=1`).
+    let bot = -(l.n_signed_crossings().1 as isize);
     let config = BuildConfig {
-        h_range: Some(config.h_range.clone().unwrap_or(-(Link::MAX_CROSSING as isize) ..= 0)),
+        h_range: Some(config.h_range.clone().unwrap_or(bot ..= 0)),
         ..config
     };
 

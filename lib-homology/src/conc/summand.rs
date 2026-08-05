@@ -31,6 +31,10 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(raw_gens: IndexSet<X>, rank: usize, tors: Vec<R>, trans: Trans<R>) -> Self { 
         assert_eq!(trans.src_dim(), raw_gens.len());
         assert_eq!(trans.tgt_dim(), rank + tors.len());
+        assert!(
+            tors.iter().all(|t| !t.is_zero() && !t.is_unit()),
+            "a torsion coefficient must be neither zero nor a unit"
+        );
 
         Self { raw_gens, rank, tors, trans }
     }

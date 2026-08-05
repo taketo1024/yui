@@ -345,26 +345,52 @@ impl Link {
     // (a knot's one traversal covers every edge), keeping the diagram. base_pt becomes `base`
     // (base = 1 gives the usual 1-based numbering of knot theory).
     pub fn reindexed(&self, start_edge: Edge, base: Edge) -> Link {
-        assert!(self.is_knot() && self.loops.is_empty(), "reindexed expects a knot");
         assert!(self.is_oriented(), "reindexed needs an orientation to traverse in");
-
-        // note: `traverse_from` runs forward from an in-port, backward from an out-port.
-        let (_, start) = self.edge_ends(start_edge, true);
 
         let mut map: HashMap<Edge, Edge> = HashMap::new();
         let mut next = base;
-        self.traverse_from(start, |i, s| {
-            map.entry(self.node(i).edge(s)).or_insert_with(|| {
+
+        // `start_edge` takes `base`. A free loop carries no ports, so it is numbered outright;
+        // otherwise the walk starts there. Note `traverse_from` runs forward from an in-port.
+        let mut port = if self.loops.contains(&start_edge) {
+            map.insert(start_edge, next);
+            next += 1;
+            None
+        } else {
+            Some(self.edge_ends(start_edge, true).1)
+        };
+
+        // then the remaining components, each from its least unnumbered edge, so a link is
+        // renumbered deterministically.
+        while let Some(p) = port.or_else(||
+            self.nodes.iter()
+                .flat_map(|x| x.edges().iter().copied())
+                .filter(|e| !map.contains_key(e))
+                .min()
+                .map(|e| self.edge_ends(e, true).1)
+        ) {
+            self.traverse_from(p, |i, s| {
+                map.entry(self.node(i).edge(s)).or_insert_with(|| {
+                    let id = next;
+                    next += 1;
+                    id
+                });
+            });
+            port = None;
+        }
+
+        let loops = self.loops.iter().map(|&e|
+            *map.entry(e).or_insert_with(|| {
                 let id = next;
                 next += 1;
                 id
-            });
-        });
+            })
+        ).collect_vec();
 
         let nodes = self.nodes.iter().map(|x|
             x.convert_edges(|e| map[&e])
         );
-        Link::new(nodes, []).with_base_pt(base)
+        Link::new(nodes, loops).with_base_pt(base)
     }
 
     // The canonical relabelling: the least `reindexed(e, 1)` over all start edges. Rebuilt from that
@@ -735,5 +761,26 @@ mod tests {
                 assert_eq!(canon(&l.reindexed(e, 1)), c, "relabelling from edge {e} changed the canonical form");
             }
         }
+    }
+
+    #[test]
+    fn reindexed_covers_links_and_loops() {
+        // more than one component: the walk continues into the rest, so every edge is renumbered.
+        for name in ["L2a1", "L4a1"] {
+            let l = Link::test_data(name);
+            for e in l.edges() {
+                let r = l.reindexed(e, 1);
+                assert_eq!(r.edges(), (1..=l.n_edges() as Edge).collect::<Vec<_>>(), "{name} from edge {e}");
+                assert_eq!(r.n_comps(), l.n_comps(), "{name} from edge {e}");
+            }
+        }
+
+        // free loops carry no ports, so they are numbered outright rather than traversed.
+        let r = Link::unknot().reindexed(1, 5);
+        assert_eq!((r.edges(), r.n_comps(), r.base_pt()), (vec![5], 1, Some(5)));
+
+        let l = Link::unlink(3);
+        let r = l.reindexed(l.edges()[1], 1);
+        assert_eq!((r.edges(), r.n_comps(), r.base_pt()), (vec![1, 2, 3], 3, Some(1)));
     }
 }

@@ -17,6 +17,9 @@ pub struct Braid {
 
 impl Braid {
     pub fn new(strands: usize, elements: Vec<BraidGen>) -> Self {
+        if let Some(g) = elements.iter().find(|g| g.index() >= strands) {
+            panic!("σ{} needs {} strands, but the braid has {strands}", g.index(), g.index() + 1);
+        }
         Self { strands, elements }
     }
 
@@ -312,5 +315,12 @@ mod tests {
         assert_eq!(l.n_crossings(), 1);
         assert_eq!(l.n_loops(), 1);
         assert_eq!(l.n_comps(), 2);
+    }
+
+    #[test]
+    #[should_panic(expected = "needs 6 strands")]
+    fn new_rejects_a_generator_beyond_the_strands() {
+        // σ₅ occupies positions 5 and 6, so `closure` would index past the strand list.
+        let _ = Braid::new(2, vec![BraidGen::new(5)]);
     }
 }

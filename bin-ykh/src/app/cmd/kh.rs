@@ -6,7 +6,7 @@ use yui_core::TeX;
 use yui_core::{EucRing, EucRingOps};
 use yui_homology::{ToSeqString, ToTableString};
 use yui_kh::kh::KhHomology;
-use yui_kh::tng::builder::{BuildConfig, CutOption};
+use yui_kh::tng::builder::{BuildConfig, CutOption, NodeOrder, Strategy};
 use yui_link::Link;
 use crate::app::args::*;
 use crate::app::utils::*;
@@ -56,6 +56,17 @@ pub struct Args {
     // cap the per-elimination fill cost; survivors defer to the matrix reduction.
     #[arg(long)]
     pub max_elim_cost: Option<usize>,
+
+    #[arg(long, value_parser = parse_strategy, default_value = "greedy")]
+    pub strategy: Strategy,
+
+    // crossing order: min-cut (default; bounds cutwidth) or given (PD order, debug).
+    #[arg(long, value_parser = parse_node_order, default_value = "min-cut")]
+    pub node_order: NodeOrder,
+
+    // skip the final deloop/eliminate; remaining circles defer to the matrix reducer.
+    #[arg(long)]
+    pub no_full_deloop: bool,
 
     #[arg(long, default_value = "0")]
     pub log: u8,
@@ -114,7 +125,15 @@ where
         let kh = if self.args.no_simplify {
             KhHomology::new_no_simplify(&l, &h, &t, self.args.reduced)
         } else {
-            let config = BuildConfig { h_range: self.args.h_range.clone(), cut: self.args.cut.clone().unwrap_or_default(), max_elim_cost: self.args.max_elim_cost, ..Default::default() };
+            let config = BuildConfig {
+                strategy: self.args.strategy,
+                node_order: self.args.node_order,
+                cut: self.args.cut.clone().unwrap_or_default(),
+                h_range: self.args.h_range.clone(),
+                max_elim_cost: self.args.max_elim_cost,
+                no_full_deloop: self.args.no_full_deloop,
+                ..Default::default()
+            };
             KhHomology::new_with_config(&l, &h, &t, self.args.reduced, config)
         };
 

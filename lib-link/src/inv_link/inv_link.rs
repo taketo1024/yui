@@ -133,7 +133,7 @@ impl InvLink {
     }
 
     pub fn with_base_pt(mut self, e: Edge) -> Self {
-        assert_eq!(self.inv_edge(e), e, "base_pt {e} must be on-axis (fixed by involution)");
+        assert!(self.is_on_axis(e), "base_pt {e} must be on-axis (fixed by involution)");
         self.inner = self.inner.with_base_pt(e);
         self
     }
@@ -146,8 +146,13 @@ impl InvLink {
         self.x_map.get(x).unwrap()
     }
 
+    // `e` meets the axis, i.e. is fixed by τ.
+    pub fn is_on_axis(&self, e: Edge) -> bool {
+        self.inv_edge(e) == e
+    }
+
     pub fn on_axis_edges(&self) -> Vec<Edge> {
-        self.edges().into_iter().filter(|&e| self.inv_edge(e) == e).collect()
+        self.edges().into_iter().filter(|&e| self.is_on_axis(e)).collect()
     }
 
     // A strong inversion reverses the orientation.
@@ -203,7 +208,7 @@ impl InvLink {
         self.conn_sum_at(other, self_e, other_e)
     }
 
-    // Equivariant connected sum: splice along on-axis edges (`inv_edge(e) == e`) of each summand,
+    // Equivariant connected sum: splice along on-axis edges (`is_on_axis`) of each summand,
     // then recover the combined strong inversion by reindexing to the standard involution.
     pub fn conn_sum_at(&self, other: &InvLink, self_e: Edge, other_e: Edge) -> InvLink {
         assert!(self.is_knot() && other.is_knot(), "connected sum requires knots");

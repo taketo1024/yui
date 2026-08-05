@@ -22,6 +22,7 @@ impl InvLink {
         let link_edges = inner.edges();
         let missing = link_edges.iter().filter(|e| !e_map.contains_key(e)).collect_vec();
         assert!(missing.is_empty(), "e_map does not cover edges {missing:?}");
+        
         let extra = e_map.keys().filter(|e| !link_edges.contains(e)).sorted().collect_vec();
         assert!(extra.is_empty(), "e_map maps edges {extra:?}, which are not in the link");
 
@@ -31,23 +32,38 @@ impl InvLink {
             assert_eq!(e_map[&f], e, "e_map is not involutive: {e} ↦ {f} ↦ {}", e_map[&f]);
         }
 
-        // ... and must carry each node to a node of the same type.
-        let mut x_map = HashMap::new();
-        for x in inner.nodes() {
-            let edges = x.edges().map(|e| e_map[&e]);
-            let y = inner.nodes()
-                .find(|y| edges.iter().all(|e| y.edges().contains(e)))
-                .unwrap_or_else(|| panic!("e_map sends node {x} to no node of the link"));
-            assert_eq!(x.node_type(), y.node_type(), "e_map changes the type of node {x}");
+        // ... and each node must have a unique corresponding node.
+        let x_map: HashMap<Node, Node> = inner.nodes().map(|x| {
+            let y = Self::find_tau_x(x, &inner, &e_map);
+            (x.clone(), y.clone())
+        }).collect();
 
-            x_map.insert(x.clone(), y.clone());
-            if x != y {
-                x_map.insert(y.clone(), x.clone());
-            }
+        assert_eq!(x_map.len(), inner.n_nodes(), "the diagram has duplicate nodes");
+
+        for (x, y) in &x_map {
+            let z = &x_map[y];
+            assert_eq!(z, x, "e_map induces a non-involutive node map: {x} ↦ {y} ↦ {z}");
         }
-        assert_eq!(x_map.len(), inner.n_nodes(), "e_map is not a bijection on nodes");
 
         Self { inner, e_map, x_map }
+    }
+
+    // τ is a rotation about an axis in the plane, so it reverses the normal — the cyclic order of a
+    // node's four slots must run backwards for τ to preserve orientation (as `preserves_dir_at` reads it).
+    fn find_tau_x<'a>(x: &'a Node, inner: &'a Link, e_map: &HashMap<Edge, Edge>) -> &'a Node {
+        let matches = |y: &Node| Slot::ALL.into_iter().any(|k|
+            Slot::ALL.into_iter().all(|s| y.edge(k.shift(4 - s.index())) == e_map[&x.edge(s)])
+        );
+        let cands = inner.nodes().filter(|y| matches(y)).collect_vec();
+
+        match cands.as_slice() {
+            [y] => {
+                assert_eq!(x.node_type(), y.node_type(), "e_map changes the type of node {x}");
+                *y
+            },
+            [] => panic!("e_map sends node {x} to no node of the link"),
+            _  => panic!("e_map does not determine the image of node {x}: {} nodes match", cands.len())
+        }
     }
 
     pub fn from_symmetric_pd_code<I1>(pd_code: I1) -> Self
@@ -290,6 +306,28 @@ mod tests {
     #[should_panic(expected = "e_map does not cover edges [3, 4, 5, 6]")]
     fn new_names_the_uncovered_edges() {
         let _ = InvLink::new(Link::test_data("3_1"), [(1, 1), (2, 2)]);
+    }
+
+    #[test]
+    #[should_panic(expected = "e_map sends node")]
+    fn new_rejects_an_edge_map_no_rotation_realizes() {
+        // the identity is an edge-involution, but no π-rotation of the trefoil fixes every edge:
+        // at a crossing with four distinct edges, no reversal of the slots is the identity.
+        let l = Link::test_data("3_1");
+        let e_map: Vec<_> = l.edges().into_iter().map(|e| (e, e)).collect();
+        let _ = InvLink::new(l, e_map);
+    }
+
+    #[test]
+    fn nodes_sharing_an_edge_set() {
+        // both crossings of L2a1 carry the same four edges, so an edge-set match cannot tell them
+        // apart; the slot arrangement picks the rotation that swaps them.
+        let l = Link::from_pd_code([[4, 1, 3, 2], [2, 3, 1, 4]]);
+        let il = InvLink::new(l, [(1, 1), (2, 2), (3, 3), (4, 4)]);
+
+        let (x0, x1) = (il.node(0), il.node(1));
+        assert_eq!(il.inv_node(x0), x1);
+        assert_eq!(il.inv_node(x1), x0);
     }
 
     #[test]

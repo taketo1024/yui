@@ -189,23 +189,30 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::cmd::test_utils::{pd, assert_out};
 
     #[test]
-    fn test1() {
+    fn ckhi_trefoil_f2() {
         let args = Args {
-            link: "[[1,5,2,4],[3,1,4,6],[5,3,6,2]]".to_string(),
+            link: pd("3_1"),
             c_value: "0".to_string(),
             c_type: CType::F2,
             ..Default::default()
         };
-        let res = dispatch(&args);
-        assert!(res.is_ok());
+        assert_out(dispatch(&args), r"
+             j\i  0   1   2   3    4
+             9    .   .   .   F₂   F₂
+             7    .   .   F₂  F₂²  F₂
+             5    .   .   F₂  F₂   .
+             3    F₂  F₂  .   .    .
+             1    F₂  F₂  .   .    .
+        ");
     }
 
     #[test]
-    fn test2() {
+    fn ckhi_trefoil_mirror_reduced_alpha() {
         let args = Args {
-            link: "[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string(),
+            link: pd("3_1"),
             c_value: "1".to_string(),
             c_type: CType::F2,
             mirror: true,
@@ -213,43 +220,69 @@ mod tests {
             show_alpha: true,
             ..Default::default()
         };
-        let res = dispatch(&args);
-        assert!(res.is_ok());
+        assert_out(dispatch(&args), r"
+             j\i  -3  -2  -1  0   1
+             -2   .   .   .   F₂  F₂
+
+             a[0] in CKhI[0]: (1)
+               (1X)₁₁₁
+
+             a[1] in CKhI[1]: (1)
+               (1X)₁₁₁
+        ");
     }
 
     #[test]
-    fn test_poly_h() {
+    fn ckhi_trefoil_poly_h() {
         let args = Args {
-            link: "[[1,5,2,4],[3,1,4,6],[5,3,6,2]]".to_string(),
+            link: pd("3_1"),
             c_value: "H".to_string(),
             c_type: CType::F2,
             ..Default::default()
         };
-        let res = dispatch(&args);
-        assert!(res.is_ok());
+        assert_out(dispatch(&args), r"
+             j\i  0      1      2      3       4
+             9    .      .      .      F₂[H]   F₂[H]
+             7    .      .      F₂[H]  F₂[H]²  F₂[H]
+             5    .      .      F₂[H]  F₂[H]   .
+             3    F₂[H]  F₂[H]  .      .       .
+             1    F₂[H]  F₂[H]  .      .       .
+        ");
     }
 
     #[test]
-    fn test_poly_t() {
+    fn ckhi_trefoil_poly_t() {
         let args = Args {
-            link: "[[1,5,2,4],[3,1,4,6],[5,3,6,2]]".to_string(),
+            link: pd("3_1"),
             c_value: "0,T".to_string(),
             c_type: CType::F2,
             ..Default::default()
         };
-        let res = dispatch(&args);
-        assert!(res.is_ok());
+        assert_out(dispatch(&args), r"
+             j\i  0      1      2      3       4
+             9    .      .      .      F₂[T]   F₂[T]
+             7    .      .      F₂[T]  F₂[T]²  F₂[T]
+             5    .      .      F₂[T]  F₂[T]   .
+             3    F₂[T]  F₂[T]  .      .       .
+             1    F₂[T]  F₂[T]  .      .       .
+        ");
     }
 
     #[test]
-    fn test_poly_ht() {
+    fn ckhi_trefoil_poly_ht() {
         let args = Args {
-            link: "[[1,5,2,4],[3,1,4,6],[5,3,6,2]]".to_string(),
+            link: pd("3_1"),
             c_value: "H,T".to_string(),
             c_type: CType::F2,
             ..Default::default()
         };
-        let res = dispatch(&args);
-        assert!(res.is_ok());
+        assert_out(dispatch(&args), r"
+             j\i  0         1         2         3          4
+             9    .         .         .         F₂[H, T]   F₂[H, T]
+             7    .         .         F₂[H, T]  F₂[H, T]²  F₂[H, T]
+             5    .         .         F₂[H, T]  F₂[H, T]   .
+             3    F₂[H, T]  F₂[H, T]  .         .          .
+             1    F₂[H, T]  F₂[H, T]  .         .          .
+        ");
     }
 }

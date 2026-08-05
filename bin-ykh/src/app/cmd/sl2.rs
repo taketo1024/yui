@@ -227,3 +227,72 @@ where
         res.trim_end().to_string()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::cmd::test_utils::{pd, assert_out};
+
+    // Kh over Q, then its decomposition into sl(2) strings δ^a q^b e(n).
+    #[test]
+    fn sl2_trefoil() {
+        let args = Args {
+            link: pd("3_1"),
+            c_type: CType::Q,
+            c_value: "0".to_string(),
+            ..Default::default()
+        };
+        assert_out(dispatch(&args), r"
+             j\i  0  1  2  3
+             9    .  .  .  Q
+             7    .  .  .  .
+             5    .  .  Q  .
+             3    Q  .  .  .
+             1    Q  .  .  .
+
+            δ⁻³q⁻⁹e(1) + δ⁻³q⁻³e(1) + δ⁻¹q⁻⁵e(2)
+        ");
+    }
+
+    #[test]
+    fn sl2_trefoil_reduced() {
+        let args = Args {
+            link: pd("3_1"),
+            c_type: CType::Q,
+            c_value: "0".to_string(),
+            reduced: true,
+            ..Default::default()
+        };
+        assert_out(dispatch(&args), r"
+             j\i  0  1  2  3
+             8    .  .  .  Q
+             6    .  .  Q  .
+             4    .  .  .  .
+             2    Q  .  .  .
+
+            δ⁻²q⁻⁸e(1) + δ⁻²q⁻⁶e(2)
+        ");
+    }
+
+    // amphichiral, so the table is symmetric and every string is a singlet.
+    #[test]
+    fn sl2_figure8() {
+        let args = Args {
+            link: pd("4_1"),
+            c_type: CType::Q,
+            c_value: "0".to_string(),
+            ..Default::default()
+        };
+        assert_out(dispatch(&args), r"
+             j\i  -2  -1  0  1  2
+             5    .   .   .  .  Q
+             3    .   .   .  .  .
+             1    .   .   Q  Q  .
+             -1   .   Q   Q  .  .
+             -3   .   .   .  .  .
+             -5   Q   .   .  .  .
+
+            δ⁻¹q⁻⁵e(1) + δ⁻¹q⁻¹e(1) + δ⁻¹qe(1) + δq⁻¹e(1) + δqe(1) + δq⁵e(1)
+        ");
+    }
+}

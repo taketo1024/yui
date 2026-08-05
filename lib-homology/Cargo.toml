@@ -12,7 +12,6 @@ repository.workspace  = true
 [features]
 default = ["multithread"]
 multithread = ["rayon"]
-tex = ["yui-core/tex"]
 test-utils = []
 
 [dependencies]

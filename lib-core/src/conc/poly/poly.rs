@@ -539,7 +539,6 @@ where R: Field, for<'x> &'x R: FieldOps<R> {}
 impl<const X: char, R> EucRing for Poly<X, R>
 where R: Field, for<'x> &'x R: FieldOps<R> {}
 
-#[cfg(feature = "tex")]
 mod tex {
     use crate::TeX;
     use super::*;
@@ -1020,7 +1019,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "tex")]
     fn tex() { 
         use crate::TeX;
         type P = LPolyN::<'x', i32>; 

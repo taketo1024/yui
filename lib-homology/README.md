@@ -24,7 +24,7 @@ src/
     ├── grid.rs        — `Grid<K, V>`: sparse K-indexed table with defaulting `Index`
     ├── format.rs      — `rmod_str` (e.g. "Z² ⊕ Z/2 ⊕ Z/2")
     ├── to_string.rs   — `ToSeqString`, `ToTableString`
-    └── tex.rs         — `TeXTable`, `tex_rmod_str` (feature-gated)
+    └── tex.rs         — `TeXTable`, `tex_rmod_str`
 ```
 
 ## Key types
@@ -109,7 +109,6 @@ assert_eq!(h[2].rank(), 1);   // H₂(S²) = Z
 ## Feature flags
 
 - `multithread` (default) — parallelizes `d_matrix` column construction via [`rayon`].
-- `tex` — LaTeX rendering (`TeXTable`, `tex_rmod_str`); pulls in `yui-core`'s `tex` feature.
 
 ## License
 

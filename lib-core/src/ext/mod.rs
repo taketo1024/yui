@@ -10,9 +10,5 @@ pub use div_round::*;
 pub use iter::*;
 pub use range::*;
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "tex")] {
-        mod tex;
-        pub use tex::*;
-    }
-}
+mod tex;
+pub use tex::*;

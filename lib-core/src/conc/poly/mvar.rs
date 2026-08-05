@@ -295,7 +295,6 @@ where X: ToString, I: 'a + ToPrimitive, S: IntoIterator<Item = (X, &'a I)> {
     }
 }
 
-#[cfg(feature = "tex")]
 mod tex {
     use crate::TeX;
     use super::*;

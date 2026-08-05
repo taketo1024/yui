@@ -179,7 +179,6 @@ impl<const p: I> Ring for FF<p> {
 impl<const p: I> EucRing for FF<p> {}
 impl<const p: I> Field for FF<p> {}
 
-#[cfg(feature = "tex")] 
 mod tex {
     use crate::TeX;
     use super::*;
@@ -307,7 +306,6 @@ mod tests {
         assert_eq!(a, F5::zero());
     }
 
-    #[cfg(feature = "tex")]
     #[test]
     fn tex() { 
         use crate::TeX;

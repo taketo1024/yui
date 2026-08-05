@@ -375,7 +375,6 @@ where T: IntType, for<'x> &'x T: IntOps<T> {
     }
 }
 
-#[cfg(feature = "tex")] 
 mod tex {
     use crate::TeX;
     use super::*;
@@ -619,7 +618,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "tex")]
     fn tex() { 
         use crate::TeX;
         assert_eq!(Ratio::<i32>::tex_math_symbol(), "\\mathbb{Q}");

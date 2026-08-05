@@ -151,7 +151,6 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-#[cfg(feature = "tex")]
 mod tex_impl {
     use super::*;
     use yui_core::TeX;

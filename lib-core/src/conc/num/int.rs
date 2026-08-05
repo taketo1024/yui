@@ -100,7 +100,6 @@ impl_integer!(i128);
 impl_integer!(BigInt);
 
 
-#[cfg(feature = "tex")] 
 mod tex {
     use crate::TeX;
     use num_bigint::BigInt;
@@ -210,7 +209,6 @@ mod tests {
         assert_eq!((-13).div_round(&5), -3);
     }
 
-    #[cfg(feature = "tex")]
     #[test]
     fn tex() { 
         use crate::TeX;

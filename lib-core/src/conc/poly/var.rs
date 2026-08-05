@@ -182,7 +182,6 @@ macro_rules! impl_univar_signed {
 impl_univar_unsigned!(usize);
 impl_univar_signed!  (isize);
 
-#[cfg(feature = "tex")] 
 mod tex {
     use crate::TeX;
     use super::*;

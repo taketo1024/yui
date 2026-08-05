@@ -131,7 +131,6 @@ impl<V: Display + Default> ToTableString<isize> for Grid<isize2, V> {
     }
 }
 
-#[cfg(feature = "tex")]
 impl<V> crate::utils::tex::TeXTable<isize2> for Grid<isize2, V>
 where V: yui_core::TeX + Default {
     fn tex_table(&self, caption: &str, head: &str) -> String {

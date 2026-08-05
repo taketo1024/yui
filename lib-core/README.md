@@ -85,7 +85,6 @@ assert_eq!((&a * &b).to_string(), "1/6");
 ## Feature flags
 
 - `serde` — `Serialize`/`Deserialize` for the concrete types.
-- `tex` — LaTeX rendering via the `TeX` trait in `ext/tex.rs`.
 
 ## License
 

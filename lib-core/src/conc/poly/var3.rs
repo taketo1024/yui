@@ -259,7 +259,6 @@ macro_rules! impl_trivar_signed {
 impl_trivar_unsigned!(usize);
 impl_trivar_signed!  (isize);
 
-#[cfg(feature = "tex")] 
 mod tex {
     use crate::TeX;
     use super::*;

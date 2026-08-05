@@ -286,7 +286,6 @@ where R: Field, for<'x> &'x R: FieldOps<R> {}
 impl<const X: char, R> EucRing for FastPoly<X, R>
 where R: Field, for<'x> &'x R: FieldOps<R> {}
 
-#[cfg(feature = "tex")]
 mod tex {
     use yui_core::TeX;
     use super::*;
@@ -450,7 +449,6 @@ mod tests {
         assert_eq!(P::from_str("x + 1"), Err(()));
     }
 
-    #[cfg(feature = "tex")]
     #[test]
     fn tex() {
         use yui_core::TeX;

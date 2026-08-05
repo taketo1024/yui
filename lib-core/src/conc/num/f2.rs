@@ -182,7 +182,6 @@ impl Ring for FF2 {
 impl EucRing for FF2 {}
 impl Field for FF2 {}
 
-#[cfg(feature = "tex")] 
 mod tex {
     use crate::TeX;
     use super::*;
@@ -317,7 +316,6 @@ mod tests {
         assert_eq!(a, FF2::zero());
     }
 
-    #[cfg(feature = "tex")]
     #[test]
     fn tex() { 
         use crate::TeX;

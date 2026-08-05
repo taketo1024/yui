@@ -251,7 +251,6 @@ macro_rules! impl_bivar_signed {
 impl_bivar_unsigned!(usize);
 impl_bivar_signed!  (isize);
 
-#[cfg(feature = "tex")] 
 mod tex {
     use crate::TeX;
     use super::*;

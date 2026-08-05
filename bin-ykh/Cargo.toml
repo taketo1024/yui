@@ -29,11 +29,11 @@ serde = { version = "1.0.228", features = ["derive"] }
 cfg-if = "1.0.4"
 itertools = "0.14.0"
 mimalloc = { version = "0.1", optional = true }
-yui-core     = { workspace = true, features = ["tex"] }
+yui-core.workspace = true
 yui-link.workspace = true
 yui-matrix.workspace = true
-yui-homology = { workspace = true, features = ["tex"] }
-yui-kh = { workspace = true, features = ["tex"] }
+yui-homology.workspace = true
+yui-kh.workspace = true
 smart-default = "0.7.1"
 
 [dev-dependencies]

@@ -2,7 +2,6 @@
 //!
 //! See: <https://en.wikipedia.org/wiki/LaTeX>
 
-#![cfg(feature = "tex")]
 
 use itertools::Itertools;
 use std::fmt::Display;

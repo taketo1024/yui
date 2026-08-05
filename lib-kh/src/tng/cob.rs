@@ -18,7 +18,6 @@ use std::collections::HashSet;
 use std::sync::{Arc, OnceLock};
 use itertools::Itertools;
 use num_traits::Zero;
-use cartesian::cartesian; // TODO: replace with itertools::iproduct! and drop the cartesian dep
 use yui_core::util::format::subscript;
 use yui_core::abst::{AddMon, MathType, Ring, RingOps};
 use yui_core::lc::{LcKey, Lc};
@@ -888,8 +887,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn is_stackable(&self, other: &Self) -> bool {
-        cartesian!(self.keys(), other.keys()).all(|(a, b)|
-            a.is_stackable(b)
+        self.keys().all(|a|
+            other.keys().all(|b| a.is_stackable(b))
         )
     }
 

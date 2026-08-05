@@ -622,11 +622,11 @@ where R: Clone + serde::Deserialize<'de> {
 impl<R> SpMat<R>
 where R: Scalar + Zero + One + ClosedAddAssign { 
     pub fn rand(shape: (usize, usize), density: f64) -> Self {
-        use cartesian::cartesian;
+        use itertools::iproduct;
         use rand::Rng;
     
         let (m, n) = shape;
-        let range = cartesian!(0..m, 0..n);
+        let range = iproduct!(0..m, 0..n);
         let mut rng = rand::rng();
     
         Self::from_entries(shape, range.filter_map(|(i, j)|

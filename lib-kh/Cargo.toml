@@ -15,7 +15,6 @@ big-link = ["yui-link/big-link"]
 
 [dependencies]
 auto-impl-ops = "0.2.1"
-cartesian = "0.3.0"
 delegate = "0.13.5"
 derive_more = { version = "2.1.1", features = ["display", "debug"] }
 log = "0.4.29"

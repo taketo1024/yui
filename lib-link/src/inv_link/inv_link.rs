@@ -244,17 +244,13 @@ mod tests {
     }
 
     #[test]
-    fn load_3_1() {
-        let l = InvLink::test_data("3_1");
-        assert_eq!(l.n_crossings(), 3);
+    fn test_data_diagrams() {
+        // the bundled symmetric diagrams parse, and are the size Lamm's tables give.
+        for (name, n) in [("3_1", 3), ("4_1", 4), ("4_1a", 4), ("4_1b", 4), ("6_3", 7), ("6_3a", 8), ("7_7b", 7)] {
+            assert_eq!(InvLink::test_data(name).n_crossings(), n, "{name}");
+        }
     }
 
-    #[test]
-    fn load_4_1() { 
-        let l = InvLink::test_data("4_1");
-        assert_eq!(l.n_crossings(), 4);
-    }
-    
     #[test]
     fn inv_edge() { 
         let l = InvLink::test_data("3_1");

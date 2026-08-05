@@ -45,9 +45,13 @@ where
 
     res += &format!("{{r|{}}}\n", "l".repeat(cols.len()));
 
-    let hor = format!("{} & {} \\\\\n", 
-        disp(head, math_mode), 
-        cols.iter().map(|c| disp(c, math_mode)).join(" & ")
+    // one cell per column, so a table with no columns emits no `&` and stays valid.
+    let row = |head: String, cells: Vec<String>|
+        std::iter::once(head).chain(cells).join(" & ") + " \\\\\n";
+
+    let hor = row(
+        disp(head, math_mode),
+        cols.iter().map(|c| disp(c, math_mode)).collect_vec()
     );
 
     if hor_at_top { 
@@ -55,10 +59,10 @@ where
         res += "\\hline\n";
     }
 
-    for i in rows { 
-        res += &format!("{} & {} \\\\\n", 
-            disp(&i, math_mode), 
-            cols.iter().map(|j| disp(entry(&i, j), math_mode)).join(" & ")
+    for i in rows {
+        res += &row(
+            disp(&i, math_mode),
+            cols.iter().map(|j| disp(entry(&i, j), math_mode)).collect_vec()
         );
     }
 
@@ -81,5 +85,23 @@ mod tests {
     fn test_tex_table() { 
         let _table = tex_table("Caption", "i, j", [1, 2, 3], [4, 5, 6, 7], |i, j| i * 10 + j, true, false);
         // println!("{_table}");
+    }
+
+    #[test]
+    fn table_without_columns() {
+        // the row must carry one cell per column, or it outruns the `{r|}` spec.
+        let entry = |i: &i32, j: &i32| i * 10 + j;
+        let none: [i32; 0] = [];
+
+        let t = tex_table("Caption", "i", none, none, entry, true, true);
+        assert!(t.contains("{r|}"));
+        assert!(!t.contains('&'), "empty table has a stray `&`:\n{t}");
+
+        let t = tex_table("Caption", "i", [1, 2], none, entry, true, true);
+        assert!(!t.contains('&'), "column-less rows have a stray `&`:\n{t}");
+
+        // and a normal table is unaffected: head + 2 columns = 2 separators per row.
+        let t = tex_table("Caption", "i", [1], [4, 5], entry, true, true);
+        assert!(t.lines().all(|l| !l.ends_with("\\\\") || l.matches('&').count() == 2), "{t}");
     }
 }

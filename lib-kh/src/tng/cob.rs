@@ -900,14 +900,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn inv(&self) -> Option<Self> {
-        if let Some((Some(cinv), Some(ainv))) = self.iter().next().map(|(c, a)| 
-            (c.inv(), a.inv())
-        ) { 
-            let inv = LcCob::from((cinv, ainv));
-            Some(inv)
-        } else { 
-            None
-        }
+        if self.nterms() != 1 { return None }
+
+        let (c, a) = self.iter().next().unwrap();
+        let inv = LcCob::from((c.inv()?, a.inv()?));
+        Some(inv)
     }
 
     fn connect(&self, c: &Cob) -> Self {
@@ -1129,6 +1126,20 @@ mod tests {
         assert_eq!(f.inv(), Some(f.clone()));
 
         let f = LcCob::from((c.clone(), 2));
+        assert!(!f.is_invertible());
+        assert_eq!(f.inv(), None);
+    }
+
+    #[test]
+    fn mor_inv_multi_term() {
+        // a sum is not invertible just because its leading term is. Both terms share the source
+        // and target, as every term of an `LcCob` does.
+        let a = TngComp::arc([0, 1]);
+        let id = Cob::from(CobComp::id(a));
+        let dotted = Cob::from(CobComp::id(a).with_dots(1, 0));
+        let f = LcCob::from((id, -1)) + LcCob::from((dotted, -1));
+
+        assert_eq!(f.nterms(), 2);
         assert!(!f.is_invertible());
         assert_eq!(f.inv(), None);
     }

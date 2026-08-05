@@ -164,7 +164,7 @@ where
             
             self.out(&format!("C[{i}]: {}", c));
     
-            let r = c.rank() + c.tors().len();
+            let r = c.n_generators();
             for i in 0..r { 
                 let z = c.generator(i);
                 self.out(&format!("  {i}: {z}"));

@@ -54,10 +54,6 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
         &self.tors
     }
 
-    pub fn total_rank(&self) -> usize {
-        self.rank + self.tors.len()
-    }
-
     pub fn is_free(&self) -> bool {
         self.tors.is_empty()
     }
@@ -82,8 +78,12 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
         &self.raw_gens
     }
 
+    pub fn n_generators(&self) -> usize {
+        self.rank + self.tors.len()
+    }
+
     pub fn generator(&self, i: usize) -> Lc<X, R> {
-        let n = self.total_rank();
+        let n = self.n_generators();
         let v = SpVec::unit(n, i);
         self.devectorize(&v)
     }
@@ -96,7 +96,7 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn generators(&self) -> impl Iterator<Item = Lc<X, R>> + use<'_, X, R> {
-        (0 .. self.rank + self.tors.len()).map(|i| self.generator(i))
+        (0 .. self.n_generators()).map(|i| self.generator(i))
     }
 
     /// Encode a linear combination of generators as a coordinate vector in
@@ -135,7 +135,7 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     /// Decode a coordinate vector (in the SNF basis) back to a linear
     /// combination of raw generators.
     pub fn devectorize(&self, v: &SpVec<R>) -> Lc<X, R> {
-        assert_eq!(v.dim(), self.total_rank());
+        assert_eq!(v.dim(), self.n_generators());
 
         let v = self.trans.backward(v);
 
@@ -146,7 +146,7 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn make_matrix<Y, F>(&self, target: &Summand<Y, R>, map: F) -> SpMat<R>
     where Y: LcKey, F: Fn(&Lc<X, R>) -> Lc<Y, R> { 
-        SpMat::from_col_vecs(target.total_rank(), self.generators().map(|z| {
+        SpMat::from_col_vecs(target.n_generators(), self.generators().map(|z| {
             let w = map(&z);
             target.vectorize(&w)
         }))
@@ -154,7 +154,7 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn make_matrix_euc<Y, F>(&self, target: &Summand<Y, R>, map: F) -> SpMat<R>
     where R: EucRing, for<'x> &'x R: EucRingOps<R>, Y: LcKey, F: Fn(&Lc<X, R>) -> Lc<Y, R> { 
-        SpMat::from_col_vecs(target.total_rank(), self.generators().map(|z| {
+        SpMat::from_col_vecs(target.n_generators(), self.generators().map(|z| {
             let w = map(&z);
             target.vectorize_euc(&w)
         }))

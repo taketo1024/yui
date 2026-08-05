@@ -185,7 +185,7 @@ where
 
             self.out(&format!("KhI[{i}]: {}", h));
 
-            let r = h.rank() + h.tors().len();
+            let r = h.n_generators();
             for i in 0..r { 
                 let z = h.generator(i);
                 self.out(&format!("  {i}: {z}"));

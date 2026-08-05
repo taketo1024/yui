@@ -418,8 +418,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let truncated = self.config.h_range.as_ref().is_some_and(|w| top == *w.end()) && top < real_top;
         if !truncated { return; }
 
+        // a vertex a tracked element lands on must stay, or `eval_elements` has nothing to read.
+        let referenced: FxHashSet<TngComplexKey> = self.elements().content().iter()
+            .flat_map(|e| e.out_cob().keys().copied())
+            .collect();
+
         let doomed = self.complex.keys_of_deg(top)
-            .filter(|k| self.complex.vertex(k).in_edges().next().is_none())
+            .filter(|k| self.complex.vertex(k).in_edges().next().is_none() && !referenced.contains(k))
             .copied()
             .collect_vec();
         if !doomed.is_empty() {

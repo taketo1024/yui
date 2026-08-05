@@ -255,6 +255,18 @@ mod tests {
     use super::KhComplex;
 
     #[test]
+    fn new_partial_topped_at_the_canon_degree() {
+        // pruning at a truncated window top dropped the vertices the canon cycles land on, and
+        // `eval_elements` then hit `is_evalable`. This diagram's crossing order is what triggers it.
+        let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]).mirror(); // writhe 3, runs 0..=3
+
+        for range in [0..=0, -1..=0, -3..=0] {
+            let c = KhComplex::new_partial(&l, &1, &0, false, Some(range.clone()));
+            assert_eq!(c.canon_cycles().len(), 2, "canon cycles in {range:?}");
+        }
+    }
+
+    #[test]
     fn ckh_trefoil() {
         let l = Link::test_data("3_1").mirror();
         let c = KhComplex::new(&l, &0, &0, false);

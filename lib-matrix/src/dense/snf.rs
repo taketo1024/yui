@@ -447,12 +447,13 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
         false
     }
 
-    fn gcdx(x: &R, y: &R) -> (R, R, R) { 
+    fn gcdx(x: &R, y: &R) -> (R, R, R) {
         let (d, s, t) = EucRing::gcdx(x, y);
 
+        // If `a = x/d` is a unit, `s = a⁻¹` satisfies `s·x + 0·y = d` (avoids coefficient growth).
         let a = x / &d;
-        if a.is_unit() { 
-            (d, a, R::zero())
+        if a.is_unit() {
+            (d, a.inv().unwrap(), R::zero())
         } else {
             (d, s, t)
         }
@@ -500,7 +501,7 @@ use {preprocess_lll_for, preprocess_lll_expand};
 
 #[cfg(test)]
 mod tests {
-    use yui_core::num::Ratio;
+    use yui_core::num::{Ratio, GaussInt};
 
     use super::*;
 
@@ -665,6 +666,26 @@ mod tests {
         assert_eq!(d, 2);
         assert_eq!(s, -1);
         assert_eq!(t, 0);
+    }
+
+    #[test]
+    fn gcdx_bezout() {
+        // the unit shortcut must invert `x/d`; over Z[i] the units ±i are not self-inverse.
+        fn check<R>(vals: &[R])
+        where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+            for x in vals {
+                for y in vals {
+                    let (d, s, t) = SnfCalc::<R>::gcdx(x, y);
+                    assert_eq!(&s * x + &t * y, d, "Bezout fails for x = {x}, y = {y}");
+                }
+            }
+        }
+
+        type G = GaussInt<i64>;
+        check(&[G::new(1, 0), G::new(0, 1), G::new(2, 1), G::new(3, 0), G::new(-1, 2)]);
+
+        type Q = Ratio<i64>;
+        check(&[Q::new(1, 2), Q::new(-3, 4), Q::new(5, 1), Q::new(2, 3)]);
     }
 
     #[test]

@@ -75,7 +75,7 @@ impl<X> KeyedUnionFind<X> where X: Eq + Hash {
     }
 
     fn index_of(&self, x: &X) -> usize {
-        self.keys.get_index_of(x).unwrap()
+        self.keys.get_index_of(x).expect("key is not in the union-find")
     }
 
     fn element_at(&self, i: usize) -> &X {

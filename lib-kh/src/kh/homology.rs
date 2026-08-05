@@ -251,7 +251,7 @@ mod tests {
 
             #[test]
             fn kh_trefoil() {
-                let l = Link::test_data("3_1");
+                let l = Link::test_data("3_1").mirror();
                 let h = $build(&l, &0, &0, false);
 
                 assert_eq!(h.h_range(), -3..=0);
@@ -268,7 +268,7 @@ mod tests {
 
             #[test]
             fn kh_trefoil_mirror() {
-                let l = Link::test_data("3_1").mirror();
+                let l = Link::test_data("3_1");
                 let h = $build(&l, &0, &0, false);
 
                 assert_eq!(h.h_range(), 0..=3);
@@ -325,7 +325,7 @@ mod tests {
 
             #[test]
             fn kh_trefoil_bigr() {
-                let l = Link::test_data("3_1");
+                let l = Link::test_data("3_1").mirror();
                 let h = $build(&l, &0, &0, false);
 
                 assert_eq!(h[(-3,-9)].rank(), 1);
@@ -342,7 +342,7 @@ mod tests {
 
             #[test]
             fn kh_trefoil_mirror_bigr() {
-                let l = Link::test_data("3_1").mirror();
+                let l = Link::test_data("3_1");
                 let h = $build(&l, &0, &0, false);
 
                 assert_eq!(h[(0, 1)].rank(), 1);
@@ -368,7 +368,7 @@ mod tests {
 
             #[test]
             fn kh_trefoil_bigr_red() {
-                let l = Link::test_data("3_1");
+                let l = Link::test_data("3_1").mirror();
                 let h = $build(&l, &0, &0, true);
 
                 assert_eq!(h[(-3,-8)].rank(), 1);
@@ -424,7 +424,7 @@ mod tests {
                 type R = FF2;
                 type P = Poly<'H', R>;
 
-                let l = Link::test_data("3_1");
+                let l = Link::test_data("3_1").mirror();
                 let (h, t) = (P::variable(), P::zero());
                 let kh = $build(&l, &h, &t, false);
 

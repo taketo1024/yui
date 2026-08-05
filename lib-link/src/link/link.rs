@@ -600,7 +600,7 @@ mod tests {
     fn trefoil() {
         let l = Link::test_data("3_1");
         assert_eq!(l.n_crossings(), 3);
-        assert_eq!(l.writhe(), -3);
+        assert_eq!(l.writhe(), 3);
         assert_eq!(l.n_comps(), 1);
     }
 

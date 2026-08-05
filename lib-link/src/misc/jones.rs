@@ -100,7 +100,7 @@ mod tests {
 
     #[test]
     fn trefoil() {
-        let l = Link::test_data("3_1");
+        let l = Link::test_data("3_1").mirror();
         let p = jones_polynomial(&l);
         let q = P::mono;
         assert_eq!(p, P::from_iter([(q(-9), -1), (q(-5), 1), (q(-3), 1), (q(-1), 1)]));

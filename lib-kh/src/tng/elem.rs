@@ -4,7 +4,7 @@ use std::fmt::Display;
 use itertools::Itertools;
 use maplit::hashmap;
 use yui_core::bitseq::Bit;
-use yui_core::{Ring, RingOps};
+use yui_core::abst::{Ring, RingOps};
 use yui_link::{Edge, Link, Node};
 
 use super::tng::TngComp;

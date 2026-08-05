@@ -4,7 +4,7 @@
 use std::fmt::Display;
 
 use ahash::RandomState;
-use yui_core::{EucRing, EucRingOps, Ring, RingOps};
+use yui_core::abst::{EucRing, EucRingOps, Ring, RingOps};
 
 type IndexSet<X> = indexmap::IndexSet<X, RandomState>;
 use yui_core::lc::{LcKey, Lc};
@@ -210,7 +210,7 @@ mod tex {
     use crate::utils::tex::tex_rmod_str;
 
     use super::*;
-    use yui_core::TeX;
+    use yui_core::util::tex::TeX;
 
     impl<X, R> TeX for Summand<X, R>
     where X: LcKey, R: Ring + TeX, for<'x> &'x R: RingOps<R> {

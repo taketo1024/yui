@@ -2,7 +2,7 @@ use smart_default::SmartDefault;
 use std::marker::PhantomData;
 use std::ops::RangeInclusive;
 use std::str::FromStr;
-use yui_core::{EucRing, EucRingOps, Field, FieldOps};
+use yui_core::abst::{EucRing, EucRingOps, Field, FieldOps};
 use yui_kh::ss::{s_invariant_with, ss_invariant_with, SsVersion};
 use yui_kh::tng::builder::{BuildConfig, CutOption, NodeOrder, Strategy};
 

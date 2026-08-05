@@ -4,7 +4,7 @@
 
 use std::collections::hash_map;
 use rustc_hash::FxHashMap;
-use crate::{Ring, RingOps};
+use crate::abst::{Ring, RingOps};
 
 use super::lc_key::LcKey;
 

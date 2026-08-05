@@ -2,7 +2,7 @@
 //!
 //! See: <https://en.wikipedia.org/wiki/Field_(mathematics)>
 
-use crate::{EucRing, EucRingOps};
+use crate::abst::{EucRing, EucRingOps};
 
 /// Helper trait, currently identical to [`EucRingOps`], kept for symmetry
 /// with the rest of the algebraic hierarchy.

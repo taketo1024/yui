@@ -1,6 +1,6 @@
 use either::Either;
 use log::*;
-use yui_core::{Ring, RingOps};
+use yui_core::abst::{Ring, RingOps};
 use log::Level;
 use yui_core::util::log::log_progress;
 

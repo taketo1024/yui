@@ -1,7 +1,8 @@
 //! LaTeX rendering for graded R-modules and graded objects.
 
 use itertools::Itertools;
-use yui_core::{Ring, RingOps, TeX};
+use yui_core::abst::{Ring, RingOps};
+use yui_core::util::tex::TeX;
 
 use std::fmt::Display;
 
@@ -17,7 +18,7 @@ pub trait ToTexSeq<I: Display>: ToSeqString<I> {
     }
 
     fn tex_seq(&self, caption: &str) -> String {
-        yui_core::tex_table(caption, self.tex_label(), [""], self.indices(), |_, i| {
+        yui_core::util::tex::tex_table(caption, self.tex_label(), [""], self.indices(), |_, i| {
             self.tex_entry_at(i)
         }, true, true)
     }
@@ -37,7 +38,7 @@ pub trait ToTexTable<I: Display>: ToTableString<I> {
         let (ind0, ind1) = self.indices();
         let head = format!("{label1} \\backslash {label0}");
 
-        yui_core::tex_table(caption, head, ind1.into_iter().rev(), ind0, |j, i| {
+        yui_core::util::tex::tex_table(caption, head, ind1.into_iter().rev(), ind0, |j, i| {
             self.tex_entry_at(i, j)
         }, true, true)
     }

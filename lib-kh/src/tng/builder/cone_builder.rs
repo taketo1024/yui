@@ -18,7 +18,7 @@ use itertools::Itertools;
 use log::{debug, info};
 use num_traits::Zero;
 use yui_core::bitseq::Bit;
-use yui_core::{Ring, RingOps};
+use yui_core::abst::{Ring, RingOps};
 use yui_link::{Edge, InvLink};
 
 use rayon::prelude::*;

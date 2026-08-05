@@ -9,6 +9,3 @@ pub use digits::*;
 pub use div_round::*;
 pub use iter::*;
 pub use range::*;
-
-mod tex;
-pub use tex::*;

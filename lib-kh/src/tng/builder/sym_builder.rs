@@ -17,7 +17,7 @@ use itertools::{iproduct, Itertools};
 use log::{debug, info};
 use yui_core::algo::KeyedUnionFind;
 use yui_core::bitseq::{Bit, BitSeq};
-use yui_core::{Ring, RingOps};
+use yui_core::abst::{Ring, RingOps};
 use yui_link::{Node, Edge, InvLink};
 
 use crate::kh::{KhAlgGen, KhGen, KhTensor};
@@ -1073,11 +1073,11 @@ mod tests {
     use super::*;
     use num_traits::Zero;
 
-    use yui_core::IteratorExt;
+    use yui_core::ext::IteratorExt;
     use yui_core::lc::Lc;
     use yui_core::num::FF2;
     use yui_core::poly::Poly;
-    use yui_core::RangeExt;
+    use yui_core::ext::RangeExt;
     use yui_homology::{ChainComplex1, ChainMap, ToSeqString, ToTableString};
 
     // `profile_sym`'s dry-run widths must match the real complex's `boundary_ends`. Boundary depends

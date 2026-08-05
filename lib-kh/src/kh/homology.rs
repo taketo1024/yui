@@ -3,7 +3,8 @@ use std::sync::OnceLock;
 use delegate::delegate;
 
 use yui_homology::{ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
-use yui_core::{EucRing, EucRingOps, IteratorExt};
+use yui_core::abst::{EucRing, EucRingOps};
+use yui_core::ext::IteratorExt;
 use yui_link::Link;
 
 use crate::kh::KhGen;
@@ -11,7 +12,7 @@ use crate::tng::builder::BuildConfig;
 use crate::util::Bigraded;
 
 use super::{KhAlg, KhChain, KhComplex};
-use yui_core::TeX;
+use yui_core::util::tex::TeX;
 use yui_homology::tex::{ToTexSeq, ToTexTable};
 
 #[derive(Clone)]

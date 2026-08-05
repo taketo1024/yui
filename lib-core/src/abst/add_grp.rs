@@ -4,7 +4,7 @@
 //! <https://en.wikipedia.org/wiki/Additive_group>
 
 use std::ops::{Neg, Sub, SubAssign};
-use crate::{AddMon, AddMonOps};
+use crate::abst::{AddMon, AddMonOps};
 
 /// Helper trait extending [`AddMonOps`] with `Neg` and `Sub` reference variants,
 /// so [`AddGrp`] can require them via one HRTB.

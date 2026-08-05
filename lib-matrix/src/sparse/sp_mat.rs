@@ -6,7 +6,7 @@ use nalgebra_sparse::na::{Scalar, ClosedAddAssign, ClosedSubAssign, ClosedMulAss
 use nalgebra_sparse::{CscMatrix, CooMatrix};
 use num_traits::{Zero, One, ToPrimitive};
 use auto_impl_ops::auto_ops;
-use yui_core::{Ring, RingOps};
+use yui_core::abst::{Ring, RingOps};
 use crate::Perm;
 use crate::dense::*;
 use super::sp_vec::SpVec;

@@ -3,7 +3,7 @@
 use std::hash::BuildHasher;
 use itertools::Itertools;
 use indexmap::IndexSet;
-use yui_core::{Ring, RingOps};
+use yui_core::abst::{Ring, RingOps};
 use yui_core::lc::{Lc, LcKey};
 use yui_matrix::sparse::SpMat;
 

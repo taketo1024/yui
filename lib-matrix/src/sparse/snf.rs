@@ -8,7 +8,7 @@
 
 use log::debug;
 use rustc_hash::{FxHashMap, FxHashSet};
-use yui_core::{EucRing, EucRingOps};
+use yui_core::abst::{EucRing, EucRingOps};
 use yui_core::util::log::log_step_crossed;
 
 use crate::MatTrait;

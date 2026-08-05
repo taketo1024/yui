@@ -6,7 +6,7 @@ use std::ops::{Index, RangeInclusive};
 use delegate::delegate;
 use itertools::Itertools;
 use yui_core::lc::LcKey;
-use yui_core::{Ring, RingOps};
+use yui_core::abst::{Ring, RingOps};
 
 use crate::utils::{Grid, ToSeqString, ToTableString};
 use crate::{AddInd, Summand, isize2, isize3};
@@ -153,7 +153,7 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
 
 mod tex_impl {
     use super::*;
-    use yui_core::TeX;
+    use yui_core::util::tex::TeX;
     use crate::utils::tex::{ToTexSeq, ToTexTable};
 
     impl<X, R> ToTexSeq<isize> for GrMod<isize, X, R>

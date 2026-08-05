@@ -11,7 +11,7 @@ use itertools::Itertools;
 use log::info;
 
 use yui_core::lc::Lc;
-use yui_core::{EucRing, EucRingOps, Field, FieldOps};
+use yui_core::abst::{EucRing, EucRingOps, Field, FieldOps};
 use yui_core::lc::LcKey;
 use yui_matrix::MatTrait;
 use yui_matrix::sparse::{SpMat, SpVec};

@@ -12,7 +12,7 @@ use num_integer::Integer;
 use num_traits::{One, Pow, ToPrimitive, Zero};
 use auto_impl_ops::auto_ops;
 
-use crate::{MathType, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, EucRingOps, AddMon, AddGrp, Mon, Ring, EucRing, Field};
+use crate::abst::{MathType, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, EucRingOps, AddMon, AddGrp, Mon, Ring, EucRing, Field};
 
 /// An element of the finite field 𝔽₂.
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
@@ -183,7 +183,7 @@ impl EucRing for FF2 {}
 impl Field for FF2 {}
 
 mod tex {
-    use crate::TeX;
+    use crate::util::tex::TeX;
     use super::*;
 
     impl TeX for FF2 {
@@ -318,7 +318,7 @@ mod tests {
 
     #[test]
     fn tex() { 
-        use crate::TeX;
+        use crate::util::tex::TeX;
         assert_eq!(FF2::tex_math_symbol(), "\\mathbb{F}_2");
         assert_eq!(FF2::from(5).tex_string(), "1");
     }

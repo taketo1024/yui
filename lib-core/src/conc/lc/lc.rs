@@ -19,7 +19,7 @@ use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, MulAssign};
 use itertools::Itertools;
 use num_traits::Zero;
 use auto_impl_ops::auto_ops;
-use crate::{MathType, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
+use crate::abst::{MathType, AddMon, AddMonOps, AddGrp, AddGrpOps, Ring, RingOps, RMod, RModOps};
 
 use super::lc_key::*;
 use super::lc_data::{LcData, LcDataIter, LcDataIntoIter};
@@ -467,7 +467,7 @@ where
 mod tests {
     use num_traits::Zero;
     use maplit::hashmap;
-    use crate::{MathType, AddMon};
+    use crate::abst::{MathType, AddMon};
     use crate::lc::{AsKey, Lc};
  
     type X = AsKey<i32>;

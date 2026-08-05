@@ -13,7 +13,7 @@ use std::collections::VecDeque;
 use itertools::Itertools;
 use log::*;
 
-use yui_core::{Ring, RingOps};
+use yui_core::abst::{Ring, RingOps};
 use yui_core::algo::TopSort;
 use yui_core::util::log::log_step_crossed;
 use crate::Perm;

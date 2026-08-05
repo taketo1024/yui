@@ -17,7 +17,8 @@ use nalgebra::{DMatrix, MatrixView, U1, Dyn};
 use log::trace;
 use num_bigint::BigInt;
 
-use yui_core::{EucRing, EucRingOps, DivRound};
+use yui_core::abst::{EucRing, EucRingOps};
+use yui_core::ext::DivRound;
 use yui_core::num::{QuadInt, GaussInt, EisenInt, IntType, IntOps};
 use crate::dense::*;
 
@@ -988,7 +989,7 @@ pub(super) mod tests {
     pub(in super::super) mod helper { 
         use super::*;
         use yui_core::num::Ratio;
-        use yui_core::{Ring, RingOps};
+        use yui_core::abst::{Ring, RingOps};
 
         pub fn assert_is_hnf<R>(b: &Mat<R>)
         where R: LLLRing, for<'x> &'x R: LLLRingOps<R> {

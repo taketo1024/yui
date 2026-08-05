@@ -1,7 +1,8 @@
 use std::ops::{Index, RangeInclusive};
 use std::sync::OnceLock;
 use delegate::delegate;
-use yui_core::{EucRing, EucRingOps, IteratorExt};
+use yui_core::abst::{EucRing, EucRingOps};
+use yui_core::ext::IteratorExt;
 use yui_homology::{ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_link::InvLink;
 use crate::kh::KhComplex;
@@ -10,7 +11,7 @@ use crate::tng::builder::SymBuildConfig;
 use crate::util::Bigraded;
 
 use super::KhIChain;
-use yui_core::TeX;
+use yui_core::util::tex::TeX;
 use yui_homology::tex::{ToTexSeq, ToTexTable};
 
 #[derive(Clone)]

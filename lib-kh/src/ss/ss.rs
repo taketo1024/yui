@@ -15,9 +15,9 @@ use itertools::Itertools;
 use log::info;
 use num_traits::Zero;
 use yui_link::Link;
-use yui_core::{EucRing, EucRingOps};
+use yui_core::abst::{EucRing, EucRingOps};
 
-use yui_core::{Field, FieldOps, MathType};
+use yui_core::abst::{Field, FieldOps, MathType};
 
 use crate::kh::{KhChain, KhComplex, KhHomology};
 use crate::tng::builder::BuildConfig;

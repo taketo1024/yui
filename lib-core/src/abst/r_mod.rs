@@ -3,7 +3,7 @@
 //! See: <https://en.wikipedia.org/wiki/Module_(mathematics)>
 
 use std::ops::{Mul, MulAssign};
-use crate::{AddGrp, AddGrpOps, Ring, RingOps};
+use crate::abst::{AddGrp, AddGrpOps, Ring, RingOps};
 
 /// Helper trait bundling [`AddGrpOps`] with scalar multiplication by `R`
 /// (both `T * R` and `T * &R`) so [`RMod`] can require them via one HRTB.

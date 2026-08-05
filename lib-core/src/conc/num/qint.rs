@@ -28,7 +28,8 @@ use std::fmt::{Display, Debug};
 use std::ops::{Add, Neg, Sub, Mul, AddAssign, SubAssign, MulAssign, Rem, Div, RemAssign, DivAssign};
 use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
-use crate::{AddGrp, AddGrpOps, AddMon, AddMonOps, DivRound, MathType, EucRing, EucRingOps, Mon, MonOps, Ring, RingOps};
+use crate::abst::{AddGrp, AddGrpOps, AddMon, AddMonOps, MathType, EucRing, EucRingOps, Mon, MonOps, Ring, RingOps};
+use crate::ext::DivRound;
 use super::int::{IntType, IntOps};
 
 /// A quadratic integer in `ℤ[ω]`, represented by `(a, b)` for `a + b·ω`.

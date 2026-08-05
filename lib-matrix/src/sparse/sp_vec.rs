@@ -4,7 +4,7 @@ use nalgebra_sparse::CscMatrix;
 use nalgebra_sparse::na::{Scalar, ClosedAddAssign, ClosedSubAssign, ClosedMulAssign};
 use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
-use yui_core::{Ring, RingOps, AddGrpOps,  AddGrp};
+use yui_core::abst::{Ring, RingOps, AddGrpOps, AddGrp};
 use super::sp_mat::SpMat;
 use crate::Perm;
 

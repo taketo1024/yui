@@ -13,7 +13,7 @@ use std::ops::{Mul, Add, Sub, Neg, AddAssign, SubAssign, MulAssign, Div, DivAssi
 use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
 
-use crate::{EucRing, EucRingOps, MathType, Mon, AddMon, AddGrp, AddMonOps, AddGrpOps, MonOps, RingOps, Ring, FieldOps, Field};
+use crate::abst::{EucRing, EucRingOps, MathType, Mon, AddMon, AddGrp, AddMonOps, AddGrpOps, MonOps, RingOps, Ring, FieldOps, Field};
 use super::int::{IntType, IntOps};
 
 /// A fraction `numer / denom` over a [`EucRing`] `T`, kept in reduced form.
@@ -376,7 +376,7 @@ where T: IntType, for<'x> &'x T: IntOps<T> {
 }
 
 mod tex {
-    use crate::TeX;
+    use crate::util::tex::TeX;
     use super::*;
 
     impl<T> TeX for Ratio<T> 
@@ -619,7 +619,7 @@ mod tests {
 
     #[test]
     fn tex() { 
-        use crate::TeX;
+        use crate::util::tex::TeX;
         assert_eq!(Ratio::<i32>::tex_math_symbol(), "\\mathbb{Q}");
 
         let a = Ratio::new(43, 1);

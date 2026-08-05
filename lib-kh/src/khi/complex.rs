@@ -13,7 +13,8 @@ use delegate::delegate;
 
 use itertools::Itertools;
 use yui_core::lc::Lc;
-use yui_core::{EucRing, EucRingOps, IteratorExt, Ring, RingOps};
+use yui_core::abst::{EucRing, EucRingOps, Ring, RingOps};
+use yui_core::ext::IteratorExt;
 use yui_homology::{ChainComplex1, ChainMap, ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_link::InvLink;
 
@@ -22,7 +23,7 @@ use crate::tng::builder::SymBuildConfig;
 use crate::khi::KhIHomology;
 use crate::khi::{KhIGen, KhIGenExt};
 use crate::util::Bigraded;
-use yui_core::TeX;
+use yui_core::util::tex::TeX;
 use yui_homology::tex::{ToTexSeq, ToTexTable};
 
 pub type KhIChain<R> = Lc<KhIGen, R>;

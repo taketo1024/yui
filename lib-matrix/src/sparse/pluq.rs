@@ -2,7 +2,7 @@
 // Implemented with the help of Claude Code.
 
 use log::debug;
-use yui_core::{Ring, RingOps, Field, FieldOps};
+use yui_core::abst::{Ring, RingOps, Field, FieldOps};
 
 use crate::{MatTrait, Perm};
 use crate::dense::Mat;

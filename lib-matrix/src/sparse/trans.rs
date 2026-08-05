@@ -1,4 +1,5 @@
-use yui_core::{CloneAnd, Ring, RingOps};
+use yui_core::abst::{Ring, RingOps};
+use yui_core::ext::CloneAnd;
 use crate::Perm;
 use crate::sparse::{SpMat, MatTrait, SpVec};
 

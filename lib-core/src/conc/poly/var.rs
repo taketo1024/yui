@@ -10,7 +10,7 @@ use std::str::FromStr;
 use num_traits::{Zero, One, ToPrimitive, Pow, FromPrimitive};
 use auto_impl_ops::auto_ops;
 
-use crate::{MathType, IndexType};
+use crate::abst::{MathType, IndexType};
 use crate::lc::LcKey;
 use crate::util::format::superscript;
 use super::{Mono, MonoOrd};
@@ -183,7 +183,7 @@ impl_univar_unsigned!(usize);
 impl_univar_signed!  (isize);
 
 mod tex {
-    use crate::TeX;
+    use crate::util::tex::TeX;
     use super::*;
 
     impl<const X: char, I> TeX for Var<X, I>

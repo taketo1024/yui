@@ -10,7 +10,7 @@ use itertools::Itertools;
 use num_traits::Zero;
 use log::info;
 
-use yui_core::MathType;
+use yui_core::abst::MathType;
 use yui_core::num::FF2;
 use yui_link::{InvLink, Link};
 

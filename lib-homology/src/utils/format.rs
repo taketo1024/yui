@@ -2,7 +2,7 @@
 //! `"Z² ⊕ Z/2 ⊕ Z/2"`.
 
 use itertools::Itertools;
-use yui_core::{Ring, RingOps};
+use yui_core::abst::{Ring, RingOps};
 
 /// Format a free-plus-torsion summand `R^rank ⊕ R/tors[0] ⊕ R/tors[1] ⊕ …`
 /// as a human-readable string.

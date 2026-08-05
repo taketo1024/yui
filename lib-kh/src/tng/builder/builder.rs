@@ -16,7 +16,7 @@ use std::ops::RangeInclusive;
 use rustc_hash::FxHashSet;
 use itertools::Itertools;
 use log::{debug, info, trace};
-use yui_core::{Ring, RingOps};
+use yui_core::abst::{Ring, RingOps};
 use yui_link::{Node, Edge, Link};
 
 use yui_homology::ChainComplex1;

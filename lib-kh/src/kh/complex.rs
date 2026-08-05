@@ -3,7 +3,8 @@ use std::sync::OnceLock;
 
 use delegate::delegate;
 use yui_core::lc::Lc;
-use yui_core::{IteratorExt, Ring, RingOps, EucRing, EucRingOps};
+use yui_core::abst::{Ring, RingOps, EucRing, EucRingOps};
+use yui_core::ext::IteratorExt;
 use yui_link::Link;
 use yui_homology::{ChainComplex1, ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 
@@ -12,7 +13,7 @@ use crate::tng::builder::BuildConfig;
 use crate::util::Bigraded;
 
 use super::KhAlg;
-use yui_core::TeX;
+use yui_core::util::tex::TeX;
 use yui_homology::tex::{ToTexSeq, ToTexTable};
 
 pub type KhChain<R> = Lc<KhGen, R>;

@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use itertools::Itertools;
 use yui_core::util::format::subscript;
-use yui_core::{MathType, Ring, RingOps};
+use yui_core::abst::{MathType, Ring, RingOps};
 use yui_core::lc::{LcKey, Lc};
 use yui_link::State;
 

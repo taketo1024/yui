@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use itertools::Itertools;
 use yui_core::lc::{LcKey, Lc};
-use yui_core::{Ring, RingOps};
+use yui_core::abst::{Ring, RingOps};
 use yui_homology::{isize2, GrMod1, GrMod2, Summand};
 
 /// q-graded decomposition of a `GrMod1` into a `GrMod2`.

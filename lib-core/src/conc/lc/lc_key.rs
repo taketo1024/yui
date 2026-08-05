@@ -7,7 +7,7 @@ use derive_more::Display;
 use itertools::Either;
 
 use crate::lc::Lc;
-use crate::{MathType, IndexType, Ring, RingOps};
+use crate::abst::{MathType, IndexType, Ring, RingOps};
 
 /// Marker trait for types usable as keys in [`Lc`](super::Lc) — i.e.
 /// elements that are hashable and totally ordered.

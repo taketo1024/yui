@@ -5,7 +5,7 @@
 
 use std::ops::{Add, AddAssign};
 use num_traits::Zero;
-use crate::MathType;
+use crate::abst::MathType;
 
 /// Helper trait bundling `Add` impls so [`AddMon`] can require all four
 /// reference variants (`T + T`, `T + &T`, `&T + T`, `&T + &T`) via one HRTB.

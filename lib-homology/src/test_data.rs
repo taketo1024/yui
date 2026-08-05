@@ -2,7 +2,7 @@
 
 use maplit::hashmap;
 use num_traits::FromPrimitive;
-use yui_core::{Ring, RingOps};
+use yui_core::abst::{Ring, RingOps};
 use yui_matrix::sparse::SpMat;
 
 use crate::GenericChainComplex1;

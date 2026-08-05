@@ -8,7 +8,7 @@ use std::sync::Arc;
 use delegate::delegate;
 use itertools::Itertools;
 use num_traits::Zero;
-use yui_core::{EucRing, EucRingOps, Ring, RingOps};
+use yui_core::abst::{EucRing, EucRingOps, Ring, RingOps};
 use yui_core::lc::{LcKey, Lc};
 
 use yui_matrix::MatTrait;
@@ -400,7 +400,7 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
 
 mod tex_impl {
     use super::*;
-    use yui_core::TeX;
+    use yui_core::util::tex::TeX;
     use crate::utils::tex::{ToTexSeq, ToTexTable};
 
     impl<X, R> ToTexSeq<isize> for ChainComplex1<X, R>

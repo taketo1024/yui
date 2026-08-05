@@ -225,6 +225,12 @@ impl<I: BitRepr> BitSeq<I> {
 
     pub fn append(&mut self, b: BitSeq<I>) {
         assert!(self.len + b.len <= Self::MAX_LEN);
+
+        // `self.len` may be `MAX_LEN`, where the shift below is undefined.
+        if b.len == 0 {
+            return
+        }
+
         self.val |= b.val << self.len;
         self.len += b.len;
     }
@@ -232,10 +238,11 @@ impl<I: BitRepr> BitSeq<I> {
     pub fn remove(&mut self, i: usize) {
         assert!(i < self.len);
 
-        let a = self.val & !((I::ONE << (i + 1)) - I::ONE);
-        let b = self.val & ((I::ONE << i) - I::ONE);
+        // shifted in two steps: `i + 1` may be `MAX_LEN`, where a shift is undefined.
+        let hi = ((self.val >> i) >> 1) << i;
+        let lo = self.val & ((I::ONE << i) - I::ONE);
 
-        self.val = a >> 1 | b;
+        self.val = hi | lo;
         self.len -= 1;
     }
 
@@ -503,6 +510,21 @@ mod tests {
     }
 
     #[test]
+    fn remove_at_max_len() {
+        // dropping the top bit of a full-length sequence.
+        let n = B::MAX_LEN;
+
+        let mut b = B::ones(n);
+        b.remove(n - 1);
+        assert_eq!(b, B::ones(n - 1));
+
+        let mut b = B::zeros(n);
+        b.set_1(n - 1);
+        b.remove(n - 1);
+        assert_eq!(b, B::zeros(n - 1));
+    }
+
+    #[test]
     fn insert() {
         let mut b = B::empty();
 
@@ -549,6 +571,16 @@ mod tests {
         b0.append(b1);
 
         assert_eq!(b0, B::new(0b010110110, 9));
+    }
+
+    #[test]
+    fn append_empty_to_full() {
+        let full = B::ones(B::MAX_LEN);
+
+        let mut b = full;
+        b.append(B::empty());
+
+        assert_eq!(b, full);
     }
 
     #[test]

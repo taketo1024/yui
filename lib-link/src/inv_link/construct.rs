@@ -93,6 +93,29 @@ mod tests {
         *axis.iter().find(|&&f| f != e).unwrap()
     }
 
+    // tw shifts the blackboard framing 2*writhe by tw, and every extra full twist costs a crossing
+    // on each of the two parallel strands.
+    #[test]
+    fn whitehead_double_twisted() {
+        let k = InvLink::test_data("3_1");
+        assert_eq!(k.writhe(), 3);
+
+        for tw in [-2, 0, 2, 4] {
+            let w = InvLink::whitehead_double(&k, true, tw);
+            let expected = 4 * k.n_crossings() + (2 * k.writhe() + tw).unsigned_abs() as usize + 2;
+            assert_eq!(w.n_crossings(), expected, "tw = {tw}");
+            assert!(w.is_knot(), "tw = {tw}");
+            assert!(w.is_strongly_invertible(), "tw = {tw}");
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "tw must be even")]
+    fn whitehead_double_rejects_an_odd_twist() {
+        // an odd twist breaks the tau-symmetry of the diagram.
+        let _ = InvLink::whitehead_double(&InvLink::test_data("3_1"), true, 1);
+    }
+
     #[test]
     fn whitehead_double_is_symmetric() {
         // building succeeding ⟺ the pairing gave a valid strong inversion.

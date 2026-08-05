@@ -84,3 +84,71 @@ impl Display for Path {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn arc_and_circ() {
+        let a = Path::arc([1, 2, 3]);
+        assert!(a.is_arc());
+        assert!(!a.is_circle());
+        assert_eq!(a.len(), 3);
+        assert_eq!(a.edges(), &[1, 2, 3]);
+
+        let c = Path::circ([1, 2, 3]);
+        assert!(c.is_circle());
+        assert!(!c.is_arc());
+        assert_eq!(c.edges(), a.edges());
+
+        // same edges, different kind — not equal.
+        assert_ne!(a, c);
+    }
+
+    #[test]
+    #[should_panic]
+    fn arc_rejects_empty() {
+        let _ = Path::arc([]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn circ_rejects_empty() {
+        let _ = Path::circ([]);
+    }
+
+    #[test]
+    fn contains_and_min_edge() {
+        let p = Path::arc([4, 2, 7]);
+        assert!(p.contains(2));
+        assert!(!p.contains(3));
+        assert_eq!(p.min_edge(), 2);
+    }
+
+    #[test]
+    fn end_pts_only_for_arcs() {
+        assert_eq!(Path::arc([4, 2, 7]).end_pts(), Some((4, 7)));
+        assert_eq!(Path::arc([5]).end_pts(), Some((5, 5)));
+        assert_eq!(Path::circ([4, 2, 7]).end_pts(), None);
+    }
+
+    #[test]
+    fn equality_is_oriented() {
+        // `Path` compares as an oriented sequence: neither reversal nor rotation is equal.
+        let p = Path::circ([1, 2, 3]);
+        assert_ne!(p, Path::circ([3, 2, 1]));
+        assert_ne!(p, Path::circ([2, 3, 1]));
+    }
+
+    #[test]
+    fn into_seq_keeps_the_order() {
+        assert_eq!(Path::circ([4, 2, 7]).into_seq().to_vec(), vec![4, 2, 7]);
+    }
+
+    #[test]
+    fn display() {
+        assert_eq!(Path::arc([1, 2, 3]).to_string(),  "[1-2-3]");
+        assert_eq!(Path::circ([1, 2, 3]).to_string(), "⚪︎(1-2-3)");
+    }
+}

@@ -11,32 +11,45 @@ env:
 
 jobs:
   build:
+    name: build & test (${{ matrix.profile }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [debug, release]
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@1.85
-    - name: Build yui-core
-      run: cargo build --verbose -p yui-core
-    - name: Test yui-core
-      run: cargo test --verbose -p yui-core
-    - name: Build yui-matrix
-      run: cargo build --verbose -p yui-matrix
-    - name: Test yui-matrix
-      run: cargo test --verbose -p yui-matrix
-    - name: Build yui-homology
-      run: cargo build --verbose -p yui-homology
-    - name: Test yui-homology
-      run: cargo test --verbose -p yui-homology
-    - name: Build yui-link
-      run: cargo build --verbose -p yui-link
-    - name: Test yui-link
-      run: cargo test --verbose -p yui-link
-    - name: Build yui-kh
-      run: cargo build --verbose -p yui-kh
-    - name: Test yui-kh
-      run: cargo test --verbose -p yui-kh
-    - name: Build bin-ykh
-      run: cargo build --verbose -p ykh
-    - name: Test bin-ykh
-      run: cargo test --verbose -p ykh
+    - name: Select the cargo profile
+      run: echo "FLAGS=${{ matrix.profile == 'release' && '--release' || '' }}" >> "$GITHUB_ENV"
 
+    - name: Build yui-core
+      run: cargo build --verbose $FLAGS -p yui-core
+    - name: Test yui-core
+      run: cargo test --verbose $FLAGS -p yui-core
+    - name: Build yui-matrix
+      run: cargo build --verbose $FLAGS -p yui-matrix
+    - name: Test yui-matrix
+      run: cargo test --verbose $FLAGS -p yui-matrix
+    - name: Build yui-homology
+      run: cargo build --verbose $FLAGS -p yui-homology
+    - name: Test yui-homology
+      run: cargo test --verbose $FLAGS -p yui-homology
+    - name: Build yui-link
+      run: cargo build --verbose $FLAGS -p yui-link
+    - name: Test yui-link
+      run: cargo test --verbose $FLAGS -p yui-link
+    - name: Build yui-kh
+      run: cargo build --verbose $FLAGS -p yui-kh
+    - name: Test yui-kh
+      run: cargo test --verbose $FLAGS -p yui-kh
+    - name: Build bin-ykh
+      run: cargo build --verbose $FLAGS -p ykh
+    - name: Test bin-ykh
+      run: cargo test --verbose $FLAGS -p ykh
+
+    # `big-link` widens Edge/State from u8/u64 to u16/u128; nothing else exercises that path.
+    - name: Test yui-link (big-link)
+      run: cargo test --verbose $FLAGS -p yui-link --features big-link
+    - name: Test yui-kh (big-link)
+      run: cargo test --verbose $FLAGS -p yui-kh --features big-link

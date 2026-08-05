@@ -264,7 +264,6 @@ impl CobComp {
         x - (b / 2) - 2 * d
     }
 
-    // Shortcut for adding a single dot.
     pub fn add_dot(self, dot: Dot) -> Self {
         let (x, y) = self.dots;
         match dot {
@@ -401,7 +400,6 @@ impl CobComp {
                 (0, 0, 0) if c.is_closed() =>
                     Lc::zero(),
 
-                // default
                 _ => {
                     let new = CobComp::new_with_nb(
                         (*c.src).clone(),

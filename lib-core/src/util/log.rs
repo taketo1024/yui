@@ -10,10 +10,8 @@ pub fn log_progress(level: Level, done: usize, prev: usize, total: usize, step: 
     }
 }
 
-/// The pacing test alone, for callers whose line carries more than `done/total` — `sp_snf`
-/// reports the non-zero count, `find_pivots` the pivots found so far. The final step always
-/// reports. Runs of at most one step log nothing: `step` is the caller's own sense of
-/// "worth reporting".
+/// The pacing test alone, for callers whose line carries more than `done/total`. The final step
+/// always reports; a run of at most one step logs nothing.
 pub fn log_step_crossed(done: usize, prev: usize, total: usize, step: usize) -> bool {
     total > step && (done / step > prev / step || done == total)
 }

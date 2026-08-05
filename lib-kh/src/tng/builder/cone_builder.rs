@@ -484,7 +484,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // survive to the matrix reduction. Called twice: non-based circles, then the based one.
     fn deloop_all(&mut self, based: bool) {
         debug!("cone deloop-all (based: {based})...");
-        let auto_elim = self.cone.config().mode.auto_elim();
+        let auto_elim = self.cone.config().strategy.auto_elim();
         let range = self.cone.complex().h_range();
         let (start, end) = (*range.start(), *range.end());
         for d in start ..= end {
@@ -516,9 +516,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 // ---- cobordism-level cone construction (`1 + τ`, char-2) ----
 
 // Config for the cone's own `TngComplexBuilder`, which drives deloop/eliminate on the coned complex:
-// the simplify `mode` and the elimination fill-cost cap carry over from the sym config.
+// the simplify `strategy` and the elimination fill-cost cap carry over from the sym config.
 fn cone_build_config(config: &SymBuildConfig) -> BuildConfig {
-    BuildConfig { mode: config.mode, max_elim_cost: config.max_elim_cost, q_range: config.q_range.clone(), ..Default::default() }
+    BuildConfig { strategy: config.strategy, max_elim_cost: config.max_elim_cost, q_range: config.q_range.clone(), ..Default::default() }
 }
 
 // An empty cone shell: same `deg_shift`/base point, one extra h-degree for the cone bit.
@@ -574,7 +574,7 @@ mod tests {
     use yui_core::num::FF2;
     use yui_link::InvLink;
     use super::*;
-    use super::super::{BuildMode, CutOption};
+    use super::super::{Strategy, CutOption};
 
     // Build the reduced cone, assert d² = 0, and return its nonzero homology ranks per degree.
     // (Full homology vs. the KhI reference is checked in `khi`.)
@@ -677,7 +677,7 @@ mod tests {
     #[test]
     fn cone_direct_9_46_windowed() {
         let l = InvLink::from_symmetric_pd_code([[18,8,1,7],[13,6,14,7],[12,2,13,1],[8,18,9,17],[5,14,6,15],[2,12,3,11],[16,10,17,9],[15,4,16,5],[10,4,11,3]]);
-        let config = SymBuildConfig { cut: CutOption::Auto(2), mode: BuildMode::MinFill, h_range: Some(-64 ..= 1), ..Default::default() };
+        let config = SymBuildConfig { cut: CutOption::Auto(2), strategy: Strategy::MinFill, h_range: Some(-64 ..= 1), ..Default::default() };
         for reduced in [false, true] {
             let full = cone_homology(&l, reduced, SymBuildConfig { h_range: Some(-64 ..= 1), ..Default::default() });
             let direct = cone_homology(&l, reduced, SymBuildConfig { ..config.clone() });
@@ -707,19 +707,19 @@ mod tests {
         let narrow = |h: Vec<(isize, usize)>| h.into_iter().filter(|&(d, _)| d <= 0).collect_vec();
         for reduced in [false, true] {
             let full = narrow(cone_homology(&l, reduced, SymBuildConfig::default()));
-            let chunked = narrow(cone_homology(&l, reduced, SymBuildConfig { cut: CutOption::Auto(2), mode: BuildMode::MinFill, h_range: Some(-64 ..= 1), ..Default::default() }));
+            let chunked = narrow(cone_homology(&l, reduced, SymBuildConfig { cut: CutOption::Auto(2), strategy: Strategy::MinFill, h_range: Some(-64 ..= 1), ..Default::default() }));
             assert_eq!(full, chunked, "reduced={reduced}");
         }
     }
 
-    // The cone homology must not depend on the simplification mode.
+    // The cone homology must not depend on the simplification strategy.
     #[test]
-    fn cone_mode_independent() {
+    fn cone_strategy_independent() {
         let l = InvLink::test_data("6_3");
         let reference = cone_homology(&l, false, SymBuildConfig::default());
-        for mode in [BuildMode::MinFill, BuildMode::NoElim, BuildMode::None] {
-            let h = cone_homology(&l, false, SymBuildConfig { mode, ..Default::default() });
-            assert_eq!(h, reference, "mode {mode:?}");
+        for strategy in [Strategy::MinFill, Strategy::NoElim, Strategy::None] {
+            let h = cone_homology(&l, false, SymBuildConfig { strategy, ..Default::default() });
+            assert_eq!(h, reference, "strategy {strategy:?}");
         }
     }
 

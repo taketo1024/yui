@@ -4,7 +4,7 @@
 // `--features big-link` for Wh(P5)).
 
 use yui_kh::khi::{ssi_invariant, ssi_invariant_ver, SsiVersion};
-use yui_kh::tng::builder::{BuildMode, CutOption, SymBuildConfig};
+use yui_kh::tng::builder::{Strategy, CutOption, SymBuildConfig};
 use yui_link::InvLink;
 
 mod common;
@@ -20,7 +20,7 @@ fn init_logger() {
 // fixes the crossing order; a PD re-import would reorder under MinCut).
 fn wh_pretzel_config(cut_at: usize) -> SymBuildConfig {
     SymBuildConfig {
-        mode: BuildMode::MinFill,
+        strategy: Strategy::MinFill,
         cut: CutOption::At(vec![cut_at]),
         max_elim_cost: Some(1 << 16),
         no_full_deloop: true,

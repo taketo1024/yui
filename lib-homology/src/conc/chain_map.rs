@@ -146,7 +146,7 @@ where
         let dx = self.source.d(i, &x);
         let fdx = self.apply(i + d_deg, &dx);
         let fx = self.apply(i, &x);
-        let dfx = self.target.d(i, &fx);
+        let dfx = self.target.d(i + self.deg, &fx);
 
         assert!(dfx == fdx, "df != fd for x = {x}.\n  df = {dfx},\n  fd = {fdx}.");
     }
@@ -180,6 +180,26 @@ mod tests {
         let f = ChainMap::new(&s2, &d3, 0, |_, z| z.clone());
 
         f.check_all();
+    }
+
+    #[test]
+    fn check_at_nonzero_deg() {
+        // C: C₁ ≅ C₀ and D: D₂ ≅ D₁, with `f` of degree 1 carrying one onto the other —
+        // a genuine chain map, so the check must accept it.
+        let c = GenericChainComplex1::<i32>::from_d_matrices(-1, [
+            (0, SpMat::zero((0, 1))),
+            (1, SpMat::from_entries((1, 1), [(0, 0, 1)])),
+        ]);
+        let d = GenericChainComplex1::<i32>::from_d_matrices(-1, [
+            (1, SpMat::zero((0, 1))),
+            (2, SpMat::from_entries((1, 1), [(0, 0, 1)])),
+        ]);
+
+        let f = ChainMap::new(&c, &d, 1, |_, z: &Lc<GenericKey<isize>, i32>|
+            z.iter().map(|(k, a)| (GenericKey(k.0 + 1, k.1), a.clone())).collect()
+        );
+
+        f.check_at(1);
     }
 
     #[test]

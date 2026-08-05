@@ -115,12 +115,12 @@ pub fn parse_strategy(s: &str) -> Result<Strategy, String> {
     }
 }
 
-// parse the ssi pipeline version: v1 | v2.
-pub fn parse_ssi_version(s: &str) -> Result<SsVersion, String> {
+// parse the ss/ssi pipeline version: v1 | v2.
+pub fn parse_ss_version(s: &str) -> Result<SsVersion, String> {
     match s.to_lowercase().as_str() {
         "v1" | "1" => Ok(SsVersion::V1),
         "v2" | "2" => Ok(SsVersion::V2),
-        _ => Err(format!("invalid ssi version `{s}`, expected v1|v2")),
+        _ => Err(format!("invalid version `{s}`, expected v1|v2")),
     }
 }
 

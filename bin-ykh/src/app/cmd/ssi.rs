@@ -36,7 +36,7 @@ pub struct Args {
     pub expected: Option<isize>,
 
     // pipeline: v2 (default, `H = 1` q-truncated solves) or v1 (homology of the cone).
-    #[arg(long, value_parser = parse_ssi_version, default_value = "v2")]
+    #[arg(long, value_parser = parse_ss_version, default_value = "v2")]
     #[default(SsVersion::V2)]
     pub ver: SsVersion,
 

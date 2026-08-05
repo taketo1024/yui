@@ -119,9 +119,13 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     pub fn truncated(&self, range: RangeInclusive<isize>) -> Self {
+        let canon_cycles = self.canon_cycles.iter().filter(|z|
+            range.contains(&self.h_deg_of_chain(z))
+        ).cloned().collect();
+
         Self::new_impl(
             self.inner.truncated(range),
-            self.canon_cycles.clone(),
+            canon_cycles,
             self.deg_shift,
         )
     }

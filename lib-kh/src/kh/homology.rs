@@ -52,16 +52,21 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     fn from_complex(c: &KhComplex<R>, range: Option<RangeInclusive<isize>>) -> Self {
         let reduced = c.inner().reduced();
-        let homology = match range {
-            Some(r) => reduced.homology_in(r),
+        let homology = match &range {
+            Some(r) => reduced.homology_in(r.clone()),
             None    => reduced.homology(),
         };
+        // a cycle outside the range indexes a degree that was never computed.
+        let canon_cycles = c.canon_cycles().iter().filter(|z|
+            range.as_ref().is_none_or(|r| r.contains(&c.h_deg_of_chain(z)))
+        ).cloned().collect();
+
         KhHomology::new_impl(
             homology,
             c.alg().clone(),
             c.deg_shift(),
             c.is_reduced(),
-            c.canon_cycles().clone()
+            canon_cycles
         )
     }
 
@@ -141,12 +146,16 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     pub fn truncated(&self, range: RangeInclusive<isize>) -> Self {
+        let canon_cycles = self.canon_cycles.iter().filter(|z|
+            range.contains(&self.h_deg_of_chain(z))
+        ).cloned().collect();
+
         Self::new_impl(
             self.inner.truncated(range),
             self.alg.clone(),
             self.deg_shift,
             self.reduced,
-            self.canon_cycles.clone()
+            canon_cycles
         )
     }
 
@@ -494,6 +503,24 @@ mod tests {
 
         assert!(part[-2].is_zero());
         assert!(part[2].is_zero());
+    }
+
+    // canon cycles outside the h-range are dropped: the Lee classes of 3_1 sit at h = 0, so a
+    // window above it keeps none (they would otherwise index an unbuilt degree).
+    #[test]
+    fn canon_cycles_clipped_to_h_range() {
+        let l = Link::test_data("3_1");
+        type R = FF2;
+        let (h, t) = (R::zero(), R::zero());
+
+        let full = KhHomology::<R>::new(&l, &h, &t, false);
+        assert_eq!(full.canon_cycles().len(), 2);
+
+        let clipped = KhHomology::<R>::new_partial(&l, &h, &t, false, Some(1..=2));
+        assert_eq!(clipped.canon_cycles().len(), 0);
+
+        assert_eq!(full.truncated(1..=2).canon_cycles().len(), 0);
+        assert_eq!(full.truncated(-3..=0).canon_cycles().len(), 2);
     }
 
     mod v2 {

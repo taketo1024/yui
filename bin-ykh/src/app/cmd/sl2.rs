@@ -47,9 +47,6 @@ pub struct Args {
     #[arg(short = 'M', long)]
     pub show_matrix: bool,
 
-    #[arg(long)]
-    pub verify: bool,
-
     #[arg(long, default_value = "0")]
     pub log: u8,
 }

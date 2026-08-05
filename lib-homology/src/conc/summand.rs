@@ -174,16 +174,6 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
         self.trans.reduce();
     }
 
-    pub fn map_raw_generators<Y>(&self, f: impl Fn(&X) -> Y) -> Summand<Y, R>
-    where Y: LcKey {
-        Summand::new(
-            self.raw_gens.iter().map(f).collect(),
-            self.rank,
-            self.tors.clone(),
-            self.trans.clone()
-        )
-    }
-
     pub fn describe_generators(&self) -> String {
         use itertools::Itertools;
         self.generators().enumerate().map(|(i, x)| format!("{i}: {x}")).join("\n")

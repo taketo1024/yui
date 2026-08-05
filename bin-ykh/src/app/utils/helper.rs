@@ -86,16 +86,3 @@ pub fn vec2str<R>(v: &SpVec<R>) -> String
 where R: Ring + ToString, for<'x> &'x R: RingOps<R> { 
     format!("({})", v.clone().into_dense().iter().join(", "))
 }
-
-pub fn csv_writer(path: &String) -> Result<csv::Writer<std::fs::File>, Box<dyn std::error::Error>> { 
-    use std::fs::OpenOptions;
-
-    let file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .open(path)?;
-
-    let wtr = csv::Writer::from_writer(file);
-
-    Ok(wtr)
-}

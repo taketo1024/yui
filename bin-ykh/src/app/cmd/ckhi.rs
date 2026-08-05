@@ -6,6 +6,7 @@ use std::marker::PhantomData;
 use std::ops::RangeInclusive;
 use std::str::FromStr;
 use yui_core::TeX;
+use yui_homology::tex::ToTexTable;
 use yui_core::{Ring, RingOps};
 use yui_homology::ToTableString;
 use yui_kh::khi::KhIComplex;
@@ -62,6 +63,10 @@ pub struct Args {
     // skip the half-build/τ-mirror preprocess (which materializes the unbridged off-axis product).
     #[arg(long)]
     pub no_preprocess: bool,
+
+    #[arg(short, long, default_value = "unicode")]
+    #[default(Format::Unicode)]
+    pub format: Format,
 
     #[arg(long, default_value = "0")]
     pub log: u8,
@@ -127,7 +132,10 @@ where
         };
         
         // CKh generators
-        let table = ckhi.to_table_string();
+        let table = match self.args.format {
+            Format::TeX => ckhi.tex_table("CKhI"),
+            _           => ckhi.to_table_string(),
+        };
         self.out(&table);
 
         // Generators

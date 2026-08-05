@@ -12,6 +12,8 @@ use crate::tng::builder::BuildConfig;
 use crate::util::Bigraded;
 
 use super::KhAlg;
+use yui_core::TeX;
+use yui_homology::tex::{ToTexSeq, ToTexTable};
 
 pub type KhChain<R> = Lc<KhGen, R>;
 pub type KhComplexSummand<R> = Summand<KhGen, R>;
@@ -204,6 +206,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
+impl<R> ToTexSeq<isize> for KhComplex<R>
+where R: Ring + TeX, for<'x> &'x R: RingOps<R> {
+    fn tex_entry_at(&self, i: &isize) -> String {
+        if self[*i].is_zero() {
+            ".".to_string()
+        } else {
+            self[*i].tex_string()
+        }
+    }
+}
+
 impl<R> ToTableString<isize> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn labels(&self) -> (String, String) { 
@@ -219,6 +232,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             ".".to_string()
         } else { 
             self[(*i, *j)].to_string()
+        }
+    }
+}
+
+impl<R> ToTexTable<isize> for KhComplex<R>
+where R: Ring + TeX, for<'x> &'x R: RingOps<R> {
+    fn tex_entry_at(&self, i: &isize, j: &isize) -> String {
+        if self[(*i, *j)].is_zero() {
+            ".".to_string()
+        } else {
+            self[(*i, *j)].tex_string()
         }
     }
 }

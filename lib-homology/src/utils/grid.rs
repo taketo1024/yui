@@ -115,6 +115,13 @@ impl<V: Display + Default> ToSeqString<isize> for Grid<isize, V> {
     }
 }
 
+impl<V> crate::utils::tex::ToTexSeq<isize> for Grid<isize, V>
+where V: Display + yui_core::TeX + Default {
+    fn tex_entry_at(&self, i: &isize) -> String {
+        self.get(*i).map(|v| v.tex_string()).unwrap_or_else(|| ".".to_string())
+    }
+}
+
 impl<V: Display + Default> ToTableString<isize> for Grid<isize2, V> {
     fn labels(&self) -> (String, String) {
         ("i".to_string(), "j".to_string())
@@ -131,17 +138,10 @@ impl<V: Display + Default> ToTableString<isize> for Grid<isize2, V> {
     }
 }
 
-impl<V> crate::utils::tex::TeXTable<isize2> for Grid<isize2, V>
-where V: yui_core::TeX + Default {
-    fn tex_table(&self, caption: &str, head: &str) -> String {
-        let cols = self.keys().map(|&isize2(i, _)| i).unique().sorted();
-        let rows = self.keys().map(|&isize2(_, j)| j).unique().sorted().rev();
-
-        yui_core::tex_table(caption, head, rows, cols, |&j, &i| {
-            self.get(isize2(i, j))
-                .map(|e| e.tex_string())
-                .unwrap_or_else(|| ".".to_string())
-        }, true, false)
+impl<V> crate::utils::tex::ToTexTable<isize> for Grid<isize2, V>
+where V: Display + yui_core::TeX + Default {
+    fn tex_entry_at(&self, i: &isize, j: &isize) -> String {
+        self.get(isize2(*i, *j)).map(|e| e.tex_string()).unwrap_or_else(|| ".".to_string())
     }
 }
 

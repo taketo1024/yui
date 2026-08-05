@@ -401,13 +401,22 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
 mod tex_impl {
     use super::*;
     use yui_core::TeX;
-    use crate::utils::tex::TeXTable;
+    use crate::utils::tex::{ToTexSeq, ToTexTable};
 
-    impl<X, R> TeXTable<isize2> for ChainComplex2<X, R>
+    impl<X, R> ToTexSeq<isize> for ChainComplex1<X, R>
     where X: LcKey, R: Ring + TeX, for<'x> &'x R: RingOps<R> {
         delegate! {
             to self.summands {
-                fn tex_table(&self, caption: &str, head: &str) -> String;
+                fn tex_entry_at(&self, i: &isize) -> String;
+            }
+        }
+    }
+
+    impl<X, R> ToTexTable<isize> for ChainComplex2<X, R>
+    where X: LcKey, R: Ring + TeX, for<'x> &'x R: RingOps<R> {
+        delegate! {
+            to self.summands {
+                fn tex_entry_at(&self, i: &isize, j: &isize) -> String;
             }
         }
     }

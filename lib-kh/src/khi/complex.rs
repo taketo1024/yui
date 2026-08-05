@@ -22,6 +22,8 @@ use crate::tng::builder::SymBuildConfig;
 use crate::khi::KhIHomology;
 use crate::khi::{KhIGen, KhIGenExt};
 use crate::util::Bigraded;
+use yui_core::TeX;
+use yui_homology::tex::{ToTexSeq, ToTexTable};
 
 pub type KhIChain<R> = Lc<KhIGen, R>;
 
@@ -257,6 +259,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
+impl<R> ToTexSeq<isize> for KhIComplex<R>
+where R: Ring + TeX, for<'x> &'x R: RingOps<R> {
+    fn tex_entry_at(&self, i: &isize) -> String {
+        if self[*i].is_zero() {
+            ".".to_string()
+        } else {
+            self[*i].tex_string()
+        }
+    }
+}
+
 impl<R> ToTableString<isize> for KhIComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn labels(&self) -> (String, String) { 
@@ -272,6 +285,17 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             ".".to_string()
         } else {
             self[(*i, *j)].to_string()
+        }
+    }
+}
+
+impl<R> ToTexTable<isize> for KhIComplex<R>
+where R: Ring + TeX, for<'x> &'x R: RingOps<R> {
+    fn tex_entry_at(&self, i: &isize, j: &isize) -> String {
+        if self[(*i, *j)].is_zero() {
+            ".".to_string()
+        } else {
+            self[(*i, *j)].tex_string()
         }
     }
 }

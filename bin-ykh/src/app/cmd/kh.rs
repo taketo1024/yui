@@ -3,6 +3,7 @@ use std::marker::PhantomData;
 use std::ops::RangeInclusive;
 use std::str::FromStr;
 use yui_core::TeX;
+use yui_homology::tex::{ToTexSeq, ToTexTable};
 use yui_core::{EucRing, EucRingOps};
 use yui_homology::{ToSeqString, ToTableString};
 use yui_kh::kh::KhHomology;
@@ -67,6 +68,10 @@ pub struct Args {
     // skip the final deloop/eliminate; remaining circles defer to the matrix reducer.
     #[arg(long)]
     pub no_full_deloop: bool,
+
+    #[arg(short, long, default_value = "unicode")]
+    #[default(Format::Unicode)]
+    pub format: Format,
 
     #[arg(long, default_value = "0")]
     pub log: u8,
@@ -138,10 +143,11 @@ where
         };
 
         // print Kh
-        let table = if bigraded { 
-            kh.to_table_string()
-        } else { 
-            kh.to_seq_string()
+        let table = match (bigraded, self.args.format) {
+            (true, Format::TeX)  => kh.tex_table("Kh"),
+            (true, _)            => kh.to_table_string(),
+            (false, Format::TeX) => kh.tex_seq("Kh"),
+            (false, _)           => kh.to_seq_string(),
         };
         self.out(&table);
 

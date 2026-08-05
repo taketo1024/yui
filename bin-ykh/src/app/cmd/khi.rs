@@ -3,6 +3,7 @@ use std::marker::PhantomData;
 use std::ops::RangeInclusive;
 use std::str::FromStr;
 use yui_core::TeX;
+use yui_homology::tex::{ToTexSeq, ToTexTable};
 use yui_core::{EucRing, EucRingOps};
 use yui_homology::{ToSeqString, ToTableString};
 use yui_kh::khi::{KhIChain, KhIHomology};
@@ -74,6 +75,7 @@ pub struct Args {
     pub cut: Option<CutOption>,
 
     #[arg(short, long, default_value = "unicode")]
+    #[default(Format::Unicode)]
     pub format: Format,
 
     #[arg(long, default_value = "0")]
@@ -151,10 +153,11 @@ where
         let bigraded = h.is_zero() && t.is_zero() || 
             ["H", "0,T"].contains(&self.args.c_value.as_str());
 
-        let table = if bigraded { 
-            khi.to_table_string()
-        } else { 
-            khi.to_seq_string()
+        let table = match (bigraded, self.args.format) {
+            (true, Format::TeX)  => khi.tex_table("KhI"),
+            (true, _)            => khi.to_table_string(),
+            (false, Format::TeX) => khi.tex_seq("KhI"),
+            (false, _)           => khi.to_seq_string(),
         };
         self.out(&table);
 

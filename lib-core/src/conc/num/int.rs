@@ -17,11 +17,21 @@ where for<'a> &'a Self: EucRingOps<Self> {}
 
 impl<T> DivRound for T
 where T: IntType, for<'x> &'x T: IntOps<T> {
+    // Rounds half away from zero.
     fn div_round(&self, q: &Self) -> Self {
-        let a = self.to_f64().unwrap();
-        let b = q.to_f64().unwrap();
-        let r = (a / b).round();
-        Self::from_f64(r).unwrap()
+        let d = self / q;
+        let r = self % q;
+
+        if r.is_zero() || (&r + &r).abs() < q.abs() {
+            return d
+        }
+
+        // the exact quotient exceeds `d` exactly when `r` and `q` agree in sign.
+        if r.is_negative() == q.is_negative() {
+            d + Self::one()
+        } else {
+            d - Self::one()
+        }
     }
 }
 
@@ -208,6 +218,25 @@ mod tests {
         assert_eq!(13.div_round(&5), 3);
         assert_eq!((-12).div_round(&5), -2);
         assert_eq!((-13).div_round(&5), -3);
+    }
+
+    #[test]
+    fn div_round_half() {
+        // halves round away from zero.
+        assert_eq!(5.div_round(&2), 3);
+        assert_eq!((-5).div_round(&2), -3);
+        assert_eq!(5.div_round(&-2), -3);
+        assert_eq!((-5).div_round(&-2), 3);
+    }
+
+    #[test]
+    fn div_round_large() {
+        // must stay exact however large the terms.
+        let a = (1i64 << 60) + 1;
+        assert_eq!(a.div_round(&1), a);
+
+        let b = BigInt::from(10).pow(400);
+        assert_eq!(b.div_round(&BigInt::from(10).pow(399)), BigInt::from(10));
     }
 
     #[test]

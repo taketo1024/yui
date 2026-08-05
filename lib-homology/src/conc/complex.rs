@@ -11,7 +11,6 @@ use num_traits::Zero;
 use yui_core::{EucRing, EucRingOps, Ring, RingOps};
 use yui_core::lc::{LcKey, Lc};
 
-#[cfg(debug_assertions)]
 use yui_matrix::MatTrait;
 use yui_matrix::sparse::{SpMat, SpVec};
 
@@ -75,7 +74,7 @@ where
         new.d_matrices = d_matrices;
 
         #[cfg(debug_assertions)]
-        new.validate_d_matrices();
+        new.check_d_matrices();
 
         new
     }
@@ -85,14 +84,14 @@ where
         self.d_matrices = Arc::new(map);
 
         #[cfg(debug_assertions)]
-        self.validate_d_matrices();
+        self.check_d_matrices();
 
         self
     }
 
-    // Each cached d-matrix's shape must match the summand ranks at its endpoints.
-    #[cfg(debug_assertions)]
-    fn validate_d_matrices(&self) {
+    /// Each cached d-matrix's shape must match the summand ranks at its endpoints.
+    /// Callable in release; construction only runs it under `debug_assertions`.
+    pub fn check_d_matrices(&self) {
         for (&i, m) in self.d_matrices.iter() {
             let (n_rows, n_cols) = m.shape();
             assert_eq!(n_cols, self[i].rank(),

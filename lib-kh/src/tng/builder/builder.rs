@@ -22,7 +22,8 @@ use yui_link::{Node, Edge, Link};
 use yui_homology::ChainComplex1;
 
 use crate::kh::{KhChain, KhComplex, KhGen};
-use crate::util::log_progress;
+use log::Level;
+use yui_core::util::log::log_progress;
 use crate::tng::{MAX_EDGE, ElimDir, Tng, TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
 use super::{reachable_range, pop_min_pivot, pivot_pool, push_pivot, sparkline, fill_cost_sparkline, cutwidth_after, toggle_boundary, BuildPlanner, TngElemBuilder};
 
@@ -473,7 +474,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
             
             done += 1;
-            log_progress(done, done - 1, done + pool.len(), PROGRESS_LOG_STEP);
+            log_progress(Level::Debug, done, done - 1, done + pool.len(), PROGRESS_LOG_STEP, 2);
         }
 
         let after = self.complex.rank(i) as isize;
@@ -556,7 +557,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
             if self.try_eliminate_at(&k, ElimDir::Outgoing) {
                 done += 1;
-                log_progress(done, done - 1, targets, PROGRESS_LOG_STEP);
+                log_progress(Level::Debug, done, done - 1, targets, PROGRESS_LOG_STEP, 2);
             }
         }
 

@@ -26,7 +26,8 @@ use crate::tng::builder::{TngComplexBuilder, TngElemBuilder, BuildConfig, Strate
 use std::fmt;
 use super::{reachable_range, pop_min_pivot, pivot_pool, push_pivot, sparkline, fill_cost_sparkline, cutwidth_after, toggle_boundary, BuildPlanner, CutOption};
 use super::builder::PROGRESS_LOG_STEP;
-use crate::util::log_progress;
+use log::Level;
+use yui_core::util::log::log_progress;
 
 /// Toggles for the automatic simplification done while building (kept separate
 /// from [`BuildConfig`] so the equivariant builder can gain its own flags).
@@ -486,7 +487,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
             
             done += 1;
-            log_progress(done, done - 1, done + pool.len(), PROGRESS_LOG_STEP);
+            log_progress(Level::Debug, done, done - 1, done + pool.len(), PROGRESS_LOG_STEP, 2);
         }
 
         let after = self.complex().rank(i) as isize;
@@ -632,7 +633,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             if n > 0 {
                 let prev = done;
                 done += n; // off-axis events consume the pivot and its τ-mirror.
-                log_progress(done, prev, targets, PROGRESS_LOG_STEP);
+                log_progress(Level::Debug, done, prev, targets, PROGRESS_LOG_STEP, 2);
             }
         }
 

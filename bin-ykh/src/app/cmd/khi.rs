@@ -6,7 +6,7 @@ use yui_core::TeX;
 use yui_core::{EucRing, EucRingOps};
 use yui_homology::{ToSeqString, ToTableString};
 use yui_kh::khi::{KhIChain, KhIHomology, ssi_invariant};
-use yui_kh::tng::builder::{SymBuildConfig, BuildMode, NodeOrder, CutOption};
+use yui_kh::tng::builder::{SymBuildConfig, Strategy, NodeOrder, CutOption};
 use yui_link::InvLink;
 use crate::app::args::*;
 use crate::app::utils::*;
@@ -53,8 +53,8 @@ pub struct Args {
     #[arg(long, value_parser = parse_h_range)]
     pub h_range: Option<RangeInclusive<isize>>,
 
-    #[arg(long, value_parser = parse_build_mode, default_value = "greedy")]
-    pub mode: BuildMode,
+    #[arg(long, value_parser = parse_strategy, default_value = "greedy")]
+    pub strategy: Strategy,
 
     // crossing order: min-cut (default; bounds cutwidth) or given (PD order, debug).
     #[arg(long, value_parser = parse_node_order, default_value = "min-cut")]
@@ -130,7 +130,7 @@ where
 
         let config = SymBuildConfig {
             h_range: self.args.h_range.clone(), // open ends are clamped inside the build
-            mode: self.args.mode,
+            strategy: self.args.strategy,
             node_order: self.args.node_order,
             preprocess: !self.args.no_preprocess,
             cut: self.args.cut.clone().unwrap_or_default(),

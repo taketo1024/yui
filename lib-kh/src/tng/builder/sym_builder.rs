@@ -156,7 +156,10 @@ impl<R> SymTngBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn from_inv_link(l: &InvLink, h: &R, t: &R, reduced: bool) -> SymTngBuilder<R> {
         assert!(l.nodes().all(|x| x.is_crossing()));
-        assert!(!reduced || l.base_pt().is_some());
+        assert!(
+            !reduced || l.base_pt().is_some_and(|e| l.is_on_axis(e)),
+            "reduced requires a base point on the axis"
+        );
 
         // the inner builder is driven by `self` — disable its own auto-simplify.
         let config = SymBuildConfig::default();

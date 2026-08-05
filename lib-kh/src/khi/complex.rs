@@ -83,7 +83,10 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
     pub fn new_no_simplify(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self {
         assert_eq!(R::one() + R::one(), R::zero(), "char(R) != 2");
-        assert!(!reduced || (l.base_pt().is_some() && t.is_zero()));
+        assert!(
+            !reduced || (l.base_pt().is_some_and(|e| l.is_on_axis(e)) && t.is_zero()),
+            "reduced requires t = 0 and a base point on the axis"
+        );
 
         let c = KhComplex::new_no_simplify(l.inner(), h, t, reduced);
         Self::from_kh_complex(c, crate::khi::tau::tau_map(l))
@@ -643,6 +646,29 @@ mod tests {
             assert_eq!(c[4].rank(), 4);
 
             c.inner().check_d_all();
+        }
+
+        // an off-axis base point leaves the reduced complex without the τ-images of its
+        // generators, which `vectorize` then drops without a word.
+        fn based_off_axis() -> InvLink {
+            let l = InvLink::test_data("3_1");
+            let e_map: Vec<_> = l.inner().edges().into_iter().map(|e| (e, l.inv_edge(e))).collect();
+            let off = l.inner().edges().into_iter().find(|&e| !l.is_on_axis(e)).unwrap();
+            InvLink::new(l.inner().clone().with_base_pt(off), e_map)
+        }
+
+        #[test]
+        #[should_panic(expected = "base point on the axis")]
+        fn reduced_rejects_off_axis_base_pt() {
+            let (h, t) = (FF2::zero(), FF2::zero());
+            let _ = KhIComplex::new_no_simplify(&based_off_axis(), &h, &t, true);
+        }
+
+        #[test]
+        #[should_panic(expected = "base point on the axis")]
+        fn reduced_rejects_off_axis_base_pt_cone() {
+            let (h, t) = (FF2::zero(), FF2::zero());
+            let _ = KhIComplex::new(&based_off_axis(), &h, &t, true);
         }
     }
 }

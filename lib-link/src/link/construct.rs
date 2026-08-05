@@ -246,11 +246,14 @@ mod tests {
     fn pretzel_determinants() {
         // det P(a, b, c) = |ab + bc + ca| — includes the (-2, 3, 7)-pretzel (det 1). `det` sums over
         // all 2^n resolutions, so the 15-crossing cases are left to `pretzel_band_symmetries`.
-        for (a, b, c) in [(1, 1, 1), (-1, -1, -1), (1, 3, 5), (-2, 3, 7)] {
+        // link-valued parameters (two or more even) are included: those are 2- and 3-component
+        // pretzel links, which the renumbering has to carry as well as knots.
+        for (a, b, c) in [(1, 1, 1), (-1, -1, -1), (1, 3, 5), (-2, 3, 7), (2, 2, 2), (2, 2, 3), (2, 2, -3)] {
             let l = Link::pretzel(a, b, c);
             let n = (a.unsigned_abs() + b.unsigned_abs() + c.unsigned_abs()) as usize;
             assert_eq!(l.n_crossings(), n, "P({a},{b},{c}) crossing count");
             assert_eq!(det(&l), (a * b + b * c + c * a).abs(), "det P({a},{b},{c})");
+            assert_eq!(l.edges(), (1..=l.n_edges() as Edge).collect::<Vec<_>>(), "P({a},{b},{c}) numbering");
         }
     }
 

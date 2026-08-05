@@ -95,7 +95,9 @@ where I: Zero + AddAssign + FromStr + FromPrimitive {
         
         for c in r.captures_iter(s) {
             let x = &c[1];
-            let i = parse_mono_deg(x, &c[0]).unwrap();
+            let i = parse_mono_deg(x, &c[0]).ok_or_else(||
+                format!("Failed to parse: {s}")
+            )?;
             if x.starts_with(X) { 
                 deg.0 += i;
             } else { 
@@ -304,6 +306,10 @@ mod tests {
         assert_eq!(M::from_str(r"X^{21}Y^{32}"), Ok(xy(21, 32)));
         assert_eq!(M::from_str(r"X^{-2}Y^{-3}"), Ok(xy(-2, -3)));
         assert!(M::from_str("2").is_err());
+
+        // unbraced, beyond one digit and negative
+        assert_eq!(M::from_str("X^21Y^32"), Ok(xy(21, 32)));
+        assert_eq!(M::from_str("X^-2"), Ok(xy(-2, 0)));
     }
 
     #[test]

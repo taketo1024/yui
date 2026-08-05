@@ -221,7 +221,7 @@ pub(crate) fn parse_mono_deg<I>(x: &str, s: &str) -> Option<I>
 where I: FromStr + FromPrimitive {
     use regex::Regex;
 
-    let p1 = format!(r"^{x}\^([0-9])$");
+    let p1 = format!(r"^{x}\^(-?[0-9]+)$");
     let p2 = format!(r"^{x}\^\{{(-?[0-9]+)\}}$");
 
     let r1 = Regex::new(&p1).unwrap();
@@ -267,6 +267,10 @@ mod tests {
         assert_eq!(M::from_str("X^{-2}"), Ok(x(-2)));
         assert!(M::from_str("2").is_err());
         assert!(M::from_str("x").is_err());
+
+        // unbraced, beyond one digit and negative
+        assert_eq!(M::from_str("X^23"), Ok(x(23)));
+        assert_eq!(M::from_str("X^-2"), Ok(x(-2)));
     }
 
     #[test]

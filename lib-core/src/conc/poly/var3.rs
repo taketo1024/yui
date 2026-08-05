@@ -97,7 +97,9 @@ where I: Zero + AddAssign + FromStr + FromPrimitive {
         
         for c in r.captures_iter(s) {
             let x = &c[1];
-            let i = parse_mono_deg(x, &c[0]).unwrap();
+            let i = parse_mono_deg(x, &c[0]).ok_or_else(||
+                format!("Failed to parse: {s}")
+            )?;
             if x.starts_with(X) { 
                 deg.0 += i;
             } else if x.starts_with(Y) { 

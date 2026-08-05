@@ -111,9 +111,10 @@ where I: Zero + FromStr + FromPrimitive {
         for c in r.captures_iter(s) {
             let x = &c[1];
             let i = usize::from_str(&c[2]).map_err(|e| e.to_string())?;
-            if let Some(d) = parse_mono_deg(x, &c[0]) { 
-                degs.push((i, d));
-            }
+            let d = parse_mono_deg(x, &c[0]).ok_or_else(||
+                format!("Failed to parse: {s}")
+            )?;
+            degs.push((i, d));
         };
 
         let mvar = MultiVar::from_iter(degs);
@@ -503,6 +504,13 @@ mod tests {
 
         let s = "Y_0";
         assert!(M::from_str(s).is_err());
+
+        // unbraced, beyond one digit: the term must not be dropped
+        let s = "X_0^23";
+        assert_eq!(M::from_str(s), Ok(M::from((0, 23))));
+
+        let s = "X_0^5 X_1^23";
+        assert_eq!(M::from_str(s), Ok(M::from_iter([(0, 5), (1, 23)])));
     }
 
     #[test]

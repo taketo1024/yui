@@ -362,9 +362,8 @@ where T: IntType, for<'x> &'x T: IntOps<T> {
 impl<T> Ord for Ratio<T>
 where T: IntType, for<'x> &'x T: IntOps<T> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        let l = self.to_f64();
-        let r = other.to_f64();
-        l.total_cmp(&r)
+        // `reduce` keeps denominators positive, so cross-multiplying preserves the order.
+        (self.numer() * other.denom()).cmp(&(other.numer() * self.denom()))
     }
 }
 
@@ -594,6 +593,20 @@ mod tests {
         let a = Ratio::new(3, 5);
         let b = Ratio::new(4, 7);
         assert!(a > b);
+    }
+
+    #[test]
+    fn cmp_large() {
+        // distinct values must compare distinct, however large the terms.
+        let a = Ratio::new((1i64 << 53) + 1, 1);
+        let b = Ratio::new(1i64 << 53, 1);
+        assert_ne!(a, b);
+        assert!(a > b);
+
+        let c = Ratio::new(1i64, (1i64 << 53) + 1);
+        let d = Ratio::new(1i64, 1i64 << 53);
+        assert_ne!(c, d);
+        assert!(c < d);
     }
 
     #[test]

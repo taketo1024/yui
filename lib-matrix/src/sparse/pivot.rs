@@ -768,7 +768,7 @@ mod tests {
 
         let occ = |pf: &PivotFinder| pf.occupied_cols().iter().positions(|&b| b).collect_vec();
 
-        assert_eq!(occ(&pf), vec![]);
+        assert!(occ(&pf).is_empty());
 
         pf.pivots.set(0, 0);
 

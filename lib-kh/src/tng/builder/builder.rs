@@ -16,13 +16,14 @@ use std::ops::RangeInclusive;
 use rustc_hash::FxHashSet;
 use itertools::Itertools;
 use log::{debug, info, trace};
-use yui_core::{Ring, RingOps};
+use yui_core::abst::{Ring, RingOps};
 use yui_link::{Node, Edge, Link};
 
 use yui_homology::ChainComplex1;
 
 use crate::kh::{KhChain, KhComplex, KhGen};
-use crate::util::log_progress;
+use log::Level;
+use yui_core::util::log::log_progress;
 use crate::tng::{MAX_EDGE, ElimDir, Tng, TngComp, TngComplexElem, LcCobTrait, TngComplex, TngComplexKey};
 use super::{reachable_range, pop_min_pivot, pivot_pool, push_pivot, sparkline, fill_cost_sparkline, cutwidth_after, toggle_boundary, BuildPlanner, TngElemBuilder};
 
@@ -39,7 +40,7 @@ pub enum NodeOrder {
 
 /// How the complex is simplified while building.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub enum BuildMode {
+pub enum Strategy {
     #[default]
     Greedy,    // deloop every circle, eliminate immediately
     MinFill,   // deloop a whole degree, then eliminate by global min-fill (Markowitz)
@@ -47,20 +48,20 @@ pub enum BuildMode {
     None,      // don't deloop, don't eliminate (raw merge; finalize still deloops to a valid complex)
 }
 
-impl BuildMode {
+impl Strategy {
     // whether the build deloops at all (None = raw merge, deloop deferred to finalize).
     pub fn auto_deloop(&self) -> bool {
-        *self != BuildMode::None
+        *self != Strategy::None
     }
 
     // whether the build eliminates at all (Greedy inline, MinFill swept; NoElim/None don't).
     pub fn auto_elim(&self) -> bool {
-        matches!(self, BuildMode::Greedy | BuildMode::MinFill)
+        matches!(self, Strategy::Greedy | Strategy::MinFill)
     }
 
     // whether each newly-delooped vertex is eliminated inline (vs swept after).
     pub fn immediate_elim(&self) -> bool {
-        *self == BuildMode::Greedy
+        *self == Strategy::Greedy
     }
 }
 
@@ -86,7 +87,7 @@ impl CutOption {
 #[derive(Clone, Debug)]
 pub struct BuildConfig {
     pub node_order: NodeOrder,
-    pub mode: BuildMode,
+    pub strategy: Strategy,
     // divide-and-conquer chunking (auto cutwidth or manual edge-cuts); None = single pass.
     pub cut: CutOption,
     pub h_range: Option<RangeInclusive<isize>>,
@@ -103,7 +104,7 @@ pub struct BuildConfig {
 
 impl Default for BuildConfig {
     fn default() -> Self {
-        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), cut: CutOption::None, h_range: None, q_range: None, max_elim_cost: None, no_full_deloop: false }
+        Self { node_order: NodeOrder::default(), strategy: Strategy::default(), cut: CutOption::None, h_range: None, q_range: None, max_elim_cost: None, no_full_deloop: false }
     }
 }
 
@@ -312,10 +313,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.elements.append_node(x);
     }
 
-    // Whether the automatic deloop runs. `false` for `BuildMode::None` and, under
+    // Whether the automatic deloop runs. `false` for `Strategy::None` and, under
     // `no_full_deloop`, once all nodes are merged — remaining circles then defer to `into_raw_complex`.
     pub(crate) fn should_deloop(&self) -> bool {
-        self.config.mode.auto_deloop()
+        self.config.strategy.auto_deloop()
             && !(self.config.no_full_deloop && self.n_nodes() == 0)
     }
 
@@ -335,7 +336,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("{} merged: {}", self.current_step(), self.stat());
     }
 
-    // Per degree: deloop (when enabled), then (if the mode eliminates) sweep i-2,i-1 by Markowitz
+    // Per degree: deloop (when enabled), then (if the strategy eliminates) sweep i-2,i-1 by Markowitz
     // cost. Greedy also inline-eliminates during deloop; the sweep just catches what it missed.
     // Without delooping the sweep still applies — invertible pivots need no delooping.
     fn merge_incremental(&mut self, left: &TngComplex<R>, right: &TngComplex<R>, range: RangeInclusive<isize>) {
@@ -347,7 +348,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             if self.should_deloop() {
                 self.deloop_in(i - 1);
             }
-            if self.config.mode.auto_elim() {
+            if self.config.strategy.auto_elim() {
                 self.eliminate_in(i - 2);
                 self.eliminate_in(i - 1);
             }
@@ -358,7 +359,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         if self.should_deloop() {
             self.deloop_in(top);
         }
-        if self.config.mode.auto_elim() {
+        if self.config.strategy.auto_elim() {
             self.eliminate_in(top - 1);
         }
     }
@@ -473,7 +474,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
             
             done += 1;
-            log_progress(done, done - 1, done + pool.len(), PROGRESS_LOG_STEP);
+            log_progress(Level::Debug, done, done - 1, done + pool.len(), PROGRESS_LOG_STEP, 2);
         }
 
         let after = self.complex.rank(i) as isize;
@@ -499,7 +500,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         // immediate elim eliminates each new vertex now; min-fill leaves them for the post-deloop
         // global pass, None leaves them entirely. `try_eliminate_at` skips over-cap pivots.
-        if self.config.mode.immediate_elim() {
+        if self.config.strategy.immediate_elim() {
             // retain only the keys that weren't eliminated
             added.retain(|k| !self.try_eliminate_at(k, ElimDir::Both));
         }
@@ -556,7 +557,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
             if self.try_eliminate_at(&k, ElimDir::Outgoing) {
                 done += 1;
-                log_progress(done, done - 1, targets, PROGRESS_LOG_STEP);
+                log_progress(Level::Debug, done, done - 1, targets, PROGRESS_LOG_STEP, 2);
             }
         }
 
@@ -626,7 +627,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let c = TngComplex::from_loop(h, t, c, marked);
             self.merge(c, vec![]);
 
-            if self.config.mode.auto_deloop() {
+            if self.config.strategy.auto_deloop() {
                 self.deloop_all();
             }
         }
@@ -725,7 +726,7 @@ impl fmt::Display for BuildProfile {
 
 impl<R> TngComplexBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    // A child builder over `chunk` (a sub-tangle), inheriting the parent's simplify mode;
+    // A child builder over `chunk` (a sub-tangle), inheriting the parent's simplify strategy;
     // chunking always uses the MinCut order, never recursing.
     fn init_child(&self, chunk: &[Node]) -> Self {
         let (h, t) = self.complex.ht();
@@ -740,7 +741,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             let s = self.complex.deg_shift().0;
             0 ..= (*r.end() - s).max(0)
         });
-        let config = BuildConfig { mode: self.config.mode, node_order: NodeOrder::MinCut, h_range, ..Default::default() };
+        let config = BuildConfig { strategy: self.config.strategy, node_order: NodeOrder::MinCut, h_range, ..Default::default() };
         child.with_config(config)
     }
 
@@ -767,7 +768,7 @@ mod tests {
 
             // raw merge (no deloop / eliminate) so we read the pure tangle boundary
             let mut b = TngComplexBuilder::<i32>::init(&0, &0, (0, 0), None)
-                .with_config(BuildConfig { mode: BuildMode::None, ..Default::default() });
+                .with_config(BuildConfig { strategy: Strategy::None, ..Default::default() });
 
             let mut open: FxHashSet<Edge> = FxHashSet::default();
             for (step, &idx) in prof.order.iter().enumerate() {
@@ -868,23 +869,23 @@ mod tests {
     }
 
     #[test]
-    fn test_build_modes_agree() {
-        // all build modes must produce identical homology (incl. torsion).
+    fn test_strategies_agree() {
+        // every strategy must produce identical homology (incl. torsion).
         let l = Link::test_data("8_19");
-        let build = |mode| {
-            let config = BuildConfig { mode, ..Default::default() };
+        let build = |strategy| {
+            let config = BuildConfig { strategy, ..Default::default() };
             TngComplexBuilder::from_link(&l, &0, &0, false).with_config(config).run()
                 .into_tng_complex().into_raw_complex()
         };
 
-        let ref_h = build(BuildMode::Greedy).homology();
-        for mode in [BuildMode::MinFill, BuildMode::NoElim, BuildMode::None] {
-            let c = build(mode);
+        let ref_h = build(Strategy::Greedy).homology();
+        for strategy in [Strategy::MinFill, Strategy::NoElim, Strategy::None] {
+            let c = build(strategy);
             c.check_d_all();
             let h = c.homology();
             for i in 0..=8 {
-                assert_eq!(h[i].rank(), ref_h[i].rank(), "rank at {i}, {mode:?}");
-                assert_eq!(h[i].tors(), ref_h[i].tors(), "tors at {i}, {mode:?}");
+                assert_eq!(h[i].rank(), ref_h[i].rank(), "rank at {i}, {strategy:?}");
+                assert_eq!(h[i].tors(), ref_h[i].tors(), "tors at {i}, {strategy:?}");
             }
         }
     }
@@ -936,7 +937,7 @@ mod tests {
     #[test]
     fn test_chunk_elements_match() {
         use crate::kh::KhHomology;
-        use crate::util::calc::div_vec;
+        use crate::ss::div_vec;
 
         let l = Link::test_data("8_19");
         let c = 2;

@@ -4,7 +4,8 @@
 
 use num_bigint::BigInt;
 use num_traits::{One, Signed, ToPrimitive, FromPrimitive};
-use crate::*;
+use crate::abst::{AddGrp, AddGrpOps, AddMon, AddMonOps, EucRing, EucRingOps, MathType, Mon, MonOps, Ring, RingOps};
+use crate::ext::DivRound;
 
 /// Helper trait bundling [`EucRingOps`] for [`IntType`].
 pub trait IntOps<T = Self>: EucRingOps<T> {}
@@ -100,9 +101,8 @@ impl_integer!(i128);
 impl_integer!(BigInt);
 
 
-#[cfg(feature = "tex")] 
 mod tex {
-    use crate::TeX;
+    use crate::util::tex::TeX;
     use num_bigint::BigInt;
     
     macro_rules! impl_tex_int {
@@ -210,10 +210,9 @@ mod tests {
         assert_eq!((-13).div_round(&5), -3);
     }
 
-    #[cfg(feature = "tex")]
     #[test]
     fn tex() { 
-        use crate::TeX;
+        use crate::util::tex::TeX;
         assert_eq!(i32::tex_math_symbol(), "\\mathbb{Z}");
         assert_eq!((-2).tex_string(), "-2");
     }

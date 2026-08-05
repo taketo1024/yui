@@ -3,7 +3,7 @@
 use std::fmt::Display;
 use itertools::Itertools;
 use num_traits::ToPrimitive;
-use crate::IntoDigits;
+use crate::ext::IntoDigits;
 
 /// Wrap `s` in parentheses if its `Display` form contains a space; otherwise return as-is.
 pub fn paren_expr<S>(s: S) -> String

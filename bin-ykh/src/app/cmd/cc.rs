@@ -4,8 +4,8 @@ use crate::app::utils::*;
 use crate::app::err::*;
 use std::marker::PhantomData;
 use std::str::FromStr;
-use yui_core::TeX;
-use yui_core::{EucRing, EucRingOps};
+use yui_core::util::tex::TeX;
+use yui_core::abst::{EucRing, EucRingOps};
 use yui_homology::{ToSeqString, ToTableString};
 use yui_kh::kh::ext::cc::KhChainMap;
 use yui_kh::kh::KhComplex;
@@ -155,15 +155,16 @@ where
 
         for i in h1.h_range() { 
             let j = i + f.deg();
-            self.out(&format!("({i}) {} -> ({j}) {}", h1[i], h2[j]));
+            let (s1, s2) = (&h1[i], &h2[j]);
 
-            for z in h1[i].generators() { 
-                let w = f.apply(i, &z);
-                let x = h1[i].vectorize_euc(&z).into_dense();
-                let y = h2[j].vectorize_euc(&w).into_dense();
-                self.out(&format!("\t{:?} -> {:?}", x, y));
+            if s1.is_zero() || s2.is_zero() { 
+                self.out(&format!("({i}) {s1} -> ({j}) {s2}\n"));
+                continue;
             }
-            self.out("");
+
+            let mat = s1.make_matrix_euc(s2, |z| f.apply(i, z)).into_dense();
+            self.out(&format!("({i}) {s1} -> ({j}) {s2}; rank: {}", mat.rank()));
+            self.out(&format!("{}\n", mat.to_string().trim_end()));
         }
     }
 
@@ -220,17 +221,17 @@ mod tests {
             f0: deg -2
 
             (0) Z² -> (-2) 0
-                [1, 0] -> []
-                [0, 1] -> []
 
             (1) 0 -> (-1) 0
 
-            (2) Z -> (0) Z²
-                [1] -> [0, -1]
+            (2) Z -> (0) Z²; rank: 1
+
+              ┌    ┐
+              │  0 │
+              │ -1 │
+              └    ┘
 
             (3) Z ⊕ (Z/2) -> (1) 0
-                [1, 0] -> []
-                [0, 1] -> []
         ");
     }
 
@@ -259,18 +260,18 @@ mod tests {
 
             f1: deg 0
 
-            (0) Z² -> (0) Z²
-                [1, 0] -> [1, 0]
-                [0, 1] -> [0, -1]
+            (0) Z² -> (0) Z²; rank: 2
+
+              ┌       ┐
+              │  1  0 │
+              │  0 -1 │
+              └       ┘
 
             (1) 0 -> (1) 0
 
             (2) Z -> (2) 0
-                [1] -> []
 
             (3) Z ⊕ (Z/2) -> (3) 0
-                [1, 0] -> []
-                [0, 1] -> []
         ");
     }
 }

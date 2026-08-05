@@ -3,7 +3,7 @@ use std::ops::AddAssign;
 use log::debug;
 use nalgebra::Scalar;
 use num_traits::{One, Zero};
-use yui_core::{Ring, RingOps};
+use yui_core::abst::{Ring, RingOps};
 use crate::Perm;
 use crate::sparse::pivot::PivotType;
 

@@ -15,13 +15,12 @@ use std::cell::RefCell;
 use std::fmt::Display;
 use std::hash::Hash;
 use std::collections::HashSet;
-use std::ops::Mul;
 use std::sync::{Arc, OnceLock};
 use itertools::Itertools;
 use num_traits::Zero;
 use cartesian::cartesian; // TODO: replace with itertools::iproduct! and drop the cartesian dep
 use yui_core::util::format::subscript;
-use yui_core::{AddMon, MathType, Ring, RingOps};
+use yui_core::abst::{AddMon, MathType, Ring, RingOps};
 use yui_core::lc::{LcKey, Lc};
 use yui_core::poly::Var2;
 use yui_link::Edge;
@@ -265,7 +264,6 @@ impl CobComp {
         x - (b / 2) - 2 * d
     }
 
-    // Shortcut for adding a single dot.
     pub fn add_dot(self, dot: Dot) -> Self {
         let (x, y) = self.dots;
         match dot {
@@ -402,7 +400,6 @@ impl CobComp {
                 (0, 0, 0) if c.is_closed() =>
                     Lc::zero(),
 
-                // default
                 _ => {
                     let new = CobComp::new_with_nb(
                         (*c.src).clone(),
@@ -858,13 +855,6 @@ impl MathType for Cob {
 
 impl LcKey for Cob {}
 
-impl Mul for Cob {
-    type Output = Cob;
-    fn mul(self, rhs: Self) -> Self::Output {
-        rhs.stack(&self)
-    }
-}
-
 pub type LcCob<R> = Lc<Cob, R>; // R-linear combination of cobordisms.
 
 pub trait LcCobTrait: Sized {
@@ -976,7 +966,7 @@ where
 mod tests {
     use num_traits::Zero;
     use maplit::hashmap;
-    use yui_core::CloneAnd;
+    use yui_core::ext::CloneAnd;
     use yui_core::poly::Poly2;
     use yui_core::bitseq::Bit;
     use yui_link::Node;

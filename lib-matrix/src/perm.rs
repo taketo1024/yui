@@ -20,9 +20,15 @@ pub struct Perm {
 
 impl Perm {
     /// Create from the image vector. `data[i]` is the image of `i`.
-    /// Panics (debug) if `data` is not a valid permutation of `0..data.len()`.
+    /// Panics if `data` is not a valid permutation of `0..data.len()`.
+    // checked in release too: `apply_to`'s raw-pointer writes rely on this.
     pub(crate) fn new(data: Vec<usize>) -> Self {
-        debug_assert!(is_valid_perm(&data), "not a valid permutation: {:?}", data);
+        assert!(is_valid_perm(&data), "not a valid permutation: {:?}", data);
+        Self::new_unchecked(data)
+    }
+
+    // for callers that already established the invariant; skips the O(n) re-scan.
+    fn new_unchecked(data: Vec<usize>) -> Self {
         Self { data: Either::Right(data) }
     }
 
@@ -156,8 +162,8 @@ impl Perm {
         let mut taken = vec![false; n];
         let mut k = 0;
         for i in prefix {
-            debug_assert!(i < n, "index {i} out of range 0..{n}");
-            debug_assert!(!taken[i], "duplicate index {i} in prefix");
+            assert!(i < n, "index {i} out of range 0..{n}");
+            assert!(!taken[i], "duplicate index {i} in prefix");
             data[i] = k;
             taken[i] = true;
             k += 1;
@@ -172,7 +178,7 @@ impl Perm {
                 pos += 1;
             }
         }
-        Self::new(data)
+        Self::new_unchecked(data)
     }
 }
 
@@ -229,14 +235,12 @@ mod tests {
     }
 
     #[test]
-    #[cfg(debug_assertions)] // `Perm::new` validates via `debug_assert!`
     #[should_panic]
     fn new_rejects_duplicate() {
         let _ = Perm::new(vec![0, 0, 1]);
     }
 
     #[test]
-    #[cfg(debug_assertions)] // `Perm::new` validates via `debug_assert!`
     #[should_panic]
     fn new_rejects_out_of_range() {
         let _ = Perm::new(vec![0, 1, 5]);

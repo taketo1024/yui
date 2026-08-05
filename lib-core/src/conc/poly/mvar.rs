@@ -9,7 +9,7 @@ use num_traits::{Zero, One, Pow, ToPrimitive, FromPrimitive};
 use itertools::Itertools;
 use auto_impl_ops::auto_ops;
 
-use crate::{MathType, IndexType};
+use crate::abst::{MathType, IndexType};
 use crate::lc::LcKey;
 use crate::util::format::subscript;
 use super::{Mono, MultiDeg, MonoOrd};
@@ -295,9 +295,8 @@ where X: ToString, I: 'a + ToPrimitive, S: IntoIterator<Item = (X, &'a I)> {
     }
 }
 
-#[cfg(feature = "tex")]
 mod tex {
-    use crate::TeX;
+    use crate::util::tex::TeX;
     use super::*;
 
     impl<const X: char, I> TeX for MultiVar<X, I>

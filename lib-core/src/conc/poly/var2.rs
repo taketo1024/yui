@@ -7,7 +7,7 @@ use std::str::FromStr;
 use num_traits::{Zero, One, Pow, FromPrimitive, ToPrimitive};
 use auto_impl_ops::auto_ops;
 
-use crate::{MathType, IndexType};
+use crate::abst::{MathType, IndexType};
 use crate::lc::LcKey;
 
 use super::{Mono, MonoOrd};
@@ -251,9 +251,8 @@ macro_rules! impl_bivar_signed {
 impl_bivar_unsigned!(usize);
 impl_bivar_signed!  (isize);
 
-#[cfg(feature = "tex")] 
 mod tex {
-    use crate::TeX;
+    use crate::util::tex::TeX;
     use super::*;
 
     impl<const X: char, const Y: char, I> TeX for Var2<X, Y, I>

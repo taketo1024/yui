@@ -2,11 +2,12 @@ use smart_default::SmartDefault;
 use std::marker::PhantomData;
 use std::ops::RangeInclusive;
 use std::str::FromStr;
-use yui_core::TeX;
-use yui_core::{EucRing, EucRingOps};
+use yui_core::util::tex::TeX;
+use yui_homology::tex::{ToTexSeq, ToTexTable};
+use yui_core::abst::{EucRing, EucRingOps};
 use yui_homology::{ToSeqString, ToTableString};
-use yui_kh::khi::{KhIChain, KhIHomology, ssi_invariant};
-use yui_kh::tng::builder::{SymBuildConfig, BuildMode, NodeOrder, CutOption};
+use yui_kh::khi::{KhIChain, KhIHomology};
+use yui_kh::tng::builder::{SymBuildConfig, Strategy, NodeOrder, CutOption};
 use yui_link::InvLink;
 use crate::app::args::*;
 use crate::app::utils::*;
@@ -46,15 +47,11 @@ pub struct Args {
     #[arg(short = 'n', long)]
     pub no_simplify: bool,
 
-    // ssi only: the guessed s-value seeding the high-q build cut (see `ssi_invariant`).
-    #[arg(long)]
-    pub expected: Option<isize>,
-
     #[arg(long, value_parser = parse_h_range)]
     pub h_range: Option<RangeInclusive<isize>>,
 
-    #[arg(long, value_parser = parse_build_mode, default_value = "greedy")]
-    pub mode: BuildMode,
+    #[arg(long, value_parser = parse_strategy, default_value = "greedy")]
+    pub strategy: Strategy,
 
     // crossing order: min-cut (default; bounds cutwidth) or given (PD order, debug).
     #[arg(long, value_parser = parse_node_order, default_value = "min-cut")]
@@ -78,6 +75,7 @@ pub struct Args {
     pub cut: Option<CutOption>,
 
     #[arg(short, long, default_value = "unicode")]
+    #[default(Format::Unicode)]
     pub format: Format,
 
     #[arg(long, default_value = "0")]
@@ -130,7 +128,7 @@ where
 
         let config = SymBuildConfig {
             h_range: self.args.h_range.clone(), // open ends are clamped inside the build
-            mode: self.args.mode,
+            strategy: self.args.strategy,
             node_order: self.args.node_order,
             preprocess: !self.args.no_preprocess,
             cut: self.args.cut.clone().unwrap_or_default(),
@@ -139,15 +137,8 @@ where
             ..Default::default()
         };
 
-        // ssi-only: computed over F2[H] internally — the selected ring is not involved.
-        let ssi_only = self.args.show_ssi && !(self.args.show_gens || self.args.show_alpha);
-        if ssi_only && !self.args.no_simplify {
-            let ssi = ssi_invariant(&l, self.args.reduced, config, self.args.expected);
-            self.out(&format!("ssi = ({}, {})", ssi.0, ssi.1));
-            return Ok(self.flush());
-        }
-
-        // the table path reads the divisibilities from KhI over the selected ring, with c = h.
+        // reads the divisibilities from KhI over the selected ring, with c = h;
+        // for the invariant itself use the `ssi` command.
         if self.args.show_ssi {
             ensure!(!h.is_zero() && !h.is_unit(), "`h` must be non-zero, non-invertible to compute ssi.");
             ensure!(t.is_zero(), "`t` must be zero to compute ss.");
@@ -162,10 +153,11 @@ where
         let bigraded = h.is_zero() && t.is_zero() || 
             ["H", "0,T"].contains(&self.args.c_value.as_str());
 
-        let table = if bigraded { 
-            khi.to_table_string()
-        } else { 
-            khi.to_seq_string()
+        let table = match (bigraded, self.args.format) {
+            (true, Format::TeX)  => khi.tex_table("KhI"),
+            (true, _)            => khi.to_table_string(),
+            (false, Format::TeX) => khi.tex_seq("KhI"),
+            (false, _)           => khi.to_seq_string(),
         };
         self.out(&table);
 
@@ -214,7 +206,7 @@ where
     fn show_ssi(&mut self, l: &InvLink, c: &R, khi: &KhIHomology<R>, zs: &[KhIChain<R>]) -> Result<(), Box<dyn std::error::Error>> { 
         assert!(!c.is_unit() && !c.is_unit());
 
-        use yui_kh::util::calc::div_vec;
+        use yui_kh::ss::div_vec;
 
         let l = l.inner();
         let w = l.writhe();

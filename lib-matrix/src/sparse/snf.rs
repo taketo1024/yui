@@ -8,11 +8,15 @@
 
 use log::debug;
 use rustc_hash::{FxHashMap, FxHashSet};
-use yui_core::{EucRing, EucRingOps};
+use yui_core::abst::{EucRing, EucRingOps};
+use yui_core::util::log::log_step_crossed;
 
 use crate::MatTrait;
 use crate::dense::snf::SnfFlags;
 use super::SpMat;
+
+// one progress line per this many pivots.
+const PIVOT_LOG_STEP: usize = 100_000;
 
 /// Result of a sparse SNF: `p * a * q = result` (diagonal), `pinv * result * qinv = a`.
 pub struct SpSnf<R>
@@ -232,7 +236,8 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
             if i >= m { break }
             if self.eliminate_step(i, j) {
                 i += 1;
-                if i % 100_000 == 0 {
+                // its own message: nnz is how fill-in is watched, so the plain form won't do.
+                if log_step_crossed(i, i - 1, m, PIVOT_LOG_STEP) {
                     let nnz: usize = self.rows.iter().map(|r| r.len()).sum();
                     debug!("  snf progress: {i} pivots ({j}/{n} cols), nnz {nnz}");
                 }

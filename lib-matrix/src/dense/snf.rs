@@ -2,7 +2,7 @@ use core::panic;
 use std::cmp::min;
 use log::trace;
 use yui_core::poly::Poly;
-use yui_core::{EucRing, EucRingOps, Field, FieldOps};
+use yui_core::abst::{EucRing, EucRingOps, Field, FieldOps};
 use crate::dense::*;
 use super::lll::{LLLRing, LLLRingOps, lll_hnf_in_place};
 

@@ -4,7 +4,7 @@
 use std::marker::PhantomData;
 use log::*;
 
-use yui_core::{EucRing, EucRingOps};
+use yui_core::abst::{EucRing, EucRingOps};
 use yui_matrix::MatTrait;
 use yui_matrix::sparse::*;
 use yui_matrix::sparse::snf::{sp_snf, SpSnf};

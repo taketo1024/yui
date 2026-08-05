@@ -21,7 +21,7 @@ use delegate::delegate;
 use num_traits::{Zero, One, Pow};
 use auto_impl_ops::auto_ops;
 
-use crate::{MathType, AddMon, AddMonOps, AddGrp, AddGrpOps, Mon, MonOps, Ring, RingOps, EucRing, EucRingOps, Field, FieldOps};
+use crate::abst::{MathType, AddMon, AddMonOps, AddGrp, AddGrpOps, Mon, MonOps, Ring, RingOps, EucRing, EucRingOps, Field, FieldOps};
 use crate::lc::Lc;
 use super::{MultiDeg, Var, Var2, Var3,MultiVar, Mono, MonoOrd};
 
@@ -539,9 +539,8 @@ where R: Field, for<'x> &'x R: FieldOps<R> {}
 impl<const X: char, R> EucRing for Poly<X, R>
 where R: Field, for<'x> &'x R: FieldOps<R> {}
 
-#[cfg(feature = "tex")]
 mod tex {
-    use crate::TeX;
+    use crate::util::tex::TeX;
     use super::*;
 
     impl<X, R> TeX for PolyBase<X, R>
@@ -1020,9 +1019,8 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "tex")]
     fn tex() { 
-        use crate::TeX;
+        use crate::util::tex::TeX;
         type P = LPolyN::<'x', i32>; 
 
         assert_eq!(P::tex_math_symbol(), "\\mathbb{Z}[x_1,\\ldots]");

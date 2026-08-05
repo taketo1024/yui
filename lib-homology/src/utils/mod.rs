@@ -7,7 +7,6 @@ pub(crate) mod format;
 mod grid;
 mod to_string;
 
-#[cfg(feature = "tex")]
 pub mod tex;
 
 pub use matrix::*;

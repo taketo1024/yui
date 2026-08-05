@@ -4,7 +4,7 @@
 
 use std::ops::{Mul, Div};
 use num_traits::One;
-use crate::lc::LcKey;
+use crate::lc::LcMulKey;
 
 /// Lexicographic and graded-lex orderings on monomials.
 ///
@@ -27,7 +27,7 @@ pub trait Mono:
     Mul<Output = Self> +
     Div<Output = Self> +
     MonoOrd +
-    LcKey
+    LcMulKey
 {
     /// Degree type — `usize` (ordinary) or `isize` (Laurent), or a tuple/vector
     /// for multivariate monomials.

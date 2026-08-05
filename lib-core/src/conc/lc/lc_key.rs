@@ -2,15 +2,33 @@
 //! constructions [`AsKey`] (wrap an arbitrary element as a key) and
 //! [`EitherKey`] (disjoint union of two key sets).
 
+use std::ops::Mul;
 use derive_more::Display;
 use itertools::Either;
 
 use crate::lc::Lc;
-use crate::{MathType, IndexType, Ring, RingOps};
+use crate::abst::{MathType, IndexType, Ring, RingOps};
 
 /// Marker trait for types usable as keys in [`Lc`](super::Lc) — i.e.
 /// elements that are hashable and totally ordered.
 pub trait LcKey: MathType + IndexType {}
+
+/// An [`LcKey`] whose product is formed by reference — the term-wise
+/// multiplication in [`Lc`](super::Lc)'s ring structure.
+///
+/// note: `Mul for &Lc` bounds on this trait, not `for<'x> &'x X: Mul`
+/// directly — since `Lc` is never an `LcKey`, the solver can't chase
+/// `&Lc<Lc<…>>: Mul` into an infinite recursion.
+pub trait LcMulKey: LcKey {
+    fn mul_ref(&self, rhs: &Self) -> Self;
+}
+
+impl<X> LcMulKey for X
+where X: LcKey, for<'x> &'x X: Mul<Output = X> {
+    fn mul_ref(&self, rhs: &Self) -> Self {
+        self * rhs
+    }
+}
 
 /// Wraps an arbitrary element `T` so it can be used as an [`LcKey`].
 ///

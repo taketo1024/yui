@@ -13,7 +13,7 @@ use derive_more::{Display, Debug};
 use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
 
-use crate::{MathType, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, EucRingOps, AddMon, AddGrp, Mon, Ring, EucRing, Field};
+use crate::abst::{MathType, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, EucRingOps, AddMon, AddGrp, Mon, Ring, EucRing, Field};
 
 type I = i32;
 
@@ -179,9 +179,8 @@ impl<const p: I> Ring for FF<p> {
 impl<const p: I> EucRing for FF<p> {}
 impl<const p: I> Field for FF<p> {}
 
-#[cfg(feature = "tex")] 
 mod tex {
-    use crate::TeX;
+    use crate::util::tex::TeX;
     use super::*;
 
     impl<const p: I> TeX for FF<p> {
@@ -307,10 +306,9 @@ mod tests {
         assert_eq!(a, F5::zero());
     }
 
-    #[cfg(feature = "tex")]
     #[test]
     fn tex() { 
-        use crate::TeX;
+        use crate::util::tex::TeX;
         assert_eq!(F3::tex_math_symbol(), "\\mathbb{F}_3");
         assert_eq!(F3::from(5).tex_string(), "2");
     }

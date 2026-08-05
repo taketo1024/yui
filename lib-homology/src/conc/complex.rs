@@ -8,10 +8,9 @@ use std::sync::Arc;
 use delegate::delegate;
 use itertools::Itertools;
 use num_traits::Zero;
-use yui_core::{EucRing, EucRingOps, Ring, RingOps};
+use yui_core::abst::{EucRing, EucRingOps, Ring, RingOps};
 use yui_core::lc::{LcKey, Lc};
 
-#[cfg(debug_assertions)]
 use yui_matrix::MatTrait;
 use yui_matrix::sparse::{SpMat, SpVec};
 
@@ -75,7 +74,7 @@ where
         new.d_matrices = d_matrices;
 
         #[cfg(debug_assertions)]
-        new.validate_d_matrices();
+        new.check_d_matrices();
 
         new
     }
@@ -85,14 +84,14 @@ where
         self.d_matrices = Arc::new(map);
 
         #[cfg(debug_assertions)]
-        self.validate_d_matrices();
+        self.check_d_matrices();
 
         self
     }
 
-    // Each cached d-matrix's shape must match the summand ranks at its endpoints.
-    #[cfg(debug_assertions)]
-    fn validate_d_matrices(&self) {
+    /// Each cached d-matrix's shape must match the summand ranks at its endpoints.
+    /// Callable in release; construction only runs it under `debug_assertions`.
+    pub fn check_d_matrices(&self) {
         for (&i, m) in self.d_matrices.iter() {
             let (n_rows, n_cols) = m.shape();
             assert_eq!(n_cols, self[i].rank(),
@@ -399,17 +398,25 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-#[cfg(feature = "tex")]
 mod tex_impl {
     use super::*;
-    use yui_core::TeX;
-    use crate::utils::tex::TeXTable;
+    use yui_core::util::tex::TeX;
+    use crate::utils::tex::{ToTexSeq, ToTexTable};
 
-    impl<X, R> TeXTable<isize2> for ChainComplex2<X, R>
+    impl<X, R> ToTexSeq<isize> for ChainComplex1<X, R>
     where X: LcKey, R: Ring + TeX, for<'x> &'x R: RingOps<R> {
         delegate! {
             to self.summands {
-                fn tex_table(&self, caption: &str, head: &str) -> String;
+                fn tex_entry_at(&self, i: &isize) -> String;
+            }
+        }
+    }
+
+    impl<X, R> ToTexTable<isize> for ChainComplex2<X, R>
+    where X: LcKey, R: Ring + TeX, for<'x> &'x R: RingOps<R> {
+        delegate! {
+            to self.summands {
+                fn tex_entry_at(&self, i: &isize, j: &isize) -> String;
             }
         }
     }

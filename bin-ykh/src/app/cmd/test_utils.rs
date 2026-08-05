@@ -2,11 +2,16 @@
 
 use std::error::Error;
 use std::fmt::Debug;
-use yui_link::Link;
+use yui_link::{InvLink, Link};
 
 // PD code of a `lib-link` test knot, in the JSON form the `link` argument takes.
 pub fn pd(name: &str) -> String {
     format!("{:?}", Link::test_data(name).pd_code())
+}
+
+// PD code of a `lib-link` symmetric test diagram, for the involutive commands.
+pub fn inv_pd(name: &str) -> String {
+    format!("{:?}", InvLink::test_data(name).pd_code())
 }
 
 // Compare a command's output cell by cell, so column padding and blank lines don't matter

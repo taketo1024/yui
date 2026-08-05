@@ -13,8 +13,9 @@ use std::collections::VecDeque;
 use itertools::Itertools;
 use log::*;
 
-use yui_core::{Ring, RingOps};
+use yui_core::abst::{Ring, RingOps};
 use yui_core::algo::TopSort;
+use yui_core::util::log::log_step_crossed;
 use crate::Perm;
 use super::*;
 
@@ -161,6 +162,7 @@ impl PivotFinder {
         }).collect_vec()
     }
 
+    #[cfg(test)]
     fn rows(&self) -> Row { 
         self.str.shape.0
     }
@@ -270,12 +272,10 @@ impl PivotFinder {
                 self.pivots.set(i, j);
             }
 
-            if self.should_report() {
-                row_count += 1;
-                if row_count % LOG_THRESHOLD == 0 {
-                    let c = self.pivots.count();
-                    trace!("    [{row_count}/{total_rows}], {c} pivots.");
-                }
+            row_count += 1;
+            if log_step_crossed(row_count, row_count - 1, total_rows, LOG_THRESHOLD) {
+                let c = self.pivots.count();
+                trace!("    [{row_count}/{total_rows}], {c} pivots.");
             }
         }
     }
@@ -295,7 +295,6 @@ impl PivotFinder {
         let loc_pivots_tls = ThreadLocal::new();
         let loc_worker_tls = ThreadLocal::new();
 
-        let report = self.should_report();
         let row_counter = SyncCounter::new(0);
 
         remain_rows.par_iter().for_each(|&i| {
@@ -314,12 +313,10 @@ impl PivotFinder {
 
             self.find_cycle_free_pivots_in(&pivots, &count, &mut loc_pivots, &mut w);
 
-            if report {
-                let row_count = row_counter.incr();
-                if row_count % LOG_THRESHOLD == 0 {
-                    let c = loc_pivots.count();
-                    trace!("    [{row_count}/{total_rows}], {c} pivots.");
-                }
+            let row_count = row_counter.incr();
+            if log_step_crossed(row_count, row_count - 1, total_rows, LOG_THRESHOLD) {
+                let c = loc_pivots.count();
+                trace!("    [{row_count}/{total_rows}], {c} pivots.");
             }
         });
 
@@ -354,9 +351,6 @@ impl PivotFinder {
         }
      }
 
-     fn should_report(&self) -> bool { 
-        self.rows() > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Debug
-     }
 }
 
 #[cfg(feature = "multithread")]

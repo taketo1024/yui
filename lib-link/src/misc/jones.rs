@@ -1,6 +1,8 @@
 use num_traits::Pow;
 use num_integer::Integer;
-use yui_core::{CloneAnd, Sign, Ring, AddMon};
+use yui_core::Sign;
+use yui_core::abst::{Ring, AddMon};
+use yui_core::ext::CloneAnd;
 use yui_core::poly::{LPoly, Mono};
 use yui_core::num::GaussInt;
 use crate::{Link, State};

@@ -54,12 +54,14 @@ where
 
     pub fn insert(&mut self, e: E) {
         let bit = e.into();
-        debug_assert!(bit < S::WIDTH, "BitMap index {bit} ≥ storage width {}", S::WIDTH);
+        // note: not a `debug_assert` — in release the shift is masked and the write wraps silently.
+        assert!(bit < S::WIDTH, "BitMap index {bit} ≥ storage width {}", S::WIDTH);
         self.bits |= S::one() << bit;
     }
 
     pub fn contains(&self, e: E) -> bool {
         let bit = e.into();
+        // hot read path; every present bit already went through the checked `insert`.
         debug_assert!(bit < S::WIDTH, "BitMap index {bit} ≥ storage width {}", S::WIDTH);
         !(self.bits & (S::one() << bit)).is_zero()
     }
@@ -188,9 +190,8 @@ mod tests {
     }
 
     #[test]
-    #[cfg(debug_assertions)] // the out-of-range guard is a `debug_assert!`
     #[should_panic(expected = "BitMap index")]
-    fn small_storage_out_of_range_panics_in_debug() {
+    fn small_storage_out_of_range_panics() {
         let mut m: BitMap<u8, u8> = BitMap::new();
         m.insert(8);  // u8 only has bits 0..8
     }

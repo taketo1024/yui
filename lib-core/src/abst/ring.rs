@@ -5,7 +5,8 @@
 //!
 //! See: <https://en.wikipedia.org/wiki/Ring_(mathematics)>
 
-use crate::{AddGrp, AddGrpOps, Mon, MonOps, Sign};
+use crate::Sign;
+use crate::abst::{AddGrp, AddGrpOps, Mon, MonOps};
 
 /// Helper trait bundling [`AddGrpOps`] and [`MonOps`] for [`Ring`].
 pub trait RingOps<T = Self>:
@@ -82,7 +83,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::Ring;
+    use crate::abst::Ring;
  
     #[test]
     fn is_pm_one() { 

@@ -16,7 +16,8 @@ use std::ops::RangeInclusive;
 use std::sync::OnceLock;
 use itertools::Itertools;
 use num_traits::Zero;
-use yui_core::{Ring, RingOps, Sign};
+use yui_core::Sign;
+use yui_core::abst::{Ring, RingOps};
 use yui_homology::{ChainComplex1, GrMod, Summand};
 use yui_link::{Link, State, Path, Edge};
 

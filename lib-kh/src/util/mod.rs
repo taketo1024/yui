@@ -6,10 +6,7 @@ pub(crate) use cached_hash::CachedHash;
 
 pub(crate) mod hash_cons;
 
-pub(crate) mod log;
-pub(crate) use log::log_progress;
 
-pub mod calc;
 
 pub mod fast_poly;
 pub use fast_poly::FastPoly;

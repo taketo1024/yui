@@ -21,7 +21,9 @@ use auto_impl_ops::auto_ops;
 use itertools::{Itertools, iproduct};
 use num_traits::Zero;
 use rayon::prelude::*;
-use yui_core::{CloneAnd, Ring, RingOps, Sign};
+use yui_core::Sign;
+use yui_core::abst::{Ring, RingOps};
+use yui_core::ext::CloneAnd;
 use yui_core::lc::LcKey;
 use yui_homology::{ChainComplex1, Summand, GrMod1};
 use yui_matrix::sparse::SpMat;
@@ -29,7 +31,8 @@ use yui_link::{Edge, Node, Path, State};
 use yui_core::bitseq::Bit;
 
 use crate::kh::{KhAlgGen, KhGen, KhTensor};
-use crate::util::log_progress;
+use log::Level;
+use yui_core::util::log::log_progress;
 use super::cob::{Cob, Dot, End, CobComp, LcCob, LcCobTrait};
 use super::tng::{Tng, TngComp};
 
@@ -500,7 +503,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
             self.add_vertex(kl, TngComplexVertex::from(tng));
             n += 1;
-            log_progress(n, n - 1, total, MERGE_LOG_STEP);
+            log_progress(Level::Debug, n, n - 1, total, MERGE_LOG_STEP, 2);
         }
 
         debug!("  C[{i}]: built {n} verts.");
@@ -519,7 +522,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         for (k_l, k_r) in Self::collect_keys(left, right, i) {
             seen += 1;
-            log_progress(seen, seen - 1, total, MERGE_PAIR_LOG_STEP);
+            log_progress(Level::Debug, seen, seen - 1, total, MERGE_PAIR_LOG_STEP, 2);
 
             let k = k_l + k_r;
             if !self.contains_key(&k) { continue }

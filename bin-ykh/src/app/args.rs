@@ -2,7 +2,8 @@ use std::ops::RangeInclusive;
 use clap::ValueEnum;
 use derive_more::Display;
 use yui_link::Link;
-use yui_kh::tng::builder::{BuildMode, NodeOrder, CutOption};
+use yui_kh::ss::SsVersion;
+use yui_kh::tng::builder::{Strategy, NodeOrder, CutOption};
 
 pub trait AppArgs { 
     fn c_type(&self) -> CType; 
@@ -103,14 +104,23 @@ pub fn parse_h_range(s: &str) -> Result<RangeInclusive<isize>, String> {
     Ok(parse(lo, -(Link::MAX_CROSSING as isize))? ..= parse(hi, Link::MAX_CROSSING as isize + 2)?)
 }
 
-// parse a build mode: greedy | min-fill | no-elim | none.
-pub fn parse_build_mode(s: &str) -> Result<BuildMode, String> {
+// parse a build strategy: greedy | min-fill | no-elim | none.
+pub fn parse_strategy(s: &str) -> Result<Strategy, String> {
     match s.to_lowercase().as_str() {
-        "greedy"               => Ok(BuildMode::Greedy),
-        "min-fill" | "minfill" => Ok(BuildMode::MinFill),
-        "no-elim" | "noelim"   => Ok(BuildMode::NoElim),
-        "none"                 => Ok(BuildMode::None),
-        _ => Err(format!("invalid mode `{s}`, expected greedy|min-fill|no-elim|none")),
+        "greedy"               => Ok(Strategy::Greedy),
+        "min-fill" | "minfill" => Ok(Strategy::MinFill),
+        "no-elim" | "noelim"   => Ok(Strategy::NoElim),
+        "none"                 => Ok(Strategy::None),
+        _ => Err(format!("invalid strategy `{s}`, expected greedy|min-fill|no-elim|none")),
+    }
+}
+
+// parse the ss/ssi pipeline version: v1 | v2.
+pub fn parse_ss_version(s: &str) -> Result<SsVersion, String> {
+    match s.to_lowercase().as_str() {
+        "v1" | "1" => Ok(SsVersion::V1),
+        "v2" | "2" => Ok(SsVersion::V2),
+        _ => Err(format!("invalid version `{s}`, expected v1|v2")),
     }
 }
 

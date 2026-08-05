@@ -10,7 +10,7 @@ use yui_matrix::Perm;
 use yui_matrix::sparse::pivot::{PivotCondition, PivotFinderConfig, PivotType, find_pivots};
 use yui_matrix::sparse::schur::Schur;
 use yui_matrix::sparse::triang::{solve_triangular_vec, TriangularType};
-use yui_core::{Ring, RingOps};
+use yui_core::abst::{Ring, RingOps};
 
 use yui_core::lc::LcKey;
 

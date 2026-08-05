@@ -18,7 +18,7 @@ use itertools::Itertools;
 use log::{debug, info};
 use num_traits::Zero;
 use yui_core::bitseq::Bit;
-use yui_core::{Ring, RingOps};
+use yui_core::abst::{Ring, RingOps};
 use yui_link::{Edge, InvLink};
 
 use rayon::prelude::*;
@@ -30,7 +30,8 @@ use crate::khi::{KhIChain, KhIGen, KhIGenExt};
 use crate::tng::{Cob, CobComp, End, LcCob, LcCobTrait, Tng, TngComplex, TngComplexElem, TngComplexKey, TngComplexVertex, circles_of, label_assignments, expanded_key, cap_circles};
 use super::{reachable_range, SymTngBuilder, SymBuildConfig, TngComplexBuilder, BuildConfig};
 use super::builder::PROGRESS_LOG_STEP;
-use crate::util::log_progress;
+use log::Level;
+use yui_core::util::log::log_progress;
 
 const CHUNK: usize = 4096;
 
@@ -202,7 +203,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             let prev = done;
             done += keys_chunk.len();
-            log_progress(done, prev, keys.len(), PROGRESS_LOG_STEP);
+            log_progress(Level::Debug, done, prev, keys.len(), PROGRESS_LOG_STEP, 2);
         }
     }
 
@@ -223,7 +224,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
 
             done += 1;
-            log_progress(done, done - 1, target.len(), PROGRESS_LOG_STEP);
+            log_progress(Level::Debug, done, done - 1, target.len(), PROGRESS_LOG_STEP, 2);
         }
     }
 
@@ -264,7 +265,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
             let prev = done;
             done += dropped_chunk.len();
-            log_progress(done, prev, dropped.len(), PROGRESS_LOG_STEP);
+            log_progress(Level::Debug, done, prev, dropped.len(), PROGRESS_LOG_STEP, 2);
         }
     }
 
@@ -450,7 +451,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                         return None;
                     }
                     let g = cap_circles(retr.clone(), End::Tgt, &circles, &b, &h, &t);
-                    let x = (g * &init).eval(&h, &t);
+                    let x = init.stack(&g).eval(&h, &t);
                     Some((kg, x))
                 }).collect_vec()
             }).collect()
@@ -484,7 +485,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // survive to the matrix reduction. Called twice: non-based circles, then the based one.
     fn deloop_all(&mut self, based: bool) {
         debug!("cone deloop-all (based: {based})...");
-        let auto_elim = self.cone.config().mode.auto_elim();
+        let auto_elim = self.cone.config().strategy.auto_elim();
         let range = self.cone.complex().h_range();
         let (start, end) = (*range.start(), *range.end());
         for d in start ..= end {
@@ -516,9 +517,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 // ---- cobordism-level cone construction (`1 + τ`, char-2) ----
 
 // Config for the cone's own `TngComplexBuilder`, which drives deloop/eliminate on the coned complex:
-// the simplify `mode` and the elimination fill-cost cap carry over from the sym config.
+// the simplify `strategy` and the elimination fill-cost cap carry over from the sym config.
 fn cone_build_config(config: &SymBuildConfig) -> BuildConfig {
-    BuildConfig { mode: config.mode, max_elim_cost: config.max_elim_cost, q_range: config.q_range.clone(), ..Default::default() }
+    BuildConfig { strategy: config.strategy, max_elim_cost: config.max_elim_cost, q_range: config.q_range.clone(), ..Default::default() }
 }
 
 // An empty cone shell: same `deg_shift`/base point, one extra h-degree for the cone bit.
@@ -574,7 +575,7 @@ mod tests {
     use yui_core::num::FF2;
     use yui_link::InvLink;
     use super::*;
-    use super::super::{BuildMode, CutOption};
+    use super::super::{Strategy, CutOption};
 
     // Build the reduced cone, assert d² = 0, and return its nonzero homology ranks per degree.
     // (Full homology vs. the KhI reference is checked in `khi`.)
@@ -677,7 +678,7 @@ mod tests {
     #[test]
     fn cone_direct_9_46_windowed() {
         let l = InvLink::from_symmetric_pd_code([[18,8,1,7],[13,6,14,7],[12,2,13,1],[8,18,9,17],[5,14,6,15],[2,12,3,11],[16,10,17,9],[15,4,16,5],[10,4,11,3]]);
-        let config = SymBuildConfig { cut: CutOption::Auto(2), mode: BuildMode::MinFill, h_range: Some(-64 ..= 1), ..Default::default() };
+        let config = SymBuildConfig { cut: CutOption::Auto(2), strategy: Strategy::MinFill, h_range: Some(-64 ..= 1), ..Default::default() };
         for reduced in [false, true] {
             let full = cone_homology(&l, reduced, SymBuildConfig { h_range: Some(-64 ..= 1), ..Default::default() });
             let direct = cone_homology(&l, reduced, SymBuildConfig { ..config.clone() });
@@ -707,19 +708,19 @@ mod tests {
         let narrow = |h: Vec<(isize, usize)>| h.into_iter().filter(|&(d, _)| d <= 0).collect_vec();
         for reduced in [false, true] {
             let full = narrow(cone_homology(&l, reduced, SymBuildConfig::default()));
-            let chunked = narrow(cone_homology(&l, reduced, SymBuildConfig { cut: CutOption::Auto(2), mode: BuildMode::MinFill, h_range: Some(-64 ..= 1), ..Default::default() }));
+            let chunked = narrow(cone_homology(&l, reduced, SymBuildConfig { cut: CutOption::Auto(2), strategy: Strategy::MinFill, h_range: Some(-64 ..= 1), ..Default::default() }));
             assert_eq!(full, chunked, "reduced={reduced}");
         }
     }
 
-    // The cone homology must not depend on the simplification mode.
+    // The cone homology must not depend on the simplification strategy.
     #[test]
-    fn cone_mode_independent() {
+    fn cone_strategy_independent() {
         let l = InvLink::test_data("6_3");
         let reference = cone_homology(&l, false, SymBuildConfig::default());
-        for mode in [BuildMode::MinFill, BuildMode::NoElim, BuildMode::None] {
-            let h = cone_homology(&l, false, SymBuildConfig { mode, ..Default::default() });
-            assert_eq!(h, reference, "mode {mode:?}");
+        for strategy in [Strategy::MinFill, Strategy::NoElim, Strategy::None] {
+            let h = cone_homology(&l, false, SymBuildConfig { strategy, ..Default::default() });
+            assert_eq!(h, reference, "strategy {strategy:?}");
         }
     }
 
@@ -727,8 +728,9 @@ mod tests {
     #[test]
     fn cone_canon_ssi_matches_matrix() {
         use yui_core::poly::Poly;
-        use crate::khi::{KhIHomology, ssi_invariant_ver, SsiVersion};
-        use crate::util::calc::div_vec;
+        use crate::khi::KhIHomology;
+        use crate::ss::{ssi_invariant_with, SsVersion};
+        use crate::ss::div_vec;
 
         type P = Poly<'H', FF2>;
         let (c, t) = (P::variable(), P::zero());
@@ -740,7 +742,7 @@ mod tests {
             ("9_46", InvLink::from_symmetric_pd_code([[18,8,1,7],[13,6,14,7],[12,2,13,1],[8,18,9,17],[5,14,6,15],[2,12,3,11],[16,10,17,9],[15,4,16,5],[10,4,11,3]])),
         ];
         for (name, l) in knots {
-            let matrix = ssi_invariant_ver(&l, false, Default::default(), None, SsiVersion::V1);
+            let matrix = ssi_invariant_with(&l, false, Default::default(), None, SsVersion::V1);
 
             let config = SymBuildConfig { h_range: Some(isize::MIN + 1 ..= 1), ..Default::default() };
             let kh = KhIHomology::new_with_config(&l, &c, &t, false, config);

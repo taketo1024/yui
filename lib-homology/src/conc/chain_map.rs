@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use num_traits::Zero;
 use yui_core::lc::{EitherKey, LcKey, Lc, split_lr};
-use yui_core::{EucRing, EucRingOps, Ring, RingOps};
+use yui_core::abst::{EucRing, EucRingOps, Ring, RingOps};
 use yui_matrix::sparse::SpMat;
 
 use crate::{GrMod, AddInd, Summand};

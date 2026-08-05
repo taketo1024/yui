@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use itertools::Itertools;
 use yui_core::bitmap::BitMap;
-use yui_core::CloneAnd;
+use yui_core::ext::CloneAnd;
 use yui_link::{Edge, Node, Path};
 use crate::util::CachedHash;
 

@@ -31,7 +31,7 @@ where Idx: Copy + Add<Output = Idx> + Sub<Output = Idx> + Neg<Output = Idx> {
 
 #[cfg(test)]
 mod tests {
-    use crate::RangeExt;
+    use crate::ext::RangeExt;
  
     #[test]
     fn range() { 

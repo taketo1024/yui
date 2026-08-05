@@ -4,7 +4,7 @@ use std::fmt::Display;
 use itertools::Itertools;
 use maplit::hashmap;
 use yui_core::bitseq::Bit;
-use yui_core::{Ring, RingOps};
+use yui_core::abst::{Ring, RingOps};
 use yui_link::{Edge, Link, Node};
 
 use super::tng::TngComp;
@@ -80,7 +80,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let init = LcCob::from(self.in_cob.clone());
         let eval = self.out_cob.iter().map(|(k, retr)| {
             let x = k.as_gen();
-            let f = retr * &init;
+            let f = init.stack(retr);
             let r = f.eval(h, t);
             (x, r)
         }).collect::<KhChain<R>>();

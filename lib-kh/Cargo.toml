@@ -12,7 +12,6 @@ repository.workspace  = true
 [features]
 default = []
 big-link = ["yui-link/big-link"]
-tex = ["yui-core/tex"]
 
 [dependencies]
 auto-impl-ops = "0.2.1"

@@ -3,7 +3,7 @@
 
 use std::ops::{Add, Neg, Sub};
 use num_traits::Zero;
-use yui_core::IndexType;
+use yui_core::abst::IndexType;
 
 /// Marker trait for grading types. Implemented for [`isize`], [`isize2`],
 /// [`isize3`]; not implemented for `usize`-based variants because they are not

@@ -1,7 +1,7 @@
 use log::info;
 use clap::{Parser, Subcommand};
 
-use super::cmd::{ckh, ckhi, kh, khi, cc, sl2};
+use super::cmd::{ckh, ckhi, kh, khi, cc, sl2, ss, ssi};
 use super::args::*;
 use super::utils::*;
 
@@ -22,6 +22,8 @@ pub enum Cmd {
     KhI(khi::Args),
     CC(cc::Args),
     SL2(sl2::Args),
+    Ss(ss::Args),
+    Ssi(ssi::Args),
 }
 
 impl CliArgs { 
@@ -33,6 +35,8 @@ impl CliArgs {
             Cmd::KhI(args)  => args,
             Cmd::CC(args)   => args,
             Cmd::SL2(args)  => args,
+            Cmd::Ss(args)   => args,
+            Cmd::Ssi(args)  => args,
         }
     }
 
@@ -80,6 +84,8 @@ impl App {
                 Cmd::KhI(args)  => khi::dispatch(args),
                 Cmd::CC(args)   => cc::dispatch(args),
                 Cmd::SL2(args)  => sl2::dispatch(args),
+                Cmd::Ss(args)   => ss::dispatch(args),
+                Cmd::Ssi(args)  => ssi::dispatch(args),
             }
         )
     }

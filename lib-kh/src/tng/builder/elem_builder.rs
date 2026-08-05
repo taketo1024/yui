@@ -2,7 +2,7 @@ use std::ops::RangeInclusive;
 
 use num_traits::Zero;
 use yui_core::bitseq::Bit;
-use yui_core::{Ring, RingOps};
+use yui_core::abst::{Ring, RingOps};
 use yui_link::{Edge, Node, Path};
 
 use itertools::Itertools;
@@ -204,7 +204,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                         return None;
                     }
                     let gc = cap_circles(retr.clone(), End::Tgt, &circles, &b, h, t);
-                    let x = (gc * &init).eval(h, t);
+                    let x = init.stack(&gc).eval(h, t);
                     Some((g, x))
                 }).collect_vec()
             }).collect()

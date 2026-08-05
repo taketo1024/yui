@@ -6,7 +6,7 @@ use auto_impl_ops::auto_ops;
 
 use yui_core::poly::{Mono, Poly};
 use yui_core::util::format::{lc, superscript};
-use yui_core::{AddGrp, AddGrpOps, AddMon, AddMonOps, MathType, EucRing, EucRingOps, Field, FieldOps, Mon, MonOps, Ring, RingOps};
+use yui_core::abst::{AddGrp, AddGrpOps, AddMon, AddMonOps, MathType, EucRing, EucRingOps, Field, FieldOps, Mon, MonOps, Ring, RingOps};
 
 // Homogeneous polynomial
 #[derive(Clone, Copy, Debug, Default)]
@@ -286,9 +286,8 @@ where R: Field, for<'x> &'x R: FieldOps<R> {}
 impl<const X: char, R> EucRing for FastPoly<X, R>
 where R: Field, for<'x> &'x R: FieldOps<R> {}
 
-#[cfg(feature = "tex")]
 mod tex {
-    use yui_core::TeX;
+    use yui_core::util::tex::TeX;
     use super::*;
 
     impl<const X: char, R> TeX for FastPoly<X, R>
@@ -450,10 +449,9 @@ mod tests {
         assert_eq!(P::from_str("x + 1"), Err(()));
     }
 
-    #[cfg(feature = "tex")]
     #[test]
     fn tex() {
-        use yui_core::TeX;
+        use yui_core::util::tex::TeX;
         type R = i64;
         type P = FastPoly<'x', R>;
 

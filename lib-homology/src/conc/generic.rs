@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use derive_more::derive::{Display, Debug};
 use num_traits::Zero;
 use yui_core::lc::{Lc, LcKey};
-use yui_core::{MathType, Ring, RingOps};
+use yui_core::abst::{MathType, Ring, RingOps};
 use yui_matrix::MatTrait;
 use yui_matrix::sparse::{SpMat, Trans};
 

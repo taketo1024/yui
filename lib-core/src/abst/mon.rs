@@ -6,7 +6,7 @@
 
 use std::ops::{Mul, MulAssign};
 use num_traits::One;
-use crate::MathType;
+use crate::abst::MathType;
 
 /// Helper trait bundling `Mul` impls so [`Mon`] can require all four
 /// reference variants (`T * T`, `T * &T`, `&T * T`, `&T * &T`) via one HRTB.

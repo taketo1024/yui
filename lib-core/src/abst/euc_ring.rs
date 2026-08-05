@@ -7,7 +7,7 @@
 //! See: <https://en.wikipedia.org/wiki/Euclidean_domain>
 
 use std::ops::{Div, DivAssign, Rem, RemAssign};
-use crate::{Ring, RingOps};
+use crate::abst::{Ring, RingOps};
 
 /// Helper trait extending [`RingOps`] with `Div` and `Rem` reference variants
 /// so [`EucRing`] can require them via one HRTB.

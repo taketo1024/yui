@@ -3,7 +3,8 @@ use std::sync::OnceLock;
 use delegate::delegate;
 
 use yui_homology::{ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
-use yui_core::{EucRing, EucRingOps, IteratorExt};
+use yui_core::abst::{EucRing, EucRingOps};
+use yui_core::ext::IteratorExt;
 use yui_link::Link;
 
 use crate::kh::KhGen;
@@ -11,6 +12,8 @@ use crate::tng::builder::BuildConfig;
 use crate::util::Bigraded;
 
 use super::{KhAlg, KhChain, KhComplex};
+use yui_core::util::tex::TeX;
+use yui_homology::tex::{ToTexSeq, ToTexTable};
 
 #[derive(Clone)]
 pub struct KhHomology<R>
@@ -196,6 +199,17 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 }
 
+impl<R> ToTexSeq<isize> for KhHomology<R>
+where R: EucRing + TeX, for<'x> &'x R: EucRingOps<R> {
+    fn tex_entry_at(&self, i: &isize) -> String {
+        if self[*i].is_zero() {
+            ".".to_string()
+        } else {
+            self[*i].tex_string()
+        }
+    }
+}
+
 impl<R> ToTableString<isize> for KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     fn labels(&self) -> (String, String) { 
@@ -211,6 +225,17 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
             ".".to_string()
         } else {
             self[(*i, *j)].to_string()
+        }
+    }
+}
+
+impl<R> ToTexTable<isize> for KhHomology<R>
+where R: EucRing + TeX, for<'x> &'x R: EucRingOps<R> {
+    fn tex_entry_at(&self, i: &isize, j: &isize) -> String {
+        if self[(*i, *j)].is_zero() {
+            ".".to_string()
+        } else {
+            self[(*i, *j)].tex_string()
         }
     }
 }

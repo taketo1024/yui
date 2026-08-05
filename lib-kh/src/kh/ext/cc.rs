@@ -10,7 +10,8 @@
 use itertools::Itertools;
 use yui_core::bitseq::Bit;
 use yui_core::lc::Lc;
-use yui_core::{Ring, RingOps, Sign};
+use yui_core::Sign;
+use yui_core::abst::{Ring, RingOps};
 use yui_homology::ChainMap;
 use yui_link::{Link, Path, State};
 use num_traits::Zero;
@@ -113,7 +114,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 #[cfg(test)]
 mod tests {
     use yui_core::poly::Poly2;
-    use yui_core::{EucRing, EucRingOps};
+    use yui_core::abst::{EucRing, EucRingOps};
     use yui_homology::ToSeqString;
     use yui_link::Link;
 

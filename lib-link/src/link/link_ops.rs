@@ -3,7 +3,8 @@
 //! which builds links out of patterns.
 
 use petgraph::Graph;
-use yui_core::{CloneAnd, Sign};
+use yui_core::Sign;
+use yui_core::ext::CloneAnd;
 use yui_core::bitseq::Bit;
 
 use super::{Edge, Link, LinkBuilder, NodeType, Path, Slot, State};

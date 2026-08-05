@@ -17,14 +17,16 @@ src/
 │   ├── complex.rs          — `KhComplex`: Khovanov chain complex
 │   ├── homology.rs         — `KhHomology`: bigraded homology
 │   ├── canon_cycle.rs      — Lee/Bar-Natan canonical cycles
-│   ├── ss.rs               — `ss_invariant`: family of slice-torus invariants
 │   └── ext/                — chain-level extras (crossing change, sl₂ action)
 ├── khi/                    — Involutive Khovanov homology
 │   ├── khi_gen.rs          — `KhIGen = EitherKey<KhGen, KhGen>` (B/Q sides)
 │   ├── tau.rs              — chain-level τ for a strongly invertible link
 │   ├── complex.rs          — `KhIComplex`: built as `Cone(1 + τ)`
-│   ├── homology.rs         — `KhIHomology`
-│   └── ssi.rs              — `ssi_invariants`: equivariant Rasmussen pair (s̲, s̄)
+│   └── homology.rs         — `KhIHomology`
+├── ss/                     — the slice-torus invariants
+│   ├── ss.rs               — `ss_invariant`: the family over `(R, c)`
+│   ├── ssi.rs              — `ssi_invariant`: equivariant Rasmussen pair (s̲, s̄)
+│   └── util.rs             — the shared `H = 1` divisibility machinery
 ├── tng/                    — Bar-Natan's tangle / cobordism category
 │   ├── tng.rs              — `Tng`, `TngComp`: Temperley–Lieb diagrams
 │   ├── cob.rs              — `Cob`, `LcCob`: cobordism morphisms with dots
@@ -55,7 +57,7 @@ src/
 
 - **`KhIComplex<R>`** — the involutive Khovanov complex `CKhI = Cone(CKh →^{Q(1+τ)} Q·CKh)` of a strongly invertible link `InvLink`.
 - **`KhIHomology<R>`**, **`KhIGen`** (= `EitherKey<KhGen, KhGen>`), **`KhIGenExt`** trait.
-- **`ssi_invariants(&InvLink, c, reduced) -> (i32, i32)`** — the equivariant Rasmussen pair `(s̲, s̄)`.
+- **`ssi_invariant(&InvLink, reduced) -> (i32, i32)`** — the equivariant Rasmussen pair `(s̲, s̄)`, in the `ss` module.
 
 ### Tangle complex (the fast backend)
 
@@ -88,7 +90,8 @@ The math in this crate follows these papers (cited at the head of each file too)
 
 ```rust
 use yui_link::Link;
-use yui_kh::kh::{KhHomology, ss_invariant};
+use yui_kh::kh::KhHomology;
+use yui_kh::ss::ss_invariant;
 
 // Khovanov homology of the trefoil over Z.
 let l = Link::from_pd_code([[1,4,2,5], [3,6,4,1], [5,2,6,3]]);

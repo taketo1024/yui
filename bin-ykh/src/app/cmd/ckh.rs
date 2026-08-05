@@ -5,11 +5,12 @@ use crate::app::err::*;
 use std::marker::PhantomData;
 use std::ops::RangeInclusive;
 use std::str::FromStr;
-use yui_core::TeX;
-use yui_core::{Ring, RingOps};
+use yui_core::util::tex::TeX;
+use yui_homology::tex::ToTexTable;
+use yui_core::abst::{Ring, RingOps};
 use yui_homology::ToTableString;
 use yui_kh::kh::KhComplex;
-use yui_kh::tng::builder::{BuildConfig, CutOption};
+use yui_kh::tng::builder::{BuildConfig, CutOption, NodeOrder, Strategy};
 
 pub fn dispatch(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
     dispatch_ring!(App, boot, args)
@@ -51,6 +52,25 @@ pub struct Args {
     // chunking: `auto(k)` (cutwidth) or manual edge-cut(s) `e,e,e;e,e,e`.
     #[arg(long, value_parser = parse_cut)]
     pub cut: Option<CutOption>,
+
+    // cap the per-elimination fill cost; survivors defer to the matrix reduction.
+    #[arg(long)]
+    pub max_elim_cost: Option<usize>,
+
+    #[arg(long, value_parser = parse_strategy, default_value = "greedy")]
+    pub strategy: Strategy,
+
+    // crossing order: min-cut (default; bounds cutwidth) or given (PD order, debug).
+    #[arg(long, value_parser = parse_node_order, default_value = "min-cut")]
+    pub node_order: NodeOrder,
+
+    // skip the final deloop/eliminate; remaining circles defer to the matrix reducer.
+    #[arg(long)]
+    pub no_full_deloop: bool,
+
+    #[arg(short, long, default_value = "unicode")]
+    #[default(Format::Unicode)]
+    pub format: Format,
 
     #[arg(long, default_value = "0")]
     pub log: u8,
@@ -102,12 +122,23 @@ where
         let ckh = if self.args.no_simplify {
             KhComplex::new_no_simplify(&l, &h, &t, self.args.reduced)
         } else {
-            let config = BuildConfig { h_range: self.args.h_range.clone(), cut: self.args.cut.clone().unwrap_or_default(), ..Default::default() };
+            let config = BuildConfig {
+                strategy: self.args.strategy,
+                node_order: self.args.node_order,
+                cut: self.args.cut.clone().unwrap_or_default(),
+                h_range: self.args.h_range.clone(),
+                max_elim_cost: self.args.max_elim_cost,
+                no_full_deloop: self.args.no_full_deloop,
+                ..Default::default()
+            };
             KhComplex::new_with_config(&l, &h, &t, self.args.reduced, config)
         };
         
         // CKh generators
-        let table = ckh.to_table_string();
+        let table = match self.args.format {
+            Format::TeX => ckh.tex_table("CKh"),
+            _           => ckh.to_table_string(),
+        };
         self.out(&table);
 
         // Generators

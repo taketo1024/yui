@@ -6,7 +6,7 @@ use std::ops::{Index, RangeInclusive};
 use delegate::delegate;
 use itertools::Itertools;
 use yui_core::lc::LcKey;
-use yui_core::{Ring, RingOps};
+use yui_core::abst::{Ring, RingOps};
 
 use crate::utils::{Grid, ToSeqString, ToTableString};
 use crate::{AddInd, Summand, isize2, isize3};
@@ -151,17 +151,25 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-#[cfg(feature = "tex")]
 mod tex_impl {
     use super::*;
-    use yui_core::TeX;
-    use crate::utils::tex::TeXTable;
+    use yui_core::util::tex::TeX;
+    use crate::utils::tex::{ToTexSeq, ToTexTable};
 
-    impl<X, R> TeXTable<isize2> for GrMod<isize2, X, R>
+    impl<X, R> ToTexSeq<isize> for GrMod<isize, X, R>
     where X: LcKey, R: Ring + TeX, for<'x> &'x R: RingOps<R> {
         delegate! {
             to self.data {
-                fn tex_table(&self, caption: &str, head: &str) -> String;
+                fn tex_entry_at(&self, i: &isize) -> String;
+            }
+        }
+    }
+
+    impl<X, R> ToTexTable<isize> for GrMod<isize2, X, R>
+    where X: LcKey, R: Ring + TeX, for<'x> &'x R: RingOps<R> {
+        delegate! {
+            to self.data {
+                fn tex_entry_at(&self, i: &isize, j: &isize) -> String;
             }
         }
     }

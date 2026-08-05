@@ -17,16 +17,17 @@ use itertools::{iproduct, Itertools};
 use log::{debug, info};
 use yui_core::algo::KeyedUnionFind;
 use yui_core::bitseq::{Bit, BitSeq};
-use yui_core::{Ring, RingOps};
+use yui_core::abst::{Ring, RingOps};
 use yui_link::{Node, Edge, InvLink};
 
 use crate::kh::{KhAlgGen, KhGen, KhTensor};
 use crate::tng::{ElimDir, LcCob, LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
-use crate::tng::builder::{TngComplexBuilder, TngElemBuilder, BuildConfig, BuildMode, NodeOrder};
+use crate::tng::builder::{TngComplexBuilder, TngElemBuilder, BuildConfig, Strategy, NodeOrder};
 use std::fmt;
 use super::{reachable_range, pop_min_pivot, pivot_pool, push_pivot, sparkline, fill_cost_sparkline, cutwidth_after, toggle_boundary, BuildPlanner, CutOption};
 use super::builder::PROGRESS_LOG_STEP;
-use crate::util::log_progress;
+use log::Level;
+use yui_core::util::log::log_progress;
 
 /// Toggles for the automatic simplification done while building (kept separate
 /// from [`BuildConfig`] so the equivariant builder can gain its own flags).
@@ -34,7 +35,7 @@ use crate::util::log_progress;
 pub struct SymBuildConfig {
     // crossing order: MinCut (default; bounds cutwidth for wide knots) or Given (PD order, debug).
     pub node_order: NodeOrder,
-    pub mode: BuildMode,
+    pub strategy: Strategy,
     // build half the off-axis crossings and mirror via τ (see `preprocess`).
     pub preprocess: bool,
     // literal truncation: homology at the endpoints is wrong (build `(a-1)..=(b+1)` for correct `[a, b]`).
@@ -54,15 +55,15 @@ pub struct SymBuildConfig {
 
 impl Default for SymBuildConfig {
     fn default() -> Self {
-        Self { node_order: NodeOrder::default(), mode: BuildMode::default(), preprocess: true, h_range: None, q_range: None, cut: CutOption::None, max_elim_cost: None, no_full_deloop: false }
+        Self { node_order: NodeOrder::default(), strategy: Strategy::default(), preprocess: true, h_range: None, q_range: None, cut: CutOption::None, max_elim_cost: None, no_full_deloop: false }
     }
 }
 
 impl SymBuildConfig {
-    // Config for the inner merge builder: `mode: None` (the sym builder drives deloop/elim, the inner
+    // Config for the inner merge builder: `strategy: None` (the sym builder drives deloop/elim, the inner
     // never orders nodes), so only `h_range` carries over — to drop out-of-window canon cycles.
     pub(crate) fn inner_build_config(&self) -> BuildConfig {
-        BuildConfig { mode: BuildMode::None, h_range: self.h_range.clone(), q_range: self.q_range.clone(), ..Default::default() }
+        BuildConfig { strategy: Strategy::None, h_range: self.h_range.clone(), q_range: self.q_range.clone(), ..Default::default() }
     }
 }
 
@@ -340,10 +341,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.merge(c, key_map, vec![]);
     }
 
-    // Whether the automatic deloop runs. `false` for `BuildMode::None` and, under
+    // Whether the automatic deloop runs. `false` for `Strategy::None` and, under
     // `no_full_deloop`, once all nodes are merged — remaining circles then defer to `into_raw_complex`.
     pub(crate) fn should_deloop(&self) -> bool {
-        self.config.mode.auto_deloop()
+        self.config.strategy.auto_deloop()
             && !(self.config.no_full_deloop && self.n_nodes() == 0)
     }
 
@@ -367,7 +368,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug!("{} merged: {}", self.current_step(), self.stat());
     }
 
-    // Per degree: deloop (when enabled), then (if the mode eliminates) sweep i-2,i-1 by equivariant
+    // Per degree: deloop (when enabled), then (if the strategy eliminates) sweep i-2,i-1 by equivariant
     // Markowitz cost. Greedy also inline-eliminates during deloop; the sweep just catches what it
     // missed. Without delooping the sweep still applies — invertible pivots need no delooping,
     // shared circles pass through as cylinders.
@@ -380,7 +381,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             if self.should_deloop() {
                 self.deloop_in(i - 1);
             }
-            if self.config.mode.auto_elim() {
+            if self.config.strategy.auto_elim() {
                 self.eliminate_in(i - 2);
                 self.eliminate_in(i - 1);
             }
@@ -391,7 +392,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         if self.should_deloop() {
             self.deloop_in(top);
         }
-        if self.config.mode.auto_elim() {
+        if self.config.strategy.auto_elim() {
             self.eliminate_in(top - 1);
         }
     }
@@ -486,7 +487,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             }
             
             done += 1;
-            log_progress(done, done - 1, done + pool.len(), PROGRESS_LOG_STEP);
+            log_progress(Level::Debug, done, done - 1, done + pool.len(), PROGRESS_LOG_STEP, 2);
         }
 
         let after = self.complex().rank(i) as isize;
@@ -512,7 +513,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         // immediate elim eliminates each new vertex now; min-fill leaves them for the post-deloop
         // global pass, None leaves them entirely.
-        if self.config.mode.immediate_elim() {
+        if self.config.strategy.immediate_elim() {
             added.retain(|k|
                 self.complex().contains_key(k) &&
                 self.try_eliminate_equiv_at(k, ElimDir::Both) == 0
@@ -632,7 +633,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             if n > 0 {
                 let prev = done;
                 done += n; // off-axis events consume the pivot and its τ-mirror.
-                log_progress(done, prev, targets, PROGRESS_LOG_STEP);
+                log_progress(Level::Debug, done, prev, targets, PROGRESS_LOG_STEP, 2);
             }
         }
 
@@ -1072,11 +1073,11 @@ mod tests {
     use super::*;
     use num_traits::Zero;
 
-    use yui_core::IteratorExt;
+    use yui_core::ext::IteratorExt;
     use yui_core::lc::Lc;
     use yui_core::num::FF2;
     use yui_core::poly::Poly;
-    use yui_core::RangeExt;
+    use yui_core::ext::RangeExt;
     use yui_homology::{ChainComplex1, ChainMap, ToSeqString, ToTableString};
 
     // `profile_sym`'s dry-run widths must match the real complex's `boundary_ends`. Boundary depends
@@ -1091,7 +1092,7 @@ mod tests {
             assert_eq!(prof.on_axis + prof.off_axis, nodes.len(), "{name}: unit counts");
 
             let mut b = TngComplexBuilder::<i32>::init(&0, &0, (0, 0), None)
-                .with_config(BuildConfig { mode: BuildMode::None, cut: CutOption::None, ..Default::default() });
+                .with_config(BuildConfig { strategy: Strategy::None, cut: CutOption::None, ..Default::default() });
 
             let mut open: FxHashSet<Edge> = FxHashSet::default();
             for (step, unit) in prof.order.iter().enumerate() {
@@ -1117,27 +1118,27 @@ mod tests {
     }
 
     #[test]
-    fn build_modes_agree() {
-        // all build modes on the sym builder must agree on homology.
+    fn strategies_agree() {
+        // every strategy on the sym builder must agree on homology.
         let l = InvLink::from_symmetric_pd_code(
             [[18,8,1,7],[13,6,14,7],[12,2,13,1],[8,18,9,17],[5,14,6,15],[2,12,3,11],[16,10,17,9],[15,4,16,5],[10,4,11,3]]
         );
         let (h, t) = (FF2::zero(), FF2::zero());
-        let build = |mode| {
+        let build = |strategy| {
             let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
-            b.config.mode = mode;
+            b.config.strategy = strategy;
             b.run().into_tng_complex().into_raw_complex()
         };
 
-        let ref_c = build(BuildMode::Greedy);
+        let ref_c = build(Strategy::Greedy);
         let range = ref_c.support().cloned().range().unwrap();
         let ref_h = ref_c.homology();
-        for mode in [BuildMode::MinFill, BuildMode::NoElim, BuildMode::None] {
-            let c = build(mode);
+        for strategy in [Strategy::MinFill, Strategy::NoElim, Strategy::None] {
+            let c = build(strategy);
             c.check_d_all();
             let h = c.homology();
             for i in range.clone() {
-                assert_eq!(h[i].rank(), ref_h[i].rank(), "rank at {i}, {mode:?}");
+                assert_eq!(h[i].rank(), ref_h[i].rank(), "rank at {i}, {strategy:?}");
             }
         }
     }
@@ -1259,7 +1260,7 @@ mod tests {
     // ingredient) computed from each chunked KhI homology must match the non-chunked one.
     #[test]
     fn chunk_elements_match() {
-        use crate::util::calc::div_vec;
+        use crate::ss::div_vec;
         type P = Poly<'H', FF2>;
 
         let l = InvLink::from_symmetric_pd_code(
@@ -1289,7 +1290,7 @@ mod tests {
         let (h, t) = (FF2::zero(), FF2::zero());
 
         let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
-        b.config.mode = BuildMode::None;
+        b.config.strategy = Strategy::None;
         let c = b.run().into_tng_complex().into_raw_complex();
         c.check_d_all();
 
@@ -1308,7 +1309,7 @@ mod tests {
         let (h, t) = (FF2::zero(), FF2::zero());
 
         let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
-        b.config.mode = BuildMode::None;
+        b.config.strategy = Strategy::None;
         b.config.h_range = Some(0..=3);
         let c = b.run().into_tng_complex().into_raw_complex();
         c.check_d_all();
@@ -1378,13 +1379,13 @@ mod tests {
 
     #[test]
     fn no_auto_deloop() {
-        // BuildMode::None never deloops (not even in finalize); into_raw_complex expands the
+        // Strategy::None never deloops (not even in finalize); into_raw_complex expands the
         // remaining circles at the matrix level, giving the same generators.
         let l = InvLink::test_data("3_1");
         let (h, t) = (FF2::zero(), FF2::zero());
 
         let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
-        b.config.mode = BuildMode::None;
+        b.config.strategy = Strategy::None;
         b.process_nodes();
 
         assert!(!b.inner.complex().is_completely_delooped());
@@ -1413,7 +1414,7 @@ mod tests {
         let (h, t) = (FF2::zero(), FF2::zero());
 
         let mut b = SymTngBuilder::from_inv_link(&l, &h, &t, false);
-        b.config.mode = BuildMode::NoElim;
+        b.config.strategy = Strategy::NoElim;
         b.process_nodes();
 
         assert!(b.inner.complex().is_completely_delooped());

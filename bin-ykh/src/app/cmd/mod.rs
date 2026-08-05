@@ -1,3 +1,6 @@
+#[cfg(test)]
+pub mod test_utils;
+
 pub mod ckh;
 pub mod kh;
 pub mod ckhi;

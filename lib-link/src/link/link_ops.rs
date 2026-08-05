@@ -181,8 +181,8 @@ mod tests {
         let l = Link::test_data("3_1");
         let l2 = l.cc_at(1);
 
-        assert_eq!(l.node(1),  &Node::new(XL, Some((Slot::SW, Slot::SE)), [3,6,4,1]));
-        assert_eq!(l2.node(1), &Node::new(XR, Some((Slot::SW, Slot::SE)), [3,6,4,1]));
+        assert_eq!(l.node(1),  &Node::new(XL, Some((Slot::SW, Slot::NW)), [3,1,4,6]));
+        assert_eq!(l2.node(1), &Node::new(XR, Some((Slot::SW, Slot::NW)), [3,1,4,6]));
     }
 
     #[test]
@@ -190,10 +190,10 @@ mod tests {
         // a smoothing that does not respect the orientation costs the whole diagram its own; only
         // the Seifert state keeps it.
         let l = Link::test_data("3_1");
-        assert_eq!(l.seifert_state(), State::from([1, 1, 1]));
+        assert_eq!(l.seifert_state(), State::from([0, 0, 0]));
 
-        assert!(l.resolve_by(&State::from([1, 1, 1])).is_oriented());
-        for st in [[0, 0, 0], [1, 0, 0], [1, 1, 0]] {
+        assert!(l.resolve_by(&State::from([0, 0, 0])).is_oriented());
+        for st in [[0, 0, 1], [0, 1, 1], [1, 1, 1]] {
             let r = l.resolve_by(&State::from(st));
             assert!(!r.is_oriented(), "{st:?} left a partial orientation");
             r.verify_ori();
@@ -206,14 +206,14 @@ mod tests {
         let l = Link::test_data("3_1").resolve_by(&s);
 
         let comps = l.comps();
-        assert_eq!(comps.len(), 3);
+        assert_eq!(comps.len(), 2);
         assert!(comps.iter().all(|c| c.is_circle()));
 
         let s = State::from([1, 1, 1]);
         let l = Link::test_data("3_1").resolve_by(&s);
 
         let comps = l.comps();
-        assert_eq!(comps.len(), 2);
+        assert_eq!(comps.len(), 3);
         assert!(comps.iter().all(|c| c.is_circle()));
     }
 

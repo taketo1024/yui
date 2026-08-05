@@ -34,3 +34,7 @@ yui-link.workspace = true
 yui-matrix.workspace = true
 yui-homology = { workspace = true, features = ["tex"] }
 yui-kh = { workspace = true, features = ["tex"] }
+smart-default = "0.7.1"
+
+[dev-dependencies]
+yui-link = { workspace = true, features = ["test-utils"] }

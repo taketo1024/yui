@@ -334,7 +334,7 @@ mod tests {
 
     #[test]
     fn test_u_trefoil() {
-        let l = Link::test_data("3_1");
+        let l = Link::test_data("3_1").mirror();
         let c = KhComplex::<i32>::new_no_simplify(&l, &0, &0, false);
         let map = c.sl2_map(&l);
 
@@ -372,7 +372,7 @@ mod tests {
 
     #[test]
     fn test_ch_map_trefoil() {
-        let l = Link::test_data("3_1");
+        let l = Link::test_data("3_1").mirror();
         let c = KhComplex::new_no_simplify(&l, &0, &0, false);
         let e = c.sl2_map(&l).into_chain_map();
 
@@ -421,7 +421,7 @@ mod tests {
 
     #[test]
     fn test_string_decomp_3_1() { 
-        let l = Link::test_data("3_1");
+        let l = Link::test_data("3_1").mirror();
         let c = KhComplex::new_no_simplify(&l, &QQ::zero(), &QQ::zero(), true);
         let e = c.sl2_map(&l);
         let h = c.homology();
@@ -437,7 +437,7 @@ mod tests {
 
     #[test]
     fn test_string_decomp_unred_3_1() { 
-        let l = Link::test_data("3_1");
+        let l = Link::test_data("3_1").mirror();
         let c = KhComplex::new_no_simplify(&l, &QQ::zero(), &QQ::zero(), false);
         let e = c.sl2_map(&l);
         let h = c.homology();

@@ -145,3 +145,99 @@ where V: yui_core::TeX + Default {
         }, true, false)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn index_falls_back_to_the_default() {
+        // the point of `Grid`: a missing key reads as `V::default()` rather than panicking.
+        let g = Grid1::<i32>::from_iter([(0, 3), (2, 5)]);
+
+        assert_eq!(g[0], 3);
+        assert_eq!(g[2], 5);
+        assert_eq!(g[1], 0);
+        assert_eq!(g[-100], 0);
+        assert_eq!(g.get_default(), &0);
+
+        // reading an absent key must not insert it.
+        assert_eq!(g.len(), 2);
+        assert!(!g.contains_key(1));
+    }
+
+    #[test]
+    fn empty_grid() {
+        let g = Grid1::<i32>::new();
+        assert!(g.is_empty());
+        assert_eq!(g.len(), 0);
+        assert_eq!(g[0], 0);
+        assert_eq!(g.get(0), None);
+        assert_eq!(g.keys().count(), 0);
+    }
+
+    #[test]
+    fn get_distinguishes_absent_from_default_valued() {
+        // `index` cannot tell the two apart, `get` must.
+        let g = Grid1::<i32>::from_iter([(0, 0)]);
+        assert_eq!(g[0], 0);
+        assert_eq!(g[1], 0);
+        assert_eq!(g.get(0), Some(&0));
+        assert_eq!(g.get(1), None);
+    }
+
+    #[test]
+    fn insert_returns_the_previous_value() {
+        let mut g = Grid1::<i32>::new();
+        assert_eq!(g.insert(0, 3), None);
+        assert_eq!(g.insert(0, 5), Some(3));
+        assert_eq!(g[0], 5);
+        assert_eq!(g.len(), 1);
+    }
+
+    #[test]
+    fn tuple_index_matches_the_isize2_key() {
+        let g = Grid2::<i32>::from_iter([(isize2(1, -2), 7)]);
+        assert_eq!(g[isize2(1, -2)], 7);
+        assert_eq!(g[(1, -2)], 7);
+        assert_eq!(g[(0, 0)], 0);
+    }
+
+    #[test]
+    fn tuple_index_matches_the_isize3_key() {
+        let g = Grid3::<i32>::from_iter([(isize3(1, -2, 3), 7)]);
+        assert_eq!(g[isize3(1, -2, 3)], 7);
+        assert_eq!(g[(1, -2, 3)], 7);
+        assert_eq!(g[(0, 0, 0)], 0);
+    }
+
+    #[test]
+    fn iter_round_trips() {
+        let g = Grid1::<i32>::from_iter([(0, 3), (2, 5)]);
+        let mut es = g.iter().map(|(&k, &v)| (k, v)).collect::<Vec<_>>();
+        es.sort();
+        assert_eq!(es, vec![(0, 3), (2, 5)]);
+
+        let mut es = g.clone().into_iter().collect::<Vec<_>>();
+        es.sort();
+        assert_eq!(es, vec![(0, 3), (2, 5)]);
+    }
+
+    #[test]
+    fn seq_string_lists_only_the_stored_keys() {
+        // `indices()` is the key set, so a gap is skipped rather than shown as `.` — index 1
+        // does not appear at all.
+        let g = Grid1::<i32>::from_iter([(0, 3), (2, 5)]);
+        fn cells(s: &str) -> Vec<Vec<String>> {
+            s.lines()
+                .map(|l| l.split_whitespace().map(str::to_string).collect::<Vec<_>>())
+                .filter(|l| !l.is_empty())
+                .collect()
+        }
+
+        assert_eq!(cells(&g.to_seq_string()), cells("
+            i  0  2
+               3  5
+        "));
+    }
+}

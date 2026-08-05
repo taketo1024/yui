@@ -600,7 +600,7 @@ mod tests {
     fn trefoil() {
         let l = Link::test_data("3_1");
         assert_eq!(l.n_crossings(), 3);
-        assert_eq!(l.writhe(), -3);
+        assert_eq!(l.writhe(), 3);
         assert_eq!(l.n_comps(), 1);
     }
 
@@ -677,6 +677,51 @@ mod tests {
     fn with_base_pt_invalid_panics() {
         // Edge 99 is not in the trefoil's edge set.
         let _ = Link::test_data("3_1").with_base_pt(99);
+    }
+
+    #[test]
+    fn unoriented_drops_every_incoming() {
+        let l = Link::test_data("3_1");
+        assert!(l.is_oriented());
+
+        let u = l.unoriented();
+        assert!(!u.is_oriented());
+        assert!(u.nodes().all(|x| x.incoming().is_none()));
+        u.verify_ori();
+
+        // the diagram itself is untouched — only the orientation is gone.
+        assert!(Iterator::zip(u.nodes(), l.nodes()).all(|(a, b)|
+            a.node_type() == b.node_type() && a.edges() == b.edges()
+        ));
+        assert_eq!(u.n_comps(), l.n_comps());
+    }
+
+    #[test]
+    fn unoriented_of_an_unoriented_diagram_is_itself() {
+        // `unlink2` loads unoriented (its over-component has no under-anchor in the PD code).
+        let l = Link::test_data("unlink2");
+        assert!(!l.is_oriented());
+        assert_eq!(l.unoriented(), l);
+
+        let u = Link::test_data("3_1").unoriented();
+        assert_eq!(u.unoriented(), u);
+    }
+
+    #[test]
+    fn n_edges_counts_the_edge_set() {
+        // `n_edges` is O(1) off the "each node-edge appears exactly twice" invariant, so it must
+        // agree with the deduped edge list — including when free loops are present.
+        for l in [
+            Link::empty(),
+            Link::unknot(),
+            Link::unlink(3),
+            Link::test_data("3_1"),
+            Link::test_data("L4a1"),
+            Link::test_data("unknot_l_twist"),
+            Link::pretzel(1, 3, 5),
+        ] {
+            assert_eq!(l.n_edges(), l.edges().len(), "{l}");
+        }
     }
 
     #[test]

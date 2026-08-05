@@ -1,3 +1,4 @@
+use smart_default::SmartDefault;
 use crate::app::args::*;
 use crate::app::utils::*;
 use crate::app::err::*;
@@ -14,14 +15,16 @@ pub fn dispatch(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
     dispatch_ring!(App, boot, args)
 }
 
-#[derive(Clone, Default, Debug, clap::Args)]
+#[derive(Clone, SmartDefault, PartialEq, Debug, clap::Args)]
 pub struct Args {
     pub link: String,
 
     #[arg(short = 't', long, default_value = "Z")]
+    #[default(CType::Z)]
     pub c_type: CType,
 
     #[arg(short, long, default_value = "0")]
+    #[default("0".to_string())]
     pub c_value: String,
 
     #[arg(short, long)]
@@ -169,69 +172,105 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use clap::Parser;
+    use crate::app::app::{CliArgs, Cmd};
+    use crate::app::cmd::test_utils::{pd, assert_out, assert_cli_default};
 
     #[test]
-    fn test1() {
-        let args = Args {
-            link: "[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string(),
-            c_value: "0".to_string(),
-            ..Default::default()
+    fn cli_defaults() {
+        let link = pd("3_1");
+        let Cmd::CKh(a) = CliArgs::parse_from(["ykh", "ckh", &link]).command else {
+            panic!("`ckh` routed to the wrong subcommand")
         };
-        let res = dispatch(&args);
-        assert!(res.is_ok());
+        assert_cli_default(&a, &Args { link, ..Default::default() });
     }
 
     #[test]
-    fn test2() {
+    fn ckh_trefoil_z() {
         let args = Args {
-            link: "[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string(),
+            link: pd("3_1"),
+            ..Default::default()
+        };
+        assert_out(dispatch(&args), r"
+             j\i  0  1  2  3
+             9    .  .  .  Z
+             7    .  .  Z  Z
+             5    .  .  Z  .
+             3    Z  .  .  .
+             1    Z  .  .  .
+        ");
+    }
+
+    #[test]
+    fn ckh_trefoil_mirror_reduced_alpha() {
+        let args = Args {
+            link: pd("3_1"),
             c_value: "2".to_string(),
             mirror: true,
             reduced: true,
             show_alpha: true,
             ..Default::default()
         };
-        let res = dispatch(&args);
-        assert!(res.is_ok());
+        assert_out(dispatch(&args), r"
+             j\i  -3  -2  -1  0
+             -2   .   .   .   Z
+             -4   .   .   .   .
+             -6   .   Z   .   .
+             -8   Z   .   .   .
+
+             a[0] in CKh[0]: (-2)
+               -2(1X)₁₁₁
+        ");
     }
 
-    mod poly_tests {
-        use super::*;
+    #[test]
+    fn ckh_trefoil_zpoly_h() {
+        let args = Args {
+            link: pd("3_1"),
+            c_value: "H".to_string(),
+            ..Default::default()
+        };
+        assert_out(dispatch(&args), r"
+             j\i  0     1  2     3
+             9    .     .  .     Z[H]
+             7    .     .  Z[H]  Z[H]
+             5    .     .  Z[H]  .
+             3    Z[H]  .  .     .
+             1    Z[H]  .  .     .
+        ");
+    }
 
-        #[test]
-        fn test_zpoly_h() {
-            let args = Args {
-                link: "[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string(),
-                c_value: "H".to_string(),
-                c_type: CType::Z,
-                ..Default::default()
-            };
-            let res = dispatch(&args);
-            assert!(res.is_ok());
-        }
+    #[test]
+    fn ckh_trefoil_zpoly_t() {
+        let args = Args {
+            link: pd("3_1"),
+            c_value: "0,T".to_string(),
+            ..Default::default()
+        };
+        assert_out(dispatch(&args), r"
+             j\i  0     1  2     3
+             9    .     .  .     Z[T]
+             7    .     .  Z[T]  Z[T]
+             5    .     .  Z[T]  .
+             3    Z[T]  .  .     .
+             1    Z[T]  .  .     .
+        ");
+    }
 
-        #[test]
-        fn test_zpoly_t() {
-            let args = Args {
-                link: "[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string(),
-                c_value: "0,T".to_string(),
-                c_type: CType::Z,
-                ..Default::default()
-            };
-            let res = dispatch(&args);
-            assert!(res.is_ok());
-        }
-
-        #[test]
-        fn test_zpoly_ht() {
-            let args = Args {
-                link: "[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string(),
-                c_value: "H,T".to_string(),
-                c_type: CType::Z,
-                ..Default::default()
-            };
-            let res = dispatch(&args);
-            assert!(res.is_ok());
-        }
+    #[test]
+    fn ckh_trefoil_zpoly_ht() {
+        let args = Args {
+            link: pd("3_1"),
+            c_value: "H,T".to_string(),
+            ..Default::default()
+        };
+        assert_out(dispatch(&args), r"
+             j\i  0        1  2        3
+             9    .        .  .        Z[H, T]
+             7    .        .  Z[H, T]  Z[H, T]
+             5    .        .  Z[H, T]  .
+             3    Z[H, T]  .  .        .
+             1    Z[H, T]  .  .        .
+        ");
     }
 }

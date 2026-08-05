@@ -28,8 +28,10 @@ src/
 │   └── jones.rs      — `jones_polynomial`, `det`
 └── test_data.rs      — hard-coded PD codes / braid words (test-only)
 resources/
-└── inv_link/         — bundled symmetric PD codes for `InvLink::load`
-    └── *.json        — 3_1, 4_1, 5_1, 5_2a/b, …, 7_7a/b
+└── inv_link/lamm/    — Lamm's tables of symmetric diagrams, for `InvLink::load`
+    ├── A/            — one strong inversion per knot, up to 10 crossings
+    ├── B/            — doubly transvergent diagrams, two classes `<knot>a` / `<knot>b`
+    └── two_bridge/   — the two-bridge knots
 ```
 
 ## Key types
@@ -47,7 +49,7 @@ Free loops are closed components without crossings. They participate in `comps()
 
 Each link carries a `base_pt: Option<Edge>`, defaulting to the minimum edge of the diagram (or `None` for the empty link). Set explicitly via `with_base_pt(e)` (consuming builder; asserts `e` is a real edge of the diagram).
 
-Accessors: `n_crossings`, `n_comps`, `comps`, `writhe`, `loops`, `n_loops`, `base_pt`, `with_base_pt`, `reindexed`, traversal helpers.
+Accessors: `n_crossings`, `n_comps`, `comps`, `writhe`, `loops`, `n_loops`, `n_edges`, `edges`, `base_pt`, `with_base_pt`, `is_oriented`, `unoriented`, `reindexed`, `reindexed_canon`, traversal helpers.
 
 Operations on a diagram: `mirror`, `conn_sum` / `conn_sum_at`, `cc_at` (crossing change), `resolve_at` / `resolve_by` (Khovanov-style 0/1-smoothings), `seifert_state`, `seifert_circles`, `seifert_graph`.
 
@@ -67,11 +69,17 @@ A vertex in a planar diagram — either a crossing or a smoothing — together w
    0   1         0   1         0   1         0   1
 ```
 
-Carries a `NodeType` (XL / XR / V / H), a `NodeOri` (`↑ ↓ ← →` or none), and `[Edge; 4]` of incident edges in the order shown. `resolve(bit)` turns a crossing (XL/XR) into a smoothing (V/H); `mirror()` swaps XL ↔ XR; `sign()` returns the crossing sign as `Option<Sign>` (from (type, orientation)).
+Carries a `NodeType` (XL / XR / V / H), the orientation, and `[Edge; 4]` of incident edges in the order shown.
+
+The four ends are named by `Slot` — `SW`, `SE`, `NE`, `NW`, counter-clockwise from the lower left, matching the positions `0, 1, 2, 3` above. The orientation is the pair of slots the two strands *enter* by, sorted, or `None` when the node is not coherently oriented; it is valid exactly when the two lie on different strands (`orientable`). A crossing's orientation survives exactly one of its two smoothings, so `resolve` clears it for the other.
+
+`resolve(bit)` turns a crossing (XL/XR) into a smoothing (V/H); `mirror()` swaps XL ↔ XR; `sign()` returns the crossing sign as `Option<Sign>` (from type and orientation).
 
 ### `Path`
 
-An ordered list of `Edge`s with a `closed: bool` flag — either an *arc* (open path) or a *circle* (closed loop). Constructed via `Path::arc(edges)` / `Path::circ(edges)` / `Path::new(edges, closed)`. Returned as the component type by `Link::comps()` and `Link::seifert_circles()`; free loops become one-element circles. Methods: `is_arc`, `is_circle`, `ends`, `contains`, `connect` (concatenate two arcs sharing an endpoint), `reduce` (canonicalize the edge sequence), `unori_eq` (equality up to orientation).
+An *oriented* connected component: either an arc (`Path::Arc`) or a closed loop (`Path::Circ`), each holding a non-empty sequence of `Edge`s. Built with `Path::arc(edges)` / `Path::circ(edges)` (both panic on an empty sequence). Returned as the component type by `Link::comps()` and `Link::seifert_circles()`; free loops become one-element circles.
+
+Methods: `is_arc`, `is_circle`, `len`, `edges`, `contains`, `min_edge`, `end_pts` (`Some((first, last))` for an arc, `None` for a circle), `into_seq`. Equality is as an oriented sequence — a circle equals neither its reversal nor its rotation.
 
 ### `Braid`
 
@@ -86,12 +94,14 @@ Methods: `closure() -> Link` (free strands become free loops in the resulting li
 An *involutive link*: a `Link` together with an involution on it — an edge bijection `e ↦ e'`, the induced node bijection, and (via the inner `Link`) an optional axis base point. Constructors:
 
 - `InvLink::new(inner, e_map)` — `e_map: IntoIterator<Item = (Edge, Edge)>`. The constructor asserts that `e_map` covers every link edge, has image within the edge set, and is involutive.
-- `InvLink::from_symmetric_pd_code(pd_code)` — convenience for *strongly invertible* knots whose PD code uses edges `1..=n` with the standard involution `e ↦ (n+1-e) mod n + 1`.
-- `InvLink::load(name)` — reads `<DATA_DIR>/inv_link/<name>.json`. Bundled entries (3_1, 4_1, 5_1, 5_2a/b, …, 7_7a/b) ship in `lib-link/resources/inv_link/` and are copied into the data dir by `scripts/fetch-knot-data.py`.
+- `InvLink::from_symmetric_pd_code(pd_code)` — for a *strongly invertible* knot given by a diagram based on its axis. τ reverses the traversal, so walking both ways from the base point pairs each edge with its image; no search and no relabelling is needed. The base point defaults to the least edge, which the symmetric convention puts on the axis.
+- `InvLink::load(name)` — reads `<DATA_DIR>/inv_link/<name>.json`. Lamm's tables ship in `lib-link/resources/inv_link/lamm/` and are flattened into the data dir by `scripts/fetch-knot-data.py`.
 
 `with_base_pt(e)` sets the base point; it asserts that `e` is on-axis (`inv_edge(e) == e`). `inv_edge(e)` and `inv_node(x)` look up the involution. Most read-only `Link` methods are delegated, including `base_pt()`.
 
-`mirror` and `conn_sum` / `conn_sum_at` are the equivariant counterparts of the `Link` operations — the connected sum splices along on-axis edges. `InvLink::sym_pretzel(a, b, a)` (all-odd) and `InvLink::whitehead_double(&k, positive, tw)` (even `tw`) are the equivariant constructions; each recovers the strong inversion by reindexing to the standard involution.
+An `InvLink` is only an *involutive* link. `on_axis_edges()` lists the τ-fixed edges, and the two cases are told apart by `is_strongly_invertible()` (τ reverses the orientation) and `is_2periodic()` (τ preserves it) — both decided from the orientation, not from index arithmetic.
+
+`mirror` and `conn_sum` / `conn_sum_at` are the equivariant counterparts of the `Link` operations — the connected sum splices along on-axis edges, `conn_sum` taking self's other on-axis edge and other's base point. `InvLink::sym_pretzel(a, b, a)` (all-odd) and `InvLink::whitehead_double(&k, positive, tw)` (even `tw`, with `whitehead_double_at` to choose which on-axis edge carries the clasp) are the equivariant constructions.
 
 ### Derived invariants
 
@@ -102,7 +112,7 @@ An *involutive link*: a `Link` together with an involution on it — an edge bij
 - **PD code.** Each crossing is `[a, b, c, d]` ordered counter-clockwise from the lower-left, with `a → c` the incoming under-strand. See:
   - KnotAtlas — [katlas.org/wiki/Planar_Diagrams](https://katlas.org/wiki/Planar_Diagrams)
   - KnotInfo — [knotinfo.org/descriptions/pd_notation.html](https://knotinfo.org/descriptions/pd_notation.html)
-- **Edge ids.** `Edge = usize`. Only used to identify endpoint coincidence; ids don't have to be contiguous or start at 0. `InvLink::from_symmetric_pd_code` expects `1..=n_edges` so the involution formula is well-defined.
+- **Edge ids.** `Edge` is `u8` by default, `u16` under the `big-link` feature. Only used to identify endpoint coincidence; ids don't have to be contiguous or start at 0.
 - **Base point.** Defaults to the minimum edge of the diagram. For `InvLink`, the base point must be fixed by the involution (use `with_base_pt(e)` to set a specific on-axis edge).
 
 ## Data directory
@@ -114,7 +124,7 @@ python3 scripts/fetch-knot-data.py            # default data dir
 python3 scripts/fetch-knot-data.py --out DIR  # or a custom directory
 ```
 
-The script writes per-knot PD codes to `<DATA_DIR>/links/`, braid words to `<DATA_DIR>/braid/`, and copies this crate's bundled symmetric PD codes (`resources/inv_link/*.json`) to `<DATA_DIR>/inv_link/`.
+The script writes per-knot PD codes to `<DATA_DIR>/links/`, braid words to `<DATA_DIR>/braid/`, and flattens this crate's bundled Lamm tables (`resources/inv_link/lamm/**`) into `<DATA_DIR>/inv_link/`. Pass `--clean` to drop entries that were removed from the repo.
 
 ## Quick example
 
@@ -136,6 +146,7 @@ assert_eq!(u.n_comps(), 3);
 ## Feature flags
 
 - `test-utils` — exposes the hard-coded `Link::test_data(name)` / `Braid::test_data(name)` / `InvLink::test_data(name)` constructors to downstream crates (behind `#[cfg(test)]` by default).
+- `big-link` — widens `Edge` from `u8` to `u16` and the resolution `State` from 64 to 128 bits, raising the crossing limit from 64 to 128.
 
 ## License
 

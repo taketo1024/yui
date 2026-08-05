@@ -1,3 +1,4 @@
+use smart_default::SmartDefault;
 use crate::app::args::*;
 use crate::app::utils::*;
 use crate::app::err::*;
@@ -14,7 +15,7 @@ pub fn dispatch(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
     dispatch_eucring!(App, boot, args)
 }
 
-#[derive(Clone, Default, Debug, clap::Args)]
+#[derive(Clone, SmartDefault, PartialEq, Debug, clap::Args)]
 pub struct Args {
     pub link: String,
 
@@ -25,9 +26,11 @@ pub struct Args {
     pub map_type: usize,
 
     #[arg(short = 't', long, default_value = "Z")]
+    #[default(CType::Z)]
     pub c_type: CType,
 
     #[arg(short, long, default_value = "0")]
+    #[default("0".to_string())]
     pub c_value: String,
 
     #[arg(short, long)]
@@ -175,73 +178,99 @@ where
     }
 }
 
-// #[cfg(_test)]
-// mod tests {
-//     use super::*;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+    use crate::app::app::{CliArgs, Cmd};
+    use crate::app::cmd::test_utils::{pd, assert_out, assert_cli_default};
 
-//     #[test]
-//     fn test1() {
-//         let args = Args {
-//             link: "3_1".to_string(),
-//             c_value: "0".to_string(),
-//             ..Default::default()
-//         };
-//         let res = dispatch(&args);
-//         assert!(res.is_ok());
-//     }
+    #[test]
+    fn cli_defaults() {
+        let link = pd("3_1");
+        let Cmd::CC(a) = CliArgs::parse_from(["ykh", "cc", &link, "-i", "0", "-f", "0"]).command else {
+            panic!("`cc` routed to the wrong subcommand")
+        };
+        assert_cli_default(&a, &Args { link, cc_index: 0, map_type: 0, ..Default::default() });
+    }
 
-//     #[test]
-//     fn test2() {
-//         let args = Args {
-//             link: "[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string(),
-//             c_value: "2".to_string(),
-//             mirror: true,
-//             reduced: true,
-//             show_alpha: true,
-//             ..Default::default()
-//         };
-//         let res = dispatch(&args);
-//         assert!(res.is_ok());
-//     }
+    // f0 lowers the h-degree by 2: the negative-to-positive crossing change on the trefoil.
+    #[test]
+    fn cc_trefoil_map0() {
+        let args = Args {
+            link: pd("3_1"),
+            cc_index: 0,
+            map_type: 0,
+            ..Default::default()
+        };
+        assert_out(dispatch(&args), r"
+            from:
+             j\i  0  1  2  3
+             9    .  .  .  Z
+             7    .  .  .  (Z/2)
+             5    .  .  Z  .
+             3    Z  .  .  .
+             1    Z  .  .  .
 
-//     #[cfg(feature = "poly")]
-//     mod poly_tests {
-//         use super::*;
+            to:
+             j\i  0
+             1    Z
+             -1   Z
 
-//         #[test]
-//         fn test_zpoly_h() {
-//             let args = Args {
-//                 link: "3_1".to_string(),
-//                 c_value: "H".to_string(),
-//                 c_type: CType::Z,
-//                 ..Default::default()
-//             };
-//             let res = dispatch(&args);
-//             assert!(res.is_ok());
-//         }
+            f0: deg -2
 
-//         #[test]
-//         fn test_zpoly_t() {
-//             let args = Args {
-//                 link: "3_1".to_string(),
-//                 c_value: "0,T".to_string(),
-//                 c_type: CType::Z,
-//                 ..Default::default()
-//             };
-//             let res = dispatch(&args);
-//             assert!(res.is_ok());
-//         }
+            (0) Z² -> (-2) 0
+                [1, 0] -> []
+                [0, 1] -> []
 
-//         #[test]
-//         fn test_zpoly_ht() {
-//             let args = Args {
-//                 link: "3_1".to_string(),
-//                 c_value: "H,T".to_string(),
-//                 c_type: CType::Z,
-//                 ..Default::default()
-//             };
-//             let res = dispatch(&args);
-//             assert!(res.is_ok());
-//         }
-//     }
-// }
+            (1) 0 -> (-1) 0
+
+            (2) Z -> (0) Z²
+                [1] -> [0, -1]
+
+            (3) Z ⊕ (Z/2) -> (1) 0
+                [1, 0] -> []
+                [0, 1] -> []
+        ");
+    }
+
+    // f1 preserves the h-degree.
+    #[test]
+    fn cc_trefoil_map1() {
+        let args = Args {
+            link: pd("3_1"),
+            cc_index: 0,
+            map_type: 1,
+            ..Default::default()
+        };
+        assert_out(dispatch(&args), r"
+            from:
+             j\i  0  1  2  3
+             9    .  .  .  Z
+             7    .  .  .  (Z/2)
+             5    .  .  Z  .
+             3    Z  .  .  .
+             1    Z  .  .  .
+
+            to:
+             j\i  0
+             1    Z
+             -1   Z
+
+            f1: deg 0
+
+            (0) Z² -> (0) Z²
+                [1, 0] -> [1, 0]
+                [0, 1] -> [0, -1]
+
+            (1) 0 -> (1) 0
+
+            (2) Z -> (2) 0
+                [1] -> []
+
+            (3) Z ⊕ (Z/2) -> (3) 0
+                [1, 0] -> []
+                [0, 1] -> []
+        ");
+    }
+}

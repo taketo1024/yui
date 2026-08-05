@@ -1,3 +1,4 @@
+use smart_default::SmartDefault;
 use std::marker::PhantomData;
 use std::ops::RangeInclusive;
 use std::str::FromStr;
@@ -15,14 +16,16 @@ pub fn dispatch(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
     dispatch_eucring!(App, boot, args)
 }
 
-#[derive(Clone, Default, Debug, clap::Args)]
+#[derive(Clone, SmartDefault, PartialEq, Debug, clap::Args)]
 pub struct Args { 
     pub link: String,
 
     #[arg(short = 't', long, default_value = "Z")]
+    #[default(CType::Z)]
     pub c_type: CType,
 
     #[arg(short, long, default_value = "0")]
+    #[default("0".to_string())]
     pub c_value: String,
 
     #[arg(short, long)]
@@ -203,53 +206,87 @@ where
 #[cfg(test)]
 mod tests { 
     use super::*;
+    use clap::Parser;
+    use crate::app::app::{CliArgs, Cmd};
+    use crate::app::cmd::test_utils::{pd, assert_out, assert_cli_default};
 
     #[test]
-    fn test1() { 
-        let args = Args { 
-            link: "[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string(), 
-            c_value: "0".to_string(), 
-            ..Default::default()
+    fn cli_defaults() {
+        let link = pd("3_1");
+        let Cmd::Kh(a) = CliArgs::parse_from(["ykh", "kh", &link]).command else {
+            panic!("`kh` routed to the wrong subcommand")
         };
-        let res = dispatch(&args);
-        assert!(res.is_ok());
+        assert_cli_default(&a, &Args { link, ..Default::default() });
     }
 
     #[test]
-    fn test2() { 
+    fn kh_trefoil_z() { 
         let args = Args { 
-            link: "[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string(),
-            c_value: "0".to_string(),
-            c_type: CType::Z,
+            link: pd("3_1"), 
+            ..Default::default()
+        };
+        assert_out(dispatch(&args), r"
+             j\i  0  1  2  3
+             9    .  .  .  Z
+             7    .  .  .  (Z/2)
+             5    .  .  Z  .
+             3    Z  .  .  .
+             1    Z  .  .  .
+        ");
+    }
+
+    #[test]
+    fn kh_trefoil_mirror_reduced() { 
+        let args = Args { 
+            link: pd("3_1"),
             mirror: true,
             reduced: true,
             ..Default::default()
         };
-        let res = dispatch(&args);
-        assert!(res.is_ok());
+        assert_out(dispatch(&args), r"
+             j\i  -3  -2  -1  0
+             -2   .   .   .   Z
+             -4   .   .   .   .
+             -6   .   Z   .   .
+             -8   Z   .   .   .
+        ");
     }
 
     #[test]
-    fn test_qpoly_h() { 
+    fn kh_trefoil_qpoly_h() { 
+        // Bar-Natan homology over Q[H]: two free towers at h = 0, one H-torsion at h = 3.
         let args = Args {
-            link: "[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string(),
+            link: pd("3_1"),
             c_value: "H".to_string(),
             c_type: CType::Q,
             ..Default::default()
         };
-        let res = dispatch(&args);
-        assert!(res.is_ok());
+        assert_out(dispatch(&args), r"
+             j\i  0     1  2  3
+             9    .     .  .  (Q[H]/H²)
+             7    .     .  .  .
+             5    .     .  .  .
+             3    Q[H]  .  .  .
+             1    Q[H]  .  .  .
+        ");
     }
 
     #[test]
-    fn test_qpoly_t() { 
+    fn kh_trefoil_qpoly_t() { 
+        // Lee homology over Q[T].
         let args = Args {
-            link: "[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string(),
+            link: pd("3_1"),
             c_value: "0,T".to_string(),
             c_type: CType::Q,
             ..Default::default()
         };
-        let res = dispatch(&args);
-        assert!(res.is_ok());
+        assert_out(dispatch(&args), r"
+             j\i  0     1  2  3
+             9    .     .  .  (Q[T]/T)
+             7    .     .  .  .
+             5    .     .  .  .
+             3    Q[T]  .  .  .
+             1    Q[T]  .  .  .
+        ");
     }
 }

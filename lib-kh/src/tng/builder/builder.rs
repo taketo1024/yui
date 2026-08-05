@@ -66,7 +66,7 @@ impl BuildMode {
 
 /// Divide-and-conquer chunking: `None` = single pass; `Auto(k)` cuts the build order at its `k-1`
 /// deepest cutwidth valleys.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub enum CutOption {
     #[default]
     None,

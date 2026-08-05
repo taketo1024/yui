@@ -1,3 +1,4 @@
+use smart_default::SmartDefault;
 use std::marker::PhantomData;
 use std::ops::RangeInclusive;
 use std::str::FromStr;
@@ -15,14 +16,16 @@ pub fn dispatch(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
     dispatch_eucring!(App, boot, args)
 }
 
-#[derive(Clone, Default, Debug, clap::Args)]
+#[derive(Clone, SmartDefault, PartialEq, Debug, clap::Args)]
 pub struct Args { 
     pub link: String,
 
     #[arg(short = 't', long, default_value = "F2")]
+    #[default(CType::F2)]
     pub c_type: CType,
 
     #[arg(short, long, default_value = "0")]
+    #[default("0".to_string())]
     pub c_value: String,
 
     #[arg(short, long)]
@@ -247,42 +250,64 @@ where
 #[cfg(test)]
 mod tests { 
     use super::*;
+    use clap::Parser;
+    use crate::app::app::{CliArgs, Cmd};
+    use crate::app::cmd::test_utils::{pd, assert_out, assert_cli_default};
 
     #[test]
-    fn test1() { 
-        let args = Args { 
-            link: "[[1,5,2,4],[3,1,4,6],[5,3,6,2]]".to_string(), 
-            c_type: CType::F2,
-            c_value: "0".to_string(),
-            ..Default::default()
+    fn cli_defaults() {
+        let link = pd("3_1");
+        let Cmd::KhI(a) = CliArgs::parse_from(["ykh", "khi", &link]).command else {
+            panic!("`khi` routed to the wrong subcommand")
         };
-        let res = dispatch(&args);
-        assert!(res.is_ok());
+        assert_cli_default(&a, &Args { link, ..Default::default() });
     }
 
     #[test]
-    fn test2() { 
+    fn khi_trefoil_f2() { 
         let args = Args { 
-            link: "[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string(),
-            c_type: CType::F2,
+            link: pd("3_1"), 
+            ..Default::default()
+        };
+        assert_out(dispatch(&args), r"
+             j\i  0   1   2   3    4
+             9    .   .   .   F₂   F₂
+             7    .   .   F₂  F₂²  F₂
+             5    .   .   F₂  F₂   .
+             3    F₂  F₂  .   .    .
+             1    F₂  F₂  .   .    .
+        ");
+    }
+
+    #[test]
+    fn khi_trefoil_mirror_reduced() { 
+        let args = Args { 
+            link: pd("3_1"),
             c_value: "1".to_string(),
             mirror: true,
             reduced: true,
             ..Default::default()
         };
-        let res = dispatch(&args);
-        assert!(res.is_ok());
+        assert_out(dispatch(&args), r"
+             i  0   1
+                F₂  F₂
+        ");
     }
 
     #[test]
-    fn test_poly_h() { 
+    fn khi_trefoil_poly_h() { 
         let args = Args {
-            link: "[[1,5,2,4],[3,1,4,6],[5,3,6,2]]".to_string(),
-            c_type: CType::F2,
+            link: pd("3_1"),
             c_value: "H".to_string(),
             ..Default::default()
         };
-        let res = dispatch(&args);
-        assert!(res.is_ok());
+        assert_out(dispatch(&args), r"
+             j\i  0      1      2  3          4
+             9    .      .      .  (F₂[H]/H)  (F₂[H]/H)
+             7    .      .      .  (F₂[H]/H)  (F₂[H]/H)
+             5    .      .      .  .          .
+             3    F₂[H]  F₂[H]  .  .          .
+             1    F₂[H]  F₂[H]  .  .          .
+        ");
     }
 }

@@ -110,10 +110,10 @@ mod tests {
         let l = Link::test_data("3_1");
         let c = 2;
         
-        assert_eq!(ss_invariant(&l, &c, false), -2);
-        assert_eq!(ss_invariant(&l, &c, true ), -2);
-        assert_eq!(ss_invariant(&l.mirror(), &c, false), 2);
-        assert_eq!(ss_invariant(&l.mirror(), &c, true ), 2);
+        assert_eq!(ss_invariant(&l, &c, false), 2);
+        assert_eq!(ss_invariant(&l, &c, true ), 2);
+        assert_eq!(ss_invariant(&l.mirror(), &c, false), -2);
+        assert_eq!(ss_invariant(&l.mirror(), &c, true ), -2);
     }
 
     #[test]
@@ -132,10 +132,10 @@ mod tests {
         let l = Link::test_data("5_1");
         let c = 2;
         
-        assert_eq!(ss_invariant(&l, &c, false), -4);
-        assert_eq!(ss_invariant(&l, &c, true ), -4);
-        assert_eq!(ss_invariant(&l.mirror(), &c, false), 4);
-        assert_eq!(ss_invariant(&l.mirror(), &c, true ), 4);
+        assert_eq!(ss_invariant(&l, &c, false), 4);
+        assert_eq!(ss_invariant(&l, &c, true ), 4);
+        assert_eq!(ss_invariant(&l.mirror(), &c, false), -4);
+        assert_eq!(ss_invariant(&l.mirror(), &c, true ), -4);
     }
 
     #[test]
@@ -143,10 +143,10 @@ mod tests {
         let l = Link::test_data("5_2");
         let c = 2;
         
-        assert_eq!(ss_invariant(&l, &c, false), -2);
-        assert_eq!(ss_invariant(&l, &c, true ), -2);
-        assert_eq!(ss_invariant(&l.mirror(), &c, false), 2);
-        assert_eq!(ss_invariant(&l.mirror(), &c, true ), 2);
+        assert_eq!(ss_invariant(&l, &c, false), 2);
+        assert_eq!(ss_invariant(&l, &c, true ), 2);
+        assert_eq!(ss_invariant(&l.mirror(), &c, false), -2);
+        assert_eq!(ss_invariant(&l.mirror(), &c, true ), -2);
     }
 
     #[test]
@@ -165,10 +165,10 @@ mod tests {
         let l = Link::test_data("6_2");
         let c = 2;
         
-        assert_eq!(ss_invariant(&l, &c, false), -2);
-        assert_eq!(ss_invariant(&l, &c, true ), -2);
-        assert_eq!(ss_invariant(&l.mirror(), &c, false), 2);
-        assert_eq!(ss_invariant(&l.mirror(), &c, true ), 2);
+        assert_eq!(ss_invariant(&l, &c, false), 2);
+        assert_eq!(ss_invariant(&l, &c, true ), 2);
+        assert_eq!(ss_invariant(&l.mirror(), &c, false), -2);
+        assert_eq!(ss_invariant(&l.mirror(), &c, true ), -2);
     }
 
     #[test]
@@ -187,10 +187,10 @@ mod tests {
         let l = Link::test_data("7_1");
         let c = 2;
         
-        assert_eq!(ss_invariant(&l, &c, false), -6);
-        assert_eq!(ss_invariant(&l, &c, true ), -6);
-        assert_eq!(ss_invariant(&l.mirror(), &c, false), 6);
-        assert_eq!(ss_invariant(&l.mirror(), &c, true ), 6);
+        assert_eq!(ss_invariant(&l, &c, false), 6);
+        assert_eq!(ss_invariant(&l, &c, true ), 6);
+        assert_eq!(ss_invariant(&l.mirror(), &c, false), -6);
+        assert_eq!(ss_invariant(&l.mirror(), &c, true ), -6);
     }
 
     #[test]
@@ -198,10 +198,10 @@ mod tests {
         let l = Link::test_data("7_2");
         let c = 2;
         
-        assert_eq!(ss_invariant(&l, &c, false), -2);
-        assert_eq!(ss_invariant(&l, &c, true ), -2);
-        assert_eq!(ss_invariant(&l.mirror(), &c, false), 2);
-        assert_eq!(ss_invariant(&l.mirror(), &c, true ), 2);
+        assert_eq!(ss_invariant(&l, &c, false), 2);
+        assert_eq!(ss_invariant(&l, &c, true ), 2);
+        assert_eq!(ss_invariant(&l.mirror(), &c, false), -2);
+        assert_eq!(ss_invariant(&l.mirror(), &c, true ), -2);
     }
 
     #[test]

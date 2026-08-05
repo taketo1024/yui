@@ -205,6 +205,8 @@ impl InvLink {
 
 impl InvLink {
     pub fn load(name: &str) -> Result<InvLink, Box<dyn std::error::Error>> {
+        // the data dir is external and empty on a fresh checkout; tests must not depend on it.
+        assert!(!cfg!(feature = "test-utils"), "`load` reads the data directory — use `test_data` in tests");
         let json = yui_core::util::data_dir::load_json("inv_link", name)?;
         let data: Vec<PDCodeX> = serde_json::from_str(&json)?;
         Ok(InvLink::from_symmetric_pd_code(data))
@@ -242,17 +244,13 @@ mod tests {
     }
 
     #[test]
-    fn load_3_1() {
-        let l = InvLink::test_data("3_1");
-        assert_eq!(l.n_crossings(), 3);
+    fn test_data_diagrams() {
+        // the bundled symmetric diagrams parse, and are the size Lamm's tables give.
+        for (name, n) in [("3_1", 3), ("4_1", 4), ("4_1a", 4), ("4_1b", 4), ("6_3", 7), ("6_3a", 8), ("7_7b", 7)] {
+            assert_eq!(InvLink::test_data(name).n_crossings(), n, "{name}");
+        }
     }
 
-    #[test]
-    fn load_4_1() { 
-        let l = InvLink::test_data("4_1");
-        assert_eq!(l.n_crossings(), 4);
-    }
-    
     #[test]
     fn inv_edge() { 
         let l = InvLink::test_data("3_1");
@@ -340,6 +338,58 @@ mod tests {
         }
         check("sym_pretzel(-3,3,-3)", &InvLink::sym_pretzel(-3, 3, -3));
         check("sym_wh+(3_1)", &InvLink::whitehead_double(&InvLink::test_data("3_1"), true, 0));
+    }
+
+    #[test]
+    #[should_panic(expected = "must be on-axis")]
+    fn with_base_pt_rejects_an_off_axis_edge() {
+        // 3_1's axis meets it at edges 1 and 4; edge 2 is swapped with 6 by tau.
+        let _ = InvLink::test_data("3_1").with_base_pt(2);
+    }
+
+    #[test]
+    fn strong_inversions_are_not_2periodic() {
+        // the two cases are exclusive: tau reverses the orientation, so it cannot preserve it.
+        for name in ["3_1", "4_1", "6_3", "5_2a", "7_7b"] {
+            let k = InvLink::test_data(name);
+            assert!(k.is_strongly_invertible(), "{name}");
+            assert!(!k.is_2periodic(), "{name}");
+        }
+    }
+
+    #[test]
+    fn conn_sum_at_depends_on_which_side_of_the_axis() {
+        // The companion's two on-axis edges are the two sides of its axis, and splicing to one or
+        // the other gives different diagrams in general — the equivariant connected sum is not
+        // determined by the two knots alone. `conn_sum` fixes the convention: other's base point.
+        // (For 4_1, 5_2a, 6_1a, 7_2a the two sides happen to agree; 6_3 is a companion where they
+        // do not, so this also pins which side `conn_sum` takes.)
+        let k1 = InvLink::test_data("3_1");
+        let k2 = InvLink::test_data("6_3");
+
+        let axis = k2.on_axis_edges();
+        assert_eq!(axis, vec![1, 8]);
+        assert_eq!(k2.base_pt(), Some(axis[0]));
+
+        // self_e is forced: the other on-axis edge, since the splice may not eat self's base point.
+        assert_eq!(k1.on_axis_edges(), vec![1, 4]);
+        assert_eq!(k1.base_pt(), Some(1));
+        let self_e = 4;
+
+        let sums = axis.iter().map(|&e| k1.conn_sum_at(&k2, self_e, e)).collect_vec();
+
+        for (s, e) in Iterator::zip(sums.iter(), axis.iter()) {
+            assert!(s.is_knot(), "other_e = {e}");
+            assert!(s.is_strongly_invertible(), "other_e = {e}");
+            let base = s.base_pt().expect("the sum keeps a base point");
+            assert_eq!(s.inv_edge(base), base, "other_e = {e}: base point is off-axis");
+            assert_eq!(s.n_crossings(), k1.n_crossings() + k2.n_crossings(), "other_e = {e}");
+            assert_eq!(det(s.inner()), det(k1.inner()) * det(k2.inner()), "other_e = {e}");
+        }
+
+        let canon = |k: &InvLink| k.inner().reindexed_canon();
+        assert_ne!(canon(&sums[0]), canon(&sums[1]), "the two sides must give different diagrams");
+        assert_eq!(canon(&k1.conn_sum(&k2)), canon(&sums[0]), "conn_sum splices at other's base point");
     }
 
     #[test]

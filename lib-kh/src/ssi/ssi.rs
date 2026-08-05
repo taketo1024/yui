@@ -7,19 +7,16 @@
 //!   Algebr. Geom. Topol. 25 (2025), 5059–5111.
 //!   <https://doi.org/10.2140/agt.2025.25.5059>, <https://arxiv.org/abs/2404.08568>
 
-use itertools::Itertools;
-use num_traits::Zero;
 use log::info;
 
 use yui_core::MathType;
 use yui_core::num::FF2;
-use yui_link::{InvLink, Link};
+use yui_link::InvLink;
 
 use crate::tng::builder::SymBuildConfig;
 use crate::util::FastPoly;
-use crate::util::calc::div_vec;
-use crate::khi::KhIHomology;
-use super::ssi_h1::ssi_divisibility_v2;
+use super::ssi_v1::ssi_divisibility_v1;
+use super::ssi_v2::ssi_divisibility_v2;
 
 type P = FastPoly<'H', FF2>;
 
@@ -34,11 +31,12 @@ pub enum SsiVersion {
 }
 
 /// `ssi` over `𝔽₂[H]`, via the current default pipeline ([`SsiVersion::V2`]).
-pub fn ssi_invariant(l: &InvLink, reduced: bool, config: SymBuildConfig, expected: Option<isize>) -> (i32, i32) {
-    ssi_invariant_ver(l, reduced, config, expected, SsiVersion::V2)
+pub fn ssi_invariant(l: &InvLink, reduced: bool) -> (i32, i32) {
+    ssi_invariant_with(l, reduced, SymBuildConfig::default(), None, SsiVersion::V2)
 }
 
-pub fn ssi_invariant_ver(l: &InvLink, reduced: bool, config: SymBuildConfig, expected: Option<isize>, ver: SsiVersion) -> (i32, i32) {
+/// The same, with the build configuration, the guessed s-value and the pipeline given explicitly.
+pub fn ssi_invariant_with(l: &InvLink, reduced: bool, config: SymBuildConfig, expected: Option<isize>, ver: SsiVersion) -> (i32, i32) {
     assert!(l.is_knot());
 
     info!("compute ssi ({ver:?}) over {}.", P::math_symbol());
@@ -59,60 +57,23 @@ pub fn ssi_invariant_ver(l: &InvLink, reduced: bool, config: SymBuildConfig, exp
     (ss0, ss1)
 }
 
-fn ssi_divisibility_v1(l: &InvLink, reduced: bool) -> (i32, i32) {
-    let r = if reduced { 1 } else { 2 };
-    let c = P::variable();
-    let t = P::zero();
-
-    // bottom..=1: building the cheap low degrees and truncating only at the top is faster than
-    // the doubly-truncated `0..=1` slice (which widens to the dense `-1..=2`). Builder clamps the start.
-    let kh = KhIHomology::new_partial(l, &c, &t, reduced, Some(-(Link::MAX_CROSSING as isize) ..= 1));
-
-    assert_eq!(kh[0].rank(), r);
-    assert_eq!(kh[1].rank(), r);    
-
-    info!("KhI[0]: {}", kh[0]);    
-    info!("KhI[1]: {}", kh[1]);    
-
-    let zs = kh.canon_cycles();
-    
-    assert_eq!(zs.len(), 2 * r);
-    for (i, z) in zs.iter().enumerate() {
-        let expected = if i < r { 0 } else { 1 };
-        assert!(!z.is_zero());
-        assert_eq!(z.homogeneous_value(|x| kh.h_deg_of(x)), Some(expected));
-    }
-
-    let ds = zs.iter().enumerate().map(|(i, z)| {
-        let h = kh.h_deg_of_chain(z);
-        let v = kh[h].vectorize_euc(z);
-        info!("a[{i}] in Kh[{h}]: ({})", v.clone().into_dense().iter().join(","));
-        v
-    }).map(|v| 
-        div_vec(&v.subvec(0..r), &c).expect("invalid divisibility.")
-    ).collect_vec();
-
-    let (d0, d1) = if reduced { 
-        (ds[0], ds[1])
-    } else { 
-        assert_eq!(ds[0], ds[1]);
-        assert_eq!(ds[2], ds[3]);
-        (ds[0], ds[2])
-    };
-
-    assert!(d0 <= d1);
-
-    (d0, d1)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
+    fn ssi_invariant_uses_the_default_config_and_v2() {
+        let l = InvLink::test_data("3_1");
+        assert_eq!(
+            ssi_invariant(&l, false),
+            ssi_invariant_with(&l, false, SymBuildConfig::default(), None, SsiVersion::V2)
+        );
+    }
+
+    #[test]
     fn test_unknot_pos_twist() {
         let l = InvLink::test_data("unknot_r_twist");
-        let ssi = ssi_invariant_ver(&l, false, SymBuildConfig::default(), None, SsiVersion::V1);
+        let ssi = ssi_invariant_with(&l, false, SymBuildConfig::default(), None, SsiVersion::V1);
         assert_eq!(ssi.0, 0);
         assert_eq!(ssi.1, 0);
     }
@@ -120,7 +81,7 @@ mod tests {
     #[test]
     fn test_unknot_neg_twist() {
         let l = InvLink::test_data("unknot_l_twist");
-        let ssi = ssi_invariant_ver(&l, false, SymBuildConfig::default(), None, SsiVersion::V1);
+        let ssi = ssi_invariant_with(&l, false, SymBuildConfig::default(), None, SsiVersion::V1);
         assert_eq!(ssi.0, 0);
         assert_eq!(ssi.1, 0);
     }
@@ -128,7 +89,7 @@ mod tests {
     #[test]
     fn test_unknot_neg_twist2() {
         let l = InvLink::test_data("unknot_l_twist2");
-        let ssi = ssi_invariant_ver(&l, false, SymBuildConfig::default(), None, SsiVersion::V1);
+        let ssi = ssi_invariant_with(&l, false, SymBuildConfig::default(), None, SsiVersion::V1);
         assert_eq!(ssi.0, 0);
         assert_eq!(ssi.1, 0);
     }
@@ -136,7 +97,7 @@ mod tests {
     // diagrams come from `test_data`, not the data dir, so the tests need no external resources.
     fn test(name: &str, ver: SsiVersion, reduced: bool, expected: (i32, i32)) {
         let l = InvLink::test_data(name);
-        let ssi = ssi_invariant_ver(&l, reduced, SymBuildConfig::default(), None, ver);
+        let ssi = ssi_invariant_with(&l, reduced, SymBuildConfig::default(), None, ver);
         assert_eq!(ssi, expected);
     }
 

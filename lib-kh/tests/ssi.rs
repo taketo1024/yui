@@ -3,7 +3,7 @@
 // The heavy ones are `#[ignore]`d — run with `--ignored --nocapture` (and
 // `--features big-link` for Wh(P5)).
 
-use yui_kh::khi::{ssi_invariant, ssi_invariant_ver, SsiVersion};
+use yui_kh::ssi::{ssi_invariant_with, SsiVersion};
 use yui_kh::tng::builder::{Strategy, CutOption, SymBuildConfig};
 use yui_link::InvLink;
 
@@ -32,7 +32,7 @@ fn wh_pretzel_config(cut_at: usize) -> SymBuildConfig {
 fn k9_46() {
     let l = inv(common::k9_46());
     for ver in [SsiVersion::V1, SsiVersion::V2] {
-        let ssi = ssi_invariant_ver(&l, false, SymBuildConfig::default(), None, ver);
+        let ssi = ssi_invariant_with(&l, false, SymBuildConfig::default(), None, ver);
         assert_eq!(ssi, (0, 2), "{ver:?}");
     }
 }
@@ -43,7 +43,7 @@ fn interlock_9_46() {
     let (pd, _) = common::interlock_9_46();
     let l = inv(pd);
     let config = SymBuildConfig { cut: CutOption::Auto(2), ..Default::default() };
-    assert_eq!(ssi_invariant(&l, false, config, None), (0, 4));
+    assert_eq!(ssi_invariant_with(&l, false, config, None, SsiVersion::V2), (0, 4));
 }
 
 #[test]
@@ -52,7 +52,7 @@ fn interlock_17nh() {
     let (pd, _) = common::interlock_17nh();
     let l = inv(pd);
     let config = SymBuildConfig { cut: CutOption::Auto(2), ..Default::default() };
-    assert_eq!(ssi_invariant(&l, false, config, None), (0, 4));
+    assert_eq!(ssi_invariant_with(&l, false, config, None, SsiVersion::V2), (0, 4));
 }
 
 #[test]
@@ -61,7 +61,7 @@ fn wh_pretzel_3() {
     init_logger();
     let k = InvLink::sym_pretzel(-3, 3, -3);
     let w = InvLink::whitehead_double(&k, true, 0);
-    let ssi = ssi_invariant(&w, false, wh_pretzel_config(17), Some(2));
+    let ssi = ssi_invariant_with(&w, false, wh_pretzel_config(17), Some(2), SsiVersion::V2);
     assert_eq!(ssi, (0, 2));
 }
 
@@ -72,7 +72,7 @@ fn wh_pretzel_5() {
     init_logger();
     let k = InvLink::sym_pretzel(-5, 5, -5);
     let w = InvLink::whitehead_double(&k, true, 0);
-    let ssi = ssi_invariant(&w, false, wh_pretzel_config(20), Some(2));
+    let ssi = ssi_invariant_with(&w, false, wh_pretzel_config(20), Some(2), SsiVersion::V2);
     println!("ssi(Wh+(P(-5,5,-5))) = {ssi:?}");
 }
 
@@ -84,7 +84,7 @@ fn k15n_103488() {
     );
 
     for ver in [SsiVersion::V1, SsiVersion::V2] {
-        let ssi = ssi_invariant_ver(&l, false, SymBuildConfig::default(), None, ver);
+        let ssi = ssi_invariant_with(&l, false, SymBuildConfig::default(), None, ver);
         assert_eq!(ssi, (0, 2), "{ver:?}");
     }
 }
@@ -96,7 +96,7 @@ fn k17nh_73() {
         [[1,27,2,26],[19,2,20,3],[3,13,4,12],[4,31,5,32],[30,5,31,6],[13,7,14,6],[8,27,9,28],[9,1,10,34],[10,18,11,17],[24,11,25,12],[14,21,15,22],[28,16,29,15],[33,16,34,17],[18,26,19,25],[20,8,21,7],[29,23,30,22],[23,33,24,32]]
     );
 
-    let ssi = ssi_invariant_ver(&l, false, SymBuildConfig::default(), None, SsiVersion::V1);
+    let ssi = ssi_invariant_with(&l, false, SymBuildConfig::default(), None, SsiVersion::V1);
 
     assert_eq!(ssi, (0, 2));
 }

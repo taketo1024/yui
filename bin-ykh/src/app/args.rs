@@ -2,7 +2,7 @@ use std::ops::RangeInclusive;
 use clap::ValueEnum;
 use derive_more::Display;
 use yui_link::Link;
-use yui_kh::khi::SsiVersion;
+use yui_kh::ssi::SsiVersion;
 use yui_kh::tng::builder::{Strategy, NodeOrder, CutOption};
 
 pub trait AppArgs { 

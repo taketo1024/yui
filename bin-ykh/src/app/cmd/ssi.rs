@@ -1,6 +1,6 @@
 use smart_default::SmartDefault;
 use std::ops::RangeInclusive;
-use yui_kh::khi::{ssi_invariant_ver, SsiVersion};
+use yui_kh::ssi::{ssi_invariant_with, SsiVersion};
 use yui_kh::tng::builder::{CutOption, NodeOrder, Strategy, SymBuildConfig};
 
 use crate::app::args::*;
@@ -99,7 +99,7 @@ impl App {
             ..Default::default()
         };
 
-        let (s0, s1) = ssi_invariant_ver(&l, self.args.reduced, config, self.args.expected, self.args.ver);
+        let (s0, s1) = ssi_invariant_with(&l, self.args.reduced, config, self.args.expected, self.args.ver);
 
         Ok(format!("ssi = ({s0}, {s1})"))
     }

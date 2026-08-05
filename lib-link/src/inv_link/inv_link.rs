@@ -236,18 +236,6 @@ mod tests {
     use crate::misc::det;
 
     #[test]
-    fn reindexed_keeps_strong_inversion() {
-        // reindex the symmetric trefoil from edge 1; the standard e↦(n+1-e)%n+1 must stay a valid τ.
-        let il = InvLink::test_data("3_1");
-        let r = il.inner().reindexed(1, 1);
-        assert_eq!(r.edges(), (1..=6).collect::<Vec<Edge>>());
-
-        let n = r.n_edges() as Edge;
-        let e_map: Vec<_> = r.edges().into_iter().map(|e| (e, (n + 1 - e) % n + 1)).collect();
-        InvLink::new(r, e_map);  // panics if the involution is invalid
-    }
-
-    #[test]
     fn pd_code_roundtrip() {
         // 5_1 as a symmetric PD (standard involution by construction); emit + reparse must recover
         // the same diagram and the same strong inversion.
@@ -392,6 +380,23 @@ mod tests {
             let k = InvLink::test_data(name);
             assert!(k.is_strongly_invertible(), "{name}");
             assert!(!k.is_2periodic(), "{name}");
+        }
+    }
+
+    #[test]
+    fn reindexed_keeps_strong_inversion() {
+        // renumbering the symmetric trefoil from either on-axis edge must leave the standard
+        // e ↦ (n+1-e)%n+1 a valid τ. Starting from edge 1 is a no-op; edge 4 is the real case.
+        let il = InvLink::test_data("3_1");
+        let n = il.n_edges() as Edge;
+
+        for start in il.on_axis_edges() {
+            let r = il.inner().reindexed(start, 1);
+            assert_eq!(r.edges(), (1..=n).collect::<Vec<Edge>>());
+
+            let e_map: Vec<_> = r.edges().into_iter().map(|e| (e, (n + 1 - e) % n + 1)).collect();
+            let re = InvLink::new(r, e_map);
+            assert!(re.is_strongly_invertible(), "renumbered from edge {start}");
         }
     }
 

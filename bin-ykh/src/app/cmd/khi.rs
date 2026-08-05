@@ -5,7 +5,7 @@ use std::str::FromStr;
 use yui_core::TeX;
 use yui_core::{EucRing, EucRingOps};
 use yui_homology::{ToSeqString, ToTableString};
-use yui_kh::khi::{KhIChain, KhIHomology, ssi_invariant};
+use yui_kh::khi::{KhIChain, KhIHomology};
 use yui_kh::tng::builder::{SymBuildConfig, Strategy, NodeOrder, CutOption};
 use yui_link::InvLink;
 use crate::app::args::*;
@@ -45,10 +45,6 @@ pub struct Args {
 
     #[arg(short = 'n', long)]
     pub no_simplify: bool,
-
-    // ssi only: the guessed s-value seeding the high-q build cut (see `ssi_invariant`).
-    #[arg(long)]
-    pub expected: Option<isize>,
 
     #[arg(long, value_parser = parse_h_range)]
     pub h_range: Option<RangeInclusive<isize>>,
@@ -139,15 +135,8 @@ where
             ..Default::default()
         };
 
-        // ssi-only: computed over F2[H] internally — the selected ring is not involved.
-        let ssi_only = self.args.show_ssi && !(self.args.show_gens || self.args.show_alpha);
-        if ssi_only && !self.args.no_simplify {
-            let ssi = ssi_invariant(&l, self.args.reduced, config, self.args.expected);
-            self.out(&format!("ssi = ({}, {})", ssi.0, ssi.1));
-            return Ok(self.flush());
-        }
-
-        // the table path reads the divisibilities from KhI over the selected ring, with c = h.
+        // reads the divisibilities from KhI over the selected ring, with c = h;
+        // for the invariant itself use the `ssi` command.
         if self.args.show_ssi {
             ensure!(!h.is_zero() && !h.is_unit(), "`h` must be non-zero, non-invertible to compute ssi.");
             ensure!(t.is_zero(), "`t` must be zero to compute ss.");

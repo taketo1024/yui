@@ -173,7 +173,6 @@ where F: Field, for<'x> &'x F: FieldOps<F> {
 #[cfg(test)]
 mod tests {
     use yui_core::num::{FF, FF2, Ratio};
-    use yui_core::poly::Poly;
     use yui_link::Link;
     use super::*;
 
@@ -235,219 +234,58 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_unknot() { 
-        let l = Link::unknot();
-        let c = 2;
-        
-        assert_eq!(ss_invariant(&l, &c, false), 0);
-        assert_eq!(ss_invariant(&l, &c, true ), 0);
-        assert_eq!(ss_invariant(&l.mirror(), &c, false), 0);
-        assert_eq!(ss_invariant(&l.mirror(), &c, true ), 0);
+    // Every case below: reduced and unreduced agree, and the mirror negates.
+    fn check<R>(l: &Link, c: &R, expected: i32)
+    where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+        assert_eq!(ss_invariant(l, c, false), expected);
+        assert_eq!(ss_invariant(l, c, true ), expected);
+        assert_eq!(ss_invariant(&l.mirror(), c, false), -expected);
+        assert_eq!(ss_invariant(&l.mirror(), c, true ), -expected);
+    }
+
+    // `c = 2` over Z, the classical Rasmussen invariant.
+    macro_rules! test_c2 {
+        ($test:ident, $name:literal, $expected:expr) => {
+            #[test]
+            fn $test() {
+                check(&Link::test_data($name), &2, $expected);
+            }
+        };
     }
 
     #[test]
-    fn test_unknot_rm1() { 
-        let l = Link::test_data("unknot_l_twist");
-        let c = 2;
-        
-        assert_eq!(ss_invariant(&l, &c, false), 0);
-        assert_eq!(ss_invariant(&l, &c, true ), 0);
-        assert_eq!(ss_invariant(&l.mirror(), &c, false), 0);
-        assert_eq!(ss_invariant(&l.mirror(), &c, true ), 0);
+    fn unknot() {
+        check(&Link::unknot(), &2, 0);
     }
 
-    #[test]
-    fn test_unknot_rm1_neg() { 
-        let l = Link::test_data("unknot_r_twist");
-        let c = 2;
-        
-        assert_eq!(ss_invariant(&l, &c, false), 0);
-        assert_eq!(ss_invariant(&l, &c, true ), 0);
-        assert_eq!(ss_invariant(&l.mirror(), &c, false), 0);
-        assert_eq!(ss_invariant(&l.mirror(), &c, true ), 0);
+    test_c2!(unknot_rm1,     "unknot_l_twist", 0);
+    test_c2!(unknot_rm1_neg, "unknot_r_twist", 0);
+    test_c2!(k3_1,  "3_1",  2);
+    test_c2!(k4_1,  "4_1",  0);
+    test_c2!(k5_1,  "5_1",  4);
+    test_c2!(k5_2,  "5_2",  2);
+    test_c2!(k6_1,  "6_1",  0);
+    test_c2!(k6_2,  "6_2",  2);
+    test_c2!(k6_3,  "6_3",  0);
+    test_c2!(k7_1,  "7_1",  6);
+    test_c2!(k7_2,  "7_2",  2);
+    test_c2!(k7_3,  "7_3",  4);
+    test_c2!(k8_19, "8_19", 6);
+
+    // 14n_19265: the value depends on the coefficients — -2 for c = 2 and over F2[H],
+    // 0 for c = 3 and over Q[H] / F3[H].
+    macro_rules! test_k14 {
+        ($test:ident, $c:expr, $expected:expr) => {
+            #[test]
+            fn $test() {
+                check(&Link::test_data("14n_19265"), &$c, $expected);
+            }
+        };
     }
 
-    #[test]
-    fn test_3_1() { 
-        let l = Link::test_data("3_1");
-        let c = 2;
-        
-        assert_eq!(ss_invariant(&l, &c, false), 2);
-        assert_eq!(ss_invariant(&l, &c, true ), 2);
-        assert_eq!(ss_invariant(&l.mirror(), &c, false), -2);
-        assert_eq!(ss_invariant(&l.mirror(), &c, true ), -2);
-    }
-
-    #[test]
-    fn test_4_1() { 
-        let l = Link::test_data("4_1");
-        let c = 2;
-        
-        assert_eq!(ss_invariant(&l, &c, false), 0);
-        assert_eq!(ss_invariant(&l, &c, true ), 0);
-        assert_eq!(ss_invariant(&l.mirror(), &c, false), 0);
-        assert_eq!(ss_invariant(&l.mirror(), &c, true ), 0);
-    }
-
-    #[test]
-    fn test_5_1() { 
-        let l = Link::test_data("5_1");
-        let c = 2;
-        
-        assert_eq!(ss_invariant(&l, &c, false), 4);
-        assert_eq!(ss_invariant(&l, &c, true ), 4);
-        assert_eq!(ss_invariant(&l.mirror(), &c, false), -4);
-        assert_eq!(ss_invariant(&l.mirror(), &c, true ), -4);
-    }
-
-    #[test]
-    fn test_5_2() { 
-        let l = Link::test_data("5_2");
-        let c = 2;
-        
-        assert_eq!(ss_invariant(&l, &c, false), 2);
-        assert_eq!(ss_invariant(&l, &c, true ), 2);
-        assert_eq!(ss_invariant(&l.mirror(), &c, false), -2);
-        assert_eq!(ss_invariant(&l.mirror(), &c, true ), -2);
-    }
-
-    #[test]
-    fn test_6_1() { 
-        let l = Link::test_data("6_1");
-        let c = 2;
-        
-        assert_eq!(ss_invariant(&l, &c, false), 0);
-        assert_eq!(ss_invariant(&l, &c, true ), 0);
-        assert_eq!(ss_invariant(&l.mirror(), &c, false), 0);
-        assert_eq!(ss_invariant(&l.mirror(), &c, true ), 0);
-    }
-
-    #[test]
-    fn test_6_2() { 
-        let l = Link::test_data("6_2");
-        let c = 2;
-        
-        assert_eq!(ss_invariant(&l, &c, false), 2);
-        assert_eq!(ss_invariant(&l, &c, true ), 2);
-        assert_eq!(ss_invariant(&l.mirror(), &c, false), -2);
-        assert_eq!(ss_invariant(&l.mirror(), &c, true ), -2);
-    }
-
-    #[test]
-    fn test_6_3() { 
-        let l = Link::test_data("6_3");
-        let c = 2;
-        
-        assert_eq!(ss_invariant(&l, &c, false), 0);
-        assert_eq!(ss_invariant(&l, &c, true ), 0);
-        assert_eq!(ss_invariant(&l.mirror(), &c, false), 0);
-        assert_eq!(ss_invariant(&l.mirror(), &c, true ), 0);
-    }
-
-    #[test]
-    fn test_7_1() { 
-        let l = Link::test_data("7_1");
-        let c = 2;
-        
-        assert_eq!(ss_invariant(&l, &c, false), 6);
-        assert_eq!(ss_invariant(&l, &c, true ), 6);
-        assert_eq!(ss_invariant(&l.mirror(), &c, false), -6);
-        assert_eq!(ss_invariant(&l.mirror(), &c, true ), -6);
-    }
-
-    #[test]
-    fn test_7_2() { 
-        let l = Link::test_data("7_2");
-        let c = 2;
-        
-        assert_eq!(ss_invariant(&l, &c, false), 2);
-        assert_eq!(ss_invariant(&l, &c, true ), 2);
-        assert_eq!(ss_invariant(&l.mirror(), &c, false), -2);
-        assert_eq!(ss_invariant(&l.mirror(), &c, true ), -2);
-    }
-
-    #[test]
-    fn test_7_3() { 
-        let l = Link::test_data("7_3");
-        let c = 2;
-        
-        assert_eq!(ss_invariant(&l, &c, false), 4);
-        assert_eq!(ss_invariant(&l, &c, true ), 4);
-        assert_eq!(ss_invariant(&l.mirror(), &c, false), -4);
-        assert_eq!(ss_invariant(&l.mirror(), &c, true ), -4);
-    }
-
-    #[test]
-    fn test_8_19() { 
-        let l = Link::test_data("8_19");
-        let c = 2;
-        
-        assert_eq!(ss_invariant(&l, &c, false), 6);
-        assert_eq!(ss_invariant(&l, &c, true ), 6);
-        assert_eq!(ss_invariant(&l.mirror(), &c, false), -6);
-        assert_eq!(ss_invariant(&l.mirror(), &c, true ), -6);
-    }
-
-    #[test]
-    fn test_k14_c2() { 
-        let l = Link::test_data("14n_19265");
-        let c = 2_i64;
-        
-        assert_eq!(ss_invariant(&l, &c, false), -2);
-        assert_eq!(ss_invariant(&l, &c, true ), -2);
-        assert_eq!(ss_invariant(&l.mirror(), &c, false), 2);
-        assert_eq!(ss_invariant(&l.mirror(), &c, true ), 2);
-    }
-
-    #[test]
-    fn test_k14_c3() { 
-        let l = Link::test_data("14n_19265");
-        let c = 3_i64;
-        
-        assert_eq!(ss_invariant(&l, &c, false), 0);
-        assert_eq!(ss_invariant(&l, &c, true ), 0);
-        assert_eq!(ss_invariant(&l.mirror(), &c, false), 0);
-        assert_eq!(ss_invariant(&l.mirror(), &c, true ), 0);
-    }
-
-    #[test]
-    #[allow(non_snake_case)]
-    fn test_k14_QH() { 
-        type Q = Ratio<i64>;
-        type R = Poly<'H', Q>;
-        let l = Link::test_data("14n_19265");
-        let c = R::variable();
-        
-        assert_eq!(ss_invariant(&l, &c, false), 0);
-        assert_eq!(ss_invariant(&l, &c, true ), 0);
-        assert_eq!(ss_invariant(&l.mirror(), &c, false), 0);
-        assert_eq!(ss_invariant(&l.mirror(), &c, true ), 0);
-    }
-
-    #[test]
-    #[allow(non_snake_case)]
-    fn test_k14_F2H() { 
-        type R = Poly<'H', FF2>;
-        let l = Link::test_data("14n_19265");
-        let c = R::variable();
-        
-        assert_eq!(ss_invariant(&l, &c, false), -2);
-        assert_eq!(ss_invariant(&l, &c, true ), -2);
-        assert_eq!(ss_invariant(&l.mirror(), &c, false), 2);
-        assert_eq!(ss_invariant(&l.mirror(), &c, true ), 2);
-    }
-    
-   #[test]
-    #[allow(non_snake_case)]
-    fn test_k14_F3H() { 
-        type R = Poly<'H', FF<3>>;
-        let l = Link::test_data("14n_19265");
-        let c = R::variable();
-        
-        assert_eq!(ss_invariant(&l, &c, false), 0);
-        assert_eq!(ss_invariant(&l, &c, true ), 0);
-        assert_eq!(ss_invariant(&l.mirror(), &c, false), 0);
-        assert_eq!(ss_invariant(&l.mirror(), &c, true ), 0);
-    }
+    test_k14!(k14_c2,  2_i64, -2);
+    test_k14!(k14_c3,  3_i64,  0);
+    test_k14!(k14_q_h,  P::<Ratio<i64>>::variable(),  0);
+    test_k14!(k14_f2_h, P::<FF2>::variable(),        -2);
+    test_k14!(k14_f3_h, P::<FF<3>>::variable(),       0);
 }

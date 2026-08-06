@@ -715,20 +715,24 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // pass — gates greedy's inline elim too). The cap is compared against the equiv fill cost.
     fn choose_equiv_inv_edge_into(&self, k: &TngComplexKey) -> Option<&TngComplexKey> {
         let cap = self.config.max_elim_cost;
-        self.complex().vertex(k).in_edges().filter_map(|j|
-            self.is_equiv_inv_edge(j, k).then_some(j)
+        self.complex().vertex(k).in_edges().filter(|j|
+            self.is_equiv_inv_edge(j, k)
+        ).filter(|j|
+            cap.is_none_or(|max| self.equiv_edge_weight(j, k) <= max)
+        ).min_by_key(|j|
+            (self.complex().edge_weight(j, k), **j)
         )
-        .filter(|j| cap.map_or(true, |max| self.equiv_edge_weight(j, k) <= max))
-        .min_by_key(|j| (self.complex().edge_weight(j, k), **j))
     }
 
     fn choose_equiv_inv_edge_from(&self, k: &TngComplexKey) -> Option<&TngComplexKey> {
         let cap = self.config.max_elim_cost;
-        self.complex().vertex(k).out_edges().filter_map(|l|
-            self.is_equiv_inv_edge(k, l).then_some(l)
+        self.complex().vertex(k).out_edges().filter(|l|
+            self.is_equiv_inv_edge(k, l)
+        ).filter(|l|
+            cap.is_none_or(|max| self.equiv_edge_weight(k, l) <= max)
+        ).min_by_key(|l|
+            (self.complex().edge_weight(k, l), **l)
         )
-        .filter(|l| cap.map_or(true, |max| self.equiv_edge_weight(k, l) <= max))
-        .min_by_key(|l| (self.complex().edge_weight(k, l), **l))
     }
 
     fn is_equiv_inv_edge(&self, i: &TngComplexKey, j: &TngComplexKey) -> bool { 

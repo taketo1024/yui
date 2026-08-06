@@ -50,8 +50,10 @@ impl KhCubeVertex {
     // so a full cube can be constructed without enumerating 2^(#circles) per vertex.
     pub fn generators(&self) -> Vec<&KhGen> {
         self.gens.get_or_init(|| {
-            KhTensor::generate(self.circles.len()).filter_map(|label|
-                self.red_i.map_or(true, |i| label[i].is_X()).then(|| KhGen::new(self.state, label))
+            KhTensor::generate(self.circles.len()).filter(|label|
+                self.red_i.is_none_or(|i| label[i].is_X())
+            ).map(|label|
+                KhGen::new(self.state, label)
             ).collect()
         }).iter().collect()
     }

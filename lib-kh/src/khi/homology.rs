@@ -58,10 +58,11 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
             None    => reduced.homology(),
         };
         // drop canon cycles whose h-degree falls outside the requested range (e.g. the Q-side at h+1).
-        let canon_cycles = c.canon_cycles().iter()
-            .filter(|z| range.as_ref().map_or(true, |r| r.contains(&c.h_deg_of_chain(z))))
-            .cloned()
-            .collect();
+        let canon_cycles = c.canon_cycles().iter().filter(|z|
+            range.as_ref().is_none_or(|r|
+                r.contains(&c.h_deg_of_chain(z))
+            )
+        ).cloned().collect();
         KhIHomology::new_impl(homology, canon_cycles, c.deg_shift())
     }
 

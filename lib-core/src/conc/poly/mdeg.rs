@@ -205,7 +205,7 @@ where I: Zero + Ord + for<'x> Add<&'x I, Output = I> {
 
 #[cfg(test)]
 mod tests {
-    use std::hash::{BuildHasher, Hasher};
+    use std::hash::BuildHasher;
 
     use super::*;
 
@@ -242,11 +242,7 @@ mod tests {
         let d3 = MultiDeg::from_iter([(0, 1), (1, -2), (2, 3), (3, 1)]);
 
         let state = std::collections::hash_map::RandomState::new();
-        let hash = |d: &MultiDeg<_>| -> u64 { 
-            let mut hasher = state.build_hasher();
-            d.hash(&mut hasher);
-            hasher.finish()
-        };
+        let hash = |d: &MultiDeg<_>| state.hash_one(&d);
 
         assert_eq!(hash(&d1), hash(&d2));
         assert_ne!(hash(&d1), hash(&d3));

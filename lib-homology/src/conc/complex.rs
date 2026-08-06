@@ -334,8 +334,10 @@ where
         let summands = self.summands.truncated(range.clone());
 
         // cached d-matrices with both endpoints inside the window stay valid.
-        let matrices = self.d_matrices.iter().filter_map(|(&i, m)|
-            (range.contains(&i) && range.contains(&(i + d_deg))).then(|| (i, m.clone()))
+        let matrices = self.d_matrices.iter().filter(|&(&i, _)|
+            range.contains(&i) && range.contains(&(i + d_deg))
+        ).map(|(&i, m)|
+            (i, m.clone())
         ).collect_vec();
 
         Self::new(summands, d_deg, move |i, z|

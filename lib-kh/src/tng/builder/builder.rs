@@ -605,20 +605,24 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // pass — this is what gates greedy's inline elim as well as the `eliminate_in` sweep).
     fn choose_inv_edge_into(&self, k: &TngComplexKey) -> Option<&TngComplexKey> {
         let cap = self.config.max_elim_cost;
-        self.complex.vertex(k).in_edges().filter_map(|j|
-            self.complex.edge(j, k).is_invertible().then_some(j)
+        self.complex.vertex(k).in_edges().filter(|j|
+            self.complex.edge(j, k).is_invertible()
+        ).filter(|j|
+            cap.is_none_or(|max| self.complex.edge_weight(j, k) <= max)
+        ).min_by_key(|j|
+            (self.complex.edge_weight(j, k), **j)
         )
-        .filter(|j| cap.map_or(true, |max| self.complex.edge_weight(j, k) <= max))
-        .min_by_key(|j| (self.complex.edge_weight(j, k), **j))
     }
 
     fn choose_inv_edge_from(&self, k: &TngComplexKey) -> Option<&TngComplexKey> {
         let cap = self.config.max_elim_cost;
-        self.complex.vertex(k).out_edges().filter_map(|l|
-            self.complex.edge(k, l).is_invertible().then_some(l)
+        self.complex.vertex(k).out_edges().filter(|l|
+            self.complex.edge(k, l).is_invertible()
+        ).filter(|l|
+            cap.is_none_or(|max| self.complex.edge_weight(k, l) <= max)
+        ).min_by_key(|l|
+            (self.complex.edge_weight(k, l), **l)
         )
-        .filter(|l| cap.map_or(true, |max| self.complex.edge_weight(k, l) <= max))
-        .min_by_key(|l| (self.complex.edge_weight(k, l), **l))
     }
 
     pub fn process_free_loops(&mut self) {

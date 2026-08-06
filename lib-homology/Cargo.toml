@@ -9,6 +9,9 @@ edition.workspace = true
 rust-version.workspace = true
 repository.workspace  = true
 
+[lib]
+doctest = false
+
 [features]
 default = ["multithread"]
 multithread = ["rayon"]

@@ -9,6 +9,9 @@ edition.workspace = true
 rust-version.workspace = true
 repository.workspace  = true
 
+[lib]
+doctest = false
+
 [features]
 serde = ["dep:serde", "dep:serde_json", "dep:serde_repr", "dep:serde_with"]
 

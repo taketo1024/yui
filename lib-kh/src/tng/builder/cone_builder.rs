@@ -607,10 +607,16 @@ mod tests {
     #[test]
     fn cone_reduced_matches_full() {
         for (name, l) in [
-            ("3_1",  InvLink::test_data("3_1")),
-            ("m3_1", InvLink::test_data("3_1").mirror()),
-            ("4_1",  InvLink::test_data("4_1")),
-            ("6_3",  InvLink::test_data("6_3")),
+            ("3_1",    InvLink::test_data("3_1")),
+            ("m3_1",   InvLink::test_data("3_1").mirror()),
+            ("4_1",    InvLink::test_data("4_1")),
+            ("5_1",    InvLink::test_data("5_1")),
+            ("6_2a",   InvLink::test_data("6_2a")),
+            ("m6_1a",  InvLink::test_data("6_1a").mirror()),
+            ("6_3",    InvLink::test_data("6_3")),
+            ("7_6a",   InvLink::test_data("7_6a")),
+            ("8_21b",  InvLink::test_data("8_21b")),
+            ("m9_46a", InvLink::test_data("9_46a").mirror()),
         ] {
             for reduced in [false, true] {
                 let config = SymBuildConfig::default();
@@ -639,22 +645,48 @@ mod tests {
     #[test]
     fn cone_config_independent() {
         for (name, l, chunks) in [
-            ("3_1", InvLink::test_data("3_1"), 2),
-            ("4_1", InvLink::test_data("4_1"), 2),
-            ("6_3", InvLink::test_data("6_3"), 3),
+            ("3_1",  InvLink::test_data("3_1"), 2),
+            ("4_1",  InvLink::test_data("4_1"), 2),
+            ("5_2a", InvLink::test_data("5_2a"), 2),
+            ("6_3",  InvLink::test_data("6_3"), 3),
+            ("7_3a", InvLink::test_data("7_3a"), 3),
         ] {
             check_configs_agree(name, &l, &[
                 ("default",            SymBuildConfig::default()),
                 ("no-full-deloop",     SymBuildConfig { no_full_deloop: true, ..Default::default() }),
                 ("chunked",            SymBuildConfig { cut: CutOption::Auto(chunks), ..Default::default() }),
                 ("chunked, no-deloop", SymBuildConfig { cut: CutOption::Auto(chunks), no_full_deloop: true, ..Default::default() }),
-                ("chunked, cap 0",     SymBuildConfig { cut: CutOption::Auto(chunks), max_elim_cost: Some(0), ..Default::default() }),
-                ("elim cap 4",         SymBuildConfig { max_elim_cost: Some(4), ..Default::default() }),
                 ("min-fill",           SymBuildConfig { strategy: Strategy::MinFill, ..Default::default() }),
-                ("no-elim",            SymBuildConfig { strategy: Strategy::NoElim, ..Default::default() }),
-                ("no-simplify",        SymBuildConfig { strategy: Strategy::None, ..Default::default() }),
             ]);
         }
+    }
+
+    // Capping the elimination cost pushes survivors into the matrix reduction, which is the
+    // expensive direction — two diagrams are enough.
+    #[test]
+    fn cone_elim_cap_independent() {
+        for (name, l, chunks) in [
+            ("3_1", InvLink::test_data("3_1"), 2),
+            ("6_3", InvLink::test_data("6_3"), 3),
+        ] {
+            check_configs_agree(name, &l, &[
+                ("default",        SymBuildConfig::default()),
+                ("cap 0",          SymBuildConfig { max_elim_cost: Some(0), ..Default::default() }),
+                ("cap 4",          SymBuildConfig { max_elim_cost: Some(4), ..Default::default() }),
+                ("chunked, cap 0", SymBuildConfig { cut: CutOption::Auto(chunks), max_elim_cost: Some(0), ..Default::default() }),
+            ]);
+        }
+    }
+
+    // `NoElim` / `None` skip the simplification entirely, so they blow up on anything but the
+    // smallest diagram — `MinFill` is cheap and rides along with the other knobs above.
+    #[test]
+    fn cone_strategy_independent() {
+        check_configs_agree("3_1", &InvLink::test_data("3_1"), &[
+            ("greedy",      SymBuildConfig::default()),
+            ("no-elim",     SymBuildConfig { strategy: Strategy::NoElim, ..Default::default() }),
+            ("no-simplify", SymBuildConfig { strategy: Strategy::None, ..Default::default() }),
+        ]);
     }
 
     // A windowed build's endpoint homology is wrong by construction, so only `d <= 0` compares.
@@ -688,11 +720,16 @@ mod tests {
         type P = Poly<'H', FF2>;
         let (c, t) = (P::variable(), P::zero());
         let knots = [
-            ("3_1", InvLink::test_data("3_1")),
-            ("4_1", InvLink::test_data("4_1")),
-            ("6_3", InvLink::test_data("6_3")),
-            // 9_46 has s̲ ≠ s̄ (ssi = (0, 2)) — exercises the canon-cycle ordering.
-            ("9_46", InvLink::sym_pretzel(-3, 3, -3)),
+            ("3_1",  InvLink::test_data("3_1")),
+            ("m3_1", InvLink::test_data("3_1").mirror()),
+            ("4_1",  InvLink::test_data("4_1")),
+            ("6_2a", InvLink::test_data("6_2a")),
+            ("6_3",  InvLink::test_data("6_3")),
+            ("7_6a", InvLink::test_data("7_6a")),
+            // 9_46 and 8_21b have s̲ ≠ s̄ (ssi = (0, 2) and (2, 4)) — they exercise the canon-cycle
+            // ordering, and are the diagrams here that reach `reduce_elements`' corrections.
+            ("9_46",  InvLink::sym_pretzel(-3, 3, -3)),
+            ("8_21b", InvLink::test_data("8_21b")),
         ];
         for (name, l) in knots {
             let matrix = ssi_invariant_with(&l, false, Default::default(), None, SsVersion::V1);

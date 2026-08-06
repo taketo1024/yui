@@ -1,3 +1,5 @@
+//! [`IntoDigits`]: decompose an integer into its base-10 digits.
+
 /// Decompose a non-negative integer into its base-10 digits.
 ///
 /// See: <https://en.wikipedia.org/wiki/Positional_notation>

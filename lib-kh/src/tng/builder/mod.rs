@@ -1,3 +1,6 @@
+//! The builders: the plain one, the equivariant one for an involutive link, and
+//! the cone builder that produces the KhI complex directly.
+
 pub mod builder;
 pub mod sym_builder;
 pub mod cone_builder;

@@ -1,3 +1,6 @@
+//! [`Trans<R>`]: a composable forward/backward basis change, tracking how a
+//! reduction relates the original generators to the surviving ones.
+
 use yui_core::abst::{Ring, RingOps};
 use yui_core::ext::CloneAnd;
 use crate::Perm;

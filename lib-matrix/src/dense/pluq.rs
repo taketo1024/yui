@@ -1,3 +1,6 @@
+//! Dense PLUQ decomposition `PA Q = LU` over a ring, and the linear solver
+//! built on it.
+
 // Implemented with the help of Claude Code.
 
 use log::debug;

@@ -1,3 +1,18 @@
+//! [`Node`]: one vertex of a diagram — a crossing (`XL`/`XR`) or a smoothing
+//! (`V`/`H`) — its four incident edges, and the orientation given by the pair of
+//! [`Slot`]s the two strands enter by.
+//!
+//! The four [`NodeType`]s, with the incident edges numbered counter-clockwise
+//! from the lower left (`0 = SW`, `1 = SE`, `2 = NE`, `3 = NW`):
+//!
+//! ```text
+//!     3   2         3   2         3   2         3   2
+//!      \ /           \ /           \ /           \_/
+//!       \    = XL,    /    = XR,   | |   = V,     _    = H
+//!      / \           / \           / \           / \
+//!     0   1         0   1         0   1         0   1
+//! ```
+
 use std::fmt::Display;
 
 use yui_core::bitseq::Bit;
@@ -9,16 +24,8 @@ use super::Edge;
 
 use NodeType::{XL, XR, V, H};
 
-// NodeType:
-//
-//     3   2         3   2         3   2         3   2        
-//      \ /           \ /           \ /           \_/         
-//       \    = XL,    /    = XR,   | |   = V,     _    = H, 
-//      / \           / \           / \           / \         
-//     0   1         0   1         0   1         0   1        
-//
-
-// One of a node's four ends, counter-clockwise from the lower left (see the NodeType diagram).
+/// One of a node's four ends, counter-clockwise from the lower left
+/// (see the module diagram).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::Display, Debug)]
 pub enum Slot {
     SW, SE, NE, NW

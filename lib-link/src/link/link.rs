@@ -1,3 +1,6 @@
+//! [`Link`]: a knot or link as a planar diagram — a `Vec<Node>` plus the free
+//! loops and an optional base point — with its accessors, components and traversal.
+
 use core::panic;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;

@@ -1,3 +1,5 @@
+//! `sl2`: the sl(2) action on Khovanov homology.
+
 use smart_default::SmartDefault;
 use crate::app::args::*;
 use crate::app::utils::dispatch::dispatch_field;

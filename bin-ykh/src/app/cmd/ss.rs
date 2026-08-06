@@ -1,3 +1,5 @@
+//! `ss`: the Rasmussen `s` invariant of a knot, over a chosen ring.
+
 use smart_default::SmartDefault;
 use std::marker::PhantomData;
 use std::ops::RangeInclusive;

@@ -1,3 +1,7 @@
+//! [`InvLink`]: a [`Link`](crate::Link) with an involution `τ`, given by an edge
+//! bijection and the induced map on nodes. Strong invertibility (`τ` reverses the
+//! orientation) and 2-periodicity (`τ` preserves it) are decided from the orientation.
+
 use std::collections::HashMap;
 
 use delegate::delegate;

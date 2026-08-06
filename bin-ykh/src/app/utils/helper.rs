@@ -1,3 +1,6 @@
+//! Loading links from a name, a PD code or a file, and parsing ring elements
+//! from the command line.
+
 #![allow(unused)]
 
 use crate::app::err::*;

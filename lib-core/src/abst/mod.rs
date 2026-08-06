@@ -1,3 +1,6 @@
+//! The algebraic trait hierarchy: `MathType` and `IndexType` at the base, then
+//! `AddMon → AddGrp`, `Mon → Ring → EucRing → Field`, and `RMod` for modules.
+
 mod basic;
 mod add_mon;
 mod add_grp;

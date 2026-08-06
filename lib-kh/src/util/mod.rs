@@ -1,3 +1,5 @@
+//! Internal support types for the Khovanov computations.
+
 pub(crate) mod bigraded;
 pub(crate) use bigraded::Bigraded;
 

@@ -1,3 +1,6 @@
+//! The cobordism-category machinery: tangles, cobordisms between them, the
+//! complex they form, and the builders that construct it crossing by crossing.
+
 pub mod tng;
 pub mod cob;
 pub mod complex;

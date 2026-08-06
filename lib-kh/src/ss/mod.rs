@@ -1,3 +1,6 @@
+//! The Rasmussen `s` invariant and its refinements: `ss` over a general ring,
+//! and `ssi` for a strongly invertible knot.
+
 mod ss;
 mod ssi;
 mod util;

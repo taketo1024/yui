@@ -1,3 +1,5 @@
+//! [`SyncCounter`]: a thread-safe counter used to label objects during a build.
+
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// A thread-safe `usize` counter, backed by [`AtomicUsize`].

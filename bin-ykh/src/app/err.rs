@@ -1,3 +1,5 @@
+//! The CLI [`Error`] type and its result alias.
+
 #[derive(Debug, derive_more::Display)]
 pub struct Error { 
     pub msg: String

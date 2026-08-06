@@ -1,3 +1,5 @@
+//! `ckhi`: print the KhI chain complex of an involutive link.
+
 use smart_default::SmartDefault;
 use crate::app::args::*;
 use crate::app::utils::*;

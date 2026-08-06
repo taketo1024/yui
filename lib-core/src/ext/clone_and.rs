@@ -1,3 +1,5 @@
+//! [`CloneAnd`]: clone a value, mutate the clone, and return it.
+
 /// Adds `clone_and(f)`: clone `self`, apply the mutation `f`, and return
 /// the modified clone — for building variants without mutating the original.
 pub trait CloneAnd where Self: Clone {

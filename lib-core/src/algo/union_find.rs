@@ -1,3 +1,6 @@
+//! Disjoint-set structures: [`UnionFind`] over `0..n` (path compression and
+//! union by rank, from `petgraph`), and [`KeyedUnionFind`] over hashable keys.
+
 use std::collections::HashMap;
 use std::hash::Hash;
 

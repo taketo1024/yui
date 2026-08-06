@@ -1,3 +1,6 @@
+//! [`CachedHash`]: wraps a value with a lazily computed structural hash, so
+//! repeated hashing and equality checks short-circuit. Mutation must invalidate it.
+
 use std::cmp::Ordering as CmpOrdering;
 use std::fmt::{self, Debug, Display};
 use std::hash::{Hash, Hasher};

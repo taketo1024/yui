@@ -1,3 +1,6 @@
+//! [`rep_comb`]: the stars-and-bars decomposition of a combination index into
+//! `(index, multiplicity)` pairs.
+
 // Makes a k-repetitive combination of indices in 0..n 
 // from an n-combination of indices in 0..(n + k). 
 //

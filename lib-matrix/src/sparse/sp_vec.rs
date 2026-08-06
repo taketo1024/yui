@@ -1,3 +1,5 @@
+//! [`SpVec<R>`]: a sparse column vector — a [`SpMat`](super::SpMat) with one column.
+
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, Range};
 use std::fmt::{Display, Debug};
 use nalgebra_sparse::CscMatrix;

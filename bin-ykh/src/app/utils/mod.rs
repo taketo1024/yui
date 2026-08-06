@@ -1,3 +1,5 @@
+//! Helpers shared by the subcommands.
+
 mod helper;
 pub use helper::*;
 

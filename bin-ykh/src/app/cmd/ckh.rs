@@ -1,3 +1,5 @@
+//! `ckh`: print the Khovanov chain complex of a link.
+
 use smart_default::SmartDefault;
 use crate::app::args::*;
 use crate::app::utils::*;

@@ -1,3 +1,6 @@
+//! [`TngComplexElem`]: an element of a [`TngComplex`](crate::tng::complex::TngComplex),
+//! tracked through deloop and eliminate so the canonical cycles survive simplification.
+
 use std::collections::HashMap;
 use std::fmt::Display;
 

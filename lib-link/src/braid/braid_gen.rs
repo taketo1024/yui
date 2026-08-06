@@ -1,3 +1,6 @@
+//! [`BraidGen`]: a signed Artin generator `σ_i^{±1}`, stored as a single `i8`
+//! whose absolute value is the 1-based strand index.
+
 use derive_more::{Display, Debug};
 use num_traits::Zero;
 use yui_core::num::{GetSign, Sign};

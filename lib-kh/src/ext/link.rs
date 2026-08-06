@@ -1,3 +1,6 @@
+//! [`LinkExt`]: link helpers used when building the complex — the `A`/`B`
+//! [`Color`] of a resolution among them.
+
 use std::collections::HashSet;
 use std::iter::zip;
 use itertools::Itertools;

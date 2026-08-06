@@ -1,3 +1,6 @@
+//! [`HashCons`]: an interning table handing out one shared `Arc` per distinct
+//! value.
+
 use std::hash::Hash;
 use std::sync::Arc;
 

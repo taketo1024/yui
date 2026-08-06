@@ -1,3 +1,6 @@
+//! Shared builder helpers: the pivot pool used to order eliminations, the
+//! supported-symmetry assertion, and degree-range arithmetic.
+
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 use std::ops::RangeInclusive;

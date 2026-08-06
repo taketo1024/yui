@@ -1,3 +1,5 @@
+//! [`RangeExt`]: shift the endpoints of a range.
+
 use std::ops::{Add, Neg, Range, RangeInclusive, Sub};
 
 /// Shift the endpoints of a [`Range`] or [`RangeInclusive`] by independent

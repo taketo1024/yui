@@ -1,3 +1,7 @@
+//! Sparse PLUQ decomposition and its solvers. `pre_pluq` stops after the
+//! heuristic pivots; `pluq` completes the factorization. `solve_pluq_incr` solves
+//! incrementally, capping the pivots taken per pass.
+
 // Sparse PLUQ decomposition & linear solver.
 // Implemented with the help of Claude Code.
 

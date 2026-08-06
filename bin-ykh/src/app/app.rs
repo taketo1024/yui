@@ -1,3 +1,6 @@
+//! [`CliArgs`] and [`App`]: the clap-parsed command line and the runner that
+//! dispatches it to one of the subcommands.
+
 use log::info;
 use clap::{Parser, Subcommand};
 

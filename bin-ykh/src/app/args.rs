@@ -1,3 +1,6 @@
+//! Argument types shared by the subcommands — the coefficient ring, output
+//! format, build strategy and chunking — with their `clap` value parsers.
+
 use std::ops::RangeInclusive;
 use clap::ValueEnum;
 use derive_more::Display;

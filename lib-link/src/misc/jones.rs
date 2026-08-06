@@ -1,3 +1,6 @@
+//! The Kauffman-bracket [`jones_polynomial`], summing over all `2^n` resolutions,
+//! and the determinant [`det`] read off it.
+
 use num_traits::Pow;
 use num_integer::Integer;
 use yui_core::num::Sign;

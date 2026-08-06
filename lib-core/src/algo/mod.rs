@@ -1,3 +1,6 @@
+//! General-purpose algorithms: topological sort, disjoint sets, and a
+//! stars-and-bars combinatorics helper.
+
 mod rep_comb;
 mod top_sort;
 mod union_find;

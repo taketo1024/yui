@@ -1,3 +1,5 @@
+//! `ssi`: the `ssi` invariant of a strongly invertible knot.
+
 use smart_default::SmartDefault;
 use std::ops::RangeInclusive;
 use yui_kh::ss::{ssi_invariant_with, SsVersion};

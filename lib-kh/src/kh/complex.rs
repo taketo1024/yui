@@ -1,3 +1,7 @@
+//! [`KhComplex`]: the Khovanov chain complex of a link, built either by the
+//! cobordism-based [`TngComplexBuilder`](crate::tng::builder::TngComplexBuilder)
+//! or the direct cube construction.
+
 use std::ops::{RangeInclusive, Index};
 use std::sync::OnceLock;
 

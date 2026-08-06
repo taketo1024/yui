@@ -1,3 +1,7 @@
+//! Macros that pick a concrete coefficient ring from the `-t` / `-c` flags and
+//! call the generic implementation with it, reporting the required kind (a ring,
+//! a Euclidean ring, or a field) when no match exists.
+
 cfg_if::cfg_if! {
     if #[cfg(feature = "i128")] {
         pub type Int = i128;

@@ -1,3 +1,5 @@
+//! `kh`: compute the Khovanov homology of a link.
+
 use smart_default::SmartDefault;
 use std::marker::PhantomData;
 use std::ops::RangeInclusive;

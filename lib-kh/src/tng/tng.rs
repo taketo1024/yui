@@ -1,3 +1,6 @@
+//! [`Tng`]: a planar tangle as a set of [`TngComp`]s — arcs and circles carrying
+//! the edges they pass through.
+
 use std::fmt::Display;
 use itertools::Itertools;
 use yui_core::bitmap::BitMap;

@@ -1,3 +1,6 @@
+//! Smith normal form over a Euclidean ring: `snf` and the in-place variant,
+//! plus `fnf` for the Frobenius (rational canonical) form.
+
 use core::panic;
 use std::cmp::min;
 use log::trace;

@@ -1,3 +1,6 @@
+//! [`Mat<R>`]: a dense matrix over a ring, backed by `nalgebra::DMatrix`, plus
+//! [`MatTrait`], the minimal shape interface shared with the sparse type.
+
 use std::ops::{Add, Neg, Sub, Mul, Index, IndexMut, AddAssign, SubAssign, MulAssign, Range};
 use std::fmt::Debug;
 use nalgebra::{ClosedSubAssign, ClosedMulAssign};

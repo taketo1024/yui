@@ -1,3 +1,6 @@
+//! The canonical (Lee/Bar-Natan) cycles of a link, built on [`KhComplex`]. Their
+//! `H`-divisibility is what the `s` and `ss` invariants read off.
+
 use yui_core::abst::{Ring, RingOps};
 use yui_link::{Link, State};
 

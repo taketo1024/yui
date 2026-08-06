@@ -1,3 +1,6 @@
+//! [`FastPoly`]: a single-term polynomial `a X^d`, used where the coefficient
+//! ring is known to stay a monomial and the general `Poly` would be overhead.
+
 use std::fmt::Display;
 use std::ops::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Neg, DivAssign, RemAssign, Div, Rem};
 use std::str::FromStr;

@@ -1,3 +1,6 @@
+//! [`KhIHomology`]: the homology of a [`KhIComplex`](crate::khi::KhIComplex),
+//! bigraded, carrying the canonical classes of the cone.
+
 use std::ops::{Index, RangeInclusive};
 use std::sync::OnceLock;
 use delegate::delegate;

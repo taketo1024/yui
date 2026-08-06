@@ -1,3 +1,6 @@
+//! [`KhHomology`]: the homology of a [`KhComplex`], as a bigraded module, with
+//! the canonical cycles carried through to the surviving basis.
+
 use std::ops::{RangeInclusive, Index};
 use std::sync::OnceLock;
 use delegate::delegate;

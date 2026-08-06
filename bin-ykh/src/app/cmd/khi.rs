@@ -1,3 +1,5 @@
+//! `khi`: compute the Khovanov homology of an involutive link.
+
 use smart_default::SmartDefault;
 use std::marker::PhantomData;
 use std::ops::RangeInclusive;

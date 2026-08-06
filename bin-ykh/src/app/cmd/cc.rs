@@ -1,3 +1,5 @@
+//! `cc`: the map on Khovanov homology induced by a crossing change.
+
 use smart_default::SmartDefault;
 use crate::app::args::*;
 use crate::app::utils::*;

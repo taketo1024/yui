@@ -1,3 +1,7 @@
+//! The two shape traits every math object satisfies: [`MathType`], which names
+//! the object via `math_symbol()`, and [`IndexType`], its hashable/ordered form
+//! used for keys and grading indices.
+
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 

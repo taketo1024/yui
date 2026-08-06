@@ -1,3 +1,6 @@
+//! Concrete number types: integers, rationals, finite fields, quadratic
+//! integers, and the multiplicative sign group.
+
 mod int;
 mod ratio;
 mod f2;

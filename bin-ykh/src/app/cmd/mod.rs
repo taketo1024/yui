@@ -1,3 +1,6 @@
+//! The subcommands: `kh` / `khi` (homology), `ckh` / `ckhi` (chain complexes),
+//! `ss` / `ssi` (invariants), `cc` (crossing change) and `sl2`.
+
 #[cfg(test)]
 pub mod test_utils;
 

@@ -1,3 +1,6 @@
+//! Khovanov homology: the Frobenius algebra, the cube of resolutions, the chain
+//! complex and its homology, plus the canonical (Lee) cycles.
+
 mod alg;
 mod kh_gen;
 mod cube;

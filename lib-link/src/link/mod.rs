@@ -1,3 +1,6 @@
+//! Planar diagrams: the [`Link`] type, its nodes and components, PD-code
+//! conversion, and the builder that assembles a diagram port by port.
+
 mod link;
 mod link_ops;
 mod node;

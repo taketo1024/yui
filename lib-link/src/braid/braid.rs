@@ -1,3 +1,6 @@
+//! [`Braid`]: a strand count plus a word in the Artin generators. `closure()`
+//! turns it into a [`Link`](crate::Link); strands touched by no crossing become free loops.
+
 use std::ops::{MulAssign, Mul};
 use auto_impl_ops::auto_ops;
 use delegate::delegate;

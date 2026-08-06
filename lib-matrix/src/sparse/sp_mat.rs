@@ -1,3 +1,6 @@
+//! [`SpMat<R>`]: a sparse matrix in CSC form, over `nalgebra_sparse::CscMatrix`.
+//! The carrier of every differential in this workspace.
+
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, MulAssign, Range};
 use std::fmt::{Display, Debug};
 use delegate::delegate;

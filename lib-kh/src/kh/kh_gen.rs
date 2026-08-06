@@ -1,3 +1,6 @@
+//! [`KhGen`]: a generator of the Khovanov complex — a resolution state together
+//! with an `X`/`1` label on each circle, carrying its own `(h, q)` degree.
+
 use std::fmt::Display;
 use itertools::Itertools;
 use yui_core::util::format::subscript;

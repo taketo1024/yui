@@ -1,3 +1,7 @@
+//! Triangular solves over a sparse matrix: inversion, and solving `a x = y`
+//! (or `x a = y`) column by column, optionally streaming each solved column to a
+//! callback so the caller never materializes the full product.
+
 use either::Either;
 use log::*;
 use yui_core::abst::{Ring, RingOps};

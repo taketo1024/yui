@@ -1,3 +1,5 @@
+//! The `ykh` command-line entry point; see the crate docs for the commands.
+
 use ykh::App;
 
 // Opt-in (`--features mimalloc`): mimalloc showed 10–20× slowdowns and one unreproduced

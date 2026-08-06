@@ -1,3 +1,6 @@
+//! [`TngElemBuilder`]: maintains the tracked elements while the complex around
+//! them is delooped and eliminated.
+
 use std::ops::RangeInclusive;
 
 use num_traits::Zero;

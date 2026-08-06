@@ -1,3 +1,6 @@
+//! [`Schur`]: the Schur complement `s = d - c a⁻¹ b` of an invertible upper-left
+//! block, with the basis changes it induces. The workhorse of chain reduction.
+
 use std::ops::AddAssign;
 
 use log::debug;

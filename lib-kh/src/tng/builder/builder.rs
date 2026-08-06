@@ -579,19 +579,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     // Eliminate at `k` via an invertible edge in the given direction (`Both` prefers incoming).
     pub fn try_eliminate_at(&mut self, k: &TngComplexKey, dir: ElimDir) -> bool {
-        if matches!(dir, ElimDir::Incoming | ElimDir::Both) {
-            if let Some(&j) = self.choose_inv_edge_into(k) {
-                self.eliminate(&j, k);
-                return true;
-            }
+        let pair = match dir {
+            ElimDir::Incoming => self.choose_inv_edge_into(k).map(|&j| (j, *k)),
+            ElimDir::Outgoing => self.choose_inv_edge_from(k).map(|&l| (*k, l)),
+            ElimDir::Both     => self.choose_inv_edge_into(k).map(|&j| (j, *k)).or_else(||
+                self.choose_inv_edge_from(k).map(|&l| (*k, l))
+            ),
+        };
+
+        if let Some((i, j)) = pair {
+            self.eliminate(&i, &j);
+            true
+        } else {
+            false
         }
-        if matches!(dir, ElimDir::Outgoing | ElimDir::Both) {
-            if let Some(&l) = self.choose_inv_edge_from(k) {
-                self.eliminate(k, &l);
-                return true;
-            }
-        }
-        false
     }
 
     pub fn eliminate(&mut self, i: &TngComplexKey, j: &TngComplexKey) {

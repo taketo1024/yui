@@ -657,17 +657,19 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // Returns the number of degree-`i` pivot targets consumed: 1 on-axis, 2 off-axis (`k` and `τk`).
     // `Both` prefers the incoming side, matching the non-sym `try_eliminate_at`.
     fn try_eliminate_equiv_at(&mut self, k: &TngComplexKey, dir: ElimDir) -> usize {
-        if matches!(dir, ElimDir::Incoming | ElimDir::Both) {
-            if let Some(&j) = self.choose_equiv_inv_edge_into(k) {
-                return self.eliminate_equiv(&j, k);
-            }
+        let pair = match dir {
+            ElimDir::Incoming => self.choose_equiv_inv_edge_into(k).map(|&j| (j, *k)),
+            ElimDir::Outgoing => self.choose_equiv_inv_edge_from(k).map(|&l| (*k, l)),
+            ElimDir::Both     => self.choose_equiv_inv_edge_into(k).map(|&j| (j, *k)).or_else(||
+                self.choose_equiv_inv_edge_from(k).map(|&l| (*k, l))
+            ),
+        };
+
+        if let Some((i, j)) = pair {
+            self.eliminate_equiv(&i, &j)
+        } else {
+            0
         }
-        if matches!(dir, ElimDir::Outgoing | ElimDir::Both) {
-            if let Some(&l) = self.choose_equiv_inv_edge_from(k) {
-                return self.eliminate_equiv(k, &l);
-            }
-        }
-        0
     }
 
     fn eliminate_equiv(&mut self, i: &TngComplexKey, j: &TngComplexKey) -> usize {

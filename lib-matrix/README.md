@@ -23,6 +23,7 @@ src/
     ├── pivot.rs  — pivot-finding heuristic (Bouillaguet–Delaplace–Voge)
     ├── pluq.rs   — sparse PLUQ + iterative linear solver
     ├── schur.rs  — Schur-complement reduction
+    ├── snf.rs    — sparse Smith normal form
     └── triang.rs — triangular solves
 ```
 
@@ -57,7 +58,7 @@ These are tailored to the needs of the homology-computation pipeline rather than
 | Triangular solve | (used internally by dense PLUQ) | `sparse::triang` |
 | PLUQ decomposition over a ring | `dense::pluq::pluq` | `sparse::pluq::pluq` / `pre_pluq` |
 | Linear solve over a field (`A·x = y`) | `dense::pluq::solve_pluq` | `sparse::pluq::solve_pluq` (+ incremental `solve_pluq_incr`) |
-| Smith normal form | `dense::snf` | — |
+| Smith normal form | `dense::snf` | `sparse::snf::sp_snf` |
 | LLL lattice reduction / Hermite normal form | `dense::lll::{lll, lll_hnf}` | — |
 
 ## Conventions

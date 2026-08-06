@@ -52,7 +52,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
     /// The default KhI construction: the cobordism-level cone (`ConeBuilder`) yields the coned complex
     /// + canon classes directly, and `into_raw_complex` converts once at the boundary (matrix-backed).
-    /// The equivalent matrix-level cone is kept for reference as `new_with_config_matrix`.
+    /// The equivalent matrix-level cone is kept for reference as `new_with_config_v1`.
     pub fn new_with_config(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig) -> Self {
         assert_supported_symmetry(l);
 

@@ -75,11 +75,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         debug!("compute schur: a{:?}, r: {r}", (m_d + r, n_b + r));
 
-        // Compute `s` via one of three fused paths, picking whichever matches the
-        // requested transforms — never materializing a `(m_d × n_b)` matmul:
-        //   - with_trans_src:    right-solve fusion → `s` and `a⁻¹b` together.
-        //   - with_trans_tgt only: left-solve fusion (transposed view) → `s` and `c·a⁻¹` together.
-        //   - neither:           right-solve streaming, `s` only.
+        // `s` streams out of one right-solve, never materializing a `(m_d × n_b)` matmul;
+        // `a⁻¹b` is retained from that same pass when asked for. `c·a⁻¹` is a separate left solve.
         let pairs = solve_triangular_with(t, a, b, |j, x_j| {
             let s_j = d.col_vec(j) - c * &x_j;
             let x_j = (with_trans_src).then_some(x_j);

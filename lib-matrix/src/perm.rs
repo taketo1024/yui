@@ -33,7 +33,7 @@ impl Perm {
     }
 
     /// Create from an iterator of images. The `i`-th item is the image of `i`.
-    /// Panics (debug) if the resulting sequence is not a valid permutation.
+    /// Panics if the resulting sequence is not a valid permutation.
     pub fn from_indices<I>(images: I) -> Self
     where I: IntoIterator<Item = usize> {
         Self::new(images.into_iter().collect())

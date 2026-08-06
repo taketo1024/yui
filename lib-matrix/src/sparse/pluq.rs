@@ -26,7 +26,7 @@ pub struct SpPluq<R> {
 }
 
 impl<R> SpPluq<R> {
-    /// Constructs a `PartialPluq` after asserting the shapes are mutually
+    /// Constructs an `SpPluq` after asserting the shapes are mutually
     /// consistent: `l.n_cols() == u.n_rows() = r`, `l.n_rows() == p.dim() = m`,
     /// `u.n_cols() == q.dim() = n`, and `s.shape() == (m - r, n - r)`.
     pub fn new(p: Perm, q: Perm, l: SpMat<R>, u: SpMat<R>, s: SpMat<R>) -> Self {

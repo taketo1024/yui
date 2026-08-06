@@ -49,7 +49,7 @@ pub struct Args {
     #[arg(long, value_parser = parse_h_range, allow_hyphen_values = true)]
     pub h_range: Option<RangeInclusive<isize>>,
 
-    // chunking: `auto(k)` (cutwidth) or manual edge-cut(s) `e,e,e;e,e,e`.
+    // chunking: `N` (auto, by cutwidth) or `at(c,..)` (manual crossing counts).
     #[arg(long, value_parser = parse_cut)]
     pub cut: Option<CutOption>,
 

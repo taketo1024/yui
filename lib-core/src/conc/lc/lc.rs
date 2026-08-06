@@ -25,8 +25,8 @@ use super::lc_key::*;
 use super::lc_data::{LcData, LcDataIter, LcDataIntoIter};
 
 /// A linear combination `Σ rᵢ · xᵢ` with keys `X: LcKey` and coefficients in a
-/// ring `R`. Stored via [`LcData`], which specializes the empty and single-term
-/// cases to avoid hashmap allocation.
+/// ring `R`. Stored via a private `LcData`, which specializes the empty and
+/// single-term cases to avoid hashmap allocation.
 #[derive(PartialEq, Eq, Clone, Default, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]

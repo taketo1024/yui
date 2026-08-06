@@ -32,7 +32,7 @@ where X: LcKey, for<'x> &'x X: Mul<Output = X> {
 
 /// Wraps an arbitrary element `T` so it can be used as an [`LcKey`].
 ///
-/// Used to build the [free module](crate::RMod) over any `T: IndexType`.
+/// Used to build the [free module](crate::abst::RMod) over any `T: IndexType`.
 #[derive(Debug, Display, Default, Hash, PartialEq, Eq, Clone, PartialOrd, Ord)]
 #[display("<{}>", _0)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]

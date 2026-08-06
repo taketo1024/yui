@@ -626,7 +626,7 @@ impl<R> SpMat<R>
 where R: Scalar + Zero + One + ClosedAddAssign { 
     pub fn rand(shape: (usize, usize), density: f64) -> Self {
         use itertools::iproduct;
-        use rand::Rng;
+        use rand::RngExt;
     
         let (m, n) = shape;
         let range = iproduct!(0..m, 0..n);

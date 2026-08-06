@@ -1335,7 +1335,10 @@ mod tests {
     }
 
     #[test]
-    fn reduce() { 
+    // `Cob` keys carry a `CachedHash`, whose `AtomicU64` reads as interior mutability.
+    // The cache is derived from the contents, so the key's `Eq`/`Hash` never change.
+    #[allow(clippy::mutable_key_type)]
+    fn reduce() {
         let c0 = CobComp::id(TngComp::circ([1])).add_dot(Dot::X);
         let c1 = CobComp::id(TngComp::circ([1])).add_dot(Dot::X).add_dot(Dot::X);
 

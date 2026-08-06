@@ -8,7 +8,7 @@ use std::sync::OnceLock;
 use delegate::delegate;
 use yui_core::lc::Lc;
 use yui_core::abst::{Ring, RingOps, EucRing, EucRingOps};
-use yui_core::ext::IteratorExt;
+use yui_core::ext::{empty_range, IteratorExt};
 use yui_link::Link;
 use yui_homology::{ChainComplex1, ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 
@@ -148,13 +148,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn h_range(&self) -> RangeInclusive<isize> {
-        self.support().copied().range().unwrap_or(0..=-1)
+        self.support().copied().range().unwrap_or_else(empty_range)
     }
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
         self.support().flat_map(|&i|
             self[i].raw_generators().iter().map(|x| self.q_deg_of(x))
-        ).range().unwrap_or(0..=-1)
+        ).range().unwrap_or_else(empty_range)
     }
 
     pub fn canon_cycles(&self) -> &[KhChain<R>] {

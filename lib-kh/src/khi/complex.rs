@@ -14,7 +14,7 @@ use delegate::delegate;
 use itertools::Itertools;
 use yui_core::lc::Lc;
 use yui_core::abst::{EucRing, EucRingOps, Ring, RingOps};
-use yui_core::ext::IteratorExt;
+use yui_core::ext::{empty_range, IteratorExt};
 use yui_homology::{ChainComplex1, ChainMap, ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_link::InvLink;
 
@@ -162,13 +162,13 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     }
 
     pub fn h_range(&self) -> RangeInclusive<isize> {
-        self.support().copied().range().unwrap_or(0..=-1)
+        self.support().copied().range().unwrap_or_else(empty_range)
     }
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
         self.support().flat_map(|&i|
             self[i].raw_generators().iter().map(|x| self.q_deg_of(x))
-        ).range().unwrap_or(0..=-1)
+        ).range().unwrap_or_else(empty_range)
     }
 
     pub fn canon_cycles(&self) -> &[KhIChain<R>] { 

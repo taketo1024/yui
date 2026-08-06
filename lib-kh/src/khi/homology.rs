@@ -5,7 +5,7 @@ use std::ops::{Index, RangeInclusive};
 use std::sync::OnceLock;
 use delegate::delegate;
 use yui_core::abst::{EucRing, EucRingOps};
-use yui_core::ext::IteratorExt;
+use yui_core::ext::{empty_range, IteratorExt};
 use yui_homology::{ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_link::InvLink;
 use crate::kh::KhComplex;
@@ -108,13 +108,13 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn h_range(&self) -> RangeInclusive<isize> {
         self.support().filter(|&&i|
             !self[i].is_zero()
-        ).copied().range().unwrap_or(0..=-1)
+        ).copied().range().unwrap_or_else(empty_range)
     }
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
         self.support().flat_map(|&i|
             self[i].generators().map(|z| self.q_deg_of_chain(&z))
-        ).range().unwrap_or(0..=-1)
+        ).range().unwrap_or_else(empty_range)
     }
 
     pub fn canon_cycles(&self) -> &[KhIChain<R>] {

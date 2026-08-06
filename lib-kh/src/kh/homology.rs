@@ -7,7 +7,7 @@ use delegate::delegate;
 
 use yui_homology::{ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_core::abst::{EucRing, EucRingOps};
-use yui_core::ext::IteratorExt;
+use yui_core::ext::{empty_range, IteratorExt};
 use yui_link::Link;
 
 use crate::kh::KhGen;
@@ -129,19 +129,19 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn h_range(&self) -> RangeInclusive<isize> {
         self.support().filter(|&&i|
             !self[i].is_zero()
-        ).copied().range().unwrap_or(0..=-1)
+        ).copied().range().unwrap_or_else(empty_range)
     }
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
         self.support().flat_map(|&i|
             self[i].generators().map(|z| self.q_deg_of_chain(&z))
-        ).range().unwrap_or(0..=-1)
+        ).range().unwrap_or_else(empty_range)
     }
 
     pub fn delta_range(&self) -> RangeInclusive<isize> {
         self.support().flat_map(|&i|
             self[i].generators().map(|z| 2 * self.h_deg_of_chain(&z) - self.q_deg_of_chain(&z))
-        ).range().unwrap_or(0..=-1)
+        ).range().unwrap_or_else(empty_range)
     }
 
     pub fn canon_cycles(&self) -> &[KhChain<R>] {

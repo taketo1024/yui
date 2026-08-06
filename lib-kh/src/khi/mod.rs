@@ -4,5 +4,5 @@ mod homology;
 mod tau;
 
 pub use khi_gen::{KhIGen, KhIGenExt};
-pub use complex::*;
-pub use homology::*;
+pub use complex::{KhIComplex, KhIChain};
+pub use homology::KhIHomology;

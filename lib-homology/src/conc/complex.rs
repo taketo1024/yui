@@ -72,8 +72,6 @@ where
         });
 
         new.d_matrices = d_matrices;
-
-        #[cfg(debug_assertions)]
         new.check_d_matrices();
 
         new
@@ -82,15 +80,13 @@ where
     pub(crate) fn with_d_matrices(mut self, matrices: impl IntoIterator<Item = (I, SpMat<R>)>) -> Self {
         let map: HashMap<I, SpMat<R>> = matrices.into_iter().collect();
         self.d_matrices = Arc::new(map);
-
-        #[cfg(debug_assertions)]
         self.check_d_matrices();
 
         self
     }
 
     /// Each cached d-matrix's shape must match the summand ranks at its endpoints.
-    /// Callable in release; construction only runs it under `debug_assertions`.
+    /// Run on every construction — only shape comparisons, so it is cheap in any build.
     pub fn check_d_matrices(&self) {
         for (&i, m) in self.d_matrices.iter() {
             let (n_rows, n_cols) = m.shape();

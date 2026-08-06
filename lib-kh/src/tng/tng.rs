@@ -29,7 +29,7 @@ enum TngCompKind {
     Circ,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct TngComp {
     kind: TngCompKind,
     edges: EdgeSet,
@@ -269,9 +269,9 @@ impl Tng {
     pub fn connect_mut(&mut self, other: &Self) {
         for c in other.comps.iter() {
             if c.is_circle() {
-                self.comps.inner_mut().push(*c);
+                self.comps.inner_mut().push(c.clone());
             } else {
-                self.append_arc(*c);
+                self.append_arc(c.clone());
             }
         }
         self.normalize();
@@ -285,7 +285,7 @@ impl Tng {
             self.comps.inner_mut()[i].connect_mut(&arc);
 
             // If the other end is also connectable to a different component:
-            let ci = self.comps[i];
+            let ci = self.comps[i].clone();
             if let Some(j) = self.find_comp(|c| *c != ci && c.is_connectable(&ci)) {
                 let cj = self.comps.inner_mut().remove(j);
                 self.comps.inner_mut()[i].connect_mut(&cj);
@@ -491,7 +491,7 @@ mod tests {
         assert_eq!(t.n_comps(), 2);
         assert_eq!(t.find_comp(|c| c.is_circle()), Some(1));
 
-        let c = *t.comp(1);
+        let c = t.comp(1).clone();
         t.remove(&c);
 
         assert_eq!(t.n_comps(), 1);

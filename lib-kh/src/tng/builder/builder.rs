@@ -468,7 +468,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         while let Some(k) = pop_min_pivot(&mut pool, |k|
             self.complex.contains_key(k).then(|| self.complex.vertex(k).c_weight())
         ) {
-            let Some(&c) = self.find_loop_in(&k, allow_based) else { continue };
+            let Some(c) = self.find_loop_in(&k, allow_based).cloned() else { continue };
             let added = self.deloop(&k, &c);
 
             for nk in added {

@@ -1125,7 +1125,7 @@ mod tests {
         assert_eq!(c.rank(0), 1);
 
         let k = TngComplexKey::init();
-        let circ = *c.vertex(&k).tng().comp(0);
+        let circ = c.vertex(&k).tng().comp(0).clone();
         let updated = c.deloop(&k, &circ);
 
         assert_eq!(c.dim(), 0);
@@ -1161,7 +1161,7 @@ mod tests {
             state: State::from([1,0]), 
             label: KhTensor::from_iter([])
         };
-        let circ = *c.vertex(&k).tng().comp(2);
+        let circ = c.vertex(&k).tng().comp(2).clone();
         assert!(circ.is_circle());
 
         let updated = c.deloop(&k, &circ);
@@ -1193,7 +1193,7 @@ mod tests {
         assert_eq!(c.rank(0), 1);
 
         let k = TngComplexKey::init();
-        let circ = *c.vertex(&k).tng().comp(0);
+        let circ = c.vertex(&k).tng().comp(0).clone();
         let updated = c.deloop(&k, &circ);
 
         assert_eq!(c.dim(), 0);

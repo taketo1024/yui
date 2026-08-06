@@ -1121,7 +1121,7 @@ mod tests {
         // a sum is not invertible just because its leading term is. Both terms share the source
         // and target, as every term of an `LcCob` does.
         let a = TngComp::arc([0, 1]);
-        let id = Cob::from(CobComp::id(a));
+        let id = Cob::from(CobComp::id(a.clone()));
         let dotted = Cob::from(CobComp::id(a).with_dots(1, 0));
         let f = LcCob::from((id, -1)) + LcCob::from((dotted, -1));
 

@@ -635,9 +635,9 @@ mod tests {
         }
     }
 
-    // The direct symmetry-broken emission (Sano2026, Prop 4.6) is a deformation retract of the
-    // doubled cone: homology must agree with the double-then-eliminate path.
-    fn check_direct_matches(l: &InvLink, config: SymBuildConfig) {
+    // The symmetry-broken emission (`cone_extend_reduced`, Sano2026 Prop 4.6) is a deformation
+    // retract of the doubled cone: its homology must agree with `cone_extend_full`'s.
+    fn check_reduced_matches_full(l: &InvLink, config: SymBuildConfig) {
         for reduced in [false, true] {
             let full = cone_homology_by(l, reduced, config.clone(), true);
             let direct = cone_homology_by(l, reduced, config.clone(), false);
@@ -646,23 +646,23 @@ mod tests {
     }
 
     #[test]
-    fn cone_direct_3_1() {
-        check_direct_matches(&InvLink::test_data("3_1"), SymBuildConfig::default());
+    fn cone_reduced_matches_full_3_1() {
+        check_reduced_matches_full(&InvLink::test_data("3_1"), SymBuildConfig::default());
     }
 
     #[test]
-    fn cone_direct_3_1_m() {
-        check_direct_matches(&InvLink::test_data("3_1").mirror(), SymBuildConfig::default());
+    fn cone_reduced_matches_full_3_1_m() {
+        check_reduced_matches_full(&InvLink::test_data("3_1").mirror(), SymBuildConfig::default());
     }
 
     #[test]
-    fn cone_direct_4_1() {
-        check_direct_matches(&InvLink::test_data("4_1"), SymBuildConfig::default());
+    fn cone_reduced_matches_full_4_1() {
+        check_reduced_matches_full(&InvLink::test_data("4_1"), SymBuildConfig::default());
     }
 
     #[test]
-    fn cone_direct_6_3_chunked() {
-        check_direct_matches(&InvLink::test_data("6_3"), SymBuildConfig { cut: CutOption::Auto(3), ..Default::default() });
+    fn cone_reduced_matches_full_6_3_chunked() {
+        check_reduced_matches_full(&InvLink::test_data("6_3"), SymBuildConfig { cut: CutOption::Auto(3), ..Default::default() });
     }
 
     // Capping the elimination fill cost must not change the homology — the survivors just defer to
@@ -693,8 +693,8 @@ mod tests {
     }
 
     #[test]
-    fn cone_direct_9_46_windowed() {
-        let l = InvLink::from_symmetric_pd_code([[18,8,1,7],[13,6,14,7],[12,2,13,1],[8,18,9,17],[5,14,6,15],[2,12,3,11],[16,10,17,9],[15,4,16,5],[10,4,11,3]]);
+    fn cone_windowed_chunked_9_46() {
+        let l = InvLink::sym_pretzel(-3, 3, -3); // 9_46
         let config = SymBuildConfig { cut: CutOption::Auto(2), strategy: Strategy::MinFill, h_range: Some(-64 ..= 1), ..Default::default() };
         for reduced in [false, true] {
             let full = cone_homology(&l, reduced, SymBuildConfig { h_range: Some(-64 ..= 1), ..Default::default() });
@@ -717,17 +717,6 @@ mod tests {
     #[test]
     fn cone_chunk_independent_6_3() {
         check_chunk_independent(&InvLink::test_data("6_3"), 3);
-    }
-
-    #[test]
-    fn cone_chunk_windowed_9_46() {
-        let l = InvLink::from_symmetric_pd_code([[18,8,1,7],[13,6,14,7],[12,2,13,1],[8,18,9,17],[5,14,6,15],[2,12,3,11],[16,10,17,9],[15,4,16,5],[10,4,11,3]]);
-        let narrow = |h: Vec<(isize, usize)>| h.into_iter().filter(|&(d, _)| d <= 0).collect_vec();
-        for reduced in [false, true] {
-            let full = narrow(cone_homology(&l, reduced, SymBuildConfig::default()));
-            let chunked = narrow(cone_homology(&l, reduced, SymBuildConfig { cut: CutOption::Auto(2), strategy: Strategy::MinFill, h_range: Some(-64 ..= 1), ..Default::default() }));
-            assert_eq!(full, chunked, "reduced={reduced}");
-        }
     }
 
     // The cone homology must not depend on the simplification strategy.
@@ -756,7 +745,7 @@ mod tests {
             ("4_1", InvLink::test_data("4_1")),
             ("6_3", InvLink::test_data("6_3")),
             // 9_46 has s̲ ≠ s̄ (ssi = (0, 2)) — exercises the canon-cycle ordering.
-            ("9_46", InvLink::from_symmetric_pd_code([[18,8,1,7],[13,6,14,7],[12,2,13,1],[8,18,9,17],[5,14,6,15],[2,12,3,11],[16,10,17,9],[15,4,16,5],[10,4,11,3]])),
+            ("9_46", InvLink::sym_pretzel(-3, 3, -3)),
         ];
         for (name, l) in knots {
             let matrix = ssi_invariant_with(&l, false, Default::default(), None, SsVersion::V1);

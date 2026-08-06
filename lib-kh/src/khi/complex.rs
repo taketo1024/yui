@@ -19,7 +19,7 @@ use yui_homology::{ChainComplex1, ChainMap, ToSeqString, ToTableString, GrMod1, 
 use yui_link::InvLink;
 
 use crate::kh::{KhComplex, KhGen};
-use crate::tng::builder::SymBuildConfig;
+use crate::tng::builder::{SymBuildConfig, assert_supported_symmetry};
 use crate::khi::KhIHomology;
 use crate::khi::{KhIGen, KhIGenExt};
 use crate::util::Bigraded;
@@ -54,6 +54,8 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     /// + canon classes directly, and `into_raw_complex` converts once at the boundary (matrix-backed).
     /// The equivalent matrix-level cone is kept for reference as `new_with_config_matrix`.
     pub fn new_with_config(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig) -> Self {
+        assert_supported_symmetry(l);
+
         let (h_range, build_config) = Self::cone_build_config(l, reduced, config);
         Self::build_cone(l, h, t, reduced, build_config, h_range)
     }
@@ -83,6 +85,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
     pub fn new_no_simplify(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self {
         assert_eq!(R::one() + R::one(), R::zero(), "char(R) != 2");
+        assert_supported_symmetry(l);
         assert!(
             !reduced || (l.base_pt().is_some_and(|e| l.is_on_axis(e)) && t.is_zero()),
             "reduced requires t = 0 and a base point on the axis"

@@ -24,7 +24,7 @@ use crate::kh::{KhAlgGen, KhGen, KhTensor};
 use crate::tng::{ElimDir, LcCob, LcCobTrait, TngComp, TngComplex, TngComplexElem, TngComplexKey};
 use crate::tng::builder::{TngComplexBuilder, TngElemBuilder, BuildConfig, Strategy, NodeOrder};
 use std::fmt;
-use super::{reachable_range, pop_min_pivot, pivot_pool, push_pivot, sparkline, fill_cost_sparkline, cutwidth_after, toggle_boundary, BuildPlanner, CutOption};
+use super::{assert_supported_symmetry, reachable_range, pop_min_pivot, pivot_pool, push_pivot, sparkline, fill_cost_sparkline, cutwidth_after, toggle_boundary, BuildPlanner, CutOption};
 use super::builder::PROGRESS_LOG_STEP;
 use log::Level;
 use yui_core::util::log::log_progress;
@@ -156,6 +156,7 @@ impl<R> SymTngBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn from_inv_link(l: &InvLink, h: &R, t: &R, reduced: bool) -> SymTngBuilder<R> {
         assert!(l.nodes().all(|x| x.is_crossing()));
+        assert_supported_symmetry(l);
         assert!(
             !reduced || l.base_pt().is_some_and(|e| l.is_on_axis(e)),
             "reduced requires a base point on the axis"

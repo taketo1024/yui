@@ -3,7 +3,7 @@ use std::collections::BinaryHeap;
 use std::ops::RangeInclusive;
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
-use yui_link::{Node, Edge};
+use yui_link::{Node, Edge, InvLink};
 use crate::tng::TngComplexKey;
 
 // A lazy min-priority pool of pivot candidates, ordered by (cached weight, key). The key joins the
@@ -31,6 +31,19 @@ where F: FnMut(&TngComplexKey) -> Option<usize> {
         }
     }
     None
+}
+
+// v1.0 supports only strongly invertible links in a transvergent diagram: canon cycles need not
+// be 1 + τ closed otherwise, and `partition_off_axis` needs an axis that separates the plane.
+pub(crate) fn assert_supported_symmetry(l: &InvLink) {
+    assert!(
+        l.is_strongly_invertible(),
+        "currently, only strongly invertible knots / links are supported"
+    );
+    assert!(
+        l.is_transvergent(),
+        "currently, only transvergent diagrams are supported (the axis must lie in the plane)"
+    );
 }
 
 // Indices in `base` that can still reach `window` with `r` pending crossings: an index

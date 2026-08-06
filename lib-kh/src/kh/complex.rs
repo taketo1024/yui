@@ -153,7 +153,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         ).range().unwrap_or(0..=-1)
     }
 
-    pub fn canon_cycles(&self) -> &Vec<KhChain<R>> { 
+    pub fn canon_cycles(&self) -> &[KhChain<R>] {
         &self.canon_cycles
     }
 

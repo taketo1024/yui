@@ -46,6 +46,7 @@ pub struct ConeBuilder<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     inner: SymTngBuilder<R>,
     cone: TngComplexBuilder<R>, // the reduced cone, filled in by the final `cone_merge`
+    full_extend: bool, // build by the reference extension instead — see `cone_extend_full`
 }
 
 impl<R> ConeBuilder<R>
@@ -53,11 +54,18 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn from_inv_link(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self {
         let inner = SymTngBuilder::from_inv_link(l, h, t, reduced);
         let cone = TngComplexBuilder::init(h, t, (0, 0), None); // replaced by `cone_merge`
-        Self { inner, cone }
+        Self { inner, cone, full_extend: false }
     }
 
     pub fn with_config(mut self, config: SymBuildConfig) -> Self {
         self.inner = self.inner.with_config(config);
+        self
+    }
+
+    /// Build the cone by the unreduced reference extension rather than the direct one.
+    /// Slower, but both must give the same homology.
+    pub fn with_full_extend(mut self, flag: bool) -> Self {
+        self.full_extend = flag;
         self
     }
 
@@ -92,14 +100,20 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let top = *range.end();
         for d in range {
             debug!("build cone C[{d}]...");
-            self.cone_extend_reduced(d);
-            self.rewrite_elements(d - 1); // degree d-1's out-edges are now complete
+            if self.full_extend {
+                self.cone_extend_full(d);
+            } else {
+                self.cone_extend_reduced(d);
+                self.reduce_elements(d - 1); // degree d-1's out-edges are now complete
+            }
             self.prune_consumed(d - 2); // free the consumed symmetric degree before the heavy eliminate
             self.cone.eliminate_in(d - 2); // stragglers: τ-fixed `1+τ` units, correction-created units
             debug!("  built cone C[{d}]: {}.", self.cone.complex().rank(d));
         }
 
-        self.rewrite_elements(top); // the top degree has no further out-edges — Iτ pushes only
+        if !self.full_extend {
+            self.reduce_elements(top); // the top degree has no further out-edges — Iτ pushes only
+        }
 
         info!("cone eliminate top C[{}..={}]", top - 1, top);
         for d in (top - 1) ..= top {
@@ -118,6 +132,51 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             [lift_elem(e, Bit::Bit0), lift_elem(e, Bit::Bit1)]
         ).collect_vec();
         self.cone.elements_mut().set(lifted);
+    }
+
+    // The full (non-reduced) cone extension — kept for debugging against `cone_extend_reduced`.
+    // Adds the symmetric complex's degree-`d` slice to the cone: the two copies `k·0`, `k·1` of each
+    // vertex, the horizontal edges *into* degree `d`, and the `1+τ` edges out of `k·0`. Processed
+    // ascending, every edge lands exactly once (its target's degree). The free-orbit `1+τ` pivots
+    // are collapsed two degrees behind by the loop's `eliminate_in`.
+    fn cone_extend_full(&mut self, d: isize) {
+        let keys = self.inner.complex().keys_of_deg(d).copied().collect_vec();
+
+        debug!("  cone-extend C[{d}]: +{} verts", 2 * keys.len());
+
+        for k in keys.iter() {
+            let tng = self.inner.complex().vertex(k).tng().clone();
+            self.cone.complex_mut().add_vertex(with_bit(k, Bit::Bit0), TngComplexVertex::from(tng.clone()));
+            self.cone.complex_mut().add_vertex(with_bit(k, Bit::Bit1), TngComplexVertex::from(tng));
+        }
+
+        // horizontal edges into degree d (each layer copies the symmetric differential).
+        for k in keys.iter() {
+            for j in self.inner.complex().vertex(k).in_edges().copied().collect_vec() {
+                let f = self.inner.complex().edge(&j, k).clone();
+                self.cone.complex_mut().add_edge(&with_bit(&j, Bit::Bit0), &with_bit(k, Bit::Bit0), f.clone());
+                self.cone.complex_mut().add_edge(&with_bit(&j, Bit::Bit1), &with_bit(k, Bit::Bit1), f);
+            }
+        }
+
+        // connecting differential (1 + τ): k·0 → k·1 (id) and k·0 → τk·1 (τ-cyl).
+        for k in keys.iter() {
+            let tng = self.inner.complex().vertex(k).tng().clone();
+            let id = LcCob::from(Cob::id(&tng));
+            let tau = LcCob::from(tau_cob(&tng, |e| self.inner.inv_edge(e)));
+            let tk = *self.inner.key_map().inv_key(k);
+            let k0 = with_bit(k, Bit::Bit0);
+
+            if &tk == k {
+                let f = id + tau; // same target: sum over char 2
+                if !f.is_zero() {
+                    self.cone.complex_mut().add_edge(&k0, &with_bit(k, Bit::Bit1), f);
+                }
+            } else {
+                self.cone.complex_mut().add_edge(&k0, &with_bit(k, Bit::Bit1), id);
+                self.cone.complex_mut().add_edge(&k0, &with_bit(&tk, Bit::Bit1), tau);
+            }
+        }
     }
 
     // Symmetry-breaking reduction (Sano2026, Prop 4.6): per free τ-orbit only the
@@ -274,7 +333,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // an entry at `N·1` redirects to `(τN)·1` via Iτ and to `l·0` via each out-edge `N → l`
     // (mirroring `eliminate_from` with the identity pivot). Corrections landing on a dropped
     // `l·0` are removed by the next degree's rewrite, matching the sequential SDR composition.
-    fn rewrite_elements(&mut self, d: isize) {
+    fn reduce_elements(&mut self, d: isize) {
         let n_elems = self.cone.elements().content().len();
         if n_elems == 0 { 
             return;
@@ -341,52 +400,6 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             OrbitClass::Drop
         };
         (tk, class)
-    }
-
-    // The full (non-reduced) cone extension — kept for debugging against `cone_extend_reduced`.
-    // Adds the symmetric complex's degree-`d` slice to the cone: the two copies `k·0`, `k·1` of each
-    // vertex, the horizontal edges *into* degree `d`, and the `1+τ` edges out of `k·0`. Processed
-    // ascending, every edge lands exactly once (its target's degree). `vertical_reduce` (via
-    // `pending_vertical`) collapses its free-orbit `1+τ` pivots two degrees behind.
-    #[allow(dead_code)]
-    fn cone_extend_full(&mut self, d: isize) {
-        let keys = self.inner.complex().keys_of_deg(d).copied().collect_vec();
-
-        debug!("  cone-extend C[{d}]: +{} verts", 2 * keys.len());
-
-        for k in keys.iter() {
-            let tng = self.inner.complex().vertex(k).tng().clone();
-            self.cone.complex_mut().add_vertex(with_bit(k, Bit::Bit0), TngComplexVertex::from(tng.clone()));
-            self.cone.complex_mut().add_vertex(with_bit(k, Bit::Bit1), TngComplexVertex::from(tng));
-        }
-
-        // horizontal edges into degree d (each layer copies the symmetric differential).
-        for k in keys.iter() {
-            for j in self.inner.complex().vertex(k).in_edges().copied().collect_vec() {
-                let f = self.inner.complex().edge(&j, k).clone();
-                self.cone.complex_mut().add_edge(&with_bit(&j, Bit::Bit0), &with_bit(k, Bit::Bit0), f.clone());
-                self.cone.complex_mut().add_edge(&with_bit(&j, Bit::Bit1), &with_bit(k, Bit::Bit1), f);
-            }
-        }
-
-        // connecting differential (1 + τ): k·0 → k·1 (id) and k·0 → τk·1 (τ-cyl).
-        for k in keys.iter() {
-            let tng = self.inner.complex().vertex(k).tng().clone();
-            let id = LcCob::from(Cob::id(&tng));
-            let tau = LcCob::from(tau_cob(&tng, |e| self.inner.inv_edge(e)));
-            let tk = *self.inner.key_map().inv_key(k);
-            let k0 = with_bit(k, Bit::Bit0);
-
-            if &tk == k {
-                let f = id + tau; // same target: sum over char 2
-                if !f.is_zero() {
-                    self.cone.complex_mut().add_edge(&k0, &with_bit(k, Bit::Bit1), f);
-                }
-            } else {
-                self.cone.complex_mut().add_edge(&k0, &with_bit(k, Bit::Bit1), id);
-                self.cone.complex_mut().add_edge(&k0, &with_bit(&tk, Bit::Bit1), tau);
-            }
-        }
     }
 
     // Drop a consumed symmetric degree and its τ key-map entries — never needed again.
@@ -580,8 +593,12 @@ mod tests {
     // Build the reduced cone, assert d² = 0, and return its nonzero homology ranks per degree.
     // (Full homology vs. the KhI reference is checked in `khi`.)
     fn cone_homology(l: &InvLink, reduced: bool, config: SymBuildConfig) -> Vec<(isize, usize)> {
+        cone_homology_by(l, reduced, config, false)
+    }
+
+    fn cone_homology_by(l: &InvLink, reduced: bool, config: SymBuildConfig, full: bool) -> Vec<(isize, usize)> {
         let c = ConeBuilder::from_inv_link(l, &FF2::zero(), &FF2::zero(), reduced)
-            .with_config(config).run().into_raw_complex(None);
+            .with_config(config).with_full_extend(full).run().into_raw_complex(None);
         c.check_d_all();
         let h = c.homology();
         h.support().map(|&i| (i, h[i].rank())).filter(|(_, r)| *r > 0).sorted().collect()
@@ -622,8 +639,8 @@ mod tests {
     // doubled cone: homology must agree with the double-then-eliminate path.
     fn check_direct_matches(l: &InvLink, config: SymBuildConfig) {
         for reduced in [false, true] {
-            let full = cone_homology(l, reduced, config.clone());
-            let direct = cone_homology(l, reduced, SymBuildConfig { ..config.clone() });
+            let full = cone_homology_by(l, reduced, config.clone(), true);
+            let direct = cone_homology_by(l, reduced, config.clone(), false);
             assert_eq!(full, direct, "reduced={reduced}");
         }
     }

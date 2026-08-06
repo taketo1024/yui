@@ -222,7 +222,7 @@ where
             let d = d.unwrap();
             let s = 2 * d + w - r + 1;
 
-            self.out(&format!("ss[{i}] = {s} (d = {d}, w = {w}, r = {r})"));
+            self.out(&format!("ssi[{i}] = {s} (d = {d}, w = {w}, r = {r})"));
         }
 
         Ok(())

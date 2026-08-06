@@ -53,6 +53,10 @@ pub struct Args {
     #[arg(long, value_parser = parse_cut)]
     pub cut: Option<CutOption>,
 
+    // cap the per-elimination fill cost; survivors defer to the matrix reduction.
+    #[arg(long)]
+    pub max_elim_cost: Option<usize>,
+
     #[arg(long, value_parser = parse_strategy, default_value = "greedy")]
     pub strategy: Strategy,
 
@@ -63,6 +67,10 @@ pub struct Args {
     // skip the half-build/τ-mirror preprocess (which materializes the unbridged off-axis product).
     #[arg(long)]
     pub no_preprocess: bool,
+
+    // skip the final deloop/eliminate; remaining circles defer to the matrix reducer.
+    #[arg(long)]
+    pub no_full_deloop: bool,
 
     #[arg(short, long, default_value = "unicode")]
     #[default(Format::Unicode)]
@@ -126,6 +134,8 @@ where
                 strategy: self.args.strategy,
                 node_order: self.args.node_order,
                 preprocess: !self.args.no_preprocess,
+                max_elim_cost: self.args.max_elim_cost,
+                no_full_deloop: self.args.no_full_deloop,
                 ..Default::default()
             };
             KhIComplex::new_with_config(&l, &h, &t, self.args.reduced, config)

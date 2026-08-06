@@ -1,6 +1,6 @@
 use derive_more::{Display, Debug};
 use num_traits::Zero;
-use yui_core::{GetSign, Sign};
+use yui_core::num::{GetSign, Sign};
 
 #[derive(Clone, Copy, PartialEq, Eq, Display, Debug)]
 #[display("{}", _0)]

@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use yui_core::bitseq::Bit;
-use yui_core::Sign;
+use yui_core::num::Sign;
 use yui_core::ext::CloneAnd;
 
 use crate::Path;

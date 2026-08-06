@@ -5,7 +5,7 @@
 //!
 //! See: <https://en.wikipedia.org/wiki/Ring_(mathematics)>
 
-use crate::Sign;
+use crate::num::Sign;
 use crate::abst::{AddGrp, AddGrpOps, Mon, MonOps};
 
 /// Helper trait bundling [`AddGrpOps`] and [`MonOps`] for [`Ring`].

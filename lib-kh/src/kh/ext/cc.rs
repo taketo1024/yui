@@ -10,7 +10,7 @@
 use itertools::Itertools;
 use yui_core::bitseq::Bit;
 use yui_core::lc::Lc;
-use yui_core::Sign;
+use yui_core::num::Sign;
 use yui_core::abst::{Ring, RingOps};
 use yui_homology::ChainMap;
 use yui_link::{Link, Path, State};

@@ -21,7 +21,7 @@ use auto_impl_ops::auto_ops;
 use itertools::{Itertools, iproduct};
 use num_traits::Zero;
 use rayon::prelude::*;
-use yui_core::Sign;
+use yui_core::num::Sign;
 use yui_core::abst::{Ring, RingOps};
 use yui_core::ext::CloneAnd;
 use yui_core::lc::LcKey;

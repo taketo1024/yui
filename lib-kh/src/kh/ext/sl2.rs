@@ -13,7 +13,7 @@ use std::ops::Index;
 
 use itertools::Itertools;
 use num_traits::Zero;
-use yui_core::Sign;
+use yui_core::num::Sign;
 use yui_core::abst::{AddMon, Field, FieldOps, Ring, RingOps};
 use yui_core::ext::RangeExt;
 use yui_homology::isize3;

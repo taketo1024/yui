@@ -65,7 +65,7 @@ pub(crate) fn reachable_range(base: RangeInclusive<isize>, window: &Option<Range
 pub(crate) fn sparkline(widths: &[usize], peak: usize) -> String {
     const BARS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
     widths.iter().map(|&w| {
-        let i = if peak == 0 { 0 } else { w * 7 / peak };
+        let i = (w * 7).checked_div(peak).unwrap_or(0);
         BARS[i.min(7)]
     }).collect()
 }

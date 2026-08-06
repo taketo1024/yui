@@ -275,15 +275,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    fn states_of_weight(&self, k: usize) -> impl Iterator<Item = &State> { 
-        self.vertices.keys().filter_map(|s| {
-                if s.weight() == k { 
-                    Some(s)
-                } else {
-                    None
-                }
-            })
-            .sorted_by(Ord::cmp)
+    fn states_of_weight(&self, k: usize) -> impl Iterator<Item = &State> {
+        self.vertices.keys().filter(|s|
+            s.weight() == k
+        ).sorted_by(Ord::cmp)
     }
 
     pub fn into_complex(self) -> ChainComplex1<KhGen, R> {

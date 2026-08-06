@@ -49,12 +49,9 @@ pub enum CType {
 }
 
 impl CType { 
-    pub fn is_field(&self) -> bool { 
+    pub fn is_field(&self) -> bool {
         use CType::*;
-        match self {
-            Q | F2 | F3 => true,
-            _ => false
-        }
+        matches!(self, Q | F2 | F3)
     }
 }
 

@@ -135,9 +135,11 @@ impl TauKeyMap {
     fn from_half(keys: &[TngComplexKey], band: RangeInclusive<usize>) -> Self {
         keys.iter().flat_map(|&k1| {
             let band = band.clone();
-            keys.iter().filter_map(move |&k2| {
-                band.contains(&(k1.weight() + k2.weight())).then(|| (k1 + k2, k2 + k1))
-            })
+            keys.iter().filter(move |k2|
+                band.contains(&(k1.weight() + k2.weight()))
+            ).map(move |&k2|
+                (k1 + k2, k2 + k1)
+            )
         }).collect()
     }
 }

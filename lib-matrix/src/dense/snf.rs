@@ -384,9 +384,9 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
         debug_assert!(self.target.is_diag());
 
         let n = min(self.target.n_rows(), self.target.n_cols());
-        let r = (0..n).filter(|&i| 
+        let r = (0..n).find(|&i|
             self.target[(i, i)].is_zero()
-        ).next().unwrap_or(n);
+        ).unwrap_or(n);
 
         if r == 0 { 
             return

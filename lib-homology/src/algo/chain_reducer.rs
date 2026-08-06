@@ -218,7 +218,7 @@ where
         trace!("  density: {}", a.density());
         trace!("  mean-weight: {}", a.mean_weight());
 
-        let config = PivotFinderConfig { piv_type, piv_cond, max_pivots: self.max_pivots, ..Default::default() };
+        let config = PivotFinderConfig { piv_type, piv_cond, max_pivots: self.max_pivots };
         let (p, q, r) = find_pivots(a, config);
 
         let (m, n) = a.shape();

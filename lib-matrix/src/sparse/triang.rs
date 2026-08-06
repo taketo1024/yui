@@ -210,12 +210,20 @@ fn collect_diag<'a, R>(t: TriangularType, a: &'a SpMat<R>) -> Vec<&'a R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     let (col_offsets, row_indices, values) = a.csc_data();
     (0..a.n_cols()).map(|j| {
-        let p = if t.is_upper() {
-            col_offsets[j + 1] - 1
+        let range = col_offsets[j] .. col_offsets[j + 1];
+        assert!(range.start < range.end, "broken input: missing diagonal at column {j}");
+
+        // Usually the column's last (upper) or first (lower) entry, but a stored zero — which
+        // `is_triang` ignores — can displace it. CSC keeps rows sorted, so binary-search then.
+        let head = if t.is_upper() { range.end - 1 } else { range.start };
+        let p = if row_indices[head] == j {
+            head
         } else {
-            col_offsets[j]
+            let k = row_indices[range.clone()].binary_search(&j).unwrap_or_else(|_|
+                panic!("broken input: missing diagonal at column {j}")
+            );
+            range.start + k
         };
-        assert_eq!(row_indices[p], j, "broken input: missing diagonal at column {j}");
         &values[p]
     }).collect()
 }
@@ -286,5 +294,27 @@ mod tests {
         let linv = inv_triangular(Lower, &l);
         let e = &l * &linv;
         assert!(e.is_id());
+    }
+
+    #[test]
+    fn diag_past_a_stored_zero() {
+        // `is_triang` filters with `iter_nz`, so a stored zero below the diagonal keeps the matrix
+        // upper-triangular in its eyes while displacing the column's last stored entry.
+        let a: SpMat<i64> = SpMat::try_from_csc_data(
+            2, 2, vec![0, 2, 3], vec![0, 1, 1], vec![1, 0, 1]
+        ).unwrap();
+        assert!(a.is_triang(Upper));
+
+        let ainv = inv_triangular(Upper, &a);
+        assert!((&a * &ainv).is_id());
+    }
+
+    #[test]
+    #[should_panic(expected = "missing diagonal at column 0")]
+    fn empty_column_names_the_missing_diagonal() {
+        let a: SpMat<i64> = SpMat::try_from_csc_data(
+            2, 2, vec![0, 0, 1], vec![1], vec![1]
+        ).unwrap();
+        let _ = inv_triangular(Upper, &a);
     }
 }

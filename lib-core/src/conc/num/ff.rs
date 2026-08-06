@@ -78,7 +78,7 @@ macro_rules! impl_unop {
             }
         }
 
-        impl<'a, const p: I> $trait for &'a FF<p> {
+        impl<const p: I> $trait for &FF<p> {
             type Output = FF<p>;
             #[inline]
             fn $method(self) -> Self::Output {
@@ -93,9 +93,9 @@ impl_unop!(Neg, neg);
 macro_rules! impl_binop {
     ($trait:ident, $method:ident) => {
         #[auto_ops]
-        impl<'a, 'b, const p: I> $trait<&'b FF<p>> for &'a FF<p> {
+        impl<const p: I> $trait<&FF<p>> for &FF<p> {
             type Output = FF<p>;
-            fn $method(self, rhs: &'b FF<p>) -> Self::Output {
+            fn $method(self, rhs: &FF<p>) -> Self::Output {
                 FF::new(self.0.$method(&rhs.0))
             }
         }
@@ -107,18 +107,18 @@ impl_binop!(Sub, sub);
 impl_binop!(Mul, mul);
 
 #[auto_ops]
-impl<'b, const p: I> Div<&'b FF<p>> for &FF<p> {
+impl<const p: I> Div<&FF<p>> for &FF<p> {
     type Output = FF<p>;
-    fn div(self, rhs: &'b FF<p>) -> Self::Output {
+    fn div(self, rhs: &FF<p>) -> Self::Output {
         assert!(!rhs.is_zero());
         self * rhs.inv().unwrap()
     }
 }
 
 #[auto_ops]
-impl<'b, const p: I> Rem<&'b FF<p>> for &FF<p> {
+impl<const p: I> Rem<&FF<p>> for &FF<p> {
     type Output = FF<p>;
-    fn rem(self, rhs: &'b FF<p>) -> Self::Output {
+    fn rem(self, rhs: &FF<p>) -> Self::Output {
         assert!(!rhs.is_zero());
         FF::zero() // MEMO: FF<p> is a field. 
     }
@@ -127,7 +127,7 @@ impl<'b, const p: I> Rem<&'b FF<p>> for &FF<p> {
 macro_rules! impl_alg_ops {
     ($trait:ident) => {
         impl<const p: I> $trait for FF<p> {}
-        impl<'a, const p: I> $trait<FF<p>> for &'a FF<p> {}
+        impl<const p: I> $trait<FF<p>> for &FF<p> {}
     };
 }
 

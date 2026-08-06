@@ -265,10 +265,10 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
 }
 
 #[auto_ops]
-impl<'b, T> Rem<&'b Ratio<T>> for &Ratio<T>
+impl<T> Rem<&Ratio<T>> for &Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     type Output = Ratio<T>;
-    fn rem(self, rhs: &'b Ratio<T>) -> Self::Output {
+    fn rem(self, rhs: &Ratio<T>) -> Self::Output {
         assert!(!rhs.is_zero());
         Ratio::zero() // MEMO Frac<T> is a field. 
     }

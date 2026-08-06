@@ -38,7 +38,7 @@ where T: IntType, for<'x> &'x T: IntOps<T> {
 macro_rules! impl_ops {
     ($trait:ident, $type:ty) => {
         impl $trait for $type {}
-        impl<'a> $trait<$type> for &'a $type {}
+        impl $trait<$type> for &$type {}
     };
 }
 

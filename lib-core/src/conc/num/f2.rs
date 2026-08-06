@@ -85,42 +85,42 @@ impl Neg for &FF2 {
 }
 
 #[auto_ops]
-impl<'b> Add<&'b FF2> for &FF2 {
+impl Add<&FF2> for &FF2 {
     type Output = FF2;
-    fn add(self, rhs: &'b FF2) -> Self::Output {
+    fn add(self, rhs: &FF2) -> Self::Output {
         FF2(self.0 != rhs.0)
     }
 }
 
 #[auto_ops]
-impl<'b> Sub<&'b FF2> for &FF2 {
+impl Sub<&FF2> for &FF2 {
     type Output = FF2;
-    fn sub(self, rhs: &'b FF2) -> Self::Output {
+    fn sub(self, rhs: &FF2) -> Self::Output {
         Add::add(self, rhs)
     }
 }
 
 #[auto_ops]
-impl<'b> Mul<&'b FF2> for &FF2 {
+impl Mul<&FF2> for &FF2 {
     type Output = FF2;
-    fn mul(self, rhs: &'b FF2) -> Self::Output {
+    fn mul(self, rhs: &FF2) -> Self::Output {
         FF2(self.0 && rhs.0)
     }
 }
 
 #[auto_ops]
-impl<'b> Div<&'b FF2> for &FF2 {
+impl Div<&FF2> for &FF2 {
     type Output = FF2;
-    fn div(self, rhs: &'b FF2) -> Self::Output {
+    fn div(self, rhs: &FF2) -> Self::Output {
         assert!(!rhs.is_zero());
         *self
     }
 }
 
 #[auto_ops]
-impl<'b> Rem<&'b FF2> for &FF2 {
+impl Rem<&FF2> for &FF2 {
     type Output = FF2;
-    fn rem(self, rhs: &'b FF2) -> Self::Output {
+    fn rem(self, rhs: &FF2) -> Self::Output {
         assert!(!rhs.is_zero());
         FF2::zero()
     }
@@ -136,7 +136,7 @@ impl Pow<usize> for &FF2 {
 macro_rules! impl_alg_ops {
     ($trait:ident) => {
         impl $trait for FF2 {}
-        impl<'a> $trait<FF2> for &'a FF2 {}
+        impl $trait<FF2> for &FF2 {}
     };
 }
 

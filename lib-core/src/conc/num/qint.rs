@@ -219,11 +219,11 @@ impl_add_op!(Add, add);
 impl_add_op!(Sub, sub);
 
 #[auto_ops]
-impl<'b, I, const D: i32> Mul<&'b QuadInt<I, D>> for &QuadInt<I, D>
+impl<I, const D: i32> Mul<&QuadInt<I, D>> for &QuadInt<I, D>
 where I: IntType, for<'x> &'x I: IntOps<I> {
     type Output = QuadInt<I, D>;
 
-    fn mul(self, rhs: &'b QuadInt<I, D>) -> Self::Output {
+    fn mul(self, rhs: &QuadInt<I, D>) -> Self::Output {
         // When D ≡ 1,
         //
         //   ω^2 = (D + 1)/4 + √D/2 
@@ -286,21 +286,21 @@ where I: IntType, for<'x> &'x I: IntOps<I> {
 }
 
 #[auto_ops]
-impl<'b, I> Div<&'b GaussInt<I>> for &GaussInt<I>
+impl<I> Div<&GaussInt<I>> for &GaussInt<I>
 where I: IntType, for<'x> &'x I: IntOps<I> {
     type Output = GaussInt<I>;
 
-    fn div(self, rhs: &'b GaussInt<I>) -> Self::Output {
+    fn div(self, rhs: &GaussInt<I>) -> Self::Output {
         self.div_round(rhs)
     }
 }
 
 #[auto_ops]
-impl<'b, I> Rem<&'b GaussInt<I>> for &GaussInt<I>
+impl<I> Rem<&GaussInt<I>> for &GaussInt<I>
 where I: IntType, for<'x> &'x I: IntOps<I> {
     type Output = GaussInt<I>;
 
-    fn rem(self, rhs: &'b GaussInt<I>) -> Self::Output {
+    fn rem(self, rhs: &GaussInt<I>) -> Self::Output {
         let q = self / rhs;
         self - rhs * q
     }
@@ -330,21 +330,21 @@ where I: IntType, for<'x> &'x I: IntOps<I> {
 }
 
 #[auto_ops]
-impl<'b, I> Div<&'b EisenInt<I>> for &EisenInt<I>
+impl<I> Div<&EisenInt<I>> for &EisenInt<I>
 where I: IntType, for<'x> &'x I: IntOps<I> {
     type Output = EisenInt<I>;
 
-    fn div(self, rhs: &'b EisenInt<I>) -> Self::Output {
+    fn div(self, rhs: &EisenInt<I>) -> Self::Output {
         self.div_round(rhs)
     }
 }
 
 #[auto_ops]
-impl<'b, I> Rem<&'b EisenInt<I>> for &EisenInt<I>
+impl<I> Rem<&EisenInt<I>> for &EisenInt<I>
 where I: IntType, for<'x> &'x I: IntOps<I> {
     type Output = EisenInt<I>;
 
-    fn rem(self, rhs: &'b EisenInt<I>) -> Self::Output {
+    fn rem(self, rhs: &EisenInt<I>) -> Self::Output {
         let q = self / rhs;
         self - rhs * q
     }
@@ -460,13 +460,13 @@ macro_rules! impl_unop {
             }
         }
 
-        impl<'a, I, const D: i32> $trait for &'a QuadInt<I, D>
+        impl<I, const D: i32> $trait for &QuadInt<I, D>
         where I: IntType, for<'x> &'x I: IntOps<I> {
             type Output = QuadInt<I, D>;
 
             fn $method(self) -> Self::Output {
                 let (a, b) = self.pair();
-                QuadInt(<&'a I>::$method(a), <&'a I>::$method(b))
+                QuadInt(<&I>::$method(a), <&I>::$method(b))
             }
         }
     };
@@ -475,14 +475,14 @@ macro_rules! impl_unop {
 macro_rules! impl_add_op {
     ($trait:ident, $method:ident) => {
         #[auto_ops]
-        impl<'a, 'b, I, const D: i32> $trait<&'b QuadInt<I, D>> for &'a QuadInt<I, D>
+        impl<I, const D: i32> $trait<&QuadInt<I, D>> for &QuadInt<I, D>
         where I: IntType, for<'x> &'x I: IntOps<I> {
             type Output = QuadInt<I, D>;
 
-            fn $method(self, rhs: &'b QuadInt<I, D>) -> Self::Output {
+            fn $method(self, rhs: &QuadInt<I, D>) -> Self::Output {
                 let (a, b) = self.pair();
                 let (c, d) =  rhs.pair();
-                QuadInt(<&'a I>::$method(a, c), <&'a I>::$method(b, d))
+                QuadInt(<&I>::$method(a, c), <&I>::$method(b, d))
             }
         }
     };
@@ -493,7 +493,7 @@ macro_rules! impl_alg_op {
         impl<I, const D: i32> $trait<Self> for QuadInt<I, D> 
         where I: IntType, for<'x> &'x I: IntOps<I> {}
 
-        impl<'a, I, const D: i32> $trait<QuadInt<I, D>> for &'a QuadInt<I, D> 
+        impl<I, const D: i32> $trait<QuadInt<I, D>> for &QuadInt<I, D> 
         where I: IntType, for<'x> &'x I: IntOps<I> {}
     };
 }
@@ -503,7 +503,7 @@ macro_rules! impl_alg_op_d {
         impl<I> $trait<Self> for QuadInt<I, $d> 
         where I: IntType, for<'x> &'x I: IntOps<I> {}
 
-        impl<'a, I> $trait<QuadInt<I, $d>> for &'a QuadInt<I, $d> 
+        impl<I> $trait<QuadInt<I, $d>> for &QuadInt<I, $d> 
         where I: IntType, for<'x> &'x I: IntOps<I> {}
     };
 }

@@ -49,10 +49,6 @@ where
         Self { data: LcData::Zero, r_zero: R::zero() }
     }
 
-    pub fn clean(&mut self) {
-        self.data.clean()
-    }
-
     pub fn nterms(&self) -> usize {
         self.data.len()
     }
@@ -135,6 +131,34 @@ where
         ).collect()
     }
 
+    /// Add all pairs at once. Terms may cancel along the way, so the reduced form is
+    /// restored once at the end — prefer this over repeated `add_pair` in a hot loop.
+    pub fn add_pairs<I>(&mut self, pairs: I)
+    where I: IntoIterator<Item = (X, R)> {
+        for (x, r) in pairs {
+            self.data.add_pair_unreduced(x, r);
+        }
+        self.data.reduce();
+    }
+
+    /// Same, taking each key by reference — the coefficient is generally the cheaper
+    /// of the two to clone (compare a `Cob` key in `yui-kh`), so it is passed by value.
+    pub fn add_pairs_ref<'a, I>(&mut self, pairs: I)
+    where I: IntoIterator<Item = (&'a X, R)>, X: 'a {
+        for (x, r) in pairs {
+            self.data.add_pair_ref_unreduced(x, r);
+        }
+        self.data.reduce();
+    }
+
+    pub fn add_pair(&mut self, rhs: (X, R)) {
+        self.add_pairs([rhs]);
+    }
+
+    pub fn add_pair_ref(&mut self, rhs: (&X, R)) {
+        self.add_pairs_ref([rhs]);
+    }
+    
     pub fn apply<F, Y: LcKey>(&self, f: F) -> Lc<Y, R>
     where F: Fn(&X) -> Lc<Y, R> {
         self.iter().flat_map(|(x, r)| { 
@@ -153,15 +177,11 @@ where
             (_, LcData::Single(y, s)) =>
                 self.map_ref(|x, r| (x_map(x, y), r * s)),
             (LcData::Many(_), LcData::Many(_)) => {
+                let x_map = &x_map;
                 let mut res = Lc::zero();
-                for (x, r) in self.iter() {
-                    for (y, s) in other.iter() {
-                        let xy = x_map(x, y);
-                        let rs = r * s;
-                        res.add_pair((xy, rs));
-                    }
-                }
-                res.clean();
+                res.add_pairs(self.iter().flat_map(|(x, r)|
+                    other.iter().map(move |(y, s)| (x_map(x, y), r * s))
+                ));
                 res
             }
         }
@@ -232,10 +252,7 @@ where
 {
     fn from_iter<T: IntoIterator<Item = (X, R)>>(iter: T) -> Self {
         let mut res = Self::new();
-        for e in iter.into_iter() { 
-            res.add_pair(e);
-        }
-        res.clean();
+        res.add_pairs(iter);
         res
     }
 }
@@ -301,26 +318,8 @@ where
     }
 }
 
-impl<X, R> Lc<X, R>
-where
-    X: LcKey,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    // must clean after call
-    pub fn add_pair(&mut self, rhs: (X, R)) {
-        let (x, r) = rhs;
-        self.data.add_pair(x, r);
-    }
-
-    // must clean after call
-    pub fn add_pair_ref(&mut self, rhs: (&X, &R)) {
-        let (x, r) = rhs;
-        self.data.add_pair_ref(x, r);
-    }
-}
-
-// Owned rhs moves its pairs in (no key clones); borrowed rhs must clone. The split `auto_ops`
-// arg-sets generate the four `Add` variants by rhs-ownership so the two impls don't collide.
+// Neither form clones a key that is already present. The split `auto_ops` arg-sets
+// generate the four `Add` variants by rhs-ownership so the two impls don't collide.
 // note: the arg-set form `auto_ops(val_val, ref_val)` is an undocumented API of `auto_impl_ops`.
 #[auto_ops(val_val, ref_val)]
 impl<X, R> AddAssign<Lc<X, R>> for Lc<X, R>
@@ -329,10 +328,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn add_assign(&mut self, rhs: Self) {
-        for e in rhs.data {
-            self.add_pair(e);
-        }
-        self.clean()
+        self.add_pairs(rhs.data);
     }
 }
 
@@ -343,14 +339,10 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn add_assign(&mut self, rhs: &Self) {
-        for e in rhs.data.iter() {
-            self.add_pair_ref(e);
-        }
-        self.clean()
+        self.add_pairs_ref(rhs.data.iter().map(|(x, r)| (x, r.clone())));
     }
 }
 
-// Owned rhs moves its keys in (negating coeffs, no key clones); borrowed rhs must clone.
 #[auto_ops(val_val, ref_val)]
 impl<X, R> SubAssign<Lc<X, R>> for Lc<X, R>
 where
@@ -358,10 +350,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn sub_assign(&mut self, rhs: Self) {
-        for (x, r) in rhs.data {
-            self.add_pair((x, -r));
-        }
-        self.clean()
+        self.add_pairs(rhs.data.into_iter().map(|(x, r)| (x, -r)));
     }
 }
 
@@ -372,10 +361,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn sub_assign(&mut self, rhs: &Self) {
-        for e in rhs.data.iter() {
-            self.add_pair_ref((e.0, &-e.1));
-        }
-        self.clean()
+        self.add_pairs_ref(rhs.data.iter().map(|(x, r)| (x, -r)));
     }
 }
 
@@ -585,20 +571,34 @@ mod tests {
     }
 
     #[test]
-    fn clean() { 
+    fn add_pair_reduced() {
+        type L = Lc<X, i32>;
+
+        // cancelled terms must be gone the moment `add_pair` returns
+        let mut z = L::from(hashmap!{ e(1) => 1, e(2) => 2, e(3) => 1 });
+        z.add_pair((e(1), -1));
+        assert_eq!(z, L::from(hashmap!{ e(2) => 2, e(3) => 1 }));
+        assert_eq!(z.nterms(), 2);
+
+        z.add_pair((e(2), -1));
+        z.add_pair((e(3), -1));
+        assert_eq!(z, L::from(hashmap!{ e(2) => 1 }));
+        assert_eq!(z.nterms(), 1);
+    }
+
+    #[test]
+    fn add_pairs_reduced() {
         type L = Lc<X, i32>;
 
         let mut z = L::from(hashmap!{ e(1) => 1, e(2) => 2, e(3) => 1 });
-        z.add_pair((e(1), -1));
-        z.add_pair((e(2), -1));
-        z.add_pair((e(3), -1));
-        
-        assert_eq!(z.nterms(), 3);
-
-        z.clean();
+        z.add_pairs([(e(1), -1), (e(2), -1), (e(3), -1)]);
 
         assert_eq!(z, L::from(hashmap!{ e(2) => 1 }));
         assert_eq!(z.nterms(), 1);
+
+        z.add_pairs([(e(2), -1)]);
+        assert!(z.is_zero());
+        assert_eq!(z.nterms(), 0);
     }
 
     #[test]

@@ -50,7 +50,7 @@ pub enum NodeType {
 
 impl NodeType { 
     // The slot at the other end of the strand passing through `slot` — the strand pairing.
-    pub fn counter_pos(&self, slot: Slot) -> Slot {
+    pub fn paired_slot(&self, slot: Slot) -> Slot {
         let i = slot.index();
         Slot::from(match self {
             XL | XR => (i + 2) % 4,   // SW<->NE, SE<->NW
@@ -92,9 +92,9 @@ impl Node {
     }
 
     // A node is coherently oriented only when its two incoming slots sit on different strands;
-    // `counter_pos` is the strand pairing.
+    // `paired_slot` is the strand pairing.
     pub fn orientable(node_type: NodeType, p: Slot, q: Slot) -> bool {
-        p != q && node_type.counter_pos(p) != q
+        p != q && node_type.paired_slot(p) != q
     }
 
     pub fn node_type(&self) -> NodeType { 
@@ -103,10 +103,6 @@ impl Node {
 
     pub fn edge(&self, s: Slot) -> Edge { 
         self.edges[s.index()]
-    }
-
-    pub fn counter_edge(&self, s: Slot) -> Edge { 
-        self.edge(self.counter_pos(s))
     }
 
     pub fn edges(&self) -> &[Edge; 4] { 
@@ -211,8 +207,8 @@ impl Node {
         }
     }
 
-    pub(crate) fn counter_pos(&self, s: Slot) -> Slot { 
-        self.node_type.counter_pos(s)
+    pub fn paired_slot(&self, s: Slot) -> Slot { 
+        self.node_type.paired_slot(s)
     }
 }
 
@@ -355,7 +351,7 @@ mod tests {
         for (ntype, expected) in cases {
             let c = node(ntype, None);
             for s in Slot::ALL {
-                assert_eq!(c.counter_pos(s), Slot::from(expected[s.index()]));
+                assert_eq!(c.paired_slot(s), Slot::from(expected[s.index()]));
             }
         }
     }

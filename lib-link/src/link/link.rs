@@ -259,7 +259,7 @@ impl Link {
 
         loop {
             let c = self.node(i);
-            let k = c.counter_pos(j);
+            let k = c.paired_slot(j);
             let next = self.traverse_outer(i, k);
 
             if next == start {
@@ -304,7 +304,7 @@ impl Link {
 
             self.traverse_from(start, |i, s| {
                 remain.remove(&self.node(i).edge(s));
-                let out = s.shift(2);
+                let out = self.node(i).paired_slot(s);
                 assert!(
                     is_incoming(i, s) || !is_incoming(i, out),
                     "inconsistent orientation: the strand through node {i} exits at slot {out}, which is claimed incoming"
@@ -782,5 +782,20 @@ mod tests {
         let l = Link::unlink(3);
         let r = l.reindexed(l.edges()[1], 1);
         assert_eq!((r.edges(), r.n_comps(), r.base_pt()), (vec![1, 2, 3], 3, Some(1)));
+    }
+
+    #[test]
+    fn reorient_exits_by_the_node_pairing() {
+        use crate::NodeType;
+
+        // An `H` node pairs NE<->NW, so a strand entering at NE exits at NW — not at the opposite
+        // corner SW, which is a *crossing*'s pairing. These two claims agree with the diagram's own
+        // orientation; reading the exit as the opposite corner made them look contradictory.
+        let mut l = Link::test_data("3_1").resolve_at(0, Bit::Bit0);
+        assert_eq!(l.node(0).node_type(), NodeType::H);
+
+        let claims = [(0, Slot::NE), (1, Slot::NW)];
+        assert!(l.reorient(|i, s| claims.contains(&(i, s))));
+        assert!(l.is_oriented());
     }
 }

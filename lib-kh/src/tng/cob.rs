@@ -480,7 +480,7 @@ impl Display for CobComp {
 
 // `comps` carries a lazily-cached structural hash (see `CachedHash`); `eq`/`hash` short-circuit
 // on it. Mutate only via `comps_mut`/`comp_mut`, which route through `inner_mut` to invalidate.
-#[derive(Clone, PartialEq, Eq, Hash, Debug, Default)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
 pub struct Cob {
     comps: CachedHash<Vec<CobComp>>,
 }
@@ -830,19 +830,6 @@ impl Display for Cob {
             let cobs = self.comps.iter().join(" ⊔ ");
             write!(f, "|{cobs}|")
         }
-    }
-}
-
-impl PartialOrd for Cob {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Cob {
-    fn cmp(&self, _other: &Self) -> std::cmp::Ordering {
-        // TODO
-        std::cmp::Ordering::Equal
     }
 }
 

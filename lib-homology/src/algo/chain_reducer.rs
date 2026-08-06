@@ -129,8 +129,8 @@ where
         self.trans.get_mut(&i)
     }
 
-    pub fn vecs(&self, i: I) -> Option<&Vec<SpVec<R>>> {
-        self.vecs.get(&i)
+    pub fn vecs(&self, i: I) -> Option<&[SpVec<R>]> {
+        self.vecs.get(&i).map(|v| v.as_slice())
     }
 
     pub fn take_vecs(&mut self, i: I) -> Vec<SpVec<R>> {

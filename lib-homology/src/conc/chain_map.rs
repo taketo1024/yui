@@ -12,6 +12,8 @@ use crate::{GrMod, AddInd, Summand};
 
 use super::ChainComplex;
 
+type ChainMapFn<'c, I, X, Y, R> = Arc<dyn Fn(I, &Lc<X, R>) -> Lc<Y, R> + Send + Sync + 'c>;
+
 /// A chain map between two chain complexes. Holds references to source and
 /// target (`'a`) and a stored closure (`'c`). [`Self::cone`] produces a fresh
 /// owned [`ChainComplex`] and so requires `'c: 'static`.
@@ -24,7 +26,7 @@ where
     source: &'a ChainComplex<I, X, R>,
     target: &'a ChainComplex<I, Y, R>,
     deg: I,
-    map: Arc<dyn Fn(I, &Lc<X, R>) -> Lc<Y, R> + Send + Sync + 'c>,
+    map: ChainMapFn<'c, I, X, Y, R>,
 }
 
 impl<'a, 'c, I, X, Y, R> ChainMap<'a, 'c, I, X, Y, R>

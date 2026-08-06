@@ -21,6 +21,9 @@ use super::Summand;
 #[cfg(feature = "multithread")]
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
+/// The differential of a [`ChainComplex`] as a closure: `d_i: C_i → C_{i + d_deg}`.
+pub type DiffMap<I, X, R> = Arc<dyn Fn(I, &Lc<X, R>) -> Lc<X, R> + Send + Sync>;
+
 pub type ChainComplex1<X, R> = ChainComplex<isize,  X, R>;
 pub type ChainComplex2<X, R> = ChainComplex<isize2, X, R>;
 pub type ChainComplex3<X, R> = ChainComplex<isize3, X, R>;
@@ -37,7 +40,7 @@ where
 {
     summands: GrMod<I, X, R>,
     d_deg: I,
-    d_map: Arc<dyn Fn(I, &Lc<X, R>) -> Lc<X, R> + Send + Sync>,
+    d_map: DiffMap<I, X, R>,
     d_matrices: Arc<HashMap<I, SpMat<R>>>,
 }
 
@@ -117,7 +120,8 @@ where
         self.d_deg
     }
 
-    pub(crate) fn raw_d(&self) -> Arc<dyn Fn(I, &Lc<X, R>) -> Lc<X, R> + Send + Sync> {
+    /// The differential closure itself, shared. Cheap to clone.
+    pub fn raw_d(&self) -> DiffMap<I, X, R> {
         self.d_map.clone()
     }
 

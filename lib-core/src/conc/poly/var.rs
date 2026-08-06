@@ -13,6 +13,7 @@ use auto_impl_ops::auto_ops;
 use crate::abst::{MathType, IndexType};
 use crate::lc::LcKey;
 use crate::util::format::superscript;
+use crate::util::parse_err::ParseErr;
 use super::{Mono, MonoOrd};
 
 /// A univariate monomial `X^d`, where the variable symbol `X` is a const
@@ -41,14 +42,14 @@ impl<const X: char, I> Var<X, I> {
 
 impl<const X: char, I> FromStr for Var<X, I>
 where I: Zero + FromStr + FromPrimitive {
-    type Err = String;
+    type Err = ParseErr;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == "1" { 
+        if s == "1" {
             Ok(Self(I::zero()))
-        } else if let Some(d) = parse_mono_deg(&X.to_string(), s) { 
+        } else if let Some(d) = parse_mono_deg(&X.to_string(), s) {
             Ok(Self(d))
-        } else { 
-            Err(format!("failed to parse '{}'", s))
+        } else {
+            Err(ParseErr::invalid(s, &format!("a monomial in {X}")))
         }
     }
 }

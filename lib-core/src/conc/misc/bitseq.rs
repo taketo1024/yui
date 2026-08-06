@@ -6,6 +6,7 @@ use std::hash::Hash;
 use std::ops::{Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, Index, Not, Shl, Shr, ShrAssign, Sub};
 use std::str::FromStr;
 use auto_impl_ops::auto_ops;
+use crate::util::parse_err::ParseErr;
 
 /// A single binary digit, `0` or `1`.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, derive_more::Display, derive_more::Debug)]
@@ -325,13 +326,13 @@ where Bit: From<T> {
 }
 
 impl<I: BitRepr> FromStr for BitSeq<I> {
-    type Err = String;
+    type Err = ParseErr;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         s.chars().map(|c|
             match c {
                 '0' => Ok(Bit::Bit0),
                 '1' => Ok(Bit::Bit1),
-                _   => Err("Invalid bit: {c}".into())
+                _   => Err(ParseErr::new(format!("invalid bit '{c}' in \"{s}\"")))
             }
         ).collect()
     }

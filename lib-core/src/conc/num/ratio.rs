@@ -14,6 +14,7 @@ use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
 
 use crate::abst::{EucRing, EucRingOps, MathType, Mon, AddMon, AddGrp, AddMonOps, AddGrpOps, MonOps, RingOps, Ring, FieldOps, Field};
+use crate::util::parse_err::ParseErr;
 use super::int::{IntType, IntOps};
 
 /// A fraction `numer / denom` over a [`EucRing`] `T`, kept in reduced form.
@@ -101,7 +102,7 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
 
 impl<T> FromStr for Ratio<T>
 where T: EucRing + FromStr, for<'x> &'x T: EucRingOps<T> {
-    type Err = String;
+    type Err = ParseErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if let Ok(a) = s.parse::<T>() {
@@ -113,13 +114,13 @@ where T: EucRing + FromStr, for<'x> &'x T: EucRingOps<T> {
             let (s1, s2) = (&c[1], &c[2]);
             if let (Ok(a), Ok(b)) = (s1.parse::<T>(), s2.parse::<T>()) {
                 if b.is_zero() {
-                    return Err(format!("zero denominator: '{s}'"))
+                    return Err(ParseErr::new(format!("zero denominator in \"{s}\"")))
                 }
                 return Ok(Self::new(a, b))
             }
         }
 
-        Err(format!("cannot parse string: '{s}'"))
+        Err(ParseErr::invalid(s, &Self::math_symbol()))
     }
 }
 

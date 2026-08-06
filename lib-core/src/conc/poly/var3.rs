@@ -9,6 +9,7 @@ use auto_impl_ops::auto_ops;
 
 use crate::abst::{MathType, IndexType};
 use crate::lc::LcKey;
+use crate::util::parse_err::ParseErr;
 
 use super::{Mono, MonoOrd};
 use super::var::parse_mono_deg;
@@ -75,7 +76,7 @@ impl<const X: char, const Y: char, const Z: char, I> From<(I, I, I)> for Var3<X,
 
 impl<const X: char, const Y: char, const Z: char, I> FromStr for Var3<X, Y, Z, I>
 where I: Zero + AddAssign + FromStr + FromPrimitive {
-    type Err = String;
+    type Err = ParseErr;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use regex::Regex;
 
@@ -89,16 +90,16 @@ where I: Zero + AddAssign + FromStr + FromPrimitive {
         let r = Regex::new(&p).unwrap();
         let r_all = Regex::new(&p_all).unwrap();
 
-        if !r_all.is_match(s) { 
-            return Err(format!("Failed to parse: {s}"))
+        if !r_all.is_match(s) {
+            return Err(ParseErr::invalid(s, &format!("a monomial in {X}, {Y}, {Z}")))
         }
 
         let mut deg = (I::zero(), I::zero(), I::zero());
-        
+
         for c in r.captures_iter(s) {
             let x = &c[1];
             let i = parse_mono_deg(x, &c[0]).ok_or_else(||
-                format!("Failed to parse: {s}")
+                ParseErr::invalid(s, &format!("a monomial in {X}, {Y}, {Z}"))
             )?;
             if x.starts_with(X) { 
                 deg.0 += i;

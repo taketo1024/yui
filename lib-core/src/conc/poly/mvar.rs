@@ -12,6 +12,7 @@ use auto_impl_ops::auto_ops;
 use crate::abst::{MathType, IndexType};
 use crate::lc::LcKey;
 use crate::util::format::subscript;
+use crate::util::parse_err::ParseErr;
 use super::{Mono, MultiDeg, MonoOrd};
 use super::var::{fmt_mono, parse_mono_deg};
 
@@ -88,11 +89,11 @@ where I: Zero {
 
 impl<const X: char, I> FromStr for MultiVar<X, I>
 where I: Zero + FromStr + FromPrimitive {
-    type Err = String;
+    type Err = ParseErr;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use regex::Regex;
 
-        if s == "1" { 
+        if s == "1" {
             return Ok(MultiVar::from(MultiDeg::empty()))
         }
 
@@ -101,18 +102,20 @@ where I: Zero + FromStr + FromPrimitive {
         let p = format!(r"({X}_([0-9]+))(\^\{{?-?[0-9]+\}}?)?");
         let p_all = format!(r"^({p}\s?)+$");
 
-        if !Regex::new(&p_all).unwrap().is_match(s) { 
-            return Err(format!("Failed to parse: {s}"))
+        if !Regex::new(&p_all).unwrap().is_match(s) {
+            return Err(ParseErr::invalid(s, &format!("a monomial in {X}_i")))
         }
 
         let r = Regex::new(&p).unwrap();
         let mut degs = vec![];
-        
+
         for c in r.captures_iter(s) {
             let x = &c[1];
-            let i = usize::from_str(&c[2]).map_err(|e| e.to_string())?;
+            let i = usize::from_str(&c[2]).map_err(|e|
+                ParseErr::new(format!("bad index in \"{s}\": {e}"))
+            )?;
             let d = parse_mono_deg(x, &c[0]).ok_or_else(||
-                format!("Failed to parse: {s}")
+                ParseErr::invalid(s, &format!("a monomial in {X}_i"))
             )?;
             degs.push((i, d));
         };

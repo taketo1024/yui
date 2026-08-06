@@ -14,6 +14,7 @@ use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
 
 use crate::abst::{MathType, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, EucRingOps, AddMon, AddGrp, Mon, Ring, EucRing, Field};
+use crate::util::parse_err::ParseErr;
 
 type I = i32;
 
@@ -41,9 +42,9 @@ impl<const p: I> From<I> for FF<p> {
 }
 
 impl<const p: I> FromStr for FF<p> {
-    type Err = <I as FromStr>::Err;
+    type Err = ParseErr;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let a = s.parse::<I>()?;
+        let a = s.parse::<I>().map_err(|_| ParseErr::invalid(s, &Self::math_symbol()))?;
         Ok(Self::from(a))
     }
 }

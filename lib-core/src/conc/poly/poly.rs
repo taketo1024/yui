@@ -23,6 +23,7 @@ use auto_impl_ops::auto_ops;
 
 use crate::abst::{MathType, AddMon, AddMonOps, AddGrp, AddGrpOps, Mon, MonOps, Ring, RingOps, EucRing, EucRingOps, Field, FieldOps};
 use crate::lc::Lc;
+use crate::util::parse_err::ParseErr;
 use super::{MultiDeg, Var, Var2, Var3,MultiVar, Mono, MonoOrd};
 
 /// Univariate polynomial `R[X]`.
@@ -257,16 +258,16 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<X, R> FromStr for PolyBase<X, R>
 where X: Mono + FromStr, R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
-    type Err = ();
+    type Err = ParseErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if let Ok(r) = R::from_str(s) { 
+        if let Ok(r) = R::from_str(s) {
             Ok(Self::from_const(r))
-        } else if let Ok(x) = X::from_str(s) { 
+        } else if let Ok(x) = X::from_str(s) {
             Ok(Self::from(x))
         } else {
             // TODO support more complex format.
-            Err(())
+            Err(ParseErr::invalid(s, &Self::math_symbol()))
         }
     }
 }
@@ -938,7 +939,10 @@ mod tests {
 
         assert_eq!(P::from_str("-3"), Ok(P::from_const(-3)));
         assert_eq!(P::from_str("x"), Ok(P::variable()));
-        assert_eq!(P::from_str("y"), Err(()));
+
+        // the error names both the input and the target ring.
+        let e = P::from_str("y").unwrap_err();
+        assert_eq!(e.to_string(), "cannot parse \"y\" as Z[x]");
 
         // TODO support more complex types
     }

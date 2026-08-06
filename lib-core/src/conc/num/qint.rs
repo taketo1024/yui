@@ -30,6 +30,7 @@ use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
 use crate::abst::{AddGrp, AddGrpOps, AddMon, AddMonOps, MathType, EucRing, EucRingOps, Mon, MonOps, Ring, RingOps};
 use crate::ext::DivRound;
+use crate::util::parse_err::ParseErr;
 use super::int::{IntType, IntOps};
 
 /// A quadratic integer in `ℤ[ω]`, represented by `(a, b)` for `a + b·ω`.
@@ -133,15 +134,15 @@ where I: IntType, for<'x> &'x I: IntOps<I> {
 
 impl<I, const D: i32> FromStr for QuadInt<I, D>
 where I: IntType + FromStr, for<'x> &'x I: IntOps<I> {
-    type Err = ();
+    type Err = ParseErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if let Ok(a) = s.parse::<I>() {
             Ok(Self::from(a))
-        } else if let Ok((a, b)) = parse_tuple::<I, I>(s) { 
+        } else if let Ok((a, b)) = parse_tuple::<I, I>(s) {
             Ok(Self::new(a, b))
-        } else { 
-            Err(())
+        } else {
+            Err(ParseErr::invalid(s, &Self::math_symbol()))
         }
     }
 }

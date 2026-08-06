@@ -13,6 +13,7 @@ use num_traits::{One, Pow, Zero};
 use auto_impl_ops::auto_ops;
 
 use crate::abst::{MathType, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, EucRingOps, AddMon, AddGrp, Mon, Ring, EucRing, Field};
+use crate::util::parse_err::ParseErr;
 
 /// An element of the finite field 𝔽₂.
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
@@ -26,9 +27,9 @@ where I: Integer {
 }
 
 impl FromStr for FF2 {
-    type Err = <i64 as FromStr>::Err;
+    type Err = ParseErr;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let a = s.parse::<i64>()?;
+        let a = s.parse::<i64>().map_err(|_| ParseErr::invalid(s, &Self::math_symbol()))?;
         Ok(Self::from(a))
     }
 }

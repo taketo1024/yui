@@ -4,8 +4,7 @@
 
 use std::collections::HashMap;
 use derive_more::derive::{Display, Debug};
-use num_traits::Zero;
-use yui_core::lc::{Lc, LcKey};
+use yui_core::lc::LcKey;
 use yui_core::abst::{MathType, Ring, RingOps};
 use yui_matrix::MatTrait;
 use yui_matrix::sparse::{SpMat, Trans};
@@ -82,17 +81,7 @@ where I: AddInd, R: Ring, for<'x> &'x R: RingOps<R> {
             }
         );
 
-        Self::new(
-            summands.clone(), d_deg,
-            move |i, z| {
-                let Some(d) = d_matrices.get(&i) else {
-                    return Lc::zero();
-                };
-                let v = summands[i].vectorize(z);
-                let dv = d * v;
-                summands[i + d_deg].devectorize(&dv)
-            }
-        )
+        Self::new_with_d_matrices(summands, d_deg, d_matrices)
     }
 
     /// The dual cochain complex: same indexing, but `d_deg` is negated and
@@ -110,5 +99,20 @@ where I: AddInd, R: Ring, for<'x> &'x R: RingOps<R> {
             (i, m)
         }).collect::<Vec<_>>();
         Self::from_d_matrices(-d_deg, matrices)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[should_panic(expected = "d_matrix at 1")]
+    fn from_d_matrices_checks_the_shapes() {
+        // `d_1` claims 3 rows, but `C_0` was declared with rank 2 by `M_0`'s column count.
+        GenericChainComplex1::<i32>::from_d_matrices(-1, [
+            (0, SpMat::from_row_major((0, 2), [])),
+            (1, SpMat::from_row_major((3, 1), [1, 0, 0])),
+        ]);
     }
 }

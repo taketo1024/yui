@@ -46,18 +46,18 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn calculate(d1: SpMat<R>, d2: SpMat<R>, with_trans: bool) -> HomologyCalcResult<R> {
         assert_eq!(d1.n_rows(), d2.n_cols());
 
-        if d1.is_zero() && d2.is_zero() { 
+        if d1.is_zero() && d2.is_zero() {
             return Self::trivial_result(d1.n_rows(), with_trans);
         }
 
         debug!("calculate homology: {} -> {} -> {}", d1.n_cols(), d1.n_rows(), d2.n_rows());
         Self::log_sparsity("d1", &d1);
         Self::log_sparsity("d2", &d2);
-        
+
         let (s1, s2) = Self::process_snf(d1, d2, with_trans);
         let (rank, tors) = Self::result(&s1, &s2);
 
-        let trans = if with_trans { 
+        let trans = if with_trans {
             Some( Self::trans(&s1, &s2) )
         } else {
             None
@@ -132,7 +132,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
         let p1 = s1.p().unwrap();                 // size = (n, n)
         let p11 = p1.submat_rows(r1..n);          // size = (n - r1, n)
-                
+
         let p2 = s2.qinv().unwrap();              // size = (n - r1, n - r1)
         let p22 = p2.submat_rows(r2..n-r1);       // size = (n - (r1 + r2), n - r1)
 
@@ -166,7 +166,7 @@ mod tests {
     use num_traits::Zero;
     use crate::GenericChainComplex1;
     use super::*;
- 
+
     #[test]
     fn s2_0th() {
         let c = GenericChainComplex1::<i32>::s2();
@@ -252,7 +252,7 @@ mod tests {
 
         let t = t.unwrap();
 
-        for i in 0..2 { 
+        for i in 0..2 {
             let v = t.backward_mat().col_vec(i);
             let z = c[1].devectorize(&v);
 

@@ -1,3 +1,6 @@
+//! [`TopSort`]: an incremental builder for a topological sort, backed by
+//! `petgraph::algo::toposort`.
+
 use petgraph::algo::toposort;
 use petgraph::graphmap::DiGraphMap;
 

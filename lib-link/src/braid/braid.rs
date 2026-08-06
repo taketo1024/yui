@@ -1,3 +1,6 @@
+//! [`Braid`]: a strand count plus a word in the Artin generators. `closure()`
+//! turns it into a [`Link`](crate::Link); strands touched by no crossing become free loops.
+
 use std::ops::{MulAssign, Mul};
 use auto_impl_ops::auto_ops;
 use delegate::delegate;
@@ -17,6 +20,9 @@ pub struct Braid {
 
 impl Braid {
     pub fn new(strands: usize, elements: Vec<BraidGen>) -> Self {
+        if let Some(g) = elements.iter().find(|g| g.index() >= strands) {
+            panic!("σ{} needs {} strands, but the braid has {strands}", g.index(), g.index() + 1);
+        }
         Self { strands, elements }
     }
 
@@ -138,8 +144,6 @@ impl Braid {
     }
 
     pub fn load(name: &str) -> Result<Braid, Box<dyn std::error::Error>> {
-        // the data dir is external and empty on a fresh checkout; tests must not depend on it.
-        assert!(!cfg!(feature = "test-utils"), "`load` reads the data directory — use `test_data` in tests");
         let json = yui_core::util::data_dir::load_json("braid", name)?;
         let code: Vec<i32> = serde_json::from_str(&json)?;
         Ok(Braid::from_iter(code))
@@ -314,5 +318,12 @@ mod tests {
         assert_eq!(l.n_crossings(), 1);
         assert_eq!(l.n_loops(), 1);
         assert_eq!(l.n_comps(), 2);
+    }
+
+    #[test]
+    #[should_panic(expected = "needs 6 strands")]
+    fn new_rejects_a_generator_beyond_the_strands() {
+        // σ₅ occupies positions 5 and 6, so `closure` would index past the strand list.
+        let _ = Braid::new(2, vec![BraidGen::new(5)]);
     }
 }

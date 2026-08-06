@@ -44,10 +44,10 @@ where
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     use super::*;
     #[test]
-    fn sum() { 
+    fn sum() {
         let a = i64::sum([4,5,6]);
         assert_eq!(a, 15);
     }

@@ -6,6 +6,7 @@ use std::hash::Hash;
 use std::ops::{Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, Index, Not, Shl, Shr, ShrAssign, Sub};
 use std::str::FromStr;
 use auto_impl_ops::auto_ops;
+use crate::util::parse_err::ParseErr;
 
 /// A single binary digit, `0` or `1`.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, derive_more::Display, derive_more::Debug)]
@@ -225,6 +226,12 @@ impl<I: BitRepr> BitSeq<I> {
 
     pub fn append(&mut self, b: BitSeq<I>) {
         assert!(self.len + b.len <= Self::MAX_LEN);
+
+        // `self.len` may be `MAX_LEN`, where the shift below is undefined.
+        if b.len == 0 {
+            return
+        }
+
         self.val |= b.val << self.len;
         self.len += b.len;
     }
@@ -232,10 +239,11 @@ impl<I: BitRepr> BitSeq<I> {
     pub fn remove(&mut self, i: usize) {
         assert!(i < self.len);
 
-        let a = self.val & !((I::ONE << (i + 1)) - I::ONE);
-        let b = self.val & ((I::ONE << i) - I::ONE);
+        // shifted in two steps: `i + 1` may be `MAX_LEN`, where a shift is undefined.
+        let hi = ((self.val >> i) >> 1) << i;
+        let lo = self.val & ((I::ONE << i) - I::ONE);
 
-        self.val = a >> 1 | b;
+        self.val = hi | lo;
         self.len -= 1;
     }
 
@@ -318,13 +326,13 @@ where Bit: From<T> {
 }
 
 impl<I: BitRepr> FromStr for BitSeq<I> {
-    type Err = String;
+    type Err = ParseErr;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         s.chars().map(|c|
             match c {
                 '0' => Ok(Bit::Bit0),
                 '1' => Ok(Bit::Bit1),
-                _   => Err("Invalid bit: {c}".into())
+                _   => Err(ParseErr::new(format!("invalid bit '{c}' in \"{s}\"")))
             }
         ).collect()
     }
@@ -503,6 +511,21 @@ mod tests {
     }
 
     #[test]
+    fn remove_at_max_len() {
+        // dropping the top bit of a full-length sequence.
+        let n = B::MAX_LEN;
+
+        let mut b = B::ones(n);
+        b.remove(n - 1);
+        assert_eq!(b, B::ones(n - 1));
+
+        let mut b = B::zeros(n);
+        b.set_1(n - 1);
+        b.remove(n - 1);
+        assert_eq!(b, B::zeros(n - 1));
+    }
+
+    #[test]
     fn insert() {
         let mut b = B::empty();
 
@@ -549,6 +572,16 @@ mod tests {
         b0.append(b1);
 
         assert_eq!(b0, B::new(0b010110110, 9));
+    }
+
+    #[test]
+    fn append_empty_to_full() {
+        let full = B::ones(B::MAX_LEN);
+
+        let mut b = full;
+        b.append(B::empty());
+
+        assert_eq!(b, full);
     }
 
     #[test]

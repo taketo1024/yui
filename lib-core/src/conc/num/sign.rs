@@ -44,22 +44,22 @@ macro_rules! impl_int_conversion {
     ($t:tt) => {
         impl From<$t> for Sign {
             fn from(value: $t) -> Self {
-                match value { 
+                match value {
                      1 => Sign::Pos,
                     -1 => Sign::Neg,
                      _ => panic!()
                 }
             }
         }
-        
+
         impl From<Sign> for $t {
             fn from(value: Sign) -> Self {
-                match value { 
+                match value {
                     Sign::Pos =>  1,
                     Sign::Neg => -1
                 }
             }
-        }                
+        }
     };
 }
 
@@ -73,7 +73,7 @@ impl Neg for Sign {
     type Output = Self;
     fn neg(self) -> Self {
         use Sign::*;
-        match self { 
+        match self {
             Neg => Pos,
             Pos => Neg
         }
@@ -99,10 +99,11 @@ pub trait GetSign {
 
 impl<T> GetSign for T where T: Signed {
     fn sign(&self) -> Sign {
-        if self.is_positive() { 
-            Sign::Pos 
-        } else { 
-            Sign::Neg 
+        assert!(!self.is_zero(), "zero has no sign");
+        if self.is_positive() {
+            Sign::Pos
+        } else {
+            Sign::Neg
         }
     }
 }
@@ -112,19 +113,25 @@ mod tests {
     use super::*;
 
     #[test]
+    #[should_panic(expected = "zero has no sign")]
+    fn sign_of_zero() {
+        let _ = 0i64.sign();
+    }
+
+    #[test]
     fn ord() {
         assert!(Sign::Neg < Sign::Pos)
     }
 
     #[test]
-    fn to_string() { 
+    fn to_string() {
         assert_eq!(&Sign::Neg.to_string(), "-");
         assert_eq!(&Sign::Pos.to_string(), "+");
     }
 
     #[cfg(feature = "serde")]
     #[test]
-    fn serialize() { 
+    fn serialize() {
         let s = Sign::Pos;
         let ser = serde_json::to_string(&s).unwrap();
         assert_eq!(ser, "1");
@@ -135,7 +142,7 @@ mod tests {
         let s = Sign::Neg;
         let ser = serde_json::to_string(&s).unwrap();
         assert_eq!(ser, "-1");
-        
+
         let des = serde_json::from_str(&ser).unwrap();
         assert_eq!(s, des);
     }

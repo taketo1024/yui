@@ -1,3 +1,6 @@
+//! [`Link`]: a knot or link as a planar diagram — a `Vec<Node>` plus the free
+//! loops and an optional base point — with its accessors, components and traversal.
+
 use core::panic;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
@@ -98,11 +101,11 @@ impl Link {
         Self::new([], (1..=n).map(|e| e as Edge))
     }
 
-    pub fn is_knot(&self) -> bool { 
+    pub fn is_knot(&self) -> bool {
         self.n_comps() == 1
     }
 
-    pub fn is_oriented(&self) -> bool { 
+    pub fn is_oriented(&self) -> bool {
         self.nodes().all(|n| n.is_oriented())
     }
 
@@ -134,32 +137,32 @@ impl Link {
         );
     }
 
-    pub fn writhe(&self) -> i32 { 
+    pub fn writhe(&self) -> i32 {
         let (p, n) = self.n_signed_crossings();
         (p as i32) - (n as i32)
     }
 
-    pub fn n_nodes(&self) -> usize { 
+    pub fn n_nodes(&self) -> usize {
         self.nodes.len()
     }
 
-    pub fn nodes(&self) -> impl Iterator<Item = &Node> { 
+    pub fn nodes(&self) -> impl Iterator<Item = &Node> {
         self.nodes.iter()
     }
 
-    pub fn node(&self, i: usize) -> &Node { 
+    pub fn node(&self, i: usize) -> &Node {
         &self.nodes[i]
     }
 
-    pub(crate) fn node_mut(&mut self, i: usize) -> &mut Node { 
+    pub(crate) fn node_mut(&mut self, i: usize) -> &mut Node {
         &mut self.nodes[i]
     }
 
-    pub fn crossings(&self) -> impl Iterator<Item = &Node> { 
+    pub fn crossings(&self) -> impl Iterator<Item = &Node> {
         self.nodes.iter().filter(|x| x.is_crossing())
     }
 
-    pub fn n_crossings(&self) -> usize { 
+    pub fn n_crossings(&self) -> usize {
         self.nodes.iter()
             .filter(|x| x.is_crossing())
             .count()
@@ -168,8 +171,8 @@ impl Link {
     pub fn n_signed_crossings(&self) -> (usize, usize) {
         let mut pos = 0;
         let mut neg = 0;
-        for n in self.nodes.iter() { 
-            if n.is_pos() { pos += 1 } 
+        for n in self.nodes.iter() {
+            if n.is_pos() { pos += 1 }
             else if n.is_neg() { neg += 1}
         }
         (pos, neg)
@@ -222,13 +225,13 @@ impl Link {
         result
     }
 
-    pub fn traverse_comps<F>(&self, mut f: F) where 
-    F: FnMut(usize, usize, Slot) { 
+    pub fn traverse_comps<F>(&self, mut f: F) where
+    F: FnMut(usize, usize, Slot) {
         let mut c = 0; // component counter
         let mut remain: HashSet<Edge> = self.nodes.iter().flat_map(|x| x.edges().iter().copied()).collect();
 
         while !remain.is_empty() {
-            // Take minimal edge-id. 
+            // Take minimal edge-id.
             let e0 = remain.iter().min().cloned().unwrap();
 
             // Find node & point having edge e0, entering at its head so the walk runs forward.
@@ -240,7 +243,7 @@ impl Link {
                 ).unwrap()
             };
 
-            self.traverse_from((i0, j0), |i, s| { 
+            self.traverse_from((i0, j0), |i, s| {
                 remain.remove(&self.node(i).edge(s));
                 f(c, i, s);
             });
@@ -259,7 +262,7 @@ impl Link {
 
         loop {
             let c = self.node(i);
-            let k = c.counter_pos(j);
+            let k = c.paired_slot(j);
             let next = self.traverse_outer(i, k);
 
             if next == start {
@@ -304,7 +307,7 @@ impl Link {
 
             self.traverse_from(start, |i, s| {
                 remain.remove(&self.node(i).edge(s));
-                let out = s.shift(2);
+                let out = self.node(i).paired_slot(s);
                 assert!(
                     is_incoming(i, s) || !is_incoming(i, out),
                     "inconsistent orientation: the strand through node {i} exits at slot {out}, which is claimed incoming"
@@ -323,7 +326,7 @@ impl Link {
         ).collect_vec();
         let coherent = !undetermined && oris.iter().all(Option::is_some);
 
-        self.nodes.iter_mut().zip(oris).for_each(|(n, o)| 
+        self.nodes.iter_mut().zip(oris).for_each(|(n, o)|
             n.set_incoming(if coherent { o } else { None })
         );
 
@@ -345,26 +348,52 @@ impl Link {
     // (a knot's one traversal covers every edge), keeping the diagram. base_pt becomes `base`
     // (base = 1 gives the usual 1-based numbering of knot theory).
     pub fn reindexed(&self, start_edge: Edge, base: Edge) -> Link {
-        assert!(self.is_knot() && self.loops.is_empty(), "reindexed expects a knot");
         assert!(self.is_oriented(), "reindexed needs an orientation to traverse in");
-
-        // note: `traverse_from` runs forward from an in-port, backward from an out-port.
-        let (_, start) = self.edge_ends(start_edge, true);
 
         let mut map: HashMap<Edge, Edge> = HashMap::new();
         let mut next = base;
-        self.traverse_from(start, |i, s| {
-            map.entry(self.node(i).edge(s)).or_insert_with(|| {
+
+        // `start_edge` takes `base`. A free loop carries no ports, so it is numbered outright;
+        // otherwise the walk starts there. Note `traverse_from` runs forward from an in-port.
+        let mut port = if self.loops.contains(&start_edge) {
+            map.insert(start_edge, next);
+            next += 1;
+            None
+        } else {
+            Some(self.edge_ends(start_edge, true).1)
+        };
+
+        // then the remaining components, each from its least unnumbered edge, so a link is
+        // renumbered deterministically.
+        while let Some(p) = port.or_else(||
+            self.nodes.iter()
+                .flat_map(|x| x.edges().iter().copied())
+                .filter(|e| !map.contains_key(e))
+                .min()
+                .map(|e| self.edge_ends(e, true).1)
+        ) {
+            self.traverse_from(p, |i, s| {
+                map.entry(self.node(i).edge(s)).or_insert_with(|| {
+                    let id = next;
+                    next += 1;
+                    id
+                });
+            });
+            port = None;
+        }
+
+        let loops = self.loops.iter().map(|&e|
+            *map.entry(e).or_insert_with(|| {
                 let id = next;
                 next += 1;
                 id
-            });
-        });
+            })
+        ).collect_vec();
 
         let nodes = self.nodes.iter().map(|x|
             x.convert_edges(|e| map[&e])
         );
-        Link::new(nodes, []).with_base_pt(base)
+        Link::new(nodes, loops).with_base_pt(base)
     }
 
     // The canonical relabelling: the least `reindexed(e, 1)` over all start edges. Rebuilt from that
@@ -467,7 +496,7 @@ mod tests {
 
         let l = Link::test_data("unknot_l_twist");
         assert_eq!(l.n_crossings(), 1);
-        
+
         let l = Link::test_data("3_1");
         assert_eq!(l.n_crossings(), 3);
     }
@@ -485,7 +514,7 @@ mod tests {
 
     #[test]
     fn link_traverse() {
-        let traverse = |l: &Link, start: (usize, Slot)| { 
+        let traverse = |l: &Link, start: (usize, Slot)| {
             let mut queue = vec![];
             l.traverse_from(start, |i, s| queue.push((i, s.index())));
             queue
@@ -493,7 +522,7 @@ mod tests {
 
         let l = Link::test_data("unknot_l_twist");
         let path = traverse(&l, (0, Slot::SW));
-        
+
         assert_eq!(path, [(0, 0), (0, 3)]); // loop
     }
 
@@ -735,5 +764,41 @@ mod tests {
                 assert_eq!(canon(&l.reindexed(e, 1)), c, "relabelling from edge {e} changed the canonical form");
             }
         }
+    }
+
+    #[test]
+    fn reindexed_covers_links_and_loops() {
+        // more than one component: the walk continues into the rest, so every edge is renumbered.
+        for name in ["L2a1", "L4a1"] {
+            let l = Link::test_data(name);
+            for e in l.edges() {
+                let r = l.reindexed(e, 1);
+                assert_eq!(r.edges(), (1..=l.n_edges() as Edge).collect::<Vec<_>>(), "{name} from edge {e}");
+                assert_eq!(r.n_comps(), l.n_comps(), "{name} from edge {e}");
+            }
+        }
+
+        // free loops carry no ports, so they are numbered outright rather than traversed.
+        let r = Link::unknot().reindexed(1, 5);
+        assert_eq!((r.edges(), r.n_comps(), r.base_pt()), (vec![5], 1, Some(5)));
+
+        let l = Link::unlink(3);
+        let r = l.reindexed(l.edges()[1], 1);
+        assert_eq!((r.edges(), r.n_comps(), r.base_pt()), (vec![1, 2, 3], 3, Some(1)));
+    }
+
+    #[test]
+    fn reorient_exits_by_the_node_pairing() {
+        use crate::NodeType;
+
+        // An `H` node pairs NE<->NW, so a strand entering at NE exits at NW — not at the opposite
+        // corner SW, which is a *crossing*'s pairing. These two claims agree with the diagram's own
+        // orientation; reading the exit as the opposite corner made them look contradictory.
+        let mut l = Link::test_data("3_1").resolve_at(0, Bit::Bit0);
+        assert_eq!(l.node(0).node_type(), NodeType::H);
+
+        let claims = [(0, Slot::NE), (1, Slot::NW)];
+        assert!(l.reorient(|i, s| claims.contains(&(i, s))));
+        assert!(l.is_oriented());
     }
 }

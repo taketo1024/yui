@@ -18,7 +18,6 @@ use std::collections::HashSet;
 use std::sync::{Arc, OnceLock};
 use itertools::Itertools;
 use num_traits::Zero;
-use cartesian::cartesian; // TODO: replace with itertools::iproduct! and drop the cartesian dep
 use yui_core::util::format::subscript;
 use yui_core::abst::{AddMon, MathType, Ring, RingOps};
 use yui_core::lc::{LcKey, Lc};
@@ -54,7 +53,7 @@ pub enum Dot {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, derive_more::Display)]
-pub enum End { 
+pub enum End {
     Src, Tgt
 }
 
@@ -67,7 +66,7 @@ pub struct CobComp {
     nb: usize,            // #∂-components — derived from (src, tgt)
 }
 
-impl CobComp { 
+impl CobComp {
     fn new(src: Tng, tgt: Tng, genus: usize, dots: (usize, usize)) -> Self {
         let nb = Self::count_boundaries(&src, &tgt);
         Self::new_with_nb(src, tgt, genus, dots, nb)
@@ -169,19 +168,19 @@ impl CobComp {
         &self.src
     }
 
-    pub fn tgt(&self) -> &Tng { 
+    pub fn tgt(&self) -> &Tng {
         &self.tgt
     }
 
-    pub fn genus(&self) -> usize { 
+    pub fn genus(&self) -> usize {
         self.genus
     }
 
-    pub fn dots(&self) -> (usize, usize) { 
+    pub fn dots(&self) -> (usize, usize) {
         self.dots
     }
 
-    pub fn total_dots(&self) -> usize { 
+    pub fn total_dots(&self) -> usize {
         self.dots.0 + self.dots.1
     }
 
@@ -200,7 +199,7 @@ impl CobComp {
         self.dots == (0, 0)
     }
 
-    pub fn is_cylinder(&self) -> bool { 
+    pub fn is_cylinder(&self) -> bool {
         self.src.n_comps() == 1 &&
         self.tgt.n_comps() == 1 &&
         self.genus == 0
@@ -212,8 +211,8 @@ impl CobComp {
     }
 
     pub fn is_zero_cob(&self) -> bool {
-        self.is_closed() && 
-        self.genus % 2 == 0 &&
+        self.is_closed() &&
+        self.genus.is_multiple_of(2) &&
         self.dots.0 == self.dots.1 // XY = T
     }
 
@@ -230,16 +229,16 @@ impl CobComp {
     }
 
     pub fn is_sdl(&self) -> bool {
-        self.src.n_comps() == 2 && 
-        self.tgt.n_comps() == 2 && 
-        self.src.comps().all(|c| c.is_arc()) && 
-        self.tgt.comps().all(|c| c.is_arc()) && 
-        self.src != self.tgt && 
+        self.src.n_comps() == 2 &&
+        self.tgt.n_comps() == 2 &&
+        self.src.comps().all(|c| c.is_arc()) &&
+        self.tgt.comps().all(|c| c.is_arc()) &&
+        self.src != self.tgt &&
         self.genus == 0
     }
 
-    pub fn inv(&self) -> Option<Self> { 
-        if self.is_invertible() { 
+    pub fn inv(&self) -> Option<Self> {
+        if self.is_invertible() {
             let inv = Self::plain(
                 (*self.tgt).clone(),
                 (*self.src).clone(),
@@ -257,7 +256,7 @@ impl CobComp {
         2 - 2 * g - b
     }
 
-    pub fn deg(&self) -> i32 { 
+    pub fn deg(&self) -> i32 {
         let x = self.euler_num();
         let b = self.src.end_pts().count() as i32;
         let d = self.total_dots() as i32;
@@ -288,18 +287,18 @@ impl CobComp {
     }
 
     // connect = horizontal composition
-    pub fn is_connectable(&self, other: &Self) -> bool { 
-        self.src.comps().any(|c1| 
-            if c1.is_arc() { 
-                other.src.comps().any(|c2| { 
+    pub fn is_connectable(&self, other: &Self) -> bool {
+        self.src.comps().any(|c1|
+            if c1.is_arc() {
+                other.src.comps().any(|c2| {
                     c2.is_arc() && c1.is_connectable(c2)
                 })
-            } else { 
-                false 
+            } else {
+                false
             }
         )
     }
-    
+
     /// Horizontal composition: merge `other` into `self` along the shared arc
     /// boundary, returning a new component. Genus recomputed via the Euler formula.
     pub fn connect(&self, other: &Self) -> Self {
@@ -308,7 +307,7 @@ impl CobComp {
         let x1 = self.euler_num();
         let x2 = other.euler_num();
         let a = self.src.end_pts().filter(|e|
-            other.src.end_pts().contains(&e)
+            other.src.end_pts().contains(e)
         ).count() as i32;
         assert!(a > 0);
 
@@ -361,7 +360,7 @@ impl CobComp {
     pub fn should_reduce(&self) -> bool {
         self.is_zero_cob() ||
         self.is_removable() ||
-        self.genus > 0 || 
+        self.genus > 0 ||
         self.dots.0 >= 1 && self.dots.1 >= 1 ||
         self.dots.0 >= 2 ||
         self.dots.1 >= 2
@@ -426,10 +425,10 @@ impl CobComp {
 
         assert!(eval.nterms() <= 1);
 
-        if let Some((c, r)) = eval.any_term() { 
+        if let Some((c, r)) = eval.any_term() {
             assert!(c.is_empty());
             r.clone()
-        } else { 
+        } else {
             R::zero()
         }
     }
@@ -451,14 +450,14 @@ impl Display for CobComp {
         };
 
 
-        if self.is_closed() { 
-            return if self.genus == 0 { 
+        if self.is_closed() {
+            return if self.genus == 0 {
                 write!(f, "{dots}S")
-            } else { 
-                write!(f, "{dots}Σ{}", subscript(self.genus as isize))                
+            } else {
+                write!(f, "{dots}Σ{}", subscript(self.genus as isize))
             }
         }
-        
+
         let base = match (self.src.n_comps(), self.tgt.n_comps(), self.genus) {
             (0, 1, 0) => "∪",
             (1, 0, 0) => "∩",
@@ -468,10 +467,10 @@ impl Display for CobComp {
             (2, 2, 0) if self.is_sdl() => "sdl",
             _ => "Cob"
         }.to_string();
-        
-        let g = if self.genus == 0 { 
+
+        let g = if self.genus == 0 {
             "".to_string()
-        } else { 
+        } else {
             format!(", g: {}", self.genus)
         };
 
@@ -481,7 +480,7 @@ impl Display for CobComp {
 
 // `comps` carries a lazily-cached structural hash (see `CachedHash`); `eq`/`hash` short-circuit
 // on it. Mutate only via `comps_mut`/`comp_mut`, which route through `inner_mut` to invalidate.
-#[derive(Clone, PartialEq, Eq, Hash, Debug, Default)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
 pub struct Cob {
     comps: CachedHash<Vec<CobComp>>,
 }
@@ -502,8 +501,8 @@ impl Cob {
     pub fn empty() -> Self {
         Self::new(vec![])
     }
-    
-    pub fn id(v: &Tng) -> Self { 
+
+    pub fn id(v: &Tng) -> Self {
         let comps = (0..v.n_comps()).map(|i| {
             let c = v.comp(i).clone();
             CobComp::id(c)
@@ -511,11 +510,11 @@ impl Cob {
         Self::new(comps)
     }
 
-    pub fn n_comps(&self) -> usize { 
+    pub fn n_comps(&self) -> usize {
         self.comps.len()
     }
 
-    pub fn comp(&self, i: usize) -> &CobComp { 
+    pub fn comp(&self, i: usize) -> &CobComp {
         &self.comps[i]
     }
 
@@ -523,7 +522,7 @@ impl Cob {
         &mut self.comps_mut()[i]
     }
 
-    pub fn comps(&self) -> impl Iterator<Item = &CobComp> { 
+    pub fn comps(&self) -> impl Iterator<Item = &CobComp> {
         self.comps.iter()
     }
 
@@ -531,15 +530,15 @@ impl Cob {
         self.comps.iter().map(|c| c.n_boundaries()).sum()
     }
 
-    pub fn is_empty(&self) -> bool { 
+    pub fn is_empty(&self) -> bool {
         self.comps.is_empty()
     }
 
-    pub fn is_zero_cob(&self) -> bool { 
+    pub fn is_zero_cob(&self) -> bool {
         self.comps.iter().any(|c| c.is_zero_cob())
     }
 
-    pub fn is_closed(&self) -> bool { 
+    pub fn is_closed(&self) -> bool {
         self.comps.iter().all(|c| c.is_closed())
     }
 
@@ -548,20 +547,20 @@ impl Cob {
     }
 
     pub fn inv(&self) -> Option<Self> {
-        if self.is_invertible() { 
+        if self.is_invertible() {
             let comps = self.comps.iter().map(|c| c.inv().unwrap());
             let inv = Self::new(comps);
             Some(inv)
-        } else { 
+        } else {
             None
         }
     }
 
-    pub fn euler_num(&self) -> i32 { 
+    pub fn euler_num(&self) -> i32 {
         self.comps.iter().map(|c| c.euler_num()).sum()
     }
 
-    pub fn deg(&self) -> i32 { 
+    pub fn deg(&self) -> i32 {
         self.comps.iter().map(|c| c.deg()).sum()
     }
 
@@ -604,7 +603,7 @@ impl Cob {
     // Ref-taking sibling of `connect_next`: same algorithm, but the working
     // set holds `&CobComp` so merges go through `connect` on the running
     // src/tgt accumulators instead of moving Tngs out.
-    fn connect_next<'a>(comps: &mut Vec<&'a CobComp>) -> Option<CobComp> {
+    fn connect_next(comps: &mut Vec<&CobComp>) -> Option<CobComp> {
         let seed = comps.pop()?;
         let mut unproc = comps.len();
 
@@ -683,17 +682,17 @@ impl Cob {
     // By-ref sibling of [`Self::stack_next`]: bot/top hold `&CobComp`, so the
     // merge code can't move Tngs out — uses `connect` on the running
     // src/tgt accumulators instead.
-    fn stack_next<'a>(
-        bot: &mut Vec<&'a CobComp>,
-        top: &mut Vec<&'a CobComp>,
+    fn stack_next(
+        bot: &mut Vec<&CobComp>,
+        top: &mut Vec<&CobComp>,
     ) -> Option<CobComp> {
         if bot.is_empty() && top.is_empty() { return None }
 
         let mut src = Tng::empty();
         let mut tgt = Tng::empty();
         let mut dots = (0, 0);
-        let mut x = 0 as i32;
-        let mut a = 0 as i32;
+        let mut x = 0_i32;
+        let mut a = 0_i32;
 
         let mut bot_unproc = bot.len();
         let mut top_unproc = top.len();
@@ -763,7 +762,7 @@ impl Cob {
 
         let need_reduce: Vec<_> = self.comps_mut().extract_if(.., |c| c.should_reduce()).collect();
         let init = LcCob::from(self);
-        
+
         need_reduce.into_iter().fold(init, |res, c| {
             let e = c.reduce(h, t);
             debug_assert!(e.keys().all(|c| c.n_comps() <= 1));
@@ -783,7 +782,7 @@ impl Cob {
 
     pub fn eval<R>(&self, h: &R, t: &R) -> R
     where R: Ring, for<'x> &'x R: RingOps<R> {
-        let comps = self.comps.iter().map(|c| 
+        let comps = self.comps.iter().map(|c|
             c.eval(h, t)
         );
         R::product(comps)
@@ -823,27 +822,14 @@ impl From<CobComp> for Cob {
 
 impl Display for Cob {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.comps.is_empty() { 
+        if self.comps.is_empty() {
             write!(f, "(∅)")
         } else if self.comps.len() == 1 {
             write!(f, "{}", self.comps[0])
-        } else { 
+        } else {
             let cobs = self.comps.iter().join(" ⊔ ");
             write!(f, "|{cobs}|")
         }
-    }
-}
-
-impl PartialOrd for Cob {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Cob {
-    fn cmp(&self, _other: &Self) -> std::cmp::Ordering {
-        // TODO
-        std::cmp::Ordering::Equal
     }
 }
 
@@ -876,7 +862,7 @@ impl<R> LcCobTrait for LcCob<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type R = R;
 
-    fn is_closed(&self) -> bool { 
+    fn is_closed(&self) -> bool {
         self.iter().all(|(f, _)| f.is_closed())
     }
 
@@ -888,8 +874,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn is_stackable(&self, other: &Self) -> bool {
-        cartesian!(self.keys(), other.keys()).all(|(a, b)|
-            a.is_stackable(b)
+        self.keys().all(|a|
+            other.keys().all(|b| a.is_stackable(b))
         )
     }
 
@@ -900,14 +886,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn inv(&self) -> Option<Self> {
-        if let Some((Some(cinv), Some(ainv))) = self.iter().next().map(|(c, a)| 
-            (c.inv(), a.inv())
-        ) { 
-            let inv = LcCob::from((cinv, ainv));
-            Some(inv)
-        } else { 
-            None
-        }
+        if self.nterms() != 1 { return None }
+
+        let (c, a) = self.iter().next().unwrap();
+        let inv = LcCob::from((c.inv()?, a.inv()?));
+        Some(inv)
     }
 
     fn connect(&self, c: &Cob) -> Self {
@@ -915,11 +898,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn stack(&self, other: &Self) -> Self {
-        if let Some(a) = self.as_scalar() { 
+        if let Some(a) = self.as_scalar() {
             other * a
-        } else if let Some(b) = other.as_scalar() { 
+        } else if let Some(b) = other.as_scalar() {
             self * b
-        } else { 
+        } else {
             self.apply_bilin(other, |c1, c2| c1.stack(c2))
         }
     }
@@ -933,11 +916,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn reduce(self, h: &Self::R, t: &Self::R) -> Self {
-        if self.should_reduce() { 
+        if self.should_reduce() {
             LcCob::sum(self.into_iter().map(|(cob, r)|
                 cob.reduce(h, t) * r
             ))
-        } else { 
+        } else {
             self
         }
     }
@@ -1118,7 +1101,7 @@ mod tests {
     }
 
     #[test]
-    fn mor_inv() { 
+    fn mor_inv() {
         let c = Cob::id(&Tng::new(vec![
             TngComp::arc([0, 1]),
             TngComp::arc([2, 3])
@@ -1129,6 +1112,20 @@ mod tests {
         assert_eq!(f.inv(), Some(f.clone()));
 
         let f = LcCob::from((c.clone(), 2));
+        assert!(!f.is_invertible());
+        assert_eq!(f.inv(), None);
+    }
+
+    #[test]
+    fn mor_inv_multi_term() {
+        // a sum is not invertible just because its leading term is. Both terms share the source
+        // and target, as every term of an `LcCob` does.
+        let a = TngComp::arc([0, 1]);
+        let id = Cob::from(CobComp::id(a.clone()));
+        let dotted = Cob::from(CobComp::id(a).with_dots(1, 0));
+        let f = LcCob::from((id, -1)) + LcCob::from((dotted, -1));
+
+        assert_eq!(f.nterms(), 2);
         assert!(!f.is_invertible());
         assert_eq!(f.inv(), None);
     }
@@ -1319,7 +1316,7 @@ mod tests {
     #[test]
     fn eval() {
         type R = Poly2<'H', 'T', i32>;
-        
+
         let ht = R::mono;
         let h = R::variable(0);
         let t = R::variable(1);
@@ -1338,11 +1335,14 @@ mod tests {
     }
 
     #[test]
-    fn reduce() { 
+    // `Cob` keys carry a `CachedHash`, whose `AtomicU64` reads as interior mutability.
+    // The cache is derived from the contents, so the key's `Eq`/`Hash` never change.
+    #[allow(clippy::mutable_key_type)]
+    fn reduce() {
         let c0 = CobComp::id(TngComp::circ([1])).add_dot(Dot::X);
         let c1 = CobComp::id(TngComp::circ([1])).add_dot(Dot::X).add_dot(Dot::X);
 
-        let c = LcCob::from_iter(hashmap! { 
+        let c = LcCob::from_iter(hashmap! {
             Cob::from(c0) => -2,
             Cob::from(c1) => 1
         });

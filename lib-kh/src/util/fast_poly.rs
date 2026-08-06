@@ -1,3 +1,6 @@
+//! [`FastPoly`]: a single-term polynomial `a X^d`, used where the coefficient
+//! ring is known to stay a monomial and the general `Poly` would be overhead.
+
 use std::fmt::Display;
 use std::ops::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Neg, DivAssign, RemAssign, Div, Rem};
 use std::str::FromStr;
@@ -6,34 +9,35 @@ use auto_impl_ops::auto_ops;
 
 use yui_core::poly::{Mono, Poly};
 use yui_core::util::format::{lc, superscript};
+use yui_core::util::parse_err::ParseErr;
 use yui_core::abst::{AddGrp, AddGrpOps, AddMon, AddMonOps, MathType, EucRing, EucRingOps, Field, FieldOps, Mon, MonOps, Ring, RingOps};
 
 // Homogeneous polynomial
 #[derive(Clone, Copy, Debug, Default)]
-pub struct FastPoly<const X: char, R> { 
+pub struct FastPoly<const X: char, R> {
     deg: usize,
     coeff: R
 }
 
-impl<const X: char, R> FastPoly<X, R> { 
-    pub fn new(deg: usize, coeff: R) -> Self { 
+impl<const X: char, R> FastPoly<X, R> {
+    pub fn new(deg: usize, coeff: R) -> Self {
         Self { deg, coeff }
     }
 
-    pub fn coeff(&self) -> &R { 
+    pub fn coeff(&self) -> &R {
         &self.coeff
     }
 
-    pub fn deg(&self) -> usize { 
+    pub fn deg(&self) -> usize {
         self.deg
     }
 
-    pub fn from_const(r: R) -> Self { 
+    pub fn from_const(r: R) -> Self {
         Self::new(0, r)
     }
 
     pub fn variable() -> Self
-    where R: One { 
+    where R: One {
         Self::new(1, R::one())
     }
 }
@@ -59,18 +63,19 @@ where R: Display + Zero {
 
 impl<const X: char, R> FromStr for FastPoly<X, R>
 where R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
-    type Err = ();
+    type Err = ParseErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let p = Poly::<X, R>::from_str(s)?;
-        if p.is_zero() { 
+        if p.is_zero() {
             Ok(Self::zero())
-        } else if p.nterms() == 1 { 
+        } else if p.nterms() == 1 {
             let (x, a) = p.any_term().unwrap();
             let p = Self::new(x.deg(), a.clone());
             Ok(p)
         } else {
-            Err(())
+            // a FastPoly holds a single term by construction.
+            Err(ParseErr::new(format!("\"{s}\" has {} terms; expected a monomial", p.nterms())))
         }
     }
 }
@@ -115,11 +120,9 @@ where R: Eq + Zero {}
 impl<const X: char, R> AddAssign<&FastPoly<X, R>> for FastPoly<X, R>
 where R: AddMon, for<'x> &'x R: AddMonOps<R> {
     fn add_assign(&mut self, rhs: &FastPoly<X, R>) {
-        if self.is_zero() { 
+        if self.is_zero() {
             *self = rhs.clone()
-        } else if rhs.is_zero() { 
-            return
-        } else { 
+        } else if !rhs.is_zero() {
             assert_eq!(self.deg, rhs.deg, "{self} + {rhs} is not homogeneous.");
             self.coeff.add_assign(&rhs.coeff)
         }
@@ -130,11 +133,9 @@ where R: AddMon, for<'x> &'x R: AddMonOps<R> {
 impl<const X: char, R> SubAssign<&FastPoly<X, R>> for FastPoly<X, R>
 where R: AddGrp, for<'x> &'x R: AddGrpOps<R> {
     fn sub_assign(&mut self, rhs: &FastPoly<X, R>) {
-        if self.is_zero() { 
+        if self.is_zero() {
             *self = -rhs
-        } else if rhs.is_zero() { 
-            return
-        } else { 
+        } else if !rhs.is_zero() {
             assert_eq!(self.deg, rhs.deg, "{self} - {rhs} is not homogeneous.");
             self.coeff.sub_assign(&rhs.coeff)
         }
@@ -161,7 +162,7 @@ where R: AddGrp, for<'x> &'x R: AddGrpOps<R> {
 impl<const X: char, R> MulAssign<&R> for FastPoly<X, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn mul_assign(&mut self, rhs: &R) {
-        if rhs.is_one() { 
+        if rhs.is_one() {
             return
         }
         self.coeff *= rhs
@@ -172,7 +173,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<const X: char, R> MulAssign<&FastPoly<X, R>> for FastPoly<X, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn mul_assign(&mut self, rhs: &FastPoly<X, R>) {
-        if rhs.is_one() { 
+        if rhs.is_one() {
             return
         }
         self.deg += rhs.deg;
@@ -214,7 +215,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {}
 impl<const X: char, R> Ring for FastPoly<X, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn inv(&self) -> Option<Self> {
-        if self.deg > 0 { 
+        if self.deg > 0 {
             return None
         }
         let a = self.coeff.inv()?;
@@ -238,21 +239,21 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<const X: char, R> FastPoly<X, R>
 where R: Field, for<'x> &'x R: FieldOps<R> {
-    pub fn div_rem(&self, rhs: &Self) -> (Self, Self) { 
+    pub fn div_rem(&self, rhs: &Self) -> (Self, Self) {
         assert!(!rhs.is_zero());
 
-        if self.deg < rhs.deg { 
+        if self.deg < rhs.deg {
             return (Self::zero(), self.clone())
         }
-        
+
         let (i, a) = (self.deg, &self.coeff); // ax^i
         let (j, b) = ( rhs.deg,  &rhs.coeff); // bx^j
-        
+
         let k = i - j; // >= 0
         let c = a / b;
         let q = FastPoly::new(k, c); // cx^k = (a/b) x^{i-j}.
         let r = Self::zero();
-        
+
         (q, r)
     }
 }
@@ -319,13 +320,13 @@ mod tex {
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     use yui_core::num::Ratio;
 
     use super::*;
 
     #[test]
-    fn zero() { 
+    fn zero() {
         type R = i64;
         type P = FastPoly<'x', R>;
 
@@ -337,9 +338,9 @@ mod tests {
         assert!(!b.is_zero());
         assert!(c.is_zero());
     }
-    
+
     #[test]
-    fn one() { 
+    fn one() {
         type R = i64;
         type P = FastPoly<'x', R>;
 
@@ -351,9 +352,9 @@ mod tests {
         assert!(b.is_one());
         assert!(!c.is_one());
     }
-    
+
     #[test]
-    fn eq() { 
+    fn eq() {
         type R = i64;
         type P = FastPoly<'x', R>;
 
@@ -369,7 +370,7 @@ mod tests {
     }
 
     #[test]
-    fn add() { 
+    fn add() {
         type R = i64;
         type P = FastPoly<'x', R>;
 
@@ -383,7 +384,7 @@ mod tests {
     }
 
     #[test]
-    fn sub() { 
+    fn sub() {
         type R = i64;
         type P = FastPoly<'x', R>;
 
@@ -397,7 +398,7 @@ mod tests {
     }
 
     #[test]
-    fn mul() { 
+    fn mul() {
         type R = i64;
         type P = FastPoly<'x', R>;
 
@@ -411,7 +412,7 @@ mod tests {
     }
 
     #[test]
-    fn div() { 
+    fn div() {
         type R = Ratio<i64>;
         type P = FastPoly<'x', R>;
 
@@ -424,7 +425,7 @@ mod tests {
     }
 
     #[test]
-    fn rem() { 
+    fn rem() {
         type R = Ratio<i64>;
         type P = FastPoly<'x', R>;
 
@@ -446,7 +447,11 @@ mod tests {
         assert_eq!(P::from_str("x"), Ok(P::variable()));
         assert_eq!(P::from_str("x^2"), Ok(P::new(2, 1)));
         // assert_eq!(P::from_str("3x^2"), Ok(P::new(2, 3))); // not supported yet
-        assert_eq!(P::from_str("x + 1"), Err(()));
+
+        // a sum is rejected by `Poly`'s own parser (which takes a const or a bare variable),
+        // so the error propagates from there rather than from the nterms guard below.
+        let e = P::from_str("x + 1").unwrap_err();
+        assert_eq!(e.to_string(), "cannot parse \"x + 1\" as Z[x]");
     }
 
     #[test]

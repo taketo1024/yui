@@ -1,3 +1,6 @@
+//! Smith normal form over a Euclidean ring: `snf` and the in-place variant,
+//! plus `fnf` for the Frobenius (rational canonical) form.
+
 use core::panic;
 use std::cmp::min;
 use log::trace;
@@ -32,7 +35,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
 // Frobenius normal form
 // ref: https://en.wikipedia.org/wiki/Frobenius_normal_form
 pub fn fnf<R>(a: &Mat<R>, flags: SnfFlags) -> SnfResult<Poly<'x', R>>
-where R: Field, for<'x> &'x R: FieldOps<R> { 
+where R: Field, for<'x> &'x R: FieldOps<R> {
     assert!(a.is_square());
 
     type P<R> = Poly<'x', R>;
@@ -40,13 +43,13 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
     let x = Mat::scalar(a.n_rows(), &P::variable());
     let a = a.map(|r| P::from_const(r.clone()) );
     let target = x - a;
-    
+
     snf_in_place::<P<R>>(target, flags)
 }
 
 #[derive(Debug)]
 pub struct SnfResult<R>
-where R: EucRing, for<'a> &'a R: EucRingOps<R> { 
+where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     result: Mat<R>,
     p:    Option<Mat<R>>,
     pinv: Option<Mat<R>>,
@@ -55,8 +58,8 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
 }
 
 impl<R> SnfResult<R>
-where R: EucRing, for<'a> &'a R: EucRingOps<R> { 
-    pub fn result(&self) -> &Mat<R> { 
+where R: EucRing, for<'a> &'a R: EucRingOps<R> {
+    pub fn result(&self) -> &Mat<R> {
         &self.result
     }
 
@@ -89,19 +92,19 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
 
     pub fn rank(&self) -> usize {
         let n = min(self.result.n_rows(), self.result.n_cols());
-        for i in 0..n { 
-            if self.result[(i, i)].is_zero() { 
+        for i in 0..n {
+            if self.result[(i, i)].is_zero() {
                 return i
             }
         }
         n
     }
 
-    pub fn factors(&self) -> Vec<&R> { 
+    pub fn factors(&self) -> Vec<&R> {
         let n = min(self.result.n_rows(), self.result.n_cols());
-        (0..n).filter_map(|i| { 
+        (0..n).filter_map(|i| {
             let a = &self.result[(i, i)];
-            if !a.is_zero() { 
+            if !a.is_zero() {
                 Some(a)
             } else {
                 None
@@ -122,7 +125,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
 
 impl<R> SnfCalc<R>
 where R: EucRing, for<'a> &'a R: EucRingOps<R> {
-    pub fn new(target: Mat<R>, flags: SnfFlags) -> Self { 
+    pub fn new(target: Mat<R>, flags: SnfFlags) -> Self {
         let id_opt = |size, flag| {
             if flag{ Some(Mat::id(size)) } else { None }
         };
@@ -137,8 +140,8 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     }
 
     pub fn result(self) -> SnfResult<R> {
-        SnfResult { 
-            result: self.target, 
+        SnfResult {
+            result: self.target,
             p: self.p,
             pinv: self.pinv,
             q: self.q,
@@ -146,11 +149,11 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
         }
     }
 
-    pub fn process(&mut self) { 
-        if self.target.is_zero() { 
+    pub fn process(&mut self) {
+        if self.target.is_zero() {
             return
         }
-        
+
         self.preprocess();
         self.eliminate_all();
         self.diag_normalize();
@@ -158,7 +161,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
 
     fn preprocess(&mut self) {
         use num_bigint::BigInt;
-        preprocess_lll_for!(self, 
+        preprocess_lll_for!(self,
             i64, i128, BigInt
         );
     }
@@ -167,9 +170,9 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
         let (m, n) = self.target.shape();
         let mut i = 0;
 
-        for j in 0..n { 
+        for j in 0..n {
             if i >= m { break }
-            if self.eliminate_step(i, j) { 
+            if self.eliminate_step(i, j) {
                 i += 1;
             }
         }
@@ -177,25 +180,25 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
 
     fn eliminate_step(&mut self, i: usize, j: usize) -> bool {
         // select pivot
-        let Some(i_p) = self.select_pivot(i, j) else { 
-            return false 
+        let Some(i_p) = self.select_pivot(i, j) else {
+            return false
         };
 
         trace!("select-pivot: ({i_p}, {j})");
 
         // swap rows
-        if i_p > i { 
+        if i_p > i {
             self.swap_rows(i, i_p);
         }
 
         // swap cols
-        if j > i { 
+        if j > i {
             self.swap_cols(i, j);
         }
 
         // normalize pivot
         let u = self.target[(i, i)].normalizing_unit();
-        if !u.is_one() { 
+        if !u.is_one() {
             self.mul_col(i, &u);
         }
 
@@ -205,21 +208,21 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
         true
     }
 
-    fn row_nz(&self, i: usize) -> usize { 
+    fn row_nz(&self, i: usize) -> usize {
         self.target.inner().row(i).iter().filter(|a| !a.is_zero()).count()
     }
 
-    fn col_nz(&self, j: usize) -> usize { 
+    fn col_nz(&self, j: usize) -> usize {
         self.target.inner().column(j).iter().filter(|a| !a.is_zero()).count()
     }
 
     fn swap_rows(&mut self, i: usize, j: usize) {
         self.target.swap_rows(i, j);
-        if let Some(p) = self.p.as_mut() { 
-            p.swap_rows(i, j) 
+        if let Some(p) = self.p.as_mut() {
+            p.swap_rows(i, j)
         }
-        if let Some(pinv) = self.pinv.as_mut() { 
-            pinv.swap_cols(i, j) 
+        if let Some(pinv) = self.pinv.as_mut() {
+            pinv.swap_cols(i, j)
         }
 
         trace!("swap-rows: ({i}, {j})\n{}", self.target);
@@ -227,11 +230,11 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
 
     fn swap_cols(&mut self, i: usize, j: usize) {
         self.target.swap_cols(i, j);
-        if let Some(q) = self.q.as_mut() { 
-            q.swap_cols(i, j) 
+        if let Some(q) = self.q.as_mut() {
+            q.swap_cols(i, j)
         }
-        if let Some(qinv) = self.qinv.as_mut() { 
-            qinv.swap_rows(i, j) 
+        if let Some(qinv) = self.qinv.as_mut() {
+            qinv.swap_rows(i, j)
         }
 
         trace!("swap-cols: ({i}, {j})\n{}", self.target);
@@ -239,67 +242,67 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
 
     fn mul_row(&mut self, i: usize, u: &R) {
         self.target.mul_row(i, u);
-        if let Some(p) = self.p.as_mut() { 
-            p.mul_row(i, u) 
+        if let Some(p) = self.p.as_mut() {
+            p.mul_row(i, u)
         }
-        
+
         if let Some(pinv) = self.pinv.as_mut() {
             let Some(uinv) = &u.inv() else { panic!("`u` is not invertible.") };
-            pinv.mul_col(i, uinv) 
+            pinv.mul_col(i, uinv)
         }
 
         trace!("mul-row: {i} by {u})\n{}", self.target);
     }
-    
+
     fn mul_col(&mut self, i: usize, u: &R) {
         self.target.mul_col(i, u);
-        if let Some(q) = self.q.as_mut() { 
-            q.mul_col(i, u) 
+        if let Some(q) = self.q.as_mut() {
+            q.mul_col(i, u)
         }
         if let Some(qinv) = self.qinv.as_mut() {
             let Some(uinv) = &u.inv() else { panic!("`u` is not invertible.") };
-            qinv.mul_row(i, uinv) 
+            qinv.mul_row(i, uinv)
         }
 
         trace!("mul-col: {i} by {u})\n{}", self.target);
     }
 
     // Multiply [a, b; c, d] from left, assuming det = 1.
-    pub fn left_elementary(&mut self, comps: [&R; 4], i: usize, j: usize) { 
+    pub fn left_elementary(&mut self, comps: [&R; 4], i: usize, j: usize) {
         let [a, b, c, d] = comps;
         debug_assert!((a * d - b * c).is_one());
 
         self.target.left_elementary(comps, i, j);
         if let Some(p) = self.p.as_mut() {
-            p.left_elementary(comps, i, j) 
-        } 
-        if let Some(pinv) = self.pinv.as_mut() { 
+            p.left_elementary(comps, i, j)
+        }
+        if let Some(pinv) = self.pinv.as_mut() {
             let inv_t = [d, &-c, &-b, a];
-            pinv.right_elementary(inv_t, i, j) 
+            pinv.right_elementary(inv_t, i, j)
         }
 
         trace!("left-elem: [{a}, {b}; {c}, {d}] for rows ({i}, {j})).\n{}", self.target);
     }
 
-    // Multiply [a, c; b, d] from right, assuming det = 1. 
-    pub fn right_elementary(&mut self, comps: [&R; 4], i: usize, j: usize) { 
+    // Multiply [a, c; b, d] from right, assuming det = 1.
+    pub fn right_elementary(&mut self, comps: [&R; 4], i: usize, j: usize) {
         let [a, b, c, d] = comps;
         debug_assert!((a * d - b * c).is_one());
-        
+
         self.target.right_elementary(comps, i, j);
-        if let Some(q) = self.q.as_mut() { 
-            q.right_elementary(comps, i, j) 
-        } 
-        if let Some(qinv) = self.qinv.as_mut() { 
+        if let Some(q) = self.q.as_mut() {
+            q.right_elementary(comps, i, j)
+        }
+        if let Some(qinv) = self.qinv.as_mut() {
             let inv_t = [d, &-c, &-b, a];
-            qinv.left_elementary(inv_t, i, j) 
+            qinv.left_elementary(inv_t, i, j)
         }
 
         trace!("right-elem: [{a}, {b}; {c}, {d}] for cols ({i}, {j})).\n{}", self.target);
     }
 
-    fn select_pivot(&self, below_i: usize, j: usize) -> Option<usize> { 
-        // find row `i` below `below_i` with minimum nnz. 
+    fn select_pivot(&self, below_i: usize, j: usize) -> Option<usize> {
+        // find row `i` below `below_i` with minimum nnz.
         (below_i..self.target.n_rows())
             .filter( |i| !self.target[(*i, j)].is_zero() )
             .map( |i| (i, self.row_nz(i)) )
@@ -310,7 +313,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
     fn eliminate_at(&mut self, i: usize, j: usize) {
         assert!(!self.target[(i, j)].is_zero());
 
-        while self.row_nz(i) > 1 || self.col_nz(j) > 1 { 
+        while self.row_nz(i) > 1 || self.col_nz(j) > 1 {
             let modified = self.eliminate_col(i, j)
                          | self.eliminate_row(i, j);
             if !modified {
@@ -319,7 +322,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
         }
     }
 
-    fn eliminate_row(&mut self, i: usize, j: usize) -> bool { 
+    fn eliminate_row(&mut self, i: usize, j: usize) -> bool {
         let mut modified = false;
 
         for j1 in 0..self.target.n_cols() {
@@ -328,9 +331,9 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
             // d = sx + ty,
             // a = x/d,
             // b = y/d.
-        
+
             // [x y][s -b] = [d 0]
-            //      [t  a]   
+            //      [t  a]
 
             let x = &self.target[(i, j )];
             let y = &self.target[(i, j1)];
@@ -339,7 +342,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
             let (a, b) = (x / &d, y / &d);
 
             self.right_elementary(
-                [&s, &t, &-b, &a], 
+                [&s, &t, &-b, &a],
                 j, j1
             );
             modified = true
@@ -347,8 +350,8 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
 
         modified
     }
-    
-    fn eliminate_col(&mut self, i: usize, j: usize) -> bool { 
+
+    fn eliminate_col(&mut self, i: usize, j: usize) -> bool {
         let mut modified = false;
 
         for i1 in 0..self.target.n_rows() {
@@ -357,7 +360,7 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
             // d = sx + ty,
             // a = x/d,
             // b = y/d.
-        
+
             // [ s t][x] < i  = [d]
             // [-b a][y] < i1   [0]
 
@@ -368,37 +371,37 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
             let (a, b) = (x / &d, y / &d);
 
             self.left_elementary(
-                [&s, &t, &-b, &a], 
+                [&s, &t, &-b, &a],
                 i, i1
             );
             modified = true
         }
-        
+
         modified
     }
-    
+
     fn diag_normalize(&mut self) {
         debug_assert!(self.target.is_diag());
 
         let n = min(self.target.n_rows(), self.target.n_cols());
-        let r = (0..n).filter(|&i| 
+        let r = (0..n).find(|&i|
             self.target[(i, i)].is_zero()
-        ).next().unwrap_or(n);
+        ).unwrap_or(n);
 
-        if r == 0 { 
+        if r == 0 {
             return
         }
 
-        'outer: loop { 
-            for i in 0..r-1 { 
-                if !self.diag_normalize_step(i) { 
+        'outer: loop {
+            for i in 0..r-1 {
+                if !self.diag_normalize_step(i) {
                     continue 'outer
                 }
             }
             break
         }
 
-        for i in 0..r { 
+        for i in 0..r {
             let a = &self.target[(i, i)];
             let u = a.normalizing_unit();
             if !u.is_one() {
@@ -414,11 +417,11 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
         assert!(!x.is_zero());
         assert!(!y.is_zero());
 
-        if x.divides(y) { 
+        if x.divides(y) {
             return true
         }
 
-        if y.divides(x) { 
+        if y.divides(x) {
             self.swap_rows(i, i + 1);
             self.swap_cols(i, i + 1);
             return false
@@ -436,23 +439,29 @@ where R: EucRing, for<'a> &'a R: EucRingOps<R> {
         let (tb, sa) = (&t * &b, &s * &a);
 
         self.left_elementary(
-            [&R::one(), &R::one(), &-tb, &sa], 
+            [&R::one(), &R::one(), &-tb, &sa],
             i, i + 1
         );
         self.right_elementary(
-            [&s, &t, &-b, &a], 
+            [&s, &t, &-b, &a],
             i, i + 1
         );
 
         false
     }
 
-    fn gcdx(x: &R, y: &R) -> (R, R, R) { 
+    fn gcdx(x: &R, y: &R) -> (R, R, R) {
         let (d, s, t) = EucRing::gcdx(x, y);
 
+        // `gcd(0, 0) = 0`, and nothing divides it.
+        if d.is_zero() {
+            return (d, s, t)
+        }
+
+        // If `a = x/d` is a unit, `s = a⁻¹` satisfies `s·x + 0·y = d` (avoids coefficient growth).
         let a = x / &d;
-        if a.is_unit() { 
-            (d, a, R::zero())
+        if a.is_unit() {
+            (d, a.inv().unwrap(), R::zero())
         } else {
             (d, s, t)
         }
@@ -465,7 +474,7 @@ where R: LLLRing, for<'a> &'a R: LLLRingOps<R> {
         trace!("start lll-preprocess, type = {}", std::any::type_name::<R>());
 
         let flag = [self.p.is_some(), self.pinv.is_some()];
-        
+
         let b = std::mem::take(&mut self.target);
         let (res, p, pinv) = lll_hnf_in_place(b, flag);
 
@@ -500,12 +509,12 @@ use {preprocess_lll_for, preprocess_lll_expand};
 
 #[cfg(test)]
 mod tests {
-    use yui_core::num::Ratio;
+    use yui_core::num::{Ratio, GaussInt};
 
     use super::*;
 
     #[test]
-    fn init() { 
+    fn init() {
         let a = Mat::from_row_major((2, 3), [1,2,3,4,5,6]);
         let calc = SnfCalc::new(a, [true; 4]);
         let (res, [p, pinv, q, qinv]) = calc.result().destruct();
@@ -518,10 +527,10 @@ mod tests {
     }
 
     #[test]
-    fn init_no_pq() { 
+    fn init_no_pq() {
         let a = Mat::from_row_major((2, 3), [1,2,3,4,5,6]);
         let calc = SnfCalc::new(a, [false; 4]);
-        
+
         let (res, [p, pinv, q, qinv]) = calc.result().destruct();
 
         assert_eq!(res, Mat::from_row_major((2, 3), [1,2,3,4,5,6]));
@@ -532,7 +541,7 @@ mod tests {
     }
 
     #[test]
-    fn row_nz() { 
+    fn row_nz() {
         let a = Mat::from_row_major((3, 3), [1,0,0,0,5,6,7,8,9]);
         let calc = SnfCalc::new(a, [false; 4]);
         assert_eq!(calc.row_nz(0), 1);
@@ -541,7 +550,7 @@ mod tests {
     }
 
     #[test]
-    fn col_nz() { 
+    fn col_nz() {
         let a = Mat::from_row_major((3, 3), [1,0,0,0,5,6,7,8,9]);
         let calc = SnfCalc::new(a, [false; 4]);
         assert_eq!(calc.col_nz(0), 2);
@@ -550,7 +559,7 @@ mod tests {
     }
 
     #[test]
-    fn swap_rows() { 
+    fn swap_rows() {
         let a = Mat::from_row_major((3, 3), [1,2,3,4,5,6,7,8,9]);
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.swap_rows(0, 1);
@@ -566,7 +575,7 @@ mod tests {
     }
 
     #[test]
-    fn swap_cols() { 
+    fn swap_cols() {
         let a = Mat::from_row_major((3, 3), [1,2,3,4,5,6,7,8,9]);
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.swap_cols(0, 1);
@@ -582,11 +591,11 @@ mod tests {
     }
 
     #[test]
-    fn mul_row() { 
+    fn mul_row() {
         let a = Mat::from_row_major((3, 3), [1,2,3,4,5,6,7,8,9]);
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.mul_row(0, &-1);
-        
+
         let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
@@ -598,11 +607,11 @@ mod tests {
     }
 
     #[test]
-    fn mul_col() { 
+    fn mul_col() {
         let a = Mat::from_row_major((3, 3), [1,2,3,4,5,6,7,8,9]);
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
         calc.mul_col(0, &-1);
-        
+
         let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
@@ -614,7 +623,7 @@ mod tests {
     }
 
     #[test]
-    fn left_elementary() { 
+    fn left_elementary() {
         let a = Mat::from_row_major((3, 3), [1,2,3,4,5,6,7,8,9]);
         let e = [&3,&2,&4,&3]; // det = 1
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
@@ -631,7 +640,7 @@ mod tests {
     }
 
     #[test]
-    fn right_elementary() { 
+    fn right_elementary() {
         let a = Mat::from_row_major((3, 3), [1,2,3,4,5,6,7,8,9]);
         let e = [&3,&2,&4,&3]; // det = 1
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
@@ -665,6 +674,28 @@ mod tests {
         assert_eq!(d, 2);
         assert_eq!(s, -1);
         assert_eq!(t, 0);
+    }
+
+    #[test]
+    fn gcdx_bezout() {
+        // the unit shortcut must invert `x/d`; over Z[i] the units ±i are not self-inverse.
+        fn check<R>(vals: &[R])
+        where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+            for x in vals {
+                for y in vals {
+                    let (d, s, t) = SnfCalc::<R>::gcdx(x, y);
+                    assert_eq!(&s * x + &t * y, d, "Bezout fails for x = {x}, y = {y}");
+                }
+            }
+        }
+
+        type G = GaussInt<i64>;
+        check(&[G::new(0, 0), G::new(1, 0), G::new(0, 1), G::new(2, 1), G::new(3, 0), G::new(-1, 2)]);
+
+        type Q = Ratio<i64>;
+        check(&[Q::new(0, 1), Q::new(1, 2), Q::new(-3, 4), Q::new(5, 1), Q::new(2, 3)]);
+
+        check(&[0i64, 1, -2, 6, 15]);
     }
 
     #[test]
@@ -829,10 +860,10 @@ mod tests {
     #[test]
     fn eliminate_all3() {
         let a: Mat<i64> = Mat::from_row_major((5, 5), [
-            -20, -7, -27, 2, 29, 
-            17, 8, 14, -4, -10, 
-            13, 8, 10, -4, -6, 
-            -9, -2, -14, 0, 16, 
+            -20, -7, -27, 2, 29,
+            17, 8, 14, -4, -10,
+            13, 8, 10, -4, -6,
+            -9, -2, -14, 0, 16,
             5, 0, 5, -1, -4
         ]);
         let mut calc = SnfCalc::new(a.clone(), [true; 4]);
@@ -854,7 +885,7 @@ mod tests {
 
         let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
-        
+
         assert_eq!(p * a.clone() * q, res);
         assert_eq!(pinv * res * qinv, a.clone());
     }
@@ -867,13 +898,13 @@ mod tests {
 
         let (res, trans) = calc.result().destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
-        
+
         assert_eq!(p * a.clone() * q, res);
         assert_eq!(pinv * res * qinv, a.clone());
     }
 
     #[test]
-    fn lll_preprocess_i64() { 
+    fn lll_preprocess_i64() {
         use super::super::lll::tests::helper::assert_is_hnf;
 
         let a: Mat<i64> = Mat::from_row_major((6, 9), [
@@ -897,7 +928,7 @@ mod tests {
     }
 
     #[test]
-    fn lll_preprocess_bigint() { 
+    fn lll_preprocess_bigint() {
         use super::super::lll::tests::helper::assert_is_hnf;
         use num_bigint::BigInt;
 
@@ -923,7 +954,7 @@ mod tests {
     }
 
     #[test]
-    fn test_snf() { 
+    fn test_snf() {
         let a = Mat::from_row_major((3, 3), [1,2,3,4,5,6,7,8,9]);
         let (res, trans) = snf(&a, [true; 4]).destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
@@ -937,7 +968,7 @@ mod tests {
     }
 
     #[test]
-    fn test_fnf() { 
+    fn test_fnf() {
         type R = Ratio<i64>;
         type P = Poly<'x', R>;
 
@@ -945,7 +976,7 @@ mod tests {
         let (res, trans) = fnf(&a, [true; 4]).destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
-        let x = Mat::scalar(3, &P::variable()) - a.map(|r| P::from_const(r.clone()));
+        let x = Mat::scalar(3, &P::variable()) - a.map(|r| P::from_const(*r));
 
         assert_eq!(&p * &x * &q, res);
         assert_eq!(&pinv * &res * &qinv, x);

@@ -1,3 +1,6 @@
+//! [`Schur`]: the Schur complement `s = d - c a⁻¹ b` of an invertible upper-left
+//! block, with the basis changes it induces. The workhorse of chain reduction.
+
 use std::ops::AddAssign;
 
 use log::debug;
@@ -75,11 +78,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         debug!("compute schur: a{:?}, r: {r}", (m_d + r, n_b + r));
 
-        // Compute `s` via one of three fused paths, picking whichever matches the
-        // requested transforms — never materializing a `(m_d × n_b)` matmul:
-        //   - with_trans_src:    right-solve fusion → `s` and `a⁻¹b` together.
-        //   - with_trans_tgt only: left-solve fusion (transposed view) → `s` and `c·a⁻¹` together.
-        //   - neither:           right-solve streaming, `s` only.
+        // `s` streams out of one right-solve, never materializing a `(m_d × n_b)` matmul;
+        // `a⁻¹b` is retained from that same pass when asked for. `c·a⁻¹` is a separate left solve.
         let pairs = solve_triangular_with(t, a, b, |j, x_j| {
             let s_j = d.col_vec(j) - c * &x_j;
             let x_j = (with_trans_src).then_some(x_j);
@@ -141,7 +141,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-fn id_mat<R: Scalar + One>(n: usize) -> SpMat<R> { 
+fn id_mat<R: Scalar + One>(n: usize) -> SpMat<R> {
     SpMat::<R>::id(n)
 }
 
@@ -154,7 +154,7 @@ fn proj_mat<R: Scalar + One + Zero + AddAssign>(n: usize, k: usize) -> SpMat<R> 
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     use super::*;
 
     #[test]
@@ -193,7 +193,7 @@ mod tests {
         let s = sch.complement();
 
         assert_eq!(s, &SpMat::from_row_major((3,2), [
-             5,  36, 
+             5,  36,
              12, 45,
             -14,-60
         ]));
@@ -210,7 +210,7 @@ mod tests {
              1,  0,
              0,  1
         ]));
-        
+
         assert_eq!(t_out, SpMat::from_row_major((3,6), [
              20, -6, -4, 1, 0, 0,
              24, -7, -5, 0, 1, 0,

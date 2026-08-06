@@ -1,12 +1,13 @@
 //! Compact bitmap over a small element type. `BitMap<E, S>` is a single
 //! word `S` (the storage) whose bit `e.into()` is set iff `e` is present.
-//! `S = u128` covers element indices `0..128`; extend by impl-ing
-//! [`BitStorage`] for wider types (e.g. `[u128; 2]`).
+//! `S = u128` covers element indices `0..128`, and [`U256`](super::u256::U256)
+//! doubles that; extend by impl-ing [`BitStorage`] for a wider type.
 
 use std::marker::PhantomData;
 use std::ops::{BitAnd, BitOr, BitOrAssign, Shl, Sub};
 
-/// Single-word storage backing a [`BitMap`]. Implemented for `u128`.
+/// Single-word storage backing a [`BitMap`]. Implemented for `u8`..`u128` and
+/// [`U256`](super::u256::U256).
 pub trait BitStorage:
     Copy + Eq + Default
     + BitAnd<Output = Self> + BitOr<Output = Self> + BitOrAssign

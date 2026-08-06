@@ -1,3 +1,6 @@
+//! [`Trans<R>`]: a composable forward/backward basis change, tracking how a
+//! reduction relates the original generators to the surviving ones.
+
 use yui_core::abst::{Ring, RingOps};
 use yui_core::ext::CloneAnd;
 use crate::Perm;
@@ -24,18 +27,18 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
     b_mats: Vec<SpMat<R>>,
 }
 
-impl<R> Trans<R> 
-where R: Ring, for <'x> &'x R: RingOps<R> { 
-    pub fn id(n: usize) -> Self { 
-        Self { 
-            src_dim: n, 
-            tgt_dim: n, 
-            f_mats: vec![], 
-            b_mats: vec![] 
+impl<R> Trans<R>
+where R: Ring, for <'x> &'x R: RingOps<R> {
+    pub fn id(n: usize) -> Self {
+        Self {
+            src_dim: n,
+            tgt_dim: n,
+            f_mats: vec![],
+            b_mats: vec![]
         }
     }
 
-    pub fn zero() -> Self { 
+    pub fn zero() -> Self {
         Self::id(0)
     }
 
@@ -46,15 +49,15 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         t
     }
 
-    pub fn src_dim(&self) -> usize { 
+    pub fn src_dim(&self) -> usize {
         self.src_dim
     }
 
-    pub fn tgt_dim(&self) -> usize { 
+    pub fn tgt_dim(&self) -> usize {
         self.tgt_dim
     }
 
-    pub fn is_id(&self) -> bool { 
+    pub fn is_id(&self) -> bool {
         self.f_mats.is_empty()
     }
 
@@ -68,7 +71,7 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         self.b_mats.iter().rev().fold(v.clone(), |v, f| f * v)
     }
 
-    pub fn append(&mut self, f: SpMat<R>, b: SpMat<R>) { 
+    pub fn append(&mut self, f: SpMat<R>, b: SpMat<R>) {
         assert_eq!(f.n_cols(), b.n_rows());
         assert_eq!(f.n_rows(), b.n_cols());
         assert_eq!(f.n_cols(), self.tgt_dim);
@@ -94,19 +97,19 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         self.b_mats.append(&mut other.b_mats);
     }
 
-    pub fn merged(&self, other: &Trans<R>) -> Self { 
-        self.clone_and(|t| 
+    pub fn merged(&self, other: &Trans<R>) -> Self {
+        self.clone_and(|t|
             t.merge(other.clone())
         )
     }
 
     pub fn forward_mat(&self) -> SpMat<R> {
         // f = fn * ... f1 * f0
-        if self.f_mats.len() == 1 { 
+        if self.f_mats.len() == 1 {
             self.f_mats[0].clone()
-        } else { 
+        } else {
             self.f_mats.iter().rev().fold(
-                SpMat::id(self.tgt_dim), 
+                SpMat::id(self.tgt_dim),
                 |res, f| res * f
             )
         }
@@ -114,11 +117,11 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
 
     pub fn backward_mat(&self) -> SpMat<R> {
         // b = b0 * b1 * ... * bn
-        if self.b_mats.len() == 1 { 
+        if self.b_mats.len() == 1 {
             self.b_mats[0].clone()
-        } else { 
+        } else {
             self.b_mats.iter().rev().fold(
-                SpMat::id(self.tgt_dim), 
+                SpMat::id(self.tgt_dim),
                 |res, b| b * res
             )
         }
@@ -126,12 +129,12 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
 
     /// Collapses the stored stages into a single pair of forward/backward matrices.
     pub fn reduce(&mut self) {
-        if self.f_mats.len() > 1 { 
+        if self.f_mats.len() > 1 {
             let f = self.forward_mat();
             self.f_mats = vec![f];
         }
 
-        if self.b_mats.len() > 1 { 
+        if self.b_mats.len() > 1 {
             let b = self.backward_mat();
             self.b_mats = vec![b];
         }
@@ -143,13 +146,13 @@ where R: Ring, for <'x> &'x R: RingOps<R> {
         let n = self.tgt_dim();
         let p = indices.len();
         let f = SpMat::from_entries(
-            (p, n), 
+            (p, n),
             indices.iter().enumerate().map(|(i, &j)|
                 (i, j, R::one())
             )
         );
         let b = SpMat::from_entries(
-            (n, p), 
+            (n, p),
             indices.iter().enumerate().map(|(i, &j)|
                 (j, i, R::one())
             )
@@ -183,7 +186,7 @@ mod tests {
         assert_eq!(w, SpVec::from(vec![0,1,2,3,4]));
         assert_eq!(x, SpVec::from(vec![0,1,2,3,4]));
     }
-    
+
     #[test]
     fn trans() {
         let t = Trans::<i32>::new(
@@ -216,7 +219,7 @@ mod tests {
     }
 
     #[test]
-    fn is_id() { 
+    fn is_id() {
         let t = Trans::<i64>::id(10);
         assert!(t.is_id());
     }

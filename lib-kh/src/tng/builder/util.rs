@@ -1,9 +1,12 @@
+//! Shared builder helpers: the pivot pool used to order eliminations, the
+//! supported-symmetry assertion, and degree-range arithmetic.
+
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 use std::ops::RangeInclusive;
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
-use yui_link::{Node, Edge};
+use yui_link::{Node, Edge, InvLink};
 use crate::tng::TngComplexKey;
 
 // A lazy min-priority pool of pivot candidates, ordered by (cached weight, key). The key joins the
@@ -33,6 +36,19 @@ where F: FnMut(&TngComplexKey) -> Option<usize> {
     None
 }
 
+// v1.0 supports only strongly invertible links in a transvergent diagram: canon cycles need not
+// be 1 + τ closed otherwise, and `partition_off_axis` needs an axis that separates the plane.
+pub(crate) fn assert_supported_symmetry(l: &InvLink) {
+    assert!(
+        l.is_strongly_invertible(),
+        "currently, only strongly invertible knots / links are supported"
+    );
+    assert!(
+        l.is_transvergent(),
+        "currently, only transvergent diagrams are supported (the axis must lie in the plane)"
+    );
+}
+
 // Indices in `base` that can still reach `window` with `r` pending crossings: an index
 // `i` ends up in `[i, i+r]`, so keep `i ∈ [a-r, b] ∩ base` (all of `base` if no window).
 pub(crate) fn reachable_range(base: RangeInclusive<isize>, window: &Option<RangeInclusive<isize>>, r: usize) -> RangeInclusive<isize> {
@@ -49,7 +65,7 @@ pub(crate) fn reachable_range(base: RangeInclusive<isize>, window: &Option<Range
 pub(crate) fn sparkline(widths: &[usize], peak: usize) -> String {
     const BARS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
     widths.iter().map(|&w| {
-        let i = if peak == 0 { 0 } else { w * 7 / peak };
+        let i = (w * 7).checked_div(peak).unwrap_or(0);
         BARS[i.min(7)]
     }).collect()
 }

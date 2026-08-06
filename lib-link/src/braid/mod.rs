@@ -1,3 +1,5 @@
+//! Braids: words in the Artin generators, and their closures as links.
+
 mod braid;
 mod braid_gen;
 

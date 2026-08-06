@@ -11,7 +11,7 @@ The foundational crate of the [`yui`](https://github.com/taketo1024/yui) workspa
 ```text
 src/
 ├── abst/    — algebraic trait hierarchy: Ring, EucRing, Field, RMod, ...
-├── conc/    — concrete instantiations: Ratio, FF, Poly, Lc, Sign, BitSeq
+├── conc/    — concrete instantiations: Ratio, FF, Sign, Poly, Lc, BitSeq
 ├── ext/     — extension traits: IteratorExt, RangeExt, IntoDigits, ...
 ├── algo/    — TopSort, UnionFind, KeyedUnionFind, rep_comb
 └── util/    — formatting, data-dir resolution, thread-safe counter
@@ -58,6 +58,7 @@ The `for<'x>` HRTB on the reference impl is required throughout; the [`auto_impl
 - `Ratio<T>` — fractions over a Euclidean ring; `Ratio<i64>` and `Ratio<BigInt>` are the rationals.
 - `FF<p>` — finite field 𝔽ₚ for prime `p`. For 𝔽₂, prefer the specialized `FF2` (uses XOR/AND directly on a `bool`).
 - `QuadInt<I, D>` — quadratic integers in ℤ\[ω\] for `ω = (1+√D)/2` or `√D`; aliases `GaussInt`, `EisenInt`.
+- `Sign` — the multiplicative group `{±1}`, with the `GetSign` trait.
 
 `conc/poly/`:
 - `Poly<X, R>` — univariate polynomial. 
@@ -68,7 +69,6 @@ The `for<'x>` HRTB on the reference impl is required throughout; the [`auto_impl
 - `Lc<X, R>` — formal linear combination `Σ rᵢxᵢ` with keys `X: LcKey` and coefficients in `R: Ring`. Elements of the free `R`-module over the key set.
 
 `conc/misc/`:
-- `Sign` — represents signs `{±1}`.
 - `bitseq::BitSeq` — packed sequence of bits, length up to 64.
 
 ## Quick example

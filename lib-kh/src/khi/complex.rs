@@ -14,12 +14,12 @@ use delegate::delegate;
 use itertools::Itertools;
 use yui_core::lc::Lc;
 use yui_core::abst::{EucRing, EucRingOps, Ring, RingOps};
-use yui_core::ext::IteratorExt;
+use yui_core::ext::{empty_range, IteratorExt};
 use yui_homology::{ChainComplex1, ChainMap, ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_link::InvLink;
 
 use crate::kh::{KhComplex, KhGen};
-use crate::tng::builder::SymBuildConfig;
+use crate::tng::builder::{SymBuildConfig, assert_supported_symmetry};
 use crate::khi::KhIHomology;
 use crate::khi::{KhIGen, KhIGenExt};
 use crate::util::Bigraded;
@@ -40,7 +40,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 }
 
 impl<R> KhIComplex<R>
-where R: Ring, for<'a> &'a R: RingOps<R> { 
+where R: Ring, for<'a> &'a R: RingOps<R> {
     pub fn new(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self {
         Self::new_partial(l, h, t, reduced, None)
     }
@@ -50,10 +50,13 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         Self::new_with_config(l, h, t, reduced, SymBuildConfig { h_range, ..Default::default() })
     }
 
-    /// The default KhI construction: the cobordism-level cone (`ConeBuilder`) yields the coned complex
-    /// + canon classes directly, and `into_raw_complex` converts once at the boundary (matrix-backed).
-    /// The equivalent matrix-level cone is kept for reference as `new_with_config_matrix`.
+    /// The default KhI construction: the cobordism-level cone (`ConeBuilder`) yields the
+    /// coned complex + canon classes directly, and `into_raw_complex` converts once at the
+    /// boundary (matrix-backed). The equivalent matrix-level cone is kept for reference as
+    /// `new_with_config_v1`.
     pub fn new_with_config(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig) -> Self {
+        assert_supported_symmetry(l);
+
         let (h_range, build_config) = Self::cone_build_config(l, reduced, config);
         Self::build_cone(l, h, t, reduced, build_config, h_range)
     }
@@ -83,7 +86,11 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 
     pub fn new_no_simplify(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self {
         assert_eq!(R::one() + R::one(), R::zero(), "char(R) != 2");
-        assert!(!reduced || (l.base_pt().is_some() && t.is_zero()));
+        assert_supported_symmetry(l);
+        assert!(
+            !reduced || (l.base_pt().is_some_and(|e| l.is_on_axis(e)) && t.is_zero()),
+            "reduced requires t = 0 and a base point on the axis"
+        );
 
         let c = KhComplex::new_no_simplify(l.inner(), h, t, reduced);
         Self::from_kh_complex(c, crate::khi::tau::tau_map(l))
@@ -156,16 +163,16 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
     }
 
     pub fn h_range(&self) -> RangeInclusive<isize> {
-        self.support().copied().range().unwrap_or(0..=-1)
+        self.support().copied().range().unwrap_or_else(empty_range)
     }
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
         self.support().flat_map(|&i|
             self[i].raw_generators().iter().map(|x| self.q_deg_of(x))
-        ).range().unwrap_or(0..=-1)
+        ).range().unwrap_or_else(empty_range)
     }
 
-    pub fn canon_cycles(&self) -> &[KhIChain<R>] { 
+    pub fn canon_cycles(&self) -> &[KhIChain<R>] {
         &self.canon_cycles
     }
 
@@ -252,7 +259,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> ToSeqString<isize> for KhIComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     delegate! {
-        to self.inner { 
+        to self.inner {
             fn label(&self) -> String;
             fn indices(&self) -> Vec<isize>;
             fn entry_at(&self, i: &isize) -> String;
@@ -273,11 +280,11 @@ where R: Ring + TeX, for<'x> &'x R: RingOps<R> {
 
 impl<R> ToTableString<isize> for KhIComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn labels(&self) -> (String, String) { 
+    fn labels(&self) -> (String, String) {
         ("i".to_string(), "j".to_string())
     }
 
-    fn indices(&self) -> (Vec<isize>, Vec<isize>) { 
+    fn indices(&self) -> (Vec<isize>, Vec<isize>) {
         (self.h_range().collect(), self.q_range().step_by(2).collect())
     }
 
@@ -643,6 +650,29 @@ mod tests {
             assert_eq!(c[4].rank(), 4);
 
             c.inner().check_d_all();
+        }
+
+        // an off-axis base point leaves the reduced complex without the τ-images of its
+        // generators, which `vectorize` then drops without a word.
+        fn based_off_axis() -> InvLink {
+            let l = InvLink::test_data("3_1");
+            let e_map: Vec<_> = l.inner().edges().into_iter().map(|e| (e, l.inv_edge(e))).collect();
+            let off = l.inner().edges().into_iter().find(|&e| !l.is_on_axis(e)).unwrap();
+            InvLink::new(l.inner().clone().with_base_pt(off), e_map)
+        }
+
+        #[test]
+        #[should_panic(expected = "base point on the axis")]
+        fn reduced_rejects_off_axis_base_pt() {
+            let (h, t) = (FF2::zero(), FF2::zero());
+            let _ = KhIComplex::new_no_simplify(&based_off_axis(), &h, &t, true);
+        }
+
+        #[test]
+        #[should_panic(expected = "base point on the axis")]
+        fn reduced_rejects_off_axis_base_pt_cone() {
+            let (h, t) = (FF2::zero(), FF2::zero());
+            let _ = KhIComplex::new(&based_off_axis(), &h, &t, true);
         }
     }
 }

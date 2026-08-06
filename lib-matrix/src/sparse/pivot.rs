@@ -41,7 +41,7 @@ pub enum PivotType {
 }
 
 impl PivotType {
-    fn str(&self) -> &'static str { 
+    fn str(&self) -> &'static str {
         match self {
             PivotType::Rows => "row",
             PivotType::Cols => "col"
@@ -77,7 +77,7 @@ impl Default for PivotFinderConfig {
 }
 
 impl PivotCondition {
-    fn is_cand<R>(&self, r: &R) -> bool 
+    fn is_cand<R>(&self, r: &R) -> bool
     where R: Ring, for<'x> &'x R: RingOps<R> {
         match self {
             PivotCondition::One       => r.is_pm_one(),
@@ -109,7 +109,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let p = Perm::forward_indices(m, pivs.iter().map(|(i, _)| *i));
     let q = Perm::forward_indices(n, pivs.iter().map(|(_, j)| *j));
     let r = pivs.len();
-    
+
     (p, q, r)
 }
 
@@ -155,7 +155,7 @@ impl PivotFinder {
         }
         let sorted = ts.into_sorted().unwrap();
         let is_row_type = self.piv_type == PivotType::Rows;
-        
+
         sorted.into_iter().map(|j| {
             let i = self.pivots.row_for(j).unwrap();
             if is_row_type { (i, j) } else { (j, i) }
@@ -163,11 +163,11 @@ impl PivotFinder {
     }
 
     #[cfg(test)]
-    fn rows(&self) -> Row { 
+    fn rows(&self) -> Row {
         self.str.shape.0
     }
 
-    fn cols(&self) -> Col { 
+    fn cols(&self) -> Col {
         self.str.shape.1
     }
 
@@ -192,11 +192,12 @@ impl PivotFinder {
         let remain_rows: Vec<_> = self.remain_rows().collect();
 
         for i in remain_rows {
+            if self.pivots.count() >= self.max_pivots { break; }
+
             let Some((j, is_cand)) = self.str.head(i) else { continue };
 
             if is_cand && !self.pivots.has_col(j) {
                 self.pivots.set(i, j);
-                if self.pivots.count() >= self.max_pivots { break; }
             }
         }
 
@@ -212,6 +213,8 @@ impl PivotFinder {
         let mut occ_cols = self.occupied_cols();
 
         for i in remain_rows {
+            if self.pivots.count() >= self.max_pivots { break; }
+
             let mut cands = vec![];
 
             for (j, is_cand) in self.str.entries_in(i) {
@@ -229,8 +232,6 @@ impl PivotFinder {
             for j in self.str.cols_in(i) {
                 occ_cols[j] = true;
             }
-
-            if self.pivots.count() >= self.max_pivots { break; }
         }
 
         let piv_count = self.pivots.count();
@@ -241,10 +242,10 @@ impl PivotFinder {
     fn find_cycle_free_pivots(&mut self) {
         let before_piv_count = self.pivots.count();
 
-        cfg_if::cfg_if! { 
-            if #[cfg(feature = "multithread")] { 
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "multithread")] {
                 self.find_cycle_free_pivots_m();
-            } else { 
+            } else {
                 self.find_cycle_free_pivots_s();
             }
         }
@@ -472,7 +473,7 @@ impl PivotData {
         self.is_piv_row[i] = true;
     }
 
-    fn iter(&self) -> impl Iterator<Item = (Row, Col)> + '_ { 
+    fn iter(&self) -> impl Iterator<Item = (Row, Col)> + '_ {
         self.indices.iter().map(|&j| {
             let i = self.data[j].unwrap();
             (i, j)
@@ -480,15 +481,15 @@ impl PivotData {
     }
 
     #[allow(unused)]
-    fn pivot_at(&self, k: usize) -> (Row, Col) { 
+    fn pivot_at(&self, k: usize) -> (Row, Col) {
         let j = self.indices[k];
         let i = self.data[j].unwrap();
         (i, j)
     }
 
-    fn update_from(&mut self, from: &Self) { 
+    fn update_from(&mut self, from: &Self) {
         debug_assert!(self.count() <= from.count());
-        for k in self.count() .. from.count() { 
+        for k in self.count() .. from.count() {
             let (i, j) = from.pivot_at(k);
             self.set(i, j);
         }
@@ -497,7 +498,7 @@ impl PivotData {
 
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum EntryStatus { 
+enum EntryStatus {
     None, Candidate, Occupied
 }
 
@@ -597,7 +598,7 @@ impl RowWorker {
     #[allow(dead_code)]
     fn update_diff(&mut self, loc_pivots: &PivotData, pivots: &PivotData) {
         debug_assert!(loc_pivots.count() <= pivots.count());
-        for k in loc_pivots.count()..pivots.count() { 
+        for k in loc_pivots.count()..pivots.count() {
             let j = pivots.indices[k];
             if self.is_candidate(j) || self.is_occupied(j) {
                 self.enqueue(j);
@@ -606,15 +607,15 @@ impl RowWorker {
         }
     }
 
-    fn should_retry(&self) -> bool { 
+    fn should_retry(&self) -> bool {
         !self.queue.is_empty()
     }
 
-    fn has_candidate(&self) -> bool { 
+    fn has_candidate(&self) -> bool {
         self.ncand > 0
     }
 
-    fn is_candidate(&self, i: usize) -> bool { 
+    fn is_candidate(&self, i: usize) -> bool {
         self.status[i] == EntryStatus::Candidate
     }
 
@@ -666,7 +667,7 @@ impl RowWorker {
 mod tests {
     use super::*;
     use num_traits::{Zero, One};
- 
+
     #[test]
     fn str_init() {
         let a = SpMat::from_row_major((6, 9), [
@@ -716,7 +717,7 @@ mod tests {
     }
 
     #[test]
-    fn pivot_data() { 
+    fn pivot_data() {
         let a = SpMat::from_row_major((2, 4), [
             1, 0, 1, 0,
             0, 0, 1, 1,
@@ -767,7 +768,7 @@ mod tests {
 
         let occ = |pf: &PivotFinder| pf.occupied_cols().iter().positions(|&b| b).collect_vec();
 
-        assert_eq!(occ(&pf), vec![]);
+        assert!(occ(&pf).is_empty());
 
         pf.pivots.set(0, 0);
 
@@ -796,7 +797,7 @@ mod tests {
     }
 
     #[test]
-    fn find_fl_col_pivots() { 
+    fn find_fl_col_pivots() {
         let a = SpMat::from_row_major((6, 9), [
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
@@ -813,7 +814,7 @@ mod tests {
     }
 
     #[test]
-    fn find_fl_row_col_pivots() { 
+    fn find_fl_row_col_pivots() {
         let a = SpMat::from_row_major((6, 9), [
             1, 0, 0, 0, 0, 1, 0, 0, 1,
             0, 1, 1, 1, 0, 1, 0, 1, 0,
@@ -965,6 +966,15 @@ mod tests {
         assert!((0..r).all(|j| {
             (j+1..r).all(|i| b[(i, j)].is_zero())
         }))
+    }
+
+    #[test]
+    fn max_pivots_zero() {
+        // the cap is tested before a pivot is taken, so zero really means zero.
+        let a: SpMat<i64> = SpMat::id(3);
+        let config = PivotFinderConfig { max_pivots: 0, ..Default::default() };
+        let (_, _, r) = find_pivots(&a, config);
+        assert_eq!(r, 0);
     }
 
     #[test]

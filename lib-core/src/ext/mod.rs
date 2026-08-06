@@ -1,3 +1,5 @@
+//! Extension traits adding small conveniences to std and num types.
+
 mod clone_and;
 mod digits;
 mod div_round;

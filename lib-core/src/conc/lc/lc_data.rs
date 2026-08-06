@@ -12,26 +12,19 @@ use super::lc_key::LcKey;
 /// - `Single(_, r)` always has `r ≠ 0`.
 /// - `Many(m)` always has `m.len() >= 2` and contains no zero values.
 ///
-/// All mutating methods that may break these invariants either restore them
-/// internally or document that [`LcData::clean`] must be called after.
-#[derive(PartialEq, Eq, Clone, Debug)]
+/// The `*_unreduced` methods may break these invariants; every other mutating
+/// method restores them. [`LcData::reduce`] restores them on demand.
+#[derive(PartialEq, Eq, Clone, Default, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub(super) enum LcData<X, R>
 where
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
+    #[default]
     Zero,
     Single(X, R),
     Many(FxHashMap<X, R>),
-}
-
-impl<X, R> Default for LcData<X, R>
-where
-    X: LcKey,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    fn default() -> Self { Self::Zero }
 }
 
 impl<X, R> LcData<X, R>
@@ -73,19 +66,15 @@ where
 
     /// Insert/combine a `(key, coef)` pair, preserving canonical form for
     /// `Zero`/`Single` transitions. For `Many`, may leave a zero coefficient
-    /// in the map; caller must invoke [`Self::clean`] afterwards.
-    pub(super) fn add_pair(&mut self, x: X, r: R) {
+    /// in the map; caller must invoke [`Self::reduce`] afterwards.
+    pub(super) fn add_pair_unreduced(&mut self, x: X, r: R) {
         if r.is_zero() { return; }
         match self {
             Self::Zero => {
                 *self = Self::Single(x, r);
             }
-            Self::Single(x0, _) if x0 == &x => {
-                let Self::Single(_, r0) = std::mem::take(self) else { unreachable!() };
-                let combined = r0 + r;
-                if !combined.is_zero() {
-                    *self = Self::Single(x, combined);
-                }
+            Self::Single(x0, r0) if x0 == &x => {
+                r0.add_assign(r);
             }
             Self::Single(_, _) => {
                 let Self::Single(x0, r0) = std::mem::take(self) else { unreachable!() };
@@ -104,20 +93,27 @@ where
         }
     }
 
-    pub(super) fn add_pair_ref(&mut self, x: &X, r: &R) {
+    /// Same, but the key is cloned only when it is not already present.
+    pub(super) fn add_pair_ref_unreduced(&mut self, x: &X, r: R) {
         if r.is_zero() { return; }
-        // For Many: avoid cloning when the key already exists.
-        if let Self::Many(m) = self {
-            if let Some(v) = m.get_mut(x) {
-                v.add_assign(r);
+        match self {
+            Self::Single(x0, r0) if x0 == x => {
+                r0.add_assign(r);
                 return;
             }
+            Self::Many(m) => {
+                if let Some(r0) = m.get_mut(x) {
+                    r0.add_assign(r);
+                    return;
+                }
+            }
+            _ => {}
         }
-        self.add_pair(x.clone(), r.clone());
+        self.add_pair_unreduced(x.clone(), r);
     }
 
-    /// Drop zero-valued terms and downgrade `Many → Single/Zero` as needed.
-    pub(super) fn clean(&mut self) {
+    /// Drop zero-valued terms, then collapse `Many → Single/Zero` if fewer than two remain.
+    pub(super) fn reduce(&mut self) {
         match self {
             Self::Zero => {}
             Self::Single(_, r) => {
@@ -127,22 +123,14 @@ where
             }
             Self::Many(m) => {
                 m.retain(|_, r| !r.is_zero());
-                self.downgrade();
-            }
-        }
-    }
-
-    /// If `Many` has 0 or 1 entries, collapse to `Zero`/`Single`.
-    fn downgrade(&mut self) {
-        if let Self::Many(m) = self {
-            match m.len() {
-                0 => *self = Self::Zero,
-                1 => {
-                    let mut taken = std::mem::take(m);
-                    let (x, r) = taken.drain().next().unwrap();
-                    *self = Self::Single(x, r);
+                match m.len() {
+                    0 => *self = Self::Zero,
+                    1 => {
+                        let (x, r) = std::mem::take(m).drain().next().unwrap();
+                        *self = Self::Single(x, r);
+                    }
+                    _ => {}
                 }
-                _ => {}
             }
         }
     }
@@ -167,7 +155,7 @@ where
                         m.insert(k, v);
                     }
                 }
-                self.downgrade();
+                self.reduce();
             }
         }
     }

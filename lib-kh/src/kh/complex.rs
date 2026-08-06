@@ -1,10 +1,14 @@
+//! [`KhComplex`]: the Khovanov chain complex of a link, built either by the
+//! cobordism-based [`TngComplexBuilder`](crate::tng::builder::TngComplexBuilder)
+//! or the direct cube construction.
+
 use std::ops::{RangeInclusive, Index};
 use std::sync::OnceLock;
 
 use delegate::delegate;
 use yui_core::lc::Lc;
 use yui_core::abst::{Ring, RingOps, EucRing, EucRingOps};
-use yui_core::ext::IteratorExt;
+use yui_core::ext::{empty_range, IteratorExt};
 use yui_link::Link;
 use yui_homology::{ChainComplex1, ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 
@@ -119,7 +123,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.alg
     }
 
-    pub fn deg_shift(&self) -> (isize, isize) { 
+    pub fn deg_shift(&self) -> (isize, isize) {
         self.deg_shift
     }
 
@@ -144,16 +148,16 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn h_range(&self) -> RangeInclusive<isize> {
-        self.support().copied().range().unwrap_or(0..=-1)
+        self.support().copied().range().unwrap_or_else(empty_range)
     }
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
         self.support().flat_map(|&i|
             self[i].raw_generators().iter().map(|x| self.q_deg_of(x))
-        ).range().unwrap_or(0..=-1)
+        ).range().unwrap_or_else(empty_range)
     }
 
-    pub fn canon_cycles(&self) -> &Vec<KhChain<R>> { 
+    pub fn canon_cycles(&self) -> &[KhChain<R>] {
         &self.canon_cycles
     }
 
@@ -199,7 +203,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> ToSeqString<isize> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     delegate! {
-        to self.inner { 
+        to self.inner {
             fn label(&self) -> String;
             fn indices(&self) -> Vec<isize>;
             fn entry_at(&self, i: &isize) -> String;
@@ -220,18 +224,18 @@ where R: Ring + TeX, for<'x> &'x R: RingOps<R> {
 
 impl<R> ToTableString<isize> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn labels(&self) -> (String, String) { 
+    fn labels(&self) -> (String, String) {
         ("i".to_string(), "j".to_string())
     }
 
-    fn indices(&self) -> (Vec<isize>, Vec<isize>) { 
+    fn indices(&self) -> (Vec<isize>, Vec<isize>) {
         (self.h_range().collect(), self.q_range().step_by(2).collect())
     }
 
-    fn entry_at(&self, i: &isize, j: &isize) -> String { 
-        if self[(*i, *j)].is_zero() { 
+    fn entry_at(&self, i: &isize, j: &isize) -> String {
+        if self[(*i, *j)].is_zero() {
             ".".to_string()
-        } else { 
+        } else {
             self[(*i, *j)].to_string()
         }
     }
@@ -253,6 +257,18 @@ mod tests {
         use yui_link::Link;
 
     use super::KhComplex;
+
+    #[test]
+    fn new_partial_topped_at_the_canon_degree() {
+        // pruning at a truncated window top dropped the vertices the canon cycles land on, and
+        // `eval_elements` then hit `is_evalable`. This diagram's crossing order is what triggers it.
+        let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]).mirror(); // writhe 3, runs 0..=3
+
+        for range in [0..=0, -1..=0, -3..=0] {
+            let c = KhComplex::new_partial(&l, &1, &0, false, Some(range.clone()));
+            assert_eq!(c.canon_cycles().len(), 2, "canon cycles in {range:?}");
+        }
+    }
 
     #[test]
     fn ckh_trefoil() {
@@ -325,7 +341,7 @@ mod tests_v1 {
         assert_eq!(c[-3].rank(), 8);
         assert_eq!(c[-2].rank(), 12);
         assert_eq!(c[-1].rank(), 6);
-        assert_eq!(c[ 0].rank(), 4);    
+        assert_eq!(c[ 0].rank(), 4);
 
         c.inner().check_d_all();
     }

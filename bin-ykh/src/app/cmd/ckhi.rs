@@ -1,3 +1,5 @@
+//! `ckhi`: print the KhI chain complex of an involutive link.
+
 use smart_default::SmartDefault;
 use crate::app::args::*;
 use crate::app::utils::*;
@@ -46,12 +48,16 @@ pub struct Args {
     #[arg(short = 'n', long)]
     pub no_simplify: bool,
 
-    #[arg(long, value_parser = parse_h_range)]
+    #[arg(long, value_parser = parse_h_range, allow_hyphen_values = true)]
     pub h_range: Option<RangeInclusive<isize>>,
 
     // chunking: `N` (cutwidth, N pieces) or `at(c,..)` (cut after the given crossing counts).
     #[arg(long, value_parser = parse_cut)]
     pub cut: Option<CutOption>,
+
+    // cap the per-elimination fill cost; survivors defer to the matrix reduction.
+    #[arg(long)]
+    pub max_elim_cost: Option<usize>,
 
     #[arg(long, value_parser = parse_strategy, default_value = "greedy")]
     pub strategy: Strategy,
@@ -63,6 +69,10 @@ pub struct Args {
     // skip the half-build/τ-mirror preprocess (which materializes the unbridged off-axis product).
     #[arg(long)]
     pub no_preprocess: bool,
+
+    // skip the final deloop/eliminate; remaining circles defer to the matrix reducer.
+    #[arg(long)]
+    pub no_full_deloop: bool,
 
     #[arg(short, long, default_value = "unicode")]
     #[default(Format::Unicode)]
@@ -93,28 +103,28 @@ where
     R: Ring + FromStr + TeX,
     for<'x> &'x R: RingOps<R>,
 {
-    pub fn boot(args: &Args) -> Result<String, Box<dyn std::error::Error>> { 
+    pub fn boot(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
         let mut app = Self::new(args.clone());
         app.run()
     }
 
-    pub fn new(args: Args) -> Self { 
+    pub fn new(args: Args) -> Self {
         let buff = String::with_capacity(1024);
         App { args, buff, _ring: PhantomData }
     }
 
     pub fn run(&mut self) -> Result<String, Box<dyn std::error::Error>> {
         let (h, t) = parse_pair::<R>(&self.args.c_value)?;
-    
+
         ensure!(self.args.c_type == CType::F2, "Only `-t F2` is supported.");
 
         if self.args.reduced {
             ensure!(t.is_zero(), "`t` must be zero for reduced.");
         }
-        if self.args.show_alpha { 
+        if self.args.show_alpha {
             ensure!(t.is_zero(), "`t` must be zero to have alpha.");
         }
-    
+
         let l = load_sinv_knot(&self.args.link, self.args.mirror)?;
 
         let ckhi = if self.args.no_simplify {
@@ -126,11 +136,13 @@ where
                 strategy: self.args.strategy,
                 node_order: self.args.node_order,
                 preprocess: !self.args.no_preprocess,
+                max_elim_cost: self.args.max_elim_cost,
+                no_full_deloop: self.args.no_full_deloop,
                 ..Default::default()
             };
             KhIComplex::new_with_config(&l, &h, &t, self.args.reduced, config)
         };
-        
+
         // CKh generators
         let table = match self.args.format {
             Format::TeX => ckhi.tex_table("CKhI"),
@@ -139,17 +151,17 @@ where
         self.out(&table);
 
         // Generators
-        if self.args.show_gens { 
+        if self.args.show_gens {
             self.show_gens(&ckhi);
         }
 
         // Diff
-        if self.args.show_diff { 
+        if self.args.show_diff {
             self.show_diff(&ckhi);
         }
-    
+
         // Alpha
-        if self.args.show_alpha { 
+        if self.args.show_alpha {
             self.show_alpha(&ckhi);
         }
 
@@ -157,15 +169,15 @@ where
         Ok(res)
     }
 
-    fn show_gens(&mut self, ckh: &KhIComplex<R>) { 
+    fn show_gens(&mut self, ckh: &KhIComplex<R>) {
         for &i in ckh.support() {
             let c = &ckh[i];
             if c.is_zero() { continue }
-            
+
             self.out(&format!("C[{i}]: {}", c));
-    
-            let r = c.rank() + c.tors().len();
-            for i in 0..r { 
+
+            let r = c.n_generators();
+            for i in 0..r {
                 let z = c.generator(i);
                 self.out(&format!("  {i}: {z}"));
             }
@@ -173,7 +185,7 @@ where
         }
     }
 
-    fn show_diff(&mut self, ckh: &KhIComplex<R>) { 
+    fn show_diff(&mut self, ckh: &KhIComplex<R>) {
         self.out(&ckh.describe_d());
     }
 
@@ -186,12 +198,12 @@ where
         }
     }
 
-    fn out(&mut self, str: &str) { 
+    fn out(&mut self, str: &str) {
         self.buff.push_str(str);
         self.buff.push('\n');
     }
 
-    fn flush(&mut self) -> String { 
+    fn flush(&mut self) -> String {
         let res = std::mem::take(&mut self.buff);
         res.trim_end().to_string()
     }

@@ -1,3 +1,6 @@
+//! [`LinkBuilder`]: assembles a diagram by adding nodes and connecting
+//! [`Port`]s. `build()` rejects unconnected or duplicated ports and non-planar wirings.
+
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Display;
 

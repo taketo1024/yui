@@ -144,7 +144,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn init(h: &R, t: &R, deg_shift: (isize, isize), base_pt: Option<Edge>) -> Self { 
+    pub fn init(h: &R, t: &R, deg_shift: (isize, isize), base_pt: Option<Edge>) -> Self {
         let complex = TngComplex::init(h, t, deg_shift, base_pt);
         Self {
             complex,
@@ -299,14 +299,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         info!("{} append: {x}", self.current_step());
 
         self.prepare_append(x);
-        
+
         let (h, t) = self.complex.ht();
         let cx = TngComplex::from_node(h, t, x, self.complex.base_pt());
         self.merge(cx, vec![]);
     }
 
-    pub(crate) fn prepare_append(&mut self, x: &Node) { 
-        if let Some(i) = self.nodes.iter().find_position(|&e| e == x) { 
+    pub(crate) fn prepare_append(&mut self, x: &Node) {
+        if let Some(i) = self.nodes.iter().find_position(|&e| e == x) {
             self.nodes.remove(i.0);
         }
 
@@ -418,8 +418,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let truncated = self.config.h_range.as_ref().is_some_and(|w| top == *w.end()) && top < real_top;
         if !truncated { return; }
 
+        // a vertex a tracked element lands on must stay, or `eval_elements` has nothing to read.
+        let referenced: FxHashSet<TngComplexKey> = self.elements().content().iter()
+            .flat_map(|e| e.out_cob().keys().copied())
+            .collect();
+
         let doomed = self.complex.keys_of_deg(top)
-            .filter(|k| self.complex.vertex(k).in_edges().next().is_none())
+            .filter(|k| self.complex.vertex(k).in_edges().next().is_none() && !referenced.contains(k))
             .copied()
             .collect_vec();
         if !doomed.is_empty() {
@@ -463,7 +468,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         while let Some(k) = pop_min_pivot(&mut pool, |k|
             self.complex.contains_key(k).then(|| self.complex.vertex(k).c_weight())
         ) {
-            let Some(&c) = self.find_loop_in(&k, allow_based) else { continue };
+            let Some(c) = self.find_loop_in(&k, allow_based).cloned() else { continue };
             let added = self.deloop(&k, &c);
 
             for nk in added {
@@ -472,7 +477,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                     push_pivot(&mut pool, nk, w);
                 }
             }
-            
+
             done += 1;
             log_progress(Level::Debug, done, done - 1, done + pool.len(), PROGRESS_LOG_STEP, 2);
         }
@@ -574,24 +579,25 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     // Eliminate at `k` via an invertible edge in the given direction (`Both` prefers incoming).
     pub fn try_eliminate_at(&mut self, k: &TngComplexKey, dir: ElimDir) -> bool {
-        if matches!(dir, ElimDir::Incoming | ElimDir::Both) {
-            if let Some(&j) = self.choose_inv_edge_into(k) {
-                self.eliminate(&j, k);
-                return true;
-            }
+        let pair = match dir {
+            ElimDir::Incoming => self.choose_inv_edge_into(k).map(|&j| (j, *k)),
+            ElimDir::Outgoing => self.choose_inv_edge_from(k).map(|&l| (*k, l)),
+            ElimDir::Both     => self.choose_inv_edge_into(k).map(|&j| (j, *k)).or_else(||
+                self.choose_inv_edge_from(k).map(|&l| (*k, l))
+            ),
+        };
+
+        if let Some((i, j)) = pair {
+            self.eliminate(&i, &j);
+            true
+        } else {
+            false
         }
-        if matches!(dir, ElimDir::Outgoing | ElimDir::Both) {
-            if let Some(&l) = self.choose_inv_edge_from(k) {
-                self.eliminate(k, &l);
-                return true;
-            }
-        }
-        false
     }
 
     pub fn eliminate(&mut self, i: &TngComplexKey, j: &TngComplexKey) {
         trace!("{} eliminate {}: {} -> {}", self.stat(), self.complex.edge(i, j), self.complex.vertex(i), self.complex.vertex(j));
-        
+
         self.elements.eliminate(&self.complex, i, j);
         self.complex.eliminate(i, j);
     }
@@ -600,24 +606,28 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // pass — this is what gates greedy's inline elim as well as the `eliminate_in` sweep).
     fn choose_inv_edge_into(&self, k: &TngComplexKey) -> Option<&TngComplexKey> {
         let cap = self.config.max_elim_cost;
-        self.complex.vertex(k).in_edges().filter_map(|j|
-            self.complex.edge(j, k).is_invertible().then_some(j)
+        self.complex.vertex(k).in_edges().filter(|j|
+            self.complex.edge(j, k).is_invertible()
+        ).filter(|j|
+            cap.is_none_or(|max| self.complex.edge_weight(j, k) <= max)
+        ).min_by_key(|j|
+            (self.complex.edge_weight(j, k), **j)
         )
-        .filter(|j| cap.map_or(true, |max| self.complex.edge_weight(j, k) <= max))
-        .min_by_key(|j| (self.complex.edge_weight(j, k), **j))
     }
 
     fn choose_inv_edge_from(&self, k: &TngComplexKey) -> Option<&TngComplexKey> {
         let cap = self.config.max_elim_cost;
-        self.complex.vertex(k).out_edges().filter_map(|l|
-            self.complex.edge(k, l).is_invertible().then_some(l)
+        self.complex.vertex(k).out_edges().filter(|l|
+            self.complex.edge(k, l).is_invertible()
+        ).filter(|l|
+            cap.is_none_or(|max| self.complex.edge_weight(k, l) <= max)
+        ).min_by_key(|l|
+            (self.complex.edge_weight(k, l), **l)
         )
-        .filter(|l| cap.map_or(true, |max| self.complex.edge_weight(k, l) <= max))
-        .min_by_key(|l| (self.complex.edge_weight(k, l), **l))
     }
 
     pub fn process_free_loops(&mut self) {
-        while !self.loops.is_empty() { 
+        while !self.loops.is_empty() {
             let c = self.loops.remove(0);
 
             self.elements.insert_loop(c);
@@ -648,7 +658,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         self.deloop_all();
 
-        // Deloop marked circles only when there are no other unmarked components left. 
+        // Deloop marked circles only when there are no other unmarked components left.
         if self.complex.is_closed() {
             for i in self.complex.h_range() {
                 self.deloop_in_with(i, true);
@@ -755,7 +765,7 @@ fn q_reachable(q0: isize, nc: isize, qr: &RangeInclusive<isize>) -> bool {
 #[cfg(test)]
 mod tests {
     use num_traits::Zero;
-    
+
     use super::*;
 
     // `profile`'s dry-run open-edge set must equal the real complex's `boundary_ends` at every step.
@@ -843,7 +853,7 @@ mod tests {
     }
 
     #[test]
-    fn test_tangle() { 
+    fn test_tangle() {
         let mut c = TngComplexBuilder::init(&0, &0, (0, 0), None);
         c.set_nodes([
             Node::from_pd_code([4,2,5,1]),
@@ -851,7 +861,7 @@ mod tests {
         ]);
 
         c.process_nodes();
-        
+
         assert!(!c.complex.is_completely_delooped());
     }
 
@@ -1056,7 +1066,7 @@ mod tests {
 
         assert_eq!(zs.len(), 2);
         assert_ne!(zs[0], zs[1]);
-        
+
         for z in zs {
             assert!(c.d(0, &z).is_zero());
         }

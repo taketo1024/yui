@@ -1,10 +1,13 @@
+//! [`KhHomology`]: the homology of a [`KhComplex`], as a bigraded module, with
+//! the canonical cycles carried through to the surviving basis.
+
 use std::ops::{RangeInclusive, Index};
 use std::sync::OnceLock;
 use delegate::delegate;
 
 use yui_homology::{ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_core::abst::{EucRing, EucRingOps};
-use yui_core::ext::IteratorExt;
+use yui_core::ext::{empty_range, IteratorExt};
 use yui_link::Link;
 
 use crate::kh::KhGen;
@@ -26,7 +29,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     cache_bigr: OnceLock<GrMod2<KhGen, R>>,
 }
 
-impl<R> KhHomology<R> 
+impl<R> KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn new(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
         let c = KhComplex::new(l, h, t, reduced);
@@ -52,29 +55,34 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 
     fn from_complex(c: &KhComplex<R>, range: Option<RangeInclusive<isize>>) -> Self {
         let reduced = c.inner().reduced();
-        let homology = match range {
-            Some(r) => reduced.homology_in(r),
+        let homology = match &range {
+            Some(r) => reduced.homology_in(r.clone()),
             None    => reduced.homology(),
         };
+        // a cycle outside the range indexes a degree that was never computed.
+        let canon_cycles = c.canon_cycles().iter().filter(|z|
+            range.as_ref().is_none_or(|r| r.contains(&c.h_deg_of_chain(z)))
+        ).cloned().collect();
+
         KhHomology::new_impl(
             homology,
             c.alg().clone(),
             c.deg_shift(),
             c.is_reduced(),
-            c.canon_cycles().clone()
+            canon_cycles
         )
     }
 
     pub fn new_no_simplify(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
-        let c = KhComplex::new_no_simplify(l, h, t, reduced); 
+        let c = KhComplex::new_no_simplify(l, h, t, reduced);
         Self::from(&c)
     }
-    
+
     pub(crate) fn new_impl(inner: GrMod1<KhGen, R>, alg: KhAlg<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
         Self { inner, alg, deg_shift, reduced, canon_cycles, cache_bigr: OnceLock::new() }
     }
 
-    pub fn inner(&self) -> &GrMod1<KhGen, R> { 
+    pub fn inner(&self) -> &GrMod1<KhGen, R> {
         &self.inner
     }
 
@@ -89,7 +97,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         &self.alg
     }
 
-    pub fn deg_shift(&self) -> (isize, isize) { 
+    pub fn deg_shift(&self) -> (isize, isize) {
         self.deg_shift
     }
 
@@ -121,32 +129,36 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn h_range(&self) -> RangeInclusive<isize> {
         self.support().filter(|&&i|
             !self[i].is_zero()
-        ).copied().range().unwrap_or(0..=-1)
+        ).copied().range().unwrap_or_else(empty_range)
     }
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
         self.support().flat_map(|&i|
             self[i].generators().map(|z| self.q_deg_of_chain(&z))
-        ).range().unwrap_or(0..=-1)
+        ).range().unwrap_or_else(empty_range)
     }
 
     pub fn delta_range(&self) -> RangeInclusive<isize> {
         self.support().flat_map(|&i|
             self[i].generators().map(|z| 2 * self.h_deg_of_chain(&z) - self.q_deg_of_chain(&z))
-        ).range().unwrap_or(0..=-1)
+        ).range().unwrap_or_else(empty_range)
     }
 
-    pub fn canon_cycles(&self) -> &Vec<KhChain<R>> { 
+    pub fn canon_cycles(&self) -> &[KhChain<R>] {
         &self.canon_cycles
     }
 
     pub fn truncated(&self, range: RangeInclusive<isize>) -> Self {
+        let canon_cycles = self.canon_cycles.iter().filter(|z|
+            range.contains(&self.h_deg_of_chain(z))
+        ).cloned().collect();
+
         Self::new_impl(
             self.inner.truncated(range),
             self.alg.clone(),
             self.deg_shift,
             self.reduced,
-            self.canon_cycles.clone()
+            canon_cycles
         )
     }
 
@@ -191,7 +203,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 impl<R> ToSeqString<isize> for KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     delegate! {
-        to self.inner { 
+        to self.inner {
             fn label(&self) -> String;
             fn indices(&self) -> Vec<isize>;
             fn entry_at(&self, i: &isize) -> String;
@@ -212,11 +224,11 @@ where R: EucRing + TeX, for<'x> &'x R: EucRingOps<R> {
 
 impl<R> ToTableString<isize> for KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    fn labels(&self) -> (String, String) { 
+    fn labels(&self) -> (String, String) {
         ("i".to_string(), "j".to_string())
     }
 
-    fn indices(&self) -> (Vec<isize>, Vec<isize>) { 
+    fn indices(&self) -> (Vec<isize>, Vec<isize>) {
         (self.h_range().collect(), self.q_range().step_by(2).collect())
     }
 
@@ -494,6 +506,24 @@ mod tests {
 
         assert!(part[-2].is_zero());
         assert!(part[2].is_zero());
+    }
+
+    // canon cycles outside the h-range are dropped: the Lee classes of 3_1 sit at h = 0, so a
+    // window above it keeps none (they would otherwise index an unbuilt degree).
+    #[test]
+    fn canon_cycles_clipped_to_h_range() {
+        let l = Link::test_data("3_1");
+        type R = FF2;
+        let (h, t) = (R::zero(), R::zero());
+
+        let full = KhHomology::<R>::new(&l, &h, &t, false);
+        assert_eq!(full.canon_cycles().len(), 2);
+
+        let clipped = KhHomology::<R>::new_partial(&l, &h, &t, false, Some(1..=2));
+        assert_eq!(clipped.canon_cycles().len(), 0);
+
+        assert_eq!(full.truncated(1..=2).canon_cycles().len(), 0);
+        assert_eq!(full.truncated(-3..=0).canon_cycles().len(), 2);
     }
 
     mod v2 {

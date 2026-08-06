@@ -13,7 +13,7 @@ use std::ops::Index;
 
 use itertools::Itertools;
 use num_traits::Zero;
-use yui_core::Sign;
+use yui_core::num::Sign;
 use yui_core::abst::{AddMon, Field, FieldOps, Ring, RingOps};
 use yui_core::ext::RangeExt;
 use yui_homology::isize3;
@@ -65,7 +65,7 @@ impl<'a, R> KhSl2Map<'a, R> where
     }
 
     fn make_path(l: &Link) -> Vec<(usize, Sign)> {
-        if l.n_nodes() == 0 { 
+        if l.n_nodes() == 0 {
             assert_eq!(l.n_loops(), 1);
             return vec![];
         }
@@ -134,7 +134,7 @@ impl<'a, R> KhSl2Map<'a, R> where
     pub fn string_decomp(&self, kh: &KhHomology<R>) -> StringDecomp<R>
     where R: Field, for<'x> &'x R: FieldOps<R> {
         use yui_matrix::sparse::SpMat;
-        
+
         assert!(self.cube().alg().h().is_zero());
         assert!(self.cube().alg().t().is_zero());
 
@@ -156,7 +156,7 @@ impl<'a, R> KhSl2Map<'a, R> where
         let (res, [_, pinv, ..]) = fnf.destruct();
         let pinv = pinv.unwrap().into_sparse();
 
-        let data = (0..n).flat_map(|i| { 
+        let data = (0..n).flat_map(|i| {
             let ord = res[(i, i)].lead_deg(); // extract torsion order l from x^l.
             if ord == 0 { return None; }
 
@@ -164,11 +164,11 @@ impl<'a, R> KhSl2Map<'a, R> where
 
             // println!("{i}) order: {ord}\n{:?}", v.clone().into_dense());
 
-            let indices = v.iter_nz().filter_map(|(j, r)| 
-                if r.is_const() { 
-                    Some(j) 
-                } else { 
-                    None 
+            let indices = v.iter_nz().filter_map(|(j, r)|
+                if r.is_const() {
+                    Some(j)
+                } else {
+                    None
                 }
             ).collect_vec();
 
@@ -192,7 +192,7 @@ impl<'a, R> KhSl2Map<'a, R> where
 pub struct StringDecomp<R> where
     R: Ring,
     for<'x> &'x R: RingOps<R>
-{ 
+{
     data: HashMap<isize3, usize>, // {(i, j, l) : n} => t^i q^j (R[x]/(x^l))^n
     _phantom: PhantomData<R>
 }
@@ -201,9 +201,9 @@ impl<R> StringDecomp<R> where
     R: Ring,
     for<'x> &'x R: RingOps<R>
 {
-    fn new(data: HashMap<isize3, usize>) -> Self { 
+    fn new(data: HashMap<isize3, usize>) -> Self {
         Self { data, _phantom: PhantomData }
-    } 
+    }
 
     pub fn len(&self) -> usize {
         self.data.len()
@@ -258,9 +258,9 @@ where
         let str = format::lc(list.map(|(&i, n)| {
             let (d, q, l) = i.into();
             let v = V::from((d, q));
-            let t = if v.multi_deg() == (0, 0) { 
+            let t = if v.multi_deg() == (0, 0) {
                 format!("e({l})")
-            } else { 
+            } else {
                 format!("{}e({l})", v)
             };
             (t, n)
@@ -273,7 +273,7 @@ where
 mod tests {
     use yui_core::num::Ratio;
     use yui_link::State;
-    
+
     #[allow(unused)]
     use yui_homology::ToTableString;
 
@@ -286,7 +286,7 @@ mod tests {
         let map = c.sl2_map(&l);
 
         assert_eq!(map.path.len(), 0);
-    } 
+    }
 
     #[test]
     fn test_sl2map_2twist_unknot() {
@@ -296,7 +296,7 @@ mod tests {
 
         assert_eq!(map.path.len(), 4);
         assert_eq!(map.path, vec![(0, Sign::Pos), (1, Sign::Neg), (1, Sign::Pos), (0, Sign::Neg)])
-    } 
+    }
 
     #[test]
     fn test_sl2map_trefoil() {
@@ -306,7 +306,7 @@ mod tests {
 
         assert_eq!(map.path.len(), 6);
         assert_eq!(map.path, vec![(0, Sign::Pos), (2, Sign::Neg), (1, Sign::Pos), (0, Sign::Neg), (2, Sign::Pos), (1, Sign::Neg)])
-    } 
+    }
 
     #[test]
     fn test_u_unknot() {
@@ -370,7 +370,7 @@ mod tests {
 
         assert_eq!(e.deg(), -2);
         e.check_all();
-    } 
+    }
 
     #[test]
     fn test_ch_map_trefoil() {
@@ -422,7 +422,7 @@ mod tests {
     type QQ = Ratio<i64>;
 
     #[test]
-    fn test_string_decomp_3_1() { 
+    fn test_string_decomp_3_1() {
         let l = Link::test_data("3_1").mirror();
         let c = KhComplex::new_no_simplify(&l, &QQ::zero(), &QQ::zero(), true);
         let e = c.sl2_map(&l);
@@ -438,7 +438,7 @@ mod tests {
     }
 
     #[test]
-    fn test_string_decomp_unred_3_1() { 
+    fn test_string_decomp_unred_3_1() {
         let l = Link::test_data("3_1").mirror();
         let c = KhComplex::new_no_simplify(&l, &QQ::zero(), &QQ::zero(), false);
         let e = c.sl2_map(&l);

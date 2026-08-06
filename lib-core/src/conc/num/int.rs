@@ -17,18 +17,28 @@ where for<'a> &'a Self: EucRingOps<Self> {}
 
 impl<T> DivRound for T
 where T: IntType, for<'x> &'x T: IntOps<T> {
+    // Rounds half away from zero.
     fn div_round(&self, q: &Self) -> Self {
-        let a = self.to_f64().unwrap();
-        let b = q.to_f64().unwrap();
-        let r = (a / b).round();
-        Self::from_f64(r).unwrap()
+        let d = self / q;
+        let r = self % q;
+
+        if r.is_zero() || (&r + &r).abs() < q.abs() {
+            return d
+        }
+
+        // the exact quotient exceeds `d` exactly when `r` and `q` agree in sign.
+        if r.is_negative() == q.is_negative() {
+            d + Self::one()
+        } else {
+            d - Self::one()
+        }
     }
 }
 
 macro_rules! impl_ops {
     ($trait:ident, $type:ty) => {
         impl $trait for $type {}
-        impl<'a> $trait<$type> for &'a $type {}
+        impl $trait<$type> for &$type {}
     };
 }
 
@@ -42,32 +52,32 @@ macro_rules! impl_integer {
         impl_ops!(IntOps, $type);
 
         impl MathType for $type {
-            fn math_symbol() -> String { 
+            fn math_symbol() -> String {
                 String::from("Z")
             }
         }
-        
+
         impl AddMon for $type {}
         impl AddGrp for $type {}
         impl Mon for $type {}
         impl Ring for $type {
             fn inv(&self) -> Option<Self> {
-                if self.is_unit() { 
+                if self.is_unit() {
                     Some(self.clone())
-                } else { 
+                } else {
                     None
                 }
             }
-        
+
             fn is_unit(&self) -> bool {
                 self.is_one() || (-self).is_one()
             }
-        
+
             fn normalizing_unit(&self) -> Self {
-                if !self.is_negative() { 
-                    Self::one() 
-                } else { 
-                    -Self::one() 
+                if !self.is_negative() {
+                    Self::one()
+                } else {
+                    -Self::one()
                 }
             }
 
@@ -104,7 +114,7 @@ impl_integer!(BigInt);
 mod tex {
     use crate::util::tex::TeX;
     use num_bigint::BigInt;
-    
+
     macro_rules! impl_tex_int {
         ($type:ident) => {
             impl TeX for $type {
@@ -125,7 +135,7 @@ mod tex {
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     use super::*;
 
     #[test]
@@ -138,21 +148,21 @@ mod tests {
     }
 
     #[test]
-    fn int_is_unit() { 
+    fn int_is_unit() {
         assert!(1.is_unit());
         assert!((-1).is_unit());
         assert!(!2.is_unit());
     }
 
     #[test]
-    fn int_inv() { 
+    fn int_inv() {
         assert_eq!(1.inv(), Some(1));
         assert_eq!((-1).inv(), Some(-1));
         assert_eq!(2.inv(), None);
     }
 
     #[test]
-    fn int_normalizing_unit() { 
+    fn int_normalizing_unit() {
         assert_eq!(1.normalizing_unit(), 1);
         assert_eq!((-1).normalizing_unit(), -1);
         assert_eq!(2.normalizing_unit(), 1);
@@ -203,7 +213,7 @@ mod tests {
     }
 
     #[test]
-    fn div_round() { 
+    fn div_round() {
         assert_eq!(12.div_round(&5), 2);
         assert_eq!(13.div_round(&5), 3);
         assert_eq!((-12).div_round(&5), -2);
@@ -211,7 +221,26 @@ mod tests {
     }
 
     #[test]
-    fn tex() { 
+    fn div_round_half() {
+        // halves round away from zero.
+        assert_eq!(5.div_round(&2), 3);
+        assert_eq!((-5).div_round(&2), -3);
+        assert_eq!(5.div_round(&-2), -3);
+        assert_eq!((-5).div_round(&-2), 3);
+    }
+
+    #[test]
+    fn div_round_large() {
+        // must stay exact however large the terms.
+        let a = (1i64 << 60) + 1;
+        assert_eq!(a.div_round(&1), a);
+
+        let b = BigInt::from(10).pow(400);
+        assert_eq!(b.div_round(&BigInt::from(10).pow(399)), BigInt::from(10));
+    }
+
+    #[test]
+    fn tex() {
         use crate::util::tex::TeX;
         assert_eq!(i32::tex_math_symbol(), "\\mathbb{Z}");
         assert_eq!((-2).tex_string(), "-2");

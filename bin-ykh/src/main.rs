@@ -1,3 +1,5 @@
+//! The `ykh` command-line entry point; see the crate docs for the commands.
+
 use ykh::App;
 
 // Opt-in (`--features mimalloc`): mimalloc showed 10–20× slowdowns and one unreproduced
@@ -9,8 +11,8 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 fn main() {
     let app = App::new();
     let res = app.run();
-    
-    match res { 
+
+    match res {
         Ok(output) => println!("{output}"),
         Err(e) => {
             log::error!("{}", e);

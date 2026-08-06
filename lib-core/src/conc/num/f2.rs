@@ -9,36 +9,36 @@ use std::fmt::{Debug, Display};
 use std::ops::{Add, Neg, Sub, Mul, Div, Rem, AddAssign, SubAssign, MulAssign, DivAssign, RemAssign};
 use std::str::FromStr;
 use num_integer::Integer;
-use num_traits::{One, Pow, ToPrimitive, Zero};
+use num_traits::{One, Pow, Zero};
 use auto_impl_ops::auto_ops;
 
 use crate::abst::{MathType, AddMonOps, AddGrpOps, MonOps, RingOps, FieldOps, EucRingOps, AddMon, AddGrp, Mon, Ring, EucRing, Field};
+use crate::util::parse_err::ParseErr;
 
 /// An element of the finite field 𝔽₂.
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
 pub struct FF2(bool);
 
 impl<I> From<I> for FF2
-where I: ToPrimitive {
+where I: Integer {
     fn from(a: I) -> Self {
-        let b = a.to_i64().unwrap().is_odd();
-        Self(b)
+        Self(a.is_odd())
     }
 }
 
 impl FromStr for FF2 {
-    type Err = <i64 as FromStr>::Err;
+    type Err = ParseErr;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let a = s.parse::<i64>()?;
+        let a = s.parse::<i64>().map_err(|_| ParseErr::invalid(s, &Self::math_symbol()))?;
         Ok(Self::from(a))
     }
 }
 
 impl Display for FF2 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.0 { 
+        if self.0 {
             write!(f, "1")
-        } else { 
+        } else {
             write!(f, "0")
         }
     }
@@ -85,42 +85,42 @@ impl Neg for &FF2 {
 }
 
 #[auto_ops]
-impl<'b> Add<&'b FF2> for &FF2 {
+impl Add<&FF2> for &FF2 {
     type Output = FF2;
-    fn add(self, rhs: &'b FF2) -> Self::Output {
+    fn add(self, rhs: &FF2) -> Self::Output {
         FF2(self.0 != rhs.0)
     }
 }
 
 #[auto_ops]
-impl<'b> Sub<&'b FF2> for &FF2 {
+impl Sub<&FF2> for &FF2 {
     type Output = FF2;
-    fn sub(self, rhs: &'b FF2) -> Self::Output {
+    fn sub(self, rhs: &FF2) -> Self::Output {
         Add::add(self, rhs)
     }
 }
 
 #[auto_ops]
-impl<'b> Mul<&'b FF2> for &FF2 {
+impl Mul<&FF2> for &FF2 {
     type Output = FF2;
-    fn mul(self, rhs: &'b FF2) -> Self::Output {
+    fn mul(self, rhs: &FF2) -> Self::Output {
         FF2(self.0 && rhs.0)
     }
 }
 
 #[auto_ops]
-impl<'b> Div<&'b FF2> for &FF2 {
+impl Div<&FF2> for &FF2 {
     type Output = FF2;
-    fn div(self, rhs: &'b FF2) -> Self::Output {
+    fn div(self, rhs: &FF2) -> Self::Output {
         assert!(!rhs.is_zero());
         *self
     }
 }
 
 #[auto_ops]
-impl<'b> Rem<&'b FF2> for &FF2 {
+impl Rem<&FF2> for &FF2 {
     type Output = FF2;
-    fn rem(self, rhs: &'b FF2) -> Self::Output {
+    fn rem(self, rhs: &FF2) -> Self::Output {
         assert!(!rhs.is_zero());
         FF2::zero()
     }
@@ -136,7 +136,7 @@ impl Pow<usize> for &FF2 {
 macro_rules! impl_alg_ops {
     ($trait:ident) => {
         impl $trait for FF2 {}
-        impl<'a> $trait<FF2> for &'a FF2 {}
+        impl $trait<FF2> for &FF2 {}
     };
 }
 
@@ -171,9 +171,9 @@ impl Ring for FF2 {
     }
 
     fn c_weight(&self) -> f64 {
-        if self.is_zero() { 
+        if self.is_zero() {
             0f64
-        } else { 
+        } else {
             1f64
         }
     }
@@ -187,7 +187,7 @@ mod tex {
     use super::*;
 
     impl TeX for FF2 {
-        fn tex_math_symbol() -> String { 
+        fn tex_math_symbol() -> String {
             String::from("\\mathbb{F}_2")
         }
         fn tex_string(&self) -> String {
@@ -197,11 +197,11 @@ mod tex {
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     use super::*;
 
     #[test]
-    fn init() { 
+    fn init() {
         let a = FF2::from(0);
         assert_eq!(a.0, false);
 
@@ -213,7 +213,7 @@ mod tests {
     }
 
     #[test]
-    fn display() { 
+    fn display() {
         let a = FF2::zero();
         assert_eq!(a.to_string(), "0");
 
@@ -225,7 +225,15 @@ mod tests {
     }
 
     #[test]
-    fn add() { 
+    fn from_big() {
+        // parity is read directly, so a value past `i64` still converts.
+        use num_bigint::BigInt;
+        assert_eq!(FF2::from(BigInt::from(2).pow(100u32) + BigInt::from(1)), FF2::one());
+        assert_eq!(FF2::from(BigInt::from(2).pow(100u32)), FF2::zero());
+    }
+
+    #[test]
+    fn add() {
         let a = FF2::from(2);
         let b = FF2::from(4);
 
@@ -243,20 +251,20 @@ mod tests {
     }
 
     #[test]
-    fn add_assign() { 
+    fn add_assign() {
         let mut a = FF2::from(3);
         a += FF2::from(4);
         assert_eq!(a, FF2::from(1));
     }
 
     #[test]
-    fn neg() { 
+    fn neg() {
         let a = FF2::from(3);
         assert_eq!(-a, FF2::from(1));
     }
 
     #[test]
-    fn sub() { 
+    fn sub() {
         let a = FF2::from(3);
         let b = FF2::from(5);
 
@@ -264,14 +272,14 @@ mod tests {
     }
 
     #[test]
-    fn sub_assign() { 
+    fn sub_assign() {
         let mut a = FF2::from(3);
         a -= FF2::from(4);
         assert_eq!(a, FF2::from(1));
     }
 
     #[test]
-    fn mul() { 
+    fn mul() {
         let a = FF2::from(3);
         let b = FF2::from(4);
         assert_eq!(a * b, FF2::from(0));
@@ -282,42 +290,42 @@ mod tests {
     }
 
     #[test]
-    fn mul_assign() { 
+    fn mul_assign() {
         let mut a = FF2::from(3);
         a *= FF2::from(4);
         assert_eq!(a, FF2::from(0));
     }
 
     #[test]
-    fn div() { 
+    fn div() {
         let a = FF2::from(5);
         let b = FF2::from(3);
         assert_eq!(a / b, FF2::from(1));
     }
 
     #[test]
-    fn div_assign() { 
+    fn div_assign() {
         let mut a = FF2::from(4);
         a /= FF2::from(3);
         assert_eq!(a, FF2::from(0));
     }
 
     #[test]
-    fn rem() { 
+    fn rem() {
         let a = FF2::from(5);
         let b = FF2::from(3);
         assert_eq!(a % b, FF2::zero());
     }
 
     #[test]
-    fn rem_assign() { 
+    fn rem_assign() {
         let mut a = FF2::from(5);
         a %= FF2::from(3);
         assert_eq!(a, FF2::zero());
     }
 
     #[test]
-    fn tex() { 
+    fn tex() {
         use crate::util::tex::TeX;
         assert_eq!(FF2::tex_math_symbol(), "\\mathbb{F}_2");
         assert_eq!(FF2::from(5).tex_string(), "1");

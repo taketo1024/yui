@@ -9,11 +9,13 @@ edition.workspace = true
 rust-version.workspace = true
 repository.workspace  = true
 
+[lib]
+doctest = false
+
 [features]
 serde = ["dep:serde", "dep:serde_json", "dep:serde_repr", "dep:serde_with"]
 
 [dependencies]
-ahash = { version = "0.8.12", features = ["serde"] }
 auto-impl-ops = "0.2.1"
 delegate = "0.13.5"
 derive_more = { version = "2.1.1", features = ["display", "debug"] }
@@ -21,10 +23,10 @@ dinglebit_combinatorics = "1.1.0"
 directories = "6.0.0"
 indexmap = "2.14.0"
 is-even = "1.0.0"
-itertools = "0.14.0"
+itertools = "0.15.0"
 log = "0.4.29"
 maplit = "1.0.2"
-num-bigint = "0.4.6"
+num-bigint = "0.5.1"
 num-integer = { version = "0.1.46", features = ["i128"] }
 num-traits = "0.2.19"
 petgraph = "0.8.3"

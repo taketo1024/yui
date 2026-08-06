@@ -32,8 +32,11 @@ impl Link {
 
     /// The KnotAtlas PD code — one `X[i,j,k,l]` per crossing, CCW from the incoming under-strand `i`.
     /// Built by traversing the components and emitting each crossing at its under-pass, so `i` is the
-    /// under-strand's incoming edge; round-trips through `from_pd_code`. Resolved (V/H) nodes are skipped.
+    /// under-strand's incoming edge; round-trips through `from_pd_code`. Resolved (V/H) nodes are
+    /// skipped. Panics on free loops, which a PD code has no way to express.
     pub fn pd_code(&self) -> Vec<PDCodeX> {
+        assert!(self.loops().is_empty(), "a PD code cannot represent free loops");
+
         let mut pd = Vec::with_capacity(self.n_nodes());
         self.traverse_comps(|_, i, j| {
             let x = self.node(i);
@@ -52,8 +55,6 @@ impl Link {
     }
 
     pub fn load(name: &str) -> Result<Link, Box<dyn std::error::Error>> {
-        // the data dir is external and empty on a fresh checkout; tests must not depend on it.
-        assert!(!cfg!(feature = "test-utils"), "`load` reads the data directory — use `test_data` in tests");
         let json = yui_core::util::data_dir::load_json("links", name)?;
         let data: Vec<PDCodeX> = serde_json::from_str(&json)?;
         Ok(Link::from_pd_code(data))
@@ -93,6 +94,12 @@ mod tests {
         }
         let l = Link::pretzel(1, 3, 5);
         assert_eq!(Link::from_pd_code(l.pd_code()).pd_code(), l.pd_code(), "pretzel(1,3,5)");
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot represent free loops")]
+    fn pd_code_rejects_free_loops() {
+        let _ = Link::unknot().pd_code();
     }
 
     #[test]

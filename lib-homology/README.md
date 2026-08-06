@@ -24,7 +24,7 @@ src/
     ├── grid.rs        — `Grid<K, V>`: sparse K-indexed table with defaulting `Index`
     ├── format.rs      — `rmod_str` (e.g. "Z² ⊕ Z/2 ⊕ Z/2")
     ├── to_string.rs   — `ToSeqString`, `ToTableString`
-    └── tex.rs         — `TeXTable`, `tex_rmod_str`
+    └── tex.rs         — `ToTexSeq`, `ToTexTable`, `tex_rmod_str`
 ```
 
 ## Key types
@@ -45,7 +45,7 @@ src/
 
 - **`GenericChainComplex<I, R>`** — a chain complex whose generators are anonymous `GenericKey<I>` placeholders, so the complex is fully described by its differential matrices. Built by `from_d_matrices(d_deg, [(i, M_i), ...])`. Useful when you only have matrices, not symbolic generators.
 
-- **`ChainMap<'a, 'c, I, X, Y, R>`** — a chain map between two complexes. Holds references to source / target (`'a`) and a closure (`'c`). Provides `apply`, `make_matrix(i)`, `cone(support, target_based)`, plus debug-only `check_all()` for verifying `df = fd`.
+- **`ChainMap<'a, 'c, I, X, Y, R>`** — a chain map between two complexes. Holds references to source / target (`'a`) and a closure (`'c`). Provides `apply`, `make_matrix(i)`, `cone(support, target_based)`, plus `check_all()` for verifying `df = fd` (gated on `cfg(test)` or the `test-utils` feature).
 
 ### Storage
 

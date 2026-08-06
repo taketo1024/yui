@@ -1,3 +1,6 @@
+//! The canonical (Lee/Bar-Natan) cycles of a link, built on [`KhComplex`]. Their
+//! `H`-divisibility is what the `s` and `ss` invariants read off.
+
 use yui_core::abst::{Ring, RingOps};
 use yui_link::{Link, State};
 
@@ -66,9 +69,9 @@ mod tests {
     use crate::kh::KhComplex;
 
     use super::*;
- 
+
     #[test]
-    fn trefoil() { 
+    fn trefoil() {
         let l = Link::test_data("3_1").mirror();
         let r = false;
         let c = KhComplex::new_no_simplify(&l, &1, &0, r);
@@ -77,26 +80,26 @@ mod tests {
         assert_eq!(zs.len(), 2);
         assert_ne!(zs[0], zs[1]);
 
-        for z in zs { 
+        for z in zs {
             assert!(z.homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
             assert!(!z.is_zero());
-            
+
             let dz = c.d(0, &z);
             assert!(dz.is_zero());
         }
     }
- 
+
     #[test]
-    fn figure8() { 
+    fn figure8() {
         let l = Link::test_data("4_1");
         let r = false;
         let c = KhComplex::new_no_simplify(&l, &1, &0, r);
         let zs = KhComplex::make_canon_cycles(&l, &0, &1, r);
-        
+
         assert_eq!(zs.len(), 2);
         assert_ne!(zs[0], zs[1]);
 
-        for z in zs { 
+        for z in zs {
             assert!(z.homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
             assert!(!z.is_zero());
 
@@ -106,7 +109,7 @@ mod tests {
     }
 
     #[test]
-    fn trefoil_red() { 
+    fn trefoil_red() {
         let l = Link::test_data("3_1").mirror();
         let r = true;
         let c = KhComplex::new_no_simplify(&l, &1, &0, r);
@@ -114,25 +117,25 @@ mod tests {
 
         assert_eq!(zs.len(), 1);
 
-        for z in zs { 
+        for z in zs {
             assert!(z.homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
             assert!(!z.is_zero());
-            
+
             let dz = c.d(0, &z);
             assert!(dz.is_zero());
         }
     }
- 
+
     #[test]
-    fn figure8_red() { 
+    fn figure8_red() {
         let l = Link::test_data("4_1");
         let r = true;
         let c = KhComplex::new_no_simplify(&l, &1, &0, r);
         let zs = KhComplex::make_canon_cycles(&l, &0, &1, r);
-        
+
         assert_eq!(zs.len(), 1);
 
-        for z in zs { 
+        for z in zs {
             assert!(z.homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
             assert!(!z.is_zero());
 

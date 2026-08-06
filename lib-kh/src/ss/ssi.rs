@@ -75,13 +75,13 @@ fn ssi_divisibility_v1(l: &InvLink, reduced: bool, config: SymBuildConfig) -> (i
     let kh = KhIHomology::new_with_config(l, &c, &t, reduced, config);
 
     assert_eq!(kh[0].rank(), r);
-    assert_eq!(kh[1].rank(), r);    
+    assert_eq!(kh[1].rank(), r);
 
-    debug!("KhI[0]: {}", kh[0]);    
-    debug!("KhI[1]: {}", kh[1]);    
+    debug!("KhI[0]: {}", kh[0]);
+    debug!("KhI[1]: {}", kh[1]);
 
     let zs = kh.canon_cycles();
-    
+
     assert_eq!(zs.len(), 2 * r);
     for (i, z) in zs.iter().enumerate() {
         let expected = if i < r { 0 } else { 1 };
@@ -94,13 +94,13 @@ fn ssi_divisibility_v1(l: &InvLink, reduced: bool, config: SymBuildConfig) -> (i
         let v = kh[h].vectorize_euc(z);
         debug!("a[{i}] in Kh[{h}]: ({})", v.clone().into_dense().iter().join(","));
         v
-    }).map(|v| 
+    }).map(|v|
         div_vec(&v.subvec(0..r), &c).expect("invalid divisibility.")
     ).collect_vec();
 
-    let (d0, d1) = if reduced { 
+    let (d0, d1) = if reduced {
         (ds[0], ds[1])
-    } else { 
+    } else {
         assert_eq!(ds[0], ds[1]);
         assert_eq!(ds[2], ds[3]);
         (ds[0], ds[2])
@@ -260,7 +260,7 @@ mod tests {
             }
         }
     }
-    
+
     test!(k3_1, "3_1", (2, 2));
     test!(k4_1a, "4_1a", (0, 0));
     test!(k4_1b, "4_1b", (0, 0));

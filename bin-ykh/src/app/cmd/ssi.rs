@@ -1,3 +1,5 @@
+//! `ssi`: the `ssi` invariant of a strongly invertible knot.
+
 use smart_default::SmartDefault;
 use std::ops::RangeInclusive;
 use yui_kh::ss::{ssi_invariant_with, SsVersion};
@@ -40,7 +42,7 @@ pub struct Args {
     #[default(SsVersion::V2)]
     pub ver: SsVersion,
 
-    #[arg(long, value_parser = parse_h_range)]
+    #[arg(long, value_parser = parse_h_range, allow_hyphen_values = true)]
     pub h_range: Option<RangeInclusive<isize>>,
 
     #[arg(long, value_parser = parse_strategy, default_value = "greedy")]

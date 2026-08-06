@@ -10,7 +10,7 @@
 use itertools::Itertools;
 use yui_core::bitseq::Bit;
 use yui_core::lc::Lc;
-use yui_core::Sign;
+use yui_core::num::Sign;
 use yui_core::abst::{Ring, RingOps};
 use yui_homology::ChainMap;
 use yui_link::{Link, Path, State};
@@ -21,10 +21,10 @@ use crate::kh::{KhAlg, KhCube, KhChain, KhGen, KhComplex, KhAlgGen, KhTensor};
 pub type KhChainMap<'a, 'c, R> = ChainMap<'a, 'c, isize, KhGen, KhGen, R>;
 
 impl<R> KhComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> { 
+where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn cc_pair(l: &Link, h: &R, t: &R, reduced: bool, i: usize) -> (KhComplex<R>, KhComplex<R>) {
         assert!(l.node(i).is_crossing());
-        
+
         let l2 = l.cc_at(i);
         let c1 = KhComplex::new_no_simplify(l, h, t, reduced);
         let c2 = KhComplex::new_no_simplify(&l2, h, t, reduced);
@@ -89,11 +89,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-fn count_1s(s: &State, i: usize) -> u32 { 
+fn count_1s(s: &State, i: usize) -> u32 {
     s.iter().enumerate().filter(|(j, b)| j > &i && b.is_one()).count() as u32
 }
 
-fn circle_index(circles: &[Path], arc: &Path) -> usize { 
+fn circle_index(circles: &[Path], arc: &Path) -> usize {
     circles.iter().find_position(|c| c.edges().contains(&arc.min_edge())).unwrap().0
 }
 
@@ -101,14 +101,14 @@ fn apply_f1<R>(alg: &KhAlg<R>, x: &KhTensor, i0: usize, i1: usize) -> Lc<KhTenso
 where R: Ring, for<'x> &'x R: RingOps<R> {
     use KhAlgGen::X;
 
-    let w0 = x.apply_at(i0, |x0| 
+    let w0 = x.apply_at(i0, |x0|
         alg.mul(*x0, X)  // multiply X at i0
     );
-    let w1 = x.apply_at(i1, |x1| 
+    let w1 = x.apply_at(i1, |x1|
         alg.mul(*x1, X)  // multiply X at i0
     );
 
-    w0 - w1 
+    w0 - w1
 }
 
 #[cfg(test)]
@@ -120,9 +120,9 @@ mod tests {
 
     use crate::kh::ext::cc::KhChainMap;
     use crate::kh::KhComplex;
- 
+
     #[test]
-    fn test_cc0_pos_to_neg() { 
+    fn test_cc0_pos_to_neg() {
         let i = 0;
         let l = Link::test_data("5_1").mirror().cc_at(i);
         let (h, t) = (0, 0);
@@ -136,7 +136,7 @@ mod tests {
     }
 
     #[test]
-    fn test_cc0_neg_to_pos() { 
+    fn test_cc0_neg_to_pos() {
         let i = 0;
         let l = Link::test_data("5_1").cc_at(i);
         let (h, t) = (0, 0);
@@ -150,7 +150,7 @@ mod tests {
     }
 
     #[test]
-    fn test_cc1_pos_to_neg() { 
+    fn test_cc1_pos_to_neg() {
         let i = 0;
         let l = Link::test_data("5_1").mirror().cc_at(i);
         let (h, t) = (0, 0);
@@ -164,7 +164,7 @@ mod tests {
     }
 
     #[test]
-    fn test_cc1_neg_to_pos() { 
+    fn test_cc1_neg_to_pos() {
         let i = 0;
         let l = Link::test_data("5_1").cc_at(i);
         let (h, t) = (0, 0);
@@ -178,7 +178,7 @@ mod tests {
     }
 
     #[test]
-    fn test_red_cc0_pos_to_neg() { 
+    fn test_red_cc0_pos_to_neg() {
         let i = 0;
         let l = Link::test_data("5_1").mirror().cc_at(i);
         let (h, t) = (0, 0);
@@ -192,7 +192,7 @@ mod tests {
     }
 
     #[test]
-    fn test_red_cc0_neg_to_pos() { 
+    fn test_red_cc0_neg_to_pos() {
         let i = 0;
         let l = Link::test_data("5_1").cc_at(i);
         let (h, t) = (0, 0);
@@ -206,7 +206,7 @@ mod tests {
     }
 
     #[test]
-    fn test_red_cc1_pos_to_neg() { 
+    fn test_red_cc1_pos_to_neg() {
         let i = 0;
         let l = Link::test_data("5_1").mirror().cc_at(i);
         let (h, t) = (0, 0);
@@ -220,7 +220,7 @@ mod tests {
     }
 
     #[test]
-    fn test_red_cc1_neg_to_pos() { 
+    fn test_red_cc1_neg_to_pos() {
         let i = 0;
         let l = Link::test_data("5_1").cc_at(i);
         let (h, t) = (0, 0);
@@ -234,7 +234,7 @@ mod tests {
     }
 
     #[test]
-    fn test_cc1_pos_to_neg_ht() { 
+    fn test_cc1_pos_to_neg_ht() {
         type P = Poly2<'h', 't', i64>;
 
         let i = 0;
@@ -250,7 +250,7 @@ mod tests {
     }
 
     #[test]
-    fn test_cc1_neg_to_pos_ht() { 
+    fn test_cc1_neg_to_pos_ht() {
         type P = Poly2<'h', 't', i64>;
 
         let i = 0;
@@ -267,7 +267,7 @@ mod tests {
 
     #[allow(unused)]
     fn print_h_map<R>(c1: &KhComplex<R>, c2: &KhComplex<R>, f: &KhChainMap<'_, '_, R>)
-    where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
+    where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         let h1 = c1.homology();
         let h2 = c2.homology();
 
@@ -279,7 +279,7 @@ mod tests {
 
         println!("f: deg {}\n", f.deg());
 
-        for i in h1.h_range() { 
+        for i in h1.h_range() {
             let j = i + f.deg();
             println!("({i}) {} -> ({j}) {}", h1[i], h2[j]);
             for z in h1[i].generators() {

@@ -21,6 +21,9 @@ use super::Summand;
 #[cfg(feature = "multithread")]
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
+/// The differential of a [`ChainComplex`] as a closure: `d_i: C_i → C_{i + d_deg}`.
+pub type DiffMap<I, X, R> = Arc<dyn Fn(I, &Lc<X, R>) -> Lc<X, R> + Send + Sync>;
+
 pub type ChainComplex1<X, R> = ChainComplex<isize,  X, R>;
 pub type ChainComplex2<X, R> = ChainComplex<isize2, X, R>;
 pub type ChainComplex3<X, R> = ChainComplex<isize3, X, R>;
@@ -37,7 +40,7 @@ where
 {
     summands: GrMod<I, X, R>,
     d_deg: I,
-    d_map: Arc<dyn Fn(I, &Lc<X, R>) -> Lc<X, R> + Send + Sync>,
+    d_map: DiffMap<I, X, R>,
     d_matrices: Arc<HashMap<I, SpMat<R>>>,
 }
 
@@ -72,8 +75,6 @@ where
         });
 
         new.d_matrices = d_matrices;
-
-        #[cfg(debug_assertions)]
         new.check_d_matrices();
 
         new
@@ -82,15 +83,13 @@ where
     pub(crate) fn with_d_matrices(mut self, matrices: impl IntoIterator<Item = (I, SpMat<R>)>) -> Self {
         let map: HashMap<I, SpMat<R>> = matrices.into_iter().collect();
         self.d_matrices = Arc::new(map);
-
-        #[cfg(debug_assertions)]
         self.check_d_matrices();
 
         self
     }
 
     /// Each cached d-matrix's shape must match the summand ranks at its endpoints.
-    /// Callable in release; construction only runs it under `debug_assertions`.
+    /// Run on every construction — only shape comparisons, so it is cheap in any build.
     pub fn check_d_matrices(&self) {
         for (&i, m) in self.d_matrices.iter() {
             let (n_rows, n_cols) = m.shape();
@@ -121,7 +120,8 @@ where
         self.d_deg
     }
 
-    pub(crate) fn raw_d(&self) -> Arc<dyn Fn(I, &Lc<X, R>) -> Lc<X, R> + Send + Sync> {
+    /// The differential closure itself, shared. Cheap to clone.
+    pub fn raw_d(&self) -> DiffMap<I, X, R> {
         self.d_map.clone()
     }
 
@@ -171,7 +171,7 @@ where
     }
 
     #[inline(never)] // for profilability
-    fn d_matrix_col(&self, i: I, j: usize) -> SpVec<R> { 
+    fn d_matrix_col(&self, i: I, j: usize) -> SpVec<R> {
         let z = self[i].generator(j);
         let w = self.d(i, &z);
         self[i + self.d_deg].vectorize(&w)
@@ -294,7 +294,7 @@ where
     /// Homology at the given indices only, using the full differentials.
     pub fn homology_in(&self, support: impl IntoIterator<Item = I>) -> GrMod<I, X, R> {
         GrMod::generate_filtered(
-            support.into_iter(),
+            support,
             |i| {
                 let hi = self.homology_at(i);
                 (!hi.is_zero()).then_some(hi)
@@ -318,7 +318,7 @@ where
     /// Trans-free homology at the given indices only, using the full differentials.
     pub fn generic_homology_in(&self, support: impl IntoIterator<Item = I>) -> GenericGrMod<I, R> {
         GrMod::generate_filtered(
-            support.into_iter(),
+            support,
             |i| {
                 let hi = self.generic_homology_at(i);
                 (!hi.is_zero()).then_some(hi)
@@ -338,8 +338,10 @@ where
         let summands = self.summands.truncated(range.clone());
 
         // cached d-matrices with both endpoints inside the window stay valid.
-        let matrices = self.d_matrices.iter().filter_map(|(&i, m)|
-            (range.contains(&i) && range.contains(&(i + d_deg))).then(|| (i, m.clone()))
+        let matrices = self.d_matrices.iter().filter(|&(&i, _)|
+            range.contains(&i) && range.contains(&(i + d_deg))
+        ).map(|(&i, m)|
+            (i, m.clone())
         ).collect_vec();
 
         Self::new(summands, d_deg, move |i, z|
@@ -379,7 +381,7 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
 impl<X, R> ToSeqString<isize> for ChainComplex1<X, R>
 where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     delegate! {
-        to self.summands { 
+        to self.summands {
             fn label(&self) -> String;
             fn indices(&self) -> Vec<isize>;
             fn entry_at(&self, i: &isize) -> String;

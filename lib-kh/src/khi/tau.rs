@@ -96,7 +96,8 @@ mod tests {
             let r = l.inner().resolve_by(&s).comps().len();
             let mut tensor = KhTensor::empty();
             for _ in 0..r { tensor.push(I); }
-            tau(&KhGen::new(s, tensor)).state().clone()
+            let g = tau(&KhGen::new(s, tensor));
+            *g.state()
         };
         let _ = empty; // silence unused
 

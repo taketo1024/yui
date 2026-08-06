@@ -22,7 +22,7 @@ pub(crate) fn make_rmod_str<F>(symbol: String, rank: usize, tors: &[String], sup
 where F: Fn(usize) -> String {
     use std::collections::BTreeMap;
 
-    if rank == 0 && tors.is_empty() { 
+    if rank == 0 && tors.is_empty() {
         return "0".to_string()
     }
 
@@ -31,23 +31,23 @@ where F: Fn(usize) -> String {
     if rank > 1 {
         let str = format!("{}{}", symbol, superscript(rank));
         res.push(str);
-    } else if rank == 1 { 
+    } else if rank == 1 {
         res.push(symbol.clone());
     }
 
     let mut tors_acc = BTreeMap::<String, usize>::new();
-    for t in tors { 
-        if let Some(v) = tors_acc.get_mut(t) { 
+    for t in tors {
+        if let Some(v) = tors_acc.get_mut(t) {
             *v += 1;
-        } else { 
+        } else {
             tors_acc.insert(t.clone(), 1);
         }
     }
-    
-    for (t, r) in tors_acc.iter() { 
-        let str = if r > &1 { 
+
+    for (t, r) in tors_acc.iter() {
+        let str = if r > &1 {
             format!("({}/{}){}", symbol, t, superscript(*r))
-        } else { 
+        } else {
             format!("({}/{})", symbol, t)
         };
         res.push(str);
@@ -59,33 +59,33 @@ where F: Fn(usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
- 
+
     #[test]
-    fn zero() { 
+    fn zero() {
         let s = rmod_str::<i32>(0, &[]);
         assert_eq!(s, "0");
     }
 
     #[test]
-    fn rank1() { 
+    fn rank1() {
         let s = rmod_str::<i32>(1, &[]);
         assert_eq!(s, "Z");
     }
 
     #[test]
-    fn rank2() { 
+    fn rank2() {
         let s = rmod_str::<i32>(2, &[]);
         assert_eq!(s, "Z²");
     }
 
     #[test]
-    fn tor() { 
+    fn tor() {
         let s = rmod_str(0, &[2]);
         assert_eq!(s, "(Z/2)");
     }
 
     #[test]
-    fn tor2() { 
+    fn tor2() {
         let s = rmod_str(0, &[2,2,3]);
         assert_eq!(s, "(Z/2)² ⊕ (Z/3)");
     }

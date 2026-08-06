@@ -1,3 +1,6 @@
+//! [`TngComplexElem`]: an element of a [`TngComplex`](crate::tng::complex::TngComplex),
+//! tracked through deloop and eliminate so the canonical cycles survive simplification.
+
 use std::collections::HashMap;
 use std::fmt::Display;
 
@@ -78,14 +81,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(self.is_evalable());
 
         let init = LcCob::from(self.in_cob.clone());
-        let eval = self.out_cob.iter().map(|(k, retr)| {
+
+        self.out_cob.iter().map(|(k, retr)| {
             let x = k.as_gen();
             let f = init.stack(retr);
             let r = f.eval(h, t);
             (x, r)
-        }).collect::<KhChain<R>>();
-
-        eval
+        }).collect::<KhChain<R>>()
     }
 
     // Invariant (debug-only): no zero `out_cob` value; all `out_cob` terms share one source; every
@@ -109,7 +111,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug_assert!(out_src.comps().filter(|c| c.is_circle()).all(|c| in_tgt.contains(c)), "verify: out_cob source circle not in in_cob target");
     }
 
-    pub fn canon_cycles(l: &Link, base_pt: Option<Edge>) -> Vec<Self> { 
+    pub fn canon_cycles(l: &Link, base_pt: Option<Edge>) -> Vec<Self> {
         assert!(l.is_knot());
         assert!(l.base_pt().is_some());
 
@@ -120,13 +122,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let state = l.seifert_state();
         let state_map = Iterator::zip(crossings.into_iter(), state.iter()).collect::<HashMap<_, _>>();
 
-        let ori = if reduced { 
+        let ori = if reduced {
             vec![true]
-        } else { 
+        } else {
             vec![true, false]
         };
 
-        let cycles = ori.into_iter().map(|o| {
+        ori.into_iter().map(|o| {
             let cob = Cob::new(
                 circles.iter().map(|(circ, col)| {
                     let marked = base_pt.map(|b| circ.contains(b)).unwrap_or(false);
@@ -136,16 +138,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 })
             );
             TngComplexElem::new(state_map.clone(), cob, base_pt)
-        }).collect();
-
-        cycles
+        }).collect()
     }
 }
 
 impl<R> Display for TngComplexElem<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mors = self.out_cob.iter().sorted_by_key(|&(&k, _)| k).map(|(k, f)| { 
+        let mors = self.out_cob.iter().sorted_by_key(|&(&k, _)| k).map(|(k, f)| {
             format!("{}: {}", k, f)
         }).join(", ");
         write!(f, "[{}]", mors)

@@ -13,7 +13,7 @@ resolver = "3"
 authors = ["Taketo Sano <taketo1024@gmail.com>"]
 license = "MIT"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 repository = "https://github.com/taketo1024/yui"
 
 [workspace.dependencies]

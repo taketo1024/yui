@@ -30,6 +30,7 @@ use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
 use crate::abst::{AddGrp, AddGrpOps, AddMon, AddMonOps, MathType, EucRing, EucRingOps, Mon, MonOps, Ring, RingOps};
 use crate::ext::DivRound;
+use crate::util::parse_err::ParseErr;
 use super::int::{IntType, IntOps};
 
 /// A quadratic integer in `ℤ[ω]`, represented by `(a, b)` for `a + b·ω`.
@@ -42,37 +43,39 @@ where I: IntType, for<'x> &'x I: IntOps<I>;
 /// Gaussian integers: `ℤ[i] = QuadInt<I, -1>`.
 pub type GaussInt<I> = QuadInt<I, -1>;
 
-/// Eisenstein integers: `ℤ[ω]` with `ω = (-1 + √-3)/2`, i.e. `QuadInt<I, -3>`.
+/// Eisenstein integers: `ℤ[ω]` with `ω = (1 + √-3)/2`, i.e. `QuadInt<I, -3>`.
+/// Note `-3 ≡ 1 (mod 4)`, so `ω` is the 6th root of unity, not the cube root `(-1 + √-3)/2`;
+/// the two generate the same ring.
 pub type EisenInt<I> = QuadInt<I, -3>;
 
 impl<I, const D: i32> QuadInt<I, D>
 where I: IntType, for<'x> &'x I: IntOps<I> {
-    pub fn new(a: I, b: I) -> Self { 
+    pub fn new(a: I, b: I) -> Self {
         assert!(D % 4 != 0);
         Self(a, b)
     }
 
-    pub fn omega() -> Self { 
+    pub fn omega() -> Self {
         Self::new(I::zero(), I::one())
     }
 
-    pub fn is_rational(&self) -> bool { 
+    pub fn is_rational(&self) -> bool {
         self.1.is_zero()
     }
 
-    pub fn left(&self) -> &I { 
+    pub fn left(&self) -> &I {
         &self.0
     }
 
-    pub fn right(&self) -> &I { 
+    pub fn right(&self) -> &I {
         &self.1
     }
 
-    pub fn pair_into(self) -> (I, I) { 
+    pub fn pair_into(self) -> (I, I) {
         (self.0, self.1)
     }
 
-    pub fn pair(&self) -> (&I, &I) { 
+    pub fn pair(&self) -> (&I, &I) {
         (&self.0, &self.1)
     }
 
@@ -87,13 +90,13 @@ where I: IntType, for<'x> &'x I: IntOps<I> {
     //          = a - b ω
     //
 
-    pub fn conj(&self) -> Self { 
+    pub fn conj(&self) -> Self {
         let (a, b) = self.pair();
-        match D.rem_euclid(4) { 
+        match D.rem_euclid(4) {
             1     => QuadInt(a + b, -b),
             2 | 3 => QuadInt(a.clone(), -b),
             _     => panic!()
-        }    
+        }
     }
 
     // When D ≡ 1,
@@ -105,10 +108,10 @@ where I: IntType, for<'x> &'x I: IntOps<I> {
     //
     //  bar(z) = a^2 - b^2 D.
     //
-    
+
     pub fn norm(&self) -> I {
         let (a, b) = self.pair();
-        match D.rem_euclid(4) { 
+        match D.rem_euclid(4) {
             1 => {
                 let d = I::from_i32( (1 - D) / 4).unwrap();
                 a * a + a * b + b * b * d
@@ -118,7 +121,7 @@ where I: IntType, for<'x> &'x I: IntOps<I> {
                 a * a - b * b * d
             },
             _     => panic!()
-        }    
+        }
     }
 }
 
@@ -131,15 +134,15 @@ where I: IntType, for<'x> &'x I: IntOps<I> {
 
 impl<I, const D: i32> FromStr for QuadInt<I, D>
 where I: IntType + FromStr, for<'x> &'x I: IntOps<I> {
-    type Err = ();
+    type Err = ParseErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if let Ok(a) = s.parse::<I>() {
             Ok(Self::from(a))
-        } else if let Ok((a, b)) = parse_tuple::<I, I>(s) { 
+        } else if let Ok((a, b)) = parse_tuple::<I, I>(s) {
             Ok(Self::new(a, b))
-        } else { 
-            Err(())
+        } else {
+            Err(ParseErr::invalid(s, &Self::math_symbol()))
         }
     }
 }
@@ -147,7 +150,7 @@ where I: IntType + FromStr, for<'x> &'x I: IntOps<I> {
 fn parse_tuple<I, J>(s: &str) -> Result<(I, J), ()>
 where I: FromStr, J: FromStr {
     let r = regex::Regex::new(r"\((.+)?,\s*(.+)?\)").unwrap();
-    if let Some(c) = r.captures(s) { 
+    if let Some(c) = r.captures(s) {
         let (s1, s2) = (&c[1], &c[2]);
         if let (Ok(a), Ok(b)) = (s1.parse::<I>(), s2.parse::<J>()) {
             return Ok((a, b))
@@ -162,21 +165,21 @@ where I: IntType, for<'x> &'x I: IntOps<I> {
         let (a, b) = self.pair();
         let x = if D == -1 { "i" } else { "ω" };
 
-        if b.is_zero() { 
+        if b.is_zero() {
             write!(f, "{a}")
-        } else if a.is_zero() { 
-            let b = 
-                if b.is_one() { String::from("") } 
+        } else if a.is_zero() {
+            let b =
+                if b.is_one() { String::from("") }
                 else if (-b).is_one() { String::from("-") }
                 else { b.to_string() };
             write!(f, "{b}{x}")
         } else {
             let sign = if !b.is_negative() { "+" } else { "-" };
-            let b = 
-                if b.is_unit() { String::from("") } 
-                else if b.is_negative() { (-b).to_string() } 
+            let b =
+                if b.is_unit() { String::from("") }
+                else if b.is_negative() { (-b).to_string() }
                 else { b.to_string() };
-    
+
             write!(f, "{a} {sign} {b}{x}")
         }
     }
@@ -216,28 +219,28 @@ impl_add_op!(Add, add);
 impl_add_op!(Sub, sub);
 
 #[auto_ops]
-impl<'b, I, const D: i32> Mul<&'b QuadInt<I, D>> for &QuadInt<I, D>
+impl<I, const D: i32> Mul<&QuadInt<I, D>> for &QuadInt<I, D>
 where I: IntType, for<'x> &'x I: IntOps<I> {
     type Output = QuadInt<I, D>;
 
-    fn mul(self, rhs: &'b QuadInt<I, D>) -> Self::Output {
+    fn mul(self, rhs: &QuadInt<I, D>) -> Self::Output {
         // When D ≡ 1,
         //
-        //   ω^2 = (D + 1)/4 + √D/2 
+        //   ω^2 = (D + 1)/4 + √D/2
         //       = (D - 1)/4 + ω,
         //
-        // hence 
-        // 
-        //    (a + bω)(c + dω) 
+        // hence
+        //
+        //    (a + bω)(c + dω)
         //  = (ac + bd(D - 1)/4) + (ad + bc + bd)ω.
         //
         // When D ≡ 2, 3,
-        // 
+        //
         //   ω^2 = D,
         //
-        // hence 
-        // 
-        //    (a + bω)(c + dω) 
+        // hence
+        //
+        //    (a + bω)(c + dω)
         //  = (ac + bdD) + (ad + bc)ω.
 
         let (a, b) = self.pair();
@@ -245,11 +248,11 @@ where I: IntType, for<'x> &'x I: IntOps<I> {
 
         if b.is_zero() {
             return QuadInt(a * c, a * d)
-        } else if d.is_zero() { 
+        } else if d.is_zero() {
             return QuadInt(a * c, b * c)
         }
 
-        match D.rem_euclid(4) { 
+        match D.rem_euclid(4) {
             1 => {
                 let e = I::from_i32((D - 1) / 4).unwrap();
                 let x = a * c + b * d * e;
@@ -263,7 +266,7 @@ where I: IntType, for<'x> &'x I: IntOps<I> {
                 QuadInt(x, y)
             },
             _ => panic!()
-        }    
+        }
     }
 }
 
@@ -275,7 +278,7 @@ where I: IntType, for<'x> &'x I: IntOps<I> {
         let norm = rhs.norm();
         let w = self * &rhs.conj();
         let (x, y) = w.pair_into();
-        QuadInt( 
+        QuadInt(
             x.div_round(&norm),
             y.div_round(&norm)
         )
@@ -283,21 +286,21 @@ where I: IntType, for<'x> &'x I: IntOps<I> {
 }
 
 #[auto_ops]
-impl<'b, I> Div<&'b GaussInt<I>> for &GaussInt<I>
+impl<I> Div<&GaussInt<I>> for &GaussInt<I>
 where I: IntType, for<'x> &'x I: IntOps<I> {
     type Output = GaussInt<I>;
 
-    fn div(self, rhs: &'b GaussInt<I>) -> Self::Output {
+    fn div(self, rhs: &GaussInt<I>) -> Self::Output {
         self.div_round(rhs)
     }
 }
 
 #[auto_ops]
-impl<'b, I> Rem<&'b GaussInt<I>> for &GaussInt<I>
+impl<I> Rem<&GaussInt<I>> for &GaussInt<I>
 where I: IntType, for<'x> &'x I: IntOps<I> {
     type Output = GaussInt<I>;
 
-    fn rem(self, rhs: &'b GaussInt<I>) -> Self::Output {
+    fn rem(self, rhs: &GaussInt<I>) -> Self::Output {
         let q = self / rhs;
         self - rhs * q
     }
@@ -307,7 +310,7 @@ where I: IntType, for<'x> &'x I: IntOps<I> {
 
 impl<I> DivRound for EisenInt<I>
 where I: IntType, for<'x> &'x I: IntOps<I> {
-    //  z / w = (x + y ω) / N(w) 
+    //  z / w = (x + y ω) / N(w)
     //        = (x + y) / N(w) + y / N(w) (ω - 1).
     //
     // (m, n) = ([(x + y) / N(w)], [y / N(w) ]).
@@ -318,7 +321,7 @@ where I: IntType, for<'x> &'x I: IntOps<I> {
         let norm = rhs.norm();
         let w = self * &rhs.conj();
         let (x, y) = w.pair();
-        let (m, n) = ( 
+        let (m, n) = (
             (x + y).div_round(&norm),
             y.div_round(&norm)
         );
@@ -327,21 +330,21 @@ where I: IntType, for<'x> &'x I: IntOps<I> {
 }
 
 #[auto_ops]
-impl<'b, I> Div<&'b EisenInt<I>> for &EisenInt<I>
+impl<I> Div<&EisenInt<I>> for &EisenInt<I>
 where I: IntType, for<'x> &'x I: IntOps<I> {
     type Output = EisenInt<I>;
 
-    fn div(self, rhs: &'b EisenInt<I>) -> Self::Output {
+    fn div(self, rhs: &EisenInt<I>) -> Self::Output {
         self.div_round(rhs)
     }
 }
 
 #[auto_ops]
-impl<'b, I> Rem<&'b EisenInt<I>> for &EisenInt<I>
+impl<I> Rem<&EisenInt<I>> for &EisenInt<I>
 where I: IntType, for<'x> &'x I: IntOps<I> {
     type Output = EisenInt<I>;
 
-    fn rem(self, rhs: &'b EisenInt<I>) -> Self::Output {
+    fn rem(self, rhs: &EisenInt<I>) -> Self::Output {
         let q = self / rhs;
         self - rhs * q
     }
@@ -357,24 +360,26 @@ impl_alg_op_d!(EucRingOps, -3);
 impl<I, const D: i32> MathType for QuadInt<I, D>
 where I: IntType, for<'x> &'x I: IntOps<I> {
     fn math_symbol() -> String {
-        if D == -1 { 
-            String::from("Z[i]")
-        } else {
-            format!("Z[√{}]", D)
+        match D {
+            -1 => String::from("Z[i]"),
+            -3 => String::from("Z[ω]"),
+            // for D ≡ 1 (mod 4) the ring is ℤ[(1+√D)/2], strictly larger than ℤ[√D].
+            _ if D.rem_euclid(4) == 1 => format!("Z[(1 + √{D})/2]"),
+            _ => format!("Z[√{D}]"),
         }
     }
 }
 
-impl<I, const D: i32> AddMon for QuadInt<I, D> 
+impl<I, const D: i32> AddMon for QuadInt<I, D>
 where I: IntType, for<'x> &'x I: IntOps<I> {}
 
-impl<I, const D: i32> AddGrp for QuadInt<I, D> 
+impl<I, const D: i32> AddGrp for QuadInt<I, D>
 where I: IntType, for<'x> &'x I: IntOps<I> {}
 
-impl<I, const D: i32> Mon for QuadInt<I, D> 
+impl<I, const D: i32> Mon for QuadInt<I, D>
 where I: IntType, for<'x> &'x I: IntOps<I> {}
 
-impl<I, const D: i32> Ring for QuadInt<I, D> 
+impl<I, const D: i32> Ring for QuadInt<I, D>
 where I: IntType, for<'x> &'x I: IntOps<I> {
     // see: https://en.wikipedia.org/wiki/Quadratic_integer#Units
     fn is_unit(&self) -> bool {
@@ -385,15 +390,15 @@ where I: IntType, for<'x> &'x I: IntOps<I> {
         if let Some(u) = self.norm().inv() {
             let u = Self::from(u);
             Some(u * self.conj())
-        } else { 
+        } else {
             None
         }
     }
 
     fn normalizing_unit(&self) -> Self {
         let (a, b) = self.pair();
-        match D { 
-            -1 => { 
+        match D {
+            -1 => {
                 if a.is_positive() && !b.is_negative() {         // a > 0, b ≧ 0 -> 1
                     Self::one()
                 } else if !a.is_positive() && b.is_positive() {  // a ≦ 0, b > 0 -> -i
@@ -406,7 +411,7 @@ where I: IntType, for<'x> &'x I: IntOps<I> {
                     Self::one()
                 }
             },
-            -3 => { 
+            -3 => {
                 let c = a + b;
                 if a.is_positive() && !b.is_negative() {         // a > 0, b ≧ 0     -> 1
                     Self::one()
@@ -420,14 +425,14 @@ where I: IntType, for<'x> &'x I: IntOps<I> {
                     Self::new(-I::one(), I::one())
                 } else if !c.is_negative() && b.is_negative() {  // a + b ≧ 0, b < 0 -> 1/ω^5 = ω
                     Self::omega()
-                } else { 
+                } else {
                     Self::one()
                 }
             },
             _ => {
-                if a.is_negative() { 
+                if a.is_negative() {
                     -Self::one()
-                } else { 
+                } else {
                     Self::one()
                 }
             }
@@ -435,10 +440,10 @@ where I: IntType, for<'x> &'x I: IntOps<I> {
     }
 }
 
-impl<I> EucRing for QuadInt<I, -1> 
+impl<I> EucRing for QuadInt<I, -1>
 where I: IntType, for<'x> &'x I: IntOps<I> {}
 
-impl<I> EucRing for QuadInt<I, -3> 
+impl<I> EucRing for QuadInt<I, -3>
 where I: IntType, for<'x> &'x I: IntOps<I> {}
 
 // -- macros -- //
@@ -455,13 +460,13 @@ macro_rules! impl_unop {
             }
         }
 
-        impl<'a, I, const D: i32> $trait for &'a QuadInt<I, D>
+        impl<I, const D: i32> $trait for &QuadInt<I, D>
         where I: IntType, for<'x> &'x I: IntOps<I> {
             type Output = QuadInt<I, D>;
 
             fn $method(self) -> Self::Output {
                 let (a, b) = self.pair();
-                QuadInt(<&'a I>::$method(a), <&'a I>::$method(b))
+                QuadInt(<&I>::$method(a), <&I>::$method(b))
             }
         }
     };
@@ -470,14 +475,14 @@ macro_rules! impl_unop {
 macro_rules! impl_add_op {
     ($trait:ident, $method:ident) => {
         #[auto_ops]
-        impl<'a, 'b, I, const D: i32> $trait<&'b QuadInt<I, D>> for &'a QuadInt<I, D>
+        impl<I, const D: i32> $trait<&QuadInt<I, D>> for &QuadInt<I, D>
         where I: IntType, for<'x> &'x I: IntOps<I> {
             type Output = QuadInt<I, D>;
 
-            fn $method(self, rhs: &'b QuadInt<I, D>) -> Self::Output {
+            fn $method(self, rhs: &QuadInt<I, D>) -> Self::Output {
                 let (a, b) = self.pair();
                 let (c, d) =  rhs.pair();
-                QuadInt(<&'a I>::$method(a, c), <&'a I>::$method(b, d))
+                QuadInt(<&I>::$method(a, c), <&I>::$method(b, d))
             }
         }
     };
@@ -485,20 +490,20 @@ macro_rules! impl_add_op {
 
 macro_rules! impl_alg_op {
     ($trait:ident) => {
-        impl<I, const D: i32> $trait<Self> for QuadInt<I, D> 
+        impl<I, const D: i32> $trait<Self> for QuadInt<I, D>
         where I: IntType, for<'x> &'x I: IntOps<I> {}
 
-        impl<'a, I, const D: i32> $trait<QuadInt<I, D>> for &'a QuadInt<I, D> 
+        impl<I, const D: i32> $trait<QuadInt<I, D>> for &QuadInt<I, D>
         where I: IntType, for<'x> &'x I: IntOps<I> {}
     };
 }
 
 macro_rules! impl_alg_op_d {
     ($trait:ident, $d:literal) => {
-        impl<I> $trait<Self> for QuadInt<I, $d> 
+        impl<I> $trait<Self> for QuadInt<I, $d>
         where I: IntType, for<'x> &'x I: IntOps<I> {}
 
-        impl<'a, I> $trait<QuadInt<I, $d>> for &'a QuadInt<I, $d> 
+        impl<I> $trait<QuadInt<I, $d>> for &QuadInt<I, $d>
         where I: IntType, for<'x> &'x I: IntOps<I> {}
     };
 }
@@ -511,7 +516,7 @@ mod tests {
     use num_bigint::BigInt;
 
     #[test]
-    fn check() { 
+    fn check() {
         fn check<T>() where T: Ring, for<'a> &'a T: RingOps<T> {}
 
         type A = QuadInt<i32, -1>;
@@ -524,7 +529,7 @@ mod tests {
     }
 
     #[test]
-    fn display_gauss() { 
+    fn display_gauss() {
         type A = QuadInt<i32, -1>;
         let a = A::new(-2, 0);
         let b = A::new(0, 3);
@@ -537,7 +542,16 @@ mod tests {
     }
 
     #[test]
-    fn display_eisen() { 
+    fn math_symbol_names_the_ring() {
+        // `D ≡ 1 (mod 4)` adjoins `(1 + √D)/2`, not `√D`.
+        assert_eq!(QuadInt::<i32, -1>::math_symbol(), "Z[i]");
+        assert_eq!(QuadInt::<i32, -3>::math_symbol(), "Z[ω]");
+        assert_eq!(QuadInt::<i32, 5>::math_symbol(), "Z[(1 + √5)/2]");
+        assert_eq!(QuadInt::<i32, -2>::math_symbol(), "Z[√-2]");
+    }
+
+    #[test]
+    fn display_eisen() {
         type A = QuadInt<i32, -3>;
         let a = A::new(-2, 0);
         let b = A::new(0, 3);
@@ -550,7 +564,7 @@ mod tests {
     }
 
     #[test]
-    fn zero() { 
+    fn zero() {
         type A = QuadInt<i32, -3>;
         let a = A::new(1, 3);
         let b = A::zero();
@@ -564,7 +578,7 @@ mod tests {
     }
 
     #[test]
-    fn one() { 
+    fn one() {
         type A = QuadInt<i32, -3>;
 
         let a = A::new(1, 3);
@@ -582,7 +596,7 @@ mod tests {
     }
 
     #[test]
-    fn add() { 
+    fn add() {
         type A = QuadInt<i32, -3>;
         let a = A::new(1, 3);
         let b = A::new(-3, 2);
@@ -591,7 +605,7 @@ mod tests {
     }
 
     #[test]
-    fn sub() { 
+    fn sub() {
         type A = QuadInt<i32, -3>;
         let a = A::new(1, 3);
         let b = A::new(-3, 2);
@@ -600,14 +614,14 @@ mod tests {
     }
 
     #[test]
-    fn neg() { 
+    fn neg() {
         type A = QuadInt<i32, -3>;
         let a = A::new(1, 3);
         assert_eq!(-a, A::new(-1, -3));
     }
 
     #[test]
-    fn mul_gauss() { 
+    fn mul_gauss() {
         type A = QuadInt<i32, -1>; // GaussInt
         let a = A::new(1, 3);
         let b = A::new(2, -1);
@@ -616,7 +630,7 @@ mod tests {
     }
 
     #[test]
-    fn mul_eisen() { 
+    fn mul_eisen() {
         type A = QuadInt<i32, -3>; // EisenInt
         let a = A::new(1, 3);
         let b = A::new(2, -1);
@@ -625,35 +639,35 @@ mod tests {
     }
 
     #[test]
-    fn norm_gauss() { 
+    fn norm_gauss() {
         type A = QuadInt<i32, -1>; // GaussInt
         let a = A::new(3, -2);
         assert_eq!(a.norm(), 13);
     }
 
     #[test]
-    fn norm_eisen() { 
+    fn norm_eisen() {
         type A = QuadInt<i32, -3>; // GaussInt
         let a = A::new(3, -2);
         assert_eq!(a.norm(), 7);
     }
 
     #[test]
-    fn conj_gauss() { 
+    fn conj_gauss() {
         type A = QuadInt<i32, -1>; // GaussInt
         let a = A::new(3, -2);
         assert_eq!(a.conj(), A::new(3, 2));
     }
 
     #[test]
-    fn conj_eisen() { 
+    fn conj_eisen() {
         type A = QuadInt<i32, -3>; // EisenInt
         let a = A::new(3, -2);
         assert_eq!(a.conj(), A::new(1, 2));
     }
 
     #[test]
-    fn unit_gauss() { 
+    fn unit_gauss() {
         type A = QuadInt<i32, -1>; // GaussInt
         assert!(A::new(1,  0).is_unit());
         assert!(A::new(0,  1).is_unit());
@@ -663,7 +677,32 @@ mod tests {
     }
 
     #[test]
-    fn unit_eisen() { 
+    fn gcd_normalized() {
+        // `x` divides `y` here, the branch that used to return `x` unchanged.
+        type A = QuadInt<i32, -1>; // GaussInt
+        let (x, y) = (A::new(0, -3), A::new(0, -6));
+
+        let d = EucRing::gcd(&x, &y);
+        assert_eq!(d, d.normalized(), "gcd is not normalized");
+
+        let (d, s, t) = EucRing::gcdx(&x, &y);
+        assert_eq!(d, d.normalized(), "gcdx's d is not normalized");
+        assert_eq!(&s * &x + &t * &y, d, "Bezout fails");
+        assert_eq!(EucRing::gcd(&x, &y), d, "gcd disagrees with gcdx");
+    }
+
+    #[test]
+    fn lcm_zero() {
+        // lcm(0, y) = 0, and gcd(0, 0) = 0 must not reach the division.
+        type A = QuadInt<i32, -1>; // GaussInt
+        let (z, a) = (A::new(0, 0), A::new(2, 1));
+        assert_eq!(EucRing::lcm(&z, &z), z);
+        assert_eq!(EucRing::lcm(&z, &a), z);
+        assert_eq!(EucRing::lcm(&a, &z), z);
+    }
+
+    #[test]
+    fn unit_eisen() {
         type A = QuadInt<i32, -3>; // EisenInt
         assert!(A::new(1,  0).is_unit());
         assert!(A::new(0,  1).is_unit());
@@ -675,7 +714,7 @@ mod tests {
     }
 
     #[test]
-    fn inv_gauss() { 
+    fn inv_gauss() {
         type A = QuadInt<i32, -1>; // GaussInt
         assert_eq!(A::new(1,  0).inv(), Some(A::new(1,  0)));
         assert_eq!(A::new(-1, 0).inv(), Some(A::new(-1, 0)));
@@ -685,7 +724,7 @@ mod tests {
     }
 
     #[test]
-    fn inv_eisen() { 
+    fn inv_eisen() {
         type A = QuadInt<i32, -3>; // EisenInt
         assert_eq!(A::new(1,  0).inv(), Some(A::new(1,  0)));
         assert_eq!(A::new(0,  1).inv(), Some(A::new(1, -1)));
@@ -697,7 +736,7 @@ mod tests {
     }
 
     #[test]
-    fn normalizing_unit_gauss() { 
+    fn normalizing_unit_gauss() {
         type A = QuadInt<i32, -1>; // GaussInt
         assert_eq!(A::new(1,  0).normalizing_unit(), A::new(1,  0));
         assert_eq!(A::new(-1, 0).normalizing_unit(), A::new(-1, 0));
@@ -705,7 +744,7 @@ mod tests {
         assert_eq!(A::new(0,  1).normalizing_unit(), A::new(0, -1));
         assert_eq!(A::new(0, -1).normalizing_unit(), A::new(0,  1));
         assert_eq!(A::new(0,  2).normalizing_unit(), A::new(0, -1));
-        
+
         assert_eq!(A::new(1,  1).normalizing_unit(), A::new(1,  0));
         assert_eq!(A::new(-1, 1).normalizing_unit(), A::new(0, -1));
         assert_eq!(A::new(-1,-1).normalizing_unit(), A::new(-1, 0));
@@ -713,7 +752,7 @@ mod tests {
     }
 
     #[test]
-    fn normalizing_unit_eisen() { 
+    fn normalizing_unit_eisen() {
         type A = QuadInt<i32, -3>; // EisenInt
         assert_eq!(A::new(1,  0).normalizing_unit(), A::new(1,  0));
         assert_eq!(A::new(0,  1).normalizing_unit(), A::new(1, -1));
@@ -722,7 +761,7 @@ mod tests {
         assert_eq!(A::new(0, -1).normalizing_unit(), A::new(-1, 1));
         assert_eq!(A::new(1, -1).normalizing_unit(), A::new(0,  1));
     }
-    
+
     #[test]
     fn rem_gauss() {
         type A = QuadInt<i32, -1>; // GaussInt

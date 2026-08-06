@@ -46,10 +46,10 @@ where
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     use super::*;
     #[test]
-    fn product() { 
+    fn product() {
         let a = i64::product([4,5,6]);
         assert_eq!(a, 120);
     }

@@ -1,3 +1,6 @@
+//! [`CliArgs`] and [`App`]: the clap-parsed command line and the runner that
+//! dispatches it to one of the subcommands.
+
 use log::info;
 use clap::{Parser, Subcommand};
 
@@ -18,7 +21,7 @@ pub struct CliArgs {
 pub enum Cmd {
     CKh(ckh::Args),
     Kh(kh::Args),
-    CKhI(ckhi::Args),    
+    CKhI(ckhi::Args),
     KhI(khi::Args),
     CC(cc::Args),
     SL2(sl2::Args),
@@ -26,9 +29,9 @@ pub enum Cmd {
     Ssi(ssi::Args),
 }
 
-impl CliArgs { 
-    fn app_args(&self) -> &dyn AppArgs { 
-        match &self.command { 
+impl CliArgs {
+    fn app_args(&self) -> &dyn AppArgs {
+        match &self.command {
             Cmd::CKh(args)  => args,
             Cmd::Kh(args)   => args,
             Cmd::CKhI(args) => args,
@@ -40,7 +43,7 @@ impl CliArgs {
         }
     }
 
-    fn log_level(&self) -> log::LevelFilter { 
+    fn log_level(&self) -> log::LevelFilter {
         self.app_args().log_level()
     }
 }
@@ -49,13 +52,13 @@ pub struct App {
     pub args: CliArgs
 }
 
-impl App { 
-    pub fn new() -> Self { 
+impl App {
+    pub fn new() -> Self {
         let args = CliArgs::parse();
         App { args }
     }
 
-    pub fn run(&self) -> Result<String, Box<dyn std::error::Error>> { 
+    pub fn run(&self) -> Result<String, Box<dyn std::error::Error>> {
         self.init_logger();
 
         info!("args:\n{:#?}", self.args);
@@ -75,9 +78,9 @@ impl App {
         env_logger::Builder::new().filter_level(l).init();
     }
 
-    fn dispatch(&self) -> Result<String, Box<dyn std::error::Error>> { 
+    fn dispatch(&self) -> Result<String, Box<dyn std::error::Error>> {
         guard_panic(||
-            match &self.args.command { 
+            match &self.args.command {
                 Cmd::CKh(args)  => ckh::dispatch(args),
                 Cmd::Kh(args)   => kh::dispatch(args),
                 Cmd::CKhI(args) => ckhi::dispatch(args),

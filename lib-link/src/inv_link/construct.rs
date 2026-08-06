@@ -22,7 +22,7 @@ impl InvLink {
     }
 
     // Strongly-invertible Whitehead double of a symmetric companion. The 2-cable inherits τ; the
-    // clasp and `tw` framing twists go in at the *other* on-axis edge (`inv_edge(e) == e`,
+    // clasp and `tw` framing twists go in at the *other* on-axis edge (`is_on_axis`,
     // e ≠ base_pt), split evenly across the axis so the diagram stays τ-invariant. `tw` counts from
     // the Seifert framing and must be even. The base point lands on the doubled on-axis strand.
     pub fn whitehead_double(l: &InvLink, positive: bool, tw: i32) -> InvLink {

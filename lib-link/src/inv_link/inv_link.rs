@@ -1,7 +1,12 @@
+//! [`InvLink`]: a [`Link`](crate::Link) with an involution `τ`, given by an edge
+//! bijection and the induced map on nodes. Strong invertibility (`τ` reverses the
+//! orientation) and 2-periodicity (`τ` preserves it) are decided from the orientation.
+
 use std::collections::HashMap;
 
 use delegate::delegate;
 use itertools::Itertools;
+use yui_core::algo::KeyedUnionFind;
 use crate::{Node, Edge, Link, Path, Slot, State, PDCodeX};
 
 // Involutive link
@@ -22,6 +27,7 @@ impl InvLink {
         let link_edges = inner.edges();
         let missing = link_edges.iter().filter(|e| !e_map.contains_key(e)).collect_vec();
         assert!(missing.is_empty(), "e_map does not cover edges {missing:?}");
+
         let extra = e_map.keys().filter(|e| !link_edges.contains(e)).sorted().collect_vec();
         assert!(extra.is_empty(), "e_map maps edges {extra:?}, which are not in the link");
 
@@ -31,27 +37,42 @@ impl InvLink {
             assert_eq!(e_map[&f], e, "e_map is not involutive: {e} ↦ {f} ↦ {}", e_map[&f]);
         }
 
-        // ... and must carry each node to a node of the same type.
-        let mut x_map = HashMap::new();
-        for x in inner.nodes() {
-            let edges = x.edges().map(|e| e_map[&e]);
-            let y = inner.nodes()
-                .find(|y| edges.iter().all(|e| y.edges().contains(e)))
-                .unwrap_or_else(|| panic!("e_map sends node {x} to no node of the link"));
-            assert_eq!(x.node_type(), y.node_type(), "e_map changes the type of node {x}");
+        // ... and each node must have a unique corresponding node.
+        let x_map: HashMap<Node, Node> = inner.nodes().map(|x| {
+            let y = Self::find_tau_x(x, &inner, &e_map);
+            (x.clone(), y.clone())
+        }).collect();
 
-            x_map.insert(x.clone(), y.clone());
-            if x != y {
-                x_map.insert(y.clone(), x.clone());
-            }
+        assert_eq!(x_map.len(), inner.n_nodes(), "the diagram has duplicate nodes");
+
+        for (x, y) in &x_map {
+            let z = &x_map[y];
+            assert_eq!(z, x, "e_map induces a non-involutive node map: {x} ↦ {y} ↦ {z}");
         }
-        assert_eq!(x_map.len(), inner.n_nodes(), "e_map is not a bijection on nodes");
 
         Self { inner, e_map, x_map }
     }
 
+    // τ is a rotation about an axis in the plane, so it reverses the normal — the cyclic order of a
+    // node's four slots must run backwards for τ to preserve orientation (as `preserves_dir_at` reads it).
+    fn find_tau_x<'a>(x: &'a Node, inner: &'a Link, e_map: &HashMap<Edge, Edge>) -> &'a Node {
+        let matches = |y: &Node| Slot::ALL.into_iter().any(|k|
+            Slot::ALL.into_iter().all(|s| y.edge(k.shift(4 - s.index())) == e_map[&x.edge(s)])
+        );
+        let cands = inner.nodes().filter(|y| matches(y)).collect_vec();
+
+        match cands.as_slice() {
+            [y] => {
+                assert_eq!(x.node_type(), y.node_type(), "e_map changes the type of node {x}");
+                y
+            },
+            [] => panic!("e_map sends node {x} to no node of the link"),
+            _  => panic!("e_map does not determine the image of node {x}: {} nodes match", cands.len())
+        }
+    }
+
     pub fn from_symmetric_pd_code<I1>(pd_code: I1) -> Self
-    where I1: IntoIterator<Item = PDCodeX> { 
+    where I1: IntoIterator<Item = PDCodeX> {
         // the base point defaults to the least edge, which the symmetric convention puts on the axis.
         Self::si_knot_from(Link::from_pd_code(pd_code))
     }
@@ -117,12 +138,12 @@ impl InvLink {
     }
 
     pub fn with_base_pt(mut self, e: Edge) -> Self {
-        assert_eq!(self.inv_edge(e), e, "base_pt {e} must be on-axis (fixed by involution)");
+        assert!(self.is_on_axis(e), "base_pt {e} must be on-axis (fixed by involution)");
         self.inner = self.inner.with_base_pt(e);
         self
     }
 
-    pub fn inv_edge(&self, e: Edge) -> Edge { 
+    pub fn inv_edge(&self, e: Edge) -> Edge {
         self.e_map.get(&e).cloned().unwrap()
     }
 
@@ -130,8 +151,38 @@ impl InvLink {
         self.x_map.get(x).unwrap()
     }
 
+    // `e` meets the axis, i.e. is fixed by τ.
+    pub fn is_on_axis(&self, e: Edge) -> bool {
+        self.inv_edge(e) == e
+    }
+
     pub fn on_axis_edges(&self) -> Vec<Edge> {
-        self.edges().into_iter().filter(|&e| self.inv_edge(e) == e).collect()
+        self.edges().into_iter().filter(|&e| self.is_on_axis(e)).collect()
+    }
+
+    // The axis lies in the projection plane (as opposed to an intravergent diagram, where it is
+    // perpendicular): a line separates the plane, so no cluster of off-axis nodes is τ-invariant.
+    pub fn is_transvergent(&self) -> bool {
+        let off_axis = self.inner.nodes().filter(|&x| self.inv_node(x) != x).collect_vec();
+
+        // two off-axis nodes are in one cluster iff they share an edge the axis does not meet
+        let shares_edge = |x: &Node, y: &Node|
+            x.edges().iter()
+                .filter(|&&e| !self.is_on_axis(e))
+                .any(|e| y.edges().contains(e));
+
+        let mut uf = KeyedUnionFind::from_iter(off_axis.iter().copied());
+        for (i, &x) in off_axis.iter().enumerate() {
+            for &y in &off_axis[..i] {
+                if shares_edge(x, y) {
+                    uf.union(&x, &y);
+                }
+            }
+        }
+
+        uf.into_disjoint().into_iter().all(|group|
+            group.first().is_none_or(|&rep| !group.contains(&self.inv_node(rep)))
+        )
     }
 
     // A strong inversion reverses the orientation.
@@ -187,7 +238,7 @@ impl InvLink {
         self.conn_sum_at(other, self_e, other_e)
     }
 
-    // Equivariant connected sum: splice along on-axis edges (`inv_edge(e) == e`) of each summand,
+    // Equivariant connected sum: splice along on-axis edges (`is_on_axis`) of each summand,
     // then recover the combined strong inversion by reindexing to the standard involution.
     pub fn conn_sum_at(&self, other: &InvLink, self_e: Edge, other_e: Edge) -> InvLink {
         assert!(self.is_knot() && other.is_knot(), "connected sum requires knots");
@@ -205,8 +256,6 @@ impl InvLink {
 
 impl InvLink {
     pub fn load(name: &str) -> Result<InvLink, Box<dyn std::error::Error>> {
-        // the data dir is external and empty on a fresh checkout; tests must not depend on it.
-        assert!(!cfg!(feature = "test-utils"), "`load` reads the data directory — use `test_data` in tests");
         let json = yui_core::util::data_dir::load_json("inv_link", name)?;
         let data: Vec<PDCodeX> = serde_json::from_str(&json)?;
         Ok(InvLink::from_symmetric_pd_code(data))
@@ -218,18 +267,6 @@ mod tests {
     use super::*;
     use crate::Slot;
     use crate::misc::det;
-
-    #[test]
-    fn reindexed_keeps_strong_inversion() {
-        // reindex the symmetric trefoil from edge 1; the standard e↦(n+1-e)%n+1 must stay a valid τ.
-        let il = InvLink::test_data("3_1");
-        let r = il.inner().reindexed(1, 1);
-        assert_eq!(r.edges(), (1..=6).collect::<Vec<Edge>>());
-
-        let n = r.n_edges() as Edge;
-        let e_map: Vec<_> = r.edges().into_iter().map(|e| (e, (n + 1 - e) % n + 1)).collect();
-        InvLink::new(r, e_map);  // panics if the involution is invalid
-    }
 
     #[test]
     fn pd_code_roundtrip() {
@@ -252,7 +289,7 @@ mod tests {
     }
 
     #[test]
-    fn inv_edge() { 
+    fn inv_edge() {
         let l = InvLink::test_data("3_1");
 
         assert_eq!(l.inv_edge(1), 1);
@@ -262,15 +299,15 @@ mod tests {
         assert_eq!(l.inv_edge(5), 3);
         assert_eq!(l.inv_edge(6), 2);
     }
-    
+
     #[test]
     fn inv_node() {
         let l = InvLink::test_data("3_1");
         let nodes = l.inner.nodes().collect_vec();
 
-        assert_eq!(l.inv_node(&nodes[0]), nodes[1]);
-        assert_eq!(l.inv_node(&nodes[1]), nodes[0]);
-        assert_eq!(l.inv_node(&nodes[2]), nodes[2]);
+        assert_eq!(l.inv_node(nodes[0]), nodes[1]);
+        assert_eq!(l.inv_node(nodes[1]), nodes[0]);
+        assert_eq!(l.inv_node(nodes[2]), nodes[2]);
     }
 
     #[test]
@@ -290,6 +327,42 @@ mod tests {
     #[should_panic(expected = "e_map does not cover edges [3, 4, 5, 6]")]
     fn new_names_the_uncovered_edges() {
         let _ = InvLink::new(Link::test_data("3_1"), [(1, 1), (2, 2)]);
+    }
+
+    #[test]
+    #[should_panic(expected = "e_map sends node")]
+    fn new_rejects_an_edge_map_no_rotation_realizes() {
+        // the identity is an edge-involution, but no π-rotation of the trefoil fixes every edge:
+        // at a crossing with four distinct edges, no reversal of the slots is the identity.
+        let l = Link::test_data("3_1");
+        let e_map: Vec<_> = l.edges().into_iter().map(|e| (e, e)).collect();
+        let _ = InvLink::new(l, e_map);
+    }
+
+    #[test]
+    fn nodes_sharing_an_edge_set() {
+        // both crossings of L2a1 carry the same four edges, so an edge-set match cannot tell them
+        // apart; the slot arrangement picks the rotation that swaps them.
+        let l = Link::from_pd_code([[4, 1, 3, 2], [2, 3, 1, 4]]);
+        let il = InvLink::new(l, [(1, 1), (2, 2), (3, 3), (4, 4)]);
+
+        let (x0, x1) = (il.node(0), il.node(1));
+        assert_eq!(il.inv_node(x0), x1);
+        assert_eq!(il.inv_node(x1), x0);
+    }
+
+    #[test]
+    fn transvergent() {
+        // 5_1's symmetric PD: the axis lies in the plane, so the off-axis crossings fall into
+        // clusters that τ pairs up.
+        let l = InvLink::from_symmetric_pd_code([[1,7,2,6],[3,9,4,8],[5,1,6,10],[7,3,8,2],[9,5,10,4]]);
+        assert!(l.is_transvergent());
+
+        // L2a1 rotated about an axis perpendicular to the plane: no edge is fixed, and the two
+        // crossings form a single cluster that τ maps onto itself.
+        let m = InvLink::new(Link::from_pd_code([[4,1,3,2],[2,3,1,4]]), [(1,2),(2,1),(3,4),(4,3)]);
+        assert!(m.on_axis_edges().is_empty());
+        assert!(!m.is_transvergent());
     }
 
     #[test]
@@ -354,6 +427,23 @@ mod tests {
             let k = InvLink::test_data(name);
             assert!(k.is_strongly_invertible(), "{name}");
             assert!(!k.is_2periodic(), "{name}");
+        }
+    }
+
+    #[test]
+    fn reindexed_keeps_strong_inversion() {
+        // renumbering the symmetric trefoil from either on-axis edge must leave the standard
+        // e ↦ (n+1-e)%n+1 a valid τ. Starting from edge 1 is a no-op; edge 4 is the real case.
+        let il = InvLink::test_data("3_1");
+        let n = il.n_edges() as Edge;
+
+        for start in il.on_axis_edges() {
+            let r = il.inner().reindexed(start, 1);
+            assert_eq!(r.edges(), (1..=n).collect::<Vec<Edge>>());
+
+            let e_map: Vec<_> = r.edges().into_iter().map(|e| (e, (n + 1 - e) % n + 1)).collect();
+            let re = InvLink::new(r, e_map);
+            assert!(re.is_strongly_invertible(), "renumbered from edge {start}");
         }
     }
 

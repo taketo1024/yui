@@ -1,3 +1,5 @@
+//! `ss`: the Rasmussen `s` invariant of a knot, over a chosen ring.
+
 use smart_default::SmartDefault;
 use std::marker::PhantomData;
 use std::ops::RangeInclusive;
@@ -46,7 +48,7 @@ pub struct Args {
     #[default(SsVersion::V2)]
     pub ver: SsVersion,
 
-    #[arg(long, value_parser = parse_h_range)]
+    #[arg(long, value_parser = parse_h_range, allow_hyphen_values = true)]
     pub h_range: Option<RangeInclusive<isize>>,
 
     #[arg(long, value_parser = parse_strategy, default_value = "greedy")]

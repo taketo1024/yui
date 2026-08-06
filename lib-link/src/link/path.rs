@@ -1,3 +1,6 @@
+//! [`Path`]: a connected component of a diagram, either an arc or a circle,
+//! held as an oriented sequence of edges.
+
 use std::fmt::Display;
 
 use smallvec::SmallVec;

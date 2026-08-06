@@ -21,7 +21,7 @@ use auto_impl_ops::auto_ops;
 use itertools::{Itertools, iproduct};
 use num_traits::Zero;
 use rayon::prelude::*;
-use yui_core::Sign;
+use yui_core::num::Sign;
 use yui_core::abst::{Ring, RingOps};
 use yui_core::ext::CloneAnd;
 use yui_core::lc::LcKey;
@@ -61,16 +61,16 @@ pub struct TngComplexKey {
     pub label: KhTensor
 }
 
-impl TngComplexKey { 
-    pub(crate) fn init() -> Self { 
+impl TngComplexKey {
+    pub(crate) fn init() -> Self {
         Self { state: State::empty(), label: KhTensor::empty() }
     }
 
-    pub fn weight(&self) -> usize { 
+    pub fn weight(&self) -> usize {
         self.state.weight()
     }
 
-    fn append(&mut self, other: TngComplexKey) { 
+    fn append(&mut self, other: TngComplexKey) {
         self.state.append(other.state);
         self.label.append(other.label);
     }
@@ -114,20 +114,20 @@ impl Display for TngComplexKey {
 
 #[derive(Clone, Debug)]
 pub struct TngComplexVertex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> { 
+where R: Ring, for<'x> &'x R: RingOps<R> {
     tng: Tng,
     in_edges: FxHashSet<TngComplexKey>,
     out_edges: FxHashMap<TngComplexKey, LcCob<R>>
 }
 
 impl<R> TngComplexVertex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> { 
-    pub fn init() -> Self { 
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    pub fn init() -> Self {
         let tng = Tng::empty();
         Self::from(tng)
     }
 
-    pub fn tng(&self) -> &Tng { 
+    pub fn tng(&self) -> &Tng {
         &self.tng
     }
 
@@ -188,7 +188,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         TngComplex{ ht, deg_shift, base_pt, dim, nodes: vec![], vertices }
     }
 
-    pub fn init(h: &R, t: &R, deg_shift: (isize, isize), base_pt: Option<Edge>) -> Self { 
+    pub fn init(h: &R, t: &R, deg_shift: (isize, isize), base_pt: Option<Edge>) -> Self {
         let mut vertices = FxHashMap::default();
         let k0 = TngComplexKey::init();
         let v0 = TngComplexVertex::init();
@@ -243,11 +243,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         c
     }
 
-    pub fn ht(&self) -> &(R, R) { 
+    pub fn ht(&self) -> &(R, R) {
         &self.ht
     }
 
-    pub fn deg_shift(&self) -> (isize, isize) { 
+    pub fn deg_shift(&self) -> (isize, isize) {
         self.deg_shift
     }
 
@@ -255,7 +255,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.deg_shift = deg_shift
     }
 
-    pub fn base_pt(&self) -> Option<Edge> { 
+    pub fn base_pt(&self) -> Option<Edge> {
         self.base_pt
     }
 
@@ -273,7 +273,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         i0 ..= i0 + n
     }
 
-    pub fn rank(&self, i: isize) -> usize { 
+    pub fn rank(&self, i: isize) -> usize {
         self.keys_of_deg(i).count()
     }
 
@@ -292,11 +292,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             .flat_map(|(e0, e1)| [e0, e1])
     }
 
-    pub fn contains_key(&self, key: &TngComplexKey) -> bool { 
+    pub fn contains_key(&self, key: &TngComplexKey) -> bool {
         self.vertices.contains_key(key)
     }
 
-    pub fn keys(&self) -> impl Iterator<Item = &TngComplexKey> { 
+    pub fn keys(&self) -> impl Iterator<Item = &TngComplexKey> {
         self.vertices.keys()
     }
 
@@ -318,7 +318,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.vertices.values().map(|v| v.out_edges.len()).sum()
     }
 
-    pub fn vertex(&self, v: &TngComplexKey) -> &TngComplexVertex<R> { 
+    pub fn vertex(&self, v: &TngComplexKey) -> &TngComplexVertex<R> {
         &self.vertices[v]
     }
 
@@ -337,11 +337,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let v = self.vertices.remove(k).unwrap();
 
         for j in v.in_edges.iter() {
-            self.vertices.get_mut(&j).unwrap().out_edges.remove(k);
+            self.vertices.get_mut(j).unwrap().out_edges.remove(k);
         }
-        
+
         for l in v.out_edges.keys() {
-            self.vertices.get_mut(&l).unwrap().in_edges.remove(k);
+            self.vertices.get_mut(l).unwrap().in_edges.remove(k);
         }
 
         v
@@ -356,8 +356,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     pub(crate) fn clear_verts(&mut self) {
         self.vertices.clear();
     }
-    
-    fn rename_vertex_key(&mut self, k_old: &TngComplexKey, k_new: TngComplexKey) { 
+
+    fn rename_vertex_key(&mut self, k_old: &TngComplexKey, k_new: TngComplexKey) {
         debug_assert_ne!(k_old, &k_new);
         debug_assert!(self.contains_key(k_old));
         debug_assert!(!self.contains_key(&k_new));
@@ -379,14 +379,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.add_vertex(k_new, v);
     }
 
-    fn duplicate_vertex(&mut self, k: &TngComplexKey, k_new: TngComplexKey) { 
+    fn duplicate_vertex(&mut self, k: &TngComplexKey, k_new: TngComplexKey) {
         debug_assert_ne!(k, &k_new);
         debug_assert!(self.contains_key(k));
         debug_assert!(!self.contains_key(&k_new));
 
         let v_new = self.vertex(k).clone();
 
-        for j in v_new.in_edges.iter() { 
+        for j in v_new.in_edges.iter() {
             let u = self.vertices.get_mut(j).unwrap();
             let f = u.out_edges[k].clone();
             u.out_edges.insert(k_new, f);
@@ -399,7 +399,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         self.add_vertex(k_new, v_new);
     }
-    
+
     pub fn edge(&self, k: &TngComplexKey, l: &TngComplexKey) -> &LcCob<R> {
         self.edge_opt(k, l).unwrap()
     }
@@ -412,11 +412,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     fn edge_mut(&mut self, k: &TngComplexKey, l: &TngComplexKey) -> Option<&mut LcCob<R>> {
         self.vertices.get_mut(k)?.out_edges.get_mut(l)
     }
-    
+
+    // the two directions must agree; a disagreement is a broken complex, so report no edge.
     pub fn has_edge(&self, k: &TngComplexKey, l: &TngComplexKey) -> bool {
         self.vertices[k].out_edges.contains_key(l) &&
-        self.vertices[l].in_edges.contains(k) &&
-        self.vertices[k].out_edges.contains_key(l)
+        self.vertices[l].in_edges.contains(k)
     }
 
     /// Fill cost of eliminating edge `k → l`: the Markowitz count `(out(k)-1)·(in(l)-1)` — the number
@@ -426,7 +426,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         (self.vertices[k].out_edges.len() - 1) * (self.vertices[l].in_edges.len() - 1)
     }
 
-    pub fn add_edge(&mut self, k: &TngComplexKey, l: &TngComplexKey, f: LcCob<R>) { 
+    pub fn add_edge(&mut self, k: &TngComplexKey, l: &TngComplexKey, f: LcCob<R>) {
         debug_assert!(!self.has_edge(k, l));
         debug_assert!(!f.is_zero());
 
@@ -437,9 +437,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         w.in_edges.insert(*k);
     }
 
-    pub fn remove_edge(&mut self, k: &TngComplexKey, l: &TngComplexKey) -> LcCob<R> { 
+    pub fn remove_edge(&mut self, k: &TngComplexKey, l: &TngComplexKey) -> LcCob<R> {
         debug_assert!(self.has_edge(k, l));
-        
+
         let w = self.vertices.get_mut(l).unwrap();
         w.in_edges.remove(k);
 
@@ -464,7 +464,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub(crate) fn prepare_merge(&mut self, other: TngComplex<R>) -> (Self, Self) { 
+    pub(crate) fn prepare_merge(&mut self, other: TngComplex<R>) -> (Self, Self) {
         assert_eq!(self.ht(), other.ht());
         assert!(self.base_pt.is_none() || other.base_pt.is_none() || self.base_pt == other.base_pt);
 
@@ -901,21 +901,21 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         ChainComplex1::new_with_d_matrices(summands, 1, matrices)
     }
 
-    pub fn is_completely_delooped(&self) -> bool { 
+    pub fn is_completely_delooped(&self) -> bool {
         self.vertices.iter().all(|(_, v)|
             v.tng.is_empty()
         )
     }
 
-    pub fn desc_d(&self) -> String { 
+    pub fn desc_d(&self) -> String {
         let mut str = "".to_string();
-        for i in self.h_range() { 
+        for i in self.h_range() {
             str += &format!("C[{i}]: {}\n", self.rank(i));
-            for (j, k) in self.keys_of_deg(i).sorted().enumerate() { 
+            for (j, k) in self.keys_of_deg(i).sorted().enumerate() {
                 let v = &self.vertices[k];
                 str += &format!(" ({j}) {k}: {}", v.tng);
-    
-                for l in self.vertex(k).out_edges().sorted() { 
+
+                for l in self.vertex(k).out_edges().sorted() {
                     let f = self.edge(k, l);
                     str += &format!("\n  -> {l}: {f}");
                 }
@@ -925,14 +925,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         str
     }
 
-    pub fn print_d(&self) { 
+    pub fn print_d(&self) {
         println!("{}", self.desc_d());
     }
 
     #[cfg(any(test, debug_assertions))]
     pub fn validate(&self) {
-        for (k, v) in self.vertices.iter() { 
-            // validate in_edges 
+        for (k, v) in self.vertices.iter() {
+            // validate in_edges
             for j in self.vertex(k).in_edges() {
                 assert!(
                     self.vertices.contains_key(j),
@@ -940,14 +940,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 );
 
                 let u = self.vertex(j);
-                
+
                 assert!(
                     u.out_edges.contains_key(k),
                     "no out-edge {j} -> {k}"
                 );
             }
-            
-            // validate out_edges 
+
+            // validate out_edges
             for l in self.vertex(k).out_edges() {
                 assert!(
                     self.vertices.contains_key(l),
@@ -969,7 +969,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
                 assert!(!f.is_zero());
 
-                f.iter().for_each(|(cob, _)| { 
+                f.iter().for_each(|(cob, _)| {
                     assert_eq!(&cob.reconst_src(), v.tng(), "invalid source: {} for {cob}", v.tng());
                     assert_eq!(&cob.reconst_tgt(), w.tng(), "invalid target: {} for {cob}", w.tng());
                 })
@@ -1046,7 +1046,7 @@ mod tests {
     use yui_link::Link;
 
     #[test]
-    fn empty() { 
+    fn empty() {
         let c = TngComplex::init(&0, &0, (0, 0), None);
 
         assert_eq!(c.dim(), 0);
@@ -1076,7 +1076,7 @@ mod tests {
     }
 
     #[test]
-    fn single_x_resolved() { 
+    fn single_x_resolved() {
         let mut c = TngComplex::init(&0, &0, (0, 0), None);
         let x = Node::from_pd_code([1,4,2,5]).resolve(Bit::Bit0);
         c.append_node(&x);
@@ -1086,7 +1086,7 @@ mod tests {
     }
 
     #[test]
-    fn two_x_disj() { 
+    fn two_x_disj() {
         let mut c = TngComplex::init(&0, &0, (0, 0), None);
         let x0 = Node::from_pd_code([1,4,2,5]);
         let x1 = Node::from_pd_code([11,14,12,15]);
@@ -1101,7 +1101,7 @@ mod tests {
     }
 
     #[test]
-    fn two_x() { 
+    fn two_x() {
         let mut c = TngComplex::init(&0, &0, (0, 0), None);
         let x0 = Node::from_pd_code([4,2,5,1]);
         let x1 = Node::from_pd_code([3,6,4,1]);
@@ -1116,7 +1116,7 @@ mod tests {
     }
 
     #[test]
-    fn deloop() { 
+    fn deloop() {
         let mut c = TngComplex::init(&0, &0, (0, 0), None);
         let x0 = Node::from_pd_code([1,2,2,1]).resolve(Bit::Bit0); // unknot
         c.append_node(&x0);
@@ -1125,7 +1125,7 @@ mod tests {
         assert_eq!(c.rank(0), 1);
 
         let k = TngComplexKey::init();
-        let circ = *c.vertex(&k).tng().comp(0);
+        let circ = c.vertex(&k).tng().comp(0).clone();
         let updated = c.deloop(&k, &circ);
 
         assert_eq!(c.dim(), 0);
@@ -1133,18 +1133,18 @@ mod tests {
 
         assert_eq!(updated, vec![
             TngComplexKey {
-                state: State::empty(), 
+                state: State::empty(),
                 label: KhTensor::from_iter([KhAlgGen::X])
             },
             TngComplexKey {
-                state: State::empty(), 
+                state: State::empty(),
                 label: KhTensor::from_iter([KhAlgGen::I])
             }
         ]);
     }
 
     #[test]
-    fn deloop_tangle() { 
+    fn deloop_tangle() {
         let mut c = TngComplex::init(&0, &0, (0, 0), None);
         let x0 = Node::from_pd_code([4,2,5,1]);
         let x1 = Node::from_pd_code([3,6,4,1]);
@@ -1158,10 +1158,10 @@ mod tests {
         assert_eq!(c.rank(2), 1);
 
         let k = TngComplexKey {
-            state: State::from([1,0]), 
+            state: State::from([1,0]),
             label: KhTensor::from_iter([])
         };
-        let circ = *c.vertex(&k).tng().comp(2);
+        let circ = c.vertex(&k).tng().comp(2).clone();
         assert!(circ.is_circle());
 
         let updated = c.deloop(&k, &circ);
@@ -1173,18 +1173,18 @@ mod tests {
 
         assert_eq!(updated, vec![
             TngComplexKey {
-                state: State::from([1,0]), 
+                state: State::from([1,0]),
                 label: KhTensor::from_iter([KhAlgGen::X])
             },
             TngComplexKey {
-                state: State::from([1,0]), 
+                state: State::from([1,0]),
                 label: KhTensor::from_iter([KhAlgGen::I])
             }
         ]);
     }
 
     #[test]
-    fn deloop_based() { 
+    fn deloop_based() {
         let mut c = TngComplex::init(&0, &0, (0, 0), Some(1)); // base point = 1
         let x0 = Node::from_pd_code([1,2,2,1]).resolve(Bit::Bit0); // unknot
         c.append_node(&x0);
@@ -1193,7 +1193,7 @@ mod tests {
         assert_eq!(c.rank(0), 1);
 
         let k = TngComplexKey::init();
-        let circ = *c.vertex(&k).tng().comp(0);
+        let circ = c.vertex(&k).tng().comp(0).clone();
         let updated = c.deloop(&k, &circ);
 
         assert_eq!(c.dim(), 0);
@@ -1201,7 +1201,7 @@ mod tests {
 
         assert_eq!(updated, vec![
             TngComplexKey {
-                state: State::empty(), 
+                state: State::empty(),
                 label: KhTensor::from_iter([KhAlgGen::X])
             },
         ]);

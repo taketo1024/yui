@@ -1,8 +1,11 @@
+//! [`KhIHomology`]: the homology of a [`KhIComplex`](crate::khi::KhIComplex),
+//! bigraded, carrying the canonical classes of the cone.
+
 use std::ops::{Index, RangeInclusive};
 use std::sync::OnceLock;
 use delegate::delegate;
 use yui_core::abst::{EucRing, EucRingOps};
-use yui_core::ext::IteratorExt;
+use yui_core::ext::{empty_range, IteratorExt};
 use yui_homology::{ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_link::InvLink;
 use crate::kh::KhComplex;
@@ -55,10 +58,11 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
             None    => reduced.homology(),
         };
         // drop canon cycles whose h-degree falls outside the requested range (e.g. the Q-side at h+1).
-        let canon_cycles = c.canon_cycles().iter()
-            .filter(|z| range.as_ref().map_or(true, |r| r.contains(&c.h_deg_of_chain(z))))
-            .cloned()
-            .collect();
+        let canon_cycles = c.canon_cycles().iter().filter(|z|
+            range.as_ref().is_none_or(|r|
+                r.contains(&c.h_deg_of_chain(z))
+            )
+        ).cloned().collect();
         KhIHomology::new_impl(homology, canon_cycles, c.deg_shift())
     }
 
@@ -105,13 +109,13 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn h_range(&self) -> RangeInclusive<isize> {
         self.support().filter(|&&i|
             !self[i].is_zero()
-        ).copied().range().unwrap_or(0..=-1)
+        ).copied().range().unwrap_or_else(empty_range)
     }
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
         self.support().flat_map(|&i|
             self[i].generators().map(|z| self.q_deg_of_chain(&z))
-        ).range().unwrap_or(0..=-1)
+        ).range().unwrap_or_else(empty_range)
     }
 
     pub fn canon_cycles(&self) -> &[KhIChain<R>] {
@@ -119,9 +123,13 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     pub fn truncated(&self, range: RangeInclusive<isize>) -> Self {
+        let canon_cycles = self.canon_cycles.iter().filter(|z|
+            range.contains(&self.h_deg_of_chain(z))
+        ).cloned().collect();
+
         Self::new_impl(
             self.inner.truncated(range),
-            self.canon_cycles.clone(),
+            canon_cycles,
             self.deg_shift,
         )
     }
@@ -167,7 +175,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 impl<R> ToSeqString<isize> for KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     delegate! {
-        to self.inner { 
+        to self.inner {
             fn label(&self) -> String;
             fn indices(&self) -> Vec<isize>;
             fn entry_at(&self, i: &isize) -> String;
@@ -188,11 +196,11 @@ where R: EucRing + TeX, for<'x> &'x R: EucRingOps<R> {
 
 impl<R> ToTableString<isize> for KhIHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    fn labels(&self) -> (String, String) { 
+    fn labels(&self) -> (String, String) {
         ("i".to_string(), "j".to_string())
     }
 
-    fn indices(&self) -> (Vec<isize>, Vec<isize>) { 
+    fn indices(&self) -> (Vec<isize>, Vec<isize>) {
         (self.h_range().collect(), self.q_range().step_by(2).collect())
     }
 

@@ -1,3 +1,5 @@
+//! `sl2`: the sl(2) action on Khovanov homology.
+
 use smart_default::SmartDefault;
 use crate::app::args::*;
 use crate::app::utils::dispatch::dispatch_field;
@@ -16,7 +18,7 @@ use yui_kh::kh::KhHomology;
 use yui_link::Link;
 
 pub fn dispatch(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
-    if args.is_field() { 
+    if args.is_field() {
         dispatch_field!(App, boot_field, args)
     } else {
         dispatch_eucring!(App, boot, args)
@@ -47,9 +49,6 @@ pub struct Args {
     #[arg(short = 'M', long)]
     pub show_matrix: bool,
 
-    #[arg(long)]
-    pub verify: bool,
-
     #[arg(long, default_value = "0")]
     pub log: u8,
 }
@@ -79,14 +78,14 @@ where
     where R: Field, for<'x> &'x R: FieldOps<R> {
         let mut app = Self::new(args.clone());
         app.run_field()
-    } 
+    }
 
-    pub fn boot(args: &Args) -> Result<String, Box<dyn std::error::Error>> { 
+    pub fn boot(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
         let mut app = Self::new(args.clone());
         app.run()
     }
 
-    pub fn new(args: Args) -> Self { 
+    pub fn new(args: Args) -> Self {
         let buff = String::with_capacity(1024);
         App { args, buff, _ring: PhantomData }
     }
@@ -124,10 +123,10 @@ where
 
         self.show_table(kh, bigraded);
 
-        if self.args.show_matrix { 
+        if self.args.show_matrix {
             if is_zero {
                 self.show_matrix_bigr(kh, e, (-2, -4));
-            } else { 
+            } else {
                 self.show_matrix(kh, e, -2);
             }
         }
@@ -150,38 +149,38 @@ where
         Ok((c, l, kh, (h, t)))
     }
 
-    fn show_table(&mut self, h: &KhHomology<R>, bigraded: bool) { 
-        let table = if bigraded { 
+    fn show_table(&mut self, h: &KhHomology<R>, bigraded: bool) {
+        let table = if bigraded {
             h.to_table_string()
-        } else { 
+        } else {
             h.to_seq_string()
         };
 
         self.out(&table);
 
-        if self.args.show_gens { 
+        if self.args.show_gens {
             self.show_gens(h);
         }
     }
 
-    fn show_gens(&mut self, h: &KhHomology<R>) { 
+    fn show_gens(&mut self, h: &KhHomology<R>) {
         for &i in h.support() {
             if h[i].is_zero() { continue }
 
             self.out(&format!("({i}): {}", h[i]));
 
-            for (k, z) in h[i].generators().enumerate() { 
+            for (k, z) in h[i].generators().enumerate() {
                 self.out(&format!("  {k}: {z}"));
             }
             self.out("");
         }
     }
 
-    fn show_matrix_bigr(&mut self, h: &KhHomology<R>, f: &KhChainMap<R>, deg: (isize, isize)) { 
-        for d in h.delta_range().step_by(2) { 
+    fn show_matrix_bigr(&mut self, h: &KhHomology<R>, f: &KhChainMap<R>, deg: (isize, isize)) {
+        for d in h.delta_range().step_by(2) {
             self.out(&format!("delta: {d}\n"));
 
-            for i1 in h.h_range().rev() { 
+            for i1 in h.h_range().rev() {
                 let j1 = 2 * i1 - d;
                 let i2 = i1 + deg.0;
                 let j2 = j1 + deg.1;
@@ -193,7 +192,7 @@ where
 
                 let mat = h1.make_matrix_euc(h2, |z| f.apply(i1, z)).into_dense();
                 let r = mat.rank();
-                
+
                 self.out(&format!("  ({i1}, {j1}): {} -> ({i2}, {j2}): {}; rank: {}", h[(i1, j1)], h[(i2, j2)], r));
                 self.out(&format!("{}\n", mat.to_string().trim_end()));
             }
@@ -201,8 +200,8 @@ where
         self.out("");
     }
 
-    fn show_matrix(&mut self, h: &KhHomology<R>, f: &KhChainMap<R>, deg: isize) { 
-        for i1 in h.h_range().rev() { 
+    fn show_matrix(&mut self, h: &KhHomology<R>, f: &KhChainMap<R>, deg: isize) {
+        for i1 in h.h_range().rev() {
             let i2 = i1 + deg;
             let h1 = &h[i1];
             let h2 = &h[i2];
@@ -211,8 +210,8 @@ where
 
             let mat = h1.make_matrix_euc(h2, |z| f.apply(i1, z)).into_dense();
             let r = mat.rank();
-            
-            if self.args.show_matrix { 
+
+            if self.args.show_matrix {
                 self.out(&format!("  {i1}: {} -> {i2}: {}; rank: {}", h[i1], h[i2], r));
                 self.out(&format!("{}\n", mat.to_string().trim_end()));
             }
@@ -220,12 +219,12 @@ where
         self.out("");
     }
 
-    fn out(&mut self, str: &str) { 
+    fn out(&mut self, str: &str) {
         self.buff.push_str(str);
         self.buff.push('\n');
     }
 
-    fn flush(&mut self) -> String { 
+    fn flush(&mut self) -> String {
         let res = std::mem::take(&mut self.buff);
         res.trim_end().to_string()
     }

@@ -1,3 +1,7 @@
+//! Sparse PLUQ decomposition and its solvers. `pre_pluq` stops after the
+//! heuristic pivots; `pluq` completes the factorization. `solve_pluq_incr` solves
+//! incrementally, capping the pivots taken per pass.
+
 // Sparse PLUQ decomposition & linear solver.
 // Implemented with the help of Claude Code.
 
@@ -26,7 +30,7 @@ pub struct SpPluq<R> {
 }
 
 impl<R> SpPluq<R> {
-    /// Constructs a `PartialPluq` after asserting the shapes are mutually
+    /// Constructs an `SpPluq` after asserting the shapes are mutually
     /// consistent: `l.n_cols() == u.n_rows() = r`, `l.n_rows() == p.dim() = m`,
     /// `u.n_cols() == q.dim() = n`, and `s.shape() == (m - r, n - r)`.
     pub fn new(p: Perm, q: Perm, l: SpMat<R>, u: SpMat<R>, s: SpMat<R>) -> Self {
@@ -299,7 +303,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
         let y0 = SpVec::from(y[..r].to_vec());
         let x = solve_triangular_vec(TriangularType::Lower, &l0, &y0).into_dense();
 
-        if check_consistency && !is_consistent(l, y, &x) { 
+        if check_consistency && !is_consistent(l, y, &x) {
             return None;
         }
         x
@@ -387,7 +391,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
         let r_old = pp.rank();
         let (pp_next, r_next, c) = chunk_pluq(pp.take_s(), chunk);
         let p_next = pp_next.p.clone();
-        
+
         merge_pluq(&mut pp, pp_next);
 
         // Apply the chunk's row perm to the tail of yp so it stays in sync with pp.l.
@@ -574,7 +578,7 @@ mod tests {
 
         let paq = a.permute(&pp.p, &pp.q);
         let rem_full = SpMat::from_entries((m, n),
-            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
+            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, *v))
         );
         assert_eq!(paq, &pp.l * &pp.u + &rem_full);
 
@@ -600,7 +604,7 @@ mod tests {
 
         let paq = a.permute(&pp.p, &pp.q);
         let rem_full = SpMat::from_entries((m, n),
-            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
+            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, *v))
         );
         assert_eq!(paq, &pp.l * &pp.u + &rem_full);
 
@@ -669,7 +673,7 @@ mod tests {
 
         let paq = a.permute(&pp.p, &pp.q);
         let rem = SpMat::from_entries((m, n),
-            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
+            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, *v))
         );
         assert_eq!(paq, &pp.l * &pp.u + &rem, "p*A*q != l*u + rest");
 
@@ -692,7 +696,7 @@ mod tests {
 
         let paq = a.permute(&pp.p, &pp.q);
         let rem = SpMat::from_entries((m, n),
-            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
+            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, *v))
         );
         assert_eq!(paq, &pp.l * &pp.u + &rem, "p*A*q != l*u + rest");
 
@@ -742,7 +746,7 @@ mod tests {
 
         let psq = s.permute(&pp.p, &pp.q);
         let rem = SpMat::from_entries((ms, ns),
-            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
+            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, *v))
         );
         assert_eq!(psq, &pp.l * &pp.u + &rem, "p*s*q != l*u + rest");
     }
@@ -799,7 +803,7 @@ mod tests {
     use yui_core::num::Ratio;
     type R = Ratio<i64>;
     fn r(n: i64) -> R { R::from(n) }
-    
+
     fn sp_mat(shape: (usize, usize), data: impl IntoIterator<Item = R>) -> SpMat<R> {
         SpMat::from_row_major(shape, data)
     }
@@ -983,7 +987,7 @@ mod tests {
 
         let psq = s.permute(&pp.p, &pp.q);
         let rem = SpMat::from_entries((m, n),
-            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
+            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, *v))
         );
         assert_eq!(psq, &pp.l * &pp.u + &rem, "p*s*q != l*u + rest (c = {c})");
     }
@@ -1017,7 +1021,7 @@ mod tests {
 
         let psq = s.permute(&pp.p, &pp.q);
         let rem = SpMat::from_entries((m, n),
-            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
+            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, *v))
         );
         assert_eq!(psq, &pp.l * &pp.u + &rem);
     }

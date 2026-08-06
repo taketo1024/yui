@@ -3,7 +3,7 @@
 //! which builds links out of patterns.
 
 use petgraph::Graph;
-use yui_core::Sign;
+use yui_core::num::Sign;
 use yui_core::ext::CloneAnd;
 use yui_core::bitseq::Bit;
 
@@ -22,6 +22,10 @@ impl Link {
     pub fn conn_sum_at(&self, other: &Link, self_e: Edge, other_e: Edge) -> Link {
         assert!(self.is_oriented(),  "conn_sum requires an oriented link (self)");
         assert!(other.is_oriented(), "conn_sum requires an oriented link (other)");
+        assert!(
+            !self.loops().contains(&self_e) && !other.loops().contains(&other_e),
+            "connected sum on free loops is not supported yet"
+        );
 
         let mut b = LinkBuilder::new();
         let v1 = b.add_link(self);
@@ -266,5 +270,12 @@ mod tests {
         let (vcs, vu) = (jones_polynomial(&cs), jones_polynomial(&Link::unknot()));
         let (v1, v2) = (jones_polynomial(&k1), jones_polynomial(&k2));
         assert_eq!(&vcs * &vu, &v1 * &v2);
+    }
+
+    #[test]
+    #[should_panic(expected = "free loops is not supported")]
+    fn conn_sum_rejects_a_free_loop_base_pt() {
+        // K # unknot = K mathematically, but the splice needs a base point sitting on a crossing.
+        let _ = Link::unknot().conn_sum(&Link::test_data("3_1"));
     }
 }

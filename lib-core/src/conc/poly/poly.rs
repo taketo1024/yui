@@ -23,6 +23,7 @@ use auto_impl_ops::auto_ops;
 
 use crate::abst::{MathType, AddMon, AddMonOps, AddGrp, AddGrpOps, Mon, MonOps, Ring, RingOps, EucRing, EucRingOps, Field, FieldOps};
 use crate::lc::Lc;
+use crate::util::parse_err::ParseErr;
 use super::{MultiDeg, Var, Var2, Var3,MultiVar, Mono, MonoOrd};
 
 /// Univariate polynomial `R[X]`.
@@ -63,7 +64,7 @@ where
 
 impl<X, R> PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
-    fn new(data: Lc<X, R>) -> Self { 
+    fn new(data: Lc<X, R>) -> Self {
         Self { data, zero: (X::one(), R::zero()) }
     }
 
@@ -71,11 +72,11 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
         Self::from((X::one(), r))
     }
 
-    pub fn inner(&self) -> &Lc<X, R> { 
+    pub fn inner(&self) -> &Lc<X, R> {
         &self.data
     }
 
-    delegate! { 
+    delegate! {
         to self.data {
             pub fn nterms(&self) -> usize;
             pub fn any_term(&self) -> Option<(&X, &R)>;
@@ -90,29 +91,29 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
         self.data.coeff(&X::from(i))
     }
 
-    pub fn is_const(&self) -> bool { 
+    pub fn is_const(&self) -> bool {
         self.iter().all(|(x, _)| x.is_one())
     }
 
-    pub fn const_term(&self) -> &R { 
+    pub fn const_term(&self) -> &R {
         self.coeff(&X::one())
     }
 
-    pub fn lead_term(&self) -> (&X, &R) { 
+    pub fn lead_term(&self) -> (&X, &R) {
         self.iter().max_by(|t1, t2| MonoOrd::cmp_grlex(t1.0, t2.0))
             .unwrap_or((&self.zero.0, &self.zero.1))
     }
 
-    pub fn lead_coeff(&self) -> &R { 
+    pub fn lead_coeff(&self) -> &R {
         self.lead_term().1
     }
 
-    pub fn lead_deg(&self) -> X::Deg { 
+    pub fn lead_deg(&self) -> X::Deg {
         self.lead_term().0.deg()
     }
 
     pub fn sort_terms_by<F>(&self, cmp: F) -> impl Iterator<Item = (&X, &R)>
-    where F: Fn(&X, &X) -> std::cmp::Ordering { 
+    where F: Fn(&X, &X) -> std::cmp::Ordering {
         self.data.sort_terms_by(cmp)
     }
 
@@ -127,7 +128,7 @@ macro_rules! impl_var_specific {
         // Univar
         impl<const X: char, R> PolyBase<Var<X, $I>, R>
         where R: Ring, for<'x> &'x R: RingOps<R> {
-            pub fn variable() -> Self { 
+            pub fn variable() -> Self {
                 Self::from(Self::mono(1))
             }
 
@@ -146,7 +147,7 @@ macro_rules! impl_var_specific {
         // Bivar
         impl<const X: char, const Y: char, R> PolyBase<Var2<X, Y, $I>, R>
         where R: Ring, for<'x> &'x R: RingOps<R> {
-            pub fn variable(i: usize) -> Self { 
+            pub fn variable(i: usize) -> Self {
                 assert!(i < 2);
                 let d = if i == 0 { (1, 0) } else { (0, 1) };
                 Self::from(Var2::from(d))
@@ -167,9 +168,9 @@ macro_rules! impl_var_specific {
         // Trivar
         impl<const X: char, const Y: char, const Z: char, R> PolyBase<Var3<X, Y, Z, $I>, R>
         where R: Ring, for<'x> &'x R: RingOps<R> {
-            pub fn variable(i: usize) -> Self { 
+            pub fn variable(i: usize) -> Self {
                 assert!(i < 3);
-                let d = match i { 
+                let d = match i {
                     0 => (1, 0, 0),
                     1 => (0, 1, 0),
                     2 => (0, 0, 1),
@@ -193,7 +194,7 @@ macro_rules! impl_var_specific {
         // MultiVar
         impl<const X: char, R> PolyBase<MultiVar<X, $I>, R>
         where R: Ring, for<'x> &'x R: RingOps<R> {
-            pub fn variable(i: usize) -> Self { 
+            pub fn variable(i: usize) -> Self {
                 let d = MultiDeg::from((i, 1));
                 Self::from(MultiVar::from(d)) // x^1
             }
@@ -202,12 +203,12 @@ macro_rules! impl_var_specific {
                 MultiVar::from(degs)
             }
 
-            pub fn lead_term_for(&self, k: usize) -> Option<(&MultiVar<X, $I>, &R)> { 
+            pub fn lead_term_for(&self, k: usize) -> Option<(&MultiVar<X, $I>, &R)> {
                 self.iter()
                     .filter(|(x, _)| x.deg_for(k) > 0)
                     .max_by(|(x, _), (y, _)|
                         Ord::cmp( &x.deg_for(k), &y.deg_for(k))
-                        .then_with(|| 
+                        .then_with(||
                             MultiVar::cmp_grlex(&x, &y)
                         )
                     )
@@ -257,16 +258,16 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<X, R> FromStr for PolyBase<X, R>
 where X: Mono + FromStr, R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
-    type Err = ();
+    type Err = ParseErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if let Ok(r) = R::from_str(s) { 
+        if let Ok(r) = R::from_str(s) {
             Ok(Self::from_const(r))
-        } else if let Ok(x) = X::from_str(s) { 
+        } else if let Ok(x) = X::from_str(s) {
             Ok(Self::from(x))
         } else {
             // TODO support more complex format.
-            Err(())
+            Err(ParseErr::invalid(s, &Self::math_symbol()))
         }
     }
 }
@@ -362,11 +363,11 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     fn mul_assign(&mut self, rhs: &PolyBase<X, R>) {
         if rhs.is_one() {
             // do nothing
-        } else if rhs.is_const() { 
+        } else if rhs.is_const() {
             *self *= rhs.const_term()
-        } else if self.is_const() { 
+        } else if self.is_const() {
             *self = rhs * self.const_term()
-        } else { 
+        } else {
             self.data *= &rhs.data
         }
     }
@@ -379,7 +380,7 @@ macro_rules! impl_pow_unsigned {
             type Output = PolyBase<X, R>;
             fn pow(self, n: $t) -> Self::Output {
                 let mut res = PolyBase::one();
-                for _ in 0..n { 
+                for _ in 0..n {
                     res *= self
                 }
                 res
@@ -398,7 +399,7 @@ macro_rules! impl_pow_signed {
         where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
             type Output = PolyBase<X, R>;
             fn pow(self, n: $t) -> Self::Output {
-                if n >= 0 { 
+                if n >= 0 {
                     self.pow(n as usize)
                 } else {
                     let inv = self.inv().unwrap();
@@ -447,7 +448,7 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {}
 impl<X, R> Ring for PolyBase<X, R>
 where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     fn inv(&self) -> Option<Self> {
-        if self.nterms() != 1 { 
+        if self.nterms() != 1 {
             return None
         }
 
@@ -458,10 +459,10 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn is_unit(&self) -> bool {
-        if self.nterms() == 1 { 
+        if self.nterms() == 1 {
             let (x, a) = self.any_term().unwrap();
             x.is_unit() && a.is_unit()
-        } else { 
+        } else {
             false
         }
     }
@@ -476,21 +477,21 @@ where X: Mono, R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<const X: char, R> Poly<X, R>
 where R: Field, for<'x> &'x R: FieldOps<R> {
-    pub fn div_rem(&self, rhs: &Self) -> (Self, Self) { 
-        let iter = |f: Self, g: &Self| -> (Self, Self) { 
-            if f.lead_deg() < g.lead_deg() { 
+    pub fn div_rem(&self, rhs: &Self) -> (Self, Self) {
+        let iter = |f: Self, g: &Self| -> (Self, Self) {
+            if f.lead_deg() < g.lead_deg() {
                 return (Self::zero(), f)
             }
 
             let (i, a) = f.lead_term(); // ax^i
             let (j, b) = g.lead_term(); // bx^j
-            
+
             let k = i.deg() - j.deg(); // >= 0
             let c = a / b;
             let x = Var::from(k);
             let q = Poly::from((x, c));   // cx^k = (a/b) x^{i-j}.
             let r = f - &q * g;
-            
+
             (q, r)
         };
 
@@ -499,8 +500,8 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
 
         let i = self.lead_deg();
         let j =  rhs.lead_deg();
-        
-        for _ in j ..= i { // passes if j > i. 
+
+        for _ in j ..= i { // passes if j > i.
             let (q1, r1) = iter(r, rhs);
             q += q1;
             r = r1;
@@ -545,7 +546,7 @@ mod tex {
 
     impl<X, R> TeX for PolyBase<X, R>
     where X: Mono + TeX, R: Ring + TeX, for<'x> &'x R: RingOps<R> {
-        fn tex_math_symbol() -> String { 
+        fn tex_math_symbol() -> String {
             format!("{}[{}]", R::tex_math_symbol(), X::tex_math_symbol())
         }
 
@@ -565,8 +566,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn init() { 
-        type P = Poly::<'x', i32>; 
+    fn init() {
+        type P = Poly::<'x', i32>;
 
         let x = P::mono;
         let f = P::from_iter([(x(0), 1), (x(1), 2), (x(2), -3)]);
@@ -575,19 +576,19 @@ mod tests {
         assert_eq!(f.data.coeff(&x(2)), &-3);
         assert_eq!(f.data.coeff(&x(3)), &0);
     }
- 
+
     #[test]
-    fn display_poly() { 
-        type P = Poly::<'x', i32>; 
+    fn display_poly() {
+        type P = Poly::<'x', i32>;
 
         let x = P::mono;
         let f = P::from_iter([(x(0), 1), (x(1), 2), (x(2), -3)]);
         assert_eq!(&f.to_string(), "-3x² + 2x + 1");
     }
- 
+
     #[test]
-    fn display_lpoly() { 
-        type P = LPoly::<'x', i32>; 
+    fn display_lpoly() {
+        type P = LPoly::<'x', i32>;
 
         let x = P::mono;
         let f = P::from_iter([(x(-1), 4), (x(0), 2), (x(2), 3)]);
@@ -595,17 +596,17 @@ mod tests {
     }
 
     #[test]
-    fn display_poly2() { 
-        type P = Poly2::<'x', 'y', i32>; 
+    fn display_poly2() {
+        type P = Poly2::<'x', 'y', i32>;
 
         let xy = P::mono;
         let f = P::from_iter([(xy(0, 0), 3), (xy(1, 0), 2), (xy(2, 3), 3)]);
         assert_eq!(&f.to_string(), "3x²y³ + 2x + 3");
     }
- 
+
     #[test]
-    fn display_mpoly() { 
-        type P = PolyN::<'x', i32>; 
+    fn display_mpoly() {
+        type P = PolyN::<'x', i32>;
 
         let xn = P::mono;
         let f = P::from_iter([
@@ -617,8 +618,8 @@ mod tests {
     }
 
     #[test]
-    fn display_mlpoly() { 
-        type P = LPolyN::<'x', i32>; 
+    fn display_mlpoly() {
+        type P = LPolyN::<'x', i32>;
 
         let xn = P::mono;
         let f = P::from_iter([
@@ -679,12 +680,12 @@ mod tests {
     }
 
     #[test]
-    fn coeff() { 
+    fn coeff() {
         type P = Poly::<'x', i32>;
 
         let x = P::mono;
         let f = P::from_iter([(x(0), 2), (x(1), 3), (x(2), -4)]);
-        
+
         assert_eq!(f.coeff_for(0), &2);
         assert_eq!(f.coeff_for(1), &3);
         assert_eq!(f.coeff_for(2), &-4);
@@ -692,7 +693,7 @@ mod tests {
     }
 
     #[test]
-    fn const_term() { 
+    fn const_term() {
         type P = Poly::<'x', i32>;
         let x = P::mono;
         let f = P::from_iter([(x(0), 2), (x(1), 3), (x(2), -4)]);
@@ -703,7 +704,7 @@ mod tests {
     }
 
     #[test]
-    fn lead_term() { 
+    fn lead_term() {
         type P = Poly::<'x', i32>;
 
         let x = P::mono;
@@ -720,7 +721,7 @@ mod tests {
     }
 
     #[test]
-    fn add() { 
+    fn add() {
         type P = Poly::<'x', i32>;
 
         let x = P::mono;
@@ -731,7 +732,7 @@ mod tests {
     }
 
     #[test]
-    fn neg() { 
+    fn neg() {
         type P = Poly::<'x', i32>;
 
         let x = P::mono;
@@ -741,7 +742,7 @@ mod tests {
     }
 
     #[test]
-    fn sub() { 
+    fn sub() {
         type P = Poly::<'x', i32>;
         let x = P::mono;
         let f = P::from_iter([(x(0), 2), (x(1), 3), (x(2), -4)]);
@@ -750,7 +751,7 @@ mod tests {
     }
 
     #[test]
-    fn mul() { 
+    fn mul() {
         type P = Poly::<'x', i32>;
 
         let x = P::mono;
@@ -761,7 +762,7 @@ mod tests {
     }
 
     #[test]
-    fn mul_const() { 
+    fn mul_const() {
         type P = Poly::<'x', i32>;
 
         let x = P::mono;
@@ -773,7 +774,7 @@ mod tests {
     }
 
     #[test]
-    fn pow() { 
+    fn pow() {
         type P = Poly::<'x', i32>;
 
         let x = P::mono;
@@ -786,7 +787,7 @@ mod tests {
     }
 
     #[test]
-    fn pow_laurent() { 
+    fn pow_laurent() {
         type P = LPoly::<'x', i32>;
 
         let x = P::mono;
@@ -799,7 +800,7 @@ mod tests {
     }
 
     #[test]
-    fn inv() { 
+    fn inv() {
         type P = Poly::<'x', i32>;
 
         let x = P::mono;
@@ -825,7 +826,7 @@ mod tests {
     }
 
     #[test]
-    fn inv_rat() { 
+    fn inv_rat() {
         type R = Ratio<i32>;
         type P = Poly::<'x', R>;
 
@@ -853,7 +854,7 @@ mod tests {
     }
 
     #[test]
-    fn inv_laurent() { 
+    fn inv_laurent() {
         type P = LPoly::<'x', i32>;
 
         let x = P::mono;
@@ -883,7 +884,7 @@ mod tests {
     }
 
     #[test]
-    fn inv_laurent_rat() { 
+    fn inv_laurent_rat() {
         type R = Ratio<i32>;
         type P = LPoly::<'x', R>;
 
@@ -914,7 +915,7 @@ mod tests {
     }
 
     #[test]
-    fn div_rem() { 
+    fn div_rem() {
         type R = Ratio<i32>;
         type P = Poly::<'x', R>;
 
@@ -933,18 +934,21 @@ mod tests {
     }
 
     #[test]
-    fn from_str() { 
+    fn from_str() {
         type P = Poly::<'x', i32>;
 
         assert_eq!(P::from_str("-3"), Ok(P::from_const(-3)));
         assert_eq!(P::from_str("x"), Ok(P::variable()));
-        assert_eq!(P::from_str("y"), Err(()));
+
+        // the error names both the input and the target ring.
+        let e = P::from_str("y").unwrap_err();
+        assert_eq!(e.to_string(), "cannot parse \"y\" as Z[x]");
 
         // TODO support more complex types
     }
 
     #[test]
-    fn eval_bivar() { 
+    fn eval_bivar() {
         type P = Poly2::<'x', 'y', i32>;
 
         let xy = P::mono;
@@ -972,8 +976,8 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
-    fn serialize_univar() { 
-        type P = Poly::<'x', i32>; 
+    fn serialize_univar() {
+        type P = Poly::<'x', i32>;
 
         let x = P::mono;
         let f = P::from_iter([(x(0), 1), (x(1), 2), (x(2), -3)]);
@@ -985,13 +989,13 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
-    fn serialize_bivar() { 
-        type P = LPoly2::<'x', 'y', i32>; 
+    fn serialize_bivar() {
+        type P = LPoly2::<'x', 'y', i32>;
 
         let xy = P::mono;
         let f = P::from_iter([
-            (xy(0, 0), 3), 
-            (xy(1, 0), 1), 
+            (xy(0, 0), 3),
+            (xy(1, 0), 1),
             (xy(-2, 13), -3)
         ]);
 
@@ -1003,8 +1007,8 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
-    fn serialize_mvar() { 
-        type P = LPolyN::<'x', i32>; 
+    fn serialize_mvar() {
+        type P = LPolyN::<'x', i32>;
 
         let xn = P::mono;
         let f = P::from_iter([
@@ -1019,9 +1023,9 @@ mod tests {
     }
 
     #[test]
-    fn tex() { 
+    fn tex() {
         use crate::util::tex::TeX;
-        type P = LPolyN::<'x', i32>; 
+        type P = LPolyN::<'x', i32>;
 
         assert_eq!(P::tex_math_symbol(), "\\mathbb{Z}[x_1,\\ldots]");
 

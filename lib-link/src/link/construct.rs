@@ -1,6 +1,8 @@
 //! Constructions producing new links from patterns — twist knots, cables and satellites.
 //! Contrast with [`crate::link::link_ops`], which operates on links you already have.
 
+use std::collections::HashSet;
+use petgraph::stable_graph::NodeIndex;
 use crate::{Link, Edge, LinkBuilder, Port};
 
 impl Link {
@@ -63,8 +65,18 @@ impl Link {
     // each edge → 2 parallel edges. Every component doubles into its two parallel copies
     // (n components → 2n; framing = the diagram's writhe per component).
     pub fn cable2(l: &Link) -> Link {
-        let (b, _) = Self::cable2_builder(l);
-        b.build().unwrap()
+        let (b, cab) = Self::cable2_builder(l);
+
+        // both copies must enter where the companion does — left free, `build` picks the
+        // anti-parallel orientation and the cross-copy crossings cancel the rest.
+        let incoming: HashSet<Port> = l.nodes().enumerate().flat_map(|(i, x)| {
+            let (p, q) = x.incoming().expect("cable2 needs an oriented diagram");
+            [p, q].map(|s| cab[i][s.index()])
+        }).flat_map(|(a0, a1)|
+            [a0, a1]
+        ).collect();
+
+        b.build_with(|i, s| incoming.contains(&(NodeIndex::new(i), s))).unwrap()
     }
 
     // The 2-cable in an open builder, plus `cab[i][slot.index()] = (copy-0 port, copy-1 port)` so callers can
@@ -234,11 +246,14 @@ mod tests {
     fn pretzel_determinants() {
         // det P(a, b, c) = |ab + bc + ca| — includes the (-2, 3, 7)-pretzel (det 1). `det` sums over
         // all 2^n resolutions, so the 15-crossing cases are left to `pretzel_band_symmetries`.
-        for (a, b, c) in [(1, 1, 1), (-1, -1, -1), (1, 3, 5), (-2, 3, 7)] {
+        // link-valued parameters (two or more even) are included: those are 2- and 3-component
+        // pretzel links, which the renumbering has to carry as well as knots.
+        for (a, b, c) in [(1, 1, 1), (-1, -1, -1), (1, 3, 5), (-2, 3, 7), (2, 2, 2), (2, 2, 3), (2, 2, -3)] {
             let l = Link::pretzel(a, b, c);
             let n = (a.unsigned_abs() + b.unsigned_abs() + c.unsigned_abs()) as usize;
             assert_eq!(l.n_crossings(), n, "P({a},{b},{c}) crossing count");
             assert_eq!(det(&l), (a * b + b * c + c * a).abs(), "det P({a},{b},{c})");
+            assert_eq!(l.edges(), (1..=l.n_edges() as Edge).collect::<Vec<_>>(), "P({a},{b},{c}) numbering");
         }
     }
 
@@ -337,6 +352,17 @@ mod tests {
         assert_eq!(c.n_comps(), 2, "2-cable of a knot is a 2-component link");
         assert!(c.is_oriented());
         let _ = c.seifert_circles(); // exercises orientation consistency
+    }
+
+    #[test]
+    fn cable2_is_parallel() {
+        // the two copies run the same way, so every sub-crossing keeps the companion's sign and
+        // the cable carries the blackboard framing. Anti-parallel copies would cancel to 0.
+        for name in ["3_1", "5_1", "5_2"] {
+            let k = Link::test_data(name);
+            let c = Link::cable2(&k);
+            assert_eq!(c.writhe(), 4 * k.writhe(), "cable2({name}) is not parallel");
+        }
     }
 
     #[test]

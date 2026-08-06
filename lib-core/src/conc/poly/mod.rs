@@ -1,3 +1,6 @@
+//! Polynomials and their monomials, in one, two, three or indexed-many
+//! variables, ordinary or Laurent.
+
 mod var;
 mod var2;
 mod var3;

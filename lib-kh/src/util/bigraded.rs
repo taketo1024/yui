@@ -1,3 +1,6 @@
+//! [`Bigraded`]: splits a singly-graded module into a bigraded one by reading a
+//! second degree off each generator.
+
 use std::collections::HashMap;
 
 use itertools::Itertools;

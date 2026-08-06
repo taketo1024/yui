@@ -9,6 +9,7 @@ use auto_impl_ops::auto_ops;
 
 use crate::abst::{MathType, IndexType};
 use crate::lc::LcKey;
+use crate::util::parse_err::ParseErr;
 
 use super::{Mono, MonoOrd};
 use super::var::parse_mono_deg;
@@ -23,9 +24,9 @@ pub struct Var3<const X: char, const Y: char, const Z: char, I>(
 );
 
 impl<const X: char, const Y: char, const Z: char, I> Var3<X, Y, Z, I> {
-    pub fn var_symbol(i: usize) -> char { 
+    pub fn var_symbol(i: usize) -> char {
         assert!(i < 3);
-        match i { 
+        match i {
             0 => X,
             1 => Y,
             2 => Z,
@@ -33,15 +34,15 @@ impl<const X: char, const Y: char, const Z: char, I> Var3<X, Y, Z, I> {
         }
     }
 
-    pub fn multi_deg(&self) -> (I, I, I) 
-    where I: Copy { 
+    pub fn multi_deg(&self) -> (I, I, I)
+    where I: Copy {
         (self.0, self.1, self.2)
     }
 
     pub fn deg_for(&self, i: usize) -> I
-    where I: Copy { 
+    where I: Copy {
         assert!(i < 3);
-        match i { 
+        match i {
             0 => self.0,
             1 => self.1,
             2 => self.2,
@@ -50,7 +51,7 @@ impl<const X: char, const Y: char, const Z: char, I> Var3<X, Y, Z, I> {
     }
 
     pub fn total_deg(&self) -> I
-    where I: Copy + for<'x> Add<&'x I, Output = I> { 
+    where I: Copy + for<'x> Add<&'x I, Output = I> {
         self.0 + &self.1 + &self.2
     }
 
@@ -60,7 +61,7 @@ impl<const X: char, const Y: char, const Z: char, I> Var3<X, Y, Z, I> {
     }
 
     fn to_string_u(&self, unicode: bool) -> String
-    where I: ToPrimitive { 
+    where I: ToPrimitive {
         let Var3(d0, d1, d2) = self;
         let seq = [(X, d0), (Y, d1), (Z, d2)];
         fmt_mono_n(seq, unicode)
@@ -75,11 +76,11 @@ impl<const X: char, const Y: char, const Z: char, I> From<(I, I, I)> for Var3<X,
 
 impl<const X: char, const Y: char, const Z: char, I> FromStr for Var3<X, Y, Z, I>
 where I: Zero + AddAssign + FromStr + FromPrimitive {
-    type Err = String;
+    type Err = ParseErr;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use regex::Regex;
 
-        if s == "1" { 
+        if s == "1" {
             return Ok(Self(I::zero(), I::zero(), I::zero()))
         }
 
@@ -89,20 +90,22 @@ where I: Zero + AddAssign + FromStr + FromPrimitive {
         let r = Regex::new(&p).unwrap();
         let r_all = Regex::new(&p_all).unwrap();
 
-        if !r_all.is_match(s) { 
-            return Err(format!("Failed to parse: {s}"))
+        if !r_all.is_match(s) {
+            return Err(ParseErr::invalid(s, &format!("a monomial in {X}, {Y}, {Z}")))
         }
 
         let mut deg = (I::zero(), I::zero(), I::zero());
-        
+
         for c in r.captures_iter(s) {
             let x = &c[1];
-            let i = parse_mono_deg(x, &c[0]).unwrap();
-            if x.starts_with(X) { 
+            let i = parse_mono_deg(x, &c[0]).ok_or_else(||
+                ParseErr::invalid(s, &format!("a monomial in {X}, {Y}, {Z}"))
+            )?;
+            if x.starts_with(X) {
                 deg.0 += i;
-            } else if x.starts_with(Y) { 
+            } else if x.starts_with(Y) {
                 deg.1 += i;
-            } else { 
+            } else {
                 deg.2 += i;
             }
         };
@@ -142,7 +145,7 @@ impl<const X: char, const Y: char, const Z: char, I> MonoOrd for Var3<X, Y, Z, I
 where I: Copy + Eq + Ord + for<'x> Add<&'x I, Output = I> {
     fn cmp_lex(&self, other: &Self) -> std::cmp::Ordering {
         // must have x_0 > x_1 > x_2
-        I::cmp(&self.0, &other.0).then_with(|| 
+        I::cmp(&self.0, &other.0).then_with(||
             I::cmp(&self.1, &other.1)
         ).then_with(||
             I::cmp(&self.2, &other.2)
@@ -150,7 +153,7 @@ where I: Copy + Eq + Ord + for<'x> Add<&'x I, Output = I> {
     }
 
     fn cmp_grlex(&self, other: &Self) -> std::cmp::Ordering {
-        I::cmp(&self.total_deg(), &other.total_deg()).then_with(|| 
+        I::cmp(&self.total_deg(), &other.total_deg()).then_with(||
             Self::cmp_lex(self, other)
         )
     }
@@ -171,7 +174,7 @@ where I: Copy + Eq + Ord + for<'x> Add<&'x I, Output = I> {
 }
 
 impl<const X: char, const Y: char, const Z: char, I> Display for Var3<X, Y, Z, I>
-where I: ToPrimitive { 
+where I: ToPrimitive {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = self.to_string_u(true);
         f.write_str(&s)
@@ -179,7 +182,7 @@ where I: ToPrimitive {
 }
 
 impl<const X: char, const Y: char, const Z: char, I> Debug for Var3<X, Y, Z, I>
-where I: ToPrimitive { 
+where I: ToPrimitive {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Display::fmt(self, f)
     }
@@ -195,12 +198,12 @@ where I: ToPrimitive {
 }
 
 impl<const X: char, const Y: char, const Z: char, I> MathType for Var3<X, Y, Z, I>
-where I: IndexType + ToPrimitive { 
+where I: IndexType + ToPrimitive {
     fn math_symbol() -> String {
         format!("{X}, {Y}, {Z}")
     }
 }
-        
+
 impl<const X: char, const Y: char, const Z: char, I> LcKey for Var3<X, Y, Z, I>
 where I: IndexType + Copy + for<'x> Add<&'x I, Output = I> + ToPrimitive {}
 
@@ -213,19 +216,19 @@ macro_rules! impl_trivar_unsigned {
                 (self.0, self.1, self.2)
             }
 
-            fn is_unit(&self) -> bool { 
+            fn is_unit(&self) -> bool {
                 self.0.is_zero() && self.1.is_zero() && self.2.is_zero()
             }
 
             fn inv(&self) -> Option<Self> { // (x^i)^{-1} = x^{-i}
                 if self.is_unit() {
                     Some(Self(0, 0, 0))
-                } else { 
+                } else {
                     None
                 }
             }
 
-            fn divides(&self, other: &Self) -> bool { 
+            fn divides(&self, other: &Self) -> bool {
                 self.0 <= other.0 && self.1 <= other.1 && self.2 <= other.2
             }
         }
@@ -241,7 +244,7 @@ macro_rules! impl_trivar_signed {
                 (self.0, self.1, self.2)
             }
 
-            fn is_unit(&self) -> bool { 
+            fn is_unit(&self) -> bool {
                 true
             }
 
@@ -249,7 +252,7 @@ macro_rules! impl_trivar_signed {
                 Some(Self(-self.0, -self.1, -self.2))
             }
 
-            fn divides(&self, _other: &Self) -> bool { 
+            fn divides(&self, _other: &Self) -> bool {
                 true
             }
         }
@@ -265,7 +268,7 @@ mod tex {
 
     impl<const X: char, const Y: char, const Z: char, I> TeX for Var3<X, Y, Z, I>
     where I: ToPrimitive {
-        fn tex_math_symbol() -> String { 
+        fn tex_math_symbol() -> String {
             format!("{},{},{}", X, Y, Z)
         }
         fn tex_string(&self) -> String {
@@ -279,16 +282,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn var_symbol() { 
+    fn var_symbol() {
         type M = Var3<'X','Y','Z',usize>;
-        
+
         assert_eq!(M::var_symbol(0), 'X');
         assert_eq!(M::var_symbol(1), 'Y');
         assert_eq!(M::var_symbol(2), 'Z');
     }
 
     #[test]
-    fn init() { 
+    fn init() {
         type M = Var3<'X','Y','Z',usize>;
         let xyz = |i, j, k| M::from((i, j, k));
 
@@ -300,10 +303,10 @@ mod tests {
     }
 
     #[test]
-    fn from_str() { 
+    fn from_str() {
         type M = Var3<'X','Y','Z',isize>;
         let xyz = |i, j, k| M::from((i, j, k));
-        
+
         assert_eq!(M::from_str("1"), Ok(M::one()));
         assert_eq!(M::from_str("X"), Ok(xyz(1, 0, 0)));
         assert_eq!(M::from_str("Y"), Ok(xyz(0, 1, 0)));
@@ -318,7 +321,7 @@ mod tests {
     }
 
     #[test]
-    fn display() { 
+    fn display() {
         type M = Var3<'X','Y','Z',usize>;
         let xyz = |i, j, k| M::from((i, j, k));
 
@@ -345,7 +348,7 @@ mod tests {
     }
 
     #[test]
-    fn neg_opt_unsigned() { 
+    fn neg_opt_unsigned() {
         type M = Var3<'X','Y','Z',usize>;
         let xyz = |i, j, k| M::from((i, j, k));
 
@@ -363,7 +366,7 @@ mod tests {
     }
 
     #[test]
-    fn neg_opt_signed() { 
+    fn neg_opt_signed() {
         type M = Var3<'X','Y','Z',isize>;
         let xyz = |i, j,k| M::from((i, j, k));
 
@@ -381,7 +384,7 @@ mod tests {
     }
 
     #[test]
-    fn eval() { 
+    fn eval() {
         type M = Var3<'X','Y','Z',usize>;
         let xyz = |i, j,k| M::from((i, j, k));
 
@@ -402,7 +405,7 @@ mod tests {
     }
 
     #[test]
-    fn cmp_lex() { 
+    fn cmp_lex() {
         type M = Var3<'X','Y','Z',usize>;
         let xyz = |i, j,k| M::from((i, j, k));
 
@@ -416,7 +419,7 @@ mod tests {
     }
 
     #[test]
-    fn cmp_grlex() { 
+    fn cmp_grlex() {
         type M = Var3<'X','Y','Z',usize>;
         let xyz = |i, j,k| M::from((i, j, k));
 

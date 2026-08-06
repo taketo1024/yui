@@ -38,7 +38,7 @@ resources/
 
 ### `Link`
 
-A knot or link given by a planar diagram. Internally a `Vec<Node>` plus a `Vec<Edge>` of free loops and an optional base point. `Edge = usize` is an opaque edge id. Construct from:
+A knot or link given by a planar diagram. Internally a `Vec<Node>` plus a `Vec<Edge>` of free loops and an optional base point. `Edge` is an opaque edge id (`u8`, or `u16` under the `big-link` feature). Construct from:
 
 - a PD code: `Link::from_pd_code([[1,4,2,5], ...])`,
 - explicit nodes and loops: `Link::new(nodes, loops)`, or the wrapper `Link::from_nodes(nodes)` for no loops,
@@ -106,6 +106,7 @@ An `InvLink` is only an *involutive* link. `on_axis_edges()` lists the τ-fixed 
 ### Derived invariants
 
 - `jones_polynomial(&Link) -> LPoly<'q', i32>` — Kauffman-bracket computation summing over all `2^n` resolutions.
+- `det(&Link) -> i32` — the determinant `|Δ_L(-1)| = |V_L(-1)|`, read off `jones_polynomial`.
 
 ## Conventions
 

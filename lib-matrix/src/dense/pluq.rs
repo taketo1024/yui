@@ -1,3 +1,6 @@
+//! Dense PLUQ decomposition `PA Q = LU` over a ring, and the linear solver
+//! built on it.
+
 // Implemented with the help of Claude Code.
 
 use log::debug;
@@ -217,7 +220,7 @@ mod tests {
         // p * A^T * q = l * u + rest
         let paq = apply_perms(&at, &dp.p, &dp.q);
         let rem_full = Mat::generate((m, n), |i, j| {
-            if i >= rank && j >= rank { dp.s[(i - rank, j - rank)].clone() } else { R::zero() }
+            if i >= rank && j >= rank { dp.s[(i - rank, j - rank)] } else { R::zero() }
         });
         assert_eq!(paq, &dp.l * &dp.u + &rem_full);
     }
@@ -241,7 +244,7 @@ mod tests {
         let mut out = Mat::zero((m, n));
         for i in 0..m {
             for j in 0..n {
-                out[(p.at(i), q.at(j))] = a[(i, j)].clone();
+                out[(p.at(i), q.at(j))] = a[(i, j)];
             }
         }
         out
@@ -276,7 +279,7 @@ mod tests {
         // Main invariant: p_mat * A * q_mat = L * U + [[0,0],[0,s]]
         let paq = apply_perms(a, &pp.p, &pp.q);
         let rem_full = Mat::generate((m, n), |i, j| {
-            if i >= rank && j >= rank { pp.s[(i - rank, j - rank)].clone() } else { R::zero() }
+            if i >= rank && j >= rank { pp.s[(i - rank, j - rank)] } else { R::zero() }
         });
         assert_eq!(paq, &pp.l * &pp.u + &rem_full, "p*A*q should equal L*U + s");
 
@@ -431,7 +434,7 @@ mod tests {
         let (m, n) = a.shape();
         assert_eq!(x.len(), n);
         for i in 0..m {
-            let ax_i: R = (0..n).fold(R::zero(), |acc, j| acc + &a[(i, j)] * &x[j]);
+            let ax_i: R = (0..n).fold(R::zero(), |acc, j| acc + a[(i, j)] * x[j]);
             assert_eq!(ax_i, y[i], "row {i}: (A*x)[{i}] != y[{i}]");
         }
         x

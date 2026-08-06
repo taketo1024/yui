@@ -74,8 +74,8 @@ fn truncated_system<F>(
 ) -> (SpMat<F>, SpVec<F>)
 where F: Field, for<'x> &'x F: FieldOps<F> {
     let in_win = |q: isize| q < q_hi;
-    let (n_rows, row_map) = window_index(tgt_q, &in_win);
-    let (n_cols, col_map) = window_index(src_q, &in_win);
+    let (n_rows, row_map) = window_index(tgt_q, in_win);
+    let (n_cols, col_map) = window_index(src_q, in_win);
 
     let a = SpMat::from_entries((n_rows, n_cols), d.iter_nz().filter_map(|(i, j, p)| {
         let i1 = row_map[i]?;

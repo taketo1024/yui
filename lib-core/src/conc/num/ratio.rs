@@ -14,6 +14,7 @@ use num_traits::{Zero, One};
 use auto_impl_ops::auto_ops;
 
 use crate::abst::{EucRing, EucRingOps, MathType, Mon, AddMon, AddGrp, AddMonOps, AddGrpOps, MonOps, RingOps, Ring, FieldOps, Field};
+use crate::util::parse_err::ParseErr;
 use super::int::{IntType, IntOps};
 
 /// A fraction `numer / denom` over a [`EucRing`] `T`, kept in reduced form.
@@ -54,7 +55,7 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
 
     fn reduce(&mut self) {
         if self.numer.is_zero() {
-            if !self.denom.is_one() { 
+            if !self.denom.is_one() {
                 self.denom.set_one();
             }
             return;
@@ -62,12 +63,12 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
 
         let u = self.denom.normalizing_unit();
 
-        if !u.is_one() { 
+        if !u.is_one() {
             self.numer *= &u;
             self.denom *= &u;
         }
 
-        if self.denom.is_one() || self.numer.is_unit() { 
+        if self.denom.is_one() || self.numer.is_unit() {
             return
         }
 
@@ -79,7 +80,7 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
         }
     }
 
-    pub fn is_int(&self) -> bool { 
+    pub fn is_int(&self) -> bool {
         self.denom.is_one()
     }
 }
@@ -101,22 +102,25 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
 
 impl<T> FromStr for Ratio<T>
 where T: EucRing + FromStr, for<'x> &'x T: EucRingOps<T> {
-    type Err = String;
+    type Err = ParseErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if let Ok(a) = s.parse::<T>() {
             return Ok(Self::from(a))
-        } 
-        
+        }
+
         let r = regex::Regex::new(r"(.+)/(.+)").unwrap();
-        if let Some(c) = r.captures(s) { 
+        if let Some(c) = r.captures(s) {
             let (s1, s2) = (&c[1], &c[2]);
             if let (Ok(a), Ok(b)) = (s1.parse::<T>(), s2.parse::<T>()) {
+                if b.is_zero() {
+                    return Err(ParseErr::new(format!("zero denominator in \"{s}\"")))
+                }
                 return Ok(Self::new(a, b))
             }
         }
 
-        Err(format!("cannot parse string: '{s}'"))
+        Err(ParseErr::invalid(s, &Self::math_symbol()))
     }
 }
 
@@ -134,10 +138,10 @@ where T: Display {
 
         let p = paren_expr(&self.numer);
         let q = paren_expr(&self.denom);
-    
-        if &q == "1" { 
+
+        if &q == "1" {
             write!(f, "{}", p)
-        } else { 
+        } else {
             write!(f, "{}/{}", p, q)
         }
     }
@@ -180,16 +184,16 @@ macro_rules! impl_add_assign_op {
             fn $method(&mut self, rhs: &Ratio<T>) {
                 let (_, b) = (&self.numer, &self.denom);
                 let (c, d) = ( &rhs.numer,  &rhs.denom);
-                
-                if rhs.is_zero() { 
+
+                if rhs.is_zero() {
                     // do nothing
-                } else if self.is_zero() { 
+                } else if self.is_zero() {
                     self.numer.$method(c);  // 0 -> 0 ± c
                     self.denom = d.clone(); // 1 -> d
-                } else if b == d { 
+                } else if b == d {
                     self.numer.$method(c);  // a -> a ± c
                     self.reduce()
-                } else { 
+                } else {
                     let l = EucRing::lcm(b, d); // l = xb = yd
                     self.numer *= (&l / b);     // a -> xa ± yc
                     self.numer.$method((&l / d) * c);
@@ -227,26 +231,26 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
         let (a, b) = (&self.numer, &self.denom);
         let (c, d) = ( &rhs.numer,  &rhs.denom);
 
-        if self.is_zero() || rhs.is_one() { 
+        if self.is_zero() || rhs.is_one() {
             // do nothing
-        } else if rhs.is_zero() { 
+        } else if rhs.is_zero() {
             self.set_zero();             // a -> 0, b -> 1
-        } else if rhs.is_int() { 
+        } else if rhs.is_int() {
             let k = EucRing::gcd(b, c);  // b = kb', c = kc'
             self.numer *= c / &k;        // a -> a * c'
             self.denom /= &k;            // b -> b'
-        } else if self.is_int() { 
+        } else if self.is_int() {
             let k = EucRing::gcd(a, d);  // a = ka', d = kd'
             self.numer /= &k;            // a -> a' * c
-            self.numer *= c;             // 
+            self.numer *= c;             //
             self.denom = d / &k;         // 1 ->      d'
         } else {
             let k = EucRing::gcd(a, d);  // a = ka', d = kd'
             let l = EucRing::gcd(b, c);  // b = lb', c = lc'
             self.numer /= &k;            // a -> a' * c'
-            self.numer *= c / &l;        //      
+            self.numer *= c / &l;        //
             self.denom /= &l;            // b -> b' * d'
-            self.denom *= d / &k;        //      
+            self.denom *= d / &k;        //
         }
     }
 }
@@ -261,12 +265,12 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
 }
 
 #[auto_ops]
-impl<'b, T> Rem<&'b Ratio<T>> for &Ratio<T>
+impl<T> Rem<&Ratio<T>> for &Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     type Output = Ratio<T>;
-    fn rem(self, rhs: &'b Ratio<T>) -> Self::Output {
+    fn rem(self, rhs: &Ratio<T>) -> Self::Output {
         assert!(!rhs.is_zero());
-        Ratio::zero() // MEMO Frac<T> is a field. 
+        Ratio::zero() // MEMO Frac<T> is a field.
     }
 }
 
@@ -287,33 +291,33 @@ decl_alg_ops!(RingOps);
 decl_alg_ops!(EucRingOps);
 decl_alg_ops!(FieldOps);
 
-impl<T> MathType for Ratio<T> 
+impl<T> MathType for Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     fn math_symbol() -> String {
         let t = T::math_symbol();
-        if &t == "Z" { 
+        if &t == "Z" {
             String::from("Q")
-        } else { 
+        } else {
             format!("Q({})", T::math_symbol())
         }
     }
 }
 
-impl<T> Mon for Ratio<T> 
+impl<T> Mon for Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {}
 
-impl<T> AddMon for Ratio<T> 
+impl<T> AddMon for Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {}
 
-impl<T> AddGrp for Ratio<T> 
+impl<T> AddGrp for Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {}
 
-impl<T> Ring for Ratio<T> 
+impl<T> Ring for Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     fn inv(&self) -> Option<Self> {
-        if self.is_zero() { 
+        if self.is_zero() {
             None
-        } else { 
+        } else {
             let inv = Self::new(self.denom.clone(), self.numer.clone());
             Some(inv)
         }
@@ -324,9 +328,9 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     }
 
     fn normalizing_unit(&self) -> Self {
-        if self.is_zero() { 
+        if self.is_zero() {
             Self::one()
-        } else { 
+        } else {
             self.inv().unwrap()
         }
     }
@@ -336,23 +340,23 @@ where T: EucRing, for<'x> &'x T: EucRingOps<T> {
     }
 }
 
-impl<T> EucRing for Ratio<T> 
+impl<T> EucRing for Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {}
 
-impl<T> Field for Ratio<T> 
+impl<T> Field for Ratio<T>
 where T: EucRing, for<'x> &'x T: EucRingOps<T> {}
 
 impl<T> Ratio<T>
 where T: IntType, for<'x> &'x T: IntOps<T> {
     pub fn abs(&self) -> Self {
-        if self.numer.is_negative() { 
+        if self.numer.is_negative() {
             -self
-        } else { 
+        } else {
             self.clone()
         }
     }
 
-    pub fn to_f64(&self) -> f64 { 
+    pub fn to_f64(&self) -> f64 {
         let p = self.numer.to_f64().unwrap();
         let q = self.denom.to_f64().unwrap();
         p / q
@@ -362,13 +366,12 @@ where T: IntType, for<'x> &'x T: IntOps<T> {
 impl<T> Ord for Ratio<T>
 where T: IntType, for<'x> &'x T: IntOps<T> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        let l = self.to_f64();
-        let r = other.to_f64();
-        l.total_cmp(&r)
+        // `reduce` keeps denominators positive, so cross-multiplying preserves the order.
+        (self.numer() * other.denom()).cmp(&(other.numer() * self.denom()))
     }
 }
 
-impl<T> PartialOrd for Ratio<T> 
+impl<T> PartialOrd for Ratio<T>
 where T: IntType, for<'x> &'x T: IntOps<T> {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         Some(self.cmp(other))
@@ -379,26 +382,26 @@ mod tex {
     use crate::util::tex::TeX;
     use super::*;
 
-    impl<T> TeX for Ratio<T> 
+    impl<T> TeX for Ratio<T>
     where T: TeX + MathType {
-        fn tex_math_symbol() -> String { 
+        fn tex_math_symbol() -> String {
             let t = T::math_symbol();
-            if &t == "Z" { 
+            if &t == "Z" {
                 String::from("\\mathbb{Q}")
-            } else { 
+            } else {
                 format!("Q({})", T::math_symbol())
-            }        
+            }
         }
 
         fn tex_string(&self) -> String {
             let p = self.numer.tex_string();
             let q = self.denom.tex_string();
-    
-            if &q == "1" { 
+
+            if &q == "1" {
                 p
-            } else if !p.starts_with('-') && !p.contains(' ') { 
+            } else if !p.starts_with('-') && !p.contains(' ') {
                 format!(r"\frac{{{p}}}{{{q}}}")
-            } else { 
+            } else {
                 let p = p.strip_prefix('-').unwrap();
                 format!(r"-\frac{{{p}}}{{{q}}}")
             }
@@ -407,7 +410,7 @@ mod tex {
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     use super::*;
 
     #[test]
@@ -453,15 +456,15 @@ mod tests {
     }
 
     #[test]
-    fn add() { 
+    fn add() {
         let a = Ratio::new(1, 2);
         let b = Ratio::new(3, 5);
         assert_eq!(a + b, Ratio::new(11, 10));
 
         let a = Ratio::new(1, 2);
         let o = Ratio::zero();
-        assert_eq!(&a + &o, a);
-        assert_eq!(&o + &a, a);
+        assert_eq!(a + o, a);
+        assert_eq!(o + a, a);
 
         let a = Ratio::new(1, 3);
         let b = Ratio::new(2, 3);
@@ -473,7 +476,7 @@ mod tests {
     }
 
     #[test]
-    fn add_assign() { 
+    fn add_assign() {
         let mut a = Ratio::new(1, 2);
         a += Ratio::new(3, 5);
 
@@ -481,89 +484,89 @@ mod tests {
     }
 
     #[test]
-    fn neg() { 
+    fn neg() {
         let a = Ratio::new(1, 2);
         assert_eq!(-a, Ratio::new(-1, 2));
     }
 
     #[test]
-    fn sub() { 
+    fn sub() {
         let a = Ratio::new(1, 2);
         let b = Ratio::new(3, 5);
         assert_eq!(a - b, Ratio::new(-1, 10));
 
         let a = Ratio::new(1, 2);
         let o = Ratio::zero();
-        assert_eq!(&a - &o, a);
-        assert_eq!(&o - &a, -a);
+        assert_eq!(a - o, a);
+        assert_eq!(o - a, -a);
     }
 
     #[test]
-    fn sub_assign() { 
+    fn sub_assign() {
         let mut a = Ratio::new(1, 2);
         a -= Ratio::new(3, 5);
         assert_eq!(a, Ratio::new(-1, 10));
     }
 
     #[test]
-    fn mul() { 
+    fn mul() {
         let a = Ratio::new(3, 10);
         let b = Ratio::new(-2, 7);
         assert_eq!(a * b, Ratio::new(-3, 35));
 
         let a = Ratio::new(3, 4);
         let e = Ratio::one();
-        assert_eq!(&a * &e, a);
-        assert_eq!(&e * &a, a);
+        assert_eq!(a * e, a);
+        assert_eq!(e * a, a);
 
         let a = Ratio::new(3, 4);
         let e = -Ratio::one();
-        assert_eq!(&a * &e, -a);
-        assert_eq!(&e * &a, -a);
+        assert_eq!(a * e, -a);
+        assert_eq!(e * a, -a);
 
         let a = Ratio::new(3, 4);
         let o = Ratio::zero();
-        assert_eq!(&a * &o, Ratio::zero());
-        assert_eq!(&o * &a, Ratio::zero());
+        assert_eq!(a * o, Ratio::zero());
+        assert_eq!(o * a, Ratio::zero());
     }
 
     #[test]
-    fn mul_assign() { 
+    fn mul_assign() {
         let mut a = Ratio::new(3, 10);
         a *= Ratio::new(2, 7);
         assert_eq!(a, Ratio::new(3, 35));
     }
 
     #[test]
-    fn div() { 
+    fn div() {
         let a = Ratio::new(3, 10);
         let b = Ratio::new(2, 7);
         assert_eq!(a / b, Ratio::new(21, 20));
     }
 
     #[test]
-    fn div_assign() { 
+    fn div_assign() {
         let mut a = Ratio::new(3, 10);
         a /= Ratio::new(2, 7);
         assert_eq!(a, Ratio::new(21, 20));
     }
 
     #[test]
-    fn rem() { 
+    fn rem() {
         let a = Ratio::new(3, 10);
         let b = Ratio::new(2, 7);
         assert_eq!(a % b, Ratio::zero());
     }
 
     #[test]
-    fn rem_assign() { 
+    fn rem_assign() {
         let mut a = Ratio::new(3, 10);
         a %= Ratio::new(2, 7);
         assert_eq!(a, Ratio::zero());
     }
 
     #[test]
-    fn inv() { 
+    fn inv() {
         let a = Ratio::new(-3, 10);
         assert_eq!(a.inv(), Some(Ratio::new(-10, 3)));
 
@@ -572,7 +575,7 @@ mod tests {
     }
 
     #[test]
-    fn is_unit() { 
+    fn is_unit() {
         let a = Ratio::new(-3, 10);
         assert!(a.is_unit());
 
@@ -581,7 +584,7 @@ mod tests {
     }
 
     #[test]
-    fn normalizing_unit() { 
+    fn normalizing_unit() {
         let a = Ratio::new(-3, 10);
         assert_eq!(a.normalizing_unit(), Ratio::new(-10, 3));
 
@@ -590,14 +593,50 @@ mod tests {
     }
 
     #[test]
-    fn cmp() { 
+    fn gcd_normalized() {
+        // over a field every nonzero element divides every other, so the gcd normalizes to 1.
+        let (x, y) = (Ratio::new(-3, 2), Ratio::new(5, 4));
+
+        let d = EucRing::gcd(&x, &y);
+        assert_eq!(d, Ratio::one(), "gcd is not normalized");
+
+        let (d, s, t) = EucRing::gcdx(&x, &y);
+        assert_eq!(d, Ratio::one(), "gcdx's d is not normalized");
+        assert_eq!(s * x + t * y, d, "Bezout fails");
+        assert_eq!(EucRing::gcd(&x, &y), d, "gcd disagrees with gcdx");
+    }
+
+    #[test]
+    fn cmp() {
         let a = Ratio::new(3, 5);
         let b = Ratio::new(4, 7);
         assert!(a > b);
     }
 
     #[test]
-    fn c_weight() { 
+    fn from_str_zero_denom() {
+        // `Ratio` derives `DeserializeFromStr`, so this must not abort the process.
+        assert!(Ratio::<i64>::from_str("1/0").is_err());
+        assert!(Ratio::<i64>::from_str("0/0").is_err());
+        assert_eq!(Ratio::<i64>::from_str("1/2"), Ok(Ratio::new(1, 2)));
+    }
+
+    #[test]
+    fn cmp_large() {
+        // distinct values must compare distinct, however large the terms.
+        let a = Ratio::new((1i64 << 53) + 1, 1);
+        let b = Ratio::new(1i64 << 53, 1);
+        assert_ne!(a, b);
+        assert!(a > b);
+
+        let c = Ratio::new(1i64, (1i64 << 53) + 1);
+        let d = Ratio::new(1i64, 1i64 << 53);
+        assert_ne!(c, d);
+        assert!(c < d);
+    }
+
+    #[test]
+    fn c_weight() {
         let a = Ratio::new(-43, 31);
         assert_eq!(a.c_weight(), 43_f64);
 
@@ -607,9 +646,9 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
-    fn serialize() { 
+    fn serialize() {
         let a = Ratio::new(3, 5);
-        
+
         let ser = serde_json::to_string(&a).unwrap();
         assert_eq!(ser, "\"3/5\"");
 
@@ -618,7 +657,7 @@ mod tests {
     }
 
     #[test]
-    fn tex() { 
+    fn tex() {
         use crate::util::tex::TeX;
         assert_eq!(Ratio::<i32>::tex_math_symbol(), "\\mathbb{Q}");
 

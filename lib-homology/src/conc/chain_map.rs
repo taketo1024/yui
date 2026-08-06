@@ -12,6 +12,8 @@ use crate::{GrMod, AddInd, Summand};
 
 use super::ChainComplex;
 
+type ChainMapFn<'c, I, X, Y, R> = Arc<dyn Fn(I, &Lc<X, R>) -> Lc<Y, R> + Send + Sync + 'c>;
+
 /// A chain map between two chain complexes. Holds references to source and
 /// target (`'a`) and a stored closure (`'c`). [`Self::cone`] produces a fresh
 /// owned [`ChainComplex`] and so requires `'c: 'static`.
@@ -24,7 +26,7 @@ where
     source: &'a ChainComplex<I, X, R>,
     target: &'a ChainComplex<I, Y, R>,
     deg: I,
-    map: Arc<dyn Fn(I, &Lc<X, R>) -> Lc<Y, R> + Send + Sync + 'c>,
+    map: ChainMapFn<'c, I, X, Y, R>,
 }
 
 impl<'a, 'c, I, X, Y, R> ChainMap<'a, 'c, I, X, Y, R>
@@ -100,6 +102,8 @@ where
     pub fn cone<It>(&self, support: It, target_based: bool) -> ChainComplex<I, EitherKey<X, Y>, R>
     where It: IntoIterator<Item = I>, 'c: 'static {
         assert!(self.source.d_deg() == self.target.d_deg());
+        // the cone pairs `Cᵢ` with `Dᵢ`, so `f` must land in the summand `d` already maps into.
+        assert!(self.deg.is_zero(), "cone requires a degree-zero map");
 
         let source = self.source;
         let target = self.target;
@@ -146,7 +150,7 @@ where
         let dx = self.source.d(i, &x);
         let fdx = self.apply(i + d_deg, &dx);
         let fx = self.apply(i, &x);
-        let dfx = self.target.d(i, &fx);
+        let dfx = self.target.d(i + self.deg, &fx);
 
         assert!(dfx == fdx, "df != fd for x = {x}.\n  df = {dfx},\n  fd = {fdx}.");
     }
@@ -183,6 +187,38 @@ mod tests {
     }
 
     #[test]
+    fn check_at_nonzero_deg() {
+        // C: C₁ ≅ C₀ and D: D₂ ≅ D₁, with `f` of degree 1 carrying one onto the other —
+        // a genuine chain map, so the check must accept it.
+        let c = GenericChainComplex1::<i32>::from_d_matrices(-1, [
+            (0, SpMat::zero((0, 1))),
+            (1, SpMat::from_entries((1, 1), [(0, 0, 1)])),
+        ]);
+        let d = GenericChainComplex1::<i32>::from_d_matrices(-1, [
+            (1, SpMat::zero((0, 1))),
+            (2, SpMat::from_entries((1, 1), [(0, 0, 1)])),
+        ]);
+
+        let f = ChainMap::new(&c, &d, 1, |_, z: &Lc<GenericKey<isize>, i32>|
+            z.iter().map(|(k, a)| (GenericKey(k.0 + 1, k.1), *a)).collect()
+        );
+
+        f.check_at(1);
+    }
+
+    #[test]
+    #[should_panic(expected = "cone requires a degree-zero map")]
+    fn cone_rejects_nonzero_deg() {
+        // with `deg ≠ 0` the `f`-terms land outside the summand and `vectorize` drops them,
+        // leaving a complex whose differential is missing `f` entirely.
+        let s2 = GenericChainComplex1::<i32>::s2();
+        let d3 = GenericChainComplex1::<i32>::d3();
+
+        let f = ChainMap::new(&s2, &d3, 1, |_, z| z.clone());
+        let _ = f.cone((0..=4).rev(), true);
+    }
+
+    #[test]
     fn test_cone() {
         type T = EitherKey<GenericKey<isize>, GenericKey<isize>>;
         let s2 = GenericChainComplex1::<i32>::s2();
@@ -193,25 +229,25 @@ mod tests {
         let cone = f.cone((0..=4).rev(), true);
         cone.check_d_all();
 
-        let x = T::from_left(s2[0].raw_generator(0).clone());
-        let y = T::from_left(s2[1].raw_generator(0).clone());
-        let z = T::from_right(d3[1].raw_generator(0).clone());
+        let x = T::from_left(*s2[0].raw_generator(0));
+        let y = T::from_left(*s2[1].raw_generator(0));
+        let z = T::from_right(*d3[1].raw_generator(0));
 
         assert_eq!(cone[1].raw_generators().get_index_of(&x), Some(0));
         assert_eq!(cone[2].raw_generators().get_index_of(&y), Some(0));
         assert_eq!(cone[1].raw_generators().get_index_of(&z), Some(4));
 
-        let dx = cone.d(1, &Lc::from(x.clone()));
+        let dx = cone.d(1, &Lc::from(x));
         assert_eq!(dx, Lc::from(T::from_right(GenericKey(0, 0))));
 
-        let dy = cone.d(2, &Lc::from(y.clone()));
+        let dy = cone.d(2, &Lc::from(y));
         assert_eq!(dy, Lc::from_iter([
             (T::from_left(GenericKey(0, 0)), -1),
             (T::from_left(GenericKey(0, 1)), 1),
             (T::from_right(GenericKey(1, 0)), 1),
         ]));
 
-        let dz = cone.d(1, &Lc::from(z.clone()));
+        let dz = cone.d(1, &Lc::from(z));
         assert_eq!(dz, Lc::from_iter([
             (T::from_right(GenericKey(0, 0)), 1),
             (T::from_right(GenericKey(0, 1)), -1),

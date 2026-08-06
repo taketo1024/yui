@@ -25,8 +25,8 @@ use super::lc_key::*;
 use super::lc_data::{LcData, LcDataIter, LcDataIntoIter};
 
 /// A linear combination `Σ rᵢ · xᵢ` with keys `X: LcKey` and coefficients in a
-/// ring `R`. Stored via [`LcData`], which specializes the empty and single-term
-/// cases to avoid hashmap allocation.
+/// ring `R`. Stored via a private `LcData`, which specializes the empty and
+/// single-term cases to avoid hashmap allocation.
 #[derive(PartialEq, Eq, Clone, Default, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
@@ -47,10 +47,6 @@ where
 {
     pub fn new() -> Self {
         Self { data: LcData::Zero, r_zero: R::zero() }
-    }
-
-    pub fn clean(&mut self) {
-        self.data.clean()
     }
 
     pub fn nterms(&self) -> usize {
@@ -120,25 +116,53 @@ where
     }
 
     pub fn filter<F>(self, f: F) -> Self
-    where F: Fn(&X) -> bool { 
+    where F: Fn(&X) -> bool {
         self.into_iter().filter(|(x, _)| f(x)).collect()
     }
 
     pub fn filtered<F>(&self, f: F) -> Self
-    where F: Fn(&X) -> bool { 
-        self.iter().filter_map(|(x, a)| 
-            if f(x) { 
+    where F: Fn(&X) -> bool {
+        self.iter().filter_map(|(x, a)|
+            if f(x) {
                 Some((x.clone(), a.clone()))
-            } else { 
+            } else {
                 None
             }
         ).collect()
     }
 
+    /// Add all pairs at once. Terms may cancel along the way, so the reduced form is
+    /// restored once at the end — prefer this over repeated `add_pair` in a hot loop.
+    pub fn add_pairs<I>(&mut self, pairs: I)
+    where I: IntoIterator<Item = (X, R)> {
+        for (x, r) in pairs {
+            self.data.add_pair_unreduced(x, r);
+        }
+        self.data.reduce();
+    }
+
+    /// Same, taking each key by reference — the coefficient is generally the cheaper
+    /// of the two to clone (compare a `Cob` key in `yui-kh`), so it is passed by value.
+    pub fn add_pairs_ref<'a, I>(&mut self, pairs: I)
+    where I: IntoIterator<Item = (&'a X, R)>, X: 'a {
+        for (x, r) in pairs {
+            self.data.add_pair_ref_unreduced(x, r);
+        }
+        self.data.reduce();
+    }
+
+    pub fn add_pair(&mut self, rhs: (X, R)) {
+        self.add_pairs([rhs]);
+    }
+
+    pub fn add_pair_ref(&mut self, rhs: (&X, R)) {
+        self.add_pairs_ref([rhs]);
+    }
+
     pub fn apply<F, Y: LcKey>(&self, f: F) -> Lc<Y, R>
     where F: Fn(&X) -> Lc<Y, R> {
-        self.iter().flat_map(|(x, r)| { 
-            f(x).into_iter().map(move |(y, s)| { 
+        self.iter().flat_map(|(x, r)| {
+            f(x).into_iter().map(move |(y, s)| {
                 (y, r * &s)
             })
         }).collect()
@@ -153,31 +177,27 @@ where
             (_, LcData::Single(y, s)) =>
                 self.map_ref(|x, r| (x_map(x, y), r * s)),
             (LcData::Many(_), LcData::Many(_)) => {
+                let x_map = &x_map;
                 let mut res = Lc::zero();
-                for (x, r) in self.iter() {
-                    for (y, s) in other.iter() {
-                        let xy = x_map(x, y);
-                        let rs = r * s;
-                        res.add_pair((xy, rs));
-                    }
-                }
-                res.clean();
+                res.add_pairs(self.iter().flat_map(|(x, r)|
+                    other.iter().map(move |(y, s)| (x_map(x, y), r * s))
+                ));
                 res
             }
         }
     }
 
     pub fn sort_terms_by<F>(&self, cmp: F) -> impl Iterator<Item = (&X, &R)>
-    where F: Fn(&X, &X) -> std::cmp::Ordering { 
+    where F: Fn(&X, &X) -> std::cmp::Ordering {
         self.iter().sorted_by(|(x, _), (y, _)| cmp(x, y))
     }
 
     pub fn to_string_by<F>(&self, cmp: F, descending: bool) -> String
     where F: Fn(&X, &X) -> std::cmp::Ordering {
         use crate::util::format::lc;
-        if descending { 
+        if descending {
             lc( self.sort_terms_by(|x, y| cmp(x, y).reverse()) )
-        } else { 
+        } else {
             lc( self.sort_terms_by(cmp) )
         }
     }
@@ -202,7 +222,7 @@ where
 {
     fn from(x: X) -> Self {
         Self::from((x, R::one()))
-    }    
+    }
 }
 
 impl<X, R> From<(X, R)> for Lc<X, R>
@@ -232,10 +252,7 @@ where
 {
     fn from_iter<T: IntoIterator<Item = (X, R)>>(iter: T) -> Self {
         let mut res = Self::new();
-        for e in iter.into_iter() { 
-            res.add_pair(e);
-        }
-        res.clean();
+        res.add_pairs(iter);
         res
     }
 }
@@ -301,26 +318,8 @@ where
     }
 }
 
-impl<X, R> Lc<X, R>
-where
-    X: LcKey,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    // must clean after call
-    pub fn add_pair(&mut self, rhs: (X, R)) {
-        let (x, r) = rhs;
-        self.data.add_pair(x, r);
-    }
-
-    // must clean after call
-    pub fn add_pair_ref(&mut self, rhs: (&X, &R)) {
-        let (x, r) = rhs;
-        self.data.add_pair_ref(x, r);
-    }
-}
-
-// Owned rhs moves its pairs in (no key clones); borrowed rhs must clone. The split `auto_ops`
-// arg-sets generate the four `Add` variants by rhs-ownership so the two impls don't collide.
+// Neither form clones a key that is already present. The split `auto_ops` arg-sets
+// generate the four `Add` variants by rhs-ownership so the two impls don't collide.
 // note: the arg-set form `auto_ops(val_val, ref_val)` is an undocumented API of `auto_impl_ops`.
 #[auto_ops(val_val, ref_val)]
 impl<X, R> AddAssign<Lc<X, R>> for Lc<X, R>
@@ -329,10 +328,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn add_assign(&mut self, rhs: Self) {
-        for e in rhs.data {
-            self.add_pair(e);
-        }
-        self.clean()
+        self.add_pairs(rhs.data);
     }
 }
 
@@ -343,14 +339,10 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn add_assign(&mut self, rhs: &Self) {
-        for e in rhs.data.iter() {
-            self.add_pair_ref(e);
-        }
-        self.clean()
+        self.add_pairs_ref(rhs.data.iter().map(|(x, r)| (x, r.clone())));
     }
 }
 
-// Owned rhs moves its keys in (negating coeffs, no key clones); borrowed rhs must clone.
 #[auto_ops(val_val, ref_val)]
 impl<X, R> SubAssign<Lc<X, R>> for Lc<X, R>
 where
@@ -358,10 +350,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn sub_assign(&mut self, rhs: Self) {
-        for (x, r) in rhs.data {
-            self.add_pair((x, -r));
-        }
-        self.clean()
+        self.add_pairs(rhs.data.into_iter().map(|(x, r)| (x, -r)));
     }
 }
 
@@ -372,10 +361,7 @@ where
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     fn sub_assign(&mut self, rhs: &Self) {
-        for e in rhs.data.iter() {
-            self.add_pair_ref((e.0, &-e.1));
-        }
-        self.clean()
+        self.add_pairs_ref(rhs.data.iter().map(|(x, r)| (x, -r)));
     }
 }
 
@@ -469,21 +455,21 @@ mod tests {
     use maplit::hashmap;
     use crate::abst::{MathType, AddMon};
     use crate::lc::{AsKey, Lc};
- 
+
     type X = AsKey<i32>;
-    fn e(i: i32) -> X { 
+    fn e(i: i32) -> X {
         X::from(i)
     }
 
     #[test]
-    fn math_symbol() { 
+    fn math_symbol() {
         type L = Lc<X, i32>;
         let symbol = L::math_symbol();
         assert_eq!(symbol, "Z<Free<i32>>");
     }
 
     #[test]
-    fn fmt() { 
+    fn fmt() {
         type L = Lc<X, i32>;
 
         let z = L::from(hashmap!{ e(1) => 1 });
@@ -509,14 +495,14 @@ mod tests {
     }
 
     #[test]
-    fn default() { 
+    fn default() {
         type L = Lc<X, i32>;
         let z = L::default();
         assert!(z.data.is_empty());
     }
 
     #[test]
-    fn from_singleton() { 
+    fn from_singleton() {
         type L = Lc<X, i32>;
         let x = e(0);
         let z = L::from(x);
@@ -524,7 +510,7 @@ mod tests {
     }
 
     #[test]
-    fn from_pair() { 
+    fn from_pair() {
         type L = Lc<X, i32>;
         let x = e(0);
         let z = L::from((x, 2));
@@ -532,7 +518,7 @@ mod tests {
     }
 
     #[test]
-    fn from_iter() { 
+    fn from_iter() {
         type L = Lc<X, i32>;
         let z = L::from_iter([(e(0), 1), (e(1), 0), (e(2), 2)]);
 
@@ -543,7 +529,7 @@ mod tests {
     }
 
     #[test]
-    fn into_singleton() { 
+    fn into_singleton() {
         type L = Lc<X, i32>;
         let z = L::from(e(0));
 
@@ -560,7 +546,7 @@ mod tests {
     }
 
     #[test]
-    fn eq() { 
+    fn eq() {
         type L = Lc<X, i32>;
         let z1 = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
         let z2 = L::from(hashmap!{ e(2) => 2, e(1) => 1 });
@@ -571,7 +557,7 @@ mod tests {
     }
 
     #[test]
-    fn zero() { 
+    fn zero() {
         type L = Lc<X, i32>;
         let z = L::zero();
 
@@ -585,20 +571,34 @@ mod tests {
     }
 
     #[test]
-    fn clean() { 
+    fn add_pair_reduced() {
+        type L = Lc<X, i32>;
+
+        // cancelled terms must be gone the moment `add_pair` returns
+        let mut z = L::from(hashmap!{ e(1) => 1, e(2) => 2, e(3) => 1 });
+        z.add_pair((e(1), -1));
+        assert_eq!(z, L::from(hashmap!{ e(2) => 2, e(3) => 1 }));
+        assert_eq!(z.nterms(), 2);
+
+        z.add_pair((e(2), -1));
+        z.add_pair((e(3), -1));
+        assert_eq!(z, L::from(hashmap!{ e(2) => 1 }));
+        assert_eq!(z.nterms(), 1);
+    }
+
+    #[test]
+    fn add_pairs_reduced() {
         type L = Lc<X, i32>;
 
         let mut z = L::from(hashmap!{ e(1) => 1, e(2) => 2, e(3) => 1 });
-        z.add_pair((e(1), -1));
-        z.add_pair((e(2), -1));
-        z.add_pair((e(3), -1));
-        
-        assert_eq!(z.nterms(), 3);
-
-        z.clean();
+        z.add_pairs([(e(1), -1), (e(2), -1), (e(3), -1)]);
 
         assert_eq!(z, L::from(hashmap!{ e(2) => 1 }));
         assert_eq!(z.nterms(), 1);
+
+        z.add_pairs([(e(2), -1)]);
+        assert!(z.is_zero());
+        assert_eq!(z.nterms(), 0);
     }
 
     #[test]
@@ -834,7 +834,7 @@ mod tests {
     }
 
     #[test]
-    fn filter_keys() { 
+    fn filter_keys() {
         type L = Lc<X, i32>;
         let z = L::from_iter( (1..10).map(|i| (e(i), i * 10)) );
         let w = z.filtered(|x| x.0 % 3 == 0 );
@@ -843,7 +843,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
-    fn serialize() { 
+    fn serialize() {
         type L = Lc<X, i32>;
         let z = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
         let ser = serde_json::to_string(&z).unwrap();

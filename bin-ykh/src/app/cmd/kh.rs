@@ -1,3 +1,5 @@
+//! `kh`: compute the Khovanov homology of a link.
+
 use smart_default::SmartDefault;
 use std::marker::PhantomData;
 use std::ops::RangeInclusive;
@@ -18,7 +20,7 @@ pub fn dispatch(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
 }
 
 #[derive(Clone, SmartDefault, PartialEq, Debug, clap::Args)]
-pub struct Args { 
+pub struct Args {
     pub link: String,
 
     #[arg(short = 't', long, default_value = "Z")]
@@ -47,7 +49,7 @@ pub struct Args {
     #[arg(short = 'n', long)]
     pub no_simplify: bool,
 
-    #[arg(long, value_parser = parse_h_range)]
+    #[arg(long, value_parser = parse_h_range, allow_hyphen_values = true)]
     pub h_range: Option<RangeInclusive<isize>>,
 
     // chunking: `N` (cutwidth, N pieces) or `at(c,..)` (cut after the given crossing counts).
@@ -98,35 +100,35 @@ where
     R: EucRing + FromStr + TeX,
     for<'x> &'x R: EucRingOps<R>,
 {
-    pub fn boot(args: &Args) -> Result<String, Box<dyn std::error::Error>> { 
+    pub fn boot(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
         let mut app = Self::new(args.clone());
         app.run()
     }
 
-    pub fn new(args: Args) -> Self { 
+    pub fn new(args: Args) -> Self {
         let buff = String::with_capacity(1024);
         App { args, buff, _ring: PhantomData }
     }
 
-    pub fn run(&mut self) -> Result<String, Box<dyn std::error::Error>> { 
+    pub fn run(&mut self) -> Result<String, Box<dyn std::error::Error>> {
         let (h, t) = parse_pair::<R>(&self.args.c_value)?;
-    
-        if self.args.reduced { 
+
+        if self.args.reduced {
             ensure!(t.is_zero(), "`t` must be zero for reduced.");
         }
-        if self.args.show_alpha { 
+        if self.args.show_alpha {
             ensure!(t.is_zero(), "`t` must be zero to have alpha.");
         }
-        if self.args.show_ss { 
+        if self.args.show_ss {
             ensure!(!h.is_zero() && !h.is_unit(), "`h` must be non-zero, non-invertible to compute ss.");
             ensure!(t.is_zero(), "`t` must be zero to compute ss.");
         }
-    
-        let bigraded = (h.is_zero() && t.is_zero()) || 
+
+        let bigraded = (h.is_zero() && t.is_zero()) ||
             ["H", "0,T"].contains(&self.args.c_value.as_str());
-    
+
         let l = load_link(&self.args.link, self.args.mirror)?;
-        
+
         let kh = if self.args.no_simplify {
             KhHomology::new_no_simplify(&l, &h, &t, self.args.reduced)
         } else {
@@ -151,30 +153,30 @@ where
         };
         self.out(&table);
 
-        if self.args.show_gens { 
+        if self.args.show_gens {
             self.show_gens(&kh);
         }
 
-        if self.args.show_alpha { 
+        if self.args.show_alpha {
             self.show_alpha(&kh);
         }
 
-        if self.args.show_ss { 
+        if self.args.show_ss {
             self.show_ss(&l, &h, &kh)?;
         }
-    
+
         Ok(self.flush())
     }
 
-    fn show_gens(&mut self, kh: &KhHomology<R>) { 
+    fn show_gens(&mut self, kh: &KhHomology<R>) {
         for &i in kh.support() {
             let h = &kh[i];
             if h.is_zero() { continue }
 
             self.out(&format!("Kh[{i}]: {}", h));
 
-            let r = h.rank() + h.tors().len();
-            for i in 0..r { 
+            let r = h.n_generators();
+            for i in 0..r {
                 let z = h.generator(i);
                 self.out(&format!("  {i}: {z}"));
             }
@@ -192,8 +194,8 @@ where
         }
     }
 
-    fn show_ss(&mut self, l: &Link, c: &R, kh: &KhHomology<R>) -> Result<(), Box<dyn std::error::Error>> { 
-        assert!(!c.is_unit() && !c.is_unit());
+    fn show_ss(&mut self, l: &Link, c: &R, kh: &KhHomology<R>) -> Result<(), Box<dyn std::error::Error>> {
+        assert!(!c.is_zero() && !c.is_unit());
 
         use yui_kh::ss::div_vec;
 
@@ -217,19 +219,19 @@ where
         Ok(())
     }
 
-    fn out(&mut self, str: &str) { 
+    fn out(&mut self, str: &str) {
         self.buff.push_str(str);
         self.buff.push('\n');
     }
 
-    fn flush(&mut self) -> String { 
+    fn flush(&mut self) -> String {
         let res = std::mem::take(&mut self.buff);
         res.trim_end().to_string()
     }
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     use super::*;
     use clap::Parser;
     use crate::app::app::{CliArgs, Cmd};
@@ -245,9 +247,20 @@ mod tests {
     }
 
     #[test]
-    fn kh_trefoil_z() { 
-        let args = Args { 
-            link: pd("3_1"), 
+    fn h_range_accepts_a_negative_bound() {
+        // a mirrored knot's support is entirely negative, so the space-separated form matters.
+        let link = pd("3_1");
+        let args = CliArgs::try_parse_from(["ykh", "kh", &link, "--h-range", "-3..=0"]).unwrap();
+        let Cmd::Kh(a) = args.command else {
+            panic!("`kh` routed to the wrong subcommand")
+        };
+        assert_eq!(a.h_range, Some(-3..=0));
+    }
+
+    #[test]
+    fn kh_trefoil_z() {
+        let args = Args {
+            link: pd("3_1"),
             ..Default::default()
         };
         assert_out(dispatch(&args), r"
@@ -261,8 +274,8 @@ mod tests {
     }
 
     #[test]
-    fn kh_trefoil_mirror_reduced() { 
-        let args = Args { 
+    fn kh_trefoil_mirror_reduced() {
+        let args = Args {
             link: pd("3_1"),
             mirror: true,
             reduced: true,
@@ -278,7 +291,7 @@ mod tests {
     }
 
     #[test]
-    fn kh_trefoil_qpoly_h() { 
+    fn kh_trefoil_qpoly_h() {
         // Bar-Natan homology over Q[H]: two free towers at h = 0, one H-torsion at h = 3.
         let args = Args {
             link: pd("3_1"),
@@ -297,7 +310,7 @@ mod tests {
     }
 
     #[test]
-    fn kh_trefoil_qpoly_t() { 
+    fn kh_trefoil_qpoly_t() {
         // Lee homology over Q[T].
         let args = Args {
             link: pd("3_1"),

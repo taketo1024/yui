@@ -1,3 +1,6 @@
+//! [`IteratorExt`]: iterator helpers, notably `range()` for the min..=max of a
+//! sequence as an `Option<RangeInclusive>`.
+
 use std::ops::RangeInclusive;
 use itertools::{Itertools, MinMaxResult};
 

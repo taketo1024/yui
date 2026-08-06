@@ -413,10 +413,10 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         self.vertices.get_mut(k)?.out_edges.get_mut(l)
     }
     
+    // the two directions must agree; a disagreement is a broken complex, so report no edge.
     pub fn has_edge(&self, k: &TngComplexKey, l: &TngComplexKey) -> bool {
         self.vertices[k].out_edges.contains_key(l) &&
-        self.vertices[l].in_edges.contains(k) &&
-        self.vertices[k].out_edges.contains_key(l)
+        self.vertices[l].in_edges.contains(k)
     }
 
     /// Fill cost of eliminating edge `k → l`: the Markowitz count `(out(k)-1)·(in(l)-1)` — the number

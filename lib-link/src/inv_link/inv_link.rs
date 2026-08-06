@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use delegate::delegate;
 use itertools::Itertools;
+use yui_core::algo::KeyedUnionFind;
 use crate::{Node, Edge, Link, Path, Slot, State, PDCodeX};
 
 // Involutive link
@@ -153,6 +154,31 @@ impl InvLink {
 
     pub fn on_axis_edges(&self) -> Vec<Edge> {
         self.edges().into_iter().filter(|&e| self.is_on_axis(e)).collect()
+    }
+
+    // The axis lies in the projection plane (as opposed to an intravergent diagram, where it is
+    // perpendicular): a line separates the plane, so no cluster of off-axis nodes is τ-invariant.
+    pub fn is_transvergent(&self) -> bool {
+        let off_axis = self.inner.nodes().filter(|&x| self.inv_node(x) != x).collect_vec();
+
+        // two off-axis nodes are in one cluster iff they share an edge the axis does not meet
+        let shares_edge = |x: &Node, y: &Node|
+            x.edges().iter()
+                .filter(|&&e| !self.is_on_axis(e))
+                .any(|e| y.edges().contains(e));
+
+        let mut uf = KeyedUnionFind::from_iter(off_axis.iter().copied());
+        for (i, &x) in off_axis.iter().enumerate() {
+            for &y in &off_axis[..i] {
+                if shares_edge(x, y) {
+                    uf.union(&x, &y);
+                }
+            }
+        }
+
+        uf.into_disjoint().into_iter().all(|group|
+            group.first().is_none_or(|&rep| !group.contains(&self.inv_node(rep)))
+        )
     }
 
     // A strong inversion reverses the orientation.
@@ -319,6 +345,20 @@ mod tests {
         let (x0, x1) = (il.node(0), il.node(1));
         assert_eq!(il.inv_node(x0), x1);
         assert_eq!(il.inv_node(x1), x0);
+    }
+
+    #[test]
+    fn transvergent() {
+        // 5_1's symmetric PD: the axis lies in the plane, so the off-axis crossings fall into
+        // clusters that τ pairs up.
+        let l = InvLink::from_symmetric_pd_code([[1,7,2,6],[3,9,4,8],[5,1,6,10],[7,3,8,2],[9,5,10,4]]);
+        assert!(l.is_transvergent());
+
+        // L2a1 rotated about an axis perpendicular to the plane: no edge is fixed, and the two
+        // crossings form a single cluster that τ maps onto itself.
+        let m = InvLink::new(Link::from_pd_code([[4,1,3,2],[2,3,1,4]]), [(1,2),(2,1),(3,4),(4,3)]);
+        assert!(m.on_axis_edges().is_empty());
+        assert!(!m.is_transvergent());
     }
 
     #[test]

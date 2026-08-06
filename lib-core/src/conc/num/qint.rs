@@ -42,7 +42,9 @@ where I: IntType, for<'x> &'x I: IntOps<I>;
 /// Gaussian integers: `ℤ[i] = QuadInt<I, -1>`.
 pub type GaussInt<I> = QuadInt<I, -1>;
 
-/// Eisenstein integers: `ℤ[ω]` with `ω = (-1 + √-3)/2`, i.e. `QuadInt<I, -3>`.
+/// Eisenstein integers: `ℤ[ω]` with `ω = (1 + √-3)/2`, i.e. `QuadInt<I, -3>`.
+/// Note `-3 ≡ 1 (mod 4)`, so `ω` is the 6th root of unity, not the cube root `(-1 + √-3)/2`;
+/// the two generate the same ring.
 pub type EisenInt<I> = QuadInt<I, -3>;
 
 impl<I, const D: i32> QuadInt<I, D>
@@ -357,10 +359,12 @@ impl_alg_op_d!(EucRingOps, -3);
 impl<I, const D: i32> MathType for QuadInt<I, D>
 where I: IntType, for<'x> &'x I: IntOps<I> {
     fn math_symbol() -> String {
-        if D == -1 { 
-            String::from("Z[i]")
-        } else {
-            format!("Z[√{}]", D)
+        match D {
+            -1 => String::from("Z[i]"),
+            -3 => String::from("Z[ω]"),
+            // for D ≡ 1 (mod 4) the ring is ℤ[(1+√D)/2], strictly larger than ℤ[√D].
+            _ if D.rem_euclid(4) == 1 => format!("Z[(1 + √{D})/2]"),
+            _ => format!("Z[√{D}]"),
         }
     }
 }
@@ -537,7 +541,16 @@ mod tests {
     }
 
     #[test]
-    fn display_eisen() { 
+    fn math_symbol_names_the_ring() {
+        // `D ≡ 1 (mod 4)` adjoins `(1 + √D)/2`, not `√D`.
+        assert_eq!(QuadInt::<i32, -1>::math_symbol(), "Z[i]");
+        assert_eq!(QuadInt::<i32, -3>::math_symbol(), "Z[ω]");
+        assert_eq!(QuadInt::<i32, 5>::math_symbol(), "Z[(1 + √5)/2]");
+        assert_eq!(QuadInt::<i32, -2>::math_symbol(), "Z[√-2]");
+    }
+
+    #[test]
+    fn display_eisen() {
         type A = QuadInt<i32, -3>;
         let a = A::new(-2, 0);
         let b = A::new(0, 3);

@@ -8,29 +8,29 @@ use yui_link::Link;
 use yui_kh::ss::SsVersion;
 use yui_kh::tng::builder::{Strategy, NodeOrder, CutOption};
 
-pub trait AppArgs { 
-    fn c_type(&self) -> CType; 
-    fn c_value(&self) -> &String; 
-    fn log(&self) -> u8; 
+pub trait AppArgs {
+    fn c_type(&self) -> CType;
+    fn c_value(&self) -> &String;
+    fn log(&self) -> u8;
 
-    fn poly_vars(&self) -> PolyVars { 
+    fn poly_vars(&self) -> PolyVars {
         parse_poly_vars(self.c_value())
     }
 
-    fn is_poly(&self) -> bool { 
+    fn is_poly(&self) -> bool {
         self.poly_vars() != PolyVars::None
     }
 
-    fn is_field(&self) -> bool { 
+    fn is_field(&self) -> bool {
         self.c_type().is_field() && !self.is_poly()
     }
 
-    fn is_euc_ring(&self) -> bool { 
-        self.c_type() == CType::Z && !self.is_poly() || 
+    fn is_euc_ring(&self) -> bool {
+        self.c_type() == CType::Z && !self.is_poly() ||
         self.c_type().is_field() && self.poly_vars().nvars() == 1
     }
 
-    fn log_level(&self) -> log::LevelFilter { 
+    fn log_level(&self) -> log::LevelFilter {
         use log::LevelFilter::*;
         match self.log() {
             1 => Info,
@@ -44,11 +44,11 @@ pub trait AppArgs {
 // no `Default`: each command's `Args` states its own, matching its clap `default_value`.
 #[derive(Clone, Copy, PartialEq, Eq, ValueEnum, Display, Debug)]
 #[clap(rename_all="verbatim")]
-pub enum CType { 
+pub enum CType {
     Z, Q, F2, F3
 }
 
-impl CType { 
+impl CType {
     pub fn is_field(&self) -> bool {
         use CType::*;
         matches!(self, Q | F2 | F3)
@@ -56,12 +56,12 @@ impl CType {
 }
 
 #[derive(PartialEq, Eq)]
-pub(crate) enum PolyVars { 
+pub(crate) enum PolyVars {
     H, T, HT, None
 }
 
 impl PolyVars {
-    pub fn nvars(&self) -> usize { 
+    pub fn nvars(&self) -> usize {
         match self {
             PolyVars::H | PolyVars::T  => 1,
             PolyVars::HT => 2,
@@ -70,11 +70,11 @@ impl PolyVars {
     }
 }
 
-pub(crate) fn parse_poly_vars(c_value: &String) -> PolyVars { 
+pub(crate) fn parse_poly_vars(c_value: &String) -> PolyVars {
     use std::collections::HashSet;
-    
+
     let s: HashSet<_> = c_value.split(',').collect();
-    match (s.contains("H"), s.contains("T")) { 
+    match (s.contains("H"), s.contains("T")) {
         (true,  true)  => PolyVars::HT,
         (true,  false) => PolyVars::H,
         (false, true)  => PolyVars::T,

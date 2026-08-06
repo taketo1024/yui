@@ -303,7 +303,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
         let y0 = SpVec::from(y[..r].to_vec());
         let x = solve_triangular_vec(TriangularType::Lower, &l0, &y0).into_dense();
 
-        if check_consistency && !is_consistent(l, y, &x) { 
+        if check_consistency && !is_consistent(l, y, &x) {
             return None;
         }
         x
@@ -391,7 +391,7 @@ where R: Field, for<'x> &'x R: FieldOps<R> {
         let r_old = pp.rank();
         let (pp_next, r_next, c) = chunk_pluq(pp.take_s(), chunk);
         let p_next = pp_next.p.clone();
-        
+
         merge_pluq(&mut pp, pp_next);
 
         // Apply the chunk's row perm to the tail of yp so it stays in sync with pp.l.
@@ -803,7 +803,7 @@ mod tests {
     use yui_core::num::Ratio;
     type R = Ratio<i64>;
     fn r(n: i64) -> R { R::from(n) }
-    
+
     fn sp_mat(shape: (usize, usize), data: impl IntoIterator<Item = R>) -> SpMat<R> {
         SpMat::from_row_major(shape, data)
     }

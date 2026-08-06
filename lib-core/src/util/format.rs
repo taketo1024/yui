@@ -9,9 +9,9 @@ use crate::ext::IntoDigits;
 pub fn paren_expr<S>(s: S) -> String
 where S: Display {
     let s = s.to_string();
-    if s.contains(' ') { 
+    if s.contains(' ') {
         format!("({s})")
-    } else { 
+    } else {
         s
     }
 }
@@ -20,24 +20,24 @@ where S: Display {
 /// `r₁·x₁ + r₂·x₂ + …`, with sign flips for negative coefficients and
 /// `1`/`-1` coefficients elided. Returns `"0"` if the iterator is empty.
 pub fn lc<X, R, S>(mut terms: S) -> String
-where 
-    X: Display, 
-    R: Display, 
+where
+    X: Display,
+    R: Display,
     S: Iterator<Item = (X, R)>
-{ 
+{
     let mut res: Vec<String> = vec![];
-    
+
     if let Some((x, r)) = terms.next() {
         let r = paren_expr(r);
         let x = x.to_string();
 
-        let term = if r == "1" { 
+        let term = if r == "1" {
             x
-        } else if r == "-1" { 
+        } else if r == "-1" {
             format!("-{x}")
         } else if x == "1" {
             format!("{r}")
-        } else { 
+        } else {
             format!("{r}{x}")
         };
 
@@ -48,17 +48,17 @@ where
         let r = paren_expr(r);
         let x = x.to_string();
 
-        let (op, r) = if let Some(r) = r.strip_prefix('-') { 
-            ("-", r.to_owned()) 
-        } else { 
+        let (op, r) = if let Some(r) = r.strip_prefix('-') {
+            ("-", r.to_owned())
+        } else {
             ("+", r.to_owned())
         };
 
-        let term = if r == "1" { 
+        let term = if r == "1" {
             x
-        } else if x == "1" { 
+        } else if x == "1" {
             r.to_string()
-        } else { 
+        } else {
             format!("{r}{x}")
         };
 
@@ -66,7 +66,7 @@ where
         res.push(term);
     }
 
-    if res.is_empty() { 
+    if res.is_empty() {
         "0".to_string()
     } else {
         res.join(" ")
@@ -78,13 +78,13 @@ pub fn subscript<I>(i: I) -> String
 where I: ToPrimitive {
     let i = i.to_isize().unwrap();
 
-    if i == 0 { 
+    if i == 0 {
         return '\u{2080}'.into()
     }
 
-    let (init, i) = if i > 0 { 
+    let (init, i) = if i > 0 {
         (String::new(), i as usize)
-    } else { 
+    } else {
         ('\u{208B}'.into(), -i as usize)
     };
 
@@ -100,18 +100,18 @@ pub fn superscript<I>(i: I) -> String
 where I: ToPrimitive {
     let i = i.to_isize().unwrap();
 
-    if i == 0 { 
+    if i == 0 {
         return '\u{2070}'.into()
     }
 
-    let (init, i) = if i > 0 { 
+    let (init, i) = if i > 0 {
         (String::new(), i as usize)
-    } else { 
+    } else {
         ('\u{207B}'.into(), -i as usize)
     };
 
     i.into_digits().fold(init, |mut res, d| {
-        let c = match d { 
+        let c = match d {
             1 => '\u{00B9}',
             2 => '\u{00B2}',
             3 => '\u{00B3}',
@@ -125,7 +125,7 @@ where I: ToPrimitive {
 /// Render a 2D table with the given header label, row keys, column keys,
 /// and a function producing each cell entry. Backed by `prettytable`.
 pub fn table<S, I, J, I1, I2, D, F>(head: S, rows: I1, cols: I2, entry: F) -> String
-where 
+where
     S: Display,
     I: Display,
     J: Display,
@@ -140,7 +140,7 @@ where
     let cols = cols.into_iter().collect_vec();
 
     fn row<I>(head: String, cols: I) -> Row
-    where I: Iterator<Item = String> { 
+    where I: Iterator<Item = String> {
         let mut cells = vec![Cell::new(head.as_str())];
         cells.extend(cols.map(|str| Cell::new(str.as_str())));
         Row::new(cells)
@@ -154,7 +154,7 @@ where
         cols.iter().map(|j| j.to_string() )
     ));
 
-    for i in rows.iter() { 
+    for i in rows.iter() {
         table.add_row(row(
             i.to_string(),
             cols.iter().map(|j| format!("{}", entry(i, j)))
@@ -169,21 +169,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_subscript() { 
+    fn test_subscript() {
         assert_eq!(subscript(0), "₀");
         assert_eq!(subscript(1234567890), "₁₂₃₄₅₆₇₈₉₀");
         assert_eq!(subscript(-1234567890), "₋₁₂₃₄₅₆₇₈₉₀");
     }
 
     #[test]
-    fn test_superscript() { 
+    fn test_superscript() {
         assert_eq!(superscript(0), "⁰");
         assert_eq!(superscript(1234567890), "¹²³⁴⁵⁶⁷⁸⁹⁰");
         assert_eq!(superscript(-1234567890), "⁻¹²³⁴⁵⁶⁷⁸⁹⁰");
     }
 
     #[test]
-    fn test_table() { 
+    fn test_table() {
         let table = table("", 1..=3, 4..=6, |i, j| i * 10 + j);
         let a = "    4   5   6 \n 1  14  15  16 \n 2  24  25  26 \n 3  34  35  36 \n";
         assert_eq!(table, a.to_string());

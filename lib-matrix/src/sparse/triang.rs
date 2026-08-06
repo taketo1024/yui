@@ -28,23 +28,23 @@ pub enum TriangularType {
     Upper, Lower
 }
 
-impl TriangularType { 
-    pub fn is_upper(&self) -> bool { 
-        match self { 
+impl TriangularType {
+    pub fn is_upper(&self) -> bool {
+        match self {
             Self::Upper => true,
             Self::Lower => false
         }
     }
 
     pub fn transpose(&self) -> Self {
-        match self { 
+        match self {
             Self::Upper => Self::Lower,
             Self::Lower => Self::Upper
         }
     }
 
-    fn str(&self) -> &'static str { 
-        match self { 
+    fn str(&self) -> &'static str {
+        match self {
             Self::Upper => "upper",
             Self::Lower => "lower"
         }
@@ -240,12 +240,12 @@ fn scatter_into<R: Clone>(data: (&[usize], &[R]), dst: &mut [R]) {
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     use super::*;
     use super::TriangularType::{Upper, Lower};
 
     #[test]
-    fn solve_upper() { 
+    fn solve_upper() {
         let u = SpMat::from_row_major((5, 5), vec![
             1, -2, 1,  3, 5,
             0, -1, 4,  2, 1,
@@ -259,7 +259,7 @@ mod tests {
     }
 
     #[test]
-    fn inv_upper() { 
+    fn inv_upper() {
         let u = SpMat::from_row_major((5, 5), [
             1, -2, 1,  3, 5,
             0, -1, 4,  2, 1,
@@ -273,7 +273,7 @@ mod tests {
     }
 
     #[test]
-    fn solve_lower() { 
+    fn solve_lower() {
         let l = SpMat::from_row_major((5, 5), [
             1,  0, 0,  0, 0,
            -2, -1, 0,  0, 0,
@@ -287,7 +287,7 @@ mod tests {
     }
 
     #[test]
-    fn inv_lower() { 
+    fn inv_lower() {
         let l = SpMat::from_row_major((5, 5), [
             1,  0, 0,  0, 0,
            -2, -1, 0,  0, 0,

@@ -123,7 +123,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         &self.alg
     }
 
-    pub fn deg_shift(&self) -> (isize, isize) { 
+    pub fn deg_shift(&self) -> (isize, isize) {
         self.deg_shift
     }
 
@@ -203,7 +203,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> ToSeqString<isize> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     delegate! {
-        to self.inner { 
+        to self.inner {
             fn label(&self) -> String;
             fn indices(&self) -> Vec<isize>;
             fn entry_at(&self, i: &isize) -> String;
@@ -224,18 +224,18 @@ where R: Ring + TeX, for<'x> &'x R: RingOps<R> {
 
 impl<R> ToTableString<isize> for KhComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn labels(&self) -> (String, String) { 
+    fn labels(&self) -> (String, String) {
         ("i".to_string(), "j".to_string())
     }
 
-    fn indices(&self) -> (Vec<isize>, Vec<isize>) { 
+    fn indices(&self) -> (Vec<isize>, Vec<isize>) {
         (self.h_range().collect(), self.q_range().step_by(2).collect())
     }
 
-    fn entry_at(&self, i: &isize, j: &isize) -> String { 
-        if self[(*i, *j)].is_zero() { 
+    fn entry_at(&self, i: &isize, j: &isize) -> String {
+        if self[(*i, *j)].is_zero() {
             ".".to_string()
-        } else { 
+        } else {
             self[(*i, *j)].to_string()
         }
     }
@@ -341,7 +341,7 @@ mod tests_v1 {
         assert_eq!(c[-3].rank(), 8);
         assert_eq!(c[-2].rank(), 12);
         assert_eq!(c[-1].rank(), 6);
-        assert_eq!(c[ 0].rank(), 4);    
+        assert_eq!(c[ 0].rank(), 4);
 
         c.inner().check_d_all();
     }

@@ -20,7 +20,7 @@ pub fn dispatch(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
 }
 
 #[derive(Clone, SmartDefault, PartialEq, Debug, clap::Args)]
-pub struct Args { 
+pub struct Args {
     pub link: String,
 
     #[arg(short = 't', long, default_value = "F2")]
@@ -105,25 +105,25 @@ where
     R: EucRing + FromStr + TeX,
     for<'x> &'x R: EucRingOps<R>,
 {
-    pub fn boot(args: &Args) -> Result<String, Box<dyn std::error::Error>> { 
+    pub fn boot(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
         let mut app = Self::new(args.clone());
         app.run()
     }
 
-    pub fn new(args: Args) -> Self { 
+    pub fn new(args: Args) -> Self {
         let buff = String::with_capacity(1024);
         App { args, buff, _ring: PhantomData }
     }
 
-    pub fn run(&mut self) -> Result<String, Box<dyn std::error::Error>> { 
+    pub fn run(&mut self) -> Result<String, Box<dyn std::error::Error>> {
         let (h, t) = parse_pair::<R>(&self.args.c_value)?;
 
         ensure!(self.args.c_type == CType::F2, "Only `-t F2` is supported.");
 
-        if self.args.reduced { 
+        if self.args.reduced {
             ensure!(t.is_zero(), "`t` must be zero for reduced.");
         }
-        if self.args.show_alpha { 
+        if self.args.show_alpha {
             ensure!(t.is_zero(), "`t` must be zero to have alpha.");
         }
         let l = load_sinv_knot(&self.args.link, self.args.mirror)?;
@@ -152,7 +152,7 @@ where
             KhIHomology::new_with_config(&l, &h, &t, self.args.reduced, config)
         };
 
-        let bigraded = h.is_zero() && t.is_zero() || 
+        let bigraded = h.is_zero() && t.is_zero() ||
             ["H", "0,T"].contains(&self.args.c_value.as_str());
 
         let table = match (bigraded, self.args.format) {
@@ -163,16 +163,16 @@ where
         };
         self.out(&table);
 
-        if self.args.show_gens { 
+        if self.args.show_gens {
             self.show_gens(&khi);
         }
 
-        if self.args.show_alpha { 
+        if self.args.show_alpha {
             let zs = khi.canon_cycles();
             self.show_alpha(&khi, zs);
         }
 
-        if self.args.show_ssi { 
+        if self.args.show_ssi {
             let zs = khi.canon_cycles();
             self.show_ssi(&l, &h, &khi, zs)?;
         }
@@ -180,7 +180,7 @@ where
         Ok(self.flush())
     }
 
-    fn show_gens(&mut self, khi: &KhIHomology<R>) { 
+    fn show_gens(&mut self, khi: &KhIHomology<R>) {
         for &i in khi.support() {
             let h = &khi[i];
             if h.is_zero() { continue }
@@ -188,7 +188,7 @@ where
             self.out(&format!("KhI[{i}]: {}", h));
 
             let r = h.n_generators();
-            for i in 0..r { 
+            for i in 0..r {
                 let z = h.generator(i);
                 self.out(&format!("  {i}: {z}"));
             }
@@ -205,7 +205,7 @@ where
         }
     }
 
-    fn show_ssi(&mut self, l: &InvLink, c: &R, khi: &KhIHomology<R>, zs: &[KhIChain<R>]) -> Result<(), Box<dyn std::error::Error>> { 
+    fn show_ssi(&mut self, l: &InvLink, c: &R, khi: &KhIHomology<R>, zs: &[KhIChain<R>]) -> Result<(), Box<dyn std::error::Error>> {
         assert!(!c.is_zero() && !c.is_unit());
 
         use yui_kh::ss::div_vec;
@@ -230,19 +230,19 @@ where
         Ok(())
     }
 
-    fn out(&mut self, str: &str) { 
+    fn out(&mut self, str: &str) {
         self.buff.push_str(str);
         self.buff.push('\n');
     }
 
-    fn flush(&mut self) -> String { 
+    fn flush(&mut self) -> String {
         let res = std::mem::take(&mut self.buff);
         res.trim_end().to_string()
     }
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     use super::*;
     use clap::Parser;
     use crate::app::app::{CliArgs, Cmd};
@@ -258,9 +258,9 @@ mod tests {
     }
 
     #[test]
-    fn khi_trefoil_f2() { 
-        let args = Args { 
-            link: pd("3_1"), 
+    fn khi_trefoil_f2() {
+        let args = Args {
+            link: pd("3_1"),
             ..Default::default()
         };
         assert_out(dispatch(&args), r"
@@ -274,8 +274,8 @@ mod tests {
     }
 
     #[test]
-    fn khi_trefoil_mirror_reduced() { 
-        let args = Args { 
+    fn khi_trefoil_mirror_reduced() {
+        let args = Args {
             link: pd("3_1"),
             c_value: "1".to_string(),
             mirror: true,
@@ -289,7 +289,7 @@ mod tests {
     }
 
     #[test]
-    fn khi_trefoil_poly_h() { 
+    fn khi_trefoil_poly_h() {
         let args = Args {
             link: pd("3_1"),
             c_value: "H".to_string(),

@@ -28,14 +28,14 @@ use super::util::{assert_homogeneous, canon_q_deg, div_vec, max_solvable_level, 
 type P<F> = FastPoly<'H', F>;
 
 pub fn ss_invariant<R>(l: &Link, c: &R, reduced: bool) -> i32
-where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     let config = BuildConfig { h_range: Some(default_h_range(l)), ..Default::default() };
     ss_invariant_with(l, c, reduced, config)
 }
 
 /// The same, with the build configuration given explicitly.
 pub fn ss_invariant_with<R>(l: &Link, c: &R, reduced: bool, config: BuildConfig) -> i32
-where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     assert!(!c.is_zero());
     assert!(!c.is_unit());
     assert!(l.is_knot());
@@ -68,14 +68,14 @@ fn assert_h_range(config: &BuildConfig) {
 }
 
 fn ss_divisibility<R>(l: &Link, c: &R, reduced: bool, config: BuildConfig) -> i32
-where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
+where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     let r = if reduced { 1 } else { 2 };
 
     let kh = KhHomology::new_with_config(l, c, &R::zero(), reduced, config);
 
     assert_eq!(kh[0].rank(), r);
     debug!("Kh[0]: {}", kh[0]);
-    
+
     let zs = kh.canon_cycles();
 
     assert_eq!(zs.len(), r);
@@ -111,7 +111,7 @@ where F: Field, for<'x> &'x F: FieldOps<F> {
         let c = P::<F>::variable();
         return ss_invariant_with::<P<F>>(l, &c, reduced, config);
     }
-    
+
     assert!(l.is_knot());
     assert_h_range(&config);
 

@@ -40,7 +40,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 }
 
 impl<R> KhIComplex<R>
-where R: Ring, for<'a> &'a R: RingOps<R> { 
+where R: Ring, for<'a> &'a R: RingOps<R> {
     pub fn new(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self {
         Self::new_partial(l, h, t, reduced, None)
     }
@@ -172,7 +172,7 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
         ).range().unwrap_or_else(empty_range)
     }
 
-    pub fn canon_cycles(&self) -> &[KhIChain<R>] { 
+    pub fn canon_cycles(&self) -> &[KhIChain<R>] {
         &self.canon_cycles
     }
 
@@ -259,7 +259,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> ToSeqString<isize> for KhIComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     delegate! {
-        to self.inner { 
+        to self.inner {
             fn label(&self) -> String;
             fn indices(&self) -> Vec<isize>;
             fn entry_at(&self, i: &isize) -> String;
@@ -280,11 +280,11 @@ where R: Ring + TeX, for<'x> &'x R: RingOps<R> {
 
 impl<R> ToTableString<isize> for KhIComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn labels(&self) -> (String, String) { 
+    fn labels(&self) -> (String, String) {
         ("i".to_string(), "j".to_string())
     }
 
-    fn indices(&self) -> (Vec<isize>, Vec<isize>) { 
+    fn indices(&self) -> (Vec<isize>, Vec<isize>) {
         (self.h_range().collect(), self.q_range().step_by(2).collect())
     }
 

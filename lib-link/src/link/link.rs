@@ -101,11 +101,11 @@ impl Link {
         Self::new([], (1..=n).map(|e| e as Edge))
     }
 
-    pub fn is_knot(&self) -> bool { 
+    pub fn is_knot(&self) -> bool {
         self.n_comps() == 1
     }
 
-    pub fn is_oriented(&self) -> bool { 
+    pub fn is_oriented(&self) -> bool {
         self.nodes().all(|n| n.is_oriented())
     }
 
@@ -137,32 +137,32 @@ impl Link {
         );
     }
 
-    pub fn writhe(&self) -> i32 { 
+    pub fn writhe(&self) -> i32 {
         let (p, n) = self.n_signed_crossings();
         (p as i32) - (n as i32)
     }
 
-    pub fn n_nodes(&self) -> usize { 
+    pub fn n_nodes(&self) -> usize {
         self.nodes.len()
     }
 
-    pub fn nodes(&self) -> impl Iterator<Item = &Node> { 
+    pub fn nodes(&self) -> impl Iterator<Item = &Node> {
         self.nodes.iter()
     }
 
-    pub fn node(&self, i: usize) -> &Node { 
+    pub fn node(&self, i: usize) -> &Node {
         &self.nodes[i]
     }
 
-    pub(crate) fn node_mut(&mut self, i: usize) -> &mut Node { 
+    pub(crate) fn node_mut(&mut self, i: usize) -> &mut Node {
         &mut self.nodes[i]
     }
 
-    pub fn crossings(&self) -> impl Iterator<Item = &Node> { 
+    pub fn crossings(&self) -> impl Iterator<Item = &Node> {
         self.nodes.iter().filter(|x| x.is_crossing())
     }
 
-    pub fn n_crossings(&self) -> usize { 
+    pub fn n_crossings(&self) -> usize {
         self.nodes.iter()
             .filter(|x| x.is_crossing())
             .count()
@@ -171,8 +171,8 @@ impl Link {
     pub fn n_signed_crossings(&self) -> (usize, usize) {
         let mut pos = 0;
         let mut neg = 0;
-        for n in self.nodes.iter() { 
-            if n.is_pos() { pos += 1 } 
+        for n in self.nodes.iter() {
+            if n.is_pos() { pos += 1 }
             else if n.is_neg() { neg += 1}
         }
         (pos, neg)
@@ -225,13 +225,13 @@ impl Link {
         result
     }
 
-    pub fn traverse_comps<F>(&self, mut f: F) where 
-    F: FnMut(usize, usize, Slot) { 
+    pub fn traverse_comps<F>(&self, mut f: F) where
+    F: FnMut(usize, usize, Slot) {
         let mut c = 0; // component counter
         let mut remain: HashSet<Edge> = self.nodes.iter().flat_map(|x| x.edges().iter().copied()).collect();
 
         while !remain.is_empty() {
-            // Take minimal edge-id. 
+            // Take minimal edge-id.
             let e0 = remain.iter().min().cloned().unwrap();
 
             // Find node & point having edge e0, entering at its head so the walk runs forward.
@@ -243,7 +243,7 @@ impl Link {
                 ).unwrap()
             };
 
-            self.traverse_from((i0, j0), |i, s| { 
+            self.traverse_from((i0, j0), |i, s| {
                 remain.remove(&self.node(i).edge(s));
                 f(c, i, s);
             });
@@ -326,7 +326,7 @@ impl Link {
         ).collect_vec();
         let coherent = !undetermined && oris.iter().all(Option::is_some);
 
-        self.nodes.iter_mut().zip(oris).for_each(|(n, o)| 
+        self.nodes.iter_mut().zip(oris).for_each(|(n, o)|
             n.set_incoming(if coherent { o } else { None })
         );
 
@@ -496,7 +496,7 @@ mod tests {
 
         let l = Link::test_data("unknot_l_twist");
         assert_eq!(l.n_crossings(), 1);
-        
+
         let l = Link::test_data("3_1");
         assert_eq!(l.n_crossings(), 3);
     }
@@ -514,7 +514,7 @@ mod tests {
 
     #[test]
     fn link_traverse() {
-        let traverse = |l: &Link, start: (usize, Slot)| { 
+        let traverse = |l: &Link, start: (usize, Slot)| {
             let mut queue = vec![];
             l.traverse_from(start, |i, s| queue.push((i, s.index())));
             queue
@@ -522,7 +522,7 @@ mod tests {
 
         let l = Link::test_data("unknot_l_twist");
         let path = traverse(&l, (0, Slot::SW));
-        
+
         assert_eq!(path, [(0, 0), (0, 3)]); // loop
     }
 

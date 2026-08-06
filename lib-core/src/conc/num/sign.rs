@@ -44,22 +44,22 @@ macro_rules! impl_int_conversion {
     ($t:tt) => {
         impl From<$t> for Sign {
             fn from(value: $t) -> Self {
-                match value { 
+                match value {
                      1 => Sign::Pos,
                     -1 => Sign::Neg,
                      _ => panic!()
                 }
             }
         }
-        
+
         impl From<Sign> for $t {
             fn from(value: Sign) -> Self {
-                match value { 
+                match value {
                     Sign::Pos =>  1,
                     Sign::Neg => -1
                 }
             }
-        }                
+        }
     };
 }
 
@@ -73,7 +73,7 @@ impl Neg for Sign {
     type Output = Self;
     fn neg(self) -> Self {
         use Sign::*;
-        match self { 
+        match self {
             Neg => Pos,
             Pos => Neg
         }
@@ -124,14 +124,14 @@ mod tests {
     }
 
     #[test]
-    fn to_string() { 
+    fn to_string() {
         assert_eq!(&Sign::Neg.to_string(), "-");
         assert_eq!(&Sign::Pos.to_string(), "+");
     }
 
     #[cfg(feature = "serde")]
     #[test]
-    fn serialize() { 
+    fn serialize() {
         let s = Sign::Pos;
         let ser = serde_json::to_string(&s).unwrap();
         assert_eq!(ser, "1");
@@ -142,7 +142,7 @@ mod tests {
         let s = Sign::Neg;
         let ser = serde_json::to_string(&s).unwrap();
         assert_eq!(ser, "-1");
-        
+
         let des = serde_json::from_str(&ser).unwrap();
         assert_eq!(s, des);
     }

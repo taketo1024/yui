@@ -144,7 +144,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    pub fn init(h: &R, t: &R, deg_shift: (isize, isize), base_pt: Option<Edge>) -> Self { 
+    pub fn init(h: &R, t: &R, deg_shift: (isize, isize), base_pt: Option<Edge>) -> Self {
         let complex = TngComplex::init(h, t, deg_shift, base_pt);
         Self {
             complex,
@@ -299,14 +299,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         info!("{} append: {x}", self.current_step());
 
         self.prepare_append(x);
-        
+
         let (h, t) = self.complex.ht();
         let cx = TngComplex::from_node(h, t, x, self.complex.base_pt());
         self.merge(cx, vec![]);
     }
 
-    pub(crate) fn prepare_append(&mut self, x: &Node) { 
-        if let Some(i) = self.nodes.iter().find_position(|&e| e == x) { 
+    pub(crate) fn prepare_append(&mut self, x: &Node) {
+        if let Some(i) = self.nodes.iter().find_position(|&e| e == x) {
             self.nodes.remove(i.0);
         }
 
@@ -477,7 +477,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                     push_pivot(&mut pool, nk, w);
                 }
             }
-            
+
             done += 1;
             log_progress(Level::Debug, done, done - 1, done + pool.len(), PROGRESS_LOG_STEP, 2);
         }
@@ -597,7 +597,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn eliminate(&mut self, i: &TngComplexKey, j: &TngComplexKey) {
         trace!("{} eliminate {}: {} -> {}", self.stat(), self.complex.edge(i, j), self.complex.vertex(i), self.complex.vertex(j));
-        
+
         self.elements.eliminate(&self.complex, i, j);
         self.complex.eliminate(i, j);
     }
@@ -627,7 +627,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn process_free_loops(&mut self) {
-        while !self.loops.is_empty() { 
+        while !self.loops.is_empty() {
             let c = self.loops.remove(0);
 
             self.elements.insert_loop(c);
@@ -658,7 +658,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         self.deloop_all();
 
-        // Deloop marked circles only when there are no other unmarked components left. 
+        // Deloop marked circles only when there are no other unmarked components left.
         if self.complex.is_closed() {
             for i in self.complex.h_range() {
                 self.deloop_in_with(i, true);
@@ -765,7 +765,7 @@ fn q_reachable(q0: isize, nc: isize, qr: &RangeInclusive<isize>) -> bool {
 #[cfg(test)]
 mod tests {
     use num_traits::Zero;
-    
+
     use super::*;
 
     // `profile`'s dry-run open-edge set must equal the real complex's `boundary_ends` at every step.
@@ -853,7 +853,7 @@ mod tests {
     }
 
     #[test]
-    fn test_tangle() { 
+    fn test_tangle() {
         let mut c = TngComplexBuilder::init(&0, &0, (0, 0), None);
         c.set_nodes([
             Node::from_pd_code([4,2,5,1]),
@@ -861,7 +861,7 @@ mod tests {
         ]);
 
         c.process_nodes();
-        
+
         assert!(!c.complex.is_completely_delooped());
     }
 
@@ -1066,7 +1066,7 @@ mod tests {
 
         assert_eq!(zs.len(), 2);
         assert_ne!(zs[0], zs[1]);
-        
+
         for z in zs {
             assert!(c.d(0, &z).is_zero());
         }

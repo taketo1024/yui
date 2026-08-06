@@ -14,7 +14,7 @@ pub trait TeX {
 
 /// Render a 2D table as a LaTeX `\begin{tabular}` environment.
 pub fn tex_table<S, I, J, I1, I2, D, F>(caption: &str, head: S, rows: I1, cols: I2, entry: F, math_mode: bool, hor_at_top: bool) -> String
-where 
+where
     S: Display,
     I: Display,
     J: Display,
@@ -23,22 +23,22 @@ where
     D: Display,
     F: Fn(&I, &J) -> D
 {
-    fn disp<S>(s: S, math_mode: bool) -> String where S: Display { 
+    fn disp<S>(s: S, math_mode: bool) -> String where S: Display {
         if math_mode {
             let s = s.to_string();
-            if s.is_empty() { 
+            if s.is_empty() {
                 "$ $".to_string()
             } else {
                 format!("${}$", s)
             }
-        } else { 
+        } else {
             s.to_string()
         }
     }
 
     let cols = cols.into_iter().collect_vec();
     let mut res = String::new();
-    
+
     res += r#"\begin{table}
 \centering
 \begin{tabular}"#;
@@ -54,7 +54,7 @@ where
         cols.iter().map(|c| disp(c, math_mode)).collect_vec()
     );
 
-    if hor_at_top { 
+    if hor_at_top {
         res += &hor;
         res += "\\hline\n";
     }
@@ -66,7 +66,7 @@ where
         );
     }
 
-    if !hor_at_top { 
+    if !hor_at_top {
         res += "\\hline\n";
         res += &hor;
     }
@@ -78,11 +78,11 @@ where
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     use super::*;
 
     #[test]
-    fn test_tex_table() { 
+    fn test_tex_table() {
         let _table = tex_table("Caption", "i, j", [1, 2, 3], [4, 5, 6, 7], |i, j| i * 10 + j, true, false);
         // println!("{_table}");
     }

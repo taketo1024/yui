@@ -222,7 +222,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let (h, t) = self.cone.complex().ht().clone();
         let inner = self.inner.complex();
         let mut done = 0;
-        
+
         for keys_chunk in keys.chunks(CHUNK) {
             // reference shadows: the nested `move` closures can only capture `Copy` refs.
             let this = &*self;
@@ -312,7 +312,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                     .filter(|k| self.tau_key(k).1 != OrbitClass::Drop).collect_vec();
                 ins.into_iter().cartesian_product(outs).filter_map(move |(x, k)| {
                     let corr = inner.edge(&x, n).stack(inner.edge(n, &k)).reduce(h, t);
-                    (!corr.is_zero()).then(|| 
+                    (!corr.is_zero()).then(||
                         (with_bit(&x, Bit::Bit1), with_bit(&k, Bit::Bit0), corr)
                     )
                 })
@@ -335,7 +335,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     // `l·0` are removed by the next degree's rewrite, matching the sequential SDR composition.
     fn reduce_elements(&mut self, d: isize) {
         let n_elems = self.cone.elements().content().len();
-        if n_elems == 0 { 
+        if n_elems == 0 {
             return;
         }
 

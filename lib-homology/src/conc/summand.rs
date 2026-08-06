@@ -16,19 +16,19 @@ use yui_matrix::sparse::{SpMat, SpVec, Trans};
 /// change from raw generators to the SNF basis.
 #[derive(Clone, Debug)]
 pub struct Summand<X, R>
-where 
+where
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     raw_gens: IndexSet<X>,
-    rank: usize, 
+    rank: usize,
     tors: Vec<R>,
     trans: Trans<R>
 }
 
 impl<X, R> Summand<X, R>
 where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
-    pub fn new(raw_gens: IndexSet<X>, rank: usize, tors: Vec<R>, trans: Trans<R>) -> Self { 
+    pub fn new(raw_gens: IndexSet<X>, rank: usize, tors: Vec<R>, trans: Trans<R>) -> Self {
         assert_eq!(trans.src_dim(), raw_gens.len());
         assert_eq!(trans.tgt_dim(), rank + tors.len());
         assert!(
@@ -126,10 +126,10 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
         let r = self.rank();
         let v = self.vectorize(z);
 
-        SpVec::from_sorted_entries(v.dim(), v.iter().map(|(i, a)| { 
-            if i < r { 
+        SpVec::from_sorted_entries(v.dim(), v.iter().map(|(i, a)| {
+            if i < r {
                 (i, a.clone())
-            } else { 
+            } else {
                 let t = &self.tors()[i - r];
                 (i, a % t)
             }
@@ -143,13 +143,13 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
 
         let v = self.trans.backward(v);
 
-        Lc::from_iter( v.iter().map(|(i, a)| 
+        Lc::from_iter( v.iter().map(|(i, a)|
             (self.raw_gens[i].clone(), a.clone())
         ) )
     }
 
     pub fn make_matrix<Y, F>(&self, target: &Summand<Y, R>, map: F) -> SpMat<R>
-    where Y: LcKey, F: Fn(&Lc<X, R>) -> Lc<Y, R> { 
+    where Y: LcKey, F: Fn(&Lc<X, R>) -> Lc<Y, R> {
         SpMat::from_col_vecs(target.n_generators(), self.generators().map(|z| {
             let w = map(&z);
             target.vectorize(&w)
@@ -157,7 +157,7 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn make_matrix_euc<Y, F>(&self, target: &Summand<Y, R>, map: F) -> SpMat<R>
-    where R: EucRing, for<'x> &'x R: EucRingOps<R>, Y: LcKey, F: Fn(&Lc<X, R>) -> Lc<Y, R> { 
+    where R: EucRing, for<'x> &'x R: EucRingOps<R>, Y: LcKey, F: Fn(&Lc<X, R>) -> Lc<Y, R> {
         SpMat::from_col_vecs(target.n_generators(), self.generators().map(|z| {
             let w = map(&z);
             target.vectorize_euc(&w)
@@ -165,7 +165,7 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     pub fn merge<Y>(&mut self, other: Summand<Y, R>)
-    where Y: LcKey { 
+    where Y: LcKey {
         assert_eq!(self.trans.tgt_dim(), other.trans.src_dim());
 
         self.rank = other.rank;
@@ -211,7 +211,7 @@ mod tex {
         fn tex_math_symbol() -> String {
             "".to_string()
         }
-    
+
         fn tex_string(&self) -> String {
             tex_rmod_str(self.rank(), self.tors())
         }
@@ -219,20 +219,20 @@ mod tex {
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     use yui_core::lc::AsKey;
 
     use super::*;
 
     type X = AsKey<i32>;
-    fn e(i: isize) -> X { 
+    fn e(i: isize) -> X {
         X::from(i as i32)
     }
-    
+
     #[test]
-    fn vectorize() { 
+    fn vectorize() {
         let s = Summand::from_raw_generators([e(0), e(1), e(2)]);
-        
+
         let x = Lc::from(e(0));
         let y = Lc::from(e(1));
         let z = Lc::from(e(2));
@@ -243,9 +243,9 @@ mod tests {
         let v = s.vectorize(&(&x - &y * 2 + &z * 3));
         assert_eq!(v, SpVec::from(vec![1,-2,3]));
     }
-        
+
     #[test]
-    fn as_chain() { 
+    fn as_chain() {
         let s = Summand::from_raw_generators([e(0), e(1), e(2)]);
 
         let x = Lc::from(e(0));

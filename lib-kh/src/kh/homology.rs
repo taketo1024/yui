@@ -29,7 +29,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     cache_bigr: OnceLock<GrMod2<KhGen, R>>,
 }
 
-impl<R> KhHomology<R> 
+impl<R> KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     pub fn new(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
         let c = KhComplex::new(l, h, t, reduced);
@@ -74,15 +74,15 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 
     pub fn new_no_simplify(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
-        let c = KhComplex::new_no_simplify(l, h, t, reduced); 
+        let c = KhComplex::new_no_simplify(l, h, t, reduced);
         Self::from(&c)
     }
-    
+
     pub(crate) fn new_impl(inner: GrMod1<KhGen, R>, alg: KhAlg<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self {
         Self { inner, alg, deg_shift, reduced, canon_cycles, cache_bigr: OnceLock::new() }
     }
 
-    pub fn inner(&self) -> &GrMod1<KhGen, R> { 
+    pub fn inner(&self) -> &GrMod1<KhGen, R> {
         &self.inner
     }
 
@@ -97,7 +97,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         &self.alg
     }
 
-    pub fn deg_shift(&self) -> (isize, isize) { 
+    pub fn deg_shift(&self) -> (isize, isize) {
         self.deg_shift
     }
 
@@ -203,7 +203,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 impl<R> ToSeqString<isize> for KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     delegate! {
-        to self.inner { 
+        to self.inner {
             fn label(&self) -> String;
             fn indices(&self) -> Vec<isize>;
             fn entry_at(&self, i: &isize) -> String;
@@ -224,11 +224,11 @@ where R: EucRing + TeX, for<'x> &'x R: EucRingOps<R> {
 
 impl<R> ToTableString<isize> for KhHomology<R>
 where R: EucRing, for<'x> &'x R: EucRingOps<R> {
-    fn labels(&self) -> (String, String) { 
+    fn labels(&self) -> (String, String) {
         ("i".to_string(), "j".to_string())
     }
 
-    fn indices(&self) -> (Vec<isize>, Vec<isize>) { 
+    fn indices(&self) -> (Vec<isize>, Vec<isize>) {
         (self.h_range().collect(), self.q_range().step_by(2).collect())
     }
 

@@ -14,30 +14,30 @@ use yui_core::abst::{AddGrp, AddGrpOps, AddMon, AddMonOps, MathType, EucRing, Eu
 
 // Homogeneous polynomial
 #[derive(Clone, Copy, Debug, Default)]
-pub struct FastPoly<const X: char, R> { 
+pub struct FastPoly<const X: char, R> {
     deg: usize,
     coeff: R
 }
 
-impl<const X: char, R> FastPoly<X, R> { 
-    pub fn new(deg: usize, coeff: R) -> Self { 
+impl<const X: char, R> FastPoly<X, R> {
+    pub fn new(deg: usize, coeff: R) -> Self {
         Self { deg, coeff }
     }
 
-    pub fn coeff(&self) -> &R { 
+    pub fn coeff(&self) -> &R {
         &self.coeff
     }
 
-    pub fn deg(&self) -> usize { 
+    pub fn deg(&self) -> usize {
         self.deg
     }
 
-    pub fn from_const(r: R) -> Self { 
+    pub fn from_const(r: R) -> Self {
         Self::new(0, r)
     }
 
     pub fn variable() -> Self
-    where R: One { 
+    where R: One {
         Self::new(1, R::one())
     }
 }
@@ -162,7 +162,7 @@ where R: AddGrp, for<'x> &'x R: AddGrpOps<R> {
 impl<const X: char, R> MulAssign<&R> for FastPoly<X, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn mul_assign(&mut self, rhs: &R) {
-        if rhs.is_one() { 
+        if rhs.is_one() {
             return
         }
         self.coeff *= rhs
@@ -173,7 +173,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<const X: char, R> MulAssign<&FastPoly<X, R>> for FastPoly<X, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn mul_assign(&mut self, rhs: &FastPoly<X, R>) {
-        if rhs.is_one() { 
+        if rhs.is_one() {
             return
         }
         self.deg += rhs.deg;
@@ -215,7 +215,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {}
 impl<const X: char, R> Ring for FastPoly<X, R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn inv(&self) -> Option<Self> {
-        if self.deg > 0 { 
+        if self.deg > 0 {
             return None
         }
         let a = self.coeff.inv()?;
@@ -239,21 +239,21 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
 impl<const X: char, R> FastPoly<X, R>
 where R: Field, for<'x> &'x R: FieldOps<R> {
-    pub fn div_rem(&self, rhs: &Self) -> (Self, Self) { 
+    pub fn div_rem(&self, rhs: &Self) -> (Self, Self) {
         assert!(!rhs.is_zero());
 
-        if self.deg < rhs.deg { 
+        if self.deg < rhs.deg {
             return (Self::zero(), self.clone())
         }
-        
+
         let (i, a) = (self.deg, &self.coeff); // ax^i
         let (j, b) = ( rhs.deg,  &rhs.coeff); // bx^j
-        
+
         let k = i - j; // >= 0
         let c = a / b;
         let q = FastPoly::new(k, c); // cx^k = (a/b) x^{i-j}.
         let r = Self::zero();
-        
+
         (q, r)
     }
 }
@@ -320,13 +320,13 @@ mod tex {
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     use yui_core::num::Ratio;
 
     use super::*;
 
     #[test]
-    fn zero() { 
+    fn zero() {
         type R = i64;
         type P = FastPoly<'x', R>;
 
@@ -338,9 +338,9 @@ mod tests {
         assert!(!b.is_zero());
         assert!(c.is_zero());
     }
-    
+
     #[test]
-    fn one() { 
+    fn one() {
         type R = i64;
         type P = FastPoly<'x', R>;
 
@@ -352,9 +352,9 @@ mod tests {
         assert!(b.is_one());
         assert!(!c.is_one());
     }
-    
+
     #[test]
-    fn eq() { 
+    fn eq() {
         type R = i64;
         type P = FastPoly<'x', R>;
 
@@ -370,7 +370,7 @@ mod tests {
     }
 
     #[test]
-    fn add() { 
+    fn add() {
         type R = i64;
         type P = FastPoly<'x', R>;
 
@@ -384,7 +384,7 @@ mod tests {
     }
 
     #[test]
-    fn sub() { 
+    fn sub() {
         type R = i64;
         type P = FastPoly<'x', R>;
 
@@ -398,7 +398,7 @@ mod tests {
     }
 
     #[test]
-    fn mul() { 
+    fn mul() {
         type R = i64;
         type P = FastPoly<'x', R>;
 
@@ -412,7 +412,7 @@ mod tests {
     }
 
     #[test]
-    fn div() { 
+    fn div() {
         type R = Ratio<i64>;
         type P = FastPoly<'x', R>;
 
@@ -425,7 +425,7 @@ mod tests {
     }
 
     #[test]
-    fn rem() { 
+    fn rem() {
         type R = Ratio<i64>;
         type P = FastPoly<'x', R>;
 

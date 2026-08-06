@@ -29,31 +29,31 @@ pub struct SpMat<R> {
     inner: CscMatrix<R>
 }
 
-impl<R> SpMat<R> { 
+impl<R> SpMat<R> {
     pub fn try_from_csc_data(
         num_rows: usize,
         num_cols: usize,
         col_offsets: Vec<usize>,
         row_indices: Vec<usize>,
         values: Vec<R>,
-    ) -> Option<Self> { 
+    ) -> Option<Self> {
         let csc = CscMatrix::try_from_csc_data(num_rows, num_cols, col_offsets, row_indices, values);
         csc.ok().map(SpMat::from)
     }
 
-    pub(crate) fn inner(&self) -> &CscMatrix<R> { 
+    pub(crate) fn inner(&self) -> &CscMatrix<R> {
         &self.inner
     }
 
-    pub(crate) fn into_inner(self) -> CscMatrix<R> { 
+    pub(crate) fn into_inner(self) -> CscMatrix<R> {
         self.inner
     }
 
-    pub fn csc_data(&self) -> (&[usize], &[usize], &[R]) { 
+    pub fn csc_data(&self) -> (&[usize], &[usize], &[R]) {
         self.inner.csc_data()
     }
 
-    pub fn disassemble(self) -> (Vec<usize>, Vec<usize>, Vec<R>) { 
+    pub fn disassemble(self) -> (Vec<usize>, Vec<usize>, Vec<R>) {
         self.inner.disassemble()
     }
 
@@ -68,31 +68,31 @@ impl<R> SpMat<R> {
     }
 
     pub fn id(n: usize) -> Self
-    where R: Scalar + One { 
+    where R: Scalar + One {
         let csc = CscMatrix::identity(n);
         Self::from(csc)
     }
 
     pub fn is_id(&self) -> bool
     where R: Scalar + One + Zero {
-        self.is_square() && self.iter().all(|(i, j, a)| 
+        self.is_square() && self.iter().all(|(i, j, a)|
             (i == j && a.is_one()) || (i != j && a.is_zero())
         )
     }
 
     pub fn is_triang(&self, t: TriangularType) -> bool
     where R: Zero {
-        if self.n_rows() != self.n_cols() { 
+        if self.n_rows() != self.n_cols() {
             return false
         }
 
-        if t.is_upper() { 
+        if t.is_upper() {
             self.iter_nz().all(|(i, j, _)| i <= j )
-        } else { 
+        } else {
             self.iter_nz().all(|(i, j, _)| i >= j )
         }
     }
-    
+
     /// Iterates the stored `(row, col, value)` triplets — may include explicit zeros.
     pub fn iter(&self) -> impl Iterator<Item = (usize, usize, &R)> {
         self.inner.triplet_iter()
@@ -105,17 +105,17 @@ impl<R> SpMat<R> {
     }
 
     pub fn into_dense(self) -> Mat<R>
-    where R: Scalar + Zero + ClosedAddAssign { 
+    where R: Scalar + Zero + ClosedAddAssign {
         self.into()
     }
 
-    pub fn nnz(&self) -> usize { 
+    pub fn nnz(&self) -> usize {
         self.inner.nnz()
     }
 
-    pub fn density(&self) -> f64 { 
+    pub fn density(&self) -> f64 {
         let (m, n) = self.shape();
-        if m == 0 || n == 0 { 
+        if m == 0 || n == 0 {
             return 0.0
         }
 
@@ -126,27 +126,27 @@ impl<R> SpMat<R> {
     }
 
     pub fn redundancy(&self) -> f64
-    where R: Zero { 
+    where R: Zero {
         let nnz = self.nnz().to_f64().unwrap();
         let red = self.iter().filter(|(_, _, a)| a.is_zero()).count().to_f64().unwrap();
         red / nnz
     }
 
     pub fn mean_weight(&self) -> f64
-    where R: Ring, for<'x> &'x R: RingOps<R> { 
+    where R: Ring, for<'x> &'x R: RingOps<R> {
         let nnz = self.nnz().to_f64().unwrap();
-        let w = self.iter().map(|(_, _, a)| a.c_weight()).sum::<f64>(); 
+        let w = self.iter().map(|(_, _, a)| a.c_weight()).sum::<f64>();
         w / nnz
     }
 
     pub fn block_diag<I>(blocks: I) -> SpMat<R>
-    where I: IntoIterator<Item = SpMat<R>> { 
+    where I: IntoIterator<Item = SpMat<R>> {
         let mut shape = (0, 0);
         let mut col_offsets: Vec<usize> = vec![];
         let mut row_indices: Vec<usize> = vec![];
         let mut values: Vec<R> = vec![];
 
-        for a in blocks { 
+        for a in blocks {
             let a_shape = a.shape();
             let (a_cols, a_rows, mut a_vals) = a.disassemble();
 
@@ -181,15 +181,15 @@ impl<R> SpMat<R> {
     }
 }
 
-impl<R> SpMat<R> 
-where R: Scalar + Clone + Zero + ClosedAddAssign { 
+impl<R> SpMat<R>
+where R: Scalar + Clone + Zero + ClosedAddAssign {
     /// Builds an `SpMat` of `shape` from `(row, col, value)` triplets. Zero
     /// values are skipped; duplicates at the same position are summed.
     pub fn from_entries<T>(shape: (usize, usize), entries: T) -> Self
     where T: IntoIterator<Item = (usize, usize, R)> {
         let mut coo = CooMatrix::new(shape.0, shape.1);
-        for (i, j, a) in entries { 
-            if a.is_zero() { 
+        for (i, j, a) in entries {
+            if a.is_zero() {
                 continue;
             }
             coo.push(i, j, a)
@@ -219,11 +219,11 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
     }
 
     pub fn from_row_major<I>(shape: (usize, usize), data: I) -> Self
-    where I: IntoIterator<Item = R> { 
+    where I: IntoIterator<Item = R> {
         let n = shape.1;
         Self::from_entries(
-            shape, 
-            data.into_iter().enumerate().map(|(k, a)| { 
+            shape,
+            data.into_iter().enumerate().map(|(k, a)| {
                 let (i, j) = (k / n, k % n);
                 (i, j, a)
             })
@@ -251,14 +251,14 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         SpVec::try_from_csc_data(self.n_rows(), row_indices, values).unwrap()
     }
 
-    pub fn transpose(&self) -> Self { 
+    pub fn transpose(&self) -> Self {
         self.inner.transpose().into()
     }
 
     /// New `shape`-d matrix whose entry at `f(i, j)` (if `Some`) is `self[(i, j)]`.
     /// Entries where `f` returns `None` are dropped.
     pub fn extract<F>(&self, shape: (usize, usize), f: F) -> SpMat<R>
-    where F: Fn(usize, usize) -> Option<(usize, usize)> { 
+    where F: Fn(usize, usize) -> Option<(usize, usize)> {
         SpMat::from_entries(shape, self.iter().filter_map(|(i, j, a)|
             f(i, j).map(|(i, j)| (i, j, a.clone()))
         ))
@@ -311,7 +311,7 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         ]
     }
 
-    pub fn submat(&self, rows: Range<usize>, cols: Range<usize>) -> SpMat<R> { 
+    pub fn submat(&self, rows: Range<usize>, cols: Range<usize>) -> SpMat<R> {
         let (i0, i1) = (rows.start, rows.end);
         let (j0, j1) = (cols.start, cols.end);
 
@@ -326,12 +326,12 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         )
     }
 
-    pub fn submat_rows(&self, rows: Range<usize>) -> SpMat<R> { 
+    pub fn submat_rows(&self, rows: Range<usize>) -> SpMat<R> {
         let n = self.n_cols();
         self.submat(rows, 0 .. n)
     }
 
-    pub fn submat_cols(&self, cols: Range<usize>) -> SpMat<R> { 
+    pub fn submat_cols(&self, cols: Range<usize>) -> SpMat<R> {
         let m = self.n_rows();
         self.submat(0 .. m, cols)
     }
@@ -466,7 +466,7 @@ where R: Scalar + Clone + Zero + ClosedAddAssign {
         let (mut col_offsets, row_indices, values) = l.disassemble();
         let last = *col_offsets.last().unwrap();
         col_offsets.extend(repeat_n(last, add_cols));
-        
+
         self.inner = CscMatrix::try_from_csc_data(
             m + add_rows, n + add_cols,
             col_offsets, row_indices, values
@@ -589,14 +589,14 @@ impl_binop!(Mul, mul);
 
 impl<R> Display for SpMat<R>
 where R: Display + Debug {
-    delegate! { to self.inner { 
+    delegate! { to self.inner {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
     }}
 }
 
 impl<R> Debug for SpMat<R>
 where R: Display + Debug {
-    delegate! { to self.inner { 
+    delegate! { to self.inner {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
     }}
 }
@@ -623,19 +623,19 @@ where R: Clone + serde::Deserialize<'de> {
 
 #[cfg(test)]
 impl<R> SpMat<R>
-where R: Scalar + Zero + One + ClosedAddAssign { 
+where R: Scalar + Zero + One + ClosedAddAssign {
     pub fn rand(shape: (usize, usize), density: f64) -> Self {
         use itertools::iproduct;
         use rand::RngExt;
-    
+
         let (m, n) = shape;
         let range = iproduct!(0..m, 0..n);
         let mut rng = rand::rng();
-    
+
         Self::from_entries(shape, range.filter_map(|(i, j)|
-            if rng.random::<f64>() < density { 
+            if rng.random::<f64>() < density {
                 Some((i, j, R::one()))
-            } else { 
+            } else {
                 None
             }
         ))
@@ -643,7 +643,7 @@ where R: Scalar + Zero + One + ClosedAddAssign {
 }
 
 #[cfg(test)]
-pub(super) mod tests { 
+pub(super) mod tests {
     use itertools::Itertools;
     use yui_core::num::Ratio;
     use crate::Perm;
@@ -651,7 +651,7 @@ pub(super) mod tests {
     use super::*;
 
     #[test]
-    fn init() { 
+    fn init() {
         let a = SpMat::from_entries((2, 2), [
             (0, 0, 1),
             (0, 1, 2),
@@ -662,7 +662,7 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn init_ratio() { 
+    fn init_ratio() {
         type R = Ratio<i64>;
         let vals = (0..4).map(|i| R::new(i + 1, 5)).collect_vec();
         let a = SpMat::from_entries((2, 2), [
@@ -681,7 +681,7 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn to_dense() { 
+    fn to_dense() {
         let a = SpMat::from_entries((2, 2), [
             (0, 0, 1),
             (0, 1, 2),
@@ -743,7 +743,7 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn submat() { 
+    fn submat() {
         let a = SpMat::from_row_major((5, 6), 0..30);
         let b = a.submat(1..3, 2..5);
         assert_eq!(b, SpMat::from_row_major((2,3), vec![
@@ -753,15 +753,15 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn transpose() { 
+    fn transpose() {
         let a = SpMat::from_row_major((3,4), 0..12);
         let b = a.transpose();
 
         assert_eq!(b, SpMat::from_row_major((4,3), vec![
-            0, 4, 8, 
-            1, 5, 9, 
-            2, 6, 10, 
-            3, 7, 11, 
+            0, 4, 8,
+            1, 5, 9,
+            2, 6, 10,
+            3, 7, 11,
         ]));
     }
 
@@ -853,7 +853,7 @@ pub(super) mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
-    fn serialize() { 
+    fn serialize() {
         let a = SpMat::from_row_major((3, 4), (0..12).map(|x| x % 5));
         let ser = serde_json::to_string(&a).unwrap();
         let des = serde_json::from_str(&ser).unwrap();

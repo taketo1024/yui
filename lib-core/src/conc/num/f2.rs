@@ -36,9 +36,9 @@ impl FromStr for FF2 {
 
 impl Display for FF2 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.0 { 
+        if self.0 {
             write!(f, "1")
-        } else { 
+        } else {
             write!(f, "0")
         }
     }
@@ -171,9 +171,9 @@ impl Ring for FF2 {
     }
 
     fn c_weight(&self) -> f64 {
-        if self.is_zero() { 
+        if self.is_zero() {
             0f64
-        } else { 
+        } else {
             1f64
         }
     }
@@ -187,7 +187,7 @@ mod tex {
     use super::*;
 
     impl TeX for FF2 {
-        fn tex_math_symbol() -> String { 
+        fn tex_math_symbol() -> String {
             String::from("\\mathbb{F}_2")
         }
         fn tex_string(&self) -> String {
@@ -197,11 +197,11 @@ mod tex {
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     use super::*;
 
     #[test]
-    fn init() { 
+    fn init() {
         let a = FF2::from(0);
         assert_eq!(a.0, false);
 
@@ -213,7 +213,7 @@ mod tests {
     }
 
     #[test]
-    fn display() { 
+    fn display() {
         let a = FF2::zero();
         assert_eq!(a.to_string(), "0");
 
@@ -233,7 +233,7 @@ mod tests {
     }
 
     #[test]
-    fn add() { 
+    fn add() {
         let a = FF2::from(2);
         let b = FF2::from(4);
 
@@ -251,20 +251,20 @@ mod tests {
     }
 
     #[test]
-    fn add_assign() { 
+    fn add_assign() {
         let mut a = FF2::from(3);
         a += FF2::from(4);
         assert_eq!(a, FF2::from(1));
     }
 
     #[test]
-    fn neg() { 
+    fn neg() {
         let a = FF2::from(3);
         assert_eq!(-a, FF2::from(1));
     }
 
     #[test]
-    fn sub() { 
+    fn sub() {
         let a = FF2::from(3);
         let b = FF2::from(5);
 
@@ -272,14 +272,14 @@ mod tests {
     }
 
     #[test]
-    fn sub_assign() { 
+    fn sub_assign() {
         let mut a = FF2::from(3);
         a -= FF2::from(4);
         assert_eq!(a, FF2::from(1));
     }
 
     #[test]
-    fn mul() { 
+    fn mul() {
         let a = FF2::from(3);
         let b = FF2::from(4);
         assert_eq!(a * b, FF2::from(0));
@@ -290,42 +290,42 @@ mod tests {
     }
 
     #[test]
-    fn mul_assign() { 
+    fn mul_assign() {
         let mut a = FF2::from(3);
         a *= FF2::from(4);
         assert_eq!(a, FF2::from(0));
     }
 
     #[test]
-    fn div() { 
+    fn div() {
         let a = FF2::from(5);
         let b = FF2::from(3);
         assert_eq!(a / b, FF2::from(1));
     }
 
     #[test]
-    fn div_assign() { 
+    fn div_assign() {
         let mut a = FF2::from(4);
         a /= FF2::from(3);
         assert_eq!(a, FF2::from(0));
     }
 
     #[test]
-    fn rem() { 
+    fn rem() {
         let a = FF2::from(5);
         let b = FF2::from(3);
         assert_eq!(a % b, FF2::zero());
     }
 
     #[test]
-    fn rem_assign() { 
+    fn rem_assign() {
         let mut a = FF2::from(5);
         a %= FF2::from(3);
         assert_eq!(a, FF2::zero());
     }
 
     #[test]
-    fn tex() { 
+    fn tex() {
         use crate::util::tex::TeX;
         assert_eq!(FF2::tex_math_symbol(), "\\mathbb{F}_2");
         assert_eq!(FF2::from(5).tex_string(), "1");

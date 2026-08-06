@@ -11,8 +11,8 @@ use yui_core::abst::{Ring, RingOps};
 use yui_link::{Edge, InvLink, Link};
 use yui_matrix::sparse::SpVec;
 
-pub fn measure<F, Res>(proc: F) -> (Res, std::time::Duration) 
-where F: FnOnce() -> Res { 
+pub fn measure<F, Res>(proc: F) -> (Res, std::time::Duration)
+where F: FnOnce() -> Res {
     let start = std::time::Instant::now();
     let res = proc();
     let time = start.elapsed();
@@ -69,13 +69,13 @@ pub fn load_sinv_knot(input: &String, mirror: bool) -> Result<InvLink, Box<dyn s
     }
 }
 
-pub fn parse_pair<R: FromStr + Zero>(s: &String) -> Result<(R, R), Box<dyn std::error::Error>> { 
-    if let Ok(c) = R::from_str(s) { 
+pub fn parse_pair<R: FromStr + Zero>(s: &String) -> Result<(R, R), Box<dyn std::error::Error>> {
+    if let Ok(c) = R::from_str(s) {
         return Ok((c, R::zero()))
     }
 
     let r = regex::Regex::new(r"^(.+),(.+)$").unwrap();
-    if let Some(m) = r.captures(s) { 
+    if let Some(m) = r.captures(s) {
         let (s1, s2) = (&m[1], &m[2]);
         if let (Ok(a), Ok(b)) = (R::from_str(s1), R::from_str(s2)) {
             return Ok((a, b))
@@ -85,7 +85,7 @@ pub fn parse_pair<R: FromStr + Zero>(s: &String) -> Result<(R, R), Box<dyn std::
     err!("cannot parse '{}' as {}.", s, std::any::type_name::<R>())
 }
 
-pub fn vec2str<R>(v: &SpVec<R>) -> String 
-where R: Ring + ToString, for<'x> &'x R: RingOps<R> { 
+pub fn vec2str<R>(v: &SpVec<R>) -> String
+where R: Ring + ToString, for<'x> &'x R: RingOps<R> {
     format!("({})", v.clone().into_dense().iter().join(", "))
 }

@@ -215,31 +215,31 @@ impl Tng {
         }
     }
 
-    pub fn empty() -> Self { 
+    pub fn empty() -> Self {
         Self::new(vec![])
     }
 
-    pub fn is_empty(&self) -> bool { 
+    pub fn is_empty(&self) -> bool {
         self.comps.is_empty()
     }
 
-    pub fn is_closed(&self) -> bool { 
+    pub fn is_closed(&self) -> bool {
         self.comps.iter().all(|a| a.is_circle())
     }
 
-    pub fn contains_circle(&self) -> bool { 
+    pub fn contains_circle(&self) -> bool {
         self.comps.iter().any(|a| a.is_circle())
     }
 
-    pub fn n_comps(&self) -> usize { 
+    pub fn n_comps(&self) -> usize {
         self.comps.len()
     }
 
-    pub fn comps(&self) -> impl Iterator<Item = &TngComp> { 
+    pub fn comps(&self) -> impl Iterator<Item = &TngComp> {
         self.comps.iter()
     }
 
-    pub fn comp(&self, i: usize) -> &TngComp { 
+    pub fn comp(&self, i: usize) -> &TngComp {
         &self.comps[i]
     }
 
@@ -299,7 +299,7 @@ impl Tng {
 
     pub fn find_comp<F>(&self, pred: F) -> Option<usize>
     where F: Fn(&TngComp) -> bool {
-        self.comps.iter().enumerate().find(|(_, c)| 
+        self.comps.iter().enumerate().find(|(_, c)|
             pred(c)
         ).map(|(i, _)| i)
     }
@@ -323,11 +323,11 @@ impl Tng {
 
 impl Display for Tng {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.is_empty() { 
+        if self.is_empty() {
             write!(f, "∅")
-        } else if self.comps.len() == 1 { 
+        } else if self.comps.len() == 1 {
             write!(f, "{}", self.comps[0])
-        } else { 
+        } else {
             write!(f, "{{{}}}", self.comps.iter().join(", "))
         }
     }
@@ -346,7 +346,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn tng_comp_eq() { 
+    fn tng_comp_eq() {
         assert_eq!(TngComp::arc([0, 1, 2]), TngComp::arc([0, 1, 2]));
         assert_eq!(TngComp::arc([0, 1, 2]), TngComp::arc([2, 1, 0]));
         assert_ne!(TngComp::arc([0, 1, 2]), TngComp::arc([0, 2]));
@@ -359,7 +359,7 @@ mod tests {
     }
 
     #[test]
-    fn is_connectable() { 
+    fn is_connectable() {
         let c0 = TngComp::arc([0, 1]);
         let c1 = TngComp::arc([1, 2]);
         let c2 = TngComp::arc([2, 3]);
@@ -375,7 +375,7 @@ mod tests {
     }
 
     #[test]
-    fn connect_comp() { 
+    fn connect_comp() {
         let c0 = TngComp::arc([0, 1]);
         let c1 = TngComp::arc([1, 2]);
         let c2 = TngComp::arc([0, 2]);
@@ -388,7 +388,7 @@ mod tests {
     }
 
     #[test]
-    fn append_arc() { 
+    fn append_arc() {
         let mut t = Tng::empty();
         assert_eq!(t.n_comps(), 0);
 
@@ -411,7 +411,7 @@ mod tests {
     }
 
     #[test]
-    fn connect() { 
+    fn connect() {
         let mut t0 = Tng::new(vec![
             TngComp::arc([0, 1]),
             TngComp::arc([2, 3]),
@@ -434,7 +434,7 @@ mod tests {
     }
 
     #[test]
-    fn tng_eq() { 
+    fn tng_eq() {
         let t0 = Tng::new(vec![
             TngComp::arc([0, 1]),
             TngComp::arc([2, 3]),
@@ -474,7 +474,7 @@ mod tests {
     }
 
     #[test]
-    fn find_loop() { 
+    fn find_loop() {
         let mut t = Tng::empty();
         assert_eq!(t.n_comps(), 0);
         assert_eq!(t.find_comp(|c| c.is_circle()), None);

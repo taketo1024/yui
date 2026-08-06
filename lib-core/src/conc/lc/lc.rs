@@ -116,16 +116,16 @@ where
     }
 
     pub fn filter<F>(self, f: F) -> Self
-    where F: Fn(&X) -> bool { 
+    where F: Fn(&X) -> bool {
         self.into_iter().filter(|(x, _)| f(x)).collect()
     }
 
     pub fn filtered<F>(&self, f: F) -> Self
-    where F: Fn(&X) -> bool { 
-        self.iter().filter_map(|(x, a)| 
-            if f(x) { 
+    where F: Fn(&X) -> bool {
+        self.iter().filter_map(|(x, a)|
+            if f(x) {
                 Some((x.clone(), a.clone()))
-            } else { 
+            } else {
                 None
             }
         ).collect()
@@ -158,11 +158,11 @@ where
     pub fn add_pair_ref(&mut self, rhs: (&X, R)) {
         self.add_pairs_ref([rhs]);
     }
-    
+
     pub fn apply<F, Y: LcKey>(&self, f: F) -> Lc<Y, R>
     where F: Fn(&X) -> Lc<Y, R> {
-        self.iter().flat_map(|(x, r)| { 
-            f(x).into_iter().map(move |(y, s)| { 
+        self.iter().flat_map(|(x, r)| {
+            f(x).into_iter().map(move |(y, s)| {
                 (y, r * &s)
             })
         }).collect()
@@ -188,16 +188,16 @@ where
     }
 
     pub fn sort_terms_by<F>(&self, cmp: F) -> impl Iterator<Item = (&X, &R)>
-    where F: Fn(&X, &X) -> std::cmp::Ordering { 
+    where F: Fn(&X, &X) -> std::cmp::Ordering {
         self.iter().sorted_by(|(x, _), (y, _)| cmp(x, y))
     }
 
     pub fn to_string_by<F>(&self, cmp: F, descending: bool) -> String
     where F: Fn(&X, &X) -> std::cmp::Ordering {
         use crate::util::format::lc;
-        if descending { 
+        if descending {
             lc( self.sort_terms_by(|x, y| cmp(x, y).reverse()) )
-        } else { 
+        } else {
             lc( self.sort_terms_by(cmp) )
         }
     }
@@ -222,7 +222,7 @@ where
 {
     fn from(x: X) -> Self {
         Self::from((x, R::one()))
-    }    
+    }
 }
 
 impl<X, R> From<(X, R)> for Lc<X, R>
@@ -455,21 +455,21 @@ mod tests {
     use maplit::hashmap;
     use crate::abst::{MathType, AddMon};
     use crate::lc::{AsKey, Lc};
- 
+
     type X = AsKey<i32>;
-    fn e(i: i32) -> X { 
+    fn e(i: i32) -> X {
         X::from(i)
     }
 
     #[test]
-    fn math_symbol() { 
+    fn math_symbol() {
         type L = Lc<X, i32>;
         let symbol = L::math_symbol();
         assert_eq!(symbol, "Z<Free<i32>>");
     }
 
     #[test]
-    fn fmt() { 
+    fn fmt() {
         type L = Lc<X, i32>;
 
         let z = L::from(hashmap!{ e(1) => 1 });
@@ -495,14 +495,14 @@ mod tests {
     }
 
     #[test]
-    fn default() { 
+    fn default() {
         type L = Lc<X, i32>;
         let z = L::default();
         assert!(z.data.is_empty());
     }
 
     #[test]
-    fn from_singleton() { 
+    fn from_singleton() {
         type L = Lc<X, i32>;
         let x = e(0);
         let z = L::from(x);
@@ -510,7 +510,7 @@ mod tests {
     }
 
     #[test]
-    fn from_pair() { 
+    fn from_pair() {
         type L = Lc<X, i32>;
         let x = e(0);
         let z = L::from((x, 2));
@@ -518,7 +518,7 @@ mod tests {
     }
 
     #[test]
-    fn from_iter() { 
+    fn from_iter() {
         type L = Lc<X, i32>;
         let z = L::from_iter([(e(0), 1), (e(1), 0), (e(2), 2)]);
 
@@ -529,7 +529,7 @@ mod tests {
     }
 
     #[test]
-    fn into_singleton() { 
+    fn into_singleton() {
         type L = Lc<X, i32>;
         let z = L::from(e(0));
 
@@ -546,7 +546,7 @@ mod tests {
     }
 
     #[test]
-    fn eq() { 
+    fn eq() {
         type L = Lc<X, i32>;
         let z1 = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
         let z2 = L::from(hashmap!{ e(2) => 2, e(1) => 1 });
@@ -557,7 +557,7 @@ mod tests {
     }
 
     #[test]
-    fn zero() { 
+    fn zero() {
         type L = Lc<X, i32>;
         let z = L::zero();
 
@@ -834,7 +834,7 @@ mod tests {
     }
 
     #[test]
-    fn filter_keys() { 
+    fn filter_keys() {
         type L = Lc<X, i32>;
         let z = L::from_iter( (1..10).map(|i| (e(i), i * 10)) );
         let w = z.filtered(|x| x.0 % 3 == 0 );
@@ -843,7 +843,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
-    fn serialize() { 
+    fn serialize() {
         type L = Lc<X, i32>;
         let z = L::from(hashmap!{ e(1) => 1, e(2) => 2 });
         let ser = serde_json::to_string(&z).unwrap();

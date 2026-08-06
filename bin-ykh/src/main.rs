@@ -11,8 +11,8 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 fn main() {
     let app = App::new();
     let res = app.run();
-    
-    match res { 
+
+    match res {
         Ok(output) => println!("{output}"),
         Err(e) => {
             log::error!("{}", e);

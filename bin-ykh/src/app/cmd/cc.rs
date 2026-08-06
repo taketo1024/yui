@@ -72,12 +72,12 @@ where
     R: EucRing + FromStr + TeX,
     for<'x> &'x R: EucRingOps<R>,
 {
-    pub fn boot(args: &Args) -> Result<String, Box<dyn std::error::Error>> { 
+    pub fn boot(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
         let mut app = Self::new(args.clone());
         app.run()
     }
 
-    pub fn new(args: Args) -> Self { 
+    pub fn new(args: Args) -> Self {
         let buff = String::with_capacity(1024);
         App { args, buff, _ring: PhantomData }
     }
@@ -90,28 +90,28 @@ where
         if self.args.reduced {
             ensure!(t.is_zero(), "`t` must be zero for reduced.");
         }
-    
+
         let r = self.args.reduced;
-        let bigraded = (h.is_zero() && t.is_zero()) || 
+        let bigraded = (h.is_zero() && t.is_zero()) ||
             ["H", "0,T"].contains(&self.args.c_value.as_str());
         let gens = self.args.show_gens;
-        
+
         let l = load_link(&self.args.link, self.args.mirror)?;
         let i = self.args.cc_index;
 
-        let l = if self.args.reverse { 
+        let l = if self.args.reverse {
             l.cc_at(i)
-        } else { 
+        } else {
             l
         };
 
         let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, r, i);
 
-        // MEMO: f0, f1 are named after the paper. 
-        let (f_name, f) = if self.args.map_type == 0 { 
+        // MEMO: f0, f1 are named after the paper.
+        let (f_name, f) = if self.args.map_type == 0 {
             ("f0", KhComplex::cc_map1(&c1, &c2, &l, i))
-        } else { 
-            ("f1", KhComplex::cc_map0(&c1, &c2, i)) 
+        } else {
+            ("f1", KhComplex::cc_map0(&c1, &c2, i))
         };
 
         let (h1, h2) = (c1.homology(), c2.homology());
@@ -119,47 +119,47 @@ where
         self.show_table("from:", &h1, bigraded, gens);
         self.show_table("to:",   &h2, bigraded, gens);
         self.show_map(f_name, &h1, &h2, &f);
-        
+
         let res = self.flush();
         Ok(res)
     }
 
-    fn show_table(&mut self, label: &str, h: &KhHomology<R>, bigraded: bool, with_gens: bool) { 
-        let table = if bigraded { 
+    fn show_table(&mut self, label: &str, h: &KhHomology<R>, bigraded: bool, with_gens: bool) {
+        let table = if bigraded {
             h.to_table_string()
-        } else { 
+        } else {
             h.to_seq_string()
         };
 
         self.out(label);
         self.out(&table);
 
-        if with_gens { 
+        if with_gens {
             self.show_gens(h);
         }
     }
 
-    fn show_gens(&mut self, h: &KhHomology<R>) { 
+    fn show_gens(&mut self, h: &KhHomology<R>) {
         for &i in h.support() {
             if h[i].is_zero() { continue }
 
             self.out(&format!("({i}): {}", h[i]));
 
-            for (k, z) in h[i].generators().enumerate() { 
+            for (k, z) in h[i].generators().enumerate() {
                 self.out(&format!("  {k}: {z}"));
             }
             self.out("");
         }
     }
 
-    fn show_map(&mut self, f_name: &str, h1: &KhHomology<R>, h2: &KhHomology<R>, f: &KhChainMap<R>) { 
+    fn show_map(&mut self, f_name: &str, h1: &KhHomology<R>, h2: &KhHomology<R>, f: &KhChainMap<R>) {
         self.out(&format!("{f_name}: deg {}\n", f.deg()));
 
-        for i in h1.h_range() { 
+        for i in h1.h_range() {
             let j = i + f.deg();
             let (s1, s2) = (&h1[i], &h2[j]);
 
-            if s1.is_zero() || s2.is_zero() { 
+            if s1.is_zero() || s2.is_zero() {
                 self.out(&format!("({i}) {s1} -> ({j}) {s2}\n"));
                 continue;
             }
@@ -170,12 +170,12 @@ where
         }
     }
 
-    fn out(&mut self, str: &str) { 
+    fn out(&mut self, str: &str) {
         self.buff.push_str(str);
         self.buff.push('\n');
     }
 
-    fn flush(&mut self) -> String { 
+    fn flush(&mut self) -> String {
         let res = std::mem::take(&mut self.buff);
         res.trim_end().to_string()
     }

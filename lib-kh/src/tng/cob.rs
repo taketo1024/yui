@@ -53,7 +53,7 @@ pub enum Dot {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, derive_more::Display)]
-pub enum End { 
+pub enum End {
     Src, Tgt
 }
 
@@ -66,7 +66,7 @@ pub struct CobComp {
     nb: usize,            // #∂-components — derived from (src, tgt)
 }
 
-impl CobComp { 
+impl CobComp {
     fn new(src: Tng, tgt: Tng, genus: usize, dots: (usize, usize)) -> Self {
         let nb = Self::count_boundaries(&src, &tgt);
         Self::new_with_nb(src, tgt, genus, dots, nb)
@@ -168,19 +168,19 @@ impl CobComp {
         &self.src
     }
 
-    pub fn tgt(&self) -> &Tng { 
+    pub fn tgt(&self) -> &Tng {
         &self.tgt
     }
 
-    pub fn genus(&self) -> usize { 
+    pub fn genus(&self) -> usize {
         self.genus
     }
 
-    pub fn dots(&self) -> (usize, usize) { 
+    pub fn dots(&self) -> (usize, usize) {
         self.dots
     }
 
-    pub fn total_dots(&self) -> usize { 
+    pub fn total_dots(&self) -> usize {
         self.dots.0 + self.dots.1
     }
 
@@ -199,7 +199,7 @@ impl CobComp {
         self.dots == (0, 0)
     }
 
-    pub fn is_cylinder(&self) -> bool { 
+    pub fn is_cylinder(&self) -> bool {
         self.src.n_comps() == 1 &&
         self.tgt.n_comps() == 1 &&
         self.genus == 0
@@ -211,7 +211,7 @@ impl CobComp {
     }
 
     pub fn is_zero_cob(&self) -> bool {
-        self.is_closed() && 
+        self.is_closed() &&
         self.genus.is_multiple_of(2) &&
         self.dots.0 == self.dots.1 // XY = T
     }
@@ -229,16 +229,16 @@ impl CobComp {
     }
 
     pub fn is_sdl(&self) -> bool {
-        self.src.n_comps() == 2 && 
-        self.tgt.n_comps() == 2 && 
-        self.src.comps().all(|c| c.is_arc()) && 
-        self.tgt.comps().all(|c| c.is_arc()) && 
-        self.src != self.tgt && 
+        self.src.n_comps() == 2 &&
+        self.tgt.n_comps() == 2 &&
+        self.src.comps().all(|c| c.is_arc()) &&
+        self.tgt.comps().all(|c| c.is_arc()) &&
+        self.src != self.tgt &&
         self.genus == 0
     }
 
-    pub fn inv(&self) -> Option<Self> { 
-        if self.is_invertible() { 
+    pub fn inv(&self) -> Option<Self> {
+        if self.is_invertible() {
             let inv = Self::plain(
                 (*self.tgt).clone(),
                 (*self.src).clone(),
@@ -256,7 +256,7 @@ impl CobComp {
         2 - 2 * g - b
     }
 
-    pub fn deg(&self) -> i32 { 
+    pub fn deg(&self) -> i32 {
         let x = self.euler_num();
         let b = self.src.end_pts().count() as i32;
         let d = self.total_dots() as i32;
@@ -287,18 +287,18 @@ impl CobComp {
     }
 
     // connect = horizontal composition
-    pub fn is_connectable(&self, other: &Self) -> bool { 
-        self.src.comps().any(|c1| 
-            if c1.is_arc() { 
-                other.src.comps().any(|c2| { 
+    pub fn is_connectable(&self, other: &Self) -> bool {
+        self.src.comps().any(|c1|
+            if c1.is_arc() {
+                other.src.comps().any(|c2| {
                     c2.is_arc() && c1.is_connectable(c2)
                 })
-            } else { 
-                false 
+            } else {
+                false
             }
         )
     }
-    
+
     /// Horizontal composition: merge `other` into `self` along the shared arc
     /// boundary, returning a new component. Genus recomputed via the Euler formula.
     pub fn connect(&self, other: &Self) -> Self {
@@ -360,7 +360,7 @@ impl CobComp {
     pub fn should_reduce(&self) -> bool {
         self.is_zero_cob() ||
         self.is_removable() ||
-        self.genus > 0 || 
+        self.genus > 0 ||
         self.dots.0 >= 1 && self.dots.1 >= 1 ||
         self.dots.0 >= 2 ||
         self.dots.1 >= 2
@@ -425,10 +425,10 @@ impl CobComp {
 
         assert!(eval.nterms() <= 1);
 
-        if let Some((c, r)) = eval.any_term() { 
+        if let Some((c, r)) = eval.any_term() {
             assert!(c.is_empty());
             r.clone()
-        } else { 
+        } else {
             R::zero()
         }
     }
@@ -450,14 +450,14 @@ impl Display for CobComp {
         };
 
 
-        if self.is_closed() { 
-            return if self.genus == 0 { 
+        if self.is_closed() {
+            return if self.genus == 0 {
                 write!(f, "{dots}S")
-            } else { 
-                write!(f, "{dots}Σ{}", subscript(self.genus as isize))                
+            } else {
+                write!(f, "{dots}Σ{}", subscript(self.genus as isize))
             }
         }
-        
+
         let base = match (self.src.n_comps(), self.tgt.n_comps(), self.genus) {
             (0, 1, 0) => "∪",
             (1, 0, 0) => "∩",
@@ -467,10 +467,10 @@ impl Display for CobComp {
             (2, 2, 0) if self.is_sdl() => "sdl",
             _ => "Cob"
         }.to_string();
-        
-        let g = if self.genus == 0 { 
+
+        let g = if self.genus == 0 {
             "".to_string()
-        } else { 
+        } else {
             format!(", g: {}", self.genus)
         };
 
@@ -501,8 +501,8 @@ impl Cob {
     pub fn empty() -> Self {
         Self::new(vec![])
     }
-    
-    pub fn id(v: &Tng) -> Self { 
+
+    pub fn id(v: &Tng) -> Self {
         let comps = (0..v.n_comps()).map(|i| {
             let c = v.comp(i).clone();
             CobComp::id(c)
@@ -510,11 +510,11 @@ impl Cob {
         Self::new(comps)
     }
 
-    pub fn n_comps(&self) -> usize { 
+    pub fn n_comps(&self) -> usize {
         self.comps.len()
     }
 
-    pub fn comp(&self, i: usize) -> &CobComp { 
+    pub fn comp(&self, i: usize) -> &CobComp {
         &self.comps[i]
     }
 
@@ -522,7 +522,7 @@ impl Cob {
         &mut self.comps_mut()[i]
     }
 
-    pub fn comps(&self) -> impl Iterator<Item = &CobComp> { 
+    pub fn comps(&self) -> impl Iterator<Item = &CobComp> {
         self.comps.iter()
     }
 
@@ -530,15 +530,15 @@ impl Cob {
         self.comps.iter().map(|c| c.n_boundaries()).sum()
     }
 
-    pub fn is_empty(&self) -> bool { 
+    pub fn is_empty(&self) -> bool {
         self.comps.is_empty()
     }
 
-    pub fn is_zero_cob(&self) -> bool { 
+    pub fn is_zero_cob(&self) -> bool {
         self.comps.iter().any(|c| c.is_zero_cob())
     }
 
-    pub fn is_closed(&self) -> bool { 
+    pub fn is_closed(&self) -> bool {
         self.comps.iter().all(|c| c.is_closed())
     }
 
@@ -547,20 +547,20 @@ impl Cob {
     }
 
     pub fn inv(&self) -> Option<Self> {
-        if self.is_invertible() { 
+        if self.is_invertible() {
             let comps = self.comps.iter().map(|c| c.inv().unwrap());
             let inv = Self::new(comps);
             Some(inv)
-        } else { 
+        } else {
             None
         }
     }
 
-    pub fn euler_num(&self) -> i32 { 
+    pub fn euler_num(&self) -> i32 {
         self.comps.iter().map(|c| c.euler_num()).sum()
     }
 
-    pub fn deg(&self) -> i32 { 
+    pub fn deg(&self) -> i32 {
         self.comps.iter().map(|c| c.deg()).sum()
     }
 
@@ -762,7 +762,7 @@ impl Cob {
 
         let need_reduce: Vec<_> = self.comps_mut().extract_if(.., |c| c.should_reduce()).collect();
         let init = LcCob::from(self);
-        
+
         need_reduce.into_iter().fold(init, |res, c| {
             let e = c.reduce(h, t);
             debug_assert!(e.keys().all(|c| c.n_comps() <= 1));
@@ -782,7 +782,7 @@ impl Cob {
 
     pub fn eval<R>(&self, h: &R, t: &R) -> R
     where R: Ring, for<'x> &'x R: RingOps<R> {
-        let comps = self.comps.iter().map(|c| 
+        let comps = self.comps.iter().map(|c|
             c.eval(h, t)
         );
         R::product(comps)
@@ -822,11 +822,11 @@ impl From<CobComp> for Cob {
 
 impl Display for Cob {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.comps.is_empty() { 
+        if self.comps.is_empty() {
             write!(f, "(∅)")
         } else if self.comps.len() == 1 {
             write!(f, "{}", self.comps[0])
-        } else { 
+        } else {
             let cobs = self.comps.iter().join(" ⊔ ");
             write!(f, "|{cobs}|")
         }
@@ -862,7 +862,7 @@ impl<R> LcCobTrait for LcCob<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type R = R;
 
-    fn is_closed(&self) -> bool { 
+    fn is_closed(&self) -> bool {
         self.iter().all(|(f, _)| f.is_closed())
     }
 
@@ -898,11 +898,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn stack(&self, other: &Self) -> Self {
-        if let Some(a) = self.as_scalar() { 
+        if let Some(a) = self.as_scalar() {
             other * a
-        } else if let Some(b) = other.as_scalar() { 
+        } else if let Some(b) = other.as_scalar() {
             self * b
-        } else { 
+        } else {
             self.apply_bilin(other, |c1, c2| c1.stack(c2))
         }
     }
@@ -916,11 +916,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 
     fn reduce(self, h: &Self::R, t: &Self::R) -> Self {
-        if self.should_reduce() { 
+        if self.should_reduce() {
             LcCob::sum(self.into_iter().map(|(cob, r)|
                 cob.reduce(h, t) * r
             ))
-        } else { 
+        } else {
             self
         }
     }
@@ -1101,7 +1101,7 @@ mod tests {
     }
 
     #[test]
-    fn mor_inv() { 
+    fn mor_inv() {
         let c = Cob::id(&Tng::new(vec![
             TngComp::arc([0, 1]),
             TngComp::arc([2, 3])
@@ -1316,7 +1316,7 @@ mod tests {
     #[test]
     fn eval() {
         type R = Poly2<'H', 'T', i32>;
-        
+
         let ht = R::mono;
         let h = R::variable(0);
         let t = R::variable(1);
@@ -1342,7 +1342,7 @@ mod tests {
         let c0 = CobComp::id(TngComp::circ([1])).add_dot(Dot::X);
         let c1 = CobComp::id(TngComp::circ([1])).add_dot(Dot::X).add_dot(Dot::X);
 
-        let c = LcCob::from_iter(hashmap! { 
+        let c = LcCob::from_iter(hashmap! {
             Cob::from(c0) => -2,
             Cob::from(c1) => 1
         });

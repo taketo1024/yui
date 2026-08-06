@@ -171,7 +171,7 @@ where
     }
 
     #[inline(never)] // for profilability
-    fn d_matrix_col(&self, i: I, j: usize) -> SpVec<R> { 
+    fn d_matrix_col(&self, i: I, j: usize) -> SpVec<R> {
         let z = self[i].generator(j);
         let w = self.d(i, &z);
         self[i + self.d_deg].vectorize(&w)
@@ -381,7 +381,7 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
 impl<X, R> ToSeqString<isize> for ChainComplex1<X, R>
 where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
     delegate! {
-        to self.summands { 
+        to self.summands {
             fn label(&self) -> String;
             fn indices(&self) -> Vec<isize>;
             fn entry_at(&self, i: &isize) -> String;

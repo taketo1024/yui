@@ -1,7 +1,7 @@
 //! The CLI [`Error`] type and its result alias.
 
 #[derive(Debug, derive_more::Display)]
-pub struct Error { 
+pub struct Error {
     pub msg: String
 }
 
@@ -17,7 +17,7 @@ macro_rules! err {
 
 macro_rules! ensure {
     ($cond:expr, $($arg:tt)*) => {{
-        if !$cond { 
+        if !$cond {
             return err!($($arg)*);
         }
     }}

@@ -25,7 +25,7 @@ pub fn jones_polynomial(l: &Link) -> LPoly<'q', i32> {
     let a = e * q.pow(n_pos - 2 * n_neg); // a = (-1)^{n^-} q^{n^+ - 2n^-}
 
     let q0: P = &q + q.pow(-1);
-    let body = P::sum(State::generate(n).map(|s| { 
+    let body = P::sum(State::generate(n).map(|s| {
         let w = s.weight();
         let l_s = l.resolve_by(&s);
         let r = l_s.n_comps();
@@ -73,7 +73,7 @@ pub fn det(l: &Link) -> i32 {
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     use super::*;
     use num_traits::One;
     use yui_core::bitseq::Bit;

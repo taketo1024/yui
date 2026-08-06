@@ -13,9 +13,9 @@ pub fn empty_range() -> RangeInclusive<isize> {
 /// left/right offsets.
 pub trait RangeExt
 where Self::Idx: Copy, Self: Sized {
-    type Idx; 
+    type Idx;
     fn mv(&self, l: Self::Idx, r: Self::Idx) -> Self;
-    fn shift(&self, a: Self::Idx) -> Self { 
+    fn shift(&self, a: Self::Idx) -> Self {
         self.mv(a, a)
     }
 }
@@ -32,7 +32,7 @@ where Idx: Copy + Add<Output = Idx> + Sub<Output = Idx> + Neg<Output = Idx> {
 impl<Idx> RangeExt for RangeInclusive<Idx>
 where Idx: Copy + Add<Output = Idx> + Sub<Output = Idx> + Neg<Output = Idx> {
     type Idx = Idx;
-    
+
     fn mv(&self, l: Self::Idx, r: Self::Idx) -> Self {
         (*self.start() + l) ..= (*self.end() + r)
     }
@@ -58,7 +58,7 @@ mod tests {
     }
 
     #[test]
-    fn range_incl() { 
+    fn range_incl() {
         let r = -1 ..= 3;
         assert_eq!(r.mv(2, 3), 1 ..= 6);
         assert_eq!(r.shift(2), 1 ..= 5);

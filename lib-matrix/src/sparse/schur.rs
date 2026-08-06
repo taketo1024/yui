@@ -141,7 +141,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     }
 }
 
-fn id_mat<R: Scalar + One>(n: usize) -> SpMat<R> { 
+fn id_mat<R: Scalar + One>(n: usize) -> SpMat<R> {
     SpMat::<R>::id(n)
 }
 
@@ -154,7 +154,7 @@ fn proj_mat<R: Scalar + One + Zero + AddAssign>(n: usize, k: usize) -> SpMat<R> 
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     use super::*;
 
     #[test]
@@ -193,7 +193,7 @@ mod tests {
         let s = sch.complement();
 
         assert_eq!(s, &SpMat::from_row_major((3,2), [
-             5,  36, 
+             5,  36,
              12, 45,
             -14,-60
         ]));
@@ -210,7 +210,7 @@ mod tests {
              1,  0,
              0,  1
         ]));
-        
+
         assert_eq!(t_out, SpMat::from_row_major((3,6), [
              20, -6, -4, 1, 0, 0,
              24, -7, -5, 0, 1, 0,

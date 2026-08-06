@@ -41,10 +41,10 @@ const MIN_PIVOT_RATE: usize = 1000;
 ///          [y]           [s]           [w]
 /// ```
 pub struct ChainReducer<I, R>
-where 
+where
     I: AddInd,
     R: Ring, for<'x> &'x R: RingOps<R>,
-{ 
+{
     support: Vec<I>,
     d_deg: I,
     mats: HashMap<I, SpMat<R>>,
@@ -54,7 +54,7 @@ where
 }
 
 impl<I, R> ChainReducer<I, R>
-where 
+where
     I: AddInd,
     R: Ring, for<'x> &'x R: RingOps<R>,
 {
@@ -73,8 +73,8 @@ where
 
         let mut reducer = Self::new(support, d_deg);
 
-        for i in reducer.support.clone() { 
-            for j in [i, i + d_deg] { 
+        for i in reducer.support.clone() {
+            for j in [i, i + d_deg] {
                 if !reducer.is_set(j) {
                     let d = complex.d_matrix(j);
                     reducer.set_matrix(j, d, with_trans);
@@ -94,18 +94,18 @@ where
         Self { support, d_deg, mats, trans, vecs, max_pivots: usize::MAX }
     }
 
-    // MEMO: not efficient, but usually the support set is small. 
-    fn sort_support(support: impl Iterator<Item = I>, d_deg: I) -> Vec<I> { 
+    // MEMO: not efficient, but usually the support set is small.
+    fn sort_support(support: impl Iterator<Item = I>, d_deg: I) -> Vec<I> {
         let mut res: Vec<I> = Vec::new();
 
-        for i0 in support.sorted() { 
+        for i0 in support.sorted() {
             let next = i0 + d_deg;
             let prev = i0 - d_deg;
-            if let Some(p) = res.iter().find_position(|i| i == &&prev) { 
+            if let Some(p) = res.iter().find_position(|i| i == &&prev) {
                 res.insert(p.0 + 1, i0);
             } else if let Some(p) = res.iter().find_position(|i| i == &&next) {
                 res.insert(p.0, i0);
-            } else { 
+            } else {
                 res.push(i0);
             }
         }
@@ -113,7 +113,7 @@ where
         res
     }
 
-    pub fn support(&self) -> &[I] { 
+    pub fn support(&self) -> &[I] {
         &self.support
     }
 
@@ -149,34 +149,34 @@ where
         self.max_pivots = max_pivots;
     }
 
-    pub fn rank(&self, i: I) -> Option<usize> { 
+    pub fn rank(&self, i: I) -> Option<usize> {
         self.matrix(i).map(|d| d.n_cols())
     }
 
-    pub fn is_set(&self, i: I) -> bool { 
+    pub fn is_set(&self, i: I) -> bool {
         self.mats.contains_key(&i)
     }
 
-    pub fn is_done(&self) -> bool { 
-        self.support.iter().all(|&i| 
+    pub fn is_done(&self) -> bool {
+        self.support.iter().all(|&i|
             self.matrix(i).map(|d| d.is_zero()).unwrap_or(false)
         )
     }
 
     pub fn set_matrix(&mut self, i: I, d: SpMat<R>, with_trans: bool) {
-        if with_trans { 
+        if with_trans {
             let n = d.n_cols();
             self.trans.insert(i, Trans::id(n));
         }
         self.mats.insert(i, d);
     }
 
-    pub fn reduce_all(&mut self, deep: bool) { 
-        if self.is_done() { 
+    pub fn reduce_all(&mut self, deep: bool) {
+        if self.is_done() {
             return
         }
-        
-        if deep { 
+
+        if deep {
             debug!("reduce all (deep)");
         } else {
             debug!("reduce all (shallow)");
@@ -184,18 +184,18 @@ where
 
         let support = self.support.clone();
 
-        for &i in support.iter() { 
+        for &i in support.iter() {
             self.reduce_at(i, deep);
         }
     }
 
-    pub fn reduce_at(&mut self, i: I, deep: bool) { 
+    pub fn reduce_at(&mut self, i: I, deep: bool) {
         let mut c = 1;
-        loop { 
+        loop {
             let (piv_type, piv_cond) = self.preferred_strategy(i);
             let cont = self.reduce_at_spec(i, piv_type, piv_cond);
 
-            if !deep || !cont { 
+            if !deep || !cont {
                 break
             }
 
@@ -204,12 +204,12 @@ where
         }
     }
 
-    pub fn reduce_at_spec(&mut self, i: I, piv_type: PivotType, piv_cond: PivotCondition) -> bool { 
-        let Some(a) = self.matrix(i) else { 
+    pub fn reduce_at_spec(&mut self, i: I, piv_type: PivotType, piv_cond: PivotCondition) -> bool {
+        let Some(a) = self.matrix(i) else {
             panic!("not initialized at {i}");
         };
 
-        if a.is_zero() { 
+        if a.is_zero() {
             return false;
         }
 
@@ -223,9 +223,9 @@ where
 
         let (m, n) = a.shape();
         if r * MIN_PIVOT_RATE < m.min(n) {
-            if r == 0 { 
+            if r == 0 {
                 debug!("  done.");
-            } else { 
+            } else {
                 debug!("  skip r: {r}.");
             }
             return false;
@@ -262,7 +262,7 @@ where
         true
     }
 
-    pub fn preferred_strategy(&self, _i: I) -> (PivotType, PivotCondition) { 
+    pub fn preferred_strategy(&self, _i: I) -> (PivotType, PivotCondition) {
         (PivotType::Cols, PivotCondition::One)
     }
 
@@ -331,14 +331,14 @@ where
 
         self.mats.insert(i1, s);
 
-        if let Some(a2) = self.matrix(i2) { 
+        if let Some(a2) = self.matrix(i2) {
             assert_eq!(a2.n_cols(), m);
             let a2 = reduce_mat_cols(a2, p, r);
             self.mats.insert(i2, a2);
         }
     }
 
-    fn deg_trip(&self, i: I) -> (I, I, I) { 
+    fn deg_trip(&self, i: I) -> (I, I, I) {
         let deg = self.d_deg;
         (i - deg, i, i + deg)
     }
@@ -379,14 +379,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn sort_asc() { 
+    fn sort_asc() {
         let supp: HashSet<isize> = HashSet::from_iter(0isize..10);
         let sort = ChainReducer::<_, i32>::sort_support(supp.into_iter(), 1);
         assert_eq!(sort, (0..10).collect_vec());
     }
 
     #[test]
-    fn sort_desc() { 
+    fn sort_desc() {
         let supp: HashSet<isize> = HashSet::from_iter(0isize..10);
         let sort = ChainReducer::<_, i32>::sort_support(supp.into_iter(), -1);
         assert_eq!(sort, (0..10).rev().collect_vec());
@@ -437,7 +437,7 @@ mod tests {
     }
 
     #[test]
-    fn acyclic() { 
+    fn acyclic() {
         let c = GenericChainComplex1::<i32>::one_one(1);
         let r = ChainReducer::reduce(&c, false).into_generic_complex();
 
@@ -448,7 +448,7 @@ mod tests {
     }
 
     #[test]
-    fn tor() { 
+    fn tor() {
         let c = GenericChainComplex1::<i32>::one_one(2);
         let r = ChainReducer::reduce(&c, false).into_generic_complex();
 
@@ -457,7 +457,7 @@ mod tests {
         assert_eq!(r[0].rank(), 1);
         assert_eq!(r[1].rank(), 1);
     }
-    
+
     #[test]
     fn d3() {
         let c = GenericChainComplex1::<i32>::d3();
@@ -551,7 +551,7 @@ mod tests {
         let v = SpVec::unit(1, 0);
         let w = t2.backward(&v);
         let z = c[2].devectorize(&w);
-        
+
         assert!(c.d(2, &z).is_zero());
     }
 
@@ -585,11 +585,11 @@ mod tests {
         let a = SpVec::unit(2, 0);
         let a = t1.backward(&a);
         let a = c[1].devectorize(&a);
-        
+
         let b = SpVec::unit(2, 1);
         let b = t1.backward(&b);
         let b = c[1].devectorize(&b);
-        
+
         assert!(c.d(1, &a).is_zero());
         assert!(c.d(1, &b).is_zero());
     }
@@ -627,7 +627,7 @@ mod tests {
         let v = SpVec::unit(1, 0);
         let w = t1.backward(&v);
         let z = c[1].devectorize(&w);
-        
+
         assert!(c.d(1, &z).is_zero());
     }
 }

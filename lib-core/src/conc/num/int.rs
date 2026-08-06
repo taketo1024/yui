@@ -52,32 +52,32 @@ macro_rules! impl_integer {
         impl_ops!(IntOps, $type);
 
         impl MathType for $type {
-            fn math_symbol() -> String { 
+            fn math_symbol() -> String {
                 String::from("Z")
             }
         }
-        
+
         impl AddMon for $type {}
         impl AddGrp for $type {}
         impl Mon for $type {}
         impl Ring for $type {
             fn inv(&self) -> Option<Self> {
-                if self.is_unit() { 
+                if self.is_unit() {
                     Some(self.clone())
-                } else { 
+                } else {
                     None
                 }
             }
-        
+
             fn is_unit(&self) -> bool {
                 self.is_one() || (-self).is_one()
             }
-        
+
             fn normalizing_unit(&self) -> Self {
-                if !self.is_negative() { 
-                    Self::one() 
-                } else { 
-                    -Self::one() 
+                if !self.is_negative() {
+                    Self::one()
+                } else {
+                    -Self::one()
                 }
             }
 
@@ -114,7 +114,7 @@ impl_integer!(BigInt);
 mod tex {
     use crate::util::tex::TeX;
     use num_bigint::BigInt;
-    
+
     macro_rules! impl_tex_int {
         ($type:ident) => {
             impl TeX for $type {
@@ -135,7 +135,7 @@ mod tex {
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     use super::*;
 
     #[test]
@@ -148,21 +148,21 @@ mod tests {
     }
 
     #[test]
-    fn int_is_unit() { 
+    fn int_is_unit() {
         assert!(1.is_unit());
         assert!((-1).is_unit());
         assert!(!2.is_unit());
     }
 
     #[test]
-    fn int_inv() { 
+    fn int_inv() {
         assert_eq!(1.inv(), Some(1));
         assert_eq!((-1).inv(), Some(-1));
         assert_eq!(2.inv(), None);
     }
 
     #[test]
-    fn int_normalizing_unit() { 
+    fn int_normalizing_unit() {
         assert_eq!(1.normalizing_unit(), 1);
         assert_eq!((-1).normalizing_unit(), -1);
         assert_eq!(2.normalizing_unit(), 1);
@@ -213,7 +213,7 @@ mod tests {
     }
 
     #[test]
-    fn div_round() { 
+    fn div_round() {
         assert_eq!(12.div_round(&5), 2);
         assert_eq!(13.div_round(&5), 3);
         assert_eq!((-12).div_round(&5), -2);
@@ -240,7 +240,7 @@ mod tests {
     }
 
     #[test]
-    fn tex() { 
+    fn tex() {
         use crate::util::tex::TeX;
         assert_eq!(i32::tex_math_symbol(), "\\mathbb{Z}");
         assert_eq!((-2).tex_string(), "-2");

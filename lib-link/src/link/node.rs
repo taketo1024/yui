@@ -51,11 +51,11 @@ impl From<usize> for Slot {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, derive_more::Display, Debug)]
-pub enum NodeType { 
-    XL, XR, V, H 
+pub enum NodeType {
+    XL, XR, V, H
 }
 
-impl NodeType { 
+impl NodeType {
     // The slot at the other end of the strand passing through `slot` — the strand pairing.
     pub fn paired_slot(&self, slot: Slot) -> Slot {
         let i = slot.index();
@@ -67,7 +67,7 @@ impl NodeType {
     }
 
     pub fn mirror(&self) -> Self {
-        match self { 
+        match self {
             XL => XR,
             XR => XL,
             _  => *self
@@ -76,7 +76,7 @@ impl NodeType {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Node { 
+pub struct Node {
     node_type: NodeType,
     // the two slots where the strands enter, sorted; `None` when the node is not coherently
     // oriented. The two must lie on different strands — see `Node::orientable`.
@@ -85,7 +85,7 @@ pub struct Node {
 }
 
 impl Node {
-    pub fn new(node_type: NodeType, incoming: Option<(Slot, Slot)>, edges: [Edge; 4]) -> Self { 
+    pub fn new(node_type: NodeType, incoming: Option<(Slot, Slot)>, edges: [Edge; 4]) -> Self {
         let incoming = incoming.map(|(p, q)| (p.min(q), p.max(q)));
         assert!(
             incoming.is_none_or(|(p, q)| Self::orientable(node_type, p, q)),
@@ -94,7 +94,7 @@ impl Node {
         Node { node_type, edges, incoming }
     }
 
-    pub fn from_pd_code(edges: [Edge; 4]) -> Self { 
+    pub fn from_pd_code(edges: [Edge; 4]) -> Self {
         Node::new(NodeType::XL, None, edges)
     }
 
@@ -104,27 +104,27 @@ impl Node {
         p != q && node_type.paired_slot(p) != q
     }
 
-    pub fn node_type(&self) -> NodeType { 
+    pub fn node_type(&self) -> NodeType {
         self.node_type
     }
 
-    pub fn edge(&self, s: Slot) -> Edge { 
+    pub fn edge(&self, s: Slot) -> Edge {
         self.edges[s.index()]
     }
 
-    pub fn edges(&self) -> &[Edge; 4] { 
+    pub fn edges(&self) -> &[Edge; 4] {
         &self.edges
     }
 
-    pub fn min_edge(&self) -> Edge { 
+    pub fn min_edge(&self) -> Edge {
         *self.edges.iter().min().unwrap()
     }
 
-    pub fn is_crossing(&self) -> bool { 
+    pub fn is_crossing(&self) -> bool {
         matches!(self.node_type, XL | XR)
     }
 
-    pub fn is_resolved(&self) -> bool { 
+    pub fn is_resolved(&self) -> bool {
         matches!(self.node_type, V | H)
     }
 
@@ -146,12 +146,12 @@ impl Node {
         })
     }
 
-    pub fn is_oriented(&self) -> bool { 
+    pub fn is_oriented(&self) -> bool {
         self.incoming.is_some()
     }
 
     // The two slots where the strands enter, sorted.
-    pub fn incoming(&self) -> Option<(Slot, Slot)> { 
+    pub fn incoming(&self) -> Option<(Slot, Slot)> {
         self.incoming
     }
 
@@ -160,31 +160,31 @@ impl Node {
         *self = Self::new(self.node_type, incoming, self.edges);
     }
 
-    pub fn is_pos(&self) -> bool { 
+    pub fn is_pos(&self) -> bool {
         self.sign().map(|x| x.is_positive()).unwrap_or(false)
     }
 
-    pub fn is_neg(&self) -> bool { 
+    pub fn is_neg(&self) -> bool {
         self.sign().map(|x| x.is_negative()).unwrap_or(false)
     }
 
     // Only a crossing has a sign, read off the type and which pair of slots the strands enter by.
-    pub fn sign(&self) -> Option<Sign> { 
+    pub fn sign(&self) -> Option<Sign> {
         use Slot::{SW, SE, NE, NW};
-        match (self.node_type, self.incoming?) { 
+        match (self.node_type, self.incoming?) {
             (XL, (SE, NE)) | (XL, (SW, NW)) | (XR, (SW, SE)) | (XR, (NE, NW)) => Some(Sign::Pos),
             (XL, (SW, SE)) | (XL, (NE, NW)) | (XR, (SE, NE)) | (XR, (SW, NW)) => Some(Sign::Neg),
             _ => None,
         }
     }
 
-    pub fn mirror(&self) -> Self { 
-        self.clone_and(|x| 
+    pub fn mirror(&self) -> Self {
+        self.clone_and(|x|
             x.node_type = self.node_type.mirror()
         )
     }
 
-    pub fn is_adj_to(&self, x: &Node) -> bool { 
+    pub fn is_adj_to(&self, x: &Node) -> bool {
         self.edges.iter().any(|e| x.edges.contains(e))
     }
 
@@ -206,15 +206,15 @@ impl Node {
     }
 
     pub fn convert_edges<F>(&self, f: F) -> Self
-    where F: Fn(Edge) -> Edge { 
-        Self { 
-            node_type: self.node_type, 
+    where F: Fn(Edge) -> Edge {
+        Self {
+            node_type: self.node_type,
             incoming: self.incoming,
             edges: self.edges.map(f)
         }
     }
 
-    pub fn paired_slot(&self, s: Slot) -> Slot { 
+    pub fn paired_slot(&self, s: Slot) -> Slot {
         self.node_type.paired_slot(s)
     }
 }
@@ -226,7 +226,7 @@ impl Display for Node {
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     use super::*;
 
     // the four orientations a crossing can carry, by the direction the strands run.

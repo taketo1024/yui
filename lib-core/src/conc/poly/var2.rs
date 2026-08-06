@@ -24,24 +24,24 @@ pub struct Var2<const X: char, const Y: char, I> (
 );
 
 impl<const X: char, const Y: char, I> Var2<X, Y, I> {
-    pub fn var_symbol(i: usize) -> char { 
+    pub fn var_symbol(i: usize) -> char {
         assert!(i < 2);
-        match i { 
+        match i {
             0 => X,
             1 => Y,
             _ => panic!()
         }
     }
 
-    pub fn multi_deg(&self) -> (I, I) 
-    where I: Copy { 
+    pub fn multi_deg(&self) -> (I, I)
+    where I: Copy {
         (self.0, self.1)
     }
 
     pub fn deg_for(&self, i: usize) -> I
-    where I: Copy { 
+    where I: Copy {
         assert!(i < 2);
-        match i { 
+        match i {
             0 => self.0,
             1 => self.1,
             _ => panic!()
@@ -49,7 +49,7 @@ impl<const X: char, const Y: char, I> Var2<X, Y, I> {
     }
 
     pub fn total_deg(&self) -> I
-    where I: Copy + for<'x> Add<&'x I, Output = I> { 
+    where I: Copy + for<'x> Add<&'x I, Output = I> {
         self.0 + &self.1
     }
 
@@ -59,7 +59,7 @@ impl<const X: char, const Y: char, I> Var2<X, Y, I> {
     }
 
     fn to_string_u(&self, unicode: bool) -> String
-    where I: ToPrimitive { 
+    where I: ToPrimitive {
         let Var2(d0, d1) = self;
         let seq = [(X, d0), (Y, d1)];
         fmt_mono_n(seq, unicode)
@@ -88,20 +88,20 @@ where I: Zero + AddAssign + FromStr + FromPrimitive {
         let r = Regex::new(&p).unwrap();
         let r_all = Regex::new(&p_all).unwrap();
 
-        if !r_all.is_match(s) { 
+        if !r_all.is_match(s) {
             return Err(ParseErr::invalid(s, &format!("a monomial in {X}, {Y}")))
         }
 
         let mut deg = (I::zero(), I::zero());
-        
+
         for c in r.captures_iter(s) {
             let x = &c[1];
             let i = parse_mono_deg(x, &c[0]).ok_or_else(||
                 ParseErr::invalid(s, &format!("a monomial in {X}, {Y}"))
             )?;
-            if x.starts_with(X) { 
+            if x.starts_with(X) {
                 deg.0 += i;
-            } else { 
+            } else {
                 deg.1 += i;
             }
         };
@@ -139,13 +139,13 @@ impl<const X: char, const Y: char, I> MonoOrd for Var2<X, Y, I>
 where I: Copy + Eq + Ord + for<'x> Add<&'x I, Output = I> {
     fn cmp_lex(&self, other: &Self) -> std::cmp::Ordering {
         // must have x_0 > x_1
-        I::cmp(&self.0, &other.0).then_with(|| 
+        I::cmp(&self.0, &other.0).then_with(||
             I::cmp(&self.1, &other.1)
         )
     }
 
     fn cmp_grlex(&self, other: &Self) -> std::cmp::Ordering {
-        I::cmp(&self.total_deg(), &other.total_deg()).then_with(|| 
+        I::cmp(&self.total_deg(), &other.total_deg()).then_with(||
             Self::cmp_lex(self, other)
         )
     }
@@ -166,7 +166,7 @@ where I: Copy + Eq + Ord + for<'x> Add<&'x I, Output = I> {
 }
 
 impl<const X: char, const Y: char, I> Display for Var2<X, Y, I>
-where I: ToPrimitive { 
+where I: ToPrimitive {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = self.to_string_u(true);
         f.write_str(&s)
@@ -174,7 +174,7 @@ where I: ToPrimitive {
 }
 
 impl<const X: char, const Y: char, I> Debug for Var2<X, Y, I>
-where I: ToPrimitive { 
+where I: ToPrimitive {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Display::fmt(self, f)
     }
@@ -190,12 +190,12 @@ where I: ToPrimitive {
 }
 
 impl<const X: char, const Y: char, I> MathType for Var2<X, Y, I>
-where I: IndexType + ToPrimitive { 
+where I: IndexType + ToPrimitive {
     fn math_symbol() -> String {
         format!("{X}, {Y}")
     }
 }
-        
+
 impl<const X: char, const Y: char, I> LcKey for Var2<X, Y, I>
 where I: IndexType + Copy + for<'x> Add<&'x I, Output = I> + ToPrimitive {}
 
@@ -208,19 +208,19 @@ macro_rules! impl_bivar_unsigned {
                 (self.0, self.1)
             }
 
-            fn is_unit(&self) -> bool { 
+            fn is_unit(&self) -> bool {
                 self.0.is_zero() && self.1.is_zero()
             }
 
             fn inv(&self) -> Option<Self> { // (x^i)^{-1} = x^{-i}
                 if self.is_unit() {
                     Some(Self(0, 0))
-                } else { 
+                } else {
                     None
                 }
             }
 
-            fn divides(&self, other: &Self) -> bool { 
+            fn divides(&self, other: &Self) -> bool {
                 self.0 <= other.0 && self.1 <= other.1
             }
         }
@@ -236,7 +236,7 @@ macro_rules! impl_bivar_signed {
                 (self.0, self.1)
             }
 
-            fn is_unit(&self) -> bool { 
+            fn is_unit(&self) -> bool {
                 true
             }
 
@@ -244,7 +244,7 @@ macro_rules! impl_bivar_signed {
                 Some(Self(-self.0, -self.1))
             }
 
-            fn divides(&self, _other: &Self) -> bool { 
+            fn divides(&self, _other: &Self) -> bool {
                 true
             }
         }
@@ -260,7 +260,7 @@ mod tex {
 
     impl<const X: char, const Y: char, I> TeX for Var2<X, Y, I>
     where I: ToPrimitive {
-        fn tex_math_symbol() -> String { 
+        fn tex_math_symbol() -> String {
             format!("{},{}", X, Y)
         }
         fn tex_string(&self) -> String {
@@ -274,15 +274,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn var_symbol() { 
+    fn var_symbol() {
         type M = Var2<'X','Y',usize>;
-        
+
         assert_eq!(M::var_symbol(0), 'X');
         assert_eq!(M::var_symbol(1), 'Y');
     }
 
     #[test]
-    fn init() { 
+    fn init() {
         type M = Var2<'X','Y',usize>;
         let xy = |i, j| M::from((i, j));
 
@@ -293,10 +293,10 @@ mod tests {
     }
 
     #[test]
-    fn from_str() { 
+    fn from_str() {
         type M = Var2<'X','Y', isize>;
         let xy = |i, j| M::from((i, j));
-        
+
         assert_eq!(M::from_str("1"), Ok(M::one()));
         assert_eq!(M::from_str("X"), Ok(xy(1, 0)));
         assert_eq!(M::from_str("Y"), Ok(xy(0, 1)));
@@ -314,7 +314,7 @@ mod tests {
     }
 
     #[test]
-    fn display() { 
+    fn display() {
         type M = Var2<'X','Y',usize>;
         let xy = |i, j| M::from((i, j));
 
@@ -341,7 +341,7 @@ mod tests {
     }
 
     #[test]
-    fn neg_opt_unsigned() { 
+    fn neg_opt_unsigned() {
         type M = Var2<'X','Y',usize>;
         let xy = |i, j| M::from((i, j));
 
@@ -359,7 +359,7 @@ mod tests {
     }
 
     #[test]
-    fn neg_opt_signed() { 
+    fn neg_opt_signed() {
         type M = Var2<'X','Y',isize>;
         let xy = |i, j| M::from((i, j));
 
@@ -377,7 +377,7 @@ mod tests {
     }
 
     #[test]
-    fn eval() { 
+    fn eval() {
         type M = Var2<'X','Y',usize>;
         let xy = |i, j| M::from((i, j));
 
@@ -398,7 +398,7 @@ mod tests {
     }
 
     #[test]
-    fn cmp_lex() { 
+    fn cmp_lex() {
         type M = Var2<'X','Y',usize>;
         let xy = |i, j| M::from((i, j));
 
@@ -411,7 +411,7 @@ mod tests {
     }
 
     #[test]
-    fn cmp_grlex() { 
+    fn cmp_grlex() {
         type M = Var2<'X','Y',usize>;
         let xy = |i, j| M::from((i, j));
 

@@ -111,7 +111,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         debug_assert!(out_src.comps().filter(|c| c.is_circle()).all(|c| in_tgt.contains(c)), "verify: out_cob source circle not in in_cob target");
     }
 
-    pub fn canon_cycles(l: &Link, base_pt: Option<Edge>) -> Vec<Self> { 
+    pub fn canon_cycles(l: &Link, base_pt: Option<Edge>) -> Vec<Self> {
         assert!(l.is_knot());
         assert!(l.base_pt().is_some());
 
@@ -122,9 +122,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let state = l.seifert_state();
         let state_map = Iterator::zip(crossings.into_iter(), state.iter()).collect::<HashMap<_, _>>();
 
-        let ori = if reduced { 
+        let ori = if reduced {
             vec![true]
-        } else { 
+        } else {
             vec![true, false]
         };
 
@@ -145,7 +145,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 impl<R> Display for TngComplexElem<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mors = self.out_cob.iter().sorted_by_key(|&(&k, _)| k).map(|(k, f)| { 
+        let mors = self.out_cob.iter().sorted_by_key(|&(&k, _)| k).map(|(k, f)| {
             format!("{}: {}", k, f)
         }).join(", ");
         write!(f, "[{}]", mors)

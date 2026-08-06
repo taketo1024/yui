@@ -99,26 +99,26 @@ where
     R: Ring + FromStr + TeX,
     for<'x> &'x R: RingOps<R>,
 {
-    pub fn boot(args: &Args) -> Result<String, Box<dyn std::error::Error>> { 
+    pub fn boot(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
         let mut app = Self::new(args.clone());
         app.run()
     }
 
-    pub fn new(args: Args) -> Self { 
+    pub fn new(args: Args) -> Self {
         let buff = String::with_capacity(1024);
         App { args, buff, _ring: PhantomData }
     }
 
     pub fn run(&mut self) -> Result<String, Box<dyn std::error::Error>> {
         let (h, t) = parse_pair::<R>(&self.args.c_value)?;
-    
+
         if self.args.reduced {
             ensure!(t.is_zero(), "`t` must be zero for reduced.");
         }
-        if self.args.show_alpha { 
+        if self.args.show_alpha {
             ensure!(t.is_zero(), "`t` must be zero to have alpha.");
         }
-    
+
         let l = load_link(&self.args.link, self.args.mirror)?;
 
         let ckh = if self.args.no_simplify {
@@ -135,7 +135,7 @@ where
             };
             KhComplex::new_with_config(&l, &h, &t, self.args.reduced, config)
         };
-        
+
         // CKh generators
         let table = match self.args.format {
             Format::TeX => ckh.tex_table("CKh"),
@@ -144,17 +144,17 @@ where
         self.out(&table);
 
         // Generators
-        if self.args.show_gens { 
+        if self.args.show_gens {
             self.show_gens(&ckh);
         }
 
         // Diff
-        if self.args.show_diff { 
+        if self.args.show_diff {
             self.show_diff(&ckh);
         }
-    
+
         // Alpha
-        if self.args.show_alpha { 
+        if self.args.show_alpha {
             self.show_alpha(&ckh);
         }
 
@@ -162,15 +162,15 @@ where
         Ok(res)
     }
 
-    fn show_gens(&mut self, ckh: &KhComplex<R>) { 
+    fn show_gens(&mut self, ckh: &KhComplex<R>) {
         for &i in ckh.support() {
             let c = &ckh[i];
             if c.is_zero() { continue }
-            
+
             self.out(&format!("C[{i}]: {}", c));
-    
+
             let r = c.n_generators();
-            for i in 0..r { 
+            for i in 0..r {
                 let z = c.generator(i);
                 self.out(&format!("  {i}: {z}"));
             }
@@ -178,7 +178,7 @@ where
         }
     }
 
-    fn show_diff(&mut self, ckh: &KhComplex<R>) { 
+    fn show_diff(&mut self, ckh: &KhComplex<R>) {
         self.out(&ckh.describe_d());
     }
 
@@ -191,12 +191,12 @@ where
         }
     }
 
-    fn out(&mut self, str: &str) { 
+    fn out(&mut self, str: &str) {
         self.buff.push_str(str);
         self.buff.push('\n');
     }
 
-    fn flush(&mut self) -> String { 
+    fn flush(&mut self) -> String {
         let res = std::mem::take(&mut self.buff);
         res.trim_end().to_string()
     }

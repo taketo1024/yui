@@ -26,7 +26,7 @@ pub struct MultiVar<const X: char, I> (
 );
 
 impl<const X: char, I> MultiVar<X, I> {
-    pub fn var_symbol() -> char { 
+    pub fn var_symbol() -> char {
         X
     }
 
@@ -47,11 +47,11 @@ impl<const X: char, I> MultiVar<X, I> {
     }
 
     fn to_string_u(&self, unicode: bool) -> String
-    where I: ToPrimitive { 
+    where I: ToPrimitive {
         let seq = self.0.iter().map(|(&i, d)| {
-            let x = if unicode { 
+            let x = if unicode {
                 format!("{X}{}", subscript(i))
-            } else { 
+            } else {
                 format!("{X}_{}", i)
             };
             (x, d)
@@ -98,7 +98,7 @@ where I: Zero + FromStr + FromPrimitive {
         }
 
         // TODO must support braced indices.
-        
+
         let p = format!(r"({X}_([0-9]+))(\^\{{?-?[0-9]+\}}?)?");
         let p_all = format!(r"^({p}\s?)+$");
 
@@ -151,7 +151,7 @@ where I: Zero + for<'x> AddAssign<&'x I> {
 }
 
 impl<const X: char, I> Display for MultiVar<X, I>
-where I: ToPrimitive { 
+where I: ToPrimitive {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = self.to_string_u(true);
         f.write_str(&s)
@@ -159,7 +159,7 @@ where I: ToPrimitive {
 }
 
 impl<const X: char, I> Debug for MultiVar<X, I>
-where I: ToPrimitive { 
+where I: ToPrimitive {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Display::fmt(self, f)
     }
@@ -167,11 +167,11 @@ where I: ToPrimitive {
 
 impl<const X: char, I> MonoOrd for MultiVar<X, I>
 where I: Zero + Ord + for<'x> Add<&'x I, Output = I> {
-    fn cmp_lex(&self, other: &Self) -> std::cmp::Ordering { 
+    fn cmp_lex(&self, other: &Self) -> std::cmp::Ordering {
         MultiDeg::cmp_lex(&self.0, &other.0)
     }
 
-    fn cmp_grlex(&self, other: &Self) -> std::cmp::Ordering { 
+    fn cmp_grlex(&self, other: &Self) -> std::cmp::Ordering {
         MultiDeg::cmp_grlex(&self.0, &other.0)
     }
 }
@@ -201,7 +201,7 @@ where I: ToPrimitive {
 }
 
 impl<const X: char, I> MathType for MultiVar<X, I>
-where I: IndexType + ToPrimitive { 
+where I: IndexType + ToPrimitive {
     fn math_symbol() -> String {
         format!("{X}")
     }
@@ -219,39 +219,39 @@ macro_rules! impl_multivar_unsigned {
                 self.0.clone()
             }
 
-            fn is_unit(&self) -> bool { 
+            fn is_unit(&self) -> bool {
                 self.0.is_zero()
             }
 
             fn inv(&self) -> Option<Self> {
-                if self.is_unit() { 
+                if self.is_unit() {
                     Some(Self(MultiDeg::zero()))
-                } else { 
+                } else {
                     None
                 }
             }
 
-            fn divides(&self, other: &Self) -> bool { 
+            fn divides(&self, other: &Self) -> bool {
                 self.0.all_leq(&other.0)
             }
         }
 
         impl<const X: char> MultiVar<X, $I> {
-            pub fn generate(n: usize, tot_deg: usize) -> impl Iterator<Item = Self> { 
+            pub fn generate(n: usize, tot_deg: usize) -> impl Iterator<Item = Self> {
                 use dinglebit_combinatorics::Combination as C;
                 use crate::algo::rep_comb;
-        
-                // MEMO: 
-                // Mathematically this restriction is unnecessary, 
-                // but (n, tot_deg) = (0, 0) will fail. 
+
+                // MEMO:
+                // Mathematically this restriction is unnecessary,
+                // but (n, tot_deg) = (0, 0) will fail.
                 assert!(n > 0);
-        
+
                 let c = C::new(n + tot_deg - 1, n - 1);
                 c.into_iter().map(move |mut list| {
                     list.push(n + tot_deg - 1); // the right-end wall
                     Self::from_iter( rep_comb(&list) )
                 })
-            }        
+            }
         }
     };
 }
@@ -265,7 +265,7 @@ macro_rules! impl_multivar_signed {
                 self.0.clone()
             }
 
-            fn is_unit(&self) -> bool { 
+            fn is_unit(&self) -> bool {
                 true
             }
 
@@ -273,7 +273,7 @@ macro_rules! impl_multivar_signed {
                 Some(Self(-&self.0))
             }
 
-            fn divides(&self, _other: &Self) -> bool { 
+            fn divides(&self, _other: &Self) -> bool {
                 true
             }
         }
@@ -284,19 +284,19 @@ impl_multivar_unsigned!(usize);
 impl_multivar_signed!  (isize);
 
 pub(crate) fn fmt_mono_n<'a, X, I, S>(seq: S, unicode: bool) -> String
-where X: ToString, I: 'a + ToPrimitive, S: IntoIterator<Item = (X, &'a I)> { 
+where X: ToString, I: 'a + ToPrimitive, S: IntoIterator<Item = (X, &'a I)> {
     let s = seq.into_iter().map(|(x, d)| {
         let m = fmt_mono(&x.to_string(), d, unicode);
-        if m == "1" { 
+        if m == "1" {
             "".to_string()
         } else {
             m
         }
     }).join("");
 
-    if s.is_empty() { 
+    if s.is_empty() {
         "1".to_string()
-    } else { 
+    } else {
         s
     }
 }
@@ -307,7 +307,7 @@ mod tex {
 
     impl<const X: char, I> TeX for MultiVar<X, I>
     where I: ToPrimitive {
-        fn tex_math_symbol() -> String { 
+        fn tex_math_symbol() -> String {
             format!("{X}_1,\\ldots")
         }
         fn tex_string(&self) -> String {
@@ -317,14 +317,14 @@ mod tex {
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     use itertools::Itertools;
     use num_integer::binomial;
 
     use super::*;
 
     #[test]
-    fn display() { 
+    fn display() {
         type M = MultiVar<'X', usize>;
 
         assert_eq!(format!("{}", M::from([])), "1");
@@ -335,7 +335,7 @@ mod tests {
     }
 
     #[test]
-    fn from_pair() { 
+    fn from_pair() {
         type M = MultiVar<'X', usize>;
 
         let d = M::from((2, 3)); // X₂³
@@ -343,7 +343,7 @@ mod tests {
     }
 
     #[test]
-    fn from_arr() { 
+    fn from_arr() {
         type M = MultiVar<'X', usize>;
 
         let d = M::from([1,0,3]); // X₀X₂³
@@ -351,7 +351,7 @@ mod tests {
     }
 
     #[test]
-    fn from_iter() { 
+    fn from_iter() {
         type M = MultiVar<'X', usize>;
 
         let d = M::from_iter([(0, 1), (2, 3)]); // X₀X₂³
@@ -359,7 +359,7 @@ mod tests {
     }
 
     #[test]
-    fn deg_for() { 
+    fn deg_for() {
         type M = MultiVar<'X', usize>;
 
         let d = M::from([1,0,3]); // X₀X₂³
@@ -370,7 +370,7 @@ mod tests {
     }
 
     #[test]
-    fn total_deg() { 
+    fn total_deg() {
         type M = MultiVar<'X', usize>;
 
         let d = M::from([1,0,3]); // X₀X₂³
@@ -421,7 +421,7 @@ mod tests {
     }
 
     #[test]
-    fn div() { 
+    fn div() {
         type M = MultiVar<'X', usize>;
 
         let one = M::from([]);
@@ -434,7 +434,7 @@ mod tests {
     }
 
     #[test]
-    fn is_divisible_isize() { 
+    fn is_divisible_isize() {
         type M = MultiVar<'X', isize>;
 
         let one = M::from([]);
@@ -451,7 +451,7 @@ mod tests {
     }
 
     #[test]
-    fn div_isize() { 
+    fn div_isize() {
         type M = MultiVar<'X', isize>;
 
         let one = M::from([]);
@@ -465,7 +465,7 @@ mod tests {
     }
 
     #[test]
-    fn gen_mons() { 
+    fn gen_mons() {
         type M = MultiVar<'X', usize>;
 
         let n = 3;
@@ -480,7 +480,7 @@ mod tests {
     }
 
     #[test]
-    fn from_str() { 
+    fn from_str() {
         type M = MultiVar<'X', isize>;
 
         let s = "1";
@@ -520,13 +520,13 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
-    fn serialize() { 
+    fn serialize() {
         type M = MultiVar<'X', isize>;
 
         let d = M::from([]);
         let ser = serde_json::to_string(&d).unwrap();
         let des = serde_json::from_str::<M>(&ser).unwrap();
-        
+
         assert_eq!(&ser, "\"1\"");
         assert_eq!(d, des);
 
@@ -540,14 +540,14 @@ mod tests {
         let d = M::from([2]);
         let ser = serde_json::to_string(&d).unwrap();
         let des = serde_json::from_str::<M>(&ser).unwrap();
-        
+
         assert_eq!(&ser, "\"X_0^2\"");
         assert_eq!(d, des);
 
         let d = M::from([-1, 0, 3]);
         let ser = serde_json::to_string(&d).unwrap();
         let des = serde_json::from_str::<M>(&ser).unwrap();
-        
+
         assert_eq!(&ser, "\"X_0^{-1}X_2^3\"");
         assert_eq!(d, des);
     }

@@ -50,9 +50,9 @@ pub(crate) use {dispatch, dispatch_ring, dispatch_eucring, dispatch_field};
 
 macro_rules! try_ring {
     ($app:ident, $method:ident, $args:expr) => {{
-        if !$args.is_poly() { 
+        if !$args.is_poly() {
             try_std!($app, $method, $args)
-        } else if $args.is_euc_ring() { 
+        } else if $args.is_euc_ring() {
             try_euc_poly!($app, $method, $args)
         } else {
             try_noneuc_poly!($app, $method, $args)
@@ -62,9 +62,9 @@ macro_rules! try_ring {
 
 macro_rules! try_eucring {
     ($app:ident, $method:ident, $args:expr) => {{
-        if !$args.is_poly() { 
+        if !$args.is_poly() {
             try_std!($app, $method, $args)
-        } else { 
+        } else {
             try_euc_poly!($app, $method, $args)
         }
     }}

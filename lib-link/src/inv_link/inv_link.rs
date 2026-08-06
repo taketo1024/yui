@@ -27,7 +27,7 @@ impl InvLink {
         let link_edges = inner.edges();
         let missing = link_edges.iter().filter(|e| !e_map.contains_key(e)).collect_vec();
         assert!(missing.is_empty(), "e_map does not cover edges {missing:?}");
-        
+
         let extra = e_map.keys().filter(|e| !link_edges.contains(e)).sorted().collect_vec();
         assert!(extra.is_empty(), "e_map maps edges {extra:?}, which are not in the link");
 
@@ -72,7 +72,7 @@ impl InvLink {
     }
 
     pub fn from_symmetric_pd_code<I1>(pd_code: I1) -> Self
-    where I1: IntoIterator<Item = PDCodeX> { 
+    where I1: IntoIterator<Item = PDCodeX> {
         // the base point defaults to the least edge, which the symmetric convention puts on the axis.
         Self::si_knot_from(Link::from_pd_code(pd_code))
     }
@@ -143,7 +143,7 @@ impl InvLink {
         self
     }
 
-    pub fn inv_edge(&self, e: Edge) -> Edge { 
+    pub fn inv_edge(&self, e: Edge) -> Edge {
         self.e_map.get(&e).cloned().unwrap()
     }
 
@@ -289,7 +289,7 @@ mod tests {
     }
 
     #[test]
-    fn inv_edge() { 
+    fn inv_edge() {
         let l = InvLink::test_data("3_1");
 
         assert_eq!(l.inv_edge(1), 1);
@@ -299,7 +299,7 @@ mod tests {
         assert_eq!(l.inv_edge(5), 3);
         assert_eq!(l.inv_edge(6), 2);
     }
-    
+
     #[test]
     fn inv_node() {
         let l = InvLink::test_data("3_1");

@@ -39,15 +39,15 @@ where X: LcKey, for<'x> &'x X: Mul<Output = X> {
 #[cfg_attr(feature = "serde", serde(transparent))]
 pub struct AsKey<T>(pub T) where T: IndexType;
 
-impl<T> From<T> for AsKey<T> 
+impl<T> From<T> for AsKey<T>
 where T: IndexType {
     fn from(value: T) -> Self {
         Self(value)
     }
 }
 
-impl<T> MathType for AsKey<T> 
-where T: IndexType { 
+impl<T> MathType for AsKey<T>
+where T: IndexType {
     fn math_symbol() -> String {
         let full_name = std::any::type_name::<T>();
         let name = full_name.split("::").last().unwrap_or(full_name);
@@ -55,7 +55,7 @@ where T: IndexType {
     }
 }
 
-impl<T> LcKey for AsKey<T> 
+impl<T> LcKey for AsKey<T>
 where T: IndexType {}
 
 /// A disjoint union `X ⊔ Y` of two key sets, used to form direct sums of
@@ -137,7 +137,7 @@ impl<X, Y> MathType for EitherKey<X, Y> where X: LcKey, Y: LcKey {
     fn math_symbol() -> String {
         if X::math_symbol() == Y::math_symbol() {
             X::math_symbol()
-        } else { 
+        } else {
             format!("E({},{})", X::math_symbol(), Y::math_symbol())
         }
     }
@@ -150,13 +150,13 @@ pub fn split_lr<X, Y, R>(z: &Lc<EitherKey<X, Y>, R>) -> (Lc<X, R>, Lc<Y, R>)
 where X: LcKey, Y: LcKey, R: Ring, for<'x> &'x R: RingOps<R>{
     let mut x = vec![];
     let mut y = vec![];
-    for (e, r) in z.iter() { 
-        if e.is_left() { 
+    for (e, r) in z.iter() {
+        if e.is_left() {
             x.push((e.clone().into_left(), r.clone()));
-        } else { 
+        } else {
             y.push((e.clone().into_right(), r.clone()));
         }
-    } 
+    }
     (Lc::from_iter(x), Lc::from_iter(y))
 }
 

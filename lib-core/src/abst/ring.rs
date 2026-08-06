@@ -84,9 +84,9 @@ where
 #[cfg(test)]
 mod tests {
     use crate::abst::Ring;
- 
+
     #[test]
-    fn is_pm_one() { 
+    fn is_pm_one() {
         assert!(1.is_pm_one());
         assert!((-1).is_pm_one());
         assert!(!2.is_pm_one());
@@ -97,6 +97,6 @@ mod tests {
     fn normalized() {
         assert_eq!(3.normalized(), 3);
         assert_eq!((-3).normalized(), 3);
-    } 
+    }
 
 }

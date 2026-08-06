@@ -260,7 +260,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         info!("build chunk (n: {}): {}", child.nodes().len(), child.nodes().iter().join(", "));
         let child = child.run();
         info!("chunk built: {}", child.stat());
-        
+
         let SymTngBuilder { key_map, mut inner, .. } = child;
         let elems = inner.elements_mut().take();
         (inner.into_tng_complex(), key_map, elems)
@@ -295,7 +295,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         }
     }
 
-    fn append_on_axis(&mut self, x: &Node) { 
+    fn append_on_axis(&mut self, x: &Node) {
         info!("{} append on-axis: {x}", self.current_step());
 
         self.prepare_append(x);
@@ -303,11 +303,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let (h, t) = self.complex().ht();
         let c = TngComplex::from_node(h, t, x, self.complex().base_pt());
         let key_map = if x.is_crossing() {
-            [Bit::Bit0, Bit::Bit1].map(|b| { 
+            [Bit::Bit0, Bit::Bit1].map(|b| {
                 let k = TngComplexKey { state: BitSeq::from(b), label: KhTensor::empty() };
                 (k, k)
             }).into_iter().collect()
-        } else { 
+        } else {
             let k = TngComplexKey::init();
             [(k, k)].into_iter().collect()
         };
@@ -328,13 +328,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             c.append_node(tx);
             c
         };
-        let key_map = if x.is_crossing() { 
+        let key_map = if x.is_crossing() {
             [
                 ([0, 0], [0, 0]),
                 ([1, 0], [0, 1]),
                 ([0, 1], [1, 0]),
                 ([1, 1], [1, 1])
-            ].map(|(b0, b1)| { 
+            ].map(|(b0, b1)| {
                 let k = TngComplexKey { state: BitSeq::from_iter(b0), label: KhTensor::empty() };
                 let l = TngComplexKey { state: BitSeq::from_iter(b1), label: KhTensor::empty() };
                 (k, l)
@@ -363,7 +363,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         // merge elements before delooping/eliminating, so the per-degree hooks transform them too.
         self.inner.elements_mut().merge(right_elements);
-        
+
         debug!("{} merge {} <- {}", self.current_step(), left.stat(), right.stat());
         debug!("  key_map: {} × {}", left_map.len(), right_map.len());
         debug!("  merge range: {:?}", range);
@@ -491,7 +491,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                     push_pivot(&mut pool, nk, w);
                 }
             }
-            
+
             done += 1;
             log_progress(Level::Debug, done, done - 1, done + pool.len(), PROGRESS_LOG_STEP, 2);
         }
@@ -539,7 +539,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         self.key_map.remove(k);
 
-        for &k_new in updated.iter() { 
+        for &k_new in updated.iter() {
             self.key_map.add_pair(k_new, k_new);
         }
 
@@ -597,7 +597,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         self.key_map.remove(k);
 
-        for (&k_new, &tk_new) in Iterator::zip(ks.iter(), tks.iter()) { 
+        for (&k_new, &tk_new) in Iterator::zip(ks.iter(), tks.iter()) {
             self.key_map.add_pair(k_new, tk_new);
         }
 
@@ -617,14 +617,14 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         // `targets` counts only the pivots the cap will actually eliminate (equiv cost ≤ cap); the
         // rest defer to the matrix. The sparkline shows the whole eliminatable distribution.
         let targets = keys.iter().filter(|(_, c)| !self.exceeds_elim_cap(*c)).count();
-        
+
         debug!("{} eliminate in C[{i}]: {}, targets: {}", self.current_step(), self.complex().rank(i), targets);
         debug!("{}   fill: {}", self.current_step(), fill_cost_sparkline(&keys, self.config.max_elim_cost));
 
         let before = self.complex().rank(i) as isize;
         let mut pool = pivot_pool(keys);
         let mut done = 0;
-        
+
         while let Some(k) = pop_min_pivot(&mut pool, |k|
             self.complex().contains_key(k).then(|| self.equiv_elim_cost(k, ElimDir::Outgoing))
         ) {
@@ -739,26 +739,26 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         )
     }
 
-    fn is_equiv_inv_edge(&self, i: &TngComplexKey, j: &TngComplexKey) -> bool { 
+    fn is_equiv_inv_edge(&self, i: &TngComplexKey, j: &TngComplexKey) -> bool {
         let f = self.complex().edge(i, j);
         f.is_invertible() && self.is_equiv_edge(i, j)
     }
 
-    fn is_equiv_edge(&self, i: &TngComplexKey, j: &TngComplexKey) -> bool { 
-        if self.key_map.is_sym(i) && self.key_map.is_sym(j) { 
+    fn is_equiv_edge(&self, i: &TngComplexKey, j: &TngComplexKey) -> bool {
+        if self.key_map.is_sym(i) && self.key_map.is_sym(j) {
             true
-        } else if !self.key_map.is_sym(i) && !self.key_map.is_sym(j) { 
-            //  i - - -> j 
-            //    \   /   
+        } else if !self.key_map.is_sym(i) && !self.key_map.is_sym(j) {
+            //  i - - -> j
+            //    \   /
             //      /     : not allowed
-            //    /   \   
+            //    /   \
             // ti - - -> tj
             let ti = self.key_map.inv_key(i);
             let tj = self.key_map.inv_key(j);
 
             !self.complex().has_edge(ti, j) &&
             !self.complex().has_edge(i, tj)
-        } else { 
+        } else {
             false
         }
     }
@@ -778,7 +778,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
 
         self.deloop_all();
 
-        // Deloop marked circles only when there are no other unmarked components left. 
+        // Deloop marked circles only when there are no other unmarked components left.
         if self.complex().is_closed() {
             for i in self.complex().h_range() {
                 self.deloop_in_with(i, true);
@@ -831,13 +831,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     #[allow(unused)]
     fn print_keys(&self) {
         let mut done = HashSet::new();
-        for k in self.key_map.keys().sorted() { 
+        for k in self.key_map.keys().sorted() {
             if done.contains(&k) { continue }
 
             let tk = self.key_map.inv_key(k);
             if k == tk {
                 println!("{}", self.complex().vertex(k));
-            } else { 
+            } else {
                 println!("{} ↔ {}", self.complex().vertex(k), self.complex().vertex(tk));
             }
 

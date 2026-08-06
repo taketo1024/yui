@@ -24,13 +24,13 @@ type I = i32;
 #[debug( "{}", _0)]
 pub struct FF<const p: I>(I);
 
-impl<const p: I> FF<p> { 
-    pub fn new(a: I) -> Self { 
+impl<const p: I> FF<p> {
+    pub fn new(a: I) -> Self {
         assert!(p > 0);
         Self(a.rem_euclid(p))
     }
 
-    pub fn rep(&self) -> &I { 
+    pub fn rep(&self) -> &I {
         &self.0
     }
 }
@@ -120,7 +120,7 @@ impl<const p: I> Rem<&FF<p>> for &FF<p> {
     type Output = FF<p>;
     fn rem(self, rhs: &FF<p>) -> Self::Output {
         assert!(!rhs.is_zero());
-        FF::zero() // MEMO: FF<p> is a field. 
+        FF::zero() // MEMO: FF<p> is a field.
     }
 }
 
@@ -151,14 +151,14 @@ impl<const p: I> Mon for FF<p> {}
 
 impl<const p: I> Ring for FF<p> {
     fn inv(&self) -> Option<Self> {
-        if self.is_zero() { 
+        if self.is_zero() {
             None
-        } else { 
-            // 1 = ax + py  ->  ax = 1 mod p. 
+        } else {
+            // 1 = ax + py  ->  ax = 1 mod p.
             let (d, x, _y) = I::gcdx(&self.0, &p);
-            
+
             assert!(d.is_one());
-            
+
             let inv = Self::new(x);
             Some(inv)
         }
@@ -169,9 +169,9 @@ impl<const p: I> Ring for FF<p> {
     }
 
     fn normalizing_unit(&self) -> Self {
-        if self.is_zero() { 
+        if self.is_zero() {
             Self::one()
-        } else { 
+        } else {
             self.inv().unwrap()
         }
     }
@@ -185,7 +185,7 @@ mod tex {
     use super::*;
 
     impl<const p: I> TeX for FF<p> {
-        fn tex_math_symbol() -> String { 
+        fn tex_math_symbol() -> String {
             format!("\\mathbb{{F}}_{p}")
         }
         fn tex_string(&self) -> String {
@@ -195,14 +195,14 @@ mod tex {
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     use super::*;
 
     type F3 = FF<3>;
     type F5 = FF<5>;
 
     #[test]
-    fn init() { 
+    fn init() {
         let a = F3::new(-7);
         assert_eq!(a.0, 2);
 
@@ -211,7 +211,7 @@ mod tests {
     }
 
     #[test]
-    fn display() { 
+    fn display() {
         let a = F3::new(-7);
         assert_eq!(format!("{}", a), "2");
 
@@ -220,7 +220,7 @@ mod tests {
     }
 
     #[test]
-    fn debug() { 
+    fn debug() {
         let a = F3::new(-7);
         assert_eq!(format!("{:?}", a), "2");
 
@@ -229,7 +229,7 @@ mod tests {
     }
 
     #[test]
-    fn add() { 
+    fn add() {
         let a = F5::new(3);
         let b = F5::new(4);
 
@@ -237,20 +237,20 @@ mod tests {
     }
 
     #[test]
-    fn add_assign() { 
+    fn add_assign() {
         let mut a = F5::new(3);
         a += F5::new(4);
         assert_eq!(a, F5::new(2));
     }
 
     #[test]
-    fn neg() { 
+    fn neg() {
         let a = F5::new(3);
         assert_eq!(-a, F5::new(2));
     }
 
     #[test]
-    fn sub() { 
+    fn sub() {
         let a = F5::new(3);
         let b = F5::new(4);
 
@@ -258,35 +258,35 @@ mod tests {
     }
 
     #[test]
-    fn sub_assign() { 
+    fn sub_assign() {
         let mut a = F5::new(3);
         a -= F5::new(4);
         assert_eq!(a, F5::new(4));
     }
 
     #[test]
-    fn mul() { 
+    fn mul() {
         let a = F5::new(3);
         let b = F5::new(4);
         assert_eq!(a * b, F5::new(2));
     }
 
     #[test]
-    fn mul_assign() { 
+    fn mul_assign() {
         let mut a = F5::new(3);
         a *= F5::new(4);
         assert_eq!(a, F5::new(2));
     }
 
     #[test]
-    fn div() { 
+    fn div() {
         let a = F5::new(4);
         let b = F5::new(3);
         assert_eq!(a / b, F5::new(3));
     }
 
     #[test]
-    fn div_assign() { 
+    fn div_assign() {
         let mut a = F5::new(4);
         a /= F5::new(3);
         assert_eq!(a, F5::new(3));
@@ -294,21 +294,21 @@ mod tests {
 
 
     #[test]
-    fn rem() { 
+    fn rem() {
         let a = F5::new(4);
         let b = F5::new(3);
         assert_eq!(a % b, F5::zero());
     }
 
     #[test]
-    fn rem_assign() { 
+    fn rem_assign() {
         let mut a = F5::new(4);
         a %= F5::new(3);
         assert_eq!(a, F5::zero());
     }
 
     #[test]
-    fn tex() { 
+    fn tex() {
         use crate::util::tex::TeX;
         assert_eq!(F3::tex_math_symbol(), "\\mathbb{F}_3");
         assert_eq!(F3::from(5).tex_string(), "2");

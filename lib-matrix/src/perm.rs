@@ -184,9 +184,9 @@ impl Perm {
 
 /// Composition `(p * q)(i) = p(q(i))` (right-to-left, math convention).
 #[auto_ops]
-impl<'a, 'b> Mul<&'b Perm> for &'a Perm {
+impl Mul<&Perm> for &Perm {
     type Output = Perm;
-    fn mul(self, rhs: &'b Perm) -> Perm {
+    fn mul(self, rhs: &Perm) -> Perm {
         assert_eq!(self.len(), rhs.len(), "permutations must have the same length");
         match (&self.data, &rhs.data) {
             (Either::Left(_), _) => rhs.clone(),

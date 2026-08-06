@@ -77,7 +77,7 @@ where for<'x> &'x Self: LLLRingOps<Self> {
 macro_rules! impl_for_int {
     ($type:ty) => {
         impl LLLRingOps<Self> for $type {}
-        impl<'a> LLLRingOps<$type> for &'a $type {}
+        impl LLLRingOps<$type> for &$type {}
 
         impl LLLRing for $type {
             type Int = Self;
@@ -106,7 +106,7 @@ macro_rules! impl_for_quad_int {
         impl<I> LLLRingOps<Self> for $type<I>
         where I: IntType, for<'x> &'x I: IntOps<I> {}
 
-        impl<'a, I> LLLRingOps<$type<I>> for &'a $type<I>
+        impl<I> LLLRingOps<$type<I>> for &$type<I>
         where I: IntType, for<'x> &'x I: IntOps<I> {}
 
         impl<I> LLLRing for $type<I>

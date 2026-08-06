@@ -234,10 +234,10 @@ where R: Scalar + Neg<Output = R> {
 macro_rules! impl_binop {
     ($trait:ident, $method:ident) => {
         #[auto_ops]
-        impl<'a, 'b, R> $trait<&'b SpVec<R>> for &'a SpVec<R>
+        impl<R> $trait<&SpVec<R>> for &SpVec<R>
         where R: Scalar + ClosedAddAssign + ClosedSubAssign + ClosedMulAssign + Zero + One + Neg<Output = R> {
             type Output = SpVec<R>;
-            fn $method(self, rhs: &'b SpVec<R>) -> Self::Output {
+            fn $method(self, rhs: &SpVec<R>) -> Self::Output {
                 let res = (&self.inner).$method(&rhs.inner);
                 SpVec::new(res)
             }
@@ -250,10 +250,10 @@ impl_binop!(Sub, sub);
 
 // SpMat * SpVec
 #[auto_ops(val_val, val_ref, ref_val)]
-impl<'b, R> Mul<&'b SpVec<R>> for &SpMat<R>
+impl<R> Mul<&SpVec<R>> for &SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = SpVec<R>;
-    fn mul(self, rhs: &'b SpVec<R>) -> Self::Output {
+    fn mul(self, rhs: &SpVec<R>) -> Self::Output {
         let res = self.inner() * &rhs.inner;
         SpVec::new(res)
     }

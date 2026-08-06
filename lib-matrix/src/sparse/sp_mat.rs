@@ -139,7 +139,7 @@ impl<R> SpMat<R> {
         w / nnz
     }
 
-    pub fn block_diag<'a, I>(blocks: I) -> SpMat<R>
+    pub fn block_diag<I>(blocks: I) -> SpMat<R>
     where I: IntoIterator<Item = SpMat<R>> { 
         let mut shape = (0, 0);
         let mut col_offsets: Vec<usize> = vec![];
@@ -572,10 +572,10 @@ where R: Scalar + Neg<Output = R> {
 macro_rules! impl_binop {
     ($trait:ident, $method:ident) => {
         #[auto_ops]
-        impl<'a, 'b, R> $trait<&'b SpMat<R>> for &'a SpMat<R>
+        impl<R> $trait<&SpMat<R>> for &SpMat<R>
         where R: Scalar + ClosedAddAssign + ClosedSubAssign + ClosedMulAssign + Zero + One + Neg<Output = R> {
             type Output = SpMat<R>;
-            fn $method(self, rhs: &'b SpMat<R>) -> Self::Output {
+            fn $method(self, rhs: &SpMat<R>) -> Self::Output {
                 let res = (&self.inner).$method(&rhs.inner);
                 SpMat::from(res)
             }

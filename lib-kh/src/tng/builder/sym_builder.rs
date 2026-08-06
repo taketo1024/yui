@@ -1061,7 +1061,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             (self.builder.inv_node(x).clone(), *b)
         ).collect();
         let base_pt = e.base_pt().map(|b| self.builder.inv_edge(b));
-        let in_cob = e.in_cob().convert_edges(&|e| self.builder.inv_edge(e));
+        let in_cob = e.in_cob().convert_edges(|e| self.builder.inv_edge(e));
 
         let mut te = TngComplexElem::new(state, in_cob, base_pt);
         te.set_out_cob(e.out_cob().iter().map(|(k, f)| (*k, tau_cob(f))));

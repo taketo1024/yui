@@ -666,10 +666,10 @@ pub(super) mod tests {
         type R = Ratio<i64>;
         let vals = (0..4).map(|i| R::new(i + 1, 5)).collect_vec();
         let a = SpMat::from_entries((2, 2), [
-            (0, 0, vals[0].clone()),
-            (0, 1, vals[2].clone()),
-            (1, 0, vals[1].clone()),
-            (1, 1, vals[3].clone())
+            (0, 0, vals[0]),
+            (0, 1, vals[2]),
+            (1, 0, vals[1]),
+            (1, 1, vals[3])
         ]);
         assert_eq!(a.disassemble(), (vec![0, 2, 4], vec![0, 1, 0, 1], vals));
     }

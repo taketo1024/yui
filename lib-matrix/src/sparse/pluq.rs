@@ -578,7 +578,7 @@ mod tests {
 
         let paq = a.permute(&pp.p, &pp.q);
         let rem_full = SpMat::from_entries((m, n),
-            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
+            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, *v))
         );
         assert_eq!(paq, &pp.l * &pp.u + &rem_full);
 
@@ -604,7 +604,7 @@ mod tests {
 
         let paq = a.permute(&pp.p, &pp.q);
         let rem_full = SpMat::from_entries((m, n),
-            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
+            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, *v))
         );
         assert_eq!(paq, &pp.l * &pp.u + &rem_full);
 
@@ -673,7 +673,7 @@ mod tests {
 
         let paq = a.permute(&pp.p, &pp.q);
         let rem = SpMat::from_entries((m, n),
-            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
+            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, *v))
         );
         assert_eq!(paq, &pp.l * &pp.u + &rem, "p*A*q != l*u + rest");
 
@@ -696,7 +696,7 @@ mod tests {
 
         let paq = a.permute(&pp.p, &pp.q);
         let rem = SpMat::from_entries((m, n),
-            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
+            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, *v))
         );
         assert_eq!(paq, &pp.l * &pp.u + &rem, "p*A*q != l*u + rest");
 
@@ -746,7 +746,7 @@ mod tests {
 
         let psq = s.permute(&pp.p, &pp.q);
         let rem = SpMat::from_entries((ms, ns),
-            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
+            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, *v))
         );
         assert_eq!(psq, &pp.l * &pp.u + &rem, "p*s*q != l*u + rest");
     }
@@ -987,7 +987,7 @@ mod tests {
 
         let psq = s.permute(&pp.p, &pp.q);
         let rem = SpMat::from_entries((m, n),
-            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
+            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, *v))
         );
         assert_eq!(psq, &pp.l * &pp.u + &rem, "p*s*q != l*u + rest (c = {c})");
     }
@@ -1021,7 +1021,7 @@ mod tests {
 
         let psq = s.permute(&pp.p, &pp.q);
         let rem = SpMat::from_entries((m, n),
-            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, v.clone()))
+            pp.s.iter_nz().map(|(i, j, v)| (i + r, j + r, *v))
         );
         assert_eq!(psq, &pp.l * &pp.u + &rem);
     }

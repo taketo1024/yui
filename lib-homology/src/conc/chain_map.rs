@@ -198,7 +198,7 @@ mod tests {
         ]);
 
         let f = ChainMap::new(&c, &d, 1, |_, z: &Lc<GenericKey<isize>, i32>|
-            z.iter().map(|(k, a)| (GenericKey(k.0 + 1, k.1), a.clone())).collect()
+            z.iter().map(|(k, a)| (GenericKey(k.0 + 1, k.1), *a)).collect()
         );
 
         f.check_at(1);
@@ -227,25 +227,25 @@ mod tests {
         let cone = f.cone((0..=4).rev(), true);
         cone.check_d_all();
 
-        let x = T::from_left(s2[0].raw_generator(0).clone());
-        let y = T::from_left(s2[1].raw_generator(0).clone());
-        let z = T::from_right(d3[1].raw_generator(0).clone());
+        let x = T::from_left(*s2[0].raw_generator(0));
+        let y = T::from_left(*s2[1].raw_generator(0));
+        let z = T::from_right(*d3[1].raw_generator(0));
 
         assert_eq!(cone[1].raw_generators().get_index_of(&x), Some(0));
         assert_eq!(cone[2].raw_generators().get_index_of(&y), Some(0));
         assert_eq!(cone[1].raw_generators().get_index_of(&z), Some(4));
 
-        let dx = cone.d(1, &Lc::from(x.clone()));
+        let dx = cone.d(1, &Lc::from(x));
         assert_eq!(dx, Lc::from(T::from_right(GenericKey(0, 0))));
 
-        let dy = cone.d(2, &Lc::from(y.clone()));
+        let dy = cone.d(2, &Lc::from(y));
         assert_eq!(dy, Lc::from_iter([
             (T::from_left(GenericKey(0, 0)), -1),
             (T::from_left(GenericKey(0, 1)), 1),
             (T::from_right(GenericKey(1, 0)), 1),
         ]));
 
-        let dz = cone.d(1, &Lc::from(z.clone()));
+        let dz = cone.d(1, &Lc::from(z));
         assert_eq!(dz, Lc::from_iter([
             (T::from_right(GenericKey(0, 0)), 1),
             (T::from_right(GenericKey(0, 1)), -1),

@@ -307,7 +307,7 @@ impl CobComp {
         let x1 = self.euler_num();
         let x2 = other.euler_num();
         let a = self.src.end_pts().filter(|e|
-            other.src.end_pts().contains(&e)
+            other.src.end_pts().contains(e)
         ).count() as i32;
         assert!(a > 0);
 

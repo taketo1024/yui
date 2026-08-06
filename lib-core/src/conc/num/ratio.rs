@@ -463,8 +463,8 @@ mod tests {
 
         let a = Ratio::new(1, 2);
         let o = Ratio::zero();
-        assert_eq!(&a + &o, a);
-        assert_eq!(&o + &a, a);
+        assert_eq!(a + o, a);
+        assert_eq!(o + a, a);
 
         let a = Ratio::new(1, 3);
         let b = Ratio::new(2, 3);
@@ -497,8 +497,8 @@ mod tests {
 
         let a = Ratio::new(1, 2);
         let o = Ratio::zero();
-        assert_eq!(&a - &o, a);
-        assert_eq!(&o - &a, -a);
+        assert_eq!(a - o, a);
+        assert_eq!(o - a, -a);
     }
 
     #[test]
@@ -516,18 +516,18 @@ mod tests {
 
         let a = Ratio::new(3, 4);
         let e = Ratio::one();
-        assert_eq!(&a * &e, a);
-        assert_eq!(&e * &a, a);
+        assert_eq!(a * e, a);
+        assert_eq!(e * a, a);
 
         let a = Ratio::new(3, 4);
         let e = -Ratio::one();
-        assert_eq!(&a * &e, -a);
-        assert_eq!(&e * &a, -a);
+        assert_eq!(a * e, -a);
+        assert_eq!(e * a, -a);
 
         let a = Ratio::new(3, 4);
         let o = Ratio::zero();
-        assert_eq!(&a * &o, Ratio::zero());
-        assert_eq!(&o * &a, Ratio::zero());
+        assert_eq!(a * o, Ratio::zero());
+        assert_eq!(o * a, Ratio::zero());
     }
 
     #[test]
@@ -602,7 +602,7 @@ mod tests {
 
         let (d, s, t) = EucRing::gcdx(&x, &y);
         assert_eq!(d, Ratio::one(), "gcdx's d is not normalized");
-        assert_eq!(&s * &x + &t * &y, d, "Bezout fails");
+        assert_eq!(s * x + t * y, d, "Bezout fails");
         assert_eq!(EucRing::gcd(&x, &y), d, "gcd disagrees with gcdx");
     }
 

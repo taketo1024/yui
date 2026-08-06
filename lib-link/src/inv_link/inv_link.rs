@@ -64,7 +64,7 @@ impl InvLink {
         match cands.as_slice() {
             [y] => {
                 assert_eq!(x.node_type(), y.node_type(), "e_map changes the type of node {x}");
-                *y
+                y
             },
             [] => panic!("e_map sends node {x} to no node of the link"),
             _  => panic!("e_map does not determine the image of node {x}: {} nodes match", cands.len())
@@ -305,9 +305,9 @@ mod tests {
         let l = InvLink::test_data("3_1");
         let nodes = l.inner.nodes().collect_vec();
 
-        assert_eq!(l.inv_node(&nodes[0]), nodes[1]);
-        assert_eq!(l.inv_node(&nodes[1]), nodes[0]);
-        assert_eq!(l.inv_node(&nodes[2]), nodes[2]);
+        assert_eq!(l.inv_node(nodes[0]), nodes[1]);
+        assert_eq!(l.inv_node(nodes[1]), nodes[0]);
+        assert_eq!(l.inv_node(nodes[2]), nodes[2]);
     }
 
     #[test]

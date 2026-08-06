@@ -976,7 +976,7 @@ mod tests {
         let (res, trans) = fnf(&a, [true; 4]).destruct();
         let [p, pinv, q, qinv] = trans.map( |p| p.unwrap() );
 
-        let x = Mat::scalar(3, &P::variable()) - a.map(|r| P::from_const(r.clone()));
+        let x = Mat::scalar(3, &P::variable()) - a.map(|r| P::from_const(*r));
 
         assert_eq!(&p * &x * &q, res);
         assert_eq!(&pinv * &res * &qinv, x);

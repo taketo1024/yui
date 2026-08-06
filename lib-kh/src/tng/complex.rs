@@ -337,11 +337,11 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let v = self.vertices.remove(k).unwrap();
 
         for j in v.in_edges.iter() {
-            self.vertices.get_mut(&j).unwrap().out_edges.remove(k);
+            self.vertices.get_mut(j).unwrap().out_edges.remove(k);
         }
         
         for l in v.out_edges.keys() {
-            self.vertices.get_mut(&l).unwrap().in_edges.remove(k);
+            self.vertices.get_mut(l).unwrap().in_edges.remove(k);
         }
 
         v

@@ -603,7 +603,7 @@ impl Cob {
     // Ref-taking sibling of `connect_next`: same algorithm, but the working
     // set holds `&CobComp` so merges go through `connect` on the running
     // src/tgt accumulators instead of moving Tngs out.
-    fn connect_next<'a>(comps: &mut Vec<&'a CobComp>) -> Option<CobComp> {
+    fn connect_next(comps: &mut Vec<&CobComp>) -> Option<CobComp> {
         let seed = comps.pop()?;
         let mut unproc = comps.len();
 
@@ -682,9 +682,9 @@ impl Cob {
     // By-ref sibling of [`Self::stack_next`]: bot/top hold `&CobComp`, so the
     // merge code can't move Tngs out — uses `connect` on the running
     // src/tgt accumulators instead.
-    fn stack_next<'a>(
-        bot: &mut Vec<&'a CobComp>,
-        top: &mut Vec<&'a CobComp>,
+    fn stack_next(
+        bot: &mut Vec<&CobComp>,
+        top: &mut Vec<&CobComp>,
     ) -> Option<CobComp> {
         if bot.is_empty() && top.is_empty() { return None }
 

@@ -67,6 +67,8 @@ where I: for<'x >AddAssign<&'x I> + Zero {
     }
 }
 
+// note: clippy flags the `+`/`-` below, but exponents add on × and subtract on ÷.
+// `#[allow]` doesn't help: `#[auto_ops]` regenerates these impls and drops it.
 #[auto_ops]
 impl<const X: char, I> MulAssign<&Var<X, I>> for Var<X, I>
 where I: for<'x >AddAssign<&'x I> {
@@ -79,7 +81,7 @@ where I: for<'x >AddAssign<&'x I> {
 impl<const X: char, I> DivAssign<&Var<X, I>> for Var<X, I>
 where I: for<'x >SubAssign<&'x I> {
     fn div_assign(&mut self, rhs: &Var<X, I>) {
-        self.0 -= &rhs.0 // x^i * x^j = x^{i+j}
+        self.0 -= &rhs.0 // x^i / x^j = x^{i-j}
     }
 }
 

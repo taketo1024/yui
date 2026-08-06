@@ -592,11 +592,7 @@ mod tests {
 
     // Build the reduced cone, assert d² = 0, and return its nonzero homology ranks per degree.
     // (Full homology vs. the KhI reference is checked in `khi`.)
-    fn cone_homology(l: &InvLink, reduced: bool, config: SymBuildConfig) -> Vec<(isize, usize)> {
-        cone_homology_by(l, reduced, config, false)
-    }
-
-    fn cone_homology_by(l: &InvLink, reduced: bool, config: SymBuildConfig, full: bool) -> Vec<(isize, usize)> {
+    fn cone_homology(l: &InvLink, reduced: bool, config: SymBuildConfig, full: bool) -> Vec<(isize, usize)> {
         let c = ConeBuilder::from_inv_link(l, &FF2::zero(), &FF2::zero(), reduced)
             .with_config(config).with_full_extend(full).run().into_raw_complex(None);
         c.check_d_all();
@@ -604,131 +600,82 @@ mod tests {
         h.support().map(|&i| (i, h[i].rank())).filter(|(_, r)| *r > 0).sorted().collect()
     }
 
-    // no_full_deloop defers the finalize deloop to into_raw_complex — the cone homology must
-    // not change (whole and chunked).
-    fn check_no_full_deloop(l: &InvLink) {
-        for reduced in [false, true] {
-            for cut in [CutOption::None, CutOption::Auto(2)] {
-                let full = cone_homology(l, reduced, SymBuildConfig { cut: cut.clone(), ..Default::default() });
-                let skipped = cone_homology(l, reduced, SymBuildConfig { cut: cut.clone(), no_full_deloop: true, ..Default::default() });
-                assert_eq!(full, skipped, "reduced={reduced}, cut={cut:?}");
-            }
-        }
-    }
-
-    #[test]
-    fn cone_no_full_deloop_3_1() {
-        check_no_full_deloop(&InvLink::test_data("3_1"));
-    }
-
-    #[test]
-    fn cone_no_full_deloop_6_3() {
-        check_no_full_deloop(&InvLink::test_data("6_3"));
-    }
-
-    // The cone homology must not depend on the chunking: whole == chunked, reduced and unreduced.
-    fn check_chunk_independent(l: &InvLink, chunks: usize) {
-        for reduced in [false, true] {
-            let whole = cone_homology(l, reduced, SymBuildConfig::default());
-            let chunked = cone_homology(l, reduced, SymBuildConfig { cut: CutOption::Auto(chunks), ..Default::default() });
-            assert_eq!(whole, chunked, "reduced={reduced}");
-        }
-    }
+    // ---- the two cone extensions agree ----
 
     // The symmetry-broken emission (`cone_extend_reduced`, Sano2026 Prop 4.6) is a deformation
     // retract of the doubled cone: its homology must agree with `cone_extend_full`'s.
-    fn check_reduced_matches_full(l: &InvLink, config: SymBuildConfig) {
-        for reduced in [false, true] {
-            let full = cone_homology_by(l, reduced, config.clone(), true);
-            let direct = cone_homology_by(l, reduced, config.clone(), false);
-            assert_eq!(full, direct, "reduced={reduced}");
+    #[test]
+    fn cone_reduced_matches_full() {
+        for (name, l) in [
+            ("3_1",  InvLink::test_data("3_1")),
+            ("m3_1", InvLink::test_data("3_1").mirror()),
+            ("4_1",  InvLink::test_data("4_1")),
+            ("6_3",  InvLink::test_data("6_3")),
+        ] {
+            for reduced in [false, true] {
+                let config = SymBuildConfig::default();
+                let full = cone_homology(&l, reduced, config.clone(), true);
+                let direct = cone_homology(&l, reduced, config, false);
+                assert_eq!(full, direct, "{name}, reduced={reduced}");
+            }
         }
     }
 
-    #[test]
-    fn cone_reduced_matches_full_3_1() {
-        check_reduced_matches_full(&InvLink::test_data("3_1"), SymBuildConfig::default());
-    }
+    // ---- the configuration does not change the homology ----
 
-    #[test]
-    fn cone_reduced_matches_full_3_1_m() {
-        check_reduced_matches_full(&InvLink::test_data("3_1").mirror(), SymBuildConfig::default());
-    }
-
-    #[test]
-    fn cone_reduced_matches_full_4_1() {
-        check_reduced_matches_full(&InvLink::test_data("4_1"), SymBuildConfig::default());
-    }
-
-    #[test]
-    fn cone_reduced_matches_full_6_3_chunked() {
-        check_reduced_matches_full(&InvLink::test_data("6_3"), SymBuildConfig { cut: CutOption::Auto(3), ..Default::default() });
-    }
-
-    // Capping the elimination fill cost must not change the homology — the survivors just defer to
-    // the matrix reduction. Test at threshold 0 (only free eliminations) and a small positive cap.
-    fn check_elim_cap(l: &InvLink) {
+    // Chunking, deferring the final deloop, capping the elimination cost and the simplification
+    // strategy are all performance knobs: every listed config must agree with the first.
+    fn check_configs_agree(name: &str, l: &InvLink, configs: &[(&str, SymBuildConfig)]) {
+        let (base_name, base) = &configs[0];
         for reduced in [false, true] {
-            let full = cone_homology(l, reduced, SymBuildConfig { ..Default::default() });
-            for cap in [Some(0), Some(4)] {
-                let capped = cone_homology(l, reduced, SymBuildConfig { max_elim_cost: cap, ..Default::default() });
-                assert_eq!(full, capped, "reduced={reduced}, cap={cap:?}");
+            let expect = cone_homology(l, reduced, base.clone(), false);
+            for (variant, config) in &configs[1..] {
+                let got = cone_homology(l, reduced, config.clone(), false);
+                assert_eq!(expect, got, "{name}: {variant} vs {base_name}, reduced={reduced}");
             }
         }
     }
 
     #[test]
-    fn cone_elim_cap_3_1() {
-        check_elim_cap(&InvLink::test_data("3_1"));
-    }
-
-    #[test]
-    fn cone_elim_cap_6_3_chunked() {
-        let l = InvLink::test_data("6_3");
-        for reduced in [false, true] {
-            let full = cone_homology(&l, reduced, SymBuildConfig { cut: CutOption::Auto(3), ..Default::default() });
-            let capped = cone_homology(&l, reduced, SymBuildConfig { cut: CutOption::Auto(3), max_elim_cost: Some(0), ..Default::default() });
-            assert_eq!(full, capped, "reduced={reduced}");
+    fn cone_config_independent() {
+        for (name, l, chunks) in [
+            ("3_1", InvLink::test_data("3_1"), 2),
+            ("4_1", InvLink::test_data("4_1"), 2),
+            ("6_3", InvLink::test_data("6_3"), 3),
+        ] {
+            check_configs_agree(name, &l, &[
+                ("default",            SymBuildConfig::default()),
+                ("no-full-deloop",     SymBuildConfig { no_full_deloop: true, ..Default::default() }),
+                ("chunked",            SymBuildConfig { cut: CutOption::Auto(chunks), ..Default::default() }),
+                ("chunked, no-deloop", SymBuildConfig { cut: CutOption::Auto(chunks), no_full_deloop: true, ..Default::default() }),
+                ("chunked, cap 0",     SymBuildConfig { cut: CutOption::Auto(chunks), max_elim_cost: Some(0), ..Default::default() }),
+                ("elim cap 4",         SymBuildConfig { max_elim_cost: Some(4), ..Default::default() }),
+                ("min-fill",           SymBuildConfig { strategy: Strategy::MinFill, ..Default::default() }),
+                ("no-elim",            SymBuildConfig { strategy: Strategy::NoElim, ..Default::default() }),
+                ("no-simplify",        SymBuildConfig { strategy: Strategy::None, ..Default::default() }),
+            ]);
         }
     }
 
+    // A windowed build's endpoint homology is wrong by construction, so only `d <= 0` compares.
     #[test]
     fn cone_windowed_chunked_9_46() {
         let l = InvLink::sym_pretzel(-3, 3, -3); // 9_46
-        let config = SymBuildConfig { cut: CutOption::Auto(2), strategy: Strategy::MinFill, h_range: Some(-64 ..= 1), ..Default::default() };
+        let window = Some(-64 ..= 1);
+        let narrow = |h: Vec<(isize, usize)>| h.into_iter().filter(|&(d, _)| d <= 0).collect_vec();
+
         for reduced in [false, true] {
-            let full = cone_homology(&l, reduced, SymBuildConfig { h_range: Some(-64 ..= 1), ..Default::default() });
-            let direct = cone_homology(&l, reduced, SymBuildConfig { ..config.clone() });
-            let narrow = |h: Vec<(isize, usize)>| h.into_iter().filter(|&(d, _)| d <= 0).collect_vec();
-            assert_eq!(narrow(full), narrow(direct), "reduced={reduced}");
+            let plain = cone_homology(&l, reduced, SymBuildConfig {
+                h_range: window.clone(), ..Default::default()
+            }, false);
+            let chunked = cone_homology(&l, reduced, SymBuildConfig {
+                cut: CutOption::Auto(2), strategy: Strategy::MinFill, h_range: window.clone(), ..Default::default()
+            }, false);
+            assert_eq!(narrow(plain), narrow(chunked), "reduced={reduced}");
         }
     }
 
-    #[test]
-    fn cone_chunk_independent_3_1() {
-        check_chunk_independent(&InvLink::test_data("3_1"), 2);
-    }
-
-    #[test]
-    fn cone_chunk_independent_4_1() {
-        check_chunk_independent(&InvLink::test_data("4_1"), 2);
-    }
-
-    #[test]
-    fn cone_chunk_independent_6_3() {
-        check_chunk_independent(&InvLink::test_data("6_3"), 3);
-    }
-
-    // The cone homology must not depend on the simplification strategy.
-    #[test]
-    fn cone_strategy_independent() {
-        let l = InvLink::test_data("6_3");
-        let reference = cone_homology(&l, false, SymBuildConfig::default());
-        for strategy in [Strategy::MinFill, Strategy::NoElim, Strategy::None] {
-            let h = cone_homology(&l, false, SymBuildConfig { strategy, ..Default::default() });
-            assert_eq!(h, reference, "strategy {strategy:?}");
-        }
-    }
+    // ---- the canon classes ----
 
     // The cone's canon classes must give the same ssi as the matrix cone.
     #[test]

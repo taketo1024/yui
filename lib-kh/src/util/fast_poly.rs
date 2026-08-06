@@ -6,6 +6,7 @@ use auto_impl_ops::auto_ops;
 
 use yui_core::poly::{Mono, Poly};
 use yui_core::util::format::{lc, superscript};
+use yui_core::util::parse_err::ParseErr;
 use yui_core::abst::{AddGrp, AddGrpOps, AddMon, AddMonOps, MathType, EucRing, EucRingOps, Field, FieldOps, Mon, MonOps, Ring, RingOps};
 
 // Homogeneous polynomial
@@ -59,18 +60,19 @@ where R: Display + Zero {
 
 impl<const X: char, R> FromStr for FastPoly<X, R>
 where R: Ring + FromStr, for<'x> &'x R: RingOps<R> {
-    type Err = ();
+    type Err = ParseErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let p = Poly::<X, R>::from_str(s)?;
-        if p.is_zero() { 
+        if p.is_zero() {
             Ok(Self::zero())
-        } else if p.nterms() == 1 { 
+        } else if p.nterms() == 1 {
             let (x, a) = p.any_term().unwrap();
             let p = Self::new(x.deg(), a.clone());
             Ok(p)
         } else {
-            Err(())
+            // a FastPoly holds a single term by construction.
+            Err(ParseErr::new(format!("\"{s}\" has {} terms; expected a monomial", p.nterms())))
         }
     }
 }
@@ -446,7 +448,11 @@ mod tests {
         assert_eq!(P::from_str("x"), Ok(P::variable()));
         assert_eq!(P::from_str("x^2"), Ok(P::new(2, 1)));
         // assert_eq!(P::from_str("3x^2"), Ok(P::new(2, 3))); // not supported yet
-        assert_eq!(P::from_str("x + 1"), Err(()));
+
+        // a sum is rejected by `Poly`'s own parser (which takes a const or a bare variable),
+        // so the error propagates from there rather than from the nterms guard below.
+        let e = P::from_str("x + 1").unwrap_err();
+        assert_eq!(e.to_string(), "cannot parse \"x + 1\" as Z[x]");
     }
 
     #[test]

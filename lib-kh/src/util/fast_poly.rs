@@ -120,11 +120,9 @@ where R: Eq + Zero {}
 impl<const X: char, R> AddAssign<&FastPoly<X, R>> for FastPoly<X, R>
 where R: AddMon, for<'x> &'x R: AddMonOps<R> {
     fn add_assign(&mut self, rhs: &FastPoly<X, R>) {
-        if self.is_zero() { 
+        if self.is_zero() {
             *self = rhs.clone()
-        } else if rhs.is_zero() { 
-            return
-        } else { 
+        } else if !rhs.is_zero() {
             assert_eq!(self.deg, rhs.deg, "{self} + {rhs} is not homogeneous.");
             self.coeff.add_assign(&rhs.coeff)
         }
@@ -135,11 +133,9 @@ where R: AddMon, for<'x> &'x R: AddMonOps<R> {
 impl<const X: char, R> SubAssign<&FastPoly<X, R>> for FastPoly<X, R>
 where R: AddGrp, for<'x> &'x R: AddGrpOps<R> {
     fn sub_assign(&mut self, rhs: &FastPoly<X, R>) {
-        if self.is_zero() { 
+        if self.is_zero() {
             *self = -rhs
-        } else if rhs.is_zero() { 
-            return
-        } else { 
+        } else if !rhs.is_zero() {
             assert_eq!(self.deg, rhs.deg, "{self} - {rhs} is not homogeneous.");
             self.coeff.sub_assign(&rhs.coeff)
         }

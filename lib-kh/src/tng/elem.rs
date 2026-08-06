@@ -81,14 +81,13 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         assert!(self.is_evalable());
 
         let init = LcCob::from(self.in_cob.clone());
-        let eval = self.out_cob.iter().map(|(k, retr)| {
+
+        self.out_cob.iter().map(|(k, retr)| {
             let x = k.as_gen();
             let f = init.stack(retr);
             let r = f.eval(h, t);
             (x, r)
-        }).collect::<KhChain<R>>();
-
-        eval
+        }).collect::<KhChain<R>>()
     }
 
     // Invariant (debug-only): no zero `out_cob` value; all `out_cob` terms share one source; every
@@ -129,7 +128,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
             vec![true, false]
         };
 
-        let cycles = ori.into_iter().map(|o| {
+        ori.into_iter().map(|o| {
             let cob = Cob::new(
                 circles.iter().map(|(circ, col)| {
                     let marked = base_pt.map(|b| circ.contains(b)).unwrap_or(false);
@@ -139,9 +138,7 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
                 })
             );
             TngComplexElem::new(state_map.clone(), cob, base_pt)
-        }).collect();
-
-        cycles
+        }).collect()
     }
 }
 

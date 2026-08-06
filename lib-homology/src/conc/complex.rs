@@ -290,7 +290,7 @@ where
     /// Homology at the given indices only, using the full differentials.
     pub fn homology_in(&self, support: impl IntoIterator<Item = I>) -> GrMod<I, X, R> {
         GrMod::generate_filtered(
-            support.into_iter(),
+            support,
             |i| {
                 let hi = self.homology_at(i);
                 (!hi.is_zero()).then_some(hi)
@@ -314,7 +314,7 @@ where
     /// Trans-free homology at the given indices only, using the full differentials.
     pub fn generic_homology_in(&self, support: impl IntoIterator<Item = I>) -> GenericGrMod<I, R> {
         GrMod::generate_filtered(
-            support.into_iter(),
+            support,
             |i| {
                 let hi = self.generic_homology_at(i);
                 (!hi.is_zero()).then_some(hi)

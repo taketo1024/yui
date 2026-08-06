@@ -212,7 +212,7 @@ impl CobComp {
 
     pub fn is_zero_cob(&self) -> bool {
         self.is_closed() && 
-        self.genus % 2 == 0 &&
+        self.genus.is_multiple_of(2) &&
         self.dots.0 == self.dots.1 // XY = T
     }
 
@@ -691,8 +691,8 @@ impl Cob {
         let mut src = Tng::empty();
         let mut tgt = Tng::empty();
         let mut dots = (0, 0);
-        let mut x = 0 as i32;
-        let mut a = 0 as i32;
+        let mut x = 0_i32;
+        let mut a = 0_i32;
 
         let mut bot_unproc = bot.len();
         let mut top_unproc = top.len();

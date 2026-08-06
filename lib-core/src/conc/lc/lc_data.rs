@@ -14,24 +14,17 @@ use super::lc_key::LcKey;
 ///
 /// The `*_unreduced` methods may break these invariants; every other mutating
 /// method restores them. [`LcData::reduce`] restores them on demand.
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Default, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub(super) enum LcData<X, R>
 where
     X: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
+    #[default]
     Zero,
     Single(X, R),
     Many(FxHashMap<X, R>),
-}
-
-impl<X, R> Default for LcData<X, R>
-where
-    X: LcKey,
-    R: Ring, for<'x> &'x R: RingOps<R>
-{
-    fn default() -> Self { Self::Zero }
 }
 
 impl<X, R> LcData<X, R>

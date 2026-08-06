@@ -242,7 +242,7 @@ mod tests {
         let d3 = MultiDeg::from_iter([(0, 1), (1, -2), (2, 3), (3, 1)]);
 
         let state = std::collections::hash_map::RandomState::new();
-        let hash = |d: &MultiDeg<_>| state.hash_one(&d);
+        let hash = |d: &MultiDeg<_>| state.hash_one(d);
 
         assert_eq!(hash(&d1), hash(&d2));
         assert_ne!(hash(&d1), hash(&d3));

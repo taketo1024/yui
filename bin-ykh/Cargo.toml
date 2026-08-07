@@ -15,7 +15,6 @@ doctest = false
 [features]
 i128 = []
 bigint = []
-mimalloc = ["dep:mimalloc"]
 
 [dependencies]
 clap = { version = "4.6.1", features = ["derive", "cargo"] }
@@ -28,7 +27,6 @@ regex = "1.12.3"
 serde_json = "1.0.149"
 cfg-if = "1.0.4"
 itertools = "0.15.0"
-mimalloc = { version = "0.1", optional = true }
 yui-core.workspace = true
 yui-link.workspace = true
 yui-matrix.workspace = true

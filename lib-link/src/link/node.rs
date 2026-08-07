@@ -184,6 +184,17 @@ impl Node {
         )
     }
 
+    // Reverse both strands: each now enters by the slot it used to leave. The two incoming slots
+    // stay on different strands, so orientability — and the sign — survive.
+    pub fn reversed(&self) -> Self {
+        self.clone_and(|x|
+            x.incoming = self.incoming.map(|(p, q)| {
+                let (p, q) = (self.paired_slot(p), self.paired_slot(q));
+                (p.min(q), p.max(q))
+            })
+        )
+    }
+
     pub fn is_adj_to(&self, x: &Node) -> bool {
         self.edges.iter().any(|e| x.edges.contains(e))
     }

@@ -227,6 +227,18 @@ impl InvLink {
         }
     }
 
+    // Reverse the orientation. `τ` is untouched: it is a map of edges, and reversing renames
+    // nothing — so a strong inversion stays one.
+    pub fn reversed(&self) -> Self {
+        Self {
+            inner: self.inner.reversed(),
+            e_map: self.e_map.clone(),
+            x_map: self.x_map.iter().map(|(x, y)|
+                (x.reversed(), y.reversed())
+            ).collect(),
+        }
+    }
+
     // Equivariant connected sum: splice self's other on-axis edge to other's base point, so self's
     // base point survives as the sum's.
     pub fn conn_sum(&self, other: &InvLink) -> InvLink {
@@ -480,6 +492,21 @@ mod tests {
         let canon = |k: &InvLink| k.inner().reindexed_canon();
         assert_ne!(canon(&sums[0]), canon(&sums[1]), "the two sides must give different diagrams");
         assert_eq!(canon(&k1.conn_sum(&k2)), canon(&sums[0]), "conn_sum splices at other's base point");
+    }
+
+    #[test]
+    fn inv_link_reversed() {
+        let k = InvLink::test_data("3_1");
+        let r = k.reversed();
+
+        assert!(r.inner().is_oriented());
+        assert!(r.is_strongly_invertible(), "reversing does not disturb the axis");
+        assert_eq!(r.writhe(), k.writhe());
+        assert_eq!(r.on_axis_edges(), k.on_axis_edges(), "τ is a map of edges, unchanged");
+        for e in k.inner().edges() {
+            assert_eq!(r.inv_edge(e), k.inv_edge(e));
+        }
+        assert_eq!(r.reversed().inner(), k.inner(), "reversing twice is the identity");
     }
 
     #[test]

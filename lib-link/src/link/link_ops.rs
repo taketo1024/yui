@@ -74,6 +74,21 @@ impl Link {
         }
     }
 
+    // Reverse the orientation. Both strands of every crossing turn around together, so the signs
+    // — hence the writhe — are unchanged; only the direction of travel is.
+    pub fn reversed(&self) -> Self {
+        let l = Self::new(
+            self.nodes().map(|x| x.reversed()),
+            self.loops().iter().copied(),
+        );
+        // `new` defaults the base point to the minimal edge; reversing keeps the edge set, so the
+        // original one is still valid.
+        match self.base_pt() {
+            Some(e) => l.with_base_pt(e),
+            None => l,
+        }
+    }
+
     pub fn cc_at(&self, i: usize) -> Self {
         assert!(self.node(i).is_crossing());
         self.clone_and(|l|
@@ -163,6 +178,30 @@ mod tests {
     use crate::{Braid, Node};
     use crate::NodeType::{XL, XR};
     use crate::misc::jones_polynomial;
+
+    #[test]
+    fn link_reversed() {
+        let l = Link::test_data("3_1");
+        let r = l.reversed();
+
+        assert!(r.is_oriented());
+        assert_eq!(r.writhe(), l.writhe(), "reversing a knot keeps every crossing sign");
+        assert_eq!(r.base_pt(), l.base_pt());
+
+        // the underlying diagram is untouched — only the direction of travel changes.
+        for (x, y) in Iterator::zip(l.nodes(), r.nodes()) {
+            assert_eq!(y.node_type(), x.node_type());
+            assert_eq!(y.edges(), x.edges());
+        }
+        assert_eq!(r.reversed(), l, "reversing twice is the identity");
+
+        // the two incoming slots move to the far end of their own strands.
+        for (x, y) in Iterator::zip(l.nodes(), r.nodes()) {
+            let (p, q) = x.incoming().unwrap();
+            assert_eq!(y.incoming(), Some((x.paired_slot(p).min(x.paired_slot(q)),
+                                           x.paired_slot(p).max(x.paired_slot(q)))));
+        }
+    }
 
     #[test]
     fn link_mirror() {

@@ -43,20 +43,18 @@ impl Link {
         b.connect(t1, h2);  // self tail → other head
         b.connect(t2, h1);  // other tail → self head
 
-        // A base point elsewhere survives the splice; one sitting on the consumed `self_e` moves
-        // onto the band, taking the `self tail → other head` side. Read the ids off before `build`
-        // renumbers. Basing on the band matters for `K # K`, whose axis is the band itself.
+        // A base point elsewhere survives; one on the consumed `self_e` moves to the band edge
+        // entering `self`, so the traversal covers `self` first. Read the ids before `build` renumbers.
         let base = self.base_pt().map(|e|
             if e != self_e {
                 b.edge_at(port(&v1, self.edge_ends(e, false).0)).unwrap()
             } else {
-                b.edge_at(t1).unwrap()
+                b.edge_at(h1).unwrap()
             }
         );
 
-        // Orientation is inherited: the splice runs tail → head both ways, so every node keeps the
-        // incoming slots it had in its own summand. Plain `build` only knows that *some* port is
-        // incoming, and would be free to reverse the whole diagram.
+        // Each node keeps its own summand's incoming slots; plain `build` would be free to reverse
+        // the whole diagram.
         let n1 = self.n_nodes();
         let sum = b.build_with(|i, s| {
             let (l, i) = if i < n1 { (self, i) } else { (other, i - n1) };
@@ -324,63 +322,55 @@ mod tests {
         assert_eq!(&vcs * &vu, &v1 * &v2);
     }
 
-    // The four curl sums below come out on the builder's own labelling, so each PD code matches
-    // with no reindexing: the band edges are 1 and 3, each curl keeps its own loop (2 and 4).
-    // The splice consumes the base point, which lands on the band at edge 3.
+    // The four curl sums below need no reindexing: the band edges are 1 and 3, each curl keeps
+    // its own loop (2 and 4), and the base point moves to the band edge entering `self`.
 
     #[test]
     fn conn_sum_of_two_curls() {
-        // The smallest non-trivial splice: the 1-crossing left curl with itself is the two-curl
-        // unknot diagram. Pins the resulting *diagram*, not just an invariant of it.
+        // The 1-crossing left curl with itself: the two-curl unknot diagram.
         let k = Link::test_data("unknot_l_twist");
         let cs = k.conn_sum(&k);
         assert_eq!(cs.pd_code(), [[1,3,2,2],[3,1,4,4]]);
-        assert_eq!(cs.base_pt(), Some(3));
+        assert_eq!(cs.base_pt(), Some(1));
     }
 
     #[test]
     fn conn_sum_of_a_curl_and_its_reverse() {
-        // Same splice with the second curl traversed the other way: the summand enters the band
-        // by its other end, so the two curls sit head-to-head.
+        // Reversing the second curl enters the band by its other end: the curls sit head-to-head.
         let k = Link::test_data("unknot_l_twist");
         let cs = k.conn_sum(&k.reversed());
         assert_eq!(cs.pd_code(), [[1,3,2,2],[4,4,1,3]]);
-        assert_eq!(cs.base_pt(), Some(3));
+        assert_eq!(cs.base_pt(), Some(1));
     }
 
     #[test]
     fn conn_sum_of_a_curl_and_its_mirror() {
-        // Mirroring flips the crossing sign but not the direction of travel, so the sum is the
-        // R2-cancelling pair — a different diagram from the reversed case above.
+        // Mirroring flips the sign but not the direction: the R2-cancelling pair.
         let k = Link::test_data("unknot_l_twist");
         let cs = k.conn_sum(&k.mirror());
         assert_eq!(cs.pd_code(), [[1,3,2,2],[4,3,1,4]]);
-        assert_eq!(cs.base_pt(), Some(3));
+        assert_eq!(cs.base_pt(), Some(1));
     }
 
     #[test]
     fn conn_sum_of_a_curl_and_its_concordance_inverse() {
-        // Mirror *and* reverse: the fourth of the four ways to glue the second curl on, and the
-        // fourth distinct diagram.
+        // Mirror *and* reverse: the fourth gluing, and the fourth distinct diagram.
         let k = Link::test_data("unknot_l_twist");
         let cs = k.conn_sum(&k.mirror().reversed());
         assert_eq!(cs.pd_code(), [[1,3,2,2],[3,4,4,1]]);
-        assert_eq!(cs.base_pt(), Some(3));
+        assert_eq!(cs.base_pt(), Some(1));
     }
 
     #[test]
     fn conn_sum_at_of_two_curls_away_from_the_base_pt() {
-        // Splicing at edge 2 instead — the curl's own loop — gives the two-curl diagram bundled as
-        // `unknot_l_twist2`. Edge 1 carries the base point and the splice leaves it alone, so it
-        // survives in place rather than moving onto the band.
+        // Splicing at edge 2 — the curl's own loop — gives `unknot_l_twist2`. The splice spares
+        // edge 1, so the base point stays there instead of moving onto the band.
         let k = Link::test_data("unknot_l_twist");
         let cs = k.conn_sum_at(&k, 2, 2);
         assert_eq!(cs.base_pt(), Some(1));
 
-        // Unlike the four sums above, the raw code is [[1,1,4,2],[3,3,2,4]]: `LinkBuilder::build`
-        // numbers edges in `connect` order, and here the two band edges are connected last, so
-        // they take the highest ids instead of following the strand. Renumbering along the
-        // orientation from the base point recovers the expected labelling.
+        // Raw is [[1,1,4,2],[3,3,2,4]]: `build` numbers edges in `connect` order, not along the
+        // strand, so compare after renumbering from the base point.
         assert_eq!(cs.reindexed(1, 1).pd_code(), [[1,1,2,4],[3,3,4,2]]);
         assert_eq!(cs.reindexed(1, 1).pd_code(), Link::test_data("unknot_l_twist2").pd_code());
     }
@@ -391,18 +381,15 @@ mod tests {
         let k = Link::test_data("unknot_l_twist");
         let cs = k.conn_sum_at(&k, 2, 1);
         assert_eq!(cs.base_pt(), Some(1));
-        // raw is [[1,1,3,2],[3,2,4,4]], and the target below is not traversal-numbered either, so
-        // both sides are renumbered from the base point before comparing.
+        // Raw is [[1,1,3,2],[3,2,4,4]], and the target is not traversal-numbered either.
         let expected = Link::from_pd_code([[1,1,2,3],[2,3,4,4]]);
         assert_eq!(cs.reindexed(1, 1).pd_code(), expected.reindexed(1, 1).pd_code());
     }
 
     #[test]
     fn conn_sum_keeps_each_summand_orientation() {
-        // The splice joins tail to head both ways, so every node keeps the incoming slots it had
-        // in its own summand. `add_link` appends self's nodes then other's, in order.
-        // Reversing a summand is the case that catches it: a PD-loaded diagram happens to have
-        // node 0's SW incoming, which is also what an unconstrained `build` picks.
+        // Every node keeps its own summand's incoming slots (`add_link` appends self's nodes,
+        // then other's). Reversing catches it: a PD diagram has node 0's SW incoming anyway.
         for (a, b) in [("3_1", "4_1"), ("4_1", "3_1"), ("unknot_l_twist", "3_1"), ("6_2", "5_1")] {
             for (rev1, rev2) in [(false, false), (true, false), (false, true), (true, true)] {
                 let k1 = Link::test_data(a).clone_and(|l| if rev1 { *l = l.reversed() });

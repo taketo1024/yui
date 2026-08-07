@@ -54,7 +54,15 @@ impl Link {
             }
         );
 
-        let sum = b.build().unwrap();
+        // Orientation is inherited: the splice runs tail → head both ways, so every node keeps the
+        // incoming slots it had in its own summand. Plain `build` only knows that *some* port is
+        // incoming, and would be free to reverse the whole diagram.
+        let n1 = self.n_nodes();
+        let sum = b.build_with(|i, s| {
+            let (l, i) = if i < n1 { (self, i) } else { (other, i - n1) };
+            l.node(i).is_incoming(Slot::from(s))
+        }).unwrap();
+
         match base {
             Some(e) => sum.with_base_pt(e),
             None => sum,
@@ -387,6 +395,30 @@ mod tests {
         // both sides are renumbered from the base point before comparing.
         let expected = Link::from_pd_code([[1,1,2,3],[2,3,4,4]]);
         assert_eq!(cs.reindexed(1, 1).pd_code(), expected.reindexed(1, 1).pd_code());
+    }
+
+    #[test]
+    fn conn_sum_keeps_each_summand_orientation() {
+        // The splice joins tail to head both ways, so every node keeps the incoming slots it had
+        // in its own summand. `add_link` appends self's nodes then other's, in order.
+        // Reversing a summand is the case that catches it: a PD-loaded diagram happens to have
+        // node 0's SW incoming, which is also what an unconstrained `build` picks.
+        for (a, b) in [("3_1", "4_1"), ("4_1", "3_1"), ("unknot_l_twist", "3_1"), ("6_2", "5_1")] {
+            for (rev1, rev2) in [(false, false), (true, false), (false, true), (true, true)] {
+                let k1 = Link::test_data(a).clone_and(|l| if rev1 { *l = l.reversed() });
+                let k2 = Link::test_data(b).clone_and(|l| if rev2 { *l = l.reversed() });
+                let cs = k1.conn_sum(&k2);
+                let n1 = k1.n_nodes();
+                let case = format!("{a}{} # {b}{}", if rev1 { "*" } else { "" }, if rev2 { "*" } else { "" });
+
+                for (i, x) in k1.nodes().enumerate() {
+                    assert_eq!(cs.node(i).incoming(), x.incoming(), "{case}: node {i} of {a}");
+                }
+                for (i, x) in k2.nodes().enumerate() {
+                    assert_eq!(cs.node(n1 + i).incoming(), x.incoming(), "{case}: node {i} of {b}");
+                }
+            }
+        }
     }
 
     #[test]

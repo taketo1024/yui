@@ -11,18 +11,22 @@ env:
 
 jobs:
   build:
-    name: build & test (${{ matrix.profile }})
+    name: build & test (${{ matrix.toolchain }}, ${{ matrix.profile }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
+        # "1.88" is the declared `rust-version` in [workspace.package] — keep the two in step.
+        # "stable" catches breakage from newer compilers before it reaches a release.
+        toolchain: ["1.88", "stable"]
         profile: [debug, release]
     steps:
     - uses: actions/checkout@v4
-    # keep in step with `rust-version` in [workspace.package]
-    - uses: dtolnay/rust-toolchain@1.88
+    - uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ matrix.toolchain }}
     - name: Select the cargo profile
-      run: echo "FLAGS=${{ matrix.profile == 'release' && '--release' || '' }}" >> "$GITHUB_ENV"
+      run: echo "FLAGS=--locked ${{ matrix.profile == 'release' && '--release' || '' }}" >> "$GITHUB_ENV"
 
     - name: Build yui-core
       run: cargo build --verbose $FLAGS -p yui-core

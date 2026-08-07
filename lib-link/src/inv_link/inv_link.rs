@@ -79,7 +79,7 @@ impl InvLink {
 
     // A strongly invertible knot, given a diagram based on its axis. τ reverses the traversal, so
     // walking both ways from the base point pairs each edge with its image.
-    pub(super) fn si_knot_from(inner: Link) -> InvLink {
+    pub fn si_knot_from(inner: Link) -> InvLink {
         assert!(inner.is_knot(), "expected a knot, found {} components", inner.n_comps());
         let base = inner.base_pt().expect("the diagram needs a base point on the axis");
         let comps = inner.comps();

@@ -115,17 +115,15 @@ macro_rules! impl_bit_repr {
 impl_bit_repr!(u8, u16, u32, u64, u128);
 
 /// A sequence of [`Bit`]s of length up to [`MAX_LEN`](BitSeq::MAX_LEN) = `I::BITS`,
-/// packed into a single word `I` (default `u64`). The bit at index `i` is stored at
+/// packed into a single word `I`. The bit at index `i` is stored at
 /// position `i` of `val`, i.e. the least-significant bit of `val` is `self[0]`.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde_with::SerializeDisplay, serde_with::DeserializeFromStr))]
-pub struct BitSeq<I: BitRepr = u64> {
+pub struct BitSeq<I: BitRepr> {
     val: I,
     len: usize
 }
 
-// Width-pinned aliases. The `I = u64` default applies in type position but not to associated-
-// function calls, so `BitSeq::generate(n)` leaves `I` unconstrained — use `BitSeq64::generate(n)`.
 macro_rules! impl_bitseq_alias {
     ($($name:ident => $t:ty),* $(,)?) => {$(
         #[doc = concat!("[`BitSeq`] packed into a `", stringify!($t), "`.")]
@@ -424,11 +422,10 @@ mod tests {
     use itertools::Itertools;
     use super::*;
 
-    type B = BitSeq;
+    type B = BitSeq64;
 
     #[test]
     fn width_aliases() {
-        // the point of the aliases: `I` is pinned, so this resolves where `BitSeq::generate` cannot.
         assert_eq!(BitSeq64::generate(3).count(), 8);
 
         assert_eq!(BitSeq8::MAX_LEN, 8);

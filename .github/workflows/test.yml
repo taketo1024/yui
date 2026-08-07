@@ -19,7 +19,8 @@ jobs:
         profile: [debug, release]
     steps:
     - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@1.85
+    # keep in step with `rust-version` in [workspace.package]
+    - uses: dtolnay/rust-toolchain@1.88
     - name: Select the cargo profile
       run: echo "FLAGS=${{ matrix.profile == 'release' && '--release' || '' }}" >> "$GITHUB_ENV"
 

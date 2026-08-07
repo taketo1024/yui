@@ -394,6 +394,50 @@ mod tests {
     }
 
     #[test]
+    fn dms_construction() {
+        // The `2K # (-2K)` diagram of Dai-Mallick-Stoffregen (`references/DMS.pdf` §1.2), built one
+        // splice at a time. `pd_code` lists crossings in traversal order, so each target goes
+        // through `from_pd_code` first — the listing order is not part of the diagram.
+        let k = Link::from_pd_code([[1,4,2,5],[5,2,6,3],[3,6,4,1]]);
+        let mk = k.mirror();
+
+        // `2K`: the band entering takes edge 1, K keeps 2..6, the band leaving takes 7, and the
+        // second copy follows as 8..12.
+        let k2 = k.conn_sum(&k);
+        assert_eq!(k2.pd_code(), Link::from_pd_code([
+            [1,4,2,5],[5,2,6,3],[3,6,4,7],[7,10,8,11],[11,8,12,9],[9,12,10,1],
+        ]).pd_code());
+        assert_eq!(k2.base_pt(), Some(1));
+
+        // `2K # K` at edge 7, away from the base: the band entering keeps 7, the band leaving takes
+        // the other summand's spliced edge, 12 + 1 = 13.
+        let with_k = k2.conn_sum_at(&k, 7, 1);
+        assert_eq!(with_k.pd_code(), Link::from_pd_code([
+            [1,4,2,5],[5,2,6,3],[3,6,4,13],[7,10,8,11],[11,8,12,9],[9,12,10,1],
+            [13,16,14,17],[17,14,18,15],[15,18,16,7],
+        ]).pd_code());
+        assert_eq!(with_k.base_pt(), Some(1));
+
+        // `2K # m(K)` — the same splice mirrored: the band edges are unchanged, only the three
+        // added crossings switch handedness.
+        let with_mk = k2.conn_sum_at(&mk, 7, 1);
+        assert_eq!(with_mk.pd_code(), Link::from_pd_code([
+            [1,4,2,5],[5,2,6,3],[3,6,4,13],[7,10,8,11],[11,8,12,9],[9,12,10,1],
+            [16,14,17,13],[14,18,15,17],[18,16,7,15],
+        ]).pd_code());
+        assert_eq!(with_mk.base_pt(), Some(1));
+
+        // `2K # m(K) # r(m(K))` at edge 16: the band entering keeps 16, the band leaving takes 19.
+        let dms = with_mk.conn_sum_at(&mk.reversed(), 16, 1);
+        assert_eq!(dms.pd_code(), Link::from_pd_code([
+            [1,4,2,5],[5,2,6,3],[3,6,4,13],[7,10,8,11],[11,8,12,9],[9,12,10,1],
+            [16,14,17,13],[14,18,15,17],[18,19,7,15],
+            [19,21,24,22],[21,23,20,24],[23,16,22,20],
+        ]).pd_code());
+        assert_eq!(dms.base_pt(), Some(1));
+    }
+
+    #[test]
     fn conn_sum_keeps_each_summand_orientation() {
         // Every node keeps its own summand's incoming slots (`add_link` appends self's nodes,
         // then other's). Reversing catches it: a PD diagram has node 0's SW incoming anyway.

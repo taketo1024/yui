@@ -316,6 +316,50 @@ mod tests {
         assert_eq!(&vcs * &vu, &v1 * &v2);
     }
 
+    // The four curl sums below come out on the builder's own labelling, so each PD code matches
+    // with no reindexing: the band edges are 1 and 3, each curl keeps its own loop (2 and 4).
+    // The splice consumes the base point, which lands on the band at edge 3.
+
+    #[test]
+    fn conn_sum_of_two_curls() {
+        // The smallest non-trivial splice: the 1-crossing left curl with itself is the two-curl
+        // unknot diagram. Pins the resulting *diagram*, not just an invariant of it.
+        let k = Link::test_data("unknot_l_twist");
+        let cs = k.conn_sum(&k);
+        assert_eq!(cs.pd_code(), [[1,3,2,2],[3,1,4,4]]);
+        assert_eq!(cs.base_pt(), Some(3));
+    }
+
+    #[test]
+    fn conn_sum_of_a_curl_and_its_reverse() {
+        // Same splice with the second curl traversed the other way: the summand enters the band
+        // by its other end, so the two curls sit head-to-head.
+        let k = Link::test_data("unknot_l_twist");
+        let cs = k.conn_sum(&k.reversed());
+        assert_eq!(cs.pd_code(), [[1,3,2,2],[4,4,1,3]]);
+        assert_eq!(cs.base_pt(), Some(3));
+    }
+
+    #[test]
+    fn conn_sum_of_a_curl_and_its_mirror() {
+        // Mirroring flips the crossing sign but not the direction of travel, so the sum is the
+        // R2-cancelling pair — a different diagram from the reversed case above.
+        let k = Link::test_data("unknot_l_twist");
+        let cs = k.conn_sum(&k.mirror());
+        assert_eq!(cs.pd_code(), [[1,3,2,2],[4,3,1,4]]);
+        assert_eq!(cs.base_pt(), Some(3));
+    }
+
+    #[test]
+    fn conn_sum_of_a_curl_and_its_concordance_inverse() {
+        // Mirror *and* reverse: the fourth of the four ways to glue the second curl on, and the
+        // fourth distinct diagram.
+        let k = Link::test_data("unknot_l_twist");
+        let cs = k.conn_sum(&k.mirror().reversed());
+        assert_eq!(cs.pd_code(), [[1,3,2,2],[3,4,4,1]]);
+        assert_eq!(cs.base_pt(), Some(3));
+    }
+
     #[test]
     #[should_panic(expected = "free loops is not supported")]
     fn conn_sum_rejects_a_free_loop_base_pt() {

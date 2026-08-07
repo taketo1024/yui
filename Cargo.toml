@@ -13,7 +13,7 @@ resolver = "3"
 authors = ["Taketo Sano <taketo1024@gmail.com>"]
 license = "MIT"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.89"   # floor set by nalgebra 0.35
 repository = "https://github.com/taketo1024/yui"
 
 [workspace.dependencies]

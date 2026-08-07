@@ -16,9 +16,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # "1.88" is the declared `rust-version` in [workspace.package] — keep the two in step.
+        # "1.89" is the declared `rust-version` in [workspace.package] — keep the two in step.
         # "stable" catches breakage from newer compilers before it reaches a release.
-        toolchain: ["1.88", "stable"]
+        toolchain: ["1.89", "stable"]
         profile: [debug, release]
     steps:
     - uses: actions/checkout@v4

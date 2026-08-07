@@ -41,7 +41,10 @@ where X: LcKey, R: Ring, for<'x> &'x R: RingOps<R> {
 
     pub fn from_raw_generators<Itr>(raw_gens: Itr) -> Self
     where Itr: IntoIterator<Item = X> {
-        let gens = raw_gens.into_iter().collect::<IndexSet<X>>();
+        let mut n = 0;
+        let gens = raw_gens.into_iter().inspect(|_| n += 1).collect::<IndexSet<X>>();
+        assert_eq!(gens.len(), n, "raw generators must be distinct");
+
         let r = gens.len();
         Self::new(gens, r, vec![], Trans::id(r))
     }
@@ -227,6 +230,12 @@ mod tests {
     type X = AsKey<i32>;
     fn e(i: isize) -> X {
         X::from(i as i32)
+    }
+
+    #[test]
+    #[should_panic(expected = "raw generators must be distinct")]
+    fn from_raw_generators_rejects_duplicates() {
+        Summand::<X, i32>::from_raw_generators([e(0), e(1), e(0)]);
     }
 
     #[test]

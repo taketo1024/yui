@@ -3,6 +3,7 @@
 use core::fmt;
 use std::fmt::{Display, Debug};
 use std::hash::Hash;
+use std::iter::successors;
 use std::ops::{Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, Index, Not, Shl, Shr, ShrAssign, Sub};
 use std::str::FromStr;
 use auto_impl_ops::auto_ops;
@@ -30,10 +31,6 @@ impl Bit {
 
     pub fn is_one(&self) -> bool {
         self == &Bit::Bit1
-    }
-
-    pub fn as_u64(&self) -> u64 {
-        if self.is_zero() { 0 } else { 1 }
     }
 }
 
@@ -80,7 +77,7 @@ pub trait BitRepr:
     + BitOr<Output = Self> + BitOrAssign
     + Not<Output = Self>
     + Shl<usize, Output = Self> + Shr<usize, Output = Self> + ShrAssign<usize>
-    + Sub<Output = Self>
+    + Add<Output = Self> + Sub<Output = Self>
 {
     const BITS: usize;
     const ZERO: Self;
@@ -89,8 +86,7 @@ pub trait BitRepr:
 
     fn count_ones(self) -> u32;
     fn reverse_bits(self) -> Self;
-    fn from_u128(v: u128) -> Self;
-    fn to_u128(self) -> u128;
+    fn to_usize(self) -> Option<usize>;
 }
 
 macro_rules! impl_bit_repr {
@@ -109,12 +105,8 @@ macro_rules! impl_bit_repr {
                 <$t>::reverse_bits(self)
             }
 
-            fn from_u128(v: u128) -> Self {
-                v as $t
-            }
-
-            fn to_u128(self) -> u128 {
-                self as u128
+            fn to_usize(self) -> Option<usize> {
+                usize::try_from(self).ok()
             }
         }
     )*};
@@ -131,6 +123,23 @@ pub struct BitSeq<I: BitRepr = u64> {
     val: I,
     len: usize
 }
+
+// Width-pinned aliases. The `I = u64` default applies in type position but not to associated-
+// function calls, so `BitSeq::generate(n)` leaves `I` unconstrained — use `BitSeq64::generate(n)`.
+macro_rules! impl_bitseq_alias {
+    ($($name:ident => $t:ty),* $(,)?) => {$(
+        #[doc = concat!("[`BitSeq`] packed into a `", stringify!($t), "`.")]
+        pub type $name = BitSeq<$t>;
+    )*};
+}
+
+impl_bitseq_alias!(
+    BitSeq8   => u8,
+    BitSeq16  => u16,
+    BitSeq32  => u32,
+    BitSeq64  => u64,
+    BitSeq128 => u128,
+);
 
 impl<I: BitRepr> BitSeq<I> {
     pub const MAX_LEN: usize = I::BITS;
@@ -168,8 +177,16 @@ impl<I: BitRepr> BitSeq<I> {
         self.len
     }
 
-    pub fn as_u128(&self) -> u128 {
-        self.val.to_u128()
+    pub fn val(&self) -> I {
+        self.val
+    }
+
+    /// The packed word as an index. Panics rather than truncating, which a plain `as usize`
+    /// would do once the sequence exceeds `usize::BITS`.
+    pub fn as_usize(&self) -> usize {
+        self.val.to_usize().unwrap_or_else(||
+            panic!("BitSeq value {:?} does not fit in usize", self.val)
+        )
     }
 
     pub fn is_empty(&self) -> bool {
@@ -289,9 +306,11 @@ impl<I: BitRepr> BitSeq<I> {
 
     /// Enumerate all `2^len` sequences of the given length, in ascending order of `val`.
     pub fn generate(len: usize) -> impl Iterator<Item = BitSeq<I>> {
-        assert!(len < 128, "generate is only sensible for small lengths");
         assert!(len <= Self::MAX_LEN);
-        (0 .. (1_u128 << len)).map(move |v| Self::new(I::from_u128(v), len))
+        assert!(len < usize::BITS as usize, "generate is only sensible for small lengths");
+        successors(Some(I::ZERO), |&v| Some(v + I::ONE))
+            .take(1 << len)
+            .map(move |v| Self::new(v, len))
     }
 }
 
@@ -406,6 +425,31 @@ mod tests {
     use super::*;
 
     type B = BitSeq;
+
+    #[test]
+    fn width_aliases() {
+        // the point of the aliases: `I` is pinned, so this resolves where `BitSeq::generate` cannot.
+        assert_eq!(BitSeq64::generate(3).count(), 8);
+
+        assert_eq!(BitSeq8::MAX_LEN, 8);
+        assert_eq!(BitSeq128::MAX_LEN, 128);
+        assert_eq!(BitSeq8::ones(3).val(), 7_u8);
+        assert_eq!(BitSeq128::ones(3).val(), 7_u128);
+    }
+
+    #[test]
+    fn as_usize() {
+        assert_eq!(B::ones(5).as_usize(), 31);
+        assert_eq!(B::zeros(5).as_usize(), 0);
+        assert_eq!(B::empty().as_usize(), 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "does not fit in usize")]
+    fn as_usize_wont_truncate() {
+        // plain `as usize` on the u128 accessor would wrap silently here.
+        BitSeq128::ones(usize::BITS as usize + 1).as_usize();
+    }
 
     #[test]
     fn new() {

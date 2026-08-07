@@ -240,8 +240,8 @@ where
         r.into_generic_complex()
     }
 
-    #[cfg(any(test, feature = "test-utils"))]
-    fn check_d_for(&self, i0: I, x: &X) {
+    /// Assert `d² = 0` on a single generator. Panics with the offending chain.
+    pub fn check_d_for(&self, i0: I, x: &X) {
         let i1 = i0 + self.d_deg();
         assert!(self.is_supported(i0), "Not supported: {i0}.");
 
@@ -251,14 +251,12 @@ where
         assert!(ddx.is_zero(), "d² is non-zero for {x} at {i0}.\n  dx: {dx}\n  ddx: {ddx}.");
     }
 
-    #[cfg(any(test, feature = "test-utils"))]
     pub fn check_d_at(&self, i0: I) {
         for x in self[i0].raw_generators().iter() {
             self.check_d_for(i0, x);
         }
     }
 
-    #[cfg(any(test, feature = "test-utils"))]
     pub fn check_d_all(&self) {
         for &i in self.support() {
             self.check_d_at(i);

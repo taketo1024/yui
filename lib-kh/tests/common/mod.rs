@@ -8,7 +8,7 @@ use std::ops::RangeInclusive;
 
 use yui_kh::ss::{ssi_invariant_with, SsVersion};
 use yui_kh::tng::builder::{CutOption, SymBuildConfig};
-use yui_link::InvLink;
+use yui_link::{InvLink, Link};
 
 /// RUST_LOG-controlled logging to stdout (tests initialize no logger by default).
 pub fn init_logger() {
@@ -77,4 +77,18 @@ pub fn assert_ssi(l: &InvLink, config: SymBuildConfig, side: Side, expected: (i3
 /// A config that only sets the chunking.
 pub fn cut_config(cut: CutOption) -> SymBuildConfig {
     SymBuildConfig { cut, ..Default::default() }
+}
+
+// `2K` built as an ordinary connected sum: `K # K` is already the flip diagram, and its axis is
+// the band, so `conn_sum` leaves the base point exactly there and the involution comes back by
+// traversal. The band's other side is the second on-axis edge, where `conn_sum` then splices.
+pub fn flip_sum(l: &Link) -> InvLink {
+    let sum = l.conn_sum(l);
+    let base = sum.base_pt().expect("conn_sum bases K # K on the band");
+    InvLink::from_symmetric_pd_code(sum.reindexed(base, 1).pd_code())
+}
+
+// `K̃ = 2K # (−K) # (−K)`, the construction of Proposition 1.5.
+pub fn flip_construction(j: InvLink) -> InvLink {
+    flip_sum(j.inner()).conn_sum(&j.mirror()).conn_sum(&j.mirror())
 }

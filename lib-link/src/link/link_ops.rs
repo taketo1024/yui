@@ -361,6 +361,35 @@ mod tests {
     }
 
     #[test]
+    fn conn_sum_at_of_two_curls_away_from_the_base_pt() {
+        // Splicing at edge 2 instead — the curl's own loop — gives the two-curl diagram bundled as
+        // `unknot_l_twist2`. Edge 1 carries the base point and the splice leaves it alone, so it
+        // survives in place rather than moving onto the band.
+        let k = Link::test_data("unknot_l_twist");
+        let cs = k.conn_sum_at(&k, 2, 2);
+        assert_eq!(cs.base_pt(), Some(1));
+
+        // Unlike the four sums above, the raw code is [[1,1,4,2],[3,3,2,4]]: `LinkBuilder::build`
+        // numbers edges in `connect` order, and here the two band edges are connected last, so
+        // they take the highest ids instead of following the strand. Renumbering along the
+        // orientation from the base point recovers the expected labelling.
+        assert_eq!(cs.reindexed(1, 1).pd_code(), [[1,1,2,4],[3,3,4,2]]);
+        assert_eq!(cs.reindexed(1, 1).pd_code(), Link::test_data("unknot_l_twist2").pd_code());
+    }
+
+    #[test]
+    fn conn_sum_at_of_two_curls_on_different_edges() {
+        // Asymmetric splice: self's loop (edge 2) to other's base edge (edge 1).
+        let k = Link::test_data("unknot_l_twist");
+        let cs = k.conn_sum_at(&k, 2, 1);
+        assert_eq!(cs.base_pt(), Some(1));
+        // raw is [[1,1,3,2],[3,2,4,4]], and the target below is not traversal-numbered either, so
+        // both sides are renumbered from the base point before comparing.
+        let expected = Link::from_pd_code([[1,1,2,3],[2,3,4,4]]);
+        assert_eq!(cs.reindexed(1, 1).pd_code(), expected.reindexed(1, 1).pd_code());
+    }
+
+    #[test]
     #[should_panic(expected = "free loops is not supported")]
     fn conn_sum_rejects_a_free_loop_base_pt() {
         // K # unknot = K mathematically, but the splice needs a base point sitting on a crossing.

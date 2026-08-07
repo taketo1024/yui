@@ -4,7 +4,10 @@
 **/.DS_STORE
 **/Cargo.lock
 /lib-kh/profile
-/log/
+# run logs — kept locally and on the ssi-results* branches, never on the release branch.
+# both spellings, and at any depth (`lib-kh/log/` was previously not covered).
+**/log/
+**/logs/
 /.venv/
 /references/
 /.claude/settings.local.json

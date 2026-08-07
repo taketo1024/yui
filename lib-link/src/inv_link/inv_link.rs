@@ -79,7 +79,7 @@ impl InvLink {
 
     // A strongly invertible knot, given a diagram based on its axis. τ reverses the traversal, so
     // walking both ways from the base point pairs each edge with its image.
-    pub(super) fn si_knot_from(inner: Link) -> InvLink {
+    pub fn si_knot_from(inner: Link) -> InvLink {
         assert!(inner.is_knot(), "expected a knot, found {} components", inner.n_comps());
         let base = inner.base_pt().expect("the diagram needs a base point on the axis");
         let comps = inner.comps();
@@ -223,6 +223,18 @@ impl InvLink {
             e_map: self.e_map.clone(),
             x_map: self.x_map.iter().map(|(x, y)|
                 (x.mirror(), y.mirror())
+            ).collect(),
+        }
+    }
+
+    // Reverse the orientation. `τ` is untouched: it is a map of edges, and reversing renames
+    // nothing — so a strong inversion stays one.
+    pub fn reversed(&self) -> Self {
+        Self {
+            inner: self.inner.reversed(),
+            e_map: self.e_map.clone(),
+            x_map: self.x_map.iter().map(|(x, y)|
+                (x.reversed(), y.reversed())
             ).collect(),
         }
     }
@@ -480,6 +492,57 @@ mod tests {
         let canon = |k: &InvLink| k.inner().reindexed_canon();
         assert_ne!(canon(&sums[0]), canon(&sums[1]), "the two sides must give different diagrams");
         assert_eq!(canon(&k1.conn_sum(&k2)), canon(&sums[0]), "conn_sum splices at other's base point");
+    }
+
+    #[test]
+    fn inv_link_reversed() {
+        let k = InvLink::test_data("3_1");
+        let r = k.reversed();
+
+        assert!(r.inner().is_oriented());
+        assert!(r.is_strongly_invertible(), "reversing does not disturb the axis");
+        assert_eq!(r.writhe(), k.writhe());
+        assert_eq!(r.on_axis_edges(), k.on_axis_edges(), "τ is a map of edges, unchanged");
+        for e in k.inner().edges() {
+            assert_eq!(r.inv_edge(e), k.inv_edge(e));
+        }
+        assert_eq!(r.reversed().inner(), k.inner(), "reversing twice is the identity");
+    }
+
+    #[test]
+    fn dms_construction() {
+        // The equivariant `2K # (-2K)` of Dai-Mallick-Stoffregen (`references/DMS.pdf` §1.2) — the
+        // same diagrams as `Link::conn_sum`'s `dms_construction`, with the splice edges no longer
+        // given by hand: `conn_sum` takes self's other on-axis edge each time.
+        let k = InvLink::from_symmetric_pd_code([[1,4,2,5],[5,2,6,3],[3,6,4,1]]);
+        assert_eq!(k.on_axis_edges(), vec![1, 4]);
+
+        // `2K`: the connected sum of the underlying link is already the flip diagram, based on the
+        // band, so τ comes back by traversal. The band's two sides are the new axis.
+        let k2 = InvLink::si_knot_from(k.inner().conn_sum(k.inner()));
+        assert_eq!(k2.inner().pd_code(), Link::from_pd_code([
+            [1,4,2,5],[5,2,6,3],[3,6,4,7],[7,10,8,11],[11,8,12,9],[9,12,10,1],
+        ]).pd_code());
+        assert_eq!(k2.on_axis_edges(), vec![1, 7]);
+
+        // `2K # m(K)`, spliced at edge 7.
+        let mk = k.mirror();
+        let with_mk = k2.conn_sum(&mk);
+        assert_eq!(with_mk.inner().pd_code(), Link::from_pd_code([
+            [1,4,2,5],[5,2,6,3],[3,6,4,13],[7,10,8,11],[11,8,12,9],[9,12,10,1],
+            [16,14,17,13],[14,18,15,17],[18,16,7,15],
+        ]).pd_code());
+        assert_eq!(with_mk.on_axis_edges(), vec![1, 16]);
+
+        // `2K # m(K) # r(m(K))`, spliced at edge 16.
+        let dms = with_mk.conn_sum(&mk.reversed());
+        assert_eq!(dms.inner().pd_code(), Link::from_pd_code([
+            [1,4,2,5],[5,2,6,3],[3,6,4,13],[7,10,8,11],[11,8,12,9],[9,12,10,1],
+            [16,14,17,13],[14,18,15,17],[18,19,7,15],
+            [19,21,24,22],[21,23,20,24],[23,16,22,20],
+        ]).pd_code());
+        assert!(dms.is_strongly_invertible());
+        assert_eq!(dms.base_pt(), Some(1));
     }
 
     #[test]

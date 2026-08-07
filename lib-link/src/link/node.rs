@@ -155,6 +155,11 @@ impl Node {
         self.incoming
     }
 
+    // False on an unoriented node, where no slot is claimed either way.
+    pub fn is_incoming(&self, s: Slot) -> bool {
+        self.incoming.is_some_and(|(p, q)| p == s || q == s)
+    }
+
     // Goes through `new`, so the pair is sorted and validated however the caller passes it.
     pub(crate) fn set_incoming(&mut self, incoming: Option<(Slot, Slot)>) {
         *self = Self::new(self.node_type, incoming, self.edges);
@@ -181,6 +186,17 @@ impl Node {
     pub fn mirror(&self) -> Self {
         self.clone_and(|x|
             x.node_type = self.node_type.mirror()
+        )
+    }
+
+    // Reverse both strands: each now enters by the slot it used to leave. The two incoming slots
+    // stay on different strands, so orientability — and the sign — survive.
+    pub fn reversed(&self) -> Self {
+        self.clone_and(|x|
+            x.incoming = self.incoming.map(|(p, q)| {
+                let (p, q) = (self.paired_slot(p), self.paired_slot(q));
+                (p.min(q), p.max(q))
+            })
         )
     }
 

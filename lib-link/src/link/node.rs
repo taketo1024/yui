@@ -155,6 +155,11 @@ impl Node {
         self.incoming
     }
 
+    // False on an unoriented node, where no slot is claimed either way.
+    pub fn is_incoming(&self, s: Slot) -> bool {
+        self.incoming.is_some_and(|(p, q)| p == s || q == s)
+    }
+
     // Goes through `new`, so the pair is sorted and validated however the caller passes it.
     pub(crate) fn set_incoming(&mut self, incoming: Option<(Slot, Slot)>) {
         *self = Self::new(self.node_type, incoming, self.edges);

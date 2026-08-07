@@ -43,11 +43,16 @@ impl Link {
         b.connect(t1, h2);  // self tail → other head
         b.connect(t2, h1);  // other tail → self head
 
-        // the splice consumes `self_e`, but any other base point survives it — read off its new id
-        // before the builder renumbers on `build`.
-        let base = self.base_pt()
-            .filter(|&e| e != self_e)
-            .map(|e| b.edge_at(port(&v1, self.edge_ends(e, false).0)).unwrap());
+        // A base point elsewhere survives the splice; one sitting on the consumed `self_e` moves
+        // onto the band, taking the `self tail → other head` side. Read the ids off before `build`
+        // renumbers. Basing on the band matters for `K # K`, whose axis is the band itself.
+        let base = self.base_pt().map(|e|
+            if e != self_e {
+                b.edge_at(port(&v1, self.edge_ends(e, false).0)).unwrap()
+            } else {
+                b.edge_at(t1).unwrap()
+            }
+        );
 
         let sum = b.build().unwrap();
         match base {

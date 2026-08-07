@@ -1,7 +1,11 @@
+//! [`CliArgs`] and [`App`]: the clap-parsed command line and the runner that
+//! dispatches it to one of the subcommands.
+
 use log::info;
 use clap::{Parser, Subcommand};
 
-use super::cmd::{ckh, ckhi, kh, khi, cc};
+use super::cmd::{ckh, ckhi, kh, khi, cc, sl2, ss, ssi};
+use super::args::*;
 use super::utils::*;
 
 #[derive(Parser, Debug)]
@@ -17,27 +21,30 @@ pub struct CliArgs {
 pub enum Cmd {
     CKh(ckh::Args),
     Kh(kh::Args),
-    CKhI(ckhi::Args),    
+    CKhI(ckhi::Args),
     KhI(khi::Args),
     CC(cc::Args),
+    SL2(sl2::Args),
+    Ss(ss::Args),
+    Ssi(ssi::Args),
 }
 
-impl CliArgs { 
-    fn log_level(&self) -> log::LevelFilter { 
-        use log::LevelFilter::*;
-        let level = match &self.command { 
-            Cmd::CKh(args)  => args.log,
-            Cmd::Kh(args)   => args.log,
-            Cmd::CKhI(args) => args.log,
-            Cmd::KhI(args)  => args.log,
-            Cmd::CC(args)   => args.log,
-        };
-        match level {
-            1 => Info,
-            2 => Debug,
-            3 => Trace,
-            _ => Off,
+impl CliArgs {
+    fn app_args(&self) -> &dyn AppArgs {
+        match &self.command {
+            Cmd::CKh(args)  => args,
+            Cmd::Kh(args)   => args,
+            Cmd::CKhI(args) => args,
+            Cmd::KhI(args)  => args,
+            Cmd::CC(args)   => args,
+            Cmd::SL2(args)  => args,
+            Cmd::Ss(args)   => args,
+            Cmd::Ssi(args)  => args,
         }
+    }
+
+    fn log_level(&self) -> log::LevelFilter {
+        self.app_args().log_level()
     }
 }
 
@@ -45,16 +52,16 @@ pub struct App {
     pub args: CliArgs
 }
 
-impl App { 
-    pub fn new() -> Self { 
+impl App {
+    pub fn new() -> Self {
         let args = CliArgs::parse();
         App { args }
     }
 
-    pub fn run(&self) -> Result<String, Box<dyn std::error::Error>> { 
+    pub fn run(&self) -> Result<String, Box<dyn std::error::Error>> {
         self.init_logger();
 
-        info!("args: {:?}", self.args);
+        info!("args:\n{:#?}", self.args);
         info!("int-type: {}", std::any::type_name::<super::utils::dispatch::Int>());
 
         let (res, time) = measure(||
@@ -68,17 +75,20 @@ impl App {
 
     fn init_logger(&self) {
         let l = self.args.log_level();
-        yui_core::util::log::init_simple_logger(l).unwrap()
+        env_logger::Builder::new().filter_level(l).init();
     }
 
-    fn dispatch(&self) -> Result<String, Box<dyn std::error::Error>> { 
+    fn dispatch(&self) -> Result<String, Box<dyn std::error::Error>> {
         guard_panic(||
-            match &self.args.command { 
+            match &self.args.command {
                 Cmd::CKh(args)  => ckh::dispatch(args),
                 Cmd::Kh(args)   => kh::dispatch(args),
                 Cmd::CKhI(args) => ckhi::dispatch(args),
                 Cmd::KhI(args)  => khi::dispatch(args),
                 Cmd::CC(args)   => cc::dispatch(args),
+                Cmd::SL2(args)  => sl2::dispatch(args),
+                Cmd::Ss(args)   => ss::dispatch(args),
+                Cmd::Ssi(args)  => ssi::dispatch(args),
             }
         )
     }

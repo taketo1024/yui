@@ -1,15 +1,18 @@
+//! Loading links from a name, a PD code or a file, and parsing ring elements
+//! from the command line.
+
 #![allow(unused)]
 
 use crate::app::err::*;
 use std::str::FromStr;
 use itertools::Itertools;
 use num_traits::Zero;
-use yui_core::{Ring, RingOps};
+use yui_core::abst::{Ring, RingOps};
 use yui_link::{Edge, InvLink, Link};
 use yui_matrix::sparse::SpVec;
 
-pub fn measure<F, Res>(proc: F) -> (Res, std::time::Duration) 
-where F: FnOnce() -> Res { 
+pub fn measure<F, Res>(proc: F) -> (Res, std::time::Duration)
+where F: FnOnce() -> Res {
     let start = std::time::Instant::now();
     let res = proc();
     let time = start.elapsed();
@@ -32,53 +35,47 @@ where F: FnOnce() -> Result<R, Box<dyn std::error::Error>> + std::panic::UnwindS
     })
 }
 
-pub fn load_link(input: &String, mirror: bool) -> Result<Link, Box<dyn std::error::Error>> { 
+pub fn load_link(input: &String, mirror: bool) -> Result<Link, Box<dyn std::error::Error>> {
     type PDCode = Vec<[Edge; 4]>;
-    
-    let l = { 
-        if let Ok(pd_code) = serde_json::from_str::<PDCode>(input) { 
-            Link::from_pd_code(pd_code)
-        } else if let Ok(link) = Link::load(input) { 
-            link
-        } else { 
-            return err!("invalid input link: '{}'", input);
-        }
+
+    let l = if input.trim_start().starts_with('[') {
+        let pd_code: PDCode = serde_json::from_str(input)?;
+        Link::from_pd_code(pd_code)
+    } else {
+        Link::load(input)?
     };
 
-    if mirror { 
+    if mirror {
         Ok(l.mirror())
-    } else { 
+    } else {
         Ok(l)
     }
 }
 
-pub fn load_sinv_knot(input: &String, mirror: bool) -> Result<InvLink, Box<dyn std::error::Error>> { 
+pub fn load_sinv_knot(input: &String, mirror: bool) -> Result<InvLink, Box<dyn std::error::Error>> {
     type PDCode = Vec<[Edge; 4]>;
-    
-    let l = { 
-        if let Ok(pd_code) = serde_json::from_str::<PDCode>(input) { 
-            InvLink::sinv_knot_from_code(pd_code)
-        } else if let Ok(link) = InvLink::load(input) { 
-            link
-        } else { 
-            return err!("invalid input link: '{}'", input);
-        }
+
+    let l = if input.trim_start().starts_with('[') {
+        let pd_code: PDCode = serde_json::from_str(input)?;
+        InvLink::from_symmetric_pd_code(pd_code)
+    } else {
+        InvLink::load(input)?
     };
 
-    if mirror { 
+    if mirror {
         Ok(l.mirror())
-    } else { 
+    } else {
         Ok(l)
     }
 }
 
-pub fn parse_pair<R: FromStr + Zero>(s: &String) -> Result<(R, R), Box<dyn std::error::Error>> { 
-    if let Ok(c) = R::from_str(s) { 
+pub fn parse_pair<R: FromStr + Zero>(s: &String) -> Result<(R, R), Box<dyn std::error::Error>> {
+    if let Ok(c) = R::from_str(s) {
         return Ok((c, R::zero()))
     }
 
     let r = regex::Regex::new(r"^(.+),(.+)$").unwrap();
-    if let Some(m) = r.captures(s) { 
+    if let Some(m) = r.captures(s) {
         let (s1, s2) = (&m[1], &m[2]);
         if let (Ok(a), Ok(b)) = (R::from_str(s1), R::from_str(s2)) {
             return Ok((a, b))
@@ -88,20 +85,7 @@ pub fn parse_pair<R: FromStr + Zero>(s: &String) -> Result<(R, R), Box<dyn std::
     err!("cannot parse '{}' as {}.", s, std::any::type_name::<R>())
 }
 
-pub fn vec2str<R>(v: &SpVec<R>) -> String 
-where R: Ring + ToString, for<'x> &'x R: RingOps<R> { 
-    format!("({})", v.to_dense().iter().join(", "))
-}
-
-pub fn csv_writer(path: &String) -> Result<csv::Writer<std::fs::File>, Box<dyn std::error::Error>> { 
-    use std::fs::OpenOptions;
-
-    let file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .open(path)?;
-
-    let wtr = csv::Writer::from_writer(file);
-
-    Ok(wtr)
+pub fn vec2str<R>(v: &SpVec<R>) -> String
+where R: Ring + ToString, for<'x> &'x R: RingOps<R> {
+    format!("({})", v.clone().into_dense().iter().join(", "))
 }

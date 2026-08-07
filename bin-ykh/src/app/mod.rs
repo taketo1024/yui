@@ -1,7 +1,9 @@
+//! The CLI application: argument parsing, command dispatch and the commands.
+
 mod app;
-pub use app::App;
+pub use app::{App, CliArgs};
 
-pub mod err;
-
+mod args;
+mod err;
 mod cmd;
 mod utils;

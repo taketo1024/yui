@@ -1,7 +1,15 @@
+//! Shared utilities: the sparse [`Grid`] storage, plain-text/LaTeX
+//! formatting helpers, and the [`ToSeqString`] / [`ToTableString`] display
+//! traits.
+
 mod matrix;
-mod chain_reducer;
-mod homology_calc;
+pub(crate) mod format;
+mod grid;
+mod to_string;
+
+pub mod tex;
 
 pub use matrix::*;
-pub use chain_reducer::ChainReducer;
-pub use homology_calc::*;
+pub use format::*;
+pub use grid::*;
+pub use to_string::*;

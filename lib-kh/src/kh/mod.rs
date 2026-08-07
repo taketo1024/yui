@@ -1,14 +1,17 @@
+//! Khovanov homology: the Frobenius algebra, the cube of resolutions, the chain
+//! complex and its homology, plus the canonical (Lee) cycles.
+
 mod alg;
-mod gen;
+mod kh_gen;
+mod cube;
 mod complex;
 mod homology;
-mod ss;
+mod canon_cycle;
 
-pub use alg::KhAlg;
-pub use gen::{KhGen, KhTensor, KhChainGen, KhChain, KhChainExt};
-pub use complex::KhComplex;
+pub use alg::{KhAlg, KhAlgGen, KhTensor};
+pub use kh_gen::KhGen;
+pub use cube::KhCube;
+pub use complex::{KhComplex, KhChain};
 pub use homology::KhHomology;
-pub use ss::ss_invariant;
 
-pub mod internal;
 pub mod ext;

@@ -1,7 +1,12 @@
+//! Triangular solves over a sparse matrix: inversion, and solving `a x = y`
+//! (or `x a = y`) column by column, optionally streaming each solved column to a
+//! callback so the caller never materializes the full product.
+
 use either::Either;
-use log::debug;
-use num_traits::Zero;
-use yui_core::{Ring, RingOps};
+use log::*;
+use yui_core::abst::{Ring, RingOps};
+use log::Level;
+use yui_core::util::log::log_progress;
 
 use super::*;
 
@@ -16,115 +21,153 @@ cfg_if::cfg_if! {
 
 const LOG_THRESHOLD: usize = 10_000;
 
+/// Selector for whether a matrix is upper- or lower-triangular, used by
+/// the triangular solvers and Schur reduction.
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum TriangularType { 
+pub enum TriangularType {
     Upper, Lower
 }
 
-impl TriangularType { 
-    pub fn is_upper(&self) -> bool { 
-        match self { 
+impl TriangularType {
+    pub fn is_upper(&self) -> bool {
+        match self {
             Self::Upper => true,
             Self::Lower => false
         }
     }
 
-    pub fn tranpose(&self) -> Self { 
-        match self { 
+    pub fn transpose(&self) -> Self {
+        match self {
             Self::Upper => Self::Lower,
             Self::Lower => Self::Upper
         }
     }
-}
 
-pub fn inv_triangular<R>(t: TriangularType, a: &SpMat<R>) -> SpMat<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    let e = SpMat::id(a.nrows());
-    solve_triangular(t, a, &e)
-}
-
-// solve ax = y.
-pub fn solve_triangular<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    assert_eq!(a.nrows(), y.nrows());
-    debug_assert!(a.is_triang(t));
-
-    cfg_if::cfg_if! { 
-        if #[cfg(feature = "multithread")] { 
-            solve_triangular_m(t, a, y)
-        } else { 
-            solve_triangular_s(t, a, y)
+    fn str(&self) -> &'static str {
+        match self {
+            Self::Upper => "upper",
+            Self::Lower => "lower"
         }
     }
 }
 
-// solve xa = y.
-pub fn solve_triangular_left<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
+/// Inverse of a triangular matrix `a`.
+pub fn inv_triangular<R>(t: TriangularType, a: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    solve_triangular(t.tranpose(), &a.transpose(), &y.transpose()).transpose()
+    let e = SpMat::id(a.n_rows());
+    solve_triangular(t, a, &e)
 }
 
-pub fn solve_triangular_vec<R>(t: TriangularType, a: &SpMat<R>, b: &SpVec<R>) -> SpVec<R>
+/// Solves `a · x = y` for triangular `a`.
+pub fn solve_triangular<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    assert_eq!(a.nrows(), b.dim());
+    let n = a.n_rows();
+    let cols = solve_triangular_with(t, a, y, |_, x| x);
+    SpMat::from_col_vecs(n, cols)
+}
+
+// Solve `ax = y` column by column, invoking `f(j, x_j)` on each solved
+// column. Hoists the diagonal collection and RHS buffer out of the per-column
+// loop, and (under `multithread`) reuses one buffer per thread.
+pub(crate) fn solve_triangular_with<R, F, T>(
+    t: TriangularType, a: &SpMat<R>, y: &SpMat<R>, f: F
+) -> Vec<T>
+where
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    F: Fn(usize, SpVec<R>) -> T + Sync,
+    T: Send,
+{
+    assert_eq!(a.n_rows(), y.n_rows());
     debug_assert!(a.is_triang(t));
 
-    let diag = collect_diag(a);
-    let mut b = b.to_dense();
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "multithread")] {
+            solve_triangular_m(t, a, y, f)
+        } else {
+            solve_triangular_s(t, a, y, f)
+        }
+    }
+}
 
-    _solve_triangular(t, a, &diag, &mut b)
+/// Solves `x · a = y` for triangular `a`.
+pub fn solve_triangular_left<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    solve_triangular(t.transpose(), &a.transpose(), &y.transpose()).transpose()
+}
+
+/// Vector form of [`solve_triangular`]: solves `a · x = b`.
+pub fn solve_triangular_vec<R>(t: TriangularType, a: &SpMat<R>, b: &SpVec<R>) -> SpVec<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    assert_eq!(a.n_rows(), b.dim());
+    debug_assert!(a.is_triang(t));
+
+    debug!("solve {} triangular-vec", t.str());
+    debug!("  a: {:?}", a.shape());
+
+    let n = a.n_rows();
+    let diag = collect_diag(t, a);
+    let mut b_buf = vec![R::zero(); n];
+    scatter_into(b.data(), &mut b_buf);
+
+    _solve_triangular(t, a, &diag, &mut b_buf)
 }
 
 #[allow(unused)]
-fn solve_triangular_s<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    debug!("solve triangular, y: {:?}", y.shape());
+fn solve_triangular_s<R, F, T>(
+    t: TriangularType, a: &SpMat<R>, y: &SpMat<R>, f: F
+) -> Vec<T>
+where
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    F: Fn(usize, SpVec<R>) -> T,
+{
+    debug!("solve {} triangular", t.str());
+    debug!("  a: {:?}, y: {:?}", a.shape(), y.shape());
 
-    let (n, k) = (a.nrows(), y.ncols());
-    let diag = collect_diag(a);
+    let (n, k) = (a.n_rows(), y.n_cols());
+    let diag = collect_diag(t, a);
     let mut b = vec![R::zero(); n];
 
-    let cols = (0..k).map(|j| { 
-        copy_into(y.col_vec(j), &mut b);
-        _solve_triangular(t, a, &diag, &mut b)
-    });
-
-    SpMat::from_col_vecs(n, cols)
+    (0..k).map(|j| {
+        scatter_into(y.col_data(j), &mut b);
+        let x = _solve_triangular(t, a, &diag, &mut b);
+        f(j, x)
+    }).collect()
 }
 
 #[cfg(feature = "multithread")]
-fn solve_triangular_m<R>(t: TriangularType, a: &SpMat<R>, y: &SpMat<R>) -> SpMat<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
+fn solve_triangular_m<R, F, T>(
+    t: TriangularType, a: &SpMat<R>, y: &SpMat<R>, f: F
+) -> Vec<T>
+where
+    R: Ring, for<'x> &'x R: RingOps<R>,
+    F: Fn(usize, SpVec<R>) -> T + Sync,
+    T: Send,
+{
     use yui_core::util::sync::SyncCounter;
 
-    debug!("solve triangular, y: {:?}", y.shape());
+    debug!("solve {} triangular (threads: {})", t.str(), rayon::current_num_threads());
+    debug!("  a: {:?}, y: {:?}", a.shape(), y.shape());
 
-    let (n, k) = (a.nrows(), y.ncols());
-    let diag = collect_diag(a);
+    let (n, k) = (a.n_rows(), y.n_cols());
+    let diag = collect_diag(t, a);
     let tl_b = Arc::new(ThreadLocal::new());
 
-    let report = should_report(y);
-    let counter = SyncCounter::new();
+    let counter = SyncCounter::new(0);
 
-    let cols = (0..k).into_par_iter().map(|j| { 
-        let mut b = tl_b.get_or(|| 
+    (0..k).into_par_iter().map(|j| {
+        let mut b = tl_b.get_or(||
             RefCell::new(vec![R::zero(); n])
         ).borrow_mut();
 
-        copy_into(y.col_vec(j), &mut b);
-        let col = _solve_triangular(t, a, &diag, &mut b);
+        scatter_into(y.col_data(j), &mut b);
+        let x = _solve_triangular(t, a, &diag, &mut b);
+        let result = f(j, x);
 
-        if report { 
-            let c = counter.incr();
-            if (c > 0 && c % LOG_THRESHOLD == 0) || c == k { 
-                debug!("  solved {c}/{k}.");
-            }
-        }
+        let c = counter.incr();
+        log_progress(Level::Trace, c, c - 1, k, LOG_THRESHOLD, 1);
 
-        col
-    }).collect::<Vec<_>>();
-
-    SpMat::from_col_vecs(n, cols)
+        result
+    }).collect()
 }
 
 #[inline(never)] // for profilability
@@ -133,9 +176,9 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
     let mut entries = vec![];
 
     let itr = diag.iter().enumerate();
-    let itr = if t.is_upper() { 
+    let itr = if t.is_upper() {
         Either::Left(itr.rev())
-    } else { 
+    } else {
         Either::Right(itr)
     };
 
@@ -145,7 +188,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let uinv = u.inv().unwrap();
         let x_j = &b[j] * &uinv; // non-zero
 
-        for (i, a_ij) in a.col_vec(j).iter() {
+        let (idx, val) = a.col_data(j);
+        for (&i, a_ij) in idx.iter().zip(val.iter()) {
             if a_ij.is_zero() { continue }
             b[i] -= a_ij * &x_j;
         }
@@ -153,42 +197,56 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         entries.push((j, x_j));
     }
 
-    debug_assert!(b.iter().all(|b_i| 
+    debug_assert!(b.iter().all(|b_i|
         b_i.is_zero())
     );
 
-    if t.is_upper() { 
-        entries.reverse()
+    let entries = if t.is_upper() {
+        Either::Left(entries.into_iter().rev())
+    } else {
+        Either::Right(entries.into_iter())
     };
 
-    SpVec::from_sorted_entries(a.ncols(), entries)
+    SpVec::from_sorted_entries(a.n_cols(), entries)
 }
 
-fn collect_diag<'a, R>(a: &'a SpMat<R>) -> Vec<&'a R>
-where R: Ring, for<'x> &'x R: RingOps<R> { 
-    a.iter().filter_map(|(i, j, a)| 
-        if i == j { Some(a) } else { None }
-    ).collect()
+fn collect_diag<'a, R>(t: TriangularType, a: &'a SpMat<R>) -> Vec<&'a R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    let (col_offsets, row_indices, values) = a.csc_data();
+    (0..a.n_cols()).map(|j| {
+        let range = col_offsets[j] .. col_offsets[j + 1];
+        assert!(range.start < range.end, "broken input: missing diagonal at column {j}");
+
+        // Usually the column's last (upper) or first (lower) entry, but a stored zero — which
+        // `is_triang` ignores — can displace it. CSC keeps rows sorted, so binary-search then.
+        let head = if t.is_upper() { range.end - 1 } else { range.start };
+        let p = if row_indices[head] == j {
+            head
+        } else {
+            let k = row_indices[range.clone()].binary_search(&j).unwrap_or_else(|_|
+                panic!("broken input: missing diagonal at column {j}")
+            );
+            range.start + k
+        };
+        &values[p]
+    }).collect()
 }
 
-fn copy_into<R>(vec: SpVec<R>, x: &mut [R])
-where R: Clone + Zero { 
-    vec.iter().for_each(|(i, r)| x[i] = r.clone())
-}
-
-#[allow(unused)]
-fn should_report<R>(a: &SpMat<R>) -> bool { 
-    usize::min(a.nrows(), a.ncols()) > LOG_THRESHOLD && log::max_level() >= log::LevelFilter::Debug
+fn scatter_into<R: Clone>(data: (&[usize], &[R]), dst: &mut [R]) {
+    let (idx, val) = data;
+    for (&i, v) in idx.iter().zip(val.iter()) {
+        dst[i] = v.clone();
+    }
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     use super::*;
     use super::TriangularType::{Upper, Lower};
 
     #[test]
-    fn solve_upper() { 
-        let u = SpMat::from_dense_data((5, 5), vec![
+    fn solve_upper() {
+        let u = SpMat::from_row_major((5, 5), vec![
             1, -2, 1,  3, 5,
             0, -1, 4,  2, 1,
             0,  0, 1,  0, 3,
@@ -201,8 +259,8 @@ mod tests {
     }
 
     #[test]
-    fn inv_upper() { 
-        let u = SpMat::from_dense_data((5, 5), [
+    fn inv_upper() {
+        let u = SpMat::from_row_major((5, 5), [
             1, -2, 1,  3, 5,
             0, -1, 4,  2, 1,
             0,  0, 1,  0, 3,
@@ -215,8 +273,8 @@ mod tests {
     }
 
     #[test]
-    fn solve_lower() { 
-        let l = SpMat::from_dense_data((5, 5), [
+    fn solve_lower() {
+        let l = SpMat::from_row_major((5, 5), [
             1,  0, 0,  0, 0,
            -2, -1, 0,  0, 0,
             1,  4, 1,  0, 0,
@@ -229,8 +287,8 @@ mod tests {
     }
 
     #[test]
-    fn inv_lower() { 
-        let l = SpMat::from_dense_data((5, 5), [
+    fn inv_lower() {
+        let l = SpMat::from_row_major((5, 5), [
             1,  0, 0,  0, 0,
            -2, -1, 0,  0, 0,
             1,  4, 1,  0, 0,
@@ -240,5 +298,27 @@ mod tests {
         let linv = inv_triangular(Lower, &l);
         let e = &l * &linv;
         assert!(e.is_id());
+    }
+
+    #[test]
+    fn diag_past_a_stored_zero() {
+        // `is_triang` filters with `iter_nz`, so a stored zero below the diagonal keeps the matrix
+        // upper-triangular in its eyes while displacing the column's last stored entry.
+        let a: SpMat<i64> = SpMat::try_from_csc_data(
+            2, 2, vec![0, 2, 3], vec![0, 1, 1], vec![1, 0, 1]
+        ).unwrap();
+        assert!(a.is_triang(Upper));
+
+        let ainv = inv_triangular(Upper, &a);
+        assert!((&a * &ainv).is_id());
+    }
+
+    #[test]
+    #[should_panic(expected = "missing diagonal at column 0")]
+    fn empty_column_names_the_missing_diagonal() {
+        let a: SpMat<i64> = SpMat::try_from_csc_data(
+            2, 2, vec![0, 0, 1], vec![1], vec![1]
+        ).unwrap();
+        let _ = inv_triangular(Upper, &a);
     }
 }

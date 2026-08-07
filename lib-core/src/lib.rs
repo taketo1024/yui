@@ -1,14 +1,13 @@
-mod abst;
-mod types;
-mod traits;
-mod misc;
-mod ext;
+#![doc = include_str!("../README.md")]
 
-pub use abst::*;
-pub use types::*;
-pub use traits::*;
-pub use misc::*;
-pub use ext::*;
+// laid out as `<group>/<type>.rs`, so a module may share its parent's name.
+#![allow(clippy::module_inception)]
+
+pub mod abst;
+pub mod ext;
+
+mod conc;
+pub use conc::*;
 
 pub mod algo;
 pub mod util;

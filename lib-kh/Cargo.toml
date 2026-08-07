@@ -1,34 +1,39 @@
 [package]
 name = "yui-kh"
 description = "Khovanov Homology Library for YUI"
-version = "0.4.0"
+version = "0.5.0"
 
 authors.workspace = true
 license.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 repository.workspace  = true
+
+[lib]
+doctest = false
 
 [features]
 default = []
+big-link = ["yui-link/big-link"]
 
 [dependencies]
 auto-impl-ops = "0.2.1"
-cartesian = "0.3.0"
-delegate = "0.13.3"
-derive_more = { version = "2.0.1", features = ["display", "debug"] }
-grouping_by = "0.2.2"
-indexmap = { version = "2.9.0", features = ["serde"] }
-log = "0.4.27"
-num-bigint = "0.4.6"
+delegate = "0.13.5"
+derive_more = { version = "2.1.1", features = ["display", "debug"] }
+log = "0.4.29"
+maplit = "1.0.2"
 num-traits = "0.2.19"
-regex = "1.11.1"
-serde_json = "1.0.140"
-serde = { version = "1.0.219", features = ["derive"] }
-cfg-if = "1.0.0"
-itertools = "0.14.0"
-ahash = "0.8.11"
-rayon = "1.10.0"
-yui-core  =    { version = "0.4.0", path = "../lib-core" }
-yui-link =     { version = "0.4.0", path = "../lib-link" }
-yui-matrix =   { version = "0.4.0", path = "../lib-matrix" }
-yui-homology = { version = "0.4.0", path = "../lib-homology" }
+cfg-if = "1.0.4"
+itertools = "0.15.0"
+rustc-hash = "2.1.1"
+rayon = "1.12.0"
+dashmap = "6.1.0"
+yui-core.workspace = true
+yui-link.workspace = true
+yui-matrix.workspace = true
+yui-homology.workspace = true
+
+[dev-dependencies]
+yui-link = { workspace = true, features = ["test-utils"] }
+yui-homology = { workspace = true }
+env_logger = "0.11"

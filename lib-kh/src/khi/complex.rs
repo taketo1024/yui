@@ -1,580 +1,678 @@
+//! The involutive Khovanov chain complex `CKhI(D, τ) = Cone(CKh(D) -^{Q(1+τ)}-> Q·CKh(D))`
+//! for a strongly invertible link, where `Q² = 0` (Definition 2.2 of the reference).
+//! Built here as the [`ChainMap::cone`] of `1 + τ`.
+//!
+//! Reference:
+//! - T. Sano, "Involutive Khovanov homology and equivariant knots",
+//!   Algebr. Geom. Topol. 25 (2025), 5059–5111.
+//!   <https://doi.org/10.2140/agt.2025.25.5059>, <https://arxiv.org/abs/2404.08568>
+
 use std::ops::{Index, RangeInclusive};
-use cartesian::cartesian;
+use std::sync::OnceLock;
 use delegate::delegate;
 
 use itertools::Itertools;
 use yui_core::lc::Lc;
-use yui_core::{EucRing, EucRingOps, Ring, RingOps};
-use yui_homology::{isize2, ChainComplexTrait, Grid1, Grid2, GridTrait, ChainComplex, Summand};
+use yui_core::abst::{EucRing, EucRingOps, Ring, RingOps};
+use yui_core::ext::{empty_range, IteratorExt};
+use yui_homology::{ChainComplex1, ChainMap, ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 use yui_link::InvLink;
-use yui_matrix::sparse::SpMat;
 
-use crate::kh::{KhChain, KhChainExt, KhComplex, KhChainGen};
+use crate::kh::{KhComplex, KhGen};
+use crate::tng::builder::{SymBuildConfig, assert_supported_symmetry};
 use crate::khi::KhIHomology;
-use crate::khi::KhIGen;
-use crate::misc::range_of;
+use crate::khi::{KhIGen, KhIGenExt};
+use crate::util::Bigraded;
+use yui_core::util::tex::TeX;
+use yui_homology::tex::{ToTexSeq, ToTexTable};
 
 pub type KhIChain<R> = Lc<KhIGen, R>;
-
-impl<R> KhChainExt for KhIChain<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    fn h_deg(&self) -> isize {
-        self.gens().map(|x| x.h_deg()).min().unwrap_or(0)
-    }
-    
-    fn q_deg(&self) -> isize {
-        self.gens().map(|x| x.q_deg()).min().unwrap_or(0)
-    }
-}
 
 pub type KhIComplexSummand<R> = Summand<KhIGen, R>;
 
 #[derive(Clone)]
 pub struct KhIComplex<R>
-where R: Ring, for<'a> &'a R: RingOps<R> { 
-    inner: ChainComplex<KhIGen, R>,
+where R: Ring, for<'a> &'a R: RingOps<R> {
+    inner: ChainComplex1<KhIGen, R>,
     canon_cycles: Vec<KhIChain<R>>,
-    deg_shift: (isize, isize)
+    deg_shift: (isize, isize),
+    cache_bigr: OnceLock<GrMod2<KhIGen, R>>,
 }
 
 impl<R> KhIComplex<R>
-where R: Ring, for<'a> &'a R: RingOps<R> { 
-    pub fn new(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self { 
-        use crate::khi::internal::v2::builder::SymTngBuilder;
-
-        SymTngBuilder::build_khi_complex(l, h, t, reduced)
+where R: Ring, for<'a> &'a R: RingOps<R> {
+    pub fn new(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self {
+        Self::new_partial(l, h, t, reduced, None)
     }
 
-    pub fn new_no_simplify(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self { 
-        use crate::khi::internal::v1::cube::KhICube;
-        use crate::kh::KhComplex;
+    // restricts the build to `h_range`; since `KhI_i = C_i ⊕ C_{i-1}`, the cone needs `C` over `[a-1, b]`.
+    pub fn new_partial(l: &InvLink, h: &R, t: &R, reduced: bool, h_range: Option<RangeInclusive<isize>>) -> Self {
+        Self::new_with_config(l, h, t, reduced, SymBuildConfig { h_range, ..Default::default() })
+    }
 
-        assert_eq!(R::one() + R::one(), R::zero(), "char(R) != 2");
-        assert!(!reduced || (l.base_pt().is_some() && t.is_zero()));
+    /// The default KhI construction: the cobordism-level cone (`ConeBuilder`) yields the
+    /// coned complex + canon classes directly, and `into_raw_complex` converts once at the
+    /// boundary (matrix-backed). The equivalent matrix-level cone is kept for reference as
+    /// `new_with_config_v1`.
+    pub fn new_with_config(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig) -> Self {
+        assert_supported_symmetry(l);
 
-        let deg_shift = KhComplex::deg_shift_for(l.link(), reduced);
+        let (h_range, build_config) = Self::cone_build_config(l, reduced, config);
+        Self::build_cone(l, h, t, reduced, build_config, h_range)
+    }
 
-        // TODO use mapping cone
+    // The ssi (`V2`) entry: `config.h_range` is used literally for the build (the driver pre-widens
+    // it), and only `raw_range` is converted — the solves never touch the other degrees.
+    pub(crate) fn new_windowed(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig, raw_range: RangeInclusive<isize>) -> Self {
+        Self::build_cone(l, h, t, reduced, config, Some(raw_range))
+    }
 
-        let cube = KhICube::new(l, h, t, reduced, deg_shift);
-        let inner = cube.into_complex();
+    fn build_cone(l: &InvLink, h: &R, t: &R, reduced: bool, build_config: SymBuildConfig, raw_range: Option<RangeInclusive<isize>>) -> Self {
+        use crate::tng::builder::ConeBuilder;
+        assert_eq!(R::one() + R::one(), R::zero(), "char(R) != 2"); // the cobordism cone is char-2 only
 
-        let canon_cycles = if l.base_pt().is_some() && l.link().is_knot() {
-            let p = l.base_pt().unwrap();
-            let zs = KhComplex::make_canon_cycles(l.link(), p, &R::zero(), h, reduced, deg_shift);
-            Iterator::chain(
-                zs.iter().map(|z| z.map_gens(|x| KhIGen::B(*x))),
-                zs.iter().map(|z| z.map_gens(|x| KhIGen::Q(*x)))
-            ).collect()
-        } else { 
-            vec![]
-        };
+        let cone = ConeBuilder::from_inv_link(l, h, t, reduced).with_config(build_config).run();
 
+        // sort by h-degree (all `B` then all `Q`) to match the matrix cone's canon-cycle order.
+        let canon_cycles = cone.eval_khi_elements().into_iter()
+            .sorted_by_key(|z| z.keys().map(|x| x.rel_h_deg()).min().unwrap_or(0))
+            .collect_vec();
+
+        let inner = cone.into_raw_complex(raw_range);
+
+        let deg_shift = KhComplex::<R>::deg_shift_for(l.inner(), reduced);
         Self::new_impl(inner, canon_cycles, deg_shift)
     }
 
-    pub fn from_kh_complex<'a, F>(c: KhComplex<R>, map: F) -> Self
-    where F: Fn(&KhChainGen) -> KhChainGen + Send + Sync + 'static {
-        let deg_shift = c.deg_shift();
+    pub fn new_no_simplify(l: &InvLink, h: &R, t: &R, reduced: bool) -> Self {
+        assert_eq!(R::one() + R::one(), R::zero(), "char(R) != 2");
+        assert_supported_symmetry(l);
+        assert!(
+            !reduced || (l.base_pt().is_some_and(|e| l.is_on_axis(e)) && t.is_zero()),
+            "reduced requires t = 0 and a base point on the axis"
+        );
+
+        let c = KhComplex::new_no_simplify(l.inner(), h, t, reduced);
+        Self::from_kh_complex(c, crate::khi::tau::tau_map(l))
+    }
+
+    pub(crate) fn from_kh_complex<F>(c: KhComplex<R>, map: F) -> Self
+    where F: Fn(&KhGen) -> KhGen + Send + Sync + 'static {
+        // the cone extends one degree above the complex.
         let h_range = c.h_range();
         let h_range = *h_range.start() ..= (h_range.end() + 1);
+        Self::cone_of(c, map, h_range)
+    }
 
-        let canon_cycles = c.canon_cycles().iter().flat_map(|z| { 
-            let bz = z.map_gens(|x| KhIGen::B(*x));
-            let qz = z.map_gens(|x| KhIGen::Q(*x));
+    pub(crate) fn cone_of<F>(c: KhComplex<R>, map: F, h_range: RangeInclusive<isize>) -> Self
+    where F: Fn(&KhGen) -> KhGen + Send + Sync + 'static {
+        let deg_shift = c.deg_shift();
+
+        let canon_cycles = c.canon_cycles().iter().flat_map(|z| {
+            let bz = z.clone().map_keys(KhIGen::from_left);
+            let qz = z.clone().map_keys(KhIGen::from_right);
             [bz, qz]
-        }).sorted_by_key(|z| z.h_deg()).collect_vec();
+        }).sorted_by_key(|z| z.keys().map(|x| x.rel_h_deg()).min().unwrap_or(0)).collect_vec();
 
-        // TODO use mapping cone
-
-        let summands = Grid1::generate(h_range, |i| { 
-            let b_gens = c[i].raw_gens().iter().map(|x| KhIGen::B(*x));
-            let q_gens = c[i - 1].raw_gens().iter().map(|x| KhIGen::Q(*x));
-            Summand::from_raw_gens(Iterator::chain(b_gens, q_gens))
+        // KhI is the mapping cone of (1 + τ) : KhComplex → KhComplex.
+        let one_plus_tau = ChainMap::new(c.inner(), c.inner(), 0, move |_, z| {
+            z.clone() + z.apply(|x| Lc::from(map(x)))
         });
-
-        let d = move |i: isize, x: &KhIGen| -> KhIChain<R> { 
-            match x { 
-                KhIGen::B(x) => {
-                    let z = KhChain::from(*x);
-                    let dx = c.d(i, &z).map_gens(|y| KhIGen::B(*y));
-                    let qx = KhIChain::from(KhIGen::Q(*x));
-                    let qtx = {
-                        let tx = map(x);
-                        KhIChain::from(KhIGen::Q(tx))
-                    };
-                    dx + qx + qtx
-                },
-                KhIGen::Q(x) => {
-                    let z = KhChain::from(*x);
-                    c.d(i, &z).map_gens(|y| KhIGen::Q(*y))
-                }
-            }
-        };
-
-        let inner = ChainComplex::new(summands, 1, move |i, z| { 
-            z.apply(|x| d(i, x))
-        });
+        let inner = one_plus_tau.cone(h_range, false);
 
         KhIComplex::new_impl(inner, canon_cycles, deg_shift)
     }
 
-    pub(crate) fn new_impl(inner: ChainComplex<KhIGen, R>, canon_cycles: Vec<KhIChain<R>>, deg_shift: (isize, isize)) -> Self { 
-        Self { inner, canon_cycles, deg_shift }
+    pub(crate) fn new_impl(inner: ChainComplex1<KhIGen, R>, canon_cycles: Vec<KhIChain<R>>, deg_shift: (isize, isize)) -> Self {
+        Self { inner, canon_cycles, deg_shift, cache_bigr: OnceLock::new() }
     }
 
-    pub fn inner(&self) -> &ChainComplex<KhIGen, R> {
+    pub fn inner(&self) -> &ChainComplex1<KhIGen, R> {
         &self.inner
     }
 
-    pub fn h_range(&self) -> RangeInclusive<isize> { 
-        range_of(self.support())
+    delegate! {
+        to self.inner {
+            pub fn support(&self) -> impl Iterator<Item = &isize> + '_;
+            pub fn is_supported(&self, i: isize) -> bool;
+            pub fn d_deg(&self) -> isize;
+            pub fn d(&self, i: isize, z: &KhIChain<R>) -> KhIChain<R>;
+            pub fn describe_d(&self) -> String;
+            pub fn describe_d_at(&self, i: isize) -> String;
+        }
+    }
+
+    pub fn deg_shift(&self) -> (isize, isize) {
+        self.deg_shift
+    }
+
+    pub fn h_deg_of(&self, x: &KhIGen) -> isize {
+        self.deg_shift.0 + x.rel_h_deg()
+    }
+
+    pub fn q_deg_of(&self, x: &KhIGen) -> isize {
+        self.deg_shift.1 + x.rel_q_deg()
+    }
+
+    pub fn h_deg_of_chain(&self, z: &KhIChain<R>) -> isize {
+        z.keys().map(|x| self.h_deg_of(x)).min().unwrap_or(0)
+    }
+
+    pub fn q_deg_of_chain(&self, z: &KhIChain<R>) -> isize {
+        z.keys().map(|x| self.q_deg_of(x)).min().unwrap_or(0)
+    }
+
+    pub fn h_range(&self) -> RangeInclusive<isize> {
+        self.support().copied().range().unwrap_or_else(empty_range)
     }
 
     pub fn q_range(&self) -> RangeInclusive<isize> {
-        range_of(self.support().flat_map(|i| 
-            self[i].raw_gens().iter().map(|x| x.q_deg())
-        ))
+        self.support().flat_map(|&i|
+            self[i].raw_generators().iter().map(|x| self.q_deg_of(x))
+        ).range().unwrap_or_else(empty_range)
     }
 
-    pub fn canon_cycles(&self) -> &[KhIChain<R>] { 
+    pub fn canon_cycles(&self) -> &[KhIChain<R>] {
         &self.canon_cycles
     }
 
     pub fn truncated(&self, range: RangeInclusive<isize>) -> Self {
         Self::new_impl(
-            self.inner.truncated(range), 
+            self.inner.truncated(range),
             self.canon_cycles.clone(),
-            self.deg_shift, 
+            self.deg_shift,
         )
     }
 
-    pub fn gen_grid(&self) -> Grid2<Summand<KhIGen, R>> {
-        let h_range = self.h_range();
-        let q_range = self.q_range().step_by(2);
-        let support = cartesian!(h_range, q_range.clone()).map(|(i, j)| 
-            isize2(i, j)
-        );
-
-        Grid2::generate(support, |idx| { 
-            let isize2(i, j) = idx;
-            let gens = self[i].raw_gens().iter().filter(|x| { 
-                x.q_deg() == j
-            }).cloned();
-            Summand::from_raw_gens(gens)
-        })
-    }
-
     pub fn homology(&self) -> KhIHomology<R>
-    where R: EucRing, for<'x> &'x R: EucRingOps<R> { 
+    where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         KhIHomology::from(self)
     }
+
+    fn cached_bigraded(&self) -> &GrMod2<KhIGen, R> {
+        self.cache_bigr.get_or_init(|| self.bigraded())
+    }
+
+    // `config.h_range` is the desired cone range `[a, b]`, clamped; since `KhI_i = C_i ⊕ C_{i-1}`,
+    // the build gets `[a-1, b]` while the rest of `config` is kept.
+    fn cone_build_config(l: &InvLink, reduced: bool, config: SymBuildConfig) -> (Option<RangeInclusive<isize>>, SymBuildConfig) {
+        let h_range = config.h_range.clone().map(|r| KhComplex::<R>::clamp_h_range(l.inner(), reduced, r));
+        let build_config = SymBuildConfig {
+            h_range: h_range.as_ref().map(|r| (*r.start() - 1) ..= *r.end()),
+            ..config
+        };
+        (h_range, build_config)
+    }
+}
+
+// Reference: the "honest" matrix-level cone — build the sym `KhComplex`, then cone `(1+τ)` at the
+// matrix level (`cone_of`). Superseded by the cobordism cone in `new_with_config`; kept for
+// cross-checks (see the `cone_canon_ssi_matches_matrix` test).
+#[allow(dead_code)]
+impl<R> KhIComplex<R>
+where R: Ring, for<'a> &'a R: RingOps<R> {
+    fn new_with_config_v1(l: &InvLink, h: &R, t: &R, reduced: bool, config: SymBuildConfig) -> Self {
+        use crate::tng::builder::SymTngBuilder;
+
+        let (h_range, build_config) = Self::cone_build_config(l, reduced, config);
+        let b = SymTngBuilder::from_inv_link(l, h, t, reduced).with_config(build_config).run();
+        let tau_map = b.tau_map();
+
+        let b = b.into_inner();
+        let canon_cycles = b.eval_elements();
+        let complex = b.into_tng_complex().into_raw_complex();
+        let c = KhComplex::from_raw_complex(l.inner(), h, t, reduced, complex, canon_cycles);
+
+        match h_range {
+            Some(range) => Self::cone_of(c, tau_map, range),
+            None => Self::from_kh_complex(c, tau_map),
+        }
+    }
+}
+
+impl<R> Bigraded<KhIGen, R> for KhIComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn base(&self) -> &GrMod1<KhIGen, R> { self.inner.summands() }
+    fn decomp_key(&self, z: &KhIChain<R>) -> isize { self.q_deg_of_chain(z) }
 }
 
 impl<R> Index<isize> for KhIComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = KhIComplexSummand<R>;
 
-    delegate! { 
+    delegate! {
         to self.inner {
             fn index(&self, index: isize) -> &Self::Output;
         }
     }
 }
 
-impl<R> GridTrait<isize> for KhIComplex<R>
+impl<R> Index<(isize, isize)> for KhIComplex<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Support = std::vec::IntoIter<isize>;
-    type Item = KhIComplexSummand<R>;
+    type Output = KhIComplexSummand<R>;
 
-    delegate! { 
-        to self.inner { 
-            fn support(&self) -> Self::Support;
-            fn is_supported(&self, i: isize) -> bool;
-            fn get(&self, i: isize) -> &Self::Item;
-            fn get_default(&self) -> &Self::Item;
+    fn index(&self, index: (isize, isize)) -> &Self::Output {
+        &self.cached_bigraded()[index]
+    }
+}
+
+impl<R> ToSeqString<isize> for KhIComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    delegate! {
+        to self.inner {
+            fn label(&self) -> String;
+            fn indices(&self) -> Vec<isize>;
+            fn entry_at(&self, i: &isize) -> String;
         }
     }
 }
 
-impl<R> ChainComplexTrait<isize> for KhIComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type R = R;
-    type Element = KhIChain<R>;
+impl<R> ToTexSeq<isize> for KhIComplex<R>
+where R: Ring + TeX, for<'x> &'x R: RingOps<R> {
+    fn tex_entry_at(&self, i: &isize) -> String {
+        if self[*i].is_zero() {
+            ".".to_string()
+        } else {
+            self[*i].tex_string()
+        }
+    }
+}
 
-    delegate! { 
-        to self.inner { 
-            fn rank(&self, i: isize) -> usize;
-            fn d_deg(&self) -> isize;
-            fn d(&self, i: isize, z: &Self::Element) -> Self::Element;
-            fn d_matrix(&self, i: isize) -> SpMat<R>;
+impl<R> ToTableString<isize> for KhIComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn labels(&self) -> (String, String) {
+        ("i".to_string(), "j".to_string())
+    }
+
+    fn indices(&self) -> (Vec<isize>, Vec<isize>) {
+        (self.h_range().collect(), self.q_range().step_by(2).collect())
+    }
+
+    fn entry_at(&self, i: &isize, j: &isize) -> String {
+        if self[(*i, *j)].is_zero() {
+            ".".to_string()
+        } else {
+            self[(*i, *j)].to_string()
+        }
+    }
+}
+
+impl<R> ToTexTable<isize> for KhIComplex<R>
+where R: Ring + TeX, for<'x> &'x R: RingOps<R> {
+    fn tex_entry_at(&self, i: &isize, j: &isize) -> String {
+        if self[(*i, *j)].is_zero() {
+            ".".to_string()
+        } else {
+            self[(*i, *j)].tex_string()
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use yui_core::poly::HPoly;
+    use yui_core::poly::Poly;
     use yui_core::num::FF2;
     use num_traits::{Zero, One};
-    use yui_homology::{ChainComplexTrait, SummandTrait};
     use super::*;
 
-    #[test]
-    fn complex_kh() { 
-        let l = InvLink::load("3_1").unwrap();
+    // canon-cycle tests are invariant under v1/v2 algorithm choice
+    macro_rules! canon_tests {
+        ($build:expr) => {
+            #[test]
+            fn canon_fbn() {
+                let l = InvLink::test_data("3_1");
 
-        type R = FF2;
-        let (h, t) = (R::zero(), R::zero());
-        let c = KhIComplex::new(&l, &h, &t, false);
+                type R = FF2;
+                let (h, t) = (R::one(), R::zero());
+                let c = $build(&l, &h, &t, false);
 
-        assert_eq!(c[0].rank(), 2);
-        assert_eq!(c[1].rank(), 2);
-        assert_eq!(c[2].rank(), 2);
-        assert_eq!(c[3].rank(), 4);
-        assert_eq!(c[4].rank(), 2);
-            
-        c.check_d_all();
+                let zs = c.canon_cycles.clone();
+
+                assert_eq!(zs.len(), 4);
+                assert!(zs[0].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
+                assert!(zs[1].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
+                assert!(zs[2].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
+                assert!(zs[3].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
+
+                for (i, z) in zs.iter().enumerate() {
+                    let i = (i / 2) as isize;
+                    assert!(c.d(i, z).is_zero());
+                }
+            }
+
+            #[test]
+            fn canon_fbn_red() {
+                let l = InvLink::test_data("3_1");
+
+                type R = FF2;
+                let (h, t) = (R::one(), R::zero());
+                let c = $build(&l, &h, &t, true);
+
+                let zs = c.canon_cycles.clone();
+
+                assert_eq!(zs.len(), 2);
+                assert!(zs[0].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
+                assert!(zs[1].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
+
+                for (i, z) in zs.iter().enumerate() {
+                    let i = i as isize;
+                    assert!(c.d(i, z).is_zero());
+                }
+            }
+
+            #[test]
+            fn canon_bn() {
+                let l = InvLink::test_data("3_1");
+
+                type R = FF2;
+                type P = Poly<'H', R>;
+                let (h, t) = (P::variable(), P::zero());
+                let c = $build(&l, &h, &t, false);
+
+                let zs = c.canon_cycles.clone();
+
+                assert_eq!(zs.len(), 4);
+                assert!(zs[0].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
+                assert!(zs[1].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
+                assert!(zs[2].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
+                assert!(zs[3].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
+
+                for (i, z) in zs.iter().enumerate() {
+                    let i = (i / 2) as isize;
+                    assert!(c.d(i, z).is_zero());
+                }
+            }
+
+            #[test]
+            fn canon_bn_red() {
+                let l = InvLink::test_data("3_1");
+
+                type R = FF2;
+                type P = Poly<'H', R>;
+                let (h, t) = (P::variable(), P::zero());
+                let c = $build(&l, &h, &t, true);
+
+                let zs = c.canon_cycles.clone();
+
+                assert_eq!(zs.len(), 2);
+                assert!(zs[0].homogeneous_value(|x| c.h_deg_of(x)) == Some(0));
+                assert!(zs[1].homogeneous_value(|x| c.h_deg_of(x)) == Some(1));
+
+                for (i, z) in zs.iter().enumerate() {
+                    let i = i as isize;
+                    assert!(c.d(i, z).is_zero());
+                }
+            }
+        };
     }
 
-    #[test]
-    fn complex_fbn() { 
-        let l = InvLink::load("3_1").unwrap();
+    mod v2 {
+        use super::*;
+        canon_tests!(KhIComplex::new);
 
-        type R = FF2;
-        let (h, t) = (R::one(), R::zero());
-        let c = KhIComplex::new(&l, &h, &t, false);
+        #[test]
+        fn complex_kh() {
+            let l = InvLink::test_data("3_1");
 
-        assert_eq!(c[0].rank(), 2);
-        assert_eq!(c[1].rank(), 2);
-        assert_eq!(c[2].rank(), 0);
-        assert_eq!(c[3].rank(), 0);
-        assert_eq!(c[4].rank(), 0);
-        
-        c.check_d_all();
-    }
+            type R = FF2;
+            let (h, t) = (R::zero(), R::zero());
+            let c = KhIComplex::new(&l, &h, &t, false);
 
-    #[test]
-    fn complex_bn() { 
-        let l = InvLink::load("3_1").unwrap();
+            assert_eq!(c[0].rank(), 2);
+            assert_eq!(c[1].rank(), 2);
+            assert_eq!(c[2].rank(), 2);
+            assert_eq!(c[3].rank(), 4);
+            assert_eq!(c[4].rank(), 2);
 
-        type R = FF2;
-        type P = HPoly<'H', R>;
-        let (h, t) = (P::variable(), P::zero());
+            c.inner().check_d_all();
+        }
 
-        let c = KhIComplex::new(&l, &h, &t, false);
+        #[test]
+        fn complex_fbn() {
+            let l = InvLink::test_data("3_1");
 
-        assert_eq!(c[0].rank(), 2);
-        assert_eq!(c[1].rank(), 2);
-        assert_eq!(c[2].rank(), 2);
-        assert_eq!(c[3].rank(), 4);
-        assert_eq!(c[4].rank(), 2);
-        
-        c.check_d_all();
-    }
+            type R = FF2;
+            let (h, t) = (R::one(), R::zero());
+            let c = KhIComplex::new(&l, &h, &t, false);
 
-    #[test]
-    fn complex_red() { 
-        let l = InvLink::load("3_1").unwrap();
+            assert_eq!(c[0].rank(), 2);
+            assert_eq!(c[1].rank(), 2);
+            assert_eq!(c[2].rank(), 0);
+            assert_eq!(c[3].rank(), 0);
+            assert_eq!(c[4].rank(), 0);
 
-        type R = FF2;
-        let (h, t) = (R::zero(), R::zero());
-        let c = KhIComplex::new(&l, &h, &t, true);
+            c.inner().check_d_all();
+        }
 
-        assert_eq!(c[0].rank(), 1);
-        assert_eq!(c[1].rank(), 1);
-        assert_eq!(c[2].rank(), 1);
-        assert_eq!(c[3].rank(), 2);
-        assert_eq!(c[4].rank(), 1);
-        
-        c.check_d_all();
-    }
+        #[test]
+        fn complex_bn() {
+            let l = InvLink::test_data("3_1");
 
-    #[test]
-    fn complex_kh_bigr() { 
-        let l = InvLink::load("3_1").unwrap();
+            type R = FF2;
+            type P = Poly<'H', R>;
+            let (h, t) = (P::variable(), P::zero());
 
-        type R = FF2;
-        let (h, t) = (R::zero(), R::zero());
-        let c = KhIComplex::new(&l, &h, &t, false).gen_grid();
+            let c = KhIComplex::new(&l, &h, &t, false);
 
-        assert_eq!(c[(0, 1)].rank(), 1);
-        assert_eq!(c[(0, 3)].rank(), 1);
-        assert_eq!(c[(1, 1)].rank(), 1);
-        assert_eq!(c[(1, 3)].rank(), 1);
-        assert_eq!(c[(2, 5)].rank(), 1);
-        assert_eq!(c[(2, 7)].rank(), 1);
-        assert_eq!(c[(3, 5)].rank(), 1);
-        assert_eq!(c[(3, 7)].rank(), 2);
-        assert_eq!(c[(3, 9)].rank(), 1);
-        assert_eq!(c[(4, 7)].rank(), 1);
-        assert_eq!(c[(4, 9)].rank(), 1);        
-    }
+            assert_eq!(c[0].rank(), 2);
+            assert_eq!(c[1].rank(), 2);
+            assert_eq!(c[2].rank(), 2);
+            assert_eq!(c[3].rank(), 4);
+            assert_eq!(c[4].rank(), 2);
 
-    #[test]
-    fn complex_kh_red_bigr() {
-        let l = InvLink::load("3_1").unwrap();
+            c.inner().check_d_all();
+        }
 
-        type R = FF2;
-        let (h, t) = (R::zero(), R::zero());
-        let c = KhIComplex::new(&l, &h, &t, true).gen_grid();
+        #[test]
+        fn complex_red() {
+            let l = InvLink::test_data("3_1");
 
-        assert_eq!(c[(0, 2)].rank(), 1);
-        assert_eq!(c[(1, 2)].rank(), 1);
-        assert_eq!(c[(2, 6)].rank(), 1);
-        assert_eq!(c[(3, 6)].rank(), 1);
-        assert_eq!(c[(3, 8)].rank(), 1);
-        assert_eq!(c[(4, 8)].rank(), 1);
-    }
+            type R = FF2;
+            let (h, t) = (R::zero(), R::zero());
+            let c = KhIComplex::new(&l, &h, &t, true);
 
-    #[test]
-    fn canon_fbn() { 
-        let l = InvLink::load("3_1").unwrap();
+            assert_eq!(c[0].rank(), 1);
+            assert_eq!(c[1].rank(), 1);
+            assert_eq!(c[2].rank(), 1);
+            assert_eq!(c[3].rank(), 2);
+            assert_eq!(c[4].rank(), 1);
 
-        type R = FF2;
-        let (h, t) = (R::one(), R::zero());
-        let c = KhIComplex::new(&l, &h, &t, false);
+            c.inner().check_d_all();
+        }
 
-        let zs = c.canon_cycles.clone();
+        #[test]
+        fn complex_kh_bigr() {
+            let l = InvLink::test_data("3_1");
 
-        assert_eq!(zs.len(), 4);
-        assert!(zs[0].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[1].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[2].gens().all(|x| x.h_deg() == 1));
-        assert!(zs[3].gens().all(|x| x.h_deg() == 1));
+            type R = FF2;
+            let (h, t) = (R::zero(), R::zero());
+            let c = KhIComplex::new(&l, &h, &t, false);
 
-        for (i, z) in zs.iter().enumerate() { 
-            let i = (i / 2) as isize;
-            assert!(c.d(i, z).is_zero());
+            assert_eq!(c[(0, 1)].rank(), 1);
+            assert_eq!(c[(0, 3)].rank(), 1);
+            assert_eq!(c[(1, 1)].rank(), 1);
+            assert_eq!(c[(1, 3)].rank(), 1);
+            assert_eq!(c[(2, 5)].rank(), 1);
+            assert_eq!(c[(2, 7)].rank(), 1);
+            assert_eq!(c[(3, 5)].rank(), 1);
+            assert_eq!(c[(3, 7)].rank(), 2);
+            assert_eq!(c[(3, 9)].rank(), 1);
+            assert_eq!(c[(4, 7)].rank(), 1);
+            assert_eq!(c[(4, 9)].rank(), 1);
+        }
+
+        #[test]
+        fn complex_kh_red_bigr() {
+            let l = InvLink::test_data("3_1");
+
+            type R = FF2;
+            let (h, t) = (R::zero(), R::zero());
+            let c = KhIComplex::new(&l, &h, &t, true);
+
+            assert_eq!(c[(0, 2)].rank(), 1);
+            assert_eq!(c[(1, 2)].rank(), 1);
+            assert_eq!(c[(2, 6)].rank(), 1);
+            assert_eq!(c[(3, 6)].rank(), 1);
+            assert_eq!(c[(3, 8)].rank(), 1);
+            assert_eq!(c[(4, 8)].rank(), 1);
+        }
+
+        // the default cobordism cone (`new`) must give the same bigraded homology as the honest
+        // matrix cone (`new_with_config_v1`).
+        #[test]
+        fn cone_matches_v1() {
+            use yui_homology::isize2;
+
+            type R = FF2;
+            let (h, t) = (R::zero(), R::zero());
+
+            let nonzero = |m: &GrMod2<KhIGen, R>| -> Vec<(isize2, usize)> {
+                m.support().map(|&k| (k, m[k].rank())).filter(|(_, r)| *r > 0).sorted().collect()
+            };
+
+            for name in ["3_1", "4_1", "6_3"] {
+                for reduced in [false, true] {
+                    let l = InvLink::test_data(name);
+                    let v1 = KhIComplex::new_with_config_v1(&l, &h, &t, reduced, SymBuildConfig::default()).homology().bigraded();
+                    let v2 = KhIComplex::new(&l, &h, &t, reduced).homology().bigraded();
+                    assert_eq!(nonzero(&v1), nonzero(&v2), "{name} reduced={reduced}");
+                }
+            }
+        }
+
+        // The sym+cone q-filter: over Khovanov (d preserves q), a q-window keeps exactly the
+        // in-window generators, and bigraded KhI homology at each kept (i, q) is unchanged.
+        // Runs the single-pass build (final-merge prune + finalize deloop filter) and a chunked
+        // build (sym chunk-merges too).
+        #[test]
+        fn q_filter_matches_full() {
+            use crate::tng::builder::CutOption;
+            type R = FF2;
+            let l = InvLink::test_data("6_3");
+            let (h, t) = (R::zero(), R::zero());
+
+            let full = KhIComplex::new(&l, &h, &t, false);
+            let (h_range, q_range) = (full.h_range(), full.q_range());
+            let full_h = full.homology();
+
+            let (lo, hi) = (*q_range.start() + 2, *q_range.end() - 2);
+
+            for cut in [CutOption::None, CutOption::Auto(3)] {
+                let config = SymBuildConfig { q_range: Some(lo ..= hi), cut: cut.clone(), ..Default::default() };
+                let win = KhIComplex::new_with_config(&l, &h, &t, false, config);
+
+                for i in win.h_range() {
+                    for x in win[i].raw_generators() {
+                        assert!((lo ..= hi).contains(&win.q_deg_of(x)), "gen out of window: ({i}, {}), cut={cut:?}", win.q_deg_of(x));
+                    }
+                }
+
+                let win_h = win.homology();
+                for i in h_range.clone() {
+                    for q in q_range.clone().step_by(2) {
+                        let expected = if (lo ..= hi).contains(&q) { full_h[(i, q)].rank() } else { 0 };
+                        assert_eq!(win_h[(i, q)].rank(), expected, "rank ({i}, {q}), cut={cut:?}");
+                    }
+                }
+            }
         }
     }
 
-    #[test]
-    fn canon_fbn_red() { 
-        let l = InvLink::load("3_1").unwrap();
+    mod v1 {
+        use super::*;
+        canon_tests!(KhIComplex::new_no_simplify);
 
-        type R = FF2;
-        let (h, t) = (R::one(), R::zero());
-        let c = KhIComplex::new(&l, &h, &t, true);
+        #[test]
+        fn complex_kh() {
+            let l = InvLink::test_data("3_1");
 
-        let zs = c.canon_cycles.clone();
+            type R = FF2;
+            let (h, t) = (R::zero(), R::zero());
+            let c = KhIComplex::new_no_simplify(&l, &h, &t, false);
 
-        assert_eq!(zs.len(), 2);
-        assert!(zs[0].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[1].gens().all(|x| x.h_deg() == 1));
+            assert_eq!(c[0].rank(), 4);
+            assert_eq!(c[1].rank(), 10);
+            assert_eq!(c[2].rank(), 18);
+            assert_eq!(c[3].rank(), 20);
+            assert_eq!(c[4].rank(), 8);
 
-        for (i, z) in zs.iter().enumerate() { 
-            let i = i as isize;
-            assert!(c.d(i, z).is_zero());
+            c.inner().check_d_all();
         }
-    }
 
-    #[test]
-    fn canon_bn() { 
-        let l = InvLink::load("3_1").unwrap();
+        #[test]
+        fn complex_fbn() {
+            let l = InvLink::test_data("3_1");
 
-        type R = FF2;
-        type P = HPoly<'H', R>;
-        let (h, t) = (P::variable(), P::zero());
-        let c = KhIComplex::new(&l, &h, &t, false);
+            type R = FF2;
+            let (h, t) = (R::one(), R::zero());
+            let c = KhIComplex::new_no_simplify(&l, &h, &t, false);
 
-        let zs = c.canon_cycles.clone();
+            assert_eq!(c[0].rank(), 4);
+            assert_eq!(c[1].rank(), 10);
+            assert_eq!(c[2].rank(), 18);
+            assert_eq!(c[3].rank(), 20);
+            assert_eq!(c[4].rank(), 8);
 
-        assert_eq!(zs.len(), 4);
-        assert!(zs[0].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[1].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[2].gens().all(|x| x.h_deg() == 1));
-        assert!(zs[3].gens().all(|x| x.h_deg() == 1));
-
-        for (i, z) in zs.iter().enumerate() { 
-            let i = (i / 2) as isize;
-            assert!(c.d(i, z).is_zero());
+            c.inner().check_d_all();
         }
-    }
 
-    #[test]
-    fn canon_bn_red() { 
-        let l = InvLink::load("3_1").unwrap();
+        #[test]
+        fn complex_bn() {
+            let l = InvLink::test_data("3_1");
 
-        type R = FF2;
-        type P = HPoly<'H', R>;
-        let (h, t) = (P::variable(), P::zero());
-        let c = KhIComplex::new(&l, &h, &t, true);
-        
-        let zs = c.canon_cycles.clone();
+            type R = FF2;
+            type P = Poly<'H', R>;
+            let (h, t) = (P::variable(), P::zero());
 
-        assert_eq!(zs.len(), 2);
-        assert!(zs[0].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[1].gens().all(|x| x.h_deg() == 1));
+            let c = KhIComplex::new_no_simplify(&l, &h, &t, false);
 
-        for (i, z) in zs.iter().enumerate() { 
-            let i = i as isize;
-            assert!(c.d(i, z).is_zero());
+            assert_eq!(c[0].rank(), 4);
+            assert_eq!(c[1].rank(), 10);
+            assert_eq!(c[2].rank(), 18);
+            assert_eq!(c[3].rank(), 20);
+            assert_eq!(c[4].rank(), 8);
+
+            c.inner().check_d_all();
         }
-    }
-}
 
-#[cfg(test)]
-mod tests_v1 {
-    use yui_core::poly::HPoly;
-    use yui_core::num::FF2;
-    use num_traits::{Zero, One};
-    use yui_homology::{ChainComplexTrait, SummandTrait};
-    use super::*;
+        #[test]
+        fn complex_red() {
+            let l = InvLink::test_data("3_1");
 
-    #[test]
-    fn complex_kh() { 
-        let l = InvLink::load("3_1").unwrap();
+            type R = FF2;
+            let (h, t) = (R::zero(), R::zero());
+            let c = KhIComplex::new_no_simplify(&l, &h, &t, true);
 
-        type R = FF2;
-        let (h, t) = (R::zero(), R::zero());
-        let c = KhIComplex::new_no_simplify(&l, &h, &t, false);
+            assert_eq!(c[0].rank(), 2);
+            assert_eq!(c[1].rank(), 5);
+            assert_eq!(c[2].rank(), 9);
+            assert_eq!(c[3].rank(), 10);
+            assert_eq!(c[4].rank(), 4);
 
-        assert_eq!(c[0].rank(), 4);
-        assert_eq!(c[1].rank(), 10);
-        assert_eq!(c[2].rank(), 18);
-        assert_eq!(c[3].rank(), 20);
-        assert_eq!(c[4].rank(), 8);
-            
-        c.check_d_all();
-    }
-
-    #[test]
-    fn complex_fbn() { 
-        let l = InvLink::load("3_1").unwrap();
-
-        type R = FF2;
-        let (h, t) = (R::one(), R::zero());
-        let c = KhIComplex::new_no_simplify(&l, &h, &t, false);
-
-        assert_eq!(c[0].rank(), 4);
-        assert_eq!(c[1].rank(), 10);
-        assert_eq!(c[2].rank(), 18);
-        assert_eq!(c[3].rank(), 20);
-        assert_eq!(c[4].rank(), 8);
-        
-        c.check_d_all();
-    }
-
-    #[test]
-    fn complex_bn() { 
-        let l = InvLink::load("3_1").unwrap();
-
-        type R = FF2;
-        type P = HPoly<'H', R>;
-        let (h, t) = (P::variable(), P::zero());
-
-        let c = KhIComplex::new_no_simplify(&l, &h, &t, false);
-
-        assert_eq!(c[0].rank(), 4);
-        assert_eq!(c[1].rank(), 10);
-        assert_eq!(c[2].rank(), 18);
-        assert_eq!(c[3].rank(), 20);
-        assert_eq!(c[4].rank(), 8);
-        
-        c.check_d_all();
-    }
-
-    #[test]
-    fn complex_red() { 
-        let l = InvLink::load("3_1").unwrap();
-
-        type R = FF2;
-        let (h, t) = (R::zero(), R::zero());
-        let c = KhIComplex::new_no_simplify(&l, &h, &t, true);
-
-        assert_eq!(c[0].rank(), 2);
-        assert_eq!(c[1].rank(), 5);
-        assert_eq!(c[2].rank(), 9);
-        assert_eq!(c[3].rank(), 10);
-        assert_eq!(c[4].rank(), 4);
-        
-        c.check_d_all();
-    }
-
-    #[test]
-    fn canon_fbn() { 
-        let l = InvLink::load("3_1").unwrap();
-
-        type R = FF2;
-        let (h, t) = (R::one(), R::zero());
-        let c = KhIComplex::new_no_simplify(&l, &h, &t, false);
-
-        let zs = c.canon_cycles.clone();
-
-        assert_eq!(zs.len(), 4);
-        assert!(zs[0].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[1].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[2].gens().all(|x| x.h_deg() == 1));
-        assert!(zs[3].gens().all(|x| x.h_deg() == 1));
-
-        for (i, z) in zs.iter().enumerate() { 
-            let i = (i / 2) as isize;
-            assert!(c.d(i, z).is_zero());
+            c.inner().check_d_all();
         }
-    }
 
-    #[test]
-    fn canon_fbn_red() { 
-        let l = InvLink::load("3_1").unwrap();
-
-        type R = FF2;
-        let (h, t) = (R::one(), R::zero());
-        let c = KhIComplex::new_no_simplify(&l, &h, &t, true);
-
-        let zs = c.canon_cycles.clone();
-
-        assert_eq!(zs.len(), 2);
-        assert!(zs[0].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[1].gens().all(|x| x.h_deg() == 1));
-
-        for (i, z) in zs.iter().enumerate() { 
-            let i = i as isize;
-            assert!(c.d(i, z).is_zero());
+        // an off-axis base point leaves the reduced complex without the τ-images of its
+        // generators, which `vectorize` then drops without a word.
+        fn based_off_axis() -> InvLink {
+            let l = InvLink::test_data("3_1");
+            let e_map: Vec<_> = l.inner().edges().into_iter().map(|e| (e, l.inv_edge(e))).collect();
+            let off = l.inner().edges().into_iter().find(|&e| !l.is_on_axis(e)).unwrap();
+            InvLink::new(l.inner().clone().with_base_pt(off), e_map)
         }
-    }
 
-    #[test]
-    fn canon_bn() { 
-        let l = InvLink::load("3_1").unwrap();
-
-        type R = FF2;
-        type P = HPoly<'H', R>;
-        let (h, t) = (P::variable(), P::zero());
-        let c = KhIComplex::new_no_simplify(&l, &h, &t, false);
-
-        let zs = c.canon_cycles.clone();
-
-        assert_eq!(zs.len(), 4);
-        assert!(zs[0].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[1].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[2].gens().all(|x| x.h_deg() == 1));
-        assert!(zs[3].gens().all(|x| x.h_deg() == 1));
-
-        for (i, z) in zs.iter().enumerate() { 
-            let i = (i / 2) as isize;
-            assert!(c.d(i, z).is_zero());
+        #[test]
+        #[should_panic(expected = "base point on the axis")]
+        fn reduced_rejects_off_axis_base_pt() {
+            let (h, t) = (FF2::zero(), FF2::zero());
+            let _ = KhIComplex::new_no_simplify(&based_off_axis(), &h, &t, true);
         }
-    }
 
-    #[test]
-    fn canon_bn_red() { 
-        let l = InvLink::load("3_1").unwrap();
-
-        type R = FF2;
-        type P = HPoly<'H', R>;
-        let (h, t) = (P::variable(), P::zero());
-        let c = KhIComplex::new_no_simplify(&l, &h, &t, true);
-        
-        let zs = c.canon_cycles.clone();
-
-        assert_eq!(zs.len(), 2);
-        assert!(zs[0].gens().all(|x| x.h_deg() == 0));
-        assert!(zs[1].gens().all(|x| x.h_deg() == 1));
-
-        for (i, z) in zs.iter().enumerate() { 
-            let i = i as isize;
-            assert!(c.d(i, z).is_zero());
+        #[test]
+        #[should_panic(expected = "base point on the axis")]
+        fn reduced_rejects_off_axis_base_pt_cone() {
+            let (h, t) = (FF2::zero(), FF2::zero());
+            let _ = KhIComplex::new(&based_off_axis(), &h, &t, true);
         }
     }
 }

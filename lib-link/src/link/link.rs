@@ -1,220 +1,260 @@
+//! [`Link`]: a knot or link as a planar diagram — a `Vec<Node>` plus the free
+//! loops and an optional base point — with its accessors, components and traversal.
+
 use core::panic;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use itertools::Itertools;
-use yui_core::{hashmap, CloneAnd, Sign};
-use yui_core::bitseq::Bit;
 
-use super::{Node, NodeType, Path};
+use super::{Node, Path, Slot};
 
-pub type Edge = usize;
-pub type State = yui_core::bitseq::BitSeq;
-pub type XCode = [Edge; 4];
+#[cfg(not(feature = "big-link"))]
+pub type Edge = u8;
+#[cfg(not(feature = "big-link"))]
+pub type StateRepr = u64;
 
-#[derive(Debug, Clone)]
-pub struct Link { 
+// `big-link`: diagrams with up to 128 crossings (256 edge labels).
+#[cfg(feature = "big-link")]
+pub type Edge = u16;
+#[cfg(feature = "big-link")]
+pub type StateRepr = u128;
+
+pub type State = yui_core::bitseq::BitSeq<StateRepr>;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Link {
     nodes: Vec<Node>,
-    edges: HashSet<Edge>
+    loops: Vec<Edge>,
+    base_pt: Option<Edge>,
 }
 
 impl Link {
-    pub fn new(nodes: Vec<Node>) -> Self { 
-        let edges = nodes.iter().flat_map(|x| x.edges()).cloned().collect();
-        let l = Self { nodes, edges };
-        l.validate();
+    /// The maximum number of crossings a `Link` can carry, bounded by the `State` width
+    /// (64 by default, 128 under the `big-link` feature).
+    pub const MAX_CROSSING: usize = State::MAX_LEN;
+
+    pub fn new(
+        nodes: impl IntoIterator<Item = Node>,
+        loops: impl IntoIterator<Item = Edge>,
+    ) -> Self {
+        let nodes = nodes.into_iter().collect_vec();
+        let loops = loops.into_iter().collect_vec();
+
+        assert!(
+            nodes.len() <= Self::MAX_CROSSING,
+            "too many crossings: {} > MAX_CROSSING = {} (enable the `big-link` feature for up to 128)",
+            nodes.len(), Self::MAX_CROSSING
+        );
+
+        let edge_counts = nodes.iter().flat_map(|x| x.edges()).cloned().counts();
+        let bad = edge_counts.iter()
+            .filter(|&(_, &c)| c != 2)
+            .map(|(&e, &c)| (e, c))
+            .sorted()
+            .collect_vec();
+        assert!(bad.is_empty(), "each edge must appear exactly twice; (edge, count) = {bad:?}");
+
+        let node_edges: HashSet<Edge> = edge_counts.into_keys().collect();
+        let mut loop_set: HashSet<Edge> = HashSet::new();
+        for &e in &loops {
+            assert!(!node_edges.contains(&e), "loop edge {e} is already used in a node");
+            assert!(loop_set.insert(e), "duplicate loop edge: {e}");
+        }
+
+        // Default base_pt to the minimal edge (if any).
+        let base_pt = node_edges.iter().chain(loops.iter()).copied().min();
+
+        let l = Self { nodes, loops, base_pt };
+        l.verify_ori();
         l
     }
 
-    fn validate(&self) { 
-        assert_eq!(self.edges.len(), self.nodes.len() * 2, "Invalid data.");
-        self.traverse(|_, _, _| ());
+    pub fn from_nodes(nodes: impl IntoIterator<Item = Node>) -> Self {
+        Self::new(nodes, [])
+    }
+
+    pub fn with_base_pt(mut self, e: Edge) -> Self {
+        let exists = self.nodes.iter().any(|x| x.edges().contains(&e))
+            || self.loops.contains(&e);
+        assert!(exists, "base_pt {e} is not an edge of this link");
+        self.base_pt = Some(e);
+        self
+    }
+
+    pub fn base_pt(&self) -> Option<Edge> {
+        self.base_pt
     }
 
     pub fn empty() -> Link {
-        Link { nodes: vec![], edges: HashSet::new() }
+        Self::new([], [])
     }
 
     pub fn is_empty(&self) -> bool {
-        self.nodes.is_empty()
+        self.nodes.is_empty() && self.loops.is_empty()
     }
 
-    pub fn is_knot(&self) -> bool { 
-        self.n_components() == 1
+    pub fn unknot() -> Link {
+        Self::unlink(1)
     }
 
-    pub fn writhe(&self) -> i32 { 
-        let (p, n) = self.count_signed_crossings();
+    pub fn unlink(n: usize) -> Link {
+        Self::new([], (1..=n).map(|e| e as Edge))
+    }
+
+    pub fn is_knot(&self) -> bool {
+        self.n_comps() == 1
+    }
+
+    pub fn is_oriented(&self) -> bool {
+        self.nodes().all(|n| n.is_oriented())
+    }
+
+    // An orientation belongs to the whole diagram: once any node has lost it, drop it everywhere.
+    pub(crate) fn normalize_ori(&mut self) {
+        if !self.is_oriented() {
+            self.nodes.iter_mut().for_each(|n|
+                n.set_incoming(None)
+            );
+        }
+    }
+
+    // Oriented throughout or not at all, every edge from an outgoing slot to an incoming one.
+    pub fn verify_ori(&self) {
+        let n_ori = self.nodes.iter().filter(|x| x.is_oriented()).count();
+        if n_ori == 0 {
+            return;
+        }
+        assert_eq!(n_ori, self.n_nodes(), "some nodes are oriented and some are not");
+
+        self.nodes.iter().flat_map(|x| {
+            let (p, q) = x.incoming().unwrap();
+            Slot::ALL.map(move |s| (x.edge(s), s == p || s == q))
+        }).into_group_map().into_iter().for_each(|(e, ins)|
+            assert!(
+                matches!(ins[..], [a, b] if a != b),
+                "edge {e} does not run from an outgoing slot to an incoming one"
+            )
+        );
+    }
+
+    pub fn writhe(&self) -> i32 {
+        let (p, n) = self.n_signed_crossings();
         (p as i32) - (n as i32)
     }
 
-    pub fn mirror(&self) -> Self {
-        self.clone_and(|l|
-            l.nodes.iter_mut().for_each(|x| x.cc())
-        )
-    }
-
-    pub fn n_nodes(&self) -> usize { 
+    pub fn n_nodes(&self) -> usize {
         self.nodes.len()
     }
 
-    pub fn nodes(&self) -> impl Iterator<Item = &Node> { 
+    pub fn nodes(&self) -> impl Iterator<Item = &Node> {
         self.nodes.iter()
     }
 
-    pub fn node(&self, i: usize) -> &Node { 
+    pub fn node(&self, i: usize) -> &Node {
         &self.nodes[i]
     }
 
-    pub fn node_mut(&mut self, i: usize) -> &mut Node { 
+    pub(crate) fn node_mut(&mut self, i: usize) -> &mut Node {
         &mut self.nodes[i]
     }
 
-    pub fn crossings(&self) -> impl Iterator<Item = &Node> { 
+    pub fn crossings(&self) -> impl Iterator<Item = &Node> {
         self.nodes.iter().filter(|x| x.is_crossing())
     }
 
-    pub fn count_crossings(&self) -> usize { 
+    pub fn n_crossings(&self) -> usize {
         self.nodes.iter()
             .filter(|x| x.is_crossing())
             .count()
     }
 
-    pub fn count_signed_crossings(&self) -> (usize, usize) {
-        let signs = self.collect_crossing_signs();
-        let pos = signs.iter().filter(|(_, s)| s.is_positive()).count();
-        let neg = signs.len() - pos;
+    pub fn n_signed_crossings(&self) -> (usize, usize) {
+        let mut pos = 0;
+        let mut neg = 0;
+        for n in self.nodes.iter() {
+            if n.is_pos() { pos += 1 }
+            else if n.is_neg() { neg += 1}
+        }
         (pos, neg)
     }
 
-    pub fn collect_crossing_signs(&self) -> HashMap<usize, Sign> {
-        use NodeType::{X, Xm};
+    pub fn loops(&self) -> &[Edge] {
+        &self.loops
+    }
 
-        let mut result = hashmap!{};
+    pub fn n_loops(&self) -> usize {
+        self.loops.len()
+    }
 
-        self.traverse(|_, i, j| { 
-            let c = self.node(i);
-            match (c.ntype(), j) { 
-                (Xm, 1) | (X, 3) => result.insert(i, Sign::Pos),
-                (Xm, 3) | (X, 1) => result.insert(i, Sign::Neg),
-                _ => None
-            };
+    pub fn n_edges(&self) -> usize {
+        self.nodes.len() * 2 + self.loops.len()
+    }
+
+    pub fn edges(&self) -> Vec<Edge> {
+        let mut edges: Vec<Edge> = self.nodes.iter()
+            .flat_map(|x| x.edges().iter().copied())
+            .chain(self.loops.iter().copied())
+            .collect();
+        edges.sort();
+        edges.dedup();
+        edges
+    }
+
+    pub fn n_comps(&self) -> usize {
+        let mut count = 0;
+        self.traverse_comps(|c, _, _|
+            if count <= c { count = c + 1 }
+        );
+        count + self.loops.len()
+    }
+
+    pub fn comps(&self) -> Vec<Path> {
+        let mut comps = vec![];
+
+        self.traverse_comps(|c, i, s| {
+            if c == comps.len() {
+                comps.push(vec![]);
+            }
+            comps[c].push(self.node(i).edge(s));
         });
 
+        let mut result: Vec<Path> = comps.into_iter().map(Path::circ).collect();
+        for &e in &self.loops {
+            result.push(Path::circ(vec![e]));
+        }
         result
     }
 
-    pub fn n_edges(&self) -> usize { 
-        self.edges.len()
-    }
-    
-    pub fn edges(&self) -> impl Iterator<Item = &Edge> {
-        self.edges.iter()
-    }
-
-    pub fn min_edge(&self) -> Option<Edge> { 
-        self.nodes.first().map(|x| x.min_edge())
-    }
-
-    pub fn n_components(&self) -> usize { 
-        let mut count = 0;
-        self.traverse(|c, _, _| 
-            if count <= c { count = c + 1 } 
-        );
-        count
-    }
-
-    pub fn collect_components(&self) -> Vec<Path> {
-        let mut comps = vec![];
-
-        self.traverse(|c, i, j| { 
-            if c == comps.len() { 
-                comps.push(vec![]);
-            }
-
-            let e = self.node(i).edge(j);
-            comps[c].push(e);
-        });
-
-        comps.into_iter().map(|edges| 
-            Path::circ(edges)
-        ).collect()
-    }
-
-    pub fn crossing_change(&self, i: usize) -> Self { 
-        assert!(self.node(i).is_crossing());
-        self.clone_and(|l| l.node_mut(i).cc())
-    }
-
-    pub fn resolved_at(&self, i: usize, r: Bit) -> Self {
-        assert!(self.node(i).is_crossing());
-        self.clone_and(|l| l.node_mut(i).resolve(r))
-    }
-
-    pub fn resolved_by(&self, s: &State) -> Self {
-        assert!(s.len() == self.count_crossings());
-
-        let n = self.nodes.len();
-        let itr = (0..n).filter(|&i| self.node(i).is_crossing());
-
-        self.clone_and(|l| {
-            for (i, r) in Iterator::zip(itr, s.iter()) {
-                l.node_mut(i).resolve(r); 
-            }
-        })
-    }
-
-    pub fn seifert_state(&self) -> State { 
-        let signs = self.collect_crossing_signs();
-        let seq = signs.iter().sorted_by_key(|(&i, _)| i).map(|(_, s)| 
-            match s { 
-                Sign::Pos => 0, 
-                Sign::Neg => 1
-            }
-        ); 
-        State::from_iter(seq)
-    }
-
-    pub fn seifert_circles(&self) -> Vec<Path> { 
-        self.resolved_by(&self.seifert_state()).collect_components()
-    }
-
-    fn traverse<F>(&self, mut f: F) where 
-    F: FnMut(usize, usize, usize) { 
-        let n = self.n_nodes();
-
+    pub fn traverse_comps<F>(&self, mut f: F) where
+    F: FnMut(usize, usize, Slot) {
         let mut c = 0; // component counter
-        let mut remain = self.edges.clone();
+        let mut remain: HashSet<Edge> = self.nodes.iter().flat_map(|x| x.edges().iter().copied()).collect();
 
-        // MEMO: For a link obtained from a PD-code, 
-        // the following loop should break after the first iteration: j0 = 0.
+        while !remain.is_empty() {
+            // Take minimal edge-id.
+            let e0 = remain.iter().min().cloned().unwrap();
 
-        for j0 in [0, 1, 2] { 
-            for i0 in 0..n {
-                let e0 = self.node(i0).edge(j0);
-                if !remain.remove(&e0) { 
-                    continue 
-                }
+            // Find node & point having edge e0, entering at its head so the walk runs forward.
+            let (i0, j0) = if self.is_oriented() {
+                self.edge_ends(e0, true).1
+            } else {
+                self.find_port(|i, s|
+                    self.node(i).edge(s) == e0
+                ).unwrap()
+            };
 
-                self.traverse_from((i0, j0), |i, j| { 
-                    let e = self.node(i).edge(j);
-                    remain.remove(&e);
+            self.traverse_from((i0, j0), |i, s| {
+                remain.remove(&self.node(i).edge(s));
+                f(c, i, s);
+            });
 
-                    f(c, i, j);
-                });
-
-                c += 1;
-            }
-
-            if remain.is_empty() { 
-                break
-            }
+            // Onto next component.
+            c += 1;
         }
-
-        assert!(remain.is_empty())
     }
 
-    fn traverse_from<F>(&self, start: (usize, usize), mut f:F) where
-        F: FnMut(usize, usize)
+    pub fn traverse_from<F>(&self, start: (usize, Slot), mut f: F) where
+        F: FnMut(usize, Slot)
     {
         let (mut i, mut j) = start;
 
@@ -222,7 +262,7 @@ impl Link {
 
         loop {
             let c = self.node(i);
-            let k = c.traverse_inner(j);
+            let k = c.paired_slot(j);
             let next = self.traverse_outer(i, k);
 
             if next == start {
@@ -235,80 +275,164 @@ impl Link {
         }
     }
 
-    fn traverse_outer(&self, n_index: usize, e_index: usize) -> (usize, usize) {
-        let e = self.nodes[n_index].edge(e_index);
+    fn traverse_outer(&self, n_index: usize, slot: Slot) -> (usize, Slot) {
+        let e = self.nodes[n_index].edge(slot);
+        self.nodes.iter().enumerate().flat_map(|(i, _)|
+            Slot::ALL.map(move |s| (i, s))
+        ).find(|&(i, s)|
+            self.nodes[i].edge(s) == e && (i, s) != (n_index, slot)
+        ).expect("Broken data")
+    }
 
-        for (i, c) in self.nodes.iter().enumerate() { 
-            for (j, &f) in c.edges().iter().enumerate() { 
-                if e == f && (n_index != i || (n_index == i && e_index != j)) { 
-                    return (i, j)
-                }
+    // Re-derive each crossing's orientation by traversing components. `is_incoming(i, j)` tells
+    // whether port j of node i is known to receive an incoming strand (PD codes: j == 0). The first
+    // claimed port met by a tentative traversal fixes the component's direction; a component claiming
+    // no port is undetermined (cf. `unlink2`) and the whole link is left unoriented. A fixed direction
+    // contradicting `is_incoming` (an odd PD code) panics. Returns whether the link is now oriented.
+    pub(crate) fn reorient<F>(&mut self, is_incoming: F) -> bool
+    where F: Fn(usize, Slot) -> bool {
+        let mut incoming: Vec<Vec<Slot>> = vec![vec![]; self.n_nodes()];
+        let mut remain: HashSet<Edge> = self.nodes.iter().flat_map(|x| x.edges().iter().copied()).collect();
+        let mut undetermined = false;
+
+        while !remain.is_empty() {
+            // start at a claimed port of an untraversed component, so the direction is correct
+            // from the outset. Components claiming no port are undetermined (cf. `unlink2`).
+            let Some(start) = self.find_port(|i, s|
+                remain.contains(&self.node(i).edge(s)) && is_incoming(i, s)
+            ) else {
+                undetermined = true;
+                break;
+            };
+
+            self.traverse_from(start, |i, s| {
+                remain.remove(&self.node(i).edge(s));
+                let out = self.node(i).paired_slot(s);
+                assert!(
+                    is_incoming(i, s) || !is_incoming(i, out),
+                    "inconsistent orientation: the strand through node {i} exits at slot {out}, which is claimed incoming"
+                );
+                incoming[i].push(s);
+            });
+        }
+
+        // a node is oriented by its two incoming slots, provided they lie on different strands;
+        // if any node fails that, or some component is undetermined, the whole link is unoriented.
+        let oris = Iterator::zip(self.nodes.iter(), incoming.iter()).map(|(n, slots)|
+            match slots[..] {
+                [p, q] => Node::orientable(n.node_type(), p, q).then_some((p, q)),
+                _ => None,
             }
+        ).collect_vec();
+        let coherent = !undetermined && oris.iter().all(Option::is_some);
+
+        self.nodes.iter_mut().zip(oris).for_each(|(n, o)|
+            n.set_incoming(if coherent { o } else { None })
+        );
+
+        coherent
+    }
+
+    pub fn unoriented(&self) -> Self {
+        if !self.is_oriented() {
+            return self.clone();
+        }
+        let mut l = self.clone();
+        l.nodes.iter_mut().for_each(|n|
+            n.set_incoming(None)
+        );
+        l
+    }
+
+    // Renumber the edges base..base+n in the order they are met traversing from `start_edge`
+    // (a knot's one traversal covers every edge), keeping the diagram. base_pt becomes `base`
+    // (base = 1 gives the usual 1-based numbering of knot theory).
+    pub fn reindexed(&self, start_edge: Edge, base: Edge) -> Link {
+        assert!(self.is_oriented(), "reindexed needs an orientation to traverse in");
+
+        let mut map: HashMap<Edge, Edge> = HashMap::new();
+        let mut next = base;
+
+        // `start_edge` takes `base`. A free loop carries no ports, so it is numbered outright;
+        // otherwise the walk starts there. Note `traverse_from` runs forward from an in-port.
+        let mut port = if self.loops.contains(&start_edge) {
+            map.insert(start_edge, next);
+            next += 1;
+            None
+        } else {
+            Some(self.edge_ends(start_edge, true).1)
+        };
+
+        // then the remaining components, each from its least unnumbered edge, so a link is
+        // renumbered deterministically.
+        while let Some(p) = port.or_else(||
+            self.nodes.iter()
+                .flat_map(|x| x.edges().iter().copied())
+                .filter(|e| !map.contains_key(e))
+                .min()
+                .map(|e| self.edge_ends(e, true).1)
+        ) {
+            self.traverse_from(p, |i, s| {
+                map.entry(self.node(i).edge(s)).or_insert_with(|| {
+                    let id = next;
+                    next += 1;
+                    id
+                });
+            });
+            port = None;
         }
 
-        panic!("Broken data")
-    }
-}
+        let loops = self.loops.iter().map(|&e|
+            *map.entry(e).or_insert_with(|| {
+                let id = next;
+                next += 1;
+                id
+            })
+        ).collect_vec();
 
-impl Link { 
-    // Planer Diagram code, represented by crossings:
-    //
-    //     3   2
-    //      \ /
-    //       \      = (0, 1, 2, 3)
-    //      / \
-    //     0   1
-    //
-    // The lower edge has direction 0 -> 2.
-    // The crossing is +1 if the upper goes 3 -> 1.
-    // see: http://katlas.math.toronto.edu/wiki/Planar_Diagrams
-
-    pub fn from_pd_code<I>(pd_code: I) -> Self
-    where I: IntoIterator<Item = XCode> { 
-        let nodes = pd_code.into_iter().map(Node::from_pd_code).collect();
-        Self::new(nodes)
+        let nodes = self.nodes.iter().map(|x|
+            x.convert_edges(|e| map[&e])
+        );
+        Link::new(nodes, loops).with_base_pt(base)
     }
 
-    pub fn is_valid_name(str: &str) -> bool { 
-        use regex::Regex;
-        let r1 = Regex::new(r"^([1-9]|10)_[0-9]+$").unwrap();
-        let r2 = Regex::new(r"^(K|L)?[1-9]+(a|n)_?[0-9]+$").unwrap(); // FIXME tmp
-        r1.is_match(str) || r2.is_match(str)
+    // The canonical relabelling: the least `reindexed(e, 1)` over all start edges. Rebuilt from that
+    // PD code so the node order is canonical too, making `==` equality up to relabelling.
+    pub fn reindexed_canon(&self) -> Link {
+        let pd = self.edges().into_iter()
+            .map(|e| self.reindexed(e, 1).pd_code())
+            .min()
+            .expect("a knot has at least one edge");
+        Self::from_pd_code(pd)
     }
 
-    pub fn load(name_or_path: &str) -> Result<Link, Box<dyn std::error::Error>> {
-        const RESOURCE_DIR: &str = "resources/links/";
-        
-        if Self::is_valid_name(name_or_path) { 
-            let dir = std::env!("CARGO_MANIFEST_DIR");
-            let path = format!("{dir}/{RESOURCE_DIR}{name_or_path}.json");
-            Self::_load(&path)
-        } else { 
-            Self::_load(name_or_path)
+    // The two (node, slot) ends of edge `e`. When `directed`, they are ordered as (tail, head)
+    // along the orientation — the strand exits at the tail and enters at the head (cf.
+    // `Node::incoming`); otherwise the order carries no meaning.
+    pub(crate) fn edge_ends(&self, e: Edge, directed: bool) -> ((usize, Slot), (usize, Slot)) {
+        assert!(!directed || self.is_oriented(), "directed edge_ends requires an oriented link");
+
+        let (x, y) = self.nodes().enumerate().flat_map(|(i, n)|
+            Slot::ALL.into_iter().filter(move |&s| n.edge(s) == e).map(move |s| (i, s))
+        ).collect_tuple().unwrap_or_else(||
+            panic!("edge {e} must appear exactly twice")
+        );
+        if !directed {
+            return (x, y);
         }
+
+        let is_in = |(i, s): (usize, Slot)| {
+            let (p, q) = self.node(i).incoming().expect("directed edge_ends requires an oriented link");
+            s == p || s == q
+        };
+        debug_assert!(is_in(x) != is_in(y), "edge {e} must have one head and one tail");
+        if is_in(x) { (y, x) } else { (x, y) }
     }
 
-    fn _load(path: &str) -> Result<Link, Box<dyn std::error::Error>> {
-        let json = std::fs::read_to_string(path)?;
-        let data: Vec<XCode> = serde_json::from_str(&json)?;
-        let l = Link::from_pd_code(data);
-        Ok(l)
-    }
-
-    pub fn unknot() -> Link { 
-        Link::from_pd_code([[0, 1, 1, 0]]).resolved_at(0, Bit::Bit0)
-    }
-
-    pub fn trefoil() -> Link { 
-        Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]])
-    }
-
-    pub fn figure8() -> Link { 
-        Link::from_pd_code([[4,2,5,1],[8,6,1,5],[6,3,7,4],[2,7,3,8]])
-    }
-
-    pub fn hopf_link() -> Link { 
-        Link::from_pd_code([[4,1,3,2],[2,3,1,4]])
+    fn find_port(&self, f: impl Fn(usize, Slot) -> bool) -> Option<(usize, Slot)> {
+        (0..self.n_nodes()).flat_map(|i|
+            Slot::ALL.map(move |s| (i, s))
+        ).find(|&(i, s)| f(i, s))
     }
 }
 
@@ -319,24 +443,41 @@ impl Display for Link {
 }
 
 #[cfg(test)]
-mod tests { 
-    use yui_core::hashmap;
+mod tests {
+    use yui_core::bitseq::Bit;
 
     use super::*;
-    use super::NodeType::{X, Xm};
 
     #[test]
-    fn link_init() { 
-        let l = Link::new(vec![]);
-        assert_eq!(l.nodes.len(), 0);
+    #[should_panic(expected = "(edge, count) = [(4, 1), (5, 3)]")]
+    fn new_names_the_miscounted_edges() {
+        // the trefoil's symmetric PD with edge 4 mistyped as 5
+        let _ = Link::from_pd_code([[1, 5, 2, 4], [3, 1, 5, 6], [5, 3, 6, 2]]);
     }
 
     #[test]
-    fn link_from_pd_code() { 
-        let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code);
-        assert_eq!(l.nodes.len(), 1);
-        assert_eq!(l.node(0).ntype(), X);
+    #[should_panic(expected = "does not run from an outgoing slot")]
+    fn new_rejects_disagreeing_orientation() {
+        use crate::NodeType::XL;
+        // both nodes take edge 1 as incoming, so it would enter at both of its ends.
+        let a = Node::new(XL, Some((Slot::SW, Slot::SE)), [1, 2, 3, 4]);
+        let b = Node::new(XL, Some((Slot::NE, Slot::NW)), [3, 4, 1, 2]);
+        let _ = Link::from_nodes([a, b]);
+    }
+
+    #[test]
+    #[should_panic(expected = "some nodes are oriented and some are not")]
+    fn new_rejects_partial_orientation() {
+        use crate::NodeType::XL;
+        let a = Node::new(XL, Some((Slot::SW, Slot::SE)), [1, 2, 3, 4]);
+        let b = Node::new(XL, None, [3, 4, 1, 2]);
+        let _ = Link::from_nodes([a, b]);
+    }
+
+    #[test]
+    fn link_init() {
+        let l = Link::from_nodes(vec![]);
+        assert_eq!(l.nodes.len(), 0);
     }
 
     #[test]
@@ -344,193 +485,320 @@ mod tests {
         let l = Link::empty();
         assert!(l.is_empty());
 
-        let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code);
+        let l = Link::test_data("unknot_l_twist");
         assert!(!l.is_empty());
     }
 
     #[test]
     fn link_crossing_num() {
         let l = Link::empty();
-        assert_eq!(l.count_crossings(), 0);
+        assert_eq!(l.n_crossings(), 0);
 
-        let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code);
-        assert_eq!(l.count_crossings(), 1);
-        
-        let pd_code = [[1,4,2,5],[3,6,4,1],[5,2,6,3]];
-        let l = Link::from_pd_code(pd_code);
-        assert_eq!(l.count_crossings(), 3);
+        let l = Link::test_data("unknot_l_twist");
+        assert_eq!(l.n_crossings(), 1);
+
+        let l = Link::test_data("3_1");
+        assert_eq!(l.n_crossings(), 3);
     }
 
     #[test]
     fn link_next() {
-        let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code);
+        let l = Link::test_data("unknot_l_twist");
 
-        assert_eq!(l.traverse_outer(0, 0), (0, 1));
-        assert_eq!(l.traverse_outer(0, 1), (0, 0));
-        assert_eq!(l.traverse_outer(0, 2), (0, 3));
-        assert_eq!(l.traverse_outer(0, 3), (0, 2));
+        let s = |i: usize| Slot::from(i);
+        assert_eq!(l.traverse_outer(0, s(0)), (0, s(1)));
+        assert_eq!(l.traverse_outer(0, s(1)), (0, s(0)));
+        assert_eq!(l.traverse_outer(0, s(2)), (0, s(3)));
+        assert_eq!(l.traverse_outer(0, s(3)), (0, s(2)));
     }
 
     #[test]
     fn link_traverse() {
-        let traverse = |l: &Link, (i0, j0)| { 
+        let traverse = |l: &Link, start: (usize, Slot)| {
             let mut queue = vec![];
-            l.traverse_from((i0, j0), |i, j| queue.push((i, j)));
+            l.traverse_from(start, |i, s| queue.push((i, s.index())));
             queue
         };
 
-        let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code);
-        let path = traverse(&l, (0, 0));
-        
+        let l = Link::test_data("unknot_l_twist");
+        let path = traverse(&l, (0, Slot::SW));
+
         assert_eq!(path, [(0, 0), (0, 3)]); // loop
     }
 
     #[test]
     fn link_crossing_signs() {
-        let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code);
-        assert_eq!(l.collect_crossing_signs(), hashmap!{ 0 => Sign::Pos});
+        let l = Link::test_data("unknot_l_twist");
+        assert_eq!(l.n_signed_crossings(), (1, 0));
 
-        let pd_code = [[0,1,1,0]];
-        let l = Link::from_pd_code(pd_code);
-        assert_eq!(l.collect_crossing_signs(), hashmap!{ 0 => Sign::Neg} );
+        let l = Link::test_data("unknot_r_twist");
+        assert_eq!(l.n_signed_crossings(), (0, 1));
 
-        let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code).resolved_at(0, Bit::Bit0);
-        assert_eq!(l.collect_crossing_signs(), hashmap!{});
+        let l = Link::test_data("unknot_l_twist").resolve_at(0, Bit::Bit0);
+        assert_eq!(l.n_signed_crossings(), (0, 0));
     }
 
     #[test]
     fn link_writhe() {
-        let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code);
+        let l = Link::test_data("unknot_l_twist");
         assert_eq!(l.writhe(), 1);
 
-        let pd_code = [[0,1,1,0]];
-        let l = Link::from_pd_code(pd_code);
+        let l = Link::test_data("unknot_r_twist");
         assert_eq!(l.writhe(), -1);
 
-        let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code).resolved_at(0, Bit::Bit0);
+        let l = Link::test_data("unknot_l_twist").resolve_at(0, Bit::Bit0);
         assert_eq!(l.writhe(), 0);
-
     }
 
     #[test]
     fn link_components() {
-        let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code);
-        let comps = l.collect_components();
-        assert_eq!(comps, vec![ Path::new(vec![0, 1], true)]);
+        let l = Link::test_data("unknot_l_twist");
+        let comps = l.comps();
+        assert_eq!(comps, vec![ Path::circ(vec![1, 2])]);
     }
 
-    #[test]
-    fn link_mirror() { 
-        let pd_code = [[0,0,1,1]];
-        let l = Link::from_pd_code(pd_code);
-        assert_eq!(l.node(0).ntype(), X);
 
-        let l = l.mirror();
-        assert_eq!(l.node(0).ntype(), Xm);
-    }
-
-    #[test]
-    fn link_resolve() {
-        let s = State::from([0, 0, 0]);
-        let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]) // trefoil
-            .resolved_by(&s);
-
-        let comps = l.collect_components();
-        assert_eq!(comps.len(), 3);
-        assert!(comps.iter().all(|c| c.is_circle()));
-
-        let s = State::from([1, 1, 1]);
-        let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]) // trefoil
-            .resolved_by(&s);
-
-        let comps = l.collect_components();
-        assert_eq!(comps.len(), 2);
-        assert!(comps.iter().all(|c| c.is_circle()));
-    }
 
     #[test]
     fn empty_link() {
         let l = Link::empty();
-        assert_eq!(l.count_crossings(), 0);
+        assert_eq!(l.n_crossings(), 0);
         assert_eq!(l.writhe(), 0);
-        assert_eq!(l.n_components(), 0);
+        assert_eq!(l.n_comps(), 0);
     }
 
     #[test]
-    fn unknot() { 
+    fn unknot() {
         let l = Link::unknot();
-        assert_eq!(l.count_crossings(), 0);
+
+        assert!(!l.is_empty());
+        assert!(l.is_oriented());
+        assert!(l.is_knot());
+
+        assert_eq!(l.n_crossings(), 0);
         assert_eq!(l.writhe(), 0);
-        assert_eq!(l.n_components(), 1);
+        assert_eq!(l.n_edges(), 1);
+        assert_eq!(l.n_comps(), 1);
+        assert_eq!(l.n_loops(), 1);
+
+        assert_eq!(l.loops(), &[1]);
+        assert_eq!(l.comps(), vec![Path::circ(vec![1])]);
     }
 
     #[test]
-    fn trefoil() { 
-        let l = Link::trefoil();
-        assert_eq!(l.count_crossings(), 3);
-        assert_eq!(l.writhe(), -3);
-        assert_eq!(l.n_components(), 1);
-    }
+    fn unlink_zero() {
+        let l = Link::unlink(0);
 
-    #[test]
-    fn figure8() { 
-        let l = Link::figure8();
-        assert_eq!(l.count_crossings(), 4);
+        assert!(l.is_empty());
+        assert!(l.is_oriented());
+        assert!(!l.is_knot());
+
+        assert_eq!(l.n_crossings(), 0);
         assert_eq!(l.writhe(), 0);
-        assert_eq!(l.n_components(), 1);
+        assert_eq!(l.n_edges(), 0);
+        assert_eq!(l.n_comps(), 0);
+        assert_eq!(l.n_loops(), 0);
+
+        assert_eq!(l.loops(), &[] as &[Edge]);
+        assert_eq!(l.comps(), vec![] as Vec<Path>);
     }
 
     #[test]
-    fn hopf_link() { 
-        let l = Link::hopf_link();
-        assert_eq!(l.count_crossings(), 2);
+    fn unlink_n() {
+        let l = Link::unlink(3);
+
+        assert!(!l.is_empty());
+        assert!(l.is_oriented());
+        assert!(!l.is_knot());
+
+        assert_eq!(l.n_crossings(), 0);
+        assert_eq!(l.writhe(), 0);
+        assert_eq!(l.n_edges(), 3);
+        assert_eq!(l.n_comps(), 3);
+        assert_eq!(l.n_loops(), 3);
+
+        assert_eq!(l.loops(), &[1, 2, 3]);
+        assert_eq!(
+            l.comps(),
+            vec![Path::circ(vec![1]), Path::circ(vec![2]), Path::circ(vec![3])]
+        );
+    }
+
+
+    #[test]
+    fn trefoil() {
+        let l = Link::test_data("3_1");
+        assert_eq!(l.n_crossings(), 3);
+        assert_eq!(l.writhe(), 3);
+        assert_eq!(l.n_comps(), 1);
+    }
+
+    #[test]
+    fn figure8() {
+        let l = Link::test_data("4_1");
+        assert_eq!(l.n_crossings(), 4);
+        assert_eq!(l.writhe(), 0);
+        assert_eq!(l.n_comps(), 1);
+    }
+
+    #[test]
+    fn hopf_link() {
+        let l = Link::test_data("L2a1");
+        assert_eq!(l.n_crossings(), 2);
         assert_eq!(l.writhe(), -2);
-        assert_eq!(l.n_components(), 2);
+        assert_eq!(l.n_comps(), 2);
     }
 
     #[test]
     fn unlink_2() {
-        let pd_code = [[1,2,3,4], [3,2,1,4]];
-        let l = Link::from_pd_code(pd_code);
-        assert_eq!(l.count_crossings(), 2);
+        // the over-component has no under-anchor, so the PD code leaves the link unoriented.
+        let l = Link::test_data("unlink2");
+        assert_eq!(l.n_crossings(), 2);
         assert_eq!(l.writhe(), 0);
-        assert_eq!(l.n_components(), 2);
+        assert_eq!(l.n_comps(), 2);
+        assert!(!l.is_oriented());
     }
 
+    #[test]
+    fn unlink_2_r2() {
+        // the R2 pair alternates over/under, so both components are under-anchored.
+        let l = Link::test_data("unlink2_r2");
+        assert_eq!(l.n_crossings(), 2);
+        assert_eq!(l.writhe(), 0);
+        assert_eq!(l.n_comps(), 2);
+        assert!(l.is_oriented());
+    }
 
     #[test]
     fn l2x4() {
-        let pd_code = [[1,5,2,8],[5,3,6,2],[3,7,4,6],[7,1,8,4]];
-        let l = Link::from_pd_code(pd_code);
-        assert_eq!(l.count_crossings(), 4);
-        assert_eq!(l.writhe(), 4);
-        assert_eq!(l.n_components(), 2);
+        let l = Link::test_data("L4a1");
+        assert_eq!(l.n_crossings(), 4);
+        assert_eq!(l.writhe(), -4);
+        assert_eq!(l.n_comps(), 2);
+    }
+
+
+    #[test]
+    fn base_pt_default_min_edge() {
+        // Defaults to the minimal edge of the link.
+        let l = Link::test_data("3_1");
+        assert_eq!(l.base_pt(), Some(1));
+
+        // Empty link has no edge, so base_pt is None.
+        assert_eq!(Link::empty().base_pt(), None);
     }
 
     #[test]
-    fn load() { 
-        let l = Link::load("3_1");
-        assert!(l.is_ok());
-
-        let l = l.unwrap();
-        assert_eq!(l.count_crossings(), 3);
+    fn with_base_pt_sets_base_pt() {
+        let l = Link::test_data("3_1").with_base_pt(1);
+        assert_eq!(l.base_pt(), Some(1));
     }
 
     #[test]
-    fn crossing_change() { 
-        let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]);
-        let l2 = l.crossing_change(1);
+    fn with_base_pt_on_loop() {
+        let l = Link::unlink(3).with_base_pt(2);
+        assert_eq!(l.base_pt(), Some(2));
+    }
 
-        assert_eq!(l.node(1),  &Node::new(NodeType::X, [3,6,4,1]));
-        assert_eq!(l2.node(1), &Node::new(NodeType::Xm, [3,6,4,1]));
+
+    #[test]
+    #[should_panic]
+    fn with_base_pt_invalid_panics() {
+        // Edge 99 is not in the trefoil's edge set.
+        let _ = Link::test_data("3_1").with_base_pt(99);
+    }
+
+    #[test]
+    fn unoriented_drops_every_incoming() {
+        let l = Link::test_data("3_1");
+        assert!(l.is_oriented());
+
+        let u = l.unoriented();
+        assert!(!u.is_oriented());
+        assert!(u.nodes().all(|x| x.incoming().is_none()));
+        u.verify_ori();
+
+        // the diagram itself is untouched — only the orientation is gone.
+        assert!(Iterator::zip(u.nodes(), l.nodes()).all(|(a, b)|
+            a.node_type() == b.node_type() && a.edges() == b.edges()
+        ));
+        assert_eq!(u.n_comps(), l.n_comps());
+    }
+
+    #[test]
+    fn unoriented_of_an_unoriented_diagram_is_itself() {
+        // `unlink2` loads unoriented (its over-component has no under-anchor in the PD code).
+        let l = Link::test_data("unlink2");
+        assert!(!l.is_oriented());
+        assert_eq!(l.unoriented(), l);
+
+        let u = Link::test_data("3_1").unoriented();
+        assert_eq!(u.unoriented(), u);
+    }
+
+    #[test]
+    fn n_edges_counts_the_edge_set() {
+        // `n_edges` is O(1) off the "each node-edge appears exactly twice" invariant, so it must
+        // agree with the deduped edge list — including when free loops are present.
+        for l in [
+            Link::empty(),
+            Link::unknot(),
+            Link::unlink(3),
+            Link::test_data("3_1"),
+            Link::test_data("L4a1"),
+            Link::test_data("unknot_l_twist"),
+            Link::pretzel(1, 3, 5),
+        ] {
+            assert_eq!(l.n_edges(), l.edges().len(), "{l}");
+        }
+    }
+
+    #[test]
+    fn reindexed_numbers_along_the_orientation() {
+        // Renumbering depends only on (diagram, start edge), so the least code is a canonical form.
+        let canon = |k: &Link| k.reindexed_canon();
+
+        for l in [Link::test_data("3_1"), Link::test_data("6_1"), Link::pretzel(1, 3, 5)] {
+            let c = canon(&l);
+            for e in l.edges() {
+                assert_eq!(canon(&l.reindexed(e, 1)), c, "relabelling from edge {e} changed the canonical form");
+            }
+        }
+    }
+
+    #[test]
+    fn reindexed_covers_links_and_loops() {
+        // more than one component: the walk continues into the rest, so every edge is renumbered.
+        for name in ["L2a1", "L4a1"] {
+            let l = Link::test_data(name);
+            for e in l.edges() {
+                let r = l.reindexed(e, 1);
+                assert_eq!(r.edges(), (1..=l.n_edges() as Edge).collect::<Vec<_>>(), "{name} from edge {e}");
+                assert_eq!(r.n_comps(), l.n_comps(), "{name} from edge {e}");
+            }
+        }
+
+        // free loops carry no ports, so they are numbered outright rather than traversed.
+        let r = Link::unknot().reindexed(1, 5);
+        assert_eq!((r.edges(), r.n_comps(), r.base_pt()), (vec![5], 1, Some(5)));
+
+        let l = Link::unlink(3);
+        let r = l.reindexed(l.edges()[1], 1);
+        assert_eq!((r.edges(), r.n_comps(), r.base_pt()), (vec![1, 2, 3], 3, Some(1)));
+    }
+
+    #[test]
+    fn reorient_exits_by_the_node_pairing() {
+        use crate::NodeType;
+
+        // An `H` node pairs NE<->NW, so a strand entering at NE exits at NW — not at the opposite
+        // corner SW, which is a *crossing*'s pairing. These two claims agree with the diagram's own
+        // orientation; reading the exit as the opposite corner made them look contradictory.
+        let mut l = Link::test_data("3_1").resolve_at(0, Bit::Bit0);
+        assert_eq!(l.node(0).node_type(), NodeType::H);
+
+        let claims = [(0, Slot::NE), (1, Slot::NW)];
+        assert!(l.reorient(|i, s| claims.contains(&(i, s))));
+        assert!(l.is_oriented());
     }
 }

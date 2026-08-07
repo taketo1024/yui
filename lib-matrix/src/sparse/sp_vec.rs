@@ -1,34 +1,38 @@
+//! [`SpVec<R>`]: a sparse column vector — a [`SpMat`](super::SpMat) with one column.
+
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign, Mul, Range};
 use std::fmt::{Display, Debug};
 use nalgebra_sparse::CscMatrix;
 use nalgebra_sparse::na::{Scalar, ClosedAddAssign, ClosedSubAssign, ClosedMulAssign};
 use num_traits::{Zero, One};
-use sprs::PermView;
 use auto_impl_ops::auto_ops;
-use yui_core::{Ring, RingOps, AddGrpOps,  AddGrp};
+use yui_core::abst::{Ring, RingOps, AddGrpOps, AddGrp};
 use super::sp_mat::SpMat;
+use crate::Perm;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SpVec<R> { 
+/// Sparse column vector, stored as a single-column [`SpMat`] (CSC with
+/// `n_cols == 1`).
+#[derive(Clone, Debug)]
+pub struct SpVec<R> {
     inner: CscMatrix<R> // ncols == 1
 }
 
-impl<R> SpVec<R> { 
-    fn new(inner: CscMatrix<R>) -> Self { 
+impl<R> SpVec<R> {
+    fn new(inner: CscMatrix<R>) -> Self {
         assert_eq!(inner.ncols(), 1);
         Self { inner }
     }
 
     #[allow(unused)]
-    pub(crate) fn inner(&self) -> &CscMatrix<R> { 
+    pub(crate) fn inner(&self) -> &CscMatrix<R> {
         &self.inner
     }
 
-    pub(crate) fn into_inner(self) -> CscMatrix<R> { 
+    pub(crate) fn into_inner(self) -> CscMatrix<R> {
         self.inner
     }
 
-    pub fn data(&self) -> (&[usize], &[R]) { 
+    pub fn data(&self) -> (&[usize], &[R]) {
         let (_, indices, values) = self.inner.csc_data();
         (indices, values)
     }
@@ -46,34 +50,34 @@ impl<R> SpVec<R> {
     pub fn unit(n: usize, i: usize) -> Self
     where R: One {
         let inner = CscMatrix::try_from_csc_data(
-            n, 1, 
-            vec![0, 1], 
-            vec![i], 
+            n, 1,
+            vec![0, 1],
+            vec![i],
             vec![R::one()]
         ).unwrap();
 
         Self::new(inner)
     }
 
-    pub fn dim(&self) -> usize { 
+    pub fn dim(&self) -> usize {
         self.inner.nrows()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (usize, &R)> { 
+    pub fn iter(&self) -> impl Iterator<Item = (usize, &R)> {
         self.inner.triplet_iter().map(|(i, _, a)| (i, a))
     }
 
     pub fn iter_nz(&self) -> impl Iterator<Item = (usize, &R)>
-    where R: Zero { 
+    where R: Zero {
         self.iter().filter(|(_, a)| !a.is_zero())
     }
 
-    pub fn into_vec(self) -> Vec<R>
-    where R: Clone + Zero { 
+    pub fn into_dense(self) -> Vec<R>
+    where R: Clone + Zero {
         self.into()
     }
 
-    pub fn into_mat(self) -> SpMat<R> { 
+    pub fn into_mat(self) -> SpMat<R> {
         self.into()
     }
 }
@@ -89,33 +93,40 @@ impl<R> From<SpVec<R>> for Vec<R>
 where R: Clone + Zero {
     fn from(value: SpVec<R>) -> Self {
         let mut res = vec![R::zero(); value.dim()];
-        for (i, a) in value.iter_nz() { 
-            res[i] = a.clone();
+        let (_, rows, vals) = value.inner.disassemble();
+        for (i, a) in rows.into_iter().zip(vals) {
+            res[i] = a;
         }
         res
     }
 }
 
 // SpVec(n) as SpMat(n, 1)
-impl<R> From<SpVec<R>> for SpMat<R> { 
+impl<R> From<SpVec<R>> for SpMat<R> {
     fn from(vec: SpVec<R>) -> Self {
         SpMat::from(vec.into_inner())
     }
 }
 
 impl<R> SpMat<R> {
-    fn into_spvec(self) -> SpVec<R> { 
+    fn into_spvec(self) -> SpVec<R> {
         assert_eq!(self.inner().ncols(), 1);
         SpVec::new(self.into_inner())
     }
 }
 
-impl<R> SpVec<R> 
-where R: Scalar + Zero + ClosedAddAssign { 
+impl<R> SpVec<R>
+where R: Scalar + Zero + ClosedAddAssign {
+    pub fn try_from_csc_data(dim: usize, row_indices: Vec<usize>, values: Vec<R>) -> Option<SpVec<R>> {
+        let col_offsets = vec![0, row_indices.len()];
+        let csc = CscMatrix::try_from_csc_data(dim, 1, col_offsets, row_indices, values).ok()?;
+        Some(SpMat::from(csc).into_spvec())
+    }
+
     pub fn from_entries<T>(dim: usize, entries: T) -> Self
     where T: IntoIterator<Item = (usize, R)> {
         SpMat::from_entries(
-            (dim, 1), 
+            (dim, 1),
             entries.into_iter().map(|(i, a)| (i, 0, a))
         ).into_spvec()
     }
@@ -123,91 +134,71 @@ where R: Scalar + Zero + ClosedAddAssign {
     pub fn from_sorted_entries<T>(dim: usize, entries: T) -> Self
     where T: IntoIterator<Item = (usize, R)> {
         let init = (vec![], vec![]);
-        let (row_indices, values) = entries.into_iter().fold(init, |mut res, (i, a)| { 
+        let (row_indices, values) = entries.into_iter().fold(init, |mut res, (i, a)| {
             assert!(i < dim);
             res.0.push(i);
             res.1.push(a);
             res
         });
-        Self::from_raw_data(dim, row_indices, values)
-    }
-
-    fn from_raw_data(dim: usize, row_indices: Vec<usize>, values: Vec<R>) -> SpVec<R> { 
-        let col_offsets = vec![0, row_indices.len()];
-        let csc = CscMatrix::try_from_csc_data(dim, 1, col_offsets, row_indices, values).unwrap();
-        SpMat::from(csc).into_spvec()
-    }
-    
-    pub fn stack_vecs<I>(vecs: I) -> Self 
-    where I: IntoIterator<Item = SpVec<R>> { 
-        let init = (0, vec![], vec![]);
-        let (dim, row_indices, values) = vecs.into_iter().fold(init, |mut res, v| { 
-            let n1 = res.0;
-            let n2 = v.dim();
-            
-            let (_, mut rows, mut vals) = v.inner.disassemble();
-            rows.iter_mut().for_each(|i| *i += n1);
-
-            res.0 += n2;
-            res.1.append(&mut rows);
-            res.2.append(&mut vals);
-            res
-        });
-        Self::from_raw_data(dim, row_indices, values)
+        Self::try_from_csc_data(dim, row_indices, values).unwrap()
     }
 
     pub fn extract<F>(&self, dim: usize, f: F) -> SpVec<R>
-    where F: Fn(usize) -> Option<usize> { 
+    where F: Fn(usize) -> Option<usize> {
         SpVec::from_entries(dim, self.iter().filter_map(|(i, a)|
             f(i).map(|i| (i, a.clone()))
         ))
     }
 
-    pub fn permute(&self, p: PermView<'_>) -> SpVec<R> { 
+    // drops explicitly-stored zeros (CSC arithmetic keeps cancellation zeros).
+    pub fn drop_zeros(self) -> Self {
+        if self.iter().all(|(_, a)| !a.is_zero()) {
+            return self;
+        }
+
+        let n = self.dim();
+        let (_, rows, vals) = self.inner.disassemble();
+        let (rows, vals) = rows.into_iter().zip(vals).filter(|(_, a)| !a.is_zero()).unzip();
+        Self::try_from_csc_data(n, rows, vals).unwrap()
+    }
+
+    pub fn permute(&self, p: &Perm) -> SpVec<R> {
         self.extract(self.dim(), |i| Some(p.at(i)))
     }
 
-    pub fn subvec(&self, range: Range<usize>) -> SpVec<R> { 
+    pub fn subvec(&self, range: Range<usize>) -> SpVec<R> {
         self.extract(
-            range.end - range.start, 
+            range.end - range.start,
             |i| range.contains(&i).then(|| i - range.start)
         )
     }
 
-    pub fn stack(&self, other: &SpVec<R>) -> SpVec<R> {
-        let (n1, n2) = (self.dim(), other.dim());
-        Self::from_entries(n1 + n2, Iterator::chain(
-            self.iter_nz().map(|(i, a)| (i, a.clone())),
-            other.iter_nz().map(|(i, a)| (n1 + i, a.clone()))
-        ))
+    pub fn stack(top: Self, bot: Self) -> SpVec<R> {
+        let (n1, n2) = (top.dim(), bot.dim());
+        let (_, mut rows, mut vals) = top.inner.disassemble();
+        let (_, bot_rows, bot_vals) = bot.inner.disassemble();
+
+        rows.extend(bot_rows.into_iter().map(|i| i + n1));
+        vals.extend(bot_vals);
+
+        Self::try_from_csc_data(n1 + n2, rows, vals).unwrap()
     }
 
-    pub fn split(&self, at: usize) -> (SpVec<R>, SpVec<R>) { 
+    pub fn split(self, at: usize) -> (SpVec<R>, SpVec<R>) {
         let n = self.dim();
-        let k = at;
-        assert!(k <= n);
+        assert!(at <= n);
 
-        let mut e1 = vec![];
-        let mut e2 = vec![];
+        let (_, mut rows, mut vals) = self.inner.disassemble();
+        let split_idx = rows.partition_point(|&i| i < at);
 
-        for (i, a) in self.iter() { 
-            if i < k { 
-                e1.push((i, a.clone()));
-            } else { 
-                e2.push((i - k, a.clone()));
-            }
-        }
+        let bot_rows: Vec<usize> = rows.split_off(split_idx).into_iter().map(|i| i - at).collect();
+        let bot_vals = vals.split_off(split_idx);
 
-        (SpVec::from_entries(k, e1), SpVec::from_entries(n - k, e2))
+        let top = Self::try_from_csc_data(at, rows, vals).unwrap();
+        let bot = Self::try_from_csc_data(n - at, bot_rows, bot_vals).unwrap();
+        (top, bot)
     }
 
-    pub fn to_dense(&self) -> Vec<R> { 
-        let mut vec = vec![R::zero(); self.dim()];
-        for (i, a) in self.iter_nz() { 
-            vec[i] = a.clone();
-        }
-        vec
-    }
 }
 
 impl<R> Default for SpVec<R> {
@@ -215,6 +206,14 @@ impl<R> Default for SpVec<R> {
         Self::zero(0)
     }
 }
+
+impl<R: PartialEq + Zero> PartialEq for SpVec<R> {
+    fn eq(&self, other: &Self) -> bool {
+        self.dim() == other.dim() && self.iter_nz().eq(other.iter_nz())
+    }
+}
+
+impl<R: Eq + Zero> Eq for SpVec<R> {}
 
 impl<R> Neg for SpVec<R>
 where R: AddGrp, for<'a> &'a R: AddGrpOps<R> {
@@ -235,10 +234,10 @@ where R: Scalar + Neg<Output = R> {
 macro_rules! impl_binop {
     ($trait:ident, $method:ident) => {
         #[auto_ops]
-        impl<'a, 'b, R> $trait<&'b SpVec<R>> for &'a SpVec<R>
+        impl<R> $trait<&SpVec<R>> for &SpVec<R>
         where R: Scalar + ClosedAddAssign + ClosedSubAssign + ClosedMulAssign + Zero + One + Neg<Output = R> {
             type Output = SpVec<R>;
-            fn $method(self, rhs: &'b SpVec<R>) -> Self::Output {
+            fn $method(self, rhs: &SpVec<R>) -> Self::Output {
                 let res = (&self.inner).$method(&rhs.inner);
                 SpVec::new(res)
             }
@@ -251,10 +250,10 @@ impl_binop!(Sub, sub);
 
 // SpMat * SpVec
 #[auto_ops(val_val, val_ref, ref_val)]
-impl<'a, 'b, R> Mul<&'b SpVec<R>> for &'a SpMat<R>
+impl<R> Mul<&SpVec<R>> for &SpMat<R>
 where R: Ring, for<'x> &'x R: RingOps<R> {
     type Output = SpVec<R>;
-    fn mul(self, rhs: &'b SpVec<R>) -> Self::Output {
+    fn mul(self, rhs: &SpVec<R>) -> Self::Output {
         let res = self.inner() * &rhs.inner;
         SpVec::new(res)
     }
@@ -270,7 +269,6 @@ where R: Ring, for<'a> &'a R: RingOps<R> {
 #[cfg(test)]
 mod tests {
     use itertools::Itertools;
-    use sprs::PermOwned;
     use super::*;
 
     #[test]
@@ -288,7 +286,7 @@ mod tests {
     #[test]
     fn to_dense() {
         let v = SpVec::from(vec![1,0,3,5,0]);
-        assert_eq!(v.to_dense(), vec![1,0,3,5,0]);
+        assert_eq!(v.into_dense(), vec![1,0,3,5,0]);
     }
 
     #[test]
@@ -328,9 +326,9 @@ mod tests {
 
     #[test]
     fn permute() {
-        let p = PermOwned::new(vec![1,3,0,2]);
+        let p = Perm::new(vec![1,3,0,2]);
         let v = SpVec::from(vec![0,1,2,3]);
-        let w = v.permute(p.view());
+        let w = v.permute(&p);
         assert_eq!(w, SpVec::from(vec![2,0,3,1]));
     }
 
@@ -338,12 +336,12 @@ mod tests {
     fn stack() {
         let v1 = SpVec::from((0..3).collect_vec());
         let v2 = SpVec::from((5..8).collect_vec());
-        let w = v1.stack(&v2);
+        let w = SpVec::stack(v1, v2);
         assert_eq!(w, SpVec::from(vec![0,1,2,5,6,7]));
     }
 
     #[test]
-    fn split() { 
+    fn split() {
         let v = SpVec::from((0..10).collect_vec());
         let (x, y) = v.split(4);
         assert_eq!(x, SpVec::from((0..4).collect_vec()));

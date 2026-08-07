@@ -1,4 +1,7 @@
-mod elem;
+//! The algebraic trait hierarchy: `MathType` and `IndexType` at the base, then
+//! `AddMon → AddGrp`, `Mon → Ring → EucRing → Field`, and `RMod` for modules.
+
+mod basic;
 mod add_mon;
 mod add_grp;
 mod mon;
@@ -7,7 +10,7 @@ mod euc_ring;
 mod field;
 mod r_mod;
 
-pub use elem::{ElemBase, Elem};
+pub use basic::{IndexType, MathType};
 pub use add_mon::{AddMon, AddMonOps};
 pub use add_grp::{AddGrp, AddGrpOps};
 pub use mon::{Mon, MonOps};

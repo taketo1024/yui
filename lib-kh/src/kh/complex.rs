@@ -1,124 +1,94 @@
+//! [`KhComplex`]: the Khovanov chain complex of a link, built either by the
+//! cobordism-based [`TngComplexBuilder`](crate::tng::builder::TngComplexBuilder)
+//! or the direct cube construction.
+
 use std::ops::{RangeInclusive, Index};
-use cartesian::cartesian;
+use std::sync::OnceLock;
 
 use delegate::delegate;
-use yui_core::{Ring, RingOps, EucRing, EucRingOps};
+use yui_core::lc::Lc;
+use yui_core::abst::{Ring, RingOps, EucRing, EucRingOps};
+use yui_core::ext::{empty_range, IteratorExt};
 use yui_link::Link;
-use yui_homology::{isize2, ChainComplexTrait, Grid2, GridTrait, ChainComplex, Summand};
-use yui_matrix::sparse::SpMat;
+use yui_homology::{ChainComplex1, ToSeqString, ToTableString, GrMod1, GrMod2, Summand};
 
-use crate::kh::r#gen::KhChain;
-use crate::kh::{KhChainGen, KhHomology};
-use crate::misc::range_of;
+use crate::kh::{KhGen, KhHomology};
+use crate::tng::builder::BuildConfig;
+use crate::util::Bigraded;
 
 use super::KhAlg;
+use yui_core::util::tex::TeX;
+use yui_homology::tex::{ToTexSeq, ToTexTable};
 
-pub type KhComplexSummand<R> = Summand<KhChainGen, R>;
+pub type KhChain<R> = Lc<KhGen, R>;
+pub type KhComplexSummand<R> = Summand<KhGen, R>;
 
 #[derive(Clone)]
 pub struct KhComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> { 
-    inner: ChainComplex<KhChainGen, R>,
-    str: KhAlg<R>,
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    inner: ChainComplex1<KhGen, R>,
+    alg: KhAlg<R>,
     deg_shift: (isize, isize),
     reduced: bool,
     canon_cycles: Vec<KhChain<R>>,
+    cache_bigr: OnceLock<GrMod2<KhGen, R>>,
 }
 
 impl<R> KhComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> { 
+where R: Ring, for<'x> &'x R: RingOps<R> {
     pub fn new(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
-        use crate::kh::internal::v2::builder::TngComplexBuilder;
-
-        assert!(!reduced || (!l.is_empty() && t.is_zero()));
-
-        TngComplexBuilder::build_kh_complex(l, h, t, reduced)
+        Self::new_partial(l, h, t, reduced, None)
     }
 
-    pub fn new_no_simplify(l: &Link, h: &R, t: &R, reduced: bool) -> Self { 
-        use crate::kh::internal::v1::cube::KhCube;
+    // restricts the build to `h_range` (literal truncation; `None` = full).
+    pub fn new_partial(l: &Link, h: &R, t: &R, reduced: bool, h_range: Option<RangeInclusive<isize>>) -> Self {
+        Self::new_with_config(l, h, t, reduced, BuildConfig { h_range, ..Default::default() })
+    }
+
+    pub fn new_with_config(l: &Link, h: &R, t: &R, reduced: bool, config: BuildConfig) -> Self {
+        use crate::tng::builder::TngComplexBuilder;
 
         assert!(!reduced || (!l.is_empty() && t.is_zero()));
 
-        let red_e = reduced.then(|| l.min_edge().unwrap());
+        let config = BuildConfig {
+            h_range: config.h_range.map(|r| Self::clamp_h_range(l, reduced, r)),
+            ..config
+        };
+        let b = TngComplexBuilder::from_link(l, h, t, reduced).with_config(config).run();
+        let canon_cycles = b.eval_elements();
+        let inner = b.into_raw_complex(); // applies config.q_range on the no_full_deloop path
+
+        KhComplex::from_raw_complex(l, h, t, reduced, inner, canon_cycles)
+    }
+
+    pub fn new_no_simplify(l: &Link, h: &R, t: &R, reduced: bool) -> Self {
+        use super::cube::KhCube;
+
+        assert!(!reduced || (!l.is_empty() && t.is_zero()));
+
+        let base_pt = if reduced { l.base_pt() } else { None };
         let deg_shift = Self::deg_shift_for(l, reduced);
-        
-        let cube = KhCube::new(l, h, t, red_e, deg_shift);
-        let str = cube.str().clone();
-        let complex = cube.into_complex();
+        let cube = KhCube::new(l, h, t, base_pt, deg_shift);
+        let inner = cube.into_complex();
 
         let canon_cycles = if t.is_zero() && l.is_knot() {
-            let p = l.min_edge().unwrap();
-            Self::make_canon_cycles(l, p, &R::zero(), h, reduced, deg_shift)
-        } else { 
+            Self::make_canon_cycles(l, &R::zero(), h, reduced)
+        } else {
             vec![]
         };
 
-        KhComplex::new_impl(complex, str, deg_shift, reduced, canon_cycles)
+        KhComplex::from_raw_complex(l, h, t, reduced, inner, canon_cycles)
     }
 
-    pub(crate) fn new_impl(inner: ChainComplex<KhChainGen, R>, str: KhAlg<R>, deg_shift: (isize, isize), reduced: bool, canon_cycles: Vec<KhChain<R>>) -> Self { 
-        KhComplex { inner, str, deg_shift, reduced, canon_cycles }
-    }
+    pub(crate) fn from_raw_complex(l: &Link, h: &R, t: &R, reduced: bool, inner: ChainComplex1<KhGen, R>, canon_cycles: Vec<KhChain<R>>) -> Self {
+        let alg = KhAlg::new(h, t);
+        let deg_shift = Self::deg_shift_for(l, reduced);
 
-    pub fn str(&self) -> &KhAlg<R> { 
-        &self.str
-    }
-
-    pub fn deg_shift(&self) -> (isize, isize) { 
-        self.deg_shift
-    }
-
-    pub fn is_reduced(&self) -> bool { 
-        self.reduced
-    }
-
-    pub fn h_range(&self) -> RangeInclusive<isize> { 
-        range_of(self.support())
-    }
-
-    pub fn q_range(&self) -> RangeInclusive<isize> {
-        range_of(self.support().flat_map(|i| 
-            self[i].raw_gens().iter().map(|x| x.q_deg())
-        ))
-    }
-
-    pub fn canon_cycles(&self) -> &Vec<KhChain<R>> { 
-        &self.canon_cycles
-    }
-
-    pub fn inner(&self) -> &ChainComplex<KhChainGen, R> {
-        &self.inner
-    }
-
-    pub fn truncated(&self, range: RangeInclusive<isize>) -> Self {
-        Self::new_impl(
-            self.inner.truncated(range), 
-            self.str.clone(), 
-            self.deg_shift, 
-            self.reduced, 
-            self.canon_cycles.clone()
-        )
-    }
-
-    pub fn gen_grid(&self) -> Grid2<Summand<KhChainGen, R>> { 
-        let h_range = self.h_range();
-        let q_range = self.q_range().step_by(2);
-        let support = cartesian!(h_range, q_range.clone()).map(|(i, j)| 
-            isize2(i, j)
-        );
-
-        Grid2::generate(support, |idx| { 
-            let isize2(i, j) = idx;
-            let gens = self[i].raw_gens().iter().filter(|x| { 
-                x.q_deg() == j
-            }).cloned();
-            Summand::from_raw_gens(gens)
-        })
+        KhComplex { inner, alg, deg_shift, reduced, canon_cycles, cache_bigr: OnceLock::new() }
     }
 
     pub fn deg_shift_for(l: &Link, reduced: bool) -> (isize, isize) {
-        let (n_pos, n_neg) = l.count_signed_crossings();
+        let (n_pos, n_neg) = l.n_signed_crossings();
         let (n_pos, n_neg) = (n_pos as isize, n_neg as isize);
         let h = -n_neg;
         let q = n_pos - 2 * n_neg;
@@ -126,51 +96,73 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         (h, q + e)
     }
 
-    delegate! { 
-        to self.inner { 
-            pub fn d(&self, i: isize, z: &KhChain<R>) -> KhChain<R>;
-        }
+    /// Clamp an h_range to the degree span, so open-ended ranges (`..=b` / `a..=`) don't overflow
+    /// the build's `(a-1)..=(b+1)` widening. Span = `[deg_shift.0, deg_shift.0 + n_crossings + 1]`.
+    pub fn clamp_h_range(l: &Link, reduced: bool, range: RangeInclusive<isize>) -> RangeInclusive<isize> {
+        let lo = Self::deg_shift_for(l, reduced).0;
+        let hi = lo + l.n_crossings() as isize + 1;
+        (*range.start()).max(lo) ..= (*range.end()).min(hi)
     }
-}
 
-impl<R> Index<isize> for KhComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Output = KhComplexSummand<R>;
+    pub fn inner(&self) -> &ChainComplex1<KhGen, R> {
+        &self.inner
+    }
 
-    delegate! { 
+    delegate! {
         to self.inner {
-            fn index(&self, index: isize) -> &Self::Output;
+            pub fn support(&self) -> impl Iterator<Item = &isize> + '_;
+            pub fn is_supported(&self, i: isize) -> bool;
+            pub fn d_deg(&self) -> isize;
+            pub fn d(&self, i: isize, z: &KhChain<R>) -> KhChain<R>;
+            pub fn describe_d(&self) -> String;
+            pub fn describe_d_at(&self, i: isize) -> String;
         }
     }
-}
 
-impl<R> GridTrait<isize> for KhComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type Support = std::vec::IntoIter<isize>;
-    type Item = KhComplexSummand<R>;
-
-    delegate! { 
-        to self.inner { 
-            fn support(&self) -> Self::Support;
-            fn is_supported(&self, i: isize) -> bool;
-            fn get(&self, i: isize) -> &Self::Item;
-            fn get_default(&self) -> &Self::Item;
-        }
+    pub fn alg(&self) -> &KhAlg<R> {
+        &self.alg
     }
-}
 
-impl<R> ChainComplexTrait<isize> for KhComplex<R>
-where R: Ring, for<'x> &'x R: RingOps<R> {
-    type R = R;
-    type Element = KhChain<R>;
+    pub fn deg_shift(&self) -> (isize, isize) {
+        self.deg_shift
+    }
 
-    delegate! { 
-        to self.inner { 
-            fn rank(&self, i: isize) -> usize;
-            fn d_deg(&self) -> isize;
-            fn d(&self, i: isize, z: &Self::Element) -> Self::Element;
-            fn d_matrix(&self, i: isize) -> SpMat<R>;
-        }
+    pub fn is_reduced(&self) -> bool {
+        self.reduced
+    }
+
+    pub fn h_deg_of(&self, x: &KhGen) -> isize {
+        self.deg_shift.0 + x.rel_h_deg()
+    }
+
+    pub fn q_deg_of(&self, x: &KhGen) -> isize {
+        self.deg_shift.1 + x.rel_q_deg()
+    }
+
+    pub fn h_deg_of_chain(&self, z: &KhChain<R>) -> isize {
+        z.keys().map(|x| self.h_deg_of(x)).min().unwrap_or(0)
+    }
+
+    pub fn q_deg_of_chain(&self, z: &KhChain<R>) -> isize {
+        z.keys().map(|x| self.q_deg_of(x)).min().unwrap_or(0)
+    }
+
+    pub fn h_range(&self) -> RangeInclusive<isize> {
+        self.support().copied().range().unwrap_or_else(empty_range)
+    }
+
+    pub fn q_range(&self) -> RangeInclusive<isize> {
+        self.support().flat_map(|&i|
+            self[i].raw_generators().iter().map(|x| self.q_deg_of(x))
+        ).range().unwrap_or_else(empty_range)
+    }
+
+    pub fn canon_cycles(&self) -> &[KhChain<R>] {
+        &self.canon_cycles
+    }
+
+    fn cached_bigraded(&self) -> &GrMod2<KhGen, R> {
+        self.cache_bigr.get_or_init(|| self.bigraded())
     }
 }
 
@@ -181,16 +173,106 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
     }
 }
 
+impl<R> Bigraded<KhGen, R> for KhComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn base(&self) -> &GrMod1<KhGen, R> { self.inner.summands() }
+    fn decomp_key(&self, z: &KhChain<R>) -> isize { self.q_deg_of_chain(z) }
+}
+
+impl<R> Index<isize> for KhComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = KhComplexSummand<R>;
+
+    delegate! {
+        to self.inner {
+            fn index(&self, index: isize) -> &Self::Output;
+        }
+    }
+}
+
+impl<R> Index<(isize, isize)> for KhComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    type Output = KhComplexSummand<R>;
+
+    fn index(&self, index: (isize, isize)) -> &Self::Output {
+        &self.cached_bigraded()[index]
+    }
+}
+
+
+impl<R> ToSeqString<isize> for KhComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    delegate! {
+        to self.inner {
+            fn label(&self) -> String;
+            fn indices(&self) -> Vec<isize>;
+            fn entry_at(&self, i: &isize) -> String;
+        }
+    }
+}
+
+impl<R> ToTexSeq<isize> for KhComplex<R>
+where R: Ring + TeX, for<'x> &'x R: RingOps<R> {
+    fn tex_entry_at(&self, i: &isize) -> String {
+        if self[*i].is_zero() {
+            ".".to_string()
+        } else {
+            self[*i].tex_string()
+        }
+    }
+}
+
+impl<R> ToTableString<isize> for KhComplex<R>
+where R: Ring, for<'x> &'x R: RingOps<R> {
+    fn labels(&self) -> (String, String) {
+        ("i".to_string(), "j".to_string())
+    }
+
+    fn indices(&self) -> (Vec<isize>, Vec<isize>) {
+        (self.h_range().collect(), self.q_range().step_by(2).collect())
+    }
+
+    fn entry_at(&self, i: &isize, j: &isize) -> String {
+        if self[(*i, *j)].is_zero() {
+            ".".to_string()
+        } else {
+            self[(*i, *j)].to_string()
+        }
+    }
+}
+
+impl<R> ToTexTable<isize> for KhComplex<R>
+where R: Ring + TeX, for<'x> &'x R: RingOps<R> {
+    fn tex_entry_at(&self, i: &isize, j: &isize) -> String {
+        if self[(*i, *j)].is_zero() {
+            ".".to_string()
+        } else {
+            self[(*i, *j)].tex_string()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use yui_homology::{ChainComplexTrait, SummandTrait};
-    use yui_link::Link;
+        use yui_link::Link;
 
     use super::KhComplex;
 
     #[test]
+    fn new_partial_topped_at_the_canon_degree() {
+        // pruning at a truncated window top dropped the vertices the canon cycles land on, and
+        // `eval_elements` then hit `is_evalable`. This diagram's crossing order is what triggers it.
+        let l = Link::from_pd_code([[1,4,2,5],[3,6,4,1],[5,2,6,3]]).mirror(); // writhe 3, runs 0..=3
+
+        for range in [0..=0, -1..=0, -3..=0] {
+            let c = KhComplex::new_partial(&l, &1, &0, false, Some(range.clone()));
+            assert_eq!(c.canon_cycles().len(), 2, "canon cycles in {range:?}");
+        }
+    }
+
+    #[test]
     fn ckh_trefoil() {
-        let l = Link::trefoil();
+        let l = Link::test_data("3_1").mirror();
         let c = KhComplex::new(&l, &0, &0, false);
 
         assert_eq!(c.h_range(), -3..=0);
@@ -201,12 +283,12 @@ mod tests {
         assert_eq!(c[-1].rank(), 0);
         assert_eq!(c[ 0].rank(), 2);
 
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 
     #[test]
     fn ckh_trefoil_red() {
-        let l = Link::trefoil();
+        let l = Link::test_data("3_1").mirror();
         let c = KhComplex::new(&l, &0, &0, true);
 
         assert_eq!(c.h_range(), -3..=0);
@@ -217,13 +299,13 @@ mod tests {
         assert_eq!(c[-1].rank(), 0);
         assert_eq!(c[ 0].rank(), 1);
 
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 
     #[test]
-    fn gen_grid() {
-        let l = Link::trefoil();
-        let c = KhComplex::new(&l, &0, &0, false).gen_grid();
+    fn ckh_trefoil_bigr() {
+        let l = Link::test_data("3_1").mirror();
+        let c = KhComplex::new(&l, &0, &0, false);
 
         assert_eq!(c[(-3, -9)].rank(), 1);
         assert_eq!(c[(-3, -7)].rank(), 1);
@@ -234,9 +316,9 @@ mod tests {
     }
 
     #[test]
-    fn gen_grid_red() {
-        let l = Link::trefoil();
-        let c = KhComplex::new(&l, &0, &0, true).gen_grid();
+    fn ckh_trefoil_bigr_red() {
+        let l = Link::test_data("3_1").mirror();
+        let c = KhComplex::new(&l, &0, &0, true);
 
         assert_eq!(c[(-3, -8)].rank(), 1);
         assert_eq!(c[(-2, -6)].rank(), 1);
@@ -246,28 +328,27 @@ mod tests {
 
 #[cfg(test)]
 mod tests_v1 {
-    use yui_homology::{ChainComplexTrait, SummandTrait};
-    use yui_link::Link;
+        use yui_link::Link;
 
     use super::KhComplex;
 
     #[test]
     fn ckh_trefoil() {
-        let l = Link::trefoil();
+        let l = Link::test_data("3_1").mirror();
         let c = KhComplex::new_no_simplify(&l, &0, &0, false);
 
         assert_eq!(c.h_range(), -3..=0);
         assert_eq!(c[-3].rank(), 8);
         assert_eq!(c[-2].rank(), 12);
         assert_eq!(c[-1].rank(), 6);
-        assert_eq!(c[ 0].rank(), 4);    
+        assert_eq!(c[ 0].rank(), 4);
 
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 
     #[test]
     fn ckh_trefoil_red() {
-        let l = Link::trefoil();
+        let l = Link::test_data("3_1").mirror();
         let c = KhComplex::new_no_simplify(&l, &0, &0, true);
 
         assert_eq!(c.h_range(), -3..=0);
@@ -276,6 +357,6 @@ mod tests_v1 {
         assert_eq!(c[-1].rank(), 3);
         assert_eq!(c[ 0].rank(), 2);
 
-        c.check_d_all();
+        c.inner().check_d_all();
     }
 }

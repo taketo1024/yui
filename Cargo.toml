@@ -7,14 +7,29 @@ members = [
     "lib-link",
     "lib-kh"
 ]
-resolver = "2"
+resolver = "3"
 
 [workspace.package]
 authors = ["Taketo Sano <taketo1024@gmail.com>"]
 license = "MIT"
-edition = "2021"
+edition = "2024"
+rust-version = "1.88"
 repository = "https://github.com/taketo1024/yui"
+
+[workspace.dependencies]
+yui-core     = { version = "0.5.0", path = "lib-core" }
+yui-link     = { version = "0.5.0", path = "lib-link" }
+yui-matrix   = { version = "0.5.0", path = "lib-matrix" }
+yui-homology = { version = "0.5.0", path = "lib-homology" }
+yui-kh       = { version = "0.5.0", path = "lib-kh" }
 
 [profile.release]
 overflow-checks = true
 # debug = true
+
+# Release-perf with full debuginfo, for `samply` / `cargo flamegraph`.
+# Build with: cargo build --profile=profiling --example profile_khi
+[profile.profiling]
+inherits = "release"
+debug = true
+split-debuginfo = "unpacked"

@@ -1,26 +1,34 @@
+//! `khi`: compute the Khovanov homology of an involutive link.
+
+use smart_default::SmartDefault;
 use std::marker::PhantomData;
+use std::ops::RangeInclusive;
 use std::str::FromStr;
-use yui_core::tex::TeX;
-use yui_core::{EucRing, EucRingOps};
-use yui_homology::{DisplaySeq, DisplayTable, GridTrait, SummandTrait, tex::TeXTable};
-use yui_kh::kh::KhChainExt;
-use yui_kh::khi::{KhIChain, KhIComplex, KhIHomology};
+use yui_core::util::tex::TeX;
+use yui_homology::tex::{ToTexSeq, ToTexTable};
+use yui_core::abst::{EucRing, EucRingOps};
+use yui_homology::{ToSeqString, ToTableString};
+use yui_kh::khi::{KhIChain, KhIHomology};
+use yui_kh::tng::builder::{SymBuildConfig, Strategy, NodeOrder, CutOption};
 use yui_link::InvLink;
+use crate::app::args::*;
 use crate::app::utils::*;
 use crate::app::err::*;
 
 pub fn dispatch(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
-    dispatch_eucring!(App, args)
+    dispatch_eucring!(App, boot, args)
 }
 
-#[derive(Clone, Default, Debug, clap::Args)]
-pub struct Args { 
+#[derive(Clone, SmartDefault, PartialEq, Debug, clap::Args)]
+pub struct Args {
     pub link: String,
 
     #[arg(short = 't', long, default_value = "F2")]
+    #[default(CType::F2)]
     pub c_type: CType,
 
     #[arg(short, long, default_value = "0")]
+    #[default("0".to_string())]
     pub c_value: String,
 
     #[arg(short, long)]
@@ -41,11 +49,45 @@ pub struct Args {
     #[arg(short = 'n', long)]
     pub no_simplify: bool,
 
+    #[arg(long, value_parser = parse_h_range, allow_hyphen_values = true)]
+    pub h_range: Option<RangeInclusive<isize>>,
+
+    #[arg(long, value_parser = parse_strategy, default_value = "greedy")]
+    pub strategy: Strategy,
+
+    // crossing order: min-cut (default; bounds cutwidth) or given (PD order, debug).
+    #[arg(long, value_parser = parse_node_order, default_value = "min-cut")]
+    pub node_order: NodeOrder,
+
+    // skip the half-build/τ-mirror preprocess (which materializes the unbridged off-axis product).
+    #[arg(long)]
+    pub no_preprocess: bool,
+
+    // cap the per-elimination fill cost; survivors defer to the matrix reduction.
+    #[arg(long)]
+    pub max_elim_cost: Option<usize>,
+
+    // skip the final deloop/eliminate; remaining circles defer to into_raw_complex + the matrix
+    // reducer. For huge knots where the final cobordism deloop is the memory/time wall.
+    #[arg(long)]
+    pub no_full_deloop: bool,
+
+    // chunking: `N` (cutwidth, N pieces) or `at(c,..)` (cut after the given crossing counts).
+    #[arg(long, value_parser = parse_cut)]
+    pub cut: Option<CutOption>,
+
     #[arg(short, long, default_value = "unicode")]
+    #[default(Format::Unicode)]
     pub format: Format,
 
     #[arg(long, default_value = "0")]
     pub log: u8,
+}
+
+impl AppArgs for Args {
+    fn c_type(&self) -> CType { self.c_type }
+    fn c_value(&self) -> &String { &self.c_value }
+    fn log(&self) -> u8 { self.log }
 }
 
 pub struct App<R>
@@ -63,102 +105,117 @@ where
     R: EucRing + FromStr + TeX,
     for<'x> &'x R: EucRingOps<R>,
 {
-    pub fn new(args: Args) -> Self { 
+    pub fn boot(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
+        let mut app = Self::new(args.clone());
+        app.run()
+    }
+
+    pub fn new(args: Args) -> Self {
         let buff = String::with_capacity(1024);
         App { args, buff, _ring: PhantomData }
     }
 
-    pub fn run(&mut self) -> Result<String, Box<dyn std::error::Error>> { 
+    pub fn run(&mut self) -> Result<String, Box<dyn std::error::Error>> {
         let (h, t) = parse_pair::<R>(&self.args.c_value)?;
 
         ensure!(self.args.c_type == CType::F2, "Only `-t F2` is supported.");
 
-        if self.args.reduced { 
+        if self.args.reduced {
             ensure!(t.is_zero(), "`t` must be zero for reduced.");
         }
-        if self.args.show_alpha { 
+        if self.args.show_alpha {
             ensure!(t.is_zero(), "`t` must be zero to have alpha.");
         }
-        if self.args.show_ssi { 
+        let l = load_sinv_knot(&self.args.link, self.args.mirror)?;
+
+        let config = SymBuildConfig {
+            h_range: self.args.h_range.clone(), // open ends are clamped inside the build
+            strategy: self.args.strategy,
+            node_order: self.args.node_order,
+            preprocess: !self.args.no_preprocess,
+            cut: self.args.cut.clone().unwrap_or_default(),
+            max_elim_cost: self.args.max_elim_cost,
+            no_full_deloop: self.args.no_full_deloop,
+            ..Default::default()
+        };
+
+        // reads the divisibilities from KhI over the selected ring, with c = h;
+        // for the invariant itself use the `ssi` command.
+        if self.args.show_ssi {
             ensure!(!h.is_zero() && !h.is_unit(), "`h` must be non-zero, non-invertible to compute ssi.");
             ensure!(t.is_zero(), "`t` must be zero to compute ss.");
         }
-    
-        let l = load_sinv_knot(&self.args.link, self.args.mirror)?;
 
-        let ckhi = if self.args.no_simplify {
-            KhIComplex::new_no_simplify(&l, &h, &t, self.args.reduced)
-        } else { 
-            KhIComplex::new(&l, &h, &t, self.args.reduced)
+        let khi = if self.args.no_simplify {
+            KhIHomology::new_no_simplify(&l, &h, &t, self.args.reduced)
+        } else {
+            KhIHomology::new_with_config(&l, &h, &t, self.args.reduced, config)
         };
-        let khi = ckhi.homology();
 
-        let bigraded = h.is_zero() && t.is_zero() || 
+        let bigraded = h.is_zero() && t.is_zero() ||
             ["H", "0,T"].contains(&self.args.c_value.as_str());
 
-        let table = if bigraded { 
-            let grid = khi.clone().gen_grid();
-            match self.args.format {
-                Format::Unicode => grid.display_table("i", "j"),
-                Format::TeX     => grid.tex_table("$\\mathit{KhI}$", " ")
-            }
-        } else { 
-            khi.display_seq("i")
+        let table = match (bigraded, self.args.format) {
+            (true, Format::TeX)  => khi.tex_table("KhI"),
+            (true, _)            => khi.to_table_string(),
+            (false, Format::TeX) => khi.tex_seq("KhI"),
+            (false, _)           => khi.to_seq_string(),
         };
         self.out(&table);
 
-        if self.args.show_gens { 
+        if self.args.show_gens {
             self.show_gens(&khi);
         }
 
-        if self.args.show_alpha { 
-            let zs = ckhi.canon_cycles();
+        if self.args.show_alpha {
+            let zs = khi.canon_cycles();
             self.show_alpha(&khi, zs);
         }
 
-        if self.args.show_ssi { 
-            let zs = ckhi.canon_cycles();
+        if self.args.show_ssi {
+            let zs = khi.canon_cycles();
             self.show_ssi(&l, &h, &khi, zs)?;
         }
 
         Ok(self.flush())
     }
 
-    fn show_gens(&mut self, khi: &KhIHomology<R>) { 
-        for i in khi.support() {
+    fn show_gens(&mut self, khi: &KhIHomology<R>) {
+        for &i in khi.support() {
             let h = &khi[i];
             if h.is_zero() { continue }
 
             self.out(&format!("KhI[{i}]: {}", h));
 
-            let r = h.rank() + h.tors().len();
-            for i in 0..r { 
-                let z = h.gen(i);
+            let r = h.n_generators();
+            for i in 0..r {
+                let z = h.generator(i);
                 self.out(&format!("  {i}: {z}"));
             }
             self.out("");
         }
     }
 
-    fn show_alpha(&mut self, khi: &KhIHomology<R>, zs: &[KhIChain<R>]) { 
-        for (i, z) in zs.iter().enumerate() { 
-            let v = khi[z.h_deg()].vectorize_euc(z);
-            self.out(&format!("a[{i}] in KhI[{}]: {}", z.h_deg(), vec2str(&v)));
+    fn show_alpha(&mut self, khi: &KhIHomology<R>, zs: &[KhIChain<R>]) {
+        for (i, z) in zs.iter().enumerate() {
+            let h = khi.h_deg_of_chain(z);
+            let v = khi[h].vectorize_euc(z);
+            self.out(&format!("a[{i}] in KhI[{h}]: {}", vec2str(&v)));
             self.out(&format!("  {z}\n"));
         }
     }
 
-    fn show_ssi(&mut self, l: &InvLink, c: &R, khi: &KhIHomology<R>, zs: &[KhIChain<R>]) -> Result<(), Box<dyn std::error::Error>> { 
-        assert!(!c.is_unit() && !c.is_unit());
+    fn show_ssi(&mut self, l: &InvLink, c: &R, khi: &KhIHomology<R>, zs: &[KhIChain<R>]) -> Result<(), Box<dyn std::error::Error>> {
+        assert!(!c.is_zero() && !c.is_unit());
 
-        use yui_kh::misc::div_vec;
+        use yui_kh::ss::div_vec;
 
-        let l = l.link();
+        let l = l.inner();
         let w = l.writhe();
         let r = l.seifert_circles().len() as i32;
 
-        for (i, z) in zs.iter().enumerate() { 
-            let h = &khi[z.h_deg()];
+        for (i, z) in zs.iter().enumerate() {
+            let h = &khi[khi.h_deg_of_chain(z)];
             let v = h.vectorize(z).subvec(0..h.rank());
             let d = div_vec(&v, c);
 
@@ -167,67 +224,84 @@ where
             let d = d.unwrap();
             let s = 2 * d + w - r + 1;
 
-            self.out(&format!("ss[{i}] = {s} (d = {d}, w = {w}, r = {r})"));
+            self.out(&format!("ssi[{i}] = {s} (d = {d}, w = {w}, r = {r})"));
         }
 
         Ok(())
     }
 
-    fn out(&mut self, str: &str) { 
+    fn out(&mut self, str: &str) {
         self.buff.push_str(str);
         self.buff.push('\n');
     }
 
-    fn flush(&mut self) -> String { 
+    fn flush(&mut self) -> String {
         let res = std::mem::take(&mut self.buff);
-        res.trim().to_string()
+        res.trim_end().to_string()
     }
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     use super::*;
+    use clap::Parser;
+    use crate::app::app::{CliArgs, Cmd};
+    use crate::app::cmd::test_utils::{pd, assert_out, assert_cli_default};
 
     #[test]
-    fn test1() { 
-        let args = Args { 
-            link: "3_1".to_string(), 
-            c_type: CType::F2,
-            c_value: "0".to_string(),
-            ..Default::default()
+    fn cli_defaults() {
+        let link = pd("3_1");
+        let Cmd::KhI(a) = CliArgs::parse_from(["ykh", "khi", &link]).command else {
+            panic!("`khi` routed to the wrong subcommand")
         };
-        let res = dispatch(&args);
-        assert!(res.is_ok());
+        assert_cli_default(&a, &Args { link, ..Default::default() });
     }
 
     #[test]
-    fn test2() { 
-        let args = Args { 
-            link: "[[1,4,2,5],[3,6,4,1],[5,2,6,3]]".to_string(),
-            c_type: CType::F2,
+    fn khi_trefoil_f2() {
+        let args = Args {
+            link: pd("3_1"),
+            ..Default::default()
+        };
+        assert_out(dispatch(&args), r"
+             j\i  0   1   2   3    4
+             9    .   .   .   F₂   F₂
+             7    .   .   F₂  F₂²  F₂
+             5    .   .   F₂  F₂   .
+             3    F₂  F₂  .   .    .
+             1    F₂  F₂  .   .    .
+        ");
+    }
+
+    #[test]
+    fn khi_trefoil_mirror_reduced() {
+        let args = Args {
+            link: pd("3_1"),
             c_value: "1".to_string(),
             mirror: true,
             reduced: true,
             ..Default::default()
         };
-        let res = dispatch(&args);
-        assert!(res.is_ok());
+        assert_out(dispatch(&args), r"
+             i  0   1
+                F₂  F₂
+        ");
     }
 
-    #[cfg(feature = "poly")]
-    mod poly_tests { 
-        use super::*;
-        
-        #[test]
-        fn test_poly_h() { 
-            let args = Args {
-                link: "3_1".to_string(),
-                c_type: CType::F2,
-                c_value: "H".to_string(),
-                ..Default::default()
-            };
-            let res = dispatch(&args);
-            assert!(res.is_ok());
-        }
+    #[test]
+    fn khi_trefoil_poly_h() {
+        let args = Args {
+            link: pd("3_1"),
+            c_value: "H".to_string(),
+            ..Default::default()
+        };
+        assert_out(dispatch(&args), r"
+             j\i  0      1      2  3          4
+             9    .      .      .  (F₂[H]/H)  (F₂[H]/H)
+             7    .      .      .  (F₂[H]/H)  (F₂[H]/H)
+             5    .      .      .  .          .
+             3    F₂[H]  F₂[H]  .  .          .
+             1    F₂[H]  F₂[H]  .  .          .
+        ");
     }
 }

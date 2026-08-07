@@ -1,54 +1,66 @@
+//! [`ChainMap`]: borrowed view of a chain map between two chain complexes,
+//! plus its mapping cone construction.
+
 use std::sync::Arc;
 
 use num_traits::Zero;
-use yui_core::lc::{EitherGen, Gen, Lc};
-use yui_core::{Ring, RingOps};
+use yui_core::lc::{EitherKey, LcKey, Lc, split_lr};
+use yui_core::abst::{EucRing, EucRingOps, Ring, RingOps};
+use yui_matrix::sparse::SpMat;
 
-use crate::{ChainComplexTrait, Grid, GridDeg, GridTrait, Summand};
+use crate::{GrMod, AddInd, Summand};
 
-use super::ChainComplexBase;
+use super::ChainComplex;
 
-/// Represents a chain map between chain complexes.
-pub struct ChainMap<I, X, Y, R>
-where 
-    I: GridDeg,
-    X: Gen, Y: Gen,
+type ChainMapFn<'c, I, X, Y, R> = Arc<dyn Fn(I, &Lc<X, R>) -> Lc<Y, R> + Send + Sync + 'c>;
+
+/// A chain map between two chain complexes. Holds references to source and
+/// target (`'a`) and a stored closure (`'c`). [`Self::cone`] produces a fresh
+/// owned [`ChainComplex`] and so requires `'c: 'static`.
+pub struct ChainMap<'a, 'c, I, X, Y, R>
+where
+    I: AddInd,
+    X: LcKey, Y: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
+    source: &'a ChainComplex<I, X, R>,
+    target: &'a ChainComplex<I, Y, R>,
     deg: I,
-    map: Arc<dyn Fn(I, &Lc<X, R>) -> Lc<Y, R> + Send + Sync>,
+    map: ChainMapFn<'c, I, X, Y, R>,
 }
 
-impl<I, X, Y, R> ChainMap<I, X, Y, R>
-where 
-    I: GridDeg,
-    X: Gen,
-    Y: Gen,
+impl<'a, 'c, I, X, Y, R> ChainMap<'a, 'c, I, X, Y, R>
+where
+    I: AddInd,
+    X: LcKey,
+    Y: LcKey,
     R: Ring, for<'x> &'x R: RingOps<R>
 {
     pub fn new<F>(
-        source: &ChainComplexBase<I, X, R>,
-        target: &ChainComplexBase<I, Y, R>,
+        source: &'a ChainComplex<I, X, R>,
+        target: &'a ChainComplex<I, Y, R>,
         deg: I,
         map: F,
     ) -> Self
-        where F: Fn(I, &Lc<X, R>) -> Lc<Y, R> + Send + Sync + 'static 
+        where F: Fn(I, &Lc<X, R>) -> Lc<Y, R> + Send + Sync + 'c
     {
-        assert!(source.d_deg() == target.d_deg());
-
-        let map = Arc::new(map);
-        Self {
-            deg,
-            map,
-        }
+        Self { source, target, deg, map: Arc::new(map) }
     }
 
-    pub fn zero(deg: I
+    pub fn zero(
+        source: &'a ChainComplex<I, X, R>,
+        target: &'a ChainComplex<I, Y, R>,
+        deg: I,
     ) -> Self {
-        Self {
-            deg,
-            map: Arc::new(|_, _| Lc::zero()),
-        }
+        Self { source, target, deg, map: Arc::new(|_, _| Lc::zero()) }
+    }
+
+    pub fn source(&self) -> &'a ChainComplex<I, X, R> {
+        self.source
+    }
+
+    pub fn target(&self) -> &'a ChainComplex<I, Y, R> {
+        self.target
     }
 
     pub fn deg(&self) -> I {
@@ -56,57 +68,45 @@ where
     }
 
     pub fn apply(&self, i: I, z: &Lc<X, R>) -> Lc<Y, R> {
-        (self.map)(i, &z)
+        (self.map)(i, z)
     }
 
-    pub fn check_for(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I, x: &X) {
-        let d_deg = source.d_deg();
-        let x = Lc::from(x.clone());
-        let dx = source.d(i, &x);
-        let fdx = self.apply(i + d_deg, &dx);
-        let fx = self.apply(i, &x);
-        let dfx = target.d(i, &fx);
-
-        assert!(dfx == fdx, "df != fd for x = {x}.\n  df = {dfx},\n  fd = {fdx}.");
+    pub fn make_matrix(&self, i: I) -> SpMat<R> {
+        self.source[i].make_matrix(&self.target[i + self.deg], |z| self.apply(i, z))
     }
 
-
-    pub fn check_at(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I) {
-        for x in source.get(i).raw_gens().iter() {
-            self.check_for(source, target, i, x);
-        }
+    pub fn make_matrix_euc(&self, i: I) -> SpMat<R>
+    where Y: LcKey, R: EucRing, for<'x> &'x R: EucRingOps<R> {
+        self.source[i].make_matrix_euc(&self.target[i + self.deg], |z| self.apply(i, z))
     }
 
-    pub fn check_all(
-        &self,
-        source: &ChainComplexBase<I, X, R>,
-        target: &ChainComplexBase<I, Y, R>,
-    ) {
-        for i in source.support() {
-            self.check_at(source, target, i);
-        }
+    pub fn describe_map(&self) -> String {
+        use itertools::Itertools;
+        self.source.support().map(|&i| self.describe_map_at(i)).join("\n\n")
     }
 
-    pub fn print_map(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>) { 
-        for i in source.support() { 
-            self.print_map_at(source, target, i);
-            println!();
-        }
-    }
-
-    pub fn print_map_at(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, i: I) { 
+    pub fn describe_map_at(&self, i: I) -> String {
+        use std::fmt::Write;
         let j = i + self.deg();
-        println!("({i}) {} -> ({j}) {}", source[i], target[j]);
-        for z in source[i].gens() { 
+        let mut s = format!("({i}) {} -> ({j}) {}", self.source[i], self.target[j]);
+        for z in self.source[i].generators() {
             let w = self.apply(i, &z);
-            println!("\t{z} -> {w}");
+            write!(s, "\n\t{z} -> {w}").unwrap();
         }
+        s
     }
 
-    pub fn cone<It>(&self, source: &ChainComplexBase<I, X, R>, target: &ChainComplexBase<I, Y, R>, support: It, target_based: bool) -> ChainComplexBase<I, EitherGen<X, Y>, R>
-    where It: IntoIterator<Item = I> {
-        assert!(source.d_deg() == target.d_deg());
+    /// Build the mapping cone `Cone(f)` of this chain map. Requires the closure
+    /// lifetime `'c: 'static` because the resulting [`ChainComplex`]'s
+    /// differential is stored as `+ 'static`.
+    pub fn cone<It>(&self, support: It, target_based: bool) -> ChainComplex<I, EitherKey<X, Y>, R>
+    where It: IntoIterator<Item = I>, 'c: 'static {
+        assert!(self.source.d_deg() == self.target.d_deg());
+        // the cone pairs `Cᵢ` with `Dᵢ`, so `f` must land in the summand `d` already maps into.
+        assert!(self.deg.is_zero(), "cone requires a degree-zero map");
 
+        let source = self.source;
+        let target = self.target;
         let d_deg = source.d_deg();
         let degs = move |i: I| {
             if !target_based {
@@ -116,94 +116,139 @@ where
             }
         };
 
-        let summands = Grid::generate(support, |i| {
+        let summands = GrMod::generate(support, |i| {
             let (i, j) = degs(i);
             let gens = Iterator::chain(
-                source.get(i).raw_gens().iter().map(|x| EitherGen::from_left(x.clone())), 
-                target.get(j).raw_gens().iter().map(|y| EitherGen::from_right(y.clone()))
+                source[i].raw_generators().iter().map(|x| EitherKey::from_left(x.clone())),
+                target[j].raw_generators().iter().map(|y| EitherKey::from_right(y.clone()))
             );
-            Summand::from_raw_gens(gens)
+            Summand::from_raw_generators(gens)
         });
 
         let d1 = source.raw_d();
         let d2 = target.raw_d();
         let f = self.map.clone();
 
-        let d_map = move |i: I, z: &Lc<EitherGen<X, Y>, R>| {
+        let d_map = move |i: I, z: &Lc<EitherKey<X, Y>, R>| {
             let (i, j) = degs(i);
-            let x = z.filter_gens(|x| x.is_left()).map_gens(|x| x.clone().into_left());
-            let y = z.filter_gens(|x| x.is_right()).map_gens(|x| x.clone().into_right());
+            let (x, y) = split_lr(z);
 
-            let dx = d1(i, &x).map_gens(|x2| EitherGen::from_left(x2.clone()));
-            let fx = f(i, &x).map_gens(|y2| EitherGen::from_right(y2.clone()));
-            let dy = d2(j, &y).map_gens(|y2| EitherGen::from_right(y2.clone()));
+            let dx = d1(i, &x).map_keys(|x2| EitherKey::from_left (x2));
+            let fx =  f(i, &x).map_keys(|y2| EitherKey::from_right(y2));
+            let dy = d2(j, &y).map_keys(|y2| EitherKey::from_right(y2));
 
             dx + fx - dy
         };
 
-        ChainComplexBase::new(summands, d_deg, d_map)
+        ChainComplex::new(summands, d_deg, d_map)
+    }
+
+    /// Assert `d∘f = f∘d` on a single generator. Panics with the offending chains.
+    pub fn check_for(&self, i: I, x: &X) {
+        let d_deg = self.source.d_deg();
+        let x = Lc::from(x.clone());
+        let dx = self.source.d(i, &x);
+        let fdx = self.apply(i + d_deg, &dx);
+        let fx = self.apply(i, &x);
+        let dfx = self.target.d(i + self.deg, &fx);
+
+        assert!(dfx == fdx, "df != fd for x = {x}.\n  df = {dfx},\n  fd = {fdx}.");
+    }
+
+    pub fn check_at(&self, i: I) {
+        for x in self.source[i].raw_generators().iter() {
+            self.check_for(i, x);
+        }
+    }
+
+    pub fn check_all(&self) {
+        for &i in self.source.support() {
+            self.check_at(i);
+        }
     }
 }
 
 #[cfg(test)]
-mod tests { 
-    use crate::{EnumGen, GenericChainComplex};
+mod tests {
+    use crate::{GenericKey, GenericChainComplex1};
 
     use super::*;
 
     #[test]
-    fn test_s2_to_d3() { 
-        let s2 = GenericChainComplex::<i32>::s2();
-        let d3 = GenericChainComplex::<i32>::d3();
+    fn test_s2_to_d3() {
+        let s2 = GenericChainComplex1::<i32>::s2();
+        let d3 = GenericChainComplex1::<i32>::d3();
 
-        let f = ChainMap::new(
-            &s2, 
-            &d3, 
-            0, 
-            |_, z| z.clone()
-        );
+        let f = ChainMap::new(&s2, &d3, 0, |_, z| z.clone());
 
-        f.check_all(&s2, &d3);
+        f.check_all();
     }
 
     #[test]
-    fn test_cone() { 
-        type T = EitherGen<EnumGen<isize>, EnumGen<isize>>;
-        let s2 = GenericChainComplex::<i32>::s2();
-        let d3 = GenericChainComplex::<i32>::d3();
+    fn check_at_nonzero_deg() {
+        // C: C₁ ≅ C₀ and D: D₂ ≅ D₁, with `f` of degree 1 carrying one onto the other —
+        // a genuine chain map, so the check must accept it.
+        let c = GenericChainComplex1::<i32>::from_d_matrices(-1, [
+            (0, SpMat::zero((0, 1))),
+            (1, SpMat::from_entries((1, 1), [(0, 0, 1)])),
+        ]);
+        let d = GenericChainComplex1::<i32>::from_d_matrices(-1, [
+            (1, SpMat::zero((0, 1))),
+            (2, SpMat::from_entries((1, 1), [(0, 0, 1)])),
+        ]);
 
-        let f = ChainMap::new(
-            &s2, 
-            &d3, 
-            0, 
-            |_, z| z.clone()
+        let f = ChainMap::new(&c, &d, 1, |_, z: &Lc<GenericKey<isize>, i32>|
+            z.iter().map(|(k, a)| (GenericKey(k.0 + 1, k.1), *a)).collect()
         );
 
-        let cone = f.cone(&s2, &d3, (0..=4).rev(), true);
+        f.check_at(1);
+    }
+
+    #[test]
+    #[should_panic(expected = "cone requires a degree-zero map")]
+    fn cone_rejects_nonzero_deg() {
+        // with `deg ≠ 0` the `f`-terms land outside the summand and `vectorize` drops them,
+        // leaving a complex whose differential is missing `f` entirely.
+        let s2 = GenericChainComplex1::<i32>::s2();
+        let d3 = GenericChainComplex1::<i32>::d3();
+
+        let f = ChainMap::new(&s2, &d3, 1, |_, z| z.clone());
+        let _ = f.cone((0..=4).rev(), true);
+    }
+
+    #[test]
+    fn test_cone() {
+        type T = EitherKey<GenericKey<isize>, GenericKey<isize>>;
+        let s2 = GenericChainComplex1::<i32>::s2();
+        let d3 = GenericChainComplex1::<i32>::d3();
+
+        let f = ChainMap::new(&s2, &d3, 0, |_, z| z.clone());
+
+        let cone = f.cone((0..=4).rev(), true);
         cone.check_d_all();
 
-        let x = T::from_left(s2[0].raw_gen(0).clone());
-        let y = T::from_left(s2[1].raw_gen(0).clone());
-        let z = T::from_right(d3[1].raw_gen(0).clone());
+        let x = T::from_left(*s2[0].raw_generator(0));
+        let y = T::from_left(*s2[1].raw_generator(0));
+        let z = T::from_right(*d3[1].raw_generator(0));
 
-        assert_eq!(cone[1].raw_gens().index_of(&x), Some(0));
-        assert_eq!(cone[2].raw_gens().index_of(&y), Some(0));
-        assert_eq!(cone[1].raw_gens().index_of(&z), Some(4));
+        assert_eq!(cone[1].raw_generators().get_index_of(&x), Some(0));
+        assert_eq!(cone[2].raw_generators().get_index_of(&y), Some(0));
+        assert_eq!(cone[1].raw_generators().get_index_of(&z), Some(4));
 
-        let dx = cone.d(1, &Lc::from(x.clone()));
-        assert_eq!(dx, Lc::from(T::from_right(EnumGen(0, 0))));
+        let dx = cone.d(1, &Lc::from(x));
+        assert_eq!(dx, Lc::from(T::from_right(GenericKey(0, 0))));
 
-        let dy = cone.d(2, &Lc::from(y.clone()));
+        let dy = cone.d(2, &Lc::from(y));
         assert_eq!(dy, Lc::from_iter([
-            (T::from_left(EnumGen(0, 0)), -1),
-            (T::from_left(EnumGen(0, 1)), 1),
-            (T::from_right(EnumGen(1, 0)), 1),
+            (T::from_left(GenericKey(0, 0)), -1),
+            (T::from_left(GenericKey(0, 1)), 1),
+            (T::from_right(GenericKey(1, 0)), 1),
         ]));
 
-        let dz = cone.d(1, &Lc::from(z.clone()));
+        let dz = cone.d(1, &Lc::from(z));
         assert_eq!(dz, Lc::from_iter([
-            (T::from_right(EnumGen(0, 0)), 1),
-            (T::from_right(EnumGen(0, 1)), -1),
+            (T::from_right(GenericKey(0, 0)), 1),
+            (T::from_right(GenericKey(0, 1)), -1),
         ]));
     }
 }

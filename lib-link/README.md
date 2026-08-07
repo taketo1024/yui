@@ -51,7 +51,7 @@ Each link carries a `base_pt: Option<Edge>`, defaulting to the minimum edge of t
 
 Accessors: `n_crossings`, `n_comps`, `comps`, `writhe`, `loops`, `n_loops`, `n_edges`, `edges`, `base_pt`, `with_base_pt`, `is_oriented`, `unoriented`, `reindexed`, `reindexed_canon`, traversal helpers.
 
-Operations on a diagram: `mirror`, `conn_sum` / `conn_sum_at`, `cc_at` (crossing change), `resolve_at` / `resolve_by` (Khovanov-style 0/1-smoothings), `seifert_state`, `seifert_circles`, `seifert_graph`.
+Operations on a diagram: `mirror`, `reversed` (reverse the orientation; crossing signs, hence the writhe, are unchanged), `conn_sum` / `conn_sum_at`, `cc_at` (crossing change), `resolve_at` / `resolve_by` (Khovanov-style 0/1-smoothings), `seifert_state`, `seifert_circles`, `seifert_graph`.
 
 Constructions are associated functions, taking the companion link (if any) as an argument: `Link::twist_knot(n)`, `Link::pretzel(a, b, c)`, `Link::cable2(&l)` (blackboard-framed 2-cable), `Link::whitehead_double(&l, positive, tw)` (`tw` from the Seifert framing) and `Link::whitehead_double_bbf(&l, positive, tw)` (from the blackboard framing).
 
@@ -95,13 +95,14 @@ An *involutive link*: a `Link` together with an involution on it — an edge bij
 
 - `InvLink::new(inner, e_map)` — `e_map: IntoIterator<Item = (Edge, Edge)>`. The constructor asserts that `e_map` covers every link edge, has image within the edge set, and is involutive.
 - `InvLink::from_symmetric_pd_code(pd_code)` — for a *strongly invertible* knot given by a diagram based on its axis. τ reverses the traversal, so walking both ways from the base point pairs each edge with its image; no search and no relabelling is needed. The base point defaults to the least edge, which the symmetric convention puts on the axis.
+- `InvLink::si_knot_from(inner)` — for a strongly invertible knot whose diagram is already based on its axis; `from_symmetric_pd_code` is this applied to `Link::from_pd_code`.
 - `InvLink::load(name)` — reads `<DATA_DIR>/inv_link/<name>.json`. Lamm's tables ship in `lib-link/resources/inv_link/lamm/` and are flattened into the data dir by `scripts/fetch-knot-data.py`.
 
-`with_base_pt(e)` sets the base point; it asserts that `e` is on-axis (`inv_edge(e) == e`). `inv_edge(e)` and `inv_node(x)` look up the involution. Most read-only `Link` methods are delegated, including `base_pt()`.
+`with_base_pt(e)` sets the base point; it asserts that `e` is on-axis (`inv_edge(e) == e`). `inv_edge(e)` and `inv_node(x)` look up the involution. `reversed()` reverses the orientation, leaving τ untouched — it maps edges, so a strong inversion stays one. Most read-only `Link` methods are delegated, including `base_pt()`.
 
 An `InvLink` is only an *involutive* link. `on_axis_edges()` lists the τ-fixed edges, and the two cases are told apart by `is_strongly_invertible()` (τ reverses the orientation) and `is_2periodic()` (τ preserves it) — both decided from the orientation, not from index arithmetic.
 
-`mirror` and `conn_sum` / `conn_sum_at` are the equivariant counterparts of the `Link` operations — the connected sum splices along on-axis edges, `conn_sum` taking self's other on-axis edge and other's base point. `InvLink::sym_pretzel(a, b, a)` (all-odd) and `InvLink::whitehead_double(&k, positive, tw)` (even `tw`, with `whitehead_double_at` to choose which on-axis edge carries the clasp) are the equivariant constructions.
+`mirror` and `conn_sum` / `conn_sum_at` are the equivariant counterparts of the `Link` operations — the connected sum splices along on-axis edges, `conn_sum` taking self's other on-axis edge and other's base point. At the `Link` level the sum is based on the band edge *entering* self, so the traversal runs through self first and the based numbering is preserved. `InvLink::sym_pretzel(a, b, a)` (all-odd) and `InvLink::whitehead_double(&k, positive, tw)` (even `tw`, with `whitehead_double_at` to choose which on-axis edge carries the clasp) are the equivariant constructions.
 
 ### Derived invariants
 

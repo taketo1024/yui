@@ -69,7 +69,8 @@ The `for<'x>` HRTB on the reference impl is required throughout; the [`auto_impl
 - `Lc<X, R>` — formal linear combination `Σ rᵢxᵢ` with keys `X: LcKey` and coefficients in `R: Ring`. Elements of the free `R`-module over the key set.
 
 `conc/misc/`:
-- `bitseq::BitSeq` — packed sequence of bits, length up to 64.
+- `bitseq::BitSeq<I>` — packed sequence of bits over a word `I`, length up to `I::BITS`.
+  Aliases `BitSeq8`, `BitSeq16`, `BitSeq32`, `BitSeq64`, `BitSeq128` pin the width.
 
 ## Quick example
 

@@ -35,17 +35,17 @@ src/
 
 ### Modules
 
-- **`Summand<X, R>`** — a free or finitely-generated `R`-module. Stores the raw generators (`indexmap::IndexSet<X>`), the free rank, torsion coefficients, and a `Trans<R>` recording the basis change from raw generators to the "SNF basis." Use `generator(i)`, `vectorize(z)`, `devectorize(v)` to move between the abstract `Lc<X, R>` form and the coordinate vector.
+- **`Summand<X, R>`** — a free or finitely-generated `R`-module. Stores the raw generators (`indexmap::IndexSet<X>`, which `from_raw_generators` asserts are distinct rather than silently deduplicating), the free rank, torsion coefficients, and a `Trans<R>` recording the basis change from raw generators to the "SNF basis." Use `generator(i)`, `vectorize(z)`, `devectorize(v)` to move between the abstract `Lc<X, R>` form and the coordinate vector.
 
 - **`GrMod<I, X, R>`** — an `I`-graded R-module: a sparse `Grid` of `Summand<X, R>` keyed by grading index. Missing indices are treated as the zero summand. Aliases: `GrMod1<X, R>`, `GrMod2<X, R>`, `GrMod3<X, R>`.
 
 ### Chain complexes
 
-- **`ChainComplex<I, X, R>`** — a chain complex: a `GrMod` of summands plus a degree-shift `d_deg: I` and a differential closure `Fn(I, &Lc<X, R>) -> Lc<X, R>`. Aliases: `ChainComplex1<X, R>`, `ChainComplex2<X, R>`, `ChainComplex3<X, R>`. Key methods: `d`, `d_matrix(i)`, `homology()`, `reduced()`, `as_generic()`.
+- **`ChainComplex<I, X, R>`** — a chain complex: a `GrMod` of summands plus a degree-shift `d_deg: I` and a differential closure `Fn(I, &Lc<X, R>) -> Lc<X, R>`. Aliases: `ChainComplex1<X, R>`, `ChainComplex2<X, R>`, `ChainComplex3<X, R>`. Key methods: `d`, `d_matrix(i)`, `homology()`, `reduced()`, `as_generic()`, plus `check_d_all()` / `check_d_at(i)` / `check_d_for(i, x)` asserting `d² = 0`.
 
 - **`GenericChainComplex<I, R>`** — a chain complex whose generators are anonymous `GenericKey<I>` placeholders, so the complex is fully described by its differential matrices. Built by `from_d_matrices(d_deg, [(i, M_i), ...])`. Useful when you only have matrices, not symbolic generators.
 
-- **`ChainMap<'a, 'c, I, X, Y, R>`** — a chain map between two complexes. Holds references to source / target (`'a`) and a closure (`'c`). Provides `apply`, `make_matrix(i)`, `cone(support, target_based)`, plus `check_all()` for verifying `df = fd` (gated on `cfg(test)` or the `test-utils` feature).
+- **`ChainMap<'a, 'c, I, X, Y, R>`** — a chain map between two complexes. Holds references to source / target (`'a`) and a closure (`'c`). Provides `apply`, `make_matrix(i)`, `cone(support, target_based)`, plus `check_all()` / `check_at(i)` / `check_for(i, x)` for verifying `df = fd`.
 
 ### Storage
 

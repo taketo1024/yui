@@ -510,6 +510,42 @@ mod tests {
     }
 
     #[test]
+    fn dms_construction() {
+        // The equivariant `2K # (-2K)` of Dai-Mallick-Stoffregen (`references/DMS.pdf` §1.2) — the
+        // same diagrams as `Link::conn_sum`'s `dms_construction`, with the splice edges no longer
+        // given by hand: `conn_sum` takes self's other on-axis edge each time.
+        let k = InvLink::from_symmetric_pd_code([[1,4,2,5],[5,2,6,3],[3,6,4,1]]);
+        assert_eq!(k.on_axis_edges(), vec![1, 4]);
+
+        // `2K`: the connected sum of the underlying link is already the flip diagram, based on the
+        // band, so τ comes back by traversal. The band's two sides are the new axis.
+        let k2 = InvLink::si_knot_from(k.inner().conn_sum(k.inner()));
+        assert_eq!(k2.inner().pd_code(), Link::from_pd_code([
+            [1,4,2,5],[5,2,6,3],[3,6,4,7],[7,10,8,11],[11,8,12,9],[9,12,10,1],
+        ]).pd_code());
+        assert_eq!(k2.on_axis_edges(), vec![1, 7]);
+
+        // `2K # m(K)`, spliced at edge 7.
+        let mk = k.mirror();
+        let with_mk = k2.conn_sum(&mk);
+        assert_eq!(with_mk.inner().pd_code(), Link::from_pd_code([
+            [1,4,2,5],[5,2,6,3],[3,6,4,13],[7,10,8,11],[11,8,12,9],[9,12,10,1],
+            [16,14,17,13],[14,18,15,17],[18,16,7,15],
+        ]).pd_code());
+        assert_eq!(with_mk.on_axis_edges(), vec![1, 16]);
+
+        // `2K # m(K) # r(m(K))`, spliced at edge 16.
+        let dms = with_mk.conn_sum(&mk.reversed());
+        assert_eq!(dms.inner().pd_code(), Link::from_pd_code([
+            [1,4,2,5],[5,2,6,3],[3,6,4,13],[7,10,8,11],[11,8,12,9],[9,12,10,1],
+            [16,14,17,13],[14,18,15,17],[18,19,7,15],
+            [19,21,24,22],[21,23,20,24],[23,16,22,20],
+        ]).pd_code());
+        assert!(dms.is_strongly_invertible());
+        assert_eq!(dms.base_pt(), Some(1));
+    }
+
+    #[test]
     fn conn_sum_is_equivariant() {
         // construction succeeding ⟺ from_standard_reindex found a valid τ on the sum.
         let k1 = InvLink::test_data("3_1");

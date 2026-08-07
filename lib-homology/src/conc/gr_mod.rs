@@ -63,6 +63,10 @@ where
         }
     }
 
+    pub fn total_rank(&self) -> usize {
+        self.support().map(|&i| self[i].rank()).sum()
+    }
+
     // Relabel generators by an injective `f`, preserving the grading.
     pub fn map_keys<Y, F>(&self, f: F) -> GrMod<I, Y, R>
     where Y: LcKey, F: Fn(&X) -> Y {

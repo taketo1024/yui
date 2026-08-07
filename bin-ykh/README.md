@@ -1,5 +1,9 @@
 # ykh
 
+[![crates.io](https://img.shields.io/crates/v/ykh.svg)](https://crates.io/crates/ykh)
+[![docs.rs](https://docs.rs/ykh/badge.svg)](https://docs.rs/ykh)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A CLI tool for Khovanov homology computations.
 
 ## Setup

@@ -143,7 +143,7 @@ where
         ChainComplex::new(summands, d_deg, d_map)
     }
 
-    #[cfg(any(test, feature = "test-utils"))]
+    /// Assert `d∘f = f∘d` on a single generator. Panics with the offending chains.
     pub fn check_for(&self, i: I, x: &X) {
         let d_deg = self.source.d_deg();
         let x = Lc::from(x.clone());
@@ -155,14 +155,12 @@ where
         assert!(dfx == fdx, "df != fd for x = {x}.\n  df = {dfx},\n  fd = {fdx}.");
     }
 
-    #[cfg(any(test, feature = "test-utils"))]
     pub fn check_at(&self, i: I) {
         for x in self.source[i].raw_generators().iter() {
             self.check_for(i, x);
         }
     }
 
-    #[cfg(any(test, feature = "test-utils"))]
     pub fn check_all(&self) {
         for &i in self.source.support() {
             self.check_at(i);

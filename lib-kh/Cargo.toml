@@ -35,5 +35,5 @@ yui-homology.workspace = true
 
 [dev-dependencies]
 yui-link = { workspace = true, features = ["test-utils"] }
-yui-homology = { workspace = true, features = ["test-utils"] }
+yui-homology = { workspace = true }
 env_logger = "0.11"

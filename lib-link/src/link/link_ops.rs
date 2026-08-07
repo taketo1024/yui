@@ -367,25 +367,28 @@ mod tests {
 
     #[test]
     fn conn_sum_at_of_two_curls_away_from_the_base_pt() {
-        // Splicing at edge 2 — the curl's own loop — gives `unknot_l_twist2`. The splice spares
-        // edge 1, so the base point stays there instead of moving onto the band.
+        // Splicing at edge 2 — the curl's own loop — spares edge 1, so the base point stays there
+        // and the bands take the freed ids 2 and 4, the incoming one getting the lower.
         let k = Link::test_data("unknot_l_twist");
         let cs = k.conn_sum_at(&k, 2, 2);
+        assert_eq!(cs.pd_code(), [[1,1,4,2],[3,3,2,4]]);
         assert_eq!(cs.base_pt(), Some(1));
 
-        // Raw is [[1,1,4,2],[3,3,2,4]]: `build` numbers edges in `connect` order, not along the
-        // strand, so compare after renumbering from the base point.
-        assert_eq!(cs.reindexed(1, 1).pd_code(), [[1,1,2,4],[3,3,4,2]]);
+        // Splicing off the base leaves the traversal numbering, so this is `unknot_l_twist2` only
+        // after renumbering.
         assert_eq!(cs.reindexed(1, 1).pd_code(), Link::test_data("unknot_l_twist2").pd_code());
     }
 
     #[test]
     fn conn_sum_at_of_two_curls_on_different_edges() {
-        // Asymmetric splice: self's loop (edge 2) to other's base edge (edge 1).
+        // Asymmetric splice: self's loop (edge 2) to other's base edge (edge 1). The bands take
+        // the freed ids 2 and 3, the incoming one getting the lower.
         let k = Link::test_data("unknot_l_twist");
         let cs = k.conn_sum_at(&k, 2, 1);
+        assert_eq!(cs.pd_code(), [[1,1,3,2],[3,2,4,4]]);
         assert_eq!(cs.base_pt(), Some(1));
-        // Raw is [[1,1,3,2],[3,2,4,4]], and the target is not traversal-numbered either.
+
+        // the same diagram as [[1,1,2,3],[2,3,4,4]], which neither code is numbered along.
         let expected = Link::from_pd_code([[1,1,2,3],[2,3,4,4]]);
         assert_eq!(cs.reindexed(1, 1).pd_code(), expected.reindexed(1, 1).pd_code());
     }

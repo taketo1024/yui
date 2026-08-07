@@ -38,10 +38,14 @@ impl Link {
         let (t1, h1) = (port(&v1, t1), port(&v1, h1));
         let (t2, h2) = (port(&v2, t2), port(&v2, h2));
 
+        // The builder reuses freed edge slots last-in-first-out, so the *second* `connect` takes
+        // the slot freed *first*: the incoming band edge gets the lower id. With both summands
+        // numbered along the strand from edge 1, the sum comes out numbered the same way — band in
+        // as 1, self's own 2..n1, band out as n1 + 1, then other's.
         b.disconnect(h1);   // free self_e's two ports
         b.disconnect(h2);   // free other_e's two ports
-        b.connect(t1, h2);  // self tail → other head
-        b.connect(t2, h1);  // other tail → self head
+        b.connect(t1, h2);  // self tail → other head (outgoing from self)
+        b.connect(t2, h1);  // other tail → self head (incoming to self)
 
         // A base point elsewhere survives; one on the consumed `self_e` moves to the band edge
         // entering `self`, so the traversal covers `self` first. Read the ids before `build` renumbers.
@@ -405,6 +409,29 @@ mod tests {
                     assert_eq!(cs.node(n1 + i).incoming(), x.incoming(), "{case}: node {i} of {b}");
                 }
             }
+        }
+    }
+
+    #[test]
+    fn conn_sum_of_based_summands_is_traversal_numbered() {
+        // Summands numbered along the strand from edge 1: the band entering K1 takes edge 1, K1
+        // keeps 2..n1, the band leaving takes n1 + 1, and K2's 2..n2 follow — so the sum is
+        // numbered along the strand from its own base point too.
+        for (a, b) in [("3_1", "4_1"), ("4_1", "3_1"), ("5_1", "6_2"), ("unknot_l_twist", "3_1")] {
+            let (k1, k2) = (Link::test_data(a), Link::test_data(b));
+            assert_eq!(k1.pd_code(), k1.reindexed(1, 1).pd_code(), "{a} is not traversal-numbered");
+            assert_eq!(k2.pd_code(), k2.reindexed(1, 1).pd_code(), "{b} is not traversal-numbered");
+
+            let cs = k1.conn_sum(&k2);
+            assert_eq!(cs.base_pt(), Some(1), "{a} # {b}");
+            assert_eq!(cs.pd_code(), cs.reindexed(1, 1).pd_code(), "{a} # {b}");
+
+            // Edge 1 is the band entering K1, edge n1 + 1 the one leaving it.
+            let (n1, x1) = (k1.n_edges() as Edge, k1.n_nodes());
+            let (tail, head) = cs.edge_ends(1, true);
+            assert!(tail.0 >= x1 && head.0 < x1, "{a} # {b}: edge 1 must enter K1");
+            let (tail, head) = cs.edge_ends(n1 + 1, true);
+            assert!(tail.0 < x1 && head.0 >= x1, "{a} # {b}: edge {} must leave K1", n1 + 1);
         }
     }
 

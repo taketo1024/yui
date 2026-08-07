@@ -35,6 +35,19 @@ python3 scripts/fetch-knot-data.py            # writes to the default data dir
 python3 scripts/fetch-knot-data.py --out DIR  # or to a custom directory
 ```
 
+### Data sources
+
+- PD codes, braid words and invariants come from **KnotInfo**:
+
+  > C. Livingston and A. H. Moore, *KnotInfo: Table of Knot Invariants*,
+  > <https://knotinfo.org/>
+
+- The transvergent (axis-symmetric) diagrams of strongly invertible knots up to 10 crossings,
+  bundled in `lib-link/resources/inv_link/lamm/`, are built from the templates of:
+
+  > C. Lamm, *Symmetric diagrams for all strongly invertible knots up to 10 crossings*,
+  > <https://arxiv.org/abs/2210.13198>
+
 ## License
 `yui` is released under the [MIT license](LICENSE).
 

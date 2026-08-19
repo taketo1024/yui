@@ -12,3 +12,6 @@ pub(crate) mod hash_cons;
 
 pub mod fast_poly;
 pub use fast_poly::FastPoly;
+
+pub mod q_graded;
+pub use q_graded::QGraded;

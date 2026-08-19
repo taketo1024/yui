@@ -11,6 +11,7 @@ use yui_core::util::tex::TeX;
 use yui_homology::tex::ToTexTable;
 use yui_core::abst::{Ring, RingOps};
 use yui_homology::ToTableString;
+use yui_kh::util::QGraded;
 use yui_kh::khi::KhIComplex;
 use yui_kh::tng::builder::{SymBuildConfig, Strategy, NodeOrder, CutOption};
 
@@ -90,7 +91,7 @@ impl AppArgs for Args {
 
 pub struct App<R>
 where
-    R: Ring + FromStr + TeX,
+    R: Ring + FromStr + TeX + QGraded,
     for<'x> &'x R: RingOps<R>,
 {
     args: Args,
@@ -100,7 +101,7 @@ where
 
 impl<R> App<R>
 where
-    R: Ring + FromStr + TeX,
+    R: Ring + FromStr + TeX + QGraded,
     for<'x> &'x R: RingOps<R>,
 {
     pub fn boot(args: &Args) -> Result<String, Box<dyn std::error::Error>> {

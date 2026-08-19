@@ -12,7 +12,8 @@ use yui_link::Link;
 
 use crate::kh::KhGen;
 use crate::tng::builder::BuildConfig;
-use crate::util::Bigraded;
+use crate::util::{Bigraded, QGraded};
+use crate::kh::complex::KhChainExt;
 
 use super::{KhAlg, KhChain, KhComplex};
 use yui_core::util::tex::TeX;
@@ -105,11 +106,6 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         self.reduced
     }
 
-    // same bigraded Khovanov homology (free ranks + torsion at every (i, j)) as `other`.
-    pub fn is_identical(&self, other: &KhHomology<R>) -> bool {
-        Bigraded::is_identical(self, other)
-    }
-
     pub fn h_deg_of(&self, x: &KhGen) -> isize {
         self.deg_shift.0 + x.rel_h_deg()
     }
@@ -122,26 +118,10 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         z.keys().map(|x| self.h_deg_of(x)).min().unwrap_or(0)
     }
 
-    pub fn q_deg_of_chain(&self, z: &KhChain<R>) -> isize {
-        z.keys().map(|x| self.q_deg_of(x)).min().unwrap_or(0)
-    }
-
     pub fn h_range(&self) -> RangeInclusive<isize> {
         self.support().filter(|&&i|
             !self[i].is_zero()
         ).copied().range().unwrap_or_else(empty_range)
-    }
-
-    pub fn q_range(&self) -> RangeInclusive<isize> {
-        self.support().flat_map(|&i|
-            self[i].generators().map(|z| self.q_deg_of_chain(&z))
-        ).range().unwrap_or_else(empty_range)
-    }
-
-    pub fn delta_range(&self) -> RangeInclusive<isize> {
-        self.support().flat_map(|&i|
-            self[i].generators().map(|z| 2 * self.h_deg_of_chain(&z) - self.q_deg_of_chain(&z))
-        ).range().unwrap_or_else(empty_range)
     }
 
     pub fn canon_cycles(&self) -> &[KhChain<R>] {
@@ -162,13 +142,40 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
         )
     }
 
+}
+
+// the `q`-grading only makes sense when the coefficients carry one
+impl<R> KhHomology<R>
+where R: EucRing + QGraded, for<'x> &'x R: EucRingOps<R> {
+    // same bigraded Khovanov homology (free ranks + torsion at every (i, j)) as `other`.
+    pub fn is_identical(&self, other: &KhHomology<R>) -> bool {
+        Bigraded::is_identical(self, other)
+    }
+
     fn cached_bigraded(&self) -> &GrMod2<KhGen, R> {
         self.cache_bigr.get_or_init(|| self.bigraded())
+    }
+
+    pub fn q_deg_of_chain(&self, z: &KhChain<R>) -> isize {
+        debug_assert!(z.is_qdeg_homogeneous(), "chain is not q-homogeneous: {z}");
+        z.iter().map(|(x, r)| self.q_deg_of(x) + r.q_deg()).min().unwrap_or(0)
+    }
+
+    pub fn q_range(&self) -> RangeInclusive<isize> {
+        self.support().flat_map(|&i|
+            self[i].generators().map(|z| self.q_deg_of_chain(&z))
+        ).range().unwrap_or_else(empty_range)
+    }
+
+    pub fn delta_range(&self) -> RangeInclusive<isize> {
+        self.support().flat_map(|&i|
+            self[i].generators().map(|z| 2 * self.h_deg_of_chain(&z) - self.q_deg_of_chain(&z))
+        ).range().unwrap_or_else(empty_range)
     }
 }
 
 impl<R> Bigraded<KhGen, R> for KhHomology<R>
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+where R: EucRing + QGraded, for<'x> &'x R: EucRingOps<R> {
     fn base(&self) -> &GrMod1<KhGen, R> { self.inner() }
     fn decomp_key(&self, z: &KhChain<R>) -> isize { self.q_deg_of_chain(z) }
 }
@@ -192,7 +199,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 }
 
 impl<R> Index<(isize, isize)> for KhHomology<R>
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+where R: EucRing + QGraded, for<'x> &'x R: EucRingOps<R> {
     type Output = Summand<KhGen, R>;
 
     fn index(&self, index: (isize, isize)) -> &Self::Output {
@@ -223,7 +230,7 @@ where R: EucRing + TeX, for<'x> &'x R: EucRingOps<R> {
 }
 
 impl<R> ToTableString<isize> for KhHomology<R>
-where R: EucRing, for<'x> &'x R: EucRingOps<R> {
+where R: EucRing + QGraded, for<'x> &'x R: EucRingOps<R> {
     fn labels(&self) -> (String, String) {
         ("i".to_string(), "j".to_string())
     }
@@ -242,7 +249,7 @@ where R: EucRing, for<'x> &'x R: EucRingOps<R> {
 }
 
 impl<R> ToTexTable<isize> for KhHomology<R>
-where R: EucRing + TeX, for<'x> &'x R: EucRingOps<R> {
+where R: EucRing + TeX + QGraded, for<'x> &'x R: EucRingOps<R> {
     fn tex_entry_at(&self, i: &isize, j: &isize) -> String {
         if self[(*i, *j)].is_zero() {
             ".".to_string()

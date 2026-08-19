@@ -22,6 +22,7 @@ use yui_matrix::MatTrait;
 use yui_matrix::dense::snf::fnf;
 
 use crate::ext::{Color, LinkExt};
+use crate::util::QGraded;
 use crate::kh::ext::cc::KhChainMap;
 use crate::kh::{KhChain, KhCube, KhGen, KhComplex, KhHomology};
 
@@ -132,7 +133,7 @@ impl<'a, R> KhSl2Map<'a, R> where
     }
 
     pub fn string_decomp(&self, kh: &KhHomology<R>) -> StringDecomp<R>
-    where R: Field, for<'x> &'x R: FieldOps<R> {
+    where R: Field + QGraded, for<'x> &'x R: FieldOps<R> {
         use yui_matrix::sparse::SpMat;
 
         assert!(self.cube().alg().h().is_zero());

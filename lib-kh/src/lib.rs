@@ -3,7 +3,7 @@
 // laid out as `<group>/<type>.rs`, so a module may share its parent's name.
 #![allow(clippy::module_inception)]
 
-mod ext;
+pub mod ext;
 
 pub mod kh;
 pub mod khi;

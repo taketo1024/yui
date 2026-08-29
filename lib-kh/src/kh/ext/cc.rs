@@ -56,7 +56,8 @@ where R: Ring, for<'x> &'x R: RingOps<R> {
         let deg = c2.deg_shift().0 - c1.deg_shift().0 - 1;
 
         let alg = c1.alg().clone();
-        let (a0, a1) = l.node(i).resolve(Bit::Bit0).arcs();
+        // note: `Φ` acts on `CKh(D₁)`, so the arcs come from the 1-resolution.
+        let (a0, a1) = l.node(i).resolve(Bit::Bit1).arcs();
 
         // TODO We don't want to reproduce the cube.
         let (h, t) = c1.alg().ht();
@@ -118,8 +119,10 @@ mod tests {
     use yui_homology::ToSeqString;
     use yui_link::Link;
 
+    use num_traits::Zero;
+
     use crate::kh::ext::cc::KhChainMap;
-    use crate::kh::KhComplex;
+    use crate::kh::{KhComplex, KhHomology};
 
     #[test]
     fn test_cc0_pos_to_neg() {
@@ -147,6 +150,25 @@ mod tests {
         assert_eq!(f.deg(), 2);
 
         f.check_all();
+    }
+
+    // the three crossings of `3_1` are equivalent, so neither map may vanish at any of them
+    #[test]
+    fn test_cc_maps_nonzero_at_each_crossing() {
+        let l = Link::test_data("3_1");
+        let (h, t) = (0i32, 0i32);
+
+        for i in 0 .. l.n_crossings() {
+            let (c1, c2) = KhComplex::cc_pair(&l, &h, &t, false, i);
+            let kh = KhHomology::from(&c1);
+
+            let nonzero = |f: &KhChainMap<'_, '_, i32>| kh.h_range().any(|a|
+                (0 .. kh[a].n_generators()).any(|k| !f.apply(a, &kh[a].generator(k)).is_zero())
+            );
+
+            assert!(nonzero(&KhComplex::cc_map0(&c1, &c2, i)), "cc_map0 vanishes at crossing {i}");
+            assert!(nonzero(&KhComplex::cc_map1(&c1, &c2, &l, i)), "cc_map1 vanishes at crossing {i}");
+        }
     }
 
     #[test]

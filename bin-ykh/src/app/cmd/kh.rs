@@ -8,6 +8,7 @@ use yui_core::util::tex::TeX;
 use yui_homology::tex::{ToTexSeq, ToTexTable};
 use yui_core::abst::{EucRing, EucRingOps};
 use yui_homology::{ToSeqString, ToTableString};
+use yui_kh::util::QGraded;
 use yui_kh::kh::KhHomology;
 use yui_kh::tng::builder::{BuildConfig, CutOption, NodeOrder, Strategy};
 use yui_link::Link;
@@ -87,7 +88,7 @@ impl AppArgs for Args {
 
 pub struct App<R>
 where
-    R: EucRing + FromStr + TeX,
+    R: EucRing + FromStr + TeX + QGraded,
     for<'x> &'x R: EucRingOps<R>,
 {
     args: Args,
@@ -97,7 +98,7 @@ where
 
 impl<R> App<R>
 where
-    R: EucRing + FromStr + TeX,
+    R: EucRing + FromStr + TeX + QGraded,
     for<'x> &'x R: EucRingOps<R>,
 {
     pub fn boot(args: &Args) -> Result<String, Box<dyn std::error::Error>> {

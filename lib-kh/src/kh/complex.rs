@@ -6,6 +6,7 @@ use std::ops::{RangeInclusive, Index};
 use std::sync::OnceLock;
 
 use delegate::delegate;
+use itertools::Itertools;
 use yui_core::lc::Lc;
 use yui_core::abst::{Ring, RingOps, EucRing, EucRingOps};
 use yui_core::ext::{empty_range, IteratorExt};
@@ -14,13 +15,26 @@ use yui_homology::{ChainComplex1, ToSeqString, ToTableString, GrMod1, GrMod2, Su
 
 use crate::kh::{KhGen, KhHomology};
 use crate::tng::builder::BuildConfig;
-use crate::util::Bigraded;
+use crate::util::{Bigraded, QGraded};
 
 use super::KhAlg;
 use yui_core::util::tex::TeX;
 use yui_homology::tex::{ToTexSeq, ToTexTable};
 
 pub type KhChain<R> = Lc<KhGen, R>;
+
+pub trait KhChainExt {
+    /// Whether every term shares one `q`-degree, so the chain has a `q`-degree at all.
+    fn is_qdeg_homogeneous(&self) -> bool;
+}
+
+impl<R> KhChainExt for KhChain<R>
+where R: Ring + QGraded, for<'x> &'x R: RingOps<R> {
+    fn is_qdeg_homogeneous(&self) -> bool {
+        self.iter().all(|(_, r)| r.is_qdeg_homogeneous())
+            && self.iter().map(|(x, r)| x.rel_q_deg() + r.q_deg()).all_equal()
+    }
+}
 pub type KhComplexSummand<R> = Summand<KhGen, R>;
 
 #[derive(Clone)]
@@ -256,7 +270,23 @@ where R: Ring + TeX, for<'x> &'x R: RingOps<R> {
 mod tests {
         use yui_link::Link;
 
-    use super::KhComplex;
+    use super::{KhChain, KhChainExt, KhComplex};
+
+    #[test]
+    fn chain_qdeg_homogeneity() {
+        let l = Link::test_data("3_1");
+        let c = KhComplex::new_no_simplify(&l, &0, &0, false);
+        let gens = c.inner()[0].raw_generators();
+
+        // a single generator is homogeneous
+        let x = KhChain::<i64>::from(gens[0].clone());
+        assert!(x.is_qdeg_homogeneous());
+
+        // two generators of different q-degree are not
+        let y = gens.iter().find(|y| y.rel_q_deg() != gens[0].rel_q_deg()).unwrap();
+        let z = x + KhChain::from(y.clone());
+        assert!(!z.is_qdeg_homogeneous());
+    }
 
     #[test]
     fn new_partial_topped_at_the_canon_degree() {

@@ -23,6 +23,7 @@ derive_more = { version = "2.1.1", features = ["display", "debug"] }
 log = "0.4.29"
 maplit = "1.0.2"
 num-traits = "0.2.19"
+num-bigint = "0.5.1"
 cfg-if = "1.0.4"
 itertools = "0.15.0"
 rustc-hash = "2.1.1"

@@ -2169,7 +2169,7 @@ checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
 
 [[package]]
 name = "ykh"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "calamine",
  "cfg-if",
@@ -2194,7 +2194,7 @@ dependencies = [
 
 [[package]]
 name = "yui-core"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "auto-impl-ops",
  "delegate",
@@ -2239,7 +2239,7 @@ dependencies = [
 
 [[package]]
 name = "yui-kh"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "auto-impl-ops",
  "cfg-if",
@@ -2262,7 +2262,7 @@ dependencies = [
 
 [[package]]
 name = "yui-link"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "auto-impl-ops",
  "delegate",

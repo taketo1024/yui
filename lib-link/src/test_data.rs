@@ -2,7 +2,7 @@
 //! used only in `cargo test` (and in downstream crates that opt into
 //! the `test-utils` feature). The named knots are KnotInfo's own
 //! diagrams, so chirality follows KnotInfo; the symmetric diagrams
-//! come from Lamm's tables (see `resources/inv_link/lamm/README.md`).
+//! come from Lamm's tables (see `resources/inv_link/README.md` at the workspace root).
 
 use crate::{Braid, InvLink, Link, PDCodeX};
 

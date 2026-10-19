@@ -1,5 +1,6 @@
 //! The subcommands: `kh` / `khi` (homology), `ckh` / `ckhi` (chain complexes),
-//! `ss` / `ssi` (invariants), `cc` (crossing change) and `sl2`.
+//! `ss` / `ssi` (invariants), `cc` (crossing change), `sl2`, and `setup`
+//! (downloading the knot data).
 
 #[cfg(test)]
 pub mod test_utils;
@@ -12,3 +13,4 @@ pub mod cc;
 pub mod ss;
 pub mod ssi;
 pub mod sl2;
+pub mod setup;

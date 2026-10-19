@@ -34,6 +34,9 @@ yui-matrix.workspace = true
 yui-homology.workspace = true
 yui-kh.workspace = true
 smart-default = "0.7.1"
+calamine = "0.36.1"
+ureq = "3.4.2"
+zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
 yui-link = { workspace = true, features = ["test-utils"] }

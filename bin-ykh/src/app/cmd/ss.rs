@@ -74,10 +74,13 @@ pub struct Args {
     pub log: u8,
 }
 
-impl AppArgs for Args {
+impl LogArg for Args {
+    fn log_value(&self) -> u8 { self.log }
+}
+
+impl CValueArg for Args {
     fn c_type(&self) -> CType { self.c_type }
     fn c_value(&self) -> &String { &self.c_value }
-    fn log(&self) -> u8 { self.log }
 }
 
 impl Args {

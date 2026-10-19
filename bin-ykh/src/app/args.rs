@@ -8,10 +8,23 @@ use yui_link::Link;
 use yui_kh::ss::SsVersion;
 use yui_kh::tng::builder::{Strategy, NodeOrder, CutOption};
 
-pub trait AppArgs {
+pub trait LogArg {
+    fn log_value(&self) -> u8;
+
+    fn log_level(&self) -> log::LevelFilter {
+        use log::LevelFilter::*;
+        match self.log_value() {
+            1 => Info,
+            2 => Debug,
+            3 => Trace,
+            _ => Off,
+        }
+    }
+}
+
+pub trait CValueArg {
     fn c_type(&self) -> CType;
     fn c_value(&self) -> &String;
-    fn log(&self) -> u8;
 
     fn poly_vars(&self) -> PolyVars {
         parse_poly_vars(self.c_value())
@@ -28,16 +41,6 @@ pub trait AppArgs {
     fn is_euc_ring(&self) -> bool {
         self.c_type() == CType::Z && !self.is_poly() ||
         self.c_type().is_field() && self.poly_vars().nvars() == 1
-    }
-
-    fn log_level(&self) -> log::LevelFilter {
-        use log::LevelFilter::*;
-        match self.log() {
-            1 => Info,
-            2 => Debug,
-            3 => Trace,
-            _ => Off,
-        }
     }
 }
 

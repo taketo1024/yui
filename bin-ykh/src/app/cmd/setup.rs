@@ -14,7 +14,7 @@ use crate::app::args::LogArg;
 
 const KNOTINFO_URL: &str = "https://raw.githubusercontent.com/knotinfo-org/assets/main/knotinfo_data_complete.xls.zip";
 const KNOTINFO_XLS: &str = "knotinfo_data_complete.xls";
-const INV_LINK_URL: &str = "https://raw.githubusercontent.com/taketo1024/yui/setup/resources/inv_link";
+const INV_LINK_URL: &str = "https://raw.githubusercontent.com/taketo1024/yui/main/resources/inv_link";
 const INV_LINK_ZIPS: [&str; 3] = ["A.zip", "B.zip", "two_bridge.zip"];
 const MAX_DOWNLOAD: u64 = 256 << 20;
 

@@ -30,7 +30,7 @@ pub enum Cmd {
 }
 
 impl CliArgs {
-    fn app_args(&self) -> &dyn AppArgs {
+    fn log_args(&self) -> &dyn LogArg {
         match &self.command {
             Cmd::CKh(args)  => args,
             Cmd::Kh(args)   => args,
@@ -44,7 +44,7 @@ impl CliArgs {
     }
 
     fn log_level(&self) -> log::LevelFilter {
-        self.app_args().log_level()
+        self.log_args().log_level()
     }
 }
 

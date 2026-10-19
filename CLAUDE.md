@@ -29,6 +29,7 @@ cargo test -p yui-homology grid
 
 # Run the CLI binary
 cargo run -p ykh -- --help
+cargo run -p ykh -- setup        # fill the data dir (needed by `Link::load` etc.)
 cargo run --release -p ykh -- kh "3_1"
 
 # Doctests are disabled in every crate (`[lib] doctest = false`), so the README
@@ -57,8 +58,14 @@ lib-link      — knot/link data structures (planar diagrams, braids)
     ↓
 lib-kh        — Khovanov homology (KhComplex, KhHomology, KhI invariant, ss)
     ↓
-bin-ykh       — CLI frontend (clap-based, commands: kh, khi, ckh, ckhi, cc, sl2)
+bin-ykh       — CLI frontend (clap-based, commands: kh, khi, ckh, ckhi, cc, sl2, ss, ssi, setup)
+
+resources/inv_link/ — Lamm's symmetric diagrams as A.zip / B.zip / two_bridge.zip (not in any crate)
 ```
+
+`ykh setup` fills the data dir: KnotInfo's `.xls.zip` → `links/` + `braid/`, and the three zips,
+downloaded from GitHub (`INV_LINK_URL` in `bin-ykh/src/app/cmd/setup.rs`), → `inv_link/`.
+To change a bundled diagram, edit and re-zip it; old `ykh` binaries pick it up once it is on `main`.
 
 ## Key abstractions
 
@@ -226,7 +233,6 @@ src/
 │   └── braid_gen.rs  — `BraidGen` (signed Artin generator, stored as `i8`)
 ├── misc/jones.rs     — `jones_polynomial`
 └── test_data.rs      — hard-coded PD codes / braid words (`#[cfg(any(test, feature = "test-utils"))]`)
-resources/inv_link/   — bundled symmetric PD codes (3_1 … 7_7b) for `InvLink::load`
 ```
 
 Key types:
@@ -249,7 +255,7 @@ Key types:
   - **Involutive vs strongly invertible**: an `InvLink` is only an *involutive* link. `is_strongly_invertible()` (τ reverses the orientation) and `is_2periodic()` (τ preserves it) decide the two cases, both from the orientation via `preserves_dir_at` — never from index arithmetic, which is degenerate when the diagram has 2 edges. `on_axis_edges()` lists the τ-fixed edges. `conn_sum` and `whitehead_double` assert knot + strongly invertible.
   - **`si_knot_from(inner)`** (public) builds the involution from a diagram *based on its axis*: τ reverses the traversal, so walking both ways from the base point pairs each edge with its image — `τ(e_{k+i}) = e_{k-i}`. No search, no relabelling, and the old `e ↦ (n+1-e) mod n + 1` formula is gone. `from_symmetric_pd_code` is just this applied to `Link::from_pd_code` (the least edge is on-axis by that convention).
   - **Determinism**: `Link::conn_sum_at` and `whitehead_double_impl` carry a base point through `LinkBuilder`'s renumbering (via `edge_at` before `build`), so `InvLink::conn_sum` (splice `self`'s *other* on-axis edge to `other`'s base point) and `whitehead_double` hand `si_knot_from` a diagram already based on the axis. Base points are no longer normalised to edge 1.
-  - `InvLink::load(name)` reads `<DATA_DIR>/inv_link/<name>.json`; bundled JSON files at `lib-link/resources/inv_link/` are copied into the data dir by `scripts/fetch-knot-data.py`.
+  - `InvLink::load(name)` reads `<DATA_DIR>/inv_link/<name>.json`; the bundled zips at the workspace's `resources/inv_link/` are extracted (flattened) into the data dir by `ykh setup`.
   - `inv_edge(e)` / `inv_node(x)` look up the involution (renamed from `inv_e` / `inv_x`).
   - `with_base_pt(e)` asserts `e` is on-axis (`inv_edge(e) == e`), then delegates to the inner `Link::with_base_pt`.
   - `reversed()` on `Node` / `Link` / `InvLink` reverses the orientation — each strand enters by the slot it used to leave. Crossing signs and the writhe are unchanged, and τ is untouched.

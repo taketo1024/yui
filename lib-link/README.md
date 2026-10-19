@@ -27,11 +27,6 @@ src/
 ├── misc/
 │   └── jones.rs      — `jones_polynomial`, `det`
 └── test_data.rs      — hard-coded PD codes / braid words (test-only)
-resources/
-└── inv_link/lamm/    — Lamm's tables of symmetric diagrams, for `InvLink::load`
-    ├── A/            — one strong inversion per knot, up to 10 crossings
-    ├── B/            — doubly transvergent diagrams, two classes `<knot>a` / `<knot>b`
-    └── two_bridge/   — the two-bridge knots
 ```
 
 ## Key types
@@ -96,7 +91,7 @@ An *involutive link*: a `Link` together with an involution on it — an edge bij
 - `InvLink::new(inner, e_map)` — `e_map: IntoIterator<Item = (Edge, Edge)>`. The constructor asserts that `e_map` covers every link edge, has image within the edge set, and is involutive.
 - `InvLink::from_symmetric_pd_code(pd_code)` — for a *strongly invertible* knot given by a diagram based on its axis. τ reverses the traversal, so walking both ways from the base point pairs each edge with its image; no search and no relabelling is needed. The base point defaults to the least edge, which the symmetric convention puts on the axis.
 - `InvLink::si_knot_from(inner)` — for a strongly invertible knot whose diagram is already based on its axis; `from_symmetric_pd_code` is this applied to `Link::from_pd_code`.
-- `InvLink::load(name)` — reads `<DATA_DIR>/inv_link/<name>.json`. Lamm's tables ship in `lib-link/resources/inv_link/lamm/` and are flattened into the data dir by `scripts/fetch-knot-data.py`.
+- `InvLink::load(name)` — reads `<DATA_DIR>/inv_link/<name>.json`. Lamm's tables of symmetric diagrams ship as zips in the workspace's `resources/inv_link/`, and `ykh setup` extracts them into the data dir.
 
 `with_base_pt(e)` sets the base point; it asserts that `e` is on-axis (`inv_edge(e) == e`). `inv_edge(e)` and `inv_node(x)` look up the involution. `reversed()` reverses the orientation, leaving τ untouched — it maps edges, so a strong inversion stays one. Most read-only `Link` methods are delegated, including `base_pt()`.
 
@@ -119,14 +114,14 @@ An `InvLink` is only an *involutive* link. `on_axis_edges()` lists the τ-fixed 
 
 ## Data directory
 
-The `*::load(name)` constructors read JSON files from a user-data directory — `$YUI_DATA_DIR` if set, otherwise the platform default (`~/Library/Application Support/yui/` on macOS, `${XDG_DATA_HOME:-~/.local/share}/yui/` on Linux, `%APPDATA%\yui\` on Windows). To populate it from the [KnotInfo](https://knotinfo.org/) database:
+The `*::load(name)` constructors read JSON files from a user-data directory — `$YUI_DATA_DIR` if set, otherwise the platform default (`~/Library/Application Support/yui/` on macOS, `${XDG_DATA_HOME:-~/.local/share}/yui/` on Linux, `%APPDATA%\yui\` on Windows). To populate it, use the [`ykh`](https://crates.io/crates/ykh) CLI:
 
 ```bash
-python3 scripts/fetch-knot-data.py            # default data dir
-python3 scripts/fetch-knot-data.py --out DIR  # or a custom directory
+ykh setup            # default data dir
+ykh setup --out DIR  # or a custom directory
 ```
 
-The script writes per-knot PD codes to `<DATA_DIR>/links/`, braid words to `<DATA_DIR>/braid/`, and flattens this crate's bundled Lamm tables (`resources/inv_link/lamm/**`) into `<DATA_DIR>/inv_link/`. Pass `--clean` to drop entries that were removed from the repo.
+It writes per-knot PD codes to `<DATA_DIR>/links/` and braid words to `<DATA_DIR>/braid/`, both from [KnotInfo](https://knotinfo.org/), and extracts Lamm's symmetric diagrams into `<DATA_DIR>/inv_link/`. Pass `--clean` to drop diagrams that were removed from the bundle.
 
 ## Quick example
 

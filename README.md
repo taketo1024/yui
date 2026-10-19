@@ -28,12 +28,14 @@
 
 Inside that dir, data is partitioned by kind, e.g. `<data_dir>/links/3_1.json`, `<data_dir>/braid/3_1.json`.
 
-To populate it from the [KnotInfo](https://knotinfo.org/) database:
+To populate it, run:
 
 ```bash
-python3 scripts/fetch-knot-data.py            # writes to the default data dir
-python3 scripts/fetch-knot-data.py --out DIR  # or to a custom directory
+ykh setup            # writes to the default data dir
+ykh setup --out DIR  # or to a custom directory
 ```
+
+This downloads the PD codes and braid words from [KnotInfo](https://knotinfo.org/), and the symmetric diagrams bundled in [`resources/inv_link/`](./resources/inv_link/).
 
 ### Data sources
 

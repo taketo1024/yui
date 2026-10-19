@@ -15,6 +15,19 @@ A CLI tool for Khovanov homology computations.
 $ cargo install ykh
 ```
 
+* Download the knot data from [KnotInfo](https://knotinfo.org/) and the bundled symmetric diagrams by
+
+```sh
+$ ykh setup
+```
+
+`<LINK>` given by name is looked up in the data directory: `$YUI_DATA_DIR` if set, otherwise
+the platform user-data dir (`~/Library/Application Support/yui/` on macOS,
+`${XDG_DATA_HOME:-~/.local/share}/yui/` on Linux, `%APPDATA%\yui\` on Windows).
+`ykh setup` keeps existing files unless `--force` is given. `--out DIR` writes to another
+directory, and `--in FILE` reads a local copy of the KnotInfo database (`.xls` or
+`.xls.zip`) instead of downloading it.
+
 ## Usage
 
 Computes the Khovanov homology / complex for the given link. 

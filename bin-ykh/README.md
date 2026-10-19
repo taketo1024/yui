@@ -15,6 +15,12 @@ A CLI tool for Khovanov homology computations.
 $ cargo install ykh
 ```
 
+To handle link diagrams with more than 64 crossings (up to 128), install with
+
+```sh
+$ cargo install ykh -F big-link
+```
+
 * Download the knot data from [KnotInfo](https://knotinfo.org/) and the bundled symmetric diagrams by
 
 ```sh

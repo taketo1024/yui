@@ -4,7 +4,7 @@
 use log::info;
 use clap::{Parser, Subcommand};
 
-use super::cmd::{ckh, ckhi, kh, khi, cc, sl2, ss, ssi};
+use super::cmd::{ckh, ckhi, kh, khi, cc, sl2, ss, ssi, setup};
 use super::args::*;
 use super::utils::*;
 
@@ -27,10 +27,12 @@ pub enum Cmd {
     SL2(sl2::Args),
     Ss(ss::Args),
     Ssi(ssi::Args),
+    /// Download the knot data from KnotInfo and the bundled symmetric diagrams
+    Setup(setup::Args),
 }
 
 impl CliArgs {
-    fn log_args(&self) -> &dyn LogArg {
+    fn log_arg(&self) -> &dyn LogArg {
         match &self.command {
             Cmd::CKh(args)  => args,
             Cmd::Kh(args)   => args,
@@ -40,11 +42,12 @@ impl CliArgs {
             Cmd::SL2(args)  => args,
             Cmd::Ss(args)   => args,
             Cmd::Ssi(args)  => args,
+            Cmd::Setup(args) => args,
         }
     }
 
     fn log_level(&self) -> log::LevelFilter {
-        self.log_args().log_level()
+        self.log_arg().log_level()
     }
 }
 
@@ -89,6 +92,7 @@ impl App {
                 Cmd::SL2(args)  => sl2::dispatch(args),
                 Cmd::Ss(args)   => ss::dispatch(args),
                 Cmd::Ssi(args)  => ssi::dispatch(args),
+                Cmd::Setup(args) => setup::dispatch(args),
             }
         )
     }
